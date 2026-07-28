@@ -1,0 +1,50 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: family-app
+  datasource:
+    url: jdbc:mysql://localhost:3306/family_app?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# JWT 配置
+jwt:
+  secret: family-app-secret-key-please-change-in-production-2026-very-long
+  # 访问令牌有效期（秒）- 2小时
+  access-token-expire: 7200
+  # 刷新令牌有效期（秒）- 7天
+  refresh-token-expire: 604800
+
+# 文件上传存储（本地兜底，生产建议使用 OSS/MinIO）
+file:
+  upload-dir: ./uploads
+  url-prefix: /files
+
+logging:
+  level:
+    com.family: debug
