@@ -5,11 +5,12 @@ server:
 
 spring:
   application:
-    name: family-app
+    name: ihomy
   datasource:
-    url: jdbc:mysql://localhost:3306/family_app?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: root
+    url: jdbc:mysql://localhost:3306/ihomy?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    # 使用专用应用账号 ihomy（最小权限，仅 DML），不要用 root 跑业务
+    username: ihomy
+    password: bW_fF65a
     driver-class-name: com.mysql.cj.jdbc.Driver
   data:
     redis:
@@ -34,7 +35,7 @@ mybatis-plus:
 
 # JWT 配置
 jwt:
-  secret: family-app-secret-key-please-change-in-production-2026-very-long
+  secret: ihomy-secret-key-please-change-in-production-2026-very-long
   # 访问令牌有效期（秒）- 2小时
   access-token-expire: 7200
   # 刷新令牌有效期（秒）- 7天
@@ -47,4 +48,4 @@ file:
 
 logging:
   level:
-    com.family: debug
+    com.ihomy: debug

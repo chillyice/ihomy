@@ -1,4 +1,4 @@
-# 家庭共用软件
+# ihomy
 
 面向家庭内部成员的内容共享平台，支持电脑浏览器、安卓、iOS 三端访问。核心功能：用户登录、博客、日志，首页模块化可扩展。
 
@@ -10,12 +10,16 @@
 .
 ├── docs/
 │   └── 需求规格说明书.docx        # 完整需求文档
+├── start.bat                      # Windows 一键启动（双击即可）
+├── scripts/
+│   ├── start-all.ps1              # Windows 一键启动前后端
+│   └── start-db.ps1               # Docker 一键拉起 MySQL/Redis
 ├── backend/                       # Spring Boot 后端
 │   ├── pom.xml
 │   ├── mvnw / mvnw.cmd            # Maven Wrapper（无需单独装 Maven）
 │   └── src/main/
-│       ├── java/com/family/
-│       │   ├── FamilyApplication.java
+│       ├── java/com/ihomy/
+│       │   ├── IhomyApplication.java
 │       │   ├── common/            # 统一响应、异常处理
 │       │   ├── config/            # Security/CORS/MyBatisPlus/Knife4j
 │       │   ├── security/          # JWT 工具、过滤器、登录上下文
@@ -48,34 +52,140 @@
 | Node.js | 18+ |
 | MySQL | 8.0+ |
 | Redis | 6+ |
+| （可选）Docker Desktop | 用于一键拉起 MySQL/Redis |
 
-## 后端启动
+## Windows 一键启动（推荐）
 
-1. 建库建表（含初始管理员账号）：
-   ```bash
-   mysql -uroot -p < backend/src/main/resources/schema.sql
-   ```
-2. 修改 `backend/src/main/resources/application.yml` 中的数据库与 Redis 连接信息。
-3. 启动：
-   ```powershell
-   cd backend
-   .\mvnw.cmd spring-boot:run
-   ```
-   后端默认端口 `8080`，接口前缀 `/api`。
-4. 接口文档（Knife4j）：浏览器打开 `http://localhost:8080/api/doc.html`
+项目自带 Windows 启动脚本，自动检查环境、启动前后端并打开浏览器。
+
+### 方式一：双击启动（最简单）
+
+双击项目根目录的 **`start.bat`**，脚本会：
+1. 检查 JDK / Node / npm 环境
+2. 新开窗口启动后端（`mvnw spring-boot:run`，端口 8080）
+3. 新开窗口启动前端（`npm run dev`，端口 5173）
+4. 自动打开浏览器 `http://localhost:5173`
+
+### 方式二：PowerShell 命令
+
+```powershell
+# 在项目根目录执行
+.\start.bat
+
+# 仅启动后端
+.\start.bat -BackendOnly
+
+# 仅启动前端
+.\start.bat -FrontendOnly
+
+# 不自动打开浏览器
+.\start.bat -NoBrowser
+
+# 生产模式（先 build 再启动 jar / vite preview）
+.\start.bat -Build
+```
+
+脚本实际调用 `scripts\start-all.ps1`，可单独查看：
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\start-all.ps1
+```
+
+### 用 Docker 一键拉起数据库（可选）
+
+如果不想本地安装 MySQL/Redis，可用 Docker：
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\start-db.ps1
+```
+该脚本会启动 `ihomy-mysql`（3306，容器 root 密码 root，自动导入 `schema.sql`，脚本内会自动创建应用账号 `ihomy`）与 `ihomy-redis`（6379）两个容器。
+停止：`docker stop ihomy-mysql ihomy-redis`；删除：`docker rm -f ihomy-mysql ihomy-redis`。
+
+### Windows 环境变量提示
+
+- 若提示 `JAVA_HOME 未设置`，脚本会自动从 `java` 路径推断并临时设置；为稳定起见建议手动配置：
+  ```powershell
+  [Environment]::SetEnvironmentVariable('JAVA_HOME', 'C:\Program Files\Java\jdk-21', 'User')
+  ```
+  设置后**重开** PowerShell 窗口生效。
+- 若 `npm`/`node` 命令找不到，请安装 Node.js 18+（https://nodejs.org），安装时勾选 "Add to PATH"。
+- 若 `mvnw.cmd` 首次运行联网下载 Maven 较慢，可配置国内镜像（见下方"加速建议"）。
+
+## 通用启动步骤（跨平台）
+
+### 1. 准备数据库与 Redis
+
+Windows 下任选其一：
+
+**A. Docker（推荐，省心）**
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\start-db.ps1
+```
+
+**B. 本地已安装 MySQL/Redis**
+
+建库建表（含初始管理员账号、应用专用账号 ihomy），在项目根目录用 root 执行一次：
+```powershell
+Get-Content backend\src\main\resources\schema.sql -Raw | mysql -uroot -p
+```
+> 该脚本需 root 权限执行（用于建库、创建 ihomy 账号并授权）。业务运行时应用使用 `ihomy` 账号连接，不用 root。
+或导入：用 Navicat / DBeaver 打开 `backend/src/main/resources/schema.sql` 执行。
+
+确保 Redis 服务已启动（Windows 可用 `redis-server.exe` 或 Memurai）。
+
+### 2. 配置后端连接信息
+
+修改 `backend/src/main/resources/application.yml`：
+```yaml
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/ihomy?...
+    username: ihomy                # 使用专用应用账号，不要用 root
+    password: Ihomy@2026           # 改成你在 schema.sql 中设置的密码
+  data:
+    redis:
+      host: localhost
+      port: 6379
+```
+
+### 3. 启动后端
+
+```powershell
+cd backend
+.\mvnw.cmd spring-boot:run
+```
+后端默认端口 `8080`，接口前缀 `/api`。接口文档（Knife4j）：浏览器打开 `http://localhost:8080/api/doc.html`
 
 默认管理员账号：`admin` / `admin123`（BCrypt，登录后请尽快修改密码）。
 
-## 前端启动
+### 4. 启动前端
 
-```bash
+```powershell
 cd frontend
-npm install
+npm install      # 首次需要
 npm run dev
 ```
 默认端口 `5173`，已配置代理把 `/api` 转发到后端 `8080`。浏览器打开 `http://localhost:5173`。
 
 生产构建：`npm run build`，产物在 `frontend/dist`，用 Nginx 托管即可（生产需配置 HTTPS，iOS 的 PWA 强制要求 HTTPS）。
+
+## 加速建议（国内网络）
+
+**Maven 加速**：在 `C:\Users\<你>\.m2\settings.xml` 添加阿里云镜像：
+```xml
+<settings>
+  <mirrors>
+    <mirror>
+      <id>aliyun</id>
+      <mirrorOf>central</mirrorOf>
+      <url>https://maven.aliyun.com/repository/public</url>
+    </mirror>
+  </mirrors>
+</settings>
+```
+
+**npm 加速**：
+```powershell
+npm config set registry https://registry.npmmirror.com
+```
 
 ## 多端访问（PWA）
 

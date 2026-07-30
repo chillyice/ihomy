@@ -1,4 +1,4 @@
-# 家庭共用软件 — Windows 部署指导
+# ihomy — Windows 部署指导
 
 > 适用项目：`ihomy`（Vue3 + Spring Boot 3 + MySQL + Redis）
 > 部署形态：Windows Server 2019/2022 或 Windows 10/11 作为服务器
@@ -36,7 +36,7 @@
    echo $env:JAVA_HOME
    ```
 
-### 2.2 安装 Node.js 20
+### 2.2 安装 Node.js 24
 
 1. 下载 LTS：https://nodejs.org/zh-cn/download
 2. 安装时勾选 "Add to PATH"。
@@ -52,6 +52,7 @@
 
 ### 2.3 安装 MySQL 8.0
 
+**方式 A：安装到磁盘**
 1. 下载 MySQL Installer：https://dev.mysql.com/downloads/installer/
 2. 安装时选择 **Server only**，认证方式选 **Use Legacy Authentication Method**（兼容性更好）或推荐 **Strong Password Encryption**。
 3. 设置 root 密码并牢记。字符集选 **utf8mb4**。
@@ -59,6 +60,15 @@
 5. 验证：
    ```powershell
    mysql -uroot -p
+   ```
+**方式 B：使用docker安装**
+1. 拉取镜像
+   ```powershell
+   docker pull mysql:8.0.44
+   ```
+2. 创建容器
+   ```powershell
+   docker run -d --name ihomy_mysql --restart always -p 3306:3306 -v C:\Users\chill\OneDrive\WorkStation\config\MySQL\conf:/etc/mysql/conf.d -v D:\WorkSpace\MySQL\data:/var/lib/mysql -v D:\WorkSpace\MySQL\logs:/var/log/mysql -e MYSQL_ROOT_PASSWORD=bW_fF65a -e TZ=Asia/Shanghai mysql:8.0.44 
    ```
 
 ### 2.4 安装 Redis
@@ -72,7 +82,7 @@ Windows 官方不提供 Redis，任选一种方式：
 
 **方式 B：Docker 运行 Redis（需 Docker Desktop）**
 ```powershell
-docker run -d --name family-redis -p 6379:6379 --restart unless-stopped redis:7-alpine
+docker run -d --name ihomy_redis --restart unless-stopped -p 6879:6879 -v C:\Users\chill\OneDrive\WorkStation\config\Redis\redis.conf:/etc/redis/redis.conf -v D:\WorkSpace\Redis\data:/data redis:latest redis-server /etc/redis/redis.conf
 ```
 
 **方式 C：社区维护的 Windows Redis**
@@ -116,9 +126,10 @@ git clone <仓库地址> C:\app\ihomy
 ```yaml
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/family_app?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: 你的MySQL密码        # ← 修改
+    url: jdbc:mysql://localhost:3306/ihomy?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    # 使用专用应用账号 ihomy（schema.sql 已自动创建，仅 DML 权限），不要用 root 跑业务
+    username: ihomy
+    password: Ihomy@2026          # ← 改成你在 schema.sql 中设置的密码
   data:
     redis:
       host: localhost
@@ -130,14 +141,14 @@ file:
   url-prefix: /files
 ```
 
-> 建议生产环境用独立应用账号连接 MySQL，不要用 root。
+> 应用使用专用账号 `ihomy` 连接数据库（仅 SELECT/INSERT/UPDATE/DELETE 权限，最小权限原则），不要用 root 跑业务。root 仅用于执行 schema.sql 初始化。
 
 ### 3.3 建库建表
 
 ```powershell
 Get-Content C:\app\ihomy\backend\src\main\resources\schema.sql -Raw | mysql -uroot -p
 ```
-该脚本会创建 `family_app` 库、5 张表、默认首页模块、管理员账号 `admin/admin123`。
+该脚本由 root 执行一次，会创建 `ihomy` 库、6 张表（含系统操作日志表）、应用专用账号 `ihomy`（仅 DML 权限）、默认首页模块、管理员账号 `admin/admin123`。
 
 ### 3.4 构建后端
 
@@ -145,7 +156,7 @@ Get-Content C:\app\ihomy\backend\src\main\resources\schema.sql -Raw | mysql -uro
 cd C:\app\ihomy\backend
 .\mvnw.cmd -B clean package -DskipTests
 ```
-产物：`C:\app\ihomy\backend\target\family-app-backend.jar`
+产物：`C:\app\ihomy\backend\target\ihomy-backend.jar`
 
 > （可选）Maven 加速：在 `C:\Users\<你>\.m2\settings.xml` 配阿里云镜像（见项目 README）。
 
@@ -162,7 +173,7 @@ npm run build
 
 ```powershell
 # 终端1：后端
-java -jar C:\app\ihomy\backend\target\family-app-backend.jar
+java -jar C:\app\ihomy\backend\target\ihomy-backend.jar
 
 # 终端2：验证
 curl http://localhost:8080/api/auth/me   # 返回 401 即正常（未带 token）
@@ -273,29 +284,29 @@ PWA 在 iOS 上**不信任自签证书**，建议用域名 + Let's Encrypt。若
 ### 6.1 后端注册为 Windows 服务（NSSM）
 
 ```powershell
-nssm install FamilyAppBackend "C:\Program Files\Java\jdk-21\bin\java.exe"
-nssm set FamilyAppBackend AppParameters "-jar C:\app\ihomy\backend\target\family-app-backend.jar"
-nssm set FamilyAppBackend AppDirectory "C:\app\ihomy\backend"
-nssm set FamilyAppBackend AppStdout "C:\app\ihomy\backend\logs\out.log"
-nssm set FamilyAppBackend AppStderr "C:\app\ihomy\backend\logs\err.log"
-nssm set FamilyAppBackend Start SERVICE_AUTO_START
-nssm start FamilyAppBackend
+nssm install IhomyBackend "C:\Program Files\Java\jdk-21\bin\java.exe"
+nssm set IhomyBackend AppParameters "-jar C:\app\ihomy\backend\target\ihomy-backend.jar"
+nssm set IhomyBackend AppDirectory "C:\app\ihomy\backend"
+nssm set IhomyBackend AppStdout "C:\app\ihomy\backend\logs\out.log"
+nssm set IhomyBackend AppStderr "C:\app\ihomy\backend\logs\err.log"
+nssm set IhomyBackend Start SERVICE_AUTO_START
+nssm start IhomyBackend
 ```
 
 管理命令：
 ```powershell
-nssm stop FamilyAppBackend      # 停止
-nssm restart FamilyAppBackend   # 重启
-nssm remove FamilyAppBackend    # 卸载服务
+nssm stop IhomyBackend      # 停止
+nssm restart IhomyBackend   # 重启
+nssm remove IhomyBackend    # 卸载服务
 ```
 
 ### 6.2 Nginx 开机自启
 
 NSSM 同样可注册：
 ```powershell
-nssm install FamilyNginx "C:\nginx\nginx.exe"
-nssm set FamilyNginx AppDirectory "C:\nginx"
-nssm start FamilyNginx
+nssm install IhomyNginx "C:\nginx\nginx.exe"
+nssm set IhomyNginx AppDirectory "C:\nginx"
+nssm start IhomyNginx
 ```
 
 ### 6.3 MySQL / Redis
@@ -315,7 +326,7 @@ nssm start FamilyNginx
 cd C:\app\ihomy\backend
 git pull
 .\mvnw.cmd -B clean package -DskipTests
-nssm restart FamilyAppBackend
+nssm restart IhomyBackend
 
 # 前端
 cd C:\app\ihomy\frontend
@@ -331,11 +342,11 @@ npm run build
 
 | 检查项 | 命令/方式 | 预期 |
 |--------|-----------|------|
-| 后端服务运行 | `nssm status FamilyAppBackend` | SERVICE_RUNNING |
+| 后端服务运行 | `nssm status IhomyBackend` | SERVICE_RUNNING |
 | 后端接口 | 浏览器 `http://localhost:8080/api/auth/me` | 返回 401 JSON |
 | 前端访问 | 浏览器 `https://你的域名` | 登录页 |
 | 登录 | admin / admin123 | 进入首页 |
-| 数据库 | `mysql -uroot -p family_app -e "show tables;"` | 5 张表 |
+| 数据库 | `mysql -uihomy -p ihomy -e "show tables;"` | 6 张表 |
 | Redis | `memurai-cli ping` | PONG |
 | PWA 安装 | Chrome 地址栏右侧安装图标 | 可安装到桌面 |
 

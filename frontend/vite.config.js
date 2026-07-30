@@ -20,7 +20,7 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: '家庭共用软件',
+        name: 'ihomy',
         short_name: '家庭',
         description: '家庭成员共用内容平台',
         theme_color: '#1F3A5F',
