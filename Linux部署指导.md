@@ -164,7 +164,7 @@ sudo -u deploy git clone <仓库地址> /opt/ihomy
 ```yaml
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/ihomy?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:6306/ihomy?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     # 使用专用应用账号 ihomy（schema.sql 已自动创建，仅 DML 权限），不要用 root 跑业务
     username: ihomy
     password: Ihomy@2026          # ← 改成你在 schema.sql 中设置的密码
@@ -361,7 +361,7 @@ sudo firewall-cmd --permanent --add-service=https
 sudo firewall-cmd --reload
 ```
 
-> MySQL(3306)、Redis(6379) **不要**开放公网，仅本机访问。
+> MySQL(6306)、Redis(6379) **不要**开放公网，仅本机访问。
 
 ---
 
@@ -477,7 +477,7 @@ services:
       - ./backend/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/schema.sql
       - mysql-data:/var/lib/mysql
     ports:
-      - "3306:3306"
+      - "6306:6306"
     restart: unless-stopped
 
   redis:

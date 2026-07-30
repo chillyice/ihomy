@@ -68,7 +68,7 @@
    ```
 2. 创建容器
    ```powershell
-   docker run -d --name ihomy_mysql --restart always -p 3306:3306 -v C:\Users\chill\OneDrive\WorkStation\config\MySQL\conf:/etc/mysql/conf.d -v D:\WorkSpace\MySQL\data:/var/lib/mysql -v D:\WorkSpace\MySQL\logs:/var/log/mysql -e MYSQL_ROOT_PASSWORD=bW_fF65a -e TZ=Asia/Shanghai mysql:8.0.44 
+   docker run -d --name ihomy_mysql --restart always -p 6306:6306 -v C:\Users\chill\OneDrive\WorkStation\config\MySQL\conf:/etc/mysql/conf.d -v D:\WorkSpace\MySQL\data:/var/lib/mysql -v D:\WorkSpace\MySQL\logs:/var/log/mysql -e MYSQL_ROOT_PASSWORD=bW_fF65a -e TZ=Asia/Shanghai mysql:8.0.44 
    ```
 
 ### 2.4 安装 Redis
@@ -126,7 +126,7 @@ git clone <仓库地址> C:\app\ihomy
 ```yaml
 spring:
   datasource:
-    url: jdbc:mysql://localhost:3306/ihomy?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:6306/ihomy?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     # 使用专用应用账号 ihomy（schema.sql 已自动创建，仅 DML 权限），不要用 root 跑业务
     username: ihomy
     password: Ihomy@2026          # ← 改成你在 schema.sql 中设置的密码
@@ -358,7 +358,7 @@ npm run build
 配阿里云 Maven 镜像（见项目 README "加速建议"），或手动装 Maven 后直接用 `mvn`。
 
 **Q2：后端启动报数据库连接失败？**
-检查 `application.yml` 的 `password`、MySQL 服务是否运行、`localhost:3306` 是否被占用。
+检查 `application.yml` 的 `password`、MySQL 服务是否运行、`localhost:6306` 是否被占用。
 
 **Q3：前端访问白屏 / 刷新 404？**
 nginx 缺少 `try_files $uri $uri/ /index.html;` 单页回退配置。

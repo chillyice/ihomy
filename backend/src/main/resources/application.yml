@@ -7,10 +7,10 @@ spring:
   application:
     name: ihomy
   datasource:
-    url: jdbc:mysql://localhost:3306/ihomy?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:6306/ihomy?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     # 使用专用应用账号 ihomy（最小权限，仅 DML），不要用 root 跑业务
     username: ihomy
-    password: bW_fF65a
+    password: Ihomy@2026
     driver-class-name: com.mysql.cj.jdbc.Driver
   data:
     redis:
