@@ -11,12 +11,12 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.family</groupId>
-    <artifactId>family-app-backend</artifactId>
+    <groupId>com.ihomy</groupId>
+    <artifactId>ihomy-backend</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
-    <name>family-app-backend</name>
-    <description>家庭共用软件后端</description>
+    <name>ihomy-backend</name>
+    <description>ihomy后端</description>
 
     <properties>
         <java.version>17</java.version>
@@ -99,7 +99,7 @@
     </dependencies>
 
     <build>
-        <finalName>family-app-backend</finalName>
+        <finalName>ihomy-backend</finalName>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

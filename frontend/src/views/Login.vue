@@ -1,7 +1,7 @@
 <template>
   <div class="login-page">
     <div class="login-card">
-      <div class="login-title">家庭共用软件</div>
+      <div class="login-title">ihomy</div>
       <div class="login-sub">{{ isRegister ? '注册并创建家庭' : '欢迎回家，请登录' }}</div>
 
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
