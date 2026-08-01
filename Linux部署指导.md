@@ -12,14 +12,18 @@
 |---|------|----------|------|----------|
 | 1 | OpenJDK | 17 或 21（推荐 21 LTS） | 运行后端 | ✅ 必须 |
 | 2 | Node.js | 18+（推荐 20 LTS） | 构建前端 | ✅ 必须（仅构建时） |
-| 3 | MySQL | 8.0+ | 主数据库 | ✅ 必须 |
-| 4 | Redis | 6+ | 缓存 / JWT 令牌 | ✅ 必须 |
-| 5 | Nginx | 1.18+ | 托管前端 + 反向代理 + HTTPS | ✅ 生产推荐 |
-| 6 | Certbot | 最新 | 申请/续期 Let's Encrypt 证书 | 🔒 HTTPS 时需要 |
-| 7 | systemd | 系统自带 | 服务管理与开机自启 | ✅ 自带 |
-| 8 | ufw / firewalld | 系统自带 | 防火墙 | ✅ 自带 |
+| 3 | MySQL | 8.0+ | 主数据库 | ✅ 必须（本机部署） |
+| 4 | Redis | 6+ | 缓存 / JWT 令牌 | ✅ 必须（Docker 部署） |
+| 5 | Docker Engine | 24+ | 运行 Redis 容器 | ✅ 必须（仅 Redis 用） |
+| 6 | Nginx | 1.18+ | 托管前端 + 反向代理 + HTTPS | ✅ 生产推荐 |
+| 7 | Certbot | 最新 | 申请/续期 Let's Encrypt 证书 | 🔒 HTTPS 时需要 |
+| 8 | systemd | 系统自带 | 服务管理与开机自启 | ✅ 自带 |
+| 9 | ufw / firewalld | 系统自带 | 防火墙 | ✅ 自带 |
 
 > 说明：Maven **无需单独安装**，项目自带 `mvnw`；Git 按需安装。
+
+> **部署策略（2GB 内存求稳方案）**：**MySQL 本机部署 + Redis 用 Docker**。
+> 理由：MySQL 调优后约 180MB，本机部署无需 Docker daemon 常驻开销（50-100MB），配置直接生效、排障直接；Redis 仅 50MB 且轻量，Docker 化管理省心、升级方便。详见第十一节"资源优化"。
 
 ---
 
@@ -75,7 +79,9 @@ node -v && npm -v
 npm config set registry https://registry.npmmirror.com
 ```
 
-### 2.4 安装 MySQL 8.0
+### 2.4 安装 MySQL 8.0（本机部署）
+
+> 求稳方案：MySQL 本机部署，不走 Docker。调优配置直接放 `/etc/mysql/conf.d/`，无需挂载。
 
 **Ubuntu：**
 ```bash
@@ -94,25 +100,61 @@ sudo mysql_secure_installation
 sudo mysql -uroot -p
 ```
 
-### 2.5 安装 Redis
-
-**Ubuntu：**
+**应用内存调优配置（2GB 内存必做）：**
 ```bash
-sudo apt install -y redis-server
-sudo systemctl enable --now redis-server
+# 将项目提供的 my.cnf 放入配置目录（端口 6306 + 内存调优）
+sudo cp /opt/ihomy/config/mysql/my.cnf /etc/mysql/conf.d/ihomy.cnf
+sudo systemctl restart mysql     # CentOS: mysqld
 ```
-**CentOS/RHEL：**
+> `my.cnf` 关键项：`port=6306`、`performance_schema=OFF`（省 80-100MB）、`max_connections=30`、`innodb_buffer_pool_size=128M`。详见第十一节。
+
+### 2.5 安装 Redis（Docker 部署）
+
+> 求稳方案：Redis 用 Docker 运行，轻量且便于升级。需先装 Docker Engine（见 2.6）。
+
+拉取并启动 Redis 容器：
 ```bash
-sudo dnf install -y redis
-sudo systemctl enable --now redis
+docker run -d --name ihomy-redis \
+  -p 6379:6379 \
+  --restart unless-stopped \
+  redis:7-alpine
 ```
 验证：
 ```bash
-redis-cli ping
+docker exec ihomy-redis redis-cli ping
 # PONG
 ```
+管理：
+```bash
+docker stop ihomy-redis      # 停止
+docker start ihomy-redis     # 启动
+docker restart ihomy-redis   # 重启
+docker logs ihomy-redis      # 查看日志
+docker pull redis:7-alpine && docker restart ihomy-redis   # 升级
+```
 
-### 2.6 安装 Nginx
+> 若不想装 Docker，Redis 也可本机安装：`sudo apt install -y redis-server`。
+
+### 2.6 安装 Docker Engine（用于运行 Redis 容器）
+
+> 求稳方案仅需 Docker 跑 Redis，MySQL/Nginx/后端均为本机服务。
+
+**Ubuntu：**
+```bash
+# 官方一键脚本（最简单）
+curl -fsSL https://get.docker.com | sudo bash
+sudo systemctl enable --now docker
+sudo usermod -aG docker ihomy     # 让 ihomy 用户免 sudo 使用 docker（需重新登录生效）
+```
+**CentOS/RHEL：** 同上，官方脚本通用。
+
+验证：
+```bash
+docker --version
+docker ps
+```
+
+### 2.7 安装 Nginx
 
 **Ubuntu：**
 ```bash
@@ -125,7 +167,7 @@ sudo dnf install -y nginx
 sudo systemctl enable --now nginx
 ```
 
-### 2.7 安装 Certbot（申请 HTTPS 证书）
+### 2.8 安装 Certbot（申请 HTTPS 证书）
 
 **Ubuntu：**
 ```bash
@@ -140,26 +182,44 @@ sudo dnf install -y certbot python3-certbot-nginx
 
 ## 三、项目部署
 
-假设部署用户为 `deploy`，项目位于 `/opt/ihomy`。
+### 权限分层模型（每应用一用户，最小权限）
 
-### 3.1 创建部署用户与目录
+| 应用 | 运行用户 | 来源 | 说明 |
+|------|----------|------|------|
+| 后端 Spring Boot | `ihomy` | 手动创建 | 应用服务账号，拥有 `/opt/ihomy` 代码、构建与运行 jar |
+| MySQL | `mysql` | apt/dnf 安装自动创建 | 系统服务，无需手动建号 |
+| Redis | 容器内 `redis` | Docker 镜像内置 | 主机无 redis 用户，容器隔离 |
+| Nginx | `www-data`(Ubuntu) / `nginx`(CentOS) | apt/dnf 安装自动创建 | 系统服务 |
+
+> **原则**：除下列关键步骤外，均不使用 root。
+> **必须 root 的关键步骤**：安装软件包、创建用户、systemd 服务管理、写 `/etc/` 下配置、防火墙、certbot、执行 schema.sql（数据库 root）。
+> **应用操作（代码/构建/配置 application.yml）**：由 `ihomy` 用户执行，不用 root。
+
+### 3.1 创建应用用户与目录（root 操作一次）
 
 ```bash
-sudo useradd -m -s /bin/bash deploy
-sudo mkdir -p /opt/ihomy
-sudo chown deploy:deploy /opt/ihomy
+# 创建应用服务账号 ihomy
+sudo useradd -m -s /bin/bash ihomy
+# 创建项目目录并归属 ihomy
+sudo mkdir -p /opt/ihomy /var/log/ihomy
+sudo chown -R ihomy:ihomy /opt/ihomy /var/log/ihomy
+# 将 ihomy 加入 docker 组，使其免 sudo 运行 Redis 容器（需重新登录生效）
+sudo usermod -aG docker ihomy
 ```
 
-### 3.2 获取代码
+### 3.2 获取代码（ihomy 用户）
 
 ```bash
-sudo -u deploy git clone <仓库地址> /opt/ihomy
-# 或上传代码包解压到 /opt/ihomy
+# 切换到应用用户
+sudo su - ihomy
+# 以下均以 ihomy 身份执行，无需 sudo
+git clone <仓库地址> /opt/ihomy
+# 或上传代码包解压到 /opt/ihomy 后 chown 给 ihomy
 ```
 
-### 3.3 配置后端
+### 3.3 配置后端（ihomy 用户，编辑项目内文件无需 root）
 
-编辑 `/opt/ihomy/backend/src/main/resources/application.yml`：
+以 `ihomy` 身份编辑 `/opt/ihomy/backend/src/main/resources/application.yml`：
 
 ```yaml
 spring:
@@ -181,47 +241,50 @@ file:
 
 > 应用使用专用账号 `ihomy` 连接数据库（仅 SELECT/INSERT/UPDATE/DELETE 权限，最小权限原则），不要用 root 跑业务。该账号由 schema.sql 自动创建并授权，无需手动建号。
 
-### 3.4 建库建表
+### 3.4 建库建表（root 操作，仅此一次）
 
 ```bash
+# 退出 ihomy 用户回到有 sudo 权限的账号
+exit
+# 用数据库 root 执行 schema.sql（建库、建表、创建应用账号 ihomy 并授权）
 mysql -uroot -p < /opt/ihomy/backend/src/main/resources/schema.sql
 ```
-该脚本由 root 执行一次，会创建 `ihomy` 库、6 张表（含系统操作日志表）、应用专用账号 `ihomy`（仅 DML 权限）、默认首页模块、管理员 `admin/admin123`。
+该脚本由数据库 root 执行一次，会创建 `ihomy` 库、6 张表（含系统操作日志表）、应用专用账号 `ihomy`（仅 DML 权限）、默认首页模块、管理员 `admin/admin123`。
 
-### 3.5 构建后端
+### 3.5 构建后端（ihomy 用户）
 
 ```bash
-sudo -u deploy bash -c '
+sudo su - ihomy
 cd /opt/ihomy/backend
 chmod +x mvnw
 ./mvnw -B clean package -DskipTests
-'
 ```
 产物：`/opt/ihomy/backend/target/ihomy-backend.jar`
 
 > Maven 加速（可选）：编辑 `~/.m2/settings.xml` 配阿里云镜像（见项目 README）。
 
-### 3.6 构建前端
+### 3.6 构建前端（ihomy 用户）
 
 ```bash
-sudo -u deploy bash -c '
 cd /opt/ihomy/frontend
 npm install
 npm run build
-'
 ```
 产物：`/opt/ihomy/frontend/dist`
 
-### 3.7 创建上传目录并授权
+### 3.7 上传目录授权（root 操作一次）
 
 ```bash
-sudo mkdir -p /opt/ihomy/uploads /var/log/ihomy
-sudo chown -R deploy:deploy /opt/ihomy/uploads /var/log/ihomy
+exit   # 回到有 sudo 权限的账号
+sudo mkdir -p /opt/ihomy/uploads
+sudo chown -R ihomy:ihomy /opt/ihomy/uploads /var/log/ihomy
 ```
 
 ---
 
-## 四、systemd 服务（后端开机自启）
+## 四、systemd 服务（后端开机自启，root 操作）
+
+> 服务文件位于 `/etc/`，需 root 创建。后端进程以 `ihomy` 应用用户身份运行（`User=ihomy`），不暴露 root。
 
 创建服务文件：
 
@@ -233,9 +296,9 @@ After=network.target mysql.service redis-server.service
 
 [Service]
 Type=simple
-User=deploy
+User=ihomy
 WorkingDirectory=/opt/ihomy/backend
-ExecStart=/usr/bin/java -Xms256m -Xmx512m -jar /opt/ihomy/backend/target/ihomy-backend.jar
+ExecStart=/usr/bin/java -Xms256m -Xmx384m -XX:MetaspaceSize=128m -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC -Xss512k -jar /opt/ihomy/backend/target/ihomy-backend.jar
 SuccessExitStatus=143
 Restart=on-failure
 RestartSec=10
@@ -248,6 +311,7 @@ EOF
 ```
 
 > CentOS 下 `After=` 的服务名是 `mysqld.service`、`redis.service`，按实际调整。
+> Redis 用 Docker 运行时，`After=` 可去掉 `redis-server.service`，改为 `docker.service`：`After=network.target mysql.service docker.service`。
 
 启用并启动：
 ```bash
@@ -367,26 +431,22 @@ sudo firewall-cmd --reload
 
 ## 八、更新部署流程
 
-代码更新后，重新构建并重启服务：
+代码更新后，以 `ihomy` 用户构建（非 root），再以 root 重启系统服务：
 
 ```bash
-sudo -u deploy bash -c '
-cd /opt/ihomy
-git pull
+# 1) 构建（ihomy 用户操作）
+sudo su - ihomy
+cd /opt/ihomy && git pull
+cd /opt/ihomy/backend && ./mvnw -B clean package -DskipTests
+cd /opt/ihomy/frontend && npm install && npm run build
+exit
 
-# 后端
-cd /opt/ihomy/backend
-./mvnw -B clean package -DskipTests
-
-# 前端
-cd /opt/ihomy/frontend
-npm install
-npm run build
-'
-
+# 2) 重启服务（root 操作）
 sudo systemctl restart ihomy-backend
 sudo systemctl reload nginx
 ```
+
+> 构建属于应用操作，用 `ihomy` 用户；重启 systemd 服务属于系统操作，用 root。权限分明。
 
 ---
 
@@ -410,12 +470,10 @@ sudo systemctl reload nginx
 ## 十、常见问题
 
 **Q1：`./mvnw` 没有执行权限？**
-```bash
-chmod +x /opt/ihomy/backend/mvnw
-```
+以 `ihomy` 用户执行：`chmod +x /opt/ihomy/backend/mvnw`。
 
 **Q2：后端启动失败，日志 `Permission denied`？**
-检查 `/opt/ihomy/uploads`、`/var/log/ihomy` 的属主是否为 `deploy`。
+检查 `/opt/ihomy/uploads`、`/var/log/ihomy` 的属主是否为 `ihomy:ihomy`（见 3.7）。systemd 服务 `User=ihomy`，目录必须归 ihomy 所有。
 
 **Q3：MySQL 报 `Access denied for user 'root'@'localhost'`？**
 Ubuntu 的 MySQL root 默认用 `auth_socket` 插件，需 `sudo mysql` 登录执行 schema.sql。应用本身用 `ihomy` 账号连接（不用 root），若 `ihomy` 账号连不上，确认已用 root 执行过 schema.sql（其中会创建并授权 `ihomy` 账号）。
@@ -436,28 +494,149 @@ sudo ss -tlnp | grep -E '8080|80|443'
 改 `application.yml` 的 `server.port` 或停掉冲突服务。
 
 **Q8：磁盘/内存不足？**
-后端 JVM 至少 256M 内存；可用 `-Xmx512m` 控制。可用 `free -h`、`df -h` 查看。
+后端 JVM 已通过 systemd 配置限制为 `-Xmx384m`（见第四节）。MySQL 已通过 `my.cnf` 调优（见第十一节）。可用 `free -h`、`df -h` 查看。若仍紧张，参考第十一节"资源优化"。
+
+---
+
+## 十一、资源优化（2GB 内存方案）
+
+> 目标：在 2GB 内存的服务器上稳定运行全套服务（后端 + MySQL + Redis + Nginx）。
+> 适用：家庭规模（2-20 人，低并发）。
+> 部署策略：**MySQL 本机部署 + Redis 用 Docker**（求稳方案）。
+> 原理：JVM 调优 + MySQL 调优 + 组件就近原则，合计内存占用约 900MB，留 1GB 余量。
+
+### 11.1 优化前后内存对比
+
+| 组件 | 默认配置 | 优化后 | 节省 |
+|------|----------|--------|------|
+| Spring Boot | 512MB+ | ~300MB | 200MB+ |
+| MySQL 8（本机） | 400MB+ | ~180MB | 220MB+ |
+| Redis（Docker） | 50MB | 50MB | - |
+| Docker daemon | 50-100MB | 50-100MB | 为 Redis 常驻 |
+| Nginx | 20MB | 20MB | - |
+| 系统 | 300MB | 300MB | - |
+| **合计** | **~1.3GB+** | **~900MB** | **~400MB** |
+
+> 说明：求稳方案仅 Redis 用 Docker，故 Docker daemon（50-100MB）仍需常驻。若连 Docker 也不装、Redis 本机 apt 安装，可再省 50-100MB，但失去容器化升级便利。权衡后推荐 Redis Docker。
+
+### 11.2 JVM 调优(后端 Spring Boot)
+
+systemd 服务文件已配置以下 JVM 参数(见第四节):
+
+```
+java -Xms256m -Xmx384m -XX:MetaspaceSize=128m -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC -Xss512k -jar ihomy-backend.jar
+```
+
+| 参数 | 作用 |
+|------|------|
+| `-Xms256m -Xmx384m` | 堆内存 256-384MB(默认可能到 1GB) |
+| `-XX:MetaspaceSize=128m -XX:MaxMetaspaceSize=192m` | 元空间上限(默认无界) |
+| `-XX:+UseSerialGC` | 单线程 GC,小堆表现好,省内存 |
+| `-Xss512k` | 线程栈减半(默认 1MB) |
+
+修改后重启生效:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart ihomy-backend
+```
+
+验证内存占用:
+```bash
+ps -o pid,rss,cmd -p $(pgrep -f ihomy-backend.jar)
+# RSS 列为实际内存(KB),约 300000-350000 即 300-350MB
+```
+
+### 11.3 MySQL 调优
+
+调优配置文件 `my.cnf` 关键项:
+
+```ini
+[mysqld]
+# 连接数(默认 151,家庭场景降到 30)
+max_connections = 30
+thread_cache_size = 4
+
+# InnoDB 缓冲(家庭数据小,128M 够用)
+innodb_buffer_pool_size = 128M
+innodb_log_buffer_size = 8M
+innodb_log_file_size = 64M
+
+# 表缓存(默认 4000,降到 200)
+table_open_cache = 200
+table_definition_cache = 200
+
+# 会话级 buffer(每连接分配,调小)
+sort_buffer_size = 128K
+read_buffer_size = 128K
+join_buffer_size = 128K
+read_rnd_buffer_size = 128K
+
+# 临时表
+tmp_table_size = 16M
+max_heap_table_size = 16M
+
+# 关键!关闭性能监控,省 80-100MB
+performance_schema = OFF
+```
+
+**部署方式（本机部署，求稳方案）：**
+
+```bash
+# 将项目提供的 my.cnf 放入配置目录
+sudo cp /opt/ihomy/config/mysql/my.cnf /etc/mysql/conf.d/ihomy.cnf
+sudo systemctl restart mysql     # CentOS: mysqld
+```
+> 完整 `my.cnf` 已随项目提供（`config/mysql/my.cnf`，含端口 6306 与全部调优项）。2.4 节安装时已执行过此步骤，此处为更新配置后重启。
+
+验证内存占用：
+```bash
+ps -o pid,rss,cmd -p $(pgrep -f mysqld)
+# RSS 约 150000-200000 即 150-200MB
+```
+
+### 11.4 Redis / Nginx 无需调优
+
+- Redis（Docker 运行）默认极轻量（~50MB），家庭数据量小无需改。
+- Nginx 托管静态文件，默认 ~20MB，无需改。
+- Docker daemon 为运行 Redis 常驻（50-100MB），属求稳方案的必要开销；若极致省内存可改 Redis 本机 apt 安装并卸载 Docker。
+
+### 11.5 优化效果验证
+
+```bash
+# 查看整体内存
+free -h
+#               total   used   free   available
+# Mem:          1.9G    900M   1.0G   1.0G
+
+# 查看各进程内存
+ps -eo pid,rss,cmd --sort=-rss | grep -E 'java|mysql|redis|nginx|dockerd' | head
+```
+
+预期：总 used 约 850-950MB，available 留 1GB 左右。
 
 ---
 
 ## 附：目录规划
 
 ```
-/opt/ihomy/                    # 项目代码（属主 deploy）
+/opt/ihomy/                    # 项目代码（属主 ihomy:ihomy）
 ├── backend/
 │   ├── target/ihomy-backend.jar
 │   └── src/main/resources/application.yml
-├── frontend/dist/             # 前端构建产物（nginx root）
-└── uploads/                   # 上传文件
-/var/log/ihomy/                # 服务日志
-/etc/nginx/conf.d/ihomy.conf   # nginx 站点配置
-/etc/systemd/system/ihomy-backend.service
-/etc/letsencrypt/live/域名/    # HTTPS 证书
+├── frontend/dist/             # 前端构建产物（nginx 读取）
+├── uploads/                   # 上传文件（属主 ihomy）
+└── config/mysql/my.cnf        # MySQL 调优配置（部署时 cp 到 /etc）
+/var/log/ihomy/                # 服务日志（属主 ihomy）
+/etc/nginx/conf.d/ihomy.conf   # nginx 站点配置（root 管理）
+/etc/systemd/system/ihomy-backend.service   # root 管理，User=ihomy
+/etc/letsencrypt/live/域名/    # HTTPS 证书（root 管理）
 ```
 
 ---
 
-## 附：可选 — Docker Compose 一键部署
+## 附：可选 — Docker Compose 全容器化部署（≥4GB 内存推荐）
+
+> ⚠️ **2GB 内存不建议用此方案**：全容器化会多一份 Docker daemon 开销 + 多个容器 runtime，内存余量偏紧。2GB 内存请用正文求稳方案（MySQL 本机 + Redis Docker）。本方案适合 4GB 及以上内存的服务器，或开发/测试环境快速拉起。
 
 若不想逐个安装软件，可用 Docker Compose（需安装 Docker Engine + Docker Compose 插件）：
 

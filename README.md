@@ -96,7 +96,7 @@ powershell -ExecutionPolicy Bypass -File scripts\start-all.ps1
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\start-db.ps1
 ```
-该脚本会启动 `ihomy-mysql`（6306，容器 root 密码 root，自动导入 `schema.sql`，脚本内会自动创建应用账号 `ihomy`）与 `ihomy-redis`（6379）两个容器。
+该脚本会启动 `ihomy-mysql`（6306，容器 root 密码 root，自动导入 `schema.sql`，挂载 `my.cnf` 内存调优，脚本内会自动创建应用账号 `ihomy`）与 `ihomy-redis`（6379）两个容器。
 停止：`docker stop ihomy-mysql ihomy-redis`；删除：`docker rm -f ihomy-mysql ihomy-redis`。
 
 ### Windows 环境变量提示
