@@ -2,7 +2,7 @@
   <div class="page">
     <div class="list-header">
       <h2>家庭博客</h2>
-      <el-button type="primary" @click="$router.push('/blog/edit')">写博客</el-button>
+      <el-button v-if="userStore.isLoggedIn" type="primary" @click="$router.push('/blog/edit')">写博客</el-button>
     </div>
     <div v-loading="loading">
       <div v-for="b in list" :key="b.id" class="blog-item card" @click="$router.push(`/blog/${b.id}`)">
@@ -12,7 +12,7 @@
           <div class="blog-meta">{{ b.viewCount }} 次浏览 · {{ formatDate(b.createdAt) }}</div>
         </div>
       </div>
-      <el-empty v-if="!loading && !list.length" description="还没有博客，去写第一篇吧" />
+      <el-empty v-if="!loading && !list.length" :description="userStore.isGuest ? '暂无公开博客' : '还没有博客，去写第一篇吧'" />
     </div>
   </div>
 </template>
@@ -20,7 +20,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { blogApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 
+const userStore = useUserStore()
 const list = ref([])
 const loading = ref(false)
 

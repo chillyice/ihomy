@@ -14,8 +14,9 @@ public class SysUser {
     private String password;
     private String nickname;
     private String avatar;
-    private String role;
+    private String email;
     private Long familyId;
+    private Integer status;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
     @TableField(fill = FieldFill.INSERT_UPDATE)

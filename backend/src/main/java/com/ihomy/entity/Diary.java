@@ -6,13 +6,14 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("diary")
+@TableName("content_diary")
 public class Diary {
     @TableId(type = IdType.AUTO)
     private Long id;
     private String content;
     private String mood;
     private String weather;
+    private String images;
     private Long authorId;
     private Long familyId;
     private Integer visibility;

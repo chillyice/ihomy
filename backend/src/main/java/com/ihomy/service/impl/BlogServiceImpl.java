@@ -22,8 +22,14 @@ public class BlogServiceImpl implements BlogService {
     @Override
     public IPage<Blog> page(int current, int size, Long familyId, String keyword) {
         LambdaQueryWrapper<Blog> qw = new LambdaQueryWrapper<>();
-        qw.eq(familyId != null, Blog::getFamilyId, familyId)
-          .eq(Blog::getStatus, 1)
+        if (familyId != null) {
+            qw.eq(Blog::getFamilyId, familyId)
+              .and(w -> w.eq(Blog::getVisibility, 4)
+                         .or().in(Blog::getVisibility, 3, 4));
+        } else {
+            qw.eq(Blog::getVisibility, 4);
+        }
+        qw.eq(Blog::getStatus, 1)
           .like(StringUtils.hasText(keyword), Blog::getTitle, keyword)
           .orderByDesc(Blog::getCreatedAt);
         return blogMapper.selectPage(new Page<>(current, size), qw);

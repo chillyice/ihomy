@@ -1,5 +1,9 @@
 import request from '@/api/request'
 
+export const publicApi = {
+  getHome: () => request.get('/public/home'),
+}
+
 export const homeApi = {
   getModules: () => request.get('/home/modules'),
   getAllModules: () => request.get('/home/modules/all'),

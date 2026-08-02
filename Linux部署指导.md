@@ -108,17 +108,71 @@ sudo systemctl restart mysql     # CentOS: mysqld
 ```
 > `my.cnf` 关键项：`port=6306`、`performance_schema=OFF`（省 80-100MB）、`max_connections=30`、`innodb_buffer_pool_size=128M`。详见第十一节。
 
-### 2.5 安装 Redis（Docker 部署）
+### 2.5 安装 Docker Engine（用于运行 Redis 容器）
 
-> 求稳方案：Redis 用 Docker 运行，轻量且便于升级。需先装 Docker Engine（见 2.6）。
+> 求稳方案仅需 Docker 跑 Redis，MySQL/Nginx/后端均为本机服务。Docker 安排在 Redis 之前，便于后续拉取 Redis 镜像。
+> 以下使用阿里云镜像源安装 Docker CE 29.7.0（避免官方源在国内访问慢/找不到版本）。
 
-拉取并启动 Redis 容器：
+**Ubuntu：**
+```bash
+# 更新包管理工具
+sudo apt-get update
+sudo apt-get -y install apt-transport-https ca-certificates curl software-properties-common
+
+# 添加 Docker 软件包源（使用 keyrings 方式管理 GPG 密钥，走阿里云镜像）
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL http://mirrors.cloud.aliyuncs.com/docker-ce/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+ARCH=$(dpkg --print-architecture)
+DISTRO=$(. /etc/os-release && echo "$VERSION_CODENAME")
+sudo tee /etc/apt/sources.list.d/docker.list > /dev/null <<EOF
+deb [arch=${ARCH} signed-by=/etc/apt/keyrings/docker.gpg] http://mirrors.cloud.aliyuncs.com/docker-ce/linux/ubuntu ${DISTRO} stable
+EOF
+sudo apt-get update
+
+# 查询 docker 部署版本（阿里云源安装时找不到正确版本，用此方式确认 29.7.0 存在）
+apt-cache show package docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin | grep 29.7.0
+
+# 安装 Docker 社区版本、容器运行时 containerd.io，以及 Docker 构建和 Compose 插件（固定 29.7.0）
+sudo apt-get -y install docker-ce-rootless-extras=5:29.7.0-1~ubuntu.26.04~resolute
+sudo apt-get -y install docker-ce=5:29.7.0-1~ubuntu.26.04~resolute docker-ce-cli=5:29.7.0-1~ubuntu.26.04~resolute containerd.io docker-buildx-plugin docker-compose-plugin
+
+# 启动并设置开机自启
+sudo systemctl enable --now docker
+# 让 ihomy 用户免 sudo 使用 docker（需重新登录生效；ihomy 用户在 3.1 节创建，若尚未创建可稍后再执行）
+sudo usermod -aG docker ihomy
+```
+
+> **关于版本号**：`5:29.7.0-1~ubuntu.26.04~resolute` 是 Ubuntu 26.04 (Resolute) 的版本字符串。若你的 Ubuntu 版本不同（如 22.04 Jammy / 24.04 Noble），需替换对应代号，或先执行上面的 `apt-cache show` 查出的版本字符串。
+> **CentOS/RHEL**：阿里云也提供 Docker 的 yum 源，参考 `https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo`，命令类似。
+
+验证：
+```bash
+docker --version
+# Docker version 29.7.0
+docker ps
+# 空列表（无运行容器）
+```
+
+### 2.6 安装 Redis（Docker 部署）
+
+> 求稳方案：Redis 用 Docker 运行，轻量且便于升级。Docker 已在 2.5 节安装。
+
+**拉取 Redis 镜像：**
+```bash
+docker pull redis
+```
+
+**启动 Redis 容器：**
 ```bash
 docker run -d --name ihomy-redis \
   -p 6379:6379 \
   --restart unless-stopped \
-  redis:7-alpine
+  redis
 ```
+> 默认拉取 `redis:latest`。如需固定版本，用 `docker pull redis:7-alpine` 并在 `docker run` 时用 `redis:7-alpine`。
+
 验证：
 ```bash
 docker exec ihomy-redis redis-cli ping
@@ -130,29 +184,10 @@ docker stop ihomy-redis      # 停止
 docker start ihomy-redis     # 启动
 docker restart ihomy-redis   # 重启
 docker logs ihomy-redis      # 查看日志
-docker pull redis:7-alpine && docker restart ihomy-redis   # 升级
+docker pull redis && docker rm -f ihomy-redis && docker run -d --name ihomy-redis -p 6379:6379 --restart unless-stopped redis   # 升级
 ```
 
-> 若不想装 Docker，Redis 也可本机安装：`sudo apt install -y redis-server`。
-
-### 2.6 安装 Docker Engine（用于运行 Redis 容器）
-
-> 求稳方案仅需 Docker 跑 Redis，MySQL/Nginx/后端均为本机服务。
-
-**Ubuntu：**
-```bash
-# 官方一键脚本（最简单）
-curl -fsSL https://get.docker.com | sudo bash
-sudo systemctl enable --now docker
-sudo usermod -aG docker ihomy     # 让 ihomy 用户免 sudo 使用 docker（需重新登录生效）
-```
-**CentOS/RHEL：** 同上，官方脚本通用。
-
-验证：
-```bash
-docker --version
-docker ps
-```
+> 若不想装 Docker，Redis 也可本机安装：`sudo apt install -y redis-server`。但求稳方案推荐 Docker 化 Redis。
 
 ### 2.7 安装 Nginx
 
@@ -209,13 +244,33 @@ sudo usermod -aG docker ihomy
 
 ### 3.2 获取代码（ihomy 用户）
 
+> **关于 /opt 权限**：`/opt` 默认属 root，但 3.1 节已 `mkdir -p /opt/ihomy` 并 `chown -R ihomy:ihomy /opt/ihomy`，所以 ihomy 用户对 `/opt/ihomy` 有完全读写权限，克隆无障碍。**注意路径是 `/opt/ihomy` 而非 `/opt`**，不要在 `/opt` 根目录直接 clone。
+
 ```bash
 # 切换到应用用户
 sudo su - ihomy
-# 以下均以 ihomy 身份执行，无需 sudo
-git clone <仓库地址> /opt/ihomy
-# 或上传代码包解压到 /opt/ihomy 后 chown 给 ihomy
+
+# 1) 生成 SSH key（用于 git@github.com 克隆，免输密码）
+ssh-keygen -t ed25519 -C "chillyice@live.com"
+# 一路回车即可（默认路径 ~/.ssh/id_ed25519，可设 passphrase 也可空）
+
+# 2) 查看公钥，复制输出内容
+cat ~/.ssh/id_ed25519.pub
+
+# 3) 把公钥添加到 GitHub
+#    浏览器登录 GitHub → Settings → SSH and GPG keys → New SSH key
+#    Title 自定义，Key 粘贴上一步输出，保存
+
+# 4) 测试 SSH 连接 GitHub（首次会提示是否信任，输入 yes）
+ssh -T git@github.com
+# 期望：Hi <你的用户名>! You've successfully authenticated...
+
+# 5) 克隆代码（用 SSH 地址，不是 https）
+git clone git@github.com:<你的用户名>/ihomy.git /opt/ihomy
 ```
+
+> **若用 HTTPS 克隆**：无需 SSH key，但推送时可能要输 token。命令：`git clone https://github.com/<你的用户名>/ihomy.git /opt/ihomy`。
+> **若代码包上传**：上传解压到 `/opt/ihomy` 后，root 执行 `sudo chown -R ihomy:ihomy /opt/ihomy` 修正属主。
 
 ### 3.3 配置后端（ihomy 用户，编辑项目内文件无需 root）
 
@@ -406,11 +461,50 @@ sudo certbot renew --dry-run
 
 ---
 
-## 七、防火墙配置
+## 七、防火墙与 SSH 配置
+
+### 7.1 SSH 登录端口改为 19068（禁止 22 端口）
+
+> 安全加固：将 SSH 端口从默认 22 改为 19068，避免自动扫描爆破。**防火墙先放行 19068，再改 sshd 配置，最后关闭 22**，顺序不能错，否则会把自己锁在外面。
+
+**第一步：防火墙先放行 19068**
 
 **Ubuntu (ufw)：**
 ```bash
-sudo ufw allow 22/tcp
+sudo ufw allow 19068/tcp
+```
+**CentOS/RHEL (firewalld)：**
+```bash
+sudo firewall-cmd --permanent --add-port=19068/tcp
+sudo firewall-cmd --reload
+```
+
+**第二步：修改 sshd 配置**
+
+```bash
+sudo vim /etc/ssh/sshd_config
+# 找到 #Port 22 这行，改为：
+#   Port 19068
+# 保存退出
+sudo systemctl restart ssh     # CentOS: sshd
+```
+
+**第三步：验证新端口可登录后，再关闭 22**
+
+```bash
+# 新开一个终端，用 19068 登录测试
+ssh -p 19068 ihomy@服务器IP
+# 能登录成功后，回到原终端关闭 22
+sudo ufw deny 22/tcp           # CentOS: firewall-cmd --permanent --remove-service=ssh && firewall-cmd --reload
+```
+
+> **务必先验证 19068 能登录，再关 22**，否则会失去远程访问能力。
+> 后续 SSH/SCP 命令都需加 `-p 19068`：`ssh -p 19068 ihomy@IP`、`scp -P 19068 文件 ihomy@IP:路径`。
+
+### 7.2 开放 Web 端口
+
+**Ubuntu (ufw)：**
+```bash
 sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 sudo ufw enable
@@ -419,13 +513,13 @@ sudo ufw status
 
 **CentOS/RHEL (firewalld)：**
 ```bash
-sudo firewall-cmd --permanent --add-service=ssh
 sudo firewall-cmd --permanent --add-service=http
 sudo firewall-cmd --permanent --add-service=https
 sudo firewall-cmd --reload
 ```
 
 > MySQL(6306)、Redis(6379) **不要**开放公网，仅本机访问。
+> SSH 端口 19068 必须放行，22 禁止。
 
 ---
 
@@ -631,6 +725,103 @@ ps -eo pid,rss,cmd --sort=-rss | grep -E 'java|mysql|redis|nginx|dockerd' | head
 /etc/systemd/system/ihomy-backend.service   # root 管理，User=ihomy
 /etc/letsencrypt/live/域名/    # HTTPS 证书（root 管理）
 ```
+
+---
+
+## 附：未来扩展 — 对接 NAS 存储
+
+> 适用场景:有了 NAS(群晖/威联通/TrueNAS 等)后,希望把用户上传的文件存到 NAS 上,既节省服务器磁盘,又利用 NAS 的 RAID 冗余保护数据。
+> **强烈推荐 NFS 挂载方案**:代码零改动,文件存储位置对应用透明。
+> 前提条件:NAS 与服务器在同一内网,NFS 延迟低。
+
+### 1. 在 NAS 上开启 NFS 共享
+
+不同 NAS 品牌操作不同,核心是创建一个共享目录并允许服务器 IP 访问:
+
+- **群晖 DSM**:控制面板 → 文件服务 → NFS → 启用;控制面板 → 共享文件夹 → 新建(如 `ihomy_files`)→ NFS 权限 → 添加服务器 IP,权限 `read/write`。
+- **威联通 QTS**:控制台 → 网络与文件服务 → Win/Mac/NFS → 启用 NFS 服务;共享文件夹 → 编辑权限 → NFS 主机访问 → 添加服务器 IP。
+- **TrueNAS**:Storage → Pools 创建数据集;Sharing → Unix (NFS) Shares → 添加,Authorized Hosts 填服务器 IP。
+
+记下 NAS 的 NFS 导出路径,如:`192.168.1.100:/volume1/ihomy_files`。
+
+### 2. 服务器安装 NFS 客户端(root 操作)
+
+```bash
+# Ubuntu
+sudo apt install -y nfs-common
+# CentOS/RHEL
+sudo dnf install -y nfs-utils
+```
+
+### 3. 挂载 NAS 共享到 uploads 目录(root 操作)
+
+```bash
+# 停止后端(避免占用 uploads 目录)
+sudo systemctl stop ihomy-backend
+
+# 备份现有文件(若有)
+sudo mv /opt/ihomy/uploads /opt/ihomy/uploads.bak
+
+# 创建空目录并挂载 NAS
+sudo mkdir -p /opt/ihomy/uploads
+sudo mount -t nfs 192.168.1.100:/volume1/ihomy_files /opt/ihomy/uploads
+
+# 验证挂载
+df -h /opt/ihomy/uploads
+# 应看到 NAS 的容量
+
+# 授权给应用用户
+sudo chown -R ihomy:ihomy /opt/ihomy/uploads
+
+# 迁回旧文件(若有)
+sudo cp -rp /opt/ihomy/uploads.bak/* /opt/ihomy/uploads/ 2>/dev/null
+sudo rm -rf /opt/ihomy/uploads.bak
+
+# 启动后端
+sudo systemctl start ihomy-backend
+```
+
+### 4. 开机自动挂载(root 操作)
+
+```bash
+echo "192.168.1.100:/volume1/ihomy_files /opt/ihomy/uploads nfs defaults,_netdev 0 0" | sudo tee -a /etc/fstab
+
+# 验证 fstab 配置正确(不会报错即 OK)
+sudo mount -a
+```
+
+> `_netdev` 选项表示等网络就绪后再挂载,避免开机时因网络未起导致挂载失败。
+
+### 5. 代码与配置改动
+
+**无!** FileService 代码对存储位置透明,只要 `/opt/ihomy/uploads` 是可读写目录,上传/访问照常工作。Nginx 的 `/files/` location 也无需改动(仍指向 `/opt/ihomy/uploads/`)。
+
+### 6. 验证
+
+```bash
+# 在服务器上传一个测试文件
+sudo -u ihomy touch /opt/ihomy/uploads/nfs-test.txt
+
+# 登录 NAS 文件管理器,应看到 ihomy_files 目录下出现 nfs-test.txt
+# 反向验证:在 NAS 上删掉该文件,服务器上 ls 应消失
+ls /opt/ihomy/uploads/nfs-test.txt
+```
+
+### 7. NAS 不可用时的风险与应对
+
+- **风险**:NAS 宕机或网络中断时,文件上传会失败(写入报 IO 错误),已上传文件的访问也会 404。
+- **应对**:NAS 的 NFS 服务要稳定;重要数据在 NAS 上做快照备份;服务器本地保留 `uploads.bak` 一段时间作为应急回退。
+
+### 8. 其他对接方式(不推荐,供了解)
+
+| 方式 | 说明 | 何时用 |
+|------|------|--------|
+| NFS 挂载(推荐) | 代码零改动,NAS 当本地目录 | NAS 在内网 |
+| NAS 的 S3 兼容 API | 改 FileService 用 AWS SDK 连 NAS | NAS 异地,或想统一对象存储接口 |
+| WebDAV | 改 FileService 用 WebDAV 客户端 | NAS 只暴露 WebDAV |
+| 阿里云 OSS | 改 FileService 用 OSS SDK | 要公网 CDN 加速,或无 NAS |
+
+> 若将来要走 S3 兼容方案(NAS/MinIO/OSS 通用),可在 `FileService` 增加一个 S3 实现,用 `@ConditionalOnProperty(name="file.storage", havingValue="s3")` 切换,本地实现保留为默认。届时再改造即可,当前无需动手。
 
 ---
 

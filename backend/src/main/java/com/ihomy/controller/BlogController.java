@@ -1,6 +1,7 @@
 package com.ihomy.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.ihomy.annotation.OperationLog;
 import com.ihomy.common.Result;
 import com.ihomy.dto.BlogDTO;
 import com.ihomy.entity.Blog;
@@ -28,7 +29,8 @@ public class BlogController {
                                     @RequestParam(defaultValue = "20") int size,
                                     @RequestParam(required = false) String keyword) {
         SysUser user = securityHelper.currentUser();
-        return Result.success(blogService.page(current, size, user.getFamilyId(), keyword));
+        Long familyId = user == null ? null : user.getFamilyId();
+        return Result.success(blogService.page(current, size, familyId, keyword));
     }
 
     @Operation(summary = "博客详情")
@@ -38,6 +40,7 @@ public class BlogController {
     }
 
     @Operation(summary = "新建博客")
+    @OperationLog(module = "BLOG", operationType = "CREATE", description = "发布博客")
     @PostMapping
     public Result<Blog> create(@Valid @RequestBody BlogDTO dto) {
         SysUser user = securityHelper.currentUser();
@@ -45,12 +48,14 @@ public class BlogController {
     }
 
     @Operation(summary = "更新博客")
+    @OperationLog(module = "BLOG", operationType = "UPDATE", description = "修改博客")
     @PutMapping("/{id}")
     public Result<Blog> update(@PathVariable Long id, @Valid @RequestBody BlogDTO dto) {
         return Result.success(blogService.update(id, securityHelper.currentUserId(), dto));
     }
 
     @Operation(summary = "删除博客")
+    @OperationLog(module = "BLOG", operationType = "DELETE", description = "删除博客")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         blogService.delete(id, securityHelper.currentUserId(), securityHelper.isOwner());

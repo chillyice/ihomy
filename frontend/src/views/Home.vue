@@ -1,125 +1,176 @@
 <template>
   <div class="home-page">
-    <!-- 软件封面：文字 + 图片 -->
+    <AppHeader :modules="modules" :family-name="family?.name" />
+
     <section class="cover">
-      <img v-if="cover.coverImage" :src="cover.coverImage" class="cover-img" alt="封面" />
+      <img v-if="family?.coverImage" :src="family.coverImage" class="cover-img" alt="封面" />
       <div class="cover-overlay">
-        <h1>{{ cover.coverText || '欢迎来到我们的家庭空间' }}</h1>
-        <p v-if="cover.coverSubtitle">{{ cover.coverSubtitle }}</p>
+        <h1>{{ family?.coverText || '欢迎来到我们的家庭空间' }}</h1>
+        <p v-if="family?.coverSubtitle">{{ family.coverSubtitle }}</p>
+      </div>
+      <div v-if="userStore.isGuest" class="guest-hint">
+        您正在以访客身份浏览公开内容
+        <el-button type="primary" size="small" @click="$router.push('/login')">登录查看更多</el-button>
       </div>
     </section>
 
-    <!-- 动态模块化首页：按 position 分区渲染 -->
-    <div class="page">
-      <div v-for="pos in positions" :key="pos" :class="['module-zone', 'zone-' + pos]">
-        <div class="module-grid">
-          <div
-            v-for="m in modulesByPosition(pos)"
-            :key="m.code"
-            class="module-card"
-            @click="goModule(m)"
-          >
-            <div class="module-icon">{{ iconFor(m.icon) }}</div>
-            <div class="module-title">{{ m.title }}</div>
-          </div>
+    <main class="main-content">
+      <AlbumCarousel :photos="photos" />
+
+      <div class="bottom-modules">
+        <div
+          v-for="m in bottomModules"
+          :key="m.code"
+          class="module-card"
+          @click="goModule(m)"
+        >
+          <div class="module-icon">{{ iconFor(m.icon) }}</div>
+          <div class="module-title">{{ m.title }}</div>
         </div>
       </div>
-    </div>
-
-    <!-- 用户栏 -->
-    <div class="page user-bar">
-      <span>{{ userStore.userInfo?.nickname }}</span>
-      <el-button v-if="userStore.isOwner" text @click="$router.push('/member')">成员管理</el-button>
-      <el-button text @click="onLogout">退出</el-button>
-    </div>
+    </main>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { homeApi } from '@/api'
+import { publicApi, homeApi } from '@/api'
+import AppHeader from '@/components/AppHeader.vue'
+import AlbumCarousel from '@/components/AlbumCarousel.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
 
-const positions = ['top', 'left', 'right', 'bottom']
 const modules = ref([])
-const cover = ref({})
+const photos = ref([])
+const family = ref({})
+
+const bottomModules = computed(() => modules.value.filter(m => m.position === 'right' || m.position === 'bottom'))
 
 const iconMap = {
   'icon-blog': '📝',
   'icon-diary': '📔',
+  'icon-album': '📷',
   'icon-member': '👥',
   'icon-cover': '🖼️',
+  'icon-study': '📚',
+  'icon-toolbox': '🧰',
 }
 const iconFor = (icon) => iconMap[icon] || '⭐'
 
-const modulesByPosition = (pos) => modules.value.filter((m) => m.position === pos)
-
 const goModule = (m) => router.push(m.path)
 
-const onLogout = () => {
-  userStore.logout()
-  router.push('/login')
+const loadPublicHome = async () => {
+  const data = await publicApi.getHome()
+  family.value = data.family || {}
+  modules.value = data.modules || []
+  photos.value = data.photos || []
 }
 
-onMounted(async () => {
+const loadUserHome = async () => {
   try {
-    modules.value = await homeApi.getModules()
+    const dash = await homeApi.getDashboard()
+    if (dash?.modules) modules.value = dash.modules
+    if (dash?.user) family.value = { name: 'ihomy' }
   } catch (e) {
-    // 忽略，模块加载失败不阻断
+    await loadPublicHome()
+    return
+  }
+  // 已登录用户也加载公开照片用于首页轮播
+  try {
+    const pub = await publicApi.getHome()
+    photos.value = pub.photos || []
+    if (pub.family) family.value = pub.family
+  } catch (e) {
+    // 忽略
+  }
+}
+
+onMounted(() => {
+  if (userStore.isLoggedIn) {
+    loadUserHome()
+  } else {
+    loadPublicHome()
   }
 })
 </script>
 
 <style scoped>
+.home-page { min-height: 100vh; background: var(--color-bg); }
+
 .cover {
   position: relative;
-  height: 220px;
+  height: 280px;
   background: linear-gradient(135deg, #1F3A5F, #2E74B5);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
 }
-.cover-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.6; }
-.cover-overlay { position: relative; text-align: center; color: #fff; padding: 0 16px; }
-.cover-overlay h1 { font-size: 28px; font-weight: 700; text-shadow: 0 2px 8px rgba(0,0,0,0.4); }
-.cover-overlay p { margin-top: 8px; opacity: 0.9; }
-
-.module-zone { margin-bottom: 12px; }
-.module-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+.cover-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.5; }
+.cover-overlay { position: relative; text-align: center; color: #fff; padding: 0 16px; z-index: 1; }
+.cover-overlay h1 {
+  font-size: 32px;
+  font-weight: 700;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  margin-bottom: 8px;
+}
+.cover-overlay p { font-size: 16px; opacity: 0.9; }
+.guest-hint {
+  position: absolute;
+  bottom: 16px;
+  right: 24px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
   gap: 12px;
+  z-index: 2;
+}
+
+.main-content {
+  max-width: 1280px;
+  margin: -40px auto 0;
+  padding: 0 24px 32px;
+  position: relative;
+  z-index: 2;
+}
+
+.bottom-modules {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 16px;
 }
 .module-card {
   background: var(--color-card);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 20px 12px;
+  padding: 24px 16px;
   text-align: center;
   cursor: pointer;
   transition: transform 0.15s, box-shadow 0.15s;
 }
-.module-card:hover { transform: translateY(-3px); box-shadow: 0 6px 18px rgba(31,58,95,0.15); }
-.module-icon { font-size: 30px; }
-.module-title { margin-top: 8px; font-size: 14px; color: var(--color-text); }
-
-.user-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  justify-content: flex-end;
-  color: var(--color-text-secondary);
-  font-size: 14px;
+.module-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(31, 58, 95, 0.15);
 }
+.module-icon { font-size: 36px; margin-bottom: 8px; }
+.module-title { font-size: 15px; color: var(--color-text); font-weight: 500; }
 
 @media (max-width: 768px) {
-  .cover { height: 170px; }
+  .cover { height: 200px; }
   .cover-overlay h1 { font-size: 22px; }
-  .module-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+  .cover-overlay p { font-size: 13px; }
+  .guest-hint { right: 12px; bottom: 12px; font-size: 12px; padding: 6px 12px; }
+  .main-content { padding: 0 12px 24px; margin-top: -24px; }
+  .bottom-modules { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+  .module-card { padding: 16px 8px; }
+  .module-icon { font-size: 28px; }
 }
 </style>

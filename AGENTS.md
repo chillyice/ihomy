@@ -46,9 +46,13 @@
 - **root 仅用于初始化**:`mysql -uroot -p < backend/src/main/resources/schema.sql`,执行一次(建库、建表、创建 ihomy 账号、初始数据)。
 - **业务运行用 `ihomy` 账号**:仅授予 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`(最小权限,无 CREATE/ALTER/DROP)。application.yml 连接用 `ihomy`,**不要用 root 跑业务**。
 - 账号同时创建 `localhost` 和 `%` 两个 host(本机/远程应用服务器都能连)。
-- **6 张表**:`family` / `sys_user` / `blog` / `diary` / `home_module` / `sys_operation_log`。
-- `sys_operation_log`(系统操作日志表):**当前只建表,未绑定 Java 层**。表结构后续会优化重构,设计思路未定。在确定方案前,不要主动给它加实体/Mapper/AOP 切面 —— 除非用户明确要求。
-- 默认管理员:`admin / admin123`(BCrypt),登录后应改密。
+- **19 张表(V2.1)**,按前缀分类:
+  - `sys_`(系统管理类,13 张):`sys_user` / `sys_role` / `sys_auth` / `sys_user_role` / `sys_role_auth` / `sys_family_info` / `sys_home_module` / `sys_invitation_code` / `sys_password_reset_token` / `sys_user_group` / `sys_user_group_member` / `sys_notification` / `sys_operation_log`
+  - `content_`(内容类,6 张):`content_blog` / `content_diary` / `content_album` / `content_photo` / `content_comment` / `content_visibility`
+- **表命名规则**:前缀区分类别;上下级关系体现在表名(如 `sys_user_role`);前缀取最顶层祖先类别。新增表必须遵守此规则。
+- **RBAC 权限模型**:用户-角色-权限三层(`sys_user` → `sys_user_role` → `sys_role` → `sys_role_auth` → `sys_auth`)。`sys_user` 无 `role` 字段,角色通过关联表查询。预设 4 角色:OWNER/MEMBER/CHILD/GUEST。同一用户在不同家庭可有不同角色(`sys_user_role.family_id` 区分)。
+- `sys_operation_log`(系统操作日志表):**已纳入功能设计**(V2.0),表结构已重构,Java 层设计为 AOP 切面 + `@OperationLog` 注解自动记录。记录范围:登录/登出、增删改内容、成员管理、配置变更。仅家长可查询。
+- 默认管理员:`admin / admin123`(BCrypt),登录后应改密。初始化时自动绑定 OWNER 角色。
 
 ## 代码结构
 
@@ -115,6 +119,13 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - `scripts/start-db.ps1` — Docker 拉起 MySQL+Redis(自动导入 schema.sql,自动建 ihomy 账号)
 - `config/mysql/my.cnf` — MySQL 调优配置(端口 6306 + 内存调优,2GB 内存方案)
 
+## 文件存储策略
+
+- **当前阶段(开发期)**:本地磁盘存储(`file.upload-dir=/opt/ihomy/uploads`),零成本零内存,FileService 已实现,开箱即用。Nginx `/files/` 托管静态目录。
+- **未来对接 NAS**:优先 NFS 挂载方案(把 NAS 共享目录挂到 `/opt/ihomy/uploads`,**代码零改动**)。前提是 NAS 与服务器同内网。详细步骤见 Linux 部署指导附录"对接 NAS 存储"。
+- **若 NAS 异地或要公网 CDN**:再改 FileService 用 S3 兼容 SDK(NAS/MinIO/OSS 通用),用 `@ConditionalOnProperty` 切换实现,本地实现保留为默认。
+- **不要主动改 FileService 的存储实现**,除非用户明确要求接 NAS/OSS。当前本地实现满足需求。
+
 ## 部署约定(Linux)
 
 - **求稳方案(2GB 内存)**:MySQL 本机部署 + Redis 用 Docker。MySQL 调优后 ~180MB,本机部署无需 Docker daemon 为它常驻;Redis 轻量,Docker 化便于升级。
@@ -123,11 +134,15 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **JVM 调优**:systemd ExecStart 用 `-Xmx384m -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC -Xss512k`。
 - **MySQL 调优**:`config/mysql/my.cnf` → `cp` 到 `/etc/mysql/conf.d/ihomy.cnf`,关键项 `performance_schema=OFF`(省 80-100MB)。
 - **端口**:MySQL 用 6306(非默认 3306),application.yml 与 my.cnf 一致。
+- **SSH 端口**:生产服务器 SSH 登录端口统一为 **19068**(禁止 22)。所有 ssh/scp 命令需加 `-p 19068`/`-P 19068`。防火墙放行 19068,关闭 22。
+- **Docker 安装源**:Ubuntu 用阿里云镜像源(`mirrors.cloud.aliyuncs.com/docker-ce`),固定版本 29.7.0(apt 源找不到正确版本,需 `apt-cache show ... | grep 29.7.0` 查询后指定)。Docker 安装顺序在 Redis 之前。
+- **Redis 镜像**:`docker pull redis`(默认 latest),与 Windows 开发机一致。
+- **Git 克隆**:用 SSH 地址(`git@github.com:...`),ihomy 用户先生成 ed25519 key 并加到 GitHub。
 
 ## 关键约束
 
 - **不要用 root 连业务库**;改 application.yml 时 username 保持 `ihomy`。
-- **不要主动给 `sys_operation_log` 加 Java 层**,除非用户明确要求(表结构待重构)。
+- **操作日志已纳入 V2.0 设计**(AOP + `@OperationLog` 注解),实现时按需求文档 4.9 节执行。
 - 改完代码,**两份目录都要同步**(尤其 schema.sql / application.yml / README / 部署文档)。
 - 新增功能走首页模块化:开发页面+路由 → 插 `home_module` 记录 → 首页自动出现入口,**不要改首页代码**。
 - iOS PWA 必须 HTTPS + 有效证书(自签不行)。

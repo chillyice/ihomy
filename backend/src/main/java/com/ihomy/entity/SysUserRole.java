@@ -8,17 +8,12 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("sys_home_module")
-public class HomeModule {
+@TableName("sys_user_role")
+public class SysUserRole {
     @TableId(type = IdType.AUTO)
     private Long id;
-    private String code;
-    private String title;
-    private String icon;
-    private String path;
-    private String position;
-    private Integer sortOrder;
-    private Integer enabled;
+    private Long userId;
+    private Long roleId;
     private Long familyId;
     private LocalDateTime createdAt;
 }

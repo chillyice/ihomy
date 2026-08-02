@@ -40,7 +40,7 @@ const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 
-const isRegister = ref(false)
+const isRegister = ref(route.query.register === '1' || false)
 const loading = ref(false)
 const formRef = ref()
 

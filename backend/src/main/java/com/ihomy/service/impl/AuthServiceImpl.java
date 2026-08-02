@@ -5,9 +5,13 @@ import com.ihomy.common.ResultCode;
 import com.ihomy.dto.LoginDTO;
 import com.ihomy.dto.RegisterDTO;
 import com.ihomy.entity.Family;
+import com.ihomy.entity.SysRole;
 import com.ihomy.entity.SysUser;
+import com.ihomy.entity.SysUserRole;
 import com.ihomy.mapper.FamilyMapper;
+import com.ihomy.mapper.SysRoleMapper;
 import com.ihomy.mapper.SysUserMapper;
+import com.ihomy.mapper.SysUserRoleMapper;
 import com.ihomy.security.JwtUtils;
 import com.ihomy.security.LoginUser;
 import com.ihomy.security.SecurityHelper;
@@ -30,6 +34,8 @@ import java.util.concurrent.TimeUnit;
 public class AuthServiceImpl implements AuthService {
 
     private final SysUserMapper sysUserMapper;
+    private final SysRoleMapper sysRoleMapper;
+    private final SysUserRoleMapper sysUserRoleMapper;
     private final FamilyMapper familyMapper;
     private final JwtUtils jwtUtils;
     private final PasswordEncoder passwordEncoder;
@@ -47,7 +53,14 @@ public class AuthServiceImpl implements AuthService {
         if (!passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
             throw new BizException(ResultCode.PASSWORD_ERROR);
         }
-        return buildTokens(user);
+        if (user.getStatus() != null && user.getStatus() == 1) {
+            throw new BizException(ResultCode.FORBIDDEN);
+        }
+        String roleCode = sysRoleMapper.selectRoleCodeByUserAndFamily(user.getId(), user.getFamilyId());
+        if (roleCode == null) {
+            roleCode = "GUEST";
+        }
+        return buildTokens(user, roleCode);
     }
 
     @Override
@@ -65,14 +78,25 @@ public class AuthServiceImpl implements AuthService {
         user.setUsername(dto.getUsername());
         user.setPassword(passwordEncoder.encode(dto.getPassword()));
         user.setNickname(dto.getNickname());
-        user.setRole("OWNER");
         user.setFamilyId(family.getId());
+        user.setStatus(0);
         sysUserMapper.insert(user);
 
         family.setOwnerId(user.getId());
         familyMapper.updateById(family);
 
-        return buildTokens(user);
+        SysRole ownerRole = sysRoleMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysRole>()
+                        .eq(SysRole::getRoleCode, "OWNER"));
+        if (ownerRole != null) {
+            SysUserRole ur = new SysUserRole();
+            ur.setUserId(user.getId());
+            ur.setRoleId(ownerRole.getId());
+            ur.setFamilyId(family.getId());
+            sysUserRoleMapper.insert(ur);
+        }
+
+        return buildTokens(user, "OWNER");
     }
 
     @Override
@@ -105,7 +129,11 @@ public class AuthServiceImpl implements AuthService {
         if (user == null) {
             throw new BizException(ResultCode.USER_NOT_FOUND);
         }
-        return buildTokens(user);
+        String roleCode = sysRoleMapper.selectRoleCodeByUserAndFamily(user.getId(), user.getFamilyId());
+        if (roleCode == null) {
+            roleCode = "GUEST";
+        }
+        return buildTokens(user, roleCode);
     }
 
     @Override
@@ -113,8 +141,8 @@ public class AuthServiceImpl implements AuthService {
         return securityHelper.current();
     }
 
-    private Map<String, Object> buildTokens(SysUser user) {
-        String access = jwtUtils.generateAccessToken(user.getId(), user.getUsername());
+    private Map<String, Object> buildTokens(SysUser user, String roleCode) {
+        String access = jwtUtils.generateAccessToken(user.getId(), user.getUsername(), roleCode);
         String refresh = jwtUtils.generateRefreshToken(user.getId(), user.getUsername());
         Map<String, Object> data = new HashMap<>();
         data.put("accessToken", access);
@@ -125,7 +153,7 @@ public class AuthServiceImpl implements AuthService {
         u.put("username", user.getUsername());
         u.put("nickname", user.getNickname());
         u.put("avatar", user.getAvatar());
-        u.put("role", user.getRole());
+        u.put("role", roleCode);
         u.put("familyId", user.getFamilyId());
         data.put("user", u);
         return data;

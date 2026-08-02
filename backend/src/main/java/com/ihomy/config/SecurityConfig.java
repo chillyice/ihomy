@@ -42,8 +42,10 @@ public class SecurityConfig {
             .cors(c -> {})
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/auth/**", "/files/**", "/doc.html", "/webjars/**",
-                        "/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                .requestMatchers("/auth/**", "/files/**", "/public/**",
+                        "/doc.html", "/webjars/**", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                        "/home/modules", "/blog/list", "/blog/*", "/diary/list").permitAll()
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e
                 .authenticationEntryPoint((req, resp, ex) -> {

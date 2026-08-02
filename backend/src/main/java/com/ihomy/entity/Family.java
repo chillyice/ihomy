@@ -6,7 +6,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("family")
+@TableName("sys_family_info")
 public class Family {
     @TableId(type = IdType.AUTO)
     private Long id;
@@ -15,6 +15,7 @@ public class Family {
     private String coverText;
     private String coverSubtitle;
     private Long ownerId;
+    private Integer isDefault;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
     @TableField(fill = FieldFill.INSERT_UPDATE)

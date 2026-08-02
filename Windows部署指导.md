@@ -82,7 +82,11 @@ Windows 官方不提供 Redis，任选一种方式：
 
 **方式 B：Docker 运行 Redis（需 Docker Desktop）**
 ```powershell
-docker run -d --name ihomy_redis --restart unless-stopped -p 6879:6879 -v C:\Users\chill\OneDrive\WorkStation\config\Redis\redis.conf:/etc/redis/redis.conf -v D:\WorkSpace\Redis\data:/data redis:latest redis-server /etc/redis/redis.conf
+# 拉取 Redis 镜像
+docker pull redis
+
+# 启动 Redis 容器（端口 6379，与 Linux 生产环境一致）
+docker run -d --name ihomy_redis --restart unless-stopped -p 6379:6379 -v C:\Users\chill\OneDrive\WorkStation\config\Redis\redis.conf:/etc/redis/redis.conf -v D:\WorkSpace\Redis\data:/data redis redis-server /etc/redis/redis.conf
 ```
 
 **方式 C：社区维护的 Windows Redis**
