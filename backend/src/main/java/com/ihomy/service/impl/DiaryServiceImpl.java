@@ -21,10 +21,16 @@ public class DiaryServiceImpl implements DiaryService {
     @Override
     public IPage<Diary> page(int current, int size, Long familyId, Long currentUserId, boolean isOwner) {
         LambdaQueryWrapper<Diary> qw = new LambdaQueryWrapper<>();
-        qw.eq(familyId != null, Diary::getFamilyId, familyId);
-        if (!isOwner) {
-            qw.and(w -> w.eq(Diary::getAuthorId, currentUserId)
-                        .or().eq(Diary::getVisibility, 1));
+        if (familyId != null) {
+            qw.eq(Diary::getFamilyId, familyId);
+            if (isOwner) {
+                // 家长可见全部
+            } else {
+                qw.and(w -> w.eq(Diary::getAuthorId, currentUserId)
+                            .or().in(Diary::getVisibility, 3, 4));
+            }
+        } else {
+            qw.eq(Diary::getVisibility, 4);
         }
         qw.orderByDesc(Diary::getCreatedAt);
         return diaryMapper.selectPage(new Page<>(current, size), qw);

@@ -1,5 +1,6 @@
 package com.ihomy.controller;
 
+import com.ihomy.annotation.OperationLog;
 import com.ihomy.common.Result;
 import com.ihomy.dto.LoginDTO;
 import com.ihomy.dto.RegisterDTO;
@@ -22,18 +23,21 @@ public class AuthController {
     private final AuthService authService;
 
     @Operation(summary = "登录")
+    @OperationLog(module = "AUTH", operationType = "LOGIN", description = "用户登录", saveArgs = false)
     @PostMapping("/login")
     public Result<Map<String, Object>> login(@Valid @RequestBody LoginDTO dto) {
         return Result.success(authService.login(dto));
     }
 
     @Operation(summary = "注册（创建家庭）")
+    @OperationLog(module = "AUTH", operationType = "CREATE", description = "注册新家庭", saveArgs = false)
     @PostMapping("/register")
     public Result<Map<String, Object>> register(@Valid @RequestBody RegisterDTO dto) {
         return Result.success(authService.register(dto));
     }
 
     @Operation(summary = "登出")
+    @OperationLog(module = "AUTH", operationType = "LOGOUT", description = "用户登出")
     @PostMapping("/logout")
     public Result<Void> logout(HttpServletRequest request) {
         authService.logout(request.getHeader("Authorization"));

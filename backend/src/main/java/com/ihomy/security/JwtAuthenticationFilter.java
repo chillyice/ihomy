@@ -36,7 +36,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 if ("ACCESS".equals(claims.get("type", String.class))) {
                     Long userId = Long.valueOf(claims.getSubject());
                     String username = claims.get("username", String.class);
-                    String role = "MEMBER";
+                    String role = claims.get("role", String.class);
+                    if (role == null) {
+                        role = "MEMBER";
+                    }
                     LoginUser loginUser = new LoginUser(userId, username, role, null);
                     var auth = new UsernamePasswordAuthenticationToken(
                             loginUser, null, List.of(new SimpleGrantedAuthority("ROLE_" + role)));

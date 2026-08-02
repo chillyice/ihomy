@@ -6,13 +6,14 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("blog")
+@TableName("content_blog")
 public class Blog {
     @TableId(type = IdType.AUTO)
     private Long id;
     private String title;
     private String content;
     private String coverImage;
+    private String tags;
     private Long authorId;
     private Long familyId;
     private Integer status;

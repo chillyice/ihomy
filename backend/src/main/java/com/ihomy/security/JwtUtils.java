@@ -32,21 +32,24 @@ public class JwtUtils {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
-    public String generateAccessToken(Long userId, String username) {
-        return build(userId, username, accessExpire, "ACCESS");
+    public String generateAccessToken(Long userId, String username, String role) {
+        return build(userId, username, role, accessExpire, "ACCESS");
     }
 
     public String generateRefreshToken(Long userId, String username) {
-        return build(userId, username, refreshExpire, "REFRESH");
+        return build(userId, username, null, refreshExpire, "REFRESH");
     }
 
-    private String build(Long userId, String username, long expire, String type) {
+    private String build(Long userId, String username, String role, long expire, String type) {
         Date now = new Date();
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(String.valueOf(userId))
                 .claim("username", username)
-                .claim("type", type)
-                .issuedAt(now)
+                .claim("type", type);
+        if (role != null) {
+            builder.claim("role", role);
+        }
+        return builder.issuedAt(now)
                 .expiration(new Date(now.getTime() + expire * 1000))
                 .signWith(key)
                 .compact();

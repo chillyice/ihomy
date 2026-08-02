@@ -1,5 +1,6 @@
 package com.ihomy.controller;
 
+import com.ihomy.annotation.OperationLog;
 import com.ihomy.common.Result;
 import com.ihomy.service.FileService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,6 +22,7 @@ public class FileController {
     private final FileService fileService;
 
     @Operation(summary = "上传图片/封面")
+    @OperationLog(module = "FILE", operationType = "CREATE", description = "上传文件", saveArgs = false)
     @PostMapping("/upload")
     public Result<Map<String, String>> upload(@RequestParam("file") MultipartFile file) throws IOException {
         String url = fileService.upload(file.getBytes(), file.getOriginalFilename(), file.getContentType());

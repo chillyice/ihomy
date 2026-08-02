@@ -8,17 +8,16 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("sys_home_module")
-public class HomeModule {
+@TableName("content_photo")
+public class Photo {
     @TableId(type = IdType.AUTO)
     private Long id;
-    private String code;
-    private String title;
-    private String icon;
-    private String path;
-    private String position;
-    private Integer sortOrder;
-    private Integer enabled;
+    private Long albumId;
+    private String url;
+    private String description;
+    private Long authorId;
     private Long familyId;
+    private Integer visibility;
     private LocalDateTime createdAt;
+    private Integer deleted;
 }

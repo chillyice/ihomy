@@ -1,5 +1,6 @@
 package com.ihomy.controller;
 
+import com.ihomy.annotation.OperationLog;
 import com.ihomy.common.BizException;
 import com.ihomy.common.Result;
 import com.ihomy.common.ResultCode;
@@ -33,7 +34,6 @@ public class HomeController {
         Long familyId = user == null ? null : user.getFamilyId();
         return Result.success(homeModuleService.listEnabled(familyId));
     }
-
     @Operation(summary = "获取全部模块（含禁用，Owner）")
     @GetMapping("/modules/all")
     public Result<List<HomeModule>> allModules() {
@@ -43,6 +43,7 @@ public class HomeController {
     }
 
     @Operation(summary = "更新模块配置（位置/排序/启用，Owner）")
+    @OperationLog(module = "HOME", operationType = "CONFIG", description = "更新首页模块配置")
     @PutMapping("/modules")
     public Result<Void> updateModules(@RequestBody HomeModuleDTO dto) {
         assertOwner();
@@ -52,6 +53,7 @@ public class HomeController {
     }
 
     @Operation(summary = "新增模块（后期扩展新功能用）")
+    @OperationLog(module = "HOME", operationType = "CREATE", description = "新增首页模块")
     @PostMapping("/modules")
     public Result<HomeModule> addModule(@RequestBody HomeModule module) {
         assertOwner();
