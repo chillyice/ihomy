@@ -1,0 +1,197 @@
+package com.ihomy.service;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ihomy.common.BizException;
+import com.ihomy.common.ResultCode;
+import com.ihomy.dto.VideoDTO;
+import com.ihomy.entity.SysUser;
+import com.ihomy.entity.Video;
+import com.ihomy.entity.VideoWish;
+import com.ihomy.mapper.SysUserMapper;
+import com.ihomy.mapper.VideoMapper;
+import com.ihomy.mapper.VideoWishMapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 放映厅业务:家庭视频库(豆瓣式元数据,软删)与"想看"清单,
+ * 改删视频校验上传者或家长,可见性固定为家庭可见。
+ */
+@Service
+@RequiredArgsConstructor
+public class VideoService {
+
+    private final VideoMapper videoMapper;
+    private final VideoWishMapper videoWishMapper;
+    private final SysUserMapper sysUserMapper;
+
+    /** 视频列表:按家庭过滤,支持关键字/类型搜索,附带上传者昵称 */
+    public List<Map<String, Object>> list(Long familyId, String keyword, String mediaType) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (familyId == null) return result;
+        LambdaQueryWrapper<Video> qw = new LambdaQueryWrapper<>();
+        qw.eq(Video::getFamilyId, familyId)
+          .eq(Video::getDeleted, 0)
+          .eq(mediaType != null && !mediaType.isBlank(), Video::getMediaType, mediaType)
+          .like(keyword != null && !keyword.isBlank(), Video::getTitle, keyword)
+          .orderByDesc(Video::getCreatedAt);
+        for (Video v : videoMapper.selectList(qw)) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", v.getId());
+            m.put("title", v.getTitle());
+            m.put("originalTitle", v.getOriginalTitle());
+            m.put("mediaType", v.getMediaType());
+            m.put("genres", v.getGenres());
+            m.put("region", v.getRegion());
+            m.put("year", v.getYear());
+            m.put("language", v.getLanguage());
+            m.put("duration", v.getDuration());
+            m.put("episodes", v.getEpisodes());
+            m.put("director", v.getDirector());
+            m.put("actors", v.getActors());
+            m.put("rating", v.getRating());
+            m.put("intro", v.getIntro());
+            m.put("poster", v.getPoster());
+            m.put("videoUrl", v.getVideoUrl());
+            m.put("uploaderId", v.getUploaderId());
+            m.put("uploaderName", resolveUserName(v.getUploaderId()));
+            m.put("createdAt", v.getCreatedAt());
+            result.add(m);
+        }
+        return result;
+    }
+
+    /** 入库视频:默认 movie 类型、家庭可见、未删除 */
+    public Video create(Long userId, Long familyId, VideoDTO dto) {
+        Video v = new Video();
+        apply(v, dto);
+        v.setUploaderId(userId);
+        v.setFamilyId(familyId);
+        v.setVisibility(3);
+        v.setDeleted(0);
+        videoMapper.insert(v);
+        return v;
+    }
+
+    /** 更新视频:仅上传者或家长,且须同家庭 */
+    public Video update(Long id, Long familyId, Long currentUserId, boolean isOwner, VideoDTO dto) {
+        Video v = requireOwn(id, familyId, currentUserId, isOwner);
+        apply(v, dto);
+        videoMapper.updateById(v);
+        return v;
+    }
+
+    /** 删除视频:软删(deleted=1) */
+    public void delete(Long id, Long familyId, Long currentUserId, boolean isOwner) {
+        requireOwn(id, familyId, currentUserId, isOwner);
+        Video v = new Video();
+        v.setId(id);
+        v.setDeleted(1);
+        videoMapper.updateById(v);
+    }
+
+    /** DTO 字段落库,mediaType 缺省补 movie */
+    private void apply(Video v, VideoDTO dto) {
+        v.setTitle(dto.getTitle());
+        v.setOriginalTitle(dto.getOriginalTitle());
+        v.setMediaType(dto.getMediaType() == null ? "movie" : dto.getMediaType());
+        v.setGenres(dto.getGenres());
+        v.setRegion(dto.getRegion());
+        v.setYear(dto.getYear());
+        v.setLanguage(dto.getLanguage());
+        v.setDuration(dto.getDuration());
+        v.setEpisodes(dto.getEpisodes());
+        v.setDirector(dto.getDirector());
+        v.setActors(dto.getActors());
+        v.setRating(dto.getRating());
+        v.setIntro(dto.getIntro());
+        v.setPoster(dto.getPoster());
+        v.setVideoUrl(dto.getVideoUrl());
+    }
+
+    /** 校验视频存在、未删除、同家庭,且操作者为上传者或家长 */
+    private Video requireOwn(Long id, Long familyId, Long currentUserId, boolean isOwner) {
+        Video v = videoMapper.selectById(id);
+        if (v == null || (v.getDeleted() != null && v.getDeleted() == 1)) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
+        if (familyId != null && !familyId.equals(v.getFamilyId())) {
+            throw new BizException(ResultCode.FORBIDDEN);
+        }
+        if (!isOwner && !v.getUploaderId().equals(currentUserId)) {
+            throw new BizException(ResultCode.FORBIDDEN);
+        }
+        return v;
+    }
+
+    /** 提交想看:状态 0=待入库 */
+    public VideoWish addWish(Long userId, Long familyId, VideoWish wish) {
+        wish.setRequesterId(userId);
+        wish.setFamilyId(familyId);
+        wish.setStatus(0);
+        wish.setDeleted(0);
+        videoWishMapper.insert(wish);
+        return wish;
+    }
+
+    /** 想看列表,附带请求者昵称 */
+    public List<Map<String, Object>> listWishes(Long familyId) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (familyId == null) return result;
+        LambdaQueryWrapper<VideoWish> qw = new LambdaQueryWrapper<>();
+        qw.eq(VideoWish::getFamilyId, familyId)
+          .eq(VideoWish::getDeleted, 0)
+          .orderByDesc(VideoWish::getCreatedAt);
+        for (VideoWish w : videoWishMapper.selectList(qw)) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", w.getId());
+            m.put("title", w.getTitle());
+            m.put("genres", w.getGenres());
+            m.put("reason", w.getReason());
+            m.put("status", w.getStatus());
+            m.put("requesterId", w.getRequesterId());
+            m.put("requesterName", resolveUserName(w.getRequesterId()));
+            m.put("createdAt", w.getCreatedAt());
+            result.add(m);
+        }
+        return result;
+    }
+
+    /** 标记想看已入库(status=1),须同家庭 */
+    public void markWishDone(Long id, Long familyId) {
+        VideoWish w = videoWishMapper.selectById(id);
+        if (w == null || (w.getDeleted() != null && w.getDeleted() == 1)) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
+        if (familyId != null && !familyId.equals(w.getFamilyId())) {
+            throw new BizException(ResultCode.FORBIDDEN);
+        }
+        w.setStatus(1);
+        videoWishMapper.updateById(w);
+    }
+
+    /** 删除想看(软删),须同家庭 */
+    public void deleteWish(Long id, Long familyId) {
+        VideoWish w = videoWishMapper.selectById(id);
+        if (w == null || (w.getDeleted() != null && w.getDeleted() == 1)) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
+        if (familyId != null && !familyId.equals(w.getFamilyId())) {
+            throw new BizException(ResultCode.FORBIDDEN);
+        }
+        w.setDeleted(1);
+        videoWishMapper.updateById(w);
+    }
+
+    private String resolveUserName(Long userId) {
+        if (userId == null) return null;
+        SysUser u = sysUserMapper.selectById(userId);
+        if (u == null) return null;
+        return u.getNickname() != null && !u.getNickname().isBlank() ? u.getNickname() : u.getUsername();
+    }
+}

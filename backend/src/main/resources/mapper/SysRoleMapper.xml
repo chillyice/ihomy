@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.SysRoleMapper">
+
+    <select id="selectRoleCodeByUserAndFamily" resultType="string">
+        SELECT r.role_code FROM sys_role r
+        JOIN sys_user_role ur ON ur.role_id = r.id
+        WHERE ur.user_id = #{userId} AND ur.family_id = #{familyId}
+        AND r.status = 1 LIMIT 1
+    </select>
+
+    <select id="selectAuthCodesByUserAndFamily" resultType="string">
+        SELECT DISTINCT a.auth_code FROM sys_auth a
+        JOIN sys_role_auth ra ON ra.auth_id = a.id
+        JOIN sys_role r ON r.id = ra.role_id AND r.status = 1
+        JOIN sys_user_role ur ON ur.role_id = r.id
+        WHERE ur.user_id = #{userId} AND ur.family_id = #{familyId}
+    </select>
+
+</mapper>

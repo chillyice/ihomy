@@ -12,6 +12,10 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
+/**
+ * JWT 工具类:签发/解析 access token(2h)与 refresh token(7d),
+ * token 中携带 userId/username/role/familyId,familyId 用于按家庭解析权限。
+ */
 @Slf4j
 @Component
 public class JwtUtils {
@@ -27,20 +31,24 @@ public class JwtUtils {
 
     private SecretKey key;
 
+    /** 由配置的 secret 派生 HMAC 密钥 */
     @PostConstruct
     public void init() {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
-    public String generateAccessToken(Long userId, String username, String role) {
-        return build(userId, username, role, accessExpire, "ACCESS");
+    /** 签发短期访问令牌(携带角色与当前家庭 ID) */
+    public String generateAccessToken(Long userId, String username, String role, Long familyId) {
+        return build(userId, username, role, familyId, accessExpire, "ACCESS");
     }
 
+    /** 签发长期刷新令牌(仅含身份,不含角色/家庭) */
     public String generateRefreshToken(Long userId, String username) {
-        return build(userId, username, null, refreshExpire, "REFRESH");
+        return build(userId, username, null, null, refreshExpire, "REFRESH");
     }
 
-    private String build(Long userId, String username, String role, long expire, String type) {
+    /** 组装 JWT:type 区分 ACCESS/REFRESH,角色与家庭 ID 仅在访问令牌中携带 */
+    private String build(Long userId, String username, String role, Long familyId, long expire, String type) {
         Date now = new Date();
         var builder = Jwts.builder()
                 .subject(String.valueOf(userId))
@@ -49,16 +57,21 @@ public class JwtUtils {
         if (role != null) {
             builder.claim("role", role);
         }
+        if (familyId != null) {
+            builder.claim("familyId", familyId);
+        }
         return builder.issuedAt(now)
                 .expiration(new Date(now.getTime() + expire * 1000))
                 .signWith(key)
                 .compact();
     }
 
+    /** 解析 token 得到 claims,签名或过期失败会抛异常 */
     public Claims parse(String token) {
         return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
     }
 
+    /** 校验 token 是否有效(解析不抛异常即为有效) */
     public boolean isValid(String token) {
         try {
             parse(token);

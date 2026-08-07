@@ -1,13 +1,29 @@
+<!-- 全局顶栏:品牌/家庭切换/模块导航/通知铃铛/用户菜单,登录与访客展示不同入口 -->
 <template>
   <header class="app-header">
     <div class="header-inner">
       <div class="brand" @click="$router.push('/')">
-        <span class="brand-name">{{ familyName || 'ihomy' }}</span>
+        <span class="brand-name">{{ appStore.familyName || 'ihomy' }}</span>
+        <el-dropdown v-if="userStore.isLoggedIn && families.length > 1" trigger="click" class="family-switch" @command="onSwitchFamily">
+          <span class="family-switch-trigger">
+            <el-icon><ArrowDown /></el-icon>
+          </span>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item v-for="f in families" :key="f.familyId" :command="f.familyId" :disabled="f.isCurrent">
+                {{ f.name }}<span v-if="f.isCurrent" class="family-current">（当前）</span>
+                <span v-if="f.isDefault" class="family-current">默认</span>
+                <span v-if="f.role" class="family-role">{{ f.role }}</span>
+              </el-dropdown-item>
+              <el-dropdown-item divided command="set-default">将当前家庭设为默认</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
 
       <nav class="nav-modules">
         <router-link
-          v-for="m in modules.filter(x => x.position === 'top' || x.position === 'left')"
+          v-for="m in navModules"
           :key="m.code"
           :to="m.path"
           class="nav-item"
@@ -17,11 +33,33 @@
       </nav>
 
       <div class="header-right">
-        <el-badge v-if="userStore.isLoggedIn" :value="unreadCount" :hidden="!unreadCount" class="msg-badge">
-          <el-icon class="msg-icon" @click="$router.push('/notification')">
-            <Bell />
-          </el-icon>
-        </el-badge>
+        <el-popover v-if="userStore.isLoggedIn" placement="bottom-end" :width="340" trigger="click" @show="loadNotifications">
+          <template #reference>
+            <el-badge :value="unreadCount" :hidden="!unreadCount" class="msg-badge">
+              <el-icon class="msg-icon"><Bell /></el-icon>
+            </el-badge>
+          </template>
+          <div class="notify-panel">
+            <div class="notify-head">
+              <span>通知</span>
+              <el-button v-if="notifications.length" text size="small" @click="markAllRead">全部已读</el-button>
+            </div>
+            <div v-if="notifications.length" class="notify-list">
+              <div
+                v-for="n in notifications"
+                :key="n.id"
+                class="notify-item"
+                :class="{ unread: !n.isRead }"
+                @click="onNotifyClick(n)"
+              >
+                <div class="notify-type">{{ notifyType(n.type) }}</div>
+                <div class="notify-content">{{ n.content }}</div>
+                <div class="notify-time">{{ formatTime(n.createdAt) }}</div>
+              </div>
+            </div>
+            <el-empty v-else description="暂无通知" :image-size="60" />
+          </div>
+        </el-popover>
 
         <el-dropdown v-if="userStore.isLoggedIn" trigger="click" @command="onCommand">
           <div class="avatar-wrap">
@@ -33,6 +71,7 @@
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item command="profile">个人中心</el-dropdown-item>
+              <el-dropdown-item command="settings">家庭设置</el-dropdown-item>
               <el-dropdown-item v-if="userStore.isOwner" command="member">成员管理</el-dropdown-item>
               <el-dropdown-item v-if="userStore.isOwner" command="homeConfig">首页配置</el-dropdown-item>
               <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
@@ -50,32 +89,127 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { Bell } from '@element-plus/icons-vue'
-
-defineProps({
-  modules: { type: Array, default: () => [] },
-  familyName: { type: String, default: '' },
-})
+import { useAppStore } from '@/stores/app'
+import { notificationApi, authApi } from '@/api'
+import { Bell, ArrowDown } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 const userStore = useUserStore()
+const appStore = useAppStore()
 const unreadCount = ref(0)
+const notifications = ref([])
+const families = ref([])
 
+// 拉取我的全部家庭列表,供切换下拉使用
+const loadFamilies = async () => {
+  if (!userStore.isLoggedIn) return
+  try {
+    families.value = await authApi.families()
+  } catch (e) {
+    // 忽略
+  }
+}
+
+// 家庭切换:set-default 把当前家庭设为默认;普通切换则换 token 后刷新首页数据回首页
+const onSwitchFamily = async (command) => {
+  try {
+    if (command === 'set-default') {
+      const cur = families.value.find((f) => f.isCurrent)
+      if (!cur) return
+      await userStore.switchFamily(cur.familyId, true)
+      ElMessage.success('已设为默认家庭')
+      await loadFamilies()
+      return
+    }
+    await userStore.switchFamily(command)
+    appStore.reset()
+    await appStore.init(true)
+    ElMessage.success('已切换家庭')
+    router.push('/')
+  } catch (e) {
+    // 忽略
+  }
+}
+
+// 顶部导航只展示 position 为 top/left 的模块
+const navModules = computed(() =>
+  appStore.modules.filter((m) => m.position === 'top' || m.position === 'left'),
+)
+
+const loadUnread = async () => {
+  if (!userStore.isLoggedIn) return
+  try {
+    unreadCount.value = await notificationApi.unreadCount()
+  } catch (e) {
+    // 忽略
+  }
+}
+
+// 打开铃铛面板时拉取通知列表并刷新未读数
+const loadNotifications = async () => {
+  try {
+    notifications.value = await notificationApi.list()
+    await loadUnread()
+  } catch (e) {
+    // 忽略
+  }
+}
+
+const markAllRead = async () => {
+  await notificationApi.markAllRead()
+  notifications.value = notifications.value.map((n) => ({ ...n, isRead: 1 }))
+  unreadCount.value = 0
+}
+
+// 点击通知:未读先标记已读,再按内容类型跳转到对应页面
+const onNotifyClick = async (n) => {
+  if (!n.isRead) {
+    await notificationApi.markRead(n.id)
+    n.isRead = 1
+    await loadUnread()
+  }
+  if (n.contentType === 'blog') router.push(`/blog/${n.contentId}`)
+  else if (n.contentType === 'diary') router.push('/diary')
+  else if (n.contentType === 'photo' && n.contentId) router.push('/album')
+}
+
+const notifyType = (t) => (t === 'reply' ? '回复' : t === 'system' ? '系统' : '评论')
+
+// 相对时间展示:分钟/小时级距,超过一天显示具体日期
+const formatTime = (d) => {
+  if (!d) return ''
+  const date = new Date(d)
+  const now = Date.now()
+  const diff = now - date.getTime()
+  if (diff < 3600000) return `${Math.max(1, Math.floor(diff / 60000))}分钟前`
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`
+  return date.toLocaleDateString('zh-CN')
+}
+
+// 用户下拉菜单命令分发(个人中心/设置/成员管理/首页配置/登出)
 const onCommand = (cmd) => {
   if (cmd === 'logout') {
+    // 登出后保持当前 URL(刷新为访客视图),不强制回首页
     userStore.logout()
-    router.push('/')
+    location.reload()
   } else if (cmd === 'member') {
     router.push('/member')
   } else if (cmd === 'homeConfig') {
     router.push('/home/config')
-  } else if (cmd === 'profile') {
-    router.push('/profile')
+  } else if (cmd === 'profile' || cmd === 'settings') {
+    router.push('/settings')
   }
 }
+
+onMounted(() => {
+  loadUnread()
+  loadFamilies()
+  watch(() => userStore.isLoggedIn, () => { loadUnread(); loadFamilies() })
+})
 </script>
 
 <style scoped>
@@ -97,13 +231,23 @@ const onCommand = (cmd) => {
   align-items: center;
   gap: 32px;
 }
-.brand { cursor: pointer; flex-shrink: 0; }
+.brand { cursor: pointer; flex-shrink: 0; display: flex; align-items: center; gap: 4px; }
 .brand-name {
   font-size: 22px;
   font-weight: 700;
   color: var(--color-primary);
   letter-spacing: 0.5px;
 }
+.family-switch-trigger {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+}
+.family-switch-trigger:hover { color: var(--color-accent); }
+.family-current { color: var(--color-text-secondary); font-size: 12px; }
+.family-role { margin-left: 6px; font-size: 11px; color: var(--color-accent); }
 .nav-modules {
   display: flex;
   align-items: center;
@@ -151,6 +295,20 @@ const onCommand = (cmd) => {
   color: var(--color-text);
 }
 .auth-actions { display: flex; gap: 8px; }
+.notify-panel { display: flex; flex-direction: column; gap: 8px; }
+.notify-head { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
+.notify-list { max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; }
+.notify-item {
+  padding: 10px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(31, 58, 95, 0.06);
+}
+.notify-item:hover { background: rgba(46, 116, 181, 0.06); }
+.notify-item.unread { background: rgba(46, 116, 181, 0.05); }
+.notify-type { font-size: 11px; color: var(--color-accent); margin-bottom: 2px; }
+.notify-content { font-size: 13px; color: var(--color-text); }
+.notify-time { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; }
 
 @media (max-width: 768px) {
   .header-inner { padding: 0 12px; gap: 12px; height: 56px; }

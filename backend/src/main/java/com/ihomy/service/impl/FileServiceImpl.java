@@ -12,6 +12,10 @@ import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.UUID;
 
+/**
+ * 文件存储实现(本地磁盘):按日期分目录存放,
+ * 文件名用 UUID 防冲突,返回可经 /files/ 访问的 URL。
+ */
 @Slf4j
 @Service
 public class FileServiceImpl implements FileService {
@@ -22,6 +26,7 @@ public class FileServiceImpl implements FileService {
     @Value("${file.url-prefix}")
     private String urlPrefix;
 
+    /** 保存文件到 upload-dir/日期目录,保留原扩展名,返回访问 URL */
     @Override
     public String upload(byte[] bytes, String originalName, String contentType) {
         try {

@@ -1,6 +1,7 @@
+<!-- 博客编辑页:新增/编辑共用,含标题、封面上传、正文、状态与可见范围 -->
 <template>
   <div class="page">
-    <el-button text @click="$router.back()">← 返回</el-button>
+    <Breadcrumb :items="[{ label: '博客', to: '/blog' }, { label: isEdit ? '编辑博客' : '写博客' }]" />
     <div class="card">
       <h2>{{ isEdit ? '编辑博客' : '写博客' }}</h2>
       <el-form :model="form" label-position="top">
@@ -25,6 +26,12 @@
             <el-radio :value="1">发布</el-radio>
           </el-radio-group>
         </el-form-item>
+        <el-form-item label="可见范围">
+          <el-radio-group v-model="form.visibility">
+            <el-radio :value="0">仅自己</el-radio>
+            <el-radio :value="3">家庭可见</el-radio>
+          </el-radio-group>
+        </el-form-item>
         <el-button type="primary" :loading="loading" @click="onSave">保存</el-button>
       </el-form>
     </div>
@@ -36,20 +43,24 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { blogApi, fileApi } from '@/api'
 import { ElMessage } from 'element-plus'
+import Breadcrumb from '@/components/Breadcrumb.vue'
 
 const route = useRoute()
 const router = useRouter()
+// 路由带 id 即为编辑模式,否则是新增
 const isEdit = computed(() => !!route.params.id)
 const loading = ref(false)
 
-const form = reactive({ title: '', content: '', coverImage: '', status: 1, visibility: 0 })
+const form = reactive({ title: '', content: '', coverImage: '', status: 1, visibility: 3 })
 
+// 封面图片上传:回填 URL 到表单,返回 false 阻止 el-upload 默认提交
 const onUpload = async (file) => {
   const data = await fileApi.upload(file)
   form.coverImage = data.url
   return false
 }
 
+// 保存:编辑走 update,新增走 create,成功后回列表页
 const onSave = async () => {
   if (!form.title) return ElMessage.warning('请输入标题')
   loading.value = true
@@ -64,6 +75,7 @@ const onSave = async () => {
 }
 
 onMounted(async () => {
+  // 编辑模式下拉取详情回填表单
   if (isEdit.value) {
     const b = await blogApi.detail(route.params.id)
     Object.assign(form, { title: b.title, content: b.content, coverImage: b.coverImage, status: b.status, visibility: b.visibility })

@@ -18,12 +18,17 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * JWT 认证过滤器:从 Authorization: Bearer 头解析访问令牌,
+ * 成功后把 LoginUser 注入 SecurityContext,供后续接口取当前用户。
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
+    private final com.ihomy.mapper.SysUserMapper sysUserMapper;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
@@ -40,13 +45,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     if (role == null) {
                         role = "MEMBER";
                     }
-                    LoginUser loginUser = new LoginUser(userId, username, role, null);
+                    Long familyId = claims.get("familyId", Long.class);
+                    if (familyId == null) {
+                        // 旧 token 无家庭信息时回退查库补全
+                        var u = sysUserMapper.selectById(userId);
+                        familyId = u != null ? u.getFamilyId() : null;
+                    }
+                    LoginUser loginUser = new LoginUser(userId, username, role, familyId);
                     var auth = new UsernamePasswordAuthenticationToken(
                             loginUser, null, List.of(new SimpleGrantedAuthority("ROLE_" + role)));
                     auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(auth);
                 }
             } catch (Exception e) {
+                // 解析失败视为未登录,交由下游拦截器返回 401
                 log.debug("JWT 解析失败: {}", e.getMessage());
             }
         }

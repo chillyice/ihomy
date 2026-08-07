@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.ContentLikeMapper">
+
+    <select id="countByContent" resultType="long">
+        SELECT COUNT(*) FROM content_like WHERE content_type = #{contentType} AND content_id = #{contentId}
+    </select>
+
+</mapper>

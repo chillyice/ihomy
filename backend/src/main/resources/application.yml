@@ -2,6 +2,10 @@ server:
   port: 8080
   servlet:
     context-path: /api
+    encoding:
+      charset: UTF-8
+      force: true
+      enabled: true
 
 spring:
   application:
@@ -19,13 +23,14 @@ spring:
       database: 0
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 20MB
+      max-file-size: 500MB
+      max-request-size: 500MB
 
 mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: com.ihomy.config.SqlStatementLog
   global-config:
     db-config:
       id-type: auto
@@ -46,6 +51,17 @@ file:
   upload-dir: ./uploads
   url-prefix: /files
 
+# 图形验证码:开发/测试环境可固定为已知值(如 qwer),方便联调;生产去掉或留空则随机生成
+app:
+  captcha-fixed-code: qwer
+
 logging:
+  file:
+    name: ./logs/ihomy.log
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %X{traceId:-} %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %X{traceId:-} %-5level %logger{36} - %msg%n"
   level:
-    com.ihomy: debug
+    com.ihomy: info
+    org.mybatis: warn
+    org.springframework.jdbc: warn

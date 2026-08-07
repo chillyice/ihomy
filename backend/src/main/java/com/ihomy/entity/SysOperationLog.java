@@ -7,6 +7,9 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+/**
+ * 操作日志实体(sys_operation_log):AOP 自动写入,含请求/结果/耗时与 traceId(链路串联)。
+ */
 @Data
 @TableName("sys_operation_log")
 public class SysOperationLog {
@@ -23,6 +26,7 @@ public class SysOperationLog {
     private Integer resultStatus;
     private String errorMsg;
     private String ip;
+    private String traceId;
     private Long costTime;
     private LocalDateTime createdAt;
 }

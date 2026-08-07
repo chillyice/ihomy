@@ -12,12 +12,17 @@ import com.ihomy.service.DiaryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+/**
+ * 生活日志(日记)业务实现:分页按家庭/可见范围过滤,增删改校验归属与权限。
+ * 可见性:3=家庭可见,4=公开,0=仅自己。
+ */
 @Service
 @RequiredArgsConstructor
 public class DiaryServiceImpl implements DiaryService {
 
     private final DiaryMapper diaryMapper;
 
+    /** 分页查询:家长见全部,成员见自己的+家庭可见/公开,游客仅公开 */
     @Override
     public IPage<Diary> page(int current, int size, Long familyId, Long currentUserId, boolean isOwner) {
         LambdaQueryWrapper<Diary> qw = new LambdaQueryWrapper<>();
@@ -36,6 +41,7 @@ public class DiaryServiceImpl implements DiaryService {
         return diaryMapper.selectPage(new Page<>(current, size), qw);
     }
 
+    /** 新建日记:默认家庭可见 */
     @Override
     public Diary create(Long authorId, Long familyId, DiaryDTO dto) {
         Diary diary = new Diary();
@@ -44,11 +50,12 @@ public class DiaryServiceImpl implements DiaryService {
         diary.setWeather(dto.getWeather());
         diary.setAuthorId(authorId);
         diary.setFamilyId(familyId);
-        diary.setVisibility(dto.getVisibility() == null ? 0 : dto.getVisibility());
+        diary.setVisibility(dto.getVisibility() == null ? 3 : dto.getVisibility());
         diaryMapper.insert(diary);
         return diary;
     }
 
+    /** 更新日记:仅作者本人可改 */
     @Override
     public Diary update(Long id, Long currentUserId, DiaryDTO dto) {
         Diary diary = diaryMapper.selectById(id);
@@ -66,6 +73,7 @@ public class DiaryServiceImpl implements DiaryService {
         return diary;
     }
 
+    /** 删除日记:作者本人或家长可删 */
     @Override
     public void delete(Long id, Long currentUserId, boolean isOwner) {
         Diary diary = diaryMapper.selectById(id);

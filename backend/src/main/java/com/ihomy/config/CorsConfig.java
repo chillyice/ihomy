@@ -6,6 +6,10 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 
+/**
+ * 跨域配置:允许所有来源/头/方法(带凭证),
+ * 开发期前端 5173 直连后端 8080 需要该配置。
+ */
 @Configuration
 public class CorsConfig {
 

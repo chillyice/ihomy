@@ -8,6 +8,7 @@ import com.ihomy.dto.HomeModuleDTO;
 import com.ihomy.entity.HomeModule;
 import com.ihomy.entity.SysUser;
 import com.ihomy.security.SecurityHelper;
+import com.ihomy.service.ActivityFeedService;
 import com.ihomy.service.HomeModuleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,6 +19,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * 首页模块接口:模块列表/配置(仅 OWNER)、模块扩展新增,以及登录用户的家庭动态流。
+ */
 @Tag(name = "首页模块")
 @RestController
 @RequestMapping("/home")
@@ -26,6 +30,7 @@ public class HomeController {
 
     private final HomeModuleService homeModuleService;
     private final SecurityHelper securityHelper;
+    private final ActivityFeedService activityFeedService;
 
     @Operation(summary = "获取首页启用的模块列表")
     @GetMapping("/modules")
@@ -72,6 +77,14 @@ public class HomeController {
         data.put("modules", homeModuleService.listEnabled(user == null ? null : user.getFamilyId()));
         data.put("user", user);
         return Result.success(data);
+    }
+
+    @Operation(summary = "家人动态流（登录用户）")
+    @GetMapping("/feed")
+    public Result<List<Map<String, Object>>> feed(@RequestParam(defaultValue = "20") int limit) {
+        SysUser user = securityHelper.currentUser();
+        Long familyId = user == null ? null : user.getFamilyId();
+        return Result.success(activityFeedService.getFeed(familyId, limit, false));
     }
 
     private void assertOwner() {

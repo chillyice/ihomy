@@ -4,8 +4,11 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.ihomy.dto.BlogDTO;
 import com.ihomy.entity.Blog;
 
+/**
+ * 博客服务接口:分页/详情/增删改。
+ */
 public interface BlogService {
-    IPage<Blog> page(int current, int size, Long familyId, String keyword);
+    IPage<Blog> page(int current, int size, Long familyId, Long currentUserId, boolean isOwner, String keyword);
 
     Blog getDetail(Long id);
 

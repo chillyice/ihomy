@@ -1,3 +1,4 @@
+// 应用入口:装配 Pinia(状态)与 Router(路由),引入全局样式
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'

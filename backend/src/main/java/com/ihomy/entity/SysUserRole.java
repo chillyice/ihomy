@@ -7,6 +7,9 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+/**
+ * 用户-角色绑定实体(sys_user_role):带 family_id,同一用户在不同家庭可有不同角色。
+ */
 @Data
 @TableName("sys_user_role")
 public class SysUserRole {
