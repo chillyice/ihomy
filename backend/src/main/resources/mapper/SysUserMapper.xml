@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.SysUserMapper">
+
+    <select id="selectByUsername" resultType="com.ihomy.entity.SysUser">
+        SELECT * FROM sys_user WHERE username = #{username} AND deleted = 0
+    </select>
+
+    <select id="selectByEmail" resultType="com.ihomy.entity.SysUser">
+        SELECT * FROM sys_user WHERE LOWER(email) = LOWER(#{email}) AND deleted = 0
+    </select>
+
+    <select id="selectMembersByFamily" resultType="map">
+        SELECT u.id, u.username, u.nickname, u.avatar, r.role_code AS roleCode
+        FROM sys_user u
+        JOIN sys_user_role ur ON ur.user_id = u.id
+        JOIN sys_role r ON r.id = ur.role_id
+        WHERE u.family_id = #{familyId} AND u.deleted = 0
+        AND ur.family_id = #{familyId} AND r.status = 1
+        ORDER BY u.id
+    </select>
+
+</mapper>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.FamilyMapper">
+
+    <select id="selectDefault" resultType="com.ihomy.entity.Family">
+        SELECT * FROM sys_family_info WHERE is_default = 1 AND deleted = 0 LIMIT 1
+    </select>
+
+</mapper>

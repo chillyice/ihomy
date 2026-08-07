@@ -2,6 +2,10 @@ package com.ihomy.common;
 
 import lombok.Getter;
 
+/**
+ * 统一错误码枚举:0 为成功;4xx/5xx 沿用 HTTP 语义;
+ * 1001 起为业务自定义错误码(如注册类错误)。
+ */
 @Getter
 public enum ResultCode {
     SUCCESS(0, "success"),
@@ -14,7 +18,9 @@ public enum ResultCode {
     USER_EXISTS(1001, "用户名已存在"),
     USER_NOT_FOUND(1002, "用户不存在"),
     PASSWORD_ERROR(1003, "密码错误"),
-    ACCOUNT_DISABLED(1004, "账号已禁用");
+    ACCOUNT_DISABLED(1004, "账号已禁用"),
+    EMAIL_EXISTS(1005, "邮箱已被注册"),
+    CAPTCHA_ERROR(1006, "验证码错误或已过期");
 
     private final int code;
     private final String message;

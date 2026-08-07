@@ -14,6 +14,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * 博客接口:列表(按可见范围)/详情/发布/修改/删除。
+ */
 @Tag(name = "博客")
 @RestController
 @RequestMapping("/blog")
@@ -30,7 +33,9 @@ public class BlogController {
                                     @RequestParam(required = false) String keyword) {
         SysUser user = securityHelper.currentUser();
         Long familyId = user == null ? null : user.getFamilyId();
-        return Result.success(blogService.page(current, size, familyId, keyword));
+        Long userId = user == null ? null : user.getId();
+        boolean isOwner = securityHelper.isOwner();
+        return Result.success(blogService.page(current, size, familyId, userId, isOwner, keyword));
     }
 
     @Operation(summary = "博客详情")

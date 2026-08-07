@@ -4,6 +4,9 @@ import lombok.Data;
 
 import java.util.List;
 
+/**
+ * 首页模块配置表单:批量更新各模块的位置/排序/启停。
+ */
 @Data
 public class HomeModuleDTO {
     private List<HomeModuleItem> modules;

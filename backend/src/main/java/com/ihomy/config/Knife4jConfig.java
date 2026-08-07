@@ -8,6 +8,10 @@ import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 
+/**
+ * Knife4j/OpenAPI 文档配置:声明接口文档标题与 JWT Bearer 认证方式,
+ * 文档地址 http://localhost:8080/api/doc.html。
+ */
 @Configuration
 public class Knife4jConfig {
 

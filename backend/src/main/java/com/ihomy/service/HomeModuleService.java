@@ -5,6 +5,9 @@ import com.ihomy.entity.HomeModule;
 
 import java.util.List;
 
+/**
+ * 首页模块服务接口:启停/排序配置与模块新增(模块化扩展入口)。
+ */
 public interface HomeModuleService {
     List<HomeModule> listEnabled(Long familyId);
 

@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.ihomy.dto.DiaryDTO;
 import com.ihomy.entity.Diary;
 
+/**
+ * 生活日志服务接口:分页/增删改。
+ */
 public interface DiaryService {
     IPage<Diary> page(int current, int size, Long familyId, Long currentUserId, boolean isOwner);
 

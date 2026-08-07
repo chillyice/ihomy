@@ -50,7 +50,7 @@
    npm config set registry https://registry.npmmirror.com
    ```
 
-### 2.3 安装 MySQL 8.0
+### 2.3 安装 MySQL 8.4.10
 
 **方式 A：安装到磁盘**
 1. 下载 MySQL Installer：https://dev.mysql.com/downloads/installer/
@@ -64,11 +64,11 @@
 **方式 B：使用docker安装**
 1. 拉取镜像
    ```powershell
-   docker pull mysql:8.0.44
+   docker pull mysql:8.4.10
    ```
 2. 创建容器
    ```powershell
-   docker run -d --name ihomy_mysql --restart always -p 6306:6306 -v C:\Users\chill\OneDrive\WorkStation\config\MySQL\conf:/etc/mysql/conf.d -v D:\WorkSpace\MySQL\data:/var/lib/mysql -v D:\WorkSpace\MySQL\logs:/var/log/mysql -e MYSQL_ROOT_PASSWORD=bW_fF65a -e TZ=Asia/Shanghai mysql:8.0.44 
+   docker run -d --name ihomy_mysql --restart always -p 6306:3306 -v C:\Users\chill\OneDrive\WorkStation\config\MySQL\conf:/etc/mysql/conf.d -v D:\WorkSpace\MySQL\data:/var/lib/mysql -v D:\WorkSpace\MySQL\logs:/var/log/mysql -e MYSQL_ROOT_PASSWORD=bW_fF65a -e TZ=Asia/Shanghai mysql:8.4.10 
    ```
 
 ### 2.4 安装 Redis
@@ -150,9 +150,18 @@ file:
 ### 3.3 建库建表
 
 ```powershell
-Get-Content C:\app\ihomy\backend\src\main\resources\schema.sql -Raw | mysql -uroot -p
+# 方案 A（推荐）：把 schema.sql 复制到 MySQL 容器内执行，完全绕过 PowerShell 编码问题
+docker cp C:\app\ihomy\backend\src\main\resources\schema.sql ihomy_mysql:/tmp/schema.sql
+docker exec ihomy_mysql bash -c "mysql -uroot -p<root密码> --default-character-set=utf8mb4 < /tmp/schema.sql"
+docker exec ihomy_mysql rm /tmp/schema.sql
+
+# 方案 B：PowerShell 管道（必须加 -Encoding UTF8，否则中文 COMMENT 变 ??? 导致 ERROR 1064）
+Get-Content C:\app\ihomy\backend\src\main\resources\schema.sql -Raw -Encoding UTF8 | mysql -uroot -p -P6306 --default-character-set=utf8mb4
 ```
-该脚本由 root 执行一次，会创建 `ihomy` 库、6 张表（含系统操作日志表）、应用专用账号 `ihomy`（仅 DML 权限）、默认首页模块、管理员账号 `admin/admin123`。
+
+> **编码坑（重要）**：schema.sql 含中文 COMMENT（如 `'BCrypt密码'`）和初始数据（如 `'我的家庭'`）。PowerShell 5.1 默认按 GBK 读取文件，不加 `-Encoding UTF8` 会导致中文写入数据库时变成 `?` 字符（不可逆），首页全部显示问号。**推荐用方案 A**（docker cp + 容器内执行），完全绕过 PowerShell 管道编码问题。
+
+该脚本由 root 执行一次，会创建 `ihomy` 库、20 张表（sys_ 系统管理类 + content_ 内容类，含 RBAC 权限模型四表）、应用专用账号 `ihomy`（仅 DML 权限）、4 个预设角色 + 27 个权限点 + 角色权限映射、默认首页模块、管理员账号 `admin/admin123`（自动绑定 OWNER 角色）。
 
 ### 3.4 构建后端
 
@@ -350,7 +359,7 @@ npm run build
 | 后端接口 | 浏览器 `http://localhost:8080/api/auth/me` | 返回 401 JSON |
 | 前端访问 | 浏览器 `https://你的域名` | 登录页 |
 | 登录 | admin / admin123 | 进入首页 |
-| 数据库 | `mysql -uihomy -p ihomy -e "show tables;"` | 6 张表 |
+| 数据库 | `mysql -uihomy -p -P6306 ihomy -e "show tables;"` | 20 张表 |
 | Redis | `memurai-cli ping` | PONG |
 | PWA 安装 | Chrome 地址栏右侧安装图标 | 可安装到桌面 |
 

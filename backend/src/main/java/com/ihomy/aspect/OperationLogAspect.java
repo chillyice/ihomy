@@ -18,6 +18,10 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.Arrays;
 
+/**
+ * @OperationLog 注解的切面:环绕记录操作日志——
+ * 记录操作人/请求信息/耗时/成败,可选保存入参与结果(截断防超长)。
+ */
 @Slf4j
 @Aspect
 @Component
@@ -27,6 +31,7 @@ public class OperationLogAspect {
     private final OperationLogService operationLogService;
     private final SecurityHelper securityHelper;
 
+    /** 环绕增强:无论成功失败都落库一条日志,失败时保存错误信息并继续抛出 */
     @Around("@annotation(operationLog)")
     public Object around(ProceedingJoinPoint pjp, OperationLog operationLog) throws Throwable {
         long start = System.currentTimeMillis();
@@ -64,11 +69,13 @@ public class OperationLogAspect {
         return result;
     }
 
+    /** 组装日志基础信息:注解内容 + 请求 IP/URL + 操作人(未登录时尝试从参数反推用户名) */
     private SysOperationLog buildBaseLog(OperationLog ann, ProceedingJoinPoint pjp) {
         SysOperationLog logEntry = new SysOperationLog();
         logEntry.setOperationType(ann.operationType());
         logEntry.setModule(ann.module());
         logEntry.setDescription(ann.description());
+        logEntry.setTraceId(org.slf4j.MDC.get(com.ihomy.filter.TraceIdFilter.TRACE_ID));
 
         HttpServletRequest req = currentRequest();
         if (req != null) {
@@ -104,6 +111,7 @@ public class OperationLogAspect {
         return logEntry;
     }
 
+    /** 通过反射尝试取第一个参数的 username(登录场景) */
     private String tryGuessUsername(Object arg) {
         try {
             return (String) arg.getClass().getMethod("getUsername").invoke(arg);
@@ -112,6 +120,7 @@ public class OperationLogAspect {
         }
     }
 
+    /** 依次取代理头中的真实 IP,取不到回退 remoteAddr,多级代理取首个地址 */
     private String resolveIp(HttpServletRequest req) {
         String ip = req.getHeader("X-Forwarded-For");
         if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
@@ -137,6 +146,7 @@ public class OperationLogAspect {
         return null;
     }
 
+    /** 序列化对象为 JSON,排除请求/响应对象,序列化失败时降级为 toString */
     private String safeJson(Object obj) {
         try {
             if (obj == null) return null;

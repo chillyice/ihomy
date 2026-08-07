@@ -7,6 +7,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+/**
+ * 操作日志落库服务:异步保存,失败仅告警不影响主业务。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -14,6 +17,7 @@ public class OperationLogService {
 
     private final SysOperationLogMapper sysOperationLogMapper;
 
+    /** 异步插入日志,失败降级为告警日志 */
     @Async
     public void save(SysOperationLog logEntry) {
         try {

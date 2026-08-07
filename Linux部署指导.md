@@ -79,7 +79,7 @@ node -v && npm -v
 npm config set registry https://registry.npmmirror.com
 ```
 
-### 2.4 安装 MySQL 8.0（本机部署）
+### 2.4 安装 MySQL 8.4.10（本机部署）
 
 > 求稳方案：MySQL 本机部署，不走 Docker。调优配置直接放 `/etc/mysql/conf.d/`，无需挂载。
 

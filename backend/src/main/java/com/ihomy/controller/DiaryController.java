@@ -13,6 +13,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * 生活日志(日记)接口:列表/写/改/删。
+ */
 @Tag(name = "日志")
 @RestController
 @RequestMapping("/diary")

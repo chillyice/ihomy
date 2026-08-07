@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.CommentMapper">
+
+    <select id="countByContentIds" resultType="map">
+        SELECT content_id, COUNT(*) AS cnt FROM content_comment
+        WHERE content_type = #{contentType} AND deleted = 0
+        AND content_id IN
+        <foreach collection="contentIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        GROUP BY content_id
+    </select>
+
+</mapper>

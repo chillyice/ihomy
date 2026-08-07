@@ -1,3 +1,4 @@
+<!-- 照片轮播:定时自动切换 + 左右按钮/圆点切换,右侧展示当前照片备注 -->
 <template>
   <div class="album-carousel">
     <div class="carousel-stage">
@@ -55,8 +56,10 @@ const props = defineProps({
 const index = ref(0)
 const timer = ref(null)
 
+// 当前展示的照片(索引越界时返回 undefined,模板走空态)
 const currentPhoto = computed(() => props.photos[index.value])
 
+// 下一张/上一张,首尾循环
 const next = () => {
   if (props.photos.length <= 1) return
   index.value = (index.value + 1) % props.photos.length
@@ -66,6 +69,7 @@ const prev = () => {
   index.value = (index.value - 1 + props.photos.length) % props.photos.length
 }
 
+// 启动定时轮播;照片不足两张不启动
 const start = () => {
   stop()
   if (props.photos.length > 1) {
@@ -79,6 +83,7 @@ const stop = () => {
   }
 }
 
+// 照片列表变化(异步加载完成)时回到第一张并重启轮播
 watch(() => props.photos, () => {
   index.value = 0
   start()

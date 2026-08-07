@@ -7,6 +7,9 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+/**
+ * 角色实体(sys_role):预设 OWNER/MEMBER/CHILD/GUEST,权限经 sys_role_auth 关联。
+ */
 @Data
 @TableName("sys_role")
 public class SysRole {

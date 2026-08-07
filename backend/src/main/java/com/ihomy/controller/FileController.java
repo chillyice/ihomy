@@ -13,6 +13,9 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * 文件上传接口:统一上传入口,返回可访问 URL(供头像/封面/内容配图使用)。
+ */
 @Tag(name = "文件上传")
 @RestController
 @RequestMapping("/file")

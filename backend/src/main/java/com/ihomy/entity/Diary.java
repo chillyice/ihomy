@@ -5,6 +5,9 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+/**
+ * 生活日志实体(content_diary):多图以 JSON 字符串存 images 字段。
+ */
 @Data
 @TableName("content_diary")
 public class Diary {
@@ -14,6 +17,7 @@ public class Diary {
     private String mood;
     private String weather;
     private String images;
+    private Integer likeCount;
     private Long authorId;
     private Long familyId;
     private Integer visibility;

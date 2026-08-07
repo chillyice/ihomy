@@ -1,12 +1,16 @@
+<!-- 首页:封面区(家庭信息+统计) + 相册轮播 + 家人动态流 + 侧栏快捷入口/纪念日/最新博客 -->
 <template>
   <div class="home-page">
-    <AppHeader :modules="modules" :family-name="family?.name" />
-
     <section class="cover">
       <img v-if="family?.coverImage" :src="family.coverImage" class="cover-img" alt="封面" />
       <div class="cover-overlay">
         <h1>{{ family?.coverText || '欢迎来到我们的家庭空间' }}</h1>
-        <p v-if="family?.coverSubtitle">{{ family.coverSubtitle }}</p>
+        <p v-if="family?.coverSubtitle" class="cover-sub">{{ family.coverSubtitle }}</p>
+        <HomeStatsBar
+          class="cover-stats"
+          :member-count="memberCount"
+          :feed-count="todayCount"
+        />
       </div>
       <div v-if="userStore.isGuest" class="guest-hint">
         您正在以访客身份浏览公开内容
@@ -15,18 +19,69 @@
     </section>
 
     <main class="main-content">
-      <AlbumCarousel :photos="photos" />
+      <div class="content-grid">
+        <div class="content-main">
+          <AlbumCarousel :photos="photos" />
 
-      <div class="bottom-modules">
-        <div
-          v-for="m in bottomModules"
-          :key="m.code"
-          class="module-card"
-          @click="goModule(m)"
-        >
-          <div class="module-icon">{{ iconFor(m.icon) }}</div>
-          <div class="module-title">{{ m.title }}</div>
+          <div class="feed-section">
+            <ActivityFeed ref="feedRef" :home-id="homeId" :hid="hid" @loaded="onFeedLoaded" />
+          </div>
         </div>
+
+        <aside class="content-side">
+          <div class="side-card">
+            <div class="side-title">快捷入口</div>
+            <div class="side-modules">
+              <div
+                v-for="m in sideModules"
+                :key="m.code"
+                class="side-module"
+                @click="goModule(m)"
+              >
+                <div class="side-icon">{{ iconFor(m.icon) }}</div>
+                <div class="side-name">{{ m.title }}</div>
+              </div>
+              <div
+                v-if="allSideModules.length > SIDE_MODULE_LIMIT"
+                class="side-module"
+                @click="$router.push('/more')"
+              >
+                <div class="side-icon">🗂️</div>
+                <div class="side-name">更多功能</div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="anniversaries.length" class="side-card">
+            <div class="side-title">🎉 家庭纪念日</div>
+            <div
+              v-for="a in anniversaries"
+              :key="a.id"
+              class="side-anni"
+              @click="$router.push('/anniversary')"
+            >
+              <div class="side-anni-date">{{ a.isLeap && a.calendar === 'lunar' ? '闰' : '' }}{{ a.month }}月{{ a.day }}日</div>
+              <div class="side-anni-info">
+                <div class="side-anni-name">{{ a.name }}</div>
+                <div class="side-anni-meta">{{ a.calendar === 'lunar' ? '农历' : '阳历' }}{{ a.userName ? ' · ' + a.userName : '' }}</div>
+              </div>
+            </div>
+            <div class="side-anni-more" @click="$router.push('/anniversary')">查看全部纪念日 →</div>
+          </div>
+
+          <div v-if="latestBlogs.length" class="side-card">
+            <div class="side-title">最新博客</div>
+            <div
+              v-for="b in latestBlogs"
+              :key="b.id"
+              class="side-blog"
+              @click="$router.push(`/blog/${b.id}`)"
+            >
+              <div class="side-blog-title">{{ b.title }}</div>
+              <div class="side-blog-meta">{{ b.viewCount || 0 }} 次浏览</div>
+            </div>
+          </div>
+        </aside>
       </div>
     </main>
   </div>
@@ -34,20 +89,35 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { publicApi, homeApi } from '@/api'
-import AppHeader from '@/components/AppHeader.vue'
+import { publicApi, homeApi, blogApi, anniversaryApi } from '@/api'
 import AlbumCarousel from '@/components/AlbumCarousel.vue'
+import HomeStatsBar from '@/components/HomeStatsBar.vue'
+import ActivityFeed from '@/components/ActivityFeed.vue'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 
 const modules = ref([])
 const photos = ref([])
 const family = ref({})
+const todayCount = ref(0)
+const memberCount = ref(0)
+const latestBlogs = ref([])
+const anniversaries = ref([])
+const feedRef = ref()
 
-const bottomModules = computed(() => modules.value.filter(m => m.position === 'right' || m.position === 'bottom'))
+const SIDE_MODULE_LIMIT = 8
+const ANNIVERSARY_SHOW = 5
+
+// 侧栏候选模块:右侧/底部/左侧位置的模块都算;首页最多展示 8 个,超出进"更多功能"
+const allSideModules = computed(() =>
+  modules.value.filter(m => m.position === 'right' || m.position === 'bottom' || m.position === 'left')
+)
+
+const sideModules = computed(() => allSideModules.value.slice(0, SIDE_MODULE_LIMIT))
 
 const iconMap = {
   'icon-blog': '📝',
@@ -57,32 +127,66 @@ const iconMap = {
   'icon-cover': '🖼️',
   'icon-study': '📚',
   'icon-toolbox': '🧰',
+  'icon-anniversary': '🎉',
 }
+// 模块图标映射,未收录的图标兜底为星星
 const iconFor = (icon) => iconMap[icon] || '⭐'
 
 const goModule = (m) => router.push(m.path)
 
+// 动态流加载完成回调,拿到今日动态数用于封面统计
+const onFeedLoaded = (count) => {
+  todayCount.value = count
+}
+
+// 从 URL 读取家庭参数:hid 为混淆分享 token,home_id 为旧版兼容参数
+const homeId = computed(() => route.query.home_id || '')
+const hid = computed(() => route.query.hid || '')
+
+// 访客/指定家庭:只走公开接口,拿公开模块、照片与成员数
 const loadPublicHome = async () => {
-  const data = await publicApi.getHome()
+  const data = await publicApi.getHome(homeId.value || undefined, hid.value || undefined)
   family.value = data.family || {}
   modules.value = data.modules || []
   photos.value = data.photos || []
+  memberCount.value = data.stats?.memberCount || 0
 }
 
+// 登录用户首页:优先拉私有仪表盘;带家庭参数或接口失败时降级走公开数据
 const loadUserHome = async () => {
+  if (hid.value || homeId.value) {
+    try {
+      await loadPublicHome()
+      return
+    } catch (e) {
+      // 忽略
+    }
+  }
   try {
     const dash = await homeApi.getDashboard()
     if (dash?.modules) modules.value = dash.modules
-    if (dash?.user) family.value = { name: 'ihomy' }
   } catch (e) {
     await loadPublicHome()
     return
   }
-  // 已登录用户也加载公开照片用于首页轮播
   try {
     const pub = await publicApi.getHome()
     photos.value = pub.photos || []
     if (pub.family) family.value = pub.family
+    memberCount.value = 1
+  } catch (e) {
+    // 忽略
+  }
+  try {
+    const bl = await blogApi.list({ current: 1, size: 5 })
+    latestBlogs.value = bl.records || []
+  } catch (e) {
+    // 忽略
+  }
+  try {
+    const list = await anniversaryApi.list()
+    const shuffled = [...(list || [])].sort(() => Math.random() - 0.5)
+    anniversaries.value = shuffled.slice(0, ANNIVERSARY_SHOW)
   } catch (e) {
     // 忽略
   }
@@ -102,25 +206,44 @@ onMounted(() => {
 
 .cover {
   position: relative;
-  height: 280px;
-  background: linear-gradient(135deg, #1F3A5F, #2E74B5);
+  min-height: 320px;
+  background: linear-gradient(135deg, #1F3A5F 0%, #2E74B5 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
 }
-.cover-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.5; }
-.cover-overlay { position: relative; text-align: center; color: #fff; padding: 0 16px; z-index: 1; }
-.cover-overlay h1 {
-  font-size: 32px;
-  font-weight: 700;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
-  margin-bottom: 8px;
+.cover-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.5;
 }
-.cover-overlay p { font-size: 16px; opacity: 0.9; }
+.cover-overlay {
+  position: relative;
+  text-align: center;
+  color: #fff;
+  padding: 0 16px;
+  z-index: 1;
+}
+.cover-overlay h1 {
+  font-size: 36px;
+  font-weight: 700;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.5);
+  margin-bottom: 12px;
+}
+.cover-sub {
+  font-size: 16px;
+  opacity: 0.9;
+  margin-bottom: 20px;
+}
+.cover-stats { margin-top: 8px; }
+
 .guest-hint {
   position: absolute;
-  bottom: 16px;
+  bottom: 20px;
   right: 24px;
   background: rgba(0, 0, 0, 0.6);
   color: #fff;
@@ -135,42 +258,133 @@ onMounted(() => {
 
 .main-content {
   max-width: 1280px;
-  margin: -40px auto 0;
+  margin: -32px auto 0;
   padding: 0 24px 32px;
   position: relative;
   z-index: 2;
 }
 
-.bottom-modules {
-  margin-top: 24px;
+.content-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: 1fr 320px;
+  gap: 24px;
+}
+.content-main { display: flex; flex-direction: column; gap: 24px; }
+.feed-section { min-height: 200px; }
+
+.content-side {
+  display: flex;
+  flex-direction: column;
   gap: 16px;
 }
-.module-card {
+.side-card {
   background: var(--color-card);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 24px 16px;
-  text-align: center;
+  padding: 20px;
+}
+.side-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-primary);
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(31, 58, 95, 0.08);
+}
+.side-modules {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.side-module {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 8px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
+  transition: background 0.15s, transform 0.15s;
 }
-.module-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(31, 58, 95, 0.15);
+.side-module:hover {
+  background: rgba(46, 116, 181, 0.08);
+  transform: translateY(-2px);
 }
-.module-icon { font-size: 36px; margin-bottom: 8px; }
-.module-title { font-size: 15px; color: var(--color-text); font-weight: 500; }
+.side-icon { font-size: 26px; margin-bottom: 4px; }
+.side-name { font-size: 13px; color: var(--color-text); }
 
+.side-blog {
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(31, 58, 95, 0.05);
+  cursor: pointer;
+}
+.side-blog:last-child { border-bottom: none; }
+.side-blog:hover .side-blog-title { color: var(--color-accent); }
+.side-blog-title {
+  font-size: 14px;
+  color: var(--color-text);
+  line-height: 1.4;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.side-blog-meta {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.side-anni {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(31, 58, 95, 0.05);
+  cursor: pointer;
+}
+.side-anni:last-of-type { border-bottom: none; }
+.side-anni:hover .side-anni-name { color: var(--color-accent); }
+.side-anni-date {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+.side-anni-info { min-width: 0; }
+.side-anni-name {
+  font-size: 14px;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.side-anni-meta {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.side-anni-more {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-accent);
+  cursor: pointer;
+  padding-top: 8px;
+  border-top: 1px solid rgba(31, 58, 95, 0.06);
+}
+.side-anni-more:hover { opacity: 0.8; }
+
+@media (max-width: 1024px) {
+  .content-grid { grid-template-columns: 1fr; }
+}
 @media (max-width: 768px) {
-  .cover { height: 200px; }
+  .cover { min-height: 220px; }
   .cover-overlay h1 { font-size: 22px; }
-  .cover-overlay p { font-size: 13px; }
+  .cover-sub { font-size: 13px; }
   .guest-hint { right: 12px; bottom: 12px; font-size: 12px; padding: 6px 12px; }
-  .main-content { padding: 0 12px 24px; margin-top: -24px; }
-  .bottom-modules { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
-  .module-card { padding: 16px 8px; }
-  .module-icon { font-size: 28px; }
+  .main-content { padding: 0 12px 24px; margin-top: -20px; }
+  .side-modules { grid-template-columns: repeat(3, 1fr); }
 }
 </style>
