@@ -52,4 +52,8 @@
         LIMIT #{limit}
     </select>
 
+    <delete id="deletePhysicalById">DELETE FROM content_photo WHERE id = #{id}</delete>
+
+    <delete id="deletePhysicalByAlbumId">DELETE FROM content_photo WHERE album_id = #{albumId}</delete>
+
 </mapper>

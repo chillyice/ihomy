@@ -18,4 +18,8 @@ public interface PhotoMapper extends BaseMapper<Photo> {
     List<Map<String, Object>> selectCascadeByFamily(@Param("familyId") Long familyId, @Param("userId") Long userId, @Param("limit") int limit);
 
     List<Photo> selectLatestPublicByFamily(@Param("familyId") Long familyId, @Param("limit") int limit);
+
+    int deletePhysicalById(@Param("id") Long id);
+
+    int deletePhysicalByAlbumId(@Param("albumId") Long albumId);
 }

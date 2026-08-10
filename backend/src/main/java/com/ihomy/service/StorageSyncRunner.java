@@ -134,7 +134,7 @@ public class StorageSyncRunner {
                 continue;
             }
             try {
-                String url = copyToSystemStorage(f, album.getId());
+                String url = copyToSystemStorage(f, album.getId(), albumName);
                 Photo photo = new Photo();
                 photo.setAlbumId(album.getId());
                 photo.setUrl(url);
@@ -185,12 +185,13 @@ public class StorageSyncRunner {
         return prefix + ":" + base.relativize(f.toAbsolutePath().normalize()).toString().replace('\\', '/');
     }
 
-    private String copyToSystemStorage(Path src, Long albumId) throws IOException {
-        String yyyyMM = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
-        Path dir = Paths.get(uploadDir, "upload", yyyyMM);
+    private String copyToSystemStorage(Path src, Long albumId, String albumName) throws IOException {
+        String cleanName = albumName == null ? null : albumName.replaceAll("[^\\w.\\-\\u4e00-\\u9fa5]", "_");
+        Path dir = cleanName == null ? Paths.get(uploadDir, "pictures")
+                : Paths.get(uploadDir, "pictures", cleanName);
         Files.createDirectories(dir);
         String fileName = albumId + "_" + System.currentTimeMillis() + "_" + src.getFileName().toString();
         Files.copy(src, dir.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
-        return "/files/upload/" + yyyyMM + "/" + fileName;
+        return "/files/pictures/" + (cleanName == null ? "" : cleanName + "/") + fileName;
     }
 }
