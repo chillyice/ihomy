@@ -114,7 +114,7 @@ public class StorageService {
     }
 
     private Path resolveSafe(Path root, String rel) {
-        String r = rel == null ? "" : rel.trim();
+        String r = rel == null ? "" : rel.trim().replace('\\', '/');
         if (r.startsWith("/")) r = r.substring(1);
         Path target = root.resolve(r).normalize();
         if (!target.startsWith(root)) {

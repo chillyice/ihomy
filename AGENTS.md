@@ -199,15 +199,17 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 ## 文件存储策略
 
-- **当前阶段(开发期)**:本地磁盘存储(`file.upload-dir=/opt/ihomy/uploads`),零成本零内存,FileService 已实现,开箱即用。Nginx `/files/` 托管静态目录(注意负向断言正则,见上"上传文件访问")。
+- **当前阶段(开发期)**:本地磁盘存储(`file.upload-dir`),零成本零内存,FileService 已实现,开箱即用。Nginx `/files/` 托管静态目录(注意负向断言正则,见上"上传文件访问")。
+  - **本机 Windows 默认**:`D:/WorkSpace/ihomy/uploads`(application.yml `file.upload-dir`,用户指定的 Windows 默认盘;生产 Linux 用 `/opt/ihomy/uploads`)。改路径只需改 yml + 移动 uploads 目录,DB 存的是相对 `/files/` 的完整 URL,与物理根无关。
 - **未来对接 NAS**:优先 NFS 挂载方案(把 NAS 共享目录挂到 `/opt/ihomy/uploads`,**代码零改动**)。前提是 NAS 与服务器同内网。详细步骤见 Linux 部署指导附录"对接 NAS 存储"。若 NAS 异地或要公网 CDN:再改 FileService 用 S3 兼容 SDK(NAS/MinIO/OSS 通用),用 `@ConditionalOnProperty` 切换实现,本地实现保留为默认。
 - **不要主动改 FileService 的存储实现**,除非用户明确要求接 NAS/OSS。当前本地实现满足需求。
 - **存储管理(V4.1,已实施)**:
-  - **统一目录结构**:系统上传走 `{上传根}/upload/{yyyyMM}/{相册ID}_{时间戳}_{文件名}` 子目录(FileService 4 参 upload 重载,Video/FileController 仍用 3 参兼容版,无相册 ID 则文件名不带前缀);系统根目录名为 `uploads`(保留现名)。
+  - **统一目录结构(分类目录,无 upload 中间层)**:上传按类型分目录——相册图片→`pictures/{相册名}/{相册ID}_{时间戳}_{文件名}`、视频与海报→`videos/`、音乐(audio/*)→`music/`、通用/头像→`files/{yyyyMM}/`。FileService 提供 `upload(bytes,name,type,albumId,albumName)`(图片带相册名)、`uploadVideo`(影片/海报)、3 参 `upload`(通用)重载;无相册名时图片平铺到 `pictures/`。DB 存 `/files/...` 完整 URL,与物理根解耦(详见「附:Windows 开发↔Linux 上线路径转换清单」)。
   - **存储设备**:`sys_storage_device`(family_id 家庭级隔离,name/device_type SYSTEM|NAS|REMOTE|MOUNT/root_path/status/created_by)。`GET /storage/device/list` 首项恒为系统设备(id=0,type=SYSTEM);设备增删改/一键同步需 `@RequirePermission("storage:manage")`(OWNER)。**设备归属=家庭级独立配置**,互不可见。**本期不做网盘**(WebDAV/OSS/S3 暂缓)。
   - **资源管理器**:`GET /storage/browse?deviceId&path` + `GET /storage/file?deviceId&path&download`(返回 byte[],media type 猜;下载文件名 URL-encode)。`StorageService.resolveSafe` 用 `normalize()+startsWith` 防路径遍历(越界返回 400,已实测)。前端 `/storage` 页(views/storage/Storage.vue):设备表格 + 文件浏览(面包屑/双击/预览 img·video/下载)。
   - **一键同步**:`POST /storage/sync {deviceId,includeEmpty}` → `{taskId}`;`GET /storage/sync/progress/{taskId}`。`StorageSyncRunner`(@Async 独立 bean——自调用不生效):按顶层目录建相册(相册名=目录名),`content_photo.source_path`(“设备:相对路径”)去重防重复,复制到 upload/yyyyMM 结构,完成/失败走 family_notification(create(receiverId,'system',content,null,'storage',null))。进度在内存 ConcurrentHashMap(重启丢失,可接受)。实测:2 目录 2 图同步成 2 相册 2 照片,空目录按 includeEmpty 跳过,二次同步全去重。
   - **不做自动同步**:上传只保留页面自主上传、创建相册上传、直接传 NAS 三条线。
+  - **硬删除策略(V5.1,已实施)**:删除照片/相册/视频时**物理删除 DB 记录 + 删除磁盘文件**。`FileService.deleteByUrl(url)` 按 `/files/` URL 解析物理路径删文件(外链/空跳过,失败仅告警,带 `normalize()+startsWith` 防越界,顺带尝试清空父目录)。照片删除走 `PhotoMapper.deletePhysicalById`(XML 物理删,绕过全局 logic-delete);相册删除连带照片记录+文件全删(`deletePhysicalByAlbumId`);视频删除**从软删改为硬删** `deletePhysicalById`,并删 `video_url`+`poster`。**关键坑**:MyBatis-Plus 全局配 `logic-delete-field: deleted`(`application.yml`),`deleteById` 实为 UPDATE 软删——要物理删必须用自定义 XML `DELETE` 语句。**覆盖范围**:仅照片/相册/视频三处;博客封面、头像、家庭封面、背景音乐、家谱照片删除时**未**连带删文件(文件成孤儿,可接受,后续按需扩展)。
 
 ## 部署约定(Linux 2GB 求稳)
 
@@ -253,6 +255,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 混淆 ID | V3.7 | share_token + `?hid=`,新家庭默认私有 |
 | 存储管理 | V4.1 | 家庭级设备+文件浏览器+一键同步(见文件存储策略小节);存量迁移待做 |
 | 物品定位 | V5.0 | 1期已上线:五级粒度(家>房子>房间>家具>位置,支持多套房+多楼层),房子/房间/家具/物品 CRUD+跨级搜索;2期户型图/3期 AI 语义待做(见规划事项) |
+| 文件硬删除 | V5.1 | 删照片/相册/视频→物理删 DB 行 + 删磁盘文件(`FileService.deleteByUrl`);视频从软删改硬删;自定义 XML DELETE 绕过全局 logic-delete;仅覆盖照片/相册/视频,博客封面/头像/音乐等未连带删 |
 
 ## 国际化约定(V4.0)
 

@@ -31,6 +31,7 @@ public class AlbumService {
     private final AlbumMapper albumMapper;
     private final PhotoMapper photoMapper;
     private final FamilyMapper familyMapper;
+    private final FileService fileService;
 
     /** 相册列表,游客只返回 public 类型;附带封面与照片数 */
     public List<Map<String, Object>> list(Long familyId, boolean isGuest) {
@@ -53,6 +54,11 @@ public class AlbumService {
             result.add(m);
         }
         return result;
+    }
+
+    /** 按主键取相册(PhotoController 上传时取相册名建目录) */
+    public Album getById(Long id) {
+        return albumMapper.selectById(id);
     }
 
     /** 相册详情+照片列表;游客仅可访问默认家庭的公开相册 */
@@ -97,13 +103,15 @@ public class AlbumService {
         return a;
     }
 
-    /** 删除相册(连带照片):仅创建者或家长 */
+    /** 删除相册(连带照片+文件):仅创建者或家长 */
     public void delete(Long id, SysUser user, boolean isOwner) {
         requireOwn(id, user, isOwner);
-        albumMapper.deleteById(id);
         LambdaQueryWrapper<Photo> qw = new LambdaQueryWrapper<>();
         qw.eq(Photo::getAlbumId, id);
-        photoMapper.delete(qw);
+        List<Photo> photos = photoMapper.selectList(qw);
+        albumMapper.deletePhysicalById(id);
+        photoMapper.deletePhysicalByAlbumId(id);
+        for (Photo p : photos) fileService.deleteByUrl(p.getUrl());
     }
 
     /** 添加照片:可见性随相册类型(public→4,private→3);首张自动成为相册封面 */
@@ -135,10 +143,11 @@ public class AlbumService {
         photoMapper.updateById(p);
     }
 
-    /** 删除照片:仅上传者或家长 */
+    /** 删除照片:仅上传者或家长(连带删除文件) */
     public void deletePhoto(Long photoId, SysUser user, boolean isOwner) {
-        requirePhoto(photoId, user, isOwner);
-        photoMapper.deleteById(photoId);
+        Photo p = requirePhoto(photoId, user, isOwner);
+        photoMapper.deletePhysicalById(photoId);
+        fileService.deleteByUrl(p.getUrl());
     }
 
     private long countPhotos(Long albumId) {

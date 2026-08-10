@@ -728,6 +728,40 @@ ps -eo pid,rss,cmd --sort=-rss | grep -E 'java|mysql|redis|nginx|dockerd' | head
 
 ---
 
+## 附:数据备份
+
+> ihomy 删除照片/相册/视频时为**硬删除**(物理删 DB 记录 + 删除磁盘文件,无回收站),误删不可恢复。生产环境务必定期备份:
+
+- **数据库**:`mysqldump -uroot -p ihomy | gzip > /var/backups/ihomy/ihomy-$(date +%F).sql.gz`,crontab 每日 03:00 执行,保留 14 天。
+- **上传文件**:`/opt/ihomy/uploads` 目录(含 pictures/videos/files/music 分类子目录),`rsync -a /opt/ihomy/uploads/ /var/backups/ihomy/uploads/`,与数据库同周期。
+- **恢复**:先恢复数据库,再恢复 uploads 目录;DB 里的文件 URL(`/files/...`)与物理路径解耦,目录还原后即可访问。
+
+---
+
+## 附：Windows 开发环境 ↔ Linux 上线:路径转换清单
+
+> 日常在 Windows 上开发验证(上传目录 `D:/WorkSpace/ihomy/uploads`),上线 Linux 时的路径处理如下。
+> 核心结论:**代码零改动,DB 里的文件 URL 零改动,只需要改 1 个配置 + 迁移 2 类数据**。
+
+| 触点 | Windows(开发) | Linux(上线) | 谁负责 |
+|------|---------------|-------------|--------|
+| 上传根目录 `file.upload-dir`(application.yml) | `D:/WorkSpace/ihomy/uploads` | `/opt/ihomy/uploads` | 部署时改 yml 一行 |
+| DB 里的文件 URL(`/files/...`) | 相对 URL 与物理根解耦 | 不变,原样用 | 无需动作 |
+| 存储设备 `sys_storage_device.root_path`(DB 数据) | 配的 Windows 盘路径 | 需改成 Linux 路径(如 `/mnt/nas/photo`) | 上线后在存储管理页重新添加/编辑设备,或 SQL UPDATE |
+| 日志路径 | `./logs/ihomy.log`(相对工作目录) | systemd 已配 /var/log/ihomy | 无需动作 |
+| Nginx `/files/` alias | 指向 Windows uploads | `/opt/ihomy/uploads/` | 部署时 nginx 配置 |
+
+代码侧已验证平台无关,无需改动:`Paths.get`/`Files` 全平台自适应;上传文件名的清洗正则兼容 UTF-8 中文;
+同步去重键 `source_path` 与防遍历校验(`resolveSafe`)均反斜杠归一,Win/Linux 行为一致。
+
+**上线迁移步骤**:
+1. 改 `application.yml` 的 `file.upload-dir` 为 `/opt/ihomy/uploads`;
+2. 以 ihomy 用户 `rsync -a D:/WorkSpace/ihomy/uploads/ /opt/ihomy/uploads/`(DB 的 URL 不用改);
+3. 重新添加家庭存储设备(Linux 侧根路径),旧设备记录可删;
+4. 验证:`/files/upload/...`、`/files/pictures/...`、`/files/music/...`、`/files/videos/...` 均可访问。
+
+---
+
 ## 附：未来扩展 — 对接 NAS 存储
 
 > 适用场景:有了 NAS(群晖/威联通/TrueNAS 等)后,希望把用户上传的文件存到 NAS 上,既节省服务器磁盘,又利用 NAS 的 RAID 冗余保护数据。

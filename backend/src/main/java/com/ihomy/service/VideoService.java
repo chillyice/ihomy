@@ -32,6 +32,7 @@ public class VideoService {
     private final VideoWishMapper videoWishMapper;
     private final SysUserMapper sysUserMapper;
     private final PointsService pointsService;
+    private final FileService fileService;
 
     /** 视频列表:按家庭过滤,支持关键字/类型搜索,附带上传者昵称 */
     public List<Map<String, Object>> list(Long familyId, String keyword, String mediaType) {
@@ -90,13 +91,12 @@ public class VideoService {
         return v;
     }
 
-    /** 删除视频:软删(deleted=1) */
+    /** 删除视频:硬删记录并删除视频文件与海报 */
     public void delete(Long id, Long familyId, Long currentUserId, boolean isOwner) {
-        requireOwn(id, familyId, currentUserId, isOwner);
-        Video v = new Video();
-        v.setId(id);
-        v.setDeleted(1);
-        videoMapper.updateById(v);
+        Video v = requireOwn(id, familyId, currentUserId, isOwner);
+        videoMapper.deletePhysicalById(id);
+        fileService.deleteByUrl(v.getVideoUrl());
+        fileService.deleteByUrl(v.getPoster());
     }
 
     /** DTO 字段落库,mediaType 缺省补 movie */

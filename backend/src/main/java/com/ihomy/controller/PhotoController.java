@@ -3,6 +3,7 @@ package com.ihomy.controller;
 import com.ihomy.annotation.OperationLog;
 import com.ihomy.common.Result;
 import com.ihomy.dto.PhotoDTO;
+import com.ihomy.entity.Album;
 import com.ihomy.entity.Photo;
 import com.ihomy.entity.SysUser;
 import com.ihomy.security.SecurityHelper;
@@ -39,9 +40,11 @@ public class PhotoController {
     public Result<List<Photo>> upload(@PathVariable Long albumId,
                                        @RequestParam(value = "files") MultipartFile[] files) throws IOException {
         SysUser user = securityHelper.currentUser();
+        Album album = albumService.getById(albumId);
         List<Photo> photos = new ArrayList<>();
         for (MultipartFile f : files) {
-            String url = fileService.upload(f.getBytes(), f.getOriginalFilename(), f.getContentType(), albumId);
+            String url = fileService.upload(f.getBytes(), f.getOriginalFilename(), f.getContentType(),
+                    albumId, album == null ? null : album.getName());
             photos.add(albumService.addPhoto(albumId, user, url, null));
         }
         if (!photos.isEmpty()) {

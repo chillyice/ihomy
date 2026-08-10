@@ -398,3 +398,13 @@ C:\nginx\                     # Nginx
 C:\nssm\                      # 服务工具
 C:\win-acme\                  # 证书工具
 ```
+
+---
+
+## 附：数据备份
+
+> ihomy 删除照片/相册/视频时为**硬删除**(物理删 DB 记录 + 删除磁盘文件,无回收站),误删不可恢复。建议定期备份:
+
+- **数据库**:`mysqldump -uroot -p ihomy > D:\backup\ihomy\ihomy-%date:~0,4%%date:~5,2%%date:~8,2%.sql`,任务计划程序每日执行,保留 14 天。
+- **上传文件**:`C:\app\ihomy\uploads` 目录(含 pictures/videos/files/music 分类子目录),用 robocopy 或手动复制到备份盘,与数据库同周期。
+- **恢复**:先恢复数据库,再恢复 uploads 目录;DB 里的文件 URL(`/files/...`)与物理路径解耦,目录还原后即可访问。
