@@ -2,6 +2,7 @@ package com.ihomy.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ihomy.common.BizException;
+import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
 import com.ihomy.dto.AlbumDTO;
 import com.ihomy.entity.Album;
@@ -117,7 +118,7 @@ public class AlbumService {
         p.setDescription(description);
         p.setAuthorId(user.getId());
         p.setFamilyId(a.getFamilyId());
-        p.setVisibility("public".equals(a.getType()) ? 4 : 3);
+        p.setVisibility("public".equals(a.getType()) ? DictConst.VIS_PUBLIC : DictConst.VIS_FAMILY);
         photoMapper.insert(p);
 
         if (a.getCoverPhotoUrl() == null || a.getCoverPhotoUrl().isBlank()) {

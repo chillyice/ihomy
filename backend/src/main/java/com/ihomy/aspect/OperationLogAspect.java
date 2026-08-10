@@ -2,6 +2,7 @@ package com.ihomy.aspect;
 
 import cn.hutool.json.JSONUtil;
 import com.ihomy.annotation.OperationLog;
+import com.ihomy.common.DictConst;
 import com.ihomy.entity.SysOperationLog;
 import com.ihomy.security.LoginUser;
 import com.ihomy.security.SecurityHelper;
@@ -41,7 +42,7 @@ public class OperationLogAspect {
         Throwable thrown = null;
         try {
             result = pjp.proceed();
-            logEntry.setResultStatus(1);
+            logEntry.setResultStatus(DictConst.LOG_FAILED);
             if (operationLog.saveResult() && result != null) {
                 String ret = safeJson(result);
                 if (ret != null && ret.length() > 2000) {
@@ -51,7 +52,7 @@ public class OperationLogAspect {
             }
         } catch (Throwable e) {
             thrown = e;
-            logEntry.setResultStatus(0);
+            logEntry.setResultStatus(DictConst.LOG_SUCCESS);
             String msg = e.getMessage();
             if (msg != null && msg.length() > 1000) {
                 msg = msg.substring(0, 1000);
@@ -69,7 +70,7 @@ public class OperationLogAspect {
         return result;
     }
 
-    /** 组装日志基础信息:注解内容 + 请求 IP/URL + 操作人(未登录时尝试从参数反推用户名) */
+    /** 组装日志基础信息:注解内容 + 请求 IP/URL + 操作人(登录接口未登录,操作人留空) */
     private SysOperationLog buildBaseLog(OperationLog ann, ProceedingJoinPoint pjp) {
         SysOperationLog logEntry = new SysOperationLog();
         logEntry.setOperationType(ann.operationType());
@@ -88,14 +89,6 @@ public class OperationLogAspect {
         if (u != null) {
             logEntry.setOperatorId(u.getUserId());
             logEntry.setOperatorName(u.getUsername());
-        } else {
-            Object[] args = pjp.getArgs();
-            if (args != null && args.length > 0 && args[0] != null) {
-                String guess = tryGuessUsername(args[0]);
-                if (guess != null) {
-                    logEntry.setOperatorName(guess);
-                }
-            }
         }
 
         if (ann.saveArgs()) {
@@ -109,15 +102,6 @@ public class OperationLogAspect {
             }
         }
         return logEntry;
-    }
-
-    /** 通过反射尝试取第一个参数的 username(登录场景) */
-    private String tryGuessUsername(Object arg) {
-        try {
-            return (String) arg.getClass().getMethod("getUsername").invoke(arg);
-        } catch (Exception ignored) {
-            return null;
-        }
     }
 
     /** 依次取代理头中的真实 IP,取不到回退 remoteAddr,多级代理取首个地址 */

@@ -33,7 +33,7 @@ public class Video {
     private String videoUrl;
     private Long uploaderId;
     private Long familyId;
-    private Integer visibility;
+    private String visibility;
     private LocalDateTime createdAt;
     private Integer deleted;
 }

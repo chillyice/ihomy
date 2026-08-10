@@ -2,6 +2,7 @@ package com.ihomy.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ihomy.common.BizException;
+import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
 import com.ihomy.entity.InvitationCode;
 import com.ihomy.entity.SysRole;
@@ -77,40 +78,10 @@ public class MemberManagementService {
         ic.setMaxUses(10);
         ic.setUsedCount(0);
         ic.setExpiresAt(LocalDateTime.now().plusDays(7));
-        ic.setStatus(1);
+        ic.setStatus(DictConst.INVITE_UNUSED);
         ic.setCreatedBy(creatorId);
         invitationCodeMapper.insert(ic);
         return Map.of("code", ic.getCode(), "expiresAt", ic.getExpiresAt());
-    }
-
-    /** 核销邀请码:校验有效性与未加入过该家庭后绑定角色 */
-    @Transactional
-    public SysUser acceptInvite(SysUser user, String code) {
-        if (code == null || code.isBlank()) throw new BizException(ResultCode.BAD_REQUEST);
-        InvitationCode ic = invitationCodeMapper.selectByCode(code);
-        if (ic == null || ic.getStatus() != 1) throw new BizException(ResultCode.NOT_FOUND);
-        if (ic.getExpiresAt() != null && ic.getExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new BizException(ResultCode.CONFLICT);
-        }
-        if (ic.getUsedCount() >= ic.getMaxUses()) throw new BizException(ResultCode.CONFLICT);
-        if (user.getFamilyId() != null && !user.getFamilyId().equals(ic.getFamilyId())) {
-            throw new BizException(ResultCode.CONFLICT);
-        }
-        ic.setUsedCount(ic.getUsedCount() + 1);
-        invitationCodeMapper.updateById(ic);
-
-        LambdaQueryWrapper<SysUserRole> qw = new LambdaQueryWrapper<>();
-        qw.eq(SysUserRole::getUserId, user.getId()).eq(SysUserRole::getFamilyId, ic.getFamilyId());
-        if (sysUserRoleMapper.selectCount(qw) == 0) {
-            SysUserRole ur = new SysUserRole();
-            ur.setUserId(user.getId());
-            ur.setRoleId(ic.getPresetRoleId());
-            ur.setFamilyId(ic.getFamilyId());
-            sysUserRoleMapper.insert(ur);
-        }
-        user.setFamilyId(ic.getFamilyId());
-        sysUserMapper.updateById(user);
-        return user;
     }
 
     /** 家庭已生成的邀请码列表(倒序) */
@@ -123,7 +94,7 @@ public class MemberManagementService {
     /** 按角色码查启用角色,不存在抛 400 */
     private SysRole findRole(String roleCode) {
         LambdaQueryWrapper<SysRole> qw = new LambdaQueryWrapper<>();
-        qw.eq(SysRole::getRoleCode, roleCode).eq(SysRole::getStatus, 1);
+        qw.eq(SysRole::getRoleCode, roleCode).eq(SysRole::getStatus, DictConst.ROLE_ENABLED);
         SysRole role = sysRoleMapper.selectOne(qw);
         if (role == null) throw new BizException(ResultCode.BAD_REQUEST);
         return role;

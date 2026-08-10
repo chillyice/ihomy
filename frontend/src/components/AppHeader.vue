@@ -2,8 +2,8 @@
 <template>
   <header class="app-header">
     <div class="header-inner">
-      <div class="brand" @click="$router.push('/')">
-        <span class="brand-name">{{ appStore.familyName || 'ihomy' }}</span>
+      <div class="brand" @click="onBrandClick">
+        <span class="brand-name">{{ userStore.isOps ? $t('nav.ops') : (appStore.familyName || 'ihomy') }}</span>
         <el-dropdown v-if="userStore.isLoggedIn && families.length > 1" trigger="click" class="family-switch" @command="onSwitchFamily">
           <span class="family-switch-trigger">
             <el-icon><ArrowDown /></el-icon>
@@ -21,7 +21,8 @@
         </el-dropdown>
       </div>
 
-      <nav class="nav-modules">
+      <!-- 首页模块导航:普通用户可见;运维用户驻留运维页,不展示动态/模块入口 -->
+      <nav v-if="!userStore.isOps" class="nav-modules">
         <router-link
           v-for="m in navModules"
           :key="m.code"
@@ -33,7 +34,39 @@
       </nav>
 
       <div class="header-right">
-        <el-popover v-if="userStore.isLoggedIn" placement="bottom-end" :width="340" trigger="click" @show="loadNotifications">
+        <!-- 语言切换:中/英,选择即持久化并全局生效 -->
+        <el-dropdown trigger="click" @command="onLang">
+          <div class="lang-trigger" :title="$t('nav.language')">
+            <span>{{ locale === 'en' ? 'EN' : '中' }}</span>
+          </div>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="zh-CN" :disabled="locale === 'zh-CN'">中文</el-dropdown-item>
+              <el-dropdown-item command="en" :disabled="locale === 'en'">English</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+
+        <!-- 主题切换:明暗模式 + 主题色,持久化到本地 -->
+        <el-dropdown trigger="click" class="theme-trigger" @command="onThemeCommand">
+          <div class="lang-trigger" :title="$t('nav.theme')">
+            <el-icon><Sunny v-if="!theme.dark" /><Moon v-else /></el-icon>
+          </div>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item :command="{ dark: !theme.dark, theme: theme.theme }">
+                {{ theme.dark ? $t('theme.light') : $t('theme.dark') }}
+              </el-dropdown-item>
+              <el-dropdown-item divided disabled style="opacity: .9">{{ $t('nav.themeColor') }}</el-dropdown-item>
+              <el-dropdown-item v-for="t in THEMES" :key="t.key" :command="{ dark: theme.dark, theme: t.key }">
+                <span class="theme-swatch" :style="{ background: t.accent }"></span>
+                {{ $t('theme.presets.' + t.key) }}
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+
+        <el-popover v-if="userStore.isLoggedIn && !userStore.isOps" placement="bottom-end" :width="340" trigger="click" @show="loadNotifications">
           <template #reference>
             <el-badge :value="unreadCount" :hidden="!unreadCount" class="msg-badge">
               <el-icon class="msg-icon"><Bell /></el-icon>
@@ -41,8 +74,8 @@
           </template>
           <div class="notify-panel">
             <div class="notify-head">
-              <span>通知</span>
-              <el-button v-if="notifications.length" text size="small" @click="markAllRead">全部已读</el-button>
+              <span>{{ $t('nav.notifications') }}</span>
+              <el-button v-if="notifications.length" text size="small" @click="markAllRead">{{ $t('nav.allRead') }}</el-button>
             </div>
             <div v-if="notifications.length" class="notify-list">
               <div
@@ -57,7 +90,7 @@
                 <div class="notify-time">{{ formatTime(n.createdAt) }}</div>
               </div>
             </div>
-            <el-empty v-else description="暂无通知" :image-size="60" />
+            <el-empty v-else :description="$t('nav.noNotification')" :image-size="60" />
           </div>
         </el-popover>
 
@@ -69,19 +102,22 @@
             <span class="avatar-name">{{ userStore.userInfo?.nickname }}</span>
           </div>
           <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="profile">个人中心</el-dropdown-item>
-              <el-dropdown-item command="settings">家庭设置</el-dropdown-item>
-              <el-dropdown-item v-if="userStore.isOwner" command="member">成员管理</el-dropdown-item>
-              <el-dropdown-item v-if="userStore.isOwner" command="homeConfig">首页配置</el-dropdown-item>
-              <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
+            <el-dropdown-menu v-if="userStore.isOps">
+              <el-dropdown-item command="ops">{{ $t('nav.ops') }}</el-dropdown-item>
+              <el-dropdown-item divided command="logout">{{ $t('nav.logout') }}</el-dropdown-item>
+            </el-dropdown-menu>
+            <el-dropdown-menu v-else>
+              <el-dropdown-item command="profile">{{ $t('settings.profile') }}</el-dropdown-item>
+              <el-dropdown-item command="settings">{{ $t('nav.settings') }}</el-dropdown-item>
+              <el-dropdown-item v-if="userStore.isOwner" command="member">{{ $t('nav.family') }}</el-dropdown-item>
+              <el-dropdown-item divided command="logout">{{ $t('nav.logout') }}</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
 
         <div v-else class="auth-actions">
-          <el-button text @click="$router.push('/login')">登录</el-button>
-          <el-button type="primary" @click="$router.push('/login?register=1')">注册</el-button>
+          <el-button text @click="$router.push('/login')">{{ $t('login.title') }}</el-button>
+          <el-button type="primary" @click="$router.push('/login?register=1')">{{ $t('login.register') }}</el-button>
         </div>
       </div>
     </div>
@@ -91,18 +127,34 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
 import { notificationApi, authApi } from '@/api'
-import { Bell, ArrowDown } from '@element-plus/icons-vue'
+import { Bell, ArrowDown, Sunny, Moon } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { applyLocale } from '@/i18n'
+import { applyTheme, initTheme, THEMES } from '@/theme'
 
 const router = useRouter()
 const userStore = useUserStore()
 const appStore = useAppStore()
+const { locale } = useI18n()
+const theme = ref({ dark: false, theme: 'ocean' })
 const unreadCount = ref(0)
 const notifications = ref([])
 const families = ref([])
+
+// 主题命令:明暗切换或选色盘,applyTheme 内部持久化
+const onThemeCommand = (cmd) => {
+  theme.value = applyTheme(cmd)
+}
+
+// 语言切换:持久化偏好并同步 document.lang
+const onLang = (lang) => {
+  applyLocale(lang)
+  ElMessage.success(lang === 'en' ? 'Language switched' : '语言已切换')
+}
 
 // 拉取我的全部家庭列表,供切换下拉使用
 const loadFamilies = async () => {
@@ -121,14 +173,14 @@ const onSwitchFamily = async (command) => {
       const cur = families.value.find((f) => f.isCurrent)
       if (!cur) return
       await userStore.switchFamily(cur.familyId, true)
-      ElMessage.success('已设为默认家庭')
+      ElMessage.success(locale.value === 'en' ? 'Set as default family' : '已设为默认家庭')
       await loadFamilies()
       return
     }
     await userStore.switchFamily(command)
     appStore.reset()
     await appStore.init(true)
-    ElMessage.success('已切换家庭')
+    ElMessage.success(locale.value === 'en' ? 'Family switched' : '已切换家庭')
     router.push('/')
   } catch (e) {
     // 忽略
@@ -148,6 +200,9 @@ const loadUnread = async () => {
     // 忽略
   }
 }
+
+// 品牌点击:运维用户回运维页,普通用户回首页
+const onBrandClick = () => router.push(userStore.isOps ? '/ops' : '/')
 
 // 打开铃铛面板时拉取通知列表并刷新未读数
 const loadNotifications = async () => {
@@ -190,7 +245,7 @@ const formatTime = (d) => {
   return date.toLocaleDateString('zh-CN')
 }
 
-// 用户下拉菜单命令分发(个人中心/设置/成员管理/首页配置/登出)
+// 用户下拉菜单命令分发(个人中心/设置/成员管理/运维/登出)
 const onCommand = (cmd) => {
   if (cmd === 'logout') {
     // 登出后保持当前 URL(刷新为访客视图),不强制回首页
@@ -198,14 +253,15 @@ const onCommand = (cmd) => {
     location.reload()
   } else if (cmd === 'member') {
     router.push('/member')
-  } else if (cmd === 'homeConfig') {
-    router.push('/home/config')
+  } else if (cmd === 'ops') {
+    router.push('/ops')
   } else if (cmd === 'profile' || cmd === 'settings') {
     router.push('/settings')
   }
 }
 
 onMounted(() => {
+  theme.value = { dark: initTheme().dark, theme: initTheme().theme }
   loadUnread()
   loadFamilies()
   watch(() => userStore.isLoggedIn, () => { loadUnread(); loadFamilies() })
@@ -295,6 +351,25 @@ onMounted(() => {
   color: var(--color-text);
 }
 .auth-actions { display: flex; gap: 8px; }
+.lang-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.lang-trigger:hover { color: var(--color-accent); background: rgba(31, 58, 95, 0.05); }
+.theme-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: -1px;
+}
 .notify-panel { display: flex; flex-direction: column; gap: 8px; }
 .notify-head { display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
 .notify-list { max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; }
@@ -311,6 +386,7 @@ onMounted(() => {
 .notify-time { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; }
 
 @media (max-width: 768px) {
+  .app-header { padding-top: env(safe-area-inset-top); }
   .header-inner { padding: 0 12px; gap: 12px; height: 56px; }
   .brand-name { font-size: 18px; }
   .nav-modules { gap: 14px; }

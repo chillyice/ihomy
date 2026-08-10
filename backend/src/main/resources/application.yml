@@ -11,7 +11,7 @@ spring:
   application:
     name: ihomy
   datasource:
-    url: jdbc:mysql://localhost:6306/ihomy?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:38654/ihomy?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     # 使用专用应用账号 ihomy（最小权限，仅 DML），不要用 root 跑业务
     username: ihomy
     password: Ihomy@2026
@@ -19,7 +19,8 @@ spring:
   data:
     redis:
       host: localhost
-      port: 6379
+      # 宿主映射 18469->容器6379(避开 Hyper-V 排除端口段 6055-6754)
+      port: 18469
       database: 0
   servlet:
     multipart:
@@ -47,8 +48,9 @@ jwt:
   refresh-token-expire: 604800
 
 # 文件上传存储（本地兜底，生产建议使用 OSS/MinIO）
+# 注意:upload-dir 必须与 nginx /files/ 的 alias 指向同一目录,用绝对路径避免随启动目录漂移
 file:
-  upload-dir: ./uploads
+  upload-dir: C:/Users/chill/OneDrive/WorkStation/Projects/ihomy/uploads
   url-prefix: /files
 
 # 图形验证码:开发/测试环境可固定为已知值(如 qwer),方便联调;生产去掉或留空则随机生成

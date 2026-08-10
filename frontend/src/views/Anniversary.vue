@@ -1,73 +1,73 @@
 <!-- 纪念日页:阳历/农历(含闰月)纪念日卡片列表,访客可读,登录后增删改 -->
 <template>
   <div class="page">
-    <Breadcrumb :items="[{ label: '纪念日' }]" />
+    <Breadcrumb :items="[{ label: t('anniversary.title') }]" />
 
     <div class="list-header">
-      <h2>纪念日</h2>
-      <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">新增纪念日</el-button>
+      <h2>{{ t('anniversary.title') }}</h2>
+      <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ t('anniversary.add') }}</el-button>
     </div>
 
     <div v-loading="loading">
       <div v-if="list.length" class="anni-grid">
         <div v-for="a in list" :key="a.id" class="anni-card card">
           <div class="anni-top">
-            <span class="calendar-badge" :class="a.calendar">{{ a.calendar === 'lunar' ? '农历' : '阳历' }}</span>
-            <span v-if="!a.recurring" class="once-badge">单次</span>
+            <span class="calendar-badge" :class="a.calendar">{{ a.calendar === 'lunar' ? t('anniversary.lunar') : t('anniversary.solar') }}</span>
+            <span v-if="a.recurring === 'ONCE'" class="once-badge">{{ t('anniversary.once') }}</span>
           </div>
-          <div class="anni-date">{{ a.isLeap && a.calendar === 'lunar' ? '闰' : '' }}{{ a.month }}月{{ a.day }}日</div>
+          <div class="anni-date">{{ t('anniversary.dateFormat', { leap: a.isLeap && a.calendar === 'lunar' ? t('anniversary.leap') : '', month: a.month, day: a.day }) }}</div>
           <div class="anni-name">{{ a.name }}</div>
           <div class="anni-owner">
             <el-icon><User /></el-icon>
-            <span>{{ a.userName || '家庭纪念日' }}</span>
+            <span>{{ a.userName || t('anniversary.familyAnniversary') }}</span>
           </div>
           <div v-if="userStore.isLoggedIn" class="anni-actions">
-            <el-button size="small" text @click="openEditor(a)">编辑</el-button>
-            <el-button size="small" text type="danger" @click="onDel(a)">删除</el-button>
+            <el-button size="small" text @click="openEditor(a)">{{ t('common.edit') }}</el-button>
+            <el-button size="small" text type="danger" @click="onDel(a)">{{ t('common.delete') }}</el-button>
           </div>
         </div>
       </div>
-      <el-empty v-else :description="userStore.isGuest ? '暂无纪念日' : '还没有纪念日，去添加一个吧'" />
+      <el-empty v-else :description="userStore.isGuest ? t('anniversary.guestEmpty') : t('anniversary.emptyHint')" />
     </div>
 
-    <el-dialog v-model="editor.visible" :title="editor.form.id ? '编辑纪念日' : '新增纪念日'" width="480px">
+    <el-dialog v-model="editor.visible" :title="editor.form.id ? t('anniversary.edit') : t('anniversary.add')" width="480px">
       <el-form :model="editor.form" label-position="top">
-        <el-form-item label="名称">
-          <el-input v-model="editor.form.name" placeholder="如：宝宝生日、结婚纪念日" />
+        <el-form-item :label="t('anniversary.name')">
+          <el-input v-model="editor.form.name" :placeholder="t('anniversary.namePlaceholder')" />
         </el-form-item>
-        <el-form-item label="历法">
+        <el-form-item :label="t('anniversary.calendar')">
           <el-radio-group v-model="editor.form.calendar">
-            <el-radio value="solar">阳历</el-radio>
-            <el-radio value="lunar">农历</el-radio>
+            <el-radio value="solar">{{ t('anniversary.solar') }}</el-radio>
+            <el-radio value="lunar">{{ t('anniversary.lunar') }}</el-radio>
           </el-radio-group>
         </el-form-item>
         <div class="form-row">
-          <el-form-item label="月份">
+          <el-form-item :label="t('anniversary.monthLabel')">
             <el-select v-model="editor.form.month" style="width: 100%">
-              <el-option v-for="m in 12" :key="m" :label="`${m} 月`" :value="m" />
+              <el-option v-for="m in 12" :key="m" :label="t('anniversary.monthOption', { n: m })" :value="m" />
             </el-select>
           </el-form-item>
-          <el-form-item label="日期">
+          <el-form-item :label="t('anniversary.dayLabel')">
             <el-select v-model="editor.form.day" style="width: 100%">
-              <el-option v-for="d in 31" :key="d" :label="`${d} 日`" :value="d" />
+              <el-option v-for="d in 31" :key="d" :label="t('anniversary.dayOption', { n: d })" :value="d" />
             </el-select>
           </el-form-item>
         </div>
-        <el-form-item v-if="editor.form.calendar === 'lunar'" label="闰月">
+        <el-form-item v-if="editor.form.calendar === 'lunar'" :label="t('anniversary.leapMonth')">
           <el-switch v-model="editor.form.isLeap" :active-value="1" :inactive-value="0" />
         </el-form-item>
-        <el-form-item label="关联成员">
-          <el-select v-model="editor.form.userId" placeholder="选择成员（不选则为家庭纪念日）" clearable style="width: 100%">
+        <el-form-item :label="t('anniversary.memberLabel')">
+          <el-select v-model="editor.form.userId" :placeholder="t('anniversary.memberPlaceholder')" clearable style="width: 100%">
             <el-option v-for="m in members" :key="m.id" :label="m.nickname || m.username" :value="m.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="每年重复">
+        <el-form-item :label="t('anniversary.recurring')">
           <el-switch v-model="editor.form.recurring" :active-value="1" :inactive-value="0" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="editor.visible = false">取消</el-button>
-        <el-button type="primary" @click="onSave">保存</el-button>
+        <el-button @click="editor.visible = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="onSave">{{ t('common.save') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -79,8 +79,10 @@ import { anniversaryApi, memberApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { User } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 
+const { t } = useI18n()
 const userStore = useUserStore()
 const list = ref([])
 const members = ref([])
@@ -115,7 +117,7 @@ const openEditor = (a) => {
   if (a) {
     Object.assign(editor.form, {
       id: a.id, name: a.name, calendar: a.calendar, month: a.month, day: a.day,
-      isLeap: a.isLeap, userId: a.userId, recurring: a.recurring,
+      isLeap: a.isLeap, userId: a.userId, recurring: a.recurring === 'ONCE' ? 0 : 1,
     })
   } else {
     Object.assign(editor.form, { id: null, name: '', calendar: 'solar', month: 1, day: 1, isLeap: 0, userId: null, recurring: 1 })
@@ -125,18 +127,18 @@ const openEditor = (a) => {
 
 // 保存:有 id 走更新,无 id 走新增
 const onSave = async () => {
-  if (!editor.form.name) return ElMessage.warning('请输入纪念日名称')
+  if (!editor.form.name) return ElMessage.warning(t('anniversary.nameRequired'))
   if (editor.form.id) await anniversaryApi.update(editor.form.id, editor.form)
   else await anniversaryApi.create(editor.form)
-  ElMessage.success('保存成功')
+  ElMessage.success(t('anniversary.saved'))
   editor.visible = false
   load()
 }
 
 const onDel = async (a) => {
-  await ElMessageBox.confirm(`确认删除「${a.name}」？`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('anniversary.deleteConfirm', { name: a.name }), t('common.tip'), { type: 'warning' })
   await anniversaryApi.remove(a.id)
-  ElMessage.success('已删除')
+  ElMessage.success(t('common.deleted'))
   load()
 }
 

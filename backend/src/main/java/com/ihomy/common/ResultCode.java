@@ -15,12 +15,13 @@ public enum ResultCode {
     NOT_FOUND(404, "资源不存在"),
     CONFLICT(409, "资源冲突"),
     INTERNAL_ERROR(500, "服务器内部错误"),
-    USER_EXISTS(1001, "用户名已存在"),
     USER_NOT_FOUND(1002, "用户不存在"),
     PASSWORD_ERROR(1003, "密码错误"),
-    ACCOUNT_DISABLED(1004, "账号已禁用"),
     EMAIL_EXISTS(1005, "邮箱已被注册"),
-    CAPTCHA_ERROR(1006, "验证码错误或已过期");
+    CAPTCHA_ERROR(1006, "验证码错误或已过期"),
+    ALREADY_CHECKIN(1007, "今日已签到"),
+    INSUFFICIENT_POINTS(1008, "积分不足"),
+    PRODUCT_SOLD_OUT(1009, "该商品已兑完或已达限兑次数");
 
     private final int code;
     private final String message;

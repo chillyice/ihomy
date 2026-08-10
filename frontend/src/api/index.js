@@ -7,20 +7,21 @@ export const publicApi = {
   getFeed: (limit = 10, homeId, hid) => request.get('/public/feed', { params: { limit, ...(hid ? { hid } : {}), ...(homeId ? { home_id: homeId } : {}) } }),
 }
 
-// 认证相关:图形验证码、家庭列表/切换、邀请码加入
+// 每日内容:必应每日一图 + 每日知识(公开,无需登录)
+export const dailyApi = {
+  image: () => request.get('/public/daily-image'),
+  knowledge: (types) => request.get('/public/daily-knowledge', { params: { types } }),
+}
+
+// 认证相关:图形验证码、家庭列表(切换/加入走 stores/user.js)
 export const authApi = {
   captcha: () => request.get('/auth/captcha'),
   families: () => request.get('/auth/families'),
-  switchFamily: (familyId) => request.post('/auth/family/switch', { familyId }),
-  join: (inviteCode) => request.post('/auth/join', { inviteCode }),
 }
 
-// 首页模块:模块配置增删改查 + 仪表盘 + 动态流
+// 首页模块:模块配置查询 + 仪表盘 + 动态流(增删改模块走 DB 种子,暂无页面)
 export const homeApi = {
-  getModules: () => request.get('/home/modules'),
   getAllModules: () => request.get('/home/modules/all'),
-  updateModules: (data) => request.put('/home/modules', { modules: data }),
-  addModule: (data) => request.post('/home/modules', data),
   getDashboard: () => request.get('/home/dashboard'),
   getFeed: (limit = 20) => request.get('/home/feed', { params: { limit } }),
 }
@@ -31,7 +32,6 @@ export const blogApi = {
   detail: (id) => request.get(`/blog/${id}`),
   create: (data) => request.post('/blog', data),
   update: (id, data) => request.put(`/blog/${id}`, data),
-  remove: (id) => request.delete(`/blog/${id}`),
 }
 
 // 日记
@@ -51,14 +51,13 @@ export const fileApi = {
   },
 }
 
-// 家庭成员、角色调整与邀请码
+// 家庭成员、角色调整与邀请码(加入家庭统一走注册带邀请码或 /auth/join)
 export const memberApi = {
   list: () => request.get('/member/list'),
   setRole: (userId, roleCode) => request.put(`/member/${userId}/role`, { roleCode }),
   remove: (userId) => request.delete(`/member/${userId}`),
   createInvite: (roleCode) => request.post('/member/invite', { roleCode }),
   inviteList: () => request.get('/member/invite'),
-  accept: (code) => request.post('/member/accept', { code }),
 }
 
 // 家庭纪念日(阳历/农历)
@@ -85,8 +84,9 @@ export const photoApi = {
     files.forEach((f) => form.append('files', f))
     return request.post(`/album/${albumId}/photos`, form, { headers: { 'Content-Type': 'multipart/form-data' } })
   },
-  updateDesc: (id, description) => request.put(`/photo/${id}`, { description }),
+updateDesc: (id, description) => request.put(`/photo/${id}`, { description }),
   remove: (id) => request.delete(`/photo/${id}`),
+  cascade: (limit = 60) => request.get('/photo/cascade', { params: { limit } }),
 }
 
 // 统一点赞
@@ -124,11 +124,9 @@ export const familyApi = {
 export const profileApi = {
   get: () => request.get('/profile'),
   update: (data) => request.put('/profile', data),
-}
-
-// 操作日志(运维用)
-export const logApi = {
-  page: (current = 1, size = 20) => request.get('/log', { params: { current, size } }),
+  label: () => request.get('/profile/label'),
+  saveLabel: (data) => request.put('/profile/label', data),
+  removeLabel: () => request.delete('/profile/label'),
 }
 
 // 放映厅:视频库 + 想看列表
@@ -147,4 +145,122 @@ export const videoApi = {
   addWish: (data) => request.post('/video/wish', data),
   wishDone: (id) => request.put(`/video/wish/${id}/done`),
   wishRemove: (id) => request.delete(`/video/wish/${id}`),
+}
+
+// �����̳�(ǩ��/�һ�/�ҳ�����)
+export const pointsApi = {
+  stats: () => request.get('/points/stats'),
+  checkin: () => request.post('/points/checkin'),
+  products: () => request.get('/points/products'),
+  create: (data) => request.post('/points/products', data),
+  update: (id, data) => request.put(`/points/products/${id}`, data),
+  remove: (id) => request.delete(`/points/products/${id}`),
+  redeem: (id) => request.post(`/points/products/${id}/redeem`),
+  myOrders: () => request.get('/points/orders'),
+  familyOrders: () => request.get('/points/orders/all'),
+  markTaken: (id) => request.put(`/points/orders/${id}/taken`),
+}
+
+// ��������(����/��ȡ/���/ȷ�Ͻ���)
+export const taskApi = {
+  list: () => request.get('/task/list'),
+  create: (data) => request.post('/task', data),
+  claim: (id) => request.post(`/task/${id}/claim`),
+  abandon: (id) => request.post(`/task/${id}/abandon`),
+  finish: (id) => request.post(`/task/${id}/finish`),
+  confirm: (id) => request.post(`/task/${id}/confirm`),
+  cancel: (id) => request.post(`/task/${id}/cancel`),
+}
+
+// ��������(����ȫ��վ��֪ͨ)
+export const reminderApi = {
+  list: () => request.get('/reminder/list'),
+  create: (data) => request.post('/reminder', data),
+  update: (id, data) => request.put(`/reminder/${id}`, data),
+  remove: (id) => request.delete(`/reminder/${id}`),
+  toggleDone: (id) => request.post(`/reminder/${id}/toggle-done`),
+}
+
+// ��ͥ�ƻ�(�ƻ�+������,�����Զ�����)
+export const planApi = {
+  list: () => request.get('/plan/list'),
+  create: (data) => request.post('/plan', data),
+  update: (id, data) => request.put(`/plan/${id}`, data),
+  remove: (id) => request.delete(`/plan/${id}`),
+  addTask: (id, data) => request.post(`/plan/${id}/task`, data),
+  updateTask: (id, data) => request.put(`/plan/task/${id}`, data),
+  removeTask: (id) => request.delete(`/plan/task/${id}`),
+}
+
+// Ը����(��ͥ����Ը��,���/���/����)
+export const wishApi = {
+  list: () => request.get('/wish/list'),
+  create: (data) => request.post('/wish', data),
+  update: (id, data) => request.put(`/wish/${id}`, data),
+  remove: (id) => request.delete(`/wish/${id}`),
+}
+
+// ���˱�(��ͥ�����˱�,��ͳ��)
+export const bookApi = {
+  list: (month) => request.get('/book/list', { params: { month } }),
+  create: (data) => request.post('/book', data),
+  update: (id, data) => request.put(`/book/${id}`, data),
+  remove: (id) => request.delete(`/book/${id}`),
+}
+
+// ��ά����(�� OPS ��ɫ)
+export const opsApi = {
+  stats: (params) => request.get('/ops/stats', { params }),
+  server: () => request.get('/ops/server'),
+logs: (params) => request.get('/ops/logs', { params }),
+}
+
+// 家谱(家庭隐私数据,需登录)
+export const treeApi = {
+  list: () => request.get('/tree/list'),
+  create: (data) => request.post('/tree', data),
+  update: (id, data) => request.put(`/tree/${id}`, data),
+  remove: (id) => request.delete(`/tree/${id}`),
+}
+
+// ������(��ʷ/δ��/�Ѷ�;ʵʱ�� WebSocket)
+export const chatApi = {
+  history: (params) => request.get('/chat/history', { params }),
+  unread: () => request.get('/chat/unread'),
+  read: (msgId) => request.post('/chat/read', { msgId }),
+}
+
+// 存储管理(家庭级设备 + 文件浏览 + 一键同步)
+export const storageApi = {
+  devices: () => request.get('/storage/device/list'),
+  addDevice: (data) => request.post('/storage/device', data),
+  updateDevice: (id, data) => request.put(`/storage/device/${id}`, data),
+  removeDevice: (id) => request.delete(`/storage/device/${id}`),
+  browse: (deviceId, path) => request.get('/storage/browse', { params: { deviceId, path } }),
+  fileUrl: (deviceId, path, download) => {
+    const base = `/api/storage/file?deviceId=${deviceId}&path=${encodeURIComponent(path)}`
+    return download ? `${base}&download=true` : base
+  },
+  sync: (data) => request.post('/storage/sync', data),
+  syncProgress: (taskId) => request.get(`/storage/sync/progress/${taskId}`),
+}
+
+// 物品定位(房子/房间/家具/物品四级 + 跨级搜索)
+export const itemApi = {
+  houses: () => request.get('/item/house/list'),
+  addHouse: (data) => request.post('/item/house', data),
+  updateHouse: (id, data) => request.put(`/item/house/${id}`, data),
+  removeHouse: (id) => request.delete(`/item/house/${id}`),
+  rooms: (houseId) => request.get('/item/room/list', { params: { houseId } }),
+  addRoom: (data) => request.post('/item/room', data),
+  updateRoom: (id, data) => request.put(`/item/room/${id}`, data),
+  removeRoom: (id) => request.delete(`/item/room/${id}`),
+  furnitures: (roomId) => request.get('/item/furniture/list', { params: { roomId } }),
+  addFurniture: (data) => request.post('/item/furniture', data),
+  updateFurniture: (id, data) => request.put(`/item/furniture/${id}`, data),
+  removeFurniture: (id) => request.delete(`/item/furniture/${id}`),
+  list: (params) => request.get('/item/list', { params }),
+  create: (data) => request.post('/item', data),
+  update: (id, data) => request.put(`/item/${id}`, data),
+  remove: (id) => request.delete(`/item/${id}`),
 }

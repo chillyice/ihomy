@@ -1,33 +1,33 @@
 <!-- 成员管理页:成员列表/角色调整/移出 + OWNER 专属的邀请码、入家申请审核、搜索加入新家庭 -->
 <template>
   <div class="page">
-    <Breadcrumb :items="[{ label: '家庭成员' }]" />
+    <Breadcrumb :items="[{ label: t('member.title') }]" />
 
     <div class="section-header">
-      <h2>家庭成员</h2>
-      <el-button type="primary" plain @click="openSearch">加入新家庭</el-button>
+      <h2>{{ t('member.title') }}</h2>
+      <el-button type="primary" plain @click="openSearch">{{ t('member.joinFamily') }}</el-button>
     </div>
 
     <div v-if="userStore.isOwner" class="card invite-card">
-      <div class="invite-title">邀请新成员</div>
+      <div class="invite-title">{{ t('member.inviteNew') }}</div>
       <div class="invite-row">
         <el-select v-model="inviteRole" style="width: 140px">
-          <el-option label="成员" value="MEMBER" />
-          <el-option label="孩童" value="CHILD" />
+          <el-option :label="t('member.member')" value="MEMBER" />
+          <el-option :label="t('member.child')" value="CHILD" />
         </el-select>
-        <el-button type="primary" @click="genInvite">生成邀请码</el-button>
+        <el-button type="primary" @click="genInvite">{{ t('member.invite') }}</el-button>
       </div>
       <div v-if="inviteCodes.length" class="invite-list">
         <div v-for="c in inviteCodes" :key="c.id" class="invite-code">
           <code>{{ c.code }}</code>
-          <span class="invite-uses">{{ c.usedCount }}/{{ c.maxUses }} 次</span>
-          <span class="invite-expire">到期 {{ formatDate(c.expiresAt) }}</span>
+          <span class="invite-uses">{{ t('member.usesCount', { used: c.usedCount, max: c.maxUses }) }}</span>
+          <span class="invite-expire">{{ t('member.expireAt', { time: formatDate(c.expiresAt) }) }}</span>
         </div>
       </div>
     </div>
 
     <div v-if="userStore.isOwner && applies.length" class="card invite-card">
-      <div class="invite-title">入家申请（{{ applies.length }}）</div>
+      <div class="invite-title">{{ t('member.applyList') }}（{{ applies.length }}）</div>
       <div class="apply-row" v-for="a in applies" :key="a.id">
         <el-avatar :size="36">{{ (a.applicantName || 'U').charAt(0) }}</el-avatar>
         <div class="apply-info">
@@ -36,8 +36,8 @@
           <div class="apply-time">{{ formatDate(a.createdAt) }}</div>
         </div>
         <div class="apply-actions">
-          <el-button size="small" type="success" @click="handleApply(a, 'approve')">通过</el-button>
-          <el-button size="small" type="danger" plain @click="handleApply(a, 'reject')">拒绝</el-button>
+          <el-button size="small" type="success" @click="handleApply(a, 'approve')">{{ t('member.approve') }}</el-button>
+          <el-button size="small" type="danger" plain @click="handleApply(a, 'reject')">{{ t('member.reject') }}</el-button>
         </div>
       </div>
     </div>
@@ -46,7 +46,10 @@
       <div v-for="m in members" :key="m.id" class="member-row card">
         <el-avatar :size="40" :src="m.avatar">{{ (m.nickname || m.username || 'U').charAt(0) }}</el-avatar>
         <div class="member-info">
-          <div class="member-name">{{ m.nickname || m.username }}</div>
+          <div class="member-name">
+            {{ m.nickname || m.username }}
+            <el-tag v-if="m.label" :color="m.labelColor || '#409EFF'" size="small" effect="dark" style="color: #fff; border: none">{{ m.label }}</el-tag>
+          </div>
           <div class="member-un">@{{ m.username }}</div>
         </div>
         <div class="member-right">
@@ -57,9 +60,9 @@
             style="width: 100px"
             @change="(v) => changeRole(m, v)"
           >
-            <el-option label="家长" value="OWNER" />
-            <el-option label="成员" value="MEMBER" />
-            <el-option label="孩童" value="CHILD" />
+            <el-option :label="t('member.owner')" value="OWNER" />
+            <el-option :label="t('member.member')" value="MEMBER" />
+            <el-option :label="t('member.child')" value="CHILD" />
           </el-select>
           <el-tag v-else size="small">{{ roleName(m.roleCode) }}</el-tag>
           <el-button
@@ -68,15 +71,15 @@
             type="danger"
             text
             @click="removeMember(m)"
-          >移出</el-button>
+          >{{ t('member.remove') }}</el-button>
         </div>
       </div>
     </div>
 
-    <el-dialog v-model="searchVisible" title="加入新家庭" width="440px">
-      <el-input v-model="keyword" placeholder="输入家庭 ID 或名称搜索" clearable @keyup.enter="doSearch">
+    <el-dialog v-model="searchVisible" :title="t('member.joinFamily')" width="440px">
+      <el-input v-model="keyword" :placeholder="t('member.searchPlaceholder')" clearable @keyup.enter="doSearch">
         <template #append>
-          <el-button @click="doSearch">搜索</el-button>
+          <el-button @click="doSearch">{{ t('common.search') }}</el-button>
         </template>
       </el-input>
       <div v-loading="searchLoading" class="search-result">
@@ -84,16 +87,16 @@
           <div class="search-item-info">
             <div class="search-item-name">
               {{ f.name }}
-              <el-tag v-if="f.isDemo" size="small" type="warning">演示家庭</el-tag>
+              <el-tag v-if="f.isDemo" size="small" type="warning">{{ t('member.demoFamily') }}</el-tag>
             </div>
-            <div class="search-item-desc">{{ f.description || f.coverText || '暂无简介' }}</div>
-            <div class="search-item-meta">{{ f.memberCount }} 位成员</div>
+            <div class="search-item-desc">{{ f.description || f.coverText || t('member.noDescription') }}</div>
+            <div class="search-item-meta">{{ t('member.memberCount', { n: f.memberCount }) }}</div>
           </div>
           <el-button size="small" type="primary" :disabled="f.joined || f.pending" @click="applyFamily(f)">
-            {{ f.joined ? '已加入' : f.pending ? '已申请' : '申请加入' }}
+            {{ f.joined ? t('member.joined') : f.pending ? t('member.applied') : t('member.applyJoin') }}
           </el-button>
         </div>
-        <el-empty v-if="!searchLoading && keyword && !searchResult.length" description="未找到家庭" :image-size="60" />
+        <el-empty v-if="!searchLoading && keyword && !searchResult.length" :description="t('member.notFound')" :image-size="60" />
       </div>
     </el-dialog>
   </div>
@@ -105,7 +108,9 @@ import { memberApi, familyApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const userStore = useUserStore()
 const members = ref([])
 const loading = ref(false)
@@ -119,7 +124,7 @@ const searchResult = ref([])
 
 // 角色码转中文展示
 const roleName = (r) =>
-  ({ OWNER: '家长', MEMBER: '成员', CHILD: '孩童' }[r] || r)
+  ({ OWNER: t('member.owner'), MEMBER: t('member.member'), CHILD: t('member.child') }[r] || r)
 
 const formatDate = (d) => (d ? new Date(d).toLocaleString('zh-CN') : '')
 
@@ -140,7 +145,7 @@ const load = async () => {
 // 生成邀请码并刷新邀请码列表(新成员注册时凭码加入家庭)
 const genInvite = async () => {
   const data = await memberApi.createInvite(inviteRole.value || 'MEMBER')
-  ElMessage.success(`邀请码已生成：${data.code}`)
+  ElMessage.success(t('member.inviteGenerated', { code: data.code }))
   inviteCodes.value = await memberApi.inviteList()
 }
 
@@ -148,17 +153,17 @@ const changeRole = async (m, roleCode) => {
   try {
     await memberApi.setRole(m.id, roleCode)
     m.roleCode = roleCode
-    ElMessage.success('角色已更新')
+    ElMessage.success(t('member.roleUpdated'))
   } catch (e) {
-    ElMessage.error('角色更新失败')
+    ElMessage.error(t('member.roleUpdateFail'))
   }
 }
 
 // 移出成员:二次确认后删除并刷新列表
 const removeMember = async (m) => {
-  await ElMessageBox.confirm(`确认将 ${m.nickname || m.username} 移出家庭？`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('member.removeConfirm', { name: m.nickname || m.username }), t('common.tip'), { type: 'warning' })
   await memberApi.remove(m.id)
-  ElMessage.success('已移出')
+  ElMessage.success(t('member.removed'))
   load()
 }
 
@@ -182,14 +187,14 @@ const doSearch = async () => {
 // 提交入家申请,等待对方家长审核
 const applyFamily = async (f) => {
   await familyApi.apply(f.id, '')
-  ElMessage.success('申请已提交，等待家长审核')
+  ElMessage.success(t('member.applySubmitted'))
   f.pending = true
 }
 
 // OWNER 审核入家申请:通过则对方成为 MEMBER
 const handleApply = async (a, action) => {
   await familyApi.handleApply(a.id, action)
-  ElMessage.success(action === 'approve' ? '已通过，对方已加入家庭' : '已拒绝')
+  ElMessage.success(action === 'approve' ? t('member.approveSuccess') : t('member.rejectSuccess'))
   load()
 }
 
@@ -209,8 +214,7 @@ onMounted(load)
 .member-list { display: flex; flex-direction: column; gap: 10px; }
 .member-row { display: flex; align-items: center; gap: 14px; padding: 12px 16px; }
 .member-info { flex: 1; }
-.member-name { font-weight: 600; font-size: 15px; color: var(--color-text); }
-.member-name { font-size: 14px; }
+.member-name { font-weight: 600; font-size: 15px; color: var(--color-text); display: flex; align-items: center; gap: 6px; }
 .member-right { display: flex; align-items: center; gap: 10px; }
 .apply-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px dashed var(--color-border); }
 .apply-info { flex: 1; }

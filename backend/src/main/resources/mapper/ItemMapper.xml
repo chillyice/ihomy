@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.ItemMapper">
+
+    <select id="selectItemByFamily" resultType="map">
+        SELECT i.id, i.family_id, i.name,
+               IFNULL(i.aliases,'')   AS aliases,
+               IFNULL(i.position,'')  AS position,
+               IFNULL(i.note,'')      AS note,
+               i.created_by, i.created_at, i.updated_at,
+               r.id        AS room_id,
+               r.house_id  AS house_id,
+               r.name      AS room_name,
+               f.id        AS furniture_id,
+               f.name      AS furniture_name,
+               h.name      AS house_name
+        FROM family_item i
+                 JOIN family_furniture f ON i.furniture_id = f.id
+                 JOIN family_room r ON f.room_id = r.id
+                 JOIN family_house h ON r.house_id = h.id
+        WHERE i.family_id = #{familyId}
+        <if test="roomId != null">
+            AND r.id = #{roomId}
+        </if>
+        <if test="furnitureId != null">
+            AND f.id = #{furnitureId}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (i.name LIKE CONCAT('%', #{keyword}, '%')
+                OR i.aliases LIKE CONCAT('%', #{keyword}, '%')
+                OR i.position LIKE CONCAT('%', #{keyword}, '%')
+                OR f.name LIKE CONCAT('%', #{keyword}, '%')
+                OR r.name LIKE CONCAT('%', #{keyword}, '%')
+                OR h.name LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY h.sort_order, h.id, r.floor, r.sort_order, r.id, f.id, i.id
+    </select>
+
+</mapper>

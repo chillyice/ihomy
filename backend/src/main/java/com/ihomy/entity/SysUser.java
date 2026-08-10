@@ -26,7 +26,7 @@ public class SysUser {
     private Long familyId;
     /** 用户设置的默认家庭(多家庭时优先访问,空=主家庭 familyId) */
     private Long defaultFamilyId;
-    private Integer status;
+    private String status;
     private Integer isFake;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;

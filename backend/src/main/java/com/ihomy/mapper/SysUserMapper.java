@@ -11,8 +11,6 @@ import java.util.Map;
 @Mapper
 public interface SysUserMapper extends BaseMapper<SysUser> {
 
-    SysUser selectByUsername(@Param("username") String username);
-
     /** 按注册邮箱查询用户(登录账号即邮箱,大小写不敏感) */
     SysUser selectByEmail(@Param("email") String email);
 

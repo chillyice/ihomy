@@ -2,8 +2,6 @@ package com.ihomy.common;
 
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -41,18 +39,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConstraintViolationException.class)
     public Result<Void> handleConstraint(ConstraintViolationException e) {
         return Result.fail(ResultCode.BAD_REQUEST.getCode(), e.getMessage());
-    }
-
-    /** 认证失败(未登录/凭证失效)统一返回 401 */
-    @ExceptionHandler(AuthenticationException.class)
-    public Result<Void> handleAuth(AuthenticationException e) {
-        return Result.fail(ResultCode.UNAUTHORIZED);
-    }
-
-    /** 权限不足统一返回 403 */
-    @ExceptionHandler(AccessDeniedException.class)
-    public Result<Void> handleDenied(AccessDeniedException e) {
-        return Result.fail(ResultCode.FORBIDDEN);
     }
 
     /** 兜底异常:记录完整堆栈后返回 500,避免泄露内部细节 */

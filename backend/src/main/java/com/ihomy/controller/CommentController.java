@@ -5,7 +5,6 @@ import com.ihomy.annotation.RequirePermission;
 import com.ihomy.common.Result;
 import com.ihomy.dto.CommentDTO;
 import com.ihomy.entity.Comment;
-import com.ihomy.entity.SysUser;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.CommentService;
 import io.swagger.v3.oas.annotations.Operation;

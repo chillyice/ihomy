@@ -18,6 +18,6 @@ public class SysRole {
     private String roleCode;
     private String roleName;
     private String description;
-    private Integer status;
+    private String status;
     private LocalDateTime createdAt;
 }

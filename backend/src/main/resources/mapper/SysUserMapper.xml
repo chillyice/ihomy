@@ -2,21 +2,19 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ihomy.mapper.SysUserMapper">
 
-    <select id="selectByUsername" resultType="com.ihomy.entity.SysUser">
-        SELECT * FROM sys_user WHERE username = #{username} AND deleted = 0
-    </select>
-
     <select id="selectByEmail" resultType="com.ihomy.entity.SysUser">
         SELECT * FROM sys_user WHERE LOWER(email) = LOWER(#{email}) AND deleted = 0
     </select>
 
     <select id="selectMembersByFamily" resultType="map">
-        SELECT u.id, u.username, u.nickname, u.avatar, r.role_code AS roleCode
+        SELECT u.id, u.username, u.nickname, u.avatar, r.role_code AS roleCode,
+               l.label AS label, l.color AS labelColor
         FROM sys_user u
         JOIN sys_user_role ur ON ur.user_id = u.id
         JOIN sys_role r ON r.id = ur.role_id
+        LEFT JOIN family_user_label l ON l.user_id = u.id AND l.family_id = #{familyId}
         WHERE u.family_id = #{familyId} AND u.deleted = 0
-        AND ur.family_id = #{familyId} AND r.status = 1
+        AND ur.family_id = #{familyId} AND r.status = 'ENABLED'
         ORDER BY u.id
     </select>
 

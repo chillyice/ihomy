@@ -6,7 +6,7 @@
         SELECT p.* FROM content_photo p
         JOIN content_album a ON p.album_id = a.id
         WHERE p.family_id = #{familyId}
-        AND p.visibility = 4
+        AND p.visibility = 'PUBLIC'
         AND a.type = 'public'
         AND p.deleted = 0 AND a.deleted = 0
         ORDER BY p.created_at DESC
@@ -26,10 +26,29 @@
         SELECT p.* FROM content_photo p
         JOIN content_album a ON p.album_id = a.id
         WHERE p.family_id = #{familyId}
-        AND p.visibility = 4
+        AND p.visibility = 'PUBLIC'
         AND a.type = 'public'
         AND p.deleted = 0 AND a.deleted = 0
         ORDER BY p.created_at DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 照片瀑布:随机取当前家庭照片,按观看者可见级别过滤(PRIVATE仅作者本人/FAMILY与PUBLIC家庭可见),带上传者昵称 -->
+    <select id="selectCascadeByFamily" resultType="java.util.Map">
+        SELECT p.id AS id, p.url AS url, p.description AS description,
+               p.taken_at AS takenAt, p.location AS location,
+               u.nickname AS uploaderName
+        FROM content_photo p
+        JOIN content_album a ON p.album_id = a.id
+        LEFT JOIN sys_user u ON p.author_id = u.id
+        WHERE p.family_id = #{familyId}
+        AND p.deleted = 0 AND a.deleted = 0
+        AND (
+            p.visibility = 'PUBLIC'
+            OR p.visibility = 'FAMILY'
+            OR (p.visibility = 'PRIVATE' AND p.author_id = #{userId})
+        )
+        ORDER BY RAND()
         LIMIT #{limit}
     </select>
 

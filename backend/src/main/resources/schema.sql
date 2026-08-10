@@ -153,6 +153,8 @@ CREATE TABLE `sys_family_info` (
   `is_default`     TINYINT      NOT NULL DEFAULT 0 COMMENT '0普通 1默认家庭（访客看到的内容来源）',
   `is_demo`        TINYINT      NOT NULL DEFAULT 0 COMMENT '0普通 1演示家庭（展示软件效果，owner 不可变更）',
   `share_token`    VARCHAR(16)  DEFAULT NULL COMMENT '16位混淆分享ID（URL ?hid= 访问，防 ID 遍历）',
+  `music_url`      VARCHAR(500) DEFAULT NULL COMMENT '家庭背景音乐 URL（上传 /files/ 或外链）',
+  `music_title`    VARCHAR(100) DEFAULT NULL COMMENT '背景音乐名称',
   `created_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted`        TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
@@ -181,10 +183,10 @@ CREATE TABLE `sys_home_module` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='首页模块配置表';
 
 -- ------------------------------------------------------------
--- 9. sys_invitation_code 邀请码表
+-- 9. family_invitation_code 邀请码表
 -- ------------------------------------------------------------
-DROP TABLE IF EXISTS `sys_invitation_code`;
-CREATE TABLE `sys_invitation_code` (
+DROP TABLE IF EXISTS `family_invitation_code`;
+CREATE TABLE `family_invitation_code` (
   `id`             BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
   `code`           VARCHAR(64) NOT NULL COMMENT '邀请码（UUID）',
   `family_id`      BIGINT      NOT NULL COMMENT '目标家庭ID',
@@ -247,11 +249,11 @@ CREATE TABLE `sys_user_group_member` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='群组成员表';
 
 -- ------------------------------------------------------------
--- 13. sys_anniversary 家庭纪念日表
+-- 13. family_anniversary 家庭纪念日表
 --     关联用户表（user_id 可空:NULL=家庭级纪念日）,支持阳历/农历
 -- ------------------------------------------------------------
-DROP TABLE IF EXISTS `sys_anniversary`;
-CREATE TABLE `sys_anniversary` (
+DROP TABLE IF EXISTS `family_anniversary`;
+CREATE TABLE `family_anniversary` (
   `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
   `name`        VARCHAR(100) NOT NULL COMMENT '纪念日名称',
   `calendar`    VARCHAR(20)  NOT NULL DEFAULT 'solar' COMMENT '历法: solar阳历 / lunar农历',
@@ -260,7 +262,7 @@ CREATE TABLE `sys_anniversary` (
   `is_leap`     TINYINT      NOT NULL DEFAULT 0 COMMENT '农历是否闰月: 0非闰 1闰',
   `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
   `user_id`     BIGINT       DEFAULT NULL COMMENT '关联用户ID（NULL为家庭级纪念日）',
-  `recurring`   TINYINT      NOT NULL DEFAULT 1 COMMENT '是否每年重复: 0单次 1每年',
+  `recurring`   VARCHAR(20)  NOT NULL DEFAULT 'YEARLY' COMMENT 'ONCE一次性/YEARLY每年',
   `created_by`  BIGINT       DEFAULT NULL COMMENT '创建人ID',
   `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -271,12 +273,32 @@ CREATE TABLE `sys_anniversary` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭纪念日表（支持农历）';
 
 -- ------------------------------------------------------------
--- 14. sys_notification 消息通知表
+-- 13.1 sys_storage_device 存储设备表（V4.1 存储管理）
+--     家庭级独立配置：各家庭 OWNER 添加自己的存储设备,互不可见。
+--     device_type: SYSTEM系统(默认本地磁盘)/NAS/REMOTE远程磁盘/MOUNT挂载(SMB/NFS)
+--     root_path 为服务器上可访问的根目录(如挂载点 /mnt/nas)
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_storage_device`;
+CREATE TABLE `sys_storage_device` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `name`        VARCHAR(100) NOT NULL COMMENT '设备名称',
+  `device_type` VARCHAR(20)  NOT NULL DEFAULT 'NAS' COMMENT 'SYSTEM系统/NAS/REMOTE远程磁盘/MOUNT挂载',
+  `root_path`   VARCHAR(500) NOT NULL COMMENT '服务器根路径/挂载点',
+  `status`      VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE启用/DISABLED停用',
+  `created_by`  BIGINT       DEFAULT NULL COMMENT '创建人ID',
+  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='存储设备表(家庭级)';
+
+-- ------------------------------------------------------------
+-- 14. family_notification 消息通知表
 --     type 字段区分通知属性：comment/reply/system/扩展模块
 --     前缀暂定 sys_，后续可能调整
 -- ------------------------------------------------------------
-DROP TABLE IF EXISTS `sys_notification`;
-CREATE TABLE `sys_notification` (
+DROP TABLE IF EXISTS `family_notification`;
+CREATE TABLE `family_notification` (
   `id`           BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
   `receiver_id`  BIGINT       NOT NULL COMMENT '接收人ID',
   `type`         VARCHAR(20)  NOT NULL COMMENT '类型: comment/reply/system等',
@@ -308,7 +330,7 @@ CREATE TABLE `sys_operation_log` (
   `request_method`  VARCHAR(10)   DEFAULT NULL COMMENT '请求方法: GET/POST/PUT/DELETE',
   `request_url`     VARCHAR(255)  DEFAULT NULL COMMENT '请求URL',
   `request_params`  TEXT          DEFAULT NULL COMMENT '请求参数(JSON)',
-  `result_status`   TINYINT       NOT NULL DEFAULT 1 COMMENT '结果: 0失败 1成功',
+  `result_status`   VARCHAR(20)   NOT NULL DEFAULT 'SUCCESS' COMMENT 'SUCCESS成功/FAILED失败',
   `error_msg`       VARCHAR(1000) DEFAULT NULL COMMENT '错误信息',
   `ip`              VARCHAR(50)   DEFAULT NULL COMMENT '操作IP地址',
   `trace_id`        VARCHAR(64)   DEFAULT NULL COMMENT '链路追踪ID（一次请求全局唯一）',
@@ -337,7 +359,7 @@ CREATE TABLE `content_blog` (
   `author_id`   BIGINT       NOT NULL COMMENT '作者ID',
   `family_id`   BIGINT       DEFAULT NULL COMMENT '所属家庭ID',
   `status`      TINYINT      NOT NULL DEFAULT 0 COMMENT '0草稿 1已发布',
-  `visibility`  TINYINT      NOT NULL DEFAULT 3 COMMENT '0仅自己/1指定成员/2指定群组/3家庭/4公开',
+  `visibility`  VARCHAR(20)  NOT NULL DEFAULT 'FAMILY' COMMENT 'PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开',
   `view_count`  INT          NOT NULL DEFAULT 0 COMMENT '浏览数',
   `like_count`  INT          NOT NULL DEFAULT 0 COMMENT '点赞数',
   `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -361,7 +383,7 @@ CREATE TABLE `content_diary` (
   `like_count` INT          NOT NULL DEFAULT 0 COMMENT '点赞数',
   `author_id`  BIGINT       NOT NULL COMMENT '作者ID',
   `family_id`  BIGINT       DEFAULT NULL COMMENT '所属家庭ID',
-  `visibility` TINYINT      NOT NULL DEFAULT 3 COMMENT '0仅自己/1指定成员/2指定群组/3家庭/4公开',
+  `visibility` VARCHAR(20)  NOT NULL DEFAULT 'FAMILY' COMMENT 'PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开',
   `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted`    TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
@@ -402,7 +424,8 @@ CREATE TABLE `content_photo` (
   `like_count`  INT          NOT NULL DEFAULT 0 COMMENT '点赞数',
   `author_id`   BIGINT       NOT NULL COMMENT '上传者ID',
   `family_id`  BIGINT       NOT NULL COMMENT '家庭ID',
-  `visibility` TINYINT      NOT NULL DEFAULT 3 COMMENT '可见范围（同博客）',
+  `visibility` VARCHAR(20) NOT NULL DEFAULT 'FAMILY' COMMENT '可见范围：PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开',
+  `source_path` VARCHAR(500) DEFAULT NULL COMMENT '来源存储路径（一键同步去重用,系统上传为空）',
   `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
   `deleted`    TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
   PRIMARY KEY (`id`),
@@ -433,7 +456,7 @@ CREATE TABLE `content_video` (
   `video_url`      VARCHAR(255) NOT NULL COMMENT '视频文件URL',
   `uploader_id`    BIGINT       NOT NULL COMMENT '上传者ID',
   `family_id`      BIGINT       NOT NULL COMMENT '家庭ID',
-  `visibility`     TINYINT      NOT NULL DEFAULT 3 COMMENT '可见范围（同博客）',
+  `visibility` VARCHAR(20) NOT NULL DEFAULT 'FAMILY' COMMENT '可见范围：PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开',
   `created_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
   `deleted`        TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
   PRIMARY KEY (`id`),
@@ -515,11 +538,11 @@ CREATE TABLE `content_like` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='点赞表';
 
 -- ------------------------------------------------------------
--- 23. sys_family_apply 家庭入家申请表
+-- 23. family_apply 家庭入家申请表
 --     搜索家庭ID后提交申请，户主/管理员审核（V3.6 多家庭）
 -- ------------------------------------------------------------
-DROP TABLE IF EXISTS `sys_family_apply`;
-CREATE TABLE `sys_family_apply` (
+DROP TABLE IF EXISTS `family_apply`;
+CREATE TABLE `family_apply` (
   `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
   `user_id`    BIGINT       NOT NULL COMMENT '申请人ID',
   `family_id`  BIGINT       NOT NULL COMMENT '目标家庭ID',
@@ -538,13 +561,15 @@ CREATE TABLE `sys_family_apply` (
 -- ============================================================
 
 -- ------------------------------------------------------------
--- 22. 初始化四个预设角色
+-- 22. 初始化五个预设角色
+--     OPS = 运维管理员（V3.8,系统级角色,仅访问 /ops 运维页,不属任何家庭）
 -- ------------------------------------------------------------
 INSERT INTO `sys_role` (`role_code`, `role_name`, `description`) VALUES
 ('OWNER',  '家长', '家庭创建者，拥有全部权限'),
 ('MEMBER', '成员', '家庭成员，可发布内容、评论、上传照片'),
 ('CHILD',  '孩童', '家庭孩童，可发布内容并控制可见范围（含对家长隐藏）'),
-('GUEST',  '访客', '家庭访客，仅可浏览公开内容');
+('GUEST',  '访客', '家庭访客，仅可浏览公开内容'),
+('OPS',    '运维管理员', '系统运维（V3.8），仅访问运维页面，不涉及任何家庭数据');
 
 -- ------------------------------------------------------------
 -- 23. 初始化权限点（按模块划分）
@@ -587,7 +612,13 @@ INSERT INTO `sys_auth` (`auth_code`, `auth_name`, `module`, `description`) VALUE
 -- 邀请码模块
 ('invite:create',      '生成邀请码', 'INVITE',  '生成家庭邀请码'),
 -- 操作日志模块
-('log:view',           '查看日志',   'LOG',     '查看系统操作日志（仅家长）');
+('log:view',           '查看日志',   'LOG',     '查看系统操作日志（仅家长）'),
+-- 积分商城模块
+('points:manage',      '积分商品管理', 'POINTS', '上架/下架积分商品、核销兑换（仅家长）'),
+-- 存储管理模块（V4.1）
+('storage:manage',     '存储管理',   'STORAGE', '管理存储设备、一键同步、浏览设备文件（仅家长）'),
+-- 运维模块（V3.8）
+('ops:view',           '运维查看',     'OPS',    '查看系统资源统计/服务器状态/操作日志（仅运维管理员）');
 
 -- ------------------------------------------------------------
 -- 24. 角色-权限映射
@@ -636,6 +667,12 @@ WHERE r.role_code = 'GUEST'
     'blog:view','diary:view','album:view','photo:view'
   );
 
+-- OPS 权限（仅运维查看;OPS 账号也受 OpsAccessFilter 白名单限制,只放行 /ops/** 与 /auth/**）
+INSERT INTO `sys_role_auth` (`role_id`, `auth_id`)
+SELECT r.id, a.id FROM `sys_role` r, `sys_auth` a
+WHERE r.role_code = 'OPS'
+  AND a.auth_code IN ('ops:view');
+
 -- ------------------------------------------------------------
 -- 25. 初始化默认首页模块（后期新增功能只需 INSERT 一条记录）
 -- ------------------------------------------------------------
@@ -645,8 +682,18 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('album',  '相册', 'icon-album',  '/album',  'album',   'left',   3, 1),
 ('anniversary', '纪念日', 'icon-anniversary', '/anniversary', 'life',   'left', 4, 1),
 ('cinema', '放映厅', 'icon-cinema', '/cinema', 'life',   'left', 5, 1),
+('points', '积分商城', 'icon-points', '/points', 'life',   'left', 6, 1),
+('task',   '任务悬赏', 'icon-task',   '/task',   'life',   'left', 7, 1),
+('reminder','今日提醒','icon-reminder','/reminder','life',  'left', 8, 1),
+('plan',   '家庭计划', 'icon-plan',   '/plan',   'life',   'left', 9, 1),
+('wish',   '愿望单',   'icon-wish',   '/wish',   'life',   'left', 10, 1),
+('book',   '记账本',   'icon-book',   '/book',   'life',   'left', 11, 1),
+('cascade','照片瀑布', 'icon-photo',  '/cascade','life',   'left', 13, 1),
+('tree',   '家谱',     'icon-tree',   '/tree',   'life',   'left', 14, 1),
 ('member', '家庭成员', 'icon-member', '/member', 'social',  'right',  1, 1),
-('cover',  '家庭封面', 'icon-cover',  '/cover',  'system',  'top',    1, 0);
+('cover',  '家庭封面', 'icon-cover',  '/cover',  'system',  'top',    1, 0),
+('storage','存储管理', 'icon-storage','/storage','system',  'left',  15, 1),
+('item','物品定位',   'icon-item',   '/item',   'life',    'left',  16, 1);
 
 -- ------------------------------------------------------------
 -- 26. 初始家庭 + 管理员账号
@@ -659,7 +706,7 @@ SET @fid = LAST_INSERT_ID();
 INSERT INTO `sys_user` (`username`, `password`, `nickname`, `email`, `family_id`, `status`)
 VALUES ('admin',
         '$2a$10$jYS9PYDoF2C/fdpp8Qee2.WG/oelBMbCjjnsCkpPfejfS0uPE/4Ji',
-        '管理员', 'admin@ihomy.local', @fid, 0);
+        '管理员', 'admin@ihomy.local', @fid, 'ACTIVE');
 SET @uid = LAST_INSERT_ID();
 
 -- 绑定 admin 为该家庭的 OWNER
@@ -670,14 +717,30 @@ SELECT @uid, id, @fid FROM `sys_role` WHERE `role_code` = 'OWNER';
 UPDATE `sys_family_info` SET `owner_id` = @uid WHERE `id` = @fid;
 
 -- ------------------------------------------------------------
+-- 26.1 运维管理员账号（V3.8）
+--     ops / ops@ihomy.local,初始密码 admin123（与 admin 相同,登录后请立即改密）
+--     OPS 角色绑定演示家庭作占位（family_id 仅用于填充 NOT NULL 关联）,
+--     实际访问由 OpsAccessFilter 白名单限制为 /ops/** 与 /auth/**,
+--     不会读到任何家庭数据。
+-- ------------------------------------------------------------
+INSERT INTO `sys_user` (`username`, `password`, `nickname`, `email`, `family_id`, `status`)
+VALUES ('ops',
+        '$2a$10$jYS9PYDoF2C/fdpp8Qee2.WG/oelBMbCjjnsCkpPfejfS0uPE/4Ji',
+        '运维管理员', 'ops@ihomy.local', @fid, 'ACTIVE');
+SET @opsid = LAST_INSERT_ID();
+
+INSERT INTO `sys_user_role` (`user_id`, `role_id`, `family_id`)
+SELECT @opsid, id, @fid FROM `sys_role` WHERE `role_code` = 'OPS';
+
+-- ------------------------------------------------------------
 -- 27. 初始化家庭纪念日（示例,家长登录后可增改）
 --     家庭纪念日: 阳历 5月20日（家庭级,user_id 为空）
 --     管理员生日: 农历 五月初三（关联用户）
 -- ------------------------------------------------------------
-INSERT INTO `sys_anniversary` (`name`, `calendar`, `month`, `day`, `is_leap`, `family_id`, `user_id`, `recurring`, `created_by`)
-VALUES ('家庭纪念日', 'solar', 5, 20, 0, @fid, NULL, 1, @uid);
-INSERT INTO `sys_anniversary` (`name`, `calendar`, `month`, `day`, `is_leap`, `family_id`, `user_id`, `recurring`, `created_by`)
-VALUES ('管理员的生日', 'lunar', 5, 3, 0, @fid, @uid, 1, @uid);
+INSERT INTO `family_anniversary` (`name`, `calendar`, `month`, `day`, `is_leap`, `family_id`, `user_id`, `recurring`, `created_by`)
+VALUES ('家庭纪念日', 'solar', 5, 20, 0, @fid, NULL, 'YEARLY', @uid);
+INSERT INTO `family_anniversary` (`name`, `calendar`, `month`, `day`, `is_leap`, `family_id`, `user_id`, `recurring`, `created_by`)
+VALUES ('管理员的生日', 'lunar', 5, 3, 0, @fid, @uid, 'YEARLY', @uid);
 
 -- ------------------------------------------------------------
 -- 28. 演示家庭（V3.6）
@@ -692,9 +755,9 @@ UPDATE `sys_family_info` SET `is_demo` = 1, `name` = 'ihomy 演示家庭',
 WHERE `id` = @fid;
 
 INSERT INTO `sys_user` (`username`, `password`, `nickname`, `email`, `family_id`, `status`, `is_fake`) VALUES
-('demo_owner',  '$2a$10$NkY7m2y6qQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQq', '演示爸爸', 'demo@ihomy.local', @fid, 0, 1),
-('demo_member', '$2a$10$NkY7m2y6qQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQq', '演示妈妈', 'demo2@ihomy.local', @fid, 0, 1),
-('demo_child',  '$2a$10$NkY7m2y6qQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQq', '演示小宝', 'demo3@ihomy.local', @fid, 0, 1);
+('demo_owner',  '$2a$10$NkY7m2y6qQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQq', '演示爸爸', 'demo@ihomy.local', @fid, 'ACTIVE', 1),
+('demo_member', '$2a$10$NkY7m2y6qQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQq', '演示妈妈', 'demo2@ihomy.local', @fid, 'ACTIVE', 1),
+('demo_child',  '$2a$10$NkY7m2y6qQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQq', '演示小宝', 'demo3@ihomy.local', @fid, 'ACTIVE', 1);
 INSERT INTO `sys_user_role` (`user_id`, `role_id`, `family_id`)
 SELECT u.id, r.id, u.family_id FROM `sys_user` u
 JOIN `sys_role` r ON r.role_code = CASE u.username
@@ -705,20 +768,208 @@ UPDATE `sys_family_info` SET `owner_id` = (SELECT id FROM `sys_user` WHERE usern
 
 INSERT INTO `content_blog` (`title`, `content`, `author_id`, `family_id`, `status`, `visibility`, `view_count`) VALUES
 ('欢迎使用 ihomy', '## 欢迎加入 ihomy\n\nihomy 是家庭共用软件，支持博客、日记、相册、放映厅等功能。\n\n- 博客：记录家庭大事小事\n- 日记本：写心情日记\n- 相册：存放全家照片\n- 放映厅：上传全家一起看的电影和视频\n\n点击右上角「注册」，创建属于你自己的家庭吧！',
- (SELECT id FROM `sys_user` WHERE username = 'demo_owner'), @fid, 1, 4, 12),
+ (SELECT id FROM `sys_user` WHERE username = 'demo_owner'), @fid, 'PUBLISHED', 'PUBLIC', 12),
 ('周末一起去野餐', '这个周末天气不错，我们全家一起去郊外野餐吧！\n\n- 地点：城市公园\n- 时间：周六上午 10 点\n- 记得带上野餐垫、风筝和零食！',
- (SELECT id FROM `sys_user` WHERE username = 'demo_owner'), @fid, 1, 4, 8),
+ (SELECT id FROM `sys_user` WHERE username = 'demo_owner'), @fid, 'PUBLISHED', 'PUBLIC', 8),
 ('小宝第一次上台表演', '今天小宝在幼儿园的文艺汇演上表演了舞蹈，跳得特别棒！\n\n虽然有点紧张，但是全程没有出错，爸爸妈妈为你骄傲！',
- (SELECT id FROM `sys_user` WHERE username = 'demo_child'), @fid, 1, 3, 15);
+ (SELECT id FROM `sys_user` WHERE username = 'demo_child'), @fid, 'PUBLISHED', 'FAMILY', 15);
 
 INSERT INTO `content_diary` (`content`, `mood`, `weather`, `author_id`, `family_id`, `visibility`)
 VALUES ('今天全家一起去爬山，山顶的风景特别美，拍了好多照片。', '开心', '晴', 
- (SELECT id FROM `sys_user` WHERE username = 'demo_member'), @fid, 3),
+ (SELECT id FROM `sys_user` WHERE username = 'demo_member'), @fid, 'FAMILY'),
 ('晚饭后一家人坐在沙发上看电影，小宝看着看着睡着了。', '温馨', '阴',
- (SELECT id FROM `sys_user` WHERE username = 'demo_member'), @fid, 3);
+ (SELECT id FROM `sys_user` WHERE username = 'demo_member'), @fid, 'FAMILY');
 
-INSERT INTO `sys_anniversary` (`name`, `calendar`, `month`, `day`, `is_leap`, `family_id`, `user_id`, `recurring`, `created_by`)
-VALUES ('结婚纪念日', 'solar', 6, 18, 0, @fid, NULL, 1, (SELECT id FROM `sys_user` WHERE username = 'demo_owner'));
+INSERT INTO `family_anniversary` (`name`, `calendar`, `month`, `day`, `is_leap`, `family_id`, `user_id`, `recurring`, `created_by`)
+VALUES ('结婚纪念日', 'solar', 6, 18, 0, @fid, NULL, 'YEARLY', (SELECT id FROM `sys_user` WHERE username = 'demo_owner'));
+
+-- ------------------------------------------------------------
+-- 28. 签到表（积分商城 V3.4，user_id+checkin_date 唯一，每日一次）
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_checkin`;
+CREATE TABLE `family_checkin` (
+  `id`          BIGINT   NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`     BIGINT   NOT NULL COMMENT '签到用户ID',
+  `family_id`   BIGINT   NOT NULL COMMENT '所属家庭ID',
+  `checkin_date` DATE     NOT NULL COMMENT '签到日期（当天一次）',
+  `points`      INT      NOT NULL DEFAULT 0 COMMENT '本次获得积分',
+  `streak`      INT      NOT NULL DEFAULT 1 COMMENT '连续签到天数',
+  `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '签到时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_date` (`user_id`, `checkin_date`),
+  KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='每日签到表';
+
+-- ------------------------------------------------------------
+-- 29. 积分流水表（每笔变动一行，balance 为变动后余额，可直查余额）
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_points_record`;
+CREATE TABLE `family_points_record` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`     BIGINT       NOT NULL COMMENT '用户ID',
+  `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `change_type` VARCHAR(20)  NOT NULL COMMENT '变动类型: CHECKIN=签到/REWARD=内容奖励/REDEEM=兑换支出',
+  `change`      INT          NOT NULL COMMENT '变动积分（正加负减）',
+  `balance`     INT          NOT NULL COMMENT '变动后余额',
+  `remark`      VARCHAR(100) DEFAULT NULL COMMENT '备注（如"发布博客""兑换 洗碗券"）',
+  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发生时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_user` (`user_id`),
+  KEY `idx_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='积分流水表';
+
+-- ------------------------------------------------------------
+-- 30. 积分商品表（家长上架的家庭虚拟物品，如"洗碗券"）
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_points_product`;
+CREATE TABLE `family_points_product` (
+  `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`  BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `name`       VARCHAR(50)  NOT NULL COMMENT '商品名称',
+  `icon`       VARCHAR(50)  DEFAULT NULL COMMENT '图标（emoji 或图标名）',
+  `points`     INT          NOT NULL COMMENT '所需积分',
+  `stock`      INT          NOT NULL DEFAULT -1 COMMENT '库存上限（-1=不限量）',
+  `per_limit`  INT          NOT NULL DEFAULT 1 COMMENT '每人限兑次数（0=不限）',
+  `enabled`    TINYINT      NOT NULL DEFAULT 1 COMMENT '0下架 1上架',
+  `created_by` BIGINT       NOT NULL COMMENT '上架人（家长）ID',
+  `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '上架时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='积分商品表';
+
+-- ------------------------------------------------------------
+-- 31. 兑换订单表（商品快照防改价追溯）
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_points_order`;
+CREATE TABLE `family_points_order` (
+  `id`           BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`      BIGINT       NOT NULL COMMENT '兑换人ID',
+  `family_id`    BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `product_id`   BIGINT       NOT NULL COMMENT '商品ID',
+  `product_name` VARCHAR(50)  NOT NULL COMMENT '商品名称快照',
+  `points_spent` INT          NOT NULL COMMENT '消耗积分',
+  `status`       TINYINT      NOT NULL DEFAULT 0 COMMENT '0待核销 1已核销（家长确认使用）',
+  `created_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '兑换时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_user` (`user_id`),
+  KEY `idx_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='积分兑换订单表';
+
+-- ------------------------------------------------------------
+-- 32. 悬赏任务表（V3.4 任务悬赏:成员发布任务,他人领取完成,发布者确认后发奖励）
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_task`;
+CREATE TABLE `family_task` (
+  `id`            BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`     BIGINT        NOT NULL COMMENT '所属家庭ID',
+  `title`         VARCHAR(100)  NOT NULL COMMENT '任务标题',
+  `description`   VARCHAR(500)  DEFAULT NULL COMMENT '任务描述',
+  `reward_type`   TINYINT       NOT NULL DEFAULT 0 COMMENT '奖励类型: 0无奖励/1积分/2自定义物品',
+  `reward_points` INT           NOT NULL DEFAULT 0 COMMENT '积分奖励数（reward_type=1 时生效）',
+  `reward_item`   VARCHAR(100)  DEFAULT NULL COMMENT '自定义物品奖励描述（reward_type=2 时生效）',
+  `status`        TINYINT       NOT NULL DEFAULT 0 COMMENT '状态: 0待领取 1进行中 2待确认 3已完成 4已取消',
+  `created_by`    BIGINT        NOT NULL COMMENT '发布人ID',
+  `assignee_id`   BIGINT        DEFAULT NULL COMMENT '领取人ID（进行中/待确认时非空）',
+  `created_at`    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发布时间',
+  `updated_at`    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family` (`family_id`),
+  KEY `idx_created` (`created_by`),
+  KEY `idx_assignee` (`assignee_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='悬赏任务表';
+
+-- ------------------------------------------------------------
+-- 33. 提醒事项表（V3.4 今日提醒:站内通知触发,repeat_type 支持一次性/每日/每周/每月）
+--     remind_date 语义:一次性=触发当天;每周=基准星期;每月=基准日号
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_reminder`;
+CREATE TABLE `family_reminder` (
+  `id`          BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`   BIGINT        NOT NULL COMMENT '所属家庭ID',
+  `title`       VARCHAR(100)  NOT NULL COMMENT '提醒标题',
+  `content`     VARCHAR(500)  DEFAULT NULL COMMENT '提醒内容',
+  `remind_date` DATE          NOT NULL COMMENT '基准日期(一次性=当天/每周=星期基准/每月=日号基准)',
+  `remind_time` TIME          NOT NULL COMMENT '触发时刻（每日重复的时刻）',
+  `repeat_type` VARCHAR(20)   NOT NULL DEFAULT 'ONCE' COMMENT 'ONCE一次性/DAILY每日/WEEKLY每周/MONTHLY每月',
+  `done`        TINYINT       NOT NULL DEFAULT 0 COMMENT '0未完成 1已完成',
+  `created_by`  BIGINT        NOT NULL COMMENT '创建人ID',
+  `created_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family` (`family_id`),
+  KEY `idx_date` (`remind_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='提醒事项表';
+
+-- ------------------------------------------------------------
+-- 34. 家庭计划表（V3.4 中长期目标:全家计划含子任务清单）
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_plan`;
+CREATE TABLE `family_plan` (
+  `id`           BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`    BIGINT        NOT NULL COMMENT '所属家庭ID',
+  `title`        VARCHAR(100)  NOT NULL COMMENT '计划标题',
+  `description`  VARCHAR(500)  DEFAULT NULL COMMENT '计划描述',
+  `target_date`  DATE          DEFAULT NULL COMMENT '目标完成日期',
+  `status`       TINYINT       NOT NULL DEFAULT 0 COMMENT '状态: 0进行中 1已完成 2已取消',
+  `created_by`   BIGINT        NOT NULL COMMENT '创建人ID',
+  `created_at`   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭计划表';
+
+-- ------------------------------------------------------------
+-- 35. 计划子任务表（V3.4,挂靠 family_plan,可指派成员）
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_plan_task`;
+CREATE TABLE `family_plan_task` (
+  `id`          BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `plan_id`     BIGINT        NOT NULL COMMENT '所属计划ID',
+  `title`       VARCHAR(100)  NOT NULL COMMENT '子任务标题',
+  `assignee_id` BIGINT        DEFAULT NULL COMMENT '指派成员ID（可空）',
+  `due_date`    DATE          DEFAULT NULL COMMENT '截止日期（可空）',
+  `done`        TINYINT       NOT NULL DEFAULT 0 COMMENT '0未完成 1已完成',
+  `created_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_plan` (`plan_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='计划子任务表';
+
+-- ------------------------------------------------------------
+-- 36. 愿望单表（V3.4 家庭共享愿望:提出/标记达成/放弃,全员可见）
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `content_wish`;
+CREATE TABLE `content_wish` (
+  `id`           BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`    BIGINT        NOT NULL COMMENT '所属家庭ID',
+  `title`        VARCHAR(100)  NOT NULL COMMENT '愿望标题',
+  `reason`       VARCHAR(500)  DEFAULT NULL COMMENT '愿望理由/备注',
+  `category`     VARCHAR(50)   DEFAULT NULL COMMENT '分类标签（逗号分隔）',
+  `status`       TINYINT       NOT NULL DEFAULT 0 COMMENT '状态: 0待实现 1已实现 2放弃',
+  `requester_id` BIGINT        NOT NULL COMMENT '提出人ID',
+  `visibility`   VARCHAR(20)   NOT NULL DEFAULT 'FAMILY' COMMENT '可见范围：PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开（默认家庭可见）',
+  `achieved_at`  DATETIME      DEFAULT NULL COMMENT '达成时间（标记实现时记录）',
+  `created_at`   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '提出时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='愿望单表';
+
+-- ------------------------------------------------------------
+-- 37. 记账明细表（V3.5 家庭共享账本:支出/收入/转账,月度统计）
+--     ponytail: 家庭即一个账本,暂不建 sys_book_account 多账户表,需要多账户时再加
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_book_record`;
+CREATE TABLE `family_book_record` (
+  `id`          BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`   BIGINT          NOT NULL COMMENT '所属家庭ID',
+  `type`        TINYINT         NOT NULL DEFAULT 0 COMMENT '类型: 0支出 1收入 2转账',
+  `amount`      DECIMAL(10, 2)  NOT NULL COMMENT '金额',
+  `category`    VARCHAR(30)     NOT NULL DEFAULT '其他' COMMENT '分类（餐饮/交通/工资等）',
+  `remark`      VARCHAR(200)    DEFAULT NULL COMMENT '备注',
+  `record_date` DATE            NOT NULL COMMENT '记账日期',
+  `created_by`  BIGINT          NOT NULL COMMENT '记录人ID',
+  `created_at`  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family_date` (`family_id`, `record_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='记账明细表';
 
 -- ============================================================
 -- 初始化完成。
@@ -730,3 +981,218 @@ VALUES ('结婚纪念日', 'solar', 6, 18, 0, @fid, NULL, 1, (SELECT id FROM `sy
 --   mysql -uihomy -p ihomy -e "SELECT auth_code, module FROM sys_auth;"
 --   mysql -uihomy -p ihomy -e "SELECT u.username, r.role_code FROM sys_user u JOIN sys_user_role ur ON u.id=ur.user_id JOIN sys_role r ON ur.role_id=r.id;"
 -- ============================================================
+
+-- ------------------------------------------------------------
+-- 38. 聊天室(V3.3):聊天消息记录(家庭房间)
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_chat_message`;
+CREATE TABLE `family_chat_message` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID(房间)',
+  `sender_id`   BIGINT       NOT NULL COMMENT '发送人ID',
+  `content`     VARCHAR(2000) NOT NULL COMMENT '消息内容',
+  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发送时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family` (`family_id`, `id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='聊天消息表';
+
+-- ------------------------------------------------------------
+-- 39. 聊天已读位置(V3.3): 每用户每家庭最后已读消息ID,未读数由此计算
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_chat_read`;
+CREATE TABLE `family_chat_read` (
+  `id`             BIGINT   NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`        BIGINT   NOT NULL COMMENT '用户ID',
+  `family_id`      BIGINT   NOT NULL COMMENT '家庭ID',
+  `last_read_msg_id` BIGINT NOT NULL DEFAULT 0 COMMENT '最后已读消息ID',
+  `updated_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_family` (`user_id`, `family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='聊天已读游标表';
+-- ------------------------------------------------------------
+-- 40. 字典表(V3.9): 全局枚举字典(字典组+值+含义)
+--     各业务表的状态/类型字段从 tinyint(0/1/2/3) 迁移为 VARCHAR 存储
+--     大写英文单词(如 FAMILY/PUBLIC/DONE),展示时经字典翻译
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_dict_item`;
+CREATE TABLE `sys_dict_item` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '字典ID',
+  `dict_group`  VARCHAR(50)  NOT NULL COMMENT '字典组(业务表+字段,如 visibility/task_status)',
+  `dict_value`  VARCHAR(30)  NOT NULL COMMENT '字典值(大写英文单词)',
+  `meaning`     VARCHAR(100) NOT NULL COMMENT '含义(中文说明)',
+  `status`      TINYINT      NOT NULL DEFAULT 1 COMMENT '状态: 1启用 0停用',
+  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `created_by`  BIGINT       DEFAULT NULL COMMENT '创建人',
+  `status_time` DATETIME     DEFAULT NULL COMMENT '状态时间',
+  `updated_by`  BIGINT       DEFAULT NULL COMMENT '修改人',
+  `flow_id`     VARCHAR(50)  DEFAULT NULL COMMENT '流程ID',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_group_value` (`dict_group`, `dict_value`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='数据字典项';
+
+INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('visibility', 'PRIVATE',   '仅自己'),
+('visibility', 'MEMBERS',   '指定成员'),
+('visibility', 'GROUPS',    '指定群组'),
+('visibility', 'FAMILY',    '家庭可见'),
+('visibility', 'PUBLIC',    '公开'),
+('user_status', 'ACTIVE',   '正常'),
+('user_status', 'DISABLED', '禁用'),
+('blog_status', 'DRAFT',    '草稿'),
+('blog_status', 'PUBLISHED','已发布'),
+('blog_status', 'HIDDEN',   '隐藏'),
+('wish_status', 'PENDING',  '待实现'),
+('wish_status', 'ACHIEVED', '已实现'),
+('wish_status', 'ABANDONED','已放弃'),
+('video_wish_status', 'PENDING', '待入库'),
+('video_wish_status', 'IMPORTED','已入库'),
+('plan_status', 'ACTIVE',   '进行中'),
+('plan_status', 'DONE',     '已完成'),
+('plan_status', 'CANCELLED','已取消'),
+('task_status', 'OPEN',     '待领取'),
+('task_status', 'IN_PROGRESS','进行中'),
+('task_status', 'REVIEW',   '待确认'),
+('task_status', 'DONE',     '已完成'),
+('task_status', 'CANCELLED','已取消'),
+('reward_type', 'NONE',     '无奖励'),
+('reward_type', 'POINTS',   '积分'),
+('reward_type', 'ITEM',     '物品'),
+('apply_status', 'PENDING', '待处理'),
+('apply_status', 'APPROVED','已通过'),
+('apply_status', 'REJECTED','已拒绝'),
+('order_status', 'PENDING', '待核销'),
+('order_status', 'REDEEMED','已核销'),
+('reminder_repeat', 'ONCE',   '一次性'),
+('reminder_repeat', 'DAILY',  '每日'),
+('reminder_repeat', 'WEEKLY', '每周'),
+('reminder_repeat', 'MONTHLY','每月'),
+('ann_recurring', 'ONCE',   '一次性'),
+('ann_recurring', 'YEARLY', '每年'),
+('book_type', 'EXPENSE',  '支出'),
+('book_type', 'INCOME',   '收入'),
+('book_type', 'TRANSFER', '转账'),
+('log_result',  'SUCCESS', '成功'),
+('log_result',  'FAILED',  '失败'),
+('invite_status','UNUSED', '未使用'),
+('invite_status','USED',   '已使用'),
+('role_status', 'ENABLED',  '启用'),
+('role_status', 'DISABLED', '停用');
+-- ------------------------------------------------------------
+-- 41. 身份标签表(V3.9): 成员在家庭内的身份标签(如"爸爸""妈妈"),每家庭一套
+--     预设 爸爸/妈妈;其余(如"大宝")为自定义。user_id+family_id 唯一。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_user_label`;
+CREATE TABLE `family_user_label` (
+  `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`    BIGINT       NOT NULL COMMENT '用户ID',
+  `family_id`  BIGINT       NOT NULL COMMENT '家庭ID',
+  `label`      VARCHAR(20)  NOT NULL COMMENT '身份标签(预设: 爸爸/妈妈; 其余自定义)',
+  `color`      VARCHAR(20)  DEFAULT NULL COMMENT '标签颜色(#hex, 可空取默认)',
+  `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_family` (`user_id`, `family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='身份标签表';
+
+-- ------------------------------------------------------------
+-- 42. 家谱成员表(V5.0 家庭关系树): 成员通过 father_id/mother_id/spouse_id 自关联,
+--     构成多代血缘+婚姻关系;generation 从根(0)向下递增,支持世代视图。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_tree`;
+CREATE TABLE `family_tree` (
+  `id`          BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`   BIGINT        NOT NULL COMMENT '所属家庭ID',
+  `name`        VARCHAR(50)   NOT NULL COMMENT '姓名',
+  `gender`      TINYINT       NOT NULL DEFAULT 0 COMMENT '性别: 0未知 1男 2女',
+  `birth_date`  DATE          DEFAULT NULL COMMENT '出生日期',
+  `photo`       VARCHAR(255)  DEFAULT NULL COMMENT '头像照片URL',
+  `father_id`   BIGINT        DEFAULT NULL COMMENT '父亲成员ID(自关联)',
+  `mother_id`   BIGINT        DEFAULT NULL COMMENT '母亲成员ID(自关联)',
+  `spouse_id`   BIGINT        DEFAULT NULL COMMENT '配偶成员ID(自关联,双向共用)',
+  `generation`  INT           NOT NULL DEFAULT 0 COMMENT '世代: 0=第一代(祖先), 每代+1',
+  `note`        VARCHAR(255)  DEFAULT NULL COMMENT '备注(生平/职业等)',
+  `deleted`     TINYINT       NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  `created_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家谱成员表';
+
+-- ------------------------------------------------------------
+-- 43. 物品定位(V5.0 家庭物品定位,1期): 房子表
+--     部分家庭不止一套房产,先有房子再有楼层/房间:
+--     五级粒度: 家(family_id) > 房子(house) > 房间 > 家具 > 位置(position)
+--     2期户型图将按 房子+楼层 为单位绘制,以 room.id 为坐标挂载点
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_house`;
+CREATE TABLE `family_house` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `name`        VARCHAR(50)  NOT NULL COMMENT '房子名(如 自住房/度假屋)',
+  `address`     VARCHAR(200) DEFAULT NULL COMMENT '地址(可选)',
+  `sort_order`  INT          NOT NULL DEFAULT 0 COMMENT '排序',
+  `created_by`  BIGINT       DEFAULT NULL COMMENT '创建人ID',
+  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='房子表(物品定位)';
+
+-- ------------------------------------------------------------
+-- 44. 物品定位(V5.0,1期): 房间表(挂在房子下,floor 为房子内楼层)
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_room`;
+CREATE TABLE `family_room` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `house_id`    BIGINT       NOT NULL COMMENT '所属房子ID',
+  `name`        VARCHAR(50)  NOT NULL COMMENT '房间名(如 客厅/书房/主卧)',
+  `floor`       INT          NOT NULL DEFAULT 1 COMMENT '所在楼层(默认1楼,负数地下)',
+  `sort_order`  INT          NOT NULL DEFAULT 0 COMMENT '排序',
+  `note`        VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  `created_by`  BIGINT       DEFAULT NULL COMMENT '创建人ID',
+  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_house` (`house_id`),
+  KEY `idx_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='房间表(物品定位)';
+
+-- ------------------------------------------------------------
+-- 45. 物品定位(V5.0,1期): 家具表(挂在房间下)
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_furniture`;
+CREATE TABLE `family_furniture` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `room_id`     BIGINT       NOT NULL COMMENT '所在房间ID',
+  `name`        VARCHAR(50)  NOT NULL COMMENT '家具名(如 柜子/茶几/冰箱)',
+  `note`        VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  `created_by`  BIGINT       DEFAULT NULL COMMENT '创建人ID',
+  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_room` (`room_id`),
+  KEY `idx_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家具表(物品定位)';
+
+-- ------------------------------------------------------------
+-- 46. 物品定位(V5.0,1期): 物品表
+--     aliases: 别名/同义词,逗号分隔(3期 AI 拆解名称+别名后按此匹配)
+--     position: 位置文本(如 最上层抽屉/台面/挂墙)
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_item`;
+CREATE TABLE `family_item` (
+  `id`            BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`     BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `furniture_id`  BIGINT       NOT NULL COMMENT '所在家具ID',
+  `name`          VARCHAR(100) NOT NULL COMMENT '物品名(如 工具箱)',
+  `aliases`       VARCHAR(200) DEFAULT NULL COMMENT '别名,逗号分隔(3期 AI 搜索匹配用)',
+  `position`      VARCHAR(50)  DEFAULT NULL COMMENT '位置(最上层抽屉/台面/地面...)',
+  `note`          VARCHAR(500) DEFAULT NULL COMMENT '备注',
+  `created_by`    BIGINT       DEFAULT NULL COMMENT '创建人ID',
+  `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_furniture` (`furniture_id`),
+  KEY `idx_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='物品表(物品定位)';

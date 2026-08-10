@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.PointsRecordMapper">
+
+    <!-- 统计用户总积分(全部流水 change 之和,无流水返回 0) -->
+    <select id="sumBalance" resultType="java.lang.Integer">
+        SELECT COALESCE(SUM(`change`), 0) FROM `family_points_record` WHERE `user_id` = #{userId}
+    </select>
+</mapper>

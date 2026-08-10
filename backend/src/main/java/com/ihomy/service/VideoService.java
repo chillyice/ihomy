@@ -2,7 +2,9 @@ package com.ihomy.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ihomy.common.BizException;
+import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
+import com.ihomy.common.UserNames;
 import com.ihomy.dto.VideoDTO;
 import com.ihomy.entity.SysUser;
 import com.ihomy.entity.Video;
@@ -29,6 +31,7 @@ public class VideoService {
     private final VideoMapper videoMapper;
     private final VideoWishMapper videoWishMapper;
     private final SysUserMapper sysUserMapper;
+    private final PointsService pointsService;
 
     /** 视频列表:按家庭过滤,支持关键字/类型搜索,附带上传者昵称 */
     public List<Map<String, Object>> list(Long familyId, String keyword, String mediaType) {
@@ -72,9 +75,10 @@ public class VideoService {
         apply(v, dto);
         v.setUploaderId(userId);
         v.setFamilyId(familyId);
-        v.setVisibility(3);
+        v.setVisibility(DictConst.VIS_FAMILY);
         v.setDeleted(0);
         videoMapper.insert(v);
+        pointsService.addRecord(userId, familyId, "REWARD", PointsService.REWARD_VIDEO, "发布视频");
         return v;
     }
 
@@ -133,7 +137,7 @@ public class VideoService {
     public VideoWish addWish(Long userId, Long familyId, VideoWish wish) {
         wish.setRequesterId(userId);
         wish.setFamilyId(familyId);
-        wish.setStatus(0);
+        wish.setStatus(DictConst.VWISH_PENDING);
         wish.setDeleted(0);
         videoWishMapper.insert(wish);
         return wish;
@@ -171,7 +175,7 @@ public class VideoService {
         if (familyId != null && !familyId.equals(w.getFamilyId())) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
-        w.setStatus(1);
+        w.setStatus(DictConst.VWISH_IMPORTED);
         videoWishMapper.updateById(w);
     }
 
@@ -190,8 +194,6 @@ public class VideoService {
 
     private String resolveUserName(Long userId) {
         if (userId == null) return null;
-        SysUser u = sysUserMapper.selectById(userId);
-        if (u == null) return null;
-        return u.getNickname() != null && !u.getNickname().isBlank() ? u.getNickname() : u.getUsername();
+        return UserNames.of(sysUserMapper.selectById(userId));
     }
 }

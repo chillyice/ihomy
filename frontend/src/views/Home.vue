@@ -2,9 +2,9 @@
 <template>
   <div class="home-page">
     <section class="cover">
-      <img v-if="family?.coverImage" :src="family.coverImage" class="cover-img" alt="封面" />
+      <img v-if="family?.coverImage" :src="family.coverImage" class="cover-img" :alt="$t('home.coverAlt')" />
       <div class="cover-overlay">
-        <h1>{{ family?.coverText || '欢迎来到我们的家庭空间' }}</h1>
+        <h1>{{ family?.coverText || $t('home.welcome') }}</h1>
         <p v-if="family?.coverSubtitle" class="cover-sub">{{ family.coverSubtitle }}</p>
         <HomeStatsBar
           class="cover-stats"
@@ -13,10 +13,17 @@
         />
       </div>
       <div v-if="userStore.isGuest" class="guest-hint">
-        您正在以访客身份浏览公开内容
-        <el-button type="primary" size="small" @click="$router.push('/login')">登录查看更多</el-button>
+        {{ $t('home.guestHint') }}
+        <el-button type="primary" size="small" @click="$router.push('/login')">{{ $t('home.loginToView') }}</el-button>
       </div>
     </section>
+
+    <!-- 今日纪念日横幅:命中成员生日/家庭纪念日时显示,庆祝动效 -->
+    <div v-if="todayEvent" class="festival-banner" :class="todayEvent.type === 'birthday' ? 'is-birthday' : 'is-anniversary'">
+      <span class="festival-emoji">{{ todayEvent.type === 'birthday' ? '🎂' : '🎉' }}</span>
+      <span class="festival-text">{{ $t('home.todayEvent', { name: todayEvent.name, kind: $t(todayEvent.type === 'birthday' ? 'home.birthday' : 'home.anniversaryDay') }) }}</span>
+      <span class="festival-confetti" aria-hidden="true"></span>
+    </div>
 
     <main class="main-content">
       <div class="content-grid">
@@ -24,13 +31,13 @@
           <AlbumCarousel :photos="photos" />
 
           <div class="feed-section">
-            <ActivityFeed ref="feedRef" :home-id="homeId" :hid="hid" @loaded="onFeedLoaded" />
+            <ActivityFeed :home-id="homeId" :hid="hid" @loaded="onFeedLoaded" />
           </div>
         </div>
 
         <aside class="content-side">
           <div class="side-card">
-            <div class="side-title">快捷入口</div>
+            <div class="side-title">{{ $t('home.quickLinks') }}</div>
             <div class="side-modules">
               <div
                 v-for="m in sideModules"
@@ -47,30 +54,30 @@
                 @click="$router.push('/more')"
               >
                 <div class="side-icon">🗂️</div>
-                <div class="side-name">更多功能</div>
+                <div class="side-name">{{ $t('more.title') }}</div>
               </div>
             </div>
           </div>
 
           <div v-if="anniversaries.length" class="side-card">
-            <div class="side-title">🎉 家庭纪念日</div>
+            <div class="side-title">🎉 {{ $t('home.anniversaries') }}</div>
             <div
               v-for="a in anniversaries"
               :key="a.id"
               class="side-anni"
               @click="$router.push('/anniversary')"
             >
-              <div class="side-anni-date">{{ a.isLeap && a.calendar === 'lunar' ? '闰' : '' }}{{ a.month }}月{{ a.day }}日</div>
+              <div class="side-anni-date">{{ $t('anniversary.dateFormat', { leap: a.isLeap && a.calendar === 'lunar' ? $t('anniversary.leap') : '', month: a.month, day: a.day }) }}</div>
               <div class="side-anni-info">
                 <div class="side-anni-name">{{ a.name }}</div>
-                <div class="side-anni-meta">{{ a.calendar === 'lunar' ? '农历' : '阳历' }}{{ a.userName ? ' · ' + a.userName : '' }}</div>
+                <div class="side-anni-meta">{{ a.calendar === 'lunar' ? $t('anniversary.lunar') : $t('anniversary.solar') }}{{ a.userName ? ' · ' + a.userName : '' }}</div>
               </div>
             </div>
-            <div class="side-anni-more" @click="$router.push('/anniversary')">查看全部纪念日 →</div>
+            <div class="side-anni-more" @click="$router.push('/anniversary')">{{ $t('home.viewAllAnniversaries') }} →</div>
           </div>
 
           <div v-if="latestBlogs.length" class="side-card">
-            <div class="side-title">最新博客</div>
+            <div class="side-title">{{ $t('home.latestBlogs') }}</div>
             <div
               v-for="b in latestBlogs"
               :key="b.id"
@@ -78,7 +85,7 @@
               @click="$router.push(`/blog/${b.id}`)"
             >
               <div class="side-blog-title">{{ b.title }}</div>
-              <div class="side-blog-meta">{{ b.viewCount || 0 }} 次浏览</div>
+              <div class="side-blog-meta">{{ $t('home.views', { count: b.viewCount || 0 }) }}</div>
             </div>
           </div>
         </aside>
@@ -105,9 +112,9 @@ const photos = ref([])
 const family = ref({})
 const todayCount = ref(0)
 const memberCount = ref(0)
+const todayEvent = ref(null)
 const latestBlogs = ref([])
 const anniversaries = ref([])
-const feedRef = ref()
 
 const SIDE_MODULE_LIMIT = 8
 const ANNIVERSARY_SHOW = 5
@@ -128,6 +135,10 @@ const iconMap = {
   'icon-study': '📚',
   'icon-toolbox': '🧰',
   'icon-anniversary': '🎉',
+  'icon-photo': '🌊',
+  'icon-tree': '🌳',
+  'icon-storage': '🗄️',
+  'icon-item': '📦',
 }
 // 模块图标映射,未收录的图标兜底为星星
 const iconFor = (icon) => iconMap[icon] || '⭐'
@@ -150,6 +161,7 @@ const loadPublicHome = async () => {
   modules.value = data.modules || []
   photos.value = data.photos || []
   memberCount.value = data.stats?.memberCount || 0
+  todayEvent.value = data.stats?.todayEvent || null
 }
 
 // 登录用户首页:优先拉私有仪表盘;带家庭参数或接口失败时降级走公开数据
@@ -173,7 +185,8 @@ const loadUserHome = async () => {
     const pub = await publicApi.getHome()
     photos.value = pub.photos || []
     if (pub.family) family.value = pub.family
-    memberCount.value = 1
+    memberCount.value = pub.stats?.memberCount || 0
+    todayEvent.value = pub.stats?.todayEvent || null
   } catch (e) {
     // 忽略
   }
@@ -254,6 +267,50 @@ onMounted(() => {
   align-items: center;
   gap: 12px;
   z-index: 2;
+}
+
+/* 今日纪念日横幅:渐变底+粒子动效,生日暖色/纪念日主色 */
+.festival-banner {
+  position: relative;
+  max-width: 1280px;
+  margin: 16px auto -16px;
+  padding: 14px 24px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  overflow: hidden;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+.festival-banner.is-birthday { background: linear-gradient(120deg, #f472b6, #fb7185); }
+.festival-banner.is-anniversary { background: linear-gradient(120deg, var(--color-primary), var(--color-accent)); }
+.festival-emoji { font-size: 22px; animation: festival-bounce 1.6s infinite; }
+.festival-confetti {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 15% 70%, rgba(255,255,255,.5) 0 2px, transparent 3px),
+              radial-gradient(circle at 32% 25%, rgba(255,255,255,.35) 0 2px, transparent 3px),
+              radial-gradient(circle at 55% 80%, rgba(255,255,255,.45) 0 2px, transparent 3px),
+              radial-gradient(circle at 75% 20%, rgba(255,255,255,.4) 0 2px, transparent 3px),
+              radial-gradient(circle at 90% 65%, rgba(255,255,255,.5) 0 2px, transparent 3px);
+  background-size: 220px 160px;
+  animation: festival-drift 4s linear infinite;
+}
+@keyframes festival-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+@keyframes festival-drift {
+  0% { background-position: 0 0, 0 0, 0 0, 0 0, 0 0; }
+  100% { background-position: 220px 160px, 220px 160px, 220px 160px, 220px 160px, 220px 160px; }
 }
 
 .main-content {

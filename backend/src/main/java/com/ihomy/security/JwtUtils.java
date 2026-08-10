@@ -84,8 +84,4 @@ public class JwtUtils {
     public long getAccessExpire() {
         return accessExpire;
     }
-
-    public long getRefreshExpire() {
-        return refreshExpire;
-    }
 }

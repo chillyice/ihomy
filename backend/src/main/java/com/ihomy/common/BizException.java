@@ -15,8 +15,9 @@ public class BizException extends RuntimeException {
         this.code = rc.getCode();
     }
 
-    public BizException(int code, String message) {
+    /** 带自定义提示语的业务异常(默认码仍由 ResultCode 提供) */
+    public BizException(ResultCode rc, String message) {
         super(message);
-        this.code = code;
+        this.code = rc.getCode();
     }
 }

@@ -4,10 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.Result;
 import com.ihomy.common.ResultCode;
-import com.ihomy.entity.Album;
 import com.ihomy.entity.Family;
 import com.ihomy.entity.HomeModule;
-import com.ihomy.entity.Photo;
 import com.ihomy.entity.SysUser;
 import com.ihomy.mapper.AlbumMapper;
 import com.ihomy.mapper.FamilyMapper;
@@ -57,25 +55,7 @@ public class PublicController {
         SysUser user = securityHelper.currentUser();
         Long currentFamily = user != null ? user.getFamilyId() : null;
 
-        Family family;
-        if (StringUtils.hasText(hid)) {
-            // 混淆 ID 优先:按 share_token 精确查询,防遍历
-            family = familyMapper.selectOne(
-                    new LambdaQueryWrapper<Family>().eq(Family::getShareToken, hid.trim()));
-            if (family == null) {
-                throw new BizException(ResultCode.NOT_FOUND);
-            }
-        } else if (homeId != null) {
-            family = familyMapper.selectById(homeId);
-            if (family == null) {
-                throw new BizException(ResultCode.NOT_FOUND);
-            }
-        } else {
-            family = currentFamily != null ? familyMapper.selectById(currentFamily) : familyMapper.selectDefault();
-            if (family == null) {
-                throw new BizException(ResultCode.NOT_FOUND);
-            }
-        }
+        Family family = resolveFamily(hid, homeId, currentFamily);
         Long familyId = family.getId();
 
         boolean member = user != null && (currentFamily != null && currentFamily.equals(familyId)
@@ -118,30 +98,38 @@ public class PublicController {
         SysUser user = securityHelper.currentUser();
         Long currentFamily = user != null ? user.getFamilyId() : null;
 
-        Family family;
-        if (StringUtils.hasText(hid)) {
-            family = familyMapper.selectOne(
-                    new LambdaQueryWrapper<Family>().eq(Family::getShareToken, hid.trim()));
-            if (family == null) {
-                throw new BizException(ResultCode.NOT_FOUND);
-            }
+        Family family = resolveFamily(hid, homeId, currentFamily);
+        // 显式指定家庭时仅公开家庭可读,不指定则跟随当前家庭/默认演示家庭
+        if (StringUtils.hasText(hid) || homeId != null) {
             if (family.getIsPublic() == null || family.getIsPublic() != 1) {
-                throw new BizException(ResultCode.NOT_FOUND);
-            }
-        } else if (homeId != null) {
-            family = familyMapper.selectById(homeId);
-            if (family == null) {
-                throw new BizException(ResultCode.NOT_FOUND);
-            }
-            if (family.getIsPublic() == null || family.getIsPublic() != 1) {
-                throw new BizException(ResultCode.NOT_FOUND);
-            }
-        } else {
-            family = currentFamily != null ? familyMapper.selectById(currentFamily) : familyMapper.selectDefault();
-            if (family == null) {
                 throw new BizException(ResultCode.NOT_FOUND);
             }
         }
         return Result.success(activityFeedService.getFeed(family.getId(), limit, true));
+    }
+
+    /** 家庭定位:hid(混淆 share_token) > home_id > 当前家庭/默认家庭;定位不到 404 */
+    private Family resolveFamily(String hid, Long homeId, Long currentFamily) {
+        if (StringUtils.hasText(hid)) {
+            // 混淆 ID 优先:按 share_token 精确查询,防遍历
+            Family f = familyMapper.selectOne(
+                    new LambdaQueryWrapper<Family>().eq(Family::getShareToken, hid.trim()));
+            if (f == null) {
+                throw new BizException(ResultCode.NOT_FOUND);
+            }
+            return f;
+        }
+        if (homeId != null) {
+            Family f = familyMapper.selectById(homeId);
+            if (f == null) {
+                throw new BizException(ResultCode.NOT_FOUND);
+            }
+            return f;
+        }
+        Family f = currentFamily != null ? familyMapper.selectById(currentFamily) : familyMapper.selectDefault();
+        if (f == null) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
+        return f;
     }
 }

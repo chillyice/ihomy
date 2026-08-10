@@ -13,4 +13,6 @@ public class FamilyDTO {
     private String coverSubtitle;
     private String description;
     private Integer isPublic;
+    private String musicUrl;
+    private String musicTitle;
 }

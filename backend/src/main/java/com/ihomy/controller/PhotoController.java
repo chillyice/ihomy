@@ -8,6 +8,7 @@ import com.ihomy.entity.SysUser;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.AlbumService;
 import com.ihomy.service.FileService;
+import com.ihomy.service.PointsService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ public class PhotoController {
 
     private final AlbumService albumService;
     private final FileService fileService;
+    private final PointsService pointsService;
     private final SecurityHelper securityHelper;
 
     @Operation(summary = "上传照片到相册（支持多张）")
@@ -39,8 +41,12 @@ public class PhotoController {
         SysUser user = securityHelper.currentUser();
         List<Photo> photos = new ArrayList<>();
         for (MultipartFile f : files) {
-            String url = fileService.upload(f.getBytes(), f.getOriginalFilename(), f.getContentType());
+            String url = fileService.upload(f.getBytes(), f.getOriginalFilename(), f.getContentType(), albumId);
             photos.add(albumService.addPhoto(albumId, user, url, null));
+        }
+        if (!photos.isEmpty()) {
+            pointsService.addRecord(user.getId(), user.getFamilyId(), "REWARD",
+                    PointsService.REWARD_PHOTO * photos.size(), "上传照片 ×" + photos.size());
         }
         return Result.success(photos);
     }
