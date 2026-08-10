@@ -8,10 +8,10 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 站内通知实体(sys_notification):type 如 comment/reply/system,sourceId 指向关联业务记录。
+ * 站内通知实体(family_notification):type 如 comment/reply/system,sourceId 指向关联业务记录。
  */
 @Data
-@TableName("sys_notification")
+@TableName("family_notification")
 public class Notification {
     @TableId(type = IdType.AUTO)
     private Long id;

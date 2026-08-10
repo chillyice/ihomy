@@ -13,6 +13,8 @@ export const useUserStore = defineStore('user', {
     isLoggedIn: (state) => !!state.token,
     // 当前家庭角色是否为家长(OWNER 权限豁免的依据)
     isOwner: (state) => state.userInfo?.role === 'OWNER',
+    // 是否为运维管理员（V3.8:仅能访问 /ops 运维页）
+    isOps: (state) => state.userInfo?.role === 'OPS',
     isGuest: (state) => !state.token,
   },
   actions: {
@@ -36,14 +38,6 @@ export const useUserStore = defineStore('user', {
       this.userInfo = data.user
       localStorage.setItem('userInfo', JSON.stringify(data.user))
     },
-    async fetchMe() {
-      const data = await request.get('/auth/me')
-      this.userInfo = data
-      localStorage.setItem('userInfo', JSON.stringify(data))
-    },
-    async fetchFamilies() {
-      return await request.get('/auth/families')
-    },
     async switchFamily(familyId, setDefault = false) {
       // 切换当前家庭:后端按新家庭重签 token,前端整体替换本地凭证
       const data = await request.post('/auth/family/switch', { familyId, setDefault })
@@ -51,9 +45,6 @@ export const useUserStore = defineStore('user', {
       this.userInfo = data.user
       localStorage.setItem('userInfo', JSON.stringify(data.user))
       return data
-    },
-    async joinFamily(inviteCode) {
-      await request.post('/auth/join', { inviteCode })
     },
     setToken(token, refreshToken) {
       this.token = token

@@ -23,7 +23,7 @@ public class SysOperationLog {
     private String requestMethod;
     private String requestUrl;
     private String requestParams;
-    private Integer resultStatus;
+    private String resultStatus;
     private String errorMsg;
     private String ip;
     private String traceId;

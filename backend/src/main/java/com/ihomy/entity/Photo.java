@@ -9,7 +9,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 照片实体(content_photo):归属相册与家庭,可见性随相册类型(public→4,private→3)。
+ * 照片实体(content_photo):归属相册与家庭,可见性随相册类型(public→PUBLIC,private→FAMILY)。
  */
 @Data
 @TableName("content_photo")
@@ -24,7 +24,8 @@ public class Photo {
     private Integer likeCount;
     private Long authorId;
     private Long familyId;
-    private Integer visibility;
+    private String visibility;
+    private String sourcePath;
     private LocalDateTime createdAt;
     @TableLogic
     private Integer deleted;

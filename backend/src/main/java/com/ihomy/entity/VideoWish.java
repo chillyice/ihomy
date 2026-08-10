@@ -8,7 +8,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * "想看"实体(content_video_wish):status 0待入库/1已入库,软删删除。
+ * "想看"实体(content_video_wish):status PENDING待入库/IMPORTED已入库,软删删除。
  */
 @Data
 @TableName("content_video_wish")
@@ -18,7 +18,7 @@ public class VideoWish {
     private String title;
     private String genres;
     private String reason;
-    private Integer status;
+    private String status;
     private Long requesterId;
     private Long familyId;
     private LocalDateTime createdAt;

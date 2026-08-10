@@ -1,15 +1,15 @@
 <!-- 相册详情页:照片墙 + 上传/备注编辑/删除(悬停显示操作),家长或上传者可管理 -->
 <template>
   <div class="page">
-    <Breadcrumb :items="[{ label: '家庭相册', to: '/album' }, { label: album.name || '相册' }]" />
+    <Breadcrumb :items="[{ label: t('album.familyTitle'), to: '/album' }, { label: album.name || t('album.title') }]" />
 
     <div v-if="album.id" class="album-header card">
       <div class="album-head-info">
         <h2>{{ album.name }}</h2>
         <el-tag size="small" :type="album.type === 'public' ? 'primary' : 'warning'">
-          {{ album.type === 'public' ? '公开' : '私密' }}
+          {{ album.type === 'public' ? t('album.public') : t('album.private') }}
         </el-tag>
-        <span class="photo-count">{{ album.photoCount }} 张照片</span>
+        <span class="photo-count">{{ t('album.photoCountLabel', { n: album.photoCount }) }}</span>
         <p v-if="album.description" class="album-desc">{{ album.description }}</p>
       </div>
       <div v-if="userStore.isLoggedIn" class="album-head-actions">
@@ -19,7 +19,7 @@
           :http-request="uploadPhoto"
           accept="image/*"
         >
-          <el-button type="primary">上传照片</el-button>
+          <el-button type="primary">{{ t('album.uploadPhotos') }}</el-button>
         </el-upload>
       </div>
     </div>
@@ -30,8 +30,8 @@
           <div class="photo-wrap">
             <img :src="p.url" :alt="p.description || album.name" loading="lazy" />
             <div class="photo-hover">
-              <span v-if="canManagePhoto(p)"><el-icon><Edit /></el-icon>备注</span>
-              <span v-if="canManagePhoto(p)" class="danger" @click="onDelPhoto(p)"><el-icon><Delete /></el-icon>删除</span>
+              <span v-if="canManagePhoto(p)" @click="openDesc(p)"><el-icon><Edit /></el-icon>{{ t('album.editNote') }}</span>
+              <span v-if="canManagePhoto(p)" class="danger" @click="onDelPhoto(p)"><el-icon><Delete /></el-icon>{{ t('common.delete') }}</span>
             </div>
           </div>
           <div v-if="p.description" class="photo-desc">{{ p.description }}</div>
@@ -41,14 +41,14 @@
           </div>
         </div>
       </div>
-      <el-empty v-else :description="userStore.isGuest ? '相册暂无公开照片' : '相册还是空的，上传第一张照片吧'" />
+      <el-empty v-else :description="userStore.isGuest ? t('album.noPublicPhotos') : t('album.emptyPhotoHint')" />
     </div>
 
-    <el-dialog v-model="descEditor.visible" title="编辑照片备注" width="420px">
-      <el-input v-model="descEditor.value" type="textarea" :rows="3" placeholder="写点什么吧" />
+    <el-dialog v-model="descEditor.visible" :title="t('album.noteTitle')" width="420px">
+      <el-input v-model="descEditor.value" type="textarea" :rows="3" :placeholder="t('album.notePlaceholder')" />
       <template #footer>
-        <el-button @click="descEditor.visible = false">取消</el-button>
-        <el-button type="primary" @click="onSaveDesc">保存</el-button>
+        <el-button @click="descEditor.visible = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="onSaveDesc">{{ t('common.save') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -60,11 +60,13 @@ import { useRoute } from 'vue-router'
 import { albumApi, photoApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Location, Clock } from '@element-plus/icons-vue'
+import { Edit, Delete, Location, Clock } from '@element-plus/icons-vue'
+import { useI18n } from 'vue-i18n'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 
 const route = useRoute()
 const userStore = useUserStore()
+const { t } = useI18n()
 const albumId = route.params.id
 const album = ref({})
 const photos = ref([])
@@ -86,7 +88,7 @@ const load = async () => {
 // 上传单张照片成功后刷新照片墙
 const uploadPhoto = async (options) => {
   await photoApi.upload(albumId, [options.file])
-  ElMessage.success('上传成功')
+  ElMessage.success(t('album.uploadSuccess'))
   load()
 }
 
@@ -99,15 +101,15 @@ const openDesc = (p) => {
 
 const onSaveDesc = async () => {
   await photoApi.updateDesc(descEditor.currentId, descEditor.value)
-  ElMessage.success('已保存')
+  ElMessage.success(t('common.saved'))
   descEditor.visible = false
   load()
 }
 
 const onDelPhoto = async (p) => {
-  await ElMessageBox.confirm('确认删除这张照片？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('album.photoDeleteConfirm'), t('common.tip'), { type: 'warning' })
   await photoApi.remove(p.id)
-  ElMessage.success('已删除')
+  ElMessage.success(t('common.deleted'))
   load()
 }
 

@@ -2,6 +2,7 @@ package com.ihomy.service;
 
 import cn.hutool.core.date.ChineseDate;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ihomy.common.DictConst;
 import com.ihomy.entity.Anniversary;
 import com.ihomy.entity.SysUser;
 import com.ihomy.mapper.AnniversaryMapper;
@@ -31,19 +32,54 @@ public class HomeStatsService {
     private final SysUserMapper sysUserMapper;
     private final AnniversaryMapper anniversaryMapper;
 
-    /** 组装首页统计:成员数 + 未来 3 个纪念日(按剩余天数排序) */
+    /** 组装首页统计:成员数 + 未来 3 个纪念日(按剩余天数排序)+ 今日纪念日(无则 null) */
     public Map<String, Object> getStats(Long familyId) {
         Map<String, Object> stats = new HashMap<>();
         stats.put("memberCount", countMembers(familyId));
         stats.put("upcomingEvents", upcomingEvents(familyId));
+        stats.put("todayEvent", todayEvent(familyId));
         return stats;
+    }
+
+    /** 今天(阳历/农历均可)是否有纪念日:有则返回 {name, type: birthday|anniversary} */
+    private Map<String, Object> todayEvent(Long familyId) {
+        if (familyId == null) return null;
+        LocalDate today = LocalDate.now();
+        LambdaQueryWrapper<Anniversary> qw = new LambdaQueryWrapper<>();
+        qw.eq(Anniversary::getFamilyId, familyId);
+        for (Anniversary a : anniversaryMapper.selectList(qw)) {
+            if (isOn(a, today)) {
+                Map<String, Object> e = new HashMap<>();
+                e.put("name", a.getName());
+                e.put("type", a.getUserId() != null ? "birthday" : "anniversary");
+                return e;
+            }
+        }
+        return null;
+    }
+
+    /** 判断纪念日日期是否落在指定公历日(阳历比月日,农历做转换) */
+    private boolean isOn(Anniversary a, LocalDate date) {
+        if (a.getMonth() == null || a.getDay() == null) return false;
+        if ("lunar".equalsIgnoreCase(a.getCalendar())) {
+            boolean leap = a.getIsLeap() != null && a.getIsLeap() == 1;
+            try {
+                ChineseDate cd = new ChineseDate(date.getYear(), a.getMonth(), a.getDay(), leap);
+                return cd.getGregorianYear() == date.getYear()
+                        && cd.getGregorianMonth() + 1 == date.getMonthValue()
+                        && cd.getGregorianDay() == date.getDayOfMonth();
+            } catch (Exception ex) {
+                return false;
+            }
+        }
+        return a.getMonth() == date.getMonthValue() && a.getDay() == date.getDayOfMonth();
     }
 
     /** 有效(未禁用)成员数 */
     private long countMembers(Long familyId) {
         if (familyId == null) return 0;
         LambdaQueryWrapper<SysUser> qw = new LambdaQueryWrapper<>();
-        qw.eq(SysUser::getFamilyId, familyId).eq(SysUser::getStatus, 0);
+        qw.eq(SysUser::getFamilyId, familyId).eq(SysUser::getStatus, DictConst.USER_ACTIVE);
         return sysUserMapper.selectCount(qw);
     }
 
@@ -53,7 +89,7 @@ public class HomeStatsService {
         if (familyId == null) return events;
 
         LambdaQueryWrapper<Anniversary> qw = new LambdaQueryWrapper<>();
-        qw.eq(Anniversary::getFamilyId, familyId).eq(Anniversary::getRecurring, 1);
+        qw.eq(Anniversary::getFamilyId, familyId).eq(Anniversary::getRecurring, DictConst.RECUR_YEARLY);
         LocalDate today = LocalDate.now();
         for (Anniversary a : anniversaryMapper.selectList(qw)) {
             LocalDate next = nextOccurrence(a, today);

@@ -54,7 +54,8 @@ public class SecurityHelper {
     public boolean hasPermission(String code) {
         LoginUser u = current();
         if (u == null) return false;
-        if ("OWNER".equals(u.getRole())) return true;
+        // OWNER 与 OPS（运维角色,由 OpsAccessFilter 另行限制访问范围）恒真
+        if ("OWNER".equals(u.getRole()) || "OPS".equals(u.getRole())) return true;
         Set<String> codes = permissionCodes(u);
         return codes.contains(code);
     }

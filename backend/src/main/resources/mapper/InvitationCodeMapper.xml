@@ -3,7 +3,7 @@
 <mapper namespace="com.ihomy.mapper.InvitationCodeMapper">
 
     <select id="selectByCode" resultType="com.ihomy.entity.InvitationCode">
-        SELECT * FROM sys_invitation_code WHERE code = #{code} LIMIT 1
+        SELECT * FROM family_invitation_code WHERE code = #{code} LIMIT 1
     </select>
 
 </mapper>

@@ -20,7 +20,7 @@ public class Diary {
     private Integer likeCount;
     private Long authorId;
     private Long familyId;
-    private Integer visibility;
+    private String visibility;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
     @TableField(fill = FieldFill.INSERT_UPDATE)

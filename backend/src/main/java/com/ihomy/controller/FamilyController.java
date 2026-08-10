@@ -95,6 +95,8 @@ public class FamilyController {
         if (dto.getCoverSubtitle() != null) f.setCoverSubtitle(dto.getCoverSubtitle());
         if (dto.getDescription() != null) f.setDescription(dto.getDescription());
         if (dto.getIsPublic() != null) f.setIsPublic(dto.getIsPublic());
+        if (dto.getMusicUrl() != null) f.setMusicUrl(dto.getMusicUrl());
+        if (dto.getMusicTitle() != null) f.setMusicTitle(dto.getMusicTitle());
         familyMapper.updateById(f);
         return Result.success(f);
     }

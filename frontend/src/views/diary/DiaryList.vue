@@ -1,10 +1,10 @@
 <!-- 日记本页:日志卡片列表(含多图、心情、天气),写/编辑走同一个对话框 -->
 <template>
   <div class="page">
-    <Breadcrumb :items="[{ label: '日记本' }]" />
+    <Breadcrumb :items="[{ label: $t('diary.title') }]" />
     <div class="list-header">
-      <h2>日记本</h2>
-      <el-button type="primary" @click="openEditor()">写日志</el-button>
+      <h2>{{ $t('diary.title') }}</h2>
+      <el-button type="primary" @click="openEditor()">{{ $t('diary.newDiary') }}</el-button>
     </div>
 
     <div v-for="d in list" :key="d.id" class="diary-item card">
@@ -24,33 +24,33 @@
         />
       </div>
       <div class="diary-actions">
-        <el-button text @click="openEditor(d)">编辑</el-button>
-        <el-button text type="danger" @click="onDel(d)">删除</el-button>
+        <el-button text @click="openEditor(d)">{{ $t('common.edit') }}</el-button>
+        <el-button text type="danger" @click="onDel(d)">{{ $t('common.delete') }}</el-button>
       </div>
     </div>
-    <el-empty v-if="!list.length" description="还没有日志" />
+    <el-empty v-if="!list.length" :description="$t('diary.noData')" />
 
-    <el-dialog v-model="editor.visible" :title="editor.form.id ? '编辑日志' : '写日志'" width="500px">
+    <el-dialog v-model="editor.visible" :title="editor.form.id ? $t('diary.editLog') : $t('diary.newDiary')" width="500px">
       <el-form :model="editor.form" label-position="top">
-        <el-form-item label="内容">
+        <el-form-item :label="$t('diary.content')">
           <el-input v-model="editor.form.content" type="textarea" :rows="6" />
         </el-form-item>
-        <el-form-item label="心情">
+        <el-form-item :label="$t('diary.mood')">
           <el-input v-model="editor.form.mood" />
         </el-form-item>
-        <el-form-item label="天气">
+        <el-form-item :label="$t('diary.weather')">
           <el-input v-model="editor.form.weather" />
         </el-form-item>
-        <el-form-item label="可见范围">
+        <el-form-item :label="$t('diary.visibility')">
           <el-radio-group v-model="editor.form.visibility">
-            <el-radio :value="0">仅自己</el-radio>
-            <el-radio :value="3">家庭可见</el-radio>
+            <el-radio :value="0">{{ $t('diary.onlySelf') }}</el-radio>
+            <el-radio :value="3">{{ $t('diary.familyVisible') }}</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="editor.visible = false">取消</el-button>
-        <el-button type="primary" @click="onSave">保存</el-button>
+        <el-button @click="editor.visible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="onSave">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -59,9 +59,11 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { diaryApi } from '@/api'
+import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 
+const { t } = useI18n()
 const list = ref([])
 const editor = reactive({ visible: false, form: { id: null, content: '', mood: '', weather: '', visibility: 3 } })
 
@@ -89,15 +91,15 @@ const openEditor = (d) => {
 const onSave = async () => {
   if (editor.form.id) await diaryApi.update(editor.form.id, editor.form)
   else await diaryApi.create(editor.form)
-  ElMessage.success('保存成功')
+  ElMessage.success(t('common.saveSuccess'))
   editor.visible = false
   load()
 }
 
 const onDel = async (d) => {
-  await ElMessageBox.confirm('确认删除该日志？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('diary.deleteConfirm'), t('common.tip'), { type: 'warning' })
   await diaryApi.remove(d.id)
-  ElMessage.success('已删除')
+  ElMessage.success(t('common.deleted'))
   load()
 }
 

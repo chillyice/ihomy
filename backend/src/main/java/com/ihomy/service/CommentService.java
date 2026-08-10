@@ -3,6 +3,7 @@ package com.ihomy.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.ResultCode;
+import com.ihomy.common.UserNames;
 import com.ihomy.dto.CommentDTO;
 import com.ihomy.entity.Blog;
 import com.ihomy.entity.Comment;
@@ -143,8 +144,7 @@ public class CommentService {
 
     private String resolveName(Long userId) {
         if (userId == null) return null;
-        SysUser u = sysUserMapper.selectById(userId);
-        return u != null ? (u.getNickname() != null && !u.getNickname().isBlank() ? u.getNickname() : u.getUsername()) : null;
+        return UserNames.of(sysUserMapper.selectById(userId));
     }
 
     /** 评论转展示结构:补作者昵称与被回复人昵称 */

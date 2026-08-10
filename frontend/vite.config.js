@@ -3,7 +3,7 @@ import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
-import { ElementPlusResolver, VantResolver } from 'unplugin-vue-components/resolvers'
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
@@ -14,7 +14,7 @@ export default defineConfig({
       resolvers: [ElementPlusResolver()],
     }),
     Components({
-      resolvers: [ElementPlusResolver(), VantResolver()],
+      resolvers: [ElementPlusResolver()],
     }),
     VitePWA({
       registerType: 'autoUpdate',
@@ -57,6 +57,12 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
+      },
+      // 上传文件:开发模式后端 context-path=/api,files 映射在 /api/files 下,故代理需 rewrite(生产由 nginx /files/ 直接托管磁盘)
+      '/files': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        rewrite: (path) => '/api' + path,
       },
     },
   },

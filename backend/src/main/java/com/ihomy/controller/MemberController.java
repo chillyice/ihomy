@@ -76,12 +76,4 @@ public class MemberController {
         SysUser user = securityHelper.currentUser();
         return Result.success(memberService.inviteList(user.getFamilyId()));
     }
-
-    @Operation(summary = "通过邀请码加入家庭")
-    @PostMapping("/accept")
-    public Result<SysUser> accept(@RequestBody Map<String, String> body) {
-        SysUser user = securityHelper.currentUser();
-        if (user == null) throw new BizException(ResultCode.UNAUTHORIZED);
-        return Result.success(memberService.acceptInvite(user, body.get("code")));
-    }
 }

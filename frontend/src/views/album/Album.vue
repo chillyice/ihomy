@@ -1,11 +1,11 @@
 <!-- 相册列表页:封面/类型/照片数卡片网格,登录后可新建,家长或创建者可管理 -->
 <template>
   <div class="page">
-    <Breadcrumb :items="[{ label: '相册' }]" />
+    <Breadcrumb :items="[{ label: t('album.title') }]" />
 
     <div class="list-header">
-      <h2>相册</h2>
-      <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">新建相册</el-button>
+      <h2>{{ t('album.title') }}</h2>
+      <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ t('album.newAlbum') }}</el-button>
     </div>
 
     <div v-loading="loading">
@@ -25,37 +25,37 @@
             <div v-else class="album-cover album-cover-empty">
               <span>📷</span>
             </div>
-            <span class="album-type" :class="a.type">{{ a.type === 'public' ? '公开' : '私密' }}</span>
-            <span class="album-count">{{ a.photoCount }} 张</span>
+            <span class="album-type" :class="a.type">{{ a.type === 'public' ? t('album.public') : t('album.private') }}</span>
+            <span class="album-count">{{ t('album.photoCount', { n: a.photoCount }) }}</span>
           </div>
           <div class="album-info">
             <div class="album-name">{{ a.name }}</div>
             <div class="album-meta">{{ formatDate(a.createdAt) }}</div>
           </div>
           <div v-if="canManage(a)" class="album-actions" @click.stop>
-            <el-button size="small" text @click="openEditor(a)">编辑</el-button>
-            <el-button size="small" text type="danger" @click="onDel(a)">删除</el-button>
+            <el-button size="small" text @click="openEditor(a)">{{ t('common.edit') }}</el-button>
+            <el-button size="small" text type="danger" @click="onDel(a)">{{ t('common.delete') }}</el-button>
           </div>
         </div>
       </div>
-      <el-empty v-else :description="userStore.isGuest ? '暂无公开相册' : '还没有相册，去创建一个吧'" />
+      <el-empty v-else :description="userStore.isGuest ? t('album.noPublicAlbum') : t('album.emptyHint')" />
     </div>
 
-    <el-dialog v-model="editor.visible" :title="editor.form.id ? '编辑相册' : '新建相册'" width="420px">
+    <el-dialog v-model="editor.visible" :title="editor.form.id ? t('album.editTitle') : t('album.newAlbum')" width="420px">
       <el-form :model="editor.form" label-position="top">
-        <el-form-item label="相册名称">
-          <el-input v-model="editor.form.name" placeholder="如：宝宝成长、旅行回忆" />
+        <el-form-item :label="t('album.albumName')">
+          <el-input v-model="editor.form.name" :placeholder="t('album.namePlaceholder')" />
         </el-form-item>
-        <el-form-item label="可见范围">
+        <el-form-item :label="t('album.visibility')">
           <el-radio-group v-model="editor.form.type">
-            <el-radio value="public">公开（访客可见）</el-radio>
-            <el-radio value="private">私密（仅家庭成员）</el-radio>
+            <el-radio value="public">{{ t('album.publicOption') }}</el-radio>
+            <el-radio value="private">{{ t('album.privateOption') }}</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="editor.visible = false">取消</el-button>
-        <el-button type="primary" @click="onSave">保存</el-button>
+        <el-button @click="editor.visible = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="onSave">{{ t('common.save') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -66,8 +66,10 @@ import { ref, reactive, onMounted } from 'vue'
 import { albumApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 
+const { t } = useI18n()
 const userStore = useUserStore()
 const albums = ref([])
 const loading = ref(false)
@@ -94,19 +96,19 @@ const openEditor = (a) => {
 }
 
 const onSave = async () => {
-  if (!editor.form.name) return ElMessage.warning('请输入相册名称')
+  if (!editor.form.name) return ElMessage.warning(t('album.nameRequired'))
   if (editor.form.id) await albumApi.update(editor.form.id, editor.form)
   else await albumApi.create(editor.form)
-  ElMessage.success('保存成功')
+  ElMessage.success(t('album.saved'))
   editor.visible = false
   load()
 }
 
 // 删除相册(连同相册内照片):二次确认后执行
 const onDel = async (a) => {
-  await ElMessageBox.confirm(`确认删除相册「${a.name}」？相册内照片将一并删除`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(t('album.deleteConfirm', { name: a.name }), t('common.tip'), { type: 'warning' })
   await albumApi.remove(a.id)
-  ElMessage.success('已删除')
+  ElMessage.success(t('common.deleted'))
   load()
 }
 

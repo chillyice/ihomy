@@ -24,6 +24,9 @@ public class Family {
     private Integer isDemo;
     /** 16 位混淆分享 token,公开访问 URL 用 ?hid= 而非裸 ID */
     private String shareToken;
+    /** 家庭背景音乐:URL(本地上传 /files/... 或外链) */
+    private String musicUrl;
+    private String musicTitle;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
     @TableField(fill = FieldFill.INSERT_UPDATE)

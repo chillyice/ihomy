@@ -1,11 +1,11 @@
 <!-- 博客详情页:正文 + 点赞 + 评论树(支持回复,家长或作者可删) -->
 <template>
   <div class="page">
-    <Breadcrumb :items="[{ label: '家庭博客', to: '/blog' }, { label: blog?.title || '博客详情' }]" />
+    <Breadcrumb :items="[{ label: $t('blog.title'), to: '/blog' }, { label: blog?.title || $t('blog.detail') }]" />
     <div v-if="blog" class="card detail">
       <h1>{{ blog.title }}</h1>
       <div class="meta">
-        <span>{{ formatDate(blog.createdAt) }} · {{ blog.viewCount }} 次浏览</span>
+        <span>{{ formatDate(blog.createdAt) }} · {{ blog.viewCount }} {{ $t('blog.views') }}</span>
         <span v-if="blog.tags" class="tags">
           <span v-for="t in tagList" :key="t" class="tag">#{{ t }}</span>
         </span>
@@ -16,27 +16,27 @@
       <div class="like-bar">
         <el-button :type="likeState.liked ? 'primary' : 'default'" round @click="onLike">
           <el-icon><Star /></el-icon>
-          <span>{{ likeState.liked ? '已赞' : '点赞' }}</span>
+          <span>{{ likeState.liked ? $t('blog.liked') : $t('blog.like') }}</span>
           <span v-if="likeState.likeCount">({{ likeState.likeCount }})</span>
         </el-button>
       </div>
     </div>
 
     <div v-if="blog" class="card comments">
-      <div class="comments-title">评论 ({{ comments.length }})</div>
+      <div class="comments-title">{{ $t('blog.comment') }} ({{ comments.length }})</div>
 
       <div v-if="userStore.isLoggedIn" class="comment-input">
         <el-input
           v-model="commentText"
-          :placeholder="replyTarget ? `回复 ${replyTarget}：` : '写下你的评论...'"
+          :placeholder="replyTarget ? $t('blog.replyPlaceholder', { name: replyTarget }) : $t('blog.commentPlaceholder')"
           @keyup.enter="submitComment"
         />
         <div class="comment-actions">
-          <el-button v-if="replyTarget" text size="small" @click="cancelReply">取消回复</el-button>
-          <el-button type="primary" size="small" :loading="submitting" @click="submitComment">发表</el-button>
+          <el-button v-if="replyTarget" text size="small" @click="cancelReply">{{ $t('blog.cancelReply') }}</el-button>
+          <el-button type="primary" size="small" :loading="submitting" @click="submitComment">{{ $t('blog.postComment') }}</el-button>
         </div>
       </div>
-      <el-empty v-else description="登录后参与评论" :image-size="60" />
+      <el-empty v-else :description="$t('blog.loginToComment')" :image-size="60" />
 
       <div v-if="comments.length" class="comment-list">
         <div v-for="c in comments" :key="c.id" class="comment-item">
@@ -46,20 +46,20 @@
           </div>
           <div class="c-body">{{ c.content }}</div>
           <div class="c-ops">
-            <el-button v-if="userStore.isLoggedIn" text size="small" @click="setReply(c)">回复</el-button>
+            <el-button v-if="userStore.isLoggedIn" text size="small" @click="setReply(c)">{{ $t('blog.reply') }}</el-button>
             <el-button
               v-if="canDelete(c)"
               text
               size="small"
               type="danger"
               @click="delComment(c)"
-            >删除</el-button>
+            >{{ $t('common.delete') }}</el-button>
           </div>
 
           <div v-if="c.replies?.length" class="reply-list">
             <div v-for="r in c.replies" :key="r.id" class="reply-item">
               <span class="c-author">{{ r.authorName }}</span>
-              <span v-if="r.replyToName" class="reply-to">回复 @{{ r.replyToName }}</span>
+              <span v-if="r.replyToName" class="reply-to">{{ $t('blog.replyTo', { name: r.replyToName }) }}</span>
               <span class="reply-content">{{ r.content }}</span>
               <el-button
                 v-if="canDelete(r)"
@@ -68,7 +68,7 @@
                 type="danger"
                 class="reply-del"
                 @click="delComment(r)"
-              >删除</el-button>
+              >{{ $t('common.delete') }}</el-button>
             </div>
           </div>
         </div>
@@ -82,10 +82,12 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { blogApi, likeApi, commentApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Star } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 
+const { t } = useI18n()
 const route = useRoute()
 const userStore = useUserStore()
 const blog = ref(null)
@@ -121,7 +123,7 @@ const loadAll = async () => {
 
 // 点赞/取消点赞:结果同步回博客浏览数的点赞字段
 const onLike = async () => {
-  if (!userStore.isLoggedIn) return ElMessage.warning('请先登录')
+  if (!userStore.isLoggedIn) return ElMessage.warning(t('blog.needLogin'))
   likeState.value = await likeApi.toggle({ contentType: 'blog', contentId: route.params.id })
   if (blog.value) blog.value.likeCount = likeState.value.likeCount
 }
@@ -142,7 +144,7 @@ const cancelReply = () => {
 
 // 提交评论/回复:成功后刷新评论树
 const submitComment = async () => {
-  if (!commentText.value.trim()) return ElMessage.warning('请输入内容')
+  if (!commentText.value.trim()) return ElMessage.warning(t('blog.inputContent'))
   submitting.value = true
   try {
     await commentApi.create({
@@ -154,7 +156,7 @@ const submitComment = async () => {
     })
     commentText.value = ''
     cancelReply()
-    ElMessage.success('评论成功')
+    ElMessage.success(t('blog.commentSuccess'))
     comments.value = await commentApi.list('blog', route.params.id)
   } finally {
     submitting.value = false
@@ -163,11 +165,10 @@ const submitComment = async () => {
 
 const delComment = async (c) => {
   await commentApi.remove(c.id)
-  ElMessage.success('已删除')
+  ElMessage.success(t('common.deleted'))
   comments.value = await commentApi.list('blog', route.params.id)
 }
 
-const formatDate = (d) => (d ? new Date(d).toLocaleString('zh-CN') : '')
 const formatTime = (d) => (d ? new Date(d).toLocaleString('zh-CN') : '')
 
 onMounted(loadAll)

@@ -9,10 +9,10 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 家庭纪念日实体(sys_anniversary):calendar solar/lunar(闰月 isLeap),userId 非空=成员生日。
+ * 家庭纪念日实体(family_anniversary):calendar solar/lunar(闰月 isLeap),userId 非空=成员生日。
  */
 @Data
-@TableName("sys_anniversary")
+@TableName("family_anniversary")
 public class Anniversary {
     @TableId(type = IdType.AUTO)
     private Long id;
@@ -23,7 +23,7 @@ public class Anniversary {
     private Integer isLeap;
     private Long familyId;
     private Long userId;
-    private Integer recurring;
+    private String recurring;
     private Long createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

@@ -2,7 +2,9 @@ package com.ihomy.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ihomy.common.BizException;
+import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
+import com.ihomy.common.UserNames;
 import com.ihomy.dto.AnniversaryDTO;
 import com.ihomy.entity.Anniversary;
 import com.ihomy.entity.SysUser;
@@ -81,7 +83,7 @@ public class AnniversaryService {
         a.setDay(dto.getDay());
         a.setIsLeap(dto.getIsLeap() == null ? 0 : dto.getIsLeap());
         a.setUserId(dto.getUserId());
-        a.setRecurring(dto.getRecurring() == null ? 1 : dto.getRecurring());
+        a.setRecurring(DictConst.annRecurring(dto.getRecurring()));
     }
 
     /** 校验纪念日存在且属于该家庭 */
@@ -95,8 +97,6 @@ public class AnniversaryService {
     /** 成员昵称(无昵称回退账号名) */
     private String resolveUserName(Long userId) {
         if (userId == null) return null;
-        SysUser u = sysUserMapper.selectById(userId);
-        if (u == null) return null;
-        return u.getNickname() != null && !u.getNickname().isBlank() ? u.getNickname() : u.getUsername();
+        return UserNames.of(sysUserMapper.selectById(userId));
     }
 }

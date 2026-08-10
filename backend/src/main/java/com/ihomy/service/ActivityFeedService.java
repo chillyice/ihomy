@@ -1,5 +1,6 @@
 package com.ihomy.service;
 
+import com.ihomy.common.UserNames;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -35,9 +36,9 @@ public class ActivityFeedService {
             com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.ihomy.entity.Blog> bq =
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
             bq.eq(com.ihomy.entity.Blog::getFamilyId, familyId)
-              .eq(com.ihomy.entity.Blog::getStatus, 1);
+              .eq(com.ihomy.entity.Blog::getStatus, com.ihomy.common.DictConst.BLOG_PUBLISHED);
             if (publicOnly) {
-                bq.eq(com.ihomy.entity.Blog::getVisibility, 4);
+                bq.eq(com.ihomy.entity.Blog::getVisibility, com.ihomy.common.DictConst.VIS_PUBLIC);
             }
             bq.orderByDesc(com.ihomy.entity.Blog::getCreatedAt).last("LIMIT " + limit);
             for (com.ihomy.entity.Blog b : blogMapper.selectList(bq)) {
@@ -57,7 +58,7 @@ public class ActivityFeedService {
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
             dq.eq(com.ihomy.entity.Diary::getFamilyId, familyId);
             if (publicOnly) {
-                dq.eq(com.ihomy.entity.Diary::getVisibility, 4);
+                dq.eq(com.ihomy.entity.Diary::getVisibility, com.ihomy.common.DictConst.VIS_PUBLIC);
             }
             dq.orderByDesc(com.ihomy.entity.Diary::getCreatedAt).last("LIMIT " + limit);
             for (com.ihomy.entity.Diary d : diaryMapper.selectList(dq)) {
@@ -146,8 +147,7 @@ public class ActivityFeedService {
 
     private String resolveAuthorName(Long authorId) {
         if (authorId == null) return null;
-        com.ihomy.entity.SysUser u = sysUserMapper.selectById(authorId);
-        return u != null ? (u.getNickname() != null ? u.getNickname() : u.getUsername()) : null;
+        return UserNames.of(sysUserMapper.selectById(authorId));
     }
 
     private String resolveAuthorAvatar(Long authorId) {

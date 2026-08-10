@@ -2,12 +2,12 @@
 <template>
   <div class="page">
     <div class="more-header">
-      <h2>全部功能</h2>
-      <el-button text @click="$router.push('/')">返回首页</el-button>
+      <h2>{{ $t('more.allModules') }}</h2>
+      <el-button text @click="$router.push('/')">{{ $t('common.backHome') }}</el-button>
     </div>
 
     <div v-for="group in groups" :key="group.category" class="card more-group">
-      <div class="group-title">{{ group.label }}</div>
+      <div class="group-title">{{ $t('more.cat.' + group.category) }}</div>
       <div class="group-grid">
         <div
           v-for="m in group.modules"
@@ -18,10 +18,10 @@
           <div class="more-icon">{{ iconFor(m.icon) }}</div>
           <div class="more-name">{{ m.title }}</div>
         </div>
-        <el-empty v-if="!group.modules.length" description="暂无功能" :image-size="60" />
+        <el-empty v-if="!group.modules.length" :description="$t('more.noGroup')" :image-size="60" />
       </div>
     </div>
-    <el-empty v-if="!modules.length" description="还没有可用功能" />
+    <el-empty v-if="!modules.length" :description="$t('more.empty')" />
   </div>
 </template>
 
@@ -36,11 +36,11 @@ const userStore = useUserStore()
 const modules = ref([])
 
 const categoryMeta = [
-  { category: 'content', label: '内容创作' },
-  { category: 'album', label: '相册' },
-  { category: 'life', label: '生活' },
-  { category: 'social', label: '家庭互动' },
-  { category: 'system', label: '系统管理' },
+  { category: 'content' },
+  { category: 'album' },
+  { category: 'life' },
+  { category: 'social' },
+  { category: 'system' },
 ]
 
 // 模块按预置分类元信息聚合,空分类不展示
@@ -59,6 +59,9 @@ const iconMap = {
   'icon-study': '📚',
   'icon-toolbox': '🧰',
   'icon-anniversary': '🎉',
+  'icon-tree': '🌳',
+  'icon-storage': '🗄️',
+  'icon-item': '📦',
 }
 const iconFor = (icon) => iconMap[icon] || '⭐'
 

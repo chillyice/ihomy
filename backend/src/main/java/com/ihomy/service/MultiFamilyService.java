@@ -2,7 +2,9 @@ package com.ihomy.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ihomy.common.BizException;
+import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
+import com.ihomy.common.UserNames;
 import com.ihomy.entity.Family;
 import com.ihomy.entity.FamilyApply;
 import com.ihomy.entity.SysUser;
@@ -83,7 +85,7 @@ public class MultiFamilyService {
         LambdaQueryWrapper<FamilyApply> qw = new LambdaQueryWrapper<>();
         qw.eq(FamilyApply::getUserId, userId)
           .eq(FamilyApply::getFamilyId, familyId)
-          .eq(FamilyApply::getStatus, 0);
+          .eq(FamilyApply::getStatus, DictConst.APPLY_PENDING);
         return familyApplyMapper.selectCount(qw) > 0;
     }
 
@@ -102,11 +104,11 @@ public class MultiFamilyService {
         apply.setUserId(userId);
         apply.setFamilyId(familyId);
         apply.setMessage(message);
-        apply.setStatus(0);
+        apply.setStatus(DictConst.APPLY_PENDING);
         familyApplyMapper.insert(apply);
 
         SysUser applicant = sysUserMapper.selectById(userId);
-        String applicantName = applicant == null ? "用户" : (applicant.getNickname() != null ? applicant.getNickname() : applicant.getUsername());
+        String applicantName = applicant == null ? "用户" : UserNames.of(applicant);
         for (SysUserRole ur : listManagers(familyId)) {
             notificationService.create(ur.getUserId(), "system",
                     applicantName + " 申请加入家庭「" + family.getName() + "」", apply.getId(), "family_apply", familyId);
@@ -145,7 +147,7 @@ public class MultiFamilyService {
             m.put("createdAt", a.getCreatedAt());
             SysUser u = sysUserMapper.selectById(a.getUserId());
             m.put("applicantId", a.getUserId());
-            m.put("applicantName", u == null ? "未知" : (u.getNickname() != null ? u.getNickname() : u.getUsername()));
+            m.put("applicantName", u == null ? "未知" : UserNames.of(u));
             result.add(m);
         }
         return result;
@@ -156,13 +158,13 @@ public class MultiFamilyService {
     public void handleApply(Long applyId, Long familyId, Long handlerId, String action) {
         FamilyApply a = familyApplyMapper.selectById(applyId);
         if (a == null || !a.getFamilyId().equals(familyId)) throw new BizException(ResultCode.NOT_FOUND);
-        if (a.getStatus() != 0) throw new BizException(ResultCode.CONFLICT);
+        if (!DictConst.APPLY_PENDING.equals(a.getStatus())) throw new BizException(ResultCode.CONFLICT);
 
         Family family = familyMapper.selectById(familyId);
         String familyName = family == null ? "家庭" : family.getName();
 
         if ("approve".equals(action)) {
-            a.setStatus(1);
+            a.setStatus(DictConst.APPLY_APPROVED);
             a.setHandledBy(handlerId);
             a.setHandledAt(LocalDateTime.now());
             familyApplyMapper.updateById(a);
@@ -182,7 +184,7 @@ public class MultiFamilyService {
             notificationService.create(a.getUserId(), "system",
                     "你的入家申请已通过，欢迎加入「" + familyName + "」", applyId, "family_apply", familyId);
         } else {
-            a.setStatus(2);
+            a.setStatus(DictConst.APPLY_REJECTED);
             a.setHandledBy(handlerId);
             a.setHandledAt(LocalDateTime.now());
             familyApplyMapper.updateById(a);

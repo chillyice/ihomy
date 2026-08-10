@@ -1,10 +1,10 @@
 <!-- 博客列表页:封面+标题+标签+浏览数的卡片列表,点击进入详情 -->
 <template>
   <div class="page">
-    <Breadcrumb :items="[{ label: '博客' }]" />
+    <Breadcrumb :items="[{ label: $t('blog.title') }]" />
     <div class="list-header">
-      <h2>博客</h2>
-      <el-button v-if="userStore.isLoggedIn" type="primary" @click="$router.push('/blog/edit')">写博客</el-button>
+      <h2>{{ $t('blog.title') }}</h2>
+      <el-button v-if="userStore.isLoggedIn" type="primary" @click="$router.push('/blog/edit')">{{ $t('blog.newPost') }}</el-button>
     </div>
     <div v-loading="loading">
       <div v-for="b in list" :key="b.id" class="blog-item card" @click="$router.push(`/blog/${b.id}`)">
@@ -14,10 +14,10 @@
           <div v-if="b.tags" class="blog-tags">
             <span v-for="t in String(b.tags).split(',').filter(Boolean)" :key="t" class="tag">#{{ t }}</span>
           </div>
-          <div class="blog-meta">{{ b.viewCount }} 次浏览 · {{ formatDate(b.createdAt) }}</div>
+          <div class="blog-meta">{{ b.viewCount }} {{ $t('blog.views') }} · {{ formatDate(b.createdAt) }}</div>
         </div>
       </div>
-      <el-empty v-if="!loading && !list.length" :description="userStore.isGuest ? '暂无公开博客' : '还没有博客，去写第一篇吧'" />
+      <el-empty v-if="!loading && !list.length" :description="userStore.isGuest ? $t('blog.noPublicBlog') : $t('blog.firstHint')" />
     </div>
   </div>
 </template>

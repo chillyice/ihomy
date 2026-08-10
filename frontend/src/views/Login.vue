@@ -2,43 +2,43 @@
   <div class="login-page">
     <div class="login-card">
       <div class="login-title">ihomy</div>
-      <div class="login-sub">{{ isRegister ? '注册 ihomy 账号' : '欢迎回家，请登录' }}</div>
+      <div class="login-sub">{{ isRegister ? $t('login.registerTitle') : $t('login.welcome') }}</div>
 
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
         <el-radio-group v-if="isRegister" v-model="regMode" class="reg-mode">
-          <el-radio-button :value="'create'">创建家庭</el-radio-button>
-          <el-radio-button :value="'join'">加入家庭</el-radio-button>
+          <el-radio-button :value="'create'">{{ $t('login.createFamily') }}</el-radio-button>
+          <el-radio-button :value="'join'">{{ $t('login.joinFamily') }}</el-radio-button>
         </el-radio-group>
 
-        <el-form-item v-if="isRegister && regMode === 'create'" label="家庭名称" prop="familyName">
-          <el-input v-model="form.familyName" placeholder="如：张家的小院" />
+        <el-form-item v-if="isRegister && regMode === 'create'" :label="$t('login.familyName')" prop="familyName">
+          <el-input v-model="form.familyName" :placeholder="$t('login.familyNamePlaceholder')" />
         </el-form-item>
-        <el-form-item v-if="isRegister && regMode === 'join'" label="邀请码" prop="inviteCode">
-          <el-input v-model="form.inviteCode" placeholder="输入家人分享给你的邀请码" />
+        <el-form-item v-if="isRegister && regMode === 'join'" :label="$t('login.inviteCode')" prop="inviteCode">
+          <el-input v-model="form.inviteCode" :placeholder="$t('login.inviteCodePlaceholder')" />
         </el-form-item>
-        <el-form-item label="注册邮箱" prop="email">
-          <el-input v-model="form.email" placeholder="邮箱即登录账号" />
+        <el-form-item :label="$t('login.email')" prop="email">
+          <el-input v-model="form.email" :placeholder="$t('login.emailPlaceholder')" />
         </el-form-item>
-        <el-form-item label="密码" prop="password">
-          <el-input v-model="form.password" type="password" show-password placeholder="请输入密码" />
+        <el-form-item :label="$t('login.password')" prop="password">
+          <el-input v-model="form.password" type="password" show-password :placeholder="$t('login.passwordPlaceholder')" />
         </el-form-item>
-        <el-form-item v-if="isRegister" label="确认密码" prop="confirmPassword">
-          <el-input v-model="form.confirmPassword" type="password" show-password placeholder="请再次输入密码" />
+        <el-form-item v-if="isRegister" :label="$t('login.confirmPassword')" prop="confirmPassword">
+          <el-input v-model="form.confirmPassword" type="password" show-password :placeholder="$t('login.confirmPasswordPlaceholder')" />
         </el-form-item>
-        <el-form-item label="验证码" prop="captchaCode">
+        <el-form-item :label="$t('login.captcha')" prop="captchaCode">
           <div class="captcha-row">
-            <el-input v-model="form.captchaCode" placeholder="输入右侧验证码（测试环境固定 qwer）" @keyup.enter="onSubmit" />
-            <img v-if="captchaImage" :src="captchaImage" class="captcha-img" alt="验证码" title="点击刷新" @click="loadCaptcha" />
+            <el-input v-model="form.captchaCode" :placeholder="$t('login.captchaPlaceholder')" @keyup.enter="onSubmit" />
+            <img v-if="captchaImage" :src="captchaImage" class="captcha-img" alt="captcha" :title="$t('login.captchaRefresh')" @click="loadCaptcha" />
           </div>
         </el-form-item>
 
         <el-button type="primary" class="submit-btn" :loading="loading" @click="onSubmit">
-          {{ isRegister ? '注册' : '登录' }}
+          {{ isRegister ? $t('login.register') : $t('login.title') }}
         </el-button>
       </el-form>
 
       <div class="toggle" @click="toggleMode">
-        {{ isRegister ? '已有账号？去登录' : '没有账号？去注册' }}
+        {{ isRegister ? $t('login.hasAccount') : $t('login.noAccount') }}
       </div>
     </div>
   </div>
@@ -47,6 +47,7 @@
 <script setup>
 import { ref, reactive, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { authApi } from '@/api'
 import { ElMessage } from 'element-plus'
@@ -54,6 +55,7 @@ import { ElMessage } from 'element-plus'
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const { t } = useI18n()
 
 const isRegister = ref(route.query.register === '1' || !!route.query.invite)
 const regMode = ref(route.query.invite ? 'join' : 'create')
@@ -73,22 +75,22 @@ const form = reactive({
 
 const rules = computed(() => ({
   email: [
-    { required: true, message: '请输入注册邮箱', trigger: 'blur' },
-    { type: 'email', message: '邮箱格式不正确', trigger: 'blur' },
+    { required: true, message: t('login.emailRequired'), trigger: 'blur' },
+    { type: 'email', message: t('login.emailInvalid'), trigger: 'blur' },
   ],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
+  password: [{ required: true, message: t('login.passwordRequired'), trigger: 'blur' }],
   confirmPassword: isRegister.value
     ? [
-        { required: true, message: '请再次输入密码', trigger: 'blur' },
+        { required: true, message: t('login.confirmPasswordRequired'), trigger: 'blur' },
         {
-          validator: (r, v, cb) => (v === form.password ? cb() : cb(new Error('两次输入的密码不一致'))),
+          validator: (r, v, cb) => (v === form.password ? cb() : cb(new Error(t('login.passwordMismatch')))),
           trigger: 'blur',
         },
       ]
     : [],
-  captchaCode: [{ required: true, message: '请输入验证码', trigger: 'blur' }],
-  familyName: isRegister.value && regMode.value === 'create' ? [{ required: true, message: '请输入家庭名称', trigger: 'blur' }] : [],
-  inviteCode: isRegister.value && regMode.value === 'join' ? [{ required: true, message: '请输入邀请码', trigger: 'blur' }] : [],
+  captchaCode: [{ required: true, message: t('login.captchaRequired'), trigger: 'blur' }],
+  familyName: isRegister.value && regMode.value === 'create' ? [{ required: true, message: t('login.familyNameRequired'), trigger: 'blur' }] : [],
+  inviteCode: isRegister.value && regMode.value === 'join' ? [{ required: true, message: t('login.inviteCodeRequired'), trigger: 'blur' }] : [],
 }))
 
 // 加载图形验证码(登录/注册共用,进入页面即加载)
@@ -125,7 +127,7 @@ const onSubmit = async () => {
       }
       await userStore.register(payload)
       // 注册成功后不自动登录:跳转登录页,登录后才能访问自己的家庭
-      ElMessage.success(regMode.value === 'create' ? '家庭创建成功，请登录' : '已加入家庭，请登录')
+      ElMessage.success(regMode.value === 'create' ? t('login.createdHint') : t('login.joinedHint'))
       isRegister.value = false
       form.password = ''
       form.confirmPassword = ''
@@ -138,7 +140,7 @@ const onSubmit = async () => {
         captchaId: captchaId.value,
         captchaCode: form.captchaCode.trim(),
       })
-      ElMessage.success('登录成功')
+      ElMessage.success(t('login.loginSuccess'))
       router.push(route.query.redirect || '/')
     }
   } catch (e) {
