@@ -21,16 +21,26 @@
         </el-dropdown>
       </div>
 
-      <!-- 首页模块导航:普通用户可见;运维用户驻留运维页,不展示动态/模块入口 -->
+      <!-- 首页模块导航:普通用户可见;超过 6 项时前 5 项平铺,其余收进"更多"下拉 -->
       <nav v-if="!userStore.isOps" class="nav-modules">
         <router-link
-          v-for="m in navModules"
+          v-for="m in navPrimary"
           :key="m.code"
           :to="m.path"
           class="nav-item"
         >
           {{ m.title }}
         </router-link>
+        <el-dropdown v-if="navSecondary.length" trigger="hover" @command="(p) => router.push(p)">
+          <span class="nav-item nav-more">
+            {{ $t('more.title') }}<el-icon class="more-arrow"><ArrowDown /></el-icon>
+          </span>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item v-for="m in navSecondary" :key="m.code" :command="m.path">{{ m.title }}</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </nav>
 
       <div class="header-right">
@@ -109,7 +119,6 @@
             <el-dropdown-menu v-else>
               <el-dropdown-item command="profile">{{ $t('settings.profile') }}</el-dropdown-item>
               <el-dropdown-item command="settings">{{ $t('nav.settings') }}</el-dropdown-item>
-              <el-dropdown-item v-if="userStore.isOwner" command="member">{{ $t('nav.family') }}</el-dropdown-item>
               <el-dropdown-item divided command="logout">{{ $t('nav.logout') }}</el-dropdown-item>
             </el-dropdown-menu>
           </template>
@@ -139,7 +148,7 @@ import { applyTheme, initTheme, THEMES } from '@/theme'
 const router = useRouter()
 const userStore = useUserStore()
 const appStore = useAppStore()
-const { locale } = useI18n()
+const { locale, t } = useI18n()
 const theme = ref({ dark: false, theme: 'ocean' })
 const unreadCount = ref(0)
 const notifications = ref([])
@@ -187,10 +196,12 @@ const onSwitchFamily = async (command) => {
   }
 }
 
-// 顶部导航只展示 position 为 top/left 的模块
-const navModules = computed(() =>
+// 顶部导航只展示 position 为 top/left 的模块;超过 5 项时前 5 项平铺,其余收进"更多"下拉
+const navAll = computed(() =>
   appStore.modules.filter((m) => m.position === 'top' || m.position === 'left'),
 )
+const navPrimary = computed(() => navAll.value.slice(0, 5))
+const navSecondary = computed(() => navAll.value.slice(5))
 
 const loadUnread = async () => {
   if (!userStore.isLoggedIn) return
@@ -232,7 +243,7 @@ const onNotifyClick = async (n) => {
   else if (n.contentType === 'photo' && n.contentId) router.push('/album')
 }
 
-const notifyType = (t) => (t === 'reply' ? '回复' : t === 'system' ? '系统' : '评论')
+const notifyType = (type) => (type === 'reply' ? t('notify.typeReply') : type === 'system' ? t('notify.typeSystem') : t('notify.typeComment'))
 
 // 相对时间展示:分钟/小时级距,超过一天显示具体日期
 const formatTime = (d) => {
@@ -240,9 +251,9 @@ const formatTime = (d) => {
   const date = new Date(d)
   const now = Date.now()
   const diff = now - date.getTime()
-  if (diff < 3600000) return `${Math.max(1, Math.floor(diff / 60000))}分钟前`
-  if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`
-  return date.toLocaleDateString('zh-CN')
+  if (diff < 3600000) return t('time.minuteAgo', { n: Math.max(1, Math.floor(diff / 60000)) })
+  if (diff < 86400000) return t('time.hourAgo', { n: Math.floor(diff / 3600000) })
+  return date.toLocaleDateString(locale.value === 'en' ? 'en-US' : 'zh-CN')
 }
 
 // 用户下拉菜单命令分发(个人中心/设置/成员管理/运维/登出)
@@ -273,10 +284,10 @@ onMounted(() => {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(255, 255, 255, 0.95);
+  background: var(--color-card);
   backdrop-filter: blur(8px);
-  border-bottom: 1px solid rgba(31, 58, 95, 0.08);
-  box-shadow: 0 1px 8px rgba(31, 58, 95, 0.04);
+  border-bottom: 1px solid var(--color-border, rgba(31, 58, 95, 0.08));
+  box-shadow: var(--shadow);
 }
 .header-inner {
   max-width: 1280px;
@@ -324,6 +335,8 @@ onMounted(() => {
   color: var(--color-accent);
   border-bottom-color: var(--color-accent);
 }
+.nav-more { display: inline-flex; align-items: center; gap: 2px; cursor: pointer; }
+.more-arrow { font-size: 12px; }
 .header-right {
   display: flex;
   align-items: center;

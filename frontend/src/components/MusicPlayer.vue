@@ -9,7 +9,7 @@
       </span>
       <span class="mp-title">{{ music.title || '🎵' }}</span>
     </button>
-    <audio ref="audioEl" :src="music.url" loop preload="none" @ended="persist(false)"></audio>
+    <audio ref="audioEl" :src="music.url" loop preload="none" @ended="playing = false; persistNow()"></audio>
   </div>
 </template>
 
@@ -46,7 +46,7 @@ const loadMusic = async () => {
       ? { url: f.musicUrl, title: f.musicTitle || '背景音乐' }
       : null
     playing.value = false
-    if (music.value && persist().playing && persist().url === music.value.url) {
+    if (music.value && persisted().playing && persisted().url === music.value.url) {
       // 自动续播:浏览器可能拦截自动播放,失败则保持待播放状态
       audioEl.value?.play?.().catch(() => {})
       playing.value = true
@@ -69,7 +69,7 @@ const toggle = async () => {
       // 播放被拒(格式/未交互),忽略
     }
   }
-  persist()
+  persistNow()
 }
 
 watch(() => userStore.isLoggedIn, loadMusic)

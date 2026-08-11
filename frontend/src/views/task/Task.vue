@@ -29,7 +29,7 @@
             <span>{{ formatTime(t) }}</span>
           </div>
           <div v-if="act(t).length" class="task-actions">
-            <el-button v-for="a in act(t)" :key="a.key" size="small" :type="a.type" plain @click="onAction(a.key, t)">
+            <el-button v-for="a in act(t)" :key="a.key" size="small" :type="a.type" plain @click="doAction(a.key, t)">
               {{ a.label }}
             </el-button>
           </div>
@@ -127,7 +127,7 @@ const doAction = async (key, task) => {
   if (confirmMap[key]) await ElMessageBox.confirm(confirmMap[key], t('common.tip'), { type: 'warning' })
   await taskApi[key](task.id)
   ElMessage.success(t('common.success'))
-  await load()
+  await loadTasks()
 }
 
 const openEditor = () => {

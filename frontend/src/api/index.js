@@ -32,6 +32,7 @@ export const blogApi = {
   detail: (id) => request.get(`/blog/${id}`),
   create: (data) => request.post('/blog', data),
   update: (id, data) => request.put(`/blog/${id}`, data),
+  categories: () => request.get('/blog/categories'),
 }
 
 // 日记
@@ -147,7 +148,7 @@ export const videoApi = {
   wishRemove: (id) => request.delete(`/video/wish/${id}`),
 }
 
-// �����̳�(ǩ��/�һ�/�ҳ�����)
+// 积分商城(签到/兑换/上架管理)
 export const pointsApi = {
   stats: () => request.get('/points/stats'),
   checkin: () => request.post('/points/checkin'),
@@ -161,7 +162,7 @@ export const pointsApi = {
   markTaken: (id) => request.put(`/points/orders/${id}/taken`),
 }
 
-// ��������(����/��ȡ/���/ȷ�Ͻ���)
+// 任务悬赏(发布/领取/完成/确认结算)
 export const taskApi = {
   list: () => request.get('/task/list'),
   create: (data) => request.post('/task', data),
@@ -172,7 +173,7 @@ export const taskApi = {
   cancel: (id) => request.post(`/task/${id}/cancel`),
 }
 
-// ��������(����ȫ��վ��֪ͨ)
+// 提醒事项(一次性/每日/每周/每月,定时站内通知全家庭)
 export const reminderApi = {
   list: () => request.get('/reminder/list'),
   create: (data) => request.post('/reminder', data),
@@ -181,7 +182,7 @@ export const reminderApi = {
   toggleDone: (id) => request.post(`/reminder/${id}/toggle-done`),
 }
 
-// ��ͥ�ƻ�(�ƻ�+������,�����Զ�����)
+// 家庭计划(计划+子任务,进度自动联动)
 export const planApi = {
   list: () => request.get('/plan/list'),
   create: (data) => request.post('/plan', data),
@@ -192,7 +193,7 @@ export const planApi = {
   removeTask: (id) => request.delete(`/plan/task/${id}`),
 }
 
-// Ը����(��ͥ����Ը��,���/���/����)
+// 愿望单(家庭共享愿望,分类/达成/放弃)
 export const wishApi = {
   list: () => request.get('/wish/list'),
   create: (data) => request.post('/wish', data),
@@ -200,7 +201,7 @@ export const wishApi = {
   remove: (id) => request.delete(`/wish/${id}`),
 }
 
-// ���˱�(��ͥ�����˱�,��ͳ��)
+// 记账本(家庭收支记录,月度统计)
 export const bookApi = {
   list: (month) => request.get('/book/list', { params: { month } }),
   create: (data) => request.post('/book', data),
@@ -208,7 +209,7 @@ export const bookApi = {
   remove: (id) => request.delete(`/book/${id}`),
 }
 
-// ��ά����(�� OPS ��ɫ)
+// 运维管理(仅 OPS 角色)
 export const opsApi = {
   stats: (params) => request.get('/ops/stats', { params }),
   server: () => request.get('/ops/server'),
@@ -223,7 +224,7 @@ export const treeApi = {
   remove: (id) => request.delete(`/tree/${id}`),
 }
 
-// ������(��ʷ/δ��/�Ѷ�;ʵʱ�� WebSocket)
+// 聊天室(历史/未读/已读游标;实时走 WebSocket)
 export const chatApi = {
   history: (params) => request.get('/chat/history', { params }),
   unread: () => request.get('/chat/unread'),

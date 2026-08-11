@@ -105,7 +105,7 @@ public class PublicController {
                 throw new BizException(ResultCode.NOT_FOUND);
             }
         }
-        return Result.success(activityFeedService.getFeed(family.getId(), limit, true));
+        return Result.success(activityFeedService.getFeed(family.getId(), limit, true, null, false));
     }
 
     /** 家庭定位:hid(混淆 share_token) > home_id > 当前家庭/默认家庭;定位不到 404 */

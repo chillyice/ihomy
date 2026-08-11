@@ -15,9 +15,17 @@
     </div>
 
     <!-- 每日一图面板 -->
-    <el-drawer v-model="showImage" :title="$t('daily.imageTitle')" size="420px" :z-index="400">
+    <el-drawer v-model="showImage" :title="$t('daily.imageTitle')" size="520px" :z-index="400">
       <div v-if="image" class="daily-image-wrap">
-        <img :src="image.url" :alt="$t('daily.imageTitle')" class="daily-image" />
+        <el-image
+          :src="image.url"
+          :preview-src-list="[image.url]"
+          :alt="$t('daily.imageTitle')"
+          fit="contain"
+          hide-on-click-modal
+          preview-teleported
+          class="daily-image"
+        />
         <div class="daily-caption">{{ image.copyright }}</div>
       </div>
       <el-empty v-else :description="$t('daily.imageError')" :image-size="70" />
@@ -36,7 +44,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { dailyApi } from '@/api'
 
 const ALL_TABS = [
@@ -56,7 +64,7 @@ const image = ref(null)
 const knowledge = ref({ content: '' })
 
 // 知识分类:读设置页保存的偏好(ihomy-daily),默认历史+生活
-const types = () => (kv().types || 'history,life').join(',')
+const types = () => (kv().types || ['history', 'life']).join(',')
 
 const openTab = (key) => {
   showKey.value = key
@@ -85,6 +93,10 @@ const loadKnowledge = async () => {
     knowledge.value = { content: '' }
   }
 }
+
+// drawer 关闭时清理 side-tab 的 .open 高亮态
+watch(showImage, (v) => { if (!v) showKey.value = null })
+watch(showKnowledge, (v) => { if (!v) showKey.value = null })
 </script>
 
 <style scoped>

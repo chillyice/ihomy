@@ -17,6 +17,7 @@ public class Blog {
     private String content;
     private String coverImage;
     private String tags;
+    private String category;
     private Long authorId;
     private Long familyId;
     private String status;

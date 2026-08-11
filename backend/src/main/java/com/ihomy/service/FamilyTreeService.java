@@ -9,6 +9,7 @@ import com.ihomy.entity.FamilyTreeMember;
 import com.ihomy.mapper.FamilyTreeMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.List;
@@ -55,6 +56,7 @@ public class FamilyTreeService {
     }
 
     /** 新增成员:世代按父母辈分+1自动推导;配偶双向绑定 */
+    @Transactional
     public FamilyTreeMember create(Long familyId, TreeMemberDTO dto) {
         FamilyTreeMember m = new FamilyTreeMember();
         m.setFamilyId(familyId);
@@ -66,6 +68,7 @@ public class FamilyTreeService {
     }
 
     /** 编辑成员(全量提交:null 字段即清空)。改父母时重算世代;配偶变更时同步双向 */
+    @Transactional
     public void update(Long id, Long familyId, TreeMemberDTO dto) {
         FamilyTreeMember m = require(id, familyId);
         // 配偶被更换或解除时,先解除旧配偶的指向
@@ -91,6 +94,7 @@ public class FamilyTreeService {
     }
 
     /** 删除成员:清除其他成员的父/母/配偶对本人的引用 */
+    @Transactional
     public void delete(Long id, Long familyId) {
         require(id, familyId);
         unlinkSpouse(id, familyId);

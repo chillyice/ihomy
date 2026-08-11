@@ -209,10 +209,6 @@ public final class DictConst {
         };
     }
 
-    public static String logResult(Integer v) {
-        return v != null && v == 0 ? LOG_SUCCESS : LOG_FAILED;
-    }
-
     public static String inviteStatus(Integer v) {
         return v != null && v == 1 ? INVITE_USED : INVITE_FALLBACK;
     }

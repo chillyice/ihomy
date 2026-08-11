@@ -146,7 +146,6 @@ const onSubmit = async () => {
   } catch (e) {
     // 验证码一次性:失败后强制刷新,避免用旧验证码反复试
     loadCaptcha()
-    throw e
   } finally {
     loading.value = false
   }

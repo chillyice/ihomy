@@ -45,15 +45,18 @@ const draft = ref('')
 const loading = ref(false)
 const connected = ref(false)
 const connectedError = ref(false)
+const connecting = ref(false)
 const msgBox = ref(null)
 let ws = null
 let heartbeatTimer = null
+let reconnectTimer = null
 
 const fmtTime = (t) => (t ? String(t).replace('T', ' ').slice(5, 16) : '')
 
 // 组件卸载时关闭连接与心跳,避免泄漏
 const cleanup = () => {
   if (heartbeatTimer) clearInterval(heartbeatTimer)
+  if (reconnectTimer) clearTimeout(reconnectTimer)
   if (ws) { ws.onclose = null; ws.close() }
 }
 
@@ -63,15 +66,18 @@ const connect = () => {
   // @vite 开发代理不转发 WS,直连 8080 端口即可(Vite HTTP 代理不支持 WS 时后端同源)
   const base = (import.meta.env.DEV ? `ws://localhost:8080` : `${proto}://${location.host}`)
   ws = new WebSocket(`${base}/api/ws/chat?token=${userStore.token}`)
-  ws.onopen = () => { connected.value = true; connectedError.value = false }
+  connecting.value = true
+  ws.onopen = () => { connected.value = true; connectedError = false; connecting.value = false }
   ws.onclose = () => {
     connected.value = false
+    connecting.value = false
     // 断开后 3 秒自动重连(服务端停机重启或网络波动恢复)
-    setTimeout(() => { if (userStore.isLoggedIn) connect() }, 3000)
+    reconnectTimer = setTimeout(() => { if (userStore.isLoggedIn) connect() }, 3000)
   }
   ws.onerror = () => { connectedError.value = true }
   ws.onmessage = (evt) => {
-    const pkt = JSON.parse(evt.data)
+    let pkt
+    try { pkt = JSON.parse(evt.data) } catch { return }
     if (pkt.type === 'message') {
       pushMsg(pkt.data)
       // 自己发的也回显(服务端广播全房间),这里统一推进已读

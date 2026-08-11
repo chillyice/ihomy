@@ -76,18 +76,20 @@ public class StorageController {
         return Result.success();
     }
 
-    @Operation(summary = "浏览设备目录")
+    @Operation(summary = "浏览设备目录(仅自定义设备)")
     @GetMapping("/browse")
     public Result<List<Map<String, Object>>> browse(@RequestParam(required = false, defaultValue = "0") Long deviceId,
                                                     @RequestParam(required = false) String path) {
+        if (deviceId == null || deviceId == 0L) throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.BAD_REQUEST, "系统设备不支持文件浏览,请添加自定义存储设备");
         return Result.success(storageService.browse(storageService.getDevice(currentFamilyId(), deviceId), path));
     }
 
-    @Operation(summary = "读取设备文件(预览/下载)")
+    @Operation(summary = "读取设备文件(预览/下载,仅自定义设备)")
     @GetMapping("/file")
     public ResponseEntity<byte[]> file(@RequestParam(required = false, defaultValue = "0") Long deviceId,
                                        @RequestParam String path,
                                        @RequestParam(required = false, defaultValue = "false") boolean download) {
+        if (deviceId == null || deviceId == 0L) throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.BAD_REQUEST, "系统设备不支持文件浏览,请添加自定义存储设备");
         StorageDevice device = storageService.getDevice(currentFamilyId(), deviceId);
         byte[] bytes = storageService.readFileBytes(device, path);
         HttpHeaders headers = new HttpHeaders();

@@ -3,7 +3,7 @@
   <nav class="breadcrumb">
     <router-link to="/" class="crumb-link">
       <el-icon class="home-icon"><HomeFilled /></el-icon>
-      <span>首页</span>
+      <span>{{ $t('nav.home') }}</span>
     </router-link>
     <template v-for="(it, i) in items" :key="i">
       <span class="sep">/</span>

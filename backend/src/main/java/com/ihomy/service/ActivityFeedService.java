@@ -25,7 +25,7 @@ public class ActivityFeedService {
     private final com.ihomy.mapper.SysUserMapper sysUserMapper;
 
     /** 组装动态:照片按上传者分组聚合为一条(带数量/前 5 张预览),最后统一按时间倒序取前 limit 条 */
-    public List<Map<String, Object>> getFeed(Long familyId, int limit, boolean publicOnly) {
+    public List<Map<String, Object>> getFeed(Long familyId, int limit, boolean publicOnly, Long currentUserId, boolean isOwner) {
         List<Map<String, Object>> items = new ArrayList<>();
         List<Map<String, Object>> blogItems = new ArrayList<>();
         List<Map<String, Object>> diaryItems = new ArrayList<>();
@@ -39,6 +39,9 @@ public class ActivityFeedService {
               .eq(com.ihomy.entity.Blog::getStatus, com.ihomy.common.DictConst.BLOG_PUBLISHED);
             if (publicOnly) {
                 bq.eq(com.ihomy.entity.Blog::getVisibility, com.ihomy.common.DictConst.VIS_PUBLIC);
+            } else if (!isOwner) {
+                bq.and(w -> w.eq(com.ihomy.entity.Blog::getAuthorId, currentUserId)
+                          .or().in(com.ihomy.entity.Blog::getVisibility, com.ihomy.common.DictConst.VIS_FAMILY, com.ihomy.common.DictConst.VIS_PUBLIC));
             }
             bq.orderByDesc(com.ihomy.entity.Blog::getCreatedAt).last("LIMIT " + limit);
             for (com.ihomy.entity.Blog b : blogMapper.selectList(bq)) {
@@ -59,6 +62,9 @@ public class ActivityFeedService {
             dq.eq(com.ihomy.entity.Diary::getFamilyId, familyId);
             if (publicOnly) {
                 dq.eq(com.ihomy.entity.Diary::getVisibility, com.ihomy.common.DictConst.VIS_PUBLIC);
+            } else if (!isOwner) {
+                dq.and(w -> w.eq(com.ihomy.entity.Diary::getAuthorId, currentUserId)
+                          .or().in(com.ihomy.entity.Diary::getVisibility, com.ihomy.common.DictConst.VIS_FAMILY, com.ihomy.common.DictConst.VIS_PUBLIC));
             }
             dq.orderByDesc(com.ihomy.entity.Diary::getCreatedAt).last("LIMIT " + limit);
             for (com.ihomy.entity.Diary d : diaryMapper.selectList(dq)) {

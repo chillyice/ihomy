@@ -1,9 +1,9 @@
-<!-- 家人动态流:按 今天/昨天/本周/更早 分组展示博客、日记、照片动态,访客仅看公开内容 -->
+<!-- 家人动态流:便条散落餐桌,每条轻微旋转,hover 抬起,无循环动画 -->
 <template>
-  <div class="activity-feed">
+  <div ref="root" class="activity-feed">
     <div class="feed-header">
-      <h2 class="feed-title">家人动态</h2>
-      <span class="feed-sub">最近的家人们都在做什么</span>
+      <h2 class="feed-title">{{ $t('feed.title') }}</h2>
+      <span class="feed-sub">{{ $t('feed.subtitle') }}</span>
     </div>
 
     <div v-if="loading" class="feed-loading">
@@ -18,57 +18,54 @@
       <div v-for="g in groups" :key="g.label" class="feed-group">
         <div class="group-label">{{ g.label }}</div>
         <div class="group-items">
-          <div v-for="(item, idx) in g.items" :key="idx" class="feed-item">
-            <div class="item-line">
-              <div class="item-dot" :class="'dot-' + item.type"></div>
-              <div class="item-card">
-                <div class="item-header">
-                  <el-avatar :size="28" :src="item.authorAvatar">
-                    {{ (item.authorName || 'U').charAt(0) }}
-                  </el-avatar>
-                  <span class="item-author">{{ item.authorName || '家人' }}</span>
-                  <span class="item-action">{{ actionText(item) }}</span>
-                  <span class="item-time">{{ formatTime(item.createdAt) }}</span>
-                </div>
+          <div v-for="(item, idx) in g.items" :key="idx" class="feed-item anim-item" :style="{ '--rot': noteRot(idx) + 'deg', '--bg': noteBg(item.type, idx) }">
+            <div class="item-card">
+              <div class="item-header">
+                <el-avatar :size="28" :src="item.authorAvatar">
+                  {{ (item.authorName || 'U').charAt(0) }}
+                </el-avatar>
+                <span class="item-author">{{ item.authorName || $t('feed.authorFallback') }}</span>
+                <span class="item-action">{{ actionText(item) }}</span>
+                <span class="item-time">{{ formatTime(item.createdAt) }}</span>
+              </div>
 
-                <div class="item-body">
-                  <div v-if="item.type === 'blog'" class="blog-preview" @click="goBlog(item.id)">
-                    <img v-if="item.coverImage" :src="item.coverImage" class="blog-cover" />
-                    <div class="blog-text">
-                      <div class="blog-title">{{ item.title }}</div>
-                      <div class="blog-summary">{{ item.summary }}</div>
-                      <div v-if="item.tags" class="blog-tags">
-                        <span v-for="t in item.tags.split(',').slice(0,3)" :key="t" class="tag">#{{ t.trim() }}</span>
-                      </div>
+              <div class="item-body">
+                <div v-if="item.type === 'blog'" class="blog-preview" @click="goBlog(item.id)">
+                  <img v-if="item.coverImage" :src="item.coverImage" class="blog-cover" />
+                  <div class="blog-text">
+                    <div class="blog-title">{{ item.title }}</div>
+                    <div class="blog-summary">{{ item.summary }}</div>
+                    <div v-if="item.tags" class="blog-tags">
+                      <span v-for="tt in item.tags.split(',').slice(0,3)" :key="tt" class="tag">#{{ tt.trim() }}</span>
                     </div>
-                  </div>
-
-                  <div v-else-if="item.type === 'diary'" class="diary-preview">
-                    <div class="diary-content">{{ item.content }}</div>
-                    <div v-if="item.mood || item.weather" class="diary-meta">
-                      <span v-if="item.mood">心情: {{ item.mood }}</span>
-                      <span v-if="item.weather"> · 天气: {{ item.weather }}</span>
-                    </div>
-                  </div>
-
-                  <div v-else-if="item.type === 'photo'" class="photo-preview">
-                    <div class="photo-grid">
-                      <div
-                        v-for="(url, i) in item.urls"
-                        :key="i"
-                        class="photo-thumb"
-                        :style="{ backgroundImage: `url(${url})` }"
-                      ></div>
-                    </div>
-                    <div class="photo-count">上传了 {{ item.count }} 张照片</div>
                   </div>
                 </div>
 
-                <div class="item-stats" v-if="(item.likeCount || 0) > 0 || (item.commentCount || 0) > 0">
-                  <span v-if="(item.commentCount || 0) > 0" class="stat-chip">💬 {{ item.commentCount }}</span>
-                  <span v-if="(item.likeCount || 0) > 0" class="stat-chip">👍 {{ item.likeCount }}</span>
-                  <span v-if="item.type === 'blog' && (item.viewCount || 0) > 0" class="stat-chip">👀 {{ item.viewCount }}</span>
+                <div v-else-if="item.type === 'diary'" class="diary-preview">
+                  <div class="diary-content">{{ item.content }}</div>
+                  <div v-if="item.mood || item.weather" class="diary-meta">
+                    <span v-if="item.mood">{{ $t('feed.mood') }}: {{ item.mood }}</span>
+                    <span v-if="item.weather"> · {{ $t('feed.weather') }}: {{ item.weather }}</span>
+                  </div>
                 </div>
+
+                <div v-else-if="item.type === 'photo'" class="photo-preview">
+                  <div class="photo-grid">
+                    <div
+                      v-for="(url, i) in item.urls"
+                      :key="i"
+                      class="photo-thumb"
+                      :style="{ backgroundImage: `url(${url})` }"
+                    ></div>
+                  </div>
+                  <div class="photo-count">{{ $t('feed.photoCount', { n: item.count }) }}</div>
+                </div>
+              </div>
+
+              <div class="item-stats" v-if="(item.likeCount || 0) > 0 || (item.commentCount || 0) > 0">
+                <span v-if="(item.commentCount || 0) > 0" class="stat-chip">💬 {{ item.commentCount }}</span>
+                <span v-if="(item.likeCount || 0) > 0" class="stat-chip">👍 {{ item.likeCount }}</span>
+                <span v-if="item.type === 'blog' && (item.viewCount || 0) > 0" class="stat-chip">👀 {{ item.viewCount }}</span>
               </div>
             </div>
           </div>
@@ -79,10 +76,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { publicApi, homeApi } from '@/api'
+import { gsap } from 'gsap'
 
 const props = defineProps({
   homeId: { type: [String, Number], default: '' },
@@ -91,26 +90,26 @@ const props = defineProps({
 
 const router = useRouter()
 const userStore = useUserStore()
+const { t, locale } = useI18n()
 
+const root = ref(null)
 const items = ref([])
 const loading = ref(false)
+let ctx
 
 const emit = defineEmits(['loaded'])
 
-// 访客与登录成员展示不同的空态提示文案
 const emptyText = computed(() =>
-  userStore.isGuest ? '暂无公开动态' : '家人们还没有发布动态，去写第一篇吧'
+  userStore.isGuest ? t('feed.emptyGuest') : t('feed.emptyMember'),
 )
 
-// 动态动作文案映射
 const actionText = (item) => {
-  if (item.type === 'blog') return '发布了博客'
-  if (item.type === 'diary') return '写了日记'
-  if (item.type === 'photo') return '上传了照片'
-  return '发布了动态'
+  if (item.type === 'blog') return t('feed.actionBlog')
+  if (item.type === 'diary') return t('feed.actionDiary')
+  if (item.type === 'photo') return t('feed.actionPhoto')
+  return t('feed.actionDefault')
 }
 
-// 动态按发布时间归入 今天/昨天/本周/更早 四组,固定顺序输出
 const groups = computed(() => {
   if (!items.value.length) return []
   const today = new Date()
@@ -124,14 +123,14 @@ const groups = computed(() => {
   for (const it of items.value) {
     const d = new Date(it.createdAt)
     let label
-    if (d >= today) label = '今天'
-    else if (d >= yesterday) label = '昨天'
-    else if (d >= weekAgo) label = '本周'
-    else label = '更早'
+    if (d >= today) label = t('feed.today')
+    else if (d >= yesterday) label = t('feed.yesterday')
+    else if (d >= weekAgo) label = t('feed.thisWeek')
+    else label = t('feed.earlier')
     if (!groupMap.has(label)) groupMap.set(label, [])
     groupMap.get(label).push(it)
   }
-  const order = ['今天', '昨天', '本周', '更早']
+  const order = [t('feed.today'), t('feed.yesterday'), t('feed.thisWeek'), t('feed.earlier')]
   return order.filter(l => groupMap.has(l)).map(l => ({ label: l, items: groupMap.get(l) }))
 })
 
@@ -140,16 +139,38 @@ const formatTime = (d) => {
   const date = new Date(d)
   const now = new Date()
   const diff = (now - date) / 1000
-  if (diff < 60) return '刚刚'
-  if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前'
-  if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前'
-  if (diff < 86400 * 7) return Math.floor(diff / 86400) + ' 天前'
-  return date.toLocaleDateString('zh-CN')
+  if (diff < 60) return t('time.justNow')
+  if (diff < 3600) return t('time.minuteAgo', { n: Math.floor(diff / 60) })
+  if (diff < 86400) return t('time.hourAgo', { n: Math.floor(diff / 3600) })
+  if (diff < 86400 * 7) return t('time.dayAgo', { n: Math.floor(diff / 86400) })
+  return date.toLocaleDateString(locale.value === 'en' ? 'en-US' : 'zh-CN')
 }
 
 const goBlog = (id) => router.push(`/blog/${id}`)
 
-// 加载动态:按 hid > home_id > 访客公开流 > 登录家庭流 的优先级选择数据源
+// 便条旋转:按 idx 交替正负,幅度递增(像随手放,每张歪一点)
+const noteRot = (idx) => (idx % 2 === 0 ? -1 : 1) * (0.8 + (idx % 4) * 0.4)
+
+// 便条配色:三种便签纸色循环
+const NOTE_COLORS = ['var(--color-sticky)', 'var(--color-sticky-2)', 'var(--color-sticky-3)']
+const noteBg = (type, idx) => NOTE_COLORS[idx % NOTE_COLORS.length]
+
+// 唯一动效:便条从上落下+轻微旋转,无循环
+const playEntrance = () => {
+  if (ctx) ctx.revert()
+  if (!root.value) return
+  ctx = gsap.context(() => {
+    gsap.from('.anim-item', {
+      y: -24,
+      autoAlpha: 0,
+      rotation: 0,
+      duration: 0.5,
+      ease: 'power2.out',
+      stagger: 0.06,
+    })
+  }, root.value)
+}
+
 const load = async () => {
   loading.value = true
   try {
@@ -172,21 +193,25 @@ const load = async () => {
   }
 }
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  nextTick(playEntrance)
+})
+
+onUnmounted(() => ctx?.revert())
+watch(groups, () => nextTick(playEntrance))
 </script>
 
 <style scoped>
 .activity-feed {
-  background: var(--color-card);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 24px;
+  background: transparent;
+  padding: 0;
 }
 .feed-header { margin-bottom: 20px; }
 .feed-title {
   font-size: 20px;
   font-weight: 700;
-  color: var(--color-primary);
+  color: var(--color-text);
   display: inline-block;
   margin-right: 12px;
 }
@@ -197,48 +222,36 @@ onMounted(load)
   font-size: 13px;
   color: var(--color-text-secondary);
   font-weight: 600;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   padding-left: 4px;
   position: relative;
 }
 .group-label::before {
   content: '';
   display: inline-block;
-  width: 3px;
-  height: 12px;
+  width: 4px;
+  height: 14px;
   background: var(--color-accent);
   border-radius: 2px;
   margin-right: 8px;
   vertical-align: middle;
 }
 
-.feed-item { margin-bottom: 16px; }
-.item-line {
-  display: flex;
-  gap: 12px;
-}
-.item-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  margin-top: 16px;
-  flex-shrink: 0;
-  background: var(--color-text-secondary);
-  border: 2px solid #fff;
-  box-shadow: 0 0 0 2px rgba(31, 58, 95, 0.1);
-}
-.dot-blog { background: #2E74B5; }
-.dot-diary { background: #67C23A; }
-.dot-photo { background: #E6A23C; }
-
+.feed-item { margin-bottom: 14px; }
+/* 便条:便签纸色,轻微旋转,纸张阴影 */
 .item-card {
-  flex: 1;
-  background: #f8fafc;
-  border-radius: 10px;
+  background: var(--bg, var(--color-sticky));
+  border-radius: 3px;
   padding: 14px 16px;
-  transition: background 0.15s;
+  transform: rotate(var(--rot, 0deg));
+  transition: transform 0.25s cubic-bezier(.34,1.56,.64,1), box-shadow 0.2s;
+  box-shadow: var(--shadow-paper);
+  cursor: default;
 }
-.item-card:hover { background: #f0f5fa; }
+.item-card:hover {
+  transform: rotate(0deg) translateY(-3px);
+  box-shadow: var(--shadow-lift);
+}
 
 .item-header {
   display: flex;
@@ -247,9 +260,9 @@ onMounted(load)
   margin-bottom: 10px;
   font-size: 14px;
 }
-.item-author { font-weight: 600; color: var(--color-text); }
-.item-action { color: var(--color-text-secondary); }
-.item-time { margin-left: auto; font-size: 12px; color: var(--color-text-secondary); }
+.item-author { font-weight: 600; color: #5C4332; }
+.item-action { color: #8B6F47; }
+.item-time { margin-left: auto; font-size: 12px; color: #8B6F47; }
 
 .blog-preview {
   display: flex;
@@ -260,14 +273,15 @@ onMounted(load)
   width: 100px;
   height: 70px;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: 4px;
   flex-shrink: 0;
+  box-shadow: var(--shadow-paper);
 }
 .blog-text { flex: 1; min-width: 0; }
 .blog-title {
   font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: #3D2E20;
   margin-bottom: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -275,7 +289,7 @@ onMounted(load)
 }
 .blog-summary {
   font-size: 13px;
-  color: var(--color-text-secondary);
+  color: #5C4332;
   line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -285,20 +299,20 @@ onMounted(load)
 .blog-tags { margin-top: 6px; }
 .tag {
   font-size: 11px;
-  color: var(--color-accent);
+  color: var(--color-pen);
   margin-right: 6px;
 }
 
 .diary-content {
   font-size: 14px;
-  color: var(--color-text);
+  color: #3D2E20;
   line-height: 1.6;
   white-space: pre-wrap;
 }
 .diary-meta {
   margin-top: 6px;
   font-size: 12px;
-  color: var(--color-text-secondary);
+  color: #8B6F47;
 }
 
 .photo-grid {
@@ -311,26 +325,26 @@ onMounted(load)
   aspect-ratio: 1;
   background-size: cover;
   background-position: center;
-  border-radius: 6px;
+  border-radius: 4px;
+  box-shadow: var(--shadow-paper);
 }
-.photo-count { font-size: 12px; color: var(--color-text-secondary); }
+.photo-count { font-size: 12px; color: #8B6F47; }
 
 .item-stats {
   display: flex;
   gap: 12px;
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px solid rgba(31, 58, 95, 0.06);
+  border-top: 1px dashed rgba(61, 46, 32, 0.15);
 }
 .stat-chip {
   font-size: 12px;
-  color: var(--color-text-secondary);
+  color: #8B6F47;
 }
 
 .feed-empty, .feed-loading { padding: 24px; }
 
 @media (max-width: 768px) {
-  .activity-feed { padding: 16px; }
   .feed-title { font-size: 17px; }
   .item-card { padding: 10px 12px; }
   .blog-cover { width: 80px; height: 56px; }

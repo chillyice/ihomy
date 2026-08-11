@@ -2,6 +2,8 @@
 // 实现方式:html.dark 类切换暗色(配合 element-plus dark css-vars),CSS 变量控制主题色
 
 export const THEMES = [
+  { key: 'oldhouse', label: '旧物之家', primary: '#3A2E22', accent: '#A8483A' },
+  { key: 'amber', label: '暮光琥珀', primary: '#6B4423', accent: '#D4A574' },
   { key: 'ocean', label: '海蓝', primary: '#1F3A5F', accent: '#2E74B5' },
   { key: 'emerald', label: '森林', primary: '#14532D', accent: '#16A34A' },
   { key: 'sunset', label: '日暮', primary: '#7C2D12', accent: '#EA580C' },
@@ -11,7 +13,7 @@ export const THEMES = [
 
 export const THEME_STORAGE_KEY = 'ihomy-theme'
 
-export const DEFAULT_THEME = { dark: false, theme: 'ocean' }
+export const DEFAULT_THEME = { dark: false, theme: 'oldhouse' }
 
 export function loadTheme() {
   try {
@@ -33,7 +35,7 @@ export function applyTheme(theme) {
   root.style.setProperty('--color-accent', preset.accent)
   // 浏览器地址栏/状态栏颜色跟随主题
   const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', t.dark ? '#14161a' : preset.primary)
+  if (meta) meta.setAttribute('content', t.dark ? '#221A14' : preset.primary)
   localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(t))
   return t
 }

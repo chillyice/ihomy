@@ -94,16 +94,20 @@ public class ReminderService {
         List<Reminder> due = reminderMapper.selectList(new LambdaQueryWrapper<Reminder>()
                 .eq(Reminder::getDone, 0));
         for (Reminder r : due) {
-            // 今日是否应触发(一次性/每日/每周/每月)
-            if (!dueToday(r)) continue;
-            // 到点(预留 5 分钟触发窗口)
-            if (r.getRemindTime().isAfter(now.plusMinutes(5))) continue;
-            // 当日已通知则跳过(重复类提醒一天一次)
-            if (notifiedToday(r)) continue;
-            List<Map<String, Object>> members = sysUserMapper.selectMembersByFamily(r.getFamilyId());
-            for (Map<String, Object> m : members) {
-                notificationService.create((Long) m.get("id"), "reminder",
-                        "提醒：" + r.getTitle(), r.getId(), "reminder", null);
+            try {
+                // 今日是否应触发(一次性/每日/每周/每月)
+                if (!dueToday(r)) continue;
+                // 到点(预留 5 分钟触发窗口)
+                if (r.getRemindTime().isAfter(now.plusMinutes(5))) continue;
+                // 当日已通知则跳过(重复类提醒一天一次)
+                if (notifiedToday(r)) continue;
+                List<Map<String, Object>> members = sysUserMapper.selectMembersByFamily(r.getFamilyId());
+                for (Map<String, Object> m : members) {
+                    notificationService.create((Long) m.get("id"), "reminder",
+                            "提醒：" + r.getTitle(), r.getId(), "reminder", null);
+                }
+            } catch (Exception e) {
+                // 单条提醒处理失败不影响其他提醒
             }
         }
     }

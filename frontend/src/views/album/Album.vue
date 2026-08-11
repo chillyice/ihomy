@@ -6,6 +6,7 @@
     <div class="list-header">
       <h2>{{ t('album.title') }}</h2>
       <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ t('album.newAlbum') }}</el-button>
+      <el-button v-if="userStore.isOwner" @click="syncVisible = true">{{ t('album.syncFromDevice') }}</el-button>
     </div>
 
     <div v-loading="loading">
@@ -58,6 +59,7 @@
         <el-button type="primary" @click="onSave">{{ t('common.save') }}</el-button>
       </template>
     </el-dialog>
+    <SyncDialog v-model="syncVisible" />
   </div>
 </template>
 
@@ -68,9 +70,11 @@ import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import SyncDialog from '@/components/SyncDialog.vue'
 
 const { t } = useI18n()
 const userStore = useUserStore()
+const syncVisible = ref(false)
 const albums = ref([])
 const loading = ref(false)
 const editor = reactive({ visible: false, form: { id: null, name: '', type: 'public' } })

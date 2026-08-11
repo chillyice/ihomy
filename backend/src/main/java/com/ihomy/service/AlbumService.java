@@ -14,6 +14,7 @@ import com.ihomy.mapper.FamilyMapper;
 import com.ihomy.mapper.PhotoMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -104,6 +105,7 @@ public class AlbumService {
     }
 
     /** 删除相册(连带照片+文件):仅创建者或家长 */
+    @Transactional
     public void delete(Long id, SysUser user, boolean isOwner) {
         requireOwn(id, user, isOwner);
         LambdaQueryWrapper<Photo> qw = new LambdaQueryWrapper<>();
@@ -144,6 +146,7 @@ public class AlbumService {
     }
 
     /** 删除照片:仅上传者或家长(连带删除文件) */
+    @Transactional
     public void deletePhoto(Long photoId, SysUser user, boolean isOwner) {
         Photo p = requirePhoto(photoId, user, isOwner);
         photoMapper.deletePhysicalById(photoId);

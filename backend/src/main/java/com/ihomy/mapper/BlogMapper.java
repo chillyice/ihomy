@@ -5,8 +5,12 @@ import com.ihomy.entity.Blog;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
+
 @Mapper
 public interface BlogMapper extends BaseMapper<Blog> {
 
     int incrViewCount(@Param("id") Long id);
+
+    List<String> selectCategoriesByFamily(@Param("familyId") Long familyId);
 }

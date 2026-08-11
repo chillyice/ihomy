@@ -209,7 +209,6 @@ onMounted(load)
 .invite-row { display: flex; gap: 10px; align-items: center; }
 .invite-list { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
 .invite-code { display: flex; gap: 12px; align-items: center; font-size: 13px; }
-.invite-usage { color: var(--color-text-secondary); font-size: 12px; }
 .invite-expire { color: var(--color-text-secondary); font-size: 12px; }
 .member-list { display: flex; flex-direction: column; gap: 10px; }
 .member-row { display: flex; align-items: center; gap: 14px; padding: 12px 16px; }

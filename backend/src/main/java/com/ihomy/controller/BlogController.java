@@ -14,6 +14,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /**
  * 博客接口:列表(按可见范围)/详情/发布/修改/删除。
  */
@@ -30,18 +32,31 @@ public class BlogController {
     @GetMapping("/list")
     public Result<IPage<Blog>> list(@RequestParam(defaultValue = "1") int current,
                                     @RequestParam(defaultValue = "20") int size,
-                                    @RequestParam(required = false) String keyword) {
+                                    @RequestParam(required = false) String keyword,
+                                    @RequestParam(required = false) String category) {
         SysUser user = securityHelper.currentUser();
         Long familyId = user == null ? null : user.getFamilyId();
         Long userId = user == null ? null : user.getId();
         boolean isOwner = securityHelper.isOwner();
-        return Result.success(blogService.page(current, size, familyId, userId, isOwner, keyword));
+        return Result.success(blogService.page(current, size, familyId, userId, isOwner, keyword, category));
+    }
+
+    @Operation(summary = "博客分类列表（家庭级）")
+    @GetMapping("/categories")
+    public Result<List<String>> categories() {
+        SysUser user = securityHelper.currentUser();
+        Long familyId = user == null ? null : user.getFamilyId();
+        return Result.success(blogService.categories(familyId));
     }
 
     @Operation(summary = "博客详情")
     @GetMapping("/{id}")
     public Result<Blog> detail(@PathVariable Long id) {
-        return Result.success(blogService.getDetail(id));
+        SysUser user = securityHelper.currentUser();
+        Long familyId = user == null ? null : user.getFamilyId();
+        Long userId = user == null ? null : user.getId();
+        boolean isOwner = securityHelper.isOwner();
+        return Result.success(blogService.getDetail(id, familyId, userId, isOwner));
     }
 
     @Operation(summary = "新建博客")
