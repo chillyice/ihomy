@@ -35,7 +35,7 @@
             <el-button v-if="w.status === 'PENDING'" size="small" type="info" plain @click="onSetStatus(w, 2)">{{ $t('wish.abandon') }}</el-button>
             <el-button v-if="w.status !== 'PENDING'" size="small" @click="onSetStatus(w, 0)">{{ $t('wish.restore') }}</el-button>
             <el-button size="small" text @click="openEditor(w)">{{ $t('common.edit') }}</el-button>
-            <el-button size="small" text type="danger" @click="onDel(w)">{{ $t('common.delete') }}</el-button>
+            <el-button size="small" text type="danger" @click="onDelete(w)">{{ $t('common.delete') }}</el-button>
           </div>
         </div>
       </div>
@@ -82,7 +82,7 @@ const list = ref([])
 const filter = ref('all')
 const editor = reactive({ visible: false, form: {}, cats: [] })
 
-const statusText = (s) => dictText('wishStatus', s)
+const statusText = (s) => dictText(t, 'wishStatus', s)
 const statusTag = (s) => ({ PENDING: '', ACHIEVED: 'success', ABANDONED: 'info' })[s] || 'info'
 
 const filtered = computed(() => {

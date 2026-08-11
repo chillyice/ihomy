@@ -35,6 +35,7 @@ public class MemberManagementService {
     private final InvitationCodeMapper invitationCodeMapper;
 
     /** 修改成员角色:目标须属于操作者家庭,先删旧绑定再插新角色 */
+    @Transactional
     public void setRole(Long operatorFamilyId, Long targetUserId, String roleCode) {
         SysRole role = findRole(roleCode);
         if (targetUserId == null || operatorFamilyId == null) throw new BizException(ResultCode.BAD_REQUEST);
@@ -53,6 +54,7 @@ public class MemberManagementService {
     }
 
     /** 移出成员:禁止移出自己;若该家庭是目标主家庭则清空其 family_id */
+    @Transactional
     public void removeMember(Long operatorUserId, Long operatorFamilyId, Long targetUserId) {
         if (operatorUserId.equals(targetUserId)) throw new BizException(ResultCode.BAD_REQUEST);
         SysUser target = sysUserMapper.selectById(targetUserId);

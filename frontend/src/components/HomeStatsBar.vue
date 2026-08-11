@@ -4,13 +4,13 @@
     <div class="stat-item">
       <span class="stat-icon">👨‍👩‍👧‍👦</span>
       <span class="stat-value">{{ memberCount }}</span>
-      <span class="stat-label">位家人</span>
+      <span class="stat-label">{{ $t('home.membersCount') }}</span>
     </div>
     <div class="stat-divider"></div>
     <div class="stat-item">
       <span class="stat-icon">📝</span>
       <span class="stat-value">{{ feedCount }}</span>
-      <span class="stat-label">今日动态</span>
+      <span class="stat-label">{{ $t('home.todayActivity') }}</span>
     </div>
   </div>
 </template>

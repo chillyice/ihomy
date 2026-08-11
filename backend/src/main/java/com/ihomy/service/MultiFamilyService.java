@@ -8,6 +8,7 @@ import com.ihomy.common.UserNames;
 import com.ihomy.entity.Family;
 import com.ihomy.entity.FamilyApply;
 import com.ihomy.entity.SysUser;
+import com.ihomy.entity.SysRole;
 import com.ihomy.entity.SysUserRole;
 import com.ihomy.mapper.FamilyApplyMapper;
 import com.ihomy.mapper.FamilyMapper;
@@ -124,11 +125,8 @@ public class MultiFamilyService {
 
     private List<Long> managerRoleIds() {
         List<Long> ids = new ArrayList<>();
-        sysRoleMapper.selectList(null).forEach(r -> {
-            if ("OWNER".equals(r.getRoleCode())) {
-                ids.add(r.getId());
-            }
-        });
+        sysRoleMapper.selectList(new LambdaQueryWrapper<SysRole>().eq(SysRole::getRoleCode, "OWNER"))
+            .forEach(r -> ids.add(r.getId()));
         return ids;
     }
 

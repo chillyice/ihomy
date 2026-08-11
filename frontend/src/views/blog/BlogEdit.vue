@@ -20,6 +20,19 @@
         <el-form-item :label="$t('blog.contentMarkdown')">
           <el-input v-model="form.content" type="textarea" :rows="14" :placeholder="$t('blog.markdownHint')" />
         </el-form-item>
+        <el-form-item :label="$t('blog.category')">
+          <el-select
+            v-model="form.category"
+            filterable
+            allow-create
+            clearable
+            default-first-option
+            :placeholder="$t('blog.categoryPlaceholder')"
+            style="width: 100%"
+          >
+            <el-option v-for="c in categories" :key="c" :label="c" :value="c" />
+          </el-select>
+        </el-form-item>
         <el-form-item :label="$t('blog.status')">
           <el-radio-group v-model="form.status">
             <el-radio :value="0">{{ $t('blog.draft') }}</el-radio>
@@ -53,7 +66,17 @@ const router = useRouter()
 const isEdit = computed(() => !!route.params.id)
 const loading = ref(false)
 
-const form = reactive({ title: '', content: '', coverImage: '', status: 1, visibility: 3 })
+const form = reactive({ title: '', content: '', coverImage: '', category: '', status: 1, visibility: 3 })
+const categories = ref([])
+
+// 拉取家庭已有分类,供 el-select 下拉;allow-create 允许输入新分类名直接创建
+const loadCategories = async () => {
+  try {
+    categories.value = await blogApi.categories() || []
+  } catch (e) {
+    // 忽略
+  }
+}
 
 // 封面图片上传:回填 URL 到表单,返回 false 阻止 el-upload 默认提交
 const onUpload = async (file) => {
@@ -80,7 +103,8 @@ onMounted(async () => {
   // 编辑模式下拉取详情回填表单
   if (isEdit.value) {
     const b = await blogApi.detail(route.params.id)
-    Object.assign(form, { title: b.title, content: b.content, coverImage: b.coverImage, status: b.status, visibility: b.visibility })
+    Object.assign(form, { title: b.title, content: b.content, coverImage: b.coverImage, category: b.category || '', status: b.status, visibility: b.visibility })
   }
+  loadCategories()
 })
 </script>

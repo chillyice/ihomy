@@ -50,8 +50,18 @@ public class ContentLikeService {
             like.setContentId(contentId);
             like.setUserId(userId);
             like.setFamilyId(familyId);
-            likeMapper.insert(like);
-            liked = true;
+            try {
+                likeMapper.insert(like);
+                liked = true;
+            } catch (org.springframework.dao.DuplicateKeyException e) {
+                ContentLike existing2 = likeMapper.selectOne(qw);
+                if (existing2 != null) {
+                    likeMapper.deleteById(existing2.getId());
+                    liked = false;
+                } else {
+                    liked = true;
+                }
+            }
         }
         long count = likeMapper.countByContent(contentType, contentId);
         syncCount(contentType, contentId, (int) count);

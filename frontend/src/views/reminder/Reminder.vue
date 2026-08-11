@@ -17,7 +17,7 @@
               <div class="reminder-title">{{ r.title }}</div>
               <div v-if="r.content" class="reminder-content">{{ r.content }}</div>
               <div class="reminder-meta">
-                {{ repeatText(r.repeatType) }} · {{ r.remindDate }} {{ r.remindTime.slice(0, 5) }}
+                {{ repeatText(r.repeatType) }} · {{ r.remindDate }} {{ (r.remindTime || '').slice(0, 5) }}
               </div>
             </div>
           </div>

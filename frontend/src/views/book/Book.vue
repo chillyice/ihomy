@@ -196,11 +196,11 @@ onMounted(load)
   grid-template-columns: 2fr 1fr;
   gap: 14px;
 }
-.records-list,
+.records,
 .cats {
   padding: 16px 18px;
 }
-.records-list h3,
+.records h3,
 .cats h3 {
   margin: 0 0 12px;
   font-size: 15px;

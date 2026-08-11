@@ -42,7 +42,7 @@ public class OperationLogAspect {
         Throwable thrown = null;
         try {
             result = pjp.proceed();
-            logEntry.setResultStatus(DictConst.LOG_FAILED);
+            logEntry.setResultStatus(DictConst.LOG_SUCCESS);
             if (operationLog.saveResult() && result != null) {
                 String ret = safeJson(result);
                 if (ret != null && ret.length() > 2000) {
@@ -52,7 +52,7 @@ public class OperationLogAspect {
             }
         } catch (Throwable e) {
             thrown = e;
-            logEntry.setResultStatus(DictConst.LOG_SUCCESS);
+            logEntry.setResultStatus(DictConst.LOG_FAILED);
             String msg = e.getMessage();
             if (msg != null && msg.length() > 1000) {
                 msg = msg.substring(0, 1000);

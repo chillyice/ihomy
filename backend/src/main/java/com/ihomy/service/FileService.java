@@ -56,13 +56,26 @@ public class FileService {
             Path target = root.resolve(rel).normalize();
             if (!target.startsWith(root)) return;   // URL 逃逸防御
             Files.deleteIfExists(target);
-            Files.delete(target.getParent());       // 尝试清空父目录(如已空的相册目录),失败忽略
+            Path parent = target.getParent();
+            if (parent != null && !parent.equals(root)) {
+                Files.delete(parent);  // 尝试清空父目录(如已空的相册目录),失败忽略
+            }
         } catch (IOException e) {
             log.warn("删除文件失败(忽略): {}", url);
         }
     }
 
     private String saveTo(byte[] bytes, String originalName, String root, String sub, Long albumId) {
+        // 扩展名黑名单:拒绝脚本/可执行文件,防存储型 XSS(nginx /files/ 按类型服务)
+        if (originalName != null) {
+            int dot = originalName.lastIndexOf('.');
+            if (dot >= 0) {
+                String ext = originalName.substring(dot + 1).toLowerCase();
+                if (java.util.Set.of("html", "htm", "svg", "js", "jsp", "php", "asp", "aspx", "exe", "bat", "cmd", "sh", "css").contains(ext)) {
+                    throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.BAD_REQUEST, "不支持的文件类型: " + ext);
+                }
+            }
+        }
         try {
             String base = originalName == null ? "file" : originalName.replaceAll("[^\\w.\\-\\u4e00-\\u9fa5]", "_");
             String fileName = (albumId == null ? "" : albumId + "_") + System.currentTimeMillis() + "_" + base;

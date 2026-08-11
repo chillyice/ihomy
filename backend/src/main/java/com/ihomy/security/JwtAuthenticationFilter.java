@@ -43,7 +43,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     String username = claims.get("username", String.class);
                     String role = claims.get("role", String.class);
                     if (role == null) {
-                        role = "MEMBER";
+                        // token 无角色信息,视为无效,交由下游返回 401
+                        chain.doFilter(request, response);
+                        return;
                     }
                     Long familyId = claims.get("familyId", Long.class);
                     if (familyId == null) {

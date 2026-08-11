@@ -84,7 +84,7 @@ public class HomeController {
     public Result<List<Map<String, Object>>> feed(@RequestParam(defaultValue = "20") int limit) {
         SysUser user = securityHelper.currentUser();
         Long familyId = user == null ? null : user.getFamilyId();
-        return Result.success(activityFeedService.getFeed(familyId, limit, false));
+        return Result.success(activityFeedService.getFeed(familyId, limit, false, user == null ? null : user.getId(), securityHelper.isOwner()));
     }
 
     private void assertOwner() {

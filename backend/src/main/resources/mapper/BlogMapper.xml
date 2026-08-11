@@ -6,4 +6,10 @@
         UPDATE content_blog SET view_count = view_count + 1 WHERE id = #{id}
     </update>
 
+    <select id="selectCategoriesByFamily" resultType="java.lang.String">
+        SELECT DISTINCT category FROM content_blog
+        WHERE family_id = #{familyId} AND category IS NOT NULL AND category &lt;&gt; '' AND deleted = 0
+        ORDER BY category
+    </select>
+
 </mapper>

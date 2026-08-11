@@ -28,6 +28,7 @@
       <div class="list-header">
         <h3>{{ $t('storage.files') }}</h3>
         <div v-if="browsing" class="browse-actions">
+          <el-button size="small" :disabled="!activePath" @click="goParent">{{ $t('storage.backToParent') }}</el-button>
           <el-breadcrumb separator="/" class="crumb">
             <el-breadcrumb-item v-for="(seg, i) in pathParts" :key="i" @click="navigateToPath(seg.path)">
               {{ seg.name }}
@@ -110,7 +111,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
@@ -121,6 +122,7 @@ const { t } = useI18n()
 const userStore = useUserStore()
 
 const devices = ref([])
+let syncTimer = null
 const loadingDevices = ref(false)
 const deviceDialog = ref(false)
 const savingDevice = ref(false)
@@ -204,6 +206,13 @@ function navigateToPath(path) {
   loadFiles()
 }
 
+function goParent() {
+  if (!activePath.value) return
+  const idx = activePath.value.lastIndexOf('/')
+  activePath.value = idx >= 0 ? activePath.value.slice(0, idx) : ''
+  loadFiles()
+}
+
 async function loadFiles() {
   loadingFiles.value = true
   try {
@@ -278,28 +287,32 @@ async function startSync() {
 }
 
 function pollProgress(taskId) {
-  const timer = setInterval(async () => {
+  syncTimer = setInterval(async () => {
     try {
       const p = await storageApi.syncProgress(taskId)
       if (p.status === 'DONE') {
-        clearInterval(timer)
+        clearInterval(syncTimer)
+        syncTimer = null
         syncResult.value = p
         syncing.value = false
         ElMessage.success(p.message || t('storage.syncDone'))
         loadDevices()
       } else if (p.status === 'FAILED') {
-        clearInterval(timer)
+        clearInterval(syncTimer)
+        syncTimer = null
         syncing.value = false
         ElMessage.error(p.message || t('storage.syncFailed'))
       }
     } catch {
-      clearInterval(timer)
+      clearInterval(syncTimer)
+      syncTimer = null
       syncing.value = false
     }
   }, 1000)
 }
 
 onMounted(loadDevices)
+onBeforeUnmount(() => { if (syncTimer) clearInterval(syncTimer) })
 </script>
 
 <style scoped>

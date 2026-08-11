@@ -41,6 +41,8 @@ public class PhotoController {
                                        @RequestParam(value = "files") MultipartFile[] files) throws IOException {
         SysUser user = securityHelper.currentUser();
         Album album = albumService.getById(albumId);
+        if (album == null) throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.NOT_FOUND);
+        if (!album.getFamilyId().equals(user.getFamilyId())) throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.FORBIDDEN);
         List<Photo> photos = new ArrayList<>();
         for (MultipartFile f : files) {
             String url = fileService.upload(f.getBytes(), f.getOriginalFilename(), f.getContentType(),

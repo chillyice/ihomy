@@ -5,6 +5,7 @@ import com.ihomy.annotation.RequirePermission;
 import com.ihomy.common.Result;
 import com.ihomy.dto.CommentDTO;
 import com.ihomy.entity.Comment;
+import com.ihomy.entity.SysUser;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.CommentService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,7 +31,9 @@ public class CommentController {
     @Operation(summary = "评论列表（含回复树）")
     @GetMapping("/list")
     public Result<List<Map<String, Object>>> list(@RequestParam String contentType, @RequestParam Long contentId) {
-        return Result.success(commentService.list(contentType, contentId));
+        SysUser user = securityHelper.currentUser();
+        Long familyId = user == null ? null : user.getFamilyId();
+        return Result.success(commentService.list(contentType, contentId, familyId));
     }
 
     @Operation(summary = "发表评论/回复")

@@ -1,21 +1,48 @@
 :root {
-  --color-primary: #1F3A5F;
-  --color-accent: #2E74B5;
-  --color-bg: #f5f7fa;
-  --color-card: #ffffff;
-  --color-text: #2c3e50;
-  --color-text-secondary: #8492a6;
-  --radius: 12px;
-  --shadow: 0 2px 12px rgba(31, 58, 95, 0.08);
+  --color-primary: #3A2E22;
+  --color-accent: #A8483A;
+  --color-bg: #EDE4D3;
+  --color-bg-2: #E2D5BC;
+  --color-card: #F5EFE0;
+  --color-card-2: #E8DEC8;
+  --color-text: #3A2E22;
+  --color-text-secondary: #7A6B5A;
+  --color-border: rgba(58, 46, 34, 0.12);
+  --color-wood: #C9A876;
+  --color-wood-dark: #8B6F47;
+  --color-ink: #3A2E22;
+  --color-pen: #5A6B7C;
+  --color-stamp: #A8483A;
+  --color-moss: #6B7A5A;
+  --color-old-white: #F5EFE0;
+  --color-sticky: #F7E9B7;
+  --color-sticky-2: #F0D9A8;
+  --color-sticky-3: #D8E0C0;
+  --radius: 6px;
+  --shadow: 0 2px 6px rgba(58, 46, 34, 0.08);
+  --shadow-lift: 0 8px 20px rgba(58, 46, 34, 0.16);
+  --shadow-paper: 0 1px 2px rgba(58, 46, 34, 0.12), 0 3px 8px rgba(58, 46, 34, 0.06);
+  --shadow-book: 0 4px 12px rgba(58, 46, 34, 0.20);
+  --font-hand: 'Caveat', 'Kalam', 'Segoe Print', cursive;
+  --font-serif: 'Georgia', 'Times New Roman', serif;
 }
 
-/* 暗色模式:跟随 html.dark(由主题系统切换),与 element-plus dark css-vars 协同 */
+/* 暗色模式:夜灯下的家,深褐非冷黑 */
 html.dark {
-  --color-bg: #14161a;
-  --color-card: #1e2126;
-  --color-text: #dcdfe4;
-  --color-text-secondary: #8a919c;
-  --shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  --color-bg: #221A14;
+  --color-bg-2: #2D241B;
+  --color-card: #2A2018;
+  --color-card-2: #352A20;
+  --color-text: #E8DCC8;
+  --color-text-secondary: #A89580;
+  --color-border: rgba(232, 220, 200, 0.10);
+  --color-wood: #5C4332;
+  --color-wood-dark: #3A2A1E;
+  --color-old-white: #2A2018;
+  --shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lift: 0 8px 20px rgba(0, 0, 0, 0.5);
+  --shadow-paper: 0 1px 2px rgba(0, 0, 0, 0.3), 0 3px 8px rgba(0, 0, 0, 0.2);
+  --shadow-book: 0 4px 12px rgba(0, 0, 0, 0.5);
   color-scheme: dark;
 }
 
@@ -43,17 +70,6 @@ a { color: var(--color-accent); text-decoration: none; }
   box-shadow: var(--shadow);
   padding: 16px;
 }
-
-.btn-primary {
-  background: var(--color-primary);
-  color: #fff;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-}
-.btn-primary:hover { background: var(--color-accent); }
 
 /* 移动端触控与安全区:底部 Home 指示条、最小触控目标、页面留白适配 */
 @media (max-width: 768px) {

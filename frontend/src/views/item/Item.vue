@@ -18,7 +18,7 @@
             <span class="item-name">{{ it.name }}</span>
             <el-tag v-if="it.position" size="small">{{ it.position }}</el-tag>
           </div>
-          <div class="item-path">{{ it.house_name }} › {{ it.room_name }} › {{ it.furniture_name }}</div>
+          <div class="item-path">{{ it.house_name }} / {{ it.room_name }} / {{ it.furniture_name }}</div>
           <div class="item-aliases" v-if="it.aliases">{{ $t('item.aliases') }}: {{ it.aliases }}</div>
           <div class="item-ops">
             <el-button size="small" @click="openItem(it)">{{ $t('common.edit') }}</el-button>

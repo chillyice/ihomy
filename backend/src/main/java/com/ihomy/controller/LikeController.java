@@ -28,7 +28,11 @@ public class LikeController {
     public Result<Map<String, Object>> toggle(@RequestBody Map<String, Object> body) {
         SysUser user = securityHelper.currentUser();
         String contentType = (String) body.get("contentType");
-        Long contentId = ((Number) body.get("contentId")).longValue();
+        Object cid = body.get("contentId");
+        if (contentType == null || contentType.isBlank() || !(cid instanceof Number)) {
+            throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.BAD_REQUEST);
+        }
+        Long contentId = ((Number) cid).longValue();
         return Result.success(likeService.toggle(user.getId(), user.getFamilyId(), contentType, contentId));
     }
 

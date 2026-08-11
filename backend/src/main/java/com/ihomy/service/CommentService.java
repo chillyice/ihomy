@@ -2,6 +2,7 @@ package com.ihomy.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ihomy.common.BizException;
+import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
 import com.ihomy.common.UserNames;
 import com.ihomy.dto.CommentDTO;
@@ -39,8 +40,9 @@ public class CommentService {
     private final PhotoMapper photoMapper;
     private final NotificationService notificationService;
 
-    /** 评论列表:先按时间排好,再按 parentId 组装成 根评论→回复 的树 */
-    public List<Map<String, Object>> list(String contentType, Long contentId) {
+    /** 评论列表:先校验内容可访问性(同家庭或公开),再按时间排好组装回复树 */
+    public List<Map<String, Object>> list(String contentType, Long contentId, Long familyId) {
+        checkContentAccessible(contentType, contentId, familyId);
         LambdaQueryWrapper<Comment> qw = new LambdaQueryWrapper<>();
         qw.eq(Comment::getContentType, contentType)
           .eq(Comment::getContentId, contentId)
@@ -99,9 +101,25 @@ public class CommentService {
         commentMapper.deleteById(id);
     }
 
+    /** 校验内容可被当前调用方访问(同家庭或公开内容),否则 404 */
+    private void checkContentAccessible(String contentType, Long contentId, Long familyId) {
+        if (contentId == null) throw new BizException(ResultCode.BAD_REQUEST);
+        String vis = null;
+        Long contentFam = null;
+        switch (contentType == null ? "" : contentType) {
+            case "blog" -> { Blog b = blogMapper.selectById(contentId); if (b == null) throw new BizException(ResultCode.NOT_FOUND); vis = b.getVisibility(); contentFam = b.getFamilyId(); }
+            case "diary" -> { Diary d = diaryMapper.selectById(contentId); if (d == null) throw new BizException(ResultCode.NOT_FOUND); vis = d.getVisibility(); contentFam = d.getFamilyId(); }
+            case "photo" -> { Photo p = photoMapper.selectById(contentId); if (p == null) throw new BizException(ResultCode.NOT_FOUND); vis = p.getVisibility(); contentFam = p.getFamilyId(); }
+            default -> throw new BizException(ResultCode.BAD_REQUEST);
+        }
+        boolean sameFamily = familyId != null && familyId.equals(contentFam);
+        if (!sameFamily && !DictConst.VIS_PUBLIC.equals(vis)) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
+    }
+
     /** 校验目标内容存在且与评论者同家庭,返回内容作者 ID(跨家庭一律 404) */
-    private Long validateTarget(String contentType, Long contentId, Long familyId) {
-        if (contentId == null) return null;
+    private Long validateTarget(String contentType, Long contentId, Long familyId) {        if (contentId == null) return null;
         switch (contentType == null ? "" : contentType) {
             case "blog" -> {
                 Blog b = blogMapper.selectById(contentId);

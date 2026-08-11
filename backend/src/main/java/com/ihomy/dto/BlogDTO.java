@@ -13,6 +13,7 @@ public class BlogDTO {
     private String content;
     private String coverImage;
     private String tags;
+    private String category;
     private Integer status;
     private Integer visibility;
 }

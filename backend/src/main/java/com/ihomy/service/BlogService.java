@@ -25,7 +25,7 @@ public class BlogService {
     private final PointsService pointsService;
 
     /** 分页查询:OWNER 见全家;成员见自己的+家庭可见/公开;游客仅公开 */
-    public IPage<Blog> page(int current, int size, Long familyId, Long currentUserId, boolean isOwner, String keyword) {
+    public IPage<Blog> page(int current, int size, Long familyId, Long currentUserId, boolean isOwner, String keyword, String category) {
         LambdaQueryWrapper<Blog> qw = new LambdaQueryWrapper<>();
         if (familyId != null) {
             qw.eq(Blog::getFamilyId, familyId);
@@ -41,15 +41,33 @@ public class BlogService {
             qw.eq(Blog::getVisibility, DictConst.VIS_PUBLIC);
         }
         qw.eq(Blog::getStatus, DictConst.BLOG_PUBLISHED)
+          .eq(StringUtils.hasText(category), Blog::getCategory, category)
           .like(StringUtils.hasText(keyword), Blog::getTitle, keyword)
           .orderByDesc(Blog::getCreatedAt);
         return blogMapper.selectPage(new Page<>(current, size), qw);
     }
 
-    /** 详情:不存在抛 404,命中后累加浏览量 */
-    public Blog getDetail(Long id) {
+    /** 家庭级分类列表:从已发布博客中 DISTINCT 拉取,空分类不返回 */
+    public java.util.List<String> categories(Long familyId) {
+        return blogMapper.selectCategoriesByFamily(familyId);
+    }
+
+    /** 详情:校验可见性与家庭归属后累加浏览量(跨家庭或不可见返回 404) */
+    public Blog getDetail(Long id, Long familyId, Long currentUserId, boolean isOwner) {
         Blog blog = blogMapper.selectById(id);
         if (blog == null) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
+        boolean sameFamily = familyId != null && familyId.equals(blog.getFamilyId());
+        boolean isAuthor = currentUserId != null && currentUserId.equals(blog.getAuthorId());
+        boolean famOwner = isOwner && sameFamily;
+        if (!DictConst.VIS_PUBLIC.equals(blog.getVisibility()) && !sameFamily) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
+        if (DictConst.VIS_PRIVATE.equals(blog.getVisibility()) && !isAuthor && !famOwner) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
+        if (!DictConst.BLOG_PUBLISHED.equals(blog.getStatus()) && !isAuthor && !famOwner) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
         blogMapper.incrViewCount(id);
@@ -63,6 +81,7 @@ public class BlogService {
         blog.setContent(dto.getContent());
         blog.setCoverImage(dto.getCoverImage());
         blog.setTags(dto.getTags());
+        blog.setCategory(dto.getCategory());
         blog.setAuthorId(authorId);
         blog.setFamilyId(familyId);
         blog.setStatus(DictConst.blogStatus(dto.getStatus()));
@@ -86,6 +105,7 @@ public class BlogService {
         blog.setContent(dto.getContent());
         blog.setCoverImage(dto.getCoverImage());
         if (dto.getTags() != null) blog.setTags(dto.getTags());
+        if (dto.getCategory() != null) blog.setCategory(dto.getCategory());
         if (dto.getStatus() != null) blog.setStatus(DictConst.blogStatus(dto.getStatus()));
         if (dto.getVisibility() != null) blog.setVisibility(DictConst.visibility(dto.getVisibility()));
         blogMapper.updateById(blog);

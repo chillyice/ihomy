@@ -32,7 +32,7 @@ public class DiaryService {
                 // 家长可见全部
             } else {
                 qw.and(w -> w.eq(Diary::getAuthorId, currentUserId)
-                            .or().in(Diary::getVisibility, 3, 4));
+                            .or().in(Diary::getVisibility, DictConst.VIS_FAMILY, DictConst.VIS_PUBLIC));
             }
         } else {
             qw.eq(Diary::getVisibility, DictConst.VIS_PUBLIC);

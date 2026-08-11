@@ -15,6 +15,12 @@
           <el-menu-item index="daily">
             <span class="menu-icon">📅</span>{{ $t('settings.cat.daily') }}
           </el-menu-item>
+          <el-menu-item index="member" v-if="userStore.isOwner">
+            <span class="menu-icon">👥</span>{{ $t('settings.cat.member') }}
+          </el-menu-item>
+          <el-menu-item index="storage">
+            <span class="menu-icon">🗄️</span>{{ $t('settings.cat.storage') }}
+          </el-menu-item>
         </el-menu>
       </aside>
 
@@ -182,6 +188,16 @@
             </el-form>
           </div>
         </template>
+
+        <!-- 成员管理(嵌入 Member 页面组件) -->
+        <template v-if="active === 'member'">
+          <MemberView />
+        </template>
+
+        <!-- 存储管理(嵌入 Storage 页面组件) -->
+        <template v-if="active === 'storage'">
+          <StorageView />
+        </template>
       </div>
     </div>
   </div>
@@ -196,6 +212,8 @@ import { useUserStore } from '@/stores/user'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import { applyLocale } from '@/i18n'
 import { applyTheme, initTheme, THEMES } from '@/theme'
+import MemberView from '@/views/Member.vue'
+import StorageView from '@/views/storage/Storage.vue'
 
 const { locale, t } = useI18n()
 const userStore = useUserStore()
@@ -269,10 +287,15 @@ const load = async () => {
 const saveProfile = async () => {
   profileSaving.value = true
   try {
-    await profileApi.update({
+    const updated = await profileApi.update({
       nickname: profile.nickname, avatar: profile.avatar,
       birthday: profile.birthday || null, gender: profile.gender,
     })
+    // 同步到全局 userStore,顶栏头像立即刷新
+    if (updated) {
+      userStore.userInfo = { ...userStore.userInfo, nickname: updated.nickname, avatar: updated.avatar, birthday: updated.birthday, gender: updated.gender }
+      localStorage.setItem('userInfo', JSON.stringify(userStore.userInfo))
+    }
     // 身份标签与资料分开保存(接口独立),有值才提交
     if (labelForm.label) await profileApi.saveLabel({ label: labelForm.label, color: labelForm.color })
     ElMessage.success(t('settings.profileSaved'))

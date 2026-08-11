@@ -83,7 +83,6 @@ const { t } = useI18n()
 const loading = ref(false)
 const saving = ref(false)
 const plans = ref([])
-const newTask = ref('')
 const editor = reactive({ visible: false, form: {} })
 
 const load = async () => {

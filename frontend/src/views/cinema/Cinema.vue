@@ -7,6 +7,7 @@
       <h2>{{ $t('cinema.title') }}</h2>
       <div class="header-actions">
         <el-input v-model="keyword" :placeholder="$t('cinema.searchPlaceholder')" clearable style="width: 200px" @keyup.enter="load" @clear="load" />
+        <el-button v-if="userStore.isOwner" @click="syncVisible = true">{{ $t('cinema.syncFromDevice') }}</el-button>
         <el-button v-if="userStore.isLoggedIn" @click="openWishDialog">{{ $t('cinema.wish') }}</el-button>
         <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ $t('cinema.upload') }}</el-button>
       </div>
@@ -176,6 +177,7 @@
     <el-dialog v-model="player.visible" :title="player.video?.title" width="800px" top="5vh" destroy-on-close>
       <video v-if="player.video?.videoUrl" :src="player.video.videoUrl" controls autoplay class="player-video" />
     </el-dialog>
+    <SyncDialog v-model="syncVisible" />
   </div>
 </template>
 
@@ -186,11 +188,13 @@ import { videoApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import SyncDialog from '@/components/SyncDialog.vue'
 
 const { t } = useI18n()
 const userStore = useUserStore()
 const tab = ref('library')
 const keyword = ref('')
+const syncVisible = ref(false)
 const list = ref([])
 const wishes = ref([])
 const loading = ref(false)

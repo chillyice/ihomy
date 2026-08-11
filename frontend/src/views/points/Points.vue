@@ -14,14 +14,14 @@
         size="large"
         round
         :disabled="stats.checkedToday"
-        :loading="checking"
+        :loading="checkingIn"
         @click="onCheckin"
       >
         {{ stats.checkedToday ? $t('points.checkedToday') : $t('points.bonus', { n: stats.todayPoints ?? 0 }) }}
       </el-button>
     </div>
 
-    <el-tabs v-model="tab">
+    <el-tabs v-model="activeTab">
       <el-tab-pane :label="$t('points.title')" name="shop">
         <div class="list-header">
           <h3>{{ $t('points.familyGoods') }}</h3>

@@ -78,9 +78,9 @@ const spawnCard = () => {
     photo,
     left: 2 + Math.random() * 94,
     deg: (Math.random() - 0.5) * 24,
-    delay: -Math.random() * 8,          // 负延迟:图片入场即处于中途,避免空档
-    duration: 14 + Math.random() * 12,  // 下落时长 14-26s
-    size: 120 + Math.random() * 100,    // 卡片宽度 120-220px
+    delay: Math.random() * 1.5,        // 正延迟:从顶部飘落入场(负延迟会跳过入场段)
+    duration: 12 + Math.random() * 8,  // 下落时长 12-20s
+    size: 120 + Math.random() * 100,   // 卡片宽度 120-220px
     hovered: false,
   }
   cards.value.push(card)
@@ -174,6 +174,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   border-radius: var(--radius);
   background: linear-gradient(180deg, rgba(0,0,0,0.04), rgba(0,0,0,0.02));
+  perspective: 1200px;
 }
 
 .photo-card {
@@ -183,8 +184,8 @@ onBeforeUnmount(() => {
   overflow: hidden;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
   cursor: pointer;
-  transform: translateZ(0);
-  animation: card-fall linear infinite;
+  transform-style: preserve-3d;
+  animation: card-fall 20s linear infinite;
 }
 .photo-card img {
   display: block;
@@ -203,10 +204,10 @@ onBeforeUnmount(() => {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
 }
 @keyframes card-fall {
-  0%   { transform: translateY(-160px) rotateX(0deg) rotateY(0deg) rotate(var(--card-rotate)); opacity: 0; }
-  10%  { opacity: 1; }
-  60%  { transform: translateY(50vh) rotateX(180deg) rotateY(180deg) rotate(var(--card-rotate)); }
-  100% { transform: translateY(105vh) rotateX(360deg) rotateY(360deg) rotate(var(--card-rotate)); opacity: 0.9; }
+  0%   { transform: translate3d(0, 0, 0) rotateX(0deg) rotateY(0deg) rotate(var(--card-rotate)); opacity: 0; }
+  8%   { opacity: 1; }
+  50%  { transform: translate3d(0, 45vh, 0) rotateX(180deg) rotateY(180deg) rotate(var(--card-rotate)); }
+  100% { transform: translate3d(0, 95vh, 0) rotateX(360deg) rotateY(360deg) rotate(var(--card-rotate)); opacity: 0.9; }
 }
 
 .photo-info {
