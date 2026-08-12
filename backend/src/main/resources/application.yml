@@ -56,6 +56,8 @@ file:
 # 图形验证码:开发/测试环境可固定为已知值(如 qwer),方便联调;生产去掉或留空则随机生成
 app:
   captcha-fixed-code: qwer
+  # 和风天气 API Key(留空则 /public/weather 返回 null,前端降级为只按时间做光影)
+  weather-key:
 
 logging:
   file:

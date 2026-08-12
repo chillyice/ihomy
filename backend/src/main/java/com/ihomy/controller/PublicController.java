@@ -15,8 +15,11 @@ import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.ActivityFeedService;
 import com.ihomy.service.HomeStatsService;
 import com.ihomy.service.MultiFamilyService;
+import com.ihomy.service.SunService;
+import com.ihomy.service.WeatherService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -47,6 +50,24 @@ public class PublicController {
     private final HomeStatsService homeStatsService;
     private final SecurityHelper securityHelper;
     private final MultiFamilyService multiFamilyService;
+    private final WeatherService weatherService;
+    private final SunService sunService;
+
+    @Operation(summary = "太阳信息(IP 定位日出日落 + 96 时隙太阳位置)")
+    @GetMapping("/sun-info")
+    public Result<Map<String, Object>> sunInfo(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isBlank()) ip = request.getRemoteAddr();
+        return Result.success(sunService.getSunInfo(ip));
+    }
+
+    @Operation(summary = "天气(IP 定位,和风天气 API,Key 未配返回 null)")
+    @GetMapping("/weather")
+    public Result<Map<String, Object>> weather(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isBlank()) ip = request.getRemoteAddr();
+        return Result.success(weatherService.getWeather(ip));
+    }
 
     @Operation(summary = "首页聚合（支持 ?hid= 混淆ID / ?home_id= 指定家庭）")
     @GetMapping("/home")

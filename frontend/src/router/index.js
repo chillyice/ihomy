@@ -4,7 +4,7 @@ import { useUserStore } from '@/stores/user'
 
 const routes = [
   { path: '/login', name: 'Login', component: () => import('@/views/Login.vue'), meta: { public: true } },
-  { path: '/', name: 'Home', component: () => import('@/views/Home.vue'), meta: { public: true } },
+  { path: '/', name: 'Home', component: () => import('@/views/Home.vue'), meta: { public: true, immersive: true } },
   { path: '/blog', name: 'BlogList', component: () => import('@/views/blog/BlogList.vue'), meta: { public: true } },
   { path: '/blog/:id', name: 'BlogDetail', component: () => import('@/views/blog/BlogDetail.vue'), meta: { public: true } },
   { path: '/blog/edit/:id?', name: 'BlogEdit', component: () => import('@/views/blog/BlogEdit.vue') },
@@ -26,6 +26,8 @@ const routes = [
   { path: '/settings', name: 'Settings', component: () => import('@/views/Settings.vue') },
   { path: '/storage', name: 'Storage', component: () => import('@/views/storage/Storage.vue') },
   { path: '/item', name: 'Item', component: () => import('@/views/item/Item.vue') },
+  { path: '/kitchen', name: 'Kitchen', component: () => import('@/views/kitchen/Kitchen.vue'), meta: { public: true } },
+  { path: '/light-test', name: 'LightTest', component: () => import('@/views/lighttest/LightTest.vue'), meta: { public: true, immersive: true } },
   // 运维管理页:仅 OPS 角色可访问（V3.8）
   { path: '/ops', name: 'Ops', component: () => import('@/views/ops/Ops.vue'), meta: { ops: true } },
   { path: '/more', name: 'More', component: () => import('@/views/More.vue'), meta: { public: true } },
