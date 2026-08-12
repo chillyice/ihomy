@@ -218,6 +218,29 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
   - **光照测试页**:`/light-test` 路由(LightTest.vue),1 分钟循环 96 时隙(625ms/段),信息面板显示时间/高度/方位/日出/日落/月相 + 进度条,用于调试验证全天光照过渡。
 - **nginx alias + FileService urlPrefix 健壮性(V5.2,已实施)**:nginx.conf `location /files/` 的 `alias D:/WorkSpace/ihomy/uploads;` 末尾缺斜杠导致 404,改为 `alias D:/WorkSpace/ihomy/uploads/;`。`FileService.saveTo` 和 `deleteByUrl` 统一 `urlPrefix.replaceAll("/+$", "")` 去尾斜杠,无论 yml 写 `/files` 还是 `/files/` 都正确拼接。同时 nginx 图片扩展名 location 用负向断言 `location ~* ^/(?!files/).+\.(...)$` 排除 `/files/`,避免 root 覆盖 alias 导致 404。
 
+- **光照生命周期重构(V5.3,已实施)**:旋转/颜色/强度全部由日出日落时间驱动(不再由方位角/高度角直接映射),windowLight.js `getSunScene` 重写:
+  - **日昼进度** `dayProgress`:`(currentMin - sunriseMin) / (sunsetMin - sunriseMin)`,0=日出→1=日落,夜间 hold 在端点(日出前=0,日落后=1)
+  - **旋转生命周期**:阴影框+光柱 `rotation = (dayProgress - 0.5) * 180` → 日出 -90°→ 正午 0°→ 日落 +90°,夜间 hold;光柱角度 = 阴影角度(同向)
+  - **阴影强度**:夜间 1(最深)→ 正午 0.3(最浅),`1 - sin(π·dayProgress) × 0.7`
+  - **灰阶防叠加**:bar 用不透明灰 `rgb(G,G,G)`,G=`(1-intensity)*255`,`mix-blend-mode: darken` → `min(backdrop, G)` 幂等,跨层重叠永不叠加(替代旧 layer opacity 方案——两层 opacity 复合会变深)
+  - **亮斑图层**(z=32,multiply):夜黑(0.7)→凌晨黄→清晨白→日间透明→傍晚橙→日落红→夜黑,颜色 lerp 过渡
+  - **反光层**(z=42,soft-light):内容组件被阳光照亮的轻微高光,`radial-gradient` 跟随光源位置,夜间 0,日间 `sin(π·dayProgress) × 0.22`
+  - **夜间光柱不发光**:夜间 palette 全 transparent(bloom/core/mid/ambient),rayBaseOpacity=0
+  - **时隙 5 分钟**:`SolarUtil.buildSlots` 96→288(15→5 分钟),`currentSlotIndex` `/5`,LightTest 循环 208ms/格
+
+- **阴影分层重构(V5.3,已实施)**:阴影拆为上下两层,光柱穿过中间:
+  - **下层** `.window-shadow-lower`(z=35):shadow-v + shadow-h + frame-h-top + frame-h-bottom
+  - **光柱层** `.light-layer`(z=48):bloom + rays
+  - **上层** `.window-shadow-upper`(z=49):frame-v-left + frame-v-right(最顶层,盖住光柱)
+  - **竖直 bar 原点对齐**:三条 bar(shadow-v/frame-v-left/frame-v-right)原点全部对齐到 (页面 50% X, 页面 -10vh Y);`top:-50vh; height:337.5vh; transform-origin Y:40vh`(页面 Y = -50+40 = -10vh);X 对齐:shadow-v `50%`(中心)、frame-v-left `100%`(右边缘)、frame-v-right `0%`(左边缘)
+  - **左右框延长 50%**:height 225%→337.5vh
+  - **内竖框减 20%**:width 140px→112px(margin-left -70→-56)
+  - **顶框**:底边在 y=-10vh,`top: calc(-10vh - 140px)`,不旋转
+
+- **光照测试页增强(V5.3,已实施)**:`/light-test` 增加日期选择器(默认 2026-06-21 夏至,`@change` 触发 `/api/public/sun-info?date=YYYY-MM-DD`);加入首页内容组件(相册舞台+左侧动态/任务面板+右侧天气/纪念日面板)用于观察反光效果;信息面板含日期/时间/高度/方位/日出/日落/正午/月相+进度条+阶段标签(日出待命/日出/清晨/日间/傍晚/日落/日落待命)。
+
+- **太阳信息 date 参数(V5.3,已实施)**:`SunService.getSunInfo(ip, LocalDate date)` 重载,`date` 为 null 取当日;`GET /api/public/sun-info?date=YYYY-MM-DD` 可选参数;缓存 key 含日期(`ihomy:sun:slots:{date}`),不同日期不冲突。
+
 ## 部署约定(Linux 2GB 求稳)
 
 - **求稳方案(2GB 内存)**:MySQL 本机部署 + Redis 用 Docker。MySQL 调优后 ~180MB,本机部署无需 Docker daemon 为它常驻;Redis 轻量,Docker 化便于升级。
@@ -270,12 +293,17 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 体积光系统 | V5.2 | 丁达尔效应:7 条光束 + 光源辉光 + 窗框内阴影(竖直+横向)+ 暗角 + 40 灰尘粒子;分层 z-index 0/2/30/35/44/46/48;windowLight.js 4 档调色板 + 月相夜间 |
 | 光照测试页 | V5.2 | `/light-test` 1 分钟循环 96 时隙,信息面板(时间/高度/方位/日出/日落/月相+进度条) |
 | nginx alias 修复 | V5.2 | `/files/` alias 末尾加 `/` + 图片扩展名 location 负向断言排除 `/files/`;FileService urlPrefix 去尾斜杠 |
+| 光照生命周期 | V5.3 | 旋转/颜色/强度全由日出日落驱动;dayProgress 0=日出→1=日落;灰阶 darken 幂等防叠加;亮斑 multiply;反光 soft-light;夜间光柱 transparent;时隙 96→288(5 分钟) |
+| 阴影分层 | V5.3 | 拆下层(z=35 内框+横框)+光柱(z=48)+上层(z=49 左右框);三条竖直 bar 原点对齐(页面 50%, -10vh);左右框延长 50%;内竖框减 20% |
+| 光照测试页增强 | V5.3 | 日期选择器(夏至模拟)+首页内容组件(相册/面板)+阶段标签(日出待命→日落待命) |
+| 太阳信息 date 参数 | V5.3 | `SunService.getSunInfo(ip, date)` 重载;`GET /public/sun-info?date=`;缓存 key 含日期 |
 
 ## 规划事项(未实现,排序按推荐优先级)
 
 | 优先级 | 规划 | 版本来源 | 要点 |
 |--------|------|---------|------|
 | P1 | 存储管理-存量迁移 | V4.1 | 设备/文件浏览器/一键同步已完成;存量 `/uploads/` 旧文件重归档(移入 upload/yyyyMM 结构并更新 DB 路径)待做 |
+| P1 | 浅色/深色模式 | V5.3 | 默认日出后日落前浅色主题,夜晚深色主题,基于 `/sun-info` 自动切换;设置中可关闭自动切换手动锁定;主题色变量 CSS custom properties,亮斑/反光/阴影层在深色模式降低强度;`sys_user.theme_mode` 字段(AUTO/LIGHT/DARK) |
 | P2 | 物品定位-户型图 | V5.0 | 1期(物品清单+搜索)已完成;2期户型图:房间矩形绘制/物品相对坐标摆放,以 room.id 挂载(数据结构已预留) |
 | P2 | 用户使用指导/帮助 | V3.5 | 新手引导弹窗+帮助页 |
 | P2 | 家庭公告/广告位 | V3.5 | 自建家庭公告(不接第三方广告,隐私原因) |
