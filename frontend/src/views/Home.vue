@@ -13,10 +13,16 @@
     <!-- 暖色环境光:黄金时刻整体暖调(multiply 微染) -->
     <div class="ambient-layer" :style="ambientStyle" aria-hidden="true"></div>
 
-    <!-- 窗框内阴影:十字窗棂(竖直条从顶部旋转 + 横向条按高度角位移),在内容上方光线下方 -->
-    <div v-if="sunScene.shadowVisible" class="window-shadow" :style="{ opacity: sunScene.shadowOpacity }" aria-hidden="true">
-      <div class="shadow-bar shadow-v" :style="shadowVStyle"></div>
-      <div class="shadow-bar shadow-h" :style="shadowHStyle"></div>
+    <!-- 窗户阴影:外框(4条)+内框十字(2条),同一层同一动效,平行四边形 -->
+    <div v-if="sunScene.shadowVisible" class="window-shadow"
+         :style="{ opacity: sunScene.shadowOpacity, '--rot': (sunScene.shadowVRotation || 0) + 'deg', '--htop': (sunScene.shadowHTop || 50) + '%' }"
+         aria-hidden="true">
+      <div class="shadow-bar frame-v-left"></div>
+      <div class="shadow-bar frame-v-right"></div>
+      <div class="shadow-bar frame-h-top"></div>
+      <div class="shadow-bar frame-h-bottom"></div>
+      <div class="shadow-bar shadow-v"></div>
+      <div class="shadow-bar shadow-h"></div>
     </div>
 
     <!-- 柔和暗角:书本在桌上的聚焦感(边缘微压暗) -->
@@ -359,14 +365,6 @@ const bloomStyle = computed(() => ({
   left: sunScene.value.source.x,
   top: sunScene.value.source.y,
   background: `radial-gradient(circle, ${sunScene.value.palette.bloom} 0%, ${sunScene.value.palette.mid} 35%, transparent 70%)`,
-}))
-
-const shadowVStyle = computed(() => ({
-  transform: `rotate(${sunScene.value.shadowVRotation || 0}deg)`,
-}))
-const shadowHStyle = computed(() => ({
-  top: (sunScene.value.shadowHTop || 50) + '%',
-  transform: `rotate(${sunScene.value.shadowVRotation || 0}deg)`,
 }))
 
 const ambientStyle = computed(() => ({
@@ -767,37 +765,81 @@ onUnmounted(() => {
   transition: background 3s ease;
 }
 
-/* 窗框内阴影:在内容上方、光线下方(multiply 变暗) */
+/* 窗户阴影:外框+内框同一层 */
 .window-shadow {
   position: fixed;
   inset: 0;
   z-index: 35;
   pointer-events: none;
-  mix-blend-mode: multiply;
   transition: opacity 3s ease;
 }
+/* 不透明色 + darken:重叠取 min(同色)=同色,不叠加变深 */
 .shadow-bar {
   position: absolute;
-  background: rgba(35, 18, 5, 0.65);
   filter: blur(16px);
+  background: rgb(106, 92, 77);
+  mix-blend-mode: darken;
 }
-/* 竖直条:从页面顶部外上方开始,transform-origin 在顶部中心,跟随太阳方位角旋转 */
+
+/* === 内框竖直:origin (50%, -7.5%),旋转 === */
 .shadow-v {
-  top: -30%;
+  top: 0;
   left: 50%;
-  width: 70px;
-  margin-left: -35px;
-  height: 160%;
-  transform-origin: top center;
+  width: 140px;
+  margin-left: -70px;
+  height: 150%;
+  transform-origin: 50% -7.5%;
   transition: transform 3s ease;
+  transform: rotate(var(--rot, 0deg));
 }
-/* 横向条:top 由太阳高度角决定(高→近顶部,低→远),跟随竖直条同角度旋转 */
+
+/* === 左框:origin 在右边缘 (50%-42.5vw, -7.5%),旋转 === */
+.frame-v-left {
+  top: 0;
+  left: 50%;
+  width: 1400px;
+  margin-left: -1400px;
+  height: 150%;
+  transform-origin: 100% -7.5%;
+  transition: transform 3s ease;
+  transform: translateX(-42.5vw) rotate(var(--rot, 0deg));
+}
+
+/* === 右框:origin 在左边缘 (50%+42.5vw, -7.5%),旋转 === */
+.frame-v-right {
+  top: 0;
+  left: 50%;
+  width: 1400px;
+  height: 150%;
+  transform-origin: 0% -7.5%;
+  transition: transform 3s ease;
+  transform: translateX(42.5vw) rotate(var(--rot, 0deg));
+}
+
+/* === 内框横向:不旋转,与顶/底框平行,top = htop === */
 .shadow-h {
-  left: -10%;
-  right: -10%;
+  left: -75%;
+  right: -75%;
   height: 70px;
-  transform-origin: center top;
-  transition: top 3s ease, transform 3s ease;
+  top: var(--htop, 50%);
+  transition: top 3s ease;
+}
+
+/* === 顶框:底边在 y=-7.5%(旋转原点水平线),height=140px,不旋转 === */
+.frame-h-top {
+  left: -75%;
+  right: -75%;
+  height: 140px;
+  top: calc(-7.5% - 140px);
+}
+
+/* === 底框:top = 2×内框中线(2×(htop+35px)),height=1400px,不旋转 === */
+.frame-h-bottom {
+  left: -75%;
+  right: -75%;
+  height: 1400px;
+  top: calc(var(--htop, 50%) * 2 + 70px);
+  transition: top 3s ease;
 }
 
 /* 体积光层:丁达尔效应(最上层,screen 变亮) */

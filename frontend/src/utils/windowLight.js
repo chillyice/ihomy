@@ -81,19 +81,18 @@ export function getSunScene(sunInfo, slotIndex) {
 
   // 阴影参数(日间才有,夜晚按月相)
   // 竖直阴影旋转:太阳在东(azDev<0)→ 阴影偏左(负旋转);太阳在西(azDev>0)→ 阴影偏右(正旋转)
-  // 阴影与光线对向(光线从太阳方向射来,阴影朝同向延伸,旋转取反使阴影远离太阳)
-  const shadowVRotation = Math.max(-45, Math.min(45, azDev * 0.5))
+  // 不 clamp 到 ±45°:允许旋转到 ±90°(框与顶框平行),太阳偏北时光线消失但旋转继续
+  const shadowVRotation = Math.max(-90, Math.min(90, azDev * 0.5))
 
   // 横向阴影 top 位置:太阳越高 → 阴影越靠近顶部(窗户);太阳越低 → 阴影越远
   // alt=90(正天顶): top≈8%; alt=0(地平线): top≈80%; alt<0: 不显示
   const shadowHTop = Math.max(5, Math.min(85, 80 - alt * 0.8))
 
-  // 窗户外框阴影(墙面投影):宽度占页面比例
-  const frameWidth = 55 // %
-  // 外框阴影延伸长度:太阳低 → 长投影;太阳高 → 短投影
-  const frameHeight = Math.max(30, Math.min(400, 300 - alt * 2.5))
-  // 外框 skew:跟随方位角
-  const frameSkew = Math.max(-30, Math.min(30, -azDev * 0.3))
+  // 南向窗户太阳可见度:方位角 90-270(东南→西南)时太阳可见
+  // 太阳偏北(az<90 或 az>270)时,南向窗户看不到太阳,光线和阴影淡出
+  let sunThroughWindow = 1
+  if (az < 90) sunThroughWindow = Math.max(0, az / 90)
+  else if (az > 270) sunThroughWindow = Math.max(0, (360 - az) / 90)
 
   // 太阳在地平线以下:夜间模式(按月相决定月光强度)
   if (alt < -6) {
@@ -116,19 +115,18 @@ export function getSunScene(sunInfo, slotIndex) {
       shadowHTop: 80,
       shadowOpacity: moonBrightness * 0.15,
       shadowVisible: moonBrightness > 0.3,
-      frameWidth, frameHeight: 50, frameSkew: 0,
-      frameOpacity: moonBrightness * 0.1,
       altitude: alt,
       azimuth: az,
     }
   }
 
-  // 光源水平位置:方位角 90(东)= 左侧 5%,180(南)= 中 50%,270(西)= 右 95%
-  const sourceX = Math.max(3, Math.min(97, ((az - 90) / 180) * 100))
+  // 光源水平位置:限制在窗户开口内(85% 宽,7.5%-92.5%)
+  // 方位角 90(东)= 左边 7.5%,180(南)= 中 50%,270(西)= 右 92.5%
+  const sourceX = Math.max(7.5, Math.min(92.5, ((az - 90) / 180) * 100))
 
   // 光柱旋转:正南(180°)= 0°(垂直),东(90°)= 左上斜射向右下,西(270°)= 右上斜射向左下
-  // transform-origin 默认 center,正旋转=顺时针=顶部转右;取反使光源在左时光柱指向右下
-  const rotation = Math.max(-55, Math.min(55, (az - 180) * 0.55))
+  // 不 clamp 到 ±55°:允许旋转到 ±90°,太阳偏北时框旋转到与顶框平行
+  const rotation = Math.max(-90, Math.min(90, (az - 180) * 0.55))
 
   // 高度角 → 颜色/强度(增亮 + 颜色凸显)
   let palette, rayOpacity
@@ -179,8 +177,6 @@ export function getSunScene(sunInfo, slotIndex) {
     shadowHTop,
     shadowOpacity: 0.5,
     shadowVisible: true,
-    frameWidth, frameHeight, frameSkew,
-    frameOpacity: 0.35,
     altitude: alt,
     azimuth: az,
   }
