@@ -121,14 +121,14 @@
 backend/ (Spring Boot 3, JDK 17/21, 包 com.ihomy)
   src/main/java/com/ihomy/
     IhomyApplication.java       # 主类 @MapperScan("com.ihomy.mapper")
-    common/      # Result统一响应/ResultCode/异常/DictConst(字典常量)
+    common/      # Result统一响应/ResultCode/异常/DictConst(字典常量)/SolarUtil(NOAA太阳位置算法)
     config/      # SecurityConfig/CorsConfig/MybatisPlusConfig/Knife4jConfig/WebAppConfig/WebSocketConfig/SqlStatementLog
     security/    # JwtUtils(JWT含familyId+role)/JwtAuthenticationFilter/LoginUser/SecurityHelper/OpsAccessFilter/TraceIdFilter
     annotation/aspect/  # @RequirePermission + Aspect;@OperationLog + Aspect
     entity/      # SysUser/Family/Blog/Diary/Album/Photo/Comment/ContentLike/Notification/Anniversary/Video/VideoWish/Reminder/Plan/Task/Points*/Chat/Wish/BookRecord/UserLabel/InvitationCode/FamilyTree...
     mapper/      # MyBatis-Plus BaseMapper 接口(自定义 SQL 全部放 resources/mapper/*.xml,接口不写 @Select/@Update 注解,参数统一 @Param)
-    service/     # 具体 @Service 类(V3.8 起单实现无接口层:Blog/Diary/File/HomeModule/Auth 无接口层)
-    controller/  # Auth/Public/File/Home/Blog/Diary/Anniversary/Album/Photo/Member/Like/Comment/Notification/Family/Profile/Log/Video/Points/Wish/Reminder/Plan/Book/Chat/Ops/Order/Task/Tree/Cascade...
+    service/     # 具体 @Service 类(V3.8 起单实现无接口层:Blog/Diary/File/HomeModule/Auth 无接口层);SunService(IP定位+NOAA时隙)/WeatherService(和风天气代理)
+    controller/  # Auth/Public(File/Home/Blog/Diary/Anniversary/Album/Photo/Member/Like/Comment/Notification/Family/Profile/Log/Video/Points/Wish/Reminder/Plan/Book/Chat/Ops/Order/Task/Tree/Cascade...(Public 含 /sun-info+/weather+/home+/feed)
     dto/         # Login/Register(inviteCode)/Blog(tags)/Diary/.../Task/Role/Family/Profile/Video/VideoWish/TreeMember 等
   src/main/resources/
     application.yml     # 端口8080, context-path=/api, 连接用 ihomy 账号; mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml
@@ -140,11 +140,12 @@ frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
     api/request.js  # axios + JWT header + 401 自动刷新token
     api/index.js    # 全部模块 API 分组导出(public/home/blog/diary/file/member/anniversary/album/photo/like/comment/notification/family/profile/log/video/points/chat/ops/tree...)
     stores/user.js  # 登录状态; stores/app.js 首页聚合(family/modules/photos/stats)
-    router/         # 登录守卫 + scrollBehavior(返回回顶部);含 /ops 运维护卫, /chat 需登录; /anniversary /album /album/:id /settings /cinema(public) /tree
+    router/         # 登录守卫 + scrollBehavior(返回回顶部);含 /ops 运维护卫, /chat 需登录; /anniversary /album /album/:id /settings /cinema(public) /tree /light-test(光照测试)
     utils/dict.js   # 枚举词条中文映射(与后端 DictConst 对应)
-    components/     # AppHeader/BackToTop/Breadcrumb/AlbumCarousel/HomeStatsBar/ActivityFeed/MusicPlayer/SideTabs
+    utils/windowLight.js  # getSunScene(sunInfo,slotIndex)+currentSlotIndex()+makeRays():体积光调色板/光束/阴影参数
+    components/     # AppHeader/BackToTop/Breadcrumb/AlbumCarousel/HomeStatsBar/ActivityFeed/MusicPlayer/SideTabs/TopBarExtras(时钟+天气)/RoomParticles(粒子层)
     styles/main.css
-    views/          # Home/Login/Member/Settings/More/Anniversary/album/Album/album/AlbumDetail/cinema/Cinema/diary/DiaryList/blog/(List/Detail/Edit)/points/Points/task/Task/reminder/plan/wish/book/chat/Chat/tree/Tree/cascade/Cascade/ops/Ops...
+    views/          # Home(沉浸式首页方案B)/Login/Member/Settings/More/Anniversary/album/Album/album/AlbumDetail/cinema/Cinema/diary/DiaryList/blog/(List/Detail/Edit)/points/Points/task/Task/reminder/plan/wish/book/chat/Chat/tree/Tree/cascade/Cascade/ops/Ops/lighttest/LightTest...
     App.vue
   vite.config.js   # PWA + 代理 /api -> :8080 + ElementPlus 按需
   public/favicon.svg
@@ -200,6 +201,22 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
   - **一键同步**:`POST /storage/sync {deviceId,includeEmpty}` → `{taskId}`;`GET /storage/sync/progress/{taskId}`。`StorageSyncRunner`(@Async 独立 bean——自调用不生效):按顶层目录建相册(相册名=目录名),`content_photo.source_path`(“设备:相对路径”)去重防重复,复制到 upload/yyyyMM 结构,完成/失败走 family_notification(create(receiverId,'system',content,null,'storage',null))。进度在内存 ConcurrentHashMap(重启丢失,可接受)。实测:2 目录 2 图同步成 2 相册 2 照片,空目录按 includeEmpty 跳过,二次同步全去重。
   - **不做自动同步**:上传只保留页面自主上传、创建相册上传、直接传 NAS 三条线。
   - **硬删除策略(V5.1,已实施)**:删除照片/相册/视频时**物理删除 DB 记录 + 删除磁盘文件**。`FileService.deleteByUrl(url)` 按 `/files/` URL 解析物理路径删文件(外链/空跳过,失败仅告警,带 `normalize()+startsWith` 防越界,顺带尝试清空父目录)。照片删除走 `PhotoMapper.deletePhysicalById`(XML 物理删,绕过全局 logic-delete);相册删除连带照片记录+文件全删(`deletePhysicalByAlbumId`);视频删除**从软删改为硬删** `deletePhysicalById`,并删 `video_url`+`poster`。**关键坑**:MyBatis-Plus 全局配 `logic-delete-field: deleted`(`application.yml`),`deleteById` 实为 UPDATE 软删——要物理删必须用自定义 XML `DELETE` 语句。**覆盖范围**:仅照片/相册/视频三处;博客封面、头像、家庭封面、背景音乐、家谱照片删除时**未**连带删文件(文件成孤儿,可接受,后续按需扩展)。
+- **博客自定义分类(V5.2,已实施)**:`content_blog.category VARCHAR(50)`(schema.sql + live DB 已 ALTER)。`BlogController` 增 `GET /blog/categories` 返回 `SELECT DISTINCT category WHERE family_id=?`(空 NULL 排除);博客列表/编辑/详情均带 category 字段。前端博客列表页顶部水平分类筛选条(全部 + 各分类 tag,点击切换),编辑器 `el-select filterable allow-create` 选或建分类;i18n `blog.category/categoryPlaceholder` 中英。无新权限码,登录即可用。
+- **天气代理(V5.2,已实施)**:`WeatherService.java` 调和风天气免费 API(IP 定位城市 → 当前天气),Redis `ihomy:weather` 缓存 30 分钟,无 key 或失败返回 null(前端降级不显示)。`GET /api/public/weather` 公开接口返回 `{temp,condition,text}`。前端 `TopBarExtras.vue` emit weather,Home 顶栏右上毛玻璃面板显示图标+温度+文字;`weatherIcon/weatherText` 按 condition 映射 emoji/中文。`app.weather-key` 配置在 application.yml(空字符串=禁用)。无新表。
+- **太阳位置系统(V5.2,已实施)**:
+  - **SolarUtil.java**(NOAA 算法,纯数学无外部依赖):给定 lat/lng/timezone/date → 96 个 15 分钟时隙(00:00-23:45)的太阳高度角/方位角 + 日出日落/月相 + 月出月落。核心方法 `buildSlots(lat,lng,tzOffsetMin,date)` 返回 `List<Map>`(time/altitude/azimuth),`sunAltAz(lat,dec,haDeg)` 计算单点高度+方位。
+  - **关键算法修复**:① 时角 `ha` 归一化到 -180~180°(`while (ha>180) ha-=360; while (ha<-180) ha+=360`),修复凌晨 `utcMin - solarNoonMin > 180°` 导致 `cos(ha)` 正负反转、方位角算反;② 方位角用 `atan2(-sin(ha), (sin(dec)-sin(lat)*sin(alt))/(cos(lat)*cos(alt)))` 替代 `acos(cosAz) + if(ha>0) 360-az`,修复夏季高纬度日出东北方时 `acos` 返回值象限歧义(07:45 az=269°→08:00 az=92° 跳变)。修复后全天平滑:日出 76°(东偏北)→ 正午 176°(正南)→ 日落 288°(西偏北)。
+  - **SunService.java**:IP 定位(ip-api.com,`/getIp` 取 client IP)→ lat/lng/timezone,Redis 缓存 6h 位置(`ihomy:sun:loc:`)+ 12h 时隙表(`ihomy:sun:slots:{date}`,按日缓存避免重复计算)。本地/开发 IP 走默认坐标(北京)。
+  - **接口**:`GET /api/public/sun-info` 公开,返回 `{date,location:{lat,lng,city},sunrise,sunset,moonrise,moonset,moonPhase,slots:[{time,altitude,azimuth}×96]}`。
+- **沉浸式首页(V5.2,已实施)**:Home 路由 `meta: { immersive: true }`,`App.vue` 检测 `isImmersive` 隐藏全局 AppHeader/BackToTop/SideTabs/MusicPlayer(页面自带沉浸式 UI)。**方案 B「展开的相册」**:牛皮纸托底(`.album-base` inset -30px)+ 中央照片轮播主舞台 + 左侧毛玻璃面板(动态 feed 微信风:头像独立行 + feed-content 包裹 nick+bubble)+ 右侧毛玻璃面板(时间天气 + 纪念日倒计时)+ 黑胶唱片播放器(`.vinyl-wrap` fixed 右下,半藏右边界 `margin-right: -60px`,hover 滑出 + scale 1.08)+ 顶栏(头像下拉 个人/设置/退出 + 语言切换 applyLocale + 消息铃铛 el-popover+el-badge + 更多导航 navPrimary 5 个 + navSecondary 下拉 + 光照测试链接)+ 背景色块(blur 60px opacity 0.4,色值 #9CD0B5/#EDDB8C/#ECC0AC/#A8C9DE/#C0D8A8,背景米白 #EDE4D3→#E2D8C4→#D6CBB4)+ GSAP 入场动画(面板/相册,光柱不入场直接显示当前状态)。毛玻璃样式:`rgba(255,255,255,0.25)` + `blur(30px)` + `border: 1px solid rgba(255,255,255,0.5)` + `border-radius: 28px`(无 mask 渐变);两侧面板宽度均 380px,left/right: 24px。
+- **体积光系统(V5.2,已实施)**:基于真实太阳位置的丁达尔效应,分层 z-index(从底到顶):bg-blobs(0)→ ambient-layer(2,multiply 暖染)→ album-stage/panels(30/40)→ **window-shadow(35,窗框内阴影,在内容上方)**→ vignette(44)→ dust-layer(46,screen)→ **light-layer(48,screen,最顶层)**→ top-bar(50)。
+  - **光束(7 条羽毛状)**:`makeRays(opacityScale)` 返回 7 条宽度 50-110px、偏移 -210~+210px、blur 30-55px 的光柱;光源水平位置 `sourceX = (az-90)/180*100`(东=左 5%,南=中 50%,西=右 95%);旋转 `rotation = (az-180)*0.55`(clamp ±55°,transform-origin center,正旋转=顺时针=顶部转右;光源在左→光柱指向右下,与光源位置一致)。
+  - **光源辉光**:`.light-bloom` 700px 圆形,`radial-gradient(bloom→mid→transparent)` + `blur(60px)`。
+  - **窗框内阴影**(`.window-shadow` z-index 35,multiply 变暗):竖直条 `.shadow-v`(top -30%、height 160%、left 50% 居中、transform-origin top center、rotation = `azDev*0.5` 即太阳在东→阴影偏左,太阳在西→阴影偏右)+ 横向条 `.shadow-h`(top = `80-alt*0.8`,太阳高→近顶部,太阳低→远;跟随竖直条同角度旋转)。
+  - **暗角 + 灰尘粒子**:40 个灰尘粒子(screen 发光,随机位置 + 漂浮动画)。
+  - **windowLight.js**:`getSunScene(sunInfo, slotIndex)` 基于高度角分 4 档(黄金时刻 alt<6° 暖橙/晨昏 <15° 暖黄/日间 <60° 暖白/正午 ≥60° 冷白),每档 bloom/core/mid/ambient/shadow 调色板 + rayOpacity(1.3/1.15/1.05/0.95);夜晚(alt<-6°)按月相 `moonBrightness`(0~1,新月 0 满月 1)决定月光强度(bloom/ray/shadow 系数)。`currentSlotIndex(sunInfo)` 按当前时间取 15 分钟时隙索引。
+  - **光照测试页**:`/light-test` 路由(LightTest.vue),1 分钟循环 96 时隙(625ms/段),信息面板显示时间/高度/方位/日出/日落/月相 + 进度条,用于调试验证全天光照过渡。
+- **nginx alias + FileService urlPrefix 健壮性(V5.2,已实施)**:nginx.conf `location /files/` 的 `alias D:/WorkSpace/ihomy/uploads;` 末尾缺斜杠导致 404,改为 `alias D:/WorkSpace/ihomy/uploads/;`。`FileService.saveTo` 和 `deleteByUrl` 统一 `urlPrefix.replaceAll("/+$", "")` 去尾斜杠,无论 yml 写 `/files` 还是 `/files/` 都正确拼接。同时 nginx 图片扩展名 location 用负向断言 `location ~* ^/(?!files/).+\.(...)$` 排除 `/files/`,避免 root 覆盖 alias 导致 404。
 
 ## 部署约定(Linux 2GB 求稳)
 
@@ -246,6 +263,13 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 存储管理 | V4.1 | 家庭级设备+文件浏览器+一键同步(见文件存储策略小节);存量迁移待做 |
 | 物品定位 | V5.0 | 1期已上线:五级粒度(家>房子>房间>家具>位置,支持多套房+多楼层),房子/房间/家具/物品 CRUD+跨级搜索;2期户型图/3期 AI 语义待做(见规划事项) |
 | 文件硬删除 | V5.1 | 删照片/相册/视频→物理删 DB 行 + 删磁盘文件(`FileService.deleteByUrl`);视频从软删改硬删;自定义 XML DELETE 绕过全局 logic-delete;仅覆盖照片/相册/视频,博客封面/头像/音乐等未连带删 |
+| 博客自定义分类 | V5.2 | `content_blog.category`,`GET /blog/categories` 返回 DISTINCT;前端水平分类筛选条 + 编辑器 allow-create |
+| 天气代理 | V5.2 | `WeatherService` 和风天气 API + Redis 30 分钟,`GET /public/weather`;顶栏毛玻璃面板显示 |
+| 太阳位置系统 | V5.2 | `SolarUtil`(NOAA 96 时隙)+ `SunService`(IP 定位 + Redis 6h/12h 缓存),`GET /public/sun-info`;时角归一化 + atan2 方位角修复 |
+| 沉浸式首页 | V5.2 | Home `meta.immersive`,App.vue 隐藏全局组件;方案 B 展开的相册:牛皮纸托底+照片轮播+左右毛玻璃(动态/任务+天气/纪念日)+黑胶播放器+顶栏+背景色块+GSAP |
+| 体积光系统 | V5.2 | 丁达尔效应:7 条光束 + 光源辉光 + 窗框内阴影(竖直+横向)+ 暗角 + 40 灰尘粒子;分层 z-index 0/2/30/35/44/46/48;windowLight.js 4 档调色板 + 月相夜间 |
+| 光照测试页 | V5.2 | `/light-test` 1 分钟循环 96 时隙,信息面板(时间/高度/方位/日出/日落/月相+进度条) |
+| nginx alias 修复 | V5.2 | `/files/` alias 末尾加 `/` + 图片扩展名 location 负向断言排除 `/files/`;FileService urlPrefix 去尾斜杠 |
 
 ## 规划事项(未实现,排序按推荐优先级)
 

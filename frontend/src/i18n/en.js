@@ -121,6 +121,15 @@ export default {
     noPhotos: 'No photos yet',
     sillEmpty: 'No messages from family today',
     daysLeftNum: 'in {n} days',
+    familyFeed: 'Family Feed',
+    kitchenLabel: 'Kitchen',
+    sofaLabel: 'Sofa',
+    windowLabel: 'Window',
+    tvLabel: 'Cinema',
+    pcLabel: 'Computer',
+    toolboxLabel: 'Toolbox',
+    tasksRewards: 'Tasks',
+    noTasks: 'No tasks',
   },
   theme: {
     dark: 'Dark mode',
@@ -680,6 +689,10 @@ export default {
     iosHint: 'Tap Share button → Add to Home Screen',
     install: 'Install',
     gotIt: 'Got it',
+  },
+  kitchen: {
+    title: 'Kitchen',
+    placeholder: 'Recipes & tutorials (coming soon)',
   },
   cascade: {
     title: 'Photo Cascade',

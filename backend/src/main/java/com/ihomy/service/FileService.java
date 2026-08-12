@@ -49,10 +49,11 @@ public class FileService {
 
     /** 按 URL 删除已上传文件:仅处理本站 URL(外链/空直接忽略),文件不存在容忍,失败仅告警 */
     public void deleteByUrl(String url) {
-        if (url == null || !url.startsWith(urlPrefix)) return;
+        String prefix = urlPrefix.replaceAll("/+$", "");
+        if (url == null || !url.startsWith(prefix + "/")) return;
         try {
             Path root = Paths.get(uploadDir).toAbsolutePath().normalize();
-            String rel = url.substring(urlPrefix.length()).replace('\\', '/').replaceFirst("^/+", "");
+            String rel = url.substring(prefix.length()).replace('\\', '/').replaceFirst("^/+", "");
             Path target = root.resolve(rel).normalize();
             if (!target.startsWith(root)) return;   // URL 逃逸防御
             Files.deleteIfExists(target);
@@ -85,7 +86,8 @@ public class FileService {
                     : Paths.get(uploadDir, root, cleanSub);
             Files.createDirectories(dir);
             Files.write(dir.resolve(fileName), bytes);
-            String path = urlPrefix + "/" + root + (cleanSub == null ? "" : "/" + cleanSub) + "/" + fileName;
+            String prefix = urlPrefix.replaceAll("/+$", "");
+            String path = prefix + "/" + root + (cleanSub == null ? "" : "/" + cleanSub) + "/" + fileName;
             log.info("文件已保存: {}", path);
             return path;
         } catch (IOException e) {

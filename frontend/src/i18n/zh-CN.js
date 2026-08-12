@@ -124,6 +124,15 @@ export default {
     noPhotos: '还没有照片',
     sillEmpty: '今天还没有家人留言',
     daysLeftNum: '{n} 天后',
+    familyFeed: '家人动态',
+    kitchenLabel: '厨房',
+    sofaLabel: '沙发',
+    windowLabel: '窗外',
+    tvLabel: '放映厅',
+    pcLabel: '电脑',
+    toolboxLabel: '工具箱',
+    tasksRewards: '悬赏 / 任务',
+    noTasks: '暂无任务',
   },
   theme: {
     dark: '深色模式',
@@ -683,6 +692,10 @@ export default {
     iosHint: '点击分享按钮 → 添加到主屏幕',
     install: '安装',
     gotIt: '知道了',
+  },
+  kitchen: {
+    title: '厨房',
+    placeholder: '食谱教程（规划中）',
   },
   cascade: {
     title: '照片瀑布',
