@@ -13,22 +13,26 @@
     <!-- 暖色环境光:黄金时刻整体暖调(multiply 微染) -->
     <div class="ambient-layer" :style="ambientStyle" aria-hidden="true"></div>
 
-    <!-- 窗户阴影:外框(4条)+内框十字(2条),同一层同一动效,平行四边形 -->
-    <div v-if="sunScene.shadowVisible" class="window-shadow"
-         :style="{ opacity: sunScene.shadowOpacity, '--rot': (sunScene.shadowVRotation || 0) + 'deg', '--htop': (sunScene.shadowHTop || 50) + '%' }"
+    <!-- 亮斑图层:模拟阳光照耀强度,在内容之上、阴影之下 -->
+    <div class="bright-spot" :style="brightSpotStyle" aria-hidden="true"></div>
+
+    <!-- 下层阴影:内框竖+内框横+顶框+底框(z=35,在光柱之下) -->
+    <div class="window-shadow-lower"
+         :style="{ '--rot': (sunScene.shadowVRotation || 0) + 'deg', '--htop': (sunScene.shadowHTop || 50) + '%', '--shadow-gray': (sunScene.shadowGray ?? 0) }"
          aria-hidden="true">
-      <div class="shadow-bar frame-v-left"></div>
-      <div class="shadow-bar frame-v-right"></div>
       <div class="shadow-bar frame-h-top"></div>
       <div class="shadow-bar frame-h-bottom"></div>
       <div class="shadow-bar shadow-v"></div>
       <div class="shadow-bar shadow-h"></div>
     </div>
 
+    <!-- 反光层:内容组件被阳光照亮的轻微高光(soft-light,夜间 0) -->
+    <div class="reflection-layer" :style="reflectionStyle" aria-hidden="true"></div>
+
     <!-- 柔和暗角:书本在桌上的聚焦感(边缘微压暗) -->
     <div class="vignette" aria-hidden="true"></div>
 
-    <!-- 体积光:丁达尔效应(最上层,光源辉光 + 多层羽毛状光束) -->
+    <!-- 体积光:丁达尔效应(z=48,在下层阴影之上、左右框之下) -->
     <div class="light-layer" aria-hidden="true">
       <div class="light-bloom" :style="bloomStyle"></div>
       <div class="light-source" :style="sourceStyle">
@@ -39,6 +43,14 @@
           :style="rs"
         ></div>
       </div>
+    </div>
+
+    <!-- 上层阴影:左框+右框(z=49,在光柱之上,最顶层) -->
+    <div class="window-shadow-upper"
+         :style="{ '--rot': (sunScene.shadowVRotation || 0) + 'deg', '--shadow-gray': (sunScene.shadowGray ?? 0) }"
+         aria-hidden="true">
+      <div class="shadow-bar frame-v-left"></div>
+      <div class="shadow-bar frame-v-right"></div>
     </div>
 
     <!-- 灰尘粒子:光路中的飘浮微粒(暖金 + 发光) -->
@@ -321,7 +333,7 @@ const trackIdx = ref(0)
 const theme = ref(loadTheme())
 const sunInfo = ref(null)
 const slotIdx = ref(currentSlotIndex())
-const sunScene = ref({ source: { x: '50%', y: '-2%' }, rotation: 0, shadowSkew: 0, palette: { bloom: 'transparent', core: 'transparent', mid: 'transparent', ambient: 'transparent', shadow: 'rgba(0,0,0,0.3)' }, rays: [] })
+const sunScene = ref({ source: { x: '50%', y: '-2%' }, rotation: 0, shadowSkew: 0, palette: { bloom: 'transparent', core: 'transparent', mid: 'transparent', ambient: 'transparent' }, rays: [], shadowVRotation: 0, shadowHTop: 50, shadowIntensity: 1, shadowGray: 0, brightSpotColor: 'rgba(0,0,0,1)', brightSpotOpacity: 0.7, reflectionOpacity: 0, isNight: true, dayProgress: 0 })
 
 // 灰尘粒子:40 个,阳光下的飘浮微粒
 const dustParticles = ref(
@@ -369,6 +381,16 @@ const bloomStyle = computed(() => ({
 
 const ambientStyle = computed(() => ({
   background: sunScene.value.palette.ambient,
+}))
+
+const brightSpotStyle = computed(() => ({
+  background: sunScene.value.brightSpotColor || 'transparent',
+  opacity: sunScene.value.brightSpotOpacity ?? 0,
+}))
+
+const reflectionStyle = computed(() => ({
+  background: `radial-gradient(ellipse 60% 50% at ${sunScene.value.source.x} ${sunScene.value.source.y}, rgba(255,245,220,1) 0%, rgba(255,235,200,0.6) 30%, transparent 70%)`,
+  opacity: sunScene.value.reflectionOpacity ?? 0,
 }))
 
 let slideTimer = null
@@ -765,54 +787,82 @@ onUnmounted(() => {
   transition: background 3s ease;
 }
 
-/* 窗户阴影:外框+内框同一层 */
-.window-shadow {
+/* 亮斑图层:在内容之上(z>30),阴影之下(z<35),multiply 让白色=透明、黑色=压暗、彩色=染色 */
+.bright-spot {
+  position: fixed;
+  inset: 0;
+  z-index: 32;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  transition: background 3s ease, opacity 3s ease;
+}
+
+/* 反光层:内容被阳光照亮的轻微高光(soft-light,夜间 0) */
+.reflection-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 42;
+  pointer-events: none;
+  mix-blend-mode: soft-light;
+  transition: opacity 3s ease;
+}
+
+/* 下层阴影:内框+顶框+底框(z=35,在光柱之下) */
+.window-shadow-lower {
   position: fixed;
   inset: 0;
   z-index: 35;
   pointer-events: none;
-  transition: opacity 3s ease;
 }
-/* 不透明色 + darken:重叠取 min(同色)=同色,不叠加变深 */
+/* 上层阴影:左框+右框(z=49,在光柱之上,最顶层) */
+.window-shadow-upper {
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+  pointer-events: none;
+}
+/* opaque gray + darken:min(backdrop, G) 幂等,跨层重叠不叠加 */
 .shadow-bar {
   position: absolute;
   filter: blur(16px);
-  background: rgb(106, 92, 77);
   mix-blend-mode: darken;
+  background: rgb(var(--shadow-gray, 0), var(--shadow-gray, 0), var(--shadow-gray, 0));
+  transition: background 3s ease;
 }
 
-/* === 内框竖直:origin (50%, -7.5%),旋转 === */
+/* === 三条竖直 bar:原点全部对齐到 (页面 50% X, 页面 -10vh Y) === */
+/* shadow-v: 宽度 112px(减20%),origin X = bar 中心(50%)= 页面 50% */
 .shadow-v {
-  top: 0;
+  top: -50vh;
   left: 50%;
-  width: 140px;
-  margin-left: -70px;
-  height: 150%;
-  transform-origin: 50% -7.5%;
-  transition: transform 3s ease;
+  width: 112px;
+  margin-left: -56px;
+  height: 337.5vh;
+  transform-origin: 50% 40vh;
+  transition: transform 3s ease, background 3s ease;
   transform: rotate(var(--rot, 0deg));
 }
 
-/* === 左框:origin 在右边缘 (50%-42.5vw, -7.5%),旋转 === */
+/* === 左框:origin 在右边缘(100%)= 页面 50% X,旋转,长度延长 50% === */
 .frame-v-left {
-  top: 0;
+  top: -50vh;
   left: 50%;
   width: 1400px;
   margin-left: -1400px;
-  height: 150%;
-  transform-origin: 100% -7.5%;
-  transition: transform 3s ease;
+  height: 337.5vh;
+  transform-origin: 100% 40vh;
+  transition: transform 3s ease, background 3s ease;
   transform: translateX(-42.5vw) rotate(var(--rot, 0deg));
 }
 
-/* === 右框:origin 在左边缘 (50%+42.5vw, -7.5%),旋转 === */
+/* === 右框:origin 在左边缘(0%)= 页面 50% X,旋转,长度延长 50% === */
 .frame-v-right {
-  top: 0;
+  top: -50vh;
   left: 50%;
   width: 1400px;
-  height: 150%;
-  transform-origin: 0% -7.5%;
-  transition: transform 3s ease;
+  height: 337.5vh;
+  transform-origin: 0% 40vh;
+  transition: transform 3s ease, background 3s ease;
   transform: translateX(42.5vw) rotate(var(--rot, 0deg));
 }
 
@@ -822,24 +872,24 @@ onUnmounted(() => {
   right: -75%;
   height: 70px;
   top: var(--htop, 50%);
-  transition: top 3s ease;
+  transition: top 3s ease, background 3s ease;
 }
 
-/* === 顶框:底边在 y=-7.5%(旋转原点水平线),height=140px,不旋转 === */
+/* === 顶框:底边在 y=-10vh(旋转原点水平线),height=140px,不旋转 === */
 .frame-h-top {
   left: -75%;
   right: -75%;
   height: 140px;
-  top: calc(-7.5% - 140px);
+  top: calc(-10vh - 140px);
 }
 
-/* === 底框:top = 2×内框中线(2×(htop+35px)),height=1400px,不旋转 === */
+/* === 底框:top = 2×内框中线,height=1400px,不旋转 === */
 .frame-h-bottom {
   left: -75%;
   right: -75%;
   height: 1400px;
   top: calc(var(--htop, 50%) * 2 + 70px);
-  transition: top 3s ease;
+  transition: top 3s ease, background 3s ease;
 }
 
 /* 体积光层:丁达尔效应(最上层,screen 变亮) */

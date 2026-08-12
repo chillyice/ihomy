@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,12 +54,17 @@ public class PublicController {
     private final WeatherService weatherService;
     private final SunService sunService;
 
-    @Operation(summary = "太阳信息(IP 定位日出日落 + 96 时隙太阳位置)")
+    @Operation(summary = "太阳信息(IP 定位日出日落 + 96 时隙太阳位置,可选 date=YYYY-MM-DD 模拟任意日期)")
     @GetMapping("/sun-info")
-    public Result<Map<String, Object>> sunInfo(HttpServletRequest request) {
+    public Result<Map<String, Object>> sunInfo(HttpServletRequest request,
+            @RequestParam(value = "date", required = false) String date) {
         String ip = request.getHeader("X-Forwarded-For");
         if (ip == null || ip.isBlank()) ip = request.getRemoteAddr();
-        return Result.success(sunService.getSunInfo(ip));
+        LocalDate ld = null;
+        if (date != null && !date.isBlank()) {
+            try { ld = LocalDate.parse(date); } catch (Exception ignored) {}
+        }
+        return Result.success(sunService.getSunInfo(ip, ld));
     }
 
     @Operation(summary = "天气(IP 定位,和风天气 API,Key 未配返回 null)")

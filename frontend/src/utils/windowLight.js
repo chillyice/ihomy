@@ -62,123 +62,169 @@ export function getRoomOverlay() {
   }
 }
 
-// 体积光场景:基于太阳高度角(altitude)和方位角(azimuth)驱动
+// 体积光场景:基于日出日落时间驱动旋转生命周期
 // sunInfo: { sunrise, sunset, solarNoon, slots: [{time, altitude, azimuth}, ...] }
-// slotIndex: 0-95(每 15 分钟一个时隙)
+// slotIndex: 0-287(每 5 分钟一个时隙)
+// 旋转:日出时 -90°,正午 0°,日落 +90°,夜间待命在日出角度
+// 亮斑:夜黑→凌晨黄→清晨白→日间透明→傍晚橙→日落红→深夜黑
+// 阴影强度:夜间最深(1),正午最浅(0.3),正弦过渡
+
+function parseTimeToMinutes(timeStr) {
+  if (!timeStr) return null
+  const parts = String(timeStr).split(':').map(Number)
+  if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) return null
+  return parts[0] * 60 + parts[1]
+}
+
+function lerpColor(c1, c2, t) {
+  const r = Math.round(c1[0] + (c2[0] - c1[0]) * t)
+  const g = Math.round(c1[1] + (c2[1] - c1[1]) * t)
+  const b = Math.round(c1[2] + (c2[2] - c1[2]) * t)
+  return `rgba(${r},${g},${b},1)`
+}
+
 export function getSunScene(sunInfo, slotIndex) {
   const slots = sunInfo?.slots || []
-  const idx = Math.max(0, Math.min(95, slotIndex || 0))
-  const slot = slots[idx] || { altitude: -30, azimuth: 0 }
-  const moonPhase = sunInfo?.moonPhase ?? 0.5
+  const idx = Math.max(0, Math.min(287, slotIndex || 0))
+  const slot = slots[idx] || { altitude: -30, azimuth: 0, time: '12:00' }
 
-  const alt = slot.altitude // -90 ~ 90
-  const az = slot.azimuth // 0 ~ 360 (North=0, East=90, South=180, West=270)
+  const alt = slot.altitude
+  const az = slot.azimuth
+  const time = slot.time
 
-  // 方位角偏离正南的度数(归一化到 -180~180)
-  let azDev = az - 180
-  while (azDev > 180) azDev -= 360
-  while (azDev < -180) azDev += 360
+  const sunriseMin = parseTimeToMinutes(sunInfo?.sunrise)
+  const sunsetMin = parseTimeToMinutes(sunInfo?.sunset)
+  const currentMin = parseTimeToMinutes(time)
 
-  // 阴影参数(日间才有,夜晚按月相)
-  // 竖直阴影旋转:太阳在东(azDev<0)→ 阴影偏左(负旋转);太阳在西(azDev>0)→ 阴影偏右(正旋转)
-  // 不 clamp 到 ±45°:允许旋转到 ±90°(框与顶框平行),太阳偏北时光线消失但旋转继续
-  const shadowVRotation = Math.max(-90, Math.min(90, azDev * 0.5))
-
-  // 横向阴影 top 位置:太阳越高 → 阴影越靠近顶部(窗户);太阳越低 → 阴影越远
-  // alt=90(正天顶): top≈8%; alt=0(地平线): top≈80%; alt<0: 不显示
-  const shadowHTop = Math.max(5, Math.min(85, 80 - alt * 0.8))
-
-  // 南向窗户太阳可见度:方位角 90-270(东南→西南)时太阳可见
-  // 太阳偏北(az<90 或 az>270)时,南向窗户看不到太阳,光线和阴影淡出
-  let sunThroughWindow = 1
-  if (az < 90) sunThroughWindow = Math.max(0, az / 90)
-  else if (az > 270) sunThroughWindow = Math.max(0, (360 - az) / 90)
-
-  // 太阳在地平线以下:夜间模式(按月相决定月光强度)
-  if (alt < -6) {
-    const moonBrightness = moonPhase < 0.5 ? moonPhase * 2 : (1 - moonPhase) * 2 // 0~1
-    const moonGlow = 0.08 + moonBrightness * 0.15
-    const moonRay = 0.1 + moonBrightness * 0.2
-    const moonShadow = 0.05 + moonBrightness * 0.08
-    return {
-      source: { x: '50%', y: '-2%' },
-      rotation: 0,
-      palette: {
-        bloom: `rgba(180, 200, 235, ${moonGlow})`,
-        core: `rgba(170, 195, 230, ${moonRay})`,
-        mid: `rgba(150, 180, 215, ${moonRay * 0.5})`,
-        ambient: `rgba(25, 30, 50, 0.08)`,
-        shadow: `rgba(10, 12, 25, ${moonShadow})`,
-      },
-      rays: makeRays(moonBrightness * 0.35),
-      shadowVRotation: 0,
-      shadowHTop: 80,
-      shadowOpacity: moonBrightness * 0.15,
-      shadowVisible: moonBrightness > 0.3,
-      altitude: alt,
-      azimuth: az,
+  // 日昼进度:0=日出,1=日落,夜间 hold 在端点
+  let dayProgress = 0.5
+  let isNight = true
+  if (sunriseMin != null && sunsetMin != null && currentMin != null && sunsetMin > sunriseMin) {
+    if (currentMin >= sunriseMin && currentMin <= sunsetMin) {
+      isNight = false
+      dayProgress = (currentMin - sunriseMin) / (sunsetMin - sunriseMin)
+    } else {
+      isNight = true
+      dayProgress = currentMin < sunriseMin ? 0 : 1
     }
   }
 
-  // 光源水平位置:限制在窗户开口内(85% 宽,7.5%-92.5%)
-  // 方位角 90(东)= 左边 7.5%,180(南)= 中 50%,270(西)= 右 92.5%
-  const sourceX = Math.max(7.5, Math.min(92.5, ((az - 90) / 180) * 100))
+  // 旋转:线性 -90°(日出)→ 0°(正午)→ +90°(日落),夜间 hold
+  const shadowVRotation = (dayProgress - 0.5) * 180
+  // 光柱旋转:与阴影同角度
+  const lightRotation = shadowVRotation
 
-  // 光柱旋转:正南(180°)= 0°(垂直),东(90°)= 左上斜射向右下,西(270°)= 右上斜射向左下
-  // 不 clamp 到 ±55°:允许旋转到 ±90°,太阳偏北时框旋转到与顶框平行
-  const rotation = Math.max(-90, Math.min(90, (az - 180) * 0.55))
+  // 光源水平位置:由方位角驱动,夜间 hold 在日出位置(左侧 7.5%)
+  const sourceX = isNight
+    ? 7.5
+    : Math.max(7.5, Math.min(92.5, ((az - 90) / 180) * 100))
 
-  // 高度角 → 颜色/强度(增亮 + 颜色凸显)
-  let palette, rayOpacity
-  if (alt < 6) {
+  // 内框横条 top:太阳越高越靠近顶部
+  const shadowHTop = Math.max(5, Math.min(85, 80 - Math.max(0, alt) * 0.8))
+
+  // 阴影强度(0=最浅,1=最深):夜间 1,正午 0.3,正弦过渡
+  const shadowIntensity = isNight ? 1 : 1 - Math.sin(dayProgress * Math.PI) * 0.7
+  // 灰阶(0=全黑,255=白透明):用 opaque gray + darken,min 幂等,跨层不叠加
+  const shadowGray = Math.round((1 - shadowIntensity) * 255)
+
+  // 亮斑颜色与不透明度:夜黑→凌晨黄→清晨白→日间透明→傍晚橙→日落红→深夜黑
+  let brightSpotColor, brightSpotOpacity
+  if (isNight) {
+    brightSpotColor = 'rgba(0,0,0,1)'
+    brightSpotOpacity = 0.7
+  } else if (dayProgress < 0.1) {
+    // 凌晨:黑→黄
+    const t = dayProgress / 0.1
+    brightSpotColor = lerpColor([0, 0, 0], [255, 200, 80], t)
+    brightSpotOpacity = 0.7 - t * 0.3
+  } else if (dayProgress < 0.3) {
+    // 清晨:黄→白
+    const t = (dayProgress - 0.1) / 0.2
+    brightSpotColor = lerpColor([255, 200, 80], [255, 250, 230], t)
+    brightSpotOpacity = 0.4 - t * 0.3
+  } else if (dayProgress < 0.7) {
+    // 日间:白→透明
+    const t = (dayProgress - 0.3) / 0.4
+    brightSpotColor = 'rgba(255,250,230,1)'
+    brightSpotOpacity = 0.1 * (1 - t)
+  } else if (dayProgress < 0.9) {
+    // 傍晚:透明→橙
+    const t = (dayProgress - 0.7) / 0.2
+    brightSpotColor = lerpColor([255, 250, 230], [255, 140, 50], t)
+    brightSpotOpacity = t * 0.5
+  } else {
+    // 日落:橙→红
+    const t = (dayProgress - 0.9) / 0.1
+    brightSpotColor = lerpColor([255, 140, 50], [200, 40, 30], t)
+    brightSpotOpacity = 0.5 + t * 0.2
+  }
+
+  // 光柱颜色:夜间全透明(不发光),日间基于高度角
+  let palette, rayBaseOpacity
+  if (isNight) {
+    palette = {
+      bloom: 'transparent',
+      core: 'transparent',
+      mid: 'transparent',
+      ambient: 'transparent',
+    }
+    rayBaseOpacity = 0
+  } else if (alt < 6) {
     palette = {
       bloom: 'rgba(255, 175, 90, 0.85)',
       core: 'rgba(255, 160, 70, 0.95)',
       mid: 'rgba(255, 130, 50, 0.6)',
       ambient: 'rgba(255, 165, 80, 0.12)',
-      shadow: 'rgba(45, 20, 5, 0.55)',
     }
-    rayOpacity = 1.3
+    rayBaseOpacity = 1.3
   } else if (alt < 15) {
     palette = {
       bloom: 'rgba(255, 200, 130, 0.78)',
       core: 'rgba(255, 190, 110, 0.92)',
       mid: 'rgba(255, 170, 85, 0.52)',
       ambient: 'rgba(255, 195, 115, 0.09)',
-      shadow: 'rgba(50, 28, 8, 0.45)',
     }
-    rayOpacity = 1.15
+    rayBaseOpacity = 1.15
   } else if (alt < 60) {
     palette = {
       bloom: 'rgba(255, 230, 180, 0.68)',
       core: 'rgba(255, 222, 160, 0.9)',
       mid: 'rgba(255, 210, 140, 0.48)',
       ambient: 'rgba(255, 225, 170, 0.06)',
-      shadow: 'rgba(55, 35, 12, 0.38)',
     }
-    rayOpacity = 1.05
+    rayBaseOpacity = 1.05
   } else {
     palette = {
       bloom: 'rgba(255, 242, 210, 0.62)',
       core: 'rgba(255, 238, 195, 0.9)',
       mid: 'rgba(255, 228, 170, 0.42)',
       ambient: 'rgba(255, 240, 200, 0.05)',
-      shadow: 'rgba(60, 40, 15, 0.32)',
     }
-    rayOpacity = 0.95
+    rayBaseOpacity = 0.95
   }
+
+  // 光柱不透明度:夜间 0(不发光),日间正弦过渡(正午最强)
+  const rayOpacity = isNight ? 0 : Math.sin(dayProgress * Math.PI) * rayBaseOpacity
+
+  // 反光层:内容组件被阳光照亮的轻微高光(soft-light,夜间 0)
+  const reflectionOpacity = isNight ? 0 : Math.sin(dayProgress * Math.PI) * 0.22
 
   return {
     source: { x: sourceX + '%', y: alt < 6 ? '2%' : '-2%' },
-    rotation,
+    rotation: lightRotation,
     palette,
     rays: makeRays(rayOpacity),
     shadowVRotation,
     shadowHTop,
-    shadowOpacity: 0.5,
-    shadowVisible: true,
+    shadowIntensity,
+    shadowGray,
+    brightSpotColor,
+    brightSpotOpacity,
+    reflectionOpacity,
     altitude: alt,
     azimuth: az,
+    isNight,
+    dayProgress,
   }
 }
 
@@ -196,12 +242,12 @@ function makeRays(opacityScale) {
   return base.map((r) => ({ ...r, opacity: r.opacity * opacityScale }))
 }
 
-// 根据当前时间获取时隙索引(0-95)
+// 根据当前时间获取时隙索引(0-287)
 export function currentSlotIndex() {
   const now = new Date()
   const h = now.getHours()
   const m = now.getMinutes()
-  return Math.floor((h * 60 + m) / 15)
+  return Math.floor((h * 60 + m) / 5)
 }
 
 // 兼容旧调用(无 sunInfo 时回退到固定时段)

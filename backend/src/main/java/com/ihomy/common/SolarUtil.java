@@ -13,11 +13,11 @@ public class SolarUtil {
     private static final double RAD = Math.PI / 180;
     private static final double DEG = 180 / Math.PI;
 
-    /** 一天的 96 个 15 分钟时隙:太阳高度角 + 方位角 */
+    /** 一天的 288 个 5 分钟时隙:太阳高度角 + 方位角 */
     public static List<Map<String, Object>> buildSlots(double lat, double lng, LocalDate date, ZoneId tz) {
-        List<Map<String, Object>> slots = new ArrayList<>(96);
-        for (int i = 0; i < 96; i++) {
-            int totalMin = i * 15;
+        List<Map<String, Object>> slots = new ArrayList<>(288);
+        for (int i = 0; i < 288; i++) {
+            int totalMin = i * 5;
             LocalTime t = LocalTime.of(totalMin / 60, totalMin % 60);
             LocalDateTime localDt = LocalDateTime.of(date, t);
             ZonedDateTime zoned = localDt.atZone(tz);

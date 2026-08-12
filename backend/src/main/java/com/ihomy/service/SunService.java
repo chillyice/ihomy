@@ -30,14 +30,14 @@ public class SunService {
     private static final String LOC_PREFIX = "ihomy:sun:loc:";
     private static final String SLOTS_PREFIX = "ihomy:sun:slots:";
 
-    /** 主入口:返回位置 + 日出日落月相 + 96 时隙表 */
-    public Map<String, Object> getSunInfo(String ip) {
+    /** 主入口:返回位置 + 日出日落月相 + 96 时隙表。date 为 null 时取当日。 */
+    public Map<String, Object> getSunInfo(String ip, LocalDate date) {
         String[] loc = resolveLocation(ip);
         double lat = Double.parseDouble(loc[0]);
         double lng = Double.parseDouble(loc[1]);
         String tzId = loc[2];
         ZoneId tz = ZoneId.of(tzId);
-        LocalDate today = LocalDate.now(tz);
+        LocalDate today = date != null ? date : LocalDate.now(tz);
 
         Map<String, Object> data = new HashMap<>();
         data.put("lat", Math.round(lat * 100) / 100.0);
@@ -55,7 +55,7 @@ public class SunService {
         Map<String, String> moon = SolarUtil.moonTimes(lat, lng, today, tz);
         data.putAll(moon);
 
-        // 96 时隙表(当日缓存)
+        // 96 时隙表(按日期缓存)
         String slotsKey = SLOTS_PREFIX + today;
         String cached = redis.opsForValue().get(slotsKey);
         if (cached != null) {
@@ -71,6 +71,11 @@ public class SunService {
         } catch (Exception ignored) {}
 
         return data;
+    }
+
+    /** 兼容旧调用 */
+    public Map<String, Object> getSunInfo(String ip) {
+        return getSunInfo(ip, null);
     }
 
     /** IP → [lat, lng, timezone](Redis 缓存 6h) */
