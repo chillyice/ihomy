@@ -9,11 +9,16 @@
 
     <div class="ambient-layer" :style="ambientStyle" aria-hidden="true"></div>
 
-    <div v-if="scene.shadowVisible" class="window-frame-shadow" :style="frameShadowStyle" aria-hidden="true"></div>
-
-    <div v-if="scene.shadowVisible" class="window-shadow" :style="{ opacity: scene.shadowOpacity }" aria-hidden="true">
-      <div class="shadow-bar shadow-v" :style="shadowVStyle"></div>
-      <div class="shadow-bar shadow-h" :style="shadowHStyle"></div>
+    <!-- 窗户阴影:外框+内框同一层,平行四边形 -->
+    <div v-if="scene.shadowVisible" class="window-shadow"
+         :style="{ opacity: scene.shadowOpacity, '--rot': (scene.shadowVRotation || 0) + 'deg', '--htop': (scene.shadowHTop || 50) + '%' }"
+         aria-hidden="true">
+      <div class="shadow-bar frame-v-left"></div>
+      <div class="shadow-bar frame-v-right"></div>
+      <div class="shadow-bar frame-h-top"></div>
+      <div class="shadow-bar frame-h-bottom"></div>
+      <div class="shadow-bar shadow-v"></div>
+      <div class="shadow-bar shadow-h"></div>
     </div>
 
     <div class="vignette" aria-hidden="true"></div>
@@ -56,7 +61,7 @@ import { getSunScene } from '@/utils/windowLight'
 const root = ref(null)
 const sunInfo = ref(null)
 const slotIdx = ref(0)
-const scene = ref({ source: { x: '50%', y: '-2%' }, rotation: 0, shadowSkew: 0, palette: { bloom: 'transparent', core: 'transparent', mid: 'transparent', ambient: 'transparent', shadow: 'rgba(0,0,0,0.3)' }, rays: [], altitude: 0, azimuth: 0 })
+const scene = ref({ source: { x: '50%', y: '-2%' }, rotation: 0, palette: { bloom: 'transparent', core: 'transparent', mid: 'transparent', ambient: 'transparent', shadow: 'rgba(0,0,0,0.3)' }, rays: [], altitude: 0, azimuth: 0, shadowVisible: false, shadowVRotation: 0, shadowHTop: 50, shadowOpacity: 0 })
 let timer = null
 
 const dustParticles = ref(
@@ -86,15 +91,6 @@ const sourceStyle = computed(() => ({ left: scene.value.source.x, top: scene.val
 const bloomStyle = computed(() => ({
   left: scene.value.source.x, top: scene.value.source.y,
   background: `radial-gradient(circle, ${scene.value.palette.bloom} 0%, ${scene.value.palette.mid} 35%, transparent 70%)`,
-}))
-const shadowVStyle = computed(() => ({ transform: `rotate(${scene.value.shadowVRotation || 0}deg)` }))
-const shadowHStyle = computed(() => ({ top: (scene.value.shadowHTop || 50) + '%', transform: `rotate(${scene.value.shadowVRotation || 0}deg)` }))
-const frameShadowStyle = computed(() => ({
-  width: (scene.value.frameWidth || 55) + '%',
-  height: (scene.value.frameHeight || 100) + 'px',
-  marginLeft: '-' + (scene.value.frameWidth || 55) / 2 + '%',
-  transform: `skewX(${scene.value.frameSkew || 0}deg)`,
-  opacity: scene.value.frameOpacity ?? 0.35,
 }))
 const ambientStyle = computed(() => ({ background: scene.value.palette.ambient }))
 
@@ -174,11 +170,14 @@ onUnmounted(() => {
 
 .ambient-layer { position: fixed; inset: 0; z-index: 2; pointer-events: none; mix-blend-mode: multiply; transition: background 0.6s ease; }
 
-.window-frame-shadow { position: fixed; top: 0; left: 50%; z-index: 5; pointer-events: none; mix-blend-mode: multiply; background: rgba(35,18,5,0.4); filter: blur(25px); transform-origin: top center; transition: transform 0.6s ease, opacity 0.6s ease, height 0.6s ease; }
-.window-shadow { position: fixed; inset: 0; z-index: 6; pointer-events: none; mix-blend-mode: multiply; transition: opacity 0.6s ease; }
-.shadow-bar { position: absolute; background: rgba(35,18,5,0.65); filter: blur(16px); }
-.shadow-v { top: -30%; left: 50%; width: 70px; margin-left: -35px; height: 160%; transform-origin: top center; transition: transform 0.6s ease; }
-.shadow-h { left: -10%; right: -10%; height: 70px; transform-origin: center top; transition: top 0.6s ease, transform 0.6s ease; }
+.window-shadow { position: fixed; inset: 0; z-index: 35; pointer-events: none; transition: opacity 0.6s ease; }
+.shadow-bar { position: absolute; filter: blur(16px); background: rgb(106, 92, 77); mix-blend-mode: darken; }
+.shadow-v { top: 0; left: 50%; width: 140px; margin-left: -70px; height: 150%; transform-origin: 50% -7.5%; transition: transform 0.6s ease; transform: rotate(var(--rot, 0deg)); }
+.frame-v-left { top: 0; left: 50%; width: 1400px; margin-left: -1400px; height: 150%; transform-origin: 100% -7.5%; transition: transform 0.6s ease; transform: translateX(-42.5vw) rotate(var(--rot, 0deg)); }
+.frame-v-right { top: 0; left: 50%; width: 1400px; height: 150%; transform-origin: 0% -7.5%; transition: transform 0.6s ease; transform: translateX(42.5vw) rotate(var(--rot, 0deg)); }
+.shadow-h { left: -75%; right: -75%; height: 70px; top: var(--htop, 50%); transition: top 0.6s ease; }
+.frame-h-top { left: -75%; right: -75%; height: 140px; top: calc(-7.5% - 140px); }
+.frame-h-bottom { left: -75%; right: -75%; height: 1400px; top: calc(var(--htop, 50%) * 2 + 70px); transition: top 0.6s ease; }
 
 .vignette { position: fixed; inset: 0; z-index: 44; pointer-events: none; background: radial-gradient(ellipse 90% 75% at 50% 42%, transparent 0%, transparent 55%, rgba(60,38,12,0.08) 80%, rgba(45,25,8,0.18) 100%); }
 
