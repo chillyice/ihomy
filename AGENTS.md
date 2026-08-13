@@ -241,6 +241,49 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 - **太阳信息 date 参数(V5.3,已实施)**:`SunService.getSunInfo(ip, LocalDate date)` 重载,`date` 为 null 取当日;`GET /api/public/sun-info?date=YYYY-MM-DD` 可选参数;缓存 key 含日期(`ihomy:sun:slots:{date}`),不同日期不冲突。
 
+- **光照效果完善(V5.3,已实施)**:
+  - **光源日出日落渐隐**:`lightOpacity = sin(π·dayProgress)`,日出=0→正午=1→日落=0,与阴影同步;`.light-layer` 整体 `opacity: lightOpacity`,bloom 辉光和光束统一渐隐;光源位置 `y: '-15%'`(页面外上方,用户看不到光源本体);光柱 `height: 200vh`(从页面外延伸到底部);移除 clip-path/mask(光源在页面外自然不可见)。
+  - **0点跳变瞬间完成**:夜间 `dayProgress` 统一为 0(不再区分日出前=0/日落后=1)→ 日落后立刻重置到 -90°;夜间 `--bar-transition: 0s`(transition 瞬间)→ +90°→-90° 跳变无动画,不会扫光;日间 `--bar-transition: 3s ease`(平滑过渡)。
+  - **阴影强度修复**:公式从 `1 - sin(π·p) × 0.7`(日出日落=1.0 完全黑)改为 `0.7 - sin(π·p) × 0.4`(日出日落=0.3,正午=0.3,夜间=0.7)。
+  - **亮斑渐变修复**:傍晚→日落不透明度从 `t * 0.0`(=0)改为 `t * 0.7`(0→0.7 平滑过渡);日出日落起终点颜色统一为深蓝黑 `rgb(8,12,28)` + 70% 不透明度。
+  - **图层层级调整**:内容组件(相册/左侧面板/右侧面板)从 z=30/40 降到 z=10/20,在阴影层(z=35)之下 → 阴影投射到内容上(更真实);album-base z=25→5,album-spine z=26→6。
+  - **灰尘亮度适配**:`.dust-layer` `opacity: lightOpacity` → 夜间 0(不可见),日间正弦过渡(正午最亮),与光柱同步。
+  - **光照测试页控件**:暂停/播放按钮(`togglePause` 清除/重建 timer)、前进/后退按钮(`prevSlot`/`nextSlot` ±1 时隙,mod 288);`.controls` 按钮组在信息面板底部。
+
+- **光照系统 V5.4 重构(已实施)**:
+  - **阴影顶框下移**:三条竖直 bar 的 `transform-origin` Y 从 `57vh` → `60vh`,`frame-h-top` 的 `top` 从 `7vh-140px` → `10vh-140px`(页面 Y = -50+60 = 10vh),顶框整体下移 3vh。
+  - **顶框随太阳高度微移**:`windowLight.js` 加 `frameTopOffset = (alt - 45) × 0.045`(±2vh),`frame-h-top` 的 `top` 加 `var(--frame-top-offset)`,太阳越高顶框越低(窗口视觉变高)。
+  - **跳变扫光修复(2 点重置方案)**:日落后 `dayProgress=1`(hold 在日落位置 +90°),凌晨 2 点 reset 到 `dayProgress=0`(-90°)。2 点无人看,跳变无感;夜间 `isNight=true` → `--bar-transition: 0s` → 瞬间跳变无扫光。回退了之前的全屏阴影遮罩方案。
+  - **台灯 mask 祛除阴影**:`.window-shadow`/`.bright-spot`/`.vignette` 三层都加 `mask-image: var(--lamp-mask)`,台灯开启时 mask 中心透明挖洞祛除阴影,关闭时 `mask: none`(阴影完整)。mask 渐变中心跟随钟摆 X 坐标。
+  - **台灯 3 态开关**:`lampMode` = auto(夜间自动)/on(常开)/off(关),按钮图标 🌑/💡/⬛ 循环切换。`lampStrength`:auto=`sunScene.lampOpacity`、on=1、off=0。
+  - **台灯开关时机**:`lampOpacity = (isNight || dayProgress ≥ 0.9 || dayProgress ≤ 0.1) ? 1 : 0`——傍晚开始(dayProgress≥0.9)开灯,清晨结束(dayProgress>0.1)关灯,夜间常亮,日间正午关闭。突变非渐变。
+  - **台灯位置**:左上黄金分割点 `(38.2%, 38.2%)`,光圈直径 `144vw`(半径 72vw,页面 4/5),z=100 最顶层,`filter: blur(20px)`。
+  - **台灯色温可调**:`lampTemp` 0-100 滑块,warm `rgba(255,180,100)` → cool `rgba(220,230,255)`,`lampColor` computed 动态生成 radial-gradient。
+  - **台灯亮度可调**:`lampBrightness` 0-100 滑块,控制 mask 透明区域比例:`lampMaskAlpha = 0.03 + 0.97 × (brightness/100)`,透明半径 `tr = alpha × 72vw`(亮度 0→2vw 几乎不祛除,亮度 100→72vw 大面积祛除)。mask 边缘始终 `black`(阴影完整),只有中心透明区域大小随亮度变化。不透明度固定 `lampStrength × 0.3`,不受亮度影响。
+  - **台灯钟摆运动**:`requestAnimationFrame` 驱动,周期 8 秒。`lampPendulumX = sin(phase) × 5vw`(横向 ±5%,总 10% 页宽),`lampPendulumScaleX = 1 - |sin| × 0.2`(中间 1.0 圆形,两侧 0.8 椭圆)。台灯 div 的 `left` 和 mask 中心 X 都跟随 `lampPendulumX`。`watchEffect` 监听 `lampStrength > 0` → 开灯启动钟摆,关灯停止。
+  - **导航栏重设计(浅色主题)**:温暖磨砂玻璃 `backdrop-filter: blur(24px) saturate(1.1)` + 暖奶油渐变背景;家庭名 hover 暖色下划线;模块导航胶囊容器;统一 36px 圆形触感按钮;用户头像胶囊;全色基于暖棕 `#3A2E22` + 暖琥珀 `#C9A876`/`#B8956A`。
+  - **夜间深色背景**:`html.dark .home-page` / `.light-test-page` 背景从硬编码 `#EDE4D3` 改为深褐黑 `#1A1410→#2A2018`;`html.dark .blob` opacity 0.4→0.08 色块夜间几乎不可见。修复了夜间背景太亮的问题(原硬编码亮色底色 + multiply 压暗仍偏灰)。
+  - **IP 定位默认济南**:`SunService.resolveLocation` IP 定位失败时默认坐标从北京 `39.9042,116.4074` 改为济南 `36.6512,117.1201`(时区 `Asia/Shanghai`)。
+  - **LightTest 深浅模式按钮**:控制栏加 ☀️/🌙 按钮,`toggleDark` 调 `applyTheme({ dark: !dark })`,测试深色/浅色模式下的光照效果。
+  - **LightTest 控制台优化**:宽度 260px→220px 变窄;按钮+滑块从一行改为两区(按钮区 flex-wrap + 滑块区垂直堆叠带标签);整体向上伸展。
+
+- **首页相册模块重构 V5.4(已实施)**:
+  - **删除**:中央 `album-stage` 轮播大图、`slides`/`slideIdx`/`currentSlide`/`slideTimer`/`buildSlides`/`parseImages`、`album-fade` 过渡、牛皮纸基底/书脊、5s 轮播定时器。
+  - **新增**:右下角 `.album-corner`(fixed, 25vw × 25vw,right 5vw bottom 5vh)。
+  - **散落拍立得堆**(近 7 天有新照片):`recentPhotos` 过滤 `createdAt < 7天` 最多 7 张;每张 `.polaroid` 220px 白边相纸(`padding: 10px 10px 38px`)、随机旋转 ±15°、随机偏移 dx±120 dy±60、投影;hover 时 z-index 99 + 旋转归零 + scale 1.08(抽出感);GSAP stagger 入场。
+  - **闭合相册**(近 7 天无新照片):平躺木色封面 `linear-gradient(#8B6F47,#6B5435)` 280×210、家庭名称 + "家庭相册"、随机斜放、hover 抬正放大;点击跳 `/album`。
+  - **点击拍立得 → `el-image-viewer`** 查看近期照片全屏大图浏览(`viewerUrls` = 近期照片 URL 列表)。
+  - **后端零改动**:`/public/home` 已返回 `photos`(20 条,已按 visibility 过滤),前端筛 7 天即可。
+
+- **UI 精简与可拖拽面板 V5.5(已实施)**:
+  - **Top bar 去底色边框**:移除 `background`/`backdrop-filter`/`border-bottom`/`box-shadow`,纯透明导航栏。
+  - **深色主题深蓝背景**:`main.css` 暗色变量从深褐 `#221A14` 改为深蓝 `#0F1A2E`/`#162238`/`#1A2540`;Home/LightTest 深色背景同步;`html.dark .blob` opacity 5%→40% + box-shadow 荧光 5%→40%。
+  - **深色模式字体浅色**:`main.css` 加 `html.dark` 全局覆写,硬编码 `#3A2E22` 等深色字体统一改为 `#E8DCC8`;`--color-text-secondary` 加亮;毛玻璃面板深色模式 `background: rgba(30,40,65,0.55)` + `border-color: rgba(255,255,255,0.12)`;feed-bubble 深色模式 `rgba(255,255,255,0.08)`。
+  - **只留浅色/深色主题**:`theme/index.js` 重写,`THEMES` 只剩 light/dark 两项;移除 preset 查找和 CSS 变量 `--color-primary`/`--color-accent` 设置;Home 顶栏主题下拉改为直接点击 ☀️/🌙 切换(`onTheme({ dark: !theme.dark })`)。
+  - **可拖拽面板**:`utils/useDragResize.js` 组合式函数(拖动+调整大小,mousemove/mouseup 全局监听,最小 200×120px);4 个面板(feed/task/weather/anniversary)改为 `.draggable-panel`,各自独立 `useDragResize` 实例;顶部 `.drag-handle`(24px,中间 40×4px 拖动条 `handle-grip`),内容下移到 `.panel-body`;右下角 `.resize-handle`(20×20px 斜角渐变 `nwse-resize`)。
+  - **album-corner 扩大 10%**:`25vw → 27.5vw`,`min-height: 280px → 308px`。
+  - **album-closed 增大 0.5 倍**:`280×210 → 420×315`。
+
 ## 部署约定(Linux 2GB 求稳)
 
 - **求稳方案(2GB 内存)**:MySQL 本机部署 + Redis 用 Docker。MySQL 调优后 ~180MB,本机部署无需 Docker daemon 为它常驻;Redis 轻量,Docker 化便于升级。
@@ -297,13 +340,16 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 阴影分层 | V5.3 | 拆下层(z=35 内框+横框)+光柱(z=48)+上层(z=49 左右框);三条竖直 bar 原点对齐(页面 50%, -10vh);左右框延长 50%;内竖框减 20% |
 | 光照测试页增强 | V5.3 | 日期选择器(夏至模拟)+首页内容组件(相册/面板)+阶段标签(日出待命→日落待命) |
 | 太阳信息 date 参数 | V5.3 | `SunService.getSunInfo(ip, date)` 重载;`GET /public/sun-info?date=`;缓存 key 含日期 |
+| 光照效果完善 | V5.3 | 光源渐隐(sin(π·p))+0点跳变瞬间(夜间 dayProgress=0,transition 0s)+阴影强度修复(0.7-sin×0.4)+亮斑渐变修复+层级调整(内容 z10/20<阴影 z35)+灰尘亮度适配+测试页控件(暂停/前进/后退) |
+| 光照系统 V5.4 | V5.4 | 阴影顶框下移 3vh+顶框随太阳高度微移;2点重置跳变扫光;台灯 mask 祛除阴影(3 层 mask+钟摆跟随);3 态开关(auto/on/off)+傍晚开清晨关;黄金分割点位置+色温/亮度可调+钟摆运动(椭圆变形);导航栏温暖磨砂玻璃;夜间深色背景;IP 默认济南;LightTest 深浅模式按钮+控制台优化 |
+| 首页相册重构 | V5.4 | 右下角拍立得堆(近 7 天照片,白边+随机旋转+hover 抽出)/闭合相册(无新照片,木色封面);点击拍立得→el-image-viewer 大图浏览;后端零改动 |
+| UI 精简与可拖拽面板 | V5.5 | Top bar 去底色边框;深色主题深蓝背景+blobs 40%荧光;深色模式字体浅色;只留浅色/深色主题;可拖拽面板(useDragResize+drag-handle+resize-handle);album-corner 扩大 10%;album-closed 增大 0.5 倍 |
 
 ## 规划事项(未实现,排序按推荐优先级)
 
 | 优先级 | 规划 | 版本来源 | 要点 |
 |--------|------|---------|------|
 | P1 | 存储管理-存量迁移 | V4.1 | 设备/文件浏览器/一键同步已完成;存量 `/uploads/` 旧文件重归档(移入 upload/yyyyMM 结构并更新 DB 路径)待做 |
-| P1 | 浅色/深色模式 | V5.3 | 默认日出后日落前浅色主题,夜晚深色主题,基于 `/sun-info` 自动切换;设置中可关闭自动切换手动锁定;主题色变量 CSS custom properties,亮斑/反光/阴影层在深色模式降低强度;`sys_user.theme_mode` 字段(AUTO/LIGHT/DARK) |
 | P2 | 物品定位-户型图 | V5.0 | 1期(物品清单+搜索)已完成;2期户型图:房间矩形绘制/物品相对坐标摆放,以 room.id 挂载(数据结构已预留) |
 | P2 | 用户使用指导/帮助 | V3.5 | 新手引导弹窗+帮助页 |
 | P2 | 家庭公告/广告位 | V3.5 | 自建家庭公告(不接第三方广告,隐私原因) |

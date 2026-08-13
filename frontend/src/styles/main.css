@@ -27,23 +27,82 @@
   --font-serif: 'Georgia', 'Times New Roman', serif;
 }
 
-/* 暗色模式:夜灯下的家,深褐非冷黑 */
+/* 暗色模式:夜色深蓝 */
 html.dark {
-  --color-bg: #221A14;
-  --color-bg-2: #2D241B;
-  --color-card: #2A2018;
-  --color-card-2: #352A20;
+  --color-bg: #0F1A2E;
+  --color-bg-2: #162238;
+  --color-card: #1A2540;
+  --color-card-2: #213152;
   --color-text: #E8DCC8;
-  --color-text-secondary: #A89580;
+  --color-text-secondary: #B0A898;
   --color-border: rgba(232, 220, 200, 0.10);
-  --color-wood: #5C4332;
-  --color-wood-dark: #3A2A1E;
-  --color-old-white: #2A2018;
+  --color-wood: #8B6F47;
+  --color-wood-dark: #6B5435;
+  --color-old-white: #1A2540;
+  --color-ink: #E8DCC8;
+  --color-pen: #9AB0C8;
+  --color-stamp: #D4886A;
+  --color-moss: #8BAA6A;
   --shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
   --shadow-lift: 0 8px 20px rgba(0, 0, 0, 0.5);
   --shadow-paper: 0 1px 2px rgba(0, 0, 0, 0.3), 0 3px 8px rgba(0, 0, 0, 0.2);
   --shadow-book: 0 4px 12px rgba(0, 0, 0, 0.5);
   color-scheme: dark;
+}
+/* 深色模式:硬编码深色字体覆写为浅色 */
+html.dark .top-bar,
+html.dark .family-name,
+html.dark .nav-item,
+html.dark .nav-action,
+html.dark .nav-user,
+html.dark .user-name,
+html.dark .glass-panel,
+html.dark .draggable-panel,
+html.dark .panel-title,
+html.dark .feed-nick,
+html.dark .feed-bubble,
+html.dark .bubble-type,
+html.dark .bubble-body,
+html.dark .bubble-time,
+html.dark .task-title,
+html.dark .task-meta,
+html.dark .task-reward,
+html.dark .clock,
+html.dark .date,
+html.dark .weather,
+html.dark .weather-icon,
+html.dark .weather-temp,
+html.dark .weather-text,
+html.dark .anni-name,
+html.dark .anni-date,
+html.dark .anni-days,
+html.dark .days-num,
+html.dark .days-unit,
+html.dark .polaroid-caption,
+html.dark .cover-title,
+html.dark .cover-sub {
+  color: #E8DCC8;
+}
+html.dark .nav-item,
+html.dark .nav-action,
+html.dark .task-meta,
+html.dark .bubble-type,
+html.dark .bubble-time,
+html.dark .date,
+html.dark .anni-date,
+html.dark .days-unit,
+html.dark .cover-sub {
+  opacity: 0.7;
+}
+html.dark .feed-bubble {
+  background: rgba(255, 255, 255, 0.08);
+}
+html.dark .draggable-panel {
+  background: rgba(30, 40, 65, 0.55);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+html.dark .handle-grip {
+  background: rgba(232, 220, 200, 0.25);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
