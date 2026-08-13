@@ -1,19 +1,14 @@
-// 主题系统:明暗模式 + 主题色,偏好存 localStorage('ihomy-theme'),默认跟随系统暗色偏好
-// 实现方式:html.dark 类切换暗色(配合 element-plus dark css-vars),CSS 变量控制主题色
+// 主题系统:仅浅色/深色两种模式,偏好存 localStorage('ihomy-theme'),默认跟随太阳位置自动切换
+// 实现方式:html.dark 类切换暗色(配合 element-plus dark css-vars)
 
 export const THEMES = [
-  { key: 'oldhouse', label: '旧物之家', primary: '#3A2E22', accent: '#A8483A' },
-  { key: 'amber', label: '暮光琥珀', primary: '#6B4423', accent: '#D4A574' },
-  { key: 'ocean', label: '海蓝', primary: '#1F3A5F', accent: '#2E74B5' },
-  { key: 'emerald', label: '森林', primary: '#14532D', accent: '#16A34A' },
-  { key: 'sunset', label: '日暮', primary: '#7C2D12', accent: '#EA580C' },
-  { key: 'violet', label: '暮紫', primary: '#312E81', accent: '#7C3AED' },
-  { key: 'rose', label: '樱粉', primary: '#881337', accent: '#E11D48' },
+  { key: 'light', label: '浅色', primary: '#3A2E22', accent: '#A8483A' },
+  { key: 'dark', label: '深色', primary: '#3A2E22', accent: '#A8483A' },
 ]
 
 export const THEME_STORAGE_KEY = 'ihomy-theme'
 
-export const DEFAULT_THEME = { dark: false, theme: 'oldhouse' }
+export const DEFAULT_THEME = { dark: false, autoMode: true }
 
 export function loadTheme() {
   try {
@@ -25,17 +20,14 @@ export function loadTheme() {
   }
 }
 
-// 应用主题:切换 html.dark 类 + 设置主/辅色 CSS 变量,并持久化
+// 应用主题:切换 html.dark 类,并持久化
 export function applyTheme(theme) {
   const t = { ...DEFAULT_THEME, ...theme }
-  const preset = THEMES.find((x) => x.key === t.theme) || THEMES[0]
   const root = document.documentElement
   root.classList.toggle('dark', !!t.dark)
-  root.style.setProperty('--color-primary', preset.primary)
-  root.style.setProperty('--color-accent', preset.accent)
   // 浏览器地址栏/状态栏颜色跟随主题
   const meta = document.querySelector('meta[name="theme-color"]')
-  if (meta) meta.setAttribute('content', t.dark ? '#221A14' : preset.primary)
+  if (meta) meta.setAttribute('content', t.dark ? '#0F1A2E' : '#EDE4D3')
   localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(t))
   return t
 }
@@ -43,8 +35,17 @@ export function applyTheme(theme) {
 // 初始化:跟随系统暗色偏好的跟随逻辑在这里完成(dark 未显式设置时取系统值)
 export function initTheme() {
   const t = loadTheme()
-  if (t.dark === undefined) {
+  if (t.autoMode && t.dark === undefined) {
     t.dark = window.matchMedia('(prefers-color-scheme: dark)').matches
   }
   return applyTheme(t)
+}
+
+// 自动模式:根据太阳位置(夜间)切换明暗,仅当 autoMode=true 时生效
+export function applyAutoTheme(isNight) {
+  const t = loadTheme()
+  if (!t.autoMode) return null
+  const newDark = !!isNight
+  if (t.dark === newDark) return t
+  return applyTheme({ ...t, dark: newDark })
 }

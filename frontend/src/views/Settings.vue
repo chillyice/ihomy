@@ -70,7 +70,8 @@
               </el-form-item>
               <el-form-item :label="$t('settings.theme')">
                 <div class="theme-row">
-                  <el-radio-group :model-value="theme.dark" @change="onChangeTheme">
+                  <el-switch v-model="theme.autoMode" @change="onToggleAutoMode" active-text="日出日落自动切换" />
+                  <el-radio-group v-if="!theme.autoMode" :model-value="theme.dark" @change="onChangeTheme">
                     <el-radio :value="false">{{ $t('theme.light') }}</el-radio>
                     <el-radio :value="true">{{ $t('theme.dark') }}</el-radio>
                   </el-radio-group>
@@ -235,10 +236,11 @@ const saveDaily = () => {
 }
 const onChangeLang = (v) => applyLocale(v)
 
-// 主题:明暗切换 / 主题色选择,applyTheme 已含持久化
+// 主题:明暗切换 / 主题色选择 / 日出日落自动切换,applyTheme 已含持久化
 const theme = ref(initTheme())
 const onChangeTheme = (dark) => { theme.value = applyTheme({ ...theme.value, dark }) }
 const changeThemeColor = (key) => { theme.value = applyTheme({ ...theme.value, theme: key }) }
+const onToggleAutoMode = (autoMode) => { theme.value = applyTheme({ ...theme.value, autoMode }) }
 
 const profile = reactive({ nickname: '', avatar: '', birthday: null, gender: 0 })
 const labelForm = reactive({ label: '', color: '#409EFF' })

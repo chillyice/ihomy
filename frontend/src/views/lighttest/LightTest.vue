@@ -9,18 +9,40 @@
 
     <div class="ambient-layer" :style="ambientStyle" aria-hidden="true"></div>
 
-    <!-- 亮斑图层:模拟阳光照耀强度,在内容之上、阴影之下 -->
-    <div class="bright-spot" :style="brightSpotStyle" aria-hidden="true"></div>
+    <!-- 亮斑图层:模拟阳光照耀强度,在内容之上、阴影之下;台灯 mask 挖洞祛除染色 -->
+    <div class="bright-spot" :style="{ ...brightSpotStyle, '--lamp-mask': lampMask }" aria-hidden="true"></div>
 
-    <!-- 下层阴影:内框竖+内框横+顶框+底框(z=35,在光柱之下) -->
-    <div class="window-shadow-lower"
-         :style="{ '--rot': (scene.shadowVRotation || 0) + 'deg', '--htop': (scene.shadowHTop || 50) + '%', '--shadow-gray': (scene.shadowGray ?? 0) }"
+    <!-- 窗户阴影:6 条 bar 单层,不透明色+normal 合并重叠区,multiply 层半透明;夜间/日落末尾 transition 0s 防跳变扫光 -->
+    <div class="window-shadow"
+         :style="{ '--rot': (scene.shadowVRotation || 0) + 'deg', '--htop': (scene.shadowHTop || 50) + '%', '--shadow-alpha': (scene.shadowIntensity ?? 0.5), '--shadow-color': (scene.shadowColor || 'rgb(0,0,0)'), '--bar-transition': scene.isNight ? '0s' : '0.2s ease', '--frame-top-offset': (scene.frameTopOffset ?? 0) + 'vh', '--lamp-mask': lampMask }"
          aria-hidden="true">
       <div class="shadow-bar frame-h-top"></div>
       <div class="shadow-bar frame-h-bottom"></div>
       <div class="shadow-bar shadow-v"></div>
       <div class="shadow-bar shadow-h"></div>
+      <div class="shadow-bar frame-v-left"></div>
+      <div class="shadow-bar frame-v-right"></div>
     </div>
+
+    <!-- 顶部导航栏(测试光照效果) -->
+    <header class="top-bar">
+      <div class="bar-left">
+        <span class="family-name">ihomy</span>
+        <nav class="nav-modules">
+          <span class="nav-item">博客</span>
+          <span class="nav-item">日记</span>
+          <span class="nav-item">相册</span>
+          <span class="nav-item">纪念日</span>
+          <span class="nav-item">更多</span>
+        </nav>
+      </div>
+      <div class="bar-right">
+        <span class="nav-action">中</span>
+        <span class="nav-action">🌙</span>
+        <span class="nav-action">🔔</span>
+        <span class="nav-user">U</span>
+      </div>
+    </header>
 
     <!-- 中央相册舞台(演示内容组件) -->
     <main class="album-stage">
@@ -74,27 +96,31 @@
       <div class="anni-row"><div class="anni-info"><div class="anni-name">小宝生日</div><div class="anni-date">11-15</div></div><div class="anni-days"><span class="days-num">95</span><span class="days-unit">天</span></div></div>
     </div>
 
-    <!-- 反光层:内容组件被阳光照亮的轻微高光(soft-light,在内容之上、阴影之下) -->
+    <!-- 台灯光源:左上黄金分割点+钟摆运动,中心亮外边暗,亮度控范围+强度,最顶层 -->
+    <div class="lamp-light" :style="{
+      opacity: lampDivOpacity,
+      left: 'calc(38.2% + ' + lampPendulumX + 'vw)',
+      top: '38.2%',
+      transform: 'translate(-50%, -50%) scaleX(' + lampPendulumScaleX + ')',
+      width: (lampRadius * 2) + 'vw',
+      height: (lampRadius * 2) + 'vw',
+      background: 'radial-gradient(circle, rgba(' + lampColor + ',0.6) 0%, rgba(' + lampColor + ',0.45) 15%, rgba(' + lampColor + ',0.3) 35%, rgba(' + lampColor + ',0.18) 55%, rgba(' + lampColor + ',0.08) 75%, transparent 95%)'
+    }" aria-hidden="true"></div>
+
+    <!-- 反光层:内容组件被阳光照亮的轻微高光(soft-light,夜间 0) -->
     <div class="reflection-layer" :style="reflectionStyle" aria-hidden="true"></div>
 
-    <div class="vignette" aria-hidden="true"></div>
+    <div class="vignette" :style="{ '--lamp-mask': lampMask }" aria-hidden="true"></div>
 
-    <div class="light-layer" aria-hidden="true">
+    <!-- 体积光:丁达尔效应(z=48),光源在页面外上方,日出日落渐隐 -->
+    <div class="light-layer" :style="{ opacity: scene.lightOpacity ?? 0, transition: scene.isNight ? 'none' : 'opacity 0.6s ease' }" aria-hidden="true">
       <div class="light-bloom" :style="bloomStyle"></div>
       <div class="light-source" :style="sourceStyle">
         <div v-for="(rs, i) in rayStyles" :key="i" class="light-ray" :style="rs"></div>
       </div>
     </div>
 
-    <!-- 上层阴影:左框+右框(z=49,在光柱之上,最顶层) -->
-    <div class="window-shadow-upper"
-         :style="{ '--rot': (scene.shadowVRotation || 0) + 'deg', '--shadow-gray': (scene.shadowGray ?? 0) }"
-         aria-hidden="true">
-      <div class="shadow-bar frame-v-left"></div>
-      <div class="shadow-bar frame-v-right"></div>
-    </div>
-
-    <div class="dust-layer" aria-hidden="true">
+    <div class="dust-layer" :style="{ opacity: scene.lightOpacity ?? 0 }" aria-hidden="true">
       <div v-for="d in dustParticles" :key="d.id" class="dust" :style="{
         left: d.left, top: d.top, width: d.size+'px', height: d.size+'px',
         animationDuration: d.duration+'s', animationDelay: d.delay+'s', '--drift': d.drift+'px',
@@ -115,6 +141,17 @@
       <div class="info-row"><span class="info-label">月相</span><span class="info-value">{{ moonPhaseText }}</span></div>
       <div class="progress-bar"><div class="progress-fill" :style="{ width: progress + '%' }"></div></div>
       <div class="phase-label">{{ phaseLabel }}</div>
+      <div class="controls">
+        <button class="ctrl-btn" @click="prevSlot" title="后退 5 分钟">⏮</button>
+        <button class="ctrl-btn ctrl-main" @click="togglePause" title="暂停/播放">{{ paused ? '▶' : '⏸' }}</button>
+        <button class="ctrl-btn" @click="nextSlot" title="前进 5 分钟">⏭</button>
+        <button class="ctrl-btn" :class="{ active: lampMode !== 'off' }" @click="toggleLamp" title="台灯:自动/开/关">{{ lampMode === 'auto' ? '🌑' : lampMode === 'on' ? '💡' : '⬛' }}</button>
+        <button class="ctrl-btn" @click="toggleDark" title="深色/浅色模式">{{ theme.dark ? '☀️' : '🌙' }}</button>
+      </div>
+      <div class="slider-group">
+        <label class="slider-row"><span>色温</span><input type="range" min="0" max="100" v-model.number="lampTemp" class="temp-slider" title="色温" /></label>
+        <label class="slider-row"><span>亮度</span><input type="range" min="0" max="100" v-model.number="lampBrightness" class="temp-slider" title="亮度" /></label>
+      </div>
     </div>
 
     <router-link to="/" class="back-link">← 返回首页</router-link>
@@ -122,15 +159,88 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watchEffect } from 'vue'
 import { getSunScene } from '@/utils/windowLight'
+import { loadTheme, applyTheme } from '@/theme'
 
 const root = ref(null)
 const sunInfo = ref(null)
 const slotIdx = ref(0)
 const testDate = ref('2026-06-21')
-const scene = ref({ source: { x: '50%', y: '-2%' }, rotation: 0, palette: { bloom: 'transparent', core: 'transparent', mid: 'transparent', ambient: 'transparent' }, rays: [], altitude: 0, azimuth: 0, shadowVRotation: 0, shadowHTop: 50, shadowIntensity: 1, shadowGray: 0, brightSpotColor: 'rgba(0,0,0,1)', brightSpotOpacity: 0.7, reflectionOpacity: 0, isNight: true, dayProgress: 0 })
+const paused = ref(false)
+const lampMode = ref('auto')
+const lampTemp = ref(30)
+const lampBrightness = ref(50)
+const theme = ref(loadTheme())
+const toggleDark = () => { theme.value = applyTheme({ ...theme.value, dark: !theme.value.dark }) }
+const lampPendulumX = ref(0)
+const lampPendulumScaleX = ref(1)
+let lampRaf = null
+const startPendulum = () => {
+  if (lampRaf) return
+  const t0 = performance.now()
+  const PERIOD = 8000
+  const loop = (t) => {
+    const phase = ((t - t0) % PERIOD) / PERIOD * Math.PI * 2
+    const sin = Math.sin(phase)
+    lampPendulumX.value = sin * 5
+    lampPendulumScaleX.value = 1 - Math.abs(sin) * 0.2
+    lampRaf = requestAnimationFrame(loop)
+  }
+  lampRaf = requestAnimationFrame(loop)
+}
+const stopPendulum = () => {
+  if (lampRaf) { cancelAnimationFrame(lampRaf); lampRaf = null }
+}
+const scene = ref({ source: { x: '50%', y: '-15%' }, rotation: 0, palette: { bloom: 'transparent', core: 'transparent', mid: 'transparent', ambient: 'transparent' }, rays: [], altitude: 0, azimuth: 0, shadowVRotation: 0, shadowHTop: 50, frameTopOffset: 0, shadowIntensity: 0.7, shadowColor: 'rgb(8,12,28)', brightSpotColor: 'rgb(8,12,28)', brightSpotOpacity: 0.7, reflectionOpacity: 0, lightOpacity: 0, lampOpacity: 1, isNight: true, dayProgress: 0 })
 let timer = null
+
+const updateScene = () => {
+  if (sunInfo.value) scene.value = getSunScene(sunInfo.value, slotIdx.value)
+}
+
+const togglePause = () => {
+  paused.value = !paused.value
+  if (paused.value) {
+    if (timer) { clearInterval(timer); timer = null }
+  } else {
+    timer = setInterval(() => {
+      slotIdx.value = (slotIdx.value + 1) % 288
+      updateScene()
+    }, 208)
+  }
+}
+const toggleLamp = () => {
+  const modes = ['auto', 'on', 'off']
+  const i = modes.indexOf(lampMode.value)
+  lampMode.value = modes[(i + 1) % modes.length]
+}
+const lampStrength = computed(() => {
+  if (lampMode.value === 'off') return 0
+  if (lampMode.value === 'on') return 1
+  return scene.value.lampOpacity ?? 0
+})
+const lampB = computed(() => lampBrightness.value / 100)
+const lampDivOpacity = computed(() => lampStrength.value * 0.3)
+const lampRadius = computed(() => 65)
+const lampMaskAlpha = computed(() => 0.03 + 0.97 * lampB.value)
+const lampMask = computed(() => {
+  if (lampStrength.value <= 0) return 'none'
+  const r = lampRadius.value
+  const tr = lampMaskAlpha.value * r
+  const te = r + 30
+  const cx = 38.2 + lampPendulumX.value
+  return `radial-gradient(circle at ${cx}% 38.2%, transparent 0%, transparent ${tr}vw, rgba(0,0,0,0.15) ${tr + (te - tr) * 0.3}vw, rgba(0,0,0,0.4) ${tr + (te - tr) * 0.55}vw, rgba(0,0,0,0.7) ${tr + (te - tr) * 0.8}vw, black ${te}vw)`
+})
+const lampColor = computed(() => {
+  const t = lampTemp.value / 100
+  const r = Math.round(255 - t * 35)
+  const g = Math.round(180 + t * 50)
+  const b = Math.round(100 + t * 155)
+  return `${r},${g},${b}`
+})
+const prevSlot = () => { slotIdx.value = (slotIdx.value - 1 + 288) % 288; updateScene() }
+const nextSlot = () => { slotIdx.value = (slotIdx.value + 1) % 288; updateScene() }
 
 const dustParticles = ref(
   Array.from({ length: 40 }, (_, i) => ({
@@ -225,14 +335,17 @@ onMounted(() => {
   // 1 分钟循环 288 时隙:每 208ms 前进 5 分钟
   timer = setInterval(() => {
     slotIdx.value = (slotIdx.value + 1) % 288
-    if (sunInfo.value) {
-      scene.value = getSunScene(sunInfo.value, slotIdx.value)
-    }
+    updateScene()
   }, 208)
+  watchEffect(() => {
+    if (lampStrength.value > 0) startPendulum()
+    else stopPendulum()
+  })
 })
 
 onUnmounted(() => {
   if (timer) clearInterval(timer)
+  stopPendulum()
 })
 </script>
 
@@ -244,51 +357,75 @@ onUnmounted(() => {
   overflow: hidden;
   font-family: Georgia, 'Times New Roman', serif;
 }
+/* 夜间深色背景 */
+html.dark .light-test-page {
+  background: linear-gradient(135deg, #0F1A2E 0%, #162238 50%, #1A2540 100%);
+}
 
 .bg-blobs { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
 .blob { position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.4; }
+/* 夜间色块大幅压暗 */
+html.dark .blob { opacity: 0.4; }
+html.dark .blob-1 { box-shadow: 0 0 120px 40px rgba(120,200,160,0.4); }
+html.dark .blob-2 { box-shadow: 0 0 120px 40px rgba(200,180,100,0.4); }
+html.dark .blob-3 { box-shadow: 0 0 120px 40px rgba(200,160,140,0.4); }
 .blob-1 { width: 480px; height: 480px; top: -120px; left: -100px; background: #9CD0B5; }
 .blob-2 { width: 560px; height: 560px; top: 25%; right: -180px; background: #EDDB8C; }
 .blob-3 { width: 420px; height: 420px; bottom: -120px; left: 18%; background: #ECC0AC; }
 
 .ambient-layer { position: fixed; inset: 0; z-index: 2; pointer-events: none; mix-blend-mode: multiply; transition: background 0.6s ease; }
 
-/* 亮斑图层:在内容之上(z>30),阴影之下(z<35),multiply 让白色=透明、黑色=压暗、彩色=染色 */
-.bright-spot { position: fixed; inset: 0; z-index: 32; pointer-events: none; mix-blend-mode: multiply; transition: background 0.6s ease, opacity 0.6s ease; }
+/* 亮斑图层:在内容之上(z>30),阴影之下(z<35),multiply 让白色=透明、黑色=压暗、彩色=染色;台灯 mask 挖洞祛除染色 */
+.bright-spot { position: fixed; inset: 0; z-index: 32; pointer-events: none; mix-blend-mode: multiply; -webkit-mask-image: var(--lamp-mask, none); mask-image: var(--lamp-mask, none); transition: background 0.6s ease, opacity 0.6s ease; }
 
-/* 下层阴影:内框+顶框+底框(z=35,在光柱之下) */
-.window-shadow-lower { position: fixed; inset: 0; z-index: 35; pointer-events: none; }
-/* 上层阴影:左框+右框(z=49,在光柱之上,最顶层) */
-.window-shadow-upper { position: fixed; inset: 0; z-index: 49; pointer-events: none; }
-/* opaque gray + darken:min(backdrop, G) 幂等,跨层重叠不叠加 */
-.shadow-bar { position: absolute; filter: blur(16px); mix-blend-mode: darken; background: rgb(var(--shadow-gray, 0), var(--shadow-gray, 0), var(--shadow-gray, 0)); transition: background 0.2s ease; }
+/* 窗户阴影:单层 6 条 bar,不透明色 normal 合并重叠区,multiply 层半透明;夜间固定 70%;台灯 mask 挖洞祛除阴影 */
+.window-shadow { position: fixed; inset: 0; z-index: 35; pointer-events: none; mix-blend-mode: multiply; opacity: var(--shadow-alpha, 0.7); -webkit-mask-image: var(--lamp-mask, none); mask-image: var(--lamp-mask, none); }
+.shadow-bar { position: absolute; filter: blur(16px); background: var(--shadow-color, rgb(0,0,0)); }
+.shadow-v, .frame-v-left, .frame-v-right { transition: transform var(--bar-transition, 0.2s ease); }
+.shadow-h, .frame-h-bottom { transition: top var(--bar-transition, 0.2s ease); }
 
-/* === 三条竖直 bar:原点全部对齐到 (页面 50% X, 页面 -10vh Y) === */
+/* === 三条竖直 bar:原点全部对齐到 (页面 50% X, 页面 7vh Y) === */
+/* top:-50vh + height:337.5vh + transform-origin Y:60vh → 页面 Y = -50+60 = 10vh */
 /* shadow-v: 宽度 112px(减20%),origin X = bar 中心(50%)= 页面 50% */
-.shadow-v { top: -50vh; left: 50%; width: 112px; margin-left: -56px; height: 337.5vh; transform-origin: 50% 40vh; transition: transform 0.2s ease, background 0.2s ease; transform: rotate(var(--rot,0deg)); }
+.shadow-v { top: -50vh; left: 50%; width: 112px; margin-left: -56px; height: 337.5vh; transform-origin: 50% 60vh; transition: transform 0.2s ease; transform: rotate(var(--rot,0deg)); }
 /* frame-v-left: origin X = bar 右边缘(100%)= 页面 50% */
-.frame-v-left { top: -50vh; left: 50%; width: 1400px; margin-left: -1400px; height: 337.5vh; transform-origin: 100% 40vh; transition: transform 0.2s ease, background 0.2s ease; transform: translateX(-42.5vw) rotate(var(--rot,0deg)); }
+.frame-v-left { top: -50vh; left: 50%; width: 1400px; margin-left: -1400px; height: 337.5vh; transform-origin: 100% 60vh; transition: transform 0.2s ease; transform: translateX(-55vw) rotate(var(--rot,0deg)); }
 /* frame-v-right: origin X = bar 左边缘(0%)= 页面 50% */
-.frame-v-right { top: -50vh; left: 50%; width: 1400px; height: 337.5vh; transform-origin: 0% 40vh; transition: transform 0.2s ease, background 0.2s ease; transform: translateX(42.5vw) rotate(var(--rot,0deg)); }
+.frame-v-right { top: -50vh; left: 50%; width: 1400px; height: 337.5vh; transform-origin: 0% 60vh; transition: transform 0.2s ease; transform: translateX(55vw) rotate(var(--rot,0deg)); }
 
-.shadow-h { left: -75%; right: -75%; height: 70px; top: var(--htop, 50%); transition: top 0.2s ease, background 0.2s ease; }
-.frame-h-top { left: -75%; right: -75%; height: 140px; top: calc(-10vh - 140px); }
-.frame-h-bottom { left: -75%; right: -75%; height: 1400px; top: calc(var(--htop, 50%) * 2 + 70px); transition: top 0.2s ease, background 0.2s ease; }
+.shadow-h { left: -75%; right: -75%; height: 70px; top: var(--htop, 50%); transition: top 0.2s ease; }
+.frame-h-top { left: -75%; right: -75%; height: 140px; top: calc(10vh - 140px + var(--frame-top-offset, 0vh)); transition: top var(--bar-transition, 0.2s ease); }
+.frame-h-bottom { left: -75%; right: -75%; height: 1400px; top: calc(var(--htop, 50%) * 2 + 70px); transition: top var(--bar-transition, 0.2s ease); }
 
-.vignette { position: fixed; inset: 0; z-index: 44; pointer-events: none; background: radial-gradient(ellipse 90% 75% at 50% 42%, transparent 0%, transparent 55%, rgba(60,38,12,0.08) 80%, rgba(45,25,8,0.18) 100%); }
+.vignette { position: fixed; inset: 0; z-index: 44; pointer-events: none; -webkit-mask-image: var(--lamp-mask, none); mask-image: var(--lamp-mask, none); background: radial-gradient(ellipse 90% 75% at 50% 42%, transparent 0%, transparent 55%, rgba(60,38,12,0.08) 80%, rgba(45,25,8,0.18) 100%); }
 
 .light-layer { position: fixed; inset: 0; z-index: 48; pointer-events: none; mix-blend-mode: screen; overflow: hidden; }
 .light-bloom { position: absolute; width: 700px; height: 700px; margin-left: -350px; margin-top: -350px; border-radius: 50%; filter: blur(60px); transition: background 0.6s ease, left 0.6s ease, top 0.6s ease; }
 .light-source { position: absolute; width: 0; height: 0; transition: left 0.6s ease, top 0.6s ease; }
-.light-ray { position: absolute; top: 0; left: 50%; height: 160vh; transform-origin: top center; transition: opacity 0.6s ease, filter 0.6s ease, transform 0.6s ease, background 0.6s ease; }
+.light-ray { position: absolute; top: 0; left: 50%; height: 200vh; transform-origin: top center; transition: opacity 0.6s ease, filter 0.6s ease, transform 0.6s ease, background 0.6s ease; }
 
 .dust-layer { position: fixed; inset: 0; z-index: 46; pointer-events: none; overflow: hidden; mix-blend-mode: screen; }
 .dust { position: absolute; border-radius: 50%; background: rgba(255,238,185,0.85); box-shadow: 0 0 8px rgba(255,225,150,0.7); animation: dust-float linear infinite; }
 @keyframes dust-float { 0% { transform: translate(0,0); opacity: 0; } 15% { opacity: 0.9; } 85% { opacity: 0.9; } 100% { transform: translate(var(--drift,60px), calc(var(--drift,60px) * -1.5)); opacity: 0; } }
 
 /* === 演示内容组件(模拟首页) === */
+/* 顶部导航栏(温暖磨砂玻璃,测试光照效果) */
+.top-bar { position: fixed; top: 0; left: 0; right: 0; height: 64px; z-index: 20; display: flex; align-items: center; justify-content: space-between; padding: 0 36px; pointer-events: none; }
+.bar-left { display: flex; align-items: center; gap: 14px; }
+.family-name { font-size: 22px; font-weight: 600; color: #3A2E22; letter-spacing: 0.5px; cursor: pointer; position: relative; padding-bottom: 2px; transition: color 0.25s; }
+.family-name::after { content: ''; position: absolute; bottom: 0; left: 0; width: 0; height: 2px; background: linear-gradient(90deg, #C9A876, #B8956A); border-radius: 1px; transition: width 0.3s ease; }
+.family-name:hover { color: #5A4530; }
+.family-name:hover::after { width: 100%; }
+.nav-modules { display: flex; align-items: center; gap: 4px; padding: 3px; border-radius: 12px; background: rgba(255,250,240,0.25); }
+.nav-item { font-size: 15px; color: rgba(58,46,34,0.75); padding: 6px 14px; border-radius: 9px; cursor: pointer; transition: color 0.2s, background 0.2s; font-weight: 500; }
+.nav-item:hover { color: #3A2E22; background: rgba(200,170,120,0.18); }
+.bar-right { display: flex; align-items: center; gap: 8px; }
+.nav-action { font-size: 15px; color: rgba(58,46,34,0.8); cursor: pointer; padding: 7px 10px; border-radius: 9px; transition: color 0.2s, background 0.2s; min-width: 36px; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; }
+.nav-action:hover { color: #3A2E22; background: rgba(200,170,120,0.15); }
+.nav-user { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #C9A876, #B8956A); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: 13px; box-shadow: 0 2px 8px rgba(140,110,70,0.2); }
+
 /* 中央相册舞台 */
-.album-stage { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 30; width: 520px; max-width: 50vw; }
+.album-stage { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10; width: 520px; max-width: 50vw; }
 .album-frame { position: relative; }
 .album-base { position: absolute; inset: -30px; background: linear-gradient(135deg, #F5E6D3, #E8D5BC); border-radius: 12px; box-shadow: 0 8px 30px rgba(60,40,20,0.15); }
 .album-photo { position: relative; width: 100%; aspect-ratio: 4/3; border-radius: 4px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
@@ -303,7 +440,7 @@ onUnmounted(() => {
 .panel-title { font-size: 14px; font-weight: 600; color: #5a4a3a; margin-bottom: 12px; opacity: 0.8; }
 
 /* 左侧面板 */
-.left-panel { position: fixed; left: 24px; top: 50%; transform: translateY(-50%); z-index: 40; width: 320px; display: flex; flex-direction: column; gap: 16px; }
+.left-panel { position: fixed; left: 24px; top: 50%; transform: translateY(-50%); z-index: 20; width: 320px; display: flex; flex-direction: column; gap: 16px; }
 .feed-panel { }
 .feed-row { display: flex; gap: 10px; padding: 8px 0; }
 .feed-avatar { width: 36px; height: 36px; border-radius: 50%; background: #A8C9DE; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: 14px; flex-shrink: 0; }
@@ -317,13 +454,13 @@ onUnmounted(() => {
 .task-meta { font-size: 11px; opacity: 0.6; color: #5a4a3a; }
 
 /* 右侧面板 */
-.weather-panel { position: fixed; right: 24px; top: 90px; z-index: 40; width: 280px; text-align: center; }
+.weather-panel { position: fixed; right: 24px; top: 90px; z-index: 20; width: 280px; text-align: center; }
 .clock { font-size: 36px; font-weight: 300; color: #3a2a1a; font-variant-numeric: tabular-nums; }
 .weather { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; color: #5a4a3a; }
 .weather-icon { font-size: 24px; }
 .weather-temp { font-size: 20px; font-weight: 600; }
 .weather-text { font-size: 14px; }
-.anniversary-panel { position: fixed; right: 24px; top: 230px; z-index: 40; width: 280px; }
+.anniversary-panel { position: fixed; right: 24px; top: 230px; z-index: 20; width: 280px; }
 .anni-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; }
 .anni-name { font-size: 13px; font-weight: 600; color: #4a3a2a; }
 .anni-date { font-size: 11px; opacity: 0.6; color: #5a4a3a; }
@@ -334,27 +471,39 @@ onUnmounted(() => {
 /* 反光层:内容被阳光照亮的轻微高光(soft-light,夜间 0) */
 .reflection-layer { position: fixed; inset: 0; z-index: 42; pointer-events: none; mix-blend-mode: soft-light; transition: opacity 0.6s ease; }
 
+/* 台灯光源:左上偏中央,散射半径=80%页宽,夜间开启+手动开关,normal 暖光(阴影由 mask 祛除),最顶层 */
+/* 台灯光源:左上黄金分割点(38.2%,38.2%),半径60vw(页面3/5),最顶层 */
+.lamp-light { position: fixed; border-radius: 50%; z-index: 100; pointer-events: none; filter: blur(20px); transition: opacity 0.3s ease; }
+
 .info-panel {
   position: fixed;
   bottom: 24px;
   left: 24px;
   z-index: 100;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(20px);
   color: #fff;
-  padding: 20px 28px;
-  border-radius: 20px;
-  min-width: 260px;
-  font-size: 14px;
+  padding: 16px 20px;
+  border-radius: 16px;
+  width: 220px;
+  font-size: 13px;
 }
-.info-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
+.info-row { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; }
 .info-label { opacity: 0.6; }
 .info-value { font-weight: 600; font-variant-numeric: tabular-nums; }
-.date-input { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: #fff; padding: 2px 6px; font-size: 13px; font-family: inherit; }
+.date-input { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: #fff; padding: 2px 6px; font-size: 12px; font-family: inherit; }
 .date-input::-webkit-calendar-picker-indicator { filter: invert(1); }
-.progress-bar { height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px; margin-top: 12px; overflow: hidden; }
+.progress-bar { height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px; margin-top: 10px; overflow: hidden; }
 .progress-fill { height: 100%; background: linear-gradient(90deg, #FFD078, #FFE8B0); border-radius: 2px; transition: width 0.6s ease; }
-.phase-label { text-align: center; margin-top: 8px; font-size: 16px; font-weight: 700; }
+.phase-label { text-align: center; margin-top: 6px; font-size: 15px; font-weight: 700; }
+.controls { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.ctrl-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; padding: 5px 10px; font-size: 15px; cursor: pointer; transition: background 0.2s; }
+.ctrl-btn:hover { background: rgba(255,255,255,0.2); }
+.ctrl-btn.active { background: rgba(255,200,100,0.3); border-color: rgba(255,200,100,0.5); }
+.ctrl-btn.ctrl-main { font-size: 17px; padding: 5px 12px; }
+.slider-group { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.slider-row { display: flex; align-items: center; gap: 8px; font-size: 12px; opacity: 0.8; }
+.temp-slider { flex: 1; cursor: pointer; }
 
 .back-link {
   position: fixed;

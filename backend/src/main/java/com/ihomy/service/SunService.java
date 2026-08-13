@@ -103,8 +103,8 @@ public class SunService {
                 return new String[]{ lat, lng, tz };
             }
         } catch (Exception e) {
-            log.warn("IP 定位失败,使用默认北京: {}", e.getMessage());
+            log.warn("IP 定位失败,使用默认济南: {}", e.getMessage());
         }
-        return new String[]{ "39.9042", "116.4074", "Asia/Shanghai" };
+        return new String[]{ "36.6512", "117.1201", "Asia/Shanghai" };
     }
 }

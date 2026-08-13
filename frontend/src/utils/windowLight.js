@@ -96,16 +96,22 @@ export function getSunScene(sunInfo, slotIndex) {
   const sunsetMin = parseTimeToMinutes(sunInfo?.sunset)
   const currentMin = parseTimeToMinutes(time)
 
-  // 日昼进度:0=日出,1=日落,夜间 hold 在端点
+  // 日昼进度:0=日出,1=日落
+  // 夜间策略:日落后 hold 在日落位置(+90°),凌晨2点 reset 到日出位置(-90°)
+  // 2点没人看,跳变无感;日落后阴影停留在日落位置,像太阳冻在日落
+  const TWO_AM = 2 * 60
   let dayProgress = 0.5
   let isNight = true
   if (sunriseMin != null && sunsetMin != null && currentMin != null && sunsetMin > sunriseMin) {
     if (currentMin >= sunriseMin && currentMin <= sunsetMin) {
       isNight = false
       dayProgress = (currentMin - sunriseMin) / (sunsetMin - sunriseMin)
+    } else if (currentMin >= sunsetMin || currentMin < TWO_AM) {
+      isNight = true
+      dayProgress = 1
     } else {
       isNight = true
-      dayProgress = currentMin < sunriseMin ? 0 : 1
+      dayProgress = 0
     }
   }
 
@@ -122,41 +128,44 @@ export function getSunScene(sunInfo, slotIndex) {
   // 内框横条 top:太阳越高越靠近顶部
   const shadowHTop = Math.max(5, Math.min(85, 80 - Math.max(0, alt) * 0.8))
 
-  // 阴影强度(0=最浅,1=最深):夜间 1,正午 0.3,正弦过渡
-  const shadowIntensity = isNight ? 1 : 1 - Math.sin(dayProgress * Math.PI) * 0.7
-  // 灰阶(0=全黑,255=白透明):用 opaque gray + darken,min 幂等,跨层不叠加
-  const shadowGray = Math.round((1 - shadowIntensity) * 255)
+  // 顶框微移:太阳越高顶框越低(窗口视觉变高),小范围 ±2vh,不影响与内横框/底框的间距
+  const frameTopOffset = isNight ? 0 : (Math.max(0, alt) - 45) * 0.045
+
+  // 阴影强度:夜间 0.7,正午 0.3,日出日落 0.7(不超过 70%)
+  const shadowIntensity = isNight ? 0.7 : 0.7 - Math.sin(dayProgress * Math.PI) * 0.4
+  // 阴影颜色:夜间深蓝黑,日间纯黑
+  const shadowColor = isNight ? 'rgb(8,12,28)' : 'rgb(0,0,0)'
 
   // 亮斑颜色与不透明度:夜黑→凌晨黄→清晨白→日间透明→傍晚橙→日落红→深夜黑
   let brightSpotColor, brightSpotOpacity
   if (isNight) {
-    brightSpotColor = 'rgba(0,0,0,1)'
+    brightSpotColor = 'rgb(8,12,28)'
     brightSpotOpacity = 0.7
   } else if (dayProgress < 0.1) {
-    // 凌晨:黑→黄
+    // 凌晨:深蓝黑→黄
     const t = dayProgress / 0.1
-    brightSpotColor = lerpColor([0, 0, 0], [255, 200, 80], t)
-    brightSpotOpacity = 0.7 - t * 0.3
+    brightSpotColor = lerpColor([8, 12, 28], [255, 200, 80], t)
+    brightSpotOpacity = 0.7
   } else if (dayProgress < 0.3) {
-    // 清晨:黄→白
+    // 清晨:黄→白,不透明度 0.7→0.1
     const t = (dayProgress - 0.1) / 0.2
     brightSpotColor = lerpColor([255, 200, 80], [255, 250, 230], t)
-    brightSpotOpacity = 0.4 - t * 0.3
+    brightSpotOpacity = 0.7 - t * 0.6
   } else if (dayProgress < 0.7) {
     // 日间:白→透明
     const t = (dayProgress - 0.3) / 0.4
     brightSpotColor = 'rgba(255,250,230,1)'
     brightSpotOpacity = 0.1 * (1 - t)
   } else if (dayProgress < 0.9) {
-    // 傍晚:透明→橙
+    // 傍晚:透明→橙,不透明度 0→0.7
     const t = (dayProgress - 0.7) / 0.2
     brightSpotColor = lerpColor([255, 250, 230], [255, 140, 50], t)
-    brightSpotOpacity = t * 0.5
+    brightSpotOpacity = t * 0.7
   } else {
-    // 日落:橙→红
+    // 日落:橙→深蓝黑,不透明度 0.7
     const t = (dayProgress - 0.9) / 0.1
-    brightSpotColor = lerpColor([255, 140, 50], [200, 40, 30], t)
-    brightSpotOpacity = 0.5 + t * 0.2
+    brightSpotColor = lerpColor([255, 140, 50], [8, 12, 28], t)
+    brightSpotOpacity = 0.7
   }
 
   // 光柱颜色:夜间全透明(不发光),日间基于高度角
@@ -206,21 +215,30 @@ export function getSunScene(sunInfo, slotIndex) {
   // 光柱不透明度:夜间 0(不发光),日间正弦过渡(正午最强)
   const rayOpacity = isNight ? 0 : Math.sin(dayProgress * Math.PI) * rayBaseOpacity
 
+  // 光源整体不透明度(控制 bloom 辉光):夜间 0,日出日落 0,正午 1,正弦过渡
+  const lightOpacity = isNight ? 0 : Math.sin(dayProgress * Math.PI)
+
   // 反光层:内容组件被阳光照亮的轻微高光(soft-light,夜间 0)
   const reflectionOpacity = isNight ? 0 : Math.sin(dayProgress * Math.PI) * 0.22
 
+  // 台灯:傍晚开始时开(dayProgress≥0.9 或夜间),清晨结束时关(dayProgress>0.1)
+  const lampOpacity = (isNight || dayProgress >= 0.9 || dayProgress <= 0.1) ? 1 : 0
+
   return {
-    source: { x: sourceX + '%', y: alt < 6 ? '2%' : '-2%' },
+    source: { x: sourceX + '%', y: '-15%' },
     rotation: lightRotation,
     palette,
     rays: makeRays(rayOpacity),
     shadowVRotation,
     shadowHTop,
+    frameTopOffset,
     shadowIntensity,
-    shadowGray,
+    shadowColor,
     brightSpotColor,
     brightSpotOpacity,
     reflectionOpacity,
+    lightOpacity,
+    lampOpacity,
     altitude: alt,
     azimuth: az,
     isNight,
