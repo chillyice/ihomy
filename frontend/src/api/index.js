@@ -114,6 +114,7 @@ export const notificationApi = {
 // 家庭资料、公开家庭搜索与入家申请
 export const familyApi = {
   get: () => request.get('/family'),
+  create: (data) => request.post('/family', data),
   update: (data) => request.put('/family', data),
   search: (keyword) => request.get('/family/search', { params: { keyword } }),
   apply: (familyId, message) => request.post('/family/apply', { familyId, message }),
@@ -213,7 +214,8 @@ export const bookApi = {
 export const opsApi = {
   stats: (params) => request.get('/ops/stats', { params }),
   server: () => request.get('/ops/server'),
-logs: (params) => request.get('/ops/logs', { params }),
+  logs: (params) => request.get('/ops/logs', { params }),
+  weatherQuota: () => request.get('/ops/weather/quota'),
 }
 
 // 家谱(家庭隐私数据,需登录)

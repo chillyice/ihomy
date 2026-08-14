@@ -1197,3 +1197,55 @@ CREATE TABLE `family_item` (
   KEY `idx_furniture` (`furniture_id`),
   KEY `idx_family` (`family_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='物品表(物品定位)';
+
+-- ------------------------------------------------------------
+-- 47. 和风天气凭证(V5.6):多环境凭证账本,同时仅一条 status=1 启用
+--     运行时优先读 status=1 的记录;yml 仍可作 fallback
+--     私钥 PEM TEXT 存储,公钥仅作对照(验证签名用)
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_weather_credential`;
+CREATE TABLE `sys_weather_credential` (
+  `id`           BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `env`          VARCHAR(20)  NOT NULL COMMENT '环境标识(test/prod)',
+  `name`         VARCHAR(50)  NOT NULL COMMENT '凭证名称(如 Windows测试/Linux生产)',
+  `api_host`     VARCHAR(100) NOT NULL COMMENT '和风天气 API Host(如 xxx.qweatherapi.com)',
+  `project_id`   VARCHAR(50)  NOT NULL COMMENT '项目ID(JWT sub)',
+  `key_id`       VARCHAR(50)  NOT NULL COMMENT '凭证ID(JWT kid)',
+  `public_key`   TEXT         DEFAULT NULL COMMENT 'Ed25519 公钥 PEM(对照用,验证签名)',
+  `private_key`  TEXT         NOT NULL COMMENT 'Ed25519 私钥 PEM(JWT 签名用)',
+  `status`       TINYINT      NOT NULL DEFAULT 0 COMMENT '0禁用 1启用(同时仅一条启用)',
+  `remark`       VARCHAR(200) DEFAULT NULL COMMENT '备注',
+  `created_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='和风天气凭证表(多环境账本)';
+
+-- 种子:Windows 测试环境(默认启用)+ Linux 生产环境(默认禁用,上线时切换)
+-- ⚠️ 私钥不入 git(安全):private_key 留 NULL,部署后手动 UPDATE 填入
+-- 公钥可入库(公开信息,用于对照)
+INSERT INTO `sys_weather_credential` (`env`, `name`, `api_host`, `project_id`, `key_id`, `public_key`, `private_key`, `status`, `remark`) VALUES
+('test', 'Windows 测试环境', 'n93h2thv7x.re.qweatherapi.com', '26E5G7E7NQ', 'TKWEDN375N',
+ '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAlSLL4DY/8NTqT3NrSIsU/+LxN5LdyM8SxvlpGZiSkUQ=\n-----END PUBLIC KEY-----',
+ NULL, 1, '开发机默认凭证,部署后 UPDATE private_key'),
+('prod', 'Linux 生产环境', 'n93h2thv7x.re.qweatherapi.com', '26E5G7E7NQ', 'TKWEDN375N',
+ '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAAwRZGyidKyTmYn9NyFsvjl24eeyW2rsw1UxRRyXpHas=\n-----END PUBLIC KEY-----',
+ NULL, 0, '生产服务器凭证,上线时 UPDATE status=1 + private_key,把 test 改为 0');
+
+-- ------------------------------------------------------------
+-- 48. 和风天气 API 调用日志(V5.6):每次 callApi 记录一条
+--     天气数据本身公开,记录无泄露风险;不记录 JWT/凭证/quota 响应(可能含账号信息)
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_weather_log`;
+CREATE TABLE `sys_weather_log` (
+  `id`           BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `api_type`     VARCHAR(20)  NOT NULL COMMENT '接口类型(now/forecast/warning/indices/air/minutely/location/quota)',
+  `location_id`  VARCHAR(20)  DEFAULT NULL COMMENT '城市ID(和风 location 参数)',
+  `status`       VARCHAR(10)  NOT NULL COMMENT 'SUCCESS/FAIL',
+  `cost_ms`      INT          DEFAULT NULL COMMENT '耗时(毫秒)',
+  `response`     TEXT         DEFAULT NULL COMMENT '响应 JSON(天气数据公开可存;quota 不存)',
+  `error_msg`    VARCHAR(500) DEFAULT NULL COMMENT '失败原因',
+  `created_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '调用时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_type_time` (`api_type`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='和风天气 API 调用日志';

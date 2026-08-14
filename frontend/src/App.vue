@@ -7,6 +7,7 @@
     <InstallPrompt />
     <SideTabs v-if="!userStore.isOps && !isImmersive" />
     <MusicPlayer v-if="!userStore.isOps && !isImmersive" />
+    <SiteFooter />
   </el-config-provider>
 </template>
 
@@ -23,6 +24,7 @@ import BackToTop from '@/components/BackToTop.vue'
 import InstallPrompt from '@/components/InstallPrompt.vue'
 import SideTabs from '@/components/SideTabs.vue'
 import MusicPlayer from '@/components/MusicPlayer.vue'
+import SiteFooter from '@/components/SiteFooter.vue'
 
 const appStore = useAppStore()
 const userStore = useUserStore()

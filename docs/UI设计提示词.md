@@ -31,8 +31,7 @@
 
 | 层 | z-index | 作用 | 混合模式 |
 |----|---------|------|----------|
-| bg-blobs | 0 | 5 个飘移色块(模糊大圆) | normal |
-| ambient-layer | 2 | 黄金时刻暖染 | multiply |
+| bg-blobs | 1 | 5 个飘移色块(模糊大圆) | normal |
 | album-base(牛皮纸) | 25 | 照片托底 | normal |
 | album-stage(照片+相册) | 30 | 中央主舞台 | normal |
 | bright-spot(亮斑) | 32 | 阳光照耀强度(夜黑→晨黄→日透明→夕橙) | multiply |
@@ -59,11 +58,7 @@
 
 动画为 `translate + scale` 组合,位移 ±120~240px,缩放 0.8~1.35。
 
-## 2. 暖色环境光(ambient-layer)
-
-`position: fixed; inset: 0; mix-blend-mode: multiply; transition: background 3s ease`。背景色由 `getSunScene()` 按太阳高度角返回的 `palette.ambient` 决定(黄金时刻 `rgba(255,165,80,0.12)` → 正午 `rgba(255,240,200,0.05)`)。
-
-## 3. 中央相册舞台(album-stage)
+## 2. 中央相册舞台(album-stage)
 
 - `position: absolute; top: 80px; bottom: 24px; left: 0; right: 0; display: flex; align-items: center; justify-content: center; padding: 0 420px`(左右给面板留位)。
 - `.album-frame`: `width: 100%; height: 80%; max-width: 900px; position: relative`。
@@ -188,7 +183,7 @@
 ## 7. 灰尘粒子(dust-layer,z-index 46)
 
 `position: fixed; inset: 0; mix-blend-mode: screen; pointer-events: none; overflow: hidden`。
-40 个粒子,每个:
+20 个粒子,每个:
 - `position: absolute; border-radius: 50%; background: rgba(255,238,185,0.85); box-shadow: 0 0 8px rgba(255,225,150,0.7)`。
 - 随机 `width/height` 2-5px,随机 `top/left`,随机 `animation-duration` 8-16s,随机 `--drift` 30-100px。
 - 动画 `dust-float linear infinite`:0% opacity:0 → 15% opacity:0.9 → 85% opacity:0.9 → 100% `translate(var(--drift), calc(var(--drift) * -1.5))` opacity:0(向右上方飘移淡出)。
@@ -303,4 +298,10 @@ gsap.from('.top-bar', { y: -20, autoAlpha: 0, duration: 0.6 })
 7. 顶栏头像下拉、语言切换、消息铃铛、台灯开关(🌑自动/💡开/⬛关)+ 色温/亮度滑块均可交互。
 8. ≤960px 时左侧面板和纪念日隐藏,只保留相册 + 顶栏 + 紧凑天气 + 小唱片。
 9. `/light-test` 测试页可模拟任意日期(默认夏至 2026-06-21),1 分钟循环 288 时隙,含日期选择器 + 首页内容组件 + 阶段标签 + 深浅模式切换 + 台灯控制台(开关/色温/亮度/钟摆)。
-10. 夜间台灯自动开启(傍晚 dayProgress≥0.9 开,清晨 dayProgress>0.1 关),mask 祛除左上黄金分割点周围阴影;台灯钟摆运动(8 秒周期,横向 ±5vw,两侧椭圆中间圆);亮度滑块控制 mask 透明区域大小(3%-100%);色温滑块控制暖光色温。
+10. 夜间台灯自动开启(傍晚 dayProgress≥0.9 开,清晨 dayProgress>0.1 关),mask 祛除左上黄金分割点周围阴影;台灯钟摆运动(8 秒周期,横向 ±5vw,两侧椭圆中间圆);亮度滑块控制 mask 透明区域大小(3%-100%);色温滑块控制暖光色温。**开关灯 2s 渐变**:mask-image 不支持 CSS transition,用 GSAP 补间驱动 `lampAnim`(reactive),`lampDivOpacity` 和 `lampMask` 同步 2s 渐变(ease `power2.out`);mask 挖洞半径随强度缩放(开灯洞从 0 放大,关灯洞缩到 0)。
+11. **主题切换 1s 过渡**:`linear-gradient` 背景不支持 CSS transition 插值,改为双层伪元素 `::before`(浅色)/`::after`(深色)opacity 交叉淡入淡出 1s;面板/色块/文字颜色同步 1s 过渡。
+12. **顶栏齿轮 popover**:色温/亮度/重置面板布局/光照测试入口集中到齿轮图标 popover;顶栏右侧另有时钟(时间+日期)。
+13. **可拖拽面板**:5 个面板(feed/task/weather/anniversary/today)可拖拽+可调大小,位置/大小持久化到 localStorage;拖拽边界 clamp(左右不越出页面、顶部不低于导航栏、底部不越界);右侧面板用 `anchorRight` 模式(pos.x 为离右边缘距离);齿轮 popover 内"重置面板布局"清持久化恢复初始值。
+14. **今日面板**:积分余额+连续天数+签到按钮+今日待办提醒前 3 条(登录可见)。
+15. **深色模式**:`html.dark .blob { opacity: 0.1 }` 色块压暗至 10%;`--color-primary` 深色覆写 `#E8DCC8`;手动切主题后取消日出日落自动切换(`autoMode=false`)+提示。
+16. **创建新家庭**:`POST /family` 已登录用户创建新家庭组(绑定 OWNER+切换当前家庭);Settings 页入口。

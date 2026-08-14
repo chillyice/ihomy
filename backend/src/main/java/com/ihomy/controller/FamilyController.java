@@ -7,20 +7,28 @@ import com.ihomy.common.Result;
 import com.ihomy.common.ResultCode;
 import com.ihomy.dto.FamilyDTO;
 import com.ihomy.entity.Family;
+import com.ihomy.entity.SysRole;
 import com.ihomy.entity.SysUser;
+import com.ihomy.entity.SysUserRole;
 import com.ihomy.mapper.FamilyMapper;
+import com.ihomy.mapper.SysRoleMapper;
+import com.ihomy.mapper.SysUserRoleMapper;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.MultiFamilyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
+
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
- * 家庭接口:公开家庭搜索/入家申请与审核(family:manage),以及当前家庭信息与设置更新。
+ * 家庭接口:创建新家庭/公开家庭搜索/入家申请与审核(family:manage),以及当前家庭信息与设置更新。
  */
 @Tag(name = "家庭设置")
 @RestController
@@ -31,6 +39,39 @@ public class FamilyController {
     private final FamilyMapper familyMapper;
     private final SecurityHelper securityHelper;
     private final MultiFamilyService multiFamilyService;
+    private final SysRoleMapper sysRoleMapper;
+    private final SysUserRoleMapper sysUserRoleMapper;
+    private final StringRedisTemplate redisTemplate;
+
+    @Operation(summary = "创建新家庭(当前用户绑定 OWNER)")
+    @OperationLog(module = "FAMILY", operationType = "CREATE", description = "创建新家庭", saveArgs = false)
+    @PostMapping
+    public Result<Family> create(@RequestBody FamilyDTO dto) {
+        SysUser user = securityHelper.currentUser();
+        if (user == null) throw new BizException(ResultCode.UNAUTHORIZED);
+        if (dto.getName() == null || dto.getName().isBlank()) throw new BizException(ResultCode.BAD_REQUEST);
+
+        Family family = new Family();
+        family.setName(dto.getName().trim());
+        family.setCoverText("欢迎来到我们的家庭空间");
+        family.setShareToken(UUID.randomUUID().toString().replace("-", "").substring(0, 16));
+        family.setOwnerId(user.getId());
+        familyMapper.insert(family);
+
+        SysRole ownerRole = sysRoleMapper.selectOne(
+                new LambdaQueryWrapper<SysRole>().eq(SysRole::getRoleCode, "OWNER"));
+        if (ownerRole != null) {
+            SysUserRole ur = new SysUserRole();
+            ur.setUserId(user.getId());
+            ur.setRoleId(ownerRole.getId());
+            ur.setFamilyId(family.getId());
+            sysUserRoleMapper.insert(ur);
+        }
+
+        redisTemplate.opsForValue().set("user:curfamily:" + user.getId(), String.valueOf(family.getId()));
+
+        return Result.success(family);
+    }
 
     @Operation(summary = "搜索公开家庭")
     @GetMapping("/search")

@@ -75,6 +75,14 @@ public class PublicController {
         return Result.success(weatherService.getWeather(ip));
     }
 
+    @Operation(summary = "天气详情聚合(当前+7d预报+24h+预警+指数+空气+分钟降水,Key 未配返回 null)")
+    @GetMapping("/weather/detail")
+    public Result<Map<String, Object>> weatherDetail(HttpServletRequest request) {
+        String ip = request.getHeader("X-Forwarded-For");
+        if (ip == null || ip.isBlank()) ip = request.getRemoteAddr();
+        return Result.success(weatherService.getDetail(ip));
+    }
+
     @Operation(summary = "首页聚合（支持 ?hid= 混淆ID / ?home_id= 指定家庭）")
     @GetMapping("/home")
     public Result<Map<String, Object>> home(@RequestParam(name = "hid", required = false) String hid,

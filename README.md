@@ -13,7 +13,8 @@
 ├── start.bat                      # Windows 一键启动（双击即可）
 ├── scripts/
 │   ├── start-all.ps1              # Windows 一键启动前后端
-│   └── start-db.ps1               # Docker 一键拉起 MySQL/Redis
+│   ├── start-db.ps1               # Docker 一键拉起 MySQL/Redis
+│   └── deploy.ps1                 # 一键部署流水线(本地构建→scp→远程重启)
 ├── backend/                       # Spring Boot 后端
 │   ├── pom.xml
 │   ├── mvnw / mvnw.cmd            # Maven Wrapper（无需单独装 Maven）

@@ -54,10 +54,18 @@ file:
   url-prefix: /files
 
 # 图形验证码:开发/测试环境可固定为已知值(如 qwer),方便联调;生产去掉或留空则随机生成
+# 和风天气:JWT(Ed25519)身份认证,凭证在控制台-项目管理获取
+# ⚠️ 私钥不入 git(生产环境):以下字段生产留空,运行时从 DB sys_weather_credential 表读
+#    本地开发可直接填入(DB 种子 private_key=NULL 时 fallback 到此 yml)
 app:
   captcha-fixed-code: qwer
-  # 和风天气 API Key(留空则 /public/weather 返回 null,前端降级为只按时间做光影)
-  weather-key:
+  weather-api-host: n93h2thv7x.re.qweatherapi.com
+  weather-project-id: 26E5G7E7NQ
+  weather-key-id: TKWEDN375N
+  weather-private-key: |
+    -----BEGIN PRIVATE KEY-----
+    MC4CAQAwBQYDK2VwBCIEIBZifGunwvPX6SyTYx8XgWLTMOnFnaMHu5Bbr+Je7fus
+    -----END PRIVATE KEY-----
 
 logging:
   file:

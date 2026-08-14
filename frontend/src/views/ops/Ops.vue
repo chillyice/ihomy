@@ -81,13 +81,26 @@
         <el-pagination v-model:current-page="logPageNum" :page-size="20" :total="logTotal"
           layout="total, prev, pager, next" style="margin-top: 14px; justify-content: flex-end" @current-change="loadLogs" />
       </el-tab-pane>
+
+      <el-tab-pane label="和风天气 API" name="weather">
+        <div v-loading="weatherLoading">
+          <el-alert type="info" :closable="false" show-icon style="margin-bottom: 14px"
+            title="和风天气控制台 API 用量统计(JWT 身份认证)" />
+          <div v-if="weatherQuota && weatherQuota.raw">
+            <el-descriptions :column="2" border size="small">
+              <el-descriptions-item v-for="(v, k) in weatherQuota.raw" :key="k" :label="k">{{ typeof v === 'object' ? JSON.stringify(v) : v }}</el-descriptions-item>
+            </el-descriptions>
+          </div>
+          <el-empty v-else-if="!weatherLoading" description="未配置和风天气凭证或暂无数据" />
+        </div>
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
 
 <script setup>
 // 运维管理:三标签聚合页;数据接口须 ops:view 权限,后端 OpsAccessFilter 还会把 OPS 角色限定在 /ops 与 /auth
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { opsApi } from '@/api'
 
@@ -114,6 +127,9 @@ const logPage = ref({ records: [] })
 const logTotal = ref(0)
 const logPageNum = ref(1)
 const logFilter = reactive({ keyword: '', operatorId: '', module: '', startDate: '', endDate: '' })
+
+const weatherLoading = ref(false)
+const weatherQuota = ref(null)
 
 const fmtMb = (bytes) => (bytes == null ? 0 : Math.round(bytes / 1024 / 1024))
 const fmtUptime = (sec) => {
@@ -172,11 +188,25 @@ const loadLogs = async (page = logPageNum.value) => {
   }
 }
 
+const loadWeatherQuota = async () => {
+  weatherLoading.value = true
+  try {
+    weatherQuota.value = await opsApi.weatherQuota()
+  } catch (e) {
+    weatherQuota.value = null
+  } finally {
+    weatherLoading.value = false
+  }
+}
+
 onMounted(async () => {
   await loadStats()
   // 默认取一页近期日志(时间倒序分页,天然轻量)
   await loadLogs(1)
 })
+
+// 切到天气标签页时加载配额
+watch(tab, (v) => { if (v === 'weather' && !weatherQuota.value) loadWeatherQuota() })
 </script>
 
 <style scoped>

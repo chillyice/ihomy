@@ -131,12 +131,13 @@ deb [arch=${ARCH} signed-by=/etc/apt/keyrings/docker.gpg] http://mirrors.cloud.a
 EOF
 sudo apt-get update
 
-# 查询 docker 部署版本（阿里云源安装时找不到正确版本，用此方式确认 29.7.0 存在）
-apt-cache show package docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin | grep 29.7.0
+# 查询 29.7.0 的完整版本字符串（因 Ubuntu 版本不同后缀不同：jammy/noble 等）
+apt-cache madison docker-ce | grep 29.7.0
+# 输出类似：docker-ce | 5:29.7.0-1~ubuntu.24.04~noble | http://...
+# 复制完整的版本字符串（5:29.7.0-1~ubuntu.xx.xx~代号），用于下方安装命令
 
-# 安装 Docker 社区版本、容器运行时 containerd.io，以及 Docker 构建和 Compose 插件（固定 29.7.0）
-sudo apt-get -y install docker-ce-rootless-extras=5:29.7.0-1~ubuntu.26.04~resolute
-sudo apt-get -y install docker-ce=5:29.7.0-1~ubuntu.26.04~resolute docker-ce-cli=5:29.7.0-1~ubuntu.26.04~resolute containerd.io docker-buildx-plugin docker-compose-plugin
+# 安装 Docker CE 29.7.0 + containerd + 插件（将 <版本字符串> 替换为上一步查出的值）
+sudo apt-get -y install docker-ce=<版本字符串> docker-ce-cli=<版本字符串> containerd.io docker-buildx-plugin docker-compose-plugin
 
 # 启动并设置开机自启
 sudo systemctl enable --now docker
@@ -144,7 +145,7 @@ sudo systemctl enable --now docker
 sudo usermod -aG docker ihomy
 ```
 
-> **关于版本号**：`5:29.7.0-1~ubuntu.26.04~resolute` 是 Ubuntu 26.04 (Resolute) 的版本字符串。若你的 Ubuntu 版本不同（如 22.04 Jammy / 24.04 Noble），需替换对应代号，或先执行上面的 `apt-cache show` 查出的版本字符串。
+> **关于版本字符串**：`apt-cache madison` 查出的完整字符串含 Ubuntu 代号后缀（如 `5:29.7.0-1~ubuntu.22.04~jammy` 或 `5:29.7.0-1~ubuntu.24.04~noble`），不同 Ubuntu 版本后缀不同，**必须用 madison 查出的实际值**，不能照抄。
 > **CentOS/RHEL**：阿里云也提供 Docker 的 yum 源，参考 `https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo`，命令类似。
 
 验证：
@@ -288,11 +289,39 @@ spring:
       host: localhost
       port: 6379
       # password: 你的Redis密码      # ← 如有密码
+  servlet:
+    multipart:
+      max-file-size: 500MB        # 视频大文件上传（放映厅）
+      max-request-size: 500MB
+
+# JWT（顶级配置，不在 app 下）
+jwt:
+  secret: ihomy-secret-key-please-change-in-production-2026-very-long   # ← 生产必须改，至少 32 字符
+  access-token-expire: 7200       # 访问令牌 2 小时
+  refresh-token-expire: 604800    # 刷新令牌 7 天
 
 file:
   upload-dir: /opt/ihomy/uploads    # ← 绝对路径
   url-prefix: /files
+
+app:
+  captcha-fixed-code:               # ← 生产环境留空=随机验证码；开发环境填 'qwer' 固定
+  weather-api-host:                 # ← 和风天气 API Host(留空=禁用,DB 优先读)
+  weather-project-id:               # ← 和风天气项目 ID
+  weather-key-id:                   # ← 和风天气凭证 ID
+  weather-private-key:              # ← Ed25519 私钥 PEM(留空=禁用,建议填 DB 不填 yml)
 ```
+
+> **⚠️ 私钥安全(风险最小化)**:
+> - **git 仓库不含任何私钥**(schema.sql 种子 `private_key=NULL`,application.yml 留空)
+> - 公钥可入库(公开信息),私钥只在服务器上手动填入
+> - **部署后执行 SQL 填入私钥**(不要编辑 yml,改 DB 更安全):
+> ```bash
+> mysql -uroot -p ihomy -e "UPDATE sys_weather_credential SET private_key='-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIORmnxrxdLbAJzZstm1z4XQc9z2pzqkvPEMFGZ/F645W\n-----END PRIVATE KEY-----' WHERE env='prod';"
+> # 切换启用环境:把 test 改 0,prod 改 1
+> mysql -uroot -p ihomy -e "UPDATE sys_weather_credential SET status=0 WHERE env='test'; UPDATE sys_weather_credential SET status=1 WHERE env='prod';"
+> ```
+> - **月度配额**:每月最多调用 49999 次 API,超限后本月自动停止调用(返回 null,前端降级),次月自动恢复
 
 > 应用使用专用账号 `ihomy` 连接数据库（仅 SELECT/INSERT/UPDATE/DELETE 权限，最小权限原则），不要用 root 跑业务。该账号由 schema.sql 自动创建并授权，无需手动建号。
 
@@ -304,7 +333,12 @@ exit
 # 用数据库 root 执行 schema.sql（建库、建表、创建应用账号 ihomy 并授权）
 mysql -uroot -p < /opt/ihomy/backend/src/main/resources/schema.sql
 ```
-该脚本由数据库 root 执行一次，会创建 `ihomy` 库、6 张表（含系统操作日志表）、应用专用账号 `ihomy`（仅 DML 权限）、默认首页模块、管理员 `admin/admin123`。
+该脚本由数据库 root 执行一次，会创建 `ihomy` 库、**41 张表**（含系统操作日志表、和风天气凭证表、天气 API 调用日志表）、应用专用账号 `ihomy`（仅 DML 权限）、默认首页模块、管理员 `admin/admin123`、运维账号 `ops/admin123`。
+
+> **⚠️ schema.sql 种子缺失**：`sys_home_module` 种子缺 `chat`（聊天室）行，全新部署后首页会缺聊天室入口。执行 schema.sql 后补一行：
+> ```bash
+> mysql -uroot -p ihomy -e "INSERT INTO sys_home_module (code, title, icon, path, category, side, sort, enabled) VALUES ('chat', '聊天室', 'icon-chat', '/chat', 'life', 'left', 12, 1);"
+> ```
 
 ### 3.5 构建后端（ihomy 用户）
 
@@ -347,7 +381,7 @@ sudo chown -R ihomy:ihomy /opt/ihomy/uploads /var/log/ihomy
 sudo tee /etc/systemd/system/ihomy-backend.service > /dev/null <<'EOF'
 [Unit]
 Description=Ihomy Family App Backend (Spring Boot)
-After=network.target mysql.service redis-server.service
+After=network.target mysql.service docker.service
 
 [Service]
 Type=simple
@@ -365,8 +399,7 @@ WantedBy=multi-user.target
 EOF
 ```
 
-> CentOS 下 `After=` 的服务名是 `mysqld.service`、`redis.service`，按实际调整。
-> Redis 用 Docker 运行时，`After=` 可去掉 `redis-server.service`，改为 `docker.service`：`After=network.target mysql.service docker.service`。
+> CentOS 下 `After=` 的服务名是 `mysqld.service`，按实际调整。
 
 启用并启动：
 ```bash
@@ -392,14 +425,44 @@ tail -f /var/log/ihomy/backend.log     # 查看文件日志
 
 ```bash
 sudo tee /etc/nginx/conf.d/ihomy.conf > /dev/null <<'EOF'
+# 80 → 443 强制跳转
 server {
     listen 80;
-    server_name 你的域名或IP;
+    server_name ihomy.top www.ihomy.top;
+    # certbot 验证用（证书续期时需保留）
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# HTTPS 主站点
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ihomy.top www.ihomy.top;
+
+    # 证书（certbot --nginx 自动生成，路径如下）
+    ssl_certificate     /etc/letsencrypt/live/ihomy.top/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/ihomy.top/privkey.pem;
+
+    # SSL 优化
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    # HSTS（首次访问后强制 HTTPS，1 年）
+    add_header Strict-Transport-Security "max-age=31536000" always;
 
     root  /opt/ihomy/frontend/dist;
     index index.html;
 
-    client_max_body_size 20m;
+    # 视频大文件上传（放映厅 500MB）
+    client_max_body_size 500m;
 
     # 前端单页应用路由回退
     location / {
@@ -416,8 +479,23 @@ server {
         proxy_read_timeout 60s;
     }
 
-    # 静态资源缓存
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff2)$ {
+    # WebSocket（聊天室）
+    location /api/ws {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 3600s;
+    }
+
+    # 上传文件静态目录（注意 alias 末尾必须带斜杠）
+    location /files/ {
+        alias /opt/ihomy/uploads/;
+    }
+
+    # 静态资源缓存（排除 /files/ 避免覆盖 alias）
+    location ~* ^/(?!files/).+\.(js|css|png|jpg|jpeg|gif|ico|svg|woff2)$ {
         expires 7d;
         add_header Cache-Control "public, immutable";
     }
@@ -425,12 +503,30 @@ server {
 EOF
 ```
 
+> **注意**：
+> - `location /files/` 的 `alias` 末尾必须带 `/`，否则 404。
+> - 图片扩展名缓存 location 用负向断言 `^/(?!files/)` 排除 `/files/`，避免 `root` 覆盖 `alias`。
+> - `/.well-known/acme-challenge/` 必须保留，certbot 续期时要用。
+> - WebSocket 的 `proxy_read_timeout 3600s` 防止长连接被 nginx 默认 60s 超时断开。
+
 测试并重载：
 ```bash
 sudo nginx -t
 sudo systemctl reload nginx
 ```
-浏览器打开 `http://你的域名或IP` 即可访问。
+
+**申请证书**（先确保 DNS A 记录已指向本机 IP，且 80 端口可公网访问）：
+```bash
+sudo certbot --nginx -d ihomy.top -d www.ihomy.top -m chillyice@live.com --agree-tos --no-eff-email
+```
+certbot 会自动：申请证书 → 修改 nginx 配置（加上 443 ssl）→ 设置 systemd timer 自动续期。证书路径：
+- `/etc/letsencrypt/live/ihomy.top/fullchain.pem`
+- `/etc/letsencrypt/live/ihomy.top/privkey.pem`
+
+续期测试：
+```bash
+sudo certbot renew --dry-run
+```
 
 ---
 
@@ -544,20 +640,79 @@ sudo systemctl reload nginx
 
 ---
 
+## 八·补、一键部署流水线（本地构建 → scp 上传 → 远程重启）
+
+> 日常迭代后懒得每次 SSH 进服务器敲命令？用项目自带的 `scripts/deploy.ps1`，在 Windows 本地一条命令完成「编译 → 上传 → 重启」。
+> 适合场景：服务器已按前文完成首次部署（源码已克隆、systemd 服务已配、nginx 已跑），后续只是更新代码。
+
+### 8·补.1 前置：配置 SSH 免密登录
+
+脚本用 `ssh`/`scp` 连服务器（端口 19068、root 登录），必须配置公钥免密，否则每次要输密码。
+
+```powershell
+# 1) 本地生成密钥（已生成可跳过）
+ssh-keygen -t ed25519
+
+# 2) 上传公钥到服务器（会提示输一次密码）
+Get-Content $env:USERPROFILE\.ssh\id_ed25519.pub | ssh -p 19068 root@ihomy.top "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"
+
+# 3) 验证免密（不应再要密码）
+ssh -p 19068 root@ihomy.top 'echo ok'
+```
+
+### 8·补.2 使用
+
+```powershell
+# 在项目根目录执行（双击 start.bat 也可，但部署建议用命令行看输出）
+powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1
+
+# 常用参数
+.\scripts\deploy.ps1                    # 全量部署（后端+前端）
+.\scripts\deploy.ps1 -BackendOnly       # 只更后端
+.\scripts\deploy.ps1 -FrontendOnly      # 只更前端
+.\scripts\deploy.ps1 -SkipBuild         # 跳过本地构建，直接用现有 jar/dist 部署
+.\scripts\deploy.ps1 -Server 1.2.3.4    # 指定其他服务器（默认 ihomy.top）
+```
+
+### 8·补.3 脚本做了什么
+
+1. **前置检查**：JAVA_HOME、ssh/scp/tar 可用、SSH 免密连通。
+2. **本地构建**：`mvnw clean package -DskipTests` 打 jar；`npm run build` 出 dist；dist 打成 tar.gz 单文件传输（比 `scp -r` 快很多）。
+3. **后端部署**：
+   - scp 上传 jar 到 `/opt/ihomy/backend/target/ihomy-backend.jar.new`。
+   - **首次部署特判**：若 `target/application.yml` 不存在，自动从 `src/main/resources/application.yml`（部署时编辑过的生产配置）复制一份到 `target/`。Spring Boot 会优先加载 jar 同目录的外部 `application.yml`，覆盖 jar 内的开发配置——所以本地 jar 里是开发配置（`D:/...`、`38654` 端口等）也无所谓，外部配置会盖掉。
+   - 备份旧 jar → 替换新 jar → `systemctl restart ihomy-backend` → 轮询 `is-active` 确认启动（最多 20 秒）。
+   - 启动失败自动回滚到 `.bak`。
+4. **前端部署**：scp 上传 tar.gz → 远程解压到 `dist.new` → 旧 `dist` 改名 `dist.bak` → `dist.new` 改名 `dist` → `nginx -t && systemctl reload nginx`。失败自动回滚。
+5. **健康检查**：`curl https://ihomy.top/api/public/home` 期望 200，失败 5 次报警。
+
+### 8·补.4 注意事项
+
+- **配置隔离**：脚本只传 jar 和 dist，**不碰服务器上的 `application.yml`**（首次从源码复制后一直保留在 `target/`）。本地 `application.yml` 是开发配置，不能直接上传覆盖生产配置。
+- **不替代首次部署**：服务器需已按前文第三节完成首次部署（源码克隆 + 建库建表 + systemd 配置 + nginx 配置）。本脚本只做「更新」。
+- **数据库变更**：若代码涉及 `schema.sql` 改动，脚本不会自动执行 SQL。需手动 `mysql -uroot -p ihomy < 增量.sql`。
+- **回滚**：失败时脚本自动回滚 jar/dist。若需手动回滚，登录服务器 `mv ihomy-backend.jar.bak ihomy-backend.jar && systemctl restart ihomy-backend`。
+
+---
+
 ## 九、验证清单
 
 | 检查项 | 命令/方式 | 预期 |
 |--------|-----------|------|
 | 后端服务 | `sudo systemctl status ihomy-backend` | active (running) |
-| 后端接口 | `curl http://localhost:8080/api/auth/me` | 返回 401 JSON |
+| 后端接口 | `curl http://localhost:8080/api/public/home` | 返回 JSON（含 modules） |
 | 前端访问 | 浏览器 `https://你的域名` | 登录页 |
-| 登录 | admin / admin123 | 进入首页 |
-| 数据库 | `mysql -uihomy -p ihomy -e "show tables;"` | 6 张表 |
-| Redis | `redis-cli ping` | PONG |
+| 登录 | 邮箱 + 密码 + 图形验证码 | 进入首页 |
+| 运维登录 | `ops / admin123` | 进入运维页 |
+| 数据库 | `mysql -uihomy -p ihomy -e "show tables;"` | 41 张表 |
+| Redis | `docker exec ihomy-redis redis-cli ping` | PONG |
 | Nginx | `sudo nginx -t` | syntax ok |
 | 证书 | `sudo certbot certificates` | 有效 |
 | PWA 安装 | Chrome/Safari 地址栏安装图标 | 可安装到桌面 |
 | 开机自启 | `sudo systemctl is-enabled ihomy-backend nginx` | enabled |
+| 上传文件 | 浏览器访问 `/files/pictures/...` 图片 URL | 200 OK |
+| WebSocket | 浏览器登录后进入聊天室 | 实时收发消息 |
+| 视频上传 | 后台放映厅上传 >100MB 视频 | 上传成功 |
 
 ---
 
@@ -578,17 +733,26 @@ nginx 缺少 `try_files $uri $uri/ /index.html;`。
 **Q5：iOS 无法"添加到主屏幕"？**
 必须 HTTPS + 有效证书，Safari 打开。自签证书不被信任，PWA 无法安装。
 
-**Q6：上传图片 413 Request Entity Too Large？**
-nginx `client_max_body_size` 太小，调大到 `20m` 后 `reload`。
+**Q6：上传图片/视频 413 Request Entity Too Large？**
+nginx `client_max_body_size` 已配置为 `500m`（放映厅视频大文件必需）。若仍报错，检查 nginx 配置是否已重载，以及是否有反向代理层（如 CDN）也需调大。
 
-**Q7：端口被占用？**
+**Q7：上传文件访问 404？**
+检查 nginx `location /files/` 的 `alias` 是否末尾带 `/`（必须 `alias /opt/ihomy/uploads/;`），以及图片扩展名缓存 location 是否用负向断言 `^/(?!files/)` 排除了 `/files/`。
+
+**Q8：聊天室连不上？**
+检查 nginx 是否配置了 `/api/ws` 的 WebSocket 反代（`proxy_http_version 1.1` + `Upgrade` 头）。前端握手 URL 为 `wss://域名/api/ws/chat?token=...`（HTTPS）或 `ws://域名/api/ws/chat?token=...`（HTTP）。
+
+**Q9：端口被占用？**
 ```bash
 sudo ss -tlnp | grep -E '8080|80|443'
 ```
 改 `application.yml` 的 `server.port` 或停掉冲突服务。
 
-**Q8：磁盘/内存不足？**
+**Q10：磁盘/内存不足？**
 后端 JVM 已通过 systemd 配置限制为 `-Xmx384m`（见第四节）。MySQL 已通过 `my.cnf` 调优（见第十一节）。可用 `free -h`、`df -h` 查看。若仍紧张，参考第十一节"资源优化"。
+
+**Q11：DNS 不生效，certbot 申请证书失败 `no valid A records`？**
+域名未指向服务器 IP。先去域名注册商 DNS 面板添加 A 记录（主机 `@`，值=服务器公网 IP），等 5-10 分钟用 `dig 你的域名` 验证能解析后再重跑 certbot。
 
 ---
 
@@ -723,7 +887,7 @@ ps -eo pid,rss,cmd --sort=-rss | grep -E 'java|mysql|redis|nginx|dockerd' | head
 /var/log/ihomy/                # 服务日志（属主 ihomy）
 /etc/nginx/conf.d/ihomy.conf   # nginx 站点配置（root 管理）
 /etc/systemd/system/ihomy-backend.service   # root 管理，User=ihomy
-/etc/letsencrypt/live/域名/    # HTTPS 证书（root 管理）
+/etc/letsencrypt/live/ihomy.top/    # HTTPS 证书（root 管理）
 ```
 
 ---
@@ -912,6 +1076,7 @@ services:
       - "443:443"
     volumes:
       - ./frontend/dist:/usr/share/nginx/html
+      - ./uploads:/opt/ihomy/uploads
       - ./nginx.conf:/etc/nginx/conf.d/default.conf
     depends_on: [backend]
     restart: unless-stopped
@@ -927,3 +1092,14 @@ cd /opt/ihomy/frontend && npm install && npm run build
 cd /opt/ihomy && docker compose up -d
 ```
 > 容器化部署时，`application.yml` 的数据库地址需改为服务名 `mysql`（host=`mysql`）、Redis 地址改为 `redis`。应用连接账号仍用 `ihomy / Ihomy@2026`（schema.sql 在容器初始化时已自动创建该账号并授权，对 `ihomy` 库有 DML 权限）。
+>
+> **nginx.conf**：Docker Compose 的 `./nginx.conf` 需包含与第五节相同的 `location /files/`（alias 指向 `/opt/ihomy/uploads/`）、`location /api/ws`（WebSocket 反代）、`client_max_body_size 500m` 等配置，反代目标改为 `http://backend:8080`（容器服务名）。
+>
+> **⚠️ schema.sql 种子缺失注意**：`schema.sql` 的 `sys_home_module` 种子缺 `chat` 行（聊天室模块），容器化全新部署后首页会缺聊天室入口。容器启动后需手动补一行：
+> ```sql
+> INSERT INTO sys_home_module (code, title, icon, path, category, side, sort, enabled)
+> VALUES ('chat', '聊天室', 'icon-chat', '/chat', 'life', 'left', 12, 1);
+> ```
+> （本机部署用 schema.sql 同样需要补，但 live DB 已有，重导整库会丢。）
+>
+> 容器化时 backend 需要在 `command` 中带上 JVM 调优参数（2GB 内存方案）：`command: java -Xms256m -Xmx384m -XX:MetaspaceSize=128m -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC -Xss512k -jar app.jar`。

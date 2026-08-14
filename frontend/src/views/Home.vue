@@ -10,9 +10,6 @@
       <div class="blob blob-5"></div>
     </div>
 
-    <!-- 暖色环境光:黄金时刻整体暖调(multiply 微染) -->
-    <div class="ambient-layer" :style="ambientStyle" aria-hidden="true"></div>
-
     <!-- 亮斑图层:模拟阳光照耀强度,在内容之上、阴影之下;台灯 mask 挖洞祛除染色 -->
     <div class="bright-spot" :style="{ ...brightSpotStyle, '--lamp-mask': lampMask }" aria-hidden="true"></div>
 
@@ -137,12 +134,40 @@
         </nav>
       </div>
       <div class="bar-right">
-        <!-- 光照测试链接 -->
-        <span class="nav-action light-test-link" @click="$router.push('/light-test')">光照测试</span>
-        <!-- 台灯开关 -->
-        <span class="nav-action lamp-toggle" :class="{ on: lampMode !== 'off' }" @click="toggleLamp" title="台灯:自动/开/关">{{ lampMode === 'auto' ? '🌑' : lampMode === 'on' ? '💡' : '⬛' }}</span>
-        <input type="range" min="0" max="100" v-model.number="lampTemp" class="temp-slider" title="色温" />
-        <input type="range" min="0" max="100" v-model.number="lampBrightness" class="temp-slider" title="亮度" />
+        <!-- 顶栏时钟(原独立面板合并到此) -->
+        <div class="topbar-clock" :title="dateStr">
+          <span class="topbar-time">{{ clock }}</span>
+          <span class="topbar-date">{{ dateStr }}</span>
+        </div>
+        <!-- 光照设置齿轮 popover:色温/亮度/ambient/重置布局/光照测试 -->
+        <el-popover placement="bottom-end" :width="280" trigger="click">
+          <template #reference>
+            <span class="nav-action" title="光照设置"><el-icon><Setting /></el-icon></span>
+          </template>
+          <div class="light-settings">
+            <div class="ls-row">
+              <span class="ls-label">台灯</span>
+              <span class="ls-lamp-btn" :class="{ on: lampMode !== 'off' }" @click="toggleLamp">{{ lampMode === 'auto' ? '自动' : lampMode === 'on' ? '常开' : '关闭' }}</span>
+            </div>
+            <div class="ls-row">
+              <span class="ls-label">色温</span>
+              <input type="range" min="0" max="100" v-model.number="lampTemp" class="ls-slider" />
+              <span class="ls-val">{{ lampTemp }}</span>
+            </div>
+            <div class="ls-row">
+              <span class="ls-label">亮度</span>
+              <input type="range" min="0" max="100" v-model.number="lampBrightness" class="ls-slider" />
+              <span class="ls-val">{{ lampBrightness }}</span>
+            </div>
+            <div class="ls-divider"></div>
+            <div class="ls-row ls-row-btn" @click="resetPanelLayout">
+              <span class="ls-label">重置面板布局</span>
+            </div>
+            <div class="ls-row ls-row-btn" @click="$router.push('/light-test')">
+              <span class="ls-label">光照测试页</span>
+            </div>
+          </div>
+        </el-popover>
         <!-- 语言切换 -->
         <el-dropdown trigger="click" @command="onLang">
           <span class="nav-action lang-trigger">{{ locale === 'en' ? 'EN' : '中' }}</span>
@@ -229,7 +254,7 @@
           </div>
         </div>
       </div>
-      <div class="resize-handle"></div>
+      <div class="resize-handle" @mousedown="feedDrag.onResizeStart"></div>
     </div>
 
     <!-- 悬赏/任务(可拖拽毛玻璃) -->
@@ -251,30 +276,76 @@
           </div>
         </div>
       </div>
-      <div class="resize-handle"></div>
+      <div class="resize-handle" @mousedown="taskDrag.onResizeStart"></div>
     </div>
 
-    <!-- 右上:时间天气(可拖拽毛玻璃) -->
+    <!-- 右侧:天气面板(默认 180px 只显示当前,点击展开详情) -->
     <div class="draggable-panel weather-panel"
-      :style="{ right: (-weatherDrag.pos.value.x) + 'px', top: weatherDrag.pos.value.y + 'px', width: weatherDrag.size.value.w + 'px', height: weatherDrag.size.value.h + 'px' }">
+      :style="{ right: weatherDrag.pos.value.x + 'px', top: weatherDrag.pos.value.y + 'px', width: weatherDrag.size.value.w + 'px', height: (weatherExpanded ? 440 : weatherDrag.size.value.h) + 'px' }">
       <div class="drag-handle" @mousedown="weatherDrag.onDragStart">
         <span class="handle-grip"></span>
       </div>
-      <div class="panel-body">
-        <div class="clock">{{ clock }}</div>
-        <div class="date">{{ dateStr }}</div>
-        <div v-if="weather" class="weather">
-          <span class="weather-icon">{{ weatherIcon }}</span>
-          <span class="weather-temp">{{ weather.temp }}°</span>
-          <span class="weather-text">{{ weatherText }}</span>
+      <div class="panel-body weather-scroll">
+        <div v-if="weather" class="weather-main" @click="weatherExpanded = !weatherExpanded">
+          <div class="weather-city">{{ weather.city || '济南' }}</div>
+          <div class="weather-current">
+            <span class="weather-icon-float">{{ weatherIcon }}</span>
+            <span class="weather-temp-large">{{ weather.temp }}<span class="temp-unit">°</span></span>
+          </div>
+          <div class="weather-condition">{{ weatherText }}<el-icon class="weather-expand-icon"><ArrowDown :class="{ flipped: weatherExpanded }" /></el-icon></div>
+        </div>
+        <div v-else class="weather-loading-text">天气加载中…</div>
+
+        <div v-if="weatherExpanded && weatherDetailData" class="weather-detail">
+          <div v-if="weatherDetailData.warning && weatherDetailData.warning.length" class="wd-section wd-warning">
+            <div v-for="w in weatherDetailData.warning" :key="w.id" class="wd-warning-item">
+              <span class="wd-warn-type">{{ w.typeName }} {{ w.level }}预警</span>
+              <span class="wd-warn-text">{{ w.text }}</span>
+            </div>
+          </div>
+
+          <div v-if="weatherDetailData.daily" class="wd-section">
+            <div class="wd-title">未来三天</div>
+            <div class="wd-forecast">
+              <div v-for="d in weatherDetailData.daily.slice(0, 3)" :key="d.fxDate" class="wd-fc-card">
+                <span class="wd-fc-date">{{ formatFcDate(d.fxDate) }}</span>
+                <span class="wd-fc-icon">{{ weatherCodeIcon(d.iconDay) }}</span>
+                <span class="wd-fc-temp">{{ d.tempMin }}° / {{ d.tempMax }}°</span>
+                <span class="wd-fc-text">{{ d.textDay }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="weatherDetailData.air" class="wd-section wd-air">
+            <span class="wd-air-label">空气</span>
+            <span class="wd-air-aqi">{{ weatherDetailData.air.aqi }}</span>
+            <span class="wd-air-cat">{{ weatherDetailData.air.category }}</span>
+            <span class="wd-air-pm">PM2.5 {{ weatherDetailData.air.pm2p5 }}</span>
+          </div>
+
+          <div v-if="weatherDetailData.minutely" class="wd-section wd-minutely">
+            <span class="wd-minutely-text">{{ weatherDetailData.minutely.short }}</span>
+            <span class="wd-minutely-desc">{{ weatherDetailData.minutely.description }}</span>
+          </div>
+
+          <div v-if="weatherDetailData.indices" class="wd-section">
+            <div class="wd-title">生活指数</div>
+            <div class="wd-indices">
+              <div v-for="i in weatherDetailData.indices.slice(0, 5)" :key="i.date" class="wd-idx-item">
+                <span class="wd-idx-name">{{ i.name }}</span>
+                <span class="wd-idx-cat">{{ i.category }}</span>
+                <span class="wd-idx-text">{{ i.text }}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="resize-handle"></div>
+      <div class="resize-handle" @mousedown="weatherDrag.onResizeStart"></div>
     </div>
 
     <!-- 纪念日倒计时(可拖拽毛玻璃) -->
     <div v-if="anniversaries.length" class="draggable-panel anniversary-panel"
-      :style="{ right: (-anniDrag.pos.value.x) + 'px', top: anniDrag.pos.value.y + 'px', width: anniDrag.size.value.w + 'px', height: anniDrag.size.value.h + 'px' }">
+      :style="{ right: anniDrag.pos.value.x + 'px', top: anniDrag.pos.value.y + 'px', width: anniDrag.size.value.w + 'px', height: anniDrag.size.value.h + 'px' }">
       <div class="drag-handle" @mousedown="anniDrag.onDragStart">
         <span class="handle-grip"></span>
       </div>
@@ -293,7 +364,42 @@
           </div>
         </div>
       </div>
-      <div class="resize-handle"></div>
+      <div class="resize-handle" @mousedown="anniDrag.onResizeStart"></div>
+    </div>
+
+    <!-- 今日概览:积分签到 + 待办提醒(可拖拽毛玻璃,登录可见) -->
+    <div v-if="userStore.isLoggedIn" class="draggable-panel today-panel"
+      :style="{ left: todayDrag.pos.value.x + 'px', top: todayDrag.pos.value.y + 'px', width: todayDrag.size.value.w + 'px', height: todayDrag.size.value.h + 'px' }">
+      <div class="drag-handle" @mousedown="todayDrag.onDragStart">
+        <span class="handle-grip"></span>
+      </div>
+      <div class="panel-body">
+        <div class="panel-title">今日</div>
+        <div class="today-scroll">
+          <div class="today-points">
+            <div class="tp-item" @click="$router.push('/points')">
+              <span class="tp-num">{{ pointsStats.balance ?? 0 }}</span>
+              <span class="tp-label">积分</span>
+            </div>
+            <div class="tp-item" @click="$router.push('/points')">
+              <span class="tp-num">{{ pointsStats.streak ?? 0 }}</span>
+              <span class="tp-label">连续天数</span>
+            </div>
+            <el-button size="small" type="primary" round :disabled="pointsStats.checkedToday" @click="doCheckin">
+              {{ pointsStats.checkedToday ? '已签到' : '签到 +' + (pointsStats.todayPoints ?? 5) }}
+            </el-button>
+          </div>
+          <div class="today-reminders">
+            <div v-if="!reminders.length" class="empty-hint">今日无待办提醒</div>
+            <div v-for="r in reminders.slice(0, 3)" :key="r.id" class="today-reminder" @click="$router.push('/reminder')">
+              <span class="tr-dot"></span>
+              <span class="tr-title">{{ r.title }}</span>
+              <span class="tr-time">{{ (r.remindTime || '').slice(0, 5) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="resize-handle" @mousedown="todayDrag.onResizeStart"></div>
     </div>
 
     <!-- 黑胶唱片:藏在右边界,hover 滑出放大,点击播放 -->
@@ -329,13 +435,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, watchEffect } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick, watchEffect } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
-import { publicApi, homeApi, taskApi, notificationApi } from '@/api'
+import { publicApi, homeApi, taskApi, notificationApi, pointsApi, reminderApi } from '@/api'
 import { gsap } from 'gsap'
-import { Sunny, Moon, Bell, ArrowDown } from '@element-plus/icons-vue'
+import { Sunny, Moon, Bell, ArrowDown, Setting } from '@element-plus/icons-vue'
 import { ElMessage, ElImageViewer } from 'element-plus'
 import { applyLocale } from '@/i18n'
 import { applyTheme, loadTheme, applyAutoTheme } from '@/theme'
@@ -358,41 +464,81 @@ const allPhotos = ref([])
 const viewerVisible = ref(false)
 const viewerIdx = ref(0)
 const weather = ref(null)
+const weatherDetailData = ref(null)
 const anniversaries = ref([])
 const musicPlaying = ref(false)
 const vinylHovered = ref(false)
 const audioEl = ref(null)
 const trackIdx = ref(0)
 const theme = ref(loadTheme())
-// 可拖拽面板:动态/任务/天气/纪念日
-const feedDrag = useDragResize({ x: 24, y: 80, w: 380, h: 300 })
-const taskDrag = useDragResize({ x: 24, y: 400, w: 380, h: 240 })
-const weatherDrag = useDragResize({ x: -304, y: 80, w: 280, h: 160 })
-const anniDrag = useDragResize({ x: -304, y: 260, w: 280, h: 200 })
+// 可拖拽面板:动态/任务/天气/纪念日/今日(位置/大小持久化到 localStorage,顶部限制在导航栏以下)
+const feedDrag = useDragResize({ x: 24, y: 80, w: 380, h: 300, storageKey: 'ihomy:panel:feed', minY: 72 })
+const taskDrag = useDragResize({ x: 24, y: 400, w: 380, h: 240, storageKey: 'ihomy:panel:task', minY: 72 })
+const weatherDrag = useDragResize({ x: 24, y: 210, w: 320, h: 180, storageKey: 'ihomy:panel:weather', minY: 72, anchorRight: true })
+const anniDrag = useDragResize({ x: 24, y: 410, w: 280, h: 200, storageKey: 'ihomy:panel:anniversary', minY: 72, anchorRight: true })
+const todayDrag = useDragResize({ x: 24, y: 660, w: 380, h: 200, storageKey: 'ihomy:panel:today', minY: 72 })
+const resetPanelLayout = () => {
+  feedDrag.reset(); taskDrag.reset(); weatherDrag.reset(); anniDrag.reset(); todayDrag.reset()
+  weatherExpanded.value = false
+  ElMessage.success('面板布局已重置')
+}
+// 今日概览:积分签到 + 待办提醒
+const pointsStats = ref({})
+const reminders = ref([])
+const loadPoints = async () => {
+  if (!userStore.isLoggedIn) return
+  try { pointsStats.value = await pointsApi.stats() } catch (e) {}
+}
+const loadReminders = async () => {
+  if (!userStore.isLoggedIn) return
+  try {
+    const r = await reminderApi.list()
+    reminders.value = (Array.isArray(r) ? r : []).filter(x => x.done !== 1)
+  } catch (e) {}
+}
+const doCheckin = async () => {
+  try {
+    const r = await pointsApi.checkin()
+    ElMessage.success(`签到成功 +${r.points} 积分,连续 ${r.streak} 天`)
+    await loadPoints()
+  } catch (e) {}
+}
 const sunInfo = ref(null)
 const slotIdx = ref(currentSlotIndex())
 const sunScene = ref({ source: { x: '50%', y: '-15%' }, rotation: 0, shadowSkew: 0, palette: { bloom: 'transparent', core: 'transparent', mid: 'transparent', ambient: 'transparent' }, rays: [], shadowVRotation: 0, shadowHTop: 50, frameTopOffset: 0, shadowIntensity: 0.7, shadowColor: 'rgb(8,12,28)', brightSpotColor: 'rgb(8,12,28)', brightSpotOpacity: 0.7, reflectionOpacity: 0, lightOpacity: 0, lampOpacity: 1, isNight: true, dayProgress: 0 })
 const lampMode = ref('auto')
 const lampTemp = ref(30)
 const lampBrightness = ref(50)
+const weatherExpanded = ref(false)
 const toggleLamp = () => {
   const modes = ['auto', 'on', 'off']
   const i = modes.indexOf(lampMode.value)
-  lampMode.value = modes[(i + 1) % modes.length]
+  lampMode.value = modes[(i + 1) % 3]
 }
 const lampStrength = computed(() => {
   if (lampMode.value === 'off') return 0
   if (lampMode.value === 'on') return 1
   return sunScene.value.lampOpacity ?? 0
 })
+// 台灯强度动画值:mask-image 不支持 CSS transition,统一由 JS 补间驱动,
+// 使 lamp-light 辉光 opacity 与 shadow/bright-spot/vignette 的 mask 同步 2s 渐变
+const lampAnim = reactive({ v: lampStrength.value })
+let lampTween = null
+watch(lampStrength, (nv) => {
+  lampTween?.kill()
+  lampTween = gsap.to(lampAnim, { v: nv, duration: 2, ease: 'power2.out', overwrite: true })
+})
+const lampStrengthAnim = computed(() => lampAnim.v)
 const lampB = computed(() => lampBrightness.value / 100)
-const lampDivOpacity = computed(() => lampStrength.value * 0.3)
+const lampDivOpacity = computed(() => lampStrengthAnim.value * 0.3)
 const lampRadius = computed(() => 65)
 const lampMaskAlpha = computed(() => 0.03 + 0.97 * lampB.value)
+// mask 挖洞半径随强度缩放:开灯洞从 0 放大,关灯洞缩到 0(阴影渐进恢复)
 const lampMask = computed(() => {
-  if (lampStrength.value <= 0) return 'none'
+  const s = lampStrengthAnim.value
+  if (s <= 0.01) return 'none'
   const r = lampRadius.value
-  const tr = lampMaskAlpha.value * r
+  const tr = lampMaskAlpha.value * r * s
   const te = r + 30
   const cx = 38.2 + lampPendulumX.value
   return `radial-gradient(circle at ${cx}% 38.2%, transparent 0%, transparent ${tr}vw, rgba(0,0,0,0.15) ${tr + (te - tr) * 0.3}vw, rgba(0,0,0,0.4) ${tr + (te - tr) * 0.55}vw, rgba(0,0,0,0.7) ${tr + (te - tr) * 0.8}vw, black ${te}vw)`
@@ -425,9 +571,9 @@ const polaroidLayout = computed(() =>
 const viewerUrls = computed(() => recentPhotos.value.map(p => p.url))
 const openViewer = (idx) => { viewerIdx.value = idx; viewerVisible.value = true }
 
-// 灰尘粒子:40 个,阳光下的飘浮微粒
+// 灰尘粒子:20 个,阳光下的飘浮微粒
 const dustParticles = ref(
-  Array.from({ length: 40 }, (_, i) => ({
+  Array.from({ length: 20 }, (_, i) => ({
     id: i,
     left: Math.random() * 100 + '%',
     top: Math.random() * 100 + '%',
@@ -467,10 +613,6 @@ const bloomStyle = computed(() => ({
   left: sunScene.value.source.x,
   top: sunScene.value.source.y,
   background: `radial-gradient(circle, ${sunScene.value.palette.bloom} 0%, ${sunScene.value.palette.mid} 35%, transparent 70%)`,
-}))
-
-const ambientStyle = computed(() => ({
-  background: sunScene.value.palette.ambient,
 }))
 
 const brightSpotStyle = computed(() => ({
@@ -539,7 +681,10 @@ const navPrimary = computed(() => allNavModules.value.slice(0, 5))
 const navSecondary = computed(() => allNavModules.value.slice(5))
 
 // 主题切换
-const onTheme = (cmd) => { theme.value = applyTheme({ ...theme.value, ...cmd }) }
+const onTheme = (cmd) => {
+  theme.value = applyTheme({ ...theme.value, ...cmd, autoMode: false })
+  ElMessage.info({ message: '已切换到手动主题,日出日落自动切换已暂停(可在设置中恢复)', duration: 4000 })
+}
 
 const feedTypeLabel = (type) => type === 'blog' ? '博客' : type === 'diary' ? '日记' : type === 'photo' ? '照片' : ''
 const feedSummary = (f) => {
@@ -577,6 +722,34 @@ const weatherText = computed(() => {
   const map = { clear: '晴', cloud: '多云', rain: '雨', snow: '雪', fog: '雾', thunder: '雷' }
   return map[weather.value.condition] || ''
 })
+
+const weatherCodeIcon = (code) => {
+  if (code == null) return ''
+  const c = parseInt(code)
+  if (c === 100) return '☀️'
+  if (c >= 101 && c <= 104) return '☁️'
+  if (c >= 150 && c <= 154) return '☁️'
+  if (c >= 300 && c <= 399) return '🌧️'
+  if (c >= 400 && c <= 499) return '❄️'
+  if (c >= 500 && c <= 599) return '🌫️'
+  if (c >= 200 && c <= 299) return '⛈️'
+  return '☁️'
+}
+const formatFcDate = (dateStr) => {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  const weekdays = ['日', '一', '二', '三', '四', '五', '六']
+  return `${d.getMonth() + 1}/${d.getDate()} 周${weekdays[d.getDay()]}`
+}
+const loadWeatherDetail = async () => {
+  try {
+    const res = await fetch('/api/public/weather/detail')
+    if (res.ok) {
+      const json = await res.json()
+      if (json.code === 0 && json.data) weatherDetailData.value = json.data
+    }
+  } catch (e) {}
+}
 
 const togglePlay = () => {
   if (!audioEl.value) return
@@ -751,6 +924,9 @@ onMounted(() => {
     }
   }, 10000)
   loadWeather()
+  loadWeatherDetail()
+  loadPoints()
+  loadReminders()
 
   nextTick(() => {
     if (!root.value) return
@@ -760,10 +936,10 @@ onMounted(() => {
       gsap.from('.task-panel', { x: -30, autoAlpha: 0, duration: 0.8, delay: 0.3 })
       gsap.from('.weather-panel', { x: 30, autoAlpha: 0, duration: 0.8, delay: 0.3 })
       gsap.from('.anniversary-panel', { x: 30, autoAlpha: 0, duration: 0.8, delay: 0.35 })
+      gsap.from('.today-panel', { y: 40, autoAlpha: 0, duration: 0.8, delay: 0.35 })
       gsap.from('.vinyl-wrap', { x: 60, autoAlpha: 0, duration: 0.8, delay: 0.4 })
       gsap.from('.polaroid', { y: 40, autoAlpha: 0, duration: 0.6, stagger: 0.08, delay: 0.3 })
-      gsap.from('.album-closed', { scale: 0.9, autoAlpha: 0, duration: 0.8, delay: 0.3 })
-    }, root.value)
+      gsap.from('.album-closed', { scale: 0.9, autoAlpha: 0, duration: 0.8, delay: 0.3 })}, root.value)
   })
 })
 
@@ -771,27 +947,43 @@ onUnmounted(() => {
   ctx?.revert()
   if (clockTimer) clearInterval(clockTimer)
   stopPendulum()
+  lampTween?.kill()
 })
 </script>
 
 <style scoped>
 .home-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #EDE4D3 0%, #E2D8C4 50%, #D6CBB4 100%);
+  background-color: #E2D8C4;
   position: relative;
   overflow: hidden;
-  font-family: Georgia, 'Times New Roman', serif;
 }
-/* 夜间深色背景 */
-html.dark .home-page {
-  background: linear-gradient(135deg, #0F1A2E 0%, #162238 50%, #1A2540 100%);
-}
-
-/* 背景色块:清新淡雅(浅绿/浅黄/浅粉/浅蓝),高斯模糊,随机飘动 */
-.bg-blobs {
+/* 深浅主题背景:双层渐变伪元素,opacity 交叉淡入淡出 1s(linear-gradient 无法被 transition 插值,不能直接过渡 background) */
+.home-page::before,
+.home-page::after {
+  content: '';
   position: absolute;
   inset: 0;
   z-index: 0;
+  pointer-events: none;
+  transition: opacity 1s ease;
+}
+.home-page::before {
+  background: linear-gradient(135deg, #EDE4D3 0%, #E2D8C4 50%, #D6CBB4 100%);
+  opacity: 1;
+}
+.home-page::after {
+  background: linear-gradient(135deg, #0F1A2E 0%, #162238 50%, #1A2540 100%);
+  opacity: 0;
+}
+html.dark .home-page::before { opacity: 0; }
+html.dark .home-page::after { opacity: 1; }
+
+/* 背景色块:清新淡雅(浅绿/浅黄/浅粉/浅蓝),高斯模糊,随机飘动;z-index 1 在渐变背景伪元素(0)之上 */
+.bg-blobs {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   overflow: hidden;
   pointer-events: none;
 }
@@ -801,9 +993,10 @@ html.dark .home-page {
   filter: blur(60px);
   opacity: 0.4;
   will-change: transform;
+  transition: opacity 1s ease, box-shadow 1s ease;
 }
-/* 夜间色块大幅压暗 */
-html.dark .blob { opacity: 0.4; }
+/* 夜间色块压暗至 10% */
+html.dark .blob { opacity: 0.1; }
 html.dark .blob-1 { box-shadow: 0 0 120px 40px rgba(120,200,160,0.4); }
 html.dark .blob-2 { box-shadow: 0 0 120px 40px rgba(200,180,100,0.4); }
 html.dark .blob-3 { box-shadow: 0 0 120px 40px rgba(200,160,140,0.4); }
@@ -873,16 +1066,6 @@ html.dark .blob-5 { box-shadow: 0 0 120px 40px rgba(160,180,120,0.4); }
   50% { transform: translate(-120px, -180px) scale(1.3); }
 }
 
-/* 暖色环境光:黄金时刻整体微染(multiply 极低透明度) */
-.ambient-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  mix-blend-mode: multiply;
-  transition: background 3s ease;
-}
-
 /* 亮斑图层:在内容之上(z>30),阴影之下(z<35),multiply 让白色=透明、黑色=压暗、彩色=染色;台灯 mask 挖洞祛除染色 */
 .bright-spot {
   position: fixed;
@@ -905,14 +1088,13 @@ html.dark .blob-5 { box-shadow: 0 0 120px 40px rgba(160,180,120,0.4); }
   transition: opacity 3s ease;
 }
 
-/* 台灯光源:左上黄金分割点(38.2%,38.2%),半径60vw(页面3/5),最顶层 */
+/* 台灯光源:左上黄金分割点(38.2%,38.2%),半径60vw(页面3/5),最顶层;opacity 由 JS 补间 2s 渐变(与 mask 同步) */
 .lamp-light {
   position: fixed;
   border-radius: 50%;
   z-index: 100;
   pointer-events: none;
   filter: blur(20px);
-  transition: opacity 0.3s ease;
 }
 
 /* 窗户阴影:单层 6 条 bar,不透明色 normal 合并重叠区,multiply 层半透明;夜间固定 70%;台灯 mask 挖洞祛除阴影 */
@@ -1403,8 +1585,56 @@ html.dark .blob-5 { box-shadow: 0 0 120px 40px rgba(160,180,120,0.4); }
   background: rgba(255, 210, 130, 0.22);
   box-shadow: 0 0 12px rgba(255, 200, 100, 0.3), 0 0 0 1px rgba(255, 200, 100, 0.2) inset;
 }
-.temp-slider { width: 72px; vertical-align: middle; cursor: pointer; opacity: 0.7; transition: opacity 0.2s; }
-.temp-slider:hover { opacity: 1; }
+
+/* 顶栏时钟(原独立面板合并) */
+.topbar-clock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.1;
+  margin-right: 4px;
+  user-select: none;
+}
+.topbar-time {
+  font-size: 18px;
+  font-weight: 600;
+  color: #3A2E22;
+  letter-spacing: 1px;
+  font-variant-numeric: tabular-nums;
+}
+.topbar-date {
+  font-size: 11px;
+  color: rgba(58, 46, 34, 0.6);
+  margin-top: 1px;
+}
+html.dark .topbar-time { color: #E8DCC8; }
+html.dark .topbar-date { color: rgba(232, 220, 200, 0.6); }
+
+/* 光照设置 popover */
+.light-settings { display: flex; flex-direction: column; gap: 10px; padding: 4px 0; }
+.ls-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.ls-label { flex: 1; color: #3A2E22; }
+.ls-slider { flex: 1.5; cursor: pointer; }
+.ls-val { width: 28px; text-align: right; font-variant-numeric: tabular-nums; color: #3A2E22; opacity: 0.7; font-size: 12px; }
+.ls-lamp-btn {
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: rgba(58, 46, 34, 0.08);
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s;
+}
+.ls-lamp-btn.on { background: rgba(255, 200, 100, 0.25); color: #8B6F47; }
+.ls-lamp-btn:hover { background: rgba(58, 46, 34, 0.14); }
+.ls-divider { height: 1px; background: rgba(58, 46, 34, 0.1); margin: 4px 0; }
+.ls-row-btn { cursor: pointer; padding: 4px 8px; border-radius: 6px; transition: background 0.2s; }
+.ls-row-btn:hover { background: rgba(58, 46, 34, 0.06); }
+.ls-row-btn .ls-label { flex: none; }
 
 /* 用户头像:温暖胶囊 */
 .nav-user {
@@ -1475,6 +1705,7 @@ html.dark .blob-5 { box-shadow: 0 0 120px 40px rgba(160,180,120,0.4); }
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.4);
   color: #3A2E22;
   overflow: hidden;
+  transition: background-color 1s ease, border-color 1s ease, color 1s ease;
 }
 /* 拖动条:面板顶部 */
 .drag-handle {
@@ -1612,29 +1843,134 @@ html.dark .blob-5 { box-shadow: 0 0 120px 40px rgba(160,180,120,0.4); }
 }
 .task-meta { font-size: 12px; opacity: 0.6; margin-top: 3px; }
 
-/* 右上时间天气:宽度与左侧一致 380,向中间靠拢 */
-.weather-panel {
-  text-align: center;
-}
-.clock {
-  font-size: 32px;
-  font-weight: 700;
-  letter-spacing: 2px;
-}
-.date {
+/* === 天气面板 === */
+.weather-panel { text-align: center; }
+.weather-scroll { overflow-y: auto; max-height: 100%; }
+.weather-scroll::-webkit-scrollbar { width: 0; }
+.weather-main { padding: 4px 20px 12px; cursor: pointer; transition: background 0.2s; border-radius: 12px; }
+.weather-main:hover { background: rgba(255, 255, 255, 0.15); }
+.weather-expand-icon { font-size: 11px; margin-left: 4px; vertical-align: middle; transition: transform 0.3s; }
+.weather-expand-icon .flipped { transform: rotate(180deg); }
+.weather-city {
   font-size: 13px;
-  opacity: 0.7;
-  margin-bottom: 6px;
+  opacity: 0.6;
+  letter-spacing: 1px;
 }
-.weather {
+.weather-current {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  font-size: 15px;
+  gap: 8px;
+  margin: 6px 0 2px;
 }
-.weather-icon { font-size: 20px; }
-.weather-temp { font-weight: 700; }
+.weather-icon-float {
+  font-size: 36px;
+  animation: icon-float 3s ease-in-out infinite;
+  display: inline-block;
+}
+@keyframes icon-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.weather-temp-large {
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1;
+  transition: color 0.6s ease;
+}
+.temp-unit { font-size: 24px; font-weight: 400; opacity: 0.7; }
+.weather-condition {
+  font-size: 14px;
+  opacity: 0.8;
+  font-weight: 500;
+}
+
+.weather-loading-text { font-size: 13px; opacity: 0.5; padding: 20px; text-align: center; }
+
+.weather-detail {
+  padding: 0 20px 16px;
+  text-align: left;
+}
+.wd-section { margin-bottom: 10px; }
+.wd-section:last-child { margin-bottom: 0; }
+.wd-title {
+  font-size: 11px;
+  opacity: 0.5;
+  margin-bottom: 6px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* 3 天预报:横向卡片 */
+.wd-forecast { display: flex; gap: 6px; }
+.wd-fc-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 4px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.3);
+  transition: background 0.2s, transform 0.2s;
+  cursor: default;
+}
+.wd-fc-card:hover { background: rgba(255, 255, 255, 0.5); transform: translateY(-2px); }
+.wd-fc-date { font-size: 11px; opacity: 0.6; }
+.wd-fc-icon { font-size: 20px; }
+.wd-fc-temp { font-size: 12px; font-weight: 600; }
+.wd-fc-text { font-size: 10px; opacity: 0.6; text-align: center; }
+
+/* 空气质量 */
+.wd-air {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(100, 200, 100, 0.12);
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+.wd-air-label { font-size: 11px; opacity: 0.6; }
+.wd-air-aqi { font-weight: 700; font-size: 16px; }
+.wd-air-cat { font-size: 11px; opacity: 0.8; }
+.wd-air-pm { font-size: 10px; opacity: 0.5; margin-left: auto; }
+
+/* 预警 */
+.wd-warning-item {
+  background: rgba(255, 180, 100, 0.2);
+  border-radius: 12px;
+  padding: 8px 12px;
+  margin-bottom: 4px;
+}
+.wd-warn-type { font-weight: 600; color: #d97706; display: block; font-size: 12px; }
+.wd-warn-text { font-size: 11px; opacity: 0.8; display: block; margin-top: 3px; line-height: 1.4; }
+
+/* 分钟降水 */
+.wd-minutely {
+  background: rgba(100, 150, 255, 0.12);
+  border-radius: 12px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wd-minutely-text { font-weight: 600; font-size: 13px; }
+.wd-minutely-desc { font-size: 11px; opacity: 0.7; }
+
+/* 生活指数 */
+.wd-indices { display: flex; flex-direction: column; gap: 4px; }
+.wd-idx-item {
+  display: grid;
+  grid-template-columns: 56px 48px 1fr;
+  gap: 6px;
+  font-size: 11px;
+  align-items: baseline;
+  padding: 4px 0;
+}
+.wd-idx-name { opacity: 0.6; }
+.wd-idx-cat { font-weight: 600; }
+.wd-idx-text { opacity: 0.7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* 纪念日面板 */
 .anniversary-panel {
@@ -1675,15 +2011,51 @@ html.dark .blob-5 { box-shadow: 0 0 120px 40px rgba(160,180,120,0.4); }
 .days-num { font-size: 20px; font-weight: 700; color: #A8483A; }
 .days-unit { font-size: 12px; opacity: 0.7; }
 
+/* === 今日概览面板:积分签到 + 待办提醒 === */
+.today-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 24px 18px;
+}
+.today-scroll::-webkit-scrollbar { width: 0; }
+.today-points {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 2px 0 12px;
+}
+.tp-item { display: flex; flex-direction: column; align-items: center; cursor: pointer; padding: 4px 10px; border-radius: 10px; transition: background 0.2s; }
+.tp-item:hover { background: rgba(58, 46, 34, 0.06); }
+.tp-num { font-size: 20px; font-weight: 700; color: #A8483A; line-height: 1; }
+.tp-label { font-size: 11px; opacity: 0.6; margin-top: 3px; }
+.today-reminders {
+  border-top: 1px solid rgba(58, 46, 34, 0.08);
+  padding-top: 6px;
+}
+.today-reminder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.today-reminder:hover { background: rgba(58, 46, 34, 0.05); }
+.tr-dot { width: 6px; height: 6px; border-radius: 50%; background: #C9A876; flex-shrink: 0; }
+.tr-title { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr-time { font-size: 11px; opacity: 0.5; font-variant-numeric: tabular-nums; }
+html.dark .tp-num { color: #D4886A; }
+
 /* 响应式 */
 @media (max-width: 1280px) {
   .draggable-panel { font-size: 13px; }
 }
 @media (max-width: 960px) {
-  .feed-panel, .task-panel, .anniversary-panel { display: none; }
+  .feed-panel, .task-panel, .anniversary-panel, .today-panel { display: none; }
   .album-corner { width: 220px; height: 200px; right: 16px; bottom: 16px; }
   .polaroid { width: 120px; margin-left: -60px; margin-top: -68px; }
-  .clock { font-size: 26px; }
+  .topbar-date { display: none; }
   .vinyl-player { width: 90px; height: 90px; margin-right: -45px; }
 }
 </style>

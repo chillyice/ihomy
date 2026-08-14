@@ -136,6 +136,13 @@
             </el-form>
           </div>
 
+          <!-- 创建新家庭:当前用户成为新家庭的 OWNER -->
+          <div class="card settings-card">
+            <h2>创建新家庭</h2>
+            <p class="share-tip">创建一个新的家庭组,你将成为新家庭的家长(OWNER)。创建后自动切换到新家庭,可在顶栏切换回原家庭。</p>
+            <el-button type="success" plain @click="createNewFamily">创建新家庭</el-button>
+          </div>
+
           <!-- 背景音乐:仅户主(OWNER)可见;可上传音乐文件或填外链,保存后全家人全局播放 -->
           <div v-if="userStore.isOwner" class="card settings-card">
             <h2>{{ $t('music.title') }}</h2>
@@ -208,7 +215,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { profileApi, familyApi, fileApi } from '@/api'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import { applyLocale } from '@/i18n'
@@ -336,6 +343,20 @@ const copyShare = async () => {
   } catch {
     ElMessage.error(t('settings.copyFailed'))
   }
+}
+
+const createNewFamily = async () => {
+  try {
+    const { value } = await ElMessageBox.prompt('请输入新家庭名称', '创建新家庭', {
+      confirmButtonText: '创建',
+      cancelButtonText: '取消',
+      inputPattern: /.+/,
+      inputErrorMessage: '家庭名称不能为空',
+    })
+    await familyApi.create({ name: value })
+    ElMessage.success('家庭创建成功,已切换到新家庭')
+    location.reload()
+  } catch (e) {}
 }
 
 // 上传头像/封面/音乐:拿到文件 URL 回填表单,由保存动作落库
