@@ -5,6 +5,7 @@ import com.ihomy.annotation.RequirePermission;
 import com.ihomy.common.Result;
 import com.ihomy.entity.SysOperationLog;
 import com.ihomy.service.OpsService;
+import com.ihomy.service.WeatherService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ import java.util.Map;
 public class OpsController {
 
     private final OpsService opsService;
+    private final WeatherService weatherService;
 
     @Operation(summary = "系统资源总数(可按时间/用户/家庭过滤)")
     @RequirePermission("ops:view")
@@ -61,5 +63,12 @@ public class OpsController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false) String keyword) {
         return Result.success(opsService.logs(current, size, operatorId, module, operationType, startDate, endDate, keyword));
+    }
+
+    @Operation(summary = "和风天气 API 用量统计(控制台 API,凭证未配返回 null)")
+    @RequirePermission("ops:view")
+    @GetMapping("/weather/quota")
+    public Result<Map<String, Object>> weatherQuota() {
+        return Result.success(weatherService.getQuota());
     }
 }

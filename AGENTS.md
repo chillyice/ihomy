@@ -51,7 +51,7 @@
 - **root 仅用于初始化**:`mysql -uroot -p < backend/src/main/resources/schema.sql`,执行一次(建库、建表、创建 ihomy 账号、初始数据)。
 - **业务运行用 `ihomy` 账号**:仅授予 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`(最小权限,无 CREATE/ALTER/DROP)。application.yml 连接用 `ihomy`,**不要用 root 跑业务**。
 - 账号同时创建 `localhost` 和 `%` 两个 host(本机/远程应用服务器都能连)。
-- **39 张表**,前缀分类(**V4.1 起执行全面重命名**):
+- **41 张表**,前缀分类(**V4.1 起执行全面重命名**):
   - `sys_`(系统/账号/权限/家庭设置,22 张):`sys_user` / `sys_role` / `sys_auth` / `sys_user_role` / `sys_role_auth` / `sys_family_info` / `sys_home_module` / `sys_password_reset_token` / `sys_user_group` / `sys_user_group_member` / `sys_operation_log` / `sys_dict_item` / `content_wish`(刻意外)等
   - `family_`(家庭事务,17 张):`family_anniversary` / `family_notification` / `family_apply` / `family_invitation_code` / `family_checkin` / `family_points_record` / `family_points_product` / `family_points_order` / `family_task` / `family_reminder` / `family_plan` / `family_plan_task` / `family_book_record` / `family_chat_message` / `family_chat_read` / `family_user_label` / `family_tree`
   - `content_`(内容类,10 张):`content_blog` / `content_diary` / `content_album` / `content_photo` / `content_comment` / `content_visibility` / `content_like` / `content_video` / `content_video_wish` / `content_wish`
@@ -202,14 +202,14 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
   - **不做自动同步**:上传只保留页面自主上传、创建相册上传、直接传 NAS 三条线。
   - **硬删除策略(V5.1,已实施)**:删除照片/相册/视频时**物理删除 DB 记录 + 删除磁盘文件**。`FileService.deleteByUrl(url)` 按 `/files/` URL 解析物理路径删文件(外链/空跳过,失败仅告警,带 `normalize()+startsWith` 防越界,顺带尝试清空父目录)。照片删除走 `PhotoMapper.deletePhysicalById`(XML 物理删,绕过全局 logic-delete);相册删除连带照片记录+文件全删(`deletePhysicalByAlbumId`);视频删除**从软删改为硬删** `deletePhysicalById`,并删 `video_url`+`poster`。**关键坑**:MyBatis-Plus 全局配 `logic-delete-field: deleted`(`application.yml`),`deleteById` 实为 UPDATE 软删——要物理删必须用自定义 XML `DELETE` 语句。**覆盖范围**:仅照片/相册/视频三处;博客封面、头像、家庭封面、背景音乐、家谱照片删除时**未**连带删文件(文件成孤儿,可接受,后续按需扩展)。
 - **博客自定义分类(V5.2,已实施)**:`content_blog.category VARCHAR(50)`(schema.sql + live DB 已 ALTER)。`BlogController` 增 `GET /blog/categories` 返回 `SELECT DISTINCT category WHERE family_id=?`(空 NULL 排除);博客列表/编辑/详情均带 category 字段。前端博客列表页顶部水平分类筛选条(全部 + 各分类 tag,点击切换),编辑器 `el-select filterable allow-create` 选或建分类;i18n `blog.category/categoryPlaceholder` 中英。无新权限码,登录即可用。
-- **天气代理(V5.2,已实施)**:`WeatherService.java` 调和风天气免费 API(IP 定位城市 → 当前天气),Redis `ihomy:weather` 缓存 30 分钟,无 key 或失败返回 null(前端降级不显示)。`GET /api/public/weather` 公开接口返回 `{temp,condition,text}`。前端 `TopBarExtras.vue` emit weather,Home 顶栏右上毛玻璃面板显示图标+温度+文字;`weatherIcon/weatherText` 按 condition 映射 emoji/中文。`app.weather-key` 配置在 application.yml(空字符串=禁用)。无新表。
+- **天气代理(V5.2 → V5.6 重构)**:`WeatherService.java` 用和风天气 **JWT(Ed25519)身份认证**(JDK 21 原生 `EdDSA`,无新依赖),凭证四件套 `app.weather-api-host`/`weather-project-id`/`weather-key-id`/`weather-private-key`(PEM 私钥,YAML `|` 块标量)。**全部留空=禁用**(`/isEnabled()` 返回 false,接口返回 null,前端降级)。**凭证优先从 `sys_weather_credential` 表读 `status=1` 的记录(多环境账本,DB 空 fallback yml)**:Win 测试种子 status=1,Linux 生产种子 status=0(上线时 SQL 翻转)。**私钥不入 git**(schema.sql 种子 `private_key=NULL`,application.yml 留空;部署后手动 UPDATE 填入;`credentials.local.sql` 模板在 resources 下,.gitignore 忽略)。**月度配额 49999 次/月**(`isQuotaExceeded()` Redis 计数器 `ihomy:weather:quota:{yearMonth}` + DB fallback;超限返回 null 前端降级,次月自动恢复)。**每次 API 调用记录日志**(`sys_weather_log` 表:api_type/location_id/status/cost_ms/response/error_msg;天气数据公开可存 response,quota 接口响应可能含账号信息不存)。Redis 缓存:now 30m / forecast 30m / warning 5m / indices 30m / air 30m / minutely 10m / location 6h。`GET /api/public/weather` 返回 `{temp,condition,text}`(顶栏简版);`GET /api/public/weather/detail` 返回聚合 `{now,daily,hourly,warning,indices,air,minutely}`(首页天气面板点击展开)。`GET /api/ops/weather/quota` 控制台 API 用量统计(OPS 运维页新增"和风天气 API"标签页,watch tab 懒加载)。前端 `TopBarExtras.vue`/`Home.vue` 天气面板点击展开详情(7d 预报+预警+生活指数+空气+分钟降水)。**光照测试页天气控制(V5.6)**:`LightTest.vue` 控制台新增 ☀️/☁️/🌧️/❄️ 4 按钮切换天气模式,通过 `weatherMultiplier`(晴 1.0/多云 0.55/雨 0.25/雪 0.4)衰减 `lightOpacity`/`rays`/`reflectionOpacity`,默认晴天高亮。
 - **太阳位置系统(V5.2,已实施)**:
   - **SolarUtil.java**(NOAA 算法,纯数学无外部依赖):给定 lat/lng/timezone/date → 96 个 15 分钟时隙(00:00-23:45)的太阳高度角/方位角 + 日出日落/月相 + 月出月落。核心方法 `buildSlots(lat,lng,tzOffsetMin,date)` 返回 `List<Map>`(time/altitude/azimuth),`sunAltAz(lat,dec,haDeg)` 计算单点高度+方位。
   - **关键算法修复**:① 时角 `ha` 归一化到 -180~180°(`while (ha>180) ha-=360; while (ha<-180) ha+=360`),修复凌晨 `utcMin - solarNoonMin > 180°` 导致 `cos(ha)` 正负反转、方位角算反;② 方位角用 `atan2(-sin(ha), (sin(dec)-sin(lat)*sin(alt))/(cos(lat)*cos(alt)))` 替代 `acos(cosAz) + if(ha>0) 360-az`,修复夏季高纬度日出东北方时 `acos` 返回值象限歧义(07:45 az=269°→08:00 az=92° 跳变)。修复后全天平滑:日出 76°(东偏北)→ 正午 176°(正南)→ 日落 288°(西偏北)。
   - **SunService.java**:IP 定位(ip-api.com,`/getIp` 取 client IP)→ lat/lng/timezone,Redis 缓存 6h 位置(`ihomy:sun:loc:`)+ 12h 时隙表(`ihomy:sun:slots:{date}`,按日缓存避免重复计算)。本地/开发 IP 走默认坐标(北京)。
   - **接口**:`GET /api/public/sun-info` 公开,返回 `{date,location:{lat,lng,city},sunrise,sunset,moonrise,moonset,moonPhase,slots:[{time,altitude,azimuth}×96]}`。
 - **沉浸式首页(V5.2,已实施)**:Home 路由 `meta: { immersive: true }`,`App.vue` 检测 `isImmersive` 隐藏全局 AppHeader/BackToTop/SideTabs/MusicPlayer(页面自带沉浸式 UI)。**方案 B「展开的相册」**:牛皮纸托底(`.album-base` inset -30px)+ 中央照片轮播主舞台 + 左侧毛玻璃面板(动态 feed 微信风:头像独立行 + feed-content 包裹 nick+bubble)+ 右侧毛玻璃面板(时间天气 + 纪念日倒计时)+ 黑胶唱片播放器(`.vinyl-wrap` fixed 右下,半藏右边界 `margin-right: -60px`,hover 滑出 + scale 1.08)+ 顶栏(头像下拉 个人/设置/退出 + 语言切换 applyLocale + 消息铃铛 el-popover+el-badge + 更多导航 navPrimary 5 个 + navSecondary 下拉 + 光照测试链接)+ 背景色块(blur 60px opacity 0.4,色值 #9CD0B5/#EDDB8C/#ECC0AC/#A8C9DE/#C0D8A8,背景米白 #EDE4D3→#E2D8C4→#D6CBB4)+ GSAP 入场动画(面板/相册,光柱不入场直接显示当前状态)。毛玻璃样式:`rgba(255,255,255,0.25)` + `blur(30px)` + `border: 1px solid rgba(255,255,255,0.5)` + `border-radius: 28px`(无 mask 渐变);两侧面板宽度均 380px,left/right: 24px。
-- **体积光系统(V5.2,已实施)**:基于真实太阳位置的丁达尔效应,分层 z-index(从底到顶):bg-blobs(0)→ ambient-layer(2,multiply 暖染)→ album-stage/panels(30/40)→ **window-shadow(35,窗框内阴影,在内容上方)**→ vignette(44)→ dust-layer(46,screen)→ **light-layer(48,screen,最顶层)**→ top-bar(50)。
+- **体积光系统(V5.2,已实施)**:基于真实太阳位置的丁达尔效应,分层 z-index(从底到顶):bg-blobs(1)→ ~~ambient-layer(2,multiply 暖染,已删除)~~→ album-stage/panels(30/40)→ **window-shadow(35,窗框内阴影,在内容上方)**→ vignette(44)→ dust-layer(46,screen)→ **light-layer(48,screen,最顶层)**→ top-bar(50)。
   - **光束(7 条羽毛状)**:`makeRays(opacityScale)` 返回 7 条宽度 50-110px、偏移 -210~+210px、blur 30-55px 的光柱;光源水平位置 `sourceX = (az-90)/180*100`(东=左 5%,南=中 50%,西=右 95%);旋转 `rotation = (az-180)*0.55`(clamp ±55°,transform-origin center,正旋转=顺时针=顶部转右;光源在左→光柱指向右下,与光源位置一致)。
   - **光源辉光**:`.light-bloom` 700px 圆形,`radial-gradient(bloom→mid→transparent)` + `blur(60px)`。
   - **窗框内阴影**(`.window-shadow` z-index 35,multiply 变暗):竖直条 `.shadow-v`(top -30%、height 160%、left 50% 居中、transform-origin top center、rotation = `azDev*0.5` 即太阳在东→阴影偏左,太阳在西→阴影偏右)+ 横向条 `.shadow-h`(top = `80-alt*0.8`,太阳高→近顶部,太阳低→远;跟随竖直条同角度旋转)。
@@ -284,6 +284,25 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
   - **album-corner 扩大 10%**:`25vw → 27.5vw`,`min-height: 280px → 308px`。
   - **album-closed 增大 0.5 倍**:`280×210 → 420×315`。
 
+- **站点底部备案号(V5.6,已实施)**:`SiteFooter.vue` 左下角 fixed,工信部 ICP 备案号(链接 beian.miit.gov.cn)+ 公安备案占位"公安备案 待登记"(灰色无链接,拿到后改正式号 + 链接 beian.gov.cn)。样式与顶栏一致(磨砂玻璃 `backdrop-filter: blur(8px)` + 小字 11px + `var(--color-card)`),沉浸式页(首页)隐藏。`App.vue` 引入,所有非沉浸式页面显示。
+
+- **首页 UI 优化(V5.6 续,已实施)**:
+  - **顶栏齿轮 popover**:删除顶栏的光照测试链接/台灯开关/色温亮度滑块,替换为齿轮图标(`Setting` icon)popover。popover 内含:台灯 3 态按钮(自动/常开/关闭)、色温滑块、亮度滑块、重置面板布局按钮、光照测试页入口。
+  - **时钟合并进顶栏**:删除独立 `clock-panel`,顶栏右侧(齿轮前)加 `.topbar-clock`(时间 18px + 日期 11px),移动端隐藏日期。
+  - **天气面板缩减**:默认高度 180px(只显示城市+温度+图标+状况),点击 `.weather-main` 切换 `weatherExpanded`,展开到 440px 显示完整详情,带箭头旋转动画。
+  - **今日面板**:新增可拖拽面板"今日"(左侧第 3 块,`todayDrag`):积分余额+连续天数+签到按钮(`pointsApi.stats/checkin`)+ 今日待办提醒前 3 条(`reminderApi.list`,过滤 `done!==1`)。登录可见,小屏隐藏。
+  - **字体统一**:删 `.home-page` 的 `Georgia` serif 和 `.draggable-panel` 的 `PingFang` 显式声明,全页继承 body 的 sans-serif(`-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif`)。
+  - **台灯 mask JS 补间**:mask-image 不支持 CSS transition,改用 GSAP 2s 补间驱动 `lampAnim = reactive({ v })`。`watch(lampStrength)` 触发 `gsap.to(lampAnim, { v: nv, duration: 2, ease: 'power2.out' })`。`lampDivOpacity` 和 `lampMask` 全部由动画值 `lampStrengthAnim` 计算。mask 挖洞半径 `tr = maskAlpha * r * s` 随强度缩放:开灯洞从 0 放大,关灯洞缩到 0。移除 `.lamp-light` 的 CSS transition(避免双重驱动)。Home + LightTest 同步。
+  - **主题 1s 过渡**:`.home-page`/`.light-test-page` 的 `linear-gradient` 背景不支持 CSS transition 插值,改为双层伪元素 `::before`(浅色渐变)/`::after`(深色渐变),`html.dark` 时 opacity 交叉淡入淡出 1s。`.bg-blobs` z-index 0→1 确保在伪元素之上。`.draggable-panel`/`.glass-panel`/`.blob` 加 `transition: background-color/border-color/color/opacity 1s ease`。`body, #app` 加全局过渡。
+  - **灰尘 40→20**:`dustParticles` 从 40 减到 20(Home + LightTest)。
+  - **resize 修复**:模板里 5 个 `.resize-handle` 都没绑定 `@mousedown="xxx.onResizeStart"`——已全部补上。
+  - **拖拽边界 + anchorRight**:`useDragResize` 内置 clamp——左右不越出页面、顶部最低到导航栏下方(`minY=72`)、底部不越界;resize 时也限制不超出视口。位置/大小持久化到 localStorage(`ihomy:panel:{feed,task,weather,anniversary,today}`),`reset()` 清持久化恢复初始值。**`anchorRight` 参数**:right 定位面板(weather/anniversary)的 `pos.x` 为离右边缘距离(正数),拖动方向取反;旧持久化值(负数)通过 `Math.abs()` 自动迁移。
+  - **深色色块亮度 10%**:`html.dark .blob { opacity: 0.1 }`(Home + LightTest)。
+  - **深色铃铛颜色**:`html.dark .msg-icon { color: rgba(232,220,200,0.8) }`(main.css)。
+  - **深色 `--color-primary` 覆写**:`main.css` 的 `html.dark` 加 `--color-primary: #E8DCC8`(全局修复,影响所有用 `var(--color-primary)` 的 ~20 处标题,含 Settings 页卡片标题)。
+  - **删除 ambient 层**:V5.6 续初版加的 ambient-layer(黄金时刻暖染 multiply)已删除——效果太淡(0.05~0.12)且增加复杂度,bright-spot 层已覆盖前景染色。Home.vue + LightTest.vue 删除 ambient-layer(div/CSS/computed/开关按钮/watchEffect),齿轮 popover 去掉 ambient 开关行,UI设计提示词.md 同步删除第 2 节。
+  - **手动切主题取消自动**:Home.vue 的 `onTheme` 设 `autoMode: false` + `ElMessage.info` 提示"已切换到手动主题,日出日落自动切换已暂停(可在设置中恢复)"。`applyAutoTheme` 检测 `autoMode=false` 自动跳过。解决:夜晚手动切浅色后,5 分钟光影切换时又被切回深色的问题。Settings 页"日出日落自动切换"开关可恢复。
+
 ## 部署约定(Linux 2GB 求稳)
 
 - **求稳方案(2GB 内存)**:MySQL 本机部署 + Redis 用 Docker。MySQL 调优后 ~180MB,本机部署无需 Docker daemon 为它常驻;Redis 轻量,Docker 化便于升级。
@@ -300,8 +319,8 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 | 功能 | 版本 | 关键点 |
 |------|------|--------|
-| 注册/登录/找回 | V3.8 重做 | 邮箱=账号(uk_email),密码+确认密码+图形验证码(dev 固定 qwer);注册可以带邀请码入家庭或创建新家庭;注册成功不自动登录 |
-| 家庭与成员 | V3.0/V3.6 | 多家庭(主家庭+当前家庭,Redis `user:curfamily:{id}`;`POST /auth/family/switch`)+ 邀请码(`?invite=`)/公开家庭搜索/入家申请/默认家庭 |
+| 注册/登录/找回 | V3.8 重做 | 邮箱=账号(uk_email),密码+确认密码+图形验证码(dev 固定 qwer);注册可以带邀请码入家庭或创建新家庭;注册成功不自动登录。**邀请码状态校验**:`AuthService.register`/`joinFamily` 校验 `status==INVITE_UNUSED`才放行(曾误写 `INVITE_USED` 导致所有邀请码返回 NOT_FOUND,已修复) |
+| 家庭与成员 | V3.0/V3.6 | 多家庭(主家庭+当前家庭,Redis `user:curfamily:{id}`;`POST /auth/family/switch`)+ 邀请码(`?invite=`)/公开家庭搜索/入家申请/默认家庭;**`POST /family` 创建新家庭**(已登录用户,绑定 OWNER+切换当前家庭) |
 | 博客/日记 | V2.0 | 标签、可见范围(默认 FAMILY 全家)、评论、点赞、首页 feed |
 | 相册/照片 | V2.2 | 批量上传、软删、按相册类型 public/private 映射可见范围 |
 | 家庭纪念日 | V3.2 | 阳历/阴历,支持季月,生日关联成员,首页倒计时 |
@@ -330,7 +349,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 物品定位 | V5.0 | 1期已上线:五级粒度(家>房子>房间>家具>位置,支持多套房+多楼层),房子/房间/家具/物品 CRUD+跨级搜索;2期户型图/3期 AI 语义待做(见规划事项) |
 | 文件硬删除 | V5.1 | 删照片/相册/视频→物理删 DB 行 + 删磁盘文件(`FileService.deleteByUrl`);视频从软删改硬删;自定义 XML DELETE 绕过全局 logic-delete;仅覆盖照片/相册/视频,博客封面/头像/音乐等未连带删 |
 | 博客自定义分类 | V5.2 | `content_blog.category`,`GET /blog/categories` 返回 DISTINCT;前端水平分类筛选条 + 编辑器 allow-create |
-| 天气代理 | V5.2 | `WeatherService` 和风天气 API + Redis 30 分钟,`GET /public/weather`;顶栏毛玻璃面板显示 |
+| 天气代理 | V5.2/V5.6 | `WeatherService` 和风天气 **JWT(Ed25519)身份认证**(JDK 21 原生);凭证四件套(api-host/project-id/key-id/private-key);**凭证优先从 `sys_weather_credential` 表读 status=1(DB 空 fallback yml)**,Win 测试 status=1 / Linux 生产 status=0;**私钥不入 git**(schema.sql 种子 NULL + yml 留空,部署后手动 UPDATE);**月度配额 49999 次/月**(Redis 计数器 + DB fallback,超限停止调用);**每次调用记 `sys_weather_log`**(天气数据存 response,quota 不存);Redis 缓存 now 30m/forecast 30m/warning 5m/indices 30m/air 30m/minutely 10m/location 6h;`GET /public/weather` 顶栏简版,`GET /public/weather/detail` 首页聚合(7d+24h+预警+指数+空气+分钟降水);`GET /ops/weather/quota` OPS 用量统计;前端 TopBarExtras/Home 天气面板点击展开;LightTest 控制台 ☀️/☁️/🌧️/❄️ 天气切换(weatherMultiplier 衰减光强) |
 | 太阳位置系统 | V5.2 | `SolarUtil`(NOAA 96 时隙)+ `SunService`(IP 定位 + Redis 6h/12h 缓存),`GET /public/sun-info`;时角归一化 + atan2 方位角修复 |
 | 沉浸式首页 | V5.2 | Home `meta.immersive`,App.vue 隐藏全局组件;方案 B 展开的相册:牛皮纸托底+照片轮播+左右毛玻璃(动态/任务+天气/纪念日)+黑胶播放器+顶栏+背景色块+GSAP |
 | 体积光系统 | V5.2 | 丁达尔效应:7 条光束 + 光源辉光 + 窗框内阴影(竖直+横向)+ 暗角 + 40 灰尘粒子;分层 z-index 0/2/30/35/44/46/48;windowLight.js 4 档调色板 + 月相夜间 |
@@ -344,6 +363,9 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 光照系统 V5.4 | V5.4 | 阴影顶框下移 3vh+顶框随太阳高度微移;2点重置跳变扫光;台灯 mask 祛除阴影(3 层 mask+钟摆跟随);3 态开关(auto/on/off)+傍晚开清晨关;黄金分割点位置+色温/亮度可调+钟摆运动(椭圆变形);导航栏温暖磨砂玻璃;夜间深色背景;IP 默认济南;LightTest 深浅模式按钮+控制台优化 |
 | 首页相册重构 | V5.4 | 右下角拍立得堆(近 7 天照片,白边+随机旋转+hover 抽出)/闭合相册(无新照片,木色封面);点击拍立得→el-image-viewer 大图浏览;后端零改动 |
 | UI 精简与可拖拽面板 | V5.5 | Top bar 去底色边框;深色主题深蓝背景+blobs 40%荧光;深色模式字体浅色;只留浅色/深色主题;可拖拽面板(useDragResize+drag-handle+resize-handle);album-corner 扩大 10%;album-closed 增大 0.5 倍 |
+| 站点底部备案号 | V5.6 | `SiteFooter.vue` 左下角 ICP+公安占位;磨砂玻璃小字;沉浸式页隐藏 |
+| 首页 UI 优化 | V5.6 续 | 顶栏齿轮 popover(色温/亮度/重置布局);时钟合并进顶栏;天气面板默认 180px 点击展开;今日面板(积分+提醒);字体统一 sans-serif;台灯 mask GSAP 2s 补间(opacity+mask 同步);主题双层伪元素背景 1s 过渡;灰尘 40→20;resize 修复;拖拽边界 clamp+持久化+anchorRight;深色色块 10%;深色 --color-primary 覆写;删除 ambient 层;手动切主题取消自动+提示 |
+| 创建新家庭 | V5.6 续 | `POST /family`(FamilyController)已登录用户创建新家庭组,绑定 OWNER + 切换当前家庭;Settings 页"创建新家庭"卡片(`ElMessageBox.prompt` 输入名称→`familyApi.create`→reload) |
 
 ## 规划事项(未实现,排序按推荐优先级)
 

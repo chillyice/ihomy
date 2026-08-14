@@ -29,6 +29,7 @@
 
 /* 暗色模式:夜色深蓝 */
 html.dark {
+  --color-primary: #E8DCC8;
   --color-bg: #0F1A2E;
   --color-bg-2: #162238;
   --color-card: #1A2540;
@@ -104,6 +105,14 @@ html.dark .draggable-panel {
 html.dark .handle-grip {
   background: rgba(232, 220, 200, 0.25);
 }
+html.dark .msg-icon {
+  color: rgba(232, 220, 200, 0.8);
+}
+html.dark .msg-icon:hover { color: #E8DCC8; }
+
+/* 深浅主题切换:1s 颜色过渡(只作用于容器级,避免拖慢 hover) */
+body, #app { transition: background-color 1s ease, color 1s ease; }
+.glass-panel { transition: background-color 1s ease, border-color 1s ease, color 1s ease; }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 

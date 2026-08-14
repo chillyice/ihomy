@@ -128,7 +128,7 @@ public class AuthService {
 
         if (StringUtils.hasText(dto.getInviteCode())) {
             InvitationCode ic = invitationCodeMapper.selectByCode(dto.getInviteCode().trim());
-            if (ic == null || !DictConst.INVITE_USED.equals(ic.getStatus())) throw new BizException(ResultCode.NOT_FOUND);
+            if (ic == null || !DictConst.INVITE_UNUSED.equals(ic.getStatus())) throw new BizException(ResultCode.NOT_FOUND);
             if (ic.getExpiresAt() != null && ic.getExpiresAt().isBefore(java.time.LocalDateTime.now())) {
                 throw new BizException(ResultCode.CONFLICT);
             }
@@ -268,7 +268,7 @@ public class AuthService {
     public void joinFamily(Long userId, String inviteCode) {
         if (!StringUtils.hasText(inviteCode)) throw new BizException(ResultCode.BAD_REQUEST);
         InvitationCode ic = invitationCodeMapper.selectByCode(inviteCode.trim());
-        if (ic == null || !DictConst.INVITE_USED.equals(ic.getStatus())) throw new BizException(ResultCode.NOT_FOUND);
+        if (ic == null || !DictConst.INVITE_UNUSED.equals(ic.getStatus())) throw new BizException(ResultCode.NOT_FOUND);
         if (ic.getExpiresAt() != null && ic.getExpiresAt().isBefore(java.time.LocalDateTime.now())) {
             throw new BizException(ResultCode.CONFLICT);
         }

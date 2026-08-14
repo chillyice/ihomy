@@ -7,8 +7,6 @@
       <div class="blob blob-3"></div>
     </div>
 
-    <div class="ambient-layer" :style="ambientStyle" aria-hidden="true"></div>
-
     <!-- 亮斑图层:模拟阳光照耀强度,在内容之上、阴影之下;台灯 mask 挖洞祛除染色 -->
     <div class="bright-spot" :style="{ ...brightSpotStyle, '--lamp-mask': lampMask }" aria-hidden="true"></div>
 
@@ -85,10 +83,60 @@
       </div>
     </aside>
 
-    <!-- 右侧:时间天气 + 纪念日(毛玻璃) -->
-    <div class="glass-panel weather-panel">
+    <!-- 右侧:时钟(独立小面板) -->
+    <div class="glass-panel clock-panel">
       <div class="clock">{{ currentTime }}</div>
-      <div class="weather"><span class="weather-icon">☀️</span><span class="weather-temp">26°</span><span class="weather-text">晴</span></div>
+    </div>
+    <!-- 右侧:天气面板 -->
+    <div class="glass-panel weather-panel">
+      <div v-if="weather" class="weather-main">
+        <div class="weather-city">{{ weather.city || '济南' }}</div>
+        <div class="weather-current">
+          <span class="weather-icon-float">{{ weatherIcon }}</span>
+          <span class="weather-temp-large">{{ weather.temp }}<span class="temp-unit">°</span></span>
+        </div>
+        <div class="weather-condition">{{ weatherText }}</div>
+      </div>
+      <div v-else class="weather-loading-text">天气加载中…</div>
+      <div v-if="weatherDetailData" class="weather-detail">
+        <div v-if="weatherDetailData.warning && weatherDetailData.warning.length" class="wd-section wd-warning">
+          <div v-for="w in weatherDetailData.warning" :key="w.id" class="wd-warning-item">
+            <span class="wd-warn-type">{{ w.typeName }} {{ w.level }}预警</span>
+            <span class="wd-warn-text">{{ w.text }}</span>
+          </div>
+        </div>
+        <div v-if="weatherDetailData.daily" class="wd-section">
+          <div class="wd-title">未来三天</div>
+          <div class="wd-forecast">
+            <div v-for="d in weatherDetailData.daily.slice(0, 3)" :key="d.fxDate" class="wd-fc-card">
+              <span class="wd-fc-date">{{ formatFcDate(d.fxDate) }}</span>
+              <span class="wd-fc-icon">{{ weatherCodeIcon(d.iconDay) }}</span>
+              <span class="wd-fc-temp">{{ d.tempMin }}° / {{ d.tempMax }}°</span>
+              <span class="wd-fc-text">{{ d.textDay }}</span>
+            </div>
+          </div>
+        </div>
+        <div v-if="weatherDetailData.air" class="wd-section wd-air">
+          <span class="wd-air-label">空气</span>
+          <span class="wd-air-aqi">{{ weatherDetailData.air.aqi }}</span>
+          <span class="wd-air-cat">{{ weatherDetailData.air.category }}</span>
+          <span class="wd-air-pm">PM2.5 {{ weatherDetailData.air.pm2p5 }}</span>
+        </div>
+        <div v-if="weatherDetailData.minutely" class="wd-section wd-minutely">
+          <span class="wd-minutely-text">{{ weatherDetailData.minutely.short }}</span>
+          <span class="wd-minutely-desc">{{ weatherDetailData.minutely.description }}</span>
+        </div>
+        <div v-if="weatherDetailData.indices" class="wd-section">
+          <div class="wd-title">生活指数</div>
+          <div class="wd-indices">
+            <div v-for="i in weatherDetailData.indices.slice(0, 5)" :key="i.date" class="wd-idx-item">
+              <span class="wd-idx-name">{{ i.name }}</span>
+              <span class="wd-idx-cat">{{ i.category }}</span>
+              <span class="wd-idx-text">{{ i.text }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="glass-panel anniversary-panel">
       <div class="panel-title">近期纪念日</div>
@@ -148,6 +196,12 @@
         <button class="ctrl-btn" :class="{ active: lampMode !== 'off' }" @click="toggleLamp" title="台灯:自动/开/关">{{ lampMode === 'auto' ? '🌑' : lampMode === 'on' ? '💡' : '⬛' }}</button>
         <button class="ctrl-btn" @click="toggleDark" title="深色/浅色模式">{{ theme.dark ? '☀️' : '🌙' }}</button>
       </div>
+      <div class="weather-controls">
+        <button class="ctrl-btn" :class="{ active: weatherMode === 'clear' }" @click="setWeather('clear')" title="晴天">☀️</button>
+        <button class="ctrl-btn" :class="{ active: weatherMode === 'cloud' }" @click="setWeather('cloud')" title="多云">☁️</button>
+        <button class="ctrl-btn" :class="{ active: weatherMode === 'rain' }" @click="setWeather('rain')" title="下雨">🌧️</button>
+        <button class="ctrl-btn" :class="{ active: weatherMode === 'snow' }" @click="setWeather('snow')" title="下雪">❄️</button>
+      </div>
       <div class="slider-group">
         <label class="slider-row"><span>色温</span><input type="range" min="0" max="100" v-model.number="lampTemp" class="temp-slider" title="色温" /></label>
         <label class="slider-row"><span>亮度</span><input type="range" min="0" max="100" v-model.number="lampBrightness" class="temp-slider" title="亮度" /></label>
@@ -159,20 +213,67 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, watchEffect } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick, watchEffect } from 'vue'
 import { getSunScene } from '@/utils/windowLight'
 import { loadTheme, applyTheme } from '@/theme'
+import { gsap } from 'gsap'
 
 const root = ref(null)
 const sunInfo = ref(null)
 const slotIdx = ref(0)
 const testDate = ref('2026-06-21')
+const weather = ref(null)
+const weatherDetailData = ref(null)
 const paused = ref(false)
 const lampMode = ref('auto')
 const lampTemp = ref(30)
 const lampBrightness = ref(50)
 const theme = ref(loadTheme())
+const weatherMode = ref('clear')
 const toggleDark = () => { theme.value = applyTheme({ ...theme.value, dark: !theme.value.dark }) }
+const setWeather = (mode) => { weatherMode.value = mode; updateScene() }
+const weatherMultiplier = computed(() => ({ clear: 1.0, cloud: 0.55, rain: 0.25, snow: 0.4 }[weatherMode.value] ?? 1.0))
+
+const weatherIcon = computed(() => {
+  if (!weather.value) return ''
+  const map = { clear: '☀️', cloud: '☁️', rain: '🌧️', snow: '❄️', fog: '🌫️', thunder: '⛈️' }
+  return map[weather.value.condition] || '☀️'
+})
+const weatherText = computed(() => {
+  if (!weather.value) return ''
+  const map = { clear: '晴', cloud: '多云', rain: '雨', snow: '雪', fog: '雾', thunder: '雷' }
+  return map[weather.value.condition] || ''
+})
+const weatherCodeIcon = (code) => {
+  if (code == null) return ''
+  const c = parseInt(code)
+  if (c === 100) return '☀️'
+  if (c >= 101 && c <= 104) return '☁️'
+  if (c >= 150 && c <= 154) return '☁️'
+  if (c >= 300 && c <= 399) return '🌧️'
+  if (c >= 400 && c <= 499) return '❄️'
+  if (c >= 500 && c <= 599) return '🌫️'
+  if (c >= 200 && c <= 299) return '⛈️'
+  return '☁️'
+}
+const formatFcDate = (dateStr) => {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  const weekdays = ['日', '一', '二', '三', '四', '五', '六']
+  return `${d.getMonth() + 1}/${d.getDate()} 周${weekdays[d.getDay()]}`
+}
+const loadWeather = async () => {
+  try {
+    const res = await fetch('/api/public/weather')
+    if (res.ok) { const json = await res.json(); if (json.code === 0 && json.data) weather.value = json.data }
+  } catch (e) {}
+}
+const loadWeatherDetail = async () => {
+  try {
+    const res = await fetch('/api/public/weather/detail')
+    if (res.ok) { const json = await res.json(); if (json.code === 0 && json.data) weatherDetailData.value = json.data }
+  } catch (e) {}
+}
 const lampPendulumX = ref(0)
 const lampPendulumScaleX = ref(1)
 let lampRaf = null
@@ -196,7 +297,16 @@ const scene = ref({ source: { x: '50%', y: '-15%' }, rotation: 0, palette: { blo
 let timer = null
 
 const updateScene = () => {
-  if (sunInfo.value) scene.value = getSunScene(sunInfo.value, slotIdx.value)
+  if (sunInfo.value) {
+    const base = getSunScene(sunInfo.value, slotIdx.value)
+    const m = weatherMultiplier.value
+    scene.value = {
+      ...base,
+      lightOpacity: (base.lightOpacity ?? 0) * m,
+      rays: (base.rays || []).map(r => ({ ...r, opacity: r.opacity * m })),
+      reflectionOpacity: (base.reflectionOpacity ?? 0) * m,
+    }
+  }
 }
 
 const togglePause = () => {
@@ -220,14 +330,25 @@ const lampStrength = computed(() => {
   if (lampMode.value === 'on') return 1
   return scene.value.lampOpacity ?? 0
 })
+// 台灯强度动画值:mask-image 不支持 CSS transition,统一由 JS 补间驱动,
+// 使 lamp-light 辉光 opacity 与 shadow/bright-spot/vignette 的 mask 同步 2s 渐变
+const lampAnim = reactive({ v: lampStrength.value })
+let lampTween = null
+watch(lampStrength, (nv) => {
+  lampTween?.kill()
+  lampTween = gsap.to(lampAnim, { v: nv, duration: 2, ease: 'power2.out', overwrite: true })
+})
+const lampStrengthAnim = computed(() => lampAnim.v)
 const lampB = computed(() => lampBrightness.value / 100)
-const lampDivOpacity = computed(() => lampStrength.value * 0.3)
+const lampDivOpacity = computed(() => lampStrengthAnim.value * 0.3)
 const lampRadius = computed(() => 65)
 const lampMaskAlpha = computed(() => 0.03 + 0.97 * lampB.value)
+// mask 挖洞半径随强度缩放:开灯洞从 0 放大,关灯洞缩到 0(阴影渐进恢复)
 const lampMask = computed(() => {
-  if (lampStrength.value <= 0) return 'none'
+  const s = lampStrengthAnim.value
+  if (s <= 0.01) return 'none'
   const r = lampRadius.value
-  const tr = lampMaskAlpha.value * r
+  const tr = lampMaskAlpha.value * r * s
   const te = r + 30
   const cx = 38.2 + lampPendulumX.value
   return `radial-gradient(circle at ${cx}% 38.2%, transparent 0%, transparent ${tr}vw, rgba(0,0,0,0.15) ${tr + (te - tr) * 0.3}vw, rgba(0,0,0,0.4) ${tr + (te - tr) * 0.55}vw, rgba(0,0,0,0.7) ${tr + (te - tr) * 0.8}vw, black ${te}vw)`
@@ -243,7 +364,7 @@ const prevSlot = () => { slotIdx.value = (slotIdx.value - 1 + 288) % 288; update
 const nextSlot = () => { slotIdx.value = (slotIdx.value + 1) % 288; updateScene() }
 
 const dustParticles = ref(
-  Array.from({ length: 40 }, (_, i) => ({
+  Array.from({ length: 20 }, (_, i) => ({
     id: i,
     left: Math.random() * 100 + '%',
     top: Math.random() * 100 + '%',
@@ -270,7 +391,6 @@ const bloomStyle = computed(() => ({
   left: scene.value.source.x, top: scene.value.source.y,
   background: `radial-gradient(circle, ${scene.value.palette.bloom} 0%, ${scene.value.palette.mid} 35%, transparent 70%)`,
 }))
-const ambientStyle = computed(() => ({ background: scene.value.palette.ambient }))
 const brightSpotStyle = computed(() => ({
   background: scene.value.brightSpotColor || 'transparent',
   opacity: scene.value.brightSpotOpacity ?? 0,
@@ -332,6 +452,8 @@ const reloadSunInfo = () => {
 
 onMounted(() => {
   loadSunInfo()
+  loadWeather()
+  loadWeatherDetail()
   // 1 分钟循环 288 时隙:每 208ms 前进 5 分钟
   timer = setInterval(() => {
     slotIdx.value = (slotIdx.value + 1) % 288
@@ -346,34 +468,48 @@ onMounted(() => {
 onUnmounted(() => {
   if (timer) clearInterval(timer)
   stopPendulum()
+  lampTween?.kill()
 })
 </script>
 
 <style scoped>
 .light-test-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #EDE4D3 0%, #E2D8C4 50%, #D6CBB4 100%);
+  background-color: #E2D8C4;
   position: relative;
   overflow: hidden;
-  font-family: Georgia, 'Times New Roman', serif;
 }
-/* 夜间深色背景 */
-html.dark .light-test-page {
+/* 深浅主题背景:双层渐变伪元素,opacity 交叉淡入淡出 1s */
+.light-test-page::before,
+.light-test-page::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  transition: opacity 1s ease;
+}
+.light-test-page::before {
+  background: linear-gradient(135deg, #EDE4D3 0%, #E2D8C4 50%, #D6CBB4 100%);
+  opacity: 1;
+}
+.light-test-page::after {
   background: linear-gradient(135deg, #0F1A2E 0%, #162238 50%, #1A2540 100%);
+  opacity: 0;
 }
+html.dark .light-test-page::before { opacity: 0; }
+html.dark .light-test-page::after { opacity: 1; }
 
-.bg-blobs { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
-.blob { position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.4; }
-/* 夜间色块大幅压暗 */
-html.dark .blob { opacity: 0.4; }
+.bg-blobs { position: absolute; inset: 0; z-index: 1; overflow: hidden; pointer-events: none; }
+.blob { position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.4; transition: opacity 1s ease, box-shadow 1s ease; }
+/* 夜间色块压暗至 10% */
+html.dark .blob { opacity: 0.1; }
 html.dark .blob-1 { box-shadow: 0 0 120px 40px rgba(120,200,160,0.4); }
 html.dark .blob-2 { box-shadow: 0 0 120px 40px rgba(200,180,100,0.4); }
 html.dark .blob-3 { box-shadow: 0 0 120px 40px rgba(200,160,140,0.4); }
 .blob-1 { width: 480px; height: 480px; top: -120px; left: -100px; background: #9CD0B5; }
 .blob-2 { width: 560px; height: 560px; top: 25%; right: -180px; background: #EDDB8C; }
 .blob-3 { width: 420px; height: 420px; bottom: -120px; left: 18%; background: #ECC0AC; }
-
-.ambient-layer { position: fixed; inset: 0; z-index: 2; pointer-events: none; mix-blend-mode: multiply; transition: background 0.6s ease; }
 
 /* 亮斑图层:在内容之上(z>30),阴影之下(z<35),multiply 让白色=透明、黑色=压暗、彩色=染色;台灯 mask 挖洞祛除染色 */
 .bright-spot { position: fixed; inset: 0; z-index: 32; pointer-events: none; mix-blend-mode: multiply; -webkit-mask-image: var(--lamp-mask, none); mask-image: var(--lamp-mask, none); transition: background 0.6s ease, opacity 0.6s ease; }
@@ -436,7 +572,7 @@ html.dark .blob-3 { box-shadow: 0 0 120px 40px rgba(200,160,140,0.4); }
 .album-spine { position: absolute; left: -8px; top: 0; bottom: 0; width: 8px; background: linear-gradient(90deg, rgba(0,0,0,0.2), transparent); }
 
 /* 毛玻璃面板通用 */
-.glass-panel { background: rgba(255,255,255,0.25); backdrop-filter: blur(30px); border: 1px solid rgba(255,255,255,0.5); border-radius: 28px; padding: 20px 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+.glass-panel { background: rgba(255,255,255,0.25); backdrop-filter: blur(30px) saturate(1.4); border: 1px solid rgba(255,255,255,0.5); border-radius: 28px; padding: 20px 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif; }
 .panel-title { font-size: 14px; font-weight: 600; color: #5a4a3a; margin-bottom: 12px; opacity: 0.8; }
 
 /* 左侧面板 */
@@ -454,13 +590,50 @@ html.dark .blob-3 { box-shadow: 0 0 120px 40px rgba(200,160,140,0.4); }
 .task-meta { font-size: 11px; opacity: 0.6; color: #5a4a3a; }
 
 /* 右侧面板 */
-.weather-panel { position: fixed; right: 24px; top: 90px; z-index: 20; width: 280px; text-align: center; }
-.clock { font-size: 36px; font-weight: 300; color: #3a2a1a; font-variant-numeric: tabular-nums; }
-.weather { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; color: #5a4a3a; }
-.weather-icon { font-size: 24px; }
-.weather-temp { font-size: 20px; font-weight: 600; }
-.weather-text { font-size: 14px; }
-.anniversary-panel { position: fixed; right: 24px; top: 230px; z-index: 20; width: 280px; }
+.clock-panel { position: fixed; right: 24px; top: 90px; z-index: 20; width: 140px; text-align: center; }
+.weather-panel { position: fixed; right: 24px; top: 160px; z-index: 20; width: 300px; text-align: center; max-height: calc(100vh - 200px); overflow-y: auto; }
+.weather-panel::-webkit-scrollbar { width: 0; }
+.clock { font-size: 28px; font-weight: 700; color: #3a2a1a; font-variant-numeric: tabular-nums; line-height: 1; }
+
+.weather-main { padding: 4px 20px 12px; }
+.weather-city { font-size: 13px; opacity: 0.6; letter-spacing: 1px; color: #5a4a3a; }
+.weather-current { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 6px 0 2px; }
+.weather-icon-float { font-size: 36px; animation: icon-float 3s ease-in-out infinite; display: inline-block; }
+@keyframes icon-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.weather-temp-large { font-size: 42px; font-weight: 700; line-height: 1; color: #3a2a1a; transition: color 0.6s ease; }
+.temp-unit { font-size: 24px; font-weight: 400; opacity: 0.7; }
+.weather-condition { font-size: 14px; opacity: 0.8; font-weight: 500; color: #5a4a3a; }
+.weather-loading-text { font-size: 13px; opacity: 0.5; padding: 20px; text-align: center; color: #5a4a3a; }
+
+.weather-detail { padding: 0 20px 16px; text-align: left; }
+.wd-section { margin-bottom: 10px; }
+.wd-section:last-child { margin-bottom: 0; }
+.wd-title { font-size: 11px; opacity: 0.5; margin-bottom: 6px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #5a4a3a; }
+.wd-forecast { display: flex; gap: 6px; }
+.wd-fc-card { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 4px; border-radius: 12px; background: rgba(255, 255, 255, 0.3); transition: background 0.2s, transform 0.2s; }
+.wd-fc-card:hover { background: rgba(255, 255, 255, 0.5); transform: translateY(-2px); }
+.wd-fc-date { font-size: 11px; opacity: 0.6; color: #5a4a3a; }
+.wd-fc-icon { font-size: 20px; }
+.wd-fc-temp { font-size: 12px; font-weight: 600; color: #3a2a1a; }
+.wd-fc-text { font-size: 10px; opacity: 0.6; text-align: center; color: #5a4a3a; }
+.wd-air { display: flex; align-items: center; gap: 8px; background: rgba(100, 200, 100, 0.12); border-radius: 12px; padding: 8px 12px; }
+.wd-air-label { font-size: 11px; opacity: 0.6; color: #5a4a3a; }
+.wd-air-aqi { font-weight: 700; font-size: 16px; color: #3a2a1a; }
+.wd-air-cat { font-size: 11px; opacity: 0.8; color: #5a4a3a; }
+.wd-air-pm { font-size: 10px; opacity: 0.5; margin-left: auto; color: #5a4a3a; }
+.wd-warning-item { background: rgba(255, 180, 100, 0.2); border-radius: 12px; padding: 8px 12px; margin-bottom: 4px; }
+.wd-warn-type { font-weight: 600; color: #d97706; display: block; font-size: 12px; }
+.wd-warn-text { font-size: 11px; opacity: 0.8; display: block; margin-top: 3px; line-height: 1.4; color: #5a4a3a; }
+.wd-minutely { background: rgba(100, 150, 255, 0.12); border-radius: 12px; padding: 8px 12px; display: flex; flex-direction: column; gap: 2px; }
+.wd-minutely-text { font-weight: 600; font-size: 13px; color: #3a2a1a; }
+.wd-minutely-desc { font-size: 11px; opacity: 0.7; color: #5a4a3a; }
+.wd-indices { display: flex; flex-direction: column; gap: 4px; }
+.wd-idx-item { display: grid; grid-template-columns: 56px 48px 1fr; gap: 6px; font-size: 11px; align-items: baseline; padding: 4px 0; }
+.wd-idx-name { opacity: 0.6; color: #5a4a3a; }
+.wd-idx-cat { font-weight: 600; color: #3a2a1a; }
+.wd-idx-text { opacity: 0.7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #5a4a3a; }
+
+.anniversary-panel { position: fixed; right: 24px; bottom: 24px; z-index: 20; width: 280px; }
 .anni-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; }
 .anni-name { font-size: 13px; font-weight: 600; color: #4a3a2a; }
 .anni-date { font-size: 11px; opacity: 0.6; color: #5a4a3a; }
@@ -473,7 +646,7 @@ html.dark .blob-3 { box-shadow: 0 0 120px 40px rgba(200,160,140,0.4); }
 
 /* 台灯光源:左上偏中央,散射半径=80%页宽,夜间开启+手动开关,normal 暖光(阴影由 mask 祛除),最顶层 */
 /* 台灯光源:左上黄金分割点(38.2%,38.2%),半径60vw(页面3/5),最顶层 */
-.lamp-light { position: fixed; border-radius: 50%; z-index: 100; pointer-events: none; filter: blur(20px); transition: opacity 0.3s ease; }
+.lamp-light { position: fixed; border-radius: 50%; z-index: 100; pointer-events: none; filter: blur(20px); }
 
 .info-panel {
   position: fixed;
@@ -497,6 +670,7 @@ html.dark .blob-3 { box-shadow: 0 0 120px 40px rgba(200,160,140,0.4); }
 .progress-fill { height: 100%; background: linear-gradient(90deg, #FFD078, #FFE8B0); border-radius: 2px; transition: width 0.6s ease; }
 .phase-label { text-align: center; margin-top: 6px; font-size: 15px; font-weight: 700; }
 .controls { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.weather-controls { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .ctrl-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: #fff; padding: 5px 10px; font-size: 15px; cursor: pointer; transition: background 0.2s; }
 .ctrl-btn:hover { background: rgba(255,255,255,0.2); }
 .ctrl-btn.active { background: rgba(255,200,100,0.3); border-color: rgba(255,200,100,0.5); }
