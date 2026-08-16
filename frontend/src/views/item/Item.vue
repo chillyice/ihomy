@@ -1,32 +1,6 @@
 <template>
   <div class="page">
     <el-tabs v-model="tab">
-      <!-- 物品:搜索 + 列表 + 新增/编辑 -->
-      <el-tab-pane :label="$t('item.items')" name="items">
-        <div class="toolbar">
-          <el-input v-model="keyword" :placeholder="$t('item.searchPh')" clearable style="width: 260px"
-                    @keyup.enter="loadItems" @clear="loadItems">
-            <template #append>
-              <el-button @click="loadItems">{{ $t('item.search') }}</el-button>
-            </template>
-          </el-input>
-          <el-button type="primary" @click="openItem()">{{ $t('item.addItem') }}</el-button>
-        </div>
-        <el-empty v-if="items.length === 0" :description="$t('item.emptyItems')" />
-        <el-card v-for="it in items" :key="it.id" shadow="hover" class="item-card">
-          <div class="item-main">
-            <span class="item-name">{{ it.name }}</span>
-            <el-tag v-if="it.position" size="small">{{ it.position }}</el-tag>
-          </div>
-          <div class="item-path">{{ it.house_name }} / {{ it.room_name }} / {{ it.furniture_name }}</div>
-          <div class="item-aliases" v-if="it.aliases">{{ $t('item.aliases') }}: {{ it.aliases }}</div>
-          <div class="item-ops">
-            <el-button size="small" @click="openItem(it)">{{ $t('common.edit') }}</el-button>
-            <el-button size="small" type="danger" plain @click="removeItem(it)">{{ $t('common.delete') }}</el-button>
-          </div>
-        </el-card>
-      </el-tab-pane>
-
       <!-- 房子 -->
       <el-tab-pane :label="$t('item.houses')" name="houses">
         <div class="toolbar">
@@ -92,6 +66,32 @@
             </template>
           </el-table-column>
         </el-table>
+      </el-tab-pane>
+
+      <!-- 物品:搜索 + 列表 + 新增/编辑 -->
+      <el-tab-pane :label="$t('item.items')" name="items">
+        <div class="toolbar">
+          <el-input v-model="keyword" :placeholder="$t('item.searchPh')" clearable style="width: 260px"
+                    @keyup.enter="loadItems" @clear="loadItems">
+            <template #append>
+              <el-button @click="loadItems">{{ $t('item.search') }}</el-button>
+            </template>
+          </el-input>
+          <el-button type="primary" @click="openItem()">{{ $t('item.addItem') }}</el-button>
+        </div>
+        <el-empty v-if="items.length === 0" :description="$t('item.emptyItems')" />
+        <el-card v-for="it in items" :key="it.id" shadow="hover" class="item-card">
+          <div class="item-main">
+            <span class="item-name">{{ it.name }}</span>
+            <el-tag v-if="it.position" size="small">{{ it.position }}</el-tag>
+          </div>
+          <div class="item-path">{{ it.house_name }} / {{ it.room_name }} / {{ it.furniture_name }}</div>
+          <div class="item-aliases" v-if="it.aliases">{{ $t('item.aliases') }}: {{ it.aliases }}</div>
+          <div class="item-ops">
+            <el-button size="small" @click="openItem(it)">{{ $t('common.edit') }}</el-button>
+            <el-button size="small" type="danger" plain @click="removeItem(it)">{{ $t('common.delete') }}</el-button>
+          </div>
+        </el-card>
       </el-tab-pane>
     </el-tabs>
 
@@ -203,7 +203,7 @@ import { itemApi } from '@/api'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
-const tab = ref('items')
+const tab = ref('houses')
 const items = ref([])
 const houses = ref([])
 const rooms = ref([])

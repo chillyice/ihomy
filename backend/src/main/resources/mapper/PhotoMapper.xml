@@ -2,17 +2,6 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ihomy.mapper.PhotoMapper">
 
-    <select id="selectPublicByFamily" resultType="com.ihomy.entity.Photo">
-        SELECT p.* FROM content_photo p
-        JOIN content_album a ON p.album_id = a.id
-        WHERE p.family_id = #{familyId}
-        AND p.visibility = 'PUBLIC'
-        AND a.type = 'public'
-        AND p.deleted = 0 AND a.deleted = 0
-        ORDER BY p.created_at DESC
-        LIMIT #{limit}
-    </select>
-
     <select id="selectLatestByFamily" resultType="com.ihomy.entity.Photo">
         SELECT p.* FROM content_photo p
         JOIN content_album a ON p.album_id = a.id

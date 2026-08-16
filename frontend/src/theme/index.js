@@ -1,11 +1,6 @@
 // 主题系统:仅浅色/深色两种模式,偏好存 localStorage('ihomy-theme'),默认跟随太阳位置自动切换
 // 实现方式:html.dark 类切换暗色(配合 element-plus dark css-vars)
 
-export const THEMES = [
-  { key: 'light', label: '浅色', primary: '#3A2E22', accent: '#A8483A' },
-  { key: 'dark', label: '深色', primary: '#3A2E22', accent: '#A8483A' },
-]
-
 export const THEME_STORAGE_KEY = 'ihomy-theme'
 
 export const DEFAULT_THEME = { dark: false, autoMode: true }

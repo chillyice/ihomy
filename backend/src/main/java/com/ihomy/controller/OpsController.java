@@ -5,6 +5,7 @@ import com.ihomy.annotation.RequirePermission;
 import com.ihomy.common.Result;
 import com.ihomy.entity.SysOperationLog;
 import com.ihomy.service.OpsService;
+import com.ihomy.service.ParameterService;
 import com.ihomy.service.WeatherService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,6 +32,7 @@ public class OpsController {
 
     private final OpsService opsService;
     private final WeatherService weatherService;
+    private final ParameterService parameterService;
 
     @Operation(summary = "系统资源总数(可按时间/用户/家庭过滤)")
     @RequirePermission("ops:view")
@@ -70,5 +72,19 @@ public class OpsController {
     @GetMapping("/weather/quota")
     public Result<Map<String, Object>> weatherQuota() {
         return Result.success(weatherService.getQuota());
+    }
+
+    @Operation(summary = "加密明文为 ENC(...) 格式(供外挂配置文件使用)")
+    @RequirePermission("ops:view")
+    @GetMapping("/crypto/encrypt")
+    public Result<String> encrypt(@RequestParam String plaintext) {
+        return Result.success(parameterService.encrypt(plaintext));
+    }
+
+    @Operation(summary = "解密 ENC(...) 密文(验证用)")
+    @RequirePermission("ops:view")
+    @GetMapping("/crypto/decrypt")
+    public Result<String> decrypt(@RequestParam String ciphertext) {
+        return Result.success(parameterService.decrypt(ciphertext));
     }
 }

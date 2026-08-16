@@ -11,7 +11,7 @@
         </span>
       </div>
       <img v-if="blog.coverImage" :src="blog.coverImage" class="cover" />
-      <div class="content">{{ blog.content }}</div>
+      <div class="content markdown-body" v-html="renderedContent"></div>
 
       <div class="like-bar">
         <el-button :type="likeState.liked ? 'primary' : 'default'" round @click="onLike">
@@ -74,6 +74,7 @@
         </div>
       </div>
     </div>
+    <el-empty v-else :description="$t('blog.notFound') || '博客不存在或无权查看'" />
   </div>
 </template>
 
@@ -85,6 +86,7 @@ import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Star } from '@element-plus/icons-vue'
+import { marked } from 'marked'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 
 const { t } = useI18n()
@@ -104,14 +106,27 @@ const tagList = computed(() =>
   blog.value?.tags ? String(blog.value.tags).split(',').filter(Boolean) : [],
 )
 
+// Markdown 渲染为 HTML
+const renderedContent = computed(() =>
+  blog.value?.content ? marked.parse(blog.value.content) : '',
+)
+
 // 删除权限:家长或评论作者本人
 const canDelete = (c) =>
   userStore.isLoggedIn && (userStore.isOwner || c.authorId === userStore.userInfo?.id)
 
 // 并行拉取博客详情、评论树与当前用户点赞状态
 const loadAll = async () => {
-  blog.value = await blogApi.detail(route.params.id)
-  comments.value = await commentApi.list('blog', route.params.id)
+  try {
+    blog.value = await blogApi.detail(route.params.id)
+  } catch (e) {
+    // 博客详情加载失败(可能不存在或无权查看),保持 blog=null 显示空状态
+  }
+  try {
+    comments.value = await commentApi.list('blog', route.params.id)
+  } catch (e) {
+    // 评论加载失败不影响博客展示
+  }
   if (userStore.isLoggedIn) {
     try {
       likeState.value = await likeApi.state('blog', route.params.id)
@@ -170,17 +185,37 @@ const delComment = async (c) => {
 }
 
 const formatTime = (d) => (d ? new Date(d).toLocaleString('zh-CN') : '')
+const formatDate = (d) => (d ? new Date(d).toLocaleDateString('zh-CN') : '')
 
 onMounted(loadAll)
 </script>
 
 <style scoped>
-.detail h1 { color: var(--color-primary); margin-bottom: 8px; }
+.detail { padding: 20px; }
+.detail h1 { color: var(--color-primary); margin-bottom: 8px; line-height: 1.4; }
 .meta { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 16px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
 .tags { display: flex; gap: 6px; }
 .tag { background: rgba(46, 116, 181, 0.08); color: var(--color-accent); padding: 1px 8px; border-radius: 10px; font-size: 12px; }
 .cover { width: 100%; max-height: 300px; object-fit: cover; border-radius: 8px; margin-bottom: 16px; }
-.content { white-space: pre-wrap; line-height: 1.8; font-size: 15px; }
+.content { line-height: 1.8; font-size: 15px; }
+.markdown-body { white-space: normal; word-wrap: break-word; }
+.markdown-body h1, .markdown-body h2, .markdown-body h3 { color: var(--color-primary); margin: 20px 0 10px; line-height: 1.4; }
+.markdown-body h1 { font-size: 22px; }
+.markdown-body h2 { font-size: 18px; border-bottom: 1px solid var(--color-border); padding-bottom: 6px; }
+.markdown-body h3 { font-size: 16px; }
+.markdown-body p { margin: 10px 0; }
+.markdown-body ul, .markdown-body ol { margin: 10px 0; padding-left: 24px; }
+.markdown-body li { margin: 4px 0; }
+.markdown-body blockquote { margin: 12px 0; padding: 8px 16px; border-left: 4px solid var(--color-accent); background: rgba(168,72,58,0.05); color: var(--color-text-secondary); }
+.markdown-body code { background: rgba(58,46,34,0.08); padding: 2px 6px; border-radius: 4px; font-size: 13px; font-family: 'Consolas', 'Monaco', monospace; }
+.markdown-body pre { background: rgba(58,46,34,0.06); padding: 12px 16px; border-radius: 8px; overflow-x: auto; margin: 12px 0; }
+.markdown-body pre code { background: none; padding: 0; }
+.markdown-body table { border-collapse: collapse; margin: 12px 0; width: 100%; }
+.markdown-body th, .markdown-body td { border: 1px solid var(--color-border); padding: 8px 12px; text-align: left; }
+.markdown-body th { background: rgba(58,46,34,0.05); font-weight: 600; }
+.markdown-body img { max-width: 100%; border-radius: 8px; }
+.markdown-body a { color: var(--color-accent); text-decoration: underline; }
+.markdown-body hr { border: none; border-top: 1px solid var(--color-border); margin: 20px 0; }
 .like-bar { margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(31, 58, 95, 0.08); }
 .comments { margin-top: 16px; }
 .comments-title { font-weight: 600; color: var(--color-primary); margin-bottom: 12px; }

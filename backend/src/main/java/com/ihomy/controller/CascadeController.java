@@ -35,6 +35,7 @@ public class CascadeController {
         LoginUser user = securityHelper.current();
         int capped = Math.min(limit, 200);
         Long userId = user == null ? null : user.getUserId();
-        return Result.success(photoMapper.selectCascadeByFamily(user.getFamilyId(), userId, capped));
+        Long familyId = user == null ? null : user.getFamilyId();
+        return Result.success(photoMapper.selectCascadeByFamily(familyId, userId, capped));
     }
 }

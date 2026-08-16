@@ -3,6 +3,10 @@
   ihomy Windows 一键启动脚本
 .DESCRIPTION
   自动检查环境，依次启动后端(Spring Boot)与前端(Vite)，并打开浏览器。
+  开发/生产差异配置通过外挂文件 external.yml 管理(环境变量 IHOMY_CONFIG_PATH 指向):
+    D:\WorkSpace\ihomy\config\external.yml (Windows 开发)
+    /opt/ihomy/config/external.yml (Linux 生产)
+  不再用 application-dev.yml profile,所有差异项(密码/路径/验证码/天气凭证)走外挂文件。
   可选参数：
     -BackendOnly   仅启动后端
     -FrontendOnly  仅启动前端
@@ -25,6 +29,11 @@ $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
 $Backend = Join-Path $Root 'backend'
 $Frontend = Join-Path $Root 'frontend'
+
+# 外挂配置文件路径(Windows 开发环境)
+$ExternalConfig = Join-Path $env:USERPROFILE '..\..\..\WorkSpace\ihomy\config\external.yml'
+# 兜底:项目同级目录下的 config
+$AltConfig = 'D:\WorkSpace\ihomy\config\external.yml'
 
 function Write-Step($msg) { Write-Host "`n==> $msg" -ForegroundColor Cyan }
 function Write-Ok($msg)   { Write-Host "    [OK] $msg" -ForegroundColor Green }
@@ -74,7 +83,7 @@ if (-not $FrontendOnly) {
   $schema = Join-Path $Backend 'src\main\resources\schema.sql'
   if (Test-Path $schema) {
     Write-Host "    若首次运行，请先建库建表："
-    Write-Host "      mysql -uroot -p < `"$schema`""
+    Write-Host "      mysql -uroot -p --default-character-set=utf8mb4 < `"$schema`""
   }
 
   if ($Build) {
@@ -84,12 +93,15 @@ if (-not $FrontendOnly) {
     Write-Ok '后端构建完成'
     $jar = Get-ChildItem (Join-Path $Backend 'target') -Filter 'ihomy-backend.jar' -ErrorAction SilentlyContinue | Select-Object -First 1
     if (-not $jar) { Die '未找到后端 jar' }
+    # 设环境变量 IHOMY_CONFIG_PATH 指向外挂配置文件
+    $env:IHOMY_CONFIG_PATH = $AltConfig
     Start-Process -FilePath 'java' -ArgumentList "-jar", $jar.FullName -WorkingDirectory $Backend
-    Write-Ok "后端已启动（java -jar $($jar.Name)），端口 8080"
+    Write-Ok "后端已启动（java -jar $($jar.Name)），端口 8080，外挂配置: $AltConfig"
   } else {
+    $env:IHOMY_CONFIG_PATH = $AltConfig
     Start-Process -FilePath 'powershell' -ArgumentList '-NoProfile','-NoExit','-Command',
-      "Set-Location '$Backend'; & '.\mvnw.cmd' spring-boot:run"
-    Write-Ok '后端已在新窗口启动（mvnw spring-boot:run），端口 8080'
+      "`$env:IHOMY_CONFIG_PATH='$AltConfig'; Set-Location '$Backend'; & '.\mvnw.cmd' spring-boot:run"
+    Write-Ok "后端已在新窗口启动（mvnw spring-boot:run），端口 8080，外挂配置: $AltConfig"
   }
 }
 

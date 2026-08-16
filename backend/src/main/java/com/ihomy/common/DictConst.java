@@ -30,7 +30,6 @@ public final class DictConst {
 
     /** 角色状态 role_status */
     public static final String ROLE_ENABLED = "ENABLED";
-    public static final String ROLE_DISABLED = "DISABLED";
     private static final String ROLE_FALLBACK = ROLE_ENABLED;
 
     /** 愿望状态 wish_status / video_wish_status */
@@ -40,7 +39,6 @@ public final class DictConst {
     public static final String VWISH_PENDING = "PENDING";
     public static final String VWISH_IMPORTED = "IMPORTED";
     private static final String WISH_FALLBACK = WISH_PENDING;
-    private static final String VWISH_FALLBACK = VWISH_PENDING;
 
     /** 家庭计划状态 plan_status */
     public static final String PLAN_ACTIVE = "ACTIVE";
@@ -54,7 +52,6 @@ public final class DictConst {
     public static final String TASK_REVIEW = "REVIEW";
     public static final String TASK_DONE = "DONE";
     public static final String TASK_CANCELLED = "CANCELLED";
-    private static final String TASK_FALLBACK = TASK_OPEN;
 
     /** 任务奖励类型 reward_type */
     public static final String REWARD_NONE = "NONE";
@@ -66,12 +63,10 @@ public final class DictConst {
     public static final String APPLY_PENDING = "PENDING";
     public static final String APPLY_APPROVED = "APPROVED";
     public static final String APPLY_REJECTED = "REJECTED";
-    private static final String APPLY_FALLBACK = APPLY_PENDING;
 
     /** 积分订单 order_status */
     public static final String ORDER_PENDING = "PENDING";
     public static final String ORDER_REDEEMED = "REDEEMED";
-    private static final String ORDER_FALLBACK = ORDER_PENDING;
 
     /** 提醒周期 reminder_repeat */
     public static final String REPEAT_ONCE = "ONCE";
@@ -97,7 +92,6 @@ public final class DictConst {
 
     /** 邀请码 invite_status */
     public static final String INVITE_UNUSED = "UNUSED";
-    public static final String INVITE_USED = "USED";
     private static final String INVITE_FALLBACK = INVITE_UNUSED;
 
     /* ---------------- 整数(历史 DTO 入参)→ 字典词 转换 ---------------- */
@@ -122,14 +116,6 @@ public final class DictConst {
         };
     }
 
-    public static String userStatus(Integer v) {
-        return v != null && v == 1 ? USER_DISABLED : USER_FALLBACK;
-    }
-
-    public static String roleStatus(Integer v) {
-        return v != null && v == 0 ? ROLE_DISABLED : ROLE_FALLBACK;
-    }
-
     public static String wishStatus(Integer v) {
         if (v == null) return WISH_FALLBACK;
         return switch (v) {
@@ -137,11 +123,6 @@ public final class DictConst {
             case 2 -> WISH_ABANDONED;
             default -> WISH_PENDING;
         };
-    }
-
-    /** 放映厅想看映射是独立枚举(不同字典组),复用单词 PENDING/IMPORTED */
-    public static String vwishStatus(Integer v) {
-        return v != null && v == 1 ? VWISH_IMPORTED : VWISH_FALLBACK;
     }
 
     public static String planStatus(Integer v) {
@@ -153,17 +134,6 @@ public final class DictConst {
         };
     }
 
-    public static String taskStatus(Integer v) {
-        if (v == null) return TASK_FALLBACK;
-        return switch (v) {
-            case 1 -> TASK_IN_PROGRESS;
-            case 2 -> TASK_REVIEW;
-            case 3 -> TASK_DONE;
-            case 4 -> TASK_CANCELLED;
-            default -> TASK_OPEN;
-        };
-    }
-
     public static String rewardType(Integer v) {
         if (v == null) return REWARD_FALLBACK;
         return switch (v) {
@@ -171,19 +141,6 @@ public final class DictConst {
             case 2 -> REWARD_ITEM;
             default -> REWARD_NONE;
         };
-    }
-
-    public static String applyStatus(Integer v) {
-        if (v == null) return APPLY_FALLBACK;
-        return switch (v) {
-            case 1 -> APPLY_APPROVED;
-            case 2 -> APPLY_REJECTED;
-            default -> APPLY_PENDING;
-        };
-    }
-
-    public static String orderStatus(Integer v) {
-        return v != null && v == 1 ? ORDER_REDEEMED : ORDER_FALLBACK;
     }
 
     public static String repeatType(Integer v) {
@@ -207,9 +164,5 @@ public final class DictConst {
             case 2 -> BOOK_TRANSFER;
             default -> BOOK_EXPENSE;
         };
-    }
-
-    public static String inviteStatus(Integer v) {
-        return v != null && v == 1 ? INVITE_USED : INVITE_FALLBACK;
     }
 }

@@ -7,7 +7,6 @@ import com.ihomy.common.ResultCode;
 import com.ihomy.entity.Family;
 import com.ihomy.entity.HomeModule;
 import com.ihomy.entity.SysUser;
-import com.ihomy.mapper.AlbumMapper;
 import com.ihomy.mapper.FamilyMapper;
 import com.ihomy.mapper.HomeModuleMapper;
 import com.ihomy.mapper.PhotoMapper;
@@ -46,7 +45,6 @@ public class PublicController {
     private final FamilyMapper familyMapper;
     private final HomeModuleMapper homeModuleMapper;
     private final PhotoMapper photoMapper;
-    private final AlbumMapper albumMapper;
     private final ActivityFeedService activityFeedService;
     private final HomeStatsService homeStatsService;
     private final SecurityHelper securityHelper;
@@ -64,15 +62,15 @@ public class PublicController {
         if (date != null && !date.isBlank()) {
             try { ld = LocalDate.parse(date); } catch (Exception ignored) {}
         }
-        return Result.success(sunService.getSunInfo(ip, ld));
+        return Result.success(sunService.getSunInfo(ip, ld, resolveFamilyLocation()));
     }
 
-    @Operation(summary = "天气(IP 定位,和风天气 API,Key 未配返回 null)")
+    @Operation(summary = "天气(IP 定位或家庭偏好位置,和风天气 API,Key 未配返回 null)")
     @GetMapping("/weather")
     public Result<Map<String, Object>> weather(HttpServletRequest request) {
         String ip = request.getHeader("X-Forwarded-For");
         if (ip == null || ip.isBlank()) ip = request.getRemoteAddr();
-        return Result.success(weatherService.getWeather(ip));
+        return Result.success(weatherService.getWeather(ip, resolveFamilyLocation()));
     }
 
     @Operation(summary = "天气详情聚合(当前+7d预报+24h+预警+指数+空气+分钟降水,Key 未配返回 null)")
@@ -80,7 +78,20 @@ public class PublicController {
     public Result<Map<String, Object>> weatherDetail(HttpServletRequest request) {
         String ip = request.getHeader("X-Forwarded-For");
         if (ip == null || ip.isBlank()) ip = request.getRemoteAddr();
-        return Result.success(weatherService.getDetail(ip));
+        return Result.success(weatherService.getDetail(ip, resolveFamilyLocation()));
+    }
+
+    /** 解析当前家庭的天气位置偏好(未登录或未设置返回 null,走 IP 定位) */
+    private String[] resolveFamilyLocation() {
+        try {
+            SysUser user = securityHelper.currentUser();
+            if (user == null || user.getFamilyId() == null) return null;
+            Family f = familyMapper.selectById(user.getFamilyId());
+            if (f != null && f.getWeatherLat() != null && f.getWeatherLng() != null) {
+                return new String[]{ f.getWeatherLat().toPlainString(), f.getWeatherLng().toPlainString(), f.getWeatherCity() };
+            }
+        } catch (Exception ignored) {}
+        return null;
     }
 
     @Operation(summary = "首页聚合（支持 ?hid= 混淆ID / ?home_id= 指定家庭）")
@@ -118,7 +129,7 @@ public class PublicController {
             data.put("photos", photoMapper.selectLatestByFamily(familyId, 20));
             data.put("stats", homeStatsService.getStats(familyId));
         } else {
-            data.put("photos", photoMapper.selectPublicByFamily(familyId, 20));
+            data.put("photos", photoMapper.selectLatestPublicByFamily(familyId, 20));
             data.put("stats", new HashMap<String, Object>());
         }
 

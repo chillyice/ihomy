@@ -1,11 +1,13 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 
 // 可拖动+可调整大小的组合式函数,位置/大小持久化到 localStorage
-// 用法:const { pos, size, reset } = useDragResize({ x, y, w, h, storageKey, minY, anchorRight })
+// 用法:const { pos, size, reset } = useDragResize({ x, y, w, h, storageKey, minY, anchorRight, marginLeft })
 // storageKey 为空则不持久化;minY 限制最高位置(默认 0);anchorRight=true 时 pos.x 为离右边缘距离(拖动方向取反)
+// marginLeft 限制左侧边界(默认 0,沉浸式首页导航栏宽 220 时传 220)
 export function useDragResize(initial) {
   const key = initial.storageKey
   const minY = initial.minY ?? 0
+  const marginLeft = initial.marginLeft ?? 0
   const anchorRight = initial.anchorRight ?? false
   const load = () => {
     if (!key) return null
@@ -43,6 +45,7 @@ export function useDragResize(initial) {
     resizing.value = true
     startX = e.clientX
     startY = e.clientY
+    startPos = { ...pos.value }
     startSize = { ...size.value }
     e.preventDefault()
     e.stopPropagation()
@@ -58,17 +61,34 @@ export function useDragResize(initial) {
       let nx
       if (anchorRight) {
         // right 模式:pos.x 是离右边缘距离,鼠标向左(dx<0)→ nx 增大(面板向左)
-        nx = Math.max(0, Math.min(startPos.x - dx, Math.max(0, vw - w)))
+        // 左边界限制:面板左边 = vw - pos.x - w ≥ marginLeft → pos.x ≤ vw - marginLeft - w
+        const maxX = Math.max(0, vw - marginLeft - w)
+        nx = Math.max(0, Math.min(startPos.x - dx, maxX))
       } else {
-        nx = Math.max(0, Math.min(startPos.x + dx, Math.max(0, vw - w)))
+        // left 模式:左边界 ≥ marginLeft,右边界 ≤ vw(右边不出屏)
+        nx = Math.max(marginLeft, Math.min(startPos.x + dx, Math.max(marginLeft, vw - w)))
       }
+      // 顶边不低于 minY,底边不超出 vh
       const ny = Math.max(minY, Math.min(startPos.y + dy, Math.max(minY, vh - h)))
       pos.value = { x: nx, y: ny }
     }
     if (resizing.value) {
-      size.value = {
-        w: Math.min(Math.max(200, startSize.w + (e.clientX - startX)), Math.max(200, vw - pos.value.x)),
-        h: Math.min(Math.max(120, startSize.h + (e.clientY - startY)), Math.max(120, vh - pos.value.y)),
+      const dx = e.clientX - startX
+      const dy = e.clientY - startY
+      if (anchorRight) {
+        // right 模式 + 左下角把手:右边缘固定(pos.x 不变),鼠标向左(dx<0)→ 宽度增大(左边缘左移)
+        // 左边缘 = vw - pos.x - startSize.w,新左边缘 = 左边缘 + dx,新宽度 = startSize.w - dx
+        // 宽度范围:最小 200,最大 = vw - marginLeft - startPos.x(左边缘不越过 marginLeft)
+        const maxW = Math.max(200, vw - marginLeft - startPos.x)
+        const newW = Math.min(Math.max(200, startSize.w - dx), maxW)
+        pos.value = { x: startPos.x, y: startPos.y }
+        size.value = { w: newW, h: Math.min(Math.max(120, startSize.h + dy), Math.max(120, vh - startPos.y)) }
+      } else {
+        // left 模式:左边固定,鼠标向右(dx>0)→ 宽度增大,右边右移,但不超过 vw
+        size.value = {
+          w: Math.min(Math.max(200, startSize.w + dx), Math.max(200, vw - startPos.x)),
+          h: Math.min(Math.max(120, startSize.h + dy), Math.max(120, vh - startPos.y)),
+        }
       }
     }
   }

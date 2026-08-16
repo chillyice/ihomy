@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.nio.charset.StandardCharsets;
 
 /**
  * 每日内容接口:
@@ -85,7 +86,7 @@ public class DailyController {
         try {
             HttpRequest req = HttpRequest.newBuilder(URI.create(BING_ENDPOINT))
                     .timeout(Duration.ofSeconds(8)).GET().build();
-            String json = httpClient.send(req, HttpResponse.BodyHandlers.ofString()).body();
+            String json = httpClient.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)).body();
             JsonNode root = objectMapper.readTree(json);
             JsonNode item = root.path("images").get(0);
             String url = item.path("url").asText();

@@ -303,7 +303,7 @@ public class AuthService {
         return securityHelper.current();
     }
 
-    /** 组装令牌响应:access/refresh token + 用户信息 + 当前家庭分享 token */
+    /** 组装令牌响应:access/refresh token + 用户信息 + 当前家庭分享 token + 权限码列表 */
     private Map<String, Object> buildTokens(SysUser user, String roleCode, Long familyId) {
         String access = jwtUtils.generateAccessToken(user.getId(), user.getUsername(), roleCode, familyId);
         String refresh = jwtUtils.generateRefreshToken(user.getId(), user.getUsername());
@@ -318,6 +318,17 @@ public class AuthService {
         u.put("avatar", user.getAvatar());
         u.put("role", roleCode);
         u.put("familyId", familyId);
+        // 权限码列表:当前家庭角色权限 + 系统级 OPS 权限(若有 OPS 绑定)
+        java.util.List<String> perms = new java.util.ArrayList<>();
+        if (familyId != null) {
+            perms.addAll(sysRoleMapper.selectAuthCodesByUserAndFamily(user.getId(), familyId));
+        }
+        boolean hasOps = sysRoleMapper.countOpsRole(user.getId()) > 0;
+        u.put("isOps", hasOps);
+        if (hasOps) {
+            perms.add("ops:view");
+        }
+        u.put("permissions", perms);
         data.put("user", u);
         // 附带当前家庭分享链接所需的混淆 token(注册/切换后前端可直接生成分享链接)
         if (familyId != null) {

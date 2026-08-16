@@ -2,6 +2,7 @@ package com.ihomy.security;
 
 import com.ihomy.common.Result;
 import com.ihomy.common.ResultCode;
+import com.ihomy.mapper.SysRoleMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -15,34 +16,62 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * OPS 角色访问隔离过滤器（V3.8）:
- * - 角色为 OPS 的请求只放行 /ops/**（运维页）与 /auth/**（登录/改密/登出）,
- *   防止运维账号凭 JWT 触达业务接口（现有 Controller 多只校验"已登录"）。
- * - 非 OPS 角色一律拒绝 /ops/**（@RequirePermission 对 OWNER 恒真,必须在此硬拦）,
- *   保证运维数据只对运维角色可见。
+ * OPS 角色访问隔离过滤器(V3.8):
+ * - 纯 OPS 角色(role=OPS)只放行 /ops/** 与 /auth/**,防止运维账号触达业务接口。
+ * - 非 OPS 角色访问 /ops/** 时,检查用户是否有系统级 OPS 角色绑定(family_id=NULL),
+ *   有则放行(支持 chillyice 这种同时是家庭 OWNER + 系统级 OPS 的场景),无则 403。
  */
 @Component
 @RequiredArgsConstructor
 public class OpsAccessFilter extends OncePerRequestFilter {
 
     private final ObjectMapper objectMapper;
+    private final SysRoleMapper sysRoleMapper;
+    // 缓存:userId → 是否有 OPS 角色(5 分钟内不重复查库)
+    private final ConcurrentHashMap<Long, Long> opsCache = new ConcurrentHashMap<>();
+    private static final long CACHE_TTL_MS = 5 * 60 * 1000L;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getPrincipal() instanceof LoginUser loginUser) {
-            boolean isOps = "OPS".equals(loginUser.getRole());
+            boolean isPureOps = "OPS".equals(loginUser.getRole());
             boolean opsPath = isOpsPath(request);
-            // OPS 访问非运维/认证路径,或非 OPS 访问运维路径:一律 403
-            if ((isOps && !isAllowed(request)) || (!isOps && opsPath)) {
+            boolean hasOpsRole = hasOpsRole(loginUser.getUserId());
+
+            // 纯 OPS 角色访问非运维/认证路径 → 403
+            if (isPureOps && !isAllowed(request)) {
+                deny(response);
+                return;
+            }
+            // 非 OPS 角色访问运维路径,且没有系统级 OPS 绑定 → 403
+            if (!isPureOps && opsPath && !hasOpsRole) {
                 deny(response);
                 return;
             }
         }
         chain.doFilter(request, response);
+    }
+
+    /** 检查用户是否有系统级 OPS 角色绑定(family_id=NULL),带 5 分钟缓存 */
+    private boolean hasOpsRole(Long userId) {
+        if (userId == null) return false;
+        long now = System.currentTimeMillis();
+        Long cachedAt = opsCache.get(userId);
+        if (cachedAt != null && now - cachedAt < CACHE_TTL_MS) {
+            return true;
+        }
+        boolean has = sysRoleMapper.countOpsRole(userId) > 0;
+        if (has) {
+            opsCache.put(userId, now);
+        } else {
+            opsCache.remove(userId);
+        }
+        return has;
     }
 
     /** 是否为运维接口路径(含 context-path=/api 前缀) */
@@ -56,7 +85,6 @@ public class OpsAccessFilter extends OncePerRequestFilter {
             return true;
         }
         String path = request.getRequestURI();
-        // context-path=/api,URI 形如 /api/ops/xxx
         return path.startsWith("/api/ops")
                 || path.startsWith("/api/auth");
     }
