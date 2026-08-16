@@ -11,16 +11,16 @@ spring:
   application:
     name: ihomy
   datasource:
-    url: jdbc:mysql://localhost:38654/ihomy?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:6306/ihomy?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     # 使用专用应用账号 ihomy（最小权限，仅 DML），不要用 root 跑业务
+    # 密码可通过外挂文件覆盖:设环境变量 IHOMY_CONFIG_PATH 指向 external.yml
     username: ihomy
     password: Ihomy@2026
     driver-class-name: com.mysql.cj.jdbc.Driver
   data:
     redis:
       host: localhost
-      # 宿主映射 18469->容器6379(避开 Hyper-V 排除端口段 6055-6754)
-      port: 18469
+      port: 6379
       database: 0
   servlet:
     multipart:
@@ -47,25 +47,23 @@ jwt:
   # 刷新令牌有效期（秒）- 7天
   refresh-token-expire: 604800
 
-# 文件上传存储（本地兜底，生产建议使用 OSS/MinIO）
+# 文件上传存储
 # 注意:upload-dir 必须与 nginx /files/ 的 alias 指向同一目录,用绝对路径避免随启动目录漂移
 file:
-  upload-dir: D:/WorkSpace/ihomy/uploads
+  upload-dir: D:\WorkSpace\ihomy\uploads
   url-prefix: /files
 
-# 图形验证码:开发/测试环境可固定为已知值(如 qwer),方便联调;生产去掉或留空则随机生成
-# 和风天气:JWT(Ed25519)身份认证,凭证在控制台-项目管理获取
-# ⚠️ 私钥不入 git(生产环境):以下字段生产留空,运行时从 DB sys_weather_credential 表读
-#    本地开发可直接填入(DB 种子 private_key=NULL 时 fallback 到此 yml)
+# 图形验证码:生产留空=随机生成;本地开发在 application-dev.yml 覆盖为 qwer
+# 和风天气:JWT(Ed25519)身份认证,凭证优先从 DB sys_weather_credential 表读 status=1 的记录
+# ⚠️ 私钥不入 git:yml 留空,部署后通过外挂文件(IHOMY_CONFIG_PATH)或手动 UPDATE sys_weather_credential 填入
+# 外挂文件中的敏感凭证可用 ENC(...) 格式 AES-GCM 加密,盐值存 sys_parameter 表(aes-salt),首次启动自动生成
+# 加密工具:启动后调用 GET /api/ops/crypto/encrypt?plaintext=xxx 生成密文(OPS 角色)
 app:
-  captcha-fixed-code: qwer
-  weather-api-host: n93h2thv7x.re.qweatherapi.com
-  weather-project-id: 26E5G7E7NQ
-  weather-key-id: TKWEDN375N
-  weather-private-key: |
-    -----BEGIN PRIVATE KEY-----
-    MC4CAQAwBQYDK2VwBCIEIBZifGunwvPX6SyTYx8XgWLTMOnFnaMHu5Bbr+Je7fus
-    -----END PRIVATE KEY-----
+  captcha-fixed-code:
+  weather-api-host:
+  weather-project-id:
+  weather-key-id:
+  weather-private-key:
 
 logging:
   file:

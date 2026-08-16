@@ -30,9 +30,9 @@ public class SunService {
     private static final String LOC_PREFIX = "ihomy:sun:loc:";
     private static final String SLOTS_PREFIX = "ihomy:sun:slots:";
 
-    /** 主入口:返回位置 + 日出日落月相 + 96 时隙表。date 为 null 时取当日。 */
-    public Map<String, Object> getSunInfo(String ip, LocalDate date) {
-        String[] loc = resolveLocation(ip);
+    /** 主入口:返回位置 + 日出日落月相 + 96 时隙表。date 为 null 时取当日。familyLocation 非空时优先使用。 */
+    public Map<String, Object> getSunInfo(String ip, LocalDate date, String[] familyLocation) {
+        String[] loc = resolveLocation(ip, familyLocation);
         double lat = Double.parseDouble(loc[0]);
         double lng = Double.parseDouble(loc[1]);
         String tzId = loc[2];
@@ -44,6 +44,9 @@ public class SunService {
         data.put("lng", Math.round(lng * 100) / 100.0);
         data.put("timezone", tz.getId());
         data.put("date", today.toString());
+        if (familyLocation != null && familyLocation.length > 2 && familyLocation[2] != null) {
+            data.put("city", familyLocation[2]);
+        }
 
         // 日出日落
         Map<String, String> sun = SolarUtil.sunTimes(lat, lng, today, tz);
@@ -55,8 +58,8 @@ public class SunService {
         Map<String, String> moon = SolarUtil.moonTimes(lat, lng, today, tz);
         data.putAll(moon);
 
-        // 96 时隙表(按日期缓存)
-        String slotsKey = SLOTS_PREFIX + today;
+        // 96 时隙表(按日期+坐标缓存)
+        String slotsKey = SLOTS_PREFIX + today + ":" + Math.round(lat * 100) + ":" + Math.round(lng * 100);
         String cached = redis.opsForValue().get(slotsKey);
         if (cached != null) {
             try {
@@ -73,13 +76,13 @@ public class SunService {
         return data;
     }
 
-    /** 兼容旧调用 */
-    public Map<String, Object> getSunInfo(String ip) {
-        return getSunInfo(ip, null);
-    }
-
-    /** IP → [lat, lng, timezone](Redis 缓存 6h) */
-    private String[] resolveLocation(String ip) {
+    /** IP → [lat, lng, timezone](Redis 缓存 6h);familyLocation 非空时优先使用 */
+    private String[] resolveLocation(String ip, String[] familyLocation) {
+        // 家庭设置的位置偏好优先
+        if (familyLocation != null && familyLocation.length >= 2
+                && familyLocation[0] != null && familyLocation[1] != null) {
+            return new String[]{ familyLocation[0], familyLocation[1], "Asia/Shanghai" };
+        }
         if (ip != null && (ip.equals("127.0.0.1") || ip.equals("0:0:0:0:0:0:0:1") || ip.startsWith("192.168."))) {
             ip = "";
         }

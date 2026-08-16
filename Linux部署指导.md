@@ -275,41 +275,32 @@ git clone git@github.com:<你的用户名>/ihomy.git /opt/ihomy
 
 ### 3.3 配置后端（ihomy 用户，编辑项目内文件无需 root）
 
-以 `ihomy` 身份编辑 `/opt/ihomy/backend/src/main/resources/application.yml`：
+> **V5.7 起:源码 `application.yml` 已是生产配置**(MySQL 6306/Redis 6379/Linux 路径/captcha 空/天气留空),jar 内嵌即生产,**首次部署无需手动编辑 yml**。本地开发差异由 `application-dev.yml` + Spring profile=dev 覆盖,不入生产 jar。
+> 仅 JWT secret 建议改成你自己的随机串(至少 32 字符):
 
+```bash
+# 以 ihomy 用户编辑(可选,建议改 JWT secret)
+vim /opt/ihomy/backend/src/main/resources/application.yml
+# 找到 jwt.secret 行,改成你的随机密钥(至少 32 字符)
+```
+
+application.yml 关键配置(已预置生产值,无需改动):
 ```yaml
 spring:
   datasource:
-    url: jdbc:mysql://localhost:6306/ihomy?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-    # 使用专用应用账号 ihomy（schema.sql 已自动创建，仅 DML 权限），不要用 root 跑业务
-    username: ihomy
-    password: Ihomy@2026          # ← 改成你在 schema.sql 中设置的密码
+    url: jdbc:mysql://localhost:6306/ihomy?...     # MySQL 6306(本机部署)
+    username: ihomy                                 # 专用应用账号(仅 DML)
+    password: Ihomy@2026                            # schema.sql 已创建
   data:
     redis:
       host: localhost
-      port: 6379
-      # password: 你的Redis密码      # ← 如有密码
-  servlet:
-    multipart:
-      max-file-size: 500MB        # 视频大文件上传（放映厅）
-      max-request-size: 500MB
-
-# JWT（顶级配置，不在 app 下）
-jwt:
-  secret: ihomy-secret-key-please-change-in-production-2026-very-long   # ← 生产必须改，至少 32 字符
-  access-token-expire: 7200       # 访问令牌 2 小时
-  refresh-token-expire: 604800    # 刷新令牌 7 天
-
+      port: 6379                                    # Redis(Docker 映射)
 file:
-  upload-dir: /opt/ihomy/uploads    # ← 绝对路径
-  url-prefix: /files
-
+  upload-dir: /opt/ihomy/uploads                    # Linux 绝对路径
 app:
-  captcha-fixed-code:               # ← 生产环境留空=随机验证码；开发环境填 'qwer' 固定
-  weather-api-host:                 # ← 和风天气 API Host(留空=禁用,DB 优先读)
-  weather-project-id:               # ← 和风天气项目 ID
-  weather-key-id:                   # ← 和风天气凭证 ID
-  weather-private-key:              # ← Ed25519 私钥 PEM(留空=禁用,建议填 DB 不填 yml)
+  captcha-fixed-code:                               # 生产留空=随机验证码
+  weather-api-host:                                 # 天气凭证留空,从 DB 读
+  weather-private-key:                              # 私钥不入 git,部署后 UPDATE DB
 ```
 
 > **⚠️ 私钥安全(风险最小化)**:
@@ -331,7 +322,7 @@ app:
 # 退出 ihomy 用户回到有 sudo 权限的账号
 exit
 # 用数据库 root 执行 schema.sql（建库、建表、创建应用账号 ihomy 并授权）
-mysql -uroot -p < /opt/ihomy/backend/src/main/resources/schema.sql
+mysql -uroot -p --default-character-set=utf8mb4 < /opt/ihomy/backend/src/main/resources/schema.sql
 ```
 该脚本由数据库 root 执行一次，会创建 `ihomy` 库、**41 张表**（含系统操作日志表、和风天气凭证表、天气 API 调用日志表）、应用专用账号 `ihomy`（仅 DML 权限）、默认首页模块、管理员 `admin/admin123`、运维账号 `ops/admin123`。
 
@@ -443,6 +434,10 @@ server {
     listen 443 ssl;
     http2 on;
     server_name ihomy.top www.ihomy.top;
+
+    # 响应头声明字符集,确保浏览器按 UTF-8 解析
+    charset utf-8;
+    charset_types text/plain text/css text/javascript application/javascript application/json application/xml image/svg+xml;
 
     # 证书（certbot --nginx 自动生成，路径如下）
     ssl_certificate     /etc/letsencrypt/live/ihomy.top/fullchain.pem;
@@ -677,18 +672,18 @@ powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1
 ### 8·补.3 脚本做了什么
 
 1. **前置检查**：JAVA_HOME、ssh/scp/tar 可用、SSH 免密连通。
-2. **本地构建**：`mvnw clean package -DskipTests` 打 jar；`npm run build` 出 dist；dist 打成 tar.gz 单文件传输（比 `scp -r` 快很多）。
+2. **本地构建**：`mvnw clean package -DskipTests` 打 jar（内嵌生产配置）；`npm run build` 出 dist；dist 打成 tar.gz 单文件传输（比 `scp -r` 快很多）。
 3. **后端部署**：
    - scp 上传 jar 到 `/opt/ihomy/backend/target/ihomy-backend.jar.new`。
-   - **首次部署特判**：若 `target/application.yml` 不存在，自动从 `src/main/resources/application.yml`（部署时编辑过的生产配置）复制一份到 `target/`。Spring Boot 会优先加载 jar 同目录的外部 `application.yml`，覆盖 jar 内的开发配置——所以本地 jar 里是开发配置（`D:/...`、`38654` 端口等）也无所谓，外部配置会盖掉。
-   - 备份旧 jar → 替换新 jar → `systemctl restart ihomy-backend` → 轮询 `is-active` 确认启动（最多 20 秒）。
+   - **清理旧外部配置**：若 `target/application.yml` 存在（早期部署遗留的外部覆盖），删除它——jar 内嵌的 application.yml 已是生产配置，不需要外部覆盖。
+   - 备份旧 jar → 替换新 jar → `systemctl restart ihomy-backend` → 轮询 `is-active` 确认启动（最多 30 秒，Spring Boot 在 2GB 服务器约需 30 秒）。
    - 启动失败自动回滚到 `.bak`。
 4. **前端部署**：scp 上传 tar.gz → 远程解压到 `dist.new` → 旧 `dist` 改名 `dist.bak` → `dist.new` 改名 `dist` → `nginx -t && systemctl reload nginx`。失败自动回滚。
-5. **健康检查**：`curl https://ihomy.top/api/public/home` 期望 200，失败 5 次报警。
+5. **健康检查**：`curl https://ihomy.top/api/public/home` 期望 200，最多重试 12 次（约 60 秒，覆盖 Spring Boot ~30 秒启动），失败自动拉取后端日志尾部 40 行。
 
 ### 8·补.4 注意事项
 
-- **配置隔离**：脚本只传 jar 和 dist，**不碰服务器上的 `application.yml`**（首次从源码复制后一直保留在 `target/`）。本地 `application.yml` 是开发配置，不能直接上传覆盖生产配置。
+- **jar 内嵌即生产配置**：源码 `application.yml` 就是生产配置（MySQL 6306/Redis 6379/Linux 路径），构建出来的 jar 直接能用，无需外部配置覆盖。本地开发差异由 `application-dev.yml` + Spring profile=dev 覆盖，不进生产 jar。
 - **不替代首次部署**：服务器需已按前文第三节完成首次部署（源码克隆 + 建库建表 + systemd 配置 + nginx 配置）。本脚本只做「更新」。
 - **数据库变更**：若代码涉及 `schema.sql` 改动，脚本不会自动执行 SQL。需手动 `mysql -uroot -p ihomy < 增量.sql`。
 - **回滚**：失败时脚本自动回滚 jar/dist。若需手动回滚，登录服务器 `mv ihomy-backend.jar.bak ihomy-backend.jar && systemctl restart ihomy-backend`。
@@ -905,24 +900,23 @@ ps -eo pid,rss,cmd --sort=-rss | grep -E 'java|mysql|redis|nginx|dockerd' | head
 ## 附：Windows 开发环境 ↔ Linux 上线:路径转换清单
 
 > 日常在 Windows 上开发验证(上传目录 `D:/WorkSpace/ihomy/uploads`),上线 Linux 时的路径处理如下。
-> 核心结论:**代码零改动,DB 里的文件 URL 零改动,只需要改 1 个配置 + 迁移 2 类数据**。
+> 核心结论(V5.7 起):**源码 `application.yml` 已是 Linux 生产配置,本地开发差异由 `application-dev.yml` + Spring profile=dev 覆盖。代码零改动,DB 里的文件 URL 零改动,上线零配置改动**。
 
-| 触点 | Windows(开发) | Linux(上线) | 谁负责 |
-|------|---------------|-------------|--------|
-| 上传根目录 `file.upload-dir`(application.yml) | `D:/WorkSpace/ihomy/uploads` | `/opt/ihomy/uploads` | 部署时改 yml 一行 |
+| 触点 | Windows(开发,application-dev.yml) | Linux(生产,application.yml) | 谁负责 |
+|------|-------------------------------------|------------------------------|--------|
+| 上传根目录 `file.upload-dir` | `D:/WorkSpace/ihomy/uploads` | `/opt/ihomy/uploads` | 已由 profile 隔离,无需手动改 |
 | DB 里的文件 URL(`/files/...`) | 相对 URL 与物理根解耦 | 不变,原样用 | 无需动作 |
 | 存储设备 `sys_storage_device.root_path`(DB 数据) | 配的 Windows 盘路径 | 需改成 Linux 路径(如 `/mnt/nas/photo`) | 上线后在存储管理页重新添加/编辑设备,或 SQL UPDATE |
 | 日志路径 | `./logs/ihomy.log`(相对工作目录) | systemd 已配 /var/log/ihomy | 无需动作 |
-| Nginx `/files/` alias | 指向 Windows uploads | `/opt/ihomy/uploads/` | 部署时 nginx 配置 |
+| Nginx `/files/` alias | 指向 Windows uploads | `/opt/ihomy/uploads/` | 部署时 nginx 配置(一次性) |
 
 代码侧已验证平台无关,无需改动:`Paths.get`/`Files` 全平台自适应;上传文件名的清洗正则兼容 UTF-8 中文;
 同步去重键 `source_path` 与防遍历校验(`resolveSafe`)均反斜杠归一,Win/Linux 行为一致。
 
 **上线迁移步骤**:
-1. 改 `application.yml` 的 `file.upload-dir` 为 `/opt/ihomy/uploads`;
-2. 以 ihomy 用户 `rsync -a D:/WorkSpace/ihomy/uploads/ /opt/ihomy/uploads/`(DB 的 URL 不用改);
-3. 重新添加家庭存储设备(Linux 侧根路径),旧设备记录可删;
-4. 验证:`/files/upload/...`、`/files/pictures/...`、`/files/music/...`、`/files/videos/...` 均可访问。
+1. 上传目录迁移:`rsync -a D:/WorkSpace/ihomy/uploads/ /opt/ihomy/uploads/`(DB 的 URL 不用改);
+2. 重新添加家庭存储设备(Linux 侧根路径),旧设备记录可删;
+3. 验证:`/files/upload/...`、`/files/pictures/...`、`/files/music/...`、`/files/videos/...` 均可访问。
 
 ---
 
@@ -1039,6 +1033,8 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: ihomy
+      LANG: C.UTF-8
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     # 注：schema.sql 挂载到初始化目录，容器首次启动会自动执行，
     # 其中包含创建应用账号 ihomy 并授权的语句。容器 root 仅用于管理。
     volumes:
@@ -1059,6 +1055,8 @@ services:
     image: eclipse-temurin:21-jre
     container_name: ihomy-backend
     working_dir: /app
+    environment:
+      LANG: C.UTF-8
     volumes:
       - ./backend/target/ihomy-backend.jar:/app/app.jar
       - ./uploads:/app/uploads

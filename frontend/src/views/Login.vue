@@ -1,5 +1,12 @@
 <template>
   <div class="login-page">
+    <!-- 背景色块(同首页风格) -->
+    <div class="bg-blobs">
+      <div class="blob" style="background:#9CD0B5; top:8%; left:6%; width:340px; height:340px;"></div>
+      <div class="blob" style="background:#EDDB8C; top:55%; left:62%; width:300px; height:300px;"></div>
+      <div class="blob" style="background:#ECC0AC; top:70%; left:12%; width:260px; height:260px;"></div>
+      <div class="blob" style="background:#A8C9DE; top:15%; left:70%; width:280px; height:280px;"></div>
+    </div>
     <div class="login-card">
       <div class="login-title">ihomy</div>
       <div class="login-sub">{{ isRegister ? $t('login.registerTitle') : $t('login.welcome') }}</div>
@@ -154,20 +161,44 @@ const onSubmit = async () => {
 
 <style scoped>
 .login-page {
+  position: relative;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #1F3A5F 0%, #2E74B5 100%);
+  background: linear-gradient(135deg, #EDE4D3 0%, #E2D8C4 50%, #D6CBB4 100%);
   padding: 16px;
+  overflow: hidden;
+}
+/* 背景色块:同首页毛玻璃风格 */
+.bg-blobs { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.4;
 }
 .login-card {
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: 400px;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 16px;
   padding: 32px 28px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 12px 40px rgba(58, 46, 34, 0.15);
+}
+html.dark .login-page {
+  background: linear-gradient(135deg, #0F1A2E 0%, #162238 50%, #1A2540 100%);
+}
+html.dark .blob { opacity: 0.1; }
+html.dark .login-card {
+  background: rgba(30, 40, 65, 0.55);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
 }
 .login-title {
   font-size: 26px;

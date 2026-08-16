@@ -10,12 +10,23 @@
         <el-button v-if="userStore.isOwner" type="primary" plain @click="openDevice()">{{ $t('storage.addDevice') }}</el-button>
       </div>
       <el-table :data="devices" v-loading="loadingDevices" stripe>
-        <el-table-column prop="name" :label="$t('storage.deviceName')" min-width="140" />
+        <el-table-column prop="name" :label="$t('storage.deviceName')" min-width="140">
+          <template #default="{ row }">
+            {{ row.name }}
+            <el-tag v-if="row.id === defaultDeviceId" size="small" type="success" style="margin-left: 6px">{{ $t('storage.defaultTag') }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="deviceType" :label="$t('storage.deviceType')" width="130" />
-        <el-table-column prop="rootPath" :label="$t('storage.rootPath')" min-width="200" show-overflow-tooltip />
-        <el-table-column :label="$t('common.actions')" width="200" fixed="right">
+        <el-table-column :label="$t('storage.rootPath')" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span v-if="row.id !== 0">{{ row.rootPath }}</span>
+            <span v-else class="path-hidden">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column :label="$t('common.actions')" width="260" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="browseDevice(row)">{{ $t('storage.browse') }}</el-button>
+            <el-button v-if="row.id !== 0 && row.id !== defaultDeviceId && userStore.isOwner" size="small" text type="success" @click="setDefaultDevice(row)">{{ $t('storage.setDefault') }}</el-button>
             <el-button v-if="row.id !== 0 && userStore.isOwner" size="small" text @click="openDevice(row)">{{ $t('common.edit') }}</el-button>
             <el-button v-if="row.id !== 0 && userStore.isOwner" size="small" text type="danger" @click="removeDevice(row)">{{ $t('common.delete') }}</el-button>
           </template>
@@ -128,6 +139,15 @@ const deviceDialog = ref(false)
 const savingDevice = ref(false)
 const deviceForm = ref({})
 const deviceTypes = ['NAS', 'REMOTE', 'MOUNT', 'SYSTEM']
+
+// 默认存储设备:localStorage 持久化(家庭级),同步时自动选中
+const defaultDeviceId = ref(parseInt(localStorage.getItem('ihomy:default-storage') || '0'))
+const setDefaultDevice = (row) => {
+  defaultDeviceId.value = row.id
+  localStorage.setItem('ihomy:default-storage', String(row.id))
+  syncDeviceId.value = row.id
+  ElMessage.success(t('common.success'))
+}
 
 const browsing = ref(false)
 const activeDeviceId = ref(0)
@@ -367,5 +387,9 @@ onBeforeUnmount(() => { if (syncTimer) clearInterval(syncTimer) })
 .preview-file {
   padding: 40px;
   color: var(--el-text-color-secondary);
+}
+.path-hidden {
+  color: var(--el-text-color-secondary);
+  opacity: 0.5;
 }
 </style>

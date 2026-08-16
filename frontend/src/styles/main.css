@@ -3,28 +3,15 @@
   --color-accent: #A8483A;
   --color-bg: #EDE4D3;
   --color-bg-2: #E2D5BC;
-  --color-card: #F5EFE0;
+  --color-card: #FAF6EC;
   --color-card-2: #E8DEC8;
   --color-text: #3A2E22;
   --color-text-secondary: #7A6B5A;
   --color-border: rgba(58, 46, 34, 0.12);
-  --color-wood: #C9A876;
-  --color-wood-dark: #8B6F47;
-  --color-ink: #3A2E22;
-  --color-pen: #5A6B7C;
-  --color-stamp: #A8483A;
-  --color-moss: #6B7A5A;
-  --color-old-white: #F5EFE0;
-  --color-sticky: #F7E9B7;
-  --color-sticky-2: #F0D9A8;
-  --color-sticky-3: #D8E0C0;
-  --radius: 6px;
-  --shadow: 0 2px 6px rgba(58, 46, 34, 0.08);
-  --shadow-lift: 0 8px 20px rgba(58, 46, 34, 0.16);
-  --shadow-paper: 0 1px 2px rgba(58, 46, 34, 0.12), 0 3px 8px rgba(58, 46, 34, 0.06);
-  --shadow-book: 0 4px 12px rgba(58, 46, 34, 0.20);
-  --font-hand: 'Caveat', 'Kalam', 'Segoe Print', cursive;
-  --font-serif: 'Georgia', 'Times New Roman', serif;
+  --radius: 10px;
+  --shadow: 0 4px 12px rgba(58, 46, 34, 0.08), 0 1px 3px rgba(58, 46, 34, 0.06);
+  --shadow-hover: 0 8px 24px rgba(58, 46, 34, 0.14), 0 2px 6px rgba(58, 46, 34, 0.08);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -1px 0 rgba(58, 46, 34, 0.04);
 }
 
 /* 暗色模式:夜色深蓝 */
@@ -32,32 +19,19 @@ html.dark {
   --color-primary: #E8DCC8;
   --color-bg: #0F1A2E;
   --color-bg-2: #162238;
-  --color-card: #1A2540;
+  --color-card: #1E2A48;
   --color-card-2: #213152;
   --color-text: #E8DCC8;
   --color-text-secondary: #B0A898;
   --color-border: rgba(232, 220, 200, 0.10);
-  --color-wood: #8B6F47;
-  --color-wood-dark: #6B5435;
-  --color-old-white: #1A2540;
-  --color-ink: #E8DCC8;
-  --color-pen: #9AB0C8;
-  --color-stamp: #D4886A;
-  --color-moss: #8BAA6A;
-  --shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-  --shadow-lift: 0 8px 20px rgba(0, 0, 0, 0.5);
-  --shadow-paper: 0 1px 2px rgba(0, 0, 0, 0.3), 0 3px 8px rgba(0, 0, 0, 0.2);
-  --shadow-book: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 rgba(0, 0, 0, 0.2);
   color-scheme: dark;
 }
 /* 深色模式:硬编码深色字体覆写为浅色 */
-html.dark .top-bar,
-html.dark .family-name,
 html.dark .nav-item,
-html.dark .nav-action,
-html.dark .nav-user,
 html.dark .user-name,
-html.dark .glass-panel,
 html.dark .draggable-panel,
 html.dark .panel-title,
 html.dark .feed-nick,
@@ -68,12 +42,10 @@ html.dark .bubble-time,
 html.dark .task-title,
 html.dark .task-meta,
 html.dark .task-reward,
-html.dark .clock,
 html.dark .date,
 html.dark .weather,
 html.dark .weather-icon,
 html.dark .weather-temp,
-html.dark .weather-text,
 html.dark .anni-name,
 html.dark .anni-date,
 html.dark .anni-days,
@@ -85,7 +57,6 @@ html.dark .cover-sub {
   color: #E8DCC8;
 }
 html.dark .nav-item,
-html.dark .nav-action,
 html.dark .task-meta,
 html.dark .bubble-type,
 html.dark .bubble-time,
@@ -99,11 +70,16 @@ html.dark .feed-bubble {
   background: rgba(255, 255, 255, 0.08);
 }
 html.dark .draggable-panel {
-  background: rgba(30, 40, 65, 0.55);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(30, 40, 65, 0.62);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3),
+              inset 0 1px 0 rgba(255, 255, 255, 0.08), inset 0 -1px 0 rgba(0, 0, 0, 0.2);
 }
 html.dark .handle-grip {
   background: rgba(232, 220, 200, 0.25);
+}
+html.dark .resize-handle {
+  background: linear-gradient(135deg, transparent 50%, rgba(232, 220, 200, 0.25) 50%);
 }
 html.dark .msg-icon {
   color: rgba(232, 220, 200, 0.8);
@@ -112,7 +88,6 @@ html.dark .msg-icon:hover { color: #E8DCC8; }
 
 /* 深浅主题切换:1s 颜色过渡(只作用于容器级,避免拖慢 hover) */
 body, #app { transition: background-color 1s ease, color 1s ease; }
-.glass-panel { transition: background-color 1s ease, border-color 1s ease, color 1s ease; }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -121,7 +96,17 @@ html, body, #app {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
   color: var(--color-text);
   background: var(--color-bg);
+  background-image:
+    radial-gradient(ellipse at 20% 0%, rgba(156, 208, 181, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(168, 201, 222, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(237, 219, 140, 0.08) 0%, transparent 60%);
+  background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
+}
+html.dark, html.dark body {
+  background-image:
+    radial-gradient(ellipse at 20% 0%, rgba(120, 200, 160, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(120, 160, 200, 0.08) 0%, transparent 50%);
 }
 
 a { color: var(--color-accent); text-decoration: none; }
@@ -135,8 +120,13 @@ a { color: var(--color-accent); text-decoration: none; }
 .card {
   background: var(--color-card);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 16px;
+  box-shadow: var(--shadow), var(--shadow-inset);
+  padding: 20px;
+  border: 1px solid var(--color-border);
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+.card:hover {
+  box-shadow: var(--shadow-hover), var(--shadow-inset);
 }
 
 /* 移动端触控与安全区:底部 Home 指示条、最小触控目标、页面留白适配 */
@@ -145,4 +135,44 @@ a { color: var(--color-accent); text-decoration: none; }
   #app { padding-bottom: env(safe-area-inset-bottom); }
   /* 触控目标最小 44px,文字链/小号/图标按钮保持紧凑 */
   .el-button:not(.is-link):not(.el-button--small):not(.is-circle) { min-height: 44px; }
+}
+
+/* === ElMessage 弹出框 UI 增强 === */
+.el-message {
+  border-radius: 12px !important;
+  padding: 14px 20px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  min-width: 200px !important;
+}
+.el-message--success {
+  background: rgba(76, 175, 80, 0.92) !important;
+  color: #fff !important;
+}
+.el-message--warning {
+  background: rgba(255, 193, 7, 0.92) !important;
+  color: #3A2E22 !important;
+}
+.el-message--error {
+  background: rgba(244, 67, 54, 0.92) !important;
+  color: #fff !important;
+}
+.el-message--info {
+  background: rgba(58, 46, 34, 0.92) !important;
+  color: #fff !important;
+}
+.el-message__content { color: inherit !important; }
+.el-message .el-message__icon { font-size: 18px !important; margin-right: 8px !important; }
+
+/* === ElNotification 弹出框增强 === */
+.el-notification {
+  border-radius: 14px !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18) !important;
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
 }

@@ -18,6 +18,9 @@
 --      并同步修改 backend/src/main/resources/application.yml。
 -- ============================================================
 
+-- 确保客户端连接字符集为 utf8mb4,避免导入时中文种子数据损坏
+SET NAMES utf8mb4;
+
 -- ------------------------------------------------------------
 -- 0. 建库
 -- ------------------------------------------------------------
@@ -155,6 +158,9 @@ CREATE TABLE `sys_family_info` (
   `share_token`    VARCHAR(16)  DEFAULT NULL COMMENT '16位混淆分享ID（URL ?hid= 访问，防 ID 遍历）',
   `music_url`      VARCHAR(500) DEFAULT NULL COMMENT '家庭背景音乐 URL（上传 /files/ 或外链）',
   `music_title`    VARCHAR(100) DEFAULT NULL COMMENT '背景音乐名称',
+  `weather_lat`    DECIMAL(10,6) DEFAULT NULL COMMENT '天气/太阳位置-纬度(空=IP自动定位)',
+  `weather_lng`    DECIMAL(10,6) DEFAULT NULL COMMENT '天气/太阳位置-经度(空=IP自动定位)',
+  `weather_city`   VARCHAR(50)  DEFAULT NULL COMMENT '天气显示城市名(空=IP自动定位)',
   `created_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted`        TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
@@ -749,6 +755,7 @@ VALUES ('管理员的生日', 'lunar', 5, 3, 0, @fid, @uid, 'YEARLY', @uid);
 --     演示假用户 is_fake=1，密码为随机串，禁止登录
 -- ------------------------------------------------------------
 UPDATE `sys_family_info` SET `is_demo` = 1, `name` = 'ihomy 演示家庭',
+  `is_public` = 1,
   `cover_text` = '欢迎来到 ihomy 演示家庭',
   `cover_subtitle` = '这里展示了 ihomy 的全部功能效果',
   `description` = '这是一个预置的演示家庭，用于展示 ihomy 的功能效果。注册并创建你自己的家庭开始使用吧。',
@@ -1212,7 +1219,7 @@ CREATE TABLE `sys_weather_credential` (
   `project_id`   VARCHAR(50)  NOT NULL COMMENT '项目ID(JWT sub)',
   `key_id`       VARCHAR(50)  NOT NULL COMMENT '凭证ID(JWT kid)',
   `public_key`   TEXT         DEFAULT NULL COMMENT 'Ed25519 公钥 PEM(对照用,验证签名)',
-  `private_key`  TEXT         NOT NULL COMMENT 'Ed25519 私钥 PEM(JWT 签名用)',
+  `private_key`  TEXT         DEFAULT NULL COMMENT 'Ed25519 私钥 PEM(JWT 签名用,留空=禁用,部署后手动 UPDATE 填入)',
   `status`       TINYINT      NOT NULL DEFAULT 0 COMMENT '0禁用 1启用(同时仅一条启用)',
   `remark`       VARCHAR(200) DEFAULT NULL COMMENT '备注',
   `created_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -1228,7 +1235,7 @@ INSERT INTO `sys_weather_credential` (`env`, `name`, `api_host`, `project_id`, `
 ('test', 'Windows 测试环境', 'n93h2thv7x.re.qweatherapi.com', '26E5G7E7NQ', 'TKWEDN375N',
  '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAlSLL4DY/8NTqT3NrSIsU/+LxN5LdyM8SxvlpGZiSkUQ=\n-----END PUBLIC KEY-----',
  NULL, 1, '开发机默认凭证,部署后 UPDATE private_key'),
-('prod', 'Linux 生产环境', 'n93h2thv7x.re.qweatherapi.com', '26E5G7E7NQ', 'TKWEDN375N',
+('prod', 'Linux 生产环境', 'n93h2thv7x.re.qweatherapi.com', '26E5G7E7NQ', 'C9PREDFHFR',
  '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAAwRZGyidKyTmYn9NyFsvjl24eeyW2rsw1UxRRyXpHas=\n-----END PUBLIC KEY-----',
  NULL, 0, '生产服务器凭证,上线时 UPDATE status=1 + private_key,把 test 改为 0');
 
@@ -1249,3 +1256,33 @@ CREATE TABLE `sys_weather_log` (
   PRIMARY KEY (`id`),
   KEY `idx_type_time` (`api_type`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='和风天气 API 调用日志';
+
+-- ------------------------------------------------------------
+-- 49. 系统参数表(V5.6续):name/value 键值对,存 AES 加密盐值等
+--     盐值首次启动自动生成(16 字节 Base64),用于解密外挂文件中的 ENC(...) 密文
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_parameter`;
+CREATE TABLE `sys_parameter` (
+  `name`        VARCHAR(50)  NOT NULL COMMENT '参数名(如 aes-salt)',
+  `value`       VARCHAR(500) NOT NULL COMMENT '参数值',
+  `description` VARCHAR(200) DEFAULT NULL COMMENT '说明',
+  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统参数表(键值对)';
+
+-- ------------------------------------------------------------
+-- 家人共享歌单表
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_music`;
+CREATE TABLE `family_music` (
+  `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`  BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `url`        VARCHAR(500) NOT NULL COMMENT '音频URL(/files/...或外链)',
+  `title`      VARCHAR(100) DEFAULT NULL COMMENT '歌曲名',
+  `added_by`   BIGINT       DEFAULT NULL COMMENT '添加者ID',
+  `sort_order` INT          NOT NULL DEFAULT 0 COMMENT '排序(小在前)',
+  `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭共享歌单表';

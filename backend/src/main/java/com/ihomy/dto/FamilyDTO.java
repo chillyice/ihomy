@@ -15,4 +15,7 @@ public class FamilyDTO {
     private Integer isPublic;
     private String musicUrl;
     private String musicTitle;
+    private java.math.BigDecimal weatherLat;
+    private java.math.BigDecimal weatherLng;
+    private String weatherCity;
 }

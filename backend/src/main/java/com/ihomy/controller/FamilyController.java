@@ -138,7 +138,16 @@ public class FamilyController {
         if (dto.getIsPublic() != null) f.setIsPublic(dto.getIsPublic());
         if (dto.getMusicUrl() != null) f.setMusicUrl(dto.getMusicUrl());
         if (dto.getMusicTitle() != null) f.setMusicTitle(dto.getMusicTitle());
-        familyMapper.updateById(f);
+        // 天气位置偏好:显式 SET NULL(清空)或值(设置),绕过 MyBatis-Plus 默认忽略 null
+        com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Family> w = new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<>();
+        w.eq(Family::getId, f.getId())
+            .set(Family::getWeatherLat, dto.getWeatherLat())
+            .set(Family::getWeatherLng, dto.getWeatherLng())
+            .set(Family::getWeatherCity, dto.getWeatherCity());
+        familyMapper.update(null, w);
+        f.setWeatherLat(dto.getWeatherLat());
+        f.setWeatherLng(dto.getWeatherLng());
+        f.setWeatherCity(dto.getWeatherCity());
         return Result.success(f);
     }
 }

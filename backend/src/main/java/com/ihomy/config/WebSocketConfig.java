@@ -8,8 +8,9 @@ import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
 
 /**
- * WebSocket 閰嶇疆:娉ㄥ唽鑱婂ぉ瀹ょ鐐?/ws/chat,
- * 鎻℃墜璧?JWT 鏍￠獙(token 鍙傛暟),鎸夊搴垎鎴块棿銆? */
+ * WebSocket 配置:注册聊天室端点 /ws/chat,
+ * 握手时 JWT 校验(token 参数),按家庭分房间广播。
+ */
 @Configuration
 @EnableWebSocket
 @RequiredArgsConstructor

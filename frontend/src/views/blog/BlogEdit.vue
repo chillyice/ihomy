@@ -21,17 +21,18 @@
           <el-input v-model="form.content" type="textarea" :rows="14" :placeholder="$t('blog.markdownHint')" />
         </el-form-item>
         <el-form-item :label="$t('blog.category')">
-          <el-select
-            v-model="form.category"
-            filterable
-            allow-create
-            clearable
-            default-first-option
-            :placeholder="$t('blog.categoryPlaceholder')"
-            style="width: 100%"
-          >
-            <el-option v-for="c in categories" :key="c" :label="c" :value="c" />
-          </el-select>
+          <div class="category-row">
+            <el-select
+              v-model="form.category"
+              filterable
+              clearable
+              :placeholder="$t('blog.categoryPlaceholder')"
+              style="flex: 1"
+            >
+              <el-option v-for="c in categories" :key="c" :label="c" :value="c" />
+            </el-select>
+            <el-button @click="showCategoryDialog = true">+ {{ $t('blog.newCategory') }}</el-button>
+          </div>
         </el-form-item>
         <el-form-item :label="$t('blog.status')">
           <el-radio-group v-model="form.status">
@@ -48,6 +49,15 @@
         <el-button type="primary" :loading="loading" @click="onSave">{{ $t('common.save') }}</el-button>
       </el-form>
     </div>
+
+    <!-- 新建分类对话框 -->
+    <el-dialog v-model="showCategoryDialog" :title="$t('blog.newCategory')" width="360px" append-to-body>
+      <el-input v-model="newCategoryName" :placeholder="$t('blog.categoryPlaceholder')" @keyup.enter="addCategory" />
+      <template #footer>
+        <el-button @click="showCategoryDialog = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="addCategory">{{ $t('common.confirm') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -68,14 +78,30 @@ const loading = ref(false)
 
 const form = reactive({ title: '', content: '', coverImage: '', category: '', status: 1, visibility: 3 })
 const categories = ref([])
+const showCategoryDialog = ref(false)
+const newCategoryName = ref('')
 
-// 拉取家庭已有分类,供 el-select 下拉;allow-create 允许输入新分类名直接创建
+// 拉取家庭已有分类,供 el-select 下拉
 const loadCategories = async () => {
   try {
     categories.value = await blogApi.categories() || []
   } catch (e) {
     // 忽略
   }
+}
+
+// 新建分类:加入下拉列表并选中
+const addCategory = () => {
+  const name = newCategoryName.value.trim()
+  if (!name) return ElMessage.warning(t('blog.categoryPlaceholder'))
+  if (categories.value.includes(name)) {
+    form.category = name
+  } else {
+    categories.value.push(name)
+    form.category = name
+  }
+  newCategoryName.value = ''
+  showCategoryDialog.value = false
 }
 
 // 封面图片上传:回填 URL 到表单,返回 false 阻止 el-upload 默认提交
@@ -108,3 +134,7 @@ onMounted(async () => {
   loadCategories()
 })
 </script>
+
+<style scoped>
+.category-row { display: flex; gap: 8px; width: 100%; }
+</style>

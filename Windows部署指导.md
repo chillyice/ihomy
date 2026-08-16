@@ -203,6 +203,10 @@ server {
     listen       80;
     server_name  你的域名或IP;
 
+    # 响应头声明字符集,确保浏览器按 UTF-8 解析
+    charset utf-8;
+    charset_types text/plain text/css text/javascript application/javascript application/json application/xml image/svg+xml;
+
     # 前端静态资源
     root  C:/app/ihomy/frontend/dist;
     index index.html;
@@ -259,6 +263,10 @@ server {
     listen 443 ssl;
     http2 on;
     server_name 你的域名;
+
+    # 响应头声明字符集,确保浏览器按 UTF-8 解析
+    charset utf-8;
+    charset_types text/plain text/css text/javascript application/javascript application/json application/xml image/svg+xml;
 
     ssl_certificate      C:/win-acme/Certificates/你的域名-chain.pem;
     ssl_certificate_key  C:/win-acme/Certificates/你的域名.key;

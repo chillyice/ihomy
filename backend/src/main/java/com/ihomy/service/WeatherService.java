@@ -55,6 +55,7 @@ public class WeatherService {
     private final StringRedisTemplate redis;
     private final WeatherCredentialMapper credentialMapper;
     private final WeatherLogMapper weatherLogMapper;
+    private final ParameterService parameterService;
     private final ObjectMapper mapper = new ObjectMapper();
 
     private static final Duration NOW_TTL = Duration.ofMinutes(30);
@@ -68,7 +69,8 @@ public class WeatherService {
     /** 月度 API 调用配额(超限后本月停止调用,返回 null 前端降级) */
     private static final int MONTHLY_QUOTA = 49999;
 
-    /** 取启用凭证:DB 优先(status=1 且 private_key 非空),空则 fallback yml */
+    /** 取启用凭证:DB 优先(status=1 且 private_key 非空),空则 fallback yml。
+     *  private_key 若为 ENC(...) 包裹格式,用 ParameterService 取盐值解密。 */
     private WeatherCredential loadCredential() {
         try {
             WeatherCredential c = credentialMapper.selectOne(
@@ -76,6 +78,8 @@ public class WeatherService {
                     .eq(WeatherCredential::getStatus, 1).last("LIMIT 1"));
             // DB 记录 private_key 非空才用;为空则 fallback yml
             if (c != null && c.getPrivateKey() != null && !c.getPrivateKey().isBlank()) {
+                // 私钥可能 ENC(...) 加密,解密后使用
+                c.setPrivateKey(parameterService.decrypt(c.getPrivateKey()));
                 return c;
             }
         } catch (Exception e) {
@@ -90,24 +94,20 @@ public class WeatherService {
         fallback.setApiHost(apiHost);
         fallback.setProjectId(projectId);
         fallback.setKeyId(keyId);
-        fallback.setPrivateKey(privateKeyPem);
+        // yml 的私钥也可能 ENC(...) 加密
+        fallback.setPrivateKey(parameterService.decrypt(privateKeyPem));
         return fallback;
     }
 
-    /** 凭证是否已配置 */
-    public boolean isEnabled() {
-        return loadCredential() != null;
-    }
-
     /** 返回当前天气 {condition, temp, text};Key 未配/请求失败返回 null */
-    public Map<String, Object> getWeather(String clientIp) {
+    public Map<String, Object> getWeather(String clientIp, String[] familyLocation) {
         WeatherCredential cred = loadCredential();
         if (cred == null) return null;
-        String cacheKey = "ihomy:weather:now";
+        String cacheKey = familyLocation != null ? "ihomy:weather:now:fam:" + familyLocation[0] + ":" + familyLocation[1] : "ihomy:weather:now";
         Map<String, Object> cached = readCache(cacheKey);
         if (cached != null) return cached;
 
-        String locationId = resolveLocation(clientIp, cred);
+        String locationId = resolveLocation(clientIp, cred, familyLocation);
         if (locationId == null) return null;
 
         JsonNode now = callApi("/v7/weather/now?location=" + locationId, cred);
@@ -118,28 +118,28 @@ public class WeatherService {
         data.put("condition", codeToCondition(code));
         data.put("temp", Integer.parseInt(n.get("temp").asText()));
         data.put("text", n.get("text").asText());
-        data.put("city", resolveCityName(clientIp));
+        data.put("city", familyLocation != null && familyLocation.length > 2 && familyLocation[2] != null ? familyLocation[2] : resolveCityName(clientIp));
         data.put("locationId", locationId);
         writeCache(cacheKey, data, NOW_TTL);
         return data;
     }
 
     /** 天气详情聚合:now + 7d + 24h + warning + indices + air + minutely */
-    public Map<String, Object> getDetail(String clientIp) {
+    public Map<String, Object> getDetail(String clientIp, String[] familyLocation) {
         WeatherCredential cred = loadCredential();
         if (cred == null) return null;
-        String cacheKey = "ihomy:weather:detail";
+        String cacheKey = familyLocation != null ? "ihomy:weather:detail:fam:" + familyLocation[0] + ":" + familyLocation[1] : "ihomy:weather:detail";
         Map<String, Object> cached = readCache(cacheKey);
         if (cached != null) return cached;
 
-        String locationId = resolveLocation(clientIp, cred);
+        String locationId = resolveLocation(clientIp, cred, familyLocation);
         if (locationId == null) return null;
 
         Map<String, Object> data = new HashMap<>();
         data.put("locationId", locationId);
 
         // 当前天气(复用 now 缓存)
-        Map<String, Object> nowData = getWeather(clientIp);
+        Map<String, Object> nowData = getWeather(clientIp, familyLocation);
         if (nowData != null) data.put("now", nowData);
 
         // 7 天预报 + 24 小时预报
@@ -181,8 +181,13 @@ public class WeatherService {
 
     // ---------- 内部:JWT + HTTP ----------
 
-    /** IP → location 坐标(经度,纬度);用 ip-api.com 定位,不依赖 qweather GeoAPI */
-    private String resolveLocation(String clientIp, WeatherCredential cred) {
+    /** IP → location 坐标(经度,纬度);家庭偏好位置优先,其次 ip-api.com 定位 */
+    private String resolveLocation(String clientIp, WeatherCredential cred, String[] familyLocation) {
+        // 家庭设置的位置偏好优先
+        if (familyLocation != null && familyLocation.length >= 2
+                && familyLocation[0] != null && familyLocation[1] != null) {
+            return familyLocation[1] + "," + familyLocation[0]; // 和风天气 location=lng,lat
+        }
         // 本地/内网 IP 用济南默认坐标
         String lookupIp = clientIp;
         if (clientIp == null || clientIp.isBlank()

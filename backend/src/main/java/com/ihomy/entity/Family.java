@@ -27,6 +27,10 @@ public class Family {
     /** 家庭背景音乐:URL(本地上传 /files/... 或外链) */
     private String musicUrl;
     private String musicTitle;
+    /** 天气/太阳位置偏好(空=IP自动定位) */
+    private java.math.BigDecimal weatherLat;
+    private java.math.BigDecimal weatherLng;
+    private String weatherCity;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
     @TableField(fill = FieldFill.INSERT_UPDATE)

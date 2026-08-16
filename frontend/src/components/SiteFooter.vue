@@ -13,9 +13,9 @@
 <style scoped>
 .site-footer {
   position: fixed;
-  left: 12px;
+  right: 16px;
   bottom: 8px;
-  z-index: 20;
+  z-index: 70;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -23,6 +23,7 @@
   color: var(--color-text-secondary, rgba(58,46,34,0.65));
   font-family: Georgia, serif;
   pointer-events: auto;
+  text-shadow: 0 1px 2px rgba(255,255,255,0.5);
 }
 .footer-link {
   color: inherit;
@@ -42,6 +43,7 @@
 }
 :global(html.dark) .site-footer {
   color: rgba(232,220,200,0.55);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
 }
 @media (max-width: 768px) {
   .site-footer { font-size: 10px; }

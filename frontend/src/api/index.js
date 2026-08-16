@@ -7,21 +7,13 @@ export const publicApi = {
   getFeed: (limit = 10, homeId, hid) => request.get('/public/feed', { params: { limit, ...(hid ? { hid } : {}), ...(homeId ? { home_id: homeId } : {}) } }),
 }
 
-// 每日内容:必应每日一图 + 每日知识(公开,无需登录)
-export const dailyApi = {
-  image: () => request.get('/public/daily-image'),
-  knowledge: (types) => request.get('/public/daily-knowledge', { params: { types } }),
-}
-
-// 认证相关:图形验证码、家庭列表(切换/加入走 stores/user.js)
+// 认证相关:图形验证码
 export const authApi = {
   captcha: () => request.get('/auth/captcha'),
-  families: () => request.get('/auth/families'),
 }
 
-// 首页模块:模块配置查询 + 仪表盘 + 动态流(增删改模块走 DB 种子,暂无页面)
+// 首页模块:仪表盘 + 动态流
 export const homeApi = {
-  getAllModules: () => request.get('/home/modules/all'),
   getDashboard: () => request.get('/home/dashboard'),
   getFeed: (limit = 20) => request.get('/home/feed', { params: { limit } }),
 }
@@ -200,6 +192,13 @@ export const wishApi = {
   create: (data) => request.post('/wish', data),
   update: (id, data) => request.put(`/wish/${id}`, data),
   remove: (id) => request.delete(`/wish/${id}`),
+}
+
+// 家庭共享歌单
+export const musicApi = {
+  list: () => request.get('/music/list'),
+  add: (data) => request.post('/music', data),
+  remove: (id) => request.delete(`/music/${id}`),
 }
 
 // 记账本(家庭收支记录,月度统计)
