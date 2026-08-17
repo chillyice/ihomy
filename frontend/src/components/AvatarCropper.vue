@@ -1,8 +1,8 @@
-<!-- 头像裁剪对话框:正方形选区,canvas 裁剪,无外部依赖 -->
+<!-- 头像裁剪对话框:正方形选区+滚轮/滑块缩放,canvas 裁剪,无外部依赖 -->
 <template>
   <el-dialog v-model="visible" :title="title" width="500px" :close-on-click-modal="false" @closed="onClosed">
-    <div v-if="imgSrc" class="cropper-box" ref="boxRef">
-      <img :src="imgSrc" class="cropper-img" @load="onImgLoad" ref="imgRef" />
+    <div v-if="imgSrc" class="cropper-box" ref="boxRef" @wheel.prevent="onWheel">
+      <img :src="imgSrc" class="cropper-img" :style="{ width: imgW + 'px', height: imgH + 'px' }" @load="onImgLoad" ref="imgRef" />
       <!-- 遮罩 + 正方形选区 -->
       <div class="cropper-overlay" :style="overlayStyle"></div>
       <div class="crop-square" :style="squareStyle" @mousedown="onDragStart" @touchstart="onDragStart">
@@ -10,6 +10,11 @@
       </div>
     </div>
     <div v-else class="cropper-loading">加载中...</div>
+    <div v-if="imgLoaded" class="zoom-row">
+      <span class="zoom-label">缩放</span>
+      <el-slider v-model.number="zoom" :min="0.5" :max="3" :step="0.1" :show-tooltip="false" style="flex:1" @input="applyZoom" />
+      <span class="zoom-value">{{ Math.round(zoom * 100) }}%</span>
+    </div>
     <template #footer>
       <el-button @click="visible = false">{{ cancelText }}</el-button>
       <el-button type="primary" :disabled="!imgLoaded" @click="onConfirm">{{ confirmText }}</el-button>
@@ -36,6 +41,9 @@ const imgRef = ref(null)
 // 图片实际显示尺寸 + 选区位置(正方形)
 const imgW = ref(0)
 const imgH = ref(0)
+const baseW = ref(0)  // 适配容器的基准宽度
+const baseH = ref(0)  // 适配容器的基准高度
+const zoom = ref(1)   // 缩放倍数 0.5~3
 const natW = ref(0)  // 原图尺寸
 const natH = ref(0)
 const sqX = ref(0)   // 选区左上角(相对显示图)
@@ -50,13 +58,28 @@ const onImgLoad = () => {
   // 显示尺寸:容器宽 460,高限 360,按比例缩放
   const maxW = 460, maxH = 360
   const ratio = Math.min(maxW / natW.value, maxH / natH.value, 1)
-  imgW.value = natW.value * ratio
-  imgH.value = natH.value * ratio
-  // 正方形选区:边长=短边,居中
+  baseW.value = natW.value * ratio
+  baseH.value = natH.value * ratio
+  zoom.value = 1
+  applyZoom()
+  imgLoaded.value = true
+}
+
+// 应用缩放:更新显示尺寸,选区居中重置
+const applyZoom = () => {
+  imgW.value = Math.round(baseW.value * zoom.value)
+  imgH.value = Math.round(baseH.value * zoom.value)
+  // 选区边长=短边,居中
   sqSize.value = Math.min(imgW.value, imgH.value)
   sqX.value = (imgW.value - sqSize.value) / 2
   sqY.value = (imgH.value - sqSize.value) / 2
-  imgLoaded.value = true
+}
+
+// 滚轮缩放
+const onWheel = (e) => {
+  const delta = e.deltaY > 0 ? -0.1 : 0.1
+  zoom.value = Math.max(0.5, Math.min(3, Math.round((zoom.value + delta) * 10) / 10))
+  applyZoom()
 }
 const sqY = ref(0)
 
@@ -136,6 +159,7 @@ const onConfirm = () => {
 const onClosed = () => {
   imgSrc.value = ''
   imgLoaded.value = false
+  zoom.value = 1
 }
 
 // 打开:传入 File
@@ -160,9 +184,16 @@ defineExpose({ open })
 }
 .cropper-img {
   display: block;
-  max-width: 460px;
-  max-height: 360px;
 }
+.zoom-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 0 4px;
+}
+.zoom-label { font-size: 13px; color: var(--el-text-color-secondary); white-space: nowrap; }
+.zoom-value { font-size: 12px; color: var(--el-text-color-secondary); width: 40px; text-align: right; }
 .cropper-overlay {
   position: absolute;
   inset: 0;

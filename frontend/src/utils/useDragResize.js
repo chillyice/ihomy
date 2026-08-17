@@ -4,6 +4,11 @@ import { ref, onMounted, onUnmounted } from 'vue'
 // 用法:const { pos, size, reset } = useDragResize({ x, y, w, h, storageKey, minY, anchorRight, marginLeft })
 // storageKey 为空则不持久化;minY 限制最高位置(默认 0);anchorRight=true 时 pos.x 为离右边缘距离(拖动方向取反)
 // marginLeft 限制左侧边界(默认 0,沉浸式首页导航栏宽 220 时传 220)
+// zIndex:面板层级,拖拽/resize 时自动置顶(但不超过光影层 65),由模块级计数器管理
+const PANEL_BASE_Z = 20
+const PANEL_TOP_MAX = 60  // 低于光影层 bright-spot(65)
+let zCounter = PANEL_BASE_Z
+
 export function useDragResize(initial) {
   const key = initial.storageKey
   const minY = initial.minY ?? 0
@@ -22,9 +27,16 @@ export function useDragResize(initial) {
   const saved = load()
   const pos = ref({ x: saved?.x ?? initial.x ?? 0, y: saved?.y ?? initial.y ?? 0 })
   const size = ref({ w: saved?.w ?? initial.w ?? 320, h: saved?.h ?? initial.h ?? 200 })
+  const zIndex = ref(PANEL_BASE_Z)
   const dragging = ref(false)
   const resizing = ref(false)
   let startX = 0, startY = 0, startPos = { x: 0, y: 0 }, startSize = { w: 0, h: 0 }
+
+  // 置顶:拖拽或 resize 时调用,提升 z-index(不超过光影层)
+  const bringToFront = () => {
+    zCounter = Math.min(zCounter + 1, PANEL_TOP_MAX)
+    zIndex.value = zCounter
+  }
 
   const save = () => {
     if (!key) return
@@ -36,6 +48,7 @@ export function useDragResize(initial) {
   const onDragStart = (e) => {
     if (e.target.classList.contains('resize-handle')) return
     dragging.value = true
+    bringToFront()
     startX = e.clientX
     startY = e.clientY
     startPos = { ...pos.value }
@@ -43,6 +56,7 @@ export function useDragResize(initial) {
   }
   const onResizeStart = (e) => {
     resizing.value = true
+    bringToFront()
     startX = e.clientX
     startY = e.clientY
     startPos = { ...pos.value }
@@ -110,5 +124,5 @@ export function useDragResize(initial) {
     window.removeEventListener('mousemove', onMouseMove)
     window.removeEventListener('mouseup', onMouseUp)
   })
-  return { pos, size, dragging, resizing, onDragStart, onResizeStart, reset }
+  return { pos, size, zIndex, dragging, resizing, onDragStart, onResizeStart, reset }
 }

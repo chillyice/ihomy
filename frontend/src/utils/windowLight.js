@@ -60,8 +60,8 @@ export function getSunScene(sunInfo, slotIndex) {
   // 内框横条 top:太阳越高越靠近顶部
   const shadowHTop = Math.max(5, Math.min(85, 80 - Math.max(0, alt) * 0.8))
 
-  // 顶框微移:太阳越高顶框越低(窗口视觉变高),小范围 ±2vh,不影响与内横框/底框的间距
-  const frameTopOffset = isNight ? 0 : (Math.max(0, alt) - 45) * 0.045
+  // 顶框随太阳高度移动:太阳越高顶框越下移(窗口视觉变窄),范围 ±8vh
+  const frameTopOffset = isNight ? 0 : -(Math.max(0, alt) - 45) * 0.18
 
   // 阴影强度:夜间 0.7,正午 0.3,日出日落 0.7(不超过 70%)
   const shadowIntensity = isNight ? 0.7 : 0.7 - Math.sin(dayProgress * Math.PI) * 0.4

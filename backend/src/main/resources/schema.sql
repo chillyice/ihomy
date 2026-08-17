@@ -1286,3 +1286,21 @@ CREATE TABLE `family_music` (
   PRIMARY KEY (`id`),
   KEY `idx_family` (`family_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭共享歌单表';
+
+-- ------------------------------------------------------------
+-- 50. sys_weather_location 和风天气地区表(V6.2)
+--     数据来源:https://github.com/qwd/LocationList (China-City-List)
+--     3577 个城市,通过脚本导入(见 scripts/gen_location_sql.py)
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_weather_location`;
+CREATE TABLE `sys_weather_location` (
+  `id`          VARCHAR(12)   NOT NULL COMMENT '和风城市ID',
+  `name`        VARCHAR(50)   NOT NULL COMMENT '城市名(中文)',
+  `adm1`        VARCHAR(50)   DEFAULT NULL COMMENT '省份(一级行政区)',
+  `adm2`        VARCHAR(50)   DEFAULT NULL COMMENT '地级市(二级行政区)',
+  `lat`         DECIMAL(10,4) NOT NULL COMMENT '纬度',
+  `lng`         DECIMAL(10,4) NOT NULL COMMENT '经度',
+  PRIMARY KEY (`id`),
+  KEY `idx_name` (`name`),
+  KEY `idx_adm1` (`adm1`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='和风天气地区表';

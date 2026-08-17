@@ -6,6 +6,7 @@ import router from './router'
 import i18n from './i18n'
 import './styles/main.css'
 import 'element-plus/theme-chalk/dark/css-vars.css'
+import 'qweather-icons/font/qweather-icons.css'
 import { initTheme } from './theme'
 
 initTheme()

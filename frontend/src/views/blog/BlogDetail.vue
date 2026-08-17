@@ -1,24 +1,38 @@
-<!-- 博客详情页:正文 + 点赞 + 评论树(支持回复,家长或作者可删) -->
+<!-- 博客详情页:目录导航 + 正文(Markdown) + 点赞 + 评论树 -->
 <template>
   <div class="page">
     <Breadcrumb :items="[{ label: $t('blog.title'), to: '/blog' }, { label: blog?.title || $t('blog.detail') }]" />
-    <div v-if="blog" class="card detail">
-      <h1>{{ blog.title }}</h1>
-      <div class="meta">
-        <span>{{ formatDate(blog.createdAt) }} · {{ blog.viewCount }} {{ $t('blog.views') }}</span>
-        <span v-if="blog.tags" class="tags">
-          <span v-for="t in tagList" :key="t" class="tag">#{{ t }}</span>
-        </span>
-      </div>
-      <img v-if="blog.coverImage" :src="blog.coverImage" class="cover" />
-      <div class="content markdown-body" v-html="renderedContent"></div>
+    <div v-if="blog" class="blog-layout">
+      <!-- 目录导航:sticky 固定,从 Markdown 标题提取 -->
+      <aside v-if="toc.length" class="toc-aside">
+        <nav class="toc">
+          <div class="toc-title">目录</div>
+          <ul>
+            <li v-for="h in toc" :key="h.id" :class="'toc-l' + h.level">
+              <a :href="'#' + h.id" @click.prevent="scrollTo(h.id)">{{ h.text }}</a>
+            </li>
+          </ul>
+        </nav>
+      </aside>
 
-      <div class="like-bar">
-        <el-button :type="likeState.liked ? 'primary' : 'default'" round @click="onLike">
-          <el-icon><Star /></el-icon>
-          <span>{{ likeState.liked ? $t('blog.liked') : $t('blog.like') }}</span>
-          <span v-if="likeState.likeCount">({{ likeState.likeCount }})</span>
-        </el-button>
+      <div class="card detail">
+        <h1>{{ blog.title }}</h1>
+        <div class="meta">
+          <span>{{ formatDate(blog.createdAt) }} · {{ blog.viewCount }} {{ $t('blog.views') }}</span>
+          <span v-if="blog.tags" class="tags">
+            <span v-for="t in tagList" :key="t" class="tag">#{{ t }}</span>
+          </span>
+        </div>
+        <img v-if="blog.coverImage" :src="blog.coverImage" class="cover" />
+        <div class="content markdown-body" ref="contentRef" v-html="renderedContent"></div>
+
+        <div class="like-bar">
+          <el-button :type="likeState.liked ? 'primary' : 'default'" round @click="onLike">
+            <el-icon><Star /></el-icon>
+            <span>{{ likeState.liked ? $t('blog.liked') : $t('blog.like') }}</span>
+            <span v-if="likeState.likeCount">({{ likeState.likeCount }})</span>
+          </el-button>
+        </div>
       </div>
     </div>
 
@@ -79,7 +93,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { blogApi, likeApi, commentApi } from '@/api'
 import { useUserStore } from '@/stores/user'
@@ -100,16 +114,53 @@ const replyTargetId = ref(null)
 const replyToUserId = ref(null)
 const submitting = ref(false)
 const likeState = ref({ liked: false, likeCount: 0 })
+const contentRef = ref(null)
+const toc = ref([])
 
 // 标签字符串按逗号拆分
 const tagList = computed(() =>
   blog.value?.tags ? String(blog.value.tags).split(',').filter(Boolean) : [],
 )
 
+// Markdown 渲染:用 marked.lexer + walkTokens 把 h1 降级为 h2(避免与博客标题的 h1 重复),
+// 同时给每个标题加 id 用于目录跳转
+marked.use({
+  renderer: {
+    heading({ text, depth }) {
+      // h1 降级为 h2,避免与页面标题重复;最大 depth=4
+      const level = Math.min(depth + (depth === 1 ? 1 : 0), 4)
+      const id = 'h-' + text.replace(/[^\w\u4e00-\u9fa5]+/g, '-').replace(/^-|-$/g, '').toLowerCase().slice(0, 50)
+      return `<h${level} id="${id}">${text}</h${level}>`
+    },
+  },
+})
+
 // Markdown 渲染为 HTML
 const renderedContent = computed(() =>
   blog.value?.content ? marked.parse(blog.value.content) : '',
 )
+
+// 从渲染后的 DOM 提取标题列表(用于目录导航)
+const extractToc = () => {
+  nextTick(() => {
+    if (!contentRef.value) { toc.value = []; return }
+    const headings = contentRef.value.querySelectorAll('h2, h3, h4')
+    toc.value = Array.from(headings).map(h => ({
+      id: h.id,
+      text: h.textContent || '',
+      level: parseInt(h.tagName.slice(1)),
+    }))
+  })
+}
+
+// 点击目录跳转
+const scrollTo = (id) => {
+  const el = document.getElementById(id)
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+// 博客内容变化后提取目录
+watch(renderedContent, extractToc)
 
 // 删除权限:家长或评论作者本人
 const canDelete = (c) =>
@@ -191,31 +242,88 @@ onMounted(loadAll)
 </script>
 
 <style scoped>
-.detail { padding: 20px; }
+/* 布局:目录 + 正文 左右排列 */
+.blog-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+/* 目录导航:sticky 固定在视口,不受页面滚动干扰 */
+.toc-aside {
+  width: 200px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 16px;
+}
+.toc {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  box-shadow: var(--shadow);
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+}
+.toc-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--color-border);
+}
+.toc ul { list-style: none; padding: 0; margin: 0; }
+.toc li { margin: 0; }
+.toc a {
+  display: block;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  border-radius: 4px;
+  transition: all 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.toc a:hover { background: rgba(168, 72, 58, 0.08); color: var(--color-accent); }
+.toc-l2 { padding-left: 0; }
+.toc-l3 { padding-left: 12px; }
+.toc-l4 { padding-left: 24px; }
+
+/* 正文卡片 */
+.detail { flex: 1; min-width: 0; padding: 24px 28px; }
 .detail h1 { color: var(--color-primary); margin-bottom: 8px; line-height: 1.4; }
 .meta { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 16px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
 .tags { display: flex; gap: 6px; }
 .tag { background: rgba(46, 116, 181, 0.08); color: var(--color-accent); padding: 1px 8px; border-radius: 10px; font-size: 12px; }
 .cover { width: 100%; max-height: 300px; object-fit: cover; border-radius: 8px; margin-bottom: 16px; }
-.content { line-height: 1.8; font-size: 15px; }
+
+/* Markdown 正文:行间距 1.9,字号 15px;层级:段落间距 > 小节间距 > 正文行间距 */
+.content { font-size: 15px; line-height: 1.9; }
 .markdown-body { white-space: normal; word-wrap: break-word; }
-.markdown-body h1, .markdown-body h2, .markdown-body h3 { color: var(--color-primary); margin: 20px 0 10px; line-height: 1.4; }
-.markdown-body h1 { font-size: 22px; }
-.markdown-body h2 { font-size: 18px; border-bottom: 1px solid var(--color-border); padding-bottom: 6px; }
-.markdown-body h3 { font-size: 16px; }
-.markdown-body p { margin: 10px 0; }
-.markdown-body ul, .markdown-body ol { margin: 10px 0; padding-left: 24px; }
-.markdown-body li { margin: 4px 0; }
-.markdown-body blockquote { margin: 12px 0; padding: 8px 16px; border-left: 4px solid var(--color-accent); background: rgba(168,72,58,0.05); color: var(--color-text-secondary); }
+.markdown-body h2, .markdown-body h3, .markdown-body h4 { color: var(--color-primary); line-height: 1.4; }
+/* 小节标题:小节间距 */
+.markdown-body h2 { font-size: 20px; margin: 22px 0 14px; border-bottom: 1px solid var(--color-border); padding-bottom: 6px; }
+.markdown-body h3 { font-size: 17px; margin: 20px 0 12px; }
+.markdown-body h4 { font-size: 15px; margin: 18px 0 10px; }
+/* 段落:段落间距(最大) */
+.markdown-body p { margin: 28px 0; }
+/* ul/ol 加大缩进,避免贴边 */
+.markdown-body ul, .markdown-body ol { margin: 22px 0; padding-left: 32px; }
+.markdown-body li { margin: 8px 0; }
+.markdown-body blockquote { margin: 24px 0; padding: 10px 18px; border-left: 4px solid var(--color-accent); background: rgba(168,72,58,0.05); color: var(--color-text-secondary); border-radius: 0 8px 8px 0; }
 .markdown-body code { background: rgba(58,46,34,0.08); padding: 2px 6px; border-radius: 4px; font-size: 13px; font-family: 'Consolas', 'Monaco', monospace; }
-.markdown-body pre { background: rgba(58,46,34,0.06); padding: 12px 16px; border-radius: 8px; overflow-x: auto; margin: 12px 0; }
+.markdown-body pre { background: rgba(58,46,34,0.06); padding: 14px 18px; border-radius: 8px; overflow-x: auto; margin: 14px 0; }
 .markdown-body pre code { background: none; padding: 0; }
-.markdown-body table { border-collapse: collapse; margin: 12px 0; width: 100%; }
+.markdown-body table { border-collapse: collapse; margin: 14px 0; width: 100%; }
 .markdown-body th, .markdown-body td { border: 1px solid var(--color-border); padding: 8px 12px; text-align: left; }
 .markdown-body th { background: rgba(58,46,34,0.05); font-weight: 600; }
-.markdown-body img { max-width: 100%; border-radius: 8px; }
+.markdown-body img { max-width: 100%; border-radius: 8px; margin: 14px 0; }
 .markdown-body a { color: var(--color-accent); text-decoration: underline; }
-.markdown-body hr { border: none; border-top: 1px solid var(--color-border); margin: 20px 0; }
+.markdown-body hr { border: none; border-top: 1px solid var(--color-border); margin: 22px 0; }
+
 .like-bar { margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(31, 58, 95, 0.08); }
 .comments { margin-top: 16px; }
 .comments-title { font-weight: 600; color: var(--color-primary); margin-bottom: 12px; }
@@ -233,4 +341,15 @@ onMounted(loadAll)
 .reply-to { color: var(--color-text-secondary); margin: 0 4px; }
 .reply-content { color: var(--color-text); }
 .reply-del { margin-left: 6px; }
+
+/* 目录滚动条 */
+.toc::-webkit-scrollbar { width: 4px; }
+.toc::-webkit-scrollbar-thumb { background: rgba(58, 46, 34, 0.15); border-radius: 2px; }
+
+/* 移动端:目录隐藏,只显示正文 */
+@media (max-width: 900px) {
+  .blog-layout { flex-direction: column; }
+  .toc-aside { display: none; }
+  .detail { padding: 20px; }
+}
 </style>
