@@ -1,6 +1,7 @@
 # ihomy 沉浸式首页 UI 设计提示词
 
-> 本文件是当前已上线的沉浸式首页(方案 B「展开的相册」)的完整 UI 设计描述,可作为提示词喂给 AI 重新生成同等视觉效果的页面。所有数值均为实装值(V6.0)。
+> 本文件是当前已上线的沉浸式首页的完整 UI 设计描述,可作为提示词喂给 AI 重新生成同等视觉效果的页面。所有数值均为实装值。
+> 本文按视觉层级组织,弱化版本号,着重描述实现细节与设计规范。
 
 ---
 
@@ -20,7 +21,7 @@
 - 原生 CSS(毛玻璃用 `backdrop-filter`,光效用 `mix-blend-mode`)
 - 数据来源:`GET /api/public/sun-info`(288 时隙太阳位置,可选 `?date=` 模拟任意日期)、`GET /api/public/weather`(天气)、`GET /api/public/home`(家庭聚合)、`GET /api/public/feed`(动态流)
 
-## 全局约定(V6.0 光影层全局化)
+## 全局约定(光影层全局化)
 
 - 光影层(`SunLightLayer.vue`)+ 左侧导航栏(`AppSidebar.vue`)+ 右下角备案号(`SiteFooter.vue`)在 `App.vue` 全局挂载,所有页面共享。
 - 首页不再自带顶栏和光影层,只负责面板+相册+唱片机+光照测试控制台。
@@ -33,7 +34,7 @@
 
 | 层 | z-index | 作用 | 混合模式 |
 |----|---------|------|----------|
-| bg-blobs(伪元素) | 1 | 5 个飘移色块(模糊大圆) | normal |
+| bg-blobs(伪元素) | 1 | 5 个飘移色块(模糊大圆,fixed 不随滚动) | normal |
 | bright-spot(亮斑) | 32 | 阳光照耀强度(夜黑→晨黄→日透明→夕橙) | multiply |
 | album-corner(拍立得堆) | 10 | 右下角散落拍立得/闭合相册 | normal |
 | panels(左右毛玻璃) | 20 | 动态/任务/天气/纪念日/今日 | normal |
@@ -43,13 +44,13 @@
 | dust-layer(灰尘) | 46 | 光路微粒(20 个,夜间不可见) | screen |
 | light-layer(体积光) | 48 | 光束+辉光 | screen |
 | window-shadow-upper(上层阴影) | 49 | 左框+右框(最顶层,盖住光柱) | darken |
-| AppSidebar(导航栏) | 100 | 左侧导航+底部主题/台灯/用户 | normal |
-| lamp-light(台灯) | 100 | 钟摆运动径向发光(夜间) | normal |
+| AppSidebar(导航栏) | 60 | 左侧导航+底部主题/台灯/用户 | normal |
 | SiteFooter(备案号) | 70 | 右下角 ICP+公安备案 | normal |
+| lamp-light(台灯) | 100 | 钟摆运动径向发光(夜间) | normal |
 
 ## 1. 背景色块(bg-blobs)
 
-5 个 `position: absolute; border-radius: 50%; filter: blur(60px); opacity: 0.4` 的大圆,各自飘移动画(18-26s `ease-in-out infinite`):
+5 个 `position: fixed; border-radius: 50%; filter: blur(60px); opacity: 0.4` 的大圆,各自飘移动画(18-26s `ease-in-out infinite`):
 
 | 编号 | 尺寸 | 位置 | 颜色 | 动画 |
 |------|------|------|------|------|
@@ -61,7 +62,13 @@
 
 动画为 `translate + scale` 组合,位移 ±120~240px,缩放 0.8~1.35。
 
-## 2. 右下角相册模块(album-corner,V6.0 重构)
+**性能注意**:
+- `position: fixed`(不随页面滚动,避免 backdrop-filter 每帧重算)
+- `transform: translateZ(0)`(隔离合成层)
+- `will-change: transform`
+- 深色模式 `opacity: 0.1`
+
+## 2. 右下角相册模块(album-corner)
 
 `position: fixed; right: 5vw; bottom: 5vh; width: 27.5vw; min-height: 308px; z-index: 10`。
 
@@ -78,11 +85,11 @@
 - 家庭名称 + "家庭相册",随机斜放。
 - hover 抬正放大,点击跳 `/album`。
 
-## 4. 体积光系统(light-layer,z-index 48)
+## 3. 体积光系统(light-layer,z-index 48)
 
 `position: fixed; inset: 0; mix-blend-mode: screen; pointer-events: none; overflow: hidden`。基于真实太阳位置(`/api/public/sun-info` 返回 288 个 5 分钟时隙,前端取当前时隙)。
 
-### 光照生命周期(V5.3)
+### 光照生命周期
 
 旋转/颜色/强度全部由**日出日落时间**驱动(不再由方位角/高度角直接映射):
 
@@ -126,7 +133,7 @@
 | 日间 | alt<60° | rgba(255,230,180,0.68) | rgba(255,222,160,0.9) | rgba(255,210,140,0.48) | rgba(255,225,170,0.06) | 1.05 |
 | 正午 | alt≥60° | rgba(255,242,210,0.62) | rgba(255,238,195,0.9) | rgba(255,228,170,0.42) | rgba(255,240,200,0.05) | 0.95 |
 
-## 5. 亮斑图层(bright-spot,z-index 32)
+## 4. 亮斑图层(bright-spot,z-index 32)
 
 `position: fixed; inset: 0; mix-blend-mode: multiply; pointer-events: none`。模拟阳光照耀强度,在内容之上、阴影之下。multiply 让白色=透明(日间无影响)、黑色=压暗(夜间)、彩色=染色(日出日落)。
 
@@ -140,7 +147,7 @@
 | 傍晚 | 0.7~0.9 | 白→橙 lerp | 0→0.5 |
 | 日落 | 0.9~1.0 | 橙→红 lerp | 0.5→0.7 |
 
-## 6. 反光层(reflection-layer,z-index 42)
+## 5. 反光层(reflection-layer,z-index 42)
 
 `position: fixed; inset: 0; mix-blend-mode: soft-light; pointer-events: none`。内容组件被阳光照亮的轻微高光。
 
@@ -148,7 +155,7 @@
 - 不透明度:夜间 0,日间 `sin(dayProgress * π) * 0.22`(正午最强,轻微)。
 - soft-light 模式:效果极其微妙,只给内容组件顶部边缘加一点暖光。
 
-## 7. 窗户阴影(V5.3 分层重构)
+## 6. 窗户阴影(分层重构)
 
 阴影拆为上下两层,光柱穿过中间。6 条 div bar,全部 `mix-blend-mode: darken`。
 
@@ -177,13 +184,14 @@
 - 内框横/顶框/底框不旋转(始终水平)。
 - `--htop: clamp(5, 85, 80 - max(0,alt) * 0.8)`%(太阳越高→内框横越靠近顶部)。
 - 窗户开口 85%:左右框 `translateX(±42.5vw)`。
+- `--frame-top-offset: (alt - 45) × 0.045 vh`(±2vh,太阳越高顶框越低)。
 
-## 6. 暗角(vignette,z-index 44)
+## 7. 暗角(vignette,z-index 44)
 
 `position: fixed; inset: 0; pointer-events: none`。
 `background: radial-gradient(ellipse 90% 75% at 50% 42%, transparent 0%, transparent 55%, rgba(60,38,12,0.08) 80%, rgba(45,25,8,0.18) 100%)`。
 
-## 7. 灰尘粒子(dust-layer,z-index 46)
+## 8. 灰尘粒子(dust-layer,z-index 46)
 
 `position: fixed; inset: 0; mix-blend-mode: screen; pointer-events: none; overflow: hidden`。
 20 个粒子,每个:
@@ -191,20 +199,29 @@
 - 随机 `width/height` 2-5px,随机 `top/left`,随机 `animation-duration` 8-16s,随机 `--drift` 30-100px。
 - 动画 `dust-float linear infinite`:0% opacity:0 → 15% opacity:0.9 → 85% opacity:0.9 → 100% `translate(var(--drift), calc(var(--drift) * -1.5))` opacity:0(向右上方飘移淡出)。
 
-## 8. 全局导航栏(AppSidebar,z-index 100,V6.0 全局化)
+## 9. 全局导航栏(AppSidebar,z-index 60)
 
 - `position: fixed; left: 0; top: 0; bottom: 0; width: 220px`(收起 64px)。
 - 温暖磨砂玻璃:`backdrop-filter: blur(24px) saturate(1.1)` + 暖奶油渐变背景。
 - 顶部:家庭名(hover 暖色下划线)+ 折叠按钮。
 - 导航列表:按 category 分组(内容/相册/生活/成员/系统),Element Plus 线性图标(Document/Notebook/Picture 等,非 emoji)。
-- "系统"分组:下拉菜单(设置 + 运维管理,后者仅 OPS 可见)。
+- **"系统"分组:设置 + 运维管理(后者仅 OPS 可见)**。**设置图标用内联 SVG 替代 el-icon Setting**(复杂 path 在 100% 缩放触发子像素光栅化开销),运维图标同理。
 - 底部:主题切换(☀️/🌙)+ 台灯三态(🌑/💡/⬛,关灯时伪元素径向发光圈+脉冲动画)+ 语言切换 + 消息铃铛 + 用户头像胶囊。
 - 深色模式:`background: rgba(30,40,65,0.55)` + `border-color: rgba(255,255,255,0.12)`。
 
-## 9. 左侧毛玻璃面板(left-panel,z-index 20,V6.0 可拖拽)
+**性能注意**:
+- `contain: layout style` + `transform: translateZ(0)`(隔离合成层)
+- `.sidebar-nav`(滚动区):`transform: translateZ(0)` + `will-change: transform`
+- nav-item hover 用 `transform: translateX(4px) scale(1.03)`(而非 box-shadow,避免触发 backdrop-filter 重算)
 
-- `position: fixed; top: 80px; left: 24px; width: 380px`(`useDragResize` 拖拽+调整大小,位置持久化 localStorage)。
+## 10. 可拖拽面板(useDragResize)
+
+- 5 个面板(feed/task/weather/anniversary/today),各自独立 `useDragResize` 实例。
+- `position: fixed; top: 80px; left/right: 24px; width: 380px`。
 - 顶部 `.drag-handle`(24px,中间 40×4px 拖动条),右下角 `.resize-handle`(20×20px 斜角)。
+- 拖拽边界 clamp(左右不越出页面、顶部不低于导航栏、底部不越界)。
+- 位置/大小持久化 localStorage。
+- zIndex + bringToFront(模块计数器,上限 60 低于光影层 65)。
 
 ### 通用毛玻璃样式(glass-panel)
 ```css
@@ -219,7 +236,7 @@ color: #3A2E22;
 
 ### 动态流面板(feed-panel,上 45%)
 - 标题:`padding: 28px 32px 14px; font-size: 15px; font-weight: 600; letter-spacing: 1px; opacity: 0.7`。
-- 滚动区:`padding: 0 28px 24px`,隐藏滚动条。
+- 滚动区:`padding: 0 28px 24px`,隐藏滚动条,`transform: translateZ(0)` 隔离合层。
 - 每条 feed 微信风:
   - `.feed-row`: `display: flex; gap: 10px; margin-bottom: 14px; cursor: pointer`。
   - 头像独立行(左)。
@@ -233,13 +250,12 @@ color: #3A2E22;
 - 每行:`display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 10px`,hover `background: rgba(58,46,34,0.06)`。
 - 奖励图标 20px,标题 15px/600 单行截断,meta 12px/0.6。
 
-## 10. 右侧毛玻璃面板(z-index 40)
-
 ### 时间天气面板(weather-panel)
 - `position: fixed; top: 80px; right: 24px; width: 380px; padding: 22px 32px; text-align: center`。
 - 时钟:`font-size: 32px; font-weight: 700; letter-spacing: 2px`。
 - 日期:`font-size: 13px; opacity: 0.7; margin-bottom: 6px`。
-- 天气:`display: flex; justify-content: center; gap: 4px; font-size: 15px`。图标 emoji 20px,温度 700,文字按 condition 映射中文(晴/多云/阴/雨/雪)。
+- 天气:`display: flex; justify-content: center; gap: 4px; font-size: 15px`。和风字体图标 `<i class="qi-{iconCode}">` 20px,温度 700,文字按 condition 映射中文(晴/多云/阴/雨/雪)。
+- 默认高度 180px(只显示城市+温度+图标+状况),点击 `.weather-main` 切换 `weatherExpanded`,展开到 440px 显示完整详情(7d 预报+预警+生活指数+空气+分钟降水),带箭头旋转动画。
 
 ### 纪念日面板(anniversary-panel)
 - `position: fixed; top: 210px; right: 24px; width: 380px; max-height: 340px`。
@@ -247,17 +263,25 @@ color: #3A2E22;
 - 名称 14px/600 单行截断,日期 12px/0.6。
 - 倒计时天数:`font-size: 20px; font-weight: 700; color: #A8483A`,单位 12px/0.7。
 
-## 11. 黑胶唱片播放器(vinyl-wrap,z-index 20,V6.0 可拖动)
+### 今日面板(today-panel)
+- 积分余额+连续天数+签到按钮(pointsApi.stats/checkin)。
+- 今日待办提醒前 3 条(reminderApi.list,过滤 done!==1)。
+- 登录可见,小屏隐藏。
 
-- `position: fixed; left/top` 定位(可拖动,localStorage 持久化;区分点击/拖拽)。
-- 唱片本体 120×120,`transition: transform 0.25s`。
-- hover:scale 1.08 + 显示曲名(`trackDisplay` computed:正在播放/已暂停/未设置音乐)。
+## 11. 黑胶唱片播放器(MusicPlayer,z-index 60)
+
+- `position: fixed; right: 24px; bottom: 24px`(全局挂载,所有页面显示)。
+- `backdrop-filter: blur(24px) saturate(1.3)` + 暖白背景。
+- 唱片本体 120×120,`transition: transform 0.3s`。
+- hover:scale 1.05 + 显示曲名(`trackDisplay` computed:正在播放/已暂停/未设置音乐)。
 - 唱片盘:`radial-gradient(circle, #3A2E22 0%, #1A1410 30%, #2A2018 60%, #1A1410 100%)`,+ `repeating-radial-gradient` 凹槽纹理,中心红色标签 `radial-gradient(circle, #A8483A 0%, #6B2E26 100%)`。
 - 播放时:`.vinyl-disc` `animation: spin 4s linear infinite`(旋转),`.vinyl-arm` `transform: rotate(20deg)`(唱臂落下)。
 - 唱臂:`width: 5px; height: 60px; background: linear-gradient(to bottom, #C9A876, #8B6F47); transform-origin: top center; transform: rotate(-15deg)`(静止时抬起)。
 - 歌曲信息(左侧):`background: rgba(255,255,255,0.7); backdrop-filter: blur(20px) saturate(1.4); border-radius: 16px; padding: 12px 18px`,默认 `opacity: 0; transform: translateX(20px); pointer-events: none`,hover `.show` 时淡入。标题 15px/700,艺术家 12px/0.6,控件 ⏮⏸▶⏭(18px,主控 22px)。
 
-## 11.5 光照测试控制台(V6.0 内嵌首页)
+**性能注意**:`contain: layout style` + `transform: translateZ(0)` 隔离合层。
+
+## 12. 光照测试控制台(内嵌首页)
 
 - `position: fixed; left: 24px; bottom: 24px; width: 220px`(毛玻璃面板)。
 - 信息面板:时间/高度角/方位角/日出/日落/阶段 + 进度条。
@@ -265,31 +289,79 @@ color: #3A2E22;
 - 1 分钟循环 288 时隙(208ms/段),停止=重置真实时间+关闭控制台。
 - `useSunLight.js` provide/inject 全局共享光影状态。
 
-## 12. GSAP 入场动画
+## 13. 台灯系统(lamp-light,z-index 100)
+
+- 位置:左上黄金分割点(38.2%, 38.2%),`filter: blur(20px)`。
+- 光圈直径 144vw(半径 72vw,页面 4/5)。
+- 3 态开关:lampMode=auto(夜间自动)/on(常开)/off(关),按钮图标🌑/💡/⬛循环切换。
+- `lampStrength`:auto=`sunScene.lampOpacity`、on=1、off=0。
+- 开关时机:`lampOpacity=(isNight||dayProgress≥0.9||dayProgress≤0.1)?1:0`。
+- 色温可调:lampTemp 0-100 滑块,warm rgba(255,180,100)→cool rgba(220,230,255)。
+- 亮度可调:lampBrightness 0-100 滑块,控制 mask 透明区域比例。
+- 钟摆运动:`requestAnimationFrame` 驱动,周期 8 秒。`lampPendulumX=sin(phase)×5vw`(横向 ±5%),`lampPendulumScaleX=1-|sin|×0.2`(中间 1.0 圆形,两侧 0.8 椭圆)。
+- **mask 祛除阴影**:`.window-shadow`/`.bright-spot`/`.vignette` 三层都加 `mask-image: var(--lamp-mask)`,台灯开启时 mask 中心透明挖洞祛除阴影,关闭时 `mask: none`。
+- **mask 中心固定**(不随钟摆变化),避免每帧重栅格化 3 个全屏 fixed 元素;只有台灯 div 本身做钟摆。
+- **开关灯 2s 渐变**:mask-image 不支持 CSS transition,用 GSAP 补间驱动 `lampAnim`(reactive),`lampDivOpacity` 和 `lampMask` 同步 2s 渐变(ease `power2.out`);mask 挖洞半径随强度缩放(开灯洞从 0 放大,关灯洞缩到 0)。
+
+## 14. 天气特效
+
+- `codeToPrecipLevel(code)` 1-6 级。
+- `snowParticles`(❄ 字符 12-28px)/`rainParticles`(线性雨滴)computed 数组,数量=降水等级×10。
+- `cloudFlicker` GSAP 每 4-8s 随机补间 0.1-1,模拟云彩遮阳。
+- `weatherShadowOpacity`:雨雪=1,多云=`1-cloudFlicker`,晴=0。
+- `.shadow-bar.weather-shadow` 在 window-shadow 内,继承同色同 blur。
+- `weatherMultiplier`(晴 1.0/多云 0.55/雨 0.25/雪 0.4)实时驱动 rayStyles/lightLayerOpacity/reflectionStyle。
+- 雪花/雨滴 CSS keyframes + `translateZ(0)` 合成层隔离。
+- bright-spot:雨雪时 opacity=0 隐藏。
+
+## 15. GSAP 入场动画
 
 页面 mount 后:
 ```js
-gsap.from('.left-panel', { x: -30, autoAlpha: 0, duration: 0.8, delay: 0.2 })
+gsap.from('.feed-panel', { x: -30, autoAlpha: 0, duration: 0.8, delay: 0.2 })
+gsap.from('.task-panel', { x: -30, autoAlpha: 0, duration: 0.8, delay: 0.3 })
 gsap.from('.weather-panel', { x: 30, autoAlpha: 0, duration: 0.8, delay: 0.3 })
-gsap.from('.anniversary-panel', { x: 30, autoAlpha: 0, duration: 0.8, delay: 0.4 })
-gsap.from('.polaroid-pos', { y: 20, autoAlpha: 0, duration: 0.5, stagger: 0.08, delay: 0.5 })
+gsap.from('.anniversary-panel', { x: 30, autoAlpha: 0, duration: 0.8, delay: 0.35 })
+gsap.from('.today-panel', { y: 40, autoAlpha: 0, duration: 0.8, delay: 0.35 })
+gsap.from('.album-corner', { scale: 0.95, autoAlpha: 0, duration: 0.8, delay: 0.4 })
+gsap.from('.polaroid', { y: 40, autoAlpha: 0, duration: 0.6, stagger: 0.08, delay: 0.3 })
+gsap.from('.album-closed', { scale: 0.9, autoAlpha: 0, duration: 0.8, delay: 0.3 })
 ```
 **光柱层不入场**,直接显示当前太阳状态(避免光从无到有的突兀)。
 
-## 13. 响应式
+## 16. 响应式
 
 | 断点 | 变化 |
 |------|------|
 | ≤1280px | album-stage padding 改 360px;左右面板宽度 320px |
 | ≤960px | 左侧面板隐藏;album-stage padding 24px;书脊隐藏;天气面板 width auto/padding 10px 16px;时钟 26px;纪念日面板隐藏;唱片 90×90/margin-right -45px |
 
-## 14. 数据流
+## 17. 数据流
 
 - 页面 mount 时并发请求 `/public/sun-info` + `/public/weather` + `/public/home` + `/public/feed`。
 - sun-info 返回 288 时隙(每 5 分钟一个),前端 `currentSlotIndex(sunInfo)` 按当前时间取 5 分钟时隙索引,`getSunScene(sunInfo, slotIndex)` 返回 `{source, rotation, palette, rays, shadowVRotation, shadowHTop, shadowIntensity, shadowGray, brightSpotColor, brightSpotOpacity, reflectionOpacity, altitude, azimuth, isNight, dayProgress}`。
 - 旋转由日出日落时间驱动(dayProgress),夜间 hold 在端点待命;光柱夜间全透明不发光;亮斑夜间黑色压暗;反光夜间 0。
 - 每 5 分钟更新一次时隙。
 - 拍立得堆按近 7 天照片筛选,点击 `el-image-viewer` 全屏浏览。
+
+## 18. 主题切换
+
+- **双层伪元素背景 1s 过渡**:`linear-gradient` 背景不支持 CSS transition 插值,改为双层伪元素 `::before`(浅色渐变)/`::after`(深色渐变),`html.dark` 时 opacity 交叉淡入淡出 1s。
+- 面板/色块/文字颜色同步 1s 过渡。
+- **手动切主题取消自动**:`onTheme` 设 `autoMode=false` + ElMessage.info 提示"已切换到手动主题,日出日落自动切换已暂停(可在设置中恢复)"。`applyAutoTheme` 检测 `autoMode=false` 自动跳过。
+- 深色模式:`html.dark .blob { opacity: 0.1 }` 色块压暗至 10%;`--color-primary` 深色覆写 `#E8DCC8`。
+
+## 19. 性能规范(已踩坑)
+
+- **100% 缩放卡顿根因**:Element Plus `Setting`/`Monitor` 图标 SVG path 过于复杂,hover 时子像素光栅化开销大 → 用内联 SVG 替代(详见博客 id=18)。
+- **backdrop-filter + overflow:auto 子元素**:毛玻璃父元素 + 子元素滚动 = 性能炸弹 → `transform: translateZ(0)` 隔离合层。
+- **背景随滚动**:`.bg-blobs` 用 `position: fixed` 不随页面滚动;移除 `background-attachment: fixed`。
+- **关闭效果时跳过定时器**:`flickerTimer` 在所有开关关闭时 return,避免持续触发 sunScene 重写。
+- **v-if 优化**:blend 层(bright-spot/reflection/light-layer/dust-layer/lamp-light)opacity≤0.01 时 `display:none`。
+- **translateZ(0) 隔离**:bg-blobs、bright-spot、reflection-layer、light-layer、vignette、dust-layer、snow-layer、rain-layer、sidebar-nav、5 个面板滚动区。
+- **contain:layout style**:app-sidebar、draggable-panel、music-player。
+- **mask 中心固定**:从 `lampMask` 移除 `lampPendulumX` 依赖,避免每帧重栅格化 3 个全屏元素。
+- **mousemove 节流**:idle 检测 2s 节流。
 
 ## 验收标准
 
@@ -298,15 +370,17 @@ gsap.from('.polaroid-pos', { y: 20, autoAlpha: 0, duration: 0.5, stagger: 0.08, 
 3. 光柱在相册和面板之上(screen 变亮),灰尘粒子在光路中漂浮发光;左右框(上层阴影 z=49)盖住光柱顶部。
 4. 阴影重叠区域颜色不叠加变深(灰阶 darken 幂等)。
 5. 内容组件(相册/面板)在日间有轻微反光高光(soft-light,跟随光源位置)。
-6. 黑胶唱片可拖动,hover 放大并显示歌曲信息(正在播放/已暂停/未设置音乐)。
+6. 黑胶唱片 hover 放大并显示歌曲信息(正在播放/已暂停/未设置音乐)。
 7. 全局导航栏(AppSidebar)左侧固定,含家庭名/模块导航/系统下拉(设置+运维)/主题切换/台灯三态/语言/铃铛/用户头像;关灯时按钮伪元素径向发光圈脉冲动画。
 8. ≤960px 时左侧面板和纪念日隐藏,只保留相册 + 导航栏 + 紧凑天气 + 小唱片。
 9. 首页左下角光照测试控制台:1 分钟循环 288 时隙,含时间/高度/方位/阶段 + 进度条 + 后退/暂停/前进/停止 + 天气控制(☀️/☁️/🌧️/❄️)+ 色温/亮度滑块;停止=重置真实时间+关闭控制台。
-10. 夜间台灯自动开启(傍晚 dayProgress≥0.9 开,清晨 dayProgress>0.1 关),mask 祛除左上黄金分割点周围阴影;台灯钟摆运动(8 秒周期,横向 ±5vw,两侧椭圆中间圆);亮度滑块控制 mask 透明区域大小(3%-100%);色温滑块控制暖光色温。**开关灯 2s 渐变**:mask-image 不支持 CSS transition,用 GSAP 补间驱动 `lampAnim`(reactive),`lampDivOpacity` 和 `lampMask` 同步 2s 渐变(ease `power2.out`);mask 挖洞半径随强度缩放(开灯洞从 0 放大,关灯洞缩到 0)。
-11. **主题切换 1s 过渡**:`linear-gradient` 背景不支持 CSS transition 插值,改为双层伪元素 `::before`(浅色)/`::after`(深色)opacity 交叉淡入淡出 1s;面板/色块/文字颜色同步 1s 过渡。
-12. **可拖拽面板**:5 个面板(feed/task/weather/anniversary/today)可拖拽+可调大小,位置/大小持久化到 localStorage;拖拽边界 clamp(左右不越出页面、顶部不低于导航栏、底部不越界);全部用 `left` 定位 + 右下角 resize handle;Settings"恢复默认面板布局"清持久化恢复初始值。
+10. 夜间台灯自动开启(傍晚 dayProgress≥0.9 开,清晨 dayProgress>0.1 关),mask 祛除左上黄金分割点周围阴影;台灯钟摆运动(8 秒周期,横向 ±5vw,两侧椭圆中间圆);亮度滑块控制 mask 透明区域大小(3%-100%);色温滑块控制暖光色温。**开关灯 2s 渐变**:GSAP 补间驱动,mask 挖洞半径随强度缩放。
+11. **主题切换 1s 过渡**:双层伪元素 `::before`/`::after` opacity 交叉淡入淡出;面板/色块/文字颜色同步 1s 过渡。
+12. **可拖拽面板**:5 个面板(feed/task/weather/anniversary/today)可拖拽+可调大小,位置/大小持久化到 localStorage;拖拽边界 clamp;Settings"恢复默认面板布局"清持久化恢复初始值。
 13. **今日面板**:积分余额+连续天数+签到按钮+今日待办提醒前 3 条(登录可见)。
 14. **备案号**:右下角 `right:16 bottom:8 z:70`,ICP+公安占位,磨砂玻璃小字。
 15. **照片瀑布**(`/cascade`):落叶式飘落动画(包装元素分离 transform 防频闪),hover 暂停+scale 1.15,点击 `el-image-viewer`,每 2s 生成一张上限 50 张。
-15. **深色模式**:`html.dark .blob { opacity: 0.1 }` 色块压暗至 10%;`--color-primary` 深色覆写 `#E8DCC8`;手动切主题后取消日出日落自动切换(`autoMode=false`)+提示。
-16. **创建新家庭**:`POST /family` 已登录用户创建新家庭组(绑定 OWNER+切换当前家庭);Settings 页入口。
+16. **深色模式**:`html.dark .blob { opacity: 0.1 }` 色块压暗至 10%;`--color-primary` 深色覆写 `#E8DCC8`;手动切主题后取消日出日落自动切换(`autoMode=false`)+提示。
+17. **创建新家庭**:`POST /family` 已登录用户创建新家庭组(绑定 OWNER+切换当前家庭);Settings 页入口。
+18. **天气特效**:雪(❄ 字符 12-28px)/雨(线性雨滴)粒子,数量=降水等级×10;多云闪烁(GSAP 4-8s 随机补间);weather-shadow 雨雪常显/多云随 cloudFlicker/晴不显示;weatherMultiplier 衰减光强(晴 1.0/多云 0.55/雨 0.25/雪 0.4)。
+19. **和风字体图标**:`<i class="qi-{iconCode}">`,iconCode 来自和风 API now.icon;npm 包 qweather-icons。
