@@ -70,6 +70,8 @@ watch(
   min-height: 100vh;
   position: relative;
   transition: margin-left 0.3s ease;
+  /* 隔离合层:页面切换 transition 的 transform 不触发 AppSidebar/MusicPlayer 的 backdrop-filter 重算 */
+  contain: layout style;
 }
 .app-main.with-sidebar {
   margin-left: 220px;

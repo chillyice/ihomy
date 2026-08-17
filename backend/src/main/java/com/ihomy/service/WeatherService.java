@@ -116,6 +116,8 @@ public class WeatherService {
         String code = n.has("icon") ? n.get("icon").asText() : "100";
         Map<String, Object> data = new HashMap<>();
         data.put("condition", codeToCondition(code));
+        data.put("precipLevel", codeToPrecipLevel(code));
+        data.put("iconCode", code);
         data.put("temp", Integer.parseInt(n.get("temp").asText()));
         data.put("text", n.get("text").asText());
         data.put("city", familyLocation != null && familyLocation.length > 2 && familyLocation[2] != null ? familyLocation[2] : resolveCityName(clientIp));
@@ -421,6 +423,27 @@ public class WeatherService {
         if (c >= 500 && c <= 599) return "fog";
         if (c >= 200 && c <= 299) return "thunder";
         return "cloud";
+    }
+
+    /** 和风天气 code → 降水等级(1~6);非降水返回 0 */
+    private int codeToPrecipLevel(String code) {
+        if (code == null) return 0;
+        int c = Integer.parseInt(code);
+        // 雨 300-399
+        if (c == 305 || c == 309 || c == 314 || c == 300 || c == 399) return 1;  // 小雨/阵雨/毛毛雨
+        if (c == 306 || c == 315) return 2;  // 中雨
+        if (c == 301 || c == 307 || c == 316) return 3;  // 强阵雨/大雨
+        if (c == 310 || c == 317) return 4;  // 暴雨
+        if (c == 311 || c == 318) return 5;  // 大暴雨
+        if (c == 312) return 6;  // 特大暴雨
+        if (c >= 300 && c <= 399) return 1;  // 其他雨默认1级
+        // 雪 400-499
+        if (c == 400 || c == 408 || c == 407 || c == 404 || c == 405 || c == 406 || c == 499) return 1;  // 小雪/阵雪/雨夹雪
+        if (c == 401 || c == 409) return 2;  // 中雪
+        if (c == 402 || c == 410) return 3;  // 大雪
+        if (c == 403) return 4;  // 暴雪
+        if (c >= 400 && c <= 499) return 1;  // 其他雪默认1级
+        return 0;
     }
 }
 

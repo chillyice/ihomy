@@ -15,9 +15,6 @@
           <el-menu-item index="daily">
             <span class="menu-icon">📅</span>{{ $t('settings.cat.daily') }}
           </el-menu-item>
-          <el-menu-item index="weather">
-            <span class="menu-icon">🌤️</span>天气
-          </el-menu-item>
           <el-menu-item index="member" v-if="userStore.isOwner">
             <span class="menu-icon">👥</span>{{ $t('settings.cat.member') }}
           </el-menu-item>
@@ -66,8 +63,8 @@
                   <el-button @click="showLabelDialog = true">+ {{ $t('settings.newLabel') }}</el-button>
                   <el-color-picker v-model="labelForm.color" />
                   <el-button v-if="labelForm.label" link type="danger" @click="clearLabel">{{ $t('common.cancel') }}</el-button>
+                  <span class="form-tip">{{ $t('settings.labelHint') }}</span>
                 </div>
-                <div class="form-tip">{{ $t('settings.labelHint') }}</div>
               </el-form-item>
               <el-form-item :label="$t('settings.language')">
                 <el-radio-group :model-value="locale" @change="onChangeLang">
@@ -186,26 +183,6 @@
 
         <!-- 成员管理(嵌入 Member 页面组件) -->
         <!-- 天气设置:地区偏好(避免 IP 定位不准) -->
-        <template v-if="active === 'weather'">
-          <div class="card settings-card">
-            <h2>天气</h2>
-            <el-form label-position="top">
-              <el-form-item label="地区偏好">
-                <div class="weather-loc-row">
-                  <el-input v-model="weatherCity" placeholder="城市名(如:济南)" style="width: 160px" />
-                  <el-input v-model="weatherLat" placeholder="纬度" style="width: 120px" />
-                  <el-input v-model="weatherLng" placeholder="经度" style="width: 120px" />
-                  <el-button @click="useIpLocation">使用 IP 定位</el-button>
-                </div>
-                <div class="share-tip">设置后天气和太阳位置将固定使用此坐标,留空则按 IP 自动定位。城市名用于天气面板显示。经纬度可从地图拾取(如 https://lbs.amap.com/tools/picker)</div>
-              </el-form-item>
-              <el-form-item>
-                <el-button type="primary" :loading="savingWeather" @click="saveWeather">保存</el-button>
-              </el-form-item>
-            </el-form>
-          </div>
-        </template>
-
         <template v-if="active === 'member'">
           <MemberView />
         </template>
@@ -215,7 +192,7 @@
           <StorageView />
         </template>
 
-        <!-- 个性化设置:主题 + 台灯/色温/亮度/夜间超时关灯/光照测试入口 -->
+        <!-- 个性化设置:主题 + 台灯/色温/亮度/阴影/天气效果/天气地区/夜间超时关灯/光照测试入口 -->
         <template v-if="active === 'light'">
           <div class="card settings-card">
             <h2>个性化设置</h2>
@@ -244,6 +221,42 @@
               <el-form-item label="亮度">
                 <el-slider v-model.number="lampBrightness" :min="0" :max="100" show-input />
               </el-form-item>
+              <el-form-item label="阴影效果">
+                <el-switch v-model="shadowEnabled" />
+                <div class="share-tip">关闭后窗户阴影和暗角将不显示,画面更干净</div>
+              </el-form-item>
+              <el-form-item label="背景色块">
+                <el-switch v-model="blobsEnabled" />
+                <div class="share-tip">关闭后背景色块飘动动画不显示(可提升低分辨率屏性能)</div>
+              </el-form-item>
+              <el-divider />
+              <el-form-item label="天气效果">
+                <el-switch v-model="weatherEffectEnabled" />
+                <div class="share-tip">开启后根据真实天气显示光柱/阴影/雨雪粒子等效果,关闭后仅按时间做光影</div>
+              </el-form-item>
+              <el-form-item label="天气地区">
+                <div class="weather-loc-row">
+                  <el-select
+                    v-model="weatherLocationId"
+                    filterable
+                    remote
+                    clearable
+                    placeholder="搜索城市名(如:济南)"
+                    :remote-method="searchLocations"
+                    :loading="locLoading"
+                    style="width: 240px"
+                    @change="onLocationChange"
+                  >
+                    <el-option v-for="loc in locationOptions" :key="loc.id" :label="loc.name + ' · ' + loc.adm1" :value="loc.id" />
+                  </el-select>
+                  <el-button v-if="weatherLocationId" @click="clearLocation">使用 IP 定位</el-button>
+                </div>
+                <div class="share-tip">选择城市后天气和太阳位置将固定使用此坐标,留空则按 IP 自动定位</div>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :loading="savingWeather" @click="saveWeather">保存天气设置</el-button>
+              </el-form-item>
+              <el-divider />
               <el-form-item label="夜间超时关灯(分钟)">
                 <el-input-number v-model.number="idleMinutes" :min="1" :max="120" :step="1" />
                 <div class="share-tip">夜间无操作超过此时长后自动关灯,有操作时立即开灯(仅"自动"模式生效)</div>
@@ -299,7 +312,7 @@ const router = useRouter()
 
 // 光照设置:从全局 useSunLight 实例注入(与 SunLightLayer/AppSidebar 共享)
 const sunLight = inject(SUN_LIGHT_KEY)
-const { lampMode, lampTemp, lampBrightness, idleMinutes, isIdle } = sunLight || {}
+const { lampMode, lampTemp, lampBrightness, shadowEnabled, weatherEffectEnabled, blobsEnabled, idleMinutes, isIdle } = sunLight || {}
 
 // 当前选中设置大类;支持 ?tab= 跳转(从导航栏头像下拉"个人资料"进入时切到 profile)
 const active = ref(route.query.tab || 'profile')
@@ -352,11 +365,42 @@ const shareToken = ref('')
 const profileSaving = ref(false)
 const familySaving = ref(false)
 // 天气地区偏好(空=IP 自动定位)
+const weatherLocationId = ref('')
 const weatherCity = ref('')
 const weatherLat = ref('')
 const weatherLng = ref('')
 const savingWeather = ref(false)
-const useIpLocation = () => { weatherCity.value = ''; weatherLat.value = ''; weatherLng.value = '' }
+const locationOptions = ref([])
+const locLoading = ref(false)
+
+const searchLocations = async (query) => {
+  if (!query) { locationOptions.value = []; return }
+  locLoading.value = true
+  try {
+    const res = await fetch(`/api/public/weather/locations?keyword=${encodeURIComponent(query)}`)
+    if (res.ok) {
+      const json = await res.json()
+      if (json.code === 0) locationOptions.value = json.data || []
+    }
+  } catch (e) {} finally {
+    locLoading.value = false
+  }
+}
+const onLocationChange = (id) => {
+  const loc = locationOptions.value.find(l => l.id === id)
+  if (loc) {
+    weatherCity.value = loc.name
+    weatherLat.value = String(loc.lat)
+    weatherLng.value = String(loc.lng)
+  }
+}
+const clearLocation = () => {
+  weatherLocationId.value = ''
+  weatherCity.value = ''
+  weatherLat.value = ''
+  weatherLng.value = ''
+}
+
 const saveWeather = async () => {
   savingWeather.value = true
   try {
@@ -405,6 +449,11 @@ const load = async () => {
     weatherCity.value = f.weatherCity || ''
     weatherLat.value = f.weatherLat ?? ''
     weatherLng.value = f.weatherLng ?? ''
+    // 如果有城市名,尝试匹配 locationId 用于显示
+    if (f.weatherCity) {
+      locationOptions.value = [{ id: '', name: f.weatherCity, adm1: '', adm2: '', lat: f.weatherLat, lng: f.weatherLng }]
+      weatherLocationId.value = ''
+    }
     shareToken.value = f.shareToken || ''
   } catch (e) {
     // 忽略
@@ -580,10 +629,10 @@ onMounted(load)
 .settings-body { flex: 1; min-width: 0; }
 .settings-card { margin-bottom: 16px; }
 .settings-card h2 { color: var(--color-primary); margin-bottom: 16px; font-size: 17px; }
-.label-row { display: flex; gap: 8px; align-items: center; }
-.form-tip { color: var(--color-text-2); font-size: 12px; margin-top: 6px; }
+.label-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.form-tip { color: var(--color-text-2); font-size: 12px; margin-left: 12px; }
 .share-row { display: flex; align-items: center; gap: 8px; width: 100%; }
-.share-tip { color: var(--color-text-secondary); font-size: 12px; margin-top: 4px; }
+.share-tip { color: var(--color-text-secondary); font-size: 12px; margin-top: 8px; display: flex; align-items: center; }
 .weather-loc-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .upload-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .avatar-preview { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 1px solid var(--color-border); cursor: pointer; }

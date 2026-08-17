@@ -22,7 +22,11 @@
           :title="m.title"
           @click="navigate(m.path)"
         >
-          <span class="nav-icon"><el-icon><component :is="iconComp(m.code)" /></el-icon></span>
+          <span class="nav-icon">
+            <svg v-if="m.code === 'settings'" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2L9.5 4.5L6 4L5 7.5L2 9.5L3.5 13L2 16.5L5 18.5L6 22L9.5 21.5L12 24L14.5 21.5L18 22L19 18.5L22 16.5L20.5 13L22 9.5L19 7.5L18 4L14.5 4.5L12 2ZM12 16A4 4 0 1 1 12 8A4 4 0 0 1 12 16Z"/></svg>
+            <svg v-else-if="m.code === 'ops'" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 4H21V16H3V4ZM5 6V14H19V6H5ZM2 18H22V20H2V18Z"/></svg>
+            <el-icon v-else><component :is="iconComp(m.code)" /></el-icon>
+          </span>
           <span v-if="!collapsed" class="nav-text">{{ m.title }}</span>
         </div>
       </div>
@@ -261,6 +265,8 @@ onMounted(() => loadUnread())
   flex-direction: column;
   transition: width 0.3s ease, background 1s ease, border-color 1s ease;
   overflow: hidden;
+  contain: layout style;
+  transform: translateZ(0);
 }
 .app-sidebar.collapsed {
   width: 64px;
@@ -310,6 +316,8 @@ html.dark .app-sidebar {
   overflow-y: auto;
   overflow-x: hidden;
   padding: 4px 10px;
+  transform: translateZ(0);
+  will-change: transform;
 }
 .sidebar-nav::-webkit-scrollbar { width: 4px; }
 .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(58,46,34,0.15); border-radius: 2px; }

@@ -7,9 +7,11 @@ import com.ihomy.common.ResultCode;
 import com.ihomy.entity.Family;
 import com.ihomy.entity.HomeModule;
 import com.ihomy.entity.SysUser;
+import com.ihomy.entity.WeatherLocation;
 import com.ihomy.mapper.FamilyMapper;
 import com.ihomy.mapper.HomeModuleMapper;
 import com.ihomy.mapper.PhotoMapper;
+import com.ihomy.mapper.WeatherLocationMapper;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.ActivityFeedService;
 import com.ihomy.service.HomeStatsService;
@@ -45,6 +47,7 @@ public class PublicController {
     private final FamilyMapper familyMapper;
     private final HomeModuleMapper homeModuleMapper;
     private final PhotoMapper photoMapper;
+    private final WeatherLocationMapper weatherLocationMapper;
     private final ActivityFeedService activityFeedService;
     private final HomeStatsService homeStatsService;
     private final SecurityHelper securityHelper;
@@ -177,5 +180,18 @@ public class PublicController {
             throw new BizException(ResultCode.NOT_FOUND);
         }
         return f;
+    }
+
+    @Operation(summary = "搜索和风天气地区(城市名模糊搜索,返回 id/名称/省份/经纬度)")
+    @GetMapping("/weather/locations")
+    public Result<List<WeatherLocation>> weatherLocations(@RequestParam String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return Result.success(List.of());
+        }
+        List<WeatherLocation> list = weatherLocationMapper.selectList(
+            new LambdaQueryWrapper<WeatherLocation>()
+                .like(WeatherLocation::getName, keyword.trim())
+                .last("LIMIT 20"));
+        return Result.success(list);
     }
 }

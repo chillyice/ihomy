@@ -193,6 +193,8 @@ onMounted(loadPlaylist)
   overflow: hidden;
   transition: width 0.3s ease, height 0.3s ease;
   user-select: none;
+  contain: layout style;
+  transform: translateZ(0);
 }
 html.dark .music-player {
   background: rgba(30, 40, 65, 0.65);

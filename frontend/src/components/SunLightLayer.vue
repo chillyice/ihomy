@@ -4,8 +4,8 @@
 <!-- 光影层在导航栏之上,覆盖全页(含导航栏),所有光影效果在所有元素之上生效 -->
 <template>
   <div class="sun-light-layer" aria-hidden="true">
-    <!-- 背景色块:5 个 blur 色块随机飘动 -->
-    <div class="bg-blobs">
+    <!-- 背景色块:5 个 blur 色块随机飘动(可开关) -->
+    <div v-if="blobsEnabled" class="bg-blobs">
       <div class="blob blob-1"></div>
       <div class="blob blob-2"></div>
       <div class="blob blob-3"></div>
@@ -14,10 +14,10 @@
     </div>
 
     <!-- 亮斑图层:multiply 染色,台灯 mask 挖洞 -->
-    <div class="bright-spot" :style="{ ...brightSpotStyle, '--lamp-mask': lampMask }"></div>
+    <div v-if="(brightSpotStyle?.opacity ?? 0) > 0.01" class="bright-spot" :style="{ ...brightSpotStyle, '--lamp-mask': lampMask }"></div>
 
-    <!-- 窗户阴影:6 条 bar,multiply,台灯 mask 挖洞 -->
-    <div class="window-shadow"
+    <!-- 窗户阴影:6 条 bar + 天气覆盖阴影,multiply,台灯 mask 挖洞(阴影开关可关闭) -->
+    <div v-if="shadowEnabled" class="window-shadow"
          :style="{ '--rot': (sunScene.shadowVRotation || 0) + 'deg', '--htop': (sunScene.shadowHTop || 50) + '%', '--shadow-alpha': (sunScene.shadowIntensity ?? 0.5), '--shadow-color': (sunScene.shadowColor || 'rgb(0,0,0)'), '--bar-transition': sunScene.isNight ? '0s' : '3s ease', '--frame-top-offset': (sunScene.frameTopOffset ?? 0) + 'vh', '--lamp-mask': lampMask }">
       <div class="shadow-bar frame-h-top"></div>
       <div class="shadow-bar frame-h-bottom"></div>
@@ -25,16 +25,18 @@
       <div class="shadow-bar shadow-h"></div>
       <div class="shadow-bar frame-v-left"></div>
       <div class="shadow-bar frame-v-right"></div>
+      <!-- 天气覆盖阴影:固定不移动,雨雪常显;多云太阳遮挡时显示 -->
+      <div class="shadow-bar weather-shadow" :style="{ opacity: weatherShadowOpacity }"></div>
     </div>
 
-    <!-- 反光层:soft-light 高光 -->
-    <div class="reflection-layer" :style="reflectionStyle"></div>
+    <!-- 反光层:soft-light 高光(opacity 为 0 时完全移除,跳过 blend 计算) -->
+    <div v-if="(reflectionStyle?.opacity ?? 0) > 0.01" class="reflection-layer" :style="reflectionStyle"></div>
 
-    <!-- 柔和暗角:边缘微压暗,台灯 mask 挖洞 -->
-    <div class="vignette" :style="{ '--lamp-mask': lampMask }"></div>
+    <!-- 柔和暗角:边缘微压暗,台灯 mask 挖洞(阴影开关可关闭) -->
+    <div v-if="shadowEnabled" class="vignette" :style="{ '--lamp-mask': lampMask }"></div>
 
-    <!-- 体积光:丁达尔效应,screen,光源在页面外上方 -->
-    <div class="light-layer" :style="{ opacity: sunScene.lightOpacity ?? 0, transition: sunScene.isNight ? 'none' : 'opacity 3s ease' }">
+    <!-- 体积光:丁达尔效应,screen,光源在页面外上方(天气系数实时应用,opacity 为 0 时完全移除) -->
+    <div v-if="(lightLayerOpacity ?? 0) > 0.01" class="light-layer" :style="{ opacity: lightLayerOpacity ?? 0, transition: sunScene.isNight ? 'none' : 'opacity 3s ease' }">
       <div class="light-bloom" :style="bloomStyle"></div>
       <div class="light-source" :style="sourceStyle">
         <div
@@ -46,8 +48,8 @@
       </div>
     </div>
 
-    <!-- 台灯光源:左上黄金分割点 + 钟摆运动,最顶层 -->
-    <div class="lamp-light" :style="{
+    <!-- 台灯光源:左上黄金分割点 + 钟摆运动,最顶层(opacity 为 0 时移除) -->
+    <div v-if="(lampDivOpacity ?? 0) > 0.01" class="lamp-light" :style="{
       opacity: lampDivOpacity,
       left: 'calc(38.2% + ' + lampPendulumX + 'vw)',
       top: '38.2%',
@@ -57,8 +59,8 @@
       background: 'radial-gradient(circle, rgba(' + lampColor + ',0.6) 0%, rgba(' + lampColor + ',0.45) 15%, rgba(' + lampColor + ',0.3) 35%, rgba(' + lampColor + ',0.18) 55%, rgba(' + lampColor + ',0.08) 75%, transparent 95%)'
     }"></div>
 
-    <!-- 灰尘粒子:光路中的飘浮微粒 -->
-    <div class="dust-layer" :style="{ opacity: sunScene.lightOpacity ?? 0 }">
+    <!-- 灰尘粒子:光路中的飘浮微粒(天气系数实时应用,opacity 为 0 时移除) -->
+    <div v-if="(lightLayerOpacity ?? 0) > 0.01" class="dust-layer" :style="{ opacity: lightLayerOpacity ?? 0 }">
       <div
         v-for="d in dustParticles"
         :key="d.id"
@@ -71,6 +73,39 @@
           animationDuration: d.duration + 's',
           animationDelay: d.delay + 's',
           '--drift': d.drift + 'px',
+        }"
+      ></div>
+    </div>
+
+    <!-- 雪花粒子:从页面最顶端飘落到最底端,数量=降水等级×10,六瓣雪花样式 -->
+    <div v-if="snowParticles.length" class="snow-layer">
+      <div
+        v-for="s in snowParticles"
+        :key="s.id"
+        class="snowflake"
+        :style="{
+          left: s.left,
+          fontSize: s.size + 'px',
+          opacity: s.opacity,
+          animationDuration: s.duration + 's',
+          animationDelay: s.delay + 's',
+          '--drift': s.drift + 'px',
+        }"
+      >❄</div>
+    </div>
+
+    <!-- 雨滴粒子:快速下落,数量=降水等级×10 -->
+    <div v-if="rainParticles.length" class="rain-layer">
+      <div
+        v-for="r in rainParticles"
+        :key="r.id"
+        class="raindrop"
+        :style="{
+          left: r.left,
+          height: r.height + 'px',
+          opacity: r.opacity,
+          animationDuration: r.duration + 's',
+          animationDelay: r.delay + 's',
         }"
       ></div>
     </div>
@@ -87,9 +122,9 @@ if (!light) {
   console.warn('[SunLightLayer] 未注入光影状态,确保 App.vue 调用了 provide(SUN_LIGHT_KEY, useSunLight())')
 }
 const {
-  sunScene, lampMask, lampDivOpacity, lampRadius, lampColor,
+  sunScene, lampMask, lampDivOpacity, lampRadius, lampColor, shadowEnabled, weatherShadowOpacity, lightLayerOpacity, blobsEnabled,
   lampPendulumX, lampPendulumScaleX,
-  dustParticles, rayStyles, sourceStyle, bloomStyle, brightSpotStyle, reflectionStyle,
+  dustParticles, snowParticles, rainParticles, rayStyles, sourceStyle, bloomStyle, brightSpotStyle, reflectionStyle,
 } = light || {}
 </script>
 
@@ -100,13 +135,16 @@ const {
   /* 这样 z-index 35/48/100 等与页面内容(z=10)在同一 context 比较,和以前 Home.vue 一样 */
 }
 
-/* 背景色块:清新淡雅,高斯模糊,随机飘动 */
+/* 背景色块:清新淡雅,高斯模糊,随机飘动(fixed 固定不随页面滚动,避免 backdrop-filter 元素每帧重算) */
 .bg-blobs {
-  position: absolute;
+  position: fixed;
   inset: 0;
   z-index: 1;
   overflow: hidden;
   pointer-events: none;
+  /* 隔离为独立合成层:drift 动画的 transform 变化不触发 backdrop-filter 元素重算 */
+  transform: translateZ(0);
+  will-change: transform;
 }
 .blob {
   position: absolute;
@@ -140,6 +178,7 @@ html.dark .blob-5 { box-shadow: 0 0 120px 40px rgba(160,180,120,0.4); }
   -webkit-mask-image: var(--lamp-mask, none);
   mask-image: var(--lamp-mask, none);
   transition: background 3s ease, opacity 3s ease;
+  transform: translateZ(0);
 }
 
 /* 反光层:soft-light 高光 */
@@ -147,6 +186,7 @@ html.dark .blob-5 { box-shadow: 0 0 120px 40px rgba(160,180,120,0.4); }
   position: fixed; inset: 0; z-index: 72; pointer-events: none;
   mix-blend-mode: soft-light;
   transition: opacity 3s ease;
+  transform: translateZ(0);
 }
 
 /* 台灯光源:最顶层 */
@@ -191,8 +231,8 @@ html.dark .blob-5 { box-shadow: 0 0 120px 40px rgba(160,180,120,0.4); }
   transition: top var(--bar-transition, 3s ease);
 }
 .frame-h-top {
-  left: -75%; right: -75%; height: 140px;
-  top: calc(10vh - 140px + var(--frame-top-offset, 0vh));
+  left: -75%; right: -75%; height: 280px;
+  top: calc(10vh - 280px + var(--frame-top-offset, 0vh));
   transition: top var(--bar-transition, 3s ease);
 }
 .frame-h-bottom {
@@ -205,6 +245,7 @@ html.dark .blob-5 { box-shadow: 0 0 120px 40px rgba(160,180,120,0.4); }
 .light-layer {
   position: fixed; inset: 0; z-index: 78; pointer-events: none;
   mix-blend-mode: screen; overflow: hidden;
+  transform: translateZ(0);
 }
 .light-bloom {
   position: absolute; width: 700px; height: 700px;
@@ -228,12 +269,21 @@ html.dark .blob-5 { box-shadow: 0 0 120px 40px rgba(160,180,120,0.4); }
   -webkit-mask-image: var(--lamp-mask, none);
   mask-image: var(--lamp-mask, none);
   background: radial-gradient(ellipse 90% 75% at 50% 42%, transparent 0%, transparent 55%, rgba(60,38,12,0.08) 80%, rgba(45,25,8,0.18) 100%);
+  transform: translateZ(0);
+}
+
+/* 天气覆盖阴影:与其他 shadow-bar 同色同 blur,固定全屏不移动,随天气显隐 */
+.shadow-bar.weather-shadow {
+  inset: 0;
+  width: 100%; height: 100%;
+  transition: opacity 2s ease;
 }
 
 /* 灰尘粒子:screen 发光 */
 .dust-layer {
   position: fixed; inset: 0; z-index: 76; pointer-events: none;
   overflow: hidden; mix-blend-mode: screen;
+  transform: translateZ(0);
 }
 .dust {
   position: absolute; border-radius: 50%;
@@ -246,5 +296,43 @@ html.dark .blob-5 { box-shadow: 0 0 120px 40px rgba(160,180,120,0.4); }
   15% { opacity: 0.9; }
   85% { opacity: 0.9; }
   100% { transform: translate(var(--drift, 60px), calc(var(--drift, 60px) * -1.5)); opacity: 0; }
+}
+
+/* 雪花层:从顶端飘到底端,六瓣雪花样式 */
+.snow-layer {
+  position: fixed; inset: 0; z-index: 77; pointer-events: none;
+  overflow: hidden;
+  transform: translateZ(0);
+}
+.snowflake {
+  position: absolute; top: -20px;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 0 4px rgba(255, 255, 255, 0.6);
+  line-height: 1;
+  user-select: none;
+  animation: snow-fall linear infinite;
+}
+@keyframes snow-fall {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translate(var(--drift, 50px), 100vh) rotate(360deg); opacity: 0; }
+}
+
+/* 雨滴层:快速下落 */
+.rain-layer {
+  position: fixed; inset: 0; z-index: 77; pointer-events: none;
+  overflow: hidden;
+  transform: translateZ(0);
+}
+.raindrop {
+  position: absolute; top: -20px; width: 1.5px;
+  background: linear-gradient(to bottom, transparent, rgba(180, 200, 230, 0.7));
+  animation: rain-fall linear infinite;
+}
+@keyframes rain-fall {
+  0% { transform: translateY(0); opacity: 0; }
+  10% { opacity: 1; }
+  100% { transform: translateY(100vh); opacity: 0.3; }
 }
 </style>

@@ -29,7 +29,7 @@
       </div>
     </div>
 
-    <!-- 图片查看器:点击拍立得查看近期照片 -->
+    <!-- 图片查看器:点击拍立得全屏浏览(原生按钮:翻页左右+关闭右上) -->
     <el-image-viewer
       v-if="viewerVisible"
       :url-list="viewerUrls"
@@ -40,14 +40,17 @@
     <!-- 左侧:家人动态 + 悬赏/任务(无边框毛玻璃,向外透明渐变) -->
     <!-- 家人动态(可拖拽毛玻璃) -->
     <div class="draggable-panel feed-panel"
-      :style="{ left: feedDrag.pos.value.x + 'px', top: feedDrag.pos.value.y + 'px', width: feedDrag.size.value.w + 'px', height: feedDrag.size.value.h + 'px' }">
+      :style="{ left: feedDrag.pos.value.x + 'px', top: feedDrag.pos.value.y + 'px', width: feedDrag.size.value.w + 'px', height: feedDrag.size.value.h + 'px', zIndex: feedDrag.zIndex.value }">
       <div class="drag-handle" @mousedown="feedDrag.onDragStart">
         <span class="handle-grip"></span>
       </div>
       <div class="panel-body">
         <div class="panel-title">{{ $t('home.familyFeed') }}</div>
         <div class="feed-scroll">
-          <div v-if="!feeds.length" class="empty-hint">{{ $t('home.sillEmpty') }}</div>
+          <div v-if="!feeds.length" class="empty-state">
+            <span class="empty-hint">{{ $t('home.sillEmpty') }}</span>
+            <el-button size="small" type="primary" plain @click="$router.push('/blog')">+ 写博客</el-button>
+          </div>
           <div v-for="(f, i) in feeds" :key="i" class="feed-row" @click="goFeed(f)">
             <el-avatar :size="36" :src="f.authorAvatar" class="feed-avatar">{{ (f.authorName || 'U').charAt(0) }}</el-avatar>
             <div class="feed-content">
@@ -66,14 +69,17 @@
 
     <!-- 悬赏/任务(可拖拽毛玻璃) -->
     <div class="draggable-panel task-panel"
-      :style="{ left: taskDrag.pos.value.x + 'px', top: taskDrag.pos.value.y + 'px', width: taskDrag.size.value.w + 'px', height: taskDrag.size.value.h + 'px' }">
+      :style="{ left: taskDrag.pos.value.x + 'px', top: taskDrag.pos.value.y + 'px', width: taskDrag.size.value.w + 'px', height: taskDrag.size.value.h + 'px', zIndex: taskDrag.zIndex.value }">
       <div class="drag-handle" @mousedown="taskDrag.onDragStart">
         <span class="handle-grip"></span>
       </div>
       <div class="panel-body">
         <div class="panel-title">{{ $t('home.tasksRewards') }}</div>
         <div class="task-scroll">
-          <div v-if="!tasks.length" class="empty-hint">{{ $t('home.noTasks') }}</div>
+          <div v-if="!tasks.length" class="empty-state">
+            <span class="empty-hint">{{ $t('home.noTasks') }}</span>
+            <el-button size="small" type="primary" plain @click="$router.push('/task')">+ 新增任务</el-button>
+          </div>
           <div v-for="t in tasks.slice(0, 5)" :key="t.id" class="task-row" @click="$router.push('/task')">
             <span class="task-reward" :class="'reward-' + t.rewardType">{{ rewardIcon(t.rewardType) }}</span>
             <div class="task-info">
@@ -88,7 +94,7 @@
 
     <!-- 右侧:天气面板(默认 180px 只显示当前,点击展开详情) -->
     <div class="draggable-panel weather-panel"
-      :style="{ left: weatherDrag.pos.value.x + 'px', top: weatherDrag.pos.value.y + 'px', width: weatherDrag.size.value.w + 'px', height: (weatherExpanded ? 440 : weatherDrag.size.value.h) + 'px' }">
+      :style="{ left: weatherDrag.pos.value.x + 'px', top: weatherDrag.pos.value.y + 'px', width: weatherDrag.size.value.w + 'px', height: (weatherExpanded ? 440 : weatherDrag.size.value.h) + 'px', zIndex: weatherDrag.zIndex.value }">
       <div class="drag-handle" @mousedown="weatherDrag.onDragStart">
         <span class="handle-grip"></span>
       </div>
@@ -96,7 +102,7 @@
         <div v-if="weather" class="weather-main" @click="weatherExpanded = !weatherExpanded">
           <div class="weather-city">{{ weather.city || '济南' }}</div>
           <div class="weather-current">
-            <span class="weather-icon-float">{{ weatherIcon }}</span>
+            <i v-if="weather.iconCode" :class="'qi-' + weather.iconCode" class="weather-icon-float"></i>
             <span class="weather-temp-large">{{ weather.temp }}<span class="temp-unit">°</span></span>
           </div>
           <div class="weather-condition">{{ weatherText }}<el-icon class="weather-expand-icon"><ArrowDown :class="{ flipped: weatherExpanded }" /></el-icon></div>
@@ -116,7 +122,7 @@
             <div class="wd-forecast">
               <div v-for="d in weatherDetailData.daily.slice(0, 3)" :key="d.fxDate" class="wd-fc-card">
                 <span class="wd-fc-date">{{ formatFcDate(d.fxDate) }}</span>
-                <span class="wd-fc-icon">{{ weatherCodeIcon(d.iconDay) }}</span>
+                <i :class="'qi-' + d.iconDay" class="wd-fc-icon"></i>
                 <span class="wd-fc-temp">{{ d.tempMin }}° / {{ d.tempMax }}°</span>
                 <span class="wd-fc-text">{{ d.textDay }}</span>
               </div>
@@ -152,7 +158,7 @@
 
     <!-- 纪念日倒计时(可拖拽毛玻璃) -->
     <div v-if="anniversaries.length" class="draggable-panel anniversary-panel"
-      :style="{ left: anniDrag.pos.value.x + 'px', top: anniDrag.pos.value.y + 'px', width: anniDrag.size.value.w + 'px', height: anniDrag.size.value.h + 'px' }">
+      :style="{ left: anniDrag.pos.value.x + 'px', top: anniDrag.pos.value.y + 'px', width: anniDrag.size.value.w + 'px', height: anniDrag.size.value.h + 'px', zIndex: anniDrag.zIndex.value }">
       <div class="drag-handle" @mousedown="anniDrag.onDragStart">
         <span class="handle-grip"></span>
       </div>
@@ -176,7 +182,7 @@
 
     <!-- 今日概览:积分签到 + 待办提醒(可拖拽毛玻璃,登录可见) -->
     <div v-if="userStore.isLoggedIn" class="draggable-panel today-panel"
-      :style="{ left: todayDrag.pos.value.x + 'px', top: todayDrag.pos.value.y + 'px', width: todayDrag.size.value.w + 'px', height: todayDrag.size.value.h + 'px' }">
+      :style="{ left: todayDrag.pos.value.x + 'px', top: todayDrag.pos.value.y + 'px', width: todayDrag.size.value.w + 'px', height: todayDrag.size.value.h + 'px', zIndex: todayDrag.zIndex.value }">
       <div class="drag-handle" @mousedown="todayDrag.onDragStart">
         <span class="handle-grip"></span>
       </div>
@@ -197,7 +203,10 @@
             </el-button>
           </div>
           <div class="today-reminders">
-            <div v-if="!reminders.length" class="empty-hint">今日无待办提醒</div>
+            <div v-if="!reminders.length" class="empty-state">
+              <span class="empty-hint">今日无待办提醒</span>
+              <el-button size="small" type="primary" plain @click="$router.push('/reminder')">+ 新增提醒</el-button>
+            </div>
             <div v-for="r in reminders.slice(0, 3)" :key="r.id" class="today-reminder" @click="$router.push('/reminder')">
               <span class="tr-dot"></span>
               <span class="tr-title">{{ r.title }}</span>
@@ -233,10 +242,13 @@
         <button class="lt-btn" @click="sunLight.stepLightTest(1)" title="前进 5 分钟">⏭</button>
       </div>
       <div class="lt-weather">
-        <button class="lt-btn" :class="{ active: sunLight.weatherMode.value === 'clear' }" @click="sunLight.setWeather('clear')" title="晴天">☀️</button>
-        <button class="lt-btn" :class="{ active: sunLight.weatherMode.value === 'cloud' }" @click="sunLight.setWeather('cloud')" title="多云">☁️</button>
-        <button class="lt-btn" :class="{ active: sunLight.weatherMode.value === 'rain' }" @click="sunLight.setWeather('rain')" title="下雨">🌧️</button>
-        <button class="lt-btn" :class="{ active: sunLight.weatherMode.value === 'snow' }" @click="sunLight.setWeather('snow')" title="下雪">❄️</button>
+        <button class="lt-btn" :class="{ active: sunLight.weatherMode.value === 'clear' }" @click="sunLight.setWeather('clear', 0)" title="晴天">☀️</button>
+        <button class="lt-btn" :class="{ active: sunLight.weatherMode.value === 'cloud' }" @click="sunLight.setWeather('cloud', 0)" title="多云">☁️</button>
+        <button class="lt-btn" :class="{ active: sunLight.weatherMode.value === 'rain' }" @click="sunLight.setWeather('rain', sunLight.precipLevel.value || 1)" title="下雨">🌧️</button>
+        <button class="lt-btn" :class="{ active: sunLight.weatherMode.value === 'snow' }" @click="sunLight.setWeather('snow', sunLight.precipLevel.value || 1)" title="下雪">❄️</button>
+      </div>
+      <div v-if="sunLight.weatherMode.value === 'rain' || sunLight.weatherMode.value === 'snow'" class="lt-sliders">
+        <label class="lt-slider-row"><span>{{ sunLight.weatherMode.value === 'rain' ? '雨量' : '雪量' }}</span><input type="range" min="1" max="6" v-model.number="sunLight.precipLevel.value" class="lt-slider" @input="sunLight.setWeather(sunLight.weatherMode.value, sunLight.precipLevel.value)" /></label>
       </div>
       <div class="lt-sliders">
         <label class="lt-slider-row"><span>色温</span><input type="range" min="0" max="100" v-model.number="sunLight.lampTemp.value" class="lt-slider" /></label>
@@ -275,7 +287,7 @@ const tasks = ref([])
 const allPhotos = ref([])
 const viewerVisible = ref(false)
 const viewerIdx = ref(0)
-const weather = ref(null)
+const weather = computed(() => sunLight?.weather.value)
 const weatherDetailData = ref(null)
 const anniversaries = ref([])
 // 可拖拽面板:动态/任务/天气/纪念日/今日(位置/大小持久化到 localStorage)
@@ -381,29 +393,11 @@ const goFeed = (f) => {
 const rewardIcon = (t) => t === 1 ? '🎁' : t === 2 ? '📦' : '⭕'
 const taskStatusLabel = (s) => ({ 0: '待领取', 1: '进行中', 2: '待确认', 3: '已完成', 4: '已取消' }[s] || '')
 
-const weatherIcon = computed(() => {
-  if (!weather.value) return ''
-  const map = { clear: '☀️', cloud: '☁️', rain: '🌧️', snow: '❄️', fog: '🌫️', thunder: '⛈️' }
-  return map[weather.value.condition] || '☀️'
-})
 const weatherText = computed(() => {
   if (!weather.value) return ''
-  const map = { clear: '晴', cloud: '多云', rain: '雨', snow: '雪', fog: '雾', thunder: '雷' }
-  return map[weather.value.condition] || ''
+  return weather.value.text || ''
 })
 
-const weatherCodeIcon = (code) => {
-  if (code == null) return ''
-  const c = parseInt(code)
-  if (c === 100) return '☀️'
-  if (c >= 101 && c <= 104) return '☁️'
-  if (c >= 150 && c <= 154) return '☁️'
-  if (c >= 300 && c <= 399) return '🌧️'
-  if (c >= 400 && c <= 499) return '❄️'
-  if (c >= 500 && c <= 599) return '🌫️'
-  if (c >= 200 && c <= 299) return '⛈️'
-  return '☁️'
-}
 const formatFcDate = (dateStr) => {
   if (!dateStr) return ''
   const d = new Date(dateStr)
@@ -417,15 +411,6 @@ const loadWeatherDetail = async () => {
       const json = await res.json()
       if (json.code === 0 && json.data) weatherDetailData.value = json.data
     }
-  } catch (e) {}
-}
-
-const loadWeather = async () => {
-  try {
-    const res = await fetch('/api/public/weather')
-    if (!res.ok) return
-    const json = await res.json()
-    if (json.code === 0 && json.data) weather.value = json.data
   } catch (e) {}
 }
 
@@ -461,7 +446,6 @@ const loadAll = async () => {
 
 onMounted(() => {
   loadAll()
-  loadWeather()
   loadWeatherDetail()
   loadPoints()
   loadReminders()
@@ -624,6 +608,8 @@ onUnmounted(() => {
   color: #3A2E22;
   overflow: hidden;
   transition: box-shadow 0.3s ease, background-color 1s ease, border-color 1s ease, color 1s ease;
+  /* 隔离合层:backdrop-filter 不因子元素滚动而触发全页重绘 */
+  contain: layout style;
 }
 .draggable-panel:hover {
   box-shadow: 0 16px 48px rgba(58, 46, 34, 0.2), 0 4px 12px rgba(58, 46, 34, 0.1),
@@ -694,14 +680,22 @@ html.dark .resize-handle-left {
   flex: 1;
   overflow-y: auto;
   padding: 0 28px 24px;
+  transform: translateZ(0);
 }
 .feed-scroll::-webkit-scrollbar { width: 0; }
 .empty-hint {
   text-align: center;
-  padding: 30px 12px;
+  padding: 12px 12px;
   font-size: 14px;
   opacity: 0.5;
   font-style: italic;
+}
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 12px;
 }
 .feed-row {
   display: flex;
@@ -758,6 +752,7 @@ html.dark .resize-handle-left {
   flex: 1;
   overflow-y: auto;
   padding: 0 28px 24px;
+  transform: translateZ(0);
 }
 .task-scroll::-webkit-scrollbar { width: 0; }
 .task-row {
@@ -783,7 +778,7 @@ html.dark .resize-handle-left {
 
 /* === 天气面板 === */
 .weather-panel { text-align: center; }
-.weather-scroll { overflow-y: auto; max-height: 100%; }
+.weather-scroll { overflow-y: auto; max-height: 100%; transform: translateZ(0); }
 .weather-scroll::-webkit-scrollbar { width: 0; }
 .weather-main { padding: 4px 20px 12px; cursor: pointer; transition: background 0.2s; border-radius: 12px; }
 .weather-main:hover { background: rgba(255, 255, 255, 0.15); }
@@ -856,7 +851,7 @@ html.dark .resize-handle-left {
 }
 .wd-fc-card:hover { background: rgba(255, 255, 255, 0.5); transform: translateY(-2px); }
 .wd-fc-date { font-size: 11px; opacity: 0.6; }
-.wd-fc-icon { font-size: 20px; }
+.wd-fc-icon { font-size: 28px; }
 .wd-fc-temp { font-size: 12px; font-weight: 600; }
 .wd-fc-text { font-size: 10px; opacity: 0.6; text-align: center; }
 
@@ -917,6 +912,7 @@ html.dark .resize-handle-left {
   flex: 1;
   overflow-y: auto;
   padding: 0 28px 18px;
+  transform: translateZ(0);
 }
 .anni-scroll::-webkit-scrollbar { width: 0; }
 .anni-row {
@@ -954,6 +950,7 @@ html.dark .resize-handle-left {
   flex: 1;
   overflow-y: auto;
   padding: 0 24px 18px;
+  transform: translateZ(0);
 }
 .today-scroll::-webkit-scrollbar { width: 0; }
 .today-points {
