@@ -145,7 +145,7 @@ if (-not $BackendOnly) {
   if (-not (Test-Path $Temp)) { New-Item -ItemType Directory -Path $Temp | Out-Null }
   $distTar = Join-Path $Temp 'frontend-dist.tar.gz'
   if (Test-Path $distTar) { Remove-Item $distTar -Force }
-  & tar -czf $distTar -C $dist '.'
+  & tar --format=ustar -czf $distTar -C $dist '.'
   if ($LASTEXITCODE -ne 0) { Die '打包 dist 失败' }
   $tarSize = [math]::Round((Get-Item $distTar).Length / 1MB, 1)
   Write-Ok "前端 dist 打包完成 ($tarSize MB)"

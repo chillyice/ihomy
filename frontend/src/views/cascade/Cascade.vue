@@ -1,13 +1,11 @@
 <template>
   <div class="page cascade-page">
-    <h2 class="page-title">{{ $t('cascade.title') }}</h2>
-    <p class="page-sub">{{ $t('cascade.hint') }}</p>
-
     <div ref="stage" class="cascade-stage">
       <div
         v-for="c in cards"
         :key="c.key"
         class="leaf-wrap"
+        :class="{ fading: c.fading }"
         :style="cardStyle(c)"
       >
         <div
@@ -29,7 +27,9 @@
       </div>
     </div>
 
-    <el-empty v-if="!loading && !photos.length" :description="$t('cascade.empty')" />
+    <div v-if="!loading && !photos.length" class="cascade-empty">
+      <el-empty :description="$t('cascade.empty')" />
+    </div>
 
     <el-image-viewer
       v-if="viewerVisible"
@@ -76,9 +76,16 @@ const spawnCard = () => {
     rot: (Math.random() - 0.5) * 30,
     drift: (Math.random() - 0.5) * 120,
     hovered: false,
+    fading: false,
   }
   cards.value.push(card)
-  if (cards.value.length > 50) cards.value.shift()
+  if (cards.value.length > 20) {
+    const old = cards.value[0]
+    old.fading = true
+    setTimeout(() => {
+      cards.value = cards.value.filter(c => c !== old)
+    }, 1500)
+  }
 }
 
 const pauseCard = (c) => { c.hovered = true }
@@ -113,10 +120,10 @@ const load = async () => {
   }
   try {
     photos.value = await photoApi.cascade() || []
-    for (let i = 0; i < 8; i++) {
-      setTimeout(() => spawnCard(), i * 800)
+    for (let i = 0; i < 5; i++) {
+      setTimeout(() => spawnCard(), i * 1000)
     }
-    spawnTimer = setInterval(spawnCard, 2000)
+    spawnTimer = setInterval(spawnCard, 3000)
   } catch (e) {
     // 忽略
   } finally {
@@ -132,16 +139,16 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.cascade-page { min-height: 100vh; }
-.page-title { color: var(--color-text); margin-bottom: 4px; font-size: 18px; }
-.page-sub { color: var(--color-text-secondary); font-size: 13px; margin-bottom: 16px; }
+.cascade-page { min-height: 100vh; padding: 0; }
 
 .cascade-stage {
-  position: relative;
-  min-height: 80vh;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
   overflow: hidden;
-  border-radius: var(--radius);
-  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.02));
+  pointer-events: auto;
 }
 
 .leaf-wrap {
@@ -149,6 +156,13 @@ onBeforeUnmount(() => {
   top: -200px;
   animation: leaf-fall linear infinite;
   will-change: transform;
+}
+.leaf-wrap.fading .leaf-card {
+  animation: leaf-fade-out 1.5s ease forwards;
+}
+@keyframes leaf-fade-out {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
 }
 .leaf-card {
   border-radius: 8px;
@@ -201,4 +215,12 @@ onBeforeUnmount(() => {
 }
 .info-desc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .info-meta { display: flex; gap: 8px; opacity: 0.85; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
+
+.cascade-empty {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+}
 </style>

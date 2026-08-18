@@ -7,6 +7,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -15,6 +17,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import javax.imageio.ImageIO;
 
 /**
  * 文件存储(本地磁盘,V4.1 分类目录):
@@ -47,7 +50,9 @@ public class FileService {
 
     /** 相册图片上传:按相册名建子目录(相册名为空时平铺) */
     public String upload(byte[] bytes, String originalName, String contentType, Long albumId, String albumName) {
-        return saveTo(bytes, originalName, "pictures", albumName, albumId);
+        String url = saveTo(bytes, originalName, "pictures", albumName, albumId);
+        generateThumbIfImage(url, contentType);
+        return url;
     }
 
     /** 视频/海报上传:统一进 videos/ 平铺 */
@@ -61,12 +66,16 @@ public class FileService {
             return saveTo(file, originalName, "music", null, null);
         }
         String yyyyMM = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
-        return saveTo(file, originalName, "files", yyyyMM, null);
+        String url = saveTo(file, originalName, "files", yyyyMM, null);
+        generateThumbIfImage(url, contentType);
+        return url;
     }
 
     /** 相册图片上传(流式) */
     public String upload(MultipartFile file, String originalName, String contentType, Long albumId, String albumName) {
-        return saveTo(file, originalName, "pictures", albumName, albumId);
+        String url = saveTo(file, originalName, "pictures", albumName, albumId);
+        generateThumbIfImage(url, contentType);
+        return url;
     }
 
     /** 视频/海报上传(流式) */
@@ -84,6 +93,9 @@ public class FileService {
             Path target = root.resolve(rel).normalize();
             if (!target.startsWith(root)) return;   // URL 逃逸防御
             Files.deleteIfExists(target);
+            // 顺带删除缩略图(约定:原图 xxx.jpg → xxx_thumb.jpg)
+            Path thumb = thumbPath(target);
+            if (thumb != null) Files.deleteIfExists(thumb);
             Path parent = target.getParent();
             if (parent != null && !parent.equals(root)) {
                 Files.delete(parent);  // 尝试清空父目录(如已空的相册目录),失败忽略
@@ -161,5 +173,50 @@ public class FileService {
         String prefix = urlPrefix.replaceAll("/+$", "");
         String urlPath = prefix + "/" + root + (cleanSub == null ? "" : "/" + cleanSub) + "/" + fileName;
         return new String[]{ dirStr, fileName, urlPath };
+    }
+
+    /**
+     * 图片上传后生成缩略图(约定:原图 xxx.jpg → xxx_thumb.jpg,maxWidth 480px)。
+     * 列表/瀑布流用缩略图 URL,大图 viewer 用原图,省手机原图流量(单张可 5-10MB)。
+     * 失败仅告警(不影响上传主流程)。
+     */
+    private void generateThumbIfImage(String url, String contentType) {
+        if (contentType == null || !contentType.startsWith("image/")) return;
+        try {
+            Path root = Paths.get(uploadDir).toAbsolutePath().normalize();
+            String prefix = urlPrefix.replaceAll("/+$", "");
+            if (!url.startsWith(prefix + "/")) return;
+            String rel = url.substring(prefix.length()).replace('\\', '/').replaceFirst("^/+", "");
+            Path source = root.resolve(rel).normalize();
+            if (!source.startsWith(root) || !Files.exists(source)) return;
+            Path thumb = thumbPath(source);
+            if (thumb == null || Files.exists(thumb)) return;
+            BufferedImage src = ImageIO.read(source.toFile());
+            if (src == null) return;  // 非 ImageIO 可读图片(如 HEIC),跳过
+            int w = src.getWidth(), h = src.getHeight();
+            int maxW = 480;
+            if (w <= maxW) {
+                // 小图直接复制,不缩放
+                Files.copy(source, thumb, StandardCopyOption.REPLACE_EXISTING);
+                return;
+            }
+            int newH = Math.round(h * ((float) maxW / w));
+            BufferedImage dst = new BufferedImage(maxW, newH, BufferedImage.TYPE_INT_RGB);
+            Graphics2D g = dst.createGraphics();
+            g.drawImage(src, 0, 0, maxW, newH, null);
+            g.dispose();
+            ImageIO.write(dst, "jpg", thumb.toFile());
+        } catch (Exception e) {
+            log.warn("缩略图生成失败(忽略): {} | {}", url, e.toString());
+        }
+    }
+
+    /** 原图路径 → 缩略图路径(xxx.jpg → xxx_thumb.jpg);非图片返回 null */
+    private Path thumbPath(Path source) {
+        String name = source.getFileName().toString();
+        int dot = name.lastIndexOf('.');
+        if (dot < 0) return null;
+        String thumbName = name.substring(0, dot) + "_thumb.jpg";
+        return source.resolveSibling(thumbName);
     }
 }

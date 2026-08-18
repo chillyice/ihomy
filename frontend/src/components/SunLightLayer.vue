@@ -146,12 +146,12 @@ const {
 .blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(60px);
-  opacity: 0.4;
+  filter: blur(80px);
+  opacity: 0.25;
   will-change: transform;
   transition: opacity 1s ease, box-shadow 1s ease;
 }
-html.dark .blob { opacity: 0.1; }
+html.dark .blob { opacity: 0.08; }
 html.dark .blob-1 { box-shadow: 0 0 120px 40px rgba(120,200,160,0.4); }
 html.dark .blob-2 { box-shadow: 0 0 120px 40px rgba(200,180,100,0.4); }
 html.dark .blob-3 { box-shadow: 0 0 120px 40px rgba(200,160,140,0.4); }

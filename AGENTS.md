@@ -377,6 +377,44 @@ ALTER TABLE content_blog   ADD INDEX idx_family_status_created (family_id, statu
 ALTER TABLE content_diary  ADD INDEX idx_family_created (family_id, deleted, created_at);
 ```
 
+#### 2026-08-18 UX 体验优化记录
+
+> 两轮共 15 项,均通过 37 passed + 前端 build 零回归。
+
+| 类别 | 文件 | 改动 |
+|------|------|------|
+| Bug | `RecipeDetail.vue:125` | `userStore.user?.id` → `userInfo.id`(非 OWNER 作者无法编辑自己菜谱) |
+| Bug | `AlbumDetail.vue` | 补 `loading` ref(原 v-loading 引用未定义变量)+ load try/catch(失败显示错误态+重试,不再伪装空相册) |
+| 照片 | `AlbumDetail.vue` | 点击照片全屏大图预览(el-image-viewer,翻页/缩放),与 Cascade/Home 一致 |
+| 照片 | `AlbumDetail.vue` + `api/index.js` | 上传进度条(el-progress)+ 按钮 loading + `photoApi.upload` 透传 `onUploadProgress` |
+| 照片 | `AlbumDetail.vue` / `Ingredient.vue` | hover-only 操作改 `@media (hover: none)` 常显(PWA 安卓/iOS 触屏之前完全无法编辑/删除) |
+| 照片 | `Cascade.vue` | img 加 `loading="lazy"`;空态加"去相册上传"CTA |
+| 性能 | `FileService.java` | 图片上传后生成缩略图(`_thumb.jpg`,maxWidth 480px);`deleteByUrl` 顺带删 _thumb;存量图前端 onerror 回退原图 |
+| 性能 | `utils/image.js` + 4 页面 | `thumbUrl(url)`/`onThumbError` 工具;AlbumDetail/Cascade/Home/DiaryList 列表用缩略图,大图 viewer 用原图(省手机原图 5-10MB 流量) |
+| 移动端 | `Home.vue` | `@media (max-width:960px)` 5 面板从 `display:none` 改 `position:static` 文档流堆叠(手机之前看不到任何面板) |
+| UX | `BlogDetail.vue` | 评论删除加确认框(此前直接删) |
+| UX | `Plan.vue` | 子任务删除加确认框 |
+| UX | `Settings.vue:65` | "取消"按钮改"清除"文案(此前按钮删标签却写"取消") |
+| UX | `Item.vue` | 补 Breadcrumb + 标题 + v-loading(此前全站唯一"裸"页) |
+| UX | `Member.vue` | 邀请码一键复制(navigator.clipboard + 成功/失败提示) |
+| UX | `Album.vue`/`DiaryList.vue`/`Kitchen.vue` | 保存按钮 :loading;DiaryList/Kitchen 补 v-loading(首屏空白闪烁) |
+
+**缩略图约定**(前后端对齐):
+- 后端 `FileService.generateThumbIfImage`:上传图片时同步生成 `原图名_thumb.jpg`(maxWidth 480,JPEG 0.8),小图(≤480px)直接复制;非 image/* 跳过;失败仅告警不影响上传。
+- 前端 `utils/image.js`:`thumbUrl(url)` 仅对 `/files/` 路径插入 `_thumb`(外链原样返回);`onThumbError` 回退原图(存量图片无缩略图时兜底)。
+- 大图查看器(el-image-viewer)始终用原图 URL。
+- live DB 无需同步(纯文件层,无 schema 变更)。
+
+#### 2026-08-18 i18n + 分页 + 图片预览(第三轮)
+
+| 类别 | 文件 | 改动 |
+|------|------|------|
+| 图片 | `DiaryList.vue` | 图片预览从 `window.open` 新标签改为应用内 `el-image-viewer`(翻页/缩放,与 AlbumDetail/Cascade 一致) |
+| 分页 | `BlogList.vue` | 加"加载更多"按钮(原固定 20 条截断,旧文章不可达);博客封面用 `thumbUrl` 缩略图 |
+| i18n | `Home.vue` | 25+ 硬编码中文改 `$t()`(家庭相册/写博客/天气加载/未来三天/积分/签到/分钟前/小时前/任务状态/星期等);脚本内 `feedTypeLabel`/`testPhase`/`feedSummary`/`formatTime`/`taskStatusLabel`/`formatFcDate` 全部走 `t()` |
+| i18n | `Settings.vue` | 40+ 硬编码中文改 `$t()`(歌单/创建家庭/个性化设置整段:台灯/色温/亮度/阴影/天气效果/天气地区/关灯超时/面板布局) |
+| i18n | `zh-CN.js`/`en.js` | 新增 `home.*` 35 key + `settings.*` 35 key(中英双语) |
+
 ## 文件存储策略
 
 - **当前阶段(开发期)**:本地磁盘存储(`file.upload-dir`),零成本零内存,FileService 已实现,开箱即用。Nginx `/files/` 托管静态目录(注意负向断言正则 `location ~* ^/(?!files/).+\.(...)$` 排除 /files/)。
