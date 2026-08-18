@@ -556,6 +556,7 @@ const createNewFamily = async () => {
     const { value } = await ElMessageBox.prompt('请输入新家庭名称', '创建新家庭', {
       confirmButtonText: '创建',
       cancelButtonText: '取消',
+      showClose: true,
       inputPattern: /.+/,
       inputErrorMessage: '家庭名称不能为空',
     })
@@ -623,11 +624,11 @@ onMounted(load)
 
 <style scoped>
 .settings-layout { display: flex; gap: 16px; align-items: flex-start; }
-.settings-side { width: 180px; flex-shrink: 0; }
+.settings-side { width: 180px; flex-shrink: 0; background: var(--color-card); border-radius: var(--radius); border: 1px solid var(--color-border); box-shadow: var(--shadow), var(--shadow-inset); padding: 8px; }
 .settings-menu { border-right: none; border-radius: 10px; overflow: hidden; }
 .menu-icon { margin-right: 8px; }
 .settings-body { flex: 1; min-width: 0; }
-.settings-card { margin-bottom: 16px; }
+.settings-card { margin-bottom: 16px; background: var(--color-card); }
 .settings-card h2 { color: var(--color-primary); margin-bottom: 16px; font-size: 17px; }
 .label-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .form-tip { color: var(--color-text-2); font-size: 12px; margin-left: 12px; }

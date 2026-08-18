@@ -4,7 +4,7 @@
     <Breadcrumb :items="[{ label: $t('blog.title') }]" />
     <div class="list-header">
       <h2>{{ $t('blog.title') }}</h2>
-      <el-button v-if="userStore.isLoggedIn" type="primary" @click="$router.push('/blog/edit')">{{ $t('blog.newPost') }}</el-button>
+      <el-button v-if="userStore.isLoggedIn" type="primary" @click="router.push('/blog/edit')">{{ $t('blog.newPost') }}</el-button>
     </div>
     <div class="blog-layout">
       <aside v-if="categories.length" class="category-side">
@@ -19,7 +19,7 @@
         >{{ c }}</div>
       </aside>
       <div v-loading="loading" class="blog-main">
-        <div v-for="b in list" :key="b.id" class="blog-item card" @click="$router.push(`/blog/${b.id}`)">
+        <div v-for="b in list" :key="b.id" class="blog-item card" @click="router.push(`/blog/${b.id}`)">
           <img v-if="b.coverImage" :src="b.coverImage" class="blog-cover" />
           <div class="blog-info">
             <div class="blog-title">{{ b.title }}</div>
@@ -40,10 +40,12 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { blogApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 
+const router = useRouter()
 const userStore = useUserStore()
 const list = ref([])
 const categories = ref([])

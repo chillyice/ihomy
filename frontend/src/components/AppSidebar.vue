@@ -42,6 +42,10 @@
         <span class="foot-btn" :class="{ 'lamp-on': lampMode !== 'off', 'lamp-off': lampMode === 'off' }" :title="'台灯:' + (lampMode === 'auto' ? '自动' : lampMode === 'on' ? '常开' : '关闭')" @click="toggleLamp">
           {{ lampMode === 'auto' ? '🌑' : lampMode === 'on' ? '💡' : '⬛' }}
         </span>
+        <!-- 光影效果开关 -->
+        <span class="foot-btn" :class="{ 'lamp-on': sunLight?.shadowEnabled?.value }" :title="sunLight?.shadowEnabled?.value ? '光影效果:开' : '光影效果:关'" @click="toggleLightEffect">
+          {{ sunLight?.shadowEnabled?.value ? '☀' : '☁' }}
+        </span>
         <span class="foot-btn" title="语言" @click="onLang">
           {{ locale === 'en' ? 'EN' : '中' }}
         </span>
@@ -122,6 +126,12 @@ const { locale, t } = useI18n()
 // 注入全局光影状态(与 SunLightLayer 共享同一实例);导航栏只用台灯开关,其余设置在 Settings 页
 const sunLight = inject(SUN_LIGHT_KEY)
 const { lampMode, toggleLamp } = sunLight || {}
+const toggleLightEffect = () => {
+  if (sunLight?.shadowEnabled) {
+    sunLight.shadowEnabled.value = !sunLight.shadowEnabled.value
+    localStorage.setItem('ihomy:light:shadow', String(sunLight.shadowEnabled.value))
+  }
+}
 
 const collapsed = ref(false)
 const theme = ref(loadTheme())
@@ -157,21 +167,22 @@ const navModules = computed(() => {
   return list.sort((a, b) => a.sortOrder - b.sortOrder)
 })
 
-// 按 category 分组
+// 按 category 分组(相册合并到内容分组)
 const groupedModules = computed(() => {
   const groups = {}
   for (const m of navModules.value) {
-    if (!groups[m.category]) groups[m.category] = []
-    groups[m.category].push(m)
+    const cat = m.category === 'album' ? 'content' : m.category
+    if (!groups[cat]) groups[cat] = []
+    groups[cat].push(m)
   }
-  const order = ['content', 'album', 'life', 'social', 'system']
+  const order = ['content', 'life', 'social', 'system']
   return order
     .filter(c => groups[c] && groups[c].length)
     .map(c => ({ category: c, modules: groups[c] }))
 })
 
 const categoryLabel = (cat) => ({
-  content: '内容', album: '相册', life: '生活', social: '成员', system: '系统',
+  content: '内容', life: '生活', social: '成员', system: '系统',
 }[cat] || '功能')
 
 const isActive = (path) => {
@@ -367,7 +378,9 @@ html.dark .nav-item.active {
   font-size: 18px;
   flex-shrink: 0;
   width: 24px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .nav-text {
   font-size: 14px;

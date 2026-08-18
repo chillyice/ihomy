@@ -1,8 +1,10 @@
-<!-- 悬浮音乐播放器:黑胶可视化+歌曲名+歌单+播放/暂停/切歌+进度条,右下角固定 -->
+<!-- 悬浮音乐播放器:整体可拖拽,展开/收缩带动画,左下角不动 -->
 <template>
-  <div v-if="playlist.length" class="music-player" :class="{ expanded }">
+  <div v-if="playlist.length" class="music-player" :class="{ expanded }"
+    :style="{ left: pos.x + 'px', bottom: pos.bottom + 'px' }"
+    @mousedown="onDragStart">
     <!-- 黑胶可视化 + 展开切换 -->
-    <div class="player-left" @click="expanded = !expanded">
+    <div class="player-left" @click.stop="expanded = !expanded">
       <div class="vinyl" :class="{ playing }">
         <div class="vinyl-disc">
           <div class="vinyl-groove"></div>
@@ -12,8 +14,9 @@
       </div>
     </div>
 
-    <!-- 展开内容:歌名+控件+进度条+歌单 -->
-    <div v-if="expanded" class="player-body">
+    <!-- 展开内容:歌名+控件+进度条+歌单(带收缩动画) -->
+    <transition name="player-expand">
+      <div v-show="expanded" class="player-body" @click.stop>
       <div class="track-info">
         <div class="track-title" :title="currentTrack.title">{{ currentTrack.title || '未知曲目' }}</div>
         <div class="track-sub">{{ playing ? '正在播放' : '已暂停' }}</div>
@@ -55,7 +58,8 @@
           <el-icon v-if="i === trackIdx && playing" class="pl-playing"><VideoPlay /></el-icon>
         </div>
       </div>
-    </div>
+      </div>
+    </transition>
 
     <audio
       ref="audioEl"
@@ -85,6 +89,44 @@ const showList = ref(false)
 const currentTime = ref(0)
 const duration = ref(0)
 const buffered = ref(0)
+
+// 拖拽位置(bottom 定位,左下角不动)
+const pos = ref({ x: 240, bottom: 24 })
+try {
+  const saved = JSON.parse(localStorage.getItem('ihomy:music:pos') || 'null')
+  if (saved && saved.x !== undefined) pos.value = saved
+} catch (e) {}
+
+const onDragStart = (e) => {
+  const tag = e.target.tagName
+  if (tag === 'BUTTON' || tag === 'AUDIO' || tag === 'INPUT' || tag === 'svg' || tag === 'path') return
+  const startX = e.clientX - pos.value.x
+  const startBottom = window.innerHeight - e.clientY - pos.value.bottom
+  let moved = false
+  const onMove = (ev) => {
+    const dx = ev.clientX - startX - pos.value.x
+    const dy = (window.innerHeight - ev.clientY - startBottom) - pos.value.bottom
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true
+    let x = ev.clientX - startX
+    let bottom = window.innerHeight - ev.clientY - startBottom
+    x = Math.max(8, Math.min(window.innerWidth - 80, x))
+    bottom = Math.max(8, Math.min(window.innerHeight - 80, bottom))
+    pos.value = { x, bottom }
+  }
+  const onUp = (ev) => {
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+    if (moved) {
+      ev.stopPropagation()
+      ev.preventDefault()
+      const blocker = (e) => { e.stopPropagation(); e.preventDefault(); document.removeEventListener('click', blocker, true) }
+      document.addEventListener('click', blocker, true)
+      localStorage.setItem('ihomy:music:pos', JSON.stringify(pos.value))
+    }
+  }
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+}
 
 const currentTrack = computed(() => playlist.value[trackIdx.value] || {})
 const playedPct = computed(() => duration.value ? (currentTime.value / duration.value) * 100 : 0)
@@ -177,8 +219,6 @@ onMounted(loadPlaylist)
 <style scoped>
 .music-player {
   position: fixed;
-  right: 24px;
-  bottom: 24px;
   z-index: 60;
   display: flex;
   align-items: flex-end;
@@ -191,11 +231,12 @@ onMounted(loadPlaylist)
   box-shadow: 0 12px 40px rgba(58, 46, 34, 0.18), 0 2px 8px rgba(58, 46, 34, 0.08),
               inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -1px 0 rgba(58, 46, 34, 0.04);
   overflow: hidden;
-  transition: width 0.3s ease, height 0.3s ease;
+  cursor: grab;
   user-select: none;
   contain: layout style;
   transform: translateZ(0);
 }
+.music-player:active { cursor: grabbing; }
 html.dark .music-player {
   background: rgba(30, 40, 65, 0.65);
   border-color: rgba(255, 255, 255, 0.12);
@@ -205,9 +246,10 @@ html.dark .music-player {
 
 .player-left {
   padding: 12px;
-  cursor: pointer;
+  cursor: grab;
   flex-shrink: 0;
 }
+.player-left:active { cursor: grabbing; }
 
 /* 黑胶可视化 */
 .vinyl {
@@ -438,7 +480,27 @@ html.dark .playlist-item.active {
 
 /* 移动端 */
 @media (max-width: 768px) {
-  .music-player { right: 12px; bottom: 12px; }
   .player-body { width: 240px; }
+}
+
+/* 展开/收缩动画:以左下角为锚点,body 从右侧长出/缩回 */
+.player-expand-enter-active,
+.player-expand-leave-active {
+  transform-origin: left bottom;
+  overflow: hidden;
+  animation: player-expand 0.35s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.player-expand-leave-active {
+  animation-direction: reverse;
+}
+@keyframes player-expand {
+  0% { opacity: 0; transform: scaleX(0); width: 0; }
+  100% { opacity: 1; transform: scaleX(1); width: 280px; }
+}
+@media (max-width: 768px) {
+  @keyframes player-expand {
+    0% { opacity: 0; transform: scaleX(0); width: 0; }
+    100% { opacity: 1; transform: scaleX(1); width: 240px; }
+  }
 }
 </style>

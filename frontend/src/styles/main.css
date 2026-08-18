@@ -136,17 +136,25 @@ a { color: var(--color-accent); text-decoration: none; }
   .el-button:not(.is-link):not(.el-button--small):not(.is-circle) { min-height: 44px; }
 }
 
-/* === ElMessage 弹出框 UI 增强 === */
+/* === ElMessage 弹出框 UI 增强(右上角,不被导航栏遮挡) === */
 .el-message {
-  border-radius: 12px !important;
-  padding: 14px 20px !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  border-radius: 10px !important;
+  padding: 10px 16px !important;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06) !important;
   backdrop-filter: blur(20px) saturate(1.4);
   -webkit-backdrop-filter: blur(20px) saturate(1.4);
   border: 1px solid rgba(255, 255, 255, 0.3) !important;
-  font-size: 14px !important;
+  font-size: 13px !important;
   font-weight: 500 !important;
-  min-width: 200px !important;
+  min-width: auto !important;
+  max-width: 320px !important;
+  z-index: 3000 !important;
+}
+.el-message:not(.is-center) {
+  top: 20px !important;
+  right: 24px !important;
+  left: auto !important;
+  transform: none !important;
 }
 .el-message--success {
   background: rgba(76, 175, 80, 0.92) !important;
@@ -175,6 +183,116 @@ a { color: var(--color-accent); text-decoration: none; }
   -webkit-backdrop-filter: blur(20px) saturate(1.4);
   border: 1px solid rgba(255, 255, 255, 0.2) !important;
 }
+
+/* === ElMessageBox 弹框 — ihomy 风格 === */
+.el-overlay.is-message-box {
+  background: rgba(58, 46, 34, 0.28) !important;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding-top: 18vh !important;
+}
+.el-overlay.is-message-box .el-message-box {
+  border-radius: 14px !important;
+  box-shadow: 0 24px 64px rgba(58, 46, 34, 0.22), 0 6px 20px rgba(58, 46, 34, 0.12) !important;
+  border: none !important;
+  background: #FAF6EC !important;
+  padding: 0 !important;
+  max-width: 380px !important;
+  min-width: 320px !important;
+  overflow: hidden !important;
+}
+html.dark .el-overlay.is-message-box .el-message-box {
+  background: #1E2A48 !important;
+}
+.el-message-box__header {
+  padding: 18px 22px 14px !important;
+  margin: 0 !important;
+  border: none !important;
+  position: relative !important;
+}
+.el-message-box__header::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  background: var(--color-accent);
+}
+.el-message-box__title {
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  color: var(--color-primary) !important;
+}
+.el-message-box__content {
+  padding: 4px 22px 20px !important;
+  font-size: 14px !important;
+  color: var(--color-text) !important;
+  line-height: 1.75 !important;
+}
+.el-message-box__status {
+  font-size: 18px !important;
+  margin-right: 12px !important;
+  padding: 6px !important;
+  border-radius: 50% !important;
+  transform: none !important;
+  top: 0 !important;
+}
+.el-message-box__status.el-message-box-icon--warning {
+  background: rgba(255, 193, 7, 0.18) !important;
+  color: #E09800 !important;
+}
+.el-message-box__status.el-message-box-icon--success {
+  background: rgba(76, 175, 80, 0.18) !important;
+  color: #2E7D32 !important;
+}
+.el-message-box__status.el-message-box-icon--error {
+  background: rgba(244, 67, 54, 0.18) !important;
+  color: #C62828 !important;
+}
+.el-message-box__status.el-message-box-icon--info {
+  background: rgba(58, 46, 34, 0.12) !important;
+  color: var(--color-text-secondary) !important;
+}
+html.dark .el-message-box__status.el-message-box-icon--warning { color: #FFC107 !important; }
+html.dark .el-message-box__status.el-message-box-icon--success { color: #66BB6A !important; }
+html.dark .el-message-box__status.el-message-box-icon--error { color: #EF5350 !important; }
+html.dark .el-message-box__status.el-message-box-icon--info { color: #B0A898 !important; }
+.el-message-box__headerbtn {
+  top: 14px !important;
+  right: 14px !important;
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 6px !important;
+  transition: background 0.2s !important;
+}
+.el-message-box__headerbtn:hover { background: rgba(168, 72, 58, 0.1) !important; }
+.el-message-box__headerbtn .el-message-box__close {
+  font-size: 16px !important;
+  color: var(--color-text-secondary) !important;
+}
+.el-message-box__btns {
+  padding: 12px 22px 16px !important;
+  border-top: 1px solid var(--color-border) !important;
+  margin: 0 !important;
+}
+.el-message-box__btns .el-button {
+  border-radius: 8px !important;
+  padding: 8px 20px !important;
+  font-weight: 500 !important;
+  font-size: 13px !important;
+}
+.el-message-box__btns .el-button--primary {
+  background: var(--color-accent) !important;
+  border-color: var(--color-accent) !important;
+}
+.el-message-box__btns .el-button--primary:hover {
+  background: #C2544A !important;
+  border-color: #C2544A !important;
+}
+.el-message-box__input { margin-top: 12px !important; }
+.el-message-box__input .el-input__wrapper { border-radius: 8px !important; }
 
 
 /* 台灯钟摆运动:8s 周期 ease-in-out 近似 sin 波,scaleX 在峰值时收缩 0.8。

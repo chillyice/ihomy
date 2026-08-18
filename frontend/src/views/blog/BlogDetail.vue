@@ -3,18 +3,7 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('blog.title'), to: '/blog' }, { label: blog?.title || $t('blog.detail') }]" />
     <div v-if="blog" class="blog-layout">
-      <!-- 目录导航:sticky 固定,从 Markdown 标题提取 -->
-      <aside v-if="toc.length" class="toc-aside">
-        <nav class="toc">
-          <div class="toc-title">目录</div>
-          <ul>
-            <li v-for="h in toc" :key="h.id" :class="'toc-l' + h.level">
-              <a :href="'#' + h.id" @click.prevent="scrollTo(h.id)">{{ h.text }}</a>
-            </li>
-          </ul>
-        </nav>
-      </aside>
-
+      <!-- 正文卡片:居中 -->
       <div class="card detail">
         <h1>{{ blog.title }}</h1>
         <div class="meta">
@@ -34,6 +23,18 @@
           </el-button>
         </div>
       </div>
+
+      <!-- 目录导航:右侧 sticky -->
+      <aside v-if="toc.length" class="toc-aside">
+        <nav class="toc">
+          <div class="toc-title">目录</div>
+          <ul>
+            <li v-for="h in toc" :key="h.id" :class="'toc-l' + h.level">
+              <a :href="'#' + h.id" :class="{ active: activeHeading === h.id }" @click.prevent="scrollTo(h.id)">{{ h.text }}</a>
+            </li>
+          </ul>
+        </nav>
+      </aside>
     </div>
 
     <div v-if="blog" class="card comments">
@@ -93,7 +94,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { blogApi, likeApi, commentApi } from '@/api'
 import { useUserStore } from '@/stores/user'
@@ -116,6 +117,7 @@ const submitting = ref(false)
 const likeState = ref({ liked: false, likeCount: 0 })
 const contentRef = ref(null)
 const toc = ref([])
+const activeHeading = ref('')
 
 // 标签字符串按逗号拆分
 const tagList = computed(() =>
@@ -159,8 +161,32 @@ const scrollTo = (id) => {
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-// 博客内容变化后提取目录
-watch(renderedContent, extractToc)
+// 博客内容变化后提取目录 + 初始化 scroll spy
+watch(renderedContent, () => {
+  extractToc()
+  nextTick(() => initScrollSpy())
+})
+
+// Scroll spy:监听滚动高亮当前章节
+let spyObserver = null
+const initScrollSpy = () => {
+  if (spyObserver) spyObserver.disconnect()
+  if (!toc.value.length) return
+  const headings = toc.value.map(h => document.getElementById(h.id)).filter(Boolean)
+  if (!headings.length) return
+  spyObserver = new IntersectionObserver(
+    (entries) => {
+      const visible = entries.filter(e => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
+      if (visible.length) activeHeading.value = visible[0].target.id
+    },
+    { rootMargin: '-80px 0px -70% 0px', threshold: 0 }
+  )
+  headings.forEach(h => spyObserver.observe(h))
+}
+
+onBeforeUnmount(() => {
+  if (spyObserver) spyObserver.disconnect()
+})
 
 // 删除权限:家长或评论作者本人
 const canDelete = (c) =>
@@ -287,7 +313,7 @@ onMounted(loadAll)
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.toc a:hover { background: rgba(168, 72, 58, 0.08); color: var(--color-accent); }
+.toc a:hover, .toc a.active { background: rgba(168, 72, 58, 0.12); color: var(--color-accent); font-weight: 600; }
 .toc-l2 { padding-left: 0; }
 .toc-l3 { padding-left: 12px; }
 .toc-l4 { padding-left: 24px; }
@@ -308,11 +334,13 @@ onMounted(loadAll)
 .markdown-body h2 { font-size: 20px; margin: 22px 0 14px; border-bottom: 1px solid var(--color-border); padding-bottom: 6px; }
 .markdown-body h3 { font-size: 17px; margin: 20px 0 12px; }
 .markdown-body h4 { font-size: 15px; margin: 18px 0 10px; }
-/* 段落:段落间距(最大) */
-.markdown-body p { margin: 28px 0; }
-/* ul/ol 加大缩进,避免贴边 */
-.markdown-body ul, .markdown-body ol { margin: 22px 0; padding-left: 32px; }
-.markdown-body li { margin: 8px 0; }
+/* 段落:段落间距(最大),拉大阅读呼吸感 */
+.markdown-body p { margin: 36px 0; }
+/* ul/ol 加大缩进,凸显列表子内容的层级 */
+.markdown-body ul, .markdown-body ol { margin: 24px 0; padding-left: 44px; }
+.markdown-body li { margin: 10px 0; }
+/* 粗体列表项(- **xx**)额外缩进 */
+.markdown-body li > strong:first-child { display: inline-block; margin-left: 8px; }
 .markdown-body blockquote { margin: 24px 0; padding: 10px 18px; border-left: 4px solid var(--color-accent); background: rgba(168,72,58,0.05); color: var(--color-text-secondary); border-radius: 0 8px 8px 0; }
 .markdown-body code { background: rgba(58,46,34,0.08); padding: 2px 6px; border-radius: 4px; font-size: 13px; font-family: 'Consolas', 'Monaco', monospace; }
 .markdown-body pre { background: rgba(58,46,34,0.06); padding: 14px 18px; border-radius: 8px; overflow-x: auto; margin: 14px 0; }
@@ -322,7 +350,7 @@ onMounted(loadAll)
 .markdown-body th { background: rgba(58,46,34,0.05); font-weight: 600; }
 .markdown-body img { max-width: 100%; border-radius: 8px; margin: 14px 0; }
 .markdown-body a { color: var(--color-accent); text-decoration: underline; }
-.markdown-body hr { border: none; border-top: 1px solid var(--color-border); margin: 22px 0; }
+.markdown-body hr { border: none; border-top: 1px solid var(--color-border); margin: 40px 0; }
 
 .like-bar { margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(31, 58, 95, 0.08); }
 .comments { margin-top: 16px; }

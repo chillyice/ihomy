@@ -1,4 +1,4 @@
-<!-- 面包屑导航:首页 + 传入的分级项,带 path 的项可点击跳转 -->
+<!-- 面包屑导航:首页 + 传入的分级项,带 to/path 的项可点击跳转 -->
 <template>
   <nav class="breadcrumb">
     <router-link to="/" class="crumb-link">
@@ -7,7 +7,7 @@
     </router-link>
     <template v-for="(it, i) in items" :key="i">
       <span class="sep">/</span>
-      <router-link v-if="it.path" :to="it.path" class="crumb-link">{{ it.label }}</router-link>
+      <router-link v-if="it.to || it.path" :to="it.to || it.path" class="crumb-link">{{ it.label }}</router-link>
       <span v-else class="crumb-current">{{ it.label }}</span>
     </template>
   </nav>
