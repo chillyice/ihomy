@@ -47,6 +47,7 @@ public class MemberController {
     public Result<Void> setRole(@PathVariable Long userId, @RequestBody RoleDTO dto) {
         SysUser user = securityHelper.currentUser();
         memberService.setRole(user.getFamilyId(), userId, dto.getRoleCode());
+        securityHelper.invalidatePerms(userId, user.getFamilyId());
         return Result.success();
     }
 
@@ -57,6 +58,7 @@ public class MemberController {
     public Result<Void> remove(@PathVariable Long userId) {
         SysUser user = securityHelper.currentUser();
         memberService.removeMember(user.getId(), user.getFamilyId(), userId);
+        securityHelper.invalidatePerms(userId, user.getFamilyId());
         return Result.success();
     }
 

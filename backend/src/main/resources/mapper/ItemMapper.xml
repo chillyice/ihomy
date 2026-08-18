@@ -6,6 +6,10 @@
         SELECT i.id, i.family_id, i.name,
                IFNULL(i.aliases,'')   AS aliases,
                IFNULL(i.position,'')  AS position,
+               IFNULL(i.image_url,'') AS image_url,
+               IFNULL(i.type,'OTHER') AS type,
+               i.quantity,
+               IFNULL(i.unit,'')      AS unit,
                IFNULL(i.note,'')      AS note,
                i.created_by, i.created_at, i.updated_at,
                r.id        AS room_id,
@@ -15,10 +19,13 @@
                f.name      AS furniture_name,
                h.name      AS house_name
         FROM family_item i
-                 JOIN family_furniture f ON i.furniture_id = f.id
-                 JOIN family_room r ON f.room_id = r.id
-                 JOIN family_house h ON r.house_id = h.id
+                 LEFT JOIN family_furniture f ON i.furniture_id = f.id
+                 LEFT JOIN family_room r ON f.room_id = r.id
+                 LEFT JOIN family_house h ON r.house_id = h.id
         WHERE i.family_id = #{familyId}
+        <if test="type != null and type != ''">
+            AND i.type = #{type}
+        </if>
         <if test="roomId != null">
             AND r.id = #{roomId}
         </if>

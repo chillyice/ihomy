@@ -1,6 +1,7 @@
 package com.ihomy.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.Result;
 import com.ihomy.common.ResultCode;
@@ -22,12 +23,15 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -37,12 +41,20 @@ import java.util.Map;
  * 公开访问接口:首页聚合与动态流。
  * 家庭定位优先级 hid(混淆 share_token) > home_id > 当前家庭/默认演示家庭;
  * 非成员仅能读到公开内容,私有家庭一律 NOT_FOUND。
+ *
+ * 性能:/public/home 每访客最多 7 次 DB(family+modules+photos+stats×3+currentUser),
+ * 整包按 familyId 缓存到 Redis 5min,模块/相册/家庭设置变更时主动失效。
+ * 缓存 key 形式:ihomy:home:pub:{familyId}(只缓存非成员视图,成员视图数据更敏感不缓存)
  */
+@Slf4j
 @Tag(name = "公开访问")
 @RestController
 @RequestMapping("/public")
 @RequiredArgsConstructor
 public class PublicController {
+
+    private static final Duration HOME_TTL = Duration.ofMinutes(5);
+    private static final String KEY_HOME_PUBLIC = "ihomy:home:pub:";
 
     private final FamilyMapper familyMapper;
     private final HomeModuleMapper homeModuleMapper;
@@ -54,6 +66,8 @@ public class PublicController {
     private final MultiFamilyService multiFamilyService;
     private final WeatherService weatherService;
     private final SunService sunService;
+    private final StringRedisTemplate redis;
+    private final ObjectMapper mapper;
 
     @Operation(summary = "太阳信息(IP 定位日出日落 + 96 时隙太阳位置,可选 date=YYYY-MM-DD 模拟任意日期)")
     @GetMapping("/sun-info")
@@ -115,6 +129,34 @@ public class PublicController {
             }
         }
 
+        // 非成员视图(访客):走整包 Redis 缓存,5min TTL,模块/相册/家庭设置变更时主动失效
+        if (!member) {
+            String key = KEY_HOME_PUBLIC + familyId;
+            try {
+                String cached = redis.opsForValue().get(key);
+                if (cached != null) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> data = mapper.readValue(cached, Map.class);
+                    return Result.success(data);
+                }
+            } catch (Exception e) {
+                log.warn("read home cache failed fid={}, fallback to DB", familyId, e);
+            }
+            Map<String, Object> data = buildHomeData(family, member, familyId);
+            try {
+                redis.opsForValue().set(key, mapper.writeValueAsString(data), HOME_TTL);
+            } catch (Exception e) {
+                log.warn("write home cache failed fid={}", familyId, e);
+            }
+            return Result.success(data);
+        }
+
+        // 成员视图:不缓存(数据敏感 + 频繁更新),直接组装
+        return Result.success(buildHomeData(family, member, familyId));
+    }
+
+    /** 组装首页聚合数据:family + isMember + modules + photos + stats */
+    private Map<String, Object> buildHomeData(Family family, boolean member, Long familyId) {
         Map<String, Object> data = new HashMap<>();
         data.put("family", family);
         data.put("isMember", member);
@@ -135,8 +177,14 @@ public class PublicController {
             data.put("photos", photoMapper.selectLatestPublicByFamily(familyId, 20));
             data.put("stats", new HashMap<String, Object>());
         }
+        return data;
+    }
 
-        return Result.success(data);
+    /** 失效某家庭的公开首页缓存(供模块/相册/家庭设置变更时调用) */
+    public void invalidateHomeCache(Long familyId) {
+        if (familyId != null) {
+            redis.delete(KEY_HOME_PUBLIC + familyId);
+        }
     }
 
     @Operation(summary = "公开动态流（支持 ?hid= 混淆ID / ?home_id= 指定家庭）")

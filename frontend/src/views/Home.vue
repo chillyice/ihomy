@@ -260,7 +260,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, inject, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, inject, nextTick, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
@@ -332,15 +332,16 @@ const recentPhotos = computed(() => {
     .filter(p => p.createdAt && now - new Date(p.createdAt).getTime() < SEVEN_DAYS)
     .slice(0, 7)
 })
-// 拍立得随机姿态:一次性生成,进首页重新撒
-const polaroidLayout = computed(() =>
-  recentPhotos.value.map((p, i) => ({
+// 拍立得随机姿态:每次 recentPhotos 变化时重新生成一次,而非 computed 内每次访问都重算(否则视觉跳动)
+const polaroidLayout = ref([])
+watch(recentPhotos, (ps) => {
+  polaroidLayout.value = ps.map((p, i) => ({
     rotate: (Math.random() - 0.5) * 30,
     dx: (Math.random() - 0.5) * 240,
     dy: (Math.random() - 0.5) * 120,
     z: i + 1,
   }))
-)
+}, { immediate: true })
 const viewerUrls = computed(() => recentPhotos.value.map(p => p.url))
 const openViewer = (idx) => { viewerIdx.value = idx; viewerVisible.value = true }
 
@@ -418,30 +419,33 @@ const homeId = computed(() => route.query.home_id || '')
 const hid = computed(() => route.query.hid || '')
 
 const loadAll = async () => {
-  let photos = []
-  try {
-    const pub = await publicApi.getHome(homeId.value || undefined, hid.value || undefined)
-    family.value = pub.family || {}
-    photos = pub.photos || []
-    const stats = pub.stats || {}
-    anniversaries.value = stats.upcomingEvents || []
-  } catch (e) {}
-  try {
-    feeds.value = hid.value
-      ? await publicApi.getFeed(20, undefined, hid.value)
-      : homeId.value
-        ? await publicApi.getFeed(20, homeId.value)
-        : userStore.isGuest
-          ? await publicApi.getFeed(20)
-          : await homeApi.getFeed(20)
-  } catch (e) { feeds.value = [] }
+  // 三类请求并行发起,各自容错;不再串行 await(原版每等一个 RTT)
+  const homePromise = publicApi.getHome(homeId.value || undefined, hid.value || undefined)
+    .then(pub => {
+      family.value = pub.family || {}
+      anniversaries.value = (pub.stats || {}).upcomingEvents || []
+      return pub.photos || []
+    })
+    .catch(() => [])
+
+  const feedPromise = (hid.value
+    ? publicApi.getFeed(20, undefined, hid.value)
+    : homeId.value
+      ? publicApi.getFeed(20, homeId.value)
+      : userStore.isGuest
+        ? publicApi.getFeed(20)
+        : homeApi.getFeed(20))
+    .then(r => { feeds.value = r || [] })
+    .catch(() => { feeds.value = [] })
+
+  const taskPromise = userStore.isLoggedIn
+    ? taskApi.list()
+        .then(r => { tasks.value = Array.isArray(r) ? r : (r.records || []) })
+        .catch(() => {})
+    : Promise.resolve()
+
+  const [photos] = await Promise.all([homePromise, feedPromise, taskPromise])
   allPhotos.value = photos
-  if (userStore.isLoggedIn) {
-    try {
-      const r = await taskApi.list()
-      tasks.value = Array.isArray(r) ? r : (r.records || [])
-    } catch (e) {}
-  }
 }
 
 onMounted(() => {

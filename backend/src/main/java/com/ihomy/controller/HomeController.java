@@ -10,6 +10,7 @@ import com.ihomy.entity.SysUser;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.ActivityFeedService;
 import com.ihomy.service.HomeModuleService;
+import com.ihomy.controller.PublicController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ public class HomeController {
     private final HomeModuleService homeModuleService;
     private final SecurityHelper securityHelper;
     private final ActivityFeedService activityFeedService;
+    private final PublicController publicController;
 
     @Operation(summary = "获取首页启用的模块列表")
     @GetMapping("/modules")
@@ -54,6 +56,7 @@ public class HomeController {
         assertOwner();
         SysUser user = securityHelper.currentUser();
         homeModuleService.updateConfig(user.getFamilyId(), dto);
+        publicController.invalidateHomeCache(user.getFamilyId());
         return Result.success();
     }
 
@@ -66,7 +69,9 @@ public class HomeController {
         module.setFamilyId(user.getFamilyId());
         if (module.getEnabled() == null) module.setEnabled(1);
         if (module.getSortOrder() == null) module.setSortOrder(0);
-        return Result.success(homeModuleService.addModule(module));
+        HomeModule saved = homeModuleService.addModule(module);
+        publicController.invalidateHomeCache(user.getFamilyId());
+        return Result.success(saved);
     }
 
     @Operation(summary = "首页聚合数据")

@@ -16,5 +16,6 @@ public interface ItemMapper extends BaseMapper<Item> {
     List<Map<String, Object>> selectItemByFamily(@Param("familyId") Long familyId,
                                                  @Param("keyword") String keyword,
                                                  @Param("roomId") Long roomId,
-                                                 @Param("furnitureId") Long furnitureId);
+                                                 @Param("furnitureId") Long furnitureId,
+                                                 @Param("type") String type);
 }

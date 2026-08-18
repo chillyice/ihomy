@@ -266,3 +266,11 @@ export const itemApi = {
   update: (id, data) => request.put(`/item/${id}`, data),
   remove: (id) => request.delete(`/item/${id}`),
 }
+
+export const kitchenApi = {
+  menu: () => request.get('/kitchen/menu'),
+  detail: (id) => request.get(`/kitchen/recipe/${id}`),
+  create: (data) => request.post('/kitchen/recipe', data),
+  update: (id, data) => request.put(`/kitchen/recipe/${id}`, data),
+  remove: (id) => request.delete(`/kitchen/recipe/${id}`),
+}

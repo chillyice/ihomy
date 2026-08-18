@@ -48,10 +48,19 @@ public class CommentService {
           .eq(Comment::getContentId, contentId)
           .orderByAsc(Comment::getCreatedAt);
         List<Comment> all = commentMapper.selectList(qw);
+
+        // 收集所有 userIds(authorId + replyToUserId)批量查用户,避免 N+1
+        java.util.Set<Long> userIds = new java.util.HashSet<>();
+        for (Comment c : all) {
+            if (c.getAuthorId() != null) userIds.add(c.getAuthorId());
+            if (c.getReplyToUserId() != null) userIds.add(c.getReplyToUserId());
+        }
+        Map<Long, SysUser> userMap = batchUsers(userIds);
+
         Map<Long, Map<String, Object>> byId = new LinkedHashMap<>();
         List<Map<String, Object>> roots = new ArrayList<>();
         for (Comment c : all) {
-            Map<String, Object> m = toView(c);
+            Map<String, Object> m = toView(c, userMap);
             byId.put(c.getId(), m);
             if (c.getParentId() == null) {
                 roots.add(m);
@@ -70,6 +79,17 @@ public class CommentService {
             }
         }
         return roots;
+    }
+
+    /** 批量取用户,返回 id→SysUser 映射(空集返空 Map,避免一次全表查) */
+    private Map<Long, SysUser> batchUsers(java.util.Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) return Map.of();
+        List<SysUser> users = sysUserMapper.selectBatchIds(ids);
+        Map<Long, SysUser> map = new HashMap<>(users.size() * 2);
+        for (SysUser u : users) {
+            map.put(u.getId(), u);
+        }
+        return map;
     }
 
     /** 发表评论:校验目标内容同家庭后落库,并通知被回复者/内容作者 */
@@ -165,15 +185,17 @@ public class CommentService {
         return UserNames.of(sysUserMapper.selectById(userId));
     }
 
-    /** 评论转展示结构:补作者昵称与被回复人昵称 */
-    private Map<String, Object> toView(Comment c) {
+    /** 评论转展示结构:补作者昵称与被回复人昵称(从批量预取的 userMap 取,无则回退单查) */
+    private Map<String, Object> toView(Comment c, Map<Long, SysUser> userMap) {
         Map<String, Object> m = new HashMap<>();
         m.put("id", c.getId());
         m.put("content", c.getContent());
         m.put("authorId", c.getAuthorId());
-        m.put("authorName", resolveName(c.getAuthorId()));
+        SysUser author = c.getAuthorId() == null ? null : userMap.get(c.getAuthorId());
+        m.put("authorName", UserNames.of(author));
         m.put("replyToUserId", c.getReplyToUserId());
-        m.put("replyToName", c.getReplyToUserId() == null ? null : resolveName(c.getReplyToUserId()));
+        SysUser replyTo = c.getReplyToUserId() == null ? null : userMap.get(c.getReplyToUserId());
+        m.put("replyToName", c.getReplyToUserId() == null ? null : UserNames.of(replyTo));
         m.put("createdAt", c.getCreatedAt());
         return m;
     }

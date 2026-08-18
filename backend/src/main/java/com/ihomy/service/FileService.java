@@ -1,13 +1,18 @@
 package com.ihomy.service;
 
+import com.ihomy.common.BizException;
+import com.ihomy.common.ResultCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
@@ -17,6 +22,9 @@ import java.time.format.DateTimeFormatter;
  * - 相册图片:进 {uploadDir}/pictures/{相册名}/(相册名为空则平铺)
  * - 视频/海报:进 {uploadDir}/videos/   (上传时影片名不可知,平铺+时间戳前缀)
  * 返回可经 /files/ 访问的 URL。目标目录由 nginx /files/ 托管,开发期经 /api/files/。
+ *
+ * 性能:大文件(视频/海报)用流式 transferTo,不再 getBytes() 全量入堆,
+ * 生产 -Xmx384m 上传 200MB 视频不再 OOM。小文件仍走 byte[] 重载(简单)。
  */
 @Slf4j
 @Service
@@ -47,6 +55,25 @@ public class FileService {
         return saveTo(bytes, originalName, "videos", null, null);
     }
 
+    /** 通用上传(流式):大文件优先用这个,避免 getBytes() 全量入堆 */
+    public String upload(MultipartFile file, String originalName, String contentType) {
+        if (contentType != null && contentType.startsWith("audio/")) {
+            return saveTo(file, originalName, "music", null, null);
+        }
+        String yyyyMM = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
+        return saveTo(file, originalName, "files", yyyyMM, null);
+    }
+
+    /** 相册图片上传(流式) */
+    public String upload(MultipartFile file, String originalName, String contentType, Long albumId, String albumName) {
+        return saveTo(file, originalName, "pictures", albumName, albumId);
+    }
+
+    /** 视频/海报上传(流式) */
+    public String uploadVideo(MultipartFile file, String originalName, String contentType) {
+        return saveTo(file, originalName, "videos", null, null);
+    }
+
     /** 按 URL 删除已上传文件:仅处理本站 URL(外链/空直接忽略),文件不存在容忍,失败仅告警 */
     public void deleteByUrl(String url) {
         String prefix = urlPrefix.replaceAll("/+$", "");
@@ -66,33 +93,73 @@ public class FileService {
         }
     }
 
+    /** 扩展名黑名单 + 路径组装,byte[] 写入版本(小文件) */
     private String saveTo(byte[] bytes, String originalName, String root, String sub, Long albumId) {
-        // 扩展名黑名单:拒绝脚本/可执行文件,防存储型 XSS(nginx /files/ 按类型服务)
+        validateName(originalName);
+        try {
+            String[] parts = buildPath(originalName, root, sub, albumId);
+            Path dir = Paths.get(parts[0]);
+            Files.createDirectories(dir);
+            Files.write(dir.resolve(parts[1]), bytes);
+            return parts[2];
+        } catch (IOException e) {
+            log.error("文件上传失败", e);
+            throw new RuntimeException("文件上传失败");
+        }
+    }
+
+    /** 流式版本(大文件优先):直接 transferTo 不入堆 */
+    private String saveTo(MultipartFile file, String originalName, String root, String sub, Long albumId) {
+        validateName(originalName);
+        try {
+            String[] parts = buildPath(originalName, root, sub, albumId);
+            Path dir = Paths.get(parts[0]);
+            Files.createDirectories(dir);
+            Path target = dir.resolve(parts[1]);
+            // 优先用 MultipartFile.transferTo(底层可能零拷贝),失败回退 InputStream + Files.copy
+            try {
+                file.transferTo(target.toFile());
+            } catch (Exception fallback) {
+                try (InputStream in = file.getInputStream()) {
+                    Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+            log.info("文件已保存: {}", parts[2]);
+            return parts[2];
+        } catch (IOException e) {
+            log.error("文件上传失败", e);
+            throw new RuntimeException("文件上传失败");
+        }
+    }
+
+    /** 校验文件名扩展名黑名单(防存储型 XSS) */
+    private void validateName(String originalName) {
         if (originalName != null) {
             int dot = originalName.lastIndexOf('.');
             if (dot >= 0) {
                 String ext = originalName.substring(dot + 1).toLowerCase();
                 if (java.util.Set.of("html", "htm", "svg", "js", "jsp", "php", "asp", "aspx", "exe", "bat", "cmd", "sh", "css").contains(ext)) {
-                    throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.BAD_REQUEST, "不支持的文件类型: " + ext);
+                    throw new BizException(ResultCode.BAD_REQUEST, "不支持的文件类型: " + ext);
                 }
             }
         }
-        try {
-            String base = originalName == null ? "file" : originalName.replaceAll("[^\\w.\\-\\u4e00-\\u9fa5]", "_");
-            String fileName = (albumId == null ? "" : albumId + "_") + System.currentTimeMillis() + "_" + base;
-            String cleanSub = sub == null || sub.isBlank() ? null
-                    : sub.replaceAll("[^\\w.\\-\\u4e00-\\u9fa5]", "_");
-            Path dir = cleanSub == null ? Paths.get(uploadDir, root)
-                    : Paths.get(uploadDir, root, cleanSub);
-            Files.createDirectories(dir);
-            Files.write(dir.resolve(fileName), bytes);
-            String prefix = urlPrefix.replaceAll("/+$", "");
-            String path = prefix + "/" + root + (cleanSub == null ? "" : "/" + cleanSub) + "/" + fileName;
-            log.info("文件已保存: {}", path);
-            return path;
-        } catch (IOException e) {
-            log.error("文件上传失败", e);
-            throw new RuntimeException("文件上传失败");
-        }
+    }
+
+    /**
+     * 组装保存路径 + URL,返回 [dirAbsolute, fileName, urlPath]
+     * dirAbsolute: 磁盘绝对路径(用于 Files.write)
+     * fileName:    最终文件名(albumId_时间戳_原名)
+     * urlPath:     可访问 URL(/files/pictures/相册名/xxx.jpg)
+     */
+    private String[] buildPath(String originalName, String root, String sub, Long albumId) {
+        String base = originalName == null ? "file" : originalName.replaceAll("[^\\w.\\-\\u4e00-\\u9fa5]", "_");
+        String fileName = (albumId == null ? "" : albumId + "_") + System.currentTimeMillis() + "_" + base;
+        String cleanSub = sub == null || sub.isBlank() ? null
+                : sub.replaceAll("[^\\w.\\-\\u4e00-\\u9fa5]", "_");
+        String dirStr = cleanSub == null ? Paths.get(uploadDir, root).toString()
+                : Paths.get(uploadDir, root, cleanSub).toString();
+        String prefix = urlPrefix.replaceAll("/+$", "");
+        String urlPath = prefix + "/" + root + (cleanSub == null ? "" : "/" + cleanSub) + "/" + fileName;
+        return new String[]{ dirStr, fileName, urlPath };
     }
 }

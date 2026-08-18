@@ -106,29 +106,28 @@ public class ContentLikeService {
         }
     }
 
-    /** 把最新点赞数回写到内容表的 likeCount 字段,便于列表直接展示 */
+    /** 把最新点赞数回写到内容表的 likeCount 字段,便于列表直接展示。
+     * 直接 UPDATE 不先 select,避免一次额外查询;不存在的 id 自然不会受影响。
+     */
     private void syncCount(String contentType, Long contentId, int count) {
         switch (contentType) {
             case "blog" -> {
-                Blog b = blogMapper.selectById(contentId);
-                if (b != null) {
-                    b.setLikeCount(count);
-                    blogMapper.updateById(b);
-                }
+                com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Blog> uw =
+                        new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<>();
+                uw.eq(Blog::getId, contentId).set(Blog::getLikeCount, count);
+                blogMapper.update(null, uw);
             }
             case "diary" -> {
-                Diary d = diaryMapper.selectById(contentId);
-                if (d != null) {
-                    d.setLikeCount(count);
-                    diaryMapper.updateById(d);
-                }
+                com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Diary> uw =
+                        new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<>();
+                uw.eq(Diary::getId, contentId).set(Diary::getLikeCount, count);
+                diaryMapper.update(null, uw);
             }
             case "photo" -> {
-                Photo p = photoMapper.selectById(contentId);
-                if (p != null) {
-                    p.setLikeCount(count);
-                    photoMapper.updateById(p);
-                }
+                com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Photo> uw =
+                        new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<>();
+                uw.eq(Photo::getId, contentId).set(Photo::getLikeCount, count);
+                photoMapper.update(null, uw);
             }
             default -> {
             }

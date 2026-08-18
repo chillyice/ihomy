@@ -9,6 +9,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 家庭动态流:聚合博客/日记/照片三类内容,按时间倒序合并,
@@ -31,6 +32,7 @@ public class ActivityFeedService {
         List<Map<String, Object>> diaryItems = new ArrayList<>();
         List<Long> blogIds = new ArrayList<>();
         List<Long> diaryIds = new ArrayList<>();
+        Set<Long> authorIds = new java.util.HashSet<>();
 
         if (familyId != null) {
             com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.ihomy.entity.Blog> bq =
@@ -45,7 +47,7 @@ public class ActivityFeedService {
             }
             bq.orderByDesc(com.ihomy.entity.Blog::getCreatedAt).last("LIMIT " + limit);
             for (com.ihomy.entity.Blog b : blogMapper.selectList(bq)) {
-                Map<String, Object> m = base("blog", b.getId(), b.getAuthorId(), b.getFamilyId(), b.getCreatedAt());
+                Map<String, Object> m = base("blog", b.getId(), b.getAuthorId(), b.getFamilyId(), b.getCreatedAt(), null);
                 m.put("title", b.getTitle());
                 m.put("summary", truncate(stripMarkdown(b.getContent()), 120));
                 m.put("coverImage", b.getCoverImage());
@@ -55,6 +57,7 @@ public class ActivityFeedService {
                 items.add(m);
                 blogItems.add(m);
                 blogIds.add(b.getId());
+                if (b.getAuthorId() != null) authorIds.add(b.getAuthorId());
             }
 
             com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.ihomy.entity.Diary> dq =
@@ -68,7 +71,7 @@ public class ActivityFeedService {
             }
             dq.orderByDesc(com.ihomy.entity.Diary::getCreatedAt).last("LIMIT " + limit);
             for (com.ihomy.entity.Diary d : diaryMapper.selectList(dq)) {
-                Map<String, Object> m = base("diary", d.getId(), d.getAuthorId(), d.getFamilyId(), d.getCreatedAt());
+                Map<String, Object> m = base("diary", d.getId(), d.getAuthorId(), d.getFamilyId(), d.getCreatedAt(), null);
                 m.put("content", truncate(d.getContent(), 150));
                 m.put("mood", d.getMood());
                 m.put("weather", d.getWeather());
@@ -77,6 +80,7 @@ public class ActivityFeedService {
                 items.add(m);
                 diaryItems.add(m);
                 diaryIds.add(d.getId());
+                if (d.getAuthorId() != null) authorIds.add(d.getAuthorId());
             }
 
             List<com.ihomy.entity.Photo> photos = publicOnly
@@ -85,12 +89,13 @@ public class ActivityFeedService {
             Map<Long, List<com.ihomy.entity.Photo>> grouped = new HashMap<>();
             for (com.ihomy.entity.Photo p : photos) {
                 grouped.computeIfAbsent(p.getAuthorId(), k -> new ArrayList<>()).add(p);
+                if (p.getAuthorId() != null) authorIds.add(p.getAuthorId());
             }
             for (Map.Entry<Long, List<com.ihomy.entity.Photo>> e : grouped.entrySet()) {
                 List<com.ihomy.entity.Photo> ps = e.getValue();
                 if (ps.isEmpty()) continue;
                 com.ihomy.entity.Photo first = ps.get(0);
-                Map<String, Object> m = base("photo", first.getAuthorId(), first.getAuthorId(), first.getFamilyId(), first.getCreatedAt());
+                Map<String, Object> m = base("photo", first.getAuthorId(), first.getAuthorId(), first.getFamilyId(), first.getCreatedAt(), null);
                 m.put("count", ps.size());
                 m.put("urls", ps.stream().map(com.ihomy.entity.Photo::getUrl).limit(5).toList());
                 m.put("descriptions", ps.stream().map(com.ihomy.entity.Photo::getDescription).limit(5).toList());
@@ -101,6 +106,15 @@ public class ActivityFeedService {
 
             applyCommentCounts(blogItems, blogIds, "blog");
             applyCommentCounts(diaryItems, diaryIds, "diary");
+
+            // 批量回填作者信息(替代 N+1 的 resolveAuthorName/Avatar)
+            Map<Long, com.ihomy.entity.SysUser> userMap = batchUsers(authorIds);
+            for (Map<String, Object> m : items) {
+                Long aid = (Long) m.get("authorId");
+                com.ihomy.entity.SysUser u = aid == null ? null : userMap.get(aid);
+                m.put("authorName", UserNames.of(u));
+                m.put("authorAvatar", u != null ? u.getAvatar() : null);
+            }
         }
 
         items.sort(Comparator.comparing(m -> (java.time.LocalDateTime) m.get("createdAt"), Comparator.reverseOrder()));
@@ -108,6 +122,17 @@ public class ActivityFeedService {
             return items.subList(0, limit);
         }
         return items;
+    }
+
+    /** 批量取用户,返回 id→SysUser 映射(空集返空 Map,避免一次全表查) */
+    private Map<Long, com.ihomy.entity.SysUser> batchUsers(java.util.Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) return Map.of();
+        List<com.ihomy.entity.SysUser> users = sysUserMapper.selectBatchIds(ids);
+        Map<Long, com.ihomy.entity.SysUser> map = new HashMap<>(users.size() * 2);
+        for (com.ihomy.entity.SysUser u : users) {
+            map.put(u.getId(), u);
+        }
+        return map;
     }
 
     /** 批量补充各内容的评论数 */
@@ -138,14 +163,14 @@ public class ActivityFeedService {
         return map;
     }
 
-    /** 动态通用基础字段:类型/id/作者信息/时间 */
-    private Map<String, Object> base(String type, Long id, Long authorId, Long familyId, java.time.LocalDateTime createdAt) {
+    /** 动态通用基础字段:类型/id/作者信息/时间(作者信息留待最后批量回填) */
+    private Map<String, Object> base(String type, Long id, Long authorId, Long familyId, java.time.LocalDateTime createdAt, Object placeholder) {
         Map<String, Object> m = new HashMap<>();
         m.put("type", type);
         m.put("id", id);
         m.put("authorId", authorId);
-        m.put("authorName", resolveAuthorName(authorId));
-        m.put("authorAvatar", resolveAuthorAvatar(authorId));
+        m.put("authorName", null);
+        m.put("authorAvatar", null);
         m.put("familyId", familyId);
         m.put("createdAt", createdAt);
         return m;

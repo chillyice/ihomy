@@ -27,6 +27,10 @@ const routes = [
   { path: '/storage', name: 'Storage', component: () => import('@/views/storage/Storage.vue') },
   { path: '/item', name: 'Item', component: () => import('@/views/item/Item.vue') },
   { path: '/kitchen', name: 'Kitchen', component: () => import('@/views/kitchen/Kitchen.vue'), meta: { public: true } },
+  { path: '/kitchen/ingredients', name: 'Ingredient', component: () => import('@/views/kitchen/Ingredient.vue') },
+  { path: '/kitchen/recipe/:id', name: 'RecipeDetail', component: () => import('@/views/kitchen/RecipeDetail.vue'), meta: { public: true } },
+  { path: '/kitchen/recipe/new', name: 'RecipeNew', component: () => import('@/views/kitchen/RecipeEdit.vue') },
+  { path: '/kitchen/recipe/:id/edit', name: 'RecipeEdit', component: () => import('@/views/kitchen/RecipeEdit.vue') },
   // 运维管理页:仅 OPS 角色可访问（V3.8）
   { path: '/ops', name: 'Ops', component: () => import('@/views/ops/Ops.vue'), meta: { ops: true } },
   // 兜底:未匹配的路由重定向回首页

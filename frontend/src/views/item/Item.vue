@@ -117,6 +117,25 @@
         <el-form-item :label="$t('item.itemName')">
           <el-input v-model="itemForm.name" :placeholder="$t('item.itemNamePh')" />
         </el-form-item>
+        <el-form-item :label="$t('item.itemImage')">
+          <el-upload :show-file-list="false" :before-upload="(f) => uploadItemImage(f)" accept="image/*">
+            <img v-if="itemForm.image_url" :src="itemForm.image_url" class="item-image-preview" />
+            <el-button v-else size="small"><el-icon><Plus /></el-icon> {{ $t('item.itemImage') }}</el-button>
+          </el-upload>
+        </el-form-item>
+        <el-form-item :label="$t('item.itemType')">
+          <el-select v-model="itemForm.type" style="width: 100%">
+            <el-option v-for="tp in itemTypes" :key="tp" :label="dictText(t, 'item_type', tp)" :value="tp" />
+          </el-select>
+        </el-form-item>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
+          <el-form-item :label="$t('item.quantity')">
+            <el-input-number v-model="itemForm.quantity" :min="0" :precision="2" :controls="false" style="width: 100%" />
+          </el-form-item>
+          <el-form-item :label="$t('item.unit')">
+            <el-input v-model="itemForm.unit" :placeholder="$t('item.unitPh')" />
+          </el-form-item>
+        </div>
         <el-form-item :label="$t('item.aliases')">
           <el-input v-model="itemForm.aliases" :placeholder="$t('item.aliasesPh')" />
         </el-form-item>
@@ -199,10 +218,13 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { itemApi } from '@/api'
+import { Plus } from '@element-plus/icons-vue'
+import { itemApi, fileApi } from '@/api'
 import { useI18n } from 'vue-i18n'
+import { dictText } from '@/utils/dict'
 
 const { t } = useI18n()
+const itemTypes = ['KITCHENWARE', 'INGREDIENT', 'DAILY', 'CLOTHES', 'TOOL', 'OTHER']
 const tab = ref('houses')
 const items = ref([])
 const houses = ref([])
@@ -245,9 +267,16 @@ const loadItems = async () => {
 
 const openItem = (row) => {
   itemForm.value = row
-    ? { id: row.id, houseId: row.house_id, roomId: row.room_id, furnitureId: row.furniture_id, name: row.name, aliases: row.aliases, position: row.position, note: row.note }
-    : { houseId: null, roomId: null, furnitureId: null, name: '', aliases: '', position: '', note: '' }
+    ? { id: row.id, houseId: row.house_id, roomId: row.room_id, furnitureId: row.furniture_id, name: row.name, aliases: row.aliases, position: row.position, image_url: row.image_url, type: row.type, quantity: row.quantity != null ? Number(row.quantity) : null, unit: row.unit, note: row.note }
+    : { houseId: null, roomId: null, furnitureId: null, name: '', aliases: '', position: '', image_url: '', type: 'OTHER', quantity: null, unit: '', note: '' }
   itemDlg.value = true
+}
+const uploadItemImage = async (file) => {
+  try {
+    const data = await fileApi.upload(file)
+    itemForm.value.image_url = data.url
+  } catch (e) {}
+  return false
 }
 const saveItem = async () => {
   if (!itemForm.value.name) return ElMessage.warning(t('item.itemNameRequired'))
@@ -256,6 +285,10 @@ const saveItem = async () => {
     name: itemForm.value.name,
     aliases: itemForm.value.aliases,
     position: itemForm.value.position,
+    imageUrl: itemForm.value.image_url,
+    type: itemForm.value.type,
+    quantity: itemForm.value.quantity,
+    unit: itemForm.value.unit,
     note: itemForm.value.note,
   }
   if (itemForm.value.id) await itemApi.update(itemForm.value.id, body)
@@ -339,6 +372,7 @@ onMounted(() => {
 .toolbar { display: flex; gap: 12px; margin-bottom: 16px; }
 .item-card { margin-bottom: 12px; }
 .item-main { display: flex; align-items: center; gap: 8px; }
+.item-image-preview { width: 200px; height: 140px; object-fit: cover; border-radius: 8px; }
 .item-name { font-size: 16px; font-weight: 600; }
 .item-path { color: #909399; font-size: 13px; margin-top: 4px; }
 .item-aliases { color: #909399; font-size: 12px; margin-top: 2px; }

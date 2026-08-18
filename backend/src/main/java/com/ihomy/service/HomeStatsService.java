@@ -36,18 +36,25 @@ public class HomeStatsService {
     public Map<String, Object> getStats(Long familyId) {
         Map<String, Object> stats = new HashMap<>();
         stats.put("memberCount", countMembers(familyId));
-        stats.put("upcomingEvents", upcomingEvents(familyId));
-        stats.put("todayEvent", todayEvent(familyId));
+        // 一次查询 family_anniversary 同表数据,todayEvent + upcomingEvents 共用
+        if (familyId != null) {
+            LambdaQueryWrapper<Anniversary> qw = new LambdaQueryWrapper<>();
+            qw.eq(Anniversary::getFamilyId, familyId);
+            List<Anniversary> all = anniversaryMapper.selectList(qw);
+            stats.put("todayEvent", todayEvent(all));
+            stats.put("upcomingEvents", upcomingEvents(all));
+        } else {
+            stats.put("todayEvent", null);
+            stats.put("upcomingEvents", new ArrayList<>());
+        }
         return stats;
     }
 
     /** 今天(阳历/农历均可)是否有纪念日:有则返回 {name, type: birthday|anniversary} */
-    private Map<String, Object> todayEvent(Long familyId) {
-        if (familyId == null) return null;
+    private Map<String, Object> todayEvent(List<Anniversary> anniversaries) {
+        if (anniversaries == null || anniversaries.isEmpty()) return null;
         LocalDate today = LocalDate.now();
-        LambdaQueryWrapper<Anniversary> qw = new LambdaQueryWrapper<>();
-        qw.eq(Anniversary::getFamilyId, familyId);
-        for (Anniversary a : anniversaryMapper.selectList(qw)) {
+        for (Anniversary a : anniversaries) {
             if (isOn(a, today)) {
                 Map<String, Object> e = new HashMap<>();
                 e.put("name", a.getName());
@@ -84,14 +91,12 @@ public class HomeStatsService {
     }
 
     /** 计算每年重复纪念日的下一次日期与剩余天数,关联成员记为生日类型 */
-    private List<Map<String, Object>> upcomingEvents(Long familyId) {
+    private List<Map<String, Object>> upcomingEvents(List<Anniversary> anniversaries) {
         List<Map<String, Object>> events = new ArrayList<>();
-        if (familyId == null) return events;
-
-        LambdaQueryWrapper<Anniversary> qw = new LambdaQueryWrapper<>();
-        qw.eq(Anniversary::getFamilyId, familyId).eq(Anniversary::getRecurring, DictConst.RECUR_YEARLY);
+        if (anniversaries == null || anniversaries.isEmpty()) return events;
         LocalDate today = LocalDate.now();
-        for (Anniversary a : anniversaryMapper.selectList(qw)) {
+        for (Anniversary a : anniversaries) {
+            if (!DictConst.RECUR_YEARLY.equals(a.getRecurring())) continue;
             LocalDate next = nextOccurrence(a, today);
             if (next == null) continue;
             Map<String, Object> e = new HashMap<>();

@@ -35,7 +35,14 @@ public class AnniversaryService {
         if (familyId == null) return result;
         LambdaQueryWrapper<Anniversary> qw = new LambdaQueryWrapper<>();
         qw.eq(Anniversary::getFamilyId, familyId).orderByDesc(Anniversary::getId);
-        for (Anniversary a : anniversaryMapper.selectList(qw)) {
+        List<Anniversary> list = anniversaryMapper.selectList(qw);
+        // 批量取关联成员昵称,避免 N+1
+        java.util.Set<Long> userIds = new java.util.HashSet<>();
+        for (Anniversary a : list) {
+            if (a.getUserId() != null) userIds.add(a.getUserId());
+        }
+        Map<Long, SysUser> userMap = batchUsers(userIds);
+        for (Anniversary a : list) {
             Map<String, Object> m = new HashMap<>();
             m.put("id", a.getId());
             m.put("name", a.getName());
@@ -45,10 +52,22 @@ public class AnniversaryService {
             m.put("isLeap", a.getIsLeap());
             m.put("recurring", a.getRecurring());
             m.put("userId", a.getUserId());
-            m.put("userName", resolveUserName(a.getUserId()));
+            SysUser u = a.getUserId() == null ? null : userMap.get(a.getUserId());
+            m.put("userName", UserNames.of(u));
             result.add(m);
         }
         return result;
+    }
+
+    /** 批量取用户,返回 id→SysUser 映射(空集返空 Map) */
+    private Map<Long, SysUser> batchUsers(java.util.Collection<Long> ids) {
+        if (ids == null || ids.isEmpty()) return Map.of();
+        List<SysUser> users = sysUserMapper.selectBatchIds(ids);
+        Map<Long, SysUser> map = new HashMap<>(users.size() * 2);
+        for (SysUser u : users) {
+            map.put(u.getId(), u);
+        }
+        return map;
     }
 
     /** 新增纪念日,默认每年重复 */

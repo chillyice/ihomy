@@ -10,6 +10,7 @@ import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.AlbumService;
 import com.ihomy.service.FileService;
 import com.ihomy.service.PointsService;
+import com.ihomy.controller.PublicController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ public class PhotoController {
     private final FileService fileService;
     private final PointsService pointsService;
     private final SecurityHelper securityHelper;
+    private final PublicController publicController;
 
     @Operation(summary = "上传照片到相册（支持多张）")
     @OperationLog(module = "PHOTO", operationType = "CREATE", description = "上传照片", saveArgs = false)
@@ -45,13 +47,14 @@ public class PhotoController {
         if (!album.getFamilyId().equals(user.getFamilyId())) throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.FORBIDDEN);
         List<Photo> photos = new ArrayList<>();
         for (MultipartFile f : files) {
-            String url = fileService.upload(f.getBytes(), f.getOriginalFilename(), f.getContentType(),
+            String url = fileService.upload(f, f.getOriginalFilename(), f.getContentType(),
                     albumId, album == null ? null : album.getName());
             photos.add(albumService.addPhoto(albumId, user, url, null));
         }
         if (!photos.isEmpty()) {
             pointsService.addRecord(user.getId(), user.getFamilyId(), "REWARD",
                     PointsService.REWARD_PHOTO * photos.size(), "上传照片 ×" + photos.size());
+            publicController.invalidateHomeCache(user.getFamilyId());
         }
         return Result.success(photos);
     }
@@ -68,7 +71,9 @@ public class PhotoController {
     @OperationLog(module = "PHOTO", operationType = "DELETE", description = "删除照片")
     @DeleteMapping("/photo/{id}")
     public Result<Void> delete(@PathVariable Long id) {
+        Long fid = securityHelper.currentUser().getFamilyId();
         albumService.deletePhoto(id, securityHelper.currentUser(), securityHelper.isOwner());
+        publicController.invalidateHomeCache(fid);
         return Result.success();
     }
 }
