@@ -139,9 +139,10 @@ public class ItemController {
     @Operation(summary = "物品列表/搜索")
     @GetMapping("/list")
     public Result<List<Map<String, Object>>> itemList(@RequestParam(required = false) String keyword,
-                                                      @RequestParam(required = false) Long roomId,
-                                                      @RequestParam(required = false) Long furnitureId) {
-        return Result.success(itemService.itemList(current().getFamilyId(), keyword, roomId, furnitureId));
+                                                       @RequestParam(required = false) Long roomId,
+                                                       @RequestParam(required = false) Long furnitureId,
+                                                       @RequestParam(required = false) String type) {
+        return Result.success(itemService.itemList(current().getFamilyId(), keyword, roomId, furnitureId, type));
     }
 
     @Operation(summary = "新增物品")

@@ -53,14 +53,15 @@
 - **业务运行用 `ihomy` 账号**:仅授予 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`(最小权限,无 CREATE/ALTER/DROP)。application.yml 连接用 `ihomy`,**不要用 root 跑业务**。
 - 账号同时创建 `localhost` 和 `%` 两个 host(本机/远程应用服务器都能连)。
 - **49 张表**,前缀分类:
-  - `sys_`(系统/账号/权限/家庭设置/日志/参数/字典,21 张):`sys_user` / `sys_role` / `sys_auth` / `sys_user_role` / `sys_role_auth` / `sys_family_info` / `sys_home_module` / `sys_password_reset_token` / `sys_user_group` / `sys_user_group_member` / `sys_operation_log` / `sys_dict_item` / `sys_parameter` / `sys_storage_device` / `sys_weather_credential` / `sys_weather_location` / `sys_weather_log`
-  - `family_`(家庭事务,17 张):`family_anniversary` / `family_notification` / `family_apply` / `family_invitation_code` / `family_checkin` / `family_points_record` / `family_points_product` / `family_points_order` / `family_task` / `family_reminder` / `family_plan` / `family_plan_task` / `family_book_record` / `family_chat_message` / `family_chat_read` / `family_user_label` / `family_tree` / `family_house` / `family_room` / `family_furniture` / `family_item` / `family_music`
-  - `content_`(内容类,9 张):`content_blog` / `content_diary` / `content_album` / `content_photo` / `content_comment` / `content_visibility` / `content_like` / `content_video` / `content_video_wish` / `content_wish`
+  - `sys_`(系统/账号/权限/家庭设置/日志/参数/字典/天气/存储,17 张):`sys_user` / `sys_role` / `sys_auth` / `sys_user_role` / `sys_role_auth` / `sys_family_info` / `sys_home_module` / `sys_password_reset_token` / `sys_user_group` / `sys_user_group_member` / `sys_operation_log` / `sys_dict_item` / `sys_parameter` / `sys_storage_device` / `sys_weather_credential` / `sys_weather_location` / `sys_weather_log`
+  - `family_`(家庭事务,22 张):`family_anniversary` / `family_notification` / `family_apply` / `family_invitation_code` / `family_checkin` / `family_points_record` / `family_points_product` / `family_points_order` / `family_task` / `family_reminder` / `family_plan` / `family_plan_task` / `family_book_record` / `family_chat_message` / `family_chat_read` / `family_user_label` / `family_tree` / `family_house` / `family_room` / `family_furniture` / `family_item` / `family_music`
+  - `content_`(内容类,10 张):`content_blog` / `content_diary` / `content_album` / `content_photo` / `content_comment` / `content_visibility` / `content_like` / `content_video` / `content_video_wish` / `content_wish`
   - **命名规则**:家庭事务业务表一律 `family_` 前缀;内容数据 `content_` 前缀;账号/权限/配置/日志/天气/存储保留 `sys_`。新增表必须遵守。前缀取最顶层祖先类别;上下级关系体现在表名(如 `sys_user_role`)。
 - **枚举不再用数字**:状态/类型字段一律大写英文单词(`PUBLISHED/DRAFT/PUBLIC/FAMILY/ACTIVE...`),含义存字典表 `sys_dict_item`,Java 常量集中于 `common/DictConst.java`,前端映射 `utils/dict.js`。**不要写回 0/1/2 判断**。
 - **注意**:`content_blog/diary/photo/video/wish` 5 张内容表 `visibility` 列为 `VARCHAR(20) DEFAULT 'FAMILY'`(PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开),schema.sql 与 live DB 已对齐(曾误写 TINYINT)。
 - 权力 4 角色:OWNER/MEMBER/CHILD/GUEST + OPS(运维,不属任何家庭)。同一用户不同家庭可不同角色(`sys_user_role.family_id` 区别)。
 - **新增带 `@RequirePermission` 接口前**:确保 auth_code 进 `sys_auth` + `sys_role_auth` 种子(OWNER 豁免,MEMBER 显式授权),否则 403。
+- **索引规范**(强制):列表查询的 WHERE + ORDER BY 字段必须落在同一复合索引内。复合索引顺序:等值字段在前,范围/排序字段在后;`deleted` 进索引(逻辑删除几乎每查必带)。已建关键复合索引:`content_blog.idx_family_status_created(family_id,status,deleted,created_at)`、`content_diary.idx_family_created(family_id,deleted,created_at)`、`content_photo.idx_family_created(family_id,deleted,created_at)`、`family_notification.idx_receiver_read(receiver_id,is_read)`。新增表/接口前先 `EXPLAIN` 验证走索引。
 
 ## 代码结构
 
@@ -69,20 +70,20 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
   src/main/java/com/ihomy/
     IhomyApplication.java       # 主类 @MapperScan("com.ihomy.mapper")
     common/      # Result统一响应/ResultCode/BizException/GlobalExceptionHandler/DictConst(字典常量)/SolarUtil(NOAA太阳位置算法)/AesUtil(凭证加密)/UserNames
-    config/      # SecurityConfig/CorsConfig/MybatisPlusConfig/Knife4jConfig/WebMvcConfig/WebSocketConfig/SqlStatementLog/ExternalConfigLoader(外挂配置加载)
-    security/    # JwtUtils(JWT含familyId+role+permissions+isOps)/JwtAuthenticationFilter/LoginUser/SecurityHelper/OpsAccessFilter/TraceIdFilter
+    config/      # SecurityConfig/CorsConfig/MybatisPlusConfig/Knife4jConfig/WebMvcConfig/WebSocketConfig/SqlStatementLog/ExternalConfigLoader(外挂配置加载)/WsHandshakeInterceptor(WebSocket JWT 验证)
+    security/    # JwtUtils(JWT含familyId+role+permissions+isOps)/JwtAuthenticationFilter/LoginUser/SecurityHelper/OpsAccessFilter
     annotation/  # @RequirePermission / @OperationLog
     aspect/      # RequirePermissionAspect(权限AOP) / OperationLogAspect(操作日志AOP)
-    filter/      # WsHandshakeInterceptor(WebSocket JWT 验证)
-    entity/      # 49张表对应实体(含 @TableLogic 软删/@TableId(type=INPUT)等)
+    filter/      # TraceIdFilter(链路ID生成,写入 MDC + 响应头 X-Trace-Id)
+    entity/      # 42 个实体类(7 张关联/字典表无实体:sys_auth/sys_role_auth/sys_user_group/sys_user_group_member/sys_password_reset_token/sys_dict_item/content_visibility)
     mapper/      # MyBatis-Plus BaseMapper 接口(自定义 SQL 全部放 resources/mapper/*.xml,接口不写 @Select/@Update 注解,参数统一 @Param)
     service/     # 32 个 @Service 类(单实现无接口层)
     controller/  # 30 个 Controller
     dto/         # 请求/响应 DTO
     websocket/   # ChatWebSocketHandler(原生 WebSocket 聊天室)
   src/main/resources/
-    application.yml     # 端口8080, context-path=/api, 连接用 ihomy 账号; mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml; **生产配置**(MySQL 6306/Redis 6379/Linux 路径),jar 内嵌即生产,部署无需外部覆盖
-    external.yml.template  # 外挂配置模板(IHOMY_CONFIG_PATH 指定路径,含 MySQL/Redis 密码 + JWT 密钥 + 天气凭证,ENC() 加密)
+    application.yml     # 端口8080, context-path=/api, 连接用 ihomy 账号; mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml; **基线配置**(MySQL 6306/Redis 6379/captcha 空/天气留空);当前 `file.upload-dir` 为 Windows 开发默认值,生产通过 external.yml 覆盖为 Linux 路径
+    external.yml.template  # 外挂配置模板(IHOMY_CONFIG_PATH 指定路径,覆盖 MySQL/Redis 密码 + JWT 密钥 + 上传路径 + captcha + 天气凭证,ENC() 加密)—— 唯一的开发/生产差异机制,**不再用 application-dev.yml profile**(见 scripts/start-all.ps1)
     mapper/*.xml        # 每个 Mapper 接口一个同名 XML(namespace=接口全限定名)
     schema.sql          # 建库+建号+建表(49张)+种子数据
   mvnw / mvnw.cmd       # Maven Wrapper,无需单独装 Maven
@@ -226,7 +227,10 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 | 模块 | Controller | Service | 关键表 | 要点 |
 |------|-----------|---------|--------|------|
-| 物品清单 | ItemController | ItemService | family_house/family_room/family_furniture/family_item | 五级粒度(家>房子>房间>家具>位置,多套房多楼层);CRUD+跨级搜索;2 期户型图/3 期 AI 语义待做 |
+| 物品清单 | ItemController | ItemService | family_house/family_room/family_furniture/family_item | 五级粒度(家>房子>房间>家具>位置,多套房多楼层);CRUD+跨级搜索;`image_url/type/quantity/unit` 4 字段(V7.0,type: KITCHENWARE/INGREDIENT/DAILY/CLOTHES/TOOL/OTHER 走 item_type 字典);`furniture_id` 可空(散放物品);`GET /item/list?type=` 按类型过滤;2 期户型图/3 期 AI 语义待做 |
+| 厨房(菜单+菜谱) | RecipeController | RecipeService | family_recipe | 菜单页按类别分组+时间推荐(早 6-10/午 11-14/晚 17-20);菜谱 CRUD;ingredients/equipment/steps 为 JSON 字段;首页模块 kitchen(position=17) |
+| 食材页 | ItemController | ItemService | family_item | `/kitchen/ingredients` 横条列表(左图透明渐变+名称+数量单位+存放位置);录入表单:图片/名称/数量/单位选择框(个斤瓶袋...)/存放位置 el-cascader 三级(house>room>furniture,默认选含"厨房"的 room);复用 itemApi type=INGREDIENT,无独立后端 |
+| 厨房 i18n | — | — | — | **教训:RecipeDetail/RecipeEdit 曾有 `const $t = (k) => k` stub 遮蔽 vue-i18n(所有文案显示原始 key)**;新页面禁止此写法,统一 `const { t: $t } = useI18n()` |
 
 ### 9. 国际化与主题
 
@@ -245,10 +249,20 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 2. **统一响应**:`Result.ok(data)` / `Result.error(ResultCode.XXX)`;异常走 `BizException(ResultCode)` + `GlobalExceptionHandler`。
 3. **权限**:`@RequirePermission("code")` + `RequirePermissionAspect`;OWNER 恒真;新增接口前确保 auth_code 进 `sys_auth`+`sys_role_auth` 种子。
 4. **操作日志**:`@OperationLog` 注解 + `OperationLogAspect` 异步落库;含 traceId(`TraceIdFilter` 生成 16 位 UUID 短串,写入 MDC + 响应头 `X-Trace-Id`)。
-5. **SQL 日志**:`mybatis-plus.log-impl=SqlStatementLog`,打印 SQL 语句+参数,过滤结果集行。
+5. **SQL 日志**:`mybatis-plus.log-impl=SqlStatementLog`(SLF4J 实现,由 `logging.level.mybatis.sql` 控制,默认 `warn` 静默);需要排查 SQL 时调到 `debug`。**禁止 `System.out.println` 打 SQL**(同步 I/O + 污染 stdout)。
 6. **软删**:`@TableLogic deleted`;**物理删必须用自定义 XML DELETE 语句**(MP `deleteById` 实为 UPDATE)。目前仅照片/相册/视频三处硬删。
 7. **家庭隔离**:所有业务数据带 `family_id`;JWT familyId 为快照,refresh 时按优先级解析;跨家庭访问返回 NOT_FOUND。
 8. **多家庭**:`sys_user_role.family_id` 区分;当前家庭存 Redis;`default_family_id` 用户设置的默认家庭。
+9. **N+1 禁令**(强制):列表接口禁止在 for 循环里 `selectById` 取关联字段(authorName/uploaderName/requesterName 等)。**必须先收集所有 userIds,用 `selectBatchIds` 批量查,内存 Map 回填**。参考 `ActivityFeedService.getFeed` / `CommentService.list` / `AnniversaryService.list` / `VideoService.list` 的 `batchUsers()` 写法。已批量化的:Book/Chat/FamilyPlan/Task/Points/ActivityFeed/Comment/Anniversary/Video。
+10. **缓存规范**(强制):
+    - **缓存键**:`ihomy:{domain}:{id}`(如 `ihomy:user:1`、`ihomy:perms:1:1`、`ihomy:home:pub:1`)。
+    - **短 TTL**:用户实体/权限码 5min;公开首页聚合 5min;天气/太阳位置按业务定。
+    - **变更点必须显式 invalidate**:`ProfileController.update` → `invalidateUser`;`MemberController.setRole/remove` → `invalidatePerms`;`AuthService.switchFamily/joinFamily` → `invalidatePerms`;模块/照片变更 → `PublicController.invalidateHomeCache`。
+    - **不变数据走内存缓存**:`sys_home_module` 全局模块 `@PostConstruct` 加载 `volatile List`,家庭模块按 familyId 缓存 `ConcurrentHashMap`,变更时 evict。**不引 Caffeine 等库**(数据量小,内存够用)。
+    - **敏感数据不缓存**:成员视图的 `/public/home`(含 stats/photos)不缓存,只缓存非成员视图。
+11. **UPDATE 不先 select**(强制):回写冗余字段(如 `like_count`)用 `LambdaUpdateWrapper.eq(id).set(field, value).update(null)`,不要 `selectById` 再 `updateById`(省一次查询)。参考 `ContentLikeService.syncCount`。
+12. **文件上传流式**(强制):大文件(>1MB)禁止 `file.getBytes()` 全量入堆(生产 `-Xmx384m` 上传 200MB 即 OOM)。**用 `MultipartFile` 重载 + `transferTo` + `Files.copy` 兜底**。FileService 已提供 3 个流式重载(`upload`/`uploadVideo` 通用+图片+视频),Controller 必须传 `MultipartFile` 不调 `getBytes()`。
+13. **JVM/连接池配置**(基线):`spring.threads.virtual.enabled: true`(JDK21 虚拟线程,Tomcat 自动用);HikariCP `maximum-pool-size: 20` + `minimum-idle: 5` + `connection-timeout: 3000`;`mybatis.sql: warn`(生产静默 SQL 日志)。
 
 ### 前端规范
 
@@ -259,21 +273,114 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 5. **图标**:Element Plus `el-icon`(线性图标);**Setting/Monitor 图标用内联 SVG 替代**(复杂 path 在 100% 缩放触发子像素光栅化开销,见性能优化博客 id=18)。
 6. **动画**:GSAP 入场;`transform: translateZ(0)` 隔离合成层;`contain: layout style` 隔离布局;避免 `background-attachment: fixed`(性能杀手)。
 7. **毛玻璃**:`backdrop-filter: blur(24px) saturate(1.1)`;子元素 hover 用 `transform` 而非 `box-shadow`(避免触发 backdrop-filter 重算)。
-8. **可拖拽面板**:`useDragResize` 组合式函数;5 个面板各自实例;位置/大小持久化 localStorage。
+8. **可拖拽面板**:`useDragResize` 组合式函数;5 个面板各自实例;位置/大小持久化 localStorage;**事件监听器按需挂载**(`onDragStart`/`onResizeStart` 时挂 `mousemove`/`mouseup`,`onMouseUp` 时移除,不要 `onMounted` 常驻——参考 `AvatarCropper.vue` 的写法)。
 9. **光影层全局化**:`SunLightLayer` + `AppSidebar` + `SiteFooter` 在 `App.vue` 全局挂载;`useSunLight` provide/inject 共享状态。
 10. **i18n**:所有用户可见文本用 `$t('key')`;中英双语;`utils/dict.js` 枚举映射。
+11. **打包分块**(强制):`vite.config.js` 必须配 `build.rollupOptions.output.manualChunks` 拆分大 vendor(当前 `element-plus`/`gsap`/`vue-i18n` 三块)。**public/ 下静态资源不得与 npm 包重复**(已删 `public/qweather-icons/`,改走 `node_modules/qweather-icons/font/`)。
+12. **重型资源异步加载**(强制):字体包/CSS(如 `qweather-icons.css` 44.9KB)阻塞首屏的,必须 `import('...')` 异步加载,不要同步 `import`。
+13. **动画优先级**(强制):持续型动画(钟摆/心跳/呼吸)优先级 **CSS `@keyframes` > GSAP 直接操作 DOM ref > `requestAnimationFrame` + 响应式 ref**。**禁止用 rAF 每帧写 Vue ref 触发响应式重渲染**(参考 `useSunLight.js` 钟摆已改 CSS `@keyframes lampSwing`)。
+14. **并行请求**(强制):多个独立的 `await xxxApi.foo()` 必须改 `Promise.all([a, b, c])` 并行(参考 `Home.vue loadAll` + `stores/app.js init`)。串行只在真有依赖时用。
+15. **computed 纯函数**(强制):`computed` 内禁止 `Math.random()`/`Date.now()`/副作用,否则每次访问重算且视觉跳动。需要随机/一次性计算用 `ref` + `watch(source, immediate)` 生成(参考 `Home.vue polaroidLayout`)。
+16. **路由懒加载**:25 个路由全部 `() => import('./views/...')`,不写同步 `import Home from '@/views/Home.vue'`。
 
-### 性能优化要点(已踩坑)
+### 性能规范(已踩坑 + 强制规则)
+
+#### 已踩坑(必读)
 
 - **100% 缩放卡顿根因**:Element Plus `Setting`/`Monitor` 图标 SVG path 过于复杂,hover 时子像素光栅化开销大 → 用内联 SVG 替代(详见博客 id=18)。
 - **backdrop-filter + overflow:auto 子元素**:毛玻璃父元素 + 子元素滚动 = 性能炸弹 → `transform: translateZ(0)` 隔离合层。
 - **背景随滚动**:`.bg-blobs` 用 `position: fixed` 不随页面滚动;移除 `background-attachment: fixed`。
 - **关闭效果时跳过定时器**:`flickerTimer` 在所有开关关闭时 return,避免持续触发 sunScene 重写。
+- **rAF 写 Vue ref**:原 `useSunLight.js` 钟摆用 `requestAnimationFrame` 每帧写 `lampPendulumX.value`/`lampPendulumScaleX.value`,触发 `SunLightLayer.vue` 每帧重渲染 → 改 CSS `@keyframes lampSwing` 完全绕过响应式。
+- **常驻事件监听器**:原 `useDragResize.js` 每实例 `onMounted` 挂 `mousemove`/`mouseup`,5 面板 = 10 常驻 listener → 改 `onDragStart` 时挂、`onMouseUp` 时移除。
+- **同步 import 阻塞首屏**:原 `main.js` 同步 `import 'qweather-icons/...'`(44.9KB CSS)→ 改 `import('...')` 异步。
+- **入口 chunk 过大**:原 `vite.config.js` 无 `manualChunks`,入口 553KB → 加 `manualChunks` 拆 `element-plus`/`gsap`/`vue-i18n`,入口降到 158KB(-71%)。
+- **`getBytes()` OOM**:原 `FileController`/`PhotoController`/`VideoController` 用 `file.getBytes()` 全量入堆,生产 `-Xmx384m` 上传 200MB 视频即 OOM → 改 `MultipartFile` + `transferTo` 流式。
+- **SQL 日志同步 I/O**:原 `SqlStatementLog` 用 `System.out.println` 同步打印每条 SQL,生产环境拖累 → 改 SLF4J,由 `logging.level.mybatis.sql` 控制(默认 `warn` 静默)。
+- **N+1 列表查询**:原 `ActivityFeedService`/`CommentService`/`AnniversaryService`/`VideoService` 在循环里 `selectById` 取用户名 → 改 `selectBatchIds` 批量查 + 内存 Map 回填。
+
+#### SQL/索引规范(强制)
+
+- **列表查询必须走索引**:WHERE + ORDER BY 字段必须在同一复合索引内,避免全表扫 + filesort。
+- **复合索引顺序**:等值字段在前,范围/排序字段在后。如 `idx_family_status_created(family_id, status, deleted, created_at)` 服务于 `WHERE family_id=? AND status=? AND deleted=0 ORDER BY created_at DESC`。
+- **逻辑删除字段进索引**:`deleted` 几乎所有查询都带,放进复合索引避免回表过滤。
+- **`ORDER BY RAND()` 慎用**:全表排序,大数据集慢。家庭照片/相册等小数据集(≤ 1000 行)可接受,加 `ponytail:` 注释说明。大数据集改 id 范围随机或预生成随机列表。
+- **物理删必须 XML DELETE**(见后端规范 6)。
+- **UPDATE 不先 select**(见后端规范 11)。
+
+#### 缓存失效矩阵(变更点 → invalidate)
+
+| 变更场景 | 失效缓存 | 调用方法 |
+|---------|---------|---------|
+| `PUT /profile`(改昵称/头像) | `ihomy:user:{uid}` | `SecurityHelper.invalidateUser(uid)` |
+| `PUT /member/{id}/role`(改角色) | `ihomy:perms:{uid}:{fid}` | `SecurityHelper.invalidatePerms(uid, fid)` |
+| `DELETE /member/{id}`(移出成员) | `ihomy:perms:{uid}:{fid}` | `SecurityHelper.invalidatePerms(uid, fid)` |
+| `POST /auth/family/switch`(切换家庭) | `ihomy:perms:{uid}:{newFid}` | `SecurityHelper.invalidatePerms(uid, newFid)` |
+| `POST /auth/join`(加入新家庭) | `ihomy:perms:{uid}:{newFid}` | `SecurityHelper.invalidatePerms(uid, newFid)` |
+| `PUT /home/modules`(改模块配置) | `ihomy:home:pub:{fid}` + 内存 familyCache | `PublicController.invalidateHomeCache(fid)` + `HomeModuleService.updateConfig` 内 evict |
+| `POST /home/modules`(新增模块) | 同上 | 同上 |
+| 照片上传/删除 | `ihomy:home:pub:{fid}` | `PublicController.invalidateHomeCache(fid)` |
+| 5min TTL 自然过期 | 所有 Redis 缓存 | 兜底机制 |
+
+#### 不建议改(成本高/收益低)
+
+- `TraceIdFilter` 用 `UUID.randomUUID()`(底层 SecureRandom)—— 单次 ~微秒,非瓶颈。
+- `JwtUtils.parse` 每次重建 parser —— jjwt parser build ~微秒,QPS 上千才值得。
+- BCrypt 密码加密 —— 安全要求,不可换。
+- `StorageService.run` 单线程串行复制 —— 手动触发一次性任务,非热点。
+- MyBatis-Plus 二级缓存 —— 默认未开(正确),二级缓存易脏数据,不推荐。
+- `stores/app.js` 不加 sessionStorage 缓存(家庭数据可变,in-memory 已够)。
+- `api/request.js` 不加请求去重/缓存(失效策略复杂,易脏数据)。
+- `AppSidebar.vue:102` 22 个 EP 图标同步导入(每个 ~1-2KB,树摇后约 30KB,改动态反而增加运行时开销)。
+
+#### 验证基线
+
+- 后端编译:`cd backend; .\mvnw.cmd -B clean compile -DskipTests` → BUILD SUCCESS
+- 前端构建:`cd frontend; npm run build` → 入口 chunk ≤ 200KB(当前 158KB)
+- 接口测试:`cd autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed
+
+#### 2026-08-17 性能优化执行记录
+
+> 三轮优化共 26 项,均通过 37 passed 测试零回归。下表为具体改动,作为后续审视/排错的索引。
+
+| 类别 | # | 文件 | 改动 |
+|------|---|------|------|
+| 零风险 | B2 | `schema.sql:441` | `content_photo` 加 `idx_family_created(family_id,deleted,created_at)` |
+| 零风险 | B11 | `application.yml:13-29` | HikariCP `maximum-pool-size:20`+`minimum-idle:5`+`connection-timeout:3000`+`idle-timeout:600000`+`max-lifetime:1800000` |
+| 零风险 | B16 | `application.yml:13-14` | `spring.threads.virtual.enabled: true`(JDK21 虚拟线程) |
+| 零风险 | F1 | `frontend/public/qweather-icons/` | 删整目录(365KB 冗余,已通过 node_modules 导入) |
+| 零风险 | F2 | `frontend/vite.config.js:53-62` | `build.rollupOptions.output.manualChunks` 拆 `element-plus`/`gsap`/`vue-i18n` |
+| 低风险 | B4 | `security/SecurityHelper.java` | `currentUser()` 走 Redis `ihomy:user:{id}` TTL 5min |
+| 低风险 | B5 | 同上 | `permissionCodes()` 走 Redis `ihomy:perms:{uid}:{fid}` TTL 5min |
+| 低风险 | B6 | `service/ActivityFeedService.java` | 收集 authorIds `selectBatchIds` 批量回填 |
+| 低风险 | B7 | `service/CommentService.java` | 收集 authorId + replyToUserId 批量回填 |
+| 低风险 | B8 | `service/{Anniversary,Video}Service.java` | list / listWishes 批量化 |
+| 低风险 | B10 | `service/HomeStatsService.java` | todayEvent + upcomingEvents 合并为一次查询 |
+| 低风险 | B12 | `service/HomeModuleService.java` | `@PostConstruct` 加载全局模块 + ConcurrentHashMap 家庭缓存 |
+| 低风险 | B15 | `service/ContentLikeService.java` | `syncCount` 改 `LambdaUpdateWrapper.set` 单 UPDATE |
+| 低风险 | F3 | `frontend/src/main.js` | `qweather-icons.css` 改 `import('...')` 异步 |
+| 低风险 | F4 | `frontend/src/utils/useDragResize.js` | onDragStart 挂/onMouseUp 移(不再 onMounted 常驻) |
+| 低风险 | F5 | `useSunLight.js` + `SunLightLayer.vue` + `main.css` | 删 lampRaf rAF,改 CSS `@keyframes lampSwing` |
+| 低风险 | F6 | `frontend/src/views/Home.vue` | `loadAll()` 三次串行 await 改 `Promise.all` |
+| 低风险 | F7 | `frontend/src/stores/app.js` | `init()` 两个 await 改 `Promise.all` |
+| 低风险 | F8 | `frontend/src/views/Home.vue` | `polaroidLayout` 从 computed 改 `ref` + `watch(recentPhotos, immediate)` |
+| 中风险 | B1 | `config/SqlStatementLog.java` + `application.yml:74-78` | `System.out.println` 改 SLF4J,由 `logging.level.mybatis.sql` 控制 |
+| 中风险 | B3 | `service/FileService.java` + 3 Controller | 新增 3 个 `MultipartFile` 流式重载(`transferTo` + `Files.copy` 兜底) |
+| 中风险 | B9 | `controller/PublicController.java` + `HomeController.java` + `PhotoController.java` | `/public/home` 非成员视图整包缓存 Redis 5min + 失效点 |
+| 中风险 | B13 | `mapper/PhotoMapper.xml:25` | 评估后保留 `ORDER BY RAND()`,加 `ponytail:` 注释(家庭照片 ≤ 1000 行,< 5ms 非瓶颈) |
+| 中风险 | B14 | `schema.sql:378,400` | `content_blog` 加 `idx_family_status_created`,`content_diary` 加 `idx_family_created` |
+
+**live DB 同步**:schema.sql 改动只对新装库生效。已有 DB 需手动执行(用 root 账号):
+```sql
+ALTER TABLE content_photo  ADD INDEX idx_family_created (family_id, deleted, created_at);
+ALTER TABLE content_blog   ADD INDEX idx_family_status_created (family_id, status, deleted, created_at);
+ALTER TABLE content_diary  ADD INDEX idx_family_created (family_id, deleted, created_at);
+```
 
 ## 文件存储策略
 
 - **当前阶段(开发期)**:本地磁盘存储(`file.upload-dir`),零成本零内存,FileService 已实现,开箱即用。Nginx `/files/` 托管静态目录(注意负向断言正则 `location ~* ^/(?!files/).+\.(...)$` 排除 /files/)。
-  - **本机 Windows 默认**:`D:/WorkSpace/ihomy/uploads`(application-dev.yml `file.upload-dir`);生产 Linux 用 `/opt/ihomy/uploads`(application.yml)。改路径只需改 yml + 移动 uploads 目录,DB 存的是相对 `/files/` 的完整 URL,与物理根无关。
+  - **路径配置**:`application.yml` 的 `file.upload-dir` 基线为生产路径 `/opt/ihomy/uploads`(Linux);开发环境通过 external.yml 覆盖为 Windows 路径 `D:\WorkSpace\ihomy\uploads`。DB 存的是相对 `/files/` 的完整 URL,与物理根无关,改路径只需改 yml + 移动 uploads 目录。
 - **未来对接 NAS**:优先 NFS 挂载方案(把 NAS 共享目录挂到 `/opt/ihomy/uploads`,**代码零改动**)。前提是 NAS 与服务器同内网。详细步骤见 Linux 部署指导附录"对接 NAS 存储"。若 NAS 异地或要公网 CDN:再改 FileService 用 S3 兼容 SDK(NAS/MinIO/OSS 通用),用 `@ConditionalOnProperty` 切换实现,本地实现保留为默认。
 - **不要主动改 FileService 的存储实现**,除非用户明确要求接 NAS/OSS。当前本地实现满足需求。
 - **统一目录结构(分类目录,无 upload 中间层)**:上传按类型分目录——相册图片→`pictures/{相册名}/{相册ID}_{时间戳}_{文件名}`、视频与海报→`videos/`、音乐(audio/*)→`music/`、通用/头像→`files/{yyyyMM}/`。FileService 提供 `upload(bytes,name,type,albumId,albumName)`(图片带相册名)、`uploadVideo`(影片/海报)、3 参 `upload`(通用)重载;无相册名时图片平铺到 `pictures/`。DB 存 `/files/...` 完整 URL,与物理根解耦。
@@ -291,7 +398,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **WeatherService 改造**:`loadCredential()` 读到的私钥若 `ENC(...)` 包裹,调 `parameterService.decrypt()` 解密;DB 和 yml 两条路径都支持。
 - **OPS 加密接口**:`GET /api/ops/crypto/encrypt?plaintext=xxx` 生成密文,`GET /api/ops/crypto/decrypt?ciphertext=ENC(xxx)` 验证解密(均 @RequirePermission("ops:view"))。
 - **外挂模板**:`backend/src/main/resources/external.yml.template`(复制为 external.yml 填真实凭证,设环境变量)。
-- **profile 化**:`application.yml` 即生产配置(MySQL 6306/Redis 6379/Linux 路径/captcha 空/天气留空),jar 内嵌即生产,部署无需外部配置覆盖;`IHOMY_CONFIG_PATH` 指向 external.yml 覆盖敏感配置。
+- **profile 化(废弃)**:**不再用 application-dev.yml profile**(见 `scripts/start-all.ps1:9`)。`application.yml` 为**生产基线配置**(MySQL 6306/Redis 6379/密码 `Ihomy@2026` 占位/captcha 空/天气留空/`file.upload-dir: /opt/ihomy/uploads` Linux 路径/`spring.threads.virtual.enabled: true` 虚拟线程/HikariCP `maximum-pool-size: 20`/`mybatis.sql: warn` 静默 SQL 日志);**所有环境差异**(开发密码/Windows 路径/captcha=qwer/天气凭证/JWT 密钥/Redis 密码)统一走 `IHOMY_CONFIG_PATH` 指向的 external.yml 覆盖。external.yml 不入 git,手动维护,生产部署时也可用 external.yml 注入真实 secrets(密码/密钥)。
 
 ## 部署约定(Linux 2GB 求稳)
 

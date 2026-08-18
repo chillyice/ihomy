@@ -260,6 +260,8 @@ public class AuthService {
             }
         }
         SysUser user = sysUserMapper.selectById(userId);
+        // 切换家庭后新家庭权限码不同,主动失效(虽然 5min TTL 也会自然过期,但切换是显式语义)
+        securityHelper.invalidatePerms(userId, familyId);
         return buildTokens(user, roleCode, familyId);
     }
 
@@ -286,6 +288,8 @@ public class AuthService {
 
         ic.setUsedCount(ic.getUsedCount() + 1);
         invitationCodeMapper.updateById(ic);
+        // 新加入家庭后权限码列表变化,主动失效
+        securityHelper.invalidatePerms(userId, ic.getFamilyId());
     }
 
     private Long curFamily(Long userId) {

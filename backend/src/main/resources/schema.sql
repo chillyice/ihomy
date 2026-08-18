@@ -374,7 +374,8 @@ CREATE TABLE `content_blog` (
   `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
   PRIMARY KEY (`id`),
   KEY `idx_author` (`author_id`),
-  KEY `idx_family` (`family_id`)
+  KEY `idx_family` (`family_id`),
+  KEY `idx_family_status_created` (`family_id`, `status`, `deleted`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='博客表';
 
 -- ------------------------------------------------------------
@@ -396,7 +397,8 @@ CREATE TABLE `content_diary` (
   `deleted`    TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
   PRIMARY KEY (`id`),
   KEY `idx_author` (`author_id`),
-  KEY `idx_family` (`family_id`)
+  KEY `idx_family` (`family_id`),
+  KEY `idx_family_created` (`family_id`, `deleted`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='日记表';
 
 -- ------------------------------------------------------------
@@ -437,7 +439,8 @@ CREATE TABLE `content_photo` (
   `deleted`    TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
   PRIMARY KEY (`id`),
   KEY `idx_album` (`album_id`),
-  KEY `idx_author` (`author_id`)
+  KEY `idx_author` (`author_id`),
+  KEY `idx_family_created` (`family_id`, `deleted`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='照片表';
 
 -- ------------------------------------------------------------
@@ -700,7 +703,8 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('member', '家庭成员', 'icon-member', '/member', 'social',  'right',  1, 1),
 ('cover',  '家庭封面', 'icon-cover',  '/cover',  'system',  'top',    1, 0),
 ('storage','存储管理', 'icon-storage','/storage','system',  'left',  15, 1),
-('item','物品定位',   'icon-item',   '/item',   'life',    'left',  16, 1);
+('item','物品定位',   'icon-item',   '/item',   'life',    'left',  16, 1),
+('kitchen','厨房',     'icon-kitchen','/kitchen','life',    'left',  17, 1);
 
 -- ------------------------------------------------------------
 -- 26. 初始家庭 + 管理员账号
@@ -1084,7 +1088,34 @@ INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
 ('invite_status','UNUSED', '未使用'),
 ('invite_status','USED',   '已使用'),
 ('role_status', 'ENABLED',  '启用'),
-('role_status', 'DISABLED', '停用');
+('role_status', 'DISABLED', '停用'),
+-- 厨房菜谱字典(V7.0)
+('recipe_cuisine', 'CHUAN',  '川菜'),
+('recipe_cuisine', 'YUE',    '粤菜'),
+('recipe_cuisine', 'LU',     '鲁菜'),
+('recipe_cuisine', 'SU',     '苏菜'),
+('recipe_cuisine', 'ZHE',    '浙菜'),
+('recipe_cuisine', 'MIN',    '闽菜'),
+('recipe_cuisine', 'XIANG',  '湘菜'),
+('recipe_cuisine', 'HUI',    '徽菜'),
+('recipe_cuisine', 'OTHER',  '其他'),
+('recipe_category', 'HOT',      '热菜'),
+('recipe_category', 'HARD',     '硬菜'),
+('recipe_category', 'COLD',     '凉菜'),
+('recipe_category', 'STAPLE',   '主食'),
+('recipe_category', 'PORRIDGE', '粥饮'),
+('recipe_category', 'DESSERT',  '甜点'),
+('recipe_flavor', 'SAVORY',     '咸鲜'),
+('recipe_flavor', 'SPICY',      '麻辣'),
+('recipe_flavor', 'SWEET_SOUR', '酸甜'),
+('recipe_flavor', 'LIGHT',      '清淡'),
+('recipe_flavor', 'OTHER',      '其他'),
+('item_type', 'KITCHENWARE', '厨具'),
+('item_type', 'INGREDIENT',  '食材'),
+('item_type', 'DAILY',       '日化'),
+('item_type', 'CLOTHES',     '衣服'),
+('item_type', 'TOOL',        '工具'),
+('item_type', 'OTHER',       '其他');
 -- ------------------------------------------------------------
 -- 41. 身份标签表(V3.9): 成员在家庭内的身份标签(如"爸爸""妈妈"),每家庭一套
 --     预设 爸爸/妈妈;其余(如"大宝")为自定义。user_id+family_id 唯一。
@@ -1192,17 +1223,21 @@ DROP TABLE IF EXISTS `family_item`;
 CREATE TABLE `family_item` (
   `id`            BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
   `family_id`     BIGINT       NOT NULL COMMENT '所属家庭ID',
-  `furniture_id`  BIGINT       NOT NULL COMMENT '所在家具ID',
+  `furniture_id`  BIGINT       DEFAULT NULL COMMENT '所在家具ID(可空,散放物品如食材)',
   `name`          VARCHAR(100) NOT NULL COMMENT '物品名(如 工具箱)',
   `aliases`       VARCHAR(200) DEFAULT NULL COMMENT '别名,逗号分隔(3期 AI 搜索匹配用)',
   `position`      VARCHAR(50)  DEFAULT NULL COMMENT '位置(最上层抽屉/台面/地面...)',
+  `image_url`     VARCHAR(500) DEFAULT NULL COMMENT '物品图片URL',
+  `type`          VARCHAR(20)  NOT NULL DEFAULT 'OTHER' COMMENT '类型:KITCHENWARE厨具/INGREDIENT食材/DAILY日化/CLOTHES衣服/TOOL工具/OTHER其他',
+  `quantity`      DECIMAL(10,2) DEFAULT NULL COMMENT '数量(食材用)',
+  `unit`          VARCHAR(20)  DEFAULT NULL COMMENT '单位(个/斤/瓶/袋/克)',
   `note`          VARCHAR(500) DEFAULT NULL COMMENT '备注',
   `created_by`    BIGINT       DEFAULT NULL COMMENT '创建人ID',
   `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   KEY `idx_furniture` (`furniture_id`),
-  KEY `idx_family` (`family_id`)
+  KEY `idx_family_type` (`family_id`, `type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='物品表(物品定位)';
 
 -- ------------------------------------------------------------
@@ -1286,6 +1321,34 @@ CREATE TABLE `family_music` (
   PRIMARY KEY (`id`),
   KEY `idx_family` (`family_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭共享歌单表';
+
+-- ------------------------------------------------------------
+-- 49.1 family_recipe 厨房菜谱表(V7.0)
+--     单表 + JSON 字段存素材/设备/步骤,不拆子表(无需反向查询)
+--     ingredients:[{name,quantity,unit,ingredient_id?}]
+--     equipment:[{name,item_id?}]
+--     steps:[{order,content,image_url?,video_url?}]
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_recipe`;
+CREATE TABLE `family_recipe` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`   BIGINT       NOT NULL COMMENT '家庭ID',
+  `name`        VARCHAR(100) NOT NULL COMMENT '菜名',
+  `cover_image` VARCHAR(500) DEFAULT NULL COMMENT '封面图URL',
+  `cuisine`     VARCHAR(20)  NOT NULL DEFAULT 'OTHER' COMMENT '菜系:CHUAN/YUE/LU/SU/ZHE/MIN/XIANG/HUI/OTHER',
+  `category`    VARCHAR(20)  NOT NULL DEFAULT 'HOT' COMMENT '类别:HOT热菜/HARD硬菜/COLD凉菜/STAPLE主食/PORRIDGE粥饮/DESSERT甜点',
+  `flavor`      VARCHAR(20)  DEFAULT NULL COMMENT '风味:SAVORY咸鲜/SPICY麻辣/SWEET_SOUR酸甜/LIGHT清淡/OTHER',
+  `description` VARCHAR(500) DEFAULT NULL COMMENT '简介',
+  `ingredients` JSON         DEFAULT NULL COMMENT '素材列表[{name,quantity,unit,ingredient_id}]',
+  `equipment`   JSON         DEFAULT NULL COMMENT '设备列表[{name,item_id}]',
+  `steps`       JSON         DEFAULT NULL COMMENT '步骤列表[{order,content,image_url,video_url}]',
+  `author_id`   BIGINT       NOT NULL COMMENT '作者ID',
+  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  PRIMARY KEY (`id`),
+  KEY `idx_family_category` (`family_id`, `category`, `deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭菜谱表';
 
 -- ------------------------------------------------------------
 -- 50. sys_weather_location 和风天气地区表(V6.2)

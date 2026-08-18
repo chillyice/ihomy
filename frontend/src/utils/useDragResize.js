@@ -1,4 +1,4 @@
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onUnmounted } from 'vue'
 
 // 可拖动+可调整大小的组合式函数,位置/大小持久化到 localStorage
 // 用法:const { pos, size, reset } = useDragResize({ x, y, w, h, storageKey, minY, anchorRight, marginLeft })
@@ -53,6 +53,9 @@ export function useDragResize(initial) {
     startY = e.clientY
     startPos = { ...pos.value }
     e.preventDefault()
+    // 拖拽开始才挂监听器,空闲无 listener(参考 AvatarCropper.vue 的写法)
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
   }
   const onResizeStart = (e) => {
     resizing.value = true
@@ -63,6 +66,9 @@ export function useDragResize(initial) {
     startSize = { ...size.value }
     e.preventDefault()
     e.stopPropagation()
+    // resize 开始才挂监听器
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
   }
   const onMouseMove = (e) => {
     const vw = window.innerWidth
@@ -110,16 +116,17 @@ export function useDragResize(initial) {
     if (dragging.value || resizing.value) save()
     dragging.value = false
     resizing.value = false
+    // 拖拽/resize 结束立即移除监听器
+    window.removeEventListener('mousemove', onMouseMove)
+    window.removeEventListener('mouseup', onMouseUp)
   }
   const reset = () => {
     pos.value = { x: initial.x ?? 0, y: initial.y ?? 0 }
     size.value = { w: initial.w ?? 320, h: initial.h ?? 200 }
     if (key) { try { localStorage.removeItem(key) } catch (e) {} }
   }
-  onMounted(() => {
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
-  })
+  // 不再在 onMounted 常驻 mousemove/mouseup,改由 onDragStart/onResizeStart 时挂载
+  // onUnmounted 仅做兜底清理(避免异常退出路径漏移除)
   onUnmounted(() => {
     window.removeEventListener('mousemove', onMouseMove)
     window.removeEventListener('mouseup', onMouseUp)

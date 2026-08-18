@@ -164,16 +164,16 @@ public class ItemService {
 
     // ---------- 物品 ----------
 
-    public List<Map<String, Object>> itemList(Long familyId, String keyword, Long roomId, Long furnitureId) {
+    public List<Map<String, Object>> itemList(Long familyId, String keyword, Long roomId, Long furnitureId, String type) {
         return itemMapper.selectItemByFamily(familyId,
                 keyword == null || keyword.isBlank() ? null : keyword.trim(),
-                roomId, furnitureId);
+                roomId, furnitureId, type);
     }
 
     public Item itemCreate(Long userId, Long familyId, ItemDTO dto) {
         requireText(dto.getName(), "请填写物品名");
-        if (dto.getFurnitureId() == null || requireFurniture(dto.getFurnitureId(), familyId) == null) {
-            throw new BizException(ResultCode.BAD_REQUEST, "请选择所在家具");
+        if (dto.getFurnitureId() != null) {
+            requireFurniture(dto.getFurnitureId(), familyId);
         }
         Item i = new Item();
         i.setFamilyId(familyId);
@@ -181,6 +181,10 @@ public class ItemService {
         i.setName(dto.getName());
         i.setAliases(dto.getAliases());
         i.setPosition(dto.getPosition());
+        i.setImageUrl(dto.getImageUrl());
+        i.setType(dto.getType() == null ? "OTHER" : dto.getType());
+        i.setQuantity(dto.getQuantity());
+        i.setUnit(dto.getUnit());
         i.setNote(dto.getNote());
         i.setCreatedBy(userId);
         itemMapper.insert(i);
@@ -190,10 +194,16 @@ public class ItemService {
     public void itemUpdate(Long id, Long familyId, ItemDTO dto) {
         Item i = requireItem(id, familyId);
         if (dto.getName() != null) i.setName(dto.getName());
-        if (dto.getFurnitureId() != null) requireFurniture(dto.getFurnitureId(), familyId);
-        if (dto.getFurnitureId() != null) i.setFurnitureId(dto.getFurnitureId());
+        if (dto.getFurnitureId() != null) {
+            requireFurniture(dto.getFurnitureId(), familyId);
+            i.setFurnitureId(dto.getFurnitureId());
+        }
         i.setAliases(dto.getAliases());
         i.setPosition(dto.getPosition());
+        i.setImageUrl(dto.getImageUrl());
+        if (dto.getType() != null) i.setType(dto.getType());
+        i.setQuantity(dto.getQuantity());
+        i.setUnit(dto.getUnit());
         i.setNote(dto.getNote());
         itemMapper.updateById(i);
     }

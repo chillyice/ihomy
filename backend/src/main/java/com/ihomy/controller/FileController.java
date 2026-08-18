@@ -28,7 +28,7 @@ public class FileController {
     @OperationLog(module = "FILE", operationType = "CREATE", description = "上传文件", saveArgs = false)
     @PostMapping("/upload")
     public Result<Map<String, String>> upload(@RequestParam("file") MultipartFile file) throws IOException {
-        String url = fileService.upload(file.getBytes(), file.getOriginalFilename(), file.getContentType());
+        String url = fileService.upload(file, file.getOriginalFilename(), file.getContentType());
         Map<String, String> data = new HashMap<>();
         data.put("url", url);
         return Result.success(data);

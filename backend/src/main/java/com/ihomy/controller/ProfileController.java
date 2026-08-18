@@ -46,6 +46,7 @@ public class ProfileController {
         if (dto.getBirthday() != null) user.setBirthday(dto.getBirthday());
         if (dto.getGender() != null) user.setGender(dto.getGender());
         sysUserMapper.updateById(user);
+        securityHelper.invalidateUser(user.getId());
         return Result.success(user);
     }
 

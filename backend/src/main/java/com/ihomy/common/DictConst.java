@@ -94,6 +94,22 @@ public final class DictConst {
     public static final String INVITE_UNUSED = "UNUSED";
     private static final String INVITE_FALLBACK = INVITE_UNUSED;
 
+    /** 菜谱类别 recipe_category */
+    public static final String RECIPE_HOT = "HOT";
+    public static final String RECIPE_HARD = "HARD";
+    public static final String RECIPE_COLD = "COLD";
+    public static final String RECIPE_STAPLE = "STAPLE";
+    public static final String RECIPE_PORRIDGE = "PORRIDGE";
+    public static final String RECIPE_DESSERT = "DESSERT";
+
+    /** 物品类型 item_type */
+    public static final String ITEM_KITCHENWARE = "KITCHENWARE";
+    public static final String ITEM_INGREDIENT = "INGREDIENT";
+    public static final String ITEM_DAILY = "DAILY";
+    public static final String ITEM_CLOTHES = "CLOTHES";
+    public static final String ITEM_TOOL = "TOOL";
+    public static final String ITEM_OTHER = "OTHER";
+
     /* ---------------- 整数(历史 DTO 入参)→ 字典词 转换 ---------------- */
 
     public static String visibility(Integer v) {

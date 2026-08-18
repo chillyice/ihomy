@@ -49,11 +49,9 @@
     </div>
 
     <!-- 台灯光源:左上黄金分割点 + 钟摆运动,最顶层(opacity 为 0 时移除) -->
-    <div v-if="(lampDivOpacity ?? 0) > 0.01" class="lamp-light" :style="{
+    <div v-if="(lampDivOpacity ?? 0) > 0.01" class="lamp-light lamp-light-pendulum" :style="{
       opacity: lampDivOpacity,
-      left: 'calc(38.2% + ' + lampPendulumX + 'vw)',
       top: '38.2%',
-      transform: 'translate(-50%, -50%) scaleX(' + lampPendulumScaleX + ')',
       width: (lampRadius * 2) + 'vw',
       height: (lampRadius * 2) + 'vw',
       background: 'radial-gradient(circle, rgba(' + lampColor + ',0.6) 0%, rgba(' + lampColor + ',0.45) 15%, rgba(' + lampColor + ',0.3) 35%, rgba(' + lampColor + ',0.18) 55%, rgba(' + lampColor + ',0.08) 75%, transparent 95%)'
@@ -123,7 +121,6 @@ if (!light) {
 }
 const {
   sunScene, lampMask, lampDivOpacity, lampRadius, lampColor, shadowEnabled, weatherShadowOpacity, lightLayerOpacity, blobsEnabled,
-  lampPendulumX, lampPendulumScaleX,
   dustParticles, snowParticles, rainParticles, rayStyles, sourceStyle, bloomStyle, brightSpotStyle, reflectionStyle,
 } = light || {}
 </script>

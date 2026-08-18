@@ -2,7 +2,7 @@
 // 从 Home.vue 提取,供 SunLightLayer.vue 和全局使用
 // 用法:App.vue 调用 useSunLight() 并 provide(SUN_LIGHT_KEY, state)
 //       SunLightLayer/AppSidebar 用 inject(SUN_LIGHT_KEY) 获取同一实例
-import { ref, reactive, computed, watch, onMounted, onUnmounted, watchEffect } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { gsap } from 'gsap'
 import { getSunScene, currentSlotIndex } from '@/utils/windowLight'
 import { applyAutoTheme } from '@/theme'
@@ -159,27 +159,9 @@ export function useSunLight() {
   const lampRadius = computed(() => 65)
   const lampMaskAlpha = computed(() => 0.03 + 0.97 * lampB.value)
 
-  const lampPendulumX = ref(0)
-  const lampPendulumScaleX = ref(1)
-  let lampRaf = null
-  const startPendulum = () => {
-    if (lampRaf) return
-    const t0 = performance.now()
-    const PERIOD = 8000
-    const loop = (t) => {
-      const phase = ((t - t0) % PERIOD) / PERIOD * Math.PI * 2
-      const sin = Math.sin(phase)
-      lampPendulumX.value = sin * 5
-      lampPendulumScaleX.value = 1 - Math.abs(sin) * 0.2
-      lampRaf = requestAnimationFrame(loop)
-    }
-    lampRaf = requestAnimationFrame(loop)
-  }
-  const stopPendulum = () => {
-    if (lampRaf) { cancelAnimationFrame(lampRaf); lampRaf = null }
-  }
+  // 钟摆运动已改为 CSS @keyframes lampSwing(见 main.css .lamp-light-pendulum),
+  // 不再用 requestAnimationFrame 每帧写 ref,完全绕过 Vue 响应式。
 
-  // mask 中心固定(不随钟摆变化),避免每帧重栅格化 3 个全屏 fixed 元素;只有台灯 div 本身做钟摆
   const lampMask = computed(() => {
     const s = lampStrengthAnim.value
     if (s <= 0.01) return 'none'
@@ -324,10 +306,7 @@ export function useSunLight() {
   onMounted(() => {
     loadSunInfo()
     loadWeather()
-    watchEffect(() => {
-      if (lampStrength.value > 0) startPendulum()
-      else stopPendulum()
-    })
+    // 钟摆运动已改为 CSS @keyframes,无需 JS rAF;lampStrength 变化只决定元素是否渲染
     // 空闲检测:注册用户活动事件(mousemove 节流),启动超时定时器
     IDLE_EVENTS.forEach(e => window.addEventListener(e, resetIdle, { passive: true }))
     IDLE_EVENTS_THROTTLED.forEach(e => window.addEventListener(e, resetIdle, { passive: true }))
@@ -362,7 +341,6 @@ export function useSunLight() {
   })
 
   onUnmounted(() => {
-    stopPendulum()
     lampTween?.kill()
     if (cloudTimer) clearInterval(cloudTimer)
     cloudTween?.kill()
@@ -380,7 +358,6 @@ export function useSunLight() {
     lampMode, lampTemp, lampBrightness, shadowEnabled, weatherEffectEnabled, blobsEnabled, toggleLamp,
     idleMinutes, isIdle,
     lampStrength, lampStrengthAnim, lampDivOpacity, lampRadius, lampMask, lampColor,
-    lampPendulumX, lampPendulumScaleX,
     dustParticles, snowParticles, rainParticles, weatherShadowOpacity, lightLayerOpacity, rayStyles, sourceStyle, bloomStyle, brightSpotStyle, reflectionStyle,
     lightTestMode, lightTestPaused, weatherMode, precipLevel, setWeather, startLightTest, pauseLightTest, stepLightTest, stopLightTest,
   }

@@ -21,6 +21,10 @@ public class Item {
     private String name;
     private String aliases;
     private String position;
+    private String imageUrl;
+    private String type;
+    private java.math.BigDecimal quantity;
+    private String unit;
     private String note;
     private Long createdBy;
     private LocalDateTime createdAt;

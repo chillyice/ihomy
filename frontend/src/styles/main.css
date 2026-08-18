@@ -175,3 +175,16 @@ a { color: var(--color-accent); text-decoration: none; }
   -webkit-backdrop-filter: blur(20px) saturate(1.4);
   border: 1px solid rgba(255, 255, 255, 0.2) !important;
 }
+
+
+/* 台灯钟摆运动:8s 周期 ease-in-out 近似 sin 波,scaleX 在峰值时收缩 0.8。
+   替代原 useSunLight.js 的 requestAnimationFrame 每帧写 ref,完全绕过 Vue 响应式。 */
+@keyframes lampSwing {
+  0%, 100% { left: 38.2%; transform: translate(-50%, -50%) scaleX(1); }
+  25%      { left: calc(38.2% - 5vw); transform: translate(-50%, -50%) scaleX(0.8); }
+  50%      { left: 38.2%; transform: translate(-50%, -50%) scaleX(1); }
+  75%      { left: calc(38.2% + 5vw); transform: translate(-50%, -50%) scaleX(0.8); }
+}
+.lamp-light-pendulum {
+  animation: lampSwing 8s ease-in-out infinite;
+}

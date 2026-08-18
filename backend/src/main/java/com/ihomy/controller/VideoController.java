@@ -47,7 +47,7 @@ public class VideoController {
     @OperationLog(module = "VIDEO", operationType = "CREATE", description = "上传视频", saveArgs = false)
     @PostMapping("/upload")
     public Result<Map<String, String>> upload(@RequestParam("file") MultipartFile file) throws IOException {
-        String url = fileService.uploadVideo(file.getBytes(), file.getOriginalFilename(), file.getContentType());
+        String url = fileService.uploadVideo(file, file.getOriginalFilename(), file.getContentType());
         Map<String, String> data = new HashMap<>();
         data.put("url", url);
         return Result.success(data);

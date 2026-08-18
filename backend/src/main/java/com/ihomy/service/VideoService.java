@@ -44,7 +44,9 @@ public class VideoService {
           .eq(mediaType != null && !mediaType.isBlank(), Video::getMediaType, mediaType)
           .like(keyword != null && !keyword.isBlank(), Video::getTitle, keyword)
           .orderByDesc(Video::getCreatedAt);
-        for (Video v : videoMapper.selectList(qw)) {
+        List<Video> videos = videoMapper.selectList(qw);
+        Map<Long, SysUser> userMap = batchUsers(videos.stream().map(Video::getUploaderId));
+        for (Video v : videos) {
             Map<String, Object> m = new HashMap<>();
             m.put("id", v.getId());
             m.put("title", v.getTitle());
@@ -63,7 +65,8 @@ public class VideoService {
             m.put("poster", v.getPoster());
             m.put("videoUrl", v.getVideoUrl());
             m.put("uploaderId", v.getUploaderId());
-            m.put("uploaderName", resolveUserName(v.getUploaderId()));
+            SysUser u = v.getUploaderId() == null ? null : userMap.get(v.getUploaderId());
+            m.put("uploaderName", UserNames.of(u));
             m.put("createdAt", v.getCreatedAt());
             result.add(m);
         }
@@ -151,7 +154,9 @@ public class VideoService {
         qw.eq(VideoWish::getFamilyId, familyId)
           .eq(VideoWish::getDeleted, 0)
           .orderByDesc(VideoWish::getCreatedAt);
-        for (VideoWish w : videoWishMapper.selectList(qw)) {
+        List<VideoWish> wishes = videoWishMapper.selectList(qw);
+        Map<Long, SysUser> userMap = batchUsers(wishes.stream().map(VideoWish::getRequesterId));
+        for (VideoWish w : wishes) {
             Map<String, Object> m = new HashMap<>();
             m.put("id", w.getId());
             m.put("title", w.getTitle());
@@ -159,11 +164,24 @@ public class VideoService {
             m.put("reason", w.getReason());
             m.put("status", w.getStatus());
             m.put("requesterId", w.getRequesterId());
-            m.put("requesterName", resolveUserName(w.getRequesterId()));
+            SysUser u = w.getRequesterId() == null ? null : userMap.get(w.getRequesterId());
+            m.put("requesterName", UserNames.of(u));
             m.put("createdAt", w.getCreatedAt());
             result.add(m);
         }
         return result;
+    }
+
+    /** 批量取用户,返回 id→SysUser 映射(空集返空 Map) */
+    private Map<Long, SysUser> batchUsers(java.util.stream.Stream<Long> ids) {
+        java.util.Set<Long> set = ids.filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+        if (set.isEmpty()) return Map.of();
+        List<SysUser> users = sysUserMapper.selectBatchIds(set);
+        Map<Long, SysUser> map = new HashMap<>(users.size() * 2);
+        for (SysUser u : users) {
+            map.put(u.getId(), u);
+        }
+        return map;
     }
 
     /** 标记想看已入库(status=1),须同家庭 */
