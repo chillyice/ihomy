@@ -556,7 +556,7 @@ const createNewFamily = async () => {
     const { value } = await ElMessageBox.prompt('请输入新家庭名称', '创建新家庭', {
       confirmButtonText: '创建',
       cancelButtonText: '取消',
-      showClose: true,
+      showClose: false,
       inputPattern: /.+/,
       inputErrorMessage: '家庭名称不能为空',
     })
