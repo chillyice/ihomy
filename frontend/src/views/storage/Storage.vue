@@ -1,8 +1,6 @@
 <!-- 存储管理页:家庭存储设备 + 文件浏览器 + 一键同步(设备目录→相册) -->
 <template>
-  <div class="page">
-    <Breadcrumb :items="[{ label: $t('storage.title') }]" />
-
+  <div class="storage-settings">
     <!-- 设备管理 -->
     <div class="card section">
       <div class="list-header">
@@ -127,7 +125,6 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { storageApi } from '@/api'
-import Breadcrumb from '@/components/Breadcrumb.vue'
 
 const { t } = useI18n()
 const userStore = useUserStore()
@@ -336,6 +333,7 @@ onBeforeUnmount(() => { if (syncTimer) clearInterval(syncTimer) })
 </script>
 
 <style scoped>
+.storage-settings { width: 100%; }
 .section {
   margin-bottom: 16px;
   padding: 16px;

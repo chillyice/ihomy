@@ -36,6 +36,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { chatApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import Breadcrumb from '@/components/Breadcrumb.vue'
 
 const userStore = useUserStore()
 const myId = computed(() => userStore.userInfo?.id)

@@ -19,6 +19,7 @@
     <BackToTop />
     <InstallPrompt />
     <MusicPlayer />
+    <LightTestConsole />
     <SiteFooter />
   </el-config-provider>
 </template>
@@ -38,6 +39,7 @@ import BackToTop from '@/components/BackToTop.vue'
 import InstallPrompt from '@/components/InstallPrompt.vue'
 import MusicPlayer from '@/components/MusicPlayer.vue'
 import SiteFooter from '@/components/SiteFooter.vue'
+import LightTestConsole from '@/components/LightTestConsole.vue'
 
 const appStore = useAppStore()
 const userStore = useUserStore()
@@ -69,18 +71,15 @@ watch(
 .app-main {
   min-height: 100vh;
   position: relative;
+  z-index: 10;
   transition: margin-left 0.3s ease;
-  /* 隔离合层:页面切换 transition 的 transform 不触发 AppSidebar/MusicPlayer 的 backdrop-filter 重算 */
-  contain: layout style;
+  contain: style;
 }
 .app-main.with-sidebar {
   margin-left: 220px;
 }
-/* 页面根元素:z-index 10 确保在背景色块(z=1)之上、窗框阴影(z=35)之下 */
-/* 光影层的 multiply/screen 混合模式可正确作用于内容(同一 stacking context) */
 .app-main > * {
   position: relative;
-  z-index: 10;
 }
 
 /* 页面滑动过渡:当前页面整体向下滑出,新页面从上方滑入 */

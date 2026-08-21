@@ -219,43 +219,7 @@
     </div>
 
     <!-- 音乐播放器已全局化到 MusicPlayer.vue(App.vue 挂载) -->
-
-    <!-- 光照测试控制台:左下角,点击"进入光照测试"后显示 -->
-    <div v-if="sunLight?.lightTestMode.value" class="light-test-console">
-      <div class="lt-header">
-        <span class="lt-title">光照测试</span>
-        <span class="lt-time">{{ testTimeDisplay }}</span>
-        <button class="lt-btn lt-reset" @click="sunLight.stopLightTest" title="重置到真实时间并关闭">⏹</button>
-      </div>
-      <div class="lt-info">
-        <span>高度 {{ sunLight.sunScene.value.altitude?.toFixed(1) }}°</span>
-        <span>方位 {{ sunLight.sunScene.value.azimuth?.toFixed(1) }}°</span>
-        <span class="lt-phase">{{ testPhase }}</span>
-      </div>
-      <div class="lt-info" v-if="sunLight?.sunInfo.value">
-        <span>日出 {{ sunLight.sunInfo.value.sunrise || '--' }}</span>
-        <span>日落 {{ sunLight.sunInfo.value.sunset || '--' }}</span>
-      </div>
-      <div class="lt-controls">
-        <button class="lt-btn" @click="sunLight.stepLightTest(-1)" title="后退 5 分钟">⏮</button>
-        <button class="lt-btn lt-main" @click="sunLight.pauseLightTest">{{ sunLight.lightTestPaused.value ? '▶' : '⏸' }}</button>
-        <button class="lt-btn" @click="sunLight.stepLightTest(1)" title="前进 5 分钟">⏭</button>
-      </div>
-      <div class="lt-weather">
-        <button class="lt-btn" :class="{ active: sunLight.weatherMode.value === 'clear' }" @click="sunLight.setWeather('clear', 0)" title="晴天">☀️</button>
-        <button class="lt-btn" :class="{ active: sunLight.weatherMode.value === 'cloud' }" @click="sunLight.setWeather('cloud', 0)" title="多云">☁️</button>
-        <button class="lt-btn" :class="{ active: sunLight.weatherMode.value === 'rain' }" @click="sunLight.setWeather('rain', sunLight.precipLevel.value || 1)" title="下雨">🌧️</button>
-        <button class="lt-btn" :class="{ active: sunLight.weatherMode.value === 'snow' }" @click="sunLight.setWeather('snow', sunLight.precipLevel.value || 1)" title="下雪">❄️</button>
-      </div>
-      <div v-if="sunLight.weatherMode.value === 'rain' || sunLight.weatherMode.value === 'snow'" class="lt-sliders">
-        <label class="lt-slider-row"><span>{{ sunLight.weatherMode.value === 'rain' ? '雨量' : '雪量' }}</span><input type="range" min="1" max="6" v-model.number="sunLight.precipLevel.value" class="lt-slider" @input="sunLight.setWeather(sunLight.weatherMode.value, sunLight.precipLevel.value)" /></label>
-      </div>
-      <div class="lt-sliders">
-        <label class="lt-slider-row"><span>色温</span><input type="range" min="0" max="100" v-model.number="sunLight.lampTemp.value" class="lt-slider" /></label>
-        <label class="lt-slider-row"><span>亮度</span><input type="range" min="0" max="100" v-model.number="sunLight.lampBrightness.value" class="lt-slider" /></label>
-      </div>
-      <div class="lt-progress"><div class="lt-progress-fill" :style="{ width: ((sunLight.slotIdx.value / 288) * 100) + '%' }"></div></div>
-    </div>
+    <!-- 光照测试控制台已全局化到 LightTestConsole.vue(App.vue 挂载) -->
   </div>
 </template>
 
@@ -349,26 +313,7 @@ const openViewer = (idx) => { viewerIdx.value = idx; viewerVisible.value = true 
 
 const feedTypeLabel = (type) => type === 'blog' ? '博客' : type === 'diary' ? '日记' : type === 'photo' ? '照片' : ''
 
-// 光照测试:时隙索引→时间显示 + 阶段标签
-const testTimeDisplay = computed(() => {
-  if (!sunLight) return ''
-  const idx = sunLight.slotIdx.value
-  const totalMin = idx * 5
-  const h = Math.floor(totalMin / 60)
-  const m = totalMin % 60
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-})
-const testPhase = computed(() => {
-  if (!sunLight) return ''
-  const s = sunLight.sunScene.value
-  if (s.isNight) return '夜间'
-  const p = s.dayProgress ?? 0
-  if (p < 0.1) return '日出'
-  if (p < 0.25) return '清晨'
-  if (p < 0.75) return '日间'
-  if (p < 0.9) return '傍晚'
-  return '日落'
-})
+// 光照测试控制台已全局化到 LightTestConsole.vue
 const feedSummary = (f) => {
   if (f.type === 'blog') return f.title || ''
   if (f.type === 'diary') return (f.content || '').slice(0, 40)
@@ -996,48 +941,4 @@ html.dark .tp-num { color: #D4886A; }
   .polaroid { width: 120px; margin-left: -60px; margin-top: -68px; }
   .topbar-date { display: none; }
 }
-
-/* === 光照测试控制台(左下角) === */
-.light-test-console {
-  position: fixed;
-  left: 240px;
-  bottom: 24px;
-  z-index: 80;
-  background: rgba(20, 28, 45, 0.72);
-  backdrop-filter: blur(20px) saturate(1.3);
-  -webkit-backdrop-filter: blur(20px) saturate(1.3);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 14px;
-  padding: 14px 18px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  color: #fff;
-  min-width: 260px;
-}
-.lt-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; }
-.lt-title { font-size: 13px; font-weight: 600; opacity: 0.8; }
-.lt-time { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; flex: 1; text-align: center; }
-.lt-info { display: flex; gap: 12px; font-size: 11px; opacity: 0.7; margin-bottom: 6px; }
-.lt-phase { color: #C9A876; font-weight: 600; }
-.lt-controls { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; }
-.lt-weather { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; }
-.lt-sliders { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
-.lt-slider-row { display: flex; align-items: center; gap: 8px; font-size: 11px; opacity: 0.8; }
-.lt-slider { flex: 1; cursor: pointer; }
-.lt-btn {
-  background: rgba(255,255,255,0.1);
-  border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 8px;
-  color: #fff;
-  padding: 5px 12px;
-  font-size: 15px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.lt-btn:hover { background: rgba(255,255,255,0.2); }
-.lt-btn.active { background: rgba(255,200,100,0.3); border-color: rgba(255,200,100,0.5); }
-.lt-btn.lt-main { font-size: 17px; }
-.lt-btn.lt-reset { background: rgba(244,67,54,0.3); border-color: rgba(244,67,54,0.5); }
-.lt-btn.lt-reset:hover { background: rgba(244,67,54,0.5); }
-.lt-progress { height: 3px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
-.lt-progress-fill { height: 100%; background: linear-gradient(90deg, #C9A876, #A8483A); transition: width 0.2s; }
 </style>

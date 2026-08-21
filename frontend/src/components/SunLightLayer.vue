@@ -1,7 +1,5 @@
-<!-- 全局光影层:体积光 + 窗框阴影 + 台灯 + 灰尘 + 背景色块 -->
-<!-- 所有页面共享,通过 useSunLight 组合式函数驱动 -->
-<!-- z-index 分层(从底到顶):bg-blobs(1)→内容(10)→AppSidebar(60)→bright-spot(65)→window-shadow(68)→reflection(72)→vignette(74)→dust(76)→light-layer(78)→lamp-light(100) -->
-<!-- 光影层在导航栏之上,覆盖全页(含导航栏),所有光影效果在所有元素之上生效 -->
+<!-- 全局光影层:体积光 + 窗框阴影 + 台灯 + 灰尘 + 背景色块 + 闪电 -->
+<!-- z-index 分层:bg-blobs(1)→glass-bg(2)→内容(10)→AppSidebar(60)→bright-spot(65)→window-shadow(68)→reflection(72)→vignette(74)→dust(76)→snow/rain(77)→light-layer(78)→lightning(79)→lamp-light(100) -->
 <template>
   <div class="sun-light-layer" aria-hidden="true">
     <!-- 背景色块:5 个 blur 色块随机飘动(可开关) -->
@@ -13,8 +11,11 @@
       <div class="blob blob-5"></div>
     </div>
 
-    <!-- 亮斑图层:multiply 染色,台灯 mask 挖洞 -->
-    <div v-if="(brightSpotStyle?.opacity ?? 0) > 0.01" class="bright-spot" :style="{ ...brightSpotStyle, '--lamp-mask': lampMask }"></div>
+    <!-- 毛玻璃背景层:全屏固定,半透明米色覆盖色块(不用 backdrop-filter 避免与面板叠加) -->
+    <div class="glass-bg"></div>
+
+    <!-- 亮斑图层:multiply 染色,台灯 mask 挖洞(阴影开关关闭时不渲染) -->
+    <div v-if="shadowEnabled && (brightSpotStyle?.opacity ?? 0) > 0.01" class="bright-spot" :style="{ ...brightSpotStyle, '--lamp-mask': lampMask }"></div>
 
     <!-- 窗户阴影:6 条 bar + 天气覆盖阴影,multiply,台灯 mask 挖洞(阴影开关可关闭) -->
     <div v-if="shadowEnabled" class="window-shadow"
@@ -92,6 +93,9 @@
       >❄</div>
     </div>
 
+    <!-- 雷雨闪电:瞬间增亮全屏,screen 混合(闪电时显示) -->
+    <div v-if="shadowEnabled && (lightningFlash ?? 0) > 0.01" class="lightning-flash" :style="{ opacity: lightningFlash }"></div>
+
     <!-- 雨滴粒子:快速下落,数量=降水等级×10 -->
     <div v-if="rainParticles.length" class="rain-layer">
       <div
@@ -121,7 +125,7 @@ if (!light) {
 }
 const {
   sunScene, lampMask, lampDivOpacity, lampRadius, lampColor, shadowEnabled, weatherShadowOpacity, lightLayerOpacity, blobsEnabled,
-  dustParticles, snowParticles, rainParticles, rayStyles, sourceStyle, bloomStyle, brightSpotStyle, reflectionStyle,
+  dustParticles, snowParticles, rainParticles, rayStyles, sourceStyle, bloomStyle, brightSpotStyle, reflectionStyle, lightningFlash,
 } = light || {}
 </script>
 
@@ -130,6 +134,19 @@ const {
   pointer-events: none;
   /* 不设 position/inset/z-index:子元素都是 fixed,各自在 root stacking context 中 */
   /* 这样 z-index 35/48/100 等与页面内容(z=10)在同一 context 比较,和以前 Home.vue 一样 */
+}
+
+/* 毛玻璃背景层:全屏固定,半透明米色,覆盖色块使其柔和(不用 backdrop-filter 避免与面板叠加) */
+.glass-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: rgba(250, 246, 236, 0.25);
+  transform: translateZ(0);
+}
+html.dark .glass-bg {
+  background: rgba(15, 26, 46, 0.3);
 }
 
 /* 背景色块:清新淡雅,高斯模糊,随机飘动(fixed 固定不随页面滚动,避免 backdrop-filter 元素每帧重算) */
@@ -331,5 +348,24 @@ html.dark .blob-5 { box-shadow: 0 0 120px 40px rgba(160,180,120,0.4); }
   0% { transform: translateY(0); opacity: 0; }
   10% { opacity: 1; }
   100% { transform: translateY(100vh); opacity: 0.3; }
+}
+
+/* 雷雨闪电:全屏瞬间增亮,screen 混合 */
+.lightning-flash {
+  position: fixed; inset: 0; z-index: 79; pointer-events: none;
+  mix-blend-mode: screen;
+  background: rgba(255, 255, 255, 0.6);
+  transform: translateZ(0);
+}
+
+/* 台灯钟摆运动:CSS @keyframes 驱动,不经过 Vue 响应式 */
+.lamp-light-pendulum {
+  left: 38.2%;
+  transform: translateX(-50%);
+  animation: lampSwing 8s ease-in-out infinite;
+}
+@keyframes lampSwing {
+  0%, 100% { transform: translateX(calc(-50% - 1.5vw)) scaleX(0.97); }
+  50% { transform: translateX(calc(-50% + 1.5vw)) scaleX(1.03); }
 }
 </style>

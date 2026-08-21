@@ -4,7 +4,6 @@
     <Breadcrumb :items="[{ label: t('album.title') }]" />
 
     <div class="list-header">
-      <h2>{{ t('album.title') }}</h2>
       <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ t('album.newAlbum') }}</el-button>
       <el-button v-if="userStore.isOwner" @click="syncVisible = true">{{ t('album.syncFromDevice') }}</el-button>
     </div>
@@ -120,8 +119,7 @@ onMounted(load)
 </script>
 
 <style scoped>
-.list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.list-header h2 { color: var(--color-primary); }
+.list-header { display: flex; justify-content: flex-start; align-items: center; gap: 10px; margin-bottom: 16px; }
 .album-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));

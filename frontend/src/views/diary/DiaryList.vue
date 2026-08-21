@@ -3,7 +3,6 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('diary.title') }]" />
     <div class="list-header">
-      <h2>{{ $t('diary.title') }}</h2>
       <el-button type="primary" @click="openEditor()">{{ $t('diary.newDiary') }}</el-button>
     </div>
 
@@ -107,8 +106,7 @@ onMounted(load)
 </script>
 
 <style scoped>
-.list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.list-header h2 { color: var(--color-primary); }
+.list-header { display: flex; justify-content: flex-start; align-items: center; gap: 10px; margin-bottom: 16px; }
 .diary-item { margin-bottom: 12px; }
 .diary-meta { font-size: 12px; color: var(--color-text-secondary); display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 .tag { background: #eef2f7; padding: 2px 8px; border-radius: 10px; }

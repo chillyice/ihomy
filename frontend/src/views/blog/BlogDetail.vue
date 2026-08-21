@@ -280,7 +280,7 @@ onMounted(loadAll)
   width: 200px;
   flex-shrink: 0;
   position: sticky;
-  top: 16px;
+  top: 42px;
 }
 .toc {
   background: var(--color-card);
@@ -353,7 +353,7 @@ onMounted(loadAll)
 .markdown-body hr { border: none; border-top: 1px solid var(--color-border); margin: 40px 0; }
 
 .like-bar { margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(31, 58, 95, 0.08); }
-.comments { margin-top: 16px; }
+.comments { margin-top: 16px; margin-right: calc(200px + 24px); padding: 20px 28px; }
 .comments-title { font-weight: 600; color: var(--color-primary); margin-bottom: 12px; }
 .comment-input { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
 .comment-actions { display: flex; justify-content: flex-end; gap: 8px; }
@@ -379,5 +379,6 @@ onMounted(loadAll)
   .blog-layout { flex-direction: column; }
   .toc-aside { display: none; }
   .detail { padding: 20px; }
+  .comments { margin-right: 0; }
 }
 </style>

@@ -144,14 +144,14 @@ const NAV_PATHS = {
   blog: '/blog', diary: '/diary', album: '/album', anniversary: '/anniversary',
   cinema: '/cinema', member: '/member', points: '/points', task: '/task',
   reminder: '/reminder', plan: '/plan', wish: '/wish', book: '/book',
-  chat: '/chat', tree: '/tree', cascade: '/cascade', storage: '/storage',
+  chat: '/chat', tree: '/tree', cascade: '/cascade',
   item: '/item', kitchen: '/kitchen', settings: '/settings', ops: '/ops',
 }
 
 // 模块列表:从 store 取,过滤出有路径映射的;末尾追加设置+运维管理(仅 OPS)虚拟模块到 system 分组
 const navModules = computed(() => {
   const list = !appStore.modules.length ? [] : appStore.modules
-    .filter(m => NAV_PATHS[m.code] && m.enabled !== 0)
+    .filter(m => NAV_PATHS[m.code] && m.enabled !== 0 && m.code !== 'storage')
     .map(m => ({
       code: m.code,
       title: m.title,

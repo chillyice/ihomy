@@ -4,7 +4,6 @@
     <Breadcrumb :items="[{ label: $t('cinema.title') }]" />
 
     <div class="list-header">
-      <h2>{{ $t('cinema.title') }}</h2>
       <div class="header-actions">
         <el-input v-model="keyword" :placeholder="$t('cinema.searchPlaceholder')" clearable style="width: 200px" @keyup.enter="load" @clear="load" />
         <el-button v-if="userStore.isOwner" @click="syncVisible = true">{{ $t('cinema.syncFromDevice') }}</el-button>
@@ -350,8 +349,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.list-header h2 { color: var(--color-primary); }
+.list-header { display: flex; justify-content: flex-start; align-items: center; gap: 10px; margin-bottom: 16px; }
 .header-actions { display: flex; gap: 10px; }
 .video-grid {
   display: grid;
