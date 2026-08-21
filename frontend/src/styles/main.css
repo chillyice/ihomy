@@ -146,7 +146,6 @@ a { color: var(--color-accent); text-decoration: none; }
   z-index: 3000 !important;
 }
 .el-message:not(.is-center) {
-  top: 20px !important;
   right: 24px !important;
   left: auto !important;
   transform: none !important;

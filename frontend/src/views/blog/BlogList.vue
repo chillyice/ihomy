@@ -3,7 +3,6 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('blog.title') }]" />
     <div class="list-header">
-      <h2>{{ $t('blog.title') }}</h2>
       <el-button v-if="userStore.isLoggedIn" type="primary" @click="router.push('/blog/edit')">{{ $t('blog.newPost') }}</el-button>
     </div>
     <div class="blog-layout">
@@ -86,8 +85,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.list-header h2 { color: var(--color-primary); }
+.list-header { display: flex; justify-content: flex-start; align-items: center; gap: 10px; margin-bottom: 16px; }
 .blog-layout { display: grid; grid-template-columns: 180px 1fr; gap: 16px; }
 .category-side {
   background: var(--color-card);
@@ -95,6 +93,8 @@ onMounted(() => {
   box-shadow: var(--shadow);
   padding: 12px;
   height: fit-content;
+  position: sticky;
+  top: 42px;
 }
 .side-title { font-size: 13px; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 8px; padding: 0 6px; }
 .cat-item {

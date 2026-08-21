@@ -4,7 +4,6 @@
     <Breadcrumb :items="[{ label: $t('wish.title') }]" />
 
     <div class="list-header">
-      <h2>{{ $t('wish.title') }}</h2>
       <el-button type="primary" @click="openEditor()">{{ $t('wish.add') }}</el-button>
     </div>
 
@@ -71,6 +70,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { wishApi } from '@/api'
 import { dictText } from '@/utils/dict'
+import Breadcrumb from '@/components/Breadcrumb.vue'
 
 const { t } = useI18n()
 

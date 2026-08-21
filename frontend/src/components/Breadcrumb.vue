@@ -27,9 +27,19 @@ defineProps({
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  margin-bottom: 16px;
+  margin: -16px -16px 12px;
   color: var(--color-text-secondary);
   flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 10px 16px;
+  background: var(--color-card);
+  backdrop-filter: blur(12px) saturate(1.1);
+  -webkit-backdrop-filter: blur(12px) saturate(1.1);
+  border-bottom: 1px solid var(--color-border);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 24px, black calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0%, black 24px, black calc(100% - 24px), transparent 100%);
 }
 .crumb-link {
   display: inline-flex;

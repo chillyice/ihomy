@@ -5,7 +5,6 @@
 
     <div class="list-header">
       <div class="left">
-        <h2>{{ $t('book.title') }}</h2>
         <el-date-picker v-model="month" type="month" value-format="YYYY-MM" @change="load" style="width: 140px" />
       </div>
       <el-button type="primary" @click="openEditor()">{{ $t('book.add') }}</el-button>
@@ -102,6 +101,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { bookApi } from '@/api'
+import Breadcrumb from '@/components/Breadcrumb.vue'
 
 // ponytail: 分类为用户自选/自定义数据(入库存储),不做翻译
 const CATEGORIES = ['餐饮', '交通', '购物', '家居', '水电燃气', '医疗', '教育', '娱乐', '工资', '红包', '其他']

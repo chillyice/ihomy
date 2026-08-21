@@ -15,9 +15,6 @@
           <el-menu-item index="daily">
             <span class="menu-icon">📅</span>{{ $t('settings.cat.daily') }}
           </el-menu-item>
-          <el-menu-item index="member" v-if="userStore.isOwner">
-            <span class="menu-icon">👥</span>{{ $t('settings.cat.member') }}
-          </el-menu-item>
           <el-menu-item index="storage">
             <span class="menu-icon">🗄️</span>{{ $t('settings.cat.storage') }}
           </el-menu-item>
@@ -181,12 +178,6 @@
           </div>
         </template>
 
-        <!-- 成员管理(嵌入 Member 页面组件) -->
-        <!-- 天气设置:地区偏好(避免 IP 定位不准) -->
-        <template v-if="active === 'member'">
-          <MemberView />
-        </template>
-
         <!-- 存储管理(嵌入 Storage 页面组件) -->
         <template v-if="active === 'storage'">
           <StorageView />
@@ -302,7 +293,6 @@ import AvatarCropper from '@/components/AvatarCropper.vue'
 import { applyLocale } from '@/i18n'
 import { applyTheme, initTheme } from '@/theme'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
-import MemberView from '@/views/Member.vue'
 import StorageView from '@/views/storage/Storage.vue'
 
 const { locale, t } = useI18n()
@@ -624,7 +614,7 @@ onMounted(load)
 
 <style scoped>
 .settings-layout { display: flex; gap: 16px; align-items: flex-start; }
-.settings-side { width: 180px; flex-shrink: 0; background: var(--color-card); border-radius: var(--radius); border: 1px solid var(--color-border); box-shadow: var(--shadow), var(--shadow-inset); padding: 8px; }
+.settings-side { width: 180px; flex-shrink: 0; background: var(--color-card); border-radius: var(--radius); border: 1px solid var(--color-border); box-shadow: var(--shadow), var(--shadow-inset); padding: 8px; position: sticky; top: 42px; }
 .settings-menu { border-right: none; border-radius: 10px; overflow: hidden; }
 .menu-icon { margin-right: 8px; }
 .settings-body { flex: 1; min-width: 0; }

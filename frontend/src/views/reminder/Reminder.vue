@@ -4,7 +4,6 @@
     <Breadcrumb :items="[{ label: $t('reminder.title') }]" />
 
     <div class="list-header">
-      <h2>{{ $t('reminder.title') }}</h2>
       <el-button type="primary" @click="openEditor()">{{ $t('reminder.add') }}</el-button>
     </div>
 
@@ -67,6 +66,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { reminderApi } from '@/api'
+import Breadcrumb from '@/components/Breadcrumb.vue'
 
 const { t } = useI18n()
 

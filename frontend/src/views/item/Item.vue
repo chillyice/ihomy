@@ -1,5 +1,6 @@
 <template>
   <div class="page">
+    <Breadcrumb :items="[{ label: $t('item.items') }]" />
     <el-tabs v-model="tab">
       <!-- 房子 -->
       <el-tab-pane :label="$t('item.houses')" name="houses">
@@ -222,6 +223,7 @@ import { Plus } from '@element-plus/icons-vue'
 import { itemApi, fileApi } from '@/api'
 import { useI18n } from 'vue-i18n'
 import { dictText } from '@/utils/dict'
+import Breadcrumb from '@/components/Breadcrumb.vue'
 
 const { t } = useI18n()
 const itemTypes = ['KITCHENWARE', 'INGREDIENT', 'DAILY', 'CLOTHES', 'TOOL', 'OTHER']

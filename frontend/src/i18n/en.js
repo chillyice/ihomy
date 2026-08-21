@@ -77,6 +77,14 @@ export default {
     tasksRewards: 'Tasks',
     noTasks: 'No tasks',
     upcomingEvents: 'Upcoming',
+    testPhase: {
+      night: 'Night',
+      sunrise: 'Sunrise',
+      morning: 'Morning',
+      daytime: 'Daytime',
+      evening: 'Evening',
+      sunset: 'Sunset',
+    },
   },
   theme: {
     dark: 'Dark mode',

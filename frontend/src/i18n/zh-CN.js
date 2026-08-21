@@ -80,6 +80,14 @@ export default {
     tasksRewards: '悬赏 / 任务',
     noTasks: '暂无任务',
     upcomingEvents: '近期纪念日',
+    testPhase: {
+      night: '夜间',
+      sunrise: '日出',
+      morning: '清晨',
+      daytime: '日间',
+      evening: '傍晚',
+      sunset: '日落',
+    },
   },
   theme: {
     dark: '深色模式',

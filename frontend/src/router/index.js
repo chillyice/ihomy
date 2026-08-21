@@ -24,7 +24,6 @@ const routes = [
   { path: '/cascade', name: 'Cascade', component: () => import('@/views/cascade/Cascade.vue') },
   { path: '/chat', name: 'Chat', component: () => import('@/views/chat/Chat.vue') },
   { path: '/settings', name: 'Settings', component: () => import('@/views/Settings.vue') },
-  { path: '/storage', name: 'Storage', component: () => import('@/views/storage/Storage.vue') },
   { path: '/item', name: 'Item', component: () => import('@/views/item/Item.vue') },
   { path: '/kitchen', name: 'Kitchen', component: () => import('@/views/kitchen/Kitchen.vue'), meta: { public: true } },
   { path: '/kitchen/ingredients', name: 'Ingredient', component: () => import('@/views/kitchen/Ingredient.vue') },

@@ -47,6 +47,7 @@ export function useSunLight() {
     weatherMode.value = mode
     precipLevel.value = level
     startCloudFlicker(mode === 'cloud')
+    startLightning(mode === 'thunder')
     refreshScene()
   }
 
@@ -63,6 +64,28 @@ export function useSunLight() {
     cloudTimer = setInterval(tick, 4000 + Math.random() * 4000)
   }
 
+  // 雷雨闪电:随机间隔触发,瞬间增亮(0→1→0.3→1→0 快速闪烁),模拟打雷闪电光
+  const lightningFlash = ref(0)
+  let lightningTimer = null
+  const startLightning = (on) => {
+    if (lightningTimer) { clearTimeout(lightningTimer); lightningTimer = null }
+    if (!on) { lightningFlash.value = 0; return }
+    const scheduleNext = () => {
+      const isThunder = weatherMode.value === 'thunder'
+      const minMs = isThunder ? 3000 : 10000
+      const rangeMs = isThunder ? 7000 : 30000
+      lightningTimer = setTimeout(() => {
+        const tl = gsap.timeline()
+        tl.to(lightningFlash, { value: 1, duration: 0.05 })
+          .to(lightningFlash, { value: 0.3, duration: 0.1 })
+          .to(lightningFlash, { value: 1, duration: 0.05 })
+          .to(lightningFlash, { value: 0, duration: 0.4, ease: 'power2.out' })
+        scheduleNext()
+      }, minMs + Math.random() * rangeMs)
+    }
+    scheduleNext()
+  }
+
   const refreshScene = () => {
     if (!sunInfo.value) return
     // 只设静态属性(调色板/旋转/阴影位置等),不烘焙天气系数
@@ -72,7 +95,7 @@ export function useSunLight() {
 
   // 天气光照系数(实时响应 cloudFlicker):晴=1,雨雪=0,多云=cloudFlicker
   const weatherLightMul = computed(() => {
-    if (weatherMode.value === 'rain' || weatherMode.value === 'snow') return 0
+    if (weatherMode.value === 'rain' || weatherMode.value === 'snow' || weatherMode.value === 'thunder') return 0
     if (weatherMode.value === 'cloud') return cloudFlicker.value
     return 1
   })
@@ -80,7 +103,8 @@ export function useSunLight() {
   // 天气覆盖阴影层:雨雪常显;多云随 cloudFlicker 平滑反向变化;晴天不显示
   // 与光柱/光源/灰尘的 weatherLightMul 完全同步(同一 cloudFlicker 驱动)
   const weatherShadowOpacity = computed(() => {
-    if (weatherMode.value === 'rain' || weatherMode.value === 'snow') return 1
+    if (!shadowEnabled.value) return 0
+    if (weatherMode.value === 'rain' || weatherMode.value === 'snow' || weatherMode.value === 'thunder') return 1
     if (weatherMode.value === 'cloud') return Math.max(0, 1 - cloudFlicker.value)
     return 0
   })
@@ -131,11 +155,17 @@ export function useSunLight() {
     weatherMode.value = 'clear'
     precipLevel.value = 0
     startCloudFlicker(false)
+    startLightning(false)
     if (testTimer) { clearInterval(testTimer); testTimer = null }
     slotIdx.value = currentSlotIndex()
     if (sunInfo.value) {
       sunScene.value = getSunScene(sunInfo.value, slotIdx.value)
     }
+  }
+
+  const setSlot = (idx) => {
+    slotIdx.value = Math.max(0, Math.min(287, idx))
+    refreshScene()
   }
 
   const lampStrength = computed(() => {
@@ -209,7 +239,7 @@ export function useSunLight() {
 
   // 雨滴粒子:数量=precipLevel×10,快速下落
   const rainParticles = computed(() => {
-    if (weatherMode.value !== 'rain' || precipLevel.value <= 0) return []
+    if ((weatherMode.value !== 'rain' && weatherMode.value !== 'thunder') || precipLevel.value <= 0) return []
     const count = precipLevel.value * 10
     return Array.from({ length: count }, (_, i) => ({
       id: 'r' + i,
@@ -235,7 +265,7 @@ export function useSunLight() {
   })
 
   // 光源整体不透明度(天气系数实时应用,控制 bloom 辉光)
-  const lightLayerOpacity = computed(() => (sunScene.value.lightOpacity ?? 0) * weatherLightMul.value)
+  const lightLayerOpacity = computed(() => shadowEnabled.value ? (sunScene.value.lightOpacity ?? 0) * weatherLightMul.value : 0)
 
   const sourceStyle = computed(() => ({
     left: sunScene.value.source.x,
@@ -250,11 +280,11 @@ export function useSunLight() {
 
   const brightSpotStyle = computed(() => ({
     background: sunScene.value.brightSpotColor || 'transparent',
-    opacity: (weatherMode.value === 'rain' || weatherMode.value === 'snow') ? 0 : (sunScene.value.brightSpotOpacity ?? 0),
+    opacity: shadowEnabled.value ? ((weatherMode.value === 'rain' || weatherMode.value === 'snow' || weatherMode.value === 'cloud' || weatherMode.value === 'thunder') ? 0 : (sunScene.value.brightSpotOpacity ?? 0)) : 0,
   }))
   const reflectionStyle = computed(() => ({
     background: `radial-gradient(ellipse 60% 50% at ${sunScene.value.source.x} ${sunScene.value.source.y}, rgba(255,245,220,1) 0%, rgba(255,235,200,0.6) 30%, transparent 70%)`,
-    opacity: (sunScene.value.reflectionOpacity ?? 0) * weatherLightMul.value,
+    opacity: shadowEnabled.value ? (sunScene.value.reflectionOpacity ?? 0) * weatherLightMul.value : 0,
   }))
 
   // 拉取太阳信息并启动时隙更新
@@ -291,7 +321,7 @@ export function useSunLight() {
         weather.value = json.data
         if (!lightTestMode.value && weatherEffectEnabled.value) {
           const cond = json.data.condition
-          if (['rain', 'snow', 'cloud'].includes(cond)) {
+          if (['rain', 'snow', 'cloud', 'thunder'].includes(cond)) {
             setWeather(cond, json.data.precipLevel || 1)
           } else {
             setWeather('clear', 0)
@@ -344,6 +374,7 @@ export function useSunLight() {
     lampTween?.kill()
     if (cloudTimer) clearInterval(cloudTimer)
     cloudTween?.kill()
+    if (lightningTimer) clearTimeout(lightningTimer)
     if (slotTimer) clearInterval(slotTimer)
     if (flickerTimer) clearInterval(flickerTimer)
     if (weatherTimer) clearInterval(weatherTimer)
@@ -358,7 +389,7 @@ export function useSunLight() {
     lampMode, lampTemp, lampBrightness, shadowEnabled, weatherEffectEnabled, blobsEnabled, toggleLamp,
     idleMinutes, isIdle,
     lampStrength, lampStrengthAnim, lampDivOpacity, lampRadius, lampMask, lampColor,
-    dustParticles, snowParticles, rainParticles, weatherShadowOpacity, lightLayerOpacity, rayStyles, sourceStyle, bloomStyle, brightSpotStyle, reflectionStyle,
-    lightTestMode, lightTestPaused, weatherMode, precipLevel, setWeather, startLightTest, pauseLightTest, stepLightTest, stopLightTest,
+    dustParticles, snowParticles, rainParticles, weatherShadowOpacity, lightLayerOpacity, rayStyles, sourceStyle, bloomStyle, brightSpotStyle, reflectionStyle, lightningFlash,
+    lightTestMode, lightTestPaused, weatherMode, precipLevel, setWeather, startLightTest, pauseLightTest, stepLightTest, stopLightTest, setSlot, refreshScene,
   }
 }

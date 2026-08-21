@@ -4,7 +4,6 @@
     <Breadcrumb :items="[{ label: $t('task.title') }]" />
 
     <div class="list-header">
-      <h2>{{ $t('task.title') }}</h2>
       <el-button type="primary" @click="openEditor()">{{ $t('task.publish') }}</el-button>
     </div>
 
@@ -76,6 +75,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { taskApi } from '@/api'
+import Breadcrumb from '@/components/Breadcrumb.vue'
 
 const { t } = useI18n()
 const userStore = useUserStore()

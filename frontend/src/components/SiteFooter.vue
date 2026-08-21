@@ -3,7 +3,7 @@
   <footer class="site-footer">
     <a href="https://beian.miit.gov.cn" target="_blank" rel="noopener noreferrer" class="footer-link">鲁ICP备2026045543号-1</a>
     <span class="footer-sep">·</span>
-    <span class="footer-link footer-pending">公安备案 待登记</span>
+    <a href="http://www.beian.gov.cn/portal/registerSystemInfo?recordcode=37010202700748" target="_blank" rel="noopener noreferrer" class="footer-link">鲁公网安备37010202700748号</a>
   </footer>
 </template>
 

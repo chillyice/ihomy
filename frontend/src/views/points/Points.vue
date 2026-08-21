@@ -24,7 +24,6 @@
     <el-tabs v-model="activeTab">
       <el-tab-pane :label="$t('points.title')" name="shop">
         <div class="list-header">
-          <h3>{{ $t('points.familyGoods') }}</h3>
           <el-button v-if="userStore.isOwner" type="primary" plain @click="openEditor()">{{ $t('points.publish') }}</el-button>
         </div>
         <div v-loading="loading">
@@ -117,6 +116,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { pointsApi } from '@/api'
+import Breadcrumb from '@/components/Breadcrumb.vue'
 
 const { t } = useI18n()
 const userStore = useUserStore()
