@@ -7,6 +7,7 @@ export default {
     notifications: 'Notifications',
     allRead: 'Mark all read',
     noNotification: 'No notifications',
+    switchFamily: 'Switch family',
   },
   common: {
     save: 'Save',

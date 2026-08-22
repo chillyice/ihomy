@@ -77,7 +77,7 @@
           </div>
         </el-popover>
       </div>
-      <el-dropdown v-if="userStore.isLoggedIn" trigger="click" @command="onUserCommand" placement="top-start">
+      <el-dropdown v-if="userStore.isLoggedIn" trigger="click" @command="onUserCommand" placement="top-start" popper-class="sidebar-user-popper" @visible-change="onDropdownVisible">
         <span class="foot-user">
           <el-avatar :size="28" :src="userInfo?.avatar">{{ (userInfo?.nickname || 'U').charAt(0) }}</el-avatar>
           <span v-if="!collapsed" class="user-name">{{ userInfo?.nickname || '我' }}</span>
@@ -86,6 +86,24 @@
           <el-dropdown-menu>
             <el-dropdown-item command="profile">{{ $t('settings.profile') }}</el-dropdown-item>
             <el-dropdown-item command="settings">{{ $t('nav.settings') }}</el-dropdown-item>
+            <div v-if="families.length > 1" class="family-switch-wrapper">
+              <el-dropdown-item class="family-switch-trigger">
+                {{ $t('nav.switchFamily') }}
+                <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+              </el-dropdown-item>
+              <div class="family-switch-panel">
+                <div
+                  v-for="f in families"
+                  :key="f.familyId"
+                  class="family-switch-item"
+                  :class="{ active: f.isCurrent }"
+                  @click="switchFamily(f.familyId)"
+                >
+                  <span>{{ f.name }}</span>
+                  <el-icon v-if="f.isCurrent"><Check /></el-icon>
+                </div>
+              </div>
+            </div>
             <el-dropdown-item divided command="logout">{{ $t('nav.logout') }}</el-dropdown-item>
           </el-dropdown-menu>
         </template>
@@ -101,9 +119,9 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
-import { notificationApi } from '@/api'
+import { notificationApi, authApi } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Sunny, Moon, Bell, Fold, Expand, Document, Notebook, Picture, Calendar, VideoPlay, Trophy, Aim, AlarmClock, List, Star, Wallet, PictureRounded, Share, User, Box, MapLocation, ChatDotRound, Food, Setting, Monitor } from '@element-plus/icons-vue'
+import { Sunny, Moon, Bell, Fold, Expand, Document, Notebook, Picture, Calendar, VideoPlay, Trophy, Aim, AlarmClock, List, Star, Wallet, PictureRounded, Share, User, Box, MapLocation, ChatDotRound, Food, Setting, Monitor, ArrowRight, Check } from '@element-plus/icons-vue'
 
 // 导航图标:Element Plus 简约线性图标(统一风格,非彩色 emoji)
 const ICON_MAP = {
@@ -257,6 +275,21 @@ const onUserCommand = (cmd) => {
   } else if (cmd === 'settings') {
     router.push('/settings')
   }
+}
+
+// 多家庭切换:下拉打开时加载家庭列表;hover 展开子菜单(纯 CSS),点击切换
+const families = ref([])
+const onDropdownVisible = async (visible) => {
+  if (visible && userStore.isLoggedIn) {
+    try { families.value = await authApi.families() } catch (e) { families.value = [] }
+  }
+}
+const switchFamily = async (familyId) => {
+  try {
+    await userStore.switchFamily(familyId, true)
+    ElMessage.success(t('nav.switchFamily') + ' ✓')
+    location.reload()
+  } catch (e) { ElMessage.error(e.message || 'Failed') }
 }
 
 onMounted(() => loadUnread())
@@ -490,4 +523,41 @@ html.dark .foot-user:hover { background: rgba(255, 255, 255, 0.08); }
 html.dark .foot-btn.lamp-off::after {
   background: radial-gradient(circle, rgba(100, 150, 220, 0.7) 0%, rgba(100, 150, 220, 0.3) 40%, transparent 70%);
 }
+</style>
+
+<style>
+.sidebar-user-popper .el-scrollbar,
+.sidebar-user-popper .el-scrollbar__wrap,
+.sidebar-user-popper .el-scrollbar__view,
+.sidebar-user-popper .el-dropdown-menu {
+  overflow: visible !important;
+}
+.sidebar-user-popper .family-switch-wrapper { position: relative; }
+.sidebar-user-popper .family-switch-trigger { display: flex; justify-content: space-between; align-items: center; }
+.sidebar-user-popper .family-switch-panel {
+  display: none;
+  position: absolute;
+  left: 100%;
+  top: 0;
+  min-width: 160px;
+  background: var(--el-bg-color, #fff);
+  border: 1px solid var(--el-border-color, #e4e7ed);
+  border-radius: 6px;
+  padding: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  z-index: 10;
+}
+.sidebar-user-popper .family-switch-wrapper:hover .family-switch-panel { display: block; }
+.sidebar-user-popper .family-switch-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s;
+}
+.sidebar-user-popper .family-switch-item:hover { background: var(--el-fill-color-light, #f5f7fa); }
+.sidebar-user-popper .family-switch-item.active { color: var(--el-color-primary, #a8483a); font-weight: 600; }
 </style>
