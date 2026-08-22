@@ -226,7 +226,7 @@ server {
     }
 
     # 上传文件大小
-    client_max_body_size 20m;
+    client_max_body_size 500m;
 
     # 静态资源缓存
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff2)$ {
@@ -281,7 +281,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
-    client_max_body_size 20m;
+    client_max_body_size 500m;
 }
 
 # 80 跳转 443

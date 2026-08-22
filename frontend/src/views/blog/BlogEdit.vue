@@ -46,7 +46,9 @@
             <el-radio :value="3">{{ $t('blog.familyVisible') }}</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-button type="primary" :loading="loading" @click="onSave">{{ $t('common.save') }}</el-button>
+        <div class="form-footer">
+          <el-button type="primary" :loading="loading" @click="onSave">{{ $t('common.save') }}</el-button>
+        </div>
       </el-form>
     </div>
 
@@ -142,4 +144,5 @@ onMounted(async () => {
 
 <style scoped>
 .category-row { display: flex; gap: 8px; width: 100%; }
+.form-footer { display: flex; justify-content: flex-end; margin-top: 4px; }
 </style>

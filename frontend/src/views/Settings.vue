@@ -69,7 +69,9 @@
                   <el-radio value="en">English</el-radio>
                 </el-radio-group>
               </el-form-item>
-              <el-button type="primary" :loading="profileSaving" @click="saveProfile">{{ $t('settings.saveProfile') }}</el-button>
+              <div class="form-footer">
+                <el-button type="primary" :loading="profileSaving" @click="saveProfile">{{ $t('settings.saveProfile') }}</el-button>
+              </div>
             </el-form>
           </div>
         </template>
@@ -107,42 +109,51 @@
                 <div class="share-row">
                   <el-input v-model="shareUrl" readonly>
                     <template #append>
-                      <el-button @click="copyShare">{{ $t('settings.copy') }}</el-button>
+                      <el-button class="ghost-btn" @click="copyShare">{{ $t('settings.copy') }}</el-button>
                     </template>
                   </el-input>
                 </div>
                 <div class="share-tip">{{ $t('settings.shareTip') }}</div>
               </el-form-item>
-              <el-button type="primary" :loading="familySaving" @click="saveFamily">{{ $t('settings.saveFamily') }}</el-button>
+              <div class="form-footer">
+                <el-button type="primary" :loading="familySaving" @click="saveFamily">{{ $t('settings.saveFamily') }}</el-button>
+              </div>
             </el-form>
           </div>
 
-          <!-- 家人共享歌单:所有家庭成员可添加曲目(上传或外链),右下角播放器全局播放 -->
+          <!-- 背景音乐设置:上传单曲/专辑 + 歌单管理(设为背景音乐) -->
           <div class="card settings-card">
-            <h2>家人共享歌单</h2>
+            <h2>背景音乐设置</h2>
             <el-form label-position="top">
-              <el-form-item label="添加曲目">
-                <div class="upload-row">
+              <el-form-item label="上传音乐">
+                <div class="music-actions">
                   <el-upload :show-file-list="false" :http-request="uploadMusic" accept="audio/*">
-                    <el-button>上传音乐文件</el-button>
+                    <el-button>上传单曲</el-button>
                   </el-upload>
-                  <el-input v-model="newTrack.url" placeholder="或粘贴音频链接 https://..." style="flex:1" />
-                  <el-input v-model="newTrack.title" placeholder="歌曲名" style="width:160px" />
-                  <el-button type="primary" @click="addTrack">添加</el-button>
+                  <el-button @click="triggerFolderInput">上传专辑文件夹</el-button>
+                  <input ref="folderInputRef" type="file" webkitdirectory multiple accept="audio/*" style="display:none" @change="onFolderChange" />
+                  <el-button class="ghost-btn" @click="openPlaylistDialog">新建歌单</el-button>
                 </div>
               </el-form-item>
-              <el-form-item v-if="playlist.length" label="歌单列表">
-                <div class="playlist-mgmt">
-                  <div v-for="(t, i) in playlist" :key="t.id || i" class="playlist-mgmt-item">
-                    <span class="pl-idx">{{ i + 1 }}</span>
-                    <span class="pl-title" :title="t.title">{{ t.title || '未知曲目' }}</span>
-                    <span class="pl-url">{{ t.url }}</span>
-                    <el-button text type="danger" size="small" @click="removeTrack(t)">删除</el-button>
+              <el-form-item label="背景音乐歌单">
+                <div class="bg-playlist-list">
+                  <div v-for="p in visiblePlaylists" :key="p.id" class="bg-playlist-item" :class="{ active: p.isBackground }">
+                    <img v-if="p.coverUrl" :src="p.coverUrl" class="bg-pl-cover" />
+                    <div v-else class="bg-pl-cover placeholder">🎼</div>
+                    <div class="bg-pl-info">
+                      <div class="bg-pl-name">{{ p.name }}</div>
+                      <div class="bg-pl-count">{{ p.trackCount || 0 }} 首</div>
+                    </div>
+                    <div v-if="p.isBackground" class="bg-pl-tag">当前背景音乐</div>
+                    <el-button v-else size="small" type="primary" @click="setBackground(p)">设为背景音乐</el-button>
+                  </div>
+                  <div v-if="allPlaylists.length > 5" class="bg-more" @click="showAllPlaylists = true">
+                    更多 ({{ allPlaylists.length - 5 }}) 个歌单
                   </div>
                 </div>
+                <el-empty v-if="!allPlaylists.length && !playlistLoading" description="暂无歌单,创建第一个吧" :image-size="40" />
               </el-form-item>
-              <el-empty v-else :description="playlistLoading ? '加载中...' : '歌单为空,添加第一首吧'" :image-size="50" />
-              <div class="share-tip">保存后全家人右下角播放器可同步播放,支持上传音频文件或外链</div>
+              <div class="share-tip">歌单是背景音乐播放的最小单元;播放器只播放当前家庭绑定的背景音乐歌单。详细配置请<a href="javascript:void(0)" class="link-text" @click="$router.push('/music')">跳转音乐页面</a></div>
             </el-form>
           </div>
 
@@ -173,7 +184,9 @@
                 </el-checkbox-group>
                 <div class="share-tip">{{ $t('settings.knowledgeTip') }}</div>
               </el-form-item>
-              <el-button type="primary" @click="saveDaily">{{ $t('settings.saveDaily') }}</el-button>
+              <div class="form-footer">
+                <el-button type="primary" @click="saveDaily">{{ $t('settings.saveDaily') }}</el-button>
+              </div>
             </el-form>
           </div>
         </template>
@@ -253,9 +266,9 @@
                 </div>
                 <div class="share-tip">选择城市后天气和太阳位置将固定使用此坐标,留空则按 IP 自动定位</div>
               </el-form-item>
-              <el-form-item>
+              <div class="form-footer">
                 <el-button type="primary" :loading="savingWeather" @click="saveWeather">保存天气设置</el-button>
-              </el-form-item>
+              </div>
               <el-divider />
               <el-form-item label="夜间超时关灯(分钟)">
                 <div class="setting-row">
@@ -270,7 +283,7 @@
               <el-divider />
               <el-form-item label="面板布局">
                 <el-button type="warning" plain @click="resetPanelLayout">恢复默认面板布局</el-button>
-                <div class="share-tip">重置首页所有可拖动面板的位置和大小(家人动态/任务/天气/纪念日/今日)</div>
+                <div class="share-tip">重置首页所有可拖动面板的位置和大小(家人动态/任务/天气/纪念日/今日/音乐播放器)</div>
               </el-form-item>
             </el-form>
           </div>
@@ -305,6 +318,41 @@
           {{ creatingFamily ? '创建中...' : '创建' }}
         </el-button>
       </template>
+    </el-dialog>
+
+    <!-- 专辑上传弹窗:输入专辑名后批量上传 -->
+    <el-dialog v-model="albumDialog.visible" title="上传专辑" width="380px" append-to-body>
+      <div class="share-tip">已选择 {{ albumDialog.files.length }} 个音乐文件,请输入专辑名称:</div>
+      <el-input v-model="albumDialog.name" placeholder="专辑名称" @keyup.enter="confirmUploadAlbum" />
+      <template #footer>
+        <el-button @click="albumDialog.visible = false">取消</el-button>
+        <el-button type="primary" :disabled="!albumDialog.name.trim() || albumDialog.uploading" :loading="albumDialog.uploading" @click="confirmUploadAlbum">上传</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 新建歌单弹窗 -->
+    <el-dialog v-model="plDialog.visible" title="新建歌单" width="380px" append-to-body>
+      <el-input v-model="plDialog.name" placeholder="歌单名称" @keyup.enter="createPlaylist" />
+      <template #footer>
+        <el-button @click="plDialog.visible = false">取消</el-button>
+        <el-button type="primary" @click="createPlaylist">创建</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 全部歌单弹窗 -->
+    <el-dialog v-model="showAllPlaylists" title="全部歌单" width="560px" append-to-body>
+      <div class="bg-playlist-list">
+        <div v-for="p in allPlaylists" :key="p.id" class="bg-playlist-item" :class="{ active: p.isBackground }">
+          <img v-if="p.coverUrl" :src="p.coverUrl" class="bg-pl-cover" />
+          <div v-else class="bg-pl-cover placeholder">🎼</div>
+          <div class="bg-pl-info">
+            <div class="bg-pl-name">{{ p.name }}</div>
+            <div class="bg-pl-count">{{ p.trackCount || 0 }} 首</div>
+          </div>
+          <div v-if="p.isBackground" class="bg-pl-tag">当前背景音乐</div>
+          <el-button v-else size="small" type="primary" @click="setBackground(p)">设为背景音乐</el-button>
+        </div>
+      </div>
     </el-dialog>
   </div>
 </template>
@@ -476,7 +524,7 @@ const load = async () => {
   } catch (e) {
     // 忽略
   }
-  loadPlaylist()
+  loadPlaylists()
 }
 
 // 保存个人资料(头像/封面通过上传后回填 URL 一并提交)
@@ -523,40 +571,82 @@ const removeMusic = async () => {
   await saveFamily()
 }
 
-// 家人共享歌单管理
-const playlist = ref([])
+// 背景音乐设置:歌单管理
+const allPlaylists = ref([])
 const playlistLoading = ref(false)
-const newTrack = reactive({ url: '', title: '' })
-const loadPlaylist = async () => {
+const showAllPlaylists = ref(false)
+const visiblePlaylists = computed(() => allPlaylists.value.slice(0, 5))
+
+const loadPlaylists = async () => {
   if (!userStore.isLoggedIn) return
   playlistLoading.value = true
   try {
-    playlist.value = await musicApi.list()
+    allPlaylists.value = await musicApi.playlistList()
   } catch (e) {
-    playlist.value = []
+    allPlaylists.value = []
   } finally {
     playlistLoading.value = false
   }
 }
-const addTrack = async () => {
-  if (!newTrack.url) return ElMessage.warning('请填写音频链接或上传文件')
+
+const uploadMusic = async (options) => {
   try {
-    await musicApi.add({ url: newTrack.url, title: newTrack.title || null })
-    newTrack.url = ''
-    newTrack.title = ''
-    ElMessage.success('已添加到歌单')
-    await loadPlaylist()
-  } catch (e) {
-    // 拦截器已提示
+    await musicApi.upload(options.file)
+    ElMessage.success('已上传到曲库')
+  } catch {
+    ElMessage.error(t('settings.uploadFailed'))
   }
 }
-const removeTrack = async (t) => {
+
+const folderInputRef = ref(null)
+const triggerFolderInput = () => folderInputRef.value?.click()
+const albumDialog = reactive({ visible: false, name: '', files: [], uploading: false })
+const onFolderChange = (e) => {
+  const files = Array.from(e.target.files || []).filter(f => f.type.startsWith('audio/'))
+  if (!files.length) { ElMessage.warning('文件夹中没有音频文件'); e.target.value = ''; return }
+  const rel = files[0].webkitRelativePath || ''
+  albumDialog.files = files
+  albumDialog.name = rel ? rel.split('/')[0] : ''
+  albumDialog.visible = true
+  e.target.value = ''
+}
+const confirmUploadAlbum = async () => {
+  const albumName = albumDialog.name.trim()
+  if (!albumName || !albumDialog.files.length) return
+  albumDialog.uploading = true
   try {
-    await musicApi.remove(t.id)
-    ElMessage.success('已删除')
-    await loadPlaylist()
+    await musicApi.uploadAlbum(albumDialog.files, albumName)
+    ElMessage.success(`已上传专辑《${albumName}》共 ${albumDialog.files.length} 首`)
+    albumDialog.visible = false
   } catch (e) {
-    // 拦截器已提示
+    ElMessage.error(t('settings.uploadFailed'))
+  } finally {
+    albumDialog.uploading = false
+  }
+}
+
+const plDialog = reactive({ visible: false, name: '' })
+const openPlaylistDialog = () => { plDialog.name = ''; plDialog.visible = true }
+const createPlaylist = async () => {
+  if (!plDialog.name.trim()) return
+  try {
+    await musicApi.createPlaylist(plDialog.name.trim())
+    ElMessage.success('歌单已创建')
+    plDialog.visible = false
+    await loadPlaylists()
+  } catch (e) {
+    ElMessage.error('创建失败')
+  }
+}
+
+const setBackground = async (p) => {
+  try {
+    await musicApi.setBackground(p.id)
+    ElMessage.success(`已将《${p.name}》设为背景音乐`)
+    userStore.bumpBgMusic()
+    await loadPlaylists()
+  } catch (e) {
+    ElMessage.error('设置失败')
   }
 }
 
@@ -606,6 +696,7 @@ const resetPanelLayout = () => {
     const keys = Object.keys(localStorage).filter(k => k.startsWith('ihomy:panel:'))
     keys.forEach(k => localStorage.removeItem(k))
     localStorage.removeItem('ihomy:vinyl:pos')
+    localStorage.removeItem('ihomy:music:pos')
     ElMessage.success('面板布局已重置,即将刷新...')
     setTimeout(() => location.reload(), 800)
   }).catch(() => {})
@@ -637,18 +728,6 @@ const uploadCover = async (options) => {
   }
 }
 
-const uploadMusic = async (options) => {
-  try {
-    const data = await fileApi.upload(options.file)
-    const title = options.file.name.replace(/\.[^.]+$/, '')
-    await musicApi.add({ url: data.url, title })
-    ElMessage.success('已添加到歌单')
-    await loadPlaylist()
-  } catch {
-    ElMessage.error(t('settings.uploadFailed'))
-  }
-}
-
 onMounted(load)
 </script>
 
@@ -672,6 +751,9 @@ html.dark .form-tip, html.dark .share-tip { color: #9a9088; }
 .setting-row { display: flex; align-items: center; gap: 10px; }
 .setting-label { font-size: 14px; font-weight: 500; color: var(--color-text); }
 
+/* 表单提交按钮:右下角对齐 */
+.form-footer { display: flex; justify-content: flex-end; margin-top: 4px; }
+
 /* 个性化设置:表单项间距统一 */
 .settings-form .el-form-item { margin-bottom: 16px; padding: 6px 0; }
 .settings-form .el-form-item .el-switch,
@@ -689,6 +771,7 @@ html.dark .form-tip, html.dark .share-tip { color: #9a9088; }
 .playlist-mgmt { display: flex; flex-direction: column; gap: 6px; width: 100%; }
 .playlist-mgmt-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--color-card-2); border-radius: 8px; font-size: 13px; }
 .playlist-mgmt-item .pl-idx { width: 20px; text-align: center; opacity: 0.5; }
+.playlist-mgmt-item .pl-album { font-size: 11px; color: var(--color-accent); background: rgba(168,72,58,0.06); padding: 1px 7px; border-radius: 6px; white-space: nowrap; }
 .playlist-mgmt-item .pl-title { flex: 1; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .playlist-mgmt-item .pl-url { font-size: 11px; color: var(--color-text-secondary); max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.6; }
 @media (max-width: 900px) {
@@ -713,4 +796,18 @@ html.dark .form-tip, html.dark .share-tip { color: #9a9088; }
 }
 .create-family-btn:hover { background: #e8e0d2; }
 .fm-hint { font-size: 13px; color: var(--color-text-secondary); line-height: 1.5; margin-bottom: 16px; }
+
+/* 背景音乐歌单列表 */
+.bg-playlist-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.bg-playlist-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--color-card-2); border-radius: 10px; transition: background 0.15s; }
+.bg-playlist-item.active { background: rgba(168,72,58,0.08); border: 1px solid rgba(168,72,58,0.2); }
+.bg-pl-cover { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+.bg-pl-cover.placeholder { display: flex; align-items: center; justify-content: center; background: rgba(58,46,34,0.06); font-size: 18px; }
+.bg-pl-info { flex: 1; min-width: 0; }
+.bg-pl-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bg-pl-count { font-size: 12px; color: var(--color-text-secondary); }
+.bg-pl-tag { font-size: 12px; color: var(--color-accent); font-weight: 500; white-space: nowrap; }
+.bg-more { text-align: center; padding: 8px; font-size: 13px; color: var(--color-accent); cursor: pointer; border-radius: 8px; }
+.bg-more:hover { background: rgba(168,72,58,0.06); }
+.link-text { color: var(--color-accent); text-decoration: underline; }
 </style>

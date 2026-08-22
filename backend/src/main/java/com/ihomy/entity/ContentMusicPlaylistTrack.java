@@ -7,19 +7,13 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
-/**
- * 家庭共享歌单曲目
- */
 @Data
-@TableName("family_music")
-public class FamilyMusic {
+@TableName("content_music_playlist_track")
+public class ContentMusicPlaylistTrack {
     @TableId(type = IdType.AUTO)
     private Long id;
-    private Long familyId;
-    private String url;
-    private String title;
-    private String album;
-    private Long addedBy;
+    private Long playlistId;
+    private Long musicId;
     private Integer sortOrder;
-    private LocalDateTime createdAt;
+    private LocalDateTime addedAt;
 }

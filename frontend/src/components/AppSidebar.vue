@@ -121,11 +121,11 @@ import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { notificationApi, authApi } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Sunny, Moon, Bell, Fold, Expand, Document, Notebook, Picture, Calendar, VideoPlay, Trophy, Aim, AlarmClock, List, Star, Wallet, PictureRounded, Share, User, Box, MapLocation, ChatDotRound, Food, Setting, Monitor, ArrowRight, Check } from '@element-plus/icons-vue'
+import { Sunny, Moon, Bell, Fold, Expand, Document, Notebook, Picture, Calendar, VideoPlay, Trophy, Aim, AlarmClock, List, Star, Wallet, PictureRounded, Share, User, Box, MapLocation, ChatDotRound, Food, Setting, Monitor, ArrowRight, Check, Headset } from '@element-plus/icons-vue'
 
 // 导航图标:Element Plus 简约线性图标(统一风格,非彩色 emoji)
 const ICON_MAP = {
-  blog: Document, diary: Notebook, album: Picture, anniversary: Calendar, cinema: VideoPlay,
+  blog: Document, diary: Notebook, album: Picture, anniversary: Calendar, cinema: VideoPlay, music: Headset,
   points: Trophy, task: Aim, reminder: AlarmClock, plan: List, wish: Star,
   book: Wallet, cascade: PictureRounded, tree: Share, member: User, storage: Box, item: MapLocation,
   chat: ChatDotRound, kitchen: Food, settings: Setting, ops: Monitor,
@@ -160,7 +160,7 @@ const userInfo = computed(() => userStore.userInfo)
 // 导航路径映射(后端 icon 字段是字符串名,这里映射 code→路由路径)
 const NAV_PATHS = {
   blog: '/blog', diary: '/diary', album: '/album', anniversary: '/anniversary',
-  cinema: '/cinema', member: '/member', points: '/points', task: '/task',
+  cinema: '/cinema', music: '/music', member: '/member', points: '/points', task: '/task',
   reminder: '/reminder', plan: '/plan', wish: '/wish', book: '/book',
   chat: '/chat', tree: '/tree', cascade: '/cascade',
   item: '/item', kitchen: '/kitchen', settings: '/settings', ops: '/ops',

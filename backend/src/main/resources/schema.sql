@@ -156,8 +156,9 @@ CREATE TABLE `sys_family_info` (
   `is_default`     TINYINT      NOT NULL DEFAULT 0 COMMENT '0普通 1默认家庭（访客看到的内容来源）',
   `is_demo`        TINYINT      NOT NULL DEFAULT 0 COMMENT '0普通 1演示家庭（展示软件效果，owner 不可变更）',
   `share_token`    VARCHAR(16)  DEFAULT NULL COMMENT '16位混淆分享ID（URL ?hid= 访问，防 ID 遍历）',
-  `music_url`      VARCHAR(500) DEFAULT NULL COMMENT '家庭背景音乐 URL（上传 /files/ 或外链）',
-  `music_title`    VARCHAR(100) DEFAULT NULL COMMENT '背景音乐名称',
+  `music_url`      VARCHAR(500) DEFAULT NULL COMMENT '家庭背景音乐 URL（旧字段,保留兼容）',
+  `music_title`    VARCHAR(100) DEFAULT NULL COMMENT '背景音乐名称（旧字段,保留兼容）',
+  `background_playlist_id` BIGINT DEFAULT NULL COMMENT '当前背景音乐歌单ID(content_music_playlist.id)',
   `weather_lat`    DECIMAL(10,6) DEFAULT NULL COMMENT '天气/太阳位置-纬度(空=IP自动定位)',
   `weather_lng`    DECIMAL(10,6) DEFAULT NULL COMMENT '天气/太阳位置-经度(空=IP自动定位)',
   `weather_city`   VARCHAR(50)  DEFAULT NULL COMMENT '天气显示城市名(空=IP自动定位)',
@@ -691,20 +692,21 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('diary',  '日记本', 'icon-diary',  '/diary',  'content', 'left',   2, 1),
 ('album',  '相册', 'icon-album',  '/album',  'album',   'left',   3, 1),
 ('anniversary', '纪念日', 'icon-anniversary', '/anniversary', 'life',   'left', 4, 1),
-('cinema', '放映厅', 'icon-cinema', '/cinema', 'life',   'left', 5, 1),
-('points', '积分商城', 'icon-points', '/points', 'life',   'left', 6, 1),
-('task',   '任务悬赏', 'icon-task',   '/task',   'life',   'left', 7, 1),
-('reminder','今日提醒','icon-reminder','/reminder','life',  'left', 8, 1),
-('plan',   '家庭计划', 'icon-plan',   '/plan',   'life',   'left', 9, 1),
-('wish',   '愿望单',   'icon-wish',   '/wish',   'life',   'left', 10, 1),
-('book',   '记账本',   'icon-book',   '/book',   'life',   'left', 11, 1),
-('cascade','照片瀑布', 'icon-photo',  '/cascade','life',   'left', 13, 1),
-('tree',   '家谱',     'icon-tree',   '/tree',   'life',   'left', 14, 1),
+  ('cinema', '放映厅', 'icon-cinema', '/cinema', 'content', 'left', 5, 1),
+('music',  '音乐',   'icon-music',  '/music',  'content', 'left', 6, 1),
+('points', '积分商城', 'icon-points', '/points', 'life',   'left', 7, 1),
+('task',   '任务悬赏', 'icon-task',   '/task',   'life',   'left', 8, 1),
+('reminder','今日提醒','icon-reminder','/reminder','life',  'left', 9, 1),
+('plan',   '家庭计划', 'icon-plan',   '/plan',   'life',   'left', 10, 1),
+('wish',   '愿望单',   'icon-wish',   '/wish',   'life',   'left', 11, 1),
+('book',   '记账本',   'icon-book',   '/book',   'life',   'left', 12, 1),
+('cascade','照片瀑布', 'icon-photo',  '/cascade','life',   'left', 14, 1),
+('tree',   '家谱',     'icon-tree',   '/tree',   'life',   'left', 15, 1),
 ('member', '家庭成员', 'icon-member', '/member', 'social',  'right',  1, 1),
 ('cover',  '家庭封面', 'icon-cover',  '/cover',  'system',  'top',    1, 0),
-('storage','存储管理', 'icon-storage','/storage','system',  'left',  15, 1),
-('item','物品定位',   'icon-item',   '/item',   'life',    'left',  16, 1),
-('kitchen','厨房',     'icon-kitchen','/kitchen','life',    'left',  17, 1);
+('storage','存储管理', 'icon-storage','/storage','system',  'left',  16, 1),
+('item','物品定位',   'icon-item',   '/item',   'life',    'left',  17, 1),
+('kitchen','厨房',     'icon-kitchen','/kitchen','life',    'left',  18, 1);
 
 -- ------------------------------------------------------------
 -- 26. 初始家庭 + 管理员账号
@@ -1307,20 +1309,60 @@ CREATE TABLE `sys_parameter` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统参数表(键值对)';
 
 -- ------------------------------------------------------------
--- 家人共享歌单表
+-- 音乐曲库表(原 family_music 重构,前缀改 content_)
 -- ------------------------------------------------------------
-DROP TABLE IF EXISTS `family_music`;
-CREATE TABLE `family_music` (
+DROP TABLE IF EXISTS `content_music`;
+CREATE TABLE `content_music` (
   `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
   `family_id`  BIGINT       NOT NULL COMMENT '所属家庭ID',
   `url`        VARCHAR(500) NOT NULL COMMENT '音频URL(/files/...或外链)',
-  `title`      VARCHAR(100) DEFAULT NULL COMMENT '歌曲名',
+  `title`      VARCHAR(200) DEFAULT NULL COMMENT '歌曲名(元数据优先,回退文件名)',
+  `artist`     VARCHAR(200) DEFAULT NULL COMMENT '艺术家/作家(元数据)',
+  `album`      VARCHAR(200) DEFAULT NULL COMMENT '唱片集/专辑名(元数据)',
+  `duration`   INT          DEFAULT NULL COMMENT '时长(秒)',
+  `bitrate`    INT          DEFAULT NULL COMMENT '比特率(kbps)',
+  `cover_url`  VARCHAR(500) DEFAULT NULL COMMENT '内嵌封面URL(提取后存为独立文件)',
+  `source_path` VARCHAR(500) DEFAULT NULL COMMENT '原始路径(设备:相对路径,去重用)',
   `added_by`   BIGINT       DEFAULT NULL COMMENT '添加者ID',
-  `sort_order` INT          NOT NULL DEFAULT 0 COMMENT '排序(小在前)',
+  `deleted`    TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
   `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_family` (`family_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭共享歌单表';
+  KEY `idx_family_album` (`family_id`, `album`, `deleted`),
+  KEY `idx_family_created` (`family_id`, `deleted`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='音乐曲库表';
+
+-- ------------------------------------------------------------
+-- 音乐歌单表(背景音乐播放单元,家庭维度独立)
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `content_music_playlist`;
+CREATE TABLE `content_music_playlist` (
+  `id`             BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`      BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `name`           VARCHAR(100) NOT NULL COMMENT '歌单名称',
+  `cover_url`      VARCHAR(500) DEFAULT NULL COMMENT '歌单封面(默认取首曲目封面)',
+  `track_count`    INT          NOT NULL DEFAULT 0 COMMENT '歌曲总数(冗余字段)',
+  `is_background`  TINYINT      NOT NULL DEFAULT 0 COMMENT '1=当前家庭背景音乐歌单(每家庭最多1条)',
+  `created_by`     BIGINT       DEFAULT NULL COMMENT '创建者ID',
+  `deleted`        TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  `created_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_family_bg` (`family_id`, `is_background`, `deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='音乐歌单表';
+
+-- ------------------------------------------------------------
+-- 歌单-曲目关联表(多对多)
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `content_music_playlist_track`;
+CREATE TABLE `content_music_playlist_track` (
+  `id`          BIGINT   NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `playlist_id` BIGINT   NOT NULL COMMENT '歌单ID',
+  `music_id`    BIGINT   NOT NULL COMMENT '曲目ID',
+  `sort_order`  INT      NOT NULL DEFAULT 0 COMMENT '排序(小在前)',
+  `added_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_playlist_music` (`playlist_id`, `music_id`),
+  KEY `idx_playlist` (`playlist_id`, `sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='歌单曲目关联表';
 
 -- ------------------------------------------------------------
 -- 49.1 family_recipe 厨房菜谱表(V7.0)

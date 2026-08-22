@@ -199,11 +199,35 @@ export const wishApi = {
   remove: (id) => request.delete(`/wish/${id}`),
 }
 
-// 家庭共享歌单
+// 音乐曲库 + 歌单管理
 export const musicApi = {
   list: () => request.get('/music/list'),
+  albums: () => request.get('/music/albums'),
+  upload: (file) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return request.post('/music/upload', fd)
+  },
+  uploadAlbum: (files, album) => {
+    const fd = new FormData()
+    files.forEach(f => fd.append('files', f))
+    if (album) fd.append('album', album)
+    return request.post('/music/upload-album', fd)
+  },
   add: (data) => request.post('/music', data),
   remove: (id) => request.delete(`/music/${id}`),
+  batchRemove: (ids) => request.delete('/music/batch', { data: { ids } }),
+  removeByAlbum: (album) => request.delete(`/music/album/${encodeURIComponent(album)}`),
+  // 歌单
+  playlistList: () => request.get('/music/playlist/list'),
+  createPlaylist: (name) => request.post('/music/playlist', { name }),
+  deletePlaylist: (id) => request.delete(`/music/playlist/${id}`),
+  playlistTracks: (id) => request.get(`/music/playlist/${id}/tracks`),
+  addTracks: (id, musicIds) => request.post(`/music/playlist/${id}/tracks`, { musicIds }),
+  removeTrack: (id, musicId) => request.delete(`/music/playlist/${id}/tracks/${musicId}`),
+  setBackground: (id) => request.put(`/music/playlist/${id}/set-background`),
+  unsetBackground: () => request.delete('/music/playlist/unset-background'),
+  getBackground: () => request.get('/music/background'),
 }
 
 // 记账本(家庭收支记录,月度统计)

@@ -2,24 +2,24 @@ package com.ihomy.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.time.LocalDateTime;
 
-/**
- * 家庭共享歌单曲目
- */
 @Data
-@TableName("family_music")
-public class FamilyMusic {
+@TableName("content_music_playlist")
+public class ContentMusicPlaylist {
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long familyId;
-    private String url;
-    private String title;
-    private String album;
-    private Long addedBy;
-    private Integer sortOrder;
+    private String name;
+    private String coverUrl;
+    private Integer trackCount;
+    private Integer isBackground;
+    private Long createdBy;
+    @TableLogic
+    private Integer deleted;
     private LocalDateTime createdAt;
 }
