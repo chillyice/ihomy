@@ -375,10 +375,25 @@ html.dark .el-overlay-dialog .el-dialog {
   color: var(--color-primary) !important;
 }
 
-/* 关闭按钮:隐藏 X */
+/* 关闭按钮:显示 X,hover 浅底色 */
 .el-dialog__headerbtn {
-  display: none !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 28px !important;
+  height: 28px !important;
+  top: 16px !important;
+  right: 16px !important;
+  border-radius: 8px !important;
+  transition: background 0.15s !important;
 }
+.el-dialog__headerbtn:hover { background: rgba(58,46,34,0.06) !important; }
+html.dark .el-dialog__headerbtn:hover { background: rgba(232,220,200,0.08) !important; }
+.el-dialog__headerbtn .el-dialog__close {
+  font-size: 16px !important;
+  color: var(--color-text-secondary) !important;
+}
+.el-dialog__headerbtn:hover .el-dialog__close { color: var(--color-text) !important; }
 
 /* body:紧凑 padding,底部 20px 间距 */
 .el-dialog__body {
@@ -681,3 +696,71 @@ html.dark .el-dropdown-menu .el-dropdown-menu__item:not(.is-disabled):hover {
   top: 0 !important;
   transform: none !important;
 }
+
+/* ========== 全局弹窗尺寸规则(按业务场景) ========== */
+/* 1.简短确认类:420px */
+.el-overlay-dialog .el-dialog.dialog-sm { width: 420px !important; }
+/* 2.选择器/简单表单:520px, max-height:520px */
+.el-overlay-dialog .el-dialog.dialog-md {
+  width: 520px !important;
+  max-height: 520px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+.el-overlay-dialog .el-dialog.dialog-md .el-dialog__body {
+  overflow-y: auto !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+}
+/* 3.复杂多字段表单:640px, max-height:640px */
+.el-overlay-dialog .el-dialog.dialog-lg {
+  width: 640px !important;
+  max-height: 640px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+.el-overlay-dialog .el-dialog.dialog-lg .el-dialog__body {
+  overflow-y: auto !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+}
+/* 4.详情/媒体预览:82vw, max 900px, max-height:85vh */
+.el-overlay-dialog .el-dialog.dialog-xl {
+  width: 82vw !important;
+  max-width: 900px !important;
+  max-height: 85vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+.el-overlay-dialog .el-dialog.dialog-xl .el-dialog__body {
+  overflow-y: auto !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+}
+
+/* 弹窗内 body 滚动条美化 */
+.el-dialog__body::-webkit-scrollbar { width: 5px; }
+.el-dialog__body::-webkit-scrollbar-track { background: transparent; }
+.el-dialog__body::-webkit-scrollbar-thumb { background: rgba(58,46,34,0.12); border-radius: 3px; }
+.el-dialog__body::-webkit-scrollbar-thumb:hover { background: rgba(58,46,34,0.2); }
+html.dark .el-dialog__body::-webkit-scrollbar-thumb { background: rgba(232,220,200,0.12); }
+html.dark .el-dialog__body::-webkit-scrollbar-thumb:hover { background: rgba(232,220,200,0.2); }
+
+/* 弹窗内 checkbox 主题色:低饱和暖棕 */
+.el-dialog .el-checkbox__input.is-checked .el-checkbox__inner {
+  background-color: #b88c6e !important;
+  border-color: #b88c6e !important;
+}
+.el-dialog .el-checkbox__input.is-checked .el-checkbox__inner::after { border-color: #fff !important; }
+.el-dialog .el-checkbox__inner { border-radius: 4px !important; }
+.el-dialog .el-checkbox__input.is-focus .el-checkbox__inner { border-color: #b88c6e !important; }
+
+/* 弹窗内 Tab:低饱和暖棕选中态 */
+.el-dialog .el-tabs__item { color: #aaa098 !important; transition: color 0.2s !important; }
+.el-dialog .el-tabs__item:hover { color: #8a7e72 !important; }
+.el-dialog .el-tabs__item.is-active { color: #5c4c3d !important; font-weight: 500 !important; }
+.el-dialog .el-tabs__active-bar { background: #c4a884 !important; height: 2px !important; opacity: 0.7 !important; border-radius: 1px !important; }
+.el-dialog .el-tabs__nav-wrap::after { display: none !important; }
+html.dark .el-dialog .el-tabs__item { color: rgba(232,220,200,0.4) !important; }
+html.dark .el-dialog .el-tabs__item:hover { color: rgba(232,220,200,0.6) !important; }
+html.dark .el-dialog .el-tabs__item.is-active { color: #E8DCC8 !important; }

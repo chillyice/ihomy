@@ -44,9 +44,21 @@
 | dust-layer(灰尘) | 46 | 光路微粒(20 个,夜间不可见) | screen |
 | light-layer(体积光) | 48 | 光束+辉光 | screen |
 | window-shadow-upper(上层阴影) | 49 | 左框+右框(最顶层,盖住光柱) | darken |
+| el-popper/dropdown/tooltip | 54 | 全局下拉菜单(teleported,光影层下方) | normal |
+| MusicPlayer(音乐播放器) | 55 | 左下角黑胶唱片播放器(有背景歌单且曲目>0 时渲染) | normal |
 | AppSidebar(导航栏) | 60 | 左侧导航+底部主题/台灯/用户 | normal |
+| bright-spot(光源辉光) | 65 | 体积光源核心光晕 | screen |
+| window-shadow-upper(窗框) | 68 | 上下分层窗框阴影 | darken |
+| reflection(反光高光) | 72 | 内容反光 | soft-light |
+| vignette(暗角) | 74 | 边缘压暗 | normal |
+| dust(灰尘粒子) | 76 | 光路微粒 | screen |
+| snow/rain(天气粒子) | 77 | 雪花/雨滴 | normal |
+| light-layer(光影根) | 78 | 光影层根容器 | normal |
+| lightning(闪电) | 79 | 雷电闪烁 | normal |
 | SiteFooter(备案号) | 70 | 右下角 ICP+公安备案 | normal |
 | lamp-light(台灯) | 100 | 钟摆运动径向发光(夜间) | normal |
+| BackToTop/InstallPrompt | 200 | 返回顶部/PWA 安装提示 | normal |
+| ElMessage(Toast) | 3000 | 右上角提示消息 | normal |
 
 ## 1. 背景色块(bg-blobs)
 
@@ -270,18 +282,51 @@ color: #3A2E22;
 - 今日待办提醒前 3 条(reminderApi.list,过滤 done!==1)。
 - 登录可见,小屏隐藏。
 
-## 11. 黑胶唱片播放器(MusicPlayer,z-index 60)
+## 11. 黑胶唱片播放器(MusicPlayer,z-index 55)
 
-- `position: fixed; right: 24px; bottom: 24px`(全局挂载,所有页面显示)。
-- `backdrop-filter: blur(24px) saturate(1.3)` + 暖白背景。
-- 唱片本体 120×120,`transition: transform 0.3s`。
-- hover:scale 1.05 + 显示曲名(`trackDisplay` computed:正在播放/已暂停/未设置音乐)。
-- 唱片盘:`radial-gradient(circle, #3A2E22 0%, #1A1410 30%, #2A2018 60%, #1A1410 100%)`,+ `repeating-radial-gradient` 凹槽纹理,中心红色标签 `radial-gradient(circle, #A8483A 0%, #6B2E26 100%)`。
-- 播放时:`.vinyl-disc` `animation: spin 4s linear infinite`(旋转),`.vinyl-arm` `transform: rotate(20deg)`(唱臂落下)。
-- 唱臂:`width: 5px; height: 60px; background: linear-gradient(to bottom, #C9A876, #8B6F47); transform-origin: top center; transform: rotate(-15deg)`(静止时抬起)。
-- 歌曲信息(左侧):`background: rgba(255,255,255,0.7); backdrop-filter: blur(20px) saturate(1.4); border-radius: 16px; padding: 12px 18px`,默认 `opacity: 0; transform: translateX(20px); pointer-events: none`,hover `.show` 时淡入。标题 15px/700,艺术家 12px/0.6,控件 ⏮⏸▶⏭(18px,主控 22px)。
+- `position: fixed; left: 240px; bottom: 24px`(全局挂载,所有页面显示)。
+- **渲染条件**:`v-if="playlist.length"` — 仅当当前家庭有背景音乐歌单且曲目数 > 0 时渲染。无歌单或无曲目时组件不显示。
+- **z-index: 55**(光影层下方:低于 bright-spot=65/vignette=74/lamp=100,高于 popper=54)。
+- `backdrop-filter: blur(24px) saturate(1.3)` + 暖白背景 `rgba(255,255,255,0.55)`。
+- 唱片本体 56×56(`.vinyl-disc`),`transition: transform 0.3s`;hover scale 1.05。
+- 唱片盘:`radial-gradient(circle, #3A2E22 0%, #1A1410 30%, #2A2018 60%, #1A1410 100%)` + `repeating-radial-gradient` 凹槽纹理,中心红色标签 `radial-gradient(circle, #A8483A 0%, #6B2E26 100%)`。
+- 播放时:`.vinyl-disc` `animation: spin 4s linear infinite`(旋转),`.vinyl-arm` `transform: rotate(15deg)`(唱臂落下)。
+- 唱臂:`width: 3px; height: 28px; background: linear-gradient(to bottom, #C9A876, #8B6F47); transform-origin: top center; transform: rotate(-15deg)`(静止时抬起)。
+- 展开内容(`.player-body` 280px):歌名 13px/600 + 状态(正在播放/已暂停)+ 进度条 + 控件(⏮⏸▶⏭ + 歌单列表)。
+- 展开/收缩动画:`transform-origin: left bottom` + `scaleX(0→1)` + `width: 0→280px` 0.35s。
+- 拖拽:`left + bottom` 定位,位置持久化 localStorage `ihomy:music:pos`;拖拽边界 clamp `max(8, ...)` 防出屏。重置位置合并到 Settings「恢复默认面板布局」。
+- 数据源:`musicApi.getBackground()` 获取当前家庭背景歌单 + 曲目;watch `bgMusicVersion`(Settings/音乐页设为背景时 bump)重新加载;watch `familyId` 切换家庭时重置。
+- 切歌:`nextTick` 后 `audioEl.play()`(不用 setTimeout);`playing.value` 先置 false 再恢复,避免状态闪烁。
 
 **性能注意**:`contain: layout style` + `transform: translateZ(0)` 隔离合层。
+
+## 11a. 全局弹窗/Toast/Popper 规范(补充)
+
+### 弹窗尺寸规则(`main.css` 全局,按业务场景)
+
+| class | 场景 | 宽度 | max-height | 滚动 |
+|-------|------|------|------------|------|
+| `dialog-sm` | 简短确认/单行输入 | 420px | 自适应 | 无 |
+| `dialog-md` | 选择器/简单表单 | 520px | 520px | body 内部滚动 |
+| `dialog-lg` | 复杂多字段表单 | 640px | 640px | body 内部滚动 |
+| `dialog-xl` | 详情/媒体预览 | 82vw(max 900px) | 85vh | body 内部滚动 |
+
+- 容器 `flex-direction:column`;body `flex:1 + overflow-y:auto`;容器本身不滚动。
+- 圆角 14px;磨砂背景 `#fcf8f0` + `blur(12px)`;ESC + 点击遮罩关闭。
+- 关闭按钮 X 显示(28×28px,圆角 8px,hover 浅米底色)。
+- 弹窗内 Tab:选中态低饱和暖棕 `#5c4c3d` + `#c4a884` 下划线 `opacity:0.7`(禁蓝色)。
+- 弹窗内 checkbox:选中色 `#b88c6e` 暖棕(禁原生蓝色)。
+
+### Toast(ElMessage)
+
+- 右上角 `right:24px`;圆角 10px;磨砂背景。
+- success:暖米底 `rgba(243,238,230,0.95)` + 褐字 `#5c4c3d`(**禁止亮绿**)。
+- warning:暖米底 + 暗金 `#8a6d3b`;error:浅红底 + 暗红 `#b04a3a`。
+- 暗色模式:`rgba(30,42,72,0.92)` 背景 + 浅米文字。
+
+### Popper/Dropdown
+
+- `.el-popper.is-light` `z-index:54`(光影层下方,MusicPlayer=55 之上)。
 
 ## 12. 光照测试控制台(全局组件)
 
@@ -377,7 +422,7 @@ gsap.from('.album-closed', { scale: 0.9, autoAlpha: 0, duration: 0.8, delay: 0.3
 3. 光柱在相册和面板之上(screen 变亮),灰尘粒子在光路中漂浮发光;左右框(上层阴影 z=49)盖住光柱顶部。
 4. 阴影重叠区域颜色不叠加变深(灰阶 darken 幂等)。
 5. 内容组件(相册/面板)在日间有轻微反光高光(soft-light,跟随光源位置)。
-6. 黑胶唱片 hover 放大并显示歌曲信息(正在播放/已暂停/未设置音乐)。
+6. 黑胶唱片播放器:有背景歌单且曲目>0 时显示在左下角(`left:240px bottom:24px z:55`),hover 放大唱片+展开歌名/进度条/控件;无歌单或无曲目时不渲染;切换家庭自动重载。
 7. 全局导航栏(AppSidebar)左侧固定,含家庭名/模块导航/系统下拉(设置+运维)/主题切换/台灯三态/语言/铃铛/用户头像;关灯时按钮伪元素径向发光圈脉冲动画。
 8. ≤960px 时左侧面板和纪念日隐藏,只保留相册 + 导航栏 + 紧凑天气 + 小唱片。
 9. 全局光照测试控制台(`LightTestConsole.vue`,App.vue 挂载):循环 288 时隙,含地区/日期/时间/高度/方位/窗角/9 段时段标签 + 进度条 + 后退/暂停/前进/停止 + 速度控制(0.5/1/2/4/8x) + 天气控制(☀️/☁️/🌧️/❄️/⛈️ + 降水滑块) + 图层开关(阴影/环境光) + 台灯模式(自动/开/关) + 色温/亮度滑块;停止=重置真实时间+关闭控制台。
