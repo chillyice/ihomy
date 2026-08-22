@@ -60,8 +60,8 @@
                   <el-button @click="showLabelDialog = true">+ {{ $t('settings.newLabel') }}</el-button>
                   <el-color-picker v-model="labelForm.color" />
                   <el-button v-if="labelForm.label" link type="danger" @click="clearLabel">{{ $t('common.cancel') }}</el-button>
-                  <span class="form-tip">{{ $t('settings.labelHint') }}</span>
                 </div>
+                <div class="form-tip">{{ $t('settings.labelHint') }}</div>
               </el-form-item>
               <el-form-item :label="$t('settings.language')">
                 <el-radio-group :model-value="locale" @change="onChangeLang">
@@ -149,8 +149,8 @@
           <!-- 创建新家庭:放在家庭设置最下方 -->
           <div class="card settings-card">
             <h2>创建新家庭</h2>
+            <button class="create-family-btn" @click="showCreateFamily = true">创建新家庭</button>
             <p class="share-tip">创建一个新的家庭组,你将成为新家庭的家长(OWNER)。创建后自动切换到新家庭,可在顶栏切换回原家庭。</p>
-            <el-button type="success" plain @click="createNewFamily">创建新家庭</el-button>
           </div>
         </template>
 
@@ -187,7 +187,7 @@
         <template v-if="active === 'light'">
           <div class="card settings-card">
             <h2>个性化设置</h2>
-            <el-form label-position="top">
+            <el-form label-position="top" class="settings-form">
               <el-form-item :label="$t('settings.theme')">
                 <div class="theme-row">
                   <el-switch v-model="theme.autoMode" @change="onToggleAutoMode" active-text="日出日落自动切换" />
@@ -212,17 +212,26 @@
               <el-form-item label="亮度">
                 <el-slider v-model.number="lampBrightness" :min="0" :max="100" show-input />
               </el-form-item>
-              <el-form-item label="阴影效果">
-                <el-switch v-model="shadowEnabled" />
+              <el-form-item>
+                <div class="setting-row">
+                  <el-switch v-model="shadowEnabled" />
+                  <span class="setting-label">阴影效果</span>
+                </div>
                 <div class="share-tip">关闭后窗户阴影和暗角将不显示,画面更干净</div>
               </el-form-item>
-              <el-form-item label="背景色块">
-                <el-switch v-model="blobsEnabled" />
+              <el-form-item>
+                <div class="setting-row">
+                  <el-switch v-model="blobsEnabled" />
+                  <span class="setting-label">背景色块</span>
+                </div>
                 <div class="share-tip">关闭后背景色块飘动动画不显示(可提升低分辨率屏性能)</div>
               </el-form-item>
               <el-divider />
-              <el-form-item label="天气效果">
-                <el-switch v-model="weatherEffectEnabled" />
+              <el-form-item>
+                <div class="setting-row">
+                  <el-switch v-model="weatherEffectEnabled" />
+                  <span class="setting-label">天气效果</span>
+                </div>
                 <div class="share-tip">开启后根据真实天气显示光柱/阴影/雨雪粒子等效果,关闭后仅按时间做光影</div>
               </el-form-item>
               <el-form-item label="天气地区">
@@ -249,7 +258,9 @@
               </el-form-item>
               <el-divider />
               <el-form-item label="夜间超时关灯(分钟)">
-                <el-input-number v-model.number="idleMinutes" :min="1" :max="120" :step="1" />
+                <div class="setting-row">
+                  <el-input-number v-model.number="idleMinutes" :min="1" :max="120" :step="1" />
+                </div>
                 <div class="share-tip">夜间无操作超过此时长后自动关灯,有操作时立即开灯(仅"自动"模式生效)</div>
                 <div v-if="isIdle" class="share-tip" style="color: var(--color-accent)">当前状态:已超时关灯</div>
               </el-form-item>
@@ -275,14 +286,31 @@
       <el-input v-model="newLabelName" :placeholder="$t('settings.labelPlaceholder')" @keyup.enter="addCustomLabel" />
       <template #footer>
         <el-button @click="showLabelDialog = false">{{ $t('common.cancel') }}</el-button>
-        <el-button type="primary" @click="addCustomLabel">{{ $t('common.confirm') }}</el-button>
+        <el-button type="primary" :disabled="!newLabelName.trim()" @click="addCustomLabel">{{ $t('common.confirm') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 创建新家庭弹窗 -->
+    <el-dialog v-model="showCreateFamily" title="创建新家庭" width="380px" append-to-body @keyup.esc="showCreateFamily = false">
+      <div class="fm-hint">你将成为新家庭的家长(OWNER),创建后自动切换到新家庭。</div>
+      <el-input
+        ref="familyNameInputRef"
+        v-model="newFamilyName"
+        placeholder="如：张家的小院"
+        @keyup.enter="confirmCreateFamily"
+      />
+      <template #footer>
+        <el-button @click="showCreateFamily = false">取消</el-button>
+        <el-button type="primary" :disabled="!newFamilyName.trim() || creatingFamily" :loading="creatingFamily" @click="confirmCreateFamily">
+          {{ creatingFamily ? '创建中...' : '创建' }}
+        </el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, inject, onMounted, watch } from 'vue'
+import { ref, reactive, computed, inject, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { profileApi, familyApi, fileApi, musicApi } from '@/api'
@@ -541,19 +569,31 @@ const copyShare = async () => {
   }
 }
 
-const createNewFamily = async () => {
+const showCreateFamily = ref(false)
+const newFamilyName = ref('')
+const creatingFamily = ref(false)
+const familyNameInputRef = ref(null)
+
+watch(showCreateFamily, (v) => {
+  if (v) {
+    newFamilyName.value = ''
+    nextTick(() => familyNameInputRef.value?.focus?.())
+  }
+})
+
+const confirmCreateFamily = async () => {
+  const name = newFamilyName.value.trim()
+  if (!name || creatingFamily.value) return
+  creatingFamily.value = true
   try {
-    const { value } = await ElMessageBox.prompt('请输入新家庭名称', '创建新家庭', {
-      confirmButtonText: '创建',
-      cancelButtonText: '取消',
-      showClose: false,
-      inputPattern: /.+/,
-      inputErrorMessage: '家庭名称不能为空',
-    })
-    await familyApi.create({ name: value })
+    await familyApi.create({ name })
     ElMessage.success('家庭创建成功,已切换到新家庭')
     location.reload()
-  } catch (e) {}
+  } catch (e) {
+    ElMessage.error(e.message || '创建失败')
+  } finally {
+    creatingFamily.value = false
+  }
 }
 
 // 恢复默认面板布局:清除 localStorage 中所有面板持久化记录,刷新页面生效
@@ -621,11 +661,24 @@ onMounted(load)
 .settings-card { margin-bottom: 16px; background: var(--color-card); }
 .settings-card h2 { color: var(--color-primary); margin-bottom: 16px; font-size: 17px; }
 .label-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.form-tip { color: var(--color-text-2); font-size: 12px; margin-left: 12px; }
+.form-tip { color: #776e62; font-size: 12px; margin-top: 8px; line-height: 1.4; width: 100%; }
 .share-row { display: flex; align-items: center; gap: 8px; width: 100%; }
-.share-tip { color: var(--color-text-secondary); font-size: 12px; margin-top: 8px; display: flex; align-items: center; }
-.weather-loc-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.share-tip { color: #776e62; font-size: 12px; margin-top: 8px; line-height: 1.4; width: 100%; }
+html.dark .form-tip, html.dark .share-tip { color: #9a9088; }
+.weather-loc-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .upload-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* 个性化设置:控件行 + 标签水平排列,垂直居中 */
+.setting-row { display: flex; align-items: center; gap: 10px; }
+.setting-label { font-size: 14px; font-weight: 500; color: var(--color-text); }
+
+/* 个性化设置:表单项间距统一 */
+.settings-form .el-form-item { margin-bottom: 16px; padding: 6px 0; }
+.settings-form .el-form-item .el-switch,
+.settings-form .el-form-item .el-input-number,
+.settings-form .el-form-item .el-radio-group,
+.settings-form .el-form-item .el-slider { margin-bottom: 0; }
+.settings-form .el-divider { margin: 8px 0 4px; }
 .avatar-preview { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 1px solid var(--color-border); cursor: pointer; }
 .uploader-btn { width: 80px; height: 80px; border-radius: 50%; border: 1px dashed var(--color-border); display: flex; align-items: center; justify-content: center; color: var(--color-text-secondary); font-size: 12px; text-align: center; cursor: pointer; background: var(--color-bg); }
 .cover-preview { max-width: 180px; max-height: 90px; object-fit: cover; border-radius: 6px; border: 1px solid var(--color-border); }
@@ -644,4 +697,20 @@ onMounted(load)
   .settings-menu { display: flex; }
   .settings-menu .el-menu-item { flex: 1; justify-content: center; }
 }
+
+/* 创建新家庭按钮 */
+.create-family-btn {
+  height: 34px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 10px;
+  background: #f3eee6;
+  color: #3A2E22;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.create-family-btn:hover { background: #e8e0d2; }
+.fm-hint { font-size: 13px; color: var(--color-text-secondary); line-height: 1.5; margin-bottom: 16px; }
 </style>

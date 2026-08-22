@@ -12,4 +12,19 @@
         ORDER BY category
     </select>
 
+    <update id="renameCategory">
+        UPDATE content_blog SET category = #{newName}
+        WHERE family_id = #{familyId} AND category = #{oldName} AND deleted = 0
+    </update>
+
+    <update id="clearCategory">
+        UPDATE content_blog SET category = NULL
+        WHERE family_id = #{familyId} AND category = #{category} AND deleted = 0
+    </update>
+
+    <delete id="deleteByCategory">
+        DELETE FROM content_blog
+        WHERE family_id = #{familyId} AND category = #{category} AND deleted = 0
+    </delete>
+
 </mapper>

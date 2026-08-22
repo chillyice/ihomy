@@ -1,15 +1,20 @@
 <!-- 面包屑导航:首页 + 传入的分级项,带 to/path 的项可点击跳转 -->
 <template>
   <nav class="breadcrumb">
-    <router-link to="/" class="crumb-link">
-      <el-icon class="home-icon"><HomeFilled /></el-icon>
-      <span>{{ $t('nav.home') }}</span>
-    </router-link>
-    <template v-for="(it, i) in items" :key="i">
-      <span class="sep">/</span>
-      <router-link v-if="it.to || it.path" :to="it.to || it.path" class="crumb-link">{{ it.label }}</router-link>
-      <span v-else class="crumb-current">{{ it.label }}</span>
-    </template>
+    <div class="crumb-left">
+      <router-link to="/" class="crumb-link">
+        <el-icon class="home-icon"><HomeFilled /></el-icon>
+        <span>{{ $t('nav.home') }}</span>
+      </router-link>
+      <template v-for="(it, i) in items" :key="i">
+        <span class="sep">/</span>
+        <router-link v-if="it.to || it.path" :to="it.to || it.path" class="crumb-link">{{ it.label }}</router-link>
+        <span v-else class="crumb-current">{{ it.label }}</span>
+      </template>
+    </div>
+    <div v-if="$slots.right" class="crumb-right">
+      <slot name="right" />
+    </div>
   </nav>
 </template>
 
@@ -25,6 +30,7 @@ defineProps({
 .breadcrumb {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   font-size: 13px;
   margin: -16px -16px 12px;
@@ -41,6 +47,8 @@ defineProps({
   -webkit-mask-image: linear-gradient(to right, transparent 0%, black 24px, black calc(100% - 24px), transparent 100%);
   mask-image: linear-gradient(to right, transparent 0%, black 24px, black calc(100% - 24px), transparent 100%);
 }
+.crumb-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.crumb-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .crumb-link {
   display: inline-flex;
   align-items: center;

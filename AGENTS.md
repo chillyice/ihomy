@@ -282,6 +282,18 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 14. **并行请求**(强制):多个独立的 `await xxxApi.foo()` 必须改 `Promise.all([a, b, c])` 并行(参考 `Home.vue loadAll` + `stores/app.js init`)。串行只在真有依赖时用。
 15. **computed 纯函数**(强制):`computed` 内禁止 `Math.random()`/`Date.now()`/副作用,否则每次访问重算且视觉跳动。需要随机/一次性计算用 `ref` + `watch(source, immediate)` 生成(参考 `Home.vue polaroidLayout`)。
 16. **路由懒加载**:24 个路由全部 `() => import('./views/...')`,不写同步 `import Home from '@/views/Home.vue'`。
+17. **模态弹窗规范**(强制,全局统一,所有 `el-dialog` + `ElMessageBox` 共享 `main.css` 全局覆写,禁止在各组件 scoped 内重复定义):
+    - **容器**:圆角 14px;阴影 `0 3px 12px rgba(0,0,0,0.07)`;背景 `#fcf8f0` + `backdrop-filter: blur(12px) saturate(1.1)`;`padding: 0`(header/body/footer 各自管 padding);`width: fit-content`(单行输入弹窗不设固定宽,内容自适应)。
+    - **遮罩**:`rgba(0,0,0,0.20)` + `blur(2px)`,不过度压暗。
+    - **标题**:左侧 4px 暖棕装饰竖线;`font-size: 15px; font-weight: 600`;标题与说明文字间距 8px。
+    - **关闭按钮**:`el-dialog__headerbtn` `display:none`(隐藏 X);`ElMessageBox` 关闭按钮同样 `display:none`。
+    - **输入框**:圆角 10px;边框 `#e4ddd0`;背景 `#fffdf8`;min-height 38px;focus 暖棕光晕 `rgba(184,140,110,0.12)`;placeholder 弱化 `#c4b8a8 opacity:0.7`。
+    - **按钮**:统一 34px 高 / 10px 圆角 / 13px 字号;主操作 `#b88c6e` 暖棕;次级 `#f3eee6` 深褐文字;危险 `#f4e0dc` 低饱和暗红 `#b04a3a`;禁用/loading `#e4ddd0` 灰底。
+    - **footer**:无顶分割线;`padding: 0 20px 18px`;输入框距底部按钮区 20px。
+    - **动画**:覆盖 EP 默认 `animation`(杀 `dialog-fade` 的 `animation` 再用 `transition`);`scale(0.94)` + opacity 淡入 0.25s。
+    - **ElMessageBox**:同风格;`max-width: 360px; min-width: 300px`;无装饰竖线;footer 无分割线;关闭按钮隐藏。
+    - **暗色模式**:弹窗背景 `#1E2A48`;次级按钮 `rgba(232,220,200,0.1)`;placeholder `rgba(232,220,200,0.35)`。
+    - **禁止**:在组件 scoped CSS 里写 `el-dialog`/`el-message-box` 样式覆写;新增弹窗只管业务逻辑,样式由全局兜底。
 
 ### 性能规范(已踩坑 + 强制规则)
 

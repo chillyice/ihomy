@@ -2,7 +2,10 @@ package com.ihomy.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.ihomy.annotation.OperationLog;
+import com.ihomy.annotation.RequirePermission;
+import com.ihomy.common.BizException;
 import com.ihomy.common.Result;
+import com.ihomy.common.ResultCode;
 import com.ihomy.dto.BlogDTO;
 import com.ihomy.entity.Blog;
 import com.ihomy.entity.SysUser;
@@ -15,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 博客接口:列表(按可见范围)/详情/发布/修改/删除。
@@ -47,6 +51,33 @@ public class BlogController {
         SysUser user = securityHelper.currentUser();
         Long familyId = user == null ? null : user.getFamilyId();
         return Result.success(blogService.categories(familyId));
+    }
+
+    @Operation(summary = "新增分类")
+    @PostMapping("/categories")
+    public Result<Void> addCategory(@RequestBody Map<String, String> body) {
+        SysUser user = securityHelper.currentUser();
+        if (user == null) throw new BizException(ResultCode.UNAUTHORIZED);
+        blogService.addCategory(user.getFamilyId(), body.get("name"));
+        return Result.success();
+    }
+
+    @Operation(summary = "重命名分类")
+    @PutMapping("/categories")
+    public Result<Void> renameCategory(@RequestBody Map<String, String> body) {
+        SysUser user = securityHelper.currentUser();
+        if (user == null) throw new BizException(ResultCode.UNAUTHORIZED);
+        blogService.renameCategory(user.getFamilyId(), body.get("oldName"), body.get("newName"));
+        return Result.success();
+    }
+
+    @Operation(summary = "删除分类")
+    @DeleteMapping("/categories")
+    public Result<Void> deleteCategory(@RequestParam String category, @RequestParam(defaultValue = "move") String mode) {
+        SysUser user = securityHelper.currentUser();
+        if (user == null) throw new BizException(ResultCode.UNAUTHORIZED);
+        blogService.deleteCategory(user.getFamilyId(), category, mode);
+        return Result.success();
     }
 
     @Operation(summary = "博客详情")

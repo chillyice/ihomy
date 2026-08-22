@@ -25,7 +25,11 @@ export const blogApi = {
   detail: (id) => request.get(`/blog/${id}`),
   create: (data) => request.post('/blog', data),
   update: (id, data) => request.put(`/blog/${id}`, data),
+  delete: (id) => request.delete(`/blog/${id}`),
   categories: () => request.get('/blog/categories'),
+  addCategory: (name) => request.post('/blog/categories', { name }),
+  renameCategory: (oldName, newName) => request.put('/blog/categories', { oldName, newName }),
+  deleteCategory: (category, mode) => request.delete('/blog/categories', { params: { category, mode } }),
 }
 
 // 日记

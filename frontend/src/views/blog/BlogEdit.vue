@@ -55,7 +55,7 @@
       <el-input v-model="newCategoryName" :placeholder="$t('blog.categoryPlaceholder')" @keyup.enter="addCategory" />
       <template #footer>
         <el-button @click="showCategoryDialog = false">{{ $t('common.cancel') }}</el-button>
-        <el-button type="primary" @click="addCategory">{{ $t('common.confirm') }}</el-button>
+        <el-button type="primary" :disabled="!newCategoryName.trim() || savingCategory" :loading="savingCategory" @click="addCategory">{{ $t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -80,6 +80,7 @@ const form = reactive({ title: '', content: '', coverImage: '', category: '', st
 const categories = ref([])
 const showCategoryDialog = ref(false)
 const newCategoryName = ref('')
+const savingCategory = ref(false)
 
 // 拉取家庭已有分类,供 el-select 下拉
 const loadCategories = async () => {
@@ -91,17 +92,21 @@ const loadCategories = async () => {
 }
 
 // 新建分类:加入下拉列表并选中
-const addCategory = () => {
+const addCategory = async () => {
   const name = newCategoryName.value.trim()
-  if (!name) return ElMessage.warning(t('blog.categoryPlaceholder'))
-  if (categories.value.includes(name)) {
+  if (!name || savingCategory.value) return
+  savingCategory.value = true
+  try {
+    await blogApi.addCategory(name)
+    categories.value = await blogApi.categories() || []
     form.category = name
-  } else {
-    categories.value.push(name)
-    form.category = name
+    newCategoryName.value = ''
+    showCategoryDialog.value = false
+  } catch (e) {
+    ElMessage.error(e.message || 'Failed')
+  } finally {
+    savingCategory.value = false
   }
-  newCategoryName.value = ''
-  showCategoryDialog.value = false
 }
 
 // 封面图片上传:回填 URL 到表单,返回 false 阻止 el-upload 默认提交

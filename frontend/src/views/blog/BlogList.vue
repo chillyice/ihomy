@@ -1,13 +1,21 @@
-<!-- 博客列表页:封面+标题+标签+浏览数的卡片列表,点击进入详情 -->
 <template>
   <div class="page">
-    <Breadcrumb :items="[{ label: $t('blog.title') }]" />
-    <div class="list-header">
-      <el-button v-if="userStore.isLoggedIn" type="primary" @click="router.push('/blog/edit')">{{ $t('blog.newPost') }}</el-button>
-    </div>
+    <Breadcrumb :items="[{ label: $t('blog.title') }]">
+      <template #right>
+        <button v-if="userStore.isLoggedIn" class="write-btn" @click="router.push('/blog/edit')">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          {{ $t('blog.newPost') }}
+        </button>
+      </template>
+    </Breadcrumb>
     <div class="blog-layout">
-      <aside v-if="categories.length" class="category-side">
-        <div class="side-title">{{ $t('blog.category') }}</div>
+      <aside v-if="categories.length || userStore.isLoggedIn" class="category-side">
+        <div class="side-head">
+          <span class="side-title">{{ $t('blog.category') }}</span>
+          <button v-if="userStore.isLoggedIn" class="icon-btn" :title="$t('blog.manageCategory')" @click="openCategoryDialog('add')">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
         <div class="cat-item" :class="{ active: !activeCategory }" @click="setCategory('')">{{ $t('blog.allCategories') }}</div>
         <div
           v-for="c in categories"
@@ -15,11 +23,21 @@
           class="cat-item"
           :class="{ active: activeCategory === c }"
           @click="setCategory(c)"
-        >{{ c }}</div>
+        >
+          <span class="cat-name">{{ c }}</span>
+          <span v-if="userStore.isLoggedIn" class="cat-ops" @click.stop>
+            <button class="cat-op-btn" :title="$t('blog.editCategory')" @click="openCategoryDialog('edit', c)">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button class="cat-op-btn danger" :title="$t('blog.deleteCategory')" @click="openDeleteCategory(c)">
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+          </span>
+        </div>
       </aside>
       <div v-loading="loading" class="blog-main">
         <div v-for="b in list" :key="b.id" class="blog-item card" @click="router.push(`/blog/${b.id}`)">
-          <img v-if="b.coverImage" :src="b.coverImage" class="blog-cover" />
+          <img v-if="b.coverImage" :src="thumbUrl(b.coverImage)" class="blog-cover" />
           <div class="blog-info">
             <div class="blog-title">{{ b.title }}</div>
             <div class="blog-sub">
@@ -30,20 +48,64 @@
             </div>
             <div class="blog-meta">{{ b.viewCount }} {{ $t('blog.views') }} · {{ formatDate(b.createdAt) }}</div>
           </div>
+          <div v-if="userStore.isLoggedIn && canEdit(b)" class="blog-more" @click.stop>
+            <el-dropdown trigger="click" placement="bottom-end" @command="cmd => onBlogCommand(cmd, b)">
+              <button class="icon-btn more-trigger">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+              </button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="edit">{{ $t('blog.editPost') }}</el-dropdown-item>
+                  <el-dropdown-item command="copy">{{ $t('blog.copyLink') }}</el-dropdown-item>
+                  <el-dropdown-item divided command="delete" class="danger-item">{{ $t('common.delete') }}</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
         </div>
-        <el-empty v-if="!loading && !list.length" :description="userStore.isGuest ? $t('blog.noPublicBlog') : $t('blog.firstHint')" />
+        <div v-if="!loading && !list.length" class="empty-state">
+          <el-empty :description="userStore.isGuest ? $t('blog.noPublicBlog') : $t('blog.firstHint')">
+            <button v-if="userStore.isLoggedIn" class="write-btn" @click="router.push('/blog/edit')">{{ $t('blog.emptyWriteBtn') }}</button>
+          </el-empty>
+        </div>
       </div>
     </div>
+
+    <el-dialog v-model="catDialog.visible" :title="catDialog.mode === 'add' ? $t('blog.newCategory') : $t('blog.editCategory')" width="360px" append-to-body>
+      <el-input v-model="catDialog.name" :placeholder="$t('blog.categoryNamePlaceholder')" @keyup.enter="saveCategory" />
+      <template #footer>
+        <el-button @click="catDialog.visible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :disabled="!catDialog.name.trim() || catDialog.saving" :loading="catDialog.saving" @click="saveCategory">{{ $t('common.confirm') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="delCatDialog.visible" :title="$t('blog.deleteCategory')" width="380px" append-to-body>
+      <p class="del-cat-name">{{ delCatDialog.category }}</p>
+      <p v-if="delCatDialog.blogCount > 0" class="del-cat-hint">{{ $t('blog.deleteCategoryHint') }}</p>
+      <el-radio-group v-if="delCatDialog.blogCount > 0" v-model="delCatDialog.mode" class="del-cat-radios">
+        <el-radio value="move">{{ $t('blog.moveToAll') }} ({{ delCatDialog.blogCount }})</el-radio>
+        <el-radio value="delete">{{ $t('blog.deleteBlogs') }} ({{ delCatDialog.blogCount }})</el-radio>
+      </el-radio-group>
+      <p v-else class="del-cat-hint">{{ $t('common.confirm') }}{{ $t('blog.deleteCategory') }}?</p>
+      <template #footer>
+        <el-button @click="delCatDialog.visible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="danger" :loading="delCatDialog.saving" @click="confirmDeleteCategory">{{ $t('common.confirm') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { blogApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import { thumbUrl } from '@/utils/image'
 
+const { t } = useI18n()
 const router = useRouter()
 const userStore = useUserStore()
 const list = ref([])
@@ -53,10 +115,12 @@ const loading = ref(false)
 
 const formatDate = (d) => (d ? new Date(d).toLocaleDateString('zh-CN') : '')
 
+const canEdit = (b) => userStore.isOwner || b.authorId === userStore.userInfo?.id
+
 const load = async () => {
   loading.value = true
   try {
-    const params = { current: 1, size: 20 }
+    const params = { current: 1, size: 50 }
     if (activeCategory.value) params.category = activeCategory.value
     const data = await blogApi.list(params)
     list.value = data.records || []
@@ -68,14 +132,92 @@ const load = async () => {
 const loadCategories = async () => {
   try {
     categories.value = await blogApi.categories() || []
-  } catch (e) {
-    // 忽略
-  }
+  } catch (e) {}
 }
 
 const setCategory = (c) => {
   activeCategory.value = c
   load()
+}
+
+const catDialog = reactive({ visible: false, mode: 'add', oldName: '', name: '', saving: false })
+const openCategoryDialog = (mode, name = '') => {
+  catDialog.mode = mode
+  catDialog.oldName = name
+  catDialog.name = mode === 'edit' ? name : ''
+  catDialog.visible = true
+}
+const saveCategory = async () => {
+  const name = catDialog.name.trim()
+  if (!name || catDialog.saving) return
+  catDialog.saving = true
+  try {
+    if (catDialog.mode === 'add') {
+      await blogApi.addCategory(name)
+    } else {
+      await blogApi.renameCategory(catDialog.oldName, name)
+    }
+    ElMessage.success(t('common.saveSuccess'))
+    catDialog.visible = false
+    await loadCategories()
+    if (catDialog.mode === 'edit' && activeCategory.value === catDialog.oldName) {
+      activeCategory.value = name
+      load()
+    }
+  } catch (e) {
+    ElMessage.error(e.message || 'Failed')
+  } finally {
+    catDialog.saving = false
+  }
+}
+
+const delCatDialog = reactive({ visible: false, category: '', blogCount: 0, mode: 'move', saving: false })
+const openDeleteCategory = async (category) => {
+  const data = await blogApi.list({ current: 1, size: 1, category })
+  delCatDialog.blogCount = data.total || 0
+  delCatDialog.category = category
+  delCatDialog.mode = 'move'
+  delCatDialog.visible = true
+}
+const confirmDeleteCategory = async () => {
+  if (delCatDialog.saving) return
+  delCatDialog.saving = true
+  try {
+    await blogApi.deleteCategory(delCatDialog.category, delCatDialog.mode)
+    ElMessage.success(t('common.deleted'))
+    delCatDialog.visible = false
+    if (activeCategory.value === delCatDialog.category) activeCategory.value = ''
+    await loadCategories()
+    await load()
+  } catch (e) {
+    ElMessage.error(e.message || 'Failed')
+  } finally {
+    delCatDialog.saving = false
+  }
+}
+
+const onBlogCommand = async (cmd, b) => {
+  if (cmd === 'edit') {
+    router.push(`/blog/edit/${b.id}`)
+  } else if (cmd === 'copy') {
+    const url = `${window.location.origin}/blog/${b.id}`
+    try {
+      await navigator.clipboard.writeText(url)
+      ElMessage.success(t('blog.linkCopied'))
+    } catch (e) {
+      ElMessage.error('Failed')
+    }
+  } else if (cmd === 'delete') {
+    try {
+      await ElMessageBox.confirm(t('blog.deleteConfirm'), { type: 'warning', confirmButtonText: t('common.delete'), cancelButtonText: t('common.cancel') })
+      await blogApi.delete(b.id)
+      ElMessage.success(t('common.deleted'))
+      await load()
+      await loadCategories()
+    } catch (e) {
+      if (e !== 'cancel') ElMessage.error(e.message || 'Failed')
+    }
+  }
 }
 
 onMounted(() => {
@@ -85,43 +227,141 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.list-header { display: flex; justify-content: flex-start; align-items: center; gap: 10px; margin-bottom: 16px; }
 .blog-layout { display: grid; grid-template-columns: 180px 1fr; gap: 16px; }
 .category-side {
   background: var(--color-card);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 12px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  padding: 10px;
   height: fit-content;
   position: sticky;
   top: 42px;
+  border: 1px solid var(--color-border);
 }
-.side-title { font-size: 13px; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 8px; padding: 0 6px; }
+.side-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding: 0 6px; }
+.side-title { font-size: 13px; font-weight: 600; color: var(--color-text-secondary); }
 .cat-item {
-  padding: 8px 10px;
-  border-radius: 6px;
+  padding: 7px 10px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
   color: var(--color-text);
   transition: background 0.15s;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
 }
-.cat-item:hover { background: var(--color-bg-2); }
-.cat-item.active { background: var(--color-accent); color: #fff; }
+.cat-item:hover { background: rgba(58,46,34,0.04); }
+.cat-item.active {
+  background: #f0e8dd;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+.cat-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--color-accent);
+}
+html.dark .cat-item.active { background: rgba(232,220,200,0.08); }
+.cat-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat-ops { display: none; gap: 2px; flex-shrink: 0; }
+.cat-item:hover .cat-ops { display: flex; }
+.cat-op-btn {
+  width: 24px; height: 24px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--color-text-secondary);
+  transition: background 0.15s, color 0.15s;
+}
+.cat-op-btn:hover { background: rgba(58,46,34,0.08); color: var(--color-primary); }
+.cat-op-btn.danger:hover { background: rgba(168,72,58,0.1); color: #b04a3a; }
+
+.icon-btn {
+  width: 28px; height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--color-text-secondary);
+  transition: background 0.15s, color 0.15s;
+}
+.icon-btn:hover { background: rgba(58,46,34,0.08); color: var(--color-primary); }
+
 .blog-main { min-width: 0; }
-.blog-item { display: flex; gap: 14px; margin-bottom: 12px; cursor: pointer; }
-.blog-item:hover { box-shadow: 0 6px 18px rgba(31,58,95,0.15); }
-.blog-cover { width: 120px; height: 80px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
-.blog-title { font-size: 16px; font-weight: 600; }
-.blog-sub { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; align-items: center; }
-.blog-cat { background: var(--color-primary); color: #fff; padding: 1px 8px; border-radius: 10px; font-size: 12px; }
-.blog-tags { display: flex; gap: 6px; flex-wrap: wrap; }
-.blog-tags .tag { background: rgba(46, 116, 181, 0.08); color: var(--color-accent); padding: 1px 8px; border-radius: 10px; font-size: 12px; }
-.blog-meta { margin-top: 8px; font-size: 12px; color: var(--color-text-secondary); }
+.blog-item {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 16px;
+  cursor: pointer;
+  padding: 20px;
+  border-radius: 14px;
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.blog-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  background: rgba(255,255,255,0.5);
+}
+html.dark .blog-item:hover { background: rgba(255,255,255,0.04); }
+.blog-cover { width: 120px; height: 80px; object-fit: cover; border-radius: 10px; flex-shrink: 0; }
+.blog-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.blog-title { font-size: 17px; font-weight: 600; line-height: 1.6; color: var(--color-primary); }
+.blog-sub { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; align-items: center; }
+.blog-cat { background: #f0e8dd; color: var(--color-accent); padding: 1px 8px; border-radius: 8px; font-size: 12px; line-height: 1.4; }
+html.dark .blog-cat { background: rgba(232,220,200,0.1); }
+.blog-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.blog-tags .tag { background: rgba(168,72,58,0.06); color: var(--color-text-secondary); padding: 1px 7px; border-radius: 8px; font-size: 12px; line-height: 1.4; }
+.blog-meta { margin-top: auto; padding-top: 6px; font-size: 12px; color: var(--color-text-secondary); line-height: 1.4; text-align: right; }
+
+.blog-more { position: absolute; top: 12px; right: 12px; opacity: 0; transition: opacity 0.2s; }
+.blog-item:hover .blog-more { opacity: 1; }
+.more-trigger { width: 28px; height: 28px; }
+
+.empty-state { padding: 40px 0; }
+
+.write-btn {
+  height: 38px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 10px;
+  background: #d4dce8;
+  color: #2c3e50;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.2s;
+}
+.write-btn:hover { background: #c4d0e0; }
+html.dark .write-btn { background: rgba(120,150,180,0.25); color: #c8d6e5; }
+html.dark .write-btn:hover { background: rgba(120,150,180,0.35); }
+
+.del-cat-name { font-weight: 600; font-size: 15px; color: var(--color-primary); margin-bottom: 8px; }
+.del-cat-hint { font-size: 13px; color: var(--color-text-secondary); line-height: 1.5; }
+.del-cat-radios { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+
+:deep(.danger-item) { color: #b04a3a !important; }
+
 @media (max-width: 768px) {
   .blog-layout { grid-template-columns: 1fr; }
   .category-side { display: flex; gap: 6px; overflow-x: auto; padding: 8px; }
-  .side-title { display: none; }
+  .side-head { display: none; }
   .cat-item { white-space: nowrap; }
+  .cat-ops { display: none !important; }
   .blog-cover { width: 90px; height: 64px; }
+  .blog-more { opacity: 1; }
 }
 </style>
