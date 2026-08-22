@@ -79,11 +79,17 @@ export default {
     upcomingEvents: 'Upcoming',
     testPhase: {
       night: 'Night',
+      midnight: 'Midnight',
+      dawn: 'Dawn',
       sunrise: 'Sunrise',
       morning: 'Morning',
+      forenoon: 'Forenoon',
       daytime: 'Daytime',
+      noon: 'Noon',
+      afternoon: 'Afternoon',
       evening: 'Evening',
       sunset: 'Sunset',
+      dusk: 'Dusk',
     },
   },
   theme: {

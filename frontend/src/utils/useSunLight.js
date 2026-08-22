@@ -23,6 +23,7 @@ export function useSunLight() {
     brightSpotColor: 'rgb(8,12,28)', brightSpotOpacity: 0.7,
     reflectionOpacity: 0, lightOpacity: 0, lampOpacity: 1,
     isNight: true, dayProgress: 0,
+    windowAngle: 0, hasDirectLight: false,
   })
 
   const lampMode = ref('auto')
@@ -34,6 +35,7 @@ export function useSunLight() {
   // 光照测试模式:开启后可手动控制 slotIdx 循环
   const lightTestMode = ref(false)
   const lightTestPaused = ref(false)
+  const testSpeed = ref(1)
   const weatherMode = ref('clear')
   const precipLevel = ref(0)
   let testTimer = null
@@ -143,7 +145,18 @@ export function useSunLight() {
       if (lightTestPaused.value) return
       slotIdx.value = (slotIdx.value + 1) % 288
       refreshScene()
-    }, 208)
+    }, 208 / testSpeed.value)
+  }
+  const setTestSpeed = (sp) => {
+    testSpeed.value = sp
+    if (testTimer && lightTestMode.value && !lightTestPaused.value) {
+      clearInterval(testTimer)
+      testTimer = setInterval(() => {
+        if (lightTestPaused.value) return
+        slotIdx.value = (slotIdx.value + 1) % 288
+        refreshScene()
+      }, 208 / sp)
+    }
   }
   const pauseLightTest = () => { lightTestPaused.value = !lightTestPaused.value }
   const stepLightTest = (dir) => {
@@ -390,6 +403,6 @@ export function useSunLight() {
     idleMinutes, isIdle,
     lampStrength, lampStrengthAnim, lampDivOpacity, lampRadius, lampMask, lampColor,
     dustParticles, snowParticles, rainParticles, weatherShadowOpacity, lightLayerOpacity, rayStyles, sourceStyle, bloomStyle, brightSpotStyle, reflectionStyle, lightningFlash,
-    lightTestMode, lightTestPaused, weatherMode, precipLevel, setWeather, startLightTest, pauseLightTest, stepLightTest, stopLightTest, setSlot, refreshScene,
+    lightTestMode, lightTestPaused, testSpeed, setTestSpeed, weatherMode, precipLevel, setWeather, startLightTest, pauseLightTest, stepLightTest, stopLightTest, setSlot, refreshScene,
   }
 }

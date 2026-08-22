@@ -91,18 +91,20 @@
 
 ### 光照生命周期
 
-旋转/颜色/强度全部由**日出日落时间**驱动(不再由方位角/高度角直接映射):
+旋转/颜色/强度由**方位角 + 窗角**驱动:
 
+- **窗角** `windowAngle = 90 - Math.abs(az - 180)`,90°=太阳正对窗户(正午),0°=太阳平行窗户(日出/日落方向)。窗角≤0 时无直射光。
+- **直射光门控** `hasDirectLight = !isNight && windowAngle > 0 && alt > 0`,太阳不直射窗户时(az<90° 或 az>270°),体积光/辉光/反光全部关闭。
 - **日昼进度** `dayProgress = (currentMin - sunriseMin) / (sunsetMin - sunriseMin)`,0=日出→1=日落,夜间 hold 在端点(日出前=0,日落后=1)。
-- **旋转**:`rotation = (dayProgress - 0.5) * 180` → 日出 -90°→ 正午 0°→ 日落 +90°,夜间 hold。光柱角度 = 阴影角度(同向)。
-- **光柱不透明度**:夜间 0(不发光),日间 `sin(dayProgress * π) * rayBaseOpacity`(正弦过渡,正午最强)。
-- **夜间调色板全 transparent**:bloom/core/mid/ambient 均为 `transparent`,rayBaseOpacity=0 → 光源辉光和光束都不可见。
+- **旋转**:`shadowVRotation = az - 180` → az=90° 时 -90°(开始)→ az=180° 正午 0°→ az=270° +90°(结束)。窗角≤0 时 hold 在对应端点(-90° 或 +90°)。光柱角度 = 阴影角度(同向)。
+- **光柱不透明度**:无直射光时 0,有直射光时 `sin(dayProgress * π) * rayBaseOpacity`(正弦过渡,正午最强)。
+- **无直射光调色板全 transparent**:bloom/core/mid/ambient 均为 `transparent`,rayBaseOpacity=0 → 光源辉光和光束都不可见。
 
 ### 光源辉光(light-bloom)
 - `position: absolute; width: 700px; height: 700px; margin-left: -350px; margin-top: -350px; border-radius: 50%; filter: blur(60px)`。
 - `background: radial-gradient(circle, <bloom> 0%, <mid> 35%, transparent 70%)`。
 - 位置:`left/top` = `source.x/source.y`。
-- 夜间 bloom=transparent → 不可见。
+- 夜间 bloom=transparent → 不可见。无直射光(窗角≤0)时同样 transparent。
 
 ### 光束(7 条羽毛状,makeRays)
 每条 `position: absolute; top: 0; left: 50%; height: 160vh; transform-origin: top center`。
@@ -118,7 +120,7 @@
 
 - `transform: translateX(<offset>px) rotate(<rotation>deg)`,`rotation` = 阴影同角度。
 - `background: linear-gradient(to bottom, <core> 0%, <mid> 35%, transparent 75%)`。
-- 夜间 opacity 全 0 → 不可见。
+- 夜间 opacity 全 0 → 不可见。无直射光时同样全 0。
 
 ### 光源水平位置
 - 日间:`sourceX = clamp(7.5, 92.5, ((az - 90) / 180) * 100)`%(东=左 7.5%,南=中 50%,西=右 92.5%)。
@@ -152,7 +154,7 @@
 `position: fixed; inset: 0; mix-blend-mode: soft-light; pointer-events: none`。内容组件被阳光照亮的轻微高光。
 
 - `background: radial-gradient(ellipse 60% 50% at <source.x> <source.y>, rgba(255,245,220,1) 0%, rgba(255,235,200,0.6) 30%, transparent 70%)`。
-- 不透明度:夜间 0,日间 `sin(dayProgress * π) * 0.22`(正午最强,轻微)。
+- 不透明度:无直射光时 0,有直射光时 `sin(dayProgress * π) * 0.22`(正午最强,轻微)。
 - soft-light 模式:效果极其微妙,只给内容组件顶部边缘加一点暖光。
 
 ## 6. 窗户阴影(分层重构)
@@ -180,7 +182,7 @@
 - X 对齐:shadow-v `50%`(中心)、frame-v-left `100%`(右边缘)、frame-v-right `0%`(左边缘)→ 全部在页面 50%。
 
 ### 旋转参数
-- `--rot: (dayProgress - 0.5) * 180 deg` → 日出 -90°→ 正午 0°→ 日落 +90°,夜间 hold。
+- `--rot: (az - 180) deg` → az=90° 时 -90°(开始旋转)→ az=180° 正午 0°→ az=270° +90°(结束旋转)。窗角≤0(az<90 或 az>270)时 hold 在对应端点。
 - 内框横/顶框/底框不旋转(始终水平)。
 - `--htop: clamp(5, 85, 80 - max(0,alt) * 0.8)`%(太阳越高→内框横越靠近顶部)。
 - 窗户开口 85%:左右框 `translateX(±42.5vw)`。
@@ -281,12 +283,15 @@ color: #3A2E22;
 
 **性能注意**:`contain: layout style` + `transform: translateZ(0)` 隔离合层。
 
-## 12. 光照测试控制台(内嵌首页)
+## 12. 光照测试控制台(全局组件)
 
-- `position: fixed; left: 24px; bottom: 24px; width: 220px`(毛玻璃面板)。
-- 信息面板:时间/高度角/方位角/日出/日落/阶段 + 进度条。
-- 控件:后退/暂停/前进/停止按钮 + 天气控制(☀️/☁️/🌧️/❄️ weatherMultiplier 衰减光强)+ 色温/亮度滑块。
-- 1 分钟循环 288 时隙(208ms/段),停止=重置真实时间+关闭控制台。
+- `position: fixed; left: 240px; bottom: 24px`(毛玻璃面板),`LightTestConsole.vue` 全局挂载于 App.vue。
+- 信息面板:地区/日期/高度角/方位角/窗角度/日出/日落/时段标签(9 段:深夜/凌晨/日出/清晨/上午/正午/下午/日落/黄昏)+ 进度条。
+- 播放控件:后退/暂停/前进/停止 + **速度控制** 5 档(0.5x/1x/2x/4x/8x,间隔 `208/testSpeed` ms)。
+- 天气控制:☀️/☁️/🌧️/❄️/⛈️ + 降水等级滑块(雨雪雷专用)。
+- 图层开关:阴影/环境光复选框。
+- 台灯模式:自动/开/关按钮 + 色温/亮度滑块。
+- 循环 288 时隙,停止=重置真实时间+关闭控制台。
 - `useSunLight.js` provide/inject 全局共享光影状态。
 
 ## 13. 台灯系统(lamp-light,z-index 100)
@@ -298,7 +303,7 @@ color: #3A2E22;
 - 开关时机:`lampOpacity=(isNight||dayProgress≥0.9||dayProgress≤0.1)?1:0`。
 - 色温可调:lampTemp 0-100 滑块,warm rgba(255,180,100)→cool rgba(220,230,255)。
 - 亮度可调:lampBrightness 0-100 滑块,控制 mask 透明区域比例。
-- 钟摆运动:`requestAnimationFrame` 驱动,周期 8 秒。`lampPendulumX=sin(phase)×5vw`(横向 ±5%),`lampPendulumScaleX=1-|sin|×0.2`(中间 1.0 圆形,两侧 0.8 椭圆)。
+- 钟摆运动:CSS `@keyframes lampSwing` 驱动(8 秒周期),不经过 Vue 响应式。横向 ±1.5vw,两侧 scaleX 0.97/1.03。
 - **mask 祛除阴影**:`.window-shadow`/`.bright-spot`/`.vignette` 三层都加 `mask-image: var(--lamp-mask)`,台灯开启时 mask 中心透明挖洞祛除阴影,关闭时 `mask: none`。
 - **mask 中心固定**(不随钟摆变化),避免每帧重栅格化 3 个全屏 fixed 元素;只有台灯 div 本身做钟摆。
 - **开关灯 2s 渐变**:mask-image 不支持 CSS transition,用 GSAP 补间驱动 `lampAnim`(reactive),`lampDivOpacity` 和 `lampMask` 同步 2s 渐变(ease `power2.out`);mask 挖洞半径随强度缩放(开灯洞从 0 放大,关灯洞缩到 0)。
@@ -339,8 +344,8 @@ gsap.from('.album-closed', { scale: 0.9, autoAlpha: 0, duration: 0.8, delay: 0.3
 ## 17. 数据流
 
 - 页面 mount 时并发请求 `/public/sun-info` + `/public/weather` + `/public/home` + `/public/feed`。
-- sun-info 返回 288 时隙(每 5 分钟一个),前端 `currentSlotIndex(sunInfo)` 按当前时间取 5 分钟时隙索引,`getSunScene(sunInfo, slotIndex)` 返回 `{source, rotation, palette, rays, shadowVRotation, shadowHTop, shadowIntensity, shadowGray, brightSpotColor, brightSpotOpacity, reflectionOpacity, altitude, azimuth, isNight, dayProgress}`。
-- 旋转由日出日落时间驱动(dayProgress),夜间 hold 在端点待命;光柱夜间全透明不发光;亮斑夜间黑色压暗;反光夜间 0。
+- sun-info 返回 288 时隙(每 5 分钟一个),前端 `currentSlotIndex(sunInfo)` 按当前时间取 5 分钟时隙索引,`getSunScene(sunInfo, slotIndex)` 返回 `{source, rotation, palette, rays, shadowVRotation, shadowHTop, shadowIntensity, shadowColor, brightSpotColor, brightSpotOpacity, reflectionOpacity, altitude, azimuth, isNight, dayProgress, windowAngle, hasDirectLight}`。
+- 旋转由方位角驱动(`az - 180`),窗角≤0(无直射光)时 hold 在端点;光柱/辉光/反光在无直射光时全透明;亮斑夜间黑色压暗。
 - 每 5 分钟更新一次时隙。
 - 拍立得堆按近 7 天照片筛选,点击 `el-image-viewer` 全屏浏览。
 
@@ -360,21 +365,23 @@ gsap.from('.album-closed', { scale: 0.9, autoAlpha: 0, duration: 0.8, delay: 0.3
 - **v-if 优化**:blend 层(bright-spot/reflection/light-layer/dust-layer/lamp-light)opacity≤0.01 时 `display:none`。
 - **translateZ(0) 隔离**:bg-blobs、bright-spot、reflection-layer、light-layer、vignette、dust-layer、snow-layer、rain-layer、sidebar-nav、5 个面板滚动区。
 - **contain:layout style**:app-sidebar、draggable-panel、music-player。
-- **mask 中心固定**:从 `lampMask` 移除 `lampPendulumX` 依赖,避免每帧重栅格化 3 个全屏元素。
+- **rAF 写 Vue ref**:原 `useSunLight.js` 钟摆用 `requestAnimationFrame` 每帧写 ref,触发 `SunLightLayer.vue` 每帧重渲染 → 改 CSS `@keyframes lampSwing` 完全绕过响应式。
+- **常驻事件监听器**:原 `useDragResize.js` 每实例 `onMounted` 挂 `mousemove`/`mouseup` → 改 `onDragStart` 时挂、`onMouseUp` 时移除。
+- **mask 中心固定**:台灯 mask 不随钟摆变化,避免每帧重栅格化 3 个全屏 fixed 元素;只有台灯 div 本身做钟摆。
 - **mousemove 节流**:idle 检测 2s 节流。
 
 ## 验收标准
 
 1. 打开页面,背景米白渐变 + 5 个色块缓慢飘移,右下角拍立得堆/闭合相册,左右毛玻璃面板从两侧滑入。
-2. 日出时光柱从左上方斜射(角度 -90°),亮斑从黑色变黄,阴影最深;正午光柱垂直(0°),亮斑透明,阴影最浅;日落光柱从右上方射(+90°),亮斑变橙红;夜间全黑,光柱不可见,阴影最深待命在日落位置,凌晨 2 点跳变回日出角度(无人看,无感)。全天平滑过渡无扫光。
+2. 日出后太阳方位到达 90° 时光柱从左上方斜射(角度 -90°),亮斑从黑色变黄,阴影最深;正午光柱垂直(0°),亮斑透明,阴影最浅;日落前方位到达 270° 时光柱从右上方射(+90°),亮斑变橙红;太阳方位在 90°~270° 之外(窗角≤0)时无直射光,光柱不可见;夜间全黑,阴影最深待命在日落位置,凌晨 2 点跳变回日出角度(无人看,无感)。全天平滑过渡无扫光。
 3. 光柱在相册和面板之上(screen 变亮),灰尘粒子在光路中漂浮发光;左右框(上层阴影 z=49)盖住光柱顶部。
 4. 阴影重叠区域颜色不叠加变深(灰阶 darken 幂等)。
 5. 内容组件(相册/面板)在日间有轻微反光高光(soft-light,跟随光源位置)。
 6. 黑胶唱片 hover 放大并显示歌曲信息(正在播放/已暂停/未设置音乐)。
 7. 全局导航栏(AppSidebar)左侧固定,含家庭名/模块导航/系统下拉(设置+运维)/主题切换/台灯三态/语言/铃铛/用户头像;关灯时按钮伪元素径向发光圈脉冲动画。
 8. ≤960px 时左侧面板和纪念日隐藏,只保留相册 + 导航栏 + 紧凑天气 + 小唱片。
-9. 首页左下角光照测试控制台:1 分钟循环 288 时隙,含时间/高度/方位/阶段 + 进度条 + 后退/暂停/前进/停止 + 天气控制(☀️/☁️/🌧️/❄️)+ 色温/亮度滑块;停止=重置真实时间+关闭控制台。
-10. 夜间台灯自动开启(傍晚 dayProgress≥0.9 开,清晨 dayProgress>0.1 关),mask 祛除左上黄金分割点周围阴影;台灯钟摆运动(8 秒周期,横向 ±5vw,两侧椭圆中间圆);亮度滑块控制 mask 透明区域大小(3%-100%);色温滑块控制暖光色温。**开关灯 2s 渐变**:GSAP 补间驱动,mask 挖洞半径随强度缩放。
+9. 全局光照测试控制台(`LightTestConsole.vue`,App.vue 挂载):循环 288 时隙,含地区/日期/时间/高度/方位/窗角/9 段时段标签 + 进度条 + 后退/暂停/前进/停止 + 速度控制(0.5/1/2/4/8x) + 天气控制(☀️/☁️/🌧️/❄️/⛈️ + 降水滑块) + 图层开关(阴影/环境光) + 台灯模式(自动/开/关) + 色温/亮度滑块;停止=重置真实时间+关闭控制台。
+10. 夜间台灯自动开启(傍晚 dayProgress≥0.9 开,清晨 dayProgress>0.1 关),mask 祛除左上黄金分割点周围阴影;台灯钟摆运动(CSS `@keyframes lampSwing` 8 秒周期,横向 ±1.5vw);亮度滑块控制 mask 透明区域大小(3%-100%);色温滑块控制暖光色温。**开关灯 2s 渐变**:GSAP 补间驱动,mask 挖洞半径随强度缩放。
 11. **主题切换 1s 过渡**:双层伪元素 `::before`/`::after` opacity 交叉淡入淡出;面板/色块/文字颜色同步 1s 过渡。
 12. **可拖拽面板**:5 个面板(feed/task/weather/anniversary/today)可拖拽+可调大小,位置/大小持久化到 localStorage;拖拽边界 clamp;Settings"恢复默认面板布局"清持久化恢复初始值。
 13. **今日面板**:积分余额+连续天数+签到按钮+今日待办提醒前 3 条(登录可见)。
