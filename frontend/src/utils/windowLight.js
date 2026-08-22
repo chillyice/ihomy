@@ -163,8 +163,8 @@ export function getSunScene(sunInfo, slotIndex) {
   // 反光层:内容组件被阳光照亮的轻微高光(soft-light,无直射光时 0)
   const reflectionOpacity = hasDirectLight ? Math.sin(dayProgress * Math.PI) * 0.22 : 0
 
-  // 台灯:傍晚开始时开(dayProgress≥0.9 或夜间),清晨结束时关(dayProgress>0.1)
-  const lampOpacity = (isNight || dayProgress >= 0.9 || dayProgress <= 0.1) ? 1 : 0
+  // 台灯:太阳方位角≥270°(日落西方)开灯,≥90°且<270°(日出东方到日落前)关灯
+  const lampOpacity = (az >= 270 || az < 90 || isNight) ? 1 : 0
 
   return {
     source: { x: sourceX + '%', y: '-15%' },

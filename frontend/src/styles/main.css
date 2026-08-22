@@ -178,11 +178,164 @@ a { color: var(--color-accent); text-decoration: none; }
   border: 1px solid rgba(255, 255, 255, 0.2) !important;
 }
 
-/* === ElMessageBox 弹框 — ihomy 风格 === */
+/* === 全局弹窗统一样式 — 浅米暖色 / 磨砂 / 紧凑 / 弱阴影 === */
+
+/* 遮罩:低透明度 + 轻磨砂 */
+.el-overlay {
+  background: rgba(0, 0, 0, 0.20) !important;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+/* el-dialog 弹窗本体 */
+.el-overlay-dialog .el-dialog {
+  border-radius: 14px !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07) !important;
+  border: 1px solid var(--color-border) !important;
+  background: #fcf8f0 !important;
+  backdrop-filter: blur(12px) saturate(1.1);
+  -webkit-backdrop-filter: blur(12px) saturate(1.1);
+  overflow: hidden;
+  margin-top: 14vh !important;
+  width: fit-content !important;
+  max-width: calc(100vw - 32px) !important;
+  padding: 0 !important;
+}
+html.dark .el-overlay-dialog .el-dialog {
+  background: #1E2A48 !important;
+}
+
+/* 标题区:无装饰线,中等字重,紧凑 padding */
+.el-dialog__header {
+  padding: 18px 20px 8px !important;
+  margin: 0 !important;
+  border: none !important;
+}
+.el-dialog__title {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  color: var(--color-primary) !important;
+}
+
+/* 关闭按钮:隐藏 X */
+.el-dialog__headerbtn {
+  display: none !important;
+}
+
+/* body:紧凑 padding,底部 20px 间距 */
+.el-dialog__body {
+  padding: 4px 20px 20px !important;
+  font-size: 14px !important;
+  color: var(--color-text) !important;
+  line-height: 1.6 !important;
+}
+
+/* footer:无顶分割线,紧凑 */
+.el-dialog__footer {
+  padding: 0 20px 18px !important;
+  border-top: none !important;
+  margin: 0 !important;
+}
+.el-dialog__footer .el-button {
+  height: 34px !important;
+  border-radius: 10px !important;
+  padding: 0 18px !important;
+  font-weight: 500 !important;
+  font-size: 13px !important;
+  border: none !important;
+}
+/* 次级按钮(取消) */
+.el-dialog__footer .el-button:not(.el-button--primary):not(.el-button--danger) {
+  background: #f3eee6 !important;
+  color: #3A2E22 !important;
+}
+.el-dialog__footer .el-button:not(.el-button--primary):not(.el-button--danger):hover {
+  background: #e8e0d2 !important;
+}
+/* 主按钮(确认/创建) */
+.el-dialog__footer .el-button--primary {
+  background: #b88c6e !important;
+  border-color: #b88c6e !important;
+  color: #fff !important;
+}
+.el-dialog__footer .el-button--primary:hover {
+  background: #a67a5e !important;
+  border-color: #a67a5e !important;
+}
+/* 危险按钮(删除) */
+.el-dialog__footer .el-button--danger {
+  background: #f4e0dc !important;
+  border-color: #f4e0dc !important;
+  color: #b04a3a !important;
+}
+.el-dialog__footer .el-button--danger:hover {
+  background: #eed0ca !important;
+  border-color: #eed0ca !important;
+}
+/* 禁用态(输入为空/loading):统一置灰 */
+.el-dialog__footer .el-button.is-disabled,
+.el-dialog__footer .el-button.is-loading {
+  background: #e4ddd0 !important;
+  border-color: #e4ddd0 !important;
+  color: #b0a898 !important;
+  cursor: not-allowed !important;
+  opacity: 1 !important;
+}
+html.dark .el-dialog__footer .el-button.is-disabled,
+html.dark .el-dialog__footer .el-button.is-loading {
+  background: rgba(232,220,200,0.06) !important;
+  border-color: rgba(232,220,200,0.06) !important;
+  color: rgba(232,220,200,0.3) !important;
+}
+html.dark .el-dialog__footer .el-button:not(.el-button--primary):not(.el-button--danger) {
+  background: rgba(232,220,200,0.1) !important;
+  color: var(--color-text) !important;
+}
+html.dark .el-dialog__footer .el-button:not(.el-button--primary):not(.el-button--danger):hover {
+  background: rgba(232,220,200,0.15) !important;
+}
+
+/* dialog 内输入框:圆角10px,placeholder 弱化 */
+.el-dialog .el-input__wrapper {
+  border-radius: 10px !important;
+  box-shadow: 0 0 0 1px #e4ddd0 inset !important;
+  background: #fffdf8 !important;
+  min-height: 38px !important;
+}
+.el-dialog .el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px #c4a87e inset, 0 0 0 3px rgba(184,140,110,0.12) !important;
+}
+.el-dialog .el-input__inner::placeholder {
+  color: #c4b8a8 !important;
+  opacity: 0.7 !important;
+}
+html.dark .el-dialog .el-input__wrapper {
+  background: rgba(255,255,255,0.04) !important;
+  box-shadow: 0 0 0 1px rgba(232,220,200,0.12) inset !important;
+}
+html.dark .el-dialog .el-input__inner::placeholder {
+  color: rgba(232,220,200,0.35) !important;
+}
+/* dialog 内 textarea */
+.el-dialog .el-textarea__inner {
+  border-radius: 10px !important;
+  border-color: #e4ddd0 !important;
+  background: #fffdf8 !important;
+}
+.el-dialog .el-textarea__inner:focus {
+  border-color: #c4a87e !important;
+  box-shadow: 0 0 0 3px rgba(184,140,110,0.12) !important;
+}
+.el-dialog .el-textarea__inner::placeholder {
+  color: #c4b8a8 !important;
+  opacity: 0.7 !important;
+}
+
+/* === ElMessageBox 弹框 — 同风格 === */
 .el-overlay.is-message-box {
-  background: rgba(58, 46, 34, 0.28) !important;
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
+  background: rgba(0, 0, 0, 0.20) !important;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   display: flex !important;
   align-items: flex-start !important;
   justify-content: center !important;
@@ -190,45 +343,39 @@ a { color: var(--color-accent); text-decoration: none; }
 }
 .el-overlay.is-message-box .el-message-box {
   border-radius: 14px !important;
-  box-shadow: 0 24px 64px rgba(58, 46, 34, 0.22), 0 6px 20px rgba(58, 46, 34, 0.12) !important;
-  border: none !important;
-  background: #FAF6EC !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07) !important;
+  border: 1px solid var(--color-border) !important;
+  background: #fcf8f0 !important;
+  backdrop-filter: blur(12px) saturate(1.1);
+  -webkit-backdrop-filter: blur(12px) saturate(1.1);
   padding: 0 !important;
-  max-width: 380px !important;
-  min-width: 320px !important;
+  max-width: 360px !important;
+  min-width: 300px !important;
   overflow: hidden !important;
 }
 html.dark .el-overlay.is-message-box .el-message-box {
   background: #1E2A48 !important;
 }
 .el-message-box__header {
-  padding: 18px 22px 14px !important;
+  padding: 16px 20px 8px !important;
   margin: 0 !important;
   border: none !important;
-  position: relative !important;
-}
-.el-message-box__header::before {
-  content: '';
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 4px;
-  background: var(--color-accent);
 }
 .el-message-box__title {
-  font-size: 16px !important;
-  font-weight: 700 !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
   color: var(--color-primary) !important;
 }
 .el-message-box__content {
-  padding: 4px 22px 20px !important;
+  padding: 4px 20px 16px !important;
   font-size: 14px !important;
   color: var(--color-text) !important;
-  line-height: 1.75 !important;
+  line-height: 1.6 !important;
 }
 .el-message-box__status {
-  font-size: 18px !important;
-  margin-right: 12px !important;
-  padding: 6px !important;
+  font-size: 16px !important;
+  margin-right: 10px !important;
+  padding: 5px !important;
   border-radius: 50% !important;
   transform: none !important;
   top: 0 !important;
@@ -242,8 +389,8 @@ html.dark .el-overlay.is-message-box .el-message-box {
   color: #2E7D32 !important;
 }
 .el-message-box__status.el-message-box-icon--error {
-  background: rgba(244, 67, 54, 0.18) !important;
-  color: #C62828 !important;
+  background: rgba(176, 74, 58, 0.15) !important;
+  color: #b04a3a !important;
 }
 .el-message-box__status.el-message-box-icon--info {
   background: rgba(58, 46, 34, 0.12) !important;
@@ -251,32 +398,61 @@ html.dark .el-overlay.is-message-box .el-message-box {
 }
 html.dark .el-message-box__status.el-message-box-icon--warning { color: #FFC107 !important; }
 html.dark .el-message-box__status.el-message-box-icon--success { color: #66BB6A !important; }
-html.dark .el-message-box__status.el-message-box-icon--error { color: #EF5350 !important; }
+html.dark .el-message-box__status.el-message-box-icon--error { color: #d9665a !important; }
 html.dark .el-message-box__status.el-message-box-icon--info { color: #B0A898 !important; }
 .el-message-box__headerbtn {
   display: none !important;
 }
 .el-message-box__btns {
-  padding: 12px 22px 16px !important;
-  border-top: 1px solid var(--color-border) !important;
+  padding: 0 20px 16px !important;
+  border-top: none !important;
   margin: 0 !important;
 }
 .el-message-box__btns .el-button {
-  border-radius: 8px !important;
-  padding: 8px 20px !important;
+  height: 34px !important;
+  border-radius: 10px !important;
+  padding: 0 18px !important;
   font-weight: 500 !important;
   font-size: 13px !important;
+  border: none !important;
+}
+.el-message-box__btns .el-button:not(.el-button--primary) {
+  background: #f3eee6 !important;
+  color: #3A2E22 !important;
+}
+.el-message-box__btns .el-button:not(.el-button--primary):hover {
+  background: #e8e0d2 !important;
 }
 .el-message-box__btns .el-button--primary {
-  background: var(--color-accent) !important;
-  border-color: var(--color-accent) !important;
+  background: #b88c6e !important;
+  border-color: #b88c6e !important;
+  color: #fff !important;
 }
 .el-message-box__btns .el-button--primary:hover {
-  background: #C2544A !important;
-  border-color: #C2544A !important;
+  background: #a67a5e !important;
+  border-color: #a67a5e !important;
 }
-.el-message-box__input { margin-top: 12px !important; }
-.el-message-box__input .el-input__wrapper { border-radius: 8px !important; }
+html.dark .el-message-box__btns .el-button:not(.el-button--primary) {
+  background: rgba(232,220,200,0.1) !important;
+  color: var(--color-text) !important;
+}
+html.dark .el-message-box__btns .el-button:not(.el-button--primary):hover {
+  background: rgba(232,220,200,0.15) !important;
+}
+.el-message-box__input { margin-top: 10px !important; }
+.el-message-box__input .el-input__wrapper {
+  border-radius: 10px !important;
+  box-shadow: 0 0 0 1px #e4ddd0 inset !important;
+  background: #fffdf8 !important;
+  min-height: 38px !important;
+}
+.el-message-box__input .el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px #c4a87e inset, 0 0 0 3px rgba(184,140,110,0.12) !important;
+}
+.el-message-box__input .el-input__inner::placeholder {
+  color: #c4b8a8 !important;
+  opacity: 0.7 !important;
+}
 
 
 /* 台灯钟摆运动:8s 周期 ease-in-out 近似 sin 波,scaleX 在峰值时收缩 0.8。
@@ -290,3 +466,12 @@ html.dark .el-message-box__status.el-message-box-icon--info { color: #B0A898 !im
 .lamp-light-pendulum {
   animation: lampSwing 8s ease-in-out infinite;
 }
+
+/* === el-dialog 淡入+微小缩放动画(覆盖 EP 默认 animation) === */
+.dialog-fade-enter-active { animation: none !important; transition: opacity 0.25s ease !important; }
+.dialog-fade-leave-active { animation: none !important; transition: opacity 0.2s ease !important; }
+.dialog-fade-enter-from, .dialog-fade-leave-to { opacity: 0 !important; }
+.dialog-fade-enter-active .el-dialog { transition: transform 0.25s ease, opacity 0.25s ease !important; }
+.dialog-fade-leave-active .el-dialog { transition: transform 0.2s ease, opacity 0.2s ease !important; }
+.dialog-fade-enter-from .el-dialog { transform: scale(0.94) !important; opacity: 0 !important; }
+.dialog-fade-leave-to .el-dialog { transform: scale(0.96) !important; opacity: 0 !important; }
