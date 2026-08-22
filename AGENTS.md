@@ -196,7 +196,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 记账 | BookController | BookService | family_book_record | type(支出/收入/转账)+月度统计+分类榜;单表无账户 |
 | 家谱 | TreeController | FamilyTreeService | family_tree | father_id/mother_id/spouse_id 自关联;spouse 双向绑定;generation 世代;**编辑全量提交,null 字段须用 LambdaUpdateWrapper 显式 SET NULL**(MP updateById 忽略 null);删除清空他人引用后逻辑删 |
 | 签到积分 | PointsController | PointsService | family_checkin/family_points_record/family_points_product/family_points_order | 日签 5 分+连续加成(7 天轮回);内容奖励(博客+10/日记+8/照片+2/视频+15);兑换校验(积分不足 1008/兑完 1009);商品管理+核销需 `@RequirePermission("points:manage")` |
-| 背景音乐 | MusicController | MusicService | content_music/content_music_playlist/content_music_playlist_track | 曲库(单曲/专辑上传,mp3agic 解析 ID3v2 元数据:标题/艺术家/专辑/时长/比特率/内嵌封面);歌单 CRUD(家庭维度独立);`is_background` 标记当前背景音乐歌单(每家庭最多 1 条);播放器 `GET /music/background` 获取歌单+曲目;`PUT /music/playlist/{id}/set-background` 设为背景;Settings 页「背景音乐设置」与导航栏「音乐」功能独立 |
+| 背景音乐 | MusicController | MusicService | content_music/content_music_playlist/content_music_playlist_track | 曲库(单曲/专辑上传,mp3agic 解析 ID3v2 元数据:标题/艺术家/专辑/时长/比特率/内嵌封面);歌单 CRUD(家庭维度独立);`is_background` 标记当前背景音乐歌单(每家庭最多 1 条);批量删除(`DELETE /music/batch` 按 ID 列表、`DELETE /music/album/{album}` 按专辑名);播放器 `GET /music/background` 获取歌单+曲目;`PUT /music/playlist/{id}/set-background` 设为背景;Settings 页「背景音乐设置」与导航栏「音乐」功能独立;MusicPlayer 仅在有背景歌单且曲目数>0 时渲染(`v-if="playlist.length"`),`z-index:55`(光影层下方);位置重置合并到 Settings「恢复默认面板布局」(清 `ihomy:music:pos`);临时文件名用纯 ASCII 后缀(含中文/斜杠的原始文件名导致 `File.createTempFile` IOException) |
 
 ### 6. 基础设施
 
@@ -283,17 +283,37 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 15. **computed 纯函数**(强制):`computed` 内禁止 `Math.random()`/`Date.now()`/副作用,否则每次访问重算且视觉跳动。需要随机/一次性计算用 `ref` + `watch(source, immediate)` 生成(参考 `Home.vue polaroidLayout`)。
 16. **路由懒加载**:24 个路由全部 `() => import('./views/...')`,不写同步 `import Home from '@/views/Home.vue'`。
 17. **模态弹窗规范**(强制,全局统一,所有 `el-dialog` + `ElMessageBox` 共享 `main.css` 全局覆写,禁止在各组件 scoped 内重复定义):
-    - **容器**:圆角 14px;阴影 `0 3px 12px rgba(0,0,0,0.07)`;背景 `#fcf8f0` + `backdrop-filter: blur(12px) saturate(1.1)`;`padding: 0`(header/body/footer 各自管 padding);`width: fit-content`(单行输入弹窗不设固定宽,内容自适应)。
-    - **遮罩**:`rgba(0,0,0,0.20)` + `blur(2px)`,不过度压暗。
+    - **容器**:圆角 14px;阴影 `0 3px 12px rgba(0,0,0,0.07)`;背景 `#fcf8f0` + `backdrop-filter: blur(12px) saturate(1.1)`;`padding: 0`(header/body/footer 各自管 padding)。
+    - **尺寸规则**(按业务场景,禁止全部弹窗同一宽度,禁止写死固定 height):
+      - `dialog-sm`(简短确认/单行输入):420px,高度自适应。
+      - `dialog-md`(选择器/简单表单):520px,`max-height:520px`,body 内部滚动。
+      - `dialog-lg`(复杂多字段表单):640px,`max-height:640px`,body 内部滚动。
+      - `dialog-xl`(详情/媒体预览):`82vw`(max 900px),`max-height:85vh`,body 内部滚动。
+      - 弹窗容器 `flex-direction:column`;body `flex:1 + overflow-y:auto`;容器本身不滚动。
+    - **遮罩**:`rgba(0,0,0,0.20)` + `blur(2px)`,不过度压暗。ESC + 点击遮罩关闭(默认开启)。
     - **标题**:左侧 4px 暖棕装饰竖线;`font-size: 15px; font-weight: 600`;标题与说明文字间距 8px。
-    - **关闭按钮**:`el-dialog__headerbtn` `display:none`(隐藏 X);`ElMessageBox` 关闭按钮同样 `display:none`。
+    - **关闭按钮**:`el-dialog__headerbtn` 显示 X(28×28px,圆角 8px,hover 浅米底色 `rgba(58,46,34,0.06)`)。`ElMessageBox` 关闭按钮 `display:none`。
+    - **弹窗内 Tab**:选中态低饱和暖棕文字 `#5c4c3d` + `#c4a884` 下划线 `opacity:0.7`;禁止蓝色高亮。
+    - **弹窗内 checkbox**:选中色 `#b88c6e` 暖棕(禁用原生蓝色)。
     - **输入框**:圆角 10px;边框 `#e4ddd0`;背景 `#fffdf8`;min-height 38px;focus 暖棕光晕 `rgba(184,140,110,0.12)`;placeholder 弱化 `#c4b8a8 opacity:0.7`。
     - **按钮**:统一 34px 高 / 10px 圆角 / 13px 字号;主操作 `#b88c6e` 暖棕;次级 `#f3eee6` 深褐文字;危险 `#f4e0dc` 低饱和暗红 `#b04a3a`;禁用/loading `#e4ddd0` 灰底。
-    - **footer**:无顶分割线;`padding: 0 20px 18px`;输入框距底部按钮区 20px。
+    - **footer**:无顶分割线;`padding: 0 20px 18px`;输入框距底部按钮区 20px;右下角对齐。
     - **动画**:覆盖 EP 默认 `animation`(杀 `dialog-fade` 的 `animation` 再用 `transition`);`scale(0.94)` + opacity 淡入 0.25s。
     - **ElMessageBox**:同风格;`max-width: 360px; min-width: 300px`;无装饰竖线;footer 无分割线;关闭按钮隐藏。
     - **暗色模式**:弹窗背景 `#1E2A48`;次级按钮 `rgba(232,220,200,0.1)`;placeholder `rgba(232,220,200,0.35)`。
     - **禁止**:在组件 scoped CSS 里写 `el-dialog`/`el-message-box` 样式覆写;新增弹窗只管业务逻辑,样式由全局兜底。
+19. **ElMessage Toast 规范**(强制,`main.css` 全局覆写):
+    - **位置**:右上角 `right:24px`(避让导航栏)。
+    - **配色**(禁止高饱和绿/红/黄):
+      - success:暖米底 `rgba(243,238,230,0.95)` + 褐字 `#5c4c3d` + 暖棕细边框 `rgba(184,140,110,0.25)`。
+      - warning:暖米底 + 暗金文字 `#8a6d3b` + 金棕边框。
+      - error:浅红底 `rgba(249,236,234,0.95)` + 暗红文字 `#b04a3a` + 细红边框。
+      - info:深褐底 + 白字。
+    - **暗色模式**:success/warning 弹窗背景 `rgba(30,42,72,0.92)` + 浅米文字。
+20. **Popper/Dropdown z-index 规范**(强制):
+    - `.el-popper.is-light`(含 dropdown/tooltip)`z-index:54`(光影层 bright-spot=65 下方)。
+    - MusicPlayer `z-index:55`(popper 上方,光影层下方)。
+    - SiteFooter `z-index:70`;BackToTop/InstallPrompt `z-index:200`;ElMessage `z-index:3000`。
 18. **按钮统一样式**(强制,全局 4 类按钮,`main.css` 统一覆写,禁止 scoped 重复定义):
     - **圆角**:所有 `el-button` 12px;small 10px。
     - **主按钮**(`type="primary"`):背景 `#b88c6e` 白字;hover `#a87c5e`;用于保存/添加/确认等正向操作。**禁止亮蓝**。
@@ -494,6 +514,25 @@ CREATE TABLE content_music (...);  -- 见 schema.sql
 CREATE TABLE content_music_playlist (...);
 CREATE TABLE content_music_playlist_track (...);
 ```
+
+#### 2026-08-23 音乐系统完善 + 全局弹窗/Toast/Popper 规范
+
+| 类别 | 文件 | 改动 |
+|------|------|------|
+| 后端 | `MusicService.java` | `extractMetadata` 临时文件名从 `"_" + originalFilename` 改为固定 `.mp3` 后缀(含中文/斜杠的原始文件名导致 `File.createTempFile` IOException);新增 `batchDeleteMusic`(按 ID 列表)+ `batchDeleteByAlbum`(按专辑名) |
+| 后端 | `MusicController.java` | 新增 `DELETE /music/batch`(批量删除曲目)+ `DELETE /music/album/{album}`(按专辑删除) |
+| 前端 | `api/index.js` | `musicApi` 新增 `batchRemove(ids)` + `removeByAlbum(album)` |
+| 前端 | `components/MusicPlayer.vue` | z-index 110→55(光影层下方);删除 `v-else-if` 无背景音乐占位 div(无歌单/无曲目时组件不渲染);删除重置位置按钮(合并到 Settings);`playAfterSwitch` 用 `nextTick` 替代 `setTimeout`;`loadBackgroundPlaylist` 加 `audioEl.load()` |
+| 前端 | `views/music/Music.vue` | 多选模式(曲目/专辑 checkbox + 批量删除);添加曲目弹窗新增「按专辑」Tab(checkbox 选专辑批量加入);歌单卡片 UI 重构(内边距 20px/间距 24px/圆角 16px/磨砂背景标签替代红色角标/删除按钮幽灵文字);Tab 选中态低饱和暖棕下划线;空状态自定义 SVG;弹窗统一 `dialog-sm`/`dialog-md` class |
+| 前端 | `views/Settings.vue` | 「恢复默认面板布局」新增清 `ihomy:music:pos`;提示文案加"音乐播放器" |
+| 前端 | `styles/main.css` | 弹窗关闭按钮 X 显示(28×28px 圆角 8px hover 浅底);弹窗尺寸规则 4 档(`dialog-sm/md/lg/xl`);弹窗内 checkbox 暖棕选中色;弹窗内 Tab 暖棕选中态;弹窗 body 滚动条美化;`.el-message--success` 亮绿→暖米底褐字;`.el-message--warning/error` 同步暖色调;`.el-popper.is-light` z-index:54(光影层下方) |
+
+**关键修复**:
+- 元数据提取失败根因:`File.createTempFile("ihomy_audio_", "_" + "Home/夜-03.mp3")` 中 `/` 是路径分隔符 → IOException → 改为固定 `.mp3` 后缀
+- 播放器不显示根因:模板两个根级 div 用 `v-if`/`v-else-if`,Vue 3 多根节点下 `v-else-if` 跨根节点不生效 → 改为 `v-if="playlist.length"` 单条件(无曲目不渲染)
+- 播放不了根因:Nginx alias 指向 `D:/WorkSpace/ihomy/uploads/` 但后端未设 `IHOMY_CONFIG_PATH` 导致上传到 `C:/opt/ihomy/uploads/` → 后端启动必须设 `IHOMY_CONFIG_PATH=D:\WorkSpace\ihomy\config\external.yml`
+
+**live DB 同步**:无 schema 变更(纯代码层)。
 
 ## 文件存储策略
 

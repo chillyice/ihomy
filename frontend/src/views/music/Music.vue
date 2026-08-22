@@ -149,7 +149,7 @@
     </el-tabs>
 
     <!-- 添加外链弹窗 -->
-    <el-dialog v-model="linkDialog.visible" title="添加外链" width="380px" append-to-body>
+    <el-dialog v-model="linkDialog.visible" title="添加外链" class="dialog-sm" append-to-body>
       <el-form label-position="top">
         <el-form-item label="音频链接">
           <el-input v-model="linkDialog.url" placeholder="https://..." />
@@ -171,7 +171,7 @@
     </el-dialog>
 
     <!-- 专辑上传弹窗 -->
-    <el-dialog v-model="albumDialog.visible" title="上传专辑" width="380px" append-to-body>
+    <el-dialog v-model="albumDialog.visible" title="上传专辑" class="dialog-sm" append-to-body>
       <div class="share-tip">已选择 {{ albumDialog.files.length }} 个音乐文件,请输入专辑名称:</div>
       <el-input v-model="albumDialog.name" placeholder="专辑名称" @keyup.enter="confirmUploadAlbum" />
       <template #footer>
@@ -181,7 +181,7 @@
     </el-dialog>
 
     <!-- 新建歌单弹窗 -->
-    <el-dialog v-model="plDialog.visible" title="新建歌单" width="380px" append-to-body>
+    <el-dialog v-model="plDialog.visible" title="新建歌单" class="dialog-sm" append-to-body>
       <el-input v-model="plDialog.name" placeholder="歌单名称" @keyup.enter="createPlaylist" />
       <template #footer>
         <el-button @click="plDialog.visible = false">取消</el-button>
@@ -190,7 +190,7 @@
     </el-dialog>
 
     <!-- 歌单详情弹窗 -->
-    <el-dialog v-model="plDetail.visible" :title="plDetail.playlist?.name || '歌单详情'" width="560px" append-to-body>
+    <el-dialog v-model="plDetail.visible" :title="plDetail.playlist?.name || '歌单详情'" class="dialog-md" append-to-body>
       <div v-loading="plDetail.loading">
         <div v-if="plDetail.tracks.length" class="pl-detail-list">
           <div v-for="(t, i) in plDetail.tracks" :key="t.id || i" class="pl-detail-item">
@@ -213,17 +213,23 @@
     </el-dialog>
 
     <!-- 添加曲目到歌单弹窗:Tab 切换(按曲目多选 / 按专辑加入) -->
-    <el-dialog v-model="addTracksDialog.visible" title="添加曲目到歌单" width="560px" append-to-body>
+    <el-dialog v-model="addTracksDialog.visible" title="添加曲目到歌单" class="dialog-md" append-to-body :close-on-click-modal="true" :close-on-press-escape="true">
       <el-tabs v-model="addTracksDialog.subTab" class="add-tracks-tabs">
         <el-tab-pane label="按曲目" name="track">
           <div v-loading="addTracksDialog.loading" class="add-tracks-list">
             <el-checkbox-group v-model="addTracksDialog.selected">
               <div v-for="t in addTracksDialog.candidates" :key="t.id" class="add-track-item">
                 <el-checkbox :value="t.id">
-                  <div class="add-track-info">
-                    <span class="add-track-title">{{ t.title || '未知曲目' }}</span>
-                    <span v-if="t.artist" class="add-track-artist">{{ t.artist }}</span>
-                    <span v-if="t.album" class="add-track-album">{{ t.album }}</span>
+                  <div class="add-track-row">
+                    <img v-if="t.coverUrl" :src="t.coverUrl" class="add-track-cover" />
+                    <div v-else class="add-track-cover placeholder">
+                      <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M9 18V5l12-2v13" stroke="#b8a890" stroke-width="1.5" stroke-linecap="round"/><circle cx="6" cy="18" r="3" stroke="#b8a890" stroke-width="1.5"/><circle cx="18" cy="16" r="3" stroke="#b8a890" stroke-width="1.5"/></svg>
+                    </div>
+                    <div class="add-track-meta">
+                      <span class="add-track-title">{{ t.title || '未知曲目' }}</span>
+                      <span v-if="t.artist" class="add-track-artist">{{ t.artist }}</span>
+                      <span v-if="t.album" class="add-track-album">{{ t.album }}</span>
+                    </div>
                   </div>
                 </el-checkbox>
               </div>
@@ -237,7 +243,9 @@
               <div class="add-album-info" @click="toggleAlbumInDialog(al)">
                 <el-checkbox :model-value="addTracksDialog.selectedAlbums.includes(al.album)" />
                 <img v-if="al.coverUrl" :src="al.coverUrl" class="add-album-cover" />
-                <div v-else class="add-album-cover placeholder">💿</div>
+                <div v-else class="add-album-cover placeholder">
+                  <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><circle cx="12" cy="12" r="10" stroke="#b8a890" stroke-width="1.5"/><circle cx="12" cy="12" r="3" stroke="#b8a890" stroke-width="1.5"/></svg>
+                </div>
                 <div class="add-album-meta">
                   <div class="add-album-name">{{ al.album }}</div>
                   <div class="add-album-count">{{ al.count }} 首</div>
@@ -255,7 +263,7 @@
     </el-dialog>
 
     <!-- 播放器弹窗 -->
-    <el-dialog v-model="player.visible" :title="player.track?.title || '播放'" width="500px" destroy-on-close>
+    <el-dialog v-model="player.visible" :title="player.track?.title || '播放'" class="dialog-md" destroy-on-close>
       <div v-if="player.track" class="player-wrap">
         <img v-if="player.track.coverUrl" :src="player.track.coverUrl" class="player-cover" />
         <div v-if="player.track.artist" class="player-artist">{{ player.track.artist }}</div>
@@ -727,13 +735,65 @@ html.dark .pl-delete-btn:hover { background: rgba(185,96,88,0.12) !important; }
 .pl-detail-dur { font-size: 11px; color: var(--color-text-secondary); }
 
 /* ========== 添加曲目弹窗 ========== */
-.add-tracks-list { max-height: 400px; overflow-y: auto; }
-.add-track-item { padding: 6px 0; border-bottom: 1px solid rgba(58,46,34,0.04); }
-.add-track-item .el-checkbox { width: 100%; }
-.add-track-info { display: inline-flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-.add-track-title { font-size: 13px; font-weight: 500; }
-.add-track-artist { font-size: 11px; color: var(--color-text-secondary); }
-.add-track-album { font-size: 11px; color: var(--color-text-secondary); opacity: 0.7; }
+.add-tracks-tabs :deep(.el-tabs__header) { margin-bottom: 16px; }
+.add-tracks-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+.add-tracks-list::-webkit-scrollbar,
+.add-album-list::-webkit-scrollbar { width: 5px; }
+.add-tracks-list::-webkit-scrollbar-track,
+.add-album-list::-webkit-scrollbar-track { background: transparent; }
+.add-tracks-list::-webkit-scrollbar-thumb,
+.add-album-list::-webkit-scrollbar-thumb { background: rgba(58,46,34,0.12); border-radius: 3px; }
+.add-tracks-list::-webkit-scrollbar-thumb:hover,
+.add-album-list::-webkit-scrollbar-thumb:hover { background: rgba(58,46,34,0.2); }
+html.dark .add-tracks-list::-webkit-scrollbar-thumb,
+html.dark .add-album-list::-webkit-scrollbar-thumb { background: rgba(232,220,200,0.12); }
+
+.add-track-item {
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(58,46,34,0.05);
+}
+.add-track-item:last-child { border-bottom: none; }
+.add-track-item .el-checkbox { width: 100%; align-items: center; }
+.add-track-item .el-checkbox__label { padding-left: 8px; width: 100%; }
+.add-track-row { display: flex; align-items: center; gap: 12px; }
+.add-track-cover {
+  width: 44px; height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.add-track-cover.placeholder {
+  display: flex; align-items: center; justify-content: center;
+  background: #ede5d8;
+}
+html.dark .add-track-cover.placeholder { background: rgba(232,220,200,0.06); }
+.add-track-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.add-track-title { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.add-track-artist { font-size: 11px; color: var(--color-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.add-track-album { font-size: 11px; color: var(--color-text-secondary); opacity: 0.6; }
+
+/* 专辑子 Tab */
+.add-album-list { max-height: 300px; overflow-y: auto; }
+.add-album-item { padding: 4px 0; }
+.add-album-info { display: flex; align-items: center; gap: 12px; padding: 10px 8px; border-radius: 10px; cursor: pointer; transition: background 0.15s; }
+.add-album-info:hover { background: rgba(58,46,34,0.04); }
+.add-album-cover {
+  width: 44px; height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.add-album-cover.placeholder {
+  display: flex; align-items: center; justify-content: center;
+  background: #ede5d8;
+}
+html.dark .add-album-cover.placeholder { background: rgba(232,220,200,0.06); }
+.add-album-meta { flex: 1; min-width: 0; }
+.add-album-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.add-album-count { font-size: 11px; color: var(--color-text-secondary); }
 
 /* ========== 多选模式 ========== */
 .music-card.selected, .album-card.selected {
@@ -749,18 +809,6 @@ html.dark .pl-delete-btn:hover { background: rgba(185,96,88,0.12) !important; }
   padding: 2px;
 }
 html.dark .card-check { background: rgba(30,42,72,0.85); }
-
-/* ========== 添加曲目弹窗(专辑子 Tab) ========== */
-.add-tracks-tabs :deep(.el-tabs__header) { margin-bottom: 12px; }
-.add-album-list { max-height: 400px; overflow-y: auto; }
-.add-album-item { padding: 4px 0; }
-.add-album-info { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 8px; cursor: pointer; }
-.add-album-info:hover { background: rgba(58,46,34,0.04); }
-.add-album-cover { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
-.add-album-cover.placeholder { display: flex; align-items: center; justify-content: center; background: #e9e2d7; font-size: 18px; }
-.add-album-meta { flex: 1; min-width: 0; }
-.add-album-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.add-album-count { font-size: 11px; color: var(--color-text-secondary); }
 
 /* ========== 播放器弹窗 ========== */
 .share-tip { color: #776e62; font-size: 12px; margin-bottom: 12px; line-height: 1.4; }
