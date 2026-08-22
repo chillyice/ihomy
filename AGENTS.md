@@ -426,6 +426,21 @@ ALTER TABLE content_diary  ADD INDEX idx_family_created (family_id, deleted, cre
 | i18n | `zh-CN.js`/`en.js` | 新增 6 个时段 key(midnight/dawn/forenoon/noon/afternoon/dusk) |
 | 删除 | `composables/useLightLab.js` + `LightLabLayer.vue` + `LightLabConsole.vue` + `views/lightlab/LightLab.vue` + `/lightlab` 路由 | LightLab 独立光影系统已删除,功能合并到生产光影系统 |
 
+#### 2026-08-22 页面规范化 + 光影天气增强 + 控制台增强
+
+| 类别 | 文件 | 改动 |
+|------|------|------|
+| 页面规范 | `views/item/Item.vue` | 对齐标准页:全局 `.page` 替代 scoped 覆盖;`.toolbar`→`.list-header`;加 `loading` ref + `v-loading`;`el-card`→全局 `.card`;dialog `label-width`→`label-position="top"`;分散 refs→`reactive({visible,form})` editor;保存按钮加 `:loading="saving"`;删除按钮 `text type="danger"`;`el-empty` 包在 `v-loading` 内 |
+| 页面规范 | `views/kitchen/Kitchen.vue` | 对齐标准页:`.kitchen-page`(1400px)→全局 `.page`(1100px);移除冗余 `<h1>`;`.kitchen-header`→`.list-header`;`.glass`+`backdrop-filter`→全局 `.card`;加 `v-loading` 包裹推荐+菜单+空态;移除 `round` |
+| UI | `styles/main.css` | ElMessage 气泡:`.el-message` 加 `display:flex;align-items:center`;`.el-message__badge` 加 flex 居中 |
+| UI | `views/Settings.vue` | `.settings-menu` 设 `background:transparent` 去掉白色底色(`.settings-side` 保留原样) |
+| 光影 | `utils/useSunLight.js` | `brightSpotStyle`:夜间不再因天气类型禁用亮斑层(之前非晴天夜间 opacity=0 导致暗化缺失、阴影变浅);白天仍按天气隐藏 |
+| 光影 | `utils/useSunLight.js` | `weatherLightMul`/`weatherShadowOpacity`/`brightSpotStyle` 新增 overcast(阴天:光0.15/阴影0.85)和 fog(雾:光0.08/阴影0.6)天气模式 |
+| 光影 | `utils/useSunLight.js` | 新增 `loadSunInfoForDate(dateStr)`:按日期请求 `/api/public/sun-info?date=`,保留当前时隙 |
+| 光影 | `utils/useSunLight.js` | 导出 `loadSunInfoForDate` |
+| 控制台 | `components/LightTestConsole.vue` | 可拖动(`useDragResize`,标题栏 `≡` 为手柄);日期选择(`<input type="date">`,切换后 `loadSunInfoForDate`);速度按钮(0.5/1/2/4/8x 高亮);天气按钮新增阴天☁️和雾🌫️(多云改⛅);信息栏增加窗角度数 |
+| 多家庭 | `stores/user.js` + `components/AppSidebar.vue` | **已回退**:头像下拉家庭切换功能未生效(el-popover teleport + scoped CSS 冲突),已删除全部相关代码(families state/loadFamilies/cascader/i18n 键),头像恢复原 `el-dropdown`(个人资料/设置/退出登录) |
+
 ## 文件存储策略
 
 - **当前阶段(开发期)**:本地磁盘存储(`file.upload-dir`),零成本零内存,FileService 已实现,开箱即用。Nginx `/files/` 托管静态目录(注意负向断言正则 `location ~* ^/(?!files/).+\.(...)$` 排除 /files/)。
