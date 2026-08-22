@@ -98,6 +98,8 @@ export function useSunLight() {
   // 天气光照系数(实时响应 cloudFlicker):晴=1,雨雪=0,多云=cloudFlicker
   const weatherLightMul = computed(() => {
     if (weatherMode.value === 'rain' || weatherMode.value === 'snow' || weatherMode.value === 'thunder') return 0
+    if (weatherMode.value === 'overcast') return 0.15
+    if (weatherMode.value === 'fog') return 0.08
     if (weatherMode.value === 'cloud') return cloudFlicker.value
     return 1
   })
@@ -107,6 +109,8 @@ export function useSunLight() {
   const weatherShadowOpacity = computed(() => {
     if (!shadowEnabled.value) return 0
     if (weatherMode.value === 'rain' || weatherMode.value === 'snow' || weatherMode.value === 'thunder') return 1
+    if (weatherMode.value === 'overcast') return 0.85
+    if (weatherMode.value === 'fog') return 0.6
     if (weatherMode.value === 'cloud') return Math.max(0, 1 - cloudFlicker.value)
     return 0
   })
@@ -293,7 +297,7 @@ export function useSunLight() {
 
   const brightSpotStyle = computed(() => ({
     background: sunScene.value.brightSpotColor || 'transparent',
-    opacity: shadowEnabled.value ? ((weatherMode.value === 'rain' || weatherMode.value === 'snow' || weatherMode.value === 'cloud' || weatherMode.value === 'thunder') ? 0 : (sunScene.value.brightSpotOpacity ?? 0)) : 0,
+    opacity: shadowEnabled.value ? (sunScene.value.isNight ? (sunScene.value.brightSpotOpacity ?? 0) : (['rain', 'snow', 'cloud', 'thunder', 'overcast', 'fog'].includes(weatherMode.value) ? 0 : (sunScene.value.brightSpotOpacity ?? 0))) : 0,
   }))
   const reflectionStyle = computed(() => ({
     background: `radial-gradient(ellipse 60% 50% at ${sunScene.value.source.x} ${sunScene.value.source.y}, rgba(255,245,220,1) 0%, rgba(255,235,200,0.6) 30%, transparent 70%)`,
@@ -317,6 +321,20 @@ export function useSunLight() {
         if (json.code === 0 && json.data) {
           sunInfo.value = json.data
           slotIdx.value = currentSlotIndex()
+          sunScene.value = getSunScene(json.data, slotIdx.value)
+          applyAutoTheme(sunScene.value.isNight)
+        }
+      }
+    } catch (e) {}
+  }
+
+  const loadSunInfoForDate = async (dateStr) => {
+    try {
+      const res = await fetch('/api/public/sun-info?date=' + dateStr)
+      if (res.ok) {
+        const json = await res.json()
+        if (json.code === 0 && json.data) {
+          sunInfo.value = json.data
           sunScene.value = getSunScene(json.data, slotIdx.value)
           applyAutoTheme(sunScene.value.isNight)
         }
@@ -398,7 +416,7 @@ export function useSunLight() {
   })
 
   return {
-    sunInfo, slotIdx, sunScene, weather, weatherDetail, loadWeather,
+    sunInfo, slotIdx, sunScene, weather, weatherDetail, loadWeather, loadSunInfoForDate,
     lampMode, lampTemp, lampBrightness, shadowEnabled, weatherEffectEnabled, blobsEnabled, toggleLamp,
     idleMinutes, isIdle,
     lampStrength, lampStrengthAnim, lampDivOpacity, lampRadius, lampMask, lampColor,

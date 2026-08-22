@@ -615,7 +615,7 @@ onMounted(load)
 <style scoped>
 .settings-layout { display: flex; gap: 16px; align-items: flex-start; }
 .settings-side { width: 180px; flex-shrink: 0; background: var(--color-card); border-radius: var(--radius); border: 1px solid var(--color-border); box-shadow: var(--shadow), var(--shadow-inset); padding: 8px; position: sticky; top: 42px; }
-.settings-menu { border-right: none; border-radius: 10px; overflow: hidden; }
+.settings-menu { border-right: none; background: transparent; }
 .menu-icon { margin-right: 8px; }
 .settings-body { flex: 1; min-width: 0; }
 .settings-card { margin-bottom: 16px; background: var(--color-card); }

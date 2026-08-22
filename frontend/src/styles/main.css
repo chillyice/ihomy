@@ -166,6 +166,8 @@ a { color: var(--color-accent); text-decoration: none; }
 }
 .el-message__content { color: inherit !important; }
 .el-message .el-message__icon { font-size: 18px !important; margin-right: 8px !important; }
+.el-message .el-message__badge { display: flex !important; align-items: center !important; }
+.el-message { display: flex !important; align-items: center !important; }
 
 /* === ElNotification 弹出框增强 === */
 .el-notification {
