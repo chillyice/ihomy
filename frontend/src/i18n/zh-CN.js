@@ -10,6 +10,7 @@ export default {
     notifications: '通知',
     allRead: '全部已读',
     noNotification: '暂无通知',
+    switchFamily: '切换家庭',
   },
   common: {
     save: '保存',
