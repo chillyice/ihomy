@@ -92,16 +92,16 @@ frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
     api/request.js  # axios + JWT header + 401 自动刷新token
     api/index.js    # 全部模块 API 分组导出(28 个 Api 对象:public/auth/home/blog/diary/file/member/anniversary/album/photo/like/comment/notification/family/profile/video/points/task/reminder/plan/wish/music/book/ops/tree/chat/storage/item)
     stores/user.js  # 登录状态 + hasPerm/isOps/isPureOps; stores/app.js 首页聚合(family/modules/photos/stats)
-    router/         # 登录守卫 + scrollBehavior(返回回顶部);含 /ops 运维护卫, /chat 需登录; 25 个路由
+    router/         # 登录守卫 + scrollBehavior(返回回顶部);含 /ops 运维护卫, /chat 需登录; 24 个路由
     i18n/           # vue-i18n 中英(applyLocale 切换)
     theme/          # applyTheme/loadTheme(明暗模式,只 light/dark)
     utils/dict.js   # 枚举词条中文映射(与后端 DictConst 对应)
-    utils/windowLight.js  # getSunScene(sunInfo,slotIndex)+currentSlotIndex()+makeRays():体积光调色板/光束/阴影参数
-    utils/useSunLight.js  # 全局光影状态(provide/inject):sunScene/lampMode/shadowEnabled/weatherEffectEnabled/blobsEnabled/lightTestMode/loadWeather
+    utils/windowLight.js  # getSunScene(sunInfo,slotIndex)+currentSlotIndex()+makeRays():体积光调色板/光束/阴影参数;windowAngle(窗角)+hasDirectLight 门控
+    utils/useSunLight.js  # 全局光影状态(provide/inject):sunScene/lampMode/shadowEnabled/weatherEffectEnabled/blobsEnabled/lightTestMode/testSpeed/loadWeather
     utils/useDragResize.js # 可拖拽面板组合式函数(zIndex+bringToFront+边界clamp+localStorage持久化)
-    components/     # AppSidebar(全局导航)/BackToTop/Breadcrumb/AvatarCropper/InstallPrompt/SiteFooter(备案号)/SunLightLayer(全局光影层)/SyncDialog(存储同步进度)
+    components/     # AppSidebar(全局导航)/BackToTop/Breadcrumb/AvatarCropper/InstallPrompt/SiteFooter(备案号)/SunLightLayer(全局光影层)/LightTestConsole(光照测试控制台)/SyncDialog(存储同步进度)
     styles/main.css # CSS 变量 + 全局样式 + 深色模式覆写 + ElMessage/ElNotification 增强
-    views/          # 25 个页面:Home(沉浸式首页)/Login/Member/Settings/Anniversary/album(Album/AlbumDetail)/cinema/Cinema/diary/DiaryList/blog(BlogList/BlogDetail/BlogEdit)/points/Points/task/Task/reminder/Reminder/plan/Plan/wish/Wish/book/Book/chat/Chat/tree/Tree/cascade/Cascade/ops/Ops/storage/Storage/item/Item/kitchen/Kitchen
+    views/          # 24 个页面:Home(沉浸式首页)/Login/Member/Settings/Anniversary/album(Album/AlbumDetail)/cinema/Cinema/diary/DiaryList/blog(BlogList/BlogDetail/BlogEdit)/points/Points/task/Task/reminder/Reminder/plan/Plan/wish/Wish/book/Book/chat/Chat/tree/Tree/cascade/Cascade/ops/Ops/storage/Storage/item/Item/kitchen/Kitchen
     App.vue
   vite.config.js   # PWA + 代理 /api -> :8080 + ElementPlus 按需
   public/favicon.svg
@@ -215,11 +215,11 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 模块 | 文件 | 要点 |
 |------|------|------|
 | 太阳位置 | `common/SolarUtil.java` + `service/SunService.java` | NOAA 算法纯数学;288 时隙(5 分钟);IP 定位(ip-api.com)+ Redis 6h 位置/12h 时隙;`GET /public/sun-info?date=`;时角归一化+atan2 方位角修复;默认济南 |
-| 体积光 | `utils/windowLight.js` + `components/SunLightLayer.vue` | 丁达尔效应:7 条光束+光源辉光+窗框阴影(上下分层)+暗角+灰尘;dayProgress 驱动旋转/颜色/强度;灰阶 darken 幂等防叠加;夜间光柱 transparent |
+| 体积光 | `utils/windowLight.js` + `components/SunLightLayer.vue` | 丁达尔效应:7 条光束+光源辉光+窗框阴影(上下分层)+暗角+灰尘;**窗角(windowAngle=90-|az-180|)门控直射光**(az 90°→270° 旋转,窗角≤0 无直射光);方位角驱动旋转(az-180);灰阶 darken 幂等防叠加;夜间光柱 transparent |
 | 台灯 | `utils/useSunLight.js` | 3 态(auto/on/off)+钟摆运动(8s 周期)+色温/亮度可调;mask 祛除阴影(GSAP 2s 补间);左上黄金分割点 |
 | 天气特效 | `utils/useSunLight.js` + `SunLightLayer.vue` | `codeToPrecipLevel` 1-6 级;snowParticles/rainParticles;cloudFlicker GSAP 4-8s;weatherShadowOpacity;weatherMultiplier(晴 1.0/多云 0.55/雨 0.25/雪 0.4) |
 | 天气代理 | `service/WeatherService.java` | 和风天气 JWT(Ed25519)身份认证(JDK 21 原生);凭证四件套(优先 DB sys_weather_credential);月度配额 49999(Redis 计数器);sys_weather_log 调用日志;Redis 缓存(now 30m/forecast 30m/warning 5m 等);`GET /public/weather` 简版+`/public/weather/detail` 聚合+`/ops/weather/quota` |
-| 光照测试 | `utils/useSunLight.js` + `Home.vue` | `lightTestMode` 1 分钟循环 288 时隙;后退/暂停/前进/停止+天气控制+色温/亮度滑块;停止=重置真实时间 |
+| 光照测试 | `utils/useSunLight.js` + `LightTestConsole.vue` | `lightTestMode` 循环 288 时隙;**testSpeed** 5 档(0.5/1/2/4/8x);窗角/方位/高度/地区/日期/日出日落显示;9 段时段标签;后退/暂停/前进/停止+天气控制+图层开关(阴影/环境光)+台灯模式+色温/亮度滑块;停止=重置真实时间 |
 | 可拖拽面板 | `utils/useDragResize.js` | 5 个面板(feed/task/weather/anniversary/today);zIndex+bringToFront;边界 clamp+localStorage 持久化 |
 | 和风图标 | `public/qweather-icons/` | npm 包 qweather-icons;`<i class="qi-{iconCode}">`;iconCode 来自和风 API now.icon |
 
@@ -281,7 +281,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 13. **动画优先级**(强制):持续型动画(钟摆/心跳/呼吸)优先级 **CSS `@keyframes` > GSAP 直接操作 DOM ref > `requestAnimationFrame` + 响应式 ref**。**禁止用 rAF 每帧写 Vue ref 触发响应式重渲染**(参考 `useSunLight.js` 钟摆已改 CSS `@keyframes lampSwing`)。
 14. **并行请求**(强制):多个独立的 `await xxxApi.foo()` 必须改 `Promise.all([a, b, c])` 并行(参考 `Home.vue loadAll` + `stores/app.js init`)。串行只在真有依赖时用。
 15. **computed 纯函数**(强制):`computed` 内禁止 `Math.random()`/`Date.now()`/副作用,否则每次访问重算且视觉跳动。需要随机/一次性计算用 `ref` + `watch(source, immediate)` 生成(参考 `Home.vue polaroidLayout`)。
-16. **路由懒加载**:25 个路由全部 `() => import('./views/...')`,不写同步 `import Home from '@/views/Home.vue'`。
+16. **路由懒加载**:24 个路由全部 `() => import('./views/...')`,不写同步 `import Home from '@/views/Home.vue'`。
 
 ### 性能规范(已踩坑 + 强制规则)
 
@@ -414,6 +414,17 @@ ALTER TABLE content_diary  ADD INDEX idx_family_created (family_id, deleted, cre
 | i18n | `Home.vue` | 25+ 硬编码中文改 `$t()`(家庭相册/写博客/天气加载/未来三天/积分/签到/分钟前/小时前/任务状态/星期等);脚本内 `feedTypeLabel`/`testPhase`/`feedSummary`/`formatTime`/`taskStatusLabel`/`formatFcDate` 全部走 `t()` |
 | i18n | `Settings.vue` | 40+ 硬编码中文改 `$t()`(歌单/创建家庭/个性化设置整段:台灯/色温/亮度/阴影/天气效果/天气地区/关灯超时/面板布局) |
 | i18n | `zh-CN.js`/`en.js` | 新增 `home.*` 35 key + `settings.*` 35 key(中英双语) |
+
+#### 2026-08-22 光影系统统一 + LightLab 删除
+
+| 类别 | 文件 | 改动 |
+|------|------|------|
+| 窗角门控 | `utils/windowLight.js` | 新增 `windowAngle = 90 - Math.abs(az - 180)` + `hasDirectLight`;光柱/辉光/反光从 `isNight` 门控改为 `hasDirectLight` 门控(太阳不直射窗户时无体积光) |
+| 方位角旋转 | `utils/windowLight.js` | `shadowVRotation` 从 `dayProgress` 驱动改为方位角驱动(`az - 180`);az=90° 开始旋转(-90°),az=270° 结束(+90°),窗角≤0 时 hold 在端点 |
+| 速度控制 | `utils/useSunLight.js` | 新增 `testSpeed` ref(5 档 0.5/1/2/4/8x)+ `setTestSpeed()`;`startLightTest` 间隔改为 `208 / testSpeed` |
+| 控制台增强 | `components/LightTestConsole.vue` | 新增:窗角度数/地区/日期/速度按钮(5 档)/图层开关(阴影+环境光)/台灯模式按钮(自动/开/关);时段标签从 6 段细分到 9 段(深夜/凌晨/日出/清晨/上午/正午/下午/日落/黄昏) |
+| i18n | `zh-CN.js`/`en.js` | 新增 6 个时段 key(midnight/dawn/forenoon/noon/afternoon/dusk) |
+| 删除 | `composables/useLightLab.js` + `LightLabLayer.vue` + `LightLabConsole.vue` + `views/lightlab/LightLab.vue` + `/lightlab` 路由 | LightLab 独立光影系统已删除,功能合并到生产光影系统 |
 
 ## 文件存储策略
 

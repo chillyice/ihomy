@@ -6,9 +6,14 @@
       <input type="time" v-model="timeInput" @change="onTimeChange" class="lt-time-input" />
       <button class="lt-btn lt-reset" @click="light.stopLightTest" title="重置到真实时间并关闭">⏹</button>
     </div>
+    <div class="lt-info lt-location" v-if="light?.sunInfo?.value">
+      <span>{{ light.sunInfo.value.city || '未知地区' }}</span>
+      <span>{{ light.sunInfo.value.date || '--' }}</span>
+    </div>
     <div class="lt-info">
       <span>高度 {{ light.sunScene.value.altitude?.toFixed(1) }}°</span>
       <span>方位 {{ light.sunScene.value.azimuth?.toFixed(1) }}°</span>
+      <span>窗角 {{ light.sunScene.value.windowAngle?.toFixed(1) }}°</span>
       <span class="lt-phase">{{ testPhase }}</span>
     </div>
     <div class="lt-info" v-if="light?.sunInfo?.value">
@@ -19,6 +24,11 @@
       <button class="lt-btn" @click="light.stepLightTest(-1)" title="后退 5 分钟">⏮</button>
       <button class="lt-btn lt-main" @click="light.pauseLightTest">{{ light.lightTestPaused.value ? '▶' : '⏸' }}</button>
       <button class="lt-btn" @click="light.stepLightTest(1)" title="前进 5 分钟">⏭</button>
+      <div class="lt-speed-group">
+        <button v-for="sp in speeds" :key="sp"
+          class="lt-btn lt-btn-xs" :class="{ active: light.testSpeed.value === sp }"
+          @click="light.setTestSpeed(sp)">{{ sp }}x</button>
+      </div>
     </div>
     <div class="lt-weather">
       <button class="lt-btn" :class="{ active: light.weatherMode.value === 'clear' }" @click="light.setWeather('clear', 0)" title="晴天">☀️</button>
@@ -29,6 +39,19 @@
     </div>
     <div v-if="light.weatherMode.value === 'rain' || light.weatherMode.value === 'snow' || light.weatherMode.value === 'thunder'" class="lt-sliders">
       <label class="lt-slider-row"><span>{{ light.weatherMode.value === 'snow' ? '雪量' : '雨量' }}</span><input type="range" min="1" max="6" v-model.number="light.precipLevel.value" class="lt-slider" @input="light.setWeather(light.weatherMode.value, light.precipLevel.value)" /></label>
+    </div>
+    <div class="lt-divider"></div>
+    <div class="lt-section-label">图层</div>
+    <div class="lt-toggles">
+      <label class="lt-toggle"><input type="checkbox" v-model="light.shadowEnabled.value" /><span>阴影</span></label>
+      <label class="lt-toggle"><input type="checkbox" v-model="light.blobsEnabled.value" /><span>环境光</span></label>
+    </div>
+    <div class="lt-divider"></div>
+    <div class="lt-section-label">台灯</div>
+    <div class="lt-lamp-mode">
+      <button v-for="m in lampModes" :key="m.value"
+        class="lt-btn lt-btn-sm" :class="{ active: light.lampMode.value === m.value }"
+        @click="light.lampMode.value = m.value">{{ m.label }}</button>
     </div>
     <div class="lt-sliders">
       <label class="lt-slider-row"><span>色温</span><input type="range" min="0" max="100" v-model.number="light.lampTemp.value" class="lt-slider" /></label>
@@ -46,16 +69,28 @@ import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
 const light = inject(SUN_LIGHT_KEY)
 
+const speeds = [0.5, 1, 2, 4, 8]
+
+const lampModes = [
+  { value: 'auto', label: '自动' },
+  { value: 'on', label: '开' },
+  { value: 'off', label: '关' },
+]
+
 const testPhase = computed(() => {
   if (!light) return ''
   const s = light.sunScene.value
-  if (s.isNight) return t('home.testPhase.night')
+  if (s.isNight) {
+    return s.dayProgress > 0.5 ? t('home.testPhase.midnight') : t('home.testPhase.dawn')
+  }
   const p = s.dayProgress ?? 0
-  if (p < 0.1) return t('home.testPhase.sunrise')
-  if (p < 0.25) return t('home.testPhase.morning')
-  if (p < 0.75) return t('home.testPhase.daytime')
-  if (p < 0.9) return t('home.testPhase.evening')
-  return t('home.testPhase.sunset')
+  if (p < 0.08) return t('home.testPhase.sunrise')
+  if (p < 0.2) return t('home.testPhase.morning')
+  if (p < 0.4) return t('home.testPhase.forenoon')
+  if (p < 0.6) return t('home.testPhase.noon')
+  if (p < 0.8) return t('home.testPhase.afternoon')
+  if (p < 0.92) return t('home.testPhase.sunset')
+  return t('home.testPhase.dusk')
 })
 
 const timeInput = ref('')
@@ -84,7 +119,7 @@ const onTimeChange = () => {
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 14px; padding: 14px 18px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  color: #fff; min-width: 260px;
+  color: #fff; min-width: 280px;
 }
 .lt-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; }
 .lt-title { font-size: 13px; font-weight: 600; opacity: 0.8; }
@@ -95,13 +130,21 @@ const onTimeChange = () => {
   font-variant-numeric: tabular-nums; padding: 4px 8px; cursor: pointer;
   color-scheme: dark;
 }
-.lt-info { display: flex; gap: 12px; font-size: 11px; opacity: 0.7; margin-bottom: 6px; }
+.lt-info { display: flex; gap: 12px; font-size: 11px; opacity: 0.7; margin-bottom: 6px; flex-wrap: wrap; }
+.lt-location { justify-content: center; font-size: 12px; opacity: 0.85; font-weight: 600; }
 .lt-phase { color: #C9A876; font-weight: 600; }
-.lt-controls { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; }
+.lt-controls { display: flex; gap: 6px; justify-content: center; align-items: center; margin-bottom: 8px; }
+.lt-speed-group { display: flex; gap: 3px; margin-left: 8px; padding-left: 8px; border-left: 1px solid rgba(255,255,255,0.15); }
 .lt-weather { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; }
+.lt-divider { height: 1px; background: rgba(255,255,255,0.1); margin: 8px 0; }
+.lt-section-label { font-size: 10px; opacity: 0.5; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; text-align: center; }
+.lt-lamp-mode { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; }
 .lt-sliders { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
 .lt-slider-row { display: flex; align-items: center; gap: 8px; font-size: 11px; opacity: 0.8; }
 .lt-slider { flex: 1; cursor: pointer; }
+.lt-toggles { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 4px; }
+.lt-toggle { display: flex; align-items: center; gap: 4px; font-size: 11px; opacity: 0.8; cursor: pointer; }
+.lt-toggle input { cursor: pointer; width: 13px; height: 13px; }
 .lt-btn {
   background: rgba(255,255,255,0.1);
   border: 1px solid rgba(255,255,255,0.2);
@@ -114,6 +157,8 @@ const onTimeChange = () => {
 .lt-btn.lt-main { font-size: 17px; }
 .lt-btn.lt-reset { background: rgba(244,67,54,0.3); border-color: rgba(244,67,54,0.5); }
 .lt-btn.lt-reset:hover { background: rgba(244,67,54,0.5); }
+.lt-btn-sm { padding: 4px 10px; font-size: 12px; }
+.lt-btn-xs { padding: 3px 7px; font-size: 10px; border-radius: 6px; }
 .lt-progress { height: 3px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
 .lt-progress-fill { height: 100%; background: linear-gradient(90deg, #C9A876, #A8483A); transition: width 0.2s; }
 @media (max-width: 900px) {

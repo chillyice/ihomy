@@ -82,11 +82,17 @@ export default {
     upcomingEvents: '近期纪念日',
     testPhase: {
       night: '夜间',
+      midnight: '深夜',
+      dawn: '凌晨',
       sunrise: '日出',
       morning: '清晨',
+      forenoon: '上午',
       daytime: '日间',
+      noon: '正午',
+      afternoon: '下午',
       evening: '傍晚',
       sunset: '日落',
+      dusk: '黄昏',
     },
   },
   theme: {

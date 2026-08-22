@@ -47,9 +47,19 @@ export function getSunScene(sunInfo, slotIndex) {
     }
   }
 
-  // 旋转:线性 -90°(日出)→ 0°(正午)→ +90°(日落),夜间 hold
-  const shadowVRotation = (dayProgress - 0.5) * 180
-  // 光柱旋转:与阴影同角度
+  // 窗角:太阳直射窗户的角度(90°=正对窗户,0°=平行窗户无直射)
+  const windowAngle = 90 - Math.abs(az - 180)
+  // 是否有直射光:白天 + 窗角>0 + 太阳在地平线上
+  const hasDirectLight = !isNight && windowAngle > 0 && alt > 0
+
+  // 旋转:基于方位角驱动,az=90°开始(-90°)→ az=180°正中(0°)→ az=270°结束(+90°)
+  // 窗角≤0(az<90 或 az>270)时 hold 在对应端点,无直射光不旋转
+  let shadowVRotation
+  if (hasDirectLight) {
+    shadowVRotation = az - 180
+  } else {
+    shadowVRotation = az <= 90 ? -90 : 90
+  }
   const lightRotation = shadowVRotation
 
   // 光源水平位置:由方位角驱动,夜间 hold 在日出位置(左侧 7.5%)
@@ -102,7 +112,7 @@ export function getSunScene(sunInfo, slotIndex) {
 
   // 光柱颜色:夜间全透明(不发光),日间基于高度角
   let palette, rayBaseOpacity
-  if (isNight) {
+  if (!hasDirectLight) {
     palette = {
       bloom: 'transparent',
       core: 'transparent',
@@ -144,14 +154,14 @@ export function getSunScene(sunInfo, slotIndex) {
     rayBaseOpacity = 0.95
   }
 
-  // 光柱不透明度:夜间 0(不发光),日间正弦过渡(正午最强)
-  const rayOpacity = isNight ? 0 : Math.sin(dayProgress * Math.PI) * rayBaseOpacity
+  // 光柱不透明度:无直射光时 0,有直射光时正弦过渡(正午最强)
+  const rayOpacity = hasDirectLight ? Math.sin(dayProgress * Math.PI) * rayBaseOpacity : 0
 
-  // 光源整体不透明度(控制 bloom 辉光):夜间 0,日出日落 0,正午 1,正弦过渡
-  const lightOpacity = isNight ? 0 : Math.sin(dayProgress * Math.PI)
+  // 光源整体不透明度(控制 bloom 辉光):无直射光时 0,正弦过渡
+  const lightOpacity = hasDirectLight ? Math.sin(dayProgress * Math.PI) : 0
 
-  // 反光层:内容组件被阳光照亮的轻微高光(soft-light,夜间 0)
-  const reflectionOpacity = isNight ? 0 : Math.sin(dayProgress * Math.PI) * 0.22
+  // 反光层:内容组件被阳光照亮的轻微高光(soft-light,无直射光时 0)
+  const reflectionOpacity = hasDirectLight ? Math.sin(dayProgress * Math.PI) * 0.22 : 0
 
   // 台灯:傍晚开始时开(dayProgress≥0.9 或夜间),清晨结束时关(dayProgress>0.1)
   const lampOpacity = (isNight || dayProgress >= 0.9 || dayProgress <= 0.1) ? 1 : 0
@@ -175,6 +185,8 @@ export function getSunScene(sunInfo, slotIndex) {
     azimuth: az,
     isNight,
     dayProgress,
+    windowAngle,
+    hasDirectLight,
   }
 }
 
