@@ -1,4 +1,4 @@
-<!-- 悬浮音乐播放器:整体可拖拽,展开/收缩带动画,左下角不动 -->
+<!-- 悬浮音乐播放器:整体可拖拽,展开/收缩带动画,左下角不动;播放当前家庭绑定的背景音乐歌单 -->
 <template>
   <div v-if="playlist.length" class="music-player" :class="{ expanded }"
     :style="{ left: pos.x + 'px', bottom: pos.bottom + 'px' }"
@@ -74,7 +74,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { musicApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { CaretLeft, CaretRight, VideoPlay, VideoPause, List } from '@element-plus/icons-vue'
@@ -91,7 +91,8 @@ const duration = ref(0)
 const buffered = ref(0)
 
 // 拖拽位置(bottom 定位,左下角不动)
-const pos = ref({ x: 240, bottom: 24 })
+const DEFAULT_POS = { x: 240, bottom: 24 }
+const pos = ref({ ...DEFAULT_POS })
 try {
   const saved = JSON.parse(localStorage.getItem('ihomy:music:pos') || 'null')
   if (saved && saved.x !== undefined) pos.value = saved
@@ -132,11 +133,17 @@ const currentTrack = computed(() => playlist.value[trackIdx.value] || {})
 const playedPct = computed(() => duration.value ? (currentTime.value / duration.value) * 100 : 0)
 const bufferedPct = computed(() => duration.value ? (buffered.value / duration.value) * 100 : 0)
 
-const loadPlaylist = async () => {
+const loadBackgroundPlaylist = async () => {
   if (!userStore.isLoggedIn) { playlist.value = []; return }
   try {
-    playlist.value = await musicApi.list()
+    const data = await musicApi.getBackground()
+    const tracks = data?.tracks || []
+    playlist.value = tracks.filter(t => t && t.url)
     if (trackIdx.value >= playlist.value.length) trackIdx.value = 0
+    if (playlist.value.length) {
+      await nextTick()
+      if (audioEl.value) audioEl.value.load()
+    }
   } catch (e) {
     playlist.value = []
   }
@@ -148,7 +155,7 @@ const togglePlay = () => {
     audioEl.value.pause()
     playing.value = false
   } else {
-    audioEl.value.play().then(() => { playing.value = true }).catch(() => {})
+    audioEl.value.play().then(() => { playing.value = true }).catch(() => { playing.value = false })
   }
 }
 
@@ -167,15 +174,13 @@ const selectTrack = (i) => {
   playAfterSwitch()
 }
 const playAfterSwitch = () => {
-  // 切歌后如果之前在播放,继续播放新曲目
   const wasPlaying = playing.value
-  setTimeout(() => {
+  playing.value = false
+  nextTick(() => {
     if (wasPlaying && audioEl.value) {
       audioEl.value.play().then(() => { playing.value = true }).catch(() => { playing.value = false })
-    } else {
-      playing.value = false
     }
-  }, 50)
+  })
 }
 
 const onSeek = (e) => {
@@ -209,17 +214,18 @@ const formatTime = (s) => {
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
 
-// 登录态变化时重新加载歌单
-watch(() => userStore.isLoggedIn, loadPlaylist)
-watch(() => userStore.userInfo?.familyId, loadPlaylist)
+// 登录态/家庭切换/背景歌单变更时重新加载
+watch(() => userStore.isLoggedIn, loadBackgroundPlaylist)
+watch(() => userStore.userInfo?.familyId, loadBackgroundPlaylist)
+watch(() => userStore.bgMusicVersion, loadBackgroundPlaylist)
 
-onMounted(loadPlaylist)
+onMounted(loadBackgroundPlaylist)
 </script>
 
 <style scoped>
 .music-player {
   position: fixed;
-  z-index: 60;
+  z-index: 55;
   display: flex;
   align-items: flex-end;
   gap: 0;

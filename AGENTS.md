@@ -52,10 +52,10 @@
 - **root 仅用于初始化**:`mysql -uroot -p < backend/src/main/resources/schema.sql`,执行一次(建库、建表、创建 ihomy 账号、初始数据)。
 - **业务运行用 `ihomy` 账号**:仅授予 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`(最小权限,无 CREATE/ALTER/DROP)。application.yml 连接用 `ihomy`,**不要用 root 跑业务**。
 - 账号同时创建 `localhost` 和 `%` 两个 host(本机/远程应用服务器都能连)。
-- **49 张表**,前缀分类:
+- **51 张表**,前缀分类:
   - `sys_`(系统/账号/权限/家庭设置/日志/参数/字典/天气/存储,17 张):`sys_user` / `sys_role` / `sys_auth` / `sys_user_role` / `sys_role_auth` / `sys_family_info` / `sys_home_module` / `sys_password_reset_token` / `sys_user_group` / `sys_user_group_member` / `sys_operation_log` / `sys_dict_item` / `sys_parameter` / `sys_storage_device` / `sys_weather_credential` / `sys_weather_location` / `sys_weather_log`
-  - `family_`(家庭事务,22 张):`family_anniversary` / `family_notification` / `family_apply` / `family_invitation_code` / `family_checkin` / `family_points_record` / `family_points_product` / `family_points_order` / `family_task` / `family_reminder` / `family_plan` / `family_plan_task` / `family_book_record` / `family_chat_message` / `family_chat_read` / `family_user_label` / `family_tree` / `family_house` / `family_room` / `family_furniture` / `family_item` / `family_music`
-  - `content_`(内容类,10 张):`content_blog` / `content_diary` / `content_album` / `content_photo` / `content_comment` / `content_visibility` / `content_like` / `content_video` / `content_video_wish` / `content_wish`
+  - `family_`(家庭事务,21 张):`family_anniversary` / `family_notification` / `family_apply` / `family_invitation_code` / `family_checkin` / `family_points_record` / `family_points_product` / `family_points_order` / `family_task` / `family_reminder` / `family_plan` / `family_plan_task` / `family_book_record` / `family_chat_message` / `family_chat_read` / `family_user_label` / `family_tree` / `family_house` / `family_room` / `family_furniture` / `family_item
+  - `content_`(内容类,13 张):`content_blog` / `content_diary` / `content_album` / `content_photo` / `content_comment` / `content_visibility` / `content_like` / `content_video` / `content_video_wish` / `content_wish` / `content_music` / `content_music_playlist` / `content_music_playlist_track`
   - **命名规则**:家庭事务业务表一律 `family_` 前缀;内容数据 `content_` 前缀;账号/权限/配置/日志/天气/存储保留 `sys_`。新增表必须遵守。前缀取最顶层祖先类别;上下级关系体现在表名(如 `sys_user_role`)。
 - **枚举不再用数字**:状态/类型字段一律大写英文单词(`PUBLISHED/DRAFT/PUBLIC/FAMILY/ACTIVE...`),含义存字典表 `sys_dict_item`,Java 常量集中于 `common/DictConst.java`,前端映射 `utils/dict.js`。**不要写回 0/1/2 判断**。
 - **注意**:`content_blog/diary/photo/video/wish` 5 张内容表 `visibility` 列为 `VARCHAR(20) DEFAULT 'FAMILY'`(PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开),schema.sql 与 live DB 已对齐(曾误写 TINYINT)。
@@ -85,7 +85,7 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
     application.yml     # 端口8080, context-path=/api, 连接用 ihomy 账号; mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml; **基线配置**(MySQL 6306/Redis 6379/captcha 空/天气留空);当前 `file.upload-dir` 为 Windows 开发默认值,生产通过 external.yml 覆盖为 Linux 路径
     external.yml.template  # 外挂配置模板(IHOMY_CONFIG_PATH 指定路径,覆盖 MySQL/Redis 密码 + JWT 密钥 + 上传路径 + captcha + 天气凭证,ENC() 加密)—— 唯一的开发/生产差异机制,**不再用 application-dev.yml profile**(见 scripts/start-all.ps1)
     mapper/*.xml        # 每个 Mapper 接口一个同名 XML(namespace=接口全限定名)
-    schema.sql          # 建库+建号+建表(49张)+种子数据
+    schema.sql          # 建库+建号+建表(51张)+种子数据
   mvnw / mvnw.cmd       # Maven Wrapper,无需单独装 Maven
 frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
   src/
@@ -196,7 +196,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 记账 | BookController | BookService | family_book_record | type(支出/收入/转账)+月度统计+分类榜;单表无账户 |
 | 家谱 | TreeController | FamilyTreeService | family_tree | father_id/mother_id/spouse_id 自关联;spouse 双向绑定;generation 世代;**编辑全量提交,null 字段须用 LambdaUpdateWrapper 显式 SET NULL**(MP updateById 忽略 null);删除清空他人引用后逻辑删 |
 | 签到积分 | PointsController | PointsService | family_checkin/family_points_record/family_points_product/family_points_order | 日签 5 分+连续加成(7 天轮回);内容奖励(博客+10/日记+8/照片+2/视频+15);兑换校验(积分不足 1008/兑完 1009);商品管理+核销需 `@RequirePermission("points:manage")` |
-| 背景音乐 | MusicController | — | family_music | `sys_family_info.music_url/music_title`;家庭共享歌单 |
+| 背景音乐 | MusicController | MusicService | content_music/content_music_playlist/content_music_playlist_track | 曲库(单曲/专辑上传,mp3agic 解析 ID3v2 元数据:标题/艺术家/专辑/时长/比特率/内嵌封面);歌单 CRUD(家庭维度独立);`is_background` 标记当前背景音乐歌单(每家庭最多 1 条);播放器 `GET /music/background` 获取歌单+曲目;`PUT /music/playlist/{id}/set-background` 设为背景;Settings 页「背景音乐设置」与导航栏「音乐」功能独立 |
 
 ### 6. 基础设施
 
@@ -294,6 +294,16 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
     - **ElMessageBox**:同风格;`max-width: 360px; min-width: 300px`;无装饰竖线;footer 无分割线;关闭按钮隐藏。
     - **暗色模式**:弹窗背景 `#1E2A48`;次级按钮 `rgba(232,220,200,0.1)`;placeholder `rgba(232,220,200,0.35)`。
     - **禁止**:在组件 scoped CSS 里写 `el-dialog`/`el-message-box` 样式覆写;新增弹窗只管业务逻辑,样式由全局兜底。
+18. **按钮统一样式**(强制,全局 4 类按钮,`main.css` 统一覆写,禁止 scoped 重复定义):
+    - **圆角**:所有 `el-button` 12px;small 10px。
+    - **主按钮**(`type="primary"`):背景 `#b88c6e` 白字;hover `#a87c5e`;用于保存/添加/确认等正向操作。**禁止亮蓝**。
+    - **次级按钮**(无 type / 默认):背景 `#f3eee6` 深褐 `#5c4c3d` 文字;hover `#e8e0d2`;用于取消/次级入口。
+    - **幽灵按钮**(`.ghost-btn` class):透明底 + `var(--color-border)` 边框 + 褐字;hover `#f3eee6` 底;用于复制链接等低权重操作。
+    - **危险按钮**(`type="danger"`):背景 `#f9ecea` 暗红 `#b96058` 文字;hover `#f0dedb`;**禁止亮红**。`text`/`link` 类型保持透明底,hover 浅红 `rgba(185,96,88,0.08)`。
+    - **尺寸**:默认 34px / small 28px / large 38px。表单底部保存按钮用默认或 large;列表行内删除用 small。
+    - **交互**:hover `translateY(-1px)` + `0 2px 8px rgba(0,0,0,0.06)` 微阴影;禁用/loading 置灰 `#e4ddd0` 去掉上浮。
+    - **摆放规则**:表单提交按钮 → `.form-footer { display: flex; justify-content: flex-end }` 右下角;模块独立功能入口 → 靠左次级按钮;Modal footer → 次级左主按钮右;列表删除 → 行最右 small danger。
+    - **暗色模式**:主按钮同色;次级 `rgba(232,220,200,0.1)`;危险 `rgba(185,96,88,0.12)` + `#d9665a`;禁用 `rgba(232,220,200,0.06)` + `rgba(232,220,200,0.3)`。
 
 ### 性能规范(已踩坑 + 强制规则)
 
@@ -452,6 +462,38 @@ ALTER TABLE content_diary  ADD INDEX idx_family_created (family_id, deleted, cre
 | 光影 | `utils/useSunLight.js` | 导出 `loadSunInfoForDate` |
 | 控制台 | `components/LightTestConsole.vue` | 可拖动(`useDragResize`,标题栏 `≡` 为手柄);日期选择(`<input type="date">`,切换后 `loadSunInfoForDate`);速度按钮(0.5/1/2/4/8x 高亮);天气按钮新增阴天☁️和雾🌫️(多云改⛅);信息栏增加窗角度数 |
 | 多家庭 | `stores/user.js` + `components/AppSidebar.vue` | **已回退**:头像下拉家庭切换功能未生效(el-popover teleport + scoped CSS 冲突),已删除全部相关代码(families state/loadFamilies/cascader/i18n 键),头像恢复原 `el-dropdown`(个人资料/设置/退出登录) |
+
+#### 2026-08-22 音乐系统重构(曲库+歌单+背景音乐)
+
+| 类别 | 文件 | 改动 |
+|------|------|------|
+| 数据库 | `schema.sql` | `family_music`→`content_music`(加 artist/duration/bitrate/cover_url/source_path/deleted);新增 `content_music_playlist`(歌单,is_background 标记);新增 `content_music_playlist_track`(歌单-曲目关联);`sys_family_info` 加 `background_playlist_id` |
+| 后端 | `pom.xml` | 加 `com.mpatric:mp3agic:0.9.1`(MP3 ID3v2 元数据解析) |
+| 后端 | `ContentMusic.java`/`ContentMusicPlaylist.java`/`ContentMusicPlaylistTrack.java` | 3 个新实体 |
+| 后端 | `ContentMusicMapper.java`/`ContentMusicPlaylistMapper.java`/`ContentMusicPlaylistTrackMapper.java` | 3 个新 Mapper |
+| 后端 | `MusicService.java` | 新建:曲库 CRUD + 元数据提取(mp3agic:标题/艺术家/专辑/时长/比特率/内嵌封面)+ 歌单 CRUD + 设为背景音乐 + 获取背景歌单 |
+| 后端 | `MusicController.java` | 完全重写:曲库(upload/upload-album/list/albums/add/delete)+ 歌单(playlist/list/create/delete/tracks/addTracks/removeTrack/set-background/unset-background/get-background) |
+| 前端 | `api/index.js` | `musicApi` 重写:upload/uploadAlbum/playlistList/createPlaylist/deletePlaylist/playlistTracks/addTracks/removeTrack/setBackground/unsetBackground/getBackground |
+| 前端 | `views/music/Music.vue` | 完全重写:3 Tab(全部曲目/按专辑/歌单);卡片网格+封面+元数据展示;新建歌单/加入歌单/设为背景;上传单曲/专辑文件夹/外链 |
+| 前端 | `views/Settings.vue` | 「家人共享歌单」→「背景音乐设置」:上传单曲/专辑+新建歌单;歌单列表(最多5条+更多弹窗);每条设为背景/当前背景高亮 |
+| 前端 | `components/MusicPlayer.vue` | `loadPlaylist`(musicApi.list)→`loadBackgroundPlaylist`(musicApi.getBackground);watch familyId 切换家庭时重置数据源 |
+
+**关键业务逻辑**:
+- 歌单是背景音乐播放的最小单元;不能直接设置单曲为背景音乐
+- 播放器只播放当前家庭绑定的背景音乐歌单;切换家庭时立即重置
+- 歌单资源归属家庭维度;每个家庭独立歌单集合
+- `content_music_playlist.is_background=1` 标记当前背景歌单(每家庭最多1条);`setBackground` 先 clear 再 set
+- MP3 上传时用 mp3agic 解析 ID3v2 标签提取元数据;非 MP3 回退文件名
+- 内嵌封面提取后存为 `/files/music/covers/{yyyyMM}/cover_{hash}.jpg`
+
+**live DB 同步**:schema.sql 改动只对新装库生效。已有 DB 需手动执行:
+```sql
+ALTER TABLE sys_family_info ADD COLUMN background_playlist_id BIGINT DEFAULT NULL COMMENT '当前背景音乐歌单ID' AFTER music_title;
+DROP TABLE IF EXISTS family_music;
+CREATE TABLE content_music (...);  -- 见 schema.sql
+CREATE TABLE content_music_playlist (...);
+CREATE TABLE content_music_playlist_track (...);
+```
 
 ## 文件存储策略
 

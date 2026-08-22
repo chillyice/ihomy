@@ -8,6 +8,7 @@ export const useUserStore = defineStore('user', {
     token: localStorage.getItem('token') || '',
     refreshToken: localStorage.getItem('refreshToken') || '',
     userInfo: JSON.parse(localStorage.getItem('userInfo') || 'null'),
+    bgMusicVersion: 0,
   }),
   getters: {
     isLoggedIn: (state) => !!state.token,
@@ -65,6 +66,9 @@ export const useUserStore = defineStore('user', {
       this.refreshToken = refreshToken
       localStorage.setItem('token', token)
       localStorage.setItem('refreshToken', refreshToken)
+    },
+    bumpBgMusic() {
+      this.bgMusicVersion++
     },
     logout() {
       // 通知后端登出(使其 refresh token 进入黑名单),再清空本地登录态

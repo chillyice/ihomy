@@ -132,6 +132,146 @@ a { color: var(--color-accent); text-decoration: none; }
   .el-button:not(.is-link):not(.el-button--small):not(.is-circle) { min-height: 44px; }
 }
 
+/* === 全局按钮统一样式 — 4 类按钮 / 浅米暖调 / 大圆角 === */
+
+/* 基础:所有 el-button 圆角 + 无 border + 过渡 */
+.el-button {
+  border-radius: 12px !important;
+  border: none !important;
+  font-weight: 500 !important;
+  transition: background 0.2s, transform 0.15s, box-shadow 0.15s !important;
+}
+.el-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.el-button:active {
+  transform: translateY(0);
+}
+
+/* 主按钮(type=primary):暖棕底白字 */
+.el-button--primary {
+  background: #b88c6e !important;
+  border-color: #b88c6e !important;
+  color: #fff !important;
+}
+.el-button--primary:hover,
+.el-button--primary:focus {
+  background: #a87c5e !important;
+  border-color: #a87c5e !important;
+}
+html.dark .el-button--primary {
+  background: #b88c6e !important;
+  border-color: #b88c6e !important;
+  color: #fff !important;
+}
+html.dark .el-button--primary:hover {
+  background: #a87c5e !important;
+}
+
+/* 次级按钮(默认 type):浅米底深褐字 */
+.el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):not(.ghost-btn) {
+  background: #f3eee6 !important;
+  border-color: #f3eee6 !important;
+  color: #5c4c3d !important;
+}
+.el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):not(.ghost-btn):hover {
+  background: #e8e0d2 !important;
+  border-color: #e8e0d2 !important;
+}
+html.dark .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):not(.ghost-btn) {
+  background: rgba(232,220,200,0.1) !important;
+  color: var(--color-text) !important;
+}
+html.dark .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):not(.ghost-btn):hover {
+  background: rgba(232,220,200,0.15) !important;
+}
+
+/* 幽灵按钮(.ghost-btn):透明底褐字,hover 浅米底 */
+.ghost-btn {
+  background: transparent !important;
+  border: 1px solid var(--color-border) !important;
+  color: #5c4c3d !important;
+}
+.ghost-btn:hover {
+  background: #f3eee6 !important;
+  border-color: #e4ddd0 !important;
+  color: #5c4c3d !important;
+}
+html.dark .ghost-btn {
+  background: transparent !important;
+  border-color: rgba(232,220,200,0.15) !important;
+  color: var(--color-text) !important;
+}
+html.dark .ghost-btn:hover {
+  background: rgba(232,220,200,0.08) !important;
+}
+
+/* 危险按钮(type=danger):浅红底暗红字 */
+.el-button--danger {
+  background: #f9ecea !important;
+  border-color: #f9ecea !important;
+  color: #b96058 !important;
+}
+.el-button--danger:hover {
+  background: #f0dedb !important;
+  border-color: #f0dedb !important;
+}
+html.dark .el-button--danger {
+  background: rgba(185,96,88,0.12) !important;
+  border-color: rgba(185,96,88,0.12) !important;
+  color: #d9665a !important;
+}
+html.dark .el-button--danger:hover {
+  background: rgba(185,96,88,0.2) !important;
+}
+
+/* text/link 类型危险按钮:保持文字态,hover 浅红底 */
+.el-button--danger.is-text,
+.el-button--danger.is-link {
+  background: transparent !important;
+  color: #b96058 !important;
+}
+.el-button--danger.is-text:hover,
+.el-button--danger.is-link:hover {
+  background: rgba(185,96,88,0.08) !important;
+}
+
+/* 禁用/loading 态:统一置灰,去掉上浮 */
+.el-button.is-disabled,
+.el-button.is-loading {
+  background: #e4ddd0 !important;
+  border-color: #e4ddd0 !important;
+  color: #b0a898 !important;
+  cursor: not-allowed !important;
+  opacity: 1 !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+html.dark .el-button.is-disabled,
+html.dark .el-button.is-loading {
+  background: rgba(232,220,200,0.06) !important;
+  border-color: rgba(232,220,200,0.06) !important;
+  color: rgba(232,220,200,0.3) !important;
+}
+
+/* 尺寸:默认 34px,small 28px,large 38px */
+.el-button:not(.is-circle):not(.el-button--small) {
+  height: 34px;
+  padding: 0 16px;
+}
+.el-button--small {
+  height: 28px;
+  padding: 0 12px;
+  font-size: 12px !important;
+  border-radius: 10px !important;
+}
+.el-button--large {
+  height: 38px;
+  padding: 0 20px;
+  font-size: 14px !important;
+}
+
 /* === ElMessage 弹出框 UI 增强(右上角,不被导航栏遮挡) === */
 .el-message {
   position: fixed !important;
@@ -149,16 +289,34 @@ a { color: var(--color-accent); text-decoration: none; }
   z-index: 3000 !important;
 }
 .el-message--success {
-  background: rgba(76, 175, 80, 0.92) !important;
-  color: #fff !important;
+  background: rgba(243, 238, 230, 0.95) !important;
+  color: #5c4c3d !important;
+  border-color: rgba(184, 140, 110, 0.25) !important;
+}
+html.dark .el-message--success {
+  background: rgba(30, 42, 72, 0.92) !important;
+  color: #E8DCC8 !important;
+  border-color: rgba(184, 140, 110, 0.3) !important;
 }
 .el-message--warning {
-  background: rgba(255, 193, 7, 0.92) !important;
-  color: #3A2E22 !important;
+  background: rgba(243, 238, 230, 0.95) !important;
+  color: #8a6d3b !important;
+  border-color: rgba(202, 168, 104, 0.3) !important;
+}
+html.dark .el-message--warning {
+  background: rgba(30, 42, 72, 0.92) !important;
+  color: #d4b88a !important;
+  border-color: rgba(202, 168, 104, 0.3) !important;
 }
 .el-message--error {
-  background: rgba(244, 67, 54, 0.92) !important;
-  color: #fff !important;
+  background: rgba(249, 236, 234, 0.95) !important;
+  color: #b04a3a !important;
+  border-color: rgba(185, 96, 88, 0.2) !important;
+}
+html.dark .el-message--error {
+  background: rgba(40, 28, 32, 0.92) !important;
+  color: #d9665a !important;
+  border-color: rgba(185, 96, 88, 0.3) !important;
 }
 .el-message--info {
   background: rgba(58, 46, 34, 0.92) !important;
@@ -475,3 +633,51 @@ html.dark .el-message-box__btns .el-button:not(.el-button--primary):hover {
 .dialog-fade-leave-active .el-dialog { transition: transform 0.2s ease, opacity 0.2s ease !important; }
 .dialog-fade-enter-from .el-dialog { transform: scale(0.94) !important; opacity: 0 !important; }
 .dialog-fade-leave-to .el-dialog { transform: scale(0.96) !important; opacity: 0 !important; }
+
+/* ========== 全局下拉菜单(teleported, scoped 不生效) ========== */
+.el-dropdown__popper.el-popper,
+.el-popper.is-light {
+  z-index: 54 !important;
+}
+.el-dropdown__popper.el-popper {
+  border-radius: 12px !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12) !important;
+  padding: 6px !important;
+}
+.el-dropdown-menu {
+  border-radius: 10px !important;
+  padding: 4px !important;
+}
+.el-dropdown-menu .el-dropdown-menu__item {
+  border-radius: 8px !important;
+  padding: 8px 16px !important;
+  font-size: 13px !important;
+  margin: 2px 0 !important;
+  transition: background 0.15s !important;
+}
+.el-dropdown-menu .el-dropdown-menu__item:not(.is-disabled):hover {
+  background: #f3eee6 !important;
+  color: #3A2E22 !important;
+}
+.el-dropdown-menu .el-dropdown-menu__item.is-disabled { opacity: 0.4 !important; }
+.el-dropdown-menu .el-dropdown-menu__item.dropdown-danger { color: #b96058 !important; }
+.el-dropdown-menu .el-dropdown-menu__item.dropdown-danger:hover { background: #f9ecea !important; color: #b96058 !important; }
+html.dark .el-dropdown-menu .el-dropdown-menu__item.dropdown-danger { color: #d9665a !important; }
+html.dark .el-dropdown-menu .el-dropdown-menu__item.dropdown-danger:hover { background: rgba(185,96,88,0.12) !important; }
+html.dark .el-dropdown-menu .el-dropdown-menu__item:not(.is-disabled):hover {
+  background: rgba(232,220,200,0.1) !important;
+  color: #E8DCC8 !important;
+}
+
+/* ========== ElMessageBox: icon + message 同行 ========== */
+.el-message-box__container {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+.el-message-box__container .el-message-box__status {
+  position: relative !important;
+  flex-shrink: 0 !important;
+  top: 0 !important;
+  transform: none !important;
+}

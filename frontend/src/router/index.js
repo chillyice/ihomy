@@ -13,6 +13,7 @@ const routes = [
   { path: '/album', name: 'Album', component: () => import('@/views/album/Album.vue'), meta: { public: true } },
   { path: '/album/:id', name: 'AlbumDetail', component: () => import('@/views/album/AlbumDetail.vue'), meta: { public: true } },
   { path: '/cinema', name: 'Cinema', component: () => import('@/views/cinema/Cinema.vue'), meta: { public: true } },
+  { path: '/music', name: 'Music', component: () => import('@/views/music/Music.vue'), meta: { public: true } },
   { path: '/member', name: 'Member', component: () => import('@/views/Member.vue') },
   { path: '/points', name: 'Points', component: () => import('@/views/points/Points.vue') },
   { path: '/task', name: 'Task', component: () => import('@/views/task/Task.vue') },
