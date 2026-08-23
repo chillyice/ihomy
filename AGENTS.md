@@ -311,9 +311,11 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
       - info:深褐底 + 白字。
     - **暗色模式**:success/warning 弹窗背景 `rgba(30,42,72,0.92)` + 浅米文字。
 20. **Popper/Dropdown z-index 规范**(强制):
-    - `.el-popper.is-light`(含 dropdown/tooltip)`z-index:54`(光影层 bright-spot=65 下方)。
-    - MusicPlayer `z-index:55`(popper 上方,光影层下方)。
+    - `.el-popper.is-light`(含 dropdown/tooltip)`z-index:61`(高于 AppSidebar=60,低于光影层 bright-spot=65)。
+    - MusicPlayer `z-index:62`(popper 上方,光影层下方)。
     - SiteFooter `z-index:70`;BackToTop/InstallPrompt `z-index:200`;ElMessage `z-index:3000`。
+    - **完整 z-index 层级**(从高到低):`ElMessage(3000) > BackToTop/InstallPrompt(200) > lamp-light(100) > LightTestConsole(80) > lightning(79) > light-layer(78) > snow/rain(77) > dust(76) > vignette(74) > reflection(72) > SiteFooter(70) > window-shadow(68) > bright-spot(65) > MusicPlayer(62) > Popper/dropdown(61) > AppSidebar(60) > draggable-panel(20→60) > main-content(10) > glass-bg(2) > bg-blobs(1)`。
+    - **光影层(65-100)为除 Toast 外的最高层**,任何新增组件 z-index 不得超 100(台灯 100 除外)。
 18. **按钮统一样式**(强制,全局 4 类按钮,`main.css` 统一覆写,禁止 scoped 重复定义):
     - **圆角**:所有 `el-button` 12px;small 10px。
     - **主按钮**(`type="primary"`):背景 `#b88c6e` 白字;hover `#a87c5e`;用于保存/添加/确认等正向操作。**禁止亮蓝**。
@@ -323,7 +325,27 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
     - **尺寸**:默认 34px / small 28px / large 38px。表单底部保存按钮用默认或 large;列表行内删除用 small。
     - **交互**:hover `translateY(-1px)` + `0 2px 8px rgba(0,0,0,0.06)` 微阴影;禁用/loading 置灰 `#e4ddd0` 去掉上浮。
     - **摆放规则**:表单提交按钮 → `.form-footer { display: flex; justify-content: flex-end }` 右下角;模块独立功能入口 → 靠左次级按钮;Modal footer → 次级左主按钮右;列表删除 → 行最右 small danger。
-    - **暗色模式**:主按钮同色;次级 `rgba(232,220,200,0.1)`;危险 `rgba(185,96,88,0.12)` + `#d9665a`;禁用 `rgba(232,220,200,0.06)` + `rgba(232,220,200,0.3)`。
+    - **暗色模式**(与浅色完全不同色值,不共用):
+      - 主按钮:背景 `#d4b298`(提亮浅暖棕),文字 `#2a2018`(深色),hover `#e0c2aa`;**禁止与浅色同色**。
+      - 次级按钮:背景 `rgba(255,255,255,0.12)`(半透明白色磨砂),文字 `#E8DCC8`(浅米白),hover `rgba(255,255,255,0.18)`。
+      - 幽灵按钮:透明底 + `rgba(255,255,255,0.15)` 边框 + `#E8DCC8` 文字;hover `rgba(255,255,255,0.08)`。
+      - 危险按钮:背景 `rgba(201,116,116,0.15)`(半透明),文字 `#c97474`(低饱和暗红),hover `rgba(201,116,116,0.25)`;禁用 `rgba(232,220,200,0.06)` + `rgba(232,220,200,0.3)`。
+      - Tab active-bar:`#d4b298` opacity 0.5。
+21. **标签(el-tag)配色规范**(强制,`main.css` 全局覆写):
+    - 圆角 8px;半透明磨砂背景;禁止高饱和实色块。
+    - 浅色:默认 `rgba(184,140,110,0.08)` 褐字;success `rgba(107,155,107,0.1)` 绿字;warning `rgba(138,109,59,0.1)` 金字;danger `rgba(185,96,88,0.1)` 红字;info `rgba(58,46,34,0.06)` 褐字。
+    - 深色:默认 `rgba(212,178,152,0.25)` 浅暖棕字;success `rgba(125,186,125,0.15)` 绿字;danger `rgba(201,116,116,0.15)` 暗红字 `#c97474`;info `rgba(255,255,255,0.08)` 浅米字。
+22. **数量角标(el-badge)规范**:
+    - 浅色:`rgba(58,46,34,0.7)` 半透明黑磨砂背景;深色:`rgba(0,0,0,0.5)` 浅米白字;不使用纯黑实色块。
+23. **图标线条规范**(强制):
+    - 所有 `el-icon` SVG `stroke-width: 2px`;图标颜色跟随文字层级:主要图标=主文字色,次要图标=辅助灰色,危险图标=低饱和暗红。
+24. **圆角全局统一**(强制,`main.css` 全局覆写):
+    - `el-button` 12px(small 10px);`el-input__wrapper` 10px;`el-card` 14px;`el-dialog` 14px。
+25. **页面统一规范**(强制,所有功能页遵守):
+    - 根容器统一 `class="page"`(全局 `.page`: `max-width:1100px; margin:0 auto; padding:16px`),**禁止 scoped 覆写** max-width/margin/padding/border。
+    - 页面级 H2/H1 标题全部移除(面包屑已体现页面标题);内容分区标题用 `.section-label`(16px/600/左 3px 暖棕竖线)。
+    - `.page-header`/`.page-title`/`.list-header` 全局统一定义在 `main.css`,禁止 scoped 重复。
+    - Breadcrumb `#right` slot 放置页面操作按钮(添加/加入等)。
 
 ### 性能规范(已踩坑 + 强制规则)
 
@@ -531,6 +553,44 @@ CREATE TABLE content_music_playlist_track (...);
 - 元数据提取失败根因:`File.createTempFile("ihomy_audio_", "_" + "Home/夜-03.mp3")` 中 `/` 是路径分隔符 → IOException → 改为固定 `.mp3` 后缀
 - 播放器不显示根因:模板两个根级 div 用 `v-if`/`v-else-if`,Vue 3 多根节点下 `v-else-if` 跨根节点不生效 → 改为 `v-if="playlist.length"` 单条件(无曲目不渲染)
 - 播放不了根因:Nginx alias 指向 `D:/WorkSpace/ihomy/uploads/` 但后端未设 `IHOMY_CONFIG_PATH` 导致上传到 `C:/opt/ihomy/uploads/` → 后端启动必须设 `IHOMY_CONFIG_PATH=D:\WorkSpace\ihomy\config\external.yml`
+
+**live DB 同步**:无 schema 变更(纯代码层)。
+
+#### 2026-08-23 首页功能组件 + 和风API修复 + 厨房修复 + 深色模式重构 + 页面规范化
+
+| 类别 | 文件 | 改动 |
+|------|------|------|
+| 首页 | `views/Home.vue` | 删除 quick-access-panel;新增 4 个可拖拽缩放毛玻璃组件(愿望单/物品寻找/今日菜谱/收支摘要),复用 `useDragResize`,各自独立 storageKey;`resetPanelLayout()` 重置 9 个面板 |
+| 后端 | `controller/BookController.java` + `service/BookService.java` | 新增 `GET /book/summary` 轻量聚合本月收入/支出/结余/记录数 |
+| 后端 | `controller/OpsController.java` | 新增 `GET /ops/weather/finance` + `GET /ops/weather/stats` |
+| 后端 | `service/WeatherService.java` | `getFinance()`/`getStats()` 去掉 `resp.path("data")` 中间层(和风 Console API 返回扁平 JSON,无 data 包裹);`parseApiType` 新增 `/finance/`→`finance`、`/metrics/`→`metrics` 映射;`logCall` 对 finance/metrics 不存响应体(含账单信息) |
+| 前端 | `views/ops/Ops.vue` | 天气 Tab 扩展为三区块(用量/财务/24h请求量);`Promise.allSettled` 并行三个接口;数据为 0 也展示,仅 API 报错时 `el-alert` 警告 |
+| 前端 | `api/index.js` | `bookApi.summary()` + `opsApi.weatherFinance()` + `opsApi.weatherStats()` |
+| 厨房Bug | `views/kitchen/Ingredient.vue` | 上传改 `:http-request`(原 `:before-upload` 返回 false 导致 EP 不传 File);`onUpload` 参数 `file`→`options.file`;`onSave` body key `image_url`→`imageUrl`(匹配 ItemDTO camelCase,否则 Jackson 不映射→DB 存 null);级联 `checkStrictly: true`(可选任意层级) |
+| 厨房Bug | `views/kitchen/Ingredient.vue` | `locationTree`/`defaultLocation` 中 `r.house_id`→`r.houseId`、`f.room_id`→`f.roomId`(实体接口返回 camelCase,snake_case 过滤导致子节点全丢) |
+| i18n | `i18n/zh-CN.js` + `en.js` | 合并重复 `dict` key(第一个含 recipe_* 被第二个覆盖→recipe 字典失效);新增 `item_type` 字典(KITCHENWARE/INGREDIENT/DAILY/CLOTHES/TOOL/OTHER 中英双语) |
+| 前端 | `views/item/Item.vue` | 物品列表新增 `el-tag` 显示类型中文标签(`dictText`);删除 scoped `.page` 覆写(对齐全局 `.page` 规范) |
+| 深色模式 | `styles/main.css` | 全面重构:primary 按钮 `#d4b298`/次级 `rgba(255,255,255,0.12)`/危险 `#c97474`/幽灵/Tab active-bar `#d4b298`;el-tag 全局规范(半透明磨砂);el-badge 规范;el-icon `stroke-width:2px`;圆角全局统一(button 12px/input 10px/card 14px/dialog 14px) |
+| z-index | `styles/main.css` + `MusicPlayer.vue` | popper 54→61(高于 sidebar 60,低于 bright-spot 65);MusicPlayer 55→62;光影层(65-100)为除 Toast 外最高层 |
+| 页面规范 | `styles/main.css` | 新增全局 `.page-header`/`.page-title`/`.list-header`/`.page h2`/`.section-label`(16px/600/左3px暖棕竖线) |
+| 页面规范 | `views/kitchen/Ingredient.vue` | `ingredient-page`→`page`;删除 scoped `.page-header`/`.page-title`;`<h1>`→移除(按钮移入 Breadcrumb `#right` slot);`<h2>` 移除 |
+| 页面规范 | `views/kitchen/RecipeDetail.vue` | `recipe-detail-page`→`page`;删除 scoped `.recipe-detail-page`;`<h1>`→`<span>` |
+| 页面规范 | `views/kitchen/RecipeEdit.vue` | `recipe-edit-page`→`page`;删除 scoped `.recipe-edit-page`/`.page-title`;`<h1>`→移除 |
+| 页面规范 | `views/blog/BlogEdit.vue` | 删除 `<h2>` 页面标题 |
+| 页面规范 | `views/blog/BlogDetail.vue` | `<h1>`→`<div class="blog-title-text">` |
+| 页面规范 | `views/album/AlbumDetail.vue` | `<h2>`→`<span class="album-name">` |
+| 页面规范 | `views/Member.vue` | 删除 `<h2>` + `.section-header`;按钮移入 Breadcrumb `#right` slot |
+| 页面规范 | `views/Settings.vue` | 5 处 `<h2>`→`<div class="section-label">` |
+| 素材bar | `views/kitchen/Ingredient.vue` | bar 高度 `height:84px`;图片 `flex:1 0 33.33%`(占条目宽度 1/3);`object-fit:cover; object-position:center`(居中裁切);右半 padding `8px 16px` gap `4px` |
+
+**关键修复**:
+- 和风 finance/stats 无数据根因:代码做了 `resp.path("data")` 但和风 Console API 返回扁平 JSON,无 data 包裹 → 字段永远 missing → 改为直接从 resp 读
+- 厨房素材图片不显示根因:`onSave` 发 `image_url`(snake_case)但 `ItemDTO.imageUrl` 是 camelCase,Jackson 不映射 → DB 存 null → 改为 `imageUrl`
+- 厨房级联不展开根因:`locationTree` 用 `r.house_id`(snake_case)过滤,但实体接口返回 camelCase `houseId` → `undefined === h.id` 永远 false → 子节点全被过滤
+- 厨房菜系/类别/风味显示英文根因:`zh-CN.js`/`en.js` 有两个 `dict` 顶层 key,JS 对象重复 key 后者覆盖前者,第一个 dict(含 recipe_*)被静默丢弃 → 合并为一个 dict
+- 头像弹出框被遮挡根因:popper z-index 54 < sidebar z-index 60 → popper 提升到 61
+
+**用户需操作**:和风控制台 → 项目管理 → 选择凭据 → 控制台权限 → 勾选「允许访问财务汇总数据」和「允许访问请求量统计」→ 保存
 
 **live DB 同步**:无 schema 变更(纯代码层)。
 
