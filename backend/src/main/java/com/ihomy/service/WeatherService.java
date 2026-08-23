@@ -181,6 +181,35 @@ public class WeatherService {
         return result;
     }
 
+    /** 控制台 API:财务汇总(余额/本月消费/待付账单) */
+    public Map<String, Object> getFinance() {
+        WeatherCredential cred = loadCredential();
+        if (cred == null) return null;
+        JsonNode resp = callApi("/finance/v1/summary", cred);
+        if (resp == null) return null;
+        Map<String, Object> result = new HashMap<>();
+        result.put("raw", resp);
+        result.put("balance", resp.path("balance").asText());
+        result.put("currency", resp.path("currency").asText());
+        result.put("thisMonth", resp.path("accruedCharges").path("thisMonth").asText());
+        result.put("previousDay", resp.path("accruedCharges").path("previousDay").asText());
+        return result;
+    }
+
+    /** 控制台 API:请求量统计(24h,按 API 名分,成功/失败) */
+    public Map<String, Object> getStats() {
+        WeatherCredential cred = loadCredential();
+        if (cred == null) return null;
+        JsonNode resp = callApi("/metrics/v1/stats", cred);
+        if (resp == null) return null;
+        Map<String, Object> result = new HashMap<>();
+        result.put("raw", resp);
+        result.put("asOf", resp.path("asOf").asText());
+        result.put("success", resp.path("success"));
+        result.put("errors", resp.path("errors"));
+        return result;
+    }
+
     // ---------- 内部:JWT + HTTP ----------
 
     /** IP → location 坐标(经度,纬度);家庭偏好位置优先,其次 ip-api.com 定位 */
@@ -331,6 +360,8 @@ public class WeatherService {
         if (pathAndQuery.startsWith("/v7/minutely")) return "minutely";
         if (pathAndQuery.startsWith("/geo/")) return "location";
         if (pathAndQuery.startsWith("/console/")) return "quota";
+        if (pathAndQuery.startsWith("/finance/")) return "finance";
+        if (pathAndQuery.startsWith("/metrics/")) return "metrics";
         return "other";
     }
 
@@ -353,7 +384,7 @@ public class WeatherService {
             logEntry.setStatus(status);
             logEntry.setCostMs(costMs);
             // quota 接口响应可能含账号信息,不存 response;其余天气数据公开可存
-            if (resp != null && !"quota".equals(apiType)) {
+            if (resp != null && !"quota".equals(apiType) && !"finance".equals(apiType) && !"metrics".equals(apiType)) {
                 String json = resp.toString();
                 logEntry.setResponse(json.length() > 10000 ? json.substring(0, 10000) : json);
             }

@@ -74,6 +74,20 @@ public class OpsController {
         return Result.success(weatherService.getQuota());
     }
 
+    @Operation(summary = "和风天气财务汇总(余额/消费/账单)")
+    @RequirePermission("ops:view")
+    @GetMapping("/weather/finance")
+    public Result<Map<String, Object>> weatherFinance() {
+        return Result.success(weatherService.getFinance());
+    }
+
+    @Operation(summary = "和风天气请求量统计(24h,按 API 分)")
+    @RequirePermission("ops:view")
+    @GetMapping("/weather/stats")
+    public Result<Map<String, Object>> weatherStats() {
+        return Result.success(weatherService.getStats());
+    }
+
     @Operation(summary = "加密明文为 ENC(...) 格式(供外挂配置文件使用)")
     @RequirePermission("ops:view")
     @GetMapping("/crypto/encrypt")

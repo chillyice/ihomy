@@ -233,6 +233,7 @@ export const musicApi = {
 // 记账本(家庭收支记录,月度统计)
 export const bookApi = {
   list: (month) => request.get('/book/list', { params: { month } }),
+  summary: () => request.get('/book/summary'),
   create: (data) => request.post('/book', data),
   update: (id, data) => request.put(`/book/${id}`, data),
   remove: (id) => request.delete(`/book/${id}`),
@@ -244,6 +245,8 @@ export const opsApi = {
   server: () => request.get('/ops/server'),
   logs: (params) => request.get('/ops/logs', { params }),
   weatherQuota: () => request.get('/ops/weather/quota'),
+  weatherFinance: () => request.get('/ops/weather/finance'),
+  weatherStats: () => request.get('/ops/weather/stats'),
 }
 
 // 家谱(家庭隐私数据,需登录)

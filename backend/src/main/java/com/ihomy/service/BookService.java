@@ -91,6 +91,28 @@ public class BookService {
         return result;
     }
 
+    /** 本月收支摘要(供首页卡片,轻量查询) */
+    public Map<String, Object> summary(Long familyId) {
+        LocalDate start = YearMonth.now().atDay(1);
+        LocalDate end = YearMonth.now().atEndOfMonth();
+        List<BookRecord> records = bookMapper.selectList(new LambdaQueryWrapper<BookRecord>()
+                .eq(BookRecord::getFamilyId, familyId)
+                .between(BookRecord::getRecordDate, start, end));
+        BigDecimal income = BigDecimal.ZERO;
+        BigDecimal expense = BigDecimal.ZERO;
+        for (BookRecord r : records) {
+            if (DictConst.BOOK_INCOME.equals(r.getType())) income = income.add(r.getAmount());
+            else if (DictConst.BOOK_EXPENSE.equals(r.getType())) expense = expense.add(r.getAmount());
+        }
+        Map<String, Object> result = new HashMap<>();
+        result.put("month", start.toString().substring(0, 7));
+        result.put("income", income);
+        result.put("expense", expense);
+        result.put("balance", income.subtract(expense));
+        result.put("count", records.size());
+        return result;
+    }
+
     /** 记一笔(缺省分类"其他",金额必须大于 0) */
     public BookRecord create(Long userId, Long familyId, BookDTO dto) {
         if (dto.getAmount() == null || dto.getAmount().compareTo(BigDecimal.ZERO) <= 0) {

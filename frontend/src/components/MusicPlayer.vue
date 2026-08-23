@@ -225,7 +225,7 @@ onMounted(loadBackgroundPlaylist)
 <style scoped>
 .music-player {
   position: fixed;
-  z-index: 55;
+  z-index: 62;
   display: flex;
   align-items: flex-end;
   gap: 0;

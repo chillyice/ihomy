@@ -118,7 +118,7 @@
                     <path d="M22 18h12M22 24h10M22 30h8" stroke="#b88c6e" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
                   </svg>
                 </div>
-                <div v-if="p.isBackground" class="bg-tag">背景音乐</div>
+                <div v-if="p.isBackground" class="bg-tag">BGM</div>
               </div>
               <div class="pl-info">
                 <div class="pl-name">{{ p.name }}</div>
@@ -126,8 +126,8 @@
                 <div class="pl-footer">
                   <div class="pl-actions">
                     <el-button size="small" @click="viewPlaylist(p)">查看</el-button>
-                    <el-button v-if="userStore.isLoggedIn && !p.isBackground" size="small" type="primary" @click="setBackground(p)">设为背景</el-button>
-                    <el-button v-if="userStore.isLoggedIn && p.isBackground" size="small" @click="unsetBackground">取消背景</el-button>
+                    <el-button v-if="userStore.isLoggedIn && !p.isBackground" size="small" type="primary" @click="setBackground(p)">设为BGM</el-button>
+                    <el-button v-if="userStore.isLoggedIn && p.isBackground" size="small" @click="unsetBackground">取消BGM</el-button>
                   </div>
                   <el-button v-if="userStore.isLoggedIn" size="small" text class="pl-delete-btn" @click="delPlaylist(p)">删除</el-button>
                 </div>
@@ -511,13 +511,13 @@ const addAlbumToPlaylist = async (pid, al) => {
 
 const setBackground = async (p) => {
   await musicApi.setBackground(p.id)
-  ElMessage.success(`已将《${p.name}》设为背景音乐`)
+  ElMessage.success(`已将《${p.name}》设为BGM`)
   userStore.bumpBgMusic()
   await loadPlaylists()
 }
 const unsetBackground = async () => {
   await musicApi.unsetBackground()
-  ElMessage.success('已取消背景音乐')
+  ElMessage.success('已取消BGM')
   userStore.bumpBgMusic()
   await loadPlaylists()
 }

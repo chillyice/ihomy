@@ -687,11 +687,6 @@ export default {
     ingredientLocation: 'Location',
     ingredientLocationPh: 'Select location (optional)',
   },
-  dict: {
-    recipe_cuisine: { CHUAN: 'Sichuan', YUE: 'Cantonese', LU: 'Shandong', SU: 'Jiangsu', ZHE: 'Zhejiang', MIN: 'Fujian', XIANG: 'Hunan', HUI: 'Anhui', OTHER: 'Other' },
-    recipe_category: { HOT: 'Hot Dishes', HARD: 'Hearty Dishes', COLD: 'Cold Dishes', STAPLE: 'Staples', PORRIDGE: 'Porridge', DESSERT: 'Desserts' },
-    recipe_flavor: { SAVORY: 'Savory', SPICY: 'Spicy', SWEET_SOUR: 'Sweet & Sour', LIGHT: 'Light', OTHER: 'Other' },
-  },
   cascade: {
     title: 'Photo Cascade',
     hint: 'Photos drift down — hover to see details, click for fullscreen',
@@ -828,6 +823,9 @@ export default {
     authorFallback: 'Family',
   },
   dict: {
+    recipe_cuisine: { CHUAN: 'Sichuan', YUE: 'Cantonese', LU: 'Shandong', SU: 'Jiangsu', ZHE: 'Zhejiang', MIN: 'Fujian', XIANG: 'Hunan', HUI: 'Anhui', OTHER: 'Other' },
+    recipe_category: { HOT: 'Hot Dishes', HARD: 'Hearty Dishes', COLD: 'Cold Dishes', STAPLE: 'Staples', PORRIDGE: 'Porridge', DESSERT: 'Desserts' },
+    recipe_flavor: { SAVORY: 'Savory', SPICY: 'Spicy', SWEET_SOUR: 'Sweet & Sour', LIGHT: 'Light', OTHER: 'Other' },
     visibility: { PRIVATE: 'Only me', MEMBERS: 'Selected members', GROUPS: 'Selected groups', FAMILY: 'Family visible', PUBLIC: 'Public' },
     blogStatus: { DRAFT: 'Draft', PUBLISHED: 'Published', HIDDEN: 'Hidden' },
     userStatus: { ACTIVE: 'Active', DISABLED: 'Disabled' },
@@ -840,5 +838,6 @@ export default {
     bookType: { EXPENSE: 'Expense', INCOME: 'Income', TRANSFER: 'Transfer' },
     repeatType: { ONCE: 'Once', DAILY: 'Daily', WEEKLY: 'Weekly', MONTHLY: 'Monthly' },
     annRecurring: { ONCE: 'One-time', YEARLY: 'Yearly' },
+    item_type: { KITCHENWARE: 'Kitchenware', INGREDIENT: 'Ingredient', DAILY: 'Daily', CLOTHES: 'Clothes', TOOL: 'Tool', OTHER: 'Other' },
   },
 }

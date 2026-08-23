@@ -21,6 +21,7 @@ export function applyLocale(locale) {
 
 const i18n = createI18n({
   legacy: false,
+  globalInjection: true,
   locale: detectLocale(),
   fallbackLocale: 'zh-CN',
   messages: { 'zh-CN': zhCN, en },

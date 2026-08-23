@@ -580,6 +580,8 @@ CREATE TABLE content_music_playlist_track (...);
 | P3 | 多重人格 | 基于身份标签扩展,一账号多标签可切换发表,会话级 currentLabel(Redis 或前端状态),与家庭切换正交 |
 | P3 | AI API 对接 | 统一对接大模型 API(聊天/内容生成),需配置 API Key 与服务商(OpenAI 兼容协议),待细化 |
 | P3 | 物品定位-AI 语义 | 3期(待2期后):自然语言"找找我的工具箱"→AI 拆出名称+别名→服务器 SQL 查询;"把工具箱放到门口的柜子最上层抽屉"→AI 按 家/房子/房间/家具/位置 五级解析,缺层追问填满后返回粒度值→服务器拼 INSERT(决策已定,依赖 AI API) |
+| P3 | 播放器解码器评估 | 当前音乐/视频用浏览器原生 `<audio>`/`<video>` 标签(硬件解码,性能最优)。**分析结论**:不建议引入 ffmpeg.wasm/howler.js/video.js — 原生方案已覆盖 MP3/AAC/MP4/WebM 主流格式,JS 解码库增加 200KB+ 包体且 CPU 解码远慢于硬件。仅在需要播放原生不支持的格式(如 FLAC/OGG/APE)或需要逐帧分析时才考虑。未来如需引入,优先 video.js(UI 统一)+ hls.js(HLS 流),不引 ffmpeg.wasm |
+| P3 | Apple Live Photos 支持 | 上传时读取 EXIF/ContentIdentifier 元数据标记实况照片,数据层关联 JPEG 封面+MOV 短视频(`content_photo` 加 `live_video_url` 字段)。照片展示左上角加实况图标(BADGE),点击查看时播放关联视频(非实况仅展示照片)。iOS Safari 上传时自动拆分 JPEG+MOV;Android/非实况无图标。需前端上传处理+后端元数据解析+展示组件三方协同 |
 | P4 | 手机号注册 | 需短信服务商(阿里云等),未接入前不实现(sys_user.phone 字段已存在) |
 | P4 | 商业化/多租户 | SaaS 订阅制评估,条件允许再做 |
 | P4 | 广告模块 | 家庭私密场景接第三方广告转化低且有隐私争议,优先自建"家庭公告/赞助位" |

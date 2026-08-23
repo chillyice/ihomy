@@ -283,7 +283,9 @@ html.dark .cat-item.active { background: rgba(232,220,200,0.08); }
   transition: background 0.15s, color 0.15s;
 }
 .cat-op-btn:hover { background: rgba(58,46,34,0.08); color: var(--color-primary); }
+html.dark .cat-op-btn:hover { background: rgba(232,220,200,0.08); }
 .cat-op-btn.danger:hover { background: rgba(168,72,58,0.1); color: #b04a3a; }
+html.dark .cat-op-btn.danger:hover { background: rgba(185,96,88,0.12); color: #d9665a; }
 
 .icon-btn {
   width: 28px; height: 28px;
@@ -296,6 +298,7 @@ html.dark .cat-item.active { background: rgba(232,220,200,0.08); }
   transition: background 0.15s, color 0.15s;
 }
 .icon-btn:hover { background: rgba(58,46,34,0.08); color: var(--color-primary); }
+html.dark .icon-btn:hover { background: rgba(232,220,200,0.08); }
 
 .blog-main { min-width: 0; }
 .blog-item {
