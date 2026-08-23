@@ -130,6 +130,7 @@ export default {
     views: '次浏览',
     liked: '已赞',
     noPublicBlog: '暂无公开博客',
+    noPostsInCategory: '分类「{cat}」下还没有博客',
     firstHint: '还没有博客，去写第一篇吧',
     replyPlaceholder: '回复 {name}：',
     commentPlaceholder: '写下你的评论...',

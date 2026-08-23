@@ -10,11 +10,13 @@ export const useAppStore = defineStore('app', {
     stats: { memberCount: 0, upcomingEvents: [] },
     loaded: false,
     loading: false,
+    homeEditMode: false,
   }),
   getters: {
     familyName: (s) => s.family?.name || '',
   },
   actions: {
+    toggleHomeEditMode() { this.homeEditMode = !this.homeEditMode },
     // 初始化首页数据:公开数据 + 登录后私有仪表盘并行拉取(原串行两个 RTT)
     async init(force = false) {
       if (this.loaded && !force) return

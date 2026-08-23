@@ -114,6 +114,7 @@ export default {
     views: 'views',
     liked: 'Liked',
     noPublicBlog: 'No public blogs yet',
+    noPostsInCategory: 'No blogs in "{cat}" category yet',
     firstHint: 'No blogs yet, write your first one!',
     replyPlaceholder: 'Reply to {name}:',
     commentPlaceholder: 'Write your comment...',

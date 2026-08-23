@@ -12,8 +12,8 @@
       <aside v-if="categories.length || userStore.isLoggedIn" class="category-side">
         <div class="side-head">
           <span class="side-title">{{ $t('blog.category') }}</span>
-          <button v-if="userStore.isLoggedIn" class="icon-btn" :title="$t('blog.manageCategory')" @click="openCategoryDialog('add')">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          <button v-if="userStore.isLoggedIn" class="side-add-btn" :title="$t('blog.manageCategory')" @click="openCategoryDialog('add')">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
           </button>
         </div>
         <div class="cat-item" :class="{ active: !activeCategory }" @click="setCategory('')">{{ $t('blog.allCategories') }}</div>
@@ -64,7 +64,7 @@
           </div>
         </div>
         <div v-if="!loading && !list.length" class="empty-state">
-          <el-empty :description="userStore.isGuest ? $t('blog.noPublicBlog') : $t('blog.firstHint')">
+          <el-empty :description="activeCategory ? $t('blog.noPostsInCategory', { cat: activeCategory }) : (userStore.isGuest ? $t('blog.noPublicBlog') : $t('blog.firstHint'))">
             <button v-if="userStore.isLoggedIn" class="write-btn" @click="router.push('/blog/edit')">{{ $t('blog.emptyWriteBtn') }}</button>
           </el-empty>
         </div>
@@ -228,66 +228,30 @@ onMounted(() => {
 
 <style scoped>
 .blog-layout { display: grid; grid-template-columns: 180px 1fr; gap: 16px; }
+
+/* ========== 左侧分类栏 ========== */
 .category-side {
-  background: var(--color-card);
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  background: rgba(255,255,255,0.45);
+  backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  border-radius: 14px;
+  box-shadow: 0 2px 12px rgba(58,46,34,0.06);
   padding: 10px;
   height: fit-content;
   position: sticky;
   top: 42px;
-  border: 1px solid var(--color-border);
+  border: 1px solid rgba(255,255,255,0.4);
+}
+html.dark .category-side {
+  background: rgba(30,42,72,0.45);
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.15);
 }
 .side-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding: 0 6px; }
 .side-title { font-size: 13px; font-weight: 600; color: var(--color-text-secondary); }
-.cat-item {
-  padding: 7px 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  color: var(--color-text);
-  transition: background 0.15s;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  position: relative;
-}
-.cat-item:hover { background: rgba(58,46,34,0.04); }
-.cat-item.active {
-  background: #f0e8dd;
-  color: var(--color-primary);
-  font-weight: 600;
-}
-.cat-item.active::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 6px;
-  bottom: 6px;
-  width: 3px;
-  border-radius: 2px;
-  background: var(--color-accent);
-}
-html.dark .cat-item.active { background: rgba(232,220,200,0.08); }
-.cat-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cat-ops { display: none; gap: 2px; flex-shrink: 0; }
-.cat-item:hover .cat-ops { display: flex; }
-.cat-op-btn {
-  width: 24px; height: 24px;
-  border: none;
-  background: transparent;
-  border-radius: 6px;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  color: var(--color-text-secondary);
-  transition: background 0.15s, color 0.15s;
-}
-.cat-op-btn:hover { background: rgba(58,46,34,0.08); color: var(--color-primary); }
-html.dark .cat-op-btn:hover { background: rgba(232,220,200,0.08); }
-.cat-op-btn.danger:hover { background: rgba(168,72,58,0.1); color: #b04a3a; }
-html.dark .cat-op-btn.danger:hover { background: rgba(185,96,88,0.12); color: #d9665a; }
 
-.icon-btn {
+/* 加号按钮:增大命中区 + hover 磨砂背景 */
+.side-add-btn {
   width: 28px; height: 28px;
   border: none;
   background: transparent;
@@ -295,68 +259,217 @@ html.dark .cat-op-btn.danger:hover { background: rgba(185,96,88,0.12); color: #d
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   color: var(--color-text-secondary);
+  transition: background 0.2s, color 0.2s, transform 0.2s;
+}
+.side-add-btn:hover {
+  background: rgba(184,140,110,0.1);
+  color: var(--color-accent, #b88c6e);
+  transform: scale(1.1);
+}
+html.dark .side-add-btn:hover { background: rgba(212,178,152,0.12); color: #d4b298; }
+
+.cat-item {
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--color-text);
+  transition: background 0.2s ease, color 0.2s ease;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+}
+.cat-item:hover { background: rgba(184,140,110,0.06); }
+html.dark .cat-item:hover { background: rgba(212,178,152,0.08); }
+
+/* 选中:竖线 + 半透明磨砂背景双重提示 */
+.cat-item.active {
+  background: rgba(184,140,110,0.12);
+  color: var(--color-accent, #b88c6e);
+  font-weight: 600;
+}
+.cat-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 6px; bottom: 6px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--color-accent, #b88c6e);
+}
+html.dark .cat-item.active { background: rgba(212,178,152,0.15); color: #d4b298; }
+html.dark .cat-item.active::before { background: #d4b298; }
+
+.cat-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat-ops { display: none; gap: 2px; flex-shrink: 0; }
+.cat-item:hover .cat-ops { display: flex; }
+.cat-op-btn {
+  width: 24px; height: 24px;
+  border: none; background: transparent;
+  border-radius: 6px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--color-text-secondary);
   transition: background 0.15s, color 0.15s;
 }
-.icon-btn:hover { background: rgba(58,46,34,0.08); color: var(--color-primary); }
-html.dark .icon-btn:hover { background: rgba(232,220,200,0.08); }
+.cat-op-btn:hover { background: rgba(184,140,110,0.1); color: var(--color-accent, #b88c6e); }
+html.dark .cat-op-btn:hover { background: rgba(212,178,152,0.1); color: #d4b298; }
+.cat-op-btn.danger:hover { background: rgba(201,116,116,0.1); color: #c97474; }
 
+/* ========== 通用图标按钮(三点更多) ========== */
+.icon-btn {
+  width: 28px; height: 28px;
+  border: none; background: transparent;
+  border-radius: 8px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--color-text-secondary);
+  transition: background 0.2s, color 0.2s;
+}
+.icon-btn:hover { background: rgba(184,140,110,0.1); color: var(--color-accent, #b88c6e); }
+html.dark .icon-btn:hover { background: rgba(212,178,152,0.1); color: #d4b298; }
+
+/* ========== 博客卡片 ========== */
 .blog-main { min-width: 0; }
 .blog-item {
   display: flex;
   gap: 14px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   cursor: pointer;
-  padding: 20px;
+  padding: 18px 20px;
   border-radius: 14px;
   position: relative;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  min-height: 90px;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 .blog-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-  background: rgba(255,255,255,0.5);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 28px rgba(58,46,34,0.12);
 }
-html.dark .blog-item:hover { background: rgba(255,255,255,0.04); }
-.blog-cover { width: 120px; height: 80px; object-fit: cover; border-radius: 10px; flex-shrink: 0; }
-.blog-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.blog-title { font-size: 17px; font-weight: 600; line-height: 1.6; color: var(--color-primary); }
-.blog-sub { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; align-items: center; }
-.blog-cat { background: #f0e8dd; color: var(--color-accent); padding: 1px 8px; border-radius: 8px; font-size: 12px; line-height: 1.4; }
-html.dark .blog-cat { background: rgba(232,220,200,0.1); }
-.blog-tags { display: flex; gap: 4px; flex-wrap: wrap; }
-.blog-tags .tag { background: rgba(168,72,58,0.06); color: var(--color-text-secondary); padding: 1px 7px; border-radius: 8px; font-size: 12px; line-height: 1.4; }
-.blog-meta { margin-top: auto; padding-top: 6px; font-size: 12px; color: var(--color-text-secondary); line-height: 1.4; text-align: right; }
+html.dark .blog-item:hover { box-shadow: 0 8px 28px rgba(0,0,0,0.3); }
 
+/* 封面:固定尺寸 + 居中裁切 */
+.blog-cover {
+  width: 120px; height: 80px;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+/* 文字区:标题 > 标签 > 辅助信息 */
+.blog-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.blog-title {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.blog-sub { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; align-items: center; }
+
+/* 标签:半透明磨砂 */
+.blog-cat {
+  background: rgba(184,140,110,0.1);
+  border: 1px solid rgba(184,140,110,0.15);
+  color: var(--color-accent, #b88c6e);
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  backdrop-filter: blur(8px);
+}
+html.dark .blog-cat {
+  background: rgba(212,178,152,0.15);
+  border-color: rgba(212,178,152,0.2);
+  color: #d4b298;
+}
+
+.blog-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.blog-tags .tag {
+  background: rgba(184,140,110,0.06);
+  border: 1px solid rgba(184,140,110,0.1);
+  color: var(--color-text-secondary);
+  padding: 2px 7px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  backdrop-filter: blur(8px);
+}
+html.dark .blog-tags .tag {
+  background: rgba(212,178,152,0.1);
+  border-color: rgba(212,178,152,0.12);
+  color: rgba(232,220,200,0.6);
+}
+
+/* 辅助信息:降低字号 + 透明度 */
+.blog-meta {
+  margin-top: auto;
+  padding-top: 6px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  opacity: 0.6;
+  line-height: 1.4;
+  text-align: right;
+}
+
+/* 更多按钮 */
 .blog-more { position: absolute; top: 12px; right: 12px; opacity: 0; transition: opacity 0.2s; }
 .blog-item:hover .blog-more { opacity: 1; }
 .more-trigger { width: 28px; height: 28px; }
 
-.empty-state { padding: 40px 0; }
+/* 空状态 */
+.empty-state { padding: 48px 0; }
 
+/* 写博客按钮:严格遵循全局双主题 primary 配色 */
 .write-btn {
-  height: 38px;
+  height: 34px;
   padding: 0 16px;
   border: none;
   border-radius: 10px;
-  background: #d4dce8;
-  color: #2c3e50;
-  font-size: 14px;
+  background: #b88c6e;
+  color: #fff;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  transition: background 0.2s;
+  transition: background 0.2s, transform 0.2s;
 }
-.write-btn:hover { background: #c4d0e0; }
-html.dark .write-btn { background: rgba(120,150,180,0.25); color: #c8d6e5; }
-html.dark .write-btn:hover { background: rgba(120,150,180,0.35); }
+.write-btn:hover { background: #a87c5e; transform: translateY(-1px); }
+html.dark .write-btn { background: #d4b298; color: #2a2018; }
+html.dark .write-btn:hover { background: #e0c2aa; }
 
+/* 删除分类弹窗 */
 .del-cat-name { font-weight: 600; font-size: 15px; color: var(--color-primary); margin-bottom: 8px; }
 .del-cat-hint { font-size: 13px; color: var(--color-text-secondary); line-height: 1.5; }
 .del-cat-radios { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 
+/* 下拉菜单:删除项低饱和暗红,禁用亮红 */
 :deep(.danger-item) { color: #b04a3a !important; }
+:deep(.danger-item:hover) { background: rgba(176,74,58,0.08) !important; color: #b04a3a !important; }
+html.dark :deep(.danger-item) { color: #c97474 !important; }
+html.dark :deep(.danger-item:hover) { background: rgba(201,116,116,0.12) !important; color: #c97474 !important; }
+
+/* 下拉菜单:hover 磨砂背景 */
+:deep(.el-dropdown-menu__item:hover) {
+  background: rgba(184,140,110,0.06) !important;
+}
+html.dark :deep(.el-dropdown-menu__item:hover) {
+  background: rgba(212,178,152,0.08) !important;
+}
+/* 深色模式:下拉菜单文字对比度提升 */
+html.dark :deep(.el-dropdown-menu) {
+  background: rgba(30,42,72,0.95) !important;
+  border-color: rgba(255,255,255,0.1) !important;
+}
+html.dark :deep(.el-dropdown-menu__item) {
+  color: rgba(232,220,200,0.85) !important;
+}
+html.dark :deep(.el-dropdown-menu__item:hover) {
+  color: #E8DCC8 !important;
+}
 
 @media (max-width: 768px) {
   .blog-layout { grid-template-columns: 1fr; }

@@ -403,196 +403,124 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - 前端构建:`cd frontend; npm run build` → 入口 chunk ≤ 200KB(当前 158KB)
 - 接口测试:`cd autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed
 
-#### 2026-08-17 性能优化执行记录
+#### 已实现变更归档(按功能域分类)
 
-> 三轮优化共 26 项,均通过 37 passed 测试零回归。下表为具体改动,作为后续审视/排错的索引。
+> 以下为已完成的改动索引,按功能域而非时间排列,便于检索。
 
-| 类别 | # | 文件 | 改动 |
-|------|---|------|------|
-| 零风险 | B2 | `schema.sql:441` | `content_photo` 加 `idx_family_created(family_id,deleted,created_at)` |
-| 零风险 | B11 | `application.yml:13-29` | HikariCP `maximum-pool-size:20`+`minimum-idle:5`+`connection-timeout:3000`+`idle-timeout:600000`+`max-lifetime:1800000` |
-| 零风险 | B16 | `application.yml:13-14` | `spring.threads.virtual.enabled: true`(JDK21 虚拟线程) |
-| 零风险 | F1 | `frontend/public/qweather-icons/` | 删整目录(365KB 冗余,已通过 node_modules 导入) |
-| 零风险 | F2 | `frontend/vite.config.js:53-62` | `build.rollupOptions.output.manualChunks` 拆 `element-plus`/`gsap`/`vue-i18n` |
-| 低风险 | B4 | `security/SecurityHelper.java` | `currentUser()` 走 Redis `ihomy:user:{id}` TTL 5min |
-| 低风险 | B5 | 同上 | `permissionCodes()` 走 Redis `ihomy:perms:{uid}:{fid}` TTL 5min |
-| 低风险 | B6 | `service/ActivityFeedService.java` | 收集 authorIds `selectBatchIds` 批量回填 |
-| 低风险 | B7 | `service/CommentService.java` | 收集 authorId + replyToUserId 批量回填 |
-| 低风险 | B8 | `service/{Anniversary,Video}Service.java` | list / listWishes 批量化 |
-| 低风险 | B10 | `service/HomeStatsService.java` | todayEvent + upcomingEvents 合并为一次查询 |
-| 低风险 | B12 | `service/HomeModuleService.java` | `@PostConstruct` 加载全局模块 + ConcurrentHashMap 家庭缓存 |
-| 低风险 | B15 | `service/ContentLikeService.java` | `syncCount` 改 `LambdaUpdateWrapper.set` 单 UPDATE |
-| 低风险 | F3 | `frontend/src/main.js` | `qweather-icons.css` 改 `import('...')` 异步 |
-| 低风险 | F4 | `frontend/src/utils/useDragResize.js` | onDragStart 挂/onMouseUp 移(不再 onMounted 常驻) |
-| 低风险 | F5 | `useSunLight.js` + `SunLightLayer.vue` + `main.css` | 删 lampRaf rAF,改 CSS `@keyframes lampSwing` |
-| 低风险 | F6 | `frontend/src/views/Home.vue` | `loadAll()` 三次串行 await 改 `Promise.all` |
-| 低风险 | F7 | `frontend/src/stores/app.js` | `init()` 两个 await 改 `Promise.all` |
-| 低风险 | F8 | `frontend/src/views/Home.vue` | `polaroidLayout` 从 computed 改 `ref` + `watch(recentPhotos, immediate)` |
-| 中风险 | B1 | `config/SqlStatementLog.java` + `application.yml:74-78` | `System.out.println` 改 SLF4J,由 `logging.level.mybatis.sql` 控制 |
-| 中风险 | B3 | `service/FileService.java` + 3 Controller | 新增 3 个 `MultipartFile` 流式重载(`transferTo` + `Files.copy` 兜底) |
-| 中风险 | B9 | `controller/PublicController.java` + `HomeController.java` + `PhotoController.java` | `/public/home` 非成员视图整包缓存 Redis 5min + 失效点 |
-| 中风险 | B13 | `mapper/PhotoMapper.xml:25` | 评估后保留 `ORDER BY RAND()`,加 `ponytail:` 注释(家庭照片 ≤ 1000 行,< 5ms 非瓶颈) |
-| 中风险 | B14 | `schema.sql:378,400` | `content_blog` 加 `idx_family_status_created`,`content_diary` 加 `idx_family_created` |
+##### 性能优化
 
-**live DB 同步**:schema.sql 改动只对新装库生效。已有 DB 需手动执行(用 root 账号):
+| 文件 | 改动 |
+|------|------|
+| `schema.sql` | `content_photo` 加 `idx_family_created`,`content_blog` 加 `idx_family_status_created`,`content_diary` 加 `idx_family_created` |
+| `application.yml` | HikariCP `maximum-pool-size:20`+`minimum-idle:5`+`connection-timeout:3000`;`spring.threads.virtual.enabled: true`(JDK21 虚拟线程) |
+| `config/SqlStatementLog.java` | `System.out.println` 改 SLF4J,由 `logging.level.mybatis.sql` 控制(默认 warn 静默) |
+| `service/FileService.java` + 3 Controller | 新增 3 个 `MultipartFile` 流式重载(`transferTo` + `Files.copy` 兜底),避免 `getBytes()` OOM |
+| `service/{ActivityFeed,Comment,Anniversary,Video}Service.java` | 列表 N+1 消除:`selectBatchIds` 批量查 + 内存 Map 回填 |
+| `service/HomeStatsService.java` | todayEvent + upcomingEvents 合并为一次查询 |
+| `service/HomeModuleService.java` | `@PostConstruct` 加载全局模块 + ConcurrentHashMap 家庭缓存 |
+| `service/ContentLikeService.java` | `syncCount` 改 `LambdaUpdateWrapper.set` 单 UPDATE(不先 select) |
+| `controller/PublicController.java` | `/public/home` 非成员视图整包缓存 Redis 5min + 失效点 |
+| `security/SecurityHelper.java` | `currentUser()`/`permissionCodes()` 走 Redis TTL 5min |
+| `frontend/vite.config.js` | `manualChunks` 拆 `element-plus`/`gsap`/`vue-i18n`,入口 553→158KB |
+| `frontend/src/main.js` | `qweather-icons.css` 改异步 `import()` |
+| `frontend/src/utils/useDragResize.js` | onDragStart 挂/onMouseUp 移(不再 onMounted 常驻) |
+| `utils/useSunLight.js` + `SunLightLayer.vue` + `main.css` | 删 lampRaf rAF,改 CSS `@keyframes lampSwing` |
+| `frontend/src/views/Home.vue` | `loadAll()` 改 `Promise.all`;`polaroidLayout` 从 computed 改 `ref`+`watch` |
+| `frontend/src/stores/app.js` | `init()` 改 `Promise.all` |
+| `frontend/public/qweather-icons/` | 删整目录(365KB 冗余,走 node_modules) |
+
+**live DB 同步**(已有库需手动执行):
 ```sql
 ALTER TABLE content_photo  ADD INDEX idx_family_created (family_id, deleted, created_at);
 ALTER TABLE content_blog   ADD INDEX idx_family_status_created (family_id, status, deleted, created_at);
 ALTER TABLE content_diary  ADD INDEX idx_family_created (family_id, deleted, created_at);
 ```
 
-#### 2026-08-18 UX 体验优化记录
+##### 首页仪表盘
 
-> 两轮共 15 项,均通过 37 passed + 前端 build 零回归。
+| 文件 | 改动 |
+|------|------|
+| `views/Home.vue` | 12列×9行栅格系统,编辑模式可拖拽/缩放/增删组件;`useWidgetDrag.js` 单例从侧边栏拖入;栅格自适应屏幕;grid-cell 出现动画;h=1 标题消失;点击置顶;拍立得溢出+散乱;编辑模式禁用内部交互(`pointer-events:none`);GAP=40px,四边 margin=32/40/40/260(侧边栏220+40) |
+| `stores/app.js` | `homeEditMode` 状态 + `toggleHomeEditMode()` |
+| `components/AppSidebar.vue` | 编辑模式按钮(EditPen 图标,foot-user-row 最右);编辑模式 nav-item 向右下偏移+虚线框占位;拖拽时右侧气泡融合;`useWidgetDrag` 启动 |
+| `utils/useWidgetDrag.js` | 跨组件拖拽单例:AppSidebar 启动→Home.vue 接收;ghost 由小变大动画;drop 创建 4×5 组件 |
+| `controller/BookController.java` + `BookService.java` | `GET /book/summary` 本月收支聚合 |
+| `views/Home.vue` | 8 个默认组件:feed(5×5)/anni(3×4)/weather(3×2)/today(3×2)/recipe(4×4)/wish(3×2)/album(5×3)/finance(2×2);布局持久化 localStorage `ihomy:dashboard:layout` |
 
-| 类别 | 文件 | 改动 |
-|------|------|------|
-| Bug | `RecipeDetail.vue:125` | `userStore.user?.id` → `userInfo.id`(非 OWNER 作者无法编辑自己菜谱) |
-| Bug | `AlbumDetail.vue` | 补 `loading` ref(原 v-loading 引用未定义变量)+ load try/catch(失败显示错误态+重试,不再伪装空相册) |
-| 照片 | `AlbumDetail.vue` | 点击照片全屏大图预览(el-image-viewer,翻页/缩放),与 Cascade/Home 一致 |
-| 照片 | `AlbumDetail.vue` + `api/index.js` | 上传进度条(el-progress)+ 按钮 loading + `photoApi.upload` 透传 `onUploadProgress` |
-| 照片 | `AlbumDetail.vue` / `Ingredient.vue` | hover-only 操作改 `@media (hover: none)` 常显(PWA 安卓/iOS 触屏之前完全无法编辑/删除) |
-| 照片 | `Cascade.vue` | img 加 `loading="lazy"`;空态加"去相册上传"CTA |
-| 性能 | `FileService.java` | 图片上传后生成缩略图(`_thumb.jpg`,maxWidth 480px);`deleteByUrl` 顺带删 _thumb;存量图前端 onerror 回退原图 |
-| 性能 | `utils/image.js` + 4 页面 | `thumbUrl(url)`/`onThumbError` 工具;AlbumDetail/Cascade/Home/DiaryList 列表用缩略图,大图 viewer 用原图(省手机原图 5-10MB 流量) |
-| 移动端 | `Home.vue` | `@media (max-width:960px)` 5 面板从 `display:none` 改 `position:static` 文档流堆叠(手机之前看不到任何面板) |
-| UX | `BlogDetail.vue` | 评论删除加确认框(此前直接删) |
-| UX | `Plan.vue` | 子任务删除加确认框 |
-| UX | `Settings.vue:65` | "取消"按钮改"清除"文案(此前按钮删标签却写"取消") |
-| UX | `Item.vue` | 补 Breadcrumb + 标题 + v-loading(此前全站唯一"裸"页) |
-| UX | `Member.vue` | 邀请码一键复制(navigator.clipboard + 成功/失败提示) |
-| UX | `Album.vue`/`DiaryList.vue`/`Kitchen.vue` | 保存按钮 :loading;DiaryList/Kitchen 补 v-loading(首屏空白闪烁) |
+##### 音乐系统
 
-**缩略图约定**(前后端对齐):
-- 后端 `FileService.generateThumbIfImage`:上传图片时同步生成 `原图名_thumb.jpg`(maxWidth 480,JPEG 0.8),小图(≤480px)直接复制;非 image/* 跳过;失败仅告警不影响上传。
-- 前端 `utils/image.js`:`thumbUrl(url)` 仅对 `/files/` 路径插入 `_thumb`(外链原样返回);`onThumbError` 回退原图(存量图片无缩略图时兜底)。
-- 大图查看器(el-image-viewer)始终用原图 URL。
-- live DB 无需同步(纯文件层,无 schema 变更)。
+| 文件 | 改动 |
+|------|------|
+| `schema.sql` | `family_music`→`content_music`;新增 `content_music_playlist`+`content_music_playlist_track`;`sys_family_info` 加 `background_playlist_id` |
+| `pom.xml` | 加 `com.mpatric:mp3agic:0.9.1` |
+| `MusicService.java` | 曲库 CRUD + mp3agic ID3v2 元数据提取 + 歌单 CRUD + 设为背景 + 获取背景歌单;`extractMetadata` 固定 `.mp3` 后缀(避免中文文件名 IOException);`batchDeleteMusic`/`batchDeleteByAlbum` |
+| `MusicController.java` | 曲库(upload/upload-album/list/albums/add/delete/batch/album)+ 歌单(playlist CRUD/tracks/set-background/get-background) |
+| `views/music/Music.vue` | 3 Tab(全部曲目/按专辑/歌单);多选批量删除;歌单卡片重构;弹窗统一 dialog-sm/md |
+| `components/MusicPlayer.vue` | z-index:62(光影层下方);无歌单不渲染;watch familyId 重置 |
+| `views/Settings.vue` | 背景音乐设置页 |
+| `views/Home.vue` | 音乐组件常驻,无歌单显示空状态 |
 
-#### 2026-08-18 i18n + 分页 + 图片预览(第三轮)
+**关键业务**:歌单是背景音乐最小单元;`is_background=1` 每家庭最多 1 条;MP3 元数据用 mp3agic 解析;内嵌封面存 `/files/music/covers/`。
 
-| 类别 | 文件 | 改动 |
-|------|------|------|
-| 图片 | `DiaryList.vue` | 图片预览从 `window.open` 新标签改为应用内 `el-image-viewer`(翻页/缩放,与 AlbumDetail/Cascade 一致) |
-| 分页 | `BlogList.vue` | 加"加载更多"按钮(原固定 20 条截断,旧文章不可达);博客封面用 `thumbUrl` 缩略图 |
-| i18n | `Home.vue` | 25+ 硬编码中文改 `$t()`(家庭相册/写博客/天气加载/未来三天/积分/签到/分钟前/小时前/任务状态/星期等);脚本内 `feedTypeLabel`/`testPhase`/`feedSummary`/`formatTime`/`taskStatusLabel`/`formatFcDate` 全部走 `t()` |
-| i18n | `Settings.vue` | 40+ 硬编码中文改 `$t()`(歌单/创建家庭/个性化设置整段:台灯/色温/亮度/阴影/天气效果/天气地区/关灯超时/面板布局) |
-| i18n | `zh-CN.js`/`en.js` | 新增 `home.*` 35 key + `settings.*` 35 key(中英双语) |
-
-#### 2026-08-22 光影系统统一 + LightLab 删除
-
-| 类别 | 文件 | 改动 |
-|------|------|------|
-| 窗角门控 | `utils/windowLight.js` | 新增 `windowAngle = 90 - Math.abs(az - 180)` + `hasDirectLight`;光柱/辉光/反光从 `isNight` 门控改为 `hasDirectLight` 门控(太阳不直射窗户时无体积光) |
-| 方位角旋转 | `utils/windowLight.js` | `shadowVRotation` 从 `dayProgress` 驱动改为方位角驱动(`az - 180`);az=90° 开始旋转(-90°),az=270° 结束(+90°),窗角≤0 时 hold 在端点 |
-| 速度控制 | `utils/useSunLight.js` | 新增 `testSpeed` ref(5 档 0.5/1/2/4/8x)+ `setTestSpeed()`;`startLightTest` 间隔改为 `208 / testSpeed` |
-| 控制台增强 | `components/LightTestConsole.vue` | 新增:窗角度数/地区/日期/速度按钮(5 档)/图层开关(阴影+环境光)/台灯模式按钮(自动/开/关);时段标签从 6 段细分到 9 段(深夜/凌晨/日出/清晨/上午/正午/下午/日落/黄昏) |
-| i18n | `zh-CN.js`/`en.js` | 新增 6 个时段 key(midnight/dawn/forenoon/noon/afternoon/dusk) |
-| 删除 | `composables/useLightLab.js` + `LightLabLayer.vue` + `LightLabConsole.vue` + `views/lightlab/LightLab.vue` + `/lightlab` 路由 | LightLab 独立光影系统已删除,功能合并到生产光影系统 |
-
-#### 2026-08-22 页面规范化 + 光影天气增强 + 控制台增强
-
-| 类别 | 文件 | 改动 |
-|------|------|------|
-| 页面规范 | `views/item/Item.vue` | 对齐标准页:全局 `.page` 替代 scoped 覆盖;`.toolbar`→`.list-header`;加 `loading` ref + `v-loading`;`el-card`→全局 `.card`;dialog `label-width`→`label-position="top"`;分散 refs→`reactive({visible,form})` editor;保存按钮加 `:loading="saving"`;删除按钮 `text type="danger"`;`el-empty` 包在 `v-loading` 内 |
-| 页面规范 | `views/kitchen/Kitchen.vue` | 对齐标准页:`.kitchen-page`(1400px)→全局 `.page`(1100px);移除冗余 `<h1>`;`.kitchen-header`→`.list-header`;`.glass`+`backdrop-filter`→全局 `.card`;加 `v-loading` 包裹推荐+菜单+空态;移除 `round` |
-| UI | `styles/main.css` | ElMessage 气泡:`.el-message` 加 `display:flex;align-items:center`;`.el-message__badge` 加 flex 居中 |
-| UI | `views/Settings.vue` | `.settings-menu` 设 `background:transparent` 去掉白色底色(`.settings-side` 保留原样) |
-| 光影 | `utils/useSunLight.js` | `brightSpotStyle`:夜间不再因天气类型禁用亮斑层(之前非晴天夜间 opacity=0 导致暗化缺失、阴影变浅);白天仍按天气隐藏 |
-| 光影 | `utils/useSunLight.js` | `weatherLightMul`/`weatherShadowOpacity`/`brightSpotStyle` 新增 overcast(阴天:光0.15/阴影0.85)和 fog(雾:光0.08/阴影0.6)天气模式 |
-| 光影 | `utils/useSunLight.js` | 新增 `loadSunInfoForDate(dateStr)`:按日期请求 `/api/public/sun-info?date=`,保留当前时隙 |
-| 光影 | `utils/useSunLight.js` | 导出 `loadSunInfoForDate` |
-| 控制台 | `components/LightTestConsole.vue` | 可拖动(`useDragResize`,标题栏 `≡` 为手柄);日期选择(`<input type="date">`,切换后 `loadSunInfoForDate`);速度按钮(0.5/1/2/4/8x 高亮);天气按钮新增阴天☁️和雾🌫️(多云改⛅);信息栏增加窗角度数 |
-| 多家庭 | `stores/user.js` + `components/AppSidebar.vue` | **已回退**:头像下拉家庭切换功能未生效(el-popover teleport + scoped CSS 冲突),已删除全部相关代码(families state/loadFamilies/cascader/i18n 键),头像恢复原 `el-dropdown`(个人资料/设置/退出登录) |
-
-#### 2026-08-22 音乐系统重构(曲库+歌单+背景音乐)
-
-| 类别 | 文件 | 改动 |
-|------|------|------|
-| 数据库 | `schema.sql` | `family_music`→`content_music`(加 artist/duration/bitrate/cover_url/source_path/deleted);新增 `content_music_playlist`(歌单,is_background 标记);新增 `content_music_playlist_track`(歌单-曲目关联);`sys_family_info` 加 `background_playlist_id` |
-| 后端 | `pom.xml` | 加 `com.mpatric:mp3agic:0.9.1`(MP3 ID3v2 元数据解析) |
-| 后端 | `ContentMusic.java`/`ContentMusicPlaylist.java`/`ContentMusicPlaylistTrack.java` | 3 个新实体 |
-| 后端 | `ContentMusicMapper.java`/`ContentMusicPlaylistMapper.java`/`ContentMusicPlaylistTrackMapper.java` | 3 个新 Mapper |
-| 后端 | `MusicService.java` | 新建:曲库 CRUD + 元数据提取(mp3agic:标题/艺术家/专辑/时长/比特率/内嵌封面)+ 歌单 CRUD + 设为背景音乐 + 获取背景歌单 |
-| 后端 | `MusicController.java` | 完全重写:曲库(upload/upload-album/list/albums/add/delete)+ 歌单(playlist/list/create/delete/tracks/addTracks/removeTrack/set-background/unset-background/get-background) |
-| 前端 | `api/index.js` | `musicApi` 重写:upload/uploadAlbum/playlistList/createPlaylist/deletePlaylist/playlistTracks/addTracks/removeTrack/setBackground/unsetBackground/getBackground |
-| 前端 | `views/music/Music.vue` | 完全重写:3 Tab(全部曲目/按专辑/歌单);卡片网格+封面+元数据展示;新建歌单/加入歌单/设为背景;上传单曲/专辑文件夹/外链 |
-| 前端 | `views/Settings.vue` | 「家人共享歌单」→「背景音乐设置」:上传单曲/专辑+新建歌单;歌单列表(最多5条+更多弹窗);每条设为背景/当前背景高亮 |
-| 前端 | `components/MusicPlayer.vue` | `loadPlaylist`(musicApi.list)→`loadBackgroundPlaylist`(musicApi.getBackground);watch familyId 切换家庭时重置数据源 |
-
-**关键业务逻辑**:
-- 歌单是背景音乐播放的最小单元;不能直接设置单曲为背景音乐
-- 播放器只播放当前家庭绑定的背景音乐歌单;切换家庭时立即重置
-- 歌单资源归属家庭维度;每个家庭独立歌单集合
-- `content_music_playlist.is_background=1` 标记当前背景歌单(每家庭最多1条);`setBackground` 先 clear 再 set
-- MP3 上传时用 mp3agic 解析 ID3v2 标签提取元数据;非 MP3 回退文件名
-- 内嵌封面提取后存为 `/files/music/covers/{yyyyMM}/cover_{hash}.jpg`
-
-**live DB 同步**:schema.sql 改动只对新装库生效。已有 DB 需手动执行:
+**live DB 同步**:
 ```sql
-ALTER TABLE sys_family_info ADD COLUMN background_playlist_id BIGINT DEFAULT NULL COMMENT '当前背景音乐歌单ID' AFTER music_title;
+ALTER TABLE sys_family_info ADD COLUMN background_playlist_id BIGINT DEFAULT NULL AFTER music_title;
 DROP TABLE IF EXISTS family_music;
 CREATE TABLE content_music (...);  -- 见 schema.sql
 CREATE TABLE content_music_playlist (...);
 CREATE TABLE content_music_playlist_track (...);
 ```
 
-#### 2026-08-23 音乐系统完善 + 全局弹窗/Toast/Popper 规范
+##### 光影系统
 
-| 类别 | 文件 | 改动 |
-|------|------|------|
-| 后端 | `MusicService.java` | `extractMetadata` 临时文件名从 `"_" + originalFilename` 改为固定 `.mp3` 后缀(含中文/斜杠的原始文件名导致 `File.createTempFile` IOException);新增 `batchDeleteMusic`(按 ID 列表)+ `batchDeleteByAlbum`(按专辑名) |
-| 后端 | `MusicController.java` | 新增 `DELETE /music/batch`(批量删除曲目)+ `DELETE /music/album/{album}`(按专辑删除) |
-| 前端 | `api/index.js` | `musicApi` 新增 `batchRemove(ids)` + `removeByAlbum(album)` |
-| 前端 | `components/MusicPlayer.vue` | z-index 110→55(光影层下方);删除 `v-else-if` 无背景音乐占位 div(无歌单/无曲目时组件不渲染);删除重置位置按钮(合并到 Settings);`playAfterSwitch` 用 `nextTick` 替代 `setTimeout`;`loadBackgroundPlaylist` 加 `audioEl.load()` |
-| 前端 | `views/music/Music.vue` | 多选模式(曲目/专辑 checkbox + 批量删除);添加曲目弹窗新增「按专辑」Tab(checkbox 选专辑批量加入);歌单卡片 UI 重构(内边距 20px/间距 24px/圆角 16px/磨砂背景标签替代红色角标/删除按钮幽灵文字);Tab 选中态低饱和暖棕下划线;空状态自定义 SVG;弹窗统一 `dialog-sm`/`dialog-md` class |
-| 前端 | `views/Settings.vue` | 「恢复默认面板布局」新增清 `ihomy:music:pos`;提示文案加"音乐播放器" |
-| 前端 | `styles/main.css` | 弹窗关闭按钮 X 显示(28×28px 圆角 8px hover 浅底);弹窗尺寸规则 4 档(`dialog-sm/md/lg/xl`);弹窗内 checkbox 暖棕选中色;弹窗内 Tab 暖棕选中态;弹窗 body 滚动条美化;`.el-message--success` 亮绿→暖米底褐字;`.el-message--warning/error` 同步暖色调;`.el-popper.is-light` z-index:54(光影层下方) |
+| 文件 | 改动 |
+|------|------|
+| `utils/windowLight.js` | `windowAngle=90-\|az-180\|`+`hasDirectLight` 门控;方位角驱动旋转;灰阶 darken 幂等 |
+| `utils/useSunLight.js` | 台灯 3 态+CSS `@keyframes lampSwing`;天气特效(snow/rain/cloud);`testSpeed` 5 档;`loadSunInfoForDate`;overcast/fog 天气模式;夜间亮斑层不因天气禁用 |
+| `components/SunLightLayer.vue` | 7 条光束+辉光+窗框阴影+暗角+灰尘;窗角门控直射光 |
+| `components/LightTestConsole.vue` | 可拖动;日期选择;速度 5 档;天气按钮;图层开关;台灯模式;9 段时段标签 |
+| 删除 | `composables/useLightLab.js`+`LightLabLayer.vue`+`LightLabConsole.vue`+`views/lightlab/LightLab.vue`+`/lightlab` 路由(LightLab 合并到生产系统) |
 
-**关键修复**:
-- 元数据提取失败根因:`File.createTempFile("ihomy_audio_", "_" + "Home/夜-03.mp3")` 中 `/` 是路径分隔符 → IOException → 改为固定 `.mp3` 后缀
-- 播放器不显示根因:模板两个根级 div 用 `v-if`/`v-else-if`,Vue 3 多根节点下 `v-else-if` 跨根节点不生效 → 改为 `v-if="playlist.length"` 单条件(无曲目不渲染)
-- 播放不了根因:Nginx alias 指向 `D:/WorkSpace/ihomy/uploads/` 但后端未设 `IHOMY_CONFIG_PATH` 导致上传到 `C:/opt/ihomy/uploads/` → 后端启动必须设 `IHOMY_CONFIG_PATH=D:\WorkSpace\ihomy\config\external.yml`
+##### 深色模式 + UI 规范
 
-**live DB 同步**:无 schema 变更(纯代码层)。
+| 文件 | 改动 |
+|------|------|
+| `styles/main.css` | 深色模式全面重构:primary `#d4b298`/次级半透明白/危险 `#c97474`;el-tag 半透明磨砂;el-badge;`stroke-width:2px`;圆角统一(button 12px/input 10px/card 14px/dialog 14px);弹窗规范 4 档(sm/md/lg/xl)+关闭按钮+Tab 暖棕+checkbox 暖棕;ElMessage 暖色调;popper z-index:61 |
+| z-index 层级 | ElMessage(3000)>BackToTop(200)>lamp-light(100)>LightTestConsole(80)>light-layer(78)>snow/rain(77)>dust(76)>vignette(74)>reflection(72)>SiteFooter(70)>window-shadow(68)>bright-spot(65)>MusicPlayer(62)>Popper(61)>AppSidebar(60)>draggable-panel(20→60)>main-content(10) |
+| 页面规范 | 全局 `.page`/`.page-header`/`.list-header`/`.section-label`;所有页面 H1/H2 移除(面包屑替代);Breadcrumb `#right` slot 放操作按钮 |
 
-#### 2026-08-23 首页功能组件 + 和风API修复 + 厨房修复 + 深色模式重构 + 页面规范化
+##### 厨房 + 物品
 
-| 类别 | 文件 | 改动 |
-|------|------|------|
-| 首页 | `views/Home.vue` | 删除 quick-access-panel;新增 4 个可拖拽缩放毛玻璃组件(愿望单/物品寻找/今日菜谱/收支摘要),复用 `useDragResize`,各自独立 storageKey;`resetPanelLayout()` 重置 9 个面板 |
-| 后端 | `controller/BookController.java` + `service/BookService.java` | 新增 `GET /book/summary` 轻量聚合本月收入/支出/结余/记录数 |
-| 后端 | `controller/OpsController.java` | 新增 `GET /ops/weather/finance` + `GET /ops/weather/stats` |
-| 后端 | `service/WeatherService.java` | `getFinance()`/`getStats()` 去掉 `resp.path("data")` 中间层(和风 Console API 返回扁平 JSON,无 data 包裹);`parseApiType` 新增 `/finance/`→`finance`、`/metrics/`→`metrics` 映射;`logCall` 对 finance/metrics 不存响应体(含账单信息) |
-| 前端 | `views/ops/Ops.vue` | 天气 Tab 扩展为三区块(用量/财务/24h请求量);`Promise.allSettled` 并行三个接口;数据为 0 也展示,仅 API 报错时 `el-alert` 警告 |
-| 前端 | `api/index.js` | `bookApi.summary()` + `opsApi.weatherFinance()` + `opsApi.weatherStats()` |
-| 厨房Bug | `views/kitchen/Ingredient.vue` | 上传改 `:http-request`(原 `:before-upload` 返回 false 导致 EP 不传 File);`onUpload` 参数 `file`→`options.file`;`onSave` body key `image_url`→`imageUrl`(匹配 ItemDTO camelCase,否则 Jackson 不映射→DB 存 null);级联 `checkStrictly: true`(可选任意层级) |
-| 厨房Bug | `views/kitchen/Ingredient.vue` | `locationTree`/`defaultLocation` 中 `r.house_id`→`r.houseId`、`f.room_id`→`f.roomId`(实体接口返回 camelCase,snake_case 过滤导致子节点全丢) |
-| i18n | `i18n/zh-CN.js` + `en.js` | 合并重复 `dict` key(第一个含 recipe_* 被第二个覆盖→recipe 字典失效);新增 `item_type` 字典(KITCHENWARE/INGREDIENT/DAILY/CLOTHES/TOOL/OTHER 中英双语) |
-| 前端 | `views/item/Item.vue` | 物品列表新增 `el-tag` 显示类型中文标签(`dictText`);删除 scoped `.page` 覆写(对齐全局 `.page` 规范) |
-| 深色模式 | `styles/main.css` | 全面重构:primary 按钮 `#d4b298`/次级 `rgba(255,255,255,0.12)`/危险 `#c97474`/幽灵/Tab active-bar `#d4b298`;el-tag 全局规范(半透明磨砂);el-badge 规范;el-icon `stroke-width:2px`;圆角全局统一(button 12px/input 10px/card 14px/dialog 14px) |
-| z-index | `styles/main.css` + `MusicPlayer.vue` | popper 54→61(高于 sidebar 60,低于 bright-spot 65);MusicPlayer 55→62;光影层(65-100)为除 Toast 外最高层 |
-| 页面规范 | `styles/main.css` | 新增全局 `.page-header`/`.page-title`/`.list-header`/`.page h2`/`.section-label`(16px/600/左3px暖棕竖线) |
-| 页面规范 | `views/kitchen/Ingredient.vue` | `ingredient-page`→`page`;删除 scoped `.page-header`/`.page-title`;`<h1>`→移除(按钮移入 Breadcrumb `#right` slot);`<h2>` 移除 |
-| 页面规范 | `views/kitchen/RecipeDetail.vue` | `recipe-detail-page`→`page`;删除 scoped `.recipe-detail-page`;`<h1>`→`<span>` |
-| 页面规范 | `views/kitchen/RecipeEdit.vue` | `recipe-edit-page`→`page`;删除 scoped `.recipe-edit-page`/`.page-title`;`<h1>`→移除 |
-| 页面规范 | `views/blog/BlogEdit.vue` | 删除 `<h2>` 页面标题 |
-| 页面规范 | `views/blog/BlogDetail.vue` | `<h1>`→`<div class="blog-title-text">` |
-| 页面规范 | `views/album/AlbumDetail.vue` | `<h2>`→`<span class="album-name">` |
-| 页面规范 | `views/Member.vue` | 删除 `<h2>` + `.section-header`;按钮移入 Breadcrumb `#right` slot |
-| 页面规范 | `views/Settings.vue` | 5 处 `<h2>`→`<div class="section-label">` |
-| 素材bar | `views/kitchen/Ingredient.vue` | bar 高度 `height:84px`;图片 `flex:1 0 33.33%`(占条目宽度 1/3);`object-fit:cover; object-position:center`(居中裁切);右半 padding `8px 16px` gap `4px` |
+| 文件 | 改动 |
+|------|------|
+| `views/kitchen/Ingredient.vue` | 上传改 `:http-request`;body key `imageUrl`(camelCase);级联 `houseId`/`roomId`(camelCase);`checkStrictly:true`;bar 高 84px 图片 1/3 宽 |
+| `views/kitchen/Kitchen.vue` | 对齐标准页 `.page`;v-loading;全局 `.card` |
+| `views/kitchen/RecipeDetail.vue` | Bug 修复:`userStore.user?.id`→`userInfo.id`(非 OWNER 作者无法编辑) |
+| `views/item/Item.vue` | `el-tag` 类型标签;对齐标准页;v-loading |
+| `i18n/zh-CN.js`+`en.js` | 合并重复 `dict` key;新增 `item_type` 字典 |
 
-**关键修复**:
-- 和风 finance/stats 无数据根因:代码做了 `resp.path("data")` 但和风 Console API 返回扁平 JSON,无 data 包裹 → 字段永远 missing → 改为直接从 resp 读
-- 厨房素材图片不显示根因:`onSave` 发 `image_url`(snake_case)但 `ItemDTO.imageUrl` 是 camelCase,Jackson 不映射 → DB 存 null → 改为 `imageUrl`
-- 厨房级联不展开根因:`locationTree` 用 `r.house_id`(snake_case)过滤,但实体接口返回 camelCase `houseId` → `undefined === h.id` 永远 false → 子节点全被过滤
-- 厨房菜系/类别/风味显示英文根因:`zh-CN.js`/`en.js` 有两个 `dict` 顶层 key,JS 对象重复 key 后者覆盖前者,第一个 dict(含 recipe_*)被静默丢弃 → 合并为一个 dict
-- 头像弹出框被遮挡根因:popper z-index 54 < sidebar z-index 60 → popper 提升到 61
+##### 运维 + 天气 API
 
-**用户需操作**:和风控制台 → 项目管理 → 选择凭据 → 控制台权限 → 勾选「允许访问财务汇总数据」和「允许访问请求量统计」→ 保存
+| 文件 | 改动 |
+|------|------|
+| `controller/OpsController.java` | `GET /ops/weather/finance`+`GET /ops/weather/stats` |
+| `service/WeatherService.java` | `getFinance()`/`getStats()` 去掉 `resp.path("data")`(和风 Console API 扁平 JSON);`parseApiType` 加 finance/metrics;`logCall` 跳过敏感响应体 |
+| `views/ops/Ops.vue` | 天气 Tab 三区块(用量/财务/24h);`Promise.allSettled` |
 
-**live DB 同步**:无 schema 变更(纯代码层)。
+##### UX 修复
+
+| 文件 | 改动 |
+|------|------|
+| `views/album/AlbumDetail.vue` | 照片全屏预览;上传进度条;触屏常显操作;loading ref |
+| `views/blog/BlogDetail.vue` | 评论删除确认框 |
+| `views/plan/Plan.vue` | 子任务删除确认框 |
+| `views/Member.vue` | 邀请码一键复制 |
+| `FileService.java` | 图片缩略图 `_thumb.jpg`(maxWidth 480);`deleteByUrl` 顺带删 |
+| `utils/image.js` | `thumbUrl`/`onThumbError` 工具;4 页面列表用缩略图 |
+| `views/blog/BlogList.vue` | "加载更多"按钮;封面缩略图 |
+| `views/diary/DiaryList.vue` | `el-image-viewer` 应用内预览 |
+| i18n | Home/Settings 60+ 硬编码中文改 `$t()`;中英双语 key |
+| 移动端 | `@media (max-width:960px)` 面板从 `display:none` 改文档流堆叠 |
 
 ## 文件存储策略
 
@@ -637,6 +565,8 @@ CREATE TABLE content_music_playlist_track (...);
 | P2 | 物品定位-户型图 | 1期(物品清单+搜索)已完成;2期户型图:房间矩形绘制/物品相对坐标摆放,以 room.id 挂载(数据结构已预留) |
 | P2 | 用户使用指导 | 新手引导弹窗+帮助页 |
 | P2 | 家庭公告/广告位 | 自建家庭公告(不接第三方广告,隐私原因) |
+| P2 | 电子图书 | 家庭书架:上传/修改/删除/分类/查询筛选电子书(EPUB/PDF/TXT/MOBI)。新增 `content_book`+`content_book_borrow` 两表;后端 BookController+BookService(CRUD+借阅+流式上传+硬删除);前端书架页(网格/列表/分类栏/搜索)+详情页+在线阅读(PDF 原生 iframe/EPUB epubjs/TXT 分页);`sys_home_module` 插入 book 模块(position=18);`sys_auth` 加 `book:manage` 权限种子;文件存 `files/books/{yyyyMM}/`。P1:DB+CRUD+书架页;P2:在线阅读+首页卡片;P3:ISBN 元数据自动抓取 |
+| P2 | 首页组件自适应展示 | 首页栅格(12列×9行)组件按尺寸分级展示。每个功能组件有默认大小(4×5 等),不同尺寸呈现不同信息密度:**h=1**(标题消失,仅展示核心数据:天气仅温度+图标,收支仅结余数字,任务仅数量角标);**h=2-3**(标题+精简列表 2-3 条);**h≥4**(标题+完整列表+详情);**w≤2**(单列窄布局:垂直堆叠条目);**w≥4**(多列网格:相册瀑布/菜谱卡片)。需为每个组件定义 compact/normal/expanded 三档展示模板,CSS 媒体查询+JS 判断 w/h 切换。组件清单:feed(默认4×6)/task(4×2)/today(4×4)/weather(3×4)/anni(1×4)/recipe(4×2)/search(4×3)/wish(4×3)/finance(4×3)/album(4×5)/music(4×3) |
 | P3 | 多重人格 | 基于身份标签扩展,一账号多标签可切换发表,会话级 currentLabel(Redis 或前端状态),与家庭切换正交 |
 | P3 | AI API 对接 | 统一对接大模型 API(聊天/内容生成),需配置 API Key 与服务商(OpenAI 兼容协议),待细化 |
 | P3 | 物品定位-AI 语义 | 3期(待2期后):自然语言"找找我的工具箱"→AI 拆出名称+别名→服务器 SQL 查询;"把工具箱放到门口的柜子最上层抽屉"→AI 按 家/房子/房间/家具/位置 五级解析,缺层追问填满后返回粒度值→服务器拼 INSERT(决策已定,依赖 AI API) |
