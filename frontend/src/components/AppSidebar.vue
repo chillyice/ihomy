@@ -1,7 +1,7 @@
 <!-- 左侧导航栏:图标+文字,按 category 分组,hover 放大阴影加深 -->
 <!-- 全局挂载(含沉浸式页),替代原顶部导航 -->
 <template>
-  <aside class="app-sidebar" :class="{ collapsed }">
+  <aside class="app-sidebar" :class="{ collapsed, 'dragging-edge': widgetDragging && !crossedEdge }">
     <!-- 顶部:家庭名 + 折叠按钮 -->
     <div class="sidebar-head">
       <span class="sidebar-brand" @click="$router.push('/')">{{ familyName || 'ihomy' }}</span>
@@ -17,17 +17,22 @@
         <div
           v-for="m in g.modules"
           :key="m.code"
-          class="nav-item"
-          :class="{ active: isActive(m.path) }"
-          :title="m.title"
-          @click="navigate(m.path)"
+          class="nav-item-wrap"
         >
-          <span class="nav-icon">
-            <svg v-if="m.code === 'settings'" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2L9.5 4.5L6 4L5 7.5L2 9.5L3.5 13L2 16.5L5 18.5L6 22L9.5 21.5L12 24L14.5 21.5L18 22L19 18.5L22 16.5L20.5 13L22 9.5L19 7.5L18 4L14.5 4.5L12 2ZM12 16A4 4 0 1 1 12 8A4 4 0 0 1 12 16Z"/></svg>
-            <svg v-else-if="m.code === 'ops'" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 4H21V16H3V4ZM5 6V14H19V6H5ZM2 18H22V20H2V18Z"/></svg>
-            <el-icon v-else><component :is="iconComp(m.code)" /></el-icon>
-          </span>
-          <span v-if="!collapsed" class="nav-text">{{ m.title }}</span>
+          <div
+            class="nav-item"
+            :class="{ active: isActive(m.path), 'widget-src': appStore.homeEditMode && widgetType(m.code) }"
+            :title="m.title"
+            @click="appStore.homeEditMode ? null : navigate(m.path)"
+            @mousedown="appStore.homeEditMode && widgetType(m.code) && startWidgetDrag(widgetType(m.code), $event)"
+          >
+            <span class="nav-icon">
+              <svg v-if="m.code === 'settings'" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2L9.5 4.5L6 4L5 7.5L2 9.5L3.5 13L2 16.5L5 18.5L6 22L9.5 21.5L12 24L14.5 21.5L18 22L19 18.5L22 16.5L20.5 13L22 9.5L19 7.5L18 4L14.5 4.5L12 2ZM12 16A4 4 0 1 1 12 8A4 4 0 0 1 12 16Z"/></svg>
+              <svg v-else-if="m.code === 'ops'" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 4H21V16H3V4ZM5 6V14H19V6H5ZM2 18H22V20H2V18Z"/></svg>
+              <el-icon v-else><component :is="iconComp(m.code)" /></el-icon>
+            </span>
+            <span v-if="!collapsed" class="nav-text">{{ m.title }}</span>
+          </div>
         </div>
       </div>
     </nav>
@@ -77,11 +82,12 @@
           </div>
         </el-popover>
       </div>
-      <el-dropdown v-if="userStore.isLoggedIn" trigger="click" @command="onUserCommand" placement="top-start" popper-class="sidebar-user-popper" @visible-change="onDropdownVisible">
-        <span class="foot-user">
-          <el-avatar :size="28" :src="userInfo?.avatar">{{ (userInfo?.nickname || 'U').charAt(0) }}</el-avatar>
-          <span v-if="!collapsed" class="user-name">{{ userInfo?.nickname || '我' }}</span>
-        </span>
+      <div class="foot-user-row">
+        <el-dropdown v-if="userStore.isLoggedIn" trigger="click" @command="onUserCommand" placement="top-start" popper-class="sidebar-user-popper" @visible-change="onDropdownVisible">
+          <span class="foot-user">
+            <el-avatar :size="28" :src="userInfo?.avatar">{{ (userInfo?.nickname || 'U').charAt(0) }}</el-avatar>
+            <span v-if="!collapsed" class="user-name">{{ userInfo?.nickname || '我' }}</span>
+          </span>
         <template #dropdown>
           <el-dropdown-menu>
             <el-dropdown-item command="profile">{{ $t('settings.profile') }}</el-dropdown-item>
@@ -108,7 +114,11 @@
           </el-dropdown-menu>
         </template>
       </el-dropdown>
-      <span v-else class="foot-btn" @click="$router.push('/login')">{{ $t('home.loginToView') }}</span>
+        <span v-else class="foot-btn" @click="$router.push('/login')">{{ $t('home.loginToView') }}</span>
+        <span v-if="userStore.isLoggedIn && route.path === '/'" class="edit-mode-btn" :class="{ active: appStore.homeEditMode }" :title="appStore.homeEditMode ? '退出编辑' : '编辑首页'" @click="appStore.toggleHomeEditMode()">
+          <el-icon><EditPen /></el-icon>
+        </span>
+      </div>
     </div>
   </aside>
 </template>
@@ -119,9 +129,10 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
+import { useWidgetDrag } from '@/utils/useWidgetDrag'
 import { notificationApi, authApi } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Sunny, Moon, Bell, Fold, Expand, Document, Notebook, Picture, Calendar, VideoPlay, Trophy, Aim, AlarmClock, List, Star, Wallet, PictureRounded, Share, User, Box, MapLocation, ChatDotRound, Food, Setting, Monitor, ArrowRight, Check, Headset } from '@element-plus/icons-vue'
+import { Sunny, Moon, Bell, Fold, Expand, Document, Notebook, Picture, Calendar, VideoPlay, Trophy, Aim, AlarmClock, List, Star, Wallet, PictureRounded, Share, User, Box, MapLocation, ChatDotRound, Food, Setting, Monitor, ArrowRight, Check, Headset, EditPen } from '@element-plus/icons-vue'
 
 // 导航图标:Element Plus 简约线性图标(统一风格,非彩色 emoji)
 const ICON_MAP = {
@@ -140,6 +151,10 @@ const route = useRoute()
 const appStore = useAppStore()
 const userStore = useUserStore()
 const { locale, t } = useI18n()
+const { startDrag: startWidgetDrag, dragging: widgetDragging, crossed: crossedEdge } = useWidgetDrag()
+
+const WIDGET_MAP = { blog: 'feed', task: 'task', points: 'today', weather: 'weather', anniversary: 'anni', kitchen: 'recipe', item: 'search', wish: 'wish', book: 'finance', album: 'album', music: 'music' }
+const widgetType = (code) => WIDGET_MAP[code] || null
 
 // 注入全局光影状态(与 SunLightLayer 共享同一实例);导航栏只用台灯开关,其余设置在 Settings 页
 const sunLight = inject(SUN_LIGHT_KEY)
@@ -382,7 +397,6 @@ html.dark .app-sidebar {
   align-items: center;
   gap: 12px;
   padding: 9px 12px;
-  margin: 2px 0;
   border-radius: 10px;
   cursor: pointer;
   color: var(--color-text);
@@ -460,14 +474,17 @@ html.dark .sidebar-foot {
 html.dark .foot-btn:hover {
   background: rgba(255, 255, 255, 0.08);
 }
+.foot-user-row { display: flex; align-items: center; gap: 6px; }
+.foot-user-row > :deep(.el-dropdown) { flex: 1; min-width: 0; }
 .foot-user {
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 8px;
+  padding: 4px 12px;
   border-radius: 8px;
   transition: background 0.2s;
+  flex: 1;
 }
 .foot-user:hover { background: rgba(58, 46, 34, 0.08); }
 html.dark .foot-user:hover { background: rgba(255, 255, 255, 0.08); }
@@ -477,6 +494,61 @@ html.dark .foot-user:hover { background: rgba(255, 255, 255, 0.08); }
 }
 .collapsed .user-name { display: none; }
 .collapsed .foot-user { justify-content: center; }
+
+.edit-mode-btn {
+  flex-shrink: 0;
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  transition: background 0.2s, color 0.2s;
+}
+.edit-mode-btn:hover { background: rgba(58,46,34,0.08); }
+.edit-mode-btn.active { background: rgba(184,140,110,0.2); color: var(--color-accent, #b88c6e); }
+html.dark .edit-mode-btn:hover { background: rgba(255,255,255,0.08); }
+html.dark .edit-mode-btn.active { background: rgba(212,178,152,0.2); color: #d4b298; }
+.collapsed .edit-mode-btn { display: none; }
+
+/* 编辑模式:导航项变为组件来源,向右下偏移+虚线框占位 */
+.nav-item-wrap { position: relative; margin: 2px 0; }
+.nav-item.widget-src { cursor: grab; }
+.nav-item.widget-src:active { cursor: grabbing; }
+.nav-item.widget-src {
+  transform: translate(4px, 4px);
+  background: rgba(184,140,110,0.1);
+  border: 1px dashed rgba(184,140,110,0.4);
+  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), background 0.2s, border-color 0.2s;
+}
+.nav-item.widget-src:hover {
+  transform: translate(8px, 8px) scale(1.05);
+  background: rgba(184,140,110,0.2);
+  border-color: rgba(184,140,110,0.6);
+  box-shadow: 0 6px 20px rgba(184,140,110,0.15);
+}
+/* 虚线占位框(编辑模式下原位置) */
+.nav-item-wrap:has(.widget-src)::before {
+  content: '';
+  position: absolute; inset: 0;
+  border: 1px dashed rgba(184,140,110,0.2);
+  border-radius: 10px;
+  pointer-events: none;
+}
+html.dark .nav-item.widget-src { background: rgba(212,178,152,0.1); border-color: rgba(212,178,152,0.3); }
+html.dark .nav-item.widget-src:hover { background: rgba(212,178,152,0.2); border-color: rgba(212,178,152,0.5); }
+html.dark .nav-item-wrap:has(.widget-src)::before { border-color: rgba(212,178,152,0.15); }
+
+/* 拖拽时侧边栏右边界气泡效果 */
+.app-sidebar.dragging-edge::after {
+  content: '';
+  position: absolute; right: -2px; top: 50%;
+  width: 24px; height: 120px;
+  transform: translateY(-50%);
+  background: radial-gradient(ellipse 12px 60px at right center, rgba(184,140,110,0.35), transparent 70%);
+  pointer-events: none;
+  animation: bubblePulse 0.8s ease-in-out infinite;
+}
+@keyframes bubblePulse { 0%,100% { opacity: 0.6; transform: translateY(-50%) scaleX(1); } 50% { opacity: 1; transform: translateY(-50%) scaleX(1.3); } }
 
 /* 通知面板 */
 .notify-panel { max-height: 400px; overflow-y: auto; }

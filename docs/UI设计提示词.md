@@ -80,20 +80,21 @@
 - `will-change: transform`
 - 深色模式 `opacity: 0.1`
 
-## 2. 右下角相册模块(album-corner)
+## 2. 相册组件(album,首页栅格内)
 
-`position: fixed; right: 5vw; bottom: 5vh; width: 27.5vw; min-height: 308px; z-index: 10`。
+相册是首页栅格系统中的一个组件,照片可溢出组件边界。
 
 ### 散落拍立得堆(近 7 天有新照片)
 - `recentPhotos` 过滤 `createdAt < 7天` 最多 7 张。
 - 每张 `.polaroid-pos`(定位包装)+ `.polaroid`(hover 缩放)分离 transform 上下文防频闪。
-- `.polaroid`: 220px 白边相纸 `padding: 10px 10px 38px`,随机旋转 ±15°、随机偏移 dx±120 dy±60、投影。
-- hover:z-index 99 + 旋转归零 + scale 1.08(抽出感)。
-- GSAP stagger 入场。
-- 点击 → `el-image-viewer` 全屏大图浏览(`viewerUrls` = 近期照片 URL 列表)。
+- `.polaroid`: 白边相纸 `padding: 6px 6px 22px`,随机旋转 ±45°、随机偏移 dx±220 dy±180、投影。
+- 拍立得宽度随组件 w 缩放:`--polaroid-w: clamp(80px, w*30px, 140px)`。
+- 照片可溢出组件边界(`overflow: visible`),z-index:40 高于其他卡片。
+- hover:z-index 99 + scale 1.15(抽出感)。
+- 点击 → `el-image-viewer` 全屏大图浏览。
 
 ### 闭合相册(近 7 天无新照片)
-- 平躺木色封面 `linear-gradient(#8B6F47,#6B5435)` 420×315。
+- 平躺木色封面 `linear-gradient(#8B6F47,#6B5435)` 140×105。
 - 家庭名称 + "家庭相册",随机斜放。
 - hover 抬正放大,点击跳 `/album`。
 
@@ -228,59 +229,50 @@
 - `.sidebar-nav`(滚动区):`transform: translateZ(0)` + `will-change: transform`
 - nav-item hover 用 `transform: translateX(4px) scale(1.03)`(而非 box-shadow,避免触发 backdrop-filter 重算)
 
-## 10. 可拖拽面板(useDragResize)
+## 10. 首页栅格仪表盘(12列×9行)
 
-- 5 个面板(feed/task/weather/anniversary/today),各自独立 `useDragResize` 实例。
-- `position: fixed; top: 80px; left/right: 24px; width: 380px`。
-- 顶部 `.drag-handle`(24px,中间 40×4px 拖动条),右下角 `.resize-handle`(20×20px 斜角)。
-- 拖拽边界 clamp(左右不越出页面、顶部不低于导航栏、底部不越界)。
-- 位置/大小持久化 localStorage。
-- zIndex + bringToFront(模块计数器,上限 60 低于光影层 65)。
+- 12 列×9 行栅格,组件按栅格单元定位(col/row/w/h)。
+- GAP=40px,四边 margin(top=32/right=40/bottom=40/left=260,左侧=侧边栏220+40)。
+- 栅格尺寸根据 `window.innerWidth/Height` 自适应计算 `cellW`/`cellH`。
+- 组件 `position: fixed`,left/top/width/height 由 `cardStyle(w)` 按栅格计算。
+- **编辑模式**:导航栏 EditPen 按钮切换 `appStore.homeEditMode`。
+  - 侧边栏导航项变为组件来源(向右下偏移 `translate(4px,4px)` + 暖棕虚线边框 + 半透明底色;hover 进一步 `translate(8px,8px) scale(1.05)`)。
+  - 原位置虚线框占位(`::before`)。
+  - 从侧边栏拖出到内容区,ghost 由 `scale(0.3)` 弹性增长到 `scale(1)`(cubic-bezier 0.34,1.56,0.64,1),尺寸 80×60→200×150;drop 创建 4×5 新组件。
+  - 侧边栏右边界气泡融合效果(`::after` radial-gradient pulse)。
+  - 卡片可拖拽移动(drag-bar 顶部手柄)+ 缩放(resize-corner 右下角),栅格吸附(`Math.round(dx/(cw+GAP))`)。
+  - 编辑模式禁用内部交互(`.card-inner { pointer-events: none }`),仅移动+缩放+删除。
+  - grid-cell 出现动画(逐个渐现 `cellAppear 0.4s ease`,delay `i*5ms`)。
+  - 编辑工具栏 hover 隐藏(`opacity:0; translateY(-10px); pointer-events:none`)。
+  - 栅格背景可见(`.grid-overlay` CSS grid,JS 计算的 `--cell-w`/`--cell-h` 变量)。
+- **h=1 时标题行消失**:`.card-head` opacity→0 + max-height→0 + padding→0(0.3s ease 动效)。
+- 点击组件置顶(zCounter,编辑/非编辑模式均可)。
+- 布局持久化 localStorage `ihomy:dashboard:layout`。
+- 8 个默认组件:feed(5×5)/anni(3×4)/weather(3×2)/today(3×2)/recipe(4×4)/wish(3×2)/album(5×3)/finance(2×2)。
+- 相册组件照片可溢出边界(`overflow: visible`,z-index:40)。
 
-### 通用毛玻璃样式(glass-panel)
+### 通用毛玻璃样式(dash-card)
 ```css
-background: rgba(255, 255, 255, 0.25);
-backdrop-filter: blur(30px) saturate(1.4);
--webkit-backdrop-filter: blur(30px) saturate(1.4);
+background: rgba(255, 255, 255, 0.42);
+backdrop-filter: blur(28px) saturate(1.4);
+-webkit-backdrop-filter: blur(28px) saturate(1.4);
 border: 1px solid rgba(255, 255, 255, 0.5);
-border-radius: 28px;
-box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+border-radius: 20px;
+box-shadow: 0 8px 28px rgba(58, 46, 34, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 color: #3A2E22;
 ```
 
-### 动态流面板(feed-panel,上 45%)
-- 标题:`padding: 28px 32px 14px; font-size: 15px; font-weight: 600; letter-spacing: 1px; opacity: 0.7`。
-- 滚动区:`padding: 0 28px 24px`,隐藏滚动条,`transform: translateZ(0)` 隔离合层。
-- 每条 feed 微信风:
-  - `.feed-row`: `display: flex; gap: 10px; margin-bottom: 14px; cursor: pointer`。
-  - 头像独立行(左)。
-  - `.feed-content`: `flex: 1; margin-top: 2px`,包裹 nick + bubble。
-  - `.feed-nick`: `font-size: 12px; font-weight: 600; line-height: 16px; margin-bottom: 2px`,单行截断。
-  - `.feed-bubble`: `background: rgba(255,255,255,0.45); border-radius: 4px 14px 14px 14px; padding: 10px 14px`,hover `background: rgba(255,255,255,0.65); transform: translateX(-3px)`。
-  - bubble 内:类型 12px/0.6,正文 14px/1.55/3 行截断,时间 11px/0.5 右对齐。
-
-### 任务面板(task-panel,下 55%)
-- 同样的标题 + 滚动区样式。
-- 每行:`display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: 10px`,hover `background: rgba(58,46,34,0.06)`。
-- 奖励图标 20px,标题 15px/600 单行截断,meta 12px/0.6。
-
-### 时间天气面板(weather-panel)
-- `position: fixed; top: 80px; right: 24px; width: 380px; padding: 22px 32px; text-align: center`。
-- 时钟:`font-size: 32px; font-weight: 700; letter-spacing: 2px`。
-- 日期:`font-size: 13px; opacity: 0.7; margin-bottom: 6px`。
-- 天气:`display: flex; justify-content: center; gap: 4px; font-size: 15px`。和风字体图标 `<i class="qi-{iconCode}">` 20px,温度 700,文字按 condition 映射中文(晴/多云/阴/雨/雪)。
-- 默认高度 180px(只显示城市+温度+图标+状况),点击 `.weather-main` 切换 `weatherExpanded`,展开到 440px 显示完整详情(7d 预报+预警+生活指数+空气+分钟降水),带箭头旋转动画。
-
-### 纪念日面板(anniversary-panel)
-- `position: fixed; top: 210px; right: 24px; width: 380px; max-height: 340px`。
-- 每行:`padding: 12px; border-bottom: 1px solid rgba(58,46,34,0.08)`,hover `background: rgba(58,46,34,0.05); border-radius: 8px`。
-- 名称 14px/600 单行截断,日期 12px/0.6。
-- 倒计时天数:`font-size: 20px; font-weight: 700; color: #A8483A`,单位 12px/0.7。
-
-### 今日面板(today-panel)
-- 积分余额+连续天数+签到按钮(pointsApi.stats/checkin)。
-- 今日待办提醒前 3 条(reminderApi.list,过滤 done!==1)。
-- 登录可见,小屏隐藏。
+### 组件内容(hover 效果统一:背景变化,无 transform 位移)
+- **家人动态(feed)**:头像+气泡消息,bubble hover `background` 变化(无 translateX)。
+- **悬赏任务(task)**:奖励图标+标题+状态点,行 hover `background`。
+- **今日(today)**:积分余额+连续天数+签到按钮+待办提醒。
+- **天气(weather)**:城市+温度+图标+状况+未来三天+空气+预警(默认展开)。
+- **纪念日(anni)**:名称+日期+倒计时天数,行 hover `background`+`border-radius`。
+- **今日推荐(recipe)**:菜谱列表(封面+名称),行 hover `background`。
+- **物品寻找(search)**:输入框+搜索结果(名称+位置),行 hover `background`。
+- **愿望单(wish)**:愿望列表(状态点+标题),行 hover `background`。
+- **本月收支(finance)**:收入/支出/结余三列。
+- **音乐(music)**:背景歌单名+曲目列表,无歌单显示空状态。
 
 ## 11. 黑胶唱片播放器(MusicPlayer,z-index 55)
 
@@ -368,14 +360,7 @@ color: #3A2E22;
 
 页面 mount 后:
 ```js
-gsap.from('.feed-panel', { x: -30, autoAlpha: 0, duration: 0.8, delay: 0.2 })
-gsap.from('.task-panel', { x: -30, autoAlpha: 0, duration: 0.8, delay: 0.3 })
-gsap.from('.weather-panel', { x: 30, autoAlpha: 0, duration: 0.8, delay: 0.3 })
-gsap.from('.anniversary-panel', { x: 30, autoAlpha: 0, duration: 0.8, delay: 0.35 })
-gsap.from('.today-panel', { y: 40, autoAlpha: 0, duration: 0.8, delay: 0.35 })
-gsap.from('.album-corner', { scale: 0.95, autoAlpha: 0, duration: 0.8, delay: 0.4 })
-gsap.from('.polaroid', { y: 40, autoAlpha: 0, duration: 0.6, stagger: 0.08, delay: 0.3 })
-gsap.from('.album-closed', { scale: 0.9, autoAlpha: 0, duration: 0.8, delay: 0.3 })
+gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, ease: 'power2.out' })
 ```
 **光柱层不入场**,直接显示当前太阳状态(避免光从无到有的突兀)。
 
@@ -383,8 +368,7 @@ gsap.from('.album-closed', { scale: 0.9, autoAlpha: 0, duration: 0.8, delay: 0.3
 
 | 断点 | 变化 |
 |------|------|
-| ≤1280px | album-stage padding 改 360px;左右面板宽度 320px |
-| ≤960px | 左侧面板隐藏;album-stage padding 24px;书脊隐藏;天气面板 width auto/padding 10px 16px;时钟 26px;纪念日面板隐藏;唱片 90×90/margin-right -45px |
+| ≤960px | 所有 dash-card `display:none`,显示"请使用电脑或平板访问首页仪表盘"提示 |
 
 ## 17. 数据流
 
@@ -477,9 +461,9 @@ gsap.from('.album-closed', { scale: 0.9, autoAlpha: 0, duration: 0.8, delay: 0.3
 9. 全局光照测试控制台(`LightTestConsole.vue`,App.vue 挂载):循环 288 时隙,含地区/日期/时间/高度/方位/窗角/9 段时段标签 + 进度条 + 后退/暂停/前进/停止 + 速度控制(0.5/1/2/4/8x) + 天气控制(☀️/☁️/🌧️/❄️/⛈️ + 降水滑块) + 图层开关(阴影/环境光) + 台灯模式(自动/开/关) + 色温/亮度滑块;停止=重置真实时间+关闭控制台。
 10. 夜间台灯自动开启(傍晚 dayProgress≥0.9 开,清晨 dayProgress>0.1 关),mask 祛除左上黄金分割点周围阴影;台灯钟摆运动(CSS `@keyframes lampSwing` 8 秒周期,横向 ±1.5vw);亮度滑块控制 mask 透明区域大小(3%-100%);色温滑块控制暖光色温。**开关灯 2s 渐变**:GSAP 补间驱动,mask 挖洞半径随强度缩放。
 11. **主题切换 1s 过渡**:双层伪元素 `::before`/`::after` opacity 交叉淡入淡出;面板/色块/文字颜色同步 1s 过渡。
-12. **可拖拽面板**:9 个面板(feed/task/weather/anniversary/today + wish/search/recipe/finance)可拖拽+可调大小,位置/大小持久化到 localStorage;拖拽边界 clamp;Settings"恢复默认面板布局"清持久化恢复初始值。
+12. **首页栅格仪表盘**:12列×9行栅格,8个默认组件(feed/anni/weather/today/recipe/wish/album/finance);编辑模式可拖拽移动+缩放+增删组件(从侧边栏拖入);h=1 标题消失;点击置顶;照片溢出;布局持久化 localStorage。
 13. **今日面板**:积分余额+连续天数+签到按钮+今日待办提醒前 3 条(登录可见)。
-14. **首页功能组件区**(登录可见):4 个可拖拽缩放毛玻璃组件(愿望单/物品寻找/今日菜谱/收支摘要),复用 `useDragResize`,各自独立 storageKey;移动端 ≤960px 隐藏。
+14. **首页功能组件区**(登录可见):栅格系统内 8 个组件(feed/anni/weather/today/recipe/wish/album/finance),编辑模式可拖拽缩放增删;移动端 ≤960px 隐藏显示提示。
 15. **备案号**:右下角 `right:16 bottom:8 z:70`,ICP+公安占位,磨砂玻璃小字。
 16. **照片瀑布**(`/cascade`):落叶式飘落动画(包装元素分离 transform 防频闪),hover 暂停+scale 1.15,点击 `el-image-viewer`,每 2s 生成一张上限 50 张。
 17. **深色模式**:`html.dark .blob { opacity: 0.1 }` 色块压暗至 10%;`--color-primary` 深色覆写 `#E8DCC8`;手动切主题后取消日出日落自动切换(`autoMode=false`)+提示;深色模式配色体系详见 §18a。
