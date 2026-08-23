@@ -1,5 +1,5 @@
 <template>
-  <div class="recipe-detail-page" v-loading="loading">
+  <div class="page" v-loading="loading">
     <Breadcrumb :items="[{ label: $t('kitchen.title'), to: '/kitchen' }, { label: $t('kitchen.recipeDetail') }]" />
 
     <div v-if="recipe" class="recipe-content">
@@ -10,7 +10,7 @@
           <div v-else class="cover cover-empty"><el-icon><Bowl /></el-icon></div>
         </div>
         <div class="info">
-          <h1 class="name">{{ recipe.name }}</h1>
+          <span class="name">{{ recipe.name }}</span>
           <div class="meta-row">
             <span class="meta-item">
               <span class="meta-label">{{ $t('kitchen.cuisine') }}:</span>
@@ -148,12 +148,6 @@ onMounted(load)
 </script>
 
 <style scoped>
-.recipe-detail-page {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 0 20px 40px;
-}
-
 .recipe-header {
   display: flex;
   gap: 24px;

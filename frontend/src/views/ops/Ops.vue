@@ -85,13 +85,57 @@
       <el-tab-pane label="和风天气 API" name="weather">
         <div v-loading="weatherLoading">
           <el-alert type="info" :closable="false" show-icon style="margin-bottom: 14px"
-            title="和风天气控制台 API 用量统计(JWT 身份认证)" />
+            title="和风天气控制台 API:用量统计 + 财务汇总 + 请求量统计(JWT 身份认证)" />
+
+          <!-- 用量统计 -->
+          <h4 class="ops-section-title">API 用量</h4>
           <div v-if="weatherQuota && weatherQuota.raw">
             <el-descriptions :column="2" border size="small">
               <el-descriptions-item v-for="(v, k) in weatherQuota.raw" :key="k" :label="k">{{ typeof v === 'object' ? JSON.stringify(v) : v }}</el-descriptions-item>
             </el-descriptions>
           </div>
-          <el-empty v-else-if="!weatherLoading" description="未配置和风天气凭证或暂无数据" />
+          <el-empty v-else-if="!weatherLoading" description="未配置和风天气凭证或暂无数据" :image-size="40" />
+
+          <!-- 财务汇总 -->
+          <h4 class="ops-section-title" style="margin-top:20px">财务汇总</h4>
+          <div v-if="weatherFinance" class="finance-grid">
+            <div class="finance-card">
+              <div class="finance-label">余额</div>
+              <div class="finance-value">{{ weatherFinance.currency || 'CNY' }} {{ weatherFinance.balance ?? '-' }}</div>
+            </div>
+            <div class="finance-card">
+              <div class="finance-label">本月消费</div>
+              <div class="finance-value">{{ weatherFinance.currency || 'CNY' }} {{ weatherFinance.thisMonth ?? '0' }}</div>
+            </div>
+            <div class="finance-card">
+              <div class="finance-label">昨日消费</div>
+              <div class="finance-value">{{ weatherFinance.currency || 'CNY' }} {{ weatherFinance.previousDay ?? '0' }}</div>
+            </div>
+          </div>
+          <el-alert v-else type="warning" :closable="false" show-icon style="margin-top:8px"
+            title="财务数据获取失败(需在和风控制台开启权限)" />
+
+          <!-- 请求量统计 -->
+          <h4 class="ops-section-title" style="margin-top:20px">24h 请求量统计</h4>
+          <div v-if="weatherStats">
+            <el-table :data="weatherStats.success || []" size="small" stripe>
+              <el-table-column prop="api" label="API" />
+              <el-table-column label="24h 成功请求">
+                <template #default="{ row }">{{ (row.hours || []).reduce((a, b) => a + b, 0) }}</template>
+              </el-table-column>
+            </el-table>
+            <div v-if="weatherStats.errors && weatherStats.errors.length" style="margin-top:12px">
+              <div class="ops-sub-title">错误请求</div>
+              <el-table :data="weatherStats.errors" size="small" stripe>
+                <el-table-column prop="api" label="API" />
+                <el-table-column label="24h 错误">
+                  <template #default="{ row }">{{ (row.hours || []).reduce((a, b) => a + b, 0) }}</template>
+                </el-table-column>
+              </el-table>
+            </div>
+          </div>
+          <el-alert v-else type="warning" :closable="false" show-icon style="margin-top:8px"
+            title="请求量统计获取失败(需在和风控制台开启权限)" />
         </div>
       </el-tab-pane>
     </el-tabs>
@@ -131,6 +175,8 @@ const logFilter = reactive({ keyword: '', operatorId: '', module: '', startDate:
 
 const weatherLoading = ref(false)
 const weatherQuota = ref(null)
+const weatherFinance = ref(null)
+const weatherStats = ref(null)
 
 const fmtMb = (bytes) => (bytes == null ? 0 : Math.round(bytes / 1024 / 1024))
 const fmtUptime = (sec) => {
@@ -192,9 +238,18 @@ const loadLogs = async (page = logPageNum.value) => {
 const loadWeatherQuota = async () => {
   weatherLoading.value = true
   try {
-    weatherQuota.value = await opsApi.weatherQuota()
+    const [quota, finance, stats] = await Promise.allSettled([
+      opsApi.weatherQuota(),
+      opsApi.weatherFinance(),
+      opsApi.weatherStats(),
+    ])
+    weatherQuota.value = quota.status === 'fulfilled' ? quota.value : null
+    weatherFinance.value = finance.status === 'fulfilled' ? finance.value : null
+    weatherStats.value = stats.status === 'fulfilled' ? stats.value : null
   } catch (e) {
     weatherQuota.value = null
+    weatherFinance.value = null
+    weatherStats.value = null
   } finally {
     weatherLoading.value = false
   }
@@ -249,4 +304,10 @@ watch(tab, (v) => { if (v === 'weather' && !weatherQuota.value) loadWeatherQuota
   .stats-grid { grid-template-columns: repeat(3, 1fr); }
   .server-row { grid-template-columns: 1fr; }
 }
+.ops-section-title { font-size: 14px; font-weight: 600; margin: 0 0 10px; color: var(--color-text); }
+.ops-sub-title { font-size: 13px; font-weight: 500; margin: 0 0 6px; color: var(--color-text-secondary); }
+.finance-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.finance-card { padding: 14px 16px; text-align: center; background: var(--color-card-2); border-radius: 10px; }
+.finance-label { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 6px; }
+.finance-value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
 </style>

@@ -174,8 +174,7 @@ onBeforeUnmount(() => {
 .leaf-card img {
   display: block;
   width: 100%;
-  aspect-ratio: 3 / 4;
-  object-fit: cover;
+  height: auto;
   pointer-events: none;
 }
 .leaf-card.hovered {

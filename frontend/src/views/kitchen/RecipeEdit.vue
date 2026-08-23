@@ -1,12 +1,11 @@
 <template>
-  <div class="recipe-edit-page" v-loading="loading">
+  <div class="page" v-loading="loading">
     <Breadcrumb :items="[
       { label: $t('kitchen.title'), to: '/kitchen' },
       { label: isEdit ? $t('kitchen.editRecipe') : $t('kitchen.addRecipe') },
     ]" />
 
     <div class="form-wrap">
-      <h1 class="page-title">{{ isEdit ? $t('kitchen.editRecipe') : $t('kitchen.addRecipe') }}</h1>
 
       <!-- 基础信息 -->
       <div class="form-section">
@@ -234,18 +233,6 @@ onMounted(load)
 </script>
 
 <style scoped>
-.recipe-edit-page {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 0 20px 40px;
-}
-
-.page-title {
-  font-size: 24px;
-  font-weight: 600;
-  margin: 20px 0 24px;
-  color: var(--text-primary, #303133);
-}
 
 .form-section {
   margin-bottom: 32px;

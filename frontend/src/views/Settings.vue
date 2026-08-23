@@ -28,7 +28,7 @@
         <!-- 个人资料大类:昵称/头像/生日/性别/身份标签 + 语言/主题 -->
         <template v-if="active === 'profile'">
           <div class="card settings-card">
-            <h2>{{ $t('settings.profile') }}</h2>
+            <div class="section-label">{{ $t('settings.profile') }}</div>
             <el-form :model="profile" label-position="top">
               <el-form-item :label="$t('settings.nickname')">
                 <el-input v-model="profile.nickname" />
@@ -79,7 +79,7 @@
         <!-- 家庭设置:基本信息 + 背景音乐(户主可编辑) -->
         <template v-if="active === 'family'">
           <div class="card settings-card">
-            <h2>{{ $t('settings.family') }}</h2>
+            <div class="section-label">{{ $t('settings.family') }}</div>
             <el-form :model="family" label-position="top">
               <el-form-item :label="$t('settings.familyName')">
                 <el-input v-model="family.name" />
@@ -123,7 +123,7 @@
 
           <!-- 背景音乐设置:上传单曲/专辑 + 歌单管理(设为背景音乐) -->
           <div class="card settings-card">
-            <h2>背景音乐设置</h2>
+            <div class="section-label">BGM 设置</div>
             <el-form label-position="top">
               <el-form-item label="上传音乐">
                 <div class="music-actions">
@@ -135,7 +135,7 @@
                   <el-button class="ghost-btn" @click="openPlaylistDialog">新建歌单</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="背景音乐歌单">
+              <el-form-item label="BGM 歌单">
                 <div class="bg-playlist-list">
                   <div v-for="p in visiblePlaylists" :key="p.id" class="bg-playlist-item" :class="{ active: p.isBackground }">
                     <img v-if="p.coverUrl" :src="p.coverUrl" class="bg-pl-cover" />
@@ -144,8 +144,8 @@
                       <div class="bg-pl-name">{{ p.name }}</div>
                       <div class="bg-pl-count">{{ p.trackCount || 0 }} 首</div>
                     </div>
-                    <div v-if="p.isBackground" class="bg-pl-tag">当前背景音乐</div>
-                    <el-button v-else size="small" type="primary" @click="setBackground(p)">设为背景音乐</el-button>
+                    <div v-if="p.isBackground" class="bg-pl-tag">当前BGM</div>
+                    <el-button v-else size="small" type="primary" @click="setBackground(p)">设为BGM</el-button>
                   </div>
                   <div v-if="allPlaylists.length > 5" class="bg-more" @click="showAllPlaylists = true">
                     更多 ({{ allPlaylists.length - 5 }}) 个歌单
@@ -153,13 +153,13 @@
                 </div>
                 <el-empty v-if="!allPlaylists.length && !playlistLoading" description="暂无歌单,创建第一个吧" :image-size="40" />
               </el-form-item>
-              <div class="share-tip">歌单是背景音乐播放的最小单元;播放器只播放当前家庭绑定的背景音乐歌单。详细配置请<a href="javascript:void(0)" class="link-text" @click="$router.push('/music')">跳转音乐页面</a></div>
+                <div class="share-tip">歌单是BGM播放的最小单元;播放器只播放当前家庭绑定的BGM歌单。详细配置请<a href="javascript:void(0)" class="link-text" @click="$router.push('/music')">跳转音乐页面</a></div>
             </el-form>
           </div>
 
           <!-- 创建新家庭:放在家庭设置最下方 -->
           <div class="card settings-card">
-            <h2>创建新家庭</h2>
+            <div class="section-label">创建新家庭</div>
             <button class="create-family-btn" @click="showCreateFamily = true">创建新家庭</button>
             <p class="share-tip">创建一个新的家庭组,你将成为新家庭的家长(OWNER)。创建后自动切换到新家庭,可在顶栏切换回原家庭。</p>
           </div>
@@ -168,7 +168,7 @@
         <!-- 每日内容 -->
         <template v-if="active === 'daily'">
           <div class="card settings-card">
-            <h2>{{ $t('settings.dailyContent') }}</h2>
+            <div class="section-label">{{ $t('settings.dailyContent') }}</div>
             <el-form label-position="top">
               <el-form-item :label="$t('settings.dailyImage')">
                 <el-switch v-model="daily.imageOn" />
@@ -199,7 +199,7 @@
         <!-- 个性化设置:主题 + 台灯/色温/亮度/阴影/天气效果/天气地区/夜间超时关灯/光照测试入口 -->
         <template v-if="active === 'light'">
           <div class="card settings-card">
-            <h2>个性化设置</h2>
+            <div class="section-label">个性化设置</div>
             <el-form label-position="top" class="settings-form">
               <el-form-item :label="$t('settings.theme')">
                 <div class="theme-row">
@@ -349,8 +349,8 @@
             <div class="bg-pl-name">{{ p.name }}</div>
             <div class="bg-pl-count">{{ p.trackCount || 0 }} 首</div>
           </div>
-          <div v-if="p.isBackground" class="bg-pl-tag">当前背景音乐</div>
-          <el-button v-else size="small" type="primary" @click="setBackground(p)">设为背景音乐</el-button>
+          <div v-if="p.isBackground" class="bg-pl-tag">当前BGM</div>
+          <el-button v-else size="small" type="primary" @click="setBackground(p)">设为BGM</el-button>
         </div>
       </div>
     </el-dialog>
@@ -642,7 +642,7 @@ const createPlaylist = async () => {
 const setBackground = async (p) => {
   try {
     await musicApi.setBackground(p.id)
-    ElMessage.success(`已将《${p.name}》设为背景音乐`)
+    ElMessage.success(`已将《${p.name}》设为BGM`)
     userStore.bumpBgMusic()
     await loadPlaylists()
   } catch (e) {
@@ -795,6 +795,8 @@ html.dark .form-tip, html.dark .share-tip { color: #9a9088; }
   transition: background 0.2s;
 }
 .create-family-btn:hover { background: #e8e0d2; }
+html.dark .create-family-btn { background: rgba(232,220,200,0.1); color: #E8DCC8; }
+html.dark .create-family-btn:hover { background: rgba(232,220,200,0.15); }
 .fm-hint { font-size: 13px; color: var(--color-text-secondary); line-height: 1.5; margin-bottom: 16px; }
 
 /* 背景音乐歌单列表 */

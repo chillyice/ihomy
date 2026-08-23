@@ -3,7 +3,6 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('blog.title'), to: '/blog' }, { label: isEdit ? $t('blog.editPost') : $t('blog.newPost') }]" />
     <div class="card">
-      <h2>{{ isEdit ? $t('blog.editPost') : $t('blog.newPost') }}</h2>
       <el-form :model="form" label-position="top">
         <el-form-item :label="$t('common.title')">
           <el-input v-model="form.title" :placeholder="$t('blog.titlePlaceholder')" />

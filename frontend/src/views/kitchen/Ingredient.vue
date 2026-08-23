@@ -1,16 +1,15 @@
 <template>
-  <div class="ingredient-page">
+  <div class="page">
     <Breadcrumb :items="[
       { label: $t('kitchen.title'), to: '/kitchen' },
       { label: $t('kitchen.ingredients') },
-    ]" />
-
-    <div class="page-header">
-      <h1 class="page-title">{{ $t('kitchen.ingredients') }}</h1>
-      <el-button v-if="userStore.isLoggedIn" type="primary" round @click="openAdd">
-        <el-icon><Plus /></el-icon> {{ $t('kitchen.addIngredient') }}
-      </el-button>
-    </div>
+    ]">
+      <template #right>
+        <el-button v-if="userStore.isLoggedIn" type="primary" round @click="openAdd">
+          <el-icon><Plus /></el-icon> {{ $t('kitchen.addIngredient') }}
+        </el-button>
+      </template>
+    </Breadcrumb>
 
     <!-- 搜索 -->
     <div class="search-bar">
@@ -57,7 +56,7 @@
       <el-form label-position="top">
         <!-- 图片上传 -->
         <el-form-item :label="$t('kitchen.ingredientImage')">
-          <el-upload :show-file-list="false" :before-upload="onUpload" accept="image/*">
+          <el-upload :show-file-list="false" :http-request="onUpload" accept="image/*">
             <img v-if="form.image_url" :src="form.image_url" class="image-preview" />
             <el-button v-else><el-icon><Plus /></el-icon> {{ $t('kitchen.ingredientImage') }}</el-button>
           </el-upload>
@@ -85,7 +84,7 @@
           <el-cascader
             v-model="form.locationPath"
             :options="locationTree"
-            :props="{ expandTrigger: 'hover', emitPath: true, checkStrictly: false }"
+            :props="{ expandTrigger: 'hover', emitPath: true, checkStrictly: true }"
             :placeholder="$t('kitchen.ingredientLocationPh')"
             clearable
             style="width: 100%"
@@ -144,10 +143,10 @@ const locationTree = computed(() => {
   return houses.value.map(h => ({
     value: h.id,
     label: h.name,
-    children: rooms.value.filter(r => r.house_id === h.id).map(r => ({
+    children: rooms.value.filter(r => r.houseId === h.id).map(r => ({
       value: r.id,
       label: r.name,
-      children: furnitures.value.filter(f => f.room_id === r.id).map(f => ({
+      children: furnitures.value.filter(f => f.roomId === r.id).map(f => ({
         value: f.id,
         label: f.name,
       })),
@@ -183,8 +182,8 @@ const defaultLocation = () => {
   // 找名称含"厨房"的 room
   const kitchenRoom = rooms.value.find(r => r.name && r.name.includes('厨房'))
   if (kitchenRoom) {
-    const house = houses.value.find(h => h.id === kitchenRoom.house_id)
-    const furn = furnitures.value.find(f => f.room_id === kitchenRoom.id)
+    const house = houses.value.find(h => h.id === kitchenRoom.houseId)
+    const furn = furnitures.value.find(f => f.roomId === kitchenRoom.id)
     if (house && furn) {
       return [house.id, kitchenRoom.id, furn.id]
     }
@@ -216,12 +215,11 @@ const openEdit = (item) => {
   dlg.value = true
 }
 
-const onUpload = async (file) => {
+const onUpload = async (options) => {
   try {
-    const data = await fileApi.upload(file)
+    const data = await fileApi.upload(options.file)
     form.image_url = data.url
   } catch (e) {}
-  return false
 }
 
 const onSave = async () => {
@@ -231,12 +229,12 @@ const onSave = async () => {
   }
   saving.value = true
   try {
-    // 级联取最后一级作为 furnitureId
-    const furnId = form.locationPath && form.locationPath.length > 0
-      ? form.locationPath[form.locationPath.length - 1] : null
+    // 级联取最后一级作为 furnitureId(仅 3 级路径时才有 furniture)
+    const furnId = form.locationPath && form.locationPath.length === 3
+      ? form.locationPath[2] : null
     const body = {
       name: form.name,
-      image_url: form.image_url,
+      imageUrl: form.image_url,
       type: 'INGREDIENT',
       quantity: form.quantity,
       unit: form.unit,
@@ -271,26 +269,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.ingredient-page {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 0 20px 40px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin: 20px 0 16px;
-}
-
-.page-title {
-  font-size: 24px;
-  font-weight: 600;
-  margin: 0;
-  color: var(--text-primary, #303133);
-}
-
 .search-bar {
   margin-bottom: 16px;
 }
@@ -303,8 +281,8 @@ onMounted(() => {
 
 .ingredient-bar {
   display: flex;
-  align-items: stretch;
-  border-radius: 16px;
+  align-items: center;
+  border-radius: 12px;
   overflow: hidden;
   cursor: pointer;
   transition: transform 0.3s ease;
@@ -313,49 +291,52 @@ onMounted(() => {
   -webkit-backdrop-filter: blur(24px) saturate(1.1);
   border: 1px solid rgba(255,255,255,0.2);
   box-shadow: 0 4px 16px rgba(0,0,0,0.06);
-  min-height: 100px;
+  height: 84px;
 }
 .ingredient-bar:hover { transform: translateX(4px); }
 
-/* 左半:图片 + 从左到右透明渐变 */
+/* 左侧:图片占条目宽度 1/3,居中裁切 */
 .bar-image-wrap {
-  flex: 0 0 40%;
+  flex: 1 0 33.33%;
+  max-width: 33.33%;
+  height: 100%;
   position: relative;
   overflow: hidden;
 }
 .bar-image {
   width: 100%;
   height: 100%;
-  min-height: 100px;
   object-fit: cover;
+  object-position: center;
   display: block;
 }
 .bar-image-empty {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 40px;
+  height: 100%;
+  font-size: 24px;
   color: var(--el-color-primary-light-5, #a0cfff);
   background: var(--el-fill-color-light, #f5f7fa);
 }
 .bar-image-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to right, transparent 0%, transparent 40%, var(--el-bg-color, rgba(255,255,255,0.9)) 100%);
+  background: linear-gradient(to right, transparent 0%, transparent 50%, var(--el-bg-color, rgba(255,255,255,0.9)) 100%);
   pointer-events: none;
 }
 
-/* 右半:名称 + 数量 */
+/* 右侧:名称 + 数量 + 位置 */
 .bar-info {
   flex: 1;
-  padding: 16px 20px;
+  padding: 8px 16px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
 }
 .bar-name {
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-primary, #303133);
 }
@@ -365,23 +346,23 @@ onMounted(() => {
   gap: 4px;
 }
 .qty-num {
-  font-size: 24px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--el-color-primary, #409eff);
 }
 .qty-unit {
-  font-size: 14px;
+  font-size: 12px;
   color: var(--text-secondary, #909399);
 }
 .qty-empty {
-  font-size: 14px;
+  font-size: 12px;
   color: var(--text-placeholder, #c0c4cc);
 }
 .bar-location {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary, #909399);
 }
 

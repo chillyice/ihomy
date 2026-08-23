@@ -218,6 +218,82 @@
       <div class="resize-handle" @mousedown="todayDrag.onResizeStart"></div>
     </div>
 
+    <!-- 首页功能组件区(可拖拽缩放毛玻璃) -->
+    <div v-if="userStore.isLoggedIn" class="draggable-panel home-widget"
+      :style="{ left: wishDrag.pos.value.x + 'px', top: wishDrag.pos.value.y + 'px', width: wishDrag.size.value.w + 'px', height: wishDrag.size.value.h + 'px', zIndex: wishDrag.zIndex.value }">
+      <div class="drag-handle" @mousedown="wishDrag.onDragStart"><span class="handle-grip"></span></div>
+      <div class="panel-body">
+        <div class="widget-title">愿望单</div>
+        <div class="widget-scroll">
+          <div v-if="wishes.length" class="wish-list">
+            <div v-for="w in wishes.slice(0, 6)" :key="w.id" class="wish-item" :class="{ done: w.status === 'ACHIEVED' }">
+              <span class="wish-dot" :class="w.status"></span>
+              <span class="wish-name">{{ w.title }}</span>
+            </div>
+          </div>
+          <div v-else class="widget-empty">暂无愿望</div>
+        </div>
+        <router-link to="/wish" class="widget-more">查看全部 →</router-link>
+      </div>
+      <div class="resize-handle" @mousedown="wishDrag.onResizeStart"></div>
+    </div>
+
+    <div v-if="userStore.isLoggedIn" class="draggable-panel home-widget"
+      :style="{ left: searchDrag.pos.value.x + 'px', top: searchDrag.pos.value.y + 'px', width: searchDrag.size.value.w + 'px', height: searchDrag.size.value.h + 'px', zIndex: searchDrag.zIndex.value }">
+      <div class="drag-handle" @mousedown="searchDrag.onDragStart"><span class="handle-grip"></span></div>
+      <div class="panel-body">
+        <div class="widget-title">物品寻找</div>
+        <div class="widget-scroll">
+          <el-input v-model="itemKeyword" placeholder="输入物品名称..." clearable prefix-icon="Search" @keyup.enter="searchItems" style="margin-bottom: 8px" />
+          <div v-if="searchResults.length" class="search-results">
+            <div v-for="r in searchResults.slice(0, 6)" :key="r.id" class="search-item">
+              <span class="search-name">{{ r.name }}</span>
+              <span class="search-loc">{{ [r.house_name, r.room_name, r.furniture_name].filter(Boolean).join(' ') }}</span>
+            </div>
+          </div>
+          <div v-else-if="searched" class="widget-empty">未找到相关物品</div>
+          <div v-else class="widget-empty">输入关键词搜索</div>
+        </div>
+        <router-link to="/item" class="widget-more">物品管理 →</router-link>
+      </div>
+      <div class="resize-handle" @mousedown="searchDrag.onResizeStart"></div>
+    </div>
+
+    <div v-if="userStore.isLoggedIn" class="draggable-panel home-widget"
+      :style="{ left: recipeDrag.pos.value.x + 'px', top: recipeDrag.pos.value.y + 'px', width: recipeDrag.size.value.w + 'px', height: recipeDrag.size.value.h + 'px', zIndex: recipeDrag.zIndex.value }">
+      <div class="drag-handle" @mousedown="recipeDrag.onDragStart"><span class="handle-grip"></span></div>
+      <div class="panel-body">
+        <div class="widget-title">今日推荐</div>
+        <div class="widget-scroll">
+          <div v-if="todayRecipes.length" class="recipe-list">
+            <router-link v-for="r in todayRecipes" :key="r.id" :to="`/kitchen/recipe/${r.id}`" class="recipe-item">
+              <img v-if="r.coverImage" :src="r.coverImage" class="recipe-cover" />
+              <div v-else class="recipe-cover placeholder">🍳</div>
+              <span class="recipe-name">{{ r.name }}</span>
+            </router-link>
+          </div>
+          <div v-else class="widget-empty">暂无推荐</div>
+        </div>
+        <router-link to="/kitchen" class="widget-more">查看菜谱 →</router-link>
+      </div>
+      <div class="resize-handle" @mousedown="recipeDrag.onResizeStart"></div>
+    </div>
+
+    <div v-if="userStore.isLoggedIn && bookSummary" class="draggable-panel home-widget"
+      :style="{ left: financeDrag.pos.value.x + 'px', top: financeDrag.pos.value.y + 'px', width: financeDrag.size.value.w + 'px', height: financeDrag.size.value.h + 'px', zIndex: financeDrag.zIndex.value }">
+      <div class="drag-handle" @mousedown="financeDrag.onDragStart"><span class="handle-grip"></span></div>
+      <div class="panel-body">
+        <div class="widget-title">本月收支</div>
+        <div class="widget-scroll finance-body">
+          <div class="fin-item"><span class="fin-label">收入</span><span class="fin-val income">+{{ bookSummary.income || 0 }}</span></div>
+          <div class="fin-item"><span class="fin-label">支出</span><span class="fin-val expense">-{{ bookSummary.expense || 0 }}</span></div>
+          <div class="fin-item"><span class="fin-label">结余</span><span class="fin-val" :class="(bookSummary.balance || 0) >= 0 ? 'income' : 'expense'">{{ bookSummary.balance || 0 }}</span></div>
+        </div>
+        <router-link to="/book" class="widget-more">查看明细 →</router-link>
+      </div>
+      <div class="resize-handle" @mousedown="financeDrag.onResizeStart"></div>
+    </div>
+
     <!-- 音乐播放器已全局化到 MusicPlayer.vue(App.vue 挂载) -->
     <!-- 光照测试控制台已全局化到 LightTestConsole.vue(App.vue 挂载) -->
   </div>
@@ -228,7 +304,7 @@ import { ref, computed, onMounted, onUnmounted, inject, nextTick, watch } from '
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
-import { publicApi, homeApi, taskApi, pointsApi, reminderApi } from '@/api'
+import { publicApi, homeApi, taskApi, pointsApi, reminderApi, bookApi, wishApi, itemApi, kitchenApi } from '@/api'
 import { gsap } from 'gsap'
 import { ElMessage, ElImageViewer } from 'element-plus'
 import { useDragResize } from '@/utils/useDragResize'
@@ -260,15 +336,22 @@ const taskDrag = useDragResize({ x: 244, y: 400, w: 380, h: 240, storageKey: 'ih
 const weatherDrag = useDragResize({ x: 1000, y: 210, w: 320, h: 180, storageKey: 'ihomy:panel:weather', marginLeft: 220 })
 const anniDrag = useDragResize({ x: 1000, y: 410, w: 280, h: 200, storageKey: 'ihomy:panel:anniversary', marginLeft: 220 })
 const todayDrag = useDragResize({ x: 244, y: 660, w: 380, h: 200, storageKey: 'ihomy:panel:today', marginLeft: 220 })
+// 功能组件:愿望单/物品寻找/今日菜谱/收支(可拖拽缩放)
+const wishDrag = useDragResize({ x: 244, y: 880, w: 260, h: 200, storageKey: 'ihomy:panel:wish', marginLeft: 220 })
+const searchDrag = useDragResize({ x: 530, y: 880, w: 260, h: 200, storageKey: 'ihomy:panel:search', marginLeft: 220 })
+const recipeDrag = useDragResize({ x: 816, y: 880, w: 260, h: 200, storageKey: 'ihomy:panel:recipe', marginLeft: 220 })
+const financeDrag = useDragResize({ x: 1000, y: 660, w: 260, h: 160, storageKey: 'ihomy:panel:finance', marginLeft: 220 })
 const weatherExpanded = ref(false)
 const resetPanelLayout = () => {
   feedDrag.reset(); taskDrag.reset(); weatherDrag.reset(); anniDrag.reset(); todayDrag.reset()
+  wishDrag.reset(); searchDrag.reset(); recipeDrag.reset(); financeDrag.reset()
   weatherExpanded.value = false
   ElMessage.success('面板布局已重置')
 }
 // 今日概览:积分签到 + 待办提醒
 const pointsStats = ref({})
 const reminders = ref([])
+const bookSummary = ref(null)
 const loadPoints = async () => {
   if (!userStore.isLoggedIn) return
   try { pointsStats.value = await pointsApi.stats() } catch (e) {}
@@ -278,6 +361,39 @@ const loadReminders = async () => {
   try {
     const r = await reminderApi.list()
     reminders.value = (Array.isArray(r) ? r : []).filter(x => x.done !== 1)
+  } catch (e) {}
+}
+const loadBookSummary = async () => {
+  if (!userStore.isLoggedIn) return
+  try { bookSummary.value = await bookApi.summary() } catch (e) {}
+}
+
+// 愿望单
+const wishes = ref([])
+const loadWishes = async () => {
+  if (!userStore.isLoggedIn) return
+  try { wishes.value = await wishApi.list() } catch (e) {}
+}
+
+// 物品寻找
+const itemKeyword = ref('')
+const searchResults = ref([])
+const searched = ref(false)
+const searchItems = async () => {
+  if (!itemKeyword.value.trim()) { searchResults.value = []; searched.value = false; return }
+  try {
+    searchResults.value = await itemApi.list({ keyword: itemKeyword.value.trim() })
+    searched.value = true
+  } catch (e) { searchResults.value = []; searched.value = true }
+}
+
+// 今日推荐菜谱
+const todayRecipes = ref([])
+const loadTodayRecipes = async () => {
+  if (!userStore.isLoggedIn) return
+  try {
+    const data = await kitchenApi.menu()
+    todayRecipes.value = data?.todayRecommend || []
   } catch (e) {}
 }
 const doCheckin = async () => {
@@ -398,6 +514,9 @@ onMounted(() => {
   loadWeatherDetail()
   loadPoints()
   loadReminders()
+  loadBookSummary()
+  loadWishes()
+  loadTodayRecipes()
   nextTick(() => {
     if (!root.value) return
     ctx = gsap.context(() => {
@@ -935,10 +1054,57 @@ html.dark .tp-num { color: #D4886A; }
 @media (max-width: 1280px) {
   .draggable-panel { font-size: 13px; }
 }
+
+/* ========== 首页功能组件(可拖拽毛玻璃) ========== */
+.home-widget .panel-body { padding: 0 16px 8px; }
+.home-widget .widget-title { font-size: 13px; font-weight: 600; color: #3A2E22; padding: 4px 0 8px; }
+.home-widget .widget-scroll { flex: 1; overflow-y: auto; min-height: 0; }
+.home-widget .widget-more { font-size: 11px; color: #b88c6e; text-decoration: none; margin-top: 4px; display: block; }
+.home-widget .widget-more:hover { color: #a06a4e; }
+.home-widget .widget-empty { font-size: 12px; color: #9a9088; padding: 12px 0; text-align: center; }
+
+/* 愿望单 */
+.wish-list { display: flex; flex-direction: column; gap: 6px; }
+.wish-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #3A2E22; }
+.wish-item.done { opacity: 0.4; text-decoration: line-through; }
+.wish-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: #c4a884; }
+.wish-dot.ACHIEVED { background: #6b9b6b; }
+.wish-dot.ABANDONED { background: #b06a58; }
+.wish-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 物品寻找 */
+.search-results { display: flex; flex-direction: column; gap: 6px; }
+.search-item { display: flex; flex-direction: column; gap: 2px; padding: 4px 0; border-bottom: 1px solid rgba(58,46,34,0.05); }
+.search-item:last-child { border: none; }
+.search-name { font-size: 12px; font-weight: 500; color: #3A2E22; }
+.search-loc { font-size: 10px; color: #9a9088; }
+
+/* 今日菜谱 */
+.recipe-list { display: flex; flex-direction: column; gap: 8px; }
+.recipe-item { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.recipe-cover { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+.recipe-cover.placeholder { display: flex; align-items: center; justify-content: center; background: #ede5d8; font-size: 16px; }
+.recipe-name { font-size: 12px; font-weight: 500; color: #3A2E22; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* 收支 */
+.finance-body { display: flex; gap: 16px; }
+.fin-item { display: flex; flex-direction: column; gap: 2px; }
+.fin-label { font-size: 10px; color: #9a9088; }
+.fin-val { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.fin-val.income { color: #6b9b6b; }
+.fin-val.expense { color: #b06a58; }
+
+/* 深色模式 */
+html.dark .home-widget .widget-title { color: #E8DCC8; }
+html.dark .home-widget .wish-item { color: #E8DCC8; }
+html.dark .home-widget .search-name { color: #E8DCC8; }
+html.dark .home-widget .recipe-name { color: #E8DCC8; }
+html.dark .home-widget .fin-val.income { color: #7dba7d; }
+html.dark .home-widget .fin-val.expense { color: #d9806a; }
+html.dark .home-widget .widget-empty { color: rgba(232,220,200,0.3); }
+html.dark .home-widget .recipe-cover.placeholder { background: rgba(232,220,200,0.06); }
+
 @media (max-width: 960px) {
-  .feed-panel, .task-panel, .anniversary-panel, .today-panel { display: none; }
-  .album-corner { width: 220px; height: 200px; right: 16px; bottom: 16px; }
-  .polaroid { width: 120px; margin-left: -60px; margin-top: -68px; }
-  .topbar-date { display: none; }
+  .home-widget { display: none; }
 }
 </style>

@@ -5,7 +5,7 @@
     <div v-if="blog" class="blog-layout">
       <!-- 正文卡片:居中 -->
       <div class="card detail">
-        <h1>{{ blog.title }}</h1>
+        <div class="blog-title-text">{{ blog.title }}</div>
         <div class="meta">
           <span>{{ formatDate(blog.createdAt) }} · {{ blog.viewCount }} {{ $t('blog.views') }}</span>
           <span v-if="blog.tags" class="tags">
@@ -320,7 +320,7 @@ onMounted(loadAll)
 
 /* 正文卡片 */
 .detail { flex: 1; min-width: 0; padding: 24px 28px; }
-.detail h1 { color: var(--color-primary); margin-bottom: 8px; line-height: 1.4; }
+.blog-title-text { font-size: 24px; font-weight: 700; color: var(--color-primary); margin-bottom: 8px; line-height: 1.4; }
 .meta { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 16px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
 .tags { display: flex; gap: 6px; }
 .tag { background: rgba(46, 116, 181, 0.08); color: var(--color-accent); padding: 1px 8px; border-radius: 10px; font-size: 12px; }

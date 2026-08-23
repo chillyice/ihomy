@@ -703,11 +703,6 @@ export default {
     ingredientLocation: '存放位置',
     ingredientLocationPh: '选择存放位置(可选)',
   },
-  dict: {
-    recipe_cuisine: { CHUAN: '川菜', YUE: '粤菜', LU: '鲁菜', SU: '苏菜', ZHE: '浙菜', MIN: '闽菜', XIANG: '湘菜', HUI: '徽菜', OTHER: '其他' },
-    recipe_category: { HOT: '热菜', HARD: '硬菜', COLD: '凉菜', STAPLE: '主食', PORRIDGE: '粥饮', DESSERT: '甜点' },
-    recipe_flavor: { SAVORY: '咸鲜', SPICY: '麻辣', SWEET_SOUR: '酸甜', LIGHT: '清淡', OTHER: '其他' },
-  },
   cascade: {
     title: '照片瀑布',
     hint: '照片随风飘落，悬停可查看信息，点击进入全屏浏览',
@@ -844,6 +839,9 @@ export default {
     authorFallback: '家人',
   },
   dict: {
+    recipe_cuisine: { CHUAN: '川菜', YUE: '粤菜', LU: '鲁菜', SU: '苏菜', ZHE: '浙菜', MIN: '闽菜', XIANG: '湘菜', HUI: '徽菜', OTHER: '其他' },
+    recipe_category: { HOT: '热菜', HARD: '硬菜', COLD: '凉菜', STAPLE: '主食', PORRIDGE: '粥饮', DESSERT: '甜点' },
+    recipe_flavor: { SAVORY: '咸鲜', SPICY: '麻辣', SWEET_SOUR: '酸甜', LIGHT: '清淡', OTHER: '其他' },
     visibility: { PRIVATE: '仅自己', MEMBERS: '指定成员', GROUPS: '指定群组', FAMILY: '家庭可见', PUBLIC: '公开' },
     blogStatus: { DRAFT: '草稿', PUBLISHED: '已发布', HIDDEN: '已隐藏' },
     userStatus: { ACTIVE: '正常', DISABLED: '禁用' },
@@ -856,5 +854,6 @@ export default {
     bookType: { EXPENSE: '支出', INCOME: '收入', TRANSFER: '转账' },
     repeatType: { ONCE: '一次性', DAILY: '每日', WEEKLY: '每周', MONTHLY: '每月' },
     annRecurring: { ONCE: '单次', YEARLY: '每年' },
+    item_type: { KITCHENWARE: '厨具', INGREDIENT: '食材', DAILY: '日化', CLOTHES: '衣物', TOOL: '工具', OTHER: '其他' },
   },
 }

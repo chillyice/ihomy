@@ -5,7 +5,7 @@
 
     <div v-if="album.id" class="album-header card">
       <div class="album-head-info">
-        <h2>{{ album.name }}</h2>
+        <span class="album-name">{{ album.name }}</span>
         <el-tag size="small" :type="album.type === 'public' ? 'primary' : 'warning'">
           {{ album.type === 'public' ? t('album.public') : t('album.private') }}
         </el-tag>

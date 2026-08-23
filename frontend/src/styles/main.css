@@ -112,6 +112,44 @@ a { color: var(--color-accent); text-decoration: none; }
   padding: 16px;
 }
 
+/* ========== 页面通用:标题栏 + 面包屑 ========== */
+.page-header {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.page-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text, #3A2E22);
+  margin: 0;
+}
+.list-header {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.page h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text, #3A2E22);
+  margin: 0 0 16px;
+}
+html.dark .page h2 { color: #E8DCC8; }
+.section-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text, #3A2E22);
+  margin: 0 0 16px;
+  padding-left: 10px;
+  border-left: 3px solid var(--color-accent, #b88c6e);
+}
+html.dark .section-label { color: #E8DCC8; }
+
 .card {
   background: var(--color-card);
   border-radius: var(--radius);
@@ -161,12 +199,13 @@ a { color: var(--color-accent); text-decoration: none; }
   border-color: #a87c5e !important;
 }
 html.dark .el-button--primary {
-  background: #b88c6e !important;
-  border-color: #b88c6e !important;
-  color: #fff !important;
+  background: #d4b298 !important;
+  border-color: #d4b298 !important;
+  color: #2a2018 !important;
 }
 html.dark .el-button--primary:hover {
-  background: #a87c5e !important;
+  background: #e0c2aa !important;
+  border-color: #e0c2aa !important;
 }
 
 /* 次级按钮(默认 type):浅米底深褐字 */
@@ -180,11 +219,13 @@ html.dark .el-button--primary:hover {
   border-color: #e8e0d2 !important;
 }
 html.dark .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):not(.ghost-btn) {
-  background: rgba(232,220,200,0.1) !important;
-  color: var(--color-text) !important;
+  background: rgba(255,255,255,0.12) !important;
+  border-color: rgba(255,255,255,0.12) !important;
+  color: #E8DCC8 !important;
 }
 html.dark .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):not(.ghost-btn):hover {
-  background: rgba(232,220,200,0.15) !important;
+  background: rgba(255,255,255,0.18) !important;
+  border-color: rgba(255,255,255,0.18) !important;
 }
 
 /* 幽灵按钮(.ghost-btn):透明底褐字,hover 浅米底 */
@@ -200,11 +241,11 @@ html.dark .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-li
 }
 html.dark .ghost-btn {
   background: transparent !important;
-  border-color: rgba(232,220,200,0.15) !important;
-  color: var(--color-text) !important;
+  border-color: rgba(255,255,255,0.15) !important;
+  color: #E8DCC8 !important;
 }
 html.dark .ghost-btn:hover {
-  background: rgba(232,220,200,0.08) !important;
+  background: rgba(255,255,255,0.08) !important;
 }
 
 /* 危险按钮(type=danger):浅红底暗红字 */
@@ -218,12 +259,13 @@ html.dark .ghost-btn:hover {
   border-color: #f0dedb !important;
 }
 html.dark .el-button--danger {
-  background: rgba(185,96,88,0.12) !important;
-  border-color: rgba(185,96,88,0.12) !important;
-  color: #d9665a !important;
+  background: rgba(201,116,116,0.15) !important;
+  border-color: rgba(201,116,116,0.15) !important;
+  color: #c97474 !important;
 }
 html.dark .el-button--danger:hover {
-  background: rgba(185,96,88,0.2) !important;
+  background: rgba(201,116,116,0.25) !important;
+  border-color: rgba(201,116,116,0.25) !important;
 }
 
 /* text/link 类型危险按钮:保持文字态,hover 浅红底 */
@@ -235,6 +277,15 @@ html.dark .el-button--danger:hover {
 .el-button--danger.is-text:hover,
 .el-button--danger.is-link:hover {
   background: rgba(185,96,88,0.08) !important;
+}
+html.dark .el-button--danger.is-text,
+html.dark .el-button--danger.is-link {
+  background: transparent !important;
+  color: #c97474 !important;
+}
+html.dark .el-button--danger.is-text:hover,
+html.dark .el-button--danger.is-link:hover {
+  background: rgba(201,116,116,0.12) !important;
 }
 
 /* 禁用/loading 态:统一置灰,去掉上浮 */
@@ -652,7 +703,7 @@ html.dark .el-message-box__btns .el-button:not(.el-button--primary):hover {
 /* ========== 全局下拉菜单(teleported, scoped 不生效) ========== */
 .el-dropdown__popper.el-popper,
 .el-popper.is-light {
-  z-index: 54 !important;
+  z-index: 61 !important;
 }
 .el-dropdown__popper.el-popper {
   border-radius: 12px !important;
@@ -760,7 +811,57 @@ html.dark .el-dialog__body::-webkit-scrollbar-thumb:hover { background: rgba(232
 .el-dialog .el-tabs__item:hover { color: #8a7e72 !important; }
 .el-dialog .el-tabs__item.is-active { color: #5c4c3d !important; font-weight: 500 !important; }
 .el-dialog .el-tabs__active-bar { background: #c4a884 !important; height: 2px !important; opacity: 0.7 !important; border-radius: 1px !important; }
+html.dark .el-tabs__active-bar { background: #d4b298 !important; opacity: 0.5 !important; }
+html.dark .el-dialog .el-tabs__active-bar { background: #d4b298 !important; opacity: 0.5 !important; }
 .el-dialog .el-tabs__nav-wrap::after { display: none !important; }
 html.dark .el-dialog .el-tabs__item { color: rgba(232,220,200,0.4) !important; }
 html.dark .el-dialog .el-tabs__item:hover { color: rgba(232,220,200,0.6) !important; }
 html.dark .el-dialog .el-tabs__item.is-active { color: #E8DCC8 !important; }
+
+/* ========== 标签(el-tag)全局规范 ========== */
+.el-tag {
+  border-radius: 8px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  border: 1px solid rgba(184,140,110,0.2) !important;
+  background: rgba(184,140,110,0.08) !important;
+  color: #5c4c3d !important;
+}
+.el-tag.el-tag--success { background: rgba(107,155,107,0.1) !important; border-color: rgba(107,155,107,0.2) !important; color: #4a7a4a !important; }
+.el-tag.el-tag--warning { background: rgba(138,109,59,0.1) !important; border-color: rgba(138,109,59,0.2) !important; color: #8a6d3b !important; }
+.el-tag.el-tag--danger { background: rgba(185,96,88,0.1) !important; border-color: rgba(185,96,88,0.2) !important; color: #b96058 !important; }
+.el-tag.el-tag--info { background: rgba(58,46,34,0.06) !important; border-color: rgba(58,46,34,0.12) !important; color: #5c4c3d !important; }
+
+html.dark .el-tag {
+  background: rgba(212,178,152,0.25) !important;
+  border-color: rgba(212,178,152,0.2) !important;
+  color: #d4b298 !important;
+}
+html.dark .el-tag.el-tag--success { background: rgba(125,186,125,0.15) !important; border-color: rgba(125,186,125,0.2) !important; color: #7dba7d !important; }
+html.dark .el-tag.el-tag--warning { background: rgba(212,178,152,0.15) !important; border-color: rgba(212,178,152,0.2) !important; color: #d4b298 !important; }
+html.dark .el-tag.el-tag--danger { background: rgba(201,116,116,0.15) !important; border-color: rgba(201,116,116,0.2) !important; color: #c97474 !important; }
+html.dark .el-tag.el-tag--info { background: rgba(255,255,255,0.08) !important; border-color: rgba(255,255,255,0.1) !important; color: rgba(232,220,200,0.6) !important; }
+
+/* ========== 数量角标 ========== */
+.el-badge__content {
+  background: rgba(58,46,34,0.7) !important;
+  border: none !important;
+  border-radius: 10px !important;
+  font-weight: 600 !important;
+}
+html.dark .el-badge__content {
+  background: rgba(0,0,0,0.5) !important;
+  color: #E8DCC8 !important;
+}
+
+/* ========== 图标规范:线条粗细 2px ========== */
+.el-icon svg { stroke-width: 2px; }
+
+/* ========== 圆角全局统一 ========== */
+.el-button { border-radius: 12px !important; }
+.el-button--small { border-radius: 10px !important; }
+.el-button--large { border-radius: 12px !important; }
+.el-input__wrapper { border-radius: 10px !important; }
+.el-select .el-input__wrapper { border-radius: 10px !important; }
+.el-card { border-radius: 14px !important; }
+.el-dialog { border-radius: 14px !important; }

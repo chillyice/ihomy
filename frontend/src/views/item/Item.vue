@@ -84,7 +84,8 @@
         <el-card v-for="it in items" :key="it.id" shadow="hover" class="item-card">
           <div class="item-main">
             <span class="item-name">{{ it.name }}</span>
-            <el-tag v-if="it.position" size="small">{{ it.position }}</el-tag>
+            <el-tag size="small">{{ dictText(t, 'item_type', it.type) }}</el-tag>
+            <el-tag v-if="it.position" size="small" type="info">{{ it.position }}</el-tag>
           </div>
           <div class="item-path">{{ it.house_name }} / {{ it.room_name }} / {{ it.furniture_name }}</div>
           <div class="item-aliases" v-if="it.aliases">{{ $t('item.aliases') }}: {{ it.aliases }}</div>
@@ -370,7 +371,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page { max-width: 960px; margin: 0 auto; padding: 24px; }
 .toolbar { display: flex; gap: 12px; margin-bottom: 16px; }
 .item-card { margin-bottom: 12px; }
 .item-main { display: flex; align-items: center; gap: 8px; }

@@ -36,6 +36,12 @@ public class BookController {
         return Result.success(bookService.list(current().getFamilyId(), month));
     }
 
+    @Operation(summary = "本月收支摘要(供首页卡片)")
+    @GetMapping("/summary")
+    public Result<Map<String, Object>> summary() {
+        return Result.success(bookService.summary(current().getFamilyId()));
+    }
+
     @Operation(summary = "记一笔(支出/收入/转账)")
     @OperationLog(module = "BOOK", operationType = "CREATE", description = "记账", saveArgs = false)
     @PostMapping
