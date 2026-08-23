@@ -44,8 +44,8 @@
 | dust-layer(灰尘) | 46 | 光路微粒(20 个,夜间不可见) | screen |
 | light-layer(体积光) | 48 | 光束+辉光 | screen |
 | window-shadow-upper(上层阴影) | 49 | 左框+右框(最顶层,盖住光柱) | darken |
-| el-popper/dropdown/tooltip | 54 | 全局下拉菜单(teleported,光影层下方) | normal |
-| MusicPlayer(音乐播放器) | 55 | 左下角黑胶唱片播放器(有背景歌单且曲目>0 时渲染) | normal |
+| el-popper/dropdown/tooltip | 61 | 全局下拉菜单(teleported,高于导航栏,光影层下方) | normal |
+| MusicPlayer(音乐播放器) | 62 | 左下角黑胶唱片播放器(有背景歌单且曲目>0 时渲染) | normal |
 | AppSidebar(导航栏) | 60 | 左侧导航+底部主题/台灯/用户 | normal |
 | bright-spot(光源辉光) | 65 | 体积光源核心光晕 | screen |
 | window-shadow-upper(窗框) | 68 | 上下分层窗框阴影 | darken |
@@ -401,6 +401,55 @@ gsap.from('.album-closed', { scale: 0.9, autoAlpha: 0, duration: 0.8, delay: 0.3
 - **手动切主题取消自动**:`onTheme` 设 `autoMode=false` + ElMessage.info 提示"已切换到手动主题,日出日落自动切换已暂停(可在设置中恢复)"。`applyAutoTheme` 检测 `autoMode=false` 自动跳过。
 - 深色模式:`html.dark .blob { opacity: 0.1 }` 色块压暗至 10%;`--color-primary` 深色覆写 `#E8DCC8`。
 
+## 18a. 深色模式配色体系(星空暗色背景)
+
+> 深色模式与浅色模式使用**完全不同的色值**,禁止直接复用浅色色值。整体设计语言:柔和低饱和暖棕主题,磨砂毛玻璃质感。
+
+### 按钮(el-button,`main.css` 全局覆写)
+
+| 按钮类型 | 深色模式背景 | 深色模式文字 | hover 背景 |
+|---------|------------|------------|-----------|
+| 主按钮(primary) | `#d4b298`(提亮浅暖棕) | `#2a2018`(深色) | `#e0c2aa` |
+| 次级按钮(默认) | `rgba(255,255,255,0.12)`(半透明白色磨砂) | `#E8DCC8`(浅米白) | `rgba(255,255,255,0.18)` |
+| 幽灵按钮(.ghost-btn) | 透明底 | `#E8DCC8` | `rgba(255,255,255,0.08)` |
+| 危险按钮(danger) | `rgba(201,116,116,0.15)`(半透明) | `#c97474`(低饱和暗红) | `rgba(201,116,116,0.25)` |
+| 危险 text/link | 透明底 | `#c97474` | `rgba(201,116,116,0.12)` |
+| 禁用/loading | `rgba(232,220,200,0.06)` | `rgba(232,220,200,0.3)` | — |
+
+### Tab 选中态
+
+- `el-tabs__active-bar`:`#d4b298` opacity 0.5(低饱和暖棕下划线,禁止亮蓝)。
+- `el-tabs__item.is-active`:`#E8DCC8`。
+
+### 状态标签(el-tag)
+
+| 标签类型 | 深色模式背景 | 深色模式文字 |
+|---------|------------|------------|
+| 默认 | `rgba(212,178,152,0.25)` | `#d4b298`(浅暖棕) |
+| success | `rgba(125,186,125,0.15)` | `#7dba7d`(低饱和绿) |
+| warning | `rgba(212,178,152,0.15)` | `#d4b298` |
+| danger | `rgba(201,116,116,0.15)` | `#c97474`(低饱和暗红) |
+| info | `rgba(255,255,255,0.08)` | `rgba(232,220,200,0.6)`(浅米) |
+
+- 圆角 8px;半透明磨砂背景;禁止高饱和实色块。
+
+### 数量角标(el-badge)
+
+- `rgba(0,0,0,0.5)` 半透明黑色磨砂背景;`#E8DCC8` 浅米白文字;不使用纯黑实色块。
+
+### 图标规范
+
+- 所有 `el-icon` SVG `stroke-width: 2px`。
+- 图标颜色跟随文字层级:主要图标=主文字色,次要图标=辅助灰色,危险图标=`#c97474`。
+
+### 圆角全局统一
+
+- `el-button` 12px(small 10px);`el-input__wrapper` 10px;`el-card` 14px;`el-dialog` 14px。
+
+### 弹窗深色模式
+
+- 弹窗背景 `#1E2A48`;次级按钮 `rgba(255,255,255,0.12)`;placeholder `rgba(232,220,200,0.35)`。
+
 ## 19. 性能规范(已踩坑)
 
 - **100% 缩放卡顿根因**:Element Plus `Setting`/`Monitor` 图标 SVG path 过于复杂,hover 时子像素光栅化开销大 → 用内联 SVG 替代(详见博客 id=18)。
@@ -428,11 +477,13 @@ gsap.from('.album-closed', { scale: 0.9, autoAlpha: 0, duration: 0.8, delay: 0.3
 9. 全局光照测试控制台(`LightTestConsole.vue`,App.vue 挂载):循环 288 时隙,含地区/日期/时间/高度/方位/窗角/9 段时段标签 + 进度条 + 后退/暂停/前进/停止 + 速度控制(0.5/1/2/4/8x) + 天气控制(☀️/☁️/🌧️/❄️/⛈️ + 降水滑块) + 图层开关(阴影/环境光) + 台灯模式(自动/开/关) + 色温/亮度滑块;停止=重置真实时间+关闭控制台。
 10. 夜间台灯自动开启(傍晚 dayProgress≥0.9 开,清晨 dayProgress>0.1 关),mask 祛除左上黄金分割点周围阴影;台灯钟摆运动(CSS `@keyframes lampSwing` 8 秒周期,横向 ±1.5vw);亮度滑块控制 mask 透明区域大小(3%-100%);色温滑块控制暖光色温。**开关灯 2s 渐变**:GSAP 补间驱动,mask 挖洞半径随强度缩放。
 11. **主题切换 1s 过渡**:双层伪元素 `::before`/`::after` opacity 交叉淡入淡出;面板/色块/文字颜色同步 1s 过渡。
-12. **可拖拽面板**:5 个面板(feed/task/weather/anniversary/today)可拖拽+可调大小,位置/大小持久化到 localStorage;拖拽边界 clamp;Settings"恢复默认面板布局"清持久化恢复初始值。
+12. **可拖拽面板**:9 个面板(feed/task/weather/anniversary/today + wish/search/recipe/finance)可拖拽+可调大小,位置/大小持久化到 localStorage;拖拽边界 clamp;Settings"恢复默认面板布局"清持久化恢复初始值。
 13. **今日面板**:积分余额+连续天数+签到按钮+今日待办提醒前 3 条(登录可见)。
-14. **备案号**:右下角 `right:16 bottom:8 z:70`,ICP+公安占位,磨砂玻璃小字。
-15. **照片瀑布**(`/cascade`):落叶式飘落动画(包装元素分离 transform 防频闪),hover 暂停+scale 1.15,点击 `el-image-viewer`,每 2s 生成一张上限 50 张。
-16. **深色模式**:`html.dark .blob { opacity: 0.1 }` 色块压暗至 10%;`--color-primary` 深色覆写 `#E8DCC8`;手动切主题后取消日出日落自动切换(`autoMode=false`)+提示。
-17. **创建新家庭**:`POST /family` 已登录用户创建新家庭组(绑定 OWNER+切换当前家庭);Settings 页入口。
-18. **天气特效**:雪(❄ 字符 12-28px)/雨(线性雨滴)粒子,数量=降水等级×10;多云闪烁(GSAP 4-8s 随机补间);weather-shadow 雨雪常显/多云随 cloudFlicker/晴不显示;weatherMultiplier 衰减光强(晴 1.0/多云 0.55/雨 0.25/雪 0.4)。
-19. **和风字体图标**:`<i class="qi-{iconCode}">`,iconCode 来自和风 API now.icon;npm 包 qweather-icons。
+14. **首页功能组件区**(登录可见):4 个可拖拽缩放毛玻璃组件(愿望单/物品寻找/今日菜谱/收支摘要),复用 `useDragResize`,各自独立 storageKey;移动端 ≤960px 隐藏。
+15. **备案号**:右下角 `right:16 bottom:8 z:70`,ICP+公安占位,磨砂玻璃小字。
+16. **照片瀑布**(`/cascade`):落叶式飘落动画(包装元素分离 transform 防频闪),hover 暂停+scale 1.15,点击 `el-image-viewer`,每 2s 生成一张上限 50 张。
+17. **深色模式**:`html.dark .blob { opacity: 0.1 }` 色块压暗至 10%;`--color-primary` 深色覆写 `#E8DCC8`;手动切主题后取消日出日落自动切换(`autoMode=false`)+提示;深色模式配色体系详见 §18a。
+18. **创建新家庭**:`POST /family` 已登录用户创建新家庭组(绑定 OWNER+切换当前家庭);Settings 页入口。
+19. **天气特效**:雪(❄ 字符 12-28px)/雨(线性雨滴)粒子,数量=降水等级×10;多云闪烁(GSAP 4-8s 随机补间);weather-shadow 雨雪常显/多云随 cloudFlicker/晴不显示;weatherMultiplier 衰减光强(晴 1.0/多云 0.55/雨 0.25/雪 0.4)。
+20. **和风字体图标**:`<i class="qi-{iconCode}">`,iconCode 来自和风 API now.icon;npm 包 qweather-icons。
+21. **z-index 层级**:光影层(65-100)为除 ElMessage Toast(3000)和 BackToTop/InstallPrompt(200)外的最高层;popper/dropdown=61(高于 sidebar=60,低于 bright-spot=65);MusicPlayer=62;任何新增组件 z-index 不得超 100(台灯 100 除外)。
