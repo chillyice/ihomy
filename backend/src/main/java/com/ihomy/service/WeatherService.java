@@ -81,14 +81,16 @@ public class WeatherService {
             if (c != null && c.getPrivateKey() != null && !c.getPrivateKey().isBlank()) {
                 // 私钥可能 ENC(...) 加密,解密后使用
                 c.setPrivateKey(parameterService.decrypt(c.getPrivateKey()));
+                log.info("[loadCredential] 从DB加载凭证成功, keyId={}", c.getKeyId());
                 return c;
             }
         } catch (Exception e) {
-            log.warn("load weather credential from DB failed: {}", e.getMessage());
+            log.error("[loadCredential] 从DB加载凭证失败,将尝试yml fallback", e);
         }
         // yml fallback
         if (apiHost == null || apiHost.isBlank() || projectId == null || projectId.isBlank()
                 || keyId == null || keyId.isBlank() || privateKeyPem == null || privateKeyPem.isBlank()) {
+            log.warn("[loadCredential] yml 凭证未配置,天气功能不可用");
             return null;
         }
         WeatherCredential fallback = new WeatherCredential();
@@ -97,6 +99,7 @@ public class WeatherService {
         fallback.setKeyId(keyId);
         // yml 的私钥也可能 ENC(...) 加密
         fallback.setPrivateKey(parameterService.decrypt(privateKeyPem));
+        log.info("[loadCredential] 从yml加载凭证成功, keyId={}", keyId);
         return fallback;
     }
 
@@ -213,6 +216,7 @@ public class WeatherService {
 
     /** 本地日志聚合:按时间范围返回调用总量+失败量折线图数据 */
     public List<Map<String, Object>> getTimeline(String range) {
+        log.info("[getTimeline] 开始聚合天气日志, range={}", range);
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
         java.time.LocalDateTime start;
         String fmt;
@@ -233,7 +237,17 @@ public class WeatherService {
                 start = now.minusHours(23).withMinute(0).withSecond(0).withNano(0);
                 fmt = "%H:00";
         }
-        return weatherLogMapper.selectTimeline(start, now, fmt);
+        log.info("[getTimeline] 查询参数: start={}, end={}, fmt={}", start, now, fmt);
+        try {
+            List<Map<String, Object>> result = weatherLogMapper.selectTimeline(start, now, fmt);
+            long totalCalls = result.stream().mapToLong(m -> ((Number) m.getOrDefault("total", 0)).longValue()).sum();
+            long totalFailed = result.stream().mapToLong(m -> ((Number) m.getOrDefault("failed", 0)).longValue()).sum();
+            log.info("[getTimeline] 聚合完成, range={}, 数据点={}, 调用总量={}, 失败总量={}", range, result.size(), totalCalls, totalFailed);
+            return result;
+        } catch (Exception e) {
+            log.error("[getTimeline] 聚合查询失败, range={}, start={}, end={}, fmt={}", range, start, now, fmt, e);
+            throw e;
+        }
     }
 
     // ---------- 内部:JWT + HTTP ----------
@@ -300,12 +314,13 @@ public class WeatherService {
 
     /** 调和风 API(自动加 JWT 头,每次调用记录日志);超月度配额返回 null */
     private JsonNode callApi(String pathAndQuery, WeatherCredential cred) {
-        if (isQuotaExceeded()) {
-            log.warn("qweather monthly quota exceeded ({}), skip call [{}]", MONTHLY_QUOTA, pathAndQuery);
-            return null;
-        }
         String apiType = parseApiType(pathAndQuery);
         String locationId = parseLocationFromQuery(pathAndQuery);
+        if (isQuotaExceeded()) {
+            log.warn("[callApi] 月度配额已耗尽({}),跳过调用, apiType={}, path={}", MONTHLY_QUOTA, apiType, pathAndQuery);
+            return null;
+        }
+        log.info("[callApi] 请求外部天气API, apiType={}, locationId={}, path={}", apiType, locationId, pathAndQuery);
         long t0 = System.currentTimeMillis();
         JsonNode resp = null;
         String errorMsg = null;
@@ -331,16 +346,17 @@ public class WeatherService {
                 is.close();
                 if (status >= 200 && status < 300) {
                     resp = mapper.readTree(body);
+                    log.info("[callApi] 响应成功, apiType={}, httpStatus={}, costMs={}", apiType, status, System.currentTimeMillis() - t0);
                 } else {
                     errorMsg = status + " " + body;
-                    log.warn("qweather call failed [{}]: {}", pathAndQuery, errorMsg);
+                    log.warn("[callApi] 响应失败, apiType={}, httpStatus={}, path={}, body={}", apiType, status, pathAndQuery, body.length() > 500 ? body.substring(0, 500) : body);
                 }
             }
             conn.disconnect();
             return resp;
         } catch (Exception e) {
             errorMsg = e.getMessage();
-            log.warn("qweather call failed [{}]: {}", pathAndQuery, errorMsg);
+            log.error("[callApi] 调用异常, apiType={}, path={}", apiType, pathAndQuery, e);
             return null;
         } finally {
             int costMs = (int) (System.currentTimeMillis() - t0);
@@ -358,7 +374,9 @@ public class WeatherService {
         String monthKey = "ihomy:weather:quota:" + java.time.YearMonth.now().toString();
         String cached = redis.opsForValue().get(monthKey);
         if (cached != null) {
-            return Long.parseLong(cached) >= MONTHLY_QUOTA;
+            boolean exceeded = Long.parseLong(cached) >= MONTHLY_QUOTA;
+            if (exceeded) log.warn("[isQuotaExceeded] Redis 计数已达配额, count={}, quota={}", cached, MONTHLY_QUOTA);
+            return exceeded;
         }
         // Redis 无计数(DB fallback):查 sys_weather_log 当月记录数
         try {
@@ -367,10 +385,11 @@ public class WeatherService {
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WeatherLog>()
                     .ge(WeatherLog::getCreatedAt, monthStart));
             long c = count != null ? count : 0;
+            log.info("[isQuotaExceeded] Redis 未命中,DB fallback 当月计数={}, quota={}", c, MONTHLY_QUOTA);
             redis.opsForValue().set(monthKey, String.valueOf(c), Duration.ofHours(1));
             return c >= MONTHLY_QUOTA;
         } catch (Exception e) {
-            log.warn("quota check failed, allow call: {}", e.getMessage());
+            log.error("[isQuotaExceeded] DB fallback 查询失败,放行调用", e);
             return false;
         }
     }
@@ -418,8 +437,9 @@ public class WeatherService {
                 logEntry.setErrorMsg(errorMsg.length() > 500 ? errorMsg.substring(0, 500) : errorMsg);
             }
             weatherLogMapper.insert(logEntry);
+            log.debug("[logCall] 日志落库成功, apiType={}, locationId={}, status={}, costMs={}", apiType, locationId, status, costMs);
         } catch (Exception e) {
-            log.warn("weather log insert failed: {}", e.getMessage());
+            log.error("[logCall] 日志落库失败, apiType={}, locationId={}, status={}, path={}", apiType, locationId, status, pathAndQuery, e);
         }
     }
 

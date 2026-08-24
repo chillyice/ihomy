@@ -10,6 +10,7 @@ import com.ihomy.service.WeatherService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -29,6 +30,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/ops")
 @RequiredArgsConstructor
+@Slf4j
 public class OpsController {
 
     private final OpsService opsService;
@@ -93,7 +95,15 @@ public class OpsController {
     @RequirePermission("ops:view")
     @GetMapping("/weather/timeline")
     public Result<List<Map<String, Object>>> weatherTimeline(@RequestParam(defaultValue = "24h") String range) {
-        return Result.success(weatherService.getTimeline(range));
+        log.info("[weatherTimeline] 入参: range={}", range);
+        try {
+            List<Map<String, Object>> data = weatherService.getTimeline(range);
+            log.info("[weatherTimeline] 查询完成, range={}, 数据点数={}", range, data.size());
+            return Result.success(data);
+        } catch (Exception e) {
+            log.error("[weatherTimeline] 查询失败, range={}", range, e);
+            throw e;
+        }
     }
 
     @Operation(summary = "加密明文为 ENC(...) 格式(供外挂配置文件使用)")
