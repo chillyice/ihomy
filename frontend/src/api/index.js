@@ -35,6 +35,7 @@ export const blogApi = {
 // 日记
 export const diaryApi = {
   list: (params) => request.get('/diary/list', { params }),
+  detail: (id) => request.get(`/diary/${id}`),
   create: (data) => request.post('/diary', data),
   update: (id, data) => request.put(`/diary/${id}`, data),
   remove: (id) => request.delete(`/diary/${id}`),

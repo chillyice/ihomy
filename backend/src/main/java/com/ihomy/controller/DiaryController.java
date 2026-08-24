@@ -35,6 +35,12 @@ public class DiaryController {
         return Result.success(diaryService.page(current, size, familyId, userId, securityHelper.isOwner()));
     }
 
+    @Operation(summary = "日志详情")
+    @GetMapping("/{id}")
+    public Result<Diary> detail(@PathVariable Long id) {
+        return Result.success(diaryService.getById(id));
+    }
+
     @Operation(summary = "新建日志")
     @OperationLog(module = "DIARY", operationType = "CREATE", description = "写日记")
     @PostMapping

@@ -9,6 +9,7 @@ const routes = [
   { path: '/blog/:id', name: 'BlogDetail', component: () => import('@/views/blog/BlogDetail.vue'), meta: { public: true } },
   { path: '/blog/edit/:id?', name: 'BlogEdit', component: () => import('@/views/blog/BlogEdit.vue'), meta: { requiresAuth: true } },
   { path: '/diary', name: 'DiaryList', component: () => import('@/views/diary/DiaryList.vue'), meta: { public: true } },
+  { path: '/diary/edit/:id?', name: 'DiaryEdit', component: () => import('@/views/diary/DiaryEdit.vue'), meta: { requiresAuth: true } },
   { path: '/anniversary', name: 'Anniversary', component: () => import('@/views/Anniversary.vue'), meta: { public: true } },
   { path: '/album', name: 'Album', component: () => import('@/views/album/Album.vue'), meta: { public: true } },
   { path: '/album/:id', name: 'AlbumDetail', component: () => import('@/views/album/AlbumDetail.vue'), meta: { public: true } },
