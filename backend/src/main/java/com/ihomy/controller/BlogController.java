@@ -49,7 +49,7 @@ public class BlogController {
     @GetMapping("/categories")
     public Result<List<String>> categories() {
         SysUser user = securityHelper.currentUser();
-        Long familyId = user == null ? null : user.getFamilyId();
+        Long familyId = user == null ? 1L : user.getFamilyId();
         return Result.success(blogService.categories(familyId));
     }
 
