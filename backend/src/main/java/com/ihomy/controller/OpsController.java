@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -86,6 +87,13 @@ public class OpsController {
     @GetMapping("/weather/stats")
     public Result<Map<String, Object>> weatherStats() {
         return Result.success(weatherService.getStats());
+    }
+
+    @Operation(summary = "天气API调用折线图(24h/本月/30天/一年)")
+    @RequirePermission("ops:view")
+    @GetMapping("/weather/timeline")
+    public Result<List<Map<String, Object>>> weatherTimeline(@RequestParam(defaultValue = "24h") String range) {
+        return Result.success(weatherService.getTimeline(range));
     }
 
     @Operation(summary = "加密明文为 ENC(...) 格式(供外挂配置文件使用)")
