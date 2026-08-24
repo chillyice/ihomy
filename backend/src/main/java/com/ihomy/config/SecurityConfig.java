@@ -47,8 +47,18 @@ public class SecurityConfig {
                         "/doc.html", "/webjars/**", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
                 // 读类接口(列表/详情/评论/点赞状态)也允许游客访问
                 .requestMatchers(org.springframework.http.HttpMethod.GET,
-                        "/home/modules", "/home/feed", "/blog/list", "/blog/*", "/diary/list",
-                        "/album/**", "/anniversary/list", "/comment/list", "/like/state").permitAll()
+                        "/home/modules", "/home/feed", "/home/dashboard",
+                        "/blog/list", "/blog/*", "/blog/categories",
+                        "/diary/list",
+                        "/album/**",
+                        "/anniversary/list",
+                        "/video/list", "/video/*",
+                        "/photo/cascade",
+                        "/comment/list",
+                        "/like/state",
+                        "/music/background",
+                        "/kitchen/menu", "/kitchen/recipe/*",
+                        "/book/summary").permitAll()
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e
                 // 未登录与无权限均以统一 JSON 结构返回,而非跳转登录页

@@ -71,13 +71,14 @@ const formRef = ref()
 const captchaId = ref('')
 const captchaImage = ref('')
 
+const _isReg = route.query.register === '1' || !!route.query.invite
 const form = reactive({
   familyName: '',
   inviteCode: route.query.invite || '',
-  email: '',
-  password: '',
+  email: _isReg ? '' : 'demo@ihomy.local',
+  password: _isReg ? '' : 'guest123',
   confirmPassword: '',
-  captchaCode: '',
+  captchaCode: _isReg ? '' : 'qwer',
 })
 
 const rules = computed(() => ({
@@ -115,6 +116,8 @@ loadCaptcha()
 
 const toggleMode = () => {
   isRegister.value = !isRegister.value
+  if (isRegister.value) { form.email = ''; form.password = ''; form.confirmPassword = ''; form.captchaCode = '' }
+  else { form.email = 'demo@ihomy.local'; form.password = 'guest123'; form.captchaCode = 'qwer' }
   loadCaptcha()
 }
 

@@ -153,6 +153,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 个人资料 | ProfileController | — | sys_user | `GET/PUT /profile`(nickname/avatar/birthday/gender);`GET/PUT/DELETE /profile/label`(身份标签) |
 | 密码找回 | AuthController | AuthService | sys_password_reset_token | 邮箱自助找回,token 30 分钟过期 |
 | 运维账号 | AuthController | AuthService | sys_user_role(family_id 可空) | `ops / ops@ihomy.local` 初始密码 admin123;OPS 角色绑定 family_id=NULL;`buildTokens` 返回 `isOps` 标志 |
+| 演示(访客)账号 | AuthController | AuthService | sys_user | `demo@ihomy.local` / `demo2@ihomy.local` / `demo3@ihomy.local` 密码均为 `guest123`;演示家庭 OWNER/MEMBER/CHILD;`is_fake=0`(可登录);登录页默认预填 `demo@ihomy.local` / `guest123` / 验证码 `qwer` |
 
 ### 2. 家庭与成员
 

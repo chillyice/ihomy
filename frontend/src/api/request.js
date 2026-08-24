@@ -26,11 +26,11 @@ request.interceptors.response.use(
     const res = response.data
     if (res.code !== undefined && res.code !== 0) {
       ElMessage.error(res.message || '请求失败')
-      // 业务层 401(如 refresh 失效):直接登出回登录页
+      // 业务层 401(如 refresh 失效):登出但仅写操作跳登录页
       if (res.code === 401) {
         const userStore = useUserStore()
         userStore.logout()
-        router.push('/login')
+        if (response.config.method !== 'get') router.push('/login')
       }
       return Promise.reject(res)
     }
@@ -39,21 +39,27 @@ request.interceptors.response.use(
   },
   async (error) => {
     const status = error.response?.status
-    // HTTP 401 且当前没有其他刷新在进行:静默续期后重放原请求
-    if (status === 401 && !refreshing) {
-      refreshing = true
+    // HTTP 401:已登录尝试刷新续期,未登录直接跳登录页(仅写操作)
+    if (status === 401) {
       const userStore = useUserStore()
-      try {
-        await userStore.refresh()
-        refreshing = false
-        error.config.headers.Authorization = `Bearer ${userStore.token}`
-        return request(error.config)
-      } catch (e) {
-        // 刷新失败(如 refresh token 过期):清空登录态跳登录页
-        refreshing = false
-        userStore.logout()
-        router.push('/login')
-        return Promise.reject(e)
+      if (!userStore.token) {
+        // 未登录用户触发写操作 401 → 跳登录页带回调
+        if (error.config.method !== 'get') router.push({ name: 'Login', query: { redirect: router.currentRoute.value.fullPath } })
+        return Promise.reject(error)
+      }
+      if (!refreshing) {
+        refreshing = true
+        try {
+          await userStore.refresh()
+          refreshing = false
+          error.config.headers.Authorization = `Bearer ${userStore.token}`
+          return request(error.config)
+        } catch (e) {
+          refreshing = false
+          userStore.logout()
+          if (error.config.method !== 'get') router.push('/login')
+          return Promise.reject(e)
+        }
       }
     }
     ElMessage.error(error.response?.data?.message || error.message || '网络错误')

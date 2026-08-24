@@ -769,9 +769,9 @@ UPDATE `sys_family_info` SET `is_demo` = 1, `name` = 'ihomy 演示家庭',
 WHERE `id` = @fid;
 
 INSERT INTO `sys_user` (`username`, `password`, `nickname`, `email`, `family_id`, `status`, `is_fake`) VALUES
-('demo_owner',  '$2a$10$NkY7m2y6qQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQq', '演示爸爸', 'demo@ihomy.local', @fid, 'ACTIVE', 1),
-('demo_member', '$2a$10$NkY7m2y6qQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQq', '演示妈妈', 'demo2@ihomy.local', @fid, 'ACTIVE', 1),
-('demo_child',  '$2a$10$NkY7m2y6qQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQqQq', '演示小宝', 'demo3@ihomy.local', @fid, 'ACTIVE', 1);
+('demo_owner',  '$2a$10$MMmotIRvLudAi0cV6SI95OemGUMiRJUv/hZMETo.GQzAFBElEA8GK', '演示爸爸', 'demo@ihomy.local', @fid, 'ACTIVE', 0),
+('demo_member', '$2a$10$MMmotIRvLudAi0cV6SI95OemGUMiRJUv/hZMETo.GQzAFBElEA8GK', '演示妈妈', 'demo2@ihomy.local', @fid, 'ACTIVE', 0),
+('demo_child',  '$2a$10$MMmotIRvLudAi0cV6SI95OemGUMiRJUv/hZMETo.GQzAFBElEA8GK', '演示小宝', 'demo3@ihomy.local', @fid, 'ACTIVE', 0);
 INSERT INTO `sys_user_role` (`user_id`, `role_id`, `family_id`)
 SELECT u.id, r.id, u.family_id FROM `sys_user` u
 JOIN `sys_role` r ON r.role_code = CASE u.username
