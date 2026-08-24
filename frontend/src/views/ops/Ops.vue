@@ -87,8 +87,33 @@
           <el-alert type="info" :closable="false" show-icon style="margin-bottom: 14px"
             title="和风天气控制台 API:用量统计 + 财务汇总 + 请求量统计(JWT 身份认证)" />
 
+          <!-- 调用折线图 -->
+          <h4 class="ops-section-title">API 调用趋势</h4>
+          <div class="timeline-controls">
+            <el-radio-group v-model="timelineRange" size="small" @change="loadTimeline">
+              <el-radio-button value="24h">24小时</el-radio-button>
+              <el-radio-button value="month">本月</el-radio-button>
+              <el-radio-button value="30d">30天</el-radio-button>
+              <el-radio-button value="year">一年</el-radio-button>
+            </el-radio-group>
+          </div>
+          <div v-if="timelineData.length" class="chart-wrap">
+            <svg :viewBox="`0 0 ${chartW} ${chartH}`" class="line-chart" preserveAspectRatio="none">
+              <line v-for="(t, i) in yTicks" :key="'grid'+i" :x1="padL" :x2="chartW - padR" :y1="t.y" :y2="t.y" stroke="var(--color-border)" stroke-width="1" stroke-dasharray="3 3" />
+              <text v-for="(t, i) in yTicks" :key="'yl'+i" :x="padL - 8" :y="t.y + 4" text-anchor="end" fill="var(--color-text-secondary)" font-size="11">{{ t.label }}</text>
+              <text v-for="(lb, i) in xLabels" :key="'xl'+i" :x="xPos(i)" :y="chartH - padB + 16" text-anchor="middle" fill="var(--color-text-secondary)" font-size="11">{{ lb }}</text>
+              <polyline :points="linePoints(timelineData.map(d => d.total))" fill="none" stroke="#b88c6e" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+              <polyline :points="linePoints(timelineData.map(d => d.failed))" fill="none" stroke="#b04a3a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+            </svg>
+            <div class="chart-legend">
+              <span class="legend-item"><span class="legend-dot" style="background:#b88c6e"></span>调用总量</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#b04a3a"></span>失败总量</span>
+            </div>
+          </div>
+          <el-empty v-else description="暂无调用记录" :image-size="40" />
+
           <!-- 用量统计 -->
-          <h4 class="ops-section-title">API 用量</h4>
+          <h4 class="ops-section-title" style="margin-top:20px">API 用量</h4>
           <div v-if="weatherQuota && weatherQuota.raw">
             <el-descriptions :column="2" border size="small">
               <el-descriptions-item v-for="(v, k) in weatherQuota.raw" :key="k" :label="k">{{ typeof v === 'object' ? JSON.stringify(v) : v }}</el-descriptions-item>
@@ -144,7 +169,7 @@
 
 <script setup>
 // 运维管理:三标签聚合页;数据接口须 ops:view 权限,后端 OpsAccessFilter 还会把 OPS 角色限定在 /ops 与 /auth
-import { onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { opsApi } from '@/api'
 import Breadcrumb from '@/components/Breadcrumb.vue'
@@ -177,6 +202,62 @@ const weatherLoading = ref(false)
 const weatherQuota = ref(null)
 const weatherFinance = ref(null)
 const weatherStats = ref(null)
+
+const timelineRange = ref('24h')
+const timelineData = ref([])
+const chartW = 800
+const chartH = 280
+const padL = 40
+const padR = 20
+const padB = 30
+const padT = 20
+
+const yMax = computed(() => {
+  const mx = Math.max(...timelineData.value.map(d => d.total), 1)
+  return mx <= 5 ? 5 : Math.ceil(mx / 5) * 5
+})
+const yTicks = computed(() => {
+  const ticks = []
+  for (let i = 0; i <= 4; i++) {
+    const val = Math.round(yMax.value * i / 4)
+    ticks.push({ y: chartH - padB - (chartH - padB - padT) * i / 4, label: val })
+  }
+  return ticks
+})
+const xLabels = computed(() => {
+  const n = timelineData.value.length
+  if (n === 0) return []
+  const step = Math.max(1, Math.ceil(n / 8))
+  const labels = []
+  for (let i = 0; i < n; i += step) labels.push(timelineData.value[i].time_bucket)
+  if ((n - 1) % step !== 0) labels.push(timelineData.value[n - 1].time_bucket)
+  const indices = []
+  for (let i = 0; i < n; i += step) indices.push(i)
+  if ((n - 1) % step !== 0) indices.push(n - 1)
+  return indices.map(i => timelineData.value[i].time_bucket)
+})
+const xPos = (i) => {
+  const n = timelineData.value.length
+  if (n <= 1) return padL
+  return padL + (chartW - padL - padR) * i / (n - 1)
+}
+const linePoints = (vals) => {
+  const n = vals.length
+  if (n === 0) return ''
+  return vals.map((v, i) => {
+    const x = n <= 1 ? padL : padL + (chartW - padL - padR) * i / (n - 1)
+    const y = chartH - padB - (chartH - padB - padT) * v / yMax.value
+    return `${x},${y}`
+  }).join(' ')
+}
+
+const loadTimeline = async () => {
+  try {
+    timelineData.value = await opsApi.weatherTimeline(timelineRange.value)
+  } catch (e) {
+    timelineData.value = []
+  }
+}
 
 const fmtMb = (bytes) => (bytes == null ? 0 : Math.round(bytes / 1024 / 1024))
 const fmtUptime = (sec) => {
@@ -253,6 +334,7 @@ const loadWeatherQuota = async () => {
   } finally {
     weatherLoading.value = false
   }
+  loadTimeline()
 }
 
 onMounted(async () => {
@@ -310,4 +392,10 @@ watch(tab, (v) => { if (v === 'weather' && !weatherQuota.value) loadWeatherQuota
 .finance-card { padding: 14px 16px; text-align: center; background: var(--color-card-2); border-radius: 10px; }
 .finance-label { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 6px; }
 .finance-value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.timeline-controls { margin-bottom: 12px; }
+.chart-wrap { background: var(--color-card-2); border-radius: 10px; padding: 16px; }
+.line-chart { width: 100%; height: 260px; display: block; }
+.chart-legend { display: flex; gap: 20px; justify-content: center; margin-top: 8px; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--color-text-secondary); }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; }
 </style>

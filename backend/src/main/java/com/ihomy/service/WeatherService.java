@@ -25,6 +25,7 @@ import java.time.ZonedDateTime;
 import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
@@ -208,6 +209,31 @@ public class WeatherService {
         result.put("success", resp.path("success"));
         result.put("errors", resp.path("errors"));
         return result;
+    }
+
+    /** 本地日志聚合:按时间范围返回调用总量+失败量折线图数据 */
+    public List<Map<String, Object>> getTimeline(String range) {
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.time.LocalDateTime start;
+        String fmt;
+        switch (range) {
+            case "month":
+                start = now.toLocalDate().withDayOfMonth(1).atStartOfDay();
+                fmt = "%Y-%m-%d";
+                break;
+            case "30d":
+                start = now.toLocalDate().minusDays(29).atStartOfDay();
+                fmt = "%Y-%m-%d";
+                break;
+            case "year":
+                start = now.toLocalDate().withDayOfYear(1).atStartOfDay();
+                fmt = "%Y-%m";
+                break;
+            default:
+                start = now.minusHours(23).withMinute(0).withSecond(0).withNano(0);
+                fmt = "%H:00";
+        }
+        return weatherLogMapper.selectTimeline(start, now, fmt);
     }
 
     // ---------- 内部:JWT + HTTP ----------
