@@ -27,4 +27,6 @@ public class Diary {
     private LocalDateTime updatedAt;
     @TableLogic
     private Integer deleted;
+    @TableField(exist = false)
+    private String authorName;
 }
