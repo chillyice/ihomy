@@ -44,7 +44,8 @@ public class PhotoController {
         SysUser user = securityHelper.currentUser();
         Album album = albumService.getById(albumId);
         if (album == null) throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.NOT_FOUND);
-        if (!album.getFamilyId().equals(user.getFamilyId())) throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.FORBIDDEN);
+        Long fid = securityHelper.current().getFamilyId();
+        if (!album.getFamilyId().equals(fid)) throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.FORBIDDEN);
         List<Photo> photos = new ArrayList<>();
         for (MultipartFile f : files) {
             String url = fileService.upload(f, f.getOriginalFilename(), f.getContentType(),
@@ -52,9 +53,9 @@ public class PhotoController {
             photos.add(albumService.addPhoto(albumId, user, url, null));
         }
         if (!photos.isEmpty()) {
-            pointsService.addRecord(user.getId(), user.getFamilyId(), "REWARD",
+            pointsService.addRecord(user.getId(), fid, "REWARD",
                     PointsService.REWARD_PHOTO * photos.size(), "上传照片 ×" + photos.size());
-            publicController.invalidateHomeCache(user.getFamilyId());
+            publicController.invalidateHomeCache(fid);
         }
         return Result.success(photos);
     }
@@ -71,7 +72,7 @@ public class PhotoController {
     @OperationLog(module = "PHOTO", operationType = "DELETE", description = "删除照片")
     @DeleteMapping("/photo/{id}")
     public Result<Void> delete(@PathVariable Long id) {
-        Long fid = securityHelper.currentUser().getFamilyId();
+        Long fid = securityHelper.current().getFamilyId();
         albumService.deletePhoto(id, securityHelper.currentUser(), securityHelper.isOwner());
         publicController.invalidateHomeCache(fid);
         return Result.success();
