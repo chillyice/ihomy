@@ -101,7 +101,7 @@ frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
     utils/useDragResize.js # 可拖拽面板组合式函数(zIndex+bringToFront+边界clamp+localStorage持久化)
     components/     # AppSidebar(全局导航)/BackToTop/Breadcrumb/AvatarCropper/InstallPrompt/SiteFooter(备案号)/SunLightLayer(全局光影层)/LightTestConsole(光照测试控制台)/SyncDialog(存储同步进度)
     styles/main.css # CSS 变量 + 全局样式 + 深色模式覆写 + ElMessage/ElNotification 增强
-    views/          # 24 个页面:Home(沉浸式首页)/Login/Member/Settings/Anniversary/album(Album/AlbumDetail)/cinema/Cinema/diary(DiaryList/DiaryEdit)/blog(BlogList/BlogDetail/BlogEdit)/points/Points/task/Task/reminder/Reminder/plan/Plan/wish/Wish/book/Book/chat/Chat/tree/Tree/cascade/Cascade/ops/Ops/storage/Storage/item/Item/kitchen/Kitchen
+    views/          # 24 个页面:Home(沉浸式首页)/Login/Member/Settings/Anniversary/album(Album/AlbumDetail)/cinema/Cinema/diary/DiaryList/blog(BlogList/BlogDetail/BlogEdit)/points/Points/task/Task/reminder/Reminder/plan/Plan/wish/Wish/book/Book/chat/Chat/tree/Tree/cascade/Cascade/ops/Ops/storage/Storage/item/Item/kitchen/Kitchen
     App.vue
   vite.config.js   # PWA + 代理 /api -> :8080 + ElementPlus 按需
   public/favicon.svg
@@ -170,7 +170,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 模块 | Controller | Service | 关键表 | 要点 |
 |------|-----------|---------|--------|------|
 | 博客 | BlogController | BlogService | content_blog | 标签(逗号分隔)+ `category VARCHAR(50)` 自定义分类;`GET /blog/categories` DISTINCT;默认 visibility=FAMILY;marked v18 renderer h1→h2;列表/编辑/详情均带 category |
-| 日记 | DiaryController | DiaryService | content_diary | 独立编辑页 `/diary/edit/:id?`(模仿博客);心情/天气弹窗选择(12心情+8天气,图标+文字);天气默认当前(`GET /public/weather`);日期可选(`dto.date` 覆盖 `createdAt`);默认 visibility=PRIVATE(仅自己),可切 FAMILY/PUBLIC;横格纸风格(蓝色横线 28px 行高);翻页(PageUp/PageDown,超出 CHARS_PER_PAGE 自动翻页);右侧涂鸦占位区(待开发);`GET /diary/{id}` 详情;DTO 加 `images`+`date` 字段;列表批量填充 `authorName`(N+1 禁令) |
+| 日记 | DiaryController | DiaryService | content_diary | 多图(JSON images 最多 9 张)+mood+weather;默认 visibility=FAMILY |
 | 相册 | AlbumController | AlbumService | content_album | type=public/private;public→PUBLIC/private→FAMILY;软删 |
 | 照片 | PhotoController | AlbumService | content_photo | 批量上传 `POST /album/{id}/photos`;`taken_at/location`;**硬删除**(`PhotoMapper.deletePhysicalById` XML DELETE 绕过全局 logic-delete)+ `FileService.deleteByUrl` 删磁盘文件;`source_path`(设备:相对路径)去重 |
 | 放映厅 | VideoController | VideoService | content_video/content_video_wish | 豆瓣式属性(media_type/genres/region/year/duration/episodes/director/actors/rating/intro/poster/video_url);`POST /video/upload` 500MB;**硬删除**(DB+video_url+poster);想看列表 CRUD |
@@ -519,13 +519,7 @@ CREATE TABLE content_music_playlist_track (...);
 | `FileService.java` | 图片缩略图 `_thumb.jpg`(maxWidth 480);`deleteByUrl` 顺带删 |
 | `utils/image.js` | `thumbUrl`/`onThumbError` 工具;4 页面列表用缩略图 |
 | `views/blog/BlogList.vue` | "加载更多"按钮;封面缩略图 |
-| `views/diary/DiaryList.vue` | 模仿 BlogList 风格:卡片式布局+hover下拉菜单+作者显示+可见性标签;心情/天气纯图标 |
-| `views/diary/DiaryEdit.vue` | 独立编辑页(模仿 BlogEdit);横格纸+翻页;心情/天气弹窗选择(图标+文字);日期选择;天气默认当前;右侧涂鸦占位区;默认仅自己可见;DTO 加 `images`+`date` |
-| `DiaryService.java` | `page()` 批量填充 `authorName`(`selectBatchIds`+Map 回填);`create()` 支持 `dto.date` 覆盖 `createdAt`;`getById()` 详情 |
-| `DiaryController.java` | 加 `GET /diary/{id}` 详情接口 |
-| `DiaryDTO.java` | 加 `images`(JSON 字符串)+`date` 字段 |
-| `Diary.java` | 加 `@TableField(exist=false) authorName` 瞬态字段 |
-| `router/index.js` | 加 `/diary/edit/:id?` 路由(requiresAuth) |
+| `views/diary/DiaryList.vue` | `el-image-viewer` 应用内预览 |
 | i18n | Home/Settings 60+ 硬编码中文改 `$t()`;中英双语 key |
 | 移动端 | `@media (max-width:960px)` 面板从 `display:none` 改文档流堆叠 |
 
