@@ -37,6 +37,7 @@ export default {
     actions: '操作',
     warning: '提示',
     remove: '移除',
+    close: '关闭',
   },
   login: {
     title: '登录',
@@ -223,6 +224,10 @@ export default {
       emptyHint: '公开相册的备注信息会随照片滚动显示在这里',
       tapToFlip: '点击翻一张',
     },
+  },
+  photoViewer: {
+    play: '播放幻灯片',
+    slideshow: '播放',
   },
   member: {
     title: '家庭成员',
