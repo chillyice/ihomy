@@ -34,6 +34,7 @@ export default {
     actions: 'Actions',
     warning: 'Notice',
     remove: 'Remove',
+    close: 'Close',
   },
   login: {
     title: 'Sign in',
@@ -207,6 +208,10 @@ export default {
       emptyHint: 'Notes from public albums scroll here with each photo',
       tapToFlip: 'Tap to flip',
     },
+  },
+  photoViewer: {
+    play: 'Play slideshow',
+    slideshow: 'Slideshow',
   },
   member: {
     title: 'Members',

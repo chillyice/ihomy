@@ -31,22 +31,20 @@
       <el-empty :description="$t('cascade.empty')" />
     </div>
 
-    <el-image-viewer
-      v-if="viewerVisible"
-      :url-list="viewerUrls"
+    <PhotoViewer
+      v-model:visible="viewerVisible"
+      :photos="photos"
       :initial-index="viewerIdx"
-      @close="closeViewer"
-      hide-on-click-modal
     />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { photoApi } from '@/api'
-import { ElImageViewer } from 'element-plus'
+import PhotoViewer from '@/components/PhotoViewer.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -57,7 +55,6 @@ const cards = ref([])
 const loading = ref(true)
 const viewerVisible = ref(false)
 const viewerIdx = ref(0)
-const viewerUrls = computed(() => photos.value.map(p => p.url))
 
 let cardSeq = 0
 let spawnTimer = null
@@ -105,7 +102,6 @@ const openViewer = (c) => {
   viewerIdx.value = Math.max(0, idx)
   viewerVisible.value = true
 }
-const closeViewer = () => { viewerVisible.value = false }
 
 const formatDate = (d) => {
   if (!d) return ''
