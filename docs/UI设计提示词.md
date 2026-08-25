@@ -471,3 +471,6 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 19. **天气特效**:雪(❄ 字符 12-28px)/雨(线性雨滴)粒子,数量=降水等级×10;多云闪烁(GSAP 4-8s 随机补间);weather-shadow 雨雪常显/多云随 cloudFlicker/晴不显示;weatherMultiplier 衰减光强(晴 1.0/多云 0.55/雨 0.25/雪 0.4)。
 20. **和风字体图标**:`<i class="qi-{iconCode}">`,iconCode 来自和风 API now.icon;npm 包 qweather-icons。
 21. **z-index 层级**:光影层(65-100)为除 ElMessage Toast(3000)和 BackToTop/InstallPrompt(200)外的最高层;popper/dropdown=61(高于 sidebar=60,低于 bright-spot=65);MusicPlayer=62;任何新增组件 z-index 不得超 100(台灯 100 除外)。
+22. **书架页**(`/library`):与博客列表页设计风格统一。grid 布局(180px 分类侧栏 + 1fr 主区);左侧分类栏(毛玻璃+sticky+active 竖线)同博客;主区图书网格 `auto-fill minmax(160px, 1fr)`,卡片含封面(3:4 比例)+格式角标(右上半透明黑底白字)+书名(2 行截断)+作者+分类标签+浏览数;卡片 hover 上浮 `translateY(-4px)`+阴影;下拉菜单(编辑/复制链接/删除)hover 显示;移动端分类栏改水平滚动+网格 `minmax(130px, 1fr)`。
+23. **书架详情页**(`/library/:id`):flex 布局(封面 140px+元信息区);封面 3:4 带阴影;元信息含书名(24px/700)、作者、格式标签(暖棕半透明)、分类标签、文件大小、标签、浏览数;操作按钮区(在线阅读/下载/阅读状态切换);简介区(section-label 标题);在线阅读器全屏覆盖(z-index:200)含顶栏(书名+翻页控件+关闭)+内容区(PDF iframe / EPUB epub.js / TXT 分页);移动端封面+元信息改垂直居中布局。
+24. **书架编辑页**(`/library/edit/:id?`):与博客编辑页设计风格统一。`.card` + `el-form label-position="top"`;文件上传(`el-input` readonly + `el-upload` append 按钮);封面上传同;表单含书名/作者/文件/封面/简介/分类(selectable+新建)/标签/可见范围;底部 `.form-footer` 右对齐保存按钮。

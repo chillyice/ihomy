@@ -13,7 +13,7 @@
 ## 项目概述
 
 - **应用名**:ihomy(家庭共用软件)。家庭内部内容共享平台,PC 浏览器 / 安卓 / iOS(均 PWA)。
-- **核心功能**:登录注册、博客、日记、相册、纪念日、留言板、放映厅、聊天室、积分商城、任务悬赏、提醒、家庭计划、愿望单、记账、家谱、运维。首页模块化可扩展(后期新增功能只需插入一条 `sys_home_module` 记录)。
+- **核心功能**:登录注册、博客、日记、相册、纪念日、留言板、放映厅、聊天室、积分商城、任务悬赏、提醒、家庭计划、愿望单、记账、家谱、书架、运维。首页模块化可扩展(后期新增功能只需插入一条 `sys_home_module` 记录)。
 - **技术栈**:前端 Vue3 + Vite + ElementPlus + PWA(`ihomy-frontend`);后端 Spring Boot 3 + MyBatis-Plus + MySQL 8 + Redis(JWT 双 token + 验证码 + WebSocket),包 `com.ihomy`,主类 `IhomyApplication`,`ihomy-backend`。
 
 ## 工作目录
@@ -52,10 +52,10 @@
 - **root 仅用于初始化**:`mysql -uroot -p < backend/src/main/resources/schema.sql`,执行一次(建库、建表、创建 ihomy 账号、初始数据)。
 - **业务运行用 `ihomy` 账号**:仅授予 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`(最小权限,无 CREATE/ALTER/DROP)。application.yml 连接用 `ihomy`,**不要用 root 跑业务**。
 - 账号同时创建 `localhost` 和 `%` 两个 host(本机/远程应用服务器都能连)。
-- **51 张表**,前缀分类:
+- **53 张表**,前缀分类:
   - `sys_`(系统/账号/权限/家庭设置/日志/参数/字典/天气/存储,17 张):`sys_user` / `sys_role` / `sys_auth` / `sys_user_role` / `sys_role_auth` / `sys_family_info` / `sys_home_module` / `sys_password_reset_token` / `sys_user_group` / `sys_user_group_member` / `sys_operation_log` / `sys_dict_item` / `sys_parameter` / `sys_storage_device` / `sys_weather_credential` / `sys_weather_location` / `sys_weather_log`
-  - `family_`(家庭事务,21 张):`family_anniversary` / `family_notification` / `family_apply` / `family_invitation_code` / `family_checkin` / `family_points_record` / `family_points_product` / `family_points_order` / `family_task` / `family_reminder` / `family_plan` / `family_plan_task` / `family_book_record` / `family_chat_message` / `family_chat_read` / `family_user_label` / `family_tree` / `family_house` / `family_room` / `family_furniture` / `family_item
-  - `content_`(内容类,13 张):`content_blog` / `content_diary` / `content_album` / `content_photo` / `content_comment` / `content_visibility` / `content_like` / `content_video` / `content_video_wish` / `content_wish` / `content_music` / `content_music_playlist` / `content_music_playlist_track`
+  - `family_`(家庭事务,21 张):`family_anniversary` / `family_notification` / `family_apply` / `family_invitation_code` / `family_checkin` / `family_points_record` / `family_points_product` / `family_points_order` / `family_task` / `family_reminder` / `family_plan` / `family_plan_task` / `family_book_record` / `family_chat_message` / `family_chat_read` / `family_user_label` / `family_tree` / `family_house` / `family_room` / `family_furniture` / `family_item`
+  - `content_`(内容类,15 张):`content_blog` / `content_diary` / `content_album` / `content_photo` / `content_comment` / `content_visibility` / `content_like` / `content_video` / `content_video_wish` / `content_wish` / `content_music` / `content_music_playlist` / `content_music_playlist_track` / `content_book` / `content_book_borrow`
   - **命名规则**:家庭事务业务表一律 `family_` 前缀;内容数据 `content_` 前缀;账号/权限/配置/日志/天气/存储保留 `sys_`。新增表必须遵守。前缀取最顶层祖先类别;上下级关系体现在表名(如 `sys_user_role`)。
 - **枚举不再用数字**:状态/类型字段一律大写英文单词(`PUBLISHED/DRAFT/PUBLIC/FAMILY/ACTIVE...`),含义存字典表 `sys_dict_item`,Java 常量集中于 `common/DictConst.java`,前端映射 `utils/dict.js`。**不要写回 0/1/2 判断**。
 - **注意**:`content_blog/diary/photo/video/wish` 5 张内容表 `visibility` 列为 `VARCHAR(20) DEFAULT 'FAMILY'`(PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开),schema.sql 与 live DB 已对齐(曾误写 TINYINT)。
@@ -75,24 +75,24 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
     annotation/  # @RequirePermission / @OperationLog
     aspect/      # RequirePermissionAspect(权限AOP) / OperationLogAspect(操作日志AOP)
     filter/      # TraceIdFilter(链路ID生成,写入 MDC + 响应头 X-Trace-Id)
-    entity/      # 42 个实体类(7 张关联/字典表无实体:sys_auth/sys_role_auth/sys_user_group/sys_user_group_member/sys_password_reset_token/sys_dict_item/content_visibility)
+    entity/      # 44 个实体类(7 张关联/字典表无实体:sys_auth/sys_role_auth/sys_user_group/sys_user_group_member/sys_password_reset_token/sys_dict_item/content_visibility)
     mapper/      # MyBatis-Plus BaseMapper 接口(自定义 SQL 全部放 resources/mapper/*.xml,接口不写 @Select/@Update 注解,参数统一 @Param)
-    service/     # 32 个 @Service 类(单实现无接口层)
-    controller/  # 30 个 Controller
+    service/     # 33 个 @Service 类(单实现无接口层)
+    controller/  # 31 个 Controller
     dto/         # 请求/响应 DTO
     websocket/   # ChatWebSocketHandler(原生 WebSocket 聊天室)
   src/main/resources/
     application.yml     # 端口8080, context-path=/api, 连接用 ihomy 账号; mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml; **基线配置**(MySQL 6306/Redis 6379/captcha 空/天气留空);当前 `file.upload-dir` 为 Windows 开发默认值,生产通过 external.yml 覆盖为 Linux 路径
     external.yml.template  # 外挂配置模板(IHOMY_CONFIG_PATH 指定路径,覆盖 MySQL/Redis 密码 + JWT 密钥 + 上传路径 + captcha + 天气凭证,ENC() 加密)—— 唯一的开发/生产差异机制,**不再用 application-dev.yml profile**(见 scripts/start-all.ps1)
     mapper/*.xml        # 每个 Mapper 接口一个同名 XML(namespace=接口全限定名)
-    schema.sql          # 建库+建号+建表(51张)+种子数据
+    schema.sql          # 建库+建号+建表(53张)+种子数据
   mvnw / mvnw.cmd       # Maven Wrapper,无需单独装 Maven
 frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
   src/
     api/request.js  # axios + JWT header + 401 自动刷新token
-    api/index.js    # 全部模块 API 分组导出(28 个 Api 对象:public/auth/home/blog/diary/file/member/anniversary/album/photo/like/comment/notification/family/profile/video/points/task/reminder/plan/wish/music/book/ops/tree/chat/storage/item)
+    api/index.js    # 全部模块 API 分组导出(29 个 Api 对象:public/auth/home/blog/diary/file/member/anniversary/album/photo/like/comment/notification/family/profile/video/points/task/reminder/plan/wish/music/book/ops/tree/chat/storage/item/kitchen/library)
     stores/user.js  # 登录状态 + hasPerm/isOps/isPureOps; stores/app.js 首页聚合(family/modules/photos/stats)
-    router/         # 登录守卫 + scrollBehavior(返回回顶部);含 /ops 运维护卫, /chat 需登录; 24 个路由
+    router/         # 登录守卫 + scrollBehavior(返回回顶部);含 /ops 运维护卫, /chat 需登录; 27 个路由
     i18n/           # vue-i18n 中英(applyLocale 切换)
     theme/          # applyTheme/loadTheme(明暗模式,只 light/dark)
     utils/dict.js   # 枚举词条中文映射(与后端 DictConst 对应)
@@ -101,7 +101,7 @@ frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
     utils/useDragResize.js # 可拖拽面板组合式函数(zIndex+bringToFront+边界clamp+localStorage持久化)
     components/     # AppSidebar(全局导航)/BackToTop/Breadcrumb/AvatarCropper/InstallPrompt/SiteFooter(备案号)/SunLightLayer(全局光影层)/LightTestConsole(光照测试控制台)/SyncDialog(存储同步进度)
     styles/main.css # CSS 变量 + 全局样式 + 深色模式覆写 + ElMessage/ElNotification 增强
-    views/          # 24 个页面:Home(沉浸式首页)/Login/Member/Settings/Anniversary/album(Album/AlbumDetail)/cinema/Cinema/diary/DiaryList/blog(BlogList/BlogDetail/BlogEdit)/points/Points/task/Task/reminder/Reminder/plan/Plan/wish/Wish/book/Book/chat/Chat/tree/Tree/cascade/Cascade/ops/Ops/storage/Storage/item/Item/kitchen/Kitchen
+    views/          # 27 个页面:Home(沉浸式首页)/Login/Member/Settings/Anniversary/album(Album/AlbumDetail)/cinema/Cinema/diary/DiaryList/blog(BlogList/BlogDetail/BlogEdit)/points/Points/task/Task/reminder/Reminder/plan/Plan/wish/Wish/book/Book/chat/Chat/tree/Tree/cascade/Cascade/ops/Ops/storage/Storage/item/Item/kitchen/Kitchen/library/LibraryList/LibraryDetail/LibraryEdit
     App.vue
   vite.config.js   # PWA + 代理 /api -> :8080 + ElementPlus 按需
   public/favicon.svg
@@ -176,6 +176,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 放映厅 | VideoController | VideoService | content_video/content_video_wish | 豆瓣式属性(media_type/genres/region/year/duration/episodes/director/actors/rating/intro/poster/video_url);`POST /video/upload` 500MB;**硬删除**(DB+video_url+poster);想看列表 CRUD |
 | 照片瀑布 | CascadeController | — | content_photo | `GET /photo/cascade` 随机;可见性过滤(成员 PUBLIC+FAMILY,PRIVATE 仅作者,未登录仅 PUBLIC) |
 | 愿望单 | WishController | WishService | content_wish | title/reason/category/status(待实现/已实现/放弃)/visibility/achieved_at |
+| 书架 | LibraryController | LibraryService | content_book/content_book_borrow | 家庭电子书架(EPUB/PDF/TXT/MOBI);上传/分类/在线阅读;**硬删除**(DB+file_url+cover_url);阅读状态跟踪(WANT_READ/READING/FINISHED);在线阅读:PDF iframe/EPUB epub.js(异步加载)/TXT 分页(2000字/页)/MOBI 仅下载;文件存 `books/{yyyyMM}/`;可见性与博客一致 |
 
 ### 4. 互动
 
@@ -240,7 +241,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | i18n | `i18n/` + `utils/dict.js` | vue-i18n 中英;applyLocale 切换;DictConst 后端常量对应 |
 | 主题 | `theme/index.js` | 只 light/dark;applyTheme/loadTheme;双层伪元素背景 1s 过渡;手动切主题取消日出日落自动 |
 | 身份标签 | ProfileController | family_user_label(user_id/family_id/label/color,每家庭一套) |
-| 字典表 | — | sys_dict_item 16 组;状态/类型字段英文单词化 |
+| 字典表 | — | sys_dict_item 18 组;状态/类型字段英文单词化 |
 
 ## 设计规范(统一实现,避免多种方式)
 
@@ -251,7 +252,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 3. **权限**:`@RequirePermission("code")` + `RequirePermissionAspect`;OWNER 恒真;新增接口前确保 auth_code 进 `sys_auth`+`sys_role_auth` 种子。
 4. **操作日志**:`@OperationLog` 注解 + `OperationLogAspect` 异步落库;含 traceId(`TraceIdFilter` 生成 16 位 UUID 短串,写入 MDC + 响应头 `X-Trace-Id`)。
 5. **SQL 日志**:`mybatis-plus.log-impl=SqlStatementLog`(SLF4J 实现,由 `logging.level.mybatis.sql` 控制,默认 `warn` 静默);需要排查 SQL 时调到 `debug`。**禁止 `System.out.println` 打 SQL**(同步 I/O + 污染 stdout)。
-6. **软删**:`@TableLogic deleted`;**物理删必须用自定义 XML DELETE 语句**(MP `deleteById` 实为 UPDATE)。目前仅照片/相册/视频三处硬删。
+6. **软删**:`@TableLogic deleted`;**物理删必须用自定义 XML DELETE 语句**(MP `deleteById` 实为 UPDATE)。目前照片/相册/视频/图书四处硬删。
 7. **家庭隔离**:所有业务数据带 `family_id`;JWT familyId 为快照,refresh 时按优先级解析;跨家庭访问返回 NOT_FOUND。
 8. **多家庭**:`sys_user_role.family_id` 区分;当前家庭存 Redis;`default_family_id` 用户设置的默认家庭。
 9. **N+1 禁令**(强制):列表接口禁止在 for 循环里 `selectById` 取关联字段(authorName/uploaderName/requesterName 等)。**必须先收集所有 userIds,用 `selectBatchIds` 批量查,内存 Map 回填**。参考 `ActivityFeedService.getFeed` / `CommentService.list` / `AnniversaryService.list` / `VideoService.list` 的 `batchUsers()` 写法。已批量化的:Book/Chat/FamilyPlan/Task/Points/ActivityFeed/Comment/Anniversary/Video。
@@ -262,7 +263,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
     - **不变数据走内存缓存**:`sys_home_module` 全局模块 `@PostConstruct` 加载 `volatile List`,家庭模块按 familyId 缓存 `ConcurrentHashMap`,变更时 evict。**不引 Caffeine 等库**(数据量小,内存够用)。
     - **敏感数据不缓存**:成员视图的 `/public/home`(含 stats/photos)不缓存,只缓存非成员视图。
 11. **UPDATE 不先 select**(强制):回写冗余字段(如 `like_count`)用 `LambdaUpdateWrapper.eq(id).set(field, value).update(null)`,不要 `selectById` 再 `updateById`(省一次查询)。参考 `ContentLikeService.syncCount`。
-12. **文件上传流式**(强制):大文件(>1MB)禁止 `file.getBytes()` 全量入堆(生产 `-Xmx384m` 上传 200MB 即 OOM)。**用 `MultipartFile` 重载 + `transferTo` + `Files.copy` 兜底**。FileService 已提供 3 个流式重载(`upload`/`uploadVideo` 通用+图片+视频),Controller 必须传 `MultipartFile` 不调 `getBytes()`。
+12. **文件上传流式**(强制):大文件(>1MB)禁止 `file.getBytes()` 全量入堆(生产 `-Xmx384m` 上传 200MB 即 OOM)。**用 `MultipartFile` 重载 + `transferTo` + `Files.copy` 兜底**。FileService 已提供 4 个流式重载(`upload`/`uploadVideo`/`uploadBook` 通用+图片+视频+电子书),Controller 必须传 `MultipartFile` 不调 `getBytes()`。
 13. **JVM/连接池配置**(基线):`spring.threads.virtual.enabled: true`(JDK21 虚拟线程,Tomcat 自动用);HikariCP `maximum-pool-size: 20` + `minimum-idle: 5` + `connection-timeout: 3000`;`mybatis.sql: warn`(生产静默 SQL 日志)。
 
 ### 前端规范
@@ -277,12 +278,12 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 8. **可拖拽面板**:`useDragResize` 组合式函数;5 个面板各自实例;位置/大小持久化 localStorage;**事件监听器按需挂载**(`onDragStart`/`onResizeStart` 时挂 `mousemove`/`mouseup`,`onMouseUp` 时移除,不要 `onMounted` 常驻——参考 `AvatarCropper.vue` 的写法)。
 9. **光影层全局化**:`SunLightLayer` + `AppSidebar` + `SiteFooter` 在 `App.vue` 全局挂载;`useSunLight` provide/inject 共享状态。
 10. **i18n**:所有用户可见文本用 `$t('key')`;中英双语;`utils/dict.js` 枚举映射。
-11. **打包分块**(强制):`vite.config.js` 必须配 `build.rollupOptions.output.manualChunks` 拆分大 vendor(当前 `element-plus`/`gsap`/`vue-i18n` 三块)。**public/ 下静态资源不得与 npm 包重复**(已删 `public/qweather-icons/`,改走 `node_modules/qweather-icons/font/`)。
+11. **打包分块**(强制):`vite.config.js` 必须配 `build.rollupOptions.output.manualChunks` 拆分大 vendor(当前 `element-plus`/`gsap`/`vue-i18n`/`epubjs` 四块)。**public/ 下静态资源不得与 npm 包重复**(已删 `public/qweather-icons/`,改走 `node_modules/qweather-icons/font/`)。
 12. **重型资源异步加载**(强制):字体包/CSS(如 `qweather-icons.css` 44.9KB)阻塞首屏的,必须 `import('...')` 异步加载,不要同步 `import`。
 13. **动画优先级**(强制):持续型动画(钟摆/心跳/呼吸)优先级 **CSS `@keyframes` > GSAP 直接操作 DOM ref > `requestAnimationFrame` + 响应式 ref**。**禁止用 rAF 每帧写 Vue ref 触发响应式重渲染**(参考 `useSunLight.js` 钟摆已改 CSS `@keyframes lampSwing`)。
 14. **并行请求**(强制):多个独立的 `await xxxApi.foo()` 必须改 `Promise.all([a, b, c])` 并行(参考 `Home.vue loadAll` + `stores/app.js init`)。串行只在真有依赖时用。
 15. **computed 纯函数**(强制):`computed` 内禁止 `Math.random()`/`Date.now()`/副作用,否则每次访问重算且视觉跳动。需要随机/一次性计算用 `ref` + `watch(source, immediate)` 生成(参考 `Home.vue polaroidLayout`)。
-16. **路由懒加载**:24 个路由全部 `() => import('./views/...')`,不写同步 `import Home from '@/views/Home.vue'`。
+16. **路由懒加载**:27 个路由全部 `() => import('./views/...')`,不写同步 `import Home from '@/views/Home.vue'`。
 17. **模态弹窗规范**(强制,全局统一,所有 `el-dialog` + `ElMessageBox` 共享 `main.css` 全局覆写,禁止在各组件 scoped 内重复定义):
     - **容器**:圆角 14px;阴影 `0 3px 12px rgba(0,0,0,0.07)`;背景 `#fcf8f0` + `backdrop-filter: blur(12px) saturate(1.1)`;`padding: 0`(header/body/footer 各自管 padding)。
     - **尺寸规则**(按业务场景,禁止全部弹窗同一宽度,禁止写死固定 height):
@@ -396,7 +397,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - MyBatis-Plus 二级缓存 —— 默认未开(正确),二级缓存易脏数据,不推荐。
 - `stores/app.js` 不加 sessionStorage 缓存(家庭数据可变,in-memory 已够)。
 - `api/request.js` 不加请求去重/缓存(失效策略复杂,易脏数据)。
-- `AppSidebar.vue:102` 22 个 EP 图标同步导入(每个 ~1-2KB,树摇后约 30KB,改动态反而增加运行时开销)。
+- `AppSidebar.vue:102` 23 个 EP 图标同步导入(每个 ~1-2KB,树摇后约 30KB,改动态反而增加运行时开销)。
 
 #### 验证基线
 
@@ -523,17 +524,51 @@ CREATE TABLE content_music_playlist_track (...);
 | i18n | Home/Settings 60+ 硬编码中文改 `$t()`;中英双语 key |
 | 移动端 | `@media (max-width:960px)` 面板从 `display:none` 改文档流堆叠 |
 
+##### 电子图书(家庭书架 V7.1)
+
+| 文件 | 改动 |
+|------|------|
+| `schema.sql` | 新增 `content_book`+`content_book_borrow` 两表;`sys_auth` 加 `library:manage`;`sys_role_auth` MEMBER/CHILD 授权;`sys_home_module` 加 library(position=19);`sys_dict_item` 加 book_format/borrow_status |
+| `entity/ContentBook.java` + `entity/BookBorrow.java` | 电子书实体+阅读状态实体 |
+| `dto/LibraryDTO.java` | 表单 DTO(title+fileUrl 必填) |
+| `mapper/ContentBookMapper.java` + `ContentBookMapper.xml` | BaseMapper + 自定义 SQL(incrViewCount/selectCategoriesByFamily/renameCategory/clearCategory/deletePhysicalById) |
+| `mapper/BookBorrowMapper.java` | BaseMapper(阅读状态 CRUD) |
+| `service/LibraryService.java` | CRUD + 分类管理 + 可见性过滤(同博客) + 阅读状态跟踪 + 硬删+文件清理 + 格式自动检测 |
+| `controller/LibraryController.java` | 列表/分类/上传/增删改/阅读状态 12 个接口 |
+| `service/FileService.java` | 新增 `uploadBook(MultipartFile)` 流式重载,存 `books/{yyyyMM}/` |
+| `common/DictConst.java` | 新增 FMT_EPUB/PDF/TXT/MOBI + BORROW_WANT/READING/FINISHED 常量 |
+| `frontend/src/api/index.js` | 新增 `libraryApi`(list/detail/create/update/delete/categories/upload/borrow) |
+| `frontend/src/router/index.js` | 3 路由:/library(list)、/library/:id(detail)、/library/edit/:id?(edit) |
+| `frontend/src/views/library/LibraryList.vue` | 书架网格(auto-fill 160px)+ 左侧分类栏 + 格式角标 + 卡片 hover 上浮 + 下拉菜单 + 分类管理弹窗 |
+| `frontend/src/views/library/LibraryDetail.vue` | 详情卡片 + 在线阅读器全屏覆盖(PDF iframe/EPUB epub.js 异步加载/TXT 分页/MOBI 仅下载)+ 阅读状态按钮 |
+| `frontend/src/views/library/LibraryEdit.vue` | 表单(书名/作者/文件上传/封面上传/简介/分类/标签/可见范围) |
+| `frontend/src/components/AppSidebar.vue` | 导航加 library(Reading 图标);ICON_MAP + NAV_PATHS |
+| `frontend/src/i18n/zh-CN.js` + `en.js` | library.* 约 55 条中英双语;dict.book_format/borrow_status |
+| `frontend/vite.config.js` | manualChunks 加 epubjs 拆分 |
+| `frontend/package.json` | 新增 epubjs 依赖 |
+
+**live DB 同步**:
+```sql
+-- 见 backend/src/main/resources/library_migration.sql
+CREATE TABLE content_book (...);
+CREATE TABLE content_book_borrow (...);
+INSERT INTO sys_auth ... 'library:manage';
+INSERT INTO sys_role_auth ...;
+INSERT INTO sys_home_module ... 'library';
+INSERT INTO sys_dict_item ... book_format/borrow_status;
+```
+
 ## 文件存储策略
 
 - **当前阶段(开发期)**:本地磁盘存储(`file.upload-dir`),零成本零内存,FileService 已实现,开箱即用。Nginx `/files/` 托管静态目录(注意负向断言正则 `location ~* ^/(?!files/).+\.(...)$` 排除 /files/)。
   - **路径配置**:`application.yml` 的 `file.upload-dir` 基线为生产路径 `/opt/ihomy/uploads`(Linux);开发环境通过 external.yml 覆盖为 Windows 路径 `D:\WorkSpace\ihomy\uploads`。DB 存的是相对 `/files/` 的完整 URL,与物理根无关,改路径只需改 yml + 移动 uploads 目录。
 - **未来对接 NAS**:优先 NFS 挂载方案(把 NAS 共享目录挂到 `/opt/ihomy/uploads`,**代码零改动**)。前提是 NAS 与服务器同内网。详细步骤见 Linux 部署指导附录"对接 NAS 存储"。若 NAS 异地或要公网 CDN:再改 FileService 用 S3 兼容 SDK(NAS/MinIO/OSS 通用),用 `@ConditionalOnProperty` 切换实现,本地实现保留为默认。
 - **不要主动改 FileService 的存储实现**,除非用户明确要求接 NAS/OSS。当前本地实现满足需求。
-- **统一目录结构(分类目录,无 upload 中间层)**:上传按类型分目录——相册图片→`pictures/{相册名}/{相册ID}_{时间戳}_{文件名}`、视频与海报→`videos/`、音乐(audio/*)→`music/`、通用/头像→`files/{yyyyMM}/`。FileService 提供 `upload(bytes,name,type,albumId,albumName)`(图片带相册名)、`uploadVideo`(影片/海报)、3 参 `upload`(通用)重载;无相册名时图片平铺到 `pictures/`。DB 存 `/files/...` 完整 URL,与物理根解耦。
+- **统一目录结构(分类目录,无 upload 中间层)**:上传按类型分目录——相册图片→`pictures/{相册名}/{相册ID}_{时间戳}_{文件名}`、视频与海报→`videos/`、音乐(audio/*)→`music/`、电子书→`books/{yyyyMM}/`、通用/头像→`files/{yyyyMM}/`。FileService 提供 `upload(bytes,name,type,albumId,albumName)`(图片带相册名)、`uploadVideo`(影片/海报)、`uploadBook`(电子书)、3 参 `upload`(通用)重载;无相册名时图片平铺到 `pictures/`。DB 存 `/files/...` 完整 URL,与物理根解耦。
 - **存储设备**:`sys_storage_device`(family_id 家庭级隔离,name/device_type SYSTEM|NAS|REMOTE|MOUNT/root_path/status/created_by)。`GET /storage/device/list` 首项恒为系统设备(id=0,type=SYSTEM);设备增删改/一键同步需 `@RequirePermission("storage:manage")`(OWNER)。**设备归属=家庭级独立配置**,互不可见。**本期不做网盘**(WebDAV/OSS/S3 暂缓)。
 - **资源管理器**:`GET /storage/browse?deviceId&path` + `GET /storage/file?deviceId&path&download`(返回 byte[],media type 猜;下载文件名 URL-encode)。`StorageService.resolveSafe` 用 `normalize()+startsWith` 防路径遍历(越界返回 400,已实测)。
 - **一键同步**:`POST /storage/sync {deviceId,includeEmpty}` → `{taskId}`;`GET /storage/sync/progress/{taskId}`。`StorageSyncRunner`(@Async 独立 bean——自调用不生效):按顶层目录建相册(相册名=目录名),`content_photo.source_path`("设备:相对路径")去重防重复,复制到 upload/yyyyMM 结构,完成/失败走 family_notification。进度在内存 ConcurrentHashMap(重启丢失,可接受)。
-- **硬删除策略**:删除照片/相册/视频时**物理删除 DB 记录 + 删除磁盘文件**。`FileService.deleteByUrl(url)` 按 `/files/` URL 解析物理路径删文件(外链/空跳过,失败仅告警,带 `normalize()+startsWith` 防越界,顺带尝试清空父目录)。照片删除走 `PhotoMapper.deletePhysicalById`(XML 物理删,绕过全局 logic-delete);相册删除连带照片记录+文件全删(`deletePhysicalByAlbumId`);视频删除**从软删改为硬删** `deletePhysicalById`,并删 `video_url`+`poster`。**关键坑**:MyBatis-Plus 全局配 `logic-delete-field: deleted`(`application.yml`),`deleteById` 实为 UPDATE 软删——要物理删必须用自定义 XML `DELETE` 语句。**覆盖范围**:仅照片/相册/视频三处;博客封面、头像、家庭封面、背景音乐、家谱照片删除时**未**连带删文件(文件成孤儿,可接受,后续按需扩展)。
+- **硬删除策略**:删除照片/相册/视频/图书时**物理删除 DB 记录 + 删除磁盘文件**。`FileService.deleteByUrl(url)` 按 `/files/` URL 解析物理路径删文件(外链/空跳过,失败仅告警,带 `normalize()+startsWith` 防越界,顺带尝试清空父目录)。照片删除走 `PhotoMapper.deletePhysicalById`(XML 物理删,绕过全局 logic-delete);相册删除连带照片记录+文件全删(`deletePhysicalByAlbumId`);视频删除**从软删改为硬删** `deletePhysicalById`,并删 `video_url`+`poster`;图书删除硬删 `ContentBookMapper.deletePhysicalById`,并删 `file_url`+`cover_url`。**关键坑**:MyBatis-Plus 全局配 `logic-delete-field: deleted`(`application.yml`),`deleteById` 实为 UPDATE 软删——要物理删必须用自定义 XML `DELETE` 语句。**覆盖范围**:照片/相册/视频/图书四处;博客封面、头像、家庭封面、背景音乐、家谱照片删除时**未**连带删文件(文件成孤儿,可接受,后续按需扩展)。
 
 ## 配置与加密
 
@@ -566,7 +601,6 @@ CREATE TABLE content_music_playlist_track (...);
 | P2 | 物品定位-户型图 | 1期(物品清单+搜索)已完成;2期户型图:房间矩形绘制/物品相对坐标摆放,以 room.id 挂载(数据结构已预留) |
 | P2 | 用户使用指导 | 新手引导弹窗+帮助页 |
 | P2 | 家庭公告/广告位 | 自建家庭公告(不接第三方广告,隐私原因) |
-| P2 | 电子图书 | 家庭书架:上传/修改/删除/分类/查询筛选电子书(EPUB/PDF/TXT/MOBI)。新增 `content_book`+`content_book_borrow` 两表;后端 BookController+BookService(CRUD+借阅+流式上传+硬删除);前端书架页(网格/列表/分类栏/搜索)+详情页+在线阅读(PDF 原生 iframe/EPUB epubjs/TXT 分页);`sys_home_module` 插入 book 模块(position=18);`sys_auth` 加 `book:manage` 权限种子;文件存 `files/books/{yyyyMM}/`。P1:DB+CRUD+书架页;P2:在线阅读+首页卡片;P3:ISBN 元数据自动抓取 |
 | P2 | 首页组件自适应展示 | 首页栅格(12列×9行)组件按尺寸分级展示。每个功能组件有默认大小(4×5 等),不同尺寸呈现不同信息密度:**h=1**(标题消失,仅展示核心数据:天气仅温度+图标,收支仅结余数字,任务仅数量角标);**h=2-3**(标题+精简列表 2-3 条);**h≥4**(标题+完整列表+详情);**w≤2**(单列窄布局:垂直堆叠条目);**w≥4**(多列网格:相册瀑布/菜谱卡片)。需为每个组件定义 compact/normal/expanded 三档展示模板,CSS 媒体查询+JS 判断 w/h 切换。组件清单:feed(默认4×6)/task(4×2)/today(4×4)/weather(3×4)/anni(1×4)/recipe(4×2)/search(4×3)/wish(4×3)/finance(4×3)/album(4×5)/music(4×3) |
 | P3 | 多重人格 | 基于身份标签扩展,一账号多标签可切换发表,会话级 currentLabel(Redis 或前端状态),与家庭切换正交 |
 | P3 | AI API 对接 | 统一对接大模型 API(聊天/内容生成),需配置 API Key 与服务商(OpenAI 兼容协议),待细化 |
