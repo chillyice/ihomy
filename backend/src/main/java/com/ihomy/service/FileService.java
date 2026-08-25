@@ -83,6 +83,12 @@ public class FileService {
         return saveTo(file, originalName, "videos", null, null);
     }
 
+    /** 电子书上传(流式):存 books/{yyyyMM}/ */
+    public String uploadBook(MultipartFile file, String originalName, String contentType) {
+        String yyyyMM = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
+        return saveTo(file, originalName, "books", yyyyMM, null);
+    }
+
     /** 按 URL 删除已上传文件:仅处理本站 URL(外链/空直接忽略),文件不存在容忍,失败仅告警 */
     public void deleteByUrl(String url) {
         String prefix = urlPrefix.replaceAll("/+$", "");

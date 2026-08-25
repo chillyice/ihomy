@@ -110,6 +110,17 @@ public final class DictConst {
     public static final String ITEM_TOOL = "TOOL";
     public static final String ITEM_OTHER = "OTHER";
 
+    /** 电子书格式 book_format */
+    public static final String FMT_EPUB = "EPUB";
+    public static final String FMT_PDF = "PDF";
+    public static final String FMT_TXT = "TXT";
+    public static final String FMT_MOBI = "MOBI";
+
+    /** 阅读状态 borrow_status */
+    public static final String BORROW_WANT = "WANT_READ";
+    public static final String BORROW_READING = "READING";
+    public static final String BORROW_FINISHED = "FINISHED";
+
     /* ---------------- 整数(历史 DTO 入参)→ 字典词 转换 ---------------- */
 
     public static String visibility(Integer v) {

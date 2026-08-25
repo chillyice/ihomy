@@ -629,7 +629,9 @@ INSERT INTO `sys_auth` (`auth_code`, `auth_name`, `module`, `description`) VALUE
 -- 存储管理模块（V4.1）
 ('storage:manage',     '存储管理',   'STORAGE', '管理存储设备、一键同步、浏览设备文件（仅家长）'),
 -- 运维模块（V3.8）
-('ops:view',           '运维查看',     'OPS',    '查看系统资源统计/服务器状态/操作日志（仅运维管理员）');
+('ops:view',           '运维查看',     'OPS',    '查看系统资源统计/服务器状态/操作日志（仅运维管理员）'),
+-- 电子图书模块（V7.1）
+('library:manage',     '图书管理',     'LIBRARY', '上传/修改/删除电子书');
 
 -- ------------------------------------------------------------
 -- 24. 角色-权限映射
@@ -653,7 +655,8 @@ WHERE r.role_code = 'MEMBER'
     'diary:create','diary:update','diary:delete','diary:view',
     'album:create','album:view',
     'photo:upload','photo:delete','photo:view',
-    'comment:create','comment:delete'
+    'comment:create','comment:delete',
+    'library:manage'
   );
 
 -- CHILD 权限
@@ -706,7 +709,8 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('cover',  '家庭封面', 'icon-cover',  '/cover',  'system',  'top',    1, 0),
 ('storage','存储管理', 'icon-storage','/storage','system',  'left',  16, 1),
 ('item','物品定位',   'icon-item',   '/item',   'life',    'left',  17, 1),
-('kitchen','厨房',     'icon-kitchen','/kitchen','life',    'left',  18, 1);
+('kitchen','厨房',     'icon-kitchen','/kitchen','life',    'left',  18, 1),
+('library','书架',     'icon-library','/library','content',  'left',  19, 1);
 
 -- ------------------------------------------------------------
 -- 26. 初始家庭 + 管理员账号
@@ -1117,7 +1121,15 @@ INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
 ('item_type', 'DAILY',       '日化'),
 ('item_type', 'CLOTHES',     '衣服'),
 ('item_type', 'TOOL',        '工具'),
-('item_type', 'OTHER',       '其他');
+('item_type', 'OTHER',       '其他'),
+-- 电子图书字典(V7.1)
+('book_format', 'EPUB', 'EPUB'),
+('book_format', 'PDF',  'PDF'),
+('book_format', 'TXT',  'TXT'),
+('book_format', 'MOBI', 'MOBI'),
+('borrow_status', 'WANT_READ',  '想读'),
+('borrow_status', 'READING',    '在读'),
+('borrow_status', 'FINISHED',   '已读完');
 -- ------------------------------------------------------------
 -- 41. 身份标签表(V3.9): 成员在家庭内的身份标签(如"爸爸""妈妈"),每家庭一套
 --     预设 爸爸/妈妈;其余(如"大宝")为自定义。user_id+family_id 唯一。
@@ -1409,3 +1421,52 @@ CREATE TABLE `sys_weather_location` (
   KEY `idx_name` (`name`),
   KEY `idx_adm1` (`adm1`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='和风天气地区表';
+
+-- ------------------------------------------------------------
+-- 51. content_book 电子图书表(V7.1 家庭书架)
+--     支持格式:EPUB/PDF/TXT/MOBI;文件存 books/{yyyyMM}/
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `content_book`;
+CREATE TABLE `content_book` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `title`       VARCHAR(200) NOT NULL COMMENT '书名',
+  `author`      VARCHAR(100) DEFAULT NULL COMMENT '作者',
+  `description` TEXT         DEFAULT NULL COMMENT '简介',
+  `cover_url`   VARCHAR(500) DEFAULT NULL COMMENT '封面图URL',
+  `file_url`    VARCHAR(500) NOT NULL COMMENT '电子书文件URL',
+  `file_format` VARCHAR(10)  NOT NULL COMMENT '格式:EPUB/PDF/TXT/MOBI',
+  `file_size`   BIGINT       DEFAULT NULL COMMENT '文件大小(字节)',
+  `category`    VARCHAR(50)  DEFAULT NULL COMMENT '分类(家庭级)',
+  `tags`        VARCHAR(255) DEFAULT NULL COMMENT '标签(逗号分隔)',
+  `status`      VARCHAR(20)  NOT NULL DEFAULT 'PUBLISHED' COMMENT 'DRAFT草稿 PUBLISHED已发布',
+  `visibility`  VARCHAR(20)  NOT NULL DEFAULT 'FAMILY' COMMENT 'PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开',
+  `uploader_id` BIGINT       NOT NULL COMMENT '上传者ID',
+  `family_id`   BIGINT       DEFAULT NULL COMMENT '所属家庭ID',
+  `view_count`  INT          NOT NULL DEFAULT 0 COMMENT '浏览数',
+  `like_count`  INT          NOT NULL DEFAULT 0 COMMENT '点赞数',
+  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  PRIMARY KEY (`id`),
+  KEY `idx_family_created` (`family_id`, `deleted`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='电子图书表';
+
+-- ------------------------------------------------------------
+-- 52. content_book_borrow 阅读状态表(V7.1)
+--     跟踪家庭成员的阅读进度:想读/在读/已读完
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `content_book_borrow`;
+CREATE TABLE `content_book_borrow` (
+  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `book_id`    BIGINT      NOT NULL COMMENT '图书ID',
+  `user_id`    BIGINT      NOT NULL COMMENT '读者ID',
+  `family_id`  BIGINT      NOT NULL COMMENT '家庭ID',
+  `status`     VARCHAR(20) NOT NULL DEFAULT 'WANT_READ' COMMENT 'WANT_READ想读/READING在读/FINISHED已读完',
+  `progress`   INT         DEFAULT 0 COMMENT '阅读进度(0-100)',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted`    TINYINT     NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_book_user` (`book_id`, `user_id`, `deleted`),
+  KEY `idx_family_status` (`family_id`, `status`, `deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='图书阅读状态表';

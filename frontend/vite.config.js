@@ -57,6 +57,7 @@ export default defineConfig({
           'element-plus': ['element-plus'],
           'gsap': ['gsap'],
           'vue-i18n': ['vue-i18n'],
+          'epubjs': ['epubjs'],
         },
       },
     },
