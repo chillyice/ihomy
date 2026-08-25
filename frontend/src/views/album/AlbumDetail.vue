@@ -12,8 +12,10 @@
         <span class="photo-count">{{ t('album.photoCountLabel', { n: album.photoCount }) }}</span>
         <p v-if="album.description" class="album-desc">{{ album.description }}</p>
       </div>
-      <div v-if="userStore.isLoggedIn" class="album-head-actions">
+      <div class="album-head-actions">
+        <el-button v-if="photos.length" @click="startSlideshow">{{ t('photoViewer.slideshow') }}</el-button>
         <el-upload
+          v-if="userStore.isLoggedIn"
           multiple
           :show-file-list="false"
           :http-request="uploadPhoto"
@@ -27,7 +29,7 @@
     <div v-loading="loading" class="album-body">
       <div v-if="photos.length" class="photo-wall">
         <div v-for="p in photos" :key="p.id" class="photo-card">
-          <div class="photo-wrap">
+          <div class="photo-wrap" @click="openViewer(p)">
             <img :src="p.url" :alt="p.description || album.name" loading="lazy" />
             <div class="photo-hover">
               <span v-if="canManagePhoto(p)" @click="openDesc(p)"><el-icon><Edit /></el-icon>{{ t('album.editNote') }}</span>
@@ -51,6 +53,12 @@
         <el-button type="primary" @click="onSaveDesc">{{ t('common.save') }}</el-button>
       </template>
     </el-dialog>
+
+    <PhotoViewer
+      v-model:visible="viewer.visible"
+      :photos="photos"
+      :initial-index="viewer.index"
+    />
   </div>
 </template>
 
@@ -63,6 +71,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Edit, Delete, Location, Clock } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import PhotoViewer from '@/components/PhotoViewer.vue'
 
 const route = useRoute()
 const userStore = useUserStore()
@@ -71,6 +80,7 @@ const albumId = route.params.id
 const album = ref({})
 const photos = ref([])
 const descEditor = reactive({ visible: false, value: '', currentId: null })
+const viewer = reactive({ visible: false, index: 0 })
 
 // 照片管理权限:家长或上传者本人
 const canManagePhoto = (p) =>
@@ -113,6 +123,17 @@ const onDelPhoto = async (p) => {
   load()
 }
 
+const openViewer = (p) => {
+  viewer.index = photos.value.findIndex(x => x.id === p.id)
+  if (viewer.index < 0) viewer.index = 0
+  viewer.visible = true
+}
+
+const startSlideshow = () => {
+  viewer.index = 0
+  viewer.visible = true
+}
+
 onMounted(load)
 </script>
 
@@ -140,6 +161,7 @@ onMounted(load)
   aspect-ratio: 1 / 1;
   overflow: hidden;
   border-radius: 10px;
+  cursor: pointer;
 }
 .photo-wrap img {
   width: 100%;
