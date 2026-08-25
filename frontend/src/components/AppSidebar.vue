@@ -132,14 +132,14 @@ import { useUserStore } from '@/stores/user'
 import { useWidgetDrag } from '@/utils/useWidgetDrag'
 import { notificationApi, authApi } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Sunny, Moon, Bell, Fold, Expand, Document, Notebook, Picture, Calendar, VideoPlay, Trophy, Aim, AlarmClock, List, Star, Wallet, PictureRounded, Share, User, Box, MapLocation, ChatDotRound, Food, Setting, Monitor, ArrowRight, Check, Headset, EditPen } from '@element-plus/icons-vue'
+import { Sunny, Moon, Bell, Fold, Expand, Document, Notebook, Picture, Calendar, VideoPlay, Trophy, Aim, AlarmClock, List, Star, Wallet, PictureRounded, Share, User, Box, MapLocation, ChatDotRound, Food, Reading, Setting, Monitor, ArrowRight, Check, Headset, EditPen } from '@element-plus/icons-vue'
 
 // 导航图标:Element Plus 简约线性图标(统一风格,非彩色 emoji)
 const ICON_MAP = {
   blog: Document, diary: Notebook, album: Picture, anniversary: Calendar, cinema: VideoPlay, music: Headset,
   points: Trophy, task: Aim, reminder: AlarmClock, plan: List, wish: Star,
   book: Wallet, cascade: PictureRounded, tree: Share, member: User, storage: Box, item: MapLocation,
-  chat: ChatDotRound, kitchen: Food, settings: Setting, ops: Monitor,
+  chat: ChatDotRound, kitchen: Food, library: Reading, settings: Setting, ops: Monitor,
 }
 const iconComp = (code) => ICON_MAP[code] || Document
 import { applyLocale } from '@/i18n'
@@ -178,7 +178,7 @@ const NAV_PATHS = {
   cinema: '/cinema', music: '/music', member: '/member', points: '/points', task: '/task',
   reminder: '/reminder', plan: '/plan', wish: '/wish', book: '/book',
   chat: '/chat', tree: '/tree', cascade: '/cascade',
-  item: '/item', kitchen: '/kitchen', settings: '/settings', ops: '/ops',
+  item: '/item', kitchen: '/kitchen', library: '/library', settings: '/settings', ops: '/ops',
 }
 
 // 模块列表:从 store 取,过滤出有路径映射的;末尾追加设置+运维管理(仅 OPS)虚拟模块到 system 分组

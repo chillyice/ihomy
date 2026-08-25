@@ -32,6 +32,9 @@ const routes = [
   { path: '/kitchen/recipe/:id', name: 'RecipeDetail', component: () => import('@/views/kitchen/RecipeDetail.vue'), meta: { public: true } },
   { path: '/kitchen/recipe/new', name: 'RecipeNew', component: () => import('@/views/kitchen/RecipeEdit.vue'), meta: { requiresAuth: true } },
   { path: '/kitchen/recipe/:id/edit', name: 'RecipeEdit', component: () => import('@/views/kitchen/RecipeEdit.vue'), meta: { requiresAuth: true } },
+  { path: '/library', name: 'LibraryList', component: () => import('@/views/library/LibraryList.vue'), meta: { public: true } },
+  { path: '/library/:id', name: 'LibraryDetail', component: () => import('@/views/library/LibraryDetail.vue'), meta: { public: true } },
+  { path: '/library/edit/:id?', name: 'LibraryEdit', component: () => import('@/views/library/LibraryEdit.vue'), meta: { requiresAuth: true } },
   // 运维管理页:仅 OPS 角色可访问
   { path: '/ops', name: 'Ops', component: () => import('@/views/ops/Ops.vue'), meta: { ops: true } },
   // 兜底:未匹配的路由重定向回首页
