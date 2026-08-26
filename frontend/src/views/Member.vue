@@ -226,4 +226,12 @@ onMounted(load)
 .search-item-name { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px; }
 .search-item-desc { color: var(--color-text-secondary); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .search-item-meta { color: var(--color-text-secondary); font-size: 12px; }
+
+@media (max-width: 768px) {
+  .member-row { flex-wrap: wrap; gap: 8px; }
+  .member-right { flex-wrap: wrap; gap: 6px; }
+  .apply-row { flex-wrap: wrap; gap: 8px; }
+  .apply-actions { width: 100%; justify-content: flex-end; }
+  .search-item { flex-wrap: wrap; }
+}
 </style>

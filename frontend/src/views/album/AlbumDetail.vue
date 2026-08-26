@@ -210,7 +210,9 @@ onMounted(load)
 }
 
 @media (max-width: 768px) {
-  .photo-wall { grid-template-columns: repeat(2, 1fr); }
+  .photo-wall { grid-template-columns: repeat(2, 1fr); gap: 6px; }
   .album-header { flex-direction: column; align-items: flex-start; }
+  .album-title { font-size: 18px; }
+  .upload-bar { flex-direction: column; gap: 8px; }
 }
 </style>

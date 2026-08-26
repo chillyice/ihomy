@@ -819,4 +819,12 @@ html.dark .create-family-btn:hover { background: rgba(232,220,200,0.15); }
 .bg-more { text-align: center; padding: 8px; font-size: 13px; color: var(--color-accent); cursor: pointer; border-radius: 8px; }
 .bg-more:hover { background: rgba(168,72,58,0.06); }
 .link-text { color: var(--color-accent); text-decoration: underline; }
+
+@media (max-width: 768px) {
+  .settings-layout { flex-direction: column; }
+  .settings-side { width: 100% !important; position: static !important; margin-bottom: 12px; }
+  .settings-side .el-menu { display: flex; flex-direction: row; overflow-x: auto; }
+  .settings-side .el-menu-item { white-space: nowrap; }
+  .form-row { flex-direction: column; gap: 0; }
+}
 </style>

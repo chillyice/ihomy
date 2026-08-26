@@ -280,4 +280,9 @@ onMounted(async () => {
 .form-row .el-form-item {
   flex: 1;
 }
+
+@media (max-width: 768px) {
+  .form-row { flex-direction: column; gap: 0; }
+  .product-grid { grid-template-columns: repeat(2, 1fr) !important; }
+}
 </style>

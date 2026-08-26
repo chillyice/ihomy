@@ -479,5 +479,9 @@ html.dark :deep(.el-dropdown-menu__item:hover) {
   .cat-ops { display: none !important; }
   .blog-cover { width: 90px; height: 64px; }
   .blog-more { opacity: 1; }
+  .blog-item { padding: 12px; }
+  .blog-title { font-size: 15px; }
+  .blog-meta { font-size: 12px; }
+  .write-btn { padding: 6px 12px; font-size: 13px; }
 }
 </style>
