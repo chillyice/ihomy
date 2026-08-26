@@ -244,4 +244,9 @@ html.dark .login-card {
   font-size: 13px;
   cursor: pointer;
 }
+
+@media (max-width: 768px) {
+  .login-card { width: 92vw !important; max-width: 400px; padding: 24px 20px; }
+  .login-title { font-size: 22px; }
+}
 </style>

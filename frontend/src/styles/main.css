@@ -14,6 +14,14 @@
   --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -1px 0 rgba(58, 46, 34, 0.04);
 }
 
+/* 毛玻璃关闭:全局禁用 backdrop-filter,用不透明背景替代(性能优化) */
+html.no-glass *,
+html.no-glass *::before,
+html.no-glass *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
 /* 暗色模式:夜色深蓝 */
 html.dark {
   --color-primary: #E8DCC8;
@@ -164,10 +172,14 @@ html.dark .section-label { color: #E8DCC8; }
 
 /* 移动端触控与安全区:底部 Home 指示条、最小触控目标、页面留白适配 */
 @media (max-width: 768px) {
-  .page { padding: 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+  .page { padding: 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom)); max-width: 100%; }
   #app { padding-bottom: env(safe-area-inset-bottom); }
   /* 触控目标最小 44px,文字链/小号/图标按钮保持紧凑 */
   .el-button:not(.is-link):not(.el-button--small):not(.is-circle) { min-height: 44px; }
+  /* 移动端子页面:顶部已有 fixed header,补顶部间距 */
+  .mobile-sub-content .page { padding-top: calc(8px + env(safe-area-inset-top, 0px)); }
+  /* 移动端隐藏光影测试控制台 */
+  .light-test-console { display: none !important; }
 }
 
 /* === 全局按钮统一样式 — 4 类按钮 / 浅米暖调 / 大圆角 === */

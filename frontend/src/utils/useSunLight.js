@@ -32,6 +32,11 @@ export function useSunLight() {
   const shadowEnabled = ref(true)
   const weatherEffectEnabled = ref(true)
   const blobsEnabled = ref(true)
+  const glassEnabled = ref(true)
+  // 总开关:所有特效都关闭时为 false,用于门控定时器/API 调用/组件挂载
+  const anyEffectEnabled = computed(() =>
+    shadowEnabled.value || blobsEnabled.value || weatherEffectEnabled.value || lampMode.value !== 'off'
+  )
   // 光照测试模式:开启后可手动控制 slotIdx 循环
   const lightTestMode = ref(false)
   const lightTestPaused = ref(false)
@@ -387,7 +392,7 @@ export function useSunLight() {
     // 所有效果关闭时跳过,避免持续触发 Vue 响应式更新和 CSS transition
     flickerTimer = setInterval(() => {
       if (!sunInfo.value) return
-      if (!shadowEnabled.value && !blobsEnabled.value && !weatherEffectEnabled.value && lampStrength.value <= 0) return
+      if (!anyEffectEnabled.value) return
       const base = getSunScene(sunInfo.value, slotIdx.value)
       sunScene.value = {
         ...base,
@@ -397,7 +402,7 @@ export function useSunLight() {
         })),
       }
     }, 10000)
-    // 每 30 分钟刷新真实天气(与后端缓存 TTL 同步)
+    // 每 30 分钟刷新真实天气(与后端缓存 TTL 同步);天气数据用于天气预报面板,始终获取
     weatherTimer = setInterval(loadWeather, 1800000)
   })
 
@@ -415,9 +420,22 @@ export function useSunLight() {
     if (idleTimer) clearTimeout(idleTimer)
   })
 
+  // 特效从全部关闭→开启时:立即刷新场景,避免等待下一个定时器周期
+  watch(anyEffectEnabled, (enabled) => {
+    if (enabled && sunInfo.value) {
+      slotIdx.value = currentSlotIndex()
+      refreshScene()
+    }
+  })
+
+  // 毛玻璃开关:在 <html> 上切换 .no-glass 类,全局禁用 backdrop-filter
+  watch(glassEnabled, (on) => {
+    document.documentElement.classList.toggle('no-glass', !on)
+  }, { immediate: true })
+
   return {
     sunInfo, slotIdx, sunScene, weather, weatherDetail, loadWeather, loadSunInfoForDate,
-    lampMode, lampTemp, lampBrightness, shadowEnabled, weatherEffectEnabled, blobsEnabled, toggleLamp,
+    lampMode, lampTemp, lampBrightness, shadowEnabled, weatherEffectEnabled, blobsEnabled, glassEnabled, anyEffectEnabled, toggleLamp,
     idleMinutes, isIdle,
     lampStrength, lampStrengthAnim, lampDivOpacity, lampRadius, lampMask, lampColor,
     dustParticles, snowParticles, rainParticles, weatherShadowOpacity, lightLayerOpacity, rayStyles, sourceStyle, bloomStyle, brightSpotStyle, reflectionStyle, lightningFlash,

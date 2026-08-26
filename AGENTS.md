@@ -99,8 +99,10 @@ frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
     utils/windowLight.js  # getSunScene(sunInfo,slotIndex)+currentSlotIndex()+makeRays():体积光调色板/光束/阴影参数;windowAngle(窗角)+hasDirectLight 门控
     utils/useSunLight.js  # 全局光影状态(provide/inject):sunScene/lampMode/shadowEnabled/weatherEffectEnabled/blobsEnabled/lightTestMode/testSpeed/loadWeather
     utils/useDragResize.js # 可拖拽面板组合式函数(zIndex+bringToFront+边界clamp+localStorage持久化)
-    components/     # AppSidebar(全局导航)/BackToTop/Breadcrumb/AvatarCropper/InstallPrompt/SiteFooter(备案号)/SunLightLayer(全局光影层)/LightTestConsole(光照测试控制台)/SyncDialog(存储同步进度)
-    styles/main.css # CSS 变量 + 全局样式 + 深色模式覆写 + ElMessage/ElNotification 增强
+    composables/useDevice.js  # 设备检测(UA+matchMedia 768px,全局单例 isMobile ref,matchMedia change 监听)
+    components/     # AppSidebar(全局导航)/BackToTop/Breadcrumb/AvatarCropper/InstallPrompt/SiteFooter(备案号)/SunLightLayer(全局光影层)/LightTestConsole(光照测试控制台)/SyncDialog(存储同步进度)/MobileTabBar/MobileHeader/MobileHomeFeed/MobileMoreGrid/MobileMePage(移动端组件)
+    layouts/MobileLayout.vue  # 移动端壳:首页三Tab模式 / 子页面返回栏模式
+    styles/main.css # CSS 变量 + 全局样式 + 深色模式覆写 + ElMessage/ElNotification 增强 + 移动端 @media 适配
     views/          # 27 个页面:Home(沉浸式首页)/Login/Member/Settings/Anniversary/album(Album/AlbumDetail)/cinema/Cinema/diary/DiaryList/blog(BlogList/BlogDetail/BlogEdit)/points/Points/task/Task/reminder/Reminder/plan/Plan/wish/Wish/book/Book/chat/Chat/tree/Tree/cascade/Cascade/ops/Ops/storage/Storage/item/Item/kitchen/Kitchen/library/LibraryList/LibraryDetail/LibraryEdit
     App.vue
   vite.config.js   # PWA + 代理 /api -> :8080 + ElementPlus 按需
@@ -242,6 +244,26 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 主题 | `theme/index.js` | 只 light/dark;applyTheme/loadTheme;双层伪元素背景 1s 过渡;手动切主题取消日出日落自动 |
 | 身份标签 | ProfileController | family_user_label(user_id/family_id/label/color,每家庭一套) |
 | 字典表 | — | sys_dict_item 18 组;状态/类型字段英文单词化 |
+
+### 10. 移动端兼容性(V8.0)
+
+| 模块 | 文件 | 要点 |
+|------|------|------|
+| 设备检测 | `composables/useDevice.js` | UA + matchMedia(768px) 双信号检测;全局单例 `isMobile` ref;matchMedia change 监听横竖屏切换 |
+| 移动布局 | `layouts/MobileLayout.vue` | 首页路由 `/` → 三 Tab 模式(底部 TabBar);其余路由 → 子页面模式(顶部返回栏 + router-view) |
+| 底部 TabBar | `components/MobileTabBar.vue` | 三 Tab:首页/更多/我的;fixed 底部 + safe-area-inset-bottom |
+| 子页面返回栏 | `components/MobileHeader.vue` | fixed 顶部 + safe-area-inset-top;返回按钮 + 标题 + 右侧 slot |
+| 首页动态流 | `components/MobileHomeFeed.vue` | 顶部横向滚动筛选栏(全部/博客/日记/照片)+ 卡片信息流;复用 publicApi/homeApi getFeed |
+| 更多功能 | `components/MobileMoreGrid.vue` | 按分类(内容/生活/成员/系统)4 列图标网格;点击跳转对应路由;复用 appStore.modules |
+| 我的页面 | `components/MobileMePage.vue` | 用户信息 + 家庭切换(展开列表)+ 主题/光影/语言开关 + 设置/成员/资料入口 + 退出 |
+| 特效门控 | `App.vue` + `useSunLight.js` | `watch(isMobile)` immediate:移动端默认关闭所有光影特效(shadow/weather/blobs/lamp/glass);"我的"Tab 可手动开启 |
+| App.vue | `App.vue` | `isMobile` 条件渲染:移动端 → `<MobileLayout>`(不含 SunLightLayer/AppSidebar/LightTestConsole);桌面端不变 |
+
+**设计决策**:采用**单代码库 + 运行时设备自适应**(非子域名 m.ihomy.top 方案)。理由:避免 JWT 跨域共享/CORS/双构建双部署/PWA 分裂;同一 URL 响应式适配,localhost 测试无需额外配置。
+
+**测试方式**:`localhost:5173` + Chrome DevTools 设备模拟;真机 `http://<局域网IP>:5173`(vite host:0.0.0.0)。
+
+**第一期适配范围**:首页(三 Tab 重设计)+ 子页面顶部返回栏 + 20 个功能页响应式 CSS 增强(Blog/Diary/Album/Chat/Login/Settings/Member/Book/Task/Plan/Wish/Points/Reminder/Tree/Item/Library)。后续迭代:进一步触摸手势优化+字体大小+性能验证。
 
 ## 设计规范(统一实现,避免多种方式)
 
@@ -558,6 +580,27 @@ INSERT INTO sys_home_module ... 'library';
 INSERT INTO sys_dict_item ... book_format/borrow_status;
 ```
 
+##### 移动端兼容性(V8.0)
+
+| 文件 | 改动 |
+|------|------|
+| `composables/useDevice.js` | 新建:UA + matchMedia(768px) 双信号检测;全局单例 `isMobile` ref;matchMedia change 监听横竖屏切换 |
+| `layouts/MobileLayout.vue` | 新建:首页路由 `/` → 三 Tab 模式(底部 TabBar);其余路由 → 子页面模式(顶部 MobileHeader + router-view);含 BackToTop/InstallPrompt/MusicPlayer |
+| `components/MobileTabBar.vue` | 新建:三 Tab(首页/更多/我的);fixed 底部 + safe-area-inset-bottom |
+| `components/MobileHeader.vue` | 新建:子页面顶部返回栏;fixed + safe-area-inset-top;返回按钮 + 标题 + 右侧 slot |
+| `components/MobileHomeFeed.vue` | 新建:首页 Tab;横向滚动筛选栏(全部/博客/日记/照片)+ 卡片信息流;复用 publicApi/homeApi getFeed |
+| `components/MobileMoreGrid.vue` | 新建:更多 Tab;按分类 4 列图标网格;复用 appStore.modules + NAV_PATHS/ICON_MAP |
+| `components/MobileMePage.vue` | 新建:我的 Tab;用户信息 + 家庭切换 + 主题/光影/语言开关 + 设置/成员/资料入口 + 退出 |
+| `App.vue` | `isMobile` 条件渲染:移动端 → `<MobileLayout>`(不挂载 SunLightLayer/AppSidebar/LightTestConsole/SiteFooter);`watch(isMobile, immediate)` 关闭所有特效 |
+| `i18n/zh-CN.js` + `en.js` | 新增 `mobile.*` 文案(home/more/me/language/members) |
+| `styles/main.css` | `@media (max-width:768px)` 增强:`.page` 全宽 + safe-area;移动端隐藏 `.light-test-console` |
+
+**设计决策**:单代码库 + 运行时设备自适应(非子域名 m.ihomy.top)。理由:避免 JWT 跨域共享/CORS/双构建双部署/PWA 分裂;同一 URL 响应式适配,localhost 测试无需额外配置。
+
+**测试方式**:`localhost:5173` + Chrome DevTools 设备模拟;真机 `http://<局域网IP>:5173`(vite host:0.0.0.0)。
+
+**第一期适配范围**:首页(三 Tab 重设计)+ 子页面顶部返回栏 + 20 个功能页响应式 CSS 增强(Blog/Diary/Album/Chat/Login/Settings/Member/Book/Task/Plan/Wish/Points/Reminder/Tree/Item/Library)。后续迭代:进一步触摸手势优化+字体大小+性能验证。
+
 ## 文件存储策略
 
 - **当前阶段(开发期)**:本地磁盘存储(`file.upload-dir`),零成本零内存,FileService 已实现,开箱即用。Nginx `/files/` 托管静态目录(注意负向断言正则 `location ~* ^/(?!files/).+\.(...)$` 排除 /files/)。
@@ -616,7 +659,7 @@ INSERT INTO sys_dict_item ... book_format/borrow_status;
 ## 文档清单
 
 - `README.md`(启动说明 + Windows 一键启动脚本用法); `Windows部署指导.md` / `Linux部署指导.md`(生产部署 NSSM/systemd/Nginx/Let's Encrypt/Docker Compose)
-- `docs/需求规格说明书.docx` — 完整需求文档(功能模块清单+实现方式+未实现规划+数据库设计+接口设计)
+- `docs/需求规格说明书.docx` — 完整需求文档(功能模块清单+实现方式+未实现规划+数据库设计+接口设计+修订记录)。**唯一正式版**,原 `.md` 已合并删除(内容以业务域重新组织,修正表数量为 53 张/实体 44 个,含移动端兼容性 V8.0 §4.10)
 - `docs/UI设计提示词.md` — 沉浸式首页 UI 设计完整规格(可作为 AI 提示词重新生成)
 - `scripts/start-all.ps1`(Windows 一键启动前后端,双击 `start.bat` 调用,设 `IHOMY_CONFIG_PATH` 环境变量)/ `start-db.ps1`(Docker 拉起 MySQL+Redis+自动导 schema.sql,端口 6306/6379,与生产一致); `config/mysql/my.cnf`(端口 6306,内存优化,仅 Linux 本机部署用)
 - 完整接口清单:见 `docs/需求规格说明书.docx` 第 7 章与各功能小节。代码事实以 `backend/src/main/java` + `resources/schema.sql` 为准,如需检索先 `grep` 再动手。

@@ -164,4 +164,9 @@ onMounted(load)
   font-size: 12px;
   margin-top: 6px;
 }
+
+@media (max-width: 768px) {
+  .reminder-item { flex-wrap: wrap; }
+  .reminder-actions { width: 100%; justify-content: flex-end; }
+}
 </style>

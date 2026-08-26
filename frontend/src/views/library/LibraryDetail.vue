@@ -252,4 +252,8 @@ html.dark .reader-overlay { background: #1a1a2e; }
   .meta-tags { justify-content: center; }
   .txt-reader { padding: 20px; }
 }
+@media (max-width: 768px) {
+  .txt-reader { padding: 16px; font-size: 15px; }
+  .book-info-grid { grid-template-columns: 1fr !important; }
+}
 </style>

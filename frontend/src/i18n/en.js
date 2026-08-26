@@ -595,6 +595,13 @@ export default {
   more: {
     all: 'All',
   },
+  mobile: {
+    home: 'Home',
+    more: 'More',
+    me: 'Me',
+    language: 'Language',
+    members: 'Members',
+  },
   ops: {
     overview: 'Overview',
     server: 'Server',

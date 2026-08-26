@@ -190,4 +190,9 @@ onMounted(load)
   gap: 6px;
   flex-wrap: wrap;
 }
+
+@media (max-width: 768px) {
+  .wish-actions .el-button { flex: 1; min-width: 60px; }
+  .wish-meta { flex-direction: column; gap: 4px; }
+}
 </style>
