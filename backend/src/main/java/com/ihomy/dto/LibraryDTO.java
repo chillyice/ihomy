@@ -3,6 +3,8 @@ package com.ihomy.dto;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
+import java.util.List;
+
 /**
  * 电子图书表单:标题+文件URL必填,其余选填。
  */
@@ -18,6 +20,7 @@ public class LibraryDTO {
     private String fileFormat;
     private Long fileSize;
     private String category;
+    private List<Long> categoryIds;
     private String tags;
     private Integer status;
     private Integer visibility;
