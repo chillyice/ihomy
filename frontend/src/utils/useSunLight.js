@@ -371,7 +371,7 @@ export function useSunLight() {
 
   onMounted(() => {
     loadSunInfo()
-    if (weatherEffectEnabled.value) loadWeather()
+    loadWeather()
     // 钟摆运动已改为 CSS @keyframes,无需 JS rAF;lampStrength 变化只决定元素是否渲染
     // 空闲检测:注册用户活动事件(mousemove 节流),启动超时定时器
     IDLE_EVENTS.forEach(e => window.addEventListener(e, resetIdle, { passive: true }))
@@ -402,11 +402,8 @@ export function useSunLight() {
         })),
       }
     }, 10000)
-    // 每 30 分钟刷新真实天气(与后端缓存 TTL 同步);天气效果关闭时跳过
-    weatherTimer = setInterval(() => {
-      if (!weatherEffectEnabled.value) return
-      loadWeather()
-    }, 1800000)
+    // 每 30 分钟刷新真实天气(与后端缓存 TTL 同步);天气数据用于天气预报面板,始终获取
+    weatherTimer = setInterval(loadWeather, 1800000)
   })
 
   onUnmounted(() => {
@@ -423,12 +420,11 @@ export function useSunLight() {
     if (idleTimer) clearTimeout(idleTimer)
   })
 
-  // 特效从全部关闭→开启时:立即刷新场景和天气,避免等待下一个定时器周期
+  // 特效从全部关闭→开启时:立即刷新场景,避免等待下一个定时器周期
   watch(anyEffectEnabled, (enabled) => {
     if (enabled && sunInfo.value) {
       slotIdx.value = currentSlotIndex()
       refreshScene()
-      if (weatherEffectEnabled.value) loadWeather()
     }
   })
 
