@@ -1,109 +1,84 @@
 <template>
-  <div class="page">
-    <Breadcrumb :items="[{ label: $t('library.title'), to: '/library' }, { label: book?.title || $t('library.detail') }]" />
-    <div v-if="book" class="lib-layout">
-      <div class="card detail">
-        <div class="book-header">
-          <div class="book-cover-large-wrap">
-            <img v-if="book.coverUrl" :src="book.coverUrl" class="book-cover-large" />
-            <div v-else class="book-cover-large placeholder">
-              <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-            </div>
-          </div>
-          <div class="book-meta-info">
-            <div class="book-title-text">{{ book.title }}</div>
-            <div v-if="book.author" class="book-author-text">{{ book.author }}</div>
-            <div class="meta-row">
-              <span class="format-tag">{{ book.fileFormat }}</span>
-              <span v-if="book.category" class="meta-cat">{{ book.category }}</span>
-              <span v-if="book.fileSize" class="meta-size">{{ formatSize(book.fileSize) }}</span>
-            </div>
-            <div v-if="book.tags" class="meta-tags">
-              <span v-for="t in String(book.tags).split(',').filter(Boolean)" :key="t" class="tag">#{{ t }}</span>
-            </div>
-            <div class="meta-stats">{{ book.viewCount }} {{ $t('library.views') }} · {{ formatDate(book.createdAt) }}</div>
-            <div class="book-actions">
-              <el-button v-if="canReadOnline" type="primary" @click="startReading">{{ $t('library.readOnline') }}</el-button>
-              <a v-if="book.fileUrl" :href="book.fileUrl" :download="book.title" class="el-button is-default">{{ $t('library.download') }}</a>
-              <template v-if="userStore.isLoggedIn">
-                <el-button v-if="borrow?.status === 'WANT_READ'" @click="setBorrowStatus('READING')">{{ $t('library.startReading') }}</el-button>
-                <el-button v-else-if="borrow?.status === 'READING'" @click="setBorrowStatus('FINISHED')">{{ $t('library.markFinished') }}</el-button>
-                <el-button v-else-if="!borrow" @click="setBorrowStatus('WANT_READ')">{{ $t('library.wantRead') }}</el-button>
-                <el-button v-if="borrow?.status === 'FINISHED'" @click="setBorrowStatus('READING')">{{ $t('library.reread') }}</el-button>
-              </template>
-            </div>
+  <el-dialog v-model="show" :title="$t('library.detail')" width="640px" append-to-body @close="$emit('close')">
+    <div v-loading="loading" class="detail-body">
+      <div v-if="book" class="book-header">
+        <div class="cover-wrap">
+          <img v-if="book.coverUrl" :src="book.coverUrl" class="book-cover" />
+          <div v-else class="book-cover placeholder">
+            <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
           </div>
         </div>
-        <div v-if="book.description" class="book-description">
-          <div class="section-label">{{ $t('library.description') }}</div>
-          <div class="desc-text">{{ book.description }}</div>
+        <div class="meta-info">
+          <div class="book-title-text">{{ book.title }}</div>
+          <div v-if="book.author" class="book-author-text">{{ book.author }}</div>
+          <div class="meta-row">
+            <span class="format-tag">{{ book.fileFormat }}</span>
+            <span v-if="book.fileSize" class="meta-size">{{ formatSize(book.fileSize) }}</span>
+            <span class="meta-views">{{ book.viewCount }} {{ $t('library.views') }}</span>
+          </div>
+          <div v-if="book.tags" class="meta-tags">
+            <span v-for="t in String(book.tags).split(',').filter(Boolean)" :key="t" class="tag">#{{ t }}</span>
+          </div>
+          <div class="meta-date">{{ formatDate(book.createdAt) }}</div>
+        </div>
+      </div>
+      <div v-if="book?.description" class="book-desc">
+        <div class="section-label">{{ $t('library.description') }}</div>
+        <div class="desc-text">{{ book.description }}</div>
+      </div>
+      <div v-if="book" class="book-cats">
+        <div class="section-label">{{ $t('library.categoriesLabel') }}</div>
+        <div class="cat-tags">
+          <span v-for="cid in book.categoryIds" :key="cid" class="cat-tag">{{ catName(cid) }}</span>
+          <span v-if="!book.categoryIds?.length" class="no-cat">{{ $t('library.uncategorized') }}</span>
         </div>
       </div>
     </div>
-
-    <div v-if="reading" class="reader-overlay" @keydown.esc="stopReading">
-      <div class="reader-bar">
-        <span class="reader-title">{{ book?.title }}</span>
-        <div class="reader-controls">
-          <el-button v-if="book?.fileFormat === 'TXT'" size="small" @click="prevPage" :disabled="readerPage <= 0">{{ $t('library.prevPage') }}</el-button>
-          <span v-if="book?.fileFormat === 'TXT'" class="page-info">{{ readerPage + 1 }} / {{ totalPages }}</span>
-          <el-button v-if="book?.fileFormat === 'TXT'" size="small" @click="nextPage" :disabled="readerPage >= totalPages - 1">{{ $t('library.nextPage') }}</el-button>
-          <el-button size="small" @click="stopReading">{{ $t('common.close') }}</el-button>
+    <template #footer v-if="book">
+      <div class="detail-footer">
+        <div class="footer-left">
+          <template v-if="userStore.isLoggedIn">
+            <el-button v-if="borrow?.status === 'WANT_READ'" size="small" @click="setBorrowStatus('READING')">{{ $t('library.startReading') }}</el-button>
+            <el-button v-else-if="borrow?.status === 'READING'" size="small" @click="setBorrowStatus('FINISHED')">{{ $t('library.markFinished') }}</el-button>
+            <el-button v-else-if="!borrow" size="small" @click="setBorrowStatus('WANT_READ')">{{ $t('library.wantRead') }}</el-button>
+            <el-button v-if="borrow?.status === 'FINISHED'" size="small" @click="setBorrowStatus('READING')">{{ $t('library.reread') }}</el-button>
+          </template>
+        </div>
+        <div class="footer-right">
+          <el-button v-if="canReadOnline" type="primary" size="small" @click="$emit('read', book)">{{ $t('library.readOnline') }}</el-button>
+          <a v-if="book.fileUrl" :href="book.fileUrl" :download="book.title" class="el-button is-default is-small">{{ $t('library.download') }}</a>
+          <el-button v-if="canEdit" size="small" @click="router.push(`/library/edit/${book.id}`)">{{ $t('library.editBook') }}</el-button>
+          <el-button @click="show = false" size="small">{{ $t('common.close') }}</el-button>
         </div>
       </div>
-      <div class="reader-content" ref="readerRef">
-        <iframe v-if="book?.fileFormat === 'PDF'" :src="book.fileUrl" class="pdf-frame" />
-        <div v-else-if="book?.fileFormat === 'TXT'" ref="txtRef" class="txt-reader">{{ currentPageText }}</div>
-        <div v-else-if="book?.fileFormat === 'EPUB'" ref="epubRef" class="epub-reader"></div>
-        <div v-else class="unsupported-format">
-          <el-empty :description="$t('library.unsupportedFormat')" />
-        </div>
-      </div>
-    </div>
-
-    <el-empty v-if="!book && !loading" :description="$t('library.notFound')" />
-  </div>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, onBeforeUnmount } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { libraryApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import Breadcrumb from '@/components/Breadcrumb.vue'
+
+const props = defineProps({ bookId: [Number, String] })
+const emit = defineEmits(['close', 'updated', 'deleted', 'read'])
 
 const { t } = useI18n()
-const route = useRoute()
+const router = useRouter()
 const userStore = useUserStore()
+const show = ref(true)
 const book = ref(null)
 const borrow = ref(null)
 const loading = ref(false)
-const reading = ref(false)
-const readerRef = ref(null)
-const txtRef = ref(null)
-const epubRef = ref(null)
-const txtContent = ref('')
-const readerPage = ref(0)
-const charsPerPage = 2000
+const categories = ref([])
 
-const canReadOnline = computed(() => {
-  if (!book.value) return false
-  const fmt = book.value.fileFormat
-  return fmt === 'PDF' || fmt === 'EPUB' || fmt === 'TXT'
-})
+const canEdit = computed(() => book.value && (userStore.isOwner || book.value.uploaderId === userStore.userInfo?.id))
+const canReadOnline = computed(() => book.value && ['PDF', 'EPUB', 'TXT'].includes(book.value.fileFormat))
 
-const totalPages = computed(() => {
-  if (!txtContent.value) return 1
-  return Math.ceil(txtContent.value.length / charsPerPage)
-})
-
-const currentPageText = computed(() => {
-  if (!txtContent.value) return ''
-  const start = readerPage.value * charsPerPage
-  return txtContent.value.slice(start, start + charsPerPage)
-})
+const catName = (id) => categories.value.find(c => c.id === id)?.name || ''
 
 const formatDate = (d) => (d ? new Date(d).toLocaleDateString('zh-CN') : '')
 const formatSize = (bytes) => {
@@ -113,147 +88,62 @@ const formatSize = (bytes) => {
   return (bytes / 1024 / 1024).toFixed(1) + ' MB'
 }
 
-const canEdit = computed(() => book.value && (userStore.isOwner || book.value.uploaderId === userStore.userInfo?.id))
-
 const loadAll = async () => {
   loading.value = true
   try {
-    book.value = await libraryApi.detail(route.params.id)
+    book.value = await libraryApi.detail(props.bookId)
   } catch (e) {
     book.value = null
   } finally {
     loading.value = false
   }
   if (userStore.isLoggedIn) {
-    try {
-      borrow.value = await libraryApi.getBorrow(route.params.id)
-    } catch (e) {}
+    try { borrow.value = await libraryApi.getBorrow(props.bookId) } catch (e) {}
   }
-}
-
-const startReading = async () => {
-  reading.value = true
-  if (book.value.fileFormat === 'TXT') {
-    if (!txtContent.value) {
-      try {
-        const res = await fetch(book.value.fileUrl)
-        txtContent.value = await res.text()
-      } catch (e) {
-        ElMessage.error(t('library.loadFailed'))
-        reading.value = false
-        return
-      }
-    }
-    readerPage.value = 0
-  } else if (book.value.fileFormat === 'EPUB') {
-    await nextTick()
-    loadEpub()
-  }
-  if (borrow.value?.status !== 'READING' && userStore.isLoggedIn) {
-    setBorrowStatus('READING')
-  }
-}
-
-const stopReading = () => {
-  reading.value = false
-  if (epubRendition) {
-    epubRendition.destroy()
-    epubRendition = null
-  }
-}
-
-let epubRendition = null
-const loadEpub = async () => {
-  if (!epubRef.value || !book.value?.fileUrl) return
-  try {
-    const ePub = (await import('epubjs')).default
-    const epub = ePub(book.value.fileUrl)
-    epubRendition = epub.renderTo(epubRef.value, { width: '100%', height: '100%' })
-    epubRendition.display()
-  } catch (e) {
-    ElMessage.error(t('library.loadFailed'))
-  }
-}
-
-const prevPage = () => {
-  if (readerPage.value > 0) readerPage.value--
-}
-const nextPage = () => {
-  if (readerPage.value < totalPages.value - 1) readerPage.value++
+  try { categories.value = await libraryApi.categories() || [] } catch (e) {}
 }
 
 const setBorrowStatus = async (status) => {
   try {
-    borrow.value = await libraryApi.updateBorrow(route.params.id, { status })
-    if (status === 'READING') ElMessage.success(t('library.readingStarted'))
-    else if (status === 'FINISHED') ElMessage.success(t('library.finishedMsg'))
+    borrow.value = await libraryApi.updateBorrow(props.bookId, { status })
+    ElMessage.success(status === 'READING' ? t('library.readingStarted') : status === 'FINISHED' ? t('library.finishedMsg') : t('common.saveSuccess'))
   } catch (e) {}
 }
 
-onBeforeUnmount(() => {
-  if (epubRendition) epubRendition.destroy()
-})
+watch(show, (v) => { if (!v) emit('close') })
 
 onMounted(loadAll)
 </script>
 
 <style scoped>
-.lib-layout { display: flex; gap: 24px; align-items: flex-start; }
-.detail { flex: 1; min-width: 0; padding: 24px 28px; }
-
-.book-header { display: flex; gap: 24px; margin-bottom: 20px; }
-.book-cover-large-wrap { width: 140px; flex-shrink: 0; }
-.book-cover-large { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
-.book-cover-large.placeholder { display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(184,140,110,0.12), rgba(184,140,110,0.04)); color: var(--color-text-secondary); opacity: 0.4; }
-html.dark .book-cover-large.placeholder { background: linear-gradient(135deg, rgba(212,178,152,0.1), rgba(212,178,152,0.03)); }
-
-.book-meta-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.book-title-text { font-size: 24px; font-weight: 700; color: var(--color-primary); line-height: 1.4; }
-.book-author-text { font-size: 15px; color: var(--color-text-secondary); }
-.meta-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+.detail-body { min-height: 200px; }
+.book-header { display: flex; gap: 20px; margin-bottom: 16px; }
+.cover-wrap { width: 120px; flex-shrink: 0; }
+.book-cover { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+.book-cover.placeholder { display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(184,140,110,0.12), rgba(184,140,110,0.04)); color: var(--color-text-secondary); opacity: 0.4; border-radius: 8px; }
+html.dark .book-cover.placeholder { background: linear-gradient(135deg, rgba(212,178,152,0.1), rgba(212,178,152,0.03)); }
+.meta-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.book-title-text { font-size: 20px; font-weight: 700; color: var(--color-primary); line-height: 1.4; }
+.book-author-text { font-size: 14px; color: var(--color-text-secondary); }
+.meta-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 2px; }
 .format-tag { background: rgba(184,140,110,0.12); color: var(--color-accent, #b88c6e); padding: 2px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; }
 html.dark .format-tag { background: rgba(212,178,152,0.15); color: #d4b298; }
-.meta-cat { background: rgba(184,140,110,0.06); border: 1px solid rgba(184,140,110,0.1); color: var(--color-text-secondary); padding: 2px 8px; border-radius: 8px; font-size: 12px; }
-html.dark .meta-cat { background: rgba(212,178,152,0.1); border-color: rgba(212,178,152,0.12); }
 .meta-size { font-size: 12px; color: var(--color-text-secondary); opacity: 0.6; }
+.meta-views { font-size: 12px; color: var(--color-text-secondary); opacity: 0.6; }
 .meta-tags { display: flex; gap: 6px; flex-wrap: wrap; }
 .tag { background: rgba(184,140,110,0.06); color: var(--color-accent); padding: 1px 8px; border-radius: 10px; font-size: 12px; }
-.meta-stats { font-size: 13px; color: var(--color-text-secondary); opacity: 0.7; }
-.book-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
-.book-actions a { text-decoration: none; }
-
-.book-description { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--color-border); }
-.section-label { font-size: 16px; font-weight: 600; color: var(--color-primary); margin-bottom: 8px; position: relative; padding-left: 10px; }
-.section-label::before { content: ''; position: absolute; left: 0; top: 3px; bottom: 3px; width: 3px; border-radius: 2px; background: var(--color-accent, #b88c6e); }
-.desc-text { font-size: 14px; line-height: 1.8; color: var(--color-text); white-space: pre-wrap; }
-
-.reader-overlay {
-  position: fixed; inset: 0; z-index: 200; background: var(--color-bg, #fff);
-  display: flex; flex-direction: column;
-}
-html.dark .reader-overlay { background: #1a1a2e; }
-.reader-bar {
-  display: flex; justify-content: space-between; align-items: center; padding: 10px 20px;
-  border-bottom: 1px solid var(--color-border); flex-shrink: 0; min-height: 50px;
-}
-.reader-title { font-size: 15px; font-weight: 600; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.reader-controls { display: flex; gap: 8px; align-items: center; }
-.page-info { font-size: 13px; color: var(--color-text-secondary); min-width: 60px; text-align: center; }
-.reader-content { flex: 1; overflow: hidden; position: relative; }
-.pdf-frame { width: 100%; height: 100%; border: none; }
-.txt-reader { padding: 40px 60px; font-size: 16px; line-height: 2; color: var(--color-text); height: 100%; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; }
-.epub-reader { width: 100%; height: 100%; }
-.unsupported-format { display: flex; align-items: center; justify-content: center; height: 100%; }
-
-@media (max-width: 900px) {
-  .book-header { flex-direction: column; align-items: center; text-align: center; }
-  .book-cover-large-wrap { width: 120px; }
-  .book-meta-info { align-items: center; }
-  .meta-tags { justify-content: center; }
-  .txt-reader { padding: 20px; }
-}
-@media (max-width: 768px) {
-  .txt-reader { padding: 16px; font-size: 15px; }
-  .book-info-grid { grid-template-columns: 1fr !important; }
-}
+.meta-date { font-size: 12px; color: var(--color-text-secondary); opacity: 0.7; }
+.book-desc { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-border); }
+.section-label { font-size: 14px; font-weight: 600; color: var(--color-primary); margin-bottom: 6px; position: relative; padding-left: 10px; }
+.section-label::before { content: ''; position: absolute; left: 0; top: 2px; bottom: 2px; width: 3px; border-radius: 2px; background: var(--color-accent, #b88c6e); }
+.desc-text { font-size: 13px; line-height: 1.8; color: var(--color-text); white-space: pre-wrap; }
+.book-cats { margin-top: 12px; }
+.cat-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.cat-tag { background: rgba(184,140,110,0.1); border: 1px solid rgba(184,140,110,0.15); color: var(--color-accent, #b88c6e); padding: 2px 8px; border-radius: 8px; font-size: 12px; }
+html.dark .cat-tag { background: rgba(212,178,152,0.15); border-color: rgba(212,178,152,0.2); color: #d4b298; }
+.no-cat { font-size: 12px; color: var(--color-text-secondary); opacity: 0.5; }
+.detail-footer { display: flex; justify-content: space-between; align-items: center; }
+.footer-right { display: flex; gap: 8px; align-items: center; }
+.footer-right a { text-decoration: none; }
+.is-small { height: 28px; padding: 0 10px; font-size: 12px; }
 </style>
