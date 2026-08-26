@@ -189,5 +189,7 @@ html.dark :deep(.el-dropdown-menu__item:hover) { color: #E8DCC8 !important; }
 
 @media (max-width: 768px) {
   .diary-more { opacity: 1; }
+  .diary-card { padding: 12px; }
+  .diary-images img { width: calc(33.33% - 4px); }
 }
 </style>

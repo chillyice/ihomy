@@ -271,4 +271,9 @@ onMounted(load)
   display: flex;
   gap: 12px;
 }
+
+@media (max-width: 768px) {
+  .form-row { flex-direction: column; gap: 0; }
+  .summary-cards { grid-template-columns: repeat(2, 1fr) !important; }
+}
 </style>

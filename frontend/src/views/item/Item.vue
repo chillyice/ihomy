@@ -379,4 +379,10 @@ onMounted(() => {
 .item-path { color: #909399; font-size: 13px; margin-top: 4px; }
 .item-aliases { color: #909399; font-size: 12px; margin-top: 2px; }
 .item-ops { margin-top: 8px; }
+
+@media (max-width: 768px) {
+  .item-image-preview { width: 100px; height: 70px; }
+  .item-name { font-size: 14px; }
+  .toolbar { flex-wrap: wrap; }
+}
 </style>

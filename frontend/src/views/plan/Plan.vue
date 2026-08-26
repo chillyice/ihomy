@@ -221,4 +221,11 @@ onMounted(load)
   gap: 8px;
   margin-top: 8px;
 }
+
+@media (max-width: 768px) {
+  .task-sub { flex-wrap: wrap; }
+  .task-sub-due { width: 100%; text-align: right; margin-left: 0; }
+  .task-add-row { flex-direction: column; }
+  .task-add-row .el-button { width: 100%; }
+}
 </style>

@@ -203,4 +203,20 @@ onBeforeUnmount(cleanup)
 .conn-hint.bad {
   color: #f56c6c;
 }
+
+@media (max-width: 768px) {
+  .chat-box {
+    height: calc(100vh - 120px);
+    min-height: 300px;
+    padding: 12px;
+  }
+  .chat-title { font-size: 14px; margin-bottom: 8px; }
+  .online-hint { display: none; }
+  .msg-avatar { width: 28px !important; height: 28px !important; }
+  .msg-meta { font-size: 11px; }
+  .msg-bubble { max-width: 75%; font-size: 14px; padding: 8px 10px; }
+  .msg-input { gap: 8px; }
+  .msg-input .el-button { flex-shrink: 0; }
+  .conn-hint { font-size: 11px; margin-top: 6px; }
+}
 </style>

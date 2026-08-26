@@ -168,6 +168,7 @@ onMounted(load)
 .album-actions { padding: 6px 8px 10px; text-align: right; }
 
 @media (max-width: 768px) {
-  .album-grid { grid-template-columns: repeat(2, 1fr); }
+  .album-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .album-name { font-size: 14px; }
 }
 </style>

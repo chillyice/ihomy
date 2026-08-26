@@ -208,4 +208,9 @@ onMounted(loadTasks)
   display: flex;
   gap: 8px;
 }
+
+@media (max-width: 768px) {
+  .task-actions { flex-wrap: wrap; }
+  .task-actions .el-button { flex: 1; min-width: 80px; }
+}
 </style>
