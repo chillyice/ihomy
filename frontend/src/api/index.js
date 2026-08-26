@@ -309,17 +309,19 @@ export const kitchenApi = {
   remove: (id) => request.delete(`/kitchen/recipe/${id}`),
 }
 
-// 电子图书(家庭书架:上传/分类/在线阅读)
+// 电子图书(家庭书架:上传/分类树/在线阅读/书签/批量操作)
 export const libraryApi = {
   list: (params) => request.get('/library/list', { params }),
   detail: (id) => request.get(`/library/${id}`),
   create: (data) => request.post('/library', data),
   update: (id, data) => request.put(`/library/${id}`, data),
   delete: (id) => request.delete(`/library/${id}`),
+  batchDelete: (ids) => request.delete('/library/batch', { data: { ids } }),
+  batchMove: (ids, categoryId) => request.put('/library/batch/move', { ids, categoryId }),
   categories: () => request.get('/library/categories'),
-  addCategory: (name) => request.post('/library/categories', { name }),
-  renameCategory: (oldName, newName) => request.put('/library/categories', { oldName, newName }),
-  deleteCategory: (category, mode) => request.delete('/library/categories', { params: { category, mode } }),
+  addCategory: (name, parentId) => request.post('/library/categories', { name, parentId }),
+  updateCategory: (id, name) => request.put(`/library/categories/${id}`, { name }),
+  deleteCategory: (id, mode) => request.delete(`/library/categories/${id}`, { params: { mode } }),
   upload: (file) => {
     const form = new FormData()
     form.append('file', file)
@@ -327,4 +329,7 @@ export const libraryApi = {
   },
   getBorrow: (id) => request.get(`/library/${id}/borrow`),
   updateBorrow: (id, data) => request.put(`/library/${id}/borrow`, data),
+  getBookmarks: (id) => request.get(`/library/${id}/bookmarks`),
+  addBookmark: (id, data) => request.post(`/library/${id}/bookmarks`, data),
+  deleteBookmark: (bmId) => request.delete(`/library/bookmarks/${bmId}`),
 }
