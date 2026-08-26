@@ -281,7 +281,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 10. **缓存规范**(强制):
     - **缓存键**:`ihomy:{domain}:{id}`(如 `ihomy:user:1`、`ihomy:perms:1:1`、`ihomy:home:pub:1`)。
     - **短 TTL**:用户实体/权限码 5min;公开首页聚合 5min;天气/太阳位置按业务定。
-    - **变更点必须显式 invalidate**:`ProfileController.update` → `invalidateUser`;`MemberController.setRole/remove` → `invalidatePerms`;`AuthService.switchFamily/joinFamily` → `invalidatePerms`;模块/照片变更 → `PublicController.invalidateHomeCache`。
+    - **变更点必须显式 invalidate**:`ProfileController.update` → `invalidateUser`;`MemberController.setRole/remove` → `invalidatePerms`;`AuthService.switchFamily` → `invalidatePerms` + `invalidateUser`;`AuthService.joinFamily` → `invalidatePerms`;模块/照片变更 → `PublicController.invalidateHomeCache`。
     - **不变数据走内存缓存**:`sys_home_module` 全局模块 `@PostConstruct` 加载 `volatile List`,家庭模块按 familyId 缓存 `ConcurrentHashMap`,变更时 evict。**不引 Caffeine 等库**(数据量小,内存够用)。
     - **敏感数据不缓存**:成员视图的 `/public/home`(含 stats/photos)不缓存,只缓存非成员视图。
 11. **UPDATE 不先 select**(强制):回写冗余字段(如 `like_count`)用 `LambdaUpdateWrapper.eq(id).set(field, value).update(null)`,不要 `selectById` 再 `updateById`(省一次查询)。参考 `ContentLikeService.syncCount`。
@@ -338,7 +338,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
     - `.el-popper.is-light`(含 dropdown/tooltip)`z-index:61`(高于 AppSidebar=60,低于光影层 bright-spot=65)。
     - MusicPlayer `z-index:62`(popper 上方,光影层下方)。
     - SiteFooter `z-index:70`;BackToTop/InstallPrompt `z-index:200`;ElMessage `z-index:3000`。
-    - **完整 z-index 层级**(从高到低):`ElMessage(3000) > BackToTop/InstallPrompt(200) > lamp-light(100) > LightTestConsole(80) > lightning(79) > light-layer(78) > snow/rain(77) > dust(76) > vignette(74) > reflection(72) > SiteFooter(70) > window-shadow(68) > bright-spot(65) > MusicPlayer(62) > Popper/dropdown(61) > AppSidebar(60) > draggable-panel(20→60) > main-content(10) > glass-bg(2) > bg-blobs(1)`。
+    - **完整 z-index 层级**(从高到低):`ElMessage(3000) > el-overlay/dialog/message-box(3000) > PhotoViewer(201) > BackToTop/InstallPrompt(200) > LibraryReader float-close(210) > lamp-light(100) > LightTestConsole(80) > lightning(79) > light-layer(78) > snow/rain(77) > dust(76) > vignette(74) > reflection(72) > SiteFooter(70) > window-shadow(68) > bright-spot(65) > MusicPlayer(62) > Popper/dropdown(61) > AppSidebar(60) > draggable-panel(20→60) > main-content(10) > glass-bg(2) > bg-blobs(1)`。
     - **光影层(65-100)为除 Toast 外的最高层**,任何新增组件 z-index 不得超 100(台灯 100 除外)。
 18. **按钮统一样式**(强制,全局 4 类按钮,`main.css` 统一覆写,禁止 scoped 重复定义):
     - **圆角**:所有 `el-button` 12px;small 10px。
@@ -403,7 +403,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | `PUT /profile`(改昵称/头像) | `ihomy:user:{uid}` | `SecurityHelper.invalidateUser(uid)` |
 | `PUT /member/{id}/role`(改角色) | `ihomy:perms:{uid}:{fid}` | `SecurityHelper.invalidatePerms(uid, fid)` |
 | `DELETE /member/{id}`(移出成员) | `ihomy:perms:{uid}:{fid}` | `SecurityHelper.invalidatePerms(uid, fid)` |
-| `POST /auth/family/switch`(切换家庭) | `ihomy:perms:{uid}:{newFid}` | `SecurityHelper.invalidatePerms(uid, newFid)` |
+| `POST /auth/family/switch`(切换家庭) | `ihomy:perms:{uid}:{newFid}` + `ihomy:user:{uid}` | `SecurityHelper.invalidatePerms(uid, newFid)` + `SecurityHelper.invalidateUser(uid)` |
 | `POST /auth/join`(加入新家庭) | `ihomy:perms:{uid}:{newFid}` | `SecurityHelper.invalidatePerms(uid, newFid)` |
 | `PUT /home/modules`(改模块配置) | `ihomy:home:pub:{fid}` + 内存 familyCache | `PublicController.invalidateHomeCache(fid)` + `HomeModuleService.updateConfig` 内 evict |
 | `POST /home/modules`(新增模块) | 同上 | 同上 |
@@ -600,6 +600,24 @@ INSERT INTO sys_dict_item ... book_format/borrow_status;
 **测试方式**:`localhost:5173` + Chrome DevTools 设备模拟;真机 `http://<局域网IP>:5173`(vite host:0.0.0.0)。
 
 **第一期适配范围**:首页(三 Tab 重设计)+ 子页面顶部返回栏 + 20 个功能页响应式 CSS 增强(Blog/Diary/Album/Chat/Login/Settings/Member/Book/Task/Plan/Wish/Points/Reminder/Tree/Item/Library)。后续迭代:进一步触摸手势优化+字体大小+性能验证。
+
+##### 播放器沉浸模式 + 多家庭修复(V8.1)
+
+| 文件 | 改动 |
+|------|------|
+| `utils/useSunLight.js` | `suspendEffects()`/`restoreEffects()`:播放器启动时保存并关闭天气/灯光/毛玻璃/色块,关闭后恢复;特效开关状态持久化 localStorage(`ihomy:effects`);suspend 期间跳过持久化避免覆盖原状态 |
+| `components/PhotoViewer.vue` | `<Teleport to="body">` + z-index:201(高于导航栏60和光影层100);`v-model:visible` watch 时 suspend/restore |
+| `views/library/LibraryReader.vue` | `<Teleport to="body">`;全屏模式浮动关闭按钮(z-index:210);`onMounted` suspend + `onBeforeUnmount` restore |
+| `views/cinema/Cinema.vue` | 视频弹窗 `watch(player.visible)` suspend/restore |
+| `views/Home.vue` | 拍立得改用 `PhotoViewer`(替换 `el-image-viewer`);点击拍立得播放全部近7天照片(`sevenDayPhotos`),拍立得仅展示7张随机;相册封面改为容器85%+透视厚度+花纹(`::before`/`::after`) |
+| `security/SecurityHelper.java` | `currentUser()` 返回前用 JWT 当前家庭覆盖 `familyId`(修复切换家庭后所有控制器拿到主家庭 ID 的 bug) |
+| `service/AuthService.java` | `switchFamily` 增加 `invalidateUser(userId)`(修复切换默认家庭不生效的缓存 bug) |
+| `service/AlbumService.java` | `detail`/`create`/`addPhoto` 增加 `currentFamilyId` 参数(防御性,配合 SecurityHelper 修复) |
+| `App.vue` | 全局页面过渡从 `slide-down` 改为 `fade`(0.5s,无 transform 避免 `position:fixed` 卡片偏移) |
+| `styles/main.css` | `.el-overlay` z-index:3000(覆盖导航栏 backdrop-filter) |
+| `views/album/AlbumDetail.vue` | 编辑/删除按钮 `@click.stop` 阻止冒泡;`.album-head-actions` 横向排列 |
+| `components/SunLightLayer.vue` | 台灯 `lampSwing` keyframes 加 `translateY(-50%)` 修复位置偏移 |
+| `vite.config.js` + `package.json` | `vite-plugin-pwa` 升级 0.20.5→1.3.0 修复 `workbox-build` ESM 兼容;移除 `cross-env`/`build:fast` |
 
 ## 文件存储策略
 

@@ -52,27 +52,35 @@ public class SecurityHelper {
         return u == null ? null : u.getUserId();
     }
 
-    /** 当前用户完整实体(优先 Redis 缓存,未登录返回 null) */
+    /** 当前用户完整实体(优先 Redis 缓存,未登录返回 null)
+     *  注意:返回的 familyId 被覆盖为 JWT 中的当前家庭(而非 DB 中的主家庭),
+     *  确保切换家庭后所有 currentUser().getFamilyId() 调用拿到正确的当前家庭。 */
     public SysUser currentUser() {
         LoginUser u = current();
         if (u == null) return null;
         Long userId = u.getUserId();
         String key = KEY_USER + userId;
+        SysUser user = null;
         try {
             String json = redis.opsForValue().get(key);
             if (json != null) {
-                return mapper.readValue(json, SysUser.class);
+                user = mapper.readValue(json, SysUser.class);
             }
         } catch (Exception e) {
             log.warn("read user cache failed uid={}, fallback to DB", userId, e);
         }
-        SysUser user = sysUserMapper.selectById(userId);
-        if (user != null) {
-            try {
-                redis.opsForValue().set(key, mapper.writeValueAsString(user), USER_TTL);
-            } catch (Exception e) {
-                log.warn("write user cache failed uid={}", userId, e);
+        if (user == null) {
+            user = sysUserMapper.selectById(userId);
+            if (user != null) {
+                try {
+                    redis.opsForValue().set(key, mapper.writeValueAsString(user), USER_TTL);
+                } catch (Exception e) {
+                    log.warn("write user cache failed uid={}", userId, e);
+                }
             }
+        }
+        if (user != null) {
+            user.setFamilyId(u.getFamilyId());
         }
         return user;
     }

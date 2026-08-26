@@ -50,7 +50,7 @@ public class PhotoController {
         for (MultipartFile f : files) {
             String url = fileService.upload(f, f.getOriginalFilename(), f.getContentType(),
                     albumId, album == null ? null : album.getName());
-            photos.add(albumService.addPhoto(albumId, user, url, null));
+            photos.add(albumService.addPhoto(albumId, user, fid, url, null));
         }
         if (!photos.isEmpty()) {
             pointsService.addRecord(user.getId(), fid, "REWARD",

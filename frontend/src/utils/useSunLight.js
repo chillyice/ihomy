@@ -26,13 +26,23 @@ export function useSunLight() {
     windowAngle: 0, hasDirectLight: false,
   })
 
-  const lampMode = ref('auto')
-  const lampTemp = ref(30)
-  const lampBrightness = ref(50)
-  const shadowEnabled = ref(true)
-  const weatherEffectEnabled = ref(true)
-  const blobsEnabled = ref(true)
-  const glassEnabled = ref(true)
+  const _saved = JSON.parse(localStorage.getItem('ihomy:effects') || 'null') || {}
+  let _suspended = null
+  const lampMode = ref(_saved.lampMode ?? 'auto')
+  const lampTemp = ref(_saved.lampTemp ?? 30)
+  const lampBrightness = ref(_saved.lampBrightness ?? 50)
+  const shadowEnabled = ref(_saved.shadowEnabled ?? true)
+  const weatherEffectEnabled = ref(_saved.weatherEffectEnabled ?? true)
+  const blobsEnabled = ref(_saved.blobsEnabled ?? true)
+  const glassEnabled = ref(_saved.glassEnabled ?? true)
+  watch([lampMode, lampTemp, lampBrightness, shadowEnabled, weatherEffectEnabled, blobsEnabled, glassEnabled], () => {
+    if (_suspended) return
+    localStorage.setItem('ihomy:effects', JSON.stringify({
+      lampMode: lampMode.value, lampTemp: lampTemp.value, lampBrightness: lampBrightness.value,
+      shadowEnabled: shadowEnabled.value, weatherEffectEnabled: weatherEffectEnabled.value,
+      blobsEnabled: blobsEnabled.value, glassEnabled: glassEnabled.value,
+    }))
+  })
   // 总开关:所有特效都关闭时为 false,用于门控定时器/API 调用/组件挂载
   const anyEffectEnabled = computed(() =>
     shadowEnabled.value || blobsEnabled.value || weatherEffectEnabled.value || lampMode.value !== 'off'
@@ -433,6 +443,18 @@ export function useSunLight() {
     document.documentElement.classList.toggle('no-glass', !on)
   }, { immediate: true })
 
+  // 播放器启动时暂停特效,关闭后恢复
+  const suspendEffects = () => {
+    if (_suspended) return
+    _suspended = { shadowEnabled: shadowEnabled.value, weatherEffectEnabled: weatherEffectEnabled.value, blobsEnabled: blobsEnabled.value, glassEnabled: glassEnabled.value, lampMode: lampMode.value }
+    shadowEnabled.value = false; weatherEffectEnabled.value = false; blobsEnabled.value = false; glassEnabled.value = false; lampMode.value = 'off'
+  }
+  const restoreEffects = () => {
+    if (!_suspended) return
+    shadowEnabled.value = _suspended.shadowEnabled; weatherEffectEnabled.value = _suspended.weatherEffectEnabled; blobsEnabled.value = _suspended.blobsEnabled; glassEnabled.value = _suspended.glassEnabled; lampMode.value = _suspended.lampMode
+    _suspended = null
+  }
+
   return {
     sunInfo, slotIdx, sunScene, weather, weatherDetail, loadWeather, loadSunInfoForDate,
     lampMode, lampTemp, lampBrightness, shadowEnabled, weatherEffectEnabled, blobsEnabled, glassEnabled, anyEffectEnabled, toggleLamp,
@@ -440,5 +462,6 @@ export function useSunLight() {
     lampStrength, lampStrengthAnim, lampDivOpacity, lampRadius, lampMask, lampColor,
     dustParticles, snowParticles, rainParticles, weatherShadowOpacity, lightLayerOpacity, rayStyles, sourceStyle, bloomStyle, brightSpotStyle, reflectionStyle, lightningFlash,
     lightTestMode, lightTestPaused, testSpeed, setTestSpeed, weatherMode, precipLevel, setWeather, startLightTest, pauseLightTest, stepLightTest, stopLightTest, setSlot, refreshScene,
+    suspendEffects, restoreEffects,
   }
 }

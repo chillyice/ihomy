@@ -5,6 +5,7 @@
   支持:键盘导航/触摸滑动/自动播放/Ken Burns缓推/缩略图条/进度条
 -->
 <template>
+  <Teleport to="body">
   <transition name="pv-fade">
     <div v-if="visible" class="photo-viewer" @touchstart="onTouchStart" @touchend="onTouchEnd">
       <!-- 背景遮罩:半透明深色(光影层会叠加在上面) -->
@@ -108,11 +109,13 @@
       </div>
     </div>
   </transition>
+  </Teleport>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -122,6 +125,7 @@ const props = defineProps({
 const emit = defineEmits(['update:visible', 'close'])
 
 const { t } = useI18n()
+const sunLight = inject(SUN_LIGHT_KEY, null)
 
 const index = ref(0)
 const playing = ref(false)
@@ -217,9 +221,11 @@ watch(() => props.visible, (v) => {
   if (v) {
     index.value = props.initialIndex
     document.body.style.overflow = 'hidden'
+    sunLight?.suspendEffects()
   } else {
     document.body.style.overflow = ''
     stopPlay()
+    sunLight?.restoreEffects()
   }
 })
 
@@ -233,15 +239,16 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKey)
   stopPlay()
   document.body.style.overflow = ''
+  sunLight?.restoreEffects()
 })
 </script>
 
 <style scoped>
-/* z-index 63:功能层之上(MusicPlayer=62),光影层之下(bright-spot=65) */
+/* z-index 201:Teleport 到 body,高于导航栏(60)和光影层(65-100) */
 .photo-viewer {
   position: fixed;
   inset: 0;
-  z-index: 63;
+  z-index: 201;
   display: flex;
   flex-direction: column;
   align-items: center;

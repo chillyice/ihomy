@@ -1,7 +1,7 @@
 <!-- 首页:12列×9行栅格仪表盘,编辑模式可拖拽/缩放/增删组件 -->
 <template>
   <div ref="root" class="home-page" :class="{ 'edit-mode': editMode }">
-    <el-image-viewer v-if="viewerVisible" :url-list="viewerUrls" :initial-index="viewerIdx" @close="viewerVisible = false" />
+    <PhotoViewer v-model:visible="viewerVisible" :photos="sevenDayPhotos" :initial-index="viewerIdx" />
 
     <!-- 编辑模式工具栏(hover隐藏) -->
     <Transition name="fade">
@@ -209,14 +209,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, inject, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, inject, nextTick, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
 import { useI18n } from 'vue-i18n'
 import { publicApi, homeApi, taskApi, pointsApi, reminderApi, bookApi, wishApi, itemApi, kitchenApi, musicApi } from '@/api'
 import { gsap } from 'gsap'
-import { ElMessage, ElImageViewer } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import PhotoViewer from '@/components/PhotoViewer.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useWidgetDrag } from '@/utils/useWidgetDrag'
 
@@ -307,11 +308,21 @@ const loadWeatherDetail = async () => { try { const res = await fetch('/api/publ
 const loadMusic = async () => { try { const r = await musicApi.getBackground(); musicPlaylist.value = r?.playlist || null; musicTracks.value = r?.tracks || [] } catch (e) {} }
 
 const SEVEN_DAYS = 7 * 86400000
-const recentPhotos = computed(() => { const now = Date.now(); return allPhotos.value.filter(p => p.createdAt && now - new Date(p.createdAt).getTime() < SEVEN_DAYS).slice(0, 7) })
+const sevenDayPhotos = computed(() => { const now = Date.now(); return allPhotos.value.filter(p => p.createdAt && now - new Date(p.createdAt).getTime() < SEVEN_DAYS) })
+const recentPhotos = computed(() => {
+  const ps = sevenDayPhotos.value.slice()
+  for (let i = ps.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [ps[i], ps[j]] = [ps[j], ps[i]] }
+  return ps.slice(0, 7)
+})
 const polaroidLayout = ref([])
-watch(recentPhotos, (ps) => { polaroidLayout.value = ps.map((p, i) => ({ rotate: (Math.random() - 0.5) * 45, dx: (Math.random() - 0.5) * 220, dy: (Math.random() - 0.5) * 180, z: i + 1 })) }, { immediate: true })
-const viewerUrls = computed(() => recentPhotos.value.map(p => p.url))
-const openViewer = (idx) => { viewerIdx.value = idx; viewerVisible.value = true }
+watch(recentPhotos, (ps) => { polaroidLayout.value = ps.map((p, i) => ({ rotate: (Math.random() - 0.5) * 50, dx: (Math.random() - 0.5) * 340, dy: (Math.random() - 0.5) * 140, z: i + 1 })) }, { immediate: true })
+const openViewer = (idx) => {
+  const all = sevenDayPhotos.value
+  const clicked = recentPhotos.value[idx]
+  const realIdx = clicked ? all.findIndex(p => p.id === clicked.id) : 0
+  viewerIdx.value = realIdx < 0 ? 0 : realIdx
+  viewerVisible.value = true
+}
 
 const feedTypeLabel = (type) => type === 'blog' ? '博客' : type === 'diary' ? '日记' : type === 'photo' ? '照片' : ''
 const feedSummary = (f) => { if (f.type === 'blog') return f.title || ''; if (f.type === 'diary') return (f.content || '').slice(0, 40); if (f.type === 'photo') return `${f.count || 0} 张照片`; return '' }
@@ -469,7 +480,7 @@ onMounted(() => {
   loadAll(); loadWeatherDetail(); loadPoints(); loadReminders(); loadBookSummary(); loadWishes(); loadTodayRecipes(); loadMusic()
   nextTick(() => { if (!root.value) return; ctx = gsap.context(() => { gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, ease: 'power2.out' }) }, root.value) })
 })
-onUnmounted(() => { ctx?.revert() })
+onBeforeUnmount(() => { ctx?.revert() })
 </script>
 
 <style scoped>
@@ -694,9 +705,11 @@ html.dark .music-title { color: #E8DCC8; }
 .polaroid-pos:hover { z-index: 99 !important; }
 .polaroid img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
 .polaroid-caption { position: absolute; bottom: 4px; left: 4px; right: 4px; font-size: 9px; color: #5a4a3a; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.album-closed { position: absolute; top: 50%; left: 50%; width: 140px; height: 105px; margin-left: -70px; margin-top: -52px; transform: rotate(-4deg); cursor: pointer; transition: transform 0.3s ease; }
-.album-closed:hover { transform: rotate(0deg) scale(1.05); }
-.album-cover { width: 100%; height: 100%; background: linear-gradient(135deg, #8B6F47 0%, #6B5435 50%, #5a4530 100%); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; }
+.album-closed { position: absolute; top: 50%; left: 50%; width: 85%; aspect-ratio: 4/3; transform: translate(-50%, -50%) rotate(-4deg); cursor: pointer; transition: transform 0.3s ease; }
+.album-closed:hover { transform: translate(-50%, -50%) rotate(0deg) scale(1.05); }
+.album-cover { width: 100%; height: 100%; background: linear-gradient(135deg, #8B6F47 0%, #6B5435 50%, #5a4530 100%); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; position: relative; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.3), 0 8px 4px -4px rgba(0,0,0,0.35), 0 12px 8px -6px rgba(0,0,0,0.25); }
+.album-cover::before { content: ''; position: absolute; inset: 0; background-image: repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(245,230,200,0.04) 8px, rgba(245,230,200,0.04) 16px); pointer-events: none; }
+.album-cover::after { content: ''; position: absolute; inset: 6px; border: 1px solid rgba(245,230,200,0.15); border-radius: 2px; pointer-events: none; }
 .cover-title { font-size: 13px; font-weight: 700; color: #F5E6C8; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
 .cover-sub { font-size: 9px; color: rgba(245,230,200,0.7); }
 

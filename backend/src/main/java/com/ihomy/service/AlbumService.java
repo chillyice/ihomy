@@ -63,14 +63,14 @@ public class AlbumService {
     }
 
     /** 相册详情+照片列表;游客仅可访问默认家庭的公开相册 */
-    public Map<String, Object> detail(Long albumId, SysUser user) {
+    public Map<String, Object> detail(Long albumId, SysUser user, Long currentFamilyId) {
         Album a = albumMapper.selectById(albumId);
         if (a == null) throw new BizException(ResultCode.NOT_FOUND);
         if (user == null) {
             if (!"public".equals(a.getType())) throw new BizException(ResultCode.FORBIDDEN);
             Family def = familyMapper.selectDefault();
             if (def == null || !def.getId().equals(a.getFamilyId())) throw new BizException(ResultCode.FORBIDDEN);
-        } else if (!a.getFamilyId().equals(user.getFamilyId())) {
+        } else if (!a.getFamilyId().equals(currentFamilyId)) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
 
@@ -85,11 +85,11 @@ public class AlbumService {
     }
 
     /** 新建相册,归属当前用户所在家庭,默认 public 类型 */
-    public Album create(SysUser user, AlbumDTO dto) {
+    public Album create(SysUser user, Long currentFamilyId, AlbumDTO dto) {
         Album a = new Album();
         a.setName(dto.getName());
         a.setType(dto.getType() == null || dto.getType().isBlank() ? "public" : dto.getType());
-        a.setFamilyId(user.getFamilyId());
+        a.setFamilyId(currentFamilyId);
         a.setCreatedBy(user.getId());
         albumMapper.insert(a);
         return a;
@@ -117,10 +117,10 @@ public class AlbumService {
     }
 
     /** 添加照片:可见性随相册类型(public→4,private→3);首张自动成为相册封面 */
-    public Photo addPhoto(Long albumId, SysUser user, String url, String description) {
+    public Photo addPhoto(Long albumId, SysUser user, Long currentFamilyId, String url, String description) {
         Album a = albumMapper.selectById(albumId);
         if (a == null) throw new BizException(ResultCode.NOT_FOUND);
-        if (!a.getFamilyId().equals(user.getFamilyId())) throw new BizException(ResultCode.FORBIDDEN);
+        if (!a.getFamilyId().equals(currentFamilyId)) throw new BizException(ResultCode.FORBIDDEN);
 
         Photo p = new Photo();
         p.setAlbumId(albumId);

@@ -35,7 +35,7 @@ public class AlbumController {
     public Result<List<Map<String, Object>>> list() {
         SysUser user = securityHelper.currentUser();
         boolean isGuest = user == null;
-        Long familyId = user == null ? resolveDefaultFamily() : user.getFamilyId();
+        Long familyId = user == null ? resolveDefaultFamily() : securityHelper.current().getFamilyId();
         return Result.success(albumService.list(familyId, isGuest));
     }
 
@@ -47,14 +47,15 @@ public class AlbumController {
     @Operation(summary = "相册详情(含照片)")
     @GetMapping("/{id}")
     public Result<Map<String, Object>> detail(@PathVariable Long id) {
-        return Result.success(albumService.detail(id, securityHelper.currentUser()));
+        return Result.success(albumService.detail(id, securityHelper.currentUser(),
+                securityHelper.currentUser() == null ? null : securityHelper.current().getFamilyId()));
     }
 
     @Operation(summary = "新建相册")
     @OperationLog(module = "ALBUM", operationType = "CREATE", description = "新建相册")
     @PostMapping
     public Result<Album> create(@RequestBody AlbumDTO dto) {
-        return Result.success(albumService.create(securityHelper.currentUser(), dto));
+        return Result.success(albumService.create(securityHelper.currentUser(), securityHelper.current().getFamilyId(), dto));
     }
 
     @Operation(summary = "更新相册")
