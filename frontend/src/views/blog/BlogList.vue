@@ -209,7 +209,7 @@ const onBlogCommand = async (cmd, b) => {
     }
   } else if (cmd === 'delete') {
     try {
-      await ElMessageBox.confirm(t('blog.deleteConfirm'), { type: 'warning', confirmButtonText: t('common.delete'), cancelButtonText: t('common.cancel') })
+      await ElMessageBox.confirm(t('blog.deleteConfirm'), { type: 'warning', confirmButtonText: t('common.delete'), cancelButtonText: t('common.cancel'), closeOnClickModal: true })
       await blogApi.delete(b.id)
       ElMessage.success(t('common.deleted'))
       await load()

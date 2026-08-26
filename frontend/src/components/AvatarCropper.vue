@@ -1,6 +1,6 @@
 <!-- 头像裁剪对话框:正方形选区+滚轮/滑块缩放,canvas 裁剪,无外部依赖 -->
 <template>
-  <el-dialog v-model="visible" :title="title" width="500px" :close-on-click-modal="false" @closed="onClosed">
+  <el-dialog v-model="visible" append-to-body :title="title" width="500px" :close-on-click-modal="false" @closed="onClosed">
     <div v-if="imgSrc" class="cropper-box" ref="boxRef" @wheel.prevent="onWheel">
       <img :src="imgSrc" class="cropper-img" :style="{ width: imgW + 'px', height: imgH + 'px' }" @load="onImgLoad" ref="imgRef" />
       <!-- 遮罩 + 正方形选区 -->

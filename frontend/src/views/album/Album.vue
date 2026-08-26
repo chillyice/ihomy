@@ -41,7 +41,7 @@
       <el-empty v-else :description="userStore.isGuest ? t('album.noPublicAlbum') : t('album.emptyHint')" />
     </div>
 
-    <el-dialog v-model="editor.visible" :title="editor.form.id ? t('album.editTitle') : t('album.newAlbum')" width="420px">
+    <el-dialog v-model="editor.visible" append-to-body :title="editor.form.id ? t('album.editTitle') : t('album.newAlbum')" width="420px">
       <el-form :model="editor.form" label-position="top">
         <el-form-item :label="t('album.albumName')">
           <el-input v-model="editor.form.name" :placeholder="t('album.namePlaceholder')" />
@@ -109,7 +109,7 @@ const onSave = async () => {
 
 // 删除相册(连同相册内照片):二次确认后执行
 const onDel = async (a) => {
-  await ElMessageBox.confirm(t('album.deleteConfirm', { name: a.name }), t('common.tip'), { type: 'warning' })
+  await ElMessageBox.confirm(t('album.deleteConfirm', { name: a.name }), t('common.tip'), { type: 'warning', closeOnClickModal: true })
   await albumApi.remove(a.id)
   ElMessage.success(t('common.deleted'))
   load()

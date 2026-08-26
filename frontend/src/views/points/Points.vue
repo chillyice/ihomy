@@ -78,7 +78,7 @@
     </el-tabs>
 
     <!-- 上架/编辑商品弹窗 -->
-    <el-dialog v-model="editor.visible" :title="editor.form.id ? $t('points.editProduct') : $t('points.publish')" width="420px">
+    <el-dialog v-model="editor.visible" append-to-body :title="editor.form.id ? $t('points.editProduct') : $t('points.publish')" width="420px">
       <el-form :model="editor.form" label-position="top">
         <el-form-item :label="$t('points.productName')">
           <el-input v-model="editor.form.name" :placeholder="$t('points.namePlaceholder')" />
@@ -172,7 +172,7 @@ const onCheckin = async () => {
 
 // 兑换确认 -> 落单后刷新余额/商品/订单
 const onRedeem = async (p) => {
-  await ElMessageBox.confirm(t('points.redeemMessage', { points: p.points, item: p.name }), t('points.redeemTitle'), { type: 'warning' })
+  await ElMessageBox.confirm(t('points.redeemMessage', { points: p.points, item: p.name }), t('points.redeemTitle'), { type: 'warning', closeOnClickModal: true })
   await pointsApi.redeem(p.id)
   ElMessage.success(t('points.redeemSuccess'))
   await Promise.all([loadStats(), loadProducts(), loadOrders()])
@@ -203,7 +203,7 @@ const onSave = async () => {
 }
 
 const onOff = async (p) => {
-  await ElMessageBox.confirm(t('points.offMessage', { item: p.name }), t('points.offTitle'), { type: 'warning' })
+  await ElMessageBox.confirm(t('points.offMessage', { item: p.name }), t('points.offTitle'), { type: 'warning', closeOnClickModal: true })
   await pointsApi.remove(p.id)
   ElMessage.success(t('points.offShelf'))
   await loadProducts()

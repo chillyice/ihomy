@@ -46,7 +46,7 @@
       <el-empty v-else :description="userStore.isGuest ? t('album.noPublicPhotos') : t('album.emptyPhotoHint')" />
     </div>
 
-    <el-dialog v-model="descEditor.visible" :title="t('album.noteTitle')" width="420px">
+    <el-dialog v-model="descEditor.visible" append-to-body :title="t('album.noteTitle')" width="420px">
       <el-input v-model="descEditor.value" type="textarea" :rows="3" :placeholder="t('album.notePlaceholder')" />
       <template #footer>
         <el-button @click="descEditor.visible = false">{{ t('common.cancel') }}</el-button>
@@ -117,7 +117,7 @@ const onSaveDesc = async () => {
 }
 
 const onDelPhoto = async (p) => {
-  await ElMessageBox.confirm(t('album.photoDeleteConfirm'), t('common.tip'), { type: 'warning' })
+  await ElMessageBox.confirm(t('album.photoDeleteConfirm'), t('common.tip'), { type: 'warning', closeOnClickModal: true })
   await photoApi.remove(p.id)
   ElMessage.success(t('common.deleted'))
   load()

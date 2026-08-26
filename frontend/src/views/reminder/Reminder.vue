@@ -29,7 +29,7 @@
       <el-empty v-else :description="$t('reminder.noData')" />
     </div>
 
-    <el-dialog v-model="editor.visible" :title="editor.form.id ? $t('reminder.editTitle') : $t('reminder.add')" width="440px">
+    <el-dialog v-model="editor.visible" append-to-body :title="editor.form.id ? $t('reminder.editTitle') : $t('reminder.add')" width="440px">
       <el-form :model="editor.form" label-position="top">
         <el-form-item :label="$t('reminder.headline')">
           <el-input v-model="editor.form.title" :placeholder="$t('reminder.titlePlaceholder')" />
@@ -117,7 +117,7 @@ const onToggle = async (r) => {
 }
 
 const onDel = async (r) => {
-  await ElMessageBox.confirm(t('reminder.deleteMessage', { title: r.title }), t('common.deleteConfirm'), { type: 'warning' })
+  await ElMessageBox.confirm(t('reminder.deleteMessage', { title: r.title }), t('common.deleteConfirm'), { type: 'warning', closeOnClickModal: true })
   await reminderApi.remove(r.id)
   ElMessage.success(t('common.deleted'))
   await load()

@@ -713,6 +713,15 @@ html.dark .el-message-box__btns .el-button:not(.el-button--primary):hover {
 .dialog-fade-enter-from .el-dialog { transform: scale(0.94) !important; opacity: 0 !important; }
 .dialog-fade-leave-to .el-dialog { transform: scale(0.96) !important; opacity: 0 !important; }
 
+/* === ElMessageBox 动画(与 el-dialog 一致:scale+opacity) === */
+.fade-in-linear-enter-active { animation: none !important; transition: opacity 0.25s ease !important; }
+.fade-in-linear-leave-active { animation: none !important; transition: opacity 0.2s ease !important; }
+.fade-in-linear-enter-from, .fade-in-linear-leave-to { opacity: 0 !important; }
+.fade-in-linear-enter-active .el-overlay-message-box { transition: transform 0.25s ease, opacity 0.25s ease !important; animation: none !important; }
+.fade-in-linear-leave-active .el-overlay-message-box { transition: transform 0.2s ease, opacity 0.2s ease !important; animation: none !important; }
+.fade-in-linear-enter-from .el-overlay-message-box { transform: scale(0.94) !important; opacity: 0 !important; }
+.fade-in-linear-leave-to .el-overlay-message-box { transform: scale(0.96) !important; opacity: 0 !important; }
+
 /* ========== 全局下拉菜单(teleported, scoped 不生效) ========== */
 .el-dropdown__popper.el-popper,
 .el-popper.is-light {

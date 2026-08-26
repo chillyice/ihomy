@@ -619,6 +619,18 @@ INSERT INTO sys_dict_item ... book_format/borrow_status;
 | `components/SunLightLayer.vue` | 台灯 `lampSwing` keyframes 加 `translateY(-50%)` 修复位置偏移 |
 | `vite.config.js` + `package.json` | `vite-plugin-pwa` 升级 0.20.5→1.3.0 修复 `workbox-build` ESM 兼容;移除 `cross-env`/`build:fast` |
 
+##### UI 交互优化 V8.2
+
+| 文件 | 改动 |
+|------|------|
+| `styles/main.css` | ElMessageBox 动画:`fade-in-linear-*` transition 覆盖 EP 默认,`.el-overlay-message-box` 加 scale(0.94)+opacity 淡入(与 el-dialog 一致);`.fade-in-linear-enter-active .el-overlay-message-box` 杀 EP 默认 `msgbox-fade-in` keyframes |
+| 31 个 `ElMessageBox.confirm` 调用(20 个文件) | 全部加 `closeOnClickModal: true`(点击遮罩关闭) |
+| `views/diary/DiaryEdit.vue` | 重写:移除多 textarea 分页,改为单个 `paper-textarea`+`autoResize()` 按整页(18行×28px=504px)自适应增长;新增 `.page-break-bg` 层每 504px 一条深色实线标记分页;日期/时间选择器上下排列(`header-left` flex-column),日期与心情底端对齐、时间与天气底端对齐;picker overlay z-index 降到 61(光影层 65 之下,编辑框之上) |
+| 24 个 `el-dialog`(18 个文件) | 全部加 `append-to-body`(修复弹窗遮罩未覆盖导航栏——弹窗渲染在组件内部被 stacking context 困住) |
+| `views/music/Music.vue` | 三种上传方式(单曲/专辑文件夹/外链)合并为「上传音乐」下拉菜单;新建歌单+多选按钮移入 `el-tabs__nav-scroll` 内部右侧(absolute 定位) |
+| `views/Home.vue` | 首页任务组件过滤 `status !== 'CANCELLED'`(已取消任务不展示;status 是字符串非数字) |
+| `views/blog/BlogList.vue` | 代码块 `pre` 深色背景+`white-space: pre-wrap` 自动换行;表格斑马纹+`display:block; overflow-x:auto`;行间距 `line-height: 2.0` |
+
 ## 文件存储策略
 
 - **当前阶段(开发期)**:本地磁盘存储(`file.upload-dir`),零成本零内存,FileService 已实现,开箱即用。Nginx `/files/` 托管静态目录(注意负向断言正则 `location ~* ^/(?!files/).+\.(...)$` 排除 /files/)。

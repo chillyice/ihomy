@@ -60,7 +60,7 @@
       </div>
     </div>
 
-    <el-dialog v-model="editor.visible" :title="editor.form.id ? $t('book.editRecord') : $t('book.add')" width="420px">
+    <el-dialog v-model="editor.visible" append-to-body :title="editor.form.id ? $t('book.editRecord') : $t('book.add')" width="420px">
       <el-form :model="editor.form" label-position="top">
         <el-form-item :label="$t('book.typeLabel')">
           <el-radio-group v-model="editor.form.type">
@@ -156,7 +156,7 @@ const onSave = async () => {
 }
 
 const onDel = async (r) => {
-  await ElMessageBox.confirm(t('book.deleteMessage', { amount: r.amount }), t('common.deleteConfirm'), { type: 'warning' })
+  await ElMessageBox.confirm(t('book.deleteMessage', { amount: r.amount }), t('common.deleteConfirm'), { type: 'warning', closeOnClickModal: true })
   await bookApi.remove(r.id)
   ElMessage.success(t('common.deleted'))
   await load()

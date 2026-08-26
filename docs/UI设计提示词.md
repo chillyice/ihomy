@@ -479,3 +479,7 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 22. **书架页**(`/library`):与博客列表页设计风格统一。grid 布局(180px 分类侧栏 + 1fr 主区);左侧分类栏(毛玻璃+sticky+active 竖线)同博客;主区图书网格 `auto-fill minmax(160px, 1fr)`,卡片含封面(3:4 比例)+格式角标(右上半透明黑底白字)+书名(2 行截断)+作者+分类标签+浏览数;卡片 hover 上浮 `translateY(-4px)`+阴影;下拉菜单(编辑/复制链接/删除)hover 显示;移动端分类栏改水平滚动+网格 `minmax(130px, 1fr)`。
 23. **书架详情页**(`/library/:id`):flex 布局(封面 140px+元信息区);封面 3:4 带阴影;元信息含书名(24px/700)、作者、格式标签(暖棕半透明)、分类标签、文件大小、标签、浏览数;操作按钮区(在线阅读/下载/阅读状态切换);简介区(section-label 标题);在线阅读器全屏覆盖(z-index:200)含顶栏(书名+翻页控件+关闭)+内容区(PDF iframe / EPUB epub.js / TXT 分页);移动端封面+元信息改垂直居中布局。
 24. **书架编辑页**(`/library/edit/:id?`):与博客编辑页设计风格统一。`.card` + `el-form label-position="top"`;文件上传(`el-input` readonly + `el-upload` append 按钮);封面上传同;表单含书名/作者/文件/封面/简介/分类(selectable+新建)/标签/可见范围;底部 `.form-footer` 右对齐保存按钮。
+25. **ElMessageBox 动画**:与 el-dialog 一致(`fade-in-linear` transition + `.el-overlay-message-box` scale(0.94)+opacity 淡入 0.25s);点击遮罩关闭(`closeOnClickModal: true`);所有 `ElMessageBox.confirm` 调用均加此参数。外观:圆角 14px+暖米底色+毛玻璃+暖棕按钮,同 el-dialog 规范。
+26. **日记编辑页**(`/diary/edit/:id?`):单张信纸自适应高度,按整页(18行×28px=504px)增长;`.page-break-bg` 层每 504px 一条深色实线标记分页;页眉日期/时间上下排列(`header-left` flex-column),日期与心情底端对齐、时间与天气底端对齐;心情/天气 picker overlay z-index:61(光影层 65 之下,编辑框之上)。
+27. **el-dialog append-to-body**(强制):所有 `el-dialog` 必须加 `append-to-body`,否则弹窗渲染在组件内部被 stacking context 困住,遮罩无法覆盖导航栏 backdrop-filter。
+28. **音乐页**(`/music`):上传方式合并为「上传音乐」下拉菜单(单曲/专辑文件夹/外链);新建歌单+多选按钮放在 `el-tabs__nav-scroll` 内部右侧(absolute 定位 `right:0; top:0`)。

@@ -338,7 +338,7 @@ const hid = computed(() => route.query.hid || '')
 const loadAll = async () => {
   const homePromise = publicApi.getHome(homeId.value || undefined, hid.value || undefined).then(pub => { family.value = pub.family || {}; anniversaries.value = (pub.stats || {}).upcomingEvents || []; return pub.photos || [] }).catch(() => [])
   const feedPromise = (hid.value ? publicApi.getFeed(20, undefined, hid.value) : homeId.value ? publicApi.getFeed(20, homeId.value) : publicApi.getFeed(20)).then(r => { feeds.value = r || [] }).catch(() => { feeds.value = [] })
-  const taskPromise = userStore.isLoggedIn ? taskApi.list().then(r => { tasks.value = Array.isArray(r) ? r : (r.records || []) }).catch(() => {}) : Promise.resolve()
+  const taskPromise = userStore.isLoggedIn ? taskApi.list().then(r => { tasks.value = (Array.isArray(r) ? r : (r.records || [])).filter(t => t.status !== 'CANCELLED') }).catch(() => {}) : Promise.resolve()
   const [photos] = await Promise.all([homePromise, feedPromise, taskPromise])
   allPhotos.value = photos
 }

@@ -54,7 +54,7 @@
     </div>
 
     <!-- 成员编辑对话框:新增/编辑共用;配偶/父亲/母亲从本家庭已有成员中选择 -->
-    <el-dialog v-model="dialog" :title="form.id ? $t('tree.edit') : $t('tree.add')" width="480px">
+    <el-dialog v-model="dialog" append-to-body :title="form.id ? $t('tree.edit') : $t('tree.add')" width="480px">
       <el-form :model="form" label-width="90px">
         <el-form-item :label="$t('tree.name')">
           <el-input v-model="form.name" :placeholder="$t('tree.namePlaceholder')" />
@@ -210,7 +210,7 @@ const save = async () => {
 
 const remove = async (id) => {
   try {
-    await ElMessageBox.confirm(t('tree.deleteConfirm'), t('common.tip'), { type: 'warning' })
+    await ElMessageBox.confirm(t('tree.deleteConfirm'), t('common.tip'), { type: 'warning', closeOnClickModal: true })
   } catch {
     return
   }

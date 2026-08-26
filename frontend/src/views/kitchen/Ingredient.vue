@@ -52,7 +52,7 @@
     </div>
 
     <!-- 编辑弹窗 -->
-    <el-dialog v-model="dlg" :title="form.id ? $t('kitchen.editIngredient') : $t('kitchen.addIngredient')" width="500px">
+    <el-dialog v-model="dlg" append-to-body :title="form.id ? $t('kitchen.editIngredient') : $t('kitchen.addIngredient')" width="500px">
       <el-form label-position="top">
         <!-- 图片上传 -->
         <el-form-item :label="$t('kitchen.ingredientImage')">
@@ -255,7 +255,7 @@ const onSave = async () => {
 
 const onDelete = async (item) => {
   try {
-    await ElMessageBox.confirm($t('kitchen.deleteConfirm'), { type: 'warning' })
+    await ElMessageBox.confirm($t('kitchen.deleteConfirm'), { type: 'warning', closeOnClickModal: true })
     await itemApi.remove(item.id)
     ElMessage.success($t('common.deleted'))
     loadList()

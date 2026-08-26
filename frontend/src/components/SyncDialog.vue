@@ -1,6 +1,6 @@
 <!-- 从设备同步对话框:选存储设备 + includeEmpty,后台同步建相册;相册/放映厅复用 -->
 <template>
-  <el-dialog v-model="visible" :title="$t('album.syncFromDevice')" width="440px">
+  <el-dialog v-model="visible" append-to-body :title="$t('album.syncFromDevice')" width="440px">
     <el-form label-position="top">
       <el-form-item :label="$t('storage.devices')">
         <el-select v-model="deviceId" :placeholder="$t('storage.pickDevice')" style="width: 100%">

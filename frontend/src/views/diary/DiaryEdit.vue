@@ -1,14 +1,14 @@
-<!-- 日记编辑页:多张纸垂直排列,连续文本流自动分页,涂鸦区 sticky 固定右侧 -->
+<!-- 日记编辑页:单张信纸按整页(18行)自适应高度,涂鸦区 sticky 固定右侧 -->
 <template>
   <div class="page">
     <Breadcrumb :items="[{ label: $t('diary.title'), to: '/diary' }, { label: isEdit ? $t('diary.editDiary') : $t('diary.newDiary') }]" />
 
     <div class="diary-layout">
-      <!-- 左侧:纸张栈(多张纸垂直排列) -->
+      <!-- 左侧:纸张 -->
       <div class="paper-stack">
-        <div v-for="(pageText, idx) in pages" :key="idx" class="paper-sheet">
-          <!-- 页眉:仅第一页 -->
-          <div v-if="idx === 0" class="paper-header">
+        <div class="paper-sheet">
+          <!-- 页眉 -->
+          <div class="paper-header">
             <div class="header-row">
               <div class="header-left">
                 <div class="date-wrap">
@@ -22,6 +22,16 @@
                     class="date-picker-line"
                   />
                   <div class="date-underline"></div>
+                </div>
+                <div class="date-wrap">
+                  <el-time-picker
+                    v-model="form.time"
+                    value-format="HH:mm"
+                    :clearable="false"
+                    size="small"
+                    class="time-picker-line"
+                  />
+                  <div class="date-underline time-underline"></div>
                 </div>
               </div>
               <div class="header-right">
@@ -37,23 +47,24 @@
             </div>
           </div>
 
-          <!-- 正文:每页固定 18 行 × 28px -->
-          <div class="paper-body">
-            <div class="ruling-bg"></div>
+          <!-- 正文:按整页自适应高度,横线背景+分页线 -->
+          <div class="paper-body" :style="{ height: bodyHeight + 'px' }">
+            <div class="ruling-bg" :style="{ height: bodyHeight + 'px' }"></div>
+            <div class="page-break-bg" :style="{ height: bodyHeight + 'px' }"></div>
             <textarea
-              :ref="el => { if (el) pageRefs[idx] = el }"
-              :value="pageText"
+              ref="textareaRef"
+              v-model="content"
               class="paper-textarea"
-              :placeholder="idx === 0 ? $t('diary.inputContent') : ''"
+              :style="{ height: bodyHeight + 'px' }"
+              :placeholder="$t('diary.inputContent')"
               spellcheck="false"
-              @input="onInput(idx, $event)"
-              @keydown="onKeydown(idx, $event)"
+              @input="autoResize"
             ></textarea>
           </div>
 
-          <!-- 页脚:仅最后一页 -->
-          <div v-if="idx === pages.length - 1" class="paper-footer">
-            <span class="page-num">{{ pages.length }} 页</span>
+          <!-- 页脚 -->
+          <div class="paper-footer">
+            <span class="page-num">{{ pageCount }} 页 · {{ wordCount }} 字</span>
             <div class="vis-row">
               <el-radio-group v-model="form.visibility" size="small">
                 <el-radio-button :value="0">{{ $t('diary.onlySelf') }}</el-radio-button>
@@ -104,7 +115,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { diaryApi } from '@/api'
 import { useI18n } from 'vue-i18n'
@@ -129,92 +140,33 @@ const WEATHERS = [
 
 const LINE_H = 28
 const LINES_PER_PAGE = 18
-const CHARS_PER_LINE = 28
-const CHARS_PER_PAGE = LINES_PER_PAGE * CHARS_PER_LINE
+const PAGE_H = LINE_H * LINES_PER_PAGE
 
-const form = reactive({ mood: '', weather: '', date: new Date().toISOString().slice(0, 10), visibility: 0 })
-const pages = ref([''])
-const pageRefs = ref([])
+const form = reactive({ mood: '', weather: '', date: new Date().toISOString().slice(0, 10), time: new Date().toTimeString().slice(0, 5), visibility: 0 })
+const content = ref('')
 const pickerOpen = ref(null)
 const pickerStyle = ref({})
 const moodBtnRef = ref(null)
 const weatherBtnRef = ref(null)
+const textareaRef = ref(null)
+const bodyHeight = ref(PAGE_H)
 
 const moodLabel = computed(() => MOODS.find(m => m.icon === form.mood)?.label || '心情')
 const weatherLabel = computed(() => WEATHERS.find(w => w.icon === form.weather)?.label || '天气')
-const fullContent = computed(() => pages.value.join(''))
+const wordCount = computed(() => content.value.length)
+const pageCount = computed(() => Math.max(1, Math.ceil(bodyHeight.value / PAGE_H)))
 
-// 核心分页逻辑:从 startIdx 开始向下重新分配文本
-const redistribute = (startIdx) => {
-  let i = startIdx
-  while (i < pages.value.length) {
-    const text = pages.value[i]
-    if (text.length > CHARS_PER_PAGE) {
-      const overflow = text.slice(CHARS_PER_PAGE)
-      pages.value[i] = text.slice(0, CHARS_PER_PAGE)
-      if (i + 1 >= pages.value.length) pages.value.push('')
-      pages.value[i + 1] = overflow + pages.value[i + 1]
-      i++
-    } else if (text.length < CHARS_PER_PAGE && i + 1 < pages.value.length) {
-      const needed = CHARS_PER_PAGE - text.length
-      const pulled = pages.value[i + 1].slice(0, needed)
-      pages.value[i] = text + pulled
-      pages.value[i + 1] = pages.value[i + 1].slice(needed)
-      if (pages.value[i + 1] === '' && i + 1 === pages.value.length - 1) { pages.value.splice(i + 1, 1); break }
-      i++
-    } else break
-  }
-  while (pages.value.length > 1 && pages.value[pages.value.length - 1] === '') pages.value.pop()
-}
-
-const onInput = (idx, e) => {
-  const ta = e.target
-  const newText = ta.value
-  const cursorPos = ta.selectionStart
-  pages.value[idx] = newText
-  const oldLen = newText.length
-  redistribute(idx)
-  const newLen = pages.value[idx].length
-  if (newLen < oldLen && cursorPos > newLen) {
-    nextTick(() => {
-      const nextTa = pageRefs.value[idx + 1]
-      if (nextTa) { nextTa.focus(); const p = cursorPos - newLen; nextTa.setSelectionRange(p, p) }
-    })
-  } else if (newLen !== oldLen) {
-    nextTick(() => { ta.setSelectionRange(cursorPos, cursorPos) })
-  }
-}
-
-const onKeydown = (idx, e) => {
-  const ta = e.target
-  const pos = ta.selectionStart
-  const len = ta.value.length
-  const collapsed = ta.selectionStart === ta.selectionEnd
-
-  // 左键在页首 → 跳到上一页末尾
-  if (e.key === 'ArrowLeft' && idx > 0 && collapsed && pos === 0) {
-    e.preventDefault()
-    nextTick(() => { const prev = pageRefs.value[idx - 1]; if (prev) { prev.focus(); const p = prev.value.length; prev.setSelectionRange(p, p) } })
-    return
-  }
-  // 右键在页尾 → 跳到下一页开头
-  if (e.key === 'ArrowRight' && idx < pages.value.length - 1 && collapsed && pos === len) {
-    e.preventDefault()
-    nextTick(() => { const next = pageRefs.value[idx + 1]; if (next) { next.focus(); next.setSelectionRange(0, 0) } })
-    return
-  }
-  // 退格在页首 → 删除上一页最后一个字符,文本回流
-  if (e.key === 'Backspace' && idx > 0 && collapsed && pos === 0) {
-    e.preventDefault()
-    const prevText = pages.value[idx - 1]
-    if (prevText.length > 0) {
-      const deletedPos = prevText.length - 1
-      pages.value[idx - 1] = prevText.slice(0, -1)
-      redistribute(idx - 1)
-      nextTick(() => { const prev = pageRefs.value[idx - 1]; if (prev) { prev.focus(); prev.setSelectionRange(deletedPos, deletedPos) } })
-    }
-    return
-  }
+const autoResize = () => {
+  nextTick(() => {
+    const ta = textareaRef.value
+    if (!ta) return
+    ta.style.height = 'auto'
+    const scrollH = ta.scrollHeight
+    const pages = Math.ceil(scrollH / PAGE_H)
+    const newH = Math.max(1, pages) * PAGE_H
+    bodyHeight.value = newH
+    ta.style.height = newH + 'px'
+  })
 }
 
 const togglePicker = (type) => {
@@ -224,7 +176,7 @@ const togglePicker = (type) => {
     const rect = btn.getBoundingClientRect()
     const popH = 220
     const top = rect.top + rect.height / 2 - popH / 2
-    pickerStyle.value = { position: 'fixed', top: Math.max(8, top) + 'px', left: (rect.right + 8) + 'px', zIndex: 59 }
+    pickerStyle.value = { position: 'fixed', top: Math.max(8, top) + 'px', left: (rect.right + 8) + 'px', zIndex: 61 }
   }
   pickerOpen.value = type
 }
@@ -253,10 +205,10 @@ const loadCurrentWeather = async () => {
 }
 
 const onSave = async () => {
-  if (!fullContent.value.trim()) return ElMessage.warning(t('diary.inputContent'))
+  if (!content.value.trim()) return ElMessage.warning(t('diary.inputContent'))
   loading.value = true
   try {
-    const payload = { content: fullContent.value, mood: form.mood, weather: form.weather, date: form.date, visibility: form.visibility }
+    const payload = { content: content.value, mood: form.mood, weather: form.weather, date: form.date + ' ' + form.time, visibility: form.visibility }
     if (isEdit.value) await diaryApi.update(route.params.id, payload)
     else await diaryApi.create(payload)
     ElMessage.success(t('common.saveSuccess'))
@@ -266,75 +218,59 @@ const onSave = async () => {
   }
 }
 
-const splitIntoPages = (content) => {
-  if (!content) return ['']
-  const arr = []
-  for (let i = 0; i < content.length; i += CHARS_PER_PAGE) arr.push(content.slice(i, i + CHARS_PER_PAGE))
-  return arr.length ? arr : ['']
-}
-
 onMounted(async () => {
   if (isEdit.value) {
     const d = await diaryApi.detail(route.params.id)
-    pages.value = splitIntoPages(d.content || '')
+    content.value = d.content || ''
+    const dt = d.createdAt ? new Date(d.createdAt) : new Date()
     Object.assign(form, {
       mood: d.mood || '', weather: d.weather || '',
-      date: d.createdAt ? d.createdAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
+      date: dt.toISOString().slice(0, 10),
+      time: dt.toTimeString().slice(0, 5),
       visibility: d.visibility === 'PRIVATE' ? 0 : d.visibility === 'PUBLIC' ? 4 : 3,
     })
   } else {
     loadCurrentWeather()
   }
-  nextTick(() => pageRefs.value[0]?.focus())
+  nextTick(() => { autoResize(); textareaRef.value?.focus() })
 })
+
+watch(content, () => autoResize())
 </script>
 
 <style scoped>
-/* 布局:左纸张栈 + 右涂鸦 sticky */
-.diary-layout {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  align-items: flex-start;
-}
+.diary-layout { display: flex; gap: 8px; justify-content: center; align-items: flex-start; }
 
-/* ========== 纸张栈 ========== */
-.paper-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex-shrink: 0;
-  width: calc(28 * 16px + 24px * 2);
-}
+.paper-stack { display: flex; flex-direction: column; flex-shrink: 0; width: calc(28 * 16px + 24px * 2); }
 
-/* 单张纸 */
 .paper-sheet {
-  background: #fffdf8;
-  border-radius: 14px;
-  box-shadow: 0 4px 24px rgba(58,46,34,0.1);
-  overflow: hidden;
-  position: relative;
+  background: #fffdf8; border-radius: 14px; box-shadow: 0 4px 24px rgba(58,46,34,0.1);
+  overflow: hidden; position: relative;
   --ruling-color: rgba(100,130,180,0.15);
+  --break-color: rgba(100,130,180,0.35);
 }
 html.dark .paper-sheet {
-  background: #1E2A48;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  background: #1E2A48; box-shadow: 0 4px 24px rgba(0,0,0,0.3);
   --ruling-color: rgba(232,220,200,0.06);
+  --break-color: rgba(232,220,200,0.15);
 }
 
-/* 日期选择器 */
-:deep(.el-date-editor.el-input) { --el-border-color: transparent; }
-:deep(.el-date-editor.el-input .el-input__wrapper) {
+:deep(.el-date-editor.el-input), :deep(.el-time-editor.el-input) { --el-border-color: transparent; width: 100px !important; }
+:deep(.el-date-editor.el-input .el-input__wrapper),
+:deep(.el-time-editor.el-input .el-input__wrapper) {
   box-shadow: none !important; background: transparent !important; padding: 0 4px;
 }
-:deep(.el-date-editor.el-input .el-input__inner) { font-size: 13px; }
+:deep(.el-date-editor.el-input .el-input__inner),
+:deep(.el-time-editor.el-input .el-input__inner) { font-size: 13px; }
 
-/* 页眉(仅第一页) */
 .paper-header { padding: 8px 24px 0; }
+/* header-row: left 和 right 都是纵向排列,底端对齐 */
 .header-row { display: flex; justify-content: space-between; align-items: flex-end; min-height: 56px; }
-.header-left { display: flex; align-items: flex-end; padding-bottom: 3px; }
+/* header-left: 日期和时间上下排列 */
+.header-left { display: flex; flex-direction: column; gap: 2px; padding-bottom: 3px; }
 .date-wrap { display: flex; flex-direction: column; align-items: stretch; }
-.date-underline { width: 130px; border-bottom: 1px solid var(--ruling-color); margin-top: 1px; }
+.date-underline { width: 100px; border-bottom: 1px solid var(--ruling-color); margin-top: 1px; }
+/* header-right: 心情和天气上下排列 */
 .header-right { display: flex; flex-direction: column; gap: 0; align-items: flex-start; }
 .mw-display {
   display: flex; align-items: center; gap: 4px;
@@ -347,82 +283,62 @@ html.dark .paper-sheet {
 .mw-icon { font-size: 16px; line-height: 1; }
 .mw-label { font-size: 13px; color: var(--color-text); }
 
-/* 正文区:固定高度 = 18行 × 28px,无滚动 */
-.paper-body {
-  position: relative;
-  height: calc(18 * 28px);
-  padding: 2px 24px 0;
-  overflow: hidden;
-}
+/* 正文区 */
+.paper-body { position: relative; padding: 2px 24px 0; overflow: hidden; }
+/* 横线背景:每28px一条浅线 */
 .ruling-bg {
-  position: absolute;
-  top: 2px; left: 24px; right: 24px; bottom: 0;
+  position: absolute; top: 2px; left: 24px; right: 24px;
   background-image: repeating-linear-gradient(to bottom,
     transparent, transparent 27px,
     var(--ruling-color) 27px, var(--ruling-color) 28px);
-  pointer-events: none;
-  z-index: 0;
+  pointer-events: none; z-index: 0;
+}
+/* 分页线:每18行(504px)一条深色实线 */
+.page-break-bg {
+  position: absolute; top: 2px; left: 12px; right: 12px;
+  background-image: repeating-linear-gradient(to bottom,
+    transparent, transparent calc(504px - 2px),
+    var(--break-color) calc(504px - 2px), var(--break-color) 504px);
+  pointer-events: none; z-index: 0;
 }
 .paper-textarea {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  border: none; outline: none; resize: none;
-  background: transparent;
+  position: relative; width: 100%;
+  border: none; outline: none; resize: none; background: transparent;
   font-family: 'Cascadia Mono', 'Consolas', 'Courier New', monospace;
-  font-size: 16px;
-  line-height: 28px;
-  color: var(--color-text);
-  z-index: 1;
-  overflow: hidden;
-  word-break: break-all;
-  padding: 0;
+  font-size: 16px; line-height: 28px; color: var(--color-text);
+  z-index: 1; overflow: hidden; word-break: break-all; padding: 0;
 }
 .paper-textarea::placeholder { color: var(--color-text-secondary); opacity: 0.4; }
 
-/* 页脚(仅最后一页) */
 .paper-footer {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 10px 24px 14px;
-  border-top: 1px solid var(--ruling-color);
+  padding: 10px 24px 14px; border-top: 1px solid var(--ruling-color);
 }
 .page-num { font-size: 12px; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
 .vis-row { display: flex; align-items: center; gap: 12px; }
 
-/* ========== 涂鸦区:sticky 固定右侧 ========== */
 .doodle-area {
-  background: rgba(255,255,255,0.45);
-  backdrop-filter: blur(24px) saturate(1.2);
-  -webkit-backdrop-filter: blur(24px) saturate(1.2);
-  border-radius: 14px;
-  width: calc(14 * 16px + 24px * 2);
-  height: calc(18 * 28px);
+  background: rgba(255,255,255,0.45); backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2); border-radius: 14px;
+  width: calc(14 * 16px + 24px * 2); height: calc(18 * 28px);
   display: flex; align-items: center; justify-content: center;
-  border: 1px solid rgba(255,255,255,0.4);
-  box-shadow: 0 2px 12px rgba(58,46,34,0.06);
-  flex-shrink: 0;
-  position: sticky;
-  top: 16px;
-  align-self: flex-start;
+  border: 1px solid rgba(255,255,255,0.4); box-shadow: 0 2px 12px rgba(58,46,34,0.06);
+  flex-shrink: 0; position: sticky; top: 16px; align-self: flex-start;
 }
 html.dark .doodle-area {
-  background: rgba(30,42,72,0.45);
-  border-color: rgba(255,255,255,0.08);
+  background: rgba(30,42,72,0.45); border-color: rgba(255,255,255,0.08);
   box-shadow: 0 2px 12px rgba(0,0,0,0.15);
 }
 .doodle-placeholder { display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--color-text-secondary); }
 .doodle-text { font-size: 14px; font-weight: 500; opacity: 0.4; }
 .doodle-hint { font-size: 12px; opacity: 0.3; }
 
-/* ========== 心情/天气弹窗 ========== */
-.picker-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 59; }
+/* 心情/天气弹窗:z-index 61(高于导航栏60,低于光影层65+) */
+.picker-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 61; }
 .picker-pop {
-  background: rgba(255,253,248,0.85);
-  backdrop-filter: blur(24px) saturate(1.2);
-  -webkit-backdrop-filter: blur(24px) saturate(1.2);
-  border-radius: 14px;
-  box-shadow: 0 8px 32px rgba(58,46,34,0.12);
-  padding: 14px; width: 240px;
+  background: rgba(255,253,248,0.85); backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2); border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(58,46,34,0.12); padding: 14px; width: 240px;
   animation: pickerIn 0.2s ease;
 }
 html.dark .picker-pop { background: rgba(30,42,72,0.9); box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
@@ -431,8 +347,8 @@ html.dark .picker-pop { background: rgba(30,42,72,0.9); box-shadow: 0 8px 32px r
 .picker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 .picker-cell {
   display: flex; flex-direction: column; align-items: center; gap: 3px;
-  padding: 8px 4px; border: none; border-radius: 10px;
-  background: transparent; cursor: pointer; transition: all 0.15s;
+  padding: 8px 4px; border: none; border-radius: 10px; background: transparent;
+  cursor: pointer; transition: all 0.15s;
 }
 .picker-cell:hover { background: rgba(184,140,110,0.08); }
 .picker-cell.active { background: rgba(184,140,110,0.12); }

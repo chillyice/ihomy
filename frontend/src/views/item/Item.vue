@@ -98,7 +98,7 @@
     </el-tabs>
 
     <!-- 物品编辑 -->
-    <el-dialog v-model="itemDlg" :title="itemForm.id ? $t('item.editItem') : $t('item.addItem')" width="480px">
+    <el-dialog v-model="itemDlg" append-to-body :title="itemForm.id ? $t('item.editItem') : $t('item.addItem')" width="480px">
       <el-form label-width="90px">
         <el-form-item :label="$t('item.houseName')">
           <el-select v-model="itemForm.houseId" :placeholder="$t('item.pickHouse')" style="width: 100%"
@@ -155,7 +155,7 @@
     </el-dialog>
 
     <!-- 房间编辑 -->
-    <el-dialog v-model="roomDlg" :title="roomForm.id ? $t('item.editRoom') : $t('item.addRoom')" width="420px">
+    <el-dialog v-model="roomDlg" append-to-body :title="roomForm.id ? $t('item.editRoom') : $t('item.addRoom')" width="420px">
       <el-form label-width="90px">
         <el-form-item :label="$t('item.houseName')">
           <el-select v-model="roomForm.houseId" :placeholder="$t('item.pickHouse')" style="width: 100%">
@@ -179,7 +179,7 @@
     </el-dialog>
 
     <!-- 家具编辑 -->
-    <el-dialog v-model="furDlg" :title="furForm.id ? $t('item.editFurniture') : $t('item.addFurniture')" width="420px">
+    <el-dialog v-model="furDlg" append-to-body :title="furForm.id ? $t('item.editFurniture') : $t('item.addFurniture')" width="420px">
       <el-form label-width="90px">
         <el-form-item :label="$t('item.roomName')">
           <el-select v-model="furForm.roomId" :placeholder="$t('item.pickRoom')" style="width: 100%">
@@ -200,7 +200,7 @@
     </el-dialog>
 
     <!-- 房子编辑 -->
-    <el-dialog v-model="houseDlg" :title="houseForm.id ? $t('item.editHouse') : $t('item.addHouse')" width="420px">
+    <el-dialog v-model="houseDlg" append-to-body :title="houseForm.id ? $t('item.editHouse') : $t('item.addHouse')" width="420px">
       <el-form label-width="90px">
         <el-form-item :label="$t('item.houseName')">
           <el-input v-model="houseForm.name" :placeholder="$t('item.houseNamePh')" />
@@ -301,7 +301,7 @@ const saveItem = async () => {
   loadItems()
 }
 const removeItem = async (row) => {
-  await ElMessageBox.confirm(t('item.deleteItemConfirm'), t('common.warning'), { type: 'warning' })
+  await ElMessageBox.confirm(t('item.deleteItemConfirm'), t('common.warning'), { type: 'warning', closeOnClickModal: true })
   await itemApi.remove(row.id)
   ElMessage.success(t('common.success'))
   loadItems()
@@ -321,7 +321,7 @@ const saveRoom = async () => {
   loadRooms()
 }
 const removeRoom = async (row) => {
-  await ElMessageBox.confirm(t('item.deleteRoomConfirm'), t('common.warning'), { type: 'warning' })
+  await ElMessageBox.confirm(t('item.deleteRoomConfirm'), t('common.warning'), { type: 'warning', closeOnClickModal: true })
   await itemApi.removeRoom(row.id)
   ElMessage.success(t('common.success'))
   loadRooms()
@@ -340,7 +340,7 @@ const saveFurniture = async () => {
   loadRooms()
 }
 const removeFurniture = async (row) => {
-  await ElMessageBox.confirm(t('item.deleteFurnitureConfirm'), t('common.warning'), { type: 'warning' })
+  await ElMessageBox.confirm(t('item.deleteFurnitureConfirm'), t('common.warning'), { type: 'warning', closeOnClickModal: true })
   await itemApi.removeFurniture(row.id)
   ElMessage.success(t('common.success'))
   loadRooms()
@@ -359,7 +359,7 @@ const saveHouse = async () => {
   loadHouses()
 }
 const removeHouse = async (row) => {
-  await ElMessageBox.confirm(t('item.deleteHouseConfirm'), t('common.warning'), { type: 'warning' })
+  await ElMessageBox.confirm(t('item.deleteHouseConfirm'), t('common.warning'), { type: 'warning', closeOnClickModal: true })
   await itemApi.removeHouse(row.id)
   ElMessage.success(t('common.success'))
   loadHouses()
