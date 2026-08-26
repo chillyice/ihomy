@@ -659,7 +659,7 @@ INSERT INTO sys_dict_item ... book_format/borrow_status;
 ## 文档清单
 
 - `README.md`(启动说明 + Windows 一键启动脚本用法); `Windows部署指导.md` / `Linux部署指导.md`(生产部署 NSSM/systemd/Nginx/Let's Encrypt/Docker Compose)
-- `docs/需求规格说明书.docx` — 完整需求文档(功能模块清单+实现方式+未实现规划+数据库设计+接口设计)
+- `docs/需求规格说明书.docx` — 完整需求文档(功能模块清单+实现方式+未实现规划+数据库设计+接口设计+修订记录)。**唯一正式版**,原 `.md` 已合并删除(内容以业务域重新组织,修正表数量为 53 张/实体 44 个,含移动端兼容性 V8.0 §4.10)
 - `docs/UI设计提示词.md` — 沉浸式首页 UI 设计完整规格(可作为 AI 提示词重新生成)
 - `scripts/start-all.ps1`(Windows 一键启动前后端,双击 `start.bat` 调用,设 `IHOMY_CONFIG_PATH` 环境变量)/ `start-db.ps1`(Docker 拉起 MySQL+Redis+自动导 schema.sql,端口 6306/6379,与生产一致); `config/mysql/my.cnf`(端口 6306,内存优化,仅 Linux 本机部署用)
 - 完整接口清单:见 `docs/需求规格说明书.docx` 第 7 章与各功能小节。代码事实以 `backend/src/main/java` + `resources/schema.sql` 为准,如需检索先 `grep` 再动手。
