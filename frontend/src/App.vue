@@ -1,26 +1,26 @@
-<!-- 根组件:全局光影层 + 左侧导航 + 页面内容(带滑动过渡) -->
+<!-- 根组件:移动端 → MobileLayout;桌面端 → 光影层 + 左侧导航 + 页面内容 -->
 <template>
   <el-config-provider :locale="elLocale">
-    <!-- 全局光影层:所有页面共享(体积光+窗框阴影+台灯+灰尘);所有特效关闭时卸载组件停止一切渲染 -->
-    <SunLightLayer v-if="anyEffectEnabled" />
+    <!-- 移动端布局 -->
+    <MobileLayout v-if="isMobile" />
 
-    <!-- 左侧导航:纯 OPS 账号(无家庭角色)不显示,OWNER+OPS 等复合角色显示 -->
-    <AppSidebar v-if="!userStore.isPureOps" />
-
-    <!-- 主内容区:带滑动过渡,仿佛平板滑动屏幕切换 -->
-    <main class="app-main" :class="{ 'with-sidebar': !userStore.isPureOps }">
-      <router-view v-slot="{ Component, route }">
-        <transition :name="route.meta.transition || 'slide-down'" mode="out-in">
-          <component :is="Component" :key="route.path" />
-        </transition>
-      </router-view>
-    </main>
-
-    <BackToTop />
-    <InstallPrompt />
-    <MusicPlayer />
-    <LightTestConsole />
-    <SiteFooter />
+    <!-- 桌面端布局 -->
+    <template v-else>
+      <SunLightLayer v-if="anyEffectEnabled" />
+      <AppSidebar v-if="!userStore.isPureOps" />
+      <main class="app-main" :class="{ 'with-sidebar': !userStore.isPureOps }">
+        <router-view v-slot="{ Component, route }">
+          <transition :name="route.meta.transition || 'slide-down'" mode="out-in">
+            <component :is="Component" :key="route.path" />
+          </transition>
+        </router-view>
+      </main>
+      <BackToTop />
+      <InstallPrompt />
+      <MusicPlayer />
+      <LightTestConsole />
+      <SiteFooter />
+    </template>
   </el-config-provider>
 </template>
 
@@ -33,6 +33,7 @@ import en from 'element-plus/es/locale/lang/en'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { useSunLight, SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import { useDevice } from '@/composables/useDevice'
 import SunLightLayer from '@/components/SunLightLayer.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
 import BackToTop from '@/components/BackToTop.vue'
@@ -40,7 +41,9 @@ import InstallPrompt from '@/components/InstallPrompt.vue'
 import MusicPlayer from '@/components/MusicPlayer.vue'
 import SiteFooter from '@/components/SiteFooter.vue'
 import LightTestConsole from '@/components/LightTestConsole.vue'
+import MobileLayout from '@/layouts/MobileLayout.vue'
 
+const { isMobile } = useDevice()
 const appStore = useAppStore()
 const userStore = useUserStore()
 const route = useRoute()
@@ -50,6 +53,17 @@ const { locale } = useI18n()
 const sunLight = useSunLight()
 provide(SUN_LIGHT_KEY, sunLight)
 const { anyEffectEnabled } = sunLight
+
+// 移动端默认关闭所有光影特效(GPU/内存敏感),用户可在"我的"Tab 手动开启
+watch(isMobile, (mobile) => {
+  if (mobile) {
+    sunLight.shadowEnabled.value = false
+    sunLight.weatherEffectEnabled.value = false
+    sunLight.blobsEnabled.value = false
+    sunLight.lampMode.value = 'off'
+    sunLight.glassEnabled.value = false
+  }
+}, { immediate: true })
 
 const elLocale = computed(() => (locale.value === 'en' ? en : zhCn))
 

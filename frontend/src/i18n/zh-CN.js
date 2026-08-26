@@ -611,6 +611,13 @@ export default {
   more: {
     all: '全部',
   },
+  mobile: {
+    home: '首页',
+    more: '更多',
+    me: '我的',
+    language: '语言',
+    members: '成员管理',
+  },
   ops: {
     overview: '资源总览',
     server: '服务器状态',
