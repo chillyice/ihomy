@@ -181,16 +181,18 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { videoApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import SyncDialog from '@/components/SyncDialog.vue'
+import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 
 const { t } = useI18n()
 const userStore = useUserStore()
+const sunLight = inject(SUN_LIGHT_KEY, null)
 const tab = ref('library')
 const keyword = ref('')
 const syncVisible = ref(false)
@@ -220,6 +222,7 @@ const emptyForm = () => ({
 const editor = reactive({ visible: false, form: emptyForm() })
 const wishDialog = reactive({ visible: false, form: { title: '', genres: [], reason: '' } })
 const player = reactive({ visible: false, video: null })
+watch(() => player.visible, (v) => { v ? sunLight?.suspendEffects() : sunLight?.restoreEffects() })
 
 const formatDate = (d) => (d ? new Date(d).toLocaleDateString('zh-CN') : '')
 

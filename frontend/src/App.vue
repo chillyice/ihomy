@@ -10,7 +10,7 @@
       <AppSidebar v-if="!userStore.isPureOps" />
       <main class="app-main" :class="{ 'with-sidebar': !userStore.isPureOps }">
         <router-view v-slot="{ Component, route }">
-          <transition :name="route.meta.transition || 'slide-down'" mode="out-in">
+          <transition :name="route.meta.transition || 'fade'" mode="out-in">
             <component :is="Component" :key="route.path" />
           </transition>
         </router-view>
@@ -117,4 +117,8 @@ watch(
   .slide-down-enter-active, .slide-down-leave-active { transition: opacity 0.3s ease; }
   .slide-down-enter-from, .slide-down-leave-to { opacity: 0; transform: none; }
 }
+
+/* 全局页面切换过渡(默认):淡入淡出,无 transform 避免 fixed 定位偏移 */
+.fade-enter-active, .fade-leave-active { transition: opacity 0.5s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>

@@ -1,4 +1,5 @@
 <template>
+  <Teleport to="body">
   <div class="reader-overlay" :class="{ dark: isDark, fullscreen: isFullscreen }">
     <!-- Top Bar -->
     <div class="reader-bar">
@@ -118,21 +119,29 @@
         </div>
       </transition>
     </div>
+
+    <!-- 全屏模式浮动关闭按钮 -->
+    <button v-if="isFullscreen" class="reader-float-close" @click="close" :title="$t('common.close')">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
   </div>
+  </Teleport>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch, inject } from 'vue'
 import { libraryApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
+import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 
 const props = defineProps({ book: Object })
 const emit = defineEmits(['close', 'statusChanged'])
 
 const { t } = useI18n()
 const userStore = useUserStore()
+const sunLight = inject(SUN_LIGHT_KEY, null)
 const isDark = ref(document.documentElement.classList.contains('dark'))
 const isFullscreen = ref(false)
 const showToc = ref(false)
@@ -182,6 +191,7 @@ const formatSize = (bytes) => {
 
 // === Init ===
 onMounted(async () => {
+  sunLight?.suspendEffects()
   if (props.book?.fileFormat === 'EPUB') {
     await nextTick()
     await initEpub()
@@ -223,6 +233,7 @@ onMounted(async () => {
 let darkObserver = null
 onBeforeUnmount(() => {
   saveProgress()
+  sunLight?.restoreEffects()
   if (epubRendition) epubRendition.destroy()
   if (darkObserver) darkObserver.disconnect()
   document.removeEventListener('keydown', onKeyDown)
@@ -524,6 +535,9 @@ watch(txtPage, () => applyTxtStyle())
 
 .reader-overlay.fullscreen .reader-bar { display: none; }
 .reader-overlay.fullscreen .toc-drawer, .reader-overlay.fullscreen .side-drawer { display: none; }
+
+.reader-float-close { position: fixed; top: 16px; right: 16px; z-index: 210; width: 40px; height: 40px; border: none; border-radius: 50%; background: rgba(0,0,0,0.35); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; backdrop-filter: blur(4px); }
+.reader-float-close:hover { background: rgba(0,0,0,0.6); }
 
 @media (max-width: 768px) {
   .toc-drawer, .side-drawer { position: absolute; top: 0; bottom: 0; z-index: 10; background: inherit; width: 80%; max-width: 300px; }

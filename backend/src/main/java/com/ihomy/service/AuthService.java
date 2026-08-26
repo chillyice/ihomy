@@ -262,6 +262,7 @@ public class AuthService {
         SysUser user = sysUserMapper.selectById(userId);
         // 切换家庭后新家庭权限码不同,主动失效(虽然 5min TTL 也会自然过期,但切换是显式语义)
         securityHelper.invalidatePerms(userId, familyId);
+        securityHelper.invalidateUser(userId);
         return buildTokens(user, roleCode, familyId);
     }
 

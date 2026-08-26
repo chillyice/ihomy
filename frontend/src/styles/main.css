@@ -403,6 +403,7 @@ html.dark .el-message--error {
 
 /* 遮罩:低透明度 + 轻磨砂 */
 .el-overlay {
+  z-index: 3000 !important;
   background: rgba(0, 0, 0, 0.20) !important;
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);

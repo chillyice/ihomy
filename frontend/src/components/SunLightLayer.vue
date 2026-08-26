@@ -361,11 +361,11 @@ html.dark .blob-5 { box-shadow: 0 0 120px 40px rgba(160,180,120,0.4); }
 /* 台灯钟摆运动:CSS @keyframes 驱动,不经过 Vue 响应式 */
 .lamp-light-pendulum {
   left: 38.2%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   animation: lampSwing 8s ease-in-out infinite;
 }
 @keyframes lampSwing {
-  0%, 100% { transform: translateX(calc(-50% - 1.5vw)) scaleX(0.97); }
-  50% { transform: translateX(calc(-50% + 1.5vw)) scaleX(1.03); }
+  0%, 100% { transform: translate(calc(-50% - 1.5vw), -50%) scaleX(0.97); }
+  50% { transform: translate(calc(-50% + 1.5vw), -50%) scaleX(1.03); }
 }
 </style>

@@ -32,8 +32,8 @@
           <div class="photo-wrap" @click="openViewer(p)">
             <img :src="p.url" :alt="p.description || album.name" loading="lazy" />
             <div class="photo-hover">
-              <span v-if="canManagePhoto(p)" @click="openDesc(p)"><el-icon><Edit /></el-icon>{{ t('album.editNote') }}</span>
-              <span v-if="canManagePhoto(p)" class="danger" @click="onDelPhoto(p)"><el-icon><Delete /></el-icon>{{ t('common.delete') }}</span>
+              <span v-if="canManagePhoto(p)" @click.stop="openDesc(p)"><el-icon><Edit /></el-icon>{{ t('album.editNote') }}</span>
+              <span v-if="canManagePhoto(p)" class="danger" @click.stop="onDelPhoto(p)"><el-icon><Delete /></el-icon>{{ t('common.delete') }}</span>
             </div>
           </div>
           <div v-if="p.description" class="photo-desc">{{ p.description }}</div>
@@ -149,6 +149,7 @@ onMounted(load)
 .album-header h2 { color: var(--color-primary); margin-bottom: 6px; }
 .photo-count { margin-left: 10px; font-size: 13px; color: var(--color-text-secondary); }
 .album-desc { margin-top: 8px; color: var(--color-text-secondary); font-size: 13px; }
+.album-head-actions { display: flex; flex-direction: row; align-items: center; gap: 8px; flex-shrink: 0; }
 .album-body { margin-top: 20px; }
 .photo-wall {
   display: grid;
