@@ -293,4 +293,10 @@ onMounted(load)
 .child-node { display: flex; flex-direction: column; align-items: center; }
 .upload-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .photo-preview { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 1px solid var(--color-border); }
+
+@media (max-width: 768px) {
+  .tree-container { overflow-x: auto; padding: 8px 0; }
+  .member-card { min-width: 120px; }
+  .upload-row { flex-direction: column; align-items: flex-start; }
+}
 </style>

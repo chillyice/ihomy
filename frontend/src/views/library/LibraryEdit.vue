@@ -172,4 +172,10 @@ onMounted(async () => {
 .upload-row { width: 100%; }
 .format-info { font-size: 12px; color: var(--color-text-secondary); margin-top: 4px; }
 .form-footer { display: flex; justify-content: flex-end; margin-top: 4px; }
+
+@media (max-width: 768px) {
+  .category-row { flex-direction: column; }
+  .form-footer { flex-direction: column; gap: 8px; }
+  .form-footer .el-button { width: 100%; }
+}
 </style>

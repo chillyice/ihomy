@@ -381,4 +381,13 @@ onMounted(loadAll)
   .detail { padding: 20px; }
   .comments { margin-right: 0; }
 }
+@media (max-width: 768px) {
+  .detail { padding: 14px; }
+  .blog-title-text { font-size: 20px !important; }
+  .blog-meta { font-size: 12px; }
+  .comment-input { flex-direction: column; gap: 8px; }
+  .comment-input .el-button { width: 100%; }
+  .reply-input { flex-direction: column; gap: 8px; }
+  .reply-input .el-button { width: 100%; }
+}
 </style>
