@@ -137,7 +137,7 @@ const load = async () => {
 
 const onDelete = async () => {
   try {
-    await ElMessageBox.confirm($t('kitchen.deleteConfirm'), { type: 'warning' })
+    await ElMessageBox.confirm($t('kitchen.deleteConfirm'), { type: 'warning', closeOnClickModal: true })
     await kitchenApi.remove(recipe.value.id)
     ElMessage.success($t('common.deleted'))
     router.push('/kitchen')

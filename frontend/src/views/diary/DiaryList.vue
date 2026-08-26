@@ -80,7 +80,7 @@ const onCommand = async (cmd, d) => {
     router.push(`/diary/edit/${d.id}`)
   } else if (cmd === 'delete') {
     try {
-      await ElMessageBox.confirm(t('diary.deleteConfirm'), { type: 'warning', confirmButtonText: t('common.delete'), cancelButtonText: t('common.cancel') })
+      await ElMessageBox.confirm(t('diary.deleteConfirm'), { type: 'warning', confirmButtonText: t('common.delete'), cancelButtonText: t('common.cancel'), closeOnClickModal: true })
       await diaryApi.remove(d.id)
       ElMessage.success(t('common.deleted'))
       await load()

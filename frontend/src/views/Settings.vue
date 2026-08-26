@@ -699,6 +699,7 @@ const resetPanelLayout = () => {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning',
+    closeOnClickModal: true,
   }).then(() => {
     const keys = Object.keys(localStorage).filter(k => k.startsWith('ihomy:panel:'))
     keys.forEach(k => localStorage.removeItem(k))

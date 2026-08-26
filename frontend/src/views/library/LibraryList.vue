@@ -314,7 +314,7 @@ const saveCategory = async () => {
 
 const onDeleteCategory = async (cat) => {
   try {
-    await ElMessageBox.confirm(`${t('library.deleteCategory')}: ${cat.name}? ${t('library.deleteCategoryHint')}`, { type: 'warning', confirmButtonText: t('common.confirm'), cancelButtonText: t('common.cancel') })
+    await ElMessageBox.confirm(`${t('library.deleteCategory')}: ${cat.name}? ${t('library.deleteCategoryHint')}`, { type: 'warning', confirmButtonText: t('common.confirm'), cancelButtonText: t('common.cancel'), closeOnClickModal: true })
     await libraryApi.deleteCategory(cat.id, 'move')
     ElMessage.success(t('common.deleted'))
     if (activeCategoryId.value === cat.id) activeCategoryId.value = null
@@ -370,7 +370,7 @@ const onBookDeleted = () => { detailVisible.value = false; load() }
 
 const onDeleteBook = async (b) => {
   try {
-    await ElMessageBox.confirm(t('library.deleteConfirm'), { type: 'warning', confirmButtonText: t('common.delete'), cancelButtonText: t('common.cancel') })
+    await ElMessageBox.confirm(t('library.deleteConfirm'), { type: 'warning', confirmButtonText: t('common.delete'), cancelButtonText: t('common.cancel'), closeOnClickModal: true })
     await libraryApi.delete(b.id)
     ElMessage.success(t('common.deleted'))
     await load()
@@ -411,7 +411,7 @@ const confirmMove = async () => {
 const batchDeleteAction = async () => {
   if (!selectedIds.value.length) return
   try {
-    await ElMessageBox.confirm(t('library.batchDeleteConfirm', { n: selectedIds.value.length }), { type: 'warning', confirmButtonText: t('common.delete'), cancelButtonText: t('common.cancel') })
+    await ElMessageBox.confirm(t('library.batchDeleteConfirm', { n: selectedIds.value.length }), { type: 'warning', confirmButtonText: t('common.delete'), cancelButtonText: t('common.cancel'), closeOnClickModal: true })
     await libraryApi.batchDelete(selectedIds.value)
     ElMessage.success(t('common.deleted'))
     exitBatch()

@@ -78,7 +78,7 @@
       </el-tab-pane>
     </el-tabs>
 
-    <el-dialog v-model="wishDialog.visible" :title="$t('cinema.submitWish')" width="460px">
+    <el-dialog v-model="wishDialog.visible" append-to-body :title="$t('cinema.submitWish')" width="460px">
       <el-form :model="wishDialog.form" label-position="top">
         <el-form-item :label="$t('cinema.name')">
           <el-input v-model="wishDialog.form.title" :placeholder="$t('cinema.namePlaceholder')" />
@@ -98,7 +98,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="editor.visible" :title="editor.form.id ? $t('cinema.editVideo') : $t('cinema.upload')" width="640px" top="5vh">
+    <el-dialog v-model="editor.visible" append-to-body :title="editor.form.id ? $t('cinema.editVideo') : $t('cinema.upload')" width="640px" top="5vh">
       <el-form :model="editor.form" label-position="top">
         <div class="form-row">
           <el-form-item :label="$t('cinema.name')">
@@ -173,7 +173,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="player.visible" :title="player.video?.title" width="800px" top="5vh" destroy-on-close>
+    <el-dialog v-model="player.visible" append-to-body :title="player.video?.title" width="800px" top="5vh" destroy-on-close>
       <video v-if="player.video?.videoUrl" :src="player.video.videoUrl" controls autoplay class="player-video" />
     </el-dialog>
     <SyncDialog v-model="syncVisible" />
@@ -308,7 +308,7 @@ const onSave = async () => {
 }
 
 const onDel = async (v) => {
-  await ElMessageBox.confirm(t('cinema.deleteConfirm', { title: v.title }), t('common.tip'), { type: 'warning' })
+  await ElMessageBox.confirm(t('cinema.deleteConfirm', { title: v.title }), t('common.tip'), { type: 'warning', closeOnClickModal: true })
   await videoApi.remove(v.id)
   ElMessage.success(t('common.deleted'))
   load()
@@ -339,7 +339,7 @@ const onWishDone = async (w) => {
 }
 
 const onWishDel = async (w) => {
-  await ElMessageBox.confirm(t('cinema.wishDeleteConfirm', { title: w.title }), t('common.tip'), { type: 'warning' })
+  await ElMessageBox.confirm(t('cinema.wishDeleteConfirm', { title: w.title }), t('common.tip'), { type: 'warning', closeOnClickModal: true })
   await videoApi.wishRemove(w.id)
   ElMessage.success(t('common.deleted'))
   loadWishes()

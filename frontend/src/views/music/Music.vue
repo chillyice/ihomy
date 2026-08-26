@@ -4,26 +4,37 @@
 
     <div class="list-header">
       <div class="header-actions">
-        <el-upload :show-file-list="false" :http-request="uploadSingle" accept="audio/*">
-          <el-button class="sec-btn">上传单曲</el-button>
-        </el-upload>
-        <el-button class="sec-btn" @click="triggerFolderInput">上传专辑文件夹</el-button>
+        <el-dropdown v-if="userStore.isLoggedIn" trigger="click" @command="onUploadCmd">
+          <el-button type="primary">上传音乐</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="single">上传单曲</el-dropdown-item>
+              <el-dropdown-item command="folder">上传专辑文件夹</el-dropdown-item>
+              <el-dropdown-item command="link" divided>添加外链</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <input ref="folderInputRef" type="file" webkitdirectory multiple accept="audio/*" style="display:none" @change="onFolderChange" />
-        <el-button class="sec-btn" @click="openPlaylistDialog">新建歌单</el-button>
-        <el-button class="sec-btn" @click="linkDialog.visible = true">添加外链</el-button>
-        <template v-if="selectMode && tab === 'all'">
-          <el-button type="danger" :disabled="!selectedIds.length" @click="batchDeleteTracks">删除选中 ({{ selectedIds.length }})</el-button>
-          <el-button class="sec-btn" @click="exitSelect">取消多选</el-button>
-        </template>
-        <template v-else-if="selectMode && tab === 'album'">
-          <el-button type="danger" :disabled="!selectedAlbums.length" @click="batchDeleteAlbums">删除选中 ({{ selectedAlbums.length }})</el-button>
-          <el-button class="sec-btn" @click="exitSelect">取消多选</el-button>
-        </template>
-        <el-button v-else-if="userStore.isLoggedIn" class="sec-btn" @click="enterSelect">多选</el-button>
+        <el-upload v-show="false" :show-file-list="false" :http-request="uploadSingle" accept="audio/*" ref="singleUploadRef">
+          <span></span>
+        </el-upload>
       </div>
     </div>
 
-    <el-tabs v-model="tab" class="music-tabs">
+    <div class="music-tabs-wrapper">
+      <el-tabs v-model="tab" class="music-tabs">
+        <div class="tabs-extra">
+          <el-button class="sec-btn" @click="openPlaylistDialog">新建歌单</el-button>
+          <template v-if="selectMode && tab === 'all'">
+            <el-button type="danger" :disabled="!selectedIds.length" @click="batchDeleteTracks">删除选中 ({{ selectedIds.length }})</el-button>
+            <el-button class="sec-btn" @click="exitSelect">取消多选</el-button>
+          </template>
+          <template v-else-if="selectMode && tab === 'album'">
+            <el-button type="danger" :disabled="!selectedAlbums.length" @click="batchDeleteAlbums">删除选中 ({{ selectedAlbums.length }})</el-button>
+            <el-button class="sec-btn" @click="exitSelect">取消多选</el-button>
+          </template>
+          <el-button v-else-if="userStore.isLoggedIn" class="sec-btn" @click="enterSelect">多选</el-button>
+        </div>
       <el-tab-pane label="全部曲目" name="all">
         <div v-loading="loading">
           <div v-if="tracks.length" class="music-grid">
@@ -147,6 +158,7 @@
         </div>
       </el-tab-pane>
     </el-tabs>
+    </div>
 
     <!-- 添加外链弹窗 -->
     <el-dialog v-model="linkDialog.visible" title="添加外链" class="dialog-sm" append-to-body>
@@ -263,7 +275,7 @@
     </el-dialog>
 
     <!-- 播放器弹窗 -->
-    <el-dialog v-model="player.visible" :title="player.track?.title || '播放'" class="dialog-md" destroy-on-close>
+    <el-dialog v-model="player.visible" append-to-body :title="player.track?.title || '播放'" class="dialog-md" destroy-on-close>
       <div v-if="player.track" class="player-wrap">
         <img v-if="player.track.coverUrl" :src="player.track.coverUrl" class="player-cover" />
         <div v-if="player.track.artist" class="player-artist">{{ player.track.artist }}</div>
@@ -288,6 +300,19 @@ const playlistLoading = ref(false)
 const tracks = ref([])
 const playlists = ref([])
 const player = reactive({ visible: false, track: null })
+const singleUploadRef = ref(null)
+
+const onUploadCmd = (cmd) => {
+  if (cmd === 'single') {
+    const uploadEl = singleUploadRef.value?.$el
+    const input = uploadEl?.querySelector('input[type="file"]')
+    if (input) input.click()
+  } else if (cmd === 'folder') {
+    triggerFolderInput()
+  } else if (cmd === 'link') {
+    linkDialog.visible = true
+  }
+}
 
 // 多选模式
 const selectMode = ref(false)
@@ -393,7 +418,7 @@ const addExternal = async () => {
 // 曲目操作
 const onTrackAction = async (cmd, t) => {
   if (cmd === 'delete') {
-    await ElMessageBox.confirm(`确定删除《${t.title || '未知曲目'}》?`, '提示', { type: 'warning' })
+    await ElMessageBox.confirm(`确定删除《${t.title || '未知曲目'}》?`, '提示', { type: 'warning', closeOnClickModal: true })
     await musicApi.remove(t.id)
     ElMessage.success('已删除')
     load()
@@ -408,7 +433,7 @@ const onTrackAction = async (cmd, t) => {
 // 批量删除曲目
 const batchDeleteTracks = async () => {
   if (!selectedIds.value.length) return
-  await ElMessageBox.confirm(`确定删除选中的 ${selectedIds.value.length} 首曲目?`, '批量删除', { type: 'warning' })
+  await ElMessageBox.confirm(`确定删除选中的 ${selectedIds.value.length} 首曲目?`, '批量删除', { type: 'warning', closeOnClickModal: true })
   await musicApi.batchRemove(selectedIds.value)
   ElMessage.success(`已删除 ${selectedIds.value.length} 首`)
   exitSelect()
@@ -418,7 +443,7 @@ const batchDeleteTracks = async () => {
 // 批量删除专辑
 const batchDeleteAlbums = async () => {
   if (!selectedAlbums.value.length) return
-  await ElMessageBox.confirm(`确定删除选中的 ${selectedAlbums.value.length} 个专辑(含所有曲目)?`, '批量删除', { type: 'warning' })
+  await ElMessageBox.confirm(`确定删除选中的 ${selectedAlbums.value.length} 个专辑(含所有曲目)?`, '批量删除', { type: 'warning', closeOnClickModal: true })
   for (const album of selectedAlbums.value) {
     await musicApi.removeByAlbum(album)
   }
@@ -523,7 +548,7 @@ const unsetBackground = async () => {
 }
 
 const delPlaylist = async (p) => {
-  await ElMessageBox.confirm(`确定删除歌单《${p.name}》?`, '提示', { type: 'warning' })
+  await ElMessageBox.confirm(`确定删除歌单《${p.name}》?`, '提示', { type: 'warning', closeOnClickModal: true })
   await musicApi.deletePlaylist(p.id)
   ElMessage.success('已删除')
   await loadPlaylists()
@@ -549,8 +574,15 @@ onMounted(() => { load(); loadPlaylists() })
 html.dark .sec-btn { background: rgba(232,220,200,0.1) !important; color: #E8DCC8 !important; }
 
 /* ========== Tab 标签栏 ========== */
+.music-tabs-wrapper { position: relative; }
 .music-tabs :deep(.el-tabs__header) { margin-bottom: 20px; }
 .music-tabs :deep(.el-tabs__nav-wrap::after) { display: none; }
+.music-tabs :deep(.el-tabs__nav-scroll) { position: relative; overflow: visible; }
+.tabs-extra {
+  position: absolute; right: 0; top: 0;
+  display: flex; gap: 8px; align-items: center; flex-shrink: 0; z-index: 2;
+  pointer-events: auto;
+}
 .music-tabs :deep(.el-tabs__item) {
   font-size: 15px;
   color: #aaa098;

@@ -326,29 +326,35 @@ onMounted(loadAll)
 .tag { background: rgba(46, 116, 181, 0.08); color: var(--color-accent); padding: 1px 8px; border-radius: 10px; font-size: 12px; }
 .cover { width: 100%; max-height: 300px; object-fit: cover; border-radius: 8px; margin-bottom: 16px; }
 
-/* Markdown 正文:行间距 1.9,字号 15px;层级:段落间距 > 小节间距 > 正文行间距 */
-.content { font-size: 15px; line-height: 1.9; }
-.markdown-body { white-space: normal; word-wrap: break-word; }
-.markdown-body h2, .markdown-body h3, .markdown-body h4 { color: var(--color-primary); line-height: 1.4; }
+/* Markdown 正文:行间距 2.0,字号 15px;层级:段落间距 > 小节间距 > 正文行间距 */
+.content { font-size: 15px; line-height: 2.0; }
+.markdown-body { white-space: normal; word-wrap: break-word; overflow-wrap: break-word; }
+.markdown-body h2, .markdown-body h3, .markdown-body h4 { color: var(--color-primary); line-height: 1.5; }
 /* 小节标题:小节间距 */
-.markdown-body h2 { font-size: 20px; margin: 22px 0 14px; border-bottom: 1px solid var(--color-border); padding-bottom: 6px; }
-.markdown-body h3 { font-size: 17px; margin: 20px 0 12px; }
-.markdown-body h4 { font-size: 15px; margin: 18px 0 10px; }
+.markdown-body h2 { font-size: 20px; margin: 28px 0 16px; border-bottom: 1px solid var(--color-border); padding-bottom: 6px; }
+.markdown-body h3 { font-size: 17px; margin: 24px 0 12px; }
+.markdown-body h4 { font-size: 15px; margin: 20px 0 10px; }
 /* 段落:段落间距(最大),拉大阅读呼吸感 */
-.markdown-body p { margin: 36px 0; }
+.markdown-body p { margin: 20px 0; line-height: 2.0; }
 /* ul/ol 加大缩进,凸显列表子内容的层级 */
-.markdown-body ul, .markdown-body ol { margin: 24px 0; padding-left: 44px; }
-.markdown-body li { margin: 10px 0; }
+.markdown-body ul, .markdown-body ol { margin: 20px 0; padding-left: 44px; }
+.markdown-body li { margin: 8px 0; line-height: 2.0; }
 /* 粗体列表项(- **xx**)额外缩进 */
 .markdown-body li > strong:first-child { display: inline-block; margin-left: 8px; }
-.markdown-body blockquote { margin: 24px 0; padding: 10px 18px; border-left: 4px solid var(--color-accent); background: rgba(168,72,58,0.05); color: var(--color-text-secondary); border-radius: 0 8px 8px 0; }
-.markdown-body code { background: rgba(58,46,34,0.08); padding: 2px 6px; border-radius: 4px; font-size: 13px; font-family: 'Consolas', 'Monaco', monospace; }
-.markdown-body pre { background: rgba(58,46,34,0.06); padding: 14px 18px; border-radius: 8px; overflow-x: auto; margin: 14px 0; }
-.markdown-body pre code { background: none; padding: 0; }
-.markdown-body table { border-collapse: collapse; margin: 14px 0; width: 100%; }
-.markdown-body th, .markdown-body td { border: 1px solid var(--color-border); padding: 8px 12px; text-align: left; }
-.markdown-body th { background: rgba(58,46,34,0.05); font-weight: 600; }
-.markdown-body img { max-width: 100%; border-radius: 8px; margin: 14px 0; }
+.markdown-body blockquote { margin: 20px 0; padding: 12px 18px; border-left: 4px solid var(--color-accent); background: rgba(168,72,58,0.05); color: var(--color-text-secondary); border-radius: 0 8px 8px 0; line-height: 2.0; }
+.markdown-body blockquote p { margin: 6px 0; }
+/* 行内代码 */
+.markdown-body code { background: rgba(58,46,34,0.08); padding: 2px 6px; border-radius: 4px; font-size: 13px; font-family: 'Consolas', 'Monaco', 'Courier New', monospace; word-break: break-all; }
+/* 代码块:深色背景+滚动+自动换行防溢出 */
+.markdown-body pre { background: #1e2a3a; color: #e8dcc8; padding: 16px 20px; border-radius: 10px; overflow-x: auto; margin: 20px 0; line-height: 1.6; }
+.markdown-body pre code { background: none; padding: 0; color: inherit; font-size: 13px; white-space: pre-wrap; word-break: break-all; word-wrap: break-word; }
+/* 表格:边框+斑马纹+滚动容器 */
+.markdown-body table { border-collapse: collapse; margin: 20px 0; width: 100%; display: block; overflow-x: auto; }
+.markdown-body thead { background: rgba(58,46,34,0.06); }
+.markdown-body th, .markdown-body td { border: 1px solid var(--color-border); padding: 10px 14px; text-align: left; line-height: 1.8; }
+.markdown-body th { font-weight: 600; white-space: nowrap; }
+.markdown-body tbody tr:nth-child(even) { background: rgba(58,46,34,0.02); }
+.markdown-body img { max-width: 100%; border-radius: 8px; margin: 20px 0; }
 .markdown-body a { color: var(--color-accent); text-decoration: underline; }
 .markdown-body hr { border: none; border-top: 1px solid var(--color-border); margin: 40px 0; }
 

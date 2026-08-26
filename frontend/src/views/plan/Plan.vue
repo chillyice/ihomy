@@ -50,7 +50,7 @@
       <el-empty v-else :description="$t('plan.noData')" />
     </div>
 
-    <el-dialog v-model="editor.visible" :title="editor.form.id ? $t('plan.editPlan') : $t('plan.newPlan')" width="440px">
+    <el-dialog v-model="editor.visible" append-to-body :title="editor.form.id ? $t('plan.editPlan') : $t('plan.newPlan')" width="440px">
       <el-form :model="editor.form" label-position="top">
         <el-form-item :label="$t('plan.planTitle')">
           <el-input v-model="editor.form.title" :placeholder="$t('plan.titlePlaceholder')" />
@@ -117,7 +117,7 @@ const onSavePlan = async () => {
 }
 
 const onDelPlan = async (p) => {
-  await ElMessageBox.confirm(t('plan.deleteMessage', { name: p.title }), t('common.deleteConfirm'), { type: 'warning' })
+  await ElMessageBox.confirm(t('plan.deleteMessage', { name: p.title }), t('common.deleteConfirm'), { type: 'warning', closeOnClickModal: true })
   await planApi.remove(p.id)
   ElMessage.success(t('common.deleted'))
   await load()

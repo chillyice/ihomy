@@ -29,7 +29,7 @@
       <el-empty v-else :description="userStore.isGuest ? t('anniversary.guestEmpty') : t('anniversary.emptyHint')" />
     </div>
 
-    <el-dialog v-model="editor.visible" :title="editor.form.id ? t('anniversary.edit') : t('anniversary.add')" width="480px">
+    <el-dialog v-model="editor.visible" append-to-body :title="editor.form.id ? t('anniversary.edit') : t('anniversary.add')" width="480px">
       <el-form :model="editor.form" label-position="top">
         <el-form-item :label="t('anniversary.name')">
           <el-input v-model="editor.form.name" :placeholder="t('anniversary.namePlaceholder')" />
@@ -135,7 +135,7 @@ const onSave = async () => {
 }
 
 const onDel = async (a) => {
-  await ElMessageBox.confirm(t('anniversary.deleteConfirm', { name: a.name }), t('common.tip'), { type: 'warning' })
+  await ElMessageBox.confirm(t('anniversary.deleteConfirm', { name: a.name }), t('common.tip'), { type: 'warning', closeOnClickModal: true })
   await anniversaryApi.remove(a.id)
   ElMessage.success(t('common.deleted'))
   load()

@@ -75,7 +75,7 @@
       </div>
     </div>
 
-    <el-dialog v-model="searchVisible" :title="t('member.joinFamily')" width="440px">
+    <el-dialog v-model="searchVisible" append-to-body :title="t('member.joinFamily')" width="440px">
       <el-input v-model="keyword" :placeholder="t('member.searchPlaceholder')" clearable @keyup.enter="doSearch">
         <template #append>
           <el-button @click="doSearch">{{ t('common.search') }}</el-button>
@@ -160,7 +160,7 @@ const changeRole = async (m, roleCode) => {
 
 // 移出成员:二次确认后删除并刷新列表
 const removeMember = async (m) => {
-  await ElMessageBox.confirm(t('member.removeConfirm', { name: m.nickname || m.username }), t('common.tip'), { type: 'warning' })
+  await ElMessageBox.confirm(t('member.removeConfirm', { name: m.nickname || m.username }), t('common.tip'), { type: 'warning', closeOnClickModal: true })
   await memberApi.remove(m.id)
   ElMessage.success(t('member.removed'))
   load()

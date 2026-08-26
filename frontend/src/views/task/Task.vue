@@ -38,7 +38,7 @@
     </div>
 
     <!-- 发布任务弹窗 -->
-    <el-dialog v-model="editor.visible" :title="$t('task.publish')" width="460px">
+    <el-dialog v-model="editor.visible" append-to-body :title="$t('task.publish')" width="460px">
       <el-form :model="editor.form" label-position="top">
         <el-form-item :label="$t('task.titleLabel')">
           <el-input v-model="editor.form.title" :placeholder="$t('task.titlePlaceholder')" />
@@ -124,7 +124,7 @@ const doAction = async (key, task) => {
     confirm: t('task.checkConfirm'),
     cancel: t('task.cancelConfirm'),
   }
-  if (confirmMap[key]) await ElMessageBox.confirm(confirmMap[key], t('common.tip'), { type: 'warning' })
+  if (confirmMap[key]) await ElMessageBox.confirm(confirmMap[key], t('common.tip'), { type: 'warning', closeOnClickModal: true })
   await taskApi[key](task.id)
   ElMessage.success(t('common.success'))
   await loadTasks()

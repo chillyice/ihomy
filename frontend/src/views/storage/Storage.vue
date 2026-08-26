@@ -88,7 +88,7 @@
     </div>
 
     <!-- 设备编辑对话框 -->
-    <el-dialog v-model="deviceDialog" :title="deviceForm.id ? $t('common.edit') : $t('storage.addDevice')" width="480px">
+    <el-dialog v-model="deviceDialog" append-to-body :title="deviceForm.id ? $t('common.edit') : $t('storage.addDevice')" width="480px">
       <el-form :model="deviceForm" label-width="90px">
         <el-form-item :label="$t('storage.deviceName')" required>
           <el-input v-model="deviceForm.name" :placeholder="$t('storage.deviceNamePh')" />
@@ -109,7 +109,7 @@
     </el-dialog>
 
     <!-- 图片/视频预览 -->
-    <el-dialog v-model="previewDialog" :title="previewName" width="70%" top="6vh">
+    <el-dialog v-model="previewDialog" append-to-body :title="previewName" width="70%" top="6vh">
       <div class="preview-box">
         <img v-if="previewIsImage" :src="previewSrc" class="preview-img" />
         <video v-else-if="previewIsVideo" :src="previewSrc" class="preview-video" controls autoplay />
@@ -205,7 +205,7 @@ async function saveDevice() {
 }
 
 async function removeDevice(row) {
-  await ElMessageBox.confirm(t('common.confirmDelete'), t('common.warning'), { type: 'warning' })
+  await ElMessageBox.confirm(t('common.confirmDelete'), t('common.warning'), { type: 'warning', closeOnClickModal: true })
   await storageApi.removeDevice(row.id)
   ElMessage.success(t('common.success'))
   loadDevices()

@@ -41,7 +41,7 @@
       <el-empty v-else :description="$t('wish.noData')" />
     </div>
 
-    <el-dialog v-model="editor.visible" :title="editor.form.id ? $t('wish.edit') : $t('wish.add')" width="440px">
+    <el-dialog v-model="editor.visible" append-to-body :title="editor.form.id ? $t('wish.edit') : $t('wish.add')" width="440px">
       <el-form :model="editor.form" label-position="top">
         <el-form-item :label="$t('wish.name')">
           <el-input v-model="editor.form.title" :placeholder="$t('wish.titlePlaceholder')" />
@@ -130,7 +130,7 @@ const onSetStatus = async (w, status) => {
 }
 
 const onDelete = async (w) => {
-  await ElMessageBox.confirm(t('wish.deleteConfirm', { title: w.title }), t('common.deleteConfirm'), { type: 'warning' })
+  await ElMessageBox.confirm(t('wish.deleteConfirm', { title: w.title }), t('common.deleteConfirm'), { type: 'warning', closeOnClickModal: true })
   await wishApi.remove(w.id)
   ElMessage.success(t('common.deleted'))
   await load()
