@@ -239,6 +239,13 @@
                 </div>
                 <div class="share-tip">关闭后背景色块飘动动画不显示(可提升低分辨率屏性能)</div>
               </el-form-item>
+              <el-form-item>
+                <div class="setting-row">
+                  <el-switch v-model="glassEnabled" />
+                  <span class="setting-label">毛玻璃效果</span>
+                </div>
+                <div class="share-tip">关闭后导航栏/弹窗/面板的磨砂模糊效果将停用,改用不透明背景(大幅降低 GPU 占用)</div>
+              </el-form-item>
               <el-divider />
               <el-form-item>
                 <div class="setting-row">
@@ -378,7 +385,7 @@ const router = useRouter()
 
 // 光照设置:从全局 useSunLight 实例注入(与 SunLightLayer/AppSidebar 共享)
 const sunLight = inject(SUN_LIGHT_KEY)
-const { lampMode, lampTemp, lampBrightness, shadowEnabled, weatherEffectEnabled, blobsEnabled, idleMinutes, isIdle } = sunLight || {}
+const { lampMode, lampTemp, lampBrightness, shadowEnabled, weatherEffectEnabled, blobsEnabled, glassEnabled, idleMinutes, isIdle } = sunLight || {}
 
 // 当前选中设置大类;支持 ?tab= 跳转(从导航栏头像下拉"个人资料"进入时切到 profile)
 const active = ref(route.query.tab || 'profile')

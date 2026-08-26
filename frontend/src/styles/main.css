@@ -14,6 +14,14 @@
   --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -1px 0 rgba(58, 46, 34, 0.04);
 }
 
+/* 毛玻璃关闭:全局禁用 backdrop-filter,用不透明背景替代(性能优化) */
+html.no-glass *,
+html.no-glass *::before,
+html.no-glass *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
 /* 暗色模式:夜色深蓝 */
 html.dark {
   --color-primary: #E8DCC8;

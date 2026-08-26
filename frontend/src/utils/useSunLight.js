@@ -32,6 +32,11 @@ export function useSunLight() {
   const shadowEnabled = ref(true)
   const weatherEffectEnabled = ref(true)
   const blobsEnabled = ref(true)
+  const glassEnabled = ref(true)
+  // 总开关:所有特效都关闭时为 false,用于门控定时器/API 调用/组件挂载
+  const anyEffectEnabled = computed(() =>
+    shadowEnabled.value || blobsEnabled.value || weatherEffectEnabled.value || lampMode.value !== 'off'
+  )
   // 光照测试模式:开启后可手动控制 slotIdx 循环
   const lightTestMode = ref(false)
   const lightTestPaused = ref(false)
@@ -366,7 +371,7 @@ export function useSunLight() {
 
   onMounted(() => {
     loadSunInfo()
-    loadWeather()
+    if (weatherEffectEnabled.value) loadWeather()
     // 钟摆运动已改为 CSS @keyframes,无需 JS rAF;lampStrength 变化只决定元素是否渲染
     // 空闲检测:注册用户活动事件(mousemove 节流),启动超时定时器
     IDLE_EVENTS.forEach(e => window.addEventListener(e, resetIdle, { passive: true }))
@@ -387,7 +392,7 @@ export function useSunLight() {
     // 所有效果关闭时跳过,避免持续触发 Vue 响应式更新和 CSS transition
     flickerTimer = setInterval(() => {
       if (!sunInfo.value) return
-      if (!shadowEnabled.value && !blobsEnabled.value && !weatherEffectEnabled.value && lampStrength.value <= 0) return
+      if (!anyEffectEnabled.value) return
       const base = getSunScene(sunInfo.value, slotIdx.value)
       sunScene.value = {
         ...base,
@@ -397,8 +402,11 @@ export function useSunLight() {
         })),
       }
     }, 10000)
-    // 每 30 分钟刷新真实天气(与后端缓存 TTL 同步)
-    weatherTimer = setInterval(loadWeather, 1800000)
+    // 每 30 分钟刷新真实天气(与后端缓存 TTL 同步);天气效果关闭时跳过
+    weatherTimer = setInterval(() => {
+      if (!weatherEffectEnabled.value) return
+      loadWeather()
+    }, 1800000)
   })
 
   onUnmounted(() => {
@@ -415,9 +423,23 @@ export function useSunLight() {
     if (idleTimer) clearTimeout(idleTimer)
   })
 
+  // 特效从全部关闭→开启时:立即刷新场景和天气,避免等待下一个定时器周期
+  watch(anyEffectEnabled, (enabled) => {
+    if (enabled && sunInfo.value) {
+      slotIdx.value = currentSlotIndex()
+      refreshScene()
+      if (weatherEffectEnabled.value) loadWeather()
+    }
+  })
+
+  // 毛玻璃开关:在 <html> 上切换 .no-glass 类,全局禁用 backdrop-filter
+  watch(glassEnabled, (on) => {
+    document.documentElement.classList.toggle('no-glass', !on)
+  }, { immediate: true })
+
   return {
     sunInfo, slotIdx, sunScene, weather, weatherDetail, loadWeather, loadSunInfoForDate,
-    lampMode, lampTemp, lampBrightness, shadowEnabled, weatherEffectEnabled, blobsEnabled, toggleLamp,
+    lampMode, lampTemp, lampBrightness, shadowEnabled, weatherEffectEnabled, blobsEnabled, glassEnabled, anyEffectEnabled, toggleLamp,
     idleMinutes, isIdle,
     lampStrength, lampStrengthAnim, lampDivOpacity, lampRadius, lampMask, lampColor,
     dustParticles, snowParticles, rainParticles, weatherShadowOpacity, lightLayerOpacity, rayStyles, sourceStyle, bloomStyle, brightSpotStyle, reflectionStyle, lightningFlash,
