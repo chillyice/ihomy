@@ -263,7 +263,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 **测试方式**:`localhost:5173` + Chrome DevTools 设备模拟;真机 `http://<局域网IP>:5173`(vite host:0.0.0.0)。
 
-**第一期适配范围**:首页(三 Tab 重设计)+ 子页面顶部返回栏。后续迭代:Blog/Diary/Album/Chat 等页面响应式 CSS 增强。
+**第一期适配范围**:首页(三 Tab 重设计)+ 子页面顶部返回栏 + 20 个功能页响应式 CSS 增强(Blog/Diary/Album/Chat/Login/Settings/Member/Book/Task/Plan/Wish/Points/Reminder/Tree/Item/Library)。后续迭代:进一步触摸手势优化+字体大小+性能验证。
 
 ## 设计规范(统一实现,避免多种方式)
 
@@ -599,7 +599,7 @@ INSERT INTO sys_dict_item ... book_format/borrow_status;
 
 **测试方式**:`localhost:5173` + Chrome DevTools 设备模拟;真机 `http://<局域网IP>:5173`(vite host:0.0.0.0)。
 
-**第一期适配范围**:首页(三 Tab 重设计)+ 子页面顶部返回栏。后续迭代:Blog/Diary/Album/Chat 等页面响应式 CSS 增强。
+**第一期适配范围**:首页(三 Tab 重设计)+ 子页面顶部返回栏 + 20 个功能页响应式 CSS 增强(Blog/Diary/Album/Chat/Login/Settings/Member/Book/Task/Plan/Wish/Points/Reminder/Tree/Item/Library)。后续迭代:进一步触摸手势优化+字体大小+性能验证。
 
 ## 文件存储策略
 
