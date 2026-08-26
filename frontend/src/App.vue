@@ -1,8 +1,8 @@
 <!-- 根组件:全局光影层 + 左侧导航 + 页面内容(带滑动过渡) -->
 <template>
   <el-config-provider :locale="elLocale">
-    <!-- 全局光影层:所有页面共享(体积光+窗框阴影+台灯+灰尘) -->
-    <SunLightLayer />
+    <!-- 全局光影层:所有页面共享(体积光+窗框阴影+台灯+灰尘);所有特效关闭时卸载组件停止一切渲染 -->
+    <SunLightLayer v-if="anyEffectEnabled" />
 
     <!-- 左侧导航:纯 OPS 账号(无家庭角色)不显示,OWNER+OPS 等复合角色显示 -->
     <AppSidebar v-if="!userStore.isPureOps" />
@@ -49,6 +49,7 @@ const { locale } = useI18n()
 // 全局光影状态:在 App.vue 创建实例,provide 给 SunLightLayer(渲染)和 AppSidebar(控制台灯)
 const sunLight = useSunLight()
 provide(SUN_LIGHT_KEY, sunLight)
+const { anyEffectEnabled } = sunLight
 
 const elLocale = computed(() => (locale.value === 'en' ? en : zhCn))
 
