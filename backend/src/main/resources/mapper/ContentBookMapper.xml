@@ -26,4 +26,25 @@
         DELETE FROM content_book WHERE id = #{id}
     </delete>
 
+    <!-- V7.2: multi-category relation operations -->
+    <select id="selectBookIdsByCategory" resultType="java.lang.Long">
+        SELECT book_id FROM content_book_category_rel WHERE category_id = #{categoryId}
+    </select>
+
+    <select id="selectCategoryIdsByBookId" resultType="java.lang.Long">
+        SELECT category_id FROM content_book_category_rel WHERE book_id = #{bookId}
+    </select>
+
+    <insert id="insertRel">
+        INSERT IGNORE INTO content_book_category_rel (book_id, category_id) VALUES (#{bookId}, #{categoryId})
+    </insert>
+
+    <delete id="deleteRelByBookId">
+        DELETE FROM content_book_category_rel WHERE book_id = #{bookId}
+    </delete>
+
+    <delete id="deleteRelByCategory">
+        DELETE FROM content_book_category_rel WHERE category_id = #{categoryId}
+    </delete>
+
 </mapper>

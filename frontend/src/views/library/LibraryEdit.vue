@@ -33,13 +33,14 @@
         <el-form-item :label="$t('library.description')">
           <el-input v-model="form.description" type="textarea" :rows="4" :placeholder="$t('library.descPlaceholder')" />
         </el-form-item>
-        <el-form-item :label="$t('library.category')">
+        <el-form-item :label="$t('library.categoriesLabel')">
           <div class="category-row">
-            <el-select v-model="form.category" filterable clearable :placeholder="$t('library.categoryPlaceholder')" style="flex: 1">
-              <el-option v-for="c in categories" :key="c" :label="c" :value="c" />
+            <el-select v-model="form.categoryIds" multiple filterable clearable :placeholder="$t('library.selectCategories')" style="flex: 1">
+              <el-option v-for="c in flatCategories" :key="c.id" :label="c.name" :value="c.id" />
             </el-select>
             <el-button @click="showCategoryDialog = true">+ {{ $t('library.newCategory') }}</el-button>
           </div>
+          <div v-if="!flatCategories.length" class="cat-hint">{{ $t('library.noCategories') }}</div>
         </el-form-item>
         <el-form-item :label="$t('library.tags')">
           <el-input v-model="form.tags" :placeholder="$t('library.tagsPlaceholder')" />
@@ -58,6 +59,12 @@
 
     <el-dialog v-model="showCategoryDialog" :title="$t('library.newCategory')" width="360px" append-to-body>
       <el-input v-model="newCategoryName" :placeholder="$t('library.categoryPlaceholder')" @keyup.enter="addCategory" />
+      <div style="margin-top: 12px">
+        <el-select v-model="newCategoryParentId" clearable :placeholder="$t('library.parentCategory')" style="width: 100%">
+          <el-option :label="$t('library.rootCategory')" :value="0" />
+          <el-option v-for="c in flatCategories" :key="c.id" :label="c.name" :value="c.id" />
+        </el-select>
+      </div>
       <template #footer>
         <el-button @click="showCategoryDialog = false">{{ $t('common.cancel') }}</el-button>
         <el-button type="primary" :disabled="!newCategoryName.trim() || savingCategory" :loading="savingCategory" @click="addCategory">{{ $t('common.confirm') }}</el-button>
@@ -81,11 +88,21 @@ const isEdit = computed(() => !!route.params.id)
 const loading = ref(false)
 const uploading = ref(false)
 
-const form = reactive({ title: '', author: '', description: '', coverUrl: '', fileUrl: '', fileFormat: '', fileSize: null, category: '', tags: '', status: 1, visibility: 3 })
+const form = reactive({ title: '', author: '', description: '', coverUrl: '', fileUrl: '', fileFormat: '', fileSize: null, categoryIds: [], tags: '', status: 1, visibility: 3 })
 const categories = ref([])
 const showCategoryDialog = ref(false)
 const newCategoryName = ref('')
+const newCategoryParentId = ref(0)
 const savingCategory = ref(false)
+
+const flatCategories = computed(() => {
+  const result = []
+  for (const c of categories.value) {
+    result.push(c)
+    if (c.children) result.push(...c.children)
+  }
+  return result
+})
 
 const formatSize = (bytes) => {
   if (!bytes) return ''
@@ -103,10 +120,11 @@ const addCategory = async () => {
   if (!name || savingCategory.value) return
   savingCategory.value = true
   try {
-    await libraryApi.addCategory(name)
-    categories.value = await libraryApi.categories() || []
-    form.category = name
+    await libraryApi.addCategory(name, newCategoryParentId.value || 0)
+    await loadCategories()
+    ElMessage.success(t('common.saveSuccess'))
     newCategoryName.value = ''
+    newCategoryParentId.value = 0
     showCategoryDialog.value = false
   } catch (e) {
     ElMessage.error(e.message || 'Failed')
@@ -161,7 +179,7 @@ const onSave = async () => {
 onMounted(async () => {
   if (isEdit.value) {
     const b = await libraryApi.detail(route.params.id)
-    Object.assign(form, { title: b.title, author: b.author, description: b.description, coverUrl: b.coverUrl, fileUrl: b.fileUrl, fileFormat: b.fileFormat, fileSize: b.fileSize, category: b.category || '', tags: b.tags || '', status: b.status, visibility: b.visibility })
+    Object.assign(form, { title: b.title, author: b.author, description: b.description, coverUrl: b.coverUrl, fileUrl: b.fileUrl, fileFormat: b.fileFormat, fileSize: b.fileSize, categoryIds: b.categoryIds || [], tags: b.tags || '', status: b.status, visibility: b.visibility })
   }
   loadCategories()
 })
@@ -171,5 +189,6 @@ onMounted(async () => {
 .category-row { display: flex; gap: 8px; width: 100%; }
 .upload-row { width: 100%; }
 .format-info { font-size: 12px; color: var(--color-text-secondary); margin-top: 4px; }
+.cat-hint { font-size: 12px; color: var(--color-text-secondary); opacity: 0.6; margin-top: 4px; }
 .form-footer { display: flex; justify-content: flex-end; margin-top: 4px; }
 </style>
