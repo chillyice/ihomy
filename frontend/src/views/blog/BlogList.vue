@@ -80,49 +80,29 @@
             <span class="cat-name">{{ $t('blog.allCategories') }}</span>
             <span class="cat-count">{{ totalCatCount }}</span>
           </div>
-          <template v-for="node in categoryTree" :key="node.name">
-            <div
-              class="cat-item"
-              :class="{ active: activeCategory === node.name }"
-              @click="setCategory(node.name)"
-            >
-              <span v-if="node.children.length" class="cat-toggle" @click.stop="toggleExpand(node.name)">
-                <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" :style="{ transform: expanded[node.name] ? 'rotate(90deg)' : '' }"><path d="M9 18l6-6-6-6"/></svg>
-              </span>
-              <span v-else class="cat-toggle-placeholder"></span>
-              <span class="cat-name">{{ node.name }}</span>
-              <span class="cat-count">{{ node.count }}</span>
-              <span v-if="userStore.isLoggedIn" class="cat-ops" @click.stop>
-                <button class="cat-op-btn" :title="$t('blog.editCategory')" @click="openCategoryDialog('edit', node.name)">
-                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                </button>
-                <button class="cat-op-btn danger" :title="$t('blog.deleteCategory')" @click="openDeleteCategory(node.name)">
-                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                </button>
-              </span>
-            </div>
-            <template v-if="node.children.length && expanded[node.name]">
-              <div
-                v-for="child in node.children"
-                :key="child.name"
-                class="cat-item child"
-                :class="{ active: activeCategory === child.name }"
-                @click="setCategory(child.name)"
-              >
-                <span class="cat-toggle-placeholder"></span>
-                <span class="cat-name">{{ child.shortName }}</span>
-                <span class="cat-count">{{ child.count }}</span>
-                <span v-if="userStore.isLoggedIn" class="cat-ops" @click.stop>
-                  <button class="cat-op-btn" :title="$t('blog.editCategory')" @click="openCategoryDialog('edit', child.name)">
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                  </button>
-                  <button class="cat-op-btn danger" :title="$t('blog.deleteCategory')" @click="openDeleteCategory(child.name)">
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                  </button>
-                </span>
-              </div>
-            </template>
-          </template>
+          <div
+            v-for="node in flatTree"
+            :key="node.name"
+            class="cat-item"
+            :class="{ active: activeCategory === node.name }"
+            :style="{ paddingLeft: (10 + node.depth * 16) + 'px' }"
+            @click="setCategory(node.name)"
+          >
+            <span v-if="node.children.length" class="cat-toggle" @click.stop="toggleExpand(node.name)">
+              <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" :style="{ transform: expanded[node.name] ? 'rotate(90deg)' : '' }"><path d="M9 18l6-6-6-6"/></svg>
+            </span>
+            <span v-else class="cat-toggle-placeholder"></span>
+            <span class="cat-name">{{ node.shortName }}</span>
+            <span class="cat-count">{{ node.depth === 0 ? (node.totalCount || 0) : node.count }}</span>
+            <span v-if="userStore.isLoggedIn" class="cat-ops" @click.stop>
+              <button class="cat-op-btn" :title="$t('blog.editCategory')" @click="openCategoryDialog('edit', node.name)">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
+              <button class="cat-op-btn danger" :title="$t('blog.deleteCategory')" @click="openDeleteCategory(node.name)">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              </button>
+            </span>
+          </div>
         </div>
       </aside>
 
@@ -175,7 +155,8 @@
     <el-dialog v-model="catDialog.visible" :title="catDialog.mode === 'add' ? $t('blog.newCategory') : $t('blog.editCategory')" width="360px" append-to-body>
       <el-form label-position="top">
         <el-form-item :label="$t('blog.parentCategory')">
-          <el-select v-model="catDialog.parent" clearable :placeholder="$t('blog.rootCategory')" style="width: 100%">
+          <el-select v-model="catDialog.parent" :placeholder="$t('blog.rootCategory')" style="width: 100%">
+            <el-option :label="$t('blog.rootCategory')" value="" />
             <el-option v-for="p in parentCategoryOptions" :key="p" :label="p" :value="p" />
           </el-select>
         </el-form-item>
@@ -262,44 +243,79 @@ const filteredList = computed(() => {
   return arr
 })
 
-// 从全量计数数据构建分类树
+// 从全量计数数据构建多级分类树
 const categoryTree = computed(() => {
   const counts = {}
   for (const item of catCountRaw.value) {
     counts[item.category] = (counts[item.category] || 0) + Number(item.cnt)
   }
   const allCats = Object.keys(counts).sort()
-  const tree = {}
-  const roots = []
+
+  // 用路径分隔符 / 构建多级树
+  const root = { name: '', children: [], count: 0 }
+  const nodeMap = { '': root }
+
   for (const cat of allCats) {
-    const idx = cat.indexOf('/')
-    if (idx > 0) {
-      const parent = cat.slice(0, idx)
-      const child = cat.slice(idx + 1)
-      if (!tree[parent]) { tree[parent] = { name: parent, count: 0, children: [] } }
-      tree[parent].children.push({ name: cat, shortName: child, count: counts[cat] })
-      tree[parent].count += counts[cat]
-    } else {
-      if (!tree[cat]) { tree[cat] = { name: cat, count: 0, children: [] } }
-      tree[cat].count += counts[cat]
+    const parts = cat.split('/')
+    let path = ''
+    let parent = root
+    for (let i = 0; i < parts.length; i++) {
+      path = i === 0 ? parts[i] : path + '/' + parts[i]
+      if (!nodeMap[path]) {
+        const node = { name: path, shortName: parts[i], depth: i, children: [], count: 0 }
+        nodeMap[path] = node
+        parent.children.push(node)
+      }
+      parent = nodeMap[path]
     }
+    nodeMap[cat].count = counts[cat]
   }
-  for (const k of Object.keys(tree)) {
-    roots.push(tree[k])
+
+  // 向上累加 count
+  const sumCount = (node) => {
+    let sum = node.count
+    for (const child of node.children) sum += sumCount(child)
+    return sum
   }
-  return roots
+  for (const node of root.children) node.totalCount = sumCount(node)
+
+  return root.children
 })
 
 const flatCategories = computed(() => {
   const arr = []
-  for (const node of categoryTree.value) {
-    arr.push(node.name)
-    for (const child of node.children) arr.push(child.name)
+  const walk = (nodes) => {
+    for (const n of nodes) { arr.push(n.name); walk(n.children) }
   }
+  walk(categoryTree.value)
   return arr
 })
 
-const parentCategoryOptions = computed(() => categoryTree.value.map(n => n.name))
+// 父分类下拉:所有已存在的分类(任意层级),用缩进展示层级
+const parentCategoryOptions = computed(() => {
+  const arr = []
+  const walk = (nodes, depth) => {
+    for (const n of nodes) {
+      arr.push({ label: '  '.repeat(depth) + n.shortName, value: n.name })
+      walk(n.children, depth + 1)
+    }
+  }
+  walk(categoryTree.value, 0)
+  return arr
+})
+
+// 扁平化分类树(带depth),用于侧边栏渲染;折叠的节点隐藏子级
+const flatTree = computed(() => {
+  const arr = []
+  const walk = (nodes, depth) => {
+    for (const n of nodes) {
+      arr.push({ ...n, depth })
+      if (n.children.length && expanded.value[n.name]) walk(n.children, depth + 1)
+    }
+  }
+  walk(categoryTree.value, 0)
+  return arr
+})
 
 const totalCatCount = computed(() => catCountRaw.value.reduce((sum, item) => sum + Number(item.cnt), 0))
 
@@ -339,7 +355,7 @@ const catDialog = reactive({ visible: false, mode: 'add', oldName: '', name: '',
 const openCategoryDialog = (mode, name = '') => {
   catDialog.mode = mode
   if (mode === 'edit') {
-    const idx = name.indexOf('/')
+    const idx = name.lastIndexOf('/')
     catDialog.oldName = name
     catDialog.parent = idx > 0 ? name.slice(0, idx) : ''
     catDialog.name = idx > 0 ? name.slice(idx + 1) : name
@@ -527,7 +543,6 @@ html.dark .cat-item:hover { background: rgba(212,178,152,0.08); }
 html.dark .cat-item.active { background: rgba(212,178,152,0.15); color: #d4b298; }
 html.dark .cat-item.active::before { background: #d4b298; }
 
-.cat-item.child { padding-left: 28px; font-size: 13px; }
 .cat-toggle { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--color-text-secondary); cursor: pointer; }
 .cat-toggle svg { transition: transform 0.2s; }
 .cat-toggle-placeholder { width: 16px; flex-shrink: 0; }
