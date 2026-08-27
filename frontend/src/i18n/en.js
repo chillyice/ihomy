@@ -151,6 +151,11 @@ export default {
     copyLink: 'Copy link',
     linkCopied: 'Link copied',
     emptyWriteBtn: 'Write your first blog',
+    sortRecent: 'Latest',
+    sortViews: 'Most viewed',
+    articlesUnit: 'posts',
+    parentCategory: 'Parent category',
+    rootCategory: 'Root category',
   },
   diary: {
     title: 'Diary',

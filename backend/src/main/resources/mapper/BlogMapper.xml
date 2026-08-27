@@ -12,6 +12,20 @@
         ORDER BY category
     </select>
 
+    <select id="selectCategoryCounts" resultType="java.util.Map">
+        SELECT category, COUNT(*) AS cnt
+        FROM content_blog
+        WHERE family_id = #{familyId} AND category IS NOT NULL AND category &lt;&gt; '' AND deleted = 0
+          AND status = 'PUBLISHED'
+          <if test="!isOwner and authorId != null">
+            AND (author_id = #{authorId} OR visibility IN ('FAMILY', 'PUBLIC'))
+          </if>
+          <if test="!isOwner and authorId == null">
+            AND visibility = 'PUBLIC'
+          </if>
+        GROUP BY category
+    </select>
+
     <update id="renameCategory">
         UPDATE content_blog SET category = #{newName}
         WHERE family_id = #{familyId} AND category = #{oldName} AND deleted = 0
