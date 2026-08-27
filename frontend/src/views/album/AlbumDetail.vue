@@ -9,7 +9,7 @@
         <el-tag size="small" :type="album.type === 'public' ? 'primary' : 'warning'">
           {{ album.type === 'public' ? t('album.public') : t('album.private') }}
         </el-tag>
-        <span class="photo-count">{{ t('album.photoCountLabel', { n: album.photoCount }) }}</span>
+        <span class="photo-count">{{ t('album.photoCountLabel', { n: photos.length }) }}</span>
         <p v-if="album.description" class="album-desc">{{ album.description }}</p>
       </div>
       <div class="album-head-actions">
@@ -141,13 +141,15 @@ onMounted(load)
 .album-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 16px;
   margin-bottom: 16px;
   padding: 20px;
 }
 .album-header h2 { color: var(--color-primary); margin-bottom: 6px; }
-.photo-count { margin-left: 10px; font-size: 13px; color: var(--color-text-secondary); }
+.album-head-info { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.album-name { font-size: 20px; font-weight: 600; color: var(--color-primary); }
+.photo-count { font-size: 13px; color: var(--color-text-secondary); }
 .album-desc { margin-top: 8px; color: var(--color-text-secondary); font-size: 13px; }
 .album-head-actions { display: flex; flex-direction: row; align-items: center; gap: 8px; flex-shrink: 0; }
 .album-body { margin-top: 20px; }
