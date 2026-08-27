@@ -221,6 +221,7 @@ const router = useRouter()
 const userStore = useUserStore()
 const list = ref([])
 const catCountRaw = ref([])
+const localCats = ref([])
 const activeCategory = ref('')
 const activeTag = ref('')
 const searchKeyword = ref('')
@@ -262,11 +263,14 @@ const filteredList = computed(() => {
   return arr
 })
 
-// 从全量计数数据构建分类树
+// 从全量计数数据+本地空分类构建分类树
 const categoryTree = computed(() => {
   const counts = {}
   for (const item of catCountRaw.value) {
     counts[item.category] = (counts[item.category] || 0) + Number(item.cnt)
+  }
+  for (const cat of localCats.value) {
+    if (!(cat in counts)) counts[cat] = 0
   }
   const allCats = Object.keys(counts).sort()
   const tree = {}
@@ -285,7 +289,7 @@ const categoryTree = computed(() => {
     }
   }
   for (const k of Object.keys(tree)) {
-    if (tree[k].count > 0 || tree[k].children.length === 0) roots.push(tree[k])
+    roots.push(tree[k])
   }
   return roots
 })
@@ -299,7 +303,15 @@ const flatCategories = computed(() => {
   return arr
 })
 
-const parentCategoryOptions = computed(() => categoryTree.value.map(n => n.name))
+const parentCategoryOptions = computed(() => {
+  const set = new Set(categoryTree.value.map(n => n.name))
+  for (const cat of localCats.value) {
+    const idx = cat.indexOf('/')
+    if (idx > 0) set.add(cat.slice(0, idx))
+    else set.add(cat)
+  }
+  return [...set]
+})
 
 const totalCatCount = computed(() => catCountRaw.value.reduce((sum, item) => sum + Number(item.cnt), 0))
 
@@ -356,8 +368,17 @@ const saveCategory = async () => {
   const fullName = catDialog.parent ? catDialog.parent + '/' + partName : partName
   catDialog.saving = true
   try {
-    if (catDialog.mode === 'add') await blogApi.addCategory(fullName)
-    else await blogApi.renameCategory(catDialog.oldName, fullName)
+    if (catDialog.mode === 'add') {
+      await blogApi.addCategory(fullName)
+      if (!localCats.value.includes(fullName)) localCats.value.push(fullName)
+      if (catDialog.parent && !localCats.value.includes(catDialog.parent) && !catCountRaw.value.some(c => c.category === catDialog.parent)) {
+        localCats.value.push(catDialog.parent)
+      }
+    } else {
+      await blogApi.renameCategory(catDialog.oldName, fullName)
+      const idx = localCats.value.indexOf(catDialog.oldName)
+      if (idx >= 0) localCats.value[idx] = fullName
+    }
     ElMessage.success(t('common.saveSuccess'))
     catDialog.visible = false
     await loadCategoryCounts()
