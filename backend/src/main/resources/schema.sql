@@ -380,6 +380,22 @@ CREATE TABLE `content_blog` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='博客表';
 
 -- ------------------------------------------------------------
+-- 16a. content_blog_category 博客分类表
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `content_blog_category`;
+CREATE TABLE `content_blog_category` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `name`        VARCHAR(50)  NOT NULL COMMENT '分类名称(子分类含父前缀,如 技术/前端)',
+  `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `sort_order`  INT          NOT NULL DEFAULT 0 COMMENT '排序',
+  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_family_name` (`family_id`, `name`, `deleted`),
+  KEY `idx_family` (`family_id`, `deleted`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='博客分类表';
+
+-- ------------------------------------------------------------
 -- 17. content_diary 日记表
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `content_diary`;
