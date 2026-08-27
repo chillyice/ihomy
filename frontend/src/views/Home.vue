@@ -705,7 +705,7 @@ html.dark .music-title { color: #E8DCC8; }
 .polaroid-pos:hover { z-index: 99 !important; }
 .polaroid img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
 .polaroid-caption { position: absolute; bottom: 4px; left: 4px; right: 4px; font-size: 9px; color: #5a4a3a; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.album-closed { position: absolute; top: 50%; left: 50%; width: 85%; aspect-ratio: 4/3; transform: translate(-50%, -50%) rotate(-4deg); cursor: pointer; transition: transform 0.3s ease; }
+.album-closed { position: absolute; top: 50%; left: 50%; width: 70%; aspect-ratio: 4/3; transform: translate(-50%, -50%) rotate(-4deg); cursor: pointer; transition: transform 0.3s ease; }
 .album-closed:hover { transform: translate(-50%, -50%) rotate(0deg) scale(1.05); }
 .album-cover { width: 100%; height: 100%; background: linear-gradient(135deg, #8B6F47 0%, #6B5435 50%, #5a4530 100%); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; position: relative; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.3), 0 8px 4px -4px rgba(0,0,0,0.35), 0 12px 8px -6px rgba(0,0,0,0.25); }
 .album-cover::before { content: ''; position: absolute; inset: 0; background-image: repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(245,230,200,0.04) 8px, rgba(245,230,200,0.04) 16px); pointer-events: none; }

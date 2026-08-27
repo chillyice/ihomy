@@ -307,12 +307,14 @@ const removeItem = async (row) => {
   loadItems()
 }
 
-const openRoom = (row) => {
+const openRoom = async (row) => {
+  if (!houses.value.length) await loadHouses()
   roomForm.value = row ? { id: row.id, houseId: row.houseId, name: row.name, floor: row.floor, note: row.note }
     : { houseId: roomHouseFilter.value, name: '', floor: 1, note: '' }
   roomDlg.value = true
 }
 const saveRoom = async () => {
+  if (!roomForm.value.houseId) return ElMessage.warning(t('item.pickHouse'))
   if (!roomForm.value.name) return ElMessage.warning(t('item.roomNameRequired'))
   if (roomForm.value.id) await itemApi.updateRoom(roomForm.value.id, roomForm.value)
   else await itemApi.addRoom(roomForm.value)

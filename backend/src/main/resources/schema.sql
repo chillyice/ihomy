@@ -710,7 +710,7 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('storage','存储管理', 'icon-storage','/storage','system',  'left',  16, 1),
 ('item','物品定位',   'icon-item',   '/item',   'life',    'left',  17, 1),
 ('kitchen','厨房',     'icon-kitchen','/kitchen','life',    'left',  18, 1),
-('library','书架',     'icon-library','/library','content',  'left',  19, 1);
+('library','书架',     'icon-library','/library','content',  'left',  20, 1);
 
 -- ------------------------------------------------------------
 -- 26. 初始家庭 + 管理员账号

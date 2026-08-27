@@ -213,6 +213,34 @@ echo 'DONE'
   Write-Ok "外挂配置已部署到 $remoteExternal(重启后端后生效)"
 }
 
+# ---------- 数据库迁移 ----------
+if (-not $FrontendOnly) {
+  $migrationsFile = Join-Path $Backend 'src\main\resources\migrations.sql'
+  if (Test-Path $migrationsFile) {
+    $migContent = Get-Content $migrationsFile -Raw
+    # 跳过只有注释/空行的文件(至少有一条非注释非空行才执行)
+    $hasSql = $false
+    foreach ($l in $migContent -split "`n") {
+      $t = $l.Trim()
+      if ($t -and -not $t.StartsWith('--')) { $hasSql = $true; break }
+    }
+    if ($hasSql) {
+      Write-Step '执行数据库迁移脚本(migrations.sql)'
+      & scp -P $Port $migrationsFile "${User}@${Server}:/tmp/ihomy-migrations.sql"
+      if ($LASTEXITCODE -ne 0) { Die '上传 migrations.sql 失败' }
+      $migResult = & ssh @sshOpts "$User@$Server" "mysql -uroot ihomy -e 'source /tmp/ihomy-migrations.sql' 2>&1; rm -f /tmp/ihomy-migrations.sql" 2>&1
+      $migResult = $migResult | Where-Object { $_ -and $_ -match 'ERROR|Warning' -and $_ -notmatch 'Using a password' }
+      if ($migResult) {
+        Write-Warn "迁移输出:"
+        $migResult | ForEach-Object { Write-Warn "  $_" }
+      }
+      Write-Ok '数据库迁移完成'
+    } else {
+      Write-Step '数据库迁移(migrations.sql 无可执行语句,跳过)'
+    }
+  }
+}
+
 # ---------- 部署后端 ----------
 if (-not $FrontendOnly) {
   Write-Step '部署后端:上传 jar'
