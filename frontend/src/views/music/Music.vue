@@ -575,9 +575,8 @@ html.dark .sec-btn { background: rgba(232,220,200,0.1) !important; color: #E8DCC
 
 /* ========== Tab 标签栏 ========== */
 .music-tabs-wrapper { position: relative; }
-.music-tabs :deep(.el-tabs__header) { margin-bottom: 20px; }
+.music-tabs :deep(.el-tabs__header) { margin-bottom: 20px; position: relative; }
 .music-tabs :deep(.el-tabs__nav-wrap::after) { display: none; }
-.music-tabs :deep(.el-tabs__nav-scroll) { position: relative; overflow: visible; }
 .tabs-extra {
   position: absolute; right: 0; top: 0;
   display: flex; gap: 8px; align-items: center; flex-shrink: 0; z-index: 2;

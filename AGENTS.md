@@ -421,6 +421,10 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - `api/request.js` 不加请求去重/缓存(失效策略复杂,易脏数据)。
 - `AppSidebar.vue:102` 23 个 EP 图标同步导入(每个 ~1-2KB,树摇后约 30KB,改动态反而增加运行时开销)。
 
+#### 已知问题(待修复)
+
+- **ElMessageBox 动画未生效**:`main.css` 中 `.fade-in-linear-*` + `.el-overlay-message-box` 的 CSS 覆写写法正确(transition name=`fade-in-linear`,class=`el-overlay-message-box` 已从 EP 源码确认),但实际运行时动画未生效。可能原因:EP 内部 `Transition` 的 `persisted` 模式导致 CSS transition 不触发,或 EP 的 `msgbox-fade-in` keyframes 优先级覆盖。待排查:用 DevTools 确认渲染时实际 class 和 transition 是否被正确应用。`closeOnClickModal: true` 已全部加上(点击遮罩关闭已生效)。
+
 #### 验证基线
 
 - 后端编译:`cd backend; .\mvnw.cmd -B clean compile -DskipTests` → BUILD SUCCESS
