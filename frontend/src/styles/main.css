@@ -349,7 +349,7 @@ html.dark .el-button.is-loading {
   font-weight: 500 !important;
   min-width: auto !important;
   max-width: 320px !important;
-  z-index: 3000 !important;
+  z-index: 101 !important;
 }
 .el-message--success {
   background: rgba(243, 238, 230, 0.95) !important;
@@ -403,7 +403,7 @@ html.dark .el-message--error {
 
 /* 遮罩:低透明度 + 轻磨砂 */
 .el-overlay {
-  z-index: 3000 !important;
+  z-index: 101 !important;
   background: rgba(0, 0, 0, 0.20) !important;
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
@@ -724,8 +724,9 @@ html.dark .el-message-box__btns .el-button:not(.el-button--primary):hover {
 
 /* ========== 全局下拉菜单(teleported, scoped 不生效) ========== */
 .el-dropdown__popper.el-popper,
-.el-popper.is-light {
-  z-index: 61 !important;
+.el-popper.is-light,
+.el-select__popper.el-popper {
+  z-index: 102 !important;
 }
 .el-dropdown__popper.el-popper {
   border-radius: 12px !important;
