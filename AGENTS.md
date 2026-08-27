@@ -338,8 +338,8 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
     - `.el-popper.is-light`(含 dropdown/tooltip)`z-index:61`(高于 AppSidebar=60,低于光影层 bright-spot=65)。
     - MusicPlayer `z-index:62`(popper 上方,光影层下方)。
     - SiteFooter `z-index:70`;BackToTop/InstallPrompt `z-index:200`;ElMessage `z-index:3000`。
-    - **完整 z-index 层级**(从高到低):`Popper/dropdown/select(102) > ElMessage(101) > el-overlay/dialog/message-box(101) > PhotoViewer(201) > BackToTop/InstallPrompt(200) > LibraryReader float-close(210) > lamp-light(100) > LightTestConsole(80) > lightning(79) > light-layer(78) > snow/rain(77) > dust(76) > vignette(74) > reflection(72) > SiteFooter(70) > window-shadow(68) > bright-spot(65) > MusicPlayer(62) > AppSidebar(60) > draggable-panel(20→60) > main-content(10) > glass-bg(2) > bg-blobs(1)`。
-    - **光影层(65-100)为除弹窗/Popper/Toast 外的最高层**,弹窗遮罩(`el-overlay`)+`ElMessage`=101,Popper/dropdown/select=102;任何新增组件 z-index 不得超 100(台灯 100 除外),弹窗遮罩和 Popper 例外(101/102)。
+    - **完整 z-index 层级**(从高到低):`lamp-light(100) > LightTestConsole(80) > lightning(79) > light-layer(78) > snow/rain(77) > dust(76) > vignette(74) > reflection(72) > SiteFooter(70) > window-shadow(68) > bright-spot(65) > Popper/dropdown/select(64) > ElMessage(63) > el-overlay/dialog/message-box(63) > MusicPlayer(62) > AppSidebar(60) > draggable-panel(20→60) > main-content(10) > glass-bg(2) > bg-blobs(1)`。
+    - **光影层(65-100)为最高层**,弹窗遮罩(`el-overlay`)+`ElMessage`=63(低于光影层),Popper/dropdown/select=64(高于弹窗,低于光影层);任何新增组件 z-index 不得超 100(台灯 100 除外)。
 18. **按钮统一样式**(强制,全局 4 类按钮,`main.css` 统一覆写,禁止 scoped 重复定义):
     - **圆角**:所有 `el-button` 12px;small 10px。
     - **主按钮**(`type="primary"`):背景 `#b88c6e` 白字;hover `#a87c5e`;用于保存/添加/确认等正向操作。**禁止亮蓝**。
