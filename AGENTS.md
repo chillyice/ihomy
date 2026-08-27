@@ -635,6 +635,17 @@ INSERT INTO sys_dict_item ... book_format/borrow_status;
 | `views/Home.vue` | 首页任务组件过滤 `status !== 'CANCELLED'`(已取消任务不展示;status 是字符串非数字) |
 | `views/blog/BlogList.vue` | 代码块 `pre` 深色背景+`white-space: pre-wrap` 自动换行;表格斑马纹+`display:block; overflow-x:auto`;行间距 `line-height: 2.0` |
 
+##### 博客列表迭代 V8.3
+
+| 文件 | 改动 |
+|------|------|
+| `BlogController.java` + `BlogService.java` + `BlogMapper.xml` + `BlogMapper.java` | 新增 `GET /blog/categories/counts` 接口:按权限全量统计每个分类文章数(`selectCategoryCounts`),不随筛选改变 |
+| `views/blog/BlogList.vue` | 重写:顶部工具栏(搜索→分类下拉→标签筛选→排序→统计→写博客);≥1400px 左侧常驻分类面板(220px,独立滚动,计数基于全量API),<1400px 改顶部下拉;分类支持子分类(用 `/` 分隔符,前端构建树,可展开/折叠);卡片三行布局(标题行→摘要行→分类+标签+元数据合并行);hover 浮现编辑/删除按钮;草稿标记;分类弹窗支持父分类选择 |
+| `api/index.js` | 新增 `blogApi.categoryCounts()` |
+| `i18n/zh-CN.js` + `en.js` | 新增 `sortRecent`/`sortViews`/`articlesUnit`/`parentCategory`/`rootCategory` |
+
+**博客分类子分类规则**:分类字符串用 `/` 分隔父子(如 `技术/前端`);后端 `content_blog.category` 存完整路径(如 `技术/前端`);前端从 `categoryCounts` API 返回的 `{category, cnt}` 列表构建树;分类面板显示父分类可展开/折叠子分类。
+
 ## 文件存储策略
 
 - **当前阶段(开发期)**:本地磁盘存储(`file.upload-dir`),零成本零内存,FileService 已实现,开箱即用。Nginx `/files/` 托管静态目录(注意负向断言正则 `location ~* ^/(?!files/).+\.(...)$` 排除 /files/)。

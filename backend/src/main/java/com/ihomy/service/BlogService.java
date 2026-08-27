@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 博客业务:分页查询按家庭/可见范围过滤,增删改校验归属与权限。
@@ -50,8 +51,13 @@ public class BlogService {
     }
 
     /** 家庭级分类列表:从已发布博客中 DISTINCT 拉取,空分类不返回 */
-    public java.util.List<String> categories(Long familyId) {
+    public List<String> categories(Long familyId) {
         return blogMapper.selectCategoriesByFamily(familyId);
+    }
+
+    /** 分类计数:按权限过滤后的全量数据统计每个分类的文章数 */
+    public List<Map<String, Object>> categoryCounts(Long familyId, Long authorId, boolean isOwner) {
+        return blogMapper.selectCategoryCounts(familyId, authorId, isOwner);
     }
 
     /** 新增分类:直接返回成功(分类是 blog.category 字段,无独立表;创建博客时自然产生) */

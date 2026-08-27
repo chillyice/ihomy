@@ -483,3 +483,4 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 26. **日记编辑页**(`/diary/edit/:id?`):单张信纸自适应高度,按整页(18行×28px=504px)增长;`.page-break-bg` 层每 504px 一条深色实线标记分页;页眉日期/时间上下排列(`header-left` flex-column),日期与心情底端对齐、时间与天气底端对齐;心情/天气 picker overlay z-index:61(光影层 65 之下,编辑框之上)。
 27. **el-dialog append-to-body**(强制):所有 `el-dialog` 必须加 `append-to-body`,否则弹窗渲染在组件内部被 stacking context 困住,遮罩无法覆盖导航栏 backdrop-filter。
 28. **音乐页**(`/music`):上传方式合并为「上传音乐」下拉菜单(单曲/专辑文件夹/外链);新建歌单+多选按钮放在 `el-tabs__nav-scroll` 内部右侧(absolute 定位 `right:0; top:0`)。
+29. **博客列表页**(`/blog`):顶部工具栏(搜索→分类下拉[<1400px]→标签筛选→排序→筛选后计数→写博客主按钮);≥1400px 左侧常驻分类面板(220px,独立滚动,计数基于全量权限API `GET /blog/categories/counts`,不随筛选改变);<1400px 自动隐藏面板改工具栏分类下拉;分类支持子分类(`/` 分隔符,前端构建树,可展开/折叠);卡片三行布局(标题行→内容摘要行→分类+标签+元数据合并行);hover 浮现编辑/删除快捷按钮;草稿标记;分类弹窗支持父分类选择。

@@ -167,6 +167,11 @@ export default {
     copyLink: '复制链接',
     linkCopied: '链接已复制',
     emptyWriteBtn: '写第一篇博客',
+    sortRecent: '最新发布',
+    sortViews: '浏览最多',
+    articlesUnit: '篇',
+    parentCategory: '父分类',
+    rootCategory: '顶级分类',
   },
   diary: {
     title: '日记本',

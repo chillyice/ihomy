@@ -53,6 +53,16 @@ public class BlogController {
         return Result.success(blogService.categories(familyId));
     }
 
+    @Operation(summary = "博客分类计数（按权限全量统计）")
+    @GetMapping("/categories/counts")
+    public Result<List<Map<String, Object>>> categoryCounts() {
+        SysUser user = securityHelper.currentUser();
+        Long familyId = user == null ? 1L : user.getFamilyId();
+        Long userId = user == null ? null : user.getId();
+        boolean isOwner = securityHelper.isOwner();
+        return Result.success(blogService.categoryCounts(familyId, userId, isOwner));
+    }
+
     @Operation(summary = "新增分类")
     @PostMapping("/categories")
     public Result<Void> addCategory(@RequestBody Map<String, String> body) {

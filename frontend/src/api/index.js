@@ -27,6 +27,7 @@ export const blogApi = {
   update: (id, data) => request.put(`/blog/${id}`, data),
   delete: (id) => request.delete(`/blog/${id}`),
   categories: () => request.get('/blog/categories'),
+  categoryCounts: () => request.get('/blog/categories/counts'),
   addCategory: (name) => request.post('/blog/categories', { name }),
   renameCategory: (oldName, newName) => request.put('/blog/categories', { oldName, newName }),
   deleteCategory: (category, mode) => request.delete('/blog/categories', { params: { category, mode } }),
