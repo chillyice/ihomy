@@ -28,9 +28,9 @@ export const blogApi = {
   delete: (id) => request.delete(`/blog/${id}`),
   categories: () => request.get('/blog/categories'),
   categoryCounts: () => request.get('/blog/categories/counts'),
-  addCategory: (name) => request.post('/blog/categories', { name }),
-  renameCategory: (oldName, newName) => request.put('/blog/categories', { oldName, newName }),
-  deleteCategory: (category, mode) => request.delete('/blog/categories', { params: { category, mode } }),
+  addCategory: (name, parentId) => request.post('/blog/categories', { name, parentId }),
+  renameCategory: (id, name, parentId) => request.put('/blog/categories', { id, name, parentId }),
+  deleteCategory: (id, mode) => request.delete('/blog/categories', { params: { id, mode } }),
 }
 
 // 日记
@@ -321,7 +321,7 @@ export const libraryApi = {
   batchMove: (ids, categoryId) => request.put('/library/batch/move', { ids, categoryId }),
   categories: () => request.get('/library/categories'),
   addCategory: (name, parentId) => request.post('/library/categories', { name, parentId }),
-  updateCategory: (id, name) => request.put(`/library/categories/${id}`, { name }),
+  updateCategory: (id, name, parentId) => request.put(`/library/categories/${id}`, { name, parentId }),
   deleteCategory: (id, mode) => request.delete(`/library/categories/${id}`, { params: { mode } }),
   upload: (file) => {
     const form = new FormData()

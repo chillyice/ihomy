@@ -2,17 +2,19 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('kitchen.title') }]" />
 
-    <div class="list-header">
-      <div class="left">
+    <div class="page-toolbar card">
+      <div class="tb-left">
         <el-button v-if="userStore.isLoggedIn" @click="$router.push('/kitchen/ingredients')">
           <el-icon><Bowl /></el-icon>
           {{ $t('kitchen.ingredients') }}
         </el-button>
       </div>
-      <el-button v-if="userStore.isLoggedIn" type="primary" @click="$router.push('/kitchen/recipe/new')">
-        <el-icon><Plus /></el-icon>
-        {{ $t('kitchen.addRecipe') }}
-      </el-button>
+      <div class="tb-right">
+        <el-button v-if="userStore.isLoggedIn" type="primary" @click="$router.push('/kitchen/recipe/new')">
+          <el-icon><Plus /></el-icon>
+          {{ $t('kitchen.addRecipe') }}
+        </el-button>
+      </div>
     </div>
 
     <div v-loading="loading">

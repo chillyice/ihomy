@@ -3,18 +3,18 @@
     <Breadcrumb :items="[
       { label: $t('kitchen.title'), to: '/kitchen' },
       { label: $t('kitchen.ingredients') },
-    ]">
-      <template #right>
+    ]" />
+
+    <div class="page-toolbar card">
+      <div class="tb-left">
+        <el-input v-model="keyword" :placeholder="$t('kitchen.ingredientName')" clearable prefix-icon="Search"
+                   @input="onSearch" style="max-width: 300px" />
+      </div>
+      <div class="tb-right">
         <el-button v-if="userStore.isLoggedIn" type="primary" round @click="openAdd">
           <el-icon><Plus /></el-icon> {{ $t('kitchen.addIngredient') }}
         </el-button>
-      </template>
-    </Breadcrumb>
-
-    <!-- 搜索 -->
-    <div class="search-bar">
-      <el-input v-model="keyword" :placeholder="$t('kitchen.ingredientName')" clearable prefix-icon="Search"
-                @input="onSearch" style="max-width: 300px" />
+      </div>
     </div>
 
     <!-- 横条列表 -->
@@ -269,10 +269,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.search-bar {
-  margin-bottom: 16px;
-}
-
 .ingredient-list {
   display: flex;
   flex-direction: column;

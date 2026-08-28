@@ -35,12 +35,19 @@
         </el-form-item>
         <el-form-item :label="$t('library.categoriesLabel')">
           <div class="category-row">
-            <el-select v-model="form.categoryIds" multiple filterable clearable :placeholder="$t('library.selectCategories')" style="flex: 1">
-              <el-option v-for="c in flatCategories" :key="c.id" :label="c.name" :value="c.id" />
-            </el-select>
+            <el-cascader
+              v-model="form.categoryIds"
+              :options="categoryCascader"
+              :props="{ expandTrigger: 'hover', checkStrictly: true, emitPath: false, multiple: true }"
+              :placeholder="$t('library.selectCategories')"
+              clearable
+              filterable
+              collapse-tags
+              collapse-tags-tooltip
+              style="flex: 1"
+            />
             <el-button @click="showCategoryDialog = true">+ {{ $t('library.newCategory') }}</el-button>
           </div>
-          <div v-if="!flatCategories.length" class="cat-hint">{{ $t('library.noCategories') }}</div>
         </el-form-item>
         <el-form-item :label="$t('library.tags')">
           <el-input v-model="form.tags" :placeholder="$t('library.tagsPlaceholder')" />
@@ -57,14 +64,22 @@
       </el-form>
     </div>
 
-    <el-dialog v-model="showCategoryDialog" :title="$t('library.newCategory')" width="360px" append-to-body>
-      <el-input v-model="newCategoryName" :placeholder="$t('library.categoryPlaceholder')" @keyup.enter="addCategory" />
-      <div style="margin-top: 12px">
-        <el-select v-model="newCategoryParentId" clearable :placeholder="$t('library.parentCategory')" style="width: 100%">
-          <el-option :label="$t('library.rootCategory')" :value="0" />
-          <el-option v-for="c in flatCategories" :key="c.id" :label="c.name" :value="c.id" />
-        </el-select>
-      </div>
+    <el-dialog v-model="showCategoryDialog" :title="$t('library.newCategory')" width="380px" append-to-body>
+      <el-form label-position="top">
+        <el-form-item :label="$t('library.parentCategory')">
+          <el-cascader
+            v-model="newCategoryParentId"
+            :options="categoryCascader"
+            :props="{ expandTrigger: 'hover', checkStrictly: true, emitPath: false }"
+            :placeholder="$t('library.rootCategory')"
+            clearable
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item :label="$t('library.categoryPlaceholder')">
+          <el-input v-model="newCategoryName" @keyup.enter="addCategory" />
+        </el-form-item>
+      </el-form>
       <template #footer>
         <el-button @click="showCategoryDialog = false">{{ $t('common.cancel') }}</el-button>
         <el-button type="primary" :disabled="!newCategoryName.trim() || savingCategory" :loading="savingCategory" @click="addCategory">{{ $t('common.confirm') }}</el-button>
@@ -92,16 +107,22 @@ const form = reactive({ title: '', author: '', description: '', coverUrl: '', fi
 const categories = ref([])
 const showCategoryDialog = ref(false)
 const newCategoryName = ref('')
-const newCategoryParentId = ref(0)
+const newCategoryParentId = ref(null)
 const savingCategory = ref(false)
 
-const flatCategories = computed(() => {
-  const result = []
+const categoryCascader = computed(() => {
+  const byParent = {}
   for (const c of categories.value) {
-    result.push(c)
-    if (c.children) result.push(...c.children)
+    const pid = c.parentId || 0
+    if (!byParent[pid]) byParent[pid] = []
+    byParent[pid].push(c)
   }
-  return result
+  const build = (pid) => (byParent[pid] || []).map(c => ({
+    value: c.id,
+    label: c.name,
+    children: build(c.id).length ? build(c.id) : undefined,
+  }))
+  return build(0)
 })
 
 const formatSize = (bytes) => {
@@ -120,11 +141,11 @@ const addCategory = async () => {
   if (!name || savingCategory.value) return
   savingCategory.value = true
   try {
-    await libraryApi.addCategory(name, newCategoryParentId.value || 0)
+    await libraryApi.addCategory(name, newCategoryParentId.value)
     await loadCategories()
     ElMessage.success(t('common.saveSuccess'))
     newCategoryName.value = ''
-    newCategoryParentId.value = 0
+    newCategoryParentId.value = null
     showCategoryDialog.value = false
   } catch (e) {
     ElMessage.error(e.message || 'Failed')

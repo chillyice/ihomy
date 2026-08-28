@@ -4,9 +4,13 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('tree.title') }]" />
 
-    <div class="tree-head">
-      <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ $t('tree.add') }}</el-button>
-      <span class="tree-tip">{{ $t('tree.tip') }}</span>
+    <div class="page-toolbar card">
+      <div class="tb-left">
+        <span class="tree-tip">{{ $t('tree.tip') }}</span>
+      </div>
+      <div class="tb-right">
+        <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ $t('tree.add') }}</el-button>
+      </div>
     </div>
 
     <div v-loading="loading" class="tree-body">
@@ -233,12 +237,6 @@ onMounted(load)
 </script>
 
 <style scoped>
-.tree-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
 .tree-tip { color: var(--color-text-2); font-size: 12px; }
 .generation-list { display: flex; flex-direction: column; gap: 26px; }
 .generation-row { display: flex; align-items: flex-start; gap: 14px; }

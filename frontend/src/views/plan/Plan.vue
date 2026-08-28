@@ -3,8 +3,10 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('plan.title') }]" />
 
-    <div class="list-header">
-      <el-button type="primary" @click="openPlanEditor()">{{ $t('plan.newPlan') }}</el-button>
+    <div class="page-toolbar card">
+      <div class="tb-right">
+        <el-button type="primary" @click="openPlanEditor()">{{ $t('plan.newPlan') }}</el-button>
+      </div>
     </div>
 
     <div v-loading="loading">

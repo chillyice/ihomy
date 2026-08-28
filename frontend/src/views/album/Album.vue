@@ -3,9 +3,11 @@
   <div class="page">
     <Breadcrumb :items="[{ label: t('album.title') }]" />
 
-    <div class="list-header">
-      <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ t('album.newAlbum') }}</el-button>
-      <el-button v-if="userStore.isOwner" @click="syncVisible = true">{{ t('album.syncFromDevice') }}</el-button>
+    <div class="page-toolbar card">
+      <div class="tb-right">
+        <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ t('album.newAlbum') }}</el-button>
+        <el-button v-if="userStore.isOwner" @click="syncVisible = true">{{ t('album.syncFromDevice') }}</el-button>
+      </div>
     </div>
 
     <div v-loading="loading">
@@ -119,7 +121,6 @@ onMounted(load)
 </script>
 
 <style scoped>
-.list-header { display: flex; justify-content: flex-start; align-items: center; gap: 10px; margin-bottom: 16px; }
 .album-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));

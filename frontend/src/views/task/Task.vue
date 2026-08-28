@@ -3,8 +3,10 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('task.title') }]" />
 
-    <div class="list-header">
-      <el-button type="primary" @click="openEditor()">{{ $t('task.publish') }}</el-button>
+    <div class="page-toolbar card">
+      <div class="tb-right">
+        <el-button type="primary" @click="openEditor()">{{ $t('task.publish') }}</el-button>
+      </div>
     </div>
 
     <el-tabs v-model="filter">

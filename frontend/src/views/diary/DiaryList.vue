@@ -1,14 +1,16 @@
 <!-- 日记本页:模仿博客列表风格,卡片式布局,hover操作菜单,显示作者 -->
 <template>
   <div class="page">
-    <Breadcrumb :items="[{ label: $t('diary.title') }]">
-      <template #right>
+    <Breadcrumb :items="[{ label: $t('diary.title') }]" />
+
+    <div class="page-toolbar card">
+      <div class="tb-right">
         <button v-if="userStore.isLoggedIn" class="write-btn" @click="router.push('/diary/edit')">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
           {{ $t('diary.newDiary') }}
         </button>
-      </template>
-    </Breadcrumb>
+      </div>
+    </div>
 
     <div v-loading="loading" class="diary-main">
       <div v-for="d in list" :key="d.id" class="diary-item card">
@@ -162,19 +164,6 @@ html.dark .public-tag { background: rgba(125,186,125,0.12); color: #7dba7d; }
 html.dark .icon-btn:hover { background: rgba(212,178,152,0.1); color: #d4b298; }
 
 .empty-state { padding: 48px 0; }
-
-.write-btn {
-  height: 34px; padding: 0 16px;
-  border: none; border-radius: 10px;
-  background: #b88c6e; color: #fff;
-  font-size: 13px; font-weight: 500;
-  cursor: pointer;
-  display: inline-flex; align-items: center; gap: 6px;
-  transition: background 0.2s, transform 0.2s;
-}
-.write-btn:hover { background: #a87c5e; transform: translateY(-1px); }
-html.dark .write-btn { background: #d4b298; color: #2a2018; }
-html.dark .write-btn:hover { background: #e0c2aa; }
 
 :deep(.danger-item) { color: #b04a3a !important; }
 :deep(.danger-item:hover) { background: rgba(176,74,58,0.08) !important; color: #b04a3a !important; }

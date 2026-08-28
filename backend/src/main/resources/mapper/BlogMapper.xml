@@ -31,6 +31,11 @@
         WHERE family_id = #{familyId} AND category = #{oldName} AND deleted = 0
     </update>
 
+    <update id="renameCategoryPrefix">
+        UPDATE content_blog SET category = CONCAT(#{newPrefix}, SUBSTRING(category, CHAR_LENGTH(#{oldPrefix}) + 1))
+        WHERE family_id = #{familyId} AND category LIKE CONCAT(#{oldPrefix}, '%') AND deleted = 0
+    </update>
+
     <update id="clearCategory">
         UPDATE content_blog SET category = NULL
         WHERE family_id = #{familyId} AND category = #{category} AND deleted = 0

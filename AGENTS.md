@@ -3,6 +3,8 @@
 > 本文件供 opencode 跨会话加载,记录项目关键决策与约定。新会话启动时会自动读取,无需重复说明背景。
 > 修改本文件后立即对所有新会话生效。
 
+> **⚠ Git 规定(必须遵守)**:非人工指令,不得主动提交代码(`git commit`/`git add -A`/`git push` 一律禁止)。`git add` 只能指定具体文件路径,禁止 `git add -A`/`git add .`。
+
 > **⚠ 路径拼写警示(遵守以防误写)**:
 > - 工作目录绝对路径:`C:\Users\chill\OneDrive\WorkStation\Projects\ihomy`
 > - 中间段是 **`WorkStation`(一个词,`W-o-r-k-S-t-a-t-i-o-n`)**,不是 `Work\Station`、不是 `WorkStudio`、也不是 `Work Station`。
@@ -82,7 +84,7 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
     dto/         # 请求/响应 DTO
     websocket/   # ChatWebSocketHandler(原生 WebSocket 聊天室)
   src/main/resources/
-    application.yml     # 端口8080, context-path=/api, 连接用 ihomy 账号; mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml; **基线配置**(MySQL 6306/Redis 6379/captcha 空/天气留空);当前 `file.upload-dir` 为 Windows 开发默认值,生产通过 external.yml 覆盖为 Linux 路径
+    application.yml     # 端口8080, context-path=/api, 连接用 ihomy 账号; mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml; **基线配置**(MySQL 6306/Redis 6379/captcha 空/天气留空);`file.upload-dir` 基线 `/opt/ihomy/uploads`(Linux),开发通过 external.yml 覆盖为 Windows 路径;`logging.file.name` 基线 `/opt/ihomy/logs/ihomy.log`,开发覆盖为 `D:\WorkSpace\ihomy\logs\ihomy.log`
     external.yml.template  # 外挂配置模板(IHOMY_CONFIG_PATH 指定路径,覆盖 MySQL/Redis 密码 + JWT 密钥 + 上传路径 + captcha + 天气凭证,ENC() 加密)—— 唯一的开发/生产差异机制,**不再用 application-dev.yml profile**(见 scripts/start-all.ps1)
     mapper/*.xml        # 每个 Mapper 接口一个同名 XML(namespace=接口全限定名)
     schema.sql          # 建库+建号+建表(53张)+种子数据
@@ -118,7 +120,7 @@ frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
 .\mvnw.cmd -B clean compile -DskipTests       # 仅编译验证
 .\mvnw.cmd spring-boot:run                     # 开发运行(端口8080)
 ```
-- 有 jar 锁先 `taskkill /F /IM java.exe` 再打包(运行中 java 锁定 logs/ihomy.log 导致 clean 失败)。
+- 有 jar 锁先 `taskkill /F /IM java.exe` 再打包(运行中 java 锁定日志文件导致 clean 失败)。日志路径:生产 `/opt/ihomy/logs/ihomy.log`,开发 `D:\WorkSpace\ihomy\logs\ihomy.log`(external.yml 覆盖)。
 - 临时 Maven(本机未装 mvn):`C:\Users\chill\AppData\Local\Temp\opencode\apache-maven-3.9.9\bin\mvn.cmd`
 - JAVA_HOME:`C:\Program Files\Java\jdk-21`(JDK 21 已装)
 - 运行后端必须用完整路径单实例:`C:\Program Files\Java\jdk-21\bin\java.exe -jar target\ihomy-backend.jar`(javapath launcher + JDK 双实例会分流 8080 请求导致偶发 401/404/500)。
@@ -337,7 +339,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 20. **Popper/Dropdown z-index 规范**(强制):
     - `.el-popper.is-light`(含 dropdown/tooltip)`z-index:61`(高于 AppSidebar=60,低于光影层 bright-spot=65)。
     - MusicPlayer `z-index:62`(popper 上方,光影层下方)。
-    - SiteFooter `z-index:70`;BackToTop/InstallPrompt `z-index:200`;ElMessage `z-index:3000`。
+    - SiteFooter `z-index:70`;BackToTop/InstallPrompt `z-index:200`;ElMessage `z-index:3000`(EP 内置,不覆写)。
     - **完整 z-index 层级**(从高到低):`lamp-light(100) > LightTestConsole(80) > lightning(79) > light-layer(78) > snow/rain(77) > dust(76) > vignette(74) > reflection(72) > SiteFooter(70) > window-shadow(68) > bright-spot(65) > Popper/dropdown/select(64) > ElMessage(63) > el-overlay/dialog/message-box(63) > MusicPlayer(62) > AppSidebar(60) > draggable-panel(20→60) > main-content(10) > glass-bg(2) > bg-blobs(1)`。
     - **光影层(65-100)为最高层**,弹窗遮罩(`el-overlay`)+`ElMessage`=63(低于光影层),Popper/dropdown/select=64(高于弹窗,低于光影层);任何新增组件 z-index 不得超 100(台灯 100 除外)。
 18. **按钮统一样式**(强制,全局 4 类按钮,`main.css` 统一覆写,禁止 scoped 重复定义):
@@ -346,7 +348,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
     - **次级按钮**(无 type / 默认):背景 `#f3eee6` 深褐 `#5c4c3d` 文字;hover `#e8e0d2`;用于取消/次级入口。
     - **幽灵按钮**(`.ghost-btn` class):透明底 + `var(--color-border)` 边框 + 褐字;hover `#f3eee6` 底;用于复制链接等低权重操作。
     - **危险按钮**(`type="danger"`):背景 `#f9ecea` 暗红 `#b96058` 文字;hover `#f0dedb`;**禁止亮红**。`text`/`link` 类型保持透明底,hover 浅红 `rgba(185,96,88,0.08)`。
-    - **尺寸**:默认 34px / small 28px / large 38px。表单底部保存按钮用默认或 large;列表行内删除用 small。
+    - **尺寸**:默认 32px / small 28px / large 38px。表单底部保存按钮用默认或 large;列表行内删除用 small。
     - **交互**:hover `translateY(-1px)` + `0 2px 8px rgba(0,0,0,0.06)` 微阴影;禁用/loading 置灰 `#e4ddd0` 去掉上浮。
     - **摆放规则**:表单提交按钮 → `.form-footer { display: flex; justify-content: flex-end }` 右下角;模块独立功能入口 → 靠左次级按钮;Modal footer → 次级左主按钮右;列表删除 → 行最右 small danger。
     - **暗色模式**(与浅色完全不同色值,不共用):
@@ -364,10 +366,12 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 23. **图标线条规范**(强制):
     - 所有 `el-icon` SVG `stroke-width: 2px`;图标颜色跟随文字层级:主要图标=主文字色,次要图标=辅助灰色,危险图标=低饱和暗红。
 24. **圆角全局统一**(强制,`main.css` 全局覆写):
-    - `el-button` 12px(small 10px);`el-input__wrapper` 10px;`el-card` 14px;`el-dialog` 14px。
+    - `el-button` 12px(small 10px);`el-input__wrapper`/`el-select__wrapper`/`el-cascader .el-input__wrapper`/`el-cascader .el-select__wrapper` 10px;`el-card` 14px;`el-dialog` 14px。
 25. **页面统一规范**(强制,所有功能页遵守):
     - 根容器统一 `class="page"`(全局 `.page`: `max-width:1100px; margin:0 auto; padding:16px`),**禁止 scoped 覆写** max-width/margin/padding/border。
     - 页面级 H2/H1 标题全部移除(面包屑已体现页面标题);内容分区标题用 `.section-label`(16px/600/左 3px 暖棕竖线)。
+    - **工具栏**:统一 `class="page-toolbar card"`,全局 `padding: 10px 16px !important`(不被 `.card` 的 20px 覆盖);`.tb-left` 放搜索/筛选/排序,`.tb-right` 放操作按钮。**禁止 scoped 定义 `.list-header`/`.toolbar`/`.header-actions` 等旧工具栏类**。
+    - **工具栏按钮**(`.write-btn`/`.ghost-btn`/`.danger-btn`/`.view-toggle`/`.vt-btn`):全局定义在 `main.css`,height:32px,**禁止 scoped 重复定义**。
     - `.page-header`/`.page-title`/`.list-header` 全局统一定义在 `main.css`,禁止 scoped 重复。
     - Breadcrumb `#right` slot 放置页面操作按钮(添加/加入等)。
 
@@ -516,6 +520,9 @@ CREATE TABLE content_music_playlist_track (...);
 | `styles/main.css` | 深色模式全面重构:primary `#d4b298`/次级半透明白/危险 `#c97474`;el-tag 半透明磨砂;el-badge;`stroke-width:2px`;圆角统一(button 12px/input 10px/card 14px/dialog 14px);弹窗规范 4 档(sm/md/lg/xl)+关闭按钮+Tab 暖棕+checkbox 暖棕;ElMessage 暖色调;popper z-index:61 |
 | z-index 层级 | ElMessage(3000)>BackToTop(200)>lamp-light(100)>LightTestConsole(80)>light-layer(78)>snow/rain(77)>dust(76)>vignette(74)>reflection(72)>SiteFooter(70)>window-shadow(68)>bright-spot(65)>MusicPlayer(62)>Popper(61)>AppSidebar(60)>draggable-panel(20→60)>main-content(10) |
 | 页面规范 | 全局 `.page`/`.page-header`/`.list-header`/`.section-label`;所有页面 H1/H2 移除(面包屑替代);Breadcrumb `#right` slot 放操作按钮 |
+| 工具栏规范 | 全局 `.page-toolbar`(padding `10px 16px !important`,不被 `.card` 20px 覆盖);`.tb-left` 放搜索/筛选,`.tb-right` 放按钮;`.write-btn`/`.ghost-btn`/`.danger-btn`/`.view-toggle`/`.vt-btn` 全局定义 height:32px,禁止 scoped 重复 |
+| 圆角规范 | `el-input__wrapper`/`el-select__wrapper`/`el-cascader` wrapper 全局 10px;`el-button` 12px;`el-card`/`el-dialog` 14px |
+| 分类级联 | 博客+图书分类选择/筛选统一用 `el-cascader`(`checkStrictly + emitPath: false`),支持多级树、`filterable` 搜索;编辑时排除当前及后代防环 |
 
 ##### 厨房 + 物品
 
@@ -550,7 +557,7 @@ CREATE TABLE content_music_playlist_track (...);
 | i18n | Home/Settings 60+ 硬编码中文改 `$t()`;中英双语 key |
 | 移动端 | `@media (max-width:960px)` 面板从 `display:none` 改文档流堆叠 |
 
-##### 电子图书(家庭书架 V7.1)
+##### 电子图书(家庭书架)
 
 | 文件 | 改动 |
 |------|------|
@@ -565,7 +572,7 @@ CREATE TABLE content_music_playlist_track (...);
 | `common/DictConst.java` | 新增 FMT_EPUB/PDF/TXT/MOBI + BORROW_WANT/READING/FINISHED 常量 |
 | `frontend/src/api/index.js` | 新增 `libraryApi`(list/detail/create/update/delete/categories/upload/borrow) |
 | `frontend/src/router/index.js` | 3 路由:/library(list)、/library/:id(detail)、/library/edit/:id?(edit) |
-| `frontend/src/views/library/LibraryList.vue` | 书架网格(auto-fill 160px)+ 左侧分类栏 + 格式角标 + 卡片 hover 上浮 + 下拉菜单 + 分类管理弹窗 |
+| `frontend/src/views/library/LibraryList.vue` | 书架网格(auto-fill 150px)+ 工具栏级联分类筛选(`el-cascader`)+ 格式角标 + 卡片 hover 上浮 + 下拉菜单 + 分类管理弹窗(`el-cascader` 选父级) |
 | `frontend/src/views/library/LibraryDetail.vue` | 详情卡片 + 在线阅读器全屏覆盖(PDF iframe/EPUB epub.js 异步加载/TXT 分页/MOBI 仅下载)+ 阅读状态按钮 |
 | `frontend/src/views/library/LibraryEdit.vue` | 表单(书名/作者/文件上传/封面上传/简介/分类/标签/可见范围) |
 | `frontend/src/components/AppSidebar.vue` | 导航加 library(Reading 图标);ICON_MAP + NAV_PATHS |
@@ -584,7 +591,7 @@ INSERT INTO sys_home_module ... 'library';
 INSERT INTO sys_dict_item ... book_format/borrow_status;
 ```
 
-##### 移动端兼容性(V8.0)
+##### 移动端兼容性
 
 | 文件 | 改动 |
 |------|------|
@@ -605,7 +612,7 @@ INSERT INTO sys_dict_item ... book_format/borrow_status;
 
 **第一期适配范围**:首页(三 Tab 重设计)+ 子页面顶部返回栏 + 20 个功能页响应式 CSS 增强(Blog/Diary/Album/Chat/Login/Settings/Member/Book/Task/Plan/Wish/Points/Reminder/Tree/Item/Library)。后续迭代:进一步触摸手势优化+字体大小+性能验证。
 
-##### 播放器沉浸模式 + 多家庭修复(V8.1)
+##### 播放器沉浸模式 + 多家庭修复
 
 | 文件 | 改动 |
 |------|------|
@@ -618,12 +625,12 @@ INSERT INTO sys_dict_item ... book_format/borrow_status;
 | `service/AuthService.java` | `switchFamily` 增加 `invalidateUser(userId)`(修复切换默认家庭不生效的缓存 bug) |
 | `service/AlbumService.java` | `detail`/`create`/`addPhoto` 增加 `currentFamilyId` 参数(防御性,配合 SecurityHelper 修复) |
 | `App.vue` | 全局页面过渡从 `slide-down` 改为 `fade`(0.5s,无 transform 避免 `position:fixed` 卡片偏移) |
-| `styles/main.css` | `.el-overlay` z-index:3000(覆盖导航栏 backdrop-filter) |
+| `styles/main.css` | `.el-overlay` z-index:63(低于光影层 65,高于 AppSidebar 60);`.el-popper` z-index:64 |
 | `views/album/AlbumDetail.vue` | 编辑/删除按钮 `@click.stop` 阻止冒泡;`.album-head-actions` 横向排列 |
 | `components/SunLightLayer.vue` | 台灯 `lampSwing` keyframes 加 `translateY(-50%)` 修复位置偏移 |
 | `vite.config.js` + `package.json` | `vite-plugin-pwa` 升级 0.20.5→1.3.0 修复 `workbox-build` ESM 兼容;移除 `cross-env`/`build:fast` |
 
-##### UI 交互优化 V8.2
+##### UI 交互优化
 
 | 文件 | 改动 |
 |------|------|
@@ -635,16 +642,18 @@ INSERT INTO sys_dict_item ... book_format/borrow_status;
 | `views/Home.vue` | 首页任务组件过滤 `status !== 'CANCELLED'`(已取消任务不展示;status 是字符串非数字) |
 | `views/blog/BlogList.vue` | 代码块 `pre` 深色背景+`white-space: pre-wrap` 自动换行;表格斑马纹+`display:block; overflow-x:auto`;行间距 `line-height: 2.0` |
 
-##### 博客列表迭代 V8.3
+##### 博客列表迭代
 
 | 文件 | 改动 |
 |------|------|
-| `BlogController.java` + `BlogService.java` + `BlogMapper.xml` + `BlogMapper.java` | 新增 `GET /blog/categories/counts` 接口:按权限全量统计每个分类文章数(`selectCategoryCounts`),不随筛选改变 |
-| `views/blog/BlogList.vue` | 重写:顶部工具栏(搜索→分类下拉→标签筛选→排序→统计→写博客);≥1400px 左侧常驻分类面板(220px,独立滚动,计数基于全量API),<1400px 改顶部下拉;分类支持子分类(用 `/` 分隔符,前端构建树,可展开/折叠);卡片三行布局(标题行→摘要行→分类+标签+元数据合并行);hover 浮现编辑/删除按钮;草稿标记;分类弹窗支持父分类选择 |
-| `api/index.js` | 新增 `blogApi.categoryCounts()` |
+| `BlogController.java` + `BlogService.java` + `BlogMapper.xml` + `BlogMapper.java` | `GET /blog/categories/counts` 按权限全量统计;分类 CRUD 全部基于 `content_blog_category` 表(`parent_id` 自引用树);`renameCategory(id, name, parentId)` 支持改名+移父级+防环+级联更新子分类博客路径;`deleteCategory(id, mode)` 递归删除子分类 |
+| `entity/BlogCategory.java` + `mapper/BlogCategoryMapper.java` | 新增实体+Mapper(BaseMapper) |
+| `views/blog/BlogList.vue` | 工具栏(搜索→分类级联→标签可搜索→排序图标→统计→写博客);≥1400px 左侧常驻分类面板(独立滚动),<1400px 顶部 `el-cascader`;分类树多级递归(后端返回扁平树);卡片三行布局;hover 编辑/删除;草稿标记;分类弹窗 `el-cascader` 选父级(编辑时排除当前及后代防环) |
+| `views/blog/BlogEdit.vue` | 分类选择改 `el-cascader`;新建分类弹窗支持选父级 |
+| `api/index.js` | `addCategory(name, parentId)` / `renameCategory(id, name, parentId)` / `deleteCategory(id, mode)` |
 | `i18n/zh-CN.js` + `en.js` | 新增 `sortRecent`/`sortViews`/`articlesUnit`/`parentCategory`/`rootCategory` |
 
-**博客分类子分类规则**:分类字符串用 `/` 分隔父子(如 `技术/前端`);后端 `content_blog.category` 存完整路径(如 `技术/前端`);前端从 `categoryCounts` API 返回的 `{category, cnt}` 列表构建树;分类面板显示父分类可展开/折叠子分类。
+**博客分类树规则**:`content_blog_category` 表用 `parent_id` 自引用(NULL=顶级),`name` 只存本级名称;后端 `categories()` 返回扁平树 `{id, name, parentId, path, depth, childCount}`;`content_blog.category` 列存全路径(如 `技术/前端`)用于筛选;`renameCategory(id, name, parentId)` 可改名+移父级(防环校验),级联更新子分类博客路径。前端用 `el-cascader`(`checkStrictly + emitPath: false`)做分类选择/筛选,编辑时排除当前分类及其后代防环。
 
 ## 文件存储策略
 
@@ -685,7 +694,6 @@ INSERT INTO sys_dict_item ... book_format/borrow_status;
 
 | 优先级 | 规划 | 要点 |
 |--------|------|------|
-| P1 | 存储管理-存量迁移 | 设备/文件浏览器/一键同步已完成;存量 `/uploads/` 旧文件重归档(移入 upload/yyyyMM 结构并更新 DB 路径)待做 |
 | P2 | 物品定位-户型图 | 1期(物品清单+搜索)已完成;2期户型图:房间矩形绘制/物品相对坐标摆放,以 room.id 挂载(数据结构已预留) |
 | P2 | 用户使用指导 | 新手引导弹窗+帮助页 |
 | P2 | 家庭公告/广告位 | 自建家庭公告(不接第三方广告,隐私原因) |

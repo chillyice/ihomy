@@ -3,9 +3,11 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('cinema.title') }]" />
 
-    <div class="list-header">
-      <div class="header-actions">
+    <div class="page-toolbar card">
+      <div class="tb-left">
         <el-input v-model="keyword" :placeholder="$t('cinema.searchPlaceholder')" clearable style="width: 200px" @keyup.enter="load" @clear="load" />
+      </div>
+      <div class="tb-right">
         <el-button v-if="userStore.isOwner" @click="syncVisible = true">{{ $t('cinema.syncFromDevice') }}</el-button>
         <el-button v-if="userStore.isLoggedIn" @click="openWishDialog">{{ $t('cinema.wish') }}</el-button>
         <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ $t('cinema.upload') }}</el-button>
@@ -352,8 +354,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.list-header { display: flex; justify-content: flex-start; align-items: center; gap: 10px; margin-bottom: 16px; }
-.header-actions { display: flex; gap: 10px; }
 .video-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -420,6 +420,5 @@ onMounted(() => {
 @media (max-width: 768px) {
   .video-grid { grid-template-columns: 1fr; }
   .form-row { grid-template-columns: 1fr; }
-  .header-actions { flex-wrap: wrap; }
 }
 </style>
