@@ -99,10 +99,12 @@ public class LibraryController {
 
     @Operation(summary = "更新分类")
     @PutMapping("/categories/{id}")
-    public Result<BookCategory> updateCategory(@PathVariable Long id, @RequestBody Map<String, String> body) {
+    public Result<BookCategory> updateCategory(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         SysUser user = securityHelper.currentUser();
         if (user == null) throw new BizException(ResultCode.UNAUTHORIZED);
-        return Result.success(libraryService.updateCategory(id, user.getFamilyId(), body.get("name")));
+        String name = (String) body.get("name");
+        Long parentId = body.get("parentId") != null ? Long.valueOf(body.get("parentId").toString()) : null;
+        return Result.success(libraryService.updateCategory(id, user.getFamilyId(), name, parentId));
     }
 
     @Operation(summary = "删除分类")

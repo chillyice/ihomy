@@ -21,16 +21,16 @@
         </el-form-item>
         <el-form-item :label="$t('blog.category')">
           <div class="category-row">
-            <el-select
+            <el-cascader
               v-model="form.category"
-              filterable
-              clearable
+              :options="categoryTree"
+              :props="{ expandTrigger: 'hover', checkStrictly: true, emitPath: false }"
               :placeholder="$t('blog.categoryPlaceholder')"
+              clearable
+              filterable
               style="flex: 1"
-            >
-              <el-option v-for="c in categories" :key="c" :label="c" :value="c" />
-            </el-select>
-            <el-button @click="showCategoryDialog = true">+ {{ $t('blog.newCategory') }}</el-button>
+            />
+            <el-button @click="openNewCatDialog">+ {{ $t('blog.newCategory') }}</el-button>
           </div>
         </el-form-item>
         <el-form-item :label="$t('blog.status')">
@@ -52,11 +52,25 @@
     </div>
 
     <!-- 新建分类对话框 -->
-    <el-dialog v-model="showCategoryDialog" :title="$t('blog.newCategory')" width="360px" append-to-body>
-      <el-input v-model="newCategoryName" :placeholder="$t('blog.categoryPlaceholder')" @keyup.enter="addCategory" />
+    <el-dialog v-model="showCategoryDialog" :title="$t('blog.newCategory')" width="380px" append-to-body>
+      <el-form label-position="top">
+        <el-form-item :label="$t('blog.parentCategory')">
+          <el-cascader
+            v-model="newCatParent"
+            :options="categoryTree"
+            :props="{ expandTrigger: 'hover', checkStrictly: true, emitPath: false }"
+            :placeholder="$t('blog.rootCategory')"
+            clearable
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item :label="$t('blog.categoryNamePlaceholder')">
+          <el-input v-model="newCatName" @keyup.enter="addCategory" />
+        </el-form-item>
+      </el-form>
       <template #footer>
         <el-button @click="showCategoryDialog = false">{{ $t('common.cancel') }}</el-button>
-        <el-button type="primary" :disabled="!newCategoryName.trim() || savingCategory" :loading="savingCategory" @click="addCategory">{{ $t('common.confirm') }}</el-button>
+        <el-button type="primary" :disabled="!newCatName.trim() || savingCategory" :loading="savingCategory" @click="addCategory">{{ $t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -80,28 +94,50 @@ const loading = ref(false)
 const form = reactive({ title: '', content: '', coverImage: '', category: '', status: 1, visibility: 3 })
 const categories = ref([])
 const showCategoryDialog = ref(false)
-const newCategoryName = ref('')
+const newCatName = ref('')
+const newCatParent = ref(null)
 const savingCategory = ref(false)
 
-// 拉取家庭已有分类,供 el-select 下拉
+// 扁平分类列表 → el-cascader 树形 options(value=path,checkStrictly 可选任意层级)
+const categoryTree = computed(() => {
+  const byParent = {}
+  for (const item of categories.value) {
+    const pid = item.parentId || 0
+    if (!byParent[pid]) byParent[pid] = []
+    byParent[pid].push(item)
+  }
+  const build = (parentId) => (byParent[parentId] || []).map(item => ({
+    value: item.path,
+    label: item.name,
+    children: item.childCount > 0 ? build(item.id) : undefined,
+  }))
+  return build(0)
+})
+
+const openNewCatDialog = () => {
+  newCatName.value = ''
+  newCatParent.value = null
+  showCategoryDialog.value = true
+}
+
+// 拉取家庭已有分类
 const loadCategories = async () => {
   try {
     categories.value = await blogApi.categories() || []
-  } catch (e) {
-    // 忽略
-  }
+  } catch (e) {}
 }
 
 // 新建分类:加入下拉列表并选中
 const addCategory = async () => {
-  const name = newCategoryName.value.trim()
+  const name = newCatName.value.trim()
   if (!name || savingCategory.value) return
   savingCategory.value = true
   try {
-    await blogApi.addCategory(name)
+    await blogApi.addCategory(name, newCatParent.value)
     categories.value = await blogApi.categories() || []
-    form.category = name
-    newCategoryName.value = ''
+    // 选中新建的分类:拼路径
+    const parent = categories.value.find(c => c.id === newCatParent.value)
+    form.category = parent ? parent.path + '/' + name : name
     showCategoryDialog.value = false
   } catch (e) {
     ElMessage.error(e.message || 'Failed')

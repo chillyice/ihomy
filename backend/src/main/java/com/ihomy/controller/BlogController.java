@@ -45,9 +45,9 @@ public class BlogController {
         return Result.success(blogService.page(current, size, familyId, userId, isOwner, keyword, category));
     }
 
-    @Operation(summary = "博客分类列表（家庭级）")
+    @Operation(summary = "博客分类列表（家庭级树形）")
     @GetMapping("/categories")
-    public Result<List<String>> categories() {
+    public Result<List<Map<String, Object>>> categories() {
         SysUser user = securityHelper.currentUser();
         Long familyId = user == null ? 1L : user.getFamilyId();
         return Result.success(blogService.categories(familyId));
@@ -65,28 +65,33 @@ public class BlogController {
 
     @Operation(summary = "新增分类")
     @PostMapping("/categories")
-    public Result<Void> addCategory(@RequestBody Map<String, String> body) {
+    public Result<Void> addCategory(@RequestBody Map<String, Object> body) {
         SysUser user = securityHelper.currentUser();
         if (user == null) throw new BizException(ResultCode.UNAUTHORIZED);
-        blogService.addCategory(user.getFamilyId(), body.get("name"));
+        String name = (String) body.get("name");
+        Long parentId = body.get("parentId") != null ? Long.valueOf(body.get("parentId").toString()) : null;
+        blogService.addCategory(user.getFamilyId(), name, parentId);
         return Result.success();
     }
 
-    @Operation(summary = "重命名分类")
+    @Operation(summary = "更新分类")
     @PutMapping("/categories")
-    public Result<Void> renameCategory(@RequestBody Map<String, String> body) {
+    public Result<Void> renameCategory(@RequestBody Map<String, Object> body) {
         SysUser user = securityHelper.currentUser();
         if (user == null) throw new BizException(ResultCode.UNAUTHORIZED);
-        blogService.renameCategory(user.getFamilyId(), body.get("oldName"), body.get("newName"));
+        Long categoryId = Long.valueOf(body.get("id").toString());
+        String newName = (String) body.get("name");
+        Long parentId = body.get("parentId") != null ? Long.valueOf(body.get("parentId").toString()) : null;
+        blogService.renameCategory(user.getFamilyId(), categoryId, newName, parentId);
         return Result.success();
     }
 
     @Operation(summary = "删除分类")
     @DeleteMapping("/categories")
-    public Result<Void> deleteCategory(@RequestParam String category, @RequestParam(defaultValue = "move") String mode) {
+    public Result<Void> deleteCategory(@RequestParam Long id, @RequestParam(defaultValue = "move") String mode) {
         SysUser user = securityHelper.currentUser();
         if (user == null) throw new BizException(ResultCode.UNAUTHORIZED);
-        blogService.deleteCategory(user.getFamilyId(), category, mode);
+        blogService.deleteCategory(user.getFamilyId(), id, mode);
         return Result.success();
     }
 

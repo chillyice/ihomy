@@ -141,6 +141,59 @@ a { color: var(--color-accent); text-decoration: none; }
   gap: 10px;
   margin-bottom: 16px;
 }
+/* ========== 页面统一工具栏 ========== */
+.page-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px !important;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.page-toolbar .tb-left { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.page-toolbar .tb-right { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+
+/* ========== 工具栏按钮(全局) ========== */
+.write-btn {
+  height: 32px; padding: 0 16px; border: none; border-radius: 10px;
+  background: #b88c6e; color: #fff; font-size: 13px; font-weight: 500;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  transition: background 0.2s, transform 0.2s;
+}
+.write-btn:hover { background: #a87c5e; transform: translateY(-1px); }
+html.dark .write-btn { background: #d4b298; color: #2a2018; }
+html.dark .write-btn:hover { background: #e0c2aa; }
+
+.ghost-btn {
+  height: 32px; padding: 0 12px; border: 1px solid var(--color-border, #e4ddd0);
+  background: transparent; border-radius: 10px; color: var(--color-text, #3A2E22);
+  font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+  transition: background 0.2s;
+}
+.ghost-btn:hover { background: rgba(184,140,110,0.06); }
+html.dark .ghost-btn:hover { background: rgba(255,255,255,0.06); }
+.ghost-btn.small { height: 28px; padding: 0 10px; font-size: 12px; }
+.ghost-btn.danger { color: #b04a3a; border-color: rgba(176,74,58,0.2); }
+html.dark .ghost-btn.danger { color: #c97474; }
+.ghost-btn.danger:hover { background: rgba(176,74,58,0.06); }
+html.dark .ghost-btn.danger:hover { background: rgba(201,116,116,0.08); }
+
+.danger-btn {
+  height: 32px; padding: 0 12px; border: none; border-radius: 10px;
+  background: rgba(249,236,234,0.95); color: #b04a3a; font-size: 13px;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+  transition: background 0.2s;
+}
+.danger-btn:hover { background: rgba(240,222,219,1); }
+html.dark .danger-btn { background: rgba(201,116,116,0.15); color: #c97474; }
+html.dark .danger-btn:hover { background: rgba(201,116,116,0.25); }
+
+.view-toggle { display: flex; gap: 2px; background: rgba(58,46,34,0.06); border-radius: 8px; padding: 2px; }
+html.dark .view-toggle { background: rgba(255,255,255,0.06); }
+.vt-btn { width: 28px; height: 28px; border: none; background: transparent; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--color-text-secondary); transition: background 0.2s, color 0.2s; }
+.vt-btn.active { background: rgba(255,255,255,0.8); color: var(--color-accent, #b88c6e); }
+html.dark .vt-btn.active { background: rgba(255,255,255,0.15); color: #d4b298; }
 .page h2 {
   font-size: 22px;
   font-weight: 700;
@@ -886,5 +939,8 @@ html.dark .el-badge__content {
 .el-button--large { border-radius: 12px !important; }
 .el-input__wrapper { border-radius: 10px !important; }
 .el-select .el-input__wrapper { border-radius: 10px !important; }
+.el-select__wrapper { border-radius: 10px !important; }
+.el-cascader .el-input__wrapper { border-radius: 10px !important; }
+.el-cascader .el-select__wrapper { border-radius: 10px !important; }
 .el-card { border-radius: 14px !important; }
 .el-dialog { border-radius: 14px !important; }

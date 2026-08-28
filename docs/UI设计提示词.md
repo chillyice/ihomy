@@ -60,8 +60,8 @@
 | BackToTop/InstallPrompt | 200 | 返回顶部/PWA 安装提示 | normal |
 | LibraryReader float-close | 210 | 电子书全屏模式浮动关闭按钮 | normal |
 | PhotoViewer | 201 | 全屏照片播放器(Teleport to body) | normal |
-| el-overlay/dialog/message-box | 3000 | 弹窗遮罩(覆盖导航栏) | normal |
-| ElMessage(Toast) | 3000 | 右上角提示消息 | normal |
+| el-overlay/dialog/message-box | 63 | 弹窗遮罩(低于光影层 65,高于 AppSidebar 60) | normal |
+| ElMessage(Toast) | 3000 | 右上角提示消息(EP 内置,不覆写) | normal |
 
 ## 1. 背景色块(bg-blobs)
 
@@ -475,12 +475,15 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 18. **创建新家庭**:`POST /family` 已登录用户创建新家庭组(绑定 OWNER+切换当前家庭);Settings 页入口。
 19. **天气特效**:雪(❄ 字符 12-28px)/雨(线性雨滴)粒子,数量=降水等级×10;多云闪烁(GSAP 4-8s 随机补间);weather-shadow 雨雪常显/多云随 cloudFlicker/晴不显示;weatherMultiplier 衰减光强(晴 1.0/多云 0.55/雨 0.25/雪 0.4)。
 20. **和风字体图标**:`<i class="qi-{iconCode}">`,iconCode 来自和风 API now.icon;npm 包 qweather-icons。
-21. **z-index 层级**:光影层(65-100)为除弹窗遮罩/Toast(3000)、PhotoViewer(201)、BackToTop/InstallPrompt(200)外的最高层;popper/dropdown=61(高于 sidebar=60,低于 bright-spot=65);MusicPlayer=62;任何新增组件 z-index 不得超 100(台灯 100 除外)。弹窗遮罩 `el-overlay` z-index:3000 覆盖导航栏 backdrop-filter。
-22. **书架页**(`/library`):与博客列表页设计风格统一。grid 布局(180px 分类侧栏 + 1fr 主区);左侧分类栏(毛玻璃+sticky+active 竖线)同博客;主区图书网格 `auto-fill minmax(160px, 1fr)`,卡片含封面(3:4 比例)+格式角标(右上半透明黑底白字)+书名(2 行截断)+作者+分类标签+浏览数;卡片 hover 上浮 `translateY(-4px)`+阴影;下拉菜单(编辑/复制链接/删除)hover 显示;移动端分类栏改水平滚动+网格 `minmax(130px, 1fr)`。
+21. **z-index 层级**:光影层(65-100)为最高层(台灯 100 除外);弹窗遮罩 `el-overlay`+`ElMessage`=63(低于光影层 65,高于 AppSidebar 60);Popper/dropdown/select=64(高于弹窗,低于光影层);PhotoViewer=201;BackToTop/InstallPrompt=200;MusicPlayer=62;任何新增组件 z-index 不得超 100(台灯 100 除外),弹窗遮罩和 Popper 例外(63/64)。
+22. **书架页**(`/library`):与博客列表页设计风格统一。顶部工具栏(`.page-toolbar.card`:搜索→分类级联→排序→格式筛选→状态筛选→上传主按钮+批量操作);图书网格 `auto-fill minmax(150px, 1fr)`,卡片含封面(3:4 比例)+格式角标(右上半透明黑底白字)+书名(2 行截断)+作者+浏览数;卡片 hover 上浮 `translateY(-4px)`+阴影;下拉菜单(编辑/复制链接/删除)hover 显示;分类选择/筛选用 `el-cascader`(`checkStrictly + emitPath: false`,支持多级树、`filterable` 搜索)。
 23. **书架详情页**(`/library/:id`):flex 布局(封面 140px+元信息区);封面 3:4 带阴影;元信息含书名(24px/700)、作者、格式标签(暖棕半透明)、分类标签、文件大小、标签、浏览数;操作按钮区(在线阅读/下载/阅读状态切换);简介区(section-label 标题);在线阅读器全屏覆盖(z-index:200)含顶栏(书名+翻页控件+关闭)+内容区(PDF iframe / EPUB epub.js / TXT 分页);移动端封面+元信息改垂直居中布局。
-24. **书架编辑页**(`/library/edit/:id?`):与博客编辑页设计风格统一。`.card` + `el-form label-position="top"`;文件上传(`el-input` readonly + `el-upload` append 按钮);封面上传同;表单含书名/作者/文件/封面/简介/分类(selectable+新建)/标签/可见范围;底部 `.form-footer` 右对齐保存按钮。
+24. **书架编辑页**(`/library/edit/:id?`):与博客编辑页设计风格统一。`.card` + `el-form label-position="top"`;文件上传(`el-input` readonly + `el-upload` append 按钮);封面上传同;表单含书名/作者/文件/封面/简介/分类(`el-cascader` 多选+新建分类弹窗支持选父级)/标签/可见范围;底部 `.form-footer` 右对齐保存按钮。
 25. **ElMessageBox 动画**:与 el-dialog 一致(`fade-in-linear` transition + `.el-overlay-message-box` scale(0.94)+opacity 淡入 0.25s);点击遮罩关闭(`closeOnClickModal: true`);所有 `ElMessageBox.confirm` 调用均加此参数。外观:圆角 14px+暖米底色+毛玻璃+暖棕按钮,同 el-dialog 规范。
 26. **日记编辑页**(`/diary/edit/:id?`):单张信纸自适应高度,按整页(18行×28px=504px)增长;`.page-break-bg` 层每 504px 一条深色实线标记分页;页眉日期/时间上下排列(`header-left` flex-column),日期与心情底端对齐、时间与天气底端对齐;心情/天气 picker overlay z-index:61(光影层 65 之下,编辑框之上)。
 27. **el-dialog append-to-body**(强制):所有 `el-dialog` 必须加 `append-to-body`,否则弹窗渲染在组件内部被 stacking context 困住,遮罩无法覆盖导航栏 backdrop-filter。
 28. **音乐页**(`/music`):上传方式合并为「上传音乐」下拉菜单(单曲/专辑文件夹/外链);新建歌单+多选按钮放在 `el-tabs__nav-scroll` 内部右侧(absolute 定位 `right:0; top:0`)。
-29. **博客列表页**(`/blog`):顶部工具栏(搜索→分类下拉[<1400px]→标签筛选→排序→筛选后计数→写博客主按钮);≥1400px 左侧常驻分类面板(220px,独立滚动,计数基于全量权限API `GET /blog/categories/counts`,不随筛选改变);<1400px 自动隐藏面板改工具栏分类下拉;分类支持子分类(`/` 分隔符,前端构建树,可展开/折叠);卡片三行布局(标题行→内容摘要行→分类+标签+元数据合并行);hover 浮现编辑/删除快捷按钮;草稿标记;分类弹窗支持父分类选择。
+29. **博客列表页**(`/blog`):顶部工具栏(`.page-toolbar.card`:搜索→分类级联[<1400px]→标签筛选(`filterable` 可输入搜索)→排序图标(↓NEW/↓MOST 无外框点击切换)→筛选后计数→写博客主按钮);≥1400px 左侧常驻分类面板(220px,独立滚动,计数基于全量权限API `GET /blog/categories/counts`,不随筛选改变);<1400px 自动隐藏面板改工具栏 `el-cascader`;分类树基于 `content_blog_category` 表 `parent_id` 自引用(后端返回扁平树 `{id,name,parentId,path,depth,childCount}`);卡片三行布局(标题行→内容摘要行→分类+标签+元数据合并行);hover 浮现编辑/删除快捷按钮;草稿标记;分类弹窗 `el-cascader` 选父级(编辑时排除当前及后代防环)。
+30. **全局工具栏规范**(`main.css`):`.page-toolbar` padding `10px 16px !important`(不被 `.card` 20px 覆盖);`.tb-left` 放搜索/筛选/排序,`.tb-right` 放操作按钮;工具栏按钮 `.write-btn`/`.ghost-btn`/`.danger-btn`/`.view-toggle`/`.vt-btn` 全局定义 height:32px,禁止 scoped 重复;所有列表页(Wish/Anniversary/Album/Cinema/Reminder/Task/Plan/Book/Kitchen/Member/DiaryList/Ingredient/Tree/Music/Points/Storage/Item/Library/Blog)统一用 `.page-toolbar.card`。
+31. **圆角统一规范**(`main.css`):`el-input__wrapper`/`el-select__wrapper`/`el-cascader .el-input__wrapper`/`el-cascader .el-select__wrapper` 全局 10px;`el-button` 12px(small 10px);`el-card`/`el-dialog` 14px。
+32. **分类级联规范**:博客+图书分类选择/筛选统一用 `el-cascader`(`checkStrictly + emitPath: false`,单选任意层级,`filterable` 可搜索);分类树基于 `parent_id` 自引用表;编辑时排除当前分类及其后代防环。

@@ -4,7 +4,7 @@
     <el-tabs v-model="tab">
       <!-- 房子 -->
       <el-tab-pane :label="$t('item.houses')" name="houses">
-        <div class="toolbar">
+        <div class="page-toolbar">
           <el-button type="primary" @click="openHouse()">{{ $t('item.addHouse') }}</el-button>
         </div>
         <el-table :data="houses" stripe>
@@ -21,7 +21,7 @@
 
       <!-- 房间 -->
       <el-tab-pane :label="$t('item.rooms')" name="rooms">
-        <div class="toolbar">
+        <div class="page-toolbar">
           <el-select v-model="roomHouseFilter" :placeholder="$t('item.allHouses')" clearable style="width: 200px"
                      @change="loadRooms">
             <el-option v-for="h in houses" :key="h.id" :label="h.name" :value="h.id" />
@@ -47,7 +47,7 @@
 
       <!-- 家具 -->
       <el-tab-pane :label="$t('item.furnitures')" name="furnitures">
-        <div class="toolbar">
+        <div class="page-toolbar">
           <el-select v-model="roomFilter" :placeholder="$t('item.allRooms')" clearable style="width: 200px"
                      @change="loadFurnitures">
             <el-option v-for="r in rooms" :key="r.id" :label="r.name" :value="r.id" />
@@ -71,7 +71,7 @@
 
       <!-- 物品:搜索 + 列表 + 新增/编辑 -->
       <el-tab-pane :label="$t('item.items')" name="items">
-        <div class="toolbar">
+        <div class="page-toolbar">
           <el-input v-model="keyword" :placeholder="$t('item.searchPh')" clearable style="width: 260px"
                     @keyup.enter="loadItems" @clear="loadItems">
             <template #append>
@@ -373,7 +373,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.toolbar { display: flex; gap: 12px; margin-bottom: 16px; }
 .item-card { margin-bottom: 12px; }
 .item-main { display: flex; align-items: center; gap: 8px; }
 .item-image-preview { width: 200px; height: 140px; object-fit: cover; border-radius: 8px; }
@@ -385,6 +384,5 @@ onMounted(() => {
 @media (max-width: 768px) {
   .item-image-preview { width: 100px; height: 70px; }
   .item-name { font-size: 14px; }
-  .toolbar { flex-wrap: wrap; }
 }
 </style>

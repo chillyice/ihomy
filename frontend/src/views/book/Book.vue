@@ -3,11 +3,13 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('book.title') }]" />
 
-    <div class="list-header">
-      <div class="left">
+    <div class="page-toolbar card">
+      <div class="tb-left">
         <el-date-picker v-model="month" type="month" value-format="YYYY-MM" @change="load" style="width: 140px" />
       </div>
-      <el-button type="primary" @click="openEditor()">{{ $t('book.add') }}</el-button>
+      <div class="tb-right">
+        <el-button type="primary" @click="openEditor()">{{ $t('book.add') }}</el-button>
+      </div>
     </div>
 
     <!-- 统计卡 -->

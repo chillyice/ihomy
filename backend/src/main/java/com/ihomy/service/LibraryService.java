@@ -109,10 +109,18 @@ public class LibraryService {
     }
 
     @Transactional
-    public BookCategory updateCategory(Long id, Long familyId, String name) {
+    public BookCategory updateCategory(Long id, Long familyId, String name, Long parentId) {
         BookCategory cat = categoryMapper.selectById(id);
         if (cat == null || !cat.getFamilyId().equals(familyId)) throw new BizException(ResultCode.NOT_FOUND);
         if (StringUtils.hasText(name)) cat.setName(name.trim());
+        if (parentId != null) {
+            if (parentId.equals(id)) throw new BizException(ResultCode.BAD_REQUEST);
+            BookCategory parent = categoryMapper.selectById(parentId);
+            if (parent == null || !parent.getFamilyId().equals(familyId)) throw new BizException(ResultCode.NOT_FOUND);
+            cat.setParentId(parentId);
+        } else {
+            cat.setParentId(0L);
+        }
         categoryMapper.updateById(cat);
         return cat;
     }

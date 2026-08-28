@@ -3,8 +3,10 @@
   <div class="page">
     <Breadcrumb :items="[{ label: t('anniversary.title') }]" />
 
-    <div class="list-header">
-      <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ t('anniversary.add') }}</el-button>
+    <div class="page-toolbar card">
+      <div class="tb-right">
+        <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ t('anniversary.add') }}</el-button>
+      </div>
     </div>
 
     <div v-loading="loading">
@@ -148,7 +150,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.list-header { display: flex; justify-content: flex-start; align-items: center; gap: 10px; margin-bottom: 16px; }
 .anni-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));

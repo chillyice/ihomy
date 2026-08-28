@@ -3,7 +3,7 @@
   <div class="storage-settings">
     <!-- 设备管理 -->
     <div class="card section">
-      <div class="list-header">
+      <div class="page-toolbar">
         <h3>{{ $t('storage.devices') }}</h3>
         <el-button v-if="userStore.isOwner" type="primary" plain @click="openDevice()">{{ $t('storage.addDevice') }}</el-button>
       </div>
@@ -34,7 +34,7 @@
 
     <!-- 文件浏览器 -->
     <div class="card section">
-      <div class="list-header">
+      <div class="page-toolbar">
         <h3>{{ $t('storage.files') }}</h3>
         <div v-if="browsing" class="browse-actions">
           <el-button size="small" :disabled="!activePath" @click="goParent">{{ $t('storage.backToParent') }}</el-button>
@@ -72,7 +72,7 @@
 
     <!-- 一键同步 -->
     <div class="card section">
-      <div class="list-header">
+      <div class="page-toolbar">
         <h3>{{ $t('storage.sync') }}</h3>
         <el-button v-if="userStore.isOwner" type="primary" :disabled="syncing" @click="startSync">{{ $t('storage.syncNow') }}</el-button>
       </div>
@@ -338,16 +338,7 @@ onBeforeUnmount(() => { if (syncTimer) clearInterval(syncTimer) })
   margin-bottom: 16px;
   padding: 16px;
 }
-.list-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-.list-header h3 {
-  margin: 0;
-  font-size: 16px;
-}
+
 .browse-actions {
   display: flex;
   align-items: center;

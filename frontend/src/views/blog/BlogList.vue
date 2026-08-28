@@ -3,7 +3,7 @@
     <Breadcrumb :items="[{ label: $t('blog.title') }]" />
 
     <!-- 顶部工具栏 -->
-    <div class="blog-toolbar card">
+    <div class="page-toolbar card">
       <div class="tb-left">
         <el-input
           v-model="searchKeyword"
@@ -19,37 +19,40 @@
           </template>
         </el-input>
 
-        <!-- 小屏分类下拉 -->
-        <el-select
-          v-if="!showSidePanel && (categoryTree.length || userStore.isLoggedIn)"
+        <!-- 小屏分类级联 -->
+        <el-cascader
+          v-if="!showSidePanel && (catCountRaw.length || userStore.isLoggedIn)"
           v-model="activeCategory"
+          :options="categoryCascaderOptions"
+          :props="{ expandTrigger: 'hover', checkStrictly: true, emitPath: false }"
           :placeholder="$t('blog.allCategories')"
           clearable
+          filterable
           size="small"
           style="width: 160px"
           @change="load"
-        >
-          <el-option :label="$t('blog.allCategories')" value="" />
-          <el-option v-for="c in flatCategories" :key="c" :label="c" :value="c" />
-        </el-select>
+        />
 
-        <!-- 标签筛选 -->
+        <!-- 标签筛选(可输入搜索) -->
         <el-select
           v-if="allTags.length"
           v-model="activeTag"
           :placeholder="$t('blog.tags')"
           clearable
+          filterable
           size="small"
           style="width: 140px"
         >
           <el-option v-for="t in allTags" :key="t" :label="'#' + t" :value="t" />
         </el-select>
 
-        <!-- 排序 -->
-        <el-select v-model="sortBy" size="small" style="width: 120px" @change="load">
-          <el-option :label="$t('blog.sortRecent')" value="recent" />
-          <el-option :label="$t('blog.sortViews')" value="views" />
-        </el-select>
+        <!-- 排序图标 -->
+        <el-tooltip :content="sortBy === 'recent' ? $t('blog.sortRecent') : $t('blog.sortViews')" placement="top">
+          <button class="sort-icon-btn" @click="toggleSort">
+            <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg>
+            <span class="sort-label">{{ sortBy === 'recent' ? 'NEW' : 'MOST' }}</span>
+          </button>
+        </el-tooltip>
 
         <!-- 筛选后计数 -->
         <span class="blog-stats">{{ filteredList.length }} {{ $t('blog.articlesUnit') }}</span>
@@ -68,7 +71,7 @@
 
     <div class="blog-layout" :class="{ 'no-side': !showSidePanel }">
       <!-- 大屏左侧分类面板 -->
-      <aside v-if="showSidePanel && (categoryTree.length || userStore.isLoggedIn)" class="category-side">
+      <aside v-if="showSidePanel && (catCountRaw.length || userStore.isLoggedIn)" class="category-side">
         <div class="side-head">
           <span class="side-title">{{ $t('blog.category') }}</span>
           <button v-if="userStore.isLoggedIn" class="side-add-btn" :title="$t('blog.newCategory')" @click="openCategoryDialog('add')">
@@ -82,23 +85,23 @@
           </div>
           <div
             v-for="node in flatTree"
-            :key="node.name"
+            :key="node.id"
             class="cat-item"
-            :class="{ active: activeCategory === node.name }"
+            :class="{ active: activeCategory === node.path }"
             :style="{ paddingLeft: (10 + node.depth * 16) + 'px' }"
-            @click="setCategory(node.name)"
+            @click="setCategory(node.path)"
           >
-            <span v-if="node.children.length" class="cat-toggle" @click.stop="toggleExpand(node.name)">
-              <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" :style="{ transform: expanded[node.name] ? 'rotate(90deg)' : '' }"><path d="M9 18l6-6-6-6"/></svg>
+            <span v-if="node.childCount > 0" class="cat-toggle" @click.stop="toggleExpand(node.path)">
+              <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" :style="{ transform: expanded[node.path] ? 'rotate(90deg)' : '' }"><path d="M9 18l6-6-6-6"/></svg>
             </span>
             <span v-else class="cat-toggle-placeholder"></span>
-            <span class="cat-name">{{ node.shortName }}</span>
-            <span class="cat-count">{{ node.depth === 0 ? (node.totalCount || 0) : node.count }}</span>
+            <span class="cat-name">{{ node.name }}</span>
+            <span class="cat-count">{{ countWithChildren(node) }}</span>
             <span v-if="userStore.isLoggedIn" class="cat-ops" @click.stop>
-              <button class="cat-op-btn" :title="$t('blog.editCategory')" @click="openCategoryDialog('edit', node.name)">
+              <button class="cat-op-btn" :title="$t('blog.editCategory')" @click="openCategoryDialog('edit', node)">
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
               </button>
-              <button class="cat-op-btn danger" :title="$t('blog.deleteCategory')" @click="openDeleteCategory(node.name)">
+              <button class="cat-op-btn danger" :title="$t('blog.deleteCategory')" @click="openDeleteCategory(node)">
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
               </button>
             </span>
@@ -155,10 +158,14 @@
     <el-dialog v-model="catDialog.visible" :title="catDialog.mode === 'add' ? $t('blog.newCategory') : $t('blog.editCategory')" width="360px" append-to-body>
       <el-form label-position="top">
         <el-form-item :label="$t('blog.parentCategory')">
-          <el-select v-model="catDialog.parent" :placeholder="$t('blog.rootCategory')" style="width: 100%">
-            <el-option :label="$t('blog.rootCategory')" value="" />
-            <el-option v-for="p in parentCategoryOptions" :key="p" :label="p" :value="p" />
-          </el-select>
+          <el-cascader
+            v-model="catDialog.parentId"
+            :options="parentCategoryTree"
+            :props="{ expandTrigger: 'hover', checkStrictly: true, emitPath: false }"
+            :placeholder="$t('blog.rootCategory')"
+            clearable
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item :label="$t('blog.categoryNamePlaceholder')">
           <el-input v-model="catDialog.name" @keyup.enter="saveCategory" />
@@ -172,7 +179,7 @@
 
     <!-- 删除分类弹窗 -->
     <el-dialog v-model="delCatDialog.visible" :title="$t('blog.deleteCategory')" width="380px" append-to-body>
-      <p class="del-cat-name">{{ delCatDialog.category }}</p>
+      <p class="del-cat-name">{{ delCatDialog.name }}</p>
       <p v-if="delCatDialog.blogCount > 0" class="del-cat-hint">{{ $t('blog.deleteCategoryHint') }}</p>
       <el-radio-group v-if="delCatDialog.blogCount > 0" v-model="delCatDialog.mode" class="del-cat-radios">
         <el-radio value="move">{{ $t('blog.moveToAll') }} ({{ delCatDialog.blogCount }})</el-radio>
@@ -243,81 +250,84 @@ const filteredList = computed(() => {
   return arr
 })
 
-// 从全量计数数据构建多级分类树
-const categoryTree = computed(() => {
-  const counts = {}
+// 后端返回扁平分类树(含 id/name/parentId/path/depth/childCount),前端直接用
+const totalCatCount = computed(() => catCountRaw.value.reduce((sum, item) => sum + Number(item.cnt || 0), 0))
+
+// 工具栏分类级联(value=path,checkStrictly 单选任意层级)
+const categoryCascaderOptions = computed(() => {
+  const byParent = {}
   for (const item of catCountRaw.value) {
-    counts[item.category] = (counts[item.category] || 0) + Number(item.cnt)
+    const pid = item.parentId || 0
+    if (!byParent[pid]) byParent[pid] = []
+    byParent[pid].push(item)
   }
-  const allCats = Object.keys(counts).sort()
+  const build = (parentId) => (byParent[parentId] || []).map(item => ({
+    value: item.path,
+    label: item.name,
+    children: item.childCount > 0 ? build(item.id) : undefined,
+  }))
+  return build(0)
+})
 
-  // 用路径分隔符 / 构建多级树
-  const root = { name: '', children: [], count: 0 }
-  const nodeMap = { '': root }
+const toggleSort = () => {
+  sortBy.value = sortBy.value === 'recent' ? 'views' : 'recent'
+  load()
+}
 
-  for (const cat of allCats) {
-    const parts = cat.split('/')
-    let path = ''
-    let parent = root
-    for (let i = 0; i < parts.length; i++) {
-      path = i === 0 ? parts[i] : path + '/' + parts[i]
-      if (!nodeMap[path]) {
-        const node = { name: path, shortName: parts[i], depth: i, children: [], count: 0 }
-        nodeMap[path] = node
-        parent.children.push(node)
+// 父分类级联树(el-cascader options 格式);编辑时排除当前分类及其后代(防环)
+const parentCategoryTree = computed(() => {
+  const excludeIds = new Set()
+  if (catDialog.mode === 'edit' && catDialog.id) {
+    excludeIds.add(catDialog.id)
+    const collectDescendants = (pid) => {
+      for (const item of catCountRaw.value) {
+        if (item.parentId === pid) { excludeIds.add(item.id); collectDescendants(item.id) }
       }
-      parent = nodeMap[path]
     }
-    nodeMap[cat].count = counts[cat]
+    collectDescendants(catDialog.id)
   }
-
-  // 向上累加 count
-  const sumCount = (node) => {
-    let sum = node.count
-    for (const child of node.children) sum += sumCount(child)
-    return sum
+  const byParent = {}
+  for (const item of catCountRaw.value) {
+    if (excludeIds.has(item.id)) continue
+    const pid = item.parentId || 0
+    if (!byParent[pid]) byParent[pid] = []
+    byParent[pid].push(item)
   }
-  for (const node of root.children) node.totalCount = sumCount(node)
-
-  return root.children
+  const build = (parentId) => (byParent[parentId] || []).map(item => ({
+    value: item.id,
+    label: item.name,
+    children: item.childCount > 0 ? build(item.id) : undefined,
+  }))
+  return build(0)
 })
 
-const flatCategories = computed(() => {
-  const arr = []
-  const walk = (nodes) => {
-    for (const n of nodes) { arr.push(n.name); walk(n.children) }
-  }
-  walk(categoryTree.value)
-  return arr
-})
-
-// 父分类下拉:所有已存在的分类(任意层级),用缩进展示层级
-const parentCategoryOptions = computed(() => {
-  const arr = []
-  const walk = (nodes, depth) => {
-    for (const n of nodes) {
-      arr.push({ label: '  '.repeat(depth) + n.shortName, value: n.name })
-      walk(n.children, depth + 1)
-    }
-  }
-  walk(categoryTree.value, 0)
-  return arr
-})
-
-// 扁平化分类树(带depth),用于侧边栏渲染;折叠的节点隐藏子级
+// 扁平化分类(含depth),用于侧边栏渲染;折叠的节点隐藏子级
 const flatTree = computed(() => {
   const arr = []
-  const walk = (nodes, depth) => {
-    for (const n of nodes) {
-      arr.push({ ...n, depth })
-      if (n.children.length && expanded.value[n.name]) walk(n.children, depth + 1)
+  const byParent = {}
+  for (const item of catCountRaw.value) {
+    const pid = item.parentId || 0
+    if (!byParent[pid]) byParent[pid] = []
+    byParent[pid].push(item)
+  }
+  const walk = (parentId, depth) => {
+    for (const item of (byParent[parentId] || [])) {
+      arr.push({ ...item, depth })
+      if (item.childCount > 0 && expanded.value[item.path]) walk(item.id, depth + 1)
     }
   }
-  walk(categoryTree.value, 0)
+  walk(0, 0)
   return arr
 })
 
-const totalCatCount = computed(() => catCountRaw.value.reduce((sum, item) => sum + Number(item.cnt), 0))
+// 累加子分类 count
+const countWithChildren = (item) => {
+  let sum = Number(item.cnt || 0)
+  for (const child of catCountRaw.value) {
+    if (child.parentId === item.id) sum += countWithChildren(child)
+  }
+  return sum
+}
 
 const load = async () => {
   loading.value = true
@@ -347,41 +357,41 @@ const filterByTag = (tg) => {
   activeTag.value = activeTag.value === tg ? '' : tg
 }
 
-const toggleExpand = (name) => {
-  expanded.value[name] = !expanded.value[name]
+const toggleExpand = (path) => {
+  expanded.value[path] = !expanded.value[path]
 }
 
-const catDialog = reactive({ visible: false, mode: 'add', oldName: '', name: '', parent: '', saving: false })
-const openCategoryDialog = (mode, name = '') => {
+const catDialog = reactive({ visible: false, mode: 'add', id: null, name: '', parentId: null, oldPath: '', saving: false })
+const openCategoryDialog = (mode, node = null) => {
   catDialog.mode = mode
-  if (mode === 'edit') {
-    const idx = name.lastIndexOf('/')
-    catDialog.oldName = name
-    catDialog.parent = idx > 0 ? name.slice(0, idx) : ''
-    catDialog.name = idx > 0 ? name.slice(idx + 1) : name
+  if (mode === 'edit' && node) {
+    catDialog.id = node.id
+    catDialog.name = node.name
+    catDialog.parentId = node.parentId
+    catDialog.oldPath = node.path
   } else {
-    catDialog.oldName = ''
-    catDialog.parent = ''
+    catDialog.id = null
     catDialog.name = ''
+    catDialog.parentId = null
+    catDialog.oldPath = ''
   }
   catDialog.visible = true
 }
 const saveCategory = async () => {
   const partName = catDialog.name.trim()
   if (!partName || catDialog.saving) return
-  const fullName = catDialog.parent ? catDialog.parent + '/' + partName : partName
   catDialog.saving = true
   try {
     if (catDialog.mode === 'add') {
-      await blogApi.addCategory(fullName)
+      await blogApi.addCategory(partName, catDialog.parentId)
     } else {
-      await blogApi.renameCategory(catDialog.oldName, fullName)
+      await blogApi.renameCategory(catDialog.id, partName, catDialog.parentId)
     }
     ElMessage.success(t('common.saveSuccess'))
     catDialog.visible = false
     await loadCategoryCounts()
-    if (catDialog.mode === 'edit' && activeCategory.value === catDialog.oldName) {
-      activeCategory.value = fullName
+    if (catDialog.mode === 'edit' && activeCategory.value === catDialog.oldPath) {
+      // 选中态保持,路径可能变了,loadCategoryCounts 后路径已更新
       load()
     }
   } catch (e) {
@@ -391,11 +401,12 @@ const saveCategory = async () => {
   }
 }
 
-const delCatDialog = reactive({ visible: false, category: '', blogCount: 0, mode: 'move', saving: false })
-const openDeleteCategory = async (category) => {
-  const count = catCountRaw.value.filter(item => item.category === category).reduce((sum, item) => sum + Number(item.cnt), 0)
-  delCatDialog.blogCount = count
-  delCatDialog.category = category
+const delCatDialog = reactive({ visible: false, id: null, name: '', path: '', blogCount: 0, mode: 'move', saving: false })
+const openDeleteCategory = async (node) => {
+  delCatDialog.id = node.id
+  delCatDialog.name = node.name
+  delCatDialog.path = node.path
+  delCatDialog.blogCount = countWithChildren(node)
   delCatDialog.mode = 'move'
   delCatDialog.visible = true
 }
@@ -403,10 +414,10 @@ const confirmDeleteCategory = async () => {
   if (delCatDialog.saving) return
   delCatDialog.saving = true
   try {
-    await blogApi.deleteCategory(delCatDialog.category, delCatDialog.mode)
+    await blogApi.deleteCategory(delCatDialog.id, delCatDialog.mode)
     ElMessage.success(t('common.deleted'))
     delCatDialog.visible = false
-    if (activeCategory.value === delCatDialog.category) activeCategory.value = ''
+    if (activeCategory.value === delCatDialog.path) activeCategory.value = ''
     await loadCategoryCounts()
     await load()
   } catch (e) {
@@ -435,19 +446,19 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* ========== 顶部工具栏 ========== */
-.blog-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-.tb-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.tb-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+/* ========== 工具栏(全局 .page-toolbar 补充) ========== */
 .blog-stats { font-size: 12px; color: var(--color-text-secondary); opacity: 0.7; white-space: nowrap; }
+
+.sort-icon-btn {
+  height: 24px; width: 56px;
+  border: none; background: transparent;
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 2px;
+  font-size: 11px; font-weight: 700; color: var(--color-text-secondary);
+  transition: color 0.2s;
+}
+.sort-icon-btn:hover { color: var(--color-accent, #b88c6e); }
+html.dark .sort-icon-btn:hover { color: #d4b298; }
+.sort-label { letter-spacing: 0.5px; }
 
 .cat-mgr-btn {
   width: 32px; height: 32px;
@@ -719,40 +730,19 @@ html.dark .action-btn.danger:hover { background: rgba(201,116,116,0.15); color: 
 /* 空状态 */
 .empty-state { padding: 48px 0; }
 
-/* 写博客主按钮 */
-.write-btn {
-  height: 34px;
-  padding: 0 16px;
-  border: none;
-  border-radius: 10px;
-  background: #b88c6e;
-  color: #fff;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: background 0.2s, transform 0.2s;
-}
-.write-btn:hover { background: #a87c5e; transform: translateY(-1px); }
-html.dark .write-btn { background: #d4b298; color: #2a2018; }
-html.dark .write-btn:hover { background: #e0c2aa; }
-
 /* 删除分类弹窗 */
 .del-cat-name { font-weight: 600; font-size: 15px; color: var(--color-primary); margin-bottom: 8px; }
 .del-cat-hint { font-size: 13px; color: var(--color-text-secondary); line-height: 1.5; }
 .del-cat-radios { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 
 @media (max-width: 768px) {
-  .blog-toolbar { padding: 8px 12px; gap: 8px; }
+  .page-toolbar { padding: 8px 12px; gap: 8px; }
   .tb-left { width: 100%; }
   .blog-cover { width: 90px; height: 64px; }
   .blog-actions { opacity: 1; }
   .blog-item { padding: 12px; }
   .blog-title { font-size: 15px; }
   .blog-meta { font-size: 12px; }
-  .write-btn { padding: 6px 12px; font-size: 13px; }
   .blog-footer { flex-direction: column; align-items: flex-start; gap: 4px; }
 }
 </style>

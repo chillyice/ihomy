@@ -23,7 +23,7 @@
 
     <el-tabs v-model="activeTab">
       <el-tab-pane :label="$t('points.title')" name="shop">
-        <div class="list-header">
+        <div class="page-toolbar">
           <el-button v-if="userStore.isOwner" type="primary" plain @click="openEditor()">{{ $t('points.publish') }}</el-button>
         </div>
         <div v-loading="loading">

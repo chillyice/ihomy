@@ -1,11 +1,13 @@
 <!-- 成员管理页:成员列表/角色调整/移出 + OWNER 专属的邀请码、入家申请审核、搜索加入新家庭 -->
 <template>
   <div class="page">
-    <Breadcrumb :items="[{ label: t('member.title') }]">
-      <template #right>
+    <Breadcrumb :items="[{ label: t('member.title') }]" />
+
+    <div class="page-toolbar card">
+      <div class="tb-right">
         <el-button type="primary" plain @click="openSearch">{{ t('member.joinFamily') }}</el-button>
-      </template>
-    </Breadcrumb>
+      </div>
+    </div>
 
     <div v-if="userStore.isOwner" class="card invite-card">
       <div class="invite-title">{{ t('member.inviteNew') }}</div>

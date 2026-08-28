@@ -77,7 +77,8 @@ app:
 
 logging:
   file:
-    name: ./logs/ihomy.log
+    # 基线为生产路径;开发环境通过 external.yml(IHOMY_CONFIG_PATH)覆盖为 Windows 路径
+    name: /opt/ihomy/logs/ihomy.log
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %X{traceId:-} %-5level %logger{36} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %X{traceId:-} %-5level %logger{36} - %msg%n"

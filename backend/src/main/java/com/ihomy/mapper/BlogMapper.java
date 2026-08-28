@@ -19,6 +19,8 @@ public interface BlogMapper extends BaseMapper<Blog> {
 
     int renameCategory(@Param("familyId") Long familyId, @Param("oldName") String oldName, @Param("newName") String newName);
 
+    int renameCategoryPrefix(@Param("familyId") Long familyId, @Param("oldPrefix") String oldPrefix, @Param("newPrefix") String newPrefix);
+
     int clearCategory(@Param("familyId") Long familyId, @Param("category") String category);
 
     int deleteByCategory(@Param("familyId") Long familyId, @Param("category") String category);

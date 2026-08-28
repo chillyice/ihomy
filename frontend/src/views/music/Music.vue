@@ -2,8 +2,8 @@
   <div class="page">
     <Breadcrumb :items="[{ label: '音乐' }]" />
 
-    <div class="list-header">
-      <div class="header-actions">
+    <div class="page-toolbar card">
+      <div class="tb-left">
         <el-dropdown v-if="userStore.isLoggedIn" trigger="click" @command="onUploadCmd">
           <el-button type="primary">上传音乐</el-button>
           <template #dropdown>
@@ -559,8 +559,7 @@ onMounted(() => { load(); loadPlaylists() })
 
 <style scoped>
 /* ========== 顶部按钮组 ========== */
-.list-header { display: flex; justify-content: flex-start; align-items: center; margin-bottom: 16px; }
-.header-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+
 .sec-btn {
   height: 34px !important;
   border-radius: 12px !important;
@@ -850,6 +849,5 @@ html.dark .card-check { background: rgba(30,42,72,0.85); }
 
 @media (max-width: 768px) {
   .music-grid, .album-grid, .playlist-grid { grid-template-columns: 1fr; }
-  .header-actions { flex-wrap: wrap; }
 }
 </style>

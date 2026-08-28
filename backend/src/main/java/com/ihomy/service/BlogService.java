@@ -52,81 +52,201 @@ public class BlogService {
         return blogMapper.selectPage(new Page<>(current, size), qw);
     }
 
-    /** 家庭级分类列表:从分类表拉取,按 name 排序(子分类自动排在父分类后面) */
-    public List<String> categories(Long familyId) {
+    /** 家庭级分类列表:返回树形结构(含 id/name/parentId/path) */
+    public List<Map<String, Object>> categories(Long familyId) {
         LambdaQueryWrapper<BlogCategory> qw = new LambdaQueryWrapper<>();
-        qw.eq(BlogCategory::getFamilyId, familyId).orderByAsc(BlogCategory::getName);
-        return blogCategoryMapper.selectList(qw).stream().map(BlogCategory::getName).toList();
+        qw.eq(BlogCategory::getFamilyId, familyId).orderByAsc(BlogCategory::getSortOrder).orderByAsc(BlogCategory::getName);
+        List<BlogCategory> all = blogCategoryMapper.selectList(qw);
+
+        Map<Long, String> pathMap = new HashMap<>();
+        Map<Long, List<BlogCategory>> childrenMap = new HashMap<>();
+        List<BlogCategory> roots = new ArrayList<>();
+        for (BlogCategory c : all) {
+            if (c.getParentId() == null) roots.add(c);
+            else childrenMap.computeIfAbsent(c.getParentId(), k -> new ArrayList<>()).add(c);
+        }
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        buildTree(roots, childrenMap, pathMap, "", 0, result);
+        return result;
+    }
+
+    private void buildTree(List<BlogCategory> nodes, Map<Long, List<BlogCategory>> childrenMap,
+                           Map<Long, String> pathMap, String parentPath, int depth, List<Map<String, Object>> result) {
+        for (BlogCategory c : nodes) {
+            String path = parentPath.isEmpty() ? c.getName() : parentPath + "/" + c.getName();
+            pathMap.put(c.getId(), path);
+            List<BlogCategory> children = childrenMap.getOrDefault(c.getId(), List.of());
+            Map<String, Object> node = new LinkedHashMap<>();
+            node.put("id", c.getId());
+            node.put("name", c.getName());
+            node.put("parentId", c.getParentId());
+            node.put("path", path);
+            node.put("depth", depth);
+            node.put("childCount", children.size());
+            result.add(node);
+            buildTree(children, childrenMap, pathMap, path, depth + 1, result);
+        }
     }
 
     /** 分类计数:分类表全量 + 博客表按权限统计,合并后返回(空分类count=0) */
     public List<Map<String, Object>> categoryCounts(Long familyId, Long authorId, boolean isOwner) {
-        // 1. 从分类表拿全量分类名
-        LambdaQueryWrapper<BlogCategory> cqw = new LambdaQueryWrapper<>();
-        cqw.eq(BlogCategory::getFamilyId, familyId).orderByAsc(BlogCategory::getName);
-        List<String> allCats = blogCategoryMapper.selectList(cqw).stream().map(BlogCategory::getName).toList();
+        // 1. 从分类表拿全量树(含path)
+        List<Map<String, Object>> tree = categories(familyId);
 
-        // 2. 从博客表按权限统计每个分类文章数
+        // 2. 从博客表按权限统计每个分类(按category字段=全路径)文章数
         List<Map<String, Object>> counts = blogMapper.selectCategoryCounts(familyId, authorId, isOwner);
         Map<String, Long> countMap = new HashMap<>();
         for (Map<String, Object> row : counts) {
             countMap.put((String) row.get("category"), ((Number) row.get("cnt")).longValue());
         }
 
-        // 3. 合并:分类表全量 + 博客表统计(博客表可能有分类表中不存在的旧分类)
+        // 3. 合并:分类表全量(按path匹配count) + 博客表可能有分类表中不存在的旧分类
         Set<String> seen = new HashSet<>();
         List<Map<String, Object>> result = new ArrayList<>();
-        for (String cat : allCats) {
-            result.add(Map.of("category", cat, "cnt", countMap.getOrDefault(cat, 0L)));
-            seen.add(cat);
+        for (Map<String, Object> node : tree) {
+            String path = (String) node.get("path");
+            Map<String, Object> row = new LinkedHashMap<>(node);
+            row.put("cnt", countMap.getOrDefault(path, 0L));
+            result.add(row);
+            seen.add(path);
         }
         for (Map<String, Object> row : counts) {
             String cat = (String) row.get("category");
-            if (!seen.contains(cat)) {
-                result.add(row);
-                seen.add(cat);
-            }
+            if (!seen.contains(cat)) { result.add(row); seen.add(cat); }
         }
         return result;
     }
 
-    /** 新增分类:持久化到分类表 */
-    public void addCategory(Long familyId, String name) {
+    /** 新增分类:持久化到分类表(parentId=NULL为顶级) */
+    public void addCategory(Long familyId, String name, Long parentId) {
         if (!StringUtils.hasText(name)) throw new BizException(ResultCode.BAD_REQUEST);
+        // 校验父分类存在
+        if (parentId != null) {
+            BlogCategory parent = blogCategoryMapper.selectById(parentId);
+            if (parent == null || !parent.getFamilyId().equals(familyId)) throw new BizException(ResultCode.NOT_FOUND);
+        }
+        // 校验同父下同名不存在
         LambdaQueryWrapper<BlogCategory> qw = new LambdaQueryWrapper<>();
-        qw.eq(BlogCategory::getFamilyId, familyId).eq(BlogCategory::getName, name);
+        qw.eq(BlogCategory::getFamilyId, familyId)
+          .eq(BlogCategory::getName, name)
+          .eq(parentId != null, BlogCategory::getParentId, parentId)
+          .isNull(parentId == null, BlogCategory::getParentId);
         if (blogCategoryMapper.selectCount(qw) > 0) throw new BizException(ResultCode.BAD_REQUEST);
         BlogCategory cat = new BlogCategory();
         cat.setName(name);
+        cat.setParentId(parentId);
         cat.setFamilyId(familyId);
         blogCategoryMapper.insert(cat);
     }
 
-    /** 重命名分类:更新分类表 + 批量更新博客表 */
-    public void renameCategory(Long familyId, String oldName, String newName) {
-        if (!StringUtils.hasText(oldName) || !StringUtils.hasText(newName)) throw new BizException(ResultCode.BAD_REQUEST);
-        LambdaQueryWrapper<BlogCategory> qw = new LambdaQueryWrapper<>();
-        qw.eq(BlogCategory::getFamilyId, familyId).eq(BlogCategory::getName, oldName);
-        BlogCategory cat = blogCategoryMapper.selectOne(qw);
-        if (cat == null) throw new BizException(ResultCode.NOT_FOUND);
-        LambdaQueryWrapper<BlogCategory> eqw = new LambdaQueryWrapper<>();
-        eqw.eq(BlogCategory::getFamilyId, familyId).eq(BlogCategory::getName, newName);
-        if (blogCategoryMapper.selectCount(eqw) > 0 && !oldName.equals(newName)) throw new BizException(ResultCode.BAD_REQUEST);
+    /** 更新分类:可改名+改父级,级联更新博客表全路径(含子分类) */
+    public void renameCategory(Long familyId, Long categoryId, String newName, Long newParentId) {
+        if (!StringUtils.hasText(newName)) throw new BizException(ResultCode.BAD_REQUEST);
+        BlogCategory cat = blogCategoryMapper.selectById(categoryId);
+        if (cat == null || !cat.getFamilyId().equals(familyId)) throw new BizException(ResultCode.NOT_FOUND);
+
+        // 校验新父级存在且不是自己/自己的后代(防环)
+        if (newParentId != null) {
+            if (newParentId.equals(categoryId)) throw new BizException(ResultCode.BAD_REQUEST);
+            BlogCategory parent = blogCategoryMapper.selectById(newParentId);
+            if (parent == null || !parent.getFamilyId().equals(familyId)) throw new BizException(ResultCode.NOT_FOUND);
+            // 检查新父级不是当前分类的后代
+            List<Map<String, Object>> tree = categories(familyId);
+            List<Long> descendants = new ArrayList<>();
+            collectChildIds(tree, categoryId, descendants);
+            if (descendants.contains(newParentId)) throw new BizException(ResultCode.BAD_REQUEST);
+        }
+
+        // 计算旧全路径
+        List<Map<String, Object>> tree = categories(familyId);
+        String oldPath = null;
+        for (Map<String, Object> node : tree) {
+            if (categoryId.equals(node.get("id"))) { oldPath = (String) node.get("path"); break; }
+        }
+        if (oldPath == null) throw new BizException(ResultCode.NOT_FOUND);
+
+        // 计算新全路径
+        String newParentPath = "";
+        if (newParentId != null) {
+            for (Map<String, Object> node : tree) {
+                if (newParentId.equals(node.get("id"))) { newParentPath = (String) node.get("path"); break; }
+            }
+        }
+        String newPath = newParentPath.isEmpty() ? newName : newParentPath + "/" + newName;
+
+        // 更新分类表
         cat.setName(newName);
+        cat.setParentId(newParentId);
         blogCategoryMapper.updateById(cat);
-        blogMapper.renameCategory(familyId, oldName, newName);
+
+        // 更新博客表:该分类及其子分类的全路径(旧前缀→新前缀)
+        renameBlogCategoryPaths(familyId, oldPath, newPath);
+        renameChildPaths(familyId, categoryId, oldPath, newPath, tree);
     }
 
-    /** 删除分类:删分类表记录 + 按mode处理博客表(mode=move清空分类,mode=delete删博客) */
-    public void deleteCategory(Long familyId, String category, String mode) {
-        if (!StringUtils.hasText(category)) throw new BizException(ResultCode.BAD_REQUEST);
-        LambdaQueryWrapper<BlogCategory> qw = new LambdaQueryWrapper<>();
-        qw.eq(BlogCategory::getFamilyId, familyId).eq(BlogCategory::getName, category);
-        blogCategoryMapper.delete(qw);
-        if ("delete".equals(mode)) {
-            blogMapper.deleteByCategory(familyId, category);
-        } else {
-            blogMapper.clearCategory(familyId, category);
+    private void renameChildPaths(Long familyId, Long parentId, String oldPrefix, String newPrefix, List<Map<String, Object>> tree) {
+        for (Map<String, Object> node : tree) {
+            if (parentId.equals(node.get("parentId"))) {
+                String oldChildPath = (String) node.get("path");
+                String newChildPath = newPrefix + oldChildPath.substring(oldPrefix.length());
+                renameBlogCategoryPaths(familyId, oldChildPath, newChildPath);
+                renameChildPaths(familyId, (Long) node.get("id"), oldChildPath, newChildPath, tree);
+            }
+        }
+    }
+
+    private void renameBlogCategoryPaths(Long familyId, String oldPath, String newPath) {
+        // 精确匹配
+        blogMapper.renameCategory(familyId, oldPath, newPath);
+        // 前缀匹配(子分类的博客: oldPath/xxx → newPath/xxx)
+        blogMapper.renameCategoryPrefix(familyId, oldPath + "/", newPath + "/");
+    }
+
+    /** 删除分类:删分类表记录(含子分类) + 按mode处理博客表 */
+    public void deleteCategory(Long familyId, Long categoryId, String mode) {
+        BlogCategory cat = blogCategoryMapper.selectById(categoryId);
+        if (cat == null || !cat.getFamilyId().equals(familyId)) throw new BizException(ResultCode.NOT_FOUND);
+
+        // 收集该分类及所有子分类的全路径
+        List<Map<String, Object>> tree = categories(familyId);
+        List<String> pathsToDelete = new ArrayList<>();
+        String targetPath = null;
+        collectChildPaths(tree, categoryId, categoryId, null, pathsToDelete);
+        for (Map<String, Object> node : tree) {
+            if (categoryId.equals(node.get("id"))) { targetPath = (String) node.get("path"); break; }
+        }
+        if (targetPath != null) pathsToDelete.add(targetPath);
+
+        // 删分类表(本分类+子分类)
+        List<Long> idsToDelete = new ArrayList<>();
+        idsToDelete.add(categoryId);
+        collectChildIds(tree, categoryId, idsToDelete);
+        blogCategoryMapper.deleteBatchIds(idsToDelete);
+
+        // 处理博客表
+        for (String path : pathsToDelete) {
+            if ("delete".equals(mode)) blogMapper.deleteByCategory(familyId, path);
+            else blogMapper.clearCategory(familyId, path);
+        }
+    }
+
+    private void collectChildPaths(List<Map<String, Object>> tree, Long parentId, Long excludeId,
+                                   String parentPath, List<String> paths) {
+        for (Map<String, Object> node : tree) {
+            if (parentId.equals(node.get("parentId")) && !excludeId.equals(node.get("id"))) {
+                paths.add((String) node.get("path"));
+                collectChildPaths(tree, (Long) node.get("id"), excludeId, (String) node.get("path"), paths);
+            }
+        }
+    }
+
+    private void collectChildIds(List<Map<String, Object>> tree, Long parentId, List<Long> ids) {
+        for (Map<String, Object> node : tree) {
+            if (parentId.equals(node.get("parentId"))) {
+                ids.add((Long) node.get("id"));
+                collectChildIds(tree, (Long) node.get("id"), ids);
+            }
         }
     }
 
