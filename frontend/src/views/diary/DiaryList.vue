@@ -1,4 +1,4 @@
-<!-- 日记本页:模仿博客列表风格,卡片式布局,hover操作菜单,显示作者 -->
+<!-- 日记本书架:每位成员一本日记本(封面网格),点击进入翻书视图 -->
 <template>
   <div class="page">
     <Breadcrumb :items="[{ label: $t('diary.title') }]" />
@@ -12,36 +12,26 @@
       </div>
     </div>
 
-    <div v-loading="loading" class="diary-main">
-      <div v-for="d in list" :key="d.id" class="diary-item card">
-        <div class="diary-header">
-          <span class="diary-date">{{ formatDate(d.createdAt) }}</span>
-          <span v-if="d.mood" class="diary-icon">{{ d.mood }}</span>
-          <span v-if="d.weather" class="diary-icon">{{ d.weather }}</span>
-          <span v-if="d.visibility === 'PRIVATE'" class="diary-tag private-tag">{{ $t('diary.onlySelf') }}</span>
-          <span v-else-if="d.visibility === 'PUBLIC'" class="diary-tag public-tag">{{ $t('diary.publicVisible') }}</span>
-        </div>
-        <div class="diary-content">{{ d.content }}</div>
-        <div class="diary-footer">
-          <span class="diary-author">{{ $t('diary.author') }}: {{ d.authorName || d.authorId || '-' }}</span>
-          <div v-if="userStore.isLoggedIn && canEdit(d)" class="diary-more">
-            <el-dropdown trigger="click" placement="bottom-end" @command="cmd => onCommand(cmd, d)">
-              <button class="icon-btn">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
-              </button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="edit">{{ $t('common.edit') }}</el-dropdown-item>
-                  <el-dropdown-item divided command="delete" class="danger-item">{{ $t('common.delete') }}</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
+    <div v-loading="loading" class="shelf-main">
+      <div class="shelf">
+        <div v-for="b in books" :key="b.authorId" class="notebook" @click="router.push(`/diary/book/${b.authorId}`)">
+          <div class="nb-cover">
+            <div class="nb-spine"></div>
+            <div class="nb-label">
+              <div class="nb-name" :title="b.authorName">{{ b.authorName || '-' }}</div>
+              <div class="nb-count">{{ $t('diary.entryCount', { n: b.count }) }}</div>
+              <div class="nb-latest">
+                <div v-if="b.count > 1">{{ $t('diary.startDate', { date: fmtShort(b.earliest) }) }}</div>
+                <div>{{ b.count > 1 ? $t('diary.endDate', { date: fmtShort(b.latest) }) : fmtShort(b.latest) }}</div>
+              </div>
+            </div>
+            <div class="nb-band"></div>
           </div>
         </div>
       </div>
 
-      <div v-if="!loading && !list.length" class="empty-state">
-        <el-empty :description="userStore.isGuest ? $t('diary.noData') : $t('diary.noData')">
+      <div v-if="!loading && !books.length" class="empty-state">
+        <el-empty :description="$t('diary.noData')">
           <button v-if="userStore.isLoggedIn" class="write-btn" @click="router.push('/diary/edit')">{{ $t('diary.emptyWriteBtn') }}</button>
         </el-empty>
       </div>
@@ -55,40 +45,35 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { diaryApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 
 const { t } = useI18n()
 const router = useRouter()
 const userStore = useUserStore()
-const list = ref([])
+const books = ref([])
 const loading = ref(false)
 
-const formatDate = (d) => (d ? new Date(d).toLocaleString('zh-CN') : '')
-const canEdit = (d) => userStore.isOwner || d.authorId === userStore.userInfo?.id
+const fmtShort = (s) => String(s || '').slice(0, 10)
 
 const load = async () => {
   loading.value = true
   try {
-    const data = await diaryApi.list({ current: 1, size: 50 })
-    list.value = data.records || []
+    // ponytail: 一次拉 200 条客户端按作者分组;单作者超 200 篇再改服务端按作者分页
+    const data = await diaryApi.list({ current: 1, size: 200 })
+    const records = data.records || []
+    const map = new Map()
+    for (const d of records) {
+      const key = d.authorId ?? 0
+      if (!map.has(key)) map.set(key, { authorId: d.authorId, authorName: d.authorName, count: 0, latest: '', earliest: '' })
+      const b = map.get(key)
+      b.count++
+      const day = fmtShort(d.createdAt)
+      if (!b.latest || day > b.latest) b.latest = day
+      if (!b.earliest || day < b.earliest) b.earliest = day
+    }
+    books.value = [...map.values()].sort((a, b) => (a.latest < b.latest ? 1 : -1))
   } finally {
     loading.value = false
-  }
-}
-
-const onCommand = async (cmd, d) => {
-  if (cmd === 'edit') {
-    router.push(`/diary/edit/${d.id}`)
-  } else if (cmd === 'delete') {
-    try {
-      await ElMessageBox.confirm(t('diary.deleteConfirm'), { type: 'warning', confirmButtonText: t('common.delete'), cancelButtonText: t('common.cancel'), closeOnClickModal: true })
-      await diaryApi.remove(d.id)
-      ElMessage.success(t('common.deleted'))
-      await load()
-    } catch (e) {
-      if (e !== 'cancel') ElMessage.error(e.message || 'Failed')
-    }
   }
 }
 
@@ -96,89 +81,100 @@ onMounted(load)
 </script>
 
 <style scoped>
-.diary-main { min-width: 0; }
+.shelf-main { min-width: 0; }
 
-.diary-item {
-  margin-bottom: 14px;
-  padding: 18px 20px;
-  border-radius: 14px;
-  position: relative;
+.shelf {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 26px 22px;
+  padding: 6px 2px 20px;
+}
+
+.notebook { aspect-ratio: 3 / 4; cursor: pointer; position: relative; }
+
+.nb-cover {
+  position: absolute; inset: 0;
+  border-radius: 5px 12px 12px 5px;
+  background: linear-gradient(155deg, #A8845C 0%, #8B6F47 45%, #6B5435 100%);
+  box-shadow:
+    0 2px 4px rgba(58,46,34,0.18),
+    0 10px 26px rgba(58,46,34,0.2),
+    inset -5px 0 8px rgba(0,0,0,0.18),
+    inset 0 1px 0 rgba(255,248,235,0.22);
+  overflow: hidden;
   transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
-.diary-item:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 28px rgba(58,46,34,0.12);
+.nb-cover::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(115deg, transparent 0 7px, rgba(255,255,255,0.025) 7px 8px);
+  pointer-events: none;
 }
-html.dark .diary-item:hover { box-shadow: 0 8px 28px rgba(0,0,0,0.3); }
+.notebook:hover .nb-cover {
+  transform: translateY(-6px);
+  box-shadow:
+    0 4px 8px rgba(58,46,34,0.2),
+    0 18px 40px rgba(58,46,34,0.28),
+    inset -5px 0 8px rgba(0,0,0,0.18),
+    inset 0 1px 0 rgba(255,248,235,0.22);
+}
 
-.diary-header { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
-.diary-date { font-size: 13px; color: var(--color-text-secondary); font-weight: 500; }
+.nb-spine {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 16px;
+  background: linear-gradient(to right, rgba(0,0,0,0.32), rgba(0,0,0,0.08) 60%, rgba(255,248,235,0.12));
+  box-shadow: 1px 0 2px rgba(0,0,0,0.2);
+}
 
-.diary-tag {
-  padding: 2px 8px;
-  border-radius: 8px;
-  font-size: 12px;
-  line-height: 1.4;
-  border: 1px solid transparent;
+.nb-band {
+  position: absolute; right: 12px; top: 0; bottom: 8%; width: 5px;
+  background: linear-gradient(to bottom, rgba(168,72,58,0.75), rgba(122,50,40,0.75));
+  border-radius: 0 0 3px 3px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
 }
-.diary-icon {
-  font-size: 18px;
-  line-height: 1;
-}
-.private-tag {
-  background: rgba(58,46,34,0.06);
-  border-color: rgba(58,46,34,0.1);
-  color: var(--color-text-secondary);
-}
-.public-tag {
-  background: rgba(107,155,107,0.1);
-  border-color: rgba(107,155,107,0.15);
-  color: #6b9b6b;
-}
-html.dark .private-tag { background: rgba(255,255,255,0.06); color: rgba(232,220,200,0.5); }
-html.dark .public-tag { background: rgba(125,186,125,0.12); color: #7dba7d; }
 
-.diary-content { white-space: pre-wrap; line-height: 1.7; color: var(--color-text); }
-
-.diary-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 12px;
-  padding-top: 8px;
-  border-top: 1px solid var(--color-border);
+.nb-label {
+  position: absolute; left: 13%; right: 14%; top: 16%;
+  background: rgba(255,253,248,0.94);
+  border-radius: 4px;
+  padding: 14px 12px 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.22);
+  transform: rotate(-1.2deg);
+  transition: transform 0.25s ease;
 }
-.diary-author { font-size: 12px; color: var(--color-text-secondary); opacity: 0.7; }
-.diary-more { opacity: 0; transition: opacity 0.2s; }
-.diary-item:hover .diary-more { opacity: 1; }
-
-.icon-btn {
-  width: 28px; height: 28px;
-  border: none; background: transparent;
-  border-radius: 8px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  color: var(--color-text-secondary);
-  transition: background 0.2s, color 0.2s;
+.nb-label::after {
+  content: '';
+  position: absolute; inset: 4px;
+  border: 1px dashed rgba(58,46,34,0.22);
+  border-radius: 3px;
+  pointer-events: none;
 }
-.icon-btn:hover { background: rgba(184,140,110,0.1); color: var(--color-accent, #b88c6e); }
-html.dark .icon-btn:hover { background: rgba(212,178,152,0.1); color: #d4b298; }
+.notebook:hover .nb-label { transform: rotate(0deg); }
+
+.nb-name {
+  font-size: 16px; font-weight: 600; color: #3A2E22;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.nb-count { font-size: 12px; color: #6b5c4a; margin-top: 6px; }
+.nb-latest { margin-top: 4px; font-variant-numeric: tabular-nums; }
+.nb-latest div { font-size: 11px; color: #8a7a64; line-height: 1.5; }
+
+html.dark .nb-cover {
+  background: linear-gradient(155deg, #5A4630 0%, #463622 45%, #322616 100%);
+  box-shadow:
+    0 2px 4px rgba(0,0,0,0.3),
+    0 10px 26px rgba(0,0,0,0.4),
+    inset -5px 0 8px rgba(0,0,0,0.3),
+    inset 0 1px 0 rgba(232,220,200,0.08);
+}
+html.dark .nb-label { background: rgba(30,42,72,0.92); box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+html.dark .nb-label::after { border-color: rgba(232,220,200,0.2); }
+html.dark .nb-name { color: #E8DCC8; }
+html.dark .nb-count { color: rgba(232,220,200,0.6); }
+html.dark .nb-latest { color: rgba(232,220,200,0.45); }
 
 .empty-state { padding: 48px 0; }
 
-:deep(.danger-item) { color: #b04a3a !important; }
-:deep(.danger-item:hover) { background: rgba(176,74,58,0.08) !important; color: #b04a3a !important; }
-html.dark :deep(.danger-item) { color: #c97474 !important; }
-html.dark :deep(.danger-item:hover) { background: rgba(201,116,116,0.12) !important; color: #c97474 !important; }
-
-:deep(.el-dropdown-menu__item:hover) { background: rgba(184,140,110,0.06) !important; }
-html.dark :deep(.el-dropdown-menu__item:hover) { background: rgba(212,178,152,0.08) !important; }
-html.dark :deep(.el-dropdown-menu) { background: rgba(30,42,72,0.95) !important; border-color: rgba(255,255,255,0.1) !important; }
-html.dark :deep(.el-dropdown-menu__item) { color: rgba(232,220,200,0.85) !important; }
-html.dark :deep(.el-dropdown-menu__item:hover) { color: #E8DCC8 !important; }
-
 @media (max-width: 768px) {
-  .diary-more { opacity: 1; }
-  .diary-card { padding: 12px; }
-  .diary-images img { width: calc(33.33% - 4px); }
+  .shelf { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 18px 14px; }
 }
 </style>

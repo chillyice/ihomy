@@ -312,6 +312,17 @@ html.dark .ghost-btn {
 html.dark .ghost-btn:hover {
   background: rgba(255,255,255,0.08) !important;
 }
+.ghost-btn:disabled, .ghost-btn:disabled:hover {
+  background: transparent !important;
+  color: #c4b8a8 !important;
+  border-color: #e4ddd0 !important;
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+html.dark .ghost-btn:disabled, html.dark .ghost-btn:disabled:hover {
+  color: rgba(232,220,200,0.3) !important;
+  border-color: rgba(255,255,255,0.1) !important;
+}
 
 /* 危险按钮(type=danger):浅红底暗红字 */
 .el-button--danger {

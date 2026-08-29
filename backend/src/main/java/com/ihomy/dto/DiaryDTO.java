@@ -9,5 +9,6 @@ public class DiaryDTO {
     private String weather;
     private Integer visibility;
     private String images;
+    private String doodle;
     private String date;
 }
