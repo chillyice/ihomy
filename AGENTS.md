@@ -211,7 +211,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 模块 | Controller | Service | 关键表 | 要点 |
 |------|-----------|---------|--------|------|
 | 文件上传 | FileController | FileService | 磁盘 | 分类目录:pictures/{相册名}/、videos/、music/、files/{yyyyMM}/;`upload(bytes,name,type,albumId,albumName)`;`deleteByUrl(url)` 按 /files/ URL 解析物理路径删文件(`normalize()+startsWith` 防越界);DB 存 `/files/...` 完整 URL |
-| 存储管理 | StorageController | StorageService/StorageSyncRunner | sys_storage_device/sys_baidu_credential | 家庭级设备(SYSTEM/NAS/REMOTE/MOUNT/BAIDU,BAIDU 走 API 跳过本地目录校验、rootPath 恒为 '/');文件浏览器 `GET /storage/browse?deviceId&path`;一键同步 `POST /storage/sync`(@Async 独立 bean,按顶层目录建相册,content_photo.source_path 去重);`@RequirePermission("storage:manage")`;百度网盘四件套凭证(AppID/AppKey 明文+SecretKey/SignKey/access_token/refresh_token ENC 加密,GET 只回 `secretKeySet/signKeySet/authorized` 不回明文,PUT 留空保留原值,`@OperationLog saveArgs=false` 防密钥落日志;OAuth 授权码模式:`GET /storage/baidu/auth/url` 生成授权链接[state 绑定家庭 10 分钟]+ `POST /storage/baidu/auth/callback` 换 token,回调页 `/storage/baidu/callback` 须与开放平台注册一致) |
+| 存储管理 | StorageController | StorageService/StorageSyncRunner | sys_storage_device/sys_baidu_credential | 家庭级设备(SYSTEM/NAS/REMOTE/MOUNT/BAIDU,BAIDU 走 API 跳过本地目录校验、rootPath 恒为 '/',浏览/预览/下载走 xpan+dlink 适配器,暂不支持一键同步);文件浏览器 `GET /storage/browse?deviceId&path`;一键同步 `POST /storage/sync`(@Async 独立 bean,按顶层目录建相册,content_photo.source_path 去重);`@RequirePermission("storage:manage")`;百度网盘四件套凭证(AppID/AppKey 明文+SecretKey/SignKey/access_token/refresh_token ENC 加密,GET 只回 `secretKeySet/signKeySet/authorized` 不回明文,PUT 留空保留原值,`@OperationLog saveArgs=false` 防密钥落日志;OAuth 授权码模式:`GET /storage/baidu/auth/url` 生成授权链接[state 绑定家庭 10 分钟]+ `POST /storage/baidu/auth/callback` 换 token,回调页 `/storage/baidu/callback` 须与开放平台注册一致) |
 | 首页聚合 | HomeController + PublicController | HomeModuleService/HomeStatsService/ActivityFeedService | sys_home_module | `GET /public/home?hid=&home_id=` 返回 {family/modules/photos/stats};`GET /public/feed` 动态流;模块化(sys_home_module 插入即扩展) |
 | 运维 | OpsController | OpsService | sys_operation_log/sys_weather_log | OPS 角色专属;资源统计/服务器状态/操作日志检索/和风天气 API 用量;不返回用户隐私 |
 | 每日内容 | DailyController | — | — | 每日一图(代理 Bing)+每日知识(4 类×5 条);`GET /public/daily-knowledge?types=` |
@@ -710,7 +710,7 @@ INSERT INTO sys_dict_item ... book_format/borrow_status;
 | `views/storage/BaiduCallback.vue` + `router/index.js` | 新建 OAuth 回调页 `/storage/baidu/callback`(public):百度授权后带 `?code=&state=` 重定向至此,调 `baiduAuthCallback` 换 token,成功/失败展示后跳回 `/settings?tab=storage`;百度侧失败(error/error_description)与登录过期分别处理 |
 | `api/index.js` + `i18n` | `storageApi.baiduCredential/saveBaiduCredential/baiduAuthUrl/baiduAuthCallback` + `storage.baidu.*` 中英文案(含回调页文案) |
 
-**百度网盘接入边界**:已完成凭证存储(四件套)+ OAuth 授权码模式授权(state 防伪 → 换 token → ENC 加密存储)。**尚未做**:token 自动刷新(refresh_token 续期,待适配器调用失败时触发)、REMOTE 设备适配器(文件列表/下载 dlink/上传/一键同步,dlink 下载须服务器中转落盘)、SignKey 回调签名校验。授权回调页地址 = `{前端origin}/storage/baidu/callback`,须与百度开放平台应用注册的「授权回调页地址」完全一致(生产 https://ihomy.top/storage/baidu/callback)。
+**百度网盘接入边界**:已完成凭证存储(四件套)+ OAuth 授权码模式授权(state 防伪 → 换 token → ENC 加密存储)+ **文件适配器**(浏览走 xpan `file?method=list`、预览/下载走 filemetas→dlink 服务器中转流式返回[UA 必须 `pan.baidu.com`,手动跟随 302 重放 UA]、token 过期/失效 errno 111/-6 自动 refresh_token 续期[距过期<5min 主动刷新,新 refresh_token 必须落库])。**尚未做**:一键同步(BAIDU 设备调用 sync 返回明确提示,逐文件 dlink 下载落盘量大耗时待后续)、SignKey 回调签名校验。授权回调页地址 = `{前端origin}/storage/baidu/callback`,须与百度开放平台应用注册的「授权回调页地址」完全一致(生产 https://ihomy.top/storage/baidu/callback)。
 
 
 ## 文件存储策略
