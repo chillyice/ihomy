@@ -151,6 +151,7 @@ public class StorageService {
     }
 
     public List<Map<String, Object>> browse(StorageDevice device, String path) {
+        if ("BAIDU".equals(device.getDeviceType())) return baiduBrowse(device, path);
         Path root = deviceRoot(device);
         Path dir = resolveSafe(root, path);
         if (!Files.isDirectory(dir)) {
@@ -194,9 +195,16 @@ public class StorageService {
         return resolveSafe(deviceRoot(device), path).getFileName().toString();
     }
 
+    /** 百度网盘文件流(dlink 服务器中转,不落盘不缓冲) */
+    public record BaiduFileStream(InputStream in, long length) {}
+
     /* ---------- 一键同步 ---------- */
 
     public Long startSync(StorageDevice device, boolean includeEmpty, SysUser user) {
+        if ("BAIDU".equals(device.getDeviceType())) {
+            // ponytail: BAIDU 同步需逐文件 dlink 下载落盘,量大耗时,待后续版本实现
+            throw new BizException(ResultCode.BAD_REQUEST, "百度网盘设备暂不支持一键同步(仅支持浏览/预览/下载)");
+        }
         Long taskId = System.nanoTime();
         syncRunner.run(device, includeEmpty, user, taskId);
         return taskId;
@@ -327,5 +335,163 @@ public class StorageService {
         } catch (Exception e) {
             throw new BizException(ResultCode.INTERNAL_ERROR, "请求百度授权接口失败: " + e.getMessage());
         }
+    }
+
+    /* ---------- 百度网盘文件访问(xpan API + dlink 服务器中转) ---------- */
+
+    /** 浏览百度网盘目录:xpan file list(目录优先,按名称排序,与本地浏览一致) */
+    public List<Map<String, Object>> baiduBrowse(StorageDevice device, String path) {
+        BaiduCredential c = requireBaiduCredential(device.getFamilyId());
+        JsonNode resp = baiduListDir(c, baiduNormalizePath(path, true));
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (JsonNode n : resp.path("list")) {
+            boolean isDir = n.path("isdir").asInt() == 1;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("name", n.path("server_filename").asText(""));
+            m.put("isDir", isDir);
+            m.put("size", isDir ? null : n.path("size").asLong());
+            m.put("modified", n.path("server_mtime").asLong() * 1000);
+            items.add(m);
+        }
+        items.sort((a, b) -> {
+            boolean da = (Boolean) a.get("isDir"), db = (Boolean) b.get("isDir");
+            if (da != db) return da ? -1 : 1;
+            return ((String) a.get("name")).compareToIgnoreCase((String) b.get("name"));
+        });
+        return items;
+    }
+
+    /** 打开百度网盘文件:dlink 必须由服务器带 UA=pan.baidu.com 中转(浏览器直链 403),流式不缓冲 */
+    public BaiduFileStream baiduOpen(StorageDevice device, String path) {
+        String p = baiduNormalizePath(path, false);
+        String dir = p.substring(0, p.lastIndexOf('/'));
+        String name = p.substring(p.lastIndexOf('/') + 1);
+        BaiduCredential c = requireBaiduCredential(device.getFamilyId());
+
+        // 1) 列父目录按文件名定位 fs_id
+        JsonNode listResp = baiduListDir(c, dir.isEmpty() ? "/" : dir);
+        long fsId = 0;
+        for (JsonNode n : listResp.path("list")) {
+            if (n.path("isdir").asInt() == 0 && name.equals(n.path("server_filename").asText())) {
+                fsId = n.path("fs_id").asLong();
+                break;
+            }
+        }
+        if (fsId == 0) throw new BizException(ResultCode.NOT_FOUND, "文件不存在: " + name);
+        final long fid = fsId;
+
+        // 2) filemetas 拿 dlink
+        JsonNode metas = baiduGet(c, token -> "https://pan.baidu.com/rest/2.0/xpan/multimedia?method=filemetas&dlink=1"
+                + "&access_token=" + URLEncoder.encode(token, StandardCharsets.UTF_8)
+                + "&fsids=" + URLEncoder.encode("[" + fid + "]", StandardCharsets.UTF_8));
+        String dlink = metas.path("list").path(0).path("dlink").asText(null);
+        if (dlink == null || dlink.isBlank()) {
+            throw new BizException(ResultCode.INTERNAL_ERROR, "百度网盘未返回下载链接(dlink)");
+        }
+
+        // 3) 打开 dlink 流(手动跟随 302 到 CDN,重放 UA 防丢失)
+        String token = baiduAccessToken(c);
+        try {
+            HttpURLConnection conn = baiduDlinkConnect(dlink + (dlink.contains("?") ? "&" : "?")
+                    + "access_token=" + URLEncoder.encode(token, StandardCharsets.UTF_8));
+            int status = conn.getResponseCode();
+            if (status == 301 || status == 302) {
+                String loc = conn.getHeaderField("Location");
+                long length = conn.getContentLengthLong();
+                conn.disconnect();
+                if (loc == null) throw new BizException(ResultCode.INTERNAL_ERROR, "百度网盘下载重定向缺少 Location");
+                conn = baiduDlinkConnect(loc);
+                if (length <= 0) length = conn.getContentLengthLong();
+                status = conn.getResponseCode();
+            }
+            if (status != 200 && status != 206) {
+                conn.disconnect();
+                throw new BizException(ResultCode.INTERNAL_ERROR, "百度网盘文件读取失败: HTTP " + status);
+            }
+            return new BaiduFileStream(conn.getInputStream(), conn.getContentLengthLong());
+        } catch (BizException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BizException(ResultCode.INTERNAL_ERROR, "下载百度网盘文件失败: " + e.getMessage());
+        }
+    }
+
+    private HttpURLConnection baiduDlinkConnect(String urlStr) throws Exception {
+        HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
+        conn.setRequestProperty("User-Agent", "pan.baidu.com"); // 百度强制要求,否则 403
+        conn.setConnectTimeout(10000);
+        conn.setReadTimeout(60000);
+        conn.setInstanceFollowRedirects(false);
+        return conn;
+    }
+
+    /** xpan 目录列表;ponytail: limit=1000 不分页,家庭网盘单目录超千文件再补分页 */
+    private JsonNode baiduListDir(BaiduCredential c, String dir) {
+        return baiduGet(c, token -> "https://pan.baidu.com/rest/2.0/xpan/file?method=list&order=name&start=0&limit=1000"
+                + "&access_token=" + URLEncoder.encode(token, StandardCharsets.UTF_8)
+                + "&dir=" + URLEncoder.encode(dir, StandardCharsets.UTF_8));
+    }
+
+    /** xpan GET:errno 111/-6(token 过期/失效)时刷新后重试一次,其余非 0 抛业务异常 */
+    private JsonNode baiduGet(BaiduCredential c, java.util.function.UnaryOperator<String> urlWithToken) {
+        JsonNode resp = httpGetJson(urlWithToken.apply(baiduAccessToken(c)));
+        long errno = resp == null ? -1 : resp.path("errno").asLong(0);
+        if (errno == 111 || errno == -6) {
+            resp = httpGetJson(urlWithToken.apply(refreshBaiduToken(c)));
+            errno = resp == null ? -1 : resp.path("errno").asLong(0);
+        }
+        if (resp == null || errno != 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "百度网盘接口失败: errno=" + errno
+                    + (resp == null ? "" : " " + resp.path("errmsg").asText("")));
+        }
+        return resp;
+    }
+
+    /** 取 access_token:距过期不足 5 分钟先刷新(避免调用必失败再重试) */
+    private String baiduAccessToken(BaiduCredential c) {
+        if (c.getAccessToken() == null || c.getAccessToken().isBlank()) {
+            throw new BizException(ResultCode.BAD_REQUEST, "百度网盘尚未授权,请先在存储设置中发起授权");
+        }
+        if (c.getTokenExpiresAt() == null || c.getTokenExpiresAt().isBefore(LocalDateTime.now().plusMinutes(5))) {
+            return refreshBaiduToken(c);
+        }
+        return parameterService.decrypt(c.getAccessToken());
+    }
+
+    /** refresh_token 换新 access_token(百度会同时下发新 refresh_token,旧作废,必须落库) */
+    private String refreshBaiduToken(BaiduCredential c) {
+        if (c.getRefreshToken() == null || c.getRefreshToken().isBlank()) {
+            throw new BizException(ResultCode.BAD_REQUEST, "百度网盘授权已失效,请重新授权");
+        }
+        JsonNode resp = httpGetJson("https://openapi.baidu.com/oauth/2.0/token?grant_type=refresh_token"
+                + "&refresh_token=" + URLEncoder.encode(parameterService.decrypt(c.getRefreshToken()), StandardCharsets.UTF_8)
+                + "&client_id=" + URLEncoder.encode(c.getAppKey(), StandardCharsets.UTF_8)
+                + "&client_secret=" + URLEncoder.encode(parameterService.decrypt(c.getSecretKey()), StandardCharsets.UTF_8));
+        if (resp == null || resp.has("error")) {
+            throw new BizException(ResultCode.BAD_REQUEST, "刷新百度授权失败,请重新授权: "
+                    + (resp == null ? "网络错误" : resp.path("error_description").asText(resp.path("error").asText(""))));
+        }
+        String at = resp.path("access_token").asText(null);
+        if (at == null || at.isBlank()) {
+            throw new BizException(ResultCode.INTERNAL_ERROR, "刷新百度授权响应缺少 access_token");
+        }
+        c.setAccessToken(parameterService.encrypt(at));
+        if (resp.hasNonNull("refresh_token")) {
+            c.setRefreshToken(parameterService.encrypt(resp.get("refresh_token").asText()));
+        }
+        c.setTokenExpiresAt(LocalDateTime.now().plusSeconds(resp.path("expires_in").asLong(2592000L)));
+        baiduCredentialMapper.updateById(c);
+        return at;
+    }
+
+    /** 百度网盘路径规范化:统一正斜杠、以 / 开头、禁 ..;dir=true 时目录缺省根目录 */
+    private String baiduNormalizePath(String path, boolean dir) {
+        String p = path == null ? "" : path.trim().replace('\\', '/');
+        if (p.contains("..")) throw new BizException(ResultCode.BAD_REQUEST, "非法路径");
+        if (!p.startsWith("/")) p = "/" + p;
+        if (p.endsWith("/")) p = p.substring(0, p.length() - 1);
+        if (p.isEmpty()) p = "/";
+        if (!dir && p.equals("/")) throw new BizException(ResultCode.BAD_REQUEST, "缺少文件名");
+        return p;
     }
 }

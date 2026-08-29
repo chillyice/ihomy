@@ -86,11 +86,27 @@ public class StorageController {
 
     @Operation(summary = "读取设备文件(预览/下载,仅自定义设备)")
     @GetMapping("/file")
-    public ResponseEntity<byte[]> file(@RequestParam(required = false, defaultValue = "0") Long deviceId,
-                                       @RequestParam String path,
-                                       @RequestParam(required = false, defaultValue = "false") boolean download) {
+    public ResponseEntity<?> file(@RequestParam(required = false, defaultValue = "0") Long deviceId,
+                                  @RequestParam String path,
+                                  @RequestParam(required = false, defaultValue = "false") boolean download) {
         if (deviceId == null || deviceId == 0L) throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.BAD_REQUEST, "系统设备不支持文件浏览,请添加自定义存储设备");
         StorageDevice device = storageService.getDevice(currentFamilyId(), deviceId);
+        // 百度网盘:dlink 服务器中转,流式返回(不缓冲,大视频不占堆)
+        if ("BAIDU".equals(device.getDeviceType())) {
+            StorageService.BaiduFileStream fs = storageService.baiduOpen(device, path);
+            String name = path.substring(path.lastIndexOf('/') + 1);
+            HttpHeaders headers = new HttpHeaders();
+            if (download) {
+                String encoded = URLEncoder.encode(name, StandardCharsets.UTF_8).replace("+", "%20");
+                headers.set("Content-Disposition", "attachment; filename*=UTF-8''" + encoded);
+                headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+            } else {
+                headers.setContentType(guessMediaType(name));
+                headers.setCacheControl("private, max-age=3600");
+            }
+            if (fs.length() > 0) headers.setContentLength(fs.length());
+            return new ResponseEntity<>(new org.springframework.core.io.InputStreamResource(fs.in()), headers, HttpStatus.OK);
+        }
         byte[] bytes = storageService.readFileBytes(device, path);
         HttpHeaders headers = new HttpHeaders();
         String name = storageService.downloadName(device, path);
