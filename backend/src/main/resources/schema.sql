@@ -282,7 +282,7 @@ CREATE TABLE `family_anniversary` (
 -- ------------------------------------------------------------
 -- 13.1 sys_storage_device 存储设备表（V4.1 存储管理）
 --     家庭级独立配置：各家庭 OWNER 添加自己的存储设备,互不可见。
---     device_type: SYSTEM系统(默认本地磁盘)/NAS/REMOTE远程磁盘/MOUNT挂载(SMB/NFS)
+--     device_type: SYSTEM系统(默认本地磁盘)/NAS/REMOTE远程磁盘/MOUNT挂载(SMB/NFS)/BAIDU百度网盘(走API,凭证存 sys_baidu_credential)
 --     root_path 为服务器上可访问的根目录(如挂载点 /mnt/nas)
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `sys_storage_device`;
@@ -298,6 +298,28 @@ CREATE TABLE `sys_storage_device` (
   PRIMARY KEY (`id`),
   KEY `idx_family` (`family_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='存储设备表(家庭级)';
+
+-- ------------------------------------------------------------
+-- 13.2 sys_baidu_credential 百度网盘接入凭证表
+--     家庭级(每家庭一条):百度网盘开放平台应用四件套,SecretKey/SignKey ENC 加密存储
+--     ⚠️ 四件套只是应用身份;用户网盘授权(access_token/refresh_token)后续 OAuth 流程再存
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_baidu_credential`;
+CREATE TABLE `sys_baidu_credential` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `app_id`      VARCHAR(64)  NOT NULL COMMENT '百度网盘开放平台 AppID',
+  `app_key`     VARCHAR(128) NOT NULL COMMENT 'AppKey(公开标识)',
+  `secret_key`  VARCHAR(255) DEFAULT NULL COMMENT 'SecretKey(ENC 加密存储)',
+  `sign_key`    VARCHAR(255) DEFAULT NULL COMMENT 'SignKey(ENC 加密存储,回调签名校验用)',
+  `access_token`  VARCHAR(512) DEFAULT NULL COMMENT 'OAuth access_token(ENC 加密,30 天有效)',
+  `refresh_token` VARCHAR(512) DEFAULT NULL COMMENT 'OAuth refresh_token(ENC 加密,10 年有效)',
+  `token_expires_at` DATETIME DEFAULT NULL COMMENT 'access_token 过期时间',
+  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='百度网盘接入凭证表(家庭级)';
 
 -- ------------------------------------------------------------
 -- 14. family_notification 消息通知表
@@ -422,21 +444,23 @@ CREATE TABLE `content_diary` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='日记表';
 
 -- ------------------------------------------------------------
--- 18. content_album 相册表
+-- 18. content_photo_album 相册表(2026-08-30 由 content_album 改名)
 -- ------------------------------------------------------------
-DROP TABLE IF EXISTS `content_album`;
-CREATE TABLE `content_album` (
+DROP TABLE IF EXISTS `content_photo_album`;
+CREATE TABLE `content_photo_album` (
   `id`             BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
   `name`           VARCHAR(100) NOT NULL COMMENT '相册名称',
   `type`           VARCHAR(20)  NOT NULL DEFAULT 'public' COMMENT 'public/private',
   `cover_photo_url` VARCHAR(255) DEFAULT NULL COMMENT '相册封面图URL',
+  `share_token`    VARCHAR(16)  DEFAULT NULL COMMENT '分享令牌(混淆ID,游客凭链接查看公开相册)',
   `family_id`      BIGINT       NOT NULL COMMENT '家庭ID',
   `created_by`     BIGINT       NOT NULL COMMENT '创建人ID',
   `created_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted`        TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
   PRIMARY KEY (`id`),
-  KEY `idx_family` (`family_id`)
+  KEY `idx_family` (`family_id`),
+  UNIQUE KEY `uk_share_token` (`share_token`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='相册表';
 
 -- ------------------------------------------------------------

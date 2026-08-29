@@ -4,7 +4,7 @@
 
     <select id="selectLatestByFamily" resultType="com.ihomy.entity.Photo">
         SELECT p.* FROM content_photo p
-        JOIN content_album a ON p.album_id = a.id
+        JOIN content_photo_album a ON p.album_id = a.id
         WHERE p.family_id = #{familyId}
         AND p.deleted = 0 AND a.deleted = 0
         ORDER BY p.created_at DESC
@@ -13,7 +13,7 @@
 
     <select id="selectLatestPublicByFamily" resultType="com.ihomy.entity.Photo">
         SELECT p.* FROM content_photo p
-        JOIN content_album a ON p.album_id = a.id
+        JOIN content_photo_album a ON p.album_id = a.id
         WHERE p.family_id = #{familyId}
         AND p.visibility = 'PUBLIC'
         AND a.type = 'public'
@@ -30,7 +30,7 @@
                p.taken_at AS takenAt, p.location AS location,
                u.nickname AS uploaderName
         FROM content_photo p
-        JOIN content_album a ON p.album_id = a.id
+        JOIN content_photo_album a ON p.album_id = a.id
         LEFT JOIN sys_user u ON p.author_id = u.id
         WHERE p.family_id = #{familyId}
         AND p.deleted = 0 AND a.deleted = 0

@@ -84,15 +84,53 @@ public class AlbumService {
         return data;
     }
 
-    /** 新建相册,归属当前用户所在家庭,默认 public 类型 */
+    /** 新建相册,归属当前用户所在家庭,默认 public 类型;生成 16 位混淆分享令牌 */
     public Album create(SysUser user, Long currentFamilyId, AlbumDTO dto) {
         Album a = new Album();
         a.setName(dto.getName());
         a.setType(dto.getType() == null || dto.getType().isBlank() ? "public" : dto.getType());
+        a.setShareToken(java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16));
         a.setFamilyId(currentFamilyId);
         a.setCreatedBy(user.getId());
         albumMapper.insert(a);
         return a;
+    }
+
+    /** 游客凭分享令牌查看公开相册:相册 public 且所属家庭已公开(is_public=1),否则 404 不泄露存在性 */
+    public Map<String, Object> shared(String token) {
+        Album a = albumMapper.selectOne(new LambdaQueryWrapper<Album>().eq(Album::getShareToken, token));
+        if (a == null || !"public".equals(a.getType())) throw new BizException(ResultCode.NOT_FOUND);
+        Family family = familyMapper.selectById(a.getFamilyId());
+        if (family == null || family.getIsPublic() == null || family.getIsPublic() != 1) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
+
+        LambdaQueryWrapper<Photo> qw = new LambdaQueryWrapper<>();
+        qw.eq(Photo::getAlbumId, a.getId())
+                .eq(Photo::getVisibility, DictConst.VIS_PUBLIC)
+                .orderByDesc(Photo::getCreatedAt);
+        List<Map<String, Object>> photos = new ArrayList<>();
+        for (Photo p : photoMapper.selectList(qw)) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", p.getId());
+            m.put("url", p.getUrl());
+            m.put("description", p.getDescription());
+            m.put("takenAt", p.getTakenAt());
+            m.put("location", p.getLocation());
+            photos.add(m);
+        }
+
+        Map<String, Object> album = new HashMap<>();
+        album.put("id", a.getId());
+        album.put("name", a.getName());
+        album.put("type", a.getType());
+        album.put("shareToken", a.getShareToken());
+        album.put("createdAt", a.getCreatedAt());
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("album", album);
+        data.put("photos", photos);
+        return data;
     }
 
     /** 更新相册:仅创建者或家长 */

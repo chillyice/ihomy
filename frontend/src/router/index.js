@@ -13,6 +13,7 @@ const routes = [
   { path: '/diary/edit/:id?', name: 'DiaryEdit', component: () => import('@/views/diary/DiaryEdit.vue'), meta: { requiresAuth: true } },
   { path: '/anniversary', name: 'Anniversary', component: () => import('@/views/Anniversary.vue'), meta: { public: true } },
   { path: '/album', name: 'Album', component: () => import('@/views/album/Album.vue'), meta: { public: true } },
+  { path: '/album/shared/:token', name: 'AlbumShared', component: () => import('@/views/album/AlbumDetail.vue'), meta: { public: true } },
   { path: '/album/:id', name: 'AlbumDetail', component: () => import('@/views/album/AlbumDetail.vue'), meta: { public: true } },
   { path: '/cinema', name: 'Cinema', component: () => import('@/views/cinema/Cinema.vue'), meta: { public: true } },
   { path: '/music', name: 'Music', component: () => import('@/views/music/Music.vue'), meta: { public: true } },
@@ -27,6 +28,8 @@ const routes = [
   { path: '/cascade', name: 'Cascade', component: () => import('@/views/cascade/Cascade.vue'), meta: { public: true } },
   { path: '/chat', name: 'Chat', component: () => import('@/views/chat/Chat.vue'), meta: { requiresAuth: true } },
   { path: '/settings', name: 'Settings', component: () => import('@/views/Settings.vue'), meta: { requiresAuth: true } },
+  // 百度网盘 OAuth 授权回调页(须与百度开放平台注册的「授权回调页地址」一致)
+  { path: '/storage/baidu/callback', name: 'BaiduCallback', component: () => import('@/views/storage/BaiduCallback.vue'), meta: { public: true } },
   { path: '/item', name: 'Item', component: () => import('@/views/item/Item.vue'), meta: { public: true } },
   { path: '/kitchen', name: 'Kitchen', component: () => import('@/views/kitchen/Kitchen.vue'), meta: { public: true } },
   { path: '/kitchen/ingredients', name: 'Ingredient', component: () => import('@/views/kitchen/Ingredient.vue'), meta: { public: true } },

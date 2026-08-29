@@ -72,6 +72,7 @@ export const anniversaryApi = {
 export const albumApi = {
   list: () => request.get('/album/list'),
   detail: (id) => request.get(`/album/${id}`),
+  shared: (token) => request.get(`/album/shared/${token}`),
   create: (data) => request.post('/album', data),
   update: (id, data) => request.put(`/album/${id}`, data),
   remove: (id) => request.delete(`/album/${id}`),
@@ -280,6 +281,10 @@ export const storageApi = {
   },
   sync: (data) => request.post('/storage/sync', data),
   syncProgress: (taskId) => request.get(`/storage/sync/progress/${taskId}`),
+  baiduCredential: () => request.get('/storage/baidu/credential'),
+  saveBaiduCredential: (data) => request.put('/storage/baidu/credential', data),
+  baiduAuthUrl: (redirectUri) => request.get('/storage/baidu/auth/url', { params: { redirectUri } }),
+  baiduAuthCallback: (data) => request.post('/storage/baidu/auth/callback', data),
 }
 
 // 物品定位(房子/房间/家具/物品四级 + 跨级搜索)

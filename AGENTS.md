@@ -54,10 +54,10 @@
 - **root 仅用于初始化**:`mysql -uroot -p < backend/src/main/resources/schema.sql`,执行一次(建库、建表、创建 ihomy 账号、初始数据)。
 - **业务运行用 `ihomy` 账号**:仅授予 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`(最小权限,无 CREATE/ALTER/DROP)。application.yml 连接用 `ihomy`,**不要用 root 跑业务**。
 - 账号同时创建 `localhost` 和 `%` 两个 host(本机/远程应用服务器都能连)。
-- **53 张表**,前缀分类:
-  - `sys_`(系统/账号/权限/家庭设置/日志/参数/字典/天气/存储,17 张):`sys_user` / `sys_role` / `sys_auth` / `sys_user_role` / `sys_role_auth` / `sys_family_info` / `sys_home_module` / `sys_password_reset_token` / `sys_user_group` / `sys_user_group_member` / `sys_operation_log` / `sys_dict_item` / `sys_parameter` / `sys_storage_device` / `sys_weather_credential` / `sys_weather_location` / `sys_weather_log`
+- **54 张表**,前缀分类:
+  - `sys_`(系统/账号/权限/家庭设置/日志/参数/字典/天气/存储,18 张):`sys_user` / `sys_role` / `sys_auth` / `sys_user_role` / `sys_role_auth` / `sys_family_info` / `sys_home_module` / `sys_password_reset_token` / `sys_user_group` / `sys_user_group_member` / `sys_operation_log` / `sys_dict_item` / `sys_parameter` / `sys_storage_device` / `sys_baidu_credential` / `sys_weather_credential` / `sys_weather_location` / `sys_weather_log`
   - `family_`(家庭事务,21 张):`family_anniversary` / `family_notification` / `family_apply` / `family_invitation_code` / `family_checkin` / `family_points_record` / `family_points_product` / `family_points_order` / `family_task` / `family_reminder` / `family_plan` / `family_plan_task` / `family_book_record` / `family_chat_message` / `family_chat_read` / `family_user_label` / `family_tree` / `family_house` / `family_room` / `family_furniture` / `family_item`
-  - `content_`(内容类,15 张):`content_blog` / `content_diary` / `content_album` / `content_photo` / `content_comment` / `content_visibility` / `content_like` / `content_video` / `content_video_wish` / `content_wish` / `content_music` / `content_music_playlist` / `content_music_playlist_track` / `content_book` / `content_book_borrow`
+  - `content_`(内容类,15 张):`content_blog` / `content_diary` / `content_photo_album` / `content_photo` / `content_comment` / `content_visibility` / `content_like` / `content_video` / `content_video_wish` / `content_wish` / `content_music` / `content_music_playlist` / `content_music_playlist_track` / `content_book` / `content_book_borrow`
   - **命名规则**:家庭事务业务表一律 `family_` 前缀;内容数据 `content_` 前缀;账号/权限/配置/日志/天气/存储保留 `sys_`。新增表必须遵守。前缀取最顶层祖先类别;上下级关系体现在表名(如 `sys_user_role`)。
 - **枚举不再用数字**:状态/类型字段一律大写英文单词(`PUBLISHED/DRAFT/PUBLIC/FAMILY/ACTIVE...`),含义存字典表 `sys_dict_item`,Java 常量集中于 `common/DictConst.java`,前端映射 `utils/dict.js`。**不要写回 0/1/2 判断**。
 - **注意**:`content_blog/diary/photo/video/wish` 5 张内容表 `visibility` 列为 `VARCHAR(20) DEFAULT 'FAMILY'`(PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开),schema.sql 与 live DB 已对齐(曾误写 TINYINT)。
@@ -177,7 +177,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 |------|-----------|---------|--------|------|
 | 博客 | BlogController | BlogService | content_blog | 标签(逗号分隔)+ `category VARCHAR(50)` 自定义分类;`GET /blog/categories` DISTINCT;默认 visibility=FAMILY;marked v18 renderer h1→h2;列表/编辑/详情均带 category |
 | 日记 | DiaryController | DiaryService | content_diary | **书架+翻书视图(V9.0)**:`/diary` 书架(每人一本封面网格,`/diary/book/:authorId` 翻书)——桌面双页信纸/移动单页,左右方向键+底部按钮翻页,目录跳转,紧凑连续排页(上一篇写完下一篇紧接),页眉 hover 编辑/删除;每页=页眉(首页)+18行×28px 正文裁剪窗口+页码脚;`measureDiaryLines` 离屏测行数分页;**信纸涂鸦(V9.1)**:`utils/doodle.js` 矢量笔画引擎(签字笔/铅笔/蜡笔/荧光笔/画笔+像素橡皮/对象橡皮),编辑页笔盘选笔后直接画在信纸上,随日记存 `doodle` JSON 列,翻书查看随信纸分页显示;date 兼容 `yyyy-MM-dd HH:mm`(旧代码会 500);默认 visibility=FAMILY |
-| 相册 | AlbumController | AlbumService | content_album | type=public/private;public→PUBLIC/private→FAMILY;软删 |
+| 相册 | AlbumController | AlbumService | content_photo_album | type=public/private;public→PUBLIC/private→FAMILY;软删;`share_token` 16 位混淆令牌,`GET /album/shared/{token}` 游客可看公开相册(需家庭 is_public=1);软删 |
 | 照片 | PhotoController | AlbumService | content_photo | 批量上传 `POST /album/{id}/photos`;`taken_at/location`;**硬删除**(`PhotoMapper.deletePhysicalById` XML DELETE 绕过全局 logic-delete)+ `FileService.deleteByUrl` 删磁盘文件;`source_path`(设备:相对路径)去重 |
 | 放映厅 | VideoController | VideoService | content_video/content_video_wish | 豆瓣式属性(media_type/genres/region/year/duration/episodes/director/actors/rating/intro/poster/video_url);`POST /video/upload` 500MB;**硬删除**(DB+video_url+poster);想看列表 CRUD |
 | 照片瀑布 | CascadeController | — | content_photo | `GET /photo/cascade` 随机;可见性过滤(成员 PUBLIC+FAMILY,PRIVATE 仅作者,未登录仅 PUBLIC) |
@@ -211,7 +211,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 模块 | Controller | Service | 关键表 | 要点 |
 |------|-----------|---------|--------|------|
 | 文件上传 | FileController | FileService | 磁盘 | 分类目录:pictures/{相册名}/、videos/、music/、files/{yyyyMM}/;`upload(bytes,name,type,albumId,albumName)`;`deleteByUrl(url)` 按 /files/ URL 解析物理路径删文件(`normalize()+startsWith` 防越界);DB 存 `/files/...` 完整 URL |
-| 存储管理 | StorageController | StorageService/StorageSyncRunner | sys_storage_device | 家庭级设备(SYSTEM/NAS/REMOTE/MOUNT);文件浏览器 `GET /storage/browse?deviceId&path`;一键同步 `POST /storage/sync`(@Async 独立 bean,按顶层目录建相册,content_photo.source_path 去重);`@RequirePermission("storage:manage")` |
+| 存储管理 | StorageController | StorageService/StorageSyncRunner | sys_storage_device/sys_baidu_credential | 家庭级设备(SYSTEM/NAS/REMOTE/MOUNT/BAIDU,BAIDU 走 API 跳过本地目录校验、rootPath 恒为 '/');文件浏览器 `GET /storage/browse?deviceId&path`;一键同步 `POST /storage/sync`(@Async 独立 bean,按顶层目录建相册,content_photo.source_path 去重);`@RequirePermission("storage:manage")`;百度网盘四件套凭证(AppID/AppKey 明文+SecretKey/SignKey/access_token/refresh_token ENC 加密,GET 只回 `secretKeySet/signKeySet/authorized` 不回明文,PUT 留空保留原值,`@OperationLog saveArgs=false` 防密钥落日志;OAuth 授权码模式:`GET /storage/baidu/auth/url` 生成授权链接[state 绑定家庭 10 分钟]+ `POST /storage/baidu/auth/callback` 换 token,回调页 `/storage/baidu/callback` 须与开放平台注册一致) |
 | 首页聚合 | HomeController + PublicController | HomeModuleService/HomeStatsService/ActivityFeedService | sys_home_module | `GET /public/home?hid=&home_id=` 返回 {family/modules/photos/stats};`GET /public/feed` 动态流;模块化(sys_home_module 插入即扩展) |
 | 运维 | OpsController | OpsService | sys_operation_log/sys_weather_log | OPS 角色专属;资源统计/服务器状态/操作日志检索/和风天气 API 用量;不返回用户隐私 |
 | 每日内容 | DailyController | — | — | 每日一图(代理 Bing)+每日知识(4 类×5 条);`GET /public/daily-knowledge?types=` |
@@ -677,6 +677,40 @@ INSERT INTO sys_dict_item ... book_format/borrow_status;
 **翻书分页规则**:一篇日记的页数 = `max(ceil(measureDiaryLines(content) / 18), ceil(doodleExtentY / 504))`(涂鸦可撑页数);书页序列按篇**紧凑拼接**(上一篇写完下一篇紧接,不补空白页,新篇页眉可能落在右页;仅总页数为奇数时最后一页右侧留白);spread s 显示第 2s+1/2s+2 页。正文不分段切割,同一文本块用裁剪窗口显示(与编辑页"textarea 长高+分页线"度量完全一致,字体/宽度改动必须同步 `utils/diary.js` 与 DiaryPage CSS)。书架封面标签起迄日期分行展示(起 {date}/迄 {date})。
 
 **涂鸦规则(V9.1)**:笔画坐标 = paper-body/sheet-body 左上角原点 CSS 像素(两页宽度同为 496px、正文 y=0 起,坐标系一致);数据 `{v:1, strokes:[{t,c,w,a,s,pts}]}` 存 `content_diary.doodle` JSON 列(`a`=透明度 0-1 缺省 1,渲染时与笔型基础 alpha 相乘);荧光笔(marker)走专用画布 + CSS `mix-blend-mode: multiply`(深色模式 screen)+opacity 0.55,其余笔走墨迹画布;编辑页画布层:荧光(2)<墨迹(3)<实时(4),正文 textarea(1);撤销/重做 = 笔画数组引用快照史(提交/擦除均不可变更新,橡皮无变化返回原引用),Ctrl+Z/Y 仅在非 textarea 焦点时生效;live DB 同步见 `backend/src/main/resources/diary_doodle_migration.sql`。
+
+##### 相册/照片(photo 分支,2026-08-30)
+
+| 文件 | 改动 |
+|------|------|
+| `schema.sql` | `content_album` 改名 `content_photo_album` + 新增 `share_token VARCHAR(16)` 唯一索引 |
+| `entity/Album.java` | `@TableName("content_photo_album")` + `shareToken` 字段 |
+| `AlbumMapper.xml` / `PhotoMapper.xml` | 3 处 JOIN + deletePhysicalById 改表名 |
+| `AlbumService.java` | `create` 生成 16 位 UUID 截断令牌;新增 `shared(token)`:令牌查相册,校验 type=public + 家庭 is_public=1,返回精简 album+photos(仅 VIS_PUBLIC 照片,不含 authorId/familyId),否则 404 不泄露存在性 |
+| `AlbumController.java` | 新增 `GET /album/shared/{token}`(GET /album/** 已 permitAll,游客可访问) |
+| `migrations.sql` | 追加改名(RENAME + information_schema 幂等判断)+ 加列 + 存量回填令牌;deploy.ps1 流水线自动执行 |
+| `components/PhotoViewer.vue` | 新增 `shareBase` prop + 分享 pv-icon-btn(复制 `{origin}/album/shared/{token}?p={shareId(photoId)}`,无 shareBase 隐藏)+ 下载 pv-icon-btn(`<a download>` 同源直链);缩略图条 watch index 激活项 `scrollIntoView` 居中(修复播放到后面照片时 pv-thumb-strip 不跟随) |
+| `views/album/AlbumDetail.vue` | 分享模式:`/album/shared/:token` 路由复用本页,`albumApi.shared` 加载;`?p=` 混淆照片ID 定位打开播放页;album-head-actions 增「分享」ghost-btn(仅 public 相册);移除「播放」el-button(播放功能保留在 PhotoViewer 内);`.album-name` 改 inline-flex 垂直居中 |
+| `utils/shareId.js` | 新建:Knuth 乘法散列(0x9E3779B1)+ base36 单向编码,URL 照片 ID 混淆;匹配时逐个编码比对,无需解码 |
+| `router/index.js` | `/album/shared/:token`(public,置于 `/album/:id` 前) |
+| `api/index.js` | `albumApi.shared(token)` |
+| `i18n/zh-CN.js` + `en.js` | `album.share` + `photoViewer.share/download/linkCopied/copyFailed` |
+
+**分享链接规则**:相册分享 URL = `{origin}/album/shared/{albumShareToken}`(仅混淆令牌,无裸 ID);游客可打开的条件 = 相册 type=public 且所属家庭 is_public=1,否则 404(不泄露存在性);照片分享 URL 追加 `?p={shareId(photoId)}`(Knuth 散列混淆,访问控制仍由相册令牌承担)。新建相册自动生成令牌,存量相册由 migrations.sql 回填。Home/Cascade 的 PhotoViewer 不传 shareBase → 分享按钮隐藏。
+
+##### 百度网盘接入凭证(photo 分支,2026-08-30)
+
+| 文件 | 改动 |
+|------|------|
+| `schema.sql` | 新增 `sys_baidu_credential`(家庭级唯一,AppID/AppKey 明文 + SecretKey/SignKey ENC 加密);总表数 53→54 |
+| `entity/BaiduCredential.java` + `mapper/BaiduCredentialMapper.java` | 实体 + BaseMapper(无自定义 SQL) |
+| `service/StorageService.java` | `getBaiduCredential`(脱敏视图,密钥只回 `secretKeySet/signKeySet`)+ `saveBaiduCredential`(留空保留原值,`parameterService.encrypt` 加密入库);OAuth 授权码模式:`getBaiduAuthUrl`(state 存 Redis `ihomy:baidu:state:{state}` 绑定家庭,10 分钟 TTL)+ `baiduAuthCallback`(state 一次性校验防令牌替换 → `openapi.baidu.com/oauth/2.0/token` 换 token → ENC 加密存储)+ `httpGetJson`(HttpURLConnection) |
+| `controller/StorageController.java` | `GET/PUT /storage/baidu/credential` + `GET /storage/baidu/auth/url?redirectUri=` + `POST /storage/baidu/auth/callback`(均 @RequirePermission("storage:manage");密钥/授权相关 `@OperationLog saveArgs=false` 防落日志) |
+| `migrations.sql` | 追加 CREATE TABLE IF NOT EXISTS + token 三列条件 ALTER(deploy.ps1 流水线执行);本地库已建 |
+| `views/storage/Storage.vue` | 设备模态框:类型选「百度网盘」(BAIDU)时隐藏根路径、显示 AppID/AppKey/SecretKey/SignKey 表单(编辑带出已存凭证,密钥留空保留),保存=先 `saveBaiduCredential` 再 add/updateDevice(rootPath 由后端置 '/');「百度网盘接入」区块只读展示:回调页地址+一键复制+授权/重新授权按钮+授权状态 tag+token 有效期,未配置时提示先添加设备;设备表 BAIDU 行根路径显示 — |
+| `views/storage/BaiduCallback.vue` + `router/index.js` | 新建 OAuth 回调页 `/storage/baidu/callback`(public):百度授权后带 `?code=&state=` 重定向至此,调 `baiduAuthCallback` 换 token,成功/失败展示后跳回 `/settings?tab=storage`;百度侧失败(error/error_description)与登录过期分别处理 |
+| `api/index.js` + `i18n` | `storageApi.baiduCredential/saveBaiduCredential/baiduAuthUrl/baiduAuthCallback` + `storage.baidu.*` 中英文案(含回调页文案) |
+
+**百度网盘接入边界**:已完成凭证存储(四件套)+ OAuth 授权码模式授权(state 防伪 → 换 token → ENC 加密存储)。**尚未做**:token 自动刷新(refresh_token 续期,待适配器调用失败时触发)、REMOTE 设备适配器(文件列表/下载 dlink/上传/一键同步,dlink 下载须服务器中转落盘)、SignKey 回调签名校验。授权回调页地址 = `{前端origin}/storage/baidu/callback`,须与百度开放平台应用注册的「授权回调页地址」完全一致(生产 https://ihomy.top/storage/baidu/callback)。
 
 
 ## 文件存储策略
