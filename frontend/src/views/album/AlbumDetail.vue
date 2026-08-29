@@ -1,4 +1,4 @@
-<!-- 相册详情页:照片墙 + 上传/备注编辑/删除(悬停显示操作),家长或上传者可管理 -->
+<!-- 相册详情页:照片墙 + 分享/上传/备注编辑/删除(悬停显示操作),家长或上传者可管理;?token 分享模式供游客观看公开相册 -->
 <template>
   <div class="page">
     <Breadcrumb :items="[{ label: t('album.familyTitle'), to: '/album' }, { label: album.name || t('album.title') }]" />
@@ -13,9 +13,13 @@
         <p v-if="album.description" class="album-desc">{{ album.description }}</p>
       </div>
       <div class="album-head-actions">
-        <el-button v-if="photos.length" @click="startSlideshow">{{ t('photoViewer.slideshow') }}</el-button>
+        <el-button
+          v-if="album.type === 'public' && album.shareToken"
+          class="ghost-btn"
+          @click="copyAlbumShare"
+        >{{ t('album.share') }}</el-button>
         <el-upload
-          v-if="userStore.isLoggedIn"
+          v-if="userStore.isLoggedIn && !shareToken"
           multiple
           :show-file-list="false"
           :http-request="uploadPhoto"
@@ -58,12 +62,13 @@
       v-model:visible="viewer.visible"
       :photos="photos"
       :initial-index="viewer.index"
+      :share-base="shareBase"
     />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { albumApi, photoApi } from '@/api'
 import { useUserStore } from '@/stores/user'
@@ -72,10 +77,12 @@ import { Edit, Delete, Location, Clock } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PhotoViewer from '@/components/PhotoViewer.vue'
+import { shareId } from '@/utils/shareId'
 
 const route = useRoute()
 const userStore = useUserStore()
 const { t } = useI18n()
+const shareToken = route.params.token || ''
 const albumId = route.params.id
 const album = ref({})
 const photos = ref([])
@@ -86,13 +93,27 @@ const viewer = reactive({ visible: false, index: 0 })
 const canManagePhoto = (p) =>
   userStore.isLoggedIn && (userStore.isOwner || p.authorId === userStore.userInfo?.id)
 
+// 相册分享链接基准(公开相册才有):游客凭链接查看,家庭需已公开
+const shareBase = computed(() =>
+  album.value.shareToken ? `${location.origin}/album/shared/${album.value.shareToken}` : ''
+)
+
 const formatDateTime = (d) => (d ? new Date(d).toLocaleString('zh-CN') : '')
 
-// 拉取相册详情与照片列表
+// 拉取相册详情与照片列表:分享模式走令牌接口(游客可访问),普通模式走详情接口
 const load = async () => {
-  const data = await albumApi.detail(albumId)
+  const data = shareToken ? await albumApi.shared(shareToken) : await albumApi.detail(albumId)
   album.value = data.album || {}
   photos.value = data.photos || []
+  // 分享链接带 ?p= 混淆照片ID时,定位到该照片并打开播放页
+  const p = route.query.p
+  if (p) {
+    const idx = photos.value.findIndex(x => shareId(x.id) === String(p))
+    if (idx >= 0) {
+      viewer.index = idx
+      viewer.visible = true
+    }
+  }
 }
 
 // 上传单张照片成功后刷新照片墙
@@ -100,6 +121,16 @@ const uploadPhoto = async (options) => {
   await photoApi.upload(albumId, [options.file])
   ElMessage.success(t('album.uploadSuccess'))
   load()
+}
+
+// 复制相册分享链接(仅家庭已公开时外人可打开,否则 404)
+const copyAlbumShare = async () => {
+  try {
+    await navigator.clipboard.writeText(shareBase.value)
+    ElMessage.success(t('photoViewer.linkCopied'))
+  } catch {
+    ElMessage.error(t('photoViewer.copyFailed'))
+  }
 }
 
 // 打开备注编辑框,记录当前照片 id
@@ -129,11 +160,6 @@ const openViewer = (p) => {
   viewer.visible = true
 }
 
-const startSlideshow = () => {
-  viewer.index = 0
-  viewer.visible = true
-}
-
 onMounted(load)
 </script>
 
@@ -148,7 +174,13 @@ onMounted(load)
 }
 .album-header h2 { color: var(--color-primary); margin-bottom: 6px; }
 .album-head-info { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-.album-name { font-size: 20px; font-weight: 600; color: var(--color-primary); }
+.album-name {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-primary);
+  display: inline-flex;
+  align-items: center;
+}
 .photo-count { font-size: 13px; color: var(--color-text-secondary); }
 .album-desc { margin-top: 8px; color: var(--color-text-secondary); font-size: 13px; }
 .album-head-actions { display: flex; flex-direction: row; align-items: center; gap: 8px; flex-shrink: 0; }

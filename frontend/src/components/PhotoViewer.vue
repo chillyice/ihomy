@@ -2,7 +2,7 @@
   照片预览播放器:全屏沉浸式照片浏览 + 幻灯片播放
   z-index: 63(功能层之上 MusicPlayer=62,光影层之下 bright-spot=65)
   光影层(光束/灰尘/暗角)渲染在照片之上,营造氛围感
-  支持:键盘导航/触摸滑动/自动播放/Ken Burns缓推/缩略图条/进度条
+  支持:键盘导航/触摸滑动/自动播放/Ken Burns缓推/缩略图条/进度条/分享链接/下载
 -->
 <template>
   <Teleport to="body">
@@ -48,6 +48,14 @@
               @click="speed = s.value"
             >{{ s.label }}</button>
           </div>
+          <!-- 分享链接(有相册分享基准时才显示) -->
+          <button v-if="shareBase" class="pv-icon-btn" :title="t('photoViewer.share')" @click="copyShare">
+            <svg viewBox="0 0 24 24" width="22" height="22"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z" fill="currentColor"/></svg>
+          </button>
+          <!-- 下载当前照片 -->
+          <button class="pv-icon-btn" :title="t('photoViewer.download')" @click="download">
+            <svg viewBox="0 0 24 24" width="22" height="22"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" fill="currentColor"/></svg>
+          </button>
           <button class="pv-icon-btn" :title="t('photoViewer.play')" @click="togglePlay">
             <svg v-if="!playing" viewBox="0 0 24 24" width="22" height="22"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
             <svg v-else viewBox="0 0 24 24" width="22" height="22"><path d="M6 5h4v14H6zm8 0h4v14h-4z" fill="currentColor"/></svg>
@@ -95,7 +103,7 @@
         </transition>
 
         <!-- 缩略图条 -->
-        <div v-if="photos.length > 1" class="pv-thumb-strip">
+        <div v-if="photos.length > 1" ref="stripRef" class="pv-thumb-strip">
           <div
             v-for="(p, i) in photos"
             :key="p.id"
@@ -113,14 +121,17 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount, inject } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { ElMessage } from 'element-plus'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import { shareId } from '@/utils/shareId'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
   photos: { type: Array, default: () => [] },
   initialIndex: { type: Number, default: 0 },
+  shareBase: { type: String, default: '' },
 })
 const emit = defineEmits(['update:visible', 'close'])
 
@@ -142,6 +153,18 @@ const speeds = [
 let playTimer = null
 let touchStartX = 0
 
+const stripRef = ref(null)
+
+// 当前激活缩略图滚动到可视区居中(播放到后面的照片时缩略图条跟随移动)
+const scrollThumbIntoView = () => {
+  nextTick(() => {
+    const el = stripRef.value?.querySelector('.pv-thumb.active')
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+  })
+}
+
+watch(index, scrollThumbIntoView)
+
 const current = computed(() => props.photos[index.value] || {})
 const hasMeta = computed(() =>
   current.value.description || current.value.uploaderName || current.value.location || current.value.takenAt
@@ -154,6 +177,29 @@ const formatDate = (d) => {
 }
 
 const onImgLoad = () => { imgLoading.value = false }
+
+// 复制当前照片分享链接(相册分享链接 + ?p= 混淆照片ID)
+const copyShare = async () => {
+  if (!props.shareBase || !current.value.id) return
+  const url = `${props.shareBase}?p=${shareId(current.value.id)}`
+  try {
+    await navigator.clipboard.writeText(url)
+    ElMessage.success(t('photoViewer.linkCopied'))
+  } catch {
+    ElMessage.error(t('photoViewer.copyFailed'))
+  }
+}
+
+// 下载当前照片(同源静态文件,download 属性触发浏览器下载)
+const download = () => {
+  if (!current.value.url) return
+  const a = document.createElement('a')
+  a.href = current.value.url
+  a.download = ''
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+}
 
 const next = () => {
   if (props.photos.length <= 1) return
@@ -220,6 +266,7 @@ const onTouchEnd = (e) => {
 watch(() => props.visible, (v) => {
   if (v) {
     index.value = props.initialIndex
+    scrollThumbIntoView()
     document.body.style.overflow = 'hidden'
     sunLight?.suspendEffects()
   } else {

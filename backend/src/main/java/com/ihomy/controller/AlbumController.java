@@ -51,6 +51,12 @@ public class AlbumController {
                 securityHelper.currentUser() == null ? null : securityHelper.current().getFamilyId()));
     }
 
+    @Operation(summary = "分享令牌查看相册(游客可访问,相册 public 且家庭公开)")
+    @GetMapping("/shared/{token}")
+    public Result<Map<String, Object>> shared(@PathVariable String token) {
+        return Result.success(albumService.shared(token));
+    }
+
     @Operation(summary = "新建相册")
     @OperationLog(module = "ALBUM", operationType = "CREATE", description = "新建相册")
     @PostMapping

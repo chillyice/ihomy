@@ -118,6 +118,39 @@ public class StorageController {
         return MediaType.APPLICATION_OCTET_STREAM;
     }
 
+    @Operation(summary = "百度网盘接入凭证(密钥不回传,仅返回是否已配置)")
+    @RequirePermission("storage:manage")
+    @GetMapping("/baidu/credential")
+    public Result<Map<String, Object>> baiduCredential() {
+        return Result.success(storageService.getBaiduCredential(currentFamilyId()));
+    }
+
+    @Operation(summary = "保存百度网盘接入凭证(密钥加密入库,留空保留原值)")
+    @OperationLog(module = "STORAGE", operationType = "UPDATE", description = "保存百度网盘凭证", saveArgs = false)
+    @RequirePermission("storage:manage")
+    @PutMapping("/baidu/credential")
+    public Result<Void> saveBaiduCredential(@RequestBody Map<String, String> body) {
+        storageService.saveBaiduCredential(currentFamilyId(), body.get("appId"), body.get("appKey"),
+                body.get("secretKey"), body.get("signKey"));
+        return Result.success();
+    }
+
+    @Operation(summary = "生成百度网盘 OAuth 授权跳转 URL(state 绑定家庭,10 分钟有效)")
+    @RequirePermission("storage:manage")
+    @GetMapping("/baidu/auth/url")
+    public Result<Map<String, String>> baiduAuthUrl(@RequestParam String redirectUri) {
+        return Result.success(Map.of("url", storageService.getBaiduAuthUrl(currentFamilyId(), redirectUri)));
+    }
+
+    @Operation(summary = "百度网盘 OAuth 授权回调:授权码换 token 并加密存储")
+    @OperationLog(module = "STORAGE", operationType = "UPDATE", description = "百度网盘OAuth授权", saveArgs = false)
+    @RequirePermission("storage:manage")
+    @PostMapping("/baidu/auth/callback")
+    public Result<Void> baiduAuthCallback(@RequestBody Map<String, String> body) {
+        storageService.baiduAuthCallback(currentFamilyId(), body.get("code"), body.get("state"), body.get("redirectUri"));
+        return Result.success();
+    }
+
     @Operation(summary = "一键同步:设备目录→相册(后台异步)")
     @OperationLog(module = "STORAGE", operationType = "CREATE", description = "一键同步存储设备", saveArgs = false)
     @RequirePermission("storage:manage")
