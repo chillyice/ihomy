@@ -71,12 +71,11 @@ public class DiaryService {
         diary.setMood(dto.getMood());
         diary.setWeather(dto.getWeather());
         diary.setImages(dto.getImages());
+        diary.setDoodle(dto.getDoodle());
         diary.setAuthorId(authorId);
         diary.setFamilyId(familyId);
         diary.setVisibility(DictConst.visibility(dto.getVisibility()));
-        if (dto.getDate() != null && !dto.getDate().isBlank()) {
-            diary.setCreatedAt(java.time.LocalDateTime.parse(dto.getDate() + "T00:00:00"));
-        }
+        diary.setCreatedAt(parseDate(dto.getDate()));
         diaryMapper.insert(diary);
         pointsService.addRecord(authorId, familyId, "REWARD", PointsService.REWARD_DIARY, "写日记");
         return diary;
@@ -95,6 +94,11 @@ public class DiaryService {
         diary.setMood(dto.getMood());
         diary.setWeather(dto.getWeather());
         diary.setImages(dto.getImages());
+        diary.setDoodle(dto.getDoodle());
+        java.time.LocalDateTime date = parseDate(dto.getDate());
+        if (date != null) {
+            diary.setCreatedAt(date);
+        }
         if (dto.getVisibility() != null) diary.setVisibility(DictConst.visibility(dto.getVisibility()));
         diaryMapper.updateById(diary);
         return diary;
@@ -110,5 +114,21 @@ public class DiaryService {
             throw new BizException(ResultCode.FORBIDDEN);
         }
         diaryMapper.deleteById(id);
+    }
+
+    /** 解析日记日期:兼容 yyyy-MM-dd、yyyy-MM-dd HH:mm(编辑页提交格式) */
+    private java.time.LocalDateTime parseDate(String s) {
+        if (s == null || s.isBlank()) {
+            return null;
+        }
+        String v = s.trim().replace(' ', 'T');
+        if (v.length() == 10) {
+            v += "T00:00";
+        }
+        try {
+            return java.time.LocalDateTime.parse(v);
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

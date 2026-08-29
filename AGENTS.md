@@ -94,10 +94,12 @@ frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
     api/request.js  # axios + JWT header + 401 自动刷新token
     api/index.js    # 全部模块 API 分组导出(29 个 Api 对象:public/auth/home/blog/diary/file/member/anniversary/album/photo/like/comment/notification/family/profile/video/points/task/reminder/plan/wish/music/book/ops/tree/chat/storage/item/kitchen/library)
     stores/user.js  # 登录状态 + hasPerm/isOps/isPureOps; stores/app.js 首页聚合(family/modules/photos/stats)
-    router/         # 登录守卫 + scrollBehavior(返回回顶部);含 /ops 运维护卫, /chat 需登录; 27 个路由
+    router/         # 登录守卫 + scrollBehavior(返回回顶部);含 /ops 运维护卫, /chat 需登录; 28 个路由
     i18n/           # vue-i18n 中英(applyLocale 切换)
     theme/          # applyTheme/loadTheme(明暗模式,只 light/dark)
     utils/dict.js   # 枚举词条中文映射(与后端 DictConst 对应)
+    utils/diary.js  # 日记纸张排版共享常量(LINE_H=28/LINES_PER_PAGE=18/PAGE_H=504)+心情天气枚举+measureDiaryLines 离屏测行数(编辑页与翻书页共用,改动须两边同步)
+    utils/doodle.js # 日记信纸涂鸦矢量笔画引擎:笔型渲染(签字笔/铅笔/蜡笔/荧光笔/画笔)+橡皮擦(像素切断/整笔删除)+parseDoodle/setupCanvas;荧光笔走 multiply 专用画布
     utils/windowLight.js  # getSunScene(sunInfo,slotIndex)+currentSlotIndex()+makeRays():体积光调色板/光束/阴影参数;windowAngle(窗角)+hasDirectLight 门控
     utils/useSunLight.js  # 全局光影状态(provide/inject):sunScene/lampMode/shadowEnabled/weatherEffectEnabled/blobsEnabled/lightTestMode/testSpeed/loadWeather
     utils/useDragResize.js # 可拖拽面板组合式函数(zIndex+bringToFront+边界clamp+localStorage持久化)
@@ -105,7 +107,7 @@ frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
     components/     # AppSidebar(全局导航)/BackToTop/Breadcrumb/AvatarCropper/InstallPrompt/SiteFooter(备案号)/SunLightLayer(全局光影层)/LightTestConsole(光照测试控制台)/SyncDialog(存储同步进度)/MobileTabBar/MobileHeader/MobileHomeFeed/MobileMoreGrid/MobileMePage(移动端组件)
     layouts/MobileLayout.vue  # 移动端壳:首页三Tab模式 / 子页面返回栏模式
     styles/main.css # CSS 变量 + 全局样式 + 深色模式覆写 + ElMessage/ElNotification 增强 + 移动端 @media 适配
-    views/          # 27 个页面:Home(沉浸式首页)/Login/Member/Settings/Anniversary/album(Album/AlbumDetail)/cinema/Cinema/diary/DiaryList/blog(BlogList/BlogDetail/BlogEdit)/points/Points/task/Task/reminder/Reminder/plan/Plan/wish/Wish/book/Book/chat/Chat/tree/Tree/cascade/Cascade/ops/Ops/storage/Storage/item/Item/kitchen/Kitchen/library/LibraryList/LibraryDetail/LibraryEdit
+    views/          # 28 个页面:Home(沉浸式首页)/Login/Member/Settings/Anniversary/album(Album/AlbumDetail)/cinema/Cinema/diary(DiaryList/DiaryBook/DiaryPage/DoodleTray/DiaryEdit)/blog(BlogList/BlogDetail/BlogEdit)/points/Points/task/Task/reminder/Reminder/plan/Plan/wish/Wish/book/Book/chat/Chat/tree/Tree/cascade/Cascade/ops/Ops/storage/Storage/item/Item/kitchen/Kitchen/library/LibraryList/LibraryDetail/LibraryEdit
     App.vue
   vite.config.js   # PWA + 代理 /api -> :8080 + ElementPlus 按需
   public/favicon.svg
@@ -174,7 +176,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 模块 | Controller | Service | 关键表 | 要点 |
 |------|-----------|---------|--------|------|
 | 博客 | BlogController | BlogService | content_blog | 标签(逗号分隔)+ `category VARCHAR(50)` 自定义分类;`GET /blog/categories` DISTINCT;默认 visibility=FAMILY;marked v18 renderer h1→h2;列表/编辑/详情均带 category |
-| 日记 | DiaryController | DiaryService | content_diary | 多图(JSON images 最多 9 张)+mood+weather;默认 visibility=FAMILY |
+| 日记 | DiaryController | DiaryService | content_diary | **书架+翻书视图(V9.0)**:`/diary` 书架(每人一本封面网格,`/diary/book/:authorId` 翻书)——桌面双页信纸/移动单页,左右方向键+底部按钮翻页,目录跳转,紧凑连续排页(上一篇写完下一篇紧接),页眉 hover 编辑/删除;每页=页眉(首页)+18行×28px 正文裁剪窗口+页码脚;`measureDiaryLines` 离屏测行数分页;**信纸涂鸦(V9.1)**:`utils/doodle.js` 矢量笔画引擎(签字笔/铅笔/蜡笔/荧光笔/画笔+像素橡皮/对象橡皮),编辑页笔盘选笔后直接画在信纸上,随日记存 `doodle` JSON 列,翻书查看随信纸分页显示;date 兼容 `yyyy-MM-dd HH:mm`(旧代码会 500);默认 visibility=FAMILY |
 | 相册 | AlbumController | AlbumService | content_album | type=public/private;public→PUBLIC/private→FAMILY;软删 |
 | 照片 | PhotoController | AlbumService | content_photo | 批量上传 `POST /album/{id}/photos`;`taken_at/location`;**硬删除**(`PhotoMapper.deletePhysicalById` XML DELETE 绕过全局 logic-delete)+ `FileService.deleteByUrl` 删磁盘文件;`source_path`(设备:相对路径)去重 |
 | 放映厅 | VideoController | VideoService | content_video/content_video_wish | 豆瓣式属性(media_type/genres/region/year/duration/episodes/director/actors/rating/intro/poster/video_url);`POST /video/upload` 500MB;**硬删除**(DB+video_url+poster);想看列表 CRUD |
@@ -654,6 +656,28 @@ INSERT INTO sys_dict_item ... book_format/borrow_status;
 | `i18n/zh-CN.js` + `en.js` | 新增 `sortRecent`/`sortViews`/`articlesUnit`/`parentCategory`/`rootCategory` |
 
 **博客分类树规则**:`content_blog_category` 表用 `parent_id` 自引用(NULL=顶级),`name` 只存本级名称;后端 `categories()` 返回扁平树 `{id, name, parentId, path, depth, childCount}`;`content_blog.category` 列存全路径(如 `技术/前端`)用于筛选;`renameCategory(id, name, parentId)` 可改名+移父级(防环校验),级联更新子分类博客路径。前端用 `el-cascader`(`checkStrictly + emitPath: false`)做分类选择/筛选,编辑时排除当前分类及其后代防环。
+
+##### 日记本书架+翻书视图(V9.0)
+
+| 文件 | 改动 |
+|------|------|
+| `views/diary/DiaryList.vue` | 重写为书架:每位作者一本日记本(木纹封面+纸质标签+绑带,3:4 网格),封面显示作者名/篇数/起迄日期,hover 抬起;点击进 `/diary/book/:authorId`;列表页不再直接展示日记内容 |
+| `views/diary/DiaryBook.vue` | 新建:翻书视图。桌面双页信纸(左/右页+书脊阴影)/移动单页(useDevice 切换,页码语义转换);紧凑连续排页(上一篇写完下一篇紧接,仅总页数为奇数时末页右侧留白);左右方向键+底部工具栏(上一页/目录/页码指示/下一页)翻页;目录 el-dropdown 按日期跳篇;翻页方向性滑入动画;新建/编辑保存后跳回对应日记本 |
+| `views/diary/DiaryPage.vue` | 新建:单张书页组件。首页页眉(日期/时间+心情/天气,沿用编辑页横线样式)+hover 编辑/删除按钮(作者或 OWNER 可见);正文=504px 裁剪窗口(`translateY(-页序*504px)` 裁同一文本块,与编辑页分页度量一致)+涂鸦双层画布(墨迹/荧光)同窗口裁剪;页脚=可见范围标签+页码+字数;空白补页只有横线 |
+| `views/diary/DoodleTray.vue` | 新建(V9.1):涂鸦笔盘。7 支内联 SVG 画笔(签字笔/铅笔/蜡笔/荧光笔/画笔/像素橡皮/对象橡皮,笔尖/笔身实时显示当前墨色),hover 抬起旋转、选中悬停;el-slider 粗细(1-12)+透明度(10%-100%);28 色调色盘(7 列网格)+彩虹自定义取色器(input type=color);撤销/重做按钮(仅涂鸦,快照历史) |
+| `utils/doodle.js` | 新建(V9.1):矢量笔画引擎。BRUSHES/INK_COLORS+renderStroke/renderStrokes(签字笔实色圆头/铅笔两遍抖动/蜡笔三遍抖动/mulberry32 种子确定性防重绘闪变/荧光笔宽平头走专用 multiply 画布/画笔随速度变宽)+erasePixel(按半径切断笔画拆新笔画)/eraseObject(整笔删除)+parseDoodle/doodleExtentY/setupCanvas/clearCanvas |
+| `utils/diary.js` | 新建:LINE_H=28/LINES_PER_PAGE=18/PAGE_H=504+MOODS/WEATHERS 枚举+`measureDiaryLines` 离屏测行数(共享单 DOM,样式须与 .page-text CSS 同步) |
+| `views/diary/DiaryEdit.vue` | 常量/枚举改引 `utils/diary.js`;日期回显改从 createdAt 原始字符串切片(修 toISOString UTC 时区偏移);编辑保存后跳回 `/diary/book/:authorId`;涂鸦三层画布接入(荧光/墨迹/实时)+指针事件+Esc 退笔;paper-body 去 2px padding 对齐查看页坐标系 |
+| `backend/.../DiaryService.java` | 修 bug:`parseDate` 兼容 `yyyy-MM-dd HH:mm`(旧代码 `parse(date+"T00:00:00")` 遇带时间的 date 直接 500,已实测);update 现在持久化日期修改(此前忽略);create/update 持久化 doodle |
+| `schema.sql` + `Diary.java`/`DiaryDTO.java` | `content_diary` 加 `doodle` JSON 列(实体+DTO 加字段);live DB 增量:`backend/src/main/resources/diary_doodle_migration.sql` |
+| `router/index.js` | 加 `/diary/book/:authorId`(public) |
+| `i18n/zh-CN.js` + `en.js` | diary.* 新增 10 条(entryCount/bookOf/pageOf/singlePageOf/toc/prevPage/nextPage/emptyBook/words) |
+| `styles/main.css` | `.ghost-btn:disabled` 全局禁用态样式 |
+
+**翻书分页规则**:一篇日记的页数 = `max(ceil(measureDiaryLines(content) / 18), ceil(doodleExtentY / 504))`(涂鸦可撑页数);书页序列按篇**紧凑拼接**(上一篇写完下一篇紧接,不补空白页,新篇页眉可能落在右页;仅总页数为奇数时最后一页右侧留白);spread s 显示第 2s+1/2s+2 页。正文不分段切割,同一文本块用裁剪窗口显示(与编辑页"textarea 长高+分页线"度量完全一致,字体/宽度改动必须同步 `utils/diary.js` 与 DiaryPage CSS)。书架封面标签起迄日期分行展示(起 {date}/迄 {date})。
+
+**涂鸦规则(V9.1)**:笔画坐标 = paper-body/sheet-body 左上角原点 CSS 像素(两页宽度同为 496px、正文 y=0 起,坐标系一致);数据 `{v:1, strokes:[{t,c,w,a,s,pts}]}` 存 `content_diary.doodle` JSON 列(`a`=透明度 0-1 缺省 1,渲染时与笔型基础 alpha 相乘);荧光笔(marker)走专用画布 + CSS `mix-blend-mode: multiply`(深色模式 screen)+opacity 0.55,其余笔走墨迹画布;编辑页画布层:荧光(2)<墨迹(3)<实时(4),正文 textarea(1);撤销/重做 = 笔画数组引用快照史(提交/擦除均不可变更新,橡皮无变化返回原引用),Ctrl+Z/Y 仅在非 textarea 焦点时生效;live DB 同步见 `backend/src/main/resources/diary_doodle_migration.sql`。
+
 
 ## 文件存储策略
 

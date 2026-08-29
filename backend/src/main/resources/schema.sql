@@ -407,6 +407,7 @@ CREATE TABLE `content_diary` (
   `mood`       VARCHAR(20)  DEFAULT NULL COMMENT '心情',
   `weather`    VARCHAR(20)  DEFAULT NULL COMMENT '天气',
   `images`     JSON         DEFAULT NULL COMMENT '图片附件URL数组（最多9张）',
+  `doodle`     JSON         DEFAULT NULL COMMENT '信纸涂鸦笔画（{v,strokes:[{t,c,w,s,pts}]}，画在纸上随日记保存）',
   `like_count` INT          NOT NULL DEFAULT 0 COMMENT '点赞数',
   `author_id`  BIGINT       NOT NULL COMMENT '作者ID',
   `family_id`  BIGINT       DEFAULT NULL COMMENT '所属家庭ID',

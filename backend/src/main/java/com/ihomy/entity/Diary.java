@@ -17,6 +17,7 @@ public class Diary {
     private String mood;
     private String weather;
     private String images;
+    private String doodle;
     private Integer likeCount;
     private Long authorId;
     private Long familyId;
