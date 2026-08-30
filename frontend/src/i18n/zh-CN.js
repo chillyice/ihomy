@@ -259,6 +259,8 @@ export default {
     allTypes: '全部类型',
     selectedCount: '已选 {n} 张照片',
     selectedAlbums: '已选 {n} 个相册',
+    selectedMixed: '已选 {a} 个相册、{p} 张照片',
+    batchMixedConfirm: '确定删除所选 {a} 个相册和 {p} 张照片？相册将连同内部照片一并删除（映射相册仅解除映射，设备文件不受影响），不可恢复。',
     deleteSelected: '删除所选',
     photoBatchDeleteConfirm: '确定删除所选 {n} 张照片？删除后不可恢复。',
     mappedReadOnly: '只读映射',
