@@ -138,10 +138,25 @@ public class AlbumService {
             albumMapService.autoRefresh(a); // 静默刷新当前层(2 分钟节流,异步不阻塞响应)
         }
 
+        // 父级相册链(面包屑导航用,从根到父)
+        List<Map<String, Object>> parents = new ArrayList<>();
+        Long pid = a.getParentId();
+        int depth = 0;
+        while (pid != null && depth++ < 10) {
+            Album p = albumMapper.selectById(pid);
+            if (p == null) break;
+            Map<String, Object> pm = new HashMap<>();
+            pm.put("id", p.getId());
+            pm.put("name", p.getName());
+            parents.add(0, pm);
+            pid = p.getParentId();
+        }
+
         Map<String, Object> data = new HashMap<>();
         data.put("album", a);
         data.put("photos", photos);
         data.put("children", childMaps);
+        data.put("parents", parents);
         return data;
     }
 

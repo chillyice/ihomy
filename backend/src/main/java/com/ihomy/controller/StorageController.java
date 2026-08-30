@@ -36,6 +36,7 @@ public class StorageController {
     private final StorageService storageService;
     private final AlbumMapService albumMapService;
     private final SignedUrlService signedUrlService;
+    private final com.ihomy.service.ThumbnailService thumbnailService;
     private final SecurityHelper securityHelper;
 
     private SysUser currentUser() {
@@ -95,28 +96,41 @@ public class StorageController {
                                   @RequestParam(required = false, defaultValue = "false") boolean download) {
         if (deviceId == null || deviceId == 0L) throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.BAD_REQUEST, "系统设备不支持文件浏览,请添加自定义存储设备");
         StorageDevice device = storageService.getDevice(currentFamilyId(), deviceId);
-        return streamFromDevice(device, path, null, download);
+        return streamFromDevice(device, path, null, download, false);
     }
 
-    @Operation(summary = "签名中转读取设备文件(img/video 标签专用,签名即凭证,10 分钟有效)")
+    @Operation(summary = "签名中转读取设备文件(img/video 标签专用,签名即凭证,10 分钟有效;thumb=1 返回 480px 缓存缩略图)")
     @GetMapping("/file-signed")
     public ResponseEntity<?> fileSigned(@RequestParam Long deviceId,
                                         @RequestParam String path,
                                         @RequestParam(required = false) Long fsId,
                                         @RequestParam long exp,
                                         @RequestParam String sig,
-                                        @RequestParam(required = false, defaultValue = "false") boolean download) {
+                                        @RequestParam(required = false, defaultValue = "false") boolean download,
+                                        @RequestParam(required = false, defaultValue = "false") boolean thumb) {
         if (!signedUrlService.verify(deviceId, path, fsId, exp, sig)) {
             throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.UNAUTHORIZED, "链接已过期或签名无效");
         }
         StorageDevice device = storageService.getDeviceById(deviceId);
         if (device == null) throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.NOT_FOUND, "存储设备不存在");
-        return streamFromDevice(device, path, fsId, download);
+        return streamFromDevice(device, path, fsId, download, thumb);
     }
 
-    /** 设备文件流式返回:百度走 dlink 中转(InputStreamResource 不缓冲),本地/挂载读盘 */
-    private ResponseEntity<?> streamFromDevice(StorageDevice device, String path, Long fsId, boolean download) {
+    /** 设备文件流式返回:thumb=图片缩略图缓存;百度走 dlink 中转(InputStreamResource 不缓冲),本地/挂载读盘 */
+    private ResponseEntity<?> streamFromDevice(StorageDevice device, String path, Long fsId,
+                                               boolean download, boolean thumb) {
         String name = path.substring(path.lastIndexOf('/') + 1);
+        // 网格缩略图:命中缓存秒回,未命中下载原图生成;HEIC 等不可读格式回退原图
+        if (thumb && !download && isImageName(name)) {
+            byte[] thumbBytes = thumbnailService.thumb(device, path, fsId);
+            if (thumbBytes != null) {
+                HttpHeaders h = new HttpHeaders();
+                h.setContentType(MediaType.IMAGE_JPEG);
+                h.setCacheControl("private, max-age=86400");
+                h.setContentLength(thumbBytes.length);
+                return new ResponseEntity<>(thumbBytes, h, HttpStatus.OK);
+            }
+        }
         HttpHeaders headers = new HttpHeaders();
         if (download) {
             String encoded = URLEncoder.encode(name, StandardCharsets.UTF_8).replace("+", "%20");
@@ -133,6 +147,12 @@ public class StorageController {
         }
         byte[] bytes = storageService.readFileBytes(device, path);
         return new ResponseEntity<>(bytes, headers, HttpStatus.OK);
+    }
+
+    private boolean isImageName(String name) {
+        String n = name.toLowerCase();
+        return n.endsWith(".jpg") || n.endsWith(".jpeg") || n.endsWith(".png") || n.endsWith(".gif")
+                || n.endsWith(".webp") || n.endsWith(".bmp");
     }
 
     private MediaType guessMediaType(String name) {
