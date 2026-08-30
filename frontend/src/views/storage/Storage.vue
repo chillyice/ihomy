@@ -99,7 +99,10 @@
     <div class="card section">
       <div class="page-toolbar">
         <h3>{{ $t('storage.sync') }}</h3>
-        <el-button v-if="userStore.isOwner" type="primary" @click="syncVisible = true">{{ $t('storage.syncNow') }}</el-button>
+        <div class="tb-right">
+          <el-button v-if="userStore.isOwner" :loading="clearingThumbs" @click="clearThumbs">{{ $t('storage.clearThumbs') }}</el-button>
+          <el-button v-if="userStore.isOwner" type="primary" @click="syncVisible = true">{{ $t('storage.syncNow') }}</el-button>
+        </div>
       </div>
       <p class="map-hint">{{ $t('storage.mapHintLong') }}</p>
     </div>
@@ -167,6 +170,19 @@ const userStore = useUserStore()
 
 const devices = ref([])
 const syncVisible = ref(false)
+const clearingThumbs = ref(false)
+// 清空设备缩略图缓存:下次打开映射相册会重新下载生成(复现首次加载/验证缓存效果用)
+const clearThumbs = async () => {
+  clearingThumbs.value = true
+  try {
+    const res = await storageApi.clearThumbs()
+    ElMessage.success(t('storage.thumbsCleared', { n: res.data }))
+  } catch (e) {
+    ElMessage.error(t('common.failed'))
+  } finally {
+    clearingThumbs.value = false
+  }
+}
 let syncTimer = null
 const loadingDevices = ref(false)
 const deviceDialog = ref(false)

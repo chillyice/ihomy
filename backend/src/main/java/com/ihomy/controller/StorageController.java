@@ -212,9 +212,16 @@ public class StorageController {
         return Result.success(Map.of("taskId", taskId));
     }
 
+    @Operation(summary = "清空设备缩略图缓存(下次打开相册重新生成)")
+    @OperationLog(module = "STORAGE", operationType = "DELETE", description = "清理缩略图缓存")
+    @RequirePermission("storage:manage")
+    @DeleteMapping("/thumbs")
+    public Result<Integer> clearThumbs() {
+        return Result.success(thumbnailService.clearCache());
+    }
+
     @Operation(summary = "同步/映射任务进度")
     @GetMapping("/sync/progress/{taskId}")
-    public Result<Map<String, Object>> progress(@PathVariable Long taskId) {
-        return Result.success(albumMapService.progress(taskId));
+    public Result<Map<String, Object>> progress(@PathVariable Long taskId) {        return Result.success(albumMapService.progress(taskId));
     }
 }

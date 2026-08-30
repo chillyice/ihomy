@@ -281,6 +281,7 @@ export const storageApi = {
     return download ? `${base}&download=true` : base
   },
   map: (data) => request.post('/storage/map', data),
+  clearThumbs: () => request.delete('/storage/thumbs'),
   syncProgress: (taskId) => request.get(`/storage/sync/progress/${taskId}`),
   baiduCredential: () => request.get('/storage/baidu/credential'),
   saveBaiduCredential: (data) => request.put('/storage/baidu/credential', data),
