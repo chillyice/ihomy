@@ -19,6 +19,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.util.HexFormat;
+import java.util.concurrent.Semaphore;
 
 /**
  * 设备照片缩略图缓存:第一次访问下载原图生成 480px 缩略图落盘,之后直接读缓存。
@@ -33,6 +34,8 @@ import java.util.HexFormat;
 public class ThumbnailService {
 
     private static final int MAX_WIDTH = 480;
+    /** 生成阶段并发上限:原图 byte[] + BufferedImage 全解码很吃堆(-Xmx384m),50 张并发生成会 OOM */
+    private static final Semaphore GEN_SLOTS = new Semaphore(2);
 
     private final StorageService storageService;
 
@@ -46,19 +49,44 @@ public class ThumbnailService {
             if (Files.exists(cache)) {
                 return Files.readAllBytes(cache);
             }
-            byte[] src = readSource(device, path, fsId);
-            if (src == null || src.length == 0) return null;
-            BufferedImage img = ImageIO.read(new ByteArrayInputStream(src));
-            if (img == null) return null; // HEIC 等不可读 → 回退原图
-            byte[] thumbBytes = scale(img);
-            Files.createDirectories(cache.getParent());
-            // ponytail: 并发未命中可能重复生成同一张,写文件 REPLACE 幂等,浪费一次下载可接受
-            Files.write(cache, thumbBytes);
-            return thumbBytes;
-        } catch (Exception e) {
+            GEN_SLOTS.acquire();
+            try {
+                byte[] src = readSource(device, path, fsId);
+                if (src == null || src.length == 0) return null;
+                BufferedImage img = ImageIO.read(new ByteArrayInputStream(src));
+                if (img == null) return null; // HEIC 等不可读 → 回退原图
+                byte[] thumbBytes = scale(img);
+                Files.createDirectories(cache.getParent());
+                // ponytail: 并发未命中可能重复生成同一张,写文件 REPLACE 幂等,浪费一次下载可接受
+                Files.write(cache, thumbBytes);
+                return thumbBytes;
+            } finally {
+                GEN_SLOTS.release();
+            }
+        } catch (Throwable e) { // 含 OutOfMemoryError:生成失败一律回退原图,不 500
             log.warn("缩略图生成失败(回退原图): device={}, path={} | {}", device.getId(), path, e.toString());
             return null;
         }
+    }
+
+    /** 清空设备缩略图缓存(运维/复现用),返回删除的缓存文件数 */
+    public int clearCache() {
+        Path dir = Paths.get(uploadDir, "device-thumbs");
+        if (!Files.exists(dir)) return 0;
+        int[] removed = {0};
+        try (var files = Files.list(dir)) {
+            files.forEach(p -> {
+                try {
+                    Files.deleteIfExists(p);
+                    removed[0]++;
+                } catch (Exception ignored) {
+                }
+            });
+        } catch (Exception e) {
+            log.warn("清空缩略图缓存失败: {}", e.toString());
+        }
+        log.info("缩略图缓存已清空,删除 {} 个文件", removed[0]);
+        return removed[0];
     }
 
     /** 下载原图全量字节:BAIDU 走 dlink 中转(并发限流内),本地/挂载读盘 */

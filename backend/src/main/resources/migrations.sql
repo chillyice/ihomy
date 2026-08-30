@@ -196,3 +196,15 @@ SET @add_photo_fsid := (
 PREPARE add_photo_fsid_stmt FROM @add_photo_fsid;
 EXECUTE add_photo_fsid_stmt;
 DEALLOCATE PREPARE add_photo_fsid_stmt;
+
+-- 2026-08-30: 日记信纸涂鸦字段(V9.1 独立迁移文件漏并入流水线,补录;生产库曾因此写日记 500)
+SET @add_diary_doodle := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `content_diary` ADD COLUMN `doodle` JSON DEFAULT NULL COMMENT ''信纸涂鸦笔画({v,strokes:[{t,c,w,s,pts}]}矢量JSON,编辑信纸随日记保存)'' AFTER `images`',
+    'SELECT ''skip: diary doodle column already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_diary' AND COLUMN_NAME = 'doodle'
+);
+PREPARE add_diary_doodle_stmt FROM @add_diary_doodle;
+EXECUTE add_diary_doodle_stmt;
+DEALLOCATE PREPARE add_diary_doodle_stmt;
