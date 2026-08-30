@@ -19,6 +19,7 @@ public class Album {
     private String name;
     private String type;
     private String coverPhotoUrl;
+    private String coverUrl;
     private String shareToken;
     private Long familyId;
     private Long parentId;

@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,7 @@ public class AlbumController {
     private final AlbumMapService albumMapService;
     private final SecurityHelper securityHelper;
     private final FamilyMapper familyMapper;
+    private final com.ihomy.service.FileService fileService;
 
     @Operation(summary = "相册列表")
     @GetMapping("/list")
@@ -79,6 +81,24 @@ public class AlbumController {
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         albumService.delete(id, securityHelper.currentUser(), securityHelper.isOwner());
+        return Result.success();
+    }
+
+    @Operation(summary = "设置自定义封面(上传图片,优先于照片封面)")
+    @OperationLog(module = "ALBUM", operationType = "UPDATE", description = "设置相册封面")
+    @PostMapping("/{id}/cover")
+    public Result<Void> setCover(@PathVariable Long id, MultipartFile file) {
+        if (file == null || file.isEmpty()) throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.BAD_REQUEST, "请选择图片文件");
+        String url = fileService.upload(file, file.getOriginalFilename(), file.getContentType());
+        albumService.updateCover(id, securityHelper.currentUser(), securityHelper.isOwner(), url);
+        return Result.success();
+    }
+
+    @Operation(summary = "清除自定义封面(回退为照片封面)")
+    @OperationLog(module = "ALBUM", operationType = "UPDATE", description = "清除相册封面")
+    @DeleteMapping("/{id}/cover")
+    public Result<Void> clearCover(@PathVariable Long id) {
+        albumService.updateCover(id, securityHelper.currentUser(), securityHelper.isOwner(), null);
         return Result.success();
     }
 

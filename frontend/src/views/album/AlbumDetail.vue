@@ -24,6 +24,12 @@
           :loading="refreshing"
           @click="onRefresh"
         >{{ t('album.refreshMap') }}</el-button>
+        <el-button v-if="canManageAlbum" class="ghost-btn" @click="pickCover">{{ t('album.setCover') }}</el-button>
+        <el-button
+          v-if="canManageAlbum && photos.length && !isMapped"
+          class="ghost-btn"
+          @click="toggleSelect"
+        >{{ selectMode ? t('album.cancelSelect') : t('album.select') }}</el-button>
         <el-button
           v-if="album.type === 'public' && album.shareToken"
           class="ghost-btn"
@@ -40,34 +46,78 @@
         </el-upload>
       </div>
     </div>
+    <input ref="coverInput" type="file" accept="image/*" class="hidden-input" @change="onCoverPicked" />
 
-    <!-- 子相册(设备目录映射层级) -->
-    <div v-if="children.length" class="child-albums">
-      <div
-        v-for="c in children"
-        :key="c.id"
-        class="child-card card"
-        @click="$router.push(`/album/${c.id}`)"
-      >
-        <div class="child-cover" :style="c.cover ? { backgroundImage: `url(${c.cover}&thumb=1)` } : {}">
-          <span v-if="!c.cover" class="child-cover-empty">📷</span>
-          <span class="status-dot" :class="c.syncStatus || 'OFFLINE'"></span>
+    <!-- 子相册(设备目录映射层级):方块/列表两种展示模式 -->
+    <div v-if="children.length" class="child-section">
+      <div class="child-toolbar">
+        <span class="section-label">{{ t('album.childAlbums') }}</span>
+        <div class="view-toggle">
+          <button class="vt-btn" :class="{ active: childView === 'grid' }" :title="t('album.gridView')" @click="setChildView('grid')">
+            <svg viewBox="0 0 16 16" width="14" height="14"><rect x="1.5" y="1.5" width="5" height="5" rx="1" fill="currentColor"/><rect x="9.5" y="1.5" width="5" height="5" rx="1" fill="currentColor"/><rect x="1.5" y="9.5" width="5" height="5" rx="1" fill="currentColor"/><rect x="9.5" y="9.5" width="5" height="5" rx="1" fill="currentColor"/></svg>
+          </button>
+          <button class="vt-btn" :class="{ active: childView === 'list' }" :title="t('album.listView')" @click="setChildView('list')">
+            <svg viewBox="0 0 16 16" width="14" height="14"><rect x="1.5" y="2.5" width="13" height="3" rx="1" fill="currentColor"/><rect x="1.5" y="6.5" width="13" height="3" rx="1" fill="currentColor"/><rect x="1.5" y="10.5" width="13" height="3" rx="1" fill="currentColor"/></svg>
+          </button>
         </div>
-        <div class="child-info">
-          <span class="child-name">{{ c.name }}</span>
-          <span class="child-meta">
-            {{ t('album.photoCount', { n: c.photoCount }) }}<template v-if="c.childCount"> · {{ t('album.subAlbumCount', { n: c.childCount }) }}</template>
-          </span>
+      </div>
+      <!-- 方块模式:大封面卡片 -->
+      <div v-if="childView === 'grid'" class="child-grid">
+        <div v-for="c in children" :key="c.id" class="child-tile card" @click="$router.push(`/album/${c.id}`)">
+          <div class="child-tile-cover">
+            <template v-if="c.cover">
+              <div class="child-tile-img" :style="{ backgroundImage: `url(${c.cover}&thumb=1)` }"></div>
+            </template>
+            <AlbumDefaultCover v-else :size="56" />
+            <span class="status-dot" :class="c.syncStatus || 'OFFLINE'"></span>
+          </div>
+          <div class="child-tile-info">
+            <span class="child-tile-name">{{ c.name }}</span>
+            <span class="child-tile-meta">
+              {{ t('album.photoCount', { n: c.photoCount }) }}<template v-if="c.childCount"> · {{ t('album.subAlbumCount', { n: c.childCount }) }}</template>
+            </span>
+          </div>
+        </div>
+      </div>
+      <!-- 列表模式:横条 -->
+      <div v-else class="child-list">
+        <div
+          v-for="c in children"
+          :key="c.id"
+          class="child-card card"
+          @click="$router.push(`/album/${c.id}`)"
+        >
+          <div class="child-cover" :style="c.cover ? { backgroundImage: `url(${c.cover}&thumb=1)` } : {}">
+            <AlbumDefaultCover v-if="!c.cover" :size="30" />
+            <span class="status-dot" :class="c.syncStatus || 'OFFLINE'"></span>
+          </div>
+          <div class="child-info">
+            <span class="child-name">{{ c.name }}</span>
+            <span class="child-meta">
+              {{ t('album.photoCount', { n: c.photoCount }) }}<template v-if="c.childCount"> · {{ t('album.subAlbumCount', { n: c.childCount }) }}</template>
+            </span>
+          </div>
         </div>
       </div>
     </div>
 
     <div v-loading="loading" class="album-body">
+      <!-- 多选工具条 -->
+      <div v-if="selectMode" class="select-bar card">
+        <span>{{ t('album.selectedCount', { n: selectedIds.length }) }}</span>
+        <div class="tb-right">
+          <el-button size="small" :disabled="batchDeleting" @click="toggleSelect">{{ t('album.cancelSelect') }}</el-button>
+          <el-button type="danger" size="small" :loading="batchDeleting" :disabled="!selectedIds.length" @click="onBatchDelete">{{ t('album.deleteSelected') }}</el-button>
+        </div>
+      </div>
       <div v-if="photos.length" class="photo-wall">
-        <div v-for="p in photos" :key="p.id" class="photo-card">
-          <div class="photo-wrap" @click="openViewer(p)">
+        <div v-for="p in photos" :key="p.id" class="photo-card" :class="{ selected: selectMode && selectedIds.includes(p.id) }">
+          <div class="photo-wrap" @click="selectMode ? togglePick(p) : openViewer(p)">
             <img :src="thumbUrl(p.url)" :alt="p.description || album.name" loading="lazy" />
-            <div class="photo-hover">
+            <span v-if="selectMode" class="pick-badge" :class="{ on: selectedIds.includes(p.id) }">
+              <svg viewBox="0 0 16 16" width="11" height="11"><path d="M3 8.5 L6.5 12 L13 4.5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+            <div v-if="!selectMode" class="photo-hover">
               <span v-if="canManagePhoto(p)" @click.stop="openDesc(p)"><el-icon><Edit /></el-icon>{{ t('album.editNote') }}</span>
               <span v-if="canManagePhoto(p)" class="danger" @click.stop="onDelPhoto(p)"><el-icon><Delete /></el-icon>{{ t('common.delete') }}</span>
             </div>
@@ -100,7 +150,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { albumApi, photoApi } from '@/api'
 import { useUserStore } from '@/stores/user'
@@ -109,7 +159,9 @@ import { Edit, Delete, Location, Clock } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PhotoViewer from '@/components/PhotoViewer.vue'
+import AlbumDefaultCover from '@/components/AlbumDefaultCover.vue'
 import { shareId } from '@/utils/shareId'
+import { useSyncStore } from '@/stores/sync'
 
 const route = useRoute()
 const userStore = useUserStore()
@@ -236,22 +288,79 @@ const openViewer = (p) => {
   viewer.visible = true
 }
 
+// ---------- 相册封面(自定义,优先于照片封面) ----------
+const coverInput = ref(null)
+// 相册管理权限:家长或创建者,且非游客分享模式
+const canManageAlbum = computed(() =>
+  !shareToken && userStore.isLoggedIn && (userStore.isOwner || album.value.createdBy === userStore.userInfo?.id)
+)
+const pickCover = () => coverInput.value?.click()
+const onCoverPicked = async (e) => {
+  const file = e.target.files?.[0]
+  if (!file) return
+  await albumApi.setCover(albumId, file)
+  ElMessage.success(t('common.saved'))
+  e.target.value = ''
+  load()
+}
+
+// ---------- 子相册展示模式(方块/列表,localStorage 记忆) ----------
+const childView = ref(localStorage.getItem('ihomy:album:childView') || 'grid')
+const setChildView = (v) => {
+  childView.value = v
+  localStorage.setItem('ihomy:album:childView', v)
+}
+
+// ---------- 照片多选删除 ----------
+const selectMode = ref(false)
+const selectedIds = ref([])
+const batchDeleting = ref(false)
+const toggleSelect = () => {
+  selectMode.value = !selectMode.value
+  selectedIds.value = []
+}
+const togglePick = (p) => {
+  const i = selectedIds.value.indexOf(p.id)
+  if (i >= 0) selectedIds.value.splice(i, 1)
+  else selectedIds.value.push(p.id)
+}
+const onBatchDelete = async () => {
+  await ElMessageBox.confirm(t('album.photoBatchDeleteConfirm', { n: selectedIds.value.length }), t('common.tip'), { type: 'warning', closeOnClickModal: true })
+  batchDeleting.value = true
+  try {
+    for (const id of [...selectedIds.value]) {
+      await photoApi.remove(id)
+    }
+    ElMessage.success(t('common.deleted'))
+    selectedIds.value = []
+    selectMode.value = false
+    load()
+  } finally {
+    batchDeleting.value = false
+  }
+}
+
+// ---------- 后台同步完成时自动刷新(停留在本页也能看到新照片) ----------
+const syncStore = useSyncStore()
+watch(syncStore.doneCount, () => load())
+
 onMounted(load)
 </script>
 
 <style scoped>
+.hidden-input { display: none; }
 .album-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
   margin-bottom: 16px;
-  padding: 20px;
+  padding: 10px 16px; /* 对齐全局 .page-toolbar 规范高度 */
 }
 .album-header h2 { color: var(--color-primary); margin-bottom: 6px; }
 .album-head-info { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .album-name {
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--color-primary);
   display: inline-flex;
@@ -278,12 +387,18 @@ onMounted(load)
 .status-dot.VALID { background: #67b26b; box-shadow: 0 0 4px rgba(103, 178, 107, 0.9); }
 .status-dot.OFFLINE, .status-dot.SYNCING { background: #9a9a9a; }
 .status-dot.MISSING { background: #b96058; box-shadow: 0 0 4px rgba(185, 96, 88, 0.9); }
-.child-albums {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 14px;
-  margin-bottom: 20px;
-}
+.child-section { margin-bottom: 20px; }
+.child-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.child-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.child-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.child-tile { overflow: hidden; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
+.child-tile:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(31,58,95,0.15); }
+.child-tile-cover { position: relative; aspect-ratio: 4 / 3; }
+.child-tile-img { width: 100%; height: 100%; background-size: cover; background-position: center; }
+.child-tile-cover .status-dot { position: absolute; top: 8px; right: 8px; border: 2px solid var(--color-bg, #fcf8f0); }
+.child-tile-info { padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
+.child-tile-name { font-size: 14px; font-weight: 600; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.child-tile-meta { font-size: 12px; color: var(--color-text-secondary); }
 .child-card {
   display: flex;
   align-items: center;
@@ -298,6 +413,7 @@ onMounted(load)
   width: 52px;
   height: 52px;
   border-radius: 8px;
+  overflow: hidden;
   background-size: cover;
   background-position: center;
   background-color: var(--color-bg-2, #eef2f7);
@@ -306,11 +422,35 @@ onMounted(load)
   align-items: center;
   justify-content: center;
 }
-.child-cover-empty { font-size: 22px; }
 .child-cover .status-dot { position: absolute; bottom: -2px; right: -2px; border: 2px solid var(--color-bg, #fcf8f0); }
 .child-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .child-name { font-size: 14px; font-weight: 600; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .child-meta { font-size: 12px; color: var(--color-text-secondary); }
+.select-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.select-bar .tb-right { display: flex; gap: 8px; }
+.photo-card.selected .photo-wrap { outline: 3px solid var(--color-primary, #b88c6e); outline-offset: -3px; }
+.pick-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  border: 2px solid rgba(184, 140, 110, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pick-badge.on { background: #b88c6e; border-color: #b88c6e; }
 .album-desc { margin-top: 8px; color: var(--color-text-secondary); font-size: 13px; }
 .album-head-actions { display: flex; flex-direction: row; align-items: center; gap: 8px; flex-shrink: 0; }
 .album-body { margin-top: 20px; }

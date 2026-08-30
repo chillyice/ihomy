@@ -89,6 +89,26 @@ public class ThumbnailService {
         return removed[0];
     }
 
+    /** 删除单张照片的缩略图缓存:按 storage://{deviceId}/{path}?fsid={fsId} 逻辑地址解析缓存 key */
+    public void evictByUrl(String url) {
+        try {
+            if (url == null || !url.startsWith("storage://")) return;
+            String rest = url.substring("storage://".length());
+            int slash = rest.indexOf('/');
+            Long deviceId = Long.valueOf(rest.substring(0, slash));
+            String path = rest.substring(slash + 1);
+            Long fsId = null;
+            int q = path.indexOf("?fsid=");
+            if (q >= 0) {
+                fsId = Long.valueOf(path.substring(q + 6));
+                path = path.substring(0, q);
+            }
+            Files.deleteIfExists(cachePath(deviceId, path, fsId));
+        } catch (Exception e) {
+            log.debug("缩略图缓存逐出失败(忽略): {} | {}", url, e.toString());
+        }
+    }
+
     /** 下载原图全量字节:BAIDU 走 dlink 中转(并发限流内),本地/挂载读盘 */
     private byte[] readSource(StorageDevice device, String path, Long fsId) throws Exception {
         if ("BAIDU".equals(device.getDeviceType())) {
@@ -119,7 +139,11 @@ public class ThumbnailService {
 
     /** 缓存文件:uploadDir/device-thumbs/{md5}.jpg */
     private Path cachePath(StorageDevice device, String path, Long fsId) throws Exception {
-        String key = device.getId() + ":" + (fsId != null && fsId > 0 ? "fs" + fsId : path);
+        return cachePath(device.getId(), path, fsId);
+    }
+
+    private Path cachePath(Long deviceId, String path, Long fsId) throws Exception {
+        String key = deviceId + ":" + (fsId != null && fsId > 0 ? "fs" + fsId : path);
         byte[] digest = MessageDigest.getInstance("MD5")
                 .digest(key.getBytes(StandardCharsets.UTF_8));
         String name = HexFormat.of().formatHex(digest) + ".jpg";
