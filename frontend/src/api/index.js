@@ -76,6 +76,7 @@ export const albumApi = {
   create: (data) => request.post('/album', data),
   update: (id, data) => request.put(`/album/${id}`, data),
   remove: (id) => request.delete(`/album/${id}`),
+  refresh: (id) => request.post(`/album/${id}/refresh`),
 }
 
 // 照片(批量上传)
@@ -268,7 +269,7 @@ export const chatApi = {
   read: (msgId) => request.post('/chat/read', { msgId }),
 }
 
-// 存储管理(家庭级设备 + 文件浏览 + 一键同步)
+// 存储管理(家庭级设备 + 文件浏览 + 目录映射同步)
 export const storageApi = {
   devices: () => request.get('/storage/device/list'),
   addDevice: (data) => request.post('/storage/device', data),
@@ -279,7 +280,7 @@ export const storageApi = {
     const base = `/api/storage/file?deviceId=${deviceId}&path=${encodeURIComponent(path)}`
     return download ? `${base}&download=true` : base
   },
-  sync: (data) => request.post('/storage/sync', data),
+  map: (data) => request.post('/storage/map', data),
   syncProgress: (taskId) => request.get(`/storage/sync/progress/${taskId}`),
   baiduCredential: () => request.get('/storage/baidu/credential'),
   saveBaiduCredential: (data) => request.put('/storage/baidu/credential', data),

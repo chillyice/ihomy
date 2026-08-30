@@ -1,6 +1,7 @@
 package com.ihomy.controller;
 
 import com.ihomy.annotation.OperationLog;
+import com.ihomy.annotation.RequirePermission;
 import com.ihomy.common.Result;
 import com.ihomy.dto.AlbumDTO;
 import com.ihomy.entity.Album;
@@ -8,6 +9,7 @@ import com.ihomy.entity.Family;
 import com.ihomy.entity.SysUser;
 import com.ihomy.mapper.FamilyMapper;
 import com.ihomy.security.SecurityHelper;
+import com.ihomy.service.AlbumMapService;
 import com.ihomy.service.AlbumService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,6 +29,7 @@ import java.util.Map;
 public class AlbumController {
 
     private final AlbumService albumService;
+    private final AlbumMapService albumMapService;
     private final SecurityHelper securityHelper;
     private final FamilyMapper familyMapper;
 
@@ -77,5 +80,18 @@ public class AlbumController {
     public Result<Void> delete(@PathVariable Long id) {
         albumService.delete(id, securityHelper.currentUser(), securityHelper.isOwner());
         return Result.success();
+    }
+
+    @Operation(summary = "刷新映射相册(重新扫描设备目录,递归子树;仅设备映射相册)")
+    @OperationLog(module = "ALBUM", operationType = "UPDATE", description = "刷新映射相册")
+    @RequirePermission("storage:manage")
+    @PostMapping("/{id}/refresh")
+    public Result<Map<String, Long>> refresh(@PathVariable Long id) {
+        com.ihomy.entity.Album a = albumService.getById(id);
+        if (a == null) throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.NOT_FOUND);
+        if (!a.getFamilyId().equals(securityHelper.current().getFamilyId())) {
+            throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.FORBIDDEN);
+        }
+        return Result.success(Map.of("taskId", albumMapService.refreshAlbum(securityHelper.currentUser(), a)));
     }
 }

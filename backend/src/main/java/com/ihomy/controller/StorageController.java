@@ -6,6 +6,8 @@ import com.ihomy.common.Result;
 import com.ihomy.entity.StorageDevice;
 import com.ihomy.entity.SysUser;
 import com.ihomy.security.SecurityHelper;
+import com.ihomy.service.AlbumMapService;
+import com.ihomy.service.SignedUrlService;
 import com.ihomy.service.StorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,8 +24,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 存储管理接口(家庭级):设备 CRUD、文件浏览/下载、一键同步。
- * 设备管理需 @storage:manage(OWNER),浏览/同步需登录。
+ * 存储管理接口(家庭级):设备 CRUD、文件浏览/下载、目录映射同步。
+ * 设备管理与映射需 @storage:manage(OWNER),浏览需登录,签名中转免登录(签名即凭证)。
  */
 @Tag(name = "存储管理")
 @RestController
@@ -32,6 +34,8 @@ import java.util.Map;
 public class StorageController {
 
     private final StorageService storageService;
+    private final AlbumMapService albumMapService;
+    private final SignedUrlService signedUrlService;
     private final SecurityHelper securityHelper;
 
     private SysUser currentUser() {
@@ -91,34 +95,43 @@ public class StorageController {
                                   @RequestParam(required = false, defaultValue = "false") boolean download) {
         if (deviceId == null || deviceId == 0L) throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.BAD_REQUEST, "系统设备不支持文件浏览,请添加自定义存储设备");
         StorageDevice device = storageService.getDevice(currentFamilyId(), deviceId);
-        // 百度网盘:dlink 服务器中转,流式返回(不缓冲,大视频不占堆)
-        if ("BAIDU".equals(device.getDeviceType())) {
-            StorageService.BaiduFileStream fs = storageService.baiduOpen(device, path);
-            String name = path.substring(path.lastIndexOf('/') + 1);
-            HttpHeaders headers = new HttpHeaders();
-            if (download) {
-                String encoded = URLEncoder.encode(name, StandardCharsets.UTF_8).replace("+", "%20");
-                headers.set("Content-Disposition", "attachment; filename*=UTF-8''" + encoded);
-                headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-            } else {
-                headers.setContentType(guessMediaType(name));
-                headers.setCacheControl("private, max-age=3600");
-            }
-            if (fs.length() > 0) headers.setContentLength(fs.length());
-            return new ResponseEntity<>(new org.springframework.core.io.InputStreamResource(fs.in()), headers, HttpStatus.OK);
+        return streamFromDevice(device, path, null, download);
+    }
+
+    @Operation(summary = "签名中转读取设备文件(img/video 标签专用,签名即凭证,10 分钟有效)")
+    @GetMapping("/file-signed")
+    public ResponseEntity<?> fileSigned(@RequestParam Long deviceId,
+                                        @RequestParam String path,
+                                        @RequestParam(required = false) Long fsId,
+                                        @RequestParam long exp,
+                                        @RequestParam String sig,
+                                        @RequestParam(required = false, defaultValue = "false") boolean download) {
+        if (!signedUrlService.verify(deviceId, path, fsId, exp, sig)) {
+            throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.UNAUTHORIZED, "链接已过期或签名无效");
         }
-        byte[] bytes = storageService.readFileBytes(device, path);
+        StorageDevice device = storageService.getDeviceById(deviceId);
+        if (device == null) throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.NOT_FOUND, "存储设备不存在");
+        return streamFromDevice(device, path, fsId, download);
+    }
+
+    /** 设备文件流式返回:百度走 dlink 中转(InputStreamResource 不缓冲),本地/挂载读盘 */
+    private ResponseEntity<?> streamFromDevice(StorageDevice device, String path, Long fsId, boolean download) {
+        String name = path.substring(path.lastIndexOf('/') + 1);
         HttpHeaders headers = new HttpHeaders();
-        String name = storageService.downloadName(device, path);
         if (download) {
             String encoded = URLEncoder.encode(name, StandardCharsets.UTF_8).replace("+", "%20");
-            headers.setContentDispositionFormData("attachment", name);
             headers.set("Content-Disposition", "attachment; filename*=UTF-8''" + encoded);
             headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
         } else {
             headers.setContentType(guessMediaType(name));
             headers.setCacheControl("private, max-age=3600");
         }
+        if ("BAIDU".equals(device.getDeviceType())) {
+            StorageService.BaiduFileStream fs = storageService.baiduOpen(device, path, fsId);
+            if (fs.length() > 0) headers.setContentLength(fs.length());
+            return new ResponseEntity<>(new org.springframework.core.io.InputStreamResource(fs.in()), headers, HttpStatus.OK);
+        }
+        byte[] bytes = storageService.readFileBytes(device, path);
         return new ResponseEntity<>(bytes, headers, HttpStatus.OK);
     }
 
@@ -167,21 +180,21 @@ public class StorageController {
         return Result.success();
     }
 
-    @Operation(summary = "一键同步:设备目录→相册(后台异步)")
-    @OperationLog(module = "STORAGE", operationType = "CREATE", description = "一键同步存储设备", saveArgs = false)
+    @Operation(summary = "从设备同步:勾选目录映射为层级相册(影子记录,不拷贝文件)")
+    @OperationLog(module = "STORAGE", operationType = "CREATE", description = "设备目录映射同步", saveArgs = false)
     @RequirePermission("storage:manage")
-    @PostMapping("/sync")
-    public Result<Map<String, Long>> sync(@RequestBody Map<String, Object> body) {
+    @PostMapping("/map")
+    public Result<Map<String, Long>> map(@RequestBody Map<String, Object> body) {
         Long deviceId = body.get("deviceId") == null ? 0L : Long.valueOf(body.get("deviceId").toString());
-        boolean includeEmpty = Boolean.TRUE.equals(body.get("includeEmpty"));
-        StorageDevice device = storageService.getDevice(currentFamilyId(), deviceId);
-        Long taskId = storageService.startSync(device, includeEmpty, currentUser());
+        @SuppressWarnings("unchecked")
+        List<String> paths = (List<String>) body.get("paths");
+        Long taskId = albumMapService.createMapping(currentUser(), currentFamilyId(), deviceId, paths);
         return Result.success(Map.of("taskId", taskId));
     }
 
-    @Operation(summary = "同步进度")
+    @Operation(summary = "同步/映射任务进度")
     @GetMapping("/sync/progress/{taskId}")
     public Result<Map<String, Object>> progress(@PathVariable Long taskId) {
-        return Result.success(storageService.syncProgress(taskId));
+        return Result.success(albumMapService.progress(taskId));
     }
 }

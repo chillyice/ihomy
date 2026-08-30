@@ -58,7 +58,8 @@ public class SecurityConfig {
                         "/like/state",
                         "/music/background",
                         "/kitchen/menu", "/kitchen/recipe/*",
-                        "/book/summary").permitAll()
+                        "/book/summary",
+                        "/storage/file-signed").permitAll()
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e
                 // 未登录与无权限均以统一 JSON 结构返回,而非跳转登录页

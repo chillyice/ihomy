@@ -47,4 +47,13 @@
 
     <delete id="deletePhysicalByAlbumId">DELETE FROM content_photo WHERE album_id = #{albumId}</delete>
 
+    <select id="countByAlbumIds" resultType="map">
+        SELECT album_id AS albumId, COUNT(*) AS cnt
+        FROM content_photo
+        WHERE deleted = 0
+          AND album_id IN
+        <foreach item="id" collection="ids" open="(" separator="," close=")">#{id}</foreach>
+        GROUP BY album_id
+    </select>
+
 </mapper>

@@ -95,22 +95,16 @@
       <el-empty v-else :description="$t('storage.pickDevice')" />
     </div>
 
-    <!-- 一键同步 -->
+    <!-- 从设备同步(目录映射) -->
     <div class="card section">
       <div class="page-toolbar">
         <h3>{{ $t('storage.sync') }}</h3>
-        <el-button v-if="userStore.isOwner" type="primary" :disabled="syncing" @click="startSync">{{ $t('storage.syncNow') }}</el-button>
+        <el-button v-if="userStore.isOwner" type="primary" @click="syncVisible = true">{{ $t('storage.syncNow') }}</el-button>
       </div>
-      <div class="sync-opts">
-        <el-select v-model="syncDeviceId" :placeholder="$t('storage.pickDevice')" style="width: 240px">
-          <el-option v-for="d in devices" :key="d.id" :label="d.name" :value="d.id" />
-        </el-select>
-        <el-checkbox v-model="includeEmpty">{{ $t('storage.includeEmpty') }}</el-checkbox>
-      </div>
-      <div v-if="syncResult" class="sync-result">
-        {{ $t('storage.syncDoneSummary', { albums: syncResult.albums ?? 0, photos: syncResult.photos ?? 0, dup: syncResult.skippedDup ?? 0 }) }}
-      </div>
+      <p class="map-hint">{{ $t('storage.mapHintLong') }}</p>
     </div>
+
+    <SyncDialog v-model="syncVisible" />
 
     <!-- 设备编辑对话框:类型为百度网盘时显示 API 凭证表单(替代根路径) -->
     <el-dialog v-model="deviceDialog" append-to-body :title="deviceForm.id ? $t('common.edit') : $t('storage.addDevice')" width="480px">
@@ -166,11 +160,13 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { storageApi } from '@/api'
+import SyncDialog from '@/components/SyncDialog.vue'
 
 const { t } = useI18n()
 const userStore = useUserStore()
 
 const devices = ref([])
+const syncVisible = ref(false)
 let syncTimer = null
 const loadingDevices = ref(false)
 const deviceDialog = ref(false)
@@ -184,12 +180,11 @@ const deviceTypes = computed(() => [
   { value: 'BAIDU', label: t('storage.baidu.typeLabel') },
 ])
 
-// 默认存储设备:localStorage 持久化(家庭级),同步时自动选中
+// 默认存储设备:localStorage 持久化(家庭级)
 const defaultDeviceId = ref(parseInt(localStorage.getItem('ihomy:default-storage') || '0'))
 const setDefaultDevice = (row) => {
   defaultDeviceId.value = row.id
   localStorage.setItem('ihomy:default-storage', String(row.id))
-  syncDeviceId.value = row.id
   ElMessage.success(t('common.success'))
 }
 
@@ -198,11 +193,6 @@ const activeDeviceId = ref(0)
 const activePath = ref('')
 const files = ref([])
 const loadingFiles = ref(false)
-
-const syncing = ref(false)
-const syncDeviceId = ref(0)
-const includeEmpty = ref(false)
-const syncResult = ref(null)
 
 // 百度网盘接入状态(凭证在设备模态框中维护,此处只读展示)
 const baiduForm = ref({ appId: '', appKey: '', secretKeySet: false, signKeySet: false, configured: false, authorized: false, tokenExpiresAt: null })
@@ -399,48 +389,6 @@ function formatTime(ms) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-async function startSync() {
-  const target = devices.value.find((d) => d.id === syncDeviceId.value)
-  if (!target) {
-    ElMessage.warning(t('storage.pickDevice'))
-    return
-  }
-  syncing.value = true
-  syncResult.value = null
-  try {
-    const { taskId } = await storageApi.sync({ deviceId: target.id, includeEmpty: includeEmpty.value })
-    ElMessage.success(t('storage.syncStarted'))
-    pollProgress(taskId)
-  } catch {
-    syncing.value = false
-  }
-}
-
-function pollProgress(taskId) {
-  syncTimer = setInterval(async () => {
-    try {
-      const p = await storageApi.syncProgress(taskId)
-      if (p.status === 'DONE') {
-        clearInterval(syncTimer)
-        syncTimer = null
-        syncResult.value = p
-        syncing.value = false
-        ElMessage.success(p.message || t('storage.syncDone'))
-        loadDevices()
-      } else if (p.status === 'FAILED') {
-        clearInterval(syncTimer)
-        syncTimer = null
-        syncing.value = false
-        ElMessage.error(p.message || t('storage.syncFailed'))
-      }
-    } catch {
-      clearInterval(syncTimer)
-      syncTimer = null
-      syncing.value = false
-    }
-  }, 1000)
-}
-
 onMounted(() => {
   loadDevices()
   if (userStore.isOwner) loadBaidu()
@@ -468,11 +416,10 @@ onBeforeUnmount(() => { if (syncTimer) clearInterval(syncTimer) })
 .file-name {
   cursor: default;
 }
-.sync-opts {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  flex-wrap: wrap;
+.map-hint {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
 }
 .baidu-hint {
   margin-bottom: 0;
@@ -495,10 +442,6 @@ onBeforeUnmount(() => { if (syncTimer) clearInterval(syncTimer) })
   margin: 0 0 12px;
   font-size: 12px;
   color: var(--color-text-secondary);
-}
-.sync-result {
-  margin-top: 12px;
-  color: var(--el-color-success);
 }
 .preview-box {
   text-align: center;

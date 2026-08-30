@@ -26,6 +26,7 @@ public class Photo {
     private Long familyId;
     private String visibility;
     private String sourcePath;
+    private Long sourceFsId;
     private LocalDateTime createdAt;
     @TableLogic
     private Integer deleted;

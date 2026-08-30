@@ -8,22 +8,29 @@ import com.ihomy.dto.AlbumDTO;
 import com.ihomy.entity.Album;
 import com.ihomy.entity.Family;
 import com.ihomy.entity.Photo;
+import com.ihomy.entity.StorageDevice;
 import com.ihomy.entity.SysUser;
 import com.ihomy.mapper.AlbumMapper;
 import com.ihomy.mapper.FamilyMapper;
 import com.ihomy.mapper.PhotoMapper;
+import com.ihomy.mapper.StorageDeviceMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * 相册业务:按家庭管理相册与照片。
+ * 相册业务:按家庭管理相册与照片(含设备目录映射的层级相册)。
  * 权限:成员可管理自己创建/上传的相册与照片,OWNER 可管理任何;游客仅可读默认家庭的公开相册。
+ * 映射相册:sourceDeviceId 非空,照片为影子记录(url=storage:// 逻辑地址),出接口时换成签名中转 URL。
  */
 @Service
 @RequiredArgsConstructor
@@ -32,9 +39,12 @@ public class AlbumService {
     private final AlbumMapper albumMapper;
     private final PhotoMapper photoMapper;
     private final FamilyMapper familyMapper;
+    private final StorageDeviceMapper storageDeviceMapper;
     private final FileService fileService;
+    private final SignedUrlService signedUrlService;
+    private final AlbumMapService albumMapService;
 
-    /** 相册列表,游客只返回 public 类型;附带封面与照片数 */
+    /** 相册列表(全部层级):游客只返回 public;含来源设备名/映射状态/子相册数/子树照片合计 */
     public List<Map<String, Object>> list(Long familyId, boolean isGuest) {
         List<Map<String, Object>> result = new ArrayList<>();
         if (familyId == null) return result;
@@ -42,14 +52,32 @@ public class AlbumService {
         qw.eq(Album::getFamilyId, familyId);
         if (isGuest) qw.eq(Album::getType, "public");
         qw.orderByDesc(Album::getId);
-        for (Album a : albumMapper.selectList(qw)) {
+        List<Album> albums = albumMapper.selectList(qw);
+        if (albums.isEmpty()) return result;
+
+        Map<Long, Long> photoCounts = batchPhotoCounts(albums);
+        Map<Long, List<Album>> byParent = albums.stream()
+                .filter(a -> a.getParentId() != null)
+                .collect(Collectors.groupingBy(Album::getParentId));
+        Map<Long, String> deviceNames = batchDeviceNames(albums);
+        Map<Long, Long> subtreeMemo = new HashMap<>();
+
+        for (Album a : albums) {
             Map<String, Object> m = new HashMap<>();
             m.put("id", a.getId());
             m.put("name", a.getName());
             m.put("type", a.getType());
             m.put("coverPhotoUrl", a.getCoverPhotoUrl());
-            m.put("cover", resolveCover(a));
-            m.put("photoCount", countPhotos(a.getId()));
+            m.put("cover", signedUrlService.resolve(resolveCover(a)));
+            m.put("photoCount", photoCounts.getOrDefault(a.getId(), 0L));
+            m.put("totalPhotoCount", subtreePhotoCount(a, byParent, photoCounts, subtreeMemo));
+            m.put("childCount", byParent.getOrDefault(a.getId(), List.of()).size());
+            m.put("parentId", a.getParentId());
+            m.put("sourceDeviceId", a.getSourceDeviceId());
+            m.put("sourceDeviceName", deviceNames.get(a.getSourceDeviceId()));
+            m.put("sourcePath", a.getSourcePath());
+            m.put("syncStatus", a.getSyncStatus());
+            m.put("lastSyncedAt", a.getLastSyncedAt());
             m.put("createdBy", a.getCreatedBy());
             m.put("createdAt", a.getCreatedAt());
             result.add(m);
@@ -62,7 +90,7 @@ public class AlbumService {
         return albumMapper.selectById(id);
     }
 
-    /** 相册详情+照片列表;游客仅可访问默认家庭的公开相册 */
+    /** 相册详情+照片+子相册;游客仅可访问默认家庭的公开相册;映射相册静默触发当前层刷新 */
     public Map<String, Object> detail(Long albumId, SysUser user, Long currentFamilyId) {
         Album a = albumMapper.selectById(albumId);
         if (a == null) throw new BizException(ResultCode.NOT_FOUND);
@@ -77,10 +105,43 @@ public class AlbumService {
         LambdaQueryWrapper<Photo> qw = new LambdaQueryWrapper<>();
         qw.eq(Photo::getAlbumId, albumId).orderByDesc(Photo::getCreatedAt);
         List<Photo> photos = photoMapper.selectList(qw);
+        for (Photo p : photos) {
+            p.setUrl(signedUrlService.resolve(p.getUrl()));
+        }
+
+        // 子相册(层级映射):卡片式入口,含各自照片数与状态
+        List<Album> children = albumMapper.selectList(new LambdaQueryWrapper<Album>()
+                .eq(Album::getParentId, albumId).orderByAsc(Album::getName));
+        Map<Long, Long> childCounts = batchPhotoCounts(children);
+        Map<Long, List<Album>> childByParent = children.stream()
+                .filter(c -> c.getParentId() != null)
+                .collect(Collectors.groupingBy(Album::getParentId));
+        Map<Long, String> deviceNames = batchDeviceNames(children);
+        List<Map<String, Object>> childMaps = new ArrayList<>();
+        for (Album c : children) {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", c.getId());
+            m.put("name", c.getName());
+            m.put("cover", signedUrlService.resolve(resolveCover(c)));
+            m.put("photoCount", childCounts.getOrDefault(c.getId(), 0L));
+            m.put("childCount", childByParent.getOrDefault(c.getId(), List.of()).size());
+            m.put("syncStatus", c.getSyncStatus());
+            m.put("lastSyncedAt", c.getLastSyncedAt());
+            m.put("sourceDeviceName", deviceNames.get(c.getSourceDeviceId()));
+            childMaps.add(m);
+        }
+
+        if (a.getCoverPhotoUrl() != null) {
+            a.setCoverPhotoUrl(signedUrlService.resolve(a.getCoverPhotoUrl()));
+        }
+        if (user != null && a.getSourceDeviceId() != null) {
+            albumMapService.autoRefresh(a); // 静默刷新当前层(2 分钟节流,异步不阻塞响应)
+        }
 
         Map<String, Object> data = new HashMap<>();
         data.put("album", a);
         data.put("photos", photos);
+        data.put("children", childMaps);
         return data;
     }
 
@@ -113,7 +174,7 @@ public class AlbumService {
         for (Photo p : photoMapper.selectList(qw)) {
             Map<String, Object> m = new HashMap<>();
             m.put("id", p.getId());
-            m.put("url", p.getUrl());
+            m.put("url", signedUrlService.resolve(p.getUrl()));
             m.put("description", p.getDescription());
             m.put("takenAt", p.getTakenAt());
             m.put("location", p.getLocation());
@@ -142,19 +203,26 @@ public class AlbumService {
         return a;
     }
 
-    /** 删除相册(连带照片+文件):仅创建者或家长 */
+    /** 删除相册(连同子相册、照片与文件):仅创建者或家长;映射相册删除=解除映射,源文件不受影响 */
     @Transactional
     public void delete(Long id, SysUser user, boolean isOwner) {
-        requireOwn(id, user, isOwner);
-        LambdaQueryWrapper<Photo> qw = new LambdaQueryWrapper<>();
-        qw.eq(Photo::getAlbumId, id);
-        List<Photo> photos = photoMapper.selectList(qw);
-        albumMapper.deletePhysicalById(id);
-        photoMapper.deletePhysicalByAlbumId(id);
-        for (Photo p : photos) fileService.deleteByUrl(p.getUrl());
+        Album root = requireOwn(id, user, isOwner);
+        List<Album> all = albumMapper.selectList(new LambdaQueryWrapper<Album>()
+                .eq(Album::getFamilyId, root.getFamilyId()));
+        List<Album> subtree = new ArrayList<>();
+        collectSubtree(root, all, subtree);
+        for (Album a : subtree) {
+            List<Photo> photos = photoMapper.selectList(new LambdaQueryWrapper<Photo>()
+                    .eq(Photo::getAlbumId, a.getId()));
+            photoMapper.deletePhysicalByAlbumId(a.getId());
+            albumMapper.deletePhysicalById(a.getId());
+            for (Photo p : photos) {
+                fileService.deleteByUrl(p.getUrl()); // storage:// 逻辑地址自动跳过,设备文件永不删除
+            }
+        }
     }
 
-    /** 添加照片:可见性随相册类型(public→4,private→3);首张自动成为相册封面 */
+    /** 添加照片:可见性随相册类型(public→PUBLIC,private→FAMILY);首张自动成为相册封面 */
     public Photo addPhoto(Long albumId, SysUser user, Long currentFamilyId, String url, String description) {
         Album a = albumMapper.selectById(albumId);
         if (a == null) throw new BizException(ResultCode.NOT_FOUND);
@@ -183,7 +251,7 @@ public class AlbumService {
         photoMapper.updateById(p);
     }
 
-    /** 删除照片:仅上传者或家长(连带删除文件) */
+    /** 删除照片:仅上传者或家长(连带删除文件;影子记录仅删数据库行) */
     @Transactional
     public void deletePhoto(Long photoId, SysUser user, boolean isOwner) {
         Photo p = requirePhoto(photoId, user, isOwner);
@@ -191,10 +259,54 @@ public class AlbumService {
         fileService.deleteByUrl(p.getUrl());
     }
 
-    private long countPhotos(Long albumId) {
-        LambdaQueryWrapper<Photo> qw = new LambdaQueryWrapper<>();
-        qw.eq(Photo::getAlbumId, albumId);
-        return photoMapper.selectCount(qw);
+    /* ---------- 私有工具 ---------- */
+
+    /** 子树照片总数(含自身),内存递归 + 备忘录(相册表数据量小) */
+    private long subtreePhotoCount(Album a, Map<Long, List<Album>> byParent,
+                                   Map<Long, Long> photoCounts, Map<Long, Long> memo) {
+        Long cached = memo.get(a.getId());
+        if (cached != null) return cached;
+        long total = photoCounts.getOrDefault(a.getId(), 0L);
+        for (Album c : byParent.getOrDefault(a.getId(), List.of())) {
+            total += subtreePhotoCount(c, byParent, photoCounts, memo);
+        }
+        memo.put(a.getId(), total);
+        return total;
+    }
+
+    /** 批量照片计数(GROUP BY,免 N+1) */
+    private Map<Long, Long> batchPhotoCounts(List<Album> albums) {
+        Map<Long, Long> counts = new HashMap<>();
+        if (albums == null || albums.isEmpty()) return counts;
+        List<Long> ids = albums.stream().map(Album::getId).toList();
+        for (Map<String, Object> row : photoMapper.countByAlbumIds(ids)) {
+            counts.put(Long.valueOf(row.get("albumId").toString()),
+                    Long.valueOf(row.get("cnt").toString()));
+        }
+        return counts;
+    }
+
+    /** 批量来源设备名(免 N+1) */
+    private Map<Long, String> batchDeviceNames(List<Album> albums) {
+        Map<Long, String> names = new HashMap<>();
+        if (albums == null || albums.isEmpty()) return names;
+        Set<Long> ids = new HashSet<>();
+        for (Album a : albums) {
+            if (a.getSourceDeviceId() != null) ids.add(a.getSourceDeviceId());
+        }
+        if (ids.isEmpty()) return names;
+        for (StorageDevice d : storageDeviceMapper.selectBatchIds(ids)) {
+            names.put(d.getId(), d.getName());
+        }
+        return names;
+    }
+
+    /** 收集相册子树(含自身;先父后子顺序无所谓,逐个删除) */
+    private void collectSubtree(Album root, List<Album> all, List<Album> out) {
+        out.add(root);
+        for (Album a : all) {
+            if (root.getId().equals(a.getParentId())) collectSubtree(a, all, out);
+        }
     }
 
     /** 相册封面:优先取显式封面,否则取最新一张照片 */

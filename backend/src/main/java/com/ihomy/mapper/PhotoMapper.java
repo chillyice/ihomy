@@ -20,4 +20,6 @@ public interface PhotoMapper extends BaseMapper<Photo> {
     int deletePhysicalById(@Param("id") Long id);
 
     int deletePhysicalByAlbumId(@Param("albumId") Long albumId);
+
+    List<Map<String, Object>> countByAlbumIds(@Param("ids") List<Long> ids);
 }

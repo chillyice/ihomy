@@ -28,6 +28,7 @@ public class CascadeController {
 
     private final PhotoMapper photoMapper;
     private final SecurityHelper securityHelper;
+    private final com.ihomy.service.SignedUrlService signedUrlService;
 
     @Operation(summary = "随机照片瀑布流(当前家庭,登录可用)")
     @GetMapping("/cascade")
@@ -36,6 +37,10 @@ public class CascadeController {
         int capped = Math.min(limit, 200);
         Long userId = user == null ? null : user.getUserId();
         Long familyId = user == null ? null : user.getFamilyId();
-        return Result.success(photoMapper.selectCascadeByFamily(familyId, userId, capped));
+        List<Map<String, Object>> photos = photoMapper.selectCascadeByFamily(familyId, userId, capped);
+        for (Map<String, Object> p : photos) {
+            p.put("url", signedUrlService.resolve((String) p.get("url"))); // storage:// → 签名中转
+        }
+        return Result.success(photos);
     }
 }

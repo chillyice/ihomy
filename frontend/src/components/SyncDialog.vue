@@ -1,73 +1,194 @@
-<!-- 从设备同步对话框:选存储设备 + includeEmpty,后台同步建相册;相册/放映厅复用 -->
+<!-- 从设备同步向导:选设备 → 目录树懒加载勾选 → 确定后目录映射为层级相册(不拷贝文件);完成后通知父组件刷新 -->
 <template>
-  <el-dialog v-model="visible" append-to-body :title="$t('album.syncFromDevice')" width="440px">
-    <el-form label-position="top">
-      <el-form-item :label="$t('storage.devices')">
-        <el-select v-model="deviceId" :placeholder="$t('storage.pickDevice')" style="width: 100%">
-          <el-option v-for="d in devices" :key="d.id" :label="d.name" :value="d.id" />
-        </el-select>
-      </el-form-item>
-      <el-form-item>
-        <el-checkbox v-model="includeEmpty">{{ $t('storage.includeEmpty') }}</el-checkbox>
-      </el-form-item>
-      <div v-if="result" class="sync-result">
-        {{ $t('storage.syncDoneSummary', { albums: result.albums ?? 0, photos: result.photos ?? 0, dup: result.skippedDup ?? 0 }) }}
+  <el-dialog v-model="visible" append-to-body :title="$t('album.syncFromDevice')" width="560px" @closed="cleanup">
+    <!-- 步骤一:选设备 -->
+    <div v-if="step === 1">
+      <p class="wizard-hint">{{ $t('storage.mapHint') }}</p>
+      <div
+        v-for="d in devices"
+        :key="d.id"
+        class="device-row card"
+        :class="{ active: deviceId === d.id }"
+        @click="pickDevice(d)"
+      >
+        <span class="device-icon">{{ deviceIcon(d.deviceType) }}</span>
+        <div class="device-info">
+          <span class="device-name">{{ d.name }}</span>
+          <span class="device-type">{{ d.deviceType }}</span>
+        </div>
+        <el-tag v-if="deviceId === d.id" size="small" type="success">{{ $t('common.selected') }}</el-tag>
       </div>
-    </el-form>
+      <el-empty v-if="!devices.length && !loadingTree" :description="$t('storage.noDeviceHint')" :image-size="60" />
+    </div>
+
+    <!-- 步骤二:目录树勾选(懒加载) -->
+    <div v-else>
+      <p class="wizard-hint">{{ $t('storage.mapTreeHint', { device: deviceName }) }}</p>
+      <div v-loading="loadingTree" class="tree-wrap">
+        <el-tree
+          ref="treeRef"
+          :key="treeKey"
+          lazy
+          node-key="path"
+          show-checkbox
+          :props="{ label: 'name', isLeaf: (d) => d.isLeaf }"
+          :load="loadNode"
+          highlight-current
+        />
+      </div>
+    </div>
+
+    <div v-if="syncing" class="sync-progress">
+      <el-progress :percentage="progressPct" :status="progressStatus" />
+      <span class="progress-msg">{{ progressMsg }}</span>
+    </div>
+    <div v-else-if="result" class="sync-result">{{ result.message }}</div>
+
     <template #footer>
-      <el-button @click="visible = false">{{ $t('common.cancel') }}</el-button>
-      <el-button type="primary" :loading="syncing" :disabled="!deviceId" @click="start">{{ $t('storage.syncNow') }}</el-button>
+      <el-button v-if="step === 2 && !syncing" @click="step = 1">{{ $t('common.back') }}</el-button>
+      <el-button @click="visible = false">{{ syncing ? $t('storage.syncInBackground') : $t('common.cancel') }}</el-button>
+      <el-button
+        v-if="step === 2 && !syncing"
+        type="primary"
+        :disabled="!checkedPaths.length"
+        @click="start"
+      >{{ $t('storage.mapNow', { n: checkedPaths.length }) }}</el-button>
     </template>
   </el-dialog>
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { storageApi } from '@/api'
 
 const { t } = useI18n()
 const props = defineProps({ modelValue: Boolean })
-const emit = defineEmits(['update:modelValue'])
-const userStore = useUserStore()
+const emit = defineEmits(['update:modelValue', 'synced'])
 
 const visible = ref(props.modelValue)
 watch(() => props.modelValue, (v) => { visible.value = v; if (v) loadDevices() })
 watch(visible, (v) => emit('update:modelValue', v))
 
+const step = ref(1)
 const devices = ref([])
 const deviceId = ref(0)
-const includeEmpty = ref(false)
+const deviceName = ref('')
+const treeRef = ref(null)
+const treeKey = ref(0)
+const loadingTree = ref(false)
 const syncing = ref(false)
 const result = ref(null)
+const progressData = ref(null)
 let timer = null
 
+// 百度网盘路径以 / 开头,本地设备为相对路径;根层调用 path 传空
+const ROOT = (id) => devices.value.find((d) => d.id === id)?.deviceType === 'BAIDU' ? '/' : ''
+
+const deviceIcon = (type) => ({ BAIDU: '☁️', NAS: '🗄️', MOUNT: '📁', REMOTE: '🌐' }[type] || '💾')
+
 async function loadDevices() {
-  devices.value = await storageApi.devices()
+  step.value = 1
+  deviceId.value = 0
+  result.value = null
+  devices.value = (await storageApi.devices()).filter((d) => d.id !== 0)
 }
+
+function pickDevice(d) {
+  deviceId.value = d.id
+  deviceName.value = d.name
+  treeKey.value++
+  step.value = 2
+}
+
+// 懒加载目录节点:只列目录(isDir),文件不进树(映射对象是目录)
+async function loadNode(node, resolve) {
+  const path = node.level === 0 ? ROOT(deviceId.value) : node.data.path
+  loadingTree.value = true
+  try {
+    const items = await storageApi.browse(deviceId.value, path)
+    resolve(items.filter((i) => i.isDir).map((i) => ({
+      name: i.name,
+      path: joinPath(path, i.name),
+      isLeaf: false, // 是否有子目录未知,展开后见分晓;空目录显示为可展开但无内容
+    })))
+  } catch (e) {
+    ElMessage.error(e.message || t('storage.browseFailed'))
+    resolve([])
+  } finally {
+    loadingTree.value = false
+  }
+}
+
+function joinPath(parent, name) {
+  if (!parent || parent === '/') return '/' + name
+  return parent.replace(/\/$/, '') + '/' + name
+}
+
+// 勾选的目录:剔除已被勾选祖先覆盖的子目录(后端递归整个子树,子路径冗余)
+const checkedPaths = computed(() => {
+  if (!treeRef.value) return []
+  const checked = treeRef.value.getCheckedNodes()
+  return checked
+    .filter((n) => !checked.some((o) => o !== n && o.path.length > n.path.length && o.path.startsWith(n.path + '/')))
+    .map((n) => n.path)
+})
 
 async function start() {
   syncing.value = true
   result.value = null
   try {
-    const { taskId } = await storageApi.sync({ deviceId: deviceId.value, includeEmpty: includeEmpty.value })
-    ElMessage.success(t('storage.syncStarted'))
+    const { taskId } = await storageApi.map({ deviceId: deviceId.value, paths: checkedPaths.value })
     timer = setInterval(async () => {
       try {
         const p = await storageApi.syncProgress(taskId)
+        progressData.value = p
         if (p.status === 'DONE' || p.status === 'FAILED') {
-          clearInterval(timer); timer = null
+          stopTimer()
           syncing.value = false
-          if (p.status === 'DONE') { result.value = p; ElMessage.success(p.message || t('storage.syncDone')) }
-          else ElMessage.error(p.message || t('storage.syncFailed'))
+          if (p.status === 'DONE') {
+            result.value = p
+            ElMessage.success(p.message || t('storage.syncDone'))
+            emit('synced')
+          } else {
+            ElMessage.error(p.message || t('storage.syncFailed'))
+          }
         }
-      } catch { clearInterval(timer); timer = null; syncing.value = false }
+      } catch { stopTimer(); syncing.value = false }
     }, 1000)
   } catch { syncing.value = false }
 }
+
+const progressPct = computed(() => {
+  const p = progressData.value
+  if (!p || !p.totalDirs) return 0
+  return Math.min(100, Math.round(((p.doneDirs || 0) / p.totalDirs) * 100))
+})
+const progressStatus = computed(() => (progressData.value?.status === 'DONE' ? 'success' : undefined))
+const progressMsg = computed(() => progressData.value?.lastAlbum
+  ? `${t('storage.syncing')} · ${progressData.value.lastAlbum}`
+  : t('storage.syncing'))
+
+function stopTimer() { if (timer) { clearInterval(timer); timer = null } }
+function cleanup() { stopTimer(); syncing.value = false }
 </script>
 
 <style scoped>
+.wizard-hint { margin: 0 0 12px; font-size: 13px; color: var(--color-text-secondary); }
+.device-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px; margin-bottom: 10px; cursor: pointer;
+  border: 1px solid transparent; transition: border-color 0.15s, transform 0.15s;
+}
+.device-row:hover { transform: translateY(-1px); }
+.device-row.active { border-color: var(--color-primary, #b88c6e); }
+.device-icon { font-size: 22px; }
+.device-info { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.device-name { font-size: 14px; font-weight: 600; color: var(--color-text); }
+.device-type { font-size: 11px; color: var(--color-text-secondary); }
+.tree-wrap { max-height: 380px; overflow-y: auto; border: 1px solid var(--color-border, #e4ddd0); border-radius: 10px; padding: 8px; }
+.sync-progress { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.progress-msg { font-size: 12px; color: var(--color-text-secondary); }
 .sync-result { margin-top: 8px; padding: 8px 12px; background: var(--color-bg-2); border-radius: 6px; font-size: 13px; }
 </style>

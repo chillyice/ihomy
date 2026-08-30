@@ -24,6 +24,7 @@ public class ActivityFeedService {
     private final com.ihomy.mapper.PhotoMapper photoMapper;
     private final com.ihomy.mapper.CommentMapper commentMapper;
     private final com.ihomy.mapper.SysUserMapper sysUserMapper;
+    private final SignedUrlService signedUrlService;
 
     /** 组装动态:照片按上传者分组聚合为一条(带数量/前 5 张预览),最后统一按时间倒序取前 limit 条 */
     public List<Map<String, Object>> getFeed(Long familyId, int limit, boolean publicOnly, Long currentUserId, boolean isOwner) {
@@ -97,7 +98,7 @@ public class ActivityFeedService {
                 com.ihomy.entity.Photo first = ps.get(0);
                 Map<String, Object> m = base("photo", first.getAuthorId(), first.getAuthorId(), first.getFamilyId(), first.getCreatedAt(), null);
                 m.put("count", ps.size());
-                m.put("urls", ps.stream().map(com.ihomy.entity.Photo::getUrl).limit(5).toList());
+                m.put("urls", ps.stream().map(p -> signedUrlService.resolve(p.getUrl())).limit(5).toList());
                 m.put("descriptions", ps.stream().map(com.ihomy.entity.Photo::getDescription).limit(5).toList());
                 m.put("likeCount", ps.stream().mapToInt(p -> p.getLikeCount() == null ? 0 : p.getLikeCount()).sum());
                 m.put("commentCount", commentCount("photo", ps.stream().map(com.ihomy.entity.Photo::getId).toList()));

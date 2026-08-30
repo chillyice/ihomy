@@ -62,6 +62,7 @@ public class PublicController {
     private final WeatherLocationMapper weatherLocationMapper;
     private final ActivityFeedService activityFeedService;
     private final HomeStatsService homeStatsService;
+    private final com.ihomy.service.SignedUrlService signedUrlService;
     private final SecurityHelper securityHelper;
     private final MultiFamilyService multiFamilyService;
     private final WeatherService weatherService;
@@ -171,13 +172,21 @@ public class PublicController {
         data.put("modules", homeModuleMapper.selectList(qw));
 
         if (member) {
-            data.put("photos", photoMapper.selectLatestByFamily(familyId, 20));
+            data.put("photos", resolvePhotoUrls(photoMapper.selectLatestByFamily(familyId, 20)));
             data.put("stats", homeStatsService.getStats(familyId));
         } else {
-            data.put("photos", photoMapper.selectLatestPublicByFamily(familyId, 20));
+            data.put("photos", resolvePhotoUrls(photoMapper.selectLatestPublicByFamily(familyId, 20)));
             data.put("stats", new HashMap<String, Object>());
         }
         return data;
+    }
+
+    /** 影子照片的 storage:// 逻辑地址 → 签名中转 URL */
+    private List<com.ihomy.entity.Photo> resolvePhotoUrls(List<com.ihomy.entity.Photo> photos) {
+        for (com.ihomy.entity.Photo p : photos) {
+            p.setUrl(signedUrlService.resolve(p.getUrl()));
+        }
+        return photos;
     }
 
     /** 失效某家庭的公开首页缓存(供模块/相册/家庭设置变更时调用) */
