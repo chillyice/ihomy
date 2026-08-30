@@ -4,17 +4,34 @@
     <Breadcrumb :items="[{ label: t('album.title') }]" />
 
     <div class="page-toolbar card">
-      <div class="tb-right">
-        <template v-if="!selectMode">
+      <template v-if="!selectMode">
+        <div class="tb-left">
+          <el-input v-model="searchKeyword" :placeholder="t('album.searchPlaceholder')" clearable size="small" style="width: 200px">
+            <template #prefix>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            </template>
+          </el-input>
+          <el-select v-model="sourceFilter" size="small" style="width: 150px" :placeholder="t('album.filterSource')">
+            <el-option value="" :label="t('album.allSources')" />
+            <el-option value="LOCAL" :label="t('album.localUpload')" />
+            <el-option v-for="s in sourceOptions" :key="s.value" :value="s.value" :label="s.label" />
+          </el-select>
+          <el-select v-model="typeFilter" size="small" style="width: 120px" :placeholder="t('album.filterType')">
+            <el-option value="" :label="t('album.allTypes')" />
+            <el-option value="public" :label="t('album.public')" />
+            <el-option value="private" :label="t('album.private')" />
+          </el-select>
+        </div>
+        <div class="tb-right">
           <el-button v-if="userStore.isLoggedIn && topAlbums.length" @click="toggleSelect">{{ t('album.select') }}</el-button>
-          <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ t('album.newAlbum') }}</el-button>
           <el-button v-if="userStore.isOwner" @click="syncVisible = true">{{ t('album.syncFromDevice') }}</el-button>
-        </template>
-        <template v-else>
-          <span class="select-count">{{ t('album.selectedAlbums', { n: selectedIds.length }) }}</span>
-          <el-button size="small" :disabled="batchDeleting" @click="toggleSelect">{{ t('album.cancelSelect') }}</el-button>
-          <el-button type="danger" size="small" :loading="batchDeleting" :disabled="!selectedIds.length" @click="onBatchDelete">{{ t('album.deleteSelected') }}</el-button>
-        </template>
+          <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ t('album.newAlbum') }}</el-button>
+        </div>
+      </template>
+      <div v-else class="tb-right">
+        <span class="select-count">{{ t('album.selectedAlbums', { n: selectedIds.length }) }}</span>
+        <el-button size="small" :disabled="batchDeleting" @click="toggleSelect">{{ t('album.cancelSelect') }}</el-button>
+        <el-button type="danger" size="small" :loading="batchDeleting" :disabled="!selectedIds.length" @click="onBatchDelete">{{ t('album.deleteSelected') }}</el-button>
       </div>
     </div>
 
@@ -36,7 +53,7 @@
             <div v-else class="album-cover">
               <AlbumDefaultCover :size="64" />
             </div>
-            <span class="album-type" :class="a.type">{{ a.type === 'public' ? t('album.public') : t('album.private') }}</span>
+            <span v-if="!selectMode" class="album-type" :class="a.type">{{ a.type === 'public' ? t('album.public') : t('album.private') }}</span>
             <span v-if="a.sourceDeviceName" class="album-source">
               <span class="status-dot" :class="a.syncStatus || 'OFFLINE'"></span>{{ a.sourceDeviceName }}
             </span>
@@ -98,8 +115,26 @@ const albums = ref([])
 const loading = ref(false)
 const editor = reactive({ visible: false, form: { id: null, name: '', type: 'public' } })
 
-// 顶层相册:层级映射的子相册不直接出现在列表页,进入父相册查看
-const topAlbums = computed(() => albums.value.filter((a) => !a.parentId))
+// 顶层相册:层级映射的子相册不直接出现在列表页,进入父相册查看;再按关键词/来源/类型前端过滤(数据量小)
+const searchKeyword = ref('')
+const sourceFilter = ref('')
+const typeFilter = ref('')
+const topAlbums = computed(() => albums.value.filter((a) => {
+  if (a.parentId) return false
+  if (searchKeyword.value && !a.name.toLowerCase().includes(searchKeyword.value.toLowerCase())) return false
+  if (typeFilter.value && a.type !== typeFilter.value) return false
+  if (sourceFilter.value === 'LOCAL' && a.sourceDeviceId) return false
+  if (sourceFilter.value && sourceFilter.value !== 'LOCAL' && String(a.sourceDeviceId) !== sourceFilter.value) return false
+  return true
+}))
+// 来源筛选选项:列表数据中出现的映射设备(去重)
+const sourceOptions = computed(() => {
+  const map = new Map()
+  for (const a of albums.value) {
+    if (a.sourceDeviceId && a.sourceDeviceName) map.set(String(a.sourceDeviceId), a.sourceDeviceName)
+  }
+  return [...map.entries()].map(([value, label]) => ({ value, label }))
+})
 
 // 管理权限:家长或相册创建者本人
 const canManage = (a) =>
