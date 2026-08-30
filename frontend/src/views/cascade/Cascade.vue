@@ -15,7 +15,7 @@
           @mouseleave="resumeCard(c)"
           @click.stop="openViewer(c)"
         >
-          <img :src="c.photo.url" draggable="false" :alt="c.photo.description || ''" />
+          <img :src="c.photo.url ? c.photo.url + '&thumb=1' : c.photo.url" draggable="false" :alt="c.photo.description || ''" />
           <div v-if="c.hovered" class="photo-info">
             <div v-if="c.photo.description" class="info-desc">{{ c.photo.description }}</div>
             <div class="info-meta">

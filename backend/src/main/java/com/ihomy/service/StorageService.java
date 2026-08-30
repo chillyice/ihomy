@@ -353,6 +353,13 @@ public class StorageService {
         return items;
     }
 
+    /**
+     * 百度 API 并发限流:网格页一次打几十个中转请求,不加限制会同时打出几十个
+     * filemetas+dlink 调用,触发百度限频且占满连接。只限建连阶段,数据传输不占槽。
+     * ponytail: 固定 4 并发,撞限频(errno 2)再按错误率自适应
+     */
+    private final java.util.concurrent.Semaphore baiduSlots = new java.util.concurrent.Semaphore(4);
+
     /** 打开百度网盘文件:dlink 必须由服务器带 UA=pan.baidu.com 中转(浏览器直链 403),流式不缓冲 */
     public BaiduFileStream baiduOpen(StorageDevice device, String path) {
         return baiduOpen(device, path, null);
@@ -364,36 +371,41 @@ public class StorageService {
         String dir = p.substring(0, p.lastIndexOf('/'));
         String name = p.substring(p.lastIndexOf('/') + 1);
         BaiduCredential c = requireBaiduCredential(device.getFamilyId());
-
-        // 1) fs_id 直达;未知则列父目录按文件名定位
-        final long fid;
-        if (fsId != null && fsId > 0) {
-            fid = fsId;
-        } else {
-            JsonNode listResp = baiduListDir(c, dir.isEmpty() ? "/" : dir);
-            long found = 0;
-            for (JsonNode n : listResp.path("list")) {
-                if (n.path("isdir").asInt() == 0 && name.equals(n.path("server_filename").asText())) {
-                    found = n.path("fs_id").asLong();
-                    break;
-                }
-            }
-            if (found == 0) throw new BizException(ResultCode.NOT_FOUND, "文件不存在: " + name);
-            fid = found;
-        }
-
-        // 2) filemetas 拿 dlink
-        JsonNode metas = baiduGet(c, token -> "https://pan.baidu.com/rest/2.0/xpan/multimedia?method=filemetas&dlink=1"
-                + "&access_token=" + URLEncoder.encode(token, StandardCharsets.UTF_8)
-                + "&fsids=" + URLEncoder.encode("[" + fid + "]", StandardCharsets.UTF_8));
-        String dlink = metas.path("list").path(0).path("dlink").asText(null);
-        if (dlink == null || dlink.isBlank()) {
-            throw new BizException(ResultCode.INTERNAL_ERROR, "百度网盘未返回下载链接(dlink)");
-        }
-
-        // 3) 打开 dlink 流(手动跟随 302 到 CDN,重放 UA 防丢失)
-        String token = baiduAccessToken(c);
         try {
+            baiduSlots.acquire();
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new BizException(ResultCode.INTERNAL_ERROR, "请求被中断");
+        }
+        try {
+            // 1) fs_id 直达;未知则列父目录按文件名定位
+            final long fid;
+            if (fsId != null && fsId > 0) {
+                fid = fsId;
+            } else {
+                JsonNode listResp = baiduListDir(c, dir.isEmpty() ? "/" : dir);
+                long found = 0;
+                for (JsonNode n : listResp.path("list")) {
+                    if (n.path("isdir").asInt() == 0 && name.equals(n.path("server_filename").asText())) {
+                        found = n.path("fs_id").asLong();
+                        break;
+                    }
+                }
+                if (found == 0) throw new BizException(ResultCode.NOT_FOUND, "文件不存在: " + name);
+                fid = found;
+            }
+
+            // 2) filemetas 拿 dlink
+            JsonNode metas = baiduGet(c, token -> "https://pan.baidu.com/rest/2.0/xpan/multimedia?method=filemetas&dlink=1"
+                    + "&access_token=" + URLEncoder.encode(token, StandardCharsets.UTF_8)
+                    + "&fsids=" + URLEncoder.encode("[" + fid + "]", StandardCharsets.UTF_8));
+            String dlink = metas.path("list").path(0).path("dlink").asText(null);
+            if (dlink == null || dlink.isBlank()) {
+                throw new BizException(ResultCode.INTERNAL_ERROR, "百度网盘未返回下载链接(dlink)");
+            }
+
+            // 3) 打开 dlink 流(手动跟随 302 到 CDN,重放 UA 防丢失);流关闭时释放限流槽
+            String token = baiduAccessToken(c);
             HttpURLConnection conn = baiduDlinkConnect(dlink + (dlink.contains("?") ? "&" : "?")
                     + "access_token=" + URLEncoder.encode(token, StandardCharsets.UTF_8));
             int status = conn.getResponseCode();
@@ -410,10 +422,22 @@ public class StorageService {
                 conn.disconnect();
                 throw new BizException(ResultCode.INTERNAL_ERROR, "百度网盘文件读取失败: HTTP " + status);
             }
-            return new BaiduFileStream(conn.getInputStream(), conn.getContentLengthLong());
+            InputStream raw = conn.getInputStream();
+            return new BaiduFileStream(new java.io.FilterInputStream(raw) {
+                @Override
+                public void close() throws java.io.IOException {
+                    try {
+                        super.close();
+                    } finally {
+                        baiduSlots.release();
+                    }
+                }
+            }, conn.getContentLengthLong());
         } catch (BizException e) {
+            baiduSlots.release();
             throw e;
         } catch (Exception e) {
+            baiduSlots.release();
             throw new BizException(ResultCode.INTERNAL_ERROR, "下载百度网盘文件失败: " + e.getMessage());
         }
     }

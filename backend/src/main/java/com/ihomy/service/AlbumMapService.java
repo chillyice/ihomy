@@ -199,6 +199,7 @@ public class AlbumMapService {
             photos += upsertShadowPhoto(user, familyId, device, album, filePath, key, fsId, modified);
         }
         pruneShadowPhotos(album, prefix, seen);
+        pruneVanishedChildren(user, familyId, device, album, items);
         p.put("lastAlbum", album.getName());
         return new int[]{0, photos};
     }
@@ -305,6 +306,35 @@ public class AlbumMapService {
                 .isNull(Album::getParentId)
                 .eq(Album::getName, name)) > 0;
         return conflict ? name + "(" + device.getName() + ")" : name;
+    }
+
+    /** 刷新时清理设备侧已消失的子相册(目录被改名/删除/移动):仅清理本映射建的,普通子相册不动 */
+    private void pruneVanishedChildren(SysUser user, Long familyId, StorageDevice device,
+                                       Album album, List<Map<String, Object>> items) {
+        Set<String> livePaths = new HashSet<>();
+        for (Map<String, Object> item : items) {
+            if (Boolean.TRUE.equals(item.get("isDir"))) {
+                livePaths.add(joinPath(device, album.getSourcePath(), String.valueOf(item.get("name"))));
+            }
+        }
+        List<Album> children = albumMapper.selectList(new LambdaQueryWrapper<Album>()
+                .eq(Album::getFamilyId, familyId)
+                .eq(Album::getParentId, album.getId()));
+        for (Album child : children) {
+            if (device.getId().equals(child.getSourceDeviceId())
+                    && (child.getSourcePath() == null || !livePaths.contains(child.getSourcePath()))) {
+                removeSubtree(child);
+            }
+        }
+    }
+
+    /** 递归删除映射相册子树(影子记录+相册行,物理删;设备文件永不动) */
+    private void removeSubtree(Album root) {
+        List<Album> children = albumMapper.selectList(new LambdaQueryWrapper<Album>()
+                .eq(Album::getParentId, root.getId()));
+        for (Album c : children) removeSubtree(c);
+        photoMapper.deletePhysicalByAlbumId(root.getId());
+        albumMapper.deletePhysicalById(root.getId());
     }
 
     /** 路径拼接:百度保留前导 /,本地设备相对路径拼接 */

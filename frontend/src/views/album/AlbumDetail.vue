@@ -1,7 +1,7 @@
 <!-- 相册详情页:照片墙 + 分享/上传/备注编辑/删除(悬停显示操作),家长或上传者可管理;?token 分享模式供游客观看公开相册 -->
 <template>
   <div class="page">
-    <Breadcrumb :items="[{ label: t('album.familyTitle'), to: '/album' }, { label: album.name || t('album.title') }]" />
+    <Breadcrumb :items="breadcrumbItems" />
 
     <div v-if="album.id" class="album-header card">
       <div class="album-head-info">
@@ -49,7 +49,7 @@
         class="child-card card"
         @click="$router.push(`/album/${c.id}`)"
       >
-        <div class="child-cover" :style="c.cover ? { backgroundImage: `url(${c.cover})` } : {}">
+        <div class="child-cover" :style="c.cover ? { backgroundImage: `url(${c.cover}&thumb=1)` } : {}">
           <span v-if="!c.cover" class="child-cover-empty">📷</span>
           <span class="status-dot" :class="c.syncStatus || 'OFFLINE'"></span>
         </div>
@@ -66,7 +66,7 @@
       <div v-if="photos.length" class="photo-wall">
         <div v-for="p in photos" :key="p.id" class="photo-card">
           <div class="photo-wrap" @click="openViewer(p)">
-            <img :src="p.url" :alt="p.description || album.name" loading="lazy" />
+            <img :src="thumbUrl(p.url)" :alt="p.description || album.name" loading="lazy" />
             <div class="photo-hover">
               <span v-if="canManagePhoto(p)" @click.stop="openDesc(p)"><el-icon><Edit /></el-icon>{{ t('album.editNote') }}</span>
               <span v-if="canManagePhoto(p)" class="danger" @click.stop="onDelPhoto(p)"><el-icon><Delete /></el-icon>{{ t('common.delete') }}</span>
@@ -158,6 +158,7 @@ const load = async () => {
   album.value = data.album || {}
   photos.value = data.photos || []
   children.value = data.children || []
+  parents.value = data.parents || []
   // 分享链接带 ?p= 混淆照片ID时,定位到该照片并打开播放页
   const p = route.query.p
   if (p) {
@@ -168,6 +169,17 @@ const load = async () => {
     }
   }
 }
+
+// 面包屑:家庭相册 → 各级父相册(可点) → 当前相册
+const parents = ref([])
+const breadcrumbItems = computed(() => [
+  { label: t('album.familyTitle'), to: '/album' },
+  ...parents.value.map((p) => ({ label: p.name, to: `/album/${p.id}` })),
+  { label: album.value.name || t('album.title') },
+])
+
+// 网格用 480px 缓存缩略图(首次访问服务端生成后秒回);PhotoViewer 播放/下载仍用原图
+const thumbUrl = (url) => (url ? `${url}&thumb=1` : url)
 
 // 手动刷新映射相册(递归子树,后台执行)
 const onRefresh = async () => {

@@ -721,7 +721,9 @@ INSERT INTO sys_dict_item ... book_format/borrow_status;
 | `api/index.js` | `storageApi.map` 替代 `sync`;`albumApi.refresh` 新增 |
 | `i18n/zh-CN.js` + `en.js` | album.*(unmapConfirm/mappedReadOnly/refreshMap/status*) + storage.*(mapHint/mapTreeHint/mapNow/syncInBackground 等) 中英双语 |
 
-**映射规则**:影子照片 = content_photo 行,`url` 存 `storage://{deviceId}/{path}?fsid={fsId}`(百度带 fsid,本地设备路径无前导 /)、`source_path` 存 `dev:{deviceId}:{path}` 去重键、`taken_at` = 设备 mtime;可见性随相册 type;封面取第一张影子记录。浏览/预览/下载经 `/api/storage/file-signed`(HMAC 签名 10 分钟,img 标签免 JWT)。刷新:手动=递归子树+通知;自动=打开详情触发当前层(2 分钟节流)。失败分类:目录不存在(本地 NOT_FOUND / 百度 errno=-9)→ MISSING(红点),其余 → OFFLINE(灰点)。删除映射相册=递归删子树+影子记录,设备文件永不触碰。百度 fs_id 存进影子记录,预览直查 filemetas 省一次列目录。**分设备缓存策略(NAS 本地 IO 不缓存,百度第二期做缩略图缓存)**。
+**映射规则**:影子照片 = content_photo 行,`url` 存 `storage://{deviceId}/{path}?fsid={fsId}`(百度带 fsid,本地设备路径无前导 /)、`source_path` 存 `dev:{deviceId}:{path}` 去重键、`taken_at` = 设备 mtime;可见性随相册 type;封面取第一张影子记录。浏览/预览/下载经 `/api/storage/file-signed`(HMAC 签名 10 分钟,img 标签免 JWT)。刷新:手动=递归子树+通知;自动=打开详情触发当前层(2 分钟节流);刷新同时清理设备侧消失的子相册(目录改名/删除/移动,按 sourcePath 比对,仅本映射建的)。失败分类:目录不存在(本地 NOT_FOUND / 百度 errno=-9)→ MISSING(红点),其余 → OFFLINE(灰点)。删除映射相册=递归删子树+影子记录,设备文件永不触碰。百度 fs_id 存进影子记录,预览直查 filemetas 省一次列目录。
+
+**缩略图缓存(V9.3)**:`&thumb=1` 参数(不参与签名)走 `ThumbnailService`——480px JPEG 落盘 `uploadDir/device-thumbs/{md5(deviceId:fsId或path)}.jpg`,首次下载原图生成、之后读缓存秒回;HEIC 等 ImageIO 不可读格式回退原图流;百度 fsId 变化自动换 key 重新生成,NAS 用路径(内容覆盖不刷新,可接受)。前端 AlbumDetail 网格/子相册封面、Cascade 瀑布网格用 `&thumb=1`,PhotoViewer 播放/下载用原图。**百度 API 并发限流**:`StorageService.baiduSlots` Semaphore(4) 包住 baiduOpen 建连阶段(filemetas+dlink open,流关闭时释放),防网格页几十并发打爆百度限频。相册详情面包屑支持层级返回(`parents` 链从根到父)。
 
 ##### 百度网盘接入凭证(photo 分支,2026-08-30)
 
