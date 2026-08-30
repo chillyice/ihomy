@@ -154,6 +154,15 @@ a { color: var(--color-accent); text-decoration: none; }
 .page-toolbar .tb-left { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .page-toolbar .tb-right { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
 
+/* 紧凑工具栏变体:博客/日记本等窄条工具栏(card 与按钮同高 34px) */
+.page-toolbar.compact { padding: 0 12px !important; min-height: 34px; }
+.page-toolbar.compact .write-btn,
+.page-toolbar.compact .cat-mgr-btn,
+.page-toolbar.compact .ghost-btn,
+.page-toolbar.compact .view-toggle { height: 34px; }
+.page-toolbar.compact .el-button { height: 34px; }
+.page-toolbar.compact .vt-btn { height: 30px; }
+
 /* ========== 工具栏按钮(全局) ========== */
 .write-btn {
   height: 32px; padding: 0 16px; border: none; border-radius: 10px;
