@@ -173,3 +173,26 @@ SET @add_baidu_token := (
 PREPARE add_baidu_token_stmt FROM @add_baidu_token;
 EXECUTE add_baidu_token_stmt;
 DEALLOCATE PREPARE add_baidu_token_stmt;
+
+-- 2026-08-30: 设备目录映射相册(层级相册 + 影子照片记录,不拷贝文件)
+SET @add_album_parent := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `content_photo_album` ADD COLUMN `parent_id` BIGINT DEFAULT NULL COMMENT ''父相册ID(层级相册,设备目录映射)'' AFTER `family_id`, ADD COLUMN `source_device_id` BIGINT DEFAULT NULL COMMENT ''映射来源设备ID(非空=映射相册)'' AFTER `parent_id`, ADD COLUMN `source_path` VARCHAR(500) DEFAULT NULL COMMENT ''设备上的远程目录路径'' AFTER `source_device_id`, ADD COLUMN `sync_status` VARCHAR(20) DEFAULT NULL COMMENT ''映射状态:VALID可访问/OFFLINE设备离线/MISSING目录丢失'' AFTER `source_path`, ADD COLUMN `last_synced_at` DATETIME DEFAULT NULL COMMENT ''最后同步刷新时间'' AFTER `sync_status`, ADD KEY `idx_family_parent` (`family_id`, `parent_id`, `deleted`)',
+    'SELECT ''skip: album mapping columns already exist'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_photo_album' AND COLUMN_NAME = 'parent_id'
+);
+PREPARE add_album_parent_stmt FROM @add_album_parent;
+EXECUTE add_album_parent_stmt;
+DEALLOCATE PREPARE add_album_parent_stmt;
+
+SET @add_photo_fsid := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `content_photo` ADD COLUMN `source_fs_id` BIGINT DEFAULT NULL COMMENT ''远程文件fs_id(百度网盘,免列目录直达dlink)'' AFTER `source_path`',
+    'SELECT ''skip: photo fs_id column already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_photo' AND COLUMN_NAME = 'source_fs_id'
+);
+PREPARE add_photo_fsid_stmt FROM @add_photo_fsid;
+EXECUTE add_photo_fsid_stmt;
+DEALLOCATE PREPARE add_photo_fsid_stmt;

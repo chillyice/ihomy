@@ -9,17 +9,28 @@
         <el-tag size="small" :type="album.type === 'public' ? 'primary' : 'warning'">
           {{ album.type === 'public' ? t('album.public') : t('album.private') }}
         </el-tag>
+        <span v-if="isMapped" class="mapped-badge">
+          <span class="status-dot" :class="album.syncStatus || 'OFFLINE'" :title="statusText"></span>
+          {{ t('album.mappedReadOnly') }} · {{ album.sourceDeviceName || '' }}
+          <span v-if="album.lastSyncedAt" class="synced-at">· {{ t('album.lastSynced') }} {{ timeAgo(album.lastSyncedAt) }}</span>
+        </span>
         <span class="photo-count">{{ t('album.photoCountLabel', { n: photos.length }) }}</span>
         <p v-if="album.description" class="album-desc">{{ album.description }}</p>
       </div>
       <div class="album-head-actions">
+        <el-button
+          v-if="isMapped && userStore.isOwner"
+          class="ghost-btn"
+          :loading="refreshing"
+          @click="onRefresh"
+        >{{ t('album.refreshMap') }}</el-button>
         <el-button
           v-if="album.type === 'public' && album.shareToken"
           class="ghost-btn"
           @click="copyAlbumShare"
         >{{ t('album.share') }}</el-button>
         <el-upload
-          v-if="userStore.isLoggedIn && !shareToken"
+          v-if="userStore.isLoggedIn && !shareToken && !isMapped"
           multiple
           :show-file-list="false"
           :http-request="uploadPhoto"
@@ -27,6 +38,27 @@
         >
           <el-button type="primary">{{ t('album.uploadPhotos') }}</el-button>
         </el-upload>
+      </div>
+    </div>
+
+    <!-- 子相册(设备目录映射层级) -->
+    <div v-if="children.length" class="child-albums">
+      <div
+        v-for="c in children"
+        :key="c.id"
+        class="child-card card"
+        @click="$router.push(`/album/${c.id}`)"
+      >
+        <div class="child-cover" :style="c.cover ? { backgroundImage: `url(${c.cover})` } : {}">
+          <span v-if="!c.cover" class="child-cover-empty">📷</span>
+          <span class="status-dot" :class="c.syncStatus || 'OFFLINE'"></span>
+        </div>
+        <div class="child-info">
+          <span class="child-name">{{ c.name }}</span>
+          <span class="child-meta">
+            {{ t('album.photoCount', { n: c.photoCount }) }}<template v-if="c.childCount"> · {{ t('album.subAlbumCount', { n: c.childCount }) }}</template>
+          </span>
+        </div>
       </div>
     </div>
 
@@ -86,12 +118,32 @@ const shareToken = route.params.token || ''
 const albumId = route.params.id
 const album = ref({})
 const photos = ref([])
+const children = ref([])
+const refreshing = ref(false)
 const descEditor = reactive({ visible: false, value: '', currentId: null })
 const viewer = reactive({ visible: false, index: 0 })
 
-// 照片管理权限:家长或上传者本人
+// 映射相册:只读(影子记录),隐藏上传与照片管理
+const isMapped = computed(() => !!album.value.sourceDeviceId)
+const statusText = computed(() => ({
+  VALID: t('album.statusValid'),
+  OFFLINE: t('album.statusOffline'),
+  MISSING: t('album.statusMissing'),
+  SYNCING: t('album.statusSyncing'),
+}[album.value.syncStatus] || ''))
+
+// 相对时间(x 前)
+const timeAgo = (d) => {
+  const s = (Date.now() - new Date(d).getTime()) / 1000
+  if (s < 60) return t('album.justNow')
+  if (s < 3600) return Math.floor(s / 60) + t('album.minutesAgo')
+  if (s < 86400) return Math.floor(s / 3600) + t('album.hoursAgo')
+  return Math.floor(s / 86400) + t('album.daysAgo')
+}
+
+// 照片管理权限:家长或上传者本人;映射相册只读,不提供编辑/删除
 const canManagePhoto = (p) =>
-  userStore.isLoggedIn && (userStore.isOwner || p.authorId === userStore.userInfo?.id)
+  !isMapped.value && userStore.isLoggedIn && (userStore.isOwner || p.authorId === userStore.userInfo?.id)
 
 // 相册分享链接基准(公开相册才有):游客凭链接查看,家庭需已公开
 const shareBase = computed(() =>
@@ -105,6 +157,7 @@ const load = async () => {
   const data = shareToken ? await albumApi.shared(shareToken) : await albumApi.detail(albumId)
   album.value = data.album || {}
   photos.value = data.photos || []
+  children.value = data.children || []
   // 分享链接带 ?p= 混淆照片ID时,定位到该照片并打开播放页
   const p = route.query.p
   if (p) {
@@ -113,6 +166,17 @@ const load = async () => {
       viewer.index = idx
       viewer.visible = true
     }
+  }
+}
+
+// 手动刷新映射相册(递归子树,后台执行)
+const onRefresh = async () => {
+  refreshing.value = true
+  try {
+    await albumApi.refresh(albumId)
+    ElMessage.success(t('album.refreshStarted'))
+  } finally {
+    refreshing.value = false
   }
 }
 
@@ -182,6 +246,59 @@ onMounted(load)
   align-items: center;
 }
 .photo-count { font-size: 13px; color: var(--color-text-secondary); }
+.mapped-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: var(--color-bg-2, #f3eee6);
+}
+.mapped-badge .synced-at { color: var(--color-text-secondary); opacity: 0.7; }
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.status-dot.VALID { background: #67b26b; box-shadow: 0 0 4px rgba(103, 178, 107, 0.9); }
+.status-dot.OFFLINE, .status-dot.SYNCING { background: #9a9a9a; }
+.status-dot.MISSING { background: #b96058; box-shadow: 0 0 4px rgba(185, 96, 88, 0.9); }
+.child-albums {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.child-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.child-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(31,58,95,0.12); }
+.child-cover {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--color-bg-2, #eef2f7);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.child-cover-empty { font-size: 22px; }
+.child-cover .status-dot { position: absolute; bottom: -2px; right: -2px; border: 2px solid var(--color-bg, #fcf8f0); }
+.child-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.child-name { font-size: 14px; font-weight: 600; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.child-meta { font-size: 12px; color: var(--color-text-secondary); }
 .album-desc { margin-top: 8px; color: var(--color-text-secondary); font-size: 13px; }
 .album-head-actions { display: flex; flex-direction: row; align-items: center; gap: 8px; flex-shrink: 0; }
 .album-body { margin-top: 20px; }

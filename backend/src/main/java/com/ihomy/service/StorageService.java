@@ -40,7 +40,6 @@ public class StorageService {
     private final StorageDeviceMapper storageDeviceMapper;
     private final BaiduCredentialMapper baiduCredentialMapper;
     private final ParameterService parameterService;
-    private final StorageSyncRunner syncRunner;
     private final StringRedisTemplate redis;
     private final ObjectMapper json = new ObjectMapper();
 
@@ -84,6 +83,12 @@ public class StorageService {
             throw new BizException(ResultCode.NOT_FOUND, "存储设备不存在");
         }
         return d;
+    }
+
+    /** 按主键取设备(签名中转端点无用户上下文,签名本身即凭证) */
+    public StorageDevice getDeviceById(Long deviceId) {
+        if (deviceId == null || deviceId == 0L) return null;
+        return storageDeviceMapper.selectById(deviceId);
     }
 
     public StorageDevice addDevice(Long familyId, String name, String deviceType, String rootPath, SysUser user) {
@@ -198,21 +203,7 @@ public class StorageService {
     /** 百度网盘文件流(dlink 服务器中转,不落盘不缓冲) */
     public record BaiduFileStream(InputStream in, long length) {}
 
-    /* ---------- 一键同步 ---------- */
-
-    public Long startSync(StorageDevice device, boolean includeEmpty, SysUser user) {
-        if ("BAIDU".equals(device.getDeviceType())) {
-            // ponytail: BAIDU 同步需逐文件 dlink 下载落盘,量大耗时,待后续版本实现
-            throw new BizException(ResultCode.BAD_REQUEST, "百度网盘设备暂不支持一键同步(仅支持浏览/预览/下载)");
-        }
-        Long taskId = System.nanoTime();
-        syncRunner.run(device, includeEmpty, user, taskId);
-        return taskId;
-    }
-
-    public Map<String, Object> syncProgress(Long taskId) {
-        return syncRunner.progress(taskId);
-    }
+    /* ---------- 一键同步(旧拷贝式已退役,统一走 AlbumMapService 映射式) ---------- */
 
     /* ---------- 百度网盘接入凭证 ---------- */
 
@@ -351,6 +342,7 @@ public class StorageService {
             m.put("isDir", isDir);
             m.put("size", isDir ? null : n.path("size").asLong());
             m.put("modified", n.path("server_mtime").asLong() * 1000);
+            m.put("fsId", isDir ? null : n.path("fs_id").asLong());
             items.add(m);
         }
         items.sort((a, b) -> {
@@ -363,22 +355,32 @@ public class StorageService {
 
     /** 打开百度网盘文件:dlink 必须由服务器带 UA=pan.baidu.com 中转(浏览器直链 403),流式不缓冲 */
     public BaiduFileStream baiduOpen(StorageDevice device, String path) {
+        return baiduOpen(device, path, null);
+    }
+
+    /** fsId 已知时跳过"列父目录找 fs_id"(影子照片直存 fs_id,省一次列表调用) */
+    public BaiduFileStream baiduOpen(StorageDevice device, String path, Long fsId) {
         String p = baiduNormalizePath(path, false);
         String dir = p.substring(0, p.lastIndexOf('/'));
         String name = p.substring(p.lastIndexOf('/') + 1);
         BaiduCredential c = requireBaiduCredential(device.getFamilyId());
 
-        // 1) 列父目录按文件名定位 fs_id
-        JsonNode listResp = baiduListDir(c, dir.isEmpty() ? "/" : dir);
-        long fsId = 0;
-        for (JsonNode n : listResp.path("list")) {
-            if (n.path("isdir").asInt() == 0 && name.equals(n.path("server_filename").asText())) {
-                fsId = n.path("fs_id").asLong();
-                break;
+        // 1) fs_id 直达;未知则列父目录按文件名定位
+        final long fid;
+        if (fsId != null && fsId > 0) {
+            fid = fsId;
+        } else {
+            JsonNode listResp = baiduListDir(c, dir.isEmpty() ? "/" : dir);
+            long found = 0;
+            for (JsonNode n : listResp.path("list")) {
+                if (n.path("isdir").asInt() == 0 && name.equals(n.path("server_filename").asText())) {
+                    found = n.path("fs_id").asLong();
+                    break;
+                }
             }
+            if (found == 0) throw new BizException(ResultCode.NOT_FOUND, "文件不存在: " + name);
+            fid = found;
         }
-        if (fsId == 0) throw new BizException(ResultCode.NOT_FOUND, "文件不存在: " + name);
-        final long fid = fsId;
 
         // 2) filemetas 拿 dlink
         JsonNode metas = baiduGet(c, token -> "https://pan.baidu.com/rest/2.0/xpan/multimedia?method=filemetas&dlink=1"

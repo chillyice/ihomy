@@ -21,6 +21,11 @@ public class Album {
     private String coverPhotoUrl;
     private String shareToken;
     private Long familyId;
+    private Long parentId;
+    private Long sourceDeviceId;
+    private String sourcePath;
+    private String syncStatus;
+    private LocalDateTime lastSyncedAt;
     private Long createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

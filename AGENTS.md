@@ -211,7 +211,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 模块 | Controller | Service | 关键表 | 要点 |
 |------|-----------|---------|--------|------|
 | 文件上传 | FileController | FileService | 磁盘 | 分类目录:pictures/{相册名}/、videos/、music/、files/{yyyyMM}/;`upload(bytes,name,type,albumId,albumName)`;`deleteByUrl(url)` 按 /files/ URL 解析物理路径删文件(`normalize()+startsWith` 防越界);DB 存 `/files/...` 完整 URL |
-| 存储管理 | StorageController | StorageService/StorageSyncRunner | sys_storage_device/sys_baidu_credential | 家庭级设备(SYSTEM/NAS/REMOTE/MOUNT/BAIDU,BAIDU 走 API 跳过本地目录校验、rootPath 恒为 '/',浏览/预览/下载走 xpan+dlink 适配器,暂不支持一键同步);文件浏览器 `GET /storage/browse?deviceId&path`;一键同步 `POST /storage/sync`(@Async 独立 bean,按顶层目录建相册,content_photo.source_path 去重);`@RequirePermission("storage:manage")`;百度网盘四件套凭证(AppID/AppKey 明文+SecretKey/SignKey/access_token/refresh_token ENC 加密,GET 只回 `secretKeySet/signKeySet/authorized` 不回明文,PUT 留空保留原值,`@OperationLog saveArgs=false` 防密钥落日志;OAuth 授权码模式:`GET /storage/baidu/auth/url` 生成授权链接[state 绑定家庭 10 分钟]+ `POST /storage/baidu/auth/callback` 换 token,回调页 `/storage/baidu/callback` 须与开放平台注册一致) |
+| 存储管理 | StorageController | StorageService/AlbumMapService/AlbumMapRunner | sys_storage_device/sys_baidu_credential | 家庭级设备(SYSTEM/NAS/REMOTE/MOUNT/BAIDU,BAIDU 走 API 跳过本地目录校验、rootPath 恒为 '/',浏览/预览/下载走 xpan+dlink 适配器);文件浏览器 `GET /storage/browse?deviceId&path`;**从设备同步 = 目录映射(不拷贝文件)**:`POST /storage/map {deviceId, paths}` 勾选目录异步建层级相册+影子照片,`GET /storage/sync/progress/{taskId}` 进度,`POST /album/{id}/refresh` 刷新子树,打开相册自动刷当前层(2 分钟节流);`@RequirePermission("storage:manage")`;百度网盘四件套凭证(AppID/AppKey 明文+SecretKey/SignKey/access_token/refresh_token ENC 加密,GET 只回 `secretKeySet/signKeySet/authorized` 不回明文,PUT 留空保留原值,`@OperationLog saveArgs=false` 防密钥落日志;OAuth 授权码模式:`GET /storage/baidu/auth/url` 生成授权链接[state 绑定家庭 10 分钟]+ `POST /storage/baidu/auth/callback` 换 token,回调页 `/storage/baidu/callback` 须与开放平台注册一致) |
 | 首页聚合 | HomeController + PublicController | HomeModuleService/HomeStatsService/ActivityFeedService | sys_home_module | `GET /public/home?hid=&home_id=` 返回 {family/modules/photos/stats};`GET /public/feed` 动态流;模块化(sys_home_module 插入即扩展) |
 | 运维 | OpsController | OpsService | sys_operation_log/sys_weather_log | OPS 角色专属;资源统计/服务器状态/操作日志检索/和风天气 API 用量;不返回用户隐私 |
 | 每日内容 | DailyController | — | — | 每日一图(代理 Bing)+每日知识(4 类×5 条);`GET /public/daily-knowledge?types=` |
@@ -696,6 +696,32 @@ INSERT INTO sys_dict_item ... book_format/borrow_status;
 | `i18n/zh-CN.js` + `en.js` | `album.share` + `photoViewer.share/download/linkCopied/copyFailed` |
 
 **分享链接规则**:相册分享 URL = `{origin}/album/shared/{albumShareToken}`(仅混淆令牌,无裸 ID);游客可打开的条件 = 相册 type=public 且所属家庭 is_public=1,否则 404(不泄露存在性);照片分享 URL 追加 `?p={shareId(photoId)}`(Knuth 散列混淆,访问控制仍由相册令牌承担)。新建相册自动生成令牌,存量相册由 migrations.sql 回填。Home/Cascade 的 PhotoViewer 不传 shareBase → 分享按钮隐藏。
+
+##### 设备目录映射相册(V9.2,2026-08-30)
+
+| 文件 | 改动 |
+|------|------|
+| `schema.sql` + `migrations.sql` | `content_photo_album` 加 parent_id/source_device_id/source_path/sync_status/last_synced_at + `idx_family_parent`;`content_photo` 加 source_fs_id |
+| `entity/Album.java` / `entity/Photo.java` | 对应新字段 |
+| `service/AlbumMapService.java` | 新建:目录映射核心。`createMapping`(校验设备→异步任务)、`refreshAlbum`(手动刷子树)、`autoRefresh`(打开相册静默刷当前层,2 分钟节流+在飞去重)、`syncAlbumTree`(列目录→影子照片 upsert→递归子目录建子相册→prune 消失记录)、`ensureRootAlbum`/`ensureChildAlbum`(同设备同路径幂等复用;撞普通相册名加"(设备名)"后缀)、`classifyStatus`(NOT_FOUND/errno=-9→MISSING,其余 OFFLINE) |
+| `service/AlbumMapRunner.java` | 新建:@Async 执行器(独立 bean 防自调用失效);`AlbumMapService→Runner` 用 @Lazy @Autowired 断构造器循环 |
+| `service/SignedUrlService.java` | 新建:HMAC-SHA256(jwt.secret)短期签名(10 分钟)。影子照片 url 存逻辑地址 `storage://{deviceId}/{远程路径}?fsid={fsId}`,`resolve()` 出接口时换 `/api/storage/file-signed` 签名 URL |
+| `service/AlbumService.java` | 重写:list 返回全部层级(parentId/sourceDeviceName/syncStatus/childCount/totalPhotoCount 子树合计,GROUP BY 批量计数免 N+1);detail 返回 children 子相册+签名 URL+触发 autoRefresh;delete 递归删子树(解除映射,deleteByUrl 跳过 storage://,设备文件永不动);shared 转 URL |
+| `service/StorageService.java` | browse 响应加 fsId(百度);baiduOpen 加 fsId 快路径(跳过列父目录);getDeviceById(签名端点无用户上下文);删 startSync/syncProgress |
+| `controller/StorageController.java` | `POST /storage/map` 替代旧 `POST /storage/sync`;`GET /storage/file-signed`(permitAll,签名即凭证)与 `/file` 共用 streamFromDevice(百度流式 InputStreamResource,本地 byte[]) |
+| `controller/AlbumController.java` | 加 `POST /{id}/refresh`(@RequirePermission storage:manage) |
+| `controller/CascadeController.java` / `PublicController.java` / `service/ActivityFeedService.java` | 照片 URL 出口统一走 signedUrlService.resolve |
+| `config/SecurityConfig.java` | GET `/storage/file-signed` permitAll |
+| `mapper/PhotoMapper.java` + `.xml` | 加 countByAlbumIds(GROUP BY 批量) |
+| 删除 | `service/StorageSyncRunner.java`(旧拷贝式一键同步退役) |
+| `components/SyncDialog.vue` | 重写为两步向导:选设备 → el-tree 懒加载目录树(lazy+show-checkbox,只列目录)→ 勾父含子自动 → POST map → 进度条(totalDirs/doneDirs)→ 完成通知父组件刷新 |
+| `views/album/Album.vue` | 顶层过滤(parentId 空);来源角标(设备名+状态点 绿VALID/灰OFFLINE/红MISSING);子相册数角标;总数用 totalPhotoCount;删除确认区分解除映射 |
+| `views/album/AlbumDetail.vue` | 子相册卡片行(封面+状态点+照片数,点击进入);映射横幅(只读·来源·上次刷新时间 ago);刷新按钮(isOwner);映射相册隐藏上传与照片编辑/删除 |
+| `views/storage/Storage.vue` | 旧一键同步区块(Sync 端点+includeEmpty+轮询)替换为说明文字+向导入口(SyncDialog 复用) |
+| `api/index.js` | `storageApi.map` 替代 `sync`;`albumApi.refresh` 新增 |
+| `i18n/zh-CN.js` + `en.js` | album.*(unmapConfirm/mappedReadOnly/refreshMap/status*) + storage.*(mapHint/mapTreeHint/mapNow/syncInBackground 等) 中英双语 |
+
+**映射规则**:影子照片 = content_photo 行,`url` 存 `storage://{deviceId}/{path}?fsid={fsId}`(百度带 fsid,本地设备路径无前导 /)、`source_path` 存 `dev:{deviceId}:{path}` 去重键、`taken_at` = 设备 mtime;可见性随相册 type;封面取第一张影子记录。浏览/预览/下载经 `/api/storage/file-signed`(HMAC 签名 10 分钟,img 标签免 JWT)。刷新:手动=递归子树+通知;自动=打开详情触发当前层(2 分钟节流)。失败分类:目录不存在(本地 NOT_FOUND / 百度 errno=-9)→ MISSING(红点),其余 → OFFLINE(灰点)。删除映射相册=递归删子树+影子记录,设备文件永不触碰。百度 fs_id 存进影子记录,预览直查 filemetas 省一次列目录。**分设备缓存策略(NAS 本地 IO 不缓存,百度第二期做缩略图缓存)**。
 
 ##### 百度网盘接入凭证(photo 分支,2026-08-30)
 

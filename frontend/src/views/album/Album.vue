@@ -11,9 +11,9 @@
     </div>
 
     <div v-loading="loading">
-      <div v-if="albums.length" class="album-grid">
+      <div v-if="topAlbums.length" class="album-grid">
         <div
-          v-for="a in albums"
+          v-for="a in topAlbums"
           :key="a.id"
           class="album-card card"
           @click="$router.push(`/album/${a.id}`)"
@@ -28,7 +28,11 @@
               <span>📷</span>
             </div>
             <span class="album-type" :class="a.type">{{ a.type === 'public' ? t('album.public') : t('album.private') }}</span>
-            <span class="album-count">{{ t('album.photoCount', { n: a.photoCount }) }}</span>
+            <span v-if="a.sourceDeviceName" class="album-source">
+              <span class="status-dot" :class="a.syncStatus || 'OFFLINE'"></span>{{ a.sourceDeviceName }}
+            </span>
+            <span class="album-count">{{ t('album.photoCount', { n: a.totalPhotoCount ?? a.photoCount }) }}</span>
+            <span v-if="a.childCount" class="album-subcount">{{ t('album.subAlbumCount', { n: a.childCount }) }}</span>
           </div>
           <div class="album-info">
             <div class="album-name">{{ a.name }}</div>
@@ -60,12 +64,12 @@
         <el-button type="primary" @click="onSave">{{ t('common.save') }}</el-button>
       </template>
     </el-dialog>
-    <SyncDialog v-model="syncVisible" />
+    <SyncDialog v-model="syncVisible" @synced="load" />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { albumApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -79,6 +83,9 @@ const syncVisible = ref(false)
 const albums = ref([])
 const loading = ref(false)
 const editor = reactive({ visible: false, form: { id: null, name: '', type: 'public' } })
+
+// 顶层相册:层级映射的子相册不直接出现在列表页,进入父相册查看
+const topAlbums = computed(() => albums.value.filter((a) => !a.parentId))
 
 // 管理权限:家长或相册创建者本人
 const canManage = (a) =>
@@ -109,9 +116,12 @@ const onSave = async () => {
   load()
 }
 
-// 删除相册(连同相册内照片):二次确认后执行
+// 删除相册:映射相册=解除映射(不碰设备文件),普通相册=连同照片删除
 const onDel = async (a) => {
-  await ElMessageBox.confirm(t('album.deleteConfirm', { name: a.name }), t('common.tip'), { type: 'warning', closeOnClickModal: true })
+  const msg = a.sourceDeviceId
+    ? t('album.unmapConfirm', { name: a.name, device: a.sourceDeviceName })
+    : t('album.deleteConfirm', { name: a.name })
+  await ElMessageBox.confirm(msg, t('common.tip'), { type: 'warning', closeOnClickModal: true })
   await albumApi.remove(a.id)
   ElMessage.success(t('common.deleted'))
   load()
@@ -153,11 +163,44 @@ onMounted(load)
   background: rgba(46, 116, 181, 0.85);
 }
 .album-type.private { background: rgba(230, 162, 60, 0.9); }
+.album-source {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #fff;
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.status-dot.VALID { background: #67b26b; box-shadow: 0 0 4px rgba(103, 178, 107, 0.9); }
+.status-dot.OFFLINE, .status-dot.SYNCING { background: #9a9a9a; }
+.status-dot.MISSING { background: #b96058; box-shadow: 0 0 4px rgba(185, 96, 88, 0.9); }
 .album-count {
   position: absolute;
   bottom: 10px;
   right: 10px;
   font-size: 12px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 2px 10px;
+  border-radius: 10px;
+}
+.album-subcount {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  font-size: 11px;
   color: #fff;
   background: rgba(0, 0, 0, 0.5);
   padding: 2px 10px;
