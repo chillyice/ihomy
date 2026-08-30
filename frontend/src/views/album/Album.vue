@@ -5,8 +5,16 @@
 
     <div class="page-toolbar card">
       <div class="tb-right">
-        <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ t('album.newAlbum') }}</el-button>
-        <el-button v-if="userStore.isOwner" @click="syncVisible = true">{{ t('album.syncFromDevice') }}</el-button>
+        <template v-if="!selectMode">
+          <el-button v-if="userStore.isLoggedIn && topAlbums.length" @click="toggleSelect">{{ t('album.select') }}</el-button>
+          <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ t('album.newAlbum') }}</el-button>
+          <el-button v-if="userStore.isOwner" @click="syncVisible = true">{{ t('album.syncFromDevice') }}</el-button>
+        </template>
+        <template v-else>
+          <span class="select-count">{{ t('album.selectedAlbums', { n: selectedIds.length }) }}</span>
+          <el-button size="small" :disabled="batchDeleting" @click="toggleSelect">{{ t('album.cancelSelect') }}</el-button>
+          <el-button type="danger" size="small" :loading="batchDeleting" :disabled="!selectedIds.length" @click="onBatchDelete">{{ t('album.deleteSelected') }}</el-button>
+        </template>
       </div>
     </div>
 
@@ -16,7 +24,8 @@
           v-for="a in topAlbums"
           :key="a.id"
           class="album-card card"
-          @click="$router.push(`/album/${a.id}`)"
+          :class="{ selected: selectMode && selectedIds.includes(a.id) }"
+          @click="selectMode ? togglePick(a) : $router.push(`/album/${a.id}`)"
         >
           <div class="album-cover-wrap">
             <div
@@ -24,8 +33,8 @@
               class="album-cover"
               :style="{ backgroundImage: `url(${a.cover})` }"
             ></div>
-            <div v-else class="album-cover album-cover-empty">
-              <span>📷</span>
+            <div v-else class="album-cover">
+              <AlbumDefaultCover :size="64" />
             </div>
             <span class="album-type" :class="a.type">{{ a.type === 'public' ? t('album.public') : t('album.private') }}</span>
             <span v-if="a.sourceDeviceName" class="album-source">
@@ -33,12 +42,15 @@
             </span>
             <span class="album-count">{{ t('album.photoCount', { n: a.totalPhotoCount ?? a.photoCount }) }}</span>
             <span v-if="a.childCount" class="album-subcount">{{ t('album.subAlbumCount', { n: a.childCount }) }}</span>
+            <span v-if="selectMode" class="pick-badge" :class="{ on: selectedIds.includes(a.id) }">
+              <svg viewBox="0 0 16 16" width="12" height="12"><path d="M3 8.5 L6.5 12 L13 4.5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
           </div>
           <div class="album-info">
             <div class="album-name">{{ a.name }}</div>
             <div class="album-meta">{{ formatDate(a.createdAt) }}</div>
           </div>
-          <div v-if="canManage(a)" class="album-actions" @click.stop>
+          <div v-if="!selectMode && canManage(a)" class="album-actions" @click.stop>
             <el-button size="small" text @click="openEditor(a)">{{ t('common.edit') }}</el-button>
             <el-button size="small" text type="danger" @click="onDel(a)">{{ t('common.delete') }}</el-button>
           </div>
@@ -69,13 +81,15 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { albumApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { useSyncStore } from '@/stores/sync'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import SyncDialog from '@/components/SyncDialog.vue'
+import AlbumDefaultCover from '@/components/AlbumDefaultCover.vue'
 
 const { t } = useI18n()
 const userStore = useUserStore()
@@ -127,10 +141,65 @@ const onDel = async (a) => {
   load()
 }
 
+// ---------- 多选删除 ----------
+const selectMode = ref(false)
+const selectedIds = ref([])
+const batchDeleting = ref(false)
+const toggleSelect = () => {
+  selectMode.value = !selectMode.value
+  selectedIds.value = []
+}
+const togglePick = (a) => {
+  const i = selectedIds.value.indexOf(a.id)
+  if (i >= 0) selectedIds.value.splice(i, 1)
+  else selectedIds.value.push(a.id)
+}
+const onBatchDelete = async () => {
+  const targets = topAlbums.value.filter((a) => selectedIds.value.includes(a.id))
+  const mapped = targets.filter((a) => a.sourceDeviceId)
+  const msg = mapped.length
+    ? t('album.batchUnmapConfirm', { n: selectedIds.value.length })
+    : t('album.batchDeleteConfirm', { n: selectedIds.value.length })
+  await ElMessageBox.confirm(msg, t('common.tip'), { type: 'warning', closeOnClickModal: true })
+  batchDeleting.value = true
+  try {
+    for (const id of [...selectedIds.value]) {
+      await albumApi.remove(id)
+    }
+    ElMessage.success(t('common.deleted'))
+    selectedIds.value = []
+    selectMode.value = false
+    load()
+  } finally {
+    batchDeleting.value = false
+  }
+}
+
+// ---------- 后台同步完成时自动刷新列表 ----------
+const syncStore = useSyncStore()
+watch(syncStore.doneCount, () => load())
+
 onMounted(load)
 </script>
 
 <style scoped>
+.select-count { font-size: 13px; color: var(--color-text-secondary); margin-right: 8px; }
+.album-card.selected { outline: 3px solid var(--color-primary, #b88c6e); outline-offset: -3px; }
+.pick-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  border: 2px solid rgba(184, 140, 110, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+.pick-badge.on { background: #b88c6e; border-color: #b88c6e; }
 .album-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -144,13 +213,6 @@ onMounted(load)
   height: 100%;
   background-size: cover;
   background-position: center;
-}
-.album-cover-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 42px;
-  background: linear-gradient(135deg, #eef2f7, #dce6f0);
 }
 .album-type {
   position: absolute;

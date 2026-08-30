@@ -452,6 +452,7 @@ CREATE TABLE `content_photo_album` (
   `name`           VARCHAR(100) NOT NULL COMMENT '相册名称',
   `type`           VARCHAR(20)  NOT NULL DEFAULT 'public' COMMENT 'public/private',
   `cover_photo_url` VARCHAR(255) DEFAULT NULL COMMENT '封面图URL',
+  `cover_url`       VARCHAR(255) DEFAULT NULL COMMENT '自定义封面URL(用户上传,优先于照片封面)',
   `share_token`    VARCHAR(16)  DEFAULT NULL COMMENT '分享令牌(混淆ID,游客凭令牌查看相册)',
   `family_id`      BIGINT       NOT NULL COMMENT '家庭ID',
   `parent_id`      BIGINT       DEFAULT NULL COMMENT '父相册ID(层级相册,设备目录映射)',

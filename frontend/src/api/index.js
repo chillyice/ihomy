@@ -77,6 +77,12 @@ export const albumApi = {
   update: (id, data) => request.put(`/album/${id}`, data),
   remove: (id) => request.delete(`/album/${id}`),
   refresh: (id) => request.post(`/album/${id}/refresh`),
+  setCover: (id, file) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return request.post(`/album/${id}/cover`, fd)
+  },
+  clearCover: (id) => request.delete(`/album/${id}/cover`),
 }
 
 // 照片(批量上传)

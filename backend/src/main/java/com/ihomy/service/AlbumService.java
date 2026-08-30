@@ -1,6 +1,7 @@
 package com.ihomy.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
@@ -43,6 +44,7 @@ public class AlbumService {
     private final FileService fileService;
     private final SignedUrlService signedUrlService;
     private final AlbumMapService albumMapService;
+    private final ThumbnailService thumbnailService;
 
     /** 相册列表(全部层级):游客只返回 public;含来源设备名/映射状态/子相册数/子树照片合计 */
     public List<Map<String, Object>> list(Long familyId, boolean isGuest) {
@@ -218,6 +220,16 @@ public class AlbumService {
         return a;
     }
 
+    /** 设置/清除自定义封面:仅创建者或家长;url 传 null 清除(回退照片封面)。注意 updateById 忽略 null,须显式 SET */
+    public void updateCover(Long id, SysUser user, boolean isOwner, String url) {
+        Album a = requireOwn(id, user, isOwner);
+        String old = a.getCoverUrl();
+        albumMapper.update(null, new LambdaUpdateWrapper<Album>()
+                .eq(Album::getId, id)
+                .set(Album::getCoverUrl, url));
+        if (old != null && !old.isBlank()) fileService.deleteByUrl(old); // 换封面/清除时删旧文件
+    }
+
     /** 删除相册(连同子相册、照片与文件):仅创建者或家长;映射相册删除=解除映射,源文件不受影响 */
     @Transactional
     public void delete(Long id, SysUser user, boolean isOwner) {
@@ -233,6 +245,7 @@ public class AlbumService {
             albumMapper.deletePhysicalById(a.getId());
             for (Photo p : photos) {
                 fileService.deleteByUrl(p.getUrl()); // storage:// 逻辑地址自动跳过,设备文件永不删除
+                thumbnailService.evictByUrl(p.getUrl()); // 影子照片的缩略图缓存一并清理
             }
         }
     }
@@ -266,12 +279,13 @@ public class AlbumService {
         photoMapper.updateById(p);
     }
 
-    /** 删除照片:仅上传者或家长(连带删除文件;影子记录仅删数据库行) */
+    /** 删除照片:仅上传者或家长(连带删除文件与缩略图缓存;影子记录仅删数据库行) */
     @Transactional
     public void deletePhoto(Long photoId, SysUser user, boolean isOwner) {
         Photo p = requirePhoto(photoId, user, isOwner);
         photoMapper.deletePhysicalById(photoId);
         fileService.deleteByUrl(p.getUrl());
+        thumbnailService.evictByUrl(p.getUrl());
     }
 
     /* ---------- 私有工具 ---------- */
@@ -324,8 +338,11 @@ public class AlbumService {
         }
     }
 
-    /** 相册封面:优先取显式封面,否则取最新一张照片 */
+    /** 相册封面:自定义封面 > 显式封面照片 > 最新一张照片(目录型相册无照片时为 null,前端显示默认图) */
     private String resolveCover(Album a) {
+        if (a.getCoverUrl() != null && !a.getCoverUrl().isBlank()) {
+            return a.getCoverUrl();
+        }
         if (a.getCoverPhotoUrl() != null && !a.getCoverPhotoUrl().isBlank()) {
             return a.getCoverPhotoUrl();
         }

@@ -723,7 +723,29 @@ INSERT INTO sys_dict_item ... book_format/borrow_status;
 
 **映射规则**:影子照片 = content_photo 行,`url` 存 `storage://{deviceId}/{path}?fsid={fsId}`(百度带 fsid,本地设备路径无前导 /)、`source_path` 存 `dev:{deviceId}:{path}` 去重键、`taken_at` = 设备 mtime;可见性随相册 type;封面取第一张影子记录。浏览/预览/下载经 `/api/storage/file-signed`(HMAC 签名 10 分钟,img 标签免 JWT)。刷新:手动=递归子树+通知;自动=打开详情触发当前层(2 分钟节流);刷新同时清理设备侧消失的子相册(目录改名/删除/移动,按 sourcePath 比对,仅本映射建的)。失败分类:目录不存在(本地 NOT_FOUND / 百度 errno=-9)→ MISSING(红点),其余 → OFFLINE(灰点)。删除映射相册=递归删子树+影子记录,设备文件永不触碰。百度 fs_id 存进影子记录,预览直查 filemetas 省一次列目录。
 
-**缩略图缓存(V9.3)**:`&thumb=1` 参数(不参与签名)走 `ThumbnailService`——480px JPEG 落盘 `uploadDir/device-thumbs/{md5(deviceId:fsId或path)}.jpg`,首次下载原图生成、之后读缓存秒回;HEIC 等 ImageIO 不可读格式回退原图流;百度 fsId 变化自动换 key 重新生成,NAS 用路径(内容覆盖不刷新,可接受)。前端 AlbumDetail 网格/子相册封面、Cascade 瀑布网格用 `&thumb=1`,PhotoViewer 播放/下载用原图。**百度 API 并发限流**:`StorageService.baiduSlots` Semaphore(4) 包住 baiduOpen 建连阶段(filemetas+dlink open,流关闭时释放),防网格页几十并发打爆百度限频。相册详情面包屑支持层级返回(`parents` 链从根到父)。
+**缩略图缓存(V9.3)**:`&thumb=1` 参数(不参与签名)走 `ThumbnailService`——480px JPEG 落盘 `uploadDir/device-thumbs/{md5(deviceId:fsId或path)}.jpg`,首次下载原图生成、之后读缓存秒回;HEIC 等 ImageIO 不可读格式回退原图流;百度 fsId 变化自动换 key 重新生成,NAS 用路径(内容覆盖不刷新,可接受)。前端 AlbumDetail 网格/子相册封面、Cascade 瀑布网格用 `&thumb=1`,PhotoViewer 播放/下载用原图。**百度 API 并发限流**:`StorageService.baiduSlots` Semaphore(4) 包住 baiduOpen 建连阶段(filemetas+dlink open,流关闭时释放),防网格页几十并发打爆百度限频;缩略图生成阶段另有 `ThumbnailService.GEN_SLOTS` Semaphore(2) 防 OOM(原图 byte[]+全解码吃堆,catch Throwable 回退原图)。相册详情面包屑支持层级返回(`parents` 链从根到父)。
+
+##### 相册体验迭代(V9.4,2026-08-30)
+
+| 文件 | 改动 |
+|------|------|
+| `schema.sql` + `migrations.sql` | `content_photo_album` 加 `cover_url`(自定义封面,优先于照片封面) |
+| `entity/Album.java` | +coverUrl 字段 |
+| `service/AlbumService.java` | resolveCover 优先级 coverUrl>coverPhotoUrl>最新照片;`updateCover`(LambdaUpdateWrapper 显式 SET——updateById 忽略 null 的坑,清除封面必须显式 SET NULL);delete/deletePhoto 连带 evictByUrl 缩略图缓存 |
+| `service/AlbumMapService.java` | removeSubtree 删影子记录时同步 evict 缩略图缓存 |
+| `service/ThumbnailService.java` | +evictByUrl(解析 storage:// 逻辑地址删缓存文件);GEN_SLOTS Semaphore(2) 生成限并发防 OOM;clearCache 端点化 |
+| `controller/AlbumController.java` | `POST /{id}/cover`(MultipartFile 上传)+ `DELETE /{id}/cover`(清除回退照片封面);换封面删旧文件 |
+| `controller/StorageController.java` | `DELETE /storage/thumbs` 清空缩略图缓存(storage:manage) |
+| `stores/sync.js`(新) | 后台同步全局监听:taskId 存 sessionStorage,3s 轮询,DONE→ElNotification+doneCount++,FAILED→error 通知;任务丢失(服务重启)自动移除 |
+| `components/AlbumDefaultCover.vue`(新) | 相册默认封面:暖棕文件夹内联 SVG(无照片无自定义封面时替代 emoji 占位) |
+| `components/SyncDialog.vue` | 前台等待完成→展示 100% 后 800ms 自动关窗;同步中关窗=转后台(syncStore.watch 继续轮询+完成弹通知) |
+| `views/album/AlbumDetail.vue` | album-header padding 对齐 page-toolbar 规范(10px 16px);「设置封面」按钮(创建者/OWNER);子相册 view-toggle 方块(4:3 大封面卡片)/列表(横条)双模式 localStorage 记忆;照片多选批量删除(选择模式+勾选角标+循环调 remove);watch syncStore.doneCount 后台完成自动刷新 |
+| `views/album/Album.vue` | 列表卡片默认封面 AlbumDefaultCover;相册多选批量删除(映射相册文案区分);watch syncStore.doneCount 自动刷新 |
+| `views/storage/Storage.vue` | 「清理缩略图缓存」按钮(OWNER) |
+| `api/index.js` | albumApi.setCover/clearCover;storageApi.clearThumbs |
+| `i18n/zh-CN.js` + `en.js` | album.*(setCover/childAlbums/gridView/listView/select/cancelSelect/selectedCount/selectedAlbums/deleteSelected/photoBatchDeleteConfirm/batchDeleteConfirm/batchUnmapConfirm)+ storage.clearThumbs/thumbsCleared + common.failed |
+
+**封面规则**:`cover_url` 自定义封面 > `cover_photo_url` 首图 > 最新一张照片 > 前端默认封面 SVG(目录型相册无照片时)。设置封面走 `POST /album/{id}/cover` 流式上传(files/{yyyyMM}/),清除走 DELETE;换/清封面自动删旧封面文件。**多选删除**=前端循环现有单删接口(权限天然继承),照片在详情页、相册在列表页,选择模式 localStorage 不记忆(一次性操作)。**后台同步提醒**=Pinia stores/sync 全局轮询(sessionStorage 持久 taskId,刷新页面恢复监听),DONE 弹 ElNotification + doneCount++,相册两页 watch 自动刷新;服务重启任务丢失自动清除监听。
 
 ##### 百度网盘接入凭证(photo 分支,2026-08-30)
 

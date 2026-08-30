@@ -43,6 +43,7 @@ public class AlbumMapService {
     private final StorageDeviceMapper storageDeviceMapper;
     private final StorageService storageService;
     private final NotificationService notificationService;
+    private final ThumbnailService thumbnailService;
 
     /** @Lazy 断开与 Runner 的构造器循环(Runner → Service → Runner) */
     @org.springframework.beans.factory.annotation.Autowired
@@ -328,13 +329,16 @@ public class AlbumMapService {
         }
     }
 
-    /** 递归删除映射相册子树(影子记录+相册行,物理删;设备文件永不动) */
+    /** 递归删除映射相册子树(影子记录+相册行,物理删;设备文件永不动;缩略图缓存一并清理) */
     private void removeSubtree(Album root) {
         List<Album> children = albumMapper.selectList(new LambdaQueryWrapper<Album>()
                 .eq(Album::getParentId, root.getId()));
         for (Album c : children) removeSubtree(c);
+        List<Photo> photos = photoMapper.selectList(new LambdaQueryWrapper<Photo>()
+                .eq(Photo::getAlbumId, root.getId()));
         photoMapper.deletePhysicalByAlbumId(root.getId());
         albumMapper.deletePhysicalById(root.getId());
+        for (Photo p : photos) thumbnailService.evictByUrl(p.getUrl());
     }
 
     /** 路径拼接:百度保留前导 /,本地设备相对路径拼接 */

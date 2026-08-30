@@ -208,3 +208,15 @@ SET @add_diary_doodle := (
 PREPARE add_diary_doodle_stmt FROM @add_diary_doodle;
 EXECUTE add_diary_doodle_stmt;
 DEALLOCATE PREPARE add_diary_doodle_stmt;
+
+-- 2026-08-30: 相册自定义封面列(优先于照片封面;目录型相册无照片时亦可设封面)
+SET @add_album_coverurl := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `content_photo_album` ADD COLUMN `cover_url` VARCHAR(255) DEFAULT NULL COMMENT ''自定义封面URL(用户上传,优先于照片封面)'' AFTER `cover_photo_url`',
+    'SELECT ''skip: album cover_url column already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_photo_album' AND COLUMN_NAME = 'cover_url'
+);
+PREPARE add_album_coverurl_stmt FROM @add_album_coverurl;
+EXECUTE add_album_coverurl_stmt;
+DEALLOCATE PREPARE add_album_coverurl_stmt;

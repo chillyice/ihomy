@@ -62,8 +62,10 @@ import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { storageApi } from '@/api'
+import { useSyncStore } from '@/stores/sync'
 
 const { t } = useI18n()
+const syncStore = useSyncStore()
 const props = defineProps({ modelValue: Boolean })
 const emit = defineEmits(['update:modelValue', 'synced'])
 
@@ -82,6 +84,7 @@ const syncing = ref(false)
 const result = ref(null)
 const progressData = ref(null)
 let timer = null
+let runningTaskId = null
 
 // 百度网盘路径以 / 开头,本地设备为相对路径;根层调用 path 传空
 const ROOT = (id) => devices.value.find((d) => d.id === id)?.deviceType === 'BAIDU' ? '/' : ''
@@ -140,6 +143,7 @@ async function start() {
   result.value = null
   try {
     const { taskId } = await storageApi.map({ deviceId: deviceId.value, paths: checkedPaths.value })
+    runningTaskId = taskId
     timer = setInterval(async () => {
       try {
         const p = await storageApi.syncProgress(taskId)
@@ -151,6 +155,7 @@ async function start() {
             result.value = p
             ElMessage.success(p.message || t('storage.syncDone'))
             emit('synced')
+            setTimeout(() => { visible.value = false }, 800) // 前台等待:展示 100% 片刻后自动关闭
           } else {
             ElMessage.error(p.message || t('storage.syncFailed'))
           }
@@ -171,7 +176,13 @@ const progressMsg = computed(() => progressData.value?.lastAlbum
   : t('storage.syncing'))
 
 function stopTimer() { if (timer) { clearInterval(timer); timer = null } }
-function cleanup() { stopTimer(); syncing.value = false }
+function cleanup() {
+  // 同步进行中关窗 = 转后台:全局 store 继续轮询,完成时弹通知
+  if (syncing.value && runningTaskId) syncStore.watch(runningTaskId)
+  stopTimer()
+  syncing.value = false
+  runningTaskId = null
+}
 </script>
 
 <style scoped>
