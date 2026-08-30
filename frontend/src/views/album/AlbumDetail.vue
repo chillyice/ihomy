@@ -18,6 +18,14 @@
         <p v-if="album.description" class="album-desc">{{ album.description }}</p>
       </div>
       <div class="album-head-actions">
+        <div v-if="children.length && !selectMode" class="view-toggle">
+          <button class="vt-btn" :class="{ active: childView === 'grid' }" :title="t('album.gridView')" @click="setChildView('grid')">
+            <svg viewBox="0 0 16 16" width="14" height="14"><rect x="1.5" y="1.5" width="5" height="5" rx="1" fill="currentColor"/><rect x="9.5" y="1.5" width="5" height="5" rx="1" fill="currentColor"/><rect x="1.5" y="9.5" width="5" height="5" rx="1" fill="currentColor"/><rect x="9.5" y="9.5" width="5" height="5" rx="1" fill="currentColor"/></svg>
+          </button>
+          <button class="vt-btn" :class="{ active: childView === 'list' }" :title="t('album.listView')" @click="setChildView('list')">
+            <svg viewBox="0 0 16 16" width="14" height="14"><rect x="1.5" y="2.5" width="13" height="3" rx="1" fill="currentColor"/><rect x="1.5" y="6.5" width="13" height="3" rx="1" fill="currentColor"/><rect x="1.5" y="10.5" width="13" height="3" rx="1" fill="currentColor"/></svg>
+          </button>
+        </div>
         <el-button
           v-if="isMapped && userStore.isOwner"
           class="ghost-btn"
@@ -26,7 +34,7 @@
         >{{ t('album.refreshMap') }}</el-button>
         <el-button v-if="canManageAlbum" class="ghost-btn" @click="pickCover">{{ t('album.setCover') }}</el-button>
         <el-button
-          v-if="canManageAlbum && photos.length && !isMapped"
+          v-if="canManageAlbum && ((photos.length && !isMapped) || children.length)"
           class="ghost-btn"
           @click="toggleSelect"
         >{{ selectMode ? t('album.cancelSelect') : t('album.select') }}</el-button>
@@ -48,28 +56,26 @@
     </div>
     <input ref="coverInput" type="file" accept="image/*" class="hidden-input" @change="onCoverPicked" />
 
-    <!-- 子相册(设备目录映射层级):方块/列表两种展示模式 -->
+    <!-- 子相册(设备目录映射层级):方块/列表两种展示模式,支持多选删除 -->
     <div v-if="children.length" class="child-section">
-      <div class="child-toolbar">
-        <span class="section-label">{{ t('album.childAlbums') }}</span>
-        <div class="view-toggle">
-          <button class="vt-btn" :class="{ active: childView === 'grid' }" :title="t('album.gridView')" @click="setChildView('grid')">
-            <svg viewBox="0 0 16 16" width="14" height="14"><rect x="1.5" y="1.5" width="5" height="5" rx="1" fill="currentColor"/><rect x="9.5" y="1.5" width="5" height="5" rx="1" fill="currentColor"/><rect x="1.5" y="9.5" width="5" height="5" rx="1" fill="currentColor"/><rect x="9.5" y="9.5" width="5" height="5" rx="1" fill="currentColor"/></svg>
-          </button>
-          <button class="vt-btn" :class="{ active: childView === 'list' }" :title="t('album.listView')" @click="setChildView('list')">
-            <svg viewBox="0 0 16 16" width="14" height="14"><rect x="1.5" y="2.5" width="13" height="3" rx="1" fill="currentColor"/><rect x="1.5" y="6.5" width="13" height="3" rx="1" fill="currentColor"/><rect x="1.5" y="10.5" width="13" height="3" rx="1" fill="currentColor"/></svg>
-          </button>
-        </div>
-      </div>
       <!-- 方块模式:大封面卡片 -->
       <div v-if="childView === 'grid'" class="child-grid">
-        <div v-for="c in children" :key="c.id" class="child-tile card" @click="$router.push(`/album/${c.id}`)">
+        <div
+          v-for="c in children"
+          :key="c.id"
+          class="child-tile card"
+          :class="{ selected: selectMode && selectedChildIds.includes(c.id) }"
+          @click="selectMode ? togglePickChild(c) : $router.push(`/album/${c.id}`)"
+        >
           <div class="child-tile-cover">
             <template v-if="c.cover">
               <div class="child-tile-img" :style="{ backgroundImage: `url(${c.cover}&thumb=1)` }"></div>
             </template>
             <AlbumDefaultCover v-else :size="56" />
             <span class="status-dot" :class="c.syncStatus || 'OFFLINE'"></span>
+            <span v-if="selectMode" class="pick-badge" :class="{ on: selectedChildIds.includes(c.id) }">
+              <svg viewBox="0 0 16 16" width="11" height="11"><path d="M3 8.5 L6.5 12 L13 4.5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
           </div>
           <div class="child-tile-info">
             <span class="child-tile-name">{{ c.name }}</span>
@@ -79,17 +85,21 @@
           </div>
         </div>
       </div>
-      <!-- 列表模式:横条 -->
+      <!-- 列表模式:横条(单个占一整行) -->
       <div v-else class="child-list">
         <div
           v-for="c in children"
           :key="c.id"
           class="child-card card"
-          @click="$router.push(`/album/${c.id}`)"
+          :class="{ selected: selectMode && selectedChildIds.includes(c.id) }"
+          @click="selectMode ? togglePickChild(c) : $router.push(`/album/${c.id}`)"
         >
           <div class="child-cover" :style="c.cover ? { backgroundImage: `url(${c.cover}&thumb=1)` } : {}">
             <AlbumDefaultCover v-if="!c.cover" :size="30" />
             <span class="status-dot" :class="c.syncStatus || 'OFFLINE'"></span>
+            <span v-if="selectMode" class="pick-badge" :class="{ on: selectedChildIds.includes(c.id) }">
+              <svg viewBox="0 0 16 16" width="11" height="11"><path d="M3 8.5 L6.5 12 L13 4.5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
           </div>
           <div class="child-info">
             <span class="child-name">{{ c.name }}</span>
@@ -102,12 +112,12 @@
     </div>
 
     <div v-loading="loading" class="album-body">
-      <!-- 多选工具条 -->
+      <!-- 多选工具条(子相册+照片混合) -->
       <div v-if="selectMode" class="select-bar card">
-        <span>{{ t('album.selectedCount', { n: selectedIds.length }) }}</span>
+        <span>{{ selectSummary }}</span>
         <div class="tb-right">
           <el-button size="small" :disabled="batchDeleting" @click="toggleSelect">{{ t('album.cancelSelect') }}</el-button>
-          <el-button type="danger" size="small" :loading="batchDeleting" :disabled="!selectedIds.length" @click="onBatchDelete">{{ t('album.deleteSelected') }}</el-button>
+          <el-button type="danger" size="small" :loading="batchDeleting" :disabled="!selectedChildIds.length && !selectedIds.length" @click="onBatchDelete">{{ t('album.deleteSelected') }}</el-button>
         </div>
       </div>
       <div v-if="photos.length" class="photo-wall">
@@ -129,7 +139,7 @@
           </div>
         </div>
       </div>
-      <el-empty v-else :description="userStore.isGuest ? t('album.noPublicPhotos') : t('album.emptyPhotoHint')" />
+      <el-empty v-else-if="!children.length" :description="userStore.isGuest ? t('album.noPublicPhotos') : t('album.emptyPhotoHint')" />
     </div>
 
     <el-dialog v-model="descEditor.visible" append-to-body :title="t('album.noteTitle')" width="420px">
@@ -311,28 +321,44 @@ const setChildView = (v) => {
   localStorage.setItem('ihomy:album:childView', v)
 }
 
-// ---------- 照片多选删除 ----------
+// ---------- 子相册 + 照片多选删除(混合选择) ----------
 const selectMode = ref(false)
-const selectedIds = ref([])
+const selectedIds = ref([])          // 选中照片 id
+const selectedChildIds = ref([])     // 选中子相册 id
 const batchDeleting = ref(false)
 const toggleSelect = () => {
   selectMode.value = !selectMode.value
   selectedIds.value = []
+  selectedChildIds.value = []
 }
 const togglePick = (p) => {
   const i = selectedIds.value.indexOf(p.id)
   if (i >= 0) selectedIds.value.splice(i, 1)
   else selectedIds.value.push(p.id)
 }
+const togglePickChild = (c) => {
+  const i = selectedChildIds.value.indexOf(c.id)
+  if (i >= 0) selectedChildIds.value.splice(i, 1)
+  else selectedChildIds.value.push(c.id)
+}
+const selectSummary = computed(() => {
+  const a = selectedChildIds.value.length
+  const p = selectedIds.value.length
+  if (a && p) return t('album.selectedMixed', { a, p })
+  if (a) return t('album.selectedAlbums', { n: a })
+  return t('album.selectedCount', { n: p })
+})
 const onBatchDelete = async () => {
-  await ElMessageBox.confirm(t('album.photoBatchDeleteConfirm', { n: selectedIds.value.length }), t('common.tip'), { type: 'warning', closeOnClickModal: true })
+  const a = selectedChildIds.value.length
+  const p = selectedIds.value.length
+  await ElMessageBox.confirm(t('album.batchMixedConfirm', { a, p }), t('common.tip'), { type: 'warning', closeOnClickModal: true })
   batchDeleting.value = true
   try {
-    for (const id of [...selectedIds.value]) {
-      await photoApi.remove(id)
-    }
+    for (const id of [...selectedChildIds.value]) await albumApi.remove(id)
+    for (const id of [...selectedIds.value]) await photoApi.remove(id)
     ElMessage.success(t('common.deleted'))
     selectedIds.value = []
+    selectedChildIds.value = []
     selectMode.value = false
     load()
   } finally {
@@ -388,17 +414,17 @@ onMounted(load)
 .status-dot.OFFLINE, .status-dot.SYNCING { background: #9a9a9a; }
 .status-dot.MISSING { background: #b96058; box-shadow: 0 0 4px rgba(185, 96, 88, 0.9); }
 .child-section { margin-bottom: 20px; }
-.child-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.child-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
 .child-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
 .child-tile { overflow: hidden; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
 .child-tile:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(31,58,95,0.15); }
+.child-tile.selected { outline: 3px solid var(--color-primary, #b88c6e); outline-offset: -3px; }
 .child-tile-cover { position: relative; aspect-ratio: 4 / 3; }
 .child-tile-img { width: 100%; height: 100%; background-size: cover; background-position: center; }
 .child-tile-cover .status-dot { position: absolute; top: 8px; right: 8px; border: 2px solid var(--color-bg, #fcf8f0); }
 .child-tile-info { padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
 .child-tile-name { font-size: 14px; font-weight: 600; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .child-tile-meta { font-size: 12px; color: var(--color-text-secondary); }
+.child-list { display: grid; grid-template-columns: 1fr; gap: 10px; }
 .child-card {
   display: flex;
   align-items: center;
@@ -408,6 +434,7 @@ onMounted(load)
   transition: transform 0.15s, box-shadow 0.15s;
 }
 .child-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(31,58,95,0.12); }
+.child-card.selected { outline: 3px solid var(--color-primary, #b88c6e); outline-offset: -3px; }
 .child-cover {
   position: relative;
   width: 52px;

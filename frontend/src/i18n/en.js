@@ -243,6 +243,8 @@ export default {
     allTypes: 'All types',
     selectedCount: '{n} photos selected',
     selectedAlbums: '{n} albums selected',
+    selectedMixed: '{a} albums and {p} photos selected',
+    batchMixedConfirm: 'Delete {a} selected albums and {p} photos? Albums will be removed with their photos (mapped albums only unlink — device files stay untouched). This cannot be undone.',
     deleteSelected: 'Delete selected',
     photoBatchDeleteConfirm: 'Delete {n} selected photos? This cannot be undone.',
     mappedReadOnly: 'Read-only mapping',
