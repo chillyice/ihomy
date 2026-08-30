@@ -3,7 +3,7 @@
     <Breadcrumb :items="[{ label: $t('blog.title') }]" />
 
     <!-- 顶部工具栏 -->
-    <div class="page-toolbar card compact">
+    <div class="page-toolbar card">
       <div class="tb-left">
         <el-input
           v-model="searchKeyword"
