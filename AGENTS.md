@@ -179,7 +179,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 日记 | DiaryController | DiaryService | content_diary | **书架+翻书视图(V9.0)**:`/diary` 书架(每人一本封面网格,`/diary/book/:authorId` 翻书)——桌面双页信纸/移动单页,左右方向键+底部按钮翻页,目录跳转,紧凑连续排页(上一篇写完下一篇紧接),页眉 hover 编辑/删除;每页=页眉(首页)+18行×28px 正文裁剪窗口+页码脚;`measureDiaryLines` 离屏测行数分页;**信纸涂鸦(V9.1)**:`utils/doodle.js` 矢量笔画引擎(签字笔/铅笔/蜡笔/荧光笔/画笔+像素橡皮/对象橡皮),编辑页笔盘选笔后直接画在信纸上,随日记存 `doodle` JSON 列,翻书查看随信纸分页显示;date 兼容 `yyyy-MM-dd HH:mm`(旧代码会 500);默认 visibility=FAMILY |
 | 相册 | AlbumController | AlbumService | content_photo_album | type=public/private;public→PUBLIC/private→FAMILY;软删;`share_token` 16 位混淆令牌,`GET /album/shared/{token}` 游客可看公开相册(需家庭 is_public=1);软删 |
 | 照片 | PhotoController | AlbumService | content_photo | 批量上传 `POST /album/{id}/photos`;`taken_at/location`;**硬删除**(`PhotoMapper.deletePhysicalById` XML DELETE 绕过全局 logic-delete)+ `FileService.deleteByUrl` 删磁盘文件;`source_path`(设备:相对路径)去重 |
-| 放映厅 | VideoController | VideoService | content_video/content_video_wish | 豆瓣式属性(media_type/genres/region/year/duration/episodes/director/actors/rating/intro/poster/video_url);`POST /video/upload` 500MB;**硬删除**(DB+video_url+poster);想看列表 CRUD |
+| 放映厅 | VideoController | VideoService/VideoMapService | content_video/content_video_wish | 豆瓣式属性(media_type/genres/region/year/duration/episodes/director/actors/rating/intro/poster/video_url);`POST /video/upload` 500MB;**硬删除**(DB+video_url+poster,storage:// 自动跳过);想看列表 CRUD;**设备目录映射**(video 分支):平铺影子视频+来源筛选/多选批量删除/播放地址现签,详见"放映厅设备映射"归档 |
 | 照片瀑布 | CascadeController | — | content_photo | `GET /photo/cascade` 随机;可见性过滤(成员 PUBLIC+FAMILY,PRIVATE 仅作者,未登录仅 PUBLIC) |
 | 愿望单 | WishController | WishService | content_wish | title/reason/category/status(待实现/已实现/放弃)/visibility/achieved_at |
 | 书架 | LibraryController | LibraryService | content_book/content_book_borrow | 家庭电子书架(EPUB/PDF/TXT/MOBI);上传/分类/在线阅读;**硬删除**(DB+file_url+cover_url);阅读状态跟踪(WANT_READ/READING/FINISHED);在线阅读:PDF iframe/EPUB epub.js(异步加载)/TXT 分页(2000字/页)/MOBI 仅下载;文件存 `books/{yyyyMM}/`;可见性与博客一致 |
@@ -786,6 +786,38 @@ INSERT INTO sys_dict_item ... book_format/borrow_status;
 | `vite.config.js` | `preview.proxy` 补 `/api`→8080 代理(vite preview 本地验证生产构建用) |
 
 **根因与兼容规则**:生产 `content_blog_category` 表为空但博客带旧分类字符串,`/blog/categories/counts` 把缺 id/parentId 的裸行混进返回,前端 `countWithChildren` 用 `child.parentId === item.id` 找子分类,`undefined === undefined` 恒真 → 全体互相无限递归 → RangeError 渲染中断白屏(接口有数据但页面空白;游客 401 拿不到该接口不崩;≥1400px 侧边栏路径必崩)。修复后旧分类行 `id=null` 只展示计数,不可编辑/删除/作父级;用户在分类管理建同名表分类后 path 匹配 + seen 去重自动合并,无需数据迁移。
+
+##### 放映厅设备映射与工具栏迭代(video 分支,2026-08-31,未合 main)
+
+| 文件 | 改动 |
+|------|------|
+| `schema.sql` + `migrations.sql` | `content_video` 加 `source_device_id/source_path/source_fs_id/source_dir/sync_status` 5 列 + `idx_family_created/idx_family_source` 索引;`video_url` 扩到 VARCHAR(500) 容纳 storage:// 长路径 |
+| `entity/Video.java` | 对应 5 个映射字段 |
+| `service/MapTaskRegistry.java`(新) | 目录映射任务进度共享注册表(相册+视频共用),进度统一走 `GET /storage/sync/progress/{taskId}`,前端 SyncDialog/sync store 零改动 |
+| `service/VideoMapService.java`(新) + `VideoMapRunner.java`(新) | 设备目录→放映厅影子视频映射(平铺模式):递归扫描视频文件(mp4/mkv/avi/mov/wmv/flv/webm/m4v/ts/rmvb/mpg/mpeg/3gp)入 `content_video`(video_url 存 `storage://` 逻辑地址,title=文件名去扩展名,mediaType=other,source_dir 记映射根目录);`refreshAll` 按 distinct(source_device_id, source_dir) 反查重扫+prune 消失记录;目录扫不到标 MISSING/OFFLINE(不清记录);根目录空 basename 拒绝 |
+| `service/AlbumMapService.java` | 私有 taskProgress map 改用共享 `MapTaskRegistry`(progress 行为不变) |
+| `service/VideoService.java` | list 响应加 sourceDeviceId/sourceDeviceName/sourceDir/syncStatus(批量查设备);videoUrl/poster 出接口走 `signedUrlService.resolve`;`update` 防护:映射视频(source_path 非空)的 video_url 不允许被编辑覆盖(前端编辑表单拿到的是已解析签名 URL,回存会污染逻辑地址);新增 `playUrl(id)` 播放地址现签;删死代码 resolveUserName |
+| `controller/VideoController.java` | 新增 `POST /video/map`(storage:manage)、`POST /video/refresh`(storage:manage)、`GET /video/{id}/play-url`(permitAll,`/video/*` 已放行,游客 401 列表拿不到数据无影响) |
+| `service/StorageService.java` + `controller/StorageController.java` | 本地设备文件流式返回改 `PathResource`(原 readFileBytes 全量 byte[],GB 级视频必 OOM);Spring 对 Resource 自动支持 Range 请求(拖进度条 206);guessMediaType 补 mkv/webm/mov/avi/m4v |
+| `views/cinema/Cinema.vue` | 工具栏对齐相册标准:tb-left=搜索+来源+类型+题材筛选(前端过滤),tb-right=选择/想看/刷新映射/同步/上传;选择态=计数+取消+删除所选(批量删除混映射视频时提示仅删记录);卡片来源角标(设备名+VALID/OFFLINE/MISSING 状态点);播放走 playUrl 现取(签名 URL 10 分钟过期);映射视频编辑表单隐藏文件上传显示"文件在设备上";watch syncStore.doneCount 后台同步完成自动刷新 |
+| `components/SyncDialog.vue` | 加 `target` prop(album 默认/video):切换 map 调用与标题/提示文案;进度轮询共用 storage 端点 |
+| `api/index.js` | videoApi 加 `map/refreshMap/playUrl` |
+| `i18n/zh-CN.js` + `en.js` | cinema.*(filterSource/allSources/localUpload/filterMediaType/allTypes/filterGenre/select/cancelSelect/selectedVideos/deleteSelected/batchDeleteConfirm/batchMixedConfirm/refreshMap/refreshStarted/playFailed/mappedFileHint)+ storage.mapHintVideo 中英 |
+
+**映射规则(video 分支)**:影子视频 = `content_video` 行,`video_url` 存 `storage://{deviceId}/{path}?fsid={fsId}`、`source_path` 存 `dev:{deviceId}:{path}` 去重键、`source_dir` 存映射根目录(相对设备);**平铺无层级容器**(用户选定,目录树结构以后再设计),列表页来源角标+来源筛选区分本地上传/设备映射;删除影子视频=物理删记录(设备文件永不动,deleteByUrl 自动跳过 storage://);刷新=按 source_dir 反查重扫,prune 仅清 `dev:{id}:{rootDir}/` 前缀下消失的记录;**播放地址每次点击现签**(`GET /video/{id}/play-url`,列表返回的签名 URL 10 分钟过期不可靠);本地设备视频流式 PathResource 输出(支持 Range,防 OOM),百度走 dlink 中转(不支持 Range,拖进度条受限——已知上限)。**冒烟已验证**:映射 3 文件(忽略非视频)/prune/刷新/删除保留设备文件/206 Range/相册映射回归(MapTaskRegistry 重构无回归)。
+
+**live DB 同步**(生产上线前执行,video 分支合入 main 后):
+```sql
+-- 见 backend/src/main/resources/migrations.sql 尾部 video 段(幂等)
+ALTER TABLE content_video ADD COLUMN source_device_id BIGINT DEFAULT NULL;
+ALTER TABLE content_video ADD COLUMN source_path VARCHAR(500) DEFAULT NULL;
+ALTER TABLE content_video ADD COLUMN source_fs_id BIGINT DEFAULT NULL;
+ALTER TABLE content_video ADD COLUMN source_dir VARCHAR(500) DEFAULT NULL;
+ALTER TABLE content_video ADD COLUMN sync_status VARCHAR(20) DEFAULT NULL;
+ALTER TABLE content_video MODIFY COLUMN video_url VARCHAR(500) NOT NULL;
+ALTER TABLE content_video ADD INDEX idx_family_created (family_id, deleted, created_at);
+ALTER TABLE content_video ADD INDEX idx_family_source (family_id, deleted, source_device_id);
+```
 
 
 ## 文件存储策略

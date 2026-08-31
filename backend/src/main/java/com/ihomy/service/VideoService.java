@@ -6,6 +6,7 @@ import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
 import com.ihomy.common.UserNames;
 import com.ihomy.dto.VideoDTO;
+import com.ihomy.entity.StorageDevice;
 import com.ihomy.entity.SysUser;
 import com.ihomy.entity.Video;
 import com.ihomy.entity.VideoWish;
@@ -23,6 +24,7 @@ import java.util.Map;
 /**
  * 放映厅业务:家庭视频库(豆瓣式元数据,软删)与"想看"清单,
  * 改删视频校验上传者或家长,可见性固定为家庭可见。
+ * 设备映射的影子视频(video_url=storage:// 逻辑地址)出接口时换签名中转 URL。
  */
 @Service
 @RequiredArgsConstructor
@@ -31,10 +33,12 @@ public class VideoService {
     private final VideoMapper videoMapper;
     private final VideoWishMapper videoWishMapper;
     private final SysUserMapper sysUserMapper;
+    private final com.ihomy.mapper.StorageDeviceMapper storageDeviceMapper;
+    private final SignedUrlService signedUrlService;
     private final PointsService pointsService;
     private final FileService fileService;
 
-    /** 视频列表:按家庭过滤,支持关键字/类型搜索,附带上传者昵称 */
+    /** 视频列表:按家庭过滤,支持关键字/类型搜索,附带上传者昵称与来源设备信息 */
     public List<Map<String, Object>> list(Long familyId, String keyword, String mediaType) {
         List<Map<String, Object>> result = new ArrayList<>();
         if (familyId == null) return result;
@@ -46,6 +50,7 @@ public class VideoService {
           .orderByDesc(Video::getCreatedAt);
         List<Video> videos = videoMapper.selectList(qw);
         Map<Long, SysUser> userMap = batchUsers(videos.stream().map(Video::getUploaderId));
+        Map<Long, StorageDevice> deviceMap = batchDevices(videos);
         for (Video v : videos) {
             Map<String, Object> m = new HashMap<>();
             m.put("id", v.getId());
@@ -62,11 +67,16 @@ public class VideoService {
             m.put("actors", v.getActors());
             m.put("rating", v.getRating());
             m.put("intro", v.getIntro());
-            m.put("poster", v.getPoster());
-            m.put("videoUrl", v.getVideoUrl());
+            m.put("poster", signedUrlService.resolve(v.getPoster()));
+            m.put("videoUrl", signedUrlService.resolve(v.getVideoUrl()));
             m.put("uploaderId", v.getUploaderId());
             SysUser u = v.getUploaderId() == null ? null : userMap.get(v.getUploaderId());
             m.put("uploaderName", UserNames.of(u));
+            m.put("sourceDeviceId", v.getSourceDeviceId());
+            m.put("sourceDir", v.getSourceDir());
+            m.put("syncStatus", v.getSyncStatus());
+            StorageDevice d = v.getSourceDeviceId() == null ? null : deviceMap.get(v.getSourceDeviceId());
+            m.put("sourceDeviceName", d == null ? null : d.getName());
             m.put("createdAt", v.getCreatedAt());
             result.add(m);
         }
@@ -86,12 +96,26 @@ public class VideoService {
         return v;
     }
 
-    /** 更新视频:仅上传者或家长,且须同家庭 */
+    /** 更新视频:仅上传者或家长,且须同家庭;设备映射视频的 video_url 由映射管理,不允许被编辑覆盖 */
     public Video update(Long id, Long familyId, Long currentUserId, boolean isOwner, VideoDTO dto) {
         Video v = requireOwn(id, familyId, currentUserId, isOwner);
+        String mappedUrl = v.getSourcePath() == null ? null : v.getVideoUrl();
         apply(v, dto);
+        if (mappedUrl != null) v.setVideoUrl(mappedUrl);
         videoMapper.updateById(v);
         return v;
+    }
+
+    /** 播放地址:storage:// 逻辑地址现签(列表返回的签名 URL 10 分钟过期,点击播放时取新的) */
+    public Map<String, String> playUrl(Long id, Long familyId) {
+        Video v = videoMapper.selectById(id);
+        if (v == null || (v.getDeleted() != null && v.getDeleted() == 1)) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
+        if (familyId != null && !familyId.equals(v.getFamilyId())) {
+            throw new BizException(ResultCode.FORBIDDEN);
+        }
+        return Map.of("url", signedUrlService.resolve(v.getVideoUrl()));
     }
 
     /** 删除视频:硬删记录并删除视频文件与海报 */
@@ -184,6 +208,21 @@ public class VideoService {
         return map;
     }
 
+    /** 批量取来源设备,返回 id→StorageDevice 映射(无映射视频返空 Map) */
+    private Map<Long, StorageDevice> batchDevices(List<Video> videos) {
+        java.util.Set<Long> set = new java.util.HashSet<>();
+        for (Video v : videos) {
+            if (v.getSourceDeviceId() != null) set.add(v.getSourceDeviceId());
+        }
+        if (set.isEmpty()) return Map.of();
+        List<StorageDevice> devices = storageDeviceMapper.selectBatchIds(set);
+        Map<Long, StorageDevice> map = new HashMap<>(devices.size() * 2);
+        for (StorageDevice d : devices) {
+            map.put(d.getId(), d);
+        }
+        return map;
+    }
+
     /** 标记想看已入库(status=1),须同家庭 */
     public void markWishDone(Long id, Long familyId) {
         VideoWish w = videoWishMapper.selectById(id);
@@ -208,10 +247,5 @@ public class VideoService {
         }
         w.setDeleted(1);
         videoWishMapper.updateById(w);
-    }
-
-    private String resolveUserName(Long userId) {
-        if (userId == null) return null;
-        return UserNames.of(sysUserMapper.selectById(userId));
     }
 }

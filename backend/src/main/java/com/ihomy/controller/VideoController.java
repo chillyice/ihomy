@@ -1,6 +1,7 @@
 package com.ihomy.controller;
 
 import com.ihomy.annotation.OperationLog;
+import com.ihomy.annotation.RequirePermission;
 import com.ihomy.common.Result;
 import com.ihomy.dto.VideoDTO;
 import com.ihomy.dto.VideoWishDTO;
@@ -9,6 +10,7 @@ import com.ihomy.entity.Video;
 import com.ihomy.entity.VideoWish;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.FileService;
+import com.ihomy.service.VideoMapService;
 import com.ihomy.service.VideoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,6 +25,7 @@ import java.util.Map;
 
 /**
  * 放映厅接口:视频库列表/上传/增删改,以及"想看"清单的提交/列表/入库标记/删除。
+ * 设备目录映射(影子视频,不拷贝文件)与播放地址现签。
  */
 @Tag(name = "放映厅")
 @RestController
@@ -31,6 +34,7 @@ import java.util.Map;
 public class VideoController {
 
     private final VideoService videoService;
+    private final VideoMapService videoMapService;
     private final FileService fileService;
     private final SecurityHelper securityHelper;
 
@@ -41,6 +45,35 @@ public class VideoController {
         SysUser user = securityHelper.currentUser();
         Long familyId = user == null ? null : user.getFamilyId();
         return Result.success(videoService.list(familyId, keyword, mediaType));
+    }
+
+    @Operation(summary = "播放地址(storage:// 逻辑地址现签,列表签名 URL 过期后重新获取)")
+    @GetMapping("/{id}/play-url")
+    public Result<Map<String, String>> playUrl(@PathVariable Long id) {
+        SysUser user = securityHelper.currentUser();
+        Long familyId = user == null ? null : user.getFamilyId();
+        return Result.success(videoService.playUrl(id, familyId));
+    }
+
+    @Operation(summary = "从设备同步视频:勾选目录映射为影子视频记录(不拷贝文件)")
+    @OperationLog(module = "VIDEO", operationType = "CREATE", description = "设备目录映射视频", saveArgs = false)
+    @RequirePermission("storage:manage")
+    @PostMapping("/map")
+    public Result<Map<String, Long>> map(@RequestBody Map<String, Object> body) {
+        Long deviceId = body.get("deviceId") == null ? 0L : Long.valueOf(body.get("deviceId").toString());
+        @SuppressWarnings("unchecked")
+        List<String> paths = (List<String>) body.get("paths");
+        Long taskId = videoMapService.createMapping(securityHelper.currentUser(), securityHelper.current().getFamilyId(), deviceId, paths);
+        return Result.success(Map.of("taskId", taskId));
+    }
+
+    @Operation(summary = "刷新设备映射(重扫全部已映射目录,清理消失记录)")
+    @OperationLog(module = "VIDEO", operationType = "UPDATE", description = "刷新设备视频映射")
+    @RequirePermission("storage:manage")
+    @PostMapping("/refresh")
+    public Result<Map<String, Long>> refresh() {
+        Long taskId = videoMapService.refreshAll(securityHelper.currentUser(), securityHelper.current().getFamilyId());
+        return Result.success(Map.of("taskId", taskId));
     }
 
     @Operation(summary = "上传视频文件")

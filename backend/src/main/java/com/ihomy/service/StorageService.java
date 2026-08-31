@@ -196,6 +196,15 @@ public class StorageService {
         }
     }
 
+    /** 本地设备文件定位(防路径遍历):供流式返回用,GB 级视频不能 readFileBytes 全量入堆 */
+    public java.nio.file.Path resolveLocalFile(StorageDevice device, String path) {
+        Path f = resolveSafe(deviceRoot(device), path);
+        if (!Files.isRegularFile(f)) {
+            throw new BizException(ResultCode.NOT_FOUND, "文件不存在");
+        }
+        return f;
+    }
+
     public String downloadName(StorageDevice device, String path) {
         return resolveSafe(deviceRoot(device), path).getFileName().toString();
     }

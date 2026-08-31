@@ -35,6 +35,11 @@ public class Video {
     private Long uploaderId;
     private Long familyId;
     private String visibility;
+    private Long sourceDeviceId;
+    private String sourcePath;
+    private Long sourceFsId;
+    private String sourceDir;
+    private String syncStatus;
     private LocalDateTime createdAt;
     @TableLogic
     private Integer deleted;

@@ -1,9 +1,10 @@
-<!-- 从设备同步向导:选设备 → 目录树懒加载勾选 → 确定后目录映射为层级相册(不拷贝文件);完成后通知父组件刷新 -->
+<!-- 从设备同步向导:选设备 → 目录树懒加载勾选 → 确定后目录映射为影子记录(不拷贝文件);完成后通知父组件刷新 -->
+<!-- target: album=映射为相册(默认) / video=映射为放映厅视频 -->
 <template>
-  <el-dialog v-model="visible" append-to-body :title="$t('album.syncFromDevice')" width="560px" @closed="cleanup">
+  <el-dialog v-model="visible" append-to-body :title="$t(target === 'video' ? 'cinema.syncFromDevice' : 'album.syncFromDevice')" width="560px" @closed="cleanup">
     <!-- 步骤一:选设备 -->
     <div v-if="step === 1">
-      <p class="wizard-hint">{{ $t('storage.mapHint') }}</p>
+      <p class="wizard-hint">{{ $t(target === 'video' ? 'storage.mapHintVideo' : 'storage.mapHint') }}</p>
       <div
         v-for="d in devices"
         :key="d.id"
@@ -61,12 +62,12 @@
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { storageApi } from '@/api'
+import { storageApi, videoApi } from '@/api'
 import { useSyncStore } from '@/stores/sync'
 
 const { t } = useI18n()
 const syncStore = useSyncStore()
-const props = defineProps({ modelValue: Boolean })
+const props = defineProps({ modelValue: Boolean, target: { type: String, default: 'album' } })
 const emit = defineEmits(['update:modelValue', 'synced'])
 
 const visible = ref(props.modelValue)
@@ -142,7 +143,8 @@ async function start() {
   syncing.value = true
   result.value = null
   try {
-    const { taskId } = await storageApi.map({ deviceId: deviceId.value, paths: checkedPaths.value })
+    const payload = { deviceId: deviceId.value, paths: checkedPaths.value }
+    const { taskId } = props.target === 'video' ? await videoApi.map(payload) : await storageApi.map(payload)
     runningTaskId = taskId
     timer = setInterval(async () => {
       try {

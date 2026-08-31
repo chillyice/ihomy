@@ -138,7 +138,7 @@ export const profileApi = {
   removeLabel: () => request.delete('/profile/label'),
 }
 
-// 放映厅:视频库 + 想看列表
+// 放映厅:视频库 + 想看列表 + 设备目录映射
 export const videoApi = {
   list: (params) => request.get('/video/list', { params }),
   // 视频/海报大文件上传:关闭超时(默认 15s 不够大文件传输)
@@ -150,6 +150,9 @@ export const videoApi = {
   create: (data) => request.post('/video', data),
   update: (id, data) => request.put(`/video/${id}`, data),
   remove: (id) => request.delete(`/video/${id}`),
+  playUrl: (id) => request.get(`/video/${id}/play-url`),
+  map: (data) => request.post('/video/map', data),
+  refreshMap: () => request.post('/video/refresh'),
   wishList: () => request.get('/video/wish/list'),
   addWish: (data) => request.post('/video/wish', data),
   wishDone: (id) => request.put(`/video/wish/${id}/done`),
