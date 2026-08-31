@@ -308,12 +308,18 @@ const loadWeatherDetail = async () => { try { const res = await fetch('/api/publ
 const loadMusic = async () => { try { const r = await musicApi.getBackground(); musicPlaylist.value = r?.playlist || null; musicTracks.value = r?.tracks || [] } catch (e) {} }
 
 const SEVEN_DAYS = 7 * 86400000
-const sevenDayPhotos = computed(() => { const now = Date.now(); return allPhotos.value.filter(p => p.createdAt && now - new Date(p.createdAt).getTime() < SEVEN_DAYS) })
-const recentPhotos = computed(() => {
-  const ps = sevenDayPhotos.value.slice()
-  for (let i = ps.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [ps[i], ps[j]] = [ps[j], ps[i]] }
-  return ps.slice(0, 7)
-})
+// 近7天照片与拍立得抽样:ref + watch 一次性生成(computed 内禁 Date.now()/Math.random(),
+// 否则任何重算都会重新洗牌导致拍立得随机跳动 —— 见 AGENTS.md computed 纯函数规范)
+const sevenDayPhotos = ref([])
+const recentPhotos = ref([])
+watch(allPhotos, (photos) => {
+  const now = Date.now()
+  const ps = photos.filter(p => p.createdAt && now - new Date(p.createdAt).getTime() < SEVEN_DAYS)
+  sevenDayPhotos.value = ps
+  const shuffled = ps.slice()
+  for (let i = shuffled.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]] }
+  recentPhotos.value = shuffled.slice(0, 7)
+}, { immediate: true })
 const polaroidLayout = ref([])
 watch(recentPhotos, (ps) => { polaroidLayout.value = ps.map((p, i) => ({ rotate: (Math.random() - 0.5) * 50, dx: (Math.random() - 0.5) * 340, dy: (Math.random() - 0.5) * 140, z: i + 1 })) }, { immediate: true })
 const openViewer = (idx) => {
