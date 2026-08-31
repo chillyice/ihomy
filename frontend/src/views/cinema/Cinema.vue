@@ -1,28 +1,66 @@
-<!-- 放映厅页:视频库(搜索/上传/内嵌播放)与想看列表(提交/标记入库)两个标签页 -->
+<!-- 放映厅页:视频库(搜索/筛选/上传/内嵌播放/设备映射)与想看列表(提交/标记入库)两个标签页 -->
 <template>
   <div class="page">
     <Breadcrumb :items="[{ label: $t('cinema.title') }]" />
 
     <div class="page-toolbar card">
-      <div class="tb-left">
-        <el-input v-model="keyword" :placeholder="$t('cinema.searchPlaceholder')" clearable style="width: 200px" @keyup.enter="load" @clear="load" />
-      </div>
-      <div class="tb-right">
-        <el-button v-if="userStore.isOwner" @click="syncVisible = true">{{ $t('cinema.syncFromDevice') }}</el-button>
-        <el-button v-if="userStore.isLoggedIn" @click="openWishDialog">{{ $t('cinema.wish') }}</el-button>
-        <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ $t('cinema.upload') }}</el-button>
+      <template v-if="!selectMode">
+        <div class="tb-left">
+          <el-input v-model="searchKeyword" :placeholder="$t('cinema.searchPlaceholder')" clearable style="width: 200px">
+            <template #prefix>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            </template>
+          </el-input>
+          <el-select v-model="sourceFilter" style="width: 150px" :placeholder="$t('cinema.filterSource')">
+            <el-option value="" :label="$t('cinema.allSources')" />
+            <el-option value="LOCAL" :label="$t('cinema.localUpload')" />
+            <el-option v-for="s in sourceOptions" :key="s.value" :value="s.value" :label="s.label" />
+          </el-select>
+          <el-select v-model="typeFilter" style="width: 120px" :placeholder="$t('cinema.filterMediaType')">
+            <el-option value="" :label="$t('cinema.allTypes')" />
+            <el-option value="movie" :label="$t('cinema.movie')" />
+            <el-option value="series" :label="$t('cinema.series')" />
+            <el-option value="other" :label="$t('cinema.other')" />
+          </el-select>
+          <el-select v-model="genreFilter" clearable filterable style="width: 140px" :placeholder="$t('cinema.filterGenre')">
+            <el-option v-for="g in genreOptions" :key="g" :value="g" :label="g" />
+          </el-select>
+        </div>
+        <div class="tb-right">
+          <el-button v-if="userStore.isLoggedIn && filteredList.length" @click="toggleSelect">{{ $t('cinema.select') }}</el-button>
+          <el-button v-if="userStore.isLoggedIn" @click="openWishDialog">{{ $t('cinema.wish') }}</el-button>
+          <el-button v-if="userStore.isOwner && hasMapped" :loading="refreshing" @click="onRefreshMap">{{ $t('cinema.refreshMap') }}</el-button>
+          <el-button v-if="userStore.isOwner" @click="syncVisible = true">{{ $t('cinema.syncFromDevice') }}</el-button>
+          <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ $t('cinema.upload') }}</el-button>
+        </div>
+      </template>
+      <div v-else class="tb-right">
+        <span class="select-count">{{ $t('cinema.selectedVideos', { n: selectedIds.length }) }}</span>
+        <el-button @click="toggleSelect">{{ $t('cinema.cancelSelect') }}</el-button>
+        <el-button type="danger" :loading="batchDeleting" :disabled="!selectedIds.length" @click="onBatchDelete">{{ $t('cinema.deleteSelected') }}</el-button>
       </div>
     </div>
 
     <el-tabs v-model="tab">
       <el-tab-pane :label="$t('cinema.library')" name="library">
         <div v-loading="loading">
-          <div v-if="list.length" class="video-grid">
-            <div v-for="v in list" :key="v.id" class="video-card card">
-              <div class="video-poster" @click="play(v)">
+          <div v-if="filteredList.length" class="video-grid">
+            <div
+              v-for="v in filteredList"
+              :key="v.id"
+              class="video-card card"
+              :class="{ selected: selectMode && selectedIds.includes(v.id) }"
+            >
+              <div class="video-poster" @click="selectMode ? togglePick(v) : play(v)">
                 <img v-if="v.poster" :src="v.poster" class="poster-img" :alt="$t('cinema.poster')" />
                 <div v-else class="poster-placeholder">🎬</div>
-                <div class="play-overlay">▶ {{ $t('cinema.play') }}</div>
+                <div v-if="!selectMode" class="play-overlay">▶ {{ $t('cinema.play') }}</div>
+                <span v-if="v.sourceDeviceName && !selectMode" class="video-source">
+                  <span class="status-dot" :class="v.syncStatus || 'OFFLINE'"></span>{{ v.sourceDeviceName }}
+                </span>
+                <span v-if="selectMode" class="pick-badge" :class="{ on: selectedIds.includes(v.id) }">
+                  <svg viewBox="0 0 16 16" width="12" height="12"><path d="M3 8.5 L6.5 12 L13 4.5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </span>
               </div>
               <div class="video-info">
                 <div class="video-title">{{ v.title }}</div>
@@ -162,7 +200,10 @@
             <el-button v-else>{{ $t('cinema.uploadPoster') }}</el-button>
           </el-upload>
         </el-form-item>
-        <el-form-item :label="$t('cinema.videoFile')">
+        <el-form-item v-if="editor.form.sourceDeviceId" :label="$t('cinema.videoFile')">
+          <div class="video-uploaded">{{ $t('cinema.mappedFileHint') }}</div>
+        </el-form-item>
+        <el-form-item v-else :label="$t('cinema.videoFile')">
           <el-upload :show-file-list="false" :http-request="uploadVideo" accept="video/*">
             <el-button type="primary" plain>{{ editor.form.videoUrl ? $t('cinema.reupload') : $t('cinema.uploadVideoFile') }}</el-button>
           </el-upload>
@@ -178,15 +219,16 @@
     <el-dialog v-model="player.visible" append-to-body :title="player.video?.title" width="800px" top="5vh" destroy-on-close>
       <video v-if="player.video?.videoUrl" :src="player.video.videoUrl" controls autoplay class="player-video" />
     </el-dialog>
-    <SyncDialog v-model="syncVisible" />
+    <SyncDialog v-model="syncVisible" target="video" @synced="load" />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch, inject } from 'vue'
+import { ref, reactive, computed, onMounted, watch, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { videoApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { useSyncStore } from '@/stores/sync'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import SyncDialog from '@/components/SyncDialog.vue'
@@ -196,7 +238,6 @@ const { t } = useI18n()
 const userStore = useUserStore()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 const tab = ref('library')
-const keyword = ref('')
 const syncVisible = ref(false)
 const list = ref([])
 const wishes = ref([])
@@ -214,11 +255,47 @@ const regionOptions = [
   '西班牙', '印度', '泰国', '俄罗斯', '加拿大', '澳大利亚', '巴西', '瑞典', '丹麦', '其他',
 ]
 
+// ---------- 筛选(相册式前端过滤,家庭数据量小) ----------
+const searchKeyword = ref('')
+const sourceFilter = ref('')
+const typeFilter = ref('')
+const genreFilter = ref('')
+const filteredList = computed(() => list.value.filter((v) => {
+  if (searchKeyword.value) {
+    const k = searchKeyword.value.toLowerCase()
+    const hay = `${v.title || ''} ${v.originalTitle || ''}`.toLowerCase()
+    if (!hay.includes(k)) return false
+  }
+  if (sourceFilter.value === 'LOCAL' && v.sourceDeviceId) return false
+  if (sourceFilter.value && sourceFilter.value !== 'LOCAL' && String(v.sourceDeviceId) !== sourceFilter.value) return false
+  if (typeFilter.value && v.mediaType !== typeFilter.value) return false
+  if (genreFilter.value && !String(v.genres || '').split(',').map((s) => s.trim()).filter(Boolean).includes(genreFilter.value)) return false
+  return true
+}))
+// 来源筛选选项:列表数据中出现的映射设备(去重)
+const sourceOptions = computed(() => {
+  const map = new Map()
+  for (const v of list.value) {
+    if (v.sourceDeviceId && v.sourceDeviceName) map.set(String(v.sourceDeviceId), v.sourceDeviceName)
+  }
+  return [...map.entries()].map(([value, label]) => ({ value, label }))
+})
+// 题材筛选选项:默认题材 + 库中已有的题材(去重)
+const genreOptions = computed(() => {
+  const set = new Set(genresOptions)
+  for (const v of list.value) {
+    for (const g of String(v.genres || '').split(',').map((s) => s.trim()).filter(Boolean)) set.add(g)
+  }
+  return [...set]
+})
+const hasMapped = computed(() => list.value.some((v) => v.sourceDeviceId))
+
 // 新影片/编辑共用的空表单(剧集数保存时由 duration 字段转换而来,表单内不单独维护)
 const emptyForm = () => ({
   id: null, title: '', originalTitle: '', mediaType: 'movie', genres: [],
   region: '', year: null, language: '', duration: null,
   director: '', actors: '', rating: null, intro: '', poster: '', videoUrl: '',
+  sourceDeviceId: null,
 })
 
 const editor = reactive({ visible: false, form: emptyForm() })
@@ -228,13 +305,11 @@ watch(() => player.visible, (v) => { v ? sunLight?.suspendEffects() : sunLight?.
 
 const formatDate = (d) => (d ? new Date(d).toLocaleDateString('zh-CN') : '')
 
-// 拉取视频库,带 keyword 时按片名搜索
+// 拉取视频库(筛选在前端做,全量拉取)
 const load = async () => {
   loading.value = true
   try {
-    const params = {}
-    if (keyword.value) params.keyword = keyword.value
-    list.value = await videoApi.list(params)
+    list.value = await videoApi.list({})
   } finally {
     loading.value = false
   }
@@ -250,10 +325,15 @@ const loadWishes = async () => {
   }
 }
 
-// 点击海报弹出播放器
-const play = (v) => {
-  player.video = v
-  player.visible = true
+// 点击海报弹出播放器:播放地址现取(storage:// 签名 URL 10 分钟过期,列表里那份可能已失效)
+const play = async (v) => {
+  try {
+    const { url } = await videoApi.playUrl(v.id)
+    player.video = { ...v, videoUrl: url }
+    player.visible = true
+  } catch {
+    ElMessage.error(t('cinema.playFailed'))
+  }
 }
 
 // 打开编辑框:编辑时把 genres 字符串拆回数组,新增用空表单
@@ -284,7 +364,7 @@ const uploadVideo = async ({ file }) => {
 // 保存影片:剧集把"片长"字段存到 episodes,电影反之;空值转 null 落库
 const onSave = async () => {
   if (!editor.form.title) return ElMessage.warning(t('cinema.titleRequired'))
-  if (!editor.form.videoUrl) return ElMessage.warning(t('cinema.videoRequired'))
+  if (!editor.form.videoUrl && !editor.form.sourceDeviceId) return ElMessage.warning(t('cinema.videoRequired'))
   const data = {
     title: editor.form.title,
     originalTitle: editor.form.originalTitle || null,
@@ -300,7 +380,7 @@ const onSave = async () => {
     rating: editor.form.rating || null,
     intro: editor.form.intro || null,
     poster: editor.form.poster || null,
-    videoUrl: editor.form.videoUrl,
+    videoUrl: editor.form.sourceDeviceId ? null : editor.form.videoUrl,
   }
   if (editor.form.id) await videoApi.update(editor.form.id, data)
   else await videoApi.create(data)
@@ -315,6 +395,56 @@ const onDel = async (v) => {
   ElMessage.success(t('common.deleted'))
   load()
 }
+
+// ---------- 多选批量删除 ----------
+const selectMode = ref(false)
+const selectedIds = ref([])
+const batchDeleting = ref(false)
+const toggleSelect = () => {
+  selectMode.value = !selectMode.value
+  selectedIds.value = []
+}
+const togglePick = (v) => {
+  const i = selectedIds.value.indexOf(v.id)
+  if (i >= 0) selectedIds.value.splice(i, 1)
+  else selectedIds.value.push(v.id)
+}
+// 批量删除:混有设备映射视频时提示只删记录不动设备文件
+const onBatchDelete = async () => {
+  const targets = filteredList.value.filter((v) => selectedIds.value.includes(v.id))
+  const msg = targets.some((v) => v.sourceDeviceId)
+    ? t('cinema.batchMixedConfirm', { n: selectedIds.value.length })
+    : t('cinema.batchDeleteConfirm', { n: selectedIds.value.length })
+  await ElMessageBox.confirm(msg, t('common.tip'), { type: 'warning', closeOnClickModal: true })
+  batchDeleting.value = true
+  try {
+    for (const id of [...selectedIds.value]) {
+      await videoApi.remove(id)
+    }
+    ElMessage.success(t('common.deleted'))
+    selectedIds.value = []
+    selectMode.value = false
+    load()
+  } finally {
+    batchDeleting.value = false
+  }
+}
+
+// ---------- 刷新设备映射 ----------
+const refreshing = ref(false)
+const onRefreshMap = async () => {
+  refreshing.value = true
+  try {
+    await videoApi.refreshMap()
+    ElMessage.success(t('cinema.refreshStarted'))
+  } finally {
+    refreshing.value = false
+  }
+}
+
+// ---------- 后台同步完成时自动刷新列表 ----------
+const syncStore = useSyncStore()
+watch(syncStore.doneCount, () => load())
 
 const openWishDialog = () => {
   wishDialog.form = { title: '', genres: [], reason: '' }
@@ -360,6 +490,7 @@ onMounted(() => {
   gap: 16px;
 }
 .video-card { overflow: hidden; display: flex; flex-direction: column; }
+.video-card.selected { outline: 3px solid var(--color-primary, #b88c6e); outline-offset: -3px; }
 .video-poster {
   position: relative;
   height: 170px;
@@ -387,6 +518,45 @@ onMounted(() => {
   transition: opacity 0.15s;
 }
 .video-poster:hover .play-overlay { opacity: 1; }
+.video-source {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #fff;
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.status-dot.VALID { background: #67b26b; box-shadow: 0 0 4px rgba(103, 178, 107, 0.9); }
+.status-dot.OFFLINE, .status-dot.SYNCING { background: #9a9a9a; }
+.status-dot.MISSING { background: #b96058; box-shadow: 0 0 4px rgba(185, 96, 88, 0.9); }
+.pick-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  border: 2px solid rgba(184, 140, 110, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+.pick-badge.on { background: #b88c6e; border-color: #b88c6e; }
+.select-count { font-size: 13px; color: var(--color-text-secondary); margin-right: 8px; }
 .video-info { padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .video-title { font-size: 16px; font-weight: 600; color: var(--color-text); }
 .video-original { font-size: 12px; color: var(--color-text-secondary); }

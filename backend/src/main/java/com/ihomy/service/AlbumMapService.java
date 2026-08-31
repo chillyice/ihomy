@@ -44,21 +44,18 @@ public class AlbumMapService {
     private final StorageService storageService;
     private final NotificationService notificationService;
     private final ThumbnailService thumbnailService;
+    private final MapTaskRegistry taskRegistry;
 
     /** @Lazy 断开与 Runner 的构造器循环(Runner → Service → Runner) */
     @org.springframework.beans.factory.annotation.Autowired
     @org.springframework.context.annotation.Lazy
     private AlbumMapRunner runner;
 
-    /** 任务进度(内存 map,重启丢失,低频后台任务可接受) */
-    private final Map<Long, Map<String, Object>> taskProgress = new ConcurrentHashMap<>();
     /** 静默刷新在飞去重(同一相册同时只跑一个刷新) */
     private final Set<Long> refreshing = ConcurrentHashMap.newKeySet();
 
     public Map<String, Object> progress(Long taskId) {
-        Map<String, Object> p = taskProgress.get(taskId);
-        if (p == null) throw new BizException(ResultCode.NOT_FOUND, "任务不存在或已过期");
-        return p;
+        return taskRegistry.progress(taskId);
     }
 
     /** 创建映射:勾选的目录 → 同层级相册 + 影子照片(异步任务) */
@@ -97,7 +94,7 @@ public class AlbumMapService {
     /* ---------- 任务体(由 AlbumMapRunner @Async 调用) ---------- */
 
     public void executeMapping(Long taskId, SysUser user, Long familyId, StorageDevice device, List<String> paths) {
-        Map<String, Object> p = taskProgress.computeIfAbsent(taskId, k -> new ConcurrentHashMap<>());
+        Map<String, Object> p = taskRegistry.begin(taskId);
         p.put("status", "RUNNING");
         p.put("totalDirs", paths.size());
         int done = 0, albums = 0, photos = 0, failed = 0;
@@ -139,7 +136,7 @@ public class AlbumMapService {
 
     public void executeRefresh(Long taskId, SysUser user, Long familyId, StorageDevice device,
                                Album album, boolean recursive) {
-        Map<String, Object> p = taskProgress.computeIfAbsent(taskId, k -> new ConcurrentHashMap<>());
+        Map<String, Object> p = taskRegistry.begin(taskId);
         p.put("status", "RUNNING");
         try {
             int[] r = syncAlbumTree(user, familyId, device, album, recursive, p);

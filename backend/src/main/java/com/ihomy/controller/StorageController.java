@@ -145,8 +145,10 @@ public class StorageController {
             if (fs.length() > 0) headers.setContentLength(fs.length());
             return new ResponseEntity<>(new org.springframework.core.io.InputStreamResource(fs.in()), headers, HttpStatus.OK);
         }
-        byte[] bytes = storageService.readFileBytes(device, path);
-        return new ResponseEntity<>(bytes, headers, HttpStatus.OK);
+        // 本地/挂载设备返回 PathResource 流式输出:大视频不全量入堆,Spring 对 Resource 自动支持 Range 请求(拖进度条)
+        org.springframework.core.io.PathResource res =
+                new org.springframework.core.io.PathResource(storageService.resolveLocalFile(device, path));
+        return new ResponseEntity<>(res, headers, HttpStatus.OK);
     }
 
     private boolean isImageName(String name) {
@@ -162,7 +164,11 @@ public class StorageController {
         if (n.endsWith(".gif")) return MediaType.IMAGE_GIF;
         if (n.endsWith(".webp")) return MediaType.parseMediaType("image/webp");
         if (n.endsWith(".bmp")) return MediaType.parseMediaType("image/bmp");
-        if (n.endsWith(".mp4")) return MediaType.parseMediaType("video/mp4");
+        if (n.endsWith(".mp4") || n.endsWith(".m4v")) return MediaType.parseMediaType("video/mp4");
+        if (n.endsWith(".mkv")) return MediaType.parseMediaType("video/x-matroska");
+        if (n.endsWith(".webm")) return MediaType.parseMediaType("video/webm");
+        if (n.endsWith(".mov")) return MediaType.parseMediaType("video/quicktime");
+        if (n.endsWith(".avi")) return MediaType.parseMediaType("video/x-msvideo");
         if (n.endsWith(".mp3")) return MediaType.parseMediaType("audio/mpeg");
         return MediaType.APPLICATION_OCTET_STREAM;
     }

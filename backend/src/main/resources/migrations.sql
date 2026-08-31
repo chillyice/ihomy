@@ -236,3 +236,93 @@ CREATE TABLE IF NOT EXISTS `content_blog_category` (
   KEY `idx_parent` (`parent_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='博客分类树(层级分类)';
 
+-- 2026-08-31(video分支): 放映厅设备目录映射——content_video 加来源字段(video_url 顺带扩到 500 容纳 storage:// 长路径)
+SET @add_video_sourcedevice := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `content_video` ADD COLUMN `source_device_id` BIGINT DEFAULT NULL COMMENT ''来源设备ID(设备目录映射)'' AFTER `visibility`',
+    'SELECT ''skip: video source_device_id column already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_video' AND COLUMN_NAME = 'source_device_id'
+);
+PREPARE add_video_sourcedevice_stmt FROM @add_video_sourcedevice;
+EXECUTE add_video_sourcedevice_stmt;
+DEALLOCATE PREPARE add_video_sourcedevice_stmt;
+
+SET @add_video_sourcepath := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `content_video` ADD COLUMN `source_path` VARCHAR(500) DEFAULT NULL COMMENT ''设备文件去重键 dev:{deviceId}:{path}'' AFTER `source_device_id`',
+    'SELECT ''skip: video source_path column already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_video' AND COLUMN_NAME = 'source_path'
+);
+PREPARE add_video_sourcepath_stmt FROM @add_video_sourcepath;
+EXECUTE add_video_sourcepath_stmt;
+DEALLOCATE PREPARE add_video_sourcepath_stmt;
+
+SET @add_video_sourcefsid := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `content_video` ADD COLUMN `source_fs_id` BIGINT DEFAULT NULL COMMENT ''百度网盘 fs_id'' AFTER `source_path`',
+    'SELECT ''skip: video source_fs_id column already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_video' AND COLUMN_NAME = 'source_fs_id'
+);
+PREPARE add_video_sourcefsid_stmt FROM @add_video_sourcefsid;
+EXECUTE add_video_sourcefsid_stmt;
+DEALLOCATE PREPARE add_video_sourcefsid_stmt;
+
+SET @add_video_sourcedir := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `content_video` ADD COLUMN `source_dir` VARCHAR(500) DEFAULT NULL COMMENT ''映射的根目录(相对设备,展示用)'' AFTER `source_fs_id`',
+    'SELECT ''skip: video source_dir column already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_video' AND COLUMN_NAME = 'source_dir'
+);
+PREPARE add_video_sourcedir_stmt FROM @add_video_sourcedir;
+EXECUTE add_video_sourcedir_stmt;
+DEALLOCATE PREPARE add_video_sourcedir_stmt;
+
+SET @add_video_syncstatus := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `content_video` ADD COLUMN `sync_status` VARCHAR(20) DEFAULT NULL COMMENT ''VALID正常/OFFLINE设备离线/MISSING目录不存在'' AFTER `source_dir`',
+    'SELECT ''skip: video sync_status column already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_video' AND COLUMN_NAME = 'sync_status'
+);
+PREPARE add_video_syncstatus_stmt FROM @add_video_syncstatus;
+EXECUTE add_video_syncstatus_stmt;
+DEALLOCATE PREPARE add_video_syncstatus_stmt;
+
+SET @widen_video_url := (
+  SELECT IF(COUNT(*) = 0 OR MAX(CHARACTER_MAXIMUM_LENGTH) >= 500,
+    'SELECT ''skip: video_url already wide enough'' AS msg',
+    'ALTER TABLE `content_video` MODIFY COLUMN `video_url` VARCHAR(500) NOT NULL COMMENT ''视频文件URL(本地上传/files/ 或设备映射 storage:// 逻辑地址)''')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_video' AND COLUMN_NAME = 'video_url'
+);
+PREPARE widen_video_url_stmt FROM @widen_video_url;
+EXECUTE widen_video_url_stmt;
+DEALLOCATE PREPARE widen_video_url_stmt;
+
+SET @add_video_idx_created := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `content_video` ADD INDEX `idx_family_created` (`family_id`, `deleted`, `created_at`)',
+    'SELECT ''skip: video idx_family_created already exists'' AS msg')
+  FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_video' AND INDEX_NAME = 'idx_family_created'
+);
+PREPARE add_video_idx_created_stmt FROM @add_video_idx_created;
+EXECUTE add_video_idx_created_stmt;
+DEALLOCATE PREPARE add_video_idx_created_stmt;
+
+SET @add_video_idx_source := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `content_video` ADD INDEX `idx_family_source` (`family_id`, `deleted`, `source_device_id`)',
+    'SELECT ''skip: video idx_family_source already exists'' AS msg')
+  FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_video' AND INDEX_NAME = 'idx_family_source'
+);
+PREPARE add_video_idx_source_stmt FROM @add_video_idx_source;
+EXECUTE add_video_idx_source_stmt;
+DEALLOCATE PREPARE add_video_idx_source_stmt;
+
+
