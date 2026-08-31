@@ -762,6 +762,31 @@ INSERT INTO sys_dict_item ... book_format/borrow_status;
 
 **百度网盘接入边界**:已完成凭证存储(四件套)+ OAuth 授权码模式授权(state 防伪 → 换 token → ENC 加密存储)+ **文件适配器**(浏览走 xpan `file?method=list`、预览/下载走 filemetas→dlink 服务器中转流式返回[UA 必须 `pan.baidu.com`,手动跟随 302 重放 UA]、token 过期/失效 errno 111/-6 自动 refresh_token 续期[距过期<5min 主动刷新,新 refresh_token 必须落库])。**尚未做**:一键同步(BAIDU 设备调用 sync 返回明确提示,逐文件 dlink 下载落盘量大耗时待后续)、SignKey 回调签名校验。授权回调页地址 = `{前端origin}/storage/baidu/callback`,须与百度开放平台应用注册的「授权回调页地址」完全一致(生产 https://ihomy.top/storage/baidu/callback)。
 
+##### 相册工具栏与多选迭代(V9.5,2026-08-31)
+
+| 文件 | 改动 |
+|------|------|
+| `views/album/Album.vue` | 工具栏改标准 `.page-toolbar`:tb-left=搜索+来源筛选(全部/本地上传/各映射设备名,sourceOptions 由列表去重)+类型筛选(全部/公开/私有);tb-right 常规态=选择(ghost)→同步→新建(primary),选择态=选中计数+取消+删除所选(danger);批量删除按钮从小号改默认尺寸(与常规按钮同规格);多选时隐藏卡片 album-type 避让 pick-badge |
+| `views/album/AlbumDetail.vue` | 多选控件并入 album-head-actions 页头操作区(选中计数+取消+删除,替换独立 select-bar 工具条);选择态隐藏 view-toggle/分享/上传等常规按钮;子相册列表视图改单列横条(`grid-template-columns: 1fr`);纯子相册相册(有子无照片)不显示照片空态(`el-empty` 改 `v-else-if="!children.length"`);子相册+照片混合多选删除(selectedChildIds/togglePickChild/selectSummary,批量删除先 `albumApi.remove` 子相册再 `photoApi.remove` 照片);`thumbUrl` 只对含 query 的签名 URL 追加 `&thumb=1`(本地 `/files/` 直链无 query,拼参数 404) |
+| `views/blog/BlogList.vue` + `views/diary/DiaryList.vue` | 工具栏恢复标准 page-toolbar 布局(compact 变体连同 main.css 段落删除) |
+| `api/index.js` | `photoApi.upload` 加 `timeout: 0`(照片上传不限时——家庭宽带上行慢,15s 默认超时曾致并发上传全部取消) |
+| `views/cascade/Cascade.vue` | 瀑布网格缩略图同 thumbUrl 规则(仅签名 URL 拼参) |
+| `migrations.sql` | 补录 `content_blog_category` 建表迁移段(此前只进 schema.sql,生产缺表) |
+| `i18n/zh-CN.js` + `en.js` | album.*(searchPlaceholder/filterSource/allSources/localUpload/filterType/allTypes/selectedMixed/batchMixedConfirm) |
+
+**多选交互规则(V9.5 定稿)**:相册列表页多选控件在工具栏 tb-right,详情页在页头操作区——常规态与选择态按钮组互斥切换,选择态=选中计数(`.select-count` 13px 次要色)+取消+删除所选(danger 默认尺寸);详情页支持子相册+照片混合勾选,批量删除先删子相册再删照片;选择模式一次性操作,不 localStorage 记忆;`&thumb=1` 只拼设备映射照片的签名 URL,本地上传 `/files/` 直链原样返回。
+
+##### 博客白屏修复(2026-08-31)
+
+| 文件 | 改动 |
+|------|------|
+| `service/BlogService.java` | `categoryCounts` 合并旧分类字符串行时补全字段:`{id:null, name, parentId:null, path, depth:0, childCount:0, cnt}`(LinkedHashMap 保序),不再把 SQL 裸行 `{category,cnt}` 直接 append |
+| `views/blog/BlogList.vue` | 4 处护栏:`countWithChildren` 对 `id==null` 行直接返回累计值;flatTree 渲染 `:key` 从 `node.id` 改 `node.path`;cat-ops `v-if` 加 `node.id != null`(旧分类行隐藏编辑/删除);parentCategoryTree 构建跳过 `id==null` 行 |
+| `views/chat/Chat.vue` | WebSocket 重连成功时 `connectedError.value = false` 复位错误标志(此前重连成功横幅不消失) |
+| `vite.config.js` | `preview.proxy` 补 `/api`→8080 代理(vite preview 本地验证生产构建用) |
+
+**根因与兼容规则**:生产 `content_blog_category` 表为空但博客带旧分类字符串,`/blog/categories/counts` 把缺 id/parentId 的裸行混进返回,前端 `countWithChildren` 用 `child.parentId === item.id` 找子分类,`undefined === undefined` 恒真 → 全体互相无限递归 → RangeError 渲染中断白屏(接口有数据但页面空白;游客 401 拿不到该接口不崩;≥1400px 侧边栏路径必崩)。修复后旧分类行 `id=null` 只展示计数,不可编辑/删除/作父级;用户在分类管理建同名表分类后 path 匹配 + seen 去重自动合并,无需数据迁移。
+
 
 ## 文件存储策略
 
