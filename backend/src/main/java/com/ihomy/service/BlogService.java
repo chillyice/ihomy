@@ -113,7 +113,18 @@ public class BlogService {
         }
         for (Map<String, Object> row : counts) {
             String cat = (String) row.get("category");
-            if (!seen.contains(cat)) { result.add(row); seen.add(cat); }
+            if (!seen.contains(cat)) {
+                Map<String, Object> legacy = new LinkedHashMap<>();
+                legacy.put("id", null);
+                legacy.put("name", cat);
+                legacy.put("parentId", null);
+                legacy.put("path", cat);
+                legacy.put("depth", 0);
+                legacy.put("childCount", 0);
+                legacy.put("cnt", ((Number) row.get("cnt")).longValue());
+                result.add(legacy);
+                seen.add(cat);
+            }
         }
         return result;
     }

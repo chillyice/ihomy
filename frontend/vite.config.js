@@ -78,4 +78,19 @@ export default defineConfig({
       },
     },
   },
+  // vite preview 同样代理后端(本地验证生产构建用)
+  preview: {
+    port: 4173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      '/files': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        rewrite: (path) => '/api' + path,
+      },
+    },
+  },
 })
