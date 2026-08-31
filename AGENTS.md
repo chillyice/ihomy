@@ -808,7 +808,7 @@ INSERT INTO sys_dict_item ... book_format/borrow_status;
 
 **TMDB 连通性实测(2026-08-31,生产服务器 ihomy.top)**:`api.themoviedb.org` 被 GFW DNS 污染(解析到 Facebook/Twitter 假 IP,阿里 DoH/权威 NS 直查均拿不到真实记录,注入答案随机);**`api.tmdb.org`(官方备用域名)干净可用**(AWS CloudFront,401 业务响应 0.5s),`image.tmdb.org` 海报 CDN(Bunny CDN)直连可用。两者同一后端:`--resolve api.themoviedb.org:443:99.84.152.10` 可正常访问(TTL=1,IP 会轮换,失效时重查 api.tmdb.org 的 A 记录)。**结论**:① ihomy 刮削 TMDB 零代理,API base 用 `api.tmdb.org` 即可;② NAS 上 Jellyfin(硬编码 api.themoviedb.org)需 hosts 指向 api.tmdb.org 的真实 IP;③ Bangumi api.bgm.tv 也被污染,不做主依赖;④ 豆瓣无官方 API 不做主依赖。放映厅方向决策(2026-08-31):不二开 Jellyfin(栈不符/部署冲突/账号断开),NAS 试用 Jellyfin 评估体验后定;ihomy 内作品化模型(work/episode 两层+TMDB 刮削+人工匹配兜底)为备选自建方案,见"放映厅设备映射"归档。
 
-**live DB 同步**(生产上线前执行,video 分支合入 main 后):
+**live DB 同步**(✅ 2026-08-31 已随 deploy.ps1 自动执行,migrations.sql video 段幂等):
 ```sql
 -- 见 backend/src/main/resources/migrations.sql 尾部 video 段(幂等)
 ALTER TABLE content_video ADD COLUMN source_device_id BIGINT DEFAULT NULL;
@@ -886,6 +886,27 @@ CREATE TABLE sys_media_server (
 - TMDB 域名污染:NAS 上 Jellyfin 需 hosts 指向 `api.tmdb.org` 真实 IP(实测方案见"TMDB 连通性实测")
 - **Docker Hub 直连被污染**(解析到 104.244.43.57 假 IP):本地拉 Jellyfin 镜像需走国内镜像源(`docker.m.daocloud.io/jellyfin/jellyfin:10.9.11` 等,2026-08-31 未验证可用性,拉取时逐个试)
 - 远程看片瓶颈 = 家庭宽带上行(与任何自建方案相同,非集成引入);frp 隧道承载 VPS→NAS API 小流量 + 客户端→NAS 播放大流量两种用途
+
+##### 生产发布与环境数据同步(2026-08-31)
+
+| 事项 | 结果 |
+|------|------|
+| video 分支上生产 | `deploy.ps1` 全量流水线(后端 jar+前端 dist+migrations video 段),健康检查通过;content_video 映射列已加,`/api/video/list` 200 |
+| 测试→生产 | 2 篇日记(id 8/9,家庭"小窝",高大尚 2026-08-29),utf8mb4 全链路,HEX 验证中文完好 |
+| 生产→测试 | 36 张表 REPLACE 镜像(生产赢,冲突行覆盖+生产独有插入,测试独有保留);生产 uploads 287MB/221 文件 tar 合并到本地(`tar -xk` 不覆盖已有) |
+| 终验 | 仅生产 0 行 / 冲突仅 6 条生产新增通知(镜像后的真实漂移) / 仅测试 31 行(用户保留:25 照片+书+杂项) |
+| 备份 | 两库全量 SQL:`C:\Users\chill\AppData\Local\Temp\opencode\backup_{prod,test}.sql`(临时目录,确认无误后可删) |
+
+**环境数据同步规范(未来复用)**:
+- 同步表清单(36 张):`sys_user`/`sys_user_role`/`sys_family_info`/`sys_home_module`/`sys_dict_item` + content_*(blog/diary/photo_album/photo/comment/like/music×3/book×2/wish/video/video_wish) + family_*(anniversary/task/plan×2/reminder/checkin/points×3/book_record/chat×2/user_label/tree/notification/apply/invitation_code)
+- **排除表(环境特定,永不同步)**:`sys_storage_device`(root_path 各环境不同)/`sys_parameter`(aes-salt 各环境独立,同步会毁掉 ENC 密文)/`sys_baidu_credential`(同前)/`sys_password_reset_token`/`sys_operation_log`(环境噪音)/`sys_weather_*`
+- 方向语义:生产→测试 = `mysqldump --replace --complete-insert --extended-insert`(同 ID 生产赢,测试独有行不受影响);测试→生产 = 纯 INSERT(--complete-insert --skip-extended-insert,先核对生产无同 ID)
+- 全链路二进制安全:python subprocess 捕获 bytes → 写文件 → docker cp / scp → `mysql --default-character-set=utf8mb4 -e "source ..."`;**禁止 PowerShell 管道**
+- 工具:`scripts/db_diff.py`(两库逐表 ID 差集 + 同 ID 行级内容对比,输出仅测试/仅生产/冲突三分类)
+
+**⚠ docker mysql 客户端字符集坑(必读)**:`docker exec ihomy-mysql mysql -N -e "..."` 不带 `--default-character-set=utf8mb4` 时,utf8mb4 中文输出会被客户端转码成 `?`(假性乱码,**数据实际完好**)。曾因此误判测试库家庭名/照片 URL/日记内容"损坏"。**判真伪用 `SELECT HEX(col)`**(真实损坏=3F 字节;伪影=正常 UTF-8 字节序列)。凡经 docker exec 的 mysql 输出与导入(mysqldump/source)一律带该参数;生产端(apt 安装的 mysql)无此问题。测试库唯一真实损坏:家庭 42(名字=5 个问号,0 内容)。
+
+**测试库遗留垃圾(用户自行删除)**:家庭 42(乱码空家庭)、content_video id 4(冒烟孤儿,storage:// 指向已删设备)、sys_storage_device id 7 CTDev(指向已删临时目录)。
 
 
 
