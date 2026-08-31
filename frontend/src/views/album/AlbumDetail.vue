@@ -18,7 +18,13 @@
         <p v-if="album.description" class="album-desc">{{ album.description }}</p>
       </div>
       <div class="album-head-actions">
-        <div v-if="children.length && !selectMode" class="view-toggle">
+        <template v-if="selectMode">
+          <span class="select-count">{{ selectSummary }}</span>
+          <el-button :disabled="batchDeleting" @click="toggleSelect">{{ t('album.cancelSelect') }}</el-button>
+          <el-button type="danger" :loading="batchDeleting" :disabled="!selectedChildIds.length && !selectedIds.length" @click="onBatchDelete">{{ t('album.deleteSelected') }}</el-button>
+        </template>
+        <template v-else>
+        <div v-if="children.length" class="view-toggle">
           <button class="vt-btn" :class="{ active: childView === 'grid' }" :title="t('album.gridView')" @click="setChildView('grid')">
             <svg viewBox="0 0 16 16" width="14" height="14"><rect x="1.5" y="1.5" width="5" height="5" rx="1" fill="currentColor"/><rect x="9.5" y="1.5" width="5" height="5" rx="1" fill="currentColor"/><rect x="1.5" y="9.5" width="5" height="5" rx="1" fill="currentColor"/><rect x="9.5" y="9.5" width="5" height="5" rx="1" fill="currentColor"/></svg>
           </button>
@@ -37,7 +43,7 @@
           v-if="canManageAlbum && ((photos.length && !isMapped) || children.length)"
           class="ghost-btn"
           @click="toggleSelect"
-        >{{ selectMode ? t('album.cancelSelect') : t('album.select') }}</el-button>
+        >{{ t('album.select') }}</el-button>
         <el-button
           v-if="album.type === 'public' && album.shareToken"
           class="ghost-btn"
@@ -52,18 +58,10 @@
         >
           <el-button type="primary">{{ t('album.uploadPhotos') }}</el-button>
         </el-upload>
+        </template>
       </div>
     </div>
     <input ref="coverInput" type="file" accept="image/*" class="hidden-input" @change="onCoverPicked" />
-
-    <!-- 多选工具条(子相册+照片混合):紧跟工具栏下方 -->
-    <div v-if="selectMode" class="select-bar card">
-      <span>{{ selectSummary }}</span>
-      <div class="tb-right">
-        <el-button size="small" :disabled="batchDeleting" @click="toggleSelect">{{ t('album.cancelSelect') }}</el-button>
-        <el-button type="danger" size="small" :loading="batchDeleting" :disabled="!selectedChildIds.length && !selectedIds.length" @click="onBatchDelete">{{ t('album.deleteSelected') }}</el-button>
-      </div>
-    </div>
 
     <!-- 子相册(设备目录映射层级):方块/列表两种展示模式,支持多选删除 -->
     <div v-if="children.length" class="child-section">
@@ -455,16 +453,7 @@ onMounted(load)
 .child-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .child-name { font-size: 14px; font-weight: 600; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .child-meta { font-size: 12px; color: var(--color-text-secondary); }
-.select-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 16px;
-  margin-bottom: 16px;
-  font-size: 13px;
-  color: var(--color-text-secondary);
-}
-.select-bar .tb-right { display: flex; gap: 8px; }
+.select-count { font-size: 13px; color: var(--color-text-secondary); }
 .photo-card.selected .photo-wrap { outline: 3px solid var(--color-primary, #b88c6e); outline-offset: -3px; }
 .pick-badge {
   position: absolute;

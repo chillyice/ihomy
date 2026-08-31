@@ -30,8 +30,8 @@
       </template>
       <div v-else class="tb-right">
         <span class="select-count">{{ t('album.selectedAlbums', { n: selectedIds.length }) }}</span>
-        <el-button size="small" :disabled="batchDeleting" @click="toggleSelect">{{ t('album.cancelSelect') }}</el-button>
-        <el-button type="danger" size="small" :loading="batchDeleting" :disabled="!selectedIds.length" @click="onBatchDelete">{{ t('album.deleteSelected') }}</el-button>
+        <el-button :disabled="batchDeleting" @click="toggleSelect">{{ t('album.cancelSelect') }}</el-button>
+        <el-button type="danger" :loading="batchDeleting" :disabled="!selectedIds.length" @click="onBatchDelete">{{ t('album.deleteSelected') }}</el-button>
       </div>
     </div>
 
