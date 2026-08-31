@@ -1,10 +1,10 @@
 <!-- 从设备同步向导:选设备 → 目录树懒加载勾选 → 确定后目录映射为影子记录(不拷贝文件);完成后通知父组件刷新 -->
-<!-- target: album=映射为相册(默认) / video=映射为放映厅视频 -->
+<!-- target: album=映射为相册(默认) / video=映射为放映厅视频 / music=映射为音乐曲库 -->
 <template>
-  <el-dialog v-model="visible" append-to-body :title="$t(target === 'video' ? 'cinema.syncFromDevice' : 'album.syncFromDevice')" width="560px" @closed="cleanup">
+  <el-dialog v-model="visible" append-to-body :title="$t(target === 'video' ? 'cinema.syncFromDevice' : target === 'music' ? 'music.syncFromDevice' : 'album.syncFromDevice')" width="560px" @closed="cleanup">
     <!-- 步骤一:选设备 -->
     <div v-if="step === 1">
-      <p class="wizard-hint">{{ $t(target === 'video' ? 'storage.mapHintVideo' : 'storage.mapHint') }}</p>
+      <p class="wizard-hint">{{ $t(target === 'video' ? 'storage.mapHintVideo' : target === 'music' ? 'storage.mapHintMusic' : 'storage.mapHint') }}</p>
       <div
         v-for="d in devices"
         :key="d.id"
@@ -62,7 +62,7 @@
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { storageApi, videoApi } from '@/api'
+import { storageApi, videoApi, musicApi } from '@/api'
 import { useSyncStore } from '@/stores/sync'
 
 const { t } = useI18n()
@@ -144,7 +144,9 @@ async function start() {
   result.value = null
   try {
     const payload = { deviceId: deviceId.value, paths: checkedPaths.value }
-    const { taskId } = props.target === 'video' ? await videoApi.map(payload) : await storageApi.map(payload)
+    const { taskId } = props.target === 'video' ? await videoApi.map(payload)
+      : props.target === 'music' ? await musicApi.map(payload)
+      : await storageApi.map(payload)
     runningTaskId = taskId
     timer = setInterval(async () => {
       try {

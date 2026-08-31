@@ -7,9 +7,11 @@ import com.ihomy.common.ResultCode;
 import com.ihomy.entity.ContentMusic;
 import com.ihomy.entity.ContentMusicPlaylist;
 import com.ihomy.entity.ContentMusicPlaylistTrack;
+import com.ihomy.entity.StorageDevice;
 import com.ihomy.mapper.ContentMusicMapper;
 import com.ihomy.mapper.ContentMusicPlaylistMapper;
 import com.ihomy.mapper.ContentMusicPlaylistTrackMapper;
+import com.ihomy.mapper.StorageDeviceMapper;
 import com.ihomy.security.SecurityHelper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +39,9 @@ public class MusicService {
     private final ContentMusicMapper musicMapper;
     private final ContentMusicPlaylistMapper playlistMapper;
     private final ContentMusicPlaylistTrackMapper trackMapper;
+    private final StorageDeviceMapper storageDeviceMapper;
     private final FileService fileService;
+    private final SignedUrlService signedUrlService;
     private final SecurityHelper securityHelper;
 
     @Value("${file.upload-dir}")
@@ -48,11 +52,49 @@ public class MusicService {
 
     // ========== 曲库管理 ==========
 
-    public List<ContentMusic> listByFamily(Long familyId) {
-        return musicMapper.selectList(
+    public List<Map<String, Object>> listByFamily(Long familyId) {
+        List<ContentMusic> musics = musicMapper.selectList(
                 new LambdaQueryWrapper<ContentMusic>()
                         .eq(ContentMusic::getFamilyId, familyId)
                         .orderByDesc(ContentMusic::getCreatedAt));
+        // 批量查映射设备名(免 N+1),storage:// 逻辑地址保持原样,播放时走 play-url 现签
+        Set<Long> deviceIds = musics.stream().map(ContentMusic::getSourceDeviceId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, StorageDevice> deviceMap = deviceIds.isEmpty() ? Map.of()
+                : storageDeviceMapper.selectBatchIds(deviceIds).stream()
+                        .collect(Collectors.toMap(StorageDevice::getId, d -> d));
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (ContentMusic m : musics) {
+            Map<String, Object> row = new HashMap<>();
+            row.put("id", m.getId());
+            row.put("url", m.getUrl());
+            row.put("title", m.getTitle());
+            row.put("artist", m.getArtist());
+            row.put("album", m.getAlbum());
+            row.put("duration", m.getDuration());
+            row.put("bitrate", m.getBitrate());
+            row.put("coverUrl", m.getCoverUrl());
+            row.put("sourceDeviceId", m.getSourceDeviceId());
+            row.put("sourceDir", m.getSourceDir());
+            row.put("syncStatus", m.getSyncStatus());
+            StorageDevice d = m.getSourceDeviceId() == null ? null : deviceMap.get(m.getSourceDeviceId());
+            row.put("sourceDeviceName", d == null ? null : d.getName());
+            row.put("createdAt", m.getCreatedAt());
+            result.add(row);
+        }
+        return result;
+    }
+
+    /** 播放地址:storage:// 逻辑地址现签(列表不解析,签名 10 分钟过期,播放时取新的) */
+    public Map<String, String> playUrl(Long id, Long familyId) {
+        ContentMusic m = musicMapper.selectById(id);
+        if (m == null || (m.getDeleted() != null && m.getDeleted() == 1)) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
+        if (familyId != null && !familyId.equals(m.getFamilyId())) {
+            throw new BizException(ResultCode.FORBIDDEN);
+        }
+        return Map.of("url", signedUrlService.resolve(m.getUrl()));
     }
 
     public List<Map<String, Object>> albumsByFamily(Long familyId) {
@@ -90,34 +132,35 @@ public class MusicService {
     }
 
     public ContentMusic uploadAndCreate(Long familyId, Long userId, MultipartFile file) {
-        // 先读 bytes(transferTo/getBytes 都只能调一次,先取 bytes 再分别使用)
-        byte[] fileBytes;
+        // 流式:transferTo 临时文件(mp3agic 需要随机读)→ 解析元数据 → Files.copy 落盘,全程不入堆
+        Path tempFile = null;
+        ContentMusic m = new ContentMusic();
+        m.setFamilyId(familyId);
+        m.setAddedBy(userId);
         try {
-            fileBytes = file.getBytes();
+            tempFile = Files.createTempFile("ihomy_audio_", ".mp3");
+            try {
+                file.transferTo(tempFile.toFile());
+            } catch (Exception fallback) {
+                try (var in = file.getInputStream()) {
+                    Files.copy(in, tempFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+            String url = fileService.upload(tempFile, file.getOriginalFilename(), file.getContentType());
+            m.setUrl(url);
+            try {
+                extractMetadata(m, tempFile.toFile(), file.getOriginalFilename(), url);
+            } catch (Exception e) {
+                log.warn("音频元数据提取失败,回退文件名: {}", file.getOriginalFilename(), e);
+                m.setTitle(file.getOriginalFilename().replaceAll("\\.[^.]+$", ""));
+            }
         } catch (java.io.IOException e) {
             log.error("文件读取失败", e);
             throw new BizException(ResultCode.BAD_REQUEST, "文件读取失败");
-        }
-
-        // 上传到 FileService
-        String url = fileService.upload(fileBytes, file.getOriginalFilename(), file.getContentType());
-
-        // 写临时文件供元数据提取
-        File tempFile = null;
-        ContentMusic m = new ContentMusic();
-        m.setFamilyId(familyId);
-        m.setUrl(url);
-        m.setAddedBy(userId);
-
-        try {
-            tempFile = File.createTempFile("ihomy_audio_", ".mp3");
-            Files.write(tempFile.toPath(), fileBytes);
-            extractMetadata(m, tempFile, file.getOriginalFilename(), url);
-        } catch (Exception e) {
-            log.warn("音频元数据提取失败,回退文件名: {}", file.getOriginalFilename(), e);
-            m.setTitle(file.getOriginalFilename().replaceAll("\\.[^.]+$", ""));
         } finally {
-            if (tempFile != null) tempFile.delete();
+            if (tempFile != null) {
+                try { Files.deleteIfExists(tempFile); } catch (java.io.IOException ignored) {}
+            }
         }
 
         musicMapper.insert(m);
@@ -139,11 +182,7 @@ public class MusicService {
     public void deleteMusic(Long familyId, Long id) {
         ContentMusic m = musicMapper.selectById(id);
         if (m == null || !m.getFamilyId().equals(familyId)) throw new BizException(ResultCode.NOT_FOUND);
-        musicMapper.deleteById(id);
-        if (m.getCoverUrl() != null && !m.getCoverUrl().isBlank()) {
-            fileService.deleteByUrl(m.getCoverUrl());
-        }
-        fileService.deleteByUrl(m.getUrl());
+        removeMusicRow(m);
         trackMapper.delete(new LambdaQueryWrapper<ContentMusicPlaylistTrack>()
                 .eq(ContentMusicPlaylistTrack::getMusicId, id));
     }
@@ -151,14 +190,29 @@ public class MusicService {
     public void batchDeleteMusic(Long familyId, List<Long> ids) {
         if (ids == null || ids.isEmpty()) return;
         List<ContentMusic> musics = musicMapper.selectBatchIds(ids);
+        List<Long> validIds = new ArrayList<>();
         for (ContentMusic m : musics) {
             if (!m.getFamilyId().equals(familyId)) continue;
-            musicMapper.deleteById(m.getId());
-            if (m.getCoverUrl() != null && !m.getCoverUrl().isBlank()) fileService.deleteByUrl(m.getCoverUrl());
-            if (m.getUrl() != null) fileService.deleteByUrl(m.getUrl());
-            trackMapper.delete(new LambdaQueryWrapper<ContentMusicPlaylistTrack>()
-                    .eq(ContentMusicPlaylistTrack::getMusicId, m.getId()));
+            removeMusicRow(m);
+            validIds.add(m.getId());
         }
+        if (!validIds.isEmpty()) {
+            trackMapper.delete(new LambdaQueryWrapper<ContentMusicPlaylistTrack>()
+                    .in(ContentMusicPlaylistTrack::getMusicId, validIds));
+        }
+    }
+
+    /** 删除曲目记录:设备映射曲目=物理删记录(设备文件永不动);本地上传/外链=软删记录+删本地文件 */
+    private void removeMusicRow(ContentMusic m) {
+        if (m.getSourcePath() != null && !m.getSourcePath().isBlank()) {
+            musicMapper.deletePhysicalById(m.getId());
+            return;
+        }
+        musicMapper.deleteById(m.getId());
+        if (m.getCoverUrl() != null && !m.getCoverUrl().isBlank()) {
+            fileService.deleteByUrl(m.getCoverUrl());
+        }
+        fileService.deleteByUrl(m.getUrl());
     }
 
     public void batchDeleteByAlbum(Long familyId, String album) {
