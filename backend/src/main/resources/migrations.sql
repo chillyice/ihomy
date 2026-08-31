@@ -220,3 +220,19 @@ SET @add_album_coverurl := (
 PREPARE add_album_coverurl_stmt FROM @add_album_coverurl;
 EXECUTE add_album_coverurl_stmt;
 DEALLOCATE PREPARE add_album_coverurl_stmt;
+
+-- 2026-08-31: 博客分类树表(博客列表迭代独立建表,漏并入流水线,生产博客页曾因此 500)
+CREATE TABLE IF NOT EXISTS `content_blog_category` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `name`        VARCHAR(50)  NOT NULL COMMENT '分类名(只存本级名称,不含祖先路径)',
+  `parent_id`   BIGINT       DEFAULT NULL COMMENT '父分类ID(NULL=顶级分类)',
+  `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `sort_order`  INT          NOT NULL DEFAULT 0 COMMENT '排序',
+  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_family_parent_name` (`family_id`, `parent_id`, `name`, `deleted`),
+  KEY `idx_family` (`family_id`, `deleted`),
+  KEY `idx_parent` (`parent_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='博客分类树(层级分类)';
+

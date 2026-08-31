@@ -90,7 +90,7 @@ export const photoApi = {
   upload: (albumId, files) => {
     const form = new FormData()
     files.forEach((f) => form.append('files', f))
-    return request.post(`/album/${albumId}/photos`, form, { headers: { 'Content-Type': 'multipart/form-data' } })
+    return request.post(`/album/${albumId}/photos`, form, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 0 }) // 上传不限时(家庭宽带上行慢,15s 默认超时曾致并发上传全部取消)
   },
 updateDesc: (id, description) => request.put(`/photo/${id}`, { description }),
   remove: (id) => request.delete(`/photo/${id}`),
