@@ -48,9 +48,6 @@
           <div v-loading="loading">
             <div v-if="filteredTracks.length" class="music-grid">
               <div v-for="t in filteredTracks" :key="t.id" class="music-card card" :class="{ selected: selectMode && selectedIds.includes(t.id) }">
-                <div v-if="selectMode" class="card-check" @click.stop="toggleTrack(t.id)">
-                  <el-checkbox :model-value="selectedIds.includes(t.id)" />
-                </div>
                 <div class="music-cover" @click="selectMode ? toggleTrack(t.id) : play(t)">
                   <img v-if="t.coverUrl" :src="t.coverUrl" class="cover-img" />
                   <div v-else class="cover-placeholder"><span>🎵</span></div>
@@ -96,9 +93,6 @@
           <div v-loading="loading">
             <div v-if="albums.length" class="album-grid">
               <div v-for="al in albums" :key="al.album" class="album-card card" :class="{ selected: selectMode && selectedAlbums.includes(al.album) }">
-                <div v-if="selectMode" class="card-check" @click.stop="toggleAlbum(al.album)">
-                  <el-checkbox :model-value="selectedAlbums.includes(al.album)" />
-                </div>
                 <div class="album-cover" @click="selectMode ? toggleAlbum(al.album) : playAlbum(al)">
                   <img v-if="al.coverUrl" :src="al.coverUrl" class="cover-img" />
                   <div v-else class="cover-placeholder"><span>💿</span></div>
@@ -917,20 +911,11 @@ html.dark .add-album-cover.placeholder { background: rgba(232,220,200,0.06); }
 .add-album-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .add-album-count { font-size: 11px; color: var(--color-text-secondary); }
 
-/* ========== 多选模式 ========== */
+/* ========== 多选模式(相册同款:右上对勾角标,卡片描边) ========== */
 .music-card.selected, .album-card.selected {
   outline: 2px solid #b88c6e;
   outline-offset: -2px;
 }
-.card-check {
-  position: absolute;
-  top: 6px; left: 6px;
-  z-index: 6;
-  background: rgba(255,255,255,0.85);
-  border-radius: 6px;
-  padding: 2px;
-}
-html.dark .card-check { background: rgba(30,42,72,0.85); }
 .pick-badge {
   position: absolute; top: 8px; right: 8px;
   width: 22px; height: 22px;
@@ -941,6 +926,9 @@ html.dark .card-check { background: rgba(30,42,72,0.85); }
 }
 .pick-badge.on { background: #b88c6e; }
 .select-count { font-size: 13px; color: var(--color-text-secondary); margin-right: 8px; }
+
+/* 工具栏按钮间距统一:el-dropdown 包裹的按钮吃掉 EP 的 .el-button+.el-button 12px 兄弟边距,补齐后与普通按钮一致(gap 8 + margin 12) */
+.tb-right :deep(.el-dropdown) { margin-left: 12px; }
 
 /* ========== 播放器弹窗 ========== */
 .share-tip { color: #776e62; font-size: 12px; margin-bottom: 12px; line-height: 1.4; }

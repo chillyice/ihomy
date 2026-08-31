@@ -6,23 +6,23 @@
     <div class="page-toolbar card">
       <template v-if="!selectMode">
         <div class="tb-left">
-          <el-input v-model="searchKeyword" :placeholder="$t('cinema.searchPlaceholder')" clearable style="width: 200px">
+          <el-input v-model="searchKeyword" :placeholder="$t('cinema.searchPlaceholder')" clearable size="small" style="width: 200px">
             <template #prefix>
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
             </template>
           </el-input>
-          <el-select v-model="sourceFilter" style="width: 150px" :placeholder="$t('cinema.filterSource')">
+          <el-select v-model="sourceFilter" size="small" style="width: 150px" :placeholder="$t('cinema.filterSource')">
             <el-option value="" :label="$t('cinema.allSources')" />
             <el-option value="LOCAL" :label="$t('cinema.localUpload')" />
             <el-option v-for="s in sourceOptions" :key="s.value" :value="s.value" :label="s.label" />
           </el-select>
-          <el-select v-model="typeFilter" style="width: 120px" :placeholder="$t('cinema.filterMediaType')">
+          <el-select v-model="typeFilter" size="small" style="width: 120px" :placeholder="$t('cinema.filterMediaType')">
             <el-option value="" :label="$t('cinema.allTypes')" />
             <el-option value="movie" :label="$t('cinema.movie')" />
             <el-option value="series" :label="$t('cinema.series')" />
             <el-option value="other" :label="$t('cinema.other')" />
           </el-select>
-          <el-select v-model="genreFilter" clearable filterable style="width: 140px" :placeholder="$t('cinema.filterGenre')">
+          <el-select v-model="genreFilter" size="small" clearable filterable style="width: 140px" :placeholder="$t('cinema.filterGenre')">
             <el-option v-for="g in genreOptions" :key="g" :value="g" :label="g" />
           </el-select>
         </div>
