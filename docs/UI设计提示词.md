@@ -325,6 +325,35 @@ color: #3A2E22;
 
 - `.el-popper.is-light` `z-index:54`(光影层下方,MusicPlayer=55 之上)。
 
+## 11b. 功能页统一工具栏与多选规范(相册/放映厅/音乐通用)
+
+**工具栏结构**(`.page-toolbar card`,全局 padding `10px 16px !important`):
+
+- `.tb-left` 搜索/筛选:组件统一 `size="small"`(24px 高,三页已对齐);搜索框 200px 带放大镜 SVG prefix + 来源筛选 150px + 类型/题材筛选 120-140px;筛选为**前端过滤**(家庭数据量小,全量拉取后 computed 过滤)。
+- `.tb-right` 操作按钮(默认 32px 高,自适应宽度):
+  - 常规态从左到右:多选 → 次级动作(想看/刷新映射,owner+有映射时显示) → 从设备同步(owner) → 主操作(新建/上传,`type="primary"`)。
+  - 选择态(互斥替换):`.select-count` 13px 次要色选中计数 + 取消 + 删除所选(danger)。
+- **按钮间距(强制)**:`.tb-right` 为 `flex gap:8px`,普通按钮间另有 EP `.el-button+.el-button` 12px 兄弟边距(合计 20px);**按钮被 `el-dropdown` 包裹时(如「上传音乐」下拉)吃不到兄弟边距,必须 scoped 补 `.tb-right :deep(.el-dropdown) { margin-left: 12px }`**,否则间距不一致。
+
+**多选交互(强制,三页同款)**:
+
+- 仅用 `.pick-badge` 右上对勾圆标(22×22px,`.on` 时 `#b88c6e` 实底白勾,非选中 `rgba(184,140,110,0.25)`)+ 卡片 `outline: 2px solid #b88c6e` 描边(`outline-offset: -2px`)。
+- 选择态点击卡片即勾选(封面点击事件 `selectMode ? toggle : play`);**禁止叠加左上 checkbox 角标**(双选择效果,已在音乐页去重)。
+- 选择模式一次性操作,不 localStorage 记忆;批量删除混设备映射内容时确认文案提示"仅删记录,设备文件不受影响"。
+
+**设备映射来源角标(统一)**:卡片封面角落 `设备名 + .status-dot` 状态点,半透明白底(`rgba(255,255,255,0.85)`)磨砂圆角小标签(11px,#6b5d4c);状态点 6px 圆点带辉光:VALID 绿 `#67b26b` / OFFLINE 灰 `#9a9a9a` / MISSING 红 `#b96058`;暗色模式 `rgba(30,42,72,0.85)` 底 `#c9b8a0` 字。
+
+## 11c. 音乐页(Music)
+
+- **结构**:Breadcrumb + 标准工具栏(11b 规范)+ 三 Tab(全部曲目/按专辑/歌单);Tab 项 15px/40px 高,active `#5c4c3d` + 下划线 `#c4a884` 2px `opacity:0.7`,无 nav 底边线;切 Tab 自动退出多选。
+- **工具栏**:tb-left 搜索(歌名/艺术家/专辑)+ 来源筛选(全部/本地上传/外链/各映射设备名,设备选项由列表数据去重);tb-right 多选/新建歌单(歌单 Tab)/刷新映射/从设备同步/上传音乐(primary 下拉:单曲/专辑文件夹/外链)。
+- **曲目卡片**:`repeat(auto-fill, minmax(220px, 1fr))` 网格,gap 24px;封面 160px(hover 半透明黑遮罩 + 44px 白底圆形 ▶ 播放按钮 scale 0.85→1;无封面显示 `#e9e2d7` 底 🎵 占位);标题 15px/600 单行省略;艺术家 12px + 专辑 11px 次要色;时长/比特率 11px `opacity:0.6`;hover `translateY(-4px)` + 阴影加深;右下 ⋮ 更多按钮(白底磨砂圆形 28px,加入歌单/删除)。
+- **专辑卡片**:280px 网格,封面 140px + 内嵌曲目列表(序号/曲名可点/时长,`max-height:120px` 滚动)+ 底部「整张加入歌单」下拉。
+- **歌单卡片**:260px 网格,封面 160px(无封面 SVG 唱片占位),BGM 标记左上白底磨砂圆角小标签;查看/设为BGM(primary small)/取消BGM/删除(text danger)。
+- **播放**:dialog-md 弹窗,居中封面 160px 圆角 12px + 艺术家 + 原生 `<audio controls autoplay>`;设备映射曲目(url 为 `storage://` 逻辑地址)点击播放时现取 `GET /music/{id}/play-url`(HMAC 签名 10 分钟),本地/外链直用原 URL。
+- **弹窗**:dialog-sm(添加外链四字段/上传专辑/新建歌单)、dialog-md(歌单详情 + 添加曲目双 Tab:按曲目 checkbox 列表/按专辑整勾)。
+- **文案**:全页 `$t('music.*')` 中英词条,无硬编码中文。
+
 ## 12. 光照测试控制台(全局组件)
 
 - `position: fixed; left: 240px; bottom: 24px`(毛玻璃面板),`LightTestConsole.vue` 全局挂载于 App.vue。
