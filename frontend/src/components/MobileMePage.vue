@@ -110,7 +110,6 @@ const toggleTheme = () => {
 const toggleLightEffect = () => {
   if (sunLight?.shadowEnabled) {
     sunLight.shadowEnabled.value = !sunLight.shadowEnabled.value
-    localStorage.setItem('ihomy:light:shadow', String(sunLight.shadowEnabled.value))
     if (sunLight.shadowEnabled.value) {
       sunLight.blobsEnabled.value = true
       sunLight.weatherEffectEnabled.value = true

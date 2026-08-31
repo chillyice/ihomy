@@ -429,12 +429,13 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 #### 已知问题(待修复)
 
+- **Edge 硬件加速整页频闪(遗留,环境/驱动问题,非应用代码)**:Edge+硬件加速下页面加载后整页频闪;**切走再切回浏览器窗口(或开关一次硬件加速+重启 Edge)即恢复**;Chrome 不复现,关硬件加速不复现。根因为显卡驱动/MPO 合成层 bug。用户侧处置(按序):开关一次硬件加速+重启 Edge(临时复位)→ 更新显卡驱动(根治)→ 注册表禁用 MPO(`HKLM\SOFTWARE\Microsoft\Windows\Dwm` → `OverlayTestMode`=5)→ 应用内 Settings 关"毛玻璃"(no-glass 全局禁 backdrop-filter,应用侧唯一规避开关)。完整排查过程与已保留/已撤销的修复清单见"首页频闪排查与修复"归档(frontend_performance 分支,2026-08-31)。
 - **ElMessageBox 动画未生效**:`main.css` 中 `.fade-in-linear-*` + `.el-overlay-message-box` 的 CSS 覆写写法正确(transition name=`fade-in-linear`,class=`el-overlay-message-box` 已从 EP 源码确认),但实际运行时动画未生效。可能原因:EP 内部 `Transition` 的 `persisted` 模式导致 CSS transition 不触发,或 EP 的 `msgbox-fade-in` keyframes 优先级覆盖。待排查:用 DevTools 确认渲染时实际 class 和 transition 是否被正确应用。`closeOnClickModal: true` 已全部加上(点击遮罩关闭已生效)。
 
 #### 验证基线
 
 - 后端编译:`cd backend; .\mvnw.cmd -B clean compile -DskipTests` → BUILD SUCCESS
-- 前端构建:`cd frontend; npm run build` → 入口 chunk ≤ 200KB(当前 158KB)
+- 前端构建:`cd frontend; npm run build` → 入口 chunk 208KB(基线 2026-08-31 实测;原 158KB 记录系 V8.0 移动端组件并入入口后过时)
 - 接口测试:`cd autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed
 
 #### 已实现变更归档(按功能域分类)
@@ -907,6 +908,27 @@ CREATE TABLE sys_media_server (
 **⚠ docker mysql 客户端字符集坑(必读)**:`docker exec ihomy-mysql mysql -N -e "..."` 不带 `--default-character-set=utf8mb4` 时,utf8mb4 中文输出会被客户端转码成 `?`(假性乱码,**数据实际完好**)。曾因此误判测试库家庭名/照片 URL/日记内容"损坏"。**判真伪用 `SELECT HEX(col)`**(真实损坏=3F 字节;伪影=正常 UTF-8 字节序列)。凡经 docker exec 的 mysql 输出与导入(mysqldump/source)一律带该参数;生产端(apt 安装的 mysql)无此问题。测试库唯一真实损坏:家庭 42(名字=5 个问号,0 内容)。
 
 **测试库遗留垃圾(用户自行删除)**:家庭 42(乱码空家庭)、content_video id 4(冒烟孤儿,storage:// 指向已删设备)、sys_storage_device id 7 CTDev(指向已删临时目录)。
+
+##### 首页频闪排查与修复(frontend_performance 分支,2026-08-31,已结案)
+
+**最终根因(用户实测确认)**:Edge 硬件加速下的 GPU 合成路径 bug(驱动/MPO 层,非应用代码)。证据链:① 关闭硬件加速 → 不频闪;② Chrome 同页面 → 不频闪;③ 切走再切回浏览器窗口(触发 DWM 全量重建)→ 频闪消失;④ 刷新页面 → 频闪复现。用户侧处理:开关一次硬件加速+重启 Edge 已恢复;**若复发**依次尝试:更新显卡驱动 → 注册表禁用 MPO(`HKLM\SOFTWARE\Microsoft\Windows\Dwm` → `OverlayTestMode`=5)→ 应用内 Settings 关"毛玻璃"(no-glass 全局禁 backdrop-filter,应用侧唯一规避开关)。
+
+**保留的修复(应用侧真实问题,与驱动 bug 无关)**:
+
+| 文件 | 改动 |
+|------|------|
+| `components/SunLightLayer.vue` | `.bg-blobs` 5 个色块从 `filter: blur(80px)` 实色圆改为**预模糊 radial-gradient** + drift keyframes 去掉 `scale()`(纯 translate);删 `.bg-blobs` 的 `will-change: transform`。修的是独立真实问题:带 filter 的层随 scale 动画被 Chromium 周期性重栅格化,叠加上方 N 张 backdrop-filter 卡片时全特效状态持续频闪(第一轮实测修复生效)。视觉近似等效,滤波成本归零 |
+| `components/AppSidebar.vue` | `toggleLightEffect` 从只切 `shadowEnabled` 改为**全量切换 5 项特效**(shadow/blobs/weather/glass/lampMode),对齐 MobileMePage 同款开关语义——原 bug:用户"关闭所有特效"后 blobs/毛玻璃/台灯/天气仍运行 |
+| `components/MobileMePage.vue` | 删 `ihomy:light:shadow` 死键写入(无读取方,持久化统一走 useSunLight 的 watch → `ihomy:effects`) |
+| `views/Home.vue` | `sevenDayPhotos`/`recentPhotos` 从含 `Date.now()`/`Math.random()` 的 computed 改 `ref + watch(allPhotos)` 一次性生成(遵守 computed 纯函数规范,防重算时拍立得重新洗牌跳动) |
+
+**已尝试并撤销的规避(根因确认在浏览器侧后全部恢复原样,构建 hash 与第一轮后一致)**:
+- `.glass-flatten` 恒等扁平化层(z63, multiply 纯白):假设 blend 层强制压平可稳定 backdrop-filter 采样——无效,已删。
+- 首页卡片/侧边栏/播放器/编辑工具栏去 backdrop-filter(博客 id=18 方案三)+ 背景增实:牺牲毛玻璃视觉,根因不在应用,已全部恢复。
+- nav-item 去 scale/box-shadow 悬停、卡片悬停改纯 transform:同上,已恢复原动效。
+- 加载后 `.recomposite-kick` 根元素瞬时 opacity 触发全量重合成(模拟切窗口):实测无效,已删。
+
+**排查方法论沉淀**:视觉频闪类问题先做浏览器侧对照(关硬件加速/换浏览器/切窗口)再动应用代码——本轮在合成器理论上绕了三大圈,最终 2 分钟的浏览器对照实验直接定位根因。后端日志无请求循环(排除 JS 轮询)仍是有效的前置排查。
 
 
 

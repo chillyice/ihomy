@@ -159,11 +159,16 @@ const widgetType = (code) => WIDGET_MAP[code] || null
 // 注入全局光影状态(与 SunLightLayer 共享同一实例);导航栏只用台灯开关,其余设置在 Settings 页
 const sunLight = inject(SUN_LIGHT_KEY)
 const { lampMode, toggleLamp } = sunLight || {}
+// 光影总开关:全量切换 5 项特效(对齐 MobileMePage 同款开关语义),
+// 只切 shadowEnabled 会导致"关闭所有特效"后 blobs/毛玻璃/台灯/天气仍运行(频闪排查踩坑)
 const toggleLightEffect = () => {
-  if (sunLight?.shadowEnabled) {
-    sunLight.shadowEnabled.value = !sunLight.shadowEnabled.value
-    localStorage.setItem('ihomy:light:shadow', String(sunLight.shadowEnabled.value))
-  }
+  if (!sunLight?.shadowEnabled) return
+  const on = !sunLight.shadowEnabled.value
+  sunLight.shadowEnabled.value = on
+  sunLight.blobsEnabled.value = on
+  sunLight.weatherEffectEnabled.value = on
+  sunLight.glassEnabled.value = on
+  sunLight.lampMode.value = on ? 'auto' : 'off'
 }
 
 const collapsed = ref(false)
