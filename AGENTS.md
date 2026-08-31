@@ -373,6 +373,10 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
     - 根容器统一 `class="page"`(全局 `.page`: `max-width:1100px; margin:0 auto; padding:16px`),**禁止 scoped 覆写** max-width/margin/padding/border。
     - 页面级 H2/H1 标题全部移除(面包屑已体现页面标题);内容分区标题用 `.section-label`(16px/600/左 3px 暖棕竖线)。
     - **工具栏**:统一 `class="page-toolbar card"`,全局 `padding: 10px 16px !important`(不被 `.card` 的 20px 覆盖);`.tb-left` 放搜索/筛选/排序,`.tb-right` 放操作按钮。**禁止 scoped 定义 `.list-header`/`.toolbar`/`.header-actions` 等旧工具栏类**。
+    - **工具栏筛选组件尺寸**:`.tb-left` 的 `el-input`/`el-select` 统一 `size="small"`(24px 高,相册/放映厅/音乐三页已对齐);`.tb-right` 按钮用默认尺寸(32px 高)。
+    - **工具栏按钮间距**(强制):`.tb-right` 为 `flex gap:8px`,普通按钮间另有 EP `.el-button+.el-button` 12px 兄弟边距(合计 20px);**按钮被 `el-dropdown` 包裹时(如「上传音乐」下拉)吃不到该兄弟边距,必须 scoped 补 `.tb-right :deep(.el-dropdown) { margin-left: 12px }`**,否则间距不一致。
+    - **多选交互统一**(强制,相册/放映厅/音乐同款):仅用 `.pick-badge` 右上对勾圆标(`.on` 时 `#b88c6e` 实底)+卡片 `outline: 2px solid #b88c6e` 描边;**禁止再加左上 checkbox 角标**(双选择效果);选择态点击卡片即勾选;常规态/选择态按钮组在工具栏 tb-right 互斥切换,选择态=选中计数(`.select-count`)+取消+删除所选(danger)。
+    - **设备映射来源角标**(统一,相册/放映厅/音乐同款):卡片封面左/右上 `设备名 + .status-dot` 状态点(VALID 绿/OFFLINE 灰/MISSING 红),半透明白底圆角小标签。
     - **工具栏按钮**(`.write-btn`/`.ghost-btn`/`.danger-btn`/`.view-toggle`/`.vt-btn`):全局定义在 `main.css`,height:32px,**禁止 scoped 重复定义**。
     - `.page-header`/`.page-title`/`.list-header` 全局统一定义在 `main.css`,禁止 scoped 重复。
     - Breadcrumb `#right` slot 放置页面操作按钮(添加/加入等)。
@@ -932,7 +936,7 @@ CREATE TABLE sys_media_server (
 
 
 
-##### 音乐设备映射与工具栏迭代(music 分支,2026-08-31,未上生产)
+##### 音乐设备映射与工具栏迭代(music 分支,2026-08-31,已合 main 上生产)
 
 | 文件 | 改动 |
 |------|------|
@@ -942,13 +946,14 @@ CREATE TABLE sys_media_server (
 | `service/MusicService.java` | `listByFamily` 返回 Map 列表(批量查设备名免 N+1,storage:// 原样返回不解析);`playUrl(id,familyId)` 播放现签;`removeMusicRow`:映射曲目物理删+不删设备文件,本地/外链保持软删+删文件;`uploadAndCreate` 流式化(transferTo 临时文件→mp3agic→`FileService.upload(Path)` Files.copy,**不再 getBytes 全量入堆**) |
 | `service/FileService.java` | 新增 `upload(Path,...)` 本地文件源流式重载(MultipartFile 被 transferTo 消费后用) |
 | `controller/MusicController.java` | `GET /music/{id}/play-url` 现签;`POST /music/map`+`POST /music/refresh`(@RequirePermission storage:manage + @OperationLog);list 返回类型改 List<Map> |
-| `views/music/Music.vue` | 工具栏对齐相册/放映厅规范:tb-left=搜索(歌名/艺术家/专辑)+来源筛选(全部/本地上传/外链/各设备);tb-right=多选/新建歌单(playlist tab)/刷新映射(owner+hasMapped)/从设备同步(owner)/上传音乐(primary 下拉:单曲/专辑文件夹/外链);选择态=计数+取消+删除所选;曲目卡片来源角标(设备名+状态点);**全页 i18n 化**(原硬编码中文→music.* 词条);play-url 播放现取;watch syncStore.doneCount 后台同步完成自动刷新;tabs-extra 按钮全部并入工具栏 |
+| `views/music/Music.vue` | 工具栏对齐相册/放映厅规范:tb-left=搜索(歌名/艺术家/专辑)+来源筛选(全部/本地上传/外链/各设备);tb-right=多选/新建歌单(playlist tab)/刷新映射(owner+hasMapped)/从设备同步(owner)/上传音乐(primary 下拉:单曲/专辑文件夹/外链);选择态=计数+取消+删除所选;曲目卡片来源角标(设备名+状态点);**全页 i18n 化**(原硬编码中文→music.* 词条);play-url 播放现取;watch syncStore.doneCount 后台同步完成自动刷新;tabs-extra 按钮全部并入工具栏;**多选=相册同款 pick-badge 右上对勾角标+卡片描边,点击卡片即勾选**(曾同时残留 checkbox 角标+对勾 badge 双效果,已去重) |
+| `views/cinema/Cinema.vue` | tb-left 搜索/来源/类型/题材 4 个筛选组件补 `size="small"`,对齐相册/音乐工具栏高度(此前为默认 32px 高,两页混排不一致) |
 | `components/MusicPlayer.vue` | `playSrc` ref + watch currentTrack:storage:// 曲目切歌现取 playUrl(带 id 竞态防护),本地/外链直用——修复 BGM 长时间挂机后签名 URL 过期切歌失败;播放器文案 i18n 化 |
 | `components/SyncDialog.vue` | `target` prop 加 `music`(map 调 musicApi.map,标题/提示 storage.mapHintMusic) |
 | `api/index.js` | musicApi 加 `playUrl/map/refreshMap` |
 | `i18n/zh-CN.js` + `en.js` | music.* 新增 70 条中英词条(工具栏/筛选/多选/映射/弹窗/播放器)+ storage.mapHintMusic + common.removed |
 
-**映射规则(music 分支)**:影子曲目 = `content_music` 行,`url` 存 `storage://{deviceId}/{path}?fsid={fsId}`、`source_path` 存 `dev:{deviceId}:{path}` 去重键、`source_dir` 存映射根目录;平铺无层级容器,来源经工具栏筛选区分(本地上传/外链/设备);删除映射曲目=物理删记录(设备文件永不动,歌单关联行连带清理);刷新=按 source_dir 反查重扫,prune 仅清 `dev:{id}:{rootDir}/` 前缀下消失的记录。**播放地址每次切歌现签**(签名 10 分钟过期,列表不解析——MusicPlayer/Music 页两处都走 `GET /music/{id}/play-url`)。已知上限:设备上的 FLAC/OGG/WMA 在 iOS Safari 不支持(Chrome/Edge 支持 FLAC/OGG),与放映厅 mkv 同理;映射曲目无 ID3 元数据/封面(仅文件名)。**冒烟已验证**:映射 3 文件(递归子目录+忽略非音频)/prune/刷新/删除保留设备文件/签名播放 200/本地曲目回归。**测试库注意**:sys_storage_device id=7(CTDev)root_path 已指向已删除的临时目录(遗留垃圾,用户自行处理)。
+**映射规则(music 分支)**:影子曲目 = `content_music` 行,`url` 存 `storage://{deviceId}/{path}?fsid={fsId}`、`source_path` 存 `dev:{deviceId}:{path}` 去重键、`source_dir` 存映射根目录;平铺无层级容器,来源经工具栏筛选区分(本地上传/外链/设备);删除映射曲目=物理删记录(设备文件永不动,歌单关联行连带清理);刷新=按 source_dir 反查重扫,prune 仅清 `dev:{id}:{rootDir}/` 前缀下消失的记录。**播放地址每次切歌现签**(签名 10 分钟过期,列表不解析——MusicPlayer/Music 页两处都走 `GET /music/{id}/play-url`)。已知上限:设备上的 FLAC/OGG/WMA 在 iOS Safari 不支持(Chrome/Edge 支持 FLAC/OGG),与放映厅 mkv 同理;映射曲目无 ID3 元数据/封面(仅文件名)。**冒烟已验证**:映射 3 文件(递归子目录+忽略非音频)/prune/刷新/删除保留设备文件/签名播放 200/本地曲目回归;**live DB 同步**:migrations.sql music 段(deploy.ps1 流水线自动执行)。**测试库注意**:sys_storage_device id=7(CTDev)root_path 已指向已删除的临时目录(遗留垃圾,用户自行处理)。
 
 ## 文件存储策略
 
