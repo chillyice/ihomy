@@ -806,6 +806,8 @@ INSERT INTO sys_dict_item ... book_format/borrow_status;
 
 **映射规则(video 分支)**:影子视频 = `content_video` 行,`video_url` 存 `storage://{deviceId}/{path}?fsid={fsId}`、`source_path` 存 `dev:{deviceId}:{path}` 去重键、`source_dir` 存映射根目录(相对设备);**平铺无层级容器**(用户选定,目录树结构以后再设计),列表页来源角标+来源筛选区分本地上传/设备映射;删除影子视频=物理删记录(设备文件永不动,deleteByUrl 自动跳过 storage://);刷新=按 source_dir 反查重扫,prune 仅清 `dev:{id}:{rootDir}/` 前缀下消失的记录;**播放地址每次点击现签**(`GET /video/{id}/play-url`,列表返回的签名 URL 10 分钟过期不可靠);本地设备视频流式 PathResource 输出(支持 Range,防 OOM),百度走 dlink 中转(不支持 Range,拖进度条受限——已知上限)。**冒烟已验证**:映射 3 文件(忽略非视频)/prune/刷新/删除保留设备文件/206 Range/相册映射回归(MapTaskRegistry 重构无回归)。
 
+**TMDB 连通性实测(2026-08-31,生产服务器 ihomy.top)**:`api.themoviedb.org` 被 GFW DNS 污染(解析到 Facebook/Twitter 假 IP,阿里 DoH/权威 NS 直查均拿不到真实记录,注入答案随机);**`api.tmdb.org`(官方备用域名)干净可用**(AWS CloudFront,401 业务响应 0.5s),`image.tmdb.org` 海报 CDN(Bunny CDN)直连可用。两者同一后端:`--resolve api.themoviedb.org:443:99.84.152.10` 可正常访问(TTL=1,IP 会轮换,失效时重查 api.tmdb.org 的 A 记录)。**结论**:① ihomy 刮削 TMDB 零代理,API base 用 `api.tmdb.org` 即可;② NAS 上 Jellyfin(硬编码 api.themoviedb.org)需 hosts 指向 api.tmdb.org 的真实 IP;③ Bangumi api.bgm.tv 也被污染,不做主依赖;④ 豆瓣无官方 API 不做主依赖。放映厅方向决策(2026-08-31):不二开 Jellyfin(栈不符/部署冲突/账号断开),NAS 试用 Jellyfin 评估体验后定;ihomy 内作品化模型(work/episode 两层+TMDB 刮削+人工匹配兜底)为备选自建方案,见"放映厅设备映射"归档。
+
 **live DB 同步**(生产上线前执行,video 分支合入 main 后):
 ```sql
 -- 见 backend/src/main/resources/migrations.sql 尾部 video 段(幂等)
