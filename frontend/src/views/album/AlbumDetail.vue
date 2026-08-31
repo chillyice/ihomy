@@ -56,6 +56,15 @@
     </div>
     <input ref="coverInput" type="file" accept="image/*" class="hidden-input" @change="onCoverPicked" />
 
+    <!-- 多选工具条(子相册+照片混合):紧跟工具栏下方 -->
+    <div v-if="selectMode" class="select-bar card">
+      <span>{{ selectSummary }}</span>
+      <div class="tb-right">
+        <el-button size="small" :disabled="batchDeleting" @click="toggleSelect">{{ t('album.cancelSelect') }}</el-button>
+        <el-button type="danger" size="small" :loading="batchDeleting" :disabled="!selectedChildIds.length && !selectedIds.length" @click="onBatchDelete">{{ t('album.deleteSelected') }}</el-button>
+      </div>
+    </div>
+
     <!-- 子相册(设备目录映射层级):方块/列表两种展示模式,支持多选删除 -->
     <div v-if="children.length" class="child-section">
       <!-- 方块模式:大封面卡片 -->
@@ -69,7 +78,7 @@
         >
           <div class="child-tile-cover">
             <template v-if="c.cover">
-              <div class="child-tile-img" :style="{ backgroundImage: `url(${c.cover}&thumb=1)` }"></div>
+              <div class="child-tile-img" :style="{ backgroundImage: `url(${thumbUrl(c.cover)})` }"></div>
             </template>
             <AlbumDefaultCover v-else :size="56" />
             <span class="status-dot" :class="c.syncStatus || 'OFFLINE'"></span>
@@ -94,7 +103,7 @@
           :class="{ selected: selectMode && selectedChildIds.includes(c.id) }"
           @click="selectMode ? togglePickChild(c) : $router.push(`/album/${c.id}`)"
         >
-          <div class="child-cover" :style="c.cover ? { backgroundImage: `url(${c.cover}&thumb=1)` } : {}">
+          <div class="child-cover" :style="c.cover ? { backgroundImage: `url(${thumbUrl(c.cover)})` } : {}">
             <AlbumDefaultCover v-if="!c.cover" :size="30" />
             <span class="status-dot" :class="c.syncStatus || 'OFFLINE'"></span>
             <span v-if="selectMode" class="pick-badge" :class="{ on: selectedChildIds.includes(c.id) }">
@@ -112,14 +121,6 @@
     </div>
 
     <div v-loading="loading" class="album-body">
-      <!-- 多选工具条(子相册+照片混合) -->
-      <div v-if="selectMode" class="select-bar card">
-        <span>{{ selectSummary }}</span>
-        <div class="tb-right">
-          <el-button size="small" :disabled="batchDeleting" @click="toggleSelect">{{ t('album.cancelSelect') }}</el-button>
-          <el-button type="danger" size="small" :loading="batchDeleting" :disabled="!selectedChildIds.length && !selectedIds.length" @click="onBatchDelete">{{ t('album.deleteSelected') }}</el-button>
-        </div>
-      </div>
       <div v-if="photos.length" class="photo-wall">
         <div v-for="p in photos" :key="p.id" class="photo-card" :class="{ selected: selectMode && selectedIds.includes(p.id) }">
           <div class="photo-wrap" @click="selectMode ? togglePick(p) : openViewer(p)">
@@ -240,8 +241,9 @@ const breadcrumbItems = computed(() => [
   { label: album.value.name || t('album.title') },
 ])
 
-// 网格用 480px 缓存缩略图(首次访问服务端生成后秒回);PhotoViewer 播放/下载仍用原图
-const thumbUrl = (url) => (url ? `${url}&thumb=1` : url)
+// 网格用 480px 缓存缩略图:仅设备映射照片(签名URL,已带query)追加 &thumb=1;
+// 本地上传照片是 /files/ 静态直链(无query),拼参数会 404,原样返回;PhotoViewer 播放/下载用原图
+const thumbUrl = (url) => (url && url.includes('?') ? `${url}&thumb=1` : url)
 
 // 手动刷新映射相册(递归子树,后台执行)
 const onRefresh = async () => {
@@ -458,7 +460,7 @@ onMounted(load)
   align-items: center;
   justify-content: space-between;
   padding: 8px 16px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   font-size: 13px;
   color: var(--color-text-secondary);
 }
