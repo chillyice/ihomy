@@ -821,6 +821,73 @@ ALTER TABLE content_video ADD INDEX idx_family_created (family_id, deleted, crea
 ALTER TABLE content_video ADD INDEX idx_family_source (family_id, deleted, source_device_id);
 ```
 
+##### 放映厅 Jellyfin 集成方案(video 分支定稿,2026-08-31,待启动)
+
+> 多端(电视/电脑/手机/平板)看片的方向决策:**核心功能(刮削/转码/TV 客户端)用 Jellyfin,界面与家庭层 ihomy 自建**(Infuse 模式:自研 UI + 标准媒体服务器后端,Findroid/Gelli/Infuse 均为此模式验证)。不自建完整媒体中心(TV 原生客户端与转码是自建死穴),不二开 Jellyfin(C#/.NET 大型代码库 fork 维护不动,与 ihomy 栈脱节)。本方案已定稿未开发,启动时按"分期"顺序执行,启动前先重读本节。
+
+**架构与部署拓扑**:
+- **NAS(家庭)**:Docker 跑 Jellyfin,媒体目录按"一个作品一个目录"约定挂载(电影一目录/剧集每季一目录,与 Jellyfin 标准约定天然一致);frp/DDNS 暴露 8096 公网入口
+- **VPS(ihomy 后端)**:只调 Jellyfin REST API(小 JSON,走 frp 隧道,流量可忽略),**不出视频流量**
+- **客户端**:播放 URL 带 api_key 直连 NAS 公网端点;手机/平板/电脑用 ihomy PWA 界面;**电视直接用 Jellyfin 原生 Android TV/tvOS App**(自建方案的死穴由此解决,体验等同商业产品)
+- **多家庭**:每家庭各自配置 Jellyfin 地址(一家庭一服务器;一个 Jellyfin 也可多库多用户服务多家庭,v1 不做);Emby 兼容预留(API 同源,server_type 字段区分)
+
+**账号模型**:v1 家庭共享账号(管理员凭证存 ihomy,观看进度/续看全家共享——家庭场景可接受);P2 做 ihomy 用户↔Jellyfin 用户映射表(各自续看)。
+
+**数据模型(新增 1 表,启动时随 migration 建)**:`sys_media_server`(family_id 唯一):
+```sql
+CREATE TABLE sys_media_server (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  family_id BIGINT NOT NULL,
+  server_type VARCHAR(20) NOT NULL DEFAULT 'JELLYFIN' COMMENT 'JELLYFIN/EMBY',
+  server_url VARCHAR(255) NOT NULL COMMENT '后端访问地址(如 frp 隧道 http://xxx:8096)',
+  public_url VARCHAR(255) DEFAULT NULL COMMENT '客户端播放直连地址(空=同 server_url)',
+  username VARCHAR(100) NOT NULL,
+  password VARCHAR(500) NOT NULL COMMENT 'ENC 加密(复用 sys_baidu_credential 模式)',
+  enabled TINYINT NOT NULL DEFAULT 1,
+  last_connected_at DATETIME DEFAULT NULL,
+  created_by BIGINT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted TINYINT NOT NULL DEFAULT 0,
+  UNIQUE KEY uk_family (family_id)
+);
+```
+密码 GET 只回 `hasPassword`,PUT 留空保留原值(百度凭证同款交互)。
+
+**API 映射(Jellyfin 10.9 REST,均未实测——S1 spike 第一件事就是验证此表)**:
+
+| ihomy 接口(前缀 /api/media) | Jellyfin 端点 |
+|---|---|
+| `PUT /media/config` 保存配置 | —(ihomy 落库,密码 ENC) |
+| `POST /media/test` 连通测试 | `POST /Users/AuthenticateByName` |
+| `GET /media/works` 作品列表(海报墙数据) | `GET /Users/{uid}/Items?Recursive=true&IncludeItemTypes=Movie,Series&Fields=Genres,People,Studios,ProductionLocations,PremiereDate,CommunityRating,ChildCount` |
+| `GET /media/works/{itemId}` 详情 | `GET /Shows/{id}/Seasons` + `GET /Shows/{id}/Episodes`(电影直接回 Items 详情) |
+| `GET /media/works/{itemId}/play` 播放地址 | `{public_url}/Videos/{id}/stream?static=true&api_key={token}`(现签) |
+| `POST /media/works/{itemId}/played` 标记看过 | `POST /Users/{uid}/PlayedItems/{id}` |
+| `GET /media/resume` 继续观看 | `GET /Users/{uid}/Items/Resume` |
+| 海报/剧照 | `GET /Items/{id}/Images/Primary`(转 ihomy 代理或直连) |
+
+- **认证**:登录头 `Authorization: MediaBrowser Client="ihomy", Device="ihomy-server", DeviceId="{随机}", Version="1.0"`,body `{Username, Pw}` → `AccessToken` + `User.Id`;token Redis 缓存 `ihomy:jf:{familyId}` 24h,401 自动重认证;stream URL 用 `api_key` query 参数
+- **播放 v1 = 直连 static stream**(h264 mp4/mkv 浏览器原生播,现有 Range 流式经验直接复用);转码 HLS(`/Videos/{id}/master.m3u8` + hls.js)留 P4 回退
+- **权限**:配置读写复用 `@RequirePermission("storage:manage")`(同 OWNER 管理员受众,免新增 auth 种子);works/详情/播放需登录(游客无 familyId 返回空)
+- **分类筛选**:数据来自 Jellyfin Items 的 Fields(题材/年代/地区/演员/导演/制作商),家庭库几百条,前端过滤(相册同款模式)
+
+**前端改造范围(S3)**:
+- Cinema 页 → Jellyfin 海报墙(作品卡片:海报/评分/年份/未看集数)+ 多维筛选 + 详情页(新路由 `/cinema/:itemId`:元数据+分季分集+播放+看过标记)+ 播放器(`<video>` src=现签 stream URL,播放点击时取,勿存列表)
+- **现有本地上传视频列表降级为次级 tab 保留**(自制内容/想看入库仍走 ihomy 自己的存储);想看清单保留(ihomy 自有功能)
+- Settings/Storage 页加「放映厅引擎」配置块(server_url/public_url/账号/密码/测试连接/状态)
+
+**分期(启动顺序)**:
+- **S1 spike**:本地 Docker 起 Jellyfin+测试媒体(容器内 ffmpeg 生成测试片源:`docker exec jellyfin ffmpeg -f lavfi -i testsrc=duration=30...` 可生成真实 h264+aac mp4;NFO+poster.jpg 测本地元数据路径),脚本跑通 登录→建库(/Library/VirtualLibraries)→列表→详情→播放→标记看过→resume;**首件事验证上表 API 假设**
+- **S2 后端**:`sys_media_server` 表 + JellyfinService(认证/列表/详情/播放地址/状态) + MediaController 代理接口,对着本地 Jellyfin 冒烟
+- **S3 前端**:海报墙/筛选/详情/播放器/配置页
+- **S4 打磨**:转码 HLS 回退、字幕轨(`/Videos/{id}/{mediaSourceId}/Subtitles/{index}/Stream.vtt`)、多用户映射、NAS 部署切换
+
+**已排雷(启动时无需重查)**:
+- TMDB 域名污染:NAS 上 Jellyfin 需 hosts 指向 `api.tmdb.org` 真实 IP(实测方案见"TMDB 连通性实测")
+- **Docker Hub 直连被污染**(解析到 104.244.43.57 假 IP):本地拉 Jellyfin 镜像需走国内镜像源(`docker.m.daocloud.io/jellyfin/jellyfin:10.9.11` 等,2026-08-31 未验证可用性,拉取时逐个试)
+- 远程看片瓶颈 = 家庭宽带上行(与任何自建方案相同,非集成引入);frp 隧道承载 VPS→NAS API 小流量 + 客户端→NAS 播放大流量两种用途
+
+
 
 ## 文件存储策略
 
@@ -861,6 +928,7 @@ ALTER TABLE content_video ADD INDEX idx_family_source (family_id, deleted, sourc
 
 | 优先级 | 规划 | 要点 |
 |--------|------|------|
+| P1 | 放映厅 Jellyfin 集成 | 方案已定稿(2026-08-31),详见"放映厅 Jellyfin 集成方案"归档:ihomy 做脸(海报墙/筛选/家庭层)+ Jellyfin 做引擎(刮削/转码/TV 客户端);S1 本地 spike 验证 API → S2 后端 → S3 前端;现有 content_video 本地库降级为次级 tab 保留;启动时先重读该归档小节 |
 | P2 | 物品定位-户型图 | 1期(物品清单+搜索)已完成;2期户型图:房间矩形绘制/物品相对坐标摆放,以 room.id 挂载(数据结构已预留) |
 | P2 | 用户使用指导 | 新手引导弹窗+帮助页 |
 | P2 | 家庭公告/广告位 | 自建家庭公告(不接第三方广告,隐私原因) |
