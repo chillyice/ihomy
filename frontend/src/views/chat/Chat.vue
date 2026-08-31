@@ -68,7 +68,7 @@ const connect = () => {
   const base = (import.meta.env.DEV ? `ws://localhost:8080` : `${proto}://${location.host}`)
   ws = new WebSocket(`${base}/api/ws/chat?token=${userStore.token}`)
   connecting.value = true
-  ws.onopen = () => { connected.value = true; connectedError = false; connecting.value = false }
+  ws.onopen = () => { connected.value = true; connectedError.value = false; connecting.value = false }
   ws.onclose = () => {
     connected.value = false
     connecting.value = false

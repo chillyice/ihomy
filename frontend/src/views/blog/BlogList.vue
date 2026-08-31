@@ -85,7 +85,7 @@
           </div>
           <div
             v-for="node in flatTree"
-            :key="node.id"
+            :key="node.path"
             class="cat-item"
             :class="{ active: activeCategory === node.path }"
             :style="{ paddingLeft: (10 + node.depth * 16) + 'px' }"
@@ -97,7 +97,7 @@
             <span v-else class="cat-toggle-placeholder"></span>
             <span class="cat-name">{{ node.name }}</span>
             <span class="cat-count">{{ countWithChildren(node) }}</span>
-            <span v-if="userStore.isLoggedIn" class="cat-ops" @click.stop>
+            <span v-if="userStore.isLoggedIn && node.id != null" class="cat-ops" @click.stop>
               <button class="cat-op-btn" :title="$t('blog.editCategory')" @click="openCategoryDialog('edit', node)">
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
               </button>
@@ -288,7 +288,7 @@ const parentCategoryTree = computed(() => {
   }
   const byParent = {}
   for (const item of catCountRaw.value) {
-    if (excludeIds.has(item.id)) continue
+    if (item.id == null || excludeIds.has(item.id)) continue
     const pid = item.parentId || 0
     if (!byParent[pid]) byParent[pid] = []
     byParent[pid].push(item)
@@ -323,6 +323,7 @@ const flatTree = computed(() => {
 // 累加子分类 count
 const countWithChildren = (item) => {
   let sum = Number(item.cnt || 0)
+  if (item.id == null) return sum
   for (const child of catCountRaw.value) {
     if (child.parentId === item.id) sum += countWithChildren(child)
   }
