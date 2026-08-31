@@ -1,5 +1,7 @@
 package com.ihomy.controller;
 
+import com.ihomy.annotation.OperationLog;
+import com.ihomy.annotation.RequirePermission;
 import com.ihomy.common.BizException;
 import com.ihomy.common.Result;
 import com.ihomy.common.ResultCode;
@@ -7,6 +9,7 @@ import com.ihomy.entity.ContentMusic;
 import com.ihomy.entity.ContentMusicPlaylist;
 import com.ihomy.security.LoginUser;
 import com.ihomy.security.SecurityHelper;
+import com.ihomy.service.MusicMapService;
 import com.ihomy.service.MusicService;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +27,7 @@ import java.util.*;
 public class MusicController {
 
     private final MusicService musicService;
+    private final MusicMapService musicMapService;
     private final SecurityHelper securityHelper;
 
     private LoginUser requireLogin() {
@@ -34,11 +38,39 @@ public class MusicController {
 
     // ========== 曲库 ==========
 
-    @Operation(summary = "曲库列表")
+    @Operation(summary = "曲库列表(含映射来源设备名/状态)")
     @GetMapping("/list")
-    public Result<List<ContentMusic>> list() {
+    public Result<List<Map<String, Object>>> list() {
         LoginUser user = requireLogin();
         return Result.success(musicService.listByFamily(user.getFamilyId()));
+    }
+
+    @Operation(summary = "播放地址(storage:// 逻辑地址现签,签名 URL 过期后重新获取)")
+    @GetMapping("/{id}/play-url")
+    public Result<Map<String, String>> playUrl(@PathVariable Long id) {
+        LoginUser user = requireLogin();
+        return Result.success(musicService.playUrl(id, user.getFamilyId()));
+    }
+
+    @Operation(summary = "从设备同步音乐:勾选目录映射为影子曲目记录(不拷贝文件)")
+    @OperationLog(module = "MUSIC", operationType = "CREATE", description = "设备目录映射音乐", saveArgs = false)
+    @RequirePermission("storage:manage")
+    @PostMapping("/map")
+    public Result<Map<String, Long>> map(@RequestBody Map<String, Object> body) {
+        Long deviceId = body.get("deviceId") == null ? 0L : Long.valueOf(body.get("deviceId").toString());
+        @SuppressWarnings("unchecked")
+        List<String> paths = (List<String>) body.get("paths");
+        Long taskId = musicMapService.createMapping(securityHelper.currentUser(), securityHelper.current().getFamilyId(), deviceId, paths);
+        return Result.success(Map.of("taskId", taskId));
+    }
+
+    @Operation(summary = "刷新设备映射(重扫全部已映射目录,清理消失记录)")
+    @OperationLog(module = "MUSIC", operationType = "UPDATE", description = "刷新设备音乐映射")
+    @RequirePermission("storage:manage")
+    @PostMapping("/refresh")
+    public Result<Map<String, Long>> refresh() {
+        Long taskId = musicMapService.refreshAll(securityHelper.currentUser(), securityHelper.current().getFamilyId());
+        return Result.success(Map.of("taskId", taskId));
     }
 
     @Operation(summary = "专辑列表(按 album 分组)")

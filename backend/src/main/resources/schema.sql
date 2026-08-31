@@ -1392,13 +1392,18 @@ CREATE TABLE `content_music` (
   `duration`   INT          DEFAULT NULL COMMENT '时长(秒)',
   `bitrate`    INT          DEFAULT NULL COMMENT '比特率(kbps)',
   `cover_url`  VARCHAR(500) DEFAULT NULL COMMENT '内嵌封面URL(提取后存为独立文件)',
-  `source_path` VARCHAR(500) DEFAULT NULL COMMENT '原始路径(设备:相对路径,去重用)',
+  `source_path` VARCHAR(500) DEFAULT NULL COMMENT '设备映射去重键(dev:设备ID:路径),本地上传/外链为空',
+  `source_device_id` BIGINT   DEFAULT NULL COMMENT '映射来源设备ID',
+  `source_fs_id`     BIGINT   DEFAULT NULL COMMENT '设备文件ID(百度)',
+  `source_dir` VARCHAR(500)   DEFAULT NULL COMMENT '映射根目录(相对设备)',
+  `sync_status` VARCHAR(20)   DEFAULT NULL COMMENT '映射状态:VALID/OFFLINE/MISSING',
   `added_by`   BIGINT       DEFAULT NULL COMMENT '添加者ID',
   `deleted`    TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
   `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_family_album` (`family_id`, `album`, `deleted`),
-  KEY `idx_family_created` (`family_id`, `deleted`, `created_at`)
+  KEY `idx_family_created` (`family_id`, `deleted`, `created_at`),
+  KEY `idx_family_source` (`family_id`, `deleted`, `source_device_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='音乐曲库表';
 
 -- ------------------------------------------------------------

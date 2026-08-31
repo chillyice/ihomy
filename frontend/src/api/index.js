@@ -229,6 +229,9 @@ export const musicApi = {
   },
   add: (data) => request.post('/music', data),
   remove: (id) => request.delete(`/music/${id}`),
+  playUrl: (id) => request.get(`/music/${id}/play-url`),
+  map: (data) => request.post('/music/map', data),
+  refreshMap: () => request.post('/music/refresh'),
   batchRemove: (ids) => request.delete('/music/batch', { data: { ids } }),
   removeByAlbum: (album) => request.delete(`/music/album/${encodeURIComponent(album)}`),
   // 歌单

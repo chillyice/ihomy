@@ -71,6 +71,17 @@ public class FileService {
         return url;
     }
 
+    /** 通用上传(本地文件源,流式 Files.copy):MultipartFile 已被 transferTo 消费后用这个 */
+    public String upload(Path source, String originalName, String contentType) {
+        if (contentType != null && contentType.startsWith("audio/")) {
+            return saveTo(source, originalName, "music", null, null);
+        }
+        String yyyyMM = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
+        String url = saveTo(source, originalName, "files", yyyyMM, null);
+        generateThumbIfImage(url, contentType);
+        return url;
+    }
+
     /** 相册图片上传(流式) */
     public String upload(MultipartFile file, String originalName, String contentType, Long albumId, String albumName) {
         String url = saveTo(file, originalName, "pictures", albumName, albumId);
@@ -142,6 +153,22 @@ public class FileService {
                     Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
                 }
             }
+            log.info("文件已保存: {}", parts[2]);
+            return parts[2];
+        } catch (IOException e) {
+            log.error("文件上传失败", e);
+            throw new RuntimeException("文件上传失败");
+        }
+    }
+
+    /** 本地文件源版本:Files.copy 不入堆 */
+    private String saveTo(Path source, String originalName, String root, String sub, Long albumId) {
+        validateName(originalName);
+        try {
+            String[] parts = buildPath(originalName, root, sub, albumId);
+            Path dir = Paths.get(parts[0]);
+            Files.createDirectories(dir);
+            Files.copy(source, dir.resolve(parts[1]), StandardCopyOption.REPLACE_EXISTING);
             log.info("文件已保存: {}", parts[2]);
             return parts[2];
         } catch (IOException e) {

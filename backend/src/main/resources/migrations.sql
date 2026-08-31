@@ -325,4 +325,65 @@ PREPARE add_video_idx_source_stmt FROM @add_video_idx_source;
 EXECUTE add_video_idx_source_stmt;
 DEALLOCATE PREPARE add_video_idx_source_stmt;
 
+-- ============================================================
+-- 2026-08-31: 音乐设备目录映射(music 分支):content_music 加映射来源列
+--   source_path 复用现有列(dev:{deviceId}:{path} 去重键)
+-- ============================================================
+
+SET @add_music_sourcedevice := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `content_music` ADD COLUMN `source_device_id` BIGINT DEFAULT NULL COMMENT ''映射来源设备ID'' AFTER `source_path`',
+    'SELECT ''skip: music source_device_id column already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_music' AND COLUMN_NAME = 'source_device_id'
+);
+PREPARE add_music_sourcedevice_stmt FROM @add_music_sourcedevice;
+EXECUTE add_music_sourcedevice_stmt;
+DEALLOCATE PREPARE add_music_sourcedevice_stmt;
+
+SET @add_music_sourcefsid := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `content_music` ADD COLUMN `source_fs_id` BIGINT DEFAULT NULL COMMENT ''百度网盘 fs_id'' AFTER `source_device_id`',
+    'SELECT ''skip: music source_fs_id column already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_music' AND COLUMN_NAME = 'source_fs_id'
+);
+PREPARE add_music_sourcefsid_stmt FROM @add_music_sourcefsid;
+EXECUTE add_music_sourcefsid_stmt;
+DEALLOCATE PREPARE add_music_sourcefsid_stmt;
+
+SET @add_music_sourcedir := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `content_music` ADD COLUMN `source_dir` VARCHAR(500) DEFAULT NULL COMMENT ''映射的根目录(相对设备,展示用)'' AFTER `source_fs_id`',
+    'SELECT ''skip: music source_dir column already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_music' AND COLUMN_NAME = 'source_dir'
+);
+PREPARE add_music_sourcedir_stmt FROM @add_music_sourcedir;
+EXECUTE add_music_sourcedir_stmt;
+DEALLOCATE PREPARE add_music_sourcedir_stmt;
+
+SET @add_music_syncstatus := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `content_music` ADD COLUMN `sync_status` VARCHAR(20) DEFAULT NULL COMMENT ''VALID正常/OFFLINE设备离线/MISSING目录不存在'' AFTER `source_dir`',
+    'SELECT ''skip: music sync_status column already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_music' AND COLUMN_NAME = 'sync_status'
+);
+PREPARE add_music_syncstatus_stmt FROM @add_music_syncstatus;
+EXECUTE add_music_syncstatus_stmt;
+DEALLOCATE PREPARE add_music_syncstatus_stmt;
+
+SET @add_music_idx_source := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `content_music` ADD INDEX `idx_family_source` (`family_id`, `deleted`, `source_device_id`)',
+    'SELECT ''skip: music idx_family_source already exists'' AS msg')
+  FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_music' AND INDEX_NAME = 'idx_family_source'
+);
+PREPARE add_music_idx_source_stmt FROM @add_music_idx_source;
+EXECUTE add_music_idx_source_stmt;
+DEALLOCATE PREPARE add_music_idx_source_stmt;
+
+
 

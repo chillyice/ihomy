@@ -204,7 +204,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 记账 | BookController | BookService | family_book_record | type(支出/收入/转账)+月度统计+分类榜;单表无账户 |
 | 家谱 | TreeController | FamilyTreeService | family_tree | father_id/mother_id/spouse_id 自关联;spouse 双向绑定;generation 世代;**编辑全量提交,null 字段须用 LambdaUpdateWrapper 显式 SET NULL**(MP updateById 忽略 null);删除清空他人引用后逻辑删 |
 | 签到积分 | PointsController | PointsService | family_checkin/family_points_record/family_points_product/family_points_order | 日签 5 分+连续加成(7 天轮回);内容奖励(博客+10/日记+8/照片+2/视频+15);兑换校验(积分不足 1008/兑完 1009);商品管理+核销需 `@RequirePermission("points:manage")` |
-| 背景音乐 | MusicController | MusicService | content_music/content_music_playlist/content_music_playlist_track | 曲库(单曲/专辑上传,mp3agic 解析 ID3v2 元数据:标题/艺术家/专辑/时长/比特率/内嵌封面);歌单 CRUD(家庭维度独立);`is_background` 标记当前背景音乐歌单(每家庭最多 1 条);批量删除(`DELETE /music/batch` 按 ID 列表、`DELETE /music/album/{album}` 按专辑名);播放器 `GET /music/background` 获取歌单+曲目;`PUT /music/playlist/{id}/set-background` 设为背景;Settings 页「背景音乐设置」与导航栏「音乐」功能独立;MusicPlayer 仅在有背景歌单且曲目数>0 时渲染(`v-if="playlist.length"`),`z-index:55`(光影层下方);位置重置合并到 Settings「恢复默认面板布局」(清 `ihomy:music:pos`);临时文件名用纯 ASCII 后缀(含中文/斜杠的原始文件名导致 `File.createTempFile` IOException) |
+| 背景音乐 | MusicController | MusicService + MusicMapService | content_music/content_music_playlist/content_music_playlist_track | 曲库(单曲/专辑上传,mp3agic 解析 ID3v2 元数据:标题/艺术家/专辑/时长/比特率/内嵌封面);**设备目录映射(music 分支,V9.8):`POST /music/map` 影子曲目入库(storage:// 逻辑地址,平铺仅文件名元数据),`POST /music/refresh` 重扫+prune,`GET /music/{id}/play-url` 播放现签(BGM 挂机切歌不失效),映射曲目物理删+设备文件不动,详见归档**;歌单 CRUD(家庭维度独立);`is_background` 标记当前背景音乐歌单(每家庭最多 1 条);批量删除(`DELETE /music/batch` 按 ID 列表、`DELETE /music/album/{album}` 按专辑名);播放器 `GET /music/background` 获取歌单+曲目;`PUT /music/playlist/{id}/set-background` 设为背景;Settings 页「背景音乐设置」与导航栏「音乐」功能独立;MusicPlayer 仅在有背景歌单且曲目数>0 时渲染(`v-if="playlist.length"`),`z-index:55`(光影层下方);位置重置合并到 Settings「恢复默认面板布局」(清 `ihomy:music:pos`);临时文件名用纯 ASCII 后缀(含中文/斜杠的原始文件名导致 `File.createTempFile` IOException) |
 
 ### 6. 基础设施
 
@@ -931,6 +931,24 @@ CREATE TABLE sys_media_server (
 **排查方法论沉淀**:视觉频闪类问题先做浏览器侧对照(关硬件加速/换浏览器/切窗口)再动应用代码——本轮在合成器理论上绕了三大圈,最终 2 分钟的浏览器对照实验直接定位根因。后端日志无请求循环(排除 JS 轮询)仍是有效的前置排查。
 
 
+
+##### 音乐设备映射与工具栏迭代(music 分支,2026-08-31,未上生产)
+
+| 文件 | 改动 |
+|------|------|
+| `schema.sql` + `migrations.sql` | `content_music` 加 `source_device_id/source_fs_id/source_dir/sync_status` 4 列 + `idx_family_source(family_id,deleted,source_device_id)` 索引;`source_path` 复用为 `dev:{deviceId}:{path}` 去重键(幂等迁移段见 migrations.sql 尾部) |
+| `entity/ContentMusic.java` + `ContentMusicMapper`(+新建 .xml) | 实体加 4 映射字段;`deletePhysicalById` XML 物理删(映射曲目删/prune 用) |
+| `service/MusicMapService.java`(新) + `MusicMapRunner.java`(新) | 设备目录→曲库映射(平铺,VideoMapService 同款):递归扫描音频(mp3/flac/wav/ogg/m4a/aac/wma/opus)入影子曲目(url 存 `storage://` 逻辑地址,title=文件名去扩展名,**不做 ID3 下载解析,无 artist/album/封面**——用户决策:纯平铺仅文件名,不目录推导);`refreshAll` 按 distinct(source_device_id, source_dir) 重扫+prune;prune 物理删记录+清理歌单关联行;MISSING/OFFLINE 状态分类 |
+| `service/MusicService.java` | `listByFamily` 返回 Map 列表(批量查设备名免 N+1,storage:// 原样返回不解析);`playUrl(id,familyId)` 播放现签;`removeMusicRow`:映射曲目物理删+不删设备文件,本地/外链保持软删+删文件;`uploadAndCreate` 流式化(transferTo 临时文件→mp3agic→`FileService.upload(Path)` Files.copy,**不再 getBytes 全量入堆**) |
+| `service/FileService.java` | 新增 `upload(Path,...)` 本地文件源流式重载(MultipartFile 被 transferTo 消费后用) |
+| `controller/MusicController.java` | `GET /music/{id}/play-url` 现签;`POST /music/map`+`POST /music/refresh`(@RequirePermission storage:manage + @OperationLog);list 返回类型改 List<Map> |
+| `views/music/Music.vue` | 工具栏对齐相册/放映厅规范:tb-left=搜索(歌名/艺术家/专辑)+来源筛选(全部/本地上传/外链/各设备);tb-right=多选/新建歌单(playlist tab)/刷新映射(owner+hasMapped)/从设备同步(owner)/上传音乐(primary 下拉:单曲/专辑文件夹/外链);选择态=计数+取消+删除所选;曲目卡片来源角标(设备名+状态点);**全页 i18n 化**(原硬编码中文→music.* 词条);play-url 播放现取;watch syncStore.doneCount 后台同步完成自动刷新;tabs-extra 按钮全部并入工具栏 |
+| `components/MusicPlayer.vue` | `playSrc` ref + watch currentTrack:storage:// 曲目切歌现取 playUrl(带 id 竞态防护),本地/外链直用——修复 BGM 长时间挂机后签名 URL 过期切歌失败;播放器文案 i18n 化 |
+| `components/SyncDialog.vue` | `target` prop 加 `music`(map 调 musicApi.map,标题/提示 storage.mapHintMusic) |
+| `api/index.js` | musicApi 加 `playUrl/map/refreshMap` |
+| `i18n/zh-CN.js` + `en.js` | music.* 新增 70 条中英词条(工具栏/筛选/多选/映射/弹窗/播放器)+ storage.mapHintMusic + common.removed |
+
+**映射规则(music 分支)**:影子曲目 = `content_music` 行,`url` 存 `storage://{deviceId}/{path}?fsid={fsId}`、`source_path` 存 `dev:{deviceId}:{path}` 去重键、`source_dir` 存映射根目录;平铺无层级容器,来源经工具栏筛选区分(本地上传/外链/设备);删除映射曲目=物理删记录(设备文件永不动,歌单关联行连带清理);刷新=按 source_dir 反查重扫,prune 仅清 `dev:{id}:{rootDir}/` 前缀下消失的记录。**播放地址每次切歌现签**(签名 10 分钟过期,列表不解析——MusicPlayer/Music 页两处都走 `GET /music/{id}/play-url`)。已知上限:设备上的 FLAC/OGG/WMA 在 iOS Safari 不支持(Chrome/Edge 支持 FLAC/OGG),与放映厅 mkv 同理;映射曲目无 ID3 元数据/封面(仅文件名)。**冒烟已验证**:映射 3 文件(递归子目录+忽略非音频)/prune/刷新/删除保留设备文件/签名播放 200/本地曲目回归。**测试库注意**:sys_storage_device id=7(CTDev)root_path 已指向已删除的临时目录(遗留垃圾,用户自行处理)。
 
 ## 文件存储策略
 

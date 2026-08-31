@@ -18,8 +18,8 @@
     <transition name="player-expand">
       <div v-show="expanded" class="player-body" @click.stop>
       <div class="track-info">
-        <div class="track-title" :title="currentTrack.title">{{ currentTrack.title || '未知曲目' }}</div>
-        <div class="track-sub">{{ playing ? '正在播放' : '已暂停' }}</div>
+        <div class="track-title" :title="currentTrack.title">{{ currentTrack.title || t('music.unknownTrack') }}</div>
+        <div class="track-sub">{{ playing ? t('music.playerPlaying') : t('music.playerPaused') }}</div>
       </div>
 
       <!-- 进度条 -->
@@ -34,12 +34,12 @@
 
       <!-- 控件 -->
       <div class="controls">
-        <button class="ctrl-btn" @click="prev" title="上一首"><el-icon><CaretLeft /></el-icon></button>
-        <button class="ctrl-btn ctrl-main" @click="togglePlay" :title="playing ? '暂停' : '播放'">
+        <button class="ctrl-btn" @click="prev" :title="t('music.prevTrack')"><el-icon><CaretLeft /></el-icon></button>
+        <button class="ctrl-btn ctrl-main" @click="togglePlay" :title="playing ? t('music.pauseToggle') : t('music.playToggle')">
           <el-icon><VideoPause v-if="playing" /><VideoPlay v-else /></el-icon>
         </button>
-        <button class="ctrl-btn" @click="next" title="下一首"><el-icon><CaretRight /></el-icon></button>
-        <button class="ctrl-btn ctrl-list" @click="showList = !showList" title="歌单">
+        <button class="ctrl-btn" @click="next" :title="t('music.nextTrack')"><el-icon><CaretRight /></el-icon></button>
+        <button class="ctrl-btn ctrl-list" @click="showList = !showList" :title="t('music.playlists')">
           <el-icon><List /></el-icon>
         </button>
       </div>
@@ -54,7 +54,7 @@
           @click="selectTrack(i)"
         >
           <span class="pl-idx">{{ i + 1 }}</span>
-          <span class="pl-title" :title="t.title">{{ t.title || '未知曲目' }}</span>
+          <span class="pl-title" :title="t.title">{{ t.title || t('music.unknownTrack') }}</span>
           <el-icon v-if="i === trackIdx && playing" class="pl-playing"><VideoPlay /></el-icon>
         </div>
       </div>
@@ -63,7 +63,7 @@
 
     <audio
       ref="audioEl"
-      :src="currentTrack.url"
+      :src="playSrc"
       @ended="next"
       @timeupdate="onTimeUpdate"
       @loadedmetadata="onLoadedMeta"
@@ -77,8 +77,10 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { musicApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { useI18n } from 'vue-i18n'
 import { CaretLeft, CaretRight, VideoPlay, VideoPause, List } from '@element-plus/icons-vue'
 
+const { t } = useI18n()
 const userStore = useUserStore()
 const audioEl = ref(null)
 const playlist = ref([])
@@ -132,6 +134,20 @@ const onDragStart = (e) => {
 const currentTrack = computed(() => playlist.value[trackIdx.value] || {})
 const playedPct = computed(() => duration.value ? (currentTime.value / duration.value) * 100 : 0)
 const bufferedPct = computed(() => duration.value ? (buffered.value / duration.value) * 100 : 0)
+
+// 播放地址:设备映射曲目 url 为 storage:// 逻辑地址,切歌时现签(签名 10 分钟过期);本地/外链直用
+const playSrc = ref('')
+watch(currentTrack, async (track) => {
+  if (!track?.url) { playSrc.value = ''; return }
+  if (!String(track.url).startsWith('storage://')) { playSrc.value = track.url; return }
+  const id = track.id
+  try {
+    const { url } = await musicApi.playUrl(id)
+    if (currentTrack.value?.id === id) playSrc.value = url  // 防快速切歌竞态
+  } catch {
+    if (currentTrack.value?.id === id) playSrc.value = ''
+  }
+}, { immediate: true })
 
 const loadBackgroundPlaylist = async () => {
   if (!userStore.isLoggedIn) { playlist.value = []; return }

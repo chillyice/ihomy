@@ -22,6 +22,10 @@ public class ContentMusic {
     private Integer bitrate;
     private String coverUrl;
     private String sourcePath;
+    private Long sourceDeviceId;
+    private Long sourceFsId;
+    private String sourceDir;
+    private String syncStatus;
     private Long addedBy;
     @TableLogic
     private Integer deleted;
