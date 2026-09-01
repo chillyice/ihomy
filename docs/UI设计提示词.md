@@ -532,6 +532,18 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 
 图表通用规范:SVG 等比缩放(禁 `preserveAspectRatio="none"` 防文字横向拉伸);柱状图柱宽=步长 55%,圆角 2px。
 
+## 22. 天气详情页(/weather,public)
+
+- **页面容器**:`.page`(max-width 1100px 居中)+ Breadcrumb 顶部;`.weather-page-body` flex column gap 14px。
+- **顶部实况卡**(.wt-hero):城市+日期(次要色 14px)→ 大图标(56px 和风图标 qi-xxx)+ 大温度(56px/700 tabular-nums,° 28px 半透明)+ 今日高低温(右侧上下排列,暖橙 `#c07a4a`/冷蓝 `#6a8ab0`)+ 天气文字;下方 9 项指标网格(`.wt-metrics` auto-fill minmax(150px,1fr),移动端 2 列):体感/湿度/风向/风速/降水/气压/能见度/云量/露点,每项 `--color-card-2` 圆角卡片(12px 次要色标签+15px/600 数值)。
+- **气象预警卡**:section-label「气象预警」;每条预警左 3px 级别色边条(白 `#9a9a9a`/蓝 `#4a90d9`/黄 `#d4a13f`/橙 `#e0862f`/红 `#d94a3f`,未知橙)+ 背景 `--color-card-2` 圆角;标题行=类型+级别(级别色加粗)+发送单位(senderName 12px 次要色)+起止时间;正文 13px;防御指南(instruction)独立块 12px 次要色底 `rgba(184,140,110,0.08)` 圆角 white-space pre-line。
+- **24 小时预报卡**:section-label 右侧 `view-toggle`/`vt-btn` 双按钮(折线/卡片,localStorage 记忆,默认折线)。卡片模式=横向滚动 `.wt-hourly`(每卡片 min-width 76px:时间/图标/温度/文字/降水概率/风力)。折线模式=SVG 720×230 等比缩放(width:100% height:auto),Catmull-Rom 平滑曲线,描边用温度渐变(冷蓝→暖橙 linearGradient 3 停靠点),下方同渐变 0.10 透明填充;最高/最低点标注(暖橙/冷蓝 11px/700);底部每 3h 时间标签(10px 次要色);hover 透明热区列 → 虚线竖线 + 圆点(暖棕 `#b88c6e` 白描边)+ HTML tooltip(时间/天气图标+温度+文字/降水概率/风力,暖米卡片圆角 10px 阴影,`translate(-50%,-120%)` 定位,边缘 clamp 8%-92%)。
+- **10 天预报表格**(el-table size=small stripe):日期/白天天气/夜间天气(和风图标 18px)/温度区间(渐变横条)/紫外线/风力/日出日落。**温度横条**(`.wt-trange` flex):左侧最低温(冷蓝)+ 中间轨道(8px 高圆角,`rgba(58,46,34,0.10)` 底,深色 `rgba(232,220,200,0.12)`)+ 右侧最高温(暖橙);轨道内每天渐变段(`tempColor()` 7 段色阶:-20°冷蓝 `#4A6FD4`→42°暖红 `#D84A3A`,整体 min-max 范围定位 left/width 百分比,`linear-gradient(90deg, 低温色, 高温色)`)+ 均值指示点(5px 圆点)。
+- **空气卡**:AQI 大数值(34px/700)+ 等级(15px/600)+ 首要污染物(12px 次要色);6 污染物标签行(PM2.5/PM10/NO₂/SO₂/O₃/CO,`--color-card-2` 圆角小标签);健康建议块(一般人群/敏感人群,绿底 `rgba(107,155,107,0.08)` 圆角,标签加粗)。
+- **生活指数**:grid auto-fill minmax(240px,1fr),每项 `--color-card-2` 圆角(名称+暖棕等级+文字说明)。
+- **分钟降水**:summary 摘要句 13px。
+- 复用光影层 detail 缓存(useSunLight.weatherDetail),失败静默;未登录/游客可看(public),无数据显示 el-empty。
+
 ## 验收标准
 
 1. 打开页面,背景米白渐变 + 5 个色块缓慢飘移,右下角拍立得堆/闭合相册,左右毛玻璃面板从两侧滑入。
@@ -574,3 +586,4 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 38. **相册详情页**(`/album/:id`):页头 album-head(padding 10px 16px 对齐工具栏规范)=面包屑层级返回(parents 父级链)+封面缩略+名称/描述+操作区。操作区常规态=视图切换 view-toggle(仅含子相册时)/选择(ghost)/分享(ghost,仅公开相册)/设置封面(ghost,创建者或 OWNER)/编辑/删除/上传照片(primary);选择态=选中计数+取消+删除所选(danger),独立多选工具条已并入操作区。子相册双视图 localStorage 记忆:方块(4:3 大封面卡片)与列表(单列横条:小封面+名称+照片数+状态点);照片网格缩略图 `&thumb=1` 只拼设备映射照片的签名 URL(本地 `/files/` 直链无 query 不拼参数);映射相册只读横幅(来源+上次刷新时间)+刷新按钮(OWNER),隐藏上传与编辑/删除;纯子相册相册(有子无照片)不显示照片空态;子相册+照片混合多选删除(先删子相册再删照片);后台同步完成 ElNotification 通知+页面自动刷新(watch syncStore.doneCount)。
 39. **运维详细日志页**(`/ops` 详细日志 tab):tid+日期查询三类日志(access/server/thirdparty)按时间线合并;来源/级别标签配色(见 §20);ERROR/WARN 左侧色条;等宽字体消息区 max-height 420px 滚动,堆栈整块保留;操作日志 TID 列点击跳转自动查询;`/ops?tab=trace&tid=xxx` 路由直达;5xx 报错 toast 自带 `[tid:xxx]`。
 40. **运维访问统计与天气 API 页**(`/ops`):访问统计 tab=6 指标卡片+24h 柱状图(暖棕总/红失败叠层,等比缩放)+接口 Top15 表,日期范围筛选,懒加载+`?tab=traffic` 直达;操作日志/详细日志筛选全部多选可搜索(见 §21);天气 API 页四段式布局(调用趋势+类型筛选→配额卡片→24h 合一表→财务),折线图 x 轴覆盖全时间范围且标签位置正确,配额为本地统计(不依赖控制台 API)。
+41. **天气详情页**(`/weather`):顶部实况(大图标+温度+高低温+9 指标);气象预警级别色左边条+发送单位+防御指南;24h 卡片↔折线图切换(默认折线,平滑曲线+hover tooltip);10 天表格温度渐变横条(整体 min-max 轨道+每天渐变段);空气健康建议;生活指数+分钟降水摘要;从侧边栏迷你天气/首页天气组件点击进入。

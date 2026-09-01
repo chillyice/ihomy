@@ -227,7 +227,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 体积光 | `utils/windowLight.js` + `components/SunLightLayer.vue` | 丁达尔效应:7 条光束+光源辉光+窗框阴影(上下分层)+暗角+灰尘;**窗角(windowAngle=90-|az-180|)门控直射光**(az 90°→270° 旋转,窗角≤0 无直射光);方位角驱动旋转(az-180);灰阶 darken 幂等防叠加;夜间光柱 transparent |
 | 台灯 | `utils/useSunLight.js` | 3 态(auto/on/off)+钟摆运动(8s 周期)+色温/亮度可调;mask 祛除阴影(GSAP 2s 补间);左上黄金分割点 |
 | 天气特效 | `utils/useSunLight.js` + `SunLightLayer.vue` | `codeToPrecipLevel` 1-6 级;snowParticles/rainParticles;cloudFlicker GSAP 4-8s;weatherShadowOpacity;weatherMultiplier(晴 1.0/多云 0.55/雨 0.25/雪 0.4) |
-| 天气代理 | `service/WeatherService.java` | 和风天气 JWT(Ed25519)身份认证(JDK 21 原生);凭证四件套(优先 DB sys_weather_credential);月度配额 49999(Redis 计数器);sys_weather_log 调用日志;Redis 缓存(now 30m/forecast 30m/warning 5m 等);`GET /public/weather` 简版+`/public/weather/detail` 聚合+`/ops/weather/quota` |
+| 天气代理 | `service/WeatherService.java` | 和风天气 JWT(Ed25519)身份认证(JDK 21 原生);凭证四件套(优先 DB sys_weather_credential);月度配额 50000(Redis 计数器);sys_weather_log 调用日志;Redis 缓存(now 30m/forecast 30m/warning 5m/minutely 10m);**v1 全量迁移**(实况/每日/小时/预警/空气坐标路径,生活指数/分钟降水仍 v7);`GET /public/weather` 简版+`/public/weather/detail` 聚合(10 天预报/分钟降水摘要/预警防御指南/空气健康建议)+`/ops/weather/quota`;**气象预警推送** @Scheduled 30min 扫全家庭写站内通知(家庭级开关 sys_parameter) |
 | 光照测试 | `utils/useSunLight.js` + `LightTestConsole.vue` | `lightTestMode` 循环 288 时隙;**testSpeed** 5 档(0.5/1/2/4/8x);窗角/方位/高度/地区/日期/日出日落显示;9 段时段标签;后退/暂停/前进/停止+天气控制+图层开关(阴影/环境光)+台灯模式+色温/亮度滑块;停止=重置真实时间 |
 | 可拖拽面板 | `utils/useDragResize.js` | 5 个面板(feed/task/weather/anniversary/today);zIndex+bringToFront;边界 clamp+localStorage 持久化 |
 | 和风图标 | `public/qweather-icons/` | npm 包 qweather-icons;`<i class="qi-{iconCode}">`;iconCode 来自和风 API now.icon |
@@ -966,30 +966,52 @@ CREATE TABLE sys_media_server (
 
 **映射规则(music 分支)**:影子曲目 = `content_music` 行,`url` 存 `storage://{deviceId}/{path}?fsid={fsId}`、`source_path` 存 `dev:{deviceId}:{path}` 去重键、`source_dir` 存映射根目录;平铺无层级容器,来源经工具栏筛选区分(本地上传/外链/设备);删除映射曲目=物理删记录(设备文件永不动,歌单关联行连带清理);刷新=按 source_dir 反查重扫,prune 仅清 `dev:{id}:{rootDir}/` 前缀下消失的记录。**播放地址每次切歌现签**(签名 10 分钟过期,列表不解析——MusicPlayer/Music 页两处都走 `GET /music/{id}/play-url`)。已知上限:设备上的 FLAC/OGG/WMA 在 iOS Safari 不支持(Chrome/Edge 支持 FLAC/OGG),与放映厅 mkv 同理;映射曲目无 ID3 元数据/封面(仅文件名)。**冒烟已验证**:映射 3 文件(递归子目录+忽略非音频)/prune/刷新/删除保留设备文件/签名播放 200/本地曲目回归;**live DB 同步**:migrations.sql music 段(deploy.ps1 流水线自动执行)。**测试库注意**:sys_storage_device id=7(CTDev)root_path 已指向已删除的临时目录(遗留垃圾,用户自行处理)。
 
-##### 天气系统迭代(weather 分支,V9.10,2026-09-01)
+##### 天气系统(weather 分支,2026-09-01)
+
+功能域:和风天气数据聚合、天气详情页、气象预警推送、运维天气监控。全链路和风 API v7→v1 迁移(JWT Ed25519 认证不变)。
+
+**1. 和风 API v7→v1 迁移**
 
 | 文件 | 改动 |
 |------|------|
-| `WeatherService.java` + `WeatherLogMapper(.xml)` + `OpsController.java` | 配额 50000;`GET /weather/type-distribution?range=` 类型分布(饼图数据源);detail 的 now 增加 `nowFull` 原始实况节点;**天气 API v7→v1 全量迁移**(2026-09-01,详见下节) |
-| `views/ops/Ops.vue` + `api/index.js` + i18n | 折线图**悬浮提示**(透明列 hover→竖线+双圆点+tooltip 时间/调用/失败,比例定位+边缘 clamp);**API 类型占比饼图**(SVG path 扇区+引导线+标签,与折线图并排 charts-row,共用时间范围,单一类型 100% 画整圆);本月配额 4 卡一行+**横向进度条**(70%/90% 阈值变金/红) |
-| `utils/useSunLight.js` | `loadWeatherDetail()`:全局拉取天气详情(预警+今日高低温,与简版天气并行,30 分钟随 loadWeather 刷新);Home 不再自己 fetch detail |
-| `components/AppSidebar.vue` | **迷你天气**(非首页时占编辑按钮位置):天气图标+当前温度+预警徽标(最高级别颜色 WarningFilled 三角叹号,el-tooltip 悬浮显示全部预警:类型/级别/起止时间),点击进 /weather;`utils/dict.js` 加 `WARN_LEVEL_ORDER/warnLevelColor/topWarning`(白<蓝<黄<橙<红) |
-| `views/Home.vue` | 天气组件精简:图标+当前温度+**右侧上下排列今日最高最低**(暖橙/冷蓝)+文字说明;移除预警/未来三天/空气区块与自有 detail 拉取;点击组件进 /weather |
-| `views/weather/Weather.vue`(新)+ `router/index.js` + i18n | **天气详情页 `/weather`**(public):顶部实况(大图标+温度+高低+9 项指标网格)→气象预警(级别色左边条)→24h 横滑卡片→7 天表格(日出日落/紫外线)→空气(AQI+6 污染物)→生活指数→分钟降水;复用光影层 detail 缓存避免重复请求;weatherPage.* 中英词条 |
+| `WeatherService.java` | 主力接口全量切 v1(v7 air/warning 已弃用 403):实况 `/weather/v1/current/{lat}/{lon}`、每日 `/weather/v1/daily/{lat}/{lon}?days=`、小时 `/weather/v1/hourly/{lat}/{lon}?hours=`、预警 `/weatheralert/v1/current/{lat}/{lon}`(坐标路径,不需要城市 ID)、空气 `/airquality/v1/current/{lat}/{lon}`(**current 不是 now**,404 根因);生活指数 `/v7/indices/1d` 与分钟降水 `/v7/minutely/5m` 不迁(官方现行版仍是 v7);坐标路径参数最多两位小数(`toLatLon` 四舍五入),全部 `localTime=true`(默认 UTC 错 8 小时) |
+| `WeatherService.java`(适配层) | v1→旧 v7 字段形状映射,前端零改动:`buildNowFull`(湿度/云量 0-1→%、能见度 m→km、风速 m/s→km/h、compass 16 方位→中文)、`mapDailyV1`(温度取整、降水概率→%、astro 日出日落完整 ISO)、`mapHourlyV1`、`mapWarningV1`(过滤 cancel、颜色代码→中文级别、description→text、+senderName/instruction)、`fetchAir`(indexes 优先国标 cn/aqi-cn、aqiDisplay、pollutants→旧键名、+健康建议) |
+| `WeatherService.parseApiType` | v1 前缀映射同类型码(now/forecast/hourly/warning/air),运维统计/趋势/饼图口径连续 |
 
-**规则**:侧边栏迷你天气=非首页路由专属(首页显示编辑按钮);预警颜色白/蓝/黄/橙/红(`utils/dict.warnLevelColor`),未知级别按橙;首页天气组件只做极简展示(点击进详情页),完整数据都在 /weather。
-
-##### 天气 API v7→v1 迁移(weather 分支,V9.11,2026-09-01)
+**2. 天气数据聚合(detail)**
 
 | 文件 | 改动 |
 |------|------|
-| `WeatherService.java` | **主力接口全量切 v1**(v7 air/warning 已弃用 403,v1 为主力版):实况 `/weather/v1/current/{lat}/{lon}`、每日 `/weather/v1/daily/{lat}/{lon}?days=`、小时 `/weather/v1/hourly/{lat}/{lon}?hours=`、预警 `/weatheralert/v1/current/{lat}/{lon}`(坐标路径,不需要城市 ID)、空气 `/airquality/v1/current/{lat}/{lon}`(**current 不是 now**,上次 404 根因);**生活指数 `/v7/indices/1d` 与分钟降水 `/v7/minutely/5m` 不迁**(官方现行版仍是 v7);认证不变(JWT Ed25519);坐标路径参数最多两位小数(`toLatLon` 四舍五入);全部带 `localTime=true`(默认 UTC 会让前端时间显示错 8 小时) |
-| `WeatherService.java`(适配层) | **v1→旧 v7 字段形状映射,前端零改动**:`buildNowFull`(湿度/云量 0-1→%、能见度 m→km、风速 m/s→km/h、compass 16 方位→中文)、`mapDailyV1`(温度取整、降水概率 0-1→%、astro 日出日落完整 ISO——`slice(11,16)` 截取正常)、`mapHourlyV1`、`mapWarningV1`(过滤 cancel 性质预警、颜色代码→中文级别 白/灰/绿/蓝/黄/amber→橙/红/紫/黑、description→text)、`fetchAir`(indexes 优先国标 cn/aqi-cn、aqiDisplay 显示值、pollutants 浓度→旧键名) |
-| `WeatherService.java`(并行验证) | `compareV7V1()`:同一位置(济南)并行调 v7+v1 各 3 组(now/7d/24h),返回关键字段对照 + 双方状态;v7 air/warning 已弃用不参与对照;不缓存,OPS 手动触发 |
-| `OpsController.java` | `GET /ops/weather/compare`(ops:view) |
-| `WeatherService.parseApiType` | v1 前缀映射到与 v7 相同的类型码(now/forecast/hourly/warning/air)——**运维天气统计/趋势/饼图口径连续**,无需改监控规则 |
+| `WeatherService.java` | 10 天预报 `days=10`;分钟降水整节点 put(保留 summary 摘要句);预警 `senderName`+`instruction` 防御指南;空气健康建议(adviceGeneral/adviceSensitive);now 增加 `nowFull` 原始实况;月度配额 50000;`GET /weather/type-distribution?range=` 类型分布 |
+| `utils/useSunLight.js` | `loadWeatherDetail()` 全局拉详情(预警+今日高低温,与简版并行,30m 刷新),Home 不再自己 fetch |
 
-**迁移规则**:v1 路径全用**坐标路径参数**(lat/lon 各两位小数),query 只剩 localTime/lang;数据单位 v1 与 v7 差异大(湿度/云量/降水概率是小数 0-1、能见度米、风速 m/s),适配层统一换算回 v7 语义;预警 v1 的 severity 是 minor/moderate/severe/extreme、颜色独立在 color.code,级别中文化取 color;`messageType.code=cancel` 的预警(取消性质,有效期 1h)过滤不展示;并行验证实测:实况 28° vs 28.0°、湿度 44 vs 46、日出同为 05:43、小时首条完全一致——数值吻合(1km 实况 vs 城市站小差异正常)。**监控规则**:apiType 类型码保持,v1 调用自动归入旧统计口径,折线图/饼图/24h 表无需改动。
+**3. 天气详情页(/weather,public)**
+
+| 文件 | 改动 |
+|------|------|
+| `views/weather/Weather.vue`(新)+ `router` + i18n | 顶部实况(大图标+温度+高低+9 指标网格)→气象预警(senderName+防御指南)→24h(卡片↔折线切换,默认折线)→10 天表格(温度渐变横条)→空气(健康建议)→生活指数→分钟降水;复用光影层 detail 缓存 |
+| `Weather.vue`(24h 折线图) | Catmull-Rom 平滑贝塞尔曲线,SVG 720×230,温度渐变描边+半透明填充,最高/最低点标注,底部每 3h 时间标签,hover 竖线+圆点+HTML tooltip(时间/天气/降水/风力);视图切换 vt-btn localStorage 记忆 |
+| `Weather.vue`(温度横条) | `tempColor()` 7 段颜色(-20°冷蓝→42°暖红),`dailyRange` 整体 min-max 轨道,`tbarStyle` 每天渐变段+均值指示点,深色模式覆写 |
+| i18n | weatherPage.* 新增 defenseGuide/chartView/cardsView/healthAdvice/sensitiveAdvice;daily 改 10 天 |
+
+**4. 气象预警推送**
+
+| 文件 | 改动 |
+|------|------|
+| `WeatherService.java` | `@Scheduled fixedDelay=30min pushWeatherAlerts()`:扫全家庭→按坐标共享缓存(10m)→Redis Set 去重(TTL 3 天)→新预警写站内通知铃铛;`fetchAlertsCached()`;注入 FamilyMapper+SysUserRoleMapper+NotificationService |
+| `ParameterService.java` | `getString(name)`/`put(name,value,desc)` 通用读写 |
+| `FamilyController.java` | `GET /family/weather-alert-push`(读)+ `PUT /family/weather-alert-push?enabled=`(@family:manage,写);开关存 sys_parameter 家庭级缺省开 |
+| `Settings.vue` + `api/index.js` | 「气象预警推送」el-switch + familyApi.getWeatherAlertPush/setWeatherAlertPush |
+
+**5. 天气入口与运维监控**
+
+| 文件 | 改动 |
+|------|------|
+| `AppSidebar.vue` | 迷你天气(非首页占编辑按钮位):图标+温度+预警徽标(el-tooltip 全部预警),点击进 /weather;`utils/dict.js` 加 `WARN_LEVEL_ORDER/warnLevelColor/topWarning`(白<蓝<黄<橙<红) |
+| `Home.vue` | 天气组件精简(图标+温度+右上下最高最低暖橙/冷蓝+文字),点击进 /weather |
+| `Ops.vue` + `WeatherLogMapper(.xml)` + `OpsController` | 调用趋势折线图悬浮提示(透明列 hover→竖线+双圆点+tooltip);API 类型占比饼图(SVG 扇区+引导线+标签);配额 4 卡+横向进度条(70%/90% 阈值变色);`GET /ops/weather/compare` v7/v1 并行验证(ops:view) |
+
+**设计决策**:v1 路径全用坐标参数(lat/lon 两位小数),query 只剩 localTime/lang;v1 单位差异(湿度/云量/降水概率 0-1、能见度米、风速 m/s)由适配层换算回 v7 语义,前端零改动;预警 severity=minor/moderate/severe/extreme、颜色在 color.code,级别中文化取 color,messageType.code=cancel 过滤。并行验证实测:实况 28° vs 28.0°、湿度 44 vs 46、日出同为 05:43——数值吻合。预警推送 30m 一轮按坐标共享缓存多家庭只打一次 API,Redis Set 去重防重复通知。折线图走 Catmull-Rom 样条,hover 用 HTML div(SVG 文字受限);温度横条整体 min-max 范围+每天渐变段+7 段温度色阶。**live DB 无需迁移**(全前端+已有 API)。
 
 
 ##### 日志追溯体系(backend_logs 分支,2026-09-01,已合 main)
@@ -1078,6 +1100,9 @@ CREATE TABLE sys_media_server (
 | P3 | 物品定位-AI 语义 | 3期(待2期后):自然语言"找找我的工具箱"→AI 拆出名称+别名→服务器 SQL 查询;"把工具箱放到门口的柜子最上层抽屉"→AI 按 家/房子/房间/家具/位置 五级解析,缺层追问填满后返回粒度值→服务器拼 INSERT(决策已定,依赖 AI API) |
 | P3 | 播放器解码器评估 | 当前音乐/视频用浏览器原生 `<audio>`/`<video>` 标签(硬件解码,性能最优)。**分析结论**:不建议引入 ffmpeg.wasm/howler.js/video.js — 原生方案已覆盖 MP3/AAC/MP4/WebM 主流格式,JS 解码库增加 200KB+ 包体且 CPU 解码远慢于硬件。仅在需要播放原生不支持的格式(如 FLAC/OGG/APE)或需要逐帧分析时才考虑。未来如需引入,优先 video.js(UI 统一)+ hls.js(HLS 流),不引 ffmpeg.wasm |
 | P3 | Apple Live Photos 支持 | 上传时读取 EXIF/ContentIdentifier 元数据标记实况照片,数据层关联 JPEG 封面+MOV 短视频(`content_photo` 加 `live_video_url` 字段)。照片展示左上角加实况图标(BADGE),点击查看时播放关联视频(非实况仅展示照片)。iOS Safari 上传时自动拆分 JPEG+MOV;Android/非实况无图标。需前端上传处理+后端元数据解析+展示组件三方协同 |
+| P3 | 72h 小时预报延展 | 当前 24h 报表已有,72h 预报由和风 v1 `/weather/v1/7d` 小时节点天然支持(96条×2h),可扩展为三天逐2h横滑图表;后端 days=3 daily 包含 hourly 字段,前端改采 hourly 数组即可。优先级低,24h 已覆盖主要使用场景 |
+| P3 | 月相/晨昏时刻 | 日出日落已在 daily 表中;月相和晨昏(天文曙光/暮光)为纯计算(天文学公式),无需额外 API。可作为日历页或天气详情页的补充信息卡片,增加"今夜月相""天文观测窗口"等生活化场景 |
+| P3 | 空气 24h/3天预报 | 当前空气质量只有实况(当前);和风 v1 `/airquality/v1/current/` 不支持预报,预报接口 `/airquality/v1/forecast/` 需订阅版,可作为空气模块的高级扩展;若无订阅预算可考虑替代方案(如用 daily 历史趋势推测,但准确度有限) |
 | P4 | 手机号注册 | 需短信服务商(阿里云等),未接入前不实现(sys_user.phone 字段已存在) |
 | P4 | 商业化/多租户 | SaaS 订阅制评估,条件允许再做 |
 | P4 | 广告模块 | 家庭私密场景接第三方广告转化低且有隐私争议,优先自建"家庭公告/赞助位" |

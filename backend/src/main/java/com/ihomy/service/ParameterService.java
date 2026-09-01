@@ -79,4 +79,19 @@ public class ParameterService {
     public String encrypt(String plaintext) {
         return AesUtil.encrypt(plaintext, getAesSalt());
     }
+
+    /** 读任意系统参数(不存在返回 null) */
+    public String getString(String name) {
+        SysParameter p = parameterMapper.findByName(name);
+        return p == null ? null : p.getValue();
+    }
+
+    /** 写系统参数(upsert) */
+    public void put(String name, String value, String description) {
+        SysParameter p = new SysParameter();
+        p.setName(name);
+        p.setValue(value);
+        p.setDescription(description);
+        parameterMapper.upsert(p);
+    }
 }

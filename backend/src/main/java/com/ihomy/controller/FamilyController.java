@@ -44,6 +44,7 @@ public class FamilyController {
     private final SysUserRoleMapper sysUserRoleMapper;
     private final StringRedisTemplate redisTemplate;
     private final BlogService blogService;
+    private final com.ihomy.service.ParameterService parameterService;
 
     @Operation(summary = "创建新家庭(当前用户绑定 OWNER)")
     @OperationLog(module = "FAMILY", operationType = "CREATE", description = "创建新家庭", saveArgs = false)
@@ -114,6 +115,26 @@ public class FamilyController {
     public Result<Void> handleApply(@PathVariable Long id, @RequestParam String action) {
         SysUser user = securityHelper.currentUser();
         multiFamilyService.handleApply(id, user.getFamilyId(), user.getId(), action);
+        return Result.success();
+    }
+
+    @Operation(summary = "天气预警推送开关(缺省开)")
+    @GetMapping("/weather-alert-push")
+    public Result<Map<String, Object>> getWeatherAlertPush() {
+        SysUser user = securityHelper.currentUser();
+        if (user == null) throw new BizException(ResultCode.UNAUTHORIZED);
+        String v = parameterService.getString("weather:alert-push:" + user.getFamilyId());
+        return Result.success(Map.of("enabled", !"false".equals(v)));
+    }
+
+    @Operation(summary = "设置天气预警推送开关")
+    @RequirePermission("family:manage")
+    @OperationLog(module = "FAMILY", operationType = "CONFIG", description = "设置天气预警推送开关", saveArgs = false)
+    @PutMapping("/weather-alert-push")
+    public Result<Void> setWeatherAlertPush(@RequestParam boolean enabled) {
+        SysUser user = securityHelper.currentUser();
+        parameterService.put("weather:alert-push:" + user.getFamilyId(), String.valueOf(enabled),
+                "天气预警推送开关(家庭级,缺省开)");
         return Result.success();
     }
 
