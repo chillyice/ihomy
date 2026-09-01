@@ -71,20 +71,21 @@
 backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
   src/main/java/com/ihomy/
     IhomyApplication.java       # 主类 @MapperScan("com.ihomy.mapper")
-    common/      # Result统一响应/ResultCode/BizException/GlobalExceptionHandler/DictConst(字典常量)/SolarUtil(NOAA太阳位置算法)/AesUtil(凭证加密)/UserNames
-    config/      # SecurityConfig/CorsConfig/MybatisPlusConfig/Knife4jConfig/WebMvcConfig/WebSocketConfig/SqlStatementLog/ExternalConfigLoader(外挂配置加载)/WsHandshakeInterceptor(WebSocket JWT 验证)
-    security/    # JwtUtils(JWT含familyId+role+permissions+isOps)/JwtAuthenticationFilter/LoginUser/SecurityHelper/OpsAccessFilter
+    common/      # Result统一响应/ResultCode/BizException/GlobalExceptionHandler/DictConst(字典常量)/SolarUtil(NOAA太阳位置算法)/AesUtil(凭证加密)/UserNames/Loggers(三类日志logger入口)/Ips(真实IP解析)/ThirdPartyHttp(三方API统一封装,出站日志+脱敏)
+    config/      # SecurityConfig/CorsConfig(暴露X-Trace-Id)/MybatisPlusConfig/Knife4jConfig/WebMvcConfig/WebSocketConfig/SqlStatementLog(SQL日志,内部类分流mybatis.sql.internal)/ExternalConfigLoader(外挂配置加载)/WsHandshakeInterceptor(WebSocket JWT 验证)/AsyncConfig(@Async虚拟线程+MDC TaskDecorator传播tid)
+    security/    # JwtUtils(JWT含familyId+role+permissions+isOps)/JwtAuthenticationFilter(认证+操作人放请求属性)/LoginUser/SecurityHelper/OpsAccessFilter
     annotation/  # @RequirePermission / @OperationLog
     aspect/      # RequirePermissionAspect(权限AOP) / OperationLogAspect(操作日志AOP)
-    filter/      # TraceIdFilter(链路ID生成,写入 MDC + 响应头 X-Trace-Id)
+    filter/      # TraceIdFilter(链路ID生成,写入 MDC + 响应头 X-Trace-Id) / AccessLogFilter(接口访问日志→access文件) / CaptureRequestWrapper(请求体截断捕获) / CaptureResponseWrapper(响应体截断捕获)
     entity/      # 44 个实体类(7 张关联/字典表无实体:sys_auth/sys_role_auth/sys_user_group/sys_user_group_member/sys_password_reset_token/sys_dict_item/content_visibility)
     mapper/      # MyBatis-Plus BaseMapper 接口(自定义 SQL 全部放 resources/mapper/*.xml,接口不写 @Select/@Update 注解,参数统一 @Param)
     service/     # 33 个 @Service 类(单实现无接口层)
     controller/  # 31 个 Controller
     dto/         # 请求/响应 DTO
-    websocket/   # ChatWebSocketHandler(原生 WebSocket 聊天室)
+    websocket/   # ChatWebSocketHandler(原生 WebSocket 聊天室,每消息独立tid+access日志)
   src/main/resources/
-    application.yml     # 端口8080, context-path=/api, 连接用 ihomy 账号; mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml; **基线配置**(MySQL 6306/Redis 6379/captcha 空/天气留空);`file.upload-dir` 基线 `/opt/ihomy/uploads`(Linux),开发通过 external.yml 覆盖为 Windows 路径;`logging.file.name` 基线 `/opt/ihomy/logs/ihomy.log`,开发覆盖为 `D:\WorkSpace\ihomy\logs\ihomy.log`
+    application.yml     # 端口8080, context-path=/api, 连接用 ihomy 账号; mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml; **基线配置**(MySQL 6306/Redis 6379/captcha 空/天气留空);`file.upload-dir` 基线 `/opt/ihomy/uploads`(Linux),开发通过 external.yml 覆盖为 Windows 路径;`logging.file.path` 基线 `/opt/ihomy/logs`,开发覆盖为 `D:\WorkSpace\ihomy\logs`;`app.log-retention-days: 7`
+    logback-spring.xml  # 三类日志文件分流(access/server/thirdparty,按天滚动+总量上限+异步);六要素 pattern `[tid:%X{traceId}]`;SQL只进server文件
     external.yml.template  # 外挂配置模板(IHOMY_CONFIG_PATH 指定路径,覆盖 MySQL/Redis 密码 + JWT 密钥 + 上传路径 + captcha + 天气凭证,ENC() 加密)—— 唯一的开发/生产差异机制,**不再用 application-dev.yml profile**(见 scripts/start-all.ps1)
     mapper/*.xml        # 每个 Mapper 接口一个同名 XML(namespace=接口全限定名)
     schema.sql          # 建库+建号+建表(53张)+种子数据
@@ -122,7 +123,7 @@ frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
 .\mvnw.cmd -B clean compile -DskipTests       # 仅编译验证
 .\mvnw.cmd spring-boot:run                     # 开发运行(端口8080)
 ```
-- 有 jar 锁先 `taskkill /F /IM java.exe` 再打包(运行中 java 锁定日志文件导致 clean 失败)。日志路径:生产 `/opt/ihomy/logs/ihomy.log`,开发 `D:\WorkSpace\ihomy\logs\ihomy.log`(external.yml 覆盖)。
+- 有 jar 锁先 `taskkill /F /IM java.exe` 再打包(运行中 java 锁定日志文件导致 clean 失败)。日志路径:生产 `/opt/ihomy/logs`(三类子目录 access/server/thirdparty),开发 `D:\WorkSpace\ihomy\logs`(external.yml 覆盖,同样三子目录)。
 - 临时 Maven(本机未装 mvn):`C:\Users\chill\AppData\Local\Temp\opencode\apache-maven-3.9.9\bin\mvn.cmd`
 - JAVA_HOME:`C:\Program Files\Java\jdk-21`(JDK 21 已装)
 - 运行后端必须用完整路径单实例:`C:\Program Files\Java\jdk-21\bin\java.exe -jar target\ihomy-backend.jar`(javapath launcher + JDK 双实例会分流 8080 请求导致偶发 401/404/500)。
@@ -139,7 +140,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 ## 统一响应与鉴权
 
 - 响应 `{code: 0, message: "success", data: ...}`;code != 0 = 失败。
-- 登录:access token(2h)+ refresh(7d,Redis 黑名单登出失效)。请求头 `Authorization: Bearer <token>`,axios 自动续期。
+- 登录:access token(2h)+ refresh(7d,Redis 黑名单登出失效)。请求头 `Authorization: Bearer <token>`,axios 自动续期。**约定(2026-09-01 踩坑)**:后端 `authenticationEntryPoint` 必须返回**真实 HTTP 401 状态码**(JSON 体照写)——前端 axios 只对 HTTP 401 触发 refresh 续期,只写 JSON 不设状态码(默认 200)会让续期永不执行,用户每 2h 被"未登录或登录已过期"登出;前端 `request.js` 用共享 `refreshPromise` 让并发 401 共享一次刷新后各自重放(`_retried` 防死循环)。续期时两个 token 都轮换(滑动续期),仅连续 7 天不访问才需重新登录。
 - 接口前缀 `/api`;Knife4j 文档 `http://localhost:8080/api/doc.html`。
 - **权限模型**:`buildTokens` 返回 `permissions` 数组 + `isOps` 标志;前端 `userStore.hasPerm(code)`/`isOps`/`isPureOps`。OWNER 恒真,其余查 `SysRoleMapper.selectAuthCodesByUserAndFamily`。
 - **OPS 隔离**:`OpsAccessFilter` 只放行 OPS 到 `/api/ops/**`+`/api/auth/**`,其余 403;非 OPS 访问 /ops/** 一律 403;支持复合角色(OWNER+OPS)访问 `/api/ops/**`(查 OPS 角色绑定+5 分钟缓存)。
@@ -175,7 +176,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 | 模块 | Controller | Service | 关键表 | 要点 |
 |------|-----------|---------|--------|------|
-| 博客 | BlogController | BlogService | content_blog | 标签(逗号分隔)+ `category VARCHAR(50)` 自定义分类;`GET /blog/categories` DISTINCT;默认 visibility=FAMILY;marked v18 renderer h1→h2;列表/编辑/详情均带 category |
+| 博客 | BlogController | BlogService | content_blog/content_blog_category | 标签(逗号分隔)+ 分类树(V9.2);**初始分类(V9.6,2026-09-01)**:新建家庭自动注入 9 个默认分类(`BlogService.seedDefaultCategories`:生活随笔/家庭时光/旅行游记/美食记录/育儿亲子/健康运动/读书笔记/兴趣爱好/未分类,**未分类固定最后**),存量家庭由 migrations.sql 补种子;**"未分类"语义**:不选/清空分类统一落"未分类"(`CATEGORY_UNCATEGORIZED`,create/update 后端映射),空分类博客可见于分类计数;旧字符串分类由迁移收编入表变可编辑;默认 visibility=FAMILY;marked v18 renderer h1→h2;列表/编辑/详情均带 category |
 | 日记 | DiaryController | DiaryService | content_diary | **书架+翻书视图(V9.0)**:`/diary` 书架(每人一本封面网格,`/diary/book/:authorId` 翻书)——桌面双页信纸/移动单页,左右方向键+底部按钮翻页,目录跳转,紧凑连续排页(上一篇写完下一篇紧接),页眉 hover 编辑/删除;每页=页眉(首页)+18行×28px 正文裁剪窗口+页码脚;`measureDiaryLines` 离屏测行数分页;**信纸涂鸦(V9.1)**:`utils/doodle.js` 矢量笔画引擎(签字笔/铅笔/蜡笔/荧光笔/画笔+像素橡皮/对象橡皮),编辑页笔盘选笔后直接画在信纸上,随日记存 `doodle` JSON 列,翻书查看随信纸分页显示;date 兼容 `yyyy-MM-dd HH:mm`(旧代码会 500);默认 visibility=FAMILY |
 | 相册 | AlbumController | AlbumService | content_photo_album | type=public/private;public→PUBLIC/private→FAMILY;软删;`share_token` 16 位混淆令牌,`GET /album/shared/{token}` 游客可看公开相册(需家庭 is_public=1);软删 |
 | 照片 | PhotoController | AlbumService | content_photo | 批量上传 `POST /album/{id}/photos`;`taken_at/location`;**硬删除**(`PhotoMapper.deletePhysicalById` XML DELETE 绕过全局 logic-delete)+ `FileService.deleteByUrl` 删磁盘文件;`source_path`(设备:相对路径)去重 |
@@ -286,11 +287,20 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
     - **缓存键**:`ihomy:{domain}:{id}`(如 `ihomy:user:1`、`ihomy:perms:1:1`、`ihomy:home:pub:1`)。
     - **短 TTL**:用户实体/权限码 5min;公开首页聚合 5min;天气/太阳位置按业务定。
     - **变更点必须显式 invalidate**:`ProfileController.update` → `invalidateUser`;`MemberController.setRole/remove` → `invalidatePerms`;`AuthService.switchFamily` → `invalidatePerms` + `invalidateUser`;`AuthService.joinFamily` → `invalidatePerms`;模块/照片变更 → `PublicController.invalidateHomeCache`。
-    - **不变数据走内存缓存**:`sys_home_module` 全局模块 `@PostConstruct` 加载 `volatile List`,家庭模块按 familyId 缓存 `ConcurrentHashMap`,变更时 evict。**不引 Caffeine 等库**(数据量小,内存够用)。
+    - **不变数据走内存缓存**:`sys_home_module` 全局模块 `@PostConstruct` 预热 + **懒加载兜底**(`globalLoaded` 双检锁——2026-09-01 生产启动 mapper 偶发未就绪致全局模块永久为空、导航只剩设置/运维;预热失败不再致命,首次查询自动加载),家庭模块按 familyId 缓存 `ConcurrentHashMap`,变更时 evict。**不引 Caffeine 等库**(数据量小,内存够用)。
     - **敏感数据不缓存**:成员视图的 `/public/home`(含 stats/photos)不缓存,只缓存非成员视图。
 11. **UPDATE 不先 select**(强制):回写冗余字段(如 `like_count`)用 `LambdaUpdateWrapper.eq(id).set(field, value).update(null)`,不要 `selectById` 再 `updateById`(省一次查询)。参考 `ContentLikeService.syncCount`。
 12. **文件上传流式**(强制):大文件(>1MB)禁止 `file.getBytes()` 全量入堆(生产 `-Xmx384m` 上传 200MB 即 OOM)。**用 `MultipartFile` 重载 + `transferTo` + `Files.copy` 兜底**。FileService 已提供 4 个流式重载(`upload`/`uploadVideo`/`uploadBook` 通用+图片+视频+电子书),Controller 必须传 `MultipartFile` 不调 `getBytes()`。
-13. **JVM/连接池配置**(基线):`spring.threads.virtual.enabled: true`(JDK21 虚拟线程,Tomcat 自动用);HikariCP `maximum-pool-size: 20` + `minimum-idle: 5` + `connection-timeout: 3000`;`mybatis.sql: warn`(生产静默 SQL 日志)。
+13. **JVM/连接池配置**(基线):`spring.threads.virtual.enabled: true`(JDK21 虚拟线程,Tomcat 自动用);HikariCP `maximum-pool-size: 20` + `minimum-idle: 5` + `connection-timeout: 3000`。
+14. **日志规范**(强制,详见 `docs/日志规范.md`):
+    - **三类文件**:access(客户端调接口,`AccessLogFilter` 自动)/server(内部流程+SQL+ERROR 堆栈,业务代码 `log.xxx()` 自动)/thirdparty(三方出站,`ThirdPartyHttp` 统一封装);按天滚动保留 `app.log-retention-days`(默认 7)天。
+    - **六要素**:时间/级别/线程/[tid]/位置(logger)/内容;消息体覆盖 谁/做什么/入参/结果/耗时。
+    - **tid 贯穿**:HTTP 自动(`TraceIdFilter`→MDC);@Async 自动(`AsyncConfig` MDC TaskDecorator);WS 每消息独立 tid;自管线程池必须配同款 TaskDecorator。
+    - **三方调用一律走 `ThirdPartyHttp.get()`**(自动 thirdparty 日志+URL/头脱敏);流式下载参考 `StorageService.baiduOpen` 手动打 `Loggers.thirdParty()`。
+    - **报错必须带堆栈**:`log.error("xx, param={}", p, e)`(e 恒为最后一个参数);禁止 `e.printStackTrace()` 和只打 `e.getMessage()`。
+    - **级别**:ERROR=需人工介入(带堆栈)/WARN=可自动恢复需关注/INFO=关键业务节点/DEBUG=细节(SQL 恒 DEBUG 只进 server 文件)。
+    - **新敏感字段进 `AccessLogFilter.SENSITIVE_JSON` 打码清单**(password/token/captcha 等)。
+    - **运维「详细日志」**:`GET /ops/logs/trace?tid=` 按tid扫三类文件;操作日志 TID 列可点;前端 5xx 报错 toast 自带 `[tid:xxx]`。排查方法论见 `docs/日志问题分析方法.md`。
 
 ### 前端规范
 
@@ -660,7 +670,7 @@ INSERT INTO sys_dict_item ... book_format/borrow_status;
 | `api/index.js` | `addCategory(name, parentId)` / `renameCategory(id, name, parentId)` / `deleteCategory(id, mode)` |
 | `i18n/zh-CN.js` + `en.js` | 新增 `sortRecent`/`sortViews`/`articlesUnit`/`parentCategory`/`rootCategory` |
 
-**博客分类树规则**:`content_blog_category` 表用 `parent_id` 自引用(NULL=顶级),`name` 只存本级名称;后端 `categories()` 返回扁平树 `{id, name, parentId, path, depth, childCount}`;`content_blog.category` 列存全路径(如 `技术/前端`)用于筛选;`renameCategory(id, name, parentId)` 可改名+移父级(防环校验),级联更新子分类博客路径。前端用 `el-cascader`(`checkStrictly + emitPath: false`)做分类选择/筛选,编辑时排除当前分类及其后代防环。
+**博客分类树规则**:`content_blog_category` 表用 `parent_id` 自引用(NULL=顶级),`name` 只存本级名称;后端 `categories()` 返回扁平树 `{id, name, parentId, path, depth, childCount}`;`content_blog.category` 列存全路径(如 `技术/前端`)用于筛选;`renameCategory(id, name, parentId)` 可改名+移父级(防环校验),级联更新子分类博客路径。前端用 `el-cascader`(`checkStrictly + emitPath: false`)做分类选择/筛选,编辑时排除当前分类及其后代防环。**未分类与初始分类(V9.6,2026-09-01)**:新建家庭自动注入 9 个默认分类(`BlogService.seedDefaultCategories`,注册/建家庭两入口,未分类固定最后);不选/清空分类统一落"未分类"(`CATEGORY_UNCATEGORIZED`,后端 create/update 映射,空分类博客可见于分类计数);存量家庭与旧字符串分类由 migrations.sql 收编(补种子+空分类归未分类+旧字符串建为顶级分类 sort 90 变可编辑)。
 
 ##### 日记本书架+翻书视图(V9.0)
 
@@ -955,6 +965,37 @@ CREATE TABLE sys_media_server (
 
 **映射规则(music 分支)**:影子曲目 = `content_music` 行,`url` 存 `storage://{deviceId}/{path}?fsid={fsId}`、`source_path` 存 `dev:{deviceId}:{path}` 去重键、`source_dir` 存映射根目录;平铺无层级容器,来源经工具栏筛选区分(本地上传/外链/设备);删除映射曲目=物理删记录(设备文件永不动,歌单关联行连带清理);刷新=按 source_dir 反查重扫,prune 仅清 `dev:{id}:{rootDir}/` 前缀下消失的记录。**播放地址每次切歌现签**(签名 10 分钟过期,列表不解析——MusicPlayer/Music 页两处都走 `GET /music/{id}/play-url`)。已知上限:设备上的 FLAC/OGG/WMA 在 iOS Safari 不支持(Chrome/Edge 支持 FLAC/OGG),与放映厅 mkv 同理;映射曲目无 ID3 元数据/封面(仅文件名)。**冒烟已验证**:映射 3 文件(递归子目录+忽略非音频)/prune/刷新/删除保留设备文件/签名播放 200/本地曲目回归;**live DB 同步**:migrations.sql music 段(deploy.ps1 流水线自动执行)。**测试库注意**:sys_storage_device id=7(CTDev)root_path 已指向已删除的临时目录(遗留垃圾,用户自行处理)。
 
+##### 日志追溯体系(backend_logs 分支,2026-09-01,未合 main 不发布生产)
+
+| 文件 | 改动 |
+|------|------|
+| `logback-spring.xml`(新) | 三类日志文件分流:`logs/{access,server,thirdparty}/ihomy-*.log`,按天滚动(TimeBasedRollingPolicy,maxHistory=`app.log-retention-days` 默认 7,totalSizeCap 1/2/1GB,cleanHistoryOnStart);六要素 pattern `[tid:%X{traceId:-}]`;AsyncAppender(neverBlock 队满丢日志不阻塞业务);`mybatis.sql` DEBUG 只进 server 文件;`mybatis.sql.internal` 压 INFO 防框架会话管理噪音;控制台不含 SQL |
+| `application.yml` | 删 `logging.file.name/pattern`(归 logback);新增 `logging.file.path`(基线 /opt/ihomy/logs,开发 external.yml 覆盖)+ `app.log-retention-days: 7`;`mybatis.sql: debug`(SQL 恒开) |
+| `common/Loggers.java`(新) | 三类日志 logger 入口:`access()`/`thirdParty(service)`;业务日志仍用 @Slf4j(自动进 server) |
+| `common/Ips.java`(新) | 真实 IP 解析(AccessLogFilter/OperationLogAspect 共用,后者私有方法删除) |
+| `common/ThirdPartyHttp.java`(新) | 三方 GET 统一封装:`>>>` 请求/`<<<` 响应(status/costMs/body 截断 1KB)/`!!!` 异常带堆栈;URL query token 类参数与 Authorization 头打码;gzip 自处理;失败抛 IOException 由调用方兜底 |
+| `filter/AccessLogFilter.java`(新) | 每请求一条 access 日志:method/URI(含 query)/user(JwtAuthenticationFilter 放的请求属性)/ip/status/业务code/cost/req/resp;入参捕获 4KB(流式旁路,multipart 只记长度)、响应 2KB(>512 字符只记 code+message);password/token/captcha 等打码;失败(HTTP≥400/code≠0)或慢(>3s)自动升 WARN;WS 握手跳过流包装(防破坏 Tomcat 协议升级) |
+| `filter/CaptureRequestWrapper.java` + `CaptureResponseWrapper.java`(新) | 请求/响应体截断捕获(tee 到 cap 字节封顶,大文件上传下载零额外内存;响应边写边透传不缓冲) |
+| `config/AsyncConfig.java`(新) | @Async 执行器:虚拟线程 + MDC TaskDecorator(提交线程 tid 复制到异步线程,操作日志落库/映射任务的 SQL 皆带发起请求 tid) |
+| `config/SqlStatementLog.java` | 内部类分流:`org.mybatis/org.apache.ibatis` 开头的框架 logger 挂 `mybatis.sql.internal.` 前缀(压回 INFO,每条 SQL 少 4-6 行会话管理噪音) |
+| `websocket/ChatWebSocketHandler.java` | 每条 WS 消息独立 16 位 tid(MDC put/remove 包裹处理);access 日志补 WS 消息行(user/family/bytes/content 截断 200) |
+| `config/WsHandshakeInterceptor.java` | attributes 补 username(WS access 日志用) |
+| `security/JwtAuthenticationFilter.java` | 认证成功把 userId/username 放请求属性(SecurityContext 在 filter 返回前已被清理,access 日志取不到) |
+| `service/WeatherService.java` | callApi/resolveLocation 出站改走 ThirdPartyHttp(weather/ipapi);删自带 HttpURLConnection 与重复日志 |
+| `service/SunService.java` | ip-api 改走 ThirdPartyHttp(删 RestClient) |
+| `controller/DailyController.java` | Bing 代理改走 ThirdPartyHttp(删 HttpClient) |
+| `service/StorageService.java` | httpGetJson 改走 ThirdPartyHttp(baidu);baiduOpen dlink 流式手动打 thirdparty 日志(fsId/status/len/costMs,失败 `!!!`) |
+| `service/OpsService.java` + `controller/OpsController.java` | `GET /ops/logs/trace?tid=&date=`:扫三类文件按 tid 精确匹配,行头正则解析(时间/线程/tid/级别/logger/消息),堆栈续行归入上一条,按时间合并排序返回(条数上限 3000、单条消息 16KB 截断);tid 格式校验防滥用 |
+| `frontend/src/api/index.js` | `opsApi.traceLogs` |
+| `frontend/src/views/ops/Ops.vue` | 新增「详细日志」tab(tid+日期查询,来源/级别标签着色,ERROR/WARN 左边条,mono 消息区 420px 滚动);操作日志表格 TID 列点击跳详细日志并按该行日期自动查询;支持 `/ops?tab=trace&tid=xxx&date=` 直达;onMounted 并行加载 |
+| `frontend/src/api/request.js` | 5xx 业务码与 HTTP 错误 toast 前缀 `[tid:xxx]`(取响应头 X-Trace-Id,报障直接拿 tid 检索) |
+| `config/CorsConfig.java` | 暴露 `X-Trace-Id` 响应头(前端可读) |
+| `i18n/zh-CN.js` + `en.js` | ops.* 新增 12 条(traceLogs/tidPlaceholder/traceDate/traceEmpty/traceTruncated/traceCount/tidJump/source_access/server/thirdparty) |
+| `docs/日志规范.md`(新) | 开发规范:三类文件/六要素/tid 规则/级别标准/三方走 ThirdPartyHttp/堆栈写法/脱敏清单/保留策略 |
+| `docs/日志问题分析方法.md`(新) | 排查方法论:拿 tid 四途径→详细日志页→四步分析(access 定请求/code 分流/server 找根因/thirdparty 排外因)+ 案例 + 终端 grep 命令 + 常见问题速查表 |
+
+**设计决策**:①日志不入库不上 ES——2GB VPS 单实例,文件按天滚动+tid 精确匹配扫描足够(操作日志表已有 trace_id 列做索引入口);②文本格式非 JSON——终端 grep 可读优先,多行堆栈靠解析器"行头时间戳判定新条目"归并;③响应捕获用旁路 tee 封顶截断(2KB)而非 ContentCaching*Wrapper——后者整包缓冲,GB 级文件下载必 OOM;④SQL 日志恒开 DEBUG——用户明确要求记录所有 SQL+入参,量靠按天滚动+2GB 上限兜底;⑤WS 握手不包装请求/响应流——Tomcat 协议升级对包装敏感,消息级日志由 Handler 每消息独立 tid 补记。**冒烟已验证**:三文件生成/登录+博客列表 SQL 带 tid/@Async 落库 SQL 带 tid(ihomy-async 线程)/weather 出站进 thirdparty 文件/密码 token 打码/失败请求升 WARN/500 异常堆栈 119 行归并成单条目/`/ops/logs/trace` 跨文件检索/code≠0 拦截。**开发环境注意**:external.yml 的 `logging.file.name` 已改 `logging.file.path: D:\WorkSpace\ihomy\logs`(三类子目录自动创建);控制台不再输出 SQL,看 SQL 请 tail server 文件。
+
 ## 文件存储策略
 
 - **当前阶段(开发期)**:本地磁盘存储(`file.upload-dir`),零成本零内存,FileService 已实现,开箱即用。Nginx `/files/` 托管静态目录(注意负向断言正则 `location ~* ^/(?!files/).+\.(...)$` 排除 /files/)。
@@ -1015,6 +1056,8 @@ CREATE TABLE sys_media_server (
 - `README.md`(启动说明 + Windows 一键启动脚本用法); `Windows部署指导.md` / `Linux部署指导.md`(生产部署 NSSM/systemd/Nginx/Let's Encrypt/Docker Compose)
 - `docs/需求规格说明书.docx` — 完整需求文档(功能模块清单+实现方式+未实现规划+数据库设计+接口设计+修订记录)。**唯一正式版**,原 `.md` 已合并删除(内容以业务域重新组织,修正表数量为 53 张/实体 44 个,含移动端兼容性 V8.0 §4.10)
 - `docs/UI设计提示词.md` — 沉浸式首页 UI 设计完整规格(可作为 AI 提示词重新生成)
+- `docs/日志规范.md` — 日志开发规范(三类文件/六要素/tid 规则/级别标准/三方调用/脱敏清单)
+- `docs/日志问题分析方法.md` — 报错排查方法论(拿 tid → 详细日志页 → 四步分析;面向运维/业务人员)
 - `scripts/start-all.ps1`(Windows 一键启动前后端,双击 `start.bat` 调用,设 `IHOMY_CONFIG_PATH` 环境变量)/ `start-db.ps1`(Docker 拉起 MySQL+Redis+自动导 schema.sql,端口 6306/6379,与生产一致); `config/mysql/my.cnf`(端口 6306,内存优化,仅 Linux 本机部署用)
 - 完整接口清单:见 `docs/需求规格说明书.docx` 第 7 章与各功能小节。代码事实以 `backend/src/main/java` + `resources/schema.sql` 为准,如需检索先 `grep` 再动手。
 

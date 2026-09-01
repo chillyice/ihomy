@@ -907,7 +907,7 @@ ps -eo pid,rss,cmd --sort=-rss | grep -E 'java|mysql|redis|nginx|dockerd' | head
 | 上传根目录 `file.upload-dir` | `D:/WorkSpace/ihomy/uploads` | `/opt/ihomy/uploads` | 已由 profile 隔离,无需手动改 |
 | DB 里的文件 URL(`/files/...`) | 相对 URL 与物理根解耦 | 不变,原样用 | 无需动作 |
 | 存储设备 `sys_storage_device.root_path`(DB 数据) | 配的 Windows 盘路径 | 需改成 Linux 路径(如 `/mnt/nas/photo`) | 上线后在存储管理页重新添加/编辑设备,或 SQL UPDATE |
-| 日志路径 | `./logs/ihomy.log`(相对工作目录) | systemd 已配 /var/log/ihomy | 无需动作 |
+| 日志路径 | `D:\WorkSpace\ihomy\logs\{access,server,thirdparty}\`(external.yml 覆盖) | `/opt/ihomy/logs/{access,server,thirdparty}/`(三类分流,按天滚动) | 已由 external.yml/基线隔离,无需手动改 |
 | Nginx `/files/` alias | 指向 Windows uploads | `/opt/ihomy/uploads/` | 部署时 nginx 配置(一次性) |
 
 代码侧已验证平台无关,无需改动:`Paths.get`/`Files` 全平台自适应;上传文件名的清洗正则兼容 UTF-8 中文;
