@@ -79,26 +79,23 @@
             </div>
           </template>
 
-          <!-- 天气 -->
+          <!-- 天气:精简展示(图标+当前温度+今日最低最高+文字);点击进入天气详情页 -->
           <template v-else-if="w.id === 'weather'">
             <div class="card-head">天气</div>
-            <div class="card-scroll weather-scroll">
+            <div class="card-scroll weather-scroll weather-clickable" @click="!editMode && $router.push('/weather')">
               <div v-if="weather" class="weather-main">
                 <div class="weather-city">{{ weather.city || '济南' }}</div>
-                <div class="weather-current"><i v-if="weather.iconCode" :class="'qi-' + weather.iconCode" class="weather-icon-float"></i><span class="weather-temp-large">{{ weather.temp }}<span class="temp-unit">°</span></span></div>
+                <div class="weather-current">
+                  <i v-if="weather.iconCode" :class="'qi-' + weather.iconCode" class="weather-icon-float"></i>
+                  <span class="weather-temp-large">{{ weather.temp }}<span class="temp-unit">°</span></span>
+                  <span v-if="todayHigh != null || todayLow != null" class="weather-hilo">
+                    <span class="wh-item wh-hi">↑ {{ todayHigh ?? '-' }}°</span>
+                    <span class="wh-item wh-lo">↓ {{ todayLow ?? '-' }}°</span>
+                  </span>
+                </div>
                 <div class="weather-condition">{{ weatherText }}</div>
               </div>
               <div v-else class="weather-loading-text">天气加载中…</div>
-              <div v-if="weatherDetailData" class="weather-detail">
-                <div v-if="weatherDetailData.warning && weatherDetailData.warning.length" class="wd-section">
-                  <div v-for="w in weatherDetailData.warning" :key="w.id" class="wd-warning-item"><span class="wd-warn-type">{{ w.typeName }} {{ w.level }}预警</span><span class="wd-warn-text">{{ w.text }}</span></div>
-                </div>
-                <div v-if="weatherDetailData.daily" class="wd-section">
-                  <div class="wd-title">未来三天</div>
-                  <div class="wd-forecast"><div v-for="d in weatherDetailData.daily.slice(0, 3)" :key="d.fxDate" class="wd-fc-card"><span class="wd-fc-date">{{ formatFcDate(d.fxDate) }}</span><i :class="'qi-' + d.iconDay" class="wd-fc-icon"></i><span class="wd-fc-temp">{{ d.tempMin }}° / {{ d.tempMax }}°</span><span class="wd-fc-text">{{ d.textDay }}</span></div></div>
-                </div>
-                <div v-if="weatherDetailData.air" class="wd-section wd-air"><span class="wd-air-label">空气</span><span class="wd-air-aqi">{{ weatherDetailData.air.aqi }}</span><span class="wd-air-cat">{{ weatherDetailData.air.category }}</span><span class="wd-air-pm">PM2.5 {{ weatherDetailData.air.pm2p5 }}</span></div>
-              </div>
             </div>
           </template>
 
@@ -284,7 +281,9 @@ const allPhotos = ref([])
 const viewerVisible = ref(false)
 const viewerIdx = ref(0)
 const weather = computed(() => sunLight?.weather.value)
-const weatherDetailData = ref(null)
+const weatherDetail = computed(() => sunLight?.weatherDetail?.value)
+const todayHigh = computed(() => weatherDetail.value?.daily?.[0]?.tempMax ?? null)
+const todayLow = computed(() => weatherDetail.value?.daily?.[0]?.tempMin ?? null)
 const anniversaries = ref([])
 const pointsStats = ref({})
 const reminders = ref([])
@@ -304,7 +303,6 @@ const loadWishes = async () => { if (userStore.isLoggedIn) { try { wishes.value 
 const searchItems = async () => { if (!itemKeyword.value.trim()) { searchResults.value = []; searched.value = false; return }; try { searchResults.value = await itemApi.list({ keyword: itemKeyword.value.trim() }); searched.value = true } catch (e) { searchResults.value = []; searched.value = true } }
 const loadTodayRecipes = async () => { if (userStore.isLoggedIn) { try { const data = await kitchenApi.menu(); todayRecipes.value = data?.todayRecommend || [] } catch (e) {} } }
 const doCheckin = async () => { try { const r = await pointsApi.checkin(); ElMessage.success(`签到成功 +${r.points} 积分,连续 ${r.streak} 天`); await loadPoints() } catch (e) {} }
-const loadWeatherDetail = async () => { try { const res = await fetch('/api/public/weather/detail'); if (res.ok) { const json = await res.json(); if (json.code === 0 && json.data) weatherDetailData.value = json.data } } catch (e) {} }
 const loadMusic = async () => { try { const r = await musicApi.getBackground(); musicPlaylist.value = r?.playlist || null; musicTracks.value = r?.tracks || [] } catch (e) {} }
 
 const SEVEN_DAYS = 7 * 86400000
@@ -337,7 +335,6 @@ const goFeed = (f) => { if (f.type === 'blog' && f.id) router.push(`/blog/${f.id
 const rewardIcon = (t) => t === 1 ? '🎁' : t === 2 ? '📦' : '⭕'
 const taskStatusLabel = (s) => ({ 0: '待领取', 1: '进行中', 2: '待确认', 3: '已完成', 4: '已取消' }[s] || '')
 const weatherText = computed(() => weather.value?.text || '')
-const formatFcDate = (dateStr) => { if (!dateStr) return ''; const d = new Date(dateStr); const weekdays = ['日', '一', '二', '三', '四', '五', '六']; return `${d.getMonth() + 1}/${d.getDate()} 周${weekdays[d.getDay()]}` }
 
 const homeId = computed(() => route.query.home_id || '')
 const hid = computed(() => route.query.hid || '')
@@ -483,7 +480,7 @@ onDrop((type, x, y) => {
 })
 
 onMounted(() => {
-  loadAll(); loadWeatherDetail(); loadPoints(); loadReminders(); loadBookSummary(); loadWishes(); loadTodayRecipes(); loadMusic()
+  loadAll(); loadPoints(); loadReminders(); loadBookSummary(); loadWishes(); loadTodayRecipes(); loadMusic()
   nextTick(() => { if (!root.value) return; ctx = gsap.context(() => { gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, ease: 'power2.out' }) }, root.value) })
 })
 onBeforeUnmount(() => { ctx?.revert() })
@@ -612,8 +609,9 @@ html.dark .today-reminder:hover { background: rgba(255,255,255,0.04); }
 .tr-title { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tr-time { font-size: 11px; opacity: 0.35; font-variant-numeric: tabular-nums; }
 
-/* 天气 */
+/* 天气(精简:图标+当前温度+今日最低最高+文字;点击进详情页) */
 .weather-scroll { text-align: center; }
+.weather-clickable { cursor: pointer; }
 .weather-main { padding: 4px 0 10px; }
 .weather-city { font-size: 13px; opacity: 0.5; }
 .weather-current { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 4px 0 2px; }
@@ -621,20 +619,12 @@ html.dark .today-reminder:hover { background: rgba(255,255,255,0.04); }
 @keyframes icon-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
 .weather-temp-large { font-size: 42px; font-weight: 700; line-height: 1; }
 .temp-unit { font-size: 24px; opacity: 0.6; }
+.weather-hilo { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; margin-left: 4px; }
+.wh-item { font-size: 12px; font-weight: 600; line-height: 1.1; opacity: 0.75; font-variant-numeric: tabular-nums; }
+.wh-hi { color: #c07a4a; }
+.wh-lo { color: #6a8ab0; }
 .weather-condition { font-size: 14px; opacity: 0.7; font-weight: 500; }
 .weather-loading-text { font-size: 13px; opacity: 0.4; padding: 20px; }
-.weather-detail { text-align: left; padding: 0 12px 12px; }
-.wd-section { margin-bottom: 8px; }
-.wd-section:last-child { margin-bottom: 0; }
-.wd-title { font-size: 11px; opacity: 0.4; margin-bottom: 4px; font-weight: 600; text-transform: uppercase; }
-.wd-forecast { display: flex; gap: 4px; }
-.wd-fc-card { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px; border-radius: 10px; background: rgba(255,255,255,0.2); }
-html.dark .wd-fc-card { background: rgba(255,255,255,0.05); }
-.wd-fc-date { font-size: 10px; opacity: 0.5; } .wd-fc-icon { font-size: 24px; } .wd-fc-temp { font-size: 11px; font-weight: 600; } .wd-fc-text { font-size: 9px; opacity: 0.5; }
-.wd-air { display: flex; align-items: center; gap: 8px; background: rgba(100,200,100,0.1); border-radius: 10px; padding: 6px 10px; }
-.wd-air-label { font-size: 11px; opacity: 0.5; } .wd-air-aqi { font-weight: 700; font-size: 16px; } .wd-air-cat { font-size: 11px; opacity: 0.7; } .wd-air-pm { font-size: 10px; opacity: 0.4; margin-left: auto; }
-.wd-warning-item { background: rgba(255,180,100,0.15); border-radius: 10px; padding: 6px 10px; margin-bottom: 4px; }
-.wd-warn-type { font-weight: 600; color: #d97706; display: block; font-size: 12px; } .wd-warn-text { font-size: 11px; opacity: 0.7; display: block; margin-top: 2px; line-height: 1.4; }
 
 /* 纪念日 */
 .anni-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 6px; border-bottom: 1px solid rgba(58,46,34,0.05); cursor: pointer; transition: background 0.2s; }

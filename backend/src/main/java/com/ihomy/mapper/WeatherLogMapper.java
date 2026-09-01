@@ -17,4 +17,8 @@ public interface WeatherLogMapper extends BaseMapper<WeatherLog> {
                                               @Param("end") LocalDateTime end,
                                               @Param("fmt") String fmt,
                                               @Param("apiTypes") List<String> apiTypes);
+
+    /** API 类型分布(饼图):按类型统计调用量 */
+    List<Map<String, Object>> selectTypeDistribution(@Param("start") LocalDateTime start,
+                                                      @Param("end") LocalDateTime end);
 }

@@ -26,6 +26,7 @@ const routes = [
   { path: '/book', name: 'Book', component: () => import('@/views/book/Book.vue'), meta: { public: true } },
   { path: '/tree', name: 'Tree', component: () => import('@/views/tree/Tree.vue'), meta: { public: true } },
   { path: '/cascade', name: 'Cascade', component: () => import('@/views/cascade/Cascade.vue'), meta: { public: true } },
+  { path: '/weather', name: 'Weather', component: () => import('@/views/weather/Weather.vue'), meta: { public: true } },
   { path: '/chat', name: 'Chat', component: () => import('@/views/chat/Chat.vue'), meta: { requiresAuth: true } },
   { path: '/settings', name: 'Settings', component: () => import('@/views/Settings.vue'), meta: { requiresAuth: true } },
   // 百度网盘 OAuth 授权回调页(须与百度开放平台注册的「授权回调页地址」一致)

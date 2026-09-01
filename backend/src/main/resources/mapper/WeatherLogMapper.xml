@@ -15,4 +15,13 @@
         GROUP BY time_bucket
         ORDER BY time_bucket
     </select>
+
+    <!-- API 类型分布(饼图):按类型统计调用量 -->
+    <select id="selectTypeDistribution" resultType="java.util.HashMap">
+        SELECT api_type AS apiType, COUNT(*) AS count
+        FROM sys_weather_log
+        WHERE created_at &gt;= #{start} AND created_at &lt; #{end}
+        GROUP BY api_type
+        ORDER BY count DESC
+    </select>
 </mapper>

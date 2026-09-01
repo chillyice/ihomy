@@ -359,6 +359,7 @@ export function useSunLight() {
 
   // 拉取真实天气并同步到光影系统(非光照测试模式)
   const loadWeather = async () => {
+    loadWeatherDetail() // 详情(预警+今日高低温)与简版天气并行,供侧边栏迷你天气/首页天气卡片
     try {
       const res = await fetch('/api/public/weather')
       if (!res.ok) return
@@ -376,6 +377,16 @@ export function useSunLight() {
           setWeather('clear', 0)
         }
       }
+    } catch (e) {}
+  }
+
+  // 拉取天气详情(now/7d/24h/预警/空气/指数;后端 Redis 缓存 30 分钟,失败静默)
+  const loadWeatherDetail = async () => {
+    try {
+      const res = await fetch('/api/public/weather/detail')
+      if (!res.ok) return
+      const json = await res.json()
+      if (json.code === 0 && json.data) weatherDetail.value = json.data
     } catch (e) {}
   }
 

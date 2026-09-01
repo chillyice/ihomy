@@ -966,7 +966,21 @@ CREATE TABLE sys_media_server (
 
 **映射规则(music 分支)**:影子曲目 = `content_music` 行,`url` 存 `storage://{deviceId}/{path}?fsid={fsId}`、`source_path` 存 `dev:{deviceId}:{path}` 去重键、`source_dir` 存映射根目录;平铺无层级容器,来源经工具栏筛选区分(本地上传/外链/设备);删除映射曲目=物理删记录(设备文件永不动,歌单关联行连带清理);刷新=按 source_dir 反查重扫,prune 仅清 `dev:{id}:{rootDir}/` 前缀下消失的记录。**播放地址每次切歌现签**(签名 10 分钟过期,列表不解析——MusicPlayer/Music 页两处都走 `GET /music/{id}/play-url`)。已知上限:设备上的 FLAC/OGG/WMA 在 iOS Safari 不支持(Chrome/Edge 支持 FLAC/OGG),与放映厅 mkv 同理;映射曲目无 ID3 元数据/封面(仅文件名)。**冒烟已验证**:映射 3 文件(递归子目录+忽略非音频)/prune/刷新/删除保留设备文件/签名播放 200/本地曲目回归;**live DB 同步**:migrations.sql music 段(deploy.ps1 流水线自动执行)。**测试库注意**:sys_storage_device id=7(CTDev)root_path 已指向已删除的临时目录(遗留垃圾,用户自行处理)。
 
-##### 日志追溯体系(backend_logs 分支,2026-09-01,未合 main 不发布生产)
+##### 天气系统迭代(weather 分支,V9.10,2026-09-01)
+
+| 文件 | 改动 |
+|------|------|
+| `WeatherService.java` + `WeatherLogMapper(.xml)` + `OpsController.java` | 配额 50000;`GET /weather/type-distribution?range=` 类型分布(饼图数据源);detail 的 now 增加 `nowFull` 原始实况节点(体感/湿度/风/气压/能见度等,塞进 now 缓存零额外调用);**air/warning 迁移 v1 新版 API**(`/airquality/v1/now/{lat}/{lon}` 映射旧字段形状、`/warning/v1/now?location={LocationID}`+`resolveCityId` geo 查城市 ID 回退济南)——v7 air/warning 已被和风弃用(403 Deprecated);**⚠ v1 接口实测 404 空 body、geo 403 Security Restriction,疑似控制台凭证安全设置未放行新 API,待用户在控制台确认**;parseApiType 补 /airquality//warning/ 前缀 |
+| `views/ops/Ops.vue` + `api/index.js` + i18n | 折线图**悬浮提示**(透明列 hover→竖线+双圆点+tooltip 时间/调用/失败,比例定位+边缘 clamp);**API 类型占比饼图**(SVG path 扇区+引导线+标签,与折线图并排 charts-row,共用时间范围,单一类型 100% 画整圆);本月配额 4 卡一行+**横向进度条**(70%/90% 阈值变金/红) |
+| `utils/useSunLight.js` | `loadWeatherDetail()`:全局拉取天气详情(预警+今日高低温,与简版天气并行,30 分钟随 loadWeather 刷新);Home 不再自己 fetch detail |
+| `components/AppSidebar.vue` | **迷你天气**(非首页时占编辑按钮位置):天气图标+当前温度+预警徽标(最高级别颜色 WarningFilled 三角叹号,el-tooltip 悬浮显示全部预警:类型/级别/起止时间),点击进 /weather;`utils/dict.js` 加 `WARN_LEVEL_ORDER/warnLevelColor/topWarning`(白<蓝<黄<橙<红) |
+| `views/Home.vue` | 天气组件精简:图标+当前温度+**右侧上下排列今日最高最低**(暖橙/冷蓝)+文字说明;移除预警/未来三天/空气区块与自有 detail 拉取;点击组件进 /weather |
+| `views/weather/Weather.vue`(新)+ `router/index.js` + i18n | **天气详情页 `/weather`**(public):顶部实况(大图标+温度+高低+9 项指标网格)→气象预警(级别色左边条)→24h 横滑卡片→7 天表格(日出日落/紫外线)→空气(AQI+6 污染物)→生活指数→分钟降水;复用光影层 detail 缓存避免重复请求;weatherPage.* 中英词条 |
+
+**规则**:侧边栏迷你天气=非首页路由专属(首页显示编辑按钮);预警颜色白/蓝/黄/橙/红(`utils/dict.warnLevelColor`),未知级别按橙;首页天气组件只做极简展示(点击进详情页),完整数据都在 /weather。
+
+##### 日志追溯体系(backend_logs 分支,2026-09-01,已合 main)
+
 
 | 文件 | 改动 |
 |------|------|
