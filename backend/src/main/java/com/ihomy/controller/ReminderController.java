@@ -61,6 +61,7 @@ public class ReminderController {
     }
 
     @Operation(summary = "完成/取消完成")
+    @OperationLog(module = "REMINDER", operationType = "UPDATE", description = "提醒完成切换")
     @PostMapping("/{id}/toggle-done")
     public Result<Void> toggleDone(@PathVariable Long id) {
         reminderService.toggleDone(id, current().getFamilyId());

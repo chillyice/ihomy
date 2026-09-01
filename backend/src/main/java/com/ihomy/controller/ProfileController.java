@@ -82,6 +82,7 @@ public class ProfileController {
 
     /** 删除身份标签(恢复默认无标签) */
     @Operation(summary = "取消身份标签")
+    @OperationLog(module = "PROFILE", operationType = "DELETE", description = "删除身份标签")
     @DeleteMapping("/label")
     public Result<Void> removeLabel() {
         SysUser user = securityHelper.currentUser();

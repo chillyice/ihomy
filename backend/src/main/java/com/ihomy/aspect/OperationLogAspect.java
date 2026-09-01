@@ -61,6 +61,9 @@ public class OperationLogAspect {
             throw e;
         } finally {
             logEntry.setCostTime(System.currentTimeMillis() - start);
+            // 业务操作日志双写:落库(原有,运维"操作日志"页)+ server 日志一行(带 tid,
+            // 所有 @OperationLog 端点的关键业务节点自动进六要素日志,无需业务代码手动打)
+            bizLog(logEntry);
             try {
                 operationLogService.save(logEntry);
             } catch (Exception e) {
@@ -68,6 +71,24 @@ public class OperationLogAspect {
             }
         }
         return result;
+    }
+
+    /** server 日志一行:成功 INFO / 失败 WARN(带错误摘要),格式见 docs/日志规范.md */
+    private void bizLog(SysOperationLog logEntry) {
+        String operator = logEntry.getOperatorId() != null
+                ? logEntry.getOperatorName() + "#" + logEntry.getOperatorId() : "anonymous";
+        String action = logEntry.getModule() + "." + logEntry.getOperationType()
+                + (logEntry.getDescription() == null || logEntry.getDescription().isEmpty()
+                        ? "" : " " + logEntry.getDescription());
+        if (DictConst.LOG_FAILED.equals(logEntry.getResultStatus())) {
+            String err = logEntry.getErrorMsg();
+            OperationLogAspect.log.warn("[操作] {} 用户={} 结果=FAILED 耗时={}ms 错误={}",
+                    action, operator, logEntry.getCostTime(),
+                    err != null && err.length() > 200 ? err.substring(0, 200) : err);
+        } else {
+            OperationLogAspect.log.info("[操作] {} 用户={} 结果=SUCCESS 耗时={}ms",
+                    action, operator, logEntry.getCostTime());
+        }
     }
 
     /** 组装日志基础信息:注解内容 + 请求 IP/URL + 操作人(登录接口未登录,操作人留空) */

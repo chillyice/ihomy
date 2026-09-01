@@ -88,6 +88,7 @@ public class LibraryController {
     }
 
     @Operation(summary = "新增分类")
+    @OperationLog(module = "LIBRARY", operationType = "CREATE", description = "新建图书分类")
     @PostMapping("/categories")
     public Result<BookCategory> addCategory(@RequestBody Map<String, Object> body) {
         SysUser user = securityHelper.currentUser();
@@ -98,6 +99,7 @@ public class LibraryController {
     }
 
     @Operation(summary = "更新分类")
+    @OperationLog(module = "LIBRARY", operationType = "UPDATE", description = "重命名图书分类")
     @PutMapping("/categories/{id}")
     public Result<BookCategory> updateCategory(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         SysUser user = securityHelper.currentUser();
@@ -108,6 +110,7 @@ public class LibraryController {
     }
 
     @Operation(summary = "删除分类")
+    @OperationLog(module = "LIBRARY", operationType = "DELETE", description = "删除图书分类")
     @DeleteMapping("/categories/{id}")
     public Result<Void> deleteCategory(@PathVariable Long id, @RequestParam(defaultValue = "move") String mode) {
         SysUser user = securityHelper.currentUser();
@@ -214,6 +217,7 @@ public class LibraryController {
     }
 
     @Operation(summary = "更新阅读状态")
+    @OperationLog(module = "LIBRARY", operationType = "UPDATE", description = "图书阅读状态")
     @PutMapping("/{id}/borrow")
     public Result<BookBorrow> updateBorrow(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         SysUser user = securityHelper.currentUser();
@@ -243,6 +247,7 @@ public class LibraryController {
     }
 
     @Operation(summary = "新增书签")
+    @OperationLog(module = "LIBRARY", operationType = "CREATE", description = "添加书签")
     @PostMapping("/{id}/bookmarks")
     public Result<BookBookmark> addBookmark(@PathVariable Long id, @RequestBody Map<String, String> body) {
         SysUser user = securityHelper.currentUser();
@@ -251,6 +256,7 @@ public class LibraryController {
     }
 
     @Operation(summary = "删除书签")
+    @OperationLog(module = "LIBRARY", operationType = "DELETE", description = "删除书签")
     @DeleteMapping("/bookmarks/{bmId}")
     public Result<Void> deleteBookmark(@PathVariable Long bmId) {
         SysUser user = securityHelper.currentUser();

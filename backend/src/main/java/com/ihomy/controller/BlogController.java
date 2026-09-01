@@ -64,6 +64,7 @@ public class BlogController {
     }
 
     @Operation(summary = "新增分类")
+    @OperationLog(module = "BLOG", operationType = "CREATE", description = "新建博客分类")
     @PostMapping("/categories")
     public Result<Void> addCategory(@RequestBody Map<String, Object> body) {
         SysUser user = securityHelper.currentUser();
@@ -75,6 +76,7 @@ public class BlogController {
     }
 
     @Operation(summary = "更新分类")
+    @OperationLog(module = "BLOG", operationType = "UPDATE", description = "重命名博客分类")
     @PutMapping("/categories")
     public Result<Void> renameCategory(@RequestBody Map<String, Object> body) {
         SysUser user = securityHelper.currentUser();
@@ -87,6 +89,7 @@ public class BlogController {
     }
 
     @Operation(summary = "删除分类")
+    @OperationLog(module = "BLOG", operationType = "DELETE", description = "删除博客分类")
     @DeleteMapping("/categories")
     public Result<Void> deleteCategory(@RequestParam Long id, @RequestParam(defaultValue = "move") String mode) {
         SysUser user = securityHelper.currentUser();
