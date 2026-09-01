@@ -989,6 +989,8 @@ CREATE TABLE sys_media_server (
 | `service/OpsService.java` + `controller/OpsController.java` | `GET /ops/logs/trace?tid=&date=`:扫三类文件按 tid 精确匹配,行头正则解析(时间/线程/tid/级别/logger/消息),堆栈续行归入上一条,按时间合并排序返回(条数上限 3000、单条消息 16KB 截断);tid 格式校验防滥用 |
 | `aspect/OperationLogAspect.java` | **业务操作日志双写**:落库同时输出 server 日志一行 `[操作] MODULE.TYPE 描述 用户=xx#N 结果=SUCCESS/FAILED 耗时=Nms`(成功 INFO/失败 WARN 带错误摘要 200 字符截断)——@OperationLog 端点的关键业务节点自动进六要素日志 |
 | 7 个 Controller(Blog/Library/Music/Like/Profile/Reminder/Task) | 补齐 25 处缺漏的 `@OperationLog`(博客/图书分类 CRUD、音乐上传+外链+删除+歌单全套、点赞切换、身份标签删除、提醒完成切换、任务放弃);auth/refresh、chat/read、notification/read 属高频噪音端点刻意不加 |
+| `service/OpsService.java` + `controller/OpsController.java`(V9.8.1) | 访问量统计 `GET /ops/traffic/stats?startDate=&endDate=`(扫 access 文件正则聚合:总请求/失败/慢/独立用户/独立IP/平均耗时+24小时分布+接口Top15,范围上限14天,WS 消息行无 status 不计入);`GET /ops/logs/options`(distinct 模块/操作类型,多选下拉数据源);`/ops/logs` 的 module/operationType/result 改 List 多选 IN;`/ops/logs/trace` 加 sources/levels 过滤(级别过滤在 flush 时判定) |
+| `views/ops/Ops.vue` + `api/index.js` + i18n(V9.8.1) | 新增「访问统计」tab(日期范围+6 指标卡片+24h 柱状图 SVG 暖棕总/红失败叠层+接口 Top15 表,懒加载+`?tab=traffic` 直达);操作日志筛选改 `el-select multiple filterable`(模块/类型=动态选项,结果=固定 SUCCESS/FAILED);详细日志加日志类型/级别多选可搜索过滤 |
 | `frontend/src/api/index.js` | `opsApi.traceLogs` |
 | `frontend/src/views/ops/Ops.vue` | 新增「详细日志」tab(tid+日期查询,来源/级别标签着色,ERROR/WARN 左边条,mono 消息区 420px 滚动);操作日志表格 TID 列点击跳详细日志并按该行日期自动查询;支持 `/ops?tab=trace&tid=xxx&date=` 直达;onMounted 并行加载 |
 | `frontend/src/api/request.js` | 5xx 业务码与 HTTP 错误 toast 前缀 `[tid:xxx]`(取响应头 X-Trace-Id,报障直接拿 tid 检索) |

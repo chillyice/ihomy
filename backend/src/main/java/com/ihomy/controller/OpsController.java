@@ -55,28 +55,47 @@ public class OpsController {
         return Result.success(opsService.server());
     }
 
-    @Operation(summary = "操作日志检索(分页,支持时间/操作人/模块/关键字)")
+    @Operation(summary = "操作日志检索(分页,支持时间/操作人/模块多选/类型多选/结果多选/关键字)")
     @RequirePermission("ops:view")
     @GetMapping("/logs")
     public Result<IPage<SysOperationLog>> logs(
             @RequestParam(defaultValue = "1") int current,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) Long operatorId,
-            @RequestParam(required = false) String module,
-            @RequestParam(required = false) String operationType,
+            @RequestParam(required = false) List<String> module,
+            @RequestParam(required = false) List<String> operationType,
+            @RequestParam(required = false) List<String> result,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false) String keyword) {
-        return Result.success(opsService.logs(current, size, operatorId, module, operationType, startDate, endDate, keyword));
+        return Result.success(opsService.logs(current, size, operatorId, module, operationType, result, startDate, endDate, keyword));
     }
 
-    @Operation(summary = "详细日志:按 tid 检索 access/server/thirdparty 三类日志文件(缺省查当天)")
+    @Operation(summary = "操作日志筛选项(distinct 模块/操作类型)")
+    @RequirePermission("ops:view")
+    @GetMapping("/logs/options")
+    public Result<Map<String, List<String>>> logOptions() {
+        return Result.success(opsService.logFilterOptions());
+    }
+
+    @Operation(summary = "访问量统计(扫描 access 日志文件,按天聚合,上限 14 天)")
+    @RequirePermission("ops:view")
+    @GetMapping("/traffic/stats")
+    public Result<Map<String, Object>> trafficStats(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return Result.success(opsService.trafficStats(startDate, endDate));
+    }
+
+    @Operation(summary = "详细日志:按 tid 检索 access/server/thirdparty 三类日志文件(缺省查当天,可按来源/级别过滤)")
     @RequirePermission("ops:view")
     @GetMapping("/logs/trace")
     public Result<Map<String, Object>> traceLogs(
             @RequestParam String tid,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return Result.success(opsService.traceLogs(tid, date));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) List<String> sources,
+            @RequestParam(required = false) List<String> levels) {
+        return Result.success(opsService.traceLogs(tid, date, sources, levels));
     }
 
     @Operation(summary = "和风天气 API 用量统计(控制台 API,凭证未配返回 null)")

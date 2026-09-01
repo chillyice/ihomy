@@ -1,5 +1,6 @@
-<!-- 运维管理页(V3.8):仅 OPS 角色可见。三个标签页:
-     资源总览(各表数量+时间/用户/家庭过滤)、服务器状态(JVM/磁盘)、操作日志检索 -->
+<!-- 运维管理页(V3.8):仅 OPS 角色可见。六个标签页:
+      资源总览(各表数量+时间/用户/家庭过滤)、服务器状态(JVM/磁盘)、访问统计(access 日志扫描聚合+24h柱状图+接口Top)、
+      操作日志检索(模块/类型/结果多选可搜索)、详细日志(tid 检索三类日志文件,来源/级别过滤)、和风天气 API -->
 <template>
   <div class="page">
     <Breadcrumb :items="[{ label: $t('ops.log') }]" />
@@ -53,11 +54,69 @@
         </div>
       </el-tab-pane>
 
+      <el-tab-pane :label="$t('ops.traffic')" name="traffic">
+        <div class="filter-row">
+          <el-date-picker v-model="trafficFilter.startDate" type="date" value-format="YYYY-MM-DD" :placeholder="$t('ops.startDate')" />
+          <el-date-picker v-model="trafficFilter.endDate" type="date" value-format="YYYY-MM-DD" :placeholder="$t('ops.endDate')" />
+          <el-button type="primary" @click="loadTraffic">{{ $t('ops.query') }}</el-button>
+          <span class="traffic-hint">{{ $t('ops.trafficHint') }}</span>
+        </div>
+        <div v-loading="trafficLoading">
+          <div v-if="traffic" class="stats-grid traffic-grid">
+            <div v-for="c in trafficCards" :key="c.key" class="stat-card card">
+              <div class="stat-name">{{ c.name }}</div>
+              <div class="stat-num">{{ traffic[c.key] ?? 0 }}</div>
+            </div>
+          </div>
+          <el-empty v-if="traffic && !traffic.total" :description="$t('ops.traceEmpty')" :image-size="40" />
+          <template v-if="traffic && traffic.total">
+            <h4 class="ops-section-title" style="margin-top: 20px">{{ $t('ops.hourly') }}</h4>
+            <div class="chart-wrap">
+              <svg :viewBox="`0 0 ${chartW} ${chartH}`" class="line-chart" preserveAspectRatio="none">
+                <line v-for="(tk, i) in tYTicks" :key="'tg'+i" :x1="padL" :x2="chartW - padR" :y1="tk.y" :y2="tk.y" stroke="var(--color-border)" stroke-width="1" stroke-dasharray="3 3" />
+                <text v-for="(tk, i) in tYTicks" :key="'tl'+i" :x="padL - 8" :y="tk.y + 4" text-anchor="end" fill="var(--color-text-secondary)" font-size="11">{{ tk.label }}</text>
+                <template v-for="(h, i) in traffic.hours" :key="'bar'+i">
+                  <rect :x="barX(i)" :y="barY(h.total)" :width="barW" :height="barH(h.total)" fill="#b88c6e" rx="2" />
+                  <rect v-if="h.failed" :x="barX(i)" :y="barY(h.failed)" :width="barW" :height="barH(h.failed)" fill="#b04a3a" rx="2" />
+                </template>
+                <text v-for="hx in [0, 3, 6, 9, 12, 15, 18, 21]" :key="'hx'+hx" :x="padL + (hx + 0.5) * barStep"
+                  :y="chartH - padB + 16" text-anchor="middle" fill="var(--color-text-secondary)" font-size="11">{{ hx }}h</text>
+              </svg>
+              <div class="chart-legend">
+                <span class="legend-item"><span class="legend-dot" style="background:#b88c6e"></span>{{ $t('ops.trafficTotal') }}</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#b04a3a"></span>{{ $t('ops.trafficFailed') }}</span>
+              </div>
+            </div>
+            <h4 class="ops-section-title" style="margin-top: 20px">{{ $t('ops.topPaths') }}</h4>
+            <el-table :data="traffic.topPaths" size="small" stripe>
+              <el-table-column prop="path" :label="$t('ops.path')" min-width="280">
+                <template #default="{ row }"><span class="mono">{{ row.path }}</span></template>
+              </el-table-column>
+              <el-table-column prop="count" :label="$t('ops.reqCount')" width="110" />
+              <el-table-column prop="failed" :label="$t('ops.trafficFailed')" width="110" />
+              <el-table-column prop="avgCostMs" :label="$t('ops.trafficAvgCost')" width="130" />
+            </el-table>
+          </template>
+        </div>
+      </el-tab-pane>
+
       <el-tab-pane :label="$t('ops.logs')" name="logs">
         <div class="filter-row">
           <el-input v-model="logFilter.keyword" :placeholder="$t('ops.logKeyword')" clearable style="width: 200px" @keyup.enter="loadLogs(1)" />
           <el-input v-model.number="logFilter.operatorId" :placeholder="$t('ops.operatorId')" style="width: 130px" />
-          <el-input v-model="logFilter.module" :placeholder="$t('ops.module')" style="width: 120px" />
+          <el-select v-model="logFilter.modules" multiple filterable clearable collapse-tags collapse-tags-tooltip
+            :placeholder="$t('ops.module')" style="width: 180px" @change="loadLogs(1)">
+            <el-option v-for="m in logOptions.modules" :key="m" :value="m" :label="m" />
+          </el-select>
+          <el-select v-model="logFilter.operationTypes" multiple filterable clearable collapse-tags collapse-tags-tooltip
+            :placeholder="$t('ops.type')" style="width: 150px" @change="loadLogs(1)">
+            <el-option v-for="ty in logOptions.operationTypes" :key="ty" :value="ty" :label="ty" />
+          </el-select>
+          <el-select v-model="logFilter.results" multiple filterable clearable collapse-tags collapse-tags-tooltip
+            :placeholder="$t('ops.result')" style="width: 120px" @change="loadLogs(1)">
+            <el-option value="SUCCESS" :label="$t('ops.success')" />
+            <el-option value="FAILED" :label="$t('ops.fail')" />
+          </el-select>
           <el-date-picker v-model="logFilter.startDate" type="date" value-format="YYYY-MM-DD" :placeholder="$t('ops.startDate')" />
           <el-date-picker v-model="logFilter.endDate" type="date" value-format="YYYY-MM-DD" :placeholder="$t('ops.endDate')" />
           <el-button type="primary" @click="loadLogs(1)">{{ $t('ops.query') }}</el-button>
@@ -92,6 +151,14 @@
         <div class="filter-row">
           <el-input v-model="traceFilter.tid" :placeholder="$t('ops.tidPlaceholder')" clearable style="width: 320px" @keyup.enter="loadTrace" />
           <el-date-picker v-model="traceFilter.date" type="date" value-format="YYYY-MM-DD" :placeholder="$t('ops.traceDate')" />
+          <el-select v-model="traceFilter.sources" multiple filterable clearable collapse-tags collapse-tags-tooltip
+            :placeholder="$t('ops.filterSource')" style="width: 170px">
+            <el-option v-for="s in TRACE_SOURCES" :key="s" :value="s" :label="$t('ops.source_' + s)" />
+          </el-select>
+          <el-select v-model="traceFilter.levels" multiple filterable clearable collapse-tags collapse-tags-tooltip
+            :placeholder="$t('ops.filterLevel')" style="width: 150px">
+            <el-option v-for="l in TRACE_LEVELS" :key="l" :value="l" :label="l" />
+          </el-select>
           <el-button type="primary" @click="loadTrace">{{ $t('ops.query') }}</el-button>
         </div>
         <el-alert v-if="traceResult && traceResult.truncated" type="warning" :closable="false" show-icon style="margin-bottom: 10px"
@@ -232,7 +299,38 @@ const logsLoading = ref(false)
 const logPage = ref({ records: [] })
 const logTotal = ref(0)
 const logPageNum = ref(1)
-const logFilter = reactive({ keyword: '', operatorId: '', module: '', startDate: '', endDate: '' })
+const logFilter = reactive({ keyword: '', operatorId: '', modules: [], operationTypes: [], results: [], startDate: '', endDate: '' })
+// 筛选下拉数据源(distinct 模块/操作类型,来自 sys_operation_log)
+const logOptions = ref({ modules: [], operationTypes: [] })
+const loadOptions = async () => {
+  try {
+    logOptions.value = await opsApi.logOptions()
+  } catch (e) { /* 选项加载失败不阻塞列表 */ }
+}
+
+// ---------- 访问量统计(扫描 access 日志文件按天聚合) ----------
+const traffic = ref(null)
+const trafficLoading = ref(false)
+const trafficFilter = reactive({ startDate: '', endDate: '' })
+const trafficCards = [
+  { key: 'total', name: t('ops.trafficTotal') },
+  { key: 'failed', name: t('ops.trafficFailed') },
+  { key: 'slow', name: t('ops.trafficSlow') },
+  { key: 'users', name: t('ops.trafficUsers') },
+  { key: 'ips', name: t('ops.trafficIps') },
+  { key: 'avgCostMs', name: t('ops.trafficAvgCost') },
+]
+const loadTraffic = async () => {
+  trafficLoading.value = true
+  try {
+    traffic.value = await opsApi.trafficStats({
+      startDate: trafficFilter.startDate || null,
+      endDate: trafficFilter.endDate || null,
+    })
+  } finally {
+    trafficLoading.value = false
+  }
+}
 
 const weatherLoading = ref(false)
 const weatherQuota = ref(null)
@@ -247,6 +345,21 @@ const padL = 40
 const padR = 20
 const padB = 30
 const padT = 20
+
+// 访问统计 24 小时柱状图几何(总请求=暖棕柱,失败=底部红色叠层)
+const barStep = (chartW - padL - padR) / 24
+const barW = barStep * 0.55
+const barX = (i) => padL + i * barStep + (barStep - barW) / 2
+const tYMax = computed(() => Math.max(...(traffic.value?.hours || []).map(h => h.total), 1))
+const barH = (v) => (chartH - padB - padT) * v / tYMax.value
+const barY = (v) => chartH - padB - barH(v)
+const tYTicks = computed(() => {
+  const ticks = []
+  for (let i = 0; i <= 4; i++) {
+    ticks.push({ y: chartH - padB - (chartH - padB - padT) * i / 4, label: Math.round(tYMax.value * i / 4) })
+  }
+  return ticks
+})
 
 const yMax = computed(() => {
   const mx = Math.max(...timelineData.value.map(d => d.total), 1)
@@ -341,7 +454,9 @@ const loadLogs = async (page = logPageNum.value) => {
       size: 20,
       keyword: logFilter.keyword || null,
       operatorId: logFilter.operatorId || null,
-      module: logFilter.module || null,
+      module: logFilter.modules.length ? logFilter.modules.join(',') : null,
+      operationType: logFilter.operationTypes.length ? logFilter.operationTypes.join(',') : null,
+      result: logFilter.results.length ? logFilter.results.join(',') : null,
       startDate: logFilter.startDate || null,
       endDate: logFilter.endDate || null,
     })
@@ -355,14 +470,21 @@ const loadLogs = async (page = logPageNum.value) => {
 // ---------- 详细日志(按 tid 检索三类日志文件) ----------
 const traceLoading = ref(false)
 const traceResult = ref(null)
-const traceFilter = reactive({ tid: '', date: '' })
+const TRACE_SOURCES = ['access', 'server', 'thirdparty']
+const TRACE_LEVELS = ['ERROR', 'WARN', 'INFO', 'DEBUG']
+const traceFilter = reactive({ tid: '', date: '', sources: [], levels: [] })
 
 const loadTrace = async () => {
   const tid = traceFilter.tid.trim()
   if (tid.length < 6) return
   traceLoading.value = true
   try {
-    traceResult.value = await opsApi.traceLogs({ tid, date: traceFilter.date || null })
+    traceResult.value = await opsApi.traceLogs({
+      tid,
+      date: traceFilter.date || null,
+      sources: traceFilter.sources.length ? traceFilter.sources.join(',') : null,
+      levels: traceFilter.levels.length ? traceFilter.levels.join(',') : null,
+    })
   } finally {
     traceLoading.value = false
   }
@@ -402,18 +524,22 @@ const loadWeatherQuota = async () => {
 }
 
 onMounted(async () => {
-  // 支持 /ops?tab=trace&tid=xxx&date=yyyy-MM-dd 直达(分享/书签)
+  // 支持 /ops?tab=trace&tid=xxx&date=yyyy-MM-dd 或 /ops?tab=traffic 直达(分享/书签)
   if (route.query.tab === 'trace' && route.query.tid) {
     tab.value = 'trace'
     traceFilter.tid = String(route.query.tid)
     if (route.query.date) traceFilter.date = String(route.query.date)
     loadTrace()
   }
-  await Promise.all([loadStats(), loadLogs(1)])
+  if (route.query.tab === 'traffic') tab.value = 'traffic'
+  await Promise.all([loadStats(), loadLogs(1), loadOptions()])
 })
 
-// 切到天气标签页时加载配额
-watch(tab, (v) => { if (v === 'weather' && !weatherQuota.value) loadWeatherQuota() })
+// 切到访问统计/天气标签页时懒加载
+watch(tab, (v) => {
+  if (v === 'traffic' && !traffic.value) loadTraffic()
+  if (v === 'weather' && !weatherQuota.value) loadWeatherQuota()
+})
 </script>
 
 <style scoped>
@@ -479,4 +605,9 @@ watch(tab, (v) => { if (v === 'weather' && !weatherQuota.value) loadWeatherQuota
 .trace-time { font-size: 12px; color: var(--color-text-secondary); }
 .trace-logger { font-size: 12px; color: var(--color-text-secondary); }
 .trace-msg { margin: 0; white-space: pre-wrap; word-break: break-all; font-size: 12px; font-family: Consolas, Monaco, 'Courier New', monospace; max-height: 420px; overflow: auto; }
+.traffic-grid { grid-template-columns: repeat(6, 1fr); }
+.traffic-hint { font-size: 12px; color: var(--color-text-secondary); }
+@media (max-width: 768px) {
+  .traffic-grid { grid-template-columns: repeat(3, 1fr); }
+}
 </style>
