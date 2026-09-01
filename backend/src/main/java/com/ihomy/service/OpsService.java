@@ -7,21 +7,28 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ihomy.entity.*;
 import com.ihomy.mapper.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.lang.management.ManagementFactory;
 import java.lang.management.OperatingSystemMXBean;
 import java.lang.management.ThreadMXBean;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileStore;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 运维服务（V3.8）:
@@ -49,6 +56,18 @@ public class OpsService {
     private final BookRecordMapper bookMapper;
     private final ReminderMapper reminderMapper;
     private final SysOperationLogMapper logMapper;
+
+    /** 日志根目录(logging.file.path,与 logback-spring.xml 一致) */
+    @Value("${logging.file.path:logs}")
+    private String logRoot;
+
+    /** 日志行头:时间 [线程] [tid:xxx] LEVEL logger - 消息 */
+    private static final Pattern LOG_HEADER = Pattern.compile(
+            "^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{3}) \\[([^\\]]*)\\] \\[tid:([^\\]]*)\\] +([A-Z]+) +(\\S+) - (.*)$");
+    /** 单条消息返回上限(防超长 SQL/堆栈撑爆响应) */
+    private static final int MAX_ENTRY_MSG = 16384;
+    /** 返回条数上限 */
+    private static final int MAX_ENTRIES = 3000;
 
     /** 各资源统计:可按开始/结束日期(含)、用户 ID、家庭 ID 过滤;缺省为全量 */
     public Map<String, Long> stats(LocalDate startDate, LocalDate endDate, Long userId, Long familyId) {
@@ -168,5 +187,93 @@ public class OpsService {
                         .or().like(SysOperationLog::getOperatorName, keyword))
                 .orderByDesc(SysOperationLog::getCreatedAt);
         return logMapper.selectPage(new Page<>(current, size), w);
+    }
+
+    /**
+     * 详细日志:按 tid 检索当日(或指定日期)三类日志文件(access/server/thirdparty),
+     * 解析成结构化条目并按时间排序合并。文件按天滚动,当天查活跃文件、历史查滚动文件。
+     */
+    public Map<String, Object> traceLogs(String tid, LocalDate date) {
+        if (tid == null || !tid.matches("[a-zA-Z0-9-]{6,64}")) {
+            throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.BAD_REQUEST, "tid 格式不合法");
+        }
+        LocalDate day = date == null ? LocalDate.now() : date;
+        String suffix = day.equals(LocalDate.now()) ? "" : "." + day.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+        List<Map<String, Object>> entries = new ArrayList<>();
+        boolean truncated = false;
+        for (String source : List.of("access", "server", "thirdparty")) {
+            Path file = Path.of(logRoot, source, "ihomy-" + source + suffix + ".log");
+            if (!Files.exists(file)) {
+                continue;
+            }
+            entries.addAll(parseAndFilter(file, source, tid));
+            if (entries.size() > MAX_ENTRIES) {
+                truncated = true;
+                entries = new ArrayList<>(entries.subList(0, MAX_ENTRIES));
+                break;
+            }
+        }
+        entries.sort(Comparator.comparing(e -> (String) e.get("time")));
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("tid", tid);
+        result.put("date", day.toString());
+        result.put("count", entries.size());
+        result.put("truncated", truncated);
+        result.put("entries", entries);
+        return result;
+    }
+
+    /** 解析单个日志文件,保留 tid 精确匹配的条目(堆栈等续行归入上一条消息) */
+    private List<Map<String, Object>> parseAndFilter(Path file, String source, String tid) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        try (BufferedReader br = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+            String line;
+            Map<String, Object> cur = null;
+            StringBuilder curMsg = null;
+            while ((line = br.readLine()) != null) {
+                Matcher header = LOG_HEADER.matcher(line);
+                if (header.matches()) {
+                    if (cur != null && tid.equals(cur.get("tid"))) {
+                        cur.put("message", truncateMsg(curMsg.toString()));
+                        out.add(cur);
+                    }
+                    cur = null;
+                    curMsg = null;
+                    if (tid.equals(header.group(3))) {
+                        cur = new LinkedHashMap<>();
+                        cur.put("time", header.group(1));
+                        cur.put("thread", header.group(2));
+                        cur.put("tid", header.group(3));
+                        cur.put("level", header.group(4));
+                        cur.put("logger", header.group(5));
+                        cur.put("source", source);
+                        curMsg = new StringBuilder(header.group(6));
+                    }
+                } else if (cur != null && curMsg != null) {
+                    // 堆栈等续行归入上一条消息
+                    curMsg.append('\n').append(line);
+                }
+            }
+            if (cur != null && tid.equals(cur.get("tid"))) {
+                cur.put("message", truncateMsg(curMsg.toString()));
+                out.add(cur);
+            }
+        } catch (Exception e) {
+            Map<String, Object> err = new LinkedHashMap<>();
+            err.put("time", "1970-01-01 00:00:00.000");
+            err.put("level", "WARN");
+            err.put("logger", OpsService.class.getName());
+            err.put("tid", tid);
+            err.put("source", source);
+            err.put("message", "日志文件读取失败: " + file + " - " + e.getMessage());
+            out.add(err);
+        }
+        return out;
+    }
+
+    private String truncateMsg(String msg) {
+        return msg.length() > MAX_ENTRY_MSG ? msg.substring(0, MAX_ENTRY_MSG) + "\n...(truncated)" : msg;
     }
 }

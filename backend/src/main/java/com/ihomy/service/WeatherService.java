@@ -2,6 +2,7 @@ package com.ihomy.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ihomy.common.ThirdPartyHttp;
 import com.ihomy.entity.WeatherCredential;
 import com.ihomy.entity.WeatherLog;
 import com.ihomy.mapper.WeatherCredentialMapper;
@@ -12,9 +13,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
 import java.security.PrivateKey;
@@ -27,7 +25,6 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.zip.GZIPInputStream;
 
 /**
  * 和风天气服务(V5.6):JWT(Ed25519)身份认证 + API Host。
@@ -278,14 +275,9 @@ public class WeatherService {
 
         // 用 ip-api.com 定位(与 SunService 同源),同时取城市名
         try {
-            URL url = new URL("http://ip-api.com/json/" + clientIp + "?fields=status,lat,lon,city");
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(5000);
-            conn.connect();
-            String body = new String(conn.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            conn.disconnect();
-            JsonNode resp = mapper.readTree(body);
+            String url = "http://ip-api.com/json/" + clientIp + "?fields=status,lat,lon,city";
+            ThirdPartyHttp.Resp r = ThirdPartyHttp.get("ipapi", url, null, 5000);
+            JsonNode resp = mapper.readTree(r.body());
             if (resp != null && resp.has("lat") && resp.get("status").asText().equals("success")) {
                 double lng = resp.get("lon").asDouble();
                 double lat = resp.get("lat").asDouble();
@@ -320,43 +312,23 @@ public class WeatherService {
             log.warn("[callApi] 月度配额已耗尽({}),跳过调用, apiType={}, path={}", MONTHLY_QUOTA, apiType, pathAndQuery);
             return null;
         }
-        log.info("[callApi] 请求外部天气API, apiType={}, locationId={}, path={}", apiType, locationId, pathAndQuery);
         long t0 = System.currentTimeMillis();
         JsonNode resp = null;
         String errorMsg = null;
         try {
             String jwt = generateJwt(cred);
             String urlStr = "https://" + cred.getApiHost() + pathAndQuery;
-
-            URL url = new URL(urlStr);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            conn.setRequestProperty("Authorization", "Bearer " + jwt);
-            conn.setConnectTimeout(10000);
-            conn.setReadTimeout(10000);
-            conn.connect();
-
-            int status = conn.getResponseCode();
-            InputStream is = (status >= 200 && status < 300) ? conn.getInputStream() : conn.getErrorStream();
-            if (is != null) {
-                if ("gzip".equalsIgnoreCase(conn.getContentEncoding())) {
-                    is = new GZIPInputStream(is);
-                }
-                String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-                is.close();
-                if (status >= 200 && status < 300) {
-                    resp = mapper.readTree(body);
-                    log.info("[callApi] 响应成功, apiType={}, httpStatus={}, costMs={}", apiType, status, System.currentTimeMillis() - t0);
-                } else {
-                    errorMsg = status + " " + body;
-                    log.warn("[callApi] 响应失败, apiType={}, httpStatus={}, path={}, body={}", apiType, status, pathAndQuery, body.length() > 500 ? body.substring(0, 500) : body);
-                }
+            // 出站走 ThirdPartyHttp:thirdparty 日志自动记请求/响应/耗时/堆栈
+            ThirdPartyHttp.Resp r = ThirdPartyHttp.get("weather", urlStr,
+                    Map.of("Authorization", "Bearer " + jwt), 10000);
+            if (r.ok()) {
+                resp = mapper.readTree(r.body());
+            } else {
+                errorMsg = r.status() + " " + r.body();
             }
-            conn.disconnect();
             return resp;
         } catch (Exception e) {
             errorMsg = e.getMessage();
-            log.error("[callApi] 调用异常, apiType={}, path={}", apiType, pathAndQuery, e);
             return null;
         } finally {
             int costMs = (int) (System.currentTimeMillis() - t0);

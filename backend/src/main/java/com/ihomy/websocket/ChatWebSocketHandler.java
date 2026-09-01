@@ -49,29 +49,45 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         if (familyId == null || userId == null) {
             return;
         }
-        // 消息负载形如 {"content":"..."}:落库后广播给同房间全部在线会话
-        Map<?, ?> payload = objectMapper.readValue(message.getPayload(), Map.class);
-        String content = payload.get("content") == null ? "" : payload.get("content").toString();
-        if (content.isBlank() || content.length() > 2000) {
-            session.close(CloseStatus.POLICY_VIOLATION);
-            return;
-        }
-        ChatMessage m = new ChatMessage();
-        m.setFamilyId(familyId);
-        m.setSenderId(userId);
-        m.setContent(content);
-        messageMapper.insert(m);
+        // 每条 WS 消息一个独立 tid:握手 tid 只代表建连,消息级操作单独成链路
+        String tid = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        org.slf4j.MDC.put(com.ihomy.filter.TraceIdFilter.TRACE_ID, tid);
+        try {
+            com.ihomy.common.Loggers.access().info(
+                    "WS /ws/chat user={}#{} family={} bytes={} content={}",
+                    session.getAttributes().get("username"), userId, familyId,
+                    message.getPayloadLength(), abbreviate(message.getPayload()));
+            // 消息负载形如 {"content":"..."}:落库后广播给同房间全部在线会话
+            Map<?, ?> payload = objectMapper.readValue(message.getPayload(), Map.class);
+            String content = payload.get("content") == null ? "" : payload.get("content").toString();
+            if (content.isBlank() || content.length() > 2000) {
+                session.close(CloseStatus.POLICY_VIOLATION);
+                return;
+            }
+            ChatMessage m = new ChatMessage();
+            m.setFamilyId(familyId);
+            m.setSenderId(userId);
+            m.setContent(content);
+            messageMapper.insert(m);
 
-        Map<String, Object> out = toJson(m, userId);
-        Set<WebSocketSession> room = rooms.get(familyId);
-        if (room != null) {
-            TextMessage broadcast = new TextMessage(objectMapper.writeValueAsString(out));
-            for (WebSocketSession s : room) {
-                if (s.isOpen()) {
-                    s.sendMessage(broadcast);
+            Map<String, Object> out = toJson(m, userId);
+            Set<WebSocketSession> room = rooms.get(familyId);
+            if (room != null) {
+                TextMessage broadcast = new TextMessage(objectMapper.writeValueAsString(out));
+                for (WebSocketSession s : room) {
+                    if (s.isOpen()) {
+                        s.sendMessage(broadcast);
+                    }
                 }
             }
+        } finally {
+            org.slf4j.MDC.remove(com.ihomy.filter.TraceIdFilter.TRACE_ID);
         }
+    }
+
+    /** WS 消息内容截断(access 日志防刷屏,完整内容在 family_chat_message 表) */
+    private String abbreviate(String payload) {
+        return payload != null && payload.length() > 200 ? payload.substring(0, 200) + "...(truncated)" : payload;
     }
 
     @Override

@@ -82,7 +82,7 @@ public class OperationLogAspect {
         if (req != null) {
             logEntry.setRequestMethod(req.getMethod());
             logEntry.setRequestUrl(req.getRequestURI());
-            logEntry.setIp(resolveIp(req));
+            logEntry.setIp(com.ihomy.common.Ips.realIp(req));
         }
 
         LoginUser u = securityHelper.current();
@@ -102,24 +102,6 @@ public class OperationLogAspect {
             }
         }
         return logEntry;
-    }
-
-    /** 依次取代理头中的真实 IP,取不到回退 remoteAddr,多级代理取首个地址 */
-    private String resolveIp(HttpServletRequest req) {
-        String ip = req.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = req.getHeader("X-Real-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = req.getHeader("Proxy-Client-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = req.getRemoteAddr();
-        }
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
-        }
-        return ip;
     }
 
     private HttpServletRequest currentRequest() {

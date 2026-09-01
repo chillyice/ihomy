@@ -40,6 +40,7 @@ public class WsHandshakeInterceptor implements HandshakeInterceptor {
             }
             attributes.put("userId", Long.valueOf(claims.getSubject()));
             attributes.put("familyId", claims.get("familyId", Long.class));
+            attributes.put("username", claims.get("username", String.class));
             return true;
         } catch (Exception e) {
             return false;

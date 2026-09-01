@@ -70,6 +70,15 @@ public class OpsController {
         return Result.success(opsService.logs(current, size, operatorId, module, operationType, startDate, endDate, keyword));
     }
 
+    @Operation(summary = "详细日志:按 tid 检索 access/server/thirdparty 三类日志文件(缺省查当天)")
+    @RequirePermission("ops:view")
+    @GetMapping("/logs/trace")
+    public Result<Map<String, Object>> traceLogs(
+            @RequestParam String tid,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return Result.success(opsService.traceLogs(tid, date));
+    }
+
     @Operation(summary = "和风天气 API 用量统计(控制台 API,凭证未配返回 null)")
     @RequirePermission("ops:view")
     @GetMapping("/weather/quota")
