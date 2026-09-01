@@ -136,6 +136,13 @@ public class OpsController {
         return Result.success(weatherService.getTypeDistribution(range));
     }
 
+    @Operation(summary = "新旧版本并行验证(v7 vs v1,同一位置关键字段对照;每次约 6 次调用,手动触发)")
+    @RequirePermission("ops:view")
+    @GetMapping("/weather/compare")
+    public Result<Map<String, Object>> weatherCompare() {
+        return Result.success(weatherService.compareV7V1());
+    }
+
     @Operation(summary = "加密明文为 ENC(...) 格式(供外挂配置文件使用)")
     @RequirePermission("ops:view")
     @GetMapping("/crypto/encrypt")
