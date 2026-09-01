@@ -268,6 +268,7 @@ export const opsApi = {
   weatherFinance: () => request.get('/ops/weather/finance'),
   weatherStats: () => request.get('/ops/weather/stats'),
   weatherTimeline: (range, types) => request.get('/ops/weather/timeline', { params: { range, types: types?.length ? types.join(',') : null } }),
+  weatherTypeDistribution: (range) => request.get('/ops/weather/type-distribution', { params: { range } }),
 }
 
 // 家谱(家庭隐私数据,需登录)

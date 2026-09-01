@@ -197,29 +197,54 @@
               <el-option v-for="at in WEATHER_API_TYPES" :key="at" :value="at" :label="$t('ops.apiType.' + at)" />
             </el-select>
           </div>
-          <div v-if="timelineData.length" class="chart-wrap">
-            <div class="chart-summary">
-              <span>{{ $t('ops.weatherTotalCalls') }} <b>{{ timelineTotal }}</b></span>
-              <span>{{ $t('ops.trafficFailed') }} <b :class="{ 'fail-num': timelineFailed > 0 }">{{ timelineFailed }}</b></span>
-              <span>{{ $t('ops.weatherFailRate') }} <b>{{ timelineFailRate }}%</b></span>
+          <div v-if="timelineData.length || pieSlices.length" class="charts-row">
+            <div class="chart-wrap chart-hover-wrap" style="flex: 1.6">
+              <div class="chart-summary">
+                <span>{{ $t('ops.weatherTotalCalls') }} <b>{{ timelineTotal }}</b></span>
+                <span>{{ $t('ops.trafficFailed') }} <b :class="{ 'fail-num': timelineFailed > 0 }">{{ timelineFailed }}</b></span>
+                <span>{{ $t('ops.weatherFailRate') }} <b>{{ timelineFailRate }}%</b></span>
+              </div>
+              <svg :viewBox="`0 0 ${chartW} ${chartH}`" class="line-chart">
+                <line v-for="(t, i) in yTicks" :key="'grid'+i" :x1="padL" :x2="chartW - padR" :y1="t.y" :y2="t.y" stroke="var(--color-border)" stroke-width="1" stroke-dasharray="3 3" />
+                <text v-for="(t, i) in yTicks" :key="'yl'+i" :x="padL - 8" :y="t.y + 4" text-anchor="end" fill="var(--color-text-secondary)" font-size="11">{{ t.label }}</text>
+                <text v-for="(lb, i) in xLabels" :key="'xl'+i" :x="lb.x" :y="chartH - padB + 16" text-anchor="middle" fill="var(--color-text-secondary)" font-size="11">{{ lb.label }}</text>
+                <polyline :points="linePoints(timelineData.map(d => d.total))" fill="none" stroke="#b88c6e" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+                <polyline :points="linePoints(timelineData.map(d => d.failed))" fill="none" stroke="#b04a3a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+                <!-- 悬浮列:透明矩形全高捕获 hover -->
+                <rect v-for="(d, i) in timelineData" :key="'hv'+i" :x="xPos(i) - hoverColW / 2" :y="padT"
+                  :width="hoverColW" :height="chartH - padB - padT" fill="transparent"
+                  @mouseenter="hoverIdx = i" @mouseleave="hoverIdx = -1" />
+                <line v-if="hoverIdx >= 0 && timelineData[hoverIdx]" :x1="xPos(hoverIdx)" :x2="xPos(hoverIdx)"
+                  :y1="padT" :y2="chartH - padB" stroke="#b88c6e" stroke-width="1" stroke-dasharray="4 2" />
+                <circle v-if="hoverIdx >= 0 && timelineData[hoverIdx]" :cx="xPos(hoverIdx)" :cy="yVal(timelineData[hoverIdx].total)" r="4" fill="#b88c6e" stroke="#fff" stroke-width="1.5" />
+                <circle v-if="hoverIdx >= 0 && timelineData[hoverIdx]" :cx="xPos(hoverIdx)" :cy="yVal(timelineData[hoverIdx].failed)" r="4" fill="#b04a3a" stroke="#fff" stroke-width="1.5" />
+              </svg>
+              <div class="chart-legend">
+                <span class="legend-item"><span class="legend-dot" style="background:#b88c6e"></span>{{ $t('ops.weatherTotalCalls') }}</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#b04a3a"></span>{{ $t('ops.trafficFailed') }}</span>
+              </div>
+              <!-- 数据点悬浮提示 -->
+              <div v-if="hoverIdx >= 0 && timelineData[hoverIdx]" class="chart-tooltip" :style="tooltipStyle">
+                <div class="ct-time">{{ timelineData[hoverIdx].time_bucket }}</div>
+                <div class="ct-row"><span class="ct-dot" style="background:#b88c6e"></span>{{ $t('ops.weatherTotalCalls') }} <b>{{ timelineData[hoverIdx].total }}</b></div>
+                <div class="ct-row"><span class="ct-dot" style="background:#b04a3a"></span>{{ $t('ops.trafficFailed') }} <b>{{ timelineData[hoverIdx].failed }}</b></div>
+              </div>
             </div>
-            <svg :viewBox="`0 0 ${chartW} ${chartH}`" class="line-chart">
-              <line v-for="(t, i) in yTicks" :key="'grid'+i" :x1="padL" :x2="chartW - padR" :y1="t.y" :y2="t.y" stroke="var(--color-border)" stroke-width="1" stroke-dasharray="3 3" />
-              <text v-for="(t, i) in yTicks" :key="'yl'+i" :x="padL - 8" :y="t.y + 4" text-anchor="end" fill="var(--color-text-secondary)" font-size="11">{{ t.label }}</text>
-              <text v-for="(lb, i) in xLabels" :key="'xl'+i" :x="lb.x" :y="chartH - padB + 16" text-anchor="middle" fill="var(--color-text-secondary)" font-size="11">{{ lb.label }}</text>
-              <polyline :points="linePoints(timelineData.map(d => d.total))" fill="none" stroke="#b88c6e" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
-              <polyline :points="linePoints(timelineData.map(d => d.failed))" fill="none" stroke="#b04a3a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
-            </svg>
-            <div class="chart-legend">
-              <span class="legend-item"><span class="legend-dot" style="background:#b88c6e"></span>{{ $t('ops.weatherTotalCalls') }}</span>
-              <span class="legend-item"><span class="legend-dot" style="background:#b04a3a"></span>{{ $t('ops.trafficFailed') }}</span>
+            <div class="chart-wrap" style="flex: 1">
+              <div class="ops-sub-title">{{ $t('ops.weatherTypeShare') }}</div>
+              <svg v-if="pieSlices.length" viewBox="0 0 400 260" class="pie-chart">
+                <path v-for="(s, i) in pieSlices" :key="'ps'+i" :d="s.path" :fill="s.color" stroke="var(--color-card-2)" stroke-width="2" />
+                <path v-for="(s, i) in pieSlices" :key="'pl'+i" :d="s.line" fill="none" stroke="var(--color-text-secondary)" stroke-width="1" />
+                <text v-for="(s, i) in pieSlices" :key="'pt'+i" :x="s.labelX" :y="s.labelY" :text-anchor="s.anchor" font-size="12" fill="var(--color-text)">{{ s.label }}</text>
+              </svg>
+              <el-empty v-else :description="$t('ops.weatherNoData')" :image-size="40" />
             </div>
           </div>
-          <el-empty v-else :description="$t('ops.weatherNoData')" :image-size="40" />
+          <el-empty v-else-if="!timelineData.length" :description="$t('ops.weatherNoData')" :image-size="40" />
 
-          <!-- 2) 本月配额(本地统计) -->
+          <!-- 2) 本月配额(本地统计):4 卡片一行 + 横向进度条 -->
           <h4 class="ops-section-title section-gap">{{ $t('ops.weatherQuota') }}</h4>
-          <div class="finance-grid">
+          <div class="quota-grid">
             <div class="finance-card">
               <div class="finance-label">{{ $t('ops.weatherQuotaUsed') }}</div>
               <div class="finance-value">{{ weatherQuota?.used ?? '-' }}</div>
@@ -236,6 +261,12 @@
               <div class="finance-label">{{ $t('ops.weatherQuotaPercent') }}</div>
               <div class="finance-value">{{ weatherQuota ? weatherQuota.usagePercent + '%' : '-' }}</div>
             </div>
+          </div>
+          <div class="quota-progress">
+            <div class="qp-track">
+              <div class="qp-fill" :class="quotaBarClass" :style="{ width: Math.min(weatherQuota?.usagePercent || 0, 100) + '%' }"></div>
+            </div>
+            <span class="qp-text">{{ (weatherQuota?.used ?? 0).toLocaleString() }} / {{ (weatherQuota?.quota ?? 50000).toLocaleString() }}</span>
           </div>
 
           <!-- 3) 24h 请求量(按 API,成功/错误/失败率合并一表) -->
@@ -409,12 +440,77 @@ const WEATHER_API_TYPES = ['now', 'forecast', 'hourly', 'warning', 'air', 'indic
 const timelineTypes = ref([])
 
 const loadTimeline = async () => {
+  loadTypeDist() // 饼图与折线图共用时间范围,并行加载
   try {
     timelineData.value = await opsApi.weatherTimeline(timelineRange.value, timelineTypes.value)
   } catch (e) {
     timelineData.value = []
   }
 }
+
+// ---------- 折线图悬浮提示 ----------
+const hoverIdx = ref(-1)
+const hoverColW = computed(() => (chartW - padL - padR) / Math.max(timelineData.value.length, 1))
+const yVal = (v) => chartH - padB - (chartH - padB - padT) * v / yMax.value
+const tooltipStyle = computed(() => {
+  if (hoverIdx.value < 0) return {}
+  // 比例定位 + 边缘 clamp,防止 tooltip 超出容器
+  const ratio = Math.min(Math.max(xPos(hoverIdx.value) / chartW, 0.15), 0.85)
+  return { left: (ratio * 100) + '%' }
+})
+
+// ---------- API 类型占比饼图(与折线图共用时间范围) ----------
+const typeDist = ref([])
+const loadTypeDist = async () => {
+  try {
+    typeDist.value = await opsApi.weatherTypeDistribution(timelineRange.value)
+  } catch (e) {
+    typeDist.value = []
+  }
+}
+// ponytail: 小占比扇区标签可能重叠,类型通常 4-6 个可接受;类型多时再加外部图例
+const PIE_COLORS = ['#b88c6e', '#a87c5e', '#c4a884', '#8a6d3b', '#b04a3a', '#d4b298', '#6b8a6b', '#e0862f', '#4a90d9', '#9b8ec4', '#c97474', '#9a9a9a']
+const pieSlices = computed(() => {
+  const dist = typeDist.value || []
+  const total = dist.reduce((a, d) => a + (d.count || 0), 0)
+  if (!total) return []
+  const cx = 200, cy = 130, r = 75
+  let angle = -Math.PI / 2
+  return dist.map((d, i) => {
+    const frac = (d.count || 0) / total
+    const a2 = angle + frac * Math.PI * 2
+    const large = frac > 0.5 ? 1 : 0
+    const x1 = cx + r * Math.cos(angle), y1 = cy + r * Math.sin(angle)
+    const x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2)
+    const mid = (angle + a2) / 2
+    const cos = Math.cos(mid), sin = Math.sin(mid)
+    // 引导线:扇区外缘(r+4)→ 外扩(r+16)→ 水平延伸 16px
+    const lx1 = cx + (r + 4) * cos, ly1 = cy + (r + 4) * sin
+    const lx2 = cx + (r + 16) * cos, ly2 = cy + (r + 16) * sin
+    const lx3 = lx2 + (cos >= 0 ? 16 : -16)
+    const pct = Math.round(frac * 1000) / 10
+    const slice = {
+      // 单一类型占 100% 时画整圆
+      path: frac >= 0.999
+        ? `M ${cx - r} ${cy} a ${r} ${r} 0 1 0 ${2 * r} 0 a ${r} ${r} 0 1 0 -${2 * r} 0 Z`
+        : `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`,
+      line: `M ${lx1} ${ly1} L ${lx2} ${ly2} L ${lx3} ${ly2}`,
+      labelX: lx3 + (cos >= 0 ? 3 : -3),
+      labelY: ly2 + 4,
+      anchor: cos >= 0 ? 'start' : 'end',
+      color: PIE_COLORS[i % PIE_COLORS.length],
+      label: `${t('ops.apiType.' + (d.apiType || 'other'))} ${pct}%`,
+    }
+    angle = a2
+    return slice
+  })
+})
+
+// ---------- 配额进度条 ----------
+const quotaBarClass = computed(() => {
+  const pct = weatherQuota.value?.usagePercent || 0
+  return pct >= 90 ? 'danger' : pct >= 70 ? 'warn' : ''
+})
 
 // 趋势摘要(所选范围合计)
 const timelineTotal = computed(() => timelineData.value.reduce((a, d) => a + d.total, 0))
@@ -620,12 +716,35 @@ watch(tab, (v) => {
 .finance-label { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 6px; }
 .finance-value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .timeline-controls { margin-bottom: 12px; }
-.chart-wrap { background: var(--color-card-2); border-radius: 10px; padding: 16px; }
+.charts-row { display: flex; gap: 14px; align-items: stretch; }
+.chart-wrap { background: var(--color-card-2); border-radius: 10px; padding: 16px; position: relative; }
 .line-chart { width: 100%; height: auto; display: block; }
+.pie-chart { width: 100%; height: auto; display: block; max-width: 420px; margin: 0 auto; }
+.chart-tooltip {
+  position: absolute; top: 26px; transform: translateX(-50%);
+  background: var(--color-card); border: 1px solid var(--color-border); border-radius: 8px;
+  padding: 8px 12px; font-size: 12px; pointer-events: none; z-index: 5;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); white-space: nowrap;
+}
+.ct-time { color: var(--color-text-secondary); margin-bottom: 4px; }
+.ct-row { display: flex; align-items: center; gap: 6px; color: var(--color-text); }
+.ct-row b { font-variant-numeric: tabular-nums; }
+.ct-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.quota-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.quota-progress { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+.qp-track { flex: 1; height: 10px; background: var(--color-card-2); border-radius: 5px; overflow: hidden; }
+.qp-fill { height: 100%; border-radius: 5px; background: #b88c6e; transition: width 0.4s ease; }
+.qp-fill.warn { background: #d4a13f; }
+.qp-fill.danger { background: #b04a3a; }
+.qp-text { font-size: 13px; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .chart-summary { display: flex; gap: 24px; font-size: 13px; color: var(--color-text-secondary); margin-bottom: 10px; }
 .chart-summary b { color: var(--color-text); font-variant-numeric: tabular-nums; }
 .chart-summary .fail-num { color: #b04a3a; }
 .section-gap { margin-top: 24px; }
+@media (max-width: 768px) {
+  .charts-row { flex-direction: column; }
+  .quota-grid { grid-template-columns: repeat(2, 1fr); }
+}
 .chart-legend { display: flex; gap: 20px; justify-content: center; margin-top: 8px; }
 .legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--color-text-secondary); }
 .legend-dot { width: 10px; height: 10px; border-radius: 50%; }

@@ -118,6 +118,22 @@
         <span v-if="userStore.isLoggedIn && route.path === '/'" class="edit-mode-btn" :class="{ active: appStore.homeEditMode }" :title="appStore.homeEditMode ? '退出编辑' : '编辑首页'" @click="appStore.toggleHomeEditMode()">
           <el-icon><EditPen /></el-icon>
         </span>
+        <!-- 非首页:编辑按钮位置显示迷你天气(图标+当前温度;有预警时显示最高级别颜色的三角叹号,悬浮看全部预警) -->
+        <el-tooltip v-else-if="sidebarWeather" placement="top-end" :disabled="!sidebarWarnings.length" popper-class="mini-weather-popper">
+          <template #content>
+            <div v-for="w in sidebarWarnings" :key="w.id" class="mw-warn-row">
+              <span class="mw-warn-dot" :style="{ background: warnLevelColor(w.level) }"></span>
+              <span>{{ w.typeName }} {{ w.level }}预警 {{ (w.startTime || '').slice(5, 16) }} ~ {{ (w.endTime || '').slice(5, 16) }}</span>
+            </div>
+          </template>
+          <span class="mini-weather" :title="sidebarWeather.city" @click="$router.push('/weather')">
+            <i :class="'qi-' + sidebarWeather.iconCode" class="mw-icon"></i>
+            <span v-if="!collapsed" class="mw-temp">{{ sidebarWeather.temp }}°</span>
+            <span v-if="topWarningBadge" class="mw-warn-badge" :style="{ color: warnLevelColor(topWarningBadge.level) }">
+              <el-icon><WarningFilled /></el-icon>
+            </span>
+          </span>
+        </el-tooltip>
       </div>
     </div>
   </aside>
@@ -132,7 +148,7 @@ import { useUserStore } from '@/stores/user'
 import { useWidgetDrag } from '@/utils/useWidgetDrag'
 import { notificationApi, authApi } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Sunny, Moon, Bell, Fold, Expand, Document, Notebook, Picture, Calendar, VideoPlay, Trophy, Aim, AlarmClock, List, Star, Wallet, PictureRounded, Share, User, Box, MapLocation, ChatDotRound, Food, Reading, Setting, Monitor, ArrowRight, Check, Headset, EditPen } from '@element-plus/icons-vue'
+import { Sunny, Moon, Bell, Fold, Expand, Document, Notebook, Picture, Calendar, VideoPlay, Trophy, Aim, AlarmClock, List, Star, Wallet, PictureRounded, Share, User, Box, MapLocation, ChatDotRound, Food, Reading, Setting, Monitor, ArrowRight, Check, Headset, EditPen, WarningFilled } from '@element-plus/icons-vue'
 
 // 导航图标:Element Plus 简约线性图标(统一风格,非彩色 emoji)
 const ICON_MAP = {
@@ -145,6 +161,7 @@ const iconComp = (code) => ICON_MAP[code] || Document
 import { applyLocale } from '@/i18n'
 import { applyTheme, loadTheme } from '@/theme'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import { warnLevelColor, topWarning } from '@/utils/dict'
 
 const router = useRouter()
 const route = useRoute()
@@ -159,6 +176,10 @@ const widgetType = (code) => WIDGET_MAP[code] || null
 // 注入全局光影状态(与 SunLightLayer 共享同一实例);导航栏只用台灯开关,其余设置在 Settings 页
 const sunLight = inject(SUN_LIGHT_KEY)
 const { lampMode, toggleLamp } = sunLight || {}
+// 迷你天气(非首页时显示在编辑按钮位置):简版天气 + 预警徽标
+const sidebarWeather = computed(() => sunLight?.weather?.value || null)
+const sidebarWarnings = computed(() => sunLight?.weatherDetail?.value?.warning || [])
+const topWarningBadge = computed(() => topWarning(sidebarWarnings.value))
 // 光影总开关:全量切换 5 项特效(对齐 MobileMePage 同款开关语义),
 // 只切 shadowEnabled 会导致"关闭所有特效"后 blobs/毛玻璃/台灯/天气仍运行(频闪排查踩坑)
 const toggleLightEffect = () => {
@@ -481,6 +502,16 @@ html.dark .foot-btn:hover {
 }
 .foot-user-row { display: flex; align-items: center; gap: 6px; }
 .foot-user-row > :deep(.el-dropdown) { flex: 1; min-width: 0; }
+/* 迷你天气(非首页时占编辑按钮位置) */
+.mini-weather { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; padding: 3px 6px; border-radius: 8px; flex: none; }
+.mini-weather:hover { background: rgba(58, 46, 34, 0.06); }
+.mw-icon { font-size: 16px; line-height: 1; color: var(--color-text); }
+.mw-temp { font-size: 13px; font-weight: 600; color: var(--color-text); font-variant-numeric: tabular-nums; }
+.mw-warn-badge { display: inline-flex; align-items: center; }
+.mw-warn-badge :deep(.el-icon) { font-size: 14px; }
+:global(.mini-weather-popper) { max-width: 320px; }
+.mw-warn-row { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 1.6; }
+.mw-warn-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .foot-user {
   cursor: pointer;
   display: flex;

@@ -67,7 +67,7 @@ public class WeatherService {
     private static final Duration LOCATION_TTL = Duration.ofHours(6);
 
     /** 月度 API 调用配额(超限后本月停止调用,返回 null 前端降级) */
-    private static final int MONTHLY_QUOTA = 49999;
+    private static final int MONTHLY_QUOTA = 50000;
 
     /** 取启用凭证:DB 优先(status=1 且 private_key 非空),空则 fallback yml。
      *  private_key 若为 ENC(...) 包裹格式,用 ParameterService 取盐值解密。 */
@@ -125,6 +125,7 @@ public class WeatherService {
         data.put("text", n.get("text").asText());
         data.put("city", familyLocation != null && familyLocation.length > 2 && familyLocation[2] != null ? familyLocation[2] : resolveCityName(clientIp));
         data.put("locationId", locationId);
+        data.put("nowFull", n); // 原始实况节点(体感/湿度/风/气压/能见度等,供天气详情页,零额外调用)
         writeCache(cacheKey, data, NOW_TTL);
         return data;
     }
@@ -143,9 +144,12 @@ public class WeatherService {
         Map<String, Object> data = new HashMap<>();
         data.put("locationId", locationId);
 
-        // 当前天气(复用 now 缓存)
+        // 当前天气(复用 now 缓存,含全量实况字段 nowFull)
         Map<String, Object> nowData = getWeather(clientIp, familyLocation);
-        if (nowData != null) data.put("now", nowData);
+        if (nowData != null) {
+            data.put("now", nowData);
+            data.put("nowFull", nowData.get("nowFull"));
+        }
 
         // 7 天预报 + 24 小时预报
         JsonNode forecast = callApi("/v7/weather/7d?location=" + locationId, cred);
@@ -153,17 +157,20 @@ public class WeatherService {
         JsonNode hourly = callApi("/v7/weather/24h?location=" + locationId, cred);
         if (hourly != null && hourly.has("hourly")) data.put("hourly", hourly.get("hourly"));
 
-        // 灾害预警
-        JsonNode warning = callApi("/v7/warning/now?location=" + locationId, cred);
-        if (warning != null && warning.has("warning")) data.put("warning", warning.get("warning"));
+        // 灾害预警(新版 /warning/v1,坐标 → 城市 LocationID;v7 已弃用恒 403)
+        String cityId = resolveCityId(locationId, cred);
+        if (cityId != null) {
+            JsonNode warning = callApi("/warning/v1/now?location=" + cityId, cred);
+            if (warning != null && warning.has("warnings")) data.put("warning", warning.get("warnings"));
+        }
+
+        // 空气质量(新版 /airquality/v1,坐标路径参数;映射为旧字段形状供前端)
+        Map<String, Object> air = fetchAir(locationId, cred);
+        if (air != null) data.put("air", air);
 
         // 天气指数(全部类型 type=0)
         JsonNode indices = callApi("/v7/indices/1d?location=" + locationId + "&type=0", cred);
         if (indices != null && indices.has("daily")) data.put("indices", indices.get("daily"));
-
-        // 空气质量(5 天)
-        JsonNode air = callApi("/v7/air/now?location=" + locationId, cred);
-        if (air != null && air.has("now")) data.put("air", air.get("now"));
 
         // 分钟降水
         JsonNode minutely = callApi("/v7/minutely/5m?location=" + locationId, cred);
@@ -280,6 +287,18 @@ public class WeatherService {
         return result;
     }
 
+    /** API 类型分布(饼图):所选时间范围内各类型调用量占比 */
+    public List<Map<String, Object>> getTypeDistribution(String range) {
+        java.time.LocalDateTime now = java.time.LocalDateTime.now();
+        java.time.LocalDateTime start = switch (range) {
+            case "month" -> now.toLocalDate().withDayOfMonth(1).atStartOfDay();
+            case "30d" -> now.toLocalDate().minusDays(29).atStartOfDay();
+            case "year" -> now.toLocalDate().withDayOfYear(1).atStartOfDay();
+            default -> now.minusHours(23).truncatedTo(java.time.temporal.ChronoUnit.HOURS);
+        };
+        return weatherLogMapper.selectTypeDistribution(start, now);
+    }
+
     // ---------- 内部:JWT + HTTP ----------
 
     /** IP → location 坐标(经度,纬度);家庭偏好位置优先,其次 ip-api.com 定位 */
@@ -335,6 +354,52 @@ public class WeatherService {
                 || clientIp.startsWith("192.168.") || clientIp.startsWith("10.") ? "default" : clientIp);
         String city = redis.opsForValue().get(key);
         return city != null ? city : "济南";
+    }
+
+    /** 坐标 → 和风城市 LocationID(新版 /warning/v1 需要);Redis 缓存 6h,失败回退济南 */
+    private String resolveCityId(String coords, WeatherCredential cred) {
+        String key = "ihomy:weather:cityid:" + coords;
+        String cached = redis.opsForValue().get(key);
+        if (cached != null) return cached;
+        try {
+            JsonNode resp = callApi("/geo/v2/city/lookup?location=" + coords, cred);
+            String id = resp != null ? resp.path("location").path(0).path("id").asText("") : "";
+            if (!id.isBlank()) {
+                redis.opsForValue().set(key, id, LOCATION_TTL);
+                return id;
+            }
+        } catch (Exception e) {
+            log.warn("[resolveCityId] geo lookup failed: {}", e.getMessage());
+        }
+        return "101120101"; // 济南(默认坐标对应城市)
+    }
+
+    /** 新版空气质量 /airquality/v1/now/{lat}/{lon} → 旧字段形状(aqi/category/level/primary/污染物浓度) */
+    private Map<String, Object> fetchAir(String coords, WeatherCredential cred) {
+        try {
+            String[] ll = coords.split(",");
+            if (ll.length < 2) return null;
+            JsonNode resp = callApi("/airquality/v1/now/" + ll[1] + "/" + ll[0], cred);
+            if (resp == null) return null;
+            Map<String, Object> m = new HashMap<>();
+            for (JsonNode idx : resp.path("indexes")) {
+                // 优先国标 AQI(aqi-cn),否则取第一个
+                if ("aqi-cn".equals(idx.path("code").asText()) || !m.containsKey("aqi")) {
+                    m.put("aqi", idx.path("aqi").asText());
+                    m.put("category", idx.path("category").asText());
+                    m.put("level", idx.path("level").asText());
+                    String pp = idx.path("primaryPollutant").path("name").asText("");
+                    if (!pp.isBlank()) m.put("primary", pp);
+                }
+            }
+            for (JsonNode p : resp.path("pollutants")) {
+                m.put(p.path("code").asText(), p.path("concentration").path("value").asText());
+            }
+            return m.containsKey("aqi") ? m : null;
+        } catch (Exception e) {
+            log.warn("[fetchAir] airquality lookup failed: {}", e.getMessage());
+            return null;
+        }
     }
 
     /** 调和风 API(自动加 JWT 头,每次调用记录日志);超月度配额返回 null */
@@ -404,6 +469,8 @@ public class WeatherService {
 
     /** 从路径解析接口类型(用于日志分类) */
     private String parseApiType(String pathAndQuery) {
+        if (pathAndQuery.startsWith("/airquality/")) return "air";
+        if (pathAndQuery.startsWith("/warning/")) return "warning";
         if (pathAndQuery.startsWith("/v7/weather/now")) return "now";
         if (pathAndQuery.startsWith("/v7/weather/7d")) return "forecast";
         if (pathAndQuery.startsWith("/v7/weather/24h")) return "hourly";

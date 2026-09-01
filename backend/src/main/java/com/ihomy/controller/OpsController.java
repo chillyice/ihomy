@@ -128,6 +128,14 @@ public class OpsController {
         return Result.success(weatherService.getTimeline(range, types));
     }
 
+    @Operation(summary = "天气API类型分布(饼图,与折线图共用时间范围)")
+    @RequirePermission("ops:view")
+    @GetMapping("/weather/type-distribution")
+    public Result<List<Map<String, Object>>> weatherTypeDistribution(
+            @RequestParam(defaultValue = "24h") String range) {
+        return Result.success(weatherService.getTypeDistribution(range));
+    }
+
     @Operation(summary = "加密明文为 ENC(...) 格式(供外挂配置文件使用)")
     @RequirePermission("ops:view")
     @GetMapping("/crypto/encrypt")
