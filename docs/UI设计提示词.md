@@ -482,6 +482,31 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 - **mask 中心固定**:台灯 mask 不随钟摆变化,避免每帧重栅格化 3 个全屏 fixed 元素;只有台灯 div 本身做钟摆。
 - **mousemove 节流**:idle 检测 2s 节流。
 
+## 20. 运维页·详细日志(Trace Logs,`/ops` 第 5 个 tab)
+
+> 按 tid(16 位链路号)检索 access/server/thirdparty 三类日志文件,时间线合并展示;面向 OPS 排查问题。
+
+### 查询区
+
+- 工具行(`.filter-row`):tid 输入框(320px,placeholder 提示「报错提示 [tid:xxx] 里的那串」)+ 日期选择器(缺省今天,日志按天滚动)+ 查询主按钮;回车触发查询。
+- 结果超 3000 条顶部 warning alert「已截断」;无结果 info alert「该日期未找到此 tid 的日志,试试调整日期」。
+- 计数行:13px 次要色「共 N 条 · yyyy-MM-dd」。
+
+### 时间线条目(`.trace-list` 纵向列表,10px 间距)
+
+- 每条 `.trace-entry`(`--color-card-2` 圆角 10px,padding 10px 14px):
+  - 头部行:时间(12px mono 次要色)+ 来源标签 + 级别标签 + logger 名(12px 次要色);
+  - 消息体 `pre.trace-msg`:等宽字体 12px,`pre-wrap`+`break-all`,`max-height: 420px` 内部滚动;**多行堆栈整块保留**(后端已按行头时间戳归并,119 行堆栈 = 一条目)。
+- 来源标签配色:access=primary(暖棕)/ server=warning(金)/ thirdparty=success(绿)。
+- 级别标签配色:ERROR=danger(红)/ WARN=warning(金)/ INFO=info。
+- 条目左侧色条:`lv-error` 3px `#b04a3a`,`lv-warn` 3px `#b88c6e`,其余无。
+
+### 入口联动
+
+- 操作日志 tab 表格 TID 列:等宽字体暖棕色链接样式(hover 下划线),点击切到详细日志 tab 并按该行日期自动查询。
+- 路由直达:`/ops?tab=trace&tid=xxx&date=yyyy-MM-dd`(onMounted 解析 query 自动查询,便于分享/书签)。
+- 前端 5xx 报错 toast(`request.js`)自带 `[tid:xxx]` 前缀(取响应头 X-Trace-Id),报障直接复制检索。
+
 ## 验收标准
 
 1. 打开页面,背景米白渐变 + 5 个色块缓慢飘移,右下角拍立得堆/闭合相册,左右毛玻璃面板从两侧滑入。
@@ -522,3 +547,4 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 36. **日记涂鸦画布层**:选中画笔后直接画在信纸上(再次点击画笔或 Esc 回写字模式)。编辑页层级:textarea(1)<荧光画布(2,`mix-blend-mode: multiply`+opacity 0.55,深色模式 screen)<墨迹画布(3)<实时画布(4)。坐标系=paper-body/sheet-body 左上角原点(两页同为 496px 宽、正文 y=0 起,编辑/查看严格一致)。笔触:签字笔实色圆头(alpha 0.95)/铅笔两遍抖动(0.3)/蜡笔三遍抖动(0.28)/荧光笔宽平头(butt cap,≥8px)/画笔随速度变宽(EMA 平滑);抖动纹理用 mulberry32 笔画种子确定性渲染防闪变;笔画透明度 `a`(0-1)与笔型基础 alpha 相乘。橡皮:像素橡皮按半径切断笔画(剩余点串拆新笔画)、对象橡皮整笔删除;撤销历史=笔画数组引用快照(不可变更新)。数据 `{v:1,strokes:[{t,c,w,a,s,pts}]}` 存 `content_diary.doodle` JSON;查看页双层画布(荧光/墨迹)随正文同窗口裁剪显示。
 37. **相册列表页**(`/album`):顶部工具栏(`.page-toolbar.card`)常规态:tb-left=搜索框→来源筛选(全部/本地上传/各映射设备名)→类型筛选(全部/公开/私有),tb-right=选择(ghost)→同步→新建(primary);选择态:tb-right=选中计数(`.select-count` 13px 次要色)+取消+删除所选(danger,默认尺寸与常规按钮同规格),常规按钮隐藏。卡片:默认封面暖棕文件夹内联 SVG(AlbumDefaultCover,无照片无自定义封面时);来源角标(设备名+状态点:绿 VALID/灰 OFFLINE/红 MISSING);子相册数角标;总数用子树合计;选中卡片暖棕 outline(3px inset)+左上 pick-badge 勾选计数,多选时隐藏卡片类型标签避让。选择模式一次性操作,不 localStorage 记忆;批量删除映射相册文案区分(解除映射)。
 38. **相册详情页**(`/album/:id`):页头 album-head(padding 10px 16px 对齐工具栏规范)=面包屑层级返回(parents 父级链)+封面缩略+名称/描述+操作区。操作区常规态=视图切换 view-toggle(仅含子相册时)/选择(ghost)/分享(ghost,仅公开相册)/设置封面(ghost,创建者或 OWNER)/编辑/删除/上传照片(primary);选择态=选中计数+取消+删除所选(danger),独立多选工具条已并入操作区。子相册双视图 localStorage 记忆:方块(4:3 大封面卡片)与列表(单列横条:小封面+名称+照片数+状态点);照片网格缩略图 `&thumb=1` 只拼设备映射照片的签名 URL(本地 `/files/` 直链无 query 不拼参数);映射相册只读横幅(来源+上次刷新时间)+刷新按钮(OWNER),隐藏上传与编辑/删除;纯子相册相册(有子无照片)不显示照片空态;子相册+照片混合多选删除(先删子相册再删照片);后台同步完成 ElNotification 通知+页面自动刷新(watch syncStore.doneCount)。
+39. **运维详细日志页**(`/ops` 详细日志 tab):tid+日期查询三类日志(access/server/thirdparty)按时间线合并;来源/级别标签配色(见 §20);ERROR/WARN 左侧色条;等宽字体消息区 max-height 420px 滚动,堆栈整块保留;操作日志 TID 列点击跳转自动查询;`/ops?tab=trace&tid=xxx` 路由直达;5xx 报错 toast 自带 `[tid:xxx]`。
