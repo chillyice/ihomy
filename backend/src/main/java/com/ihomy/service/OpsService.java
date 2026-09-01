@@ -64,6 +64,9 @@ public class OpsService {
     /** 日志行头:时间 [线程] [tid:xxx] LEVEL logger - 消息 */
     private static final Pattern LOG_HEADER = Pattern.compile(
             "^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{3}) \\[([^\\]]*)\\] \\[tid:([^\\]]*)\\] +([A-Z]+) +(\\S+) - (.*)$");
+    /** access 日志消息体:METHOD uri user=xx ip=xx status=N code=N cost=Nms req=... */
+    private static final Pattern ACCESS_LINE = Pattern.compile(
+            "^(\\S+) (\\S+) user=(\\S+) ip=(\\S+) status=(\\d+) code=(-|\\d+) cost=(\\d+)ms.*$");
     /** 单条消息返回上限(防超长 SQL/堆栈撑爆响应) */
     private static final int MAX_ENTRY_MSG = 16384;
     /** 返回条数上限 */
@@ -169,16 +172,18 @@ public class OpsService {
         return result;
     }
 
-    /** 操作日志检索:过滤分页(时间/操作人/模块/操作类型/关键字),时间倒序 */
-    public IPage<SysOperationLog> logs(int current, int size, Long operatorId, String module,
-                                       String operationType, LocalDate startDate, LocalDate endDate,
-                                       String keyword) {
+    /** 操作日志检索:过滤分页(时间/操作人/模块列表/操作类型列表/结果列表/关键字),时间倒序 */
+    public IPage<SysOperationLog> logs(int current, int size, Long operatorId, List<String> modules,
+                                        List<String> operationTypes, List<String> results,
+                                        LocalDate startDate, LocalDate endDate,
+                                        String keyword) {
         LocalDateTime start = startDate == null ? null : startDate.atStartOfDay();
         LocalDateTime end = endDate == null ? null : endDate.plusDays(1).atStartOfDay();
         LambdaQueryWrapper<SysOperationLog> w = new LambdaQueryWrapper<SysOperationLog>()
                 .eq(operatorId != null, SysOperationLog::getOperatorId, operatorId)
-                .eq(module != null && !module.isBlank(), SysOperationLog::getModule, module)
-                .eq(operationType != null && !operationType.isBlank(), SysOperationLog::getOperationType, operationType)
+                .in(modules != null && !modules.isEmpty(), SysOperationLog::getModule, modules)
+                .in(operationTypes != null && !operationTypes.isEmpty(), SysOperationLog::getOperationType, operationTypes)
+                .in(results != null && !results.isEmpty(), SysOperationLog::getResultStatus, results)
                 .ge(start != null, SysOperationLog::getCreatedAt, start)
                 .lt(end != null, SysOperationLog::getCreatedAt, end)
                 .and(keyword != null && !keyword.isBlank(), kw -> kw
@@ -189,11 +194,131 @@ public class OpsService {
         return logMapper.selectPage(new Page<>(current, size), w);
     }
 
+    /** 操作日志筛选项:distinct 模块/操作类型(下拉多选可搜索的数据源) */
+    public Map<String, List<String>> logFilterOptions() {
+        Map<String, List<String>> options = new LinkedHashMap<>();
+        options.put("modules", logMapper.selectObjs(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<SysOperationLog>()
+                .select("DISTINCT module").isNotNull("module").orderByAsc("module"))
+                .stream().map(String::valueOf).toList());
+        options.put("operationTypes", logMapper.selectObjs(new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<SysOperationLog>()
+                .select("DISTINCT operation_type").isNotNull("operation_type").orderByAsc("operation_type"))
+                .stream().map(String::valueOf).toList());
+        return options;
+    }
+
+    /**
+     * 访问量统计:扫描 access 日志文件(按天,缺省今天,上限 14 天)聚合——
+     * 总请求/失败/慢请求/独立用户/独立 IP/平均耗时 + 24 小时分布 + 接口 Top15。
+     * access 行格式:METHOD uri user=xx ip=xx status=N code=N cost=Nms(WS 消息行无 status,不计入)。
+     */
+    public Map<String, Object> trafficStats(LocalDate startDate, LocalDate endDate) {
+        LocalDate today = LocalDate.now();
+        LocalDate start = startDate == null ? today : startDate;
+        LocalDate end = endDate == null ? start : endDate;
+        if (end.isBefore(start)) {
+            LocalDate t = start;
+            start = end;
+            end = t;
+        }
+        if (start.isBefore(today.minusDays(13))) {
+            start = today.minusDays(13); // ponytail: 上限 14 天(保留 7 天,留冗余),再大扫文件太慢
+        }
+
+        long total = 0, failed = 0, slow = 0, costSum = 0;
+        java.util.Set<String> users = new java.util.HashSet<>();
+        java.util.Set<String> ips = new java.util.HashSet<>();
+        long[] hourTotal = new long[24];
+        long[] hourFailed = new long[24];
+        Map<String, long[]> paths = new LinkedHashMap<>(); // key=METHOD path -> [count, failed, costSum]
+
+        for (LocalDate d = start; !d.isAfter(end); d = d.plusDays(1)) {
+            String suffix = d.equals(today) ? "" : "." + d.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            Path file = Path.of(logRoot, "access", "ihomy-access" + suffix + ".log");
+            if (!Files.exists(file)) {
+                continue;
+            }
+            try (BufferedReader br = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    Matcher header = LOG_HEADER.matcher(line);
+                    if (!header.matches()) {
+                        continue;
+                    }
+                    Matcher m = ACCESS_LINE.matcher(header.group(6));
+                    if (!m.matches()) {
+                        continue;
+                    }
+                    int hour = Integer.parseInt(header.group(1).substring(11, 13));
+                    int status = Integer.parseInt(m.group(5));
+                    Integer bizCode = "-".equals(m.group(6)) ? null : Integer.valueOf(m.group(6));
+                    long cost = Long.parseLong(m.group(7));
+                    boolean isFailed = status >= 400 || (bizCode != null && bizCode != 0);
+
+                    total++;
+                    costSum += cost;
+                    users.add(m.group(3));
+                    ips.add(m.group(4));
+                    hourTotal[hour]++;
+                    if (isFailed) {
+                        failed++;
+                        hourFailed[hour]++;
+                    }
+                    if (cost > 3000) {
+                        slow++;
+                    }
+                    String pathKey = m.group(1) + " " + m.group(2).split("\\?")[0];
+                    long[] agg = paths.computeIfAbsent(pathKey, k -> new long[3]);
+                    agg[0]++;
+                    if (isFailed) {
+                        agg[1]++;
+                    }
+                    agg[2] += cost;
+                }
+            } catch (Exception ignored) {
+                // 单文件读取失败跳过(占用/损坏),统计其余文件
+            }
+        }
+
+        List<Map<String, Object>> hours = new ArrayList<>();
+        for (int h = 0; h < 24; h++) {
+            Map<String, Object> hm = new LinkedHashMap<>();
+            hm.put("hour", h);
+            hm.put("total", hourTotal[h]);
+            hm.put("failed", hourFailed[h]);
+            hours.add(hm);
+        }
+        List<Map<String, Object>> top = paths.entrySet().stream()
+                .sorted((a, b) -> Long.compare(b.getValue()[0], a.getValue()[0]))
+                .limit(15)
+                .map(e -> {
+                    Map<String, Object> pm = new LinkedHashMap<>();
+                    pm.put("path", e.getKey());
+                    pm.put("count", e.getValue()[0]);
+                    pm.put("failed", e.getValue()[1]);
+                    pm.put("avgCostMs", e.getValue()[0] == 0 ? 0 : e.getValue()[2] / e.getValue()[0]);
+                    return pm;
+                })
+                .toList();
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("startDate", start.toString());
+        result.put("endDate", end.toString());
+        result.put("total", total);
+        result.put("failed", failed);
+        result.put("slow", slow);
+        result.put("users", users.size());
+        result.put("ips", ips.size());
+        result.put("avgCostMs", total == 0 ? 0 : costSum / total);
+        result.put("hours", hours);
+        result.put("topPaths", top);
+        return result;
+    }
+
     /**
      * 详细日志:按 tid 检索当日(或指定日期)三类日志文件(access/server/thirdparty),
-     * 解析成结构化条目并按时间排序合并。文件按天滚动,当天查活跃文件、历史查滚动文件。
+     * 解析成结构化条目并按时间排序合并;可按来源与级别过滤。文件按天滚动,当天查活跃文件、历史查滚动文件。
      */
-    public Map<String, Object> traceLogs(String tid, LocalDate date) {
+    public Map<String, Object> traceLogs(String tid, LocalDate date, List<String> sources, List<String> levels) {
         if (tid == null || !tid.matches("[a-zA-Z0-9-]{6,64}")) {
             throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.BAD_REQUEST, "tid 格式不合法");
         }
@@ -203,11 +328,14 @@ public class OpsService {
         List<Map<String, Object>> entries = new ArrayList<>();
         boolean truncated = false;
         for (String source : List.of("access", "server", "thirdparty")) {
+            if (sources != null && !sources.isEmpty() && !sources.contains(source)) {
+                continue;
+            }
             Path file = Path.of(logRoot, source, "ihomy-" + source + suffix + ".log");
             if (!Files.exists(file)) {
                 continue;
             }
-            entries.addAll(parseAndFilter(file, source, tid));
+            entries.addAll(parseAndFilter(file, source, tid, levels));
             if (entries.size() > MAX_ENTRIES) {
                 truncated = true;
                 entries = new ArrayList<>(entries.subList(0, MAX_ENTRIES));
@@ -225,8 +353,8 @@ public class OpsService {
         return result;
     }
 
-    /** 解析单个日志文件,保留 tid 精确匹配的条目(堆栈等续行归入上一条消息) */
-    private List<Map<String, Object>> parseAndFilter(Path file, String source, String tid) {
+    /** 解析单个日志文件,保留 tid 精确匹配的条目(堆栈等续行归入上一条消息);levels 非空时按级别过滤 */
+    private List<Map<String, Object>> parseAndFilter(Path file, String source, String tid, List<String> levels) {
         List<Map<String, Object>> out = new ArrayList<>();
         try (BufferedReader br = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
             String line;
@@ -235,7 +363,7 @@ public class OpsService {
             while ((line = br.readLine()) != null) {
                 Matcher header = LOG_HEADER.matcher(line);
                 if (header.matches()) {
-                    if (cur != null && tid.equals(cur.get("tid"))) {
+                    if (cur != null && tid.equals(cur.get("tid")) && levelOk(cur, levels)) {
                         cur.put("message", truncateMsg(curMsg.toString()));
                         out.add(cur);
                     }
@@ -256,7 +384,7 @@ public class OpsService {
                     curMsg.append('\n').append(line);
                 }
             }
-            if (cur != null && tid.equals(cur.get("tid"))) {
+            if (cur != null && tid.equals(cur.get("tid")) && levelOk(cur, levels)) {
                 cur.put("message", truncateMsg(curMsg.toString()));
                 out.add(cur);
             }
@@ -271,6 +399,11 @@ public class OpsService {
             out.add(err);
         }
         return out;
+    }
+
+    /** 级别过滤:levels 为空=不过滤 */
+    private boolean levelOk(Map<String, Object> entry, List<String> levels) {
+        return levels == null || levels.isEmpty() || levels.contains(entry.get("level"));
     }
 
     private String truncateMsg(String msg) {
