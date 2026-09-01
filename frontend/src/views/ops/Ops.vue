@@ -72,7 +72,7 @@
           <template v-if="traffic && traffic.total">
             <h4 class="ops-section-title" style="margin-top: 20px">{{ $t('ops.hourly') }}</h4>
             <div class="chart-wrap">
-              <svg :viewBox="`0 0 ${chartW} ${chartH}`" class="line-chart" preserveAspectRatio="none">
+              <svg :viewBox="`0 0 ${chartW} ${chartH}`" class="line-chart">
                 <line v-for="(tk, i) in tYTicks" :key="'tg'+i" :x1="padL" :x2="chartW - padR" :y1="tk.y" :y2="tk.y" stroke="var(--color-border)" stroke-width="1" stroke-dasharray="3 3" />
                 <text v-for="(tk, i) in tYTicks" :key="'tl'+i" :x="padL - 8" :y="tk.y + 4" text-anchor="end" fill="var(--color-text-secondary)" font-size="11">{{ tk.label }}</text>
                 <template v-for="(h, i) in traffic.hours" :key="'bar'+i">
@@ -182,85 +182,91 @@
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="和风天气 API" name="weather">
+      <el-tab-pane :label="$t('ops.weather')" name="weather">
         <div v-loading="weatherLoading">
-          <el-alert type="info" :closable="false" show-icon style="margin-bottom: 14px"
-            title="和风天气控制台 API:用量统计 + 财务汇总 + 请求量统计(JWT 身份认证)" />
-
-          <!-- 调用折线图 -->
-          <h4 class="ops-section-title">API 调用趋势</h4>
-          <div class="timeline-controls">
+          <!-- 1) 调用趋势(最关注):时间段 + API 类型多选筛选 -->
+          <div class="filter-row">
             <el-radio-group v-model="timelineRange" size="small" @change="loadTimeline">
-              <el-radio-button value="24h">24小时</el-radio-button>
-              <el-radio-button value="month">本月</el-radio-button>
-              <el-radio-button value="30d">30天</el-radio-button>
-              <el-radio-button value="year">一年</el-radio-button>
+              <el-radio-button value="24h">{{ $t('ops.weather24h') }}</el-radio-button>
+              <el-radio-button value="month">{{ $t('ops.weatherMonth') }}</el-radio-button>
+              <el-radio-button value="30d">{{ $t('ops.weather30d') }}</el-radio-button>
+              <el-radio-button value="year">{{ $t('ops.weatherYear') }}</el-radio-button>
             </el-radio-group>
+            <el-select v-model="timelineTypes" multiple filterable clearable collapse-tags collapse-tags-tooltip
+              :placeholder="$t('ops.weatherApiType')" style="width: 240px" @change="loadTimeline">
+              <el-option v-for="at in WEATHER_API_TYPES" :key="at" :value="at" :label="$t('ops.apiType.' + at)" />
+            </el-select>
           </div>
           <div v-if="timelineData.length" class="chart-wrap">
-            <svg :viewBox="`0 0 ${chartW} ${chartH}`" class="line-chart" preserveAspectRatio="none">
+            <div class="chart-summary">
+              <span>{{ $t('ops.weatherTotalCalls') }} <b>{{ timelineTotal }}</b></span>
+              <span>{{ $t('ops.trafficFailed') }} <b :class="{ 'fail-num': timelineFailed > 0 }">{{ timelineFailed }}</b></span>
+              <span>{{ $t('ops.weatherFailRate') }} <b>{{ timelineFailRate }}%</b></span>
+            </div>
+            <svg :viewBox="`0 0 ${chartW} ${chartH}`" class="line-chart">
               <line v-for="(t, i) in yTicks" :key="'grid'+i" :x1="padL" :x2="chartW - padR" :y1="t.y" :y2="t.y" stroke="var(--color-border)" stroke-width="1" stroke-dasharray="3 3" />
               <text v-for="(t, i) in yTicks" :key="'yl'+i" :x="padL - 8" :y="t.y + 4" text-anchor="end" fill="var(--color-text-secondary)" font-size="11">{{ t.label }}</text>
-              <text v-for="(lb, i) in xLabels" :key="'xl'+i" :x="xPos(i)" :y="chartH - padB + 16" text-anchor="middle" fill="var(--color-text-secondary)" font-size="11">{{ lb }}</text>
+              <text v-for="(lb, i) in xLabels" :key="'xl'+i" :x="lb.x" :y="chartH - padB + 16" text-anchor="middle" fill="var(--color-text-secondary)" font-size="11">{{ lb.label }}</text>
               <polyline :points="linePoints(timelineData.map(d => d.total))" fill="none" stroke="#b88c6e" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
               <polyline :points="linePoints(timelineData.map(d => d.failed))" fill="none" stroke="#b04a3a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
             </svg>
             <div class="chart-legend">
-              <span class="legend-item"><span class="legend-dot" style="background:#b88c6e"></span>调用总量</span>
-              <span class="legend-item"><span class="legend-dot" style="background:#b04a3a"></span>失败总量</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#b88c6e"></span>{{ $t('ops.weatherTotalCalls') }}</span>
+              <span class="legend-item"><span class="legend-dot" style="background:#b04a3a"></span>{{ $t('ops.trafficFailed') }}</span>
             </div>
           </div>
-          <el-empty v-else description="暂无调用记录" :image-size="40" />
+          <el-empty v-else :description="$t('ops.weatherNoData')" :image-size="40" />
 
-          <!-- 用量统计 -->
-          <h4 class="ops-section-title" style="margin-top:20px">API 用量</h4>
-          <div v-if="weatherQuota && weatherQuota.raw">
-            <el-descriptions :column="2" border size="small">
-              <el-descriptions-item v-for="(v, k) in weatherQuota.raw" :key="k" :label="k">{{ typeof v === 'object' ? JSON.stringify(v) : v }}</el-descriptions-item>
-            </el-descriptions>
+          <!-- 2) 本月配额(本地统计) -->
+          <h4 class="ops-section-title section-gap">{{ $t('ops.weatherQuota') }}</h4>
+          <div class="finance-grid">
+            <div class="finance-card">
+              <div class="finance-label">{{ $t('ops.weatherQuotaUsed') }}</div>
+              <div class="finance-value">{{ weatherQuota?.used ?? '-' }}</div>
+            </div>
+            <div class="finance-card">
+              <div class="finance-label">{{ $t('ops.weatherQuotaLimit') }}</div>
+              <div class="finance-value">{{ weatherQuota?.quota ?? '-' }}</div>
+            </div>
+            <div class="finance-card">
+              <div class="finance-label">{{ $t('ops.weatherQuotaRemaining') }}</div>
+              <div class="finance-value">{{ weatherQuota?.remaining ?? '-' }}</div>
+            </div>
+            <div class="finance-card">
+              <div class="finance-label">{{ $t('ops.weatherQuotaPercent') }}</div>
+              <div class="finance-value">{{ weatherQuota ? weatherQuota.usagePercent + '%' : '-' }}</div>
+            </div>
           </div>
-          <el-empty v-else-if="!weatherLoading" description="未配置和风天气凭证或暂无数据" :image-size="40" />
 
-          <!-- 财务汇总 -->
-          <h4 class="ops-section-title" style="margin-top:20px">财务汇总</h4>
+          <!-- 3) 24h 请求量(按 API,成功/错误/失败率合并一表) -->
+          <h4 class="ops-section-title section-gap">{{ $t('ops.weather24hStats') }}</h4>
+          <el-table v-if="weatherStatRows.length" :data="weatherStatRows" size="small" stripe>
+            <el-table-column prop="api" label="API" min-width="140" />
+            <el-table-column prop="ok" :label="$t('ops.weatherSuccess')" width="110" />
+            <el-table-column prop="err" :label="$t('ops.weatherError')" width="110" />
+            <el-table-column :label="$t('ops.weatherFailRate')" width="110">
+              <template #default="{ row }">{{ row.failRate }}%</template>
+            </el-table-column>
+          </el-table>
+          <el-alert v-else-if="!weatherLoading" type="warning" :closable="false" show-icon :title="$t('ops.weatherStatsFail')" />
+
+          <!-- 4) 财务汇总(最不关注,放最底) -->
+          <h4 class="ops-section-title section-gap">{{ $t('ops.weatherFinance') }}</h4>
           <div v-if="weatherFinance" class="finance-grid">
             <div class="finance-card">
-              <div class="finance-label">余额</div>
+              <div class="finance-label">{{ $t('ops.weatherBalance') }}</div>
               <div class="finance-value">{{ weatherFinance.currency || 'CNY' }} {{ weatherFinance.balance ?? '-' }}</div>
             </div>
             <div class="finance-card">
-              <div class="finance-label">本月消费</div>
+              <div class="finance-label">{{ $t('ops.weatherThisMonth') }}</div>
               <div class="finance-value">{{ weatherFinance.currency || 'CNY' }} {{ weatherFinance.thisMonth ?? '0' }}</div>
             </div>
             <div class="finance-card">
-              <div class="finance-label">昨日消费</div>
+              <div class="finance-label">{{ $t('ops.weatherYesterday') }}</div>
               <div class="finance-value">{{ weatherFinance.currency || 'CNY' }} {{ weatherFinance.previousDay ?? '0' }}</div>
             </div>
           </div>
-          <el-alert v-else type="warning" :closable="false" show-icon style="margin-top:8px"
-            title="财务数据获取失败(需在和风控制台开启权限)" />
-
-          <!-- 请求量统计 -->
-          <h4 class="ops-section-title" style="margin-top:20px">24h 请求量统计</h4>
-          <div v-if="weatherStats">
-            <el-table :data="weatherStats.success || []" size="small" stripe>
-              <el-table-column prop="api" label="API" />
-              <el-table-column label="24h 成功请求">
-                <template #default="{ row }">{{ (row.hours || []).reduce((a, b) => a + b, 0) }}</template>
-              </el-table-column>
-            </el-table>
-            <div v-if="weatherStats.errors && weatherStats.errors.length" style="margin-top:12px">
-              <div class="ops-sub-title">错误请求</div>
-              <el-table :data="weatherStats.errors" size="small" stripe>
-                <el-table-column prop="api" label="API" />
-                <el-table-column label="24h 错误">
-                  <template #default="{ row }">{{ (row.hours || []).reduce((a, b) => a + b, 0) }}</template>
-                </el-table-column>
-              </el-table>
-            </div>
-          </div>
-          <el-alert v-else type="warning" :closable="false" show-icon style="margin-top:8px"
-            title="请求量统计获取失败(需在和风控制台开启权限)" />
+          <el-alert v-else-if="!weatherLoading" type="warning" :closable="false" show-icon :title="$t('ops.weatherFinanceFail')" />
         </div>
       </el-tab-pane>
     </el-tabs>
@@ -376,14 +382,12 @@ const yTicks = computed(() => {
 const xLabels = computed(() => {
   const n = timelineData.value.length
   if (n === 0) return []
+  // 采样标签:约 8 个 + 恒含首末;坐标用真实数据下标计算(修标签全挤左侧的 bug)
   const step = Math.max(1, Math.ceil(n / 8))
-  const labels = []
-  for (let i = 0; i < n; i += step) labels.push(timelineData.value[i].time_bucket)
-  if ((n - 1) % step !== 0) labels.push(timelineData.value[n - 1].time_bucket)
   const indices = []
   for (let i = 0; i < n; i += step) indices.push(i)
-  if ((n - 1) % step !== 0) indices.push(n - 1)
-  return indices.map(i => timelineData.value[i].time_bucket)
+  if (indices[indices.length - 1] !== n - 1) indices.push(n - 1)
+  return indices.map(i => ({ x: xPos(i), label: timelineData.value[i].time_bucket }))
 })
 const xPos = (i) => {
   const n = timelineData.value.length
@@ -400,13 +404,41 @@ const linePoints = (vals) => {
   }).join(' ')
 }
 
+// 天气 API 类型(与后端 parseApiType 对齐)
+const WEATHER_API_TYPES = ['now', 'forecast', 'hourly', 'warning', 'air', 'indices', 'minutely', 'location', 'quota', 'finance', 'metrics', 'other']
+const timelineTypes = ref([])
+
 const loadTimeline = async () => {
   try {
-    timelineData.value = await opsApi.weatherTimeline(timelineRange.value)
+    timelineData.value = await opsApi.weatherTimeline(timelineRange.value, timelineTypes.value)
   } catch (e) {
     timelineData.value = []
   }
 }
+
+// 趋势摘要(所选范围合计)
+const timelineTotal = computed(() => timelineData.value.reduce((a, d) => a + d.total, 0))
+const timelineFailed = computed(() => timelineData.value.reduce((a, d) => a + d.failed, 0))
+const timelineFailRate = computed(() => timelineTotal.value === 0 ? 0 : Math.round(timelineFailed.value * 1000 / timelineTotal.value) / 10)
+
+// 24h 请求量:成功/错误两表合一,补失败率
+const weatherStatRows = computed(() => {
+  const s = weatherStats.value
+  if (!s) return []
+  const map = new Map()
+  for (const r of s.success || []) {
+    map.set(r.api, { api: r.api, ok: (r.hours || []).reduce((a, b) => a + b, 0), err: 0 })
+  }
+  for (const r of s.errors || []) {
+    const row = map.get(r.api) || { api: r.api, ok: 0, err: 0 }
+    row.err = (r.hours || []).reduce((a, b) => a + b, 0)
+    map.set(r.api, row)
+  }
+  return [...map.values()].map(r => ({
+    ...r,
+    failRate: r.ok + r.err === 0 ? 0 : Math.round(r.err * 1000 / (r.ok + r.err)) / 10,
+  }))
+})
 
 const fmtMb = (bytes) => (bytes == null ? 0 : Math.round(bytes / 1024 / 1024))
 const fmtUptime = (sec) => {
@@ -504,6 +536,7 @@ const levelTagType = (l) => (l === 'ERROR' ? 'danger' : l === 'WARN' ? 'warning'
 
 const loadWeatherQuota = async () => {
   weatherLoading.value = true
+  loadTimeline() // 与下面三个并行,不串行等待
   try {
     const [quota, finance, stats] = await Promise.allSettled([
       opsApi.weatherQuota(),
@@ -520,7 +553,6 @@ const loadWeatherQuota = async () => {
   } finally {
     weatherLoading.value = false
   }
-  loadTimeline()
 }
 
 onMounted(async () => {
@@ -589,7 +621,11 @@ watch(tab, (v) => {
 .finance-value { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .timeline-controls { margin-bottom: 12px; }
 .chart-wrap { background: var(--color-card-2); border-radius: 10px; padding: 16px; }
-.line-chart { width: 100%; height: 260px; display: block; }
+.line-chart { width: 100%; height: auto; display: block; }
+.chart-summary { display: flex; gap: 24px; font-size: 13px; color: var(--color-text-secondary); margin-bottom: 10px; }
+.chart-summary b { color: var(--color-text); font-variant-numeric: tabular-nums; }
+.chart-summary .fail-num { color: #b04a3a; }
+.section-gap { margin-top: 24px; }
 .chart-legend { display: flex; gap: 20px; justify-content: center; margin-top: 8px; }
 .legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--color-text-secondary); }
 .legend-dot { width: 10px; height: 10px; border-radius: 50%; }

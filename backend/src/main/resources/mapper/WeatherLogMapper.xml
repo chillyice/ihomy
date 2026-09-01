@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.WeatherLogMapper">
+
+    <!-- 时间线聚合:有数据的桶(零填充在 Service 层做,保证 x 轴覆盖全时间范围) -->
+    <select id="selectTimeline" resultType="java.util.HashMap">
+        SELECT DATE_FORMAT(created_at, #{fmt}) AS time_bucket, COUNT(*) AS total,
+               SUM(CASE WHEN status = 'FAIL' THEN 1 ELSE 0 END) AS failed
+        FROM sys_weather_log
+        WHERE created_at &gt;= #{start} AND created_at &lt; #{end}
+        <if test="apiTypes != null and apiTypes.size() > 0">
+            AND api_type IN
+            <foreach collection="apiTypes" item="t" open="(" separator="," close=")">#{t}</foreach>
+        </if>
+        GROUP BY time_bucket
+        ORDER BY time_bucket
+    </select>
+</mapper>

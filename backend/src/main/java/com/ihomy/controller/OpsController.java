@@ -119,19 +119,13 @@ public class OpsController {
         return Result.success(weatherService.getStats());
     }
 
-    @Operation(summary = "天气API调用折线图(24h/本月/30天/一年)")
+    @Operation(summary = "天气API调用折线图(24h/本月/30天/一年,可按 API 类型多选过滤;零填充覆盖全时间范围)")
     @RequirePermission("ops:view")
     @GetMapping("/weather/timeline")
-    public Result<List<Map<String, Object>>> weatherTimeline(@RequestParam(defaultValue = "24h") String range) {
-        log.info("[weatherTimeline] 入参: range={}", range);
-        try {
-            List<Map<String, Object>> data = weatherService.getTimeline(range);
-            log.info("[weatherTimeline] 查询完成, range={}, 数据点数={}", range, data.size());
-            return Result.success(data);
-        } catch (Exception e) {
-            log.error("[weatherTimeline] 查询失败, range={}", range, e);
-            throw e;
-        }
+    public Result<List<Map<String, Object>>> weatherTimeline(
+            @RequestParam(defaultValue = "24h") String range,
+            @RequestParam(required = false) List<String> types) {
+        return Result.success(weatherService.getTimeline(range, types));
     }
 
     @Operation(summary = "加密明文为 ENC(...) 格式(供外挂配置文件使用)")

@@ -21,6 +21,8 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
@@ -171,14 +173,32 @@ public class WeatherService {
         return data;
     }
 
-    /** 控制台 API:用量统计(供 OPS 运维页) */
+    /**
+     * 本月配额使用(本地统计:Redis 计数器 / DB fallback)。
+     * 原实现调 /console/v1/usage 实测恒 404(死接口,从未成功过),改为本地口径:
+     * 只统计计费的数据 API(now/forecast/air 等),控制台类(quota/finance/metrics)不计费不计数。
+     */
     public Map<String, Object> getQuota() {
-        WeatherCredential cred = loadCredential();
-        if (cred == null) return null;
-        JsonNode resp = callApi("/console/v1/usage", cred);
-        if (resp == null) return null;
+        String monthKey = "ihomy:weather:quota:" + java.time.YearMonth.now();
+        String cached = redis.opsForValue().get(monthKey);
+        long used;
+        if (cached != null) {
+            used = Long.parseLong(cached);
+        } else {
+            java.time.LocalDateTime monthStart = java.time.LocalDate.now().withDayOfMonth(1).atStartOfDay();
+            Long count = weatherLogMapper.selectCount(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WeatherLog>()
+                            .ge(WeatherLog::getCreatedAt, monthStart)
+                            .eq(WeatherLog::getStatus, "SUCCESS")
+                            .notIn(WeatherLog::getApiType, List.of("quota", "finance", "metrics")));
+            used = count != null ? count : 0;
+        }
         Map<String, Object> result = new HashMap<>();
-        result.put("raw", resp);
+        result.put("month", java.time.YearMonth.now().toString());
+        result.put("used", used);
+        result.put("quota", MONTHLY_QUOTA);
+        result.put("remaining", Math.max(0, MONTHLY_QUOTA - used));
+        result.put("usagePercent", Math.round(used * 1000.0 / MONTHLY_QUOTA) / 10.0);
         return result;
     }
 
@@ -211,40 +231,53 @@ public class WeatherService {
         return result;
     }
 
-    /** 本地日志聚合:按时间范围返回调用总量+失败量折线图数据 */
-    public List<Map<String, Object>> getTimeline(String range) {
-        log.info("[getTimeline] 开始聚合天气日志, range={}", range);
+    /**
+     * 本地日志聚合:按时间范围返回调用总量+失败量折线图数据,可按 API 类型过滤。
+     * 零填充整个时间范围(缺数据的桶补 0)——修 x 轴覆盖不全 + 24h 跨零点同小时合并问题
+     * (24h 桶格式带日期 "%m-%d %H:00",昨天 23 点与今天 23 点不再合并、词法排序即时间序)。
+     */
+    public List<Map<String, Object>> getTimeline(String range, List<String> apiTypes) {
         java.time.LocalDateTime now = java.time.LocalDateTime.now();
         java.time.LocalDateTime start;
-        String fmt;
+        String fmt;                 // MySQL DATE_FORMAT
+        String javaPattern;         // 与 fmt 对齐的 Java 模式
+        java.time.temporal.ChronoUnit unit; // 桶粒度
         switch (range) {
-            case "month":
+            case "month" -> {
                 start = now.toLocalDate().withDayOfMonth(1).atStartOfDay();
-                fmt = "%Y-%m-%d";
-                break;
-            case "30d":
+                fmt = "%Y-%m-%d"; javaPattern = "yyyy-MM-dd"; unit = java.time.temporal.ChronoUnit.DAYS;
+            }
+            case "30d" -> {
                 start = now.toLocalDate().minusDays(29).atStartOfDay();
-                fmt = "%Y-%m-%d";
-                break;
-            case "year":
+                fmt = "%Y-%m-%d"; javaPattern = "yyyy-MM-dd"; unit = java.time.temporal.ChronoUnit.DAYS;
+            }
+            case "year" -> {
                 start = now.toLocalDate().withDayOfYear(1).atStartOfDay();
-                fmt = "%Y-%m";
-                break;
-            default:
-                start = now.minusHours(23).withMinute(0).withSecond(0).withNano(0);
-                fmt = "%H:00";
+                fmt = "%Y-%m"; javaPattern = "yyyy-MM"; unit = java.time.temporal.ChronoUnit.MONTHS;
+            }
+            default -> {
+                start = now.minusHours(23).truncatedTo(java.time.temporal.ChronoUnit.HOURS);
+                fmt = "%m-%d %H:00"; javaPattern = "MM-dd HH:00"; unit = java.time.temporal.ChronoUnit.HOURS;
+            }
         }
-        log.info("[getTimeline] 查询参数: start={}, end={}, fmt={}", start, now, fmt);
-        try {
-            List<Map<String, Object>> result = weatherLogMapper.selectTimeline(start, now, fmt);
-            long totalCalls = result.stream().mapToLong(m -> ((Number) m.getOrDefault("total", 0)).longValue()).sum();
-            long totalFailed = result.stream().mapToLong(m -> ((Number) m.getOrDefault("failed", 0)).longValue()).sum();
-            log.info("[getTimeline] 聚合完成, range={}, 数据点={}, 调用总量={}, 失败总量={}", range, result.size(), totalCalls, totalFailed);
-            return result;
-        } catch (Exception e) {
-            log.error("[getTimeline] 聚合查询失败, range={}, start={}, end={}, fmt={}", range, start, now, fmt, e);
-            throw e;
+        List<Map<String, Object>> rows = weatherLogMapper.selectTimeline(start, now, fmt, apiTypes);
+        java.util.Map<String, Map<String, Object>> byBucket = new java.util.HashMap<>();
+        for (Map<String, Object> r : rows) {
+            byBucket.put(String.valueOf(r.get("time_bucket")), r);
         }
+        DateTimeFormatter jf = DateTimeFormatter.ofPattern(javaPattern);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (java.time.LocalDateTime t = start; !t.isAfter(now); t = t.plus(1, unit)) {
+            String bucket = t.format(jf);
+            Map<String, Object> r = byBucket.get(bucket);
+            Map<String, Object> point = new HashMap<>();
+            point.put("time_bucket", bucket);
+            point.put("total", r == null ? 0L : ((Number) r.getOrDefault("total", 0)).longValue());
+            point.put("failed", r == null ? 0L : ((Number) r.getOrDefault("failed", 0)).longValue());
+            result.add(point);
+        }
+        log.debug("[getTimeline] range={}, types={}, 数据点={}", range, apiTypes, result.size());
+        return result;
     }
 
     // ---------- 内部:JWT + HTTP ----------
@@ -333,10 +366,11 @@ public class WeatherService {
         } finally {
             int costMs = (int) (System.currentTimeMillis() - t0);
             logCall(apiType, locationId, resp != null ? "SUCCESS" : "FAIL", costMs, resp, errorMsg, pathAndQuery);
-            // 增加月度计数(Redis)
-            if (resp != null) {
+            // 增加月度计数(Redis):只计计费的数据 API,控制台类不计费;key 两个月未活动自动过期
+            if (resp != null && !"quota".equals(apiType) && !"finance".equals(apiType) && !"metrics".equals(apiType)) {
                 String monthKey = "ihomy:weather:quota:" + java.time.YearMonth.now().toString();
                 redis.opsForValue().increment(monthKey);
+                redis.expire(monthKey, java.time.Duration.ofDays(62));
             }
         }
     }
@@ -350,12 +384,14 @@ public class WeatherService {
             if (exceeded) log.warn("[isQuotaExceeded] Redis 计数已达配额, count={}, quota={}", cached, MONTHLY_QUOTA);
             return exceeded;
         }
-        // Redis 无计数(DB fallback):查 sys_weather_log 当月记录数
+        // Redis 无计数(DB fallback):查 sys_weather_log 当月数据 API 成功数(口径与计数器一致)
         try {
             java.time.LocalDateTime monthStart = java.time.LocalDate.now().withDayOfMonth(1).atStartOfDay();
             Long count = weatherLogMapper.selectCount(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WeatherLog>()
-                    .ge(WeatherLog::getCreatedAt, monthStart));
+                    .ge(WeatherLog::getCreatedAt, monthStart)
+                    .eq(WeatherLog::getStatus, "SUCCESS")
+                    .notIn(WeatherLog::getApiType, List.of("quota", "finance", "metrics")));
             long c = count != null ? count : 0;
             log.info("[isQuotaExceeded] Redis 未命中,DB fallback 当月计数={}, quota={}", c, MONTHLY_QUOTA);
             redis.opsForValue().set(monthKey, String.valueOf(c), Duration.ofHours(1));
