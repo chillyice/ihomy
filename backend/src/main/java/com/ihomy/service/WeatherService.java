@@ -3,14 +3,19 @@ package com.ihomy.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ihomy.common.ThirdPartyHttp;
+import com.ihomy.entity.Family;
+import com.ihomy.entity.SysUserRole;
 import com.ihomy.entity.WeatherCredential;
 import com.ihomy.entity.WeatherLog;
+import com.ihomy.mapper.FamilyMapper;
+import com.ihomy.mapper.SysUserRoleMapper;
 import com.ihomy.mapper.WeatherCredentialMapper;
 import com.ihomy.mapper.WeatherLogMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -57,6 +62,9 @@ public class WeatherService {
     private final WeatherCredentialMapper credentialMapper;
     private final WeatherLogMapper weatherLogMapper;
     private final ParameterService parameterService;
+    private final FamilyMapper familyMapper;
+    private final SysUserRoleMapper sysUserRoleMapper;
+    private final NotificationService notificationService;
     private final ObjectMapper mapper = new ObjectMapper();
 
     private static final Duration NOW_TTL = Duration.ofMinutes(30);
@@ -174,9 +182,9 @@ public class WeatherService {
             data.put("nowFull", nowData.get("nowFull"));
         }
 
-        // 7 天 + 24 小时预报(v1 坐标路径,映射为旧 v7 字段形状)
+        // 10 天 + 24 小时预报(v1 坐标路径,映射为旧 v7 字段形状;v1 支持最多 10 天)
         String[] ll = toLatLon(locationId);
-        JsonNode dailyResp = callApi("/weather/v1/daily/" + ll[0] + "/" + ll[1] + "?localTime=true", cred);
+        JsonNode dailyResp = callApi("/weather/v1/daily/" + ll[0] + "/" + ll[1] + "?days=10&localTime=true", cred);
         if (dailyResp != null && dailyResp.has("days")) data.put("daily", mapDailyV1(dailyResp.get("days")));
         JsonNode hourlyResp = callApi("/weather/v1/hourly/" + ll[0] + "/" + ll[1] + "?localTime=true", cred);
         if (hourlyResp != null && hourlyResp.has("hours")) data.put("hourly", mapHourlyV1(hourlyResp.get("hours")));
@@ -193,9 +201,9 @@ public class WeatherService {
         JsonNode indices = callApi("/v7/indices/1d?location=" + locationId + "&type=0", cred);
         if (indices != null && indices.has("daily")) data.put("indices", indices.get("daily"));
 
-        // 分钟降水
+        // 分钟降水(整节点:summary 摘要句 + minutely 数组)
         JsonNode minutely = callApi("/v7/minutely/5m?location=" + locationId, cred);
-        if (minutely != null && minutely.has("minutely")) data.put("minutely", minutely.get("minutely"));
+        if (minutely != null && minutely.has("minutely")) data.put("minutely", minutely);
 
         writeCache(cacheKey, data, NOW_TTL);
         return data;
@@ -492,6 +500,7 @@ public class WeatherService {
             w.put("status", "active");
             w.put("code", a.path("eventType").path("code").asText());
             w.put("title", a.path("headline").asText());
+            w.put("senderName", a.path("senderName").asText());
             w.put("typeName", a.path("eventType").path("name").asText());
             w.put("level", ALERT_COLOR_CN.getOrDefault(a.path("color").path("code").asText(), "橙色"));
             w.put("startTime", a.path("effectiveTime").asText());
@@ -561,31 +570,107 @@ public class WeatherService {
         return city != null ? city : "济南";
     }
 
-    /** 新版空气质量 /airquality/v1/current/{lat}/{lon} → 旧字段形状(aqi/category/level/primary/污染物浓度) */
+    /** 新版空气质量 /airquality/v1/current/{lat}/{lon} → 旧字段形状(aqi/category/level/primary/健康建议/污染物浓度) */
     private Map<String, Object> fetchAir(String coords, WeatherCredential cred) {
         try {
             String[] ll = toLatLon(coords);
             JsonNode resp = callApi("/airquality/v1/current/" + ll[0] + "/" + ll[1], cred);
             if (resp == null) return null;
-            Map<String, Object> m = new HashMap<>();
+            // 选定指数:优先国标 AQI(cn / aqi-cn),否则第一个
+            JsonNode picked = null;
             for (JsonNode idx : resp.path("indexes")) {
-                // 优先国标 AQI(cn / aqi-cn),否则取第一个
                 String code = idx.path("code").asText();
-                if ("cn".equals(code) || "aqi-cn".equals(code) || !m.containsKey("aqi")) {
-                    m.put("aqi", idx.path("aqiDisplay").asText(idx.path("aqi").asText()));
-                    m.put("category", idx.path("category").asText());
-                    m.put("level", idx.path("level").asText());
-                    String pp = idx.path("primaryPollutant").path("name").asText("");
-                    if (!pp.isBlank()) m.put("primary", pp);
-                }
+                if ("cn".equals(code) || "aqi-cn".equals(code)) { picked = idx; break; }
+                if (picked == null) picked = idx;
+            }
+            if (picked == null) return null;
+            Map<String, Object> m = new HashMap<>();
+            m.put("aqi", picked.path("aqiDisplay").asText(picked.path("aqi").asText()));
+            m.put("category", picked.path("category").asText());
+            m.put("level", picked.path("level").asText());
+            String pp = picked.path("primaryPollutant").path("name").asText("");
+            if (!pp.isBlank()) m.put("primary", pp);
+            // 健康建议(一般人群/敏感人群)
+            JsonNode advice = picked.path("health").path("advice");
+            if (!advice.isMissingNode()) {
+                m.put("adviceGeneral", advice.path("generalPopulation").asText(""));
+                m.put("adviceSensitive", advice.path("sensitivePopulation").asText(""));
             }
             for (JsonNode p : resp.path("pollutants")) {
                 m.put(p.path("code").asText(), p.path("concentration").path("value").asText());
             }
-            return m.containsKey("aqi") ? m : null;
+            return m;
         } catch (Exception e) {
             log.warn("[fetchAir] airquality lookup failed: {}", e.getMessage());
             return null;
+        }
+    }
+
+    // ---------- 预警主动推送(30 分钟一轮,家庭级开关) ----------
+
+    /** 拉当前生效预警(按坐标共享缓存 10 分钟,多家庭同坐标只打一次 API) */
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> fetchAlertsCached(String coords, WeatherCredential cred) {
+        String key = "ihomy:weather:alerts:" + coords;
+        try {
+            String cached = redis.opsForValue().get(key);
+            if (cached != null) return (List<Map<String, Object>>) mapper.readValue(cached, List.class);
+        } catch (Exception e) {
+            log.warn("[fetchAlertsCached] read cache failed: {}", e.getMessage());
+        }
+        String[] ll = toLatLon(coords);
+        JsonNode resp = callApi("/weatheralert/v1/current/" + ll[0] + "/" + ll[1] + "?localTime=true", cred);
+        List<Map<String, Object>> list = resp != null && resp.has("alerts") ? mapWarningV1(resp.get("alerts")) : List.of();
+        try {
+            redis.opsForValue().set(key, mapper.writeValueAsString(list), Duration.ofMinutes(10));
+        } catch (Exception e) {
+            log.warn("[fetchAlertsCached] write cache failed: {}", e.getMessage());
+        }
+        return list;
+    }
+
+    /**
+     * 预警主动推送:每 30 分钟扫描所有家庭,新出现的预警发给全部成员站内通知(铃铛)。
+     * 家庭级开关存 sys_parameter(weather:alert-push:{familyId}="false" 关闭,缺省=开);
+     * 未设置天气地区的家庭用服务器默认位置(济南);预警 ID 用 Redis Set 去重(TTL 3 天)。
+     */
+    @Scheduled(fixedDelay = 1800_000, initialDelay = 120_000)
+    public void pushWeatherAlerts() {
+        WeatherCredential cred = loadCredential();
+        if (cred == null) return;
+        List<Family> families = familyMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Family>()
+                        .eq(Family::getDeleted, 0));
+        for (Family f : families) {
+            try {
+                if ("false".equals(parameterService.getString("weather:alert-push:" + f.getId()))) continue;
+                String coords = f.getWeatherLat() != null && f.getWeatherLng() != null
+                        ? f.getWeatherLng().toPlainString() + "," + f.getWeatherLat().toPlainString()
+                        : "117.1201,36.6512";
+                List<Map<String, Object>> alerts = fetchAlertsCached(coords, cred);
+                if (alerts.isEmpty()) continue;
+                List<Long> memberIds = sysUserRoleMapper.selectList(
+                                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysUserRole>()
+                                        .eq(SysUserRole::getFamilyId, f.getId())
+                                        .select(SysUserRole::getUserId))
+                        .stream().map(SysUserRole::getUserId).distinct().toList();
+                String dedupeKey = "ihomy:weather:alertpush:" + f.getId();
+                for (Map<String, Object> a : alerts) {
+                    String alertId = String.valueOf(a.get("id"));
+                    Long added = redis.opsForSet().add(dedupeKey, alertId);
+                    if (added == null || added == 0) continue;
+                    redis.expire(dedupeKey, Duration.ofDays(3));
+                    String headline = String.valueOf(a.get("title"));
+                    if (headline.length() > 120) headline = headline.substring(0, 120) + "…";
+                    String content = "【气象预警】" + a.get("typeName") + " " + a.get("level") + "预警:" + headline;
+                    for (Long uid : memberIds) {
+                        notificationService.create(uid, "system", content, null, "weather_alert", null);
+                    }
+                    log.info("[pushWeatherAlerts] family={} alert={} 已推送给 {} 名成员", f.getId(), alertId, memberIds.size());
+                }
+            } catch (Exception e) {
+                log.warn("[pushWeatherAlerts] family={} failed: {}", f.getId(), e.getMessage());
+            }
         }
     }
 

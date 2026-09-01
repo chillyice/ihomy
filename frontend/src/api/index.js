@@ -127,6 +127,8 @@ export const familyApi = {
   apply: (familyId, message) => request.post('/family/apply', { familyId, message }),
   applyList: () => request.get('/family/apply/list'),
   handleApply: (id, action) => request.put(`/family/apply/${id}`, null, { params: { action } }),
+  getWeatherAlertPush: () => request.get('/family/weather-alert-push'),
+  setWeatherAlertPush: (enabled) => request.put(`/family/weather-alert-push`, null, { params: { enabled } }),
 }
 
 // 个人资料

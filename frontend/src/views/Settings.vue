@@ -273,6 +273,13 @@
                 </div>
                 <div class="share-tip">选择城市后天气和太阳位置将固定使用此坐标,留空则按 IP 自动定位</div>
               </el-form-item>
+              <el-form-item label="气象预警推送">
+                <div class="setting-row">
+                  <el-switch v-model="alertPushEnabled" @change="onAlertPushChange" />
+                  <span class="setting-label">推送到通知铃铛</span>
+                </div>
+                <div class="share-tip">开启后当地发布的气象预警(暴雨/大风等)自动推送给全部家庭成员站内通知,约每 30 分钟检查一次</div>
+              </el-form-item>
               <div class="form-footer">
                 <el-button type="primary" :loading="savingWeather" @click="saveWeather">保存天气设置</el-button>
               </div>
@@ -445,6 +452,7 @@ const weatherLng = ref('')
 const savingWeather = ref(false)
 const locationOptions = ref([])
 const locLoading = ref(false)
+const alertPushEnabled = ref(true)
 
 const searchLocations = async (query) => {
   if (!query) { locationOptions.value = []; return }
@@ -472,6 +480,12 @@ const clearLocation = () => {
   weatherCity.value = ''
   weatherLat.value = ''
   weatherLng.value = ''
+}
+const loadAlertPush = async () => {
+  try { const r = await familyApi.getWeatherAlertPush(); alertPushEnabled.value = r?.enabled !== false } catch {}
+}
+const onAlertPushChange = async (v) => {
+  try { await familyApi.setWeatherAlertPush(v) } catch { alertPushEnabled.value = !v }
 }
 
 const saveWeather = async () => {
@@ -528,6 +542,7 @@ const load = async () => {
       weatherLocationId.value = ''
     }
     shareToken.value = f.shareToken || ''
+    loadAlertPush()
   } catch (e) {
     // 忽略
   }
