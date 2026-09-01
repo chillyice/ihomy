@@ -129,11 +129,11 @@ public class AuthService {
 
         if (StringUtils.hasText(dto.getInviteCode())) {
             InvitationCode ic = invitationCodeMapper.selectByCode(dto.getInviteCode().trim());
-            if (ic == null || !DictConst.INVITE_UNUSED.equals(ic.getStatus())) throw new BizException(ResultCode.NOT_FOUND);
+            if (ic == null || !DictConst.INVITE_UNUSED.equals(ic.getStatus())) throw new BizException(ResultCode.NOT_FOUND, "邀请码不存在或已失效");
             if (ic.getExpiresAt() != null && ic.getExpiresAt().isBefore(java.time.LocalDateTime.now())) {
-                throw new BizException(ResultCode.CONFLICT);
+                throw new BizException(ResultCode.CONFLICT, "邀请码已过期");
             }
-            if (ic.getUsedCount() >= ic.getMaxUses()) throw new BizException(ResultCode.CONFLICT);
+            if (ic.getUsedCount() >= ic.getMaxUses()) throw new BizException(ResultCode.CONFLICT, "邀请码已使用完");
             user.setFamilyId(ic.getFamilyId());
             sysUserMapper.insert(user);
 
@@ -274,15 +274,15 @@ public class AuthService {
     public void joinFamily(Long userId, String inviteCode) {
         if (!StringUtils.hasText(inviteCode)) throw new BizException(ResultCode.BAD_REQUEST);
         InvitationCode ic = invitationCodeMapper.selectByCode(inviteCode.trim());
-        if (ic == null || !DictConst.INVITE_UNUSED.equals(ic.getStatus())) throw new BizException(ResultCode.NOT_FOUND);
+        if (ic == null || !DictConst.INVITE_UNUSED.equals(ic.getStatus())) throw new BizException(ResultCode.NOT_FOUND, "邀请码不存在或已失效");
         if (ic.getExpiresAt() != null && ic.getExpiresAt().isBefore(java.time.LocalDateTime.now())) {
-            throw new BizException(ResultCode.CONFLICT);
+            throw new BizException(ResultCode.CONFLICT, "邀请码已过期");
         }
-        if (ic.getUsedCount() >= ic.getMaxUses()) throw new BizException(ResultCode.CONFLICT);
+        if (ic.getUsedCount() >= ic.getMaxUses()) throw new BizException(ResultCode.CONFLICT, "邀请码已使用完");
         Long existing = sysUserRoleMapper.selectCount(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysUserRole>()
                         .eq(SysUserRole::getUserId, userId).eq(SysUserRole::getFamilyId, ic.getFamilyId()));
-        if (existing > 0) throw new BizException(ResultCode.CONFLICT);
+        if (existing > 0) throw new BizException(ResultCode.CONFLICT, "您已在该家庭中");
 
         SysUserRole ur = new SysUserRole();
         ur.setUserId(userId);
