@@ -507,6 +507,31 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 - 路由直达:`/ops?tab=trace&tid=xxx&date=yyyy-MM-dd`(onMounted 解析 query 自动查询,便于分享/书签)。
 - 前端 5xx 报错 toast(`request.js`)自带 `[tid:xxx]` 前缀(取响应头 X-Trace-Id),报障直接复制检索。
 
+## 21. 运维页·访问统计与天气 API(2026-09-01 V9.9)
+
+### 访问统计 tab(`/ops` name=traffic)
+
+- 筛选行:起止日期选择器+查询按钮+灰色小字提示「数据来自 access 日志文件扫描,按天聚合(上限 14 天)」。
+- 6 指标卡片一行(`.traffic-grid` 6 列,768px 折 3 列):总请求/失败请求/慢请求(>3s)/独立用户/独立 IP/平均耗时(ms)。
+- 24 小时分布图(`.chart-wrap` SVG 800×280 **等比缩放** width:100% height:auto):24 根暖棕 `#b88c6e` 柱(总请求)+底部红色 `#b04a3a` 叠层(失败数);x 轴每 3 小时一个标签(0h/3h/.../21h);图例两项。
+- 接口 Top15 表:接口(mono 字体)/请求数/失败/平均耗时;无数据显示空态。
+- 懒加载(切到 tab 才查)+`/ops?tab=traffic` 路由直达。
+
+### 日志筛选组件规范(操作日志/详细日志通用)
+
+- 全部 `el-select multiple filterable clearable collapse-tags collapse-tags-tooltip`,选中即触发查询。
+- 操作日志:模块/操作类型(动态选项来自 `GET /ops/logs/options` distinct)+结果(固定 成功/失败)。
+- 详细日志:日志类型(访问/服务端/第三方)+日志级别(ERROR/WARN/INFO/DEBUG),选项为固定枚举。
+
+### 天气 API tab(按关注优先级重排)
+
+1. **调用趋势**(置顶):时间段单选(24小时/本月/30天/一年)+ **API 类型多选可搜索**(12 类:实时天气/预报/逐小时/预警/空气质量/生活指数/分钟降水/城市搜索/配额查询/财务/指标/其他);图表上方摘要行(13px 次要色):调用总量/失败请求/失败率(失败>0 红色 `#b04a3a`);折线图暖棕总量+红色失败两条线,x 轴标签按真实数据下标定位且**零填充覆盖全时间范围**;图例两项。
+2. **本月配额(本地统计)**:4 卡片一行——本月已用/配额上限/剩余/使用率(百分比)。
+3. **24h 请求量统计(按 API)**:API/成功/错误/失败率合一表(size=small)。
+4. **财务汇总**(沉底):余额/本月消费/昨日消费 3 卡片;获取失败显示 warning alert。
+
+图表通用规范:SVG 等比缩放(禁 `preserveAspectRatio="none"` 防文字横向拉伸);柱状图柱宽=步长 55%,圆角 2px。
+
 ## 验收标准
 
 1. 打开页面,背景米白渐变 + 5 个色块缓慢飘移,右下角拍立得堆/闭合相册,左右毛玻璃面板从两侧滑入。
@@ -548,3 +573,4 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 37. **相册列表页**(`/album`):顶部工具栏(`.page-toolbar.card`)常规态:tb-left=搜索框→来源筛选(全部/本地上传/各映射设备名)→类型筛选(全部/公开/私有),tb-right=选择(ghost)→同步→新建(primary);选择态:tb-right=选中计数(`.select-count` 13px 次要色)+取消+删除所选(danger,默认尺寸与常规按钮同规格),常规按钮隐藏。卡片:默认封面暖棕文件夹内联 SVG(AlbumDefaultCover,无照片无自定义封面时);来源角标(设备名+状态点:绿 VALID/灰 OFFLINE/红 MISSING);子相册数角标;总数用子树合计;选中卡片暖棕 outline(3px inset)+左上 pick-badge 勾选计数,多选时隐藏卡片类型标签避让。选择模式一次性操作,不 localStorage 记忆;批量删除映射相册文案区分(解除映射)。
 38. **相册详情页**(`/album/:id`):页头 album-head(padding 10px 16px 对齐工具栏规范)=面包屑层级返回(parents 父级链)+封面缩略+名称/描述+操作区。操作区常规态=视图切换 view-toggle(仅含子相册时)/选择(ghost)/分享(ghost,仅公开相册)/设置封面(ghost,创建者或 OWNER)/编辑/删除/上传照片(primary);选择态=选中计数+取消+删除所选(danger),独立多选工具条已并入操作区。子相册双视图 localStorage 记忆:方块(4:3 大封面卡片)与列表(单列横条:小封面+名称+照片数+状态点);照片网格缩略图 `&thumb=1` 只拼设备映射照片的签名 URL(本地 `/files/` 直链无 query 不拼参数);映射相册只读横幅(来源+上次刷新时间)+刷新按钮(OWNER),隐藏上传与编辑/删除;纯子相册相册(有子无照片)不显示照片空态;子相册+照片混合多选删除(先删子相册再删照片);后台同步完成 ElNotification 通知+页面自动刷新(watch syncStore.doneCount)。
 39. **运维详细日志页**(`/ops` 详细日志 tab):tid+日期查询三类日志(access/server/thirdparty)按时间线合并;来源/级别标签配色(见 §20);ERROR/WARN 左侧色条;等宽字体消息区 max-height 420px 滚动,堆栈整块保留;操作日志 TID 列点击跳转自动查询;`/ops?tab=trace&tid=xxx` 路由直达;5xx 报错 toast 自带 `[tid:xxx]`。
+40. **运维访问统计与天气 API 页**(`/ops`):访问统计 tab=6 指标卡片+24h 柱状图(暖棕总/红失败叠层,等比缩放)+接口 Top15 表,日期范围筛选,懒加载+`?tab=traffic` 直达;操作日志/详细日志筛选全部多选可搜索(见 §21);天气 API 页四段式布局(调用趋势+类型筛选→配额卡片→24h 合一表→财务),折线图 x 轴覆盖全时间范围且标签位置正确,配额为本地统计(不依赖控制台 API)。
