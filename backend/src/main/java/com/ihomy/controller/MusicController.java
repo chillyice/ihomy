@@ -81,6 +81,7 @@ public class MusicController {
     }
 
     @Operation(summary = "上传单曲(自动解析元数据)")
+    @OperationLog(module = "MUSIC", operationType = "CREATE", description = "上传单曲", saveArgs = false)
     @PostMapping("/upload")
     public Result<ContentMusic> upload(@RequestParam("file") MultipartFile file) {
         LoginUser user = requireLogin();
@@ -88,6 +89,7 @@ public class MusicController {
     }
 
     @Operation(summary = "批量上传专辑(文件夹)")
+    @OperationLog(module = "MUSIC", operationType = "CREATE", description = "批量上传专辑", saveArgs = false)
     @PostMapping("/upload-album")
     public Result<Void> uploadAlbum(@RequestParam("files") MultipartFile[] files,
                                      @RequestParam(value = "album", required = false) String album) {
@@ -97,6 +99,7 @@ public class MusicController {
     }
 
     @Operation(summary = "添加外链曲目")
+    @OperationLog(module = "MUSIC", operationType = "CREATE", description = "添加外链曲目")
     @PostMapping
     public Result<ContentMusic> add(@RequestBody ContentMusic dto) {
         LoginUser user = requireLogin();
@@ -105,6 +108,7 @@ public class MusicController {
     }
 
     @Operation(summary = "删除曲目")
+    @OperationLog(module = "MUSIC", operationType = "DELETE", description = "删除曲目")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         LoginUser user = requireLogin();
@@ -113,6 +117,7 @@ public class MusicController {
     }
 
     @Operation(summary = "批量删除曲目")
+    @OperationLog(module = "MUSIC", operationType = "DELETE", description = "批量删除曲目")
     @DeleteMapping("/batch")
     public Result<Void> batchDelete(@RequestBody Map<String, List<Long>> body) {
         LoginUser user = requireLogin();
@@ -121,6 +126,7 @@ public class MusicController {
     }
 
     @Operation(summary = "按专辑批量删除")
+    @OperationLog(module = "MUSIC", operationType = "DELETE", description = "按专辑删除曲目")
     @DeleteMapping("/album/{album}")
     public Result<Void> deleteByAlbum(@PathVariable String album) {
         LoginUser user = requireLogin();
@@ -138,6 +144,7 @@ public class MusicController {
     }
 
     @Operation(summary = "新建歌单")
+    @OperationLog(module = "MUSIC", operationType = "CREATE", description = "新建歌单")
     @PostMapping("/playlist")
     public Result<ContentMusicPlaylist> createPlaylist(@RequestBody Map<String, String> body) {
         LoginUser user = requireLogin();
@@ -145,6 +152,7 @@ public class MusicController {
     }
 
     @Operation(summary = "删除歌单")
+    @OperationLog(module = "MUSIC", operationType = "DELETE", description = "删除歌单")
     @DeleteMapping("/playlist/{id}")
     public Result<Void> deletePlaylist(@PathVariable Long id) {
         LoginUser user = requireLogin();
@@ -160,6 +168,7 @@ public class MusicController {
     }
 
     @Operation(summary = "添加曲目到歌单")
+    @OperationLog(module = "MUSIC", operationType = "UPDATE", description = "歌单添加曲目")
     @PostMapping("/playlist/{id}/tracks")
     public Result<Void> addTracks(@PathVariable Long id, @RequestBody Map<String, List<Long>> body) {
         LoginUser user = requireLogin();
@@ -168,6 +177,7 @@ public class MusicController {
     }
 
     @Operation(summary = "从歌单移除曲目")
+    @OperationLog(module = "MUSIC", operationType = "UPDATE", description = "歌单移除曲目")
     @DeleteMapping("/playlist/{id}/tracks/{musicId}")
     public Result<Void> removeTrack(@PathVariable Long id, @PathVariable Long musicId) {
         LoginUser user = requireLogin();
@@ -176,6 +186,7 @@ public class MusicController {
     }
 
     @Operation(summary = "设为背景音乐歌单")
+    @OperationLog(module = "MUSIC", operationType = "UPDATE", description = "设为背景歌单")
     @PutMapping("/playlist/{id}/set-background")
     public Result<Void> setBackground(@PathVariable Long id) {
         LoginUser user = requireLogin();
@@ -184,6 +195,7 @@ public class MusicController {
     }
 
     @Operation(summary = "取消背景音乐")
+    @OperationLog(module = "MUSIC", operationType = "UPDATE", description = "取消背景歌单")
     @DeleteMapping("/playlist/unset-background")
     public Result<Void> unsetBackground() {
         LoginUser user = requireLogin();

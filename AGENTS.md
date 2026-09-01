@@ -299,6 +299,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
     - **三方调用一律走 `ThirdPartyHttp.get()`**(自动 thirdparty 日志+URL/头脱敏);流式下载参考 `StorageService.baiduOpen` 手动打 `Loggers.thirdParty()`。
     - **报错必须带堆栈**:`log.error("xx, param={}", p, e)`(e 恒为最后一个参数);禁止 `e.printStackTrace()` 和只打 `e.getMessage()`。
     - **级别**:ERROR=需人工介入(带堆栈)/WARN=可自动恢复需关注/INFO=关键业务节点/DEBUG=细节(SQL 恒 DEBUG 只进 server 文件)。
+    - **业务操作日志双写**(强制):`@OperationLog` 切面在落库同时输出 server 日志一行 `[操作] MODULE.TYPE 描述 用户=xx#N 结果=SUCCESS/FAILED 耗时=Nms`——**所有写接口(POST/PUT/DELETE)必须加 @OperationLog**(module 大写/operationType 用 CREATE/UPDATE/DELETE 等标准词/description 中文短句;高频噪音端点如 token 刷新、已读标记除外),业务代码无需再手动打关键节点 INFO。
     - **新敏感字段进 `AccessLogFilter.SENSITIVE_JSON` 打码清单**(password/token/captcha 等)。
     - **运维「详细日志」**:`GET /ops/logs/trace?tid=` 按tid扫三类文件;操作日志 TID 列可点;前端 5xx 报错 toast 自带 `[tid:xxx]`。排查方法论见 `docs/日志问题分析方法.md`。
 
@@ -986,6 +987,8 @@ CREATE TABLE sys_media_server (
 | `controller/DailyController.java` | Bing 代理改走 ThirdPartyHttp(删 HttpClient) |
 | `service/StorageService.java` | httpGetJson 改走 ThirdPartyHttp(baidu);baiduOpen dlink 流式手动打 thirdparty 日志(fsId/status/len/costMs,失败 `!!!`) |
 | `service/OpsService.java` + `controller/OpsController.java` | `GET /ops/logs/trace?tid=&date=`:扫三类文件按 tid 精确匹配,行头正则解析(时间/线程/tid/级别/logger/消息),堆栈续行归入上一条,按时间合并排序返回(条数上限 3000、单条消息 16KB 截断);tid 格式校验防滥用 |
+| `aspect/OperationLogAspect.java` | **业务操作日志双写**:落库同时输出 server 日志一行 `[操作] MODULE.TYPE 描述 用户=xx#N 结果=SUCCESS/FAILED 耗时=Nms`(成功 INFO/失败 WARN 带错误摘要 200 字符截断)——@OperationLog 端点的关键业务节点自动进六要素日志 |
+| 7 个 Controller(Blog/Library/Music/Like/Profile/Reminder/Task) | 补齐 25 处缺漏的 `@OperationLog`(博客/图书分类 CRUD、音乐上传+外链+删除+歌单全套、点赞切换、身份标签删除、提醒完成切换、任务放弃);auth/refresh、chat/read、notification/read 属高频噪音端点刻意不加 |
 | `frontend/src/api/index.js` | `opsApi.traceLogs` |
 | `frontend/src/views/ops/Ops.vue` | 新增「详细日志」tab(tid+日期查询,来源/级别标签着色,ERROR/WARN 左边条,mono 消息区 420px 滚动);操作日志表格 TID 列点击跳详细日志并按该行日期自动查询;支持 `/ops?tab=trace&tid=xxx&date=` 直达;onMounted 并行加载 |
 | `frontend/src/api/request.js` | 5xx 业务码与 HTTP 错误 toast 前缀 `[tid:xxx]`(取响应头 X-Trace-Id,报障直接拿 tid 检索) |

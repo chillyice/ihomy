@@ -1,5 +1,6 @@
 package com.ihomy.controller;
 
+import com.ihomy.annotation.OperationLog;
 import com.ihomy.common.Result;
 import com.ihomy.entity.SysUser;
 import com.ihomy.security.SecurityHelper;
@@ -24,6 +25,7 @@ public class LikeController {
     private final SecurityHelper securityHelper;
 
     @Operation(summary = "点赞/取消点赞")
+    @OperationLog(module = "LIKE", operationType = "UPDATE", description = "点赞切换")
     @PostMapping("/toggle")
     public Result<Map<String, Object>> toggle(@RequestBody Map<String, Object> body) {
         SysUser user = securityHelper.currentUser();

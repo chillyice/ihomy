@@ -57,6 +57,7 @@ public class TaskController {
     }
 
     @Operation(summary = "放弃任务")
+    @OperationLog(module = "TASK", operationType = "UPDATE", description = "放弃任务")
     @PostMapping("/{id}/abandon")
     public Result<Void> abandon(@PathVariable Long id) {
         LoginUser user = current();
