@@ -8,13 +8,13 @@
           <el-input v-model="form.title" :placeholder="$t('blog.titlePlaceholder')" />
         </el-form-item>
         <el-form-item :label="$t('blog.coverImage')">
-          <el-input v-model="form.coverImage" :placeholder="$t('blog.coverUrlPlaceholder')">
-            <template #append>
-              <el-upload :show-file-list="false" :before-upload="onUpload">
-                <el-button>{{ $t('common.upload') }}</el-button>
-              </el-upload>
-            </template>
-          </el-input>
+          <div class="cover-uploader">
+            <el-upload :show-file-list="false" :before-upload="onUpload" accept="image/*">
+              <img v-if="form.coverImage" :src="form.coverImage" class="cover-preview" :alt="$t('blog.coverImage')" />
+              <div v-else class="cover-uploader-btn">{{ $t('blog.uploadCover') }}</div>
+            </el-upload>
+            <el-button v-if="form.coverImage" link type="danger" @click="form.coverImage = ''">{{ $t('common.remove') }}</el-button>
+          </div>
         </el-form-item>
         <el-form-item :label="$t('blog.contentMarkdown')">
           <el-input v-model="form.content" type="textarea" :rows="14" :placeholder="$t('blog.markdownHint')" />
@@ -43,6 +43,7 @@
           <el-radio-group v-model="form.visibility">
             <el-radio :value="0">{{ $t('blog.onlySelf') }}</el-radio>
             <el-radio :value="3">{{ $t('blog.familyVisible') }}</el-radio>
+            <el-radio :value="4">{{ $t('blog.publicVisible') }}</el-radio>
           </el-radio-group>
         </el-form-item>
         <div class="form-footer">
@@ -93,6 +94,7 @@ const loading = ref(false)
 
 const form = reactive({ title: '', content: '', coverImage: '', category: '', status: 1, visibility: 3 })
 const categories = ref([])
+const legacyCategory = ref(null)
 const showCategoryDialog = ref(false)
 const newCatName = ref('')
 const newCatParent = ref(null)
@@ -111,7 +113,12 @@ const categoryTree = computed(() => {
     label: item.name,
     children: item.childCount > 0 ? build(item.id) : undefined,
   }))
-  return build(0)
+  const tree = build(0)
+  // 旧分类(不在分类表,如迁移前的自由文本)注入顶级选项,保证编辑时 cascader 能回显
+  if (legacyCategory.value && !categories.value.some(c => c.path === legacyCategory.value)) {
+    tree.push({ value: legacyCategory.value, label: legacyCategory.value })
+  }
+  return tree
 })
 
 const openNewCatDialog = () => {
@@ -125,6 +132,8 @@ const loadCategories = async () => {
   try {
     categories.value = await blogApi.categories() || []
   } catch (e) {}
+  // 编辑回填的分类不在分类表中(旧数据):记录为顶级选项,cascader 对不上的值显示空白
+  if (form.category && !categories.value.some(c => c.path === form.category)) legacyCategory.value = form.category
 }
 
 // 新建分类:加入下拉列表并选中
@@ -154,12 +163,14 @@ const onUpload = async (file) => {
 }
 
 // 保存:编辑走 update,新增走 create,成功后回列表页
+// 分类归一:清空选择(undefined/null)转空串,后端把空分类落"未分类"
 const onSave = async () => {
   if (!form.title) return ElMessage.warning(t('blog.inputTitle'))
   loading.value = true
   try {
-    if (isEdit.value) await blogApi.update(route.params.id, form)
-    else await blogApi.create(form)
+    const payload = { ...form, category: form.category || '' }
+    if (isEdit.value) await blogApi.update(route.params.id, payload)
+    else await blogApi.create(payload)
     ElMessage.success(t('common.saveSuccess'))
     router.push('/blog')
   } finally {
@@ -168,10 +179,17 @@ const onSave = async () => {
 }
 
 onMounted(async () => {
-  // 编辑模式下拉取详情回填表单
+  // 编辑模式下拉取详情回填表单(后端 status/visibility 为字符串枚举,表单用数字码,同 DiaryEdit 转换)
   if (isEdit.value) {
     const b = await blogApi.detail(route.params.id)
-    Object.assign(form, { title: b.title, content: b.content, coverImage: b.coverImage, category: b.category || '', status: b.status, visibility: b.visibility })
+    Object.assign(form, {
+      title: b.title,
+      content: b.content,
+      coverImage: b.coverImage,
+      category: b.category || '',
+      status: b.status === 'PUBLISHED' ? 1 : 0,
+      visibility: b.visibility === 'PRIVATE' ? 0 : b.visibility === 'PUBLIC' ? 4 : 3,
+    })
   }
   loadCategories()
 })
@@ -180,6 +198,9 @@ onMounted(async () => {
 <style scoped>
 .category-row { display: flex; gap: 8px; width: 100%; }
 .form-footer { display: flex; justify-content: flex-end; margin-top: 4px; }
+.cover-uploader { display: flex; align-items: flex-end; gap: 12px; }
+.cover-preview { width: 180px; height: 100px; object-fit: cover; border-radius: 8px; border: 1px solid var(--color-border); cursor: pointer; }
+.cover-uploader-btn { width: 180px; height: 100px; border-radius: 8px; border: 1px dashed var(--color-border); display: flex; align-items: center; justify-content: center; color: var(--color-text-secondary); font-size: 12px; cursor: pointer; background: var(--color-bg); }
 
 @media (max-width: 768px) {
   .category-row { flex-direction: column; }

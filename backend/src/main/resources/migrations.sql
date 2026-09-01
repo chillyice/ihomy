@@ -386,4 +386,50 @@ EXECUTE add_music_idx_source_stmt;
 DEALLOCATE PREPARE add_music_idx_source_stmt;
 
 
+-- ------------------------------------------------------------
+-- 初始博客分类(2026-09-01):为尚无分类的家庭注入默认分类 + 空分类博客归入"未分类" + 旧分类字符串收编入表
+-- 新建家庭由 BlogService.seedDefaultCategories 注入同一套;已有自建分类树的家庭跳过种子
+-- 旧字符串分类(如"代码导览/开发笔记")收编为正式顶级分类,获得 id 后即可在分类管理里改名/移父级/删除
+-- 幂等:NOT EXISTS 守卫,重复执行无副作用
+-- ------------------------------------------------------------
+INSERT INTO `content_blog_category` (`name`, `family_id`, `sort_order`)
+SELECT d.name, f.id, d.sort
+FROM `sys_family_info` f
+JOIN (
+  SELECT '生活随笔' AS name, 1 AS sort UNION ALL
+  SELECT '家庭时光', 2 UNION ALL
+  SELECT '旅行游记', 3 UNION ALL
+  SELECT '美食记录', 4 UNION ALL
+  SELECT '育儿亲子', 5 UNION ALL
+  SELECT '健康运动', 6 UNION ALL
+  SELECT '读书笔记', 7 UNION ALL
+  SELECT '兴趣爱好', 8 UNION ALL
+  SELECT '未分类', 9
+) d
+WHERE NOT EXISTS (
+  SELECT 1 FROM `content_blog_category` c
+  WHERE c.family_id = f.id AND c.deleted = 0
+);
+
+-- 未分类固定排最后(早期种子把它排在 1,统一挪到 9)
+UPDATE `content_blog_category` SET `sort_order` = 9
+WHERE `deleted` = 0 AND `parent_id` IS NULL AND `name` = '未分类';
+
+-- 空分类博客归入"未分类"
+UPDATE `content_blog` SET `category` = '未分类'
+WHERE `deleted` = 0 AND (`category` IS NULL OR `category` = '');
+
+-- 旧分类字符串收编为顶级分类(sort 90 块,排在默认分类之后;斜杠路径按整名收编)
+INSERT INTO `content_blog_category` (`name`, `family_id`, `sort_order`)
+SELECT b.category, b.family_id, 90
+FROM (
+  SELECT DISTINCT `category`, `family_id` FROM `content_blog`
+  WHERE `deleted` = 0 AND `category` IS NOT NULL AND `category` != '' AND `category` != '未分类'
+) b
+WHERE NOT EXISTS (
+  SELECT 1 FROM `content_blog_category` c
+  WHERE c.family_id = b.family_id AND c.deleted = 0 AND c.parent_id IS NULL AND c.name = b.category
+);
+
+
 

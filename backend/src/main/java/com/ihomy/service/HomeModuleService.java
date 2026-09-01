@@ -30,25 +30,45 @@ public class HomeModuleService {
 
     // ponytail: 启动加载全局模块 + familyId 缓存,变更时 evict;未引入 Caffeine 等库
     private volatile List<HomeModule> globalModules = List.of();
+    private volatile boolean globalLoaded = false;
     private final ConcurrentHashMap<Long, List<HomeModule>> familyCache = new ConcurrentHashMap<>();
 
     @PostConstruct
     void init() {
+        // 预热:@PostConstruct 阶段 mapper 可能未就绪(生产 2026-09-01 曾因此启动失败,
+        // 全局模块永久为空导致导航消失),失败不致命,首次查询走懒加载兜底
+        loadGlobal();
+    }
+
+    /** 加载全局模块到内存(启动预热与查询兜底共用;成功后置 loaded 标记) */
+    private void loadGlobal() {
         try {
             LambdaQueryWrapper<HomeModule> qw = new LambdaQueryWrapper<>();
             qw.isNull(HomeModule::getFamilyId).orderByAsc(HomeModule::getPosition).orderByAsc(HomeModule::getSortOrder);
             globalModules = homeModuleMapper.selectList(qw);
+            globalLoaded = true;
             log.info("loaded {} global home modules", globalModules.size());
         } catch (Exception e) {
             log.warn("init global modules failed, will lazy load", e);
         }
     }
 
+    /** 全局模块(启动预热失败时首次查询懒加载,兑现日志里"will lazy load"的承诺) */
+    private List<HomeModule> globalModulesOrLoad() {
+        if (!globalLoaded) {
+            synchronized (this) {
+                if (!globalLoaded) loadGlobal();
+            }
+        }
+        return globalModules;
+    }
+
     /** 已启用模块(全局 + 本家庭),按位置/排序号升序 */
     public List<HomeModule> listEnabled(Long familyId) {
         List<HomeModule> family = familyModules(familyId);
-        List<HomeModule> result = new ArrayList<>(globalModules.size() + family.size());
-        for (HomeModule m : globalModules) {
+        List<HomeModule> globals = globalModulesOrLoad();
+        List<HomeModule> result = new ArrayList<>(globals.size() + family.size());
+        for (HomeModule m : globals) {
             if (m.getEnabled() != null && m.getEnabled() == 1) result.add(m);
         }
         for (HomeModule m : family) {
@@ -67,8 +87,9 @@ public class HomeModuleService {
     /** 全部模块(含停用),供管理端配置 */
     public List<HomeModule> listAll(Long familyId) {
         List<HomeModule> family = familyModules(familyId);
-        List<HomeModule> result = new ArrayList<>(globalModules.size() + family.size());
-        result.addAll(globalModules);
+        List<HomeModule> globals = globalModulesOrLoad();
+        List<HomeModule> result = new ArrayList<>(globals.size() + family.size());
+        result.addAll(globals);
         result.addAll(family);
         result.sort((a, b) -> {
             String pa = a.getPosition() == null ? "" : a.getPosition();
@@ -126,12 +147,6 @@ public class HomeModuleService {
     }
 
     private void reloadGlobal() {
-        try {
-            LambdaQueryWrapper<HomeModule> qw = new LambdaQueryWrapper<>();
-            qw.isNull(HomeModule::getFamilyId).orderByAsc(HomeModule::getPosition).orderByAsc(HomeModule::getSortOrder);
-            globalModules = homeModuleMapper.selectList(qw);
-        } catch (Exception e) {
-            log.warn("reload global modules failed", e);
-        }
+        loadGlobal();
     }
 }
