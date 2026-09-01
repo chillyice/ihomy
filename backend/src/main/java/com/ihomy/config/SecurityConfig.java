@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.MediaType;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -63,7 +64,10 @@ public class SecurityConfig {
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e
                 // 未登录与无权限均以统一 JSON 结构返回,而非跳转登录页
+                // 401 必须带真实 HTTP 状态码:前端 axios 只对 HTTP 401 触发 refresh token 自动续期,
+                // 此前漏设状态码(默认 200)导致续期逻辑永不执行,用户每 2 小时被登出
                 .authenticationEntryPoint((req, resp, ex) -> {
+                    resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     resp.setContentType(MediaType.APPLICATION_JSON_VALUE);
                     resp.setCharacterEncoding("UTF-8");
                     resp.getWriter().write(objectMapper.writeValueAsString(Result.fail(ResultCode.UNAUTHORIZED)));

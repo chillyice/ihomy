@@ -51,6 +51,7 @@ public class AuthService {
     private final SecurityHelper securityHelper;
     private final InvitationCodeMapper invitationCodeMapper;
     private final CaptchaService captchaService;
+    private final BlogService blogService;
 
     private static final String BLACKLIST_PREFIX = "jwt:blacklist:";
     private static final String CUR_FAMILY_PREFIX = "user:curfamily:";
@@ -155,6 +156,8 @@ public class AuthService {
         family.setCoverText("欢迎来到我们的家庭空间");
         family.setShareToken(genShareToken());
         familyMapper.insert(family);
+        // 注入初始博客分类(未分类/生活随笔等,幂等)
+        blogService.seedDefaultCategories(family.getId());
 
         user.setFamilyId(family.getId());
         sysUserMapper.insert(user);

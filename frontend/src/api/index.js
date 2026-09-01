@@ -216,16 +216,17 @@ export const wishApi = {
 export const musicApi = {
   list: () => request.get('/music/list'),
   albums: () => request.get('/music/albums'),
+  // 上传不限时(整专辑多文件,家庭宽带上行慢,15s 默认超时会中断,同照片/视频上传)
   upload: (file) => {
     const fd = new FormData()
     fd.append('file', file)
-    return request.post('/music/upload', fd)
+    return request.post('/music/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 0 })
   },
   uploadAlbum: (files, album) => {
     const fd = new FormData()
     files.forEach(f => fd.append('files', f))
     if (album) fd.append('album', album)
-    return request.post('/music/upload-album', fd)
+    return request.post('/music/upload-album', fd, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 0 })
   },
   add: (data) => request.post('/music', data),
   remove: (id) => request.delete(`/music/${id}`),

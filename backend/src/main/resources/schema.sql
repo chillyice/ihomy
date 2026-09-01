@@ -842,13 +842,18 @@ WHERE u.is_fake = 1;
 
 UPDATE `sys_family_info` SET `owner_id` = (SELECT id FROM `sys_user` WHERE username = 'demo_owner') WHERE `id` = @fid;
 
-INSERT INTO `content_blog` (`title`, `content`, `author_id`, `family_id`, `status`, `visibility`, `view_count`) VALUES
+INSERT INTO `content_blog` (`title`, `content`, `author_id`, `family_id`, `status`, `visibility`, `view_count`, `category`) VALUES
 ('欢迎使用 ihomy', '## 欢迎加入 ihomy\n\nihomy 是家庭共用软件，支持博客、日记、相册、放映厅等功能。\n\n- 博客：记录家庭大事小事\n- 日记本：写心情日记\n- 相册：存放全家照片\n- 放映厅：上传全家一起看的电影和视频\n\n点击右上角「注册」，创建属于你自己的家庭吧！',
- (SELECT id FROM `sys_user` WHERE username = 'demo_owner'), @fid, 'PUBLISHED', 'PUBLIC', 12),
+ (SELECT id FROM `sys_user` WHERE username = 'demo_owner'), @fid, 'PUBLISHED', 'PUBLIC', 12, '未分类'),
 ('周末一起去野餐', '这个周末天气不错，我们全家一起去郊外野餐吧！\n\n- 地点：城市公园\n- 时间：周六上午 10 点\n- 记得带上野餐垫、风筝和零食！',
- (SELECT id FROM `sys_user` WHERE username = 'demo_owner'), @fid, 'PUBLISHED', 'PUBLIC', 8),
+ (SELECT id FROM `sys_user` WHERE username = 'demo_owner'), @fid, 'PUBLISHED', 'PUBLIC', 8, '家庭时光'),
 ('小宝第一次上台表演', '今天小宝在幼儿园的文艺汇演上表演了舞蹈，跳得特别棒！\n\n虽然有点紧张，但是全程没有出错，爸爸妈妈为你骄傲！',
- (SELECT id FROM `sys_user` WHERE username = 'demo_child'), @fid, 'PUBLISHED', 'FAMILY', 15);
+ (SELECT id FROM `sys_user` WHERE username = 'demo_child'), @fid, 'PUBLISHED', 'FAMILY', 15, '育儿亲子');
+
+-- 初始博客分类(演示家庭;新建家庭由 BlogService.seedDefaultCategories 注入同一套,未分类固定最后)
+INSERT INTO `content_blog_category` (`name`, `family_id`, `sort_order`) VALUES
+('生活随笔', @fid, 1), ('家庭时光', @fid, 2), ('旅行游记', @fid, 3), ('美食记录', @fid, 4), ('育儿亲子', @fid, 5),
+('健康运动', @fid, 6), ('读书笔记', @fid, 7), ('兴趣爱好', @fid, 8), ('未分类', @fid, 9);
 
 INSERT INTO `content_diary` (`content`, `mood`, `weather`, `author_id`, `family_id`, `visibility`)
 VALUES ('今天全家一起去爬山，山顶的风景特别美，拍了好多照片。', '开心', '晴', 

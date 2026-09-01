@@ -228,11 +228,17 @@ if (-not $FrontendOnly) {
       Write-Step '执行数据库迁移脚本(migrations.sql)'
       & scp -P $Port $migrationsFile "${User}@${Server}:/tmp/ihomy-migrations.sql"
       if ($LASTEXITCODE -ne 0) { Die '上传 migrations.sql 失败' }
-      $migResult = & ssh @sshOpts "$User@$Server" "mysql -uroot ihomy -e 'source /tmp/ihomy-migrations.sql' 2>&1; rm -f /tmp/ihomy-migrations.sql" 2>&1
-      $migResult = $migResult | Where-Object { $_ -and $_ -match 'ERROR|Warning' -and $_ -notmatch 'Using a password' }
-      if ($migResult) {
+      # --default-character-set=utf8mb4:migrations.sql 含中文字符串数据,不带此参数会按客户端默认字符集写入乱码
+      $migResult = & ssh @sshOpts "$User@$Server" "mysql -uroot --default-character-set=utf8mb4 ihomy -e 'source /tmp/ihomy-migrations.sql' 2>&1; rm -f /tmp/ihomy-migrations.sql" 2>&1
+      $migErrors = @($migResult | Where-Object { $_ -and $_ -match 'ERROR' })
+      $migWarns = @($migResult | Where-Object { $_ -and $_ -match 'Warning' -and $_ -notmatch 'Using a password' })
+      if ($migWarns) {
         Write-Warn "迁移输出:"
-        $migResult | ForEach-Object { Write-Warn "  $_" }
+        $migWarns | ForEach-Object { Write-Warn "  $_" }
+      }
+      if ($migErrors) {
+        $migErrors | ForEach-Object { Write-Warn "  $_" }
+        Die '数据库迁移执行失败(见上方 ERROR)'
       }
       Write-Ok '数据库迁移完成'
     } else {

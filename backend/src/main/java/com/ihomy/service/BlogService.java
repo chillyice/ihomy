@@ -25,9 +25,32 @@ import java.util.*;
 @RequiredArgsConstructor
 public class BlogService {
 
+    /** 未分类:博客不选分类时的归宿(空/清空分类统一落这里,列表计数可见) */
+    public static final String CATEGORY_UNCATEGORIZED = "未分类";
+
+    /** 新家庭初始博客分类(创建家庭时注入,家长可改名/删除;未分类固定最后) */
+    private static final List<String> DEFAULT_CATEGORIES = List.of(
+            "生活随笔", "家庭时光", "旅行游记", "美食记录", "育儿亲子",
+            "健康运动", "读书笔记", "兴趣爱好", CATEGORY_UNCATEGORIZED);
+
     private final BlogMapper blogMapper;
     private final BlogCategoryMapper blogCategoryMapper;
     private final PointsService pointsService;
+
+    /** 为家庭注入初始分类(幂等:已有任意分类的家庭跳过,不干扰用户自建树) */
+    public void seedDefaultCategories(Long familyId) {
+        LambdaQueryWrapper<BlogCategory> qw = new LambdaQueryWrapper<>();
+        qw.eq(BlogCategory::getFamilyId, familyId);
+        if (blogCategoryMapper.selectCount(qw) > 0) return;
+        int sort = 1;
+        for (String name : DEFAULT_CATEGORIES) {
+            BlogCategory c = new BlogCategory();
+            c.setName(name);
+            c.setFamilyId(familyId);
+            c.setSortOrder(sort++);
+            blogCategoryMapper.insert(c);
+        }
+    }
 
     /** 分页查询:OWNER 见全家;成员见自己的+家庭可见/公开;游客仅公开 */
     public IPage<Blog> page(int current, int size, Long familyId, Long currentUserId, boolean isOwner, String keyword, String category) {
@@ -290,11 +313,12 @@ public class BlogService {
         blog.setContent(dto.getContent());
         blog.setCoverImage(dto.getCoverImage());
         blog.setTags(dto.getTags());
-        blog.setCategory(dto.getCategory());
         blog.setAuthorId(authorId);
         blog.setFamilyId(familyId);
         blog.setStatus(DictConst.blogStatus(dto.getStatus()));
         blog.setVisibility(DictConst.visibility(dto.getVisibility()));
+        // 空分类统一落"未分类",保证列表分类计数可见
+        blog.setCategory(StringUtils.hasText(dto.getCategory()) ? dto.getCategory() : CATEGORY_UNCATEGORIZED);
         blog.setViewCount(0);
         blogMapper.insert(blog);
         pointsService.addRecord(authorId, familyId, "REWARD", PointsService.REWARD_BLOG, "发布博客");
@@ -314,7 +338,8 @@ public class BlogService {
         blog.setContent(dto.getContent());
         blog.setCoverImage(dto.getCoverImage());
         if (dto.getTags() != null) blog.setTags(dto.getTags());
-        if (dto.getCategory() != null) blog.setCategory(dto.getCategory());
+        // 分类传了但为空串(前端清空选择)= 移入"未分类";null = 不修改
+        if (dto.getCategory() != null) blog.setCategory(StringUtils.hasText(dto.getCategory()) ? dto.getCategory() : CATEGORY_UNCATEGORIZED);
         if (dto.getStatus() != null) blog.setStatus(DictConst.blogStatus(dto.getStatus()));
         if (dto.getVisibility() != null) blog.setVisibility(DictConst.visibility(dto.getVisibility()));
         blogMapper.updateById(blog);

@@ -14,6 +14,7 @@ import com.ihomy.mapper.FamilyMapper;
 import com.ihomy.mapper.SysRoleMapper;
 import com.ihomy.mapper.SysUserRoleMapper;
 import com.ihomy.security.SecurityHelper;
+import com.ihomy.service.BlogService;
 import com.ihomy.service.MultiFamilyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -42,6 +43,7 @@ public class FamilyController {
     private final SysRoleMapper sysRoleMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
     private final StringRedisTemplate redisTemplate;
+    private final BlogService blogService;
 
     @Operation(summary = "创建新家庭(当前用户绑定 OWNER)")
     @OperationLog(module = "FAMILY", operationType = "CREATE", description = "创建新家庭", saveArgs = false)
@@ -57,6 +59,9 @@ public class FamilyController {
         family.setShareToken(UUID.randomUUID().toString().replace("-", "").substring(0, 16));
         family.setOwnerId(user.getId());
         familyMapper.insert(family);
+
+        // 注入初始博客分类(未分类/生活随笔等,幂等)
+        blogService.seedDefaultCategories(family.getId());
 
         SysRole ownerRole = sysRoleMapper.selectOne(
                 new LambdaQueryWrapper<SysRole>().eq(SysRole::getRoleCode, "OWNER"));
