@@ -3,11 +3,11 @@ package com.ihomy.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ihomy.common.SolarUtil;
+import com.ihomy.common.ThirdPartyHttp;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
 
 import java.time.*;
 import java.util.HashMap;
@@ -96,7 +96,7 @@ public class SunService {
         }
         try {
             String url = "http://ip-api.com/json/" + ip + "?fields=status,lat,lon,timezone";
-            JsonNode resp = RestClient.create().get().uri(url).retrieve().body(JsonNode.class);
+            JsonNode resp = mapper.readTree(ThirdPartyHttp.get("ipapi", url, null, 8000).body());
             if (resp != null && resp.has("lat")) {
                 String lat = String.valueOf(resp.get("lat").asDouble());
                 String lng = String.valueOf(resp.get("lon").asDouble());

@@ -261,6 +261,7 @@ export const opsApi = {
   stats: (params) => request.get('/ops/stats', { params }),
   server: () => request.get('/ops/server'),
   logs: (params) => request.get('/ops/logs', { params }),
+  traceLogs: (params) => request.get('/ops/logs/trace', { params }),
   weatherQuota: () => request.get('/ops/weather/quota'),
   weatherFinance: () => request.get('/ops/weather/finance'),
   weatherStats: () => request.get('/ops/weather/stats'),

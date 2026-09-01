@@ -74,17 +74,17 @@ app:
   weather-project-id:
   weather-key-id:
   weather-private-key:
+  # 日志保留天数(logback 三类日志文件共用,按天滚动)
+  log-retention-days: 7
 
 logging:
   file:
+    # 日志根目录:access/ server/ thirdparty/ 三个子目录(见 logback-spring.xml)
     # 基线为生产路径;开发环境通过 external.yml(IHOMY_CONFIG_PATH)覆盖为 Windows 路径
-    name: /opt/ihomy/logs/ihomy.log
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %X{traceId:-} %-5level %logger{36} - %msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %X{traceId:-} %-5level %logger{36} - %msg%n"
+    path: /opt/ihomy/logs
   level:
     com.ihomy: info
-    # SQL 语句日志:debug 才输出(由 SqlStatementLog 控制),生产保持 warn 静默
-    mybatis.sql: warn
+    # SQL 语句+入参日志(进 server 日志文件,不进控制台)
+    mybatis.sql: debug
     org.mybatis: warn
     org.springframework.jdbc: warn

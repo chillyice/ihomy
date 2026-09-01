@@ -1,0 +1,117 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ihomy 日志配置(backend_logs 分支):
+  三类日志文件按天滚动,tid(traceId) 贯穿全部输出:
+    - logs/access/ihomy-access.log         客户端调接口(每请求一条:入参/操作人/状态/耗时/响应code)
+    - logs/server/ihomy-server.log         应用内部流程 + SQL 语句及入参 + 框架 ERROR(含堆栈)
+    - logs/thirdparty/ihomy-thirdparty.log 调用第三方服务 API(和风/百度/必应/ip-api)
+  日志根目录:logging.file.path(基线 /opt/ihomy/logs,开发经 external.yml 覆盖)
+  保留天数:app.log-retention-days(默认 7),各类有总量上限防撑爆磁盘
+  六要素:时间 级别 线程 [tid] 位置(logger) 内容
+  注意:SQL 日志(mybatis.sql)只进 server 文件不进控制台,控制台看 SQL 请 tail server 文件
+-->
+<configuration>
+
+    <property name="LOG_HOME" value="${LOG_PATH:-logs}"/>
+    <springProperty scope="context" name="RETENTION_DAYS" source="app.log-retention-days" defaultValue="7"/>
+    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [tid:%X{traceId:-}] %-5level %logger{36} - %msg%n"/>
+
+    <!-- 控制台(开发终端,人类可读;不含 SQL) -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- access 日志文件 -->
+    <appender name="ACCESS_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_HOME}/access/ihomy-access.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_HOME}/access/ihomy-access.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>${RETENTION_DAYS}</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- server 日志文件(含 SQL,体量最大) -->
+    <appender name="SERVER_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_HOME}/server/ihomy-server.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_HOME}/server/ihomy-server.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>${RETENTION_DAYS}</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- thirdparty 日志文件 -->
+    <appender name="THIRD_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_HOME}/thirdparty/ihomy-thirdparty.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_HOME}/thirdparty/ihomy-thirdparty.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>${RETENTION_DAYS}</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- 异步包装:业务线程只入队,队列满丢弃新日志(neverBlock)不阻塞请求 -->
+    <appender name="ACCESS_ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>2048</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="ACCESS_FILE"/>
+    </appender>
+    <appender name="SERVER_ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>4096</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="SERVER_FILE"/>
+    </appender>
+    <appender name="THIRD_ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>2048</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="THIRD_FILE"/>
+    </appender>
+
+    <!-- 客户端接口调用:AccessLogFilter 专用 -->
+    <logger name="ACCESS" level="INFO" additivity="false">
+        <appender-ref ref="ACCESS_ASYNC"/>
+    </logger>
+
+    <!-- 第三方服务出站调用:ThirdPartyHttp 专用 -->
+    <logger name="thirdparty" level="INFO" additivity="false">
+        <appender-ref ref="THIRD_ASYNC"/>
+    </logger>
+
+    <!-- SQL 语句+入参(不记结果集):只进 server 文件,不刷控制台 -->
+    <logger name="mybatis.sql" level="DEBUG" additivity="false">
+        <appender-ref ref="SERVER_ASYNC"/>
+    </logger>
+
+    <!-- mybatis 框架内部日志(SqlSessionUtils/Transaction 会话管理噪音):压回 INFO,
+         DEBUG 静默;WARN 以上走 root(控制台+server 文件) -->
+    <logger name="mybatis.sql.internal" level="INFO"/>
+
+    <!-- 应用内部流程 + 框架日志:控制台 + server 文件 -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="SERVER_ASYNC"/>
+    </root>
+
+</configuration>

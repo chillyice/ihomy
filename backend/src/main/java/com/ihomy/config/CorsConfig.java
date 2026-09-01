@@ -20,6 +20,8 @@ public class CorsConfig {
         cors.addAllowedOriginPattern("*");
         cors.addAllowedHeader("*");
         cors.addAllowedMethod("*");
+        // 暴露链路追踪头给前端(报错 toast 展示 tid,便于到运维"详细日志"页检索)
+        cors.addExposedHeader("X-Trace-Id");
         cors.setAllowCredentials(true);
         cors.setMaxAge(3600L);
         source.registerCorsConfiguration("/**", cors);

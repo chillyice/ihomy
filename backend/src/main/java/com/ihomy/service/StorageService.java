@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.ResultCode;
+import com.ihomy.common.ThirdPartyHttp;
 import com.ihomy.entity.BaiduCredential;
 import com.ihomy.entity.StorageDevice;
 import com.ihomy.entity.SysUser;
@@ -319,19 +320,10 @@ public class StorageService {
         return c;
     }
 
-    /** 简易 HTTP GET 取 JSON(百度 OAuth 端点返回未压缩 JSON) */
+    /** 简易 HTTP GET 取 JSON(百度 OAuth/xpan 端点;出站日志走 ThirdPartyHttp→thirdparty 文件) */
     private JsonNode httpGetJson(String urlStr) {
         try {
-            URL url = new URL(urlStr);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            conn.setConnectTimeout(10000);
-            conn.setReadTimeout(10000);
-            int status = conn.getResponseCode();
-            InputStream is = (status >= 200 && status < 300) ? conn.getInputStream() : conn.getErrorStream();
-            String body = is == null ? "" : new String(is.readAllBytes(), StandardCharsets.UTF_8);
-            conn.disconnect();
-            return json.readTree(body);
+            return json.readTree(ThirdPartyHttp.get("baidu", urlStr, null, 10000).body());
         } catch (Exception e) {
             throw new BizException(ResultCode.INTERNAL_ERROR, "请求百度授权接口失败: " + e.getMessage());
         }
@@ -414,7 +406,11 @@ public class StorageService {
             }
 
             // 3) 打开 dlink 流(手动跟随 302 到 CDN,重放 UA 防丢失);流关闭时释放限流槽
+            //    大文件流式下载不走 ThirdPartyHttp(不能整包读),手动打 thirdparty 日志
             String token = baiduAccessToken(c);
+            org.slf4j.Logger tp = com.ihomy.common.Loggers.thirdParty("baidu");
+            long t0 = System.currentTimeMillis();
+            tp.info(">>> STREAM dlink fsId={} path={}", fid, p);
             HttpURLConnection conn = baiduDlinkConnect(dlink + (dlink.contains("?") ? "&" : "?")
                     + "access_token=" + URLEncoder.encode(token, StandardCharsets.UTF_8));
             int status = conn.getResponseCode();
@@ -429,8 +425,12 @@ public class StorageService {
             }
             if (status != 200 && status != 206) {
                 conn.disconnect();
+                tp.error("!!! STREAM dlink failed fsId={} status={} costMs={}",
+                        fid, status, System.currentTimeMillis() - t0);
                 throw new BizException(ResultCode.INTERNAL_ERROR, "百度网盘文件读取失败: HTTP " + status);
             }
+            tp.info("<<< STREAM dlink fsId={} status={} len={} costMs={}",
+                    fid, status, conn.getContentLengthLong(), System.currentTimeMillis() - t0);
             InputStream raw = conn.getInputStream();
             return new BaiduFileStream(new java.io.FilterInputStream(raw) {
                 @Override

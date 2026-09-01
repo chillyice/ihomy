@@ -26,7 +26,9 @@ request.interceptors.response.use(
   (response) => {
     const res = response.data
     if (res.code !== undefined && res.code !== 0) {
-      ElMessage.error(res.message || '请求失败')
+      // 5xx 级系统异常附上 tid,用户报障时可直接拿它到运维"详细日志"页检索
+      const tid = response.headers?.['x-trace-id']
+      ElMessage.error((res.code >= 500 && tid ? `[tid:${tid}] ` : '') + (res.message || '请求失败'))
       // 业务层 401(如 refresh token 失效):登出但仅写操作跳登录页
       if (res.code === 401) {
         const userStore = useUserStore()
@@ -67,7 +69,8 @@ request.interceptors.response.use(
         return Promise.reject(e)
       }
     }
-    ElMessage.error(error.response?.data?.message || error.message || '网络错误')
+    const tid = error.response?.headers?.['x-trace-id']
+    ElMessage.error((tid ? `[tid:${tid}] ` : '') + (error.response?.data?.message || error.message || '网络错误'))
     return Promise.reject(error)
   }
 )

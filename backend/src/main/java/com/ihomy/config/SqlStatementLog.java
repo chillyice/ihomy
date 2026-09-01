@@ -8,19 +8,23 @@ import org.slf4j.LoggerFactory;
  * 自定义 MyBatis 日志:仅打印 SQL 语句与参数(==>),
  * 过滤结果集输出(<== 列/行/Total),减少日志占用。
  *
- * 改造点(2026-08-17):原版 isDebugEnabled() 恒 true + System.out.println 同步打印,
- * 生产环境每条 SQL 都打 stdout,既有 I/O 开销又污染日志。改为 SLF4J 后由 logging.level
- * 控制:`logging.level.com.ihomy.config.SqlStatementLog=debug` 才会输出。
+ * logger 名统一加 "mybatis.sql." 前缀,可在 application.yml/logback-spring.xml 单独调级
+ * (当前 DEBUG 恒开,只进 server 日志文件)。
  *
- * 日志类别名前缀 "mybatis.sql.",可在 application.yml 单独调级。
+ * 内部类过滤(mybatis-spring 的 SqlSessionUtils/Transaction 每条 SQL 多打 4-6 行会话管理噪音):
+ * org.mybatis / org.apache.ibatis 开头的内部类改挂 "mybatis.sql.internal." 前缀,
+ * 该前缀未配置 DEBUG,框架内部 DEBUG 静默,ERROR/WARN 仍进 root(控制台+server 文件)。
  */
 public class SqlStatementLog implements Log {
 
     private final Logger logger;
 
     public SqlStatementLog(String clazz) {
-        // 用统一 logger 名,便于在 application.yml 通过 logging.level.mybatis.sql 控制
-        this.logger = LoggerFactory.getLogger("mybatis.sql." + clazz);
+        if (clazz.startsWith("org.mybatis") || clazz.startsWith("org.apache.ibatis")) {
+            this.logger = LoggerFactory.getLogger("mybatis.sql.internal." + clazz);
+        } else {
+            this.logger = LoggerFactory.getLogger("mybatis.sql." + clazz);
+        }
     }
 
     @Override

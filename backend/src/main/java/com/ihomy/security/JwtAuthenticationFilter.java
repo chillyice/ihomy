@@ -58,6 +58,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             loginUser, null, List.of(new SimpleGrantedAuthority("ROLE_" + role)));
                     auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(auth);
+                    // 操作人放请求属性:AccessLogFilter 在 SecurityContext 清理后仍能记录谁在调用
+                    request.setAttribute("ihomy.userId", userId);
+                    request.setAttribute("ihomy.username", username);
                 }
             } catch (Exception e) {
                 // 解析失败视为未登录,交由下游拦截器返回 401

@@ -77,9 +77,42 @@
             </template>
           </el-table-column>
           <el-table-column prop="costTime" :label="$t('ops.costTime')" width="90" />
+          <el-table-column prop="traceId" label="TID" width="150">
+            <template #default="{ row }">
+              <span v-if="row.traceId" class="tid-link mono" :title="$t('ops.tidJump')" @click="jumpToTrace(row)">{{ row.traceId }}</span>
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
         </el-table>
         <el-pagination v-model:current-page="logPageNum" :page-size="20" :total="logTotal"
           layout="total, prev, pager, next" style="margin-top: 14px; justify-content: flex-end" @current-change="loadLogs" />
+      </el-tab-pane>
+
+      <el-tab-pane :label="$t('ops.traceLogs')" name="trace">
+        <div class="filter-row">
+          <el-input v-model="traceFilter.tid" :placeholder="$t('ops.tidPlaceholder')" clearable style="width: 320px" @keyup.enter="loadTrace" />
+          <el-date-picker v-model="traceFilter.date" type="date" value-format="YYYY-MM-DD" :placeholder="$t('ops.traceDate')" />
+          <el-button type="primary" @click="loadTrace">{{ $t('ops.query') }}</el-button>
+        </div>
+        <el-alert v-if="traceResult && traceResult.truncated" type="warning" :closable="false" show-icon style="margin-bottom: 10px"
+          :title="$t('ops.traceTruncated')" />
+        <el-alert v-if="!traceLoading && traceResult && !traceResult.entries.length" type="info" :closable="false" show-icon
+          :title="$t('ops.traceEmpty')" />
+        <div v-if="traceResult && traceResult.entries.length" class="trace-count">
+          {{ $t('ops.traceCount', { n: traceResult.count }) }} · {{ traceResult.date }}
+        </div>
+        <div v-loading="traceLoading" class="trace-list">
+          <div v-for="(e, i) in traceResult?.entries || []" :key="i" class="trace-entry"
+            :class="'lv-' + String(e.level || '').toLowerCase()">
+            <div class="trace-head">
+              <span class="trace-time mono">{{ e.time }}</span>
+              <el-tag size="small" :type="sourceTagType(e.source)">{{ $t('ops.source_' + e.source) }}</el-tag>
+              <el-tag size="small" :type="levelTagType(e.level)">{{ e.level }}</el-tag>
+              <span class="trace-logger">{{ e.logger }}</span>
+            </div>
+            <pre class="trace-msg">{{ e.message }}</pre>
+          </div>
+        </div>
       </el-tab-pane>
 
       <el-tab-pane label="和风天气 API" name="weather">
@@ -168,13 +201,16 @@
 </template>
 
 <script setup>
-// 运维管理:三标签聚合页;数据接口须 ops:view 权限,后端 OpsAccessFilter 还会把 OPS 角色限定在 /ops 与 /auth
+// 运维管理:标签聚合页;数据接口须 ops:view 权限,后端 OpsAccessFilter 还会把 OPS 角色限定在 /ops 与 /auth
+// 详细日志:按 tid 检索 access/server/thirdparty 三类日志文件;操作日志 TID 列可点击跳转并自动查询
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { opsApi } from '@/api'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 
 const { t } = useI18n()
+const route = useRoute()
 
 // 资源卡片定义(键与后端 stats 返回字段一一对应,名称走 i18n)
 const STAT_CARDS = [
@@ -316,6 +352,34 @@ const loadLogs = async (page = logPageNum.value) => {
   }
 }
 
+// ---------- 详细日志(按 tid 检索三类日志文件) ----------
+const traceLoading = ref(false)
+const traceResult = ref(null)
+const traceFilter = reactive({ tid: '', date: '' })
+
+const loadTrace = async () => {
+  const tid = traceFilter.tid.trim()
+  if (tid.length < 6) return
+  traceLoading.value = true
+  try {
+    traceResult.value = await opsApi.traceLogs({ tid, date: traceFilter.date || null })
+  } finally {
+    traceLoading.value = false
+  }
+}
+
+/** 操作日志行点击 TID:跳详细日志 tab,按该条日志的日期直接查询 */
+const jumpToTrace = (row) => {
+  tab.value = 'trace'
+  traceFilter.tid = row.traceId
+  traceFilter.date = (row.createdAt || '').slice(0, 10) || ''
+  traceResult.value = null
+  loadTrace()
+}
+
+const sourceTagType = (s) => (s === 'access' ? 'primary' : s === 'thirdparty' ? 'success' : 'warning')
+const levelTagType = (l) => (l === 'ERROR' ? 'danger' : l === 'WARN' ? 'warning' : 'info')
+
 const loadWeatherQuota = async () => {
   weatherLoading.value = true
   try {
@@ -338,9 +402,14 @@ const loadWeatherQuota = async () => {
 }
 
 onMounted(async () => {
-  await loadStats()
-  // 默认取一页近期日志(时间倒序分页,天然轻量)
-  await loadLogs(1)
+  // 支持 /ops?tab=trace&tid=xxx&date=yyyy-MM-dd 直达(分享/书签)
+  if (route.query.tab === 'trace' && route.query.tid) {
+    tab.value = 'trace'
+    traceFilter.tid = String(route.query.tid)
+    if (route.query.date) traceFilter.date = String(route.query.date)
+    loadTrace()
+  }
+  await Promise.all([loadStats(), loadLogs(1)])
 })
 
 // 切到天气标签页时加载配额
@@ -398,4 +467,16 @@ watch(tab, (v) => { if (v === 'weather' && !weatherQuota.value) loadWeatherQuota
 .chart-legend { display: flex; gap: 20px; justify-content: center; margin-top: 8px; }
 .legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--color-text-secondary); }
 .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+.mono { font-family: Consolas, Monaco, 'Courier New', monospace; }
+.tid-link { color: #b88c6e; cursor: pointer; font-size: 12px; }
+.tid-link:hover { text-decoration: underline; }
+.trace-count { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 10px; }
+.trace-list { display: flex; flex-direction: column; gap: 10px; }
+.trace-entry { background: var(--color-card-2); border-radius: 10px; padding: 10px 14px; }
+.trace-entry.lv-error { border-left: 3px solid #b04a3a; }
+.trace-entry.lv-warn { border-left: 3px solid #b88c6e; }
+.trace-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+.trace-time { font-size: 12px; color: var(--color-text-secondary); }
+.trace-logger { font-size: 12px; color: var(--color-text-secondary); }
+.trace-msg { margin: 0; white-space: pre-wrap; word-break: break-all; font-size: 12px; font-family: Consolas, Monaco, 'Courier New', monospace; max-height: 420px; overflow: auto; }
 </style>

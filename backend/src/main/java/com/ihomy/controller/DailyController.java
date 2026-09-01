@@ -3,6 +3,7 @@ package com.ihomy.controller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ihomy.common.Result;
+import com.ihomy.common.ThirdPartyHttp;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -11,18 +12,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.nio.charset.StandardCharsets;
 
 /**
  * 每日内容接口:
@@ -39,8 +34,6 @@ public class DailyController {
             "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=zh-CN";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(5)).build();
 
     /** 当日图片缓存:key 为日期字符串,避免频繁请求必应 */
     private final Map<String, Map<String, Object>> imageCache = new ConcurrentHashMap<>();
@@ -84,10 +77,8 @@ public class DailyController {
             return Result.success(cached);
         }
         try {
-            HttpRequest req = HttpRequest.newBuilder(URI.create(BING_ENDPOINT))
-                    .timeout(Duration.ofSeconds(8)).GET().build();
-            String json = httpClient.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)).body();
-            JsonNode root = objectMapper.readTree(json);
+            ThirdPartyHttp.Resp r = ThirdPartyHttp.get("bing", BING_ENDPOINT, null, 8000);
+            JsonNode root = objectMapper.readTree(r.body());
             JsonNode item = root.path("images").get(0);
             String url = item.path("url").asText();
             Map<String, Object> data = new HashMap<>();
