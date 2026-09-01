@@ -25,6 +25,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -113,21 +114,43 @@ public class WeatherService {
         String locationId = resolveLocation(clientIp, cred, familyLocation);
         if (locationId == null) return null;
 
-        JsonNode now = callApi("/v7/weather/now?location=" + locationId, cred);
-        if (now == null || !now.has("now")) return null;
-        JsonNode n = now.get("now");
-        String code = n.has("icon") ? n.get("icon").asText() : "100";
+        // v1 实时天气(坐标路径,最多两位小数;localTime=true 返回当地时间)
+        String[] ll = toLatLon(locationId);
+        JsonNode now = callApi("/weather/v1/current/" + ll[0] + "/" + ll[1] + "?localTime=true", cred);
+        if (now == null || !now.has("condition")) return null;
+        String code = now.path("condition").path("code").asText("100");
         Map<String, Object> data = new HashMap<>();
         data.put("condition", codeToCondition(code));
         data.put("precipLevel", codeToPrecipLevel(code));
         data.put("iconCode", code);
-        data.put("temp", Integer.parseInt(n.get("temp").asText()));
-        data.put("text", n.get("text").asText());
+        data.put("temp", (int) Math.round(now.path("temperature").path("value").asDouble()));
+        data.put("text", now.path("condition").path("text").asText());
         data.put("city", familyLocation != null && familyLocation.length > 2 && familyLocation[2] != null ? familyLocation[2] : resolveCityName(clientIp));
         data.put("locationId", locationId);
-        data.put("nowFull", n); // 原始实况节点(体感/湿度/风/气压/能见度等,供天气详情页,零额外调用)
+        data.put("nowFull", buildNowFull(now)); // v1 实况映射为旧 v7 字段形状(前端零改动)
         writeCache(cacheKey, data, NOW_TTL);
         return data;
+    }
+
+    /** v1 实时天气 → 旧 v7 now 字段形状(单位换算:湿度/云量 0-1→%、能见度 m→km、风速 m/s→km/h) */
+    private Map<String, Object> buildNowFull(JsonNode c) {
+        Map<String, Object> n = new LinkedHashMap<>();
+        n.put("temp", round1(c.path("temperature").path("value").asDouble()));
+        n.put("feelsLike", round1(c.path("feelsLike").path("value").asDouble()));
+        n.put("icon", c.path("condition").path("code").asText());
+        n.put("text", c.path("condition").path("text").asText());
+        n.put("wind360", c.path("wind").path("direction").path("degree").asText());
+        n.put("windDir", compassCn(c.path("wind").path("direction").path("compass").asText()));
+        n.put("windScale", c.path("wind").path("scale").asText());
+        n.put("windSpeed", round1(c.path("wind").path("speed").path("value").asDouble() * 3.6));
+        n.put("humidity", (int) Math.round(c.path("humidity").asDouble() * 100));
+        n.put("precip", round2(c.path("precipitation").path("amount").path("value").asDouble()));
+        n.put("pressure", round1(c.path("pressure").path("value").asDouble()));
+        n.put("vis", round1(c.path("visibility").path("value").asDouble() / 1000));
+        n.put("dew", round1(c.path("dewPoint").path("value").asDouble()));
+        n.put("cloud", (int) Math.round(c.path("cloudCover").asDouble() * 100));
+        n.put("uvIndex", c.path("uvIndex").asText());
+        return n;
     }
 
     /** 天气详情聚合:now + 7d + 24h + warning + indices + air + minutely */
@@ -151,18 +174,16 @@ public class WeatherService {
             data.put("nowFull", nowData.get("nowFull"));
         }
 
-        // 7 天预报 + 24 小时预报
-        JsonNode forecast = callApi("/v7/weather/7d?location=" + locationId, cred);
-        if (forecast != null && forecast.has("daily")) data.put("daily", forecast.get("daily"));
-        JsonNode hourly = callApi("/v7/weather/24h?location=" + locationId, cred);
-        if (hourly != null && hourly.has("hourly")) data.put("hourly", hourly.get("hourly"));
+        // 7 天 + 24 小时预报(v1 坐标路径,映射为旧 v7 字段形状)
+        String[] ll = toLatLon(locationId);
+        JsonNode dailyResp = callApi("/weather/v1/daily/" + ll[0] + "/" + ll[1] + "?localTime=true", cred);
+        if (dailyResp != null && dailyResp.has("days")) data.put("daily", mapDailyV1(dailyResp.get("days")));
+        JsonNode hourlyResp = callApi("/weather/v1/hourly/" + ll[0] + "/" + ll[1] + "?localTime=true", cred);
+        if (hourlyResp != null && hourlyResp.has("hours")) data.put("hourly", mapHourlyV1(hourlyResp.get("hours")));
 
-        // 灾害预警(新版 /warning/v1,坐标 → 城市 LocationID;v7 已弃用恒 403)
-        String cityId = resolveCityId(locationId, cred);
-        if (cityId != null) {
-            JsonNode warning = callApi("/warning/v1/now?location=" + cityId, cred);
-            if (warning != null && warning.has("warnings")) data.put("warning", warning.get("warnings"));
-        }
+        // 灾害预警(v1 /weatheralert/v1/current 坐标路径;v7 已弃用 403)
+        JsonNode warning = callApi("/weatheralert/v1/current/" + ll[0] + "/" + ll[1] + "?localTime=true", cred);
+        if (warning != null && warning.has("alerts")) data.put("warning", mapWarningV1(warning.get("alerts")));
 
         // 空气质量(新版 /airquality/v1,坐标路径参数;映射为旧字段形状供前端)
         Map<String, Object> air = fetchAir(locationId, cred);
@@ -299,6 +320,190 @@ public class WeatherService {
         return weatherLogMapper.selectTypeDistribution(start, now);
     }
 
+    /**
+     * 新旧版本并行验证(测试环境,OPS 手动触发):同一位置分别调 v7 与 v1,返回关键字段对照。
+     * v7 air/warning 已弃用(403),仅对比 now/7d/24h 三组;每次约 6 次调用,不缓存。
+     */
+    public Map<String, Object> compareV7V1() {
+        WeatherCredential cred = loadCredential();
+        if (cred == null) return Map.of("error", "天气凭证未配置");
+        String coords = "117.1201,36.6512"; // 测试环境默认济南
+        String[] ll = toLatLon(coords);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("location", coords);
+
+        // 实况:v7 now vs v1 current
+        JsonNode now7 = callApi("/v7/weather/now?location=" + coords, cred);
+        JsonNode n7 = now7 == null ? null : now7.path("now");
+        JsonNode now1 = callApi("/weather/v1/current/" + ll[0] + "/" + ll[1] + "?localTime=true", cred);
+        Map<String, Object> nowCmp = new LinkedHashMap<>();
+        nowCmp.put("v7Status", n7 != null && n7.has("temp") ? "ok" : "fail");
+        nowCmp.put("v1Status", now1 != null && now1.has("condition") ? "ok" : "fail");
+        if (n7 != null && n7.has("temp")) {
+            nowCmp.put("v7", Map.of("temp", n7.path("temp").asText(), "feelsLike", n7.path("feelsLike").asText(),
+                    "humidity", n7.path("humidity").asText(), "windDir", n7.path("windDir").asText(),
+                    "windScale", n7.path("windScale").asText(), "vis", n7.path("vis").asText(), "text", n7.path("text").asText()));
+        }
+        if (now1 != null && now1.has("condition")) {
+            nowCmp.put("v1", Map.of("temp", round1(now1.path("temperature").path("value").asDouble()),
+                    "feelsLike", round1(now1.path("feelsLike").path("value").asDouble()),
+                    "humidity", (int) Math.round(now1.path("humidity").asDouble() * 100),
+                    "windDir", compassCn(now1.path("wind").path("direction").path("compass").asText()) + " " + now1.path("wind").path("scale").asText() + "级",
+                    "windScale", now1.path("wind").path("scale").asText(),
+                    "vis", round1(now1.path("visibility").path("value").asDouble() / 1000),
+                    "text", now1.path("condition").path("text").asText()));
+        }
+        result.put("now", nowCmp);
+
+        // 每日预报首日
+        JsonNode d7resp = callApi("/v7/weather/7d?location=" + coords, cred);
+        JsonNode d7 = d7resp == null ? null : d7resp.path("daily").path(0);
+        JsonNode d1resp = callApi("/weather/v1/daily/" + ll[0] + "/" + ll[1] + "?localTime=true", cred);
+        JsonNode d1 = d1resp == null ? null : d1resp.path("days").path(0);
+        Map<String, Object> dailyCmp = new LinkedHashMap<>();
+        dailyCmp.put("v7Status", d7 != null && d7.has("tempMax") ? "ok" : "fail");
+        dailyCmp.put("v1Status", d1 != null && d1.has("temperatureMax") ? "ok" : "fail");
+        if (d7 != null && d7.has("tempMax")) {
+            dailyCmp.put("v7", Map.of("fxDate", d7.path("fxDate").asText(), "tempMax", d7.path("tempMax").asText(),
+                    "tempMin", d7.path("tempMin").asText(), "textDay", d7.path("textDay").asText(),
+                    "sunrise", d7.path("sunrise").asText()));
+        }
+        if (d1 != null && d1.has("temperatureMax")) {
+            dailyCmp.put("v1", Map.of("fxDate", d1.path("forecastStartTime").asText().substring(0, 10),
+                    "tempMax", (int) Math.round(d1.path("temperatureMax").path("value").asDouble()),
+                    "tempMin", (int) Math.round(d1.path("temperatureMin").path("value").asDouble()),
+                    "textDay", d1.path("daytime").path("condition").path("text").asText(),
+                    "sunrise", d1.path("astro").path("sunrise").asText()));
+        }
+        result.put("daily0", dailyCmp);
+
+        // 小时预报首条
+        JsonNode h7resp = callApi("/v7/weather/24h?location=" + coords, cred);
+        JsonNode h7 = h7resp == null ? null : h7resp.path("hourly").path(0);
+        JsonNode h1resp = callApi("/weather/v1/hourly/" + ll[0] + "/" + ll[1] + "?localTime=true", cred);
+        JsonNode h1 = h1resp == null ? null : h1resp.path("hours").path(0);
+        Map<String, Object> hourlyCmp = new LinkedHashMap<>();
+        hourlyCmp.put("v7Status", h7 != null && h7.has("temp") ? "ok" : "fail");
+        hourlyCmp.put("v1Status", h1 != null && h1.has("temperature") ? "ok" : "fail");
+        if (h7 != null && h7.has("temp")) {
+            hourlyCmp.put("v7", Map.of("fxTime", h7.path("fxTime").asText(), "temp", h7.path("temp").asText(),
+                    "text", h7.path("text").asText(), "pop", h7.path("pop").asText()));
+        }
+        if (h1 != null && h1.has("temperature")) {
+            hourlyCmp.put("v1", Map.of("fxTime", h1.path("forecastTime").asText(),
+                    "temp", (int) Math.round(h1.path("temperature").path("value").asDouble()),
+                    "text", h1.path("condition").path("text").asText(),
+                    "pop", (int) Math.round(h1.path("precipitation").path("probability").asDouble() * 100)));
+        }
+        result.put("hourly0", hourlyCmp);
+        return result;
+    }
+
+    // ---------- v1 → v7 字段形状适配(前端零改动) ----------
+
+    /** 风向方位代码 → 中文(v1 compass 16 方位) */
+    private static final Map<String, String> COMPASS_CN = Map.ofEntries(
+            Map.entry("n", "北风"), Map.entry("nne", "北东北风"), Map.entry("ne", "东北风"), Map.entry("ene", "东东北风"),
+            Map.entry("e", "东风"), Map.entry("ese", "东东南风"), Map.entry("se", "东南风"), Map.entry("sse", "南东南风"),
+            Map.entry("s", "南风"), Map.entry("ssw", "南西南风"), Map.entry("sw", "西南风"), Map.entry("wsw", "西西南风"),
+            Map.entry("w", "西风"), Map.entry("wnw", "西西北风"), Map.entry("nw", "西北风"), Map.entry("nnw", "北西北风"));
+
+    /** v1 预警颜色代码 → 中文级别(前端 warnLevelColor 识别白/蓝/黄/橙/红) */
+    private static final Map<String, String> ALERT_COLOR_CN = Map.of(
+            "white", "白色", "gray", "灰色", "green", "绿色", "blue", "蓝色", "yellow", "黄色",
+            "amber", "橙色", "orange", "橙色", "red", "红色", "purple", "紫色", "black", "黑色");
+
+    private String compassCn(String compass) {
+        return COMPASS_CN.getOrDefault(compass == null ? "" : compass, "");
+    }
+
+    private double round1(double v) { return Math.round(v * 10) / 10.0; }
+    private double round2(double v) { return Math.round(v * 100) / 100.0; }
+
+    /** 坐标 "lng,lat" → v1 路径参数 [lat, lon](十进制最多两位,官方要求) */
+    private String[] toLatLon(String coords) {
+        String[] ll = coords.split(",");
+        return new String[]{
+                String.format("%.2f", Double.parseDouble(ll[1])),
+                String.format("%.2f", Double.parseDouble(ll[0]))};
+    }
+
+    /** v1 每日预报 days[] → 旧 v7 daily[] 字段形状(湿度 0-1→%、温度取整) */
+    private List<Map<String, Object>> mapDailyV1(JsonNode days) {
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (JsonNode day : days) {
+            Map<String, Object> d = new LinkedHashMap<>();
+            String start = day.path("forecastStartTime").asText();
+            d.put("fxDate", start.length() >= 10 ? start.substring(0, 10) : start);
+            d.put("sunrise", day.path("astro").path("sunrise").asText());
+            d.put("sunset", day.path("astro").path("sunset").asText());
+            d.put("moonrise", day.path("astro").path("moonrise").asText());
+            d.put("moonset", day.path("astro").path("moonset").asText());
+            d.put("moonPhase", day.path("astro").path("moonPhase").asText());
+            d.put("tempMax", (int) Math.round(day.path("temperatureMax").path("value").asDouble()));
+            d.put("tempMin", (int) Math.round(day.path("temperatureMin").path("value").asDouble()));
+            JsonNode dt = day.path("daytime");
+            JsonNode nt = day.path("nighttime");
+            d.put("iconDay", dt.path("condition").path("code").asText());
+            d.put("textDay", dt.path("condition").path("text").asText());
+            d.put("iconNight", nt.path("condition").path("code").asText());
+            d.put("textNight", nt.path("condition").path("text").asText());
+            d.put("wind360Day", dt.path("wind").path("direction").path("degree").asText());
+            d.put("windDirDay", compassCn(dt.path("wind").path("direction").path("compass").asText()));
+            d.put("windScaleDay", dt.path("wind").path("scale").asText());
+            d.put("windSpeedDay", round1(dt.path("wind").path("speed").path("value").asDouble() * 3.6));
+            d.put("humidity", (int) Math.round(dt.path("humidity").asDouble() * 100));
+            d.put("precip", round2(dt.path("precipitation").path("amount").path("value").asDouble()));
+            d.put("pop", (int) Math.round(dt.path("precipitation").path("probability").asDouble() * 100));
+            d.put("uvIndex", day.path("uvIndexMax").asText());
+            list.add(d);
+        }
+        return list;
+    }
+
+    /** v1 小时预报 hours[] → 旧 v7 hourly[] 字段形状(降水概率 0-1→%) */
+    private List<Map<String, Object>> mapHourlyV1(JsonNode hours) {
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (JsonNode h : hours) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("fxTime", h.path("forecastTime").asText());
+            m.put("temp", (int) Math.round(h.path("temperature").path("value").asDouble()));
+            m.put("icon", h.path("condition").path("code").asText());
+            m.put("text", h.path("condition").path("text").asText());
+            m.put("pop", (int) Math.round(h.path("precipitation").path("probability").asDouble() * 100));
+            m.put("windDir", compassCn(h.path("wind").path("direction").path("compass").asText()));
+            m.put("windScale", h.path("wind").path("scale").asText());
+            m.put("precip", round2(h.path("precipitation").path("amount").path("value").asDouble()));
+            m.put("humidity", (int) Math.round(h.path("humidity").asDouble() * 100));
+            list.add(m);
+        }
+        return list;
+    }
+
+    /** v1 预警 alerts[] → 旧 v7 warning[] 字段形状(过滤 cancel 性质;颜色代码→中文级别) */
+    private List<Map<String, Object>> mapWarningV1(JsonNode alerts) {
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (JsonNode a : alerts) {
+            if ("cancel".equals(a.path("messageType").path("code").asText())) {
+                continue; // 取消性质的预警有效期 1 小时,不展示
+            }
+            Map<String, Object> w = new LinkedHashMap<>();
+            w.put("id", a.path("id").asText());
+            w.put("status", "active");
+            w.put("code", a.path("eventType").path("code").asText());
+            w.put("title", a.path("headline").asText());
+            w.put("typeName", a.path("eventType").path("name").asText());
+            w.put("level", ALERT_COLOR_CN.getOrDefault(a.path("color").path("code").asText(), "橙色"));
+            w.put("startTime", a.path("effectiveTime").asText());
+            w.put("endTime", a.path("expireTime").asText());
+            w.put("text", a.path("description").asText(a.path("headline").asText()));
+            w.put("severity", a.path("severity").asText());
+            w.put("instruction", a.path("instruction").asText());
+            list.add(w);
+        }
+        return list;
+    }
+
     // ---------- 内部:JWT + HTTP ----------
 
     /** IP → location 坐标(经度,纬度);家庭偏好位置优先,其次 ip-api.com 定位 */
@@ -356,36 +561,18 @@ public class WeatherService {
         return city != null ? city : "济南";
     }
 
-    /** 坐标 → 和风城市 LocationID(新版 /warning/v1 需要);Redis 缓存 6h,失败回退济南 */
-    private String resolveCityId(String coords, WeatherCredential cred) {
-        String key = "ihomy:weather:cityid:" + coords;
-        String cached = redis.opsForValue().get(key);
-        if (cached != null) return cached;
-        try {
-            JsonNode resp = callApi("/geo/v2/city/lookup?location=" + coords, cred);
-            String id = resp != null ? resp.path("location").path(0).path("id").asText("") : "";
-            if (!id.isBlank()) {
-                redis.opsForValue().set(key, id, LOCATION_TTL);
-                return id;
-            }
-        } catch (Exception e) {
-            log.warn("[resolveCityId] geo lookup failed: {}", e.getMessage());
-        }
-        return "101120101"; // 济南(默认坐标对应城市)
-    }
-
-    /** 新版空气质量 /airquality/v1/now/{lat}/{lon} → 旧字段形状(aqi/category/level/primary/污染物浓度) */
+    /** 新版空气质量 /airquality/v1/current/{lat}/{lon} → 旧字段形状(aqi/category/level/primary/污染物浓度) */
     private Map<String, Object> fetchAir(String coords, WeatherCredential cred) {
         try {
-            String[] ll = coords.split(",");
-            if (ll.length < 2) return null;
-            JsonNode resp = callApi("/airquality/v1/now/" + ll[1] + "/" + ll[0], cred);
+            String[] ll = toLatLon(coords);
+            JsonNode resp = callApi("/airquality/v1/current/" + ll[0] + "/" + ll[1], cred);
             if (resp == null) return null;
             Map<String, Object> m = new HashMap<>();
             for (JsonNode idx : resp.path("indexes")) {
-                // 优先国标 AQI(aqi-cn),否则取第一个
-                if ("aqi-cn".equals(idx.path("code").asText()) || !m.containsKey("aqi")) {
-                    m.put("aqi", idx.path("aqi").asText());
+                // 优先国标 AQI(cn / aqi-cn),否则取第一个
+                String code = idx.path("code").asText();
+                if ("cn".equals(code) || "aqi-cn".equals(code) || !m.containsKey("aqi")) {
+                    m.put("aqi", idx.path("aqiDisplay").asText(idx.path("aqi").asText()));
                     m.put("category", idx.path("category").asText());
                     m.put("level", idx.path("level").asText());
                     String pp = idx.path("primaryPollutant").path("name").asText("");
@@ -467,10 +654,13 @@ public class WeatherService {
         }
     }
 
-    /** 从路径解析接口类型(用于日志分类) */
+    /** 从路径解析接口类型(用于日志分类;v1 与 v7 映射到同一类型码,运维统计口径连续) */
     private String parseApiType(String pathAndQuery) {
-        if (pathAndQuery.startsWith("/airquality/")) return "air";
-        if (pathAndQuery.startsWith("/warning/")) return "warning";
+        if (pathAndQuery.startsWith("/weather/v1/current")) return "now";
+        if (pathAndQuery.startsWith("/weather/v1/daily")) return "forecast";
+        if (pathAndQuery.startsWith("/weather/v1/hourly")) return "hourly";
+        if (pathAndQuery.startsWith("/weatheralert/v1/")) return "warning";
+        if (pathAndQuery.startsWith("/airquality/v1/")) return "air";
         if (pathAndQuery.startsWith("/v7/weather/now")) return "now";
         if (pathAndQuery.startsWith("/v7/weather/7d")) return "forecast";
         if (pathAndQuery.startsWith("/v7/weather/24h")) return "hourly";

@@ -970,7 +970,7 @@ CREATE TABLE sys_media_server (
 
 | 文件 | 改动 |
 |------|------|
-| `WeatherService.java` + `WeatherLogMapper(.xml)` + `OpsController.java` | 配额 50000;`GET /weather/type-distribution?range=` 类型分布(饼图数据源);detail 的 now 增加 `nowFull` 原始实况节点(体感/湿度/风/气压/能见度等,塞进 now 缓存零额外调用);**air/warning 迁移 v1 新版 API**(`/airquality/v1/now/{lat}/{lon}` 映射旧字段形状、`/warning/v1/now?location={LocationID}`+`resolveCityId` geo 查城市 ID 回退济南)——v7 air/warning 已被和风弃用(403 Deprecated);**⚠ v1 接口实测 404 空 body、geo 403 Security Restriction,疑似控制台凭证安全设置未放行新 API,待用户在控制台确认**;parseApiType 补 /airquality//warning/ 前缀 |
+| `WeatherService.java` + `WeatherLogMapper(.xml)` + `OpsController.java` | 配额 50000;`GET /weather/type-distribution?range=` 类型分布(饼图数据源);detail 的 now 增加 `nowFull` 原始实况节点;**天气 API v7→v1 全量迁移**(2026-09-01,详见下节) |
 | `views/ops/Ops.vue` + `api/index.js` + i18n | 折线图**悬浮提示**(透明列 hover→竖线+双圆点+tooltip 时间/调用/失败,比例定位+边缘 clamp);**API 类型占比饼图**(SVG path 扇区+引导线+标签,与折线图并排 charts-row,共用时间范围,单一类型 100% 画整圆);本月配额 4 卡一行+**横向进度条**(70%/90% 阈值变金/红) |
 | `utils/useSunLight.js` | `loadWeatherDetail()`:全局拉取天气详情(预警+今日高低温,与简版天气并行,30 分钟随 loadWeather 刷新);Home 不再自己 fetch detail |
 | `components/AppSidebar.vue` | **迷你天气**(非首页时占编辑按钮位置):天气图标+当前温度+预警徽标(最高级别颜色 WarningFilled 三角叹号,el-tooltip 悬浮显示全部预警:类型/级别/起止时间),点击进 /weather;`utils/dict.js` 加 `WARN_LEVEL_ORDER/warnLevelColor/topWarning`(白<蓝<黄<橙<红) |
@@ -978,6 +978,19 @@ CREATE TABLE sys_media_server (
 | `views/weather/Weather.vue`(新)+ `router/index.js` + i18n | **天气详情页 `/weather`**(public):顶部实况(大图标+温度+高低+9 项指标网格)→气象预警(级别色左边条)→24h 横滑卡片→7 天表格(日出日落/紫外线)→空气(AQI+6 污染物)→生活指数→分钟降水;复用光影层 detail 缓存避免重复请求;weatherPage.* 中英词条 |
 
 **规则**:侧边栏迷你天气=非首页路由专属(首页显示编辑按钮);预警颜色白/蓝/黄/橙/红(`utils/dict.warnLevelColor`),未知级别按橙;首页天气组件只做极简展示(点击进详情页),完整数据都在 /weather。
+
+##### 天气 API v7→v1 迁移(weather 分支,V9.11,2026-09-01)
+
+| 文件 | 改动 |
+|------|------|
+| `WeatherService.java` | **主力接口全量切 v1**(v7 air/warning 已弃用 403,v1 为主力版):实况 `/weather/v1/current/{lat}/{lon}`、每日 `/weather/v1/daily/{lat}/{lon}?days=`、小时 `/weather/v1/hourly/{lat}/{lon}?hours=`、预警 `/weatheralert/v1/current/{lat}/{lon}`(坐标路径,不需要城市 ID)、空气 `/airquality/v1/current/{lat}/{lon}`(**current 不是 now**,上次 404 根因);**生活指数 `/v7/indices/1d` 与分钟降水 `/v7/minutely/5m` 不迁**(官方现行版仍是 v7);认证不变(JWT Ed25519);坐标路径参数最多两位小数(`toLatLon` 四舍五入);全部带 `localTime=true`(默认 UTC 会让前端时间显示错 8 小时) |
+| `WeatherService.java`(适配层) | **v1→旧 v7 字段形状映射,前端零改动**:`buildNowFull`(湿度/云量 0-1→%、能见度 m→km、风速 m/s→km/h、compass 16 方位→中文)、`mapDailyV1`(温度取整、降水概率 0-1→%、astro 日出日落完整 ISO——`slice(11,16)` 截取正常)、`mapHourlyV1`、`mapWarningV1`(过滤 cancel 性质预警、颜色代码→中文级别 白/灰/绿/蓝/黄/amber→橙/红/紫/黑、description→text)、`fetchAir`(indexes 优先国标 cn/aqi-cn、aqiDisplay 显示值、pollutants 浓度→旧键名) |
+| `WeatherService.java`(并行验证) | `compareV7V1()`:同一位置(济南)并行调 v7+v1 各 3 组(now/7d/24h),返回关键字段对照 + 双方状态;v7 air/warning 已弃用不参与对照;不缓存,OPS 手动触发 |
+| `OpsController.java` | `GET /ops/weather/compare`(ops:view) |
+| `WeatherService.parseApiType` | v1 前缀映射到与 v7 相同的类型码(now/forecast/hourly/warning/air)——**运维天气统计/趋势/饼图口径连续**,无需改监控规则 |
+
+**迁移规则**:v1 路径全用**坐标路径参数**(lat/lon 各两位小数),query 只剩 localTime/lang;数据单位 v1 与 v7 差异大(湿度/云量/降水概率是小数 0-1、能见度米、风速 m/s),适配层统一换算回 v7 语义;预警 v1 的 severity 是 minor/moderate/severe/extreme、颜色独立在 color.code,级别中文化取 color;`messageType.code=cancel` 的预警(取消性质,有效期 1h)过滤不展示;并行验证实测:实况 28° vs 28.0°、湿度 44 vs 46、日出同为 05:43、小时首条完全一致——数值吻合(1km 实况 vs 城市站小差异正常)。**监控规则**:apiType 类型码保持,v1 调用自动归入旧统计口径,折线图/饼图/24h 表无需改动。
+
 
 ##### 日志追溯体系(backend_logs 分支,2026-09-01,已合 main)
 
