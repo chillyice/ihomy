@@ -267,7 +267,7 @@ export const opsApi = {
   weatherQuota: () => request.get('/ops/weather/quota'),
   weatherFinance: () => request.get('/ops/weather/finance'),
   weatherStats: () => request.get('/ops/weather/stats'),
-  weatherTimeline: (range) => request.get('/ops/weather/timeline', { params: { range } }),
+  weatherTimeline: (range, types) => request.get('/ops/weather/timeline', { params: { range, types: types?.length ? types.join(',') : null } }),
 }
 
 // 家谱(家庭隐私数据,需登录)
