@@ -32,6 +32,9 @@ public class OperationLogAspect {
     private final OperationLogService operationLogService;
     private final SecurityHelper securityHelper;
 
+    /** 请求属性键:标记此请求已被 @OperationLog 切面记录,供 GlobalExceptionHandler 判断避免重复补记读接口异常 */
+    public static final String OPLOG_RECORDED_ATTR = "com.ihomy.oplog.recorded";
+
     /** 环绕增强:无论成功失败都落库一条日志,失败时保存错误信息并继续抛出 */
     @Around("@annotation(operationLog)")
     public Object around(ProceedingJoinPoint pjp, OperationLog operationLog) throws Throwable {
@@ -68,6 +71,11 @@ public class OperationLogAspect {
                 operationLogService.save(logEntry);
             } catch (Exception e) {
                 OperationLogAspect.log.warn("操作日志切面保存失败: {}", e.getMessage());
+            }
+            // 标记此请求已由 @OperationLog 记录(含失败),异常传播到 GlobalExceptionHandler 时据此跳过补记
+            HttpServletRequest req = currentRequest();
+            if (req != null) {
+                req.setAttribute(OPLOG_RECORDED_ATTR, Boolean.TRUE);
             }
         }
         return result;
