@@ -840,7 +840,13 @@ html.dark .create-family-btn:hover { background: rgba(232,220,200,0.15); }
   .settings-layout { flex-direction: column; }
   .settings-side { width: 100% !important; position: static !important; margin-bottom: 12px; }
   .settings-side .el-menu { display: flex; flex-direction: row; overflow-x: auto; }
-  .settings-side .el-menu-item { white-space: nowrap; }
+  .settings-side .el-menu-item { white-space: nowrap; flex-shrink: 0; }
   .form-row { flex-direction: column; gap: 0; }
+  /* 窄屏下横向操作行换行,避免溢出 */
+  .music-actions { flex-wrap: wrap; }
+  .setting-row { flex-wrap: wrap; }
+  .bg-playlist-item { flex-wrap: wrap; }
+  .bg-pl-tag { margin-left: 52px; }
+  .settings-card .el-input, .settings-card .el-select { width: 100%; }
 }
 </style>

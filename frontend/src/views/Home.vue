@@ -328,10 +328,12 @@ const openViewer = (idx) => {
   viewerVisible.value = true
 }
 
-const feedTypeLabel = (type) => type === 'blog' ? '博客' : type === 'diary' ? '日记' : type === 'photo' ? '照片' : ''
-const feedSummary = (f) => { if (f.type === 'blog') return f.title || ''; if (f.type === 'diary') return (f.content || '').slice(0, 40); if (f.type === 'photo') return `${f.count || 0} 张照片`; return '' }
+const TYPE_LABELS = { blog: '博客', diary: '日记', photo: '照片', video: '放映厅', wish: '愿望', task: '任务', recipe: '菜谱', book: '书架' }
+const feedTypeLabel = (type) => TYPE_LABELS[type] || ''
+const feedSummary = (f) => { if (f.type === 'blog') return f.title || ''; if (f.type === 'diary') return (f.content || '').slice(0, 40); if (f.type === 'photo') return `${f.count || 0} 张照片`; if (f.type === 'video') return `上传了影片:${f.title || ''}`; if (f.type === 'wish') return f.status === 'ACHIEVED' ? `实现了愿望:${f.title || ''}` : `许下愿望:${f.title || ''}`; if (f.type === 'task') return `发布任务:${f.title || ''}`; if (f.type === 'recipe') return `分享菜谱:${f.title || ''}`; if (f.type === 'book') return `上架图书:《${f.title || ''}》`; return '' }
 const formatTime = (d) => { if (!d) return ''; const date = new Date(d); const now = new Date(); const diff = (now - date) / 1000; if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前'; if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前'; return date.toLocaleDateString('zh-CN') }
-const goFeed = (f) => { if (f.type === 'blog' && f.id) router.push(`/blog/${f.id}`); else if (f.type === 'diary') router.push('/diary'); else if (f.type === 'photo') router.push('/album') }
+const FEED_ROUTES = { diary: '/diary', photo: '/album', video: '/cinema', wish: '/wish', task: '/task', recipe: '/kitchen', book: '/library' }
+const goFeed = (f) => { if (f.type === 'blog' && f.id) router.push(`/blog/${f.id}`); else if (FEED_ROUTES[f.type]) router.push(FEED_ROUTES[f.type]) }
 const rewardIcon = (t) => t === 1 ? '🎁' : t === 2 ? '📦' : '⭕'
 const taskStatusLabel = (s) => ({ 0: '待领取', 1: '进行中', 2: '待确认', 3: '已完成', 4: '已取消' }[s] || '')
 const weatherText = computed(() => weather.value?.text || '')

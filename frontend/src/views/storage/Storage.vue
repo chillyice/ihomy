@@ -8,20 +8,20 @@
         <el-button v-if="userStore.isOwner" type="primary" plain @click="openDevice()">{{ $t('storage.addDevice') }}</el-button>
       </div>
       <el-table :data="devices" v-loading="loadingDevices" stripe>
-        <el-table-column prop="name" :label="$t('storage.deviceName')" min-width="140">
+        <el-table-column prop="name" :label="$t('storage.deviceName')" :min-width="isMobile ? 120 : 140">
           <template #default="{ row }">
             {{ row.name }}
             <el-tag v-if="row.id === defaultDeviceId" size="small" type="success" style="margin-left: 6px">{{ $t('storage.defaultTag') }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="deviceType" :label="$t('storage.deviceType')" width="130" />
-        <el-table-column :label="$t('storage.rootPath')" min-width="200" show-overflow-tooltip>
+        <el-table-column v-if="!isMobile" prop="deviceType" :label="$t('storage.deviceType')" width="130" />
+        <el-table-column v-if="!isMobile" :label="$t('storage.rootPath')" min-width="200" show-overflow-tooltip>
           <template #default="{ row }">
             <span v-if="row.id !== 0 && row.deviceType !== 'BAIDU'">{{ row.rootPath }}</span>
             <span v-else class="path-hidden">—</span>
           </template>
         </el-table-column>
-        <el-table-column :label="$t('common.actions')" width="260" fixed="right">
+        <el-table-column :label="$t('common.actions')" :width="isMobile ? 140 : 260" :fixed="isMobile ? false : 'right'">
           <template #default="{ row }">
             <el-button size="small" @click="browseDevice(row)">{{ $t('storage.browse') }}</el-button>
             <el-button v-if="row.id !== 0 && row.id !== defaultDeviceId && userStore.isOwner" size="small" text type="success" @click="setDefaultDevice(row)">{{ $t('storage.setDefault') }}</el-button>
@@ -72,19 +72,19 @@
       </div>
       <div v-if="browsing" v-loading="loadingFiles">
         <el-table :data="files" stripe @row-dblclick="onFileDblClick">
-          <el-table-column :label="$t('storage.name')" min-width="220">
+          <el-table-column :label="$t('storage.name')" :min-width="isMobile ? 140 : 220">
             <template #default="{ row }">
               <span class="file-ico">{{ row.isDir ? '📁' : fileIcon(row.name) }}</span>
               <span class="file-name">{{ row.name }}</span>
             </template>
           </el-table-column>
-          <el-table-column :label="$t('storage.size')" width="120">
+          <el-table-column v-if="!isMobile" :label="$t('storage.size')" width="120">
             <template #default="{ row }">{{ row.isDir ? '-' : formatSize(row.size) }}</template>
           </el-table-column>
-          <el-table-column :label="$t('storage.modified')" width="160">
+          <el-table-column v-if="!isMobile" :label="$t('storage.modified')" width="160">
             <template #default="{ row }">{{ formatTime(row.modified) }}</template>
           </el-table-column>
-          <el-table-column :label="$t('common.actions')" width="180">
+          <el-table-column :label="$t('common.actions')" :width="isMobile ? 140 : 180">
             <template #default="{ row }">
               <el-button v-if="isPreviewable(row.name)" size="small" @click="preview(row)">{{ $t('storage.preview') }}</el-button>
               <el-button size="small" text @click="download(row)">{{ $t('storage.download') }}</el-button>
@@ -162,11 +162,13 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
+import { useDevice } from '@/composables/useDevice'
 import { storageApi } from '@/api'
 import SyncDialog from '@/components/SyncDialog.vue'
 
 const { t } = useI18n()
 const userStore = useUserStore()
+const { isMobile } = useDevice()
 
 const devices = ref([])
 const syncVisible = ref(false)
@@ -477,5 +479,13 @@ onBeforeUnmount(() => { if (syncTimer) clearInterval(syncTimer) })
 .path-hidden {
   color: var(--el-text-color-secondary);
   opacity: 0.5;
+}
+
+@media (max-width: 768px) {
+  .storage-settings { max-width: 100%; overflow-x: hidden; }
+  .section { padding: 10px; }
+  .page-toolbar h3 { font-size: 15px; }
+  /* 移动端设备表/文件表:去掉 fixed 后表格自身横向滚动,这里限制卡片不撑破页面 */
+  .section :deep(.el-table) { font-size: 12px; }
 }
 </style>

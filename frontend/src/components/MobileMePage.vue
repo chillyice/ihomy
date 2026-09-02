@@ -113,6 +113,7 @@ const toggleLightEffect = () => {
     if (sunLight.shadowEnabled.value) {
       sunLight.blobsEnabled.value = true
       sunLight.weatherEffectEnabled.value = true
+      sunLight.lampMode.value = 'auto'
     } else {
       sunLight.blobsEnabled.value = false
       sunLight.weatherEffectEnabled.value = false

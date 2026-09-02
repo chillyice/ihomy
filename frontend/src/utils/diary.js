@@ -8,6 +8,7 @@ export const LINE_H = 28
 export const LINES_PER_PAGE = 18
 export const PAGE_H = LINE_H * LINES_PER_PAGE
 export const CONTENT_W = 28 * 16
+export const PAPER_W = 28 * 16 + 24 * 2 // 信纸总宽 496px(= 448 内容 + 24*2 边距)
 export const PAPER_TEXT_FONT = "'Cascadia Mono', 'Consolas', 'Courier New', monospace"
 
 export const MOODS = [

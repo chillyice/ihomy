@@ -1,6 +1,6 @@
-<!-- 面包屑导航:首页 + 传入的分级项,带 to/path 的项可点击跳转 -->
+<!-- 面包屑导航:首页 + 传入的分级项,带 to/path 的项可点击跳转;移动端隐藏(MobileHeader 已提供返回+标题) -->
 <template>
-  <nav class="breadcrumb">
+  <nav v-if="!isMobile" class="breadcrumb">
     <div class="crumb-left">
       <router-link to="/" class="crumb-link">
         <el-icon class="home-icon"><HomeFilled /></el-icon>
@@ -20,10 +20,13 @@
 
 <script setup>
 import { HomeFilled } from '@element-plus/icons-vue'
+import { useDevice } from '@/composables/useDevice'
 
 defineProps({
   items: { type: Array, default: () => [] },
 })
+
+const { isMobile } = useDevice()
 </script>
 
 <style scoped>
