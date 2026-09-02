@@ -544,6 +544,36 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 - **分钟降水**:summary 摘要句 13px。
 - 复用光影层 detail 缓存(useSunLight.weatherDetail),失败静默;未登录/游客可看(public),无数据显示 el-empty。
 
+## 23. 移动端布局(MobileLayout,≤768px)
+
+单代码库 + 运行时设备自适应(非子域名):`useDevice`(UA + matchMedia 768px 双信号)返回全局单例 `isMobile`,matchMedia change 监听横竖屏。移动端 → `<MobileLayout>`,桌面端 → AppSidebar + 光影层。
+
+### 首页三 Tab 模式(`/` 路由)
+
+- **MobileTabBar**:底部固定(fixed + safe-area-inset-bottom)三 Tab(首页/更多/我的)。
+- **MobileHomeFeed**(首页 Tab):顶部**文字式筛选 + 下划线选中**(无胶囊背景);动态流 8 类型(博客/日记/照片/视频/愿望/任务/菜谱/图书,9 Tab),复用 `homeApi.getFeed`(与桌面同一数据源,前端按 type 分流渲染,封面字段 `coverImage`)。
+- **MobileMoreGrid**(更多 Tab):按分类(内容/生活/成员/系统)4 列图标网格,复用 appStore.modules。
+- **MobileMePage**(我的 Tab):用户信息 + 家庭切换(展开列表)+ 主题/光影/语言开关 + 设置/成员/资料入口 + 退出。
+
+### 子页面模式(其余路由)
+
+- **MobileHeader**:顶部 fixed 返回栏(fixed + safe-area-inset-top)+ 标题 + 右侧 slot。
+- Breadcrumb 移动端隐藏(`v-if="!isMobile"`,返回栏已含标题)。
+- `.page` 移动端加 `overflow-x: hidden`(全局防横向溢出)。
+
+### 光影特效门控
+
+- 移动端**首次访问默认关**(仅无 `localStorage['ihomy:effects']` 时强制关),用户开启后刷新保留。
+- 移动端挂载 `<SunLightLayer v-if="anyEffectEnabled">`(特效开才渲染)。
+- 开启特效同步 `lampMode='auto'`(灯光随日出日落),关闭时 lampMode='off' + glassEnabled=false。
+
+### 功能页移动端增强
+
+- **日记编辑器**(`DiaryEdit`):信纸 `transform: scale()` 缩放(ResizeObserver 监听容器宽),`canvasPos` 修复缩放后涂鸦坐标映射(`clientWidth/rect.width`);`DoodleTray` 移动端底部抽屉(默认折叠,标题点击展开)。
+- **设备管理**(`Storage`):设备表/文件表移动端隐藏次要列(deviceType/rootPath/size/modified),只留 name+actions 消除横向滚动;el-table 去 `fixed="right"`(`:fixed="isMobile ? false : 'right'"`)。
+- **照片瀑布**(`Cascade`):卡片尺寸响应式(窄屏 90-150px/宽屏 130-220px);补 `@touchstart/@touchend` 替代 hover(touch 设备信息层不显示)。
+- **设置页**(`Settings`):横向操作行 flex-wrap 换行;侧栏菜单横向滚动 + 菜单项 `flex-shrink:0`;输入框全宽。
+
 ## 验收标准
 
 1. 打开页面,背景米白渐变 + 5 个色块缓慢飘移,右下角拍立得堆/闭合相册,左右毛玻璃面板从两侧滑入。

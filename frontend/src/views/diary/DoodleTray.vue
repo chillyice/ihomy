@@ -1,100 +1,113 @@
-<!-- 日记涂鸦笔盘:不同笔尖的画笔陈列 + 粗细调节 + 调色盘;点击画笔选中/取消 -->
+<!-- 日记涂鸦笔盘:不同笔尖的画笔陈列 + 粗细调节 + 调色盘;点击画笔选中/取消;移动端为底部可收起抽屉 -->
 <template>
-  <div class="doodle-area">
-    <div class="tray-title">{{ $t('diary.doodleTitle') }}</div>
-
-    <div class="pen-grid">
-      <button v-for="b in BRUSHES" :key="b.id" type="button" class="pen-item" :class="{ active: brush === b.id }" :title="$t(b.labelKey)" @click="$emit('update:brush', brush === b.id ? null : b.id)">
-        <span class="pen-svg">
-          <!-- 签字笔 -->
-          <svg v-if="b.id === 'gel'" viewBox="0 0 26 52">
-            <rect x="9" y="3" width="8" height="25" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.5" />
-            <path d="M10.5 8 h5" stroke="currentColor" stroke-width="1.2" />
-            <path d="M9 28 L17 28 L14.2 39 L11.8 39 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
-            <path d="M11.8 39 L14.2 39 L13 48 Z" :fill="brushColor" />
-          </svg>
-          <!-- 铅笔 -->
-          <svg v-else-if="b.id === 'pencil'" viewBox="0 0 26 52">
-            <rect x="9.5" y="3" width="7" height="24" fill="none" stroke="currentColor" stroke-width="1.5" />
-            <path d="M11.5 9 h3 M11.5 13 h3" stroke="currentColor" stroke-width="1" opacity="0.5" />
-            <path d="M9.5 27 L16.5 27 L13 41 Z" fill="#E8CE9E" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
-            <path d="M11.9 36.5 L14.1 36.5 L13 41 Z" :fill="brushColor" />
-          </svg>
-          <!-- 蜡笔 -->
-          <svg v-else-if="b.id === 'crayon'" viewBox="0 0 26 52">
-            <path d="M8 6 h10 v22 q0 3 -2 4 l-2 9 h-2 l-2 -9 q-2 -1 -2 -4 Z" :fill="brushColor" fill-opacity="0.75" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
-            <path d="M8 14 h10 M8 18 h10" stroke="currentColor" stroke-width="1" opacity="0.45" />
-          </svg>
-          <!-- 荧光笔 -->
-          <svg v-else-if="b.id === 'marker'" viewBox="0 0 26 52">
-            <rect x="9" y="3" width="8" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="1.5" />
-            <path d="M9 9 h8" stroke="currentColor" stroke-width="1.2" />
-            <path d="M8.5 23 L17.5 23 L15.5 41 L10.5 39 Z" :fill="brushColor" fill-opacity="0.7" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
-          </svg>
-          <!-- 画笔 -->
-          <svg v-else-if="b.id === 'brush'" viewBox="0 0 26 52">
-            <rect x="11.5" y="3" width="3" height="19" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5" />
-            <rect x="10.5" y="22" width="5" height="5" fill="none" stroke="currentColor" stroke-width="1.3" />
-            <path d="M10.5 27 Q13.5 34 11 44 Q13 50 15.5 44 Q14.5 34 15.5 27 Z" :fill="brushColor" fill-opacity="0.85" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
-          </svg>
-          <!-- 像素橡皮 -->
-          <svg v-else-if="b.id === 'eraserP'" viewBox="0 0 26 52">
-            <rect x="7" y="12" width="12" height="22" rx="3" fill="none" stroke="currentColor" stroke-width="1.5" />
-            <path d="M7 19 h12" stroke="currentColor" stroke-width="1" opacity="0.45" />
-            <g :fill="brushColor">
-              <rect x="9" y="41" width="3" height="3" /><rect x="14" y="41" width="3" height="3" /><rect x="11.5" y="45" width="3" height="3" />
-            </g>
-          </svg>
-          <!-- 对象橡皮 -->
-          <svg v-else viewBox="0 0 26 52">
-            <rect x="7" y="12" width="12" height="22" rx="3" fill="none" stroke="currentColor" stroke-width="1.5" />
-            <path d="M7 19 h12" stroke="currentColor" stroke-width="1" opacity="0.45" />
-            <path d="M7 45 q3.5 -5 6.5 0 t6.5 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity="0.55" />
-            <path d="M18.5 40.5 l5 5 M23.5 40.5 l-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
-          </svg>
-        </span>
-        <span class="pen-name">{{ $t(b.labelKey) }}</span>
-      </button>
+  <div class="doodle-area" :class="{ collapsed, mobile: isMobile }">
+    <div class="tray-title" @click="toggle">
+      <span>{{ $t('diary.doodleTitle') }}</span>
+      <span v-if="isMobile" class="tray-toggle" :class="{ up: !collapsed }">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>
+      </span>
     </div>
 
-    <div class="tray-row">
-      <span class="tray-label">{{ $t('diary.thickness') }}</span>
-      <el-slider :model-value="size" :min="1" :max="12" :step="1" size="small" @update:model-value="(v) => $emit('update:size', v)" />
-    </div>
-
-    <div class="tray-row">
-      <span class="tray-label">{{ $t('diary.alphaLabel') }}</span>
-      <el-slider :model-value="alpha" :min="10" :max="100" :step="5" size="small" @update:model-value="(v) => $emit('update:alpha', v)" />
-    </div>
-
-    <div class="tray-row palette-row">
-      <span class="tray-label">{{ $t('diary.colorLabel') }}</span>
-      <div class="palette">
-        <button v-for="c in INK_COLORS" :key="c" type="button" class="swatch" :class="{ active: brushColor.toLowerCase() === c.toLowerCase() }" :style="{ background: c }" @click="$emit('update:brushColor', c)" />
-        <label class="swatch custom" :class="{ active: !INK_COLORS.some((c) => c.toLowerCase() === brushColor.toLowerCase()) }" :title="$t('diary.customColor')">
-          <input type="color" :value="safeColor" @input="(e) => $emit('update:brushColor', e.target.value)" />
-        </label>
+    <div v-show="!collapsed || !isMobile" class="tray-body">
+      <div class="pen-grid">
+        <button v-for="b in BRUSHES" :key="b.id" type="button" class="pen-item" :class="{ active: brush === b.id }" :title="$t(b.labelKey)" @click="$emit('update:brush', brush === b.id ? null : b.id)">
+          <span class="pen-svg">
+            <!-- 签字笔 -->
+            <svg v-if="b.id === 'gel'" viewBox="0 0 26 52">
+              <rect x="9" y="3" width="8" height="25" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.5" />
+              <path d="M10.5 8 h5" stroke="currentColor" stroke-width="1.2" />
+              <path d="M9 28 L17 28 L14.2 39 L11.8 39 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+              <path d="M11.8 39 L14.2 39 L13 48 Z" :fill="brushColor" />
+            </svg>
+            <!-- 铅笔 -->
+            <svg v-else-if="b.id === 'pencil'" viewBox="0 0 26 52">
+              <rect x="9.5" y="3" width="7" height="24" fill="none" stroke="currentColor" stroke-width="1.5" />
+              <path d="M11.5 9 h3 M11.5 13 h3" stroke="currentColor" stroke-width="1" opacity="0.5" />
+              <path d="M9.5 27 L16.5 27 L13 41 Z" fill="#E8CE9E" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+              <path d="M11.9 36.5 L14.1 36.5 L13 41 Z" :fill="brushColor" />
+            </svg>
+            <!-- 蜡笔 -->
+            <svg v-else-if="b.id === 'crayon'" viewBox="0 0 26 52">
+              <path d="M8 6 h10 v22 q0 3 -2 4 l-2 9 h-2 l-2 -9 q-2 -1 -2 -4 Z" :fill="brushColor" fill-opacity="0.75" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+              <path d="M8 14 h10 M8 18 h10" stroke="currentColor" stroke-width="1" opacity="0.45" />
+            </svg>
+            <!-- 荧光笔 -->
+            <svg v-else-if="b.id === 'marker'" viewBox="0 0 26 52">
+              <rect x="9" y="3" width="8" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="1.5" />
+              <path d="M9 9 h8" stroke="currentColor" stroke-width="1.2" />
+              <path d="M8.5 23 L17.5 23 L15.5 41 L10.5 39 Z" :fill="brushColor" fill-opacity="0.7" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+            </svg>
+            <!-- 画笔 -->
+            <svg v-else-if="b.id === 'brush'" viewBox="0 0 26 52">
+              <rect x="11.5" y="3" width="3" height="19" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5" />
+              <rect x="10.5" y="22" width="5" height="5" fill="none" stroke="currentColor" stroke-width="1.3" />
+              <path d="M10.5 27 Q13.5 34 11 44 Q13 50 15.5 44 Q14.5 34 15.5 27 Z" :fill="brushColor" fill-opacity="0.85" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+            </svg>
+            <!-- 像素橡皮 -->
+            <svg v-else-if="b.id === 'eraserP'" viewBox="0 0 26 52">
+              <rect x="7" y="12" width="12" height="22" rx="3" fill="none" stroke="currentColor" stroke-width="1.5" />
+              <path d="M7 19 h12" stroke="currentColor" stroke-width="1" opacity="0.45" />
+              <g :fill="brushColor">
+                <rect x="9" y="41" width="3" height="3" /><rect x="14" y="41" width="3" height="3" /><rect x="11.5" y="45" width="3" height="3" />
+              </g>
+            </svg>
+            <!-- 对象橡皮 -->
+            <svg v-else viewBox="0 0 26 52">
+              <rect x="7" y="12" width="12" height="22" rx="3" fill="none" stroke="currentColor" stroke-width="1.5" />
+              <path d="M7 19 h12" stroke="currentColor" stroke-width="1" opacity="0.45" />
+              <path d="M7 45 q3.5 -5 6.5 0 t6.5 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity="0.55" />
+              <path d="M18.5 40.5 l5 5 M23.5 40.5 l-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+            </svg>
+          </span>
+          <span class="pen-name">{{ $t(b.labelKey) }}</span>
+        </button>
       </div>
-    </div>
 
-    <div class="tray-actions">
-      <button type="button" class="ghost-btn small" :disabled="!canUndo" @click="$emit('undo')">
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
-        {{ $t('diary.undo') }}
-      </button>
-      <button type="button" class="ghost-btn small" :disabled="!canRedo" @click="$emit('redo')">
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg>
-        {{ $t('diary.redo') }}
-      </button>
-    </div>
+      <div class="tray-row">
+        <span class="tray-label">{{ $t('diary.thickness') }}</span>
+        <el-slider :model-value="size" :min="1" :max="12" :step="1" size="small" @update:model-value="(v) => $emit('update:size', v)" />
+      </div>
 
-    <div class="tray-hint">{{ $t('diary.trayHint') }}</div>
+      <div class="tray-row">
+        <span class="tray-label">{{ $t('diary.alphaLabel') }}</span>
+        <el-slider :model-value="alpha" :min="10" :max="100" :step="5" size="small" @update:model-value="(v) => $emit('update:alpha', v)" />
+      </div>
+
+      <div class="tray-row palette-row">
+        <span class="tray-label">{{ $t('diary.colorLabel') }}</span>
+        <div class="palette">
+          <button v-for="c in INK_COLORS" :key="c" type="button" class="swatch" :class="{ active: brushColor.toLowerCase() === c.toLowerCase() }" :style="{ background: c }" @click="$emit('update:brushColor', c)" />
+          <label class="swatch custom" :class="{ active: !INK_COLORS.some((c) => c.toLowerCase() === brushColor.toLowerCase()) }" :title="$t('diary.customColor')">
+            <input type="color" :value="safeColor" @input="(e) => $emit('update:brushColor', e.target.value)" />
+          </label>
+        </div>
+      </div>
+
+      <div class="tray-actions">
+        <button type="button" class="ghost-btn small" :disabled="!canUndo" @click="$emit('undo')">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
+          {{ $t('diary.undo') }}
+        </button>
+        <button type="button" class="ghost-btn small" :disabled="!canRedo" @click="$emit('redo')">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg>
+          {{ $t('diary.redo') }}
+        </button>
+      </div>
+
+      <div class="tray-hint">{{ $t('diary.trayHint') }}</div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import { BRUSHES, INK_COLORS } from '@/utils/doodle'
+import { useDevice } from '@/composables/useDevice'
+
+const { isMobile } = useDevice()
+const collapsed = ref(true)
+
+const toggle = () => { if (isMobile.value) collapsed.value = !collapsed.value }
 
 const props = defineProps({
   brush: { type: String, default: null },
@@ -124,6 +137,15 @@ html.dark .doodle-area {
 }
 
 .tray-title { font-size: 12px; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 10px; text-align: center; letter-spacing: 2px; }
+
+/* 移动端标题栏兼作收起/展开把手 */
+.mobile .tray-title {
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  margin-bottom: 0; padding: 4px 0; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; user-select: none;
+}
+.tray-toggle { display: inline-flex; transition: transform 0.25s ease; }
+.tray-toggle.up { transform: rotate(180deg); }
 
 .pen-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px 2px; }
 
@@ -175,7 +197,15 @@ html.dark .swatch { border-color: rgba(255,255,255,0.25); }
 .tray-hint { font-size: 11px; color: var(--color-text-secondary); opacity: 0.55; line-height: 1.6; margin-top: 12px; }
 
 @media (max-width: 768px) {
-  .doodle-area { width: 100%; position: static; }
+  .doodle-area {
+    width: 100%; position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+    border-radius: 14px 14px 0 0; z-index: 55;
+    max-height: 48vh;
+    display: flex; flex-direction: column; overflow: hidden;
+    padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
+  }
+  /* 标题栏固定抽屉顶部,工具内容在 body 内部滚动(收起把手始终可见) */
+  .mobile .tray-body { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 4px; }
   .pen-svg { width: 22px; height: 44px; }
 }
 </style>

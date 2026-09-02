@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 家庭动态流:聚合博客/日记/照片三类内容,按时间倒序合并,
+ * 家庭动态流:聚合博客/日记/照片/视频/愿望/任务/菜谱/图书八类内容,按时间倒序合并,
  * 支持游客模式(仅公开内容)与条数限制。
  */
 @Service
@@ -24,6 +24,11 @@ public class ActivityFeedService {
     private final com.ihomy.mapper.PhotoMapper photoMapper;
     private final com.ihomy.mapper.CommentMapper commentMapper;
     private final com.ihomy.mapper.SysUserMapper sysUserMapper;
+    private final com.ihomy.mapper.VideoMapper videoMapper;
+    private final com.ihomy.mapper.WishMapper wishMapper;
+    private final com.ihomy.mapper.TaskMapper taskMapper;
+    private final com.ihomy.mapper.RecipeMapper recipeMapper;
+    private final com.ihomy.mapper.ContentBookMapper contentBookMapper;
     private final SignedUrlService signedUrlService;
 
     /** 组装动态:照片按上传者分组聚合为一条(带数量/前 5 张预览),最后统一按时间倒序取前 limit 条 */
@@ -103,6 +108,98 @@ public class ActivityFeedService {
                 m.put("likeCount", ps.stream().mapToInt(p -> p.getLikeCount() == null ? 0 : p.getLikeCount()).sum());
                 m.put("commentCount", commentCount("photo", ps.stream().map(com.ihomy.entity.Photo::getId).toList()));
                 items.add(m);
+            }
+
+            // 视频(放映厅):poster 出接口走签名解析(本地 /files/ 原样返回)
+            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.ihomy.entity.Video> vq =
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+            vq.eq(com.ihomy.entity.Video::getFamilyId, familyId);
+            if (publicOnly) {
+                vq.eq(com.ihomy.entity.Video::getVisibility, com.ihomy.common.DictConst.VIS_PUBLIC);
+            } else if (!isOwner) {
+                vq.and(w -> w.eq(com.ihomy.entity.Video::getUploaderId, currentUserId)
+                          .or().in(com.ihomy.entity.Video::getVisibility, com.ihomy.common.DictConst.VIS_FAMILY, com.ihomy.common.DictConst.VIS_PUBLIC));
+            }
+            vq.orderByDesc(com.ihomy.entity.Video::getCreatedAt).last("LIMIT " + limit);
+            for (com.ihomy.entity.Video v : videoMapper.selectList(vq)) {
+                Map<String, Object> m = base("video", v.getId(), v.getUploaderId(), v.getFamilyId(), v.getCreatedAt(), null);
+                m.put("title", v.getTitle());
+                m.put("coverImage", v.getPoster() == null ? null : signedUrlService.resolve(v.getPoster()));
+                items.add(m);
+                if (v.getUploaderId() != null) authorIds.add(v.getUploaderId());
+            }
+
+            // 愿望单
+            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.ihomy.entity.Wish> wq =
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+            wq.eq(com.ihomy.entity.Wish::getFamilyId, familyId);
+            if (publicOnly) {
+                wq.eq(com.ihomy.entity.Wish::getVisibility, com.ihomy.common.DictConst.VIS_PUBLIC);
+            } else if (!isOwner) {
+                wq.and(w -> w.eq(com.ihomy.entity.Wish::getRequesterId, currentUserId)
+                          .or().in(com.ihomy.entity.Wish::getVisibility, com.ihomy.common.DictConst.VIS_FAMILY, com.ihomy.common.DictConst.VIS_PUBLIC));
+            }
+            wq.orderByDesc(com.ihomy.entity.Wish::getCreatedAt).last("LIMIT " + limit);
+            for (com.ihomy.entity.Wish w : wishMapper.selectList(wq)) {
+                Map<String, Object> m = base("wish", w.getId(), w.getRequesterId(), w.getFamilyId(), w.getCreatedAt(), null);
+                m.put("title", w.getTitle());
+                m.put("status", w.getStatus());
+                items.add(m);
+                if (w.getRequesterId() != null) authorIds.add(w.getRequesterId());
+            }
+
+            // 任务悬赏(家庭内部可见,游客模式跳过)
+            if (!publicOnly) {
+                com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.ihomy.entity.Task> tq =
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+                tq.eq(com.ihomy.entity.Task::getFamilyId, familyId)
+                  .ne(com.ihomy.entity.Task::getStatus, com.ihomy.common.DictConst.TASK_CANCELLED)
+                  .orderByDesc(com.ihomy.entity.Task::getCreatedAt).last("LIMIT " + limit);
+                for (com.ihomy.entity.Task t : taskMapper.selectList(tq)) {
+                    Map<String, Object> m = base("task", t.getId(), t.getCreatedBy(), t.getFamilyId(), t.getCreatedAt(), null);
+                    m.put("title", t.getTitle());
+                    m.put("status", t.getStatus());
+                    m.put("rewardType", t.getRewardType());
+                    m.put("rewardPoints", t.getRewardPoints());
+                    items.add(m);
+                    if (t.getCreatedBy() != null) authorIds.add(t.getCreatedBy());
+                }
+            }
+
+            // 菜谱(家庭内部可见,游客模式跳过)
+            if (!publicOnly) {
+                com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.ihomy.entity.Recipe> rq =
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+                rq.eq(com.ihomy.entity.Recipe::getFamilyId, familyId)
+                  .orderByDesc(com.ihomy.entity.Recipe::getCreatedAt).last("LIMIT " + limit);
+                for (com.ihomy.entity.Recipe r : recipeMapper.selectList(rq)) {
+                    Map<String, Object> m = base("recipe", r.getId(), r.getAuthorId(), r.getFamilyId(), r.getCreatedAt(), null);
+                    m.put("title", r.getName());
+                    m.put("coverImage", r.getCoverImage());
+                    items.add(m);
+                    if (r.getAuthorId() != null) authorIds.add(r.getAuthorId());
+                }
+            }
+
+            // 图书(书架,仅已发布)
+            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.ihomy.entity.ContentBook> bkq =
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
+            bkq.eq(com.ihomy.entity.ContentBook::getFamilyId, familyId)
+               .eq(com.ihomy.entity.ContentBook::getStatus, com.ihomy.common.DictConst.BLOG_PUBLISHED);
+            if (publicOnly) {
+                bkq.eq(com.ihomy.entity.ContentBook::getVisibility, com.ihomy.common.DictConst.VIS_PUBLIC);
+            } else if (!isOwner) {
+                bkq.and(w -> w.eq(com.ihomy.entity.ContentBook::getUploaderId, currentUserId)
+                          .or().in(com.ihomy.entity.ContentBook::getVisibility, com.ihomy.common.DictConst.VIS_FAMILY, com.ihomy.common.DictConst.VIS_PUBLIC));
+            }
+            bkq.orderByDesc(com.ihomy.entity.ContentBook::getCreatedAt).last("LIMIT " + limit);
+            for (com.ihomy.entity.ContentBook bk : contentBookMapper.selectList(bkq)) {
+                Map<String, Object> m = base("book", bk.getId(), bk.getUploaderId(), bk.getFamilyId(), bk.getCreatedAt(), null);
+                m.put("title", bk.getTitle());
+                m.put("author", bk.getAuthor());
+                m.put("coverImage", bk.getCoverUrl());
+                items.add(m);
+                if (bk.getUploaderId() != null) authorIds.add(bk.getUploaderId());
             }
 
             applyCommentCounts(blogItems, blogIds, "blog");

@@ -1,8 +1,11 @@
 <!-- 根组件:移动端 → MobileLayout;桌面端 → 光影层 + 左侧导航 + 页面内容 -->
 <template>
   <el-config-provider :locale="elLocale">
-    <!-- 移动端布局 -->
-    <MobileLayout v-if="isMobile" />
+    <!-- 移动端布局:特效开启时同样挂载光影层(全部 pointer-events:none 不挡触摸) -->
+    <template v-if="isMobile">
+      <SunLightLayer v-if="anyEffectEnabled" />
+      <MobileLayout />
+    </template>
 
     <!-- 桌面端布局 -->
     <template v-else>
@@ -54,9 +57,10 @@ const sunLight = useSunLight()
 provide(SUN_LIGHT_KEY, sunLight)
 const { anyEffectEnabled } = sunLight
 
-// 移动端默认关闭所有光影特效(GPU/内存敏感),用户可在"我的"Tab 手动开启
+// 移动端首次使用(本设备无保存偏好)默认关闭所有光影特效(GPU/内存敏感);
+// 用户开启过则写入 ihomy:effects,刷新后尊重用户选择不再强制关闭
 watch(isMobile, (mobile) => {
-  if (mobile) {
+  if (mobile && !localStorage.getItem('ihomy:effects')) {
     sunLight.shadowEnabled.value = false
     sunLight.weatherEffectEnabled.value = false
     sunLight.blobsEnabled.value = false

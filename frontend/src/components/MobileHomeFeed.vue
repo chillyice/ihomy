@@ -24,8 +24,8 @@
             <span class="feed-time">{{ formatTime(f.createdAt) }}</span>
           </div>
           <div class="feed-card-body">
-            <div v-if="f.coverUrl" class="feed-cover">
-              <img :src="f.coverUrl" :alt="feedSummary(f)" loading="lazy" />
+            <div v-if="feedCover(f)" class="feed-cover">
+              <img :src="feedCover(f)" :alt="feedSummary(f)" loading="lazy" />
             </div>
             <div class="feed-text">
               <div v-if="f.type === 'blog'" class="feed-title">{{ f.title }}</div>
@@ -56,6 +56,11 @@ const filters = [
   { key: 'blog', label: '博客' },
   { key: 'diary', label: '日记' },
   { key: 'photo', label: '照片' },
+  { key: 'video', label: '放映厅' },
+  { key: 'wish', label: '愿望' },
+  { key: 'task', label: '任务' },
+  { key: 'recipe', label: '菜谱' },
+  { key: 'book', label: '书架' },
 ]
 
 const filteredFeeds = computed(() => {
@@ -63,11 +68,18 @@ const filteredFeeds = computed(() => {
   return feeds.value.filter(f => f.type === activeFilter.value)
 })
 
-const feedTypeLabel = (type) => type === 'blog' ? '博客' : type === 'diary' ? '日记' : type === 'photo' ? '照片' : ''
+const TYPE_LABELS = { blog: '博客', diary: '日记', photo: '照片', video: '放映厅', wish: '愿望', task: '任务', recipe: '菜谱', book: '书架' }
+const feedTypeLabel = (type) => TYPE_LABELS[type] || ''
+const feedCover = (f) => f.coverImage || (Array.isArray(f.urls) && f.urls.length ? f.urls[0] : '')
 const feedSummary = (f) => {
   if (f.type === 'blog') return f.title || ''
   if (f.type === 'diary') return (f.content || '').slice(0, 60)
   if (f.type === 'photo') return `${f.count || 0} 张照片`
+  if (f.type === 'video') return `上传了影片:${f.title || ''}`
+  if (f.type === 'wish') return f.status === 'ACHIEVED' ? `实现了愿望:${f.title || ''}` : `许下愿望:${f.title || ''}`
+  if (f.type === 'task') return `发布任务:${f.title || ''}`
+  if (f.type === 'recipe') return `分享菜谱:${f.title || ''}`
+  if (f.type === 'book') return `上架图书:《${f.title || ''}》`
   return ''
 }
 const formatTime = (d) => {
@@ -78,10 +90,10 @@ const formatTime = (d) => {
   if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前'
   return date.toLocaleDateString('zh-CN')
 }
+const FEED_ROUTES = { diary: '/diary', photo: '/album', video: '/cinema', wish: '/wish', task: '/task', recipe: '/kitchen', book: '/library' }
 const goFeed = (f) => {
   if (f.type === 'blog' && f.id) router.push(`/blog/${f.id}`)
-  else if (f.type === 'diary') router.push('/diary')
-  else if (f.type === 'photo') router.push('/album')
+  else if (FEED_ROUTES[f.type]) router.push(FEED_ROUTES[f.type])
 }
 
 onMounted(async () => {
@@ -108,8 +120,8 @@ html.dark .filter-bar { background: rgba(20, 28, 45, 0.92); border-bottom-color:
 
 .filter-scroll {
   display: flex;
-  gap: 8px;
-  padding: 10px 16px;
+  gap: 22px;
+  padding: 12px 20px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
@@ -118,21 +130,38 @@ html.dark .filter-bar { background: rgba(20, 28, 45, 0.92); border-bottom-color:
 
 .filter-chip {
   flex-shrink: 0;
-  padding: 6px 16px;
-  border-radius: 20px;
-  font-size: 14px;
-  color: var(--color-text-secondary, #666);
-  background: rgba(0, 0, 0, 0.04);
+  position: relative;
+  padding: 4px 0;
+  font-size: 15px;
+  color: var(--color-text-secondary, #8a8378);
+  background: transparent;
   cursor: pointer;
-  transition: all 0.2s;
+  white-space: nowrap;
+  transition: color 0.2s;
   -webkit-tap-highlight-color: transparent;
 }
-html.dark .filter-chip { background: rgba(255,255,255,0.08); color: #aaa; }
-.filter-chip.active {
+html.dark .filter-chip { color: #9aa0a8; }
+
+/* 选中态下划线:从中心展开 */
+.filter-chip::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -2px;
+  transform: translateX(-50%);
+  width: 0;
+  height: 2.5px;
+  border-radius: 2px;
   background: var(--color-primary, #b88c6e);
-  color: #fff;
+  transition: width 0.25s ease;
 }
-html.dark .filter-chip.active { background: #d4b298; color: #1a1a1a; }
+.filter-chip.active {
+  color: var(--color-text-primary, #3a2e22);
+  font-weight: 600;
+}
+.filter-chip.active::after { width: 60%; }
+html.dark .filter-chip.active { color: #E8DCC8; }
+html.dark .filter-chip::after { background: #d4b298; }
 
 .feed-list { padding: 12px 16px 80px; }
 

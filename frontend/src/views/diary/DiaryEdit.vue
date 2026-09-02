@@ -4,9 +4,10 @@
     <Breadcrumb :items="[{ label: $t('diary.title'), to: '/diary' }, { label: isEdit ? $t('diary.editDiary') : $t('diary.newDiary') }]" />
 
     <div class="diary-layout">
-      <!-- 左侧:纸张 -->
-      <div class="paper-stack">
-        <div class="paper-sheet">
+      <!-- 左侧:纸张(移动端等比缩放适配屏幕宽度) -->
+      <div class="paper-scaler" :style="scalerStyle">
+        <div ref="paperRef" class="paper-stack" :style="paperTransform">
+          <div class="paper-sheet">
           <!-- 页眉 -->
           <div class="paper-header">
             <div class="header-row">
@@ -89,6 +90,7 @@
           </div>
         </div>
       </div>
+      </div>
 
       <!-- 右侧:涂鸦笔盘 sticky -->
       <DoodleTray
@@ -137,11 +139,13 @@ import { ElMessage } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import DoodleTray from './DoodleTray.vue'
 import { INK_COLORS, parseDoodle, renderStroke, renderStrokes, erasePixel, eraseObject, setupCanvas, clearCanvas } from '@/utils/doodle'
-import { PAGE_H, MOODS, WEATHERS, moodLabel as moodLabelOf, weatherLabel as weatherLabelOf } from '@/utils/diary'
+import { PAGE_H, PAPER_W, MOODS, WEATHERS, moodLabel as moodLabelOf, weatherLabel as weatherLabelOf } from '@/utils/diary'
+import { useDevice } from '@/composables/useDevice'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const { isMobile } = useDevice()
 const isEdit = computed(() => !!route.params.id)
 const loading = ref(false)
 const authorId = ref(null)
@@ -154,6 +158,22 @@ const moodBtnRef = ref(null)
 const weatherBtnRef = ref(null)
 const textareaRef = ref(null)
 const bodyHeight = ref(PAGE_H)
+
+/* ---------- 移动端信纸等比缩放:纸张固定 496px,小屏按视口宽度缩放,保持涂鸦坐标系与查看页一致 ---------- */
+const paperRef = ref(null)
+const paperScale = ref(1)
+const scalerH = ref(PAGE_H)
+const paperTransform = computed(() => (paperScale.value < 1 ? { transform: `scale(${paperScale.value})`, transformOrigin: 'top left' } : {}))
+const scalerStyle = computed(() => (paperScale.value < 1 ? { width: `${PAPER_W * paperScale.value}px`, height: `${scalerH.value}px` } : {}))
+const syncScale = () => {
+  if (!isMobile.value) { paperScale.value = 1; return }
+  const avail = window.innerWidth - 24 // .page 移动端左右 padding 12px*2
+  paperScale.value = Math.min(1, avail / PAPER_W)
+}
+const syncHeight = () => {
+  if (paperRef.value) scalerH.value = Math.ceil(paperRef.value.offsetHeight * paperScale.value)
+}
+let scaleObserver = null
 
 const moodLabel = computed(() => moodLabelOf(form.mood))
 const weatherLabel = computed(() => weatherLabelOf(form.weather))
@@ -247,8 +267,12 @@ const drawLive = () => {
 }
 
 const canvasPos = (e) => {
-  const rect = liveRef.value.getBoundingClientRect()
-  return [e.clientX - rect.left, e.clientY - rect.top]
+  const cv = liveRef.value
+  const rect = cv.getBoundingClientRect()
+  // CSS transform 缩放后 rect 为视觉尺寸,须换算回画布布局坐标(clientWidth 为未缩放布局尺寸)
+  const sx = (cv.clientWidth || 1) / (rect.width || 1)
+  const sy = (cv.clientHeight || 1) / (rect.height || 1)
+  return [(e.clientX - rect.left) * sx, (e.clientY - rect.top) * sy]
 }
 
 const applyErase = (x, y) => {
@@ -397,16 +421,32 @@ onMounted(async () => {
   hIndex.value = 0
   nextTick(() => { autoResize(); redrawBase(); textareaRef.value?.focus() })
   window.addEventListener('keydown', onKeydown)
+  syncScale()
+  syncHeight()
+  window.addEventListener('resize', onResize)
+  if (typeof ResizeObserver !== 'undefined' && paperRef.value) {
+    scaleObserver = new ResizeObserver(() => syncHeight())
+    scaleObserver.observe(paperRef.value)
+  }
 })
 
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+const onResize = () => { syncScale(); syncHeight() }
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('resize', onResize)
+  scaleObserver?.disconnect()
+})
 
 watch(content, () => autoResize())
+watch(paperScale, () => syncHeight())
+watch(isMobile, () => { syncScale(); syncHeight() })
 </script>
 
 <style scoped>
 .diary-layout { display: flex; gap: 8px; justify-content: center; align-items: flex-start; }
 
+.paper-scaler { flex-shrink: 0; overflow: hidden; }
 .paper-stack { display: flex; flex-direction: column; flex-shrink: 0; width: calc(28 * 16px + 24px * 2); }
 
 .paper-sheet {
@@ -522,6 +562,7 @@ html.dark .picker-cell.active { background: rgba(212,178,152,0.12); }
 html.dark .picker-clear { background: rgba(201,116,116,0.08); color: #c97474; }
 
 @media (max-width: 768px) {
-  .diary-layout { flex-direction: column; align-items: center; }
+  .diary-layout { flex-direction: column; align-items: center; padding-bottom: 96px; }
+  .paper-scaler { margin: 0 auto; }
 }
 </style>

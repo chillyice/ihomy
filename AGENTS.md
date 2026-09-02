@@ -258,11 +258,11 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 移动布局 | `layouts/MobileLayout.vue` | 首页路由 `/` → 三 Tab 模式(底部 TabBar);其余路由 → 子页面模式(顶部返回栏 + router-view) |
 | 底部 TabBar | `components/MobileTabBar.vue` | 三 Tab:首页/更多/我的;fixed 底部 + safe-area-inset-bottom |
 | 子页面返回栏 | `components/MobileHeader.vue` | fixed 顶部 + safe-area-inset-top;返回按钮 + 标题 + 右侧 slot |
-| 首页动态流 | `components/MobileHomeFeed.vue` | 顶部横向滚动筛选栏(全部/博客/日记/照片)+ 卡片信息流;复用 publicApi/homeApi getFeed |
+| 首页动态流 | `components/MobileHomeFeed.vue` | 顶部**文字式筛选 + 下划线选中**(无胶囊背景);动态流 8 类型(博客/日记/照片/视频/愿望/任务/菜谱/图书,9 Tab);复用 homeApi getFeed |
 | 更多功能 | `components/MobileMoreGrid.vue` | 按分类(内容/生活/成员/系统)4 列图标网格;点击跳转对应路由;复用 appStore.modules |
 | 我的页面 | `components/MobileMePage.vue` | 用户信息 + 家庭切换(展开列表)+ 主题/光影/语言开关 + 设置/成员/资料入口 + 退出 |
-| 特效门控 | `App.vue` + `useSunLight.js` | `watch(isMobile)` immediate:移动端默认关闭所有光影特效(shadow/weather/blobs/lamp/glass);"我的"Tab 可手动开启 |
-| App.vue | `App.vue` | `isMobile` 条件渲染:移动端 → `<MobileLayout>`(不含 SunLightLayer/AppSidebar/LightTestConsole);桌面端不变 |
+| 特效门控 | `App.vue` + `useSunLight.js` | 移动端**首次访问默认关**(仅无 `localStorage['ihomy:effects']` 时强制关),用户开启后刷新保留;移动端挂载 `SunLightLayer`(`anyEffectEnabled` 才渲染);开启后 `lampMode='auto'` |
+| App.vue | `App.vue` | `isMobile` 条件渲染:移动端 → `<MobileLayout>`(不含 AppSidebar/LightTestConsole,含按需 SunLightLayer);桌面端不变 |
 
 **设计决策**:采用**单代码库 + 运行时设备自适应**(非子域名 m.ihomy.top 方案)。理由:避免 JWT 跨域共享/CORS/双构建双部署/PWA 分裂;同一 URL 响应式适配,localhost 测试无需额外配置。
 
@@ -629,6 +629,26 @@ INSERT INTO sys_dict_item ... book_format/borrow_status;
 **测试方式**:`localhost:5173` + Chrome DevTools 设备模拟;真机 `http://<局域网IP>:5173`(vite host:0.0.0.0)。
 
 **第一期适配范围**:首页(三 Tab 重设计)+ 子页面顶部返回栏 + 20 个功能页响应式 CSS 增强(Blog/Diary/Album/Chat/Login/Settings/Member/Book/Task/Plan/Wish/Points/Reminder/Tree/Item/Library)。后续迭代:进一步触摸手势优化+字体大小+性能验证。
+
+##### 移动端兼容性二期(mobile 分支)
+
+| 文件 | 改动 |
+|------|------|
+| `components/MobileHomeFeed.vue` | 筛选栏从胶囊改为**文字式 + 下划线选中**;动态流扩展为 8 类型(博客/日记/照片/视频/愿望/任务/菜谱/图书),9 Tab;TYPE_LABELS/feedSummary/FEED_ROUTES;封面字段 `coverUrl`→`coverImage` |
+| `backend/.../ActivityFeedService.java` | 动态流 3 类型(blog/diary/photo)→8 类型(+video/wish/task/recipe/book);Task/Recipe 无 visibility 列(家庭内部,游客跳过),Video/Wish/Book 按 visibility 过滤,Book 需 status=PUBLISHED |
+| `views/Home.vue` | 桌面首页 feed 同步 `feedTypeLabel`/`feedSummary`/`goFeed`(与移动端一致) |
+| `utils/diary.js` | 新增 `PAPER_W = 496`(28×16+24×2)信纸宽度常量 |
+| `views/diary/DiaryEdit.vue` | 移动端信纸 `transform: scale()` 缩放(ResizeObserver 监听容器宽);`canvasPos` 修复缩放后涂鸦坐标映射(`clientWidth/rect.width`) |
+| `views/diary/DoodleTray.vue` | 移动端底部抽屉(默认折叠,标题点击展开);修复桌面 `top:16px` 未清除致抽屉飘到顶部(CSS over-constrained 让 top 赢过 bottom,且被 MobileHeader z-60 遮住无法折叠);改 flex-column(title 固定 + .tray-body 内部滚动) |
+| `App.vue` | 移动端分支挂载 `<SunLightLayer v-if="anyEffectEnabled">`(修复移动端开特效无光影);`watch(isMobile)` 仅在无 `ihomy:effects` 时默认关特效 |
+| `components/MobileMePage.vue` | `toggleLightEffect` 打开时 `lampMode='auto'`,关闭时 `lampMode='off'+glassEnabled=false` |
+| `components/Breadcrumb.vue` | `v-if="!isMobile"` 移动端隐藏(MobileHeader 已含标题) |
+| `views/Settings.vue` | 移动端增强:横向操作行(music-actions/setting-row/bg-playlist-item)flex-wrap 换行;输入框全宽;侧栏菜单项 flex-shrink:0 |
+| `views/storage/Storage.vue` | 移动端设备表/文件表**隐藏次要列**(deviceType/rootPath/size/modified),只留 name+actions 消除横向滚动;el-table 去 `fixed="right"`(`:fixed="isMobile ? false : 'right'"`);actions 列宽 260→140 |
+| `views/cascade/Cascade.vue` | 移动端卡片尺寸响应式(窄屏 90-150px/宽屏 130-220px);补 `@touchstart/@touchend`(原仅 hover,touch 设备信息层不显示) |
+| `styles/main.css` | `.page` 移动端加 `overflow-x: hidden`(全局防横向溢出) |
+
+**设计决策**:移动端 feed 复用后端 `getFeed`(与桌面同一数据源,前端按 type 分流渲染);移动端光影特效**首次访问默认关、用户开启后持久化**;设备管理/文件浏览移动端采用**隐藏次要列**而非横向滚动(信息通过桌面端查看);照片瀑布卡片尺寸随视口缩放,触摸设备用 touch 事件替代 hover。
 
 ##### 播放器沉浸模式 + 多家庭修复
 
@@ -1094,6 +1114,7 @@ CREATE TABLE sys_media_server (
 | P2 | 物品定位-户型图 | 1期(物品清单+搜索)已完成;2期户型图:房间矩形绘制/物品相对坐标摆放,以 room.id 挂载(数据结构已预留) |
 | P2 | 用户使用指导 | 新手引导弹窗+帮助页 |
 | P2 | 家庭公告/广告位 | 自建家庭公告(不接第三方广告,隐私原因) |
+| P2 | 设置页-存储管理设计统一 | 存储管理 tab(Storage.vue)用 `.card.section`+`.page-toolbar`+`h3` 工具栏标题,与 profile/family/daily/light 其他 tab 的 `.card.settings-card`+`.section-label`(左竖线标题)风格不一致;统一为 section-label 标题 + 卡片规范。移动端已临时隐藏次要列(deviceType/rootPath/size/modified)消除横向溢出,统一时一并处理 |
 | P2 | 首页组件自适应展示 | 首页栅格(12列×9行)组件按尺寸分级展示。每个功能组件有默认大小(4×5 等),不同尺寸呈现不同信息密度:**h=1**(标题消失,仅展示核心数据:天气仅温度+图标,收支仅结余数字,任务仅数量角标);**h=2-3**(标题+精简列表 2-3 条);**h≥4**(标题+完整列表+详情);**w≤2**(单列窄布局:垂直堆叠条目);**w≥4**(多列网格:相册瀑布/菜谱卡片)。需为每个组件定义 compact/normal/expanded 三档展示模板,CSS 媒体查询+JS 判断 w/h 切换。组件清单:feed(默认4×6)/task(4×2)/today(4×4)/weather(3×4)/anni(1×4)/recipe(4×2)/search(4×3)/wish(4×3)/finance(4×3)/album(4×5)/music(4×3) |
 | P3 | 多重人格 | 基于身份标签扩展,一账号多标签可切换发表,会话级 currentLabel(Redis 或前端状态),与家庭切换正交 |
 | P3 | AI API 对接 | 统一对接大模型 API(聊天/内容生成),需配置 API Key 与服务商(OpenAI 兼容协议),待细化 |

@@ -13,6 +13,8 @@
           :class="{ hovered: c.hovered }"
           @mouseenter="pauseCard(c)"
           @mouseleave="resumeCard(c)"
+          @touchstart="pauseCard(c)"
+          @touchend="resumeCard(c)"
           @click.stop="openViewer(c)"
         >
           <img :src="c.photo.url && c.photo.url.includes('?') ? c.photo.url + '&thumb=1' : c.photo.url" draggable="false" :alt="c.photo.description || ''" />
@@ -63,13 +65,17 @@ let rafId = null
 const spawnCard = () => {
   if (!photos.value.length) return
   const photo = photos.value[Math.floor(Math.random() * photos.value.length)]
+  // 窄屏(移动端)缩小卡片尺寸,避免超出视口被 overflow:hidden 裁掉
+  const narrow = window.innerWidth < 768
+  const maxSize = narrow ? 150 : 220
+  const minSize = narrow ? 90 : 130
   const card = {
     key: ++cardSeq,
     photo,
-    x: 5 + Math.random() * 90,
+    x: narrow ? 5 + Math.random() * 70 : 5 + Math.random() * 90,
     delay: 0,
     duration: 15 + Math.random() * 12,
-    size: 130 + Math.random() * 90,
+    size: minSize + Math.random() * (maxSize - minSize),
     rot: (Math.random() - 0.5) * 30,
     drift: (Math.random() - 0.5) * 120,
     hovered: false,
@@ -217,5 +223,10 @@ onBeforeUnmount(() => {
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 10;
+}
+
+@media (max-width: 768px) {
+  .leaf-card { border-radius: 6px; }
+  .photo-info { font-size: 10px; }
 }
 </style>
