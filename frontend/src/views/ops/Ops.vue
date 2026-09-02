@@ -143,8 +143,8 @@
             </template>
           </el-table-column>
         </el-table>
-        <el-pagination v-model:current-page="logPageNum" :page-size="20" :total="logTotal"
-          layout="total, prev, pager, next" style="margin-top: 14px; justify-content: flex-end" @current-change="loadLogs" />
+        <el-pagination v-model:current-page="logPageNum" v-model:page-size="logPageSize" :page-sizes="[20, 50, 100, 200]" :total="logTotal"
+          layout="total, sizes, prev, pager, next" style="margin-top: 14px; justify-content: flex-end" @current-change="loadLogs" @size-change="loadLogs(1)" />
       </el-tab-pane>
 
       <el-tab-pane :label="$t('ops.traceLogs')" name="trace">
@@ -336,6 +336,7 @@ const logsLoading = ref(false)
 const logPage = ref({ records: [] })
 const logTotal = ref(0)
 const logPageNum = ref(1)
+const logPageSize = ref(20)
 const logFilter = reactive({ keyword: '', operatorId: '', modules: [], operationTypes: [], results: [], startDate: '', endDate: '' })
 // 筛选下拉数据源(distinct 模块/操作类型,来自 sys_operation_log)
 const logOptions = ref({ modules: [], operationTypes: [] })
@@ -579,7 +580,7 @@ const loadLogs = async (page = logPageNum.value) => {
   try {
     const data = await opsApi.logs({
       current: page,
-      size: 20,
+      size: logPageSize.value,
       keyword: logFilter.keyword || null,
       operatorId: logFilter.operatorId || null,
       module: logFilter.modules.length ? logFilter.modules.join(',') : null,
