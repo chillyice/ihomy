@@ -431,5 +431,36 @@ WHERE NOT EXISTS (
   WHERE c.family_id = b.family_id AND c.deleted = 0 AND c.parent_id IS NULL AND c.name = b.category
 );
 
+-- ------------------------------------------------------------
+-- content_book 补 uploader_id + like_count 列(2026-09-02)
+-- 代码实体 ContentBook 用 uploader_id/like_count,但早期库(created_by 建表)缺这两列,
+-- 导致 /api/public/feed 查询图书报 "Unknown column 'uploader_id'"(500 内部错误)。
+-- 幂等:information_schema.COLUMNS 判断,重复执行无副作用
+-- ------------------------------------------------------------
+SET @add_book_uploader := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `content_book` ADD COLUMN `uploader_id` BIGINT DEFAULT NULL COMMENT ''上传者ID'' AFTER `visibility`',
+    'SELECT ''skip: uploader_id already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_book' AND COLUMN_NAME = 'uploader_id'
+);
+PREPARE add_book_uploader_stmt FROM @add_book_uploader;
+EXECUTE add_book_uploader_stmt;
+DEALLOCATE PREPARE add_book_uploader_stmt;
+
+SET @add_book_like := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `content_book` ADD COLUMN `like_count` INT NOT NULL DEFAULT 0 COMMENT ''点赞数'' AFTER `view_count`',
+    'SELECT ''skip: like_count already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_book' AND COLUMN_NAME = 'like_count'
+);
+PREPARE add_book_like_stmt FROM @add_book_like;
+EXECUTE add_book_like_stmt;
+DEALLOCATE PREPARE add_book_like_stmt;
+
+-- 存量图书回填 uploader_id(旧库用 created_by 存上传者)
+UPDATE `content_book` SET `uploader_id` = `created_by` WHERE `uploader_id` IS NULL;
+
 
 
