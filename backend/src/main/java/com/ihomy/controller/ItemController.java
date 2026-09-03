@@ -168,4 +168,45 @@ public class ItemController {
         itemService.itemDelete(id, current().getFamilyId());
         return Result.success();
     }
+
+    // ---------- 户型图(2期) ----------
+
+    @Operation(summary = "户型图数据(房子元信息+房间+家具+物品)")
+    @GetMapping("/floor-plan")
+    public Result<Map<String, Object>> floorPlan(@RequestParam Long houseId,
+                                                 @RequestParam(required = false) Integer floor) {
+        return Result.success(itemService.floorPlan(current().getFamilyId(), houseId, floor));
+    }
+
+    @Operation(summary = "保存楼层配置(底图/比例尺)")
+    @OperationLog(module = "ITEM", operationType = "UPDATE", description = "保存楼层配置(底图/比例尺)")
+    @PutMapping("/house/{id}/floor-plans")
+    public Result<Void> houseFloorPlans(@PathVariable Long id, @RequestBody HouseDTO dto) {
+        itemService.saveFloorPlans(id, current().getFamilyId(), dto.getFloorPlans());
+        return Result.success();
+    }
+
+    @Operation(summary = "保存房间几何")
+    @OperationLog(module = "ITEM", operationType = "UPDATE", description = "保存房间几何")
+    @PutMapping("/room/{id}/geometry")
+    public Result<Void> roomGeometry(@PathVariable Long id, @RequestBody RoomDTO dto) {
+        itemService.saveRoomGeometry(id, current().getFamilyId(), dto.getGeometry());
+        return Result.success();
+    }
+
+    @Operation(summary = "保存家具几何")
+    @OperationLog(module = "ITEM", operationType = "UPDATE", description = "保存家具几何")
+    @PutMapping("/furniture/{id}/geometry")
+    public Result<Void> furnitureGeometry(@PathVariable Long id, @RequestBody FurnitureDTO dto) {
+        itemService.saveFurnitureGeometry(id, current().getFamilyId(), dto);
+        return Result.success();
+    }
+
+    @Operation(summary = "保存物品相对坐标")
+    @OperationLog(module = "ITEM", operationType = "UPDATE", description = "保存物品相对坐标")
+    @PutMapping("/{id}/place")
+    public Result<Void> itemPlace(@PathVariable Long id, @RequestBody ItemDTO dto) {
+        itemService.saveItemPlace(id, current().getFamilyId(), dto);
+        return Result.success();
+    }
 }

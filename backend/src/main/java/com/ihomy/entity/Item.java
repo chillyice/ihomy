@@ -18,6 +18,7 @@ public class Item {
     private Long id;
     private Long familyId;
     private Long furnitureId;
+    private Long roomId;
     private String name;
     private String aliases;
     private String position;
@@ -26,6 +27,8 @@ public class Item {
     private java.math.BigDecimal quantity;
     private String unit;
     private String note;
+    private java.math.BigDecimal relX;
+    private java.math.BigDecimal relY;
     private Long createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

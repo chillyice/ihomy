@@ -1,6 +1,9 @@
 package com.ihomy.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.ResultCode;
 import com.ihomy.dto.FurnitureDTO;
@@ -18,6 +21,7 @@ import com.ihomy.mapper.RoomMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -33,6 +37,7 @@ public class ItemService {
     private final RoomMapper roomMapper;
     private final FurnitureMapper furnitureMapper;
     private final ItemMapper itemMapper;
+    private final ObjectMapper mapper = new ObjectMapper();
 
     // ---------- 房子 ----------
 
@@ -49,6 +54,7 @@ public class ItemService {
         h.setFamilyId(familyId);
         h.setName(dto.getName());
         h.setAddress(dto.getAddress());
+        h.setFloorPlans(dto.getFloorPlans());
         h.setSortOrder(dto.getSortOrder() == null ? 0 : dto.getSortOrder());
         h.setCreatedBy(userId);
         houseMapper.insert(h);
@@ -59,6 +65,7 @@ public class ItemService {
         House h = requireHouse(id, familyId);
         if (dto.getName() != null) h.setName(dto.getName());
         if (dto.getAddress() != null) h.setAddress(dto.getAddress());
+        if (dto.getFloorPlans() != null) h.setFloorPlans(dto.getFloorPlans());
         if (dto.getSortOrder() != null) h.setSortOrder(dto.getSortOrder());
         houseMapper.updateById(h);
     }
@@ -95,6 +102,7 @@ public class ItemService {
         r.setFloor(dto.getFloor() == null ? 1 : dto.getFloor());
         r.setSortOrder(dto.getSortOrder() == null ? 0 : dto.getSortOrder());
         r.setNote(dto.getNote());
+        r.setGeometry(dto.getGeometry());
         r.setCreatedBy(userId);
         roomMapper.insert(r);
         return r;
@@ -108,15 +116,21 @@ public class ItemService {
         if (dto.getFloor() != null) r.setFloor(dto.getFloor());
         if (dto.getSortOrder() != null) r.setSortOrder(dto.getSortOrder());
         r.setNote(dto.getNote());
+        if (dto.getGeometry() != null) r.setGeometry(dto.getGeometry());
         roomMapper.updateById(r);
     }
 
     public void roomDelete(Long id, Long familyId) {
         requireRoom(id, familyId);
-        if (furnitureMapper.selectCount(new LambdaQueryWrapper<Furniture>()
-                .eq(Furniture::getRoomId, id)) > 0) {
-            throw new BizException(ResultCode.BAD_REQUEST, "该房间下还有家具,请先删除或转移家具");
-        }
+        // 家具进家具库(room_id 置空),与物品绑定不动;散放物品(room_id 指向本房间)同步清空
+        furnitureMapper.update(null, new LambdaUpdateWrapper<Furniture>()
+                .eq(Furniture::getFamilyId, familyId)
+                .eq(Furniture::getRoomId, id)
+                .set(Furniture::getRoomId, null));
+        itemMapper.update(null, new LambdaUpdateWrapper<Item>()
+                .eq(Item::getFamilyId, familyId)
+                .eq(Item::getRoomId, id)
+                .set(Item::getRoomId, null));
         roomMapper.deleteById(id);
     }
 
@@ -131,13 +145,18 @@ public class ItemService {
 
     public Furniture furnitureCreate(Long userId, Long familyId, FurnitureDTO dto) {
         requireText(dto.getName(), "请填写家具名");
-        if (dto.getRoomId() == null || requireRoom(dto.getRoomId(), familyId) == null) {
-            throw new BizException(ResultCode.BAD_REQUEST, "请选择所在房间");
+        if (dto.getRoomId() != null) {
+            requireRoom(dto.getRoomId(), familyId);
         }
         Furniture f = new Furniture();
         f.setFamilyId(familyId);
         f.setRoomId(dto.getRoomId());
         f.setName(dto.getName());
+        f.setType(dto.getType());
+        f.setX(dto.getX());
+        f.setY(dto.getY());
+        f.setW(dto.getW());
+        f.setH(dto.getH());
         f.setNote(dto.getNote());
         f.setCreatedBy(userId);
         furnitureMapper.insert(f);
@@ -147,8 +166,15 @@ public class ItemService {
     public void furnitureUpdate(Long id, Long familyId, FurnitureDTO dto) {
         Furniture f = requireFurniture(id, familyId);
         if (dto.getName() != null) f.setName(dto.getName());
-        if (dto.getRoomId() != null) requireRoom(dto.getRoomId(), familyId);
-        if (dto.getRoomId() != null) f.setRoomId(dto.getRoomId());
+        if (dto.getType() != null) f.setType(dto.getType());
+        if (dto.getRoomId() != null) {
+            requireRoom(dto.getRoomId(), familyId);
+            f.setRoomId(dto.getRoomId());
+        }
+        if (dto.getX() != null) f.setX(dto.getX());
+        if (dto.getY() != null) f.setY(dto.getY());
+        if (dto.getW() != null) f.setW(dto.getW());
+        if (dto.getH() != null) f.setH(dto.getH());
         f.setNote(dto.getNote());
         furnitureMapper.updateById(f);
     }
@@ -175,9 +201,13 @@ public class ItemService {
         if (dto.getFurnitureId() != null) {
             requireFurniture(dto.getFurnitureId(), familyId);
         }
+        if (dto.getRoomId() != null) {
+            requireRoom(dto.getRoomId(), familyId);
+        }
         Item i = new Item();
         i.setFamilyId(familyId);
         i.setFurnitureId(dto.getFurnitureId());
+        i.setRoomId(dto.getRoomId());
         i.setName(dto.getName());
         i.setAliases(dto.getAliases());
         i.setPosition(dto.getPosition());
@@ -186,6 +216,8 @@ public class ItemService {
         i.setQuantity(dto.getQuantity());
         i.setUnit(dto.getUnit());
         i.setNote(dto.getNote());
+        i.setRelX(dto.getRelX());
+        i.setRelY(dto.getRelY());
         i.setCreatedBy(userId);
         itemMapper.insert(i);
         return i;
@@ -198,6 +230,10 @@ public class ItemService {
             requireFurniture(dto.getFurnitureId(), familyId);
             i.setFurnitureId(dto.getFurnitureId());
         }
+        if (dto.getRoomId() != null) {
+            requireRoom(dto.getRoomId(), familyId);
+            i.setRoomId(dto.getRoomId());
+        }
         i.setAliases(dto.getAliases());
         i.setPosition(dto.getPosition());
         i.setImageUrl(dto.getImageUrl());
@@ -205,11 +241,108 @@ public class ItemService {
         i.setQuantity(dto.getQuantity());
         i.setUnit(dto.getUnit());
         i.setNote(dto.getNote());
+        if (dto.getRelX() != null) i.setRelX(dto.getRelX());
+        if (dto.getRelY() != null) i.setRelY(dto.getRelY());
         itemMapper.updateById(i);
     }
 
     public void itemDelete(Long id, Long familyId) {
         itemMapper.deleteById(requireItem(id, familyId).getId());
+    }
+
+    // ---------- 户型图(2期) ----------
+
+    public Map<String, Object> floorPlan(Long familyId, Long houseId, Integer floor) {
+        House h = requireHouse(houseId, familyId);
+        int fl = floor == null ? 1 : floor;
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("houseId", h.getId());
+        result.put("houseName", h.getName());
+        result.put("floor", fl);
+
+        String imageUrl = null;
+        double scale = 100.0;
+        if (h.getFloorPlans() != null && !h.getFloorPlans().isBlank()) {
+            try {
+                JsonNode fp = mapper.readTree(h.getFloorPlans());
+                JsonNode level = fp.get(String.valueOf(fl));
+                if (level != null) {
+                    if (level.hasNonNull("imageUrl")) imageUrl = level.get("imageUrl").asText();
+                    if (level.hasNonNull("scale")) scale = level.get("scale").asDouble(100.0);
+                }
+            } catch (Exception ignored) {
+                // 配置损坏回退默认 100px/m
+            }
+        }
+        result.put("imageUrl", imageUrl);
+        result.put("scale", scale);
+
+        List<Room> rooms = roomMapper.selectList(new LambdaQueryWrapper<Room>()
+                .eq(Room::getFamilyId, familyId)
+                .eq(Room::getHouseId, houseId)
+                .eq(Room::getFloor, fl)
+                .orderByAsc(Room::getSortOrder)
+                .orderByAsc(Room::getId));
+        result.put("rooms", rooms);
+
+        List<Long> roomIds = rooms.stream().map(Room::getId).toList();
+        List<Furniture> furnitures = roomIds.isEmpty() ? List.of()
+                : furnitureMapper.selectList(new LambdaQueryWrapper<Furniture>()
+                .eq(Furniture::getFamilyId, familyId)
+                .in(Furniture::getRoomId, roomIds));
+        result.put("furnitures", furnitures);
+
+        List<Long> furnitureIds = furnitures.stream().map(Furniture::getId).toList();
+        List<Item> items;
+        if (!furnitureIds.isEmpty() && !roomIds.isEmpty()) {
+            items = itemMapper.selectList(new LambdaQueryWrapper<Item>()
+                    .eq(Item::getFamilyId, familyId)
+                    .and(q -> q.in(Item::getFurnitureId, furnitureIds).or().in(Item::getRoomId, roomIds)));
+        } else if (!furnitureIds.isEmpty()) {
+            items = itemMapper.selectList(new LambdaQueryWrapper<Item>()
+                    .eq(Item::getFamilyId, familyId).in(Item::getFurnitureId, furnitureIds));
+        } else if (!roomIds.isEmpty()) {
+            items = itemMapper.selectList(new LambdaQueryWrapper<Item>()
+                    .eq(Item::getFamilyId, familyId).in(Item::getRoomId, roomIds));
+        } else {
+            items = List.of();
+        }
+        result.put("items", items);
+        return result;
+    }
+
+    public void saveFloorPlans(Long houseId, Long familyId, String floorPlans) {
+        requireHouse(houseId, familyId);
+        houseMapper.update(null, new LambdaUpdateWrapper<House>()
+                .eq(House::getId, houseId)
+                .set(House::getFloorPlans, floorPlans));
+    }
+
+    public void saveRoomGeometry(Long id, Long familyId, String geometry) {
+        requireRoom(id, familyId);
+        roomMapper.update(null, new LambdaUpdateWrapper<Room>()
+                .eq(Room::getId, id)
+                .set(Room::getGeometry, geometry));
+    }
+
+    public void saveFurnitureGeometry(Long id, Long familyId, FurnitureDTO dto) {
+        requireFurniture(id, familyId);
+        LambdaUpdateWrapper<Furniture> uw = new LambdaUpdateWrapper<Furniture>()
+                .eq(Furniture::getId, id)
+                .set(Furniture::getX, dto.getX())
+                .set(Furniture::getY, dto.getY())
+                .set(Furniture::getW, dto.getW())
+                .set(Furniture::getH, dto.getH());
+        if (dto.getType() != null) uw.set(Furniture::getType, dto.getType());
+        furnitureMapper.update(null, uw);
+    }
+
+    public void saveItemPlace(Long id, Long familyId, ItemDTO dto) {
+        requireItem(id, familyId);
+        itemMapper.update(null, new LambdaUpdateWrapper<Item>()
+                .eq(Item::getId, id)
+                .set(Item::getRelX, dto.getRelX())
+                .set(Item::getRelY, dto.getRelY()));
     }
 
     // ---------- 校验 ----------

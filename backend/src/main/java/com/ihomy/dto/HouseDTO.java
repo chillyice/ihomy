@@ -9,5 +9,6 @@ import lombok.Data;
 public class HouseDTO {
     private String name;
     private String address;
+    private String floorPlans;
     private Integer sortOrder;
 }

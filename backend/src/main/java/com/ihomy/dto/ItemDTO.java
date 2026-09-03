@@ -8,6 +8,7 @@ import lombok.Data;
 @Data
 public class ItemDTO {
     private Long furnitureId;
+    private Long roomId;
     private String name;
     private String aliases;
     private String position;
@@ -16,4 +17,6 @@ public class ItemDTO {
     private java.math.BigDecimal quantity;
     private String unit;
     private String note;
+    private java.math.BigDecimal relX;
+    private java.math.BigDecimal relY;
 }

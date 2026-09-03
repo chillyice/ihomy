@@ -12,4 +12,5 @@ public class RoomDTO {
     private Integer floor;
     private Integer sortOrder;
     private String note;
+    private String geometry;
 }
