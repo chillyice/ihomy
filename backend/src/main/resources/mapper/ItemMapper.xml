@@ -15,16 +15,19 @@
                i.rel_y,
                i.room_id              AS item_room_id,
                i.created_by, i.created_at, i.updated_at,
-               r.id        AS room_id,
-               r.house_id  AS house_id,
-               r.name      AS room_name,
+               COALESCE(r.id, ir.id)           AS room_id,
+               COALESCE(r.house_id, ir.house_id) AS house_id,
+               COALESCE(r.name, ir.name)       AS room_name,
+               COALESCE(r.floor, ir.floor)     AS floor,
                f.id        AS furniture_id,
                f.name      AS furniture_name,
-               h.name      AS house_name
+               COALESCE(h.name, ih.name)       AS house_name
         FROM family_item i
                  LEFT JOIN family_furniture f ON i.furniture_id = f.id
                  LEFT JOIN family_room r ON f.room_id = r.id
                  LEFT JOIN family_house h ON r.house_id = h.id
+                 LEFT JOIN family_room ir ON i.room_id = ir.id
+                 LEFT JOIN family_house ih ON ir.house_id = ih.id
         WHERE i.family_id = #{familyId}
         <if test="type != null and type != ''">
             AND i.type = #{type}
@@ -43,7 +46,7 @@
                 OR r.name LIKE CONCAT('%', #{keyword}, '%')
                 OR h.name LIKE CONCAT('%', #{keyword}, '%'))
         </if>
-        ORDER BY h.sort_order, h.id, r.floor, r.sort_order, r.id, f.id, i.id
+        ORDER BY COALESCE(h.id, ih.id), COALESCE(r.floor, ir.floor), COALESCE(r.sort_order, ir.sort_order), COALESCE(r.id, ir.id), f.id, i.id
     </select>
 
 </mapper>
