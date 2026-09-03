@@ -338,14 +338,36 @@ const onPointerMove = (e) => {
     const i = d.idx
     const prev = poly[(i - 1 + n) % n]
     const next = poly[(i + 1) % n]
-    const snapped = snapVertex(prev, next, p.x, p.y)
-    d.snapped = snapped.snapped
-    let vx = snapped.x; let vy = snapped.y
+    const ctrl = e.ctrlKey || e.metaKey
     snapLine.value = null
-    const others = otherRoomVertices(d.room.id)
-    const t = others.length ? snapPoint({ x: vx, y: vy }, others) : null
-    if (t) { snapLine.value = { x1: vx, y1: vy, x2: t.x, y2: t.y }; vx = t.x; vy = t.y }
-    poly[i] = { x: vx, y: vy }
+    d.snapped = false
+    if (d.followMode && !ctrl) {
+      // 角缩放:顶点自由移动,水平邻边对端跟随 dy,垂直邻边对端跟随 dx(保持直角)
+      const cur = poly[i]
+      let nx = p.x; let ny = p.y
+      const others = otherRoomVertices(d.room.id)
+      const t = others.length ? snapPoint({ x: nx, y: ny }, others) : null
+      if (t) { snapLine.value = { x1: nx, y1: ny, x2: t.x, y2: t.y }; nx = t.x; ny = t.y; d.snapped = true }
+      const dx = nx - cur.x
+      const dy = ny - cur.y
+      if (d.followMode.e1H) prev.y += dy
+      else if (d.followMode.e1V) prev.x += dx
+      if (d.followMode.e2H) next.y += dy
+      else if (d.followMode.e2V) next.x += dx
+      poly[i] = { x: nx, y: ny }
+    } else if (ctrl) {
+      // Ctrl:纯自由拖点(无任何吸附),可拉出斜边
+      poly[i] = { x: p.x, y: p.y }
+    } else {
+      // 非直角:自由拖 + 轴对齐吸附辅助调直 + 磁吸
+      const snapped = snapVertex(prev, next, p.x, p.y)
+      d.snapped = snapped.snapped
+      let vx = snapped.x; let vy = snapped.y
+      const others = otherRoomVertices(d.room.id)
+      const t = others.length ? snapPoint({ x: vx, y: vy }, others) : null
+      if (t) { snapLine.value = { x1: vx, y1: vy, x2: t.x, y2: t.y }; vx = t.x; vy = t.y }
+      poly[i] = { x: vx, y: vy }
+    }
     rebuildRoomMeta(d.room)
   } else if (d.type === 'room-edge') {
     let dx = p.x - d.startX
@@ -477,7 +499,20 @@ const onRoomDown = (e, r) => {
   if (props.tool === 'draw-poly') { drawPolyPoint(e); return }
   beginDrag(e, { type: 'room-body', room: r, orig: r.poly.map((p) => ({ ...p })), startX: toCanvas(e).x, startY: toCanvas(e).y })
 }
-const onVertexDown = (e, r, i) => { beginDrag(e, { type: 'room-vertex', room: r, idx: i }) }
+const onVertexDown = (e, r, i) => {
+  const poly = r.poly
+  const n = poly.length
+  const prev = poly[(i - 1 + n) % n]
+  const next = poly[(i + 1) % n]
+  const cur = poly[i]
+  const e1H = Math.abs(prev.y - cur.y) < 0.5
+  const e1V = Math.abs(prev.x - cur.x) < 0.5
+  const e2H = Math.abs(next.y - cur.y) < 0.5
+  const e2V = Math.abs(next.x - cur.x) < 0.5
+  // 拖动开始时角是轴对齐直角 → 默认「角缩放」(两条邻边沿轴向平移、对端跟随);Ctrl = 只动此点
+  const followMode = ((e1H && e2V) || (e1V && e2H)) ? { e1H, e1V, e2H, e2V } : null
+  beginDrag(e, { type: 'room-vertex', room: r, idx: i, followMode })
+}
 const isSnapping = (r, i) => {
   const d = drag.value
   return !!d && d.type === 'room-vertex' && d.room === r && d.idx === i && !!d.snapped
