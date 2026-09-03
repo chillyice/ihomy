@@ -161,9 +161,22 @@ const snapPoint = (p, vertices, threshold = 6) => {
   return best
 }
 
+// 边线对齐:值吸附到其他房间的水平/垂直边线(阈值按视图缩放换算),返回对齐值或 null
+const findAlignLine = (excludeId, val, axis) => {
+  const th = 6 / view.value.k
+  for (const r of roomsLocal.value) {
+    if (r.id === excludeId) continue
+    for (let i = 0; i < r.poly.length; i++) {
+      const a2 = r.poly[i]; const b2 = r.poly[(i + 1) % r.poly.length]
+      if (axis === 'y' && Math.abs(a2.y - b2.y) < 0.5 && Math.abs(val - a2.y) < th) return a2.y
+      if (axis === 'x' && Math.abs(a2.x - b2.x) < 0.5 && Math.abs(val - a2.x) < th) return a2.x
+    }
+  }
+  return null
+}
+
 // 家具贴墙吸附:家具边贴合房间边/其他家具边(垂直/水平,阈值 6px),返回平移修正量
-const snapFurniture = (f, excludeId) => {
-  const SNAP = 6
+const snapFurniture = (f, excludeId) => {  const SNAP = 6
   const edges = []
   roomsLocal.value.forEach((r) => {
     r.poly.forEach((v, i) => {
@@ -454,13 +467,27 @@ const onPointerMove = (e) => {
         }
       }
     }
-    d.room.poly[d.aIdx] = { x: d.orig[0].x + dx, y: d.orig[0].y + dy }
-    d.room.poly[d.bIdx] = { x: d.orig[1].x + dx, y: d.orig[1].y + dy }
-    // 边接近水平/垂直时吸附对齐(阈值按视图缩放换算,物理 6px 手感)
-    const ea = d.room.poly[d.aIdx]; const eb = d.room.poly[d.bIdx]
-    const th = 6 / view.value.k
-    if (Math.abs(ea.y - eb.y) < th) { const my = (ea.y + eb.y) / 2; ea.y = my; eb.y = my }
-    else if (Math.abs(ea.x - eb.x) < th) { const mx = (ea.x + eb.x) / 2; ea.x = mx; eb.x = mx }
+    // 基于原始边判定接近水平/垂直 → 拖拽时拉平(平移不改变边方向,实时判定永远不触发)
+    const oA = d.orig[0]; const oB = d.orig[1]
+    const origLen = Math.hypot(oB.x - oA.x, oB.y - oA.y) || 1
+    const nearH = Math.abs(oA.y - oB.y) / origLen < 0.25
+    const nearV = Math.abs(oA.x - oB.x) / origLen < 0.25
+    if (nearH) {
+      let ty = (oA.y + oB.y) / 2 + dy
+      const ln = findAlignLine(d.room.id, ty, 'y')
+      if (ln != null) { snapLine.value = { x1: oA.x + dx, y1: ty, x2: oA.x + dx, y2: ln }; ty = ln }
+      d.room.poly[d.aIdx] = { x: oA.x + dx, y: ty }
+      d.room.poly[d.bIdx] = { x: oB.x + dx, y: ty }
+    } else if (nearV) {
+      let tx = (oA.x + oB.x) / 2 + dx
+      const ln = findAlignLine(d.room.id, tx, 'x')
+      if (ln != null) { snapLine.value = { x1: tx, y1: oA.y + dy, x2: ln, y2: oA.y + dy }; tx = ln }
+      d.room.poly[d.aIdx] = { x: tx, y: oA.y + dy }
+      d.room.poly[d.bIdx] = { x: tx, y: oB.y + dy }
+    } else {
+      d.room.poly[d.aIdx] = { x: oA.x + dx, y: oA.y + dy }
+      d.room.poly[d.bIdx] = { x: oB.x + dx, y: oB.y + dy }
+    }
     rebuildRoomMeta(d.room)
   } else if (d.type === 'furn-move') {
     let dx = p.x - d.startX; let dy = p.y - d.startY
@@ -593,16 +620,24 @@ const onCanvasClick = () => {
   emit('save-room', he.room.id, JSON.stringify(poly))
   hoverEdge.value = null
 }
+// 切换工具清 hover 残留(避免残留 guard 吞掉画图点击)
+watch(() => props.tool, () => { hoverEdge.value = null })
 
 // ---- 房间 ----
+// 工具分发:非 select 工具时点击任何元素(房间/家具/物品/手柄)都落到画布层,不被挡住吞点
+const routeTool = (e) => {
+  if (props.tool === 'calibrate') { handleCalibrateClick(e); return true }
+  if (props.tool === 'draw-rect') { startDrawRect(e); return true }
+  if (props.tool === 'draw-poly') { drawPolyPoint(e); return true }
+  return false
+}
 const onRoomDown = (e, r) => {
-  if (hoverEdge.value && hoverEdge.value.room === r) return
-  if (props.tool === 'calibrate') { handleCalibrateClick(e); return }
-  if (props.tool === 'draw-rect') { startDrawRect(e); return }
-  if (props.tool === 'draw-poly') { drawPolyPoint(e); return }
+  if (props.tool === 'select' && hoverEdge.value && hoverEdge.value.room === r) return
+  if (routeTool(e)) return
   beginDrag(e, { type: 'room-body', room: r, orig: r.poly.map((p) => ({ ...p })), startX: toCanvas(e).x, startY: toCanvas(e).y, furnOrig: {} })
 }
 const onVertexDown = (e, r, i) => {
+  if (routeTool(e)) return
   const poly = r.poly
   const n = poly.length
   const prev = poly[(i - 1 + n) % n]
@@ -621,6 +656,7 @@ const isSnapping = (r, i) => {
   return !!d && d.type === 'room-vertex' && d.room === r && d.idx === i && !!d.snapped
 }
 const onEdgeDown = (e, r, i) => {
+  if (routeTool(e)) return
   const poly = r.poly
   const aIdx = i
   const bIdx = (i + 1) % poly.length
@@ -636,8 +672,7 @@ const removeVertex = (r, i) => {
 
 // ---- 家具 ----
 const onFurnDown = (e, f) => {
-  if (props.tool === 'calibrate') { handleCalibrateClick(e); return }
-  if (props.tool !== 'select') return
+  if (routeTool(e)) return
   beginDrag(e, { type: 'furn-move', f, orig: { x: f.x, y: f.y }, startX: toCanvas(e).x, startY: toCanvas(e).y })
 }
 // 8 向缩放手柄(4 角 + 4 边中点,同房间编辑体验)
@@ -650,10 +685,14 @@ const furnHandlePos = (f, a) => {
     n: [cx, f.y], s: [cx, f.y + f.h], w: [f.x, cy], e: [f.x + f.w, cy],
   }[a]
 }
-const onFurnHandleDown = (e, f, anchor) => beginDrag(e, { type: 'furn-resize', f, anchor, orig: { x: f.x, y: f.y, w: f.w, h: f.h } })
+const onFurnHandleDown = (e, f, anchor) => {
+  if (routeTool(e)) return
+  beginDrag(e, { type: 'furn-resize', f, anchor, orig: { x: f.x, y: f.y, w: f.w, h: f.h } })
+}
 
 // ---- 物品 ----
 const onItemDown = (e, it) => {
+  if (routeTool(e)) return
   const orig = props.items.find((x) => x.id === it.id)
   if (orig) beginDrag(e, { type: 'item-move', item: orig, prevRel: { relX: orig.relX, relY: orig.relY } })
 }

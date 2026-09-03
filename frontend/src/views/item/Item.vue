@@ -40,6 +40,14 @@
                 <el-button class="fp-tool-btn">{{ $t('item.uploadFloorPlan') }}</el-button>
               </el-upload>
               <el-button :type="tool === 'calibrate' ? 'primary' : ''" class="fp-tool-btn" @click="tool = tool === 'calibrate' ? 'select' : 'calibrate'">{{ $t('item.calibrate') }}</el-button>
+              <!-- 已有房间列表 -->
+              <template v-if="floorPlan.rooms.length">
+                <div class="fp-side-head">{{ $t('item.rooms') }}</div>
+                <div v-for="r in floorPlan.rooms" :key="r.id" class="fp-side-row">
+                  <span class="fp-side-name">{{ r.name }}</span>
+                  <el-button size="small" type="danger" plain @click="removeRoom({ id: r.id })">{{ $t('common.delete') }}</el-button>
+                </div>
+              </template>
             </template>
             <!-- 家具 tab -->
             <template v-else-if="sidebarTab === 'furnitures'">
@@ -95,11 +103,12 @@
           <el-button type="primary" size="small">{{ $t('item.editFloorPlan') }}</el-button>
         </div>
 
-        <!-- 楼层切换器(左下角) -->
-        <div v-if="floors.length > 1" class="fp-floors">
+        <!-- 楼层切换器(左下角;编辑态常显,可加层) -->
+        <div v-if="floors.length > 1 || mode === 'edit'" class="fp-floors">
           <div v-for="f in floors" :key="f" :class="['fp-floor', { on: f === currentFloor }]" @click="switchFloor(f)">
             {{ f }}F
           </div>
+          <div v-if="mode === 'edit'" class="fp-floor" @click="addFloor">+</div>
         </div>
 
         <!-- 搜索结果 -->
@@ -467,6 +476,10 @@ const onDuplicateRoom = (roomId) => {
   roomDlg.value = true
 }
 const switchFloor = (f) => { currentFloor.value = f; loadFloorPlan() }
+const addFloor = () => {
+  currentFloor.value = Math.max(...floors.value) + 1
+  loadFloorPlan()
+}
 const toggleEdit = () => {
   mode.value = mode.value === 'edit' ? 'view' : 'edit'
   if (mode.value === 'edit') tool.value = 'select'
@@ -493,6 +506,8 @@ const onSaveFurnitureGeometry = async (id, data, prev) => {
   const p = prev || (f ? { x: f.x, y: f.y, w: f.w, h: f.h } : null)
   if (p) pushUndo({ type: 'furn', id, data: p })
   await itemApi.saveFurnitureGeometry(id, data)
+  // 回写原对象:级联平移基准/后续 undo prev 与视觉位置一致(否则拖房间时家具跳回旧位)
+  if (f) Object.assign(f, data)
 }
 const onSaveItemPlace = async (id, data, prev) => {
   if (prev) pushUndo({ type: 'item', id, data: prev })
@@ -697,8 +712,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fp-upload { width: 100%; margin-bottom: 8px; }
 .fp-upload :deep(.el-upload) { width: 100%; }
 .fp-upload :deep(.el-upload) .fp-tool-btn { margin-bottom: 0; }
-.fp-side-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #eee5d8; }
-.fp-side-name { font-size: 13px; color: #5c4c3d; }
+.fp-side-head { font-size: 12px; color: #a89a8a; margin: 14px 0 4px; }
+.fp-side-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 0; border-bottom: 1px dashed #eee5d8; }
+.fp-side-name { font-size: 13px; color: #5c4c3d; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fp-side-row :deep(.el-button + .el-button) { margin-left: 4px; }
 .fp-side-ok { color: #7aa07a; }
 .fp-floors { position: absolute; left: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 4px; z-index: 5; }
 .fp-floor { width: 36px; height: 36px; border-radius: 8px; background: rgba(255,255,255,0.9); color: #5c4c3d; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 13px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
