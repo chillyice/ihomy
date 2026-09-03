@@ -22,6 +22,7 @@ public class Room {
     private Integer floor;
     private Integer sortOrder;
     private String note;
+    private String geometry;
     private Long createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

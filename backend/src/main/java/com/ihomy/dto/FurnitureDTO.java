@@ -9,5 +9,10 @@ import lombok.Data;
 public class FurnitureDTO {
     private Long roomId;
     private String name;
+    private String type;
+    private java.math.BigDecimal x;
+    private java.math.BigDecimal y;
+    private java.math.BigDecimal w;
+    private java.math.BigDecimal h;
     private String note;
 }

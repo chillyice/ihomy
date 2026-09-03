@@ -18,6 +18,11 @@ public class Furniture {
     private Long familyId;
     private Long roomId;
     private String name;
+    private String type;
+    private java.math.BigDecimal x;
+    private java.math.BigDecimal y;
+    private java.math.BigDecimal w;
+    private java.math.BigDecimal h;
     private String note;
     private Long createdBy;
     private LocalDateTime createdAt;

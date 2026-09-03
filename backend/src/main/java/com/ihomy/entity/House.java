@@ -19,6 +19,7 @@ public class House {
     private Long familyId;
     private String name;
     private String address;
+    private String floorPlans;
     private Integer sortOrder;
     private Long createdBy;
     private LocalDateTime createdAt;

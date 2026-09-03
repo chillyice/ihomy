@@ -459,8 +459,139 @@ PREPARE add_book_like_stmt FROM @add_book_like;
 EXECUTE add_book_like_stmt;
 DEALLOCATE PREPARE add_book_like_stmt;
 
--- 存量图书回填 uploader_id(旧库用 created_by 存上传者)
-UPDATE `content_book` SET `uploader_id` = `created_by` WHERE `uploader_id` IS NULL;
+-- 存量图书回填 uploader_id(已执行;content_book 现已无 created_by 列,此 UPDATE 会报错并中止 source,故注释)
+-- UPDATE `content_book` SET `uploader_id` = `created_by` WHERE `uploader_id` IS NULL;
+
+
+-- ------------------------------------------------------------
+-- 物品定位户型图 S1(2026-09-03):数据模型重构
+--   family_house.floor_plans  楼层户型图 JSON(key=楼层:{imageUrl,scale})
+--   family_room.geometry      房间正交多边形 JSON 顶点数组
+--   family_furniture          room_id 改可空(空=家具库)+ type + x/y/w/h
+--   family_item               rel_x/rel_y 相对锚点包围盒 0~1
+-- 幂等:information_schema.COLUMNS 判断,重复执行无副作用
+-- ------------------------------------------------------------
+
+SET @add_house_floorplans := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `family_house` ADD COLUMN `floor_plans` TEXT DEFAULT NULL COMMENT ''楼层户型图配置(JSON,key=楼层号:{imageUrl,scale})'' AFTER `address`',
+    'SELECT ''skip: house floor_plans already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_house' AND COLUMN_NAME = 'floor_plans'
+);
+PREPARE add_house_floorplans_stmt FROM @add_house_floorplans;
+EXECUTE add_house_floorplans_stmt;
+DEALLOCATE PREPARE add_house_floorplans_stmt;
+
+SET @add_room_geometry := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `family_room` ADD COLUMN `geometry` TEXT DEFAULT NULL COMMENT ''房间正交多边形几何(JSON顶点数组:[{x,y}...])'' AFTER `note`',
+    'SELECT ''skip: room geometry already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_room' AND COLUMN_NAME = 'geometry'
+);
+PREPARE add_room_geometry_stmt FROM @add_room_geometry;
+EXECUTE add_room_geometry_stmt;
+DEALLOCATE PREPARE add_room_geometry_stmt;
+
+SET @mod_furniture_room_nullable := (
+  SELECT IF(IS_NULLABLE = 'NO',
+    'ALTER TABLE `family_furniture` MODIFY COLUMN `room_id` BIGINT DEFAULT NULL COMMENT ''所在房间ID(可空,空=家具库)''',
+    'SELECT ''skip: furniture room_id already nullable'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_furniture' AND COLUMN_NAME = 'room_id'
+);
+PREPARE mod_furniture_room_nullable_stmt FROM @mod_furniture_room_nullable;
+EXECUTE mod_furniture_room_nullable_stmt;
+DEALLOCATE PREPARE mod_furniture_room_nullable_stmt;
+
+SET @add_furniture_type := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `family_furniture` ADD COLUMN `type` VARCHAR(20) DEFAULT NULL COMMENT ''家具类型(衣柜/床/冰箱/书桌/沙发/茶几/柜子/餐桌/书架/其他)'' AFTER `name`',
+    'SELECT ''skip: furniture type already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_furniture' AND COLUMN_NAME = 'type'
+);
+PREPARE add_furniture_type_stmt FROM @add_furniture_type;
+EXECUTE add_furniture_type_stmt;
+DEALLOCATE PREPARE add_furniture_type_stmt;
+
+SET @add_furniture_x := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `family_furniture` ADD COLUMN `x` DECIMAL(12,2) DEFAULT NULL COMMENT ''画布X坐标(px)'' AFTER `type`',
+    'SELECT ''skip: furniture x already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_furniture' AND COLUMN_NAME = 'x'
+);
+PREPARE add_furniture_x_stmt FROM @add_furniture_x;
+EXECUTE add_furniture_x_stmt;
+DEALLOCATE PREPARE add_furniture_x_stmt;
+
+SET @add_furniture_y := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `family_furniture` ADD COLUMN `y` DECIMAL(12,2) DEFAULT NULL COMMENT ''画布Y坐标(px)'' AFTER `x`',
+    'SELECT ''skip: furniture y already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_furniture' AND COLUMN_NAME = 'y'
+);
+PREPARE add_furniture_y_stmt FROM @add_furniture_y;
+EXECUTE add_furniture_y_stmt;
+DEALLOCATE PREPARE add_furniture_y_stmt;
+
+SET @add_furniture_w := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `family_furniture` ADD COLUMN `w` DECIMAL(12,2) DEFAULT NULL COMMENT ''画布宽(px)'' AFTER `y`',
+    'SELECT ''skip: furniture w already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_furniture' AND COLUMN_NAME = 'w'
+);
+PREPARE add_furniture_w_stmt FROM @add_furniture_w;
+EXECUTE add_furniture_w_stmt;
+DEALLOCATE PREPARE add_furniture_w_stmt;
+
+SET @add_furniture_h := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `family_furniture` ADD COLUMN `h` DECIMAL(12,2) DEFAULT NULL COMMENT ''画布高(px)'' AFTER `w`',
+    'SELECT ''skip: furniture h already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_furniture' AND COLUMN_NAME = 'h'
+);
+PREPARE add_furniture_h_stmt FROM @add_furniture_h;
+EXECUTE add_furniture_h_stmt;
+DEALLOCATE PREPARE add_furniture_h_stmt;
+
+SET @add_item_relx := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `family_item` ADD COLUMN `rel_x` DECIMAL(5,4) DEFAULT NULL COMMENT ''相对锚点包围盒X(0~1)'' AFTER `note`',
+    'SELECT ''skip: item rel_x already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_item' AND COLUMN_NAME = 'rel_x'
+);
+PREPARE add_item_relx_stmt FROM @add_item_relx;
+EXECUTE add_item_relx_stmt;
+DEALLOCATE PREPARE add_item_relx_stmt;
+
+SET @add_item_rely := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `family_item` ADD COLUMN `rel_y` DECIMAL(5,4) DEFAULT NULL COMMENT ''相对锚点包围盒Y(0~1)'' AFTER `rel_x`',
+    'SELECT ''skip: item rel_y already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_item' AND COLUMN_NAME = 'rel_y'
+);
+PREPARE add_item_rely_stmt FROM @add_item_rely;
+EXECUTE add_item_rely_stmt;
+DEALLOCATE PREPARE add_item_rely_stmt;
+
+SET @add_item_roomid := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `family_item` ADD COLUMN `room_id` BIGINT DEFAULT NULL COMMENT ''所在房间ID(可空,散放物品锚房间)'' AFTER `furniture_id`',
+    'SELECT ''skip: item room_id already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_item' AND COLUMN_NAME = 'room_id'
+);
+PREPARE add_item_roomid_stmt FROM @add_item_roomid;
+EXECUTE add_item_roomid_stmt;
+DEALLOCATE PREPARE add_item_roomid_stmt;
 
 
 
