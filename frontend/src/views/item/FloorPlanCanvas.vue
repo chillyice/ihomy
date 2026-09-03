@@ -1,6 +1,6 @@
 <template>
   <div class="fp-canvas" ref="wrapRef">
-    <svg ref="svgRef" class="fp-svg" @wheel.prevent="onWheel" @pointerdown="onSvgDown" @pointerdown.capture="onPointerDownCapture" @pointermove="onHoverMove" @pointerup="onSvgPointerEnd" @pointercancel="onSvgPointerEnd" @click="onCanvasClick" @dblclick="onSvgDblClick" @dragover.prevent @drop="onDrop">
+    <svg ref="svgRef" :class="['fp-svg', { 'is-drawing': tool === 'draw-rect' || tool === 'draw-poly' || tool === 'calibrate' }]" @wheel.prevent="onWheel" @pointerdown="onSvgDown" @pointerdown.capture="onPointerDownCapture" @pointermove="onHoverMove" @pointerup="onSvgPointerEnd" @pointercancel="onSvgPointerEnd" @click="onCanvasClick" @dblclick="onSvgDblClick" @dragover.prevent @drop="onDrop">
       <defs>
         <filter id="fp-rough" x="-5%" y="-5%" width="110%" height="110%">
           <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" result="n" />
@@ -15,9 +15,8 @@
             :points="pts(r.poly)"
             class="fp-room"
             :class="{ 'is-hit': hitRoomIds.includes(r.id), 'is-overlap': mode === 'edit' && overlapRoomIds.includes(r.id) }"
-            filter="url(#fp-rough)"
+            :filter="mode === 'view' ? 'url(#fp-rough)' : undefined"
             @pointerdown.stop="mode === 'edit' ? onRoomDown($event, r) : null"
-            @dblclick="mode === 'edit' && tool === 'select' ? $emit('duplicate-room', r.id) : null"
             @contextmenu.prevent="mode === 'edit' ? $emit('delete-room', r.id) : null"
           />
           <g v-if="r.name">
@@ -30,7 +29,7 @@
           <rect
             :x="f.x" :y="f.y" :width="f.w" :height="f.h"
             class="fp-furn"
-            filter="url(#fp-rough)"
+            :filter="mode === 'view' ? 'url(#fp-rough)' : undefined"
             @pointerdown.stop="mode === 'edit' ? onFurnDown($event, f) : null"
             @dblclick="mode === 'view' ? $emit('select-furniture', f.id) : null"
             @contextmenu.prevent="mode === 'edit' ? $emit('delete-furniture', f.id) : null"
@@ -108,7 +107,7 @@ const props = defineProps({
   tool: { type: String, default: 'select' },
   scale: { type: Number, default: 100 },
 })
-const emit = defineEmits(['save-room', 'save-furniture', 'save-item', 'create-room', 'create-furniture', 'select-furniture', 'calibrate', 'edit-edge', 'duplicate-room', 'delete-room', 'delete-furniture', 'rename-room', 'rename-furniture'])
+const emit = defineEmits(['save-room', 'save-furniture', 'save-item', 'create-room', 'create-furniture', 'select-furniture', 'calibrate', 'edit-edge', 'delete-room', 'delete-furniture', 'rename-room', 'rename-furniture'])
 
 const wrapRef = ref(null)
 const svgRef = ref(null)
@@ -174,6 +173,18 @@ const findAlignLine = (excludeId, val, axis) => {
     }
   }
   return null
+}
+
+// 邻边吸直:邻边接近水平/垂直时,自由端对齐到拖动端点的 x/y(axis='x' 对齐 x)
+const straightenNeighbor = (room, fixedIdx, otherIdx, axis) => {
+  const fixed = room.poly[fixedIdx]; const other = room.poly[otherIdx]
+  if (!fixed || !other) return
+  const len = Math.hypot(fixed.x - other.x, fixed.y - other.y) || 1
+  const ratio = axis === 'x' ? Math.abs(fixed.x - other.x) / len : Math.abs(fixed.y - other.y) / len
+  if (ratio < 0.25) {
+    if (axis === 'x') other.x = fixed.x
+    else other.y = fixed.y
+  }
 }
 
 // 家具贴墙吸附:家具边贴合房间边/其他家具边(垂直/水平,阈值 6px),返回平移修正量
@@ -474,17 +485,26 @@ const onPointerMove = (e) => {
     const nearH = Math.abs(oA.y - oB.y) / origLen < 0.25
     const nearV = Math.abs(oA.x - oB.x) / origLen < 0.25
     if (nearH) {
+      // 拖水平边:轻微水平位移吸附归零(纯垂直移动,邻边 ad/bc 保持垂直)
+      if (Math.abs(dx) < 8 / view.value.k) dx = 0
       let ty = (oA.y + oB.y) / 2 + dy
       const ln = findAlignLine(d.room.id, ty, 'y')
       if (ln != null) { snapLine.value = { x1: oA.x + dx, y1: ty, x2: oA.x + dx, y2: ln }; ty = ln }
       d.room.poly[d.aIdx] = { x: oA.x + dx, y: ty }
       d.room.poly[d.bIdx] = { x: oB.x + dx, y: ty }
+      // 邻边吸直:a 的前邻边 / b 的后邻边接近垂直时,对齐到拖动端点的 x
+      straightenNeighbor(d.room, d.aIdx, (d.aIdx - 1 + d.room.poly.length) % d.room.poly.length, 'x')
+      straightenNeighbor(d.room, d.bIdx, (d.bIdx + 1) % d.room.poly.length, 'x')
     } else if (nearV) {
+      // 拖垂直边:轻微垂直位移吸附归零(纯水平移动,邻边保持水平)
+      if (Math.abs(dy) < 8 / view.value.k) dy = 0
       let tx = (oA.x + oB.x) / 2 + dx
       const ln = findAlignLine(d.room.id, tx, 'x')
       if (ln != null) { snapLine.value = { x1: tx, y1: oA.y + dy, x2: ln, y2: oA.y + dy }; tx = ln }
       d.room.poly[d.aIdx] = { x: tx, y: oA.y + dy }
       d.room.poly[d.bIdx] = { x: tx, y: oB.y + dy }
+      straightenNeighbor(d.room, d.aIdx, (d.aIdx - 1 + d.room.poly.length) % d.room.poly.length, 'y')
+      straightenNeighbor(d.room, d.bIdx, (d.bIdx + 1) % d.room.poly.length, 'y')
     } else {
       d.room.poly[d.aIdx] = { x: oA.x + dx, y: oA.y + dy }
       d.room.poly[d.bIdx] = { x: oB.x + dx, y: oB.y + dy }
@@ -802,8 +822,10 @@ defineExpose({ finishPoly, fit })
 .fp-canvas { position: relative; width: 100%; height: 100%; overflow: hidden; background: #f6efe4; }
 .fp-svg { width: 100%; height: 100%; display: block; cursor: grab; }
 .fp-svg:active { cursor: grabbing; }
+.fp-svg.is-drawing { cursor: crosshair; }
 .fp-bg { pointer-events: none; } /* 底图纯背景,不挡画布交互 */
 .fp-editable { pointer-events: auto; cursor: text; }
+.fp-drawing, .fp-snap-line, .fp-calib-dot, .fp-calib-line, .fp-hover-add { pointer-events: none; } /* 预览/装饰元素不挡落点 */
 .fp-room { fill: rgba(184, 140, 110, 0.14); stroke: rgba(184, 140, 110, 0.65); stroke-width: 2; }
 .fp-room.is-hit { fill: rgba(184, 140, 110, 0.28); }
 .fp-room.is-overlap { stroke: #b04a3a; stroke-width: 2.5; fill: rgba(185, 96, 88, 0.16); }
