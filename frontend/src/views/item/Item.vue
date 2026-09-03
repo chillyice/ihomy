@@ -84,6 +84,8 @@
           @calibrate="onCalibrate"
           @edit-edge="onEditEdge"
           @duplicate-room="onDuplicateRoom"
+          @delete-room="(id) => removeRoom({ id })"
+          @delete-furniture="(id) => removeFurniture({ id })"
         />
 
         <!-- 空楼层引导(有房子但当前楼层无房间) -->
@@ -252,7 +254,7 @@
         <el-form-item :label="$t('item.roomName')">
           <el-input v-model="roomForm.name" :placeholder="$t('item.roomNameHint')" />
         </el-form-item>
-        <el-form-item v-if="!roomForm._geometry" :label="$t('item.floor')">
+        <el-form-item :label="$t('item.floor')">
           <el-input-number v-model="roomForm.floor" :min="-2" :max="99" />
         </el-form-item>
         <el-form-item :label="$t('item.note')">
@@ -600,9 +602,12 @@ const saveRoom = async () => {
   if (!roomForm.value.houseId && !roomForm.value._geometry) return ElMessage.warning(t('item.pickHouse'))
   if (!roomForm.value.name) return ElMessage.warning(t('item.roomNameRequired'))
   const geom = roomForm.value._geometry
+  const floor = roomForm.value.floor
   if (roomForm.value.id) await itemApi.updateRoom(roomForm.value.id, roomForm.value)
   else roomForm.value = await itemApi.addRoom({ houseId: roomForm.value.houseId, name: roomForm.value.name, floor: roomForm.value.floor, note: roomForm.value.note })
   if (geom) await itemApi.saveRoomGeometry(roomForm.value.id, geom)
+  // 画在别的楼层时保存后自动切过去(楼层入口)
+  if (floor != null && floor !== currentFloor.value) currentFloor.value = floor
   ElMessage.success(t('common.success'))
   roomDlg.value = false
   loadRooms()
@@ -688,7 +693,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fp-side-tab.on { color: #5c4c3d; font-weight: 600; border-bottom: 2px solid #b88c6e; }
 .fp-side-body { flex: 1; overflow-y: auto; padding: 12px; }
 .fp-tool-hint { font-size: 12px; color: #a89a8a; margin-bottom: 12px; }
-.fp-tool-btn { width: 100%; margin-bottom: 8px; }
+.fp-tool-btn { width: 100%; margin-left: 0 !important; margin-bottom: 8px; }
+.fp-upload { width: 100%; margin-bottom: 8px; }
+.fp-upload :deep(.el-upload) { width: 100%; }
+.fp-upload :deep(.el-upload) .fp-tool-btn { margin-bottom: 0; }
 .fp-side-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #eee5d8; }
 .fp-side-name { font-size: 13px; color: #5c4c3d; }
 .fp-side-ok { color: #7aa07a; }
