@@ -51,7 +51,10 @@
                 <div class="fp-side-head">{{ $t('item.rooms') }}</div>
                 <div v-for="r in floorPlan.rooms" :key="r.id" class="fp-side-row">
                   <span class="fp-side-name">{{ r.name }}</span>
-                  <el-button size="small" type="danger" plain @click="removeRoom({ id: r.id })">{{ $t('common.delete') }}</el-button>
+                  <span>
+                    <el-button size="small" @click="onDuplicateRoom(r.id)">{{ $t('item.duplicate') }}</el-button>
+                    <el-button size="small" type="danger" plain @click="removeRoom({ id: r.id })">{{ $t('common.delete') }}</el-button>
+                  </span>
                 </div>
               </template>
             </template>
@@ -106,7 +109,6 @@
           @select-furniture="onSelectFurniture"
           @calibrate="onCalibrate"
           @edit-edge="onEditEdge"
-          @duplicate-room="onDuplicateRoom"
           @delete-room="(id) => removeRoom({ id })"
           @delete-furniture="(id) => removeFurniture({ id })"
           @rename-room="onRenameRoom"
@@ -429,7 +431,10 @@ const saveOpacity = async (val) => {
   if (house && house.floorPlans) { try { floorPlans = JSON.parse(house.floorPlans) } catch {} }
   const cur = floorPlans[currentFloor.value] || {}
   floorPlans[currentFloor.value] = { ...cur, opacity: val }
-  await itemApi.saveFloorPlans(currentHouseId.value, JSON.stringify(floorPlans))
+  const json = JSON.stringify(floorPlans)
+  await itemApi.saveFloorPlans(currentHouseId.value, json)
+  // 回写本地(否则切层回来 watch 从旧 floorPlans 解析,opacity 回退)
+  if (house) house.floorPlans = json
 }
 
 // ---- 数据加载 ----
@@ -798,7 +803,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <style scoped>
-.fp-page { display: flex; flex-direction: column; max-width: none; width: 100%; height: calc(100vh - 110px); }
+.fp-page { display: flex; flex-direction: column; max-width: none; width: 100%; height: calc(100vh - 70px); }
 .fp-topbar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; }
 .fp-house { width: 180px; }
 .fp-search { width: 320px; }

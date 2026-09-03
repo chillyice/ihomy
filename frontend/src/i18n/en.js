@@ -1107,6 +1107,7 @@ export default {
     editEdgeLen: 'Edge length',
     edgeLenPrompt: 'Enter edge length (meters, direction preserved)',
     duplicateSuffix: ' copy',
+    duplicate: 'Copy',
     nothingToUndo: 'Nothing to undo',
     emptyFloorRoomsTitle: 'No rooms on this floor yet',
     emptyFloorRoomsText: 'Draw your first room to start the floor plan',
