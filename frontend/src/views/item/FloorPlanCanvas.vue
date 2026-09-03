@@ -18,6 +18,7 @@
             filter="url(#fp-rough)"
             @pointerdown.stop="mode === 'edit' ? onRoomDown($event, r) : null"
             @dblclick="mode === 'edit' && tool === 'select' ? $emit('duplicate-room', r.id) : null"
+            @contextmenu.prevent="mode === 'edit' ? $emit('delete-room', r.id) : null"
           />
           <g v-if="r.name">
             <text :x="r.cx" :y="r.cy - 6" class="fp-room-label">{{ r.name }}</text>
@@ -32,10 +33,18 @@
             filter="url(#fp-rough)"
             @pointerdown.stop="mode === 'edit' ? onFurnDown($event, f) : null"
             @dblclick="mode === 'view' ? $emit('select-furniture', f.id) : null"
+            @contextmenu.prevent="mode === 'edit' ? $emit('delete-furniture', f.id) : null"
           />
           <text v-if="f.w > 40 && f.h > 18" :x="f.x + f.w / 2" :y="f.y + f.h / 2" class="fp-furn-label">{{ f.name }}</text>
           <template v-if="mode === 'edit'">
-            <rect class="fp-resize" :x="f.x + f.w - 6" :y="f.y + f.h - 6" width="12" height="12" @pointerdown.stop="onFurnResizeDown($event, f)" />
+            <circle v-for="a in furnCorners" :key="'fc' + a" class="fp-handle" r="5"
+                    :cx="furnHandlePos(f, a)[0]" :cy="furnHandlePos(f, a)[1]"
+                    :style="{ cursor: (a === 'nw' || a === 'se') ? 'nwse-resize' : 'nesw-resize' }"
+                    @pointerdown.stop="onFurnHandleDown($event, f, a)" />
+            <rect v-for="a in furnEdges" :key="'fe' + a" class="fp-edge-handle" width="9" height="9"
+                  :x="furnHandlePos(f, a)[0] - 4.5" :y="furnHandlePos(f, a)[1] - 4.5"
+                  :style="{ cursor: (a === 'n' || a === 's') ? 'ns-resize' : 'ew-resize' }"
+                  @pointerdown.stop="onFurnHandleDown($event, f, a)" />
           </template>
         </g>
         <!-- 物品 -->
@@ -98,7 +107,7 @@ const props = defineProps({
   tool: { type: String, default: 'select' },
   scale: { type: Number, default: 100 },
 })
-const emit = defineEmits(['save-room', 'save-furniture', 'save-item', 'create-room', 'select-furniture', 'calibrate', 'edit-edge', 'duplicate-room'])
+const emit = defineEmits(['save-room', 'save-furniture', 'save-item', 'create-room', 'select-furniture', 'calibrate', 'edit-edge', 'duplicate-room', 'delete-room', 'delete-furniture'])
 
 const wrapRef = ref(null)
 const svgRef = ref(null)
@@ -207,10 +216,13 @@ const buildRoom = (r) => {
 const roomsLocal = ref([])
 watch(() => props.rooms, (rooms) => { roomsLocal.value = (rooms || []).map(buildRoom) }, { immediate: true, deep: true })
 
-// 副本隔离:拖拽改副本,原数据保留旧值供撤销记录
-const placedFurnitures = computed(() => props.furnitures
-  .filter((f) => f.x != null && f.y != null && f.w != null && f.h != null)
-  .map((f) => ({ ...f })))
+// 副本隔离(ref 深响应式,拖拽有过程效果;原数据保留旧值供撤销记录)
+const placedFurnitures = ref([])
+watch(() => props.furnitures, (fs) => {
+  placedFurnitures.value = (fs || [])
+    .filter((f) => f.x != null && f.y != null && f.w != null && f.h != null)
+    .map((f) => ({ ...f }))
+}, { immediate: true, deep: true })
 
 const furnitureById = computed(() => { const m = {}; props.furnitures.forEach((f) => { m[f.id] = f }); return m })
 const roomById = computed(() => { const m = {}; roomsLocal.value.forEach((r) => { m[r.id] = r }); return m })
@@ -444,6 +456,11 @@ const onPointerMove = (e) => {
     }
     d.room.poly[d.aIdx] = { x: d.orig[0].x + dx, y: d.orig[0].y + dy }
     d.room.poly[d.bIdx] = { x: d.orig[1].x + dx, y: d.orig[1].y + dy }
+    // 边接近水平/垂直时吸附对齐(阈值按视图缩放换算,物理 6px 手感)
+    const ea = d.room.poly[d.aIdx]; const eb = d.room.poly[d.bIdx]
+    const th = 6 / view.value.k
+    if (Math.abs(ea.y - eb.y) < th) { const my = (ea.y + eb.y) / 2; ea.y = my; eb.y = my }
+    else if (Math.abs(ea.x - eb.x) < th) { const mx = (ea.x + eb.x) / 2; ea.x = mx; eb.x = mx }
     rebuildRoomMeta(d.room)
   } else if (d.type === 'furn-move') {
     let dx = p.x - d.startX; let dy = p.y - d.startY
@@ -452,7 +469,13 @@ const onPointerMove = (e) => {
     d.f.x = d.orig.x + dx + snap.dx
     d.f.y = d.orig.y + dy + snap.dy
   } else if (d.type === 'furn-resize') {
-    d.f.w = Math.max(20, p.x - d.f.x); d.f.h = Math.max(20, p.y - d.f.y)
+    const o = d.orig; const a = d.anchor
+    let { x, y, w, h } = o
+    if (a.includes('e')) w = Math.max(20, p.x - o.x)
+    if (a.includes('s')) h = Math.max(20, p.y - o.y)
+    if (a.includes('w')) { const right = o.x + o.w; x = Math.min(p.x, right - 20); w = right - x }
+    if (a.includes('n')) { const bottom = o.y + o.h; y = Math.min(p.y, bottom - 20); h = bottom - y }
+    d.f.x = x; d.f.y = y; d.f.w = w; d.f.h = h
   } else if (d.type === 'item-move') {
     const it = d.item
     if (it.furnitureId != null && furnitureById.value[it.furnitureId]) {
@@ -617,7 +640,17 @@ const onFurnDown = (e, f) => {
   if (props.tool !== 'select') return
   beginDrag(e, { type: 'furn-move', f, orig: { x: f.x, y: f.y }, startX: toCanvas(e).x, startY: toCanvas(e).y })
 }
-const onFurnResizeDown = (e, f) => { beginDrag(e, { type: 'furn-resize', f }) }
+// 8 向缩放手柄(4 角 + 4 边中点,同房间编辑体验)
+const furnCorners = ['nw', 'ne', 'sw', 'se']
+const furnEdges = ['n', 's', 'e', 'w']
+const furnHandlePos = (f, a) => {
+  const cx = f.x + f.w / 2; const cy = f.y + f.h / 2
+  return {
+    nw: [f.x, f.y], ne: [f.x + f.w, f.y], sw: [f.x, f.y + f.h], se: [f.x + f.w, f.y + f.h],
+    n: [cx, f.y], s: [cx, f.y + f.h], w: [f.x, cy], e: [f.x + f.w, cy],
+  }[a]
+}
+const onFurnHandleDown = (e, f, anchor) => beginDrag(e, { type: 'furn-resize', f, anchor, orig: { x: f.x, y: f.y, w: f.w, h: f.h } })
 
 // ---- 物品 ----
 const onItemDown = (e, it) => {
@@ -696,14 +729,21 @@ const onSvgDblClick = (e) => {
   if (drag.value && drag.value.type === 'draw-poly' && drag.value.points.length >= 2) {
     const p = drag.value.points
     const last = p[p.length - 1]; const prev = p[p.length - 2]
-    if (Math.hypot(last.x - prev.x, last.y - prev.y) < 12) p.splice(p.length - 1, 1)
+    if (Math.hypot(last.x - prev.x, last.y - prev.y) < 12 / view.value.k) p.splice(p.length - 1, 1)
   }
   finishPoly()
 }
 
-watch(() => [props.rooms, props.furnitures, props.imageUrl], () => { nextTick(fit) }, { deep: true })
-onMounted(fit)
-onBeforeUnmount(detach)
+// 拖拽中不 fit(级联平移等实时数据变化会重置视图,元素视觉漂移)
+watch(() => [props.rooms, props.furnitures, props.imageUrl], () => { if (!drag.value) nextTick(fit) }, { deep: true })
+let resizeObserver = null
+onMounted(() => {
+  fit()
+  // 画布尺寸变化(侧栏出现/窗口缩放)重新适配,元素始终在窗格内
+  resizeObserver = new ResizeObserver(() => { if (!drag.value) fit() })
+  resizeObserver.observe(wrapRef.value)
+})
+onBeforeUnmount(() => { detach(); if (resizeObserver) resizeObserver.disconnect() })
 
 defineExpose({ finishPoly, fit })
 </script>
@@ -721,9 +761,7 @@ defineExpose({ finishPoly, fit })
 .fp-dim { font-size: 10px; fill: #6b9b6b; text-anchor: middle; pointer-events: none; }
 .fp-furn { fill: rgba(120, 100, 80, 0.18); stroke: #8a6f55; stroke-width: 1.5; }
 .fp-furn-label { font-size: 11px; fill: #6b5435; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
-.fp-resize { fill: #fff; stroke: #b88c6e; stroke-width: 1.5; cursor: nwse-resize; }
-.fp-item { fill: #b04a3a; stroke: #fff; stroke-width: 2; }
-.fp-item.is-hit { fill: #e0a030; }
+.fp-item { fill: #b04a3a; stroke: #fff; stroke-width: 2; }.fp-item.is-hit { fill: #e0a030; }
 .fp-item-label { font-size: 10px; fill: #5c4c3d; text-anchor: middle; paint-order: stroke; stroke: rgba(255, 253, 248, 0.85); stroke-width: 3; pointer-events: none; }
 .fp-handle { fill: #fff; stroke: #b88c6e; stroke-width: 2; cursor: pointer; }
 .fp-handle.is-snapped { fill: #6b9b6b; stroke: #fff; }
