@@ -1,6 +1,6 @@
 <template>
   <div class="fp-canvas" ref="wrapRef">
-    <svg ref="svgRef" class="fp-svg" @wheel.prevent="onWheel" @pointerdown="onSvgDown" @pointermove="onHoverMove" @click="onCanvasClick">
+    <svg ref="svgRef" class="fp-svg" @wheel.prevent="onWheel" @pointerdown="onSvgDown" @pointerdown.capture="onPointerDownCapture" @pointermove="onHoverMove" @pointerup="onSvgPointerEnd" @pointercancel="onSvgPointerEnd" @click="onCanvasClick" @dblclick="onSvgDblClick">
       <defs>
         <filter id="fp-rough" x="-5%" y="-5%" width="110%" height="110%">
           <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" result="n" />
@@ -14,10 +14,10 @@
           <polygon
             :points="pts(r.poly)"
             class="fp-room"
-            :class="{ 'is-hit': hitRoomIds.includes(r.id) }"
+            :class="{ 'is-hit': hitRoomIds.includes(r.id), 'is-overlap': mode === 'edit' && overlapRoomIds.includes(r.id) }"
             filter="url(#fp-rough)"
             @pointerdown.stop="mode === 'edit' ? onRoomDown($event, r) : null"
-            @dblclick.stop="mode === 'edit' ? $emit('duplicate-room', r.id) : null"
+            @dblclick="mode === 'edit' && tool === 'select' ? $emit('duplicate-room', r.id) : null"
           />
           <g v-if="r.name">
             <text :x="r.cx" :y="r.cy - 6" class="fp-room-label">{{ r.name }}</text>
@@ -46,6 +46,7 @@
             :class="{ 'is-hit': highlightItemIds.includes(it.id) }"
             @pointerdown.stop="mode === 'edit' ? onItemDown($event, it) : null"
           />
+          <text :x="it.ax" :y="it.ay - 11" class="fp-item-label">{{ it.name }}</text>
         </g>
         <!-- 编辑态手柄 -->
         <template v-if="mode === 'edit'">
@@ -237,6 +238,55 @@ const hitRoomIds = computed(() => {
   return [...ids]
 })
 
+// ---- 房间重叠检测(编辑态警示) ----
+const pointInPoly = (p, poly) => {
+  let inside = false
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    if (((poly[i].y > p.y) !== (poly[j].y > p.y)) &&
+      (p.x < ((poly[j].x - poly[i].x) * (p.y - poly[i].y)) / (poly[j].y - poly[i].y) + poly[i].x)) inside = !inside
+  }
+  return inside
+}
+const segsIntersect = (p1, p2, p3, p4) => {
+  const d = (a, b, c) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+  const d1 = d(p3, p4, p1); const d2 = d(p3, p4, p2); const d3 = d(p1, p2, p3); const d4 = d(p1, p2, p4)
+  return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))
+}
+// 点在边上(相邻房间共边/角对角不算重叠)
+const onSegment = (p, a, b) => {
+  const cross = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)
+  if (Math.abs(cross) > 1e-9) return false
+  return p.x >= Math.min(a.x, b.x) - 1e-9 && p.x <= Math.max(a.x, b.x) + 1e-9 &&
+    p.y >= Math.min(a.y, b.y) - 1e-9 && p.y <= Math.max(a.y, b.y) + 1e-9
+}
+const pointStrictlyInside = (p, poly) => {
+  for (let i = 0; i < poly.length; i++) {
+    if (onSegment(p, poly[i], poly[(i + 1) % poly.length])) return false
+  }
+  return pointInPoly(p, poly)
+}
+const polysOverlap = (pa, pb) => {
+  if (pa.length < 3 || pb.length < 3) return false
+  if (pa.some((p) => pointStrictlyInside(p, pb))) return true
+  if (pb.some((p) => pointStrictlyInside(p, pa))) return true
+  for (let i = 0; i < pa.length; i++) {
+    for (let j = 0; j < pb.length; j++) {
+      if (segsIntersect(pa[i], pa[(i + 1) % pa.length], pb[j], pb[(j + 1) % pb.length])) return true
+    }
+  }
+  return false
+}
+const overlapRoomIds = computed(() => {
+  const ids = new Set()
+  const rs = roomsLocal.value.filter((r) => r.poly.length >= 3)
+  for (let i = 0; i < rs.length; i++) {
+    for (let j = i + 1; j < rs.length; j++) {
+      if (polysOverlap(rs[i].poly, rs[j].poly)) { ids.add(rs[i].id); ids.add(rs[j].id) }
+    }
+  }
+  return [...ids]
+})
+
 const visibleItems = computed(() => {
   if (props.mode === 'edit') return absItems.value
   const hit = new Set(props.highlightItemIds)
@@ -332,6 +382,13 @@ const onPointerMove = (e) => {
     }
     d.room.poly = d.orig.map((pt) => ({ x: pt.x + dx, y: pt.y + dy }))
     rebuildRoomMeta(d.room)
+    // 家具级联平移:归属该房间且已摆放的家具跟随房间
+    props.furnitures.forEach((f) => {
+      if (f.roomId !== d.room.id || f.x == null || f.y == null) return
+      if (!d.furnOrig[f.id]) d.furnOrig[f.id] = { x: f.x, y: f.y, w: f.w, h: f.h }
+      const o = d.furnOrig[f.id]
+      f.x = o.x + dx; f.y = o.y + dy
+    })
   } else if (d.type === 'room-vertex') {
     const poly = d.room.poly
     const n = poly.length
@@ -416,14 +473,23 @@ const onPointerMove = (e) => {
   }
 }
 
-const onPointerUp = () => {
+const onPointerUp = (e) => {
+  if (e && e.pointerId != null) onSvgPointerEnd(e)
   const d = drag.value
   if (!d) return
+  if (d.type === 'draw-poly') return // 逐点描绘:点击间保持状态,双击闭合/切工具时 finishPoly
   justDragged = true
   setTimeout(() => { justDragged = false }, 0)
   if (d.type === 'room-body' || d.type === 'room-vertex' || d.type === 'room-edge') {
     emit('save-room', d.room.id, JSON.stringify(d.room.poly))
     rebuildRoomMeta(d.room)
+    if (d.type === 'room-body' && d.furnOrig) {
+      // 级联平移的家具逐个保存(带 prev 供撤销)
+      Object.keys(d.furnOrig).forEach((fid) => {
+        const f = props.furnitures.find((x) => x.id === Number(fid))
+        if (f) emit('save-furniture', f.id, { x: f.x, y: f.y, w: f.w, h: f.h }, d.furnOrig[fid])
+      })
+    }
   } else if (d.type === 'furn-move' || d.type === 'furn-resize') {
     emit('save-furniture', d.f.id, { x: d.f.x, y: d.f.y, w: d.f.w, h: d.f.h })
   } else if (d.type === 'item-move') {
@@ -475,6 +541,20 @@ const detectHoverEdge = (p) => {
   hoverEdge.value = best
 }
 const onHoverMove = (e) => {
+  if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+  if (pointers.size === 2 && pinchDist > 0) {
+    const [a, b] = [...pointers.values()]
+    const dist = Math.hypot(a.x - b.x, a.y - b.y)
+    const rect = svgRef.value.getBoundingClientRect()
+    const mx = (a.x + b.x) / 2 - rect.left
+    const my = (a.y + b.y) / 2 - rect.top
+    const k = clamp(view.value.k * (dist / pinchDist), 0.1, 8)
+    view.value.tx = mx - (mx - view.value.tx) * (k / view.value.k)
+    view.value.ty = my - (my - view.value.ty) * (k / view.value.k)
+    view.value.k = k
+    pinchDist = dist
+    return
+  }
   if (drag.value) return
   if (props.mode !== 'edit' || props.tool !== 'select') { hoverEdge.value = null; return }
   detectHoverEdge(toCanvas(e))
@@ -497,7 +577,7 @@ const onRoomDown = (e, r) => {
   if (props.tool === 'calibrate') { handleCalibrateClick(e); return }
   if (props.tool === 'draw-rect') { startDrawRect(e); return }
   if (props.tool === 'draw-poly') { drawPolyPoint(e); return }
-  beginDrag(e, { type: 'room-body', room: r, orig: r.poly.map((p) => ({ ...p })), startX: toCanvas(e).x, startY: toCanvas(e).y })
+  beginDrag(e, { type: 'room-body', room: r, orig: r.poly.map((p) => ({ ...p })), startX: toCanvas(e).x, startY: toCanvas(e).y, furnOrig: {} })
 }
 const onVertexDown = (e, r, i) => {
   const poly = r.poly
@@ -590,6 +670,37 @@ const onSvgDown = (e) => {
   beginDrag(e, { type: 'pan' })
 }
 
+// ---- 移动端双指缩放(pinch) ----
+const pointers = new Map()
+let pinchDist = 0
+const onPointerDownCapture = (e) => {
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+  if (pointers.size === 2) {
+    if (drag.value) { drag.value = null; detach(); snapLine.value = null }
+    hoverEdge.value = null
+    const [a, b] = [...pointers.values()]
+    pinchDist = Math.hypot(a.x - b.x, a.y - b.y)
+    e.stopPropagation()
+    e.preventDefault()
+  }
+}
+const onSvgPointerEnd = (e) => {
+  pointers.delete(e.pointerId)
+  if (pointers.size < 2) pinchDist = 0
+}
+
+// ---- 逐点描绘双击闭合 ----
+const onSvgDblClick = (e) => {
+  if (props.tool !== 'draw-poly') return
+  e.preventDefault()
+  if (drag.value && drag.value.type === 'draw-poly' && drag.value.points.length >= 2) {
+    const p = drag.value.points
+    const last = p[p.length - 1]; const prev = p[p.length - 2]
+    if (Math.hypot(last.x - prev.x, last.y - prev.y) < 12) p.splice(p.length - 1, 1)
+  }
+  finishPoly()
+}
+
 watch(() => [props.rooms, props.furnitures, props.imageUrl], () => { nextTick(fit) }, { deep: true })
 onMounted(fit)
 onBeforeUnmount(detach)
@@ -604,6 +715,7 @@ defineExpose({ finishPoly, fit })
 .fp-bg { opacity: 0.85; }
 .fp-room { fill: rgba(184, 140, 110, 0.14); stroke: rgba(184, 140, 110, 0.65); stroke-width: 2; }
 .fp-room.is-hit { fill: rgba(184, 140, 110, 0.28); }
+.fp-room.is-overlap { stroke: #b04a3a; stroke-width: 2.5; fill: rgba(185, 96, 88, 0.16); }
 .fp-room-label { font-size: 13px; fill: #5c4c3d; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
 .fp-room-area { font-size: 11px; fill: #a89a8a; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
 .fp-dim { font-size: 10px; fill: #6b9b6b; text-anchor: middle; pointer-events: none; }
@@ -612,6 +724,7 @@ defineExpose({ finishPoly, fit })
 .fp-resize { fill: #fff; stroke: #b88c6e; stroke-width: 1.5; cursor: nwse-resize; }
 .fp-item { fill: #b04a3a; stroke: #fff; stroke-width: 2; }
 .fp-item.is-hit { fill: #e0a030; }
+.fp-item-label { font-size: 10px; fill: #5c4c3d; text-anchor: middle; paint-order: stroke; stroke: rgba(255, 253, 248, 0.85); stroke-width: 3; pointer-events: none; }
 .fp-handle { fill: #fff; stroke: #b88c6e; stroke-width: 2; cursor: pointer; }
 .fp-handle.is-snapped { fill: #6b9b6b; stroke: #fff; }
 .fp-edge-handle { fill: #fff; stroke: #b88c6e; stroke-width: 1.5; cursor: pointer; }
