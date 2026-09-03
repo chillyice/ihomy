@@ -1,108 +1,188 @@
 <template>
-  <div class="page">
-    <Breadcrumb :items="[{ label: $t('item.items') }]" />
-    <el-tabs v-model="tab">
-      <!-- 房子 -->
-      <el-tab-pane :label="$t('item.houses')" name="houses">
-        <div class="page-toolbar">
-          <el-button type="primary" @click="openHouse()">{{ $t('item.addHouse') }}</el-button>
-        </div>
-        <el-table :data="houses" stripe>
-          <el-table-column prop="name" :label="$t('item.houseName')" />
-          <el-table-column prop="address" :label="$t('item.houseAddress')" show-overflow-tooltip />
-          <el-table-column :label="$t('common.actions')" width="160">
-            <template #default="{ row }">
-              <el-button size="small" @click="openHouse(row)">{{ $t('common.edit') }}</el-button>
-              <el-button size="small" type="danger" plain @click="removeHouse(row)">{{ $t('common.delete') }}</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-tab-pane>
+  <div class="page fp-page">
+    <!-- 顶栏 -->
+    <div class="fp-topbar">
+      <el-select v-model="currentHouseId" :placeholder="$t('item.pickHouse')" class="fp-house" @change="onHouseChange">
+        <el-option v-for="h in houses" :key="h.id" :label="h.name" :value="h.id" />
+      </el-select>
+      <el-input v-model="searchKeyword" :placeholder="$t('item.searchPh')" clearable class="fp-search" @keyup.enter="onSearch" @clear="clearSearch">
+        <template #prefix><el-icon><Search /></el-icon></template>
+      </el-input>
+      <div class="fp-top-actions">
+        <el-button @click="listMode = !listMode">{{ listMode ? $t('item.done') : $t('item.listView') }}</el-button>
+        <el-button v-if="!listMode && houses.length" type="primary" @click="toggleEdit">{{ mode === 'edit' ? $t('item.done') : $t('item.editFloorPlan') }}</el-button>
+      </div>
+    </div>
 
-      <!-- 房间 -->
-      <el-tab-pane :label="$t('item.rooms')" name="rooms">
-        <div class="page-toolbar">
-          <el-select v-model="roomHouseFilter" :placeholder="$t('item.allHouses')" clearable style="width: 200px"
-                     @change="loadRooms">
-            <el-option v-for="h in houses" :key="h.id" :label="h.name" :value="h.id" />
-          </el-select>
-          <el-button type="primary" @click="openRoom()">{{ $t('item.addRoom') }}</el-button>
-        </div>
-        <el-table :data="rooms" stripe>
-          <el-table-column :label="$t('item.houseName')">
-            <template #default="{ row }">{{ houseName(row.houseId) }}</template>
-          </el-table-column>
-          <el-table-column prop="name" :label="$t('item.roomName')" />
-          <el-table-column prop="floor" :label="$t('item.floor')" width="90" />
-          <el-table-column prop="sortOrder" :label="$t('item.sort')" width="90" />
-          <el-table-column prop="note" :label="$t('item.note')" show-overflow-tooltip />
-          <el-table-column :label="$t('common.actions')" width="160">
-            <template #default="{ row }">
-              <el-button size="small" @click="openRoom(row)">{{ $t('common.edit') }}</el-button>
-              <el-button size="small" type="danger" plain @click="removeRoom(row)">{{ $t('common.delete') }}</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-tab-pane>
+    <!-- 户型图主视图 -->
+    <div v-if="!listMode" class="fp-main">
+      <!-- 空态 -->
+      <div v-if="!houses.length" class="fp-empty" @click="openHouse()">
+        <div class="fp-empty-plus">+</div>
+        <div class="fp-empty-text">{{ $t('item.emptyFloorPlan') }}</div>
+      </div>
 
-      <!-- 家具 -->
-      <el-tab-pane :label="$t('item.furnitures')" name="furnitures">
-        <div class="page-toolbar">
-          <el-select v-model="roomFilter" :placeholder="$t('item.allRooms')" clearable style="width: 200px"
-                     @change="loadFurnitures">
-            <el-option v-for="r in rooms" :key="r.id" :label="r.name" :value="r.id" />
-          </el-select>
-          <el-button type="primary" @click="openFurniture()">{{ $t('item.addFurniture') }}</el-button>
-        </div>
-        <el-table :data="furnitures" stripe>
-          <el-table-column prop="name" :label="$t('item.furnitureName')" />
-          <el-table-column :label="$t('item.roomName')">
-            <template #default="{ row }">{{ roomName(row.roomId) }}</template>
-          </el-table-column>
-          <el-table-column prop="note" :label="$t('item.note')" show-overflow-tooltip />
-          <el-table-column :label="$t('common.actions')" width="160">
-            <template #default="{ row }">
-              <el-button size="small" @click="openFurniture(row)">{{ $t('common.edit') }}</el-button>
-              <el-button size="small" type="danger" plain @click="removeFurniture(row)">{{ $t('common.delete') }}</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-tab-pane>
-
-      <!-- 物品:搜索 + 列表 + 新增/编辑 -->
-      <el-tab-pane :label="$t('item.items')" name="items">
-        <div class="page-toolbar">
-          <el-input v-model="keyword" :placeholder="$t('item.searchPh')" clearable style="width: 260px"
-                    @keyup.enter="loadItems" @clear="loadItems">
-            <template #append>
-              <el-button @click="loadItems">{{ $t('item.search') }}</el-button>
-            </template>
-          </el-input>
-          <el-button type="primary" @click="openItem()">{{ $t('item.addItem') }}</el-button>
-        </div>
-        <el-empty v-if="items.length === 0" :description="$t('item.emptyItems')" />
-        <el-card v-for="it in items" :key="it.id" shadow="hover" class="item-card">
-          <div class="item-main">
-            <span class="item-name">{{ it.name }}</span>
-            <el-tag size="small">{{ dictText(t, 'item_type', it.type) }}</el-tag>
-            <el-tag v-if="it.position" size="small" type="info">{{ it.position }}</el-tag>
+      <template v-else>
+        <!-- 编辑侧栏(酷家乐式) -->
+        <div v-if="mode === 'edit'" class="fp-sidebar">
+          <div class="fp-side-tabs">
+            <div :class="['fp-side-tab', { on: sidebarTab === 'rooms' }]" @click="sidebarTab = 'rooms'">{{ $t('item.rooms') }}</div>
+            <div :class="['fp-side-tab', { on: sidebarTab === 'furnitures' }]" @click="sidebarTab = 'furnitures'">{{ $t('item.furnitures') }}</div>
+            <div :class="['fp-side-tab', { on: sidebarTab === 'library' }]" @click="sidebarTab = 'library'">{{ $t('item.library') }}</div>
           </div>
-          <div class="item-path">{{ it.house_name }} / {{ it.room_name }} / {{ it.furniture_name }}</div>
-          <div class="item-aliases" v-if="it.aliases">{{ $t('item.aliases') }}: {{ it.aliases }}</div>
-          <div class="item-ops">
-            <el-button size="small" @click="openItem(it)">{{ $t('common.edit') }}</el-button>
-            <el-button size="small" type="danger" plain @click="removeItem(it)">{{ $t('common.delete') }}</el-button>
+          <div class="fp-side-body">
+            <!-- 房间 tab -->
+            <template v-if="sidebarTab === 'rooms'">
+              <div class="fp-tool-hint">{{ $t('item.drawHint') }}</div>
+              <el-button :type="tool === 'draw-rect' ? 'primary' : ''" class="fp-tool-btn" @click="tool = tool === 'draw-rect' ? 'select' : 'draw-rect'">{{ $t('item.drawRoomRect') }}</el-button>
+              <el-button :type="tool === 'draw-poly' ? 'primary' : ''" class="fp-tool-btn" @click="togglePoly">{{ $t('item.drawRoomPoly') }}</el-button>
+            </template>
+            <!-- 家具 tab -->
+            <template v-else-if="sidebarTab === 'furnitures'">
+              <div v-for="f in floorFurnitures" :key="f.id" class="fp-side-row">
+                <span class="fp-side-name">{{ f.name }}</span>
+                <el-button v-if="f.x == null" size="small" @click="placeFurniture(f)">{{ $t('item.addHouseHint') }}</el-button>
+                <span v-else class="fp-side-ok">✓</span>
+              </div>
+              <el-button type="primary" size="small" class="fp-tool-btn" @click="openFurniture()">{{ $t('item.addFurniture') }}</el-button>
+            </template>
+            <!-- 库 tab -->
+            <template v-else>
+              <div v-for="f in libraryFurnitures" :key="f.id" class="fp-side-row">
+                <span class="fp-side-name">{{ f.name }}</span>
+                <el-button size="small" @click="moveFurnitureToRoom(f)">{{ $t('item.pickRoom') }}</el-button>
+              </div>
+              <div v-if="!libraryFurnitures.length" class="fp-tool-hint">{{ $t('item.emptyItems') }}</div>
+            </template>
           </div>
-        </el-card>
-      </el-tab-pane>
-    </el-tabs>
+        </div>
+
+        <!-- 画布 -->
+        <FloorPlanCanvas
+          ref="canvasRef"
+          :mode="mode"
+          :tool="tool"
+          :rooms="floorPlan.rooms"
+          :furnitures="floorPlan.furnitures"
+          :items="floorPlan.items"
+          :image-url="floorPlan.imageUrl"
+          :highlight-item-ids="highlightItemIds"
+          :selected-furniture-id="selectedFurnitureId"
+          @save-room="onSaveRoomGeometry"
+          @save-furniture="onSaveFurnitureGeometry"
+          @save-item="onSaveItemPlace"
+          @create-room="onCreateRoom"
+          @select-furniture="onSelectFurniture"
+        />
+
+        <!-- 楼层切换器(左下角) -->
+        <div v-if="floors.length > 1" class="fp-floors">
+          <div v-for="f in floors" :key="f" :class="['fp-floor', { on: f === currentFloor }]" @click="switchFloor(f)">
+            {{ f }}F
+          </div>
+        </div>
+
+        <!-- 搜索结果 -->
+        <div v-if="searchResults.length" class="fp-results">
+          <div class="fp-results-title">{{ $t('item.searchResults') }} ({{ searchResults.length }})</div>
+          <div v-for="it in searchResults" :key="it.id" class="fp-result" :class="{ on: highlightItemIds.includes(it.id) }" @click="locateItem(it)">
+            <span class="fp-result-name">{{ it.name }}</span>
+            <span class="fp-result-path">{{ it.house_name }} / {{ it.room_name }} / {{ it.furniture_name || it.position }}</span>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- 列表模式(旧 CRUD) -->
+    <div v-else class="fp-list">
+      <el-tabs v-model="tab">
+        <el-tab-pane :label="$t('item.houses')" name="houses">
+          <div class="page-toolbar">
+            <el-button type="primary" @click="openHouse()">{{ $t('item.addHouse') }}</el-button>
+          </div>
+          <el-table :data="houses" stripe>
+            <el-table-column prop="name" :label="$t('item.houseName')" />
+            <el-table-column prop="address" :label="$t('item.houseAddress')" show-overflow-tooltip />
+            <el-table-column :label="$t('common.actions')" width="160">
+              <template #default="{ row }">
+                <el-button size="small" @click="openHouse(row)">{{ $t('common.edit') }}</el-button>
+                <el-button size="small" type="danger" plain @click="removeHouse(row)">{{ $t('common.delete') }}</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+        <el-tab-pane :label="$t('item.rooms')" name="rooms">
+          <div class="page-toolbar">
+            <el-select v-model="roomHouseFilter" :placeholder="$t('item.allHouses')" clearable style="width: 200px" @change="loadRooms">
+              <el-option v-for="h in houses" :key="h.id" :label="h.name" :value="h.id" />
+            </el-select>
+            <el-button type="primary" @click="openRoom()">{{ $t('item.addRoom') }}</el-button>
+          </div>
+          <el-table :data="rooms" stripe>
+            <el-table-column :label="$t('item.houseName')">
+              <template #default="{ row }">{{ houseName(row.houseId) }}</template>
+            </el-table-column>
+            <el-table-column prop="name" :label="$t('item.roomName')" />
+            <el-table-column prop="floor" :label="$t('item.floor')" width="90" />
+            <el-table-column prop="note" :label="$t('item.note')" show-overflow-tooltip />
+            <el-table-column :label="$t('common.actions')" width="160">
+              <template #default="{ row }">
+                <el-button size="small" @click="openRoom(row)">{{ $t('common.edit') }}</el-button>
+                <el-button size="small" type="danger" plain @click="removeRoom(row)">{{ $t('common.delete') }}</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+        <el-tab-pane :label="$t('item.furnitures')" name="furnitures">
+          <div class="page-toolbar">
+            <el-select v-model="roomFilter" :placeholder="$t('item.allRooms')" clearable style="width: 200px" @change="loadFurnitures">
+              <el-option v-for="r in rooms" :key="r.id" :label="r.name" :value="r.id" />
+            </el-select>
+            <el-button type="primary" @click="openFurniture()">{{ $t('item.addFurniture') }}</el-button>
+          </div>
+          <el-table :data="furnitures" stripe>
+            <el-table-column prop="name" :label="$t('item.furnitureName')" />
+            <el-table-column :label="$t('item.roomName')">
+              <template #default="{ row }">{{ roomName(row.roomId) }}</template>
+            </el-table-column>
+            <el-table-column prop="type" :label="$t('item.furnitureType')" width="100" />
+            <el-table-column :label="$t('common.actions')" width="160">
+              <template #default="{ row }">
+                <el-button size="small" @click="openFurniture(row)">{{ $t('common.edit') }}</el-button>
+                <el-button size="small" type="danger" plain @click="removeFurniture(row)">{{ $t('common.delete') }}</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+        <el-tab-pane :label="$t('item.items')" name="items">
+          <div class="page-toolbar">
+            <el-input v-model="keyword" :placeholder="$t('item.searchPh')" clearable style="width: 260px" @keyup.enter="loadItems" @clear="loadItems">
+              <template #append><el-button @click="loadItems">{{ $t('item.search') }}</el-button></template>
+            </el-input>
+            <el-button type="primary" @click="openItem()">{{ $t('item.addItem') }}</el-button>
+          </div>
+          <el-empty v-if="items.length === 0" :description="$t('item.emptyItems')" />
+          <el-card v-for="it in items" :key="it.id" shadow="hover" class="item-card">
+            <div class="item-main">
+              <span class="item-name">{{ it.name }}</span>
+              <el-tag size="small">{{ dictText(t, 'item_type', it.type) }}</el-tag>
+              <el-tag v-if="it.position" size="small" type="info">{{ it.position }}</el-tag>
+            </div>
+            <div class="item-path">{{ it.house_name }} / {{ it.room_name }} / {{ it.furniture_name }}</div>
+            <div class="item-ops">
+              <el-button size="small" @click="openItem(it)">{{ $t('common.edit') }}</el-button>
+              <el-button size="small" type="danger" plain @click="removeItem(it)">{{ $t('common.delete') }}</el-button>
+            </div>
+          </el-card>
+        </el-tab-pane>
+      </el-tabs>
+    </div>
 
     <!-- 物品编辑 -->
     <el-dialog v-model="itemDlg" append-to-body :title="itemForm.id ? $t('item.editItem') : $t('item.addItem')" width="480px">
       <el-form label-width="90px">
         <el-form-item :label="$t('item.houseName')">
-          <el-select v-model="itemForm.houseId" :placeholder="$t('item.pickHouse')" style="width: 100%"
-                     @change="itemForm.furnitureId = null">
+          <el-select v-model="itemForm.houseId" :placeholder="$t('item.pickHouse')" style="width: 100%" @change="itemForm.furnitureId = null; itemForm.roomId = null">
             <el-option v-for="h in houses" :key="h.id" :label="h.name" :value="h.id" />
           </el-select>
         </el-form-item>
@@ -130,17 +210,6 @@
             <el-option v-for="tp in itemTypes" :key="tp" :label="dictText(t, 'item_type', tp)" :value="tp" />
           </el-select>
         </el-form-item>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
-          <el-form-item :label="$t('item.quantity')">
-            <el-input-number v-model="itemForm.quantity" :min="0" :precision="2" :controls="false" style="width: 100%" />
-          </el-form-item>
-          <el-form-item :label="$t('item.unit')">
-            <el-input v-model="itemForm.unit" :placeholder="$t('item.unitPh')" />
-          </el-form-item>
-        </div>
-        <el-form-item :label="$t('item.aliases')">
-          <el-input v-model="itemForm.aliases" :placeholder="$t('item.aliasesPh')" />
-        </el-form-item>
         <el-form-item :label="$t('item.position')">
           <el-input v-model="itemForm.position" :placeholder="$t('item.positionPh')" />
         </el-form-item>
@@ -157,15 +226,15 @@
     <!-- 房间编辑 -->
     <el-dialog v-model="roomDlg" append-to-body :title="roomForm.id ? $t('item.editRoom') : $t('item.addRoom')" width="420px">
       <el-form label-width="90px">
-        <el-form-item :label="$t('item.houseName')">
+        <el-form-item v-if="!roomForm._geometry" :label="$t('item.houseName')">
           <el-select v-model="roomForm.houseId" :placeholder="$t('item.pickHouse')" style="width: 100%">
             <el-option v-for="h in houses" :key="h.id" :label="h.name" :value="h.id" />
           </el-select>
         </el-form-item>
         <el-form-item :label="$t('item.roomName')">
-          <el-input v-model="roomForm.name" :placeholder="$t('item.roomNamePh')" />
+          <el-input v-model="roomForm.name" :placeholder="$t('item.roomNameHint')" />
         </el-form-item>
-        <el-form-item :label="$t('item.floor')">
+        <el-form-item v-if="!roomForm._geometry" :label="$t('item.floor')">
           <el-input-number v-model="roomForm.floor" :min="-2" :max="99" />
         </el-form-item>
         <el-form-item :label="$t('item.note')">
@@ -182,12 +251,17 @@
     <el-dialog v-model="furDlg" append-to-body :title="furForm.id ? $t('item.editFurniture') : $t('item.addFurniture')" width="420px">
       <el-form label-width="90px">
         <el-form-item :label="$t('item.roomName')">
-          <el-select v-model="furForm.roomId" :placeholder="$t('item.pickRoom')" style="width: 100%">
+          <el-select v-model="furForm.roomId" clearable :placeholder="$t('item.pickRoom')" style="width: 100%">
             <el-option v-for="r in rooms" :key="r.id" :label="r.name" :value="r.id" />
           </el-select>
         </el-form-item>
         <el-form-item :label="$t('item.furnitureName')">
           <el-input v-model="furForm.name" :placeholder="$t('item.furnitureNamePh')" />
+        </el-form-item>
+        <el-form-item :label="$t('item.furnitureType')">
+          <el-select v-model="furForm.type" filterable allow-create default-first-option :placeholder="$t('item.furnitureType')" style="width: 100%">
+            <el-option v-for="tp in furnitureTypes" :key="tp" :label="tp" :value="tp" />
+          </el-select>
         </el-form-item>
         <el-form-item :label="$t('item.note')">
           <el-input v-model="furForm.note" />
@@ -218,16 +292,32 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { Search, Plus } from '@element-plus/icons-vue'
 import { itemApi, fileApi } from '@/api'
 import { useI18n } from 'vue-i18n'
 import { dictText } from '@/utils/dict'
-import Breadcrumb from '@/components/Breadcrumb.vue'
+import FloorPlanCanvas from './FloorPlanCanvas.vue'
 
 const { t } = useI18n()
 const itemTypes = ['KITCHENWARE', 'INGREDIENT', 'DAILY', 'CLOTHES', 'TOOL', 'OTHER']
+const furnitureTypes = ['衣柜', '床', '冰箱', '书桌', '沙发', '茶几', '柜子', '餐桌', '书架', '其他']
+
+// ---- 户型图状态 ----
+const listMode = ref(false)
+const mode = ref('view') // view | edit
+const tool = ref('select') // select | draw-rect | draw-poly
+const sidebarTab = ref('rooms')
+const currentHouseId = ref(null)
+const currentFloor = ref(1)
+const floorPlan = ref({ rooms: [], furnitures: [], items: [], imageUrl: null, scale: 100 })
+const searchKeyword = ref('')
+const searchResults = ref([])
+const selectedFurnitureId = ref(null)
+const canvasRef = ref(null)
+
+// ---- 列表模式状态(旧 CRUD) ----
 const tab = ref('houses')
 const items = ref([])
 const houses = ref([])
@@ -251,8 +341,28 @@ const roomsOf = (houseId) => rooms.value.filter((r) => r.houseId === houseId || 
 const houseName = (id) => houses.value.find((h) => h.id === Number(id))?.name || '-'
 const roomName = (id) => rooms.value.find((r) => r.id === Number(id))?.name || '-'
 
+const highlightItemIds = computed(() => searchResults.value.map((it) => it.id))
+const floorFurnitures = computed(() => floorPlan.value.furnitures)
+const libraryFurnitures = computed(() => furnitures.value.filter((f) => !f.roomId))
+
+const floors = computed(() => {
+  const set = new Set()
+  floorPlan.value.rooms.forEach((r) => set.add(r.floor))
+  const house = houses.value.find((h) => h.id === currentHouseId.value)
+  if (house && house.floorPlans) {
+    try { Object.keys(JSON.parse(house.floorPlans)).forEach((k) => set.add(Number(k))) } catch {}
+  }
+  if (!set.size) set.add(currentFloor.value)
+  return [...set].sort((a, b) => a - b)
+})
+
+// ---- 数据加载 ----
 const loadHouses = async () => {
   houses.value = await itemApi.houses()
+  if (!currentHouseId.value && houses.value.length) {
+    currentHouseId.value = houses.value[0].id
+    loadFloorPlan()
+  }
   loadRooms()
 }
 const loadRooms = async () => {
@@ -268,6 +378,57 @@ const loadItems = async () => {
   items.value = await itemApi.list({ keyword: keyword.value || undefined })
 }
 
+const loadFloorPlan = async () => {
+  if (!currentHouseId.value) { floorPlan.value = { rooms: [], furnitures: [], items: [], imageUrl: null, scale: 100 }; return }
+  floorPlan.value = await itemApi.floorPlan(currentHouseId.value, currentFloor.value)
+}
+const onHouseChange = () => { currentFloor.value = 1; loadFloorPlan() }
+const switchFloor = (f) => { currentFloor.value = f; loadFloorPlan() }
+const toggleEdit = () => {
+  mode.value = mode.value === 'edit' ? 'view' : 'edit'
+  if (mode.value === 'edit') tool.value = 'select'
+}
+const togglePoly = () => {
+  if (tool.value === 'draw-poly') { tool.value = 'select'; canvasRef.value?.finishPoly() }
+  else tool.value = 'draw-poly'
+}
+
+// ---- 画布回调 ----
+const onSaveRoomGeometry = async (id, geometry) => { await itemApi.saveRoomGeometry(id, geometry) }
+const onSaveFurnitureGeometry = async (id, data) => { await itemApi.saveFurnitureGeometry(id, data) }
+const onSaveItemPlace = async (id, data) => { await itemApi.saveItemPlace(id, data) }
+const onSelectFurniture = (id) => { selectedFurnitureId.value = selectedFurnitureId.value === id ? null : id }
+const onCreateRoom = (geometry) => {
+  roomForm.value = { houseId: currentHouseId.value, name: '', floor: currentFloor.value, note: '', _geometry: geometry }
+  roomDlg.value = true
+}
+const placeFurniture = async (f) => {
+  await itemApi.saveFurnitureGeometry(f.id, { x: 200, y: 200, w: 200, h: 100 })
+  loadFloorPlan()
+}
+const moveFurnitureToRoom = (f) => {
+  furForm.value = { id: f.id, roomId: null, name: f.name, type: f.type, note: f.note }
+  furDlg.value = true
+}
+
+// ---- 搜索 ----
+const onSearch = async () => {
+  if (!searchKeyword.value) { clearSearch(); return }
+  searchResults.value = await itemApi.list({ keyword: searchKeyword.value })
+}
+const clearSearch = () => { searchKeyword.value = ''; searchResults.value = [] }
+const locateItem = (it) => {
+  if (it.house_id != null) {
+    if (currentHouseId.value !== Number(it.house_id)) {
+      currentHouseId.value = Number(it.house_id)
+    }
+    if (it.floor != null) currentFloor.value = Number(it.floor)
+    selectedFurnitureId.value = it.furniture_id || null
+    loadFloorPlan()
+  }
+}
+
+// ---- 旧 CRUD ----
 const openItem = (row) => {
   itemForm.value = row
     ? { id: row.id, houseId: row.house_id, roomId: row.room_id, furnitureId: row.furniture_id, name: row.name, aliases: row.aliases, position: row.position, image_url: row.image_url, type: row.type, quantity: row.quantity != null ? Number(row.quantity) : null, unit: row.unit, note: row.note }
@@ -285,6 +446,7 @@ const saveItem = async () => {
   if (!itemForm.value.name) return ElMessage.warning(t('item.itemNameRequired'))
   const body = {
     furnitureId: itemForm.value.furnitureId,
+    roomId: itemForm.value.roomId,
     name: itemForm.value.name,
     aliases: itemForm.value.aliases,
     position: itemForm.value.position,
@@ -293,6 +455,8 @@ const saveItem = async () => {
     quantity: itemForm.value.quantity,
     unit: itemForm.value.unit,
     note: itemForm.value.note,
+    relX: itemForm.value.furnitureId ? 0.5 : null,
+    relY: itemForm.value.furnitureId ? 0.5 : null,
   }
   if (itemForm.value.id) await itemApi.update(itemForm.value.id, body)
   else await itemApi.create(body)
@@ -310,42 +474,48 @@ const removeItem = async (row) => {
 const openRoom = async (row) => {
   if (!houses.value.length) await loadHouses()
   roomForm.value = row ? { id: row.id, houseId: row.houseId, name: row.name, floor: row.floor, note: row.note }
-    : { houseId: roomHouseFilter.value, name: '', floor: 1, note: '' }
+    : { houseId: roomHouseFilter.value || currentHouseId.value, name: '', floor: currentFloor.value, note: '' }
   roomDlg.value = true
 }
 const saveRoom = async () => {
-  if (!roomForm.value.houseId) return ElMessage.warning(t('item.pickHouse'))
+  if (!roomForm.value.houseId && !roomForm.value._geometry) return ElMessage.warning(t('item.pickHouse'))
   if (!roomForm.value.name) return ElMessage.warning(t('item.roomNameRequired'))
+  const geom = roomForm.value._geometry
   if (roomForm.value.id) await itemApi.updateRoom(roomForm.value.id, roomForm.value)
-  else await itemApi.addRoom(roomForm.value)
+  else roomForm.value = await itemApi.addRoom({ houseId: roomForm.value.houseId, name: roomForm.value.name, floor: roomForm.value.floor, note: roomForm.value.note })
+  if (geom) await itemApi.saveRoomGeometry(roomForm.value.id, geom)
   ElMessage.success(t('common.success'))
   roomDlg.value = false
   loadRooms()
+  loadFloorPlan()
 }
 const removeRoom = async (row) => {
-  await ElMessageBox.confirm(t('item.deleteRoomConfirm'), t('common.warning'), { type: 'warning', closeOnClickModal: true })
+  await ElMessageBox.confirm(t('item.deleteRoomMoveLib'), t('common.warning'), { type: 'warning', closeOnClickModal: true })
   await itemApi.removeRoom(row.id)
   ElMessage.success(t('common.success'))
   loadRooms()
+  loadFloorPlan()
 }
 
 const openFurniture = (row) => {
-  furForm.value = row ? { id: row.id, roomId: row.roomId, name: row.name, note: row.note } : { roomId: roomFilter.value, name: '', note: '' }
+  furForm.value = row ? { id: row.id, roomId: row.roomId, name: row.name, type: row.type, note: row.note } : { roomId: roomFilter.value, name: '', type: '衣柜', note: '' }
   furDlg.value = true
 }
 const saveFurniture = async () => {
   if (!furForm.value.name) return ElMessage.warning(t('item.furnitureNameRequired'))
   if (furForm.value.id) await itemApi.updateFurniture(furForm.value.id, furForm.value)
-  else await itemApi.addFurniture(furForm.value)
+  else await itemApi.addFurniture({ roomId: furForm.value.roomId, name: furForm.value.name, type: furForm.value.type, note: furForm.value.note })
   ElMessage.success(t('common.success'))
   furDlg.value = false
   loadRooms()
+  loadFloorPlan()
 }
 const removeFurniture = async (row) => {
   await ElMessageBox.confirm(t('item.deleteFurnitureConfirm'), t('common.warning'), { type: 'warning', closeOnClickModal: true })
   await itemApi.removeFurniture(row.id)
   ElMessage.success(t('common.success'))
   loadRooms()
+  loadFloorPlan()
 }
 
 const openHouse = (row) => {
@@ -367,22 +537,50 @@ const removeHouse = async (row) => {
   loadHouses()
 }
 
-onMounted(() => {
-  loadHouses()
-})
+watch(listMode, (v) => { if (!v) loadFloorPlan() })
+onMounted(() => { loadHouses() })
 </script>
 
 <style scoped>
+.fp-page { display: flex; flex-direction: column; height: calc(100vh - 80px); }
+.fp-topbar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; }
+.fp-house { width: 180px; }
+.fp-search { width: 320px; }
+.fp-top-actions { margin-left: auto; display: flex; gap: 8px; }
+.fp-main { position: relative; flex: 1; display: flex; overflow: hidden; border-radius: 14px; }
+.fp-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; color: #5c4c3d; }
+.fp-empty-plus { width: 96px; height: 96px; border: 2px dashed #b88c6e; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 48px; color: #b88c6e; }
+.fp-empty-text { margin-top: 16px; font-size: 15px; color: #8a7a6a; }
+.fp-sidebar { width: 220px; border-right: 1px solid #eee5d8; background: #faf5ec; display: flex; flex-direction: column; }
+.fp-side-tabs { display: flex; border-bottom: 1px solid #eee5d8; }
+.fp-side-tab { flex: 1; text-align: center; padding: 10px 0; cursor: pointer; font-size: 13px; color: #8a7a6a; }
+.fp-side-tab.on { color: #5c4c3d; font-weight: 600; border-bottom: 2px solid #b88c6e; }
+.fp-side-body { flex: 1; overflow-y: auto; padding: 12px; }
+.fp-tool-hint { font-size: 12px; color: #a89a8a; margin-bottom: 12px; }
+.fp-tool-btn { width: 100%; margin-bottom: 8px; }
+.fp-side-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #eee5d8; }
+.fp-side-name { font-size: 13px; color: #5c4c3d; }
+.fp-side-ok { color: #7aa07a; }
+.fp-floors { position: absolute; left: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 4px; z-index: 5; }
+.fp-floor { width: 36px; height: 36px; border-radius: 8px; background: rgba(255,255,255,0.9); color: #5c4c3d; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 13px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+.fp-floor.on { background: #b88c6e; color: #fff; }
+.fp-results { position: absolute; right: 12px; top: 12px; width: 260px; max-height: 60%; overflow-y: auto; background: rgba(255,253,248,0.96); border-radius: 12px; box-shadow: 0 3px 12px rgba(0,0,0,0.12); padding: 10px; z-index: 5; }
+.fp-results-title { font-size: 13px; font-weight: 600; color: #5c4c3d; margin-bottom: 8px; }
+.fp-result { padding: 6px 8px; border-radius: 8px; cursor: pointer; }
+.fp-result:hover { background: rgba(184,140,110,0.1); }
+.fp-result.on { background: rgba(184,140,110,0.18); }
+.fp-result-name { display: block; font-size: 13px; color: #3a2e22; }
+.fp-result-path { display: block; font-size: 11px; color: #a89a8a; margin-top: 2px; }
+.fp-list { flex: 1; overflow-y: auto; }
 .item-card { margin-bottom: 12px; }
 .item-main { display: flex; align-items: center; gap: 8px; }
-.item-image-preview { width: 200px; height: 140px; object-fit: cover; border-radius: 8px; }
 .item-name { font-size: 16px; font-weight: 600; }
 .item-path { color: #909399; font-size: 13px; margin-top: 4px; }
-.item-aliases { color: #909399; font-size: 12px; margin-top: 2px; }
 .item-ops { margin-top: 8px; }
-
+.item-image-preview { width: 200px; height: 140px; object-fit: cover; border-radius: 8px; }
 @media (max-width: 768px) {
-  .item-image-preview { width: 100px; height: 70px; }
-  .item-name { font-size: 14px; }
+  .fp-search { width: 140px; }
+  .fp-sidebar { display: none; }
+  .fp-page { height: calc(100vh - 120px); }
 }
 </style>

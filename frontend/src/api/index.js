@@ -326,6 +326,11 @@ export const itemApi = {
   create: (data) => request.post('/item', data),
   update: (id, data) => request.put(`/item/${id}`, data),
   remove: (id) => request.delete(`/item/${id}`),
+  floorPlan: (houseId, floor) => request.get('/item/floor-plan', { params: { houseId, floor } }),
+  saveFloorPlans: (id, floorPlans) => request.put(`/item/house/${id}/floor-plans`, { floorPlans }),
+  saveRoomGeometry: (id, geometry) => request.put(`/item/room/${id}/geometry`, { geometry }),
+  saveFurnitureGeometry: (id, data) => request.put(`/item/furniture/${id}/geometry`, data),
+  saveItemPlace: (id, data) => request.put(`/item/${id}/place`, data),
 }
 
 export const kitchenApi = {
