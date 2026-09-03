@@ -10,7 +10,7 @@
       </el-input>
       <div class="fp-top-actions">
         <el-button @click="listMode = !listMode">{{ listMode ? $t('item.done') : $t('item.listView') }}</el-button>
-        <el-button v-if="!listMode && houses.length" type="primary" @click="toggleEdit">{{ mode === 'edit' ? $t('item.done') : $t('item.editFloorPlan') }}</el-button>
+        <el-button v-if="!listMode && houses.length" type="primary" class="fp-edit-btn" @click="toggleEdit">{{ mode === 'edit' ? $t('item.done') : $t('item.editFloorPlan') }}</el-button>
       </div>
     </div>
 
@@ -36,12 +36,16 @@
               <div class="fp-tool-hint">{{ $t('item.drawHint') }}</div>
               <el-button :type="tool === 'draw-rect' ? 'primary' : ''" class="fp-tool-btn" @click="tool = tool === 'draw-rect' ? 'select' : 'draw-rect'">{{ $t('item.drawRoomRect') }}</el-button>
               <el-button :type="tool === 'draw-poly' ? 'primary' : ''" class="fp-tool-btn" @click="togglePoly">{{ $t('item.drawRoomPoly') }}</el-button>
+              <el-upload :show-file-list="false" :before-upload="uploadFloorPlan" accept="image/*" class="fp-upload">
+                <el-button class="fp-tool-btn">{{ $t('item.uploadFloorPlan') }}</el-button>
+              </el-upload>
+              <el-button :type="tool === 'calibrate' ? 'primary' : ''" class="fp-tool-btn" @click="tool = tool === 'calibrate' ? 'select' : 'calibrate'">{{ $t('item.calibrate') }}</el-button>
             </template>
             <!-- 家具 tab -->
             <template v-else-if="sidebarTab === 'furnitures'">
               <div v-for="f in floorFurnitures" :key="f.id" class="fp-side-row">
                 <span class="fp-side-name">{{ f.name }}</span>
-                <el-button v-if="f.x == null" size="small" @click="placeFurniture(f)">{{ $t('item.addHouseHint') }}</el-button>
+                <el-button v-if="f.x == null" size="small" type="primary" @click="placeFurniture(f)">{{ $t('item.place') }}</el-button>
                 <span v-else class="fp-side-ok">✓</span>
               </div>
               <el-button type="primary" size="small" class="fp-tool-btn" @click="openFurniture()">{{ $t('item.addFurniture') }}</el-button>
@@ -50,7 +54,10 @@
             <template v-else>
               <div v-for="f in libraryFurnitures" :key="f.id" class="fp-side-row">
                 <span class="fp-side-name">{{ f.name }}</span>
-                <el-button size="small" @click="moveFurnitureToRoom(f)">{{ $t('item.pickRoom') }}</el-button>
+                <span>
+                  <el-button size="small" type="primary" @click="placeFurniture(f)">{{ $t('item.place') }}</el-button>
+                  <el-button size="small" @click="moveFurnitureToRoom(f)">{{ $t('item.pickRoom') }}</el-button>
+                </span>
               </div>
               <div v-if="!libraryFurnitures.length" class="fp-tool-hint">{{ $t('item.emptyItems') }}</div>
             </template>
@@ -68,11 +75,15 @@
           :image-url="floorPlan.imageUrl"
           :highlight-item-ids="highlightItemIds"
           :selected-furniture-id="selectedFurnitureId"
+          :scale="floorPlan.scale || 100"
           @save-room="onSaveRoomGeometry"
           @save-furniture="onSaveFurnitureGeometry"
           @save-item="onSaveItemPlace"
           @create-room="onCreateRoom"
           @select-furniture="onSelectFurniture"
+          @calibrate="onCalibrate"
+          @edit-edge="onEditEdge"
+          @duplicate-room="onDuplicateRoom"
         />
 
         <!-- 楼层切换器(左下角) -->
@@ -292,7 +303,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus } from '@element-plus/icons-vue'
 import { itemApi, fileApi } from '@/api'
@@ -383,6 +394,69 @@ const loadFloorPlan = async () => {
   floorPlan.value = await itemApi.floorPlan(currentHouseId.value, currentFloor.value)
 }
 const onHouseChange = () => { currentFloor.value = 1; loadFloorPlan() }
+const uploadFloorPlan = async (file) => {
+  try {
+    const data = await fileApi.upload(file)
+    const house = houses.value.find((h) => h.id === currentHouseId.value)
+    let floorPlans = {}
+    if (house && house.floorPlans) { try { floorPlans = JSON.parse(house.floorPlans) } catch {} }
+    const cur = floorPlans[currentFloor.value] || {}
+    floorPlans[currentFloor.value] = { ...cur, imageUrl: data.url }
+    await itemApi.saveFloorPlans(currentHouseId.value, JSON.stringify(floorPlans))
+    ElMessage.success(t('common.success'))
+    loadHouses()
+    loadFloorPlan()
+  } catch (e) {}
+  return false
+}
+const onCalibrate = async (pxDist) => {
+  try {
+    const { value } = await ElMessageBox.prompt(t('item.calibratePrompt'), t('item.calibrate'), { inputValue: '1.0', closeOnClickModal: true })
+    const meters = parseFloat(value)
+    if (!meters || meters <= 0) return
+    const scale = pxDist / meters
+    const house = houses.value.find((h) => h.id === currentHouseId.value)
+    let floorPlans = {}
+    if (house && house.floorPlans) { try { floorPlans = JSON.parse(house.floorPlans) } catch {} }
+    const cur = floorPlans[currentFloor.value] || {}
+    floorPlans[currentFloor.value] = { ...cur, scale }
+    await itemApi.saveFloorPlans(currentHouseId.value, JSON.stringify(floorPlans))
+    ElMessage.success(t('common.success'))
+    tool.value = 'select'
+    loadHouses()
+    loadFloorPlan()
+  } catch (e) {}
+}
+const onEditEdge = async (roomId, edgeIdx) => {
+  const room = floorPlan.value.rooms.find((r) => r.id === roomId)
+  if (!room) return
+  let poly
+  try { poly = JSON.parse(room.geometry || '[]') } catch { return }
+  if (poly.length < 3) return
+  const a = poly[edgeIdx]; const b = poly[(edgeIdx + 1) % poly.length]
+  const scale = floorPlan.value.scale || 100
+  const curLen = Math.hypot(b.x - a.x, b.y - a.y) / scale
+  try {
+    const { value } = await ElMessageBox.prompt(t('item.edgeLenPrompt'), t('item.editEdgeLen'), { inputValue: curLen.toFixed(2), closeOnClickModal: true })
+    const meters = parseFloat(value)
+    if (!meters || meters <= 0) return
+    const px = meters * scale
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1
+    poly[(edgeIdx + 1) % poly.length] = { x: a.x + ((b.x - a.x) / len) * px, y: a.y + ((b.y - a.y) / len) * px }
+    await onSaveRoomGeometry(roomId, JSON.stringify(poly))
+    ElMessage.success(t('common.success'))
+  } catch (e) {}
+}
+const onDuplicateRoom = (roomId) => {
+  const room = floorPlan.value.rooms.find((r) => r.id === roomId)
+  if (!room) return
+  let poly
+  try { poly = JSON.parse(room.geometry || '[]') } catch { return }
+  if (poly.length < 3) return
+  const shifted = poly.map((p) => ({ x: p.x + 40, y: p.y + 40 }))
+  roomForm.value = { houseId: currentHouseId.value, name: `${room.name}${t('item.duplicateSuffix')}`, floor: currentFloor.value, note: room.note || '', _geometry: JSON.stringify(shifted) }
+  roomDlg.value = true
+}
 const switchFloor = (f) => { currentFloor.value = f; loadFloorPlan() }
 const toggleEdit = () => {
   mode.value = mode.value === 'edit' ? 'view' : 'edit'
@@ -394,16 +468,48 @@ const togglePoly = () => {
 }
 
 // ---- 画布回调 ----
-const onSaveRoomGeometry = async (id, geometry) => { await itemApi.saveRoomGeometry(id, geometry) }
-const onSaveFurnitureGeometry = async (id, data) => { await itemApi.saveFurnitureGeometry(id, data) }
-const onSaveItemPlace = async (id, data) => { await itemApi.saveItemPlace(id, data) }
+const undoStack = ref([])
+const lastRoomGeom = {}
+const pushUndo = (entry) => { undoStack.value.push(entry); if (undoStack.value.length > 50) undoStack.value.shift() }
+
+const onSaveRoomGeometry = async (id, geometry) => {
+  const room = floorPlan.value.rooms.find((r) => r.id === id)
+  const prev = Object.prototype.hasOwnProperty.call(lastRoomGeom, id) ? lastRoomGeom[id] : (room ? room.geometry : null)
+  pushUndo({ type: 'room', id, geometry: prev })
+  lastRoomGeom[id] = geometry
+  await itemApi.saveRoomGeometry(id, geometry)
+}
+const onSaveFurnitureGeometry = async (id, data) => {
+  const f = floorPlan.value.furnitures.find((x) => x.id === id)
+  if (f) pushUndo({ type: 'furn', id, data: { x: f.x, y: f.y, w: f.w, h: f.h } })
+  await itemApi.saveFurnitureGeometry(id, data)
+}
+const onSaveItemPlace = async (id, data, prev) => {
+  if (prev) pushUndo({ type: 'item', id, data: prev })
+  await itemApi.saveItemPlace(id, data)
+}
+const undo = async () => {
+  const e = undoStack.value.pop()
+  if (!e) { ElMessage.info(t('item.nothingToUndo')); return }
+  if (e.type === 'room') { await itemApi.saveRoomGeometry(e.id, e.geometry); lastRoomGeom[e.id] = e.geometry }
+  else if (e.type === 'furn') await itemApi.saveFurnitureGeometry(e.id, e.data)
+  else if (e.type === 'item') await itemApi.saveItemPlace(e.id, e.data)
+  await loadFloorPlan()
+}
 const onSelectFurniture = (id) => { selectedFurnitureId.value = selectedFurnitureId.value === id ? null : id }
 const onCreateRoom = (geometry) => {
   roomForm.value = { houseId: currentHouseId.value, name: '', floor: currentFloor.value, note: '', _geometry: geometry }
   roomDlg.value = true
 }
 const placeFurniture = async (f) => {
-  await itemApi.saveFurnitureGeometry(f.id, { x: 200, y: 200, w: 200, h: 100 })
+  let roomId = f.roomId
+  if (!roomId) {
+    const room = floorPlan.value.rooms[0]
+    if (!room) { ElMessage.warning(t('item.drawRoomFirst')); return }
+    roomId = room.id
+  }
+  await itemApi.updateFurniture(f.id, { roomId, name: f.name, type: f.type, note: f.note, x: 200, y: 200, w: 200, h: 100 })
+  loadRooms()
   loadFloorPlan()
 }
 const moveFurnitureToRoom = (f) => {
@@ -498,7 +604,7 @@ const removeRoom = async (row) => {
 }
 
 const openFurniture = (row) => {
-  furForm.value = row ? { id: row.id, roomId: row.roomId, name: row.name, type: row.type, note: row.note } : { roomId: roomFilter.value, name: '', type: '衣柜', note: '' }
+  furForm.value = row ? { id: row.id, roomId: row.roomId, name: row.name, type: row.type, note: row.note } : { roomId: roomFilter.value || floorPlan.value.rooms[0]?.id || null, name: '', type: '衣柜', note: '' }
   furDlg.value = true
 }
 const saveFurniture = async () => {
@@ -538,7 +644,16 @@ const removeHouse = async (row) => {
 }
 
 watch(listMode, (v) => { if (!v) loadFloorPlan() })
-onMounted(() => { loadHouses() })
+const onKeydown = (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z') return
+  const tag = (e.target && e.target.tagName) || ''
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return
+  if (mode.value !== 'edit') return
+  e.preventDefault()
+  undo()
+}
+onMounted(() => { loadHouses(); window.addEventListener('keydown', onKeydown) })
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <style scoped>
@@ -581,6 +696,7 @@ onMounted(() => { loadHouses() })
 @media (max-width: 768px) {
   .fp-search { width: 140px; }
   .fp-sidebar { display: none; }
+  .fp-edit-btn { display: none; }
   .fp-page { height: calc(100vh - 120px); }
 }
 </style>

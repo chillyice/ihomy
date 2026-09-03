@@ -1,6 +1,12 @@
 <template>
   <div class="fp-canvas" ref="wrapRef">
     <svg ref="svgRef" class="fp-svg" @wheel.prevent="onWheel" @pointerdown="onSvgDown" @pointermove="onHoverMove" @click="onCanvasClick">
+      <defs>
+        <filter id="fp-rough" x="-5%" y="-5%" width="110%" height="110%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" result="n" />
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="2.5" />
+        </filter>
+      </defs>
       <g :transform="`translate(${view.tx},${view.ty}) scale(${view.k})`">
         <image v-if="imageUrl" :href="imageUrl" x="0" y="0" class="fp-bg" />
         <!-- 房间 -->
@@ -9,15 +15,21 @@
             :points="pts(r.poly)"
             class="fp-room"
             :class="{ 'is-hit': hitRoomIds.includes(r.id) }"
+            filter="url(#fp-rough)"
             @pointerdown.stop="mode === 'edit' ? onRoomDown($event, r) : null"
+            @dblclick.stop="mode === 'edit' ? $emit('duplicate-room', r.id) : null"
           />
-          <text v-if="r.name" :x="r.cx" :y="r.cy" class="fp-room-label">{{ r.name }}</text>
+          <g v-if="r.name">
+            <text :x="r.cx" :y="r.cy - 6" class="fp-room-label">{{ r.name }}</text>
+            <text :x="r.cx" :y="r.cy + 10" class="fp-room-area">{{ (polyArea(r.poly) / Math.pow(props.scale || 100, 2)).toFixed(2) }} m²</text>
+          </g>
         </g>
         <!-- 家具 -->
         <g v-for="f in placedFurnitures" :key="f.id">
           <rect
             :x="f.x" :y="f.y" :width="f.w" :height="f.h"
             class="fp-furn"
+            filter="url(#fp-rough)"
             @pointerdown.stop="mode === 'edit' ? onFurnDown($event, f) : null"
             @dblclick="mode === 'view' ? $emit('select-furniture', f.id) : null"
           />
@@ -45,7 +57,9 @@
                     @dblclick.stop="removeVertex(r, i)" />
             <rect v-for="(m, i) in r.mids" :key="'m' + i"
                   :x="m.x - 5" :y="m.y - 5" width="10" height="10" class="fp-edge-handle"
-                  @pointerdown.stop="onEdgeDown($event, r, i)" />
+                  @pointerdown.stop="onEdgeDown($event, r, i)"
+                  @dblclick.stop="$emit('edit-edge', r.id, i)" />
+            <text v-for="(m, i) in r.mids" :key="'dim' + i" :x="m.x" :y="m.y - 9" class="fp-dim">{{ edgeLenM(r, i) }}</text>
           </g>
           <!-- hover 边加号 -->
           <g v-if="hoverEdge" class="fp-hover-add">
@@ -53,10 +67,17 @@
             <line :x1="hoverEdge.point.x - 4" :y1="hoverEdge.point.y" :x2="hoverEdge.point.x + 4" :y2="hoverEdge.point.y" class="fp-hover-plus" />
             <line :x1="hoverEdge.point.x" :y1="hoverEdge.point.y - 4" :x2="hoverEdge.point.x" :y2="hoverEdge.point.y + 4" class="fp-hover-plus" />
           </g>
+          <!-- 吸附对齐虚线 -->
+          <line v-if="snapLine" :x1="snapLine.x1" :y1="snapLine.y1" :x2="snapLine.x2" :y2="snapLine.y2" class="fp-snap-line" />
         </template>
         <!-- 正在画的房间 -->
         <polygon v-if="drawing.poly && drawing.poly.length" :points="pts(drawing.poly)" class="fp-drawing" />
         <rect v-if="drawing.rect" :x="drawing.rect.x" :y="drawing.rect.y" :width="drawing.rect.w" :height="drawing.rect.h" class="fp-drawing" />
+        <!-- 底图标定两点 -->
+        <g v-if="calibPoints.length">
+          <circle v-for="(p, i) in calibPoints" :key="'c' + i" :cx="p.x" :cy="p.y" r="5" class="fp-calib-dot" />
+          <line v-if="calibPoints.length === 2" :x1="calibPoints[0].x" :y1="calibPoints[0].y" :x2="calibPoints[1].x" :y2="calibPoints[1].y" class="fp-calib-line" />
+        </g>
       </g>
     </svg>
   </div>
@@ -74,8 +95,9 @@ const props = defineProps({
   highlightItemIds: { type: Array, default: () => [] },
   selectedFurnitureId: { type: Number, default: null },
   tool: { type: String, default: 'select' },
+  scale: { type: Number, default: 100 },
 })
-const emit = defineEmits(['save-room', 'save-furniture', 'save-item', 'create-room', 'select-furniture'])
+const emit = defineEmits(['save-room', 'save-furniture', 'save-item', 'create-room', 'select-furniture', 'calibrate', 'edit-edge', 'duplicate-room'])
 
 const wrapRef = ref(null)
 const svgRef = ref(null)
@@ -83,6 +105,8 @@ const view = ref({ tx: 0, ty: 0, k: 1 })
 const drawing = ref({ poly: null, rect: null })
 const drag = ref(null)
 const hoverEdge = ref(null)
+const snapLine = ref(null)
+const calibPoints = ref([])
 let justDragged = false
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
@@ -107,6 +131,63 @@ const projectToSegment = (p, a, b) => {
   return { point, dist: Math.hypot(p.x - point.x, p.y - point.y) }
 }
 
+// 其他房间顶点(排除当前房间)
+const otherRoomVertices = (excludeId) => {
+  const vs = []
+  roomsLocal.value.forEach((r) => {
+    if (r.id === excludeId) return
+    r.poly.forEach((v) => vs.push({ x: v.x, y: v.y }))
+  })
+  return vs
+}
+
+// 点吸附到最近顶点(阈值内),返回目标顶点或 null
+const snapPoint = (p, vertices, threshold = 6) => {
+  let best = null; let bestDist = threshold
+  for (const v of vertices) {
+    const dist = Math.hypot(p.x - v.x, p.y - v.y)
+    if (dist < bestDist) { bestDist = dist; best = { x: v.x, y: v.y } }
+  }
+  return best
+}
+
+// 家具贴墙吸附:家具边贴合房间边/其他家具边(垂直/水平,阈值 6px),返回平移修正量
+const snapFurniture = (f, excludeId) => {
+  const SNAP = 6
+  const edges = []
+  roomsLocal.value.forEach((r) => {
+    r.poly.forEach((v, i) => {
+      const a = v; const b = r.poly[(i + 1) % r.poly.length]
+      if (Math.abs(a.x - b.x) < 0.5) edges.push({ axis: 'x', val: a.x, lo: Math.min(a.y, b.y), hi: Math.max(a.y, b.y) })
+      else if (Math.abs(a.y - b.y) < 0.5) edges.push({ axis: 'y', val: a.y, lo: Math.min(a.x, b.x), hi: Math.max(a.x, b.x) })
+    })
+  })
+  placedFurnitures.value.forEach((o) => {
+    if (o.id === excludeId) return
+    edges.push({ axis: 'x', val: o.x, lo: o.y, hi: o.y + o.h })
+    edges.push({ axis: 'x', val: o.x + o.w, lo: o.y, hi: o.y + o.h })
+    edges.push({ axis: 'y', val: o.y, lo: o.x, hi: o.x + o.w })
+    edges.push({ axis: 'y', val: o.y + o.h, lo: o.x, hi: o.x + o.w })
+  })
+  const fEdges = [
+    { axis: 'x', val: f.x, lo: f.y, hi: f.y + f.h, ref: { x1: f.x, y1: f.y } },
+    { axis: 'x', val: f.x + f.w, lo: f.y, hi: f.y + f.h, ref: { x1: f.x + f.w, y1: f.y } },
+    { axis: 'y', val: f.y, lo: f.x, hi: f.x + f.w, ref: { x1: f.x, y1: f.y } },
+    { axis: 'y', val: f.y + f.h, lo: f.x, hi: f.x + f.w, ref: { x1: f.x, y1: f.y + f.h } },
+  ]
+  for (const fe of fEdges) {
+    for (const re of edges) {
+      if (fe.axis !== re.axis) continue
+      const diff = fe.val - re.val
+      if (Math.abs(diff) >= SNAP) continue
+      if (fe.hi < re.lo || fe.lo > re.hi) continue
+      if (fe.axis === 'x') return { dx: 0, dy: -diff, line: { x1: fe.ref.x1, y1: fe.ref.y1, x2: fe.ref.x1, y2: fe.ref.y1 - diff } }
+      return { dx: -diff, dy: 0, line: { x1: fe.ref.x1, y1: fe.ref.y1, x2: fe.ref.x1 - diff, y2: fe.ref.y1 } }
+    }
+  }
+  return { dx: 0, dy: 0, line: null }
+}
+
 const parseGeom = (g) => { try { const a = JSON.parse(g || '[]'); return Array.isArray(a) ? a : [] } catch { return [] } }
 
 const buildRoom = (r) => {
@@ -125,7 +206,10 @@ const buildRoom = (r) => {
 const roomsLocal = ref([])
 watch(() => props.rooms, (rooms) => { roomsLocal.value = (rooms || []).map(buildRoom) }, { immediate: true, deep: true })
 
-const placedFurnitures = computed(() => props.furnitures.filter((f) => f.x != null && f.y != null && f.w != null && f.h != null))
+// 副本隔离:拖拽改副本,原数据保留旧值供撤销记录
+const placedFurnitures = computed(() => props.furnitures
+  .filter((f) => f.x != null && f.y != null && f.w != null && f.h != null)
+  .map((f) => ({ ...f })))
 
 const furnitureById = computed(() => { const m = {}; props.furnitures.forEach((f) => { m[f.id] = f }); return m })
 const roomById = computed(() => { const m = {}; roomsLocal.value.forEach((r) => { m[r.id] = r }); return m })
@@ -161,6 +245,28 @@ const visibleItems = computed(() => {
 })
 
 const pts = (poly) => poly.map((p) => `${p.x},${p.y}`).join(' ')
+
+// 多边形面积(shoelace,像素²)
+const polyArea = (poly) => {
+  let s = 0
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]; const b = poly[(i + 1) % poly.length]
+    s += a.x * b.y - b.x * a.y
+  }
+  return Math.abs(s) / 2
+}
+
+// 米数格式化(像素→米,保留 2 位)
+const fmtM = (px) => {
+  const m = px / (props.scale || 100)
+  return m >= 100 ? m.toFixed(0) : m.toFixed(2)
+}
+
+// 边 i 的长度(米)
+const edgeLenM = (r, i) => {
+  const a = r.poly[i]; const b = r.poly[(i + 1) % r.poly.length]
+  return fmtM(Math.hypot(b.x - a.x, b.y - a.y))
+}
 
 const toCanvas = (e) => {
   const rect = svgRef.value.getBoundingClientRect()
@@ -210,7 +316,20 @@ const onPointerMove = (e) => {
   if (d.type === 'pan') {
     view.value.tx += e.movementX; view.value.ty += e.movementY
   } else if (d.type === 'room-body') {
-    const dx = p.x - d.startX; const dy = p.y - d.startY
+    let dx = p.x - d.startX; let dy = p.y - d.startY
+    const rawDx = dx; const rawDy = dy
+    const others = otherRoomVertices(d.room.id)
+    snapLine.value = null
+    if (others.length) {
+      for (const pt of d.orig) {
+        const t = snapPoint({ x: pt.x + dx, y: pt.y + dy }, others)
+        if (t) {
+          snapLine.value = { x1: pt.x + rawDx, y1: pt.y + rawDy, x2: t.x, y2: t.y }
+          dx += t.x - (pt.x + dx); dy += t.y - (pt.y + dy)
+          break
+        }
+      }
+    }
     d.room.poly = d.orig.map((pt) => ({ x: pt.x + dx, y: pt.y + dy }))
     rebuildRoomMeta(d.room)
   } else if (d.type === 'room-vertex') {
@@ -221,17 +340,38 @@ const onPointerMove = (e) => {
     const next = poly[(i + 1) % n]
     const snapped = snapVertex(prev, next, p.x, p.y)
     d.snapped = snapped.snapped
-    poly[i] = { x: snapped.x, y: snapped.y }
+    let vx = snapped.x; let vy = snapped.y
+    snapLine.value = null
+    const others = otherRoomVertices(d.room.id)
+    const t = others.length ? snapPoint({ x: vx, y: vy }, others) : null
+    if (t) { snapLine.value = { x1: vx, y1: vy, x2: t.x, y2: t.y }; vx = t.x; vy = t.y }
+    poly[i] = { x: vx, y: vy }
     rebuildRoomMeta(d.room)
   } else if (d.type === 'room-edge') {
-    const dx = p.x - d.startX
-    const dy = p.y - d.startY
+    let dx = p.x - d.startX
+    let dy = p.y - d.startY
+    const rawDx = dx; const rawDy = dy
+    const others = otherRoomVertices(d.room.id)
+    snapLine.value = null
+    if (others.length) {
+      for (const pt of d.orig) {
+        const t = snapPoint({ x: pt.x + dx, y: pt.y + dy }, others)
+        if (t) {
+          snapLine.value = { x1: pt.x + rawDx, y1: pt.y + rawDy, x2: t.x, y2: t.y }
+          dx += t.x - (pt.x + dx); dy += t.y - (pt.y + dy)
+          break
+        }
+      }
+    }
     d.room.poly[d.aIdx] = { x: d.orig[0].x + dx, y: d.orig[0].y + dy }
     d.room.poly[d.bIdx] = { x: d.orig[1].x + dx, y: d.orig[1].y + dy }
     rebuildRoomMeta(d.room)
   } else if (d.type === 'furn-move') {
-    const dx = p.x - d.startX; const dy = p.y - d.startY
-    d.f.x = d.orig.x + dx; d.f.y = d.orig.y + dy
+    let dx = p.x - d.startX; let dy = p.y - d.startY
+    const snap = snapFurniture({ x: d.orig.x + dx, y: d.orig.y + dy, w: d.f.w, h: d.f.h }, d.f.id)
+    snapLine.value = snap.line
+    d.f.x = d.orig.x + dx + snap.dx
+    d.f.y = d.orig.y + dy + snap.dy
   } else if (d.type === 'furn-resize') {
     d.f.w = Math.max(20, p.x - d.f.x); d.f.h = Math.max(20, p.y - d.f.y)
   } else if (d.type === 'item-move') {
@@ -265,7 +405,7 @@ const onPointerUp = () => {
   } else if (d.type === 'furn-move' || d.type === 'furn-resize') {
     emit('save-furniture', d.f.id, { x: d.f.x, y: d.f.y, w: d.f.w, h: d.f.h })
   } else if (d.type === 'item-move') {
-    emit('save-item', d.item.id, { relX: d.item.relX, relY: d.item.relY })
+    emit('save-item', d.item.id, { relX: d.item.relX, relY: d.item.relY }, d.prevRel)
   } else if (d.type === 'draw-rect') {
     const r = drawing.value.rect
     if (r && r.w > 10 && r.h > 10) {
@@ -274,6 +414,7 @@ const onPointerUp = () => {
     drawing.value.rect = null
   }
   drag.value = null
+  snapLine.value = null
   detach()
 }
 
@@ -331,6 +472,7 @@ const onCanvasClick = () => {
 // ---- 房间 ----
 const onRoomDown = (e, r) => {
   if (hoverEdge.value && hoverEdge.value.room === r) return
+  if (props.tool === 'calibrate') { handleCalibrateClick(e); return }
   if (props.tool === 'draw-rect') { startDrawRect(e); return }
   if (props.tool === 'draw-poly') { drawPolyPoint(e); return }
   beginDrag(e, { type: 'room-body', room: r, orig: r.poly.map((p) => ({ ...p })), startX: toCanvas(e).x, startY: toCanvas(e).y })
@@ -356,6 +498,7 @@ const removeVertex = (r, i) => {
 
 // ---- 家具 ----
 const onFurnDown = (e, f) => {
+  if (props.tool === 'calibrate') { handleCalibrateClick(e); return }
   if (props.tool !== 'select') return
   beginDrag(e, { type: 'furn-move', f, orig: { x: f.x, y: f.y }, startX: toCanvas(e).x, startY: toCanvas(e).y })
 }
@@ -364,7 +507,7 @@ const onFurnResizeDown = (e, f) => { beginDrag(e, { type: 'furn-resize', f }) }
 // ---- 物品 ----
 const onItemDown = (e, it) => {
   const orig = props.items.find((x) => x.id === it.id)
-  if (orig) beginDrag(e, { type: 'item-move', item: orig })
+  if (orig) beginDrag(e, { type: 'item-move', item: orig, prevRel: { relX: orig.relX, relY: orig.relY } })
 }
 
 // ---- 画房间 ----
@@ -391,9 +534,22 @@ const finishPoly = () => {
   detach()
 }
 
+// ---- 底图标定(两点测距) ----
+const handleCalibrateClick = (e) => {
+  const p = toCanvas(e)
+  calibPoints.value.push({ x: p.x, y: p.y })
+  if (calibPoints.value.length === 2) {
+    const [a, b] = calibPoints.value
+    emit('calibrate', Math.hypot(b.x - a.x, b.y - a.y))
+    calibPoints.value = []
+  }
+  e.preventDefault()
+}
+
 const onSvgDown = (e) => {
   if (e.target !== e.currentTarget) return
   if (props.mode !== 'edit') { beginDrag(e, { type: 'pan' }); return }
+  if (props.tool === 'calibrate') { handleCalibrateClick(e); return }
   if (props.tool === 'draw-rect') { startDrawRect(e); return }
   if (props.tool === 'draw-poly') { drawPolyPoint(e); return }
   beginDrag(e, { type: 'pan' })
@@ -414,6 +570,8 @@ defineExpose({ finishPoly, fit })
 .fp-room { fill: rgba(184, 140, 110, 0.14); stroke: rgba(184, 140, 110, 0.65); stroke-width: 2; }
 .fp-room.is-hit { fill: rgba(184, 140, 110, 0.28); }
 .fp-room-label { font-size: 13px; fill: #5c4c3d; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.fp-room-area { font-size: 11px; fill: #a89a8a; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.fp-dim { font-size: 10px; fill: #6b9b6b; text-anchor: middle; pointer-events: none; }
 .fp-furn { fill: rgba(120, 100, 80, 0.18); stroke: #8a6f55; stroke-width: 1.5; }
 .fp-furn-label { font-size: 11px; fill: #6b5435; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
 .fp-resize { fill: #fff; stroke: #b88c6e; stroke-width: 1.5; cursor: nwse-resize; }
@@ -424,5 +582,8 @@ defineExpose({ finishPoly, fit })
 .fp-edge-handle { fill: #fff; stroke: #b88c6e; stroke-width: 1.5; cursor: pointer; }
 .fp-hover-ring { fill: rgba(255, 255, 255, 0.9); stroke: #b88c6e; stroke-width: 2; }
 .fp-hover-plus { stroke: #b88c6e; stroke-width: 2; stroke-linecap: round; }
+.fp-snap-line { stroke: #6b9b6b; stroke-width: 1.5; stroke-dasharray: 5 4; }
+.fp-calib-dot { fill: #e0a030; stroke: #fff; stroke-width: 2; }
+.fp-calib-line { stroke: #e0a030; stroke-width: 1.5; stroke-dasharray: 5 4; }
 .fp-drawing { fill: rgba(184, 140, 110, 0.12); stroke: #b88c6e; stroke-width: 2; stroke-dasharray: 6 4; }
 </style>
