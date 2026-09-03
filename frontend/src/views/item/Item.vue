@@ -36,10 +36,16 @@
               <div class="fp-tool-hint">{{ $t('item.drawHint') }}</div>
               <el-button :type="tool === 'draw-rect' ? 'primary' : ''" class="fp-tool-btn" @click="tool = tool === 'draw-rect' ? 'select' : 'draw-rect'">{{ $t('item.drawRoomRect') }}</el-button>
               <el-button :type="tool === 'draw-poly' ? 'primary' : ''" class="fp-tool-btn" @click="togglePoly">{{ $t('item.drawRoomPoly') }}</el-button>
-              <el-upload :show-file-list="false" :before-upload="uploadFloorPlan" accept="image/*" class="fp-upload">
+              <el-upload :show-file-list="false" :before-upload="uploadFloorPlan" accept="image/*,.pdf" class="fp-upload">
                 <el-button class="fp-tool-btn">{{ $t('item.uploadFloorPlan') }}</el-button>
               </el-upload>
-              <el-button :type="tool === 'calibrate' ? 'primary' : ''" class="fp-tool-btn" @click="tool = tool === 'calibrate' ? 'select' : 'calibrate'">{{ $t('item.calibrate') }}</el-button>
+              <el-tooltip :content="$t('item.calibrateTip')" placement="right" :show-after="300">
+                <el-button :type="tool === 'calibrate' ? 'primary' : ''" class="fp-tool-btn" @click="tool = tool === 'calibrate' ? 'select' : 'calibrate'">{{ $t('item.calibrate') }}</el-button>
+              </el-tooltip>
+              <div v-if="floorPlan.imageUrl" class="fp-opacity-row">
+                <span class="fp-opacity-label">{{ $t('item.floorPlanOpacity') }}</span>
+                <el-slider v-model="floorPlanOpacity" :min="0.1" :max="1" :step="0.05" size="small" @change="saveOpacity" />
+              </div>
               <!-- 已有房间列表 -->
               <template v-if="floorPlan.rooms.length">
                 <div class="fp-side-head">{{ $t('item.rooms') }}</div>
@@ -51,6 +57,13 @@
             </template>
             <!-- 家具 tab -->
             <template v-else-if="sidebarTab === 'furnitures'">
+              <div class="fp-side-head">{{ $t('item.furnPresets') }}</div>
+              <div class="fp-presets">
+                <div v-for="p in furnPresets" :key="p.type" class="fp-preset" draggable="true" @dragstart="onPresetDragStart($event, p)">
+                  <span class="fp-preset-shape" :style="{ width: p.pw + 'px', height: p.ph + 'px' }"></span>
+                  <span class="fp-preset-name">{{ p.type }}</span>
+                </div>
+              </div>
               <div v-for="f in floorFurnitures" :key="f.id" class="fp-side-row">
                 <span class="fp-side-name">{{ f.name }}</span>
                 <el-button v-if="f.x == null" size="small" type="primary" @click="placeFurniture(f)">{{ $t('item.place') }}</el-button>
@@ -81,6 +94,7 @@
           :furnitures="floorPlan.furnitures"
           :items="floorPlan.items"
           :image-url="floorPlan.imageUrl"
+          :opacity="floorPlanOpacity"
           :highlight-item-ids="highlightItemIds"
           :selected-furniture-id="selectedFurnitureId"
           :scale="floorPlan.scale || 100"
@@ -88,12 +102,15 @@
           @save-furniture="onSaveFurnitureGeometry"
           @save-item="onSaveItemPlace"
           @create-room="onCreateRoom"
+          @create-furniture="onCreateFurniture"
           @select-furniture="onSelectFurniture"
           @calibrate="onCalibrate"
           @edit-edge="onEditEdge"
           @duplicate-room="onDuplicateRoom"
           @delete-room="(id) => removeRoom({ id })"
           @delete-furniture="(id) => removeFurniture({ id })"
+          @rename-room="onRenameRoom"
+          @rename-furniture="onRenameFurniture"
         />
 
         <!-- 空楼层引导(有房子但当前楼层无房间) -->
@@ -332,6 +349,17 @@ import FloorPlanCanvas from './FloorPlanCanvas.vue'
 const { t } = useI18n()
 const itemTypes = ['KITCHENWARE', 'INGREDIENT', 'DAILY', 'CLOTHES', 'TOOL', 'OTHER']
 const furnitureTypes = ['衣柜', '床', '冰箱', '书桌', '沙发', '茶几', '柜子', '餐桌', '书架', '其他']
+// 预设家具(画布 px,默认 100px/m):拖入画布自动关联房间、按类型序号命名
+const furnPresets = [
+  { type: '衣柜', w: 120, h: 60 },
+  { type: '床', w: 150, h: 200 },
+  { type: '书桌', w: 120, h: 60 },
+  { type: '餐桌', w: 140, h: 80 },
+  { type: '沙发', w: 180, h: 90 },
+  { type: '茶几', w: 90, h: 50 },
+  { type: '冰箱', w: 70, h: 70 },
+  { type: '柜子', w: 80, h: 40 },
+]
 
 // ---- 户型图状态 ----
 const listMode = ref(false)
@@ -381,9 +409,28 @@ const floors = computed(() => {
   if (house && house.floorPlans) {
     try { Object.keys(JSON.parse(house.floorPlans)).forEach((k) => set.add(Number(k))) } catch {}
   }
-  if (!set.size) set.add(currentFloor.value)
+  set.add(currentFloor.value) // 当前层常驻:点 + 新开的空层切走后不消失
   return [...set].sort((a, b) => a - b)
 })
+
+// 底图不透明度(楼层配置内,前端自行解析)
+const floorPlanOpacity = ref(1)
+watch([() => houses.value, currentHouseId, currentFloor], () => {
+  const h = houses.value.find((x) => x.id === currentHouseId.value)
+  let v = 1
+  if (h && h.floorPlans) {
+    try { v = JSON.parse(h.floorPlans)[currentFloor.value]?.opacity ?? 1 } catch {}
+  }
+  floorPlanOpacity.value = v
+}, { immediate: true })
+const saveOpacity = async (val) => {
+  const house = houses.value.find((h) => h.id === currentHouseId.value)
+  let floorPlans = {}
+  if (house && house.floorPlans) { try { floorPlans = JSON.parse(house.floorPlans) } catch {} }
+  const cur = floorPlans[currentFloor.value] || {}
+  floorPlans[currentFloor.value] = { ...cur, opacity: val }
+  await itemApi.saveFloorPlans(currentHouseId.value, JSON.stringify(floorPlans))
+}
 
 // ---- 数据加载 ----
 const loadHouses = async () => {
@@ -412,9 +459,27 @@ const loadFloorPlan = async () => {
   floorPlan.value = await itemApi.floorPlan(currentHouseId.value, currentFloor.value)
 }
 const onHouseChange = () => { currentFloor.value = 1; loadFloorPlan() }
+// PDF 底图:渲染第一页为 PNG 再上传(SVG image 不支持 PDF)
+const pdfToImage = async (file) => {
+  const pdfjs = await import('pdfjs-dist')
+  const workerUrl = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default
+  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
+  const buf = await file.arrayBuffer()
+  const pdf = await pdfjs.getDocument({ data: buf }).promise
+  const page = await pdf.getPage(1)
+  const viewport = page.getViewport({ scale: 2 })
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.min(viewport.width, 4000)
+  canvas.height = Math.round(viewport.height * (canvas.width / viewport.width))
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise
+  return new Promise((resolve) => canvas.toBlob((b) => {
+    resolve(new File([b], 'floor-plan.png', { type: 'image/png' }))
+  }, 'image/png'))
+}
 const uploadFloorPlan = async (file) => {
   try {
-    const data = await fileApi.upload(file)
+    const img = file.type === 'application/pdf' ? await pdfToImage(file) : file
+    const data = await fileApi.upload(img)
     const house = houses.value.find((h) => h.id === currentHouseId.value)
     let floorPlans = {}
     if (house && house.floorPlans) { try { floorPlans = JSON.parse(house.floorPlans) } catch {} }
@@ -424,7 +489,7 @@ const uploadFloorPlan = async (file) => {
     ElMessage.success(t('common.success'))
     loadHouses()
     loadFloorPlan()
-  } catch (e) {}
+  } catch (e) { console.error(e) }
   return false
 }
 const onCalibrate = async (pxDist) => {
@@ -545,6 +610,49 @@ const placeFurniture = async (f) => {
 const moveFurnitureToRoom = (f) => {
   furForm.value = { id: f.id, roomId: null, name: f.name, type: f.type, note: f.note }
   furDlg.value = true
+}
+
+// ---- 预设家具拖入 ----
+const onPresetDragStart = (e, p) => {
+  e.dataTransfer.setData('text/furn-type', p.type)
+  e.dataTransfer.effectAllowed = 'copy'
+}
+const onCreateFurniture = async ({ type, roomId, x, y }) => {
+  if (!roomId) { ElMessage.warning(t('item.dropInRoomFirst')); return }
+  const preset = furnPresets.find((p) => p.type === type)
+  const w = preset ? preset.w : 100
+  const h = preset ? preset.h : 100
+  const seq = furnitures.value.filter((f) => f.type === type).length + 1
+  await itemApi.addFurniture({ roomId, name: `${type}${seq}`, type, x: x - w / 2, y: y - h / 2, w, h })
+  ElMessage.success(t('common.success'))
+  loadRooms()
+  loadFloorPlan()
+}
+
+// ---- 双击名称改名 ----
+const onRenameRoom = async (id) => {
+  const room = floorPlan.value.rooms.find((r) => r.id === id)
+  if (!room) return
+  try {
+    const { value } = await ElMessageBox.prompt(t('item.renamePrompt'), t('item.editRoom'), { inputValue: room.name, closeOnClickModal: true })
+    if (!value || value === room.name) return
+    await itemApi.updateRoom(id, { name: value, floor: room.floor, note: room.note })
+    ElMessage.success(t('common.success'))
+    loadRooms()
+    loadFloorPlan()
+  } catch (e) {}
+}
+const onRenameFurniture = async (id) => {
+  const f = floorPlan.value.furnitures.find((x) => x.id === id)
+  if (!f) return
+  try {
+    const { value } = await ElMessageBox.prompt(t('item.renamePrompt'), t('item.editFurniture'), { inputValue: f.name, closeOnClickModal: true })
+    if (!value || value === f.name) return
+    await itemApi.updateFurniture(id, { roomId: f.roomId, name: value, type: f.type, note: f.note, x: f.x, y: f.y, w: f.w, h: f.h })
+    ElMessage.success(t('common.success'))
+    loadRooms()
+    loadFloorPlan()
+  } catch (e) {}
 }
 
 // ---- 搜索 ----
@@ -690,7 +798,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <style scoped>
-.fp-page { display: flex; flex-direction: column; height: calc(100vh - 80px); }
+.fp-page { display: flex; flex-direction: column; max-width: none; width: 100%; height: calc(100vh - 110px); }
 .fp-topbar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; }
 .fp-house { width: 180px; }
 .fp-search { width: 320px; }
@@ -713,6 +821,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fp-upload :deep(.el-upload) { width: 100%; }
 .fp-upload :deep(.el-upload) .fp-tool-btn { margin-bottom: 0; }
 .fp-side-head { font-size: 12px; color: #a89a8a; margin: 14px 0 4px; }
+.fp-presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 8px 0 12px; }
+.fp-preset { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 2px 6px; border: 1px dashed #d8c9b8; border-radius: 8px; cursor: grab; background: #fffdf8; }
+.fp-preset:hover { border-color: #b88c6e; background: rgba(184, 140, 110, 0.08); }
+.fp-preset:active { cursor: grabbing; }
+.fp-preset-shape { background: rgba(138, 111, 85, 0.35); border: 1px solid #8a6f55; border-radius: 2px; }
+.fp-preset-name { font-size: 11px; color: #5c4c3d; }
+.fp-opacity-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.fp-opacity-label { font-size: 12px; color: #a89a8a; white-space: nowrap; }
+.fp-opacity-row :deep(.el-slider) { flex: 1; }
 .fp-side-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 0; border-bottom: 1px dashed #eee5d8; }
 .fp-side-name { font-size: 13px; color: #5c4c3d; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fp-side-row :deep(.el-button + .el-button) { margin-left: 4px; }

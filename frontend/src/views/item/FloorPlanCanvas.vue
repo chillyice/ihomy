@@ -1,6 +1,6 @@
 <template>
   <div class="fp-canvas" ref="wrapRef">
-    <svg ref="svgRef" class="fp-svg" @wheel.prevent="onWheel" @pointerdown="onSvgDown" @pointerdown.capture="onPointerDownCapture" @pointermove="onHoverMove" @pointerup="onSvgPointerEnd" @pointercancel="onSvgPointerEnd" @click="onCanvasClick" @dblclick="onSvgDblClick">
+    <svg ref="svgRef" class="fp-svg" @wheel.prevent="onWheel" @pointerdown="onSvgDown" @pointerdown.capture="onPointerDownCapture" @pointermove="onHoverMove" @pointerup="onSvgPointerEnd" @pointercancel="onSvgPointerEnd" @click="onCanvasClick" @dblclick="onSvgDblClick" @dragover.prevent @drop="onDrop">
       <defs>
         <filter id="fp-rough" x="-5%" y="-5%" width="110%" height="110%">
           <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" result="n" />
@@ -8,7 +8,7 @@
         </filter>
       </defs>
       <g :transform="`translate(${view.tx},${view.ty}) scale(${view.k})`">
-        <image v-if="imageUrl" :href="imageUrl" x="0" y="0" class="fp-bg" />
+        <image v-if="imageUrl" :href="imageUrl" x="0" y="0" class="fp-bg" :opacity="opacity" />
         <!-- 房间 -->
         <g v-for="r in roomsLocal" :key="r.id">
           <polygon
@@ -21,7 +21,7 @@
             @contextmenu.prevent="mode === 'edit' ? $emit('delete-room', r.id) : null"
           />
           <g v-if="r.name">
-            <text :x="r.cx" :y="r.cy - 6" class="fp-room-label">{{ r.name }}</text>
+            <text :x="r.cx" :y="r.cy - 6" class="fp-room-label fp-editable" @dblclick.stop="$emit('rename-room', r.id)">{{ r.name }}</text>
             <text :x="r.cx" :y="r.cy + 10" class="fp-room-area">{{ (polyArea(r.poly) / Math.pow(props.scale || 100, 2)).toFixed(2) }} m²</text>
           </g>
         </g>
@@ -35,7 +35,7 @@
             @dblclick="mode === 'view' ? $emit('select-furniture', f.id) : null"
             @contextmenu.prevent="mode === 'edit' ? $emit('delete-furniture', f.id) : null"
           />
-          <text v-if="f.w > 40 && f.h > 18" :x="f.x + f.w / 2" :y="f.y + f.h / 2" class="fp-furn-label">{{ f.name }}</text>
+          <text v-if="f.w > 40 && f.h > 18" :x="f.x + f.w / 2" :y="f.y + f.h / 2" class="fp-furn-label fp-editable" @dblclick.stop="$emit('rename-furniture', f.id)">{{ f.name }}</text>
           <template v-if="mode === 'edit'">
             <circle v-for="a in furnCorners" :key="'fc' + a" class="fp-handle" r="5"
                     :cx="furnHandlePos(f, a)[0]" :cy="furnHandlePos(f, a)[1]"
@@ -102,12 +102,13 @@ const props = defineProps({
   furnitures: { type: Array, default: () => [] },
   items: { type: Array, default: () => [] },
   imageUrl: { type: String, default: null },
+  opacity: { type: Number, default: 1 },
   highlightItemIds: { type: Array, default: () => [] },
   selectedFurnitureId: { type: Number, default: null },
   tool: { type: String, default: 'select' },
   scale: { type: Number, default: 100 },
 })
-const emit = defineEmits(['save-room', 'save-furniture', 'save-item', 'create-room', 'select-furniture', 'calibrate', 'edit-edge', 'duplicate-room', 'delete-room', 'delete-furniture'])
+const emit = defineEmits(['save-room', 'save-furniture', 'save-item', 'create-room', 'create-furniture', 'select-furniture', 'calibrate', 'edit-edge', 'duplicate-room', 'delete-room', 'delete-furniture', 'rename-room', 'rename-furniture'])
 
 const wrapRef = ref(null)
 const svgRef = ref(null)
@@ -721,6 +722,16 @@ const finishPoly = () => {
   detach()
 }
 
+// ---- 侧栏预设家具拖入(drop) ----
+const onDrop = (e) => {
+  const type = e.dataTransfer.getData('text/furn-type')
+  if (!type) return
+  e.preventDefault()
+  const p = toCanvas(e)
+  const room = roomsLocal.value.find((r) => r.poly.length >= 3 && pointInPoly(p, r.poly))
+  emit('create-furniture', { type, roomId: room ? room.id : null, x: p.x, y: p.y })
+}
+
 // ---- 底图标定(两点测距) ----
 const handleCalibrateClick = (e) => {
   const p = toCanvas(e)
@@ -791,7 +802,8 @@ defineExpose({ finishPoly, fit })
 .fp-canvas { position: relative; width: 100%; height: 100%; overflow: hidden; background: #f6efe4; }
 .fp-svg { width: 100%; height: 100%; display: block; cursor: grab; }
 .fp-svg:active { cursor: grabbing; }
-.fp-bg { opacity: 0.85; }
+.fp-bg { pointer-events: none; } /* 底图纯背景,不挡画布交互 */
+.fp-editable { pointer-events: auto; cursor: text; }
 .fp-room { fill: rgba(184, 140, 110, 0.14); stroke: rgba(184, 140, 110, 0.65); stroke-width: 2; }
 .fp-room.is-hit { fill: rgba(184, 140, 110, 0.28); }
 .fp-room.is-overlap { stroke: #b04a3a; stroke-width: 2.5; fill: rgba(185, 96, 88, 0.16); }
