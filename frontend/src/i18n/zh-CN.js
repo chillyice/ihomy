@@ -1127,6 +1127,11 @@ export default {
     nothingToUndo: '没有可撤销的操作',
     emptyFloorRoomsTitle: '这一层还没有房间',
     emptyFloorRoomsText: '画下第一个房间,开始你的户型图',
+    furnPresets: '家具预设(拖入画布)',
+    dropInRoomFirst: '请拖到房间里',
+    renamePrompt: '输入新名称',
+    calibrateTip: '在底图上点两个点(如已知长度的墙),输入两点间真实距离(米),自动换算画布比例尺,面积与边长更准确',
+    floorPlanOpacity: '底图不透明度',
     deleteRoomMoveLib: '删除该房间？房间里的家具会移入家具库',
   },
   notify: {

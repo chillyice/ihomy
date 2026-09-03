@@ -1110,6 +1110,11 @@ export default {
     nothingToUndo: 'Nothing to undo',
     emptyFloorRoomsTitle: 'No rooms on this floor yet',
     emptyFloorRoomsText: 'Draw your first room to start the floor plan',
+    furnPresets: 'Furniture presets (drag in)',
+    dropInRoomFirst: 'Drop inside a room',
+    renamePrompt: 'Enter a new name',
+    calibrateTip: 'Click two points on the floor plan (e.g. a wall of known length), enter the real distance in meters to calibrate the scale — areas and edge lengths become accurate',
+    floorPlanOpacity: 'Floor plan opacity',
     deleteRoomMoveLib: 'Delete this room? Its furniture will move to the library',
   },
   notify: {
