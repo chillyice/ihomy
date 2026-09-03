@@ -86,6 +86,13 @@
           @duplicate-room="onDuplicateRoom"
         />
 
+        <!-- 空楼层引导(有房子但当前楼层无房间) -->
+        <div v-if="!floorPlan.rooms.length && mode !== 'edit'" class="fp-guide" @click="toggleEdit">
+          <div class="fp-guide-title">{{ $t('item.emptyFloorRoomsTitle') }}</div>
+          <div class="fp-guide-text">{{ $t('item.emptyFloorRoomsText') }}</div>
+          <el-button type="primary" size="small">{{ $t('item.editFloorPlan') }}</el-button>
+        </div>
+
         <!-- 楼层切换器(左下角) -->
         <div v-if="floors.length > 1" class="fp-floors">
           <div v-for="f in floors" :key="f" :class="['fp-floor', { on: f === currentFloor }]" @click="switchFloor(f)">
@@ -479,9 +486,10 @@ const onSaveRoomGeometry = async (id, geometry) => {
   lastRoomGeom[id] = geometry
   await itemApi.saveRoomGeometry(id, geometry)
 }
-const onSaveFurnitureGeometry = async (id, data) => {
+const onSaveFurnitureGeometry = async (id, data, prev) => {
   const f = floorPlan.value.furnitures.find((x) => x.id === id)
-  if (f) pushUndo({ type: 'furn', id, data: { x: f.x, y: f.y, w: f.w, h: f.h } })
+  const p = prev || (f ? { x: f.x, y: f.y, w: f.w, h: f.h } : null)
+  if (p) pushUndo({ type: 'furn', id, data: p })
   await itemApi.saveFurnitureGeometry(id, data)
 }
 const onSaveItemPlace = async (id, data, prev) => {
@@ -500,6 +508,7 @@ const onSelectFurniture = (id) => { selectedFurnitureId.value = selectedFurnitur
 const onCreateRoom = (geometry) => {
   roomForm.value = { houseId: currentHouseId.value, name: '', floor: currentFloor.value, note: '', _geometry: geometry }
   roomDlg.value = true
+  tool.value = 'select'
 }
 const placeFurniture = async (f) => {
   let roomId = f.roomId
@@ -508,7 +517,11 @@ const placeFurniture = async (f) => {
     if (!room) { ElMessage.warning(t('item.drawRoomFirst')); return }
     roomId = room.id
   }
-  await itemApi.updateFurniture(f.id, { roomId, name: f.name, type: f.type, note: f.note, x: 200, y: 200, w: 200, h: 100 })
+  // 已摆放数递增错开,避免多件家具叠在同一点
+  const placed = floorPlan.value.furnitures.filter((x) => x.x != null).length
+  const x = 200 + (placed % 5) * 50
+  const y = 200 + Math.floor(placed / 5) * 50
+  await itemApi.updateFurniture(f.id, { roomId, name: f.name, type: f.type, note: f.note, x, y, w: 200, h: 100 })
   loadRooms()
   loadFloorPlan()
 }
@@ -666,6 +679,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fp-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; color: #5c4c3d; }
 .fp-empty-plus { width: 96px; height: 96px; border: 2px dashed #b88c6e; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 48px; color: #b88c6e; }
 .fp-empty-text { margin-top: 16px; font-size: 15px; color: #8a7a6a; }
+.fp-guide { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); text-align: center; cursor: pointer; z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.fp-guide-title { font-size: 16px; font-weight: 600; color: #5c4c3d; }
+.fp-guide-text { font-size: 13px; color: #a89a8a; }
 .fp-sidebar { width: 220px; border-right: 1px solid #eee5d8; background: #faf5ec; display: flex; flex-direction: column; }
 .fp-side-tabs { display: flex; border-bottom: 1px solid #eee5d8; }
 .fp-side-tab { flex: 1; text-align: center; padding: 10px 0; cursor: pointer; font-size: 13px; color: #8a7a6a; }

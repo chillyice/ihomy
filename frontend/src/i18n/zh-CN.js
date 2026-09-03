@@ -1125,6 +1125,8 @@ export default {
     edgeLenPrompt: '输入边长（米，保持边方向）',
     duplicateSuffix: ' 副本',
     nothingToUndo: '没有可撤销的操作',
+    emptyFloorRoomsTitle: '这一层还没有房间',
+    emptyFloorRoomsText: '画下第一个房间,开始你的户型图',
     deleteRoomMoveLib: '删除该房间？房间里的家具会移入家具库',
   },
   notify: {

@@ -1108,6 +1108,8 @@ export default {
     edgeLenPrompt: 'Enter edge length (meters, direction preserved)',
     duplicateSuffix: ' copy',
     nothingToUndo: 'Nothing to undo',
+    emptyFloorRoomsTitle: 'No rooms on this floor yet',
+    emptyFloorRoomsText: 'Draw your first room to start the floor plan',
     deleteRoomMoveLib: 'Delete this room? Its furniture will move to the library',
   },
   notify: {
