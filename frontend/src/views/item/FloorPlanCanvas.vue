@@ -20,7 +20,7 @@
             @contextmenu.prevent="mode === 'edit' ? $emit('delete-room', r.id) : null"
           />
           <g v-if="r.name">
-            <text :x="r.cx" :y="r.cy - 6" class="fp-room-label fp-editable" @dblclick.stop="$emit('rename-room', r.id)">{{ r.name }}</text>
+            <text :x="r.cx" :y="r.cy - 6" class="fp-room-label fp-editable" @click.stop="mode === 'edit' && tool === 'select' && $emit('rename-room', r.id)">{{ r.name }}</text>
             <text :x="r.cx" :y="r.cy + 10" class="fp-room-area">{{ (polyArea(r.poly) / Math.pow(props.scale || 100, 2)).toFixed(2) }} m²</text>
           </g>
         </g>
@@ -34,14 +34,14 @@
             @dblclick="mode === 'view' ? $emit('select-furniture', f.id) : null"
             @contextmenu.prevent="mode === 'edit' ? $emit('delete-furniture', f.id) : null"
           />
-          <text v-if="f.w > 40 && f.h > 18" :x="f.x + f.w / 2" :y="f.y + f.h / 2" class="fp-furn-label fp-editable" @dblclick.stop="$emit('rename-furniture', f.id)">{{ f.name }}</text>
+          <text v-if="f.w > 40 && f.h > 18" :x="f.x + f.w / 2" :y="f.y + f.h / 2" class="fp-furn-label fp-editable" @click.stop="mode === 'edit' && tool === 'select' && $emit('rename-furniture', f.id)">{{ f.name }}</text>
           <template v-if="mode === 'edit'">
-            <circle v-for="a in furnCorners" :key="'fc' + a" class="fp-handle" r="5"
+            <circle v-for="a in furnCorners" :key="'fc' + a" class="fp-handle" :r="5 / view.k" vector-effect="non-scaling-stroke"
                     :cx="furnHandlePos(f, a)[0]" :cy="furnHandlePos(f, a)[1]"
                     :style="{ cursor: (a === 'nw' || a === 'se') ? 'nwse-resize' : 'nesw-resize' }"
                     @pointerdown.stop="onFurnHandleDown($event, f, a)" />
-            <rect v-for="a in furnEdges" :key="'fe' + a" class="fp-edge-handle" width="9" height="9"
-                  :x="furnHandlePos(f, a)[0] - 4.5" :y="furnHandlePos(f, a)[1] - 4.5"
+            <rect v-for="a in furnEdges" :key="'fe' + a" class="fp-edge-handle" :width="9 / view.k" :height="9 / view.k" vector-effect="non-scaling-stroke"
+                  :x="furnHandlePos(f, a)[0] - 4.5 / view.k" :y="furnHandlePos(f, a)[1] - 4.5 / view.k"
                   :style="{ cursor: (a === 'n' || a === 's') ? 'ns-resize' : 'ew-resize' }"
                   @pointerdown.stop="onFurnHandleDown($event, f, a)" />
           </template>
@@ -56,38 +56,38 @@
           />
           <text :x="it.ax" :y="it.ay - 11" class="fp-item-label">{{ it.name }}</text>
         </g>
-        <!-- 编辑态手柄 -->
+        <!-- 编辑态手柄(画布内所有手柄/按钮均按 view.k 反缩放,屏幕尺寸恒定,不随画布缩放变化) -->
         <template v-if="mode === 'edit'">
           <g v-for="h in roomHandles" :key="'h' + h.r.id">
             <circle v-for="i in h.vertexIdxs" :key="'v' + i"
-                    :cx="h.r.poly[i].x" :cy="h.r.poly[i].y" r="6" class="fp-handle"
+                    :cx="h.r.poly[i].x" :cy="h.r.poly[i].y" :r="6 / view.k" class="fp-handle" vector-effect="non-scaling-stroke"
                     :class="{ 'is-snapped': isSnapping(h.r, i) }"
                     @pointerdown.stop="onVertexDown($event, h.r, i)"
                     @dblclick.stop="tool === 'select' && removeVertex(h.r, i)" />
             <rect v-for="i in h.midIdxs" :key="'m' + i"
-                  :x="h.r.mids[i].x - 5" :y="h.r.mids[i].y - 5" width="10" height="10" class="fp-edge-handle"
+                  :x="h.r.mids[i].x - 5 / view.k" :y="h.r.mids[i].y - 5 / view.k" :width="10 / view.k" :height="10 / view.k" class="fp-edge-handle" vector-effect="non-scaling-stroke"
                   @pointerdown.stop="onEdgeDown($event, h.r, i)"
                   @dblclick.stop="tool === 'select' && $emit('edit-edge', h.r.id, i)" />
-            <text v-for="(m, i) in h.r.mids" :key="'dim' + i" :x="m.x" :y="m.y - 9" class="fp-dim">{{ edgeLenM(h.r, i) }}</text>
+            <text v-for="(m, i) in h.r.mids" :key="'dim' + i" :x="m.x" :y="m.y - 9" :class="['fp-dim', { 'fp-dim-editable': tool === 'select' }]" @click.stop="tool === 'select' && $emit('edit-edge', h.r.id, i)">{{ edgeLenM(h.r, i) }}</text>
           </g>
-          <!-- hover 边加号 -->
-          <g v-if="hover && tool === 'select'" class="fp-hover-add">
-            <circle :cx="hover.point.x" :cy="hover.point.y" r="9" class="fp-hover-ring" />
-            <line :x1="hover.point.x - 4" :y1="hover.point.y" :x2="hover.point.x + 4" :y2="hover.point.y" class="fp-hover-plus" />
-            <line :x1="hover.point.x" :y1="hover.point.y - 4" :x2="hover.point.x" :y2="hover.point.y + 4" class="fp-hover-plus" />
+          <!-- hover 边加号(尺寸随 view.k 反缩放,保持屏幕恒定) -->
+          <g v-if="hover && tool === 'select'" class="fp-hover-add" :transform="`translate(${hover.point.x},${hover.point.y}) scale(${1 / view.k})`">
+            <circle cx="0" cy="0" r="9" class="fp-hover-ring" />
+            <line x1="-4" y1="0" x2="4" y2="0" class="fp-hover-plus" />
+            <line x1="0" y1="-4" x2="0" y2="4" class="fp-hover-plus" />
           </g>
-          <!-- 裁剪 hover:张开的剪刀 -->
-          <g v-if="tool === 'cut' && hover && !cutStart" class="fp-hover-tool" :transform="`translate(${hover.point.x},${hover.point.y})`">
+          <!-- 裁剪 hover:张开的剪刀(尺寸随 view.k 反缩放,保持屏幕恒定) -->
+          <g v-if="tool === 'cut' && hover && !cutStart" class="fp-hover-tool" :transform="`translate(${hover.point.x},${hover.point.y}) scale(${1 / view.k})`">
             <circle cx="-5" cy="7" r="3" /><circle cx="5" cy="7" r="3" />
             <line x1="-3.5" y1="4.5" x2="8" y2="-8" /><line x1="3.5" y1="4.5" x2="-8" y2="-8" />
           </g>
-          <!-- 裁剪终点 hover:闭合的剪刀(合法目标边/顶点) -->
-          <g v-if="tool === 'cut' && hover && cutStart && cutPreview && cutPreview.valid" class="fp-hover-tool ok" :transform="`translate(${hover.point.x},${hover.point.y})`">
+          <!-- 裁剪终点 hover:闭合的剪刀(合法目标边/顶点,尺寸随 view.k 反缩放) -->
+          <g v-if="tool === 'cut' && hover && cutStart && cutPreview && cutPreview.valid" class="fp-hover-tool ok" :transform="`translate(${hover.point.x},${hover.point.y}) scale(${1 / view.k})`">
             <circle cx="-4" cy="7" r="3" /><circle cx="4" cy="7" r="3" />
             <line x1="-2" y1="4.5" x2="3" y2="-8" /><line x1="2" y1="4.5" x2="-3" y2="-8" />
           </g>
-          <!-- 粘合 hover:满牙膏筒(共享边) -->
-          <g v-if="tool === 'glue' && glueHover" class="fp-hover-tool" :transform="`translate(${hover.point.x},${hover.point.y})`">
+          <!-- 粘合 hover:满牙膏筒(共享边,尺寸随 view.k 反缩放) -->
+          <g v-if="tool === 'glue' && glueHover" class="fp-hover-tool" :transform="`translate(${hover.point.x},${hover.point.y}) scale(${1 / view.k})`">
             <rect x="-4.5" y="-4" width="9" height="13" rx="3.5" /><rect x="-2.5" y="-9" width="5" height="4" rx="1.2" />
           </g>
           <!-- 裁剪/粘合虚线:合法绿 / 非法暗红 -->
@@ -125,7 +125,7 @@ const props = defineProps({
   tool: { type: String, default: 'select' },
   scale: { type: Number, default: 100 },
 })
-const emit = defineEmits(['save-room', 'save-furniture', 'save-item', 'create-room', 'create-furniture', 'select-furniture', 'calibrate', 'edit-edge', 'delete-room', 'delete-furniture', 'rename-room', 'rename-furniture', 'cut-room', 'glue-rooms'])
+const emit = defineEmits(['save-room', 'save-rooms', 'save-furniture', 'save-item', 'create-room', 'create-furniture', 'select-furniture', 'calibrate', 'edit-edge', 'delete-room', 'delete-furniture', 'rename-room', 'rename-furniture', 'cut-room', 'glue-rooms'])
 
 const wrapRef = ref(null)
 const svgRef = ref(null)
@@ -439,7 +439,7 @@ const onPointerMove = (e) => {
       else if (d.followMode.e2V) next.x += dx
       poly[i] = { x: nx, y: ny }
     } else if (ctrl) {
-      // Ctrl:纯自由拖点(无任何吸附),可拉出斜边
+      // Ctrl:纯自由拖点(无任何吸附、不联动重合顶点),可拉出斜边
       poly[i] = { x: p.x, y: p.y }
     } else {
       // 非直角:自由拖 + 轴对齐吸附辅助调直 + 磁吸
@@ -450,6 +450,14 @@ const onPointerMove = (e) => {
       const t = others.length ? snapPoint({ x: vx, y: vy }, others) : null
       if (t) { snapLine.value = { x1: vx, y1: vy, x2: t.x, y2: t.y }; vx = t.x; vy = t.y }
       poly[i] = { x: vx, y: vy }
+    }
+    // 共享墙角联动:与本顶点重合的其他房间顶点跟随,墙体保持相连(Ctrl=只动本房间)
+    if (d.links && d.links.length && !ctrl) {
+      for (const lk of d.links) {
+        lk.room.poly[lk.idx] = { ...poly[i] }
+        rebuildRoomMeta(lk.room)
+      }
+      d.linkedMoved = true
     }
     rebuildRoomMeta(d.room)
   } else if (d.type === 'room-edge') {
@@ -498,6 +506,14 @@ const onPointerMove = (e) => {
       d.room.poly[d.aIdx] = { x: oA.x + dx, y: oA.y + dy }
       d.room.poly[d.bIdx] = { x: oB.x + dx, y: oB.y + dy }
     }
+    // 共享墙角联动:边两端点与其他房间重合顶点跟随(Ctrl=只动本房间)
+    if (d.links && d.links.length && !(e.ctrlKey || e.metaKey)) {
+      for (const lk of d.links) {
+        lk.room.poly[lk.idx] = { ...(lk.end === 'a' ? d.room.poly[d.aIdx] : d.room.poly[d.bIdx]) }
+        rebuildRoomMeta(lk.room)
+      }
+      d.linkedMoved = true
+    }
     rebuildRoomMeta(d.room)
   } else if (d.type === 'furn-move') {
     let dx = p.x - d.startX; let dy = p.y - d.startY
@@ -541,7 +557,13 @@ const onPointerUp = (e) => {
   justDragged = true
   setTimeout(() => { justDragged = false }, 0)
   if (d.type === 'room-body' || d.type === 'room-vertex' || d.type === 'room-edge') {
-    emit('save-room', d.room.id, JSON.stringify(d.room.poly))
+    if (d.linkedMoved && d.links) {
+      // 联动拖拽:本房间+联动房间批量保存(单条撤销记录,一步整体回滚)
+      emit('save-rooms', [{ id: d.room.id, geometry: JSON.stringify(d.room.poly) }, ...d.links.map((lk) => ({ id: lk.room.id, geometry: JSON.stringify(lk.room.poly) }))])
+      d.links.forEach((lk) => rebuildRoomMeta(lk.room))
+    } else {
+      emit('save-room', d.room.id, JSON.stringify(d.room.poly))
+    }
     rebuildRoomMeta(d.room)
     if (d.type === 'room-body' && d.furnOrig) {
       // 级联平移的家具逐个保存(带 prev 供撤销)
@@ -797,6 +819,18 @@ const onRoomDown = (e, r) => {
   if (routeTool(e)) return
   beginDrag(e, { type: 'room-body', room: r, orig: r.poly.map((p) => ({ ...p })), startX: toCanvas(e).x, startY: toCanvas(e).y, furnOrig: {} })
 }
+// 与顶点 (room, idx) 重合的其他房间顶点(共享墙角联动:多房间顶点同位置时一起动,墙体保持相连)
+const coincidentLinks = (room, idx) => {
+  const v = room.poly[idx]
+  const links = []
+  for (const r of roomsLocal.value) {
+    if (r.id === room.id) continue
+    r.poly.forEach((q, j) => {
+      if (samePt(q, v)) links.push({ room: r, idx: j })
+    })
+  }
+  return links
+}
 const onVertexDown = (e, r, i) => {
   if (routeTool(e)) return
   const poly = r.poly
@@ -808,9 +842,9 @@ const onVertexDown = (e, r, i) => {
   const e1V = Math.abs(prev.x - cur.x) < 0.5
   const e2H = Math.abs(next.y - cur.y) < 0.5
   const e2V = Math.abs(next.x - cur.x) < 0.5
-  // 拖动开始时角是轴对齐直角 → 默认「角缩放」(两条邻边沿轴向平移、对端跟随);Ctrl = 只动此点
+  // 拖动开始时角是轴对齐直角 → 默认「角缩放」(两条邻边沿轴向平移、对端跟随);Ctrl = 只动此点(脱离吸附与联动)
   const followMode = ((e1H && e2V) || (e1V && e2H)) ? { e1H, e1V, e2H, e2V } : null
-  beginDrag(e, { type: 'room-vertex', room: r, idx: i, followMode })
+  beginDrag(e, { type: 'room-vertex', room: r, idx: i, followMode, links: coincidentLinks(r, i) })
 }
 const isSnapping = (r, i) => {
   const d = drag.value
@@ -821,7 +855,11 @@ const onEdgeDown = (e, r, i) => {
   const poly = r.poly
   const aIdx = i
   const bIdx = (i + 1) % poly.length
-  beginDrag(e, { type: 'room-edge', room: r, aIdx, bIdx, orig: [{ ...poly[aIdx] }, { ...poly[bIdx] }], startX: toCanvas(e).x, startY: toCanvas(e).y })
+  const links = [
+    ...coincidentLinks(r, aIdx).map((lk) => ({ ...lk, end: 'a' })),
+    ...coincidentLinks(r, bIdx).map((lk) => ({ ...lk, end: 'b' })),
+  ]
+  beginDrag(e, { type: 'room-edge', room: r, aIdx, bIdx, links, orig: [{ ...poly[aIdx] }, { ...poly[bIdx] }], startX: toCanvas(e).x, startY: toCanvas(e).y })
 }
 const removeVertex = (r, i) => {
   const poly = r.poly
@@ -971,11 +1009,13 @@ defineExpose({ finishPoly, fit, cancelPending })
 .fp-room { fill: rgba(184, 140, 110, 0.14); stroke: rgba(184, 140, 110, 0.65); stroke-width: 2; }
 .fp-room.is-hit { fill: rgba(184, 140, 110, 0.28); }
 .fp-room.is-overlap { stroke: #b04a3a; stroke-width: 2.5; fill: rgba(185, 96, 88, 0.16); }
-.fp-room-label { font-size: 13px; fill: #5c4c3d; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.fp-room-label { font-size: 13px; fill: #5c4c3d; text-anchor: middle; dominant-baseline: middle; }
 .fp-room-area { font-size: 11px; fill: #a89a8a; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
 .fp-dim { font-size: 10px; fill: #6b9b6b; text-anchor: middle; pointer-events: none; }
+.fp-dim-editable { pointer-events: auto; cursor: pointer; }
+.fp-dim-editable:hover { text-decoration: underline; }
 .fp-furn { fill: rgba(120, 100, 80, 0.18); stroke: #8a6f55; stroke-width: 1.5; }
-.fp-furn-label { font-size: 11px; fill: #6b5435; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+.fp-furn-label { font-size: 11px; fill: #6b5435; text-anchor: middle; dominant-baseline: middle; }
 .fp-item { fill: #b04a3a; stroke: #fff; stroke-width: 2; }.fp-item.is-hit { fill: #e0a030; }
 .fp-item-label { font-size: 10px; fill: #5c4c3d; text-anchor: middle; paint-order: stroke; stroke: rgba(255, 253, 248, 0.85); stroke-width: 3; pointer-events: none; }
 .fp-handle { fill: #fff; stroke: #b88c6e; stroke-width: 2; cursor: pointer; }
