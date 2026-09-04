@@ -71,11 +71,28 @@
             <text v-for="(m, i) in r.mids" :key="'dim' + i" :x="m.x" :y="m.y - 9" class="fp-dim">{{ edgeLenM(r, i) }}</text>
           </g>
           <!-- hover 边加号 -->
-          <g v-if="hoverEdge" class="fp-hover-add">
+          <g v-if="hoverEdge && tool === 'select'" class="fp-hover-add">
             <circle :cx="hoverEdge.point.x" :cy="hoverEdge.point.y" r="9" class="fp-hover-ring" />
             <line :x1="hoverEdge.point.x - 4" :y1="hoverEdge.point.y" :x2="hoverEdge.point.x + 4" :y2="hoverEdge.point.y" class="fp-hover-plus" />
             <line :x1="hoverEdge.point.x" :y1="hoverEdge.point.y - 4" :x2="hoverEdge.point.x" :y2="hoverEdge.point.y + 4" class="fp-hover-plus" />
           </g>
+          <!-- 裁剪 hover:张开的剪刀 -->
+          <g v-if="tool === 'cut' && hoverEdge && !cutStart" class="fp-hover-tool" :transform="`translate(${hoverEdge.point.x},${hoverEdge.point.y})`">
+            <circle cx="-5" cy="7" r="3" /><circle cx="5" cy="7" r="3" />
+            <line x1="-3.5" y1="4.5" x2="8" y2="-8" /><line x1="3.5" y1="4.5" x2="-8" y2="-8" />
+          </g>
+          <!-- 裁剪终点 hover:闭合的剪刀(合法目标边) -->
+          <g v-if="tool === 'cut' && hoverEdge && cutStart && cutPreview && cutPreview.valid" class="fp-hover-tool ok" :transform="`translate(${hoverEdge.point.x},${hoverEdge.point.y})`">
+            <circle cx="-4" cy="7" r="3" /><circle cx="4" cy="7" r="3" />
+            <line x1="-2" y1="4.5" x2="3" y2="-8" /><line x1="2" y1="4.5" x2="-3" y2="-8" />
+          </g>
+          <!-- 粘合 hover:满牙膏筒(共享边) -->
+          <g v-if="tool === 'glue' && glueHover" class="fp-hover-tool" :transform="`translate(${hoverEdge.point.x},${hoverEdge.point.y})`">
+            <rect x="-4.5" y="-4" width="9" height="13" rx="3.5" /><rect x="-2.5" y="-9" width="5" height="4" rx="1.2" />
+          </g>
+          <!-- 裁剪/粘合虚线:合法绿 / 非法暗红 -->
+          <line v-if="cutPreview" :x1="cutPreview.from.x" :y1="cutPreview.from.y" :x2="cutPreview.to.x" :y2="cutPreview.to.y" :class="['fp-cut-line', { valid: cutPreview.valid }]" />
+          <line v-if="gluePreview" :x1="gluePreview.from.x" :y1="gluePreview.from.y" :x2="gluePreview.to.x" :y2="gluePreview.to.y" :class="['fp-cut-line', { valid: gluePreview.valid }]" />
           <!-- 吸附对齐虚线 -->
           <line v-if="snapLine" :x1="snapLine.x1" :y1="snapLine.y1" :x2="snapLine.x2" :y2="snapLine.y2" class="fp-snap-line" />
         </template>
@@ -94,6 +111,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { pointInPoly, onSegment, segsIntersect, segOverlap, cutSegmentValid } from '@/utils/floorPlanGeom'
 
 const props = defineProps({
   mode: { type: String, default: 'view' },
@@ -107,7 +125,7 @@ const props = defineProps({
   tool: { type: String, default: 'select' },
   scale: { type: Number, default: 100 },
 })
-const emit = defineEmits(['save-room', 'save-furniture', 'save-item', 'create-room', 'create-furniture', 'select-furniture', 'calibrate', 'edit-edge', 'delete-room', 'delete-furniture', 'rename-room', 'rename-furniture'])
+const emit = defineEmits(['save-room', 'save-furniture', 'save-item', 'create-room', 'create-furniture', 'select-furniture', 'calibrate', 'edit-edge', 'delete-room', 'delete-furniture', 'rename-room', 'rename-furniture', 'cut-room', 'glue-rooms'])
 
 const wrapRef = ref(null)
 const svgRef = ref(null)
@@ -276,26 +294,7 @@ const hitRoomIds = computed(() => {
 })
 
 // ---- 房间重叠检测(编辑态警示) ----
-const pointInPoly = (p, poly) => {
-  let inside = false
-  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    if (((poly[i].y > p.y) !== (poly[j].y > p.y)) &&
-      (p.x < ((poly[j].x - poly[i].x) * (p.y - poly[i].y)) / (poly[j].y - poly[i].y) + poly[i].x)) inside = !inside
-  }
-  return inside
-}
-const segsIntersect = (p1, p2, p3, p4) => {
-  const d = (a, b, c) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
-  const d1 = d(p3, p4, p1); const d2 = d(p3, p4, p2); const d3 = d(p1, p2, p3); const d4 = d(p1, p2, p4)
-  return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))
-}
 // 点在边上(相邻房间共边/角对角不算重叠)
-const onSegment = (p, a, b) => {
-  const cross = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)
-  if (Math.abs(cross) > 1e-9) return false
-  return p.x >= Math.min(a.x, b.x) - 1e-9 && p.x <= Math.max(a.x, b.x) + 1e-9 &&
-    p.y >= Math.min(a.y, b.y) - 1e-9 && p.y <= Math.max(a.y, b.y) + 1e-9
-}
 const pointStrictlyInside = (p, poly) => {
   for (let i = 0; i < poly.length; i++) {
     if (onSegment(p, poly[i], poly[(i + 1) % poly.length])) return false
@@ -627,12 +626,17 @@ const onHoverMove = (e) => {
     return
   }
   if (drag.value) return
-  if (props.mode !== 'edit' || props.tool !== 'select') { hoverEdge.value = null; return }
-  detectHoverEdge(toCanvas(e))
+  mousePos.value = toCanvas(e)
+  if (props.mode !== 'edit') { hoverEdge.value = null; return }
+  if (!['select', 'cut', 'glue'].includes(props.tool)) { hoverEdge.value = null; return }
+  detectHoverEdge(mousePos.value)
 }
 const onCanvasClick = () => {
   if (justDragged) return
-  if (props.mode !== 'edit' || props.tool !== 'select') return
+  if (props.mode !== 'edit') return
+  if (props.tool === 'cut') { onCutClick(); return }
+  if (props.tool === 'glue') { onGlueClick(); return }
+  if (props.tool !== 'select') return
   if (!hoverEdge.value) return
   const he = hoverEdge.value
   const poly = he.room.poly
@@ -641,8 +645,89 @@ const onCanvasClick = () => {
   emit('save-room', he.room.id, JSON.stringify(poly))
   hoverEdge.value = null
 }
-// 切换工具清 hover 残留(避免残留 guard 吞掉画图点击)
-watch(() => props.tool, () => { hoverEdge.value = null })
+// 切换工具清 hover 残留(避免残留 guard 吞掉画图点击)+ 清裁剪/粘合进行中状态
+watch(() => props.tool, () => { hoverEdge.value = null; cutStart.value = null; glueStart.value = null })
+
+// ---- 裁剪(cut)/ 粘合(glue) ----
+const mousePos = ref(null)
+const cutStart = ref(null) // { roomId, edgeIdx, point }
+const glueStart = ref(null) // { roomAId, roomBId, from, s, t }
+
+// 粘合 hover:鼠标所在边与其他房间边共线重叠(吸附边)才可作起点
+const glueHover = computed(() => {
+  if (props.tool !== 'glue' || !hoverEdge.value || glueStart.value) return null
+  const he = hoverEdge.value
+  const poly = he.room.poly
+  const a1 = poly[he.edgeIdx]; const a2 = poly[(he.edgeIdx + 1) % poly.length]
+  for (const r of roomsLocal.value) {
+    if (r.id === he.room.id) continue
+    for (let j = 0; j < r.poly.length; j++) {
+      const ov = segOverlap(a1, a2, r.poly[j], r.poly[(j + 1) % r.poly.length])
+      if (ov) return { roomA: he.room, roomB: r, ...ov }
+    }
+  }
+  return null
+})
+
+// 裁剪虚线预览:起点固定,终点随鼠标;落在同房间另一条边上且连线合法才绿
+const cutPreview = computed(() => {
+  if (props.tool !== 'cut' || !cutStart.value || !mousePos.value) return null
+  const room = roomsLocal.value.find((r) => r.id === cutStart.value.roomId)
+  if (!room) return null
+  const he = hoverEdge.value
+  let end = mousePos.value
+  let valid = false
+  if (he && he.room === room && he.edgeIdx !== cutStart.value.edgeIdx) {
+    end = he.point
+    valid = cutSegmentValid(room.poly, cutStart.value.point, end)
+  }
+  return { from: cutStart.value.point, to: end, valid }
+})
+
+// 粘合虚线预览:终点吸附到共享边段上才绿
+const gluePreview = computed(() => {
+  if (props.tool !== 'glue' || !glueStart.value || !mousePos.value) return null
+  const g = glueStart.value
+  const proj = projectToSegment(mousePos.value, g.s, g.t)
+  const near = proj.dist < 6 / view.value.k
+  return { from: g.from, to: near ? proj.point : mousePos.value, valid: near }
+})
+
+const onCutClick = () => {
+  const he = hoverEdge.value
+  if (!he) return
+  if (!cutStart.value) {
+    cutStart.value = { roomId: he.room.id, edgeIdx: he.edgeIdx, point: { ...he.point } }
+    return
+  }
+  const pv = cutPreview.value
+  if (pv && pv.valid) {
+    emit('cut-room', {
+      roomId: cutStart.value.roomId,
+      a: { edgeIdx: cutStart.value.edgeIdx, point: cutStart.value.point },
+      b: { edgeIdx: he.edgeIdx, point: { ...he.point } },
+    })
+    cutStart.value = null
+  }
+}
+const onGlueClick = () => {
+  if (!glueStart.value) {
+    const gh = glueHover.value
+    if (gh) {
+      glueStart.value = {
+        roomAId: gh.roomA.id, roomBId: gh.roomB.id,
+        from: { ...hoverEdge.value.point }, s: gh.s, t: gh.t,
+      }
+    }
+    return
+  }
+  const pv = gluePreview.value
+  if (pv && pv.valid) {
+    emit('glue-rooms', { roomAId: glueStart.value.roomAId, roomBId: glueStart.value.roomBId })
+    glueStart.value = null
+  }
+}
+const cancelPending = () => { cutStart.value = null; glueStart.value = null }
 
 // ---- 房间 ----
 // 工具分发:非 select 工具时点击任何元素(房间/家具/物品/手柄)都落到画布层,不被挡住吞点
@@ -650,6 +735,7 @@ const routeTool = (e) => {
   if (props.tool === 'calibrate') { handleCalibrateClick(e); return true }
   if (props.tool === 'draw-rect') { startDrawRect(e); return true }
   if (props.tool === 'draw-poly') { drawPolyPoint(e); return true }
+  if (props.tool === 'cut' || props.tool === 'glue') return true // 专属 click 流程,不启动拖拽
   return false
 }
 const onRoomDown = (e, r) => {
@@ -815,7 +901,7 @@ onMounted(() => {
 })
 onBeforeUnmount(() => { detach(); if (resizeObserver) resizeObserver.disconnect() })
 
-defineExpose({ finishPoly, fit })
+defineExpose({ finishPoly, fit, cancelPending })
 </script>
 
 <style scoped>
@@ -825,7 +911,7 @@ defineExpose({ finishPoly, fit })
 .fp-svg.is-drawing { cursor: crosshair; }
 .fp-bg { pointer-events: none; } /* 底图纯背景,不挡画布交互 */
 .fp-editable { pointer-events: auto; cursor: text; }
-.fp-drawing, .fp-snap-line, .fp-calib-dot, .fp-calib-line, .fp-hover-add { pointer-events: none; } /* 预览/装饰元素不挡落点 */
+.fp-drawing, .fp-snap-line, .fp-calib-dot, .fp-calib-line, .fp-hover-add, .fp-hover-tool, .fp-cut-line { pointer-events: none; } /* 预览/装饰元素不挡落点 */
 .fp-room { fill: rgba(184, 140, 110, 0.14); stroke: rgba(184, 140, 110, 0.65); stroke-width: 2; }
 .fp-room.is-hit { fill: rgba(184, 140, 110, 0.28); }
 .fp-room.is-overlap { stroke: #b04a3a; stroke-width: 2.5; fill: rgba(185, 96, 88, 0.16); }
@@ -841,6 +927,12 @@ defineExpose({ finishPoly, fit })
 .fp-edge-handle { fill: #fff; stroke: #b88c6e; stroke-width: 1.5; cursor: pointer; }
 .fp-hover-ring { fill: rgba(255, 255, 255, 0.9); stroke: #b88c6e; stroke-width: 2; }
 .fp-hover-plus { stroke: #b88c6e; stroke-width: 2; stroke-linecap: round; }
+.fp-hover-tool circle { fill: none; stroke: #5c4c3d; stroke-width: 2; }
+.fp-hover-tool line { stroke: #5c4c3d; stroke-width: 2; stroke-linecap: round; }
+.fp-hover-tool rect { fill: rgba(255, 253, 248, 0.95); stroke: #5c4c3d; stroke-width: 1.8; }
+.fp-hover-tool.ok circle, .fp-hover-tool.ok line { stroke: #6b9b6b; }
+.fp-cut-line { stroke: #b04a3a; stroke-width: 2; stroke-dasharray: 6 4; pointer-events: none; }
+.fp-cut-line.valid { stroke: #6b9b6b; }
 .fp-snap-line { stroke: #6b9b6b; stroke-width: 1.5; stroke-dasharray: 5 4; }
 .fp-calib-dot { fill: #e0a030; stroke: #fff; stroke-width: 2; }
 .fp-calib-line { stroke: #e0a030; stroke-width: 1.5; stroke-dasharray: 5 4; }
