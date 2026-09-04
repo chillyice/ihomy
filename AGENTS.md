@@ -236,7 +236,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 | 模块 | Controller | Service | 关键表 | 要点 |
 |------|-----------|---------|--------|------|
-| 物品清单 | ItemController | ItemService | family_house/family_room/family_furniture/family_item | 五级粒度(家>房子>房间>家具>位置,多套房多楼层);CRUD+跨级搜索;`image_url/type/quantity/unit` 4 字段(V7.0,type: KITCHENWARE/INGREDIENT/DAILY/CLOTHES/TOOL/OTHER 走 item_type 字典);`furniture_id` 可空(散放物品);`GET /item/list?type=` 按类型过滤;2 期户型图已实现(S1 数据模型重构 + S2 户型图编辑器,详见下方「物品定位户型图」归档);3 期 AI 语义待做 |
+| 物品清单 | ItemController | ItemService | family_house/family_room/family_furniture/family_item | 五级粒度(家>房子>房间>家具>位置,多套房多楼层);CRUD+跨级搜索;`image_url/type/quantity/unit` 4 字段(V7.0,type: KITCHENWARE/INGREDIENT/DAILY/CLOTHES/TOOL/OTHER 走 item_type 字典);`furniture_id` 可空(散放物品);`GET /item/list?type=` 按类型过滤;**2 期户型图全部实现(S1~S5+裁剪/粘合,详见下方「物品定位户型图」归档)**;3 期 AI 语义待做 |
 | 厨房(菜单+菜谱) | RecipeController | RecipeService | family_recipe | 菜单页按类别分组+时间推荐(早 6-10/午 11-14/晚 17-20);菜谱 CRUD;ingredients/equipment/steps 为 JSON 字段;首页模块 kitchen(position=17) |
 | 食材页 | ItemController | ItemService | family_item | `/kitchen/ingredients` 横条列表(左图透明渐变+名称+数量单位+存放位置);录入表单:图片/名称/数量/单位选择框(个斤瓶袋...)/存放位置 el-cascader 三级(house>room>furniture,默认选含"厨房"的 room);复用 itemApi type=INGREDIENT,无独立后端 |
 | 厨房 i18n | — | — | — | **教训:RecipeDetail/RecipeEdit 曾有 `const $t = (k) => k` stub 遮蔽 vue-i18n(所有文案显示原始 key)**;新页面禁止此写法,统一 `const { t: $t } = useI18n()` |
@@ -1071,9 +1071,9 @@ CREATE TABLE sys_media_server (
 
 **设计决策**:①日志不入库不上 ES——2GB VPS 单实例,文件按天滚动+tid 精确匹配扫描足够(操作日志表已有 trace_id 列做索引入口);②文本格式非 JSON——终端 grep 可读优先,多行堆栈靠解析器"行头时间戳判定新条目"归并;③响应捕获用旁路 tee 封顶截断(2KB)而非 ContentCaching*Wrapper——后者整包缓冲,GB 级文件下载必 OOM;④SQL 日志恒开 DEBUG——用户明确要求记录所有 SQL+入参,量靠按天滚动+2GB 上限兜底;⑤WS 握手不包装请求/响应流——Tomcat 协议升级对包装敏感,消息级日志由 Handler 每消息独立 tid 补记。**冒烟已验证**:三文件生成/登录+博客列表 SQL 带 tid/@Async 落库 SQL 带 tid(ihomy-async 线程)/weather 出站进 thirdparty 文件/密码 token 打码/失败请求升 WARN/500 异常堆栈 119 行归并成单条目/`/ops/logs/trace` 跨文件检索/code≠0 拦截。**开发环境注意**:external.yml 的 `logging.file.name` 已改 `logging.file.path: D:\WorkSpace\ihomy\logs`(三类子目录自动创建);控制台不再输出 SQL,看 SQL 请 tail server 文件。
 
-##### 物品定位户型图(item_seeker 分支,2026-09-03,已合 main)
+##### 物品定位户型图(item_seeker 分支,S1+S2 已合 main;S3~S5+裁剪粘合待合)
 
-> 物品定位 2期户型图,S1 数据模型重构 + S2 前端户型图编辑器。设计见 `docs/户型图设计.md`(v4 + 文末「实现记录」)。S3 吸附 / S4 尺寸标定定位 / S5 打磨待做。
+> 物品定位 2期户型图,**S1~S5 全部完成 + 房间裁剪/粘合已实现**。设计见 `docs/户型图设计.md`(v4 + 文末「实现记录」§14/§15)。
 
 **S1 数据模型重构**(commit 628fddc):
 
@@ -1099,6 +1099,48 @@ CREATE TABLE sys_media_server (
 3. **hover 边 + 点击插点(替代「双击边折边」)**:编辑态鼠标靠近边显示圆圈加号(随鼠标沿边投影点移动),点击在投影点插入端点,边 ab→ad+db;不做两阶段折边状态机。
 
 **冒烟已验证**:建房子→存房间几何→建库家具→存家具几何→移入房间→存楼层配置→锚家具物品→相对坐标→floor-plan 返回→删房间家具进库。前端 build 通过。
+
+**S3 吸附 + S4 尺寸标定 + S5 打磨**(commit 11043ce):
+
+| 文件 | 改动 |
+|------|------|
+| FloorPlanCanvas.vue | S3:顶点磁吸其他房间顶点(6px+绿虚线)、家具贴墙吸附(房间边/其他家具边);S4:房间面积(shoelace m²)、边长标注(米)、两点测距标定 scale、移动端只读(CSS 隐藏编辑)、双击边手柄数值输入(保持方向)、手绘风滤镜(feTurbulence,**仅查看态**);S5:Ctrl+Z 撤销(栈50;房间 lastRoomGeom 链/家具副本隔离/物品 prevRel)、双击房间复制(后挪侧栏)、重叠警示(严格内部+边交叉,共边不误报)、空楼层引导、pinch 双指缩放 |
+| Item.vue | 侧栏房间列表(复制/删除)、undo 栈回调、placeFurniture 错开叠放 |
+
+**编辑手势与页面迭代**(四轮用户测试反馈,commit 5f302f8..490a31f):
+
+| 改动 | 要点 |
+|------|------|
+| 直角顶点「角缩放」 | 拖动开始判定角形态(整次固定):轴对齐直角默认角缩放(水平邻边对端跟随 dy/垂直邻边对端跟随 dx,保持直角,PS 语义);Ctrl=只动该点(无吸附拉斜边);非直角=自由+吸附辅助 |
+| 家具 8 向缩放 | 4角+4边中点手柄(方向光标,防反转 min20),替代单右下手柄 |
+| 家具拖拽过程效果 | 副本从 computed 改 ref+watch 深响应(computed 返回值非响应式,拖拽无过程) |
+| 家具级联平移 | 拖房间归属家具跟随(furnOrig 快照+松手带 prev 保存);**保存后必须 Object.assign 回写原对象**(否则级联基准是旧值,家具跳回原位) |
+| 边拖拽四层 | 基于**原始边**判定(平移不改变边方向,实时判定永不触发):斜率<25% 拉平 + 轻微正交位移归零(纯单轴,邻边保持垂直) + 邻边吸直 straightenNeighbor + 对齐其他房间边线 findAlignLine |
+| 工具分发 routeTool | 画图/标定/裁剪/粘合下点击任何元素落到画布层不被吞;切工具清 hover;非 select 不拖拽 |
+| 逐点描绘修复 | pointerup 不清状态(曾永远只能画1点);双击闭合去重阈值按缩放换算;预览/装饰元素 pointer-events:none(预览线曾自己挡落点) |
+| 画布体验 | 画图十字光标;拖拽中不 fit(级联触发 deep watch 重置视图);ResizeObserver 侧栏出现自动 fit;画板全宽 `calc(100vh-70px)` |
+| 楼层入口 | 切换器编辑态常显+「+」加层;floors 常含 currentFloor;画图弹窗楼层字段显示+保存自动切层(修死锁) |
+| 双击改名/右键删除 | 房间名/家具名双击弹框(带原值全量,note 覆盖坑);编辑态右键删除 |
+
+**家具预设拖入 + 底图 PDF/不透明度**(commit b42e82f):
+
+| 文件 | 改动 |
+|------|------|
+| Item.vue | 家具 tab 8 种预设(衣柜/床/书桌/餐桌/沙发/茶几/冰箱/柜子,真实比例)HTML5 拖入:落点找包含房间自动关联、命名 类型+序号(同类型递增)、落点居中、addFurniture 带坐标创建;底图不透明度滑杆(按楼层存 floorPlans[层].opacity,保存后回写本地防切层回退);标定按钮 tooltip |
+| FloorPlanCanvas.vue | svg @drop(点在多边形内找房间+emit);底图 pointer-events:none+opacity prop;PDF 支持(pdfjs-dist **异步 chunk 仅 PDF 时加载**,渲染第一页 scale2 转 PNG) |
+| package.json | +pdfjs-dist |
+
+**房间裁剪(拆分)/ 粘合(合并)**(commit 21326f0):
+
+| 文件 | 改动 |
+|------|------|
+| `utils/floorPlanGeom.js`(新) | 共享几何模块:pointInPoly/onSegment/segsIntersect/cutSegmentValid(不穿顶点+不跨边+中点在内)/splitPoly(边两点切两多边形)/segOverlap(共线重叠段)/mergePolys(顶点分裂法合并+连续去重+首尾去重)/polyBBox;画布与页面共用 |
+| FloorPlanCanvas.vue | cut/glue 工具流程:hoverEdge 检测放宽;剪刀(张开/闭合)/牙膏筒 SVG 图标;虚线预览 computed(合法绿/非法暗红);routeTool 吞拖拽;Esc/切工具取消(expose cancelPending);emit cut-room/glue-rooms;本地几何函数改 import 共享模块 |
+| Item.vue | onCutRoom(splitPoly→两房间原名+序号递进 nextRoomName→家具按中心分配 moveFurnToRoom→散放物品按绝对位置分配 moveScatteredItem 重算 relX→删原房间);onGlueRooms(mergePolys→A 改名「A-B」改几何→B 家具物品迁移→删 B);Esc 取消 pending |
+
+**踩坑记录(S3 之后迭代)**:①级联平移改 props 触发 deep watch→fit 重置视图(视觉假象"其他房间反向移动")→拖拽中不 fit;②computed 返回的副本对象非响应式→家具拖拽无过程效果,改 ref+watch;③拖家具保存后不回写本地原对象→下次级联基准是旧值,家具跳回原位;④边拖拽是整体平移、|Δy| 恒定,实时轴对齐判定永远不触发→改基于原始边判定;⑤正在画的预览多边形 pointer-events 未禁,自己挡住落点(逐点描绘"点不落地");⑥楼层数据驱动(floors=房间∪底图)与"开新层"互为死锁→floors 常含 currentFloor+编辑态常显加号;⑦双击名称改名与双击房间复制手势冲突→复制挪侧栏按钮。
+
+**自测基线**:几何算法 node 自检 24/24(裁剪粘合)+ 9/9(重叠)+ 9/9(缩放对齐)+ 6/6(吸直);API 冒烟 31/31 全链路 + 14/14 预设路径 + 14/14 裁剪粘合调用链(测试数据自动清理);build 通过(pdfjs 独立异步 chunk,入口 223KB 基线内)。
 
 ## 文件存储策略
 
@@ -1140,7 +1182,7 @@ CREATE TABLE sys_media_server (
 | 优先级 | 规划 | 要点 |
 |--------|------|------|
 | P1 | 放映厅 Jellyfin 集成 | 方案已定稿(2026-08-31),详见"放映厅 Jellyfin 集成方案"归档:ihomy 做脸(海报墙/筛选/家庭层)+ Jellyfin 做引擎(刮削/转码/TV 客户端);S1 本地 spike 验证 API → S2 后端 → S3 前端;现有 content_video 本地库降级为次级 tab 保留;启动时先重读该归档小节 |
-| P2 | 物品定位-户型图 | 1期(物品清单+搜索)已完成;2期户型图 **S1(数据模型)+S2(页面骨架+编辑手势)已实现并合入 main**(分支 item_seeker,详见 `docs/户型图设计.md` v4 + 文末实现记录):**户型图=页面主视图(非 tab)**,顶部搜索框+房子切换+列表/编辑,**查看/找东西与编辑两模式分离**,空态画布中央「+」加房子,编辑态左侧**酷家乐式侧栏(房间/家具/库子 tab)**;多边形房间(**允许斜边**,`family_room.geometry` 替换矩形,命名预设+自定义)+矩形家具(`family_furniture.x/y/w/h`+`type` 预设/自定义+`room_id` 可空=**家具库**)+物品点(锚家具/房间+相对坐标,`position` 文本承载位置描述无抽屉层级);楼层配置按楼层存(`family_house.floor_plans` JSON,底图+比例尺,**默认 100px/m 标定降级为可选校正**,不加新表);**一套房多层每层一张,楼层切换器左下角(商厦模式,没图不显示默认1F)**;SVG 渲染**手绘草图风**;**徒手画一等公民(底图可选)**;**物品标记不常显、搜索/点家具才浮现,搜索多结果走角落结果列表跨房子/楼层分组**;画房间拖矩形+逐点描绘;编辑手势(实装):拖主体平移/拖顶点自由改角(轴对齐吸附辅助成矩形)/拖边自由平移/hover 边显示圆圈加号点击插点/双击顶点删点/拖家具移动缩放/拖物品定位/空白平移滚轮缩放;定位模式(物品搜索/「定位」跳转放大高亮);家具随房间平移、不随变形(靠墙柜墙动柜不动);吸附对齐(不建共享墙);尺寸标注米/毫米+数值输入+常显开关;面积附带;**移动端只读户型图+列表 CRUD 无画布编辑**;剩余 S3 边吸附+对齐虚线 / S4 尺寸标注+底图标定+面积+定位模式+手绘风 / S5 打磨待做。开工前先重读设计文档 |
+| P2 | 物品定位-户型图 | 1期(物品清单+搜索)已完成;**2期户型图 S1~S5 全部完成+房间裁剪/粘合已实现**(分支 item_seeker;S1+S2 已合 main,S3 之后待合;详见 `docs/户型图设计.md` v4 + 文末实现记录 §14/§15 + AGENTS「物品定位户型图」归档)。完整能力:户型图主视图(全宽)+ 两模式分离 + 酷家乐式侧栏(画图工具/8 种家具预设拖入自动关联房间+序号命名/库);多边形房间(允许斜边,直角顶点角缩放拖拽+Ctrl 自由)/矩形家具(8 向缩放+级联平移+贴墙吸附)/物品点(锚+相对坐标);楼层(编辑态常显+「+」加层,无死锁);房间**裁剪**(剪刀图标+合法性虚线,一拆二+序号递进+家具物品迁移)与**粘合**(牙膏筒+共享边合并,命名 A-B);尺寸(边长标注/数值输入/面积 m²/两点标定);底图(图片+PDF+不透明度);手绘风(仅查看态);吸附(顶点磁吸/贴墙/边四层对齐);撤销 Ctrl+Z;重叠警示;移动端只读+pinch。剩余优化:物品头像图、家具类型图标、搜索定位放大居中(见归档跳过项);3期 AI 语义待做 |
 | P2 | 用户使用指导 | 新手引导弹窗+帮助页 |
 | P2 | 家庭公告/广告位 | 自建家庭公告(不接第三方广告,隐私原因) |
 | P2 | 设置页-存储管理设计统一 | 存储管理 tab(Storage.vue)用 `.card.section`+`.page-toolbar`+`h3` 工具栏标题,与 profile/family/daily/light 其他 tab 的 `.card.settings-card`+`.section-label`(左竖线标题)风格不一致;统一为 section-label 标题 + 卡片规范。移动端已临时隐藏次要列(deviceType/rootPath/size/modified)消除横向溢出,统一时一并处理 |
