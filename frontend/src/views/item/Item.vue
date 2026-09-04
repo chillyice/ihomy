@@ -83,9 +83,13 @@
                 <div class="fp-side-head">{{ $t('item.rooms') }}</div>
                 <div v-for="r in floorPlan.rooms" :key="r.id" class="fp-side-row">
                   <span class="fp-side-name">{{ r.name }}</span>
-                  <span>
-                    <el-button size="small" @click="onDuplicateRoom(r.id)">{{ $t('item.duplicate') }}</el-button>
-                    <el-button size="small" type="danger" plain @click="removeRoom({ id: r.id })">{{ $t('common.delete') }}</el-button>
+                  <span class="fp-side-icons">
+                    <el-tooltip :content="$t('item.duplicate')" placement="top" :show-after="300">
+                      <el-button size="small" text @click="onDuplicateRoom(r.id)"><el-icon><CopyDocument /></el-icon></el-button>
+                    </el-tooltip>
+                    <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+                      <el-button size="small" text type="danger" @click="removeRoom({ id: r.id })"><el-icon><Delete /></el-icon></el-button>
+                    </el-tooltip>
                   </span>
                 </div>
               </template>
@@ -134,6 +138,7 @@
           :selected-furniture-id="selectedFurnitureId"
           :scale="floorPlan.scale || 100"
           @save-room="onSaveRoomGeometry"
+          @save-rooms="onSaveRoomsBatch"
           @save-furniture="onSaveFurnitureGeometry"
           @save-item="onSaveItemPlace"
           @create-room="onCreateRoom"
@@ -376,7 +381,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Plus } from '@element-plus/icons-vue'
+import { Search, Plus, CopyDocument, Delete } from '@element-plus/icons-vue'
 import { itemApi, fileApi } from '@/api'
 import { useI18n } from 'vue-i18n'
 import { dictText } from '@/utils/dict'
@@ -606,6 +611,17 @@ const onSaveRoomGeometry = async (id, geometry) => {
   lastRoomGeom[id] = geometry
   await itemApi.saveRoomGeometry(id, geometry)
 }
+// 联动拖拽批量保存:多房间几何合并为一条撤销记录,一步整体回滚
+const onSaveRoomsBatch = async (list) => {
+  const items = list.map(({ id, geometry }) => {
+    const room = floorPlan.value.rooms.find((r) => r.id === id)
+    const prev = Object.prototype.hasOwnProperty.call(lastRoomGeom, id) ? lastRoomGeom[id] : (room ? room.geometry : null)
+    lastRoomGeom[id] = geometry
+    return { id, prev, geometry }
+  })
+  if (items.some((x) => x.prev != null)) pushUndo({ type: 'rooms', items })
+  for (const it of items) await itemApi.saveRoomGeometry(it.id, it.geometry)
+}
 const onSaveFurnitureGeometry = async (id, data, prev) => {
   const f = floorPlan.value.furnitures.find((x) => x.id === id)
   const p = prev || (f ? { x: f.x, y: f.y, w: f.w, h: f.h } : null)
@@ -622,6 +638,13 @@ const undo = async () => {
   const e = undoStack.value.pop()
   if (!e) { ElMessage.info(t('item.nothingToUndo')); return }
   if (e.type === 'room') { await itemApi.saveRoomGeometry(e.id, e.geometry); lastRoomGeom[e.id] = e.geometry }
+  else if (e.type === 'rooms') {
+    for (const it of e.items) {
+      if (it.prev == null) continue
+      await itemApi.saveRoomGeometry(it.id, it.prev)
+      lastRoomGeom[it.id] = it.prev
+    }
+  }
   else if (e.type === 'furn') await itemApi.saveFurnitureGeometry(e.id, e.data)
   else if (e.type === 'item') await itemApi.saveItemPlace(e.id, e.data)
   await loadFloorPlan()
@@ -954,6 +977,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fp-opacity-row :deep(.el-slider) { flex: 1; }
 .fp-side-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 0; border-bottom: 1px dashed #eee5d8; }
 .fp-side-name { font-size: 13px; color: #5c4c3d; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fp-side-icons { display: inline-flex; align-items: center; gap: 2px; }
 .fp-side-row :deep(.el-button + .el-button) { margin-left: 4px; }
 .fp-side-ok { color: #7aa07a; }
 .fp-floors { position: absolute; left: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 4px; z-index: 5; }
