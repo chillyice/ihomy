@@ -24,9 +24,12 @@ export const segsIntersect = (p1, p2, p3, p4) => {
   return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))
 }
 
-// 裁剪连线合法性:不穿任何顶点、不与任何边严格相交、中点在多边形内(防凹形外绕)
+// 裁剪连线合法性:切点可落在顶点上(切角/对角切),但连线内部不得穿过任何顶点、
+// 不与任何边严格相交、中点在多边形内(防凹形外绕)
 export const cutSegmentValid = (poly, p1, p2) => {
+  if (samePt(p1, p2)) return false
   for (const v of poly) {
+    if (samePt(v, p1) || samePt(v, p2)) continue
     if (onSegment(v, p1, p2)) return false
   }
   for (let i = 0; i < poly.length; i++) {
@@ -35,7 +38,25 @@ export const cutSegmentValid = (poly, p1, p2) => {
   return pointInPoly({ x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 }, poly)
 }
 
-// 拆分:边 iA 上点 pA、边 iB 上点 pB(点在边内部),把多边形切成两个
+// 连续重合顶点去重(切点恰为顶点时,拼接处会产生重复点)
+const dedupSeq = (pts) => {
+  const out = []
+  for (const p of pts) {
+    if (!out.length || !samePt(out[out.length - 1], p)) out.push(p)
+  }
+  if (out.length > 1 && samePt(out[0], out[out.length - 1])) out.pop()
+  return out
+}
+
+// 裁剪完整方案校验:连线合法 + 切完两侧都是有效多边形(各 ≥3 顶点)。
+// 拒绝退化切法:切点落在顶点、另一切点又在该顶点的邻边上(切出 2 点残片/沿线虚切)
+export const cutPlanValid = (poly, iA, pA, iB, pB) => {
+  if (!cutSegmentValid(poly, pA, pB)) return false
+  const [q1, q2] = splitPoly(poly, iA, pA, iB, pB)
+  return q1.length >= 3 && q2.length >= 3
+}
+
+// 拆分:边 iA 上点 pA、边 iB 上点 pB(点在边内部或恰为顶点),把多边形切成两个
 export const splitPoly = (poly, iA, pA, iB, pB) => {
   if (iA > iB) { const ti = iA; iA = iB; iB = ti; const tp = pA; pA = pB; pB = tp }
   const first = [{ ...pA }]
@@ -45,7 +66,7 @@ export const splitPoly = (poly, iA, pA, iB, pB) => {
   for (let i = iB + 1; i < poly.length; i++) second.push({ ...poly[i] })
   for (let i = 0; i <= iA; i++) second.push({ ...poly[i] })
   second.push({ ...pA })
-  return [first, second]
+  return [dedupSeq(first), dedupSeq(second)]
 }
 
 // 两线段共线重叠检测(粘合的吸附边):返回重叠段 { s, t }(沿 a1→a2 方向,s 靠 a1)或 null
