@@ -41,10 +41,10 @@ export const projectToSegment = (p, a, b) => {
 //    另一房间的端点落在裁剪房间的边上(T 形交界)时,该点仍选为裁剪房间的边点(终点可落共享墙);
 // 2) 裁剪房间此处无候选或未下刀 → 顶点优先,再按鼠标所在房间 → 最近边所属房间 → 就近,
 //    归属到别的房间时由组件的重锚机制切换目标房间。
-// 边中点手柄不作吸附目标。rooms: [{ id, poly }],
+// 边中点手柄不作吸附目标。rooms: [{ id, poly }],opts.th 可选阈值(屏幕恒定时传 12/缩放),默认 12。
 // 返回 { kind: 'vertex'|'edge', room, point, vertexIdx?/edgeIdx? } 或 null
 export const detectBoundary = (rooms, p, opts = {}) => {
-  const TH = 12
+  const TH = opts.th || 12
   const vCands = []
   const eCands = []
   for (const r of rooms) {

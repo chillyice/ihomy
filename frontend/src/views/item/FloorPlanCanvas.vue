@@ -64,6 +64,11 @@
         <!-- 编辑态手柄(画布内所有手柄/按钮均按 view.k 反缩放,屏幕尺寸恒定,不随画布缩放变化) -->
         <template v-if="mode === 'edit'">
           <g v-for="h in roomHandles" :key="'h' + h.r.id">
+            <!-- 端点:透明命中圆(r=12px 屏幕)在下扩大可点区,可见手柄(r=6px)在上保留吸附态与 hover -->
+            <circle v-for="i in h.vertexIdxs" :key="'vh' + i"
+                    :cx="h.r.poly[i].x" :cy="h.r.poly[i].y" :r="12 / view.k" class="fp-hit"
+                    @pointerdown.stop="onVertexDown($event, h.r, i)"
+                    @dblclick.stop="tool === 'select' && removeVertex(h.r, i)" />
             <circle v-for="i in h.vertexIdxs" :key="'v' + i"
                     :cx="h.r.poly[i].x" :cy="h.r.poly[i].y" :r="6 / view.k" class="fp-handle" vector-effect="non-scaling-stroke"
                     :class="{ 'is-snapped': isSnapping(h.r, i) }"
@@ -658,7 +663,7 @@ const beginDrag = (e, d) => {
 // select:手柄区域让位(靠近顶点/边中点不出 + 号,那是拖手柄的区域),其余吸附最近边(投影)。
 // cut/glue:走共享几何模块 detectBoundary(候选池+归属优先级;端点优先、边投影,不吸附边中点手柄)。
 const detectHover = (p) => {
-  const TH = 12
+  const TH = 12 / view.value.k // 屏幕恒定 12px:端点让位区/边识别在缩放下一致
   if (props.tool === 'select') {
     for (const r of roomsLocal.value) {
       const poly = r.poly
@@ -679,7 +684,7 @@ const detectHover = (p) => {
     return best
   }
   const cutId = props.tool === 'cut' && cutStart.value ? cutStart.value.roomId : null
-  return detectBoundary(roomsLocal.value, p, { cutId })
+  return detectBoundary(roomsLocal.value, p, { cutId, th: TH })
 }
 const onHoverMove = (e) => {
   if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
@@ -730,12 +735,14 @@ const mousePos = ref(null)
 const cutStart = ref(null) // { roomId, edgeIdx, point }
 const glueStart = ref(null) // { roomAId, roomBId, from, s, t }
 
-// 手柄按需显隐:端点=鼠标移入该房间内部(或正在拖该房间)才显示;边中点移动手柄=鼠标贴近那条边
-// (或正在拖那条边)才显示;其余情况隐藏。画图/标定工具下手柄不参与交互,整体隐藏;尺寸标注不受影响。
+// 手柄按需显隐:端点=鼠标移入该房间内部(或正在拖该房间)才显示,在多边形外但贴近某端点(屏幕 12px)时只亮该端点;
+// 边中点移动手柄=鼠标贴近那条边(或正在拖那条边)才显示;其余情况隐藏。
+// 画图/标定工具下手柄不参与交互,整体隐藏;尺寸标注不受影响。
 const roomHandles = computed(() => {
   if (!['select', 'cut', 'glue'].includes(props.tool)) return []
   const mp = mousePos.value
   const d = drag.value
+  const NEAR = 12 / view.value.k // 端点/边邻域(屏幕恒定 12px,多边形外 1px 也识别)
   const out = []
   for (const r of roomsLocal.value) {
     const n = r.poly.length
@@ -745,8 +752,9 @@ const roomHandles = computed(() => {
     const midIdxs = []
     for (let i = 0; i < n; i++) {
       if (inside || dragRoom) vertexIdxs.push(i)
+      else if (mp && Math.hypot(mp.x - r.poly[i].x, mp.y - r.poly[i].y) < NEAR) vertexIdxs.push(i) // 在外但贴近该端点:只亮这一个,尖角即现即抓
       if (dragRoom && dragRoom.type === 'room-edge' && dragRoom.aIdx === i) { midIdxs.push(i); continue }
-      if (mp && projectToSegment(mp, r.poly[i], r.poly[(i + 1) % n]).dist < 12) midIdxs.push(i)
+      if (mp && projectToSegment(mp, r.poly[i], r.poly[(i + 1) % n]).dist < NEAR) midIdxs.push(i)
     }
     out.push({ r, vertexIdxs, midIdxs })
   }
@@ -1138,6 +1146,7 @@ defineExpose({ finishPoly, fit, cancelPending })
 .fp-item { fill: #b04a3a; stroke: #fff; stroke-width: 2; }.fp-item.is-hit { fill: #e0a030; }
 .fp-item-label { font-size: 10px; fill: #5c4c3d; text-anchor: middle; paint-order: stroke; stroke: rgba(255, 253, 248, 0.85); stroke-width: 3; pointer-events: none; }
 .fp-handle { fill: #fff; stroke: #b88c6e; stroke-width: 2; cursor: move; } /* 端点四向箭头:十字中心即热点,尖角端点也能精准落点 */
+.fp-hit { fill: transparent; cursor: move; } /* 端点透明命中区:可点 12px,可见 6px */
 .fp-handle:hover { stroke: #5c4c3d; }
 .fp-handle.is-snapped { fill: #6b9b6b; stroke: #fff; }
 .fp-edge-handle { fill: #fff; stroke: #b88c6e; stroke-width: 1.5; cursor: move; } /* 实际由内联方向光标(ns/ew/move)覆盖 */

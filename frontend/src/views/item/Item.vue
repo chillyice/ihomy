@@ -808,21 +808,27 @@ const onCutRoom = async ({ roomId, a, b }) => {
   const houseId = room.house_id ?? room.houseId
   const name1 = nextRoomName(room.name, 1)
   const name2 = nextRoomName(room.name, 2)
-  const r1 = await itemApi.addRoom({ houseId, name: name1, floor: room.floor, note: room.note })
-  await itemApi.saveRoomGeometry(r1.id, JSON.stringify(poly1))
-  const r2 = await itemApi.addRoom({ houseId, name: name2, floor: room.floor, note: room.note })
-  await itemApi.saveRoomGeometry(r2.id, JSON.stringify(poly2))
+  // 两个新房间互不依赖:并行创建
+  const [r1, r2] = await Promise.all([
+    itemApi.addRoom({ houseId, name: name1, floor: room.floor, note: room.note }),
+    itemApi.addRoom({ houseId, name: name2, floor: room.floor, note: room.note }),
+  ])
   // 家具按中心分配;散放物品按绝对位置分配并重算相对坐标
   const bbox = polyBBox(poly)
-  for (const f of floorPlan.value.furnitures.filter((x) => x.roomId === roomId && x.x != null)) {
-    await moveFurnToRoom(f, pointInPoly({ x: f.x + f.w / 2, y: f.y + f.h / 2 }, poly1) ? r1.id : r2.id)
-  }
-  for (const it of floorPlan.value.items.filter((x) => x.roomId === roomId && x.furnitureId == null)) {
-    const ax = bbox.minX + (it.relX || 0.5) * (bbox.maxX - bbox.minX)
-    const ay = bbox.minY + (it.relY || 0.5) * (bbox.maxY - bbox.minY)
-    const target = pointInPoly({ x: ax, y: ay }, poly1) ? { poly: poly1, id: r1.id } : { poly: poly2, id: r2.id }
-    await moveScatteredItem(it, bbox, target.poly, target.id)
-  }
+  // 新房间几何/家具/物品迁移互不依赖:并行;删原房间必须最后(后端删房间会把家具移入库)
+  await Promise.all([
+    itemApi.saveRoomGeometry(r1.id, JSON.stringify(poly1)),
+    itemApi.saveRoomGeometry(r2.id, JSON.stringify(poly2)),
+    ...floorPlan.value.furnitures.filter((x) => x.roomId === roomId && x.x != null)
+      .map((f) => moveFurnToRoom(f, pointInPoly({ x: f.x + f.w / 2, y: f.y + f.h / 2 }, poly1) ? r1.id : r2.id)),
+    ...floorPlan.value.items.filter((x) => x.roomId === roomId && x.furnitureId == null)
+      .map((it) => {
+        const ax = bbox.minX + (it.relX || 0.5) * (bbox.maxX - bbox.minX)
+        const ay = bbox.minY + (it.relY || 0.5) * (bbox.maxY - bbox.minY)
+        const target = pointInPoly({ x: ax, y: ay }, poly1) ? { poly: poly1, id: r1.id } : { poly: poly2, id: r2.id }
+        return moveScatteredItem(it, bbox, target.poly, target.id)
+      }),
+  ])
   await itemApi.removeRoom(roomId)
   ElMessage.success(t('common.success'))
   tool.value = 'select'
@@ -839,14 +845,15 @@ const onGlueRooms = async ({ roomAId, roomBId }) => {
   if (!merged) { ElMessage.warning(t('item.glueNoSharedEdge')); return }
   // B 的家具归 A;散放物品按绝对位置重算相对合并包围盒的坐标
   const bboxB = polyBBox(polyB)
-  for (const f of floorPlan.value.furnitures.filter((x) => x.roomId === roomBId && x.x != null)) {
-    await moveFurnToRoom(f, roomAId)
-  }
-  for (const it of floorPlan.value.items.filter((x) => x.roomId === roomBId && x.furnitureId == null)) {
-    await moveScatteredItem(it, bboxB, merged, roomAId)
-  }
-  await itemApi.updateRoom(roomAId, { name: `${A.name}-${B.name}`, floor: A.floor, note: A.note })
-  await itemApi.saveRoomGeometry(roomAId, JSON.stringify(merged))
+  // 迁移/A 改名/A 合并几何互不依赖:并行;删 B 必须最后(后端删房间会把家具移入库)
+  await Promise.all([
+    ...floorPlan.value.furnitures.filter((x) => x.roomId === roomBId && x.x != null)
+      .map((f) => moveFurnToRoom(f, roomAId)),
+    ...floorPlan.value.items.filter((x) => x.roomId === roomBId && x.furnitureId == null)
+      .map((it) => moveScatteredItem(it, bboxB, merged, roomAId)),
+    itemApi.updateRoom(roomAId, { name: `${A.name}-${B.name}`, floor: A.floor, note: A.note }),
+    itemApi.saveRoomGeometry(roomAId, JSON.stringify(merged)),
+  ])
   await itemApi.removeRoom(roomBId)
   ElMessage.success(t('common.success'))
   tool.value = 'select'
