@@ -36,6 +36,12 @@
               <div class="fp-tool-hint">{{ $t('item.drawHint') }}</div>
               <el-button :type="tool === 'draw-rect' ? 'primary' : ''" class="fp-tool-btn" @click="tool = tool === 'draw-rect' ? 'select' : 'draw-rect'">{{ $t('item.drawRoomRect') }}</el-button>
               <el-button :type="tool === 'draw-poly' ? 'primary' : ''" class="fp-tool-btn" @click="togglePoly">{{ $t('item.drawRoomPoly') }}</el-button>
+              <el-tooltip :content="$t('item.cutTip')" placement="right" :show-after="300">
+                <el-button :type="tool === 'cut' ? 'primary' : ''" class="fp-tool-btn" @click="tool = tool === 'cut' ? 'select' : 'cut'">{{ $t('item.cut') }}</el-button>
+              </el-tooltip>
+              <el-tooltip :content="$t('item.glueTip')" placement="right" :show-after="300">
+                <el-button :type="tool === 'glue' ? 'primary' : ''" class="fp-tool-btn" @click="tool = tool === 'glue' ? 'select' : 'glue'">{{ $t('item.glue') }}</el-button>
+              </el-tooltip>
               <el-upload :show-file-list="false" :before-upload="uploadFloorPlan" accept="image/*,.pdf" class="fp-upload">
                 <el-button class="fp-tool-btn">{{ $t('item.uploadFloorPlan') }}</el-button>
               </el-upload>
@@ -113,6 +119,8 @@
           @delete-furniture="(id) => removeFurniture({ id })"
           @rename-room="onRenameRoom"
           @rename-furniture="onRenameFurniture"
+          @cut-room="onCutRoom"
+          @glue-rooms="onGlueRooms"
         />
 
         <!-- 空楼层引导(有房子但当前楼层无房间) -->
@@ -346,6 +354,7 @@ import { Search, Plus } from '@element-plus/icons-vue'
 import { itemApi, fileApi } from '@/api'
 import { useI18n } from 'vue-i18n'
 import { dictText } from '@/utils/dict'
+import { splitPoly, mergePolys, pointInPoly, polyBBox } from '@/utils/floorPlanGeom'
 import FloorPlanCanvas from './FloorPlanCanvas.vue'
 
 const { t } = useI18n()
@@ -660,6 +669,85 @@ const onRenameFurniture = async (id) => {
   } catch (e) {}
 }
 
+// ---- 裁剪(拆分)/ 粘合(合并) ----
+const nextRoomName = (base, seq) => {
+  let n = seq
+  while (rooms.value.some((r) => r.name === `${base}${n}`)) n++
+  return `${base}${n}`
+}
+// 家具按中心点分配到新房间
+const moveFurnToRoom = async (f, roomId) => {
+  await itemApi.updateFurniture(f.id, { roomId, name: f.name, type: f.type, note: f.note, x: f.x, y: f.y, w: f.w, h: f.h })
+}
+// 散放物品转移到新房间,并按新房间包围盒重算相对坐标
+const moveScatteredItem = async (it, fromBBox, newPoly, newRoomId) => {
+  const ax = fromBBox.minX + (it.relX || 0.5) * (fromBBox.maxX - fromBBox.minX)
+  const ay = fromBBox.minY + (it.relY || 0.5) * (fromBBox.maxY - fromBBox.minY)
+  const tb = polyBBox(newPoly)
+  const relX = Math.max(0, Math.min(1, (ax - tb.minX) / ((tb.maxX - tb.minX) || 1)))
+  const relY = Math.max(0, Math.min(1, (ay - tb.minY) / ((tb.maxY - tb.minY) || 1)))
+  await itemApi.update(it.id, {
+    roomId: newRoomId, relX, relY,
+    name: it.name, aliases: it.aliases, position: it.position, imageUrl: it.image_url,
+    type: it.type, quantity: it.quantity, unit: it.unit, note: it.note,
+  })
+}
+const onCutRoom = async ({ roomId, a, b }) => {
+  const room = floorPlan.value.rooms.find((r) => r.id === roomId)
+  if (!room) return
+  let poly
+  try { poly = JSON.parse(room.geometry || '[]') } catch { return }
+  if (poly.length < 3) return
+  const [poly1, poly2] = splitPoly(poly, a.edgeIdx, a.point, b.edgeIdx, b.point)
+  const houseId = room.house_id ?? room.houseId
+  const name1 = nextRoomName(room.name, 1)
+  const name2 = nextRoomName(room.name, 2)
+  const r1 = await itemApi.addRoom({ houseId, name: name1, floor: room.floor, note: room.note })
+  await itemApi.saveRoomGeometry(r1.id, JSON.stringify(poly1))
+  const r2 = await itemApi.addRoom({ houseId, name: name2, floor: room.floor, note: room.note })
+  await itemApi.saveRoomGeometry(r2.id, JSON.stringify(poly2))
+  // 家具按中心分配;散放物品按绝对位置分配并重算相对坐标
+  const bbox = polyBBox(poly)
+  for (const f of floorPlan.value.furnitures.filter((x) => x.roomId === roomId && x.x != null)) {
+    await moveFurnToRoom(f, pointInPoly({ x: f.x + f.w / 2, y: f.y + f.h / 2 }, poly1) ? r1.id : r2.id)
+  }
+  for (const it of floorPlan.value.items.filter((x) => x.roomId === roomId && x.furnitureId == null)) {
+    const ax = bbox.minX + (it.relX || 0.5) * (bbox.maxX - bbox.minX)
+    const ay = bbox.minY + (it.relY || 0.5) * (bbox.maxY - bbox.minY)
+    const target = pointInPoly({ x: ax, y: ay }, poly1) ? { poly: poly1, id: r1.id } : { poly: poly2, id: r2.id }
+    await moveScatteredItem(it, bbox, target.poly, target.id)
+  }
+  await itemApi.removeRoom(roomId)
+  ElMessage.success(t('common.success'))
+  tool.value = 'select'
+  loadRooms()
+  loadFloorPlan()
+}
+const onGlueRooms = async ({ roomAId, roomBId }) => {
+  const A = floorPlan.value.rooms.find((r) => r.id === roomAId)
+  const B = floorPlan.value.rooms.find((r) => r.id === roomBId)
+  if (!A || !B) return
+  let polyA; let polyB
+  try { polyA = JSON.parse(A.geometry || '[]'); polyB = JSON.parse(B.geometry || '[]') } catch { return }
+  const merged = mergePolys(polyA, polyB)
+  if (!merged) { ElMessage.warning(t('item.glueNoSharedEdge')); return }
+  // B 的家具归 A;散放物品按绝对位置重算相对合并包围盒的坐标
+  const bboxB = polyBBox(polyB)
+  for (const f of floorPlan.value.furnitures.filter((x) => x.roomId === roomBId && x.x != null)) {
+    await moveFurnToRoom(f, roomAId)
+  }
+  for (const it of floorPlan.value.items.filter((x) => x.roomId === roomBId && x.furnitureId == null)) {
+    await moveScatteredItem(it, bboxB, merged, roomAId)
+  }
+  await itemApi.updateRoom(roomAId, { name: `${A.name}-${B.name}`, floor: A.floor, note: A.note })
+  await itemApi.saveRoomGeometry(roomAId, JSON.stringify(merged))
+  await itemApi.removeRoom(roomBId)
+  ElMessage.success(t('common.success'))
+  tool.value = 'select'
+  loadRooms()
+  loadFloorPlan()
+}
+
 // ---- 搜索 ----
 const onSearch = async () => {
   if (!searchKeyword.value) { clearSearch(); return }
@@ -791,6 +879,7 @@ const removeHouse = async (row) => {
 
 watch(listMode, (v) => { if (!v) loadFloorPlan() })
 const onKeydown = (e) => {
+  if (e.key === 'Escape') { canvasRef.value?.cancelPending(); return }
   if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z') return
   const tag = (e.target && e.target.tagName) || ''
   if (tag === 'INPUT' || tag === 'TEXTAREA') return

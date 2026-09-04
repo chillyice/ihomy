@@ -1116,6 +1116,11 @@ export default {
     renamePrompt: 'Enter a new name',
     calibrateTip: 'Click two points on the floor plan (e.g. a wall of known length), enter the real distance in meters to calibrate the scale — areas and edge lengths become accurate',
     floorPlanOpacity: 'Floor plan opacity',
+    cut: 'Cut',
+    cutTip: 'Click one edge of a room, then another edge — the room splits along the line (the line must not cross vertices or leave the room)',
+    glue: 'Glue',
+    glueTip: 'After two rooms share a snapped edge, click the shared edge then the other end to merge them into one',
+    glueNoSharedEdge: 'These two rooms have no shared edge to glue',
     deleteRoomMoveLib: 'Delete this room? Its furniture will move to the library',
   },
   notify: {
