@@ -10,7 +10,7 @@
       </el-input>
       <div class="fp-top-actions">
         <el-button @click="listMode = !listMode">{{ listMode ? $t('item.done') : $t('item.listView') }}</el-button>
-        <el-button v-if="!listMode && houses.length" type="primary" @click="toggleEdit">{{ mode === 'edit' ? $t('item.done') : $t('item.editFloorPlan') }}</el-button>
+        <el-button v-if="!listMode && houses.length" type="primary" class="fp-edit-btn" @click="toggleEdit">{{ mode === 'edit' ? $t('item.done') : $t('item.editFloorPlan') }}</el-button>
       </div>
     </div>
 
@@ -36,12 +36,46 @@
               <div class="fp-tool-hint">{{ $t('item.drawHint') }}</div>
               <el-button :type="tool === 'draw-rect' ? 'primary' : ''" class="fp-tool-btn" @click="tool = tool === 'draw-rect' ? 'select' : 'draw-rect'">{{ $t('item.drawRoomRect') }}</el-button>
               <el-button :type="tool === 'draw-poly' ? 'primary' : ''" class="fp-tool-btn" @click="togglePoly">{{ $t('item.drawRoomPoly') }}</el-button>
+              <el-tooltip :content="$t('item.cutTip')" placement="right" :show-after="300">
+                <el-button :type="tool === 'cut' ? 'primary' : ''" class="fp-tool-btn" @click="tool = tool === 'cut' ? 'select' : 'cut'">{{ $t('item.cut') }}</el-button>
+              </el-tooltip>
+              <el-tooltip :content="$t('item.glueTip')" placement="right" :show-after="300">
+                <el-button :type="tool === 'glue' ? 'primary' : ''" class="fp-tool-btn" @click="tool = tool === 'glue' ? 'select' : 'glue'">{{ $t('item.glue') }}</el-button>
+              </el-tooltip>
+              <el-upload :show-file-list="false" :before-upload="uploadFloorPlan" accept="image/*,.pdf" class="fp-upload">
+                <el-button class="fp-tool-btn">{{ $t('item.uploadFloorPlan') }}</el-button>
+              </el-upload>
+              <el-tooltip :content="$t('item.calibrateTip')" placement="right" :show-after="300">
+                <el-button :type="tool === 'calibrate' ? 'primary' : ''" class="fp-tool-btn" @click="tool = tool === 'calibrate' ? 'select' : 'calibrate'">{{ $t('item.calibrate') }}</el-button>
+              </el-tooltip>
+              <div v-if="floorPlan.imageUrl" class="fp-opacity-row">
+                <span class="fp-opacity-label">{{ $t('item.floorPlanOpacity') }}</span>
+                <el-slider v-model="floorPlanOpacity" :min="0.1" :max="1" :step="0.05" size="small" @change="saveOpacity" />
+              </div>
+              <!-- 已有房间列表 -->
+              <template v-if="floorPlan.rooms.length">
+                <div class="fp-side-head">{{ $t('item.rooms') }}</div>
+                <div v-for="r in floorPlan.rooms" :key="r.id" class="fp-side-row">
+                  <span class="fp-side-name">{{ r.name }}</span>
+                  <span>
+                    <el-button size="small" @click="onDuplicateRoom(r.id)">{{ $t('item.duplicate') }}</el-button>
+                    <el-button size="small" type="danger" plain @click="removeRoom({ id: r.id })">{{ $t('common.delete') }}</el-button>
+                  </span>
+                </div>
+              </template>
             </template>
             <!-- 家具 tab -->
             <template v-else-if="sidebarTab === 'furnitures'">
+              <div class="fp-side-head">{{ $t('item.furnPresets') }}</div>
+              <div class="fp-presets">
+                <div v-for="p in furnPresets" :key="p.type" class="fp-preset" draggable="true" @dragstart="onPresetDragStart($event, p)">
+                  <span class="fp-preset-shape" :style="{ width: p.pw + 'px', height: p.ph + 'px' }"></span>
+                  <span class="fp-preset-name">{{ p.type }}</span>
+                </div>
+              </div>
               <div v-for="f in floorFurnitures" :key="f.id" class="fp-side-row">
                 <span class="fp-side-name">{{ f.name }}</span>
-                <el-button v-if="f.x == null" size="small" @click="placeFurniture(f)">{{ $t('item.addHouseHint') }}</el-button>
+                <el-button v-if="f.x == null" size="small" type="primary" @click="placeFurniture(f)">{{ $t('item.place') }}</el-button>
                 <span v-else class="fp-side-ok">✓</span>
               </div>
               <el-button type="primary" size="small" class="fp-tool-btn" @click="openFurniture()">{{ $t('item.addFurniture') }}</el-button>
@@ -50,7 +84,10 @@
             <template v-else>
               <div v-for="f in libraryFurnitures" :key="f.id" class="fp-side-row">
                 <span class="fp-side-name">{{ f.name }}</span>
-                <el-button size="small" @click="moveFurnitureToRoom(f)">{{ $t('item.pickRoom') }}</el-button>
+                <span>
+                  <el-button size="small" type="primary" @click="placeFurniture(f)">{{ $t('item.place') }}</el-button>
+                  <el-button size="small" @click="moveFurnitureToRoom(f)">{{ $t('item.pickRoom') }}</el-button>
+                </span>
               </div>
               <div v-if="!libraryFurnitures.length" class="fp-tool-hint">{{ $t('item.emptyItems') }}</div>
             </template>
@@ -66,20 +103,39 @@
           :furnitures="floorPlan.furnitures"
           :items="floorPlan.items"
           :image-url="floorPlan.imageUrl"
+          :opacity="floorPlanOpacity"
           :highlight-item-ids="highlightItemIds"
           :selected-furniture-id="selectedFurnitureId"
+          :scale="floorPlan.scale || 100"
           @save-room="onSaveRoomGeometry"
           @save-furniture="onSaveFurnitureGeometry"
           @save-item="onSaveItemPlace"
           @create-room="onCreateRoom"
+          @create-furniture="onCreateFurniture"
           @select-furniture="onSelectFurniture"
+          @calibrate="onCalibrate"
+          @edit-edge="onEditEdge"
+          @delete-room="(id) => removeRoom({ id })"
+          @delete-furniture="(id) => removeFurniture({ id })"
+          @rename-room="onRenameRoom"
+          @rename-furniture="onRenameFurniture"
+          @cut-room="onCutRoom"
+          @glue-rooms="onGlueRooms"
         />
 
-        <!-- 楼层切换器(左下角) -->
-        <div v-if="floors.length > 1" class="fp-floors">
+        <!-- 空楼层引导(有房子但当前楼层无房间) -->
+        <div v-if="!floorPlan.rooms.length && mode !== 'edit'" class="fp-guide" @click="toggleEdit">
+          <div class="fp-guide-title">{{ $t('item.emptyFloorRoomsTitle') }}</div>
+          <div class="fp-guide-text">{{ $t('item.emptyFloorRoomsText') }}</div>
+          <el-button type="primary" size="small">{{ $t('item.editFloorPlan') }}</el-button>
+        </div>
+
+        <!-- 楼层切换器(左下角;编辑态常显,可加层) -->
+        <div v-if="floors.length > 1 || mode === 'edit'" class="fp-floors">
           <div v-for="f in floors" :key="f" :class="['fp-floor', { on: f === currentFloor }]" @click="switchFloor(f)">
             {{ f }}F
           </div>
+          <div v-if="mode === 'edit'" class="fp-floor" @click="addFloor">+</div>
         </div>
 
         <!-- 搜索结果 -->
@@ -234,7 +290,7 @@
         <el-form-item :label="$t('item.roomName')">
           <el-input v-model="roomForm.name" :placeholder="$t('item.roomNameHint')" />
         </el-form-item>
-        <el-form-item v-if="!roomForm._geometry" :label="$t('item.floor')">
+        <el-form-item :label="$t('item.floor')">
           <el-input-number v-model="roomForm.floor" :min="-2" :max="99" />
         </el-form-item>
         <el-form-item :label="$t('item.note')">
@@ -292,17 +348,29 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus } from '@element-plus/icons-vue'
 import { itemApi, fileApi } from '@/api'
 import { useI18n } from 'vue-i18n'
 import { dictText } from '@/utils/dict'
+import { splitPoly, mergePolys, pointInPoly, polyBBox } from '@/utils/floorPlanGeom'
 import FloorPlanCanvas from './FloorPlanCanvas.vue'
 
 const { t } = useI18n()
 const itemTypes = ['KITCHENWARE', 'INGREDIENT', 'DAILY', 'CLOTHES', 'TOOL', 'OTHER']
 const furnitureTypes = ['衣柜', '床', '冰箱', '书桌', '沙发', '茶几', '柜子', '餐桌', '书架', '其他']
+// 预设家具(画布 px,默认 100px/m):拖入画布自动关联房间、按类型序号命名
+const furnPresets = [
+  { type: '衣柜', w: 120, h: 60 },
+  { type: '床', w: 150, h: 200 },
+  { type: '书桌', w: 120, h: 60 },
+  { type: '餐桌', w: 140, h: 80 },
+  { type: '沙发', w: 180, h: 90 },
+  { type: '茶几', w: 90, h: 50 },
+  { type: '冰箱', w: 70, h: 70 },
+  { type: '柜子', w: 80, h: 40 },
+]
 
 // ---- 户型图状态 ----
 const listMode = ref(false)
@@ -352,9 +420,31 @@ const floors = computed(() => {
   if (house && house.floorPlans) {
     try { Object.keys(JSON.parse(house.floorPlans)).forEach((k) => set.add(Number(k))) } catch {}
   }
-  if (!set.size) set.add(currentFloor.value)
+  set.add(currentFloor.value) // 当前层常驻:点 + 新开的空层切走后不消失
   return [...set].sort((a, b) => a - b)
 })
+
+// 底图不透明度(楼层配置内,前端自行解析)
+const floorPlanOpacity = ref(1)
+watch([() => houses.value, currentHouseId, currentFloor], () => {
+  const h = houses.value.find((x) => x.id === currentHouseId.value)
+  let v = 1
+  if (h && h.floorPlans) {
+    try { v = JSON.parse(h.floorPlans)[currentFloor.value]?.opacity ?? 1 } catch {}
+  }
+  floorPlanOpacity.value = v
+}, { immediate: true })
+const saveOpacity = async (val) => {
+  const house = houses.value.find((h) => h.id === currentHouseId.value)
+  let floorPlans = {}
+  if (house && house.floorPlans) { try { floorPlans = JSON.parse(house.floorPlans) } catch {} }
+  const cur = floorPlans[currentFloor.value] || {}
+  floorPlans[currentFloor.value] = { ...cur, opacity: val }
+  const json = JSON.stringify(floorPlans)
+  await itemApi.saveFloorPlans(currentHouseId.value, json)
+  // 回写本地(否则切层回来 watch 从旧 floorPlans 解析,opacity 回退)
+  if (house) house.floorPlans = json
+}
 
 // ---- 数据加载 ----
 const loadHouses = async () => {
@@ -383,7 +473,92 @@ const loadFloorPlan = async () => {
   floorPlan.value = await itemApi.floorPlan(currentHouseId.value, currentFloor.value)
 }
 const onHouseChange = () => { currentFloor.value = 1; loadFloorPlan() }
+// PDF 底图:渲染第一页为 PNG 再上传(SVG image 不支持 PDF)
+const pdfToImage = async (file) => {
+  const pdfjs = await import('pdfjs-dist')
+  const workerUrl = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default
+  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
+  const buf = await file.arrayBuffer()
+  const pdf = await pdfjs.getDocument({ data: buf }).promise
+  const page = await pdf.getPage(1)
+  const viewport = page.getViewport({ scale: 2 })
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.min(viewport.width, 4000)
+  canvas.height = Math.round(viewport.height * (canvas.width / viewport.width))
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise
+  return new Promise((resolve) => canvas.toBlob((b) => {
+    resolve(new File([b], 'floor-plan.png', { type: 'image/png' }))
+  }, 'image/png'))
+}
+const uploadFloorPlan = async (file) => {
+  try {
+    const img = file.type === 'application/pdf' ? await pdfToImage(file) : file
+    const data = await fileApi.upload(img)
+    const house = houses.value.find((h) => h.id === currentHouseId.value)
+    let floorPlans = {}
+    if (house && house.floorPlans) { try { floorPlans = JSON.parse(house.floorPlans) } catch {} }
+    const cur = floorPlans[currentFloor.value] || {}
+    floorPlans[currentFloor.value] = { ...cur, imageUrl: data.url }
+    await itemApi.saveFloorPlans(currentHouseId.value, JSON.stringify(floorPlans))
+    ElMessage.success(t('common.success'))
+    loadHouses()
+    loadFloorPlan()
+  } catch (e) { console.error(e) }
+  return false
+}
+const onCalibrate = async (pxDist) => {
+  try {
+    const { value } = await ElMessageBox.prompt(t('item.calibratePrompt'), t('item.calibrate'), { inputValue: '1.0', closeOnClickModal: true })
+    const meters = parseFloat(value)
+    if (!meters || meters <= 0) return
+    const scale = pxDist / meters
+    const house = houses.value.find((h) => h.id === currentHouseId.value)
+    let floorPlans = {}
+    if (house && house.floorPlans) { try { floorPlans = JSON.parse(house.floorPlans) } catch {} }
+    const cur = floorPlans[currentFloor.value] || {}
+    floorPlans[currentFloor.value] = { ...cur, scale }
+    await itemApi.saveFloorPlans(currentHouseId.value, JSON.stringify(floorPlans))
+    ElMessage.success(t('common.success'))
+    tool.value = 'select'
+    loadHouses()
+    loadFloorPlan()
+  } catch (e) {}
+}
+const onEditEdge = async (roomId, edgeIdx) => {
+  const room = floorPlan.value.rooms.find((r) => r.id === roomId)
+  if (!room) return
+  let poly
+  try { poly = JSON.parse(room.geometry || '[]') } catch { return }
+  if (poly.length < 3) return
+  const a = poly[edgeIdx]; const b = poly[(edgeIdx + 1) % poly.length]
+  const scale = floorPlan.value.scale || 100
+  const curLen = Math.hypot(b.x - a.x, b.y - a.y) / scale
+  try {
+    const { value } = await ElMessageBox.prompt(t('item.edgeLenPrompt'), t('item.editEdgeLen'), { inputValue: curLen.toFixed(2), closeOnClickModal: true })
+    const meters = parseFloat(value)
+    if (!meters || meters <= 0) return
+    const px = meters * scale
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1
+    poly[(edgeIdx + 1) % poly.length] = { x: a.x + ((b.x - a.x) / len) * px, y: a.y + ((b.y - a.y) / len) * px }
+    await onSaveRoomGeometry(roomId, JSON.stringify(poly))
+    ElMessage.success(t('common.success'))
+  } catch (e) {}
+}
+const onDuplicateRoom = (roomId) => {
+  const room = floorPlan.value.rooms.find((r) => r.id === roomId)
+  if (!room) return
+  let poly
+  try { poly = JSON.parse(room.geometry || '[]') } catch { return }
+  if (poly.length < 3) return
+  const shifted = poly.map((p) => ({ x: p.x + 40, y: p.y + 40 }))
+  roomForm.value = { houseId: currentHouseId.value, name: `${room.name}${t('item.duplicateSuffix')}`, floor: currentFloor.value, note: room.note || '', _geometry: JSON.stringify(shifted) }
+  roomDlg.value = true
+}
 const switchFloor = (f) => { currentFloor.value = f; loadFloorPlan() }
+const addFloor = () => {
+  currentFloor.value = Math.max(...floors.value) + 1
+  loadFloorPlan()
+}
 const toggleEdit = () => {
   mode.value = mode.value === 'edit' ? 'view' : 'edit'
   if (mode.value === 'edit') tool.value = 'select'
@@ -394,21 +569,183 @@ const togglePoly = () => {
 }
 
 // ---- 画布回调 ----
-const onSaveRoomGeometry = async (id, geometry) => { await itemApi.saveRoomGeometry(id, geometry) }
-const onSaveFurnitureGeometry = async (id, data) => { await itemApi.saveFurnitureGeometry(id, data) }
-const onSaveItemPlace = async (id, data) => { await itemApi.saveItemPlace(id, data) }
+const undoStack = ref([])
+const lastRoomGeom = {}
+const pushUndo = (entry) => { undoStack.value.push(entry); if (undoStack.value.length > 50) undoStack.value.shift() }
+
+const onSaveRoomGeometry = async (id, geometry) => {
+  const room = floorPlan.value.rooms.find((r) => r.id === id)
+  const prev = Object.prototype.hasOwnProperty.call(lastRoomGeom, id) ? lastRoomGeom[id] : (room ? room.geometry : null)
+  pushUndo({ type: 'room', id, geometry: prev })
+  lastRoomGeom[id] = geometry
+  await itemApi.saveRoomGeometry(id, geometry)
+}
+const onSaveFurnitureGeometry = async (id, data, prev) => {
+  const f = floorPlan.value.furnitures.find((x) => x.id === id)
+  const p = prev || (f ? { x: f.x, y: f.y, w: f.w, h: f.h } : null)
+  if (p) pushUndo({ type: 'furn', id, data: p })
+  await itemApi.saveFurnitureGeometry(id, data)
+  // 回写原对象:级联平移基准/后续 undo prev 与视觉位置一致(否则拖房间时家具跳回旧位)
+  if (f) Object.assign(f, data)
+}
+const onSaveItemPlace = async (id, data, prev) => {
+  if (prev) pushUndo({ type: 'item', id, data: prev })
+  await itemApi.saveItemPlace(id, data)
+}
+const undo = async () => {
+  const e = undoStack.value.pop()
+  if (!e) { ElMessage.info(t('item.nothingToUndo')); return }
+  if (e.type === 'room') { await itemApi.saveRoomGeometry(e.id, e.geometry); lastRoomGeom[e.id] = e.geometry }
+  else if (e.type === 'furn') await itemApi.saveFurnitureGeometry(e.id, e.data)
+  else if (e.type === 'item') await itemApi.saveItemPlace(e.id, e.data)
+  await loadFloorPlan()
+}
 const onSelectFurniture = (id) => { selectedFurnitureId.value = selectedFurnitureId.value === id ? null : id }
 const onCreateRoom = (geometry) => {
   roomForm.value = { houseId: currentHouseId.value, name: '', floor: currentFloor.value, note: '', _geometry: geometry }
   roomDlg.value = true
+  tool.value = 'select'
 }
 const placeFurniture = async (f) => {
-  await itemApi.saveFurnitureGeometry(f.id, { x: 200, y: 200, w: 200, h: 100 })
+  let roomId = f.roomId
+  if (!roomId) {
+    const room = floorPlan.value.rooms[0]
+    if (!room) { ElMessage.warning(t('item.drawRoomFirst')); return }
+    roomId = room.id
+  }
+  // 已摆放数递增错开,避免多件家具叠在同一点
+  const placed = floorPlan.value.furnitures.filter((x) => x.x != null).length
+  const x = 200 + (placed % 5) * 50
+  const y = 200 + Math.floor(placed / 5) * 50
+  await itemApi.updateFurniture(f.id, { roomId, name: f.name, type: f.type, note: f.note, x, y, w: 200, h: 100 })
+  loadRooms()
   loadFloorPlan()
 }
 const moveFurnitureToRoom = (f) => {
   furForm.value = { id: f.id, roomId: null, name: f.name, type: f.type, note: f.note }
   furDlg.value = true
+}
+
+// ---- 预设家具拖入 ----
+const onPresetDragStart = (e, p) => {
+  e.dataTransfer.setData('text/furn-type', p.type)
+  e.dataTransfer.effectAllowed = 'copy'
+}
+const onCreateFurniture = async ({ type, roomId, x, y }) => {
+  if (!roomId) { ElMessage.warning(t('item.dropInRoomFirst')); return }
+  const preset = furnPresets.find((p) => p.type === type)
+  const w = preset ? preset.w : 100
+  const h = preset ? preset.h : 100
+  const seq = furnitures.value.filter((f) => f.type === type).length + 1
+  await itemApi.addFurniture({ roomId, name: `${type}${seq}`, type, x: x - w / 2, y: y - h / 2, w, h })
+  ElMessage.success(t('common.success'))
+  loadRooms()
+  loadFloorPlan()
+}
+
+// ---- 双击名称改名 ----
+const onRenameRoom = async (id) => {
+  const room = floorPlan.value.rooms.find((r) => r.id === id)
+  if (!room) return
+  try {
+    const { value } = await ElMessageBox.prompt(t('item.renamePrompt'), t('item.editRoom'), { inputValue: room.name, closeOnClickModal: true })
+    if (!value || value === room.name) return
+    await itemApi.updateRoom(id, { name: value, floor: room.floor, note: room.note })
+    ElMessage.success(t('common.success'))
+    loadRooms()
+    loadFloorPlan()
+  } catch (e) {}
+}
+const onRenameFurniture = async (id) => {
+  const f = floorPlan.value.furnitures.find((x) => x.id === id)
+  if (!f) return
+  try {
+    const { value } = await ElMessageBox.prompt(t('item.renamePrompt'), t('item.editFurniture'), { inputValue: f.name, closeOnClickModal: true })
+    if (!value || value === f.name) return
+    await itemApi.updateFurniture(id, { roomId: f.roomId, name: value, type: f.type, note: f.note, x: f.x, y: f.y, w: f.w, h: f.h })
+    ElMessage.success(t('common.success'))
+    loadRooms()
+    loadFloorPlan()
+  } catch (e) {}
+}
+
+// ---- 裁剪(拆分)/ 粘合(合并) ----
+const nextRoomName = (base, seq) => {
+  let n = seq
+  while (rooms.value.some((r) => r.name === `${base}${n}`)) n++
+  return `${base}${n}`
+}
+// 家具按中心点分配到新房间
+const moveFurnToRoom = async (f, roomId) => {
+  await itemApi.updateFurniture(f.id, { roomId, name: f.name, type: f.type, note: f.note, x: f.x, y: f.y, w: f.w, h: f.h })
+}
+// 散放物品转移到新房间,并按新房间包围盒重算相对坐标
+const moveScatteredItem = async (it, fromBBox, newPoly, newRoomId) => {
+  const ax = fromBBox.minX + (it.relX || 0.5) * (fromBBox.maxX - fromBBox.minX)
+  const ay = fromBBox.minY + (it.relY || 0.5) * (fromBBox.maxY - fromBBox.minY)
+  const tb = polyBBox(newPoly)
+  const relX = Math.max(0, Math.min(1, (ax - tb.minX) / ((tb.maxX - tb.minX) || 1)))
+  const relY = Math.max(0, Math.min(1, (ay - tb.minY) / ((tb.maxY - tb.minY) || 1)))
+  await itemApi.update(it.id, {
+    roomId: newRoomId, relX, relY,
+    name: it.name, aliases: it.aliases, position: it.position, imageUrl: it.image_url,
+    type: it.type, quantity: it.quantity, unit: it.unit, note: it.note,
+  })
+}
+const onCutRoom = async ({ roomId, a, b }) => {
+  const room = floorPlan.value.rooms.find((r) => r.id === roomId)
+  if (!room) return
+  let poly
+  try { poly = JSON.parse(room.geometry || '[]') } catch { return }
+  if (poly.length < 3) return
+  const [poly1, poly2] = splitPoly(poly, a.edgeIdx, a.point, b.edgeIdx, b.point)
+  const houseId = room.house_id ?? room.houseId
+  const name1 = nextRoomName(room.name, 1)
+  const name2 = nextRoomName(room.name, 2)
+  const r1 = await itemApi.addRoom({ houseId, name: name1, floor: room.floor, note: room.note })
+  await itemApi.saveRoomGeometry(r1.id, JSON.stringify(poly1))
+  const r2 = await itemApi.addRoom({ houseId, name: name2, floor: room.floor, note: room.note })
+  await itemApi.saveRoomGeometry(r2.id, JSON.stringify(poly2))
+  // 家具按中心分配;散放物品按绝对位置分配并重算相对坐标
+  const bbox = polyBBox(poly)
+  for (const f of floorPlan.value.furnitures.filter((x) => x.roomId === roomId && x.x != null)) {
+    await moveFurnToRoom(f, pointInPoly({ x: f.x + f.w / 2, y: f.y + f.h / 2 }, poly1) ? r1.id : r2.id)
+  }
+  for (const it of floorPlan.value.items.filter((x) => x.roomId === roomId && x.furnitureId == null)) {
+    const ax = bbox.minX + (it.relX || 0.5) * (bbox.maxX - bbox.minX)
+    const ay = bbox.minY + (it.relY || 0.5) * (bbox.maxY - bbox.minY)
+    const target = pointInPoly({ x: ax, y: ay }, poly1) ? { poly: poly1, id: r1.id } : { poly: poly2, id: r2.id }
+    await moveScatteredItem(it, bbox, target.poly, target.id)
+  }
+  await itemApi.removeRoom(roomId)
+  ElMessage.success(t('common.success'))
+  tool.value = 'select'
+  loadRooms()
+  loadFloorPlan()
+}
+const onGlueRooms = async ({ roomAId, roomBId }) => {
+  const A = floorPlan.value.rooms.find((r) => r.id === roomAId)
+  const B = floorPlan.value.rooms.find((r) => r.id === roomBId)
+  if (!A || !B) return
+  let polyA; let polyB
+  try { polyA = JSON.parse(A.geometry || '[]'); polyB = JSON.parse(B.geometry || '[]') } catch { return }
+  const merged = mergePolys(polyA, polyB)
+  if (!merged) { ElMessage.warning(t('item.glueNoSharedEdge')); return }
+  // B 的家具归 A;散放物品按绝对位置重算相对合并包围盒的坐标
+  const bboxB = polyBBox(polyB)
+  for (const f of floorPlan.value.furnitures.filter((x) => x.roomId === roomBId && x.x != null)) {
+    await moveFurnToRoom(f, roomAId)
+  }
+  for (const it of floorPlan.value.items.filter((x) => x.roomId === roomBId && x.furnitureId == null)) {
+    await moveScatteredItem(it, bboxB, merged, roomAId)
+  }
+  await itemApi.updateRoom(roomAId, { name: `${A.name}-${B.name}`, floor: A.floor, note: A.note })
+  await itemApi.saveRoomGeometry(roomAId, JSON.stringify(merged))
+  await itemApi.removeRoom(roomBId)
+  ElMessage.success(t('common.success'))
+  tool.value = 'select'
+  loadRooms()
+  loadFloorPlan()
 }
 
 // ---- 搜索 ----
@@ -481,9 +818,12 @@ const saveRoom = async () => {
   if (!roomForm.value.houseId && !roomForm.value._geometry) return ElMessage.warning(t('item.pickHouse'))
   if (!roomForm.value.name) return ElMessage.warning(t('item.roomNameRequired'))
   const geom = roomForm.value._geometry
+  const floor = roomForm.value.floor
   if (roomForm.value.id) await itemApi.updateRoom(roomForm.value.id, roomForm.value)
   else roomForm.value = await itemApi.addRoom({ houseId: roomForm.value.houseId, name: roomForm.value.name, floor: roomForm.value.floor, note: roomForm.value.note })
   if (geom) await itemApi.saveRoomGeometry(roomForm.value.id, geom)
+  // 画在别的楼层时保存后自动切过去(楼层入口)
+  if (floor != null && floor !== currentFloor.value) currentFloor.value = floor
   ElMessage.success(t('common.success'))
   roomDlg.value = false
   loadRooms()
@@ -498,7 +838,7 @@ const removeRoom = async (row) => {
 }
 
 const openFurniture = (row) => {
-  furForm.value = row ? { id: row.id, roomId: row.roomId, name: row.name, type: row.type, note: row.note } : { roomId: roomFilter.value, name: '', type: '衣柜', note: '' }
+  furForm.value = row ? { id: row.id, roomId: row.roomId, name: row.name, type: row.type, note: row.note } : { roomId: roomFilter.value || floorPlan.value.rooms[0]?.id || null, name: '', type: '衣柜', note: '' }
   furDlg.value = true
 }
 const saveFurniture = async () => {
@@ -538,11 +878,21 @@ const removeHouse = async (row) => {
 }
 
 watch(listMode, (v) => { if (!v) loadFloorPlan() })
-onMounted(() => { loadHouses() })
+const onKeydown = (e) => {
+  if (e.key === 'Escape') { canvasRef.value?.cancelPending(); return }
+  if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 'z') return
+  const tag = (e.target && e.target.tagName) || ''
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return
+  if (mode.value !== 'edit') return
+  e.preventDefault()
+  undo()
+}
+onMounted(() => { loadHouses(); window.addEventListener('keydown', onKeydown) })
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <style scoped>
-.fp-page { display: flex; flex-direction: column; height: calc(100vh - 80px); }
+.fp-page { display: flex; flex-direction: column; max-width: none; width: 100%; height: calc(100vh - 70px); }
 .fp-topbar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; }
 .fp-house { width: 180px; }
 .fp-search { width: 320px; }
@@ -551,15 +901,32 @@ onMounted(() => { loadHouses() })
 .fp-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; color: #5c4c3d; }
 .fp-empty-plus { width: 96px; height: 96px; border: 2px dashed #b88c6e; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 48px; color: #b88c6e; }
 .fp-empty-text { margin-top: 16px; font-size: 15px; color: #8a7a6a; }
+.fp-guide { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); text-align: center; cursor: pointer; z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.fp-guide-title { font-size: 16px; font-weight: 600; color: #5c4c3d; }
+.fp-guide-text { font-size: 13px; color: #a89a8a; }
 .fp-sidebar { width: 220px; border-right: 1px solid #eee5d8; background: #faf5ec; display: flex; flex-direction: column; }
 .fp-side-tabs { display: flex; border-bottom: 1px solid #eee5d8; }
 .fp-side-tab { flex: 1; text-align: center; padding: 10px 0; cursor: pointer; font-size: 13px; color: #8a7a6a; }
 .fp-side-tab.on { color: #5c4c3d; font-weight: 600; border-bottom: 2px solid #b88c6e; }
 .fp-side-body { flex: 1; overflow-y: auto; padding: 12px; }
 .fp-tool-hint { font-size: 12px; color: #a89a8a; margin-bottom: 12px; }
-.fp-tool-btn { width: 100%; margin-bottom: 8px; }
-.fp-side-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #eee5d8; }
-.fp-side-name { font-size: 13px; color: #5c4c3d; }
+.fp-tool-btn { width: 100%; margin-left: 0 !important; margin-bottom: 8px; }
+.fp-upload { width: 100%; margin-bottom: 8px; }
+.fp-upload :deep(.el-upload) { width: 100%; }
+.fp-upload :deep(.el-upload) .fp-tool-btn { margin-bottom: 0; }
+.fp-side-head { font-size: 12px; color: #a89a8a; margin: 14px 0 4px; }
+.fp-presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 8px 0 12px; }
+.fp-preset { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 2px 6px; border: 1px dashed #d8c9b8; border-radius: 8px; cursor: grab; background: #fffdf8; }
+.fp-preset:hover { border-color: #b88c6e; background: rgba(184, 140, 110, 0.08); }
+.fp-preset:active { cursor: grabbing; }
+.fp-preset-shape { background: rgba(138, 111, 85, 0.35); border: 1px solid #8a6f55; border-radius: 2px; }
+.fp-preset-name { font-size: 11px; color: #5c4c3d; }
+.fp-opacity-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.fp-opacity-label { font-size: 12px; color: #a89a8a; white-space: nowrap; }
+.fp-opacity-row :deep(.el-slider) { flex: 1; }
+.fp-side-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 0; border-bottom: 1px dashed #eee5d8; }
+.fp-side-name { font-size: 13px; color: #5c4c3d; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fp-side-row :deep(.el-button + .el-button) { margin-left: 4px; }
 .fp-side-ok { color: #7aa07a; }
 .fp-floors { position: absolute; left: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 4px; z-index: 5; }
 .fp-floor { width: 36px; height: 36px; border-radius: 8px; background: rgba(255,255,255,0.9); color: #5c4c3d; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 13px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
@@ -581,6 +948,7 @@ onMounted(() => { loadHouses() })
 @media (max-width: 768px) {
   .fp-search { width: 140px; }
   .fp-sidebar { display: none; }
+  .fp-edit-btn { display: none; }
   .fp-page { height: calc(100vh - 120px); }
 }
 </style>

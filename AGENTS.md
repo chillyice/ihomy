@@ -1,13 +1,12 @@
 # AGENTS.md — ihomy 项目规则
 
-> 本文件供 opencode 跨会话加载,记录项目关键决策与约定。新会话启动时会自动读取,无需重复说明背景。
-> 修改本文件后立即对所有新会话生效。
+> 本文件供 ZCode(及 opencode 等)跨会话加载,记录项目关键规则、约定与当前事实。新会话启动时会自动读取,无需重复说明背景;修改后立即对所有新会话生效。
+> **分工(2026-09-04 起)**:本文件只留规则+导航索引,目标 **≤60KB 保证完整注入上下文**(超出会被截断且尾部最先丢失);完整功能需求见 `docs/需求设计说明书.md`(活文档);历史实现归档见 `docs/变更归档.md`(新归档追加到该文件,不写回本文件)。
 
 > **⚠ Git 规定(必须遵守)**:非人工指令,不得主动提交代码(`git commit`/`git add -A`/`git push` 一律禁止)。`git add` 只能指定具体文件路径,禁止 `git add -A`/`git add .`。
 
 > **⚠ 路径拼写警示(遵守以防误写)**:
 > - 工作目录绝对路径:`C:\Users\chill\OneDrive\WorkStation\Projects\ihomy`
-> - 中间段是 **`WorkStation`(一个词,`W-o-r-k-S-t-a-t-i-o-n`)**,不是 `Work\Station`、不是 `WorkStudio`、也不是 `Work Station`。
 > - 每次读/写/移动文件前先逐字核对路径;发现读不到文件时优先怀疑路径拼写而非文件不存在。
 > - **⚠ 编码警示(必须遵守)**:含中文的源码/配置/SQL 一律走本工具的 Read/Write/Edit 读写,禁止用 PowerShell `Get-Content`/`Set-Content`/`WriteAllText` 读写(PS 5.1 默认 GBK 会破坏 UTF-8 中文,且 `[IO.File]::WriteAllText` 默认带 BOM 导致 javac 报非法字符)。PowerShell 仅用于:npm/mvn 构建、HTTP 冒烟。
 > - **⚠ 数据库写中文警示**:向 MySQL 写入含中文的 SQL 时,**禁止**用 PowerShell 管道 `Get-Content file.sql | docker exec -i mysql mysql ...`(PS 5.1 管道编码非 UTF-8 导致中文乱码)。**正确方式**:① 用本工具 Write 写 SQL 文件(UTF-8 无 BOM)→ `docker cp file.sql ihomy-mysql:/tmp/` → `docker exec ihomy-mysql mysql --default-character-set=utf8mb4 ihomy -e "source /tmp/file.sql"` → 清理临时文件;② 纯 ASCII SQL 可直接 `docker exec mysql -e "..."`;③ 远程用 `scp -P 19068 file.sql root@ihomy.top:/tmp/` → SSH 执行 `mysql -e "source /tmp/file.sql"`。终端显示中文为 `?` 是 GBK 终端问题,不代表存储乱码,用 `python -c "import subprocess; ..."` 验证。
@@ -54,10 +53,10 @@
 - **root 仅用于初始化**:`mysql -uroot -p < backend/src/main/resources/schema.sql`,执行一次(建库、建表、创建 ihomy 账号、初始数据)。
 - **业务运行用 `ihomy` 账号**:仅授予 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`(最小权限,无 CREATE/ALTER/DROP)。application.yml 连接用 `ihomy`,**不要用 root 跑业务**。
 - 账号同时创建 `localhost` 和 `%` 两个 host(本机/远程应用服务器都能连)。
-- **54 张表**,前缀分类:
+- **59 张表**,前缀分类:
   - `sys_`(系统/账号/权限/家庭设置/日志/参数/字典/天气/存储,18 张):`sys_user` / `sys_role` / `sys_auth` / `sys_user_role` / `sys_role_auth` / `sys_family_info` / `sys_home_module` / `sys_password_reset_token` / `sys_user_group` / `sys_user_group_member` / `sys_operation_log` / `sys_dict_item` / `sys_parameter` / `sys_storage_device` / `sys_baidu_credential` / `sys_weather_credential` / `sys_weather_location` / `sys_weather_log`
-  - `family_`(家庭事务,21 张):`family_anniversary` / `family_notification` / `family_apply` / `family_invitation_code` / `family_checkin` / `family_points_record` / `family_points_product` / `family_points_order` / `family_task` / `family_reminder` / `family_plan` / `family_plan_task` / `family_book_record` / `family_chat_message` / `family_chat_read` / `family_user_label` / `family_tree` / `family_house` / `family_room` / `family_furniture` / `family_item`
-  - `content_`(内容类,15 张):`content_blog` / `content_diary` / `content_photo_album` / `content_photo` / `content_comment` / `content_visibility` / `content_like` / `content_video` / `content_video_wish` / `content_wish` / `content_music` / `content_music_playlist` / `content_music_playlist_track` / `content_book` / `content_book_borrow`
+  - `family_`(家庭事务,22 张):`family_anniversary` / `family_notification` / `family_apply` / `family_invitation_code` / `family_checkin` / `family_points_record` / `family_points_product` / `family_points_order` / `family_task` / `family_reminder` / `family_plan` / `family_plan_task` / `family_book_record` / `family_chat_message` / `family_chat_read` / `family_user_label` / `family_tree` / `family_house` / `family_room` / `family_furniture` / `family_item` / `family_recipe`
+  - `content_`(内容类,19 张):`content_blog` / `content_blog_category` / `content_diary` / `content_photo_album` / `content_photo` / `content_comment` / `content_visibility` / `content_like` / `content_video` / `content_video_wish` / `content_wish` / `content_music` / `content_music_playlist` / `content_music_playlist_track` / `content_book` / `content_book_borrow` / `content_book_category` / `content_book_category_rel` / `content_book_bookmark`
   - **命名规则**:家庭事务业务表一律 `family_` 前缀;内容数据 `content_` 前缀;账号/权限/配置/日志/天气/存储保留 `sys_`。新增表必须遵守。前缀取最顶层祖先类别;上下级关系体现在表名(如 `sys_user_role`)。
 - **枚举不再用数字**:状态/类型字段一律大写英文单词(`PUBLISHED/DRAFT/PUBLIC/FAMILY/ACTIVE...`),含义存字典表 `sys_dict_item`,Java 常量集中于 `common/DictConst.java`,前端映射 `utils/dict.js`。**不要写回 0/1/2 判断**。
 - **注意**:`content_blog/diary/photo/video/wish` 5 张内容表 `visibility` 列为 `VARCHAR(20) DEFAULT 'FAMILY'`(PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开),schema.sql 与 live DB 已对齐(曾误写 TINYINT)。
@@ -77,10 +76,10 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
     annotation/  # @RequirePermission / @OperationLog
     aspect/      # RequirePermissionAspect(权限AOP) / OperationLogAspect(操作日志AOP)
     filter/      # TraceIdFilter(链路ID生成,写入 MDC + 响应头 X-Trace-Id) / AccessLogFilter(接口访问日志→access文件) / CaptureRequestWrapper(请求体截断捕获) / CaptureResponseWrapper(响应体截断捕获)
-    entity/      # 44 个实体类(7 张关联/字典表无实体:sys_auth/sys_role_auth/sys_user_group/sys_user_group_member/sys_password_reset_token/sys_dict_item/content_visibility)
+    entity/      # 52 个实体类(8 张关联/字典表无实体:sys_auth/sys_role_auth/sys_user_group/sys_user_group_member/sys_password_reset_token/sys_dict_item/content_visibility/content_book_category_rel)
     mapper/      # MyBatis-Plus BaseMapper 接口(自定义 SQL 全部放 resources/mapper/*.xml,接口不写 @Select/@Update 注解,参数统一 @Param)
-    service/     # 33 个 @Service 类(单实现无接口层)
-    controller/  # 31 个 Controller
+    service/     # 43 个 @Service 类(单实现无接口层)
+    controller/  # 32 个 Controller
     dto/         # 请求/响应 DTO
     websocket/   # ChatWebSocketHandler(原生 WebSocket 聊天室,每消息独立tid+access日志)
   src/main/resources/
@@ -88,14 +87,14 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
     logback-spring.xml  # 三类日志文件分流(access/server/thirdparty,按天滚动+总量上限+异步);六要素 pattern `[tid:%X{traceId}]`;SQL只进server文件
     external.yml.template  # 外挂配置模板(IHOMY_CONFIG_PATH 指定路径,覆盖 MySQL/Redis 密码 + JWT 密钥 + 上传路径 + captcha + 天气凭证,ENC() 加密)—— 唯一的开发/生产差异机制,**不再用 application-dev.yml profile**(见 scripts/start-all.ps1)
     mapper/*.xml        # 每个 Mapper 接口一个同名 XML(namespace=接口全限定名)
-    schema.sql          # 建库+建号+建表(53张)+种子数据
+    schema.sql          # 建库+建号+建表(59张)+种子数据
   mvnw / mvnw.cmd       # Maven Wrapper,无需单独装 Maven
 frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
   src/
     api/request.js  # axios + JWT header + 401 自动刷新token
-    api/index.js    # 全部模块 API 分组导出(29 个 Api 对象:public/auth/home/blog/diary/file/member/anniversary/album/photo/like/comment/notification/family/profile/video/points/task/reminder/plan/wish/music/book/ops/tree/chat/storage/item/kitchen/library)
+    api/index.js    # 全部模块 API 分组导出(30 个 Api 对象:public/auth/home/blog/diary/file/member/anniversary/album/photo/like/comment/notification/family/profile/video/points/task/reminder/plan/wish/music/book/ops/tree/chat/storage/item/kitchen/library)
     stores/user.js  # 登录状态 + hasPerm/isOps/isPureOps; stores/app.js 首页聚合(family/modules/photos/stats)
-    router/         # 登录守卫 + scrollBehavior(返回回顶部);含 /ops 运维护卫, /chat 需登录; 28 个路由
+    router/         # 登录守卫 + scrollBehavior(返回回顶部);含 /ops 运维护卫, /chat 需登录; 36 个路由
     i18n/           # vue-i18n 中英(applyLocale 切换)
     theme/          # applyTheme/loadTheme(明暗模式,只 light/dark)
     utils/dict.js   # 枚举词条中文映射(与后端 DictConst 对应)
@@ -146,129 +145,45 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **OPS 隔离**:`OpsAccessFilter` 只放行 OPS 到 `/api/ops/**`+`/api/auth/**`,其余 403;非 OPS 访问 /ops/** 一律 403;支持复合角色(OWNER+OPS)访问 `/api/ops/**`(查 OPS 角色绑定+5 分钟缓存)。
 - 点赞/评论/通知严格同家庭:`validateTarget` 校验内容 family_id 与用户一致,跨家庭返回 NOT_FOUND。
 
-## 功能模块清单(按业务域归档)
+## 功能模块清单(索引)
 
-> 完整功能详情见 `docs/需求规格说明书.docx`。代码事实以 `backend/src/main/java` + `resources/schema.sql` 为准,如需检索先 `grep` 再动手。
+> 完整功能描述(Controller/Service/关键表/要点/接口清单)见 **docs/需求设计说明书.md** 第 4 章;本节仅作导航索引。
 
-### 1. 认证与账号
-
-| 模块 | Controller | Service | 关键表 | 要点 |
-|------|-----------|---------|--------|------|
-| 注册/登录 | AuthController | AuthService | sys_user/sys_user_role/sys_family_info | 邮箱=账号(uk_email 唯一);注册必填邮箱+密码+确认密码+图形验证码;注册可带邀请码加入家庭或创建新家庭(新家庭默认私有 is_public=0);注册成功不自动登录跳登录页;**邀请码状态校验:`status==INVITE_UNUSED` 才放行**(曾误写 INVITE_USED) |
-| 图形验证码 | AuthController | CaptchaService | Redis captcha:{id} | `GET /auth/captcha` 返回 {captchaId,image(base64)};5 分钟 TTL,一次性校验(错误/重用 1006);开发环境固定 `qwer`(`app.captcha-fixed-code`) |
-| JWT 双 token | JwtUtils | — | Redis 黑名单 | access 2h + refresh 7d;JWT claim 含 userId/username/role/familyId;refresh 时按优先级解析当前家庭(Redis>default_family_id>family_id) |
-| 个人资料 | ProfileController | — | sys_user | `GET/PUT /profile`(nickname/avatar/birthday/gender);`GET/PUT/DELETE /profile/label`(身份标签) |
-| 密码找回 | AuthController | AuthService | sys_password_reset_token | 邮箱自助找回,token 30 分钟过期 |
-| 运维账号 | AuthController | AuthService | sys_user_role(family_id 可空) | `ops / ops@ihomy.local` 初始密码 admin123;OPS 角色绑定 family_id=NULL;`buildTokens` 返回 `isOps` 标志 |
-| 演示(访客)账号 | AuthController | AuthService | sys_user | `demo@ihomy.local` / `demo2@ihomy.local` / `demo3@ihomy.local` 密码均为 `guest123`;演示家庭 OWNER/MEMBER/CHILD;`is_fake=0`(可登录);登录页默认预填 `demo@ihomy.local` / `guest123` / 验证码 `qwer` |
-
-### 2. 家庭与成员
-
-| 模块 | Controller | Service | 关键表 | 要点 |
-|------|-----------|---------|--------|------|
-| 家庭管理 | FamilyController | MultiFamilyService | sys_family_info | `GET/PUT /family`(@family:manage);`POST /family` 创建新家庭(绑定 OWNER+切换当前家庭);`share_token` 16 位随机(注册时生成);`is_demo` 演示家庭标记;`music_url/music_title` 背景音乐;`weather_lat/weather_lng/weather_city` 天气地区偏好(空=IP 自动定位);`is_public` 访客公开开关 |
-| 多家庭切换 | AuthController | MultiFamilyService | Redis user:curfamily:{id} | `GET /auth/families` 返回 {familyId,name,role,isPrimary,isDefault,isCurrent};`POST /auth/family/switch {familyId,setDefault?}` 校验角色绑定后更新 Redis+重签 token;`POST /auth/join {inviteCode}` 凭码加入(不自动切换) |
-| 成员管理 | MemberController | MemberManagementService | sys_user_role/family_invitation_code | `GET /member/list`(含 role_code+label);`PUT /member/{id}/role`;`DELETE /member/{id}`;`POST /member/invite`(生成码);`GET /member/invite`(码列表) |
-| 公开家庭搜索 | FamilyController | — | family_apply | `GET /family/search?keyword=`;`POST /family/apply`;`GET /family/apply/list`;`PUT /family/apply/{id}?action=approve|reject`(通过绑 MEMBER+通知) |
-| 家庭分享 | PublicController | — | sys_family_info.share_token | `?hid=<share_token>` 优先于 `?home_id=`;访客访问私有家庭 hid → NOT_FOUND;演示家庭 share_token 固定 `98a06619927f11f1` |
-
-### 3. 内容创作
-
-| 模块 | Controller | Service | 关键表 | 要点 |
-|------|-----------|---------|--------|------|
-| 博客 | BlogController | BlogService | content_blog/content_blog_category | 标签(逗号分隔)+ 分类树(V9.2);**初始分类(V9.6,2026-09-01)**:新建家庭自动注入 9 个默认分类(`BlogService.seedDefaultCategories`:生活随笔/家庭时光/旅行游记/美食记录/育儿亲子/健康运动/读书笔记/兴趣爱好/未分类,**未分类固定最后**),存量家庭由 migrations.sql 补种子;**"未分类"语义**:不选/清空分类统一落"未分类"(`CATEGORY_UNCATEGORIZED`,create/update 后端映射),空分类博客可见于分类计数;旧字符串分类由迁移收编入表变可编辑;默认 visibility=FAMILY;marked v18 renderer h1→h2;列表/编辑/详情均带 category |
-| 日记 | DiaryController | DiaryService | content_diary | **书架+翻书视图(V9.0)**:`/diary` 书架(每人一本封面网格,`/diary/book/:authorId` 翻书)——桌面双页信纸/移动单页,左右方向键+底部按钮翻页,目录跳转,紧凑连续排页(上一篇写完下一篇紧接),页眉 hover 编辑/删除;每页=页眉(首页)+18行×28px 正文裁剪窗口+页码脚;`measureDiaryLines` 离屏测行数分页;**信纸涂鸦(V9.1)**:`utils/doodle.js` 矢量笔画引擎(签字笔/铅笔/蜡笔/荧光笔/画笔+像素橡皮/对象橡皮),编辑页笔盘选笔后直接画在信纸上,随日记存 `doodle` JSON 列,翻书查看随信纸分页显示;date 兼容 `yyyy-MM-dd HH:mm`(旧代码会 500);默认 visibility=FAMILY |
-| 相册 | AlbumController | AlbumService | content_photo_album | type=public/private;public→PUBLIC/private→FAMILY;软删;`share_token` 16 位混淆令牌,`GET /album/shared/{token}` 游客可看公开相册(需家庭 is_public=1);软删 |
-| 照片 | PhotoController | AlbumService | content_photo | 批量上传 `POST /album/{id}/photos`;`taken_at/location`;**硬删除**(`PhotoMapper.deletePhysicalById` XML DELETE 绕过全局 logic-delete)+ `FileService.deleteByUrl` 删磁盘文件;`source_path`(设备:相对路径)去重 |
-| 放映厅 | VideoController | VideoService/VideoMapService | content_video/content_video_wish | 豆瓣式属性(media_type/genres/region/year/duration/episodes/director/actors/rating/intro/poster/video_url);`POST /video/upload` 500MB;**硬删除**(DB+video_url+poster,storage:// 自动跳过);想看列表 CRUD;**设备目录映射**(video 分支):平铺影子视频+来源筛选/多选批量删除/播放地址现签,详见"放映厅设备映射"归档 |
-| 照片瀑布 | CascadeController | — | content_photo | `GET /photo/cascade` 随机;可见性过滤(成员 PUBLIC+FAMILY,PRIVATE 仅作者,未登录仅 PUBLIC) |
-| 愿望单 | WishController | WishService | content_wish | title/reason/category/status(待实现/已实现/放弃)/visibility/achieved_at |
-| 书架 | LibraryController | LibraryService | content_book/content_book_borrow | 家庭电子书架(EPUB/PDF/TXT/MOBI);上传/分类/在线阅读;**硬删除**(DB+file_url+cover_url);阅读状态跟踪(WANT_READ/READING/FINISHED);在线阅读:PDF iframe/EPUB epub.js(异步加载)/TXT 分页(2000字/页)/MOBI 仅下载;文件存 `books/{yyyyMM}/`;可见性与博客一致 |
-
-### 4. 互动
-
-| 模块 | Controller | Service | 关键表 | 要点 |
-|------|-----------|---------|--------|------|
-| 点赞 | LikeController | ContentLikeService | content_like | content_type+content_id+user_id+family_id UNIQUE;toggle 语义;跨家庭 NOT_FOUND |
-| 评论 | CommentController | CommentService | content_comment | 二级树(parent_id+reply_to_user_id);`GET /comment/list` 树;删除:OWNER 或作者 |
-| 通知 | NotificationController | NotificationService | family_notification | 评论/回复自动通知;入家申请结果通知(type=system,content_type=family_apply);`GET /notification/list`、`/unread-count`、`PUT /{id}/read`、`PUT /read-all` |
-| 聊天室 | ChatController + ChatWebSocketHandler | ChatService | family_chat_message/family_chat_read | 原生 WebSocket(非 STOMP);握手 `?token=` 验 JWT;按家庭分房间广播;发送即落库;`GET /chat/history`、`/unread`、`POST /chat/read` |
-
-### 5. 家庭生活
-
-| 模块 | Controller | Service | 关键表 | 要点 |
-|------|-----------|---------|--------|------|
-| 纪念日 | AnniversaryController | AnniversaryService | family_anniversary | 阳历/农历(calendar solar/lunar)+闰月(is_leap)+关联成员(user_id 可空)+每年重复(recurring);农历转公历 Hutool ChineseDate(`getGregorianMonth()` 0-based 需 +1);首页倒计时 stats.upcomingEvents |
-| 提醒 | ReminderController | ReminderService | family_reminder | 一次性/每日/每周/每月;站内通知(family_notification) |
-| 家庭计划 | PlanController | FamilyPlanService | family_plan/family_plan_task | 计划+子任务+完成度联动进度;子任务可指派成员 |
-| 任务悬赏 | TaskController | TaskService | family_task | 状态机:待领取→进行中→待确认→已完成/已取消;reward_type=1 积分结算走 `pointsService.addRecord`;发布者不可自领 |
-| 记账 | BookController | BookService | family_book_record | type(支出/收入/转账)+月度统计+分类榜;单表无账户 |
-| 家谱 | TreeController | FamilyTreeService | family_tree | father_id/mother_id/spouse_id 自关联;spouse 双向绑定;generation 世代;**编辑全量提交,null 字段须用 LambdaUpdateWrapper 显式 SET NULL**(MP updateById 忽略 null);删除清空他人引用后逻辑删 |
-| 签到积分 | PointsController | PointsService | family_checkin/family_points_record/family_points_product/family_points_order | 日签 5 分+连续加成(7 天轮回);内容奖励(博客+10/日记+8/照片+2/视频+15);兑换校验(积分不足 1008/兑完 1009);商品管理+核销需 `@RequirePermission("points:manage")` |
-| 背景音乐 | MusicController | MusicService + MusicMapService | content_music/content_music_playlist/content_music_playlist_track | 曲库(单曲/专辑上传,mp3agic 解析 ID3v2 元数据:标题/艺术家/专辑/时长/比特率/内嵌封面);**设备目录映射(music 分支,V9.8):`POST /music/map` 影子曲目入库(storage:// 逻辑地址,平铺仅文件名元数据),`POST /music/refresh` 重扫+prune,`GET /music/{id}/play-url` 播放现签(BGM 挂机切歌不失效),映射曲目物理删+设备文件不动,详见归档**;歌单 CRUD(家庭维度独立);`is_background` 标记当前背景音乐歌单(每家庭最多 1 条);批量删除(`DELETE /music/batch` 按 ID 列表、`DELETE /music/album/{album}` 按专辑名);播放器 `GET /music/background` 获取歌单+曲目;`PUT /music/playlist/{id}/set-background` 设为背景;Settings 页「背景音乐设置」与导航栏「音乐」功能独立;MusicPlayer 仅在有背景歌单且曲目数>0 时渲染(`v-if="playlist.length"`),`z-index:55`(光影层下方);位置重置合并到 Settings「恢复默认面板布局」(清 `ihomy:music:pos`);临时文件名用纯 ASCII 后缀(含中文/斜杠的原始文件名导致 `File.createTempFile` IOException) |
-
-### 6. 基础设施
-
-| 模块 | Controller | Service | 关键表 | 要点 |
-|------|-----------|---------|--------|------|
-| 文件上传 | FileController | FileService | 磁盘 | 分类目录:pictures/{相册名}/、videos/、music/、files/{yyyyMM}/;`upload(bytes,name,type,albumId,albumName)`;`deleteByUrl(url)` 按 /files/ URL 解析物理路径删文件(`normalize()+startsWith` 防越界);DB 存 `/files/...` 完整 URL |
-| 存储管理 | StorageController | StorageService/AlbumMapService/AlbumMapRunner | sys_storage_device/sys_baidu_credential | 家庭级设备(SYSTEM/NAS/REMOTE/MOUNT/BAIDU,BAIDU 走 API 跳过本地目录校验、rootPath 恒为 '/',浏览/预览/下载走 xpan+dlink 适配器);文件浏览器 `GET /storage/browse?deviceId&path`;**从设备同步 = 目录映射(不拷贝文件)**:`POST /storage/map {deviceId, paths}` 勾选目录异步建层级相册+影子照片,`GET /storage/sync/progress/{taskId}` 进度,`POST /album/{id}/refresh` 刷新子树,打开相册自动刷当前层(2 分钟节流);`@RequirePermission("storage:manage")`;百度网盘四件套凭证(AppID/AppKey 明文+SecretKey/SignKey/access_token/refresh_token ENC 加密,GET 只回 `secretKeySet/signKeySet/authorized` 不回明文,PUT 留空保留原值,`@OperationLog saveArgs=false` 防密钥落日志;OAuth 授权码模式:`GET /storage/baidu/auth/url` 生成授权链接[state 绑定家庭 10 分钟]+ `POST /storage/baidu/auth/callback` 换 token,回调页 `/storage/baidu/callback` 须与开放平台注册一致) |
-| 首页聚合 | HomeController + PublicController | HomeModuleService/HomeStatsService/ActivityFeedService | sys_home_module | `GET /public/home?hid=&home_id=` 返回 {family/modules/photos/stats};`GET /public/feed` 动态流;模块化(sys_home_module 插入即扩展) |
-| 运维 | OpsController | OpsService | sys_operation_log/sys_weather_log | OPS 角色专属;资源统计/服务器状态/操作日志检索/和风天气 API 用量;不返回用户隐私 |
-| 每日内容 | DailyController | — | — | 每日一图(代理 Bing)+每日知识(4 类×5 条);`GET /public/daily-knowledge?types=` |
-| 操作日志 | LogController(@OperationLog AOP) | OperationLogService | sys_operation_log | AOP `@OperationLog` 注解自动记录;含 traceId 链路;仅 OPS 可查 |
-| 系统参数 | — | ParameterService | sys_parameter | 键值对;AES 盐值(aes-salt)首启自动生成入库;`getAesSalt()` 优先环境变量 |
-
-### 7. 沉浸式光影系统
-
-| 模块 | 文件 | 要点 |
-|------|------|------|
-| 太阳位置 | `common/SolarUtil.java` + `service/SunService.java` | NOAA 算法纯数学;288 时隙(5 分钟);IP 定位(ip-api.com)+ Redis 6h 位置/12h 时隙;`GET /public/sun-info?date=`;时角归一化+atan2 方位角修复;默认济南 |
-| 体积光 | `utils/windowLight.js` + `components/SunLightLayer.vue` | 丁达尔效应:7 条光束+光源辉光+窗框阴影(上下分层)+暗角+灰尘;**窗角(windowAngle=90-|az-180|)门控直射光**(az 90°→270° 旋转,窗角≤0 无直射光);方位角驱动旋转(az-180);灰阶 darken 幂等防叠加;夜间光柱 transparent |
-| 台灯 | `utils/useSunLight.js` | 3 态(auto/on/off)+钟摆运动(8s 周期)+色温/亮度可调;mask 祛除阴影(GSAP 2s 补间);左上黄金分割点 |
-| 天气特效 | `utils/useSunLight.js` + `SunLightLayer.vue` | `codeToPrecipLevel` 1-6 级;snowParticles/rainParticles;cloudFlicker GSAP 4-8s;weatherShadowOpacity;weatherMultiplier(晴 1.0/多云 0.55/雨 0.25/雪 0.4) |
-| 天气代理 | `service/WeatherService.java` | 和风天气 JWT(Ed25519)身份认证(JDK 21 原生);凭证四件套(优先 DB sys_weather_credential);月度配额 50000(Redis 计数器);sys_weather_log 调用日志;Redis 缓存(now 30m/forecast 30m/warning 5m/minutely 10m);**v1 全量迁移**(实况/每日/小时/预警/空气坐标路径,生活指数/分钟降水仍 v7);`GET /public/weather` 简版+`/public/weather/detail` 聚合(10 天预报/分钟降水摘要/预警防御指南/空气健康建议)+`/ops/weather/quota`;**气象预警推送** @Scheduled 30min 扫全家庭写站内通知(家庭级开关 sys_parameter) |
-| 光照测试 | `utils/useSunLight.js` + `LightTestConsole.vue` | `lightTestMode` 循环 288 时隙;**testSpeed** 5 档(0.5/1/2/4/8x);窗角/方位/高度/地区/日期/日出日落显示;9 段时段标签;后退/暂停/前进/停止+天气控制+图层开关(阴影/环境光)+台灯模式+色温/亮度滑块;停止=重置真实时间 |
-| 可拖拽面板 | `utils/useDragResize.js` | 5 个面板(feed/task/weather/anniversary/today);zIndex+bringToFront;边界 clamp+localStorage 持久化 |
-| 和风图标 | `public/qweather-icons/` | npm 包 qweather-icons;`<i class="qi-{iconCode}">`;iconCode 来自和风 API now.icon |
-
-### 8. 物品定位
-
-| 模块 | Controller | Service | 关键表 | 要点 |
-|------|-----------|---------|--------|------|
-| 物品清单 | ItemController | ItemService | family_house/family_room/family_furniture/family_item | 五级粒度(家>房子>房间>家具>位置,多套房多楼层);CRUD+跨级搜索;`image_url/type/quantity/unit` 4 字段(V7.0,type: KITCHENWARE/INGREDIENT/DAILY/CLOTHES/TOOL/OTHER 走 item_type 字典);`furniture_id` 可空(散放物品);`GET /item/list?type=` 按类型过滤;2 期户型图已实现(S1 数据模型重构 + S2 户型图编辑器,详见下方「物品定位户型图」归档);3 期 AI 语义待做 |
-| 厨房(菜单+菜谱) | RecipeController | RecipeService | family_recipe | 菜单页按类别分组+时间推荐(早 6-10/午 11-14/晚 17-20);菜谱 CRUD;ingredients/equipment/steps 为 JSON 字段;首页模块 kitchen(position=17) |
-| 食材页 | ItemController | ItemService | family_item | `/kitchen/ingredients` 横条列表(左图透明渐变+名称+数量单位+存放位置);录入表单:图片/名称/数量/单位选择框(个斤瓶袋...)/存放位置 el-cascader 三级(house>room>furniture,默认选含"厨房"的 room);复用 itemApi type=INGREDIENT,无独立后端 |
-| 厨房 i18n | — | — | — | **教训:RecipeDetail/RecipeEdit 曾有 `const $t = (k) => k` stub 遮蔽 vue-i18n(所有文案显示原始 key)**;新页面禁止此写法,统一 `const { t: $t } = useI18n()` |
-
-### 9. 国际化与主题
-
-| 模块 | 文件 | 要点 |
-|------|------|------|
-| i18n | `i18n/` + `utils/dict.js` | vue-i18n 中英;applyLocale 切换;DictConst 后端常量对应 |
-| 主题 | `theme/index.js` | 只 light/dark;applyTheme/loadTheme;双层伪元素背景 1s 过渡;手动切主题取消日出日落自动 |
-| 身份标签 | ProfileController | family_user_label(user_id/family_id/label/color,每家庭一套) |
-| 字典表 | — | sys_dict_item 18 组;状态/类型字段英文单词化 |
-
-### 10. 移动端兼容性(V8.0)
-
-| 模块 | 文件 | 要点 |
-|------|------|------|
-| 设备检测 | `composables/useDevice.js` | UA + matchMedia(768px) 双信号检测;全局单例 `isMobile` ref;matchMedia change 监听横竖屏切换 |
-| 移动布局 | `layouts/MobileLayout.vue` | 首页路由 `/` → 三 Tab 模式(底部 TabBar);其余路由 → 子页面模式(顶部返回栏 + router-view) |
-| 底部 TabBar | `components/MobileTabBar.vue` | 三 Tab:首页/更多/我的;fixed 底部 + safe-area-inset-bottom |
-| 子页面返回栏 | `components/MobileHeader.vue` | fixed 顶部 + safe-area-inset-top;返回按钮 + 标题 + 右侧 slot |
-| 首页动态流 | `components/MobileHomeFeed.vue` | 顶部**文字式筛选 + 下划线选中**(无胶囊背景);动态流 8 类型(博客/日记/照片/视频/愿望/任务/菜谱/图书,9 Tab);复用 homeApi getFeed |
-| 更多功能 | `components/MobileMoreGrid.vue` | 按分类(内容/生活/成员/系统)4 列图标网格;点击跳转对应路由;复用 appStore.modules |
-| 我的页面 | `components/MobileMePage.vue` | 用户信息 + 家庭切换(展开列表)+ 主题/光影/语言开关 + 设置/成员/资料入口 + 退出 |
-| 特效门控 | `App.vue` + `useSunLight.js` | 移动端**首次访问默认关**(仅无 `localStorage['ihomy:effects']` 时强制关),用户开启后刷新保留;移动端挂载 `SunLightLayer`(`anyEffectEnabled` 才渲染);开启后 `lampMode='auto'` |
-| App.vue | `App.vue` | `isMobile` 条件渲染:移动端 → `<MobileLayout>`(不含 AppSidebar/LightTestConsole,含按需 SunLightLayer);桌面端不变 |
-
-**设计决策**:采用**单代码库 + 运行时设备自适应**(非子域名 m.ihomy.top 方案)。理由:避免 JWT 跨域共享/CORS/双构建双部署/PWA 分裂;同一 URL 响应式适配,localhost 测试无需额外配置。
-
-**测试方式**:`localhost:5173` + Chrome DevTools 设备模拟;真机 `http://<局域网IP>:5173`(vite host:0.0.0.0)。
-
-**第一期适配范围**:首页(三 Tab 重设计)+ 子页面顶部返回栏 + 20 个功能页响应式 CSS 增强(Blog/Diary/Album/Chat/Login/Settings/Member/Book/Task/Plan/Wish/Points/Reminder/Tree/Item/Library)。后续迭代:进一步触摸手势优化+字体大小+性能验证。
+| 域 | 模块 | Controller / Service | 关键表 | 一句话要点 |
+|----|------|---------------------|--------|-----------|
+| 账号 | 注册/登录/验证码/密码找回 | AuthController / AuthService | sys_user 等 | 邮箱=账号;JWT 双 token(2h/7d 滑动续期,HTTP 401 触发续期);开发验证码固定 qwer;演示账号 demo@ihomy.local 等/guest123 |
+| 账号 | 个人资料/身份标签 | ProfileController | sys_user / family_user_label | nickname/avatar/birthday/gender;标签每家庭一套 |
+| 家庭 | 家庭管理/多家庭切换 | FamilyController, AuthController / MultiFamilyService | sys_family_info | share_token 分享;Redis 当前家庭;4 种加入方式;天气地区偏好;气象预警推送开关 |
+| 家庭 | 成员管理/邀请码/入家申请 | MemberController, FamilyController | sys_user_role / family_invitation_code / family_apply | 角色变更/移除/邀请码;公开家庭搜索+申请审批 |
+| 内容 | 博客 | BlogController / BlogService | content_blog(+category) | 标签+分类树(el-cascader);新建家庭注入 9 默认分类;未分类兜底 |
+| 内容 | 日记 | DiaryController / DiaryService | content_diary | 书架+翻书视图(18行×28px 分页);信纸涂鸦 doodle JSON(doodle.js 笔型引擎);date 兼容 yyyy-MM-dd HH:mm |
+| 内容 | 相册/照片 | AlbumController, PhotoController / AlbumService | content_photo_album / content_photo | 硬删;层级相册+设备目录映射(影子照片+签名 URL+缩略图缓存);自定义封面优先级;分享 token+Knuth 混淆;多选批删 |
+| 内容 | 放映厅 | VideoController / VideoService(+VideoMapService) | content_video(+wish) | 豆瓣式属性;硬删;设备映射(平铺+播放现签+Range 流式);想看列表;Jellyfin 集成规划 P1 |
+| 内容 | 照片瀑布 | CascadeController | content_photo | 随机+可见性过滤;落叶动效;缩略图 |
+| 内容 | 愿望单 | WishController / WishService | content_wish | 待实现/已实现/放弃 |
+| 内容 | 书架 | LibraryController / LibraryService | content_book×5(borrow/category/category_rel/bookmark) | EPUB/PDF/TXT/MOBI;分类树+批量删除/移动+阅读状态+书签;在线阅读(阅读器全屏);硬删 |
+| 互动 | 点赞/评论 | LikeController, CommentController | content_like / content_comment | toggle 语义;二级树;严格同家庭 |
+| 互动 | 通知 | NotificationController / NotificationService | family_notification | 评论/入家申请/同步完成/气象预警通知 |
+| 互动 | 聊天室 | ChatController + ChatWebSocketHandler / ChatService | family_chat_message / family_chat_read | 原生 WS(握手 ?token=);按家庭房间;每消息独立 tid |
+| 生活 | 纪念日 | AnniversaryController / AnniversaryService | family_anniversary | 阳历/农历+闰月+每年重复;Hutool ChineseDate 月份 0-based 需+1 |
+| 生活 | 提醒/计划/任务/记账/家谱 | ReminderController 等 / 各 Service | family_reminder / plan×2 / task / book_record / tree | 提醒 4 频率;计划+子任务进度联动;任务状态机(积分结算走 pointsService);记账单表;家谱 null 字段须 LambdaUpdateWrapper 显式 SET |
+| 生活 | 签到积分商城 | PointsController / PointsService | family_checkin / family_points_* | 日签 5 分+连续加成;内容奖励(博客10/日记8/照片2/视频15);兑换校验 1008/1009 |
+| 生活 | 背景音乐 | MusicController / MusicService(+MusicMapService) | content_music×3 | mp3agic ID3 解析;歌单 is_background 每家庭 1 条;设备映射(纯文件名平铺);播放现签 |
+| 基础 | 文件上传 | FileController / FileService | 磁盘 | 分类目录;流式重载(禁 getBytes);deleteByUrl 防路径越界 |
+| 基础 | 存储管理 | StorageController / StorageService+AlbumMapService+ThumbnailService+SignedUrlService | sys_storage_device / sys_baidu_credential | 设备 CRUD+文件浏览;目录映射(不拷贝文件);HMAC 签名 URL;百度 OAuth+dlink 中转;缩略图缓存 |
+| 基础 | 首页聚合 | HomeController + PublicController | sys_home_module | 模块化插入即扩展;动态流 8 类型;非成员视图 Redis 缓存 5min |
+| 基础 | 运维 | OpsController / OpsService | sys_operation_log / sys_weather_log | OPS 隔离(OpsAccessFilter);资源/日志/天气/访问量统计;tid 检索详细日志 |
+| 基础 | 每日内容 | DailyController | — | 每日一图(代理 Bing)+每日知识 |
+| 基础 | 操作日志/日志追溯 | LogController + @OperationLog AOP | sys_operation_log | 约 130 处写接口覆盖;三类日志文件(access/server/thirdparty);tid 全链路(详见 docs/日志规范.md) |
+| 基础 | 系统参数 | ParameterService | sys_parameter | 键值对;AES 盐值首启入库 |
+| 光影 | 太阳位置/体积光/台灯/天气特效 | SolarUtil + SunService / windowLight.js + SunLightLayer.vue | — | NOAA 288 时隙;窗角门控直射光;CSS keyframes 钟摆;天气 multiplier;suspend/restore 播放器沉浸 |
+| 光影 | 天气代理/预警推送 | WeatherService | sys_weather_* | 和风 v1 迁移+适配层(前端零改动);配额 50000 本地统计;30min 预警推送(家庭级开关) |
+| 光影 | 天气详情页/光照测试台 | views/weather/Weather.vue + LightTestConsole.vue | — | 9 指标实况+预警+24h 折线+10 天横条;288 时隙循环 5 档速度 |
+| 光影 | 首页仪表盘 | Home.vue + useWidgetDrag.js | localStorage | 12×9 栅格;编辑模式拖拽缩放增删;8 默认组件;布局持久化 |
+| 物品 | 物品定位+户型图 | ItemController / ItemService | family_house / family_room / family_furniture / family_item | 五级粒度+跨级搜索;**户型图 2 期全部完成**(多边形房间/家具库/裁剪粘合/尺寸标定/吸附/撤销,详见 docs/户型图设计.md);3 期 AI 语义待做 |
+| 厨房 | 菜单/菜谱/食材 | RecipeController / RecipeService | family_recipe | 菜单按类别+时间推荐;ingredients/equipment/steps JSON;食材页复用 itemApi type=INGREDIENT |
+| 系统 | i18n/主题/字典 | i18n/ + theme/ + utils/dict.js | sys_dict_item | 中英双语;只 light/dark;枚举英文单词化(禁数字) |
+| 移动端 | 设备自适应(V8.0/V9.13) | useDevice.js + MobileLayout.vue + Mobile* 组件 | — | 单代码库运行时自适应;首页三 Tab;子页面返回栏;特效首次访问默认关 |
 
 ## 设计规范(统一实现,避免多种方式)
 
@@ -444,7 +359,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 #### 已知问题(待修复)
 
-- **Edge 硬件加速整页频闪(遗留,环境/驱动问题,非应用代码)**:Edge+硬件加速下页面加载后整页频闪;**切走再切回浏览器窗口(或开关一次硬件加速+重启 Edge)即恢复**;Chrome 不复现,关硬件加速不复现。根因为显卡驱动/MPO 合成层 bug。用户侧处置(按序):开关一次硬件加速+重启 Edge(临时复位)→ 更新显卡驱动(根治)→ 注册表禁用 MPO(`HKLM\SOFTWARE\Microsoft\Windows\Dwm` → `OverlayTestMode`=5)→ 应用内 Settings 关"毛玻璃"(no-glass 全局禁 backdrop-filter,应用侧唯一规避开关)。完整排查过程与已保留/已撤销的修复清单见"首页频闪排查与修复"归档(frontend_performance 分支,2026-08-31)。
+- **Edge 硬件加速整页频闪(遗留,环境/驱动问题,非应用代码)**:Edge+硬件加速下页面加载后整页频闪;**切走再切回浏览器窗口(或开关一次硬件加速+重启 Edge)即恢复**;Chrome 不复现,关硬件加速不复现。根因为显卡驱动/MPO 合成层 bug。用户侧处置(按序):开关一次硬件加速+重启 Edge(临时复位)→ 更新显卡驱动(根治)→ 注册表禁用 MPO(`HKLM\SOFTWARE\Microsoft\Windows\Dwm` → `OverlayTestMode`=5)→ 应用内 Settings 关"毛玻璃"(no-glass 全局禁 backdrop-filter,应用侧唯一规避开关)。完整排查过程与已保留/已撤销的修复清单见 docs/变更归档.md「首页频闪排查与修复」(frontend_performance 分支,2026-08-31)。
 - **ElMessageBox 动画未生效**:`main.css` 中 `.fade-in-linear-*` + `.el-overlay-message-box` 的 CSS 覆写写法正确(transition name=`fade-in-linear`,class=`el-overlay-message-box` 已从 EP 源码确认),但实际运行时动画未生效。可能原因:EP 内部 `Transition` 的 `persisted` 模式导致 CSS transition 不触发,或 EP 的 `msgbox-fade-in` keyframes 优先级覆盖。待排查:用 DevTools 确认渲染时实际 class 和 transition 是否被正确应用。`closeOnClickModal: true` 已全部加上(点击遮罩关闭已生效)。
 
 #### 验证基线
@@ -453,652 +368,10 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - 前端构建:`cd frontend; npm run build` → 入口 chunk 208KB(基线 2026-08-31 实测;原 158KB 记录系 V8.0 移动端组件并入入口后过时)
 - 接口测试:`cd autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed
 
-#### 已实现变更归档(按功能域分类)
+## 已实现变更归档(已外置)
 
-> 以下为已完成的改动索引,按功能域而非时间排列,便于检索。
-
-##### 性能优化
-
-| 文件 | 改动 |
-|------|------|
-| `schema.sql` | `content_photo` 加 `idx_family_created`,`content_blog` 加 `idx_family_status_created`,`content_diary` 加 `idx_family_created` |
-| `application.yml` | HikariCP `maximum-pool-size:20`+`minimum-idle:5`+`connection-timeout:3000`;`spring.threads.virtual.enabled: true`(JDK21 虚拟线程) |
-| `config/SqlStatementLog.java` | `System.out.println` 改 SLF4J,由 `logging.level.mybatis.sql` 控制(默认 warn 静默) |
-| `service/FileService.java` + 3 Controller | 新增 3 个 `MultipartFile` 流式重载(`transferTo` + `Files.copy` 兜底),避免 `getBytes()` OOM |
-| `service/{ActivityFeed,Comment,Anniversary,Video}Service.java` | 列表 N+1 消除:`selectBatchIds` 批量查 + 内存 Map 回填 |
-| `service/HomeStatsService.java` | todayEvent + upcomingEvents 合并为一次查询 |
-| `service/HomeModuleService.java` | `@PostConstruct` 加载全局模块 + ConcurrentHashMap 家庭缓存 |
-| `service/ContentLikeService.java` | `syncCount` 改 `LambdaUpdateWrapper.set` 单 UPDATE(不先 select) |
-| `controller/PublicController.java` | `/public/home` 非成员视图整包缓存 Redis 5min + 失效点 |
-| `security/SecurityHelper.java` | `currentUser()`/`permissionCodes()` 走 Redis TTL 5min |
-| `frontend/vite.config.js` | `manualChunks` 拆 `element-plus`/`gsap`/`vue-i18n`,入口 553→158KB |
-| `frontend/src/main.js` | `qweather-icons.css` 改异步 `import()` |
-| `frontend/src/utils/useDragResize.js` | onDragStart 挂/onMouseUp 移(不再 onMounted 常驻) |
-| `utils/useSunLight.js` + `SunLightLayer.vue` + `main.css` | 删 lampRaf rAF,改 CSS `@keyframes lampSwing` |
-| `frontend/src/views/Home.vue` | `loadAll()` 改 `Promise.all`;`polaroidLayout` 从 computed 改 `ref`+`watch` |
-| `frontend/src/stores/app.js` | `init()` 改 `Promise.all` |
-| `frontend/public/qweather-icons/` | 删整目录(365KB 冗余,走 node_modules) |
-
-**live DB 同步**(已有库需手动执行):
-```sql
-ALTER TABLE content_photo  ADD INDEX idx_family_created (family_id, deleted, created_at);
-ALTER TABLE content_blog   ADD INDEX idx_family_status_created (family_id, status, deleted, created_at);
-ALTER TABLE content_diary  ADD INDEX idx_family_created (family_id, deleted, created_at);
-```
-
-##### 首页仪表盘
-
-| 文件 | 改动 |
-|------|------|
-| `views/Home.vue` | 12列×9行栅格系统,编辑模式可拖拽/缩放/增删组件;`useWidgetDrag.js` 单例从侧边栏拖入;栅格自适应屏幕;grid-cell 出现动画;h=1 标题消失;点击置顶;拍立得溢出+散乱;编辑模式禁用内部交互(`pointer-events:none`);GAP=40px,四边 margin=32/40/40/260(侧边栏220+40) |
-| `stores/app.js` | `homeEditMode` 状态 + `toggleHomeEditMode()` |
-| `components/AppSidebar.vue` | 编辑模式按钮(EditPen 图标,foot-user-row 最右);编辑模式 nav-item 向右下偏移+虚线框占位;拖拽时右侧气泡融合;`useWidgetDrag` 启动 |
-| `utils/useWidgetDrag.js` | 跨组件拖拽单例:AppSidebar 启动→Home.vue 接收;ghost 由小变大动画;drop 创建 4×5 组件 |
-| `controller/BookController.java` + `BookService.java` | `GET /book/summary` 本月收支聚合 |
-| `views/Home.vue` | 8 个默认组件:feed(5×5)/anni(3×4)/weather(3×2)/today(3×2)/recipe(4×4)/wish(3×2)/album(5×3)/finance(2×2);布局持久化 localStorage `ihomy:dashboard:layout` |
-
-##### 音乐系统
-
-| 文件 | 改动 |
-|------|------|
-| `schema.sql` | `family_music`→`content_music`;新增 `content_music_playlist`+`content_music_playlist_track`;`sys_family_info` 加 `background_playlist_id` |
-| `pom.xml` | 加 `com.mpatric:mp3agic:0.9.1` |
-| `MusicService.java` | 曲库 CRUD + mp3agic ID3v2 元数据提取 + 歌单 CRUD + 设为背景 + 获取背景歌单;`extractMetadata` 固定 `.mp3` 后缀(避免中文文件名 IOException);`batchDeleteMusic`/`batchDeleteByAlbum` |
-| `MusicController.java` | 曲库(upload/upload-album/list/albums/add/delete/batch/album)+ 歌单(playlist CRUD/tracks/set-background/get-background) |
-| `views/music/Music.vue` | 3 Tab(全部曲目/按专辑/歌单);多选批量删除;歌单卡片重构;弹窗统一 dialog-sm/md |
-| `components/MusicPlayer.vue` | z-index:62(光影层下方);无歌单不渲染;watch familyId 重置 |
-| `views/Settings.vue` | 背景音乐设置页 |
-| `views/Home.vue` | 音乐组件常驻,无歌单显示空状态 |
-
-**关键业务**:歌单是背景音乐最小单元;`is_background=1` 每家庭最多 1 条;MP3 元数据用 mp3agic 解析;内嵌封面存 `/files/music/covers/`。
-
-**live DB 同步**:
-```sql
-ALTER TABLE sys_family_info ADD COLUMN background_playlist_id BIGINT DEFAULT NULL AFTER music_title;
-DROP TABLE IF EXISTS family_music;
-CREATE TABLE content_music (...);  -- 见 schema.sql
-CREATE TABLE content_music_playlist (...);
-CREATE TABLE content_music_playlist_track (...);
-```
-
-##### 光影系统
-
-| 文件 | 改动 |
-|------|------|
-| `utils/windowLight.js` | `windowAngle=90-\|az-180\|`+`hasDirectLight` 门控;方位角驱动旋转;灰阶 darken 幂等 |
-| `utils/useSunLight.js` | 台灯 3 态+CSS `@keyframes lampSwing`;天气特效(snow/rain/cloud);`testSpeed` 5 档;`loadSunInfoForDate`;overcast/fog 天气模式;夜间亮斑层不因天气禁用 |
-| `components/SunLightLayer.vue` | 7 条光束+辉光+窗框阴影+暗角+灰尘;窗角门控直射光 |
-| `components/LightTestConsole.vue` | 可拖动;日期选择;速度 5 档;天气按钮;图层开关;台灯模式;9 段时段标签 |
-| 删除 | `composables/useLightLab.js`+`LightLabLayer.vue`+`LightLabConsole.vue`+`views/lightlab/LightLab.vue`+`/lightlab` 路由(LightLab 合并到生产系统) |
-
-##### 深色模式 + UI 规范
-
-| 文件 | 改动 |
-|------|------|
-| `styles/main.css` | 深色模式全面重构:primary `#d4b298`/次级半透明白/危险 `#c97474`;el-tag 半透明磨砂;el-badge;`stroke-width:2px`;圆角统一(button 12px/input 10px/card 14px/dialog 14px);弹窗规范 4 档(sm/md/lg/xl)+关闭按钮+Tab 暖棕+checkbox 暖棕;ElMessage 暖色调;popper z-index:61 |
-| z-index 层级 | ElMessage(3000)>BackToTop(200)>lamp-light(100)>LightTestConsole(80)>light-layer(78)>snow/rain(77)>dust(76)>vignette(74)>reflection(72)>SiteFooter(70)>window-shadow(68)>bright-spot(65)>MusicPlayer(62)>Popper(61)>AppSidebar(60)>draggable-panel(20→60)>main-content(10) |
-| 页面规范 | 全局 `.page`/`.page-header`/`.list-header`/`.section-label`;所有页面 H1/H2 移除(面包屑替代);Breadcrumb `#right` slot 放操作按钮 |
-| 工具栏规范 | 全局 `.page-toolbar`(padding `10px 16px !important`,不被 `.card` 20px 覆盖);`.tb-left` 放搜索/筛选,`.tb-right` 放按钮;`.write-btn`/`.ghost-btn`/`.danger-btn`/`.view-toggle`/`.vt-btn` 全局定义 height:32px,禁止 scoped 重复 |
-| 圆角规范 | `el-input__wrapper`/`el-select__wrapper`/`el-cascader` wrapper 全局 10px;`el-button` 12px;`el-card`/`el-dialog` 14px |
-| 分类级联 | 博客+图书分类选择/筛选统一用 `el-cascader`(`checkStrictly + emitPath: false`),支持多级树、`filterable` 搜索;编辑时排除当前及后代防环 |
-
-##### 厨房 + 物品
-
-| 文件 | 改动 |
-|------|------|
-| `views/kitchen/Ingredient.vue` | 上传改 `:http-request`;body key `imageUrl`(camelCase);级联 `houseId`/`roomId`(camelCase);`checkStrictly:true`;bar 高 84px 图片 1/3 宽 |
-| `views/kitchen/Kitchen.vue` | 对齐标准页 `.page`;v-loading;全局 `.card` |
-| `views/kitchen/RecipeDetail.vue` | Bug 修复:`userStore.user?.id`→`userInfo.id`(非 OWNER 作者无法编辑) |
-| `views/item/Item.vue` | `el-tag` 类型标签;对齐标准页;v-loading |
-| `i18n/zh-CN.js`+`en.js` | 合并重复 `dict` key;新增 `item_type` 字典 |
-
-##### 运维 + 天气 API
-
-| 文件 | 改动 |
-|------|------|
-| `controller/OpsController.java` | `GET /ops/weather/finance`+`GET /ops/weather/stats` |
-| `service/WeatherService.java` | `getFinance()`/`getStats()` 去掉 `resp.path("data")`(和风 Console API 扁平 JSON);`parseApiType` 加 finance/metrics;`logCall` 跳过敏感响应体 |
-| `views/ops/Ops.vue` | 天气 Tab 三区块(用量/财务/24h);`Promise.allSettled` |
-
-##### UX 修复
-
-| 文件 | 改动 |
-|------|------|
-| `views/album/AlbumDetail.vue` | 照片全屏预览;上传进度条;触屏常显操作;loading ref |
-| `views/blog/BlogDetail.vue` | 评论删除确认框 |
-| `views/plan/Plan.vue` | 子任务删除确认框 |
-| `views/Member.vue` | 邀请码一键复制 |
-| `FileService.java` | 图片缩略图 `_thumb.jpg`(maxWidth 480);`deleteByUrl` 顺带删 |
-| `utils/image.js` | `thumbUrl`/`onThumbError` 工具;4 页面列表用缩略图 |
-| `views/blog/BlogList.vue` | "加载更多"按钮;封面缩略图 |
-| `views/diary/DiaryList.vue` | `el-image-viewer` 应用内预览 |
-| i18n | Home/Settings 60+ 硬编码中文改 `$t()`;中英双语 key |
-| 移动端 | `@media (max-width:960px)` 面板从 `display:none` 改文档流堆叠 |
-
-##### 电子图书(家庭书架)
-
-| 文件 | 改动 |
-|------|------|
-| `schema.sql` | 新增 `content_book`+`content_book_borrow` 两表;`sys_auth` 加 `library:manage`;`sys_role_auth` MEMBER/CHILD 授权;`sys_home_module` 加 library(position=19);`sys_dict_item` 加 book_format/borrow_status |
-| `entity/ContentBook.java` + `entity/BookBorrow.java` | 电子书实体+阅读状态实体 |
-| `dto/LibraryDTO.java` | 表单 DTO(title+fileUrl 必填) |
-| `mapper/ContentBookMapper.java` + `ContentBookMapper.xml` | BaseMapper + 自定义 SQL(incrViewCount/selectCategoriesByFamily/renameCategory/clearCategory/deletePhysicalById) |
-| `mapper/BookBorrowMapper.java` | BaseMapper(阅读状态 CRUD) |
-| `service/LibraryService.java` | CRUD + 分类管理 + 可见性过滤(同博客) + 阅读状态跟踪 + 硬删+文件清理 + 格式自动检测 |
-| `controller/LibraryController.java` | 列表/分类/上传/增删改/阅读状态 12 个接口 |
-| `service/FileService.java` | 新增 `uploadBook(MultipartFile)` 流式重载,存 `books/{yyyyMM}/` |
-| `common/DictConst.java` | 新增 FMT_EPUB/PDF/TXT/MOBI + BORROW_WANT/READING/FINISHED 常量 |
-| `frontend/src/api/index.js` | 新增 `libraryApi`(list/detail/create/update/delete/categories/upload/borrow) |
-| `frontend/src/router/index.js` | 3 路由:/library(list)、/library/:id(detail)、/library/edit/:id?(edit) |
-| `frontend/src/views/library/LibraryList.vue` | 书架网格(auto-fill 150px)+ 工具栏级联分类筛选(`el-cascader`)+ 格式角标 + 卡片 hover 上浮 + 下拉菜单 + 分类管理弹窗(`el-cascader` 选父级) |
-| `frontend/src/views/library/LibraryDetail.vue` | 详情卡片 + 在线阅读器全屏覆盖(PDF iframe/EPUB epub.js 异步加载/TXT 分页/MOBI 仅下载)+ 阅读状态按钮 |
-| `frontend/src/views/library/LibraryEdit.vue` | 表单(书名/作者/文件上传/封面上传/简介/分类/标签/可见范围) |
-| `frontend/src/components/AppSidebar.vue` | 导航加 library(Reading 图标);ICON_MAP + NAV_PATHS |
-| `frontend/src/i18n/zh-CN.js` + `en.js` | library.* 约 55 条中英双语;dict.book_format/borrow_status |
-| `frontend/vite.config.js` | manualChunks 加 epubjs 拆分 |
-| `frontend/package.json` | 新增 epubjs 依赖 |
-
-**live DB 同步**:
-```sql
--- 见 backend/src/main/resources/library_migration.sql
-CREATE TABLE content_book (...);
-CREATE TABLE content_book_borrow (...);
-INSERT INTO sys_auth ... 'library:manage';
-INSERT INTO sys_role_auth ...;
-INSERT INTO sys_home_module ... 'library';
-INSERT INTO sys_dict_item ... book_format/borrow_status;
-```
-
-##### 移动端兼容性
-
-| 文件 | 改动 |
-|------|------|
-| `composables/useDevice.js` | 新建:UA + matchMedia(768px) 双信号检测;全局单例 `isMobile` ref;matchMedia change 监听横竖屏切换 |
-| `layouts/MobileLayout.vue` | 新建:首页路由 `/` → 三 Tab 模式(底部 TabBar);其余路由 → 子页面模式(顶部 MobileHeader + router-view);含 BackToTop/InstallPrompt/MusicPlayer |
-| `components/MobileTabBar.vue` | 新建:三 Tab(首页/更多/我的);fixed 底部 + safe-area-inset-bottom |
-| `components/MobileHeader.vue` | 新建:子页面顶部返回栏;fixed + safe-area-inset-top;返回按钮 + 标题 + 右侧 slot |
-| `components/MobileHomeFeed.vue` | 新建:首页 Tab;横向滚动筛选栏(全部/博客/日记/照片)+ 卡片信息流;复用 publicApi/homeApi getFeed |
-| `components/MobileMoreGrid.vue` | 新建:更多 Tab;按分类 4 列图标网格;复用 appStore.modules + NAV_PATHS/ICON_MAP |
-| `components/MobileMePage.vue` | 新建:我的 Tab;用户信息 + 家庭切换 + 主题/光影/语言开关 + 设置/成员/资料入口 + 退出 |
-| `App.vue` | `isMobile` 条件渲染:移动端 → `<MobileLayout>`(不挂载 SunLightLayer/AppSidebar/LightTestConsole/SiteFooter);`watch(isMobile, immediate)` 关闭所有特效 |
-| `i18n/zh-CN.js` + `en.js` | 新增 `mobile.*` 文案(home/more/me/language/members) |
-| `styles/main.css` | `@media (max-width:768px)` 增强:`.page` 全宽 + safe-area;移动端隐藏 `.light-test-console` |
-
-**设计决策**:单代码库 + 运行时设备自适应(非子域名 m.ihomy.top)。理由:避免 JWT 跨域共享/CORS/双构建双部署/PWA 分裂;同一 URL 响应式适配,localhost 测试无需额外配置。
-
-**测试方式**:`localhost:5173` + Chrome DevTools 设备模拟;真机 `http://<局域网IP>:5173`(vite host:0.0.0.0)。
-
-**第一期适配范围**:首页(三 Tab 重设计)+ 子页面顶部返回栏 + 20 个功能页响应式 CSS 增强(Blog/Diary/Album/Chat/Login/Settings/Member/Book/Task/Plan/Wish/Points/Reminder/Tree/Item/Library)。后续迭代:进一步触摸手势优化+字体大小+性能验证。
-
-##### 移动端兼容性二期(mobile 分支)
-
-| 文件 | 改动 |
-|------|------|
-| `components/MobileHomeFeed.vue` | 筛选栏从胶囊改为**文字式 + 下划线选中**;动态流扩展为 8 类型(博客/日记/照片/视频/愿望/任务/菜谱/图书),9 Tab;TYPE_LABELS/feedSummary/FEED_ROUTES;封面字段 `coverUrl`→`coverImage` |
-| `backend/.../ActivityFeedService.java` | 动态流 3 类型(blog/diary/photo)→8 类型(+video/wish/task/recipe/book);Task/Recipe 无 visibility 列(家庭内部,游客跳过),Video/Wish/Book 按 visibility 过滤,Book 需 status=PUBLISHED |
-| `views/Home.vue` | 桌面首页 feed 同步 `feedTypeLabel`/`feedSummary`/`goFeed`(与移动端一致) |
-| `utils/diary.js` | 新增 `PAPER_W = 496`(28×16+24×2)信纸宽度常量 |
-| `views/diary/DiaryEdit.vue` | 移动端信纸 `transform: scale()` 缩放(ResizeObserver 监听容器宽);`canvasPos` 修复缩放后涂鸦坐标映射(`clientWidth/rect.width`) |
-| `views/diary/DoodleTray.vue` | 移动端底部抽屉(默认折叠,标题点击展开);修复桌面 `top:16px` 未清除致抽屉飘到顶部(CSS over-constrained 让 top 赢过 bottom,且被 MobileHeader z-60 遮住无法折叠);改 flex-column(title 固定 + .tray-body 内部滚动) |
-| `App.vue` | 移动端分支挂载 `<SunLightLayer v-if="anyEffectEnabled">`(修复移动端开特效无光影);`watch(isMobile)` 仅在无 `ihomy:effects` 时默认关特效 |
-| `components/MobileMePage.vue` | `toggleLightEffect` 打开时 `lampMode='auto'`,关闭时 `lampMode='off'+glassEnabled=false` |
-| `components/Breadcrumb.vue` | `v-if="!isMobile"` 移动端隐藏(MobileHeader 已含标题) |
-| `views/Settings.vue` | 移动端增强:横向操作行(music-actions/setting-row/bg-playlist-item)flex-wrap 换行;输入框全宽;侧栏菜单项 flex-shrink:0 |
-| `views/storage/Storage.vue` | 移动端设备表/文件表**隐藏次要列**(deviceType/rootPath/size/modified),只留 name+actions 消除横向滚动;el-table 去 `fixed="right"`(`:fixed="isMobile ? false : 'right'"`);actions 列宽 260→140 |
-| `views/cascade/Cascade.vue` | 移动端卡片尺寸响应式(窄屏 90-150px/宽屏 130-220px);补 `@touchstart/@touchend`(原仅 hover,touch 设备信息层不显示) |
-| `styles/main.css` | `.page` 移动端加 `overflow-x: hidden`(全局防横向溢出) |
-
-**设计决策**:移动端 feed 复用后端 `getFeed`(与桌面同一数据源,前端按 type 分流渲染);移动端光影特效**首次访问默认关、用户开启后持久化**;设备管理/文件浏览移动端采用**隐藏次要列**而非横向滚动(信息通过桌面端查看);照片瀑布卡片尺寸随视口缩放,触摸设备用 touch 事件替代 hover。
-
-##### 播放器沉浸模式 + 多家庭修复
-
-| 文件 | 改动 |
-|------|------|
-| `utils/useSunLight.js` | `suspendEffects()`/`restoreEffects()`:播放器启动时保存并关闭天气/灯光/毛玻璃/色块,关闭后恢复;特效开关状态持久化 localStorage(`ihomy:effects`);suspend 期间跳过持久化避免覆盖原状态 |
-| `components/PhotoViewer.vue` | `<Teleport to="body">` + z-index:201(高于导航栏60和光影层100);`v-model:visible` watch 时 suspend/restore |
-| `views/library/LibraryReader.vue` | `<Teleport to="body">`;全屏模式浮动关闭按钮(z-index:210);`onMounted` suspend + `onBeforeUnmount` restore |
-| `views/cinema/Cinema.vue` | 视频弹窗 `watch(player.visible)` suspend/restore |
-| `views/Home.vue` | 拍立得改用 `PhotoViewer`(替换 `el-image-viewer`);点击拍立得播放全部近7天照片(`sevenDayPhotos`),拍立得仅展示7张随机;相册封面改为容器85%+透视厚度+花纹(`::before`/`::after`) |
-| `security/SecurityHelper.java` | `currentUser()` 返回前用 JWT 当前家庭覆盖 `familyId`(修复切换家庭后所有控制器拿到主家庭 ID 的 bug) |
-| `service/AuthService.java` | `switchFamily` 增加 `invalidateUser(userId)`(修复切换默认家庭不生效的缓存 bug) |
-| `service/AlbumService.java` | `detail`/`create`/`addPhoto` 增加 `currentFamilyId` 参数(防御性,配合 SecurityHelper 修复) |
-| `App.vue` | 全局页面过渡从 `slide-down` 改为 `fade`(0.5s,无 transform 避免 `position:fixed` 卡片偏移) |
-| `styles/main.css` | `.el-overlay` z-index:63(低于光影层 65,高于 AppSidebar 60);`.el-popper` z-index:64 |
-| `views/album/AlbumDetail.vue` | 编辑/删除按钮 `@click.stop` 阻止冒泡;`.album-head-actions` 横向排列 |
-| `components/SunLightLayer.vue` | 台灯 `lampSwing` keyframes 加 `translateY(-50%)` 修复位置偏移 |
-| `vite.config.js` + `package.json` | `vite-plugin-pwa` 升级 0.20.5→1.3.0 修复 `workbox-build` ESM 兼容;移除 `cross-env`/`build:fast` |
-
-##### UI 交互优化
-
-| 文件 | 改动 |
-|------|------|
-| `styles/main.css` | ElMessageBox 动画:`fade-in-linear-*` transition 覆盖 EP 默认,`.el-overlay-message-box` 加 scale(0.94)+opacity 淡入(与 el-dialog 一致);`.fade-in-linear-enter-active .el-overlay-message-box` 杀 EP 默认 `msgbox-fade-in` keyframes |
-| 31 个 `ElMessageBox.confirm` 调用(20 个文件) | 全部加 `closeOnClickModal: true`(点击遮罩关闭) |
-| `views/diary/DiaryEdit.vue` | 重写:移除多 textarea 分页,改为单个 `paper-textarea`+`autoResize()` 按整页(18行×28px=504px)自适应增长;新增 `.page-break-bg` 层每 504px 一条深色实线标记分页;日期/时间选择器上下排列(`header-left` flex-column),日期与心情底端对齐、时间与天气底端对齐;picker overlay z-index 降到 61(光影层 65 之下,编辑框之上) |
-| 24 个 `el-dialog`(18 个文件) | 全部加 `append-to-body`(修复弹窗遮罩未覆盖导航栏——弹窗渲染在组件内部被 stacking context 困住) |
-| `views/music/Music.vue` | 三种上传方式(单曲/专辑文件夹/外链)合并为「上传音乐」下拉菜单;新建歌单+多选按钮移入 `el-tabs__nav-scroll` 内部右侧(absolute 定位) |
-| `views/Home.vue` | 首页任务组件过滤 `status !== 'CANCELLED'`(已取消任务不展示;status 是字符串非数字) |
-| `views/blog/BlogList.vue` | 代码块 `pre` 深色背景+`white-space: pre-wrap` 自动换行;表格斑马纹+`display:block; overflow-x:auto`;行间距 `line-height: 2.0` |
-
-##### 博客列表迭代
-
-| 文件 | 改动 |
-|------|------|
-| `BlogController.java` + `BlogService.java` + `BlogMapper.xml` + `BlogMapper.java` | `GET /blog/categories/counts` 按权限全量统计;分类 CRUD 全部基于 `content_blog_category` 表(`parent_id` 自引用树);`renameCategory(id, name, parentId)` 支持改名+移父级+防环+级联更新子分类博客路径;`deleteCategory(id, mode)` 递归删除子分类 |
-| `entity/BlogCategory.java` + `mapper/BlogCategoryMapper.java` | 新增实体+Mapper(BaseMapper) |
-| `views/blog/BlogList.vue` | 工具栏(搜索→分类级联→标签可搜索→排序图标→统计→写博客);≥1400px 左侧常驻分类面板(独立滚动),<1400px 顶部 `el-cascader`;分类树多级递归(后端返回扁平树);卡片三行布局;hover 编辑/删除;草稿标记;分类弹窗 `el-cascader` 选父级(编辑时排除当前及后代防环) |
-| `views/blog/BlogEdit.vue` | 分类选择改 `el-cascader`;新建分类弹窗支持选父级 |
-| `api/index.js` | `addCategory(name, parentId)` / `renameCategory(id, name, parentId)` / `deleteCategory(id, mode)` |
-| `i18n/zh-CN.js` + `en.js` | 新增 `sortRecent`/`sortViews`/`articlesUnit`/`parentCategory`/`rootCategory` |
-
-**博客分类树规则**:`content_blog_category` 表用 `parent_id` 自引用(NULL=顶级),`name` 只存本级名称;后端 `categories()` 返回扁平树 `{id, name, parentId, path, depth, childCount}`;`content_blog.category` 列存全路径(如 `技术/前端`)用于筛选;`renameCategory(id, name, parentId)` 可改名+移父级(防环校验),级联更新子分类博客路径。前端用 `el-cascader`(`checkStrictly + emitPath: false`)做分类选择/筛选,编辑时排除当前分类及其后代防环。**未分类与初始分类(V9.6,2026-09-01)**:新建家庭自动注入 9 个默认分类(`BlogService.seedDefaultCategories`,注册/建家庭两入口,未分类固定最后);不选/清空分类统一落"未分类"(`CATEGORY_UNCATEGORIZED`,后端 create/update 映射,空分类博客可见于分类计数);存量家庭与旧字符串分类由 migrations.sql 收编(补种子+空分类归未分类+旧字符串建为顶级分类 sort 90 变可编辑)。
-
-##### 日记本书架+翻书视图(V9.0)
-
-| 文件 | 改动 |
-|------|------|
-| `views/diary/DiaryList.vue` | 重写为书架:每位作者一本日记本(木纹封面+纸质标签+绑带,3:4 网格),封面显示作者名/篇数/起迄日期,hover 抬起;点击进 `/diary/book/:authorId`;列表页不再直接展示日记内容 |
-| `views/diary/DiaryBook.vue` | 新建:翻书视图。桌面双页信纸(左/右页+书脊阴影)/移动单页(useDevice 切换,页码语义转换);紧凑连续排页(上一篇写完下一篇紧接,仅总页数为奇数时末页右侧留白);左右方向键+底部工具栏(上一页/目录/页码指示/下一页)翻页;目录 el-dropdown 按日期跳篇;翻页方向性滑入动画;新建/编辑保存后跳回对应日记本 |
-| `views/diary/DiaryPage.vue` | 新建:单张书页组件。首页页眉(日期/时间+心情/天气,沿用编辑页横线样式)+hover 编辑/删除按钮(作者或 OWNER 可见);正文=504px 裁剪窗口(`translateY(-页序*504px)` 裁同一文本块,与编辑页分页度量一致)+涂鸦双层画布(墨迹/荧光)同窗口裁剪;页脚=可见范围标签+页码+字数;空白补页只有横线 |
-| `views/diary/DoodleTray.vue` | 新建(V9.1):涂鸦笔盘。7 支内联 SVG 画笔(签字笔/铅笔/蜡笔/荧光笔/画笔/像素橡皮/对象橡皮,笔尖/笔身实时显示当前墨色),hover 抬起旋转、选中悬停;el-slider 粗细(1-12)+透明度(10%-100%);28 色调色盘(7 列网格)+彩虹自定义取色器(input type=color);撤销/重做按钮(仅涂鸦,快照历史) |
-| `utils/doodle.js` | 新建(V9.1):矢量笔画引擎。BRUSHES/INK_COLORS+renderStroke/renderStrokes(签字笔实色圆头/铅笔两遍抖动/蜡笔三遍抖动/mulberry32 种子确定性防重绘闪变/荧光笔宽平头走专用 multiply 画布/画笔随速度变宽)+erasePixel(按半径切断笔画拆新笔画)/eraseObject(整笔删除)+parseDoodle/doodleExtentY/setupCanvas/clearCanvas |
-| `utils/diary.js` | 新建:LINE_H=28/LINES_PER_PAGE=18/PAGE_H=504+MOODS/WEATHERS 枚举+`measureDiaryLines` 离屏测行数(共享单 DOM,样式须与 .page-text CSS 同步) |
-| `views/diary/DiaryEdit.vue` | 常量/枚举改引 `utils/diary.js`;日期回显改从 createdAt 原始字符串切片(修 toISOString UTC 时区偏移);编辑保存后跳回 `/diary/book/:authorId`;涂鸦三层画布接入(荧光/墨迹/实时)+指针事件+Esc 退笔;paper-body 去 2px padding 对齐查看页坐标系 |
-| `backend/.../DiaryService.java` | 修 bug:`parseDate` 兼容 `yyyy-MM-dd HH:mm`(旧代码 `parse(date+"T00:00:00")` 遇带时间的 date 直接 500,已实测);update 现在持久化日期修改(此前忽略);create/update 持久化 doodle |
-| `schema.sql` + `Diary.java`/`DiaryDTO.java` | `content_diary` 加 `doodle` JSON 列(实体+DTO 加字段);live DB 增量:`backend/src/main/resources/diary_doodle_migration.sql` |
-| `router/index.js` | 加 `/diary/book/:authorId`(public) |
-| `i18n/zh-CN.js` + `en.js` | diary.* 新增 10 条(entryCount/bookOf/pageOf/singlePageOf/toc/prevPage/nextPage/emptyBook/words) |
-| `styles/main.css` | `.ghost-btn:disabled` 全局禁用态样式 |
-
-**翻书分页规则**:一篇日记的页数 = `max(ceil(measureDiaryLines(content) / 18), ceil(doodleExtentY / 504))`(涂鸦可撑页数);书页序列按篇**紧凑拼接**(上一篇写完下一篇紧接,不补空白页,新篇页眉可能落在右页;仅总页数为奇数时最后一页右侧留白);spread s 显示第 2s+1/2s+2 页。正文不分段切割,同一文本块用裁剪窗口显示(与编辑页"textarea 长高+分页线"度量完全一致,字体/宽度改动必须同步 `utils/diary.js` 与 DiaryPage CSS)。书架封面标签起迄日期分行展示(起 {date}/迄 {date})。
-
-**涂鸦规则(V9.1)**:笔画坐标 = paper-body/sheet-body 左上角原点 CSS 像素(两页宽度同为 496px、正文 y=0 起,坐标系一致);数据 `{v:1, strokes:[{t,c,w,a,s,pts}]}` 存 `content_diary.doodle` JSON 列(`a`=透明度 0-1 缺省 1,渲染时与笔型基础 alpha 相乘);荧光笔(marker)走专用画布 + CSS `mix-blend-mode: multiply`(深色模式 screen)+opacity 0.55,其余笔走墨迹画布;编辑页画布层:荧光(2)<墨迹(3)<实时(4),正文 textarea(1);撤销/重做 = 笔画数组引用快照史(提交/擦除均不可变更新,橡皮无变化返回原引用),Ctrl+Z/Y 仅在非 textarea 焦点时生效;live DB 同步见 `backend/src/main/resources/diary_doodle_migration.sql`。
-
-##### 相册/照片(photo 分支,2026-08-30)
-
-| 文件 | 改动 |
-|------|------|
-| `schema.sql` | `content_album` 改名 `content_photo_album` + 新增 `share_token VARCHAR(16)` 唯一索引 |
-| `entity/Album.java` | `@TableName("content_photo_album")` + `shareToken` 字段 |
-| `AlbumMapper.xml` / `PhotoMapper.xml` | 3 处 JOIN + deletePhysicalById 改表名 |
-| `AlbumService.java` | `create` 生成 16 位 UUID 截断令牌;新增 `shared(token)`:令牌查相册,校验 type=public + 家庭 is_public=1,返回精简 album+photos(仅 VIS_PUBLIC 照片,不含 authorId/familyId),否则 404 不泄露存在性 |
-| `AlbumController.java` | 新增 `GET /album/shared/{token}`(GET /album/** 已 permitAll,游客可访问) |
-| `migrations.sql` | 追加改名(RENAME + information_schema 幂等判断)+ 加列 + 存量回填令牌;deploy.ps1 流水线自动执行 |
-| `components/PhotoViewer.vue` | 新增 `shareBase` prop + 分享 pv-icon-btn(复制 `{origin}/album/shared/{token}?p={shareId(photoId)}`,无 shareBase 隐藏)+ 下载 pv-icon-btn(`<a download>` 同源直链);缩略图条 watch index 激活项 `scrollIntoView` 居中(修复播放到后面照片时 pv-thumb-strip 不跟随) |
-| `views/album/AlbumDetail.vue` | 分享模式:`/album/shared/:token` 路由复用本页,`albumApi.shared` 加载;`?p=` 混淆照片ID 定位打开播放页;album-head-actions 增「分享」ghost-btn(仅 public 相册);移除「播放」el-button(播放功能保留在 PhotoViewer 内);`.album-name` 改 inline-flex 垂直居中 |
-| `utils/shareId.js` | 新建:Knuth 乘法散列(0x9E3779B1)+ base36 单向编码,URL 照片 ID 混淆;匹配时逐个编码比对,无需解码 |
-| `router/index.js` | `/album/shared/:token`(public,置于 `/album/:id` 前) |
-| `api/index.js` | `albumApi.shared(token)` |
-| `i18n/zh-CN.js` + `en.js` | `album.share` + `photoViewer.share/download/linkCopied/copyFailed` |
-
-**分享链接规则**:相册分享 URL = `{origin}/album/shared/{albumShareToken}`(仅混淆令牌,无裸 ID);游客可打开的条件 = 相册 type=public 且所属家庭 is_public=1,否则 404(不泄露存在性);照片分享 URL 追加 `?p={shareId(photoId)}`(Knuth 散列混淆,访问控制仍由相册令牌承担)。新建相册自动生成令牌,存量相册由 migrations.sql 回填。Home/Cascade 的 PhotoViewer 不传 shareBase → 分享按钮隐藏。
-
-##### 设备目录映射相册(V9.2,2026-08-30)
-
-| 文件 | 改动 |
-|------|------|
-| `schema.sql` + `migrations.sql` | `content_photo_album` 加 parent_id/source_device_id/source_path/sync_status/last_synced_at + `idx_family_parent`;`content_photo` 加 source_fs_id |
-| `entity/Album.java` / `entity/Photo.java` | 对应新字段 |
-| `service/AlbumMapService.java` | 新建:目录映射核心。`createMapping`(校验设备→异步任务)、`refreshAlbum`(手动刷子树)、`autoRefresh`(打开相册静默刷当前层,2 分钟节流+在飞去重)、`syncAlbumTree`(列目录→影子照片 upsert→递归子目录建子相册→prune 消失记录)、`ensureRootAlbum`/`ensureChildAlbum`(同设备同路径幂等复用;撞普通相册名加"(设备名)"后缀)、`classifyStatus`(NOT_FOUND/errno=-9→MISSING,其余 OFFLINE) |
-| `service/AlbumMapRunner.java` | 新建:@Async 执行器(独立 bean 防自调用失效);`AlbumMapService→Runner` 用 @Lazy @Autowired 断构造器循环 |
-| `service/SignedUrlService.java` | 新建:HMAC-SHA256(jwt.secret)短期签名(10 分钟)。影子照片 url 存逻辑地址 `storage://{deviceId}/{远程路径}?fsid={fsId}`,`resolve()` 出接口时换 `/api/storage/file-signed` 签名 URL |
-| `service/AlbumService.java` | 重写:list 返回全部层级(parentId/sourceDeviceName/syncStatus/childCount/totalPhotoCount 子树合计,GROUP BY 批量计数免 N+1);detail 返回 children 子相册+签名 URL+触发 autoRefresh;delete 递归删子树(解除映射,deleteByUrl 跳过 storage://,设备文件永不动);shared 转 URL |
-| `service/StorageService.java` | browse 响应加 fsId(百度);baiduOpen 加 fsId 快路径(跳过列父目录);getDeviceById(签名端点无用户上下文);删 startSync/syncProgress |
-| `controller/StorageController.java` | `POST /storage/map` 替代旧 `POST /storage/sync`;`GET /storage/file-signed`(permitAll,签名即凭证)与 `/file` 共用 streamFromDevice(百度流式 InputStreamResource,本地 byte[]) |
-| `controller/AlbumController.java` | 加 `POST /{id}/refresh`(@RequirePermission storage:manage) |
-| `controller/CascadeController.java` / `PublicController.java` / `service/ActivityFeedService.java` | 照片 URL 出口统一走 signedUrlService.resolve |
-| `config/SecurityConfig.java` | GET `/storage/file-signed` permitAll |
-| `mapper/PhotoMapper.java` + `.xml` | 加 countByAlbumIds(GROUP BY 批量) |
-| 删除 | `service/StorageSyncRunner.java`(旧拷贝式一键同步退役) |
-| `components/SyncDialog.vue` | 重写为两步向导:选设备 → el-tree 懒加载目录树(lazy+show-checkbox,只列目录)→ 勾父含子自动 → POST map → 进度条(totalDirs/doneDirs)→ 完成通知父组件刷新 |
-| `views/album/Album.vue` | 顶层过滤(parentId 空);来源角标(设备名+状态点 绿VALID/灰OFFLINE/红MISSING);子相册数角标;总数用 totalPhotoCount;删除确认区分解除映射 |
-| `views/album/AlbumDetail.vue` | 子相册卡片行(封面+状态点+照片数,点击进入);映射横幅(只读·来源·上次刷新时间 ago);刷新按钮(isOwner);映射相册隐藏上传与照片编辑/删除 |
-| `views/storage/Storage.vue` | 旧一键同步区块(Sync 端点+includeEmpty+轮询)替换为说明文字+向导入口(SyncDialog 复用) |
-| `api/index.js` | `storageApi.map` 替代 `sync`;`albumApi.refresh` 新增 |
-| `i18n/zh-CN.js` + `en.js` | album.*(unmapConfirm/mappedReadOnly/refreshMap/status*) + storage.*(mapHint/mapTreeHint/mapNow/syncInBackground 等) 中英双语 |
-
-**映射规则**:影子照片 = content_photo 行,`url` 存 `storage://{deviceId}/{path}?fsid={fsId}`(百度带 fsid,本地设备路径无前导 /)、`source_path` 存 `dev:{deviceId}:{path}` 去重键、`taken_at` = 设备 mtime;可见性随相册 type;封面取第一张影子记录。浏览/预览/下载经 `/api/storage/file-signed`(HMAC 签名 10 分钟,img 标签免 JWT)。刷新:手动=递归子树+通知;自动=打开详情触发当前层(2 分钟节流);刷新同时清理设备侧消失的子相册(目录改名/删除/移动,按 sourcePath 比对,仅本映射建的)。失败分类:目录不存在(本地 NOT_FOUND / 百度 errno=-9)→ MISSING(红点),其余 → OFFLINE(灰点)。删除映射相册=递归删子树+影子记录,设备文件永不触碰。百度 fs_id 存进影子记录,预览直查 filemetas 省一次列目录。
-
-**缩略图缓存(V9.3)**:`&thumb=1` 参数(不参与签名)走 `ThumbnailService`——480px JPEG 落盘 `uploadDir/device-thumbs/{md5(deviceId:fsId或path)}.jpg`,首次下载原图生成、之后读缓存秒回;HEIC 等 ImageIO 不可读格式回退原图流;百度 fsId 变化自动换 key 重新生成,NAS 用路径(内容覆盖不刷新,可接受)。前端 AlbumDetail 网格/子相册封面、Cascade 瀑布网格用 `&thumb=1`,PhotoViewer 播放/下载用原图。**百度 API 并发限流**:`StorageService.baiduSlots` Semaphore(4) 包住 baiduOpen 建连阶段(filemetas+dlink open,流关闭时释放),防网格页几十并发打爆百度限频;缩略图生成阶段另有 `ThumbnailService.GEN_SLOTS` Semaphore(2) 防 OOM(原图 byte[]+全解码吃堆,catch Throwable 回退原图)。相册详情面包屑支持层级返回(`parents` 链从根到父)。
-
-##### 相册体验迭代(V9.4,2026-08-30)
-
-| 文件 | 改动 |
-|------|------|
-| `schema.sql` + `migrations.sql` | `content_photo_album` 加 `cover_url`(自定义封面,优先于照片封面) |
-| `entity/Album.java` | +coverUrl 字段 |
-| `service/AlbumService.java` | resolveCover 优先级 coverUrl>coverPhotoUrl>最新照片;`updateCover`(LambdaUpdateWrapper 显式 SET——updateById 忽略 null 的坑,清除封面必须显式 SET NULL);delete/deletePhoto 连带 evictByUrl 缩略图缓存 |
-| `service/AlbumMapService.java` | removeSubtree 删影子记录时同步 evict 缩略图缓存 |
-| `service/ThumbnailService.java` | +evictByUrl(解析 storage:// 逻辑地址删缓存文件);GEN_SLOTS Semaphore(2) 生成限并发防 OOM;clearCache 端点化 |
-| `controller/AlbumController.java` | `POST /{id}/cover`(MultipartFile 上传)+ `DELETE /{id}/cover`(清除回退照片封面);换封面删旧文件 |
-| `controller/StorageController.java` | `DELETE /storage/thumbs` 清空缩略图缓存(storage:manage) |
-| `stores/sync.js`(新) | 后台同步全局监听:taskId 存 sessionStorage,3s 轮询,DONE→ElNotification+doneCount++,FAILED→error 通知;任务丢失(服务重启)自动移除 |
-| `components/AlbumDefaultCover.vue`(新) | 相册默认封面:暖棕文件夹内联 SVG(无照片无自定义封面时替代 emoji 占位) |
-| `components/SyncDialog.vue` | 前台等待完成→展示 100% 后 800ms 自动关窗;同步中关窗=转后台(syncStore.watch 继续轮询+完成弹通知) |
-| `views/album/AlbumDetail.vue` | album-header padding 对齐 page-toolbar 规范(10px 16px);「设置封面」按钮(创建者/OWNER);子相册 view-toggle 方块(4:3 大封面卡片)/列表(横条)双模式 localStorage 记忆;照片多选批量删除(选择模式+勾选角标+循环调 remove);watch syncStore.doneCount 后台完成自动刷新 |
-| `views/album/Album.vue` | 列表卡片默认封面 AlbumDefaultCover;相册多选批量删除(映射相册文案区分);watch syncStore.doneCount 自动刷新 |
-| `views/storage/Storage.vue` | 「清理缩略图缓存」按钮(OWNER) |
-| `api/index.js` | albumApi.setCover/clearCover;storageApi.clearThumbs |
-| `i18n/zh-CN.js` + `en.js` | album.*(setCover/childAlbums/gridView/listView/select/cancelSelect/selectedCount/selectedAlbums/deleteSelected/photoBatchDeleteConfirm/batchDeleteConfirm/batchUnmapConfirm)+ storage.clearThumbs/thumbsCleared + common.failed |
-
-**封面规则**:`cover_url` 自定义封面 > `cover_photo_url` 首图 > 最新一张照片 > 前端默认封面 SVG(目录型相册无照片时)。设置封面走 `POST /album/{id}/cover` 流式上传(files/{yyyyMM}/),清除走 DELETE;换/清封面自动删旧封面文件。**多选删除**=前端循环现有单删接口(权限天然继承),照片在详情页、相册在列表页,选择模式 localStorage 不记忆(一次性操作)。**后台同步提醒**=Pinia stores/sync 全局轮询(sessionStorage 持久 taskId,刷新页面恢复监听),DONE 弹 ElNotification + doneCount++,相册两页 watch 自动刷新;服务重启任务丢失自动清除监听。
-
-##### 百度网盘接入凭证(photo 分支,2026-08-30)
-
-| 文件 | 改动 |
-|------|------|
-| `schema.sql` | 新增 `sys_baidu_credential`(家庭级唯一,AppID/AppKey 明文 + SecretKey/SignKey ENC 加密);总表数 53→54 |
-| `entity/BaiduCredential.java` + `mapper/BaiduCredentialMapper.java` | 实体 + BaseMapper(无自定义 SQL) |
-| `service/StorageService.java` | `getBaiduCredential`(脱敏视图,密钥只回 `secretKeySet/signKeySet`)+ `saveBaiduCredential`(留空保留原值,`parameterService.encrypt` 加密入库);OAuth 授权码模式:`getBaiduAuthUrl`(state 存 Redis `ihomy:baidu:state:{state}` 绑定家庭,10 分钟 TTL)+ `baiduAuthCallback`(state 一次性校验防令牌替换 → `openapi.baidu.com/oauth/2.0/token` 换 token → ENC 加密存储)+ `httpGetJson`(HttpURLConnection) |
-| `controller/StorageController.java` | `GET/PUT /storage/baidu/credential` + `GET /storage/baidu/auth/url?redirectUri=` + `POST /storage/baidu/auth/callback`(均 @RequirePermission("storage:manage");密钥/授权相关 `@OperationLog saveArgs=false` 防落日志) |
-| `migrations.sql` | 追加 CREATE TABLE IF NOT EXISTS + token 三列条件 ALTER(deploy.ps1 流水线执行);本地库已建 |
-| `views/storage/Storage.vue` | 设备模态框:类型选「百度网盘」(BAIDU)时隐藏根路径、显示 AppID/AppKey/SecretKey/SignKey 表单(编辑带出已存凭证,密钥留空保留),保存=先 `saveBaiduCredential` 再 add/updateDevice(rootPath 由后端置 '/');「百度网盘接入」区块只读展示:回调页地址+一键复制+授权/重新授权按钮+授权状态 tag+token 有效期,未配置时提示先添加设备;设备表 BAIDU 行根路径显示 — |
-| `views/storage/BaiduCallback.vue` + `router/index.js` | 新建 OAuth 回调页 `/storage/baidu/callback`(public):百度授权后带 `?code=&state=` 重定向至此,调 `baiduAuthCallback` 换 token,成功/失败展示后跳回 `/settings?tab=storage`;百度侧失败(error/error_description)与登录过期分别处理 |
-| `api/index.js` + `i18n` | `storageApi.baiduCredential/saveBaiduCredential/baiduAuthUrl/baiduAuthCallback` + `storage.baidu.*` 中英文案(含回调页文案) |
-
-**百度网盘接入边界**:已完成凭证存储(四件套)+ OAuth 授权码模式授权(state 防伪 → 换 token → ENC 加密存储)+ **文件适配器**(浏览走 xpan `file?method=list`、预览/下载走 filemetas→dlink 服务器中转流式返回[UA 必须 `pan.baidu.com`,手动跟随 302 重放 UA]、token 过期/失效 errno 111/-6 自动 refresh_token 续期[距过期<5min 主动刷新,新 refresh_token 必须落库])。**尚未做**:一键同步(BAIDU 设备调用 sync 返回明确提示,逐文件 dlink 下载落盘量大耗时待后续)、SignKey 回调签名校验。授权回调页地址 = `{前端origin}/storage/baidu/callback`,须与百度开放平台应用注册的「授权回调页地址」完全一致(生产 https://ihomy.top/storage/baidu/callback)。
-
-##### 相册工具栏与多选迭代(V9.5,2026-08-31)
-
-| 文件 | 改动 |
-|------|------|
-| `views/album/Album.vue` | 工具栏改标准 `.page-toolbar`:tb-left=搜索+来源筛选(全部/本地上传/各映射设备名,sourceOptions 由列表去重)+类型筛选(全部/公开/私有);tb-right 常规态=选择(ghost)→同步→新建(primary),选择态=选中计数+取消+删除所选(danger);批量删除按钮从小号改默认尺寸(与常规按钮同规格);多选时隐藏卡片 album-type 避让 pick-badge |
-| `views/album/AlbumDetail.vue` | 多选控件并入 album-head-actions 页头操作区(选中计数+取消+删除,替换独立 select-bar 工具条);选择态隐藏 view-toggle/分享/上传等常规按钮;子相册列表视图改单列横条(`grid-template-columns: 1fr`);纯子相册相册(有子无照片)不显示照片空态(`el-empty` 改 `v-else-if="!children.length"`);子相册+照片混合多选删除(selectedChildIds/togglePickChild/selectSummary,批量删除先 `albumApi.remove` 子相册再 `photoApi.remove` 照片);`thumbUrl` 只对含 query 的签名 URL 追加 `&thumb=1`(本地 `/files/` 直链无 query,拼参数 404) |
-| `views/blog/BlogList.vue` + `views/diary/DiaryList.vue` | 工具栏恢复标准 page-toolbar 布局(compact 变体连同 main.css 段落删除) |
-| `api/index.js` | `photoApi.upload` 加 `timeout: 0`(照片上传不限时——家庭宽带上行慢,15s 默认超时曾致并发上传全部取消) |
-| `views/cascade/Cascade.vue` | 瀑布网格缩略图同 thumbUrl 规则(仅签名 URL 拼参) |
-| `migrations.sql` | 补录 `content_blog_category` 建表迁移段(此前只进 schema.sql,生产缺表) |
-| `i18n/zh-CN.js` + `en.js` | album.*(searchPlaceholder/filterSource/allSources/localUpload/filterType/allTypes/selectedMixed/batchMixedConfirm) |
-
-**多选交互规则(V9.5 定稿)**:相册列表页多选控件在工具栏 tb-right,详情页在页头操作区——常规态与选择态按钮组互斥切换,选择态=选中计数(`.select-count` 13px 次要色)+取消+删除所选(danger 默认尺寸);详情页支持子相册+照片混合勾选,批量删除先删子相册再删照片;选择模式一次性操作,不 localStorage 记忆;`&thumb=1` 只拼设备映射照片的签名 URL,本地上传 `/files/` 直链原样返回。
-
-##### 博客白屏修复(2026-08-31)
-
-| 文件 | 改动 |
-|------|------|
-| `service/BlogService.java` | `categoryCounts` 合并旧分类字符串行时补全字段:`{id:null, name, parentId:null, path, depth:0, childCount:0, cnt}`(LinkedHashMap 保序),不再把 SQL 裸行 `{category,cnt}` 直接 append |
-| `views/blog/BlogList.vue` | 4 处护栏:`countWithChildren` 对 `id==null` 行直接返回累计值;flatTree 渲染 `:key` 从 `node.id` 改 `node.path`;cat-ops `v-if` 加 `node.id != null`(旧分类行隐藏编辑/删除);parentCategoryTree 构建跳过 `id==null` 行 |
-| `views/chat/Chat.vue` | WebSocket 重连成功时 `connectedError.value = false` 复位错误标志(此前重连成功横幅不消失) |
-| `vite.config.js` | `preview.proxy` 补 `/api`→8080 代理(vite preview 本地验证生产构建用) |
-
-**根因与兼容规则**:生产 `content_blog_category` 表为空但博客带旧分类字符串,`/blog/categories/counts` 把缺 id/parentId 的裸行混进返回,前端 `countWithChildren` 用 `child.parentId === item.id` 找子分类,`undefined === undefined` 恒真 → 全体互相无限递归 → RangeError 渲染中断白屏(接口有数据但页面空白;游客 401 拿不到该接口不崩;≥1400px 侧边栏路径必崩)。修复后旧分类行 `id=null` 只展示计数,不可编辑/删除/作父级;用户在分类管理建同名表分类后 path 匹配 + seen 去重自动合并,无需数据迁移。
-
-##### 放映厅设备映射与工具栏迭代(video 分支,2026-08-31,未合 main)
-
-| 文件 | 改动 |
-|------|------|
-| `schema.sql` + `migrations.sql` | `content_video` 加 `source_device_id/source_path/source_fs_id/source_dir/sync_status` 5 列 + `idx_family_created/idx_family_source` 索引;`video_url` 扩到 VARCHAR(500) 容纳 storage:// 长路径 |
-| `entity/Video.java` | 对应 5 个映射字段 |
-| `service/MapTaskRegistry.java`(新) | 目录映射任务进度共享注册表(相册+视频共用),进度统一走 `GET /storage/sync/progress/{taskId}`,前端 SyncDialog/sync store 零改动 |
-| `service/VideoMapService.java`(新) + `VideoMapRunner.java`(新) | 设备目录→放映厅影子视频映射(平铺模式):递归扫描视频文件(mp4/mkv/avi/mov/wmv/flv/webm/m4v/ts/rmvb/mpg/mpeg/3gp)入 `content_video`(video_url 存 `storage://` 逻辑地址,title=文件名去扩展名,mediaType=other,source_dir 记映射根目录);`refreshAll` 按 distinct(source_device_id, source_dir) 反查重扫+prune 消失记录;目录扫不到标 MISSING/OFFLINE(不清记录);根目录空 basename 拒绝 |
-| `service/AlbumMapService.java` | 私有 taskProgress map 改用共享 `MapTaskRegistry`(progress 行为不变) |
-| `service/VideoService.java` | list 响应加 sourceDeviceId/sourceDeviceName/sourceDir/syncStatus(批量查设备);videoUrl/poster 出接口走 `signedUrlService.resolve`;`update` 防护:映射视频(source_path 非空)的 video_url 不允许被编辑覆盖(前端编辑表单拿到的是已解析签名 URL,回存会污染逻辑地址);新增 `playUrl(id)` 播放地址现签;删死代码 resolveUserName |
-| `controller/VideoController.java` | 新增 `POST /video/map`(storage:manage)、`POST /video/refresh`(storage:manage)、`GET /video/{id}/play-url`(permitAll,`/video/*` 已放行,游客 401 列表拿不到数据无影响) |
-| `service/StorageService.java` + `controller/StorageController.java` | 本地设备文件流式返回改 `PathResource`(原 readFileBytes 全量 byte[],GB 级视频必 OOM);Spring 对 Resource 自动支持 Range 请求(拖进度条 206);guessMediaType 补 mkv/webm/mov/avi/m4v |
-| `views/cinema/Cinema.vue` | 工具栏对齐相册标准:tb-left=搜索+来源+类型+题材筛选(前端过滤),tb-right=选择/想看/刷新映射/同步/上传;选择态=计数+取消+删除所选(批量删除混映射视频时提示仅删记录);卡片来源角标(设备名+VALID/OFFLINE/MISSING 状态点);播放走 playUrl 现取(签名 URL 10 分钟过期);映射视频编辑表单隐藏文件上传显示"文件在设备上";watch syncStore.doneCount 后台同步完成自动刷新 |
-| `components/SyncDialog.vue` | 加 `target` prop(album 默认/video):切换 map 调用与标题/提示文案;进度轮询共用 storage 端点 |
-| `api/index.js` | videoApi 加 `map/refreshMap/playUrl` |
-| `i18n/zh-CN.js` + `en.js` | cinema.*(filterSource/allSources/localUpload/filterMediaType/allTypes/filterGenre/select/cancelSelect/selectedVideos/deleteSelected/batchDeleteConfirm/batchMixedConfirm/refreshMap/refreshStarted/playFailed/mappedFileHint)+ storage.mapHintVideo 中英 |
-
-**映射规则(video 分支)**:影子视频 = `content_video` 行,`video_url` 存 `storage://{deviceId}/{path}?fsid={fsId}`、`source_path` 存 `dev:{deviceId}:{path}` 去重键、`source_dir` 存映射根目录(相对设备);**平铺无层级容器**(用户选定,目录树结构以后再设计),列表页来源角标+来源筛选区分本地上传/设备映射;删除影子视频=物理删记录(设备文件永不动,deleteByUrl 自动跳过 storage://);刷新=按 source_dir 反查重扫,prune 仅清 `dev:{id}:{rootDir}/` 前缀下消失的记录;**播放地址每次点击现签**(`GET /video/{id}/play-url`,列表返回的签名 URL 10 分钟过期不可靠);本地设备视频流式 PathResource 输出(支持 Range,防 OOM),百度走 dlink 中转(不支持 Range,拖进度条受限——已知上限)。**冒烟已验证**:映射 3 文件(忽略非视频)/prune/刷新/删除保留设备文件/206 Range/相册映射回归(MapTaskRegistry 重构无回归)。
-
-**TMDB 连通性实测(2026-08-31,生产服务器 ihomy.top)**:`api.themoviedb.org` 被 GFW DNS 污染(解析到 Facebook/Twitter 假 IP,阿里 DoH/权威 NS 直查均拿不到真实记录,注入答案随机);**`api.tmdb.org`(官方备用域名)干净可用**(AWS CloudFront,401 业务响应 0.5s),`image.tmdb.org` 海报 CDN(Bunny CDN)直连可用。两者同一后端:`--resolve api.themoviedb.org:443:99.84.152.10` 可正常访问(TTL=1,IP 会轮换,失效时重查 api.tmdb.org 的 A 记录)。**结论**:① ihomy 刮削 TMDB 零代理,API base 用 `api.tmdb.org` 即可;② NAS 上 Jellyfin(硬编码 api.themoviedb.org)需 hosts 指向 api.tmdb.org 的真实 IP;③ Bangumi api.bgm.tv 也被污染,不做主依赖;④ 豆瓣无官方 API 不做主依赖。放映厅方向决策(2026-08-31):不二开 Jellyfin(栈不符/部署冲突/账号断开),NAS 试用 Jellyfin 评估体验后定;ihomy 内作品化模型(work/episode 两层+TMDB 刮削+人工匹配兜底)为备选自建方案,见"放映厅设备映射"归档。
-
-**live DB 同步**(✅ 2026-08-31 已随 deploy.ps1 自动执行,migrations.sql video 段幂等):
-```sql
--- 见 backend/src/main/resources/migrations.sql 尾部 video 段(幂等)
-ALTER TABLE content_video ADD COLUMN source_device_id BIGINT DEFAULT NULL;
-ALTER TABLE content_video ADD COLUMN source_path VARCHAR(500) DEFAULT NULL;
-ALTER TABLE content_video ADD COLUMN source_fs_id BIGINT DEFAULT NULL;
-ALTER TABLE content_video ADD COLUMN source_dir VARCHAR(500) DEFAULT NULL;
-ALTER TABLE content_video ADD COLUMN sync_status VARCHAR(20) DEFAULT NULL;
-ALTER TABLE content_video MODIFY COLUMN video_url VARCHAR(500) NOT NULL;
-ALTER TABLE content_video ADD INDEX idx_family_created (family_id, deleted, created_at);
-ALTER TABLE content_video ADD INDEX idx_family_source (family_id, deleted, source_device_id);
-```
-
-##### 放映厅 Jellyfin 集成方案(video 分支定稿,2026-08-31,待启动)
-
-> 多端(电视/电脑/手机/平板)看片的方向决策:**核心功能(刮削/转码/TV 客户端)用 Jellyfin,界面与家庭层 ihomy 自建**(Infuse 模式:自研 UI + 标准媒体服务器后端,Findroid/Gelli/Infuse 均为此模式验证)。不自建完整媒体中心(TV 原生客户端与转码是自建死穴),不二开 Jellyfin(C#/.NET 大型代码库 fork 维护不动,与 ihomy 栈脱节)。本方案已定稿未开发,启动时按"分期"顺序执行,启动前先重读本节。
-
-**架构与部署拓扑**:
-- **NAS(家庭)**:Docker 跑 Jellyfin,媒体目录按"一个作品一个目录"约定挂载(电影一目录/剧集每季一目录,与 Jellyfin 标准约定天然一致);frp/DDNS 暴露 8096 公网入口
-- **VPS(ihomy 后端)**:只调 Jellyfin REST API(小 JSON,走 frp 隧道,流量可忽略),**不出视频流量**
-- **客户端**:播放 URL 带 api_key 直连 NAS 公网端点;手机/平板/电脑用 ihomy PWA 界面;**电视直接用 Jellyfin 原生 Android TV/tvOS App**(自建方案的死穴由此解决,体验等同商业产品)
-- **多家庭**:每家庭各自配置 Jellyfin 地址(一家庭一服务器;一个 Jellyfin 也可多库多用户服务多家庭,v1 不做);Emby 兼容预留(API 同源,server_type 字段区分)
-
-**账号模型**:v1 家庭共享账号(管理员凭证存 ihomy,观看进度/续看全家共享——家庭场景可接受);P2 做 ihomy 用户↔Jellyfin 用户映射表(各自续看)。
-
-**数据模型(新增 1 表,启动时随 migration 建)**:`sys_media_server`(family_id 唯一):
-```sql
-CREATE TABLE sys_media_server (
-  id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  family_id BIGINT NOT NULL,
-  server_type VARCHAR(20) NOT NULL DEFAULT 'JELLYFIN' COMMENT 'JELLYFIN/EMBY',
-  server_url VARCHAR(255) NOT NULL COMMENT '后端访问地址(如 frp 隧道 http://xxx:8096)',
-  public_url VARCHAR(255) DEFAULT NULL COMMENT '客户端播放直连地址(空=同 server_url)',
-  username VARCHAR(100) NOT NULL,
-  password VARCHAR(500) NOT NULL COMMENT 'ENC 加密(复用 sys_baidu_credential 模式)',
-  enabled TINYINT NOT NULL DEFAULT 1,
-  last_connected_at DATETIME DEFAULT NULL,
-  created_by BIGINT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  deleted TINYINT NOT NULL DEFAULT 0,
-  UNIQUE KEY uk_family (family_id)
-);
-```
-密码 GET 只回 `hasPassword`,PUT 留空保留原值(百度凭证同款交互)。
-
-**API 映射(Jellyfin 10.9 REST,均未实测——S1 spike 第一件事就是验证此表)**:
-
-| ihomy 接口(前缀 /api/media) | Jellyfin 端点 |
-|---|---|
-| `PUT /media/config` 保存配置 | —(ihomy 落库,密码 ENC) |
-| `POST /media/test` 连通测试 | `POST /Users/AuthenticateByName` |
-| `GET /media/works` 作品列表(海报墙数据) | `GET /Users/{uid}/Items?Recursive=true&IncludeItemTypes=Movie,Series&Fields=Genres,People,Studios,ProductionLocations,PremiereDate,CommunityRating,ChildCount` |
-| `GET /media/works/{itemId}` 详情 | `GET /Shows/{id}/Seasons` + `GET /Shows/{id}/Episodes`(电影直接回 Items 详情) |
-| `GET /media/works/{itemId}/play` 播放地址 | `{public_url}/Videos/{id}/stream?static=true&api_key={token}`(现签) |
-| `POST /media/works/{itemId}/played` 标记看过 | `POST /Users/{uid}/PlayedItems/{id}` |
-| `GET /media/resume` 继续观看 | `GET /Users/{uid}/Items/Resume` |
-| 海报/剧照 | `GET /Items/{id}/Images/Primary`(转 ihomy 代理或直连) |
-
-- **认证**:登录头 `Authorization: MediaBrowser Client="ihomy", Device="ihomy-server", DeviceId="{随机}", Version="1.0"`,body `{Username, Pw}` → `AccessToken` + `User.Id`;token Redis 缓存 `ihomy:jf:{familyId}` 24h,401 自动重认证;stream URL 用 `api_key` query 参数
-- **播放 v1 = 直连 static stream**(h264 mp4/mkv 浏览器原生播,现有 Range 流式经验直接复用);转码 HLS(`/Videos/{id}/master.m3u8` + hls.js)留 P4 回退
-- **权限**:配置读写复用 `@RequirePermission("storage:manage")`(同 OWNER 管理员受众,免新增 auth 种子);works/详情/播放需登录(游客无 familyId 返回空)
-- **分类筛选**:数据来自 Jellyfin Items 的 Fields(题材/年代/地区/演员/导演/制作商),家庭库几百条,前端过滤(相册同款模式)
-
-**前端改造范围(S3)**:
-- Cinema 页 → Jellyfin 海报墙(作品卡片:海报/评分/年份/未看集数)+ 多维筛选 + 详情页(新路由 `/cinema/:itemId`:元数据+分季分集+播放+看过标记)+ 播放器(`<video>` src=现签 stream URL,播放点击时取,勿存列表)
-- **现有本地上传视频列表降级为次级 tab 保留**(自制内容/想看入库仍走 ihomy 自己的存储);想看清单保留(ihomy 自有功能)
-- Settings/Storage 页加「放映厅引擎」配置块(server_url/public_url/账号/密码/测试连接/状态)
-
-**分期(启动顺序)**:
-- **S1 spike**:本地 Docker 起 Jellyfin+测试媒体(容器内 ffmpeg 生成测试片源:`docker exec jellyfin ffmpeg -f lavfi -i testsrc=duration=30...` 可生成真实 h264+aac mp4;NFO+poster.jpg 测本地元数据路径),脚本跑通 登录→建库(/Library/VirtualLibraries)→列表→详情→播放→标记看过→resume;**首件事验证上表 API 假设**
-- **S2 后端**:`sys_media_server` 表 + JellyfinService(认证/列表/详情/播放地址/状态) + MediaController 代理接口,对着本地 Jellyfin 冒烟
-- **S3 前端**:海报墙/筛选/详情/播放器/配置页
-- **S4 打磨**:转码 HLS 回退、字幕轨(`/Videos/{id}/{mediaSourceId}/Subtitles/{index}/Stream.vtt`)、多用户映射、NAS 部署切换
-
-**已排雷(启动时无需重查)**:
-- TMDB 域名污染:NAS 上 Jellyfin 需 hosts 指向 `api.tmdb.org` 真实 IP(实测方案见"TMDB 连通性实测")
-- **Docker Hub 直连被污染**(解析到 104.244.43.57 假 IP):本地拉 Jellyfin 镜像需走国内镜像源(`docker.m.daocloud.io/jellyfin/jellyfin:10.9.11` 等,2026-08-31 未验证可用性,拉取时逐个试)
-- 远程看片瓶颈 = 家庭宽带上行(与任何自建方案相同,非集成引入);frp 隧道承载 VPS→NAS API 小流量 + 客户端→NAS 播放大流量两种用途
-
-##### 生产发布与环境数据同步(2026-08-31)
-
-| 事项 | 结果 |
-|------|------|
-| video 分支上生产 | `deploy.ps1` 全量流水线(后端 jar+前端 dist+migrations video 段),健康检查通过;content_video 映射列已加,`/api/video/list` 200 |
-| 测试→生产 | 2 篇日记(id 8/9,家庭"小窝",高大尚 2026-08-29),utf8mb4 全链路,HEX 验证中文完好 |
-| 生产→测试 | 36 张表 REPLACE 镜像(生产赢,冲突行覆盖+生产独有插入,测试独有保留);生产 uploads 287MB/221 文件 tar 合并到本地(`tar -xk` 不覆盖已有) |
-| 终验 | 仅生产 0 行 / 冲突仅 6 条生产新增通知(镜像后的真实漂移) / 仅测试 31 行(用户保留:25 照片+书+杂项) |
-| 备份 | 两库全量 SQL:`C:\Users\chill\AppData\Local\Temp\opencode\backup_{prod,test}.sql`(临时目录,确认无误后可删) |
-
-**环境数据同步规范(未来复用)**:
-- 同步表清单(36 张):`sys_user`/`sys_user_role`/`sys_family_info`/`sys_home_module`/`sys_dict_item` + content_*(blog/diary/photo_album/photo/comment/like/music×3/book×2/wish/video/video_wish) + family_*(anniversary/task/plan×2/reminder/checkin/points×3/book_record/chat×2/user_label/tree/notification/apply/invitation_code)
-- **排除表(环境特定,永不同步)**:`sys_storage_device`(root_path 各环境不同)/`sys_parameter`(aes-salt 各环境独立,同步会毁掉 ENC 密文)/`sys_baidu_credential`(同前)/`sys_password_reset_token`/`sys_operation_log`(环境噪音)/`sys_weather_*`
-- 方向语义:生产→测试 = `mysqldump --replace --complete-insert --extended-insert`(同 ID 生产赢,测试独有行不受影响);测试→生产 = 纯 INSERT(--complete-insert --skip-extended-insert,先核对生产无同 ID)
-- 全链路二进制安全:python subprocess 捕获 bytes → 写文件 → docker cp / scp → `mysql --default-character-set=utf8mb4 -e "source ..."`;**禁止 PowerShell 管道**
-- 工具:`scripts/db_diff.py`(两库逐表 ID 差集 + 同 ID 行级内容对比,输出仅测试/仅生产/冲突三分类)
-
-**⚠ docker mysql 客户端字符集坑(必读)**:`docker exec ihomy-mysql mysql -N -e "..."` 不带 `--default-character-set=utf8mb4` 时,utf8mb4 中文输出会被客户端转码成 `?`(假性乱码,**数据实际完好**)。曾因此误判测试库家庭名/照片 URL/日记内容"损坏"。**判真伪用 `SELECT HEX(col)`**(真实损坏=3F 字节;伪影=正常 UTF-8 字节序列)。凡经 docker exec 的 mysql 输出与导入(mysqldump/source)一律带该参数;生产端(apt 安装的 mysql)无此问题。测试库唯一真实损坏:家庭 42(名字=5 个问号,0 内容)。
-
-**测试库遗留垃圾(用户自行删除)**:家庭 42(乱码空家庭)、content_video id 4(冒烟孤儿,storage:// 指向已删设备)、sys_storage_device id 7 CTDev(指向已删临时目录)。
-
-##### 首页频闪排查与修复(frontend_performance 分支,2026-08-31,已结案)
-
-**最终根因(用户实测确认)**:Edge 硬件加速下的 GPU 合成路径 bug(驱动/MPO 层,非应用代码)。证据链:① 关闭硬件加速 → 不频闪;② Chrome 同页面 → 不频闪;③ 切走再切回浏览器窗口(触发 DWM 全量重建)→ 频闪消失;④ 刷新页面 → 频闪复现。用户侧处理:开关一次硬件加速+重启 Edge 已恢复;**若复发**依次尝试:更新显卡驱动 → 注册表禁用 MPO(`HKLM\SOFTWARE\Microsoft\Windows\Dwm` → `OverlayTestMode`=5)→ 应用内 Settings 关"毛玻璃"(no-glass 全局禁 backdrop-filter,应用侧唯一规避开关)。
-
-**保留的修复(应用侧真实问题,与驱动 bug 无关)**:
-
-| 文件 | 改动 |
-|------|------|
-| `components/SunLightLayer.vue` | `.bg-blobs` 5 个色块从 `filter: blur(80px)` 实色圆改为**预模糊 radial-gradient** + drift keyframes 去掉 `scale()`(纯 translate);删 `.bg-blobs` 的 `will-change: transform`。修的是独立真实问题:带 filter 的层随 scale 动画被 Chromium 周期性重栅格化,叠加上方 N 张 backdrop-filter 卡片时全特效状态持续频闪(第一轮实测修复生效)。视觉近似等效,滤波成本归零 |
-| `components/AppSidebar.vue` | `toggleLightEffect` 从只切 `shadowEnabled` 改为**全量切换 5 项特效**(shadow/blobs/weather/glass/lampMode),对齐 MobileMePage 同款开关语义——原 bug:用户"关闭所有特效"后 blobs/毛玻璃/台灯/天气仍运行 |
-| `components/MobileMePage.vue` | 删 `ihomy:light:shadow` 死键写入(无读取方,持久化统一走 useSunLight 的 watch → `ihomy:effects`) |
-| `views/Home.vue` | `sevenDayPhotos`/`recentPhotos` 从含 `Date.now()`/`Math.random()` 的 computed 改 `ref + watch(allPhotos)` 一次性生成(遵守 computed 纯函数规范,防重算时拍立得重新洗牌跳动) |
-
-**已尝试并撤销的规避(根因确认在浏览器侧后全部恢复原样,构建 hash 与第一轮后一致)**:
-- `.glass-flatten` 恒等扁平化层(z63, multiply 纯白):假设 blend 层强制压平可稳定 backdrop-filter 采样——无效,已删。
-- 首页卡片/侧边栏/播放器/编辑工具栏去 backdrop-filter(博客 id=18 方案三)+ 背景增实:牺牲毛玻璃视觉,根因不在应用,已全部恢复。
-- nav-item 去 scale/box-shadow 悬停、卡片悬停改纯 transform:同上,已恢复原动效。
-- 加载后 `.recomposite-kick` 根元素瞬时 opacity 触发全量重合成(模拟切窗口):实测无效,已删。
-
-**排查方法论沉淀**:视觉频闪类问题先做浏览器侧对照(关硬件加速/换浏览器/切窗口)再动应用代码——本轮在合成器理论上绕了三大圈,最终 2 分钟的浏览器对照实验直接定位根因。后端日志无请求循环(排除 JS 轮询)仍是有效的前置排查。
-
-
-
-##### 音乐设备映射与工具栏迭代(music 分支,2026-08-31,已合 main 上生产)
-
-| 文件 | 改动 |
-|------|------|
-| `schema.sql` + `migrations.sql` | `content_music` 加 `source_device_id/source_fs_id/source_dir/sync_status` 4 列 + `idx_family_source(family_id,deleted,source_device_id)` 索引;`source_path` 复用为 `dev:{deviceId}:{path}` 去重键(幂等迁移段见 migrations.sql 尾部) |
-| `entity/ContentMusic.java` + `ContentMusicMapper`(+新建 .xml) | 实体加 4 映射字段;`deletePhysicalById` XML 物理删(映射曲目删/prune 用) |
-| `service/MusicMapService.java`(新) + `MusicMapRunner.java`(新) | 设备目录→曲库映射(平铺,VideoMapService 同款):递归扫描音频(mp3/flac/wav/ogg/m4a/aac/wma/opus)入影子曲目(url 存 `storage://` 逻辑地址,title=文件名去扩展名,**不做 ID3 下载解析,无 artist/album/封面**——用户决策:纯平铺仅文件名,不目录推导);`refreshAll` 按 distinct(source_device_id, source_dir) 重扫+prune;prune 物理删记录+清理歌单关联行;MISSING/OFFLINE 状态分类 |
-| `service/MusicService.java` | `listByFamily` 返回 Map 列表(批量查设备名免 N+1,storage:// 原样返回不解析);`playUrl(id,familyId)` 播放现签;`removeMusicRow`:映射曲目物理删+不删设备文件,本地/外链保持软删+删文件;`uploadAndCreate` 流式化(transferTo 临时文件→mp3agic→`FileService.upload(Path)` Files.copy,**不再 getBytes 全量入堆**) |
-| `service/FileService.java` | 新增 `upload(Path,...)` 本地文件源流式重载(MultipartFile 被 transferTo 消费后用) |
-| `controller/MusicController.java` | `GET /music/{id}/play-url` 现签;`POST /music/map`+`POST /music/refresh`(@RequirePermission storage:manage + @OperationLog);list 返回类型改 List<Map> |
-| `views/music/Music.vue` | 工具栏对齐相册/放映厅规范:tb-left=搜索(歌名/艺术家/专辑)+来源筛选(全部/本地上传/外链/各设备);tb-right=多选/新建歌单(playlist tab)/刷新映射(owner+hasMapped)/从设备同步(owner)/上传音乐(primary 下拉:单曲/专辑文件夹/外链);选择态=计数+取消+删除所选;曲目卡片来源角标(设备名+状态点);**全页 i18n 化**(原硬编码中文→music.* 词条);play-url 播放现取;watch syncStore.doneCount 后台同步完成自动刷新;tabs-extra 按钮全部并入工具栏;**多选=相册同款 pick-badge 右上对勾角标+卡片描边,点击卡片即勾选**(曾同时残留 checkbox 角标+对勾 badge 双效果,已去重) |
-| `views/cinema/Cinema.vue` | tb-left 搜索/来源/类型/题材 4 个筛选组件补 `size="small"`,对齐相册/音乐工具栏高度(此前为默认 32px 高,两页混排不一致) |
-| `components/MusicPlayer.vue` | `playSrc` ref + watch currentTrack:storage:// 曲目切歌现取 playUrl(带 id 竞态防护),本地/外链直用——修复 BGM 长时间挂机后签名 URL 过期切歌失败;播放器文案 i18n 化 |
-| `components/SyncDialog.vue` | `target` prop 加 `music`(map 调 musicApi.map,标题/提示 storage.mapHintMusic) |
-| `api/index.js` | musicApi 加 `playUrl/map/refreshMap` |
-| `i18n/zh-CN.js` + `en.js` | music.* 新增 70 条中英词条(工具栏/筛选/多选/映射/弹窗/播放器)+ storage.mapHintMusic + common.removed |
-
-**映射规则(music 分支)**:影子曲目 = `content_music` 行,`url` 存 `storage://{deviceId}/{path}?fsid={fsId}`、`source_path` 存 `dev:{deviceId}:{path}` 去重键、`source_dir` 存映射根目录;平铺无层级容器,来源经工具栏筛选区分(本地上传/外链/设备);删除映射曲目=物理删记录(设备文件永不动,歌单关联行连带清理);刷新=按 source_dir 反查重扫,prune 仅清 `dev:{id}:{rootDir}/` 前缀下消失的记录。**播放地址每次切歌现签**(签名 10 分钟过期,列表不解析——MusicPlayer/Music 页两处都走 `GET /music/{id}/play-url`)。已知上限:设备上的 FLAC/OGG/WMA 在 iOS Safari 不支持(Chrome/Edge 支持 FLAC/OGG),与放映厅 mkv 同理;映射曲目无 ID3 元数据/封面(仅文件名)。**冒烟已验证**:映射 3 文件(递归子目录+忽略非音频)/prune/刷新/删除保留设备文件/签名播放 200/本地曲目回归;**live DB 同步**:migrations.sql music 段(deploy.ps1 流水线自动执行)。**测试库注意**:sys_storage_device id=7(CTDev)root_path 已指向已删除的临时目录(遗留垃圾,用户自行处理)。
-
-##### 天气系统(weather 分支,2026-09-01)
-
-功能域:和风天气数据聚合、天气详情页、气象预警推送、运维天气监控。全链路和风 API v7→v1 迁移(JWT Ed25519 认证不变)。
-
-**1. 和风 API v7→v1 迁移**
-
-| 文件 | 改动 |
-|------|------|
-| `WeatherService.java` | 主力接口全量切 v1(v7 air/warning 已弃用 403):实况 `/weather/v1/current/{lat}/{lon}`、每日 `/weather/v1/daily/{lat}/{lon}?days=`、小时 `/weather/v1/hourly/{lat}/{lon}?hours=`、预警 `/weatheralert/v1/current/{lat}/{lon}`(坐标路径,不需要城市 ID)、空气 `/airquality/v1/current/{lat}/{lon}`(**current 不是 now**,404 根因);生活指数 `/v7/indices/1d` 与分钟降水 `/v7/minutely/5m` 不迁(官方现行版仍是 v7);坐标路径参数最多两位小数(`toLatLon` 四舍五入),全部 `localTime=true`(默认 UTC 错 8 小时) |
-| `WeatherService.java`(适配层) | v1→旧 v7 字段形状映射,前端零改动:`buildNowFull`(湿度/云量 0-1→%、能见度 m→km、风速 m/s→km/h、compass 16 方位→中文)、`mapDailyV1`(温度取整、降水概率→%、astro 日出日落完整 ISO)、`mapHourlyV1`、`mapWarningV1`(过滤 cancel、颜色代码→中文级别、description→text、+senderName/instruction)、`fetchAir`(indexes 优先国标 cn/aqi-cn、aqiDisplay、pollutants→旧键名、+健康建议) |
-| `WeatherService.parseApiType` | v1 前缀映射同类型码(now/forecast/hourly/warning/air),运维统计/趋势/饼图口径连续 |
-
-**2. 天气数据聚合(detail)**
-
-| 文件 | 改动 |
-|------|------|
-| `WeatherService.java` | 10 天预报 `days=10`;分钟降水整节点 put(保留 summary 摘要句);预警 `senderName`+`instruction` 防御指南;空气健康建议(adviceGeneral/adviceSensitive);now 增加 `nowFull` 原始实况;月度配额 50000;`GET /weather/type-distribution?range=` 类型分布 |
-| `utils/useSunLight.js` | `loadWeatherDetail()` 全局拉详情(预警+今日高低温,与简版并行,30m 刷新),Home 不再自己 fetch |
-
-**3. 天气详情页(/weather,public)**
-
-| 文件 | 改动 |
-|------|------|
-| `views/weather/Weather.vue`(新)+ `router` + i18n | 顶部实况(大图标+温度+高低+9 指标网格)→气象预警(senderName+防御指南)→24h(卡片↔折线切换,默认折线)→10 天表格(温度渐变横条)→空气(健康建议)→生活指数→分钟降水;复用光影层 detail 缓存 |
-| `Weather.vue`(24h 折线图) | Catmull-Rom 平滑贝塞尔曲线,SVG 720×230,温度渐变描边+半透明填充,最高/最低点标注,底部每 3h 时间标签,hover 竖线+圆点+HTML tooltip(时间/天气/降水/风力);视图切换 vt-btn localStorage 记忆 |
-| `Weather.vue`(温度横条) | `tempColor()` 7 段颜色(-20°冷蓝→42°暖红),`dailyRange` 整体 min-max 轨道,`tbarStyle` 每天渐变段+均值指示点,深色模式覆写 |
-| i18n | weatherPage.* 新增 defenseGuide/chartView/cardsView/healthAdvice/sensitiveAdvice;daily 改 10 天 |
-
-**4. 气象预警推送**
-
-| 文件 | 改动 |
-|------|------|
-| `WeatherService.java` | `@Scheduled fixedDelay=30min pushWeatherAlerts()`:扫全家庭→按坐标共享缓存(10m)→Redis Set 去重(TTL 3 天)→新预警写站内通知铃铛;`fetchAlertsCached()`;注入 FamilyMapper+SysUserRoleMapper+NotificationService |
-| `ParameterService.java` | `getString(name)`/`put(name,value,desc)` 通用读写 |
-| `FamilyController.java` | `GET /family/weather-alert-push`(读)+ `PUT /family/weather-alert-push?enabled=`(@family:manage,写);开关存 sys_parameter 家庭级缺省开 |
-| `Settings.vue` + `api/index.js` | 「气象预警推送」el-switch + familyApi.getWeatherAlertPush/setWeatherAlertPush |
-
-**5. 天气入口与运维监控**
-
-| 文件 | 改动 |
-|------|------|
-| `AppSidebar.vue` | 迷你天气(非首页占编辑按钮位):图标+温度+预警徽标(el-tooltip 全部预警),点击进 /weather;`utils/dict.js` 加 `WARN_LEVEL_ORDER/warnLevelColor/topWarning`(白<蓝<黄<橙<红) |
-| `Home.vue` | 天气组件精简(图标+温度+右上下最高最低暖橙/冷蓝+文字),点击进 /weather |
-| `Ops.vue` + `WeatherLogMapper(.xml)` + `OpsController` | 调用趋势折线图悬浮提示(透明列 hover→竖线+双圆点+tooltip);API 类型占比饼图(SVG 扇区+引导线+标签);配额 4 卡+横向进度条(70%/90% 阈值变色);`GET /ops/weather/compare` v7/v1 并行验证(ops:view) |
-
-**设计决策**:v1 路径全用坐标参数(lat/lon 两位小数),query 只剩 localTime/lang;v1 单位差异(湿度/云量/降水概率 0-1、能见度米、风速 m/s)由适配层换算回 v7 语义,前端零改动;预警 severity=minor/moderate/severe/extreme、颜色在 color.code,级别中文化取 color,messageType.code=cancel 过滤。并行验证实测:实况 28° vs 28.0°、湿度 44 vs 46、日出同为 05:43——数值吻合。预警推送 30m 一轮按坐标共享缓存多家庭只打一次 API,Redis Set 去重防重复通知。折线图走 Catmull-Rom 样条,hover 用 HTML div(SVG 文字受限);温度横条整体 min-max 范围+每天渐变段+7 段温度色阶。**live DB 无需迁移**(全前端+已有 API)。
-
-
-##### 日志追溯体系(backend_logs 分支,2026-09-01,已合 main)
-
-
-| 文件 | 改动 |
-|------|------|
-| `logback-spring.xml`(新) | 三类日志文件分流:`logs/{access,server,thirdparty}/ihomy-*.log`,按天滚动(TimeBasedRollingPolicy,maxHistory=`app.log-retention-days` 默认 7,totalSizeCap 1/2/1GB,cleanHistoryOnStart);六要素 pattern `[tid:%X{traceId:-}]`;AsyncAppender(neverBlock 队满丢日志不阻塞业务);`mybatis.sql` DEBUG 只进 server 文件;`mybatis.sql.internal` 压 INFO 防框架会话管理噪音;控制台不含 SQL |
-| `application.yml` | 删 `logging.file.name/pattern`(归 logback);新增 `logging.file.path`(基线 /opt/ihomy/logs,开发 external.yml 覆盖)+ `app.log-retention-days: 7`;`mybatis.sql: debug`(SQL 恒开) |
-| `common/Loggers.java`(新) | 三类日志 logger 入口:`access()`/`thirdParty(service)`;业务日志仍用 @Slf4j(自动进 server) |
-| `common/Ips.java`(新) | 真实 IP 解析(AccessLogFilter/OperationLogAspect 共用,后者私有方法删除) |
-| `common/ThirdPartyHttp.java`(新) | 三方 GET 统一封装:`>>>` 请求/`<<<` 响应(status/costMs/body 截断 1KB)/`!!!` 异常带堆栈;URL query token 类参数与 Authorization 头打码;gzip 自处理;失败抛 IOException 由调用方兜底 |
-| `filter/AccessLogFilter.java`(新) | 每请求一条 access 日志:method/URI(含 query)/user(JwtAuthenticationFilter 放的请求属性)/ip/status/业务code/cost/req/resp;入参捕获 4KB(流式旁路,multipart 只记长度)、响应 2KB(>512 字符只记 code+message);password/token/captcha 等打码;失败(HTTP≥400/code≠0)或慢(>3s)自动升 WARN;WS 握手跳过流包装(防破坏 Tomcat 协议升级) |
-| `filter/CaptureRequestWrapper.java` + `CaptureResponseWrapper.java`(新) | 请求/响应体截断捕获(tee 到 cap 字节封顶,大文件上传下载零额外内存;响应边写边透传不缓冲) |
-| `config/AsyncConfig.java`(新) | @Async 执行器:虚拟线程 + MDC TaskDecorator(提交线程 tid 复制到异步线程,操作日志落库/映射任务的 SQL 皆带发起请求 tid) |
-| `config/SqlStatementLog.java` | 内部类分流:`org.mybatis/org.apache.ibatis` 开头的框架 logger 挂 `mybatis.sql.internal.` 前缀(压回 INFO,每条 SQL 少 4-6 行会话管理噪音) |
-| `websocket/ChatWebSocketHandler.java` | 每条 WS 消息独立 16 位 tid(MDC put/remove 包裹处理);access 日志补 WS 消息行(user/family/bytes/content 截断 200) |
-| `config/WsHandshakeInterceptor.java` | attributes 补 username(WS access 日志用) |
-| `security/JwtAuthenticationFilter.java` | 认证成功把 userId/username 放请求属性(SecurityContext 在 filter 返回前已被清理,access 日志取不到) |
-| `service/WeatherService.java` | callApi/resolveLocation 出站改走 ThirdPartyHttp(weather/ipapi);删自带 HttpURLConnection 与重复日志 |
-| `service/SunService.java` | ip-api 改走 ThirdPartyHttp(删 RestClient) |
-| `controller/DailyController.java` | Bing 代理改走 ThirdPartyHttp(删 HttpClient) |
-| `service/StorageService.java` | httpGetJson 改走 ThirdPartyHttp(baidu);baiduOpen dlink 流式手动打 thirdparty 日志(fsId/status/len/costMs,失败 `!!!`) |
-| `service/OpsService.java` + `controller/OpsController.java` | `GET /ops/logs/trace?tid=&date=`:扫三类文件按 tid 精确匹配,行头正则解析(时间/线程/tid/级别/logger/消息),堆栈续行归入上一条,按时间合并排序返回(条数上限 3000、单条消息 16KB 截断);tid 格式校验防滥用 |
-| `aspect/OperationLogAspect.java` | **业务操作日志双写**:落库同时输出 server 日志一行 `[操作] MODULE.TYPE 描述 用户=xx#N 结果=SUCCESS/FAILED 耗时=Nms`(成功 INFO/失败 WARN 带错误摘要 200 字符截断)——@OperationLog 端点的关键业务节点自动进六要素日志 |
-| 7 个 Controller(Blog/Library/Music/Like/Profile/Reminder/Task) | 补齐 25 处缺漏的 `@OperationLog`(博客/图书分类 CRUD、音乐上传+外链+删除+歌单全套、点赞切换、身份标签删除、提醒完成切换、任务放弃);auth/refresh、chat/read、notification/read 属高频噪音端点刻意不加 |
-| `service/OpsService.java` + `controller/OpsController.java`(V9.8.1) | 访问量统计 `GET /ops/traffic/stats?startDate=&endDate=`(扫 access 文件正则聚合:总请求/失败/慢/独立用户/独立IP/平均耗时+24小时分布+接口Top15,范围上限14天,WS 消息行无 status 不计入);`GET /ops/logs/options`(distinct 模块/操作类型,多选下拉数据源);`/ops/logs` 的 module/operationType/result 改 List 多选 IN;`/ops/logs/trace` 加 sources/levels 过滤(级别过滤在 flush 时判定) |
-| `views/ops/Ops.vue` + `api/index.js` + i18n(V9.8.1) | 新增「访问统计」tab(日期范围+6 指标卡片+24h 柱状图 SVG 暖棕总/红失败叠层+接口 Top15 表,懒加载+`?tab=traffic` 直达);操作日志筛选改 `el-select multiple filterable`(模块/类型=动态选项,结果=固定 SUCCESS/FAILED);详细日志加日志类型/级别多选可搜索过滤 |
-| `WeatherService.java` + `WeatherLogMapper(.java→.xml)` + `OpsController.java` + `views/ops/Ops.vue` + i18n(V9.8.2) | 天气 API 页按关注优先级重排:调用趋势置顶(时间段单选+**API 类型多选可搜索**过滤+总量/失败/失败率摘要)→本月配额(4 卡片)→24h 按 API 成功/错误/失败率合一表→财务沉底。修 3 个 bug:①x 轴覆盖不全=SQL 只返回有数据的桶+`%H:00` 跨零点同小时合并 → Service 零填充整个时间范围(24h 桶改 `%m-%d %H:00`);②x 标签全挤左侧=模板用 v-for 序号当数据下标 → xLabels 改返回 `{x,label}` 按真实下标定位;③`/console/v1/usage` 恒 404(死接口从未成功)→ quota 改本地统计(Redis 计数器/DB fallback,口径只计数据 API,控制台类 quota/finance/metrics 不计费不计数)。另:selectTimeline SQL 移 XML(原来 @Select 注解违反规范);图表 preserveAspectRatio=none 改等比缩放 height:auto(修文字横向拉伸);计数器 key 加 62 天过期(原无 TTL 永久残留);天气 tab 全部硬编码中文 i18n 化(ops.weather*/apiType.* 约 40 词条);loadTimeline 并行化 |
-| `frontend/src/api/index.js` | `opsApi.traceLogs` |
-| `frontend/src/views/ops/Ops.vue` | 新增「详细日志」tab(tid+日期查询,来源/级别标签着色,ERROR/WARN 左边条,mono 消息区 420px 滚动);操作日志表格 TID 列点击跳详细日志并按该行日期自动查询;支持 `/ops?tab=trace&tid=xxx&date=` 直达;onMounted 并行加载 |
-| `frontend/src/api/request.js` | 5xx 业务码与 HTTP 错误 toast 前缀 `[tid:xxx]`(取响应头 X-Trace-Id,报障直接拿 tid 检索) |
-| `config/CorsConfig.java` | 暴露 `X-Trace-Id` 响应头(前端可读) |
-| `i18n/zh-CN.js` + `en.js` | ops.* 新增 12 条(traceLogs/tidPlaceholder/traceDate/traceEmpty/traceTruncated/traceCount/tidJump/source_access/server/thirdparty) |
-| `docs/日志规范.md`(新) | 开发规范:三类文件/六要素/tid 规则/级别标准/三方走 ThirdPartyHttp/堆栈写法/脱敏清单/保留策略 |
-| `docs/日志问题分析方法.md`(新) | 排查方法论:拿 tid 四途径→详细日志页→四步分析(access 定请求/code 分流/server 找根因/thirdparty 排外因)+ 案例 + 终端 grep 命令 + 常见问题速查表 |
-
-**设计决策**:①日志不入库不上 ES——2GB VPS 单实例,文件按天滚动+tid 精确匹配扫描足够(操作日志表已有 trace_id 列做索引入口);②文本格式非 JSON——终端 grep 可读优先,多行堆栈靠解析器"行头时间戳判定新条目"归并;③响应捕获用旁路 tee 封顶截断(2KB)而非 ContentCaching*Wrapper——后者整包缓冲,GB 级文件下载必 OOM;④SQL 日志恒开 DEBUG——用户明确要求记录所有 SQL+入参,量靠按天滚动+2GB 上限兜底;⑤WS 握手不包装请求/响应流——Tomcat 协议升级对包装敏感,消息级日志由 Handler 每消息独立 tid 补记。**冒烟已验证**:三文件生成/登录+博客列表 SQL 带 tid/@Async 落库 SQL 带 tid(ihomy-async 线程)/weather 出站进 thirdparty 文件/密码 token 打码/失败请求升 WARN/500 异常堆栈 119 行归并成单条目/`/ops/logs/trace` 跨文件检索/code≠0 拦截。**开发环境注意**:external.yml 的 `logging.file.name` 已改 `logging.file.path: D:\WorkSpace\ihomy\logs`(三类子目录自动创建);控制台不再输出 SQL,看 SQL 请 tail server 文件。
-
-##### 物品定位户型图(item_seeker 分支,2026-09-03,已合 main)
-
-> 物品定位 2期户型图,S1 数据模型重构 + S2 前端户型图编辑器。设计见 `docs/户型图设计.md`(v4 + 文末「实现记录」)。S3 吸附 / S4 尺寸标定定位 / S5 打磨待做。
-
-**S1 数据模型重构**(commit 628fddc):
-
-| 文件 | 改动 |
-|------|------|
-| `schema.sql` + `migrations.sql` | `family_house.floor_plans` TEXT(JSON,key=楼层:`{imageUrl,scale}`,默认 scale=100px/m);`family_room.geometry` TEXT(JSON 顶点数组,替代 `x/y/w/h`);`family_furniture.room_id` 可空(空=家具库)+ `type` + `x/y/w/h`(DECIMAL 可空=未摆上画布);`family_item.rel_x/rel_y`(DECIMAL 0~1)+ `room_id` 可空(散放锚房间);migrations 幂等段(条件 ALTER,已随 deploy 自动执行) |
-| `entity/House/Room/Furniture/Item` + DTO | 实体与 DTO 加 `floorPlans/geometry/type/x/y/w/h/relX/relY` 字段 |
-| `ItemService` + `ItemController` | 5 个户型图接口(均 `@OperationLog`):`GET /item/floor-plan?houseId=&floor=`、`PUT /item/house/{id}/floor-plans`、`PUT /item/room/{id}/geometry`、`PUT /item/furniture/{id}/geometry`、`PUT /item/{id}/place` |
-| `mapper/ItemMapper.xml` | 散放物品 `COALESCE(r.id, ir.id)` 等返回 room/house/floor 信息(物品列表/搜索结果带路径) |
-
-**S2 前端户型图编辑器**:
-
-| 文件 | 改动 |
-|------|------|
-| `api/index.js` | itemApi 加 `floorPlan/saveFloorPlans/saveRoomGeometry/saveFurnitureGeometry/saveItemPlace` |
-| `views/item/Item.vue` | 重写为**户型图主视图**(非 tab):顶栏房子下拉+搜索框+「列表」「编辑」;空态画布中央大「+」建房子;查看/编辑两模式分离;编辑态左侧酷家乐式侧栏(房间/家具/库 tab);左下角楼层切换器(>1 层显示 `N`F);搜索命中右下角结果列表(房子/房间/家具/位置分组)点条目切房/楼层+高亮;旧 CRUD 收进「列表」模式 |
-| `views/item/FloorPlanCanvas.vue`(新) | SVG 编辑器:房间 `<polygon>`/家具 `<rect>`(右下缩放手柄)/物品 `<circle>`/底图 `<image>`;`transform: translate() scale()` 平移缩放 + fit 自动适配;编辑手势(实装):拖主体=全顶点平移/拖顶点=自由改单点(**允许斜边**+轴对齐吸附辅助成矩形,阈值 6px,吸附顶点变绿)/拖边=两端点自由平移/hover 边(12px)显示圆圈加号点击插入端点(靠近顶点/边中点手柄 12px 内不显示)/双击顶点=删点(最少4点)/拖家具=移动缩放/拖物品=定位/空白拖拽滚轮=平移缩放;画房间=拖矩形+逐点描绘 |
-| `i18n/zh-CN.js` + `en.js` | item.* 户型图词条(顶栏/空态/侧栏/楼层/搜索/弹窗等) |
-
-**关键实现规则(相对设计 v4 的 3 处变更)**:
-1. **允许斜边(去掉强制直角)**:决策 #19「边强制横竖」作废;顶点/边自由拖动,多边形可含斜边。
-2. **轴对齐吸附(辅助,非强制)**:拖顶点时邻边贴近横/纵轴 6px 内吸附到 prev/next 的 x/y,辅助把边角调成矩形;吸附瞬间手柄变绿。
-3. **hover 边 + 点击插点(替代「双击边折边」)**:编辑态鼠标靠近边显示圆圈加号(随鼠标沿边投影点移动),点击在投影点插入端点,边 ab→ad+db;不做两阶段折边状态机。
-
-**冒烟已验证**:建房子→存房间几何→建库家具→存家具几何→移入房间→存楼层配置→锚家具物品→相对坐标→floor-plan 返回→删房间家具进库。前端 build 通过。
+> 历史归档(86KB,30 个功能域子节:性能优化/首页仪表盘/音乐×2/光影/UI 规范/厨房/运维/UX/图书/移动端×2/播放器/博客/日记/相册×5/百度凭证/放映厅×2/生产发布/频闪排查/天气/日志追溯/户型图)已整体迁至 **`docs/变更归档.md`**,内容原样保留。含文件级改动表、设计决策、踩坑记录与 live DB 同步 SQL。
+> **检索历史实现/设计决策/live DB 迁移 SQL 时读该文件;新的变更归档继续追加到该文件末尾**(新增 `#####` 子节),不要再写回 AGENTS.md。
 
 ## 文件存储策略
 
@@ -1106,11 +379,11 @@ CREATE TABLE sys_media_server (
   - **路径配置**:`application.yml` 的 `file.upload-dir` 基线为生产路径 `/opt/ihomy/uploads`(Linux);开发环境通过 external.yml 覆盖为 Windows 路径 `D:\WorkSpace\ihomy\uploads`。DB 存的是相对 `/files/` 的完整 URL,与物理根无关,改路径只需改 yml + 移动 uploads 目录。
 - **未来对接 NAS**:优先 NFS 挂载方案(把 NAS 共享目录挂到 `/opt/ihomy/uploads`,**代码零改动**)。前提是 NAS 与服务器同内网。详细步骤见 Linux 部署指导附录"对接 NAS 存储"。若 NAS 异地或要公网 CDN:再改 FileService 用 S3 兼容 SDK(NAS/MinIO/OSS 通用),用 `@ConditionalOnProperty` 切换实现,本地实现保留为默认。
 - **不要主动改 FileService 的存储实现**,除非用户明确要求接 NAS/OSS。当前本地实现满足需求。
-- **统一目录结构(分类目录,无 upload 中间层)**:上传按类型分目录——相册图片→`pictures/{相册名}/{相册ID}_{时间戳}_{文件名}`、视频与海报→`videos/`、音乐(audio/*)→`music/`、电子书→`books/{yyyyMM}/`、通用/头像→`files/{yyyyMM}/`。FileService 提供 `upload(bytes,name,type,albumId,albumName)`(图片带相册名)、`uploadVideo`(影片/海报)、`uploadBook`(电子书)、3 参 `upload`(通用)重载;无相册名时图片平铺到 `pictures/`。DB 存 `/files/...` 完整 URL,与物理根解耦。
-- **存储设备**:`sys_storage_device`(family_id 家庭级隔离,name/device_type SYSTEM|NAS|REMOTE|MOUNT/root_path/status/created_by)。`GET /storage/device/list` 首项恒为系统设备(id=0,type=SYSTEM);设备增删改/一键同步需 `@RequirePermission("storage:manage")`(OWNER)。**设备归属=家庭级独立配置**,互不可见。**本期不做网盘**(WebDAV/OSS/S3 暂缓)。
-- **资源管理器**:`GET /storage/browse?deviceId&path` + `GET /storage/file?deviceId&path&download`(返回 byte[],media type 猜;下载文件名 URL-encode)。`StorageService.resolveSafe` 用 `normalize()+startsWith` 防路径遍历(越界返回 400,已实测)。
-- **一键同步**:`POST /storage/sync {deviceId,includeEmpty}` → `{taskId}`;`GET /storage/sync/progress/{taskId}`。`StorageSyncRunner`(@Async 独立 bean——自调用不生效):按顶层目录建相册(相册名=目录名),`content_photo.source_path`("设备:相对路径")去重防重复,复制到 upload/yyyyMM 结构,完成/失败走 family_notification。进度在内存 ConcurrentHashMap(重启丢失,可接受)。
-- **硬删除策略**:删除照片/相册/视频/图书时**物理删除 DB 记录 + 删除磁盘文件**。`FileService.deleteByUrl(url)` 按 `/files/` URL 解析物理路径删文件(外链/空跳过,失败仅告警,带 `normalize()+startsWith` 防越界,顺带尝试清空父目录)。照片删除走 `PhotoMapper.deletePhysicalById`(XML 物理删,绕过全局 logic-delete);相册删除连带照片记录+文件全删(`deletePhysicalByAlbumId`);视频删除**从软删改为硬删** `deletePhysicalById`,并删 `video_url`+`poster`;图书删除硬删 `ContentBookMapper.deletePhysicalById`,并删 `file_url`+`cover_url`。**关键坑**:MyBatis-Plus 全局配 `logic-delete-field: deleted`(`application.yml`),`deleteById` 实为 UPDATE 软删——要物理删必须用自定义 XML `DELETE` 语句。**覆盖范围**:照片/相册/视频/图书四处;博客封面、头像、家庭封面、背景音乐、家谱照片删除时**未**连带删文件(文件成孤儿,可接受,后续按需扩展)。
+- **统一目录结构(分类目录,无 upload 中间层)**:上传按类型分目录——相册图片→`pictures/{相册名}/{相册ID}_{时间戳}_{文件名}`、视频与海报→`videos/`、音乐(audio/*)→`music/`、电子书→`books/{yyyyMM}/`、通用/头像→`files/{yyyyMM}/`。FileService 提供流式重载(`upload(MultipartFile...)`/`upload(Path,...)` 图片带相册名、`uploadVideo`、`uploadBook`);无相册名时图片平铺到 `pictures/`。DB 存 `/files/...` 完整 URL,与物理根解耦。
+- **存储设备**:`sys_storage_device`(family_id 家庭级隔离,name/device_type SYSTEM|NAS|REMOTE|MOUNT|BAIDU/root_path/status/created_by)。`GET /storage/device/list` 首项恒为系统设备(id=0,type=SYSTEM);设备增删改/目录映射需 `@RequirePermission("storage:manage")`(OWNER)。**设备归属=家庭级独立配置**,互不可见。百度网盘已接入(凭证四件套/OAuth/xpan 浏览/dlink 中转,详见需求设计说明书 4.6.2);WebDAV/OSS/S3 暂缓。
+- **资源管理器**:`GET /storage/browse?deviceId&path`(响应带 fsId)+ `GET /storage/file?deviceId&path&download`(流式中转:本地 PathResource 支持 Range/百度 InputStreamResource)。`StorageService.resolveSafe` 用 `normalize()+startsWith` 防路径遍历(越界返回 400,已实测)。
+- **设备目录映射(替代旧"一键同步",旧 StorageSyncRunner 已退役)**:`POST /storage/map {deviceId, paths}` 勾选目录异步建层级相册+影子照片(不拷贝文件);进度 `GET /storage/sync/progress/{taskId}`(MapTaskRegistry 相册/视频共用);映射规则/签名 URL/缩略图缓存见需求设计说明书 4.3.3 与 4.6.2。
+- **硬删除策略**:删除照片/相册/视频/图书时**物理删除 DB 记录 + 删除磁盘文件**。`FileService.deleteByUrl(url)` 按 `/files/` URL 解析物理路径删文件(外链/空跳过,失败仅告警,带 `normalize()+startsWith` 防越界,顺带删缩略图、尝试清空父目录)。照片删除走 `PhotoMapper.deletePhysicalById`(XML 物理删,绕过全局 logic-delete);相册删除连带照片记录+文件全删(`deletePhysicalByAlbumId`);视频删除**从软删改为硬删** `deletePhysicalById`,并删 `video_url`+`poster`;图书删除硬删 `ContentBookMapper.deletePhysicalById`,并删 `file_url`+`cover_url`;映射的影子照片/视频/曲目物理删但**设备文件永不动**。**关键坑**:MyBatis-Plus 全局配 `logic-delete-field: deleted`(`application.yml`),`deleteById` 实为 UPDATE 软删——要物理删必须用自定义 XML `DELETE` 语句。**覆盖范围**:照片/相册/视频/图书四处;博客封面、头像、家庭封面、背景音乐、家谱照片删除时**未**连带删文件(文件成孤儿,可接受,后续按需扩展)。
 
 ## 配置与加密
 
@@ -1139,20 +412,18 @@ CREATE TABLE sys_media_server (
 
 | 优先级 | 规划 | 要点 |
 |--------|------|------|
-| P1 | 放映厅 Jellyfin 集成 | 方案已定稿(2026-08-31),详见"放映厅 Jellyfin 集成方案"归档:ihomy 做脸(海报墙/筛选/家庭层)+ Jellyfin 做引擎(刮削/转码/TV 客户端);S1 本地 spike 验证 API → S2 后端 → S3 前端;现有 content_video 本地库降级为次级 tab 保留;启动时先重读该归档小节 |
-| P2 | 物品定位-户型图 | 1期(物品清单+搜索)已完成;2期户型图 **S1(数据模型)+S2(页面骨架+编辑手势)已实现并合入 main**(分支 item_seeker,详见 `docs/户型图设计.md` v4 + 文末实现记录):**户型图=页面主视图(非 tab)**,顶部搜索框+房子切换+列表/编辑,**查看/找东西与编辑两模式分离**,空态画布中央「+」加房子,编辑态左侧**酷家乐式侧栏(房间/家具/库子 tab)**;多边形房间(**允许斜边**,`family_room.geometry` 替换矩形,命名预设+自定义)+矩形家具(`family_furniture.x/y/w/h`+`type` 预设/自定义+`room_id` 可空=**家具库**)+物品点(锚家具/房间+相对坐标,`position` 文本承载位置描述无抽屉层级);楼层配置按楼层存(`family_house.floor_plans` JSON,底图+比例尺,**默认 100px/m 标定降级为可选校正**,不加新表);**一套房多层每层一张,楼层切换器左下角(商厦模式,没图不显示默认1F)**;SVG 渲染**手绘草图风**;**徒手画一等公民(底图可选)**;**物品标记不常显、搜索/点家具才浮现,搜索多结果走角落结果列表跨房子/楼层分组**;画房间拖矩形+逐点描绘;编辑手势(实装):拖主体平移/拖顶点自由改角(轴对齐吸附辅助成矩形)/拖边自由平移/hover 边显示圆圈加号点击插点/双击顶点删点/拖家具移动缩放/拖物品定位/空白平移滚轮缩放;定位模式(物品搜索/「定位」跳转放大高亮);家具随房间平移、不随变形(靠墙柜墙动柜不动);吸附对齐(不建共享墙);尺寸标注米/毫米+数值输入+常显开关;面积附带;**移动端只读户型图+列表 CRUD 无画布编辑**;剩余 S3 边吸附+对齐虚线 / S4 尺寸标注+底图标定+面积+定位模式+手绘风 / S5 打磨待做。开工前先重读设计文档 |
+| P1 | 放映厅 Jellyfin 集成 | 方案已定稿(2026-08-31),详见 docs/变更归档.md「放映厅 Jellyfin 集成方案」:ihomy 做脸(海报墙/筛选/家庭层)+ Jellyfin 做引擎(刮削/转码/TV 客户端);S1 本地 spike 验证 API → S2 后端 → S3 前端;现有 content_video 本地库降级为次级 tab 保留;**启动时先重读该归档小节** |
+| P2 | 物品定位-户型图 剩余优化 | 2 期全部完成(完整能力清单见 docs/需求设计说明书.md 4.8);剩余:物品头像图、家具类型图标、搜索定位放大居中 |
 | P2 | 用户使用指导 | 新手引导弹窗+帮助页 |
 | P2 | 家庭公告/广告位 | 自建家庭公告(不接第三方广告,隐私原因) |
-| P2 | 设置页-存储管理设计统一 | 存储管理 tab(Storage.vue)用 `.card.section`+`.page-toolbar`+`h3` 工具栏标题,与 profile/family/daily/light 其他 tab 的 `.card.settings-card`+`.section-label`(左竖线标题)风格不一致;统一为 section-label 标题 + 卡片规范。移动端已临时隐藏次要列(deviceType/rootPath/size/modified)消除横向溢出,统一时一并处理 |
-| P2 | 首页组件自适应展示 | 首页栅格(12列×9行)组件按尺寸分级展示。每个功能组件有默认大小(4×5 等),不同尺寸呈现不同信息密度:**h=1**(标题消失,仅展示核心数据:天气仅温度+图标,收支仅结余数字,任务仅数量角标);**h=2-3**(标题+精简列表 2-3 条);**h≥4**(标题+完整列表+详情);**w≤2**(单列窄布局:垂直堆叠条目);**w≥4**(多列网格:相册瀑布/菜谱卡片)。需为每个组件定义 compact/normal/expanded 三档展示模板,CSS 媒体查询+JS 判断 w/h 切换。组件清单:feed(默认4×6)/task(4×2)/today(4×4)/weather(3×4)/anni(1×4)/recipe(4×2)/search(4×3)/wish(4×3)/finance(4×3)/album(4×5)/music(4×3) |
+| P2 | 设置页-存储管理设计统一 | 存储管理 tab(Storage.vue)用 `.card.section`+`.page-toolbar` 与 profile/family/daily/light 其他 tab 的 `.card.settings-card`+`.section-label` 风格不一致;统一为 section-label 标题+卡片规范;移动端隐藏次要列消除横向溢出一并处理 |
+| P2 | 首页组件自适应展示 | 首页栅格(12列×9行)组件按尺寸分级展示:h=1 仅核心数据(标题消失)/h=2-3 精简列表/h≥4 完整列表/w≤2 单列/w≥4 多列网格;每组件 compact/normal/expanded 三档模板。组件清单:feed(5×5)/task(4×2)/today(4×4)/weather(3×4)/anni(1×4)/recipe(4×2)/wish(4×3)/finance(4×3)/album(4×5)/music(4×3) |
 | P3 | 多重人格 | 基于身份标签扩展,一账号多标签可切换发表,会话级 currentLabel(Redis 或前端状态),与家庭切换正交 |
-| P3 | AI API 对接 | 统一对接大模型 API(聊天/内容生成),需配置 API Key 与服务商(OpenAI 兼容协议),待细化 |
-| P3 | 物品定位-AI 语义 | 3期(待2期后):自然语言"找找我的工具箱"→AI 拆出名称+别名→服务器 SQL 查询;"把工具箱放到门口的柜子最上层抽屉"→AI 按 家/房子/房间/家具/位置 五级解析,缺层追问填满后返回粒度值→服务器拼 INSERT(决策已定,依赖 AI API) |
-| P3 | 播放器解码器评估 | 当前音乐/视频用浏览器原生 `<audio>`/`<video>` 标签(硬件解码,性能最优)。**分析结论**:不建议引入 ffmpeg.wasm/howler.js/video.js — 原生方案已覆盖 MP3/AAC/MP4/WebM 主流格式,JS 解码库增加 200KB+ 包体且 CPU 解码远慢于硬件。仅在需要播放原生不支持的格式(如 FLAC/OGG/APE)或需要逐帧分析时才考虑。未来如需引入,优先 video.js(UI 统一)+ hls.js(HLS 流),不引 ffmpeg.wasm |
-| P3 | Apple Live Photos 支持 | 上传时读取 EXIF/ContentIdentifier 元数据标记实况照片,数据层关联 JPEG 封面+MOV 短视频(`content_photo` 加 `live_video_url` 字段)。照片展示左上角加实况图标(BADGE),点击查看时播放关联视频(非实况仅展示照片)。iOS Safari 上传时自动拆分 JPEG+MOV;Android/非实况无图标。需前端上传处理+后端元数据解析+展示组件三方协同 |
-| P3 | 72h 小时预报延展 | 当前 24h 报表已有,72h 预报由和风 v1 `/weather/v1/7d` 小时节点天然支持(96条×2h),可扩展为三天逐2h横滑图表;后端 days=3 daily 包含 hourly 字段,前端改采 hourly 数组即可。优先级低,24h 已覆盖主要使用场景 |
-| P3 | 月相/晨昏时刻 | 日出日落已在 daily 表中;月相和晨昏(天文曙光/暮光)为纯计算(天文学公式),无需额外 API。可作为日历页或天气详情页的补充信息卡片,增加"今夜月相""天文观测窗口"等生活化场景 |
-| P3 | 空气 24h/3天预报 | 当前空气质量只有实况(当前);和风 v1 `/airquality/v1/current/` 不支持预报,预报接口 `/airquality/v1/forecast/` 需订阅版,可作为空气模块的高级扩展;若无订阅预算可考虑替代方案(如用 daily 历史趋势推测,但准确度有限) |
+| P3 | AI API 对接 | 统一对接大模型 API(聊天/内容生成),OpenAI 兼容协议,待细化 |
+| P3 | 物品定位-AI 语义 | 3 期:自然语言"找找我的工具箱"→AI 拆名称+别名→SQL 查询;"放到门口柜子最上层抽屉"→AI 按五级粒度解析,缺层追问→拼 INSERT(决策已定,依赖 AI API) |
+| P3 | 播放器解码器评估 | 原生 `<audio>`/`<video>` 已覆盖主流格式(硬件解码最优);不建议 ffmpeg.wasm(200KB+ 包体+CPU 解码慢);未来如需引入优先 video.js+hls.js |
+| P3 | Apple Live Photos 支持 | EXIF/ContentIdentifier 标记实况照片,JPEG 封面+MOV 关联(`content_photo` 加 `live_video_url`);前端上传+后端解析+展示组件三方协同 |
+| P3 | 72h 预报延展 / 月相晨昏 / 空气预报 | 72h 走 v1 daily hourly 数组;月相晨昏纯天文计算;空气预报需订阅版(无预算可用历史趋势推测) |
 | P4 | 手机号注册 | 需短信服务商(阿里云等),未接入前不实现(sys_user.phone 字段已存在) |
 | P4 | 商业化/多租户 | SaaS 订阅制评估,条件允许再做 |
 | P4 | 广告模块 | 家庭私密场景接第三方广告转化低且有隐私争议,优先自建"家庭公告/赞助位" |
@@ -1162,13 +433,15 @@ CREATE TABLE sys_media_server (
 ## 文档清单
 
 - `README.md`(启动说明 + Windows 一键启动脚本用法); `Windows部署指导.md` / `Linux部署指导.md`(生产部署 NSSM/systemd/Nginx/Let's Encrypt/Docker Compose)
-- `docs/需求规格说明书.docx` — 完整需求文档(功能模块清单+实现方式+未实现规划+数据库设计+接口设计+修订记录)。**唯一正式版**,原 `.md` 已合并删除(内容以业务域重新组织,修正表数量为 53 张/实体 44 个,含移动端兼容性 V8.0 §4.10)
+- `docs/需求设计说明书.md` — **完整功能需求唯一活文档**(功能模块清单+数据库设计 59 表+接口设计+规划事项+修订记录),随迭代持续更新
+- `docs/需求规格说明书.docx` — 需求文档历史归档(V9.16 起冻结,由上方 .md 接棒,不再更新)
+- `docs/变更归档.md` — 已实现变更归档(按功能域的文件级改动表+设计决策+踩坑+live DB 同步 SQL);新变更归档追加到该文件末尾
 - `docs/UI设计提示词.md` — 沉浸式首页 UI 设计完整规格(可作为 AI 提示词重新生成)
 - `docs/日志规范.md` — 日志开发规范(三类文件/六要素/tid 规则/级别标准/三方调用/脱敏清单)
 - `docs/日志问题分析方法.md` — 报错排查方法论(拿 tid → 详细日志页 → 四步分析;面向运维/业务人员)
-- `docs/户型图设计.md` — 物品定位-户型图(2期)完整设计(数据模型/家具随房间移动规则/编辑手势/吸附/尺寸标注/分期 S1-S5);S1+S2 已实现并合入 main,实现变更(允许斜边/hover 加点/边自由平移)见文末「实现记录」
+- `docs/户型图设计.md` — 物品定位-户型图(2期)完整设计(数据模型/家具随房间移动规则/编辑手势/吸附/尺寸标注/分期 S1-S5)+文末实现记录
 - `scripts/start-all.ps1`(Windows 一键启动前后端,双击 `start.bat` 调用,设 `IHOMY_CONFIG_PATH` 环境变量)/ `start-db.ps1`(Docker 拉起 MySQL+Redis+自动导 schema.sql,端口 6306/6379,与生产一致); `config/mysql/my.cnf`(端口 6306,内存优化,仅 Linux 本机部署用)
-- 完整接口清单:见 `docs/需求规格说明书.docx` 第 7 章与各功能小节。代码事实以 `backend/src/main/java` + `resources/schema.sql` 为准,如需检索先 `grep` 再动手。
+- 完整接口清单:见 `docs/需求设计说明书.md` 第 7 章。代码事实以 `backend/src/main/java` + `resources/schema.sql` 为准,如需检索先 `grep` 再动手。
 
 ## 环境检查(参考)
 
