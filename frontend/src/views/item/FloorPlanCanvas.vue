@@ -1,14 +1,19 @@
 <template>
   <div class="fp-canvas" ref="wrapRef">
-    <svg ref="svgRef" :class="['fp-svg', { 'is-drawing': tool === 'draw-rect' || tool === 'draw-poly' || tool === 'calibrate' }]" @wheel.prevent="onWheel" @pointerdown="onSvgDown" @pointerdown.capture="onPointerDownCapture" @pointermove="onHoverMove" @pointerup="onSvgPointerEnd" @pointercancel="onSvgPointerEnd" @pointerleave="onPointerLeave" @click="onCanvasClick" @dblclick="onSvgDblClick" @dragover.prevent @drop="onDrop">
+    <svg ref="svgRef" :class="['fp-svg', { 'is-drawing': drawingTool, 'is-editing': mode === 'edit' && !drawingTool, 'is-dragging': mode === 'edit' && !!drag && !drawingTool, 'is-icon-cursor': iconAsCursor, 'is-tool-select': mode === 'edit' && tool === 'select' }]" @wheel.prevent="onWheel" @pointerdown="onSvgDown" @pointerdown.capture="onPointerDownCapture" @pointermove="onHoverMove" @pointerup="onSvgPointerEnd" @pointercancel="onSvgPointerEnd" @pointerleave="onPointerLeave" @click="onCanvasClick" @dblclick="onSvgDblClick" @contextmenu="onContextMenu" @dragover.prevent @drop="onDrop">
       <defs>
         <filter id="fp-rough" x="-5%" y="-5%" width="110%" height="110%">
           <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" result="n" />
           <feDisplacementMap in="SourceGraphic" in2="n" scale="2.5" />
         </filter>
+        <!-- 制图纸点阵:与世界坐标对齐每米一点,点径不随缩放;过密时步长倍增仍落整米线 -->
+        <pattern id="fp-dots" patternUnits="userSpaceOnUse" :width="gridStepPx" :height="gridStepPx" :x="view.tx" :y="view.ty">
+          <circle :cx="gridDotR" :cy="gridDotR" :r="gridDotR" fill="rgba(184, 140, 110, 0.28)" />
+        </pattern>
       </defs>
+      <rect v-if="mode === 'edit'" class="fp-grid" width="100%" height="100%" fill="url(#fp-dots)" />
       <g :transform="`translate(${view.tx},${view.ty}) scale(${view.k})`">
-        <image v-if="imageUrl" :href="imageUrl" x="0" y="0" class="fp-bg" :opacity="opacity" />
+        <image v-if="imageUrl" :href="imageUrl" :transform="`translate(${imgLocal.x},${imgLocal.y}) scale(${imgLocal.k})`" :class="['fp-bg', { 'fp-bg-edit': mode === 'edit' && tool === 'image' }]" :opacity="opacity" @pointerdown.stop="mode === 'edit' && tool === 'image' ? onBgDown($event) : null" />
         <!-- 房间 -->
         <g v-for="r in roomsLocal" :key="r.id">
           <polygon
@@ -17,11 +22,11 @@
             :class="{ 'is-hit': hitRoomIds.includes(r.id), 'is-overlap': mode === 'edit' && overlapRoomIds.includes(r.id) }"
             :filter="mode === 'view' ? 'url(#fp-rough)' : undefined"
             @pointerdown.stop="mode === 'edit' ? onRoomDown($event, r) : null"
-            @contextmenu.prevent="mode === 'edit' ? $emit('delete-room', r.id) : null"
           />
-          <g v-if="r.name">
-            <text :x="r.cx" :y="r.cy - 6" class="fp-room-label fp-editable" @click.stop="mode === 'edit' && tool === 'select' && $emit('rename-room', r.id)">{{ r.name }}</text>
-            <text :x="r.cx" :y="r.cy + 10" class="fp-room-area">{{ (polyArea(r.poly) / Math.pow(props.scale || 100, 2)).toFixed(2) }} m²</text>
+          <!-- 房间名称/面积:反缩放使屏幕字号恒定,不随画布缩放变化 -->
+          <g v-if="r.name" :transform="`translate(${r.cx},${r.cy}) scale(${1 / view.k})`">
+            <text x="0" y="-6" class="fp-room-label fp-editable" @click.stop="mode === 'edit' && tool === 'select' && $emit('rename-room', r.id)">{{ r.name }}</text>
+            <text x="0" y="10" class="fp-room-area">{{ (polyArea(r.poly) / Math.pow(props.scale || 100, 2)).toFixed(2) }} m²</text>
           </g>
         </g>
         <!-- 家具 -->
@@ -32,10 +37,10 @@
             :filter="mode === 'view' ? 'url(#fp-rough)' : undefined"
             @pointerdown.stop="mode === 'edit' ? onFurnDown($event, f) : null"
             @dblclick="mode === 'view' ? $emit('select-furniture', f.id) : null"
-            @contextmenu.prevent="mode === 'edit' ? $emit('delete-furniture', f.id) : null"
+            @contextmenu.prevent="mode === 'edit' && tool === 'select' ? $emit('delete-furniture', f.id) : null"
           />
           <text v-if="f.w > 40 && f.h > 18" :x="f.x + f.w / 2" :y="f.y + f.h / 2" class="fp-furn-label fp-editable" @click.stop="mode === 'edit' && tool === 'select' && $emit('rename-furniture', f.id)">{{ f.name }}</text>
-          <template v-if="mode === 'edit'">
+          <template v-if="mode === 'edit' && tool === 'select'">
             <circle v-for="a in furnCorners" :key="'fc' + a" class="fp-handle" :r="5 / view.k" vector-effect="non-scaling-stroke"
                     :cx="furnHandlePos(f, a)[0]" :cy="furnHandlePos(f, a)[1]"
                     :style="{ cursor: (a === 'nw' || a === 'se') ? 'nwse-resize' : 'nesw-resize' }"
@@ -66,10 +71,19 @@
                     @dblclick.stop="tool === 'select' && removeVertex(h.r, i)" />
             <rect v-for="i in h.midIdxs" :key="'m' + i"
                   :x="h.r.mids[i].x - 5 / view.k" :y="h.r.mids[i].y - 5 / view.k" :width="10 / view.k" :height="10 / view.k" class="fp-edge-handle" vector-effect="non-scaling-stroke"
+                  :style="{ cursor: edgeCursor(h.r, i) }"
                   @pointerdown.stop="onEdgeDown($event, h.r, i)"
                   @dblclick.stop="tool === 'select' && $emit('edit-edge', h.r.id, i)" />
-            <text v-for="(m, i) in h.r.mids" :key="'dim' + i" :x="m.x" :y="m.y - 9" :class="['fp-dim', { 'fp-dim-editable': tool === 'select' }]" @click.stop="tool === 'select' && $emit('edit-edge', h.r.id, i)">{{ edgeLenM(h.r, i) }}</text>
+            <!-- 边长标注:反缩放使屏幕字号恒定(同手柄),点击仍可编辑边长 -->
+            <text v-for="(m, i) in h.r.mids" :key="'dim' + i" :transform="`translate(${m.x},${m.y}) scale(${1 / view.k})`" x="0" y="-9" :class="['fp-dim', { 'fp-dim-editable': tool === 'select' }]" @click.stop="tool === 'select' && $emit('edit-edge', h.r.id, i)">{{ edgeLenM(h.r, i) }}</text>
           </g>
+          <!-- 底图调整手柄:四角等比缩放(对角为锚),尺寸随 view.k 反缩放 -->
+          <template v-if="tool === 'image' && imgSize.w">
+            <rect v-for="c in bgCorners" :key="'bg' + c" class="fp-handle" vector-effect="non-scaling-stroke"
+                  :x="bgCornerPos(c)[0] - 5 / view.k" :y="bgCornerPos(c)[1] - 5 / view.k" :width="10 / view.k" :height="10 / view.k"
+                  :style="{ cursor: (c === 'nw' || c === 'se') ? 'nwse-resize' : 'nesw-resize' }"
+                  @pointerdown.stop="onBgHandleDown($event, c)" />
+          </template>
           <!-- hover 边加号(尺寸随 view.k 反缩放,保持屏幕恒定) -->
           <g v-if="hover && tool === 'select'" class="fp-hover-add" :transform="`translate(${hover.point.x},${hover.point.y}) scale(${1 / view.k})`">
             <circle cx="0" cy="0" r="9" class="fp-hover-ring" />
@@ -124,8 +138,10 @@ const props = defineProps({
   selectedFurnitureId: { type: Number, default: null },
   tool: { type: String, default: 'select' },
   scale: { type: Number, default: 100 },
+  imageTransform: { type: Object, default: null },
+  fitKey: { type: Number, default: 0 },
 })
-const emit = defineEmits(['save-room', 'save-rooms', 'save-furniture', 'save-item', 'create-room', 'create-furniture', 'select-furniture', 'calibrate', 'edit-edge', 'delete-room', 'delete-furniture', 'rename-room', 'rename-furniture', 'cut-room', 'glue-rooms'])
+const emit = defineEmits(['save-room', 'save-rooms', 'save-furniture', 'save-item', 'create-room', 'create-furniture', 'select-furniture', 'calibrate', 'edit-edge', 'delete-furniture', 'rename-room', 'rename-furniture', 'cut-room', 'glue-rooms', 'save-image-transform'])
 
 const wrapRef = ref(null)
 const svgRef = ref(null)
@@ -257,6 +273,18 @@ watch(() => props.furnitures, (fs) => {
     .map((f) => ({ ...f }))
 }, { immediate: true, deep: true })
 
+// ---- 底图变换(调整底图工具:平移 + 四角等比缩放,持久化在楼层配置 img 字段) ----
+const imgLocal = ref({ x: 0, y: 0, k: 1 })
+watch(() => props.imageTransform, (v) => { imgLocal.value = v ? { ...v } : { x: 0, y: 0, k: 1 } }, { immediate: true, deep: true })
+const imgSize = ref({ w: 0, h: 0 })
+watch(() => props.imageUrl, (url) => {
+  imgSize.value = { w: 0, h: 0 }
+  if (!url) return
+  const img = new Image()
+  img.onload = () => { imgSize.value = { w: img.naturalWidth, h: img.naturalHeight } }
+  img.src = url
+}, { immediate: true })
+
 const furnitureById = computed(() => { const m = {}; props.furnitures.forEach((f) => { m[f.id] = f }); return m })
 const roomById = computed(() => { const m = {}; roomsLocal.value.forEach((r) => { m[r.id] = r }); return m })
 
@@ -344,6 +372,15 @@ const edgeLenM = (r, i) => {
   return fmtM(Math.hypot(b.x - a.x, b.y - a.y))
 }
 
+// ---- 制图纸点阵(编辑态背景) ----
+// 步长与世界坐标对齐(1 米 = props.scale px),缩放时点径恒定;屏幕上过密时步长倍增,仍落在整米网格线上
+const gridDotR = 1.1
+const gridStepPx = computed(() => {
+  let step = props.scale || 100
+  while (step * view.value.k < 26) step *= 2
+  return step * view.value.k
+})
+
 const toCanvas = (e) => {
   const rect = svgRef.value.getBoundingClientRect()
   return { x: (e.clientX - rect.left - view.value.tx) / view.value.k, y: (e.clientY - rect.top - view.value.ty) / view.value.k }
@@ -357,6 +394,10 @@ const fit = () => {
   const collect = (x, y) => { minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y) }
   roomsLocal.value.forEach((r) => r.poly.forEach((p) => collect(p.x, p.y)))
   placedFurnitures.value.forEach((f) => { collect(f.x, f.y); collect(f.x + f.w, f.y + f.h) })
+  if (imgSize.value.w) {
+    collect(imgLocal.value.x, imgLocal.value.y)
+    collect(imgLocal.value.x + imgSize.value.w * imgLocal.value.k, imgLocal.value.y + imgSize.value.h * imgLocal.value.k)
+  }
   if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 1000; maxY = 700 }
   const bw = maxX - minX || 1000; const bh = maxY - minY || 700
   const k = Math.min(w / bw, h / bh) * 0.85
@@ -529,6 +570,16 @@ const onPointerMove = (e) => {
     if (a.includes('w')) { const right = o.x + o.w; x = Math.min(p.x, right - 20); w = right - x }
     if (a.includes('n')) { const bottom = o.y + o.h; y = Math.min(p.y, bottom - 20); h = bottom - y }
     d.f.x = x; d.f.y = y; d.f.w = w; d.f.h = h
+  } else if (d.type === 'bg-move') {
+    imgLocal.value.x = d.orig.x + (p.x - d.startX)
+    imgLocal.value.y = d.orig.y + (p.y - d.startY)
+  } else if (d.type === 'bg-resize') {
+    // 对角为锚等比缩放:锚角画布位置固定,origin = 锚点 − 锚角局部坐标 × 新比例(抓任意角都不跳变)
+    const len = Math.hypot(p.x - d.anchor.x, p.y - d.anchor.y)
+    const k = Math.max(0.05, Math.min(20, d.k0 * (len / d.len0)))
+    imgLocal.value.k = k
+    imgLocal.value.x = d.anchor.x - d.aLocal[0] * k
+    imgLocal.value.y = d.anchor.y - d.aLocal[1] * k
   } else if (d.type === 'item-move') {
     const it = d.item
     if (it.furnitureId != null && furnitureById.value[it.furnitureId]) {
@@ -574,6 +625,8 @@ const onPointerUp = (e) => {
     }
   } else if (d.type === 'furn-move' || d.type === 'furn-resize') {
     emit('save-furniture', d.f.id, { x: d.f.x, y: d.f.y, w: d.f.w, h: d.f.h })
+  } else if (d.type === 'bg-move' || d.type === 'bg-resize') {
+    emit('save-image-transform', { x: imgLocal.value.x, y: imgLocal.value.y, k: imgLocal.value.k })
   } else if (d.type === 'item-move') {
     emit('save-item', d.item.id, { relX: d.item.relX, relY: d.item.relY }, d.prevRel)
   } else if (d.type === 'draw-rect') {
@@ -805,6 +858,29 @@ const onGlueClick = () => {
 }
 const cancelPending = () => { cutStart.value = null; glueStart.value = null }
 
+// 右键:编辑态裁剪/粘合取消已选的起点;浏览模式保留浏览器原生菜单
+const onContextMenu = (e) => {
+  if (props.mode !== 'edit') return
+  e.preventDefault()
+  if (props.tool === 'cut' || props.tool === 'glue') cancelPending()
+}
+
+// 画图类工具(十字光标);编辑态其余工具默认箭头,拖动中统一四向箭头
+const drawingTool = computed(() => props.tool === 'draw-rect' || props.tool === 'draw-poly' || props.tool === 'calibrate')
+
+// 悬停工具图标(加号/剪刀/牙膏筒)即指针:隐藏原生光标,避免手型/十字遮挡图标。
+// 与模板各 hover 图标的 v-if 完全同步;拖拽平移时 hover 置空,光标自动恢复。
+const iconAsCursor = computed(() => {
+  if (props.mode !== 'edit') return false
+  if (props.tool === 'select') return !!hover.value
+  if (props.tool === 'cut') {
+    if (!hover.value) return false
+    if (!cutStart.value) return true
+    return !!(cutPreview.value && cutPreview.value.valid)
+  }
+  return props.tool === 'glue' ? !!glueHover.value : false
+})
+
 // ---- 房间 ----
 // 工具分发:非 select 工具时点击任何元素(房间/家具/物品/手柄)都落到画布层,不被挡住吞点
 const routeTool = (e) => {
@@ -877,6 +953,13 @@ const onFurnDown = (e, f) => {
 // 8 向缩放手柄(4 角 + 4 边中点,同房间编辑体验)
 const furnCorners = ['nw', 'ne', 'sw', 'se']
 const furnEdges = ['n', 's', 'e', 'w']
+// 边中点手柄光标:水平边上下推、垂直边左右推(与拖拽行为一致的双箭头)
+const edgeCursor = (r, i) => {
+  const a = r.poly[i]; const b = r.poly[(i + 1) % r.poly.length]
+  if (Math.abs(a.y - b.y) < Math.abs(a.x - b.x)) return 'ns-resize'
+  if (Math.abs(a.x - b.x) < Math.abs(a.y - b.y)) return 'ew-resize'
+  return 'move'
+}
 const furnHandlePos = (f, a) => {
   const cx = f.x + f.w / 2; const cy = f.y + f.h / 2
   return {
@@ -887,6 +970,31 @@ const furnHandlePos = (f, a) => {
 const onFurnHandleDown = (e, f, anchor) => {
   if (routeTool(e)) return
   beginDrag(e, { type: 'furn-resize', f, anchor, orig: { x: f.x, y: f.y, w: f.w, h: f.h } })
+}
+
+// ---- 底图调整(拖动平移,四角等比缩放以对角为锚) ----
+const bgCorners = ['nw', 'ne', 'sw', 'se']
+const bgCornerPos = (c) => {
+  const w = imgSize.value.w * imgLocal.value.k; const h = imgSize.value.h * imgLocal.value.k
+  const x = imgLocal.value.x; const y = imgLocal.value.y
+  return { nw: [x, y], ne: [x + w, y], sw: [x, y + h], se: [x + w, y + h] }[c]
+}
+const onBgDown = (e) => {
+  beginDrag(e, { type: 'bg-move', orig: { x: imgLocal.value.x, y: imgLocal.value.y }, startX: toCanvas(e).x, startY: toCanvas(e).y })
+}
+const onBgHandleDown = (e, corner) => {
+  const W = imgSize.value.w; const H = imgSize.value.h
+  const localOf = { nw: [0, 0], ne: [W, 0], sw: [0, H], se: [W, H] }
+  const opp = { nw: 'se', ne: 'sw', sw: 'ne', se: 'nw' }[corner]
+  const [ax, ay] = bgCornerPos(opp)
+  const [cx, cy] = bgCornerPos(corner)
+  beginDrag(e, {
+    type: 'bg-resize',
+    anchor: { x: ax, y: ay },
+    aLocal: localOf[opp],
+    k0: imgLocal.value.k,
+    len0: Math.hypot(cx - ax, cy - ay) || 1,
+  })
 }
 
 // ---- 物品 ----
@@ -984,8 +1092,10 @@ const onSvgDblClick = (e) => {
   finishPoly()
 }
 
-// 拖拽中不 fit(级联平移等实时数据变化会重置视图,元素视觉漂移)
-watch(() => [props.rooms, props.furnitures, props.imageUrl], () => { if (!drag.value) nextTick(fit) }, { deep: true })
+// 视口只在父组件明确要求时重置(换房/换层/换底图,fitKey 自增)或底图尺寸异步就绪时适配;
+// 几何保存、撤销、改名等数据更新一律不动当前缩放平移,避免编辑中视图跳动
+watch(() => props.fitKey, () => nextTick(fit))
+watch(imgSize, () => { if (!drag.value) nextTick(fit) })
 let resizeObserver = null
 onMounted(() => {
   fit()
@@ -1002,25 +1112,36 @@ defineExpose({ finishPoly, fit, cancelPending })
 .fp-canvas { position: relative; width: 100%; height: 100%; overflow: hidden; background: #f6efe4; }
 .fp-svg { width: 100%; height: 100%; display: block; cursor: grab; }
 .fp-svg:active { cursor: grabbing; }
+.fp-svg.is-editing { cursor: default; } /* 编辑模式默认初始箭头:尖头即指针热点,便于对准细小目标 */
+.fp-svg.is-editing:active { cursor: move; } /* 按下拖动时四向箭头:十字中心即指针热点 */
+.fp-svg.is-dragging, .fp-svg.is-dragging :deep(*) { cursor: move !important; } /* 拖动全程统一四向箭头(指针滑出手柄也不闪变) */
 .fp-svg.is-drawing { cursor: crosshair; }
+.fp-svg.is-icon-cursor { cursor: none; }
+.fp-svg.is-icon-cursor:active { cursor: none; } /* 按在工具图标(加点/裁剪/粘合)上时光标保持隐藏 */
+.fp-svg.is-icon-cursor :deep(*) { cursor: none !important; }
+.fp-grid { pointer-events: none; } /* 点阵纯背景,不挡画布交互 */
 .fp-bg { pointer-events: none; } /* 底图纯背景,不挡画布交互 */
-.fp-editable { pointer-events: auto; cursor: text; }
+.fp-bg-edit { pointer-events: auto; cursor: move; } /* 调整底图工具:底图可拖动 */
+.fp-editable { pointer-events: auto; cursor: default; }
+.fp-svg.is-tool-select .fp-editable { cursor: text; } /* 仅选择工具下点名称可改名,其余工具不误示文本光标 */
 .fp-drawing, .fp-snap-line, .fp-calib-dot, .fp-calib-line, .fp-hover-add, .fp-hover-tool, .fp-cut-line { pointer-events: none; } /* 预览/装饰元素不挡落点 */
 .fp-room { fill: rgba(184, 140, 110, 0.14); stroke: rgba(184, 140, 110, 0.65); stroke-width: 2; }
 .fp-room.is-hit { fill: rgba(184, 140, 110, 0.28); }
 .fp-room.is-overlap { stroke: #b04a3a; stroke-width: 2.5; fill: rgba(185, 96, 88, 0.16); }
-.fp-room-label { font-size: 13px; fill: #5c4c3d; text-anchor: middle; dominant-baseline: middle; }
+.fp-room-label { font-size: 13px; font-weight: 600; letter-spacing: 0.02em; fill: #5c4c3d; text-anchor: middle; dominant-baseline: middle; }
 .fp-room-area { font-size: 11px; fill: #a89a8a; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
-.fp-dim { font-size: 10px; fill: #6b9b6b; text-anchor: middle; pointer-events: none; }
+.fp-dim { font-size: 10px; fill: #6b9b6b; text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: rgba(246, 239, 228, 0.85); stroke-width: 3px; }
 .fp-dim-editable { pointer-events: auto; cursor: pointer; }
 .fp-dim-editable:hover { text-decoration: underline; }
 .fp-furn { fill: rgba(120, 100, 80, 0.18); stroke: #8a6f55; stroke-width: 1.5; }
 .fp-furn-label { font-size: 11px; fill: #6b5435; text-anchor: middle; dominant-baseline: middle; }
 .fp-item { fill: #b04a3a; stroke: #fff; stroke-width: 2; }.fp-item.is-hit { fill: #e0a030; }
 .fp-item-label { font-size: 10px; fill: #5c4c3d; text-anchor: middle; paint-order: stroke; stroke: rgba(255, 253, 248, 0.85); stroke-width: 3; pointer-events: none; }
-.fp-handle { fill: #fff; stroke: #b88c6e; stroke-width: 2; cursor: pointer; }
+.fp-handle { fill: #fff; stroke: #b88c6e; stroke-width: 2; cursor: move; } /* 端点四向箭头:十字中心即热点,尖角端点也能精准落点 */
+.fp-handle:hover { stroke: #5c4c3d; }
 .fp-handle.is-snapped { fill: #6b9b6b; stroke: #fff; }
-.fp-edge-handle { fill: #fff; stroke: #b88c6e; stroke-width: 1.5; cursor: pointer; }
+.fp-edge-handle { fill: #fff; stroke: #b88c6e; stroke-width: 1.5; cursor: move; } /* 实际由内联方向光标(ns/ew/move)覆盖 */
+.fp-edge-handle:hover { stroke: #5c4c3d; }
 .fp-hover-ring { fill: rgba(255, 255, 255, 0.9); stroke: #b88c6e; stroke-width: 2; }
 .fp-hover-plus { stroke: #b88c6e; stroke-width: 2; stroke-linecap: round; }
 .fp-hover-tool circle { fill: none; stroke: #5c4c3d; stroke-width: 2; }

@@ -33,7 +33,7 @@
           <div class="fp-side-body">
             <!-- 房间 tab -->
             <template v-if="sidebarTab === 'rooms'">
-              <div class="fp-tool-hint">{{ $t('item.drawHint') }}</div>
+              <div class="fp-tool-hint">{{ $t(toolHintKey) }}</div>
               <div class="fp-tools">
                 <!-- 画矩形:虚线矩形+右下角端点 -->
                 <el-tooltip :content="$t('item.drawRoomRect')" placement="top" :show-after="300">
@@ -73,6 +73,12 @@
                     <svg viewBox="0 0 24 24" class="fp-ico"><line x1="5" y1="17.5" x2="19" y2="6.5" stroke-dasharray="3 2.4" /><line x1="3.8" y1="16" x2="6.2" y2="19" /><line x1="17.8" y1="5" x2="20.2" y2="8" /><circle cx="5" cy="17.5" r="1.9" fill="currentColor" stroke="none" /><circle cx="19" cy="6.5" r="1.9" fill="currentColor" stroke="none" /></svg>
                   </el-button>
                 </el-tooltip>
+                <!-- 调整底图:图片框+外扩箭头(底图分辨率与画布比例尺不一致时,拖动缩放对齐房间) -->
+                <el-tooltip v-if="floorPlan.imageUrl" :content="$t('item.adjustBg')" placement="top" :show-after="300">
+                  <el-button :type="tool === 'image' ? 'primary' : ''" class="fp-tool-ico" @click="tool = tool === 'image' ? 'select' : 'image'">
+                    <svg viewBox="0 0 24 24" class="fp-ico"><rect x="4.5" y="8" width="10" height="9" rx="2" /><path d="M14 8.5 L19.5 3 M19.5 3 h-4.2 M19.5 3 v4.2" /></svg>
+                  </el-button>
+                </el-tooltip>
               </div>
               <div v-if="floorPlan.imageUrl" class="fp-opacity-row">
                 <span class="fp-opacity-label">{{ $t('item.floorPlanOpacity') }}</span>
@@ -99,7 +105,7 @@
               <div class="fp-side-head">{{ $t('item.furnPresets') }}</div>
               <div class="fp-presets">
                 <div v-for="p in furnPresets" :key="p.type" class="fp-preset" draggable="true" @dragstart="onPresetDragStart($event, p)">
-                  <span class="fp-preset-shape" :style="{ width: p.pw + 'px', height: p.ph + 'px' }"></span>
+                  <span class="fp-preset-shape" :style="presetShape(p)"></span>
                   <span class="fp-preset-name">{{ p.type }}</span>
                 </div>
               </div>
@@ -137,6 +143,8 @@
           :highlight-item-ids="highlightItemIds"
           :selected-furniture-id="selectedFurnitureId"
           :scale="floorPlan.scale || 100"
+          :image-transform="floorPlanImg"
+          :fit-key="fitKey"
           @save-room="onSaveRoomGeometry"
           @save-rooms="onSaveRoomsBatch"
           @save-furniture="onSaveFurnitureGeometry"
@@ -146,12 +154,12 @@
           @select-furniture="onSelectFurniture"
           @calibrate="onCalibrate"
           @edit-edge="onEditEdge"
-          @delete-room="(id) => removeRoom({ id })"
           @delete-furniture="(id) => removeFurniture({ id })"
           @rename-room="onRenameRoom"
           @rename-furniture="onRenameFurniture"
           @cut-room="onCutRoom"
           @glue-rooms="onGlueRooms"
+          @save-image-transform="onSaveImageTransform"
         />
 
         <!-- 空楼层引导(有房子但当前楼层无房间) -->
@@ -162,11 +170,16 @@
         </div>
 
         <!-- 楼层切换器(左下角;编辑态常显,可加层) -->
-        <div v-if="floors.length > 1 || mode === 'edit'" class="fp-floors">
+        <div v-if="floors.length > 1 || mode === 'edit'" :class="['fp-floors', { 'with-side': mode === 'edit' }]">
           <div v-for="f in floors" :key="f" :class="['fp-floor', { on: f === currentFloor }]" @click="switchFloor(f)">
             {{ f }}F
           </div>
           <div v-if="mode === 'edit'" class="fp-floor" @click="addFloor">+</div>
+        </div>
+
+        <!-- 适配视图:缩放平移后一键回到全景(撤销/保存不再自动重置视图) -->
+        <div class="fp-fit" :title="$t('item.fitView')" @click="canvasRef?.fit()">
+          <svg viewBox="0 0 24 24" class="fp-fit-ico"><path d="M4 9 V6.5 A2.5 2.5 0 0 1 6.5 4 H9 M15 4 h2.5 A2.5 2.5 0 0 1 20 6.5 V9 M20 15 v2.5 a2.5 2.5 0 0 1 -2.5 2.5 H15 M9 20 H6.5 A2.5 2.5 0 0 1 4 17.5 V15" /></svg>
         </div>
 
         <!-- 搜索结果 -->
@@ -385,7 +398,7 @@ import { Search, Plus, CopyDocument, Delete } from '@element-plus/icons-vue'
 import { itemApi, fileApi } from '@/api'
 import { useI18n } from 'vue-i18n'
 import { dictText } from '@/utils/dict'
-import { splitPoly, mergePolys, pointInPoly, polyBBox } from '@/utils/floorPlanGeom'
+import { splitPoly, mergePolys, pointInPoly, polyBBox, samePt } from '@/utils/floorPlanGeom'
 import FloorPlanCanvas from './FloorPlanCanvas.vue'
 
 const { t } = useI18n()
@@ -402,6 +415,11 @@ const furnPresets = [
   { type: '冰箱', w: 70, h: 70 },
   { type: '柜子', w: 80, h: 40 },
 ]
+// 预设缩略形状:按真实 w/h 等比缩进 26px 框(此前引用未定义的 pw/ph,形状塌陷不可见)
+const presetShape = (p) => {
+  const s = 26 / Math.max(p.w, p.h)
+  return { width: Math.round(p.w * s) + 'px', height: Math.round(p.h * s) + 'px' }
+}
 
 // ---- 户型图状态 ----
 const listMode = ref(false)
@@ -415,6 +433,9 @@ const searchKeyword = ref('')
 const searchResults = ref([])
 const selectedFurnitureId = ref(null)
 const canvasRef = ref(null)
+const fitKey = ref(0) // 自增触发画布重新适配视图(换房/换层/换底图);撤销/几何保存不再重置视口
+// 侧栏提示随当前工具切换:裁剪/粘合/标定/底图显示各自操作说明,其余回退画图提示
+const toolHintKey = computed(() => ({ cut: 'item.cutTip', glue: 'item.glueTip', calibrate: 'item.calibrateTip', image: 'item.adjustBgTip' }[tool.value] || 'item.drawHint'))
 
 // ---- 列表模式状态(旧 CRUD) ----
 const tab = ref('houses')
@@ -455,15 +476,22 @@ const floors = computed(() => {
   return [...set].sort((a, b) => a - b)
 })
 
-// 底图不透明度(楼层配置内,前端自行解析)
+// 底图不透明度 + 底图变换(平移/缩放),均在楼层配置内,前端自行解析
 const floorPlanOpacity = ref(1)
+const floorPlanImg = ref({ x: 0, y: 0, k: 1 })
 watch([() => houses.value, currentHouseId, currentFloor], () => {
   const h = houses.value.find((x) => x.id === currentHouseId.value)
   let v = 1
+  let img = { x: 0, y: 0, k: 1 }
   if (h && h.floorPlans) {
-    try { v = JSON.parse(h.floorPlans)[currentFloor.value]?.opacity ?? 1 } catch {}
+    try {
+      const cfg = JSON.parse(h.floorPlans)[currentFloor.value]
+      v = cfg?.opacity ?? 1
+      if (cfg?.img) img = { ...cfg.img }
+    } catch {}
   }
   floorPlanOpacity.value = v
+  floorPlanImg.value = img
 }, { immediate: true })
 const saveOpacity = async (val) => {
   const house = houses.value.find((h) => h.id === currentHouseId.value)
@@ -475,6 +503,18 @@ const saveOpacity = async (val) => {
   await itemApi.saveFloorPlans(currentHouseId.value, json)
   // 回写本地(否则切层回来 watch 从旧 floorPlans 解析,opacity 回退)
   if (house) house.floorPlans = json
+}
+const onSaveImageTransform = async (img) => {
+  const house = houses.value.find((h) => h.id === currentHouseId.value)
+  let floorPlans = {}
+  if (house && house.floorPlans) { try { floorPlans = JSON.parse(house.floorPlans) } catch {} }
+  const cur = floorPlans[currentFloor.value] || {}
+  floorPlans[currentFloor.value] = { ...cur, img }
+  const json = JSON.stringify(floorPlans)
+  await itemApi.saveFloorPlans(currentHouseId.value, json)
+  // 回写本地(否则切层回来 watch 从旧 floorPlans 解析,底图位置回退)
+  if (house) house.floorPlans = json
+  floorPlanImg.value = { ...img }
 }
 
 // ---- 数据加载 ----
@@ -503,7 +543,7 @@ const loadFloorPlan = async () => {
   if (!currentHouseId.value) { floorPlan.value = { rooms: [], furnitures: [], items: [], imageUrl: null, scale: 100 }; return }
   floorPlan.value = await itemApi.floorPlan(currentHouseId.value, currentFloor.value)
 }
-const onHouseChange = () => { currentFloor.value = 1; loadFloorPlan() }
+const onHouseChange = () => { currentFloor.value = 1; loadFloorPlan(); fitKey.value++ }
 // PDF 底图:渲染第一页为 PNG 再上传(SVG image 不支持 PDF)
 const pdfToImage = async (file) => {
   const pdfjs = await import('pdfjs-dist')
@@ -534,6 +574,7 @@ const uploadFloorPlan = async (file) => {
     ElMessage.success(t('common.success'))
     loadHouses()
     loadFloorPlan()
+    fitKey.value++
   } catch (e) { console.error(e) }
   return false
 }
@@ -561,7 +602,7 @@ const onEditEdge = async (roomId, edgeIdx) => {
   let poly
   try { poly = JSON.parse(room.geometry || '[]') } catch { return }
   if (poly.length < 3) return
-  const a = poly[edgeIdx]; const b = poly[(edgeIdx + 1) % poly.length]
+  const a = poly[edgeIdx]; const bIdx = (edgeIdx + 1) % poly.length; const b = poly[bIdx]
   const scale = floorPlan.value.scale || 100
   const curLen = Math.hypot(b.x - a.x, b.y - a.y) / scale
   try {
@@ -570,8 +611,20 @@ const onEditEdge = async (roomId, edgeIdx) => {
     if (!meters || meters <= 0) return
     const px = meters * scale
     const len = Math.hypot(b.x - a.x, b.y - a.y) || 1
-    poly[(edgeIdx + 1) % poly.length] = { x: a.x + ((b.x - a.x) / len) * px, y: a.y + ((b.y - a.y) / len) * px }
-    await onSaveRoomGeometry(roomId, JSON.stringify(poly))
+    const nb = { x: a.x + ((b.x - a.x) / len) * px, y: a.y + ((b.y - a.y) / len) * px }
+    poly[bIdx] = nb
+    // 共享墙角联动:与其他房间重合于被移动端点的顶点一起挪,墙体保持相连
+    const saves = [{ id: roomId, geometry: JSON.stringify(poly) }]
+    for (const r of floorPlan.value.rooms) {
+      if (r.id === roomId) continue
+      let rp
+      try { rp = JSON.parse(r.geometry || '[]') } catch { continue }
+      if (!rp.some((v) => samePt(v, b))) continue
+      rp.forEach((v, j) => { if (samePt(v, b)) rp[j] = { ...nb } })
+      saves.push({ id: r.id, geometry: JSON.stringify(rp) })
+    }
+    if (saves.length > 1) await onSaveRoomsBatch(saves)
+    else await onSaveRoomGeometry(roomId, JSON.stringify(poly))
     ElMessage.success(t('common.success'))
   } catch (e) {}
 }
@@ -585,10 +638,11 @@ const onDuplicateRoom = (roomId) => {
   roomForm.value = { houseId: currentHouseId.value, name: `${room.name}${t('item.duplicateSuffix')}`, floor: currentFloor.value, note: room.note || '', _geometry: JSON.stringify(shifted) }
   roomDlg.value = true
 }
-const switchFloor = (f) => { currentFloor.value = f; loadFloorPlan() }
+const switchFloor = (f) => { currentFloor.value = f; loadFloorPlan(); fitKey.value++ }
 const addFloor = () => {
   currentFloor.value = Math.max(...floors.value) + 1
   loadFloorPlan()
+  fitKey.value++
 }
 const toggleEdit = () => {
   mode.value = mode.value === 'edit' ? 'view' : 'edit'
@@ -610,6 +664,8 @@ const onSaveRoomGeometry = async (id, geometry) => {
   pushUndo({ type: 'room', id, geometry: prev })
   lastRoomGeom[id] = geometry
   await itemApi.saveRoomGeometry(id, geometry)
+  // 回写本地:边长编辑/撤销读取的 geometry 与画布视觉保持一致(否则读到旧值,改了不生效)
+  if (room) room.geometry = geometry
 }
 // 联动拖拽批量保存:多房间几何合并为一条撤销记录,一步整体回滚
 const onSaveRoomsBatch = async (list) => {
@@ -617,6 +673,7 @@ const onSaveRoomsBatch = async (list) => {
     const room = floorPlan.value.rooms.find((r) => r.id === id)
     const prev = Object.prototype.hasOwnProperty.call(lastRoomGeom, id) ? lastRoomGeom[id] : (room ? room.geometry : null)
     lastRoomGeom[id] = geometry
+    if (room) room.geometry = geometry
     return { id, prev, geometry }
   })
   if (items.some((x) => x.prev != null)) pushUndo({ type: 'rooms', items })
@@ -941,7 +998,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <style scoped>
-.fp-page { display: flex; flex-direction: column; max-width: none; width: 100%; height: calc(100vh - 70px); }
+.fp-page { display: flex; flex-direction: column; max-width: none; width: 100%; height: 100vh; height: 100dvh; }
 .fp-topbar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; }
 .fp-house { width: 180px; }
 .fp-search { width: 320px; }
@@ -958,14 +1015,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fp-side-tab { flex: 1; text-align: center; padding: 10px 0; cursor: pointer; font-size: 13px; color: #8a7a6a; }
 .fp-side-tab.on { color: #5c4c3d; font-weight: 600; border-bottom: 2px solid #b88c6e; }
 .fp-side-body { flex: 1; overflow-y: auto; padding: 12px; }
-.fp-tool-hint { font-size: 12px; color: #a89a8a; margin-bottom: 12px; }
+.fp-tool-hint { font-size: 12px; line-height: 1.6; color: #8a7a6a; background: rgba(184, 140, 110, 0.09); border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; }
 .fp-tool-btn { width: 100%; margin-left: 0 !important; margin-bottom: 8px; }
 .fp-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .fp-tools :deep(.el-button) { width: 36px; height: 36px; padding: 0; }
 .fp-tools :deep(.el-button + .el-button) { margin-left: 0; }
 .fp-tools :deep(.el-upload) { display: inline-flex; }
 .fp-ico { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.fp-side-head { font-size: 12px; color: #a89a8a; margin: 14px 0 4px; }
+.fp-side-head { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #a89a8a; margin: 14px 0 4px; }
 .fp-presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 8px 0 12px; }
 .fp-preset { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 2px 6px; border: 1px dashed #d8c9b8; border-radius: 8px; cursor: grab; background: #fffdf8; }
 .fp-preset:hover { border-color: #b88c6e; background: rgba(184, 140, 110, 0.08); }
@@ -978,11 +1035,18 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fp-side-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 0; border-bottom: 1px dashed #eee5d8; }
 .fp-side-name { font-size: 13px; color: #5c4c3d; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fp-side-icons { display: inline-flex; align-items: center; gap: 2px; }
+.fp-side-icons :deep(.el-button) { padding: 5px 6px; }
 .fp-side-row :deep(.el-button + .el-button) { margin-left: 4px; }
 .fp-side-ok { color: #7aa07a; }
 .fp-floors { position: absolute; left: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 4px; z-index: 5; }
-.fp-floor { width: 36px; height: 36px; border-radius: 8px; background: rgba(255,255,255,0.9); color: #5c4c3d; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 13px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+.fp-floors.with-side { left: 232px; } /* 避让编辑侧栏(220px),浮在画布左下角而非侧栏面板上 */
+.fp-floor { width: 36px; height: 36px; border-radius: 8px; background: rgba(255,255,255,0.92); color: #5c4c3d; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 13px; font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,0.1); transition: background 0.15s, box-shadow 0.15s, transform 0.15s; }
+.fp-floor:hover { background: #fff; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.16); }
 .fp-floor.on { background: #b88c6e; color: #fff; }
+.fp-floor.on:hover { background: #a87e60; }
+.fp-fit { position: absolute; right: 12px; bottom: 12px; width: 36px; height: 36px; border-radius: 8px; background: rgba(255,255,255,0.92); color: #5c4c3d; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.1); transition: background 0.15s, box-shadow 0.15s, transform 0.15s; z-index: 5; }
+.fp-fit:hover { background: #fff; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.16); }
+.fp-fit-ico { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .fp-results { position: absolute; right: 12px; top: 12px; width: 260px; max-height: 60%; overflow-y: auto; background: rgba(255,253,248,0.96); border-radius: 12px; box-shadow: 0 3px 12px rgba(0,0,0,0.12); padding: 10px; z-index: 5; }
 .fp-results-title { font-size: 13px; font-weight: 600; color: #5c4c3d; margin-bottom: 8px; }
 .fp-result { padding: 6px 8px; border-radius: 8px; cursor: pointer; }
@@ -1000,7 +1064,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 @media (max-width: 768px) {
   .fp-search { width: 140px; }
   .fp-sidebar { display: none; }
+  .fp-floors.with-side { left: 12px; } /* 移动端侧栏隐藏,楼层切换器回到画布左下角 */
   .fp-edit-btn { display: none; }
-  .fp-page { height: calc(100vh - 120px); }
+  .fp-page { height: calc(100dvh - 120px); }
 }
 </style>
