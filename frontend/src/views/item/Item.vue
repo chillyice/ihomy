@@ -34,20 +34,46 @@
             <!-- 房间 tab -->
             <template v-if="sidebarTab === 'rooms'">
               <div class="fp-tool-hint">{{ $t('item.drawHint') }}</div>
-              <el-button :type="tool === 'draw-rect' ? 'primary' : ''" class="fp-tool-btn" @click="tool = tool === 'draw-rect' ? 'select' : 'draw-rect'">{{ $t('item.drawRoomRect') }}</el-button>
-              <el-button :type="tool === 'draw-poly' ? 'primary' : ''" class="fp-tool-btn" @click="togglePoly">{{ $t('item.drawRoomPoly') }}</el-button>
-              <el-tooltip :content="$t('item.cutTip')" placement="right" :show-after="300">
-                <el-button :type="tool === 'cut' ? 'primary' : ''" class="fp-tool-btn" @click="tool = tool === 'cut' ? 'select' : 'cut'">{{ $t('item.cut') }}</el-button>
-              </el-tooltip>
-              <el-tooltip :content="$t('item.glueTip')" placement="right" :show-after="300">
-                <el-button :type="tool === 'glue' ? 'primary' : ''" class="fp-tool-btn" @click="tool = tool === 'glue' ? 'select' : 'glue'">{{ $t('item.glue') }}</el-button>
-              </el-tooltip>
-              <el-upload :show-file-list="false" :before-upload="uploadFloorPlan" accept="image/*,.pdf" class="fp-upload">
-                <el-button class="fp-tool-btn">{{ $t('item.uploadFloorPlan') }}</el-button>
-              </el-upload>
-              <el-tooltip :content="$t('item.calibrateTip')" placement="right" :show-after="300">
-                <el-button :type="tool === 'calibrate' ? 'primary' : ''" class="fp-tool-btn" @click="tool = tool === 'calibrate' ? 'select' : 'calibrate'">{{ $t('item.calibrate') }}</el-button>
-              </el-tooltip>
+              <div class="fp-tools">
+                <!-- 画矩形:虚线矩形+右下角端点 -->
+                <el-tooltip :content="$t('item.drawRoomRect')" placement="top" :show-after="300">
+                  <el-button :type="tool === 'draw-rect' ? 'primary' : ''" class="fp-tool-ico" @click="tool = tool === 'draw-rect' ? 'select' : 'draw-rect'">
+                    <svg viewBox="0 0 24 24" class="fp-ico"><rect x="4.5" y="5.5" width="13" height="12" rx="2" stroke-dasharray="3 2.6" /><circle cx="17.5" cy="17.5" r="2.4" fill="currentColor" stroke="none" /></svg>
+                  </el-button>
+                </el-tooltip>
+                <!-- 逐点描绘:不规则多边形+顶点圆点 -->
+                <el-tooltip :content="$t('item.drawRoomPoly')" placement="top" :show-after="300">
+                  <el-button :type="tool === 'draw-poly' ? 'primary' : ''" class="fp-tool-ico" @click="togglePoly">
+                    <svg viewBox="0 0 24 24" class="fp-ico"><path d="M5.5 14.5 L8 5.5 L15.5 4 L19.5 10 L14 19 L7.5 18.5 Z" /><circle cx="5.5" cy="14.5" r="1.7" fill="currentColor" stroke="none" /><circle cx="8" cy="5.5" r="1.7" fill="currentColor" stroke="none" /><circle cx="15.5" cy="4" r="1.7" fill="currentColor" stroke="none" /><circle cx="19.5" cy="10" r="1.7" fill="currentColor" stroke="none" /><circle cx="14" cy="19" r="1.7" fill="currentColor" stroke="none" /><circle cx="7.5" cy="18.5" r="1.7" fill="currentColor" stroke="none" /></svg>
+                  </el-button>
+                </el-tooltip>
+                <!-- 裁剪:剪刀(与画布 hover 剪刀同款) -->
+                <el-tooltip :content="$t('item.cutTip')" placement="top" :show-after="300">
+                  <el-button :type="tool === 'cut' ? 'primary' : ''" class="fp-tool-ico" @click="tool = tool === 'cut' ? 'select' : 'cut'">
+                    <svg viewBox="0 0 24 24" class="fp-ico"><circle cx="7" cy="19" r="2.8" /><circle cx="17" cy="19" r="2.8" /><line x1="8.5" y1="16.5" x2="20" y2="4" /><line x1="15.5" y1="16.5" x2="4" y2="4" /></svg>
+                  </el-button>
+                </el-tooltip>
+                <!-- 粘合:胶水瓶 -->
+                <el-tooltip :content="$t('item.glueTip')" placement="top" :show-after="300">
+                  <el-button :type="tool === 'glue' ? 'primary' : ''" class="fp-tool-ico" @click="tool = tool === 'glue' ? 'select' : 'glue'">
+                    <svg viewBox="0 0 24 24" class="fp-ico"><rect x="9.7" y="2.5" width="4.6" height="3.6" rx="1" /><path d="M9.3 6.1 h5.4 v2.5 c1.8 1 2.8 2.7 2.8 4.7 v5.4 a2.3 2.3 0 0 1 -2.3 2.3 H8.8 a2.3 2.3 0 0 1 -2.3 -2.3 v-5.4 c0 -2 1 -3.7 2.8 -4.7 Z" /><line x1="8.5" y1="13.5" x2="15.5" y2="13.5" /></svg>
+                  </el-button>
+                </el-tooltip>
+                <!-- 上传底图:微型简约户型图(三个小矩形拼起来) -->
+                <el-tooltip :content="$t('item.uploadFloorPlan')" placement="top" :show-after="300">
+                  <el-upload :show-file-list="false" :before-upload="uploadFloorPlan" accept="image/*,.pdf">
+                    <el-button class="fp-tool-ico">
+                      <svg viewBox="0 0 24 24" class="fp-ico"><rect x="4" y="4.5" width="16" height="6.5" /><rect x="4" y="11" width="7.6" height="8.5" /><rect x="11.6" y="11" width="8.4" height="8.5" /></svg>
+                    </el-button>
+                  </el-upload>
+                </el-tooltip>
+                <!-- 标定:两点+虚线+端刻度(测距标注,对应点两点量距的交互) -->
+                <el-tooltip :content="$t('item.calibrateTip')" placement="top" :show-after="300">
+                  <el-button :type="tool === 'calibrate' ? 'primary' : ''" class="fp-tool-ico" @click="tool = tool === 'calibrate' ? 'select' : 'calibrate'">
+                    <svg viewBox="0 0 24 24" class="fp-ico"><line x1="5" y1="17.5" x2="19" y2="6.5" stroke-dasharray="3 2.4" /><line x1="3.8" y1="16" x2="6.2" y2="19" /><line x1="17.8" y1="5" x2="20.2" y2="8" /><circle cx="5" cy="17.5" r="1.9" fill="currentColor" stroke="none" /><circle cx="19" cy="6.5" r="1.9" fill="currentColor" stroke="none" /></svg>
+                  </el-button>
+                </el-tooltip>
+              </div>
               <div v-if="floorPlan.imageUrl" class="fp-opacity-row">
                 <span class="fp-opacity-label">{{ $t('item.floorPlanOpacity') }}</span>
                 <el-slider v-model="floorPlanOpacity" :min="0.1" :max="1" :step="0.05" size="small" @change="saveOpacity" />
@@ -911,9 +937,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fp-side-body { flex: 1; overflow-y: auto; padding: 12px; }
 .fp-tool-hint { font-size: 12px; color: #a89a8a; margin-bottom: 12px; }
 .fp-tool-btn { width: 100%; margin-left: 0 !important; margin-bottom: 8px; }
-.fp-upload { width: 100%; margin-bottom: 8px; }
-.fp-upload :deep(.el-upload) { width: 100%; }
-.fp-upload :deep(.el-upload) .fp-tool-btn { margin-bottom: 0; }
+.fp-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.fp-tools :deep(.el-button) { width: 36px; height: 36px; padding: 0; }
+.fp-tools :deep(.el-button + .el-button) { margin-left: 0; }
+.fp-tools :deep(.el-upload) { display: inline-flex; }
+.fp-ico { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .fp-side-head { font-size: 12px; color: #a89a8a; margin: 14px 0 4px; }
 .fp-presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 8px 0 12px; }
 .fp-preset { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 2px 6px; border: 1px dashed #d8c9b8; border-radius: 8px; cursor: grab; background: #fffdf8; }

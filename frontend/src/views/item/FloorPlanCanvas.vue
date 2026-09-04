@@ -1,6 +1,6 @@
 <template>
   <div class="fp-canvas" ref="wrapRef">
-    <svg ref="svgRef" :class="['fp-svg', { 'is-drawing': tool === 'draw-rect' || tool === 'draw-poly' || tool === 'calibrate' }]" @wheel.prevent="onWheel" @pointerdown="onSvgDown" @pointerdown.capture="onPointerDownCapture" @pointermove="onHoverMove" @pointerup="onSvgPointerEnd" @pointercancel="onSvgPointerEnd" @click="onCanvasClick" @dblclick="onSvgDblClick" @dragover.prevent @drop="onDrop">
+    <svg ref="svgRef" :class="['fp-svg', { 'is-drawing': tool === 'draw-rect' || tool === 'draw-poly' || tool === 'calibrate' }]" @wheel.prevent="onWheel" @pointerdown="onSvgDown" @pointerdown.capture="onPointerDownCapture" @pointermove="onHoverMove" @pointerup="onSvgPointerEnd" @pointercancel="onSvgPointerEnd" @pointerleave="onPointerLeave" @click="onCanvasClick" @dblclick="onSvgDblClick" @dragover.prevent @drop="onDrop">
       <defs>
         <filter id="fp-rough" x="-5%" y="-5%" width="110%" height="110%">
           <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" result="n" />
@@ -58,36 +58,36 @@
         </g>
         <!-- 编辑态手柄 -->
         <template v-if="mode === 'edit'">
-          <g v-for="r in roomsLocal" :key="'h' + r.id">
-            <circle v-for="(p, i) in r.poly" :key="'v' + i"
-                    :cx="p.x" :cy="p.y" r="6" class="fp-handle"
-                    :class="{ 'is-snapped': isSnapping(r, i) }"
-                    @pointerdown.stop="onVertexDown($event, r, i)"
-                    @dblclick.stop="removeVertex(r, i)" />
-            <rect v-for="(m, i) in r.mids" :key="'m' + i"
-                  :x="m.x - 5" :y="m.y - 5" width="10" height="10" class="fp-edge-handle"
-                  @pointerdown.stop="onEdgeDown($event, r, i)"
-                  @dblclick.stop="$emit('edit-edge', r.id, i)" />
-            <text v-for="(m, i) in r.mids" :key="'dim' + i" :x="m.x" :y="m.y - 9" class="fp-dim">{{ edgeLenM(r, i) }}</text>
+          <g v-for="h in roomHandles" :key="'h' + h.r.id">
+            <circle v-for="i in h.vertexIdxs" :key="'v' + i"
+                    :cx="h.r.poly[i].x" :cy="h.r.poly[i].y" r="6" class="fp-handle"
+                    :class="{ 'is-snapped': isSnapping(h.r, i) }"
+                    @pointerdown.stop="onVertexDown($event, h.r, i)"
+                    @dblclick.stop="tool === 'select' && removeVertex(h.r, i)" />
+            <rect v-for="i in h.midIdxs" :key="'m' + i"
+                  :x="h.r.mids[i].x - 5" :y="h.r.mids[i].y - 5" width="10" height="10" class="fp-edge-handle"
+                  @pointerdown.stop="onEdgeDown($event, h.r, i)"
+                  @dblclick.stop="tool === 'select' && $emit('edit-edge', h.r.id, i)" />
+            <text v-for="(m, i) in h.r.mids" :key="'dim' + i" :x="m.x" :y="m.y - 9" class="fp-dim">{{ edgeLenM(h.r, i) }}</text>
           </g>
           <!-- hover 边加号 -->
-          <g v-if="hoverEdge && tool === 'select'" class="fp-hover-add">
-            <circle :cx="hoverEdge.point.x" :cy="hoverEdge.point.y" r="9" class="fp-hover-ring" />
-            <line :x1="hoverEdge.point.x - 4" :y1="hoverEdge.point.y" :x2="hoverEdge.point.x + 4" :y2="hoverEdge.point.y" class="fp-hover-plus" />
-            <line :x1="hoverEdge.point.x" :y1="hoverEdge.point.y - 4" :x2="hoverEdge.point.x" :y2="hoverEdge.point.y + 4" class="fp-hover-plus" />
+          <g v-if="hover && tool === 'select'" class="fp-hover-add">
+            <circle :cx="hover.point.x" :cy="hover.point.y" r="9" class="fp-hover-ring" />
+            <line :x1="hover.point.x - 4" :y1="hover.point.y" :x2="hover.point.x + 4" :y2="hover.point.y" class="fp-hover-plus" />
+            <line :x1="hover.point.x" :y1="hover.point.y - 4" :x2="hover.point.x" :y2="hover.point.y + 4" class="fp-hover-plus" />
           </g>
           <!-- 裁剪 hover:张开的剪刀 -->
-          <g v-if="tool === 'cut' && hoverEdge && !cutStart" class="fp-hover-tool" :transform="`translate(${hoverEdge.point.x},${hoverEdge.point.y})`">
+          <g v-if="tool === 'cut' && hover && !cutStart" class="fp-hover-tool" :transform="`translate(${hover.point.x},${hover.point.y})`">
             <circle cx="-5" cy="7" r="3" /><circle cx="5" cy="7" r="3" />
             <line x1="-3.5" y1="4.5" x2="8" y2="-8" /><line x1="3.5" y1="4.5" x2="-8" y2="-8" />
           </g>
-          <!-- 裁剪终点 hover:闭合的剪刀(合法目标边) -->
-          <g v-if="tool === 'cut' && hoverEdge && cutStart && cutPreview && cutPreview.valid" class="fp-hover-tool ok" :transform="`translate(${hoverEdge.point.x},${hoverEdge.point.y})`">
+          <!-- 裁剪终点 hover:闭合的剪刀(合法目标边/顶点) -->
+          <g v-if="tool === 'cut' && hover && cutStart && cutPreview && cutPreview.valid" class="fp-hover-tool ok" :transform="`translate(${hover.point.x},${hover.point.y})`">
             <circle cx="-4" cy="7" r="3" /><circle cx="4" cy="7" r="3" />
             <line x1="-2" y1="4.5" x2="3" y2="-8" /><line x1="2" y1="4.5" x2="-3" y2="-8" />
           </g>
           <!-- 粘合 hover:满牙膏筒(共享边) -->
-          <g v-if="tool === 'glue' && glueHover" class="fp-hover-tool" :transform="`translate(${hoverEdge.point.x},${hoverEdge.point.y})`">
+          <g v-if="tool === 'glue' && glueHover" class="fp-hover-tool" :transform="`translate(${hover.point.x},${hover.point.y})`">
             <rect x="-4.5" y="-4" width="9" height="13" rx="3.5" /><rect x="-2.5" y="-9" width="5" height="4" rx="1.2" />
           </g>
           <!-- 裁剪/粘合虚线:合法绿 / 非法暗红 -->
@@ -111,7 +111,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import { pointInPoly, onSegment, segsIntersect, segOverlap, cutSegmentValid } from '@/utils/floorPlanGeom'
+import { pointInPoly, onSegment, segsIntersect, segOverlap, cutPlanValid, samePt, projectToSegment, detectBoundary } from '@/utils/floorPlanGeom'
 
 const props = defineProps({
   mode: { type: String, default: 'view' },
@@ -132,7 +132,7 @@ const svgRef = ref(null)
 const view = ref({ tx: 0, ty: 0, k: 1 })
 const drawing = ref({ poly: null, rect: null })
 const drag = ref(null)
-const hoverEdge = ref(null)
+const hover = ref(null) // 边界 hover:{ kind: 'vertex'|'edge', room, point, vertexIdx?/edgeIdx? }
 const snapLine = ref(null)
 const calibPoints = ref([])
 let justDragged = false
@@ -147,16 +147,6 @@ const snapVertex = (prev, next, px, py, threshold = 6) => {
   if (Math.abs(px - next.x) < threshold) { sx = next.x; snapped = true }
   if (Math.abs(py - next.y) < threshold) { sy = next.y; snapped = true }
   return { x: sx, y: sy, snapped }
-}
-
-const projectToSegment = (p, a, b) => {
-  const abx = b.x - a.x; const aby = b.y - a.y
-  const len2 = abx * abx + aby * aby
-  let t = 0
-  if (len2 > 0) t = ((p.x - a.x) * abx + (p.y - a.y) * aby) / len2
-  t = Math.max(0, Math.min(1, t))
-  const point = { x: a.x + t * abx, y: a.y + t * aby }
-  return { point, dist: Math.hypot(p.x - point.x, p.y - point.y) }
 }
 
 // 其他房间顶点(排除当前房间)
@@ -583,32 +573,38 @@ const detach = () => {
 
 const beginDrag = (e, d) => {
   drag.value = d
-  hoverEdge.value = null
+  hover.value = null
   document.addEventListener('pointermove', onPointerMove)
   document.addEventListener('pointerup', onPointerUp)
   e.preventDefault()
 }
 
-// ---- hover 边 + 点击插入端点 ----
-const detectHoverEdge = (p) => {
-  const HANDLE_R = 12
-  for (const r of roomsLocal.value) {
-    const poly = r.poly
-    for (let i = 0; i < poly.length; i++) {
-      if (Math.hypot(p.x - poly[i].x, p.y - poly[i].y) < HANDLE_R) { hoverEdge.value = null; return }
-      const m = r.mids[i]
-      if (m && Math.hypot(p.x - m.x, p.y - m.y) < HANDLE_R) { hoverEdge.value = null; return }
+// ---- hover 边界检测 + 点击插入端点 ----
+// select:手柄区域让位(靠近顶点/边中点不出 + 号,那是拖手柄的区域),其余吸附最近边(投影)。
+// cut/glue:走共享几何模块 detectBoundary(候选池+归属优先级;端点优先、边投影,不吸附边中点手柄)。
+const detectHover = (p) => {
+  const TH = 12
+  if (props.tool === 'select') {
+    for (const r of roomsLocal.value) {
+      const poly = r.poly
+      for (let i = 0; i < poly.length; i++) {
+        if (Math.hypot(p.x - poly[i].x, p.y - poly[i].y) < TH) return null
+        const m = r.mids[i]
+        if (m && Math.hypot(p.x - m.x, p.y - m.y) < TH) return null
+      }
     }
-  }
-  let best = null; let bestDist = 12
-  for (const r of roomsLocal.value) {
-    const poly = r.poly
-    for (let i = 0; i < poly.length; i++) {
-      const proj = projectToSegment(p, poly[i], poly[(i + 1) % poly.length])
-      if (proj.dist < bestDist) { bestDist = proj.dist; best = { room: r, edgeIdx: i, point: proj.point } }
+    let best = null; let bestDist = TH
+    for (const r of roomsLocal.value) {
+      const poly = r.poly
+      for (let i = 0; i < poly.length; i++) {
+        const proj = projectToSegment(p, poly[i], poly[(i + 1) % poly.length])
+        if (proj.dist < bestDist) { bestDist = proj.dist; best = { kind: 'edge', room: r, edgeIdx: i, point: proj.point } }
+      }
     }
+    return best
   }
-  hoverEdge.value = best
+  const cutId = props.tool === 'cut' && cutStart.value ? cutStart.value.roomId : null
+  return detectBoundary(roomsLocal.value, p, { cutId })
 }
 const onHoverMove = (e) => {
   if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
@@ -627,9 +623,15 @@ const onHoverMove = (e) => {
   }
   if (drag.value) return
   mousePos.value = toCanvas(e)
-  if (props.mode !== 'edit') { hoverEdge.value = null; return }
-  if (!['select', 'cut', 'glue'].includes(props.tool)) { hoverEdge.value = null; return }
-  detectHoverEdge(mousePos.value)
+  if (props.mode !== 'edit') { hover.value = null; return }
+  if (!['select', 'cut', 'glue'].includes(props.tool)) { hover.value = null; return }
+  hover.value = detectHover(mousePos.value)
+}
+// 鼠标离开画布:清 hover 与手柄显隐依据(mousePos)
+const onPointerLeave = () => {
+  if (drag.value) return
+  mousePos.value = null
+  hover.value = null
 }
 const onCanvasClick = () => {
   if (justDragged) return
@@ -637,51 +639,102 @@ const onCanvasClick = () => {
   if (props.tool === 'cut') { onCutClick(); return }
   if (props.tool === 'glue') { onGlueClick(); return }
   if (props.tool !== 'select') return
-  if (!hoverEdge.value) return
-  const he = hoverEdge.value
+  if (!hover.value || hover.value.kind !== 'edge') return
+  const he = hover.value
   const poly = he.room.poly
   poly.splice(he.edgeIdx + 1, 0, { ...he.point })
   rebuildRoomMeta(he.room)
   emit('save-room', he.room.id, JSON.stringify(poly))
-  hoverEdge.value = null
+  hover.value = null
 }
 // 切换工具清 hover 残留(避免残留 guard 吞掉画图点击)+ 清裁剪/粘合进行中状态
-watch(() => props.tool, () => { hoverEdge.value = null; cutStart.value = null; glueStart.value = null })
+watch(() => props.tool, () => { hover.value = null; cutStart.value = null; glueStart.value = null })
 
 // ---- 裁剪(cut)/ 粘合(glue) ----
 const mousePos = ref(null)
 const cutStart = ref(null) // { roomId, edgeIdx, point }
 const glueStart = ref(null) // { roomAId, roomBId, from, s, t }
 
-// 粘合 hover:鼠标所在边与其他房间边共线重叠(吸附边)才可作起点
-const glueHover = computed(() => {
-  if (props.tool !== 'glue' || !hoverEdge.value || glueStart.value) return null
-  const he = hoverEdge.value
-  const poly = he.room.poly
-  const a1 = poly[he.edgeIdx]; const a2 = poly[(he.edgeIdx + 1) % poly.length]
+// 手柄按需显隐:端点=鼠标移入该房间内部(或正在拖该房间)才显示;边中点移动手柄=鼠标贴近那条边
+// (或正在拖那条边)才显示;其余情况隐藏。画图/标定工具下手柄不参与交互,整体隐藏;尺寸标注不受影响。
+const roomHandles = computed(() => {
+  if (!['select', 'cut', 'glue'].includes(props.tool)) return []
+  const mp = mousePos.value
+  const d = drag.value
+  const out = []
   for (const r of roomsLocal.value) {
-    if (r.id === he.room.id) continue
-    for (let j = 0; j < r.poly.length; j++) {
-      const ov = segOverlap(a1, a2, r.poly[j], r.poly[(j + 1) % r.poly.length])
-      if (ov) return { roomA: he.room, roomB: r, ...ov }
+    const n = r.poly.length
+    const dragRoom = d && d.room === r ? d : null
+    const inside = !!mp && n >= 3 && pointInPoly(mp, r.poly)
+    const vertexIdxs = []
+    const midIdxs = []
+    for (let i = 0; i < n; i++) {
+      if (inside || dragRoom) vertexIdxs.push(i)
+      if (dragRoom && dragRoom.type === 'room-edge' && dragRoom.aIdx === i) { midIdxs.push(i); continue }
+      if (mp && projectToSegment(mp, r.poly[i], r.poly[(i + 1) % n]).dist < 12) midIdxs.push(i)
+    }
+    out.push({ r, vertexIdxs, midIdxs })
+  }
+  return out
+})
+
+// 粘合 hover:鼠标所在边(或顶点的两条邻边)与其他房间边共线重叠(吸附边)才可作起点
+const glueHover = computed(() => {
+  if (props.tool !== 'glue' || !hover.value || glueStart.value) return null
+  const h = hover.value
+  const poly = h.room.poly
+  const n = poly.length
+  const candIdxs = h.kind === 'vertex' ? [h.vertexIdx, (h.vertexIdx - 1 + n) % n] : [h.edgeIdx]
+  for (const ei of candIdxs) {
+    const a1 = poly[ei]; const a2 = poly[(ei + 1) % n]
+    for (const r of roomsLocal.value) {
+      if (r.id === h.room.id) continue
+      for (let j = 0; j < r.poly.length; j++) {
+        const ov = segOverlap(a1, a2, r.poly[j], r.poly[(j + 1) % r.poly.length])
+        if (ov) return { roomA: h.room, roomB: r, ...ov }
+      }
     }
   }
   return null
 })
 
-// 裁剪虚线预览:起点固定,终点随鼠标;落在同房间另一条边上且连线合法才绿
+// 点 p 是否恰落在 room 边界上(顶点重合或贴边,阈值 1px),返回可作切点的边索引
+const anchorOnRoom = (room, p) => {
+  const poly = room.poly
+  for (let i = 0; i < poly.length; i++) {
+    if (samePt(poly[i], p)) return { edgeIdx: i }
+  }
+  for (let i = 0; i < poly.length; i++) {
+    if (projectToSegment(p, poly[i], poly[(i + 1) % poly.length]).dist < 1) return { edgeIdx: i }
+  }
+  return null
+}
+
+// 裁剪虚线预览:终点随鼠标吸附(端点优先/边投影);落在同房间另一条边界上且切完两侧均为
+// 有效多边形(各 ≥3 顶点,拒绝退化切法)才绿。起点落在相邻房间的重合端点/共享边上时,
+// 随目标房间重锚(裁剪可对重合端点操作),发射时以重锚后的起点为准。
 const cutPreview = computed(() => {
   if (props.tool !== 'cut' || !cutStart.value || !mousePos.value) return null
-  const room = roomsLocal.value.find((r) => r.id === cutStart.value.roomId)
+  const s = cutStart.value
+  let room = roomsLocal.value.find((r) => r.id === s.roomId)
   if (!room) return null
-  const he = hoverEdge.value
+  let startEdgeIdx = s.edgeIdx
+  let startRoomId = s.roomId
+  const h = hover.value
   let end = mousePos.value
   let valid = false
-  if (he && he.room === room && he.edgeIdx !== cutStart.value.edgeIdx) {
-    end = he.point
-    valid = cutSegmentValid(room.poly, cutStart.value.point, end)
+  if (h) {
+    if (h.room !== room) {
+      const re = anchorOnRoom(h.room, s.point)
+      if (re) { room = h.room; startRoomId = h.room.id; startEdgeIdx = re.edgeIdx }
+    }
+    if (h.room === room) {
+      const endIdx = h.kind === 'vertex' ? h.vertexIdx : h.edgeIdx
+      end = h.point
+      valid = endIdx !== startEdgeIdx && cutPlanValid(room.poly, startEdgeIdx, s.point, endIdx, end)
+    }
   }
-  return { from: cutStart.value.point, to: end, valid }
+  return { start: { roomId: startRoomId, edgeIdx: startEdgeIdx, point: s.point }, from: s.point, to: end, valid }
 })
 
 // 粘合虚线预览:终点吸附到共享边段上才绿
@@ -694,18 +747,19 @@ const gluePreview = computed(() => {
 })
 
 const onCutClick = () => {
-  const he = hoverEdge.value
-  if (!he) return
+  const h = hover.value
+  if (!h) return
+  const idx = h.kind === 'vertex' ? h.vertexIdx : h.edgeIdx
   if (!cutStart.value) {
-    cutStart.value = { roomId: he.room.id, edgeIdx: he.edgeIdx, point: { ...he.point } }
+    cutStart.value = { roomId: h.room.id, edgeIdx: idx, point: { ...h.point } }
     return
   }
   const pv = cutPreview.value
   if (pv && pv.valid) {
     emit('cut-room', {
-      roomId: cutStart.value.roomId,
-      a: { edgeIdx: cutStart.value.edgeIdx, point: cutStart.value.point },
-      b: { edgeIdx: he.edgeIdx, point: { ...he.point } },
+      roomId: pv.start.roomId,
+      a: { edgeIdx: pv.start.edgeIdx, point: pv.start.point },
+      b: { edgeIdx: idx, point: { ...h.point } },
     })
     cutStart.value = null
   }
@@ -716,7 +770,7 @@ const onGlueClick = () => {
     if (gh) {
       glueStart.value = {
         roomAId: gh.roomA.id, roomBId: gh.roomB.id,
-        from: { ...hoverEdge.value.point }, s: gh.s, t: gh.t,
+        from: { ...hover.value.point }, s: gh.s, t: gh.t,
       }
     }
     return
@@ -739,7 +793,7 @@ const routeTool = (e) => {
   return false
 }
 const onRoomDown = (e, r) => {
-  if (props.tool === 'select' && hoverEdge.value && hoverEdge.value.room === r) return
+  if (props.tool === 'select' && hover.value && hover.value.room === r) return
   if (routeTool(e)) return
   beginDrag(e, { type: 'room-body', room: r, orig: r.poly.map((p) => ({ ...p })), startX: toCanvas(e).x, startY: toCanvas(e).y, furnOrig: {} })
 }
@@ -856,6 +910,8 @@ const onSvgDown = (e) => {
   if (props.tool === 'calibrate') { handleCalibrateClick(e); return }
   if (props.tool === 'draw-rect') { startDrawRect(e); return }
   if (props.tool === 'draw-poly') { drawPolyPoint(e); return }
+  // 裁剪/粘合:贴边(有 hover)时让位给点击落点,空白处仍可拖拽平移
+  if ((props.tool === 'cut' || props.tool === 'glue') && hover.value) return
   beginDrag(e, { type: 'pan' })
 }
 
@@ -866,7 +922,7 @@ const onPointerDownCapture = (e) => {
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
   if (pointers.size === 2) {
     if (drag.value) { drag.value = null; detach(); snapLine.value = null }
-    hoverEdge.value = null
+    hover.value = null
     const [a, b] = [...pointers.values()]
     pinchDist = Math.hypot(a.x - b.x, a.y - b.y)
     e.stopPropagation()
