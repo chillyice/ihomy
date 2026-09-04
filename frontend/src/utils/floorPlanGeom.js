@@ -24,6 +24,68 @@ export const segsIntersect = (p1, p2, p3, p4) => {
   return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))
 }
 
+// 点到线段的投影(最近点与距离)
+export const projectToSegment = (p, a, b) => {
+  const abx = b.x - a.x; const aby = b.y - a.y
+  const len2 = abx * abx + aby * aby
+  let t = 0
+  if (len2 > 0) t = ((p.x - a.x) * abx + (p.y - a.y) * aby) / len2
+  t = Math.max(0, Math.min(1, t))
+  const point = { x: a.x + t * abx, y: a.y + t * aby }
+  return { point, dist: Math.hypot(p.x - point.x, p.y - point.y) }
+}
+
+// 边界吸附检测(裁剪/粘合共用,纯函数):收集阈值内全部顶点/边候选,再按归属优先级挑。
+// 共享墙/共享角在相邻房间各有一份几何,归属错了裁剪预览永远不绿。优先级:
+// 1) 已下刀(cutId) → 房间归属优先于候选类型:裁剪房间自己的端点照常吸附顶点;
+//    另一房间的端点落在裁剪房间的边上(T 形交界)时,该点仍选为裁剪房间的边点(终点可落共享墙);
+// 2) 裁剪房间此处无候选或未下刀 → 顶点优先,再按鼠标所在房间 → 最近边所属房间 → 就近,
+//    归属到别的房间时由组件的重锚机制切换目标房间。
+// 边中点手柄不作吸附目标。rooms: [{ id, poly }],
+// 返回 { kind: 'vertex'|'edge', room, point, vertexIdx?/edgeIdx? } 或 null
+export const detectBoundary = (rooms, p, opts = {}) => {
+  const TH = 12
+  const vCands = []
+  const eCands = []
+  for (const r of rooms) {
+    const poly = r.poly
+    for (let i = 0; i < poly.length; i++) {
+      const vd = Math.hypot(p.x - poly[i].x, p.y - poly[i].y)
+      if (vd < TH) vCands.push({ room: r, vertexIdx: i, dist: vd })
+      const proj = projectToSegment(p, poly[i], poly[(i + 1) % poly.length])
+      if (proj.dist < TH) eCands.push({ room: r, edgeIdx: i, point: proj.point, dist: proj.dist })
+    }
+  }
+  if (opts.cutId != null) {
+    const cv = vCands.filter((c) => c.room.id === opts.cutId)
+    if (cv.length) {
+      const v = cv.reduce((a, b) => (a.dist <= b.dist ? a : b))
+      return { kind: 'vertex', room: v.room, vertexIdx: v.vertexIdx, point: { ...v.room.poly[v.vertexIdx] } }
+    }
+    const ce = eCands.filter((c) => c.room.id === opts.cutId)
+    if (ce.length) {
+      const e = ce.reduce((a, b) => (a.dist <= b.dist ? a : b))
+      return { kind: 'edge', room: e.room, edgeIdx: e.edgeIdx, point: e.point }
+    }
+  }
+  const nearestEdge = eCands.length ? eCands.reduce((a, b) => (a.dist <= b.dist ? a : b)) : null
+  const pickPool = (cands) => {
+    if (cands.length < 2) return cands
+    let pref = cands.filter((c) => pointInPoly(p, c.room.poly))
+    if (!pref.length && nearestEdge) pref = cands.filter((c) => c.room === nearestEdge.room)
+    return pref.length ? pref : cands
+  }
+  if (vCands.length) {
+    const v = pickPool(vCands).reduce((a, b) => (a.dist <= b.dist ? a : b))
+    return { kind: 'vertex', room: v.room, vertexIdx: v.vertexIdx, point: { ...v.room.poly[v.vertexIdx] } }
+  }
+  if (eCands.length) {
+    const e = pickPool(eCands).reduce((a, b) => (a.dist <= b.dist ? a : b))
+    return { kind: 'edge', room: e.room, edgeIdx: e.edgeIdx, point: e.point }
+  }
+  return null
+}
+
 // 裁剪连线合法性:切点可落在顶点上(切角/对角切),但连线内部不得穿过任何顶点、
 // 不与任何边严格相交、中点在多边形内(防凹形外绕)
 export const cutSegmentValid = (poly, p1, p2) => {
@@ -88,6 +150,33 @@ export const segOverlap = (a1, a2, b1, b2) => {
   return { s, t }
 }
 
+// 顶点冗余判定:落在两邻点连线上(垂直距离 < 0.5px 且投影在两点之间)
+const collinearBetween = (p, a, b) => {
+  const ux = b.x - a.x; const uy = b.y - a.y
+  const len2 = ux * ux + uy * uy
+  if (len2 < 1e-9) return false
+  const cross = Math.abs(ux * (p.y - a.y) - uy * (p.x - a.x))
+  if (cross / Math.sqrt(len2) > 0.5) return false
+  const dot = (p.x - a.x) * ux + (p.y - a.y) * uy
+  return dot > -1e-9 && dot < len2 + 1e-9
+}
+
+// 去共线顶点:剪切产生的切点在粘合后落在原边上成为冗余中间点(一条边被拆成两段),
+// 删除后恢复原边;粘合拼接处的共线接缝点同理清除,真实拐点不受影响
+const dropCollinear = (pts) => {
+  const out = [...pts]
+  let changed = true
+  while (changed && out.length > 3) {
+    changed = false
+    for (let i = 0; i < out.length; i++) {
+      const prev = out[(i - 1 + out.length) % out.length]
+      const next = out[(i + 1) % out.length]
+      if (collinearBetween(out[i], prev, next)) { out.splice(i, 1); changed = true; break }
+    }
+  }
+  return out
+}
+
 // 合并:两多边形沿共线重叠边拼接为一个;找不到共享边返回 null
 export const mergePolys = (A, B) => {
   const n = A.length; const m = B.length
@@ -109,7 +198,7 @@ export const mergePolys = (A, B) => {
         if (!out.length || !samePt(out[out.length - 1], p)) out.push(p)
       }
       if (out.length > 1 && samePt(out[0], out[out.length - 1])) out.pop() // 首尾重复
-      return out
+      return dropCollinear(out)
     }
   }
   return null
