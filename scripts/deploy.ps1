@@ -83,10 +83,16 @@ if (-not (Test-Path $env:JAVA_HOME)) { Die "JAVA_HOME 无效: $env:JAVA_HOME" }
 Write-Ok "JAVA_HOME: $env:JAVA_HOME"
 
 # 工具
-foreach ($t in 'ssh','scp','tar') {
-  if (-not (Get-Command $t -ErrorAction SilentlyContinue)) { Die "未找到 $t,Windows 10+ 自带 OpenSSH 与 tar" }
+foreach ($t in 'ssh','scp') {
+  if (-not (Get-Command $t -ErrorAction SilentlyContinue)) { Die "未找到 $t,Windows 10+ 自带 OpenSSH" }
 }
-Write-Ok 'ssh / scp / tar 可用'
+Write-Ok 'ssh / scp 可用'
+
+# tar 固定用 Windows 自带 bsdtar:从 Git Bash 调起本脚本时 PATH 里 GNU tar 优先,
+# 它会把 C:\ 路径的冒号解析成远程主机名("Cannot connect to C")导致打包 dist 失败
+$tarExe = Join-Path $env:SystemRoot 'System32\tar.exe'
+if (-not (Test-Path $tarExe)) { Die "未找到 Windows 自带 tar: $tarExe" }
+Write-Ok "tar: $tarExe"
 
 # SSH 连接(免密)
 Write-Step "测试 SSH 连接 $User@${Server}:$Port"
@@ -145,7 +151,7 @@ if (-not $BackendOnly) {
   if (-not (Test-Path $Temp)) { New-Item -ItemType Directory -Path $Temp | Out-Null }
   $distTar = Join-Path $Temp 'frontend-dist.tar.gz'
   if (Test-Path $distTar) { Remove-Item $distTar -Force }
-  & tar --format=ustar -czf $distTar -C $dist '.'
+    & $tarExe --format=ustar -czf $distTar -C $dist '.'
   if ($LASTEXITCODE -ne 0) { Die '打包 dist 失败' }
   $tarSize = [math]::Round((Get-Item $distTar).Length / 1MB, 1)
   Write-Ok "前端 dist 打包完成 ($tarSize MB)"
