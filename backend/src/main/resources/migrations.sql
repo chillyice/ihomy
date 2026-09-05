@@ -593,5 +593,13 @@ PREPARE add_item_roomid_stmt FROM @add_item_roomid;
 EXECUTE add_item_roomid_stmt;
 DEALLOCATE PREPARE add_item_roomid_stmt;
 
+-- 2026-09-05: 补生产缺失的 library:manage 权限(早期书架迁移被注释为"已执行"但生产 sys_auth 实际未落地)
+-- sys_auth 有 uk_auth_code、sys_role_auth 有 uk_role_auth,INSERT IGNORE 幂等;授权对齐 schema.sql(MEMBER 显式授权)
+INSERT IGNORE INTO `sys_auth` (`auth_code`, `auth_name`, `module`, `description`) VALUES
+('library:manage', '图书管理', 'LIBRARY', '上传/修改/删除电子书');
+INSERT IGNORE INTO `sys_role_auth` (`role_id`, `auth_id`)
+SELECT r.id, a.id FROM `sys_role` r, `sys_auth` a
+WHERE r.role_code = 'MEMBER' AND a.auth_code = 'library:manage';
+
 
 
