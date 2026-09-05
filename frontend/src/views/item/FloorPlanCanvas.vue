@@ -2,10 +2,6 @@
   <div class="fp-canvas" ref="wrapRef">
     <svg ref="svgRef" :class="['fp-svg', { 'is-drawing': drawingTool, 'is-editing': mode === 'edit' && !drawingTool, 'is-dragging': mode === 'edit' && !!drag && !drawingTool, 'is-icon-cursor': iconAsCursor, 'is-tool-select': mode === 'edit' && tool === 'select' }]" @wheel.prevent="onWheel" @pointerdown="onSvgDown" @pointerdown.capture="onPointerDownCapture" @pointermove="onHoverMove" @pointerup="onSvgPointerEnd" @pointercancel="onSvgPointerEnd" @pointerleave="onPointerLeave" @click="onCanvasClick" @dblclick="onSvgDblClick" @contextmenu="onContextMenu" @dragover.prevent @drop="onDrop">
       <defs>
-        <filter id="fp-rough" x="-5%" y="-5%" width="110%" height="110%">
-          <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" result="n" />
-          <feDisplacementMap in="SourceGraphic" in2="n" scale="2.5" />
-        </filter>
         <!-- 制图纸点阵:与世界坐标对齐每米一点,点径不随缩放;过密时步长倍增仍落整米线 -->
         <pattern id="fp-dots" patternUnits="userSpaceOnUse" :width="gridStepPx" :height="gridStepPx" :x="view.tx" :y="view.ty">
           <circle :cx="gridDotR" :cy="gridDotR" :r="gridDotR" fill="rgba(184, 140, 110, 0.28)" />
@@ -13,16 +9,19 @@
       </defs>
       <rect v-if="mode === 'edit'" class="fp-grid" width="100%" height="100%" fill="url(#fp-dots)" />
       <g :transform="`translate(${view.tx},${view.ty}) scale(${view.k})`">
-        <image v-if="imageUrl" :href="imageUrl" :transform="`translate(${imgLocal.x},${imgLocal.y}) scale(${imgLocal.k})`" :class="['fp-bg', { 'fp-bg-edit': mode === 'edit' && tool === 'image' }]" :opacity="opacity" @pointerdown.stop="mode === 'edit' && tool === 'image' ? onBgDown($event) : null" />
+        <image v-if="shownImageUrl" :href="shownImageUrl" :transform="`translate(${imgLocal.x},${imgLocal.y}) scale(${imgLocal.k})`" :class="['fp-bg', { 'fp-bg-edit': mode === 'edit' && tool === 'image' }]" :opacity="opacity" @pointerdown.stop="mode === 'edit' && tool === 'image' ? onBgDown($event) : null" />
         <!-- 房间 -->
         <g v-for="r in roomsLocal" :key="r.id">
           <polygon
             :points="pts(r.poly)"
             class="fp-room"
-            :class="{ 'is-hit': hitRoomIds.includes(r.id), 'is-overlap': mode === 'edit' && overlapRoomIds.includes(r.id) }"
-            :filter="mode === 'view' ? 'url(#fp-rough)' : undefined"
+            :class="{ 'is-view': mode === 'view', 'is-hit': hitRoomIds.includes(r.id), 'is-overlap': mode === 'edit' && overlapRoomIds.includes(r.id) }"
             @pointerdown.stop="mode === 'edit' ? onRoomDown($event, r) : null"
           />
+          <!-- 查看态蜡笔边界:3 遍抖动闭合线半透明叠加,替代原 feTurbulence 滤镜 -->
+          <g v-if="mode === 'view' && roomCrayon[r.id]" class="fp-crayon">
+            <path v-for="(d, i) in roomCrayon[r.id]" :key="i" :d="d" class="fp-crayon-stroke room" />
+          </g>
           <!-- 房间名称/面积:反缩放使屏幕字号恒定,不随画布缩放变化 -->
           <g v-if="r.name" :transform="`translate(${r.cx},${r.cy}) scale(${1 / view.k})`">
             <text x="0" y="-6" class="fp-room-label fp-editable" @click.stop="mode === 'edit' && tool === 'select' && $emit('rename-room', r.id)">{{ r.name }}</text>
@@ -32,20 +31,23 @@
         <!-- 家具 -->
         <g v-for="f in placedFurnitures" :key="f.id">
           <rect
-            :x="f.x" :y="f.y" :width="f.w" :height="f.h"
+            :x="f.x" :y="f.y" :width="f.w" :height="f.h" rx="3"
             class="fp-furn"
-            :filter="mode === 'view' ? 'url(#fp-rough)' : undefined"
+            :class="{ 'is-view': mode === 'view' }"
             @pointerdown.stop="mode === 'edit' ? onFurnDown($event, f) : null"
             @dblclick="mode === 'view' ? $emit('select-furniture', f.id) : null"
             @contextmenu.prevent="mode === 'edit' && tool === 'select' ? $emit('delete-furniture', f.id) : null"
           />
+          <g v-if="mode === 'view' && furnCrayon[f.id]" class="fp-crayon">
+            <path v-for="(d, i) in furnCrayon[f.id]" :key="i" :d="d" class="fp-crayon-stroke furn" />
+          </g>
           <text v-if="f.w > 40 && f.h > 18" :x="f.x + f.w / 2" :y="f.y + f.h / 2" class="fp-furn-label fp-editable" @click.stop="mode === 'edit' && tool === 'select' && $emit('rename-furniture', f.id)">{{ f.name }}</text>
-          <template v-if="mode === 'edit' && tool === 'select'">
-            <circle v-for="a in furnCorners" :key="'fc' + a" class="fp-handle" :r="5 / view.k" vector-effect="non-scaling-stroke"
+          <template v-if="mode === 'edit' && tool === 'select' && furnHandles.get(f.id)">
+            <circle v-for="a in furnHandles.get(f.id).corners" :key="'fc' + a" class="fp-handle" :r="5 / view.k" vector-effect="non-scaling-stroke"
                     :cx="furnHandlePos(f, a)[0]" :cy="furnHandlePos(f, a)[1]"
                     :style="{ cursor: (a === 'nw' || a === 'se') ? 'nwse-resize' : 'nesw-resize' }"
                     @pointerdown.stop="onFurnHandleDown($event, f, a)" />
-            <rect v-for="a in furnEdges" :key="'fe' + a" class="fp-edge-handle" :width="9 / view.k" :height="9 / view.k" vector-effect="non-scaling-stroke"
+            <rect v-for="a in furnHandles.get(f.id).edges" :key="'fe' + a" class="fp-edge-handle" :width="9 / view.k" :height="9 / view.k" vector-effect="non-scaling-stroke"
                   :x="furnHandlePos(f, a)[0] - 4.5 / view.k" :y="furnHandlePos(f, a)[1] - 4.5 / view.k"
                   :style="{ cursor: (a === 'n' || a === 's') ? 'ns-resize' : 'ew-resize' }"
                   @pointerdown.stop="onFurnHandleDown($event, f, a)" />
@@ -125,6 +127,30 @@
         </g>
       </g>
     </svg>
+    <!-- 缩略图(迷你地图):右上角悬浮,可折叠成横条、可拖动 -->
+    <div
+      class="fp-thumb"
+      :class="{ 'is-collapsed': thumbCollapsed }"
+      :style="thumbStyle"
+      @pointerdown="onThumbDragStart"
+    >
+      <template v-if="!thumbCollapsed">
+        <svg class="fp-thumb-map" :viewBox="thumbViewBox" preserveAspectRatio="xMidYMid meet">
+          <polygon v-for="r in roomsLocal" :key="'tr' + r.id" :points="pts(r.poly)" class="fp-thumb-room" />
+          <rect v-for="f in placedFurnitures" :key="'tf' + f.id" :x="f.x" :y="f.y" :width="f.w" :height="f.h" class="fp-thumb-furn" />
+          <rect v-if="thumbViewport" :x="thumbViewport.x" :y="thumbViewport.y" :width="thumbViewport.w" :height="thumbViewport.h" class="fp-thumb-viewport" />
+        </svg>
+        <button type="button" class="fp-thumb-toggle" :title="$t('item.thumbCollapse')" @pointerdown.stop @click="thumbCollapsed = true">
+          <svg viewBox="0 0 16 16" class="fp-thumb-chevron"><path d="M4 10 L8 6 L12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </button>
+      </template>
+      <template v-else>
+        <span class="fp-thumb-bar-label">{{ $t('item.floorPlanThumb') }}</span>
+        <button type="button" class="fp-thumb-toggle" :title="$t('item.thumbExpand')" @pointerdown.stop @click="thumbCollapsed = false">
+          <svg viewBox="0 0 16 16" class="fp-thumb-chevron"><path d="M4 6 L8 10 L12 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </button>
+      </template>
+    </div>
   </div>
 </template>
 
@@ -146,7 +172,7 @@ const props = defineProps({
   imageTransform: { type: Object, default: null },
   fitKey: { type: Number, default: 0 },
 })
-const emit = defineEmits(['save-room', 'save-rooms', 'save-furniture', 'save-item', 'create-room', 'create-furniture', 'select-furniture', 'calibrate', 'edit-edge', 'delete-furniture', 'rename-room', 'rename-furniture', 'cut-room', 'glue-rooms', 'save-image-transform'])
+const emit = defineEmits(['save-room', 'save-rooms', 'save-furniture', 'save-item', 'create-room', 'create-furniture', 'place-furniture', 'select-furniture', 'calibrate', 'edit-edge', 'delete-furniture', 'rename-room', 'rename-furniture', 'cut-room', 'glue-rooms', 'save-image-transform'])
 
 const wrapRef = ref(null)
 const svgRef = ref(null)
@@ -160,6 +186,67 @@ let justDragged = false
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
+// ---- 蜡笔笔触(与日记本 doodle.js crayon 同款):确定性抖动,重绘不闪变 ----
+const mulberry32 = (a) => () => {
+  a |= 0; a = (a + 0x6D2B79F5) | 0
+  let t = Math.imul(a ^ (a >>> 15), 1 | a)
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+}
+// id → 32 位确定性种子(每房间/家具边界抖动固定,缩放/重绘不闪变)
+const seedFromId = (id) => {
+  let h = 2166136261
+  const s = String(id)
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) }
+  return h >>> 0
+}
+// 多边形边界 → 3 遍手绘蜡笔闭合路径(doodle.js crayon 笔触):
+// 每条边按长度细分成小段,沿边加小幅正弦曲折(垂直边方向)+ 更小的随机抖动;
+// 波浪按空间波长连续(相位沿周长累积),幅度小、频率自然,边不再是生硬的直线。
+const crayonStrokePaths = (poly, seed, amp) => {
+  const n = poly.length
+  const edgeLens = []
+  let perim = 0
+  for (let i = 0; i < n; i++) {
+    const a = poly[i]; const b = poly[(i + 1) % n]
+    const len = Math.hypot(b.x - a.x, b.y - a.y)
+    edgeLens.push(len)
+    perim += len
+  }
+  if (perim < 1) return []
+  const paths = []
+  for (let pass = 0; pass < 3; pass++) {
+    const rnd = mulberry32(seed + pass * 104729)
+    // 波长固定(px)而非"周长/波数",大房间小房间都呈现相近的手绘波浪频率;每 pass 相位错开
+    const wavelength = 36 + rnd() * 44
+    const freq = (Math.PI * 2) / wavelength
+    const phase = rnd() * Math.PI * 2
+    const pts = []
+    let acc = 0
+    for (let i = 0; i < n; i++) {
+      const a = poly[i]; const b = poly[(i + 1) % n]
+      const dx = b.x - a.x; const dy = b.y - a.y
+      const len = edgeLens[i] || 1
+      const px = -dy / len; const py = dx / len
+      const seg = Math.max(2, Math.min(12, Math.round(len / 16)))
+      for (let s = 0; s <= seg; s++) {
+        const t = s / seg
+        const dist = acc + t * len
+        const wob = Math.sin(dist * freq + phase) * amp * 0.5
+        const jx = (rnd() - 0.5) * amp * 0.18
+        const jy = (rnd() - 0.5) * amp * 0.18
+        pts.push([a.x + dx * t + px * wob + jx, a.y + dy * t + py * wob + jy])
+      }
+      acc += len
+    }
+    let d = `M${pts[0][0]},${pts[0][1]}`
+    for (let i = 1; i < pts.length; i++) d += `L${pts[i][0]},${pts[i][1]}`
+    d += 'Z'
+    paths.push(d)
+  }
+  return paths
+}
+
 // 顶点轴对齐吸附:边贴近横/纵轴时吸附到 prev/next 的 x/y,辅助调节成矩形
 const snapVertex = (prev, next, px, py, threshold = 6) => {
   let sx = px; let sy = py; let snapped = false
@@ -170,15 +257,27 @@ const snapVertex = (prev, next, px, py, threshold = 6) => {
   return { x: sx, y: sy, snapped }
 }
 
-// 其他房间顶点(排除当前房间)
-const otherRoomVertices = (excludeId) => {
+// 其他房间顶点(排除当前房间;联动拖拽时再排除跟随的重合顶点,避免吸附到自身造成一帧滞后卡顿与磁吸失效)
+const otherRoomVertices = (excludeId, excludeVerts) => {
+  const ex = new Set((excludeVerts || []).map((v) => `${v.id}:${v.idx}`))
   const vs = []
   roomsLocal.value.forEach((r) => {
     if (r.id === excludeId) return
-    r.poly.forEach((v) => vs.push({ x: v.x, y: v.y }))
+    r.poly.forEach((v, j) => {
+      if (ex.has(`${r.id}:${j}`)) return
+      vs.push({ x: v.x, y: v.y })
+    })
   })
   return vs
 }
+
+// 联动拖拽时跟随的重合顶点:与拖点重合,从磁吸候选池排除(吸附到自身无意义且会滞后一帧)
+const linkedExcludeVerts = (d) => d.links && d.links.length
+  ? d.links.map((lk) => ({ id: lk.room.id, idx: lk.idx }))
+  : []
+
+// 联动拖拽时跟随的房间 id 集合:这些房间的重合边是"自身",边线对齐吸附需整体排除
+const linkedRoomIds = (d) => d.links && d.links.length ? new Set(d.links.map((lk) => lk.room.id)) : null
 
 // 点吸附到最近顶点(阈值内),返回目标顶点或 null
 const snapPoint = (p, vertices, threshold = 6) => {
@@ -190,11 +289,13 @@ const snapPoint = (p, vertices, threshold = 6) => {
   return best
 }
 
-// 边线对齐:值吸附到其他房间的水平/垂直边线(阈值按视图缩放换算),返回对齐值或 null
-const findAlignLine = (excludeId, val, axis) => {
+// 边线对齐:值吸附到其他房间的水平/垂直边线(阈值按视图缩放换算),返回对齐值或 null。
+// 联动拖拽时排除跟随房间(其重合边是"自身",对齐到它会滞后一帧并磁吸失效)。
+const findAlignLine = (excludeId, val, axis, excludeRoomIds) => {
   const th = 6 / view.value.k
   for (const r of roomsLocal.value) {
     if (r.id === excludeId) continue
+    if (excludeRoomIds && excludeRoomIds.has(r.id)) continue
     for (let i = 0; i < r.poly.length; i++) {
       const a2 = r.poly[i]; const b2 = r.poly[(i + 1) % r.poly.length]
       if (axis === 'y' && Math.abs(a2.y - b2.y) < 0.5 && Math.abs(val - a2.y) < th) return a2.y
@@ -204,52 +305,160 @@ const findAlignLine = (excludeId, val, axis) => {
   return null
 }
 
-// 邻边吸直:邻边接近水平/垂直时,自由端对齐到拖动端点的 x/y(axis='x' 对齐 x)
-const straightenNeighbor = (room, fixedIdx, otherIdx, axis) => {
-  const fixed = room.poly[fixedIdx]; const other = room.poly[otherIdx]
-  if (!fixed || !other) return
-  const len = Math.hypot(fixed.x - other.x, fixed.y - other.y) || 1
-  const ratio = axis === 'x' ? Math.abs(fixed.x - other.x) / len : Math.abs(fixed.y - other.y) / len
+// 邻边吸直:邻边接近水平/垂直时,自由端对齐到拖动端点的 x/y(axis='x' 对齐 x)。
+// 判定用拖动前的原始端点(origFixed),对齐值仍用当前拖动端点:边 ab 插入点 c 后拖 ac 时,
+// b 侧邻边 c-b 是共线延续段,若用拖动后的 c 位置判定,短子边 + 大位移会把 c-b 误判为"接近垂直"从而把 b 也拽动;
+// 用原始共线几何则 ratio≈1 跳过,而直角邻边仍按当前端点对齐(水平位移跟随)。
+const straightenNeighbor = (room, fixedIdx, otherIdx, axis, origFixed) => {
+  const current = room.poly[fixedIdx]; const other = room.poly[otherIdx]
+  if (!current || !other) return
+  const ref = origFixed || current
+  const len = Math.hypot(ref.x - other.x, ref.y - other.y) || 1
+  const ratio = axis === 'x' ? Math.abs(ref.x - other.x) / len : Math.abs(ref.y - other.y) / len
   if (ratio < 0.25) {
-    if (axis === 'x') other.x = fixed.x
-    else other.y = fixed.y
+    if (axis === 'x') other.x = current.x
+    else other.y = current.y
   }
 }
 
-// 家具贴墙吸附:家具边贴合房间边/其他家具边(垂直/水平,阈值 6px),返回平移修正量
-const snapFurniture = (f, excludeId) => {  const SNAP = 6
-  const edges = []
+// ---- 家具吸附(移动 + 缩放共用目标池) ----
+// 目标池:房间与家具的轴对齐边 + 角点,分开收集以便按「家具优先于房间」排序。
+// 边按轴向分垂直(x 常量)/水平(y 常量),lo/hi 为沿另一轴的范围,用于范围匹配。
+const collectSnapTargets = (excludeId) => {
+  const roomVEdges = []; const roomHEdges = []; const roomCorners = []
+  const furnVEdges = []; const furnHEdges = []; const furnCorners = []
   roomsLocal.value.forEach((r) => {
     r.poly.forEach((v, i) => {
       const a = v; const b = r.poly[(i + 1) % r.poly.length]
-      if (Math.abs(a.x - b.x) < 0.5) edges.push({ axis: 'x', val: a.x, lo: Math.min(a.y, b.y), hi: Math.max(a.y, b.y) })
-      else if (Math.abs(a.y - b.y) < 0.5) edges.push({ axis: 'y', val: a.y, lo: Math.min(a.x, b.x), hi: Math.max(a.x, b.x) })
+      roomCorners.push({ x: a.x, y: a.y })
+      if (Math.abs(a.x - b.x) < 0.5) roomVEdges.push({ val: a.x, lo: Math.min(a.y, b.y), hi: Math.max(a.y, b.y) })
+      else if (Math.abs(a.y - b.y) < 0.5) roomHEdges.push({ val: a.y, lo: Math.min(a.x, b.x), hi: Math.max(a.x, b.x) })
     })
   })
   placedFurnitures.value.forEach((o) => {
     if (o.id === excludeId) return
-    edges.push({ axis: 'x', val: o.x, lo: o.y, hi: o.y + o.h })
-    edges.push({ axis: 'x', val: o.x + o.w, lo: o.y, hi: o.y + o.h })
-    edges.push({ axis: 'y', val: o.y, lo: o.x, hi: o.x + o.w })
-    edges.push({ axis: 'y', val: o.y + o.h, lo: o.x, hi: o.x + o.w })
+    furnCorners.push(
+      { x: o.x, y: o.y }, { x: o.x + o.w, y: o.y },
+      { x: o.x + o.w, y: o.y + o.h }, { x: o.x, y: o.y + o.h },
+    )
+    furnVEdges.push({ val: o.x, lo: o.y, hi: o.y + o.h }, { val: o.x + o.w, lo: o.y, hi: o.y + o.h })
+    furnHEdges.push({ val: o.y, lo: o.x, hi: o.x + o.w }, { val: o.y + o.h, lo: o.x, hi: o.x + o.w })
   })
-  const fEdges = [
-    { axis: 'x', val: f.x, lo: f.y, hi: f.y + f.h, ref: { x1: f.x, y1: f.y } },
-    { axis: 'x', val: f.x + f.w, lo: f.y, hi: f.y + f.h, ref: { x1: f.x + f.w, y1: f.y } },
-    { axis: 'y', val: f.y, lo: f.x, hi: f.x + f.w, ref: { x1: f.x, y1: f.y } },
-    { axis: 'y', val: f.y + f.h, lo: f.x, hi: f.x + f.w, ref: { x1: f.x, y1: f.y + f.h } },
-  ]
-  for (const fe of fEdges) {
-    for (const re of edges) {
-      if (fe.axis !== re.axis) continue
-      const diff = fe.val - re.val
-      if (Math.abs(diff) >= SNAP) continue
-      if (fe.hi < re.lo || fe.lo > re.hi) continue
-      if (fe.axis === 'x') return { dx: 0, dy: -diff, line: { x1: fe.ref.x1, y1: fe.ref.y1, x2: fe.ref.x1, y2: fe.ref.y1 - diff } }
-      return { dx: -diff, dy: 0, line: { x1: fe.ref.x1, y1: fe.ref.y1, x2: fe.ref.x1 - diff, y2: fe.ref.y1 } }
+  return { roomVEdges, roomHEdges, roomCorners, furnVEdges, furnHEdges, furnCorners }
+}
+
+// 家具矩形控制特征:4 角 + 4 边(移动吸附复用)
+const furnControl = (rect) => ({
+  corners: [
+    { x: rect.x, y: rect.y }, { x: rect.x + rect.w, y: rect.y },
+    { x: rect.x + rect.w, y: rect.y + rect.h }, { x: rect.x, y: rect.y + rect.h },
+  ],
+  vEdges: [
+    { val: rect.x, lo: rect.y, hi: rect.y + rect.h, ref: { x1: rect.x, y1: rect.y } },
+    { val: rect.x + rect.w, lo: rect.y, hi: rect.y + rect.h, ref: { x1: rect.x + rect.w, y1: rect.y } },
+  ],
+  hEdges: [
+    { val: rect.y, lo: rect.x, hi: rect.x + rect.w, ref: { x1: rect.x, y1: rect.y } },
+    { val: rect.y + rect.h, lo: rect.x, hi: rect.x + rect.w, ref: { x1: rect.x, y1: rect.y + rect.h } },
+  ],
+})
+
+// 角对点吸附:家具角贴到目标角点,返回 {dx,dy,line} 或 null
+const snapRectCorner = (fCorners, targetCorners, SNAP) => {
+  let best = null; let bestDist = SNAP
+  for (const fc of fCorners) {
+    for (const c of targetCorners) {
+      const dx = c.x - fc.x; const dy = c.y - fc.y
+      const dist = Math.hypot(dx, dy)
+      if (dist < bestDist) { bestDist = dist; best = { dx, dy, line: { x1: fc.x, y1: fc.y, x2: c.x, y2: c.y } } }
     }
   }
-  return { dx: 0, dy: 0, line: null }
+  return best
+}
+
+// 边对边吸附:家具边贴到目标边,返回 {dx,dy,line} 或 null
+const snapRectEdges = (fV, fH, vEdges, hEdges, SNAP) => {
+  let best = null; let bestDist = SNAP
+  for (const fe of fV) {
+    for (const re of vEdges) {
+      const diff = re.val - fe.val
+      if (Math.abs(diff) >= bestDist) continue
+      if (fe.hi < re.lo || fe.lo > re.hi) continue
+      bestDist = Math.abs(diff); best = { dx: diff, dy: 0, line: { x1: fe.ref.x1, y1: fe.ref.y1, x2: fe.ref.x1 + diff, y2: fe.ref.y1 } }
+    }
+  }
+  for (const fe of fH) {
+    for (const re of hEdges) {
+      const diff = re.val - fe.val
+      if (Math.abs(diff) >= bestDist) continue
+      if (fe.hi < re.lo || fe.lo > re.hi) continue
+      bestDist = Math.abs(diff); best = { dx: 0, dy: diff, line: { x1: fe.ref.x1, y1: fe.ref.y1, x2: fe.ref.x1, y2: fe.ref.y1 + diff } }
+    }
+  }
+  return best
+}
+
+// 家具移动吸附:优先贴靠其他家具,再贴靠房间;同类里角对点优先(可同时对齐两条边)。
+// 之前角/边共用"最近者"比较,单条边一维距离恒小于角的二维距离,导致贴直角墙角时只吸附一条边。
+const snapFurnitureMove = (rect, excludeId) => {
+  const SNAP = 6 / view.value.k
+  const t = collectSnapTargets(excludeId)
+  const fc = furnControl(rect)
+  return snapRectCorner(fc.corners, t.furnCorners, SNAP)
+    || snapRectEdges(fc.vEdges, fc.hEdges, t.furnVEdges, t.furnHEdges, SNAP)
+    || snapRectCorner(fc.corners, t.roomCorners, SNAP)
+    || snapRectEdges(fc.vEdges, fc.hEdges, t.roomVEdges, t.roomHEdges, SNAP)
+    || { dx: 0, dy: 0, line: null }
+}
+
+// 家具缩放吸附:拖拽手柄带动的自由边贴靠目标边/角点,返回修正后的矩形与吸附线。
+// 每个自由边独立吸附;优先家具(边>角)后房间(边>角);保持 ≥ minSize,不越过锚点对边。
+const snapFurnitureResize = (rect, excludeId, anchor, minSize = 20) => {
+  const SNAP = 6 / view.value.k
+  const t = collectSnapTargets(excludeId)
+  let x = rect.x; let y = rect.y; let w = rect.w; let h = rect.h
+  const right = rect.x + rect.w    // w/n 手柄时右/下边为固定锚边
+  const bottom = rect.y + rect.h
+  let line = null
+  // 单轴吸附:在一组目标(边>角)里找最近坐标;无命中返回 null
+  const snapAxisGroup = (axis, val, lo, hi, vEdges, hEdges, corners) => {
+    const edges = axis === 'x' ? vEdges : hEdges
+    let best = null; let bestDist = SNAP
+    for (const e of edges) {
+      const diff = e.val - val
+      if (Math.abs(diff) >= bestDist) continue
+      if (hi < e.lo || lo > e.hi) continue
+      bestDist = Math.abs(diff); best = e.val
+    }
+    for (const c of corners) {
+      const cv = axis === 'x' ? c.x : c.y
+      const diff = cv - val
+      if (Math.abs(diff) >= bestDist) continue
+      if (axis === 'x' ? (c.y < lo || c.y > hi) : (c.x < lo || c.x > hi)) continue
+      bestDist = Math.abs(diff); best = cv
+    }
+    return best
+  }
+  const snapAxis = (axis, val, lo, hi) =>
+    snapAxisGroup(axis, val, lo, hi, t.furnVEdges, t.furnHEdges, t.furnCorners)
+    ?? snapAxisGroup(axis, val, lo, hi, t.roomVEdges, t.roomHEdges, t.roomCorners)
+  if (anchor.includes('e')) {
+    const tv = snapAxis('x', x + w, y, y + h)
+    if (tv != null) { w = Math.max(minSize, tv - x); line = { x1: rect.x + rect.w, y1: y, x2: x + w, y2: y } }
+  }
+  if (anchor.includes('w')) {
+    const tv = snapAxis('x', x, y, y + h)
+    if (tv != null) { x = Math.min(tv, right - minSize); w = right - x; line = { x1: rect.x, y1: y, x2: x, y2: y } }
+  }
+  if (anchor.includes('s')) {
+    const tv = snapAxis('y', y + h, x, x + w)
+    if (tv != null) { h = Math.max(minSize, tv - y); line = { x1: x, y1: rect.y + rect.h, x2: x, y2: y + h } }
+  }
+  if (anchor.includes('n')) {
+    const tv = snapAxis('y', y, x, x + w)
+    if (tv != null) { y = Math.min(tv, bottom - minSize); h = bottom - y; line = { x1: x, y1: rect.y, x2: x, y2: y } }
+  }
+  return { x, y, w, h, line }
 }
 
 const parseGeom = (g) => { try { const a = JSON.parse(g || '[]'); return Array.isArray(a) ? a : [] } catch { return [] } }
@@ -278,20 +487,128 @@ watch(() => props.furnitures, (fs) => {
     .map((f) => ({ ...f }))
 }, { immediate: true, deep: true })
 
+// ---- 缩略图(迷你地图):右上角悬浮,可折叠成横条、可拖动 ----
+const THUMB_W = 168
+const THUMB_H = 112
+const THUMB_BAR_H = 26
+const thumbCollapsed = ref(false)
+const thumbPos = ref({ x: 0, y: 0 })
+const thumbMoved = ref(false)
+const wrapSize = ref({ w: 0, h: 0 })
+
+const thumbBounds = computed(() => {
+  let minX = Infinity; let minY = Infinity; let maxX = -Infinity; let maxY = -Infinity
+  roomsLocal.value.forEach((r) => r.poly.forEach((p) => {
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x
+    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y
+  }))
+  placedFurnitures.value.forEach((f) => {
+    if (f.x < minX) minX = f.x; if (f.x + f.w > maxX) maxX = f.x + f.w
+    if (f.y < minY) minY = f.y; if (f.y + f.h > maxY) maxY = f.y + f.h
+  })
+  if (!isFinite(minX)) return null
+  return { minX, minY, w: Math.max(1, maxX - minX), h: Math.max(1, maxY - minY) }
+})
+const thumbViewBox = computed(() => {
+  const b = thumbBounds.value
+  return b ? `${b.minX} ${b.minY} ${b.w} ${b.h}` : '0 0 1 1'
+})
+// 当前可视区域(世界坐标),在缩略图上以红框标示
+const thumbViewport = computed(() => {
+  const w = wrapSize.value.w; const h = wrapSize.value.h
+  if (!w || !h) return null
+  const k = view.value.k || 1
+  return { x: -view.value.tx / k, y: -view.value.ty / k, w: w / k, h: h / k }
+})
+const thumbStyle = computed(() => ({ left: `${thumbPos.value.x}px`, top: `${thumbPos.value.y}px` }))
+const clampThumbPos = (x, y) => {
+  const w = wrapSize.value.w || THUMB_W
+  const h = wrapSize.value.h || THUMB_H
+  const th = thumbCollapsed.value ? THUMB_BAR_H : THUMB_H
+  return {
+    x: Math.max(0, Math.min(w - THUMB_W, x)),
+    y: Math.max(0, Math.min(h - th, y)),
+  }
+}
+const resetThumbPos = () => {
+  const w = wrapSize.value.w
+  if (w) thumbPos.value = { x: Math.max(0, w - THUMB_W - 12), y: 12 }
+}
+let thumbDrag = null
+const onThumbDragStart = (e) => {
+  if (e.button !== 0) return
+  e.preventDefault()
+  thumbDrag = { startX: e.clientX, startY: e.clientY, origX: thumbPos.value.x, origY: thumbPos.value.y }
+  document.addEventListener('pointermove', onThumbDragMove)
+  document.addEventListener('pointerup', onThumbDragEnd)
+}
+const onThumbDragMove = (e) => {
+  if (!thumbDrag) return
+  thumbMoved.value = true
+  const dx = e.clientX - thumbDrag.startX
+  const dy = e.clientY - thumbDrag.startY
+  thumbPos.value = clampThumbPos(thumbDrag.origX + dx, thumbDrag.origY + dy)
+}
+const onThumbDragEnd = () => {
+  thumbDrag = null
+  document.removeEventListener('pointermove', onThumbDragMove)
+  document.removeEventListener('pointerup', onThumbDragEnd)
+}
+
 // ---- 底图变换(调整底图工具:平移 + 四角等比缩放,持久化在楼层配置 img 字段) ----
 const imgLocal = ref({ x: 0, y: 0, k: 1 })
 watch(() => props.imageTransform, (v) => { imgLocal.value = v ? { ...v } : { x: 0, y: 0, k: 1 } }, { immediate: true, deep: true })
-const imgSize = ref({ w: 0, h: 0 })
+// ---- 底图预加载(消除切层闪烁) ----
+// 直接替换 <image> href 会瞬间清空旧图、新图异步加载期间出现空白闪烁;
+// 改为新图预加载完成后再替换显示,旧图全程可见;快速切层时丢弃过期旧图。
+const shownImageUrl = ref(null)   // 当前显示的底图(预加载完成才更新)
+const imgSize = ref({ w: 0, h: 0 }) // 显示中底图的自然尺寸(供 fit 纳入适配范围)
+const imgLoading = ref(false)     // 是否有新底图正在加载
 watch(() => props.imageUrl, (url) => {
-  imgSize.value = { w: 0, h: 0 }
-  if (!url) return
+  if (!url) {
+    shownImageUrl.value = null
+    imgSize.value = { w: 0, h: 0 }
+    imgLoading.value = false
+    return
+  }
+  if (url === shownImageUrl.value && imgSize.value.w) return // 同图已显示,跳过重复加载
+  imgLoading.value = true
   const img = new Image()
-  img.onload = () => { imgSize.value = { w: img.naturalWidth, h: img.naturalHeight } }
+  img.onload = () => {
+    if (props.imageUrl !== url) return // 过期旧图(快速切层后才加载完)丢弃
+    shownImageUrl.value = url
+    imgSize.value = { w: img.naturalWidth, h: img.naturalHeight }
+    imgLoading.value = false
+  }
+  img.onerror = () => {
+    if (props.imageUrl !== url) return
+    shownImageUrl.value = url
+    imgSize.value = { w: 0, h: 0 }
+    imgLoading.value = false
+  }
   img.src = url
 }, { immediate: true })
 
 const furnitureById = computed(() => { const m = {}; props.furnitures.forEach((f) => { m[f.id] = f }); return m })
 const roomById = computed(() => { const m = {}; roomsLocal.value.forEach((r) => { m[r.id] = r }); return m })
+
+// 查看态手绘边界:房间/家具边界改用蜡笔抖动线(doodle.js crayon 笔触);编辑态仍用直线便于对齐
+const roomCrayon = computed(() => {
+  if (props.mode !== 'view') return {}
+  const m = {}
+  for (const r of roomsLocal.value) if (r.poly.length >= 3) m[r.id] = crayonStrokePaths(r.poly, seedFromId(r.id), 3.6)
+  return m
+})
+const rectCorners = (f) => [
+  { x: f.x, y: f.y }, { x: f.x + f.w, y: f.y },
+  { x: f.x + f.w, y: f.y + f.h }, { x: f.x, y: f.y + f.h },
+]
+const furnCrayon = computed(() => {
+  if (props.mode !== 'view') return {}
+  const m = {}
+  for (const f of placedFurnitures.value) m[f.id] = crayonStrokePaths(rectCorners(f), seedFromId(f.id), 2.6)
+  return m
+})
 
 const absItems = computed(() => props.items.map((it) => {
   let ax = 0; let ay = 0
@@ -474,7 +791,7 @@ const onPointerMove = (e) => {
       // 角缩放:顶点自由移动,水平邻边对端跟随 dy,垂直邻边对端跟随 dx(保持直角)
       const cur = poly[i]
       let nx = p.x; let ny = p.y
-      const others = otherRoomVertices(d.room.id)
+      const others = otherRoomVertices(d.room.id, linkedExcludeVerts(d))
       const t = others.length ? snapPoint({ x: nx, y: ny }, others) : null
       if (t) { snapLine.value = { x1: nx, y1: ny, x2: t.x, y2: t.y }; nx = t.x; ny = t.y; d.snapped = true }
       const dx = nx - cur.x
@@ -492,7 +809,7 @@ const onPointerMove = (e) => {
       const snapped = snapVertex(prev, next, p.x, p.y)
       d.snapped = snapped.snapped
       let vx = snapped.x; let vy = snapped.y
-      const others = otherRoomVertices(d.room.id)
+      const others = otherRoomVertices(d.room.id, linkedExcludeVerts(d))
       const t = others.length ? snapPoint({ x: vx, y: vy }, others) : null
       if (t) { snapLine.value = { x1: vx, y1: vy, x2: t.x, y2: t.y }; vx = t.x; vy = t.y }
       poly[i] = { x: vx, y: vy }
@@ -510,7 +827,7 @@ const onPointerMove = (e) => {
     let dx = p.x - d.startX
     let dy = p.y - d.startY
     const rawDx = dx; const rawDy = dy
-    const others = otherRoomVertices(d.room.id)
+    const others = otherRoomVertices(d.room.id, linkedExcludeVerts(d))
     snapLine.value = null
     if (others.length) {
       for (const pt of d.orig) {
@@ -531,23 +848,23 @@ const onPointerMove = (e) => {
       // 拖水平边:轻微水平位移吸附归零(纯垂直移动,邻边 ad/bc 保持垂直)
       if (Math.abs(dx) < 8 / view.value.k) dx = 0
       let ty = (oA.y + oB.y) / 2 + dy
-      const ln = findAlignLine(d.room.id, ty, 'y')
+      const ln = findAlignLine(d.room.id, ty, 'y', linkedRoomIds(d))
       if (ln != null) { snapLine.value = { x1: oA.x + dx, y1: ty, x2: oA.x + dx, y2: ln }; ty = ln }
       d.room.poly[d.aIdx] = { x: oA.x + dx, y: ty }
       d.room.poly[d.bIdx] = { x: oB.x + dx, y: ty }
       // 邻边吸直:a 的前邻边 / b 的后邻边接近垂直时,对齐到拖动端点的 x
-      straightenNeighbor(d.room, d.aIdx, (d.aIdx - 1 + d.room.poly.length) % d.room.poly.length, 'x')
-      straightenNeighbor(d.room, d.bIdx, (d.bIdx + 1) % d.room.poly.length, 'x')
+      straightenNeighbor(d.room, d.aIdx, (d.aIdx - 1 + d.room.poly.length) % d.room.poly.length, 'x', d.orig[0])
+      straightenNeighbor(d.room, d.bIdx, (d.bIdx + 1) % d.room.poly.length, 'x', d.orig[1])
     } else if (nearV) {
       // 拖垂直边:轻微垂直位移吸附归零(纯水平移动,邻边保持水平)
       if (Math.abs(dy) < 8 / view.value.k) dy = 0
       let tx = (oA.x + oB.x) / 2 + dx
-      const ln = findAlignLine(d.room.id, tx, 'x')
+      const ln = findAlignLine(d.room.id, tx, 'x', linkedRoomIds(d))
       if (ln != null) { snapLine.value = { x1: tx, y1: oA.y + dy, x2: ln, y2: oA.y + dy }; tx = ln }
       d.room.poly[d.aIdx] = { x: tx, y: oA.y + dy }
       d.room.poly[d.bIdx] = { x: tx, y: oB.y + dy }
-      straightenNeighbor(d.room, d.aIdx, (d.aIdx - 1 + d.room.poly.length) % d.room.poly.length, 'y')
-      straightenNeighbor(d.room, d.bIdx, (d.bIdx + 1) % d.room.poly.length, 'y')
+      straightenNeighbor(d.room, d.aIdx, (d.aIdx - 1 + d.room.poly.length) % d.room.poly.length, 'y', d.orig[0])
+      straightenNeighbor(d.room, d.bIdx, (d.bIdx + 1) % d.room.poly.length, 'y', d.orig[1])
     } else {
       d.room.poly[d.aIdx] = { x: oA.x + dx, y: oA.y + dy }
       d.room.poly[d.bIdx] = { x: oB.x + dx, y: oB.y + dy }
@@ -562,8 +879,8 @@ const onPointerMove = (e) => {
     }
     rebuildRoomMeta(d.room)
   } else if (d.type === 'furn-move') {
-    let dx = p.x - d.startX; let dy = p.y - d.startY
-    const snap = snapFurniture({ x: d.orig.x + dx, y: d.orig.y + dy, w: d.f.w, h: d.f.h }, d.f.id)
+    const dx = p.x - d.startX; const dy = p.y - d.startY
+    const snap = snapFurnitureMove({ x: d.orig.x + dx, y: d.orig.y + dy, w: d.f.w, h: d.f.h }, d.f.id)
     snapLine.value = snap.line
     d.f.x = d.orig.x + dx + snap.dx
     d.f.y = d.orig.y + dy + snap.dy
@@ -574,7 +891,9 @@ const onPointerMove = (e) => {
     if (a.includes('s')) h = Math.max(20, p.y - o.y)
     if (a.includes('w')) { const right = o.x + o.w; x = Math.min(p.x, right - 20); w = right - x }
     if (a.includes('n')) { const bottom = o.y + o.h; y = Math.min(p.y, bottom - 20); h = bottom - y }
-    d.f.x = x; d.f.y = y; d.f.w = w; d.f.h = h
+    const snap = snapFurnitureResize({ x, y, w, h }, d.f.id, a)
+    snapLine.value = snap.line
+    d.f.x = snap.x; d.f.y = snap.y; d.f.w = snap.w; d.f.h = snap.h
   } else if (d.type === 'bg-move') {
     imgLocal.value.x = d.orig.x + (p.x - d.startX)
     imgLocal.value.y = d.orig.y + (p.y - d.startY)
@@ -629,7 +948,13 @@ const onPointerUp = (e) => {
       })
     }
   } else if (d.type === 'furn-move' || d.type === 'furn-resize') {
-    emit('save-furniture', d.f.id, { x: d.f.x, y: d.f.y, w: d.f.w, h: d.f.h })
+    const data = { x: d.f.x, y: d.f.y, w: d.f.w, h: d.f.h }
+    if (d.type === 'furn-move') {
+      // 家具拖入其他房间时归属随之改变(以中心点判定,与裁剪时家具分配口径一致)
+      const r = roomsLocal.value.find((rm) => rm.poly.length >= 3 && pointInPoly({ x: d.f.x + d.f.w / 2, y: d.f.y + d.f.h / 2 }, rm.poly))
+      if (r && r.id !== d.f.roomId) data.roomId = r.id
+    }
+    emit('save-furniture', d.f.id, data)
   } else if (d.type === 'bg-move' || d.type === 'bg-resize') {
     emit('save-image-transform', { x: imgLocal.value.x, y: imgLocal.value.y, k: imgLocal.value.k })
   } else if (d.type === 'item-move') {
@@ -660,11 +985,19 @@ const beginDrag = (e, d) => {
 }
 
 // ---- hover 边界检测 + 点击插入端点 ----
+// 家具 hover 优先:指针落在已摆放家具上(或其边缘邻近)时,房间边界的 +/手柄让位给家具。
+const overPlacedFurniture = (p) => {
+  const NEAR = 12 / view.value.k
+  return placedFurnitures.value.some((f) =>
+    p.x >= f.x - NEAR && p.x <= f.x + f.w + NEAR &&
+    p.y >= f.y - NEAR && p.y <= f.y + f.h + NEAR)
+}
 // select:手柄区域让位(靠近顶点/边中点不出 + 号,那是拖手柄的区域),其余吸附最近边(投影)。
 // cut/glue:走共享几何模块 detectBoundary(候选池+归属优先级;端点优先、边投影,不吸附边中点手柄)。
 const detectHover = (p) => {
-  const TH = 12 / view.value.k // 屏幕恒定 12px:端点让位区/边识别在缩放下一致
+  const TH = 6 / view.value.k // 屏幕恒定 6px:边识别范围缩小,避免 hover 显示但点击无效(指针中心未真正落在边上)
   if (props.tool === 'select') {
+    if (overPlacedFurniture(p)) return null
     for (const r of roomsLocal.value) {
       const poly = r.poly
       for (let i = 0; i < poly.length; i++) {
@@ -742,19 +1075,21 @@ const roomHandles = computed(() => {
   if (!['select', 'cut', 'glue'].includes(props.tool)) return []
   const mp = mousePos.value
   const d = drag.value
-  const NEAR = 12 / view.value.k // 端点/边邻域(屏幕恒定 12px,多边形外 1px 也识别)
+  const NEAR = 6 / view.value.k // 端点/边邻域(屏幕恒定 6px,与 hover 检测对齐)
+  // 家具 hover 优先:非拖拽状态下,指针落在已摆放家具上时,房间顶点/边中点手柄让位
+  const overFurn = !d && !!mp && overPlacedFurniture(mp)
   const out = []
   for (const r of roomsLocal.value) {
     const n = r.poly.length
     const dragRoom = d && d.room === r ? d : null
-    const inside = !!mp && n >= 3 && pointInPoly(mp, r.poly)
+    const inside = !!mp && !overFurn && n >= 3 && pointInPoly(mp, r.poly)
     const vertexIdxs = []
     const midIdxs = []
     for (let i = 0; i < n; i++) {
       if (inside || dragRoom) vertexIdxs.push(i)
-      else if (mp && Math.hypot(mp.x - r.poly[i].x, mp.y - r.poly[i].y) < NEAR) vertexIdxs.push(i) // 在外但贴近该端点:只亮这一个,尖角即现即抓
+      else if (!overFurn && mp && Math.hypot(mp.x - r.poly[i].x, mp.y - r.poly[i].y) < NEAR) vertexIdxs.push(i) // 在外但贴近该端点:只亮这一个,尖角即现即抓
       if (dragRoom && dragRoom.type === 'room-edge' && dragRoom.aIdx === i) { midIdxs.push(i); continue }
-      if (mp && projectToSegment(mp, r.poly[i], r.poly[(i + 1) % n]).dist < NEAR) midIdxs.push(i)
+      if (!overFurn && mp && projectToSegment(mp, r.poly[i], r.poly[(i + 1) % n]).dist < NEAR) midIdxs.push(i)
     }
     out.push({ r, vertexIdxs, midIdxs })
   }
@@ -975,6 +1310,37 @@ const furnHandlePos = (f, a) => {
     n: [cx, f.y], s: [cx, f.y + f.h], w: [f.x, cy], e: [f.x + f.w, cy],
   }[a]
 }
+// 家具手柄按需显隐(同房间):鼠标在该家具内部/贴近其边角,或正在拖该家具时显示,其余隐藏。
+const furnHandles = computed(() => {
+  const map = new Map()
+  if (!['select', 'cut', 'glue'].includes(props.tool)) return map
+  const mp = mousePos.value
+  const d = drag.value
+  const NEAR = 12 / view.value.k
+  const cornerAt = { nw: [0, 0], ne: [1, 0], sw: [0, 1], se: [1, 1] }
+  const edgeAt = { n: [0.5, 0], s: [0.5, 1], e: [1, 0.5], w: [0, 0.5] }
+  for (const f of placedFurnitures.value) {
+    if (d && (d.type === 'furn-move' || d.type === 'furn-resize') && d.f === f) {
+      map.set(f.id, { corners: [...furnCorners], edges: [...furnEdges] })
+      continue
+    }
+    if (!mp) continue
+    const inside = mp.x >= f.x && mp.x <= f.x + f.w && mp.y >= f.y && mp.y <= f.y + f.h
+    if (inside) { map.set(f.id, { corners: [...furnCorners], edges: [...furnEdges] }); continue }
+    const corners = []
+    for (const a of furnCorners) {
+      const [rx, ry] = cornerAt[a]
+      if (Math.hypot(mp.x - (f.x + rx * f.w), mp.y - (f.y + ry * f.h)) < NEAR) corners.push(a)
+    }
+    const edges = []
+    for (const a of furnEdges) {
+      const [rx, ry] = edgeAt[a]
+      if (Math.hypot(mp.x - (f.x + rx * f.w), mp.y - (f.y + ry * f.h)) < NEAR) edges.push(a)
+    }
+    if (corners.length || edges.length) map.set(f.id, { corners, edges })
+  }
+  return map
+})
 const onFurnHandleDown = (e, f, anchor) => {
   if (routeTool(e)) return
   beginDrag(e, { type: 'furn-resize', f, anchor, orig: { x: f.x, y: f.y, w: f.w, h: f.h } })
@@ -1036,14 +1402,19 @@ const finishPoly = () => {
   detach()
 }
 
-// ---- 侧栏预设家具拖入(drop) ----
+// ---- 侧栏家具拖入(drop):预设拖入创建新家具,库内家具拖入摆放 ----
 const onDrop = (e) => {
   const type = e.dataTransfer.getData('text/furn-type')
-  if (!type) return
+  const furnId = e.dataTransfer.getData('text/furn-id')
+  if (!type && !furnId) return
   e.preventDefault()
   const p = toCanvas(e)
   const room = roomsLocal.value.find((r) => r.poly.length >= 3 && pointInPoly(p, r.poly))
-  emit('create-furniture', { type, roomId: room ? room.id : null, x: p.x, y: p.y })
+  if (furnId) {
+    emit('place-furniture', { id: Number(furnId), roomId: room ? room.id : null, x: p.x, y: p.y })
+  } else {
+    emit('create-furniture', { type, roomId: room ? room.id : null, x: p.x, y: p.y })
+  }
 }
 
 // ---- 底图标定(两点测距) ----
@@ -1101,17 +1472,40 @@ const onSvgDblClick = (e) => {
 }
 
 // 视口只在父组件明确要求时重置(换房/换层/换底图,fitKey 自增)或底图尺寸异步就绪时适配;
-// 几何保存、撤销、改名等数据更新一律不动当前缩放平移,避免编辑中视图跳动
-watch(() => props.fitKey, () => nextTick(fit))
-watch(imgSize, () => { if (!drag.value) nextTick(fit) })
+// 几何保存、撤销、改名等数据更新一律不动当前缩放平移,避免编辑中视图跳动。
+// 同一 tick 内多次 fit 请求合并为一次;底图加载中暂缓 fit,待图片尺寸就绪后统一适配(避免先按无图适配再跳一次)。
+let fitScheduled = false
+const scheduleFit = () => {
+  if (fitScheduled) return
+  fitScheduled = true
+  nextTick(() => {
+    fitScheduled = false
+    if (!drag.value) fit()
+  })
+}
+watch(() => props.fitKey, () => {
+  if (imgLoading.value) return // 新图尚未就绪:等 imgSize 变化后由下方监听器补适配
+  scheduleFit()
+})
+watch(imgSize, () => scheduleFit())
 let resizeObserver = null
 onMounted(() => {
-  fit()
-  // 画布尺寸变化(侧栏出现/窗口缩放)重新适配,元素始终在窗格内
-  resizeObserver = new ResizeObserver(() => { if (!drag.value) fit() })
+  scheduleFit()
+  // 画布尺寸变化(侧栏出现/窗口缩放)重新适配,元素始终在窗格内;同时刷新缩略图默认位置
+  resizeObserver = new ResizeObserver(() => {
+    if (wrapRef.value) {
+      wrapSize.value = { w: wrapRef.value.clientWidth, h: wrapRef.value.clientHeight }
+      if (!thumbMoved.value) resetThumbPos()
+    }
+    if (!drag.value) scheduleFit()
+  })
   resizeObserver.observe(wrapRef.value)
+  if (wrapRef.value) {
+    wrapSize.value = { w: wrapRef.value.clientWidth, h: wrapRef.value.clientHeight }
+    resetThumbPos()
+  }
 })
-onBeforeUnmount(() => { detach(); if (resizeObserver) resizeObserver.disconnect() })
+onBeforeUnmount(() => { detach(); onThumbDragEnd(); if (resizeObserver) resizeObserver.disconnect() })
 
 defineExpose({ finishPoly, fit, cancelPending })
 </script>
@@ -1134,6 +1528,7 @@ defineExpose({ finishPoly, fit, cancelPending })
 .fp-svg.is-tool-select .fp-editable { cursor: text; } /* 仅选择工具下点名称可改名,其余工具不误示文本光标 */
 .fp-drawing, .fp-snap-line, .fp-calib-dot, .fp-calib-line, .fp-hover-add, .fp-hover-tool, .fp-cut-line { pointer-events: none; } /* 预览/装饰元素不挡落点 */
 .fp-room { fill: rgba(184, 140, 110, 0.14); stroke: rgba(184, 140, 110, 0.65); stroke-width: 2; }
+.fp-room.is-view { stroke: none; } /* 查看态:边界改蜡笔抖动线 */
 .fp-room.is-hit { fill: rgba(184, 140, 110, 0.28); }
 .fp-room.is-overlap { stroke: #b04a3a; stroke-width: 2.5; fill: rgba(185, 96, 88, 0.16); }
 .fp-room-label { font-size: 13px; font-weight: 600; letter-spacing: 0.02em; fill: #5c4c3d; text-anchor: middle; dominant-baseline: middle; }
@@ -1141,8 +1536,14 @@ defineExpose({ finishPoly, fit, cancelPending })
 .fp-dim { font-size: 10px; fill: #6b9b6b; text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: rgba(246, 239, 228, 0.85); stroke-width: 3px; }
 .fp-dim-editable { pointer-events: auto; cursor: pointer; }
 .fp-dim-editable:hover { text-decoration: underline; }
-.fp-furn { fill: rgba(120, 100, 80, 0.18); stroke: #8a6f55; stroke-width: 1.5; }
-.fp-furn-label { font-size: 11px; fill: #6b5435; text-anchor: middle; dominant-baseline: middle; }
+.fp-furn { fill: rgba(96, 144, 128, 0.28); stroke: #4f806f; stroke-width: 1.6; }
+.fp-furn.is-view { stroke: none; }
+.fp-furn-label { font-size: 11px; fill: #2f5a4c; text-anchor: middle; dominant-baseline: middle; }
+/* 蜡笔边界(查看态手绘):3 遍抖动半透明叠加,与日记本 doodle.js crayon 笔触一致 */
+.fp-crayon { pointer-events: none; }
+.fp-crayon-stroke { fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 0.28; }
+.fp-crayon-stroke.room { stroke: #b88c6e; stroke-width: 4; }
+.fp-crayon-stroke.furn { stroke: #5f9380; stroke-width: 3; }
 .fp-item { fill: #b04a3a; stroke: #fff; stroke-width: 2; }.fp-item.is-hit { fill: #e0a030; }
 .fp-item-label { font-size: 10px; fill: #5c4c3d; text-anchor: middle; paint-order: stroke; stroke: rgba(255, 253, 248, 0.85); stroke-width: 3; pointer-events: none; }
 .fp-handle { fill: #fff; stroke: #b88c6e; stroke-width: 2; cursor: move; } /* 端点四向箭头:十字中心即热点,尖角端点也能精准落点 */
@@ -1163,4 +1564,17 @@ defineExpose({ finishPoly, fit, cancelPending })
 .fp-calib-dot { fill: #e0a030; stroke: #fff; stroke-width: 2; }
 .fp-calib-line { stroke: #e0a030; stroke-width: 1.5; stroke-dasharray: 5 4; }
 .fp-drawing { fill: rgba(184, 140, 110, 0.12); stroke: #b88c6e; stroke-width: 2; stroke-dasharray: 6 4; }
+/* 缩略图(迷你地图):右上角悬浮,可折叠成横条、可拖动 */
+.fp-thumb { position: absolute; z-index: 6; width: 168px; height: 112px; background: rgba(255, 253, 248, 0.96); border: 1px solid rgba(184, 140, 110, 0.35); border-radius: 10px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12); cursor: grab; overflow: hidden; user-select: none; touch-action: none; }
+.fp-thumb:active { cursor: grabbing; }
+.fp-thumb.is-collapsed { height: 26px; display: flex; align-items: center; gap: 6px; padding: 0 6px; }
+.fp-thumb-map { width: 100%; height: 100%; display: block; }
+.fp-thumb-room { fill: rgba(184, 140, 110, 0.25); stroke: rgba(184, 140, 110, 0.8); stroke-width: 2; }
+.fp-thumb-furn { fill: rgba(96, 144, 128, 0.4); stroke: rgba(79, 128, 111, 0.9); stroke-width: 1.5; }
+.fp-thumb-viewport { fill: none; stroke: #b04a3a; stroke-width: 2; }
+.fp-thumb-toggle { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border: none; background: rgba(255, 255, 255, 0.92); border-radius: 6px; cursor: pointer; color: #8a7a6a; }
+.fp-thumb-toggle:hover { color: #5c4c3d; background: #fff; }
+.fp-thumb.is-collapsed .fp-thumb-toggle { position: static; }
+.fp-thumb-bar-label { font-size: 11px; color: #8a7a6a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+.fp-thumb-chevron { width: 14px; height: 14px; }
 </style>

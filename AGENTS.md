@@ -151,7 +151,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 系统 | i18n / 主题 / 字典 | i18n/ + theme/ + utils/dict.js |
 | 移动端 | 设备自适应 | useDevice.js + MobileLayout.vue + Mobile* 组件 |
 
-**关键坑速查**(实现细节,详见 docs):日记 date 兼容 `yyyy-MM-dd HH:mm`;纪念日 Hutool ChineseDate 月份 0-based 需 +1;家谱 null 字段须 `LambdaUpdateWrapper` 显式 SET;相册分享 token + Knuth 混淆;博客新建家庭注入 9 默认分类;物品户型图 2 期完成(裁剪/粘合删原房保持最后防家具入库覆盖、端点识别/字号/光标屏幕恒定)、3 期 AI 语义待做。
+**关键坑速查**(实现细节,详见 docs):日记 date 兼容 `yyyy-MM-dd HH:mm`;纪念日 Hutool ChineseDate 月份 0-based 需 +1;家谱 null 字段须 `LambdaUpdateWrapper` 显式 SET;相册分享 token + Knuth 混淆;博客新建家庭注入 9 默认分类;物品户型图 2 期完成(裁剪/粘合删原房保持最后防家具入库覆盖、端点识别/字号/光标屏幕恒定;**hover 边加号阈值 6px**——原 12px 太大导致 hover 显示但 click 被 `justDragged` 拦截;库内家具拖入画布替代「摆放」+「请选择房间」按钮)、3 期 AI 语义待做。
 
 ## 设计规范(统一实现,避免多种方式)
 

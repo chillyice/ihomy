@@ -28,7 +28,6 @@
           <div class="fp-side-tabs">
             <div :class="['fp-side-tab', { on: sidebarTab === 'rooms' }]" @click="sidebarTab = 'rooms'">{{ $t('item.rooms') }}</div>
             <div :class="['fp-side-tab', { on: sidebarTab === 'furnitures' }]" @click="sidebarTab = 'furnitures'">{{ $t('item.furnitures') }}</div>
-            <div :class="['fp-side-tab', { on: sidebarTab === 'library' }]" @click="sidebarTab = 'library'">{{ $t('item.library') }}</div>
           </div>
           <div class="fp-side-body">
             <!-- 房间 tab -->
@@ -100,8 +99,9 @@
                 </div>
               </template>
             </template>
-            <!-- 家具 tab -->
+            <!-- 家具 tab(家具库已合并进来) -->
             <template v-else-if="sidebarTab === 'furnitures'">
+              <el-button type="primary" size="small" class="fp-tool-btn" @click="openFurniture()">{{ $t('item.addFurniture') }}</el-button>
               <div class="fp-side-head">{{ $t('item.furnPresets') }}</div>
               <div class="fp-presets">
                 <div v-for="p in furnPresets" :key="p.type" class="fp-preset" draggable="true" @dragstart="onPresetDragStart($event, p)">
@@ -109,21 +109,64 @@
                   <span class="fp-preset-name">{{ p.type }}</span>
                 </div>
               </div>
-              <div v-for="f in floorFurnitures" :key="f.id" class="fp-side-row">
-                <span class="fp-side-name">{{ f.name }}</span>
-                <el-button v-if="f.x == null" size="small" type="primary" @click="placeFurniture(f)">{{ $t('item.place') }}</el-button>
-                <span v-else class="fp-side-ok">✓</span>
+
+              <div class="fp-side-head">{{ $t('item.placedFurniture') }}</div>
+              <div v-for="f in floorFurnitures" :key="f.id" class="fp-side-furn">
+                <div class="fp-side-row">
+                  <el-input
+                    v-if="editingFurnId === f.id"
+                    v-model="editingFurnName"
+                    size="small"
+                    class="fp-side-rename"
+                    :ref="setFurnNameInput"
+                    @keyup.enter="commitEditFurnName"
+                    @blur="commitEditFurnName"
+                  />
+                  <span v-else class="fp-side-name fp-side-name-editable" @click="startEditFurnName(f)">{{ f.name }}</span>
+                  <span class="fp-side-icons">
+                    <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
+                      <el-button size="small" text @click="openFurniture(f)"><el-icon><Edit /></el-icon></el-button>
+                    </el-tooltip>
+                    <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+                      <el-button size="small" text type="danger" @click="unplaceFurniture(f)"><el-icon><Delete /></el-icon></el-button>
+                    </el-tooltip>
+                  </span>
+                </div>
+                <div class="fp-side-meta">
+                  <span v-if="furnRoomName(f)" class="fp-side-room">{{ furnRoomName(f) }}</span>
+                  <span v-if="f.note" class="fp-side-note">{{ f.note }}</span>
+                  <span class="fp-side-count">{{ furnItemCount(f) }} {{ $t('item.itemsCount') }}</span>
+                </div>
               </div>
-              <el-button type="primary" size="small" class="fp-tool-btn" @click="openFurniture()">{{ $t('item.addFurniture') }}</el-button>
-            </template>
-            <!-- 库 tab -->
-            <template v-else>
-              <div v-for="f in libraryFurnitures" :key="f.id" class="fp-side-row">
-                <span class="fp-side-name">{{ f.name }}</span>
-                <span>
-                  <el-button size="small" type="primary" @click="placeFurniture(f)">{{ $t('item.place') }}</el-button>
-                  <el-button size="small" @click="moveFurnitureToRoom(f)">{{ $t('item.pickRoom') }}</el-button>
-                </span>
+              <div v-if="!floorFurnitures.length" class="fp-tool-hint">{{ $t('item.emptyItems') }}</div>
+
+              <div class="fp-side-head">{{ $t('item.library') }}</div>
+              <div v-if="libraryFurnitures.length" class="fp-drag-hint">{{ $t('item.dragFurnHint') }}</div>
+              <div v-for="f in libraryFurnitures" :key="f.id" class="fp-side-furn" draggable="true" @dragstart="onLibFurnDragStart($event, f)">
+                <div class="fp-side-row">
+                  <el-input
+                    v-if="editingFurnId === f.id"
+                    v-model="editingFurnName"
+                    size="small"
+                    class="fp-side-rename"
+                    :ref="setFurnNameInput"
+                    @keyup.enter="commitEditFurnName"
+                    @blur="commitEditFurnName"
+                  />
+                  <span v-else class="fp-side-name fp-side-name-editable" @click="startEditFurnName(f)">{{ f.name }}</span>
+                  <span class="fp-side-icons">
+                    <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
+                      <el-button size="small" text @click="openFurniture(f)"><el-icon><Edit /></el-icon></el-button>
+                    </el-tooltip>
+                    <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+                      <el-button size="small" text type="danger" @click="removeFurniture(f)"><el-icon><Delete /></el-icon></el-button>
+                    </el-tooltip>
+                  </span>
+                </div>
+                <div class="fp-side-meta">
+                  <span v-if="f.note" class="fp-side-note">{{ f.note }}</span>
+                  <span class="fp-side-count">{{ furnItemCount(f) }} {{ $t('item.itemsCount') }}</span>
+                </div>
               </div>
               <div v-if="!libraryFurnitures.length" class="fp-tool-hint">{{ $t('item.emptyItems') }}</div>
             </template>
@@ -154,12 +197,13 @@
           @select-furniture="onSelectFurniture"
           @calibrate="onCalibrate"
           @edit-edge="onEditEdge"
-          @delete-furniture="(id) => removeFurniture({ id })"
+          @delete-furniture="(id) => unplaceFurniture({ id })"
           @rename-room="onRenameRoom"
           @rename-furniture="onRenameFurniture"
           @cut-room="onCutRoom"
           @glue-rooms="onGlueRooms"
           @save-image-transform="onSaveImageTransform"
+          @place-furniture="onPlaceFurnitureFromDrop"
         />
 
         <!-- 空楼层引导(有房子但当前楼层无房间) -->
@@ -256,20 +300,35 @@
         </el-tab-pane>
         <el-tab-pane :label="$t('item.items')" name="items">
           <div class="page-toolbar">
-            <el-input v-model="keyword" :placeholder="$t('item.searchPh')" clearable style="width: 260px" @keyup.enter="loadItems" @clear="loadItems">
-              <template #append><el-button @click="loadItems">{{ $t('item.search') }}</el-button></template>
-            </el-input>
-            <el-button type="primary" @click="openItem()">{{ $t('item.addItem') }}</el-button>
+            <template v-if="!selectMode">
+              <div class="tb-left">
+                <el-input v-model="keyword" :placeholder="$t('item.searchPh')" clearable size="small" style="width: 260px" @keyup.enter="loadItems" @clear="loadItems">
+                  <template #append><el-button @click="loadItems">{{ $t('item.search') }}</el-button></template>
+                </el-input>
+              </div>
+              <div class="tb-right">
+                <el-button :disabled="!items.length" @click="toggleSelect">{{ $t('item.select') }}</el-button>
+                <el-button type="primary" @click="openItem()">{{ $t('item.addItem') }}</el-button>
+              </div>
+            </template>
+            <div v-else class="tb-right">
+              <span class="select-count">{{ $t('item.selectedItems', { n: selectedIds.length }) }}</span>
+              <el-button @click="toggleSelect">{{ $t('item.cancelSelect') }}</el-button>
+              <el-button type="primary" :disabled="!selectedIds.length" @click="openBatchFurniture()">{{ $t('item.batchEditFurniture') }}</el-button>
+            </div>
           </div>
           <el-empty v-if="items.length === 0" :description="$t('item.emptyItems')" />
-          <el-card v-for="it in items" :key="it.id" shadow="hover" class="item-card">
+          <el-card v-for="it in items" :key="it.id" shadow="hover" class="item-card" :class="{ 'is-pick': selectMode, selected: selectMode && selectedIds.includes(it.id) }" @click="selectMode && togglePick(it)">
+            <span v-if="selectMode" class="pick-badge" :class="{ on: selectedIds.includes(it.id) }">
+              <svg viewBox="0 0 16 16" width="12" height="12"><path d="M3 8.5 L6.5 12 L13 4.5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
             <div class="item-main">
               <span class="item-name">{{ it.name }}</span>
               <el-tag size="small">{{ dictText(t, 'item_type', it.type) }}</el-tag>
               <el-tag v-if="it.position" size="small" type="info">{{ it.position }}</el-tag>
             </div>
             <div class="item-path">{{ it.house_name }} / {{ it.room_name }} / {{ it.furniture_name }}</div>
-            <div class="item-ops">
+            <div v-if="!selectMode" class="item-ops">
               <el-button size="small" @click="openItem(it)">{{ $t('common.edit') }}</el-button>
               <el-button size="small" type="danger" plain @click="removeItem(it)">{{ $t('common.delete') }}</el-button>
             </div>
@@ -320,6 +379,22 @@
       <template #footer>
         <el-button @click="itemDlg = false">{{ $t('common.cancel') }}</el-button>
         <el-button type="primary" @click="saveItem">{{ $t('common.confirm') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 批量设置所属家具 -->
+    <el-dialog v-model="batchFurnDlg" append-to-body :title="$t('item.batchEditFurniture')" width="420px">
+      <el-form label-width="90px">
+        <el-form-item :label="$t('item.furnitureName')">
+          <el-select v-model="batchFurnitureId" clearable :placeholder="$t('item.pickFurniture')" style="width: 100%">
+            <el-option v-for="f in furnitures" :key="f.id" :label="furnLabel(f)" :value="f.id" />
+          </el-select>
+        </el-form-item>
+        <div class="fp-batch-hint">{{ $t('item.batchAssignHint') }}</div>
+      </el-form>
+      <template #footer>
+        <el-button @click="batchFurnDlg = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="applyBatchFurniture">{{ $t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
 
@@ -392,9 +467,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Plus, CopyDocument, Delete } from '@element-plus/icons-vue'
+import { Search, Plus, CopyDocument, Delete, Edit } from '@element-plus/icons-vue'
 import { itemApi, fileApi } from '@/api'
 import { useI18n } from 'vue-i18n'
 import { dictText } from '@/utils/dict'
@@ -446,6 +521,11 @@ const furnitures = ref([])
 const keyword = ref('')
 const roomFilter = ref(null)
 const roomHouseFilter = ref(null)
+// 物品多选 + 批量设置所属家具
+const selectMode = ref(false)
+const selectedIds = ref([])
+const batchFurnDlg = ref(false)
+const batchFurnitureId = ref(null)
 
 const itemDlg = ref(false)
 const itemForm = ref({})
@@ -453,6 +533,10 @@ const roomDlg = ref(false)
 const roomForm = ref({})
 const furDlg = ref(false)
 const furForm = ref({})
+const editingFurnId = ref(null) // 侧栏家具名内联编辑中的家具 id
+const editingFurnName = ref('')
+let furnNameInput = null
+const setFurnNameInput = (el) => { furnNameInput = el }
 const houseDlg = ref(false)
 const houseForm = ref({})
 
@@ -460,10 +544,14 @@ const furnOf = (roomId) => furnitures.value.filter((f) => f.roomId === roomId ||
 const roomsOf = (houseId) => rooms.value.filter((r) => r.houseId === houseId || r.houseId === Number(houseId))
 const houseName = (id) => houses.value.find((h) => h.id === Number(id))?.name || '-'
 const roomName = (id) => rooms.value.find((r) => r.id === Number(id))?.name || '-'
+const furnLabel = (f) => (f.roomId ? `${f.name}（${roomName(f.roomId)}）` : `${f.name}（${t('item.library')}）`)
 
 const highlightItemIds = computed(() => searchResults.value.map((it) => it.id))
 const floorFurnitures = computed(() => floorPlan.value.furnitures)
 const libraryFurnitures = computed(() => furnitures.value.filter((f) => !f.roomId))
+// 家具当前所在房间名 / 存放物品数(侧栏家具列表展示)
+const furnRoomName = (f) => floorPlan.value.rooms.find((r) => Number(r.id) === Number(f.roomId))?.name || ''
+const furnItemCount = (f) => floorPlan.value.items.filter((it) => Number(it.furnitureId) === Number(f.id)).length
 
 const floors = computed(() => {
   const set = new Set()
@@ -539,11 +627,15 @@ const loadItems = async () => {
   items.value = await itemApi.list({ keyword: keyword.value || undefined })
 }
 
+let floorPlanSeq = 0 // 楼层数据加载序号:快速切层/切房时丢弃过期响应,避免旧楼层晚到覆盖新楼层造成闪烁
 const loadFloorPlan = async () => {
+  const seq = ++floorPlanSeq
   if (!currentHouseId.value) { floorPlan.value = { rooms: [], furnitures: [], items: [], imageUrl: null, scale: 100 }; return }
-  floorPlan.value = await itemApi.floorPlan(currentHouseId.value, currentFloor.value)
+  const data = await itemApi.floorPlan(currentHouseId.value, currentFloor.value)
+  if (seq !== floorPlanSeq) return // 过期响应丢弃
+  floorPlan.value = data
 }
-const onHouseChange = () => { currentFloor.value = 1; loadFloorPlan(); fitKey.value++ }
+const onHouseChange = async () => { currentFloor.value = 1; await loadFloorPlan(); fitKey.value++ }
 // PDF 底图:渲染第一页为 PNG 再上传(SVG image 不支持 PDF)
 const pdfToImage = async (file) => {
   const pdfjs = await import('pdfjs-dist')
@@ -573,7 +665,7 @@ const uploadFloorPlan = async (file) => {
     await itemApi.saveFloorPlans(currentHouseId.value, JSON.stringify(floorPlans))
     ElMessage.success(t('common.success'))
     loadHouses()
-    loadFloorPlan()
+    await loadFloorPlan()
     fitKey.value++
   } catch (e) { console.error(e) }
   return false
@@ -638,10 +730,10 @@ const onDuplicateRoom = (roomId) => {
   roomForm.value = { houseId: currentHouseId.value, name: `${room.name}${t('item.duplicateSuffix')}`, floor: currentFloor.value, note: room.note || '', _geometry: JSON.stringify(shifted) }
   roomDlg.value = true
 }
-const switchFloor = (f) => { currentFloor.value = f; loadFloorPlan(); fitKey.value++ }
-const addFloor = () => {
+const switchFloor = async (f) => { currentFloor.value = f; await loadFloorPlan(); fitKey.value++ }
+const addFloor = async () => {
   currentFloor.value = Math.max(...floors.value) + 1
-  loadFloorPlan()
+  await loadFloorPlan()
   fitKey.value++
 }
 const toggleEdit = () => {
@@ -681,7 +773,7 @@ const onSaveRoomsBatch = async (list) => {
 }
 const onSaveFurnitureGeometry = async (id, data, prev) => {
   const f = floorPlan.value.furnitures.find((x) => x.id === id)
-  const p = prev || (f ? { x: f.x, y: f.y, w: f.w, h: f.h } : null)
+  const p = prev || (f ? { x: f.x, y: f.y, w: f.w, h: f.h, roomId: f.roomId } : null)
   if (p) pushUndo({ type: 'furn', id, data: p })
   await itemApi.saveFurnitureGeometry(id, data)
   // 回写原对象:级联平移基准/后续 undo prev 与视觉位置一致(否则拖房间时家具跳回旧位)
@@ -727,6 +819,17 @@ const placeFurniture = async (f) => {
   loadRooms()
   loadFloorPlan()
 }
+// 从画布拖放摆放库内家具:指定房间+精确坐标
+const onPlaceFurnitureFromDrop = async ({ id, roomId, x, y }) => {
+  const f = furnitures.value.find((x) => x.id === id)
+  if (!f) return
+  const rid = roomId || floorPlan.value.rooms[0]?.id
+  if (!rid) { ElMessage.warning(t('item.drawRoomFirst')); return }
+  await itemApi.updateFurniture(f.id, { roomId: rid, name: f.name, type: f.type, note: f.note, x: x - 100, y: y - 50, w: 200, h: 100 })
+  ElMessage.success(t('common.success'))
+  loadRooms()
+  loadFloorPlan()
+}
 const moveFurnitureToRoom = (f) => {
   furForm.value = { id: f.id, roomId: null, name: f.name, type: f.type, note: f.note }
   furDlg.value = true
@@ -736,6 +839,11 @@ const moveFurnitureToRoom = (f) => {
 const onPresetDragStart = (e, p) => {
   e.dataTransfer.setData('text/furn-type', p.type)
   e.dataTransfer.effectAllowed = 'copy'
+}
+// 库内家具拖入画布:携带家具 id,drop 时走摆放逻辑
+const onLibFurnDragStart = (e, f) => {
+  e.dataTransfer.setData('text/furn-id', String(f.id))
+  e.dataTransfer.effectAllowed = 'move'
 }
 const onCreateFurniture = async ({ type, roomId, x, y }) => {
   if (!roomId) { ElMessage.warning(t('item.dropInRoomFirst')); return }
@@ -762,17 +870,35 @@ const onRenameRoom = async (id) => {
     loadFloorPlan()
   } catch (e) {}
 }
+const doRenameFurniture = async (id, name) => {
+  const f = floorPlan.value.furnitures.find((x) => x.id === id) || furnitures.value.find((x) => x.id === id)
+  if (!f || !name || name === f.name) return
+  await itemApi.updateFurniture(id, { roomId: f.roomId, name, type: f.type, note: f.note, x: f.x, y: f.y, w: f.w, h: f.h })
+  ElMessage.success(t('common.success'))
+  loadRooms()
+  loadFloorPlan()
+}
 const onRenameFurniture = async (id) => {
   const f = floorPlan.value.furnitures.find((x) => x.id === id)
   if (!f) return
   try {
     const { value } = await ElMessageBox.prompt(t('item.renamePrompt'), t('item.editFurniture'), { inputValue: f.name, closeOnClickModal: true })
     if (!value || value === f.name) return
-    await itemApi.updateFurniture(id, { roomId: f.roomId, name: value, type: f.type, note: f.note, x: f.x, y: f.y, w: f.w, h: f.h })
-    ElMessage.success(t('common.success'))
-    loadRooms()
-    loadFloorPlan()
+    await doRenameFurniture(id, value)
   } catch (e) {}
+}
+// 侧栏家具名内联改名:点击名称变输入框,回车/失焦保存(不再弹对话框)
+const startEditFurnName = (f) => {
+  editingFurnId.value = f.id
+  editingFurnName.value = f.name
+  nextTick(() => furnNameInput?.focus())
+}
+const commitEditFurnName = async () => {
+  const id = editingFurnId.value
+  if (id == null) return
+  editingFurnId.value = null
+  const name = (editingFurnName.value || '').trim()
+  await doRenameFurniture(id, name)
 }
 
 // ---- 裁剪(拆分)/ 粘合(合并) ----
@@ -970,6 +1096,37 @@ const removeFurniture = async (row) => {
   loadRooms()
   loadFloorPlan()
 }
+const unplaceFurniture = async (row) => {
+  await ElMessageBox.confirm(t('item.unplaceFurnitureConfirm'), t('common.warning'), { type: 'warning', closeOnClickModal: true })
+  await itemApi.unplaceFurniture(row.id)
+  ElMessage.success(t('common.success'))
+  loadRooms()
+  loadFloorPlan()
+}
+
+// ---- 物品多选 + 批量设置所属家具 ----
+const toggleSelect = () => {
+  selectMode.value = !selectMode.value
+  if (!selectMode.value) selectedIds.value = []
+}
+const togglePick = (it) => {
+  const i = selectedIds.value.indexOf(it.id)
+  if (i >= 0) selectedIds.value.splice(i, 1)
+  else selectedIds.value.push(it.id)
+}
+const openBatchFurniture = () => {
+  if (!selectedIds.value.length) return ElMessage.warning(t('item.batchSelectFirst'))
+  batchFurnitureId.value = null
+  batchFurnDlg.value = true
+}
+const applyBatchFurniture = async () => {
+  await itemApi.batchAssignFurniture({ ids: [...selectedIds.value], furnitureId: batchFurnitureId.value })
+  ElMessage.success(t('common.success'))
+  batchFurnDlg.value = false
+  selectedIds.value = []
+  selectMode.value = false
+  loadItems()
+}
 
 const openHouse = (row) => {
   houseForm.value = row ? { id: row.id, name: row.name, address: row.address } : { name: '', address: '' }
@@ -1023,6 +1180,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fp-side-tab.on { color: #5c4c3d; font-weight: 600; border-bottom: 2px solid #b88c6e; }
 .fp-side-body { flex: 1; overflow-y: auto; padding: 12px; }
 .fp-tool-hint { font-size: 12px; line-height: 1.6; color: #8a7a6a; background: rgba(184, 140, 110, 0.09); border-radius: 8px; padding: 8px 10px; margin-bottom: 12px; }
+.fp-drag-hint { font-size: 11px; color: #a89a8a; margin-bottom: 6px; }
 .fp-tool-btn { width: 100%; margin-left: 0 !important; margin-bottom: 8px; }
 .fp-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .fp-tools :deep(.el-button) { width: 36px; height: 36px; padding: 0; }
@@ -1041,6 +1199,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fp-opacity-row :deep(.el-slider) { flex: 1; }
 .fp-side-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 0; border-bottom: 1px dashed #eee5d8; }
 .fp-side-name { font-size: 13px; color: #5c4c3d; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fp-side-name-editable { cursor: text; }
+.fp-side-name-editable:hover { color: #b88c6e; text-decoration: underline; text-underline-offset: 2px; }
+.fp-side-rename { flex: 1; min-width: 0; }
+.fp-side-furn { padding: 6px 0; border-bottom: 1px dashed #eee5d8; }
+.fp-side-furn[draggable="true"] { cursor: grab; }
+.fp-side-furn[draggable="true"]:active { cursor: grabbing; }
+.fp-side-furn .fp-side-row { padding: 0; border-bottom: none; }
+.fp-side-meta { display: flex; align-items: center; gap: 10px; margin-top: 4px; font-size: 11px; color: #a89a8a; }
+.fp-side-room { color: #8a7a6a; padding: 1px 8px; border-radius: 8px; background: rgba(138, 111, 85, 0.09); border: 1px solid rgba(138, 111, 85, 0.16); white-space: nowrap; }
+.fp-side-note { color: #a89a8a; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fp-side-count { white-space: nowrap; }
 .fp-side-icons { display: inline-flex; align-items: center; gap: 2px; }
 .fp-side-icons :deep(.el-button) { padding: 5px 6px; }
 .fp-side-row :deep(.el-button + .el-button) { margin-left: 4px; }
@@ -1062,7 +1231,26 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fp-result-name { display: block; font-size: 13px; color: #3a2e22; }
 .fp-result-path { display: block; font-size: 11px; color: #a89a8a; margin-top: 2px; }
 .fp-list { flex: 1; overflow-y: auto; }
-.item-card { margin-bottom: 12px; }
+.item-card { position: relative; margin-bottom: 12px; }
+.item-card.is-pick { cursor: pointer; }
+.item-card.selected { outline: 3px solid var(--color-primary, #b88c6e); outline-offset: -3px; }
+.select-count { font-size: 13px; color: var(--color-text-secondary, #909399); margin-right: 8px; }
+.pick-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  border: 2px solid rgba(184, 140, 110, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+.pick-badge.on { background: #b88c6e; border-color: #b88c6e; }
+.fp-batch-hint { font-size: 12px; line-height: 1.6; color: #a89a8a; margin-top: 4px; }
 .item-main { display: flex; align-items: center; gap: 8px; }
 .item-name { font-size: 16px; font-weight: 600; }
 .item-path { color: #909399; font-size: 13px; margin-top: 4px; }
