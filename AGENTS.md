@@ -53,10 +53,7 @@
 - **root 仅用于初始化**:`mysql -uroot -p < backend/src/main/resources/schema.sql`,执行一次(建库、建表、创建 ihomy 账号、初始数据)。
 - **业务运行用 `ihomy` 账号**:仅授予 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`(最小权限,无 CREATE/ALTER/DROP)。application.yml 连接用 `ihomy`,**不要用 root 跑业务**。
 - 账号同时创建 `localhost` 和 `%` 两个 host(本机/远程应用服务器都能连)。
-- **59 张表**,前缀分类:
-  - `sys_`(系统/账号/权限/家庭设置/日志/参数/字典/天气/存储,18 张):`sys_user` / `sys_role` / `sys_auth` / `sys_user_role` / `sys_role_auth` / `sys_family_info` / `sys_home_module` / `sys_password_reset_token` / `sys_user_group` / `sys_user_group_member` / `sys_operation_log` / `sys_dict_item` / `sys_parameter` / `sys_storage_device` / `sys_baidu_credential` / `sys_weather_credential` / `sys_weather_location` / `sys_weather_log`
-  - `family_`(家庭事务,22 张):`family_anniversary` / `family_notification` / `family_apply` / `family_invitation_code` / `family_checkin` / `family_points_record` / `family_points_product` / `family_points_order` / `family_task` / `family_reminder` / `family_plan` / `family_plan_task` / `family_book_record` / `family_chat_message` / `family_chat_read` / `family_user_label` / `family_tree` / `family_house` / `family_room` / `family_furniture` / `family_item` / `family_recipe`
-  - `content_`(内容类,19 张):`content_blog` / `content_blog_category` / `content_diary` / `content_photo_album` / `content_photo` / `content_comment` / `content_visibility` / `content_like` / `content_video` / `content_video_wish` / `content_wish` / `content_music` / `content_music_playlist` / `content_music_playlist_track` / `content_book` / `content_book_borrow` / `content_book_category` / `content_book_category_rel` / `content_book_bookmark`
+- **59 张表**,前缀分类:`sys_` 18 张(系统/账号/权限/配置/日志/天气/存储)、`family_` 22 张(家庭事务)、`content_` 19 张(内容数据)。**完整表清单见 `docs/需求设计说明书.md` §6.2**。
   - **命名规则**:家庭事务业务表一律 `family_` 前缀;内容数据 `content_` 前缀;账号/权限/配置/日志/天气/存储保留 `sys_`。新增表必须遵守。前缀取最顶层祖先类别;上下级关系体现在表名(如 `sys_user_role`)。
 - **枚举不再用数字**:状态/类型字段一律大写英文单词(`PUBLISHED/DRAFT/PUBLIC/FAMILY/ACTIVE...`),含义存字典表 `sys_dict_item`,Java 常量集中于 `common/DictConst.java`,前端映射 `utils/dict.js`。**不要写回 0/1/2 判断**。
 - **注意**:`content_blog/diary/photo/video/wish` 5 张内容表 `visibility` 列为 `VARCHAR(20) DEFAULT 'FAMILY'`(PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开),schema.sql 与 live DB 已对齐(曾误写 TINYINT)。
@@ -69,49 +66,40 @@
 ```
 backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
   src/main/java/com/ihomy/
-    IhomyApplication.java       # 主类 @MapperScan("com.ihomy.mapper")
-    common/      # Result统一响应/ResultCode/BizException/GlobalExceptionHandler/DictConst(字典常量)/SolarUtil(NOAA太阳位置算法)/AesUtil(凭证加密)/UserNames/Loggers(三类日志logger入口)/Ips(真实IP解析)/ThirdPartyHttp(三方API统一封装,出站日志+脱敏)
-    config/      # SecurityConfig/CorsConfig(暴露X-Trace-Id)/MybatisPlusConfig/Knife4jConfig/WebMvcConfig/WebSocketConfig/SqlStatementLog(SQL日志,内部类分流mybatis.sql.internal)/ExternalConfigLoader(外挂配置加载)/WsHandshakeInterceptor(WebSocket JWT 验证)/AsyncConfig(@Async虚拟线程+MDC TaskDecorator传播tid)
-    security/    # JwtUtils(JWT含familyId+role+permissions+isOps)/JwtAuthenticationFilter(认证+操作人放请求属性)/LoginUser/SecurityHelper/OpsAccessFilter
+    IhomyApplication.java   # 主类 @MapperScan("com.ihomy.mapper")
+    common/      # Result/ResultCode/BizException/GlobalExceptionHandler/DictConst/SolarUtil/AesUtil/UserNames/Loggers/Ips/ThirdPartyHttp
+    config/      # SecurityConfig/CorsConfig/MybatisPlusConfig/Knife4jConfig/WebMvcConfig/WebSocketConfig/SqlStatementLog/ExternalConfigLoader/WsHandshakeInterceptor/AsyncConfig
+    security/    # JwtUtils/JwtAuthenticationFilter/LoginUser/SecurityHelper/OpsAccessFilter
     annotation/  # @RequirePermission / @OperationLog
-    aspect/      # RequirePermissionAspect(权限AOP) / OperationLogAspect(操作日志AOP)
-    filter/      # TraceIdFilter(链路ID生成,写入 MDC + 响应头 X-Trace-Id) / AccessLogFilter(接口访问日志→access文件) / CaptureRequestWrapper(请求体截断捕获) / CaptureResponseWrapper(响应体截断捕获)
-    entity/      # 52 个实体类(8 张关联/字典表无实体:sys_auth/sys_role_auth/sys_user_group/sys_user_group_member/sys_password_reset_token/sys_dict_item/content_visibility/content_book_category_rel)
-    mapper/      # MyBatis-Plus BaseMapper 接口(自定义 SQL 全部放 resources/mapper/*.xml,接口不写 @Select/@Update 注解,参数统一 @Param)
-    service/     # 43 个 @Service 类(单实现无接口层)
+    aspect/      # RequirePermissionAspect / OperationLogAspect
+    filter/      # TraceIdFilter / AccessLogFilter / CaptureRequestWrapper / CaptureResponseWrapper
+    entity/      # 52 个实体类(8 张关联/字典表无实体)
+    mapper/      # MyBatis-Plus BaseMapper(自定义 SQL 全放 resources/mapper/*.xml,接口不写注解,参数统一 @Param)
+    service/     # 43 个 @Service(单实现无接口层)
     controller/  # 32 个 Controller
     dto/         # 请求/响应 DTO
-    websocket/   # ChatWebSocketHandler(原生 WebSocket 聊天室,每消息独立tid+access日志)
+    websocket/   # ChatWebSocketHandler(原生 WebSocket 聊天室)
   src/main/resources/
-    application.yml     # 端口8080, context-path=/api, 连接用 ihomy 账号; mybatis-plus.mapper-locations=classpath*:/mapper/**/*.xml; **基线配置**(MySQL 6306/Redis 6379/captcha 空/天气留空);`file.upload-dir` 基线 `/opt/ihomy/uploads`(Linux),开发通过 external.yml 覆盖为 Windows 路径;`logging.file.path` 基线 `/opt/ihomy/logs`,开发覆盖为 `D:\WorkSpace\ihomy\logs`;`app.log-retention-days: 7`
-    logback-spring.xml  # 三类日志文件分流(access/server/thirdparty,按天滚动+总量上限+异步);六要素 pattern `[tid:%X{traceId}]`;SQL只进server文件
-    external.yml.template  # 外挂配置模板(IHOMY_CONFIG_PATH 指定路径,覆盖 MySQL/Redis 密码 + JWT 密钥 + 上传路径 + captcha + 天气凭证,ENC() 加密)—— 唯一的开发/生产差异机制,**不再用 application-dev.yml profile**(见 scripts/start-all.ps1)
-    mapper/*.xml        # 每个 Mapper 接口一个同名 XML(namespace=接口全限定名)
-    schema.sql          # 建库+建号+建表(59张)+种子数据
-  mvnw / mvnw.cmd       # Maven Wrapper,无需单独装 Maven
+    application.yml     # 端口8080 context-path=/api;生产基线配置(MySQL 6306/Redis 6379);file.upload-dir /opt/ihomy/uploads;logging.file.path /opt/ihomy/logs
+    logback-spring.xml  # 三类日志分流(access/server/thirdparty,六要素 pattern,按天滚动)
+    external.yml.template  # 外挂配置模板(IHOMY_CONFIG_PATH 覆盖密码/密钥/路径/captcha/天气,唯一开发生产差异机制)
+    mapper/*.xml        # 每个 Mapper 一个同名 XML
+    schema.sql          # 建库+建号+建表(59张)+种子
+  mvnw / mvnw.cmd       # Maven Wrapper
 frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
   src/
-    api/request.js  # axios + JWT header + 401 自动刷新token
-    api/index.js    # 全部模块 API 分组导出(30 个 Api 对象:public/auth/home/blog/diary/file/member/anniversary/album/photo/like/comment/notification/family/profile/video/points/task/reminder/plan/wish/music/book/ops/tree/chat/storage/item/kitchen/library)
-    stores/user.js  # 登录状态 + hasPerm/isOps/isPureOps; stores/app.js 首页聚合(family/modules/photos/stats)
-    router/         # 登录守卫 + scrollBehavior(返回回顶部);含 /ops 运维护卫, /chat 需登录; 36 个路由
-    i18n/           # vue-i18n 中英(applyLocale 切换)
-    theme/          # applyTheme/loadTheme(明暗模式,只 light/dark)
-    utils/dict.js   # 枚举词条中文映射(与后端 DictConst 对应)
-    utils/diary.js  # 日记纸张排版共享常量(LINE_H=28/LINES_PER_PAGE=18/PAGE_H=504)+心情天气枚举+measureDiaryLines 离屏测行数(编辑页与翻书页共用,改动须两边同步)
-    utils/doodle.js # 日记信纸涂鸦矢量笔画引擎:笔型渲染(签字笔/铅笔/蜡笔/荧光笔/画笔)+橡皮擦(像素切断/整笔删除)+parseDoodle/setupCanvas;荧光笔走 multiply 专用画布
-    utils/windowLight.js  # getSunScene(sunInfo,slotIndex)+currentSlotIndex()+makeRays():体积光调色板/光束/阴影参数;windowAngle(窗角)+hasDirectLight 门控
-    utils/useSunLight.js  # 全局光影状态(provide/inject):sunScene/lampMode/shadowEnabled/weatherEffectEnabled/blobsEnabled/lightTestMode/testSpeed/loadWeather
-    utils/useDragResize.js # 可拖拽面板组合式函数(zIndex+bringToFront+边界clamp+localStorage持久化)
-    composables/useDevice.js  # 设备检测(UA+matchMedia 768px,全局单例 isMobile ref,matchMedia change 监听)
-    components/     # AppSidebar(全局导航)/BackToTop/Breadcrumb/AvatarCropper/InstallPrompt/SiteFooter(备案号)/SunLightLayer(全局光影层)/LightTestConsole(光照测试控制台)/SyncDialog(存储同步进度)/MobileTabBar/MobileHeader/MobileHomeFeed/MobileMoreGrid/MobileMePage(移动端组件)
-    layouts/MobileLayout.vue  # 移动端壳:首页三Tab模式 / 子页面返回栏模式
-    styles/main.css # CSS 变量 + 全局样式 + 深色模式覆写 + ElMessage/ElNotification 增强 + 移动端 @media 适配
-    views/          # 28 个页面:Home(沉浸式首页)/Login/Member/Settings/Anniversary/album(Album/AlbumDetail)/cinema/Cinema/diary(DiaryList/DiaryBook/DiaryPage/DoodleTray/DiaryEdit)/blog(BlogList/BlogDetail/BlogEdit)/points/Points/task/Task/reminder/Reminder/plan/Plan/wish/Wish/book/Book/chat/Chat/tree/Tree/cascade/Cascade/ops/Ops/storage/Storage/item/Item/kitchen/Kitchen/library/LibraryList/LibraryDetail/LibraryEdit
+    api/          # request.js(axios+JWT+401 自动刷新) + index.js(30 个 Api 对象)
+    stores/       # user.js(登录+权限) / app.js(首页聚合)
+    router/       # 登录守卫 + scrollBehavior;36 个路由(懒加载)
+    i18n/ theme/  # vue-i18n 中英;明暗主题(只 light/dark)
+    utils/        # dict.js / diary.js / doodle.js(涂鸦引擎) / windowLight.js / useSunLight.js / useDragResize.js
+    composables/  # useDevice.js(设备检测)
+    components/   # AppSidebar/BackToTop/Breadcrumb/AvatarCropper/InstallPrompt/SiteFooter/SunLightLayer/LightTestConsole/SyncDialog/Mobile*(移动端)
+    layouts/MobileLayout.vue  # 移动端壳
+    styles/main.css # CSS 变量 + 全局样式 + 深色模式 + EP 组件覆写 + @media
+    views/        # 28 个页面(Home/Login/Member/Settings/Anniversary/album/cinema/diary/blog/points/task/reminder/plan/wish/book/chat/tree/cascade/ops/storage/item/kitchen/library)
     App.vue
-  vite.config.js   # PWA + 代理 /api -> :8080 + ElementPlus 按需
-  public/favicon.svg
-  public/qweather-icons/  # 和风天气字体图标(woff2/woff/ttf + CSS)
+  vite.config.js   # PWA + 代理 /api->8080 + manualChunks 分块 + ElementPlus 按需
 ```
 
 ## 构建与验证命令
@@ -147,43 +135,23 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 ## 功能模块清单(索引)
 
-> 完整功能描述(Controller/Service/关键表/要点/接口清单)见 **docs/需求设计说明书.md** 第 4 章;本节仅作导航索引。
+> 完整功能描述(Controller/Service/关键表/要点/接口清单)见 **docs/需求设计说明书.md** 第 4 章;历史踩坑与 live DB 迁移 SQL 见 **docs/变更归档.md**。本节仅作导航索引。
 
-| 域 | 模块 | Controller / Service | 关键表 | 一句话要点 |
-|----|------|---------------------|--------|-----------|
-| 账号 | 注册/登录/验证码/密码找回 | AuthController / AuthService | sys_user 等 | 邮箱=账号;JWT 双 token(2h/7d 滑动续期,HTTP 401 触发续期);开发验证码固定 qwer;演示账号 demo@ihomy.local 等/guest123 |
-| 账号 | 个人资料/身份标签 | ProfileController | sys_user / family_user_label | nickname/avatar/birthday/gender;标签每家庭一套 |
-| 家庭 | 家庭管理/多家庭切换 | FamilyController, AuthController / MultiFamilyService | sys_family_info | share_token 分享;Redis 当前家庭;4 种加入方式;天气地区偏好;气象预警推送开关 |
-| 家庭 | 成员管理/邀请码/入家申请 | MemberController, FamilyController | sys_user_role / family_invitation_code / family_apply | 角色变更/移除/邀请码;公开家庭搜索+申请审批 |
-| 内容 | 博客 | BlogController / BlogService | content_blog(+category) | 标签+分类树(el-cascader);新建家庭注入 9 默认分类;未分类兜底 |
-| 内容 | 日记 | DiaryController / DiaryService | content_diary | 书架+翻书视图(18行×28px 分页);信纸涂鸦 doodle JSON(doodle.js 笔型引擎);date 兼容 yyyy-MM-dd HH:mm |
-| 内容 | 相册/照片 | AlbumController, PhotoController / AlbumService | content_photo_album / content_photo | 硬删;层级相册+设备目录映射(影子照片+签名 URL+缩略图缓存);自定义封面优先级;分享 token+Knuth 混淆;多选批删 |
-| 内容 | 放映厅 | VideoController / VideoService(+VideoMapService) | content_video(+wish) | 豆瓣式属性;硬删;设备映射(平铺+播放现签+Range 流式);想看列表;Jellyfin 集成规划 P1 |
-| 内容 | 照片瀑布 | CascadeController | content_photo | 随机+可见性过滤;落叶动效;缩略图 |
-| 内容 | 愿望单 | WishController / WishService | content_wish | 待实现/已实现/放弃 |
-| 内容 | 书架 | LibraryController / LibraryService | content_book×5(borrow/category/category_rel/bookmark) | EPUB/PDF/TXT/MOBI;分类树+批量删除/移动+阅读状态+书签;在线阅读(阅读器全屏);硬删 |
-| 互动 | 点赞/评论 | LikeController, CommentController | content_like / content_comment | toggle 语义;二级树;严格同家庭 |
-| 互动 | 通知 | NotificationController / NotificationService | family_notification | 评论/入家申请/同步完成/气象预警通知 |
-| 互动 | 聊天室 | ChatController + ChatWebSocketHandler / ChatService | family_chat_message / family_chat_read | 原生 WS(握手 ?token=);按家庭房间;每消息独立 tid |
-| 生活 | 纪念日 | AnniversaryController / AnniversaryService | family_anniversary | 阳历/农历+闰月+每年重复;Hutool ChineseDate 月份 0-based 需+1 |
-| 生活 | 提醒/计划/任务/记账/家谱 | ReminderController 等 / 各 Service | family_reminder / plan×2 / task / book_record / tree | 提醒 4 频率;计划+子任务进度联动;任务状态机(积分结算走 pointsService);记账单表;家谱 null 字段须 LambdaUpdateWrapper 显式 SET |
-| 生活 | 签到积分商城 | PointsController / PointsService | family_checkin / family_points_* | 日签 5 分+连续加成;内容奖励(博客10/日记8/照片2/视频15);兑换校验 1008/1009 |
-| 生活 | 背景音乐 | MusicController / MusicService(+MusicMapService) | content_music×3 | mp3agic ID3 解析;歌单 is_background 每家庭 1 条;设备映射(纯文件名平铺);播放现签 |
-| 基础 | 文件上传 | FileController / FileService | 磁盘 | 分类目录;流式重载(禁 getBytes);deleteByUrl 防路径越界 |
-| 基础 | 存储管理 | StorageController / StorageService+AlbumMapService+ThumbnailService+SignedUrlService | sys_storage_device / sys_baidu_credential | 设备 CRUD+文件浏览;目录映射(不拷贝文件);HMAC 签名 URL;百度 OAuth+dlink 中转;缩略图缓存 |
-| 基础 | 首页聚合 | HomeController + PublicController | sys_home_module | 模块化插入即扩展;动态流 8 类型;非成员视图 Redis 缓存 5min |
-| 基础 | 运维 | OpsController / OpsService | sys_operation_log / sys_weather_log | OPS 隔离(OpsAccessFilter);资源/日志/天气/访问量统计;tid 检索详细日志 |
-| 基础 | 每日内容 | DailyController | — | 每日一图(代理 Bing)+每日知识 |
-| 基础 | 操作日志/日志追溯 | LogController + @OperationLog AOP | sys_operation_log | 约 130 处写接口覆盖;三类日志文件(access/server/thirdparty);tid 全链路(详见 docs/日志规范.md) |
-| 基础 | 系统参数 | ParameterService | sys_parameter | 键值对;AES 盐值首启入库 |
-| 光影 | 太阳位置/体积光/台灯/天气特效 | SolarUtil + SunService / windowLight.js + SunLightLayer.vue | — | NOAA 288 时隙;窗角门控直射光;CSS keyframes 钟摆;天气 multiplier;suspend/restore 播放器沉浸 |
-| 光影 | 天气代理/预警推送 | WeatherService | sys_weather_* | 和风 v1 迁移+适配层(前端零改动);配额 50000 本地统计;30min 预警推送(家庭级开关) |
-| 光影 | 天气详情页/光照测试台 | views/weather/Weather.vue + LightTestConsole.vue | — | 9 指标实况+预警+24h 折线+10 天横条;288 时隙循环 5 档速度 |
-| 光影 | 首页仪表盘 | Home.vue + useWidgetDrag.js | localStorage | 12×9 栅格;编辑模式拖拽缩放增删;8 默认组件;布局持久化 |
-| 物品 | 物品定位+户型图 | ItemController / ItemService | family_house / family_room / family_furniture / family_item | 五级粒度+跨级搜索;**户型图 2 期全部完成**(多边形房间/家具库/裁剪粘合/尺寸标定/吸附/撤销,详见 docs/户型图设计.md);3 期 AI 语义待做 |
-| 厨房 | 菜单/菜谱/食材 | RecipeController / RecipeService | family_recipe | 菜单按类别+时间推荐;ingredients/equipment/steps JSON;食材页复用 itemApi type=INGREDIENT |
-| 系统 | i18n/主题/字典 | i18n/ + theme/ + utils/dict.js | sys_dict_item | 中英双语;只 light/dark;枚举英文单词化(禁数字) |
-| 移动端 | 设备自适应(V8.0/V9.13) | useDevice.js + MobileLayout.vue + Mobile* 组件 | — | 单代码库运行时自适应;首页三 Tab;子页面返回栏;特效首次访问默认关 |
+| 域 | 模块 | 关键入口 |
+|----|------|---------|
+| 账号 | 注册/登录/验证码/密码找回/个人资料 | AuthController / ProfileController |
+| 家庭 | 家庭管理/多家庭切换/成员/邀请码/入家申请 | FamilyController / AuthController / MemberController |
+| 内容 | 博客 / 日记 / 相册照片 / 放映厅 / 照片瀑布 / 愿望单 / 书架 | Blog / Diary / Album+Photo / Video / Cascade / Wish / Library 各 Controller |
+| 互动 | 点赞 / 评论 / 通知 / 聊天室 | Like / Comment / Notification / Chat Controller + ChatWebSocketHandler |
+| 生活 | 纪念日 / 提醒 / 计划 / 任务 / 记账 / 家谱 / 签到积分 / 背景音乐 | Anniversary / Reminder / Plan / Task / Points / Music 各 Controller |
+| 基础 | 文件上传 / 存储管理 / 首页聚合 / 运维 / 每日内容 / 操作日志 / 系统参数 | File / Storage / Home+Public / Ops / Daily / Log 各 Controller |
+| 光影 | 太阳位置/体积光/台灯/天气 / 天气代理 / 天气详情 / 首页仪表盘 | SolarUtil+SunService + windowLight.js + SunLightLayer.vue |
+| 物品 | 物品定位+户型图 | ItemController / ItemService(详见 docs/户型图设计.md) |
+| 厨房 | 菜单/菜谱/食材 | RecipeController / RecipeService |
+| 系统 | i18n / 主题 / 字典 | i18n/ + theme/ + utils/dict.js |
+| 移动端 | 设备自适应 | useDevice.js + MobileLayout.vue + Mobile* 组件 |
+
+**关键坑速查**(实现细节,详见 docs):日记 date 兼容 `yyyy-MM-dd HH:mm`;纪念日 Hutool ChineseDate 月份 0-based 需 +1;家谱 null 字段须 `LambdaUpdateWrapper` 显式 SET;相册分享 token + Knuth 混淆;博客新建家庭注入 9 默认分类;物品户型图 2 期完成(裁剪/粘合删原房保持最后防家具入库覆盖、端点识别/字号/光标屏幕恒定)、3 期 AI 语义待做。
 
 ## 设计规范(统一实现,避免多种方式)
 
@@ -236,92 +204,19 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 14. **并行请求**(强制):多个独立的 `await xxxApi.foo()` 必须改 `Promise.all([a, b, c])` 并行(参考 `Home.vue loadAll` + `stores/app.js init`)。串行只在真有依赖时用。
 15. **computed 纯函数**(强制):`computed` 内禁止 `Math.random()`/`Date.now()`/副作用,否则每次访问重算且视觉跳动。需要随机/一次性计算用 `ref` + `watch(source, immediate)` 生成(参考 `Home.vue polaroidLayout`)。
 16. **路由懒加载**:27 个路由全部 `() => import('./views/...')`,不写同步 `import Home from '@/views/Home.vue'`。
-17. **模态弹窗规范**(强制,全局统一,所有 `el-dialog` + `ElMessageBox` 共享 `main.css` 全局覆写,禁止在各组件 scoped 内重复定义):
-    - **容器**:圆角 14px;阴影 `0 3px 12px rgba(0,0,0,0.07)`;背景 `#fcf8f0` + `backdrop-filter: blur(12px) saturate(1.1)`;`padding: 0`(header/body/footer 各自管 padding)。
-    - **尺寸规则**(按业务场景,禁止全部弹窗同一宽度,禁止写死固定 height):
-      - `dialog-sm`(简短确认/单行输入):420px,高度自适应。
-      - `dialog-md`(选择器/简单表单):520px,`max-height:520px`,body 内部滚动。
-      - `dialog-lg`(复杂多字段表单):640px,`max-height:640px`,body 内部滚动。
-      - `dialog-xl`(详情/媒体预览):`82vw`(max 900px),`max-height:85vh`,body 内部滚动。
-      - 弹窗容器 `flex-direction:column`;body `flex:1 + overflow-y:auto`;容器本身不滚动。
-    - **遮罩**:`rgba(0,0,0,0.20)` + `blur(2px)`,不过度压暗。ESC + 点击遮罩关闭(默认开启)。
-    - **标题**:左侧 4px 暖棕装饰竖线;`font-size: 15px; font-weight: 600`;标题与说明文字间距 8px。
-    - **关闭按钮**:`el-dialog__headerbtn` 显示 X(28×28px,圆角 8px,hover 浅米底色 `rgba(58,46,34,0.06)`)。`ElMessageBox` 关闭按钮 `display:none`。
-    - **弹窗内 Tab**:选中态低饱和暖棕文字 `#5c4c3d` + `#c4a884` 下划线 `opacity:0.7`;禁止蓝色高亮。
-    - **弹窗内 checkbox**:选中色 `#b88c6e` 暖棕(禁用原生蓝色)。
-    - **输入框**:圆角 10px;边框 `#e4ddd0`;背景 `#fffdf8`;min-height 38px;focus 暖棕光晕 `rgba(184,140,110,0.12)`;placeholder 弱化 `#c4b8a8 opacity:0.7`。
-    - **按钮**:统一 34px 高 / 10px 圆角 / 13px 字号;主操作 `#b88c6e` 暖棕;次级 `#f3eee6` 深褐文字;危险 `#f4e0dc` 低饱和暗红 `#b04a3a`;禁用/loading `#e4ddd0` 灰底。
-    - **footer**:无顶分割线;`padding: 0 20px 18px`;输入框距底部按钮区 20px;右下角对齐。
-    - **动画**:覆盖 EP 默认 `animation`(杀 `dialog-fade` 的 `animation` 再用 `transition`);`scale(0.94)` + opacity 淡入 0.25s。
-    - **ElMessageBox**:同风格;`max-width: 360px; min-width: 300px`;无装饰竖线;footer 无分割线;关闭按钮隐藏。
-    - **暗色模式**:弹窗背景 `#1E2A48`;次级按钮 `rgba(232,220,200,0.1)`;placeholder `rgba(232,220,200,0.35)`。
-    - **禁止**:在组件 scoped CSS 里写 `el-dialog`/`el-message-box` 样式覆写;新增弹窗只管业务逻辑,样式由全局兜底。
-19. **ElMessage Toast 规范**(强制,`main.css` 全局覆写):
-    - **位置**:右上角 `right:24px`(避让导航栏)。
-    - **配色**(禁止高饱和绿/红/黄):
-      - success:暖米底 `rgba(243,238,230,0.95)` + 褐字 `#5c4c3d` + 暖棕细边框 `rgba(184,140,110,0.25)`。
-      - warning:暖米底 + 暗金文字 `#8a6d3b` + 金棕边框。
-      - error:浅红底 `rgba(249,236,234,0.95)` + 暗红文字 `#b04a3a` + 细红边框。
-      - info:深褐底 + 白字。
-    - **暗色模式**:success/warning 弹窗背景 `rgba(30,42,72,0.92)` + 浅米文字。
-20. **Popper/Dropdown z-index 规范**(强制):
-    - `.el-popper.is-light`(含 dropdown/tooltip)`z-index:61`(高于 AppSidebar=60,低于光影层 bright-spot=65)。
-    - MusicPlayer `z-index:62`(popper 上方,光影层下方)。
-    - SiteFooter `z-index:70`;BackToTop/InstallPrompt `z-index:200`;ElMessage `z-index:3000`(EP 内置,不覆写)。
-    - **完整 z-index 层级**(从高到低):`lamp-light(100) > LightTestConsole(80) > lightning(79) > light-layer(78) > snow/rain(77) > dust(76) > vignette(74) > reflection(72) > SiteFooter(70) > window-shadow(68) > bright-spot(65) > Popper/dropdown/select(64) > ElMessage(63) > el-overlay/dialog/message-box(63) > MusicPlayer(62) > AppSidebar(60) > draggable-panel(20→60) > main-content(10) > glass-bg(2) > bg-blobs(1)`。
-    - **光影层(65-100)为最高层**,弹窗遮罩(`el-overlay`)+`ElMessage`=63(低于光影层),Popper/dropdown/select=64(高于弹窗,低于光影层);任何新增组件 z-index 不得超 100(台灯 100 除外)。
-18. **按钮统一样式**(强制,全局 4 类按钮,`main.css` 统一覆写,禁止 scoped 重复定义):
-    - **圆角**:所有 `el-button` 12px;small 10px。
-    - **主按钮**(`type="primary"`):背景 `#b88c6e` 白字;hover `#a87c5e`;用于保存/添加/确认等正向操作。**禁止亮蓝**。
-    - **次级按钮**(无 type / 默认):背景 `#f3eee6` 深褐 `#5c4c3d` 文字;hover `#e8e0d2`;用于取消/次级入口。
-    - **幽灵按钮**(`.ghost-btn` class):透明底 + `var(--color-border)` 边框 + 褐字;hover `#f3eee6` 底;用于复制链接等低权重操作。
-    - **危险按钮**(`type="danger"`):背景 `#f9ecea` 暗红 `#b96058` 文字;hover `#f0dedb`;**禁止亮红**。`text`/`link` 类型保持透明底,hover 浅红 `rgba(185,96,88,0.08)`。
-    - **尺寸**:默认 32px / small 28px / large 38px。表单底部保存按钮用默认或 large;列表行内删除用 small。
-    - **交互**:hover `translateY(-1px)` + `0 2px 8px rgba(0,0,0,0.06)` 微阴影;禁用/loading 置灰 `#e4ddd0` 去掉上浮。
-    - **摆放规则**:表单提交按钮 → `.form-footer { display: flex; justify-content: flex-end }` 右下角;模块独立功能入口 → 靠左次级按钮;Modal footer → 次级左主按钮右;列表删除 → 行最右 small danger。
-    - **暗色模式**(与浅色完全不同色值,不共用):
-      - 主按钮:背景 `#d4b298`(提亮浅暖棕),文字 `#2a2018`(深色),hover `#e0c2aa`;**禁止与浅色同色**。
-      - 次级按钮:背景 `rgba(255,255,255,0.12)`(半透明白色磨砂),文字 `#E8DCC8`(浅米白),hover `rgba(255,255,255,0.18)`。
-      - 幽灵按钮:透明底 + `rgba(255,255,255,0.15)` 边框 + `#E8DCC8` 文字;hover `rgba(255,255,255,0.08)`。
-      - 危险按钮:背景 `rgba(201,116,116,0.15)`(半透明),文字 `#c97474`(低饱和暗红),hover `rgba(201,116,116,0.25)`;禁用 `rgba(232,220,200,0.06)` + `rgba(232,220,200,0.3)`。
-      - Tab active-bar:`#d4b298` opacity 0.5。
-21. **标签(el-tag)配色规范**(强制,`main.css` 全局覆写):
-    - 圆角 8px;半透明磨砂背景;禁止高饱和实色块。
-    - 浅色:默认 `rgba(184,140,110,0.08)` 褐字;success `rgba(107,155,107,0.1)` 绿字;warning `rgba(138,109,59,0.1)` 金字;danger `rgba(185,96,88,0.1)` 红字;info `rgba(58,46,34,0.06)` 褐字。
-    - 深色:默认 `rgba(212,178,152,0.25)` 浅暖棕字;success `rgba(125,186,125,0.15)` 绿字;danger `rgba(201,116,116,0.15)` 暗红字 `#c97474`;info `rgba(255,255,255,0.08)` 浅米字。
-22. **数量角标(el-badge)规范**:
-    - 浅色:`rgba(58,46,34,0.7)` 半透明黑磨砂背景;深色:`rgba(0,0,0,0.5)` 浅米白字;不使用纯黑实色块。
-23. **图标线条规范**(强制):
-    - 所有 `el-icon` SVG `stroke-width: 2px`;图标颜色跟随文字层级:主要图标=主文字色,次要图标=辅助灰色,危险图标=低饱和暗红。
-24. **圆角全局统一**(强制,`main.css` 全局覆写):
-    - `el-button` 12px(small 10px);`el-input__wrapper`/`el-select__wrapper`/`el-cascader .el-input__wrapper`/`el-cascader .el-select__wrapper` 10px;`el-card` 14px;`el-dialog` 14px。
-25. **页面统一规范**(强制,所有功能页遵守):
-    - 根容器统一 `class="page"`(全局 `.page`: `max-width:1100px; margin:0 auto; padding:16px`),**禁止 scoped 覆写** max-width/margin/padding/border。
-    - 页面级 H2/H1 标题全部移除(面包屑已体现页面标题);内容分区标题用 `.section-label`(16px/600/左 3px 暖棕竖线)。
-    - **工具栏**:统一 `class="page-toolbar card"`,全局 `padding: 10px 16px !important`(不被 `.card` 的 20px 覆盖);`.tb-left` 放搜索/筛选/排序,`.tb-right` 放操作按钮。**禁止 scoped 定义 `.list-header`/`.toolbar`/`.header-actions` 等旧工具栏类**。
-    - **工具栏筛选组件尺寸**:`.tb-left` 的 `el-input`/`el-select` 统一 `size="small"`(24px 高,相册/放映厅/音乐三页已对齐);`.tb-right` 按钮用默认尺寸(32px 高)。
-    - **工具栏按钮间距**(强制):`.tb-right` 为 `flex gap:8px`,普通按钮间另有 EP `.el-button+.el-button` 12px 兄弟边距(合计 20px);**按钮被 `el-dropdown` 包裹时(如「上传音乐」下拉)吃不到该兄弟边距,必须 scoped 补 `.tb-right :deep(.el-dropdown) { margin-left: 12px }`**,否则间距不一致。
-    - **多选交互统一**(强制,相册/放映厅/音乐同款):仅用 `.pick-badge` 右上对勾圆标(`.on` 时 `#b88c6e` 实底)+卡片 `outline: 2px solid #b88c6e` 描边;**禁止再加左上 checkbox 角标**(双选择效果);选择态点击卡片即勾选;常规态/选择态按钮组在工具栏 tb-right 互斥切换,选择态=选中计数(`.select-count`)+取消+删除所选(danger)。
-    - **设备映射来源角标**(统一,相册/放映厅/音乐同款):卡片封面左/右上 `设备名 + .status-dot` 状态点(VALID 绿/OFFLINE 灰/MISSING 红),半透明白底圆角小标签。
-    - **工具栏按钮**(`.write-btn`/`.ghost-btn`/`.danger-btn`/`.view-toggle`/`.vt-btn`):全局定义在 `main.css`,height:32px,**禁止 scoped 重复定义**。
-    - `.page-header`/`.page-title`/`.list-header` 全局统一定义在 `main.css`,禁止 scoped 重复。
-    - Breadcrumb `#right` slot 放置页面操作按钮(添加/加入等)。
+17. **全局 UI 样式统一**(强制):`el-dialog`/`ElMessageBox`/`ElMessage`/`el-popper`/`el-button`/`el-tag`/`el-badge`/`el-input` 及所有 EP 组件的配色、圆角、尺寸、z-index 一律由 `main.css` 全局覆写,**禁止在组件 scoped 内重复定义**。完整样式值(弹窗四档尺寸/遮罩/输入框/Toast 四色/完整 z-index 链)见 `docs/UI设计提示词.md` §11a 与 §3。
+18. **按钮/标签/角标/图标/圆角统一**(强制,`main.css` 全局覆写,禁止 scoped 重复定义):按钮四类(主/次/幽灵/危险,浅色与深色**完全不同色值、不共用**)、`el-tag` 半透明磨砂、`el-badge` 半透明黑、`el-icon` `stroke-width:2px`、圆角统一(button 12px / input 10px / card+dialog 14px)。**完整色值见 `docs/UI设计提示词.md` §18a**。
+19. **页面统一规范**(强制,所有功能页遵守):根容器 `class="page"`(禁止 scoped 覆写 max-width/margin/padding);页面级 H1/H2 移除(面包屑已体现标题),分区标题用 `.section-label`;工具栏统一 `class="page-toolbar card"`(`.tb-left` 筛选组件 `size="small"`,`tb-right` 操作按钮 `gap:8px`,下拉包裹需补 `:deep(.el-dropdown){margin-left:12px}`);多选交互统一 `.pick-badge` 对勾圆标 + 卡片描边(**禁左上 checkbox 角标**);设备映射来源角标 `设备名 + .status-dot`。详见 `docs/UI设计提示词.md` §11b。
 
-### 性能规范(已踩坑 + 强制规则)
+### 性能规范(强制规则)
 
-#### 已踩坑(必读)
+> **已踩坑清单**(100% 缩放卡顿 / backdrop-filter 滚动炸弹 / rAF 写 Vue ref / 常驻事件监听器 / 同步 import 阻塞首屏 / 入口 chunk 过大 / `getBytes()` OOM / SQL 日志同步 I/O / N+1)详见 `docs/变更归档.md`「性能优化」与 `docs/UI设计提示词.md` §19。由此固化的强制规则:
 
-- **100% 缩放卡顿根因**:Element Plus `Setting`/`Monitor` 图标 SVG path 过于复杂,hover 时子像素光栅化开销大 → 用内联 SVG 替代(详见博客 id=18)。
-- **backdrop-filter + overflow:auto 子元素**:毛玻璃父元素 + 子元素滚动 = 性能炸弹 → `transform: translateZ(0)` 隔离合层。
-- **背景随滚动**:`.bg-blobs` 用 `position: fixed` 不随页面滚动;移除 `background-attachment: fixed`。
-- **关闭效果时跳过定时器**:`flickerTimer` 在所有开关关闭时 return,避免持续触发 sunScene 重写。
-- **rAF 写 Vue ref**:原 `useSunLight.js` 钟摆用 `requestAnimationFrame` 每帧写 `lampPendulumX.value`/`lampPendulumScaleX.value`,触发 `SunLightLayer.vue` 每帧重渲染 → 改 CSS `@keyframes lampSwing` 完全绕过响应式。
-- **常驻事件监听器**:原 `useDragResize.js` 每实例 `onMounted` 挂 `mousemove`/`mouseup`,5 面板 = 10 常驻 listener → 改 `onDragStart` 时挂、`onMouseUp` 时移除。
-- **同步 import 阻塞首屏**:原 `main.js` 同步 `import 'qweather-icons/...'`(44.9KB CSS)→ 改 `import('...')` 异步。
-- **入口 chunk 过大**:原 `vite.config.js` 无 `manualChunks`,入口 553KB → 加 `manualChunks` 拆 `element-plus`/`gsap`/`vue-i18n`,入口降到 158KB(-71%)。
-- **`getBytes()` OOM**:原 `FileController`/`PhotoController`/`VideoController` 用 `file.getBytes()` 全量入堆,生产 `-Xmx384m` 上传 200MB 视频即 OOM → 改 `MultipartFile` + `transferTo` 流式。
-- **SQL 日志同步 I/O**:原 `SqlStatementLog` 用 `System.out.println` 同步打印每条 SQL,生产环境拖累 → 改 SLF4J,由 `logging.level.mybatis.sql` 控制(默认 `warn` 静默)。
-- **N+1 列表查询**:原 `ActivityFeedService`/`CommentService`/`AnniversaryService`/`VideoService` 在循环里 `selectById` 取用户名 → 改 `selectBatchIds` 批量查 + 内存 Map 回填。
+- **动画优先级**:持续型动画 CSS `@keyframes` > GSAP 直接操作 DOM ref > `requestAnimationFrame`;**禁止 rAF 每帧写 Vue ref**(见前端规范 13)。
+- **事件监听器按需挂载**:`onDragStart`/`onResizeStart` 时挂 `mousemove`/`mouseup`,`onMouseUp` 时移除,不要 `onMounted` 常驻。
+- **重型资源异步加载**:字体包/大 CSS(如 `qweather-icons.css`)必须 `import('...')` 异步,不要同步 `import`。
+- **入口 chunk 分块**:`vite.config.js` 必须配 `manualChunks`(element-plus/gsap/vue-i18n/epubjs)。
+- **文件上传流式 / N+1 / SQL 日志**:见后端规范 12 / 9 / 5。
 
 #### SQL/索引规范(强制)
 
@@ -359,8 +254,8 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 #### 已知问题(待修复)
 
-- **Edge 硬件加速整页频闪(遗留,环境/驱动问题,非应用代码)**:Edge+硬件加速下页面加载后整页频闪;**切走再切回浏览器窗口(或开关一次硬件加速+重启 Edge)即恢复**;Chrome 不复现,关硬件加速不复现。根因为显卡驱动/MPO 合成层 bug。用户侧处置(按序):开关一次硬件加速+重启 Edge(临时复位)→ 更新显卡驱动(根治)→ 注册表禁用 MPO(`HKLM\SOFTWARE\Microsoft\Windows\Dwm` → `OverlayTestMode`=5)→ 应用内 Settings 关"毛玻璃"(no-glass 全局禁 backdrop-filter,应用侧唯一规避开关)。完整排查过程与已保留/已撤销的修复清单见 docs/变更归档.md「首页频闪排查与修复」(frontend_performance 分支,2026-08-31)。
-- **ElMessageBox 动画未生效**:`main.css` 中 `.fade-in-linear-*` + `.el-overlay-message-box` 的 CSS 覆写写法正确(transition name=`fade-in-linear`,class=`el-overlay-message-box` 已从 EP 源码确认),但实际运行时动画未生效。可能原因:EP 内部 `Transition` 的 `persisted` 模式导致 CSS transition 不触发,或 EP 的 `msgbox-fade-in` keyframes 优先级覆盖。待排查:用 DevTools 确认渲染时实际 class 和 transition 是否被正确应用。`closeOnClickModal: true` 已全部加上(点击遮罩关闭已生效)。
+- **Edge 硬件加速整页频闪**(遗留,环境/驱动问题,非应用代码):切走再切回窗口(或开关硬件加速+重启 Edge)即恢复;Chrome 不复现。用户侧处置按序:开关硬件加速+重启 Edge → 更新显卡驱动 → 注册表禁 MPO(`OverlayTestMode`=5)→ 应用内关"毛玻璃"。详见 docs/变更归档.md「首页频闪排查与修复」。
+- **ElMessageBox 动画未生效**:CSS 覆写写法正确但运行时未生效,疑 EP `Transition` persisted 模式所致,待 DevTools 排查。
 
 #### 验证基线
 
@@ -408,27 +303,12 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **Redis 镜像**:`docker pull redis`(默认 latest)。**Git 克隆**:用 SSH 地址,ihomy 用户先生成 ed25519 key 并加到 GitHub。
 - 详细步骤在 `Linux部署指导.md`。
 
-## 规划事项(未实现,排序按推荐优先级)
+## 规划事项(未实现)
 
-| 优先级 | 规划 | 要点 |
-|--------|------|------|
-| P1 | 放映厅 Jellyfin 集成 | 方案已定稿(2026-08-31),详见 docs/变更归档.md「放映厅 Jellyfin 集成方案」:ihomy 做脸(海报墙/筛选/家庭层)+ Jellyfin 做引擎(刮削/转码/TV 客户端);S1 本地 spike 验证 API → S2 后端 → S3 前端;现有 content_video 本地库降级为次级 tab 保留;**启动时先重读该归档小节** |
-| P2 | 物品定位-户型图 剩余优化 | 2 期全部完成(完整能力清单见 docs/需求设计说明书.md 4.8);剩余:物品头像图、家具类型图标、搜索定位放大居中 |
-| P2 | 用户使用指导 | 新手引导弹窗+帮助页 |
-| P2 | 家庭公告/广告位 | 自建家庭公告(不接第三方广告,隐私原因) |
-| P2 | 设置页-存储管理设计统一 | 存储管理 tab(Storage.vue)用 `.card.section`+`.page-toolbar` 与 profile/family/daily/light 其他 tab 的 `.card.settings-card`+`.section-label` 风格不一致;统一为 section-label 标题+卡片规范;移动端隐藏次要列消除横向溢出一并处理 |
-| P2 | 首页组件自适应展示 | 首页栅格(12列×9行)组件按尺寸分级展示:h=1 仅核心数据(标题消失)/h=2-3 精简列表/h≥4 完整列表/w≤2 单列/w≥4 多列网格;每组件 compact/normal/expanded 三档模板。组件清单:feed(5×5)/task(4×2)/today(4×4)/weather(3×4)/anni(1×4)/recipe(4×2)/wish(4×3)/finance(4×3)/album(4×5)/music(4×3) |
-| P3 | 多重人格 | 基于身份标签扩展,一账号多标签可切换发表,会话级 currentLabel(Redis 或前端状态),与家庭切换正交 |
-| P3 | AI API 对接 | 统一对接大模型 API(聊天/内容生成),OpenAI 兼容协议,待细化 |
-| P3 | 物品定位-AI 语义 | 3 期:自然语言"找找我的工具箱"→AI 拆名称+别名→SQL 查询;"放到门口柜子最上层抽屉"→AI 按五级粒度解析,缺层追问→拼 INSERT(决策已定,依赖 AI API) |
-| P3 | 播放器解码器评估 | 原生 `<audio>`/`<video>` 已覆盖主流格式(硬件解码最优);不建议 ffmpeg.wasm(200KB+ 包体+CPU 解码慢);未来如需引入优先 video.js+hls.js |
-| P3 | Apple Live Photos 支持 | EXIF/ContentIdentifier 标记实况照片,JPEG 封面+MOV 关联(`content_photo` 加 `live_video_url`);前端上传+后端解析+展示组件三方协同 |
-| P3 | 72h 预报延展 / 月相晨昏 / 空气预报 | 72h 走 v1 daily hourly 数组;月相晨昏纯天文计算;空气预报需订阅版(无预算可用历史趋势推测) |
-| P4 | 手机号注册 | 需短信服务商(阿里云等),未接入前不实现(sys_user.phone 字段已存在) |
-| P4 | 商业化/多租户 | SaaS 订阅制评估,条件允许再做 |
-| P4 | 广告模块 | 家庭私密场景接第三方广告转化低且有隐私争议,优先自建"家庭公告/赞助位" |
-
-> 优先级含义:P1 用户价值高且技术上可行(依赖最少);P2 锦上添花;P3 结构性改动;P4 依赖外部条件(短信商/商业决策)。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
+> 完整规划清单(P1-P4)见 `docs/需求设计说明书.md` 第 9 章「规划事项」,此处只留最需注意的两条:
+- **P1 放映厅 Jellyfin 集成**:方案已定稿,详见 docs/变更归档.md「放映厅 Jellyfin 集成方案」;**启动时先重读该归档小节**。
+- **P3 物品定位-AI 语义**:3 期,依赖 AI API(决策已定,待 API 接入)。
+- 优先级:P1 用户价值高且可行 / P2 锦上添花 / P3 结构性改动 / P4 依赖外部条件。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
 
 ## 文档清单
 
