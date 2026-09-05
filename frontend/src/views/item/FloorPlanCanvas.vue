@@ -17,6 +17,7 @@
             class="fp-room"
             :class="{ 'is-view': mode === 'view', 'is-hit': hitRoomIds.includes(r.id), 'is-overlap': mode === 'edit' && overlapRoomIds.includes(r.id) }"
             @pointerdown="mode === 'edit' ? onRoomDown($event, r) : null"
+            @contextmenu.prevent
           />
           <!-- 查看态蜡笔边界:3 遍抖动闭合线半透明叠加,替代原 feTurbulence 滤镜 -->
           <g v-if="mode === 'view' && roomCrayon[r.id]" class="fp-crayon">
@@ -36,7 +37,7 @@
             :class="{ 'is-view': mode === 'view' }"
             @pointerdown="mode === 'edit' ? onFurnDown($event, f) : null"
             @dblclick="mode === 'edit' ? $emit('edit-furniture-items', f.id) : $emit('select-furniture', f.id)"
-            @contextmenu.prevent="mode === 'edit' && tool === 'select' ? $emit('delete-furniture', f.id) : null"
+            @contextmenu.prevent="onFurnContextmenu($event, f)"
           />
           <g v-if="mode === 'view' && furnCrayon[f.id]" class="fp-crayon">
             <path v-for="(d, i) in furnCrayon[f.id]" :key="i" :d="d" class="fp-crayon-stroke furn" />
@@ -59,7 +60,7 @@
             :cx="it.ax" :cy="it.ay" r="6"
             class="fp-item"
             :class="{ 'is-hit': highlightItemIds.includes(it.id) }"
-            @pointerdown.stop="mode === 'edit' ? onItemDown($event, it) : null"
+            @pointerdown="mode === 'edit' ? onItemDown($event, it) : null"
           />
           <text :x="it.ax" :y="it.ay - 11" class="fp-item-label">{{ it.name }}</text>
         </g>
@@ -122,15 +123,16 @@
         <rect v-if="drawing.rect" :x="drawing.rect.x" :y="drawing.rect.y" :width="drawing.rect.w" :height="drawing.rect.h" class="fp-drawing" />
         <!-- 底图标定线段(持久,可拖端点+吸附) -->
         <g v-if="calibFirst && !calibLine" class="fp-calib">
-          <circle :cx="calibFirst.x" :cy="calibFirst.y" r="5" class="fp-calib-dot" />
+          <circle :cx="calibFirst.x" :cy="calibFirst.y" :r="5 / view.k" class="fp-calib-dot" style="pointer-events: none" />
           <line :x1="calibFirst.x" :y1="calibFirst.y" :x2="mousePos ? mousePos.x : calibFirst.x" :y2="mousePos ? mousePos.y : calibFirst.y" class="fp-calib-line" />
         </g>
         <g v-if="calibLine" class="fp-calib">
-          <line :x1="calibLine.a.x" :y1="calibLine.a.y" :x2="calibLine.b.x" :y2="calibLine.b.y" class="fp-calib-line" />
-          <circle :cx="calibLine.a.x" :cy="calibLine.a.y" r="5 / view.k" class="fp-calib-dot fp-calib-handle" vector-effect="non-scaling-stroke"
-                  @pointerdown.stop="onCalibHandleDown($event, 'a')" />
-          <circle :cx="calibLine.b.x" :cy="calibLine.b.y" r="5 / view.k" class="fp-calib-dot fp-calib-handle" vector-effect="non-scaling-stroke"
-                  @pointerdown.stop="onCalibHandleDown($event, 'b')" />
+          <line :x1="calibLine.a.x" :y1="calibLine.a.y" :x2="calibLine.b.x" :y2="calibLine.b.y" class="fp-calib-line" style="pointer-events: stroke" @pointerdown.stop="onCalibLineDown($event)" />
+          <circle :cx="calibLine.a.x" :cy="calibLine.a.y" :r="10 / view.k" fill="transparent" style="pointer-events: all" @pointerdown.stop="onCalibHandleDown($event, 'a')" />
+          <!-- 可见端点同样挂 handler:它叠在命中圆之上,不挂会吞掉圆心处的按下事件(照房间顶点手柄双挂惯例) -->
+          <circle :cx="calibLine.a.x" :cy="calibLine.a.y" :r="5 / view.k" class="fp-calib-dot fp-calib-handle" vector-effect="non-scaling-stroke" @pointerdown.stop="onCalibHandleDown($event, 'a')" />
+          <circle :cx="calibLine.b.x" :cy="calibLine.b.y" :r="10 / view.k" fill="transparent" style="pointer-events: all" @pointerdown.stop="onCalibHandleDown($event, 'b')" />
+          <circle :cx="calibLine.b.x" :cy="calibLine.b.y" :r="5 / view.k" class="fp-calib-dot fp-calib-handle" vector-effect="non-scaling-stroke" @pointerdown.stop="onCalibHandleDown($event, 'b')" />
           <text :x="(calibLine.a.x + calibLine.b.x) / 2" :y="(calibLine.a.y + calibLine.b.y) / 2 - 8 / view.k" class="fp-calib-len"
                 :style="{ fontSize: 11 / view.k + 'px' }">{{ (Math.hypot(calibLine.b.x - calibLine.a.x, calibLine.b.y - calibLine.a.y) / (scale || 100)).toFixed(2) }} m</text>
         </g>
@@ -730,7 +732,7 @@ const overlapRoomIds = computed(() => {
 })
 
 const visibleItems = computed(() => {
-  if (props.mode === 'edit') return absItems.value
+  if (props.mode === 'edit') return [] // 编辑模式不展示物品
   const hit = new Set(props.highlightItemIds)
   const fid = props.selectedFurnitureId
   return absItems.value.filter((it) => hit.has(it.id) || (fid != null && it.furnitureId === fid))
@@ -988,7 +990,16 @@ const onPointerMove = (e) => {
   } else if (d.type === 'draw-poly') {
     drawing.value.poly = [...d.points, { x: p.x, y: p.y }]
   } else if (d.type === 'calib-handle') {
-    calibLine.value[d.which] = { x: p.x, y: p.y }
+    const boundary = detectBoundary(roomsLocal.value, p, { th: 12 / view.value.k })
+    calibLine.value[d.which] = boundary ? boundary.point : { x: p.x, y: p.y }
+  } else if (d.type === 'calib-line') {
+    const dx = p.x - d.startX; const dy = p.y - d.startY
+    const na = { x: d.origA.x + dx, y: d.origA.y + dy }
+    const nb = { x: d.origB.x + dx, y: d.origB.y + dy }
+    // 两端点各自吸附
+    const ba = detectBoundary(roomsLocal.value, na, { th: 12 / view.value.k })
+    const bb = detectBoundary(roomsLocal.value, nb, { th: 12 / view.value.k })
+    calibLine.value = { a: ba ? ba.point : na, b: bb ? bb.point : nb }
   }
 }
 
@@ -1267,7 +1278,7 @@ const onGlueClick = () => {
     glueStart.value = null
   }
 }
-const cancelPending = () => { cutStart.value = null; glueStart.value = null }
+const cancelPending = () => { cutStart.value = null; glueStart.value = null; clearCalibLine() }
 
 // 右键:编辑态裁剪/粘合取消已选的起点;浏览模式保留浏览器原生菜单
 const onContextMenu = (e) => {
@@ -1311,6 +1322,7 @@ const routeTool = (e) => {
   return false
 }
 const onRoomDown = (e, r) => {
+  if (e.button !== 0) return // 右键不拦截,交给画布 pan
   e.stopPropagation()
   if (props.tool === 'select' && hover.value && hover.value.room === r) return
   if (routeTool(e)) return
@@ -1329,6 +1341,7 @@ const coincidentLinks = (room, idx) => {
   return links
 }
 const onVertexDown = (e, r, i) => {
+  if (e.button !== 0) { beginDrag(e, { type: 'pan' }); return } // 右键拖动一律平移画布,不触发顶点操作
   if (routeTool(e)) return
   const poly = r.poly
   const n = poly.length
@@ -1348,6 +1361,7 @@ const isSnapping = (r, i) => {
   return !!d && d.type === 'room-vertex' && d.room === r && d.idx === i && !!d.snapped
 }
 const onEdgeDown = (e, r, i) => {
+  if (e.button !== 0) { beginDrag(e, { type: 'pan' }); return } // 右键拖动一律平移画布
   if (routeTool(e)) return
   const poly = r.poly
   const aIdx = i
@@ -1367,10 +1381,22 @@ const removeVertex = (r, i) => {
 }
 
 // ---- 家具 ----
+let furnRightDownAt = null // 右键按下位置:松开时位移超阈值判定为拖动画布,不触发右键删除
 const onFurnDown = (e, f) => {
+  if (e.button !== 0) {
+    if (e.button === 2) furnRightDownAt = { x: e.clientX, y: e.clientY }
+    return // 右键不拦截,交给画布 pan;原地右键才保留删除语义
+  }
   e.stopPropagation()
   if (routeTool(e)) return
   beginDrag(e, { type: 'furn-move', f, orig: { x: f.x, y: f.y }, startX: toCanvas(e).x, startY: toCanvas(e).y })
+}
+// 家具右键菜单:原地右键=删除(保留既有功能);右键拖动画布(位移超 5px)不触发删除
+const onFurnContextmenu = (e, f) => {
+  if (props.mode !== 'edit' || props.tool !== 'select') return
+  const dragged = furnRightDownAt && Math.hypot(e.clientX - furnRightDownAt.x, e.clientY - furnRightDownAt.y) > 5
+  furnRightDownAt = null
+  if (!dragged) emit('delete-furniture', f.id)
 }
 // 8 向缩放手柄(4 角 + 4 边中点,同房间编辑体验)
 const furnCorners = ['nw', 'ne', 'sw', 'se']
@@ -1421,6 +1447,7 @@ const furnHandles = computed(() => {
   return map
 })
 const onFurnHandleDown = (e, f, anchor) => {
+  if (e.button !== 0) { beginDrag(e, { type: 'pan' }); return } // 右键拖动一律平移画布,不触发缩放
   if (routeTool(e)) return
   beginDrag(e, { type: 'furn-resize', f, anchor, orig: { x: f.x, y: f.y, w: f.w, h: f.h } })
 }
@@ -1433,9 +1460,11 @@ const bgCornerPos = (c) => {
   return { nw: [x, y], ne: [x + w, y], sw: [x, y + h], se: [x + w, y + h] }[c]
 }
 const onBgDown = (e) => {
+  if (e.button !== 0) { beginDrag(e, { type: 'pan' }); return } // 右键拖动一律平移画布
   beginDrag(e, { type: 'bg-move', orig: { x: imgLocal.value.x, y: imgLocal.value.y }, startX: toCanvas(e).x, startY: toCanvas(e).y })
 }
 const onBgHandleDown = (e, corner) => {
+  if (e.button !== 0) { beginDrag(e, { type: 'pan' }); return } // 右键拖动一律平移画布,不触发底图缩放
   const W = imgSize.value.w; const H = imgSize.value.h
   const localOf = { nw: [0, 0], ne: [W, 0], sw: [0, H], se: [W, H] }
   const opp = { nw: 'se', ne: 'sw', sw: 'ne', se: 'nw' }[corner]
@@ -1452,6 +1481,8 @@ const onBgHandleDown = (e, corner) => {
 
 // ---- 物品 ----
 const onItemDown = (e, it) => {
+  if (e.button !== 0) return // 右键不拦截,交给画布 pan
+  e.stopPropagation()
   if (routeTool(e)) return
   const orig = props.items.find((x) => x.id === it.id)
   if (orig) beginDrag(e, { type: 'item-move', item: orig, prevRel: { relX: orig.relX, relY: orig.relY } })
@@ -1519,13 +1550,22 @@ const confirmCalibrate = () => {
 }
 const clearCalibLine = () => { calibLine.value = null; calibFirst.value = null }
 const onCalibHandleDown = (e, which) => {
+  if (e.button !== 0) { beginDrag(e, { type: 'pan' }); return } // 右键拖动一律平移画布
   if (!calibLine.value) return
   e.stopPropagation()
   beginDrag(e, { type: 'calib-handle', which, orig: { ...calibLine.value[which] } })
 }
+// 拖动整条标定线段(整体平移+吸附)
+const onCalibLineDown = (e) => {
+  if (e.button !== 0) { beginDrag(e, { type: 'pan' }); return } // 右键拖动一律平移画布
+  if (!calibLine.value) return
+  beginDrag(e, { type: 'calib-line', origA: { ...calibLine.value.a }, origB: { ...calibLine.value.b }, startX: toCanvas(e).x, startY: toCanvas(e).y })
+}
 
 const onSvgDown = (e) => {
   if (props.mode !== 'edit') { beginDrag(e, { type: 'pan' }); return }
+  // 右键在任意元素上都应触发画布平移
+  if (e.button !== 0) { beginDrag(e, { type: 'pan' }); return }
   if (e.target !== e.currentTarget) return
   if (props.tool === 'calibrate') { handleCalibrateClick(e); return }
   if (props.tool === 'draw-rect') { startDrawRect(e); return }
@@ -1643,7 +1683,7 @@ defineExpose({ finishPoly, fit, cancelPending })
 .fp-bg-edit { pointer-events: auto; cursor: move; } /* 调整底图工具:底图可拖动 */
 .fp-editable { pointer-events: auto; cursor: default; }
 .fp-svg.is-tool-select .fp-editable { cursor: text; } /* 仅选择工具下点名称可改名,其余工具不误示文本光标 */
-.fp-drawing, .fp-snap-line, .fp-calib-dot, .fp-calib-line, .fp-hover-add, .fp-hover-tool, .fp-cut-line { pointer-events: none; } /* 预览/装饰元素不挡落点 */
+.fp-drawing, .fp-snap-line, .fp-calib-line, .fp-hover-add, .fp-hover-tool, .fp-cut-line { pointer-events: none; } /* 预览/装饰元素不挡落点 */
 .fp-room { fill: rgba(184, 140, 110, 0.14); stroke: rgba(184, 140, 110, 0.65); stroke-width: 2; }
 .fp-room.is-view { stroke: none; } /* 查看态:边界改蜡笔抖动线 */
 .fp-room.is-hit { fill: rgba(184, 140, 110, 0.28); }
@@ -1680,7 +1720,7 @@ defineExpose({ finishPoly, fit, cancelPending })
 .fp-snap-line { stroke: #6b9b6b; stroke-width: 1.5; stroke-dasharray: 5 4; }
 .fp-calib-dot { fill: #e0a030; stroke: #fff; stroke-width: 2; }
 .fp-calib-line { stroke: #e0a030; stroke-width: 1.5; stroke-dasharray: 5 4; }
-.fp-calib-handle { cursor: grab; }
+.fp-calib-handle { cursor: grab; pointer-events: all; }
 .fp-calib-handle:active { cursor: grabbing; }
 .fp-calib-len { fill: #e0a030; text-anchor: middle; paint-order: stroke; stroke: rgba(255,253,248,0.85); stroke-width: 3; pointer-events: none; font-weight: 600; }
 .fp-calib-confirm { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 6px; padding: 8px 18px; background: rgba(224, 160, 48, 0.92); color: #fff; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.15); user-select: none; }

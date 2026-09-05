@@ -85,8 +85,17 @@
               </div>
               <!-- 已有房间列表 -->
               <template v-if="floorPlan.rooms.length">
-                <div class="fp-side-head">{{ $t('item.rooms') }}</div>
+                <div class="fp-side-head">
+                  <span>{{ $t('item.rooms') }}</span>
+                  <el-button v-if="!roomSelectMode" size="small" text @click="roomSelectMode = true">{{ $t('common.select') }}</el-button>
+                  <template v-else>
+                    <el-button size="small" text type="danger" :disabled="!selectedRoomIds.length" @click="batchDeleteRooms">{{ $t('common.delete') }}({{ selectedRoomIds.length }})</el-button>
+                    <el-button size="small" text @click="roomSelectMode = false; selectedRoomIds = []">{{ $t('common.cancel') }}</el-button>
+                  </template>
+                </div>
                 <div v-for="r in floorPlan.rooms" :key="r.id" class="fp-side-row">
+                  <!-- 常驻占位:多选模式切换时行高不变(非多选仅隐藏,保留空间) -->
+                  <el-checkbox v-model="selectedRoomIds" :value="r.id" class="fp-side-check" :class="{ 'is-off': !roomSelectMode }" />
                   <span class="fp-side-name">{{ r.name }}</span>
                   <span class="fp-side-icons">
                     <el-tooltip :content="$t('item.duplicate')" placement="top" :show-after="300">
@@ -218,9 +227,30 @@
 
         <!-- 楼层切换器(左下角;编辑态常显,可加层) -->
         <div v-if="floors.length > 1 || mode === 'edit'" :class="['fp-floors', { 'with-side': mode === 'edit' }]">
-          <div v-for="f in floors" :key="f" :class="['fp-floor', { on: f === currentFloor }]" @click="switchFloor(f)">
-            {{ f }}F
-          </div>
+          <template v-for="(f, fi) in floors" :key="f">
+            <div class="fp-floor-row">
+              <input
+                v-if="renamingFloor === f"
+                ref="renameInputEl"
+                v-model="renameValue"
+                class="fp-floor-input"
+                :title="$t('item.floorRename')"
+                @keyup.enter="confirmRenameFloor(f)"
+                @keyup.esc="renamingFloor = null"
+                @blur="confirmRenameFloor(f)"
+              />
+              <template v-else>
+                <div :class="['fp-floor', { on: f === currentFloor }]" @click="switchFloor(f)">
+                  {{ f }}F
+                </div>
+                <div v-if="mode === 'edit' && floors.length > 1" class="fp-floor-arrows">
+                  <div v-if="fi > 0" class="fp-floor fp-floor-arrow" :title="$t('item.floorUp')" @click.stop="swapFloor(f, floors[fi - 1])">↑</div>
+                  <div v-if="fi < floors.length - 1" class="fp-floor fp-floor-arrow" @click.stop="swapFloor(f, floors[fi + 1])" :title="$t('item.floorDown')">↓</div>
+                </div>
+                <div v-if="mode === 'edit'" class="fp-floor fp-floor-arrow" :title="$t('item.floorRename')" @click.stop="startRenameFloor(f)">✎</div>
+              </template>
+            </div>
+          </template>
           <div v-if="mode === 'edit'" class="fp-floor" @click="addFloor">+</div>
         </div>
 
@@ -591,6 +621,9 @@ const selectMode = ref(false)
 const selectedIds = ref([])
 const batchFurnDlg = ref(false)
 const batchFurnitureId = ref(null)
+// 房间批量编辑
+const roomSelectMode = ref(false)
+const selectedRoomIds = ref([])
 
 const itemDlg = ref(false)
 const itemForm = ref({})
@@ -631,9 +664,25 @@ const floors = computed(() => {
   floorPlan.value.rooms.forEach((r) => set.add(r.floor))
   const house = houses.value.find((h) => h.id === currentHouseId.value)
   if (house && house.floorPlans) {
-    try { Object.keys(JSON.parse(house.floorPlans)).forEach((k) => set.add(Number(k))) } catch {}
+    try {
+      const fp = JSON.parse(house.floorPlans)
+      Object.keys(fp).forEach((k) => { if (k !== 'floorOrder') set.add(Number(k)) })
+      // 按 floorOrder 排序(若配置了)
+      const order = fp.floorOrder || []
+      if (order.length) {
+        set.add(currentFloor.value)
+        return [...set].sort((a, b) => {
+          const ai = order.indexOf(a)
+          const bi = order.indexOf(b)
+          if (ai !== -1 && bi !== -1) return ai - bi
+          if (ai !== -1) return -1
+          if (bi !== -1) return 1
+          return b - a
+        })
+      }
+    } catch {}
   }
-  set.add(currentFloor.value) // 当前层常驻:点 + 新开的空层切走后不消失
+  set.add(currentFloor.value)
   return [...set].sort((a, b) => b - a)
 })
 
@@ -834,13 +883,79 @@ const switchFloor = async (f) => {
   setTimeout(() => { floorTransition.value = { direction, phase: '' } }, 550)
 }
 const addFloor = async () => {
-  currentFloor.value = Math.max(...floors.value) + 1
+  const newFloor = Math.max(...floors.value) + 1
+  currentFloor.value = newFloor
+  // 持久化空楼层到 floorPlans JSON,防止切走后消失
+  const house = houses.value.find((h) => h.id === currentHouseId.value)
+  if (house) {
+    let fp = {}
+    if (house.floorPlans) { try { fp = JSON.parse(house.floorPlans) } catch {} }
+    if (!fp[newFloor]) {
+      fp[newFloor] = { scale: 100 }
+      await itemApi.saveFloorPlans(house.id, JSON.stringify(fp))
+      loadHouses()
+    }
+  }
   await loadFloorPlan()
   fitKey.value++
+}
+// 楼层互换显示顺序(不改房间floor字段,只改floorPlans.floorOrder)
+const swapFloor = async (a, b) => {
+  if (a === b) return
+  const house = houses.value.find((h) => h.id === currentHouseId.value)
+  if (!house) return
+  let fp = {}
+  if (house.floorPlans) { try { fp = JSON.parse(house.floorPlans) } catch {} }
+  // 从 floors computed 推导完整楼层列表(包含所有层)
+  const allFloors = [...floors.value]
+  let order = fp.floorOrder || [...allFloors]
+  // 确保 order 包含所有楼层
+  allFloors.forEach((f) => { if (!order.includes(f)) order.push(f) })
+  // 兼容:order 中有已不存在的楼层则移除
+  order = order.filter((f) => allFloors.includes(f))
+  const ai = order.indexOf(a)
+  const bi = order.indexOf(b)
+  if (ai === -1 || bi === -1) return
+  ;[order[ai], order[bi]] = [order[bi], order[ai]]
+  fp.floorOrder = order
+  await itemApi.saveFloorPlans(house.id, JSON.stringify(fp))
+  loadHouses()
 }
 const toggleEdit = () => {
   mode.value = mode.value === 'edit' ? 'view' : 'edit'
   if (mode.value === 'edit') tool.value = 'select'
+}
+// 楼层改号:房间 floor 字段与 floorPlans 键/floorOrder 一体重映射(2楼→12楼、1楼→-1楼);
+// 内联输入而非 ElMessageBox(全站 MessageBox 样式缺陷修复前弹窗不可见)
+const renamingFloor = ref(null)
+const renameValue = ref('')
+const startRenameFloor = (f) => {
+  renamingFloor.value = f
+  renameValue.value = String(f)
+  nextTick(() => document.querySelector('.fp-floor-input')?.focus())
+}
+const confirmRenameFloor = async (oldF) => {
+  if (renamingFloor.value !== oldF) return
+  const nf = parseInt(renameValue.value, 10)
+  renamingFloor.value = null
+  if (Number.isNaN(nf) || nf === oldF) return
+  if (floors.value.includes(nf)) { ElMessage.error(t('item.floorRenameExists')); return }
+  const house = houses.value.find((h) => h.id === currentHouseId.value)
+  if (!house) return
+  let fp = {}
+  if (house.floorPlans) { try { fp = JSON.parse(house.floorPlans) } catch {} }
+  const fp2 = {}
+  Object.keys(fp).forEach((k) => { if (k !== 'floorOrder') fp2[Number(k) === oldF ? String(nf) : k] = fp[k] })
+  if (Array.isArray(fp.floorOrder)) fp2.floorOrder = fp.floorOrder.map((x) => (Number(x) === oldF ? nf : x))
+  await itemApi.saveFloorPlans(house.id, JSON.stringify(fp2))
+  // floorPlan.rooms 只含当前层的房间,改号必须按 houseId 拉全量房间再过滤迁移
+  const allRooms = await itemApi.rooms(house.id)
+  const rooms = allRooms.filter((r) => r.floor === oldF)
+  await Promise.all(rooms.map((r) => itemApi.updateRoom(r.id, { floor: nf, note: r.note })))
+  if (currentFloor.value === oldF) currentFloor.value = nf
+  loadHouses()
+  await loadFloorPlan()
+  ElMessage.success(t('item.floorRenamed', { n: rooms.length }))
 }
 const togglePoly = () => {
   if (tool.value === 'draw-poly') { tool.value = 'select'; canvasRef.value?.finishPoly() }
@@ -1235,6 +1350,16 @@ const removeRoom = async (row) => {
   loadRooms()
   loadFloorPlan()
 }
+const batchDeleteRooms = async () => {
+  if (!selectedRoomIds.value.length) return
+  await ElMessageBox.confirm(t('item.deleteRoomMoveLib'), t('common.warning'), { type: 'warning', closeOnClickModal: true })
+  for (const id of selectedRoomIds.value) { await itemApi.removeRoom(id) }
+  ElMessage.success(t('common.success'))
+  roomSelectMode.value = false
+  selectedRoomIds.value = []
+  loadRooms()
+  loadFloorPlan()
+}
 
 const openFurniture = (row) => {
   furForm.value = row ? { id: row.id, roomId: row.roomId, name: row.name, type: row.type, note: row.note } : { roomId: roomFilter.value || floorPlan.value.rooms[0]?.id || null, name: '', type: '衣柜', note: '' }
@@ -1334,7 +1459,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fp-guide { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); text-align: center; cursor: pointer; z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .fp-guide-title { font-size: 16px; font-weight: 600; color: #5c4c3d; }
 .fp-guide-text { font-size: 13px; color: #a89a8a; }
-.fp-sidebar { width: 220px; border-right: 1px solid #eee5d8; background: #faf5ec; display: flex; flex-direction: column; }
+.fp-sidebar { width: 220px; flex-shrink: 0; border-right: 1px solid #eee5d8; background: #faf5ec; display: flex; flex-direction: column; }
 .fp-side-tabs { display: flex; border-bottom: 1px solid #eee5d8; }
 .fp-side-tab { flex: 1; text-align: center; padding: 10px 0; cursor: pointer; font-size: 13px; color: #8a7a6a; }
 .fp-side-tab.on { color: #5c4c3d; font-weight: 600; border-bottom: 2px solid #b88c6e; }
@@ -1347,7 +1472,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fp-tools :deep(.el-button + .el-button) { margin-left: 0; }
 .fp-tools :deep(.el-upload) { display: inline-flex; }
 .fp-ico { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.fp-side-head { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #a89a8a; margin: 14px 0 4px; }
+.fp-side-head { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #a89a8a; margin: 14px 0 6px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.06); }
+.fp-side-head:first-child { margin-top: 0; padding-top: 0; border-top: none; }
 .fp-presets { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 8px 0 12px; }
 .fp-preset { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 2px 6px; border: 1px dashed #d8c9b8; border-radius: 8px; cursor: grab; background: #fffdf8; }
 .fp-preset:hover { border-color: #b88c6e; background: rgba(184, 140, 110, 0.08); }
@@ -1357,12 +1483,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fp-opacity-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
 .fp-opacity-label { font-size: 12px; color: #a89a8a; white-space: nowrap; }
 .fp-opacity-row :deep(.el-slider) { flex: 1; }
-.fp-side-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 0; border-bottom: 1px dashed #eee5d8; }
+.fp-side-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 0; border-bottom: 1px dashed #eee5d8; min-height: 32px; }
 .fp-side-name { font-size: 13px; color: #5c4c3d; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fp-side-name-editable { cursor: text; }
 .fp-side-name-editable:hover { color: #b88c6e; text-decoration: underline; text-underline-offset: 2px; }
 .fp-side-rename { flex: 1; min-width: 0; }
 .fp-side-furn { padding: 6px 0; border-bottom: 1px dashed #eee5d8; }
+/* 已摆放家具条目之间不显示分隔线(家具库列表仍保留) */
+.fp-side-furn:not([draggable="true"]) { border-bottom: none; }
 .fp-side-furn[draggable="true"] { cursor: grab; }
 .fp-side-furn[draggable="true"]:active { cursor: grabbing; }
 .fp-side-furn .fp-side-row { padding: 0; border-bottom: none; }
@@ -1375,15 +1503,21 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fp-side-row :deep(.el-button + .el-button) { margin-left: 4px; }
 .fp-side-ok { color: #7aa07a; }
 .fp-floors { position: absolute; left: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 4px; z-index: 5; }
-.fp-floors.with-side { left: 232px; } /* 避让编辑侧栏(220px),浮在画布左下角而非侧栏面板上 */
+.fp-floors.with-side { left: 227px; } /* 避让编辑侧栏(220px+1px边框),留 6px 间隙贴近侧栏 */
 .fp-floor { width: 36px; height: 36px; border-radius: 8px; background: rgba(255,255,255,0.92); color: #5c4c3d; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 13px; font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,0.1); transition: background 0.15s, box-shadow 0.15s, transform 0.15s; }
 .fp-floor:hover { background: #fff; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.16); }
 .fp-floor.on { background: #b88c6e; color: #fff; }
 .fp-floor.on:hover { background: #a87e60; }
+.fp-floor-arrow { width: 20px; height: 20px; font-size: 11px; border-radius: 4px; background: rgba(184,140,110,0.12); color: #8a7a6a; box-shadow: none; }
+.fp-floor-arrows { display: flex; flex-direction: column; gap: 2px; }
+.fp-floor-arrows .fp-floor-arrow { width: 17px; height: 17px; font-size: 9px; } /* 上下移纵向堆叠:两钮加间距与 36px 芯片等高 */
+.fp-floor-arrow:hover { background: rgba(184,140,110,0.25); color: #5c4c3d; }
+.fp-floor-row { display: flex; align-items: center; gap: 2px; }
+.fp-floor-input { width: 46px; height: 28px; border-radius: 8px; border: 1px solid var(--color-primary, #b88c6e); background: rgba(255,255,255,0.95); color: #5c4c3d; text-align: center; font-size: 12px; font-weight: 600; outline: none; }
 .fp-fit { position: absolute; right: 12px; bottom: 12px; width: 36px; height: 36px; border-radius: 8px; background: rgba(255,255,255,0.92); color: #5c4c3d; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.1); transition: background 0.15s, box-shadow 0.15s, transform 0.15s; z-index: 5; }
 .fp-fit:hover { background: #fff; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.16); }
 .fp-fit-ico { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.fp-results { position: absolute; right: 12px; top: 12px; width: 260px; max-height: 60%; overflow-y: auto; background: rgba(255,253,248,0.96); border-radius: 12px; box-shadow: 0 3px 12px rgba(0,0,0,0.12); padding: 10px; z-index: 5; }
+.fp-results { position: absolute; right: 12px; bottom: 12px; width: 260px; max-height: 50%; overflow-y: auto; background: rgba(255,253,248,0.96); border-radius: 12px; box-shadow: 0 3px 12px rgba(0,0,0,0.12); padding: 10px; z-index: 5; }
 .fp-results-title { font-size: 13px; font-weight: 600; color: #5c4c3d; margin-bottom: 8px; }
 .fp-result { padding: 6px 8px; border-radius: 8px; cursor: pointer; }
 .fp-result:hover { background: rgba(184,140,110,0.1); }
@@ -1412,6 +1546,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .pick-badge.on { background: #b88c6e; border-color: #b88c6e; }
 .fp-batch-hint { font-size: 12px; line-height: 1.6; color: #a89a8a; margin-top: 4px; }
 .furn-items-toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
+.fp-side-check { flex-shrink: 0; width: 16px; height: 20px; margin-right: 6px; }
+.fp-side-check.is-off { visibility: hidden; }
+.fp-side-check :deep(.el-checkbox__input) { margin-right: 0; }
+.fp-side-check :deep(.el-checkbox__label) { padding-left: 0; }
 .item-main { display: flex; align-items: center; gap: 8px; }
 .item-name { font-size: 16px; font-weight: 600; }
 .item-path { color: #909399; font-size: 13px; margin-top: 4px; }

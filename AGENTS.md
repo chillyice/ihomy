@@ -14,7 +14,7 @@
 ## 项目概述
 
 - **应用名**:ihomy(家庭共用软件)。家庭内部内容共享平台,PC 浏览器 / 安卓 / iOS(均 PWA)。
-- **核心功能**:登录注册、博客、日记、相册、纪念日、留言板、放映厅、聊天室、积分商城、任务悬赏、提醒、家庭计划、愿望单、记账、家谱、书架、运维。首页模块化可扩展(后期新增功能只需插入一条 `sys_home_module` 记录)。
+- **核心功能**:登录注册、博客、日记、相册、纪念日、留言板、放映厅、聊天室、积分商城、任务悬赏、提醒、家庭计划、愿望单、记账、家谱、书架、工具箱(脑图设计)、运维。首页模块化可扩展(后期新增功能只需插入一条 `sys_home_module` 记录)。
 - **技术栈**:前端 Vue3 + Vite + ElementPlus + PWA(`ihomy-frontend`);后端 Spring Boot 3 + MyBatis-Plus + MySQL 8 + Redis(JWT 双 token + 验证码 + WebSocket),包 `com.ihomy`,主类 `IhomyApplication`,`ihomy-backend`。
 
 ## 工作目录
@@ -53,7 +53,7 @@
 - **root 仅用于初始化**:`mysql -uroot -p < backend/src/main/resources/schema.sql`,执行一次(建库、建表、创建 ihomy 账号、初始数据)。
 - **业务运行用 `ihomy` 账号**:仅授予 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`(最小权限,无 CREATE/ALTER/DROP)。application.yml 连接用 `ihomy`,**不要用 root 跑业务**。
 - 账号同时创建 `localhost` 和 `%` 两个 host(本机/远程应用服务器都能连)。
-- **59 张表**,前缀分类:`sys_` 18 张(系统/账号/权限/配置/日志/天气/存储)、`family_` 22 张(家庭事务)、`content_` 19 张(内容数据)。**完整表清单见 `docs/需求设计说明书.md` §6.2**。
+- **60 张表**,前缀分类:`sys_` 18 张(系统/账号/权限/配置/日志/天气/存储)、`family_` 22 张(家庭事务)、`content_` 20 张(内容数据)。**完整表清单见 `docs/需求设计说明书.md` §6.2**。
   - **命名规则**:家庭事务业务表一律 `family_` 前缀;内容数据 `content_` 前缀;账号/权限/配置/日志/天气/存储保留 `sys_`。新增表必须遵守。前缀取最顶层祖先类别;上下级关系体现在表名(如 `sys_user_role`)。
 - **枚举不再用数字**:状态/类型字段一律大写英文单词(`PUBLISHED/DRAFT/PUBLIC/FAMILY/ACTIVE...`),含义存字典表 `sys_dict_item`,Java 常量集中于 `common/DictConst.java`,前端映射 `utils/dict.js`。**不要写回 0/1/2 判断**。
 - **注意**:`content_blog/diary/photo/video/wish` 5 张内容表 `visibility` 列为 `VARCHAR(20) DEFAULT 'FAMILY'`(PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开),schema.sql 与 live DB 已对齐(曾误写 TINYINT)。
@@ -73,10 +73,10 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
     annotation/  # @RequirePermission / @OperationLog
     aspect/      # RequirePermissionAspect / OperationLogAspect
     filter/      # TraceIdFilter / AccessLogFilter / CaptureRequestWrapper / CaptureResponseWrapper
-    entity/      # 52 个实体类(8 张关联/字典表无实体)
+    entity/      # 53 个实体类(8 张关联/字典表无实体)
     mapper/      # MyBatis-Plus BaseMapper(自定义 SQL 全放 resources/mapper/*.xml,接口不写注解,参数统一 @Param)
-    service/     # 43 个 @Service(单实现无接口层)
-    controller/  # 32 个 Controller
+    service/     # 44 个 @Service(单实现无接口层)
+    controller/  # 33 个 Controller
     dto/         # 请求/响应 DTO
     websocket/   # ChatWebSocketHandler(原生 WebSocket 聊天室)
   src/main/resources/
@@ -84,20 +84,20 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
     logback-spring.xml  # 三类日志分流(access/server/thirdparty,六要素 pattern,按天滚动)
     external.yml.template  # 外挂配置模板(IHOMY_CONFIG_PATH 覆盖密码/密钥/路径/captcha/天气,唯一开发生产差异机制)
     mapper/*.xml        # 每个 Mapper 一个同名 XML
-    schema.sql          # 建库+建号+建表(59张)+种子
+    schema.sql          # 建库+建号+建表(60张)+种子
   mvnw / mvnw.cmd       # Maven Wrapper
 frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
   src/
-    api/          # request.js(axios+JWT+401 自动刷新) + index.js(30 个 Api 对象)
+    api/          # request.js(axios+JWT+401 自动刷新) + index.js(31 个 Api 对象)
     stores/       # user.js(登录+权限) / app.js(首页聚合)
-    router/       # 登录守卫 + scrollBehavior;36 个路由(懒加载)
+    router/       # 登录守卫 + scrollBehavior;39 个路由(懒加载)
     i18n/ theme/  # vue-i18n 中英;明暗主题(只 light/dark)
     utils/        # dict.js / diary.js / doodle.js(涂鸦引擎) / windowLight.js / useSunLight.js / useDragResize.js
     composables/  # useDevice.js(设备检测)
     components/   # AppSidebar/BackToTop/Breadcrumb/AvatarCropper/InstallPrompt/SiteFooter/SunLightLayer/LightTestConsole/SyncDialog/Mobile*(移动端)
     layouts/MobileLayout.vue  # 移动端壳
     styles/main.css # CSS 变量 + 全局样式 + 深色模式 + EP 组件覆写 + @media
-    views/        # 28 个页面(Home/Login/Member/Settings/Anniversary/album/cinema/diary/blog/points/task/reminder/plan/wish/book/chat/tree/cascade/ops/storage/item/kitchen/library)
+    views/        # 31 个页面(Home/Login/Member/Settings/Anniversary/album/cinema/diary/blog/points/task/reminder/plan/wish/book/chat/tree/cascade/ops/storage/item/kitchen/library/tools)
     App.vue
   vite.config.js   # PWA + 代理 /api->8080 + manualChunks 分块 + ElementPlus 按需
 ```
@@ -148,6 +148,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 光影 | 太阳位置/体积光/台灯/天气 / 天气代理 / 天气详情 / 首页仪表盘 | SolarUtil+SunService + windowLight.js + SunLightLayer.vue |
 | 物品 | 物品定位+户型图 | ItemController / ItemService(详见 docs/户型图设计.md) |
 | 厨房 | 菜单/菜谱/食材 | RecipeController / RecipeService |
+| 工具 | 工具箱聚合页/脑图设计(simple-mind-map) | MindMapController / MindMapService |
 | 系统 | i18n / 主题 / 字典 | i18n/ + theme/ + utils/dict.js |
 | 移动端 | 设备自适应 | useDevice.js + MobileLayout.vue + Mobile* 组件 |
 
@@ -198,13 +199,13 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 8. **可拖拽面板**:`useDragResize` 组合式函数;5 个面板各自实例;位置/大小持久化 localStorage;**事件监听器按需挂载**(`onDragStart`/`onResizeStart` 时挂 `mousemove`/`mouseup`,`onMouseUp` 时移除,不要 `onMounted` 常驻——参考 `AvatarCropper.vue` 的写法)。
 9. **光影层全局化**:`SunLightLayer` + `AppSidebar` + `SiteFooter` 在 `App.vue` 全局挂载;`useSunLight` provide/inject 共享状态。
 10. **i18n**:所有用户可见文本用 `$t('key')`;中英双语;`utils/dict.js` 枚举映射。
-11. **打包分块**(强制):`vite.config.js` 必须配 `build.rollupOptions.output.manualChunks` 拆分大 vendor(当前 `element-plus`/`gsap`/`vue-i18n`/`epubjs` 四块)。**public/ 下静态资源不得与 npm 包重复**(已删 `public/qweather-icons/`,改走 `node_modules/qweather-icons/font/`)。
+11. **打包分块**(强制):`vite.config.js` 必须配 `build.rollupOptions.output.manualChunks` 拆分大 vendor(当前 `element-plus`/`gsap`/`vue-i18n`/`epubjs`/`simple-mind-map` 五块)。**public/ 下静态资源不得与 npm 包重复**(已删 `public/qweather-icons/`,改走 `node_modules/qweather-icons/font/`)。
 12. **重型资源异步加载**(强制):字体包/CSS(如 `qweather-icons.css` 44.9KB)阻塞首屏的,必须 `import('...')` 异步加载,不要同步 `import`。
 13. **动画优先级**(强制):持续型动画(钟摆/心跳/呼吸)优先级 **CSS `@keyframes` > GSAP 直接操作 DOM ref > `requestAnimationFrame` + 响应式 ref**。**禁止用 rAF 每帧写 Vue ref 触发响应式重渲染**(参考 `useSunLight.js` 钟摆已改 CSS `@keyframes lampSwing`)。
 14. **并行请求**(强制):多个独立的 `await xxxApi.foo()` 必须改 `Promise.all([a, b, c])` 并行(参考 `Home.vue loadAll` + `stores/app.js init`)。串行只在真有依赖时用。
 15. **computed 纯函数**(强制):`computed` 内禁止 `Math.random()`/`Date.now()`/副作用,否则每次访问重算且视觉跳动。需要随机/一次性计算用 `ref` + `watch(source, immediate)` 生成(参考 `Home.vue polaroidLayout`)。
 16. **路由懒加载**:27 个路由全部 `() => import('./views/...')`,不写同步 `import Home from '@/views/Home.vue'`。
-17. **全局 UI 样式统一**(强制):`el-dialog`/`ElMessageBox`/`ElMessage`/`el-popper`/`el-button`/`el-tag`/`el-badge`/`el-input` 及所有 EP 组件的配色、圆角、尺寸、z-index 一律由 `main.css` 全局覆写,**禁止在组件 scoped 内重复定义**。完整样式值(弹窗四档尺寸/遮罩/输入框/Toast 四色/完整 z-index 链)见 `docs/UI设计提示词.md` §11a 与 §3。
+17. **全局 UI 样式统一**(强制):`el-dialog`/`ElMessageBox`/`ElMessage`/`el-popper`/`el-button`/`el-tag`/`el-badge`/`el-input` 及所有 EP 组件的配色、圆角、尺寸、z-index 一律由 `main.css` 全局覆写,**禁止在组件 scoped 内重复定义**。完整样式值(弹窗四档尺寸/遮罩/输入框/Toast 四色/完整 z-index 链)见 `docs/UI设计提示词.md` §11a 与 §3。**命令式 API(ElMessage/ElMessageBox/ElNotification/ElLoading)的组件样式已在 main.js 显式引入**——unplugin 按需加载只覆盖模板组件,新增命令式调用时须确认对应样式已在 main.js 引入,否则弹窗会以裸 DOM 渲染到文档流末尾(不可见,曾误报为「ElMessageBox 动画未生效」)。
 18. **按钮/标签/角标/图标/圆角统一**(强制,`main.css` 全局覆写,禁止 scoped 重复定义):按钮四类(主/次/幽灵/危险,浅色与深色**完全不同色值、不共用**)、`el-tag` 半透明磨砂、`el-badge` 半透明黑、`el-icon` `stroke-width:2px`、圆角统一(button 12px / input 10px / card+dialog 14px)。**完整色值见 `docs/UI设计提示词.md` §18a**。
 19. **页面统一规范**(强制,所有功能页遵守):根容器 `class="page"`(禁止 scoped 覆写 max-width/margin/padding);页面级 H1/H2 移除(面包屑已体现标题),分区标题用 `.section-label`;工具栏统一 `class="page-toolbar card"`(`.tb-left` 筛选组件 `size="small"`,`tb-right` 操作按钮 `gap:8px`,下拉包裹需补 `:deep(.el-dropdown){margin-left:12px}`);多选交互统一 `.pick-badge` 对勾圆标 + 卡片描边(**禁左上 checkbox 角标**);设备映射来源角标 `设备名 + .status-dot`。详见 `docs/UI设计提示词.md` §11b。
 
@@ -215,7 +216,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **动画优先级**:持续型动画 CSS `@keyframes` > GSAP 直接操作 DOM ref > `requestAnimationFrame`;**禁止 rAF 每帧写 Vue ref**(见前端规范 13)。
 - **事件监听器按需挂载**:`onDragStart`/`onResizeStart` 时挂 `mousemove`/`mouseup`,`onMouseUp` 时移除,不要 `onMounted` 常驻。
 - **重型资源异步加载**:字体包/大 CSS(如 `qweather-icons.css`)必须 `import('...')` 异步,不要同步 `import`。
-- **入口 chunk 分块**:`vite.config.js` 必须配 `manualChunks`(element-plus/gsap/vue-i18n/epubjs)。
+- **入口 chunk 分块**:`vite.config.js` 必须配 `manualChunks`(element-plus/gsap/vue-i18n/epubjs/simple-mind-map)。
 - **文件上传流式 / N+1 / SQL 日志**:见后端规范 12 / 9 / 5。
 
 #### SQL/索引规范(强制)
@@ -255,12 +256,12 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 #### 已知问题(待修复)
 
 - **Edge 硬件加速整页频闪**(遗留,环境/驱动问题,非应用代码):切走再切回窗口(或开关硬件加速+重启 Edge)即恢复;Chrome 不复现。用户侧处置按序:开关硬件加速+重启 Edge → 更新显卡驱动 → 注册表禁 MPO(`OverlayTestMode`=5)→ 应用内关"毛玻璃"。详见 docs/变更归档.md「首页频闪排查与修复」。
-- **ElMessageBox 动画未生效**:CSS 覆写写法正确但运行时未生效,疑 EP `Transition` persisted 模式所致,待 DevTools 排查。
+- ~~**ElMessageBox 动画未生效**~~（2026-09-06 已定位并修复）：真因是命令式 API 的 EP 样式未被按需加载——弹窗以裸 DOM 渲染在文档流末尾（`.el-overlay` position:static）而非"动画问题"。已在 main.js 显式引入 message/message-box/notification/loading 四个组件样式；**新增命令式 API 调用时必须同步确认对应样式已引入**（模板按需加载不覆盖命令式调用）。
 
 #### 验证基线
 
 - 后端编译:`cd backend; .\mvnw.cmd -B clean compile -DskipTests` → BUILD SUCCESS
-- 前端构建:`cd frontend; npm run build` → 入口 chunk 208KB(基线 2026-08-31 实测;原 158KB 记录系 V8.0 移动端组件并入入口后过时)
+- 前端构建:`cd frontend; npm run build` → 入口 chunk ≈224-228KB(基线 2026-09-06 实测 228KB/gzip 89KB;simple-mind-map 已隔离为独立异步 chunk ~340KB 仅脑图编辑页加载)
 - 接口测试:`cd autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed
 
 ## 已实现变更归档(已外置)
@@ -313,7 +314,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 ## 文档清单
 
 - `README.md`(启动说明 + Windows 一键启动脚本用法); `Windows部署指导.md` / `Linux部署指导.md`(生产部署 NSSM/systemd/Nginx/Let's Encrypt/Docker Compose)
-- `docs/需求设计说明书.md` — **完整功能需求唯一活文档**(功能模块清单+数据库设计 59 表+接口设计+规划事项+修订记录),随迭代持续更新
+- `docs/需求设计说明书.md` — **完整功能需求唯一活文档**(功能模块清单+数据库设计 60 表+接口设计+规划事项+修订记录),随迭代持续更新
 - `docs/需求规格说明书.docx` — 需求文档历史归档(V9.16 起冻结,由上方 .md 接棒,不再更新)
 - `docs/变更归档.md` — 已实现变更归档(按功能域的文件级改动表+设计决策+踩坑+live DB 同步 SQL);新变更归档追加到该文件末尾
 - `docs/UI设计提示词.md` — 沉浸式首页 UI 设计完整规格(可作为 AI 提示词重新生成)

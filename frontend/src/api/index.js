@@ -367,3 +367,12 @@ export const libraryApi = {
   addBookmark: (id, data) => request.post(`/library/${id}/bookmarks`, data),
   deleteBookmark: (bmId) => request.delete(`/library/bookmarks/${bmId}`),
 }
+
+// 工具箱-脑图设计(家庭共享思维导图,data 为 simple-mind-map 完整 JSON)
+export const mindmapApi = {
+  list: () => request.get('/mindmap/list'),
+  detail: (id) => request.get(`/mindmap/${id}`),
+  create: (data) => request.post('/mindmap', data),
+  update: (id, data) => request.put(`/mindmap/${id}`, data),
+  remove: (id) => request.delete(`/mindmap/${id}`),
+}

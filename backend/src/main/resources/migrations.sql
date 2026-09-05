@@ -601,5 +601,25 @@ INSERT IGNORE INTO `sys_role_auth` (`role_id`, `auth_id`)
 SELECT r.id, a.id FROM `sys_role` r, `sys_auth` a
 WHERE r.role_code = 'MEMBER' AND a.auth_code = 'library:manage';
 
+-- 2026-09-06: 工具箱-脑图设计(内容表 + 首页模块种子,均幂等)
+CREATE TABLE IF NOT EXISTS `content_mindmap` (
+  `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`  BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `user_id`    BIGINT       NOT NULL COMMENT '创建人ID',
+  `title`      VARCHAR(100) NOT NULL COMMENT '脑图标题',
+  `data`       LONGTEXT     DEFAULT NULL COMMENT '脑图数据JSON(layout/root/theme/view/config)',
+  `deleted`    TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family_updated` (`family_id`, `deleted`, `updated_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='脑图表';
+
+-- sys_home_module 无 (code,family_id=NULL) 唯一约束兜底(NULL 可重复),用 NOT EXISTS 防重
+INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`)
+SELECT 'tools', '工具箱', 'icon-tools', '/tools', 'life', 'left', 19, 1
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM `sys_home_module` WHERE `code` = 'tools' AND `family_id` IS NULL);
+
 
 

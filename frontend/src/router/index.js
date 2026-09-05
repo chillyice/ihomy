@@ -39,6 +39,10 @@ const routes = [
   { path: '/kitchen/recipe/:id/edit', name: 'RecipeEdit', component: () => import('@/views/kitchen/RecipeEdit.vue'), meta: { requiresAuth: true } },
   { path: '/library', name: 'LibraryList', component: () => import('@/views/library/LibraryList.vue'), meta: { public: true } },
   { path: '/library/edit/:id?', name: 'LibraryEdit', component: () => import('@/views/library/LibraryEdit.vue'), meta: { requiresAuth: true } },
+  // 工具箱:功能聚合页 + 脑图设计(列表游客可见,编辑器需登录)
+  { path: '/tools', name: 'Tools', component: () => import('@/views/tools/Tools.vue'), meta: { public: true } },
+  { path: '/tools/mindmap', name: 'MindMapList', component: () => import('@/views/tools/MindMap.vue'), meta: { public: true } },
+  { path: '/tools/mindmap/:id', name: 'MindMapEditor', component: () => import('@/views/tools/MindMapEditor.vue'), meta: { requiresAuth: true } },
   // 运维管理页:仅 OPS 角色可访问
   { path: '/ops', name: 'Ops', component: () => import('@/views/ops/Ops.vue'), meta: { ops: true } },
   // 兜底:未匹配的路由重定向回首页

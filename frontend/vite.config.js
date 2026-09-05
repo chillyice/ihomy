@@ -58,6 +58,7 @@ export default defineConfig({
           'gsap': ['gsap'],
           'vue-i18n': ['vue-i18n'],
           'epubjs': ['epubjs'],
+          'simple-mind-map': ['simple-mind-map'],
         },
       },
     },
