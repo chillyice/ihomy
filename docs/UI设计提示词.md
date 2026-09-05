@@ -32,36 +32,31 @@
 
 ## 分层 z-index(从底到顶,严格按此顺序)
 
-| 层 | z-index | 作用 | 混合模式 |
-|----|---------|------|----------|
-| bg-blobs(伪元素) | 1 | 5 个飘移色块(模糊大圆,fixed 不随滚动) | normal |
-| bright-spot(亮斑) | 32 | 阳光照耀强度(夜黑→晨黄→日透明→夕橙) | multiply |
-| album-corner(拍立得堆) | 10 | 右下角散落拍立得/闭合相册 | normal |
-| panels(左右毛玻璃) | 20 | 动态/任务/天气/纪念日/今日 | normal |
-| window-shadow-lower(下层阴影) | 35 | 内框竖+内框横+顶框+底框 | darken |
-| reflection-layer(反光) | 42 | 内容被阳光照亮的轻微高光 | soft-light |
-| vignette(暗角) | 44 | 边缘压暗(台灯 mask 祛除阴影) | normal |
-| dust-layer(灰尘) | 46 | 光路微粒(20 个,夜间不可见) | screen |
-| light-layer(体积光) | 48 | 光束+辉光 | screen |
-| window-shadow-upper(上层阴影) | 49 | 左框+右框(最顶层,盖住光柱) | darken |
-| el-popper/dropdown/tooltip | 61 | 全局下拉菜单(teleported,高于导航栏,光影层下方) | normal |
-| MusicPlayer(音乐播放器) | 62 | 左下角黑胶唱片播放器(有背景歌单且曲目>0 时渲染) | normal |
-| AppSidebar(导航栏) | 60 | 左侧导航+底部主题/台灯/用户 | normal |
-| bright-spot(光源辉光) | 65 | 体积光源核心光晕 | screen |
-| window-shadow-upper(窗框) | 68 | 上下分层窗框阴影 | darken |
-| reflection(反光高光) | 72 | 内容反光 | soft-light |
-| vignette(暗角) | 74 | 边缘压暗 | normal |
-| dust(灰尘粒子) | 76 | 光路微粒 | screen |
-| snow/rain(天气粒子) | 77 | 雪花/雨滴 | normal |
-| light-layer(光影根) | 78 | 光影层根容器 | normal |
-| lightning(闪电) | 79 | 雷电闪烁 | normal |
-| SiteFooter(备案号) | 70 | 右下角 ICP+公安备案 | normal |
-| lamp-light(台灯) | 100 | 钟摆运动径向发光(夜间) | normal |
-| BackToTop/InstallPrompt | 200 | 返回顶部/PWA 安装提示 | normal |
-| LibraryReader float-close | 210 | 电子书全屏模式浮动关闭按钮 | normal |
-| PhotoViewer | 201 | 全屏照片播放器(Teleport to body) | normal |
-| el-overlay/dialog/message-box | 63 | 弹窗遮罩(低于光影层 65,高于 AppSidebar 60) | normal |
-| ElMessage(Toast) | 3000 | 右上角提示消息(EP 内置,不覆写) | normal |
+| 层 | z-index | 作用 |
+|----|---------|------|
+| bg-blobs(伪元素) | 1 | 5 个飘移色块(模糊大圆,fixed 不随滚动) |
+| glass-bg(玻璃背景) | 2 | 背景玻璃层 |
+| main-content(页面内容) | 10 | 主内容 + 首页拍立得堆/面板 |
+| draggable-panel(可拖拽面板) | 20→60 | 首页组件面板,置顶最高到 60(不超过光影层) |
+| AppSidebar(导航栏) | 60 | 左侧导航+底部主题/台灯/用户 |
+| MusicPlayer(音乐播放器) | 62 | 左下角黑胶唱片播放器(有背景歌单且曲目>0 时渲染) |
+| el-overlay/dialog/message-box | 63 | 弹窗遮罩(低于光影层,高于 AppSidebar) |
+| el-popper/dropdown/tooltip | 64 | 全局下拉菜单(teleported,高于弹窗,低于光影层) |
+| bright-spot(光源辉光) | 65 | 体积光源核心光晕 |
+| window-shadow(窗框阴影) | 68 | 上下分层窗框阴影 |
+| SiteFooter(备案号) | 70 | 右下角 ICP+公安备案 |
+| reflection(反光高光) | 72 | 内容反光 |
+| vignette(暗角) | 74 | 边缘压暗 |
+| dust(灰尘粒子) | 76 | 光路微粒 |
+| snow/rain(天气粒子) | 77 | 雪花/雨滴 |
+| light-layer(光影根) | 78 | 光影层根容器 |
+| lightning(闪电) | 79 | 雷电闪烁 |
+| LightTestConsole(光照测试台) | 80 | 全局固定面板 |
+| lamp-light(台灯) | 100 | 钟摆运动径向发光(夜间) |
+| BackToTop/InstallPrompt | 200 | 返回顶部/PWA 安装提示 |
+| PhotoViewer | 201 | 全屏照片播放器(Teleport to body) |
+| LibraryReader float-close | 210 | 电子书全屏模式浮动关闭按钮 |
+| ElMessage(Toast) | 3000 | 右上角提示消息(EP 内置,不覆写) |
 
 ## 1. 背景色块(bg-blobs)
 
@@ -323,7 +318,7 @@ color: #3A2E22;
 
 ### Popper/Dropdown
 
-- `.el-popper.is-light` `z-index:54`(光影层下方,MusicPlayer=55 之上)。
+- `.el-popper.is-light` `z-index:64`(高于弹窗 overlay=63,低于 bright-spot=65;MusicPlayer=62)。
 
 ## 11b. 功能页统一工具栏与多选规范(相册/放映厅/音乐通用)
 
