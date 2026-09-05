@@ -1102,6 +1102,7 @@ export default {
     uploadFloorPlan: 'Upload floor plan',
     calibrate: 'Calibrate',
     calibratePrompt: 'Enter the actual distance between the two points (meters)',
+    calibrateConfirm: 'Confirm calibration',
     place: 'Place',
     drawRoomFirst: 'Draw a room before placing furniture',
     editEdgeLen: 'Edge length',
