@@ -174,6 +174,7 @@
         </div>
 
         <!-- 画布 -->
+        <div :class="['fp-canvas-wrap', floorTransition.phase === 'exit' ? (floorTransition.direction === 'up' ? 'fp-floor-exit-up' : 'fp-floor-exit-down') : '', floorTransition.phase === 'enter' ? (floorTransition.direction === 'up' ? 'fp-floor-enter-from-below' : 'fp-floor-enter-from-above') : '']">
         <FloorPlanCanvas
           ref="canvasRef"
           :mode="mode"
@@ -205,6 +206,7 @@
           @save-image-transform="onSaveImageTransform"
           @place-furniture="onPlaceFurnitureFromDrop"
         />
+        </div>
 
         <!-- 空楼层引导(有房子但当前楼层无房间) -->
         <div v-if="!floorPlan.rooms.length && mode !== 'edit'" class="fp-guide" @click="toggleEdit">
@@ -508,7 +510,8 @@ const searchKeyword = ref('')
 const searchResults = ref([])
 const selectedFurnitureId = ref(null)
 const canvasRef = ref(null)
-const fitKey = ref(0) // 自增触发画布重新适配视图(换房/换层/换底图);撤销/几何保存不再重置视口
+const fitKey = ref(0)
+const floorTransition = ref({ direction: 'down', phase: '' })
 // 侧栏提示随当前工具切换:裁剪/粘合/标定/底图显示各自操作说明,其余回退画图提示
 const toolHintKey = computed(() => ({ cut: 'item.cutTip', glue: 'item.glueTip', calibrate: 'item.calibrateTip', image: 'item.adjustBgTip' }[tool.value] || 'item.drawHint'))
 
@@ -561,7 +564,7 @@ const floors = computed(() => {
     try { Object.keys(JSON.parse(house.floorPlans)).forEach((k) => set.add(Number(k))) } catch {}
   }
   set.add(currentFloor.value) // 当前层常驻:点 + 新开的空层切走后不消失
-  return [...set].sort((a, b) => a - b)
+  return [...set].sort((a, b) => b - a)
 })
 
 // 底图不透明度 + 底图变换(平移/缩放),均在楼层配置内,前端自行解析
@@ -730,7 +733,19 @@ const onDuplicateRoom = (roomId) => {
   roomForm.value = { houseId: currentHouseId.value, name: `${room.name}${t('item.duplicateSuffix')}`, floor: currentFloor.value, note: room.note || '', _geometry: JSON.stringify(shifted) }
   roomDlg.value = true
 }
-const switchFloor = async (f) => { currentFloor.value = f; await loadFloorPlan(); fitKey.value++ }
+const switchFloor = async (f) => {
+  if (f === currentFloor.value) return
+  const direction = f > currentFloor.value ? 'up' : 'down'
+  // Phase 1: exit animation (old content visible)
+  floorTransition.value = { direction, phase: 'exit' }
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+  // Phase 2: swap data + enter animation (new content fades in)
+  currentFloor.value = f
+  await loadFloorPlan()
+  fitKey.value++
+  floorTransition.value = { direction, phase: 'enter' }
+  setTimeout(() => { floorTransition.value = { direction, phase: '' } }, 550)
+}
 const addFloor = async () => {
   currentFloor.value = Math.max(...floors.value) + 1
   await loadFloorPlan()
@@ -1163,6 +1178,28 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 <style scoped>
 .fp-page { display: flex; flex-direction: column; max-width: none; width: 100%; height: 100vh; height: 100dvh; }
+.fp-canvas-wrap { position: relative; flex: 1; display: flex; overflow: hidden; }
+/* 楼层切换动画 */
+.fp-floor-exit-up { animation: floorExitUp 0.4s ease-in forwards; }
+.fp-floor-exit-down { animation: floorExitDown 0.4s ease-in forwards; }
+.fp-floor-enter-from-below { animation: floorEnterFromBelow 0.5s ease-out 0.05s forwards; }
+.fp-floor-enter-from-above { animation: floorEnterFromAbove 0.5s ease-out 0.05s forwards; }
+@keyframes floorExitUp {
+  0% { opacity: 1; transform: scale(1) translateY(0); }
+  100% { opacity: 0; transform: scale(1.4) translateY(-30%); }
+}
+@keyframes floorExitDown {
+  0% { opacity: 1; transform: scale(1) translateY(0); }
+  100% { opacity: 0; transform: scale(0.6) translateY(30%); }
+}
+@keyframes floorEnterFromBelow {
+  0% { opacity: 0; transform: scale(0.8) translateY(20%); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes floorEnterFromAbove {
+  0% { opacity: 0; transform: scale(1.2) translateY(-20%); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
 .fp-topbar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; }
 .fp-house { width: 180px; }
 .fp-search { width: 320px; }

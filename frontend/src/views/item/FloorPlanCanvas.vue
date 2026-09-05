@@ -127,15 +127,18 @@
         </g>
       </g>
     </svg>
-    <!-- 缩略图(迷你地图):右上角悬浮,可折叠成横条、可拖动 -->
+    <!-- 缩略图(迷你地图):右上角悬浮,可折叠成横条;顶部拖拽条移动缩略图,内部点击平移画板 -->
     <div
       class="fp-thumb"
       :class="{ 'is-collapsed': thumbCollapsed }"
       :style="thumbStyle"
-      @pointerdown="onThumbDragStart"
     >
       <template v-if="!thumbCollapsed">
-        <svg class="fp-thumb-map" :viewBox="thumbViewBox" preserveAspectRatio="xMidYMid meet">
+        <!-- 拖拽条:仅此区域可移动缩略图位置 -->
+        <div class="fp-thumb-drag" @pointerdown="onThumbDragStart">
+          <svg viewBox="0 0 16 8" class="fp-thumb-grip"><circle cx="4" cy="4" r="1.2" /><circle cx="8" cy="4" r="1.2" /><circle cx="12" cy="4" r="1.2" /></svg>
+        </div>
+        <svg class="fp-thumb-map" :viewBox="thumbViewBox" preserveAspectRatio="xMidYMid meet" @click="onThumbClick">
           <polygon v-for="r in roomsLocal" :key="'tr' + r.id" :points="pts(r.poly)" class="fp-thumb-room" />
           <rect v-for="f in placedFurnitures" :key="'tf' + f.id" :x="f.x" :y="f.y" :width="f.w" :height="f.h" class="fp-thumb-furn" />
           <rect v-if="thumbViewport" :x="thumbViewport.x" :y="thumbViewport.y" :width="thumbViewport.w" :height="thumbViewport.h" class="fp-thumb-viewport" />
@@ -145,6 +148,10 @@
         </button>
       </template>
       <template v-else>
+        <!-- 折叠态:拖拽条也在此,可移动 -->
+        <div class="fp-thumb-drag fp-thumb-drag-bar" @pointerdown="onThumbDragStart">
+          <svg viewBox="0 0 8 16" class="fp-thumb-grip-v"><circle cx="4" cy="4" r="1.2" /><circle cx="4" cy="8" r="1.2" /><circle cx="4" cy="12" r="1.2" /></svg>
+        </div>
         <span class="fp-thumb-bar-label">{{ $t('item.floorPlanThumb') }}</span>
         <button type="button" class="fp-thumb-toggle" :title="$t('item.thumbExpand')" @pointerdown.stop @click="thumbCollapsed = false">
           <svg viewBox="0 0 16 16" class="fp-thumb-chevron"><path d="M4 6 L8 10 L12 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
@@ -523,8 +530,8 @@ const thumbViewport = computed(() => {
 const thumbStyle = computed(() => ({ left: `${thumbPos.value.x}px`, top: `${thumbPos.value.y}px` }))
 const clampThumbPos = (x, y) => {
   const w = wrapSize.value.w || THUMB_W
-  const h = wrapSize.value.h || THUMB_H
-  const th = thumbCollapsed.value ? THUMB_BAR_H : THUMB_H
+  const h = wrapSize.value.h || (THUMB_H + 18)
+  const th = thumbCollapsed.value ? THUMB_BAR_H : THUMB_H + 18
   return {
     x: Math.max(0, Math.min(w - THUMB_W, x)),
     y: Math.max(0, Math.min(h - th, y)),
@@ -533,6 +540,22 @@ const clampThumbPos = (x, y) => {
 const resetThumbPos = () => {
   const w = wrapSize.value.w
   if (w) thumbPos.value = { x: Math.max(0, w - THUMB_W - 12), y: 12 }
+}
+// 缩略图内部点击:将画板中心平移到点击的世界坐标位置
+const onThumbClick = (e) => {
+  const svg = e.currentTarget
+  const rect = svg.getBoundingClientRect()
+  const sx = (e.clientX - rect.left) / rect.width
+  const sy = (e.clientY - rect.top) / rect.height
+  const b = thumbBounds.value
+  if (!b) return
+  const worldX = b.minX + sx * b.w
+  const worldY = b.minY + sy * b.h
+  const cw = wrapSize.value.clientWidth || 800
+  const ch = wrapSize.value.clientHeight || 500
+  const k = view.value.k || 1
+  view.value.tx = cw / 2 - worldX * k
+  view.value.ty = ch / 2 - worldY * k
 }
 let thumbDrag = null
 const onThumbDragStart = (e) => {
@@ -1564,15 +1587,18 @@ defineExpose({ finishPoly, fit, cancelPending })
 .fp-calib-dot { fill: #e0a030; stroke: #fff; stroke-width: 2; }
 .fp-calib-line { stroke: #e0a030; stroke-width: 1.5; stroke-dasharray: 5 4; }
 .fp-drawing { fill: rgba(184, 140, 110, 0.12); stroke: #b88c6e; stroke-width: 2; stroke-dasharray: 6 4; }
-/* 缩略图(迷你地图):右上角悬浮,可折叠成横条、可拖动 */
-.fp-thumb { position: absolute; z-index: 6; width: 168px; height: 112px; background: rgba(255, 253, 248, 0.96); border: 1px solid rgba(184, 140, 110, 0.35); border-radius: 10px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12); cursor: grab; overflow: hidden; user-select: none; touch-action: none; }
-.fp-thumb:active { cursor: grabbing; }
-.fp-thumb.is-collapsed { height: 26px; display: flex; align-items: center; gap: 6px; padding: 0 6px; }
-.fp-thumb-map { width: 100%; height: 100%; display: block; }
+/* 缩略图(迷你地图):右上角悬浮,可折叠成横条 */
+.fp-thumb { position: absolute; z-index: 6; width: 168px; background: rgba(255, 253, 248, 0.96); border: 1px solid rgba(184, 140, 110, 0.35); border-radius: 10px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12); user-select: none; touch-action: none; }
+.fp-thumb-drag { display: flex; align-items: center; justify-content: center; height: 18px; cursor: grab; border-radius: 10px 10px 0 0; background: rgba(184, 140, 110, 0.12); }
+.fp-thumb-drag:active { cursor: grabbing; }
+.fp-thumb-drag-bar { height: auto; padding: 2px 0; border-radius: 0; background: none; }
+.fp-thumb-grip { width: 16px; height: 8px; fill: #a89a8a; }
+.fp-thumb-grip-v { width: 8px; height: 16px; fill: #a89a8a; }
+.fp-thumb-map { width: 100%; display: block; cursor: pointer; }
 .fp-thumb-room { fill: rgba(184, 140, 110, 0.25); stroke: rgba(184, 140, 110, 0.8); stroke-width: 2; }
 .fp-thumb-furn { fill: rgba(96, 144, 128, 0.4); stroke: rgba(79, 128, 111, 0.9); stroke-width: 1.5; }
 .fp-thumb-viewport { fill: none; stroke: #b04a3a; stroke-width: 2; }
-.fp-thumb-toggle { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border: none; background: rgba(255, 255, 255, 0.92); border-radius: 6px; cursor: pointer; color: #8a7a6a; }
+.fp-thumb-toggle { position: absolute; top: 22px; right: 4px; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border: none; background: rgba(255, 255, 255, 0.92); border-radius: 6px; cursor: pointer; color: #8a7a6a; }
 .fp-thumb-toggle:hover { color: #5c4c3d; background: #fff; }
 .fp-thumb.is-collapsed .fp-thumb-toggle { position: static; }
 .fp-thumb-bar-label { font-size: 11px; color: #8a7a6a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
