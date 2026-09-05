@@ -174,7 +174,6 @@
         </div>
 
         <!-- 画布 -->
-        <div :class="['fp-canvas-wrap', floorTransition.phase === 'exit' ? (floorTransition.direction === 'up' ? 'fp-floor-exit-up' : 'fp-floor-exit-down') : '', floorTransition.phase === 'enter' ? (floorTransition.direction === 'up' ? 'fp-floor-enter-from-below' : 'fp-floor-enter-from-above') : '']">
         <FloorPlanCanvas
           ref="canvasRef"
           :mode="mode"
@@ -205,8 +204,8 @@
           @glue-rooms="onGlueRooms"
           @save-image-transform="onSaveImageTransform"
           @place-furniture="onPlaceFurnitureFromDrop"
+          :floor-transition="floorTransition"
         />
-        </div>
 
         <!-- 空楼层引导(有房子但当前楼层无房间) -->
         <div v-if="!floorPlan.rooms.length && mode !== 'edit'" class="fp-guide" @click="toggleEdit">
@@ -742,7 +741,7 @@ const switchFloor = async (f) => {
   // Phase 2: swap data + enter animation (new content fades in)
   currentFloor.value = f
   await loadFloorPlan()
-  fitKey.value++
+  // 不 fit:保留当前缩放平移位置,用户要求画板不变
   floorTransition.value = { direction, phase: 'enter' }
   setTimeout(() => { floorTransition.value = { direction, phase: '' } }, 550)
 }
@@ -1178,28 +1177,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 <style scoped>
 .fp-page { display: flex; flex-direction: column; max-width: none; width: 100%; height: 100vh; height: 100dvh; }
-.fp-canvas-wrap { position: relative; flex: 1; display: flex; overflow: hidden; }
-/* 楼层切换动画 */
-.fp-floor-exit-up { animation: floorExitUp 0.4s ease-in forwards; }
-.fp-floor-exit-down { animation: floorExitDown 0.4s ease-in forwards; }
-.fp-floor-enter-from-below { animation: floorEnterFromBelow 0.5s ease-out 0.05s forwards; }
-.fp-floor-enter-from-above { animation: floorEnterFromAbove 0.5s ease-out 0.05s forwards; }
-@keyframes floorExitUp {
-  0% { opacity: 1; transform: scale(1) translateY(0); }
-  100% { opacity: 0; transform: scale(1.4) translateY(-30%); }
-}
-@keyframes floorExitDown {
-  0% { opacity: 1; transform: scale(1) translateY(0); }
-  100% { opacity: 0; transform: scale(0.6) translateY(30%); }
-}
-@keyframes floorEnterFromBelow {
-  0% { opacity: 0; transform: scale(0.8) translateY(20%); }
-  100% { opacity: 1; transform: scale(1) translateY(0); }
-}
-@keyframes floorEnterFromAbove {
-  0% { opacity: 0; transform: scale(1.2) translateY(-20%); }
-  100% { opacity: 1; transform: scale(1) translateY(0); }
-}
 .fp-topbar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; }
 .fp-house { width: 180px; }
 .fp-search { width: 320px; }
