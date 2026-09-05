@@ -1,6 +1,6 @@
 <template>
   <div class="fp-canvas" ref="wrapRef">
-    <svg ref="svgRef" :class="['fp-svg', { 'is-drawing': drawingTool, 'is-editing': mode === 'edit' && !drawingTool, 'is-dragging': mode === 'edit' && !!drag && !drawingTool, 'is-icon-cursor': iconAsCursor, 'is-tool-select': mode === 'edit' && tool === 'select' }]" @wheel.prevent="onWheel" @pointerdown="onSvgDown" @pointerdown.capture="onPointerDownCapture" @pointermove="onHoverMove" @pointerup="onSvgPointerEnd" @pointercancel="onSvgPointerEnd" @pointerleave="onPointerLeave" @click="onCanvasClick" @dblclick="onSvgDblClick" @contextmenu="onContextMenu" @dragover.prevent @drop="onDrop">
+    <svg ref="svgRef" :class="['fp-svg', svgTransitionClass, { 'is-drawing': drawingTool, 'is-editing': mode === 'edit' && !drawingTool, 'is-dragging': mode === 'edit' && !!drag && !drawingTool, 'is-icon-cursor': iconAsCursor, 'is-tool-select': mode === 'edit' && tool === 'select' }]" @wheel.prevent="onWheel" @pointerdown="onSvgDown" @pointerdown.capture="onPointerDownCapture" @pointermove="onHoverMove" @pointerup="onSvgPointerEnd" @pointercancel="onSvgPointerEnd" @pointerleave="onPointerLeave" @click="onCanvasClick" @dblclick="onSvgDblClick" @contextmenu="onContextMenu" @dragover.prevent @drop="onDrop">
       <defs>
         <!-- 制图纸点阵:与世界坐标对齐每米一点,点径不随缩放;过密时步长倍增仍落整米线 -->
         <pattern id="fp-dots" patternUnits="userSpaceOnUse" :width="gridStepPx" :height="gridStepPx" :x="view.tx" :y="view.ty">
@@ -127,7 +127,7 @@
         </g>
       </g>
     </svg>
-    <!-- 缩略图(迷你地图):右上角悬浮,可折叠成横条;顶部拖拽条移动缩略图,内部点击平移画板 -->
+    <!-- 缩略图(迷你地图):右上角悬浮,可折叠成横条;顶部拖拽条移动缩略图,内部点击/悬停平移画板 -->
     <div
       class="fp-thumb"
       :class="{ 'is-collapsed': thumbCollapsed }"
@@ -138,21 +138,17 @@
         <div class="fp-thumb-drag" @pointerdown="onThumbDragStart">
           <svg viewBox="0 0 16 8" class="fp-thumb-grip"><circle cx="4" cy="4" r="1.2" /><circle cx="8" cy="4" r="1.2" /><circle cx="12" cy="4" r="1.2" /></svg>
         </div>
-        <svg class="fp-thumb-map" :viewBox="thumbViewBox" preserveAspectRatio="xMidYMid meet" @click="onThumbClick">
+        <svg class="fp-thumb-map" :viewBox="thumbViewBox" preserveAspectRatio="xMidYMid meet" @pointerdown="onThumbMapDown" @pointermove="onThumbMapMove" @pointerup="onThumbMapEnd" @pointerleave="onThumbMapEnd">
           <polygon v-for="r in roomsLocal" :key="'tr' + r.id" :points="pts(r.poly)" class="fp-thumb-room" />
           <rect v-for="f in placedFurnitures" :key="'tf' + f.id" :x="f.x" :y="f.y" :width="f.w" :height="f.h" class="fp-thumb-furn" />
           <rect v-if="thumbViewport" :x="thumbViewport.x" :y="thumbViewport.y" :width="thumbViewport.w" :height="thumbViewport.h" class="fp-thumb-viewport" />
+          <rect v-if="thumbPreview" :x="thumbPreview.x" :y="thumbPreview.y" :width="thumbPreview.w" :height="thumbPreview.h" class="fp-thumb-preview" />
         </svg>
         <button type="button" class="fp-thumb-toggle" :title="$t('item.thumbCollapse')" @pointerdown.stop @click="thumbCollapsed = true">
           <svg viewBox="0 0 16 16" class="fp-thumb-chevron"><path d="M4 10 L8 6 L12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
         </button>
       </template>
       <template v-else>
-        <!-- 折叠态:拖拽条也在此,可移动 -->
-        <div class="fp-thumb-drag fp-thumb-drag-bar" @pointerdown="onThumbDragStart">
-          <svg viewBox="0 0 8 16" class="fp-thumb-grip-v"><circle cx="4" cy="4" r="1.2" /><circle cx="4" cy="8" r="1.2" /><circle cx="4" cy="12" r="1.2" /></svg>
-        </div>
-        <span class="fp-thumb-bar-label">{{ $t('item.floorPlanThumb') }}</span>
         <button type="button" class="fp-thumb-toggle" :title="$t('item.thumbExpand')" @pointerdown.stop @click="thumbCollapsed = false">
           <svg viewBox="0 0 16 16" class="fp-thumb-chevron"><path d="M4 6 L8 10 L12 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
         </button>
@@ -178,6 +174,7 @@ const props = defineProps({
   scale: { type: Number, default: 100 },
   imageTransform: { type: Object, default: null },
   fitKey: { type: Number, default: 0 },
+  floorTransition: { type: Object, default: () => ({ direction: 'down', phase: '' }) },
 })
 const emit = defineEmits(['save-room', 'save-rooms', 'save-furniture', 'save-item', 'create-room', 'create-furniture', 'place-furniture', 'select-furniture', 'calibrate', 'edit-edge', 'delete-furniture', 'rename-room', 'rename-furniture', 'cut-room', 'glue-rooms', 'save-image-transform'])
 
@@ -531,7 +528,7 @@ const thumbStyle = computed(() => ({ left: `${thumbPos.value.x}px`, top: `${thum
 const clampThumbPos = (x, y) => {
   const w = wrapSize.value.w || THUMB_W
   const h = wrapSize.value.h || (THUMB_H + 18)
-  const th = thumbCollapsed.value ? THUMB_BAR_H : THUMB_H + 18
+  const th = thumbCollapsed.value ? 28 : THUMB_H + 18
   return {
     x: Math.max(0, Math.min(w - THUMB_W, x)),
     y: Math.max(0, Math.min(h - th, y)),
@@ -541,22 +538,45 @@ const resetThumbPos = () => {
   const w = wrapSize.value.w
   if (w) thumbPos.value = { x: Math.max(0, w - THUMB_W - 12), y: 12 }
 }
-// 缩略图内部点击:将画板中心平移到点击的世界坐标位置
-const onThumbClick = (e) => {
+// 缩略图内部:pointerdown/pointermove 实时预览红框+平移画板;pointerup 确认
+const thumbPreview = ref(null)
+let thumbNavDragging = false
+const thumbNavWorld = (e) => {
   const svg = e.currentTarget
   const rect = svg.getBoundingClientRect()
   const sx = (e.clientX - rect.left) / rect.width
   const sy = (e.clientY - rect.top) / rect.height
   const b = thumbBounds.value
-  if (!b) return
-  const worldX = b.minX + sx * b.w
-  const worldY = b.minY + sy * b.h
-  const cw = wrapSize.value.clientWidth || 800
-  const ch = wrapSize.value.clientHeight || 500
-  const k = view.value.k || 1
-  view.value.tx = cw / 2 - worldX * k
-  view.value.ty = ch / 2 - worldY * k
+  if (!b) return null
+  return { x: b.minX + sx * b.w, y: b.minY + sy * b.h }
 }
+const onThumbMapDown = (e) => {
+  if (e.button !== 0) return
+  thumbNavDragging = true
+  const p = thumbNavWorld(e)
+  if (p) {
+    const cw = wrapSize.value.clientWidth || 800
+    const ch = wrapSize.value.clientHeight || 500
+    const k = view.value.k || 1
+    const b = thumbBounds.value
+    thumbPreview.value = { x: p.x - (cw / k) / 2, y: p.y - (ch / k) / 2, w: cw / k, h: ch / k }
+    view.value.tx = cw / 2 - p.x * k
+    view.value.ty = ch / 2 - p.y * k
+  }
+}
+const onThumbMapMove = (e) => {
+  if (!thumbNavDragging) return
+  const p = thumbNavWorld(e)
+  if (p) {
+    const cw = wrapSize.value.clientWidth || 800
+    const ch = wrapSize.value.clientHeight || 500
+    const k = view.value.k || 1
+    thumbPreview.value = { x: p.x - (cw / k) / 2, y: p.y - (ch / k) / 2, w: cw / k, h: ch / k }
+    view.value.tx = cw / 2 - p.x * k
+    view.value.ty = ch / 2 - p.y * k
+  }
+}
+const onThumbMapEnd = () => { thumbNavDragging = false; thumbPreview.value = null }
 let thumbDrag = null
 const onThumbDragStart = (e) => {
   if (e.button !== 0) return
@@ -1234,6 +1254,15 @@ const onContextMenu = (e) => {
 // 画图类工具(十字光标);编辑态其余工具默认箭头,拖动中统一四向箭头
 const drawingTool = computed(() => props.tool === 'draw-rect' || props.tool === 'draw-poly' || props.tool === 'calibrate')
 
+// 楼层切换动画 class
+const svgTransitionClass = computed(() => {
+  const ft = props.floorTransition
+  if (!ft || !ft.phase) return {}
+  if (ft.phase === 'exit') return ft.direction === 'up' ? 'fp-floor-exit-up' : 'fp-floor-exit-down'
+  if (ft.phase === 'enter') return ft.direction === 'up' ? 'fp-floor-enter-from-below' : 'fp-floor-enter-from-above'
+  return {}
+})
+
 // 悬停工具图标(加号/剪刀/牙膏筒)即指针:隐藏原生光标,避免手型/十字遮挡图标。
 // 与模板各 hover 图标的 v-if 完全同步;拖拽平移时 hover 置空,光标自动恢复。
 const iconAsCursor = computed(() => {
@@ -1536,6 +1565,27 @@ defineExpose({ finishPoly, fit, cancelPending })
 <style scoped>
 .fp-canvas { position: relative; width: 100%; height: 100%; overflow: hidden; background: #f6efe4; }
 .fp-svg { width: 100%; height: 100%; display: block; cursor: grab; }
+/* 楼层切换动画:仅 SVG 内容变化,背景/容器不动 */
+.fp-floor-exit-up { animation: fpFloorExitUp 0.4s ease-in forwards; }
+.fp-floor-exit-down { animation: fpFloorExitDown 0.4s ease-in forwards; }
+.fp-floor-enter-from-below { animation: fpFloorEnterFromBelow 0.5s ease-out 0.05s forwards; }
+.fp-floor-enter-from-above { animation: fpFloorEnterFromAbove 0.5s ease-out 0.05s forwards; }
+@keyframes fpFloorExitUp {
+  0% { opacity: 1; transform: scale(1) translateY(0); }
+  100% { opacity: 0; transform: scale(1.4) translateY(-30%); }
+}
+@keyframes fpFloorExitDown {
+  0% { opacity: 1; transform: scale(1) translateY(0); }
+  100% { opacity: 0; transform: scale(0.6) translateY(30%); }
+}
+@keyframes fpFloorEnterFromBelow {
+  0% { opacity: 0; transform: scale(0.8) translateY(20%); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes fpFloorEnterFromAbove {
+  0% { opacity: 0; transform: scale(1.2) translateY(-20%); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
 .fp-svg:active { cursor: grabbing; }
 .fp-svg.is-editing { cursor: default; } /* 编辑模式默认初始箭头:尖头即指针热点,便于对准细小目标 */
 .fp-svg.is-editing:active { cursor: move; } /* 按下拖动时四向箭头:十字中心即指针热点 */
@@ -1589,18 +1639,19 @@ defineExpose({ finishPoly, fit, cancelPending })
 .fp-drawing { fill: rgba(184, 140, 110, 0.12); stroke: #b88c6e; stroke-width: 2; stroke-dasharray: 6 4; }
 /* 缩略图(迷你地图):右上角悬浮,可折叠成横条 */
 .fp-thumb { position: absolute; z-index: 6; width: 168px; background: rgba(255, 253, 248, 0.96); border: 1px solid rgba(184, 140, 110, 0.35); border-radius: 10px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12); user-select: none; touch-action: none; }
+.fp-thumb.is-collapsed { width: auto; padding: 0; }
 .fp-thumb-drag { display: flex; align-items: center; justify-content: center; height: 18px; cursor: grab; border-radius: 10px 10px 0 0; background: rgba(184, 140, 110, 0.12); }
 .fp-thumb-drag:active { cursor: grabbing; }
-.fp-thumb-drag-bar { height: auto; padding: 2px 0; border-radius: 0; background: none; }
 .fp-thumb-grip { width: 16px; height: 8px; fill: #a89a8a; }
-.fp-thumb-grip-v { width: 8px; height: 16px; fill: #a89a8a; }
 .fp-thumb-map { width: 100%; display: block; cursor: pointer; }
 .fp-thumb-room { fill: rgba(184, 140, 110, 0.25); stroke: rgba(184, 140, 110, 0.8); stroke-width: 2; }
 .fp-thumb-furn { fill: rgba(96, 144, 128, 0.4); stroke: rgba(79, 128, 111, 0.9); stroke-width: 1.5; }
-.fp-thumb-viewport { fill: none; stroke: #b04a3a; stroke-width: 2; }
-.fp-thumb-toggle { position: absolute; top: 22px; right: 4px; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border: none; background: rgba(255, 255, 255, 0.92); border-radius: 6px; cursor: pointer; color: #8a7a6a; }
+.fp-thumb-viewport { fill: rgba(176, 74, 58, 0.08); stroke: #b04a3a; stroke-width: 2; }
+.fp-thumb-preview { fill: rgba(176, 74, 58, 0.12); stroke: #b04a3a; stroke-width: 1.5; stroke-dasharray: 4 3; }
+.fp-thumb-toggle { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border: none; background: rgba(255, 255, 255, 0.92); border-radius: 6px; cursor: pointer; color: #8a7a6a; flex-shrink: 0; }
 .fp-thumb-toggle:hover { color: #5c4c3d; background: #fff; }
-.fp-thumb.is-collapsed .fp-thumb-toggle { position: static; }
-.fp-thumb-bar-label { font-size: 11px; color: #8a7a6a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+.fp-thumb:not(.is-collapsed) .fp-thumb-toggle { position: absolute; top: 22px; right: 4px; }
+.fp-thumb.is-collapsed { display: flex; align-items: center; gap: 4px; padding: 4px 8px; }
+.fp-thumb-bar-label { font-size: 11px; color: #8a7a6a; white-space: nowrap; }
 .fp-thumb-chevron { width: 14px; height: 14px; }
 </style>
