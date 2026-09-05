@@ -1119,6 +1119,7 @@ export default {
     uploadFloorPlan: '上传底图',
     calibrate: '标定',
     calibratePrompt: '输入两点之间的实际距离（米）',
+    calibrateConfirm: '确认标定',
     adjustBg: '调整底图',
     adjustBgTip: '拖动底图移动位置，拖四角等比缩放，把底图尺寸与画好的房间对齐（底图分辨率和画布比例尺往往不一致）',
     fitView: '适配视图',

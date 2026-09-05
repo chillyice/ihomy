@@ -16,7 +16,7 @@
             :points="pts(r.poly)"
             class="fp-room"
             :class="{ 'is-view': mode === 'view', 'is-hit': hitRoomIds.includes(r.id), 'is-overlap': mode === 'edit' && overlapRoomIds.includes(r.id) }"
-            @pointerdown.stop="mode === 'edit' ? onRoomDown($event, r) : null"
+            @pointerdown="mode === 'edit' ? onRoomDown($event, r) : null"
           />
           <!-- 查看态蜡笔边界:3 遍抖动闭合线半透明叠加,替代原 feTurbulence 滤镜 -->
           <g v-if="mode === 'view' && roomCrayon[r.id]" class="fp-crayon">
@@ -34,8 +34,8 @@
             :x="f.x" :y="f.y" :width="f.w" :height="f.h" rx="3"
             class="fp-furn"
             :class="{ 'is-view': mode === 'view' }"
-            @pointerdown.stop="mode === 'edit' ? onFurnDown($event, f) : null"
-            @dblclick="mode === 'view' ? $emit('select-furniture', f.id) : null"
+            @pointerdown="mode === 'edit' ? onFurnDown($event, f) : null"
+            @dblclick="mode === 'edit' ? $emit('edit-furniture-items', f.id) : $emit('select-furniture', f.id)"
             @contextmenu.prevent="mode === 'edit' && tool === 'select' ? $emit('delete-furniture', f.id) : null"
           />
           <g v-if="mode === 'view' && furnCrayon[f.id]" class="fp-crayon">
@@ -120,38 +120,45 @@
         <!-- 正在画的房间 -->
         <polygon v-if="drawing.poly && drawing.poly.length" :points="pts(drawing.poly)" class="fp-drawing" />
         <rect v-if="drawing.rect" :x="drawing.rect.x" :y="drawing.rect.y" :width="drawing.rect.w" :height="drawing.rect.h" class="fp-drawing" />
-        <!-- 底图标定两点 -->
-        <g v-if="calibPoints.length">
-          <circle v-for="(p, i) in calibPoints" :key="'c' + i" :cx="p.x" :cy="p.y" r="5" class="fp-calib-dot" />
-          <line v-if="calibPoints.length === 2" :x1="calibPoints[0].x" :y1="calibPoints[0].y" :x2="calibPoints[1].x" :y2="calibPoints[1].y" class="fp-calib-line" />
+        <!-- 底图标定线段(持久,可拖端点+吸附) -->
+        <g v-if="calibFirst && !calibLine" class="fp-calib">
+          <circle :cx="calibFirst.x" :cy="calibFirst.y" r="5" class="fp-calib-dot" />
+          <line :x1="calibFirst.x" :y1="calibFirst.y" :x2="mousePos ? mousePos.x : calibFirst.x" :y2="mousePos ? mousePos.y : calibFirst.y" class="fp-calib-line" />
+        </g>
+        <g v-if="calibLine" class="fp-calib">
+          <line :x1="calibLine.a.x" :y1="calibLine.a.y" :x2="calibLine.b.x" :y2="calibLine.b.y" class="fp-calib-line" />
+          <circle :cx="calibLine.a.x" :cy="calibLine.a.y" r="5 / view.k" class="fp-calib-dot fp-calib-handle" vector-effect="non-scaling-stroke"
+                  @pointerdown.stop="onCalibHandleDown($event, 'a')" />
+          <circle :cx="calibLine.b.x" :cy="calibLine.b.y" r="5 / view.k" class="fp-calib-dot fp-calib-handle" vector-effect="non-scaling-stroke"
+                  @pointerdown.stop="onCalibHandleDown($event, 'b')" />
+          <text :x="(calibLine.a.x + calibLine.b.x) / 2" :y="(calibLine.a.y + calibLine.b.y) / 2 - 8 / view.k" class="fp-calib-len"
+                :style="{ fontSize: 11 / view.k + 'px' }">{{ (Math.hypot(calibLine.b.x - calibLine.a.x, calibLine.b.y - calibLine.a.y) / (scale || 100)).toFixed(2) }} m</text>
         </g>
       </g>
     </svg>
-    <!-- 缩略图(迷你地图):右上角悬浮,可折叠成横条;顶部拖拽条移动缩略图,内部点击/悬停平移画板 -->
+    <!-- 标定确认按钮:线段放置后显示,双击线段/端点或点此按钮确认输入长度 -->
+    <div v-if="calibLine && tool === 'calibrate'" class="fp-calib-confirm" @click="confirmCalibrate">
+      <svg viewBox="0 0 16 16" width="14" height="14"><path d="M3 8l3.5 3.5L13 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      {{ $t('item.calibrateConfirm') }}
+    </div>
+    <!-- 缩略图(迷你地图):右上角悬浮,可折叠成横条;拖拽手柄单击切换折叠/展开,拖动移动位置 -->
     <div
       class="fp-thumb"
       :class="{ 'is-collapsed': thumbCollapsed }"
       :style="thumbStyle"
     >
+      <div class="fp-thumb-drag" @pointerdown="onThumbDragStart">
+        <svg v-if="!thumbCollapsed" viewBox="0 0 16 8" class="fp-thumb-grip"><circle cx="4" cy="4" r="1.2" /><circle cx="8" cy="4" r="1.2" /><circle cx="12" cy="4" r="1.2" /></svg>
+        <svg v-else viewBox="0 0 16 8" class="fp-thumb-grip"><circle cx="4" cy="4" r="1.2" /><circle cx="8" cy="4" r="1.2" /><circle cx="12" cy="4" r="1.2" /></svg>
+      </div>
       <template v-if="!thumbCollapsed">
-        <!-- 拖拽条:仅此区域可移动缩略图位置 -->
-        <div class="fp-thumb-drag" @pointerdown="onThumbDragStart">
-          <svg viewBox="0 0 16 8" class="fp-thumb-grip"><circle cx="4" cy="4" r="1.2" /><circle cx="8" cy="4" r="1.2" /><circle cx="12" cy="4" r="1.2" /></svg>
-        </div>
         <svg class="fp-thumb-map" :viewBox="thumbViewBox" preserveAspectRatio="xMidYMid meet" @pointerdown="onThumbMapDown" @pointermove="onThumbMapMove" @pointerup="onThumbMapEnd" @pointerleave="onThumbMapEnd">
           <polygon v-for="r in roomsLocal" :key="'tr' + r.id" :points="pts(r.poly)" class="fp-thumb-room" />
           <rect v-for="f in placedFurnitures" :key="'tf' + f.id" :x="f.x" :y="f.y" :width="f.w" :height="f.h" class="fp-thumb-furn" />
+          <circle v-for="it in thumbHighlightItems" :key="'ti' + it.id" :cx="it.ax" :cy="it.ay" r="3" class="fp-thumb-item" />
           <rect v-if="thumbViewport" :x="thumbViewport.x" :y="thumbViewport.y" :width="thumbViewport.w" :height="thumbViewport.h" class="fp-thumb-viewport" />
           <rect v-if="thumbPreview" :x="thumbPreview.x" :y="thumbPreview.y" :width="thumbPreview.w" :height="thumbPreview.h" class="fp-thumb-preview" />
         </svg>
-        <button type="button" class="fp-thumb-toggle" :title="$t('item.thumbCollapse')" @pointerdown.stop @click="thumbCollapsed = true">
-          <svg viewBox="0 0 16 16" class="fp-thumb-chevron"><path d="M4 10 L8 6 L12 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
-        </button>
-      </template>
-      <template v-else>
-        <button type="button" class="fp-thumb-toggle" :title="$t('item.thumbExpand')" @pointerdown.stop @click="thumbCollapsed = false">
-          <svg viewBox="0 0 16 16" class="fp-thumb-chevron"><path d="M4 6 L8 10 L12 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
-        </button>
       </template>
     </div>
   </div>
@@ -176,7 +183,7 @@ const props = defineProps({
   fitKey: { type: Number, default: 0 },
   floorTransition: { type: Object, default: () => ({ direction: 'down', phase: '' }) },
 })
-const emit = defineEmits(['save-room', 'save-rooms', 'save-furniture', 'save-item', 'create-room', 'create-furniture', 'place-furniture', 'select-furniture', 'calibrate', 'edit-edge', 'delete-furniture', 'rename-room', 'rename-furniture', 'cut-room', 'glue-rooms', 'save-image-transform'])
+const emit = defineEmits(['save-room', 'save-rooms', 'save-furniture', 'save-item', 'create-room', 'create-furniture', 'place-furniture', 'select-furniture', 'edit-furniture-items', 'calibrate', 'calibrate-confirm', 'edit-edge', 'delete-furniture', 'rename-room', 'rename-furniture', 'cut-room', 'glue-rooms', 'save-image-transform'])
 
 const wrapRef = ref(null)
 const svgRef = ref(null)
@@ -185,7 +192,9 @@ const drawing = ref({ poly: null, rect: null })
 const drag = ref(null)
 const hover = ref(null) // 边界 hover:{ kind: 'vertex'|'edge', room, point, vertexIdx?/edgeIdx? }
 const snapLine = ref(null)
-const calibPoints = ref([])
+const calibPoints = ref([]) // 兼容:保留为空数组,标定走 calibLine
+const calibLine = ref(null) // { a:{x,y}, b:{x,y} } 持久标定线段(可拖端点)
+const calibFirst = ref(null) // 第一个点击点(尚未确定B时)
 let justDragged = false
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
@@ -510,12 +519,21 @@ const thumbBounds = computed(() => {
     if (f.x < minX) minX = f.x; if (f.x + f.w > maxX) maxX = f.x + f.w
     if (f.y < minY) minY = f.y; if (f.y + f.h > maxY) maxY = f.y + f.h
   })
+  thumbHighlightItems.value.forEach((it) => {
+    if (it.ax < minX) minX = it.ax; if (it.ax > maxX) maxX = it.ax
+    if (it.ay < minY) minY = it.ay; if (it.ay > maxY) maxY = it.ay
+  })
   if (!isFinite(minX)) return null
   return { minX, minY, w: Math.max(1, maxX - minX), h: Math.max(1, maxY - minY) }
 })
 const thumbViewBox = computed(() => {
   const b = thumbBounds.value
   return b ? `${b.minX} ${b.minY} ${b.w} ${b.h}` : '0 0 1 1'
+})
+// 缩略图中高亮物品(搜索结果)的绝对坐标
+const thumbHighlightItems = computed(() => {
+  const hit = new Set(props.highlightItemIds)
+  return absItems.value.filter((it) => hit.has(it.id) && it.ax !== 0 && it.ay !== 0)
 })
 // 当前可视区域(世界坐标),在缩略图上以红框标示
 const thumbViewport = computed(() => {
@@ -528,9 +546,10 @@ const thumbStyle = computed(() => ({ left: `${thumbPos.value.x}px`, top: `${thum
 const clampThumbPos = (x, y) => {
   const w = wrapSize.value.w || THUMB_W
   const h = wrapSize.value.h || (THUMB_H + 18)
-  const th = thumbCollapsed.value ? 28 : THUMB_H + 18
+  const tw = thumbCollapsed.value ? 80 : THUMB_W
+  const th = thumbCollapsed.value ? 24 : THUMB_H + 18
   return {
-    x: Math.max(0, Math.min(w - THUMB_W, x)),
+    x: Math.max(0, Math.min(w - tw, x)),
     y: Math.max(0, Math.min(h - th, y)),
   }
 }
@@ -555,10 +574,9 @@ const onThumbMapDown = (e) => {
   thumbNavDragging = true
   const p = thumbNavWorld(e)
   if (p) {
-    const cw = wrapSize.value.clientWidth || 800
-    const ch = wrapSize.value.clientHeight || 500
+    const cw = wrapSize.value.w || 800
+    const ch = wrapSize.value.h || 500
     const k = view.value.k || 1
-    const b = thumbBounds.value
     thumbPreview.value = { x: p.x - (cw / k) / 2, y: p.y - (ch / k) / 2, w: cw / k, h: ch / k }
     view.value.tx = cw / 2 - p.x * k
     view.value.ty = ch / 2 - p.y * k
@@ -568,8 +586,8 @@ const onThumbMapMove = (e) => {
   if (!thumbNavDragging) return
   const p = thumbNavWorld(e)
   if (p) {
-    const cw = wrapSize.value.clientWidth || 800
-    const ch = wrapSize.value.clientHeight || 500
+    const cw = wrapSize.value.w || 800
+    const ch = wrapSize.value.h || 500
     const k = view.value.k || 1
     thumbPreview.value = { x: p.x - (cw / k) / 2, y: p.y - (ch / k) / 2, w: cw / k, h: ch / k }
     view.value.tx = cw / 2 - p.x * k
@@ -578,24 +596,29 @@ const onThumbMapMove = (e) => {
 }
 const onThumbMapEnd = () => { thumbNavDragging = false; thumbPreview.value = null }
 let thumbDrag = null
+let thumbDragMoved = false
 const onThumbDragStart = (e) => {
   if (e.button !== 0) return
   e.preventDefault()
+  thumbDragMoved = false
   thumbDrag = { startX: e.clientX, startY: e.clientY, origX: thumbPos.value.x, origY: thumbPos.value.y }
   document.addEventListener('pointermove', onThumbDragMove)
   document.addEventListener('pointerup', onThumbDragEnd)
 }
 const onThumbDragMove = (e) => {
   if (!thumbDrag) return
+  thumbDragMoved = true
   thumbMoved.value = true
   const dx = e.clientX - thumbDrag.startX
   const dy = e.clientY - thumbDrag.startY
   thumbPos.value = clampThumbPos(thumbDrag.origX + dx, thumbDrag.origY + dy)
 }
 const onThumbDragEnd = () => {
+  const wasDrag = thumbDragMoved
   thumbDrag = null
   document.removeEventListener('pointermove', onThumbDragMove)
   document.removeEventListener('pointerup', onThumbDragEnd)
+  if (!wasDrag) thumbCollapsed.value = !thumbCollapsed.value
 }
 
 // ---- 底图变换(调整底图工具:平移 + 四角等比缩放,持久化在楼层配置 img 字段) ----
@@ -964,6 +987,8 @@ const onPointerMove = (e) => {
     drawing.value.rect = { x, y, w: Math.abs(p.x - d.startX), h: Math.abs(p.y - d.startY) }
   } else if (d.type === 'draw-poly') {
     drawing.value.poly = [...d.points, { x: p.x, y: p.y }]
+  } else if (d.type === 'calib-handle') {
+    calibLine.value[d.which] = { x: p.x, y: p.y }
   }
 }
 
@@ -1104,7 +1129,7 @@ const onCanvasClick = () => {
   hover.value = null
 }
 // 切换工具清 hover 残留(避免残留 guard 吞掉画图点击)+ 清裁剪/粘合进行中状态
-watch(() => props.tool, () => { hover.value = null; cutStart.value = null; glueStart.value = null })
+watch(() => props.tool, () => { hover.value = null; cutStart.value = null; glueStart.value = null; clearCalibLine() })
 
 // ---- 裁剪(cut)/ 粘合(glue) ----
 const mousePos = ref(null)
@@ -1286,6 +1311,7 @@ const routeTool = (e) => {
   return false
 }
 const onRoomDown = (e, r) => {
+  e.stopPropagation()
   if (props.tool === 'select' && hover.value && hover.value.room === r) return
   if (routeTool(e)) return
   beginDrag(e, { type: 'room-body', room: r, orig: r.poly.map((p) => ({ ...p })), startX: toCanvas(e).x, startY: toCanvas(e).y, furnOrig: {} })
@@ -1342,6 +1368,7 @@ const removeVertex = (r, i) => {
 
 // ---- 家具 ----
 const onFurnDown = (e, f) => {
+  e.stopPropagation()
   if (routeTool(e)) return
   beginDrag(e, { type: 'furn-move', f, orig: { x: f.x, y: f.y }, startX: toCanvas(e).x, startY: toCanvas(e).y })
 }
@@ -1469,21 +1496,37 @@ const onDrop = (e) => {
   }
 }
 
-// ---- 底图标定(两点测距) ----
+// ---- 底图标定(线段+端点拖拽+吸附) ----
 const handleCalibrateClick = (e) => {
   const p = toCanvas(e)
-  calibPoints.value.push({ x: p.x, y: p.y })
-  if (calibPoints.value.length === 2) {
-    const [a, b] = calibPoints.value
-    emit('calibrate', Math.hypot(b.x - a.x, b.y - a.y))
-    calibPoints.value = []
+  if (!calibFirst.value && !calibLine.value) {
+    // 第一次点击:设置起点
+    calibFirst.value = { x: p.x, y: p.y }
+  } else if (calibFirst.value && !calibLine.value) {
+    // 第二次点击:设置终点,创建持久线段
+    calibLine.value = { a: { ...calibFirst.value }, b: { x: p.x, y: p.y } }
+    calibFirst.value = null
+  } else if (calibLine.value) {
+    // 已有线段:双击端点确认(由 onSvgDblClick 处理)
   }
   e.preventDefault()
 }
+const confirmCalibrate = () => {
+  if (!calibLine.value) return
+  const [a, b] = [calibLine.value.a, calibLine.value.b]
+  emit('calibrate-confirm', Math.hypot(b.x - a.x, b.y - a.y))
+  calibLine.value = null
+}
+const clearCalibLine = () => { calibLine.value = null; calibFirst.value = null }
+const onCalibHandleDown = (e, which) => {
+  if (!calibLine.value) return
+  e.stopPropagation()
+  beginDrag(e, { type: 'calib-handle', which, orig: { ...calibLine.value[which] } })
+}
 
 const onSvgDown = (e) => {
-  if (e.target !== e.currentTarget) return
   if (props.mode !== 'edit') { beginDrag(e, { type: 'pan' }); return }
+  if (e.target !== e.currentTarget) return
   if (props.tool === 'calibrate') { handleCalibrateClick(e); return }
   if (props.tool === 'draw-rect') { startDrawRect(e); return }
   if (props.tool === 'draw-poly') { drawPolyPoint(e); return }
@@ -1513,6 +1556,7 @@ const onSvgPointerEnd = (e) => {
 
 // ---- 逐点描绘双击闭合 ----
 const onSvgDblClick = (e) => {
+  if (props.tool === 'calibrate' && calibLine.value) { confirmCalibrate(); return }
   if (props.tool !== 'draw-poly') return
   e.preventDefault()
   if (drag.value && drag.value.type === 'draw-poly' && drag.value.points.length >= 2) {
@@ -1568,8 +1612,8 @@ defineExpose({ finishPoly, fit, cancelPending })
 /* 楼层切换动画:仅 SVG 内容变化,背景/容器不动 */
 .fp-floor-exit-up { animation: fpFloorExitUp 0.4s ease-in forwards; }
 .fp-floor-exit-down { animation: fpFloorExitDown 0.4s ease-in forwards; }
-.fp-floor-enter-from-below { animation: fpFloorEnterFromBelow 0.5s ease-out 0.05s forwards; }
-.fp-floor-enter-from-above { animation: fpFloorEnterFromAbove 0.5s ease-out 0.05s forwards; }
+.fp-floor-enter-from-below { animation: fpFloorEnterFromBelow 0.5s ease-out 0.05s both; }
+.fp-floor-enter-from-above { animation: fpFloorEnterFromAbove 0.5s ease-out 0.05s both; }
 @keyframes fpFloorExitUp {
   0% { opacity: 1; transform: scale(1) translateY(0); }
   100% { opacity: 0; transform: scale(1.4) translateY(-30%); }
@@ -1636,22 +1680,24 @@ defineExpose({ finishPoly, fit, cancelPending })
 .fp-snap-line { stroke: #6b9b6b; stroke-width: 1.5; stroke-dasharray: 5 4; }
 .fp-calib-dot { fill: #e0a030; stroke: #fff; stroke-width: 2; }
 .fp-calib-line { stroke: #e0a030; stroke-width: 1.5; stroke-dasharray: 5 4; }
+.fp-calib-handle { cursor: grab; }
+.fp-calib-handle:active { cursor: grabbing; }
+.fp-calib-len { fill: #e0a030; text-anchor: middle; paint-order: stroke; stroke: rgba(255,253,248,0.85); stroke-width: 3; pointer-events: none; font-weight: 600; }
+.fp-calib-confirm { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 6px; padding: 8px 18px; background: rgba(224, 160, 48, 0.92); color: #fff; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.15); user-select: none; }
+.fp-calib-confirm:hover { background: #e0a030; }
 .fp-drawing { fill: rgba(184, 140, 110, 0.12); stroke: #b88c6e; stroke-width: 2; stroke-dasharray: 6 4; }
 /* 缩略图(迷你地图):右上角悬浮,可折叠成横条 */
 .fp-thumb { position: absolute; z-index: 6; width: 168px; background: rgba(255, 253, 248, 0.96); border: 1px solid rgba(184, 140, 110, 0.35); border-radius: 10px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12); user-select: none; touch-action: none; }
-.fp-thumb.is-collapsed { width: auto; padding: 0; }
+.fp-thumb.is-collapsed { width: 168px; padding: 0; }
 .fp-thumb-drag { display: flex; align-items: center; justify-content: center; height: 18px; cursor: grab; border-radius: 10px 10px 0 0; background: rgba(184, 140, 110, 0.12); }
+.fp-thumb.is-collapsed .fp-thumb-drag { height: 24px; border-radius: 10px; cursor: pointer; background: rgba(184, 140, 110, 0.18); }
 .fp-thumb-drag:active { cursor: grabbing; }
 .fp-thumb-grip { width: 16px; height: 8px; fill: #a89a8a; }
 .fp-thumb-map { width: 100%; display: block; cursor: pointer; }
-.fp-thumb-room { fill: rgba(184, 140, 110, 0.25); stroke: rgba(184, 140, 110, 0.8); stroke-width: 2; }
-.fp-thumb-furn { fill: rgba(96, 144, 128, 0.4); stroke: rgba(79, 128, 111, 0.9); stroke-width: 1.5; }
+.fp-thumb-room { fill: rgba(184, 140, 110, 0.15); stroke: rgba(139, 115, 85, 0.5); stroke-width: 1; }
+.fp-thumb-furn { fill: rgba(176, 74, 58, 0.2); stroke: rgba(176, 74, 58, 0.5); stroke-width: 0.8; }
+.fp-thumb-item { fill: #e0a030; stroke: #fff; stroke-width: 1; }
 .fp-thumb-viewport { fill: rgba(176, 74, 58, 0.08); stroke: #b04a3a; stroke-width: 2; }
 .fp-thumb-preview { fill: rgba(176, 74, 58, 0.12); stroke: #b04a3a; stroke-width: 1.5; stroke-dasharray: 4 3; }
-.fp-thumb-toggle { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; border: none; background: rgba(255, 255, 255, 0.92); border-radius: 6px; cursor: pointer; color: #8a7a6a; flex-shrink: 0; }
-.fp-thumb-toggle:hover { color: #5c4c3d; background: #fff; }
-.fp-thumb:not(.is-collapsed) .fp-thumb-toggle { position: absolute; top: 22px; right: 4px; }
-.fp-thumb.is-collapsed { display: flex; align-items: center; gap: 4px; padding: 4px 8px; }
-.fp-thumb-bar-label { font-size: 11px; color: #8a7a6a; white-space: nowrap; }
 .fp-thumb-chevron { width: 14px; height: 14px; }
 </style>

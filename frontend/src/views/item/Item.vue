@@ -195,7 +195,9 @@
           @create-room="onCreateRoom"
           @create-furniture="onCreateFurniture"
           @select-furniture="onSelectFurniture"
+          @edit-furniture-items="onEditFurnitureItems"
           @calibrate="onCalibrate"
+          @calibrate-confirm="onCalibrateConfirm"
           @edit-edge="onEditEdge"
           @delete-furniture="(id) => unplaceFurniture({ id })"
           @rename-room="onRenameRoom"
@@ -449,6 +451,67 @@
       </template>
     </el-dialog>
 
+    <!-- 家具物品管理(编辑模式双击家具) -->
+    <el-dialog v-model="furnItemsDlg" append-to-body :title="furnItemsTitle" width="520px" @open="loadFurnItems">
+      <div class="furn-items-toolbar">
+        <el-button type="primary" size="small" @click="openFurnItem()"><el-icon><Plus /></el-icon> {{ $t('item.addItem') }}</el-button>
+        <el-button size="small" @click="openFurnForm()"><el-icon><Edit /></el-icon> {{ $t('item.editFurniture') }}</el-button>
+      </div>
+      <el-table :data="furnItems" stripe max-height="360" empty-text="--">
+        <el-table-column prop="name" :label="$t('item.itemName')" show-overflow-tooltip />
+        <el-table-column prop="type" :label="$t('item.itemType')" width="100">
+          <template #default="{ row }">{{ dictText(t, 'item_type', row.type) }}</template>
+        </el-table-column>
+        <el-table-column prop="position" :label="$t('item.position')" width="100" show-overflow-tooltip />
+        <el-table-column :label="$t('common.actions')" width="120">
+          <template #default="{ row }">
+            <el-button link size="small" @click="openFurnItem(row)">{{ $t('common.edit') }}</el-button>
+            <el-button link size="small" type="danger" @click="removeFurnItem(row)">{{ $t('common.delete') }}</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <!-- 编辑家具自身属性 -->
+      <el-form v-if="furnItemsShowEdit" label-width="80px" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(184,140,110,0.15)">
+        <el-form-item :label="$t('item.furnitureName')">
+          <el-input v-model="furnEditForm.name" />
+        </el-form-item>
+        <el-form-item :label="$t('item.furnitureType')">
+          <el-input v-model="furnEditForm.type" />
+        </el-form-item>
+        <el-form-item :label="$t('item.note')">
+          <el-input v-model="furnEditForm.note" type="textarea" :rows="2" />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" size="small" @click="saveFurnEdit">{{ $t('common.confirm') }}</el-button>
+          <el-button size="small" @click="furnItemsShowEdit = false">{{ $t('common.cancel') }}</el-button>
+        </el-form-item>
+      </el-form>
+    </el-dialog>
+
+    <!-- 家具内物品编辑 -->
+    <el-dialog v-model="furnItemEditDlg" append-to-body :title="furnItemForm.id ? $t('item.editItem') : $t('item.addItem')" width="420px">
+      <el-form label-width="80px">
+        <el-form-item :label="$t('item.itemName')">
+          <el-input v-model="furnItemForm.name" />
+        </el-form-item>
+        <el-form-item :label="$t('item.itemType')">
+          <el-select v-model="furnItemForm.type" style="width: 100%">
+            <el-option v-for="tp in itemTypes" :key="tp" :label="dictText(t, 'item_type', tp)" :value="tp" />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="$t('item.position')">
+          <el-input v-model="furnItemForm.position" />
+        </el-form-item>
+        <el-form-item :label="$t('item.note')">
+          <el-input v-model="furnItemForm.note" type="textarea" :rows="2" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="furnItemEditDlg = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="saveFurnItem">{{ $t('common.confirm') }}</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 房子编辑 -->
     <el-dialog v-model="houseDlg" append-to-body :title="houseForm.id ? $t('item.editHouse') : $t('item.addHouse')" width="420px">
       <el-form label-width="90px">
@@ -535,6 +598,14 @@ const roomDlg = ref(false)
 const roomForm = ref({})
 const furDlg = ref(false)
 const furForm = ref({})
+// 家具物品管理(编辑模式双击家具)
+const furnItemsDlg = ref(false)
+const furnItemsFurnitureId = ref(null)
+const furnItems = ref([])
+const furnItemsShowEdit = ref(false)
+const furnEditForm = ref({ name: '', type: '', note: '' })
+const furnItemEditDlg = ref(false)
+const furnItemForm = ref({})
 const editingFurnId = ref(null) // 侧栏家具名内联编辑中的家具 id
 const editingFurnName = ref('')
 let furnNameInput = null
@@ -690,6 +761,24 @@ const onCalibrate = async (pxDist) => {
     loadFloorPlan()
   } catch (e) {}
 }
+const onCalibrateConfirm = async (pxDist) => {
+  try {
+    const { value } = await ElMessageBox.prompt(t('item.calibratePrompt'), t('item.calibrate'), { inputValue: '1.0', closeOnClickModal: true })
+    const meters = parseFloat(value)
+    if (!meters || meters <= 0) return
+    const scale = pxDist / meters
+    const house = houses.value.find((h) => h.id === currentHouseId.value)
+    let floorPlans = {}
+    if (house && house.floorPlans) { try { floorPlans = JSON.parse(house.floorPlans) } catch {} }
+    const cur = floorPlans[currentFloor.value] || {}
+    floorPlans[currentFloor.value] = { ...cur, scale }
+    await itemApi.saveFloorPlans(currentHouseId.value, JSON.stringify(floorPlans))
+    ElMessage.success(t('common.success'))
+    tool.value = 'select'
+    loadHouses()
+    loadFloorPlan()
+  } catch (e) {}
+}
 const onEditEdge = async (roomId, edgeIdx) => {
   const room = floorPlan.value.rooms.find((r) => r.id === roomId)
   if (!room) return
@@ -735,13 +824,12 @@ const onDuplicateRoom = (roomId) => {
 const switchFloor = async (f) => {
   if (f === currentFloor.value) return
   const direction = f > currentFloor.value ? 'up' : 'down'
-  // Phase 1: exit animation (old content visible)
+  // Phase 1: exit animation (old content visible, 400ms)
   floorTransition.value = { direction, phase: 'exit' }
-  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
-  // Phase 2: swap data + enter animation (new content fades in)
+  await new Promise((r) => setTimeout(r, 420))
+  // Phase 2: swap data + enter animation (new content fades in from opacity 0)
   currentFloor.value = f
   await loadFloorPlan()
-  // 不 fit:保留当前缩放平移位置,用户要求画板不变
   floorTransition.value = { direction, phase: 'enter' }
   setTimeout(() => { floorTransition.value = { direction, phase: '' } }, 550)
 }
@@ -813,6 +901,64 @@ const undo = async () => {
   await loadFloorPlan()
 }
 const onSelectFurniture = (id) => { selectedFurnitureId.value = selectedFurnitureId.value === id ? null : id }
+// ---- 家具物品管理(编辑模式双击家具) ----
+const furnItemsTitle = computed(() => {
+  const f = floorPlan.value.furnitures.find((x) => x.id === furnItemsFurnitureId.value)
+  return f ? `${f.name} - ${t('item.items')}` : t('item.items')
+})
+const onEditFurnitureItems = (fId) => {
+  furnItemsFurnitureId.value = fId
+  furnItemsShowEdit.value = false
+  furnItemsDlg.value = true
+}
+const loadFurnItems = async () => {
+  if (!furnItemsFurnitureId.value) return
+  furnItems.value = (floorPlan.value.items || []).filter((it) => it.furnitureId === furnItemsFurnitureId.value)
+}
+const openFurnItem = (row) => {
+  furnItemForm.value = row
+    ? { id: row.id, name: row.name, type: row.type, position: row.position || '', note: row.note || '' }
+    : { name: '', type: 'OTHER', position: '', note: '' }
+  furnItemEditDlg.value = true
+}
+const saveFurnItem = async () => {
+  if (!furnItemForm.value.name) return ElMessage.warning(t('item.itemNameRequired'))
+  const body = {
+    furnitureId: furnItemsFurnitureId.value,
+    roomId: floorPlan.value.furnitures.find((f) => f.id === furnItemsFurnitureId.value)?.room_id || floorPlan.value.furnitures.find((f) => f.id === furnItemsFurnitureId.value)?.roomId || null,
+    name: furnItemForm.value.name,
+    type: furnItemForm.value.type,
+    position: furnItemForm.value.position,
+    note: furnItemForm.value.note,
+    relX: 0.5,
+    relY: 0.5,
+  }
+  if (furnItemForm.value.id) await itemApi.update(furnItemForm.value.id, body)
+  else await itemApi.create(body)
+  ElMessage.success(t('common.success'))
+  furnItemEditDlg.value = false
+  await loadFloorPlan()
+  loadFurnItems()
+}
+const removeFurnItem = async (row) => {
+  await ElMessageBox.confirm(t('item.deleteItemConfirm'), t('common.warning'), { type: 'warning', closeOnClickModal: true })
+  await itemApi.remove(row.id)
+  ElMessage.success(t('common.success'))
+  await loadFloorPlan()
+  loadFurnItems()
+}
+const openFurnForm = () => {
+  const f = floorPlan.value.furnitures.find((x) => x.id === furnItemsFurnitureId.value)
+  if (!f) return
+  furnEditForm.value = { name: f.name, type: f.type || '', note: f.note || '' }
+  furnItemsShowEdit.value = true
+}
+const saveFurnEdit = async () => {
+  await itemApi.updateFurniture(furnItemsFurnitureId.value, furnEditForm.value)
+  ElMessage.success(t('common.success'))
+  furnItemsShowEdit.value = false
+  await loadFloorPlan()
+}
 const onCreateRoom = (geometry) => {
   roomForm.value = { houseId: currentHouseId.value, name: '', floor: currentFloor.value, note: '', _geometry: geometry }
   roomDlg.value = true
@@ -1265,6 +1411,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 }
 .pick-badge.on { background: #b88c6e; border-color: #b88c6e; }
 .fp-batch-hint { font-size: 12px; line-height: 1.6; color: #a89a8a; margin-top: 4px; }
+.furn-items-toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
 .item-main { display: flex; align-items: center; gap: 8px; }
 .item-name { font-size: 16px; font-weight: 600; }
 .item-path { color: #909399; font-size: 13px; margin-top: 4px; }
