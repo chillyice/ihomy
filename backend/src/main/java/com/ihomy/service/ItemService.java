@@ -181,11 +181,29 @@ public class ItemService {
 
     public void furnitureDelete(Long id, Long familyId) {
         requireFurniture(id, familyId);
-        if (itemMapper.selectCount(new LambdaQueryWrapper<Item>()
-                .eq(Item::getFurnitureId, id)) > 0) {
-            throw new BizException(ResultCode.BAD_REQUEST, "该家具上还有物品,请先删除或转移物品");
-        }
+        // 库里删除才是真正删除:家具上的物品不删除,仅解除归属(furniture_id/相对坐标置空)
+        itemMapper.update(null, new LambdaUpdateWrapper<Item>()
+                .eq(Item::getFamilyId, familyId)
+                .eq(Item::getFurnitureId, id)
+                .set(Item::getFurnitureId, null)
+                .set(Item::getRelX, null)
+                .set(Item::getRelY, null));
         furnitureMapper.deleteById(id);
+    }
+
+    /**
+     * 画板中移除家具:家具回库(room_id/画布几何置空),物品归属不变(furniture_id 不动)。
+     */
+    public void unplaceFurniture(Long id, Long familyId) {
+        requireFurniture(id, familyId);
+        furnitureMapper.update(null, new LambdaUpdateWrapper<Furniture>()
+                .eq(Furniture::getId, id)
+                .eq(Furniture::getFamilyId, familyId)
+                .set(Furniture::getRoomId, null)
+                .set(Furniture::getX, null)
+                .set(Furniture::getY, null)
+                .set(Furniture::getW, null)
+                .set(Furniture::getH, null));
     }
 
     // ---------- 物品 ----------
@@ -248,6 +266,39 @@ public class ItemService {
 
     public void itemDelete(Long id, Long familyId) {
         itemMapper.deleteById(requireItem(id, familyId).getId());
+    }
+
+    /**
+     * 批量设置物品所属家具:furnitureId 为空时解除归属;非空时物品归入该家具(散放房间与相对坐标随之重置)。
+     */
+    public void itemBatchAssignFurniture(Long familyId, List<Long> ids, Long furnitureId) {
+        if (ids == null || ids.isEmpty()) {
+            throw new BizException(ResultCode.BAD_REQUEST, "请选择物品");
+        }
+        if (furnitureId != null) {
+            requireFurniture(furnitureId, familyId);
+        }
+        long distinct = ids.stream().distinct().count();
+        List<Item> found = itemMapper.selectList(new LambdaQueryWrapper<Item>()
+                .eq(Item::getFamilyId, familyId)
+                .in(Item::getId, ids));
+        if (found.size() != distinct) {
+            throw new BizException(ResultCode.NOT_FOUND, "部分物品不存在或不属于当前家庭");
+        }
+        LambdaUpdateWrapper<Item> uw = new LambdaUpdateWrapper<Item>()
+                .eq(Item::getFamilyId, familyId)
+                .in(Item::getId, ids);
+        if (furnitureId != null) {
+            uw.set(Item::getFurnitureId, furnitureId)
+                    .set(Item::getRoomId, null)
+                    .set(Item::getRelX, new java.math.BigDecimal("0.5"))
+                    .set(Item::getRelY, new java.math.BigDecimal("0.5"));
+        } else {
+            uw.set(Item::getFurnitureId, null)
+                    .set(Item::getRelX, null)
+                    .set(Item::getRelY, null);
+        }
+        itemMapper.update(null, uw);
     }
 
     // ---------- 户型图(2期) ----------
@@ -334,6 +385,10 @@ public class ItemService {
                 .set(Furniture::getW, dto.getW())
                 .set(Furniture::getH, dto.getH());
         if (dto.getType() != null) uw.set(Furniture::getType, dto.getType());
+        if (dto.getRoomId() != null) {
+            requireRoom(dto.getRoomId(), familyId);
+            uw.set(Furniture::getRoomId, dto.getRoomId());
+        }
         furnitureMapper.update(null, uw);
     }
 

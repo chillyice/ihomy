@@ -4,6 +4,7 @@ import com.ihomy.annotation.OperationLog;
 import com.ihomy.common.Result;
 import com.ihomy.dto.FurnitureDTO;
 import com.ihomy.dto.HouseDTO;
+import com.ihomy.dto.ItemBatchDTO;
 import com.ihomy.dto.ItemDTO;
 import com.ihomy.dto.RoomDTO;
 import com.ihomy.entity.Furniture;
@@ -134,6 +135,14 @@ public class ItemController {
         return Result.success();
     }
 
+    @Operation(summary = "家具移入家具库(画板移除,物品归属不变)")
+    @OperationLog(module = "ITEM", operationType = "UPDATE", description = "家具移入家具库(画板移除)")
+    @PutMapping("/furniture/{id}/unplace")
+    public Result<Void> furnitureUnplace(@PathVariable Long id) {
+        itemService.unplaceFurniture(id, current().getFamilyId());
+        return Result.success();
+    }
+
     // ---------- 物品 ----------
 
     @Operation(summary = "物品列表/搜索")
@@ -166,6 +175,14 @@ public class ItemController {
     @DeleteMapping("/{id}")
     public Result<Void> itemDelete(@PathVariable Long id) {
         itemService.itemDelete(id, current().getFamilyId());
+        return Result.success();
+    }
+
+    @Operation(summary = "批量设置物品所属家具")
+    @OperationLog(module = "ITEM", operationType = "UPDATE", description = "批量设置物品所属家具")
+    @PutMapping("/batch/furniture")
+    public Result<Void> itemBatchAssignFurniture(@RequestBody ItemBatchDTO dto) {
+        itemService.itemBatchAssignFurniture(current().getFamilyId(), dto.getIds(), dto.getFurnitureId());
         return Result.success();
     }
 
