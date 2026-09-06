@@ -621,5 +621,22 @@ SELECT 'tools', '工具箱', 'icon-tools', '/tools', 'life', 'left', 19, 1
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM `sys_home_module` WHERE `code` = 'tools' AND `family_id` IS NULL);
 
+-- ------------------------------------------------------------
+-- 2026-09-06 V9.27 导航生活组排序:物品定位/厨房置顶,其余依次后移
+-- 幂等(UPDATE 重复执行结果一致);后端重启或经 PUT /home/modules 触发 reloadGlobal 后生效
+-- ------------------------------------------------------------
+UPDATE `sys_home_module` SET `sort_order` = 4  WHERE `code` = 'item'        AND `family_id` IS NULL;
+UPDATE `sys_home_module` SET `sort_order` = 5  WHERE `code` = 'kitchen'     AND `family_id` IS NULL;
+UPDATE `sys_home_module` SET `sort_order` = 6  WHERE `code` = 'anniversary' AND `family_id` IS NULL;
+UPDATE `sys_home_module` SET `sort_order` = 7  WHERE `code` = 'points'      AND `family_id` IS NULL;
+UPDATE `sys_home_module` SET `sort_order` = 8  WHERE `code` = 'task'        AND `family_id` IS NULL;
+UPDATE `sys_home_module` SET `sort_order` = 9  WHERE `code` = 'reminder'    AND `family_id` IS NULL;
+UPDATE `sys_home_module` SET `sort_order` = 10 WHERE `code` = 'plan'        AND `family_id` IS NULL;
+UPDATE `sys_home_module` SET `sort_order` = 11 WHERE `code` = 'wish'        AND `family_id` IS NULL;
+UPDATE `sys_home_module` SET `sort_order` = 12 WHERE `code` = 'book'        AND `family_id` IS NULL;
+UPDATE `sys_home_module` SET `sort_order` = 13 WHERE `code` = 'cascade'     AND `family_id` IS NULL;
+UPDATE `sys_home_module` SET `sort_order` = 14 WHERE `code` = 'tree'        AND `family_id` IS NULL;
+UPDATE `sys_home_module` SET `sort_order` = 15 WHERE `code` = 'tools'       AND `family_id` IS NULL;
+
 
 
