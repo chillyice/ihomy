@@ -53,7 +53,7 @@
 - **root 仅用于初始化**:`mysql -uroot -p < backend/src/main/resources/schema.sql`,执行一次(建库、建表、创建 ihomy 账号、初始数据)。
 - **业务运行用 `ihomy` 账号**:仅授予 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`(最小权限,无 CREATE/ALTER/DROP)。application.yml 连接用 `ihomy`,**不要用 root 跑业务**。
 - 账号同时创建 `localhost` 和 `%` 两个 host(本机/远程应用服务器都能连)。
-- **60 张表**,前缀分类:`sys_` 18 张(系统/账号/权限/配置/日志/天气/存储)、`family_` 22 张(家庭事务)、`content_` 20 张(内容数据)。**完整表清单见 `docs/需求设计说明书.md` §6.2**。
+- **61 张表**,前缀分类:`sys_` 18 张(系统/账号/权限/配置/日志/天气/存储)、`family_` 22 张(家庭事务)、`content_` 21 张(内容数据)。**完整表清单见 `docs/需求设计说明书.md` §6.2**。
   - **命名规则**:家庭事务业务表一律 `family_` 前缀;内容数据 `content_` 前缀;账号/权限/配置/日志/天气/存储保留 `sys_`。新增表必须遵守。前缀取最顶层祖先类别;上下级关系体现在表名(如 `sys_user_role`)。
 - **枚举不再用数字**:状态/类型字段一律大写英文单词(`PUBLISHED/DRAFT/PUBLIC/FAMILY/ACTIVE...`),含义存字典表 `sys_dict_item`,Java 常量集中于 `common/DictConst.java`,前端映射 `utils/dict.js`。**不要写回 0/1/2 判断**。
 - **注意**:`content_blog/diary/photo/video/wish` 5 张内容表 `visibility` 列为 `VARCHAR(20) DEFAULT 'FAMILY'`(PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开),schema.sql 与 live DB 已对齐(曾误写 TINYINT)。
@@ -84,7 +84,7 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
     logback-spring.xml  # 三类日志分流(access/server/thirdparty,六要素 pattern,按天滚动)
     external.yml.template  # 外挂配置模板(IHOMY_CONFIG_PATH 覆盖密码/密钥/路径/captcha/天气,唯一开发生产差异机制)
     mapper/*.xml        # 每个 Mapper 一个同名 XML
-    schema.sql          # 建库+建号+建表(60张)+种子
+    schema.sql          # 建库+建号+建表(61张)+种子
   mvnw / mvnw.cmd       # Maven Wrapper
 frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
   src/
@@ -146,13 +146,13 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 生活 | 纪念日 / 提醒 / 计划 / 任务 / 记账 / 家谱 / 签到积分 / 背景音乐 | Anniversary / Reminder / Plan / Task / Points / Music 各 Controller |
 | 基础 | 文件上传 / 存储管理 / 首页聚合 / 运维 / 每日内容 / 操作日志 / 系统参数 | File / Storage / Home+Public / Ops / Daily / Log 各 Controller |
 | 光影 | 太阳位置/体积光/台灯/天气 / 天气代理 / 天气详情 / 首页仪表盘 | SolarUtil+SunService + windowLight.js + SunLightLayer.vue |
-| 物品 | 物品定位+户型图 | ItemController / ItemService(详见 docs/户型图设计.md) |
+| 物品 | 物品定位+户型图 | ItemController / ItemService(设计决策见需求设计说明书 §4.8.1) |
 | 厨房 | 菜单/菜谱/食材 | RecipeController / RecipeService |
-| 工具 | 工具箱聚合页/脑图设计(simple-mind-map) | MindMapController / MindMapService |
+| 工具 | 工具箱聚合页/脑图设计(simple-mind-map,快照/回滚/协同轮询) | MindMapController / MindMapService |
 | 系统 | i18n / 主题 / 字典 | i18n/ + theme/ + utils/dict.js |
 | 移动端 | 设备自适应 | useDevice.js + MobileLayout.vue + Mobile* 组件 |
 
-**关键坑速查**(实现细节,详见 docs):日记 date 兼容 `yyyy-MM-dd HH:mm`;纪念日 Hutool ChineseDate 月份 0-based 需 +1;家谱 null 字段须 `LambdaUpdateWrapper` 显式 SET;相册分享 token + Knuth 混淆;博客新建家庭注入 9 默认分类;物品户型图 2 期完成(裁剪/粘合删原房保持最后防家具入库覆盖、端点识别/字号/光标屏幕恒定;**hover 边加号阈值 6px**——原 12px 太大导致 hover 显示但 click 被 `justDragged` 拦截;库内家具拖入画布替代「摆放」+「请选择房间」按钮)、3 期 AI 语义待做。
+**关键坑速查**(实现细节,详见 docs):日记 date 兼容 `yyyy-MM-dd HH:mm`;纪念日 Hutool ChineseDate 月份 0-based 需 +1;家谱 null 字段须 `LambdaUpdateWrapper` 显式 SET;相册分享 token + Knuth 混淆;博客新建家庭注入 9 默认分类;物品户型图 2 期完成(裁剪/粘合删原房保持最后防家具入库覆盖、端点识别/字号/光标屏幕恒定;**hover 边加号阈值 6px**——原 12px 太大导致 hover 显示但 click 被 `justDragged` 拦截;库内家具拖入画布替代「摆放」+「请选择房间」按钮)、3 期 AI 语义待做;**MP `updateById` 会显式回写实体里的旧 `updated_at` 抑制 `ON UPDATE CURRENT_TIMESTAMP`**——凡依赖 updated_at 做变更检测/排序的表,更新必须 LambdaUpdateWrapper 只 SET 业务字段并重查回传新值(2026-09-06 脑图协同踩坑);**simple-mind-map npm 包只内置 default 主题**,其余主题须 `mindmapThemes.js` defineTheme 本地注册,否则 setTheme 静默回落默认样式;**脑图多端并发保存靠 update 乐观锁**(客户端带 baseUpdatedAt,库中 updated_at 已刷新则 409,前端弹窗裁决覆盖/加载远端——双开 20s 轮询窗口内静默互覆盖实测丢数据);**脑图保存前 stripEmptyNodes 剥空叶子**(新增节点不输入直接确认残留 `<p><br></p>`,须传 getData(true).root 而非整包)。
 
 ## 设计规范(统一实现,避免多种方式)
 
@@ -314,13 +314,13 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 ## 文档清单
 
 - `README.md`(启动说明 + Windows 一键启动脚本用法); `Windows部署指导.md` / `Linux部署指导.md`(生产部署 NSSM/systemd/Nginx/Let's Encrypt/Docker Compose)
-- `docs/需求设计说明书.md` — **完整功能需求唯一活文档**(功能模块清单+数据库设计 60 表+接口设计+规划事项+修订记录),随迭代持续更新
+- `docs/需求设计说明书.md` — **完整功能需求唯一活文档**(功能模块清单+数据库设计 61 表+接口设计+规划事项+修订记录),随迭代持续更新;§4.8.1 含原户型图设计.md 并入的设计决策存档(2026-09-07,原文件已删)
 - `docs/需求规格说明书.docx` — 需求文档历史归档(V9.16 起冻结,由上方 .md 接棒,不再更新)
 - `docs/变更归档.md` — 已实现变更归档(按功能域的文件级改动表+设计决策+踩坑+live DB 同步 SQL);新变更归档追加到该文件末尾
 - `docs/UI设计提示词.md` — 沉浸式首页 UI 设计完整规格(可作为 AI 提示词重新生成)
 - `docs/日志规范.md` — 日志开发规范(三类文件/六要素/tid 规则/级别标准/三方调用/脱敏清单)
 - `docs/日志问题分析方法.md` — 报错排查方法论(拿 tid → 详细日志页 → 四步分析;面向运维/业务人员)
-- `docs/户型图设计.md` — 物品定位-户型图(2期)完整设计(数据模型/家具随房间移动规则/编辑手势/吸附/尺寸标注/分期 S1-S5)+文末实现记录
+- `docs/功能测试用例.md` — 全站功能测试用例(32 域 ~320 条,含脑图 48 条+执行记录);API 批量脚本 `scripts/test_mm_api.py`
 - `scripts/start-all.ps1`(Windows 一键启动前后端,双击 `start.bat` 调用,设 `IHOMY_CONFIG_PATH` 环境变量)/ `start-db.ps1`(Docker 拉起 MySQL+Redis+自动导 schema.sql,端口 6306/6379,与生产一致); `config/mysql/my.cnf`(端口 6306,内存优化,仅 Linux 本机部署用)
 - 完整接口清单:见 `docs/需求设计说明书.md` 第 7 章。代码事实以 `backend/src/main/java` + `resources/schema.sql` 为准,如需检索先 `grep` 再动手。
 

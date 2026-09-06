@@ -640,3 +640,33 @@ UPDATE `sys_home_module` SET `sort_order` = 15 WHERE `code` = 'tools'       AND 
 
 
 
+-- ------------------------------------------------------------
+-- 2026-09-06 V9.28 脑图第二批:列表缩略图列(MySQL 8 无 ADD COLUMN IF NOT EXISTS,条件判断幂等)
+-- ------------------------------------------------------------
+SET @add_mm_thumb := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `content_mindmap` ADD COLUMN `thumb_url` MEDIUMTEXT DEFAULT NULL COMMENT ''列表缩略图(data URL,编辑器保存时生成)'' AFTER `data`',
+    'SELECT ''skip: thumb_url already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_mindmap' AND COLUMN_NAME = 'thumb_url'
+);
+PREPARE add_mm_thumb_stmt FROM @add_mm_thumb;
+EXECUTE add_mm_thumb_stmt;
+DEALLOCATE PREPARE add_mm_thumb_stmt;
+
+-- ------------------------------------------------------------
+-- 2026-09-06 V9.29 脑图第三批:历史版本快照表(CREATE IF NOT EXISTS 天然幂等)
+-- 每图保留最近 20 份,超出由 deleteKeepRecent XML 清理
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `content_mindmap_snapshot` (
+  `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `mindmap_id` BIGINT       NOT NULL COMMENT '脑图ID',
+  `family_id`  BIGINT       NOT NULL COMMENT '所属家庭ID(冗余,隔离校验用)',
+  `user_id`    BIGINT       NOT NULL COMMENT '创建快照的用户ID',
+  `title`      VARCHAR(100) NOT NULL COMMENT '快照时标题',
+  `data`       LONGTEXT     DEFAULT NULL COMMENT '脑图数据JSON(getData(true) 全量)',
+  `source`     VARCHAR(20)  NOT NULL DEFAULT 'AUTO' COMMENT '来源:AUTO自动/MANUAL手动',
+  `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_mindmap_created` (`mindmap_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='脑图历史版本快照表';

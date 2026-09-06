@@ -29,6 +29,9 @@ public class ContentMindmap {
     /** 脑图数据 JSON(layout/root/theme/view/config) */
     private String data;
 
+    /** 列表缩略图(data URL,编辑器保存时生成) */
+    private String thumbUrl;
+
     @TableLogic
     private Integer deleted;
 

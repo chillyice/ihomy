@@ -12,4 +12,10 @@ public class MindMapDTO {
 
     /** 脑图数据 JSON 字符串 */
     private String data;
+
+    /** 列表缩略图 data URL(null 不修改) */
+    private String thumbUrl;
+
+    /** 乐观锁基线:客户端最后一次看到的 updated_at(ISO 格式)。非空时若库中已更新则返回 409,防多端互相覆盖 */
+    private String baseUpdatedAt;
 }

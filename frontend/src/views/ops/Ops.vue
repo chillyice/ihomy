@@ -232,7 +232,7 @@
             </div>
             <div class="chart-wrap" style="flex: 1">
               <div class="ops-sub-title">{{ $t('ops.weatherTypeShare') }}</div>
-              <svg v-if="pieSlices.length" viewBox="0 0 400 260" class="pie-chart">
+              <svg v-if="pieSlices.length" viewBox="0 0 480 260" class="pie-chart">
                 <path v-for="(s, i) in pieSlices" :key="'ps'+i" :d="s.path" :fill="s.color" stroke="var(--color-card-2)" stroke-width="2" />
                 <path v-for="(s, i) in pieSlices" :key="'pl'+i" :d="s.line" fill="none" stroke="var(--color-text-secondary)" stroke-width="1" />
                 <text v-for="(s, i) in pieSlices" :key="'pt'+i" :x="s.labelX" :y="s.labelY" :text-anchor="s.anchor" font-size="12" fill="var(--color-text)">{{ s.label }}</text>
@@ -469,15 +469,18 @@ const loadTypeDist = async () => {
     typeDist.value = []
   }
 }
-// ponytail: 小占比扇区标签可能重叠,类型通常 4-6 个可接受;类型多时再加外部图例
+// 标签防重叠:相邻小占比扇区的引导线终点彼此靠近,按左右分侧自上而下强制最小垂直间距,
+// 引导线随标签位移自然弯折(扇区外缘 → 标签尖端 → 水平短线)
 const PIE_COLORS = ['#b88c6e', '#a87c5e', '#c4a884', '#8a6d3b', '#b04a3a', '#d4b298', '#6b8a6b', '#e0862f', '#4a90d9', '#9b8ec4', '#c97474', '#9a9a9a']
 const pieSlices = computed(() => {
   const dist = typeDist.value || []
   const total = dist.reduce((a, d) => a + (d.count || 0), 0)
   if (!total) return []
-  const cx = 200, cy = 130, r = 75
+  const cx = 240, cy = 130, r = 64
+  const TIP = r + 22           // 标签尖端到圆心的水平距离
+  const MIN_GAP = 15, MIN_Y = 12, MAX_Y = 244
   let angle = -Math.PI / 2
-  return dist.map((d, i) => {
+  const slices = dist.map((d, i) => {
     const frac = (d.count || 0) / total
     const a2 = angle + frac * Math.PI * 2
     const large = frac > 0.5 ? 1 : 0
@@ -485,26 +488,44 @@ const pieSlices = computed(() => {
     const x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2)
     const mid = (angle + a2) / 2
     const cos = Math.cos(mid), sin = Math.sin(mid)
-    // 引导线:扇区外缘(r+4)→ 外扩(r+16)→ 水平延伸 16px
-    const lx1 = cx + (r + 4) * cos, ly1 = cy + (r + 4) * sin
-    const lx2 = cx + (r + 16) * cos, ly2 = cy + (r + 16) * sin
-    const lx3 = lx2 + (cos >= 0 ? 16 : -16)
-    const pct = Math.round(frac * 1000) / 10
+    const right = cos >= 0
     const slice = {
       // 单一类型占 100% 时画整圆
       path: frac >= 0.999
         ? `M ${cx - r} ${cy} a ${r} ${r} 0 1 0 ${2 * r} 0 a ${r} ${r} 0 1 0 -${2 * r} 0 Z`
         : `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`,
-      line: `M ${lx1} ${ly1} L ${lx2} ${ly2} L ${lx3} ${ly2}`,
-      labelX: lx3 + (cos >= 0 ? 3 : -3),
-      labelY: ly2 + 4,
-      anchor: cos >= 0 ? 'start' : 'end',
+      edgeX: cx + (r + 3) * cos, edgeY: cy + (r + 3) * sin,
+      tipX: cx + (right ? TIP : -TIP),
+      naturalY: cy + (r + 12) * sin,
+      right,
       color: PIE_COLORS[i % PIE_COLORS.length],
-      label: `${t('ops.apiType.' + (d.apiType || 'other'))} ${pct}%`,
+      label: `${t('ops.apiType.' + (d.apiType || 'other'))} ${Math.round(frac * 1000) / 10}%`,
     }
     angle = a2
     return slice
   })
+  // 左右两侧分别排序后自上而下推开;底部越界时自下而上回压
+  for (const side of [true, false]) {
+    const group = slices.filter(s => s.right === side).sort((a, b) => a.naturalY - b.naturalY)
+    let prev = -Infinity
+    for (const s of group) {
+      s.labelY = Math.max(Math.min(s.naturalY, MAX_Y), prev + MIN_GAP, MIN_Y)
+      prev = s.labelY
+    }
+    for (let k = group.length - 1; k >= 0 && prev > MAX_Y; k--) {
+      group[k].labelY = Math.min(group[k].labelY, prev - MIN_GAP)
+      prev = group[k].labelY
+    }
+  }
+  return slices.map(s => ({
+    path: s.path,
+    color: s.color,
+    label: s.label,
+    line: `M ${s.edgeX} ${s.edgeY} L ${s.tipX} ${s.labelY} L ${s.tipX + (s.right ? 10 : -10)} ${s.labelY}`,
+    labelX: s.tipX + (s.right ? 13 : -13),
+    labelY: s.labelY + 4,
+    anchor: s.right ? 'start' : 'end',
+  }))
 })
 
 // ---------- 配额进度条 ----------

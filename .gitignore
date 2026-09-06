@@ -1,0 +1,5 @@
+# ZCode 本地技能/会话目录
+.zcode/
+
+# GUI 测试截图(测试产物,不入库)
+gui-test-screenshots/

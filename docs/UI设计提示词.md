@@ -571,7 +571,7 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 
 ## 24. 物品定位户型图(户型图编辑器,`/item` 页面主视图)
 
-> S1~S5 + 房间裁剪/粘合已全部实现;设计详见 `docs/户型图设计.md`(v4 + 文末「实现记录」§14/§15)。以下为实装 UI 规格。
+> S1~S5 + 房间裁剪/粘合已全部实现;设计决策见 `docs/需求设计说明书.md` §4.8.1(原 docs/户型图设计.md 已并入)。以下为实装 UI 规格。
 
 - **页面结构 = 户型图主视图(非 tab,全宽)**:顶栏常驻 房子下拉 → 搜索框(搜物品名 → 画布高亮定位)→「列表」「编辑」;主体整块是画布(`calc(100vh-70px)` 贴底留距,破 .page 1100px 限制),不加独立导航。**楼层切换器在左下角**(竖排 `1F/2F/3F` 商厦电梯模式,编辑态常显+「+」加层;查看态 ≥2 层显示)。
 - **两模式分离**:查看/找东西(默认)与 编辑 分开;点「编辑」进入编辑态,左侧出**酷家乐式侧栏(房间/家具/库 tab)**,点「完成」退出;查看态隐藏侧栏、不误拖;侧栏出现时画布 ResizeObserver 自动重新 fit,元素始终在窗格内。
@@ -596,6 +596,8 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 46. **户型图房间tab多选**(编辑态房间列表):头部「多选」进入,进入后头部切换为批量删除(N)/取消;复选框**常驻占位**(非多选 `visibility:hidden`),多选切换行高不变;行内复制/删除图标保留。
 47. **户型图楼层切换器增强**(编辑态):上移/下移箭头**纵向堆叠**(`.fp-floor-arrows` 列布局,单钮 17×17,两钮+2px 间距与 36px 芯片等高);✎ 改楼层号(芯片原地变内联输入框,自动聚焦,Enter/失焦确认,Esc 取消;目标号已存在拒绝;真改号同步房间归属与楼层配置);切换器贴近编辑侧栏(`left:227px`,间隙 6px,侧栏 `flex-shrink:0` 固定 220px)。
 48. **工具箱聚合页**(`/tools`):`.page` 根容器+面包屑+`.section-label`;工具卡片网格 `auto-fill minmax(240px,1fr)`,卡片=图标块(56px 圆角暖棕底)+名称(16px/600)+描述(13px 次要色)+「进入」链接(hover `translateY(-3px)`,transform 而非 box-shadow);占位卡虚线边框+降透明度(`opacity:.55`+`border-style:dashed`),不可点。
+49. **脑图列表页**(`/tools/mindmap`):`page-toolbar card`(左=回收站+新建脑图按钮,右=刷新);卡片网格 `auto-fill minmax(250px,1fr)` gap 16px;卡片(`.mm-card.card`)=缩略图(`width:100%; max-height:150px; object-fit:contain; radius 8px`,无图不渲染 img 布局不塌)+标题(15px/600 单行省略,右侧留 32px 给删除钮)+创建人/更新时间(12px 次要色);hover `translateY(-3px)`;删除钮垃圾桶图标右上角 12px(默认次要色,hover 危险色)。新建对话框=模板选择(`mm-tpl-grid` 卡片:emoji+名称+一句描述,选中描边主色)+标题输入(maxlength 100)+确认;回收站对话框=行列表(标题+创建人·时间+恢复/彻底删除按钮,`max-height:420px` 滚动),彻底删除带 ElMessageBox 二次确认。
+50. **脑图编辑器**(`/tools/mindmap/{id}`,`.page.mm-page` 全屏画布模式 `100dvh` 破 1100px 宽限):顶栏=返回+标题(点改名)+工具按钮组(撤销/重做/加子节点/加同级/删除节点/根居中/样式面板/搜索/**演示模式**/历史)+结构/主题双下拉(116px)+导入/导出下拉+保存状态(12px,saved 次要色/dirty 警告色/failed 危险色)+保存按钮;主体 `.mm-canvas`(`flex:1; radius 14px; border; overflow:hidden`,SVG 单层渲染)。悬浮件:搜索替换栏(顶部居中,z=30,输入 170px+计数+上一个/下一个+替换组);节点样式面板(右上角 z=30,268px,三区=文字/节点/连线,左侧 3px 主色条分区标题);**右键菜单**(`position:fixed` z=2600,200px 宽,15 项+分隔线,`max-height:calc(100vh-16px)` 滚动兜底,**定位 clamp 估算高须取 560**——实测 554px,估算偏小会底部溢出);图标子面板(菜单内嵌展开,24px 图标格 active 主色描边);备注气泡(fixed 320px,`white-space:pre-wrap` max-height 200px);富文本格式工具栏(编辑态选中文字浮现,B/I/U/S+色板+清除,`@mousedown.prevent` 防夺焦);历史版本抽屉(el-dialog,立即快照/回滚(带确认)/删除);保存冲突弹窗(ElMessageBox warning,「用我的版本覆盖」/「加载家人的版本」二选一)。深色模式走 CSS 变量自动适配。
 
 ## 验收标准
 

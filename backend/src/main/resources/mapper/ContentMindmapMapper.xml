@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.ContentMindmapMapper">
+
+    <select id="selectTrashByFamily" resultType="com.ihomy.entity.ContentMindmap">
+        SELECT id, family_id, user_id, title, deleted, created_at, updated_at
+        FROM content_mindmap
+        WHERE family_id = #{familyId} AND deleted = 1
+        ORDER BY updated_at DESC
+    </select>
+
+    <select id="selectDeletedById" resultType="com.ihomy.entity.ContentMindmap">
+        SELECT id, family_id, user_id, title, deleted, created_at, updated_at
+        FROM content_mindmap
+        WHERE id = #{id} AND deleted = 1
+    </select>
+
+    <update id="restoreById">
+        UPDATE content_mindmap SET deleted = 0 WHERE id = #{id} AND deleted = 1
+    </update>
+
+    <delete id="deletePhysicalById">
+        DELETE FROM content_mindmap WHERE id = #{id} AND deleted = 1
+    </delete>
+</mapper>

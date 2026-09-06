@@ -375,4 +375,12 @@ export const mindmapApi = {
   create: (data) => request.post('/mindmap', data),
   update: (id, data) => request.put(`/mindmap/${id}`, data),
   remove: (id) => request.delete(`/mindmap/${id}`),
+  trash: () => request.get('/mindmap/trash'),
+  restore: (id) => request.put(`/mindmap/${id}/restore`),
+  purge: (id) => request.delete(`/mindmap/${id}/purge`),
+  snapshotList: (id) => request.get(`/mindmap/${id}/snapshot/list`),
+  snapshotCreate: (id, source = 'MANUAL') => request.post(`/mindmap/${id}/snapshot`, null, { params: { source } }),
+  snapshotGet: (id, sid) => request.get(`/mindmap/${id}/snapshot/${sid}`),
+  snapshotRestore: (id, sid) => request.put(`/mindmap/${id}/snapshot/${sid}/restore`),
+  snapshotDelete: (id, sid) => request.delete(`/mindmap/${id}/snapshot/${sid}`),
 }
