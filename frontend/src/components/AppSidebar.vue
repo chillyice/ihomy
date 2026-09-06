@@ -116,7 +116,13 @@
       </el-dropdown>
         <span v-else class="foot-btn" @click="$router.push('/login')">{{ $t('home.loginToView') }}</span>
         <span v-if="userStore.isLoggedIn && route.path === '/'" class="edit-mode-btn" :class="{ active: appStore.homeEditMode }" :title="appStore.homeEditMode ? '退出编辑' : '编辑首页'" @click="appStore.toggleHomeEditMode()">
-          <el-icon><EditPen /></el-icon>
+          <!-- 四个圆角方块(2×2 网格):桌面布局编辑语义;内联 SVG 替代 EP 图标(性能规范) -->
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+            <rect x="3" y="3" width="8" height="8" rx="2" />
+            <rect x="13" y="3" width="8" height="8" rx="2" />
+            <rect x="3" y="13" width="8" height="8" rx="2" />
+            <rect x="13" y="13" width="8" height="8" rx="2" />
+          </svg>
         </span>
         <!-- 非首页:编辑按钮位置显示迷你天气(图标+当前温度;有预警时显示最高级别颜色的三角叹号,悬浮看全部预警) -->
         <el-tooltip v-else-if="sidebarWeather" placement="top-end" :disabled="!sidebarWarnings.length" popper-class="mini-weather-popper">
@@ -148,7 +154,7 @@ import { useUserStore } from '@/stores/user'
 import { useWidgetDrag } from '@/utils/useWidgetDrag'
 import { notificationApi, authApi } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Sunny, Moon, Bell, Fold, Expand, Document, Notebook, Picture, Calendar, VideoPlay, Trophy, Aim, AlarmClock, List, Star, Wallet, PictureRounded, Share, User, Box, MapLocation, ChatDotRound, Food, Reading, Setting, Monitor, ArrowRight, Check, Headset, EditPen, WarningFilled, Tools } from '@element-plus/icons-vue'
+import { Sunny, Moon, Bell, Fold, Expand, Document, Notebook, Picture, Calendar, VideoPlay, Trophy, Aim, AlarmClock, List, Star, Wallet, PictureRounded, Share, User, Box, MapLocation, ChatDotRound, Food, Reading, Setting, Monitor, ArrowRight, Check, Headset, WarningFilled, Tools } from '@element-plus/icons-vue'
 
 // 导航图标:Element Plus 简约线性图标(统一风格,非彩色 emoji)
 const ICON_MAP = {
