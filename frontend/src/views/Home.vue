@@ -185,13 +185,13 @@
 
           <!-- 拍立得 -->
           <template v-else-if="w.id === 'album'">
-            <div class="album-container" :style="{ '--polaroid-w': Math.min(140, Math.max(80, w.w * 30)) + 'px' }">
+            <div class="album-container" :style="{ '--polaroid-w': polaroidW(w) + 'px' }">
               <div v-if="recentPhotos.length" class="polaroid-stack">
                 <div v-for="(p, i) in recentPhotos" :key="p.id" class="polaroid-pos" :style="{ transform: `rotate(${polaroidLayout[i]?.rotate || 0}deg) translate(${polaroidLayout[i]?.dx || 0}px, ${polaroidLayout[i]?.dy || 0}px)`, zIndex: polaroidLayout[i]?.z || 1 }">
                   <div class="polaroid" @click="!editMode && openViewer(i)"><img :src="p.url" :alt="p.description || ''" /><div v-if="p.description" class="polaroid-caption">{{ p.description }}</div></div>
                 </div>
               </div>
-              <div v-else class="album-closed" @click="!editMode && $router.push('/album')"><div class="album-cover"><div class="cover-title">{{ family?.name || 'ihomy' }}</div><div class="cover-sub">家庭相册</div></div></div>
+              <div v-else class="album-closed" :style="{ width: albumCoverW(w) + 'px' }" @click="!editMode && $router.push('/album')"><div class="album-cover"><div class="cover-title">{{ family?.name || 'ihomy' }}</div><div class="cover-sub">家庭相册</div></div></div>
             </div>
           </template>
         </div>
@@ -269,6 +269,23 @@ const cardStyle = (w) => {
   const s = { left: left + 'px', top: top + 'px', width: width + 'px', height: height + 'px' }
   if (w._z) s.zIndex = w._z
   return s
+}
+
+// 相册内容尺寸:按组件实际像素的宽高双向预算取 min——宽页面(列宽远大于行高)时受高度约束,
+// 不再随组件宽度撑大;cardStyle 同源的格子数学
+const albumBox = (w) => ({
+  W: w.w * cellW.value + (w.w - 1) * GAP,
+  H: w.h * cellH.value + (w.h - 1) * GAP,
+})
+// 拍立得宽:全高≈0.75P+22(4:3 图+白框+手写条),高向不超组件高 55%,宽向不超组件宽 42%
+const polaroidW = (w) => {
+  const { W, H } = albumBox(w)
+  return Math.round(Math.max(80, Math.min(W * 0.42, (H * 0.55 - 22) / 0.75, 170)))
+}
+// 相册封面宽:4:3 → 全高=宽×0.75,宽取组件宽 70% 与组件高 95% 的较小者
+const albumCoverW = (w) => {
+  const { W, H } = albumBox(w)
+  return Math.round(Math.min(W * 0.7, H * 0.95))
 }
 
 const gridOverlayStyle = computed(() => ({
@@ -710,7 +727,7 @@ html.dark .music-title { color: #E8DCC8; }
 .polaroid-pos:hover { z-index: 99 !important; }
 .polaroid img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
 .polaroid-caption { position: absolute; bottom: 4px; left: 4px; right: 4px; font-size: 9px; color: #5a4a3a; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.album-closed { position: absolute; top: 50%; left: 50%; width: 70%; aspect-ratio: 4/3; transform: translate(-50%, -50%) rotate(-4deg); cursor: pointer; transition: transform 0.3s ease; }
+.album-closed { position: absolute; top: 50%; left: 50%; aspect-ratio: 4/3; transform: translate(-50%, -50%) rotate(-4deg); cursor: pointer; transition: transform 0.3s ease; }
 .album-closed:hover { transform: translate(-50%, -50%) rotate(0deg) scale(1.05); }
 .album-cover { width: 100%; height: 100%; background: linear-gradient(135deg, #8B6F47 0%, #6B5435 50%, #5a4530 100%); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; position: relative; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.3), 0 8px 4px -4px rgba(0,0,0,0.35), 0 12px 8px -6px rgba(0,0,0,0.25); }
 .album-cover::before { content: ''; position: absolute; inset: 0; background-image: repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(245,230,200,0.04) 8px, rgba(245,230,200,0.04) 16px); pointer-events: none; }
