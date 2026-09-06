@@ -599,6 +599,8 @@ const currentHouseId = ref(null)
 const currentFloor = ref(1)
 const floorPlan = ref({ rooms: [], furnitures: [], items: [], imageUrl: null, scale: 100 })
 const searchKeyword = ref('')
+let defaultFloorDone = false // 房间数据到位后的默认层兜底只执行一次
+const floorTouched = ref(false) // 用户/搜索已手动切层,不再自动覆盖默认层
 const searchResults = ref([])
 const selectedFurnitureId = ref(null)
 const canvasRef = ref(null)
@@ -732,12 +734,40 @@ const loadHouses = async () => {
   houses.value = await itemApi.houses()
   if (!currentHouseId.value && houses.value.length) {
     currentHouseId.value = houses.value[0].id
+    currentFloor.value = defaultFloorOf(houses.value[0])
     loadFloorPlan()
   }
   loadRooms()
 }
+
+// 默认楼层:有 1 楼选 1 楼;没有 1 楼(纯地下/跳层编号)选最高层。
+// 楼层来源 = floorPlans JSON 键 ∪ 房间 floor(房间可能未进楼层配置)。
+const defaultFloorOf = (house) => {
+  const set = new Set()
+  if (house && house.floorPlans) {
+    try {
+      const fp = JSON.parse(house.floorPlans)
+      Object.keys(fp).forEach((k) => { if (k !== 'floorOrder') set.add(Number(k)) })
+    } catch {}
+  }
+  rooms.value.forEach((r) => { if (r.houseId === house?.id) set.add(r.floor) })
+  if (set.has(1)) return 1
+  if (set.size) return Math.max(...set)
+  return 1
+}
 const loadRooms = async () => {
   rooms.value = await itemApi.rooms(roomHouseFilter.value)
+  // 默认楼层兜底:loadHouses 阶段 rooms 还没到位,默认层只按 floorPlans 键计算,
+  // 会漏掉"房间存在但楼层不在楼层配置里"的 1 楼;房间到位后重算一次(用户手动切过层则不覆盖)。
+  if (!defaultFloorDone && !floorTouched.value && currentHouseId.value) {
+    defaultFloorDone = true
+    const house = houses.value.find((h) => h.id === currentHouseId.value)
+    const nf = defaultFloorOf(house)
+    if (nf !== currentFloor.value) {
+      currentFloor.value = nf
+      await loadFloorPlan()
+    }
+  }
   loadFurnitures()
   loadItems()
 }
@@ -757,7 +787,10 @@ const loadFloorPlan = async () => {
   if (seq !== floorPlanSeq) return // 过期响应丢弃
   floorPlan.value = data
 }
-const onHouseChange = async () => { currentFloor.value = 1; await loadFloorPlan(); fitKey.value++ }
+const onHouseChange = async () => {
+  currentFloor.value = defaultFloorOf(houses.value.find((h) => h.id === currentHouseId.value))
+  await loadFloorPlan(); fitKey.value++
+}
 // PDF 底图:渲染第一页为 PNG 再上传(SVG image 不支持 PDF)
 const pdfToImage = async (file) => {
   const pdfjs = await import('pdfjs-dist')
@@ -871,6 +904,7 @@ const onDuplicateRoom = (roomId) => {
   roomDlg.value = true
 }
 const switchFloor = async (f) => {
+  floorTouched.value = true
   if (f === currentFloor.value) return
   const direction = f > currentFloor.value ? 'up' : 'down'
   // Phase 1: exit animation (old content visible, 400ms)
@@ -1266,9 +1300,22 @@ const onGlueRooms = async ({ roomAId, roomBId }) => {
 const onSearch = async () => {
   if (!searchKeyword.value) { clearSearch(); return }
   searchResults.value = await itemApi.list({ keyword: searchKeyword.value })
+  autoSwitchToHits()
+}
+// 搜索命中后自动切层:只看当前房子的命中;命中楼层里有 1 楼默认展示 1 楼,
+// 没有 1 楼则取命中楼层中最高层(跨房子的命中走右下角结果列表点选跳转)
+const autoSwitchToHits = async () => {
+  floorTouched.value = true
+  const hits = searchResults.value.filter((it) => it.house_id != null && Number(it.house_id) === Number(currentHouseId.value))
+  // floor/house_id 先判非空再 Number(Number(null)=0 会被当成 0 楼层)
+  const floorsWithHits = [...new Set(hits.filter((it) => it.floor != null && !Number.isNaN(Number(it.floor))).map((it) => Number(it.floor)))]
+  if (!floorsWithHits.length) return
+  const target = floorsWithHits.includes(1) ? 1 : Math.max(...floorsWithHits)
+  if (target !== currentFloor.value) await switchFloor(target)
 }
 const clearSearch = () => { searchKeyword.value = ''; searchResults.value = [] }
 const locateItem = (it) => {
+  floorTouched.value = true
   if (it.house_id != null) {
     if (currentHouseId.value !== Number(it.house_id)) {
       currentHouseId.value = Number(it.house_id)
