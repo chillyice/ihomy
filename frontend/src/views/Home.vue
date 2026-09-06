@@ -229,6 +229,13 @@ let ctx
 
 const editMode = computed(() => appStore.homeEditMode)
 const finishEdit = () => { appStore.toggleHomeEditMode() }
+// 进入编辑模式清除入场动画残留:GSAP from 的中间态 transform 在 tween 被中断(DOM 重建等)后会永久
+// 残留在组件上,使组件偏离栅格线;编辑态语义是精确对齐,进场先 kill 动画并清掉非 Vue 管理的 inline 样式
+watch(editMode, (on) => {
+  if (!on) return
+  gsap.killTweensOf('.dash-card')
+  gsap.set('.dash-card', { clearProps: 'transform,opacity,visibility' })
+})
 
 // ========== 栅格尺寸:自适应屏幕分辨率 ==========
 const COLS = 12
