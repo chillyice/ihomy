@@ -1,4 +1,4 @@
-<!-- 头像裁剪对话框:正方形选区+滚轮/滑块缩放,canvas 裁剪,无外部依赖 -->
+<!-- 头像裁剪对话框:图片固定显示,滚轮/滑块缩放正方形选择框(中心锚定),canvas 裁剪,无外部依赖 -->
 <template>
   <el-dialog v-model="visible" append-to-body :title="title" width="500px" :close-on-click-modal="false" @closed="onClosed">
     <div v-if="imgSrc" class="cropper-box" ref="boxRef" @wheel.prevent="onWheel">
@@ -11,8 +11,8 @@
     </div>
     <div v-else class="cropper-loading">加载中...</div>
     <div v-if="imgLoaded" class="zoom-row">
-      <span class="zoom-label">缩放</span>
-      <el-slider v-model.number="zoom" :min="0.5" :max="3" :step="0.1" :show-tooltip="false" style="flex:1" @input="applyZoom" />
+      <span class="zoom-label">选择框</span>
+      <el-slider v-model.number="zoom" :min="0.2" :max="1" :step="0.05" :show-tooltip="false" style="flex:1" @input="applyZoom" />
       <span class="zoom-value">{{ Math.round(zoom * 100) }}%</span>
     </div>
     <template #footer>
@@ -41,15 +41,15 @@ const imgRef = ref(null)
 // 图片实际显示尺寸 + 选区位置(正方形)
 const imgW = ref(0)
 const imgH = ref(0)
-const baseW = ref(0)  // 适配容器的基准宽度
+const baseW = ref(0)  // 适配容器的基准宽度(图片固定显示,不再缩放)
 const baseH = ref(0)  // 适配容器的基准高度
-const zoom = ref(1)   // 缩放倍数 0.5~3
+const zoom = ref(1)   // 选择框大小 = 图片短边 × zoom(0.2~1)
 const natW = ref(0)  // 原图尺寸
 const natH = ref(0)
 const sqX = ref(0)   // 选区左上角(相对显示图)
 const sqSize = ref(0)
 
-// 图片加载后初始化:计算显示尺寸,选区居中,边长=短边
+// 图片加载后初始化:计算固定显示尺寸,选区居中铺满短边
 const onImgLoad = () => {
   const img = imgRef.value
   if (!img) return
@@ -61,24 +61,28 @@ const onImgLoad = () => {
   baseW.value = natW.value * ratio
   baseH.value = natH.value * ratio
   zoom.value = 1
+  sqSize.value = 0 // 触发 applyZoom 的居中初始化
   applyZoom()
   imgLoaded.value = true
 }
 
-// 应用缩放:更新显示尺寸,选区居中重置
+// 应用选择框大小:图片固定,选区以自身中心为锚缩放(中心不动),边界 clamp 在图片内
 const applyZoom = () => {
-  imgW.value = Math.round(baseW.value * zoom.value)
-  imgH.value = Math.round(baseH.value * zoom.value)
-  // 选区边长=短边,居中
-  sqSize.value = Math.min(imgW.value, imgH.value)
-  sqX.value = (imgW.value - sqSize.value) / 2
-  sqY.value = (imgH.value - sqSize.value) / 2
+  imgW.value = Math.round(baseW.value)
+  imgH.value = Math.round(baseH.value)
+  const short = Math.min(imgW.value, imgH.value)
+  const newSize = Math.round(short * zoom.value)
+  const cx = sqSize.value > 0 ? sqX.value + sqSize.value / 2 : imgW.value / 2
+  const cy = sqSize.value > 0 ? sqY.value + sqSize.value / 2 : imgH.value / 2
+  sqSize.value = newSize
+  sqX.value = Math.max(0, Math.min(imgW.value - newSize, cx - newSize / 2))
+  sqY.value = Math.max(0, Math.min(imgH.value - newSize, cy - newSize / 2))
 }
 
-// 滚轮缩放
+// 滚轮缩放选择框
 const onWheel = (e) => {
-  const delta = e.deltaY > 0 ? -0.1 : 0.1
-  zoom.value = Math.max(0.5, Math.min(3, Math.round((zoom.value + delta) * 10) / 10))
+  const delta = e.deltaY > 0 ? -0.05 : 0.05
+  zoom.value = Math.max(0.2, Math.min(1, Math.round((zoom.value + delta) * 100) / 100))
   applyZoom()
 }
 const sqY = ref(0)
