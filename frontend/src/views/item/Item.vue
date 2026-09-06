@@ -248,6 +248,7 @@
                   <div v-if="fi < floors.length - 1" class="fp-floor fp-floor-arrow" @click.stop="swapFloor(f, floors[fi + 1])" :title="$t('item.floorDown')">↓</div>
                 </div>
                 <div v-if="mode === 'edit'" class="fp-floor fp-floor-arrow" :title="$t('item.floorRename')" @click.stop="startRenameFloor(f)">✎</div>
+                <div v-if="mode === 'edit' && floors.length > 1" class="fp-floor fp-floor-arrow fp-floor-del" :title="$t('item.floorDelete')" @click.stop="deleteFloor(f)">🗑</div>
               </template>
             </div>
           </template>
@@ -991,6 +992,35 @@ const confirmRenameFloor = async (oldF) => {
   await loadFloorPlan()
   ElMessage.success(t('item.floorRenamed', { n: rooms.length }))
 }
+// 删除楼层:房间复用 roomDelete 级联(家具进家具库/物品保留/散放物品清归属),floorPlans 移除该层键+floorOrder 同步;
+// 最后一个楼层不可删(按钮已隐藏,此处兜底);删的是当前层则按默认楼层规则(有1楼选1楼,无1楼选最高层)落回剩余楼层
+const deleteFloor = async (f) => {
+  if (floors.value.length <= 1) return
+  const house = houses.value.find((h) => h.id === currentHouseId.value)
+  if (!house) return
+  const allRooms = await itemApi.rooms(house.id)
+  const floorRooms = allRooms.filter((r) => r.floor === f) // 不叫 rooms:遮蔽外层 rooms ref
+  const msg = floorRooms.length
+    ? t('item.floorDeleteConfirmRooms', { floor: f, n: floorRooms.length })
+    : t('item.floorDeleteConfirm', { floor: f })
+  await ElMessageBox.confirm(msg, t('common.warning'), { type: 'warning', closeOnClickModal: true })
+  await Promise.all(floorRooms.map((r) => itemApi.removeRoom(r.id)))
+  let fp = {}
+  if (house.floorPlans) { try { fp = JSON.parse(house.floorPlans) } catch {} }
+  const fp2 = {}
+  Object.keys(fp).forEach((k) => { if (k !== 'floorOrder' && Number(k) !== f) fp2[k] = fp[k] })
+  if (Array.isArray(fp.floorOrder)) {
+    const order = fp.floorOrder.filter((x) => Number(x) !== f)
+    if (order.length > 1) fp2.floorOrder = order // 只剩一层无需显示顺序配置
+  }
+  const json = JSON.stringify(fp2)
+  await itemApi.saveFloorPlans(house.id, json)
+  house.floorPlans = json // 本地回写:defaultFloorOf/floors 从 floorPlans 解析
+  rooms.value = rooms.value.filter((r) => !(r.houseId === house.id && r.floor === f)) // 本地同步被删房间,默认层计算不误判
+  loadHouses() // 刷新 houses + rooms + furnitures + items(家具进库后侧栏/列表要更新)
+  ElMessage.success(t('item.floorDeleted'))
+  if (currentFloor.value === f) await switchFloor(defaultFloorOf(house))
+}
 const togglePoly = () => {
   if (tool.value === 'draw-poly') { tool.value = 'select'; canvasRef.value?.finishPoly() }
   else tool.value = 'draw-poly'
@@ -1559,6 +1589,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fp-floor-arrows { display: flex; flex-direction: column; gap: 2px; }
 .fp-floor-arrows .fp-floor-arrow { width: 17px; height: 17px; font-size: 9px; } /* 上下移纵向堆叠:两钮加间距与 36px 芯片等高 */
 .fp-floor-arrow:hover { background: rgba(184,140,110,0.25); color: #5c4c3d; }
+.fp-floor-del { font-size: 10px; }
+.fp-floor-del:hover { background: rgba(211,88,66,0.16); color: #c0503c; }
 .fp-floor-row { display: flex; align-items: center; gap: 2px; }
 .fp-floor-input { width: 46px; height: 28px; border-radius: 8px; border: 1px solid var(--color-primary, #b88c6e); background: rgba(255,255,255,0.95); color: #5c4c3d; text-align: center; font-size: 12px; font-weight: 600; outline: none; }
 .fp-fit { position: absolute; right: 12px; bottom: 12px; width: 36px; height: 36px; border-radius: 8px; background: rgba(255,255,255,0.92); color: #5c4c3d; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.1); transition: background 0.15s, box-shadow 0.15s, transform 0.15s; z-index: 5; }
