@@ -56,13 +56,17 @@
         </g>
         <!-- 物品 -->
         <g v-for="it in visibleItems" :key="it.id">
+          <template v-if="highlightItemIds.includes(it.id)">
+            <circle :cx="it.ax" :cy="it.ay" r="6" class="fp-item-ping" />
+            <circle :cx="it.ax" :cy="it.ay" r="6" class="fp-item-halo" />
+          </template>
           <circle
             :cx="it.ax" :cy="it.ay" r="6"
             class="fp-item"
             :class="{ 'is-hit': highlightItemIds.includes(it.id) }"
             @pointerdown="mode === 'edit' ? onItemDown($event, it) : null"
           />
-          <text :x="it.ax" :y="it.ay - 11" class="fp-item-label">{{ it.name }}</text>
+          <text :x="it.ax" :y="it.ay - 11" class="fp-item-label" :class="{ 'is-hit': highlightItemIds.includes(it.id) }">{{ it.name }}</text>
         </g>
         <!-- 编辑态手柄(画布内所有手柄/按钮均按 view.k 反缩放,屏幕尺寸恒定,不随画布缩放变化) -->
         <template v-if="mode === 'edit'">
@@ -1701,8 +1705,16 @@ defineExpose({ finishPoly, fit, cancelPending })
 .fp-crayon-stroke { fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 0.28; }
 .fp-crayon-stroke.room { stroke: #b88c6e; stroke-width: 4; }
 .fp-crayon-stroke.furn { stroke: #5f9380; stroke-width: 3; }
-.fp-item { fill: #b04a3a; stroke: #fff; stroke-width: 2; }.fp-item.is-hit { fill: #e0a030; }
+.fp-item { fill: #b04a3a; stroke: #fff; stroke-width: 2; }
+.fp-item.is-hit { fill: #e0a030; stroke-width: 2.5; animation: fpItemPulse 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+/* 搜索命中动效:恒定光晕定位 + 雷达波纹扩散 + 圆点呼吸脉冲,黄点/小字与底图重合时仍醒目 */
+.fp-item-ping { fill: none; stroke: #e0a030; stroke-width: 2.5; pointer-events: none; transform-box: fill-box; transform-origin: center; animation: fpItemPing 1.6s ease-out infinite; }
+.fp-item-halo { fill: rgba(224, 160, 48, 0.30); stroke: none; pointer-events: none; transform-box: fill-box; transform-origin: center; transform: scale(2.4); animation: fpItemHalo 1.6s ease-in-out infinite; }
 .fp-item-label { font-size: 10px; fill: #5c4c3d; text-anchor: middle; paint-order: stroke; stroke: rgba(255, 253, 248, 0.85); stroke-width: 3; pointer-events: none; }
+.fp-item-label.is-hit { font-weight: 700; stroke: rgba(255, 253, 248, 0.95); stroke-width: 4; }
+@keyframes fpItemPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }
+@keyframes fpItemHalo { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+@keyframes fpItemPing { 0% { transform: scale(1); opacity: 1; } 80% { transform: scale(3.2); opacity: 0; } 100% { transform: scale(3.2); opacity: 0; } }
 .fp-handle { fill: #fff; stroke: #b88c6e; stroke-width: 2; cursor: move; } /* 端点四向箭头:十字中心即热点,尖角端点也能精准落点 */
 .fp-hit { fill: transparent; cursor: move; } /* 端点透明命中区:可点 12px,可见 6px */
 .fp-handle:hover { stroke: #5c4c3d; }
