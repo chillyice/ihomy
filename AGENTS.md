@@ -5,6 +5,8 @@
 
 > **⚠ Git 规定(必须遵守)**:非人工指令,不得主动提交代码(`git commit`/`git add -A`/`git push` 一律禁止)。`git add` 只能指定具体文件路径,禁止 `git add -A`/`git add .`。
 
+> **⚠ 敏感数据规定(必须遵守)**:任何密码/密钥/私钥/token 一律不写入仓库文件——DB 密码与 JWT 密钥走 external.yml(不入 git,模板见 `external.yml.template`);`Linux部署指导.md`/`Windows部署指导.md`/`schema.sql` 为本地维护文档(.gitignore 已忽略,含凭证台账);前端演示凭证走 `frontend/.env.local`。历史曾因明文凭证入公开仓库做过全量清理+凭证轮换(2026-09-07),勿再引入。
+
 > **⚠ 路径拼写警示(遵守以防误写)**:
 > - 工作目录绝对路径:`C:\Users\chill\OneDrive\WorkStation\Projects\ihomy`
 > - 每次读/写/移动文件前先逐字核对路径;发现读不到文件时优先怀疑路径拼写而非文件不存在。
@@ -40,7 +42,7 @@
 | Maven artifact / jar 名 | `ihomy-backend` |
 | npm 包名 | `ihomy-frontend` |
 | 数据库名 | `ihomy` |
-| 应用连接账号 | `ihomy`(密码默认 `***REMOVED-DB-DEFAULT-PASSWORD***`,需改) |
+| 应用连接账号 | `ihomy`(密码经 external.yml 注入,不入仓库) |
 | Docker 容器名 | `ihomy-mysql` / `ihomy-redis` / `ihomy-backend` / `ihomy-nginx` |
 | Windows 服务名 | `IhomyBackend` / `IhomyNginx` |
 | 显示名 / PWA name / 页面标题 | `ihomy` |
@@ -50,7 +52,7 @@
 
 ## 数据库约定
 
-- **root 仅用于初始化**:`mysql -uroot -p < backend/src/main/resources/schema.sql`,执行一次(建库、建表、创建 ihomy 账号、初始数据)。
+- **root 仅用于初始化**:`mysql -uroot -p < backend/src/main/resources/schema.sql`,执行一次(建库、建表、创建 ihomy 账号、初始数据)。**schema.sql 为本地维护文件,不入 git**(.gitignore 已忽略;账号密码为占位符,执行前需替换)。
 - **业务运行用 `ihomy` 账号**:仅授予 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`(最小权限,无 CREATE/ALTER/DROP)。application.yml 连接用 `ihomy`,**不要用 root 跑业务**。
 - 账号同时创建 `localhost` 和 `%` 两个 host(本机/远程应用服务器都能连)。
 - **61 张表**,前缀分类:`sys_` 18 张(系统/账号/权限/配置/日志/天气/存储)、`family_` 22 张(家庭事务)、`content_` 21 张(内容数据)。**完整表清单见 `docs/需求设计说明书.md` §6.2**。
@@ -80,11 +82,11 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
     dto/         # 请求/响应 DTO
     websocket/   # ChatWebSocketHandler(原生 WebSocket 聊天室)
   src/main/resources/
-    application.yml     # 端口8080 context-path=/api;生产基线配置(MySQL 6306/Redis 6379);file.upload-dir /opt/ihomy/uploads;logging.file.path /opt/ihomy/logs
+    application.yml     # 端口8080 context-path=/api;生产基线配置(MySQL 6306/Redis 6379;DB密码/JWT密钥留空,由 external.yml 提供);file.upload-dir /opt/ihomy/uploads;logging.file.path /opt/ihomy/logs
     logback-spring.xml  # 三类日志分流(access/server/thirdparty,六要素 pattern,按天滚动)
     external.yml.template  # 外挂配置模板(IHOMY_CONFIG_PATH 覆盖密码/密钥/路径/captcha/天气,唯一开发生产差异机制)
     mapper/*.xml        # 每个 Mapper 一个同名 XML
-    schema.sql          # 建库+建号+建表(61张)+种子
+    schema.sql          # 建库+建号+建表(61张)+种子(本地维护,不入 git)
   mvnw / mvnw.cmd       # Maven Wrapper
 frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
   src/
@@ -290,7 +292,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **WeatherService 改造**:`loadCredential()` 读到的私钥若 `ENC(...)` 包裹,调 `parameterService.decrypt()` 解密;DB 和 yml 两条路径都支持。
 - **OPS 加密接口**:`GET /api/ops/crypto/encrypt?plaintext=xxx` 生成密文,`GET /api/ops/crypto/decrypt?ciphertext=ENC(xxx)` 验证解密(均 @RequirePermission("ops:view"))。
 - **外挂模板**:`backend/src/main/resources/external.yml.template`(复制为 external.yml 填真实凭证,设环境变量)。
-- **profile 化(废弃)**:**不再用 application-dev.yml profile**(见 `scripts/start-all.ps1:9`)。`application.yml` 为**生产基线配置**(MySQL 6306/Redis 6379/密码 `***REMOVED-DB-DEFAULT-PASSWORD***` 占位/captcha 空/天气留空/`file.upload-dir: /opt/ihomy/uploads` Linux 路径/`spring.threads.virtual.enabled: true` 虚拟线程/HikariCP `maximum-pool-size: 20`/`mybatis.sql: warn` 静默 SQL 日志);**所有环境差异**(开发密码/Windows 路径/captcha=qwer/天气凭证/JWT 密钥/Redis 密码)统一走 `IHOMY_CONFIG_PATH` 指向的 external.yml 覆盖。external.yml 不入 git,手动维护,生产部署时也可用 external.yml 注入真实 secrets(密码/密钥)。
+- **profile 化(废弃)**:**不再用 application-dev.yml profile**(见 `scripts/start-all.ps1:9`)。`application.yml` 为**生产基线配置**(MySQL 6306/Redis 6379/**DB 密码与 JWT 密钥留空——必须由 external.yml 提供,缺失启动即失败(JwtUtils fail-fast)**/captcha 空/天气留空/`file.upload-dir: /opt/ihomy/uploads` Linux 路径/`spring.threads.virtual.enabled: true` 虚拟线程/HikariCP `maximum-pool-size: 20`/`mybatis.sql: warn` 静默 SQL 日志);**所有环境差异**(开发密码/Windows 路径/captcha=qwer/天气凭证/JWT 密钥/Redis 密码)统一走 `IHOMY_CONFIG_PATH` 指向的 external.yml 覆盖。external.yml 不入 git(.gitignore 已忽略),手动维护,生产部署时也可用 external.yml 注入真实 secrets(密码/密钥)。
 
 ## 部署约定(Linux 2GB 求稳)
 
@@ -313,16 +315,15 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 ## 文档清单
 
-- `README.md`(启动说明 + Windows 一键启动脚本用法); `Windows部署指导.md` / `Linux部署指导.md`(生产部署 NSSM/systemd/Nginx/Let's Encrypt/Docker Compose)
+- `README.md`(项目简介,GitHub 展示,不含密码); `Windows部署指导.md` / `Linux部署指导.md`(生产部署 NSSM/systemd/Nginx/Let's Encrypt/Docker Compose;**本地维护不入 git**,Linux 版含凭证台账)
 - `docs/需求设计说明书.md` — **完整功能需求唯一活文档**(功能模块清单+数据库设计 61 表+接口设计+规划事项+修订记录),随迭代持续更新;§4.8.1 含原户型图设计.md 并入的设计决策存档(2026-09-07,原文件已删)
-- `docs/需求规格说明书.docx` — 需求文档历史归档(V9.16 起冻结,由上方 .md 接棒,不再更新)
 - `docs/变更归档.md` — 已实现变更归档(按功能域的文件级改动表+设计决策+踩坑+live DB 同步 SQL);新变更归档追加到该文件末尾
 - `docs/UI设计提示词.md` — 沉浸式首页 UI 设计完整规格(可作为 AI 提示词重新生成)
 - `docs/日志规范.md` — 日志开发规范(三类文件/六要素/tid 规则/级别标准/三方调用/脱敏清单)
 - `docs/日志问题分析方法.md` — 报错排查方法论(拿 tid → 详细日志页 → 四步分析;面向运维/业务人员)
-- `docs/功能测试用例.md` — 全站功能测试用例(32 域 ~320 条,含脑图 48 条+执行记录);API 批量脚本 `scripts/test_mm_api.py`
+- `docs/功能测试用例.md` — 全站功能测试用例(32 域 ~320 条,含脑图 48 条+执行记录)
 - `scripts/start-all.ps1`(Windows 一键启动前后端,双击 `start.bat` 调用,设 `IHOMY_CONFIG_PATH` 环境变量)/ `start-db.ps1`(Docker 拉起 MySQL+Redis+自动导 schema.sql,端口 6306/6379,与生产一致); `config/mysql/my.cnf`(端口 6306,内存优化,仅 Linux 本机部署用)
-- 完整接口清单:见 `docs/需求设计说明书.md` 第 7 章。代码事实以 `backend/src/main/java` + `resources/schema.sql` 为准,如需检索先 `grep` 再动手。
+- 完整接口清单:见 `docs/需求设计说明书.md` 第 7 章。代码事实以 `backend/src/main/java` + `resources/schema.sql`(本地维护,不入 git) 为准,如需检索先 `grep` 再动手。
 
 ## 环境检查(参考)
 

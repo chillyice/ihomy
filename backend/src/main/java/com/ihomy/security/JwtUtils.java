@@ -31,9 +31,12 @@ public class JwtUtils {
 
     private SecretKey key;
 
-    /** 由配置的 secret 派生 HMAC 密钥 */
+    /** 由配置的 secret 派生 HMAC 密钥(缺失时启动即失败,密钥只允许来自 external.yml 外挂配置) */
     @PostConstruct
     public void init() {
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException("jwt.secret 未配置:请设环境变量 IHOMY_CONFIG_PATH 指向 external.yml 并配置 jwt.secret(参考 external.yml.template)");
+        }
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 

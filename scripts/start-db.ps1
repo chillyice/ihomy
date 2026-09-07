@@ -58,10 +58,29 @@ for ($i = 0; $i -lt 30; $i++) {
 if ($ok) { Write-Host '    [OK] MySQL 就绪' -ForegroundColor Green }
 else { Write-Host '    [!!] MySQL 未在 60s 内就绪，请检查 docker logs ihomy-mysql' -ForegroundColor Yellow }
 
+# ---------- 应用账号密码与 external.yml 对齐 ----------
+# schema.sql 的 ihomy 账号密码为占位符;从开发 external.yml 读取真实密码并对齐(幂等,每次启动都执行)
+$devExternal = 'D:\WorkSpace\ihomy\config\external.yml'
+if (Test-Path $devExternal) {
+  $raw = Get-Content $devExternal -Raw -Encoding UTF8
+  $m = [regex]::Match($raw, '(?s)datasource:\s*password:\s*([A-Za-z0-9_@#$%^&*+!.-]+)')
+  if ($m.Success -and $m.Groups[1].Value -notmatch '^CHANGE_ME') {
+    $appPwd = $m.Groups[1].Value
+    # 纯 ASCII SQL,直接 docker exec 执行(符合编码规范)
+    docker exec ihomy-mysql mysql -uroot -proot -e "ALTER USER 'ihomy'@'localhost' IDENTIFIED BY '$appPwd'; ALTER USER 'ihomy'@'%' IDENTIFIED BY '$appPwd'; FLUSH PRIVILEGES;" 2>$null
+    if ($LASTEXITCODE -eq 0) { Write-Host '    [OK] 应用账号 ihomy 密码已与 external.yml 对齐' -ForegroundColor Green }
+    else { Write-Host '    [!!] 应用账号密码对齐失败,请手动 docker exec ALTER USER' -ForegroundColor Yellow }
+  } else {
+    Write-Host '    [!!] 未从 external.yml 解析到应用密码,请确认 spring.datasource.password 已配置真实值' -ForegroundColor Yellow
+  }
+} else {
+  Write-Host "    [!!] 未找到开发外挂配置 $devExternal,请先创建(参考 backend/src/main/resources/external.yml.template)" -ForegroundColor Yellow
+}
+
 Write-Host "`n容器已启动：" -ForegroundColor Green
 Write-Host '  MySQL  ihomy-mysql  localhost:6306  (容器内 3306)'
 Write-Host '    容器 root 密码: root （仅管理用）'
-Write-Host '    应用连接账号:   ihomy / ***REMOVED-DB-DEFAULT-PASSWORD*** （schema.sql 已自动创建，仅 DML 权限）'
+Write-Host '    应用连接账号:   ihomy （仅 DML 权限；密码与 D:\WorkSpace\ihomy\config\external.yml 对齐，见上方对齐步骤）'
 Write-Host '    数据库:         ihomy'
 Write-Host '  Redis  ihomy-redis  localhost:6379  (容器内 6379)'
 Write-Host "`n停止: docker stop ihomy-mysql ihomy-redis"

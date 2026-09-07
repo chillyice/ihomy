@@ -72,11 +72,14 @@ const captchaId = ref('')
 const captchaImage = ref('')
 
 const _isReg = route.query.register === '1' || !!route.query.invite
+// 演示账号预填:从 .env.local 的 VITE_DEMO_* 读取(仅开发环境配置;生产构建为空,密码不入仓库)
+const DEMO_EMAIL = import.meta.env.VITE_DEMO_EMAIL || ''
+const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD || ''
 const form = reactive({
   familyName: '',
   inviteCode: route.query.invite || '',
-  email: _isReg ? '' : 'demo@ihomy.local',
-  password: _isReg ? '' : '***REMOVED-DEMO-PASSWORD***',
+  email: _isReg ? '' : DEMO_EMAIL,
+  password: _isReg ? '' : DEMO_PASSWORD,
   confirmPassword: '',
   captchaCode: _isReg ? '' : 'qwer',
 })
@@ -117,7 +120,7 @@ loadCaptcha()
 const toggleMode = () => {
   isRegister.value = !isRegister.value
   if (isRegister.value) { form.email = ''; form.password = ''; form.confirmPassword = ''; form.captchaCode = '' }
-  else { form.email = 'demo@ihomy.local'; form.password = '***REMOVED-DEMO-PASSWORD***'; form.captchaCode = 'qwer' }
+  else { form.email = DEMO_EMAIL; form.password = DEMO_PASSWORD; form.captchaCode = 'qwer' }
   loadCaptcha()
 }
 
