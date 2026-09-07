@@ -15,5 +15,6 @@ backend/src/main/resources/schema.sql
 external.yml
 external.yml.bak
 
-# 前端本地环境变量(演示账号密码等)
+# 前端本地环境变量(演示账号密码等;frontend/.gitignore 的 *.local 已覆盖,此处双保险)
 frontend/.env.local
+frontend/.env.development.local
