@@ -3,6 +3,10 @@
     <span class="back-btn" @click="goBack">
       <el-icon><ArrowLeft /></el-icon>
     </span>
+    <!-- 直达首页:功能页可能有多级历史(列表→详情→编辑),返回键逐级回退太深 -->
+    <span class="home-btn" :title="$t('mobile.home')" @click="goHome">
+      <el-icon><HomeFilled /></el-icon>
+    </span>
     <span class="header-title">{{ title }}</span>
     <span class="header-right">
       <slot name="right" />
@@ -11,14 +15,17 @@
 </template>
 
 <script setup>
-import { ArrowLeft } from '@element-plus/icons-vue'
+import { ArrowLeft, HomeFilled } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 const props = defineProps({ title: { type: String, default: '' } })
 const router = useRouter()
 const goBack = () => {
-  if (window.history.length > 1) router.back()
+  // vue-router 会在 history.state.back 记录应用内上一条路由;无记录说明是外链/PWA 直达深页,
+  // 此时 history.back() 会退出站点,改为直接回首页
+  if (window.history.state && window.history.state.back != null) router.back()
   else router.push('/')
 }
+const goHome = () => router.push('/')
 </script>
 
 <style scoped>
@@ -31,8 +38,8 @@ const goBack = () => {
   padding-top: env(safe-area-inset-top, 0px);
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding-left: 12px;
+  gap: 4px;
+  padding-left: 8px;
   padding-right: 12px;
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(20px) saturate(1.1);
@@ -44,7 +51,7 @@ html.dark .mobile-header {
   background: rgba(20, 28, 45, 0.92);
   border-bottom-color: rgba(255, 255, 255, 0.08);
 }
-.back-btn {
+.back-btn, .home-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -54,10 +61,11 @@ html.dark .mobile-header {
   cursor: pointer;
   color: var(--color-text-primary, #333);
   -webkit-tap-highlight-color: transparent;
+  font-size: 18px;
 }
-.back-btn:active { background: rgba(0, 0, 0, 0.06); }
-html.dark .back-btn { color: #E8DCC8; }
-html.dark .back-btn:active { background: rgba(255, 255, 255, 0.08); }
+.back-btn:active, .home-btn:active { background: rgba(0, 0, 0, 0.06); }
+html.dark .back-btn, html.dark .home-btn { color: #E8DCC8; }
+html.dark .back-btn:active, html.dark .home-btn:active { background: rgba(255, 255, 255, 0.08); }
 .header-title {
   flex: 1;
   font-size: 16px;

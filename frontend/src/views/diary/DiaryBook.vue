@@ -3,14 +3,17 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('diary.title'), to: '/diary' }, { label: bookTitle }]" />
 
-    <div v-loading="loading" class="book-main">
+    <div v-loading="loading" class="book-main" ref="mainRef">
       <div v-if="!loading && entries.length" class="book-wrap">
-        <div :key="pos + (isMobile ? 'm' : 'd')" class="book-spread" :class="'flip-' + dir">
-          <template v-if="!isMobile">
-            <DiaryPage :page="pages[pos * 2] || blankPage" :no="pos * 2 + 1" side="left" :can-edit="canEdit(pages[pos * 2])" @action="(a) => onAction(a, pages[pos * 2])" />
-            <DiaryPage :page="pages[pos * 2 + 1] || blankPage" :no="pos * 2 + 2" side="right" :can-edit="canEdit(pages[pos * 2 + 1])" @action="(a) => onAction(a, pages[pos * 2 + 1])" />
-          </template>
-          <DiaryPage v-else :page="pages[pos] || blankPage" :no="pos + 1" side="single" :can-edit="canEdit(pages[pos])" @action="(a) => onAction(a, pages[pos])" />
+        <!-- 缩放外壳:小屏按可用宽度等比缩放信纸(与编辑页一致);翻页动画挂在外壳,缩放 transform 挂在内层互不覆盖 -->
+        <div :key="pos + (isMobile ? 'm' : 'd')" class="book-scaler" :class="['flip-' + dir, { scaled: spreadScale < 1 }]" :style="scalerStyle">
+          <div ref="spreadRef" class="book-spread" :style="spreadStyle">
+            <template v-if="!isMobile">
+              <DiaryPage :page="pages[pos * 2] || blankPage" :no="pos * 2 + 1" side="left" :can-edit="canEdit(pages[pos * 2])" @action="(a) => onAction(a, pages[pos * 2])" />
+              <DiaryPage :page="pages[pos * 2 + 1] || blankPage" :no="pos * 2 + 2" side="right" :can-edit="canEdit(pages[pos * 2 + 1])" @action="(a) => onAction(a, pages[pos * 2 + 1])" />
+            </template>
+            <DiaryPage v-else :page="pages[pos] || blankPage" :no="pos + 1" side="single" :can-edit="canEdit(pages[pos])" @action="(a) => onAction(a, pages[pos])" />
+          </div>
         </div>
 
         <div class="book-toolbar">
@@ -50,14 +53,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { diaryApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useDevice } from '@/composables/useDevice'
-import { LINES_PER_PAGE, PAGE_H, measureDiaryLines } from '@/utils/diary'
+import { LINES_PER_PAGE, PAGE_H, PAPER_W, measureDiaryLines } from '@/utils/diary'
 import { parseDoodle, doodleExtentY } from '@/utils/doodle'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import DiaryPage from './DiaryPage.vue'
@@ -81,6 +84,31 @@ const authorName = computed(() => entries.value[0]?.authorName || '')
 const maxPos = computed(() => (isMobile.value ? pages.value.length - 1 : Math.ceil(pages.value.length / 2) - 1))
 const canPrev = computed(() => pos.value > 0)
 const canNext = computed(() => pos.value < maxPos.value)
+
+/* ---------- 信纸缩放:查看页与编辑页一致,可用宽度不足时整版等比缩放(涂鸦/分页坐标系不变,仅视觉缩放) ---------- */
+const DESKTOP_SPREAD_W = PAPER_W * 2 + 10 // 双页信纸 + 10px 书缝
+const mainRef = ref(null)
+const spreadRef = ref(null)
+const spreadScale = ref(1)
+const scalerH = ref(0)
+const spreadW = computed(() => (isMobile.value ? PAPER_W : DESKTOP_SPREAD_W))
+const spreadStyle = computed(() => (spreadScale.value < 1 ? { transform: `scale(${spreadScale.value})`, transformOrigin: 'top left', width: spreadW.value + 'px' } : {}))
+const scalerStyle = computed(() => {
+  const s = spreadScale.value
+  const style = { width: Math.round(spreadW.value * s) + 'px' }
+  if (scalerH.value) style.height = scalerH.value + 'px'
+  return style
+})
+const syncScalerHeight = () => {
+  if (spreadRef.value) scalerH.value = Math.ceil(spreadRef.value.offsetHeight * spreadScale.value)
+}
+const syncSpreadScale = () => {
+  // 可用宽度取页面内容盒实测值(桌面含左侧导航让位,手机为视口减 padding)
+  const avail = mainRef.value?.clientWidth || window.innerWidth
+  spreadScale.value = Math.min(1, avail / spreadW.value)
+  nextTick(syncScalerHeight)
+}
+const onResize = () => syncSpreadScale()
 
 const indicator = computed(() => {
   const n = pages.value.length
@@ -118,6 +146,7 @@ const load = async () => {
     })
     buildPages()
     pos.value = 0
+    nextTick(syncSpreadScale)
   } finally {
     loading.value = false
   }
@@ -159,16 +188,23 @@ const onKeydown = (e) => {
   else if (e.key === 'ArrowRight') flip(1)
 }
 
-// 桌面<->移动切换时转换页码语义(双页spread <-> 单页)
+// 桌面<->移动切换时转换页码语义(双页spread <-> 单页),并按新布局重算缩放
 watch(isMobile, (m) => {
   pos.value = m ? Math.min(maxPos.value, pos.value * 2) : Math.floor(pos.value / 2)
+  nextTick(syncSpreadScale)
 })
+// 翻页重挂载后重测高度(首页/空白页页眉高度略有差异)
+watch(pos, () => nextTick(syncScalerHeight))
 
 onMounted(() => {
   load()
   window.addEventListener('keydown', onKeydown)
+  window.addEventListener('resize', onResize)
 })
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('resize', onResize)
+})
 </script>
 
 <style scoped>
@@ -178,10 +214,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
 .book-spread { display: flex; justify-content: center; gap: 10px; }
 
-/* 翻页动画:方向性滑入(下次翻页重挂载触发) */
-.book-spread { will-change: transform, opacity; }
-.flip-next { animation: flipNext 0.28s ease both; }
-.flip-prev { animation: flipPrev 0.28s ease both; }
+/* 缩放外壳:收窄时 overflow 裁掉内层未缩放的布局盒,防止多余滚动空间;缩放 transform 在内层 .book-spread */
+.book-scaler { position: relative; }
+.book-scaler.scaled { overflow: hidden; }
+
+/* 翻页动画:方向性滑入(下次翻页重挂载触发),挂在外壳避免覆盖内层缩放 transform */
+.book-scaler { will-change: transform, opacity; }
+.book-scaler.flip-next { animation: flipNext 0.28s ease both; }
+.book-scaler.flip-prev { animation: flipPrev 0.28s ease both; }
 @keyframes flipNext { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes flipPrev { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: translateX(0); } }
 

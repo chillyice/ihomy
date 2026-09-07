@@ -39,7 +39,7 @@ import java.util.Map;
  * 凭证优先从 sys_weather_credential 表读 status=1 的记录(多环境账本),yml 作 fallback。
  * 支持当前天气、预报、预警、天气指数、空气质量、分钟降水六类查询。
  * 凭证未配置时所有方法返回 null,前端降级为只按时间做光影。
- * Redis 缓存:now 30 分钟 / forecast 30 分钟 / warning 5 分钟 / indices 30 分钟 / air 30 分钟 / minutely 10 分钟。
+ * Redis 缓存:now 30 分钟 / forecast 30 分钟 / 预警 25 分钟(坐标级,详情聚合与定时推送共用同一缓存) / indices 30 分钟 / air 30 分钟 / minutely 10 分钟。
  */
 @Slf4j
 @Service
@@ -69,7 +69,6 @@ public class WeatherService {
 
     private static final Duration NOW_TTL = Duration.ofMinutes(30);
     private static final Duration FORECAST_TTL = Duration.ofMinutes(30);
-    private static final Duration WARNING_TTL = Duration.ofMinutes(5);
     private static final Duration INDICES_TTL = Duration.ofMinutes(30);
     private static final Duration AIR_TTL = Duration.ofMinutes(30);
     private static final Duration MINUTELY_TTL = Duration.ofMinutes(10);
@@ -190,8 +189,9 @@ public class WeatherService {
         if (hourlyResp != null && hourlyResp.has("hours")) data.put("hourly", mapHourlyV1(hourlyResp.get("hours")));
 
         // 灾害预警(v1 /weatheralert/v1/current 坐标路径;v7 已弃用 403)
-        JsonNode warning = callApi("/weatheralert/v1/current/" + ll[0] + "/" + ll[1] + "?localTime=true", cred);
-        if (warning != null && warning.has("alerts")) data.put("warning", mapWarningV1(warning.get("alerts")));
+        // 走 fetchAlertsCached 坐标级共享缓存:详情请求与定时推送(均约 30 分钟一轮)合并为每坐标每轮最多 1 次调用
+        List<Map<String, Object>> warnings = fetchAlertsCached(locationId, cred);
+        if (!warnings.isEmpty()) data.put("warning", warnings);
 
         // 空气质量(新版 /airquality/v1,坐标路径参数;映射为旧字段形状供前端)
         Map<String, Object> air = fetchAir(locationId, cred);
@@ -608,7 +608,11 @@ public class WeatherService {
 
     // ---------- 预警主动推送(30 分钟一轮,家庭级开关) ----------
 
-    /** 拉当前生效预警(按坐标共享缓存 10 分钟,多家庭同坐标只打一次 API) */
+    /**
+     * 拉当前生效预警(按坐标共享缓存,多家庭同坐标只打一次 API)。
+     * 缓存 TTL 25 分钟:两个消费方(详情聚合 30 分钟缓存、预警推送 30 分钟一轮)均按 ≈30 分钟粒度消费,
+     * TTL 略低于消费间隔,合并后每坐标每个周期最多 1 次真实调用(此前两路各打一遍,预警调用量约为其他类型 2 倍)。
+     */
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> fetchAlertsCached(String coords, WeatherCredential cred) {
         String key = "ihomy:weather:alerts:" + coords;
@@ -622,7 +626,7 @@ public class WeatherService {
         JsonNode resp = callApi("/weatheralert/v1/current/" + ll[0] + "/" + ll[1] + "?localTime=true", cred);
         List<Map<String, Object>> list = resp != null && resp.has("alerts") ? mapWarningV1(resp.get("alerts")) : List.of();
         try {
-            redis.opsForValue().set(key, mapper.writeValueAsString(list), Duration.ofMinutes(10));
+            redis.opsForValue().set(key, mapper.writeValueAsString(list), Duration.ofMinutes(25));
         } catch (Exception e) {
             log.warn("[fetchAlertsCached] write cache failed: {}", e.getMessage());
         }

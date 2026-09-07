@@ -37,6 +37,8 @@ export default {
     warning: 'Notice',
     remove: 'Remove',
     close: 'Close',
+    expand: 'Expand',
+    collapse: 'Collapse',
     selected: 'Selected',
   },
   login: {

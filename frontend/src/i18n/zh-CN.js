@@ -41,6 +41,8 @@ export default {
     remove: '移除',
     removed: '已移除',
     close: '关闭',
+    expand: '展开',
+    collapse: '收起',
     selected: '已选择',
   },
   login: {

@@ -1,16 +1,17 @@
 <!-- 日记涂鸦笔盘:不同笔尖的画笔陈列 + 粗细调节 + 调色盘;点击画笔选中/取消;移动端为底部可收起抽屉 -->
 <template>
   <div class="doodle-area" :class="{ collapsed, mobile: isMobile }">
-    <div class="tray-title" @click="toggle">
-      <span>{{ $t('diary.doodleTitle') }}</span>
-      <span v-if="isMobile" class="tray-toggle" :class="{ up: !collapsed }">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>
-      </span>
+    <!-- 仅箭头把手可收起/展开:整行标题不做开关,防止手写笔书写时手掌误触抽屉弹跳 -->
+    <div class="tray-title">
+      <span class="tray-name">{{ collapsed && brush ? activeBrushLabel : $t('diary.doodleTitle') }}</span>
+      <button v-if="isMobile" type="button" class="tray-toggle" :class="{ up: !collapsed }" :title="collapsed ? $t('common.expand') : $t('common.collapse')" @click="toggle">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>
+      </button>
     </div>
 
     <div v-show="!collapsed || !isMobile" class="tray-body">
       <div class="pen-grid">
-        <button v-for="b in BRUSHES" :key="b.id" type="button" class="pen-item" :class="{ active: brush === b.id }" :title="$t(b.labelKey)" @click="$emit('update:brush', brush === b.id ? null : b.id)">
+        <button v-for="b in BRUSHES" :key="b.id" type="button" class="pen-item" :class="{ active: brush === b.id }" :title="$t(b.labelKey)" @click="pickBrush(b)">
           <span class="pen-svg">
             <!-- 签字笔 -->
             <svg v-if="b.id === 'gel'" viewBox="0 0 26 52">
@@ -101,9 +102,11 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { BRUSHES, INK_COLORS } from '@/utils/doodle'
 import { useDevice } from '@/composables/useDevice'
 
+const { t } = useI18n()
 const { isMobile } = useDevice()
 const collapsed = ref(true)
 
@@ -117,7 +120,15 @@ const props = defineProps({
   canUndo: { type: Boolean, default: false },
   canRedo: { type: Boolean, default: false },
 })
-defineEmits(['update:brush', 'update:size', 'update:alpha', 'update:brushColor', 'undo', 'redo'])
+const emit = defineEmits(['update:brush', 'update:size', 'update:alpha', 'update:brushColor', 'undo', 'redo'])
+
+// 选笔后移动端自动收起抽屉:笔盘不再遮挡纸面,手掌也碰不到笔盘控件;换笔点箭头重新展开
+const pickBrush = (b) => {
+  emit('update:brush', props.brush === b.id ? null : b.id)
+  if (isMobile.value) collapsed.value = true
+}
+
+const activeBrushLabel = computed(() => t(BRUSHES.find((b) => b.id === props.brush)?.labelKey || 'diary.doodleTitle'))
 
 const safeColor = computed(() => (/^#[0-9a-fA-F]{6}$/.test(props.brushColor) ? props.brushColor : '#3A2E22'))
 </script>
@@ -138,13 +149,22 @@ html.dark .doodle-area {
 
 .tray-title { font-size: 12px; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 10px; text-align: center; letter-spacing: 2px; }
 
-/* 移动端标题栏兼作收起/展开把手 */
+/* 移动端标题栏 + 箭头把手(唯一开关,触控目标 ≥40px) */
 .mobile .tray-title {
-  display: flex; align-items: center; justify-content: center; gap: 4px;
-  margin-bottom: 0; padding: 4px 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin-bottom: 0; padding: 2px 0;
   -webkit-tap-highlight-color: transparent; user-select: none;
 }
-.tray-toggle { display: inline-flex; transition: transform 0.25s ease; }
+.mobile .tray-title .tray-name { line-height: 36px; }
+.tray-toggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 40px; height: 36px; margin: 0 -6px; padding: 0;
+  border: none; background: transparent; color: var(--color-text-secondary);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: transform 0.25s ease, background 0.15s;
+  border-radius: 8px;
+}
+.tray-toggle:active { background: rgba(184,140,110,0.12); }
 .tray-toggle.up { transform: rotate(180deg); }
 
 .pen-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px 2px; }
