@@ -266,7 +266,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 - 后端编译:`cd backend; .\mvnw.cmd -B clean compile -DskipTests` → BUILD SUCCESS
 - 前端构建:`cd frontend; npm run build` → 入口 chunk ≈224-228KB(基线 2026-09-06 实测 228KB/gzip 89KB;simple-mind-map 已隔离为独立异步 chunk ~340KB 仅脑图编辑页加载)
-- 接口测试:`cd autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed
+- 接口测试:同级独立项目(不在本仓库)`cd ..\autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed;**CI(GitHub Actions,`.github/workflows/ci.yml`)每次推送自动验证:前后端构建+compose 起库导入 schema+后端启动+登录冒烟**
 
 ## 已实现变更归档(已外置)
 
