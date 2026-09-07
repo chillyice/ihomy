@@ -1,0 +1,47 @@
+# ihomy 本地开发中间件(MySQL + Redis)
+# 用法:docker compose up -d(或 .\scripts\start-db.ps1 / setup.ps1,首次启动自动导入 schema.sql)
+# 端口与生产对齐:MySQL 6306(容器内 3306)/ Redis 6379;容器名 ihomy-mysql / ihomy-redis。
+# 数据持久化:命名卷 ihomy-mysql-data(重置数据库 = docker compose down -v)。
+name: ihomy
+
+services:
+  mysql:
+    image: mysql:8.4.10
+    container_name: ihomy-mysql
+    ports:
+      - "6306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root   # 仅本机开发管理用;生产 root 密码不入库
+    volumes:
+      - mysql-data:/var/lib/mysql
+      # 首次启动(空数据卷)由 MySQL 入口脚本自动执行:建库建表+种子
+      - ./backend/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
+      - --performance_schema=OFF
+      - --max_connections=30
+    healthcheck:
+      # 走 TCP(127.0.0.1)而非 socket:初始化阶段的临时服务器只开 socket,
+      # socket ping 会在 schema 导入完成前误报 healthy
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  redis:
+    image: redis:latest
+    container_name: ihomy-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  mysql-data:
+    name: ihomy-mysql-data

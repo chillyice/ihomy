@@ -5,12 +5,13 @@
 
 > **⚠ Git 规定(必须遵守)**:非人工指令,不得主动提交代码(`git commit`/`git add -A`/`git push` 一律禁止)。`git add` 只能指定具体文件路径,禁止 `git add -A`/`git add .`。
 
-> **⚠ 敏感数据规定(必须遵守)**:任何密码/密钥/私钥/token 一律不写入仓库文件——DB 密码与 JWT 密钥走 external.yml(不入 git,模板见 `external.yml.template`);`Linux部署指导.md`/`Windows部署指导.md`/`schema.sql` 为本地维护文档(.gitignore 已忽略,含凭证台账);前端演示凭证走 `frontend/.env.development.local`(仅 vite dev 加载,生产构建不读取;**`.env.local` 所有模式都加载会内联进生产 bundle,禁用**)。历史曾因明文凭证入公开仓库做过全量清理+凭证轮换(2026-09-07),勿再引入。轮换后凭证台账在本地 `Linux部署指导.md` §〇;重写前全量备份(bundle/脱敏文件/WIP 补丁/替换清单)在 `D:\WorkSpace\ihomy-backup-20260907\`;详见 `docs/变更归档.md` 敏感数据治理小节。
+> **⚠ 敏感数据规定(必须遵守)**:**生产**密码/密钥/私钥/token 一律不写入仓库文件——生产 DB 密码与 JWT 密钥走服务器上的 external.yml(不入 git,模板见 `external.yml.template`);`Linux部署指导.md`/`Windows部署指导.md`/`docs/新人上手指南.md` 为本地维护文档(.gitignore 已忽略,含凭证台账);前端演示凭证走 `frontend/.env.development.local`(仅 vite dev 加载,生产构建不读取;**`.env.local` 所有模式都加载会内联进生产 bundle,禁用**)。**schema.sql 为开发安全版已入库(2026-09-07)**:仅含本机 Docker 开发固定凭证(ihomy 账号密码/admin 与 ops 种子的 BCrypt 哈希,明文只在本地新人上手指南),生产凭证完全独立;生产部署时必须 `ALTER USER` 改独立强密码。历史曾因明文生产凭证入公开仓库做过全量清理+凭证轮换(2026-09-07),勿再引入生产凭证。轮换后凭证台账在本地 `Linux部署指导.md` §〇;重写前全量备份(bundle/脱敏文件/WIP 补丁/替换清单)在 `D:\WorkSpace\ihomy-backup-20260907\`;详见 `docs/变更归档.md` 敏感数据治理小节。
 
 > **⚠ 路径拼写警示(遵守以防误写)**:
 > - 工作目录绝对路径:`C:\Users\chill\OneDrive\WorkStation\Projects\ihomy`
 > - 每次读/写/移动文件前先逐字核对路径;发现读不到文件时优先怀疑路径拼写而非文件不存在。
 > - **⚠ 编码警示(必须遵守)**:含中文的源码/配置/SQL 一律走本工具的 Read/Write/Edit 读写,禁止用 PowerShell `Get-Content`/`Set-Content`/`WriteAllText` 读写(PS 5.1 默认 GBK 会破坏 UTF-8 中文,且 `[IO.File]::WriteAllText` 默认带 BOM 导致 javac 报非法字符)。PowerShell 仅用于:npm/mvn 构建、HTTP 冒烟。
+> - **⚠ PowerShell 5.1 原生命令传参两坑**(2026-09-07 start-db.ps1 踩坑):① 不带引号的点号参数会被拆词(`mysqladmin ping -h127.0.0.1` 实际收到主机 `127`),必须写成 `'-h127.0.0.1'`;② 传给原生命令的参数里嵌双引号会被吃掉(`docker inspect --format '{{ index .X "key" }}'` 必然探测失败),改用无引号模板 `{{.Config.Labels}}` 或行为式判断。另:**.ps1 含中文必须带 UTF-8 BOM**(无 BOM 时 PS 5.1 按 GBK 解析直接语法错误);Write 工具默认无 BOM,新建中文 .ps1 后须补 BOM。
 > - **⚠ 数据库写中文警示**:向 MySQL 写入含中文的 SQL 时,**禁止**用 PowerShell 管道 `Get-Content file.sql | docker exec -i mysql mysql ...`(PS 5.1 管道编码非 UTF-8 导致中文乱码)。**正确方式**:① 用本工具 Write 写 SQL 文件(UTF-8 无 BOM)→ `docker cp file.sql ihomy-mysql:/tmp/` → `docker exec ihomy-mysql mysql --default-character-set=utf8mb4 ihomy -e "source /tmp/file.sql"` → 清理临时文件;② 纯 ASCII SQL 可直接 `docker exec mysql -e "..."`;③ 远程用 `scp -P 19068 file.sql root@ihomy.top:/tmp/` → SSH 执行 `mysql -e "source /tmp/file.sql"`。终端显示中文为 `?` 是 GBK 终端问题,不代表存储乱码,用 `python -c "import subprocess; ..."` 验证。
 
 ## 项目概述
@@ -52,7 +53,7 @@
 
 ## 数据库约定
 
-- **root 仅用于初始化**:`mysql -uroot -p < backend/src/main/resources/schema.sql`,执行一次(建库、建表、创建 ihomy 账号、初始数据)。**schema.sql 为本地维护文件,不入 git**(.gitignore 已忽略;账号密码为占位符,执行前需替换)。
+- **root 仅用于初始化**:`mysql -uroot -p < backend/src/main/resources/schema.sql`,执行一次(建库、建表、创建 ihomy 账号、初始数据);本地开发直接 `.\scripts\start-db.ps1`(Docker 首次启动自动导入)。**schema.sql 为开发安全版,已入库(2026-09-07)**:ihomy 账号密码为本机开发固定值(与 `scripts/setup.ps1` 生成的 external.yml 一致);admin/ops 初始密码为开发专用值(明文见本地 `docs/新人上手指南.md`,不入 git),生产部署必须改独立强密码(见 Linux部署指导.md)。
 - **业务运行用 `ihomy` 账号**:仅授予 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`(最小权限,无 CREATE/ALTER/DROP)。application.yml 连接用 `ihomy`,**不要用 root 跑业务**。
 - 账号同时创建 `localhost` 和 `%` 两个 host(本机/远程应用服务器都能连)。
 - **生产 MySQL 密码策略(2026-09-07 轮换踩坑)**:生产库启用 `validate_password` MEDIUM(特殊字符/数字/大小写各≥1,长度≥8)——生成/轮换 DB 密码必须含特殊字符(避开 `' " \ $ |` 转义雷区,建议 `!@%^&*-_+=.`),否则 `ALTER USER` 报 1819;开发 Docker MySQL 无此组件,同一密码 dev 可用 prod 被拒。
@@ -87,7 +88,7 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
     logback-spring.xml  # 三类日志分流(access/server/thirdparty,六要素 pattern,按天滚动)
     external.yml.template  # 外挂配置模板(IHOMY_CONFIG_PATH 覆盖密码/密钥/路径/captcha/天气,唯一开发生产差异机制)
     mapper/*.xml        # 每个 Mapper 一个同名 XML
-    schema.sql          # 建库+建号+建表(61张)+种子(本地维护,不入 git)
+    schema.sql          # 建库+建号+建表(61张)+种子(开发安全版,已入库;本地开发由 start-db.ps1 自动导入)
   mvnw / mvnw.cmd       # Maven Wrapper
 frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
   src/
@@ -113,7 +114,7 @@ frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
 .\mvnw.cmd -B clean compile -DskipTests       # 仅编译验证
 .\mvnw.cmd spring-boot:run                     # 开发运行(端口8080)
 ```
-- 有 jar 锁先 `taskkill /F /IM java.exe` 再打包(运行中 java 锁定日志文件导致 clean 失败)。日志路径:生产 `/opt/ihomy/logs`(三类子目录 access/server/thirdparty),开发 `D:\WorkSpace\ihomy\logs`(external.yml 覆盖,同样三子目录)。
+- 有 jar 锁先 `taskkill /F /IM java.exe` 再打包(运行中 java 锁定日志文件导致 clean 失败)。日志路径:生产 `/opt/ihomy/logs`(三类子目录 access/server/thirdparty),开发由 external.yml 指定(旧机器 `D:\WorkSpace\ihomy\logs`,setup.ps1 新装的机器为仓库内 `data\logs`,同样三子目录)。
 - 临时 Maven(本机未装 mvn):`C:\Users\chill\AppData\Local\Temp\opencode\apache-maven-3.9.9\bin\mvn.cmd`
 - JAVA_HOME:`C:\Program Files\Java\jdk-21`(JDK 21 已装)
 - 运行后端必须用完整路径单实例:`C:\Program Files\Java\jdk-21\bin\java.exe -jar target\ihomy-backend.jar`(javapath launcher + JDK 双实例会分流 8080 请求导致偶发 401/404/500)。
@@ -125,7 +126,7 @@ npm run dev        # 开发(端口5173,代理/api到8080)
 npm run build      # 生产构建,产物 dist/,含 PWA service worker
 ```
 
-冒烟:登录 `POST /api/auth/login {email, password, captchaId, captchaCode:'qwer'}`(开发环境验证码固定 `qwer`,先 `GET /api/auth/captcha` 取 id),响应 code=0 即有 token。数据库重导:整库 `schema.sql`;增量建表/改表直接执行对应 SQL 段(docker exec -i ihomy_mysql mysql -uroot -p<root密码> --default-character-set=utf8mb4)。
+冒烟:登录 `POST /api/auth/login {email, password, captchaId, captchaCode:'qwer'}`(开发环境验证码固定 `qwer`,先 `GET /api/auth/captcha` 取 id),响应 code=0 即有 token。**新人环境初始化**:`.\scripts\setup.ps1`(前置检查+生成 config\external.yml+起库+前端依赖,幂等;详见本地 `docs/新人上手指南.md`)。**CI**:GitHub Actions(`.github/workflows/ci.yml`)每次推送自动做前后端构建+compose 起库导入 schema+后端启动+登录冒烟,验证仓库自给自足。数据库重导:整库 `schema.sql`;增量建表/改表直接执行对应 SQL 段(docker exec -i ihomy-mysql mysql -uroot -p<root密码> --default-character-set=utf8mb4)。
 
 ## 统一响应与鉴权
 
@@ -155,7 +156,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 系统 | i18n / 主题 / 字典 | i18n/ + theme/ + utils/dict.js |
 | 移动端 | 设备自适应 | useDevice.js + MobileLayout.vue + Mobile* 组件 |
 
-**关键坑速查**(实现细节,详见 docs):日记 date 兼容 `yyyy-MM-dd HH:mm`;纪念日 Hutool ChineseDate 月份 0-based 需 +1;家谱 null 字段须 `LambdaUpdateWrapper` 显式 SET;相册分享 token + Knuth 混淆;博客新建家庭注入 9 默认分类;物品户型图 2 期完成(裁剪/粘合删原房保持最后防家具入库覆盖、端点识别/字号/光标屏幕恒定;**hover 边加号阈值 6px**——原 12px 太大导致 hover 显示但 click 被 `justDragged` 拦截;库内家具拖入画布替代「摆放」+「请选择房间」按钮)、3 期 AI 语义待做;**MP `updateById` 会显式回写实体里的旧 `updated_at` 抑制 `ON UPDATE CURRENT_TIMESTAMP`**——凡依赖 updated_at 做变更检测/排序的表,更新必须 LambdaUpdateWrapper 只 SET 业务字段并重查回传新值(2026-09-06 脑图协同踩坑);**simple-mind-map npm 包只内置 default 主题**,其余主题须 `mindmapThemes.js` defineTheme 本地注册,否则 setTheme 静默回落默认样式;**脑图多端并发保存靠 update 乐观锁**(客户端带 baseUpdatedAt,库中 updated_at 已刷新则 409,前端弹窗裁决覆盖/加载远端——双开 20s 轮询窗口内静默互覆盖实测丢数据);**脑图保存前 stripEmptyNodes 剥空叶子**(新增节点不输入直接确认残留 `<p><br></p>`,须传 getData(true).root 而非整包)。
+**关键坑速查**(实现细节,详见 docs):日记 date 兼容 `yyyy-MM-dd HH:mm`;纪念日 Hutool ChineseDate 月份 0-based 需 +1;家谱 null 字段须 `LambdaUpdateWrapper` 显式 SET;相册分享 token + Knuth 混淆;博客新建家庭注入 9 默认分类;物品户型图 2 期完成(裁剪/粘合删原房保持最后防家具入库覆盖、端点识别/字号/光标屏幕恒定;**hover 边加号阈值 6px**——原 12px 太大导致 hover 显示但 click 被 `justDragged` 拦截;库内家具拖入画布替代「摆放」+「请选择房间」按钮)、3 期 AI 语义待做;**未设计楼层画布空白+引导**(2026-09-07:表单录入房间无 geometry,画布标签 cx/cy=0 会全堆叠在原点;"已设计"=floorDesigned 有底图或任一房间形状≥3 点,未设计时隐藏家具/物品+引导进编辑+拦截摆放,画完第一间自动恢复);**MP `updateById` 会显式回写实体里的旧 `updated_at` 抑制 `ON UPDATE CURRENT_TIMESTAMP`**——凡依赖 updated_at 做变更检测/排序的表,更新必须 LambdaUpdateWrapper 只 SET 业务字段并重查回传新值(2026-09-06 脑图协同踩坑);**simple-mind-map npm 包只内置 default 主题**,其余主题须 `mindmapThemes.js` defineTheme 本地注册,否则 setTheme 静默回落默认样式;**脑图多端并发保存靠 update 乐观锁**(客户端带 baseUpdatedAt,库中 updated_at 已刷新则 409,前端弹窗裁决覆盖/加载远端——双开 20s 轮询窗口内静默互覆盖实测丢数据);**脑图保存前 stripEmptyNodes 剥空叶子**(新增节点不输入直接确认残留 `<p><br></p>`,须传 getData(true).root 而非整包);**EP dropdown 内嵌 CSS hover 子菜单两坑**(2026-09-07 头像「切换家庭」):hover 容忍期须用 `visibility` 延迟隐藏而非 `display` 切换(L 形 hover 区域有路径死角,`display:none` 后移入面板区无法复活),且绝对定位子面板会撑大 `el-scrollbar__wrap` 的 scrollWidth 让 EP 画出滚不动的幽灵 bar(该 popper 的 `.el-scrollbar__bar` 直接 display:none);详见 docs/变更归档.md 同日小节。
 
 ## 设计规范(统一实现,避免多种方式)
 
@@ -316,15 +317,15 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 ## 文档清单
 
-- `README.md`(项目简介,GitHub 展示,不含密码); `Windows部署指导.md` / `Linux部署指导.md`(生产部署 NSSM/systemd/Nginx/Let's Encrypt/Docker Compose;**本地维护不入 git**,Linux 版含凭证台账)
+- `README.md`(项目简介,GitHub 展示,不含密码); `Windows部署指导.md` / `Linux部署指导.md`(生产部署 NSSM/systemd/Nginx/Let's Encrypt/Docker Compose;**本地维护不入 git**,Linux 版含凭证台账); `docs/新人上手指南.md`(新成员环境搭建+开发账号初始密码;**本地维护不入 git**,给新成员时直接发该文件)
 - `docs/需求设计说明书.md` — **完整功能需求唯一活文档**(功能模块清单+数据库设计 61 表+接口设计+规划事项+修订记录),随迭代持续更新;§4.8.1 含原户型图设计.md 并入的设计决策存档(2026-09-07,原文件已删)
 - `docs/变更归档.md` — 已实现变更归档(按功能域的文件级改动表+设计决策+踩坑+live DB 同步 SQL);新变更归档追加到该文件末尾
 - `docs/UI设计提示词.md` — 沉浸式首页 UI 设计完整规格(可作为 AI 提示词重新生成)
 - `docs/日志规范.md` — 日志开发规范(三类文件/六要素/tid 规则/级别标准/三方调用/脱敏清单)
 - `docs/日志问题分析方法.md` — 报错排查方法论(拿 tid → 详细日志页 → 四步分析;面向运维/业务人员)
 - `docs/功能测试用例.md` — 全站功能测试用例(32 域 ~320 条,含脑图 48 条+执行记录)
-- `scripts/start-all.ps1`(Windows 一键启动前后端,双击 `start.bat` 调用,设 `IHOMY_CONFIG_PATH` 环境变量)/ `start-db.ps1`(Docker 拉起 MySQL+Redis+自动导 schema.sql,端口 6306/6379,与生产一致); `config/mysql/my.cnf`(端口 6306,内存优化,仅 Linux 本机部署用)
-- 完整接口清单:见 `docs/需求设计说明书.md` 第 7 章。代码事实以 `backend/src/main/java` + `resources/schema.sql`(本地维护,不入 git) 为准,如需检索先 `grep` 再动手。
+- `scripts/setup.ps1`(新人一次性环境初始化:前置软件检查+生成 config\external.yml+docker compose 起库+前端依赖,幂等)/ `start-all.ps1`(日常一键启动前后端,双击 `start.bat` 调用,设 `IHOMY_CONFIG_PATH` 环境变量)/ `start-db.ps1`(docker compose 起 MySQL+Redis,首启自动导 schema.sql,每次启动把 ihomy 账号密码对齐 external.yml,端口 6306/6379 与生产一致);根目录 `docker-compose.yml`(开发中间件定义,含健康检查,数据卷 ihomy-mysql-data); `.github/workflows/ci.yml`(GitHub Actions CI); `config/mysql/my.cnf`(端口 6306,内存优化,仅 Linux 本机部署用)
+- 完整接口清单:见 `docs/需求设计说明书.md` 第 7 章。代码事实以 `backend/src/main/java` + `resources/schema.sql`(开发安全版,已入库) 为准,如需检索先 `grep` 再动手。
 
 ## 环境检查(参考)
 

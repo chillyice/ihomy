@@ -31,7 +31,7 @@ cd frontend && npm install && npm run dev        # http://localhost:5173
 cd backend && ./mvnw spring-boot:run             # http://localhost:8080/api
 ```
 
-> 说明：数据库初始化脚本（schema.sql）与详细部署文档由维护者本地保管，不入仓库；本仓库只包含应用代码与不含敏感信息的文档。
+> 说明：详细部署文档与新人上手指南由维护者本地保管，不入仓库；`schema.sql` 为开发安全版随仓库提供（仅含本机 Docker 开发凭证，生产凭证一律走 external.yml 外挂文件，不入仓库）。
 
 ## License
 

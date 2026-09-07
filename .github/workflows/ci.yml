@@ -1,0 +1,110 @@
+# ihomy CI:验证"仓库自给自足"——全新 checkout 构建前后端,起库导入 schema,后端启动+登录冒烟。
+# 该流水线通过 = 新成员克隆仓库后按本地 docs/新人上手指南.md 的流程可正常搭建环境。
+# 注意:冒烟用密码由本流水线随机生成并直接 UPDATE 进库,仓库中不保存任何 admin 明文密码。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build backend
+        working-directory: backend
+        # 用 sh 调用:mvnw 在 git 里无执行位(Windows 仓库惯例)
+        run: sh ./mvnw -B clean package -DskipTests
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Start MySQL + Redis (docker compose)
+        # 首次启动由容器自动导入 backend/src/main/resources/schema.sql(建库建表+种子)
+        run: docker compose up -d --wait
+
+      - name: Reset admin password for smoke test
+        run: |
+          python3 -m venv /tmp/ci-venv
+          /tmp/ci-venv/bin/pip install --quiet bcrypt
+          CI_PWD="ci-smoke-${RANDOM}"
+          HASH=$(/tmp/ci-venv/bin/python -c "import bcrypt; print(bcrypt.hashpw('${CI_PWD}'.encode(), bcrypt.gensalt(10, prefix=b'2a')).decode())")
+          docker exec ihomy-mysql mysql -uroot -proot -e "UPDATE ihomy.sys_user SET password='${HASH}' WHERE username='admin';"
+          echo "CI_PWD=${CI_PWD}" >> "$GITHUB_ENV"
+
+      - name: Prepare external config
+        run: |
+          mkdir -p /tmp/ihomy-uploads /tmp/ihomy-logs
+          cat > /tmp/ihomy-external.yml <<'EOF'
+          spring:
+            datasource:
+              password: ihomy-dev-2026!
+          jwt:
+            secret: ci-only-jwt-secret-0123456789abcdef0123456789abcdef
+          file:
+            upload-dir: /tmp/ihomy-uploads
+            url-prefix: /files
+          logging:
+            file:
+              path: /tmp/ihomy-logs
+          app:
+            captcha-fixed-code: qwer
+          EOF
+
+      - name: Run backend
+        env:
+          IHOMY_CONFIG_PATH: /tmp/ihomy-external.yml
+        run: |
+          cd backend
+          nohup java -jar target/ihomy-backend.jar > /tmp/backend.log 2>&1 &
+          for i in $(seq 1 90); do
+            curl -sf http://localhost:8080/api/auth/captcha > /dev/null && break
+            sleep 2
+          done
+          if ! curl -sf http://localhost:8080/api/auth/captcha > /dev/null; then
+            echo "::error::后端未在 180s 内启动"
+            tail -100 /tmp/backend.log
+            exit 1
+          fi
+          echo "backend is up"
+
+      - name: Smoke test (captcha + login)
+        run: |
+          CAPTCHA_ID=$(curl -sf http://localhost:8080/api/auth/captcha | jq -r '.data.captchaId')
+          if [ -z "$CAPTCHA_ID" ] || [ "$CAPTCHA_ID" = "null" ]; then
+            echo "::error::获取验证码失败"; exit 1
+          fi
+          LOGIN=$(curl -sf -X POST http://localhost:8080/api/auth/login \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"admin@ihomy.local\",\"password\":\"${CI_PWD}\",\"captchaId\":\"${CAPTCHA_ID}\",\"captchaCode\":\"qwer\"}")
+          echo "$LOGIN" | jq -e '.code == 0' > /dev/null \
+            || { echo "::error::登录冒烟失败: $LOGIN"; exit 1; }
+          echo "login smoke passed"
+
+      - name: Dump backend log on failure
+        if: failure()
+        run: tail -200 /tmp/backend.log 2>/dev/null || true
