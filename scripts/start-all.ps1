@@ -139,4 +139,4 @@ if (-not $NoBrowser) {
 }
 
 Write-Host "`n启动完成。前端: http://localhost:5173  后端接口: http://localhost:8080/api" -ForegroundColor Cyan
-Write-Host '默认账号: admin / ***REMOVED-INIT-PASSWORD***' -ForegroundColor Cyan
+Write-Host '初始账号: admin（初始密码见本地 Linux部署指导.md 凭证台账）' -ForegroundColor Cyan

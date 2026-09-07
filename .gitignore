@@ -3,3 +3,17 @@
 
 # GUI 测试截图(测试产物,不入库)
 gui-test-screenshots/
+
+# 本地维护文档(含凭证/部署细节,不入库;OneDrive 本地副本是唯一来源)
+/Linux部署指导.md
+/Windows部署指导.md
+
+# 数据库初始化脚本(含账号种子,本地维护)
+backend/src/main/resources/schema.sql
+
+# 外挂配置真实值(模板 external.yml.template 入库)
+external.yml
+external.yml.bak
+
+# 前端本地环境变量(演示账号密码等)
+frontend/.env.local

@@ -16,9 +16,9 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:6306/ihomy?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     # 使用专用应用账号 ihomy（最小权限，仅 DML），不要用 root 跑业务
-    # 密码可通过外挂文件覆盖:设环境变量 IHOMY_CONFIG_PATH 指向 external.yml
+    # 密码不入仓库:必须由外挂文件提供(设环境变量 IHOMY_CONFIG_PATH 指向 external.yml,见 external.yml.template)
     username: ihomy
-    password: ***REMOVED-DB-DEFAULT-PASSWORD***
+    password:
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 20
@@ -49,8 +49,9 @@ mybatis-plus:
       logic-not-delete-value: 0
 
 # JWT 配置
+# 密钥不入仓库:必须由外挂文件 external.yml 提供(缺失时后端启动即失败,防误用默认密钥)
 jwt:
-  secret: ***REMOVED-JWT-DEFAULT-SECRET***
+  secret:
   # 访问令牌有效期（秒）- 2小时
   access-token-expire: 7200
   # 刷新令牌有效期（秒）- 7天
