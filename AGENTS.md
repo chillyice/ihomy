@@ -310,8 +310,10 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 ## 规划事项(未实现)
 
-> 完整规划清单(P1-P4)见 `docs/需求设计说明书.md` 第 9 章「规划事项」,此处只留最需注意的两条:
+> 完整规划清单(P1-P4)见 `docs/需求设计说明书.md` 第 9 章「规划事项」,此处只留最需注意的四条:
 - **P1 放映厅 Jellyfin 集成**:方案已定稿,详见 docs/变更归档.md「放映厅 Jellyfin 集成方案」;**启动时先重读该归档小节**。
+- **P2 智能家居中控(Home Assistant 集成)**(2026-09-07 评估定稿):硬件协议层全归 HA(家庭中枢:J4125 PVE 虚拟化 OpenWrt/HAOS/OMV + WireGuard 隧道连 VPS,硬件部署另行推进),ihomy 只做数据沉淀与家人控制入口——S1 Paho 订阅 Mosquitto 入库 sys_iot_device/sys_iot_data + Redis 最新值、S2 HA REST 控制入口(long-lived token)、S3 前端中控页(sys_home_module 模块)+ 物品定位户型图联动;详见需求设计说明书 §9。
+- **P2 WebDAV/NEXTCLOUD 存储设备接入**(2026-09-07 评估定稿):Nextcloud/坚果云/Alist/NAS 等仅作可选存储后端经 WebDAV 接入(与百度网盘平级,sys_storage_device 新增设备类型+轻量客户端,复用现有设备抽象);**明确不做**平台级整合/同机部署 Nextcloud(2GB 内存约束)/Talk 替代聊天室/在线 Office 协作;详见需求设计说明书 §9。
 - **P3 物品定位-AI 语义**:3 期,依赖 AI API(决策已定,待 API 接入)。
 - 优先级:P1 用户价值高且可行 / P2 锦上添花 / P3 结构性改动 / P4 依赖外部条件。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
 
