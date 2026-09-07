@@ -1,5 +1,8 @@
-# ZCode 本地技能/会话目录
+# 本地工具/IDE 目录(AI 会话与技能/IDEA 工程文件,不入库)
 .zcode/
+.agents/
+.opencode/
+.idea/
 
 # GUI 测试截图(测试产物,不入库)
 gui-test-screenshots/
