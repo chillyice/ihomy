@@ -108,7 +108,7 @@
     <!-- 心情/天气选择弹窗 -->
     <teleport to="body">
       <div v-if="pickerOpen" class="picker-overlay" @click="pickerOpen = null">
-        <div class="picker-pop" :style="pickerStyle" @click.stop>
+        <div class="picker-pop" :class="{ centered: pickerCentered }" :style="pickerStyle" @click.stop>
           <div class="picker-title">{{ pickerOpen === 'mood' ? $t('diary.mood') : $t('diary.weather') }}</div>
           <div class="picker-grid">
             <button
@@ -141,10 +141,12 @@ import DoodleTray from './DoodleTray.vue'
 import { INK_COLORS, parseDoodle, renderStroke, renderStrokes, erasePixel, eraseObject, setupCanvas, clearCanvas } from '@/utils/doodle'
 import { PAGE_H, PAPER_W, MOODS, WEATHERS, moodLabel as moodLabelOf, weatherLabel as weatherLabelOf } from '@/utils/diary'
 import { useDevice } from '@/composables/useDevice'
+import { useUserStore } from '@/stores/user'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const { isMobile } = useDevice()
 const isEdit = computed(() => !!route.params.id)
 const loading = ref(false)
@@ -154,6 +156,7 @@ const form = reactive({ mood: '', weather: '', date: new Date().toISOString().sl
 const content = ref('')
 const pickerOpen = ref(null)
 const pickerStyle = ref({})
+const pickerCentered = ref(false)
 const moodBtnRef = ref(null)
 const weatherBtnRef = ref(null)
 const textareaRef = ref(null)
@@ -179,6 +182,44 @@ const moodLabel = computed(() => moodLabelOf(form.mood))
 const weatherLabel = computed(() => weatherLabelOf(form.weather))
 const wordCount = computed(() => content.value.length)
 const pageCount = computed(() => Math.max(1, Math.ceil(bodyHeight.value / PAGE_H)))
+
+/* ---------- 草稿持久化(sessionStorage):iPad 旋转会切换移动/桌面布局导致本组件重挂载、iOS PWA 旋转会整页 reload,未保存内容全丢;同会话内恢复 ---------- */
+const draftKey = computed(() => `ihomy:diary-draft:${route.params.id || 'new'}:${userStore.userInfo?.id ?? 0}`)
+let draftReady = false // 初始装载(服务端数据/草稿回填)完成前不写草稿,避免只打开不编辑也生成草稿
+let draftDirty = false
+let draftTimer = null
+const saveDraft = () => {
+  try {
+    sessionStorage.setItem(draftKey.value, JSON.stringify({ c: content.value, m: form.mood, w: form.weather, d: form.date, t: form.time, v: form.visibility, s: strokes.value }))
+  } catch (e) {} // 隐私模式/存储满:静默降级,不阻断书写
+}
+const queueSaveDraft = () => {
+  clearTimeout(draftTimer)
+  draftTimer = setTimeout(saveDraft, 400)
+}
+const clearDraft = () => {
+  clearTimeout(draftTimer)
+  draftDirty = false
+  try { sessionStorage.removeItem(draftKey.value) } catch (e) {}
+}
+const readDraft = () => {
+  try {
+    const raw = sessionStorage.getItem(draftKey.value)
+    if (!raw) return null
+    const o = JSON.parse(raw)
+    return o && typeof o === 'object' ? o : null
+  } catch { return null }
+}
+const applyDraft = (o) => {
+  if (typeof o.c === 'string' && o.c) content.value = o.c
+  if (typeof o.m === 'string') form.mood = o.m
+  if (typeof o.w === 'string') form.weather = o.w
+  if (typeof o.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.d)) form.date = o.d
+  if (typeof o.t === 'string' && /^\d{2}:\d{2}$/.test(o.t)) form.time = o.t
+  if ([0, 3, 4].includes(o.v)) form.visibility = o.v
+  if (Array.isArray(o.s)) strokes.value = o.s.filter((s) => s && typeof s.t === 'string' && Array.isArray(s.pts) && s.pts.length)
+}
+const flushDraftIfDirty = () => { if (draftDirty) saveDraft() } // pagehide/切后台立即落盘(旋转 reload 前的最后时机)
 
 const autoResize = () => {
   nextTick(() => {
@@ -207,6 +248,9 @@ let curStroke = null
 let lastErase = null
 let redrawQueued = false
 let dragStartStrokes = null // 本次橡皮拖动前的笔画引用(判断是否有变化)
+let drawingPointerId = null // 当前笔画的指针:多指/手掌的 pointermove 不再串进同一笔画
+let lastPenAt = 0 // 手写笔最近一次活动(按下/移动/悬停)时间戳,用于手掌抑制
+const PEN_REJECT_MS = 1500
 
 /* 撤销/重做:快照为 strokes 数组引用(笔画提交/擦除均不可变更新,引用即可作快照) */
 const history = ref([])
@@ -285,8 +329,15 @@ const applyErase = (x, y) => {
 
 const onPointerDown = (e) => {
   if (!activeBrush.value) return
+  if (drawing) return // 单一笔画:并发的第二指针(多指/手掌)一律忽略
+  if (e.pointerType === 'pen') {
+    lastPenAt = Date.now()
+  } else if (e.pointerType === 'touch' && Date.now() - lastPenAt < PEN_REJECT_MS) {
+    return // 手写笔刚用过(含悬停):触摸大概率是手掌,拒绝起笔(平板 palm rejection)
+  }
   e.preventDefault()
   drawing = true
+  drawingPointerId = e.pointerId
   liveRef.value.setPointerCapture(e.pointerId)
   const [x, y] = canvasPos(e)
   if (isEraser.value) {
@@ -300,7 +351,9 @@ const onPointerDown = (e) => {
 }
 
 const onPointerMove = (e) => {
-  if (!drawing) return
+  // 笔悬停(hover,无按键)也刷新时间戳:笔在板面上方时手掌持续被抑制
+  if (e.pointerType === 'pen') lastPenAt = Date.now()
+  if (!drawing || e.pointerId !== drawingPointerId) return
   const [x, y] = canvasPos(e)
   if (isEraser.value) {
     const [lx, ly] = lastErase
@@ -317,9 +370,10 @@ const onPointerMove = (e) => {
   }
 }
 
-const onPointerUp = () => {
-  if (!drawing) return
+const onPointerUp = (e) => {
+  if (!drawing || e.pointerId !== drawingPointerId) return
   drawing = false
+  drawingPointerId = null
   if (curStroke && curStroke.pts.length) {
     strokes.value = [...strokes.value, curStroke]
     pushHistory()
@@ -353,12 +407,21 @@ watch(bodyHeight, () => nextTick(redrawBase))
 
 const togglePicker = (type) => {
   if (pickerOpen.value === type) { pickerOpen.value = null; return }
-  const btn = type === 'mood' ? moodBtnRef.value : weatherBtnRef.value
-  if (btn) {
-    const rect = btn.getBoundingClientRect()
-    const popH = 220
-    const top = rect.top + rect.height / 2 - popH / 2
-    pickerStyle.value = { position: 'fixed', top: Math.max(8, top) + 'px', left: (rect.right + 8) + 'px', zIndex: 61 }
+  if (isMobile.value) {
+    // 手机:信纸缩放铺满屏宽,按钮贴右缘,锚点定位会把弹窗推出屏幕外 → 固定居中展示
+    pickerCentered.value = true
+    pickerStyle.value = {}
+  } else {
+    pickerCentered.value = false
+    const btn = type === 'mood' ? moodBtnRef.value : weatherBtnRef.value
+    if (btn) {
+      const rect = btn.getBoundingClientRect()
+      const popW = 240
+      const popH = 220
+      const top = Math.min(Math.max(8, rect.top + rect.height / 2 - popH / 2), window.innerHeight - popH - 8)
+      const left = Math.min(rect.right + 8, window.innerWidth - popW - 8)
+      pickerStyle.value = { position: 'fixed', top: top + 'px', left: left + 'px', zIndex: 61 }
+    }
   }
   pickerOpen.value = type
 }
@@ -393,6 +456,7 @@ const onSave = async () => {
     const payload = { content: content.value, mood: form.mood, weather: form.weather, date: form.date + ' ' + form.time, visibility: form.visibility, doodle: strokes.value.length ? JSON.stringify({ v: 1, strokes: strokes.value }) : null }
     if (isEdit.value) await diaryApi.update(route.params.id, payload)
     else await diaryApi.create(payload)
+    clearDraft() // 保存成功,草稿使命完成
     ElMessage.success(t('common.saveSuccess'))
     // 编辑完成回到该作者的日记本翻书视图;新建回到书架
     router.push(isEdit.value && authorId.value != null ? `/diary/book/${authorId.value}` : '/diary')
@@ -402,6 +466,7 @@ const onSave = async () => {
 }
 
 onMounted(async () => {
+  const draft = readDraft()
   if (isEdit.value) {
     const d = await diaryApi.detail(route.params.id)
     content.value = d.content || ''
@@ -414,8 +479,10 @@ onMounted(async () => {
       time: raw.slice(11, 16) || form.time,
       visibility: d.visibility === 'PRIVATE' ? 0 : d.visibility === 'PUBLIC' ? 4 : 3,
     })
+    if (draft) applyDraft(draft) // 旋转/刷新丢内容后回来:草稿是本设备最近一次编辑,覆盖服务端数据
   } else {
-    loadCurrentWeather()
+    if (draft) applyDraft(draft)
+    else loadCurrentWeather()
   }
   history.value = [strokes.value]
   hIndex.value = 0
@@ -424,10 +491,13 @@ onMounted(async () => {
   syncScale()
   syncHeight()
   window.addEventListener('resize', onResize)
+  window.addEventListener('pagehide', flushDraftIfDirty)
+  document.addEventListener('visibilitychange', flushDraftIfDirty)
   if (typeof ResizeObserver !== 'undefined' && paperRef.value) {
     scaleObserver = new ResizeObserver(() => syncHeight())
     scaleObserver.observe(paperRef.value)
   }
+  draftReady = true
 })
 
 const onResize = () => { syncScale(); syncHeight() }
@@ -435,12 +505,20 @@ const onResize = () => { syncScale(); syncHeight() }
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
   window.removeEventListener('resize', onResize)
+  window.removeEventListener('pagehide', flushDraftIfDirty)
+  document.removeEventListener('visibilitychange', flushDraftIfDirty)
   scaleObserver?.disconnect()
 })
 
 watch(content, () => autoResize())
 watch(paperScale, () => syncHeight())
 watch(isMobile, () => { syncScale(); syncHeight() })
+// 草稿自动保存:任何内容/心情天气/涂鸦变更(初始装载完成后)防抖落盘
+watch([content, () => form.mood, () => form.weather, () => form.date, () => form.time, () => form.visibility, strokes], () => {
+  if (!draftReady) return
+  draftDirty = true
+  queueSaveDraft()
+})
 </script>
 
 <style scoped>
@@ -542,6 +620,9 @@ html.dark .doodle-mark { mix-blend-mode: screen; }
 }
 html.dark .picker-pop { background: rgba(30,42,72,0.9); box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
 @keyframes pickerIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+/* 手机居中模式:transform 已用于居中定位,入场动画只走透明度避免覆盖位移 */
+.picker-pop.centered { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); animation: pickerInCenter 0.2s ease; }
+@keyframes pickerInCenter { from { opacity: 0; } to { opacity: 1; } }
 .picker-title { font-size: 12px; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 10px; text-align: center; }
 .picker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 .picker-cell {
