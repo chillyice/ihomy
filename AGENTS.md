@@ -5,7 +5,7 @@
 
 > **⚠ Git 规定(必须遵守)**:非人工指令,不得主动提交代码(`git commit`/`git add -A`/`git push` 一律禁止)。`git add` 只能指定具体文件路径,禁止 `git add -A`/`git add .`。
 
-> **⚠ 敏感数据规定(必须遵守)**:任何密码/密钥/私钥/token 一律不写入仓库文件——DB 密码与 JWT 密钥走 external.yml(不入 git,模板见 `external.yml.template`);`Linux部署指导.md`/`Windows部署指导.md`/`schema.sql` 为本地维护文档(.gitignore 已忽略,含凭证台账);前端演示凭证走 `frontend/.env.local`。历史曾因明文凭证入公开仓库做过全量清理+凭证轮换(2026-09-07),勿再引入。
+> **⚠ 敏感数据规定(必须遵守)**:任何密码/密钥/私钥/token 一律不写入仓库文件——DB 密码与 JWT 密钥走 external.yml(不入 git,模板见 `external.yml.template`);`Linux部署指导.md`/`Windows部署指导.md`/`schema.sql` 为本地维护文档(.gitignore 已忽略,含凭证台账);前端演示凭证走 `frontend/.env.development.local`(仅 vite dev 加载,生产构建不读取)。历史曾因明文凭证入公开仓库做过全量清理+凭证轮换(2026-09-07),勿再引入。
 
 > **⚠ 路径拼写警示(遵守以防误写)**:
 > - 工作目录绝对路径:`C:\Users\chill\OneDrive\WorkStation\Projects\ihomy`
