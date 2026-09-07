@@ -5,7 +5,7 @@
 
 > **⚠ Git 规定(必须遵守)**:非人工指令,不得主动提交代码(`git commit`/`git add -A`/`git push` 一律禁止)。`git add` 只能指定具体文件路径,禁止 `git add -A`/`git add .`。
 
-> **⚠ 敏感数据规定(必须遵守)**:任何密码/密钥/私钥/token 一律不写入仓库文件——DB 密码与 JWT 密钥走 external.yml(不入 git,模板见 `external.yml.template`);`Linux部署指导.md`/`Windows部署指导.md`/`schema.sql` 为本地维护文档(.gitignore 已忽略,含凭证台账);前端演示凭证走 `frontend/.env.development.local`(仅 vite dev 加载,生产构建不读取)。历史曾因明文凭证入公开仓库做过全量清理+凭证轮换(2026-09-07),勿再引入。
+> **⚠ 敏感数据规定(必须遵守)**:任何密码/密钥/私钥/token 一律不写入仓库文件——DB 密码与 JWT 密钥走 external.yml(不入 git,模板见 `external.yml.template`);`Linux部署指导.md`/`Windows部署指导.md`/`schema.sql` 为本地维护文档(.gitignore 已忽略,含凭证台账);前端演示凭证走 `frontend/.env.development.local`(仅 vite dev 加载,生产构建不读取;**`.env.local` 所有模式都加载会内联进生产 bundle,禁用**)。历史曾因明文凭证入公开仓库做过全量清理+凭证轮换(2026-09-07),勿再引入。轮换后凭证台账在本地 `Linux部署指导.md` §〇;重写前全量备份(bundle/脱敏文件/WIP 补丁/替换清单)在 `D:\WorkSpace\ihomy-backup-20260907\`;详见 `docs/变更归档.md` 敏感数据治理小节。
 
 > **⚠ 路径拼写警示(遵守以防误写)**:
 > - 工作目录绝对路径:`C:\Users\chill\OneDrive\WorkStation\Projects\ihomy`
@@ -55,6 +55,7 @@
 - **root 仅用于初始化**:`mysql -uroot -p < backend/src/main/resources/schema.sql`,执行一次(建库、建表、创建 ihomy 账号、初始数据)。**schema.sql 为本地维护文件,不入 git**(.gitignore 已忽略;账号密码为占位符,执行前需替换)。
 - **业务运行用 `ihomy` 账号**:仅授予 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`(最小权限,无 CREATE/ALTER/DROP)。application.yml 连接用 `ihomy`,**不要用 root 跑业务**。
 - 账号同时创建 `localhost` 和 `%` 两个 host(本机/远程应用服务器都能连)。
+- **生产 MySQL 密码策略(2026-09-07 轮换踩坑)**:生产库启用 `validate_password` MEDIUM(特殊字符/数字/大小写各≥1,长度≥8)——生成/轮换 DB 密码必须含特殊字符(避开 `' " \ $ |` 转义雷区,建议 `!@%^&*-_+=.`),否则 `ALTER USER` 报 1819;开发 Docker MySQL 无此组件,同一密码 dev 可用 prod 被拒。
 - **61 张表**,前缀分类:`sys_` 18 张(系统/账号/权限/配置/日志/天气/存储)、`family_` 22 张(家庭事务)、`content_` 21 张(内容数据)。**完整表清单见 `docs/需求设计说明书.md` §6.2**。
   - **命名规则**:家庭事务业务表一律 `family_` 前缀;内容数据 `content_` 前缀;账号/权限/配置/日志/天气/存储保留 `sys_`。新增表必须遵守。前缀取最顶层祖先类别;上下级关系体现在表名(如 `sys_user_role`)。
 - **枚举不再用数字**:状态/类型字段一律大写英文单词(`PUBLISHED/DRAFT/PUBLIC/FAMILY/ACTIVE...`),含义存字典表 `sys_dict_item`,Java 常量集中于 `common/DictConst.java`,前端映射 `utils/dict.js`。**不要写回 0/1/2 判断**。
