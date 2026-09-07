@@ -9,7 +9,6 @@ gui-test-screenshots/
 
 # 本地维护文档(含凭证/部署细节,不入库;OneDrive 本地副本是唯一来源)
 /Linux部署指导.md
-/Windows部署指导.md
 /docs/新人上手指南.md
 
 # 外挂配置真实值(模板 external.yml.template 入库)

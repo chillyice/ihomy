@@ -5,7 +5,7 @@
 
 > **⚠ Git 规定(必须遵守)**:非人工指令,不得主动提交代码(`git commit`/`git add -A`/`git push` 一律禁止)。`git add` 只能指定具体文件路径,禁止 `git add -A`/`git add .`。
 
-> **⚠ 敏感数据规定(必须遵守)**:**生产**密码/密钥/私钥/token 一律不写入仓库文件——生产 DB 密码与 JWT 密钥走服务器上的 external.yml(不入 git,模板见 `external.yml.template`);`Linux部署指导.md`(§〇凭证台账,凭证唯一记录处)/`Windows部署指导.md`(指路 stub)/`docs/新人上手指南.md`(含开发账号明文)为本地维护文档(.gitignore 已忽略;部署流程已脱敏入库 `docs/部署指导-*.md`,凭证位置一律占位符);前端演示凭证走 `frontend/.env.development.local`(仅 vite dev 加载,生产构建不读取;**`.env.local` 所有模式都加载会内联进生产 bundle,禁用**)。**schema.sql 为开发安全版已入库(2026-09-07)**:仅含本机 Docker 开发固定凭证(ihomy 账号密码/admin 与 ops 种子的 BCrypt 哈希,明文只在本地新人上手指南),生产凭证完全独立;生产部署时必须 `ALTER USER` 改独立强密码。历史曾因明文生产凭证入公开仓库做过全量清理+凭证轮换(2026-09-07),勿再引入生产凭证。轮换后凭证台账在本地 `Linux部署指导.md` §〇;重写前全量备份(bundle/脱敏文件/WIP 补丁/替换清单)在 `D:\WorkSpace\ihomy-backup-20260907\`;详见 `docs/变更归档.md` 敏感数据治理小节。
+> **⚠ 敏感数据规定(必须遵守)**:**生产**密码/密钥/私钥/token 一律不写入仓库文件——生产 DB 密码与 JWT 密钥走服务器上的 external.yml(不入 git,模板见 `external.yml.template`);`Linux部署指导.md`(§〇凭证台账,凭证唯一记录处,两平台共用)/`docs/新人上手指南.md`(含开发账号明文)为本地维护文档(.gitignore 已忽略;部署流程已脱敏入库 `docs/部署指导-*.md`,凭证位置一律占位符);前端演示凭证走 `frontend/.env.development.local`(仅 vite dev 加载,生产构建不读取;**`.env.local` 所有模式都加载会内联进生产 bundle,禁用**)。**schema.sql 为开发安全版已入库(2026-09-07)**:仅含本机 Docker 开发固定凭证(ihomy 账号密码/admin 与 ops 种子的 BCrypt 哈希,明文只在本地新人上手指南),生产凭证完全独立;生产部署时必须 `ALTER USER` 改独立强密码。历史曾因明文生产凭证入公开仓库做过全量清理+凭证轮换(2026-09-07),勿再引入生产凭证。轮换后凭证台账在本地 `Linux部署指导.md` §〇;重写前全量备份(bundle/脱敏文件/WIP 补丁/替换清单)在 `D:\WorkSpace\ihomy-backup-20260907\`;详见 `docs/变更归档.md` 敏感数据治理小节。
 
 > **⚠ 路径拼写警示(遵守以防误写)**:
 > - 工作目录绝对路径:`C:\Users\chill\OneDrive\WorkStation\Projects\ihomy`
@@ -29,7 +29,7 @@
 | `C:\Users\chill\OneDrive\WorkStation\Projects\ihomy` | 唯一工作目录(代码编辑 + 构建验证 + 部署文档) |
 
 - 所有代码编辑、编译、构建验证都在此目录进行。
-- 部署文档:流程在 `docs/部署指导-Linux.md`/`docs/部署指导-Windows.md`(入库脱敏版);本地 `Linux部署指导.md`(§〇凭证台账)与 `Windows部署指导.md`(指路 stub)也在此目录。
+- 部署文档:流程在 `docs/部署指导-Linux.md`/`docs/部署指导-Windows.md`(入库脱敏版);本地 `Linux部署指导.md`(§〇凭证台账)也在此目录。
 - Nginx 静态根指向 `frontend/dist`,构建后直接生效(Ctrl+Shift+R 刷新浏览器)。
 
 ## 命名约定(务必遵守)
@@ -317,7 +317,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 ## 文档清单
 
-- `README.md`(项目简介,GitHub 展示,不含密码); `docs/README.md`(文档索引:每份文档一句话定位+新人阅读顺序); `docs/架构设计.md`(系统上下文/请求流转/模块分域/关键机制/部署拓扑); `docs/部署指导-Linux.md` / `docs/部署指导-Windows.md`(生产部署全流程 systemd/NSSM/Nginx/Let's Encrypt/Docker Compose/备份/NAS,**脱敏入库版**,凭证一律占位符); `Linux部署指导.md`(本地,**只剩 §〇凭证台账**,不入 git)/ `Windows部署指导.md`(本地,指路 stub,不入 git); `docs/新人上手指南.md`(新成员环境搭建+开发账号初始密码;**本地维护不入 git**,给新成员时直接发该文件)
+- `README.md`(项目简介,GitHub 展示,不含密码); `docs/README.md`(文档索引:每份文档一句话定位+新人阅读顺序); `docs/架构设计.md`(系统上下文/请求流转/模块分域/关键机制/部署拓扑); `docs/部署指导-Linux.md` / `docs/部署指导-Windows.md`(生产部署全流程 systemd/NSSM/Nginx/Let's Encrypt/Docker Compose/备份/NAS,**脱敏入库版**,凭证一律占位符); `Linux部署指导.md`(本地,**只剩 §〇凭证台账**,两平台共用,不入 git); `docs/新人上手指南.md`(新成员环境搭建+开发账号初始密码;**本地维护不入 git**,给新成员时直接发该文件)
 - `docs/需求设计说明书.md` — **完整功能需求唯一活文档**(功能模块清单+数据库设计 61 表+接口设计+规划事项+修订记录),随迭代持续更新;§4.8.1 含原户型图设计.md 并入的设计决策存档(2026-09-07,原文件已删)
 - `docs/变更归档.md` — 已实现变更归档(按功能域的文件级改动表+设计决策+踩坑+live DB 同步 SQL);新变更归档追加到该文件末尾
 - `docs/UI设计提示词.md` — 沉浸式首页 UI 设计完整规格(可作为 AI 提示词重新生成)
