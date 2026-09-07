@@ -188,8 +188,8 @@
           :mode="mode"
           :tool="tool"
           :rooms="floorPlan.rooms"
-          :furnitures="floorPlan.furnitures"
-          :items="floorPlan.items"
+          :furnitures="floorDesigned ? floorPlan.furnitures : []"
+          :items="floorDesigned ? floorPlan.items : []"
           :image-url="floorPlan.imageUrl"
           :opacity="floorPlanOpacity"
           :highlight-item-ids="highlightItemIds"
@@ -218,10 +218,10 @@
           :floor-transition="floorTransition"
         />
 
-        <!-- 空楼层引导(有房子但当前楼层无房间) -->
-        <div v-if="!floorPlan.rooms.length && mode !== 'edit'" class="fp-guide" @click="toggleEdit">
-          <div class="fp-guide-title">{{ $t('item.emptyFloorRoomsTitle') }}</div>
-          <div class="fp-guide-text">{{ $t('item.emptyFloorRoomsText') }}</div>
+        <!-- 空楼层/未设计引导:无房间,或只录了房间数据还没画户型图(有底图或任一房间有形状才算已设计) -->
+        <div v-if="!floorDesigned && mode !== 'edit'" class="fp-guide" @click="toggleEdit">
+          <div class="fp-guide-title">{{ floorPlan.rooms.length ? $t('item.undesignedTitle') : $t('item.emptyFloorRoomsTitle') }}</div>
+          <div class="fp-guide-text">{{ floorPlan.rooms.length ? $t('item.undesignedText') : $t('item.emptyFloorRoomsText') }}</div>
           <el-button type="primary" size="small">{{ $t('item.editFloorPlan') }}</el-button>
         </div>
 
@@ -788,6 +788,16 @@ const loadFloorPlan = async () => {
   if (seq !== floorPlanSeq) return // 过期响应丢弃
   floorPlan.value = data
 }
+// 当前楼层是否已设计户型图:有底图,或任一房间画了形状(≥3 点)。
+// 只录了房间/家具数据、没画形状时画布展示为空 + 引导编辑,而不是把无形状房间
+// 的标签堆叠在原点;家具/物品一并隐藏(摆放按钮同步拦截),画完第一个房间即恢复展示。
+const floorDesigned = computed(() => {
+  const fp = floorPlan.value
+  if (fp.imageUrl) return true
+  return (fp.rooms || []).some((r) => {
+    try { const g = JSON.parse(r.geometry || '[]'); return Array.isArray(g) && g.length >= 3 } catch { return false }
+  })
+})
 const onHouseChange = async () => {
   currentFloor.value = defaultFloorOf(houses.value.find((h) => h.id === currentHouseId.value))
   await loadFloorPlan(); fitKey.value++
@@ -1144,6 +1154,7 @@ const onCreateRoom = (geometry) => {
   tool.value = 'select'
 }
 const placeFurniture = async (f) => {
+  if (!floorDesigned.value) return ElMessage.warning(t('item.noFloorPlanYet'))
   let roomId = f.roomId
   if (!roomId) {
     const room = floorPlan.value.rooms[0]
@@ -1158,8 +1169,9 @@ const placeFurniture = async (f) => {
   loadRooms()
   loadFloorPlan()
 }
-// 从画布拖放摆放库内家具:指定房间+精确坐标
+// 从画布拖放摆放库内家具:指定房间+精确坐标(未设计楼层拦截,避免摆到看不见的默认坐标)
 const onPlaceFurnitureFromDrop = async ({ id, roomId, x, y }) => {
+  if (!floorDesigned.value) return ElMessage.warning(t('item.noFloorPlanYet'))
   const f = furnitures.value.find((x) => x.id === id)
   if (!f) return
   const rid = roomId || floorPlan.value.rooms[0]?.id

@@ -23,8 +23,8 @@
           <g v-if="mode === 'view' && roomCrayon[r.id]" class="fp-crayon">
             <path v-for="(d, i) in roomCrayon[r.id]" :key="i" :d="d" class="fp-crayon-stroke room" />
           </g>
-          <!-- 房间名称/面积:反缩放使屏幕字号恒定,不随画布缩放变化 -->
-          <g v-if="r.name" :transform="`translate(${r.cx},${r.cy}) scale(${1 / view.k})`">
+          <!-- 房间名称/面积:反缩放使屏幕字号恒定,不随画布缩放变化;无形状(表单录入未绘制)不画标签,避免全部堆叠在原点 -->
+          <g v-if="r.name && r.poly.length >= 3" :transform="`translate(${r.cx},${r.cy}) scale(${1 / view.k})`">
             <text x="0" y="-6" class="fp-room-label fp-editable" @click.stop="mode === 'edit' && tool === 'select' && $emit('rename-room', r.id)">{{ r.name }}</text>
             <text x="0" y="10" class="fp-room-area">{{ (polyArea(r.poly) / Math.pow(props.scale || 100, 2)).toFixed(2) }} m²</text>
           </g>

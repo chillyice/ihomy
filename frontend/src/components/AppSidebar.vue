@@ -325,13 +325,13 @@ const onUserCommand = (cmd) => {
   }
 }
 
-// 多家庭切换:下拉打开时加载家庭列表;hover 展开子菜单(纯 CSS),点击切换
+// 多家庭切换:hover 展开子菜单(纯 CSS 延迟隐藏),点击切换
 const families = ref([])
-const onDropdownVisible = async (visible) => {
-  if (visible && userStore.isLoggedIn) {
-    try { families.value = await authApi.families() } catch (e) { families.value = [] }
-  }
+const loadFamilies = async () => {
+  if (!userStore.isLoggedIn) return
+  try { families.value = await authApi.families() } catch (e) { families.value = [] }
 }
+const onDropdownVisible = (visible) => { if (visible) loadFamilies() }
 const switchFamily = async (familyId) => {
   try {
     await userStore.switchFamily(familyId, true)
@@ -340,7 +340,8 @@ const switchFamily = async (familyId) => {
   } catch (e) { ElMessage.error(e.message || 'Failed') }
 }
 
-onMounted(() => loadUnread())
+// 预加载家庭列表:首次打开下拉即完整渲染,避免家栏后到导致菜单向上长高、鼠标下突然出现 hover 项
+onMounted(() => { loadUnread(); loadFamilies() })
 </script>
 
 <style scoped>
@@ -647,14 +648,27 @@ html.dark .foot-btn.lamp-off::after {
 .sidebar-user-popper .el-dropdown-menu {
   overflow: visible !important;
 }
+/* 隐藏 EP 滚动条:子面板绝对定位仍会撑大 wrap 的 scrollWidth,el-scrollbar update()
+   会给水平 bar 算出尺寸并显示——一个永远滚不动的"幽灵滚动条";本菜单内容短且
+   overflow 已强制 visible,EP 自定义 bar 无用,直接隐藏 */
+.sidebar-user-popper .el-scrollbar__bar { display: none !important; }
 .sidebar-user-popper .family-switch-wrapper { position: relative; }
 .sidebar-user-popper .family-switch-trigger { display: flex; justify-content: space-between; align-items: center; }
 .sidebar-user-popper .family-switch-panel {
-  display: none;
+  /* 不用 display:none 切换:hover 区域是 L 形(触发行+右挂面板),触发行正下方是
+     「退出登录」,鼠标斜向下够第二个家庭时会先穿出 hover 区导致面板闪没(实测复现)。
+     改为 visibility+opacity 延迟 300ms 隐藏:穿行死角的短暂离开不触发隐藏,移入
+     面板即恢复 hover;真正离开(如移向退出登录)300ms 后才隐藏 */
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.2s ease, visibility 0s linear 0.3s;
   position: absolute;
   left: 100%;
   top: 0;
   min-width: 160px;
+  max-height: 45vh;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: var(--el-bg-color, #fff);
   border: 1px solid var(--el-border-color, #e4e7ed);
   border-radius: 6px;
@@ -662,7 +676,11 @@ html.dark .foot-btn.lamp-off::after {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
   z-index: 10;
 }
-.sidebar-user-popper .family-switch-wrapper:hover .family-switch-panel { display: block; }
+.sidebar-user-popper .family-switch-wrapper:hover .family-switch-panel {
+  visibility: visible;
+  opacity: 1;
+  transition: opacity 0.15s ease;
+}
 .sidebar-user-popper .family-switch-item {
   display: flex;
   justify-content: space-between;
