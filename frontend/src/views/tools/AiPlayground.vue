@@ -62,11 +62,24 @@
       <div v-if="chatMeta" class="pg-meta">{{ chatMeta }}</div>
     </div>
 
-    <!-- 图片生成:prompt + 尺寸档位 + 张数(豆包 Seedream 参数面板) -->
+    <!-- 图片生成:prompt + 方舟参数面板(参考图/尺寸/张数/种子/引导强度/组图/水印/响应格式) -->
     <div v-else-if="capability === 'image'" class="pg-card card">
       <div class="pg-row">
         <span class="section-label">{{ $t('tools.aiPlayground.imagePrompt') }}</span>
         <el-input v-model="imagePrompt" type="textarea" :rows="3" :placeholder="$t('tools.aiPlayground.imagePlaceholder')" />
+      </div>
+      <div class="pg-inline">
+        <input ref="refInputRef" type="file" accept="image/*" multiple hidden @change="onRefPick" />
+        <div class="pg-field">
+          <span class="section-label">{{ $t('tools.aiPlayground.refImages') }}</span>
+          <div class="pg-ref-list">
+            <div v-for="(img, i) in refImages" :key="i" class="pg-ref-item">
+              <img :src="img.dataUrl" :alt="img.name" />
+              <span class="pg-ref-del" @click="removeRefImage(i)">×</span>
+            </div>
+            <el-button v-if="refImages.length < 10" size="small" @click="refInputRef && refInputRef.click()">+ {{ $t('tools.aiPlayground.addRef') }}</el-button>
+          </div>
+        </div>
       </div>
       <div class="pg-inline">
         <div class="pg-field">
@@ -76,13 +89,51 @@
             <el-option v-for="s in sizePresets" :key="s" :label="s" :value="s" />
           </el-select>
         </div>
-        <div class="pg-field">
+        <div v-if="imageSequential !== 'auto'" class="pg-field">
           <span class="section-label">{{ $t('tools.aiPlayground.imageCount') }}</span>
           <el-input-number v-model="imageCount" :min="1" :max="4" size="small" />
+        </div>
+        <div class="pg-field">
+          <span class="section-label">{{ $t('tools.aiPlayground.seed') }}</span>
+          <el-input-number v-model="imageSeed" :min="-1" :max="2147483647" :controls="false" size="small" style="width: 130px" />
+          <span class="pg-field-hint">{{ $t('tools.aiPlayground.seedRandom') }}</span>
+        </div>
+        <div class="pg-field">
+          <span class="section-label">{{ $t('tools.aiPlayground.guidance') }}</span>
+          <div class="pg-param-slider">
+            <el-checkbox v-model="guidanceCustom" size="small">{{ $t('tools.aiPlayground.guidanceCustom') }}</el-checkbox>
+            <el-slider v-model="imageGuidance" :min="1" :max="10" :step="0.5" :disabled="!guidanceCustom" class="pg-slider" />
+            <span v-if="guidanceCustom" class="pg-temp-val">{{ imageGuidance }}</span>
+          </div>
+        </div>
+        <div class="pg-field">
+          <span class="section-label">{{ $t('tools.aiPlayground.sequential') }}</span>
+          <div class="pg-param-inline">
+            <el-select v-model="imageSequential" size="small" style="width: 110px">
+              <el-option :label="$t('tools.aiPlayground.sequentialOff')" value="disabled" />
+              <el-option :label="$t('tools.aiPlayground.sequentialAuto')" value="auto" />
+            </el-select>
+            <template v-if="imageSequential === 'auto'">
+              <span class="pg-field-hint">{{ $t('tools.aiPlayground.maxImages') }}</span>
+              <el-input-number v-model="imageMaxImages" :min="1" :max="10" size="small" style="width: 90px" />
+            </template>
+          </div>
+        </div>
+        <div class="pg-field">
+          <span class="section-label">{{ $t('tools.aiPlayground.watermark') }}</span>
+          <el-switch v-model="imageWatermark" />
+        </div>
+        <div class="pg-field">
+          <span class="section-label">{{ $t('tools.aiPlayground.responseFormat') }}</span>
+          <el-select v-model="imageRf" size="small" style="width: 120px">
+            <el-option label="url" value="url" />
+            <el-option label="b64_json" value="b64_json" />
+          </el-select>
         </div>
         <el-button type="primary" :loading="imageLoading" @click="genImage">{{ $t('tools.aiPlayground.generate') }}</el-button>
       </div>
       <div class="pg-hint">{{ $t('tools.aiPlayground.sizeTierNote') }}</div>
+      <div class="pg-hint">{{ $t('tools.aiPlayground.paramsNote') }}</div>
       <div v-if="imageLoading" v-loading="imageLoading" class="pg-img-loading" />
       <div v-if="imageResults.length" class="pg-img-grid">
         <div v-for="(img, i) in imageResults" :key="i" class="pg-img-item">
@@ -189,13 +240,33 @@ const clearChat = () => { chatMessages.value = []; chatMeta.value = '' }
 
 // ---- 图片生成 ----
 // Seedream 5.0 模型要求总像素 ≥ 3686400(≥1920×1920),小尺寸会被方舟 400 拒绝
-const sizePresets = ['2048x2048', '1920x1920', '1440x2560', '2560x1440', '2K', '4K']
+const sizePresets = ['2048x2048', '1920x1920', '1440x2560', '2560x1440', '2K', '4K', 'adaptive']
 const imagePrompt = ref('')
 const imageSize = ref('')
 const imageCount = ref(1)
+const imageSeed = ref(-1) // -1=随机(不传)
+const imageGuidance = ref(2.5)
+const guidanceCustom = ref(false) // 关=不发送,用模型默认
+const imageWatermark = ref(true)
+const imageRf = ref('url')
+const imageSequential = ref('disabled')
+const imageMaxImages = ref(4)
+const refImages = ref([]) // 参考图 [{name, dataUrl}]
+const refInputRef = ref(null)
 const imageLoading = ref(false)
 const imageResults = ref([])
 const imageMeta = ref('')
+
+const onRefPick = (e) => {
+  for (const f of e.target.files || []) {
+    if (refImages.value.length >= 10) break
+    const reader = new FileReader()
+    reader.onload = () => refImages.value.push({ name: f.name, dataUrl: reader.result })
+    reader.readAsDataURL(f)
+  }
+  e.target.value = ''
+}
+const removeRefImage = (i) => { refImages.value.splice(i, 1) }
 
 const genImage = async () => {
   const prompt = imagePrompt.value.trim()
@@ -205,7 +276,19 @@ const genImage = async () => {
   imageMeta.value = ''
   const start = Date.now()
   try {
-    const data = await aiApi.image({ prompt, size: imageSize.value || null, n: imageCount.value })
+    const groupMode = imageSequential.value === 'auto'
+    const data = await aiApi.image({
+      prompt,
+      size: imageSize.value || null,
+      n: groupMode ? null : imageCount.value,
+      imageUrls: refImages.value.map((r) => r.dataUrl),
+      seed: imageSeed.value >= 0 ? imageSeed.value : null,
+      guidanceScale: guidanceCustom.value ? imageGuidance.value : null,
+      watermark: imageWatermark.value,
+      responseFormat: imageRf.value,
+      sequentialMode: groupMode ? 'auto' : null,
+      sequentialMaxImages: groupMode ? imageMaxImages.value : null,
+    })
     imageResults.value = data.map((d) => ({
       url: d.url || (d.b64_json ? 'data:image/png;base64,' + d.b64_json : ''),
     })).filter((d) => d.url)
@@ -297,6 +380,34 @@ const doTranscribe = async () => {
 .pg-meta { margin-top: 10px; font-size: 12px; color: var(--color-text-secondary, #7a6b5a); }
 .pg-inline { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
 .pg-field { display: flex; flex-direction: column; gap: 6px; }
+.pg-field-hint { font-size: 12px; color: var(--color-text-secondary, #7a6b5a); }
+.pg-param-inline { display: flex; align-items: center; gap: 8px; }
+.pg-param-slider { display: flex; align-items: center; gap: 8px; }
+.pg-slider { width: 140px; }
+.pg-ref-list { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pg-ref-item {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--color-border, rgba(58, 46, 34, 0.12));
+}
+.pg-ref-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pg-ref-del {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  line-height: 14px;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 0 0 0 8px;
+}
 .pg-hint { margin-top: 8px; font-size: 12px; color: var(--color-text-secondary, #7a6b5a); }
 .pg-img-loading { height: 200px; border-radius: 10px; }
 .pg-img-grid {

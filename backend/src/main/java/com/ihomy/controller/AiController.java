@@ -63,7 +63,7 @@ public class AiController {
     @PostMapping("/image")
     public Result<List<Map<String, Object>>> image(@RequestBody AiImageDTO dto) {
         securityHelper.current();
-        return Result.success(aiService.images(dto.getPrompt(), dto.getSize(), dto.getN()));
+        return Result.success(aiService.images(dto));
     }
 
     @Operation(summary = "AI 语音识别")

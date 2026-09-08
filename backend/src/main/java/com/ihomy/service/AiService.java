@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.ResultCode;
 import com.ihomy.common.ThirdPartyHttp;
+import com.ihomy.dto.AiImageDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -201,19 +202,48 @@ public class AiService {
     }
 
     /** OpenAI 兼容图片生成:POST {base}/images/generations,返回 data 数组(元素含 url 或 b64_json) */
-    public List<Map<String, Object>> images(String prompt, String size, Integer n) {
+    public List<Map<String, Object>> images(AiImageDTO dto) {
         if (!isImageAvailable()) {
             throw new BizException(ResultCode.BAD_REQUEST, "AI 图片生成未配置,请在 external.yml 配置 app.ai.image-model 后重启后端");
         }
-        requireText(prompt, "请填写图片描述");
+        requireText(dto.getPrompt(), "请填写图片描述");
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", imageModel.trim());
-        body.put("prompt", prompt.trim());
-        body.put("n", n == null || n < 1 ? 1 : Math.min(n, 4));
-        if (notBlank(size)) {
-            body.put("size", size.trim());
+        body.put("prompt", dto.getPrompt().trim());
+        // 组图模式由 sequential_image_generation 驱动,此时不再传 n(避免两者语义冲突)
+        boolean groupMode = "auto".equals(dto.getSequentialMode());
+        if (groupMode) {
+            body.put("sequential_image_generation", "auto");
+            Map<String, Object> seqOpts = new LinkedHashMap<>();
+            int maxImages = dto.getSequentialMaxImages() == null ? 4 : dto.getSequentialMaxImages();
+            seqOpts.put("max_images", Math.min(Math.max(maxImages, 1), 10));
+            body.put("sequential_image_generation_options", seqOpts);
+        } else {
+            body.put("n", dto.getN() == null || dto.getN() < 1 ? 1 : Math.min(dto.getN(), 4));
         }
-        body.put("response_format", "url");
+        if (dto.getImageUrls() != null && !dto.getImageUrls().isEmpty()) {
+            List<String> refs = dto.getImageUrls().stream()
+                    .filter(s -> s != null && !s.isBlank())
+                    .limit(10)
+                    .toList();
+            if (!refs.isEmpty()) {
+                body.put("image", refs.size() == 1 ? refs.get(0) : refs);
+            }
+        }
+        if (notBlank(dto.getSize())) {
+            body.put("size", dto.getSize().trim());
+        }
+        // 可选参数:仅在前端显式给出时透传(null=用模型默认,不进请求体)
+        if (dto.getSeed() != null && dto.getSeed() >= 0) {
+            body.put("seed", Math.min(dto.getSeed(), 2147483647L));
+        }
+        if (dto.getGuidanceScale() != null) {
+            body.put("guidance_scale", Math.min(Math.max(dto.getGuidanceScale(), 1.0), 10.0));
+        }
+        if (dto.getWatermark() != null) {
+            body.put("watermark", dto.getWatermark());
+        }
+        body.put("response_format", "b64_json".equals(dto.getResponseFormat()) ? "b64_json" : "url");
         Map<String, String> headers = Map.of(
                 "Content-Type", "application/json",
                 "Authorization", "Bearer " + decryptIfEnc(imageKey()));
