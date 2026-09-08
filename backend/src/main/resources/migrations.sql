@@ -693,3 +693,29 @@ SET @drop_book_created_by := (
 PREPARE drop_book_created_by_stmt FROM @drop_book_created_by;
 EXECUTE drop_book_created_by_stmt;
 DEALLOCATE PREPARE drop_book_created_by_stmt;
+
+-- ------------------------------------------------------------
+-- 2026-09-08 V9.43 家庭级 AI API 配置:新增 sys_family_ai_config 表(每家庭一行)
+-- AI 调用按当前家庭取本表配置,行内字段为空/无行时落回全局 app.ai.* 兜底;
+-- 真实 API Key 不入 git:经设置-家庭 AI 配置界面保存(ENC 加密)或各环境手动 INSERT
+-- 幂等:CREATE TABLE IF NOT EXISTS,重复执行无副作用
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `sys_family_ai_config` (
+  `id`             BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`      BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `base_url`       VARCHAR(200) DEFAULT NULL COMMENT 'OpenAI 兼容服务地址(不含路径,如 https://api.deepseek.com)',
+  `api_key`        VARCHAR(500) DEFAULT NULL COMMENT 'API Key(ENC 加密存储)',
+  `model`          VARCHAR(100) DEFAULT NULL COMMENT '对话模型名(如 deepseek-chat)',
+  `timeout_ms`     INT          DEFAULT NULL COMMENT '单次调用超时(毫秒),留空=跟随全局兜底',
+  `image_model`    VARCHAR(100) DEFAULT NULL COMMENT '图片生成模型名(留空复用 model 能力判定口径)',
+  `image_base_url` VARCHAR(200) DEFAULT NULL COMMENT '图片生成服务地址(留空复用 base_url)',
+  `image_api_key`  VARCHAR(500) DEFAULT NULL COMMENT '图片生成 API Key(ENC 加密存储,留空复用 api_key)',
+  `asr_model`      VARCHAR(100) DEFAULT NULL COMMENT '语音识别模型名',
+  `asr_base_url`   VARCHAR(200) DEFAULT NULL COMMENT '语音识别服务地址(留空复用 base_url)',
+  `asr_api_key`    VARCHAR(500) DEFAULT NULL COMMENT '语音识别 API Key(ENC 加密存储,留空复用 api_key)',
+  `remark`         VARCHAR(200) DEFAULT NULL COMMENT '备注',
+  `created_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭级 AI API 配置表(每家庭一行)';

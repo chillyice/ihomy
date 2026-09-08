@@ -12,6 +12,9 @@
           <el-menu-item index="family">
             <span class="menu-icon">🏠</span>{{ $t('settings.cat.family') }}
           </el-menu-item>
+          <el-menu-item v-if="userStore.hasPerm('family:manage')" index="ai">
+            <span class="menu-icon">🤖</span>{{ $t('settings.cat.ai') }}
+          </el-menu-item>
           <el-menu-item index="daily">
             <span class="menu-icon">📅</span>{{ $t('settings.cat.daily') }}
           </el-menu-item>
@@ -162,6 +165,63 @@
             <div class="section-label">创建新家庭</div>
             <button class="create-family-btn" @click="showCreateFamily = true">创建新家庭</button>
             <p class="share-tip">创建一个新的家庭组,你将成为新家庭的家长(OWNER)。创建后自动切换到新家庭,可在顶栏切换回原家庭。</p>
+          </div>
+        </template>
+
+        <!-- 家庭 AI API 配置:按家庭独立配置(家长可编辑),字段留空跟随全局兜底 -->
+        <template v-if="active === 'ai'">
+          <div class="card settings-card">
+            <div class="section-label">{{ $t('settings.ai.title') }}</div>
+            <div class="ai-cap-row">
+              <span v-for="cap in ['chat', 'image', 'asr']" :key="cap" class="ai-cap" :class="{ ok: aiConfig.available[cap] }">
+                {{ $t('settings.ai.' + cap) }} · {{ aiConfig.available[cap] ? $t('settings.ai.available') : $t('settings.ai.unconfigured') }}
+              </span>
+            </div>
+            <div class="share-tip">{{ $t('settings.ai.hint') }}</div>
+            <el-form label-position="top" v-loading="aiLoading">
+              <el-form-item :label="$t('settings.ai.baseUrl')">
+                <el-input v-model="aiConfig.baseUrl" :placeholder="globalAiPlaceholder('baseUrl')" clearable />
+              </el-form-item>
+              <el-form-item :label="$t('settings.ai.apiKey')">
+                <el-input v-model="aiKeyInput" type="password" show-password
+                  :placeholder="aiConfig.apiKeySet ? $t('settings.ai.keyKeep') : $t('settings.ai.followGlobal')" />
+              </el-form-item>
+              <el-form-item :label="$t('settings.ai.model')">
+                <el-input v-model="aiConfig.model" :placeholder="globalAiPlaceholder('model')" clearable />
+              </el-form-item>
+              <el-form-item :label="$t('settings.ai.timeout')">
+                <el-input-number v-model="aiConfig.timeoutMs" :min="1000" :max="600000" :step="1000" :placeholder="$t('settings.ai.followGlobal')" />
+              </el-form-item>
+              <el-divider />
+              <el-form-item :label="$t('settings.ai.imageModel')">
+                <el-input v-model="aiConfig.imageModel" :placeholder="globalAiPlaceholder('imageModel')" clearable />
+              </el-form-item>
+              <el-form-item :label="$t('settings.ai.imageBaseUrl')">
+                <el-input v-model="aiConfig.imageBaseUrl" :placeholder="$t('settings.ai.reuseMain')" clearable />
+              </el-form-item>
+              <el-form-item :label="$t('settings.ai.imageApiKey')">
+                <el-input v-model="aiImageKeyInput" type="password" show-password
+                  :placeholder="aiConfig.imageApiKeySet ? $t('settings.ai.keyKeep') : $t('settings.ai.reuseMainKey')" />
+              </el-form-item>
+              <el-divider />
+              <el-form-item :label="$t('settings.ai.asrModel')">
+                <el-input v-model="aiConfig.asrModel" :placeholder="globalAiPlaceholder('asrModel')" clearable />
+              </el-form-item>
+              <el-form-item :label="$t('settings.ai.asrBaseUrl')">
+                <el-input v-model="aiConfig.asrBaseUrl" :placeholder="$t('settings.ai.reuseMain')" clearable />
+              </el-form-item>
+              <el-form-item :label="$t('settings.ai.asrApiKey')">
+                <el-input v-model="aiAsrKeyInput" type="password" show-password
+                  :placeholder="aiConfig.asrApiKeySet ? $t('settings.ai.keyKeep') : $t('settings.ai.reuseMainKey')" />
+              </el-form-item>
+              <el-form-item :label="$t('settings.ai.remark')">
+                <el-input v-model="aiConfig.remark" maxlength="200" clearable />
+              </el-form-item>
+              <div class="form-footer">
+                <el-button type="primary" :loading="aiSaving" @click="saveAiConfig">{{ $t('settings.ai.save') }}</el-button>
+                <el-button v-if="aiConfig.configured" class="ghost-btn" @click="resetAiConfig">{{ $t('settings.ai.reset') }}</el-button>
+              </div>
+            </el-form>
           </div>
         </template>
 
@@ -375,7 +435,7 @@
 import { ref, reactive, computed, inject, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { profileApi, familyApi, fileApi, musicApi } from '@/api'
+import { profileApi, familyApi, fileApi, musicApi, aiApi } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import Breadcrumb from '@/components/Breadcrumb.vue'
@@ -547,6 +607,7 @@ const load = async () => {
     // 忽略
   }
   loadPlaylists()
+  loadAiConfig()
 }
 
 // 保存个人资料(头像/封面通过上传后回填 URL 一并提交)
@@ -708,6 +769,102 @@ const confirmCreateFamily = async () => {
   }
 }
 
+// 家庭 AI API 配置(家长可编辑;字段留空跟随全局兜底,密钥留空保留原值)
+const canManageAi = computed(() => userStore.hasPerm('family:manage'))
+const aiConfig = reactive({
+  configured: false, baseUrl: '', model: '', timeoutMs: null,
+  imageModel: '', imageBaseUrl: '', asrModel: '', asrBaseUrl: '', remark: '',
+  apiKeySet: false, imageApiKeySet: false, asrApiKeySet: false,
+  global: {}, available: { chat: false, image: false, asr: false },
+})
+const aiKeyInput = ref('')
+const aiImageKeyInput = ref('')
+const aiAsrKeyInput = ref('')
+const aiSaving = ref(false)
+const aiLoading = ref(false)
+
+// 未配置字段的占位提示:显示当前全局兜底值(模型名/地址非敏感)
+const globalAiPlaceholder = (key) => {
+  const g = aiConfig.global || {}
+  return g[key] ? t('settings.ai.followGlobalWith', { val: g[key] }) : t('settings.ai.followGlobal')
+}
+
+const loadAiConfig = async () => {
+  if (!userStore.isLoggedIn || !canManageAi.value) return
+  aiLoading.value = true
+  try {
+    const r = await aiApi.config()
+    Object.assign(aiConfig, {
+      configured: r.configured,
+      baseUrl: r.baseUrl || '',
+      model: r.model || '',
+      timeoutMs: r.timeoutMs ?? null,
+      imageModel: r.imageModel || '',
+      imageBaseUrl: r.imageBaseUrl || '',
+      asrModel: r.asrModel || '',
+      asrBaseUrl: r.asrBaseUrl || '',
+      remark: r.remark || '',
+      apiKeySet: r.apiKeySet,
+      imageApiKeySet: r.imageApiKeySet,
+      asrApiKeySet: r.asrApiKeySet,
+      global: r.global || {},
+      available: r.available || { chat: false, image: false, asr: false },
+    })
+  } catch (e) {
+    // 拦截器已提示(非家长 403 时静默)
+  } finally {
+    aiLoading.value = false
+  }
+}
+
+const saveAiConfig = async () => {
+  aiSaving.value = true
+  try {
+    const data = {
+      baseUrl: aiConfig.baseUrl || '',
+      model: aiConfig.model || '',
+      timeoutMs: aiConfig.timeoutMs == null ? '' : String(aiConfig.timeoutMs),
+      imageModel: aiConfig.imageModel || '',
+      imageBaseUrl: aiConfig.imageBaseUrl || '',
+      asrModel: aiConfig.asrModel || '',
+      asrBaseUrl: aiConfig.asrBaseUrl || '',
+      remark: aiConfig.remark || '',
+    }
+    // 密钥仅在输入时提交(留空=保留原值/跟随全局)
+    if (aiKeyInput.value) data.apiKey = aiKeyInput.value
+    if (aiImageKeyInput.value) data.imageApiKey = aiImageKeyInput.value
+    if (aiAsrKeyInput.value) data.asrApiKey = aiAsrKeyInput.value
+    await aiApi.saveConfig(data)
+    aiKeyInput.value = ''
+    aiImageKeyInput.value = ''
+    aiAsrKeyInput.value = ''
+    ElMessage.success(t('settings.ai.saved'))
+    await loadAiConfig()
+  } catch (e) {
+    // 拦截器已提示
+  } finally {
+    aiSaving.value = false
+  }
+}
+
+// 恢复默认:删除本家庭 AI 配置行,AI 调用回退全局兜底
+const resetAiConfig = () => {
+  ElMessageBox.confirm(t('settings.ai.resetConfirm'), t('settings.ai.reset'), {
+    confirmButtonText: t('common.confirm'),
+    cancelButtonText: t('common.cancel'),
+    type: 'warning',
+    closeOnClickModal: true,
+  }).then(async () => {
+    try {
+      await aiApi.deleteConfig()
+      ElMessage.success(t('settings.ai.resetDone'))
+      await loadAiConfig()
+    } catch (e) {
+      // 拦截器已提示
+    }
+  }).catch(() => {})
+}
+
 // 恢复默认面板布局:清除 localStorage 中所有面板持久化记录,刷新页面生效
 const resetPanelLayout = () => {
   ElMessageBox.confirm('确定恢复首页所有面板的默认位置和大小?当前自定义布局将被清除。', '恢复默认布局', {
@@ -769,6 +926,11 @@ onMounted(load)
 html.dark .form-tip, html.dark .share-tip { color: #9a9088; }
 .weather-loc-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .upload-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* 家庭 AI 配置:能力状态徽标(可用=主题色/未配置=灰) */
+.ai-cap-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.ai-cap { font-size: 12px; padding: 2px 10px; border-radius: 999px; background: var(--color-card-2, rgba(0,0,0,0.04)); color: var(--color-text-secondary); border: 1px solid var(--color-border); }
+.ai-cap.ok { color: var(--color-primary); border-color: var(--color-primary); background: rgba(64, 158, 255, 0.08); }
 
 /* 个性化设置:控件行 + 标签水平排列,垂直居中 */
 .setting-row { display: flex; align-items: center; gap: 10px; }

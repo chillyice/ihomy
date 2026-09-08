@@ -75,7 +75,7 @@ public class ItemAiService {
 
     public Map<String, Object> find(Long familyId, String query) {
         String q = requireText(query, "请描述要找的物品");
-        JsonNode plan = aiService.chatJson(FIND_SYSTEM_PROMPT, "用户找物描述:" + q);
+        JsonNode plan = aiService.chatJson(familyId, FIND_SYSTEM_PROMPT, "用户找物描述:" + q);
         List<String> parsed = strings(plan.get("keywords"));
         String type = normTypeOrNull(plan.path("type"));
         List<String> keywords = parsed.isEmpty() ? List.of(q.trim()) : parsed; // AI 拆解失败回退原文
@@ -120,7 +120,7 @@ public class ItemAiService {
 
     public Map<String, Object> put(Long userId, Long familyId, String text) {
         String q = requireText(text, "请描述物品放置位置");
-        JsonNode plan = aiService.chatJson(PUT_SYSTEM_PROMPT,
+        JsonNode plan = aiService.chatJson(familyId, PUT_SYSTEM_PROMPT,
                 "家庭上下文清单:\n" + toJson(buildContext(familyId)) + "\n\n用户描述:" + q);
 
         String name = plan.path("name").asText("").trim();

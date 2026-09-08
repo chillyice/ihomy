@@ -341,9 +341,12 @@ export const itemApi = {
   aiPut: (data) => request.post('/item/ai/put', data),
 }
 
-// AI 接入(Playground 测试页):能力状态/对话/图片生成/语音识别(模型走 app.ai 配置)
+// AI 接入(Playground 测试页):能力状态/对话/图片生成/语音识别(按家庭配置,全局兜底)
 export const aiApi = {
   status: () => request.get('/ai/status'),
+  config: () => request.get('/ai/config'),
+  saveConfig: (data) => request.put('/ai/config', data),
+  deleteConfig: () => request.delete('/ai/config'),
   chat: (data) => request.post('/ai/chat', data, { timeout: 150000 }),
   image: (data) => request.post('/ai/image', data, { timeout: 180000 }),
   transcribe: (file, language) => {
