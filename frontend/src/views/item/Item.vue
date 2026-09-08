@@ -264,7 +264,12 @@
 
         <!-- 搜索结果 -->
         <div v-if="searchResults.length" class="fp-results">
-          <div class="fp-results-title">{{ $t('item.searchResults') }} ({{ searchResults.length }})</div>
+          <div class="fp-results-title">
+            {{ $t('item.searchResults') }} ({{ searchResults.length }})
+            <span class="fp-src-tag" :class="{ ai: searchSource === 'ai' }">
+              {{ searchSource === 'ai' ? '✨ ' + $t('item.aiFindTag') : $t('item.keywordTag') }}
+            </span>
+          </div>
           <div v-for="it in searchResults" :key="it.id" class="fp-result" :class="{ on: highlightItemIds.includes(it.id) }" @click="locateItem(it)">
             <img v-if="it.image_url" :src="it.image_url" class="fp-result-ava" />
             <div class="fp-result-text">
@@ -273,6 +278,9 @@
             </div>
           </div>
         </div>
+        <!-- 关键词无命中 → AI 语义找物兜底(俗称/别名/自然语言) -->
+        <div v-else-if="aiSearching" class="fp-results fp-search-hint">✨ {{ $t('item.aiSearching') }}</div>
+        <div v-else-if="searched" class="fp-results fp-search-hint">{{ $t('item.noResults') }}</div>
       </template>
     </div>
 
@@ -354,6 +362,7 @@
               </div>
               <div class="tb-right">
                 <el-button :disabled="!items.length" @click="toggleSelect">{{ $t('item.select') }}</el-button>
+                <el-button @click="openAiRegister">✨ {{ $t('item.aiRegister') }}</el-button>
                 <el-button type="primary" @click="openItem()">{{ $t('item.addItem') }}</el-button>
               </div>
             </template>
@@ -383,6 +392,17 @@
         </el-tab-pane>
       </el-tabs>
     </div>
+
+    <!-- AI 智能登记物品(自然语言放物) -->
+    <el-dialog v-model="aiDlg" append-to-body :title="$t('item.aiRegisterTitle')" width="480px">
+      <div class="share-tip">{{ $t('item.aiRegisterTip') }}</div>
+      <el-input v-model="aiText" type="textarea" :rows="3" maxlength="200" :placeholder="$t('item.aiRegisterPh')" @keydown.ctrl.enter="confirmAiPut" />
+      <div v-if="aiReply" class="ai-reply">{{ aiReply }}</div>
+      <template #footer>
+        <el-button @click="aiDlg = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="aiPutting" @click="confirmAiPut">{{ $t('item.aiRegisterGo') }}</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 物品编辑 -->
     <el-dialog v-model="itemDlg" append-to-body :title="itemForm.id ? $t('item.editItem') : $t('item.addItem')" width="480px">
@@ -1348,10 +1368,33 @@ const onGlueRooms = async ({ roomAId, roomBId }) => {
   loadFloorPlan()
 }
 
-// ---- 搜索 ----
+// ---- 搜索(关键词优先,无命中时 AI 语义找物兜底) ----
+const searched = ref(false)
+const searchSource = ref('') // 'keyword' | 'ai'
+const aiSearching = ref(false)
 const onSearch = async () => {
   if (!searchKeyword.value) { clearSearch(); return }
+  searched.value = true
+  searchSource.value = 'keyword'
   searchResults.value = await itemApi.list({ keyword: searchKeyword.value })
+  if (searchResults.value.length) {
+    await autoSwitchToHits()
+    focusFirstHit()
+    return
+  }
+  // 关键词无命中 → AI 找物兜底(俗称/别名/自然语言描述);AI 不可用静默保持无结果
+  aiSearching.value = true
+  try {
+    const r = await itemApi.aiFind({ query: searchKeyword.value })
+    if (r.matches && r.matches.length) {
+      searchResults.value = r.matches
+      searchSource.value = 'ai'
+    }
+  } catch (e) {
+    // AI 未配置/调用失败:保持关键词搜索的无结果状态,不弹错误
+  } finally {
+    aiSearching.value = false
+  }
   await autoSwitchToHits()
   focusFirstHit()
 }
@@ -1373,7 +1416,7 @@ const focusFirstHit = () => {
     Number(it.house_id) === Number(currentHouseId.value) && Number(it.floor) === Number(currentFloor.value))
   if (hit) canvasRef.value?.focusItem(hit.id)
 }
-const clearSearch = () => { searchKeyword.value = ''; searchResults.value = [] }
+const clearSearch = () => { searchKeyword.value = ''; searchResults.value = []; searched.value = false; searchSource.value = '' }
 const locateItem = async (it) => {
   floorTouched.value = true
   if (it.house_id == null) return
@@ -1385,6 +1428,34 @@ const locateItem = async (it) => {
   await loadFloorPlan()
   // 放大居中到命中物品(物品无锚点时画布内回退家具/房间中心)
   canvasRef.value?.focusItem(it.id)
+}
+
+// ---- AI 智能登记(自然语言放物:已有同名/别名物品更新位置,否则新增) ----
+const aiDlg = ref(false)
+const aiText = ref('')
+const aiReply = ref('')
+const aiPutting = ref(false)
+const openAiRegister = () => {
+  aiText.value = ''
+  aiReply.value = ''
+  aiDlg.value = true
+}
+const confirmAiPut = async () => {
+  const text = aiText.value.trim()
+  if (!text || aiPutting.value) return
+  aiPutting.value = true
+  try {
+    const r = await itemApi.aiPut({ text })
+    aiReply.value = r.reply
+    ElMessage.success(r.reply)
+    // 刷新列表与画布数据(登记后物品出现在对应楼层)
+    await loadItems()
+    await loadFloorPlan()
+  } catch (e) {
+    // AI 未配置/识别失败:拦截器已提示,保留输入便于修改重发
+  } finally {
+    aiPutting.value = false
+  }
 }
 
 // ---- 旧 CRUD ----
@@ -1631,6 +1702,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fp-fit-ico { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .fp-results { position: absolute; right: 12px; bottom: 12px; width: 260px; max-height: 50%; overflow-y: auto; background: rgba(255,253,248,0.96); border-radius: 12px; box-shadow: 0 3px 12px rgba(0,0,0,0.12); padding: 10px; z-index: 5; }
 .fp-results-title { font-size: 13px; font-weight: 600; color: #5c4c3d; margin-bottom: 8px; }
+.fp-src-tag { font-size: 11px; font-weight: 500; padding: 1px 8px; border-radius: 999px; margin-left: 6px; background: rgba(0,0,0,0.05); color: #8a7a68; border: 1px solid rgba(0,0,0,0.08); }
+.fp-src-tag.ai { background: rgba(120, 90, 40, 0.08); color: var(--color-accent, #a8483a); border-color: rgba(168, 72, 58, 0.25); }
+.fp-search-hint { font-size: 12px; color: #8a7a68; padding: 4px 2px; }
+.ai-reply { margin-top: 10px; padding: 8px 12px; border-radius: 10px; background: var(--color-card-2, rgba(0,0,0,0.03)); border: 1px solid var(--color-border); font-size: 13px; color: var(--color-text); }
 .fp-result { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; cursor: pointer; }
 .fp-result:hover { background: rgba(184,140,110,0.1); }
 .fp-result.on { background: rgba(184,140,110,0.18); }

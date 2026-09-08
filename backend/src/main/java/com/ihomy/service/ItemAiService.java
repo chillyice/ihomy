@@ -57,6 +57,7 @@ public class ItemAiService {
             4. type 仅六种:KITCHENWARE/INGREDIENT/DAILY/CLOTHES/TOOL/OTHER,判断不出填 OTHER;
             5. 物品名提取简短通用叫法(如"剪刀"),aliases 数组给同义叫法;quantity/unit 仅在用户说明数量时给;
             6. 若用户描述的是已有物品换了位置(如"剪刀现在在厨房"),move 填 true;明确是新买的物品填 false。
+               items 清单是"名称(别名1/别名2)"紧凑文本,仅供判定用户说的是否为已有物品,不含位置信息。
             只输出 JSON 对象,不要输出任何其他内容:
             {"name":"物品名","aliases":["别名"],"type":"TOOL","position":"最上层抽屉","quantity":null,"unit":null,"roomId":null,"furnitureId":null,"move":true}""";
 
@@ -75,9 +76,17 @@ public class ItemAiService {
 
     public Map<String, Object> find(Long familyId, String query) {
         String q = requireText(query, "请描述要找的物品");
-        JsonNode plan = aiService.chatJson(familyId, FIND_SYSTEM_PROMPT, "用户找物描述:" + q);
-        List<String> parsed = strings(plan.get("keywords"));
-        String type = normTypeOrNull(plan.path("type"));
+        // AI 解析自愈:模型不可用/超时/异常时回退原文关键词,接口本身始终可用(前端据此免错误兜底)
+        boolean aiParsed = true;
+        JsonNode plan = null;
+        try {
+            plan = aiService.chatJson(familyId, FIND_SYSTEM_PROMPT, "用户找物描述:" + q);
+        } catch (Exception e) {
+            aiParsed = false;
+            log.warn("[AI找物] AI 解析不可用,回退原文关键词 family={} query={}", familyId, q);
+        }
+        List<String> parsed = plan == null ? List.of() : strings(plan.get("keywords"));
+        String type = plan == null ? null : normTypeOrNull(plan.path("type"));
         List<String> keywords = parsed.isEmpty() ? List.of(q.trim()) : parsed; // AI 拆解失败回退原文
 
         List<Map<String, Object>> matches = itemMapper.selectItemByFamily(familyId, null, null, null, null)
@@ -91,6 +100,7 @@ public class ItemAiService {
                 .toList();
 
         Map<String, Object> result = new LinkedHashMap<>();
+        result.put("aiParsed", aiParsed);
         result.put("reply", matches.isEmpty() ? "没有找到相关物品" : "找到 " + matches.size() + " 件相关物品");
         result.put("keywords", keywords);
         result.put("matches", matches);
@@ -269,10 +279,10 @@ public class ItemAiService {
         ctx.put("items", itemMapper.selectItemByFamily(familyId, null, null, null, null).stream()
                 .limit(CONTEXT_LIMIT)
                 .map(row -> {
-                    Map<String, Object> m = brief(((Number) row.get("id")).longValue(), str(row.get("name")));
+                    // 紧凑"名称(别名1/别名2)"文本:省 id(AI 无需回传物品 id,后端按名称/别名匹配)与 JSON 键名 token
+                    String name = str(row.get("name"));
                     String aliases = str(row.get("aliases"));
-                    if (!aliases.isEmpty()) m.put("aliases", aliases);
-                    return m;
+                    return aliases.isEmpty() ? name : name + "(" + aliases.replace(",", "/") + ")";
                 })
                 .toList());
         return ctx;
