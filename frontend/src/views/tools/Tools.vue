@@ -15,6 +15,12 @@
         <div class="tool-desc">{{ $t('tools.mindmap.desc') }}</div>
         <span class="tool-enter">{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon></span>
       </div>
+      <div class="tool-card card" @click="$router.push('/tools/ai-playground')">
+        <div class="tool-icon"><el-icon :size="30"><MagicStick /></el-icon></div>
+        <div class="tool-name">{{ $t('tools.aiPlayground.title') }}</div>
+        <div class="tool-desc">{{ $t('tools.aiPlayground.desc') }}</div>
+        <span class="tool-enter">{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon></span>
+      </div>
       <div class="tool-card card tool-disabled">
         <div class="tool-icon"><el-icon :size="30"><MagicStick /></el-icon></div>
         <div class="tool-name">{{ $t('tools.more') }}</div>

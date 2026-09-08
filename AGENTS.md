@@ -98,7 +98,7 @@ frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
     stores/       # user.js(登录+权限) / app.js(首页聚合)
     router/       # 登录守卫 + scrollBehavior;39 个路由(懒加载)
     i18n/ theme/  # vue-i18n 中英;明暗主题(只 light/dark)
-    utils/        # dict.js / diary.js / doodle.js(涂鸦引擎) / windowLight.js / useSunLight.js / useDragResize.js
+    utils/        # dict.js / diary.js / doodle.js(涂鸦引擎) / furnitureIcon.js(家具类型图标) / windowLight.js / useSunLight.js / useDragResize.js
     composables/  # useDevice.js(设备检测)
     components/   # AppSidebar/BackToTop/Breadcrumb/AvatarCropper/InstallPrompt/SiteFooter/SunLightLayer/LightTestConsole/SyncDialog/Mobile*(移动端)
     layouts/MobileLayout.vue  # 移动端壳
@@ -152,13 +152,14 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 生活 | 纪念日 / 提醒 / 计划 / 任务 / 记账 / 家谱 / 签到积分 / 背景音乐 | Anniversary / Reminder / Plan / Task / Points / Music 各 Controller |
 | 基础 | 文件上传 / 存储管理 / 首页聚合 / 运维 / 每日内容 / 操作日志 / 系统参数 | File / Storage / Home+Public / Ops / Daily / Log 各 Controller |
 | 光影 | 太阳位置/体积光/台灯/天气 / 天气代理 / 天气详情 / 首页仪表盘 | SolarUtil+SunService + windowLight.js + SunLightLayer.vue |
-| 物品 | 物品定位+户型图 | ItemController / ItemService(设计决策见需求设计说明书 §4.8.1) |
+| 物品 | 物品定位+户型图+AI 语义 | ItemController / ItemService / ItemAiService+AiService(设计决策见需求设计说明书 §4.8.1) |
+| AI | 图片生成/语音识别接入+AI 测试台 | AiService / AiController(/ai/status、/ai/chat、/ai/image、/ai/transcribe) |
 | 厨房 | 菜单/菜谱/食材 | RecipeController / RecipeService |
-| 工具 | 工具箱聚合页/脑图设计(simple-mind-map,快照/回滚/协同轮询) | MindMapController / MindMapService |
+| 工具 | 工具箱聚合页/脑图设计(simple-mind-map,快照/回滚/协同轮询)/AI 测试台(/tools/ai-playground 临时) | MindMapController / MindMapService |
 | 系统 | i18n / 主题 / 字典 | i18n/ + theme/ + utils/dict.js |
 | 移动端 | 设备自适应 | useDevice.js + MobileLayout.vue + Mobile* 组件 |
 
-**关键坑速查**(实现细节,详见 docs):日记 date 兼容 `yyyy-MM-dd HH:mm`;纪念日 Hutool ChineseDate 月份 0-based 需 +1;家谱 null 字段须 `LambdaUpdateWrapper` 显式 SET;相册分享 token + Knuth 混淆;博客新建家庭注入 9 默认分类;物品户型图 2 期完成(裁剪/粘合删原房保持最后防家具入库覆盖、端点识别/字号/光标屏幕恒定;**hover 边加号阈值 6px**——原 12px 太大导致 hover 显示但 click 被 `justDragged` 拦截;库内家具拖入画布替代「摆放」+「请选择房间」按钮)、3 期 AI 语义待做;**未设计楼层画布空白+引导**(2026-09-07:表单录入房间无 geometry,画布标签 cx/cy=0 会全堆叠在原点;"已设计"=floorDesigned 有底图或任一房间形状≥3 点,未设计时隐藏家具/物品+引导进编辑+拦截摆放,画完第一间自动恢复);**MP `updateById` 会显式回写实体里的旧 `updated_at` 抑制 `ON UPDATE CURRENT_TIMESTAMP`**——凡依赖 updated_at 做变更检测/排序的表,更新必须 LambdaUpdateWrapper 只 SET 业务字段并重查回传新值(2026-09-06 脑图协同踩坑);**simple-mind-map npm 包只内置 default 主题**,其余主题须 `mindmapThemes.js` defineTheme 本地注册,否则 setTheme 静默回落默认样式;**脑图多端并发保存靠 update 乐观锁**(客户端带 baseUpdatedAt,库中 updated_at 已刷新则 409,前端弹窗裁决覆盖/加载远端——双开 20s 轮询窗口内静默互覆盖实测丢数据);**脑图保存前 stripEmptyNodes 剥空叶子**(新增节点不输入直接确认残留 `<p><br></p>`,须传 getData(true).root 而非整包);**EP dropdown 内嵌 CSS hover 子菜单两坑**(2026-09-07 头像「切换家庭」):hover 容忍期须用 `visibility` 延迟隐藏而非 `display` 切换(L 形 hover 区域有路径死角,`display:none` 后移入面板区无法复活),且绝对定位子面板会撑大 `el-scrollbar__wrap` 的 scrollWidth 让 EP 画出滚不动的幽灵 bar(该 popper 的 `.el-scrollbar__bar` 直接 display:none);详见 docs/变更归档.md 同日小节。
+**关键坑速查**(实现细节,详见 docs):日记 date 兼容 `yyyy-MM-dd HH:mm`;纪念日 Hutool ChineseDate 月份 0-based 需 +1;家谱 null 字段须 `LambdaUpdateWrapper` 显式 SET;相册分享 token + Knuth 混淆;博客新建家庭注入 9 默认分类;物品户型图 2 期完成(裁剪/粘合删原房保持最后防家具入库覆盖、端点识别/字号/光标屏幕恒定;**hover 边加号阈值 6px**——原 12px 太大导致 hover 显示但 click 被 `justDragged` 拦截;库内家具拖入画布替代「摆放」+「请选择房间」按钮)、3 期 AI 语义后端已实现(V9.40:/item/ai/find、/item/ai/put,前端入口计入规划);**未设计楼层画布空白+引导**(2026-09-07:表单录入房间无 geometry,画布标签 cx/cy=0 会全堆叠在原点;"已设计"=floorDesigned 有底图或任一房间形状≥3 点,未设计时隐藏家具/物品+引导进编辑+拦截摆放,画完第一间自动恢复);**MP `updateById` 会显式回写实体里的旧 `updated_at` 抑制 `ON UPDATE CURRENT_TIMESTAMP`**——凡依赖 updated_at 做变更检测/排序的表,更新必须 LambdaUpdateWrapper 只 SET 业务字段并重查回传新值(2026-09-06 脑图协同踩坑);**simple-mind-map npm 包只内置 default 主题**,其余主题须 `mindmapThemes.js` defineTheme 本地注册,否则 setTheme 静默回落默认样式;**脑图多端并发保存靠 update 乐观锁**(客户端带 baseUpdatedAt,库中 updated_at 已刷新则 409,前端弹窗裁决覆盖/加载远端——双开 20s 轮询窗口内静默互覆盖实测丢数据);**脑图保存前 stripEmptyNodes 剥空叶子**(新增节点不输入直接确认残留 `<p><br></p>`,须传 getData(true).root 而非整包);**EP dropdown 内嵌 CSS hover 子菜单两坑**(2026-09-07 头像「切换家庭」):hover 容忍期须用 `visibility` 延迟隐藏而非 `display` 切换(L 形 hover 区域有路径死角,`display:none` 后移入面板区无法复活),且绝对定位子面板会撑大 `el-scrollbar__wrap` 的 scrollWidth 让 EP 画出滚不动的幽灵 bar(该 popper 的 `.el-scrollbar__bar` 直接 display:none);详见 docs/变更归档.md 同日小节。
 
 ## 设计规范(统一实现,避免多种方式)
 
@@ -267,7 +268,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 #### 验证基线
 
 - 后端编译:`cd backend; .\mvnw.cmd -B clean compile -DskipTests` → BUILD SUCCESS
-- 前端构建:`cd frontend; npm run build` → 入口 chunk ≈224-228KB(基线 2026-09-06 实测 228KB/gzip 89KB;simple-mind-map 已隔离为独立异步 chunk ~340KB 仅脑图编辑页加载)
+- 前端构建:`cd frontend; npm run build` → 入口 chunk ≈242.6KB(基线 2026-09-08 实测 242.58KB/gzip 95.78KB,较 240.36KB 的 +2.2KB 来自 V9.41 AI 测试台路由/api/i18n 入口段,AiPlayground 页面本体独立 chunk 8.4KB 仅测试页加载;simple-mind-map 已隔离为独立异步 chunk ~340KB 仅脑图编辑页加载)
 - 接口测试:同级独立项目(不在本仓库)`cd ..\autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed;**CI(GitHub Actions,`.github/workflows/ci.yml`)每次推送自动验证:前后端构建+compose 起库导入 schema+后端启动+登录冒烟**
 
 ## 已实现变更归档(已外置)
@@ -290,11 +291,12 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 ## 配置与加密
 
-- **外挂配置**:`IHOMY_CONFIG_PATH` 环境变量指定 yml 路径,`ExternalConfigLoader`(EnvironmentPostProcessor)在 Spring Boot 启动早期加载,注入到 Environment 最高优先级(覆盖 application.yml + profile yml)。含:MySQL 密码、Redis 密码、邮件 SMTP、天气四件套。
+- **外挂配置**:`IHOMY_CONFIG_PATH` 环境变量指定 yml 路径,`ExternalConfigLoader`(EnvironmentPostProcessor)在 Spring Boot 启动早期加载,注入到 Environment 最高优先级(覆盖 application.yml + profile yml)。含:MySQL 密码、Redis 密码、邮件 SMTP、天气四件套。**用户级环境变量曾指向旧路径 `D:\WorkSpace\ihomy\config\external.yml`(陈旧副本,合并单目录前的遗留),2026-09-08 已重定向到仓库副本 `config/external.yml`——改配置前先核实环境变量实际指向:直改仓库副本而环境变量指向别处不生效(已运行进程与新 shell 可能仍旧值,启动命令里显式设置最可靠)。**
 - **DB/Redis/邮件密码明文**:避免鸡生蛋(DB 未连上无法读盐值解密)。
 - **业务凭证(天气私钥)AES-GCM 加密**:`AesUtil`(PBKDF2WithHmacSHA256 派生密钥 100000 次 + 256bit + GCM 128bit tag);密文格式 `ENC(Base64(iv+cipher+tag))`;盐值 16 字节 Base64。
 - **盐值存 DB**:`sys_parameter` 表(name/value),盐值 key=`aes-salt`,首次启动 `ParameterService.getAesSalt()` 自动生成并入库(优先环境变量 `IHOMY_AES_SALT`),之后缓存内存。
 - **WeatherService 改造**:`loadCredential()` 读到的私钥若 `ENC(...)` 包裹,调 `parameterService.decrypt()` 解密;DB 和 yml 两条路径都支持。
+- **AI 模型接入(V9.40,V9.41 补)**:`app.ai.base-url/api-key/model/timeout-ms`(application.yml 留空,external.yml 覆盖;api-key 支持 `ENC(...)`,解密同天气私钥机制);OpenAI 兼容 /chat/completions,统一走 `AiService`(chat/chatJson 带温度重载/images/transcribe/status),出站走 ThirdPartyHttp;**dev 已接入**:chat=GLM-5.3-Flash(tshl 代理)+image=doubao-seedream-5-0-260128(豆包 ark 直连,**出图尺寸下限总像素 ≥3686400 即 ≥1920×1920**),config/external.yml(不入 git);语音识别(asr-model,推荐 SenseVoice)模型名配置后启用,base-url/api-key 缺省复用主配置;AI 测试台 /tools/ai-playground(/ai/status 配置驱动,临时页);后续 AI 功能直接复用,不另起 HTTP 客户端。详见需求设计说明书 §4.6.9。
 - **OPS 加密接口**:`GET /api/ops/crypto/encrypt?plaintext=xxx` 生成密文,`GET /api/ops/crypto/decrypt?ciphertext=ENC(xxx)` 验证解密(均 @RequirePermission("ops:view"))。
 - **外挂模板**:`backend/src/main/resources/external.yml.template`(复制为 external.yml 填真实凭证,设环境变量)。
 - **profile 化(废弃)**:**不再用 application-dev.yml profile**(见 `scripts/start-all.ps1:9`)。`application.yml` 为**生产基线配置**(MySQL 6306/Redis 6379/**DB 密码与 JWT 密钥留空——必须由 external.yml 提供,缺失启动即失败(JwtUtils fail-fast)**/captcha 空/天气留空/`file.upload-dir: /opt/ihomy/uploads` Linux 路径/`spring.threads.virtual.enabled: true` 虚拟线程/HikariCP `maximum-pool-size: 20`/`mybatis.sql: warn` 静默 SQL 日志);**所有环境差异**(开发密码/Windows 路径/captcha=qwer/天气凭证/JWT 密钥/Redis 密码)统一走 `IHOMY_CONFIG_PATH` 指向的 external.yml 覆盖。external.yml 不入 git(.gitignore 已忽略),手动维护,生产部署时也可用 external.yml 注入真实 secrets(密码/密钥)。
@@ -316,7 +318,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 > 完整规划清单(P1-P4)见 `docs/需求设计说明书.md` 第 9 章「规划事项」,此处只留最需注意的四条:
 - **P1 放映厅 Jellyfin 集成**:方案已定稿,详见 docs/变更归档.md「放映厅 Jellyfin 集成方案」;**启动时先重读该归档小节**。
 - **P2 智能家居中控(Home Assistant 集成)**(2026-09-07 评估定稿):硬件协议层全归 HA(家庭中枢:J4125 PVE 虚拟化 OpenWrt/HAOS/OMV + WireGuard 隧道连 VPS,硬件部署另行推进),ihomy 只做数据沉淀与家人控制入口——S1 Paho 订阅 Mosquitto 入库 sys_iot_device/sys_iot_data + Redis 最新值、S2 HA REST 控制入口(long-lived token)、S3 前端中控页(sys_home_module 模块)+ 物品定位户型图联动;详见需求设计说明书 §9。
-- **P3 物品定位-AI 语义**:3 期,依赖 AI API(决策已定,待 API 接入)。
+- **P3 物品定位-AI 语义**:后端已实现(V9.40:AiService 统一接入层 + POST /item/ai/find、/item/ai/put,详见需求设计说明书 §4.6.9/§4.8;**dev 真实联调已通过**:tshl OpenAI 兼容代理 + GLM-5.3-Flash,dev external.yml 已配 app.ai);**前端找物/放物入口待实现**(搜索框 AI 找物+结果定位+放物确认,复用 itemApi.aiFind/aiPut 与画布 focusItem)。
 - 优先级:P1 用户价值高且可行 / P2 锦上添花 / P3 结构性改动 / P4 依赖外部条件。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
 
 ## 文档清单

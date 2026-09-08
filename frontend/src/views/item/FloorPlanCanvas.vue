@@ -42,6 +42,10 @@
           <g v-if="mode === 'view' && furnCrayon[f.id]" class="fp-crayon">
             <path v-for="(d, i) in furnCrayon[f.id]" :key="i" :d="d" class="fp-crayon-stroke furn" />
           </g>
+          <!-- 家具类型图标:矩形左上角(小件不画),随画布缩放与标签一致 -->
+          <g v-if="f.w >= 22 && f.h >= 22" class="fp-furn-ico" :transform="`translate(${f.x + 4},${f.y + 4}) scale(0.58)`">
+            <component :is="p.tag" v-for="(p, i) in furnitureIcon(f.type)" :key="i" v-bind="p.attrs" />
+          </g>
           <text v-if="f.w > 40 && f.h > 18" :x="f.x + f.w / 2" :y="f.y + f.h / 2" class="fp-furn-label fp-editable" @click.stop="mode === 'edit' && tool === 'select' && $emit('rename-furniture', f.id)">{{ f.name }}</text>
           <template v-if="mode === 'edit' && tool === 'select' && furnHandles.get(f.id)">
             <circle v-for="a in furnHandles.get(f.id).corners" :key="'fc' + a" class="fp-handle" :r="5 / view.k" vector-effect="non-scaling-stroke"
@@ -54,13 +58,18 @@
                   @pointerdown.stop="onFurnHandleDown($event, f, a)" />
           </template>
         </g>
-        <!-- 物品 -->
+        <!-- 物品(有头像图用图,加载失败/无图回落色点) -->
         <g v-for="it in visibleItems" :key="it.id">
           <template v-if="highlightItemIds.includes(it.id)">
             <circle :cx="it.ax" :cy="it.ay" r="6" class="fp-item-ping" />
             <circle :cx="it.ax" :cy="it.ay" r="6" class="fp-item-halo" />
           </template>
-          <circle
+          <template v-if="itemImgOf(it)">
+            <clipPath :id="'fp-item-clip-' + it.id"><circle :cx="it.ax" :cy="it.ay" r="6" /></clipPath>
+            <image :href="itemImgOf(it)" :x="it.ax - 6" :y="it.ay - 6" width="12" height="12" preserveAspectRatio="xMidYMid slice" :clip-path="`url(#fp-item-clip-${it.id})`" @error="onItemImgError(it)" />
+            <circle :cx="it.ax" :cy="it.ay" r="6" class="fp-item-ring" :class="{ 'is-hit': highlightItemIds.includes(it.id) }" />
+          </template>
+          <circle v-else
             :cx="it.ax" :cy="it.ay" r="6"
             class="fp-item"
             :class="{ 'is-hit': highlightItemIds.includes(it.id) }"
@@ -172,7 +181,9 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import gsap from 'gsap'
 import { pointInPoly, onSegment, segsIntersect, segOverlap, cutPlanValid, samePt, projectToSegment, detectBoundary } from '@/utils/floorPlanGeom'
+import { furnitureIcon } from '@/utils/furnitureIcon'
 
 const props = defineProps({
   mode: { type: String, default: 'view' },
@@ -696,6 +707,19 @@ const absItems = computed(() => props.items.map((it) => {
   return { ...it, ax, ay }
 }))
 
+// 物品头像:有图用图,加载失败/无图回落色点;画布 items 来自实体(imageUrl),搜索结果来自 map(image_url)
+const itemImgFailed = ref(new Set())
+const itemImgOf = (it) => {
+  const url = it.imageUrl || it.image_url
+  if (!url || itemImgFailed.value.has(it.id)) return null
+  return url
+}
+const onItemImgError = (it) => {
+  const s = new Set(itemImgFailed.value)
+  s.add(it.id)
+  itemImgFailed.value = s
+}
+
 const hitRoomIds = computed(() => {
   const ids = new Set()
   props.highlightItemIds.forEach((iid) => {
@@ -799,6 +823,7 @@ const fit = () => {
 }
 
 const onWheel = (e) => {
+  stopFocusTween()
   const rect = svgRef.value.getBoundingClientRect()
   const mx = e.clientX - rect.left; const my = e.clientY - rect.top
   const factor = e.deltaY < 0 ? 1.1 : 0.9
@@ -806,6 +831,29 @@ const onWheel = (e) => {
   view.value.tx = mx - (mx - view.value.tx) * (k / view.value.k)
   view.value.ty = my - (my - view.value.ty) * (k / view.value.k)
   view.value.k = k
+}
+
+// ---- 搜索定位放大居中 ----
+let focusTween = null
+const stopFocusTween = () => { if (focusTween) { focusTween.kill(); focusTween = null } }
+// 平滑缩放并居中到世界坐标点(一次性 GSAP 补间 view;滚轮/拖拽平移会立即停止补间)
+const focusPoint = (x, y, targetK) => {
+  const w = wrapRef.value?.clientWidth || 800
+  const h = wrapRef.value?.clientHeight || 500
+  const k = clamp(targetK || Math.max(view.value.k, 1.6), 0.1, 8)
+  stopFocusTween()
+  focusTween = gsap.to(view.value, { k, tx: w / 2 - x * k, ty: h / 2 - y * k, duration: 0.45, ease: 'power2.out' })
+}
+// 定位到物品:物品无锚点(未摆放)时依次回退 家具中心 → 房间中心 → 全景适配
+const focusItem = (id) => {
+  const it = absItems.value.find((x) => x.id === id)
+  if (it && !(it.ax === 0 && it.ay === 0)) { focusPoint(it.ax, it.ay); return }
+  const item = props.items.find((x) => x.id === id)
+  const f = item && item.furnitureId != null ? placedFurnitures.value.find((x) => x.id === item.furnitureId) : null
+  if (f) { focusPoint(f.x + f.w / 2, f.y + f.h / 2); return }
+  const r = item && item.roomId != null ? roomsLocal.value.find((x) => x.id === item.roomId) : null
+  if (r && r.poly.length >= 3) { focusPoint(r.cx, r.cy); return }
+  scheduleFit()
 }
 
 const rebuildRoomMeta = (r) => {
@@ -1567,6 +1615,7 @@ const onCalibLineDown = (e) => {
 }
 
 const onSvgDown = (e) => {
+  stopFocusTween()
   if (props.mode !== 'edit') { beginDrag(e, { type: 'pan' }); return }
   // 右键在任意元素上都应触发画布平移
   if (e.button !== 0) { beginDrag(e, { type: 'pan' }); return }
@@ -1645,9 +1694,9 @@ onMounted(() => {
     resetThumbPos()
   }
 })
-onBeforeUnmount(() => { detach(); onThumbDragEnd(); if (resizeObserver) resizeObserver.disconnect() })
+onBeforeUnmount(() => { stopFocusTween(); detach(); onThumbDragEnd(); if (resizeObserver) resizeObserver.disconnect() })
 
-defineExpose({ finishPoly, fit, cancelPending })
+defineExpose({ finishPoly, fit, cancelPending, focusPoint, focusItem })
 </script>
 
 <style scoped>
@@ -1700,6 +1749,8 @@ defineExpose({ finishPoly, fit, cancelPending })
 .fp-furn { fill: rgba(96, 144, 128, 0.28); stroke: #4f806f; stroke-width: 1.6; }
 .fp-furn.is-view { stroke: none; }
 .fp-furn-label { font-size: 11px; fill: #2f5a4c; text-anchor: middle; dominant-baseline: middle; }
+/* 家具类型图标(矩形左上角,随画布缩放与标签一致) */
+.fp-furn-ico :is(rect, line, circle, path, ellipse) { fill: none; stroke: #4f806f; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 /* 蜡笔边界(查看态手绘):3 遍抖动半透明叠加,与日记本 doodle.js crayon 笔触一致 */
 .fp-crayon { pointer-events: none; }
 .fp-crayon-stroke { fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 0.28; }
@@ -1707,6 +1758,9 @@ defineExpose({ finishPoly, fit, cancelPending })
 .fp-crayon-stroke.furn { stroke: #5f9380; stroke-width: 3; }
 .fp-item { fill: #b04a3a; stroke: #fff; stroke-width: 2; }
 .fp-item.is-hit { fill: #e0a030; stroke-width: 2.5; animation: fpItemPulse 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+/* 带头像图的物品:白描边圆环叠在图上;命中态换金色并呼吸脉冲 */
+.fp-item-ring { fill: none; stroke: #fff; stroke-width: 2; }
+.fp-item-ring.is-hit { stroke: #e0a030; stroke-width: 2.5; animation: fpItemPulse 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
 /* 搜索命中动效:恒定光晕定位 + 雷达波纹扩散 + 圆点呼吸脉冲,黄点/小字与底图重合时仍醒目 */
 .fp-item-ping { fill: none; stroke: #e0a030; stroke-width: 2.5; pointer-events: none; transform-box: fill-box; transform-origin: center; animation: fpItemPing 1.6s ease-out infinite; }
 .fp-item-halo { fill: rgba(224, 160, 48, 0.30); stroke: none; pointer-events: none; transform-box: fill-box; transform-origin: center; transform: scale(2.4); animation: fpItemHalo 1.6s ease-in-out infinite; }

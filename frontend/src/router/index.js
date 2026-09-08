@@ -45,6 +45,8 @@ const routes = [
   { path: '/tools', name: 'Tools', component: () => import('@/views/tools/Tools.vue'), meta: { public: true } },
   { path: '/tools/mindmap', name: 'MindMapList', component: () => import('@/views/tools/MindMap.vue'), meta: { public: true } },
   { path: '/tools/mindmap/:id', name: 'MindMapEditor', component: () => import('@/views/tools/MindMapEditor.vue'), meta: { requiresAuth: true } },
+  // AI 测试台(临时):对话/图片/语音输入输出调试,依赖 /ai/** 登录接口
+  { path: '/tools/ai-playground', name: 'AiPlayground', component: () => import('@/views/tools/AiPlayground.vue'), meta: { requiresAuth: true } },
   // 运维管理页:仅 OPS 角色可访问
   { path: '/ops', name: 'Ops', component: () => import('@/views/ops/Ops.vue'), meta: { ops: true } },
   // 兜底:未匹配的路由重定向回首页

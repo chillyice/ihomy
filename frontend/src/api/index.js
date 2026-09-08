@@ -336,6 +336,22 @@ export const itemApi = {
   saveRoomGeometry: (id, geometry) => request.put(`/item/room/${id}/geometry`, { geometry }),
   saveFurnitureGeometry: (id, data) => request.put(`/item/furniture/${id}/geometry`, data),
   saveItemPlace: (id, data) => request.put(`/item/${id}/place`, data),
+  // AI 语义(3期):自然语言找物/放物(前端交互入口计入规划,见需求设计说明书 §9)
+  aiFind: (data) => request.post('/item/ai/find', data),
+  aiPut: (data) => request.post('/item/ai/put', data),
+}
+
+// AI 接入(Playground 测试页):能力状态/对话/图片生成/语音识别(模型走 app.ai 配置)
+export const aiApi = {
+  status: () => request.get('/ai/status'),
+  chat: (data) => request.post('/ai/chat', data, { timeout: 150000 }),
+  image: (data) => request.post('/ai/image', data, { timeout: 180000 }),
+  transcribe: (file, language) => {
+    const form = new FormData()
+    form.append('file', file)
+    if (language) form.append('language', language)
+    return request.post('/ai/transcribe', form, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 150000 })
+  },
 }
 
 export const kitchenApi = {

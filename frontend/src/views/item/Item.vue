@@ -114,7 +114,7 @@
               <div class="fp-side-head">{{ $t('item.furnPresets') }}</div>
               <div class="fp-presets">
                 <div v-for="p in furnPresets" :key="p.type" class="fp-preset" draggable="true" @dragstart="onPresetDragStart($event, p)">
-                  <span class="fp-preset-shape" :style="presetShape(p)"></span>
+                  <svg viewBox="0 0 24 24" class="fp-preset-ico"><component :is="pt.tag" v-for="(pt, i) in furnitureIcon(p.type)" :key="i" v-bind="pt.attrs" /></svg>
                   <span class="fp-preset-name">{{ p.type }}</span>
                 </div>
               </div>
@@ -122,6 +122,7 @@
               <div class="fp-side-head">{{ $t('item.placedFurniture') }}</div>
               <div v-for="f in floorFurnitures" :key="f.id" class="fp-side-furn">
                 <div class="fp-side-row">
+                  <svg viewBox="0 0 24 24" class="fp-side-furn-ico"><component :is="pt.tag" v-for="(pt, i) in furnitureIcon(f.type)" :key="i" v-bind="pt.attrs" /></svg>
                   <el-input
                     v-if="editingFurnId === f.id"
                     v-model="editingFurnName"
@@ -153,6 +154,7 @@
               <div v-if="libraryFurnitures.length" class="fp-drag-hint">{{ $t('item.dragFurnHint') }}</div>
               <div v-for="f in libraryFurnitures" :key="f.id" class="fp-side-furn" draggable="true" @dragstart="onLibFurnDragStart($event, f)">
                 <div class="fp-side-row">
+                  <svg viewBox="0 0 24 24" class="fp-side-furn-ico"><component :is="pt.tag" v-for="(pt, i) in furnitureIcon(f.type)" :key="i" v-bind="pt.attrs" /></svg>
                   <el-input
                     v-if="editingFurnId === f.id"
                     v-model="editingFurnName"
@@ -264,8 +266,11 @@
         <div v-if="searchResults.length" class="fp-results">
           <div class="fp-results-title">{{ $t('item.searchResults') }} ({{ searchResults.length }})</div>
           <div v-for="it in searchResults" :key="it.id" class="fp-result" :class="{ on: highlightItemIds.includes(it.id) }" @click="locateItem(it)">
-            <span class="fp-result-name">{{ it.name }}</span>
-            <span class="fp-result-path">{{ it.house_name }} / {{ it.room_name }} / {{ it.furniture_name || it.position }}</span>
+            <img v-if="it.image_url" :src="it.image_url" class="fp-result-ava" />
+            <div class="fp-result-text">
+              <span class="fp-result-name">{{ it.name }}</span>
+              <span class="fp-result-path">{{ it.house_name }} / {{ it.room_name }} / {{ it.furniture_name || it.position }}</span>
+            </div>
           </div>
         </div>
       </template>
@@ -319,7 +324,14 @@
             <el-button type="primary" @click="openFurniture()">{{ $t('item.addFurniture') }}</el-button>
           </div>
           <el-table :data="furnitures" stripe>
-            <el-table-column prop="name" :label="$t('item.furnitureName')" />
+            <el-table-column prop="name" :label="$t('item.furnitureName')">
+              <template #default="{ row }">
+                <span class="furn-name-cell">
+                  <svg viewBox="0 0 24 24" class="furn-ico-sm"><component :is="pt.tag" v-for="(pt, i) in furnitureIcon(row.type)" :key="i" v-bind="pt.attrs" /></svg>
+                  {{ row.name }}
+                </span>
+              </template>
+            </el-table-column>
             <el-table-column :label="$t('item.roomName')">
               <template #default="{ row }">{{ roomName(row.roomId) }}</template>
             </el-table-column>
@@ -357,6 +369,7 @@
               <svg viewBox="0 0 16 16" width="12" height="12"><path d="M3 8.5 L6.5 12 L13 4.5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </span>
             <div class="item-main">
+              <img v-if="it.image_url" :src="it.image_url" class="item-avatar" />
               <span class="item-name">{{ it.name }}</span>
               <el-tag size="small">{{ dictText(t, 'item_type', it.type) }}</el-tag>
               <el-tag v-if="it.position" size="small" type="info">{{ it.position }}</el-tag>
@@ -568,6 +581,7 @@ import { Search, Plus, CopyDocument, Delete, Edit } from '@element-plus/icons-vu
 import { itemApi, fileApi } from '@/api'
 import { useI18n } from 'vue-i18n'
 import { dictText } from '@/utils/dict'
+import { furnitureIcon } from '@/utils/furnitureIcon'
 import { splitPoly, mergePolys, pointInPoly, polyBBox, samePt } from '@/utils/floorPlanGeom'
 import FloorPlanCanvas from './FloorPlanCanvas.vue'
 
@@ -585,11 +599,6 @@ const furnPresets = [
   { type: '冰箱', w: 70, h: 70 },
   { type: '柜子', w: 80, h: 40 },
 ]
-// 预设缩略形状:按真实 w/h 等比缩进 26px 框(此前引用未定义的 pw/ph,形状塌陷不可见)
-const presetShape = (p) => {
-  const s = 26 / Math.max(p.w, p.h)
-  return { width: Math.round(p.w * s) + 'px', height: Math.round(p.h * s) + 'px' }
-}
 
 // ---- 户型图状态 ----
 const listMode = ref(false)
@@ -1342,7 +1351,8 @@ const onGlueRooms = async ({ roomAId, roomBId }) => {
 const onSearch = async () => {
   if (!searchKeyword.value) { clearSearch(); return }
   searchResults.value = await itemApi.list({ keyword: searchKeyword.value })
-  autoSwitchToHits()
+  await autoSwitchToHits()
+  focusFirstHit()
 }
 // 搜索命中后自动切层:只看当前房子的命中;命中楼层里有 1 楼默认展示 1 楼,
 // 没有 1 楼则取命中楼层中最高层(跨房子的命中走右下角结果列表点选跳转)
@@ -1355,17 +1365,25 @@ const autoSwitchToHits = async () => {
   const target = floorsWithHits.includes(1) ? 1 : Math.max(...floorsWithHits)
   if (target !== currentFloor.value) await switchFloor(target)
 }
+// 搜索后放大居中到当前房子当前楼层的第一个命中物品
+const focusFirstHit = () => {
+  const hit = searchResults.value.find((it) =>
+    it.house_id != null && it.floor != null &&
+    Number(it.house_id) === Number(currentHouseId.value) && Number(it.floor) === Number(currentFloor.value))
+  if (hit) canvasRef.value?.focusItem(hit.id)
+}
 const clearSearch = () => { searchKeyword.value = ''; searchResults.value = [] }
-const locateItem = (it) => {
+const locateItem = async (it) => {
   floorTouched.value = true
-  if (it.house_id != null) {
-    if (currentHouseId.value !== Number(it.house_id)) {
-      currentHouseId.value = Number(it.house_id)
-    }
-    if (it.floor != null) currentFloor.value = Number(it.floor)
-    selectedFurnitureId.value = it.furniture_id || null
-    loadFloorPlan()
+  if (it.house_id == null) return
+  if (currentHouseId.value !== Number(it.house_id)) {
+    currentHouseId.value = Number(it.house_id)
   }
+  if (it.floor != null) currentFloor.value = Number(it.floor)
+  selectedFurnitureId.value = it.furniture_id || null
+  await loadFloorPlan()
+  // 放大居中到命中物品(物品无锚点时画布内回退家具/房间中心)
+  canvasRef.value?.focusItem(it.id)
 }
 
 // ---- 旧 CRUD ----
@@ -1567,12 +1585,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fp-preset { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 2px 6px; border: 1px dashed #d8c9b8; border-radius: 8px; cursor: grab; background: #fffdf8; }
 .fp-preset:hover { border-color: #b88c6e; background: rgba(184, 140, 110, 0.08); }
 .fp-preset:active { cursor: grabbing; }
-.fp-preset-shape { background: rgba(138, 111, 85, 0.35); border: 1px solid #8a6f55; border-radius: 2px; }
+.fp-preset-ico { width: 22px; height: 22px; fill: none; stroke: #8a6f55; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .fp-preset-name { font-size: 11px; color: #5c4c3d; }
 .fp-opacity-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
 .fp-opacity-label { font-size: 12px; color: #a89a8a; white-space: nowrap; }
 .fp-opacity-row :deep(.el-slider) { flex: 1; }
 .fp-side-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 0; border-bottom: 1px dashed #eee5d8; min-height: 32px; }
+/* 家具类型图标(侧栏家具行名称前) */
+.fp-side-furn-ico { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: #8a7a6a; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .fp-side-name { font-size: 13px; color: #5c4c3d; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fp-side-name-editable { cursor: text; }
 .fp-side-name-editable:hover { color: #b88c6e; text-decoration: underline; text-underline-offset: 2px; }
@@ -1610,11 +1630,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fp-fit-ico { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .fp-results { position: absolute; right: 12px; bottom: 12px; width: 260px; max-height: 50%; overflow-y: auto; background: rgba(255,253,248,0.96); border-radius: 12px; box-shadow: 0 3px 12px rgba(0,0,0,0.12); padding: 10px; z-index: 5; }
 .fp-results-title { font-size: 13px; font-weight: 600; color: #5c4c3d; margin-bottom: 8px; }
-.fp-result { padding: 6px 8px; border-radius: 8px; cursor: pointer; }
+.fp-result { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; cursor: pointer; }
 .fp-result:hover { background: rgba(184,140,110,0.1); }
 .fp-result.on { background: rgba(184,140,110,0.18); }
+/* 搜索结果行头像 */
+.fp-result-ava { width: 26px; height: 26px; border-radius: 7px; object-fit: cover; flex-shrink: 0; }
+.fp-result-text { min-width: 0; }
 .fp-result-name { display: block; font-size: 13px; color: #3a2e22; }
-.fp-result-path { display: block; font-size: 11px; color: #a89a8a; margin-top: 2px; }
+.fp-result-path { display: block; font-size: 11px; color: #a89a8a; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fp-list { flex: 1; overflow-y: auto; }
 .item-card { position: relative; margin-bottom: 12px; }
 .item-card.is-pick { cursor: pointer; }
@@ -1642,6 +1665,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fp-side-check :deep(.el-checkbox__input) { margin-right: 0; }
 .fp-side-check :deep(.el-checkbox__label) { padding-left: 0; }
 .item-main { display: flex; align-items: center; gap: 8px; }
+/* 物品头像(列表卡片) */
+.item-avatar { width: 42px; height: 42px; border-radius: 10px; object-fit: cover; flex-shrink: 0; }
+/* 列表家具类型图标 */
+.furn-name-cell { display: inline-flex; align-items: center; gap: 6px; }
+.furn-ico-sm { width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: #8a7a6a; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .item-name { font-size: 16px; font-weight: 600; }
 .item-path { color: #909399; font-size: 13px; margin-top: 4px; }
 .item-ops { margin-top: 8px; }

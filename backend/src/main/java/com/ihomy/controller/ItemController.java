@@ -4,6 +4,7 @@ import com.ihomy.annotation.OperationLog;
 import com.ihomy.common.Result;
 import com.ihomy.dto.FurnitureDTO;
 import com.ihomy.dto.HouseDTO;
+import com.ihomy.dto.ItemAiDTO;
 import com.ihomy.dto.ItemBatchDTO;
 import com.ihomy.dto.ItemDTO;
 import com.ihomy.dto.RoomDTO;
@@ -13,6 +14,7 @@ import com.ihomy.entity.Item;
 import com.ihomy.entity.Room;
 import com.ihomy.security.LoginUser;
 import com.ihomy.security.SecurityHelper;
+import com.ihomy.service.ItemAiService;
 import com.ihomy.service.ItemService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -33,6 +35,7 @@ import java.util.Map;
 public class ItemController {
 
     private final ItemService itemService;
+    private final ItemAiService itemAiService;
     private final SecurityHelper securityHelper;
 
     private LoginUser current() {
@@ -225,5 +228,22 @@ public class ItemController {
     public Result<Void> itemPlace(@PathVariable Long id, @RequestBody ItemDTO dto) {
         itemService.saveItemPlace(id, current().getFamilyId(), dto);
         return Result.success();
+    }
+
+    // ---------- AI 语义(3期:自然语言找物/放物,前端入口计入规划) ----------
+
+    @Operation(summary = "AI 找物(自然语言搜索)")
+    @OperationLog(module = "ITEM", operationType = "QUERY", description = "AI 找物")
+    @PostMapping("/ai/find")
+    public Result<Map<String, Object>> aiFind(@RequestBody ItemAiDTO dto) {
+        return Result.success(itemAiService.find(current().getFamilyId(), dto.getQuery()));
+    }
+
+    @Operation(summary = "AI 放物(自然语言登记位置)")
+    @OperationLog(module = "ITEM", operationType = "CREATE", description = "AI 放物")
+    @PostMapping("/ai/put")
+    public Result<Map<String, Object>> aiPut(@RequestBody ItemAiDTO dto) {
+        LoginUser u = current();
+        return Result.success(itemAiService.put(u.getUserId(), u.getFamilyId(), dto.getText()));
     }
 }
