@@ -159,7 +159,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 系统 | i18n / 主题 / 字典 | i18n/ + theme/ + utils/dict.js |
 | 移动端 | 设备自适应 | useDevice.js + MobileLayout.vue + Mobile* 组件 |
 
-**关键坑速查**(实现细节,详见 docs):日记 date 兼容 `yyyy-MM-dd HH:mm`;纪念日 Hutool ChineseDate 月份 0-based 需 +1;家谱 null 字段须 `LambdaUpdateWrapper` 显式 SET;相册分享 token + Knuth 混淆;博客新建家庭注入 9 默认分类;物品户型图 2 期完成(裁剪/粘合删原房保持最后防家具入库覆盖、端点识别/字号/光标屏幕恒定;**hover 边加号阈值 6px**——原 12px 太大导致 hover 显示但 click 被 `justDragged` 拦截;库内家具拖入画布替代「摆放」+「请选择房间」按钮)、3 期 AI 语义后端已实现(V9.40:/item/ai/find、/item/ai/put,前端入口计入规划);**未设计楼层画布空白+引导**(2026-09-07:表单录入房间无 geometry,画布标签 cx/cy=0 会全堆叠在原点;"已设计"=floorDesigned 有底图或任一房间形状≥3 点,未设计时隐藏家具/物品+引导进编辑+拦截摆放,画完第一间自动恢复);**MP `updateById` 会显式回写实体里的旧 `updated_at` 抑制 `ON UPDATE CURRENT_TIMESTAMP`**——凡依赖 updated_at 做变更检测/排序的表,更新必须 LambdaUpdateWrapper 只 SET 业务字段并重查回传新值(2026-09-06 脑图协同踩坑);**simple-mind-map npm 包只内置 default 主题**,其余主题须 `mindmapThemes.js` defineTheme 本地注册,否则 setTheme 静默回落默认样式;**脑图多端并发保存靠 update 乐观锁**(客户端带 baseUpdatedAt,库中 updated_at 已刷新则 409,前端弹窗裁决覆盖/加载远端——双开 20s 轮询窗口内静默互覆盖实测丢数据);**脑图保存前 stripEmptyNodes 剥空叶子**(新增节点不输入直接确认残留 `<p><br></p>`,须传 getData(true).root 而非整包);**EP dropdown 内嵌 CSS hover 子菜单两坑**(2026-09-07 头像「切换家庭」):hover 容忍期须用 `visibility` 延迟隐藏而非 `display` 切换(L 形 hover 区域有路径死角,`display:none` 后移入面板区无法复活),且绝对定位子面板会撑大 `el-scrollbar__wrap` 的 scrollWidth 让 EP 画出滚不动的幽灵 bar(该 popper 的 `.el-scrollbar__bar` 直接 display:none);详见 docs/变更归档.md 同日小节。
+**关键坑速查**(实现细节,详见 docs):日记 date 兼容 `yyyy-MM-dd HH:mm`;纪念日 Hutool ChineseDate 月份 0-based 需 +1;家谱 null 字段须 `LambdaUpdateWrapper` 显式 SET;相册分享 token + Knuth 混淆;博客新建家庭注入 9 默认分类;物品户型图 2 期完成(裁剪/粘合删原房保持最后防家具入库覆盖、端点识别/字号/光标屏幕恒定;**hover 边加号阈值 6px**——原 12px 太大导致 hover 显示但 click 被 `justDragged` 拦截;库内家具拖入画布替代「摆放」+「请选择房间」按钮)、3 期 AI 语义后端已实现(V9.40:/item/ai/find、/item/ai/put,前端入口计入规划);**未设计楼层画布空白+引导**(2026-09-07:表单录入房间无 geometry,画布标签 cx/cy=0 会全堆叠在原点;"已设计"=floorDesigned 有底图或任一房间形状≥3 点,未设计时隐藏家具/物品+引导进编辑+拦截摆放,画完第一间自动恢复);**MP `updateById` 会显式回写实体里的旧 `updated_at` 抑制 `ON UPDATE CURRENT_TIMESTAMP`**——凡依赖 updated_at 做变更检测/排序的表,更新必须 LambdaUpdateWrapper 只 SET 业务字段并重查回传新值(2026-09-06 脑图协同踩坑);**simple-mind-map npm 包只内置 default 主题**,其余主题须 `mindmapThemes.js` defineTheme 本地注册,否则 setTheme 静默回落默认样式;**脑图多端并发保存靠 update 乐观锁**(客户端带 baseUpdatedAt,库中 updated_at 已刷新则 409,前端弹窗裁决覆盖/加载远端——双开 20s 轮询窗口内静默互覆盖实测丢数据);**脑图保存前 stripEmptyNodes 剥空叶子**(新增节点不输入直接确认残留 `<p><br></p>`,须传 getData(true).root 而非整包);**EP dropdown 内嵌 CSS hover 子菜单两坑**(2026-09-07 头像「切换家庭」):hover 容忍期须用 `visibility` 延迟隐藏而非 `display` 切换(L 形 hover 区域有路径死角,`display:none` 后移入面板区无法复活),且绝对定位子面板会撑大 `el-scrollbar__wrap` 的 scrollWidth 让 EP 画出滚不动的幽灵 bar(该 popper 的 `.el-scrollbar__bar` 直接 display:none);**pdfjs-dist 统一 v6**(物品定位 PDF 底图转图 + 书架 PDF 查看器两消费方同版本,worker 用 `build/pdf.worker.min.mjs?url`,降 v3 会因 build 目录无 .mjs 构建失败;**PDF 在浏览器不用裸 iframe**——iOS Safari/安卓 Chrome 的 iframe 不内联渲染 PDF,书架阅读器已换 pdf.js canvas 连续滚动视图 V9.42);详见 docs/变更归档.md 同日小节。
 
 ## 设计规范(统一实现,避免多种方式)
 
@@ -206,7 +206,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 8. **可拖拽面板**:`useDragResize` 组合式函数;5 个面板各自实例;位置/大小持久化 localStorage;**事件监听器按需挂载**(`onDragStart`/`onResizeStart` 时挂 `mousemove`/`mouseup`,`onMouseUp` 时移除,不要 `onMounted` 常驻——参考 `AvatarCropper.vue` 的写法)。
 9. **光影层全局化**:`SunLightLayer` + `AppSidebar` + `SiteFooter` 在 `App.vue` 全局挂载;`useSunLight` provide/inject 共享状态。
 10. **i18n**:所有用户可见文本用 `$t('key')`;中英双语;`utils/dict.js` 枚举映射。
-11. **打包分块**(强制):`vite.config.js` 必须配 `build.rollupOptions.output.manualChunks` 拆分大 vendor(当前 `element-plus`/`gsap`/`vue-i18n`/`epubjs`/`simple-mind-map` 五块)。**public/ 下静态资源不得与 npm 包重复**(已删 `public/qweather-icons/`,改走 `node_modules/qweather-icons/font/`)。
+11. **打包分块**(强制):`vite.config.js` 必须配 `build.rollupOptions.output.manualChunks` 拆分大 vendor(当前 `element-plus`/`gsap`/`vue-i18n`/`epubjs`/`pdfjs`/`simple-mind-map` 六块)。**public/ 下静态资源不得与 npm 包重复**(已删 `public/qweather-icons/`,改走 `node_modules/qweather-icons/font/`)。
 12. **重型资源异步加载**(强制):字体包/CSS(如 `qweather-icons.css` 44.9KB)阻塞首屏的,必须 `import('...')` 异步加载,不要同步 `import`。
 13. **动画优先级**(强制):持续型动画(钟摆/心跳/呼吸)优先级 **CSS `@keyframes` > GSAP 直接操作 DOM ref > `requestAnimationFrame` + 响应式 ref**。**禁止用 rAF 每帧写 Vue ref 触发响应式重渲染**(参考 `useSunLight.js` 钟摆已改 CSS `@keyframes lampSwing`)。
 14. **并行请求**(强制):多个独立的 `await xxxApi.foo()` 必须改 `Promise.all([a, b, c])` 并行(参考 `Home.vue loadAll` + `stores/app.js init`)。串行只在真有依赖时用。
@@ -223,7 +223,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **动画优先级**:持续型动画 CSS `@keyframes` > GSAP 直接操作 DOM ref > `requestAnimationFrame`;**禁止 rAF 每帧写 Vue ref**(见前端规范 13)。
 - **事件监听器按需挂载**:`onDragStart`/`onResizeStart` 时挂 `mousemove`/`mouseup`,`onMouseUp` 时移除,不要 `onMounted` 常驻。
 - **重型资源异步加载**:字体包/大 CSS(如 `qweather-icons.css`)必须 `import('...')` 异步,不要同步 `import`。
-- **入口 chunk 分块**:`vite.config.js` 必须配 `manualChunks`(element-plus/gsap/vue-i18n/epubjs/simple-mind-map)。
+- **入口 chunk 分块**:`vite.config.js` 必须配 `manualChunks`(element-plus/gsap/vue-i18n/epubjs/pdfjs/simple-mind-map)。
 - **文件上传流式 / N+1 / SQL 日志**:见后端规范 12 / 9 / 5。
 
 #### SQL/索引规范(强制)
@@ -268,7 +268,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 #### 验证基线
 
 - 后端编译:`cd backend; .\mvnw.cmd -B clean compile -DskipTests` → BUILD SUCCESS
-- 前端构建:`cd frontend; npm run build` → 入口 chunk ≈242.6KB(基线 2026-09-08 实测 242.58KB/gzip 95.78KB,较 240.36KB 的 +2.2KB 来自 V9.41 AI 测试台路由/api/i18n 入口段,AiPlayground 页面本体独立 chunk 8.4KB 仅测试页加载;simple-mind-map 已隔离为独立异步 chunk ~340KB 仅脑图编辑页加载)
+- 前端构建:`cd frontend; npm run build` → 入口 chunk ≈242.7KB(基线 2026-09-08 实测 242.68KB/gzip 95.85KB,V9.42 书架 PDF 查看器仅加 LibraryList 懒加载段;pdfjs 已隔离为独立异步 chunk ~483KB 仅 PDF 场景加载;simple-mind-map ~340KB 仅脑图编辑页加载)
 - 接口测试:同级独立项目(不在本仓库)`cd ..\autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed;**CI(GitHub Actions,`.github/workflows/ci.yml`)每次推送自动验证:前后端构建+compose 起库导入 schema+后端启动+登录冒烟**
 
 ## 已实现变更归档(已外置)

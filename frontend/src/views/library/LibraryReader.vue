@@ -10,10 +10,15 @@
         <span class="reader-title">{{ book?.title }}</span>
       </div>
       <div class="bar-right">
+        <div v-if="book?.fileFormat === 'PDF' && pdfPageCount" class="pdf-ctl">
+          <button class="r-btn" @click="zoomPdf(-1)" :title="$t('library.zoomOut')">−</button>
+          <span class="pdf-page-ind">{{ pdfPage }} / {{ pdfPageCount }}</span>
+          <button class="r-btn" @click="zoomPdf(1)" :title="$t('library.zoomIn')">+</button>
+        </div>
         <button v-if="book?.fileFormat === 'EPUB'" class="r-btn" @click="toggleSettings" :title="$t('library.fontSize')">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>
         </button>
-        <button v-if="book?.fileFormat === 'EPUB'" class="r-btn" @click="toggleBookmarkPanel" :title="$t('library.bookmark')">
+        <button v-if="book?.fileFormat === 'EPUB' || book?.fileFormat === 'PDF'" class="r-btn" @click="toggleBookmarkPanel" :title="$t('library.bookmark')">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
         </button>
         <button class="r-btn" @click="addBookmark" :title="$t('library.addBookmark')">
@@ -47,7 +52,18 @@
 
       <!-- Center: Reader Content -->
       <div class="reader-content" ref="contentRef">
-        <iframe v-if="book?.fileFormat === 'PDF'" :src="book.fileUrl" class="pdf-frame" />
+        <div v-if="book?.fileFormat === 'PDF'" class="pdf-reader">
+          <div class="pdf-scroll" ref="pdfScrollRef" @scroll="onPdfScroll">
+            <div v-for="n in pdfPageCount" :key="n" class="pdf-page-wrap" :data-page="n" :style="pdfWrapHeight ? { minHeight: pdfWrapHeight + 'px' } : null">
+              <canvas :ref="el => setPdfCanvas(el, n)" class="pdf-canvas"></canvas>
+            </div>
+          </div>
+          <div v-if="pdfLoading" class="pdf-hint">{{ $t('common.loading') }}</div>
+          <div v-else-if="pdfError" class="pdf-hint">
+            <div>{{ $t('library.loadFailed') }}</div>
+            <a :href="book?.fileUrl" :download="book?.title" class="r-btn primary" style="margin-top: 12px">{{ $t('library.download') }}</a>
+          </div>
+        </div>
         <div v-else-if="book?.fileFormat === 'TXT'" ref="txtRef" class="txt-reader" @click="onTxtClick">{{ currentPageText }}</div>
         <div v-else-if="book?.fileFormat === 'EPUB'" ref="epubRef" class="epub-reader" @click="onEpubClick"></div>
         <div v-else class="unsupported">
@@ -55,8 +71,8 @@
           <a :href="book?.fileUrl" :download="book?.title" class="r-btn primary" style="margin-top: 12px">{{ $t('library.download') }}</a>
         </div>
 
-        <!-- Nav arrows for EPUB/TXT -->
-        <template v-if="book?.fileFormat === 'EPUB' || book?.fileFormat === 'TXT'">
+        <!-- Nav arrows for EPUB/TXT/PDF -->
+        <template v-if="book?.fileFormat === 'EPUB' || book?.fileFormat === 'TXT' || book?.fileFormat === 'PDF'">
           <button class="nav-arrow left" @click="prevPage">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
@@ -129,12 +145,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch, inject } from 'vue'
+import { ref, shallowRef, computed, onMounted, onBeforeUnmount, nextTick, watch, inject } from 'vue'
 import { libraryApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
 const props = defineProps({ book: Object })
 const emit = defineEmits(['close', 'statusChanged'])
@@ -163,6 +180,23 @@ const charsPerPage = 3000
 // EPUB reader state
 let epubRendition = null
 let epubBook = null
+
+// PDF reader state(pdf.js 动态加载,worker 为 ?url 资源,仅打开 PDF 时拉取)
+const pdfScrollRef = ref(null)
+const pdfCanvasRefs = {}
+const pdfDoc = shallowRef(null)
+const pdfPageCount = ref(0)
+const pdfPage = ref(1)
+const pdfWrapHeight = ref(0)
+const pdfLoading = ref(false)
+const pdfError = ref(false)
+let pdfBaseScale = 1
+let pdfZoom = 1
+let pdfRenderedScale = 0
+const pdfRenderedPages = new Set()
+const pdfRenderingPages = new Set()
+let pdfObserver = null
+let pdfScrollTimer = null
 
 // Reader settings
 const fontSize = ref(parseInt(localStorage.getItem('ihomy:reader:fontSize') || '16'))
@@ -197,6 +231,9 @@ onMounted(async () => {
     await initEpub()
   } else if (props.book?.fileFormat === 'TXT') {
     await loadTxt()
+  } else if (props.book?.fileFormat === 'PDF') {
+    await nextTick()
+    await initPdf()
   }
 
   if (userStore.isLoggedIn) {
@@ -209,6 +246,12 @@ onMounted(async () => {
         } else if (props.book.fileFormat === 'TXT') {
           const page = parseInt(borrow.value.cfi)
           if (!isNaN(page) && page < totalPages.value) txtPage.value = page
+        } else if (props.book.fileFormat === 'PDF' && pdfDoc.value) {
+          const p = parseInt(borrow.value.cfi)
+          if (!isNaN(p) && p >= 1 && p <= pdfPageCount.value) {
+            pdfPage.value = p
+            scrollToPdfPage(p, false)
+          }
         }
       }
     } catch (e) {}
@@ -236,6 +279,9 @@ onBeforeUnmount(() => {
   sunLight?.restoreEffects()
   if (epubRendition) epubRendition.destroy()
   if (darkObserver) darkObserver.disconnect()
+  if (pdfObserver) pdfObserver.disconnect()
+  clearTimeout(pdfScrollTimer)
+  try { pdfDoc.value?.destroy() } catch (e) {}
   document.removeEventListener('keydown', onKeyDown)
 })
 
@@ -299,6 +345,159 @@ const onEpubClick = (e) => {
   else if (x > rect.width * 0.7) nextPage()
 }
 
+// === PDF ===
+const setPdfCanvas = (el, n) => { if (el) pdfCanvasRefs[n] = el; else delete pdfCanvasRefs[n] }
+
+const pdfScale = () => pdfBaseScale * pdfZoom
+
+const initPdf = async () => {
+  if (!props.book?.fileUrl) { pdfError.value = true; return }
+  pdfLoading.value = true
+  try {
+    const mod = await import('pdfjs-dist')
+    const pdfjsLib = mod.default?.GlobalWorkerOptions ? mod.default : mod
+    pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl
+    const doc = await pdfjsLib.getDocument({ url: props.book.fileUrl }).promise
+    pdfDoc.value = doc
+    pdfPageCount.value = doc.numPages
+    await fitPdfScale()
+    pdfLoading.value = false
+    await nextTick()
+    setupPdfObserver()
+    renderPdfPage(pdfPage.value)
+  } catch (e) {
+    pdfLoading.value = false
+    pdfError.value = true
+  }
+}
+
+// 按容器宽度适配基础缩放,页高预留占位保证滚动条与跳页定位稳定
+const fitPdfScale = async () => {
+  const doc = pdfDoc.value
+  if (!doc) return
+  try {
+    const page = await doc.getPage(1)
+    const vp = page.getViewport({ scale: 1 })
+    const containerW = pdfScrollRef.value?.clientWidth || 800
+    pdfBaseScale = Math.max(0.3, Math.min(2, (containerW - 40) / vp.width))
+    pdfZoom = 1
+    pdfWrapHeight.value = Math.floor(vp.height * pdfBaseScale)
+  } catch (e) {}
+}
+
+const renderPdfPage = async (n) => {
+  const doc = pdfDoc.value
+  if (!doc || n < 1 || n > pdfPageCount.value) return
+  const scale = pdfScale()
+  if (pdfRenderedScale === scale && pdfRenderedPages.has(n)) return
+  if (pdfRenderingPages.has(n)) return
+  pdfRenderingPages.add(n)
+  try {
+    const page = await doc.getPage(n)
+    const canvas = pdfCanvasRefs[n]
+    if (!canvas) return
+    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    const viewport = page.getViewport({ scale })
+    canvas.width = Math.floor(viewport.width * dpr)
+    canvas.height = Math.floor(viewport.height * dpr)
+    canvas.style.width = Math.floor(viewport.width) + 'px'
+    canvas.style.height = Math.floor(viewport.height) + 'px'
+    await page.render({
+      canvasContext: canvas.getContext('2d'),
+      viewport,
+      transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null,
+    }).promise
+    if (scale === pdfScale()) pdfRenderedPages.add(n)
+  } catch (e) {
+    // 缩放/重适配时旧渲染被画布重置打断,忽略
+  } finally {
+    pdfRenderingPages.delete(n)
+  }
+}
+
+const setupPdfObserver = () => {
+  const root = pdfScrollRef.value
+  if (!root) return
+  pdfObserver = new IntersectionObserver((entries) => {
+    entries.forEach(en => {
+      if (!en.isIntersecting) return
+      const n = +en.target.dataset.page
+      renderPdfPage(n)
+      renderPdfPage(n + 1)
+    })
+  }, { root, rootMargin: '800px 0px' })
+  root.querySelectorAll('.pdf-page-wrap').forEach(w => pdfObserver.observe(w))
+}
+
+const onPdfScroll = () => {
+  if (pdfLoading.value || !pdfPageCount.value) return
+  clearTimeout(pdfScrollTimer)
+  pdfScrollTimer = setTimeout(() => {
+    const root = pdfScrollRef.value
+    if (!root) return
+    const wraps = root.querySelectorAll('.pdf-page-wrap')
+    if (!wraps.length) return
+    const probe = root.scrollTop + root.clientHeight / 3
+    let cur = 1
+    wraps.forEach(w => { if (w.offsetTop <= probe) cur = +w.dataset.page })
+    if (cur !== pdfPage.value) {
+      pdfPage.value = cur
+      if (userStore.isLoggedIn) {
+        libraryApi.updateBorrow(props.book.id, { progress: Math.round((cur / pdfPageCount.value) * 100), cfi: String(cur) }).catch(() => {})
+      }
+    }
+  }, 150)
+}
+
+const scrollToPdfPage = (n, smooth = true) => {
+  const el = pdfScrollRef.value?.querySelector(`[data-page="${n}"]`)
+  if (el) el.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' })
+}
+
+const updatePdfWrapHeight = async () => {
+  const doc = pdfDoc.value
+  if (!doc) return
+  try {
+    const page = await doc.getPage(1)
+    const vp = page.getViewport({ scale: 1 })
+    pdfWrapHeight.value = Math.floor(vp.height * pdfScale())
+  } catch (e) {}
+}
+
+const clearPdfCanvases = () => {
+  pdfRenderedScale = 0
+  pdfRenderedPages.clear()
+  Object.values(pdfCanvasRefs).forEach(c => {
+    if (c) { c.width = 0; c.height = 0; c.style.width = '0px'; c.style.height = '0px' }
+  })
+}
+
+const zoomPdf = (delta) => {
+  const next = Math.min(3, Math.max(0.5, +(pdfZoom + delta * 0.2).toFixed(2)))
+  if (next === pdfZoom || !pdfDoc.value) return
+  const root = pdfScrollRef.value
+  const ratio = root ? root.scrollTop / Math.max(1, root.scrollHeight) : 0
+  pdfZoom = next
+  clearPdfCanvases()
+  updatePdfWrapHeight()
+  nextTick(() => {
+    if (root) root.scrollTop = ratio * root.scrollHeight
+    renderPdfPage(pdfPage.value)
+  })
+}
+
+// 全屏切换后容器宽度变化,重新适配缩放
+const refitPdf = async () => {
+  if (props.book?.fileFormat !== 'PDF' || !pdfDoc.value) return
+  const root = pdfScrollRef.value
+  const ratio = root ? root.scrollTop / Math.max(1, root.scrollHeight) : 0
+  await fitPdfScale()
+  clearPdfCanvases()
+  await nextTick()
+  if (root) root.scrollTop = ratio * root.scrollHeight
+  renderPdfPage(pdfPage.value)
+}
+
 // === TXT ===
 const loadTxt = async () => {
   try {
@@ -323,6 +522,8 @@ const prevPage = () => {
     epubRendition.prev()
   } else if (props.book?.fileFormat === 'TXT') {
     if (txtPage.value > 0) txtPage.value--
+  } else if (props.book?.fileFormat === 'PDF') {
+    scrollToPdfPage(Math.max(1, pdfPage.value - 1))
   }
 }
 
@@ -331,6 +532,8 @@ const nextPage = () => {
     epubRendition.next()
   } else if (props.book?.fileFormat === 'TXT') {
     if (txtPage.value < totalPages.value - 1) txtPage.value++
+  } else if (props.book?.fileFormat === 'PDF') {
+    scrollToPdfPage(Math.min(pdfPageCount.value, pdfPage.value + 1))
   }
 }
 
@@ -354,6 +557,8 @@ const addBookmark = async () => {
     cfi = epubRendition.location?.start?.cfi || ''
   } else if (props.book.fileFormat === 'TXT') {
     cfi = String(txtPage.value)
+  } else if (props.book.fileFormat === 'PDF') {
+    cfi = String(pdfPage.value)
   }
   if (!cfi) return ElMessage.warning(t('library.bookmark'))
   try {
@@ -378,6 +583,9 @@ const goToBookmark = (bm) => {
   } else if (props.book.fileFormat === 'TXT') {
     const page = parseInt(bm.cfi)
     if (!isNaN(page)) txtPage.value = page
+  } else if (props.book.fileFormat === 'PDF') {
+    const p = parseInt(bm.cfi)
+    if (!isNaN(p)) scrollToPdfPage(p)
   }
   showSidebar.value = false
 }
@@ -430,6 +638,7 @@ const toggleFullscreen = () => {
 const applyFullscreen = () => {
   nextTick(() => {
     if (epubRendition) epubRendition.resize()
+    refitPdf()
   })
 }
 
@@ -444,6 +653,9 @@ const saveProgress = async () => {
   } else if (props.book.fileFormat === 'TXT') {
     cfi = String(txtPage.value)
     progress = Math.round((txtPage.value / totalPages.value) * 100)
+  } else if (props.book.fileFormat === 'PDF' && pdfPageCount.value) {
+    cfi = String(pdfPage.value)
+    progress = Math.round((pdfPage.value / pdfPageCount.value) * 100)
   }
   if (cfi) {
     try { await libraryApi.updateBorrow(props.book.id, { cfi, progress }) } catch (e) {}
@@ -497,7 +709,14 @@ watch(txtPage, () => applyTxtStyle())
 .toc-empty { font-size: 12px; opacity: 0.5; padding: 12px 8px; text-align: center; }
 
 .reader-content { flex: 1; position: relative; overflow: hidden; }
-.pdf-frame { width: 100%; height: 100%; border: none; }
+.pdf-reader { width: 100%; height: 100%; position: relative; }
+.pdf-scroll { position: relative; width: 100%; height: 100%; overflow-y: auto; overflow-x: auto; background: rgba(0,0,0,0.05); -webkit-overflow-scrolling: touch; }
+.reader-overlay.dark .pdf-scroll { background: rgba(0,0,0,0.3); }
+.pdf-page-wrap { display: flex; justify-content: center; padding: 12px 16px; }
+.pdf-canvas { display: block; background: #fff; box-shadow: 0 2px 14px rgba(0,0,0,0.18); }
+.pdf-hint { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 14px; opacity: 0.75; }
+.pdf-ctl { display: flex; align-items: center; gap: 2px; margin-right: 8px; }
+.pdf-page-ind { font-size: 12px; min-width: 52px; text-align: center; opacity: 0.75; font-variant-numeric: tabular-nums; }
 .txt-reader { height: 100%; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; padding: 0 40px; }
 .epub-reader { width: 100%; height: 100%; }
 .unsupported { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; font-size: 14px; opacity: 0.6; }
