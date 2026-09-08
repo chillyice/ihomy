@@ -719,3 +719,92 @@ CREATE TABLE IF NOT EXISTS `sys_family_ai_config` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_family` (`family_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭级 AI API 配置表(每家庭一行)';
+
+-- ------------------------------------------------------------
+-- 2026-09-08 V9.48 家庭 AI 模型池+功能绑定:拆 sys_family_ai_config 为两张表
+-- 一次性数据迁移(执行一次;旧表删除后本块无需再跑,重复执行会因旧表缺失报错,跳过即可):
+--   1) 建 sys_family_ai_model(模型池) + sys_family_ai_feature(功能绑定)
+--   2) 旧表每家庭一行 → 1 条 LLM + 1 条 IMAGE(若配) + 1 条 ASR(若配)
+--   3) 功能绑定:找物/放物/对话→LLM,图片→IMAGE,语音→ASR
+--   4) 删除旧表 sys_family_ai_config
+-- 真实密钥 ENC 密文原样搬入,不做加解密;image/asr 地址与 Key 留空时复用旧表主配置
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `sys_family_ai_model` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `name`        VARCHAR(50)  NOT NULL COMMENT '显示名',
+  `type`        VARCHAR(20)  NOT NULL COMMENT '模型类型:LLM/IMAGE/ASR',
+  `base_url`    VARCHAR(200) DEFAULT NULL COMMENT '服务地址',
+  `api_key`     VARCHAR(500) DEFAULT NULL COMMENT 'API Key(ENC 加密存储)',
+  `model`       VARCHAR(100) NOT NULL COMMENT '真实模型标识',
+  `timeout_ms`  INT          DEFAULT NULL COMMENT '超时(毫秒),留空默认 30000',
+  `sort_order`  INT          NOT NULL DEFAULT 0 COMMENT '排序',
+  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭级 AI 模型池表';
+
+CREATE TABLE IF NOT EXISTS `sys_family_ai_feature` (
+  `id`           BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`    BIGINT      NOT NULL COMMENT '所属家庭ID',
+  `feature_code` VARCHAR(30) NOT NULL COMMENT '功能:ITEM_FIND/ITEM_PUT/CHAT/IMAGE/ASR',
+  `model_id`     BIGINT      DEFAULT NULL COMMENT '绑定的模型 id(可空=未配置)',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_family_feature` (`family_id`, `feature_code`),
+  KEY `idx_model` (`model_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭级 AI 功能绑定表';
+
+-- 数据迁移:旧表存在才搬(一次性)
+INSERT INTO `sys_family_ai_model` (`family_id`, `name`, `type`, `base_url`, `api_key`, `model`, `timeout_ms`, `sort_order`)
+SELECT `family_id`, '对话模型', 'LLM', `base_url`, `api_key`, `model`, `timeout_ms`, 1
+FROM `sys_family_ai_config` WHERE `base_url` IS NOT NULL AND `model` IS NOT NULL;
+
+INSERT INTO `sys_family_ai_model` (`family_id`, `name`, `type`, `base_url`, `api_key`, `model`, `timeout_ms`, `sort_order`)
+SELECT `family_id`, '图片生成', 'IMAGE',
+       COALESCE(NULLIF(`image_base_url`, ''), `base_url`),
+       COALESCE(NULLIF(`image_api_key`, ''), `api_key`),
+       `image_model`, `timeout_ms`, 2
+FROM `sys_family_ai_config` WHERE `image_model` IS NOT NULL;
+
+INSERT INTO `sys_family_ai_model` (`family_id`, `name`, `type`, `base_url`, `api_key`, `model`, `timeout_ms`, `sort_order`)
+SELECT `family_id`, '语音识别', 'ASR',
+       COALESCE(NULLIF(`asr_base_url`, ''), `base_url`),
+       COALESCE(NULLIF(`asr_api_key`, ''), `api_key`),
+       `asr_model`, `timeout_ms`, 3
+FROM `sys_family_ai_config` WHERE `asr_model` IS NOT NULL;
+
+INSERT INTO `sys_family_ai_feature` (`family_id`, `feature_code`, `model_id`)
+SELECT c.`family_id`, 'ITEM_FIND', (SELECT m.`id` FROM `sys_family_ai_model` m WHERE m.`family_id` = c.`family_id` AND m.`type` = 'LLM' LIMIT 1)
+FROM `sys_family_ai_config` c;
+
+INSERT INTO `sys_family_ai_feature` (`family_id`, `feature_code`, `model_id`)
+SELECT c.`family_id`, 'ITEM_PUT', (SELECT m.`id` FROM `sys_family_ai_model` m WHERE m.`family_id` = c.`family_id` AND m.`type` = 'LLM' LIMIT 1)
+FROM `sys_family_ai_config` c;
+
+INSERT INTO `sys_family_ai_feature` (`family_id`, `feature_code`, `model_id`)
+SELECT c.`family_id`, 'CHAT', (SELECT m.`id` FROM `sys_family_ai_model` m WHERE m.`family_id` = c.`family_id` AND m.`type` = 'LLM' LIMIT 1)
+FROM `sys_family_ai_config` c;
+
+INSERT INTO `sys_family_ai_feature` (`family_id`, `feature_code`, `model_id`)
+SELECT c.`family_id`, 'IMAGE', (SELECT m.`id` FROM `sys_family_ai_model` m WHERE m.`family_id` = c.`family_id` AND m.`type` = 'IMAGE' LIMIT 1)
+FROM `sys_family_ai_config` c;
+
+INSERT INTO `sys_family_ai_feature` (`family_id`, `feature_code`, `model_id`)
+SELECT c.`family_id`, 'ASR', (SELECT m.`id` FROM `sys_family_ai_model` m WHERE m.`family_id` = c.`family_id` AND m.`type` = 'ASR' LIMIT 1)
+FROM `sys_family_ai_config` c;
+
+DROP TABLE IF EXISTS `sys_family_ai_config`;
+
+-- ------------------------------------------------------------
+-- 2026-09-08 V9.49 物品定位改「本地规则 + LLM 兜底」:为现有家庭插入内置 LOCAL 模型行
+-- sys_family_ai_model.type 新增 LOCAL(本地规则,零 token 离线,不可删改);
+-- 新家庭由 FamilyAiConfigService.ensureLocalModel 懒创建,此处只为已存在家庭补齐(幂等)。
+-- ------------------------------------------------------------
+INSERT INTO `sys_family_ai_model` (`family_id`, `name`, `type`, `base_url`, `api_key`, `model`, `timeout_ms`, `sort_order`)
+SELECT f.`id`, '本地规则解析(离线)', 'LOCAL', NULL, NULL, 'local-rule', 30000, 0
+FROM `sys_family_info` f
+WHERE f.`deleted` = 0
+  AND NOT EXISTS (
+      SELECT 1 FROM `sys_family_ai_model` m WHERE m.`family_id` = f.`id` AND m.`type` = 'LOCAL'
+  );

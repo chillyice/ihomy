@@ -1640,27 +1640,38 @@ CREATE TABLE `content_mindmap_snapshot` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='脑图历史版本快照表';
 
 -- ------------------------------------------------------------
--- 56. sys_family_ai_config 家庭级 AI API 配置表(V9.43):每家庭一行,按家庭独立配置
---     AI 调用按当前家庭取本表配置,行内字段为空/无行时落回全局 app.ai.*(application.yml/external.yml)兜底;
---     api_key/image_api_key/asr_api_key ENC 加密存储(AES-GCM,盐值 sys_parameter.aes-salt),不回传前端
+-- 56. sys_family_ai_model 家庭级 AI 模型池表(V9.48;V9.49 加 LOCAL 内置本地规则):每家庭多条,type=LLM/IMAGE/ASR/LOCAL
+--     AI 调用按功能从本表绑定的模型取配置,无全局兜底;api_key ENC 加密存储不回传前端
+--     LOCAL=内置本地规则(零 token 离线,不可删改,由 FamilyAiConfigService.ensureLocalModel 懒创建)
 -- ------------------------------------------------------------
-DROP TABLE IF EXISTS `sys_family_ai_config`;
-CREATE TABLE `sys_family_ai_config` (
-  `id`             BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `family_id`      BIGINT       NOT NULL COMMENT '所属家庭ID',
-  `base_url`       VARCHAR(200) DEFAULT NULL COMMENT 'OpenAI 兼容服务地址(不含路径,如 https://api.deepseek.com)',
-  `api_key`        VARCHAR(500) DEFAULT NULL COMMENT 'API Key(ENC 加密存储)',
-  `model`          VARCHAR(100) DEFAULT NULL COMMENT '对话模型名(如 deepseek-chat)',
-  `timeout_ms`     INT          DEFAULT NULL COMMENT '单次调用超时(毫秒),留空=跟随全局兜底',
-  `image_model`    VARCHAR(100) DEFAULT NULL COMMENT '图片生成模型名(留空复用 model 能力判定口径)',
-  `image_base_url` VARCHAR(200) DEFAULT NULL COMMENT '图片生成服务地址(留空复用 base_url)',
-  `image_api_key`  VARCHAR(500) DEFAULT NULL COMMENT '图片生成 API Key(ENC 加密存储,留空复用 api_key)',
-  `asr_model`      VARCHAR(100) DEFAULT NULL COMMENT '语音识别模型名',
-  `asr_base_url`   VARCHAR(200) DEFAULT NULL COMMENT '语音识别服务地址(留空复用 base_url)',
-  `asr_api_key`    VARCHAR(500) DEFAULT NULL COMMENT '语音识别 API Key(ENC 加密存储,留空复用 api_key)',
-  `remark`         VARCHAR(200) DEFAULT NULL COMMENT '备注',
-  `created_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+DROP TABLE IF EXISTS `sys_family_ai_model`;
+CREATE TABLE `sys_family_ai_model` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `name`        VARCHAR(50)  NOT NULL COMMENT '显示名(如 tshl GLM 快模型)',
+  `type`        VARCHAR(20)  NOT NULL COMMENT '模型类型:LLM/IMAGE/ASR/LOCAL(本地规则内置)',
+  `base_url`    VARCHAR(200) DEFAULT NULL COMMENT 'OpenAI 兼容服务地址(不含路径,如 https://api.deepseek.com)',
+  `api_key`     VARCHAR(500) DEFAULT NULL COMMENT 'API Key(ENC 加密存储)',
+  `model`       VARCHAR(100) NOT NULL COMMENT '真实模型标识(如 GLM-5.3-Flash / doubao-seedream-5-0-260128 / SenseVoice)',
+  `timeout_ms`  INT          DEFAULT NULL COMMENT '单次调用超时(毫秒),留空=默认 30000',
+  `sort_order`  INT          NOT NULL DEFAULT 0 COMMENT '排序',
+  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_family` (`family_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭级 AI API 配置表(每家庭一行,真实密钥不入 git,经界面或 SQL 手动填入)';
+  KEY `idx_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭级 AI 模型池表(每家庭多条,真实密钥不入 git,经界面或 SQL 手动填入)';
+
+-- ------------------------------------------------------------
+-- 57. sys_family_ai_feature 家庭级 AI 功能绑定表(V9.48):每家庭每功能一行
+--     model_id 指向 sys_family_ai_model.id,null=该功能未配置(停用)
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_family_ai_feature`;
+CREATE TABLE `sys_family_ai_feature` (
+  `id`           BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`    BIGINT      NOT NULL COMMENT '所属家庭ID',
+  `feature_code` VARCHAR(30) NOT NULL COMMENT '功能:ITEM_FIND/ITEM_PUT/CHAT/IMAGE/ASR',
+  `model_id`     BIGINT      DEFAULT NULL COMMENT '绑定的模型 id(可空=未配置)',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_family_feature` (`family_id`, `feature_code`),
+  KEY `idx_model` (`model_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭级 AI 功能绑定表(每家庭每功能一行)';

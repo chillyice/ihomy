@@ -3,6 +3,7 @@ package com.ihomy.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ihomy.common.AiConst;
 import com.ihomy.common.BizException;
 import com.ihomy.common.ResultCode;
 import com.ihomy.common.ThirdPartyHttp;
@@ -20,11 +21,11 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * AI 模型统一接入层(V9.40,按家庭配置 V9.43):OpenAI 兼容协议(POST {base-url}/chat/completions),
+ * AI 模型统一接入层(V9.40,按功能解析模型 V9.48):OpenAI 兼容协议(POST {base-url}/chat/completions),
  * 供物品定位 AI 语义及后续需要大模型的功能(聊天/内容生成)复用。
- * 配置按当前家庭双层解析(FamilyAiConfigService.resolve):家庭行非空字段 > 全局 app.ai.* 兜底;
- * base-url/api-key/model 任一为空即该家庭未启用。三方出站一律走 ThirdPartyHttp(thirdparty 日志 +
- * URL/头脱敏);失败转 BizException 由全局异常处理兜底(底层 IOException 堆栈已在 thirdparty 日志落盘)。
+ * 每个功能按其 feature_code 从家庭模型池解析模型(FamilyAiConfigService.resolveForFeature),
+ * 无全局兜底;base-url/api-key/model 任一为空即该功能未配置。三方出站一律走 ThirdPartyHttp
+ * (thirdparty 日志 + URL/头脱敏);失败转 BizException 由全局异常处理兜底。
  */
 @Service
 @RequiredArgsConstructor
@@ -36,42 +37,23 @@ public class AiService {
 
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
-    /** AI 功能是否已配置启用(未配置时调用方应友好提示而非报 500) */
-    public boolean isAvailable(Long familyId) {
-        FamilyAiConfigService.AiConfig c = familyAiConfigService.resolve(familyId);
-        return notBlank(c.baseUrl()) && notBlank(c.apiKey()) && notBlank(c.model());
-    }
-
     /** 各能力配置状态(Playground):能力→available/model,另附统一超时;模型名非敏感(仅模型标识) */
     public Map<String, Object> status(Long familyId) {
-        FamilyAiConfigService.AiConfig c = familyAiConfigService.resolve(familyId);
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("chat", capability(isAvailable(familyId), c.model()));
-        out.put("image", capability(isImageAvailable(familyId), c.imageModel()));
-        out.put("asr", capability(isAsrAvailable(familyId), c.asrModel()));
-        out.put("timeoutMs", c.timeoutMs());
+        out.put("chat", capability(familyId, AiConst.FEATURE_CHAT));
+        out.put("image", capability(familyId, AiConst.FEATURE_IMAGE));
+        out.put("asr", capability(familyId, AiConst.FEATURE_ASR));
         return out;
     }
 
-    private Map<String, Object> capability(boolean available, String model) {
+    private Map<String, Object> capability(Long familyId, String featureCode) {
+        FamilyAiConfigService.AiConfig c = familyAiConfigService.resolveForFeature(familyId, featureCode);
+        boolean available = notBlank(c.baseUrl()) && notBlank(c.apiKey()) && notBlank(c.model());
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("available", available);
-        m.put("model", model == null ? "" : model.trim());
+        m.put("model", c.model() == null ? "" : c.model().trim());
+        m.put("timeoutMs", c.timeoutMs());
         return m;
-    }
-
-    /** 图片生成是否已启用(模型名配齐即可;地址/Key 缺省复用主配置) */
-    public boolean isImageAvailable(Long familyId) {
-        FamilyAiConfigService.AiConfig c = familyAiConfigService.resolve(familyId);
-        return notBlank(c.imageModel()) && notBlank(familyAiConfigService.imageBase(c))
-                && notBlank(familyAiConfigService.imageKey(c));
-    }
-
-    /** 语音识别是否已启用 */
-    public boolean isAsrAvailable(Long familyId) {
-        FamilyAiConfigService.AiConfig c = familyAiConfigService.resolve(familyId);
-        return notBlank(c.asrModel()) && notBlank(familyAiConfigService.asrBase(c))
-                && notBlank(familyAiConfigService.asrKey(c));
     }
 
     /** 多轮消息对话,返回首条回复文本(messages 元素含 role 与 content,temperature 缺省 0.2) */
@@ -81,19 +63,20 @@ public class AiService {
 
     /** 多轮消息对话带自定义采样温度(Playground 调参用) */
     public String chat(Long familyId, List<Map<String, String>> messages, Double temperature) {
-        return doChat(familyId, messages, false, temperature);
+        return doChat(familyId, AiConst.FEATURE_CHAT, messages, false, temperature);
     }
 
-    /** 单轮问答并解析 JSON 回复:JSON 模式 + markdown 围栏容错 */
-    public JsonNode chatJson(Long familyId, String systemPrompt, String userContent) {
+    /** 单轮问答并解析 JSON 回复:JSON 模式 + markdown 围栏容错;featureCode 指定用哪个功能绑定的模型 */
+    public JsonNode chatJson(Long familyId, String featureCode, String systemPrompt, String userContent) {
         List<Map<String, String>> messages = new ArrayList<>();
         messages.add(message("system", systemPrompt));
         messages.add(message("user", userContent));
-        return parseJson(doChat(familyId, messages, true, null));
+        return parseJson(doChat(familyId, featureCode, messages, true, null));
     }
 
-    private String doChat(Long familyId, List<Map<String, String>> messages, boolean jsonMode, Double temperature) {
-        FamilyAiConfigService.AiConfig c = familyAiConfigService.resolve(familyId);
+    private String doChat(Long familyId, String featureCode, List<Map<String, String>> messages,
+                          boolean jsonMode, Double temperature) {
+        FamilyAiConfigService.AiConfig c = familyAiConfigService.resolveForFeature(familyId, featureCode);
         if (!notBlank(c.baseUrl()) || !notBlank(c.apiKey()) || !notBlank(c.model())) {
             throw new BizException(ResultCode.BAD_REQUEST, "AI 服务未配置,请家长在设置-家庭 AI 配置中填写");
         }
@@ -153,15 +136,13 @@ public class AiService {
 
     /** OpenAI 兼容图片生成:POST {base}/images/generations,返回 data 数组(元素含 url 或 b64_json) */
     public List<Map<String, Object>> images(Long familyId, AiImageDTO dto) {
-        FamilyAiConfigService.AiConfig c = familyAiConfigService.resolve(familyId);
-        String imageBase = familyAiConfigService.imageBase(c);
-        String imageKey = familyAiConfigService.imageKey(c);
-        if (!notBlank(c.imageModel()) || !notBlank(imageBase) || !notBlank(imageKey)) {
+        FamilyAiConfigService.AiConfig c = familyAiConfigService.resolveForFeature(familyId, AiConst.FEATURE_IMAGE);
+        if (!notBlank(c.baseUrl()) || !notBlank(c.apiKey()) || !notBlank(c.model())) {
             throw new BizException(ResultCode.BAD_REQUEST, "AI 图片生成未配置,请家长在设置-家庭 AI 配置中填写");
         }
         requireText(dto.getPrompt(), "请填写图片描述");
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", c.imageModel().trim());
+        body.put("model", c.model().trim());
         body.put("prompt", dto.getPrompt().trim());
         // 组图模式由 sequential_image_generation 驱动,此时不再传 n(避免两者语义冲突)
         boolean groupMode = "auto".equals(dto.getSequentialMode());
@@ -199,9 +180,9 @@ public class AiService {
         body.put("response_format", "b64_json".equals(dto.getResponseFormat()) ? "b64_json" : "url");
         Map<String, String> headers = Map.of(
                 "Content-Type", "application/json",
-                "Authorization", "Bearer " + decryptIfEnc(imageKey));
+                "Authorization", "Bearer " + decryptIfEnc(c.apiKey()));
         try {
-            String url = stripTrailingSlash(imageBase) + "/images/generations";
+            String url = stripTrailingSlash(c.baseUrl()) + "/images/generations";
             ThirdPartyHttp.Resp resp = ThirdPartyHttp.request("ai", "POST", url, headers,
                     mapper.writeValueAsBytes(body), c.timeoutMs());
             // 个别端点不支持 response_format,400 且报文提到该字段时去掉重试一次
@@ -232,10 +213,8 @@ public class AiService {
 
     /** OpenAI 兼容语音识别:multipart POST {base}/audio/transcriptions,返回转写文本 */
     public Map<String, Object> transcribe(Long familyId, byte[] audio, String filename, String mimeType, String language) {
-        FamilyAiConfigService.AiConfig c = familyAiConfigService.resolve(familyId);
-        String asrBase = familyAiConfigService.asrBase(c);
-        String asrKey = familyAiConfigService.asrKey(c);
-        if (!notBlank(c.asrModel()) || !notBlank(asrBase) || !notBlank(asrKey)) {
+        FamilyAiConfigService.AiConfig c = familyAiConfigService.resolveForFeature(familyId, AiConst.FEATURE_ASR);
+        if (!notBlank(c.baseUrl()) || !notBlank(c.apiKey()) || !notBlank(c.model())) {
             throw new BizException(ResultCode.BAD_REQUEST, "AI 语音识别未配置,请家长在设置-家庭 AI 配置中填写");
         }
         if (audio == null || audio.length == 0) {
@@ -243,17 +222,17 @@ public class AiService {
         }
         String boundary = "ihomy-ai-" + UUID.randomUUID().toString().replace("-", "");
         Map<String, String> fields = new LinkedHashMap<>();
-        fields.put("model", c.asrModel().trim());
+        fields.put("model", c.model().trim());
         if (notBlank(language)) {
             fields.put("language", language.trim());
         }
         Map<String, String> headers = Map.of(
                 "Content-Type", "multipart/form-data; boundary=" + boundary,
-                "Authorization", "Bearer " + decryptIfEnc(asrKey));
+                "Authorization", "Bearer " + decryptIfEnc(c.apiKey()));
         try {
             byte[] body = multipart(boundary, fields, "file",
                     filename == null || filename.isBlank() ? "audio.wav" : filename, mimeType, audio);
-            String url = stripTrailingSlash(asrBase) + "/audio/transcriptions";
+            String url = stripTrailingSlash(c.baseUrl()) + "/audio/transcriptions";
             ThirdPartyHttp.Resp resp = ThirdPartyHttp.request("ai", "POST", url, headers, body, c.timeoutMs());
             if (!resp.ok()) {
                 throw new BizException(ResultCode.INTERNAL_ERROR,

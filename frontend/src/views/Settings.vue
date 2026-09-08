@@ -168,61 +168,94 @@
           </div>
         </template>
 
-        <!-- 家庭 AI API 配置:按家庭独立配置(家长可编辑),字段留空跟随全局兜底 -->
+        <!-- 家庭 AI 配置:模型池 + 功能绑定(家长可编辑) -->
         <template v-if="active === 'ai'">
-          <div class="card settings-card">
+          <div class="card settings-card" v-loading="aiLoading">
             <div class="section-label">{{ $t('settings.ai.title') }}</div>
-            <div class="ai-cap-row">
-              <span v-for="cap in ['chat', 'image', 'asr']" :key="cap" class="ai-cap" :class="{ ok: aiConfig.available[cap] }">
-                {{ $t('settings.ai.' + cap) }} · {{ aiConfig.available[cap] ? $t('settings.ai.available') : $t('settings.ai.unconfigured') }}
+            <div class="share-tip">{{ $t('settings.ai.hint') }}</div>
+
+            <div class="ai-sub-label">{{ $t('settings.ai.models') }}</div>
+            <div class="ai-toolbar">
+              <el-button type="primary" plain @click="openAiModel()">{{ $t('settings.ai.addModel') }}</el-button>
+            </div>
+            <el-table :data="aiModels" stripe>
+              <el-table-column prop="name" :label="$t('settings.ai.modelName')" min-width="140" show-overflow-tooltip />
+              <el-table-column :label="$t('settings.ai.modelType')" width="150">
+                <template #default="{ row }">
+                  <el-tag size="small">{{ $t('settings.ai.type.' + row.type) }}</el-tag>
+                  <el-tag v-if="row.builtin" size="small" type="info" class="ai-builtin">{{ $t('settings.ai.builtin') }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="model" :label="$t('settings.ai.model')" min-width="170" show-overflow-tooltip />
+              <el-table-column prop="baseUrl" :label="$t('settings.ai.baseUrl')" min-width="190" show-overflow-tooltip />
+              <el-table-column :label="$t('common.actions')" width="140">
+                <template #default="{ row }">
+                  <template v-if="row.builtin">—</template>
+                  <template v-else>
+                    <el-button size="small" text @click="openAiModel(row)">{{ $t('common.edit') }}</el-button>
+                    <el-button size="small" text type="danger" @click="removeAiModel(row)">{{ $t('common.delete') }}</el-button>
+                  </template>
+                </template>
+              </el-table-column>
+            </el-table>
+
+            <div class="ai-sub-label">{{ $t('settings.ai.features') }}</div>
+            <div v-for="f in aiFeatures" :key="f.featureCode" class="ai-feature-row">
+              <span class="ai-feature-name">{{ $t('settings.ai.feature.' + f.featureCode) }}</span>
+              <el-select
+                v-model="f.modelId"
+                clearable
+                filterable
+                :placeholder="$t('settings.ai.noModel')"
+                class="ai-feature-select"
+                @change="bindAiFeature(f)"
+              >
+                <el-option
+                  v-for="m in modelsByTypes(f.modelTypes)"
+                  :key="m.id"
+                  :label="m.name + ' (' + m.model + ')'"
+                  :value="m.id"
+                />
+              </el-select>
+              <span class="ai-feature-state" :class="{ ok: f.available }">
+                {{ f.available ? $t('settings.ai.available') : $t('settings.ai.unconfigured') }}
               </span>
             </div>
-            <div class="share-tip">{{ $t('settings.ai.hint') }}</div>
-            <el-form label-position="top" v-loading="aiLoading">
+          </div>
+
+          <!-- 模型编辑对话框 -->
+          <el-dialog v-model="aiModelDialog" append-to-body
+            :title="aiModelForm.id ? $t('common.edit') : $t('settings.ai.addModel')" width="480px">
+            <el-form :model="aiModelForm" label-width="110px">
+              <el-form-item :label="$t('settings.ai.modelName')" required>
+                <el-input v-model="aiModelForm.name" :placeholder="$t('settings.ai.modelNamePh')" />
+              </el-form-item>
+              <el-form-item :label="$t('settings.ai.modelType')" required>
+                <el-select v-model="aiModelForm.type" style="width: 100%">
+                  <el-option :label="$t('settings.ai.type.LLM')" value="LLM" />
+                  <el-option :label="$t('settings.ai.type.IMAGE')" value="IMAGE" />
+                  <el-option :label="$t('settings.ai.type.ASR')" value="ASR" />
+                </el-select>
+              </el-form-item>
               <el-form-item :label="$t('settings.ai.baseUrl')">
-                <el-input v-model="aiConfig.baseUrl" :placeholder="globalAiPlaceholder('baseUrl')" clearable />
+                <el-input v-model="aiModelForm.baseUrl" :placeholder="$t('settings.ai.baseUrlPh')" />
               </el-form-item>
               <el-form-item :label="$t('settings.ai.apiKey')">
-                <el-input v-model="aiKeyInput" type="password" show-password
-                  :placeholder="aiConfig.apiKeySet ? $t('settings.ai.keyKeep') : $t('settings.ai.followGlobal')" />
+                <el-input v-model="aiModelForm.apiKey" type="password" show-password
+                  :placeholder="aiModelForm.apiKeySet ? $t('settings.ai.keyKeep') : $t('settings.ai.keyRequired')" />
               </el-form-item>
-              <el-form-item :label="$t('settings.ai.model')">
-                <el-input v-model="aiConfig.model" :placeholder="globalAiPlaceholder('model')" clearable />
+              <el-form-item :label="$t('settings.ai.model')" required>
+                <el-input v-model="aiModelForm.model" :placeholder="$t('settings.ai.modelPh')" />
               </el-form-item>
               <el-form-item :label="$t('settings.ai.timeout')">
-                <el-input-number v-model="aiConfig.timeoutMs" :min="1000" :max="600000" :step="1000" :placeholder="$t('settings.ai.followGlobal')" />
+                <el-input-number v-model="aiModelForm.timeoutMs" :min="1000" :max="600000" :step="1000" :placeholder="$t('settings.ai.timeoutPh')" />
               </el-form-item>
-              <el-divider />
-              <el-form-item :label="$t('settings.ai.imageModel')">
-                <el-input v-model="aiConfig.imageModel" :placeholder="globalAiPlaceholder('imageModel')" clearable />
-              </el-form-item>
-              <el-form-item :label="$t('settings.ai.imageBaseUrl')">
-                <el-input v-model="aiConfig.imageBaseUrl" :placeholder="$t('settings.ai.reuseMain')" clearable />
-              </el-form-item>
-              <el-form-item :label="$t('settings.ai.imageApiKey')">
-                <el-input v-model="aiImageKeyInput" type="password" show-password
-                  :placeholder="aiConfig.imageApiKeySet ? $t('settings.ai.keyKeep') : $t('settings.ai.reuseMainKey')" />
-              </el-form-item>
-              <el-divider />
-              <el-form-item :label="$t('settings.ai.asrModel')">
-                <el-input v-model="aiConfig.asrModel" :placeholder="globalAiPlaceholder('asrModel')" clearable />
-              </el-form-item>
-              <el-form-item :label="$t('settings.ai.asrBaseUrl')">
-                <el-input v-model="aiConfig.asrBaseUrl" :placeholder="$t('settings.ai.reuseMain')" clearable />
-              </el-form-item>
-              <el-form-item :label="$t('settings.ai.asrApiKey')">
-                <el-input v-model="aiAsrKeyInput" type="password" show-password
-                  :placeholder="aiConfig.asrApiKeySet ? $t('settings.ai.keyKeep') : $t('settings.ai.reuseMainKey')" />
-              </el-form-item>
-              <el-form-item :label="$t('settings.ai.remark')">
-                <el-input v-model="aiConfig.remark" maxlength="200" clearable />
-              </el-form-item>
-              <div class="form-footer">
-                <el-button type="primary" :loading="aiSaving" @click="saveAiConfig">{{ $t('settings.ai.save') }}</el-button>
-                <el-button v-if="aiConfig.configured" class="ghost-btn" @click="resetAiConfig">{{ $t('settings.ai.reset') }}</el-button>
-              </div>
             </el-form>
-          </div>
+            <template #footer>
+              <el-button @click="aiModelDialog = false">{{ $t('common.cancel') }}</el-button>
+              <el-button type="primary" :loading="aiSaving" @click="saveAiModel">{{ $t('common.confirm') }}</el-button>
+            </template>
+          </el-dialog>
         </template>
 
         <!-- 每日内容 -->
@@ -769,47 +802,24 @@ const confirmCreateFamily = async () => {
   }
 }
 
-// 家庭 AI API 配置(家长可编辑;字段留空跟随全局兜底,密钥留空保留原值)
+// 家庭 AI 配置:模型池 + 功能绑定(家长可编辑;密钥留空保留原值)
 const canManageAi = computed(() => userStore.hasPerm('family:manage'))
-const aiConfig = reactive({
-  configured: false, baseUrl: '', model: '', timeoutMs: null,
-  imageModel: '', imageBaseUrl: '', asrModel: '', asrBaseUrl: '', remark: '',
-  apiKeySet: false, imageApiKeySet: false, asrApiKeySet: false,
-  global: {}, available: { chat: false, image: false, asr: false },
-})
-const aiKeyInput = ref('')
-const aiImageKeyInput = ref('')
-const aiAsrKeyInput = ref('')
+const aiModels = ref([])
+const aiFeatures = ref([])
+const aiModelDialog = ref(false)
+const aiModelForm = reactive({ id: null, name: '', type: 'LLM', baseUrl: '', apiKey: '', model: '', timeoutMs: null, apiKeySet: false })
 const aiSaving = ref(false)
 const aiLoading = ref(false)
 
-// 未配置字段的占位提示:显示当前全局兜底值(模型名/地址非敏感)
-const globalAiPlaceholder = (key) => {
-  const g = aiConfig.global || {}
-  return g[key] ? t('settings.ai.followGlobalWith', { val: g[key] }) : t('settings.ai.followGlobal')
-}
+const modelsByTypes = (types) => aiModels.value.filter(m => (types || []).includes(m.type))
 
 const loadAiConfig = async () => {
   if (!userStore.isLoggedIn || !canManageAi.value) return
   aiLoading.value = true
   try {
-    const r = await aiApi.config()
-    Object.assign(aiConfig, {
-      configured: r.configured,
-      baseUrl: r.baseUrl || '',
-      model: r.model || '',
-      timeoutMs: r.timeoutMs ?? null,
-      imageModel: r.imageModel || '',
-      imageBaseUrl: r.imageBaseUrl || '',
-      asrModel: r.asrModel || '',
-      asrBaseUrl: r.asrBaseUrl || '',
-      remark: r.remark || '',
-      apiKeySet: r.apiKeySet,
-      imageApiKeySet: r.imageApiKeySet,
-      asrApiKeySet: r.asrApiKeySet,
-      global: r.global || {},
-      available: r.available || { chat: false, image: false, asr: false },
-    })
+    const [models, features] = await Promise.all([aiApi.models(), aiApi.features()])
+    aiModels.value = models || []
+    aiFeatures.value = (features || []).map(f => ({ ...f, modelId: f.modelId ?? null }))
   } catch (e) {
     // 拦截器已提示(非家长 403 时静默)
   } finally {
@@ -817,28 +827,39 @@ const loadAiConfig = async () => {
   }
 }
 
-const saveAiConfig = async () => {
+const openAiModel = (row) => {
+  Object.assign(aiModelForm, row ? {
+    id: row.id, name: row.name, type: row.type, baseUrl: row.baseUrl || '',
+    model: row.model || '', timeoutMs: row.timeoutMs ?? null, apiKey: '', apiKeySet: row.apiKeySet,
+  } : {
+    id: null, name: '', type: 'LLM', baseUrl: '', model: '', timeoutMs: null, apiKey: '', apiKeySet: false,
+  })
+  aiModelDialog.value = true
+}
+
+const saveAiModel = async () => {
+  if (!aiModelForm.name || !aiModelForm.type || !aiModelForm.model) {
+    ElMessage.warning(t('settings.ai.requiredTip'))
+    return
+  }
   aiSaving.value = true
   try {
     const data = {
-      baseUrl: aiConfig.baseUrl || '',
-      model: aiConfig.model || '',
-      timeoutMs: aiConfig.timeoutMs == null ? '' : String(aiConfig.timeoutMs),
-      imageModel: aiConfig.imageModel || '',
-      imageBaseUrl: aiConfig.imageBaseUrl || '',
-      asrModel: aiConfig.asrModel || '',
-      asrBaseUrl: aiConfig.asrBaseUrl || '',
-      remark: aiConfig.remark || '',
+      name: aiModelForm.name,
+      type: aiModelForm.type,
+      baseUrl: aiModelForm.baseUrl || '',
+      model: aiModelForm.model || '',
+      timeoutMs: aiModelForm.timeoutMs == null ? '' : String(aiModelForm.timeoutMs),
     }
-    // 密钥仅在输入时提交(留空=保留原值/跟随全局)
-    if (aiKeyInput.value) data.apiKey = aiKeyInput.value
-    if (aiImageKeyInput.value) data.imageApiKey = aiImageKeyInput.value
-    if (aiAsrKeyInput.value) data.asrApiKey = aiAsrKeyInput.value
-    await aiApi.saveConfig(data)
-    aiKeyInput.value = ''
-    aiImageKeyInput.value = ''
-    aiAsrKeyInput.value = ''
+    // 密钥仅在输入时提交(留空=保留原值)
+    if (aiModelForm.apiKey) data.apiKey = aiModelForm.apiKey
+    if (aiModelForm.id) {
+      await aiApi.updateModel(aiModelForm.id, data)
+    } else {
+      await aiApi.addModel(data)
+    }
     ElMessage.success(t('settings.ai.saved'))
+    aiModelDialog.value = false
     await loadAiConfig()
   } catch (e) {
     // 拦截器已提示
@@ -847,22 +868,34 @@ const saveAiConfig = async () => {
   }
 }
 
-// 恢复默认:删除本家庭 AI 配置行,AI 调用回退全局兜底
-const resetAiConfig = () => {
-  ElMessageBox.confirm(t('settings.ai.resetConfirm'), t('settings.ai.reset'), {
+const removeAiModel = (row) => {
+  ElMessageBox.confirm(t('settings.ai.deleteModelConfirm'), t('common.delete'), {
     confirmButtonText: t('common.confirm'),
     cancelButtonText: t('common.cancel'),
     type: 'warning',
     closeOnClickModal: true,
   }).then(async () => {
     try {
-      await aiApi.deleteConfig()
-      ElMessage.success(t('settings.ai.resetDone'))
+      await aiApi.deleteModel(row.id)
+      ElMessage.success(t('settings.ai.deleteModelDone'))
       await loadAiConfig()
     } catch (e) {
       // 拦截器已提示
     }
   }).catch(() => {})
+}
+
+// 功能绑定:下拉选择后立即保存;失败回滚刷新
+const bindAiFeature = async (f) => {
+  const mid = f.modelId == null || f.modelId === '' ? null : f.modelId
+  try {
+    await aiApi.bindFeature(f.featureCode, mid)
+    ElMessage.success(t('settings.ai.saved'))
+    await loadAiConfig()
+  } catch (e) {
+    // 拦截器已提示
+    await loadAiConfig()
+  }
 }
 
 // 恢复默认面板布局:清除 localStorage 中所有面板持久化记录,刷新页面生效
@@ -927,10 +960,15 @@ html.dark .form-tip, html.dark .share-tip { color: #9a9088; }
 .weather-loc-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .upload-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 
-/* 家庭 AI 配置:能力状态徽标(可用=主题色/未配置=灰) */
-.ai-cap-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
-.ai-cap { font-size: 12px; padding: 2px 10px; border-radius: 999px; background: var(--color-card-2, rgba(0,0,0,0.04)); color: var(--color-text-secondary); border: 1px solid var(--color-border); }
-.ai-cap.ok { color: var(--color-primary); border-color: var(--color-primary); background: rgba(64, 158, 255, 0.08); }
+/* 家庭 AI 配置:模型池 + 功能绑定 */
+.ai-sub-label { font-size: 13px; font-weight: 500; color: var(--color-text); margin: 14px 0 8px; }
+.ai-toolbar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.ai-builtin { margin-left: 6px; }
+.ai-feature-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+.ai-feature-name { width: 96px; flex-shrink: 0; font-size: 13px; color: var(--color-text); }
+.ai-feature-select { flex: 1; min-width: 0; }
+.ai-feature-state { font-size: 12px; color: var(--color-text-secondary); white-space: nowrap; }
+.ai-feature-state.ok { color: var(--color-primary); }
 
 /* 个性化设置:控件行 + 标签水平排列,垂直居中 */
 .setting-row { display: flex; align-items: center; gap: 10px; }

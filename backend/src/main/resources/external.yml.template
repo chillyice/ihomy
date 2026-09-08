@@ -36,16 +36,4 @@ app:
   weather-project-id:
   weather-key-id:
   weather-private-key:         # Ed25519 私钥 PEM;不入 git,推荐只配 DB 并用 ENC(...) 加密
-  # AI 大模型统一接入(OpenAI 兼容):物品定位 AI 找物/放物及后续 AI 功能共用,三项全配置才启用
-  # 图片生成/语音识别:对应 model 配置后启用,base-url/api-key 留空复用上面主配置(走同一代理)
-  # ai:
-  #   base-url: https://api.deepseek.com   # OpenAI 兼容服务地址(不含 /chat/completions)
-  #   api-key: CHANGE_ME_AI_API_KEY        # 支持 ENC(...) 加密(GET /api/ops/crypto/encrypt 生成)
-  #   model: deepseek-chat
-  #   timeout-ms: 30000
-  #   image-model: doubao-seedream-4-0     # 图片生成模型(豆包 Seedream,走 /images/generations)
-  #   image-base-url:                      # 留空复用 base-url
-  #   image-api-key:                       # 留空复用 api-key
-  #   asr-model: SenseVoice                # 语音识别模型(走 /audio/transcriptions)
-  #   asr-base-url:                        # 留空复用 base-url
-  #   asr-api-key:                         # 留空复用 api-key
+  # AI 大模型配置已按家庭(模型池 sys_family_ai_model + 功能绑定 sys_family_ai_feature),在应用内「设置-家庭 AI 配置」维护,不再走全局 yml(V9.48)

@@ -75,21 +75,7 @@ app:
   weather-project-id:
   weather-key-id:
   weather-private-key:
-  # AI 大模型统一接入(V9.40,OpenAI 兼容 /chat/completions):物品定位 AI 语义及后续 AI 功能共用
-  # 三项全配置才启用;api-key 支持 ENC(...) 加密(盐值 sys_parameter.aes-salt)
-  ai:
-    base-url:            # OpenAI 兼容服务地址(如 https://api.deepseek.com,不含路径),留空=未启用
-    api-key:             # API Key(external.yml 覆盖,不入 git)
-    model:               # 模型名(如 deepseek-chat)
-    timeout-ms: 30000    # 单次调用超时(毫秒)
-    # 图片生成(豆包 Seedream 等 OpenAI 兼容 /images/generations):model 配置才启用;地址/Key 留空复用上面主配置
-    image-model:         # 图片模型名(如 doubao-seedream-4-0)
-    image-base-url:      # 留空复用 base-url
-    image-api-key:       # 留空复用 api-key
-    # 语音识别(ASR,OpenAI 兼容 /audio/transcriptions):model 配置才启用;地址/Key 留空复用上面主配置
-    asr-model:           # 语音识别模型名(如 SenseVoice)
-    asr-base-url:        # 留空复用 base-url
-    asr-api-key:         # 留空复用 api-key
+  # AI 大模型配置已按家庭(模型池 sys_family_ai_model + 功能绑定 sys_family_ai_feature,设置页-家庭 AI 配置维护),不再走全局 yml(V9.48)
   # 日志保留天数(logback 三类日志文件共用,按天滚动)
   log-retention-days: 7
 

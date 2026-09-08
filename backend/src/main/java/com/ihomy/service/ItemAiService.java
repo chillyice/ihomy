@@ -3,6 +3,7 @@ package com.ihomy.service;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ihomy.common.AiConst;
 import com.ihomy.common.BizException;
 import com.ihomy.common.ResultCode;
 import com.ihomy.entity.Furniture;
@@ -28,12 +29,11 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * 物品定位 AI 语义(3期,V9.40):自然语言找物/放物。
- * 决策(需求设计说明书 §9):AI 拆解名称+五级粒度解析 → SQL 查询/INSERT。
- * 找物:AI 提取关键词/类型 → 家庭物品全量一次 SQL,内存按关键词打分(名称>别名>位置/家具/房间/房子);
- * 放物:AI 解析物品与五级粒度目标(furnitureId/roomId 必须从上下文清单中选,防编造)
- *   → 后端二次校验家庭归属 → 命中同名/别名物品且 AI 判定挪位则 UPDATE,否则 INSERT。
- * 前端找物/放物入口计入规划(需求设计说明书 §9),本组接口先行供联调。
+ * 物品定位 AI 语义(3期,V9.40;V9.49 改「本地规则优先 + LLM 兜底」):
+ * 找物/放物默认走 ItemLocalParser 本地规则(零 token 离线);绑定 LLM 时本地覆盖不了才回 aiService.chatJson。
+ * 找物:本地反向闭集匹配,或 LLM 提取关键词后内存打分(名称>别名>位置/家具/房间/房子);
+ * 放物:本地正则抽取「把X放Y(的Z)里」,或 LLM 解析五级粒度目标(roomId/furnitureId 必须从上下文清单选防编造);
+ * 落库统一走 executePut(命中同名/别名且 move 则 UPDATE,否则 INSERT)。
  */
 @Slf4j
 @Service
@@ -66,6 +66,8 @@ public class ItemAiService {
     private static final int CONTEXT_LIMIT = 150;
 
     private final AiService aiService;
+    private final FamilyAiConfigService familyAiConfigService;
+    private final ItemLocalParser itemLocalParser;
     private final HouseMapper houseMapper;
     private final RoomMapper roomMapper;
     private final FurnitureMapper furnitureMapper;
@@ -76,11 +78,25 @@ public class ItemAiService {
 
     public Map<String, Object> find(Long familyId, String query) {
         String q = requireText(query, "请描述要找的物品");
-        // AI 解析自愈:模型不可用/超时/异常时回退原文关键词,接口本身始终可用(前端据此免错误兜底)
+        FamilyAiConfigService.AiConfig cfg = familyAiConfigService.resolveForFeature(familyId, AiConst.FEATURE_ITEM_FIND);
+        // LOCAL 或未配置 → 纯本地规则;绑定 LLM → 本地优先,无命中才 LLM 兜底
+        boolean localOnly = cfg.type() == null || AiConst.TYPE_LOCAL.equals(cfg.type());
+        if (localOnly) {
+            return findResult(q, itemLocalParser.findLocal(familyId, q), true);
+        }
+        List<Map<String, Object>> localMatches = itemLocalParser.findLocal(familyId, q);
+        if (!localMatches.isEmpty()) {
+            return findResult(q, localMatches, true);
+        }
+        return llmFind(familyId, q);
+    }
+
+    /** LLM 找物兜底:提取关键词+类型 → 内存打分;模型不可用/异常回退原文关键词 */
+    private Map<String, Object> llmFind(Long familyId, String q) {
         boolean aiParsed = true;
         JsonNode plan = null;
         try {
-            plan = aiService.chatJson(familyId, FIND_SYSTEM_PROMPT, "用户找物描述:" + q);
+            plan = aiService.chatJson(familyId, AiConst.FEATURE_ITEM_FIND, FIND_SYSTEM_PROMPT, "用户找物描述:" + q);
         } catch (Exception e) {
             aiParsed = false;
             log.warn("[AI找物] AI 解析不可用,回退原文关键词 family={} query={}", familyId, q);
@@ -103,6 +119,15 @@ public class ItemAiService {
         result.put("aiParsed", aiParsed);
         result.put("reply", matches.isEmpty() ? "没有找到相关物品" : "找到 " + matches.size() + " 件相关物品");
         result.put("keywords", keywords);
+        result.put("matches", matches);
+        return result;
+    }
+
+    private Map<String, Object> findResult(String q, List<Map<String, Object>> matches, boolean aiParsed) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("aiParsed", aiParsed);
+        result.put("reply", matches.isEmpty() ? "没有找到相关物品" : "找到 " + matches.size() + " 件相关物品");
+        result.put("keywords", List.of(q.trim()));
         result.put("matches", matches);
         return result;
     }
@@ -130,7 +155,26 @@ public class ItemAiService {
 
     public Map<String, Object> put(Long userId, Long familyId, String text) {
         String q = requireText(text, "请描述物品放置位置");
-        JsonNode plan = aiService.chatJson(familyId, PUT_SYSTEM_PROMPT,
+        FamilyAiConfigService.AiConfig cfg = familyAiConfigService.resolveForFeature(familyId, AiConst.FEATURE_ITEM_PUT);
+        boolean localOnly = cfg.type() == null || AiConst.TYPE_LOCAL.equals(cfg.type());
+        if (localOnly) {
+            ItemLocalParser.PutPlan plan = itemLocalParser.parsePut(familyId, q);
+            if (plan == null) {
+                throw new BizException(ResultCode.BAD_REQUEST, "未能识别物品与位置,请换个说法(如「把温度计放厨房的橱柜里」)");
+            }
+            return executePut(userId, familyId, plan);
+        }
+        // 绑定 LLM:本地优先,不自信(解析不出物品名或位置)才 LLM 兜底
+        ItemLocalParser.PutPlan localPlan = itemLocalParser.parsePut(familyId, q);
+        if (localPlan != null) {
+            return executePut(userId, familyId, localPlan);
+        }
+        return llmPut(userId, familyId, q);
+    }
+
+    /** LLM 放物兜底:解析五级粒度目标(防编造),再走统一落库 */
+    private Map<String, Object> llmPut(Long userId, Long familyId, String q) {
+        JsonNode plan = aiService.chatJson(familyId, AiConst.FEATURE_ITEM_PUT, PUT_SYSTEM_PROMPT,
                 "家庭上下文清单:\n" + toJson(buildContext(familyId)) + "\n\n用户描述:" + q);
 
         String name = plan.path("name").asText("").trim();
@@ -158,17 +202,23 @@ public class ItemAiService {
             roomId = furniture.getRoomId();
         }
 
-        Item existing = findByNameOrAlias(familyId, name);
+        return executePut(userId, familyId, new ItemLocalParser.PutPlan(
+                name, aliases, type, position, quantity, unit, roomId, furnitureId, move));
+    }
+
+    /** 统一落库:命中同名/别名且 move 则 UPDATE(挪位),否则 INSERT */
+    private Map<String, Object> executePut(Long userId, Long familyId, ItemLocalParser.PutPlan p) {
+        Item existing = findByNameOrAlias(familyId, p.name());
         boolean moved;
         Long itemId;
         String itemName;
-        if (existing != null && move) {
+        if (existing != null && p.move()) {
             LambdaUpdateWrapper<Item> uw = new LambdaUpdateWrapper<Item>()
                     .eq(Item::getId, existing.getId())
-                    .set(Item::getRoomId, roomId)
-                    .set(Item::getFurnitureId, furnitureId)
-                    .set(Item::getPosition, position);
-            if (!Objects.equals(existing.getFurnitureId(), furnitureId)) {
+                    .set(Item::getRoomId, p.roomId())
+                    .set(Item::getFurnitureId, p.furnitureId())
+                    .set(Item::getPosition, p.position());
+            if (!Objects.equals(existing.getFurnitureId(), p.furnitureId())) {
                 uw.set(Item::getRelX, BigDecimal.valueOf(0.5)).set(Item::getRelY, BigDecimal.valueOf(0.5));
             }
             itemMapper.update(null, uw);
@@ -178,15 +228,15 @@ public class ItemAiService {
         } else {
             Item item = new Item();
             item.setFamilyId(familyId);
-            item.setFurnitureId(furnitureId);
-            item.setRoomId(roomId);
-            item.setName(name);
-            item.setAliases(aliases);
-            item.setPosition(position);
-            item.setType(type);
-            item.setQuantity(quantity);
-            item.setUnit(unit);
-            if (furnitureId != null || roomId != null) {
+            item.setFurnitureId(p.furnitureId());
+            item.setRoomId(p.roomId());
+            item.setName(p.name());
+            item.setAliases(p.aliases());
+            item.setPosition(p.position());
+            item.setType(p.type());
+            item.setQuantity(p.quantity());
+            item.setUnit(p.unit());
+            if (p.furnitureId() != null || p.roomId() != null) {
                 item.setRelX(BigDecimal.valueOf(0.5));
                 item.setRelY(BigDecimal.valueOf(0.5));
             }
@@ -194,10 +244,10 @@ public class ItemAiService {
             itemMapper.insert(item);
             moved = false;
             itemId = item.getId();
-            itemName = name;
+            itemName = p.name();
         }
 
-        String loc = locationDesc(roomId, furnitureId, position);
+        String loc = locationDesc(p.roomId(), p.furnitureId(), p.position());
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("moved", moved);
         result.put("itemId", itemId);

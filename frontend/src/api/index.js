@@ -341,12 +341,15 @@ export const itemApi = {
   aiPut: (data) => request.post('/item/ai/put', data),
 }
 
-// AI 接入(Playground 测试页):能力状态/对话/图片生成/语音识别(按家庭配置,全局兜底)
+// AI 接入:能力状态/模型池/功能绑定/对话/图片生成/语音识别(按家庭模型池+功能绑定)
 export const aiApi = {
   status: () => request.get('/ai/status'),
-  config: () => request.get('/ai/config'),
-  saveConfig: (data) => request.put('/ai/config', data),
-  deleteConfig: () => request.delete('/ai/config'),
+  models: () => request.get('/ai/models'),
+  addModel: (data) => request.post('/ai/models', data),
+  updateModel: (id, data) => request.put(`/ai/models/${id}`, data),
+  deleteModel: (id) => request.delete(`/ai/models/${id}`),
+  features: () => request.get('/ai/features'),
+  bindFeature: (featureCode, modelId) => request.put(`/ai/features/${featureCode}`, { modelId }),
   chat: (data) => request.post('/ai/chat', data, { timeout: 150000 }),
   image: (data) => request.post('/ai/image', data, { timeout: 180000 }),
   transcribe: (file, language) => {

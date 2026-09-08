@@ -22,9 +22,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * AI 接入接口(V9.40;按家庭配置 V9.43):图片生成 / 语音识别(OpenAI 兼容协议)。
- * 配置按当前家庭双层解析(家庭行 > 全局 app.ai.* 兜底);仅登录即可用(家庭内共享),
- * 能力未配置友好提示。家庭 AI 配置读写(/ai/config)family:manage 仅家长,密钥不回传。
+ * AI 接入接口(V9.40;按功能解析模型 V9.48):图片生成 / 语音识别(OpenAI 兼容协议)。
+ * 配置按当前家庭模型池+功能绑定(无全局兜底);仅登录即可用(家庭内共享),
+ * 能力未配置友好提示。模型池与功能绑定(/ai/models、/ai/features)family:manage 仅家长,密钥不回传。
  */
 @Tag(name = "AI 接入")
 @RestController
@@ -50,28 +50,53 @@ public class AiController {
         return Result.success(aiService.status(currentFamilyId()));
     }
 
-    @Operation(summary = "家庭 AI API 配置(密钥不回传,仅返回是否已配置)")
+    @Operation(summary = "家庭 AI 模型池列表(密钥不回传)")
     @RequirePermission("family:manage")
-    @GetMapping("/config")
-    public Result<Map<String, Object>> config() {
-        return Result.success(familyAiConfigService.get(currentFamilyId()));
+    @GetMapping("/models")
+    public Result<List<Map<String, Object>>> models() {
+        return Result.success(familyAiConfigService.listModels(currentFamilyId()));
     }
 
-    @Operation(summary = "保存家庭 AI API 配置(密钥加密入库,留空保留原值)")
-    @OperationLog(module = "AI", operationType = "CONFIG", description = "保存家庭 AI 配置", saveArgs = false)
+    @Operation(summary = "新增家庭 AI 模型(密钥加密入库)")
+    @OperationLog(module = "AI", operationType = "CREATE", description = "新增 AI 模型", saveArgs = false)
     @RequirePermission("family:manage")
-    @PutMapping("/config")
-    public Result<Void> saveConfig(@RequestBody Map<String, String> body) {
-        familyAiConfigService.save(currentFamilyId(), body);
+    @PostMapping("/models")
+    public Result<Long> addModel(@RequestBody Map<String, String> body) {
+        return Result.success(familyAiConfigService.saveModel(currentFamilyId(), null, body));
+    }
+
+    @Operation(summary = "更新家庭 AI 模型(密钥留空保留原值)")
+    @OperationLog(module = "AI", operationType = "UPDATE", description = "更新 AI 模型", saveArgs = false)
+    @RequirePermission("family:manage")
+    @PutMapping("/models/{id}")
+    public Result<Void> updateModel(@PathVariable Long id, @RequestBody Map<String, String> body) {
+        familyAiConfigService.saveModel(currentFamilyId(), id, body);
         return Result.success();
     }
 
-    @Operation(summary = "删除家庭 AI 配置(回退全局兜底)")
-    @OperationLog(module = "AI", operationType = "DELETE", description = "删除家庭 AI 配置", saveArgs = false)
+    @Operation(summary = "删除家庭 AI 模型(引用它的功能解绑停用)")
+    @OperationLog(module = "AI", operationType = "DELETE", description = "删除 AI 模型", saveArgs = false)
     @RequirePermission("family:manage")
-    @DeleteMapping("/config")
-    public Result<Void> deleteConfig() {
-        familyAiConfigService.delete(currentFamilyId());
+    @DeleteMapping("/models/{id}")
+    public Result<Void> deleteModel(@PathVariable Long id) {
+        familyAiConfigService.deleteModel(currentFamilyId(), id);
+        return Result.success();
+    }
+
+    @Operation(summary = "家庭 AI 功能绑定列表")
+    @RequirePermission("family:manage")
+    @GetMapping("/features")
+    public Result<List<Map<String, Object>>> features() {
+        return Result.success(familyAiConfigService.getFeatures(currentFamilyId()));
+    }
+
+    @Operation(summary = "绑定功能到模型(modelId 为空=停用该功能)")
+    @OperationLog(module = "AI", operationType = "UPDATE", description = "绑定 AI 功能模型", saveArgs = false)
+    @RequirePermission("family:manage")
+    @PutMapping("/features/{featureCode}")
+    public Result<Void> bindFeature(@PathVariable String featureCode, @RequestBody(required = false) Map<String, Object> body) {
+        Long modelId = body == null || body.get("modelId") == null ? null : ((Number) body.get("modelId")).longValue();
+        familyAiConfigService.bindFeature(currentFamilyId(), featureCode, modelId);
         return Result.success();
     }
 
