@@ -59,7 +59,7 @@
 - **业务运行用 `ihomy` 账号**:仅授予 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`(最小权限,无 CREATE/ALTER/DROP)。application.yml 连接用 `ihomy`,**不要用 root 跑业务**。
 - 账号同时创建 `localhost` 和 `%` 两个 host(本机/远程应用服务器都能连)。
 - **生产 MySQL 密码策略(2026-09-07 轮换踩坑)**:生产库启用 `validate_password` MEDIUM(特殊字符/数字/大小写各≥1,长度≥8)——生成/轮换 DB 密码必须含特殊字符(避开 `' " \ $ |` 转义雷区,建议 `!@%^&*-_+=.`),否则 `ALTER USER` 报 1819;开发 Docker MySQL 无此组件,同一密码 dev 可用 prod 被拒。
-- **62 张表**,前缀分类:`sys_` 19 张(系统/账号/权限/配置/日志/天气/存储)、`family_` 22 张(家庭事务)、`content_` 21 张(内容数据)。**完整表清单见 `docs/需求设计说明书.md` §6.2**。
+- **63 张表**,前缀分类:`sys_` 20 张(系统/账号/权限/配置/日志/天气/存储)、`family_` 22 张(家庭事务)、`content_` 21 张(内容数据)。**完整表清单见 `docs/需求设计说明书.md` §6.2**。
   - **命名规则**:家庭事务业务表一律 `family_` 前缀;内容数据 `content_` 前缀;账号/权限/配置/日志/天气/存储保留 `sys_`。新增表必须遵守。前缀取最顶层祖先类别;上下级关系体现在表名(如 `sys_user_role`)。
 - **枚举不再用数字**:状态/类型字段一律大写英文单词(`PUBLISHED/DRAFT/PUBLIC/FAMILY/ACTIVE...`),含义存字典表 `sys_dict_item`,Java 常量集中于 `common/DictConst.java`,前端映射 `utils/dict.js`。**不要写回 0/1/2 判断**。
 - **注意**:`content_blog/diary/photo/video/wish` 5 张内容表 `visibility` 列为 `VARCHAR(20) DEFAULT 'FAMILY'`(PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开),schema.sql 与 live DB 已对齐(曾误写 TINYINT)。
@@ -268,7 +268,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 #### 验证基线
 
 - 后端编译:`cd backend; .\mvnw.cmd -B clean compile -DskipTests` → BUILD SUCCESS
-- 前端构建:`cd frontend; npm run build` → 入口 chunk ≈246.4KB(基线 2026-09-08 V9.47 实测 246.42KB/gzip 97.66KB,V9.47 AI 配置面板去全局化 i18n/逻辑 +1.1KB;pdfjs 已隔离为独立异步 chunk ~483KB 仅 PDF 场景加载;simple-mind-map ~340KB 仅脑图编辑页加载)
+- 前端构建:`cd frontend; npm run build` → 入口 chunk ≈246.4KB(基线 2026-09-08 V9.48 实测 246.35KB/gzip 97.70KB,V9.48 AI 模型池+功能绑定面板 i18n/逻辑;pdfjs 已隔离为独立异步 chunk ~483KB 仅 PDF 场景加载;simple-mind-map ~340KB 仅脑图编辑页加载)
 - 接口测试:同级独立项目(不在本仓库)`cd ..\autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed;**CI(GitHub Actions,`.github/workflows/ci.yml`)每次推送自动验证:前后端构建+compose 起库导入 schema+后端启动+登录冒烟**
 
 ## 已实现变更归档(已外置)
@@ -296,7 +296,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **业务凭证(天气私钥)AES-GCM 加密**:`AesUtil`(PBKDF2WithHmacSHA256 派生密钥 100000 次 + 256bit + GCM 128bit tag);密文格式 `ENC(Base64(iv+cipher+tag))`;盐值 16 字节 Base64。
 - **盐值存 DB**:`sys_parameter` 表(name/value),盐值 key=`aes-salt`,首次启动 `ParameterService.getAesSalt()` 自动生成并入库(优先环境变量 `IHOMY_AES_SALT`),之后缓存内存。
 - **WeatherService 改造**:`loadCredential()` 读到的私钥若 `ENC(...)` 包裹,调 `parameterService.decrypt()` 解密;DB 和 yml 两条路径都支持。
-- **AI 模型接入(V9.40,V9.43 按家庭,V9.47 去全局)**:**配置只按家庭**——`sys_family_ai_config` 表每家庭一行(设置页-家庭 AI 配置维护,`GET/PUT/DELETE /ai/config` `family:manage` 仅家长,密钥 ENC 加密不回传,留空保留原值;无行/主配置字段空=该家庭未启用,timeout 缺省 30000),`FamilyAiConfigService.resolve(familyId)` 只读本家庭行,**全局 `app.ai.*` yml 兜底已删除**(application.yml/external.yml.template 的 ai 段已移除,dev config/external.yml 同),家庭内 image/asr 地址与 Key 缺省复用主配置;OpenAI 兼容 /chat/completions,统一走 `AiService`(chat/chatJson/images/transcribe/status 全部传 familyId),出站走 ThirdPartyHttp;**dev 已接入**(家庭 DB 行,不入 git):chat=GLM-5.3-Flash(tshl 代理)+image=doubao-seedream-5-0-260128(豆包 ark 直连,**出图尺寸下限总像素 ≥3686400 即 ≥1920×1920**),演示家庭/小窝 DB 行均配;语音识别(asr-model,推荐 SenseVoice)模型名配置后启用;AI 测试台 /tools/ai-playground(/ai/status 配置驱动,临时页);后续 AI 功能直接复用,不另起 HTTP 客户端;**新家庭要用 AI 必须家长在设置页配置(无任何全局兜底)**。详见需求设计说明书 §4.6.9。
+- **AI 模型接入(V9.40,V9.43 按家庭,V9.47 去全局,V9.48 模型池+功能绑定)**:**模型池 + 按功能选模型**——`sys_family_ai_model` 每家庭多条(类型 LLM/IMAGE/ASR,自带 base_url/api_key/model/timeout_ms,密钥 ENC 加密不回传),`sys_family_ai_feature` 每家庭每功能一行(feature_code→model_id,5 个功能:ITEM_FIND 找物/ITEM_PUT 放物/CHAT 对话/IMAGE 图片/ASR 语音;功能只能绑对应类型,model_id 空=该功能停用);`FamilyAiConfigService.resolveForFeature(familyId, featureCode)` 按功能解析模型,无全局兜底;设置页「家庭 AI 配置」面板=模型池 el-table+弹窗增删改 + 5 个功能下拉绑定(`/ai/models` CRUD + `/ai/features` 列表 + `PUT /ai/features/{code}` 绑定,family:manage 仅家长);OpenAI 兼容 /chat/completions,统一走 `AiService`(chat→CHAT/chatJson→传 featureCode/images→IMAGE/transcribe→ASR/status→chat/image/asr),出站走 ThirdPartyHttp;**dev 已接入**(家庭模型池 DB 行,不入 git):对话=GLM-5.3-Flash(tshl 代理)+图片=doubao-seedream-5-0-260128(豆包 ark 直连,**出图尺寸下限总像素 ≥3686400 即 ≥1920×1920**),演示家庭/小窝均已迁移;语音识别(asr,推荐 SenseVoice 自部署)配置后启用;AI 测试台 /tools/ai-playground(/ai/status 配置驱动,临时页);后续 AI 功能直接复用 chat/chatJson 并新增 feature_code 即可;**新家庭要用 AI 必须家长先加模型再按功能绑定**。详见需求设计说明书 §4.6.9。
 - **OPS 加密接口**:`GET /api/ops/crypto/encrypt?plaintext=xxx` 生成密文,`GET /api/ops/crypto/decrypt?ciphertext=ENC(xxx)` 验证解密(均 @RequirePermission("ops:view"))。
 - **外挂模板**:`backend/src/main/resources/external.yml.template`(复制为 external.yml 填真实凭证,设环境变量)。
 - **profile 化(废弃)**:**不再用 application-dev.yml profile**(见 `scripts/start-all.ps1:9`)。`application.yml` 为**生产基线配置**(MySQL 6306/Redis 6379/**DB 密码与 JWT 密钥留空——必须由 external.yml 提供,缺失启动即失败(JwtUtils fail-fast)**/captcha 空/天气留空/`file.upload-dir: /opt/ihomy/uploads` Linux 路径/`spring.threads.virtual.enabled: true` 虚拟线程/HikariCP `maximum-pool-size: 20`/`mybatis.sql: warn` 静默 SQL 日志);**所有环境差异**(开发密码/Windows 路径/captcha=qwer/天气凭证/JWT 密钥/Redis 密码)统一走 `IHOMY_CONFIG_PATH` 指向的 external.yml 覆盖。external.yml 不入 git(.gitignore 已忽略),手动维护,生产部署时也可用 external.yml 注入真实 secrets(密码/密钥)。
