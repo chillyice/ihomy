@@ -31,6 +31,8 @@ const routes = [
   { path: '/settings', name: 'Settings', component: () => import('@/views/Settings.vue'), meta: { requiresAuth: true } },
   // 百度网盘 OAuth 授权回调页(须与百度开放平台注册的「授权回调页地址」一致)
   { path: '/storage/baidu/callback', name: 'BaiduCallback', component: () => import('@/views/storage/BaiduCallback.vue'), meta: { public: true } },
+  // 文件浏览:独立功能页,登录用户浏览/预览/下载存储设备文件(管理操作仅 OWNER)
+  { path: '/storage/files', name: 'FileBrowse', component: () => import('@/views/storage/FileBrowse.vue'), meta: { requiresAuth: true } },
   { path: '/item', name: 'Item', component: () => import('@/views/item/Item.vue'), meta: { public: true } },
   { path: '/kitchen', name: 'Kitchen', component: () => import('@/views/kitchen/Kitchen.vue'), meta: { public: true } },
   { path: '/kitchen/ingredients', name: 'Ingredient', component: () => import('@/views/kitchen/Ingredient.vue'), meta: { public: true } },
@@ -69,6 +71,21 @@ router.beforeEach((to) => {
   if (to.meta.ops && !userStore.hasPerm('ops:view')) {
     return { name: 'Home' }
   }
+})
+
+// 懒加载 chunk 失败自愈:重新构建后旧标签页仍引用旧哈希文件(404),
+// 整页刷新一次拿到新构建;同一路由 30 秒内只刷一次,真实网络故障时不至于无限刷新
+router.onError((error, to) => {
+  const msg = (error?.message || '').toLowerCase()
+  const chunkFailed =
+    msg.includes('dynamically imported module') ||
+    msg.includes('importing a module script') ||
+    msg.includes('loading chunk')
+  if (!chunkFailed || !to) return
+  const key = `ihomy:chunk-reload:${to.fullPath}`
+  if (Date.now() - Number(sessionStorage.getItem(key) || 0) < 30_000) return
+  sessionStorage.setItem(key, String(Date.now()))
+  window.location.href = to.fullPath
 })
 
 export default router

@@ -300,6 +300,9 @@ export const storageApi = {
     return download ? `${base}&download=true` : base
   },
   map: (data) => request.post('/storage/map', data),
+  mkdir: (deviceId, path) => request.post('/storage/entry/mkdir', { deviceId, path }),
+  rename: (deviceId, path, newName) => request.put('/storage/entry/rename', { deviceId, path, newName }),
+  removeEntries: (deviceId, paths) => request.delete('/storage/entry/batch', { data: { deviceId, paths } }),
   clearThumbs: () => request.delete('/storage/thumbs'),
   syncProgress: (taskId) => request.get(`/storage/sync/progress/${taskId}`),
   baiduCredential: () => request.get('/storage/baidu/credential'),

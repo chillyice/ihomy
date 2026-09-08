@@ -119,6 +119,49 @@ public class StorageController {
         return streamFromDevice(device, path, fsId, download, thumb, range);
     }
 
+    @Operation(summary = "新建目录(仅自定义设备,系统设备只读)")
+    @OperationLog(module = "STORAGE", operationType = "CREATE", description = "新建目录")
+    @RequirePermission("storage:manage")
+    @PostMapping("/entry/mkdir")
+    public Result<Void> mkdir(@RequestBody Map<String, Object> body) {
+        Long deviceId = bodyDeviceId(body);
+        storageService.mkdir(storageService.getDevice(currentFamilyId(), deviceId), strVal(body.get("path")));
+        return Result.success();
+    }
+
+    @Operation(summary = "重命名文件/目录(仅自定义设备,系统设备只读)")
+    @OperationLog(module = "STORAGE", operationType = "UPDATE", description = "重命名文件")
+    @RequirePermission("storage:manage")
+    @PutMapping("/entry/rename")
+    public Result<Void> rename(@RequestBody Map<String, Object> body) {
+        Long deviceId = bodyDeviceId(body);
+        storageService.rename(storageService.getDevice(currentFamilyId(), deviceId),
+                strVal(body.get("path")), strVal(body.get("newName")));
+        return Result.success();
+    }
+
+    @Operation(summary = "批量删除文件/目录(百度进其回收站可恢复;本地/WebDAV 递归永久删除)")
+    @OperationLog(module = "STORAGE", operationType = "DELETE", description = "删除文件")
+    @RequirePermission("storage:manage")
+    @DeleteMapping("/entry/batch")
+    public Result<Integer> deleteEntries(@RequestBody Map<String, Object> body) {
+        Long deviceId = bodyDeviceId(body);
+        @SuppressWarnings("unchecked")
+        List<String> paths = (List<String>) body.get("paths");
+        int n = storageService.deleteEntries(storageService.getDevice(currentFamilyId(), deviceId), paths);
+        if (paths != null) paths.forEach(p -> thumbnailService.evictByPath(deviceId, p));
+        return Result.success(n);
+    }
+
+    private Long bodyDeviceId(Map<String, Object> body) {
+        Object v = body.get("deviceId");
+        return v == null ? 0L : Long.valueOf(v.toString());
+    }
+
+    private String strVal(Object v) {
+        return v == null ? null : v.toString();
+    }
+
     /**
      * 设备文件流式返回:thumb=图片缩略图缓存;百度走 dlink 中转(InputStreamResource 不缓冲),
      * WebDAV 走 Range 透传中转(206/Content-Range,视频/音频可拖进度条),本地/挂载读盘。

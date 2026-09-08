@@ -109,6 +109,16 @@ public class ThumbnailService {
         }
     }
 
+    /** 删除设备文件后按路径尽力清缩略图缓存(无 fsid 设备=NAS/本地/WebDAV 生效;百度 fsId key 场景靠刷新/过期收敛) */
+    public void evictByPath(Long deviceId, String path) {
+        try {
+            if (deviceId == null || deviceId == 0L || path == null) return;
+            Files.deleteIfExists(cachePath(deviceId, path, null));
+        } catch (Exception e) {
+            log.debug("缩略图缓存逐出失败(忽略): device={}, path={} | {}", deviceId, path, e.toString());
+        }
+    }
+
     /** 下载原图全量字节:BAIDU 走 dlink 中转(并发限流内),WebDAV 流式拉取,本地/挂载读盘 */
     private byte[] readSource(StorageDevice device, String path, Long fsId) throws Exception {
         if ("BAIDU".equals(device.getDeviceType())) {

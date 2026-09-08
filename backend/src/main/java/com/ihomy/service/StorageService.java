@@ -42,6 +42,7 @@ public class StorageService {
     private final StorageDeviceMapper storageDeviceMapper;
     private final BaiduCredentialMapper baiduCredentialMapper;
     private final ParameterService parameterService;
+    private final SignedUrlService signedUrlService;
     private final StringRedisTemplate redis;
     private final ObjectMapper json = new ObjectMapper();
 
@@ -177,8 +178,36 @@ public class StorageService {
     }
 
     public List<Map<String, Object>> browse(StorageDevice device, String path) {
-        if ("BAIDU".equals(device.getDeviceType())) return baiduBrowse(device, path);
-        if (isWebDavType(device.getDeviceType())) return webdavBrowse(device, path);
+        List<Map<String, Object>> items;
+        if ("BAIDU".equals(device.getDeviceType())) {
+            items = baiduBrowse(device, path);
+        } else if (isWebDavType(device.getDeviceType())) {
+            items = webdavBrowse(device, path);
+        } else {
+            items = localBrowse(device, path);
+        }
+        // 文件项附签名 URL(免登录,前端 img/iframe/下载全走它;目录不需要)
+        for (Map<String, Object> item : items) {
+            if (!Boolean.TRUE.equals(item.get("isDir")) && device.getId() != null && device.getId() > 0) {
+                String full = browsePath(device.getDeviceType(), path, String.valueOf(item.get("name")));
+                item.put("signedUrl", signedUrlService.sign(device.getId(), full, null));
+            }
+        }
+        return items;
+    }
+
+    /** 浏览项完整路径(签名用):百度/WebDAV 以 / 开头,本地设备相对路径拼接 */
+    private String browsePath(String deviceType, String parent, String name) {
+        String p = parent == null ? "" : parent;
+        if ("BAIDU".equals(deviceType) || isWebDavType(deviceType)) {
+            String base = p.isEmpty() || "/".equals(p) ? "" : p;
+            return base + "/" + name;
+        }
+        return p.isEmpty() ? name : p + "/" + name;
+    }
+
+    /** 本地设备列目录(目录优先,按名称排序) */
+    private List<Map<String, Object>> localBrowse(StorageDevice device, String path) {
         Path root = deviceRoot(device);
         Path dir = resolveSafe(root, path);
         if (!Files.isDirectory(dir)) {
@@ -229,6 +258,118 @@ public class StorageService {
 
     public String downloadName(StorageDevice device, String path) {
         return resolveSafe(deviceRoot(device), path).getFileName().toString();
+    }
+
+    /* ---------- 文件管理写操作(新建/重命名/删除;系统设备只读) ---------- */
+
+    /** 写操作仅限自定义设备:系统设备(本地上传根目录)存业务内容,只读 */
+    private void requireWritable(StorageDevice device) {
+        if (device == null || device.getId() == null || device.getId() == 0L) {
+            throw new BizException(ResultCode.BAD_REQUEST, "系统设备不支持文件管理操作");
+        }
+    }
+
+    /** 新建目录(本地/WebDAV/百度三分支) */
+    public void mkdir(StorageDevice device, String path) {
+        requireWritable(device);
+        if (path == null || path.isBlank()) {
+            throw new BizException(ResultCode.BAD_REQUEST, "目录路径不能为空");
+        }
+        if ("BAIDU".equals(device.getDeviceType())) {
+            baiduMkdir(device, baiduNormalizePath(path, true));
+        } else if (isWebDavType(device.getDeviceType())) {
+            WebDavCreds c = parseWebDavCreds(device);
+            WebDavClient.mkcol(c.serverUrl(), webdavNormalizePath(path, true), c.username(), c.password());
+        } else {
+            Path dir = resolveSafe(deviceRoot(device), path);
+            if (Files.exists(dir)) {
+                throw new BizException(ResultCode.BAD_REQUEST, "目录已存在");
+            }
+            try {
+                Files.createDirectory(dir);
+            } catch (Exception e) {
+                throw new BizException(ResultCode.BAD_REQUEST, "新建目录失败: " + e.getMessage());
+            }
+        }
+    }
+
+    /** 重命名(同目录内改名;新名称禁路径分隔符与 ..) */
+    public void rename(StorageDevice device, String path, String newName) {
+        requireWritable(device);
+        if (newName == null || newName.isBlank()) {
+            throw new BizException(ResultCode.BAD_REQUEST, "新名称不能为空");
+        }
+        String name = newName.trim();
+        if (name.contains("/") || name.contains("\\") || name.contains("..")) {
+            throw new BizException(ResultCode.BAD_REQUEST, "名称不能包含路径分隔符或 ..");
+        }
+        if ("BAIDU".equals(device.getDeviceType())) {
+            baiduRename(device, baiduNormalizePath(path, false), name);
+        } else if (isWebDavType(device.getDeviceType())) {
+            WebDavCreds c = parseWebDavCreds(device);
+            String p = webdavNormalizePath(path, false);
+            String parent = p.substring(0, p.lastIndexOf('/'));
+            WebDavClient.move(c.serverUrl(), p, parent + "/" + name, c.username(), c.password());
+        } else {
+            Path src = resolveSafe(deviceRoot(device), path);
+            if (!Files.exists(src)) {
+                throw new BizException(ResultCode.NOT_FOUND, "文件或目录不存在");
+            }
+            try {
+                Files.move(src, src.getParent().resolve(name));
+            } catch (Exception e) {
+                throw new BizException(ResultCode.BAD_REQUEST, "重命名失败: " + e.getMessage());
+            }
+        }
+    }
+
+    /** 批量删除(百度一次调用进其回收站可恢复;本地/WebDAV 逐个,目录含内容递归,永久删除) */
+    public int deleteEntries(StorageDevice device, List<String> paths) {
+        requireWritable(device);
+        if (paths == null || paths.isEmpty()) {
+            throw new BizException(ResultCode.BAD_REQUEST, "请选择要删除的文件或目录");
+        }
+        if ("BAIDU".equals(device.getDeviceType())) {
+            baiduDelete(device, paths);
+            return paths.size();
+        }
+        WebDavCreds c = isWebDavType(device.getDeviceType()) ? parseWebDavCreds(device) : null;
+        int deleted = 0;
+        for (String path : paths) {
+            if (c != null) {
+                WebDavClient.delete(c.serverUrl(), webdavNormalizePath(path, true), c.username(), c.password());
+            } else {
+                Path target = resolveSafe(deviceRoot(device), path);
+                if (!Files.exists(target)) {
+                    throw new BizException(ResultCode.NOT_FOUND, "文件或目录不存在: " + path);
+                }
+                deleteLocalRecursive(target);
+            }
+            deleted++;
+        }
+        return deleted;
+    }
+
+    /** 本地递归删除(目录先删子项);target 已经 resolveSafe 校验 */
+    private void deleteLocalRecursive(Path target) throws BizException {
+        try {
+            if (Files.isDirectory(target)) {
+                try (var walk = Files.walk(target)) {
+                    walk.sorted(java.util.Comparator.reverseOrder())
+                            .forEach(p -> {
+                                try {
+                                    Files.deleteIfExists(p);
+                                } catch (Exception e) {
+                                    throw new RuntimeException(e);
+                                }
+                            });
+                }
+            } else {
+                Files.deleteIfExists(target);
+            }
+        } catch (Exception e) {
+            throw new BizException(ResultCode.INTERNAL_ERROR, "删除失败: " + e.getMessage());
+        }
     }
 
     /** 百度网盘文件流(dlink 服务器中转,不落盘不缓冲) */
@@ -644,5 +785,76 @@ public class StorageService {
         if (p.isEmpty()) p = "/";
         if (!dir && p.equals("/")) throw new BizException(ResultCode.BAD_REQUEST, "缺少文件名");
         return p;
+    }
+
+    /* ---------- 百度网盘写操作(POST 表单;项目首个 POST 到百度的先例) ---------- */
+
+    /** xpan POST 表单:errno 111/-6(token 过期/失效)刷新后重试一次,其余非 0 抛业务异常 */
+    private JsonNode baiduPostForm(BaiduCredential c, java.util.function.UnaryOperator<String> urlWithToken, byte[] formBody) {
+        JsonNode resp = postJson(urlWithToken.apply(baiduAccessToken(c)), formBody);
+        long errno = resp == null ? -1 : resp.path("errno").asLong(0);
+        if (errno == 111 || errno == -6) {
+            resp = postJson(urlWithToken.apply(refreshBaiduToken(c)), formBody);
+            errno = resp == null ? -1 : resp.path("errno").asLong(0);
+        }
+        if (resp == null || errno != 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "百度网盘接口失败: errno=" + errno
+                    + (resp == null ? "" : " " + resp.path("errmsg").asText("")));
+        }
+        return resp;
+    }
+
+    /** POST 表单取 JSON(百度 xpan 写端点;出站日志走 ThirdPartyHttp→thirdparty 文件) */
+    private JsonNode postJson(String urlStr, byte[] formBody) {
+        try {
+            return json.readTree(ThirdPartyHttp.request("baidu", "POST", urlStr,
+                    Map.of("Content-Type", "application/x-www-form-urlencoded"), formBody, 10000).body());
+        } catch (Exception e) {
+            throw new BizException(ResultCode.INTERNAL_ERROR, "请求百度网盘接口失败: " + e.getMessage());
+        }
+    }
+
+    /** 百度新建文件夹:xpan create(isdir=1) */
+    private void baiduMkdir(StorageDevice device, String path) {
+        BaiduCredential c = requireBaiduCredential(device.getFamilyId());
+        String form = "path=" + URLEncoder.encode(path, StandardCharsets.UTF_8) + "&isdir=1&size=0";
+        baiduPostForm(c, token -> "https://pan.baidu.com/rest/2.0/xpan/file?method=create"
+                + "&access_token=" + URLEncoder.encode(token, StandardCharsets.UTF_8),
+                form.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** 百度重命名:filemanager opera=rename(filelist=[{"path","newname"}]) */
+    private void baiduRename(StorageDevice device, String path, String newName) {
+        BaiduCredential c = requireBaiduCredential(device.getFamilyId());
+        try {
+            String fileList = json.writeValueAsString(List.of(Map.of("path", path, "newname", newName)));
+            String form = "filelist=" + URLEncoder.encode(fileList, StandardCharsets.UTF_8);
+            baiduPostForm(c, token -> "https://pan.baidu.com/rest/2.0/xpan/file?method=filemanager&opera=rename"
+                    + "&access_token=" + URLEncoder.encode(token, StandardCharsets.UTF_8),
+                    form.getBytes(StandardCharsets.UTF_8));
+        } catch (BizException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BizException(ResultCode.INTERNAL_ERROR, "百度重命名失败: " + e.getMessage());
+        }
+    }
+
+    /** 百度删除:filemanager opera=delete(filelist=[路径]);进百度网盘回收站,可恢复 */
+    private void baiduDelete(StorageDevice device, List<String> paths) {
+        BaiduCredential c = requireBaiduCredential(device.getFamilyId());
+        try {
+            List<String> normalized = new ArrayList<>();
+            for (String p : paths) {
+                normalized.add(baiduNormalizePath(p, true));
+            }
+            String form = "filelist=" + URLEncoder.encode(json.writeValueAsString(normalized), StandardCharsets.UTF_8);
+            baiduPostForm(c, token -> "https://pan.baidu.com/rest/2.0/xpan/file?method=filemanager&opera=delete"
+                    + "&access_token=" + URLEncoder.encode(token, StandardCharsets.UTF_8),
+                    form.getBytes(StandardCharsets.UTF_8));
+        } catch (BizException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BizException(ResultCode.INTERNAL_ERROR, "百度删除失败: " + e.getMessage());
+        }
     }
 }

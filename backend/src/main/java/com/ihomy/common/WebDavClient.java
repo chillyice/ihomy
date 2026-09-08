@@ -114,6 +114,55 @@ public final class WebDavClient {
         }
     }
 
+    /** 新建目录:MKCOL 空体(非标准方法,走 ThirdPartyHttp.request 的 HttpClient 分支) */
+    public static void mkcol(String baseUrl, String path, String user, String pass) {
+        davWrite("MKCOL", baseUrl, path, user, pass, null, "新建目录");
+    }
+
+    /** 重命名/移动:MOVE + Destination 绝对 URL + Overwrite: T(RFC 4918 要求 Destination 为绝对 URI) */
+    public static void move(String baseUrl, String path, String destPath, String user, String pass) {
+        Map<String, String> extra = Map.of(
+                "Destination", joinUrl(baseUrl, destPath),
+                "Overwrite", "T");
+        davWrite("MOVE", baseUrl, path, user, pass, extra, "重命名");
+    }
+
+    /** 删除文件/目录(目录含内容递归删除) */
+    public static void delete(String baseUrl, String path, String user, String pass) {
+        davWrite("DELETE", baseUrl, path, user, pass, null, "删除");
+    }
+
+    /** 写操作统一出站:错误映射复刻 propfind 样板,按动作给业务文案 */
+    private static void davWrite(String method, String baseUrl, String path, String user, String pass,
+                                 Map<String, String> extraHeaders, String action) {
+        Map<String, String> headers = new java.util.LinkedHashMap<>();
+        headers.put("Authorization", basicAuth(user, pass));
+        if (extraHeaders != null) {
+            headers.putAll(extraHeaders);
+        }
+        ThirdPartyHttp.Resp resp;
+        try {
+            resp = ThirdPartyHttp.request("webdav", method, joinUrl(baseUrl, path), headers, null, 15000);
+        } catch (IOException e) {
+            throw new BizException(ResultCode.INTERNAL_ERROR, "无法连接 WebDAV 服务器: " + e.getMessage());
+        }
+        if (resp.status() == 404) {
+            throw new BizException(ResultCode.NOT_FOUND, action + "失败: 路径不存在");
+        }
+        if (resp.status() == 401 || resp.status() == 403) {
+            throw new BizException(ResultCode.BAD_REQUEST, "WebDAV 认证失败,请检查账号与应用密码");
+        }
+        if (resp.status() == 405) {
+            throw new BizException(ResultCode.BAD_REQUEST, action + "失败: 目标已存在或服务器不支持该操作");
+        }
+        if (resp.status() == 409) {
+            throw new BizException(ResultCode.BAD_REQUEST, action + "失败: 父目录不存在");
+        }
+        if (!resp.ok()) {
+            throw new BizException(ResultCode.INTERNAL_ERROR, action + "失败: WebDAV 服务器返回 HTTP " + resp.status());
+        }
+    }
+
     /** 解析 207 Multi-Status:相对路径 = 解码 href − baseUrl 路径前缀;跳过自集合条目 */
     private static List<DavItem> parseMultiStatus(String xml, String baseUrl, String requestPath) {
         List<DavItem> items = new ArrayList<>();

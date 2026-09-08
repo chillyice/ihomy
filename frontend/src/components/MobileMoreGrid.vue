@@ -46,13 +46,14 @@ const NAV_PATHS = {
   reminder: '/reminder', plan: '/plan', wish: '/wish', book: '/book',
   chat: '/chat', tree: '/tree', cascade: '/cascade',
   item: '/item', kitchen: '/kitchen', library: '/library', settings: '/settings', ops: '/ops',
+  storage: '/storage/files',
 }
 
 const CATEGORY_LABELS = { content: '内容', life: '生活', social: '成员', system: '系统' }
 
 const groups = computed(() => {
   const list = !appStore.modules.length ? [] : appStore.modules
-    .filter(m => NAV_PATHS[m.code] && m.enabled !== 0 && m.code !== 'storage')
+    .filter(m => NAV_PATHS[m.code] && m.enabled !== 0)
     .map(m => ({
       code: m.code, title: m.title, path: NAV_PATHS[m.code],
       category: m.category === 'album' ? 'content' : (m.category || 'life'),

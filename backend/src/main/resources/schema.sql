@@ -775,7 +775,7 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('tools',     '工具箱',   'icon-tools',     '/tools',  'life', 'left', 15, 1),
 ('member', '家庭成员', 'icon-member', '/member', 'social',  'right',  1, 1),
 ('cover',  '家庭封面', 'icon-cover',  '/cover',  'system',  'top',    1, 0),
-('storage','存储管理', 'icon-storage','/storage','system',  'left',  16, 1);
+('storage','文件浏览','icon-storage','/storage/files','system',  'left',  16, 1);
 
 -- ------------------------------------------------------------
 -- 26. 初始家庭 + 管理员账号

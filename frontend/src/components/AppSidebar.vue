@@ -211,13 +211,14 @@ const NAV_PATHS = {
   reminder: '/reminder', plan: '/plan', wish: '/wish', book: '/book',
   chat: '/chat', tree: '/tree', cascade: '/cascade',
   item: '/item', kitchen: '/kitchen', library: '/library', settings: '/settings', ops: '/ops',
+  storage: '/storage/files',
   tools: '/tools',
 }
 
 // 模块列表:从 store 取,过滤出有路径映射的;末尾追加设置+运维管理(仅 OPS)虚拟模块到 system 分组
 const navModules = computed(() => {
   const list = !appStore.modules.length ? [] : appStore.modules
-    .filter(m => NAV_PATHS[m.code] && m.enabled !== 0 && m.code !== 'storage')
+    .filter(m => NAV_PATHS[m.code] && m.enabled !== 0)
     .map(m => ({
       code: m.code,
       title: m.title,
