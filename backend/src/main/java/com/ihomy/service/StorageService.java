@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.ResultCode;
 import com.ihomy.common.ThirdPartyHttp;
+import com.ihomy.common.WebDavClient;
 import com.ihomy.entity.BaiduCredential;
 import com.ihomy.entity.StorageDevice;
 import com.ihomy.entity.SysUser;
@@ -49,6 +50,11 @@ public class StorageService {
 
     /* ---------- 设备 CRUD ---------- */
 
+    /** WebDAV 系设备类型(NEXTCLOUD/WEBDAV):路径以 / 开头,凭证存 root_path(serverUrl|username|ENC 密码) */
+    public static boolean isWebDavType(String deviceType) {
+        return "WEBDAV".equals(deviceType) || "NEXTCLOUD".equals(deviceType);
+    }
+
     public List<Map<String, Object>> listDevices(Long familyId) {
         List<Map<String, Object>> result = new ArrayList<>();
         result.add(systemDevice());
@@ -59,11 +65,18 @@ public class StorageService {
                     m.put("id", d.getId());
                     m.put("name", d.getName());
                     m.put("deviceType", d.getDeviceType());
-                    m.put("rootPath", d.getRootPath());
+                    // WebDAV 设备 root_path 含凭证,只回 serverUrl|username(密码段剥掉,同百度密钥不回传)
+                    m.put("rootPath", isWebDavType(d.getDeviceType()) ? maskWebDavRootPath(d.getRootPath()) : d.getRootPath());
                     m.put("status", d.getStatus());
                     result.add(m);
                 });
         return result;
+    }
+
+    /** WebDAV root_path 脱敏:剥掉最后一段 ENC 密码,回 serverUrl|username */
+    private String maskWebDavRootPath(String rootPath) {
+        int p2 = rootPath == null ? -1 : rootPath.lastIndexOf('|');
+        return p2 > 0 ? rootPath.substring(0, p2) : rootPath;
     }
 
     private Map<String, Object> systemDevice() {
@@ -92,13 +105,16 @@ public class StorageService {
         return storageDeviceMapper.selectById(deviceId);
     }
 
-    public StorageDevice addDevice(Long familyId, String name, String deviceType, String rootPath, SysUser user) {
+    public StorageDevice addDevice(Long familyId, String name, String deviceType, String rootPath,
+                                   String username, String password, SysUser user) {
         if (name == null || name.isBlank()) {
             throw new BizException(ResultCode.BAD_REQUEST, "设备名称不能为空");
         }
         boolean baidu = "BAIDU".equals(deviceType);
         if (baidu) {
             rootPath = "/"; // 百度网盘走 API 无本地根目录,占位待适配器解释;凭证存 sys_baidu_credential
+        } else if (isWebDavType(deviceType)) {
+            rootPath = buildWebDavRootPath(deviceType, rootPath, username, password, null);
         } else if (rootPath == null || rootPath.isBlank()) {
             throw new BizException(ResultCode.BAD_REQUEST, "设备名称与路径不能为空");
         } else {
@@ -119,13 +135,17 @@ public class StorageService {
         return d;
     }
 
-    public void updateDevice(Long familyId, Long deviceId, String name, String deviceType, String rootPath) {
+    public void updateDevice(Long familyId, Long deviceId, String name, String deviceType,
+                             String rootPath, String username, String password) {
         StorageDevice d = getDevice(familyId, deviceId);
         if (name != null && !name.isBlank()) d.setName(name.trim());
         if (deviceType != null && !deviceType.isBlank()) d.setDeviceType(deviceType);
         boolean baidu = "BAIDU".equals(d.getDeviceType());
         if (baidu) {
             d.setRootPath("/");
+        } else if (isWebDavType(d.getDeviceType())) {
+            // 编辑密码留空沿用旧值;地址/账号变更会重新测连
+            d.setRootPath(buildWebDavRootPath(d.getDeviceType(), rootPath, username, password, d.getRootPath()));
         } else if (rootPath != null && !rootPath.isBlank()) {
             Path root = Paths.get(rootPath).toAbsolutePath().normalize();
             if (!Files.isDirectory(root)) {
@@ -158,6 +178,7 @@ public class StorageService {
 
     public List<Map<String, Object>> browse(StorageDevice device, String path) {
         if ("BAIDU".equals(device.getDeviceType())) return baiduBrowse(device, path);
+        if (isWebDavType(device.getDeviceType())) return webdavBrowse(device, path);
         Path root = deviceRoot(device);
         Path dir = resolveSafe(root, path);
         if (!Files.isDirectory(dir)) {
@@ -521,6 +542,101 @@ public class StorageService {
 
     /** 百度网盘路径规范化:统一正斜杠、以 / 开头、禁 ..;dir=true 时目录缺省根目录 */
     private String baiduNormalizePath(String path, boolean dir) {
+        String p = path == null ? "" : path.trim().replace('\\', '/');
+        if (p.contains("..")) throw new BizException(ResultCode.BAD_REQUEST, "非法路径");
+        if (!p.startsWith("/")) p = "/" + p;
+        if (p.endsWith("/")) p = p.substring(0, p.length() - 1);
+        if (p.isEmpty()) p = "/";
+        if (!dir && p.equals("/")) throw new BizException(ResultCode.BAD_REQUEST, "缺少文件名");
+        return p;
+    }
+
+    /* ---------- WebDAV/Nextcloud 设备接入(NEXTCLOUD/WEBDAV,凭证存 root_path) ---------- */
+
+    /** WebDAV 凭证(解密后) */
+    public record WebDavCreds(String serverUrl, String username, String password) {}
+
+    /**
+     * root_path 凭证解析:格式 serverUrl|username|ENC(password),从最后一段往前取
+     * (密码是 Base64 密文不含 |,username/serverUrl 位移安全)。
+     */
+    private WebDavCreds parseWebDavCreds(StorageDevice device) {
+        String rootPath = device.getRootPath();
+        int p1 = rootPath.indexOf('|');
+        int p2 = rootPath.lastIndexOf('|');
+        if (p1 <= 0 || p2 <= p1) {
+            throw new BizException(ResultCode.INTERNAL_ERROR, "WebDAV 设备凭证缺失,请编辑设备重新配置");
+        }
+        return new WebDavCreds(rootPath.substring(0, p1),
+                rootPath.substring(p1 + 1, p2),
+                parameterService.decrypt(rootPath.substring(p2 + 1)));
+    }
+
+    /** 组装 root_path(serverUrl|username|ENC 密码)并 PROPFIND 测连,不通过不入库;编辑密码留空沿用旧值 */
+    private String buildWebDavRootPath(String deviceType, String serverUrl, String username,
+                                       String password, String oldRootPath) {
+        if (serverUrl == null || serverUrl.isBlank() || username == null || username.isBlank()) {
+            throw new BizException(ResultCode.BAD_REQUEST, "服务器地址与账号不能为空");
+        }
+        String url = normalizeDavUrl(deviceType, serverUrl, username.trim());
+        String encPwd;
+        boolean oldLooksWebDav = oldRootPath != null && oldRootPath.indexOf('|') > 0;
+        if (password != null && !password.isBlank()) {
+            encPwd = parameterService.encrypt(password.trim());
+        } else if (oldLooksWebDav) {
+            encPwd = parameterService.decrypt(oldRootPath.substring(oldRootPath.lastIndexOf('|') + 1));
+        } else {
+            throw new BizException(ResultCode.BAD_REQUEST, "应用密码不能为空");
+        }
+        WebDavCreds c = new WebDavCreds(url, username.trim(), parameterService.decrypt(encPwd));
+        WebDavClient.propfind(url, "/", c.username(), c.password(), 0); // 测连:401/404/连接失败直接抛给前端
+        return url + "|" + c.username() + "|" + encPwd;
+    }
+
+    /** DAV 地址规范化:去尾斜杠;NEXTCLOUD 填站点根地址时自动拼 /remote.php/dav/files/{用户名} */
+    private String normalizeDavUrl(String deviceType, String serverUrl, String username) {
+        String u = serverUrl.trim();
+        if (u.endsWith("/")) u = u.substring(0, u.length() - 1);
+        if (!u.startsWith("http://") && !u.startsWith("https://")) {
+            throw new BizException(ResultCode.BAD_REQUEST, "服务器地址必须以 http(s):// 开头");
+        }
+        if ("NEXTCLOUD".equals(deviceType) && !u.contains("/remote.php/dav")) {
+            u = u + "/remote.php/dav/files/" + username;
+        }
+        return u;
+    }
+
+    /** 浏览 WebDAV/Nextcloud 目录:PROPFIND Depth=1(目录优先按名称排序,与本地浏览一致;fsId 恒 null) */
+    public List<Map<String, Object>> webdavBrowse(StorageDevice device, String path) {
+        WebDavCreds c = parseWebDavCreds(device);
+        String p = webdavNormalizePath(path, true);
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (WebDavClient.DavItem it : WebDavClient.propfind(c.serverUrl(), p, c.username(), c.password(), 1)) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("name", it.name());
+            m.put("isDir", it.dir());
+            m.put("size", it.dir() ? null : it.size());
+            m.put("modified", it.modified());
+            m.put("fsId", null);
+            items.add(m);
+        }
+        items.sort((a, b) -> {
+            boolean da = (Boolean) a.get("isDir"), db = (Boolean) b.get("isDir");
+            if (da != db) return da ? -1 : 1;
+            return ((String) a.get("name")).compareToIgnoreCase((String) b.get("name"));
+        });
+        return items;
+    }
+
+    /** 打开 WebDAV/Nextcloud 文件流:Range 原样透传(200/206),流式不缓冲 */
+    public WebDavClient.WebDavStream webdavOpen(StorageDevice device, String path, String range) {
+        WebDavCreds c = parseWebDavCreds(device);
+        String p = webdavNormalizePath(path, false);
+        return WebDavClient.open(c.serverUrl(), p, c.username(), c.password(), range);
+    }
+
+    /** WebDAV 路径规范化:与 baiduNormalizePath 同规则(正斜杠、/ 开头、禁 ..) */
+    private String webdavNormalizePath(String path, boolean dir) {
         String p = path == null ? "" : path.trim().replace('\\', '/');
         if (p.contains("..")) throw new BizException(ResultCode.BAD_REQUEST, "非法路径");
         if (!p.startsWith("/")) p = "/" + p;

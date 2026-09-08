@@ -59,7 +59,7 @@ public class StorageController {
     @PostMapping("/device")
     public Result<StorageDevice> addDevice(@RequestBody Map<String, String> body) {
         StorageDevice d = storageService.addDevice(currentFamilyId(), body.get("name"),
-                body.get("deviceType"), body.get("rootPath"), currentUser());
+                body.get("deviceType"), body.get("rootPath"), body.get("username"), body.get("password"), currentUser());
         return Result.success(d);
     }
 
@@ -68,7 +68,8 @@ public class StorageController {
     @RequirePermission("storage:manage")
     @PutMapping("/device/{id}")
     public Result<Void> updateDevice(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        storageService.updateDevice(currentFamilyId(), id, body.get("name"), body.get("deviceType"), body.get("rootPath"));
+        storageService.updateDevice(currentFamilyId(), id, body.get("name"), body.get("deviceType"),
+                body.get("rootPath"), body.get("username"), body.get("password"));
         return Result.success();
     }
 
@@ -93,10 +94,11 @@ public class StorageController {
     @GetMapping("/file")
     public ResponseEntity<?> file(@RequestParam(required = false, defaultValue = "0") Long deviceId,
                                   @RequestParam String path,
-                                  @RequestParam(required = false, defaultValue = "false") boolean download) {
+                                  @RequestParam(required = false, defaultValue = "false") boolean download,
+                                  @RequestHeader(value = HttpHeaders.RANGE, required = false) String range) {
         if (deviceId == null || deviceId == 0L) throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.BAD_REQUEST, "系统设备不支持文件浏览,请添加自定义存储设备");
         StorageDevice device = storageService.getDevice(currentFamilyId(), deviceId);
-        return streamFromDevice(device, path, null, download, false);
+        return streamFromDevice(device, path, null, download, false, range);
     }
 
     @Operation(summary = "签名中转读取设备文件(img/video 标签专用,签名即凭证,10 分钟有效;thumb=1 返回 480px 缓存缩略图)")
@@ -107,18 +109,22 @@ public class StorageController {
                                         @RequestParam long exp,
                                         @RequestParam String sig,
                                         @RequestParam(required = false, defaultValue = "false") boolean download,
-                                        @RequestParam(required = false, defaultValue = "false") boolean thumb) {
+                                        @RequestParam(required = false, defaultValue = "false") boolean thumb,
+                                        @RequestHeader(value = HttpHeaders.RANGE, required = false) String range) {
         if (!signedUrlService.verify(deviceId, path, fsId, exp, sig)) {
             throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.UNAUTHORIZED, "链接已过期或签名无效");
         }
         StorageDevice device = storageService.getDeviceById(deviceId);
         if (device == null) throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.NOT_FOUND, "存储设备不存在");
-        return streamFromDevice(device, path, fsId, download, thumb);
+        return streamFromDevice(device, path, fsId, download, thumb, range);
     }
 
-    /** 设备文件流式返回:thumb=图片缩略图缓存;百度走 dlink 中转(InputStreamResource 不缓冲),本地/挂载读盘 */
+    /**
+     * 设备文件流式返回:thumb=图片缩略图缓存;百度走 dlink 中转(InputStreamResource 不缓冲),
+     * WebDAV 走 Range 透传中转(206/Content-Range,视频/音频可拖进度条),本地/挂载读盘。
+     */
     private ResponseEntity<?> streamFromDevice(StorageDevice device, String path, Long fsId,
-                                               boolean download, boolean thumb) {
+                                               boolean download, boolean thumb, String range) {
         String name = path.substring(path.lastIndexOf('/') + 1);
         // 网格缩略图:命中缓存秒回,未命中下载原图生成;HEIC 等不可读格式回退原图
         if (thumb && !download && isImageName(name)) {
@@ -144,6 +150,15 @@ public class StorageController {
             StorageService.BaiduFileStream fs = storageService.baiduOpen(device, path, fsId);
             if (fs.length() > 0) headers.setContentLength(fs.length());
             return new ResponseEntity<>(new org.springframework.core.io.InputStreamResource(fs.in()), headers, HttpStatus.OK);
+        }
+        // WebDAV 中转:Range 透传给源服务器,回传上游 206/Content-Range/Accept-Ranges(视频/音频可拖进度条)
+        if (StorageService.isWebDavType(device.getDeviceType())) {
+            com.ihomy.common.WebDavClient.WebDavStream ws = storageService.webdavOpen(device, path, range);
+            if (ws.length() > 0) headers.setContentLength(ws.length());
+            if (ws.contentRange() != null) headers.set("Content-Range", ws.contentRange());
+            headers.set("Accept-Ranges", "bytes");
+            return new ResponseEntity<>(new org.springframework.core.io.InputStreamResource(ws.in()),
+                    headers, HttpStatus.valueOf(ws.status()));
         }
         // 本地/挂载设备返回 PathResource 流式输出:大视频不全量入堆,Spring 对 Resource 自动支持 Range 请求(拖进度条)
         org.springframework.core.io.PathResource res =

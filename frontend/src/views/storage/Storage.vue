@@ -120,9 +120,22 @@
             <el-option v-for="dt in deviceTypes" :key="dt.value" :label="dt.label" :value="dt.value" />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="deviceForm.deviceType !== 'BAIDU'" :label="$t('storage.rootPath')" required>
+        <el-form-item v-if="deviceForm.deviceType !== 'BAIDU' && !isWebDavType(deviceForm.deviceType)" :label="$t('storage.rootPath')" required>
           <el-input v-model="deviceForm.rootPath" :placeholder="$t('storage.rootPathPh')" />
         </el-form-item>
+        <template v-if="isWebDavType(deviceForm.deviceType)">
+          <el-form-item :label="$t('storage.webdav.server')" required>
+            <el-input v-model="deviceForm.serverUrl"
+              :placeholder="deviceForm.deviceType === 'NEXTCLOUD' ? $t('storage.webdav.serverPhNc') : $t('storage.webdav.serverPh')" />
+          </el-form-item>
+          <el-form-item :label="$t('storage.webdav.username')" required>
+            <el-input v-model="deviceForm.username" :placeholder="$t('storage.webdav.usernamePh')" />
+          </el-form-item>
+          <el-form-item :label="$t('storage.webdav.password')">
+            <el-input v-model="deviceForm.password" type="password" show-password
+              :placeholder="deviceForm.id ? $t('storage.webdav.keepPlaceholder') : $t('storage.webdav.passwordPh')" />
+          </el-form-item>
+        </template>
         <template v-if="deviceForm.deviceType === 'BAIDU'">
           <el-form-item label="AppID" required>
             <el-input v-model="deviceForm.appId" placeholder="百度网盘开放平台 AppID" />
@@ -190,11 +203,14 @@ const loadingDevices = ref(false)
 const deviceDialog = ref(false)
 const savingDevice = ref(false)
 const deviceForm = ref({})
-// 设备类型:BAIDU 走百度网盘 API(凭证在 sys_baidu_credential),无本地根路径
+// 设备类型:BAIDU 走百度网盘 API(凭证在 sys_baidu_credential);NEXTCLOUD/WEBDAV 走 WebDAV(凭证随设备 root_path 加密存储)
+const isWebDavType = (t) => t === 'NEXTCLOUD' || t === 'WEBDAV'
 const deviceTypes = computed(() => [
   { value: 'NAS', label: 'NAS' },
   { value: 'REMOTE', label: 'REMOTE' },
   { value: 'MOUNT', label: 'MOUNT' },
+  { value: 'NEXTCLOUD', label: t('storage.webdav.nextcloudLabel') },
+  { value: 'WEBDAV', label: t('storage.webdav.typeLabel') },
   { value: 'BAIDU', label: t('storage.baidu.typeLabel') },
 ])
 
@@ -275,16 +291,23 @@ async function loadDevices() {
 }
 
 function openDevice(row) {
-  const base = { secretKey: '', signKey: '', appId: '', appKey: '', secretKeySet: false, signKeySet: false }
+  const base = { secretKey: '', signKey: '', appId: '', appKey: '', secretKeySet: false, signKeySet: false, serverUrl: '', username: '', password: '' }
   if (row) {
     // 编辑:百度网盘设备带出已存凭证(密钥只显示"留空保持不变")
-    deviceForm.value = {
+    const form = {
       ...row, ...base,
       appId: baiduForm.value.appId || '',
       appKey: baiduForm.value.appKey || '',
       secretKeySet: baiduForm.value.secretKeySet,
       signKeySet: baiduForm.value.signKeySet,
     }
+    // WebDAV 设备:rootPath 回传格式 serverUrl|username(密码已脱敏),拆入表单
+    if (isWebDavType(row.deviceType) && typeof row.rootPath === 'string' && row.rootPath.includes('|')) {
+      const parts = row.rootPath.split('|')
+      form.serverUrl = parts[0] || ''
+      form.username = parts[1] || ''
+    }
+    deviceForm.value = form
   } else {
     deviceForm.value = { name: '', deviceType: 'NAS', rootPath: '', ...base }
   }
@@ -307,6 +330,25 @@ async function saveDevice() {
         signKey: deviceForm.value.signKey,
       })
       const payload = { name: deviceForm.value.name, deviceType: 'BAIDU', rootPath: '/' }
+      if (deviceForm.value.id) await storageApi.updateDevice(deviceForm.value.id, payload)
+      else await storageApi.addDevice(payload)
+    } else if (isWebDavType(deviceForm.value.deviceType)) {
+      // WebDAV 设备:凭证随设备 root_path 加密存储,后端 PROPFIND 测连通过后入库
+      if (!deviceForm.value.serverUrl || !deviceForm.value.username) {
+        ElMessage.warning(t('storage.webdav.required'))
+        return
+      }
+      if (!deviceForm.value.id && !deviceForm.value.password) {
+        ElMessage.warning(t('storage.webdav.passwordRequired'))
+        return
+      }
+      const payload = {
+        name: deviceForm.value.name,
+        deviceType: deviceForm.value.deviceType,
+        rootPath: deviceForm.value.serverUrl,
+        username: deviceForm.value.username,
+        password: deviceForm.value.password,
+      }
       if (deviceForm.value.id) await storageApi.updateDevice(deviceForm.value.id, payload)
       else await storageApi.addDevice(payload)
     } else {

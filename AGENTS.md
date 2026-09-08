@@ -184,7 +184,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
     - **三类文件**:access(客户端调接口,`AccessLogFilter` 自动)/server(内部流程+SQL+ERROR 堆栈,业务代码 `log.xxx()` 自动)/thirdparty(三方出站,`ThirdPartyHttp` 统一封装);按天滚动保留 `app.log-retention-days`(默认 7)天。
     - **六要素**:时间/级别/线程/[tid]/位置(logger)/内容;消息体覆盖 谁/做什么/入参/结果/耗时。
     - **tid 贯穿**:HTTP 自动(`TraceIdFilter`→MDC);@Async 自动(`AsyncConfig` MDC TaskDecorator);WS 每消息独立 tid;自管线程池必须配同款 TaskDecorator。
-    - **三方调用一律走 `ThirdPartyHttp.get()`**(自动 thirdparty 日志+URL/头脱敏);流式下载参考 `StorageService.baiduOpen` 手动打 `Loggers.thirdParty()`。
+    - **三方调用一律走 `ThirdPartyHttp.get()`**(自动 thirdparty 日志+URL/头脱敏);自定义方法(PROPFIND 等)走 `ThirdPartyHttp.request()`——**JDK HttpURLConnection 不支持自定义 HTTP 方法**(直接抛 Invalid HTTP method),request 内部对非标准方法自动走 java.net.http.HttpClient;流式下载参考 `StorageService.baiduOpen` 手动打 `Loggers.thirdParty()`。
     - **报错必须带堆栈**:`log.error("xx, param={}", p, e)`(e 恒为最后一个参数);禁止 `e.printStackTrace()` 和只打 `e.getMessage()`。
     - **级别**:ERROR=需人工介入(带堆栈)/WARN=可自动恢复需关注/INFO=关键业务节点/DEBUG=细节(SQL 恒 DEBUG 只进 server 文件)。
     - **业务操作日志双写**(强制):`@OperationLog` 切面在落库同时输出 server 日志一行 `[操作] MODULE.TYPE 描述 用户=xx#N 结果=SUCCESS/FAILED 耗时=Nms`——**所有写接口(POST/PUT/DELETE)必须加 @OperationLog**(module 大写/operationType 用 CREATE/UPDATE/DELETE 等标准词/description 中文短句;高频噪音端点如 token 刷新、已读标记除外),业务代码无需再手动打关键节点 INFO。
@@ -280,7 +280,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **未来对接 NAS**:优先 NFS 挂载方案(把 NAS 共享目录挂到 `/opt/ihomy/uploads`,**代码零改动**)。前提是 NAS 与服务器同内网。详细步骤见 `docs/部署指导-Linux.md` 附录"对接 NAS 存储"。若 NAS 异地或要公网 CDN:再改 FileService 用 S3 兼容 SDK(NAS/MinIO/OSS 通用),用 `@ConditionalOnProperty` 切换实现,本地实现保留为默认。
 - **不要主动改 FileService 的存储实现**,除非用户明确要求接 NAS/OSS。当前本地实现满足需求。
 - **统一目录结构(分类目录,无 upload 中间层)**:上传按类型分目录——相册图片→`pictures/{相册名}/{相册ID}_{时间戳}_{文件名}`、视频与海报→`videos/`、音乐(audio/*)→`music/`、电子书→`books/{yyyyMM}/`、通用/头像→`files/{yyyyMM}/`。FileService 提供流式重载(`upload(MultipartFile...)`/`upload(Path,...)` 图片带相册名、`uploadVideo`、`uploadBook`);无相册名时图片平铺到 `pictures/`。DB 存 `/files/...` 完整 URL,与物理根解耦。
-- **存储设备**:`sys_storage_device`(family_id 家庭级隔离,name/device_type SYSTEM|NAS|REMOTE|MOUNT|BAIDU/root_path/status/created_by)。`GET /storage/device/list` 首项恒为系统设备(id=0,type=SYSTEM);设备增删改/目录映射需 `@RequirePermission("storage:manage")`(OWNER)。**设备归属=家庭级独立配置**,互不可见。百度网盘已接入(凭证四件套/OAuth/xpan 浏览/dlink 中转,详见需求设计说明书 4.6.2);WebDAV/OSS/S3 暂缓。
+- **存储设备**:`sys_storage_device`(family_id 家庭级隔离,name/device_type SYSTEM|NAS|REMOTE|MOUNT|BAIDU/NEXTCLOUD|WEBDAV/root_path/status/created_by)。`GET /storage/device/list` 首项恒为系统设备(id=0,type=SYSTEM);设备增删改/目录映射需 `@RequirePermission("storage:manage")`(OWNER)。**设备归属=家庭级独立配置**,互不可见。百度网盘已接入(凭证四件套/OAuth/xpan 浏览/dlink 中转);WebDAV/Nextcloud 已接入(2026-09-08,NEXTCLOUD/WEBDAV 类型+轻量客户端 common/WebDavClient,凭证存 root_path `serverUrl|username|ENC(密码)`,添加即测连,流式中转补 Range,详见需求设计说明书 4.6.2 与变更归档同日小节);OSS/S3 暂缓。
 - **资源管理器**:`GET /storage/browse?deviceId&path`(响应带 fsId)+ `GET /storage/file?deviceId&path&download`(流式中转:本地 PathResource 支持 Range/百度 InputStreamResource)。`StorageService.resolveSafe` 用 `normalize()+startsWith` 防路径遍历(越界返回 400,已实测)。
 - **设备目录映射(替代旧"一键同步",旧 StorageSyncRunner 已退役)**:`POST /storage/map {deviceId, paths}` 勾选目录异步建层级相册+影子照片(不拷贝文件);进度 `GET /storage/sync/progress/{taskId}`(MapTaskRegistry 相册/视频共用);映射规则/签名 URL/缩略图缓存见需求设计说明书 4.3.3 与 4.6.2。
 - **硬删除策略**:删除照片/相册/视频/图书时**物理删除 DB 记录 + 删除磁盘文件**。`FileService.deleteByUrl(url)` 按 `/files/` URL 解析物理路径删文件(外链/空跳过,失败仅告警,带 `normalize()+startsWith` 防越界,顺带删缩略图、尝试清空父目录)。照片删除走 `PhotoMapper.deletePhysicalById`(XML 物理删,绕过全局 logic-delete);相册删除连带照片记录+文件全删(`deletePhysicalByAlbumId`);视频删除**从软删改为硬删** `deletePhysicalById`,并删 `video_url`+`poster`;图书删除硬删 `ContentBookMapper.deletePhysicalById`,并删 `file_url`+`cover_url`;映射的影子照片/视频/曲目物理删但**设备文件永不动**。**关键坑**:MyBatis-Plus 全局配 `logic-delete-field: deleted`(`application.yml`),`deleteById` 实为 UPDATE 软删——要物理删必须用自定义 XML `DELETE` 语句。**覆盖范围**:照片/相册/视频/图书四处;博客封面、头像、家庭封面、背景音乐、家谱照片删除时**未**连带删文件(文件成孤儿,可接受,后续按需扩展)。
@@ -313,7 +313,6 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 > 完整规划清单(P1-P4)见 `docs/需求设计说明书.md` 第 9 章「规划事项」,此处只留最需注意的四条:
 - **P1 放映厅 Jellyfin 集成**:方案已定稿,详见 docs/变更归档.md「放映厅 Jellyfin 集成方案」;**启动时先重读该归档小节**。
 - **P2 智能家居中控(Home Assistant 集成)**(2026-09-07 评估定稿):硬件协议层全归 HA(家庭中枢:J4125 PVE 虚拟化 OpenWrt/HAOS/OMV + WireGuard 隧道连 VPS,硬件部署另行推进),ihomy 只做数据沉淀与家人控制入口——S1 Paho 订阅 Mosquitto 入库 sys_iot_device/sys_iot_data + Redis 最新值、S2 HA REST 控制入口(long-lived token)、S3 前端中控页(sys_home_module 模块)+ 物品定位户型图联动;详见需求设计说明书 §9。
-- **P2 WebDAV/NEXTCLOUD 存储设备接入**(2026-09-07 评估定稿):Nextcloud/坚果云/Alist/NAS 等仅作可选存储后端经 WebDAV 接入(与百度网盘平级,sys_storage_device 新增设备类型+轻量客户端,复用现有设备抽象);**明确不做**平台级整合/同机部署 Nextcloud(2GB 内存约束)/Talk 替代聊天室/在线 Office 协作;详见需求设计说明书 §9。
 - **P3 物品定位-AI 语义**:3 期,依赖 AI API(决策已定,待 API 接入)。
 - 优先级:P1 用户价值高且可行 / P2 锦上添花 / P3 结构性改动 / P4 依赖外部条件。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
 

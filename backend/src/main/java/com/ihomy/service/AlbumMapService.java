@@ -338,10 +338,10 @@ public class AlbumMapService {
         for (Photo p : photos) thumbnailService.evictByUrl(p.getUrl());
     }
 
-    /** 路径拼接:百度保留前导 /,本地设备相对路径拼接 */
+    /** 路径拼接:百度/WebDAV 保留前导 /(路径以 / 开头),本地设备相对路径拼接 */
     private String joinPath(StorageDevice device, String parent, String name) {
         String p = parent == null ? "" : parent;
-        if ("BAIDU".equals(device.getDeviceType())) {
+        if ("BAIDU".equals(device.getDeviceType()) || StorageService.isWebDavType(device.getDeviceType())) {
             String base = p.isEmpty() || "/".equals(p) ? "" : p;
             return base + "/" + name;
         }

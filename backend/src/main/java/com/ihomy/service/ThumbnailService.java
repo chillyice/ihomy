@@ -109,11 +109,16 @@ public class ThumbnailService {
         }
     }
 
-    /** 下载原图全量字节:BAIDU 走 dlink 中转(并发限流内),本地/挂载读盘 */
+    /** 下载原图全量字节:BAIDU 走 dlink 中转(并发限流内),WebDAV 流式拉取,本地/挂载读盘 */
     private byte[] readSource(StorageDevice device, String path, Long fsId) throws Exception {
         if ("BAIDU".equals(device.getDeviceType())) {
             StorageService.BaiduFileStream fs = storageService.baiduOpen(device, path, fsId);
             try (InputStream in = fs.in()) {
+                return in.readAllBytes();
+            }
+        }
+        if (StorageService.isWebDavType(device.getDeviceType())) {
+            try (InputStream in = storageService.webdavOpen(device, path, null).in()) {
                 return in.readAllBytes();
             }
         }

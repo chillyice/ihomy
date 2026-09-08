@@ -87,10 +87,10 @@ const progressData = ref(null)
 let timer = null
 let runningTaskId = null
 
-// 百度网盘路径以 / 开头,本地设备为相对路径;根层调用 path 传空
-const ROOT = (id) => devices.value.find((d) => d.id === id)?.deviceType === 'BAIDU' ? '/' : ''
+// 百度/WebDAV 系路径以 / 开头,本地设备为相对路径;根层调用 path 传空
+const ROOT = (id) => ['BAIDU', 'NEXTCLOUD', 'WEBDAV'].includes(devices.value.find((d) => d.id === id)?.deviceType) ? '/' : ''
 
-const deviceIcon = (type) => ({ BAIDU: '☁️', NAS: '🗄️', MOUNT: '📁', REMOTE: '🌐' }[type] || '💾')
+const deviceIcon = (type) => ({ BAIDU: '☁️', NEXTCLOUD: '☁️', WEBDAV: '🔗', NAS: '🗄️', MOUNT: '📁', REMOTE: '🌐' }[type] || '💾')
 
 async function loadDevices() {
   step.value = 1

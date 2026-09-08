@@ -286,16 +286,16 @@ CREATE TABLE `family_anniversary` (
 -- ------------------------------------------------------------
 -- 13.1 sys_storage_device 存储设备表（V4.1 存储管理）
 --     家庭级独立配置：各家庭 OWNER 添加自己的存储设备,互不可见。
---     device_type: SYSTEM系统(默认本地磁盘)/NAS/REMOTE远程磁盘/MOUNT挂载(SMB/NFS)/BAIDU百度网盘(走API,凭证存 sys_baidu_credential)
---     root_path 为服务器上可访问的根目录(如挂载点 /mnt/nas)
+--     device_type: SYSTEM系统(默认本地磁盘)/NAS/REMOTE远程磁盘/MOUNT挂载(SMB/NFS)/BAIDU百度网盘(走API,凭证存 sys_baidu_credential)/NEXTCLOUD/WEBDAV(WebDAV系,凭证存 root_path)
+--     root_path 为服务器上可访问的根目录(如挂载点 /mnt/nas);WebDAV 设备存 serverUrl|username|ENC(应用密码)
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `sys_storage_device`;
 CREATE TABLE `sys_storage_device` (
   `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
   `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
   `name`        VARCHAR(100) NOT NULL COMMENT '设备名称',
-  `device_type` VARCHAR(20)  NOT NULL DEFAULT 'NAS' COMMENT 'SYSTEM系统/NAS/REMOTE远程磁盘/MOUNT挂载',
-  `root_path`   VARCHAR(500) NOT NULL COMMENT '服务器根路径/挂载点',
+  `device_type` VARCHAR(20)  NOT NULL DEFAULT 'NAS' COMMENT 'SYSTEM系统/NAS/REMOTE远程磁盘/MOUNT挂载/BAIDU百度/NEXTCLOUD/WEBDAV',
+  `root_path`   VARCHAR(500) NOT NULL COMMENT '服务器根路径/挂载点;WebDAV设备存 serverUrl|username|ENC(密码)',
   `status`      VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE启用/DISABLED停用',
   `created_by`  BIGINT       DEFAULT NULL COMMENT '创建人ID',
   `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
