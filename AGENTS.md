@@ -319,7 +319,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 > 完整规划清单(P1-P4)见 `docs/需求设计说明书.md` 第 9 章「规划事项」,此处只留最需注意的四条:
 - **P1 放映厅 Jellyfin 集成**:方案已定稿,详见 docs/变更归档.md「放映厅 Jellyfin 集成方案」;**启动时先重读该归档小节**。
 - **P2 智能家居中控(Home Assistant 集成)**(2026-09-07 评估定稿):硬件协议层全归 HA(家庭中枢:J4125 PVE 虚拟化 OpenWrt/HAOS/OMV + WireGuard 隧道连 VPS,硬件部署另行推进),ihomy 只做数据沉淀与家人控制入口——S1 Paho 订阅 Mosquitto 入库 sys_iot_device/sys_iot_data + Redis 最新值、S2 HA REST 控制入口(long-lived token)、S3 前端中控页(sys_home_module 模块)+ 物品定位户型图联动;详见需求设计说明书 §9。
-- **P3 物品定位-AI 语义**:后端已实现(V9.40:AiService 统一接入层 + POST /item/ai/find、/item/ai/put,详见需求设计说明书 §4.6.9/§4.8;**dev 真实联调已通过**:tshl OpenAI 兼容代理 + GLM-5.3-Flash,dev external.yml 已配 app.ai);**前端找物/放物入口待实现**(搜索框 AI 找物+结果定位+放物确认,复用 itemApi.aiFind/aiPut 与画布 focusItem)。
+- **P3 物品定位-AI 语义(已完成 V9.46)**:后端 V9.40(AiService 统一接入层 + POST /item/ai/find、/item/ai/put);**前端入口 V9.46 已实现**(查看模式搜索框关键词优先+无命中 AI 找物兜底+来源标注;列表模式「AI 登记」弹窗;**删不经过 AI**——AI 找到走既有删除按钮人工确认);token 节约:put 上下文 items 压缩为紧凑"名称(别名)"文本(find 无清单),find AI 解析自愈回退原文;详见需求设计说明书 §4.6.9/§4.8。
 - 优先级:P1 用户价值高且可行 / P2 锦上添花 / P3 结构性改动 / P4 依赖外部条件。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
 
 ## 文档清单
