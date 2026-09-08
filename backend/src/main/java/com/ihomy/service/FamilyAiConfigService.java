@@ -38,8 +38,9 @@ public class FamilyAiConfigService {
     private final AiFeatureMapper aiFeatureMapper;
     private final ParameterService parameterService;
 
-    /** 解析后的生效模型快照(apiKey 为原文/ENC 原样,解密延迟到出站前;type=LOCAL 时 base/apiKey/model 为空) */
-    public record AiConfig(String baseUrl, String apiKey, String model, Integer timeoutMs, String type) {
+    /** 解析后的生效模型快照(apiKey/secretKey 为原文/ENC 原样,解密延迟到出站前;type=LOCAL 时 base/apiKey/model 为空) */
+    public record AiConfig(String baseUrl, String apiKey, String model, Integer timeoutMs, String type,
+                           String provider, String secretKey) {
     }
 
     // ---------- 功能解析 ----------
@@ -58,11 +59,13 @@ public class FamilyAiConfigService {
                 m.getApiKey(),
                 m.getModel(),
                 m.getTimeoutMs() != null ? m.getTimeoutMs() : DEFAULT_TIMEOUT_MS,
-                m.getType());
+                m.getType(),
+                m.getProvider() == null || m.getProvider().isBlank() ? AiConst.PROVIDER_OPENAI : m.getProvider(),
+                m.getSecretKey());
     }
 
     private AiConfig empty() {
-        return new AiConfig(null, null, null, DEFAULT_TIMEOUT_MS, null);
+        return new AiConfig(null, null, null, DEFAULT_TIMEOUT_MS, null, AiConst.PROVIDER_OPENAI, null);
     }
 
     // ---------- 内置 LOCAL 模型 ----------
@@ -107,10 +110,12 @@ public class FamilyAiConfigService {
         o.put("id", m.getId());
         o.put("name", nullToEmpty(m.getName()));
         o.put("type", m.getType());
+        o.put("provider", m.getProvider() == null || m.getProvider().isBlank() ? AiConst.PROVIDER_OPENAI : m.getProvider());
         o.put("baseUrl", nullToEmpty(m.getBaseUrl()));
         o.put("model", nullToEmpty(m.getModel()));
         o.put("timeoutMs", m.getTimeoutMs());
         o.put("apiKeySet", notBlank(m.getApiKey()));
+        o.put("secretKeySet", notBlank(m.getSecretKey()));
         o.put("sortOrder", m.getSortOrder());
         o.put("builtin", AiConst.TYPE_LOCAL.equals(m.getType()));
         return o;
@@ -141,10 +146,21 @@ public class FamilyAiConfigService {
         String model = trimToNull(body.get("model"));
         if (model != null) m.setModel(model);
         if (m.getModel() == null || m.getModel().isBlank()) throw new BizException(ResultCode.BAD_REQUEST, "模型标识不能为空");
+        // 服务商 provider 仅 ASR 有意义;非 ASR 一律 OPENAI,ASR 缺省 OPENAI
+        String provider = trimToNull(body.get("provider"));
+        if (provider != null && !AiConst.isValidProvider(provider)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "服务商须为 OPENAI/BAIDU");
+        }
+        if (AiConst.TYPE_ASR.equals(m.getType())) {
+            m.setProvider(provider == null && m.getProvider() == null ? AiConst.PROVIDER_OPENAI : (provider != null ? provider : m.getProvider()));
+        } else {
+            m.setProvider(AiConst.PROVIDER_OPENAI);
+        }
         applyField(m::setBaseUrl, body.get("baseUrl"));
         if (body.get("timeoutMs") != null) m.setTimeoutMs(parseTimeout(body.get("timeoutMs")));
         if (body.get("sortOrder") != null) m.setSortOrder(parseIntOr(body.get("sortOrder"), 0));
         applySecret(m::setApiKey, body.get("apiKey"));
+        applySecret(m::setSecretKey, body.get("secretKey"));
         if (id == null) {
             aiModelMapper.insert(m);
         } else {
@@ -230,10 +246,11 @@ public class FamilyAiConfigService {
 
     // ---------- 字段/密钥处理 ----------
 
-    /** 生效判定:LOCAL 恒可用(离线),其余须 baseUrl/apiKey/model 配齐 */
-    private boolean isAvailable(AiConfig c) {
+    /** 生效判定:LOCAL 恒可用(离线),其余须 baseUrl/apiKey/model 配齐;百度 ASR 额外须 secretKey */
+    public boolean isAvailable(AiConfig c) {
         if (AiConst.TYPE_LOCAL.equals(c.type())) return true;
-        return notBlank(c.baseUrl()) && notBlank(c.apiKey()) && notBlank(c.model());
+        if (!notBlank(c.baseUrl()) || !notBlank(c.apiKey()) || !notBlank(c.model())) return false;
+        return !AiConst.PROVIDER_BAIDU.equals(c.provider()) || notBlank(c.secretKey());
     }
 
     /** 文本字段:trim 后非空入库,空串置 NULL */

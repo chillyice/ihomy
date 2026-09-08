@@ -19,13 +19,17 @@ public class AiModel {
     private Long familyId;
     /** 显示名(如 tshl GLM 快模型) */
     private String name;
-    /** 模型类型 LLM/IMAGE/ASR */
+    /** 模型类型 LLM/IMAGE/ASR/LOCAL */
     private String type;
-    /** OpenAI 兼容服务地址(不含路径) */
+    /** 服务商/协议:OPENAI(OpenAI 兼容,默认)/BAIDU(百度短语音,仅 ASR) */
+    private String provider;
+    /** OpenAI 兼容服务地址(不含路径);百度短语音为识别接口地址 */
     private String baseUrl;
-    /** API Key(ENC 加密存储) */
+    /** API Key(ENC 加密存储;百度为 API Key/client_id) */
     private String apiKey;
-    /** 真实模型标识(如 GLM-5.3-Flash / doubao-seedream-5-0-260128 / SenseVoice) */
+    /** 第二密钥(ENC 加密存储;百度 Secret Key/client_secret,其余服务商为空) */
+    private String secretKey;
+    /** 真实模型标识(如 GLM-5.3-Flash / doubao-seedream-5-0-260128 / SenseVoice;百度为 dev_pid 如 1537) */
     private String model;
     /** 单次调用超时(毫秒),留空=默认 30000 */
     private Integer timeoutMs;

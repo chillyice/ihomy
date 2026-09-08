@@ -33,6 +33,7 @@ public class AiService {
 
     private final FamilyAiConfigService familyAiConfigService;
     private final ParameterService parameterService;
+    private final BaiduAsrClient baiduAsrClient;
     private final ObjectMapper mapper = new ObjectMapper();
 
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
@@ -48,7 +49,7 @@ public class AiService {
 
     private Map<String, Object> capability(Long familyId, String featureCode) {
         FamilyAiConfigService.AiConfig c = familyAiConfigService.resolveForFeature(familyId, featureCode);
-        boolean available = notBlank(c.baseUrl()) && notBlank(c.apiKey()) && notBlank(c.model());
+        boolean available = familyAiConfigService.isAvailable(c);
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("available", available);
         m.put("model", c.model() == null ? "" : c.model().trim());
@@ -211,9 +212,13 @@ public class AiService {
         }
     }
 
-    /** OpenAI 兼容语音识别:multipart POST {base}/audio/transcriptions,返回转写文本 */
-    public Map<String, Object> transcribe(Long familyId, byte[] audio, String filename, String mimeType, String language) {
+    /** 语音识别:OpenAI 兼容 multipart(/audio/transcriptions)或百度短语音(provider=BAIDU),返回转写文本 */
+    public Map<String, Object> transcribe(Long familyId, byte[] audio, String filename, String mimeType,
+                                          String language, Integer rate) {
         FamilyAiConfigService.AiConfig c = familyAiConfigService.resolveForFeature(familyId, AiConst.FEATURE_ASR);
+        if (AiConst.PROVIDER_BAIDU.equals(c.provider())) {
+            return transcribeBaidu(c, familyId, audio, filename, rate);
+        }
         if (!notBlank(c.baseUrl()) || !notBlank(c.apiKey()) || !notBlank(c.model())) {
             throw new BizException(ResultCode.BAD_REQUEST, "AI 语音识别未配置,请家长在设置-家庭 AI 配置中填写");
         }
@@ -247,6 +252,47 @@ public class AiService {
         } catch (Exception e) {
             throw new BizException(ResultCode.INTERNAL_ERROR, "AI 语音识别调用失败:" + e.getMessage());
         }
+    }
+
+    /** 百度短语音识别:access_token 由 BaiduAsrClient 缓存换取;format 按扩展名推断,rate 缺省 16000 */
+    private Map<String, Object> transcribeBaidu(FamilyAiConfigService.AiConfig c, Long familyId,
+                                                byte[] audio, String filename, Integer rate) {
+        if (!notBlank(c.baseUrl()) || !notBlank(c.apiKey()) || !notBlank(c.model())) {
+            throw new BizException(ResultCode.BAD_REQUEST, "百度语音识别未配置,请家长在设置-家庭 AI 配置中填写");
+        }
+        if (!notBlank(c.secretKey())) {
+            throw new BizException(ResultCode.BAD_REQUEST, "百度语音识别缺 Secret Key,请在模型配置中填写");
+        }
+        if (audio == null || audio.length == 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "请上传音频文件");
+        }
+        int r = rate == null ? 16000 : rate;
+        if (r != 16000 && r != 8000) {
+            throw new BizException(ResultCode.BAD_REQUEST, "采样率仅支持 16000/8000");
+        }
+        String text = baiduAsrClient.recognize(
+                stripTrailingSlash(c.baseUrl()),
+                decryptIfEnc(c.apiKey()),
+                decryptIfEnc(c.secretKey()),
+                c.model(),
+                audioFormat(filename),
+                r,
+                "ihomy-family-" + familyId,
+                audio,
+                c.timeoutMs());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("text", text);
+        return out;
+    }
+
+    /** 按文件扩展名推断百度音频 format:仅 wav/amr/m4a 显式,其余按 pcm */
+    private String audioFormat(String filename) {
+        if (filename == null) return "pcm";
+        String lower = filename.toLowerCase();
+        if (lower.endsWith(".wav")) return "wav";
+        if (lower.endsWith(".amr")) return "amr";
+        if (lower.endsWith(".m4a")) return "m4a";
+        return "pcm";
     }
 
     /** 手工构建 multipart/form-data 请求体(字段 + 单文件;ThirdPartyHttp 只收 byte[] body) */

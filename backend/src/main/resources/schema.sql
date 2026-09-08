@@ -1640,9 +1640,10 @@ CREATE TABLE `content_mindmap_snapshot` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='脑图历史版本快照表';
 
 -- ------------------------------------------------------------
--- 56. sys_family_ai_model 家庭级 AI 模型池表(V9.48;V9.49 加 LOCAL 内置本地规则):每家庭多条,type=LLM/IMAGE/ASR/LOCAL
---     AI 调用按功能从本表绑定的模型取配置,无全局兜底;api_key ENC 加密存储不回传前端
+-- 56. sys_family_ai_model 家庭级 AI 模型池表(V9.48;V9.49 加 LOCAL 内置本地规则;V9.50 加 provider/secret_key):每家庭多条,type=LLM/IMAGE/ASR/LOCAL
+--     AI 调用按功能从本表绑定的模型取配置,无全局兜底;api_key/secret_key ENC 加密存储不回传前端
 --     LOCAL=内置本地规则(零 token 离线,不可删改,由 FamilyAiConfigService.ensureLocalModel 懒创建)
+--     provider=OPENAI(OpenAI 兼容,默认)/BAIDU(百度短语音,仅 ASR,需 api_key=API Key + secret_key=Secret Key 换 access_token)
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `sys_family_ai_model`;
 CREATE TABLE `sys_family_ai_model` (
@@ -1650,9 +1651,11 @@ CREATE TABLE `sys_family_ai_model` (
   `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
   `name`        VARCHAR(50)  NOT NULL COMMENT '显示名(如 tshl GLM 快模型)',
   `type`        VARCHAR(20)  NOT NULL COMMENT '模型类型:LLM/IMAGE/ASR/LOCAL(本地规则内置)',
-  `base_url`    VARCHAR(200) DEFAULT NULL COMMENT 'OpenAI 兼容服务地址(不含路径,如 https://api.deepseek.com)',
-  `api_key`     VARCHAR(500) DEFAULT NULL COMMENT 'API Key(ENC 加密存储)',
-  `model`       VARCHAR(100) NOT NULL COMMENT '真实模型标识(如 GLM-5.3-Flash / doubao-seedream-5-0-260128 / SenseVoice)',
+  `provider`    VARCHAR(20)  NOT NULL DEFAULT 'OPENAI' COMMENT '服务商:OPENAI(OpenAI兼容)/BAIDU(百度短语音,仅ASR)',
+  `base_url`    VARCHAR(200) DEFAULT NULL COMMENT 'OpenAI 兼容服务地址(不含路径,如 https://api.deepseek.com);百度为识别接口地址',
+  `api_key`     VARCHAR(500) DEFAULT NULL COMMENT 'API Key(ENC 加密存储;百度为 API Key/client_id)',
+  `secret_key`  VARCHAR(500) DEFAULT NULL COMMENT '第二密钥(ENC 加密存储;百度 Secret Key/client_secret,其余为空)',
+  `model`       VARCHAR(100) NOT NULL COMMENT '真实模型标识(如 GLM-5.3-Flash / doubao-seedream-5-0-260128 / SenseVoice;百度为 dev_pid 如 1537)',
   `timeout_ms`  INT          DEFAULT NULL COMMENT '单次调用超时(毫秒),留空=默认 30000',
   `sort_order`  INT          NOT NULL DEFAULT 0 COMMENT '排序',
   `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',

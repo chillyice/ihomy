@@ -808,3 +808,53 @@ WHERE f.`deleted` = 0
   AND NOT EXISTS (
       SELECT 1 FROM `sys_family_ai_model` m WHERE m.`family_id` = f.`id` AND m.`type` = 'LOCAL'
   );
+
+-- ------------------------------------------------------------
+-- 2026-09-08 V9.50 百度短语音识别(ASR)接入:模型池加「服务商 provider」+「第二密钥 secret_key」
+-- sys_family_ai_model 新增两列(幂等,MySQL 8 无 ADD COLUMN IF NOT EXISTS,用 information_schema 条件判断):
+--   provider    OPENAI(OpenAI 兼容,默认) / BAIDU(百度短语音,仅 ASR)
+--   secret_key  BAIDU 的 Secret Key(client_secret),ENC 加密;其余服务商为 NULL
+-- 百度短语音识别协议:OAuth(API Key + Secret Key 换 access_token,30 天)→ POST vop.baidu.com/server_api
+--   (JSON: format/rate/channel/cuid/token/dev_pid/speech(base64)/len)。
+-- 说明:真实 API Key/Secret Key 不入 git(敏感数据规定),由各环境用
+--   GET /api/ops/crypto/encrypt?plaintext=xxx 生成 ENC 密文后回填,再执行下方配置 SQL。
+-- ------------------------------------------------------------
+SET @add_ai_provider := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `sys_family_ai_model` ADD COLUMN `provider` VARCHAR(20) NOT NULL DEFAULT ''OPENAI'' COMMENT ''服务商:OPENAI/BAIDU'' AFTER `type`',
+    'SELECT ''skip: ai provider already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sys_family_ai_model' AND COLUMN_NAME = 'provider'
+);
+PREPARE add_ai_provider_stmt FROM @add_ai_provider;
+EXECUTE add_ai_provider_stmt;
+DEALLOCATE PREPARE add_ai_provider_stmt;
+
+SET @add_ai_secret_key := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `sys_family_ai_model` ADD COLUMN `secret_key` VARCHAR(500) DEFAULT NULL COMMENT ''第二密钥(百度 Secret Key,ENC)'' AFTER `api_key`',
+    'SELECT ''skip: ai secret_key already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sys_family_ai_model' AND COLUMN_NAME = 'secret_key'
+);
+PREPARE add_ai_secret_key_stmt FROM @add_ai_secret_key;
+EXECUTE add_ai_secret_key_stmt;
+DEALLOCATE PREPARE add_ai_secret_key_stmt;
+
+-- 配置百度短语音识别模型 + 绑定 ASR 功能(按环境执行,演示家庭/小窝名称以实际库为准):
+-- 【测试环境】给「ihomy 演示家庭」和「小窝」两个家庭配置:
+--   SET @enc_api_key = 'ENC(用测试环境盐值生成)';
+--   SET @enc_secret  = 'ENC(用测试环境盐值生成)';
+--   INSERT INTO `sys_family_ai_model`
+--     (`family_id`, `name`, `type`, `provider`, `base_url`, `api_key`, `secret_key`, `model`, `timeout_ms`, `sort_order`)
+--   SELECT `id`, '百度短语音识别', 'ASR', 'BAIDU', 'https://vop.baidu.com/server_api',
+--          @enc_api_key, @enc_secret, '1537', 30000, 3
+--   FROM `sys_family_info` WHERE `deleted` = 0 AND `name` IN ('ihomy 演示家庭', '小窝');
+--   INSERT INTO `sys_family_ai_feature` (`family_id`, `feature_code`, `model_id`)
+--   SELECT m.`family_id`, 'ASR', m.`id` FROM `sys_family_ai_model` m
+--   WHERE m.`type` = 'ASR' AND m.`provider` = 'BAIDU'
+--     AND m.`family_id` IN (SELECT `id` FROM `sys_family_info` WHERE `deleted` = 0 AND `name` IN ('ihomy 演示家庭', '小窝'))
+--   ON DUPLICATE KEY UPDATE `model_id` = VALUES(`model_id`);
+--
+-- 【生产环境】只给「小窝」配置(演示家庭不配):
+--   同上,把 WHERE 的 `name` 条件改为仅 `IN ('小窝')`,并换用生产环境盐值生成的 ENC 密文。

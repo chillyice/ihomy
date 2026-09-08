@@ -21,6 +21,20 @@ public final class AiConst {
     /** 本地规则(内置模型条目,不可删改;零 token 离线解析) */
     public static final String TYPE_LOCAL = "LOCAL";
 
+    /** 服务商/协议:OPENAI=OpenAI 兼容协议(LLM/IMAGE/ASR 默认),BAIDU=百度短语音(仅 ASR) */
+    public static final String PROVIDER_OPENAI = "OPENAI";
+    public static final String PROVIDER_BAIDU = "BAIDU";
+
+    /** 百度 OAuth access_token 获取地址(API Key + Secret Key 换取) */
+    public static final String BAIDU_TOKEN_URL = "https://aip.baidubce.com/oauth/2.0/token";
+    /** 百度短语音识别默认 dev_pid(普通话,带标点) */
+    public static final String BAIDU_DEFAULT_DEV_PID = "1537";
+
+    /** 有效的服务商(仅模型池新增/更新时校验) */
+    public static boolean isValidProvider(String provider) {
+        return PROVIDER_OPENAI.equals(provider) || PROVIDER_BAIDU.equals(provider);
+    }
+
     /** 功能 code */
     public static final String FEATURE_ITEM_FIND = "ITEM_FIND";
     public static final String FEATURE_ITEM_PUT = "ITEM_PUT";

@@ -128,12 +128,13 @@ public class AiController {
     @OperationLog(module = "AI", operationType = "CREATE", description = "AI 语音识别", saveArgs = false)
     @PostMapping("/transcribe")
     public Result<Map<String, Object>> transcribe(@RequestParam("file") MultipartFile file,
-                                                  @RequestParam(required = false) String language) throws IOException {
+                                                  @RequestParam(required = false) String language,
+                                                  @RequestParam(required = false) Integer rate) throws IOException {
         securityHelper.current();
         if (file.getSize() > MAX_AUDIO_BYTES) {
             throw new BizException(ResultCode.BAD_REQUEST, "音频文件过大(上限 20MB)");
         }
         return Result.success(aiService.transcribe(currentFamilyId(), file.getBytes(), file.getOriginalFilename(),
-                file.getContentType(), language));
+                file.getContentType(), language, rate));
     }
 }

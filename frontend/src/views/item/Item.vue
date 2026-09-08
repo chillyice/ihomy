@@ -8,6 +8,15 @@
       <el-input v-model="searchKeyword" :placeholder="$t('item.searchPh')" clearable class="fp-search" @keyup.enter="onSearch" @clear="clearSearch">
         <template #prefix><el-icon><Search /></el-icon></template>
       </el-input>
+      <el-button
+        class="fp-voice"
+        :class="{ recording: voiceRecording }"
+        :title="voiceRecording ? $t('item.voiceStop') : $t('item.voiceSearch')"
+        :loading="voiceProcessing"
+        @click="toggleVoiceSearch"
+      >
+        <el-icon><Microphone /></el-icon>
+      </el-button>
       <div class="fp-top-actions">
         <el-button @click="listMode = !listMode">{{ listMode ? $t('item.done') : $t('item.listView') }}</el-button>
         <el-button v-if="!listMode && houses.length" type="primary" class="fp-edit-btn" @click="toggleEdit">{{ mode === 'edit' ? $t('item.done') : $t('item.editFloorPlan') }}</el-button>
@@ -397,6 +406,17 @@
     <el-dialog v-model="aiDlg" append-to-body :title="$t('item.aiRegisterTitle')" width="480px">
       <div class="share-tip">{{ $t('item.aiRegisterTip') }}</div>
       <el-input v-model="aiText" type="textarea" :rows="3" maxlength="200" :placeholder="$t('item.aiRegisterPh')" @keydown.ctrl.enter="confirmAiPut" />
+      <div class="ai-voice-row">
+        <el-button
+          size="small"
+          text
+          :class="{ recording: voiceRecording }"
+          :loading="voiceProcessing"
+          @click="toggleVoicePut"
+        >
+          <el-icon><Microphone /></el-icon> {{ voiceRecording ? $t('item.voiceStop') : $t('item.voiceDictate') }}
+        </el-button>
+      </div>
       <div v-if="aiReply" class="ai-reply">{{ aiReply }}</div>
       <template #footer>
         <el-button @click="aiDlg = false">{{ $t('common.cancel') }}</el-button>
@@ -597,12 +617,13 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Plus, CopyDocument, Delete, Edit } from '@element-plus/icons-vue'
-import { itemApi, fileApi } from '@/api'
+import { Search, Plus, CopyDocument, Delete, Edit, Microphone } from '@element-plus/icons-vue'
+import { itemApi, fileApi, aiApi } from '@/api'
 import { useI18n } from 'vue-i18n'
 import { dictText } from '@/utils/dict'
 import { furnitureIcon } from '@/utils/furnitureIcon'
 import { splitPoly, mergePolys, pointInPoly, polyBBox, samePt } from '@/utils/floorPlanGeom'
+import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
 import FloorPlanCanvas from './FloorPlanCanvas.vue'
 
 const { t } = useI18n()
@@ -1458,6 +1479,69 @@ const confirmAiPut = async () => {
   }
 }
 
+// ---- 语音输入:录音 → 转写 → 找物/放物(走 /ai/transcribe,当前家庭 ASR 模型) ----
+const { recording: voiceRecording, start: voiceStart, stop: voiceStop } = useVoiceRecorder()
+const voiceProcessing = ref(false)
+let voiceTimer = null
+
+const toggleVoiceSearch = async () => {
+  if (voiceRecording.value) { await finishVoice('search'); return }
+  if (voiceProcessing.value) return
+  await beginVoice('search')
+}
+const toggleVoicePut = async () => {
+  if (voiceRecording.value) { await finishVoice('put'); return }
+  if (voiceProcessing.value) return
+  await beginVoice('put')
+}
+const beginVoice = async (mode) => {
+  try {
+    await voiceStart()
+    clearTimeout(voiceTimer)
+    // 短语音场景 10s 自动结束兜底,防误触长时间录音
+    voiceTimer = setTimeout(() => { if (voiceRecording.value) finishVoice(mode) }, 10000)
+  } catch (e) {
+    ElMessage.warning(t('item.voiceDenied'))
+  }
+}
+const finishVoice = async (mode) => {
+  clearTimeout(voiceTimer)
+  if (!voiceRecording.value) return
+  voiceProcessing.value = true
+  try {
+    const blob = await voiceStop()
+    const file = new File([blob], 'voice.wav', { type: 'audio/wav' })
+    const r = await aiApi.transcribe(file, null)
+    const text = (r.text || '').trim()
+    if (!text) { ElMessage.warning(t('item.voiceEmpty')); return }
+    if (mode === 'put') {
+      aiText.value = text
+      aiReply.value = ''
+    } else if (classifyVoice(text) === 'put') {
+      // 语音里是「放」语义:进 AI 登记弹窗预填,人工确认后再落库(放物会改数据)
+      aiText.value = text
+      aiReply.value = ''
+      aiDlg.value = true
+    } else {
+      // 找物语义:切回户型图视图,复用关键词优先 + AI 找物兜底
+      listMode.value = false
+      searchKeyword.value = text
+      await onSearch()
+    }
+  } catch (e) {
+    // 转写失败/未配置:拦截器已 toast 提示,这里不再重复
+  } finally {
+    voiceProcessing.value = false
+  }
+}
+// 意图分流:问位置(找/哪)→找物;放置动词(放/摆/搁/塞/挂)→放物;其余默认找物
+const classifyVoice = (text) => {
+  const t = text || ''
+  if (/找|哪/.test(t)) return 'find'
+  if (/放|摆|搁|塞|挂/.test(t)) return 'put'
+  return 'find'
+}
+
 // ---- 旧 CRUD ----
 const openItem = (row) => {
   itemForm.value = row
@@ -1622,7 +1706,7 @@ const onKeydown = (e) => {
   undo()
 }
 onMounted(() => { loadHouses(); window.addEventListener('keydown', onKeydown) })
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown); if (voiceRecording.value) voiceStop() })
 </script>
 
 <style scoped>
@@ -1630,6 +1714,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .fp-topbar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; }
 .fp-house { width: 180px; }
 .fp-search { width: 320px; }
+.fp-voice { flex-shrink: 0; }
+.fp-voice.recording { color: #fff; background: var(--color-danger, #e74c3c); border-color: var(--color-danger, #e74c3c); animation: fp-voice-pulse 1.2s ease-in-out infinite; }
+@keyframes fp-voice-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.35); } 50% { box-shadow: 0 0 0 6px rgba(231, 76, 60, 0); } }
+.ai-voice-row { margin-top: 8px; text-align: right; }
 .fp-top-actions { margin-left: auto; display: flex; gap: 8px; }
 .fp-main { position: relative; flex: 1; display: flex; overflow: hidden; border-radius: 14px; }
 .fp-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; color: #5c4c3d; }

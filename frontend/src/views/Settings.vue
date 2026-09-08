@@ -180,10 +180,11 @@
             </div>
             <el-table :data="aiModels" stripe>
               <el-table-column prop="name" :label="$t('settings.ai.modelName')" min-width="140" show-overflow-tooltip />
-              <el-table-column :label="$t('settings.ai.modelType')" width="150">
+              <el-table-column :label="$t('settings.ai.modelType')" width="170">
                 <template #default="{ row }">
                   <el-tag size="small">{{ $t('settings.ai.type.' + row.type) }}</el-tag>
-                  <el-tag v-if="row.builtin" size="small" type="info" class="ai-builtin">{{ $t('settings.ai.builtin') }}</el-tag>
+                  <el-tag v-if="row.provider === 'BAIDU'" size="small" class="ai-builtin">{{ $t('settings.ai.provider.BAIDU') }}</el-tag>
+                  <el-tag v-else-if="row.builtin" size="small" type="info" class="ai-builtin">{{ $t('settings.ai.builtin') }}</el-tag>
                 </template>
               </el-table-column>
               <el-table-column prop="model" :label="$t('settings.ai.model')" min-width="170" show-overflow-tooltip />
@@ -237,15 +238,27 @@
                   <el-option :label="$t('settings.ai.type.ASR')" value="ASR" />
                 </el-select>
               </el-form-item>
-              <el-form-item :label="$t('settings.ai.baseUrl')">
-                <el-input v-model="aiModelForm.baseUrl" :placeholder="$t('settings.ai.baseUrlPh')" />
+              <el-form-item v-if="aiModelForm.type === 'ASR'" :label="$t('settings.ai.providerLabel')">
+                <el-select v-model="aiModelForm.provider" style="width: 100%">
+                  <el-option :label="$t('settings.ai.provider.OPENAI')" value="OPENAI" />
+                  <el-option :label="$t('settings.ai.provider.BAIDU')" value="BAIDU" />
+                </el-select>
+              </el-form-item>
+              <el-form-item :label="aiModelForm.provider === 'BAIDU' ? $t('settings.ai.baseUrlBaidu') : $t('settings.ai.baseUrl')">
+                <el-input v-model="aiModelForm.baseUrl"
+                  :placeholder="aiModelForm.provider === 'BAIDU' ? $t('settings.ai.baseUrlBaiduPh') : $t('settings.ai.baseUrlPh')" />
               </el-form-item>
               <el-form-item :label="$t('settings.ai.apiKey')">
                 <el-input v-model="aiModelForm.apiKey" type="password" show-password
                   :placeholder="aiModelForm.apiKeySet ? $t('settings.ai.keyKeep') : $t('settings.ai.keyRequired')" />
               </el-form-item>
+              <el-form-item v-if="aiModelForm.provider === 'BAIDU'" :label="$t('settings.ai.secretKey')">
+                <el-input v-model="aiModelForm.secretKey" type="password" show-password
+                  :placeholder="aiModelForm.secretKeySet ? $t('settings.ai.keyKeep') : $t('settings.ai.secretKeyPh')" />
+              </el-form-item>
               <el-form-item :label="$t('settings.ai.model')" required>
-                <el-input v-model="aiModelForm.model" :placeholder="$t('settings.ai.modelPh')" />
+                <el-input v-model="aiModelForm.model"
+                  :placeholder="aiModelForm.provider === 'BAIDU' ? $t('settings.ai.modelBaiduPh') : $t('settings.ai.modelPh')" />
               </el-form-item>
               <el-form-item :label="$t('settings.ai.timeout')">
                 <el-input-number v-model="aiModelForm.timeoutMs" :min="1000" :max="600000" :step="1000" :placeholder="$t('settings.ai.timeoutPh')" />
@@ -807,9 +820,14 @@ const canManageAi = computed(() => userStore.hasPerm('family:manage'))
 const aiModels = ref([])
 const aiFeatures = ref([])
 const aiModelDialog = ref(false)
-const aiModelForm = reactive({ id: null, name: '', type: 'LLM', baseUrl: '', apiKey: '', model: '', timeoutMs: null, apiKeySet: false })
+const aiModelForm = reactive({ id: null, name: '', type: 'LLM', provider: 'OPENAI', baseUrl: '', apiKey: '', secretKey: '', model: '', timeoutMs: null, apiKeySet: false, secretKeySet: false })
 const aiSaving = ref(false)
 const aiLoading = ref(false)
+
+// 切换模型类型:非语音模型强制回 OpenAI 协议(后端同口径),隐藏百度专属字段
+watch(() => aiModelForm.type, (t) => {
+  if (t !== 'ASR') aiModelForm.provider = 'OPENAI'
+})
 
 const modelsByTypes = (types) => aiModels.value.filter(m => (types || []).includes(m.type))
 
@@ -829,10 +847,12 @@ const loadAiConfig = async () => {
 
 const openAiModel = (row) => {
   Object.assign(aiModelForm, row ? {
-    id: row.id, name: row.name, type: row.type, baseUrl: row.baseUrl || '',
-    model: row.model || '', timeoutMs: row.timeoutMs ?? null, apiKey: '', apiKeySet: row.apiKeySet,
+    id: row.id, name: row.name, type: row.type, provider: row.provider || 'OPENAI', baseUrl: row.baseUrl || '',
+    model: row.model || '', timeoutMs: row.timeoutMs ?? null, apiKey: '', secretKey: '',
+    apiKeySet: row.apiKeySet, secretKeySet: row.secretKeySet,
   } : {
-    id: null, name: '', type: 'LLM', baseUrl: '', model: '', timeoutMs: null, apiKey: '', apiKeySet: false,
+    id: null, name: '', type: 'LLM', provider: 'OPENAI', baseUrl: '', model: '', timeoutMs: null,
+    apiKey: '', secretKey: '', apiKeySet: false, secretKeySet: false,
   })
   aiModelDialog.value = true
 }
@@ -847,12 +867,16 @@ const saveAiModel = async () => {
     const data = {
       name: aiModelForm.name,
       type: aiModelForm.type,
+      provider: aiModelForm.provider || 'OPENAI',
       baseUrl: aiModelForm.baseUrl || '',
       model: aiModelForm.model || '',
       timeoutMs: aiModelForm.timeoutMs == null ? '' : String(aiModelForm.timeoutMs),
     }
+    // 百度短语音:服务地址留空给默认识别接口
+    if (data.provider === 'BAIDU' && !data.baseUrl) data.baseUrl = 'https://vop.baidu.com/server_api'
     // 密钥仅在输入时提交(留空=保留原值)
     if (aiModelForm.apiKey) data.apiKey = aiModelForm.apiKey
+    if (aiModelForm.secretKey) data.secretKey = aiModelForm.secretKey
     if (aiModelForm.id) {
       await aiApi.updateModel(aiModelForm.id, data)
     } else {
