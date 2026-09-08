@@ -60,6 +60,8 @@ public class SecurityConfig {
                         "/music/background",
                         "/kitchen/menu", "/kitchen/recipe/*",
                         "/book/summary",
+                        // 书架读类接口允许游客访问(服务层匿名只返回 PUBLIC 书;写接口仍需登录)
+                        "/library/list", "/library/categories", "/library/*",
                         "/storage/file-signed").permitAll()
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e
