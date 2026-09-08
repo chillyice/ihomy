@@ -676,3 +676,20 @@ CREATE TABLE IF NOT EXISTS `content_mindmap_snapshot` (
 -- 标题/路径变更(无 DDL);后端重启后 HomeModuleService 内存缓存自动加载新记录
 -- ------------------------------------------------------------
 UPDATE `sys_home_module` SET `title`='文件浏览', `path`='/storage/files' WHERE `code`='storage' AND `family_id` IS NULL;
+
+-- ------------------------------------------------------------
+-- 2026-09-08 V9.42 书架 PDF 查看器发生产发现:content_book 残留早期 created_by NOT NULL 无默认列
+-- (schema.sql/实体均无此列,代码不写该列,生产书架新建图书全部 500 "Field 'created_by' doesn't
+--  have a default value";生产库该表为空,直接 DROP 对齐 schema.sql)
+-- 幂等:information_schema.COLUMNS 判断,重复执行无副作用
+-- ------------------------------------------------------------
+SET @drop_book_created_by := (
+  SELECT IF(COUNT(*) > 0,
+    'ALTER TABLE `content_book` DROP COLUMN `created_by`',
+    'SELECT ''skip: created_by already dropped'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_book' AND COLUMN_NAME = 'created_by'
+);
+PREPARE drop_book_created_by_stmt FROM @drop_book_created_by;
+EXECUTE drop_book_created_by_stmt;
+DEALLOCATE PREPARE drop_book_created_by_stmt;

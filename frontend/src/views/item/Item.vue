@@ -815,7 +815,8 @@ const onHouseChange = async () => {
 const pdfToImage = async (file) => {
   const pdfjs = await import('pdfjs-dist')
   const workerUrl = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default
-  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
+  // 加版本查询:防 nginx 修 .mjs MIME 前浏览器按旧 content-type 缓存 worker(模块脚本 MIME 错即拒载)
+  pdfjs.GlobalWorkerOptions.workerSrc = workerUrl + '?v=2'
   const buf = await file.arrayBuffer()
   const pdf = await pdfjs.getDocument({ data: buf }).promise
   const page = await pdf.getPage(1)

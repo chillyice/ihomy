@@ -356,7 +356,8 @@ const initPdf = async () => {
   try {
     const mod = await import('pdfjs-dist')
     const pdfjsLib = mod.default?.GlobalWorkerOptions ? mod.default : mod
-    pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl
+    // 加版本查询:防 nginx 修 .mjs MIME 前浏览器按旧 content-type 缓存 worker(模块脚本 MIME 错即拒载)
+    pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl + '?v=2'
     const doc = await pdfjsLib.getDocument({ url: props.book.fileUrl }).promise
     pdfDoc.value = doc
     pdfPageCount.value = doc.numPages
@@ -388,8 +389,8 @@ const fitPdfScale = async () => {
 const renderPdfPage = async (n) => {
   const doc = pdfDoc.value
   if (!doc || n < 1 || n > pdfPageCount.value) return
-  const scale = pdfScale()
-  if (pdfRenderedScale === scale && pdfRenderedPages.has(n)) return
+  const scaleAtStart = pdfScale()
+  if (pdfRenderedScale === scaleAtStart && pdfRenderedPages.has(n)) return
   if (pdfRenderingPages.has(n)) return
   pdfRenderingPages.add(n)
   try {
@@ -397,7 +398,7 @@ const renderPdfPage = async (n) => {
     const canvas = pdfCanvasRefs[n]
     if (!canvas) return
     const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    const viewport = page.getViewport({ scale })
+    const viewport = page.getViewport({ scale: scaleAtStart })
     canvas.width = Math.floor(viewport.width * dpr)
     canvas.height = Math.floor(viewport.height * dpr)
     canvas.style.width = Math.floor(viewport.width) + 'px'
@@ -407,11 +408,13 @@ const renderPdfPage = async (n) => {
       viewport,
       transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null,
     }).promise
-    if (scale === pdfScale()) pdfRenderedPages.add(n)
+    if (scaleAtStart === pdfScale()) pdfRenderedPages.add(n)
   } catch (e) {
     // 缩放/重适配时旧渲染被画布重置打断,忽略
   } finally {
     pdfRenderingPages.delete(n)
+    // 渲染期间缩放已变:旧渲染不算数,重跑按新 scale 重绘(否则缩放后白屏且无重触发)
+    if (scaleAtStart !== pdfScale() && pdfDoc.value) renderPdfPage(n)
   }
 }
 
@@ -475,27 +478,27 @@ const clearPdfCanvases = () => {
 const zoomPdf = (delta) => {
   const next = Math.min(3, Math.max(0.5, +(pdfZoom + delta * 0.2).toFixed(2)))
   if (next === pdfZoom || !pdfDoc.value) return
-  const root = pdfScrollRef.value
-  const ratio = root ? root.scrollTop / Math.max(1, root.scrollHeight) : 0
+  // 记住当前页:清画布后 scrollHeight 塌缩,滚动比例保持会跳页,直接按页跳回
+  const cur = pdfPage.value
   pdfZoom = next
   clearPdfCanvases()
-  updatePdfWrapHeight()
-  nextTick(() => {
-    if (root) root.scrollTop = ratio * root.scrollHeight
-    renderPdfPage(pdfPage.value)
+  updatePdfWrapHeight().then(() => {
+    nextTick(() => {
+      scrollToPdfPage(cur, false)
+      renderPdfPage(cur)
+    })
   })
 }
 
 // 全屏切换后容器宽度变化,重新适配缩放
 const refitPdf = async () => {
   if (props.book?.fileFormat !== 'PDF' || !pdfDoc.value) return
-  const root = pdfScrollRef.value
-  const ratio = root ? root.scrollTop / Math.max(1, root.scrollHeight) : 0
+  const cur = pdfPage.value
   await fitPdfScale()
   clearPdfCanvases()
   await nextTick()
-  if (root) root.scrollTop = ratio * root.scrollHeight
-  renderPdfPage(pdfPage.value)
+  scrollToPdfPage(cur, false)
+  renderPdfPage(cur)
 }
 
 // === TXT ===

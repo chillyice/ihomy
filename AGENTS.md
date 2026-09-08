@@ -311,6 +311,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **SSH 端口**:生产服务器 SSH 登录端口统一为 **19068**(禁止 22)。所有 ssh/scp 命令需加 `-p 19068`/`-P 19068`。防火墙放行 19068,关闭 22。
 - **Docker 安装源**:Ubuntu 用阿里云镜像源(`mirrors.cloud.aliyuncs.com/docker-ce`),固定版本 29.7.0。
 - **Redis 镜像**:`docker pull redis`(默认 latest)。**Git 克隆**:用 SSH 地址,ihomy 用户先生成 ed25519 key 并加到 GitHub。
+- **nginx .mjs MIME(2026-09-08 坑)**:mime.types 默认无 mjs 映射,`.mjs` 服为 `application/octet-stream` 会被浏览器拒绝执行 module worker/动态 import——生产 `/etc/nginx/mime.types` 已改 `application/javascript js mjs;`,**重装/新服务器部署必须补**(否则书架 PDF 查看器/户型图 PDF 底图「加载失败」)。
 - 详细步骤在 `docs/部署指导-Linux.md`(入库脱敏版;本地 `Linux部署指导.md` 只留凭证台账)。
 
 ## 规划事项(未实现)
