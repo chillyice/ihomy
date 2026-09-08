@@ -670,3 +670,9 @@ CREATE TABLE IF NOT EXISTS `content_mindmap_snapshot` (
   PRIMARY KEY (`id`),
   KEY `idx_mindmap_created` (`mindmap_id`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='脑图历史版本快照表';
+
+-- ------------------------------------------------------------
+-- 2026-09-08 V9.39 存储管理/文件浏览拆分:storage 首页模块记录改指独立文件浏览页
+-- 标题/路径变更(无 DDL);后端重启后 HomeModuleService 内存缓存自动加载新记录
+-- ------------------------------------------------------------
+UPDATE `sys_home_module` SET `title`='文件浏览', `path`='/storage/files' WHERE `code`='storage' AND `family_id` IS NULL;
