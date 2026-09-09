@@ -45,6 +45,7 @@ public class AiService {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("chat", capability(familyId, AiConst.FEATURE_CHAT));
         out.put("image", capability(familyId, AiConst.FEATURE_IMAGE));
+        out.put("weatherImage", capability(familyId, AiConst.FEATURE_WEATHER_IMAGE));
         out.put("asr", capability(familyId, AiConst.FEATURE_ASR));
         return out;
     }
@@ -155,7 +156,12 @@ public class AiService {
 
     /** OpenAI 兼容图片生成:POST {base}/images/generations,返回 data 数组(元素含 url 或 b64_json);主报错回退兜底 */
     public List<Map<String, Object>> images(Long familyId, AiImageDTO dto) {
-        FamilyAiConfigService.Chain chain = familyAiConfigService.resolveChain(familyId, AiConst.FEATURE_IMAGE);
+        return images(familyId, AiConst.FEATURE_IMAGE, dto);
+    }
+
+    /** OpenAI 兼容图片生成:指定 featureCode(如 WEATHER_IMAGE 天气生图),按该功能绑定的模型解析 */
+    public List<Map<String, Object>> images(Long familyId, String featureCode, AiImageDTO dto) {
+        FamilyAiConfigService.Chain chain = familyAiConfigService.resolveChain(familyId, featureCode);
         try {
             return doImages(chain.primary(), dto);
         } catch (RuntimeException e) {

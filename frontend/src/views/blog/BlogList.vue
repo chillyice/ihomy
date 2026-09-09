@@ -98,12 +98,12 @@
             <span class="cat-name">{{ node.name }}</span>
             <span class="cat-count">{{ countWithChildren(node) }}</span>
             <span v-if="userStore.isLoggedIn && node.id != null" class="cat-ops" @click.stop>
-              <button class="cat-op-btn" :title="$t('blog.editCategory')" @click="openCategoryDialog('edit', node)">
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              </button>
-              <button class="cat-op-btn danger" :title="$t('blog.deleteCategory')" @click="openDeleteCategory(node)">
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-              </button>
+              <el-tooltip :content="$t('blog.editCategory')" placement="top" :show-after="300">
+                <el-button size="small" text @click="openCategoryDialog('edit', node)"><el-icon><Edit /></el-icon></el-button>
+              </el-tooltip>
+              <el-tooltip :content="$t('blog.deleteCategory')" placement="top" :show-after="300">
+                <el-button size="small" text type="danger" @click="openDeleteCategory(node)"><el-icon><Delete /></el-icon></el-button>
+              </el-tooltip>
             </span>
           </div>
         </div>
@@ -138,12 +138,12 @@
             </div>
           </div>
           <div v-if="userStore.isLoggedIn && canEdit(b)" class="blog-actions" @click.stop>
-            <button class="action-btn edit" :title="$t('blog.editPost')" @click="router.push(`/blog/edit/${b.id}`)">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </button>
-            <button class="action-btn danger" :title="$t('common.delete')" @click="onBlogDelete(b)">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            </button>
+            <el-tooltip :content="$t('blog.editPost')" placement="top" :show-after="300">
+              <el-button size="small" text @click="router.push(`/blog/edit/${b.id}`)"><el-icon><Edit /></el-icon></el-button>
+            </el-tooltip>
+            <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+              <el-button size="small" text type="danger" @click="onBlogDelete(b)"><el-icon><Delete /></el-icon></el-button>
+            </el-tooltip>
           </div>
         </div>
         <div v-if="!loading && !filteredList.length" class="empty-state">
@@ -198,6 +198,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { Edit, Delete } from '@element-plus/icons-vue'
 import { blogApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -562,19 +563,10 @@ html.dark .cat-item.active::before { background: #d4b298; }
 .cat-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .cat-count { font-size: 11px; color: var(--color-text-secondary); opacity: 0.6; flex-shrink: 0; font-variant-numeric: tabular-nums; }
 .cat-ops { display: none; gap: 2px; flex-shrink: 0; }
+.cat-ops :deep(.el-button) { padding: 5px 6px; }
+.cat-ops :deep(.el-button + .el-button) { margin-left: 4px; }
 .cat-item:hover .cat-ops { display: flex; }
 .cat-item:hover .cat-count { display: none; }
-.cat-op-btn {
-  width: 24px; height: 24px;
-  border: none; background: transparent;
-  border-radius: 6px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  color: var(--color-text-secondary);
-  transition: background 0.15s, color 0.15s;
-}
-.cat-op-btn:hover { background: rgba(184,140,110,0.1); color: var(--color-accent, #b88c6e); }
-html.dark .cat-op-btn:hover { background: rgba(212,178,152,0.1); color: #d4b298; }
-.cat-op-btn.danger:hover { background: rgba(201,116,116,0.1); color: #c97474; }
 
 /* ========== 博客卡片 ========== */
 .blog-main { min-width: 0; }
@@ -708,25 +700,13 @@ html.dark .blog-tags .tag:hover {
   top: 12px;
   right: 14px;
   display: flex;
-  gap: 4px;
+  gap: 2px;
   opacity: 0;
   transition: opacity 0.2s;
 }
+.blog-actions :deep(.el-button) { padding: 5px 6px; }
+.blog-actions :deep(.el-button + .el-button) { margin-left: 4px; }
 .blog-item:hover .blog-actions { opacity: 1; }
-.action-btn {
-  width: 28px; height: 28px;
-  border: none; background: rgba(255,255,255,0.7);
-  backdrop-filter: blur(8px);
-  border-radius: 8px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  color: var(--color-text-secondary);
-  transition: background 0.15s, color 0.15s;
-}
-.action-btn:hover { background: rgba(184,140,110,0.15); color: var(--color-accent, #b88c6e); }
-.action-btn.danger:hover { background: rgba(201,116,116,0.15); color: #c97474; }
-html.dark .action-btn { background: rgba(30,42,72,0.7); }
-html.dark .action-btn:hover { background: rgba(212,178,152,0.15); color: #d4b298; }
-html.dark .action-btn.danger:hover { background: rgba(201,116,116,0.15); color: #c97474; }
 
 /* 空状态 */
 .empty-state { padding: 48px 0; }

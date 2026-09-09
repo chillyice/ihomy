@@ -305,8 +305,12 @@
             <el-table-column prop="address" :label="$t('item.houseAddress')" show-overflow-tooltip />
             <el-table-column :label="$t('common.actions')" width="160">
               <template #default="{ row }">
-                <el-button size="small" @click="openHouse(row)">{{ $t('common.edit') }}</el-button>
-                <el-button size="small" type="danger" plain @click="removeHouse(row)">{{ $t('common.delete') }}</el-button>
+                <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
+                  <el-button size="small" text @click="openHouse(row)"><el-icon><Edit /></el-icon></el-button>
+                </el-tooltip>
+                <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+                  <el-button size="small" text type="danger" @click="removeHouse(row)"><el-icon><Delete /></el-icon></el-button>
+                </el-tooltip>
               </template>
             </el-table-column>
           </el-table>
@@ -327,8 +331,12 @@
             <el-table-column prop="note" :label="$t('item.note')" show-overflow-tooltip />
             <el-table-column :label="$t('common.actions')" width="160">
               <template #default="{ row }">
-                <el-button size="small" @click="openRoom(row)">{{ $t('common.edit') }}</el-button>
-                <el-button size="small" type="danger" plain @click="removeRoom(row)">{{ $t('common.delete') }}</el-button>
+                <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
+                  <el-button size="small" text @click="openRoom(row)"><el-icon><Edit /></el-icon></el-button>
+                </el-tooltip>
+                <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+                  <el-button size="small" text type="danger" @click="removeRoom(row)"><el-icon><Delete /></el-icon></el-button>
+                </el-tooltip>
               </template>
             </el-table-column>
           </el-table>
@@ -355,8 +363,12 @@
             <el-table-column prop="type" :label="$t('item.furnitureType')" width="100" />
             <el-table-column :label="$t('common.actions')" width="160">
               <template #default="{ row }">
-                <el-button size="small" @click="openFurniture(row)">{{ $t('common.edit') }}</el-button>
-                <el-button size="small" type="danger" plain @click="removeFurniture(row)">{{ $t('common.delete') }}</el-button>
+                <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
+                  <el-button size="small" text @click="openFurniture(row)"><el-icon><Edit /></el-icon></el-button>
+                </el-tooltip>
+                <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+                  <el-button size="small" text type="danger" @click="removeFurniture(row)"><el-icon><Delete /></el-icon></el-button>
+                </el-tooltip>
               </template>
             </el-table-column>
           </el-table>
@@ -394,8 +406,12 @@
             </div>
             <div class="item-path">{{ it.house_name }} / {{ it.room_name }} / {{ it.furniture_name }}</div>
             <div v-if="!selectMode" class="item-ops">
-              <el-button size="small" @click="openItem(it)">{{ $t('common.edit') }}</el-button>
-              <el-button size="small" type="danger" plain @click="removeItem(it)">{{ $t('common.delete') }}</el-button>
+              <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
+                <el-button size="small" text @click="openItem(it)"><el-icon><Edit /></el-icon></el-button>
+              </el-tooltip>
+              <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+                <el-button size="small" text type="danger" @click="removeItem(it)"><el-icon><Delete /></el-icon></el-button>
+              </el-tooltip>
             </div>
           </el-card>
         </el-tab-pane>
@@ -549,8 +565,12 @@
         <el-table-column prop="position" :label="$t('item.position')" width="100" show-overflow-tooltip />
         <el-table-column :label="$t('common.actions')" width="120">
           <template #default="{ row }">
-            <el-button link size="small" @click="openFurnItem(row)">{{ $t('common.edit') }}</el-button>
-            <el-button link size="small" type="danger" @click="removeFurnItem(row)">{{ $t('common.delete') }}</el-button>
+            <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
+              <el-button size="small" text @click="openFurnItem(row)"><el-icon><Edit /></el-icon></el-button>
+            </el-tooltip>
+            <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+              <el-button size="small" text type="danger" @click="removeFurnItem(row)"><el-icon><Delete /></el-icon></el-button>
+            </el-tooltip>
           </template>
         </el-table-column>
       </el-table>
@@ -1837,6 +1857,11 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown); if (vo
 .item-name { font-size: 16px; font-weight: 600; }
 .item-path { color: #909399; font-size: 13px; margin-top: 4px; }
 .item-ops { margin-top: 8px; }
+.item-ops :deep(.el-button) { padding: 5px 6px; }
+.item-ops :deep(.el-button + .el-button) { margin-left: 4px; }
+/* 列表模式/家具物品表格内的编辑/删除图标按钮:紧凑间距 */
+:deep(.el-table .el-button) { padding: 5px 6px; }
+:deep(.el-table .el-button + .el-button) { margin-left: 4px; }
 .item-image-preview { width: 200px; height: 140px; object-fit: cover; border-radius: 8px; }
 @media (max-width: 768px) {
   .fp-search { width: 140px; }

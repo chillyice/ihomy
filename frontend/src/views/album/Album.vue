@@ -68,8 +68,12 @@
             <div class="album-meta">{{ formatDate(a.createdAt) }}</div>
           </div>
           <div v-if="!selectMode && canManage(a)" class="album-actions" @click.stop>
-            <el-button size="small" text @click="openEditor(a)">{{ t('common.edit') }}</el-button>
-            <el-button size="small" text type="danger" @click="onDel(a)">{{ t('common.delete') }}</el-button>
+            <el-tooltip :content="t('common.edit')" placement="top" :show-after="300">
+              <el-button size="small" text @click="openEditor(a)"><el-icon><Edit /></el-icon></el-button>
+            </el-tooltip>
+            <el-tooltip :content="t('common.delete')" placement="top" :show-after="300">
+              <el-button size="small" text type="danger" @click="onDel(a)"><el-icon><Delete /></el-icon></el-button>
+            </el-tooltip>
           </div>
         </div>
       </div>
@@ -104,6 +108,7 @@ import { useUserStore } from '@/stores/user'
 import { useSyncStore } from '@/stores/sync'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
+import { Edit, Delete } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import SyncDialog from '@/components/SyncDialog.vue'
 import AlbumDefaultCover from '@/components/AlbumDefaultCover.vue'
@@ -307,6 +312,8 @@ onMounted(load)
 .album-name { font-size: 15px; font-weight: 600; color: var(--color-text); }
 .album-meta { font-size: 12px; color: var(--color-text-secondary); margin-top: 4px; }
 .album-actions { padding: 6px 8px 10px; text-align: right; }
+.album-actions :deep(.el-button) { padding: 5px 6px; }
+.album-actions :deep(.el-button + .el-button) { margin-left: 4px; }
 
 @media (max-width: 768px) {
   .album-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }

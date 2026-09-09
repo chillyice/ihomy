@@ -917,3 +917,31 @@ INSERT IGNORE INTO `sys_synonym` (`canonical`, `alias`, `source`) VALUES
 ('垃圾桶', '垃圾篓', 'BUILTIN'), ('垃圾桶', '纸篓', 'BUILTIN'),
 ('台灯', '床头灯', 'BUILTIN'),
 ('袜子', '短袜', 'BUILTIN'), ('袜子', '长袜', 'BUILTIN');
+
+-- ------------------------------------------------------------
+-- 2026-09-09 V9.53 天气多源 provider:sys_weather_credential 加 provider + config_json
+-- 一、加 provider 列(幂等):天气源标识 QWEATHER/OPENWEATHER/AMAP,既有行 DEFAULT 落 QWEATHER
+-- ------------------------------------------------------------
+SET @add_wc_provider := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `sys_weather_credential` ADD COLUMN `provider` VARCHAR(20) NOT NULL DEFAULT ''QWEATHER'' COMMENT ''天气源:QWEATHER/OPENWEATHER/AMAP'' AFTER `name`',
+    'SELECT ''skip: weather provider already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sys_weather_credential' AND COLUMN_NAME = 'provider'
+);
+PREPARE add_wc_provider_stmt FROM @add_wc_provider;
+EXECUTE add_wc_provider_stmt;
+DEALLOCATE PREPARE add_wc_provider_stmt;
+
+-- 二、加 config_json 列(幂等):非和风天气源凭证(ENC 加密 JSON,如 {"apiKey":"..."})
+-- ------------------------------------------------------------
+SET @add_wc_cfg := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `sys_weather_credential` ADD COLUMN `config_json` TEXT DEFAULT NULL COMMENT ''非和风天气源凭证(ENC 加密 JSON)'' AFTER `private_key`',
+    'SELECT ''skip: weather config_json already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sys_weather_credential' AND COLUMN_NAME = 'config_json'
+);
+PREPARE add_wc_cfg_stmt FROM @add_wc_cfg;
+EXECUTE add_wc_cfg_stmt;
+DEALLOCATE PREPARE add_wc_cfg_stmt;

@@ -2,6 +2,7 @@ package com.ihomy.controller;
 
 import com.ihomy.annotation.OperationLog;
 import com.ihomy.annotation.RequirePermission;
+import com.ihomy.common.AiConst;
 import com.ihomy.common.BizException;
 import com.ihomy.common.Result;
 import com.ihomy.common.ResultCode;
@@ -117,12 +118,17 @@ public class AiController {
         return Result.success(out);
     }
 
-    @Operation(summary = "AI 图片生成")
+    @Operation(summary = "AI 图片生成(featureCode 可选,缺省 IMAGE;天气生图传 WEATHER_IMAGE)")
     @OperationLog(module = "AI", operationType = "CREATE", description = "AI 图片生成")
     @PostMapping("/image")
-    public Result<List<Map<String, Object>>> image(@RequestBody AiImageDTO dto) {
+    public Result<List<Map<String, Object>>> image(@RequestBody AiImageDTO dto,
+                                                   @RequestParam(required = false) String featureCode) {
         securityHelper.current();
-        return Result.success(aiService.images(currentFamilyId(), dto));
+        String code = featureCode == null || featureCode.isBlank() ? AiConst.FEATURE_IMAGE : featureCode;
+        if (!AiConst.allowedTypes(code).contains(AiConst.TYPE_IMAGE)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "图片生成仅支持绑定了生图模型的功能");
+        }
+        return Result.success(aiService.images(currentFamilyId(), code, dto));
     }
 
     @Operation(summary = "AI 语音识别")

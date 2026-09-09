@@ -15,12 +15,12 @@
           </div>
         </div>
         <div v-if="canEdit" class="head-actions">
-          <button class="act-btn" :title="$t('common.edit')" @click.stop="$emit('action', 'edit')">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-          </button>
-          <button class="act-btn danger" :title="$t('common.delete')" @click.stop="$emit('action', 'delete')">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
-          </button>
+          <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
+            <el-button size="small" text @click.stop="$emit('action', 'edit')"><el-icon><Edit /></el-icon></el-button>
+          </el-tooltip>
+          <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+            <el-button size="small" text type="danger" @click.stop="$emit('action', 'delete')"><el-icon><Delete /></el-icon></el-button>
+          </el-tooltip>
         </div>
       </template>
     </div>
@@ -47,6 +47,7 @@
 
 <script setup>
 import { computed, ref, watch, onMounted, nextTick } from 'vue'
+import { Edit, Delete } from '@element-plus/icons-vue'
 import { PAGE_H, moodLabel, weatherLabel } from '@/utils/diary'
 import { parseDoodle, doodleExtentY, renderStrokes, setupCanvas, clearCanvas } from '@/utils/doodle'
 
@@ -140,21 +141,11 @@ html.dark .sheet-right::before { background: linear-gradient(to right, rgba(0,0,
 
 .head-actions {
   position: absolute; top: 6px; right: 10px;
-  display: flex; gap: 4px; opacity: 0; transition: opacity 0.2s;
+  display: flex; gap: 2px; opacity: 0; transition: opacity 0.2s;
 }
+.head-actions :deep(.el-button) { padding: 5px 6px; }
+.head-actions :deep(.el-button + .el-button) { margin-left: 4px; }
 .sheet:hover .head-actions { opacity: 1; }
-.act-btn {
-  width: 26px; height: 26px; border: none; border-radius: 8px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  background: rgba(255,253,248,0.9); color: var(--color-text-secondary);
-  box-shadow: 0 1px 4px rgba(58,46,34,0.12);
-  transition: background 0.2s, color 0.2s;
-}
-.act-btn:hover { background: rgba(184,140,110,0.14); color: #b88c6e; }
-.act-btn.danger:hover { background: rgba(176,74,58,0.1); color: #b04a3a; }
-html.dark .act-btn { background: rgba(30,42,72,0.9); color: rgba(232,220,200,0.7); }
-html.dark .act-btn:hover { background: rgba(212,178,152,0.15); color: #d4b298; }
-html.dark .act-btn.danger:hover { background: rgba(201,116,116,0.15); color: #c97474; }
 
 .sheet-body { position: relative; height: 504px; overflow: hidden; }
 .ruling-bg {

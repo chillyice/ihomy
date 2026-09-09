@@ -152,7 +152,9 @@
                       <el-button v-if="userStore.isLoggedIn && !p.isBackground" size="small" type="primary" @click="setBackground(p)">{{ $t('music.setBgm') }}</el-button>
                       <el-button v-if="userStore.isLoggedIn && p.isBackground" size="small" @click="unsetBackground">{{ $t('music.unsetBgm') }}</el-button>
                     </div>
-                    <el-button v-if="userStore.isLoggedIn" size="small" text class="pl-delete-btn" @click="delPlaylist(p)">{{ $t('common.delete') }}</el-button>
+                    <el-tooltip v-if="userStore.isLoggedIn" :content="$t('common.delete')" placement="top" :show-after="300">
+                      <el-button size="small" text class="pl-delete-btn" @click="delPlaylist(p)"><el-icon><Delete /></el-icon></el-button>
+                    </el-tooltip>
                   </div>
                 </div>
               </div>
@@ -309,7 +311,7 @@ import { musicApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useSyncStore } from '@/stores/sync'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MoreFilled } from '@element-plus/icons-vue'
+import { MoreFilled, Delete } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import SyncDialog from '@/components/SyncDialog.vue'

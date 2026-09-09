@@ -1336,34 +1336,37 @@ CREATE TABLE `family_item` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='物品表(物品定位)';
 
 -- ------------------------------------------------------------
--- 47. 和风天气凭证(V5.6):多环境凭证账本,同时仅一条 status=1 启用
---     运行时优先读 status=1 的记录;yml 仍可作 fallback
---     私钥 PEM TEXT 存储,公钥仅作对照(验证签名用)
+-- 47. 天气 API 凭证(V9.53 起多天气源 provider):多环境凭证账本,同时仅一条 status=1 启用
+--     provider=QWEATHER/OPENWEATHER/AMAP(和风/OpenWeather/高德);和风用下方专属字段,
+--     其他天气源凭证走 config_json(整体 ENC 加密 JSON,如 {"apiKey":"..."})
+--     运行时优先读 status=1 的记录;yml 仍可作 fallback(仅和风)
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `sys_weather_credential`;
 CREATE TABLE `sys_weather_credential` (
   `id`           BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
   `env`          VARCHAR(20)  NOT NULL COMMENT '环境标识(test/prod)',
   `name`         VARCHAR(50)  NOT NULL COMMENT '凭证名称(如 Windows测试/Linux生产)',
+  `provider`     VARCHAR(20)  NOT NULL DEFAULT 'QWEATHER' COMMENT '天气源:QWEATHER/OPENWEATHER/AMAP',
   `api_host`     VARCHAR(100) NOT NULL COMMENT '和风天气 API Host(如 xxx.qweatherapi.com)',
-  `project_id`   VARCHAR(50)  NOT NULL COMMENT '项目ID(JWT sub)',
-  `key_id`       VARCHAR(50)  NOT NULL COMMENT '凭证ID(JWT kid)',
+  `project_id`   VARCHAR(50)  NOT NULL COMMENT '项目ID(JWT sub,仅和风)',
+  `key_id`       VARCHAR(50)  NOT NULL COMMENT '凭证ID(JWT kid,仅和风)',
   `public_key`   TEXT         DEFAULT NULL COMMENT 'Ed25519 公钥 PEM(对照用,验证签名)',
   `private_key`  TEXT         DEFAULT NULL COMMENT 'Ed25519 私钥 PEM(JWT 签名用,留空=禁用,部署后手动 UPDATE 填入)',
+  `config_json`  TEXT         DEFAULT NULL COMMENT '非和风天气源凭证(ENC 加密 JSON,如 {"apiKey":"..."})',
   `status`       TINYINT      NOT NULL DEFAULT 0 COMMENT '0禁用 1启用(同时仅一条启用)',
   `remark`       VARCHAR(200) DEFAULT NULL COMMENT '备注',
   `created_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   KEY `idx_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='和风天气凭证表(多环境账本)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='天气 API 凭证表(多环境+多天气源账本)';
 
--- 种子:占位示例,部署后请替换为你自己在和风天气控制台创建的凭证
--- ⚠️ 真实凭证(含私钥)不入 git:部署后手动 UPDATE 填入(或走 external.yml + ENC(...) 加密)
-INSERT INTO `sys_weather_credential` (`env`, `name`, `api_host`, `project_id`, `key_id`, `public_key`, `private_key`, `status`, `remark`) VALUES
-('test', 'Windows 测试环境', 'your-test-api-host.qweatherapi.com', 'YOUR_TEST_PROJECT_ID', 'YOUR_TEST_KEY_ID',
+-- 种子:占位示例,部署后请替换为你自己在天气服务商控制台创建的凭证
+-- ⚠️ 真实凭证(含私钥/API Key)不入 git:部署后手动 UPDATE 填入(或走 external.yml + ENC(...) 加密)
+INSERT INTO `sys_weather_credential` (`env`, `name`, `provider`, `api_host`, `project_id`, `key_id`, `public_key`, `private_key`, `status`, `remark`) VALUES
+('test', 'Windows 测试环境', 'QWEATHER', 'your-test-api-host.qweatherapi.com', 'YOUR_TEST_PROJECT_ID', 'YOUR_TEST_KEY_ID',
  NULL, NULL, 0, '占位示例,部署后替换为真实凭证'),
-('prod', 'Linux 生产环境', 'your-prod-api-host.qweatherapi.com', 'YOUR_PROD_PROJECT_ID', 'YOUR_PROD_KEY_ID',
+('prod', 'Linux 生产环境', 'QWEATHER', 'your-prod-api-host.qweatherapi.com', 'YOUR_PROD_PROJECT_ID', 'YOUR_PROD_KEY_ID',
  NULL, NULL, 0, '占位示例,部署后替换为真实凭证并 UPDATE status=1');
 
 -- ------------------------------------------------------------
@@ -1673,7 +1676,7 @@ DROP TABLE IF EXISTS `sys_family_ai_feature`;
 CREATE TABLE `sys_family_ai_feature` (
   `id`                BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
   `family_id`         BIGINT      NOT NULL COMMENT '所属家庭ID',
-  `feature_code`      VARCHAR(30) NOT NULL COMMENT '功能:ITEM_FIND/ITEM_PUT/CHAT/IMAGE/ASR',
+  `feature_code`      VARCHAR(30) NOT NULL COMMENT '功能:ITEM_FIND/ITEM_PUT/CHAT/IMAGE/WEATHER_IMAGE/ASR',
   `model_id`          BIGINT      DEFAULT NULL COMMENT '主模型 id(可空=未配置)',
   `fallback_model_id` BIGINT      DEFAULT NULL COMMENT '兜底/辅助模型 id(可空;主模型不足时启用)',
   PRIMARY KEY (`id`),

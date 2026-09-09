@@ -95,6 +95,7 @@ export const photoApi = {
 updateDesc: (id, description) => request.put(`/photo/${id}`, { description }),
   remove: (id) => request.delete(`/photo/${id}`),
   cascade: (limit = 60) => request.get('/photo/cascade', { params: { limit } }),
+  saveFromUrl: (albumId, data) => request.post(`/album/${albumId}/photos/from-url`, data),
 }
 
 // 统一点赞
@@ -129,6 +130,15 @@ export const familyApi = {
   handleApply: (id, action) => request.put(`/family/apply/${id}`, null, { params: { action } }),
   getWeatherAlertPush: () => request.get('/family/weather-alert-push'),
   setWeatherAlertPush: (enabled) => request.put(`/family/weather-alert-push`, null, { params: { enabled } }),
+}
+
+// 天气 API 配置(和风天气凭证,家长可管理)
+export const weatherApi = {
+  credentials: () => request.get('/weather/credentials'),
+  addCredential: (data) => request.post('/weather/credentials', data),
+  updateCredential: (id, data) => request.put(`/weather/credentials/${id}`, data),
+  deleteCredential: (id) => request.delete(`/weather/credentials/${id}`),
+  enableCredential: (id) => request.put(`/weather/credentials/${id}/enable`),
 }
 
 // 个人资料
@@ -351,7 +361,7 @@ export const aiApi = {
   features: () => request.get('/ai/features'),
   bindFeature: (featureCode, modelId, fallbackModelId) => request.put(`/ai/features/${featureCode}`, { modelId, fallbackModelId: fallbackModelId ?? null }),
   chat: (data) => request.post('/ai/chat', data, { timeout: 150000 }),
-  image: (data) => request.post('/ai/image', data, { timeout: 180000 }),
+  image: (data, featureCode) => request.post(`/ai/image${featureCode ? `?featureCode=${featureCode}` : ''}`, data, { timeout: 180000 }),
   transcribe: (file, language) => {
     const form = new FormData()
     form.append('file', file)

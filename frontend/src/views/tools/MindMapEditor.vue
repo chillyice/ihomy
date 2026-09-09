@@ -236,7 +236,9 @@
             </div>
             <div class="mm-hist-ops">
               <el-button size="small" type="primary" text @click="restoreSnapshot(s)">{{ $t('tools.mindmap.rollback') }}</el-button>
-              <el-button size="small" type="danger" text @click="deleteSnapshot(s)">{{ $t('common.delete') }}</el-button>
+              <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+                <el-button size="small" type="danger" text @click="deleteSnapshot(s)"><el-icon><Delete /></el-icon></el-button>
+              </el-tooltip>
             </div>
           </div>
         </div>

@@ -23,8 +23,12 @@
             <span>{{ a.userName || t('anniversary.familyAnniversary') }}</span>
           </div>
           <div v-if="userStore.isLoggedIn" class="anni-actions">
-            <el-button size="small" text @click="openEditor(a)">{{ t('common.edit') }}</el-button>
-            <el-button size="small" text type="danger" @click="onDel(a)">{{ t('common.delete') }}</el-button>
+            <el-tooltip :content="t('common.edit')" placement="top" :show-after="300">
+              <el-button size="small" text @click="openEditor(a)"><el-icon><Edit /></el-icon></el-button>
+            </el-tooltip>
+            <el-tooltip :content="t('common.delete')" placement="top" :show-after="300">
+              <el-button size="small" text type="danger" @click="onDel(a)"><el-icon><Delete /></el-icon></el-button>
+            </el-tooltip>
           </div>
         </div>
       </div>
@@ -79,7 +83,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { anniversaryApi, memberApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { User } from '@element-plus/icons-vue'
+import { User, Edit, Delete } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 
@@ -175,6 +179,8 @@ onMounted(() => {
   color: var(--color-text-secondary);
 }
 .anni-actions { margin-top: 4px; text-align: right; border-top: 1px solid rgba(31, 58, 95, 0.06); padding-top: 8px; }
+.anni-actions :deep(.el-button) { padding: 5px 6px; }
+.anni-actions :deep(.el-button + .el-button) { margin-left: 4px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
 @media (max-width: 768px) {

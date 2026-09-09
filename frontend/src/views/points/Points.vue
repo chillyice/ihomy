@@ -41,7 +41,9 @@
                   :disabled="p.enabled !== 1 || soldOut(p)"
                   @click="onRedeem(p)"
                 >{{ $t('points.redeem') }}</el-button>
-                <el-button v-if="userStore.isOwner" size="small" text @click="openEditor(p)">{{ $t('common.edit') }}</el-button>
+                <el-tooltip v-if="userStore.isOwner" :content="$t('common.edit')" placement="top" :show-after="300">
+                  <el-button size="small" text @click="openEditor(p)"><el-icon><Edit /></el-icon></el-button>
+                </el-tooltip>
                 <el-button v-if="userStore.isOwner" size="small" text type="danger" @click="onOff(p)">{{ $t('points.takeOff') }}</el-button>
               </div>
             </div>
@@ -113,6 +115,7 @@
 // 积分商城:签到、家庭商品兑换;家长可上架/编辑/下架商品并核销兑换
 import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Edit } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { pointsApi } from '@/api'

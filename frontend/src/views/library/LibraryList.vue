@@ -84,7 +84,9 @@
                   <button class="ovl-btn" @click.stop="openDetail(b)">{{ $t('library.viewDetail') }}</button>
                   <template v-if="userStore.isLoggedIn && canEdit(b)">
                     <button class="ovl-btn" @click.stop="moveCategory(b)">{{ $t('library.moveCategory') }}</button>
-                    <button class="ovl-btn danger" @click.stop="onDeleteBook(b)">{{ $t('common.delete') }}</button>
+                    <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+                      <el-button size="small" text type="danger" @click.stop="onDeleteBook(b)"><el-icon><Delete /></el-icon></el-button>
+                    </el-tooltip>
                   </template>
                 </div>
               </div>
@@ -115,7 +117,9 @@
               <div v-if="!batchMode" class="row-actions" @click.stop>
                 <button v-if="canReadOnline(b)" class="ghost-btn small" @click="openReader(b)">{{ $t('library.read') }}</button>
                 <button class="ghost-btn small" @click="openDetail(b)">{{ $t('library.viewDetail') }}</button>
-                <button v-if="userStore.isLoggedIn && canEdit(b)" class="ghost-btn small danger" @click="onDeleteBook(b)">{{ $t('common.delete') }}</button>
+                <el-tooltip v-if="userStore.isLoggedIn && canEdit(b)" :content="$t('common.delete')" placement="top" :show-after="300">
+                  <el-button size="small" text type="danger" @click="onDeleteBook(b)"><el-icon><Delete /></el-icon></el-button>
+                </el-tooltip>
               </div>
             </div>
           </div>
@@ -178,6 +182,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { Delete } from '@element-plus/icons-vue'
 import { libraryApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -445,12 +450,11 @@ html.dark .book-cover.placeholder { background: linear-gradient(135deg, rgba(212
 .format-badge.small { position: static; font-size: 10px; padding: 1px 5px; }
 .book-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; opacity: 0; transition: opacity 0.2s; border-radius: 8px; }
 .book-card:hover .book-overlay { opacity: 1; }
+.book-overlay :deep(.el-button) { padding: 5px 6px; }
 .ovl-btn { padding: 4px 12px; border: 1px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.15); color: #fff; border-radius: 8px; font-size: 12px; cursor: pointer; transition: background 0.2s; backdrop-filter: blur(4px); }
 .ovl-btn:hover { background: rgba(255,255,255,0.3); }
 .ovl-btn.primary { background: rgba(184,140,110,0.8); border-color: rgba(184,140,110,0.8); }
 .ovl-btn.primary:hover { background: rgba(168,124,94,0.9); }
-.ovl-btn.danger { border-color: rgba(255,100,100,0.4); }
-.ovl-btn.danger:hover { background: rgba(180,60,60,0.5); }
 .book-info { display: flex; flex-direction: column; gap: 3px; }
 .book-title { font-size: 13px; font-weight: 600; line-height: 1.4; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .book-author { font-size: 11px; color: var(--color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -470,6 +474,7 @@ html.dark .row-cover.placeholder { background: linear-gradient(135deg, rgba(212,
 .row-title { font-size: 14px; font-weight: 600; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-sub { display: flex; gap: 8px; align-items: center; margin-top: 2px; font-size: 12px; color: var(--color-text-secondary); }
 .row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.row-actions :deep(.el-button) { padding: 5px 6px; }
 
 .empty-state { padding: 48px 0; }
 

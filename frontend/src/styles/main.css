@@ -174,10 +174,6 @@ html.dark .write-btn:hover { background: #e0c2aa; }
 .ghost-btn:hover { background: rgba(184,140,110,0.06); }
 html.dark .ghost-btn:hover { background: rgba(255,255,255,0.06); }
 .ghost-btn.small { height: 28px; padding: 0 10px; font-size: 12px; }
-.ghost-btn.danger { color: #b04a3a; border-color: rgba(176,74,58,0.2); }
-html.dark .ghost-btn.danger { color: #c97474; }
-.ghost-btn.danger:hover { background: rgba(176,74,58,0.06); }
-html.dark .ghost-btn.danger:hover { background: rgba(201,116,116,0.08); }
 
 .danger-btn {
   height: 32px; padding: 0 12px; border: none; border-radius: 10px;

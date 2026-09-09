@@ -80,8 +80,12 @@
                 <div class="video-footer">
                   <span class="video-uploader">{{ v.uploaderName }}</span>
                   <span v-if="userStore.isLoggedIn" class="video-actions">
-                    <el-button size="small" text @click="openEditor(v)">{{ $t('common.edit') }}</el-button>
-                    <el-button size="small" text type="danger" @click="onDel(v)">{{ $t('common.delete') }}</el-button>
+                    <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
+                      <el-button size="small" text @click="openEditor(v)"><el-icon><Edit /></el-icon></el-button>
+                    </el-tooltip>
+                    <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+                      <el-button size="small" text type="danger" @click="onDel(v)"><el-icon><Delete /></el-icon></el-button>
+                    </el-tooltip>
                   </span>
                 </div>
               </div>
@@ -109,7 +113,9 @@
               </div>
               <div class="wish-actions">
                 <el-button v-if="userStore.isLoggedIn && w.status === 'PENDING'" size="small" type="primary" plain @click="onWishDone(w)">{{ $t('cinema.markImported') }}</el-button>
-                <el-button v-if="userStore.isLoggedIn" size="small" text type="danger" @click="onWishDel(w)">{{ $t('common.delete') }}</el-button>
+                <el-tooltip v-if="userStore.isLoggedIn" :content="$t('common.delete')" placement="top" :show-after="300">
+                  <el-button size="small" text type="danger" @click="onWishDel(w)"><el-icon><Delete /></el-icon></el-button>
+                </el-tooltip>
               </div>
             </div>
           </div>
@@ -226,6 +232,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, watch, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Edit, Delete } from '@element-plus/icons-vue'
 import { videoApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useSyncStore } from '@/stores/sync'
@@ -574,6 +581,8 @@ onMounted(() => {
 }
 .video-uploader { font-size: 12px; color: var(--color-text-secondary); }
 .video-actions { display: flex; }
+.video-actions :deep(.el-button) { padding: 5px 6px; }
+.video-actions :deep(.el-button + .el-button) { margin-left: 4px; }
 .wish-list { display: flex; flex-direction: column; gap: 12px; max-width: 720px; }
 .wish-item { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 20px; }
 .wish-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }

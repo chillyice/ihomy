@@ -35,8 +35,12 @@
             <el-button v-if="w.status === 'PENDING'" size="small" type="success" plain @click="onSetStatus(w, 1)">{{ $t('wish.achieved') }}</el-button>
             <el-button v-if="w.status === 'PENDING'" size="small" type="info" plain @click="onSetStatus(w, 2)">{{ $t('wish.abandon') }}</el-button>
             <el-button v-if="w.status !== 'PENDING'" size="small" @click="onSetStatus(w, 0)">{{ $t('wish.restore') }}</el-button>
-            <el-button size="small" text @click="openEditor(w)">{{ $t('common.edit') }}</el-button>
-            <el-button size="small" text type="danger" @click="onDelete(w)">{{ $t('common.delete') }}</el-button>
+            <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
+              <el-button size="small" text @click="openEditor(w)"><el-icon><Edit /></el-icon></el-button>
+            </el-tooltip>
+            <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+              <el-button size="small" text type="danger" @click="onDelete(w)"><el-icon><Delete /></el-icon></el-button>
+            </el-tooltip>
           </div>
         </div>
       </div>
@@ -69,6 +73,7 @@
 // 愿望单:愿望卡片网格 + 状态 tab;标记实现/放弃走 PUT status
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { wishApi } from '@/api'
 import { dictText } from '@/utils/dict'
@@ -192,6 +197,8 @@ onMounted(load)
   gap: 6px;
   flex-wrap: wrap;
 }
+.wish-actions :deep(.el-button.is-text) { padding: 5px 6px; }
+.wish-actions :deep(.el-button.is-text + .el-button.is-text) { margin-left: 4px; }
 
 @media (max-width: 768px) {
   .wish-actions .el-button { flex: 1; min-width: 60px; }

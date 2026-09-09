@@ -176,7 +176,7 @@ const userStore = useUserStore()
 const { locale, t } = useI18n()
 const { startDrag: startWidgetDrag, dragging: widgetDragging, crossed: crossedEdge } = useWidgetDrag()
 
-const WIDGET_MAP = { blog: 'feed', task: 'task', points: 'today', weather: 'weather', anniversary: 'anni', kitchen: 'recipe', item: 'search', wish: 'wish', book: 'finance', album: 'album', music: 'music' }
+const WIDGET_MAP = { blog: 'feed', task: 'task', points: 'today', weather: 'weather', anniversary: 'anni', kitchen: 'recipe', item: 'search', wish: 'wish', book: 'finance', album: 'album' }
 const widgetType = (code) => WIDGET_MAP[code] || null
 
 // 注入全局光影状态(与 SunLightLayer 共享同一实例);导航栏只用台灯开关,其余设置在 Settings 页

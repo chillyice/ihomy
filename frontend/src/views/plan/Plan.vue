@@ -20,8 +20,12 @@
               <el-tag v-else size="small">{{ $t('plan.status.CANCELLED') }}</el-tag>
             </div>
             <div class="plan-actions">
-              <el-button size="small" text @click="openPlanEditor(p)">{{ $t('common.edit') }}</el-button>
-              <el-button size="small" text type="danger" @click="onDelPlan(p)">{{ $t('common.delete') }}</el-button>
+              <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
+                <el-button size="small" text @click="openPlanEditor(p)"><el-icon><Edit /></el-icon></el-button>
+              </el-tooltip>
+              <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+                <el-button size="small" text type="danger" @click="onDelPlan(p)"><el-icon><Delete /></el-icon></el-button>
+              </el-tooltip>
             </div>
           </div>
           <div v-if="p.description" class="plan-desc">{{ p.description }}</div>
@@ -40,7 +44,9 @@
               <el-checkbox :model-value="t.done === 1" @change="onToggleTask(p, t)" />
               <span class="task-sub-title" :class="{ done: t.done === 1 }">{{ t.title }}</span>
               <span v-if="t.dueDate" class="task-sub-due">{{ t.dueDate }}</span>
-              <el-button size="small" text type="danger" @click="onDelTask(p, t)">{{ $t('common.delete') }}</el-button>
+              <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+                <el-button size="small" text type="danger" @click="onDelTask(p, t)"><el-icon><Delete /></el-icon></el-button>
+              </el-tooltip>
             </div>
             <div class="task-add-row">
               <el-input v-model="p._newTask" size="small" :placeholder="$t('plan.taskPlaceholder')" @keyup.enter="onAddTask(p)" style="max-width: 300px" />
@@ -76,6 +82,7 @@
 // 家庭计划:计划 CRUD + 子任务 CRUD,勾选子任务自动联动计划完成状态
 import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { planApi } from '@/api'
 import Breadcrumb from '@/components/Breadcrumb.vue'
@@ -172,6 +179,8 @@ onMounted(load)
 .plan-title .el-tag {
   margin-left: 8px;
 }
+.plan-actions :deep(.el-button) { padding: 5px 6px; }
+.plan-actions :deep(.el-button + .el-button) { margin-left: 4px; }
 .plan-desc {
   color: #666;
   font-size: 13px;

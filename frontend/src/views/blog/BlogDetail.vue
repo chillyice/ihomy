@@ -62,13 +62,9 @@
           <div class="c-body">{{ c.content }}</div>
           <div class="c-ops">
             <el-button v-if="userStore.isLoggedIn" text size="small" @click="setReply(c)">{{ $t('blog.reply') }}</el-button>
-            <el-button
-              v-if="canDelete(c)"
-              text
-              size="small"
-              type="danger"
-              @click="delComment(c)"
-            >{{ $t('common.delete') }}</el-button>
+            <el-tooltip v-if="canDelete(c)" :content="$t('common.delete')" placement="top" :show-after="300">
+              <el-button text size="small" type="danger" @click="delComment(c)"><el-icon><Delete /></el-icon></el-button>
+            </el-tooltip>
           </div>
 
           <div v-if="c.replies?.length" class="reply-list">
@@ -76,14 +72,9 @@
               <span class="c-author">{{ r.authorName }}</span>
               <span v-if="r.replyToName" class="reply-to">{{ $t('blog.replyTo', { name: r.replyToName }) }}</span>
               <span class="reply-content">{{ r.content }}</span>
-              <el-button
-                v-if="canDelete(r)"
-                text
-                size="small"
-                type="danger"
-                class="reply-del"
-                @click="delComment(r)"
-              >{{ $t('common.delete') }}</el-button>
+              <el-tooltip v-if="canDelete(r)" :content="$t('common.delete')" placement="top" :show-after="300">
+                <el-button text size="small" type="danger" class="reply-del" @click="delComment(r)"><el-icon><Delete /></el-icon></el-button>
+              </el-tooltip>
             </div>
           </div>
         </div>
@@ -100,7 +91,7 @@ import { blogApi, likeApi, commentApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { Star } from '@element-plus/icons-vue'
+import { Star, Delete } from '@element-plus/icons-vue'
 import { marked } from 'marked'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 

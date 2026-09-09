@@ -25,8 +25,12 @@
           <template #default="{ row }">
             <el-button v-if="row.id !== 0" size="small" @click="goBrowse(row)">{{ $t('storage.browse') }}</el-button>
             <el-button v-if="row.id !== 0 && row.id !== defaultDeviceId && userStore.isOwner" size="small" text type="success" @click="setDefaultDevice(row)">{{ $t('storage.setDefault') }}</el-button>
-            <el-button v-if="row.id !== 0 && userStore.isOwner" size="small" text @click="openDevice(row)">{{ $t('common.edit') }}</el-button>
-            <el-button v-if="row.id !== 0 && userStore.isOwner" size="small" text type="danger" @click="removeDevice(row)">{{ $t('common.delete') }}</el-button>
+            <el-tooltip v-if="row.id !== 0 && userStore.isOwner" :content="$t('common.edit')" placement="top" :show-after="300">
+              <el-button size="small" text @click="openDevice(row)"><el-icon><Edit /></el-icon></el-button>
+            </el-tooltip>
+            <el-tooltip v-if="row.id !== 0 && userStore.isOwner" :content="$t('common.delete')" placement="top" :show-after="300">
+              <el-button size="small" text type="danger" @click="removeDevice(row)"><el-icon><Delete /></el-icon></el-button>
+            </el-tooltip>
           </template>
         </el-table-column>
       </el-table>
@@ -123,6 +127,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
+import { Edit, Delete } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useDevice } from '@/composables/useDevice'
@@ -357,6 +362,9 @@ onMounted(() => {
   color: var(--el-text-color-secondary);
   opacity: 0.5;
 }
+/* 设备表内编辑/删除图标按钮:紧凑间距(排除「设为默认」等文本按钮) */
+:deep(.el-table .el-button.is-text:not(.el-button--success)) { padding: 5px 6px; }
+:deep(.el-table .el-button.is-text:not(.el-button--success) + .el-button.is-text:not(.el-button--success)) { margin-left: 4px; }
 
 @media (max-width: 768px) {
   .storage-settings { max-width: 100%; overflow-x: hidden; }

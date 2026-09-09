@@ -158,6 +158,7 @@
     </div>
     <!-- 缩略图(迷你地图):右上角悬浮,可折叠成横条;拖拽手柄单击切换折叠/展开,拖动移动位置 -->
     <div
+      v-if="showThumb"
       class="fp-thumb"
       :class="{ 'is-collapsed': thumbCollapsed }"
       :style="thumbStyle"
@@ -198,6 +199,7 @@ const props = defineProps({
   scale: { type: Number, default: 100 },
   imageTransform: { type: Object, default: null },
   fitKey: { type: Number, default: 0 },
+  showThumb: { type: Boolean, default: true },
   floorTransition: { type: Object, default: () => ({ direction: 'down', phase: '' }) },
 })
 const emit = defineEmits(['save-room', 'save-rooms', 'save-furniture', 'save-item', 'create-room', 'create-furniture', 'place-furniture', 'select-furniture', 'edit-furniture-items', 'calibrate', 'calibrate-confirm', 'edit-edge', 'delete-furniture', 'rename-room', 'rename-furniture', 'cut-room', 'glue-rooms', 'save-image-transform'])
@@ -835,14 +837,25 @@ const onWheel = (e) => {
 
 // ---- 搜索定位放大居中 ----
 let focusTween = null
+let pendingFocus = null // 底图加载期间暂缓的聚焦请求,等图片就绪并 fit() 后再执行,避免 fit() 重置 view 打断放大补间
 const stopFocusTween = () => { if (focusTween) { focusTween.kill(); focusTween = null } }
-// 平滑缩放并居中到世界坐标点(一次性 GSAP 补间 view;滚轮/拖拽平移会立即停止补间)
-const focusPoint = (x, y, targetK) => {
+const applyFocus = (x, y, targetK) => {
   const w = wrapRef.value?.clientWidth || 800
   const h = wrapRef.value?.clientHeight || 500
   const k = clamp(targetK || Math.max(view.value.k, 1.6), 0.1, 8)
   stopFocusTween()
   focusTween = gsap.to(view.value, { k, tx: w / 2 - x * k, ty: h / 2 - y * k, duration: 0.45, ease: 'power2.out' })
+}
+const flushFocus = () => {
+  if (!pendingFocus || imgLoading.value) return
+  const p = pendingFocus
+  pendingFocus = null
+  applyFocus(p.x, p.y, p.targetK)
+}
+// 平滑缩放并居中到世界坐标点(一次性 GSAP 补间 view;滚轮/拖拽平移会立即停止补间)
+const focusPoint = (x, y, targetK) => {
+  pendingFocus = { x, y, targetK }
+  nextTick(() => flushFocus())
 }
 // 定位到物品:物品无锚点(未摆放)时依次回退 家具中心 → 房间中心 → 全景适配
 const focusItem = (id) => {
@@ -1676,7 +1689,10 @@ watch(() => props.fitKey, () => {
   if (imgLoading.value) return // 新图尚未就绪:等 imgSize 变化后由下方监听器补适配
   scheduleFit()
 })
-watch(imgSize, () => scheduleFit())
+watch(imgSize, () => {
+  scheduleFit()
+  nextTick(() => flushFocus())
+})
 let resizeObserver = null
 onMounted(() => {
   scheduleFit()

@@ -43,8 +43,12 @@
             </div>
             <div class="record-amount" :class="typeCls(r)">{{ (r.type === 'EXPENSE' ? '-' : '+') + r.amount }}</div>
             <div class="record-actions">
-              <el-button size="small" text @click="openEditor(r)">{{ $t('common.edit') }}</el-button>
-              <el-button size="small" text type="danger" @click="onDel(r)">{{ $t('common.delete') }}</el-button>
+              <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
+                <el-button size="small" text @click="openEditor(r)"><el-icon><Edit /></el-icon></el-button>
+              </el-tooltip>
+              <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+                <el-button size="small" text type="danger" @click="onDel(r)"><el-icon><Delete /></el-icon></el-button>
+              </el-tooltip>
             </div>
           </div>
           <el-empty v-if="!records.length" :description="$t('book.noRecords')" />
@@ -100,6 +104,7 @@
 // 记账本:月度明细+收支统计;改删仅记录人/家长(后端校验),前端按条件隐藏按钮
 import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { bookApi } from '@/api'
@@ -254,6 +259,8 @@ onMounted(load)
 .record-amount.t1 {
   color: #67c23a;
 }
+.record-actions :deep(.el-button) { padding: 5px 6px; }
+.record-actions :deep(.el-button + .el-button) { margin-left: 4px; }
 .cat-row {
   display: flex;
   justify-content: space-between;

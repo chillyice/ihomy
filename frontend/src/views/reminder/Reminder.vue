@@ -23,8 +23,12 @@
             </div>
           </div>
           <div class="reminder-actions">
-            <el-button size="small" text @click="openEditor(r)">{{ $t('common.edit') }}</el-button>
-            <el-button size="small" text type="danger" @click="onDel(r)">{{ $t('common.delete') }}</el-button>
+            <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
+              <el-button size="small" text @click="openEditor(r)"><el-icon><Edit /></el-icon></el-button>
+            </el-tooltip>
+            <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+              <el-button size="small" text type="danger" @click="onDel(r)"><el-icon><Delete /></el-icon></el-button>
+            </el-tooltip>
           </div>
         </div>
       </div>
@@ -66,6 +70,7 @@
 // 提醒事项:增删改+完成勾选;触发由后端定时任务推送站内通知
 import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { reminderApi } from '@/api'
 import Breadcrumb from '@/components/Breadcrumb.vue'
@@ -166,6 +171,8 @@ onMounted(load)
   font-size: 12px;
   margin-top: 6px;
 }
+.reminder-actions :deep(.el-button) { padding: 5px 6px; }
+.reminder-actions :deep(.el-button + .el-button) { margin-left: 4px; }
 
 @media (max-width: 768px) {
   .reminder-item { flex-wrap: wrap; }
