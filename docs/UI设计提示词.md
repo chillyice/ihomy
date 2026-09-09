@@ -229,26 +229,28 @@
 - `.sidebar-nav`(滚动区):`transform: translateZ(0)` + `will-change: transform`
 - nav-item hover 用 `transform: translateX(4px) scale(1.03)`(而非 box-shadow,避免触发 backdrop-filter 重算)
 
-## 10. 首页栅格仪表盘(12列×9行)
+## 10. 首页栅格仪表盘(12列×9行,V9.53 四档 snap + hover 推开邻居)
 
 - 12 列×9 行栅格,组件按栅格单元定位(col/row/w/h)。
 - GAP=40px,四边 margin(top=32/right=40/bottom=40/left=260,左侧=侧边栏220+40)。
 - 栅格尺寸根据 `window.innerWidth/Height` 自适应计算 `cellW`/`cellH`。
-- 组件 `position: fixed`,left/top/width/height 由 `cardStyle(w)` 按栅格计算。
+- 组件 `position: fixed`,left/top/width/height 由 `cardBoxStyle(w)` 按栅格计算。
+- **四档尺寸(V9.53)**:档位由面积推导 `displayTier(w)`=`w.w*w.h` → `≤4=S(小)/≤9=M(中)/≤20=L(大)/>20=XL(巨大)`;自由拖拽缩放改 snap 四档(`snapSize` 吸附到最近档);拖入/拖出默认尺寸各组件不同(`WIDGET_DEFAULT_SIZE`);每档内部排版不同(小=一眼核心/中=详略得当/大=完整/巨大=扩展,`nFeed/nTask/nReminder/nAnni/nRecipe/nWish/nForecast(w)` 按档截断列表)。
+- **hover 放大 + 推开邻居(V9.53)**:中/小档 hover 临时升一档(大/巨大档不参与);悬停组件 `h-boosted` 放大(scale+阴影+描边加深),邻居 `h-pushed` 缩成胶囊(`transform` 视觉位移,不触发 grid reflow);小档未展开时右下角 `.wave-hint` 波浪三点+「悬停查看更多」文字;悬停延迟防扫视抖动。
 - **编辑模式**:导航栏 EditPen 按钮切换 `appStore.homeEditMode`。
   - 侧边栏导航项变为组件来源(向右下偏移 `translate(4px,4px)` + 暖棕虚线边框 + 半透明底色;hover 进一步 `translate(8px,8px) scale(1.05)`)。
   - 原位置虚线框占位(`::before`)。
-  - 从侧边栏拖出到内容区,ghost 由 `scale(0.3)` 弹性增长到 `scale(1)`(cubic-bezier 0.34,1.56,0.64,1),尺寸 80×60→200×150;drop 创建 4×5 新组件。
+  - 从侧边栏拖出到内容区,ghost 由 `scale(0.3)` 弹性增长到 `scale(1)`(cubic-bezier 0.34,1.56,0.64,1),尺寸 80×60→200×150;drop 按 WIDGET_DEFAULT_SIZE 创建组件。
   - 侧边栏右边界气泡融合效果(`::after` radial-gradient pulse)。
-  - 卡片可拖拽移动(drag-bar 顶部手柄)+ 缩放(resize-corner 右下角),栅格吸附(`Math.round(dx/(cw+GAP))`)。
+  - 卡片可拖拽移动(drag-bar 顶部手柄)+ 缩放(resize-corner 右下角),缩放 snap 四档、移动栅格吸附(`Math.round(dx/(cw+GAP))`)。
   - 编辑模式禁用内部交互(`.card-inner { pointer-events: none }`),仅移动+缩放+删除。
   - grid-cell 出现动画(逐个渐现 `cellAppear 0.4s ease`,delay `i*5ms`)。
   - 编辑工具栏 hover 隐藏(`opacity:0; translateY(-10px); pointer-events:none`)。
   - 栅格背景可见(`.grid-overlay` CSS grid,JS 计算的 `--cell-w`/`--cell-h` 变量)。
 - **h=1 时标题行消失**:`.card-head` opacity→0 + max-height→0 + padding→0(0.3s ease 动效)。
 - 点击组件置顶(zCounter,编辑/非编辑模式均可)。
-- 布局持久化 localStorage `ihomy:dashboard:layout`。
-- 8 个默认组件:feed(5×5)/anni(3×4)/weather(3×2)/today(3×2)/recipe(4×4)/wish(3×2)/album(5×3)/finance(2×2)。
+- 布局持久化 localStorage `ihomy:dashboard:layout:v2`(版本号升级,旧 v1 布局弃用)。
+- **默认布局 9 组件(V9.53)**:feed(4×5)/weather(3×3)/anni(3×3)/today(3×2)/album(4×4)/search(4×5)/recipe(2×2)/wish(2×2)/finance(2×2);task 由侧边栏拖入;**删除「背景音乐」格子**(与悬浮黑胶播放器冗余)。
 - 相册组件照片可溢出边界(`overflow: visible`,z-index:40)。
 
 ### 通用毛玻璃样式(dash-card)
@@ -262,17 +264,18 @@ box-shadow: 0 8px 28px rgba(58, 46, 34, 0.1), inset 0 1px 0 rgba(255, 255, 255, 
 color: #3A2E22;
 ```
 
-### 组件内容(hover 效果统一:背景变化,无 transform 位移)
-- **家人动态(feed)**:头像+气泡消息,bubble hover `background` 变化(无 translateX)。
-- **悬赏任务(task)**:奖励图标+标题+状态点,行 hover `background`。
-- **今日(today)**:积分余额+连续天数+签到按钮+待办提醒。
-- **天气(weather)**:城市+温度+图标+状况+未来三天+空气+预警(默认展开)。
-- **纪念日(anni)**:名称+日期+倒计时天数,行 hover `background`+`border-radius`。
-- **今日推荐(recipe)**:菜谱列表(封面+名称),行 hover `background`。
-- **物品寻找(search)**:输入框+搜索结果(名称+位置),行 hover `background`。
-- **愿望单(wish)**:愿望列表(状态点+标题),行 hover `background`。
+### 组件内容(V9.53 起按档渐进展开;hover 统一:背景变化,不再整体 transform 位移)
+- **家人动态(feed)**:头像+气泡消息,bubble hover `background` 变化;条目数按档截断 `nFeed(w)`。
+- **悬赏任务(task)**:奖励图标+标题+状态点,行 hover `background`;`nTask(w)`。
+- **今日(today)**:积分余额+连续天数+签到按钮+待办提醒;S 档隐藏待办(`nReminder(w)>0` 才渲染)。
+- **天气(weather,V9.53 AI 生图底图)**:中档以上 `tierOf(w)!=='S'` 渲染 `.weather-bg`(AI 生图 URL 背景+渐变遮罩,叠加毛玻璃 `.weather-main`);S 档只显示图标+温度;大/巨大档加多日预报条 `.weather-forecast`;点击进详情页。
+- **纪念日(anni)**:名称+日期+倒计时天数,行 hover `background`+`border-radius`;`nAnni(w)`。
+- **今日推荐(recipe)**:菜谱列表(封面+名称),行 hover `background`;`nRecipe(w)`。
+- **寻物(search,V9.53 缩小版 item 页)**:搜索框(关键词优先+AI 兜底)+只读户型图 FloorPlanCanvas(mode=view)+命中放大居中+上/下一个导航+语音找物(Web Speech API);无户型图显示引导文案。
+- **愿望单(wish)**:愿望列表(状态点+标题),行 hover `background`;`nWish(w)`。
 - **本月收支(finance)**:收入/支出/结余三列。
-- **音乐(music)**:背景歌单名+曲目列表,无歌单显示空状态。
+- **相册(album,V9.53 封面 3D 翻开)**:无近 7 天新照片时闭合相册封面 hover 沿书脊翻到 145° 露出内页历史照片轮播(静躺 2s→翻阅 1.5s);有近期照片仍走拍立得堆。
+- ~~**音乐(music)**~~:已删除(V9.53,与悬浮黑胶 MusicPlayer 冗余)。
 
 ## 11. 黑胶唱片播放器(MusicPlayer,z-index 55)
 
@@ -646,6 +649,10 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 
 43. **文件浏览页与存储管理 tab**(`/storage/files` 独立功能页 2026-09-08 拆分;存储管理=设置页 tab 统一设计):文件浏览页=面包屑(文件浏览)+`.page-toolbar.card` 工具栏(tb-left=设备下拉 180px clearable+占位「请选择设备后浏览」→返回上一级→路径面包屑可点,tb-right=新建目录/多选,选择态=选中计数+删除所选(danger)+取消)+文件表(名称/大小/修改时间/操作,行内 pick-badge 对勾圆标多选与相册同款;预览/下载/重命名行按钮,重命名 OWNER);**设备识别不到/清空/浏览失败→卡片空态显示,不残留旧数据**;无自定义设备→el-empty 空态引导(OWNER 带「去添加设备」跳设置)。存储管理 tab=三张 `.card.settings-card`+`.section-label` 竖线标题(与其他设置 tab 同款,完成 §9 P2 统一):设备管理卡(设备表+添加设备 `.mgmt-toolbar`+浏览按钮跳转文件浏览页)、百度网盘接入卡(授权状态 tag+回调地址 code 块+复制)、从设备同步卡(映射说明+清理缩略图/从设备同步按钮);设置页所有操作按钮收敛 `.mgmt-toolbar`(`display:flex; gap:8px; margin-bottom:12px`),不再用功能页 `.page-toolbar`。
 
-44. **AI 测试台**(`/tools/ai-playground`,2026-09-08 V9.41 临时页,工具箱入口卡片,requiresAuth):面包屑(工具箱→AI 测试台)+`.page-toolbar.card` 工具栏(tb-left=能力 el-radio-group small(对话/图片生成/语音识别)+模型名 `el-tag` type=info+可用状态 tag(success=可用/danger=未配置),由 GET /ai/status 配置驱动);未配置能力→`el-alert` warning 提示(external.yml 配置 app.ai.* 后重启后端)+面板按钮禁用。**对话面板**=系统提示词 textarea 2 行(可选)+温度滑杆 0~2 step 0.1(右侧数值展示)+多轮气泡消息区(max-height 420px 滚动,`.pg-chat-list` 边框圆角 10px `--color-bg-2` 底,user 右侧 `--color-accent` 白字/assistant 左侧 `--color-card`,bubble 圆角 12px 白字 pre-wrap)+输入 textarea 2 行(Enter 发送 Shift+Enter 换行)+右侧动作列(清空+发送 loading)+耗时 meta 行。**图片面板**(V9.44 方舟参数全量开放,未自定义参数不进请求体)=prompt textarea 3 行+参考图缩略图列表(FileReader base64 读图,≤10 张,行内删除角标)+尺寸预设下拉(adaptive(跟随模型)/默认(比例随机)/2048x2048/1920x1920/1440x2560/2560x1440/2K/4K,**Seedream 5.0 下限总像素 ≥3686400**)+张数 el-input-number 1~4(组图模式启用时隐藏)+组图模式下拉(off/auto,auto=顺序生成直到认为完整)+组图上限 el-input-number 1~10 缺省 4+种子 el-input-number(-1 随机,≥0 透传)+引导强度勾选启用+滑杆 1~10 缺省 4+水印开关(默认关)+响应格式下拉(url/b64_json)+生成按钮+v-loading 占位+结果网格(`repeat(auto-fill, minmax(200px,1fr))`,el-image 1:1 圆角 10px 点击预览+复制签名 URL 按钮)+小字档位说明。**语音面板**=选音频按钮(hidden input accept=audio/*)+文件名大小+语言下拉(zh/en,clearable)+转写按钮+结果展示(`--color-card-2` 底圆角 10px pre-wrap)。页面本体独立 chunk 懒加载(8.4KB JS+5.4KB CSS)。
+44. **AI 测试台**(`/tools/ai-playground`,2026-09-08 V9.41 临时页,工具箱入口卡片,requiresAuth;V9.53 改「指令(左)+舞台(右)」双栏):面包屑(工具箱→AI 测试台)+`.wk-bar card` 能力切换区(tb-left=能力 el-radio-group small(对话/图片生成/语音识别)+模型名 `el-tag` type=info+可用状态 tag(success=可用/danger=未配置),由 GET /ai/status 配置驱动);未配置能力→`el-alert` warning 提示+面板按钮禁用。**V9.53 起双栏 `.wk-grid`**:左 `.wk-deck`(输入区)=内容区 `.wk-eyebrow`(内容)+`.wk-adv`(更多设置折叠,含温度等高级参数),右 `.wk-stage`(输出区)=气泡消息/结果展示。**对话面板**=系统提示词 textarea 2 行+温度滑杆 0~2 step 0.1(折叠)+多轮气泡消息区(max-height 滚动,user 右侧 accent 白字/assistant 左侧 card)+输入 textarea(Enter 发送)+清空/发送+耗时 meta。**图片面板**=prompt+参考图+尺寸/张数/种子/引导强度/水印/响应格式(方舟参数,V9.44)+生成+结果网格。**语音面板**=选音频+语言+转写+结果。**天气背景 AI 生成配置(V9.53)**:启用开关/画面风格/图片尺寸/图组保鲜(天)/水印/自定义场景,保存 localStorage,作用于首页天气组件 AI 生图底图。页面本体独立 chunk 懒加载。
 
-45. **设置页·家庭 AI 配置面板**(`Settings` 分类「AI 配置」🤖,2026-09-08 V9.43,V9.47 去全局兜底,V9.48 改模型池+功能绑定,V9.49 加 LOCAL 本地规则,V9.50 加百度短语音,V9.52 加功能兜底模型,仅家长可见——菜单项 `v-if userStore.hasPerm('family:manage')`,与其他设置大类同款侧栏导航):单张 `.card.settings-card` v-loading+`.section-label` 标题「家庭 AI 配置(模型池 + 功能绑定)」+说明文案 `.share-tip`(先加模型再按功能选/服务地址+Key+模型标识配齐即启用/Key 加密不回传)。**模型池区**:`.ai-sub-label` 分节标题「模型池」+`.ai-toolbar` 右上「添加模型」primary plain 按钮+`el-table`(列:模型名称/类型 el-tag size=small(语言模型/图片模型/语音模型/本地规则,LOCAL 内置行另加 type=info「内置」角标 `.ai-builtin`,百度短语音行(provider=BAIDU)另加「百度短语音」角标 `.ai-builtin`)/模型标识/服务地址 overflow-tooltip/操作=编辑+删除 text 按钮,LOCAL 内置行显「—」不渲染编辑/删除);模型编辑 `el-dialog`(append-to-body,480px,label-width 110px:模型名称/类型 el-select 三选一(LLM/IMAGE/ASR,不含 LOCAL)/协议·服务商 el-select(仅 ASR 显,OpenAI 兼容|百度短语音,选百度才显后续百度专属字段,切非 ASR 自动回 OpenAI)/服务地址(动态 label+占位:百度=「识别接口地址(百度 server_api)」+`https://vop.baidu.com/server_api`)/API Key type=password show-password 占位「已配置,留空保留原值」或「必填」/Secret Key(仅百度显,type=password show-password,占位「已配置,留空保留原值」或「百度 Secret Key(换 access_token)」)/模型标识(动态占位:百度=`dev_pid 如 1537(普通话)`)/超时 el-input-number 1000~600000 step 1000),底部取消+确定。**功能绑定区(V9.52 起每行双下拉)**:`.ai-sub-label`「功能绑定」+5 行 `.ai-feature-row`(flex:左侧 `.ai-feature-name` 96px 功能名「物品寻找/物品放物/AI 对话/图片生成/语音识别」+两个 `.ai-feature-select` el-select filterable clearable——第一个=主模型(选项=允许类型的模型池条目——找物/放物=LOCAL+LLM、对话/图片/语音各自单一类型,由后端 modelTypes 数组过滤 `modelsByTypes`,label「名称(模型标识)」,placeholder「未选择(该功能停用)」),第二个=兜底模型(同类型过滤且排除主模型 `modelsByTypesExcluding`,placeholder「兜底模型(可选)」);两者选择均 PUT 保存 `{modelId,fallbackModelId}`)+右侧 `.ai-feature-state`(可用=主题色/未配置=灰,LOCAL 恒可用,百度 ASR 需 baseUrl+API Key+Secret Key+dev_pid 配齐));删除模型用 ElMessageBox 确认「删除后绑定它的功能将变为未配置(停用)」。
+45. **设置页·家庭 AI 配置面板**(`Settings` 分类「AI 配置」🤖,2026-09-08 V9.43,V9.47 去全局兜底,V9.48 改模型池+功能绑定,V9.49 加 LOCAL 本地规则,V9.50 加百度短语音,V9.52 加功能兜底模型,V9.53 加天气生图 WEATHER_IMAGE,仅家长可见——菜单项 `v-if userStore.hasPerm('family:manage')`,与其他设置大类同款侧栏导航):单张 `.card.settings-card` v-loading+`.section-label` 标题「家庭 AI 配置(模型池 + 功能绑定)」+说明文案 `.share-tip`(先加模型再按功能选/服务地址+Key+模型标识配齐即启用/Key 加密不回传)。**模型池区**:`.ai-sub-label` 分节标题「模型池」+`.ai-toolbar` 右上「添加模型」primary plain 按钮+`el-table`(列:模型名称/类型 el-tag size=small(语言模型/图片模型/语音模型/本地规则,LOCAL 内置行另加 type=info「内置」角标 `.ai-builtin`,百度短语音行(provider=BAIDU)另加「百度短语音」角标 `.ai-builtin`)/模型标识/服务地址 overflow-tooltip/操作=编辑+删除 text 按钮,LOCAL 内置行显「—」不渲染编辑/删除);模型编辑 `el-dialog`(append-to-body,480px,label-width 110px:模型名称/类型 el-select 三选一(LLM/IMAGE/ASR,不含 LOCAL)/协议·服务商 el-select(仅 ASR 显,OpenAI 兼容|百度短语音,选百度才显后续百度专属字段,切非 ASR 自动回 OpenAI)/服务地址(动态 label+占位:百度=「识别接口地址(百度 server_api)」+`https://vop.baidu.com/server_api`)/API Key type=password show-password 占位「已配置,留空保留原值」或「必填」/Secret Key(仅百度显,type=password show-password,占位「已配置,留空保留原值」或「百度 Secret Key(换 access_token)」)/模型标识(动态占位:百度=`dev_pid 如 1537(普通话)`)/超时 el-input-number 1000~600000 step 1000),底部取消+确定。**功能绑定区(V9.52 起每行双下拉,V9.53 起 6 行)**:`.ai-sub-label`「功能绑定」+6 行 `.ai-feature-row`(flex:左侧 `.ai-feature-name` 96px 功能名「物品寻找/物品放物/AI 对话/图片生成/天气生图/语音识别」+两个 `.ai-feature-select` el-select filterable clearable——第一个=主模型(选项=允许类型的模型池条目——找物/放物=LOCAL+LLM、对话=LLM、图片/天气生图=IMAGE、语音=ASR,由后端 modelTypes 数组过滤 `modelsByTypes`,label「名称(模型标识)」,placeholder「未选择(该功能停用)」),第二个=兜底模型(同类型过滤且排除主模型 `modelsByTypesExcluding`,placeholder「兜底模型(可选)」);两者选择均 PUT 保存 `{modelId,fallbackModelId}`)+右侧 `.ai-feature-state`(可用=主题色/未配置=灰,LOCAL 恒可用,百度 ASR 需 baseUrl+API Key+Secret Key+dev_pid 配齐));删除模型用 ElMessageBox 确认「删除后绑定它的功能将变为未配置(停用)」。
+
+46. **设置页·天气 tab**(`Settings` 分类「天气」🌤️,2026-09-10 V9.53,仅家长可见——菜单项 `v-if userStore.hasPerm('family:manage')`,天气地区+预警推送自「光影」设置迁入):三张 `.card.settings-card`+`.section-label` 竖线标题(与其他设置 tab 同款)。**天气地区卡**:地区 el-select filterable remote(搜索城市名如「济南」,`weatherLocationId` 变更即保存)+「使用 IP 定位」按钮+当前地区/说明 `.share-tip`。**气象预警推送卡**:el-switch 开关(30 分钟一轮推送到通知铃铛)。**天气 API 凭证卡**:`.ai-toolbar` 右上「新增凭证」primary plain 按钮+凭证列表(名称+默认 tag(绿,status=1)+设为默认(非默认项)/编辑/删除图标按钮)+el-empty 空态引导;凭证编辑 `el-dialog`(560px,label-width 130px:凭证名称/环境 el-select(test/prod)/天气源 el-select(QWEATHER/OPENWEATHER/AMAP)——选 QWEATHER 显示 API Host/项目 ID/凭证 ID/私钥 textarea(留空保留原值)/公钥 textarea(可选),选其他天气源只显示 API Key type=password show-password;密钥 ENC 入库不回显,列表只回 privateKeySet/publicKeySet/apiKeySet 布尔);启用前校验密钥已填(和风看私钥,其他看 API Key)。
+
+47. **列表行内操作图标化(V9.53)**:功能页列表/表格的「编辑/删除」文字按钮统一改 `el-tooltip`(content 提示,placement=top,show-after 300ms)包裹的 `el-icon`(Edit/Delete)图标按钮(`size="small" text`),删除钮 `type="danger"`;同步删除自定义 `.cat-op-btn`/`.action-btn`/`.ghost-btn.danger` CSS(main.css 删 `.ghost-btn.danger`)。覆盖页:Anniversary/Album/BlogDetail/BlogList/Book/Cinema/DiaryPage/LibraryList/Music/Plan/Points/Reminder/Storage/Wish/Settings(AI 模型表操作列)/Item/FloorPlanCanvas/MindMapEditor。

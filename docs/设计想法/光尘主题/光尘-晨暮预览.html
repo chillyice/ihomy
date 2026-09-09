@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-mode="dawn" data-theme="guangchen">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>光尘 · Light &amp; Dust — 晨 / 暮 主题预览</title>
+<style>
+  /* ===== 光尘 调色板(晨 dawm / 暮 dusk)===== */
+  :root{
+    --bg: #F1E7D6;            /* 晨 背景暖木米 */
+    --bg-2: #E4D5BF;          /* 晨 暖木米浅褐 */
+    --card: #FBF3E4;          /* 晨 卡片羊皮纸 */
+    --card-2: #EBDCC6;        /* 晨 卡片边 */
+    --primary: #8A6A4E;       /* 晨 主色深木 */
+    --primary-hover: #7A5B40; /* 晨 主色 hover 深木 */
+    --accent: #C9807A;        /* 晨 强调陶土 */
+    --green: #7C8B6C;         /* 晨 点缀鼠尾草绿 */
+    --text: #4A3A2B;          /* 晨 正文深褐 */
+    --text-2: #8A7A64;        /* 晨 次要文字 */
+    --text-3: #B5A98C;        /* 晨 弱文字 */
+    --border: rgba(138,106,78,.14);
+    --line: rgba(138,106,78,.10);
+    --shadow: 0 10px 28px rgba(122,90,60,.14), 0 2px 6px rgba(122,90,60,.08);
+    --shadow-hover: 0 16px 44px rgba(122,90,60,.22), 0 3px 8px rgba(122,90,60,.10);
+    --glow-warm: rgba(201,128,122,.55);
+    --beam: url("data:image/svg+xml,%3Csvg width='340' height='760' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='b' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23FFE9C4' stop-opacity='.38'/%3E%3Cstop offset='.55' stop-color='%23FFDDA6' stop-opacity='.13'/%3E%3Cstop offset='1' stop-color='%23FFDDA6' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='340' height='760' fill='url(%23b)' transform='rotate(14 170 380)'/%3E%3C/svg%3E");
+  }
+  html[data-mode="dusk"]{
+    --bg: #241A12;            /* 暮 背景深咖 */
+    --bg-2: #2E2217;          /* 暮 深咖褐 */
+    --card: #33241A;          /* 暮 卡片暖褐 */
+    --card-2: #3D2C20;        /* 暮 卡片边 */
+    --primary: #C9A16E;       /* 暮 主色琥珀木 */
+    --primary-hover: #D8B47E; /* 暮 主色 hover */
+    --accent: #E19A8C;        /* 暮 强调陶土 */
+    --green: #8FA080;         /* 暮 绿 */
+    --text: #EFE0C8;          /* 暮 正文奶油 */
+    --text-2: #C0A98C;        /* 暮 次要 */
+    --text-3: #9A8767;        /* 暮 弱 */
+    --border: rgba(201,161,110,.16);
+    --line: rgba(201,161,110,.12);
+    --shadow: 0 12px 32px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.35);
+    --shadow-hover: 0 18px 48px rgba(0,0,0,.55), 0 3px 10px rgba(0,0,0,.4);
+    --glow-warm: rgba(225,154,140,.42);
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    color:var(--text);
+    background:var(--bg);
+    min-height:100vh;
+    transition:background .8s ease,color .8s ease;
+    overflow-x:hidden;
+  }
+
+  /* ===== 全局氛围层:缓慢呼吸的背景渐变(光/风/浮尘)/窗光/尘 ===== */
+  .atmos{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+  .atmos .sky{position:absolute;inset:0;
+    background:
+      radial-gradient(1200px 600px at 82% -8%, var(--bg-2), transparent 62%),
+      radial-gradient(900px 500px at 14% 108%, var(--bg-2), transparent 55%),
+      var(--bg);
+  }
+  /* 一扇"窗"的窗框阴影(光尘签名) */
+  .win{position:absolute;top:-40px;right:6%;width:300px;height:520px}
+  .win::before,.win::after,.win .bar{content:"";position:absolute;background:rgba(120,88,50,.16);box-shadow:0 1px 8px rgba(0,0,0,.06)}
+  .win::before{left:0;right:0;top:0;height:14px}
+  .win::after{left:0;right:0;bottom:0;height:14px}
+  .win .bar{top:0;bottom:0;left:50%;width:14px;transform:translateX(-50%)}
+  .win .bar2{position:absolute;left:0;right:0;top:50%;height:14px;transform:translateY(-50%)}
+  html[data-mode="dusk"] .win::before,html[data-mode="dusk"] .win::after,html[data-mode="dusk"] .win .bar,html[data-mode="dusk"] .win .bar2{background:rgba(255,206,150,.10)}
+  /* 光柱:角度/强度缓移,像纱窗飘动 */
+  .beam{position:absolute;top:-60px;right:8%;width:340px;height:760px;background:var(--beam);background-size:100% 100%;
+    filter:blur(2px);opacity:.85;mix-blend-mode:screen;animation:beamDrift 14s ease-in-out infinite alternate}
+  html[data-mode="dusk"] .beam{opacity:.5}
+  @keyframes beamDrift{from{transform:rotate(4deg) translateX(0)}to{transform:rotate(9deg) translateX(-26px)}}
+  .bloom{position:absolute;top:56px;right:11%;width:220px;height:220px;border-radius:50%;
+    background:radial-gradient(circle,var(--glow-warm),transparent 68%);filter:blur(30px);opacity:.8}
+  html[data-mode="dusk"] .bloom{opacity:.65}
+
+  /* 尘粒:在光柱区缓漫蛇形飘移,离光变淡 */
+  .dust{position:absolute;width:4px;height:4px;border-radius:50%;background:#FFEFCF;
+    filter:blur(.4px);opacity:0;animation:dust 16s ease-in-out infinite;
+    box-shadow:0 0 6px 1px rgba(255,236,196,.8)}
+  html[data-mode="dusk"] .dust{background:#F3C983;box-shadow:0 0 6px 1px rgba(243,201,131,.7)}
+  @keyframes dust{
+    0%{transform:translate(0,0);opacity:0}
+    12%{opacity:.9}
+    28%{transform:translate(30px,60px);opacity:1}
+    46%{transform:translate(-14px,150px);opacity:.9}
+    64%{transform:translate(26px,250px);opacity:.7}
+    82%{transform:translate(8px,380px);opacity:.4}
+    100%{transform:translate(-16px,520px);opacity:0}
+  }
+
+  /* ===== 预览壳 ===== */
+  .wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:30px 20px 60px}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:14px}
+  .brand .logo{width:44px;height:44px;border-radius:14px;background:var(--primary);color:var(--card);
+    display:grid;place-items:center;font-weight:700;font-size:20px;box-shadow:var(--shadow)}
+  .brand h1{font-size:18px;margin:0;font-weight:650;letter-spacing:.3px}
+  .brand p{margin:2px 0 0;font-size:12.5px;color:var(--text-2)}
+  .ctl{display:flex;gap:10px;align-items:center}
+  .seg{display:inline-flex;padding:4px;gap:4px;background:var(--card);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow)}
+  .seg button{all:unset;cursor:pointer;padding:8px 20px;border-radius:11px;font-size:13.5px;color:var(--text-2);transition:.25s}
+  .seg button.on{background:var(--primary);color:var(--card);box-shadow:var(--shadow)}
+  .seg button.on:hover{background:var(--primary-hover)}
+  .note{font-size:12px;color:var(--text-3)}
+
+  /* ===== 模拟 App ===== */
+  .studio{border-radius:22px;overflow:hidden;background:var(--bg);border:1px solid var(--border);box-shadow:var(--shadow-hover)}
+  .app{display:grid;grid-template-columns:230px 1fr;min-height:660px}
+  /* 侧栏 */
+  .side{background:linear-gradient(180deg,var(--card),var(--card-2));border-right:1px solid var(--line);padding:16px 14px}
+  .side .card{background:transparent;border:none;box-shadow:none;padding:0;margin:0}
+  .side .user{display:flex;align-items:center;gap:11px;padding:4px 6px 16px;border-bottom:1px solid var(--line);margin-bottom:12px}
+  .side .av{width:38px;height:38px;border-radius:50%;background:var(--green);color:var(--card);display:grid;place-items:center;font-weight:700}
+  .side .nm{font-size:13.5px;font-weight:600;color:var(--text)}
+  .side .fm{font-size:11.5px;color:var(--text-3)}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:11px;font-size:13.5px;color:var(--text-2);cursor:pointer;margin-bottom:2px;transition:.2s}
+  .nav-item:hover{background:var(--line);color:var(--text)}
+  .nav-item.act{background:var(--primary);color:var(--card);box-shadow:var(--shadow)}
+  .nav-item .dot{width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.7}
+  .side .foot{position:absolute;bottom:16px;left:14px;right:14px}
+
+  /* 主区 */
+  .main{padding:22px 24px 30px}
+  .main-head{display:flex;align-items:end;justify-content:space-between;margin-bottom:20px}
+  .main-head h2{font-size:20px;margin:0;font-weight:650}
+  .main-head .sub{font-size:12.5px;color:var(--text-3);margin-top:3px}
+  .g-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+
+  /* 卡片 = 家具块(暖木/羊皮,非玻璃):暖木边框 + 更暖更柔阴影 */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;
+    box-shadow:var(--shadow);padding:18px;position:relative;transition:box-shadow .35s ease,transform .35s ease,background .6s ease}
+  .card:hover{box-shadow:var(--shadow-hover)}
+  .card h3{font-size:13px;font-weight:650;margin:0 0 12px;color:var(--text)}
+  .card .muted{font-size:11.5px;color:var(--text-3)}
+
+  .c12{grid-column:span 12}.c8{grid-column:span 8}.c6{grid-column:span 6}.c4{grid-column:span 4}.c3{grid-column:span 3}
+
+  /* 天气「活窗」— 光尘签名 */
+  .win-card{grid-column:span 8;overflow:hidden;background:var(--card)}
+  .win-card .glass{position:relative;height:230px;border-radius:12px;overflow:hidden;
+    background:linear-gradient(160deg,var(--bg-2),var(--card-2));
+    box-shadow:inset 0 0 0 1px var(--line), inset 0 14px 40px rgba(122,90,60,.08)}
+  .win-card .glass::before{content:"";position:absolute;inset:0;
+    background:radial-gradient(360px 200px at 74% 18%, var(--glow-warm), transparent 62%)}
+  .win-card .glass::after{content:"";position:absolute;left:14%;top:-4%;width:46%;height:110%;
+    background:var(--beam);background-size:100% 100%;mix-blend-mode:screen;opacity:.8;transform:rotate(10deg)}
+  html[data-mode="dusk"] .win-card .glass::after{opacity:.5}
+  .win-glow{position:absolute;top:16px;right:20px;width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,var(--glow-warm),transparent 66%);filter:blur(20px)}
+  .win-dust{width:4px;height:4px;border-radius:50%;background:#FFF0D0;position:absolute;left:6%;top:6%;filter:blur(.3px);opacity:0;animation:wd 13s ease-in-out infinite;box-shadow:0 0 6px 1px rgba(255,236,196,.8)}
+  @keyframes wd{0%{transform:translate(0,0) rotate(0);opacity:0}14%{opacity:.9}36%{transform:translate(120px,70px) rotate(160deg);opacity:1}58%{transform:translate(40px,150px) rotate(280deg);opacity:.7}80%{transform:translate(150px,210px) rotate(420deg);opacity:.3}100%{transform:translate(90px,250px);opacity:0}}
+  .win-info{position:absolute;left:22px;bottom:22px;color:var(--text)}
+  .win-info .temp{font-size:40px;font-weight:650;line-height:1;letter-spacing:-1px}
+  .win-info .we{font-size:14px;font-weight:600;margin-top:6px}
+  .win-info .st{font-size:12px;color:var(--text-2);margin-top:3px}
+  .ctrl-row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+
+  /* 按钮 */
+  .btn{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--border);background:var(--line);color:var(--text-2);border-radius:11px;padding:9px 16px;font-size:13px;cursor:pointer;transition:.2s;font-weight:550}
+  .btn:hover{background:var(--card-2);color:var(--text)}
+  .btn.primary{background:var(--primary);border-color:var(--primary);color:var(--card);box-shadow:var(--shadow)}
+  .btn.primary:hover{background:var(--primary-hover)}
+  .btn.accent{background:var(--accent);border-color:var(--accent);color:#FFF7F0;box-shadow:var(--shadow)}
+  .btn.ghost{background:transparent}
+  .btn.sm{padding:6px 12px;font-size:12px;border-radius:9px}
+
+  /* 标签 */
+  .tag{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:9px;font-size:12px;background:var(--line);color:var(--text-2)}
+  .tag.acc{background:var(--accent);color:#FFF7F0}
+  .tag.grn{background:var(--green);color:var(--card)}
+  .tag.pri{background:var(--primary);color:var(--card)}
+
+  /* 进度/健康条 */
+  .meter{height:8px;border-radius:6px;background:var(--line);overflow:hidden;margin-top:8px}
+  .meter>i{display:block;height:100%;background:linear-gradient(90deg,var(--primary),var(--accent));border-radius:6px}
+
+  .list .row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .list .row:last-child{border-bottom:none}
+  .list .row .l{display:flex;align-items:center;gap:9px}
+  .ic{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:13px;background:var(--line)}
+  .val{font-weight:650;color:var(--primary)}
+
+  .spark{display:flex;align-items:flex-end;gap:5px;height:52px;margin-top:10px}
+  .spark i{flex:1;background:linear-gradient(180deg,var(--accent),var(--primary));border-radius:4px 4px 0 0;opacity:.85}
+
+  .seg-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+  .pill{font-size:12px;padding:7px 14px;border-radius:11px;background:var(--line);color:var(--text-2);cursor:pointer;transition:.2s}
+  .pill.on{background:var(--primary);color:var(--card)}
+
+  @media(max-width:880px){
+    .app{grid-template-columns:1fr}
+    .side{display:none}
+    .c12,.c8,.c6,.c4,.c3{grid-column:span 12}
+  }
+</style>
+</head>
+<body>
+  <!-- 氛围层 -->
+  <div class="atmos" aria-hidden="true">
+    <div class="sky"></div>
+    <div class="win"><span class="bar"></span><span class="bar2"></span></div>
+    <div class="beam"></div>
+    <div class="bloom"></div>
+    <span class="dust" style="left:72%;top:40%;animation-delay:-2s"></span>
+    <span class="dust" style="left:66%;top:20%;animation-delay:-5s"></span>
+    <span class="dust" style="left:78%;top:30%;animation-delay:-8s"></span>
+    <span class="dust" style="left:70%;top:6%;animation-delay:-11s"></span>
+  </div>
+
+  <div class="wrap">
+    <!-- 顶栏:切换晨/暮 -->
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo">光</div>
+        <div>
+          <h1>光尘 <span style="font-weight:400;color:var(--text-3);font-size:13px">Light &amp; Dust</span></h1>
+          <p>暖木 · 陶土 · 鼠尾草绿 · 奶油 —— 一扇会呼吸的窗</p>
+        </div>
+      </div>
+      <div class="ctl">
+        <div class="seg" id="seg">
+          <button id="dsun" class="on">☀ 晨 Dawn</button>
+          <button id="dmoon">☾ 暮 Dusk</button>
+        </div>
+        <span class="note">静态预览 · 切换看晨暮对照</span>
+      </div>
+    </div>
+
+    <!-- 模拟应用 -->
+    <div class="studio">
+      <div class="app">
+        <!-- 侧栏 -->
+        <aside class="side">
+          <div class="user">
+            <div class="av">家</div>
+            <div>
+              <div class="nm">小窝</div>
+              <div class="fm">ihomy · 晨暮</div>
+            </div>
+          </div>
+          <div class="nav-item act"><span class="dot"></span>首页</div>
+          <div class="nav-item"><span class="dot"></span>家人动态</div>
+          <div class="nav-item"><span class="dot"></span>相册</div>
+          <div class="nav-item"><span class="dot"></span>厨房</div>
+          <div class="nav-item"><span class="dot"></span>寻物</div>
+          <div class="nav-item"><span class="dot"></span>记事</div>
+          <div class="nav-item"><span class="dot"></span>设置</div>
+        </aside>
+
+        <!-- 主区 -->
+        <div class="main">
+          <div class="main-head">
+            <div>
+              <h2>九月 · 早安</h2>
+              <div class="sub">一家人都在家，今天天气很好</div>
+            </div>
+            <div class="ctrl-row" style="margin:0">
+              <button class="btn primary sm">+ 发点什么</button>
+              <button class="btn ghost sm">家人</button>
+            </div>
+          </div>
+
+          <div class="g-grid">
+            <!-- 天气「活窗」 — 光尘签名 -->
+            <div class="card win-card">
+              <h3 style="display:flex;align-items:center;justify-content:space-between">
+                <span>天气窗 · 杭州</span>
+                <span class="muted">实时</span>
+              </h3>
+              <div class="glass">
+                <div class="win-glow"></div>
+                <span class="win-dust" style="animation-delay:-1s"></span>
+                <span class="win-dust" style="animation-delay:-4s;left:30%;top:12%"></span>
+                <span class="win-dust" style="animation-delay:-7s;left:12%;top:50%"></span>
+                <span class="win-dust" style="animation-delay:-10s;left:44%;top:30%"></span>
+                <div class="win-info">
+                  <div class="temp">24°<span style="font-size:18px;vertical-align:top">C</span></div>
+                  <div class="we">晴 · 白云缓移</div>
+                  <div class="st">仿佛窗外就是午后阳光</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 家人动态 -->
+            <div class="card c4">
+              <h3>家人动态</h3>
+              <div class="list">
+                <div class="row"><span class="l"><span class="ic">📷</span></span><span class="val">妈妈</span><span class="muted">上传相册</span></div>
+                <div class="row"><span class="l"><span class="ic">🍳</span></span><span class="val">爸爸</span><span class="muted">新增菜谱</span></div>
+                <div class="row"><span class="l"><span class="ic">🎁</span></span><span class="val">妹妹</span><span class="muted">愿望 +1</span></div>
+              </div>
+            </div>
+
+            <!-- 纪念日 -->
+            <div class="card c3" style="grid-column:span 4">
+              <h3>纪念日</h3>
+              <div class="val" style="font-size:16px;margin-bottom:4px">结婚纪念日</div>
+              <div class="muted">还有 12 天</div>
+              <div class="meter"><i style="width:68%"></i></div>
+              <div class="ctrl-row" style="margin-top:12px">
+                <button class="btn accent sm">许愿</button>
+              </div>
+            </div>
+
+            <!-- 收支 -->
+            <div class="card c4">
+              <h3>本月收支</h3>
+              <div style="display:flex;justify-content:space-between;align-items:baseline">
+                <div class="val" style="font-size:16px">¥ 2,368</div>
+                <div class="muted">结余</div>
+              </div>
+              <div class="spark"><i style="height:38%"></i><i style="height:60%"></i><i style="height:45%"></i><i style="height:78%"></i><i style="height:55%"></i><i style="height:92%"></i></div>
+            </div>
+
+            <!-- 寻物 -->
+            <div class="card c4">
+              <h3>寻物</h3>
+              <div class="ctrl-row" style="margin-top:4px">
+                <button class="btn primary sm">找东西 →</button>
+              </div>
+              <div class="list" style="margin-top:8px">
+                <div class="row"><span class="l"><span class="ic">📏</span>尺子</span><span class="tag">书房</span></div>
+                <div class="row"><span class="l"><span class="ic">🔍</span>眼镜</span><span class="tag grn">已找到</span></div>
+              </div>
+            </div>
+
+            <!-- 标签/色板示例 -->
+            <div class="card c12" >
+              <h3>色板 &amp; 组件</h3>
+              <div class="seg-row">
+                <span class="pill">晨</span><span class="pill">暮</span>
+                <span class="tag pri">主色</span><span class="tag acc">陶土</span><span class="tag grn">鼠尾草绿</span><span class="tag">奶油</span>
+              </div>
+              <div class="ctrl-row">
+                <button class="btn primary">主按钮 · 深木</button>
+                <button class="btn accent">强调按钮 · 陶土</button>
+                <button class="btn">次按钮</button>
+                <button class="btn ghost">幽灵按钮</button>
+              </div>
+              <div class="muted" style="margin-top:14px">
+                卡片不再用玻璃，改为暖木/羊皮「家具块」——墙是背景，卡片是屋子里的家具。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="note" style="text-align:center;margin-top:16px">
+      光尘 · 主题预览 — 右下角是「会呼吸的窗」:光柱里的尘粒随日光缓漫、暮时暖灯亮起。切换 ☀晨 / ☾暮 看两态。
+    </div>
+  </div>
+
+<script>
+  const root = document.documentElement;
+  const dsun = document.getElementById('dsun');
+  const dmoon = document.getElementById('dmoon');
+  function set(mode){
+    root.setAttribute('data-mode', mode);
+    dsun.classList.toggle('on', mode==='dawn');
+    dmoon.classList.toggle('on', mode==='dusk');
+  }
+  dsun.onclick = ()=>set('dawn');
+  dmoon.onclick = ()=>set('dusk');
+  // 支持 ?mode=dawn|dusk 供无头截图固定态
+  const want = new URLSearchParams(location.search).get('mode');
+  set(want === 'dusk' ? 'dusk' : 'dawn');
+</script>
+</body>
+</html>
