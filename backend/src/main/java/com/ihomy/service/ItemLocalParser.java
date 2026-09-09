@@ -44,6 +44,7 @@ public class ItemLocalParser {
     private final ItemMapper itemMapper;
     private final RoomMapper roomMapper;
     private final FurnitureMapper furnitureMapper;
+    private final SynonymService synonymService;
 
     /** 放物解析结果(供 ItemAiService 执行落库;aliases/quantity/unit 本地规则不强求) */
     public record PutPlan(String name, String aliases, String type, String position,
@@ -56,13 +57,24 @@ public class ItemLocalParser {
     public List<Map<String, Object>> findLocal(Long familyId, String query) {
         String q = query == null ? "" : query.trim();
         if (q.isEmpty()) return List.of();
+        // 同义词变体:原文 + 把 query 中命中的别名替换为组内其它成员,任一叫法都能命中同一条
+        List<String> variants = synonymService.expand(q);
         return itemMapper.selectItemByFamily(familyId, null, null, null, null).stream()
-                .map(row -> Map.entry(score(row, q), row))
+                .map(row -> Map.entry(maxScore(row, variants), row))
                 .filter(e -> e.getKey() > 0)
                 .sorted((a, b) -> b.getKey() - a.getKey())
                 .limit(20)
                 .map(Map.Entry::getValue)
                 .toList();
+    }
+
+    /** 对每行取所有变体的最大得分(同义词扩展后的最佳命中) */
+    private int maxScore(Map<String, Object> row, List<String> variants) {
+        int best = 0;
+        for (String v : variants) {
+            best = Math.max(best, score(row, v));
+        }
+        return best;
     }
 
     /** 反向打分:名称 3 > 别名 2(逗号 split 逐个匹配) > 位置/家具/房间/房子各 1;任一命中即保留 */
@@ -113,6 +125,15 @@ public class ItemLocalParser {
         String locDesc = m.group(2).trim();
         if (name.isEmpty() || name.length() > 100 || locDesc.isEmpty()) return null;
 
+        // 同义词归一化:命中则 name=规范词、aliases=组内其余成员(修正「手纸」等别名不被类型词识别与重复建档)
+        String canonical = synonymService.canonicalOf(name);
+        String aliases = null;
+        if (canonical != null) {
+            name = canonical;
+            List<String> aliasList = synonymService.aliasesOf(canonical);
+            if (!aliasList.isEmpty()) aliases = String.join(",", aliasList);
+        }
+
         String loc = stripTailParticles(locDesc);
         if (loc.isEmpty()) return null;
 
@@ -132,8 +153,8 @@ public class ItemLocalParser {
         if (furnitureId == null && roomId == null) return null; // 位置解析不出 → 不自信
 
         String position = extractPosition(loc, furniture, room);
-        String type = guessType(q);
-        return new PutPlan(name, null, type, position, null, null, roomId, furnitureId, true);
+        String type = guessType(name);
+        return new PutPlan(name, aliases, type, position, null, null, roomId, furnitureId, true);
     }
 
     /** 取名字在 text 中最长命中的实体(纯子串匹配,防近音误配到别的位置) */

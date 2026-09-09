@@ -7,7 +7,8 @@ import lombok.Data;
 
 /**
  * 家庭级 AI 功能绑定实体(sys_family_ai_feature):每家庭每功能一行,
- * model_id 指向 sys_family_ai_model.id,null=该功能未配置(停用)。
+ * model_id 指向 sys_family_ai_model.id(主模型),null=该功能未配置(停用);
+ * fallback_model_id 指向兜底/辅助模型 id(可空),主模型不足时启用。
  */
 @Data
 @TableName("sys_family_ai_feature")
@@ -17,6 +18,8 @@ public class AiFeature {
     private Long familyId;
     /** 功能 code(ITEM_FIND/ITEM_PUT/CHAT/IMAGE/ASR,见 AiConst) */
     private String featureCode;
-    /** 绑定的模型 id,可空=未配置 */
+    /** 绑定的主模型 id,可空=未配置 */
     private Long modelId;
+    /** 兜底/辅助模型 id,可空 */
+    private Long fallbackModelId;
 }

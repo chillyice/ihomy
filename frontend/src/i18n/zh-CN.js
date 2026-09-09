@@ -711,6 +711,7 @@ export default {
       builtin: '内置',
       features: '功能绑定',
       noModel: '未选择(该功能停用)',
+      noFallback: '兜底模型(可选)',
       feature: {
         ITEM_FIND: '物品寻找',
         ITEM_PUT: '物品放物',

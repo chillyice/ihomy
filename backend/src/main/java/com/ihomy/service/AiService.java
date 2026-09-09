@@ -9,6 +9,7 @@ import com.ihomy.common.ResultCode;
 import com.ihomy.common.ThirdPartyHttp;
 import com.ihomy.dto.AiImageDTO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
@@ -27,6 +28,7 @@ import java.util.UUID;
  * 无全局兜底;base-url/api-key/model 任一为空即该功能未配置。三方出站一律走 ThirdPartyHttp
  * (thirdparty 日志 + URL/头脱敏);失败转 BizException 由全局异常处理兜底。
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AiService {
@@ -62,9 +64,18 @@ public class AiService {
         return chat(familyId, messages, null);
     }
 
-    /** 多轮消息对话带自定义采样温度(Playground 调参用) */
+    /** 多轮消息对话带自定义采样温度(Playground 调参用);主模型报错时回退兜底模型(容灾) */
     public String chat(Long familyId, List<Map<String, String>> messages, Double temperature) {
-        return doChat(familyId, AiConst.FEATURE_CHAT, messages, false, temperature);
+        FamilyAiConfigService.Chain chain = familyAiConfigService.resolveChain(familyId, AiConst.FEATURE_CHAT);
+        try {
+            return doChat(chain.primary(), messages, false, temperature);
+        } catch (RuntimeException e) {
+            if (chain.hasFallback()) {
+                log.warn("[AI对话] 主模型失败,回退兜底模型 err={}", e.getMessage());
+                return doChat(chain.fallback(), messages, false, temperature);
+            }
+            throw e;
+        }
     }
 
     /** 单轮问答并解析 JSON 回复:JSON 模式 + markdown 围栏容错;featureCode 指定用哪个功能绑定的模型 */
@@ -72,13 +83,20 @@ public class AiService {
         List<Map<String, String>> messages = new ArrayList<>();
         messages.add(message("system", systemPrompt));
         messages.add(message("user", userContent));
-        return parseJson(doChat(familyId, featureCode, messages, true, null));
+        return parseJson(doChat(familyAiConfigService.resolveForFeature(familyId, featureCode), messages, true, null));
     }
 
-    private String doChat(Long familyId, String featureCode, List<Map<String, String>> messages,
+    /** 单轮问答并解析 JSON 回复:显式指定模型配置(找物/放物用兜底模型时传 fallback 配置) */
+    public JsonNode chatJson(FamilyAiConfigService.AiConfig c, String systemPrompt, String userContent) {
+        List<Map<String, String>> messages = new ArrayList<>();
+        messages.add(message("system", systemPrompt));
+        messages.add(message("user", userContent));
+        return parseJson(doChat(c, messages, true, null));
+    }
+
+    private String doChat(FamilyAiConfigService.AiConfig c, List<Map<String, String>> messages,
                           boolean jsonMode, Double temperature) {
-        FamilyAiConfigService.AiConfig c = familyAiConfigService.resolveForFeature(familyId, featureCode);
-        if (!notBlank(c.baseUrl()) || !notBlank(c.apiKey()) || !notBlank(c.model())) {
+        if (c == null || !notBlank(c.baseUrl()) || !notBlank(c.apiKey()) || !notBlank(c.model())) {
             throw new BizException(ResultCode.BAD_REQUEST, "AI 服务未配置,请家长在设置-家庭 AI 配置中填写");
         }
         String url = stripTrailingSlash(c.baseUrl()) + "/chat/completions";
@@ -135,10 +153,22 @@ public class AiService {
         }
     }
 
-    /** OpenAI 兼容图片生成:POST {base}/images/generations,返回 data 数组(元素含 url 或 b64_json) */
+    /** OpenAI 兼容图片生成:POST {base}/images/generations,返回 data 数组(元素含 url 或 b64_json);主报错回退兜底 */
     public List<Map<String, Object>> images(Long familyId, AiImageDTO dto) {
-        FamilyAiConfigService.AiConfig c = familyAiConfigService.resolveForFeature(familyId, AiConst.FEATURE_IMAGE);
-        if (!notBlank(c.baseUrl()) || !notBlank(c.apiKey()) || !notBlank(c.model())) {
+        FamilyAiConfigService.Chain chain = familyAiConfigService.resolveChain(familyId, AiConst.FEATURE_IMAGE);
+        try {
+            return doImages(chain.primary(), dto);
+        } catch (RuntimeException e) {
+            if (chain.hasFallback()) {
+                log.warn("[AI图片] 主模型失败,回退兜底模型 err={}", e.getMessage());
+                return doImages(chain.fallback(), dto);
+            }
+            throw e;
+        }
+    }
+
+    private List<Map<String, Object>> doImages(FamilyAiConfigService.AiConfig c, AiImageDTO dto) {
+        if (c == null || !notBlank(c.baseUrl()) || !notBlank(c.apiKey()) || !notBlank(c.model())) {
             throw new BizException(ResultCode.BAD_REQUEST, "AI 图片生成未配置,请家长在设置-家庭 AI 配置中填写");
         }
         requireText(dto.getPrompt(), "请填写图片描述");
@@ -212,14 +242,33 @@ public class AiService {
         }
     }
 
-    /** 语音识别:OpenAI 兼容 multipart(/audio/transcriptions)或百度短语音(provider=BAIDU),返回转写文本 */
+    /** 语音识别:OpenAI 兼容 multipart(/audio/transcriptions)或百度短语音(provider=BAIDU);主报错/空结果回退兜底 */
     public Map<String, Object> transcribe(Long familyId, byte[] audio, String filename, String mimeType,
                                           String language, Integer rate) {
-        FamilyAiConfigService.AiConfig c = familyAiConfigService.resolveForFeature(familyId, AiConst.FEATURE_ASR);
-        if (AiConst.PROVIDER_BAIDU.equals(c.provider())) {
+        FamilyAiConfigService.Chain chain = familyAiConfigService.resolveChain(familyId, AiConst.FEATURE_ASR);
+        try {
+            Map<String, Object> out = doTranscribe(chain.primary(), familyId, audio, filename, mimeType, language, rate);
+            if (out != null && !String.valueOf(out.getOrDefault("text", "")).isBlank()) return out;
+            if (chain.hasFallback()) {
+                log.warn("[AI语音] 主模型空结果,回退兜底模型");
+                return doTranscribe(chain.fallback(), familyId, audio, filename, mimeType, language, rate);
+            }
+            return out;
+        } catch (RuntimeException e) {
+            if (chain.hasFallback()) {
+                log.warn("[AI语音] 主模型失败,回退兜底模型 err={}", e.getMessage());
+                return doTranscribe(chain.fallback(), familyId, audio, filename, mimeType, language, rate);
+            }
+            throw e;
+        }
+    }
+
+    private Map<String, Object> doTranscribe(FamilyAiConfigService.AiConfig c, Long familyId, byte[] audio,
+                                             String filename, String mimeType, String language, Integer rate) {
+        if (c != null && AiConst.PROVIDER_BAIDU.equals(c.provider())) {
             return transcribeBaidu(c, familyId, audio, filename, rate);
         }
-        if (!notBlank(c.baseUrl()) || !notBlank(c.apiKey()) || !notBlank(c.model())) {
+        if (c == null || !notBlank(c.baseUrl()) || !notBlank(c.apiKey()) || !notBlank(c.model())) {
             throw new BizException(ResultCode.BAD_REQUEST, "AI 语音识别未配置,请家长在设置-家庭 AI 配置中填写");
         }
         if (audio == null || audio.length == 0) {

@@ -55,7 +55,7 @@ public class ItemAiService {
             2. 用户提到家具时优先给 furnitureId(家具会决定房间);只提到房间(如"在客厅地上")给 roomId;
             3. 上下文里找不到匹配的家具/房间时对应字段填 null(物品仍会登记,位置留空);
             4. type 仅六种:KITCHENWARE/INGREDIENT/DAILY/CLOTHES/TOOL/OTHER,判断不出填 OTHER;
-            5. 物品名提取简短通用叫法(如"剪刀"),aliases 数组给同义叫法;quantity/unit 仅在用户说明数量时给;
+            5. 物品名提取简短通用叫法(如"剪刀"),优先复用已知规范词集合中的词;aliases 数组给 3~5 个常见同义叫法;quantity/unit 仅在用户说明数量时给;
             6. 若用户描述的是已有物品换了位置(如"剪刀现在在厨房"),move 填 true;明确是新买的物品填 false。
                items 清单是"名称(别名1/别名2)"紧凑文本,仅供判定用户说的是否为已有物品,不含位置信息。
             只输出 JSON 对象,不要输出任何其他内容:
@@ -68,6 +68,7 @@ public class ItemAiService {
     private final AiService aiService;
     private final FamilyAiConfigService familyAiConfigService;
     private final ItemLocalParser itemLocalParser;
+    private final SynonymService synonymService;
     private final HouseMapper houseMapper;
     private final RoomMapper roomMapper;
     private final FurnitureMapper furnitureMapper;
@@ -78,9 +79,16 @@ public class ItemAiService {
 
     public Map<String, Object> find(Long familyId, String query) {
         String q = requireText(query, "请描述要找的物品");
-        FamilyAiConfigService.AiConfig cfg = familyAiConfigService.resolveForFeature(familyId, AiConst.FEATURE_ITEM_FIND);
-        // LOCAL 或未配置 → 纯本地规则;绑定 LLM → 本地优先,无命中才 LLM 兜底
-        boolean localOnly = cfg.type() == null || AiConst.TYPE_LOCAL.equals(cfg.type());
+        FamilyAiConfigService.Chain chain = familyAiConfigService.resolveChain(familyId, AiConst.FEATURE_ITEM_FIND);
+        Map<String, Object> result = findWith(familyId, q, chain.primary());
+        if (hasMatches(result) || !chain.hasFallback()) return result;
+        log.info("[AI找物] 主模型无命中,回退兜底模型 family={}", familyId);
+        return findWith(familyId, q, chain.fallback());
+    }
+
+    /** 按单个模型配置找物:LOCAL/未配置 → 纯本地;LLM → 本地优先,无命中才 LLM */
+    private Map<String, Object> findWith(Long familyId, String q, FamilyAiConfigService.AiConfig cfg) {
+        boolean localOnly = cfg == null || cfg.type() == null || AiConst.TYPE_LOCAL.equals(cfg.type());
         if (localOnly) {
             return findResult(q, itemLocalParser.findLocal(familyId, q), true);
         }
@@ -88,15 +96,20 @@ public class ItemAiService {
         if (!localMatches.isEmpty()) {
             return findResult(q, localMatches, true);
         }
-        return llmFind(familyId, q);
+        return llmFind(familyId, q, cfg);
+    }
+
+    private boolean hasMatches(Map<String, Object> result) {
+        Object matches = result == null ? null : result.get("matches");
+        return matches instanceof List && !((List<?>) matches).isEmpty();
     }
 
     /** LLM 找物兜底:提取关键词+类型 → 内存打分;模型不可用/异常回退原文关键词 */
-    private Map<String, Object> llmFind(Long familyId, String q) {
+    private Map<String, Object> llmFind(Long familyId, String q, FamilyAiConfigService.AiConfig cfg) {
         boolean aiParsed = true;
         JsonNode plan = null;
         try {
-            plan = aiService.chatJson(familyId, AiConst.FEATURE_ITEM_FIND, FIND_SYSTEM_PROMPT, "用户找物描述:" + q);
+            plan = aiService.chatJson(cfg, FIND_SYSTEM_PROMPT, "用户找物描述:" + q);
         } catch (Exception e) {
             aiParsed = false;
             log.warn("[AI找物] AI 解析不可用,回退原文关键词 family={} query={}", familyId, q);
@@ -155,26 +168,42 @@ public class ItemAiService {
 
     public Map<String, Object> put(Long userId, Long familyId, String text) {
         String q = requireText(text, "请描述物品放置位置");
-        FamilyAiConfigService.AiConfig cfg = familyAiConfigService.resolveForFeature(familyId, AiConst.FEATURE_ITEM_PUT);
-        boolean localOnly = cfg.type() == null || AiConst.TYPE_LOCAL.equals(cfg.type());
-        if (localOnly) {
-            ItemLocalParser.PutPlan plan = itemLocalParser.parsePut(familyId, q);
-            if (plan == null) {
-                throw new BizException(ResultCode.BAD_REQUEST, "未能识别物品与位置,请换个说法(如「把温度计放厨房的橱柜里」)");
-            }
-            return executePut(userId, familyId, plan);
-        }
-        // 绑定 LLM:本地优先,不自信(解析不出物品名或位置)才 LLM 兜底
+        FamilyAiConfigService.Chain chain = familyAiConfigService.resolveChain(familyId, AiConst.FEATURE_ITEM_PUT);
+        // 本地规则优先:能解析直接落库(无论主模型是 LOCAL 还是 LLM)
         ItemLocalParser.PutPlan localPlan = itemLocalParser.parsePut(familyId, q);
         if (localPlan != null) {
             return executePut(userId, familyId, localPlan);
         }
-        return llmPut(userId, familyId, q);
+        return putViaLlm(userId, familyId, q, chain);
+    }
+
+    /** 本地解析不出时走 LLM:主模型优先,不足/失败再兜底 */
+    private Map<String, Object> putViaLlm(Long userId, Long familyId, String q, FamilyAiConfigService.Chain chain) {
+        if (isLlm(chain.primary())) {
+            try {
+                return llmPut(userId, familyId, q, chain.primary());
+            } catch (RuntimeException e) {
+                if (chain.hasFallback() && isLlm(chain.fallback())) {
+                    log.warn("[AI放物] 主模型失败,回退兜底模型 err={}", e.getMessage());
+                    return llmPut(userId, familyId, q, chain.fallback());
+                }
+                throw e;
+            }
+        }
+        // 主模型是 LOCAL/未配置(本地已试过失败):兜底是 LLM 才回退,否则提示
+        if (chain.hasFallback() && isLlm(chain.fallback())) {
+            return llmPut(userId, familyId, q, chain.fallback());
+        }
+        throw new BizException(ResultCode.BAD_REQUEST, "未能识别物品与位置,请换个说法(如「把温度计放厨房的橱柜里」)");
+    }
+
+    private boolean isLlm(FamilyAiConfigService.AiConfig c) {
+        return c != null && AiConst.TYPE_LLM.equals(c.type());
     }
 
     /** LLM 放物兜底:解析五级粒度目标(防编造),再走统一落库 */
-    private Map<String, Object> llmPut(Long userId, Long familyId, String q) {
-        JsonNode plan = aiService.chatJson(familyId, AiConst.FEATURE_ITEM_PUT, PUT_SYSTEM_PROMPT,
+    private Map<String, Object> llmPut(Long userId, Long familyId, String q, FamilyAiConfigService.AiConfig cfg) {
+        JsonNode plan = aiService.chatJson(cfg, putSystemPrompt(),
                 "家庭上下文清单:\n" + toJson(buildContext(familyId)) + "\n\n用户描述:" + q);
 
         String name = plan.path("name").asText("").trim();
@@ -182,6 +211,9 @@ public class ItemAiService {
             throw new BizException(ResultCode.BAD_REQUEST, "AI 未能识别物品名,请换个说法重试");
         }
         if (name.length() > 100) name = name.substring(0, 100);
+        // 归一化:LLM 若给的是已知别名,改用规范词(防反向同义对)
+        String canonical = synonymService.canonicalOf(name);
+        if (canonical != null) name = canonical;
         String type = normType(plan.path("type").asText(null));
         String position = truncateTo(blankToNull(plan.path("position").asText(null)), 50);
         String aliases = joinAliases(plan.get("aliases"));
@@ -247,6 +279,9 @@ public class ItemAiService {
             itemName = p.name();
         }
 
+        // 落库成功后把(规范词, 别名)写回同义词表(LLM 学习,已存在自动跳过;LOCAL 的 aliases 本就来自同义词表,幂等)
+        learnSynonyms(p.name(), p.aliases());
+
         String loc = locationDesc(p.roomId(), p.furnitureId(), p.position());
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("moved", moved);
@@ -258,6 +293,22 @@ public class ItemAiService {
                 : (moved ? "已把「" + itemName + "」移到 " + loc : "已记录「" + itemName + "」,放在 " + loc));
         log.info("[AI放物] family={} item={} moved={} location={}", familyId, itemName, moved, loc);
         return result;
+    }
+
+    /** 放物提示词:把当前同义词表规范词集合注入上下文,要求 LLM 优先复用 */
+    private String putSystemPrompt() {
+        String canonicals = synonymService.canonicalList();
+        if (canonicals.isEmpty()) return PUT_SYSTEM_PROMPT;
+        return PUT_SYSTEM_PROMPT + "\n已知规范词集合(物品名优先从中复用,勿另造同义新词):" + canonicals;
+    }
+
+    /** 把(规范词, 别名)写回同义词表:逐个别名 upsert(source=LLM),已存在幂等跳过 */
+    private void learnSynonyms(String name, String aliases) {
+        if (name == null || name.isBlank() || aliases == null || aliases.isBlank()) return;
+        for (String a : aliases.split("[,，/|、]")) {
+            String al = a.trim();
+            if (!al.isEmpty()) synonymService.upsert(name, al, "LLM");
+        }
     }
 
     /** 同名或别名命中(忽略大小写;优先精确同名) */

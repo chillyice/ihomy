@@ -45,15 +45,42 @@ public class FamilyAiConfigService {
 
     // ---------- 功能解析 ----------
 
-    /** 按功能解析生效模型:绑定→模型行,未绑定/模型缺失返回全空(该功能未配置);type 用于区分本地/LLM */
+    /** 解析链:主模型 + 兜底模型(兜底为空则 null) */
+    public record Chain(AiConfig primary, AiConfig fallback) {
+        public boolean hasFallback() {
+            return fallback != null;
+        }
+    }
+
+    /** 按功能解析生效主模型:绑定→模型行,未绑定/模型缺失返回全空(该功能未配置);type 用于区分本地/LLM */
     public AiConfig resolveForFeature(Long familyId, String featureCode) {
-        if (familyId == null) return empty();
-        AiFeature binding = aiFeatureMapper.selectOne(new LambdaQueryWrapper<AiFeature>()
-                .eq(AiFeature::getFamilyId, familyId)
-                .eq(AiFeature::getFeatureCode, featureCode));
+        AiFeature binding = binding(familyId, featureCode);
         if (binding == null || binding.getModelId() == null) return empty();
         AiModel m = aiModelMapper.selectById(binding.getModelId());
         if (m == null || !m.getFamilyId().equals(familyId)) return empty();
+        return toConfig(m);
+    }
+
+    /** 解析主 + 兜底模型链;兜底为空时 fallback=null */
+    public Chain resolveChain(Long familyId, String featureCode) {
+        AiConfig primary = resolveForFeature(familyId, featureCode);
+        AiFeature binding = binding(familyId, featureCode);
+        AiConfig fallback = null;
+        if (binding != null && binding.getFallbackModelId() != null) {
+            AiModel m = aiModelMapper.selectById(binding.getFallbackModelId());
+            if (m != null && m.getFamilyId().equals(familyId)) fallback = toConfig(m);
+        }
+        return new Chain(primary, fallback);
+    }
+
+    private AiFeature binding(Long familyId, String featureCode) {
+        if (familyId == null) return null;
+        return aiFeatureMapper.selectOne(new LambdaQueryWrapper<AiFeature>()
+                .eq(AiFeature::getFamilyId, familyId)
+                .eq(AiFeature::getFeatureCode, featureCode));
+    }
+
+    private AiConfig toConfig(AiModel m) {
         return new AiConfig(
                 m.getBaseUrl(),
                 m.getApiKey(),
@@ -180,6 +207,10 @@ public class FamilyAiConfigService {
                 .eq(AiFeature::getFamilyId, familyId)
                 .eq(AiFeature::getModelId, id)
                 .set(AiFeature::getModelId, null));
+        aiFeatureMapper.update(null, new LambdaUpdateWrapper<AiFeature>()
+                .eq(AiFeature::getFamilyId, familyId)
+                .eq(AiFeature::getFallbackModelId, id)
+                .set(AiFeature::getFallbackModelId, null));
     }
 
     private AiModel requireModel(Long id, Long familyId) {
@@ -202,6 +233,7 @@ public class FamilyAiConfigService {
         for (String code : AiConst.FEATURES) {
             AiFeature binding = bindings.get(code);
             AiModel model = binding != null && binding.getModelId() != null ? aiModelMapper.selectById(binding.getModelId()) : null;
+            AiModel fallback = binding != null && binding.getFallbackModelId() != null ? aiModelMapper.selectById(binding.getFallbackModelId()) : null;
             Map<String, Object> o = new LinkedHashMap<>();
             o.put("featureCode", code);
             o.put("modelTypes", AiConst.allowedTypes(code).stream().sorted().toList());
@@ -209,6 +241,9 @@ public class FamilyAiConfigService {
             o.put("modelName", model != null ? nullToEmpty(model.getName()) : "");
             o.put("model", model != null ? nullToEmpty(model.getModel()) : "");
             o.put("modelType", model != null ? model.getType() : null);
+            o.put("fallbackModelId", fallback != null ? fallback.getId() : null);
+            o.put("fallbackModelName", fallback != null ? nullToEmpty(fallback.getName()) : "");
+            o.put("fallbackModelType", fallback != null ? fallback.getType() : null);
             AiConfig c = resolveForFeature(familyId, code);
             o.put("available", isAvailable(c));
             out.add(o);
@@ -216,8 +251,8 @@ public class FamilyAiConfigService {
         return out;
     }
 
-    /** 绑定/解绑功能:modelId 为空=停用该功能;校验模型归属 + 允许类型集合 */
-    public void bindFeature(Long familyId, String featureCode, Long modelId) {
+    /** 绑定/解绑功能:modelId 为空=停用该功能;fallbackModelId 为空=不设兜底;校验模型归属 + 允许类型集合 + 兜底≠主 */
+    public void bindFeature(Long familyId, String featureCode, Long modelId, Long fallbackModelId) {
         if (!AiConst.isValidFeature(featureCode)) throw new BizException(ResultCode.BAD_REQUEST, "未知功能");
         AiFeature binding = aiFeatureMapper.selectOne(new LambdaQueryWrapper<AiFeature>()
                 .eq(AiFeature::getFamilyId, familyId)
@@ -231,16 +266,30 @@ public class FamilyAiConfigService {
             }
             target = m.getId();
         }
+        Long targetFallback = fallbackModelId;
+        if (fallbackModelId != null) {
+            if (fallbackModelId.equals(target)) {
+                throw new BizException(ResultCode.BAD_REQUEST, "兜底模型不能与主模型相同");
+            }
+            AiModel fm = requireModel(fallbackModelId, familyId);
+            Set<String> allowed = AiConst.allowedTypes(featureCode);
+            if (!allowed.contains(fm.getType())) {
+                throw new BizException(ResultCode.BAD_REQUEST, "兜底模型只能绑定" + String.join("/", allowed) + "类型的模型");
+            }
+            targetFallback = fm.getId();
+        }
         if (binding == null) {
             binding = new AiFeature();
             binding.setFamilyId(familyId);
             binding.setFeatureCode(featureCode);
             binding.setModelId(target);
+            binding.setFallbackModelId(targetFallback);
             aiFeatureMapper.insert(binding);
         } else {
             aiFeatureMapper.update(null, new LambdaUpdateWrapper<AiFeature>()
                     .eq(AiFeature::getId, binding.getId())
-                    .set(AiFeature::getModelId, target));
+                    .set(AiFeature::getModelId, target)
+                    .set(AiFeature::getFallbackModelId, targetFallback));
         }
     }
 

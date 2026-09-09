@@ -1665,16 +1665,50 @@ CREATE TABLE `sys_family_ai_model` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭级 AI 模型池表(每家庭多条,真实密钥不入 git,经界面或 SQL 手动填入)';
 
 -- ------------------------------------------------------------
--- 57. sys_family_ai_feature 家庭级 AI 功能绑定表(V9.48):每家庭每功能一行
---     model_id 指向 sys_family_ai_model.id,null=该功能未配置(停用)
+-- 57. sys_family_ai_feature 家庭级 AI 功能绑定表(V9.48;V9.52 加 fallback_model_id):每家庭每功能一行
+--     model_id 指向 sys_family_ai_model.id(主模型),null=该功能未配置(停用)
+--     fallback_model_id 指向兜底/辅助模型 id(可空),主模型不足时启用
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `sys_family_ai_feature`;
 CREATE TABLE `sys_family_ai_feature` (
-  `id`           BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `family_id`    BIGINT      NOT NULL COMMENT '所属家庭ID',
-  `feature_code` VARCHAR(30) NOT NULL COMMENT '功能:ITEM_FIND/ITEM_PUT/CHAT/IMAGE/ASR',
-  `model_id`     BIGINT      DEFAULT NULL COMMENT '绑定的模型 id(可空=未配置)',
+  `id`                BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`         BIGINT      NOT NULL COMMENT '所属家庭ID',
+  `feature_code`      VARCHAR(30) NOT NULL COMMENT '功能:ITEM_FIND/ITEM_PUT/CHAT/IMAGE/ASR',
+  `model_id`          BIGINT      DEFAULT NULL COMMENT '主模型 id(可空=未配置)',
+  `fallback_model_id` BIGINT      DEFAULT NULL COMMENT '兜底/辅助模型 id(可空;主模型不足时启用)',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_family_feature` (`family_id`, `feature_code`),
   KEY `idx_model` (`model_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭级 AI 功能绑定表(每家庭每功能一行)';
+
+-- ------------------------------------------------------------
+-- 58. sys_synonym 同义词表(V9.52):全局可生长「规范词→别名」映射,录入联想别名 + 找物读表扩展共用
+--     canonical=规范词(如 纸巾),alias=同义别名(如 手纸),source=BUILTIN/LLM/USER
+--     内存缓存由 SynonymService 预热 + 懒加载兜底;写入 upsert 幂等(uk_syn)
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_synonym`;
+CREATE TABLE `sys_synonym` (
+  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `canonical`  VARCHAR(50) NOT NULL COMMENT '规范词(如 纸巾)',
+  `alias`      VARCHAR(50) NOT NULL COMMENT '同义别名(如 手纸)',
+  `source`     VARCHAR(20) NOT NULL DEFAULT 'BUILTIN' COMMENT '来源:BUILTIN/LLM/USER',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_syn` (`canonical`, `alias`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='同义词表(全局可生长;录入联想+找物扩展共用)';
+
+-- 58. sys_synonym BUILTIN 种子(宁缺毋滥,多词一义示范;「面巾」因与「面巾纸」子串歧义暂不收录)
+INSERT INTO `sys_synonym` (`canonical`, `alias`, `source`) VALUES
+('纸巾', '卫生纸', 'BUILTIN'), ('纸巾', '厕纸', 'BUILTIN'), ('纸巾', '手纸', 'BUILTIN'), ('纸巾', '面巾纸', 'BUILTIN'),
+('遥控器', '遥控', 'BUILTIN'), ('遥控器', '遥控板', 'BUILTIN'),
+('剪刀', '剪子', 'BUILTIN'),
+('充电器', '充电头', 'BUILTIN'), ('充电器', '充电线', 'BUILTIN'), ('充电器', '数据线', 'BUILTIN'),
+('洗发水', '洗头膏', 'BUILTIN'), ('洗发水', '洗发液', 'BUILTIN'),
+('拖鞋', '凉拖', 'BUILTIN'), ('拖鞋', '棉拖', 'BUILTIN'),
+('毛巾', '洗脸巾', 'BUILTIN'),
+('水杯', '杯子', 'BUILTIN'), ('水杯', '口杯', 'BUILTIN'),
+('电饭煲', '电饭锅', 'BUILTIN'),
+('吹风机', '电吹风', 'BUILTIN'), ('吹风机', '风筒', 'BUILTIN'),
+('垃圾桶', '垃圾篓', 'BUILTIN'), ('垃圾桶', '纸篓', 'BUILTIN'),
+('台灯', '床头灯', 'BUILTIN'),
+('袜子', '短袜', 'BUILTIN'), ('袜子', '长袜', 'BUILTIN');

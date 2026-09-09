@@ -858,3 +858,62 @@ DEALLOCATE PREPARE add_ai_secret_key_stmt;
 --
 -- 【生产环境】只给「小窝」配置(演示家庭不配):
 --   同上,把 WHERE 的 `name` 条件改为仅 `IN ('小窝')`,并换用生产环境盐值生成的 ENC 密文。
+
+-- ------------------------------------------------------------
+-- 2026-09-09 V9.52 物品定位 AI 增强:同义词表 + 功能二级兜底模型
+-- 一、sys_family_ai_feature 加 fallback_model_id 列(幂等,MySQL 8 无 ADD COLUMN IF NOT EXISTS):
+--    主模型(model_id)不足时启用兜底/辅助模型(fallback_model_id,可空)
+-- ------------------------------------------------------------
+SET @add_ai_fallback := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `sys_family_ai_feature` ADD COLUMN `fallback_model_id` BIGINT DEFAULT NULL COMMENT ''兜底/辅助模型 id(可空;主模型不足时启用)'' AFTER `model_id`',
+    'SELECT ''skip: ai fallback_model_id already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sys_family_ai_feature' AND COLUMN_NAME = 'fallback_model_id'
+);
+PREPARE add_ai_fallback_stmt FROM @add_ai_fallback;
+EXECUTE add_ai_fallback_stmt;
+DEALLOCATE PREPARE add_ai_fallback_stmt;
+
+-- 二、迁移既有找物/放物绑定(保持「本地优先→LLM 兜底」现行为无损):
+--   model_id 指向 LLM 的行 → fallback_model_id = model_id,model_id = 该家庭 LOCAL 模型 id;
+--   model_id 指向 LOCAL 的行 → 保持不动(兜底 null)。幂等:跑过后 model_id 已指向 LOCAL,不再命中 LLM 条件。
+-- ------------------------------------------------------------
+UPDATE `sys_family_ai_feature` f
+SET f.`fallback_model_id` = f.`model_id`,
+    f.`model_id` = (
+        SELECT l.`id` FROM `sys_family_ai_model` l
+        WHERE l.`family_id` = f.`family_id` AND l.`type` = 'LOCAL'
+        ORDER BY l.`id` LIMIT 1
+    )
+WHERE f.`feature_code` IN ('ITEM_FIND', 'ITEM_PUT')
+  AND f.`model_id` IS NOT NULL
+  AND EXISTS (SELECT 1 FROM `sys_family_ai_model` m WHERE m.`id` = f.`model_id` AND m.`type` = 'LLM');
+
+-- ------------------------------------------------------------
+-- 三、sys_synonym 同义词表(全局可生长) + BUILTIN 种子(幂等)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `sys_synonym` (
+  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `canonical`  VARCHAR(50) NOT NULL COMMENT '规范词(如 纸巾)',
+  `alias`      VARCHAR(50) NOT NULL COMMENT '同义别名(如 手纸)',
+  `source`     VARCHAR(20) NOT NULL DEFAULT 'BUILTIN' COMMENT '来源:BUILTIN/LLM/USER',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_syn` (`canonical`, `alias`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='同义词表(全局可生长;录入联想+找物扩展共用)';
+
+INSERT IGNORE INTO `sys_synonym` (`canonical`, `alias`, `source`) VALUES
+('纸巾', '卫生纸', 'BUILTIN'), ('纸巾', '厕纸', 'BUILTIN'), ('纸巾', '手纸', 'BUILTIN'), ('纸巾', '面巾纸', 'BUILTIN'),
+('遥控器', '遥控', 'BUILTIN'), ('遥控器', '遥控板', 'BUILTIN'),
+('剪刀', '剪子', 'BUILTIN'),
+('充电器', '充电头', 'BUILTIN'), ('充电器', '充电线', 'BUILTIN'), ('充电器', '数据线', 'BUILTIN'),
+('洗发水', '洗头膏', 'BUILTIN'), ('洗发水', '洗发液', 'BUILTIN'),
+('拖鞋', '凉拖', 'BUILTIN'), ('拖鞋', '棉拖', 'BUILTIN'),
+('毛巾', '洗脸巾', 'BUILTIN'),
+('水杯', '杯子', 'BUILTIN'), ('水杯', '口杯', 'BUILTIN'),
+('电饭煲', '电饭锅', 'BUILTIN'),
+('吹风机', '电吹风', 'BUILTIN'), ('吹风机', '风筒', 'BUILTIN'),
+('垃圾桶', '垃圾篓', 'BUILTIN'), ('垃圾桶', '纸篓', 'BUILTIN'),
+('台灯', '床头灯', 'BUILTIN'),
+('袜子', '短袜', 'BUILTIN'), ('袜子', '长袜', 'BUILTIN');

@@ -698,6 +698,7 @@ export default {
       builtin: 'Built-in',
       features: 'Feature binding',
       noModel: 'Not selected (disabled)',
+      noFallback: 'Fallback model (optional)',
       feature: {
         ITEM_FIND: 'Item find',
         ITEM_PUT: 'Item put',

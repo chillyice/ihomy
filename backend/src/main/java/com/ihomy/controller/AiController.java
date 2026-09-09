@@ -90,13 +90,14 @@ public class AiController {
         return Result.success(familyAiConfigService.getFeatures(currentFamilyId()));
     }
 
-    @Operation(summary = "绑定功能到模型(modelId 为空=停用该功能)")
+    @Operation(summary = "绑定功能到模型(modelId 为空=停用该功能;fallbackModelId 可选兜底)")
     @OperationLog(module = "AI", operationType = "UPDATE", description = "绑定 AI 功能模型", saveArgs = false)
     @RequirePermission("family:manage")
     @PutMapping("/features/{featureCode}")
     public Result<Void> bindFeature(@PathVariable String featureCode, @RequestBody(required = false) Map<String, Object> body) {
         Long modelId = body == null || body.get("modelId") == null ? null : ((Number) body.get("modelId")).longValue();
-        familyAiConfigService.bindFeature(currentFamilyId(), featureCode, modelId);
+        Long fallbackModelId = body == null || body.get("fallbackModelId") == null ? null : ((Number) body.get("fallbackModelId")).longValue();
+        familyAiConfigService.bindFeature(currentFamilyId(), featureCode, modelId, fallbackModelId);
         return Result.success();
     }
 

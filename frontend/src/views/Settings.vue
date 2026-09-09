@@ -218,6 +218,21 @@
                   :value="m.id"
                 />
               </el-select>
+              <el-select
+                v-model="f.fallbackModelId"
+                clearable
+                filterable
+                :placeholder="$t('settings.ai.noFallback')"
+                class="ai-feature-select"
+                @change="bindAiFeature(f)"
+              >
+                <el-option
+                  v-for="m in modelsByTypesExcluding(f.modelTypes, f.modelId)"
+                  :key="m.id"
+                  :label="m.name + ' (' + m.model + ')'"
+                  :value="m.id"
+                />
+              </el-select>
               <span class="ai-feature-state" :class="{ ok: f.available }">
                 {{ f.available ? $t('settings.ai.available') : $t('settings.ai.unconfigured') }}
               </span>
@@ -830,6 +845,7 @@ watch(() => aiModelForm.type, (t) => {
 })
 
 const modelsByTypes = (types) => aiModels.value.filter(m => (types || []).includes(m.type))
+const modelsByTypesExcluding = (types, excludeId) => aiModels.value.filter(m => (types || []).includes(m.type) && m.id !== excludeId)
 
 const loadAiConfig = async () => {
   if (!userStore.isLoggedIn || !canManageAi.value) return
@@ -837,7 +853,7 @@ const loadAiConfig = async () => {
   try {
     const [models, features] = await Promise.all([aiApi.models(), aiApi.features()])
     aiModels.value = models || []
-    aiFeatures.value = (features || []).map(f => ({ ...f, modelId: f.modelId ?? null }))
+    aiFeatures.value = (features || []).map(f => ({ ...f, modelId: f.modelId ?? null, fallbackModelId: f.fallbackModelId ?? null }))
   } catch (e) {
     // 拦截器已提示(非家长 403 时静默)
   } finally {
@@ -912,8 +928,9 @@ const removeAiModel = (row) => {
 // 功能绑定:下拉选择后立即保存;失败回滚刷新
 const bindAiFeature = async (f) => {
   const mid = f.modelId == null || f.modelId === '' ? null : f.modelId
+  const fid = f.fallbackModelId == null || f.fallbackModelId === '' ? null : f.fallbackModelId
   try {
-    await aiApi.bindFeature(f.featureCode, mid)
+    await aiApi.bindFeature(f.featureCode, mid, fid)
     ElMessage.success(t('settings.ai.saved'))
     await loadAiConfig()
   } catch (e) {
