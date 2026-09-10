@@ -238,7 +238,7 @@
                     </Transition>
                   </div>
                   <div class="album-cover">
-                    <div class="album-cover-front"><div class="cover-title">{{ family?.name || 'ihomy' }}</div><div class="cover-sub">家庭相册</div></div>
+                    <div class="album-cover-front"><img :src="albumCoverUrl" alt="家庭相册" class="album-cover-img" /></div>
                     <div class="album-cover-back"></div>
                   </div>
                 </div>
@@ -267,6 +267,7 @@ import { gsap } from 'gsap'
 import { ElMessage } from 'element-plus'
 import { Search, Microphone } from '@element-plus/icons-vue'
 import PhotoViewer from '@/components/PhotoViewer.vue'
+import albumCoverUrl from '@/assets/album-cover.jpg'
 import FloorPlanCanvas from '@/views/item/FloorPlanCanvas.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useWidgetDrag } from '@/utils/useWidgetDrag'
@@ -1255,15 +1256,13 @@ html.dark .music-title { color: #E8DCC8; }
 .album-page-empty { display: flex; align-items: center; justify-content: center; padding: 12px; font-size: 12px; color: #8B6F47; }
 /* 封面:沿书脊翻到 145° 露出内衬;合上时对称地从 145° 回到 0°,与翻开同一节奏(1.5s) */
 .album-cover { position: absolute; inset: 0; transform-style: preserve-3d; transform-origin: left center; transform: rotateY(0deg); transition: transform 1.5s ease-in-out; }
-.album-cover-front { position: absolute; inset: 0; backface-visibility: hidden; background: linear-gradient(135deg, #8B6F47 0%, #6B5435 50%, #5a4530 100%); border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px; overflow: hidden; box-shadow: 0 6px 18px rgba(0,0,0,0.3); transition: opacity 1.5s ease-in-out; }
-.album-cover-front::before { content: ''; position: absolute; inset: 0; background-image: repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(245,230,200,0.04) 8px, rgba(245,230,200,0.04) 16px); pointer-events: none; }
-.album-cover-front::after { content: ''; position: absolute; inset: 6px; border: 1px solid rgba(245,230,200,0.15); border-radius: 2px; pointer-events: none; }
+/* 封面正面:老式皮质相册封面图(asset 为 800×600 预压缩版,勿直接换回 1.4MB 原图) */
+.album-cover-front { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 4px; overflow: hidden; box-shadow: 0 6px 18px rgba(0,0,0,0.3); transition: opacity 1.5s ease-in-out; }
+.album-cover-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .album-cover-back { position: absolute; inset: 0; backface-visibility: hidden; transform: rotateY(180deg); background: linear-gradient(160deg, #f3ead7 0%, #e7d9be 100%); border-radius: 4px; box-shadow: 0 6px 18px rgba(0,0,0,0.25); transition: opacity 1.5s ease-in-out; }
 .album-book.open .album-cover { transform: rotateY(-145deg); }
 .album-book.open .album-cover-front { opacity: 0; }
 .album-book.open .album-cover-back { opacity: 0; }
-.cover-title { font-size: 13px; font-weight: 700; color: #F5E6C8; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
-.cover-sub { font-size: 9px; color: rgba(245,230,200,0.7); }
 /* 旧照片翻页:卡片翻转 145°(1.5s),正/背面各自淡出(1.5s),置于上层;新照片静躺不动,置于下层等待被翻开 */
 .album-page-leave-active { z-index: 2; }
 .album-page-leave-to { transform: rotateY(-145deg); }

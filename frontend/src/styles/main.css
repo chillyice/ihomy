@@ -59,9 +59,7 @@ html.dark .anni-date,
 html.dark .anni-days,
 html.dark .days-num,
 html.dark .days-unit,
-html.dark .polaroid-caption,
-html.dark .cover-title,
-html.dark .cover-sub {
+html.dark .polaroid-caption {
   color: #E8DCC8;
 }
 html.dark .nav-item,
@@ -70,8 +68,7 @@ html.dark .bubble-type,
 html.dark .bubble-time,
 html.dark .date,
 html.dark .anni-date,
-html.dark .days-unit,
-html.dark .cover-sub {
+html.dark .days-unit {
   opacity: 0.7;
 }
 html.dark .feed-bubble {
