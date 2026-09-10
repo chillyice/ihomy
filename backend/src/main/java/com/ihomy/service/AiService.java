@@ -181,8 +181,11 @@ public class AiService {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", c.model().trim());
         body.put("prompt", dto.getPrompt().trim());
+        // Seedream 5.0 pro 不支持组图(sequential_image_generation)且仅出单图;强制单图,
+        // 不传组图字段、n 恒为 1——避免把 lite 的组图/多图规则套到 pro 上被方舟拒绝
+        boolean pro = detectImageEngine(c) == ImageEngine.SEEDREAM_PRO;
         // 组图模式由 sequential_image_generation 驱动,此时不再传 n(避免两者语义冲突)
-        boolean groupMode = "auto".equals(dto.getSequentialMode());
+        boolean groupMode = !pro && "auto".equals(dto.getSequentialMode());
         if (groupMode) {
             body.put("sequential_image_generation", "auto");
             Map<String, Object> seqOpts = new LinkedHashMap<>();
@@ -190,7 +193,13 @@ public class AiService {
             seqOpts.put("max_images", Math.min(Math.max(maxImages, 1), 10));
             body.put("sequential_image_generation_options", seqOpts);
         } else {
-            body.put("n", dto.getN() == null || dto.getN() < 1 ? 1 : Math.min(dto.getN(), 4));
+            int n;
+            if (pro) {
+                n = 1;
+            } else {
+                n = dto.getN() == null || dto.getN() < 1 ? 1 : Math.min(dto.getN(), 4);
+            }
+            body.put("n", n);
         }
         if (dto.getImageUrls() != null && !dto.getImageUrls().isEmpty()) {
             List<String> refs = dto.getImageUrls().stream()
@@ -246,6 +255,19 @@ public class AiService {
         } catch (Exception e) {
             throw new BizException(ResultCode.INTERNAL_ERROR, "AI 图片生成调用失败:" + e.getMessage());
         }
+    }
+
+    /** 图片模型引擎:按 model 名归一化区分 Seedream 5.0 pro(仅单图、size 规则不同)与其它(组图兼容) */
+    private enum ImageEngine { GENERIC, SEEDREAM, SEEDREAM_PRO }
+
+    /** 识别绑定的图片模型属于哪个引擎:pro 走单图+pro size 规则,其余保持组图+通用规则 */
+    private ImageEngine detectImageEngine(FamilyAiConfigService.AiConfig c) {
+        if (c == null || !notBlank(c.model())) return ImageEngine.GENERIC;
+        String m = c.model().trim().toLowerCase();
+        boolean seedream = m.contains("seedream");
+        if (seedream && m.contains("pro")) return ImageEngine.SEEDREAM_PRO;
+        if (seedream) return ImageEngine.SEEDREAM;
+        return ImageEngine.GENERIC;
     }
 
     /** 语音识别:OpenAI 兼容 multipart(/audio/transcriptions)或百度短语音(provider=BAIDU);主报错/空结果回退兜底 */
