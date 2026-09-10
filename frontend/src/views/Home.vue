@@ -23,7 +23,7 @@
     <template v-for="w in visibleWidgets" :key="w.uid">
       <div
         class="dash-card"
-        :class="[w.id, 'w-tier-' + displayTier(w), { 'edit-active': editMode, dragging: w._dragging, 'h-1': w.h === 1, 'h-boosted': isBoosted(w), 'h-pushed': isPushed(w) }]"
+        :class="[w.id, { 'edit-active': editMode, dragging: w._dragging, 'h-1': w.h === 1, 'is-hovered': hoverExpands && hoverUid === w.uid, 'is-neighbor': isFullNeighbor(w), 'wave-hint': !editMode && displayTier(w) === 'S' && !hoverExpands }]"
         :style="cardBoxStyle(w)"
         @mouseenter="onCardEnter(w)"
         @mouseleave="onCardLeave"
@@ -32,6 +32,12 @@
         <div v-if="editMode" class="drag-bar" @mousedown="onDragStart($event, w)"><span class="grip"></span></div>
         <button v-if="editMode" class="del-btn" @click.stop="removeWidget(w)">✕</button>
         <div v-if="editMode" class="resize-corner" @mousedown.stop="onResizeStart($event, w)"></div>
+
+        <!-- 邻居胶囊:仅「全盖」级邻居缩成图标+标题(部分盖→降档显示内容,擦边→轻微缩小) -->
+        <div v-if="isFullNeighbor(w)" class="neighbor-capsule">
+          <span class="nc-icon">{{ WIDGET_ICONS[w.id] || '' }}</span>
+          <span class="nc-label">{{ WIDGET_LABELS[w.id] }}</span>
+        </div>
 
         <div class="card-inner">
           <!-- 家人动态 -->
@@ -239,11 +245,6 @@
               </div>
             </div>
           </template>
-        </div>
-        <!-- 小档未展开的波浪/文字引导(排版方案 §二.2) -->
-        <div v-if="displayTier(w) === 'S' && !editMode && !isBoosted(w) && !isPushed(w)" class="wave-hint">
-          <span class="wa-hint-text">悬停查看更多</span>
-          <span class="wa-wave"><i></i><i></i><i></i></span>
         </div>
       </div>
     </template>
@@ -571,68 +572,93 @@ const removeWidget = (w) => {
   saveLayout()
 }
 
-// ========== P2 hover 放大 + 推开邻居(排版方案 §二,按反馈细化) ==========
-const HOVER_DELAY = 360
+// ========== P2 hover 放大 + 推开邻居(排版方案 §二,三档邻居:全盖→胶囊 / 部分盖→降档缩小 / 擦边→轻微缩小) ==========
+const HOVER_DELAY = 350
 // 触摸/平板只览不展开(探询 §7):仅「支持 hover + 精确指针」设备参与放大/推挤/翻牌,避免 tap 误触
 const HOVER_CAPABLE = typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(hover: hover)').matches && window.matchMedia('(pointer: fine)').matches
 const hoverUid = ref(null)
 let hoverTimer = null
-const hoveredWidget = computed(() => widgets.value.find(w => w.uid === hoverUid.value) || null)
 
-// 放大倍数:小→中、中→大(决定放大后覆盖多大范围,也就决定「影响多少邻居」)
-const BOOST_SCALE = { S: 1.52, M: 1.36 }
-// 受影响邻居的收缩倍数(向「外侧」收缩,而非朝中心缩)
-const PUSH_SCALE = 0.84
-
-// —— 几何(与 cardStyle 同源)——
-const cardBounds = (w) => {
-  const cw = cellW.value, ch = cellH.value
-  const left = MARGIN.left + w.col * (cw + GAP)
-  const top = MARGIN.top + w.row * (ch + GAP)
-  const width = w.w * cw + (w.w - 1) * GAP
-  const height = w.h * ch + (w.h - 1) * GAP
-  return { left, top, right: left + width, bottom: top + height, w: width, h: height }
+// 放大比例:小档 2→3(1.5x),中档 3→4(1.33x);大/巨大不放大
+const hoverScale = (hw) => ({ S: 1.5, M: 4 / 3, L: 1, XL: 1 }[displayTier(hw)] ?? 1)
+// 放大后组件的视觉矩形(格坐标):中心缩放理想矩形 clamp 进栅格(边缘组件向内收),
+// 并反推 transform-origin(相对原组件尺寸的 0-1 比例)使 scale 视觉与矩形一致
+const hoverRect = (h) => {
+  const sc = hoverScale(h)
+  const w = h.w * sc
+  const hgt = h.h * sc
+  const idealLeft = h.col + h.w / 2 - w / 2
+  const idealTop = h.row + h.h / 2 - hgt / 2
+  const left = Math.min(Math.max(idealLeft, 0), Math.max(0, COLS - w))
+  const top = Math.min(Math.max(idealTop, 0), Math.max(0, ROWS - hgt))
+  const originX = sc > 1 ? (h.col - left) / (h.w * (sc - 1)) : 0.5
+  const originY = sc > 1 ? (h.row - top) / (h.h * (sc - 1)) : 0.5
+  return { left, top, w, hgt, originX, originY }
 }
-// 边缘组件的放大锚点(靠屏幕内侧):在左/右/上/下边缘时 origin 落在外边缘,放大方向朝屏幕内;
-// 满宽/满高组件在该轴无法外扩 → 该轴不放大(锁 1),只放大另一轴,避免生长出屏
-const boostScale = (w) => { const s = BOOST_SCALE[displayTier(w)] || 1; return { sx: w.w >= COLS ? 1 : s, sy: w.h >= ROWS ? 1 : s } }
-const boostOriginFrac = (w) => ({
-  fx: w.w >= COLS ? 0.5 : (w.col === 0 ? 0 : (w.col + w.w >= COLS ? 1 : 0.5)),
-  fy: w.h >= ROWS ? 0.5 : (w.row === 0 ? 0 : (w.row + w.h >= ROWS ? 1 : 0.5)),
-})
-// 放大后实际到达的像素矩形(实际渲染即为此范围 => 决定哪些邻居被「推开」)
-const grownPx = (w) => {
-  const b = cardBounds(w)
-  const { sx, sy } = boostScale(w)
-  const { fx, fy } = boostOriginFrac(w)
-  const nw = b.w * sx, nh = b.h * sy
-  const left = b.left - (nw - b.w) * fx
-  const top = b.top - (nh - b.h) * fy
-  return { left, top, right: left + nw, bottom: top + nh }
+// 判断邻居 n 是否被放大后的组件 h 影响:与 clamp 后的放大矩形(格坐标)相交即受影响
+const hoverAffects = (h, n) => {
+  const sc = hoverScale(h)
+  if (sc <= 1) return false
+  const r = hoverRect(h)
+  const nl = n.col, nt = n.row, nr = n.col + n.w, nb = n.row + n.h
+  return nl < r.left + r.w && nr > r.left && nt < r.top + r.hgt && nb > r.top
 }
-const overlap = (a, b) => !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom)
+// ---- 推开邻居三档(方案二:按覆盖比例)----
+// 全盖 ≥70% → 胶囊(缩 0.55+位移);部分盖 ≥30% → 降档缩小(内容还在,少显示一些);擦边 → 轻微缩小 0.85、内容不变
+const NEIGHBOR_FULL = 0.7
+const NEIGHBOR_PARTIAL = 0.3
+const NEIGHBOR_SCALE_FULL = 0.55
+const NEIGHBOR_SCALE_GRAZE = 0.85
+const NEIGHBOR_PUSH_FULL = 70
+const NEIGHBOR_PUSH_PARTIAL = 35
+// 放大矩形盖住邻居 n 的面积占比(0~1)
+const hoverCoverage = (h, n) => {
+  const r = hoverRect(h)
+  const ox = Math.max(n.col, r.left)
+  const oy = Math.max(n.row, r.top)
+  const ox2 = Math.min(n.col + n.w, r.left + r.w)
+  const oy2 = Math.min(n.row + n.h, r.top + r.hgt)
+  if (ox >= ox2 || oy >= oy2) return 0
+  return ((ox2 - ox) * (oy2 - oy)) / (n.w * n.h)
+}
+// 覆盖等级:full / partial / graze(S 档最小无法降档,部分盖也按全盖处理成胶囊)
+const neighborLevel = (h, n) => {
+  const c = hoverCoverage(h, n)
+  if (c >= NEIGHBOR_FULL || (c >= NEIGHBOR_PARTIAL && displayTier(n) === 'S')) return 'full'
+  if (c >= NEIGHBOR_PARTIAL) return 'partial'
+  return 'graze'
+}
+// 模板/tierOf 用:某组件当前是哪个覆盖等级的邻居(非邻居返回 '')
+const neighborLevelOf = (w) => {
+  if (!HOVER_CAPABLE || editMode.value || !hoverExpands.value || hoverUid.value === w.uid) return ''
+  const hovered = widgets.value.find(x => x.uid === hoverUid.value)
+  if (!hovered || !hoverAffects(hovered, w)) return ''
+  return neighborLevel(hovered, w)
+}
+const isFullNeighbor = (w) => neighborLevelOf(w) === 'full'
+const isPartialNeighbor = (w) => neighborLevelOf(w) === 'partial'
 
-// —— 状态机 ——
-const hoverActive = computed(() => HOVER_CAPABLE && !editMode.value && !!hoveredWidget.value && (displayTier(hoveredWidget.value) === 'S' || displayTier(hoveredWidget.value) === 'M'))
-const isBoosted = (w) => hoverActive.value && hoveredWidget.value?.uid === w.uid
-// 只有放大后真正覆盖/贴近的邻居才受影响,其余保持不变
-const isPushed = (w) => hoverActive.value && hoveredWidget.value?.uid !== w.uid && overlap(grownPx(hoveredWidget.value), cardBounds(w))
-
-// 生效档位:被 hover 的组件临时升一档;被推开的邻居临时降一档(内容随之少一些,不收缩成胶囊);其余保持基础档
+// 生效档位:被 hover 的组件临时升一档;被部分盖的邻居临时降一档(内容随之少一些,全盖邻居缩成胶囊);其余保持基础档
 const TIER_UP = { S: 'M', M: 'L' }
-const TIER_DOWN = { S: 'S', M: 'S', L: 'M', XL: 'L' }
+const TIER_DOWN = { XL: 'L', L: 'M', M: 'S' }
+const DOWN_SCALE = { XL: 0.8, L: 0.75, M: 2 / 3 }
+const downScaleOf = (w) => DOWN_SCALE[displayTier(w)] ?? NEIGHBOR_SCALE_FULL
 const tierOf = (w) => {
   const base = displayTier(w)
-  if (!HOVER_CAPABLE || editMode.value) return base
+  if (editMode.value || !HOVER_CAPABLE) return base
   if (hoverUid.value === w.uid) return TIER_UP[base] || base
-  if (isPushed(w)) return TIER_DOWN[base] || base
+  if (isPartialNeighbor(w)) return TIER_DOWN[base] || base
   return base
 }
+// 当前悬停组件是否真的会放大:仅中小档 hover 放大,大/巨大不放大——只有放大时才推挤邻居
+const hoverExpands = computed(() => {
+  if (!HOVER_CAPABLE || editMode.value) return false
+  const h = widgets.value.find(x => x.uid === hoverUid.value)
+  return !!h && (displayTier(h) === 'S' || displayTier(h) === 'M')
+})
 
 const setHover = (w) => {
   if (editMode.value || !HOVER_CAPABLE) return
-  const t = displayTier(w)
-  if (t === 'L' || t === 'XL') return // 大/巨大不参与 hover 增效(仅 CSS 高亮)
   if (hoverTimer) clearTimeout(hoverTimer)
   hoverTimer = setTimeout(() => { hoverUid.value = w.uid }, HOVER_DELAY)
 }
@@ -643,33 +669,34 @@ const clearHover = () => {
 const onCardEnter = (w) => { setHover(w); if (w.id === 'album') onAlbumEnter() }
 const onCardLeave = () => { clearHover(); onAlbumLeave() }
 
-// 邻居收缩锚在「外侧」(远离 hovered 的一侧):收缩时朝外缩、往 hovered 反方向退开,而非朝组件中心缩
-const pushedOriginFrac = (w) => {
-  const h = hoveredWidget.value, hb = cardBounds(h), nb = cardBounds(w)
-  const hcx = (hb.left + hb.right) / 2, hcy = (hb.top + hb.bottom) / 2
-  const ncx = (nb.left + nb.right) / 2, ncy = (nb.top + nb.bottom) / 2
-  const dx = ncx - hcx, dy = ncy - hcy
-  if (Math.abs(dx) >= Math.abs(dy)) return { fx: dx >= 0 ? 1 : 0, fy: 0.5 }
-  return { fx: 0.5, fy: dy >= 0 ? 1 : 0 }
-}
-const originOf = (w) => {
-  const h = hoveredWidget.value
-  if (h?.uid === w.uid) { const { fx, fy } = boostOriginFrac(w); return `${fx * 100}% ${fy * 100}%` }
-  if (isPushed(w)) { const { fx, fy } = pushedOriginFrac(w); return `${fx * 100}% ${fy * 100}%` }
-  return '50% 50%'
-}
-const cardTransform = (w) => {
-  if (editMode.value || !HOVER_CAPABLE || !hoverActive.value) return ''
-  const h = hoveredWidget.value
-  if (h.uid === w.uid) { const { sx, sy } = boostScale(w); return `scale(${sx}, ${sy})` }
-  if (isPushed(w)) return `scale(${PUSH_SCALE})`
-  return ''
+// 放大/推开邻居的 inline transform(在 cardBoxStyle 里调用,非真实重排)
+const hoverTransform = (w) => {
+  if (editMode.value || !HOVER_CAPABLE || !hoverExpands.value) return null
+  if (hoverUid.value === w.uid) {
+    const sc = hoverScale(w)
+    if (sc <= 1) return null
+    const r = hoverRect(w)
+    return { transform: `scale(${sc})`, origin: `${(r.originX * 100).toFixed(1)}% ${(r.originY * 100).toFixed(1)}%`, z: 80 }
+  }
+  const hovered = widgets.value.find(x => x.uid === hoverUid.value)
+  if (!hovered || !hoverAffects(hovered, w)) return null
+  const level = neighborLevel(hovered, w)
+  const r = hoverRect(hovered)
+  const dx = (w.col + w.w / 2) - (r.left + r.w / 2)
+  const dy = (w.row + w.h / 2) - (r.top + r.hgt / 2)
+  const len = Math.hypot(dx, dy) || 1
+  if (level === 'graze') return { transform: `scale(${NEIGHBOR_SCALE_GRAZE})`, origin: '50% 50%', z: 10 }
+  if (level === 'partial') return { transform: `translate(${(dx / len) * NEIGHBOR_PUSH_PARTIAL}px, ${(dy / len) * NEIGHBOR_PUSH_PARTIAL}px) scale(${downScaleOf(w)})`, origin: '50% 50%', z: 10 }
+  return { transform: `translate(${(dx / len) * NEIGHBOR_PUSH_FULL}px, ${(dy / len) * NEIGHBOR_PUSH_FULL}px) scale(${NEIGHBOR_SCALE_FULL})`, origin: '50% 50%', z: 10 }
 }
 const cardBoxStyle = (w) => {
   const s = cardStyle(w)
-  if (hoverActive.value && hoveredWidget.value?.uid === w.uid) s.zIndex = 50 // 放大的卡片浮于邻居之上
-  s.transform = cardTransform(w)
-  s.transformOrigin = originOf(w)
+  const hv = hoverTransform(w)
+  if (hv) {
+    s.transform = hv.transform
+    s.transformOrigin = hv.origin
+    if (hv.z) s.zIndex = hv.z
+  }
   return s
 }
 
@@ -959,6 +986,7 @@ onUnmounted(() => { window.removeEventListener('mousemove', onMouseMove); window
 
 // ========== 从侧边栏拖入组件 ==========
 const WIDGET_LABELS = { feed: '家人动态', task: '悬赏任务', today: '今日', weather: '天气', anni: '纪念日', recipe: '今日推荐', search: '寻物', wish: '愿望单', finance: '本月收支', album: '相册' }
+const WIDGET_ICONS = { feed: '👥', task: '🎯', today: '📅', weather: '🌤', anni: '🎂', recipe: '🍳', search: '🔍', wish: '⭐', finance: '💰', album: '📷' }
 const ghostActive = ref(false)
 const ghostGrown = ref(false)
 const ghostX = ref(0)
@@ -1046,7 +1074,7 @@ html.dark .grid-cell { border-color: rgba(212,178,152,0.1); }
   transition: transform 0.25s ease, box-shadow 0.25s ease;
   contain: layout style;
 }
-.dash-card:not(.edit-active):hover { transform: scale(1.04); box-shadow: 0 16px 48px rgba(58,46,34,0.22); z-index: 25; }
+.dash-card:not(.edit-active):hover { box-shadow: 0 12px 40px rgba(58,46,34,0.18); }
 .dash-card.edit-active {
   cursor: default;
   border-color: rgba(184,140,110,0.3);
@@ -1271,18 +1299,18 @@ html.dark .music-title { color: #E8DCC8; }
 .ghost-label { font-size: 12px; font-weight: 600; color: #3A2E22; white-space: nowrap; }
 html.dark .ghost-label { color: #E8DCC8; }
 
-/* ===== P2 hover:放大的卡片 + 被推开的邻居(保留部分内容,向「外侧」缩) + 波浪引导 ===== */
-.dash-card.h-boosted { box-shadow: 0 18px 48px rgba(58,46,34,0.28); border-color: rgba(184,140,110,0.5); }
-html.dark .dash-card.h-boosted { box-shadow: 0 18px 48px rgba(0,0,0,0.5); border-color: rgba(212,178,152,0.35); }
-.dash-card.h-pushed { opacity: 0.94; box-shadow: 0 4px 16px rgba(58,46,34,0.09); }
-html.dark .dash-card.h-pushed { box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
-.wave-hint { position: absolute; right: 12px; bottom: 10px; display: flex; align-items: center; gap: 6px; font-size: 10px; opacity: 0.55; pointer-events: none; z-index: 3; }
-.wa-hint-text { letter-spacing: 0.5px; }
-.wa-wave { display: inline-flex; gap: 2px; align-items: center; }
-.wa-wave i { width: 3px; height: 3px; border-radius: 50%; background: currentColor; opacity: 0.6; animation: waveDot 1.2s ease-in-out infinite; }
-.wa-wave i:nth-child(2) { animation-delay: 0.2s; }
-.wa-wave i:nth-child(3) { animation-delay: 0.4s; }
-@keyframes waveDot { 0%,100% { transform: translateY(0); opacity: 0.4; } 50% { transform: translateY(-3px); opacity: 1; } }
+/* ===== P2 hover:放大的卡片 + 被推开的邻居(全盖→胶囊/部分盖→降档缩小/擦边→轻微缩小) + 波浪引导 ===== */
+.dash-card.is-hovered { box-shadow: 0 20px 52px rgba(58,46,34,0.24); transition: transform 0.35s cubic-bezier(0.34, 1.2, 0.64, 1), box-shadow 0.3s ease; }
+html.dark .dash-card.is-hovered { box-shadow: 0 20px 52px rgba(0,0,0,0.4); }
+.dash-card.is-neighbor { transition: transform 0.35s cubic-bezier(0.34, 1.2, 0.64, 1); }
+.dash-card.is-neighbor .card-inner { opacity: 0; pointer-events: none; }
+.neighbor-capsule { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; z-index: 5; }
+.neighbor-capsule .nc-icon { font-size: 20px; line-height: 1; }
+.neighbor-capsule .nc-label { font-size: 11px; font-weight: 600; opacity: 0.7; }
+/* 小档未展开时的波浪提示:引导 hover 查看更多(方案 §2.2) */
+.dash-card.wave-hint::after { content: 'hover 查看更多'; position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); font-size: 10px; opacity: 0; color: #a06a4e; animation: wavePulse 2.4s ease-in-out infinite; pointer-events: none; }
+html.dark .dash-card.wave-hint::after { color: #d4b298; }
+@keyframes wavePulse { 0%,100% { opacity: 0; transform: translateX(-50%) translateY(0); } 50% { opacity: 0.75; transform: translateX(-50%) translateY(-3px); } }
 
 /* ===== P3 天气 AI 生图底图(渐变+毛玻璃兜底) ===== */
 .dash-card.weather .card-inner { position: relative; z-index: 1; }
