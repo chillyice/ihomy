@@ -215,6 +215,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 17. **全局 UI 样式统一**(强制):`el-dialog`/`ElMessageBox`/`ElMessage`/`el-popper`/`el-button`/`el-tag`/`el-badge`/`el-input` 及所有 EP 组件的配色、圆角、尺寸、z-index 一律由 `main.css` 全局覆写,**禁止在组件 scoped 内重复定义**。完整样式值(弹窗四档尺寸/遮罩/输入框/Toast 四色/完整 z-index 链)见 `docs/UI设计提示词.md` §11a 与 §3。**命令式 API(ElMessage/ElMessageBox/ElNotification/ElLoading)的组件样式已在 main.js 显式引入**——unplugin 按需加载只覆盖模板组件,新增命令式调用时须确认对应样式已在 main.js 引入,否则弹窗会以裸 DOM 渲染到文档流末尾(不可见,曾误报为「ElMessageBox 动画未生效」)。
 18. **按钮/标签/角标/图标/圆角统一**(强制,`main.css` 全局覆写,禁止 scoped 重复定义):按钮四类(主/次/幽灵/危险,浅色与深色**完全不同色值、不共用**)、`el-tag` 半透明磨砂、`el-badge` 半透明黑、`el-icon` `stroke-width:2px`、圆角统一(button 12px / input 10px / card+dialog 14px)。**完整色值见 `docs/UI设计提示词.md` §18a**。
 19. **页面统一规范**(强制,所有功能页遵守):根容器 `class="page"`(禁止 scoped 覆写 max-width/margin/padding);页面级 H1/H2 移除(面包屑已体现标题),分区标题用 `.section-label`;工具栏统一 `class="page-toolbar card"`(`.tb-left` 筛选组件 `size="small"`,`tb-right` 操作按钮 `gap:8px`,下拉包裹需补 `:deep(.el-dropdown){margin-left:12px}`);多选交互统一 `.pick-badge` 对勾圆标 + 卡片描边(**禁左上 checkbox 角标**);设备映射来源角标 `设备名 + .status-dot`。详见 `docs/UI设计提示词.md` §11b。
+20. **位图资产压缩入库**(强制):装饰性位图(封面/底图/插画)压缩后放 `frontend/src/assets/` 并 ESM 导入(`import x from '@/assets/x.jpg'`,构建出内容哈希名 `assets/x-<hash>.jpg`,配 nginx `expires 7d; immutable` 长期缓存),**不放 `public/`**(无哈希,换图后客户端不刷新)。宽度按实际渲染尺寸 2 倍封顶;带颗粒/噪声的图先做 3×3 中值滤波再压(降高频噪点,同画质约省 1/3 体积),输出渐进式 JPEG。参照相册封面 2560×1920 1.37MB → 800×600 112KB(-92%)。
 
 ### 性能规范(强制规则)
 

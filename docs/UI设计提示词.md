@@ -86,17 +86,17 @@
 - `sevenDayPhotos` 过滤 `createdAt < 7天` 全量;`recentPhotos` 从中随机取 7 张展示。
 - 每张 `.polaroid-pos`(定位包装)+ `.polaroid`(hover 缩放)分离 transform 上下文防频闪。
 - `.polaroid`: 白边相纸 `padding: 6px 6px 22px`,随机旋转 ±25°、随机偏移 dx±170 dy±70、投影。
-- 拍立得宽度随组件 w 缩放:`--polaroid-w: clamp(80px, w*30px, 140px)`。
+- 拍立得宽度按组件实际像素双向预算取 min:`polaroidW(w)=max(80, min(组件宽×0.42, (组件高×0.55−22)/0.75, 170))`(全高≈0.75P+22 = 4:3 图+白框+手写条;高向不超组件高 55%,宽向不超组件宽 42%)。
 - 照片可溢出组件边界(`overflow: visible`),z-index:40 高于其他卡片。
 - hover:z-index 99 + scale 1.15(抽出感)。
 - 点击 → `PhotoViewer` 全屏沉浸式浏览(播放全部近 7 天照片,非仅展示的 7 张),启动时关闭天气/灯光/毛玻璃/色块特效。
 
 ### 闭合相册(近 7 天无新照片)
-- 平躺木色封面 `linear-gradient(#8B6F47,#6B5435)`,宽度 85% 容器,4:3 比例。
-- 透视厚度感:多层 box-shadow 模拟俯视厚度。
-- 花纹点缀:`::before` 45° 斜纹底纹 + `::after` 内边框。
-- 家庭名称 + "家庭相册",随机斜放。
-- hover 抬正放大,点击跳 `/album`。
+- 封面为**位图**(V9.54):`frontend/src/assets/album-cover.jpg`——老式皮质相册,图内已烫金「家庭相册」;800×600 / 112KB(由 2560×1920 原稿压缩来,ESM 导入取内容哈希)。`object-fit: cover` 填满 4:3 容器(原图即 4:3,实际零裁切)。
+- `.album-cover-front` 只保留 `border-radius` / `overflow: hidden`(裁圆角)/ 投影 / `opacity 1.5s` 淡出;原来的木色渐变底、`::before` 45° 斜纹、`::after` 内边框、家庭名 + "家庭相册" 两行文字**全部删除**——图里已有完整金色回纹边框与烫金标题,叠加即重复。
+- 封面宽 `albumCoverW(w)=min(组件宽×0.7, 组件高×0.95)`,`.album-closed` 绝对定位 + `translate(-50%,-50%)` 居中,`perspective: 1100px`。
+- **hover 3D 翻开**(V9.53):`.album-book.open` 时封面以 `transform-origin: left center` 沿书脊转到 `rotateY(-145deg)` 露出内页,封面正/背两面各自 `opacity` 淡出(1.5s);内页 `.album-page` 为历史照片轮播(`historyPhotos`,静躺 2s → 翻阅 1.5s,`ALBUM_PAGE_MS=3500`),翻页卡片 `preserve-3d` + 正/背面分别淡出(避免 opacity 压平 `preserve-3d`),CSS `transition 1.5s` 与 JS 定时器同节奏;无历史照片时内页显示「去添加家庭照片」空态。
+- 点击跳 `/album`。
 
 ## 3. 体积光系统(light-layer,z-index 48)
 
@@ -274,7 +274,7 @@ color: #3A2E22;
 - **寻物(search,V9.53 缩小版 item 页)**:搜索框(关键词优先+AI 兜底)+只读户型图 FloorPlanCanvas(mode=view)+命中放大居中+上/下一个导航+语音找物(Web Speech API);无户型图显示引导文案。
 - **愿望单(wish)**:愿望列表(状态点+标题),行 hover `background`;`nWish(w)`。
 - **本月收支(finance)**:收入/支出/结余三列。
-- **相册(album,V9.53 封面 3D 翻开)**:无近 7 天新照片时闭合相册封面 hover 沿书脊翻到 145° 露出内页历史照片轮播(静躺 2s→翻阅 1.5s);有近期照片仍走拍立得堆。
+- **相册(album,V9.53 封面 3D 翻开;V9.54 封面换压缩位图)**:无近 7 天新照片时闭合相册封面 hover 沿书脊翻到 145° 露出内页历史照片轮播(静躺 2s→翻阅 1.5s);封面正面为皮质相册位图 `album-cover.jpg`(800×600/112KB,图内含「家庭相册」烫金字,原 CSS 渐变+文字封面已替换);有近期照片仍走拍立得堆。
 - ~~**音乐(music)**~~:已删除(V9.53,与悬浮黑胶 MusicPlayer 冗余)。
 
 ## 11. 黑胶唱片播放器(MusicPlayer,z-index 55)
