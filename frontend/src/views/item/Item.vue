@@ -1420,7 +1420,7 @@ const onSearch = async () => {
   searchResults.value = await itemApi.list({ keyword: searchKeyword.value })
   if (searchResults.value.length) {
     await autoSwitchToHits()
-    focusFirstHit()
+    await focusFirstHit()
     return
   }
   // 关键词无命中 → AI 找物兜底(俗称/别名/自然语言描述);AI 不可用静默保持无结果
@@ -1437,21 +1437,32 @@ const onSearch = async () => {
     aiSearching.value = false
   }
   await autoSwitchToHits()
-  focusFirstHit()
+  await focusFirstHit()
 }
-// 搜索命中后自动切层:只看当前房子的命中;命中楼层里有 1 楼默认展示 1 楼,
-// 没有 1 楼则取命中楼层中最高层(跨房子的命中走右下角结果列表点选跳转)
+// 搜索命中后实时定位:切到第一个命中的房子+楼层(命中楼层里有 1 楼优先 1 楼,
+// 没有 1 楼取最高层),命中物品随即高亮+居中显示在户型图上,跨房子也直接切过去。
 const autoSwitchToHits = async () => {
   floorTouched.value = true
-  const hits = searchResults.value.filter((it) => it.house_id != null && Number(it.house_id) === Number(currentHouseId.value))
   // floor/house_id 先判非空再 Number(Number(null)=0 会被当成 0 楼层)
-  const floorsWithHits = [...new Set(hits.filter((it) => it.floor != null && !Number.isNaN(Number(it.floor))).map((it) => Number(it.floor)))]
+  const hits = searchResults.value.filter((it) => it.house_id != null && it.floor != null && !Number.isNaN(Number(it.floor)))
+  if (!hits.length) return
+  const targetHouse = Number(hits[0].house_id)
+  const floorsWithHits = [...new Set(hits.filter((it) => Number(it.house_id) === targetHouse).map((it) => Number(it.floor)))]
   if (!floorsWithHits.length) return
   const target = floorsWithHits.includes(1) ? 1 : Math.max(...floorsWithHits)
-  if (target !== currentFloor.value) await switchFloor(target)
+  if (Number(currentHouseId.value) === targetHouse) {
+    if (target !== currentFloor.value) await switchFloor(target)
+    return
+  }
+  // 跨房子:直接切房+切层+重载(搜索定位走即时跳转,不走楼层切换动画;
+  // 不触发 fitKey 适配,交给下方 focusFirstHit 直接定位到命中物品)
+  currentHouseId.value = targetHouse
+  currentFloor.value = target
+  await loadFloorPlan()
 }
 // 搜索后放大居中到当前房子当前楼层的第一个命中物品
-const focusFirstHit = () => {
+const focusFirstHit = async () => {
+  await nextTick() // 等切房/切层后 floorPlan.items 传入画布再定位,避免读到旧楼层数据
   const hit = searchResults.value.find((it) =>
     it.house_id != null && it.floor != null &&
     Number(it.house_id) === Number(currentHouseId.value) && Number(it.floor) === Number(currentFloor.value))
@@ -1467,6 +1478,7 @@ const locateItem = async (it) => {
   if (it.floor != null) currentFloor.value = Number(it.floor)
   selectedFurnitureId.value = it.furniture_id || null
   await loadFloorPlan()
+  await nextTick() // 等 floorPlan.items 传入画布再定位,避免读到旧楼层数据
   // 放大居中到命中物品(物品无锚点时画布内回退家具/房间中心)
   canvasRef.value?.focusItem(it.id)
 }
