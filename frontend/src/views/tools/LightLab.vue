@@ -2,12 +2,14 @@
      交互:OrbitControls 左键旋转(绕场景中央)/右键平移(移动场景)/滚轮缩放;拖动发光小球移动光源。
      太阳模拟:客户端 NOAA 算法(见 utils/solarPosition.js,与后端 SolarUtil 同源),按日期+经纬度(默认济南)+
                时区 UTC+8 计算高度角/方位角,驱动平行太阳光;支持播放/暂停/加速/步进;房间朝南=窗朝方位角 180°。
+     窗户:两扇日字形传统窗,绕外窗框竖轴由中间向外推开(合页在左右外梃);墙体厚度与窗框/窗棂同厚。
      手动模式:可拖拽光源 + 光源类型(平行光/聚光/点光)。约定:懒加载路由 + three 独立 chunk,不接 i18n。 -->
 <template>
   <div class="light-lab">
     <div ref="canvasRef" class="light-lab-canvas"></div>
 
     <div class="hud">
+      <button class="hud-back" @click="goBack" title="返回工具箱">← 返回</button>
       <div class="hud-title">3D 光影实验台</div>
 
       <div class="hud-row">
@@ -69,7 +71,14 @@
         <div class="hud-coords">光源 {{ lightCoords || '—' }}</div>
       </template>
 
+      <div class="hud-row">
+        <span class="hud-label">开窗</span>
+        <input type="range" min="0" max="90" step="1" v-model.number="windowOpen" class="hud-range" />
+        <span class="hud-unit">{{ windowOpen }}°</span>
+      </div>
+
       <div class="hud-row hud-footer">
+        <button class="hud-btn" :class="{ on: lampOn }" @click="toggleLamp">台灯 {{ lampOn ? '开' : '关' }}</button>
         <button class="hud-btn" @click="resetCamera">重置视角</button>
       </div>
       <div class="hud-hint">左键旋转 · 右键平移 · 滚轮缩放 · 拖动发光小球移动光源</div>
@@ -79,6 +88,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { sunPosition } from '@/utils/solarPosition'
@@ -91,9 +101,12 @@ const SUN_DISTANCE = 15
 const SUN_BASE_INTENSITY = 6
 
 const canvasRef = ref(null)
+const router = useRouter()
+const goBack = () => router.push('/tools')
 const mode = ref('sun')
 const lightType = ref('directional')
 const shadowOn = ref(true)
+const lampOn = ref(true)
 const playing = ref(true)
 const speed = ref(1)
 const speeds = [0.5, 1, 2, 4, 8]
@@ -106,6 +119,7 @@ const hudAz = ref('--')
 const hudWindowAngle = ref('--')
 const isNight = ref(false)
 const lightCoords = ref('')
+const windowOpen = ref(50) // 开窗角度(0° 关闭 ~ 90° 全开)
 const reducedMotion = ref(false)
 
 const locationLabel = computed(() =>
@@ -124,6 +138,12 @@ let gizmo = null
 let gizmoHit = null
 let raycaster = null
 let dragPlane = null
+let lampGroup = null
+let lampLight = null
+let lampShadeMat = null
+let windowGroup = null
+let sashL = null
+let sashR = null
 let compassTextures = []
 let dragging = false
 let rafId = null
@@ -131,7 +151,9 @@ let rafId = null
 // 模拟时间(当地时间分钟,0~1440),普通变量由 rAF 推进,不写 Vue ref
 let minutesOfDay = 0
 let lastTickMs = null
+let lastFrameMs = null
 let lastHudFlushMs = null
+let currentOpen = 0
 let latestSun = { time: '--:--', altitude: 0, azimuth: 180 }
 
 const _tmpNormal = new THREE.Vector3()
@@ -140,14 +162,30 @@ const _sunColor = new THREE.Color()
 // 场景常量(墙在 z=WALL_Z,窗朝南=方位角 180° 方向)
 const WALL_Z = -2.5
 const WALL_W = 6
-const WALL_H = 5
+const WALL_H = 6.5
 const ROOM_DEPTH = 6
 const WIN_W = 2.4
 const WIN_H = 3
 const WIN_BOTTOM = 0.8
 const WIN_CX = 0
 const WIN_CY = WIN_BOTTOM + WIN_H / 2
+const WALL_T = 0.16      // 墙体厚度(与窗框/窗棂同厚)
+const FRAME_BAR = 0.07   // 窗框/窗扇框 面内厚度
+const MULLION_BAR = 0.04 // 窗棂(中横档)面内厚度
 const DEFAULT_LIGHT_POS = new THREE.Vector3(1.5, 3.6, -6.5)
+// 桌面台灯(可开关):置于桌面上靠左,灯罩朝下打光
+const LAMP_X = -0.9
+const LAMP_Z = WALL_Z + 0.35 // 桌面中心深(见 buildTable 的 TZ)
+const LAMP_BASE_Y = 0.75     // 桌面顶高(见 buildTable 的 TT)
+const LAMP_INTENSITY = 10
+const SHADOW_BLUR_RADIUS = 6    // 阴影模糊半径(配合 VSM 软阴影消除锯齿)
+const SHADOW_BLUR_SAMPLES = 16  // 模糊采样数
+
+// 软阴影:把 LightShadow 配置为带高斯模糊的 VSM(半径/采样),柔化锯齿边缘
+function softenShadow(shadow) {
+  shadow.radius = SHADOW_BLUR_RADIUS
+  shadow.blurSamples = SHADOW_BLUR_SAMPLES
+}
 
 function init() {
   const container = canvasRef.value
@@ -158,7 +196,7 @@ function init() {
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1))
   renderer.setSize(w, h)
   renderer.shadowMap.enabled = shadowOn.value
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  renderer.shadowMap.type = THREE.VSMShadowMap
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   renderer.toneMappingExposure = 1.12
   renderer.domElement.style.touchAction = 'none'
@@ -168,10 +206,11 @@ function init() {
   scene.background = new THREE.Color(0x15110d)
 
   camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 100)
-  camera.position.set(4.5, 2.6, 4.5)
+  // 默认正视窗户:相机在室内(z>WALL_Z),平视窗心,从室内向室外看
+  camera.position.set(0, WIN_CY, 3.2)
 
   controls = new OrbitControls(camera, renderer.domElement)
-  controls.target.set(0, 1.4, -1)
+  controls.target.set(0, WIN_CY, WALL_Z)
   controls.enableDamping = !reducedMotion.value
   controls.dampingFactor = 0.08
   controls.minDistance = 3
@@ -188,6 +227,7 @@ function init() {
   sunLight = new THREE.DirectionalLight(0xfff2da, SUN_BASE_INTENSITY)
   sunLight.castShadow = shadowOn.value
   sunLight.shadow.mapSize.set(2048, 2048)
+  softenShadow(sunLight.shadow)
   sunLight.shadow.camera.near = 0.5
   sunLight.shadow.camera.far = 60
   sunLight.shadow.camera.left = -12
@@ -202,8 +242,10 @@ function init() {
   buildFloor()
   buildWall()
   buildSideWalls()
-  buildMullions()
+  buildCeiling()
+  buildWindow()
   buildTable()
+  buildLamp()
   buildBalcony()
   buildBoxes()
   buildCompass()
@@ -231,7 +273,7 @@ function init() {
 
 function buildFloor() {
   const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(20, 20),
+    new THREE.PlaneGeometry(12, 12),
     new THREE.MeshStandardMaterial({ color: 0x3a322a, roughness: 0.85, metalness: 0 })
   )
   floor.rotation.x = -Math.PI / 2
@@ -253,8 +295,11 @@ function buildWall() {
   hole.lineTo(WIN_CX - WIN_W / 2, WIN_BOTTOM + WIN_H)
   hole.closePath()
   shape.holes.push(hole)
+  // 挤出墙体厚度(与窗框/窗棂同厚),沿 z 居中,形成真实窗洞侧壁
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: WALL_T, bevelEnabled: false })
+  geo.translate(0, 0, -WALL_T / 2)
   const wall = new THREE.Mesh(
-    new THREE.ShapeGeometry(shape),
+    geo,
     new THREE.MeshStandardMaterial({ color: 0x8d7d6a, roughness: 0.92, side: THREE.DoubleSide })
   )
   wall.position.set(0, 0, WALL_Z)
@@ -266,7 +311,7 @@ function buildWall() {
 function buildSideWalls() {
   const mat = new THREE.MeshStandardMaterial({ color: 0x7d6f5d, roughness: 0.92 })
   const openZ = WALL_Z + ROOM_DEPTH
-  const geo = new THREE.BoxGeometry(0.14, WALL_H, ROOM_DEPTH)
+  const geo = new THREE.BoxGeometry(WALL_T, WALL_H, ROOM_DEPTH)
   const centerZ = (WALL_Z + openZ) / 2
   ;[WALL_W / 2, -WALL_W / 2].forEach((x) => {
     const wall = new THREE.Mesh(geo, mat)
@@ -277,10 +322,21 @@ function buildSideWalls() {
   })
 }
 
+function buildCeiling() {
+  const mat = new THREE.MeshStandardMaterial({ color: 0x7d6f5d, roughness: 0.92 })
+  const openZ = WALL_Z + ROOM_DEPTH
+  const centerZ = (WALL_Z + openZ) / 2
+  const ceiling = new THREE.Mesh(new THREE.BoxGeometry(WALL_W, WALL_T, ROOM_DEPTH), mat)
+  ceiling.position.set(0, WALL_H - WALL_T / 2, centerZ)
+  ceiling.castShadow = true
+  ceiling.receiveShadow = true
+  scene.add(ceiling)
+}
+
 function buildTable() {
   const mat = new THREE.MeshStandardMaterial({ color: 0x7a5a3a, roughness: 0.6 })
   const TW = 2.8 // 桌面宽(比窗 2.4 宽一点)
-  const TD = 0.7 // 桌面深
+  const TD = 1.4 // 桌面深(向室内拉宽两倍)
   const TH = 0.05 // 桌面厚
   const TT = 0.75 // 桌面顶高(正常桌高)
   const TZ = WALL_Z + TD / 2 // 靠窗墙
@@ -299,6 +355,42 @@ function buildTable() {
     return leg
   })
   scene.add(top, ...legs)
+}
+
+function buildLamp() {
+  lampGroup = new THREE.Group()
+  const metalMat = new THREE.MeshStandardMaterial({ color: 0x30343c, roughness: 0.4, metalness: 0.7 })
+  lampShadeMat = new THREE.MeshStandardMaterial({ color: 0x1e4a3a, roughness: 0.5, metalness: 0.2, emissive: 0x000000, side: THREE.DoubleSide })
+
+  // 底座
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.15, 0.04, 24), metalMat)
+  base.position.y = 0.02
+  base.castShadow = true
+  base.receiveShadow = true
+  // 灯杆
+  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.03, 0.45, 16), metalMat)
+  arm.position.y = 0.04 + 0.225
+  arm.castShadow = true
+  // 灯罩(锥体,尖朝上、开口朝下,双面可见)
+  const shade = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.22, 24, 1, true), lampShadeMat)
+  shade.position.y = 0.04 + 0.45 + 0.11
+  shade.castShadow = true
+  lampGroup.add(base, arm, shade)
+  lampGroup.position.set(LAMP_X, LAMP_BASE_Y, LAMP_Z)
+  scene.add(lampGroup)
+
+  // 台灯光源:聚光灯朝下打向桌面
+  lampLight = new THREE.SpotLight(0xffe0b0, LAMP_INTENSITY, 8, 0.7, 0.55, 2)
+  lampLight.castShadow = shadowOn.value
+  lampLight.shadow.mapSize.set(1024, 1024)
+  softenShadow(lampLight.shadow)
+  lampLight.shadow.bias = -0.0004
+  lampLight.position.set(LAMP_X, LAMP_BASE_Y + 0.45, LAMP_Z)
+  lampLight.target.position.set(LAMP_X, 0.72, LAMP_Z + 0.35)
+  scene.add(lampLight)
+  scene.add(lampLight.target)
+  lampLight.visible = lampOn.value
+  lampShadeMat.emissive.setHex(lampOn.value ? 0xffc87a : 0x000000)
 }
 
 function buildBalcony() {
@@ -320,16 +412,79 @@ function buildBalcony() {
   scene.add(balcony, pot)
 }
 
-function buildMullions() {
-  const mat = new THREE.MeshStandardMaterial({ color: 0x5a4630, roughness: 0.7 })
-  const t = 0.09
-  const v = new THREE.Mesh(new THREE.BoxGeometry(t, WIN_H, t), mat)
-  v.position.set(WIN_CX, WIN_CY, WALL_Z)
-  v.castShadow = true
-  const h = new THREE.Mesh(new THREE.BoxGeometry(WIN_W, t, t), mat)
-  h.position.set(WIN_CX, WIN_CY, WALL_Z)
-  h.castShadow = true
-  scene.add(v, h)
+function windowBar(w, h, d, cx, cy, cz, mat) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat)
+  m.position.set(cx, cy, cz)
+  m.castShadow = true
+  m.receiveShadow = true
+  return m
+}
+
+function buildWindow() {
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0x4a3824, roughness: 0.55 })
+  const glassMat = new THREE.MeshStandardMaterial({
+    color: 0xa8c6d8, roughness: 0.08, metalness: 0.1,
+    transparent: true, opacity: 0.22, side: THREE.DoubleSide,
+  })
+
+  windowGroup = new THREE.Group()
+  windowGroup.position.set(0, 0, WALL_Z)
+  const D = WALL_T
+  const FB = FRAME_BAR
+
+  // 外窗框(固定):上下左右四根,填满洞口边缘
+  windowGroup.add(windowBar(WIN_W, FB, D, WIN_CX, WIN_BOTTOM + WIN_H - FB / 2, 0, frameMat))
+  windowGroup.add(windowBar(WIN_W, FB, D, WIN_CX, WIN_BOTTOM + FB / 2, 0, frameMat))
+  windowGroup.add(windowBar(FB, WIN_H, D, WIN_CX - WIN_W / 2 + FB / 2, WIN_CY, 0, frameMat))
+  windowGroup.add(windowBar(FB, WIN_H, D, WIN_CX + WIN_W / 2 - FB / 2, WIN_CY, 0, frameMat))
+
+  // 两扇窗:左扇合页在左梃、右扇合页在右梃,由中间向外推开
+  sashL = buildSash(frameMat, glassMat, D, FB)
+  sashL.position.set(WIN_CX - WIN_W / 2 + FB, 0, 0)
+  windowGroup.add(sashL)
+
+  sashR = buildSash(frameMat, glassMat, D, FB)
+  sashR.scale.x = -1
+  sashR.position.set(WIN_CX + WIN_W / 2 - FB, 0, 0)
+  windowGroup.add(sashR)
+
+  scene.add(windowGroup)
+
+  // 初始即按滑杆角度摆好,避免首帧从 0° 突跳
+  currentOpen = windowOpen.value
+  sashL.rotation.y = currentOpen * RAD
+  sashR.rotation.y = -currentOpen * RAD
+}
+
+function buildSash(frameMat, glassMat, D, FB) {
+  const g = new THREE.Group()
+  const SW = WIN_W / 2 - FB            // 单扇宽(左框内缘到中缝)
+  const MB = MULLION_BAR
+  const y0 = WIN_BOTTOM
+  const y1 = WIN_BOTTOM + WIN_H
+  const innerTop = y1 - FB             // 上框条下缘
+  const innerBot = y0 + FB             // 下框条上缘
+  const sashH = innerTop - innerBot    // 扇内高
+  const ym = WIN_BOTTOM + WIN_H / 2
+
+  // 四根窗扇框(合页梃 / 中缝梃 / 上梃 / 下梃)
+  g.add(windowBar(FB, sashH, D, FB / 2, ym, 0, frameMat))
+  g.add(windowBar(FB, sashH, D, SW - FB / 2, ym, 0, frameMat))
+  g.add(windowBar(SW, FB, D, SW / 2, innerTop - FB / 2, 0, frameMat))
+  g.add(windowBar(SW, FB, D, SW / 2, innerBot + FB / 2, 0, frameMat))
+  // 日字形中横棂(把窗扇分成上下两格)
+  g.add(windowBar(SW, MB, D, SW / 2, ym, 0, frameMat))
+
+  // 玻璃:上下两格,透明不投影(阳光穿过)
+  const gw = SW - FB * 2
+  const gh = (sashH - FB * 2 - MB) / 2
+  const glassGeo = new THREE.PlaneGeometry(gw, gh)
+  const top = new THREE.Mesh(glassGeo, glassMat)
+  top.position.set(SW / 2, ym + MB / 2 + gh / 2, 0)
+  const bot = new THREE.Mesh(glassGeo, glassMat)
+  bot.position.set(SW / 2, ym - MB / 2 - gh / 2, 0)
+  g.add(top, bot)
+  return g
 }
 
 function buildBoxes() {
@@ -366,12 +521,12 @@ function makeTextSprite(text, color) {
 }
 
 function buildCompass() {
-  const R = 8
+  const R = 5
   const marks = [
     { t: 'N', p: [0, 0.05, R], c: 'rgba(255,255,255,0.55)' },
     { t: 'S', p: [0, 0.05, -R], c: 'rgba(255,176,96,0.85)' }, // 南=太阳侧(窗朝南)
-    { t: 'E', p: [R, 0.05, 0], c: 'rgba(255,255,255,0.55)' },
-    { t: 'W', p: [-R, 0.05, 0], c: 'rgba(255,255,255,0.55)' },
+    { t: 'E', p: [-R, 0.05, 0], c: 'rgba(255,255,255,0.55)' },
+    { t: 'W', p: [R, 0.05, 0], c: 'rgba(255,255,255,0.55)' },
   ]
   marks.forEach((m) => {
     const s = makeTextSprite(m.t, m.c)
@@ -419,6 +574,7 @@ function applyLightType() {
     const l = new THREE.DirectionalLight(0xfff1d6, 3)
     l.castShadow = shadowOn.value
     l.shadow.mapSize.set(2048, 2048)
+    softenShadow(l.shadow)
     l.shadow.camera.near = 0.5
     l.shadow.camera.far = 40
     l.shadow.camera.left = -10
@@ -437,6 +593,7 @@ function applyLightType() {
     const l = new THREE.SpotLight(0xfff1d6, 120, 60, Math.PI / 5, 0.35, 1.6)
     l.castShadow = shadowOn.value
     l.shadow.mapSize.set(2048, 2048)
+    softenShadow(l.shadow)
     l.shadow.bias = -0.0002
     l.position.copy(pos)
     manualLightTarget = new THREE.Object3D()
@@ -484,7 +641,7 @@ function sunDirection(alt, az) {
   const altR = alt * RAD
   const azR = az * RAD
   return new THREE.Vector3(
-    Math.sin(azR) * Math.cos(altR),
+    -Math.sin(azR) * Math.cos(altR),
     Math.sin(altR),
     Math.cos(azR) * Math.cos(altR)
   )
@@ -593,6 +750,10 @@ function toggleShadow() {
   shadowOn.value = !shadowOn.value
 }
 
+function toggleLamp() {
+  lampOn.value = !lampOn.value
+}
+
 function resetManualLight() {
   if (!manualLight) return
   manualLight.position.copy(DEFAULT_LIGHT_POS)
@@ -629,9 +790,10 @@ function onResize() {
 
 function onVisibility() {
   if (document.hidden) {
-    if (rafId) { cancelAnimationFrame(rafId); rafId = null; lastTickMs = null }
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; lastTickMs = null; lastFrameMs = null }
   } else if (!rafId) {
     lastTickMs = null
+    lastFrameMs = null
     loop()
   }
 }
@@ -639,6 +801,8 @@ function onVisibility() {
 function loop(now) {
   rafId = requestAnimationFrame(loop)
   const nowMs = now || performance.now()
+  const dt = lastFrameMs == null ? 0 : (nowMs - lastFrameMs) / 1000
+  lastFrameMs = nowMs
 
   // 推进模拟时间(太阳模式 + 播放中)
   if (lastTickMs != null && playing.value && mode.value === 'sun') {
@@ -649,6 +813,11 @@ function loop(now) {
   lastTickMs = nowMs
 
   if (mode.value === 'sun') applySunPosition()
+
+  // 窗扇平滑推拉(绕外窗框竖轴旋转,左扇 +θ / 右扇 -θ 向室外推开)
+  currentOpen += (windowOpen.value - currentOpen) * Math.min(1, dt * 8)
+  if (sashL) sashL.rotation.y = currentOpen * RAD
+  if (sashR) sashR.rotation.y = -currentOpen * RAD
 
   controls.update()
   renderer.render(scene, camera)
@@ -688,10 +857,16 @@ watch(shadowOn, (on) => {
   renderer.shadowMap.enabled = on
   if (sunLight) sunLight.castShadow = on
   if (manualLight) manualLight.castShadow = on
+  if (lampLight) lampLight.castShadow = on
 })
 
 watch(lightType, () => {
   if (renderer) applyLightType()
+})
+
+watch(lampOn, (on) => {
+  if (lampLight) lampLight.visible = on
+  if (lampShadeMat) lampShadeMat.emissive.setHex(on ? 0xffc87a : 0x000000)
 })
 
 watch([lat, lng, dateStr], () => {
@@ -747,6 +922,23 @@ onBeforeUnmount(dispose)
   font-weight: 600;
   opacity: 0.9;
   letter-spacing: 1px;
+}
+.hud-back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.hud-back:hover {
+  background: rgba(255, 255, 255, 0.24);
 }
 .hud-row {
   display: flex;
@@ -826,6 +1018,12 @@ onBeforeUnmount(dispose)
 .hud-input.num {
   width: 62px;
   font-variant-numeric: tabular-nums;
+}
+.hud-range {
+  flex: 1;
+  min-width: 0;
+  accent-color: #ffc864;
+  cursor: pointer;
 }
 .hud-coords {
   font-size: 11px;

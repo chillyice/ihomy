@@ -52,7 +52,7 @@ const routes = [
   // AI 测试台(临时):对话/图片/语音输入输出调试,依赖 /ai/** 登录接口
   { path: '/tools/ai-playground', name: 'AiPlayground', component: () => import('@/views/tools/AiPlayground.vue'), meta: { requiresAuth: true } },
   // 3D 光影实验台(临时):Three.js 太阳模拟+真实阴影,未来场景主题的 3D 基础模型
-  { path: '/tools/light-lab', name: 'LightLab', component: () => import('@/views/tools/LightLab.vue'), meta: { public: true } },
+  { path: '/tools/light-lab', name: 'LightLab', component: () => import('@/views/tools/LightLab.vue'), meta: { public: true, immersive: true } },
   // 运维管理页:仅 OPS 角色可访问
   { path: '/ops', name: 'Ops', component: () => import('@/views/ops/Ops.vue'), meta: { ops: true } },
   // 兜底:未匹配的路由重定向回首页

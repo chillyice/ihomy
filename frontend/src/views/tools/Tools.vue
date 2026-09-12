@@ -21,6 +21,12 @@
         <div class="tool-desc">{{ $t('tools.aiPlayground.desc') }}</div>
         <span class="tool-enter">{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon></span>
       </div>
+      <div class="tool-card card" @click="$router.push('/tools/light-lab')">
+        <div class="tool-icon"><el-icon :size="30"><Sunny /></el-icon></div>
+        <div class="tool-name">{{ $t('tools.lightLab.title') }}</div>
+        <div class="tool-desc">{{ $t('tools.lightLab.desc') }}</div>
+        <span class="tool-enter">{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon></span>
+      </div>
       <div class="tool-card card tool-disabled">
         <div class="tool-icon"><el-icon :size="30"><MagicStick /></el-icon></div>
         <div class="tool-name">{{ $t('tools.more') }}</div>
@@ -30,7 +36,7 @@
 </template>
 
 <script setup>
-import { Tools, ArrowRight, MagicStick } from '@element-plus/icons-vue'
+import { Tools, ArrowRight, MagicStick, Sunny } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 </script>
 
