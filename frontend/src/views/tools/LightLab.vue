@@ -19,6 +19,20 @@
         </div>
       </div>
 
+      <div class="hud-row">
+        <span class="hud-label">阴影算法</span>
+        <div class="hud-seg">
+          <button :class="{ active: shadowMode === 'pcf' }" @click="shadowMode = 'pcf'">PCF 软阴影</button>
+          <button :class="{ active: shadowMode === 'pcss' }" @click="shadowMode = 'pcss'">PCSS</button>
+        </div>
+      </div>
+
+      <div class="hud-row" v-if="shadowMode === 'pcss'">
+        <span class="hud-label">阴影软硬</span>
+        <input type="range" min="0" max="0.0015" step="0.0001" v-model.number="pcssLightSize" class="hud-range" />
+        <span class="hud-unit">{{ pcssLightSize.toFixed(4) }}</span>
+      </div>
+
       <!-- 太阳模拟面板 -->
       <template v-if="mode === 'sun'">
         <div class="hud-row">
@@ -93,6 +107,156 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { sunPosition } from '@/utils/solarPosition'
 
+// PCSS(Percentage-Closer Soft Shadows)实验实现:可变半影(近遮挡硬、远处软)。
+// 通过覆写 three.js 的 BASIC 阴影分支 getShadow 实现;仅本实验页生效(three 仅此处使用)。
+const PCSS_SENTINEL = '// ihomy-pcss-shadow'
+const PCSS_GET_SHADOW = /* glsl */ `
+		${PCSS_SENTINEL}
+		#define PCSS_BLOCKER_SAMPLES 16
+		#define PCSS_PCF_SAMPLES 16
+		#define PCSS_SEARCH_RADIUS 20.0
+		#define PCSS_MIN_RADIUS 1.0
+		#define PCSS_MAX_RADIUS 32.0
+		uniform float pcssLightSize; // 光源角尺寸(软硬度),由 HUD 滑杆实时驱动
+
+		// 16 个泊松盘采样点(归一化,单位圆内)
+		const vec2 pcssPoisson16[ 16 ] = vec2[ 16 ](
+			vec2( -0.94201624, -0.39906216 ), vec2( 0.94558609, -0.76890725 ),
+			vec2( -0.094184101, -0.92938870 ), vec2( 0.34495938, 0.29387760 ),
+			vec2( -0.91588581, 0.45771432 ), vec2( -0.81544232, -0.87912464 ),
+			vec2( -0.38277543, 0.27676845 ), vec2( 0.97484398, 0.75648379 ),
+			vec2( 0.44323325, -0.97511554 ), vec2( 0.53742981, -0.47373420 ),
+			vec2( -0.26496911, -0.41893023 ), vec2( 0.79197514, 0.19090188 ),
+			vec2( -0.24188840, 0.99706507 ), vec2( -0.81409955, 0.91437590 ),
+			vec2( 0.19984126, 0.78641367 ), vec2( 0.14383161, -0.14100790 )
+		);
+
+		// 每个像素随机旋转采样盘,消除带状噪声
+		float pcssHash( vec2 p ) {
+			return fract( sin( dot( p, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
+		}
+
+		vec2 pcssRotate( vec2 p, float s, float c ) {
+			return vec2( p.x * c - p.y * s, p.x * s + p.y * c );
+		}
+
+		// 该深度是否比接收点更靠近光源(即是否为阻挡物/遮挡物)
+		bool pcssIsOccluder( float depth, float receiverDepth ) {
+			#ifdef USE_REVERSED_DEPTH_BUFFER
+				return depth > receiverDepth;
+			#else
+				return depth < receiverDepth;
+			#endif
+		}
+
+		// 该样本是否受光(1.0 受光 / 0.0 阴影),与 three.js 原生 BASIC 阴影判断一致
+		float pcssIsLit( float depth, float receiverDepth ) {
+			#ifdef USE_REVERSED_DEPTH_BUFFER
+				return step( depth, receiverDepth );
+			#else
+				return step( receiverDepth, depth );
+			#endif
+		}
+
+		float getShadow( sampler2D shadowMap, vec2 shadowMapSize, float shadowIntensity, float shadowBias, float shadowRadius, vec4 shadowCoord ) {
+
+			float shadow = 1.0;
+
+			shadowCoord.xyz /= shadowCoord.w;
+
+			#ifdef USE_REVERSED_DEPTH_BUFFER
+
+				shadowCoord.z -= shadowBias;
+
+			#else
+
+				shadowCoord.z += shadowBias;
+
+			#endif
+
+			bool inFrustum = shadowCoord.x >= 0.0 && shadowCoord.x <= 1.0 && shadowCoord.y >= 0.0 && shadowCoord.y <= 1.0;
+
+			if ( inFrustum && shadowCoord.z <= 1.0 ) {
+
+				vec2 texelSize = vec2( 1.0 ) / shadowMapSize;
+				float receiverDepth = shadowCoord.z;
+				float ang = pcssHash( gl_FragCoord.xy ) * 6.28318530718;
+				float s = sin( ang );
+				float c = cos( ang );
+
+				// 1. 阻挡物搜索:在搜索盘内平均所有比接收点更近的深度
+				float blockerDepthSum = 0.0;
+				float blockerCount = 0.0;
+
+				for ( int i = 0; i < PCSS_BLOCKER_SAMPLES; i ++ ) {
+
+					vec2 offset = pcssRotate( pcssPoisson16[ i ], s, c ) * ( PCSS_SEARCH_RADIUS * texelSize );
+					float d = texture2D( shadowMap, shadowCoord.xy + offset ).r;
+
+					if ( pcssIsOccluder( d, receiverDepth ) ) {
+
+						blockerDepthSum += d;
+						blockerCount += 1.0;
+
+					}
+
+				}
+
+				if ( blockerCount < 0.5 ) {
+
+					shadow = 1.0; // 完全受光
+
+				} else if ( blockerCount > float( PCSS_BLOCKER_SAMPLES ) - 0.5 ) {
+
+					shadow = 0.0; // 完全遮挡(硬阴影)
+
+				} else {
+
+					// 2. 半影估计:阻挡物与接收点深度差越大,半影越软
+					float avgBlockerDepth = blockerDepthSum / blockerCount;
+					float penumbra = abs( receiverDepth - avgBlockerDepth ) / max( avgBlockerDepth, 1e-4 );
+					float filterRadius = clamp( penumbra * pcssLightSize * shadowMapSize.x, PCSS_MIN_RADIUS, PCSS_MAX_RADIUS );
+
+					// 3. PCF:按半影半径采样,平均受光比例
+					float lit = 0.0;
+
+					for ( int i = 0; i < PCSS_PCF_SAMPLES; i ++ ) {
+
+						vec2 offset = pcssRotate( pcssPoisson16[ i ], s, c ) * ( filterRadius * texelSize );
+						float d = texture2D( shadowMap, shadowCoord.xy + offset ).r;
+						lit += pcssIsLit( d, receiverDepth );
+
+					}
+
+					shadow = lit / float( PCSS_PCF_SAMPLES );
+
+				}
+
+			}
+
+			return mix( 1.0, shadow, shadowIntensity );
+
+		}
+`
+
+// 幂等覆写 three.js 的 BASIC 阴影分支为 PCSS(防 HMR 重复覆写导致函数重复定义)
+function installPcssShadow() {
+  const chunk = THREE.ShaderChunk.shadowmap_pars_fragment
+  if (chunk.includes(PCSS_SENTINEL)) return
+  const sig = 'float getShadow( sampler2D shadowMap,'
+  const sigIdx = chunk.lastIndexOf(sig)
+  if (sigIdx === -1) return
+  const ret = 'return mix( 1.0, shadow, shadowIntensity );'
+  const retIdx = chunk.indexOf(ret, sigIdx)
+  if (retIdx === -1) return
+  const closeIdx = chunk.indexOf('}', retIdx)
+  if (closeIdx === -1) return
+  THREE.ShaderChunk.shadowmap_pars_fragment = chunk.slice(0, sigIdx) + PCSS_GET_SHADOW + chunk.slice(closeIdx + 1)
+}
+
+// PCSS 软硬度统一 uniform:所有材质共享同一对象引用,HUD 滑杆改动后下一帧即生效(无需重编译)
+const pcssLightSizeUniform = { value: 0.0008 }
+
 const RAD = Math.PI / 180
 const TZ_OFFSET_HOURS = 8
 const JINAN_LAT = 36.6512
@@ -106,6 +270,8 @@ const goBack = () => router.push('/tools')
 const mode = ref('sun')
 const lightType = ref('directional')
 const shadowOn = ref(true)
+const shadowMode = ref('pcf') // 'pcf' = PCF 软阴影(现状) / 'pcss' = PCSS 可变半影
+const pcssLightSize = ref(0.0008) // PCSS 半影软硬度(0~0.0015,越小越硬)
 const lampOn = ref(true)
 const playing = ref(true)
 const speed = ref(1)
@@ -134,6 +300,7 @@ let sunLight = null
 let manualLight = null
 let manualLightTarget = null
 let hemi = null
+let bounceLight = null
 let gizmo = null
 let gizmoHit = null
 let raycaster = null
@@ -158,6 +325,8 @@ let latestSun = { time: '--:--', altitude: 0, azimuth: 180 }
 
 const _tmpNormal = new THREE.Vector3()
 const _sunColor = new THREE.Color()
+const _skyNight = new THREE.Color(0x0a0c14) // 夜空
+const _skyDay = new THREE.Color(0xa8d0f0)   // 白天明亮天空蓝
 
 // 场景常量(墙在 z=WALL_Z,窗朝南=方位角 180° 方向)
 const WALL_Z = -2.5
@@ -175,19 +344,13 @@ const MULLION_BAR = 0.04 // 窗棂(中横档)面内厚度
 const DEFAULT_LIGHT_POS = new THREE.Vector3(1.5, 3.6, -6.5)
 // 桌面台灯(可开关):置于桌面上靠左,灯罩朝下打光
 const LAMP_X = -0.9
-const LAMP_Z = WALL_Z + 0.35 // 桌面中心深(见 buildTable 的 TZ)
+const LAMP_Z = WALL_Z + 0.7 // 桌面中心深(与 buildTable 的 TZ 对齐,TD 已拉宽到 1.4)
 const LAMP_BASE_Y = 0.75     // 桌面顶高(见 buildTable 的 TT)
 const LAMP_INTENSITY = 10
-const SHADOW_BLUR_RADIUS = 6    // 阴影模糊半径(配合 VSM 软阴影消除锯齿)
-const SHADOW_BLUR_SAMPLES = 16  // 模糊采样数
-
-// 软阴影:把 LightShadow 配置为带高斯模糊的 VSM(半径/采样),柔化锯齿边缘
-function softenShadow(shadow) {
-  shadow.radius = SHADOW_BLUR_RADIUS
-  shadow.blurSamples = SHADOW_BLUR_SAMPLES
-}
 
 function init() {
+  installPcssShadow()
+
   const container = canvasRef.value
   const w = container.clientWidth || window.innerWidth
   const h = container.clientHeight || window.innerHeight
@@ -196,7 +359,7 @@ function init() {
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1))
   renderer.setSize(w, h)
   renderer.shadowMap.enabled = shadowOn.value
-  renderer.shadowMap.type = THREE.VSMShadowMap
+  renderer.shadowMap.type = shadowMode.value === 'pcss' ? THREE.BasicShadowMap : THREE.PCFShadowMap
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   renderer.toneMappingExposure = 1.12
   renderer.domElement.style.touchAction = 'none'
@@ -223,17 +386,20 @@ function init() {
   hemi = new THREE.HemisphereLight(0xcfd8ff, 0x2e2419, 0.5)
   scene.add(hemi)
 
+  // 漫反射补光(模拟阳光射入后经地板/家具反弹的间接光照,暖色)
+  bounceLight = new THREE.AmbientLight(0xffd9b0, 0)
+  scene.add(bounceLight)
+
   // 太阳光(平行光,太阳模拟专用)
   sunLight = new THREE.DirectionalLight(0xfff2da, SUN_BASE_INTENSITY)
   sunLight.castShadow = shadowOn.value
   sunLight.shadow.mapSize.set(2048, 2048)
-  softenShadow(sunLight.shadow)
-  sunLight.shadow.camera.near = 0.5
-  sunLight.shadow.camera.far = 60
-  sunLight.shadow.camera.left = -12
-  sunLight.shadow.camera.right = 12
-  sunLight.shadow.camera.top = 12
-  sunLight.shadow.camera.bottom = -12
+  sunLight.shadow.camera.near = 5
+  sunLight.shadow.camera.far = 30
+  sunLight.shadow.camera.left = -8
+  sunLight.shadow.camera.right = 8
+  sunLight.shadow.camera.top = 8
+  sunLight.shadow.camera.bottom = -8
   sunLight.shadow.bias = -0.0002
   sunLight.target.position.set(0, 0.8, -1)
   scene.add(sunLight)
@@ -254,6 +420,17 @@ function init() {
   // 手动光源(初始平行光,默认隐藏;进入手动模式才显示)
   applyLightType()
   syncLightVisibility()
+
+  // 给所有材质注入 PCSS 软硬度 uniform(共享引用,HUD 滑杆改动即时生效)
+  scene.traverse((obj) => {
+    if (!obj.material) return
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material]
+    mats.forEach((m) => {
+      m.onBeforeCompile = (shader) => {
+        shader.uniforms.pcssLightSize = pcssLightSizeUniform
+      }
+    })
+  })
 
   raycaster = new THREE.Raycaster()
   dragPlane = new THREE.Plane()
@@ -334,27 +511,59 @@ function buildCeiling() {
 }
 
 function buildTable() {
-  const mat = new THREE.MeshStandardMaterial({ color: 0x7a5a3a, roughness: 0.6 })
+  const woodMat = new THREE.MeshStandardMaterial({ color: 0x7a5a3a, roughness: 0.6 })
+  const drawerMat = new THREE.MeshStandardMaterial({ color: 0x6b4c30, roughness: 0.7 })
+  const knobMat = new THREE.MeshStandardMaterial({ color: 0xc9b27a, roughness: 0.3, metalness: 0.7 })
+
   const TW = 2.8 // 桌面宽(比窗 2.4 宽一点)
   const TD = 1.4 // 桌面深(向室内拉宽两倍)
-  const TH = 0.05 // 桌面厚
+  const TH = 0.08 // 桌面厚
   const TT = 0.75 // 桌面顶高(正常桌高)
   const TZ = WALL_Z + TD / 2 // 靠窗墙
-  const top = new THREE.Mesh(new THREE.BoxGeometry(TW, TH, TD), mat)
+
+  // 桌面
+  const top = new THREE.Mesh(new THREE.BoxGeometry(TW, TH, TD), woodMat)
   top.position.set(0, TT - TH / 2, TZ)
   top.castShadow = true
   top.receiveShadow = true
-  const legGeo = new THREE.BoxGeometry(0.06, TT - TH, 0.06)
-  const lx = TW / 2 - 0.08
-  const lz = TD / 2 - 0.08
-  const legs = [[1, 1], [1, -1], [-1, 1], [-1, -1]].map(([sx, sz]) => {
-    const leg = new THREE.Mesh(legGeo, mat)
-    leg.position.set(sx * lx, (TT - TH) / 2, TZ + sz * lz)
-    leg.castShadow = true
-    leg.receiveShadow = true
-    return leg
-  })
-  scene.add(top, ...legs)
+
+  // 左右两个抽屉柜:实心到地,既当桌腿又彻底挡光(杜绝 VSM 漏光)
+  const pedestalW = 0.6
+  const pedestalH = TT - TH // 桌面下沿到地面
+  const pedestalD = TD
+  const px = TW / 2 - pedestalW / 2 - 0.05
+  const frontZ = TZ + TD / 2 + 0.01 // 抽屉面板(朝室内 +z)略凸出
+
+  const parts = [top]
+  for (const x of [-px, px]) {
+    const p = new THREE.Mesh(new THREE.BoxGeometry(pedestalW, pedestalH, pedestalD), woodMat)
+    p.position.set(x, pedestalH / 2, TZ)
+    p.castShadow = true
+    p.receiveShadow = true
+    parts.push(p)
+
+    // 抽屉面板 + 把手(每柜 3 层)
+    const drawerCount = 3
+    const drawerH = 0.18
+    const gap = 0.025
+    const yStart = 0.05
+    for (let i = 0; i < drawerCount; i++) {
+      const dy = yStart + i * (drawerH + gap) + drawerH / 2
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(pedestalW - 0.1, drawerH, 0.02), drawerMat)
+      panel.position.set(x, dy, frontZ)
+      panel.castShadow = true
+      panel.receiveShadow = true
+      parts.push(panel)
+
+      const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.03, 12), knobMat)
+      knob.rotation.x = Math.PI / 2
+      knob.position.set(x, dy, frontZ + 0.02)
+      knob.castShadow = true
+      parts.push(knob)
+    }
+  }
+
+  scene.add(...parts)
 }
 
 function buildLamp() {
@@ -382,9 +591,10 @@ function buildLamp() {
   // 台灯光源:聚光灯朝下打向桌面
   lampLight = new THREE.SpotLight(0xffe0b0, LAMP_INTENSITY, 8, 0.7, 0.55, 2)
   lampLight.castShadow = shadowOn.value
-  lampLight.shadow.mapSize.set(1024, 1024)
-  softenShadow(lampLight.shadow)
+  lampLight.shadow.mapSize.set(2048, 2048)
   lampLight.shadow.bias = -0.0004
+  lampLight.shadow.camera.near = 0.1
+  lampLight.shadow.camera.far = 10
   lampLight.position.set(LAMP_X, LAMP_BASE_Y + 0.45, LAMP_Z)
   lampLight.target.position.set(LAMP_X, 0.72, LAMP_Z + 0.35)
   scene.add(lampLight)
@@ -574,7 +784,6 @@ function applyLightType() {
     const l = new THREE.DirectionalLight(0xfff1d6, 3)
     l.castShadow = shadowOn.value
     l.shadow.mapSize.set(2048, 2048)
-    softenShadow(l.shadow)
     l.shadow.camera.near = 0.5
     l.shadow.camera.far = 40
     l.shadow.camera.left = -10
@@ -593,7 +802,6 @@ function applyLightType() {
     const l = new THREE.SpotLight(0xfff1d6, 120, 60, Math.PI / 5, 0.35, 1.6)
     l.castShadow = shadowOn.value
     l.shadow.mapSize.set(2048, 2048)
-    softenShadow(l.shadow)
     l.shadow.bias = -0.0002
     l.position.copy(pos)
     manualLightTarget = new THREE.Object3D()
@@ -674,9 +882,16 @@ function flushHud() {
   hudAz.value = latestSun.azimuth.toFixed(1)
   hudWindowAngle.value = Math.max(0, 90 - Math.abs(latestSun.azimuth - 180)).toFixed(0)
   isNight.value = latestSun.altitude <= 0
-  const night = latestSun.altitude <= 0
-  hemi.intensity = night ? 0.14 : 0.68
-  scene.background.setHex(night ? 0x0a0c14 : 0x15110d)
+
+  // 白昼因子:从 -3°(晨昏蒙影)到 12°(日出后)平滑过渡——白天整体环境变亮、天空变蓝,区别于黑夜
+  const day = THREE.MathUtils.smoothstep(latestSun.altitude, -3, 12)
+  hemi.intensity = THREE.MathUtils.lerp(0.14, 1.0, day)
+  scene.background.lerpColors(_skyNight, _skyDay, day)
+
+  // 漫反射补光:太阳越高、窗开得越大,室内反弹光越亮(暖色,模拟地板/家具漫反射)
+  const sunUp = Math.max(0, Math.sin(latestSun.altitude * RAD))
+  const winOpen = Math.sin(currentOpen * RAD) // 0(关) ~ 1(全开)
+  bounceLight.intensity = 0.4 * sunUp * (0.4 + 0.6 * winOpen)
 }
 
 function toNDC(e) {
@@ -748,6 +963,12 @@ function updateCoords() {
 
 function toggleShadow() {
   shadowOn.value = !shadowOn.value
+}
+
+function applyShadowMode() {
+  if (!renderer) return
+  // three.js 检测到 type 变化会自动重建深度纹理 + 重编译材质(sampler2DShadow ↔ sampler2D)
+  renderer.shadowMap.type = shadowMode.value === 'pcss' ? THREE.BasicShadowMap : THREE.PCFShadowMap
 }
 
 function toggleLamp() {
@@ -862,6 +1083,14 @@ watch(shadowOn, (on) => {
 
 watch(lightType, () => {
   if (renderer) applyLightType()
+})
+
+watch(shadowMode, () => {
+  applyShadowMode()
+})
+
+watch(pcssLightSize, (v) => {
+  pcssLightSizeUniform.value = v
 })
 
 watch(lampOn, (on) => {
