@@ -3,26 +3,26 @@
   <el-config-provider :locale="elLocale">
     <!-- 移动端布局:特效开启时同样挂载光影层(全部 pointer-events:none 不挡触摸) -->
     <template v-if="isMobile">
-      <SunLightLayer v-if="anyEffectEnabled" />
+      <SunLightLayer v-if="anyEffectEnabled && !immersive" />
       <MobileLayout />
     </template>
 
     <!-- 桌面端布局 -->
     <template v-else>
-      <SunLightLayer v-if="anyEffectEnabled" />
-      <AppSidebar v-if="!userStore.isPureOps" />
-      <main class="app-main" :class="{ 'with-sidebar': !userStore.isPureOps }">
+      <SunLightLayer v-if="anyEffectEnabled && !immersive" />
+      <AppSidebar v-if="!userStore.isPureOps && !immersive" />
+      <main class="app-main" :class="{ 'with-sidebar': !userStore.isPureOps && !immersive }">
         <router-view v-slot="{ Component, route }">
           <transition :name="route.meta.transition || 'fade'" mode="out-in">
             <component :is="Component" :key="route.path" />
           </transition>
         </router-view>
       </main>
-      <BackToTop />
+      <BackToTop v-if="!immersive" />
       <InstallPrompt />
-      <MusicPlayer />
+      <MusicPlayer v-if="!immersive" />
       <LightTestConsole />
-      <SiteFooter />
+      <SiteFooter v-if="!immersive" />
     </template>
   </el-config-provider>
 </template>
@@ -50,6 +50,8 @@ const { isMobile } = useDevice()
 const appStore = useAppStore()
 const userStore = useUserStore()
 const route = useRoute()
+// 沉浸式页面(如场景主题 P1)：隐藏侧边栏 / 页脚 / 回顶 / 播放器，内容区占满全屏
+const immersive = computed(() => !!route.meta.immersive)
 const { locale } = useI18n()
 
 // 全局光影状态:在 App.vue 创建实例,provide 给 SunLightLayer(渲染)和 AppSidebar(控制台灯)

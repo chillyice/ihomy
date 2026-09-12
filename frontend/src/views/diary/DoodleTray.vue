@@ -143,7 +143,7 @@ const safeColor = computed(() => (/^#[0-9a-fA-F]{6}$/.test(props.brushColor) ? p
   flex-shrink: 0; position: sticky; top: 16px; align-self: flex-start;
 }
 html.dark .doodle-area {
-  background: rgba(30,42,72,0.45); border-color: rgba(255,255,255,0.08);
+  background: rgba(var(--color-card-rgb),0.45); border-color: rgba(255,255,255,0.08);
   box-shadow: 0 2px 12px rgba(0,0,0,0.15);
 }
 
@@ -164,7 +164,7 @@ html.dark .doodle-area {
   transition: transform 0.25s ease, background 0.15s;
   border-radius: 8px;
 }
-.tray-toggle:active { background: rgba(184,140,110,0.12); }
+.tray-toggle:active { background: rgba(var(--color-brand-rgb),0.12); }
 .tray-toggle.up { transform: rotate(180deg); }
 
 .pen-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px 2px; }
@@ -175,18 +175,18 @@ html.dark .doodle-area {
   display: flex; flex-direction: column; align-items: center; gap: 3px;
   transition: background 0.2s;
 }
-.pen-item:hover { background: rgba(184,140,110,0.08); }
-html.dark .pen-item:hover { background: rgba(212,178,152,0.08); }
+.pen-item:hover { background: rgba(var(--color-brand-rgb),0.08); }
+html.dark .pen-item:hover { background: rgba(var(--color-brand-rgb),0.08); }
 
 .pen-svg { display: block; width: 26px; height: 52px; transition: transform 0.22s ease; }
 .pen-item:hover .pen-svg { transform: translateY(-5px) rotate(-4deg); }
-.pen-item.active { color: var(--color-text); background: rgba(184,140,110,0.1); }
-html.dark .pen-item.active { background: rgba(212,178,152,0.12); color: #E8DCC8; }
+.pen-item.active { color: var(--color-text); background: rgba(var(--color-brand-rgb),0.1); }
+html.dark .pen-item.active { background: rgba(var(--color-brand-rgb),0.12); color: #E8DCC8; }
 .pen-item.active .pen-svg { transform: translateY(-5px) rotate(-4deg); filter: drop-shadow(0 4px 6px rgba(58,46,34,0.25)); }
 
 .pen-name { font-size: 10.5px; color: var(--color-text-secondary); opacity: 0.75; }
-.pen-item.active .pen-name { color: #b88c6e; opacity: 1; font-weight: 600; }
-html.dark .pen-item.active .pen-name { color: #d4b298; }
+.pen-item.active .pen-name { color: var(--color-brand); opacity: 1; font-weight: 600; }
+html.dark .pen-item.active .pen-name { color: var(--color-brand); }
 
 .tray-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
 .tray-label { font-size: 12px; color: var(--color-text-secondary); flex-shrink: 0; min-width: 3.2em; }
@@ -200,7 +200,7 @@ html.dark .pen-item.active .pen-name { color: #d4b298; }
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .swatch:hover { transform: scale(1.18); }
-.swatch.active { box-shadow: 0 0 0 2px #b88c6e, 0 1px 4px rgba(58,46,34,0.3); transform: scale(1.12); }
+.swatch.active { box-shadow: 0 0 0 2px var(--color-brand), 0 1px 4px rgba(58,46,34,0.3); transform: scale(1.12); }
 html.dark .swatch { border-color: rgba(255,255,255,0.25); }
 .swatch.custom { border: none; background: conic-gradient(#E3B23C, #5B8C5A, #4A7FB5, #7B5EA7, #C96A8B, #D97B29, #E3B23C); }
 .swatch.custom::after {

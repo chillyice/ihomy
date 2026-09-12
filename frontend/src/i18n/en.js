@@ -1305,6 +1305,10 @@ export default {
     title: 'Tools',
     enter: 'Open',
     more: 'More tools coming soon',
+    lightLab: {
+      title: 'Light Lab',
+      desc: '3D real-time shadows: sun sim / move light',
+    },
     aiPlayground: {
       title: 'AI Playground',
       desc: 'Debug chat / image / speech model input & output',

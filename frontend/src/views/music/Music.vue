@@ -695,7 +695,7 @@ html.dark .cover-placeholder span { color: rgba(232,220,200,0.2); }
   border-radius: 50%;
   background: rgba(255,255,255,0.9);
   display: flex; align-items: center; justify-content: center;
-  font-size: 16px; color: #b88c6e;
+  font-size: 16px; color: var(--color-brand);
   box-shadow: 0 4px 12px rgba(0,0,0,0.2);
   transform: scale(0.85);
   transition: transform 0.2s;
@@ -714,13 +714,13 @@ html.dark .cover-placeholder span { color: rgba(232,220,200,0.2); }
   font-size: 11px;
   padding: 2px 8px;
   border-radius: 6px;
-  border: 1px solid rgba(184,140,110,0.15);
+  border: 1px solid rgba(var(--color-brand-rgb),0.15);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 html.dark .music-source {
-  background: rgba(30,42,72,0.85);
+  background: rgba(var(--color-card-rgb),0.85);
   color: #c9b8a0;
-  border-color: rgba(184,140,110,0.2);
+  border-color: rgba(var(--color-brand-rgb),0.2);
 }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 .status-dot.VALID { background: #67b26b; box-shadow: 0 0 4px rgba(103, 178, 107, 0.9); }
@@ -765,7 +765,7 @@ html.dark .music-source {
 .music-card:hover .card-more-btn { opacity: 1; }
 .card-more-btn:hover { background: rgba(255,255,255,0.95); }
 .card-more-btn .el-icon { font-size: 16px; color: #5c4c3d; }
-html.dark .card-more-btn { background: rgba(30,42,72,0.8); }
+html.dark .card-more-btn { background: rgba(var(--color-card-rgb),0.8); }
 html.dark .card-more-btn .el-icon { color: #E8DCC8; }
 
 /* ========== 专辑卡片 ========== */
@@ -809,12 +809,12 @@ html.dark .card-more-btn .el-icon { color: #E8DCC8; }
   font-size: 11px; font-weight: 500;
   padding: 3px 10px;
   border-radius: 8px;
-  border: 1px solid rgba(184,140,110,0.15);
+  border: 1px solid rgba(var(--color-brand-rgb),0.15);
 }
 html.dark .bg-tag {
-  background: rgba(30,42,72,0.82);
+  background: rgba(var(--color-card-rgb),0.82);
   color: #c9b8a0;
-  border-color: rgba(184,140,110,0.2);
+  border-color: rgba(var(--color-brand-rgb),0.2);
 }
 .pl-info { padding: 20px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
 .pl-name { font-size: 16px; font-weight: 600; color: var(--color-text); }
@@ -915,18 +915,18 @@ html.dark .add-album-cover.placeholder { background: rgba(232,220,200,0.06); }
 
 /* ========== 多选模式(相册同款:右上对勾角标,卡片描边) ========== */
 .music-card.selected, .album-card.selected {
-  outline: 2px solid #b88c6e;
+  outline: 2px solid var(--color-brand);
   outline-offset: -2px;
 }
 .pick-badge {
   position: absolute; top: 8px; right: 8px;
   width: 22px; height: 22px;
   border-radius: 50%;
-  background: rgba(184,140,110,0.25);
+  background: rgba(var(--color-brand-rgb),0.25);
   display: flex; align-items: center; justify-content: center;
   transition: all 0.15s;
 }
-.pick-badge.on { background: #b88c6e; }
+.pick-badge.on { background: var(--color-brand); }
 .select-count { font-size: 13px; color: var(--color-text-secondary); margin-right: 8px; }
 
 /* 工具栏按钮间距统一:el-dropdown 包裹的按钮吃掉 EP 的 .el-button+.el-button 12px 兄弟边距,补齐后与普通按钮一致(gap 8 + margin 12) */

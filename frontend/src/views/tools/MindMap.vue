@@ -274,9 +274,9 @@ onMounted(load)
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
-.mm-tpl-card:hover { border-color: var(--color-primary, #b88c6e); }
+.mm-tpl-card:hover { border-color: var(--color-primary, var(--color-brand)); }
 .mm-tpl-card.active {
-  border-color: var(--color-primary, #b88c6e);
+  border-color: var(--color-primary, var(--color-brand));
   background: var(--color-primary-light, rgba(184, 140, 110, 0.08));
 }
 .mm-tpl-name {

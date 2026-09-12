@@ -458,6 +458,14 @@
                 </div>
               </el-form-item>
               <el-divider />
+              <el-form-item label="首页主题">
+                <el-radio-group :model-value="homeTheme" @change="onChangeHomeTheme">
+                  <el-radio :value="HOME_THEME_SCENE">场景主题</el-radio>
+                  <el-radio :value="HOME_THEME_CLASSIC">传统主题</el-radio>
+                </el-radio-group>
+                <div class="share-tip">场景主题 = 沉浸式房间(默认);传统主题 = 模块化卡片首页</div>
+              </el-form-item>
+              <el-divider />
               <el-form-item label="台灯模式">
                 <el-radio-group :model-value="lampMode" @change="(v) => lampMode = v">
                   <el-radio value="auto">自动(夜间开灯/日间关灯)</el-radio>
@@ -601,6 +609,7 @@ import Breadcrumb from '@/components/Breadcrumb.vue'
 import AvatarCropper from '@/components/AvatarCropper.vue'
 import { applyLocale } from '@/i18n'
 import { applyTheme, initTheme } from '@/theme'
+import { loadHomeTheme, setHomeTheme, HOME_THEME_SCENE, HOME_THEME_CLASSIC } from '@/theme/homeTheme'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import StorageView from '@/views/storage/Storage.vue'
 
@@ -638,10 +647,18 @@ const theme = ref(initTheme())
 const onChangeTheme = (dark) => { theme.value = applyTheme({ ...theme.value, dark }) }
 const onToggleAutoMode = (autoMode) => { theme.value = applyTheme({ ...theme.value, autoMode }) }
 
-// 进入光照测试:跳转首页并启动测试模式
+// 首页主题:场景主题(沉浸式) vs 传统主题(模块化首页);切换即跳转到对应首页
+const homeTheme = ref(loadHomeTheme())
+const onChangeHomeTheme = (v) => {
+  homeTheme.value = setHomeTheme(v)
+  ElMessage.success(v === HOME_THEME_CLASSIC ? '已切换到传统主题' : '已切换到场景主题')
+  router.push(v === HOME_THEME_CLASSIC ? '/home' : '/scene')
+}
+
+// 进入光照测试:跳转传统首页并启动测试模式
 const enterLightTest = () => {
   if (sunLight) sunLight.startLightTest()
-  router.push('/')
+  router.push('/home')
 }
 
 const profile = reactive({ nickname: '', avatar: '', birthday: null, gender: 0 })

@@ -166,7 +166,7 @@ html.dark .nb-cover {
     inset -5px 0 8px rgba(0,0,0,0.3),
     inset 0 1px 0 rgba(232,220,200,0.08);
 }
-html.dark .nb-label { background: rgba(30,42,72,0.92); box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+html.dark .nb-label { background: rgba(var(--color-card-rgb),0.92); box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
 html.dark .nb-label::after { border-color: rgba(232,220,200,0.2); }
 html.dark .nb-name { color: #E8DCC8; }
 html.dark .nb-count { color: rgba(232,220,200,0.6); }

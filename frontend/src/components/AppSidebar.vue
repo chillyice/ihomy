@@ -115,7 +115,7 @@
         </template>
       </el-dropdown>
         <span v-else class="foot-btn" @click="$router.push('/login')">{{ $t('home.loginToView') }}</span>
-        <span v-if="userStore.isLoggedIn && route.path === '/'" class="edit-mode-btn" :class="{ active: appStore.homeEditMode }" :title="appStore.homeEditMode ? '退出编辑' : '编辑首页'" @click="appStore.toggleHomeEditMode()">
+        <span v-if="userStore.isLoggedIn && route.path === '/home'" class="edit-mode-btn" :class="{ active: appStore.homeEditMode }" :title="appStore.homeEditMode ? '退出编辑' : '编辑首页'" @click="appStore.toggleHomeEditMode()">
           <!-- 四个圆角方块(2×2 网格):桌面布局编辑语义;内联 SVG 替代 EP 图标(性能规范) -->
           <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
             <rect x="3" y="3" width="8" height="8" rx="2" />
@@ -366,7 +366,7 @@ onMounted(() => { loadUnread(); loadFamilies() })
   width: 64px;
 }
 html.dark .app-sidebar {
-  background: rgba(20, 28, 45, 0.55);
+  background: rgba(var(--color-card-rgb), 0.55);
   border-right-color: rgba(255, 255, 255, 0.12);
 }
 
@@ -550,9 +550,9 @@ html.dark .foot-user:hover { background: rgba(255, 255, 255, 0.08); }
   transition: background 0.2s, color 0.2s;
 }
 .edit-mode-btn:hover { background: rgba(58,46,34,0.08); }
-.edit-mode-btn.active { background: rgba(184,140,110,0.2); color: var(--color-accent, #b88c6e); }
+.edit-mode-btn.active { background: rgba(var(--color-brand-rgb),0.2); color: var(--color-accent, var(--color-brand)); }
 html.dark .edit-mode-btn:hover { background: rgba(255,255,255,0.08); }
-html.dark .edit-mode-btn.active { background: rgba(212,178,152,0.2); color: #d4b298; }
+html.dark .edit-mode-btn.active { background: rgba(var(--color-brand-rgb),0.2); color: var(--color-brand); }
 .collapsed .edit-mode-btn { display: none; }
 
 /* 编辑模式:导航项变为组件来源,向右下偏移+虚线框占位 */
@@ -561,27 +561,27 @@ html.dark .edit-mode-btn.active { background: rgba(212,178,152,0.2); color: #d4b
 .nav-item.widget-src:active { cursor: grabbing; }
 .nav-item.widget-src {
   transform: translate(4px, 4px);
-  background: rgba(184,140,110,0.1);
-  border: 1px dashed rgba(184,140,110,0.4);
+  background: rgba(var(--color-brand-rgb),0.1);
+  border: 1px dashed rgba(var(--color-brand-rgb),0.4);
   transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), background 0.2s, border-color 0.2s;
 }
 .nav-item.widget-src:hover {
   transform: translate(8px, 8px) scale(1.05);
-  background: rgba(184,140,110,0.2);
-  border-color: rgba(184,140,110,0.6);
-  box-shadow: 0 6px 20px rgba(184,140,110,0.15);
+  background: rgba(var(--color-brand-rgb),0.2);
+  border-color: rgba(var(--color-brand-rgb),0.6);
+  box-shadow: 0 6px 20px rgba(var(--color-brand-rgb),0.15);
 }
 /* 虚线占位框(编辑模式下原位置) */
 .nav-item-wrap:has(.widget-src)::before {
   content: '';
   position: absolute; inset: 0;
-  border: 1px dashed rgba(184,140,110,0.2);
+  border: 1px dashed rgba(var(--color-brand-rgb),0.2);
   border-radius: 10px;
   pointer-events: none;
 }
-html.dark .nav-item.widget-src { background: rgba(212,178,152,0.1); border-color: rgba(212,178,152,0.3); }
-html.dark .nav-item.widget-src:hover { background: rgba(212,178,152,0.2); border-color: rgba(212,178,152,0.5); }
-html.dark .nav-item-wrap:has(.widget-src)::before { border-color: rgba(212,178,152,0.15); }
+html.dark .nav-item.widget-src { background: rgba(var(--color-brand-rgb),0.1); border-color: rgba(var(--color-brand-rgb),0.3); }
+html.dark .nav-item.widget-src:hover { background: rgba(var(--color-brand-rgb),0.2); border-color: rgba(var(--color-brand-rgb),0.5); }
+html.dark .nav-item-wrap:has(.widget-src)::before { border-color: rgba(var(--color-brand-rgb),0.15); }
 
 /* 拖拽时侧边栏右边界气泡效果 */
 .app-sidebar.dragging-edge::after {
@@ -589,7 +589,7 @@ html.dark .nav-item-wrap:has(.widget-src)::before { border-color: rgba(212,178,1
   position: absolute; right: -2px; top: 50%;
   width: 24px; height: 120px;
   transform: translateY(-50%);
-  background: radial-gradient(ellipse 12px 60px at right center, rgba(184,140,110,0.35), transparent 70%);
+  background: radial-gradient(ellipse 12px 60px at right center, rgba(var(--color-brand-rgb),0.35), transparent 70%);
   pointer-events: none;
   animation: bubblePulse 0.8s ease-in-out infinite;
 }

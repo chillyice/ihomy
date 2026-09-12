@@ -60,6 +60,7 @@ export default defineConfig({
           'epubjs': ['epubjs'],
           'pdfjs': ['pdfjs-dist'],
           'simple-mind-map': ['simple-mind-map'],
+          'three': ['three'],
         },
       },
     },

@@ -534,7 +534,7 @@ watch([content, () => form.mood, () => form.weather, () => form.date, () => form
   --break-color: rgba(100,130,180,0.35);
 }
 html.dark .paper-sheet {
-  background: #1E2A48; box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  background: var(--color-card); box-shadow: 0 4px 24px rgba(0,0,0,0.3);
   --ruling-color: rgba(232,220,200,0.06);
   --break-color: rgba(232,220,200,0.15);
 }
@@ -618,7 +618,7 @@ html.dark .doodle-mark { mix-blend-mode: screen; }
   box-shadow: 0 8px 32px rgba(58,46,34,0.12); padding: 14px; width: 240px;
   animation: pickerIn 0.2s ease;
 }
-html.dark .picker-pop { background: rgba(30,42,72,0.9); box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+html.dark .picker-pop { background: rgba(var(--color-card-rgb),0.9); box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
 @keyframes pickerIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
 /* 手机居中模式:transform 已用于居中定位,入场动画只走透明度避免覆盖位移 */
 .picker-pop.centered { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); animation: pickerInCenter 0.2s ease; }
@@ -630,10 +630,10 @@ html.dark .picker-pop { background: rgba(30,42,72,0.9); box-shadow: 0 8px 32px r
   padding: 8px 4px; border: none; border-radius: 10px; background: transparent;
   cursor: pointer; transition: all 0.15s;
 }
-.picker-cell:hover { background: rgba(184,140,110,0.08); }
-.picker-cell.active { background: rgba(184,140,110,0.12); }
-html.dark .picker-cell:hover { background: rgba(212,178,152,0.08); }
-html.dark .picker-cell.active { background: rgba(212,178,152,0.12); }
+.picker-cell:hover { background: rgba(var(--color-brand-rgb),0.08); }
+.picker-cell.active { background: rgba(var(--color-brand-rgb),0.12); }
+html.dark .picker-cell:hover { background: rgba(var(--color-brand-rgb),0.08); }
+html.dark .picker-cell.active { background: rgba(var(--color-brand-rgb),0.12); }
 .cell-icon { font-size: 22px; line-height: 1; }
 .cell-label { font-size: 11px; color: var(--color-text-secondary); }
 .picker-clear {

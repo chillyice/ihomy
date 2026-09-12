@@ -197,7 +197,7 @@ function cleanup() {
   border: 1px solid transparent; transition: border-color 0.15s, transform 0.15s;
 }
 .device-row:hover { transform: translateY(-1px); }
-.device-row.active { border-color: var(--color-primary, #b88c6e); }
+.device-row.active { border-color: var(--color-primary, var(--color-brand)); }
 .device-icon { font-size: 22px; }
 .device-info { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 .device-name { font-size: 14px; font-weight: 600; color: var(--color-text); }

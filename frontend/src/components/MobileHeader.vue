@@ -48,7 +48,7 @@ const goHome = () => router.push('/')
   z-index: 60;
 }
 html.dark .mobile-header {
-  background: rgba(20, 28, 45, 0.92);
+  background: rgba(var(--color-card-rgb), 0.92);
   border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 .back-btn, .home-btn {

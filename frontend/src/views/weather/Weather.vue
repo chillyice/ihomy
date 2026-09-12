@@ -372,7 +372,7 @@ onMounted(load)
 .wt-warn-sender { font-size: 12px; color: var(--color-text-secondary); }
 .wt-warn-time { font-size: 12px; color: var(--color-text-secondary); }
 .wt-warn-text { font-size: 13px; line-height: 1.6; margin-top: 6px; color: var(--color-text); }
-.wt-warn-instruction { font-size: 12px; line-height: 1.6; margin-top: 6px; padding: 8px 10px; background: rgba(184,140,110,0.08); border-radius: 8px; color: var(--color-text-secondary); white-space: pre-line; }
+.wt-warn-instruction { font-size: 12px; line-height: 1.6; margin-top: 6px; padding: 8px 10px; background: rgba(var(--color-brand-rgb),0.08); border-radius: 8px; color: var(--color-text-secondary); white-space: pre-line; }
 .wt-section-head { display: flex; align-items: center; justify-content: space-between; }
 /* 24h 卡片 */
 .wt-hourly { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; }
@@ -389,7 +389,7 @@ onMounted(load)
 .wc-xlabel { font-size: 10px; fill: var(--color-text-secondary); text-anchor: middle; font-variant-numeric: tabular-nums; }
 .wc-extreme { font-size: 11px; font-weight: 700; text-anchor: middle; }
 .wc-hover-line { stroke: var(--color-text-secondary); stroke-dasharray: 3 3; opacity: 0.4; }
-.wc-hover-dot { fill: #b88c6e; stroke: #fffdf8; stroke-width: 2; }
+.wc-hover-dot { fill: var(--color-brand); stroke: #fffdf8; stroke-width: 2; }
 .wc-tooltip { position: absolute; transform: translate(-50%, -120%); background: var(--color-card-2); border: 1px solid var(--color-border); border-radius: 10px; padding: 8px 12px; font-size: 12px; pointer-events: none; box-shadow: 0 3px 12px rgba(0,0,0,0.08); white-space: nowrap; z-index: 5; }
 .wct-time { color: var(--color-text-secondary); font-size: 11px; }
 .wct-main { font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 4px; }
@@ -415,13 +415,13 @@ onMounted(load)
 .wt-index { background: var(--color-card-2); border-radius: 10px; padding: 12px 14px; }
 .wi-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
 .wi-name { font-size: 13px; font-weight: 600; }
-.wi-cat { font-size: 12px; color: #b88c6e; font-weight: 600; }
+.wi-cat { font-size: 12px; color: var(--color-brand); font-weight: 600; }
 .wi-text { font-size: 12px; line-height: 1.6; color: var(--color-text-secondary); }
 .wt-minutely { font-size: 13px; line-height: 1.6; color: var(--color-text); }
 /* 深色模式横条轨道 */
 :global(html.dark) .wt-tbar-track { background: rgba(232,220,200,0.12); }
 :global(html.dark) .wt-tbar-dot { background: rgba(232,220,200,0.55); }
-:global(html.dark) .wc-hover-dot { stroke: #1E2A48; }
+:global(html.dark) .wc-hover-dot { stroke: var(--color-card); }
 @media (max-width: 768px) {
   .wt-metrics { grid-template-columns: repeat(2, 1fr); }
   .wt-big-icon { font-size: 44px; }

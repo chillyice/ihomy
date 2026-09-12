@@ -295,8 +295,8 @@ onMounted(async () => {
   justify-content: center;
 }
 .pick-badge.on {
-  background: var(--color-primary, #b88c6e);
-  border-color: var(--color-primary, #b88c6e);
+  background: var(--color-primary, var(--color-brand));
+  border-color: var(--color-primary, var(--color-brand));
 }
 .select-count {
   font-size: 13px;

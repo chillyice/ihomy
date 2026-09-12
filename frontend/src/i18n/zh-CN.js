@@ -1322,6 +1322,10 @@ export default {
     title: '工具箱',
     enter: '进入',
     more: '更多工具，敬请期待',
+    lightLab: {
+      title: '光影实验台',
+      desc: '3D 真实阴影：太阳模拟 / 移动光源',
+    },
     aiPlayground: {
       title: 'AI 测试台',
       desc: '对话 / 图片 / 语音模型输入输出调试',
