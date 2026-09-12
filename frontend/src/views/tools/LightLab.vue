@@ -300,6 +300,7 @@ let sunLight = null
 let manualLight = null
 let manualLightTarget = null
 let hemi = null
+let bounceLight = null
 let gizmo = null
 let gizmoHit = null
 let raycaster = null
@@ -324,6 +325,8 @@ let latestSun = { time: '--:--', altitude: 0, azimuth: 180 }
 
 const _tmpNormal = new THREE.Vector3()
 const _sunColor = new THREE.Color()
+const _skyNight = new THREE.Color(0x0a0c14) // 夜空
+const _skyDay = new THREE.Color(0xa8d0f0)   // 白天明亮天空蓝
 
 // 场景常量(墙在 z=WALL_Z,窗朝南=方位角 180° 方向)
 const WALL_Z = -2.5
@@ -382,6 +385,10 @@ function init() {
   // 环境补光(日/夜在 loop 中调节强度)
   hemi = new THREE.HemisphereLight(0xcfd8ff, 0x2e2419, 0.5)
   scene.add(hemi)
+
+  // 漫反射补光(模拟阳光射入后经地板/家具反弹的间接光照,暖色)
+  bounceLight = new THREE.AmbientLight(0xffd9b0, 0)
+  scene.add(bounceLight)
 
   // 太阳光(平行光,太阳模拟专用)
   sunLight = new THREE.DirectionalLight(0xfff2da, SUN_BASE_INTENSITY)
@@ -875,9 +882,16 @@ function flushHud() {
   hudAz.value = latestSun.azimuth.toFixed(1)
   hudWindowAngle.value = Math.max(0, 90 - Math.abs(latestSun.azimuth - 180)).toFixed(0)
   isNight.value = latestSun.altitude <= 0
-  const night = latestSun.altitude <= 0
-  hemi.intensity = night ? 0.14 : 0.68
-  scene.background.setHex(night ? 0x0a0c14 : 0x15110d)
+
+  // 白昼因子:从 -3°(晨昏蒙影)到 12°(日出后)平滑过渡——白天整体环境变亮、天空变蓝,区别于黑夜
+  const day = THREE.MathUtils.smoothstep(latestSun.altitude, -3, 12)
+  hemi.intensity = THREE.MathUtils.lerp(0.14, 1.0, day)
+  scene.background.lerpColors(_skyNight, _skyDay, day)
+
+  // 漫反射补光:太阳越高、窗开得越大,室内反弹光越亮(暖色,模拟地板/家具漫反射)
+  const sunUp = Math.max(0, Math.sin(latestSun.altitude * RAD))
+  const winOpen = Math.sin(currentOpen * RAD) // 0(关) ~ 1(全开)
+  bounceLight.intensity = 0.4 * sunUp * (0.4 + 0.6 * winOpen)
 }
 
 function toNDC(e) {
