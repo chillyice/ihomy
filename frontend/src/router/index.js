@@ -1,10 +1,14 @@
 // 路由表 + 登录守卫:默认所有页面游客可浏览,仅纯写/个人页需登录
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { loadHomeTheme, HOME_THEME_CLASSIC } from '@/theme/homeTheme'
 
 const routes = [
   { path: '/login', name: 'Login', component: () => import('@/views/Login.vue'), meta: { public: true } },
-  { path: '/', name: 'Home', component: () => import('@/views/Home.vue'), meta: { public: true } },
+  // 首页:按偏好重定向到沉浸式场景(/scene)或传统模块化首页(/home)
+  { path: '/', redirect: () => (loadHomeTheme() === HOME_THEME_CLASSIC ? '/home' : '/scene') },
+  { path: '/scene', name: 'SceneHome', component: () => import('@/views/scene/SceneHome.vue'), meta: { public: true, immersive: true } },
+  { path: '/home', name: 'Home', component: () => import('@/views/Home.vue'), meta: { public: true } },
   { path: '/blog', name: 'BlogList', component: () => import('@/views/blog/BlogList.vue'), meta: { public: true } },
   { path: '/blog/:id', name: 'BlogDetail', component: () => import('@/views/blog/BlogDetail.vue'), meta: { public: true } },
   { path: '/blog/edit/:id?', name: 'BlogEdit', component: () => import('@/views/blog/BlogEdit.vue'), meta: { requiresAuth: true } },
@@ -47,6 +51,8 @@ const routes = [
   { path: '/tools/mindmap/:id', name: 'MindMapEditor', component: () => import('@/views/tools/MindMapEditor.vue'), meta: { requiresAuth: true } },
   // AI 测试台(临时):对话/图片/语音输入输出调试,依赖 /ai/** 登录接口
   { path: '/tools/ai-playground', name: 'AiPlayground', component: () => import('@/views/tools/AiPlayground.vue'), meta: { requiresAuth: true } },
+  // 3D 光影实验台(临时):Three.js 太阳模拟+真实阴影,未来场景主题的 3D 基础模型
+  { path: '/tools/light-lab', name: 'LightLab', component: () => import('@/views/tools/LightLab.vue'), meta: { public: true } },
   // 运维管理页:仅 OPS 角色可访问
   { path: '/ops', name: 'Ops', component: () => import('@/views/ops/Ops.vue'), meta: { ops: true } },
   // 兜底:未匹配的路由重定向回首页
