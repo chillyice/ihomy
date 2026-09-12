@@ -430,22 +430,22 @@ onMounted(() => {
 <style scoped>
 /* Toolbar: global .page-toolbar */
 .cat-add-btn { width: 28px; height: 28px; border: none; background: transparent; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--color-text-secondary); transition: background 0.2s, color 0.2s, transform 0.2s; }
-.cat-add-btn:hover { background: rgba(184,140,110,0.1); color: var(--color-accent, #b88c6e); transform: scale(1.1); }
-html.dark .cat-add-btn:hover { background: rgba(212,178,152,0.12); color: #d4b298; }
+.cat-add-btn:hover { background: rgba(var(--color-brand-rgb),0.1); color: var(--color-accent, var(--color-brand)); transform: scale(1.1); }
+html.dark .cat-add-btn:hover { background: rgba(var(--color-brand-rgb),0.12); color: var(--color-brand); }
 /* Book Grid */
 .book-area { min-height: 200px; }
 .book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
 .book-card { cursor: pointer; padding: 12px; border-radius: 14px; position: relative; transition: transform 0.25s ease, box-shadow 0.25s ease; display: flex; flex-direction: column; gap: 8px; }
 .book-card:hover { transform: translateY(-4px); box-shadow: 0 8px 28px rgba(58,46,34,0.12); }
 html.dark .book-card:hover { box-shadow: 0 8px 28px rgba(0,0,0,0.3); }
-.book-card.selected { box-shadow: 0 0 0 2px var(--color-accent, #b88c6e); }
+.book-card.selected { box-shadow: 0 0 0 2px var(--color-accent, var(--color-brand)); }
 .book-check { position: absolute; top: 6px; left: 6px; width: 22px; height: 22px; border-radius: 6px; border: 2px solid rgba(255,255,255,0.6); background: rgba(0,0,0,0.3); z-index: 2; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-.book-check:has(svg) { background: var(--color-accent, #b88c6e); border-color: var(--color-accent, #b88c6e); }
-html.dark .book-check:has(svg) { background: #d4b298; border-color: #d4b298; }
+.book-check:has(svg) { background: var(--color-accent, var(--color-brand)); border-color: var(--color-accent, var(--color-brand)); }
+html.dark .book-check:has(svg) { background: var(--color-brand); border-color: var(--color-brand); }
 .book-cover-wrap { position: relative; aspect-ratio: 3/4; border-radius: 8px; overflow: hidden; }
 .book-cover { width: 100%; height: 100%; object-fit: cover; }
-.book-cover.placeholder { display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(184,140,110,0.12), rgba(184,140,110,0.04)); color: var(--color-text-secondary); opacity: 0.4; }
-html.dark .book-cover.placeholder { background: linear-gradient(135deg, rgba(212,178,152,0.1), rgba(212,178,152,0.03)); }
+.book-cover.placeholder { display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(var(--color-brand-rgb),0.12), rgba(var(--color-brand-rgb),0.04)); color: var(--color-text-secondary); opacity: 0.4; }
+html.dark .book-cover.placeholder { background: linear-gradient(135deg, rgba(var(--color-brand-rgb),0.1), rgba(var(--color-brand-rgb),0.03)); }
 .format-badge { position: absolute; top: 5px; right: 5px; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.5); color: #fff; font-size: 10px; font-weight: 600; backdrop-filter: blur(4px); }
 .format-badge.small { position: static; font-size: 10px; padding: 1px 5px; }
 .book-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; opacity: 0; transition: opacity 0.2s; border-radius: 8px; }
@@ -453,7 +453,7 @@ html.dark .book-cover.placeholder { background: linear-gradient(135deg, rgba(212
 .book-overlay :deep(.el-button) { padding: 5px 6px; }
 .ovl-btn { padding: 4px 12px; border: 1px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.15); color: #fff; border-radius: 8px; font-size: 12px; cursor: pointer; transition: background 0.2s; backdrop-filter: blur(4px); }
 .ovl-btn:hover { background: rgba(255,255,255,0.3); }
-.ovl-btn.primary { background: rgba(184,140,110,0.8); border-color: rgba(184,140,110,0.8); }
+.ovl-btn.primary { background: rgba(var(--color-brand-rgb),0.8); border-color: rgba(var(--color-brand-rgb),0.8); }
 .ovl-btn.primary:hover { background: rgba(168,124,94,0.9); }
 .book-info { display: flex; flex-direction: column; gap: 3px; }
 .book-title { font-size: 13px; font-weight: 600; line-height: 1.4; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
@@ -466,10 +466,10 @@ html.dark .book-cover.placeholder { background: linear-gradient(135deg, rgba(212
 .book-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
 .book-row:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(58,46,34,0.08); }
 html.dark .book-row:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
-.book-row.selected { box-shadow: 0 0 0 2px var(--color-accent, #b88c6e); }
+.book-row.selected { box-shadow: 0 0 0 2px var(--color-accent, var(--color-brand)); }
 .row-cover { width: 40px; height: 54px; border-radius: 4px; object-fit: cover; flex-shrink: 0; }
-.row-cover.placeholder { display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(184,140,110,0.12), rgba(184,140,110,0.04)); color: var(--color-text-secondary); opacity: 0.3; }
-html.dark .row-cover.placeholder { background: linear-gradient(135deg, rgba(212,178,152,0.1), rgba(212,178,152,0.03)); }
+.row-cover.placeholder { display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(var(--color-brand-rgb),0.12), rgba(var(--color-brand-rgb),0.04)); color: var(--color-text-secondary); opacity: 0.3; }
+html.dark .row-cover.placeholder { background: linear-gradient(135deg, rgba(var(--color-brand-rgb),0.1), rgba(var(--color-brand-rgb),0.03)); }
 .row-info { flex: 1; min-width: 0; }
 .row-title { font-size: 14px; font-weight: 600; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-sub { display: flex; gap: 8px; align-items: center; margin-top: 2px; font-size: 12px; color: var(--color-text-secondary); }

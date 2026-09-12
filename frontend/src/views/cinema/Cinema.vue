@@ -497,7 +497,7 @@ onMounted(() => {
   gap: 16px;
 }
 .video-card { overflow: hidden; display: flex; flex-direction: column; }
-.video-card.selected { outline: 3px solid var(--color-primary, #b88c6e); outline-offset: -3px; }
+.video-card.selected { outline: 3px solid var(--color-primary, var(--color-brand)); outline-offset: -3px; }
 .video-poster {
   position: relative;
   height: 170px;
@@ -562,7 +562,7 @@ onMounted(() => {
   justify-content: center;
   z-index: 2;
 }
-.pick-badge.on { background: #b88c6e; border-color: #b88c6e; }
+.pick-badge.on { background: var(--color-brand); border-color: var(--color-brand); }
 .select-count { font-size: 13px; color: var(--color-text-secondary); margin-right: 8px; }
 .video-info { padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .video-title { font-size: 16px; font-weight: 600; color: var(--color-text); }

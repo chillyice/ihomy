@@ -368,7 +368,7 @@ export function useSunLight() {
         weather.value = json.data
         if (!lightTestMode.value && weatherEffectEnabled.value) {
           const cond = json.data.condition
-          if (['rain', 'snow', 'cloud', 'thunder'].includes(cond)) {
+          if (['rain', 'snow', 'cloud', 'thunder', 'fog'].includes(cond)) {
             setWeather(cond, json.data.precipLevel || 1)
           } else {
             setWeather('clear', 0)
@@ -472,7 +472,7 @@ export function useSunLight() {
     idleMinutes, isIdle,
     lampStrength, lampStrengthAnim, lampDivOpacity, lampRadius, lampMask, lampColor,
     dustParticles, snowParticles, rainParticles, weatherShadowOpacity, lightLayerOpacity, rayStyles, sourceStyle, bloomStyle, brightSpotStyle, reflectionStyle, lightningFlash,
-    lightTestMode, lightTestPaused, testSpeed, setTestSpeed, weatherMode, precipLevel, setWeather, startLightTest, pauseLightTest, stepLightTest, stopLightTest, setSlot, refreshScene,
+    lightTestMode, lightTestPaused, testSpeed, setTestSpeed, weatherMode, cloudFlicker, precipLevel, setWeather, startLightTest, pauseLightTest, stepLightTest, stopLightTest, setSlot, refreshScene,
     suspendEffects, restoreEffects,
   }
 }

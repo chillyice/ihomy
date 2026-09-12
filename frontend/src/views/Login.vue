@@ -198,11 +198,11 @@ const onSubmit = async () => {
   box-shadow: 0 12px 40px rgba(58, 46, 34, 0.15);
 }
 html.dark .login-page {
-  background: linear-gradient(135deg, #0F1A2E 0%, #162238 50%, #1A2540 100%);
+  background: linear-gradient(135deg, var(--color-bg) 0%, var(--color-bg-2) 50%, var(--color-card) 100%);
 }
 html.dark .blob { opacity: 0.1; }
 html.dark .login-card {
-  background: rgba(30, 40, 65, 0.55);
+  background: rgba(var(--color-card-rgb), 0.55);
   border-color: rgba(255, 255, 255, 0.12);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
 }

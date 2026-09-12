@@ -120,27 +120,27 @@ onMounted(loadAll)
 .book-header { display: flex; gap: 20px; margin-bottom: 16px; }
 .cover-wrap { width: 120px; flex-shrink: 0; }
 .book-cover { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
-.book-cover.placeholder { display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(184,140,110,0.12), rgba(184,140,110,0.04)); color: var(--color-text-secondary); opacity: 0.4; border-radius: 8px; }
-html.dark .book-cover.placeholder { background: linear-gradient(135deg, rgba(212,178,152,0.1), rgba(212,178,152,0.03)); }
+.book-cover.placeholder { display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(var(--color-brand-rgb),0.12), rgba(var(--color-brand-rgb),0.04)); color: var(--color-text-secondary); opacity: 0.4; border-radius: 8px; }
+html.dark .book-cover.placeholder { background: linear-gradient(135deg, rgba(var(--color-brand-rgb),0.1), rgba(var(--color-brand-rgb),0.03)); }
 .meta-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 .book-title-text { font-size: 20px; font-weight: 700; color: var(--color-primary); line-height: 1.4; }
 .book-author-text { font-size: 14px; color: var(--color-text-secondary); }
 .meta-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 2px; }
-.format-tag { background: rgba(184,140,110,0.12); color: var(--color-accent, #b88c6e); padding: 2px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; }
-html.dark .format-tag { background: rgba(212,178,152,0.15); color: #d4b298; }
+.format-tag { background: rgba(var(--color-brand-rgb),0.12); color: var(--color-accent, var(--color-brand)); padding: 2px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; }
+html.dark .format-tag { background: rgba(var(--color-brand-rgb),0.15); color: var(--color-brand); }
 .meta-size { font-size: 12px; color: var(--color-text-secondary); opacity: 0.6; }
 .meta-views { font-size: 12px; color: var(--color-text-secondary); opacity: 0.6; }
 .meta-tags { display: flex; gap: 6px; flex-wrap: wrap; }
-.tag { background: rgba(184,140,110,0.06); color: var(--color-accent); padding: 1px 8px; border-radius: 10px; font-size: 12px; }
+.tag { background: rgba(var(--color-brand-rgb),0.06); color: var(--color-accent); padding: 1px 8px; border-radius: 10px; font-size: 12px; }
 .meta-date { font-size: 12px; color: var(--color-text-secondary); opacity: 0.7; }
 .book-desc { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-border); }
 .section-label { font-size: 14px; font-weight: 600; color: var(--color-primary); margin-bottom: 6px; position: relative; padding-left: 10px; }
-.section-label::before { content: ''; position: absolute; left: 0; top: 2px; bottom: 2px; width: 3px; border-radius: 2px; background: var(--color-accent, #b88c6e); }
+.section-label::before { content: ''; position: absolute; left: 0; top: 2px; bottom: 2px; width: 3px; border-radius: 2px; background: var(--color-accent, var(--color-brand)); }
 .desc-text { font-size: 13px; line-height: 1.8; color: var(--color-text); white-space: pre-wrap; }
 .book-cats { margin-top: 12px; }
 .cat-tags { display: flex; gap: 6px; flex-wrap: wrap; }
-.cat-tag { background: rgba(184,140,110,0.1); border: 1px solid rgba(184,140,110,0.15); color: var(--color-accent, #b88c6e); padding: 2px 8px; border-radius: 8px; font-size: 12px; }
-html.dark .cat-tag { background: rgba(212,178,152,0.15); border-color: rgba(212,178,152,0.2); color: #d4b298; }
+.cat-tag { background: rgba(var(--color-brand-rgb),0.1); border: 1px solid rgba(var(--color-brand-rgb),0.15); color: var(--color-accent, var(--color-brand)); padding: 2px 8px; border-radius: 8px; font-size: 12px; }
+html.dark .cat-tag { background: rgba(var(--color-brand-rgb),0.15); border-color: rgba(var(--color-brand-rgb),0.2); color: var(--color-brand); }
 .no-cat { font-size: 12px; color: var(--color-text-secondary); opacity: 0.5; }
 .detail-footer { display: flex; justify-content: space-between; align-items: center; }
 .footer-right { display: flex; gap: 8px; align-items: center; }

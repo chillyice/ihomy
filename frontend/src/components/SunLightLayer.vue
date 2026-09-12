@@ -142,11 +142,8 @@ const {
   inset: 0;
   z-index: 2;
   pointer-events: none;
-  background: rgba(250, 246, 236, 0.25);
+  background: var(--light-glass-bg, rgba(250, 246, 236, 0.25));
   transform: translateZ(0);
-}
-html.dark .glass-bg {
-  background: rgba(15, 26, 46, 0.3);
 }
 
 /* 背景色块:清新淡雅,随机飘动(fixed 固定不随页面滚动) */
@@ -169,16 +166,16 @@ html.dark .glass-bg {
   transition: opacity 1s ease, box-shadow 1s ease;
 }
 html.dark .blob { opacity: 0.08; }
-html.dark .blob-1 { box-shadow: 0 0 120px 40px rgba(120,200,160,0.4); }
-html.dark .blob-2 { box-shadow: 0 0 120px 40px rgba(200,180,100,0.4); }
-html.dark .blob-3 { box-shadow: 0 0 120px 40px rgba(200,160,140,0.4); }
-html.dark .blob-4 { box-shadow: 0 0 120px 40px rgba(120,160,200,0.4); }
-html.dark .blob-5 { box-shadow: 0 0 120px 40px rgba(160,180,120,0.4); }
-.blob-1 { width: 480px; height: 480px; top: -120px; left: -100px; background: radial-gradient(circle, #9CD0B5 0%, rgba(156,208,181,0.55) 45%, transparent 70%); animation: drift1 22s ease-in-out infinite; }
-.blob-2 { width: 560px; height: 560px; top: 25%; right: -180px; background: radial-gradient(circle, #EDDB8C 0%, rgba(237,219,140,0.55) 45%, transparent 70%); animation: drift2 26s ease-in-out infinite; }
-.blob-3 { width: 420px; height: 420px; bottom: -120px; left: 18%; background: radial-gradient(circle, #ECC0AC 0%, rgba(236,192,172,0.55) 45%, transparent 70%); animation: drift3 20s ease-in-out infinite; }
-.blob-4 { width: 380px; height: 380px; top: 35%; left: 32%; background: radial-gradient(circle, #A8C9DE 0%, rgba(168,201,222,0.55) 45%, transparent 70%); animation: drift4 24s ease-in-out infinite; }
-.blob-5 { width: 300px; height: 300px; bottom: 20%; right: 22%; background: radial-gradient(circle, #C0D8A8 0%, rgba(192,216,168,0.55) 45%, transparent 70%); animation: drift5 18s ease-in-out infinite; }
+html.dark .blob-1 { box-shadow: 0 0 120px 40px rgba(var(--blob-1), 0.4); }
+html.dark .blob-2 { box-shadow: 0 0 120px 40px rgba(var(--blob-2), 0.4); }
+html.dark .blob-3 { box-shadow: 0 0 120px 40px rgba(var(--blob-3), 0.4); }
+html.dark .blob-4 { box-shadow: 0 0 120px 40px rgba(var(--blob-4), 0.4); }
+html.dark .blob-5 { box-shadow: 0 0 120px 40px rgba(var(--blob-5), 0.4); }
+.blob-1 { width: 480px; height: 480px; top: -120px; left: -100px; background: radial-gradient(circle, rgb(var(--blob-1)) 0%, rgba(var(--blob-1), 0.55) 45%, transparent 70%); animation: drift1 22s ease-in-out infinite; }
+.blob-2 { width: 560px; height: 560px; top: 25%; right: -180px; background: radial-gradient(circle, rgb(var(--blob-2)) 0%, rgba(var(--blob-2), 0.55) 45%, transparent 70%); animation: drift2 26s ease-in-out infinite; }
+.blob-3 { width: 420px; height: 420px; bottom: -120px; left: 18%; background: radial-gradient(circle, rgb(var(--blob-3)) 0%, rgba(var(--blob-3), 0.55) 45%, transparent 70%); animation: drift3 20s ease-in-out infinite; }
+.blob-4 { width: 380px; height: 380px; top: 35%; left: 32%; background: radial-gradient(circle, rgb(var(--blob-4)) 0%, rgba(var(--blob-4), 0.55) 45%, transparent 70%); animation: drift4 24s ease-in-out infinite; }
+.blob-5 { width: 300px; height: 300px; bottom: 20%; right: 22%; background: radial-gradient(circle, rgb(var(--blob-5)) 0%, rgba(var(--blob-5), 0.55) 45%, transparent 70%); animation: drift5 18s ease-in-out infinite; }
 /* ponytail: 纯 translate 漂移(无 scale)——scale 变化会触发层重栅格化,是频闪诱因之一 */
 @keyframes drift1 { 0%,100%{transform:translate(0,0);} 33%{transform:translate(180px,120px);} 66%{transform:translate(-80px,200px);} }
 @keyframes drift2 { 0%,100%{transform:translate(0,0);} 33%{transform:translate(-200px,150px);} 66%{transform:translate(120px,-120px);} }
@@ -302,15 +299,18 @@ html.dark .blob-5 { box-shadow: 0 0 120px 40px rgba(160,180,120,0.4); }
 }
 .dust {
   position: absolute; border-radius: 50%;
-  background: rgba(255,238,185,0.85);
-  box-shadow: 0 0 8px rgba(255,225,150,0.7);
+  background: var(--light-dust, rgba(255,238,185,0.85));
+  box-shadow: 0 0 8px var(--light-dust-glow, rgba(255,225,150,0.7));
   animation: dust-float linear infinite;
 }
 @keyframes dust-float {
-  0% { transform: translate(0,0); opacity: 0; }
-  15% { opacity: 0.9; }
-  85% { opacity: 0.9; }
-  100% { transform: translate(var(--drift, 60px), calc(var(--drift, 60px) * -1.5)); opacity: 0; }
+  0% { transform: translate(0, 0); opacity: 0; }
+  12% { opacity: 0.9; }
+  28% { transform: translate(calc(var(--drift, 60px) * 0.5), calc(var(--drift, 60px) * 1)); opacity: 1; }
+  46% { transform: translate(calc(var(--drift, 60px) * -0.25), calc(var(--drift, 60px) * 2.5)); opacity: 0.9; }
+  64% { transform: translate(calc(var(--drift, 60px) * 0.45), calc(var(--drift, 60px) * 4)); opacity: 0.7; }
+  82% { transform: translate(calc(var(--drift, 60px) * 0.15), calc(var(--drift, 60px) * 6.3)); opacity: 0.4; }
+  100% { transform: translate(calc(var(--drift, 60px) * -0.3), calc(var(--drift, 60px) * 8.6)); opacity: 0; }
 }
 
 /* 雪花层:从顶端飘到底端,六瓣雪花样式 */

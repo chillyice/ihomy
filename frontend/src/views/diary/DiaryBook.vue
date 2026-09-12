@@ -236,7 +236,7 @@ onBeforeUnmount(() => {
   box-shadow: 0 2px 12px rgba(58,46,34,0.06);
 }
 html.dark .book-toolbar {
-  background: rgba(30,42,72,0.45);
+  background: rgba(var(--color-card-rgb),0.45);
   border-color: rgba(255,255,255,0.08);
   box-shadow: 0 2px 12px rgba(0,0,0,0.15);
 }

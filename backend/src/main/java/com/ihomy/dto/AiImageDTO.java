@@ -24,6 +24,8 @@ public class AiImageDTO {
     private Double guidanceScale;
     /** 水印(null=服务端默认开) */
     private Boolean watermark;
+    /** 背景模式:transparent=透明背景抠图(需配合 imageUrls 传含透明像素的 PNG) */
+    private String background;
     /** 响应格式 url/b64_json(默认 url) */
     private String responseFormat;
     /** 组图模式:auto=自动组图(其余值不传) */

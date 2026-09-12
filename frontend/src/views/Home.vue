@@ -22,6 +22,7 @@
     <!-- 组件 -->
     <template v-for="w in visibleWidgets" :key="w.uid">
       <div
+        :ref="el => setCardEl(w.uid, el)"
         class="dash-card"
         :class="[w.id, { 'edit-active': editMode, dragging: w._dragging, 'h-1': w.h === 1, 'is-hovered': hoverExpands && hoverUid === w.uid, 'is-neighbor': isFullNeighbor(w), 'wave-hint': !editMode && displayTier(w) === 'S' && !hoverExpands }]"
         :style="cardBoxStyle(w)"
@@ -91,7 +92,7 @@
 
           <!-- 天气:AI 生图底图(中档以上)+ 图标/温度/高低温/文字 + 预报;点击进入天气详情页 -->
           <template v-else-if="w.id === 'weather'">
-            <div v-if="tierOf(w) !== 'S'" class="weather-bg">
+            <div v-if="tierOf(w) === 'XL'" class="weather-bg">
               <div v-if="weatherBg" class="weather-bg-img" :style="{ backgroundImage: `url(${weatherBg})` }"></div>
               <div class="weather-bg-grad"></div>
             </div>
@@ -580,8 +581,13 @@ const HOVER_CAPABLE = typeof window !== 'undefined' && !!window.matchMedia && wi
 const hoverUid = ref(null)
 let hoverTimer = null
 
-// 放大比例:小档 2→3(1.5x),中档 3→4(1.33x);大/巨大不放大
-const hoverScale = (hw) => ({ S: 1.5, M: 4 / 3, L: 1, XL: 1 }[displayTier(hw)] ?? 1)
+// 放大比例:普通组件 小档 2→3(1.5x)/中档 3→4(1.33x),大/巨大不放大;
+// 天气为「主角」:hover 直接放大到 5×5 巨大档(scale = 5 / 较长边,≥1),已 XL 不放大
+const WEATHER_HERO = 5
+const hoverScale = (hw) => {
+  if (hw.id === 'weather') return displayTier(hw) === 'XL' ? 1 : Math.max(1, WEATHER_HERO / Math.max(hw.w, hw.h))
+  return ({ S: 1.5, M: 4 / 3, L: 1, XL: 1 }[displayTier(hw)] ?? 1)
+}
 // 放大后组件的视觉矩形(格坐标):中心缩放理想矩形 clamp 进栅格(边缘组件向内收),
 // 并反推 transform-origin(相对原组件尺寸的 0-1 比例)使 scale 视觉与矩形一致
 const hoverRect = (h) => {
@@ -610,8 +616,7 @@ const NEIGHBOR_FULL = 0.7
 const NEIGHBOR_PARTIAL = 0.3
 const NEIGHBOR_SCALE_FULL = 0.55
 const NEIGHBOR_SCALE_GRAZE = 0.85
-const NEIGHBOR_PUSH_FULL = 70
-const NEIGHBOR_PUSH_PARTIAL = 35
+const NEIGHBOR_PUSH_BUFFER = 6 // 最小推挤位移后的缓冲(px),确保邻居有可见移动
 // 放大矩形盖住邻居 n 的面积占比(0~1)
 const hoverCoverage = (h, n) => {
   const r = hoverRect(h)
@@ -647,15 +652,17 @@ const downScaleOf = (w) => DOWN_SCALE[displayTier(w)] ?? NEIGHBOR_SCALE_FULL
 const tierOf = (w) => {
   const base = displayTier(w)
   if (editMode.value || !HOVER_CAPABLE) return base
-  if (hoverUid.value === w.uid) return TIER_UP[base] || base
+  if (hoverUid.value === w.uid) return w.id === 'weather' ? 'XL' : (TIER_UP[base] || base)
   if (isPartialNeighbor(w)) return TIER_DOWN[base] || base
   return base
 }
-// 当前悬停组件是否真的会放大:仅中小档 hover 放大,大/巨大不放大——只有放大时才推挤邻居
+// 当前悬停组件是否真的会放大:天气放大到巨大(XL 前都放大),其余仅中小档放大——只有放大时才推挤邻居
 const hoverExpands = computed(() => {
   if (!HOVER_CAPABLE || editMode.value) return false
   const h = widgets.value.find(x => x.uid === hoverUid.value)
-  return !!h && (displayTier(h) === 'S' || displayTier(h) === 'M')
+  if (!h) return false
+  if (h.id === 'weather') return displayTier(h) !== 'XL'
+  return displayTier(h) === 'S' || displayTier(h) === 'M'
 })
 
 const setHover = (w) => {
@@ -670,36 +677,79 @@ const clearHover = () => {
 const onCardEnter = (w) => { setHover(w); if (w.id === 'album') onAlbumEnter() }
 const onCardLeave = () => { clearHover(); onAlbumLeave() }
 
-// 放大/推开邻居的 inline transform(在 cardBoxStyle 里调用,非真实重排)
-const hoverTransform = (w) => {
+// 卡片 px 矩形(cardStyle 同源格子数学)
+const cardRectPx = (w) => {
+  const cw = cellW.value, ch = cellH.value
+  const left = MARGIN.left + w.col * (cw + GAP)
+  const top = MARGIN.top + w.row * (ch + GAP)
+  const width = w.w * cw + (w.w - 1) * GAP
+  const height = w.h * ch + (w.h - 1) * GAP
+  return { left, top, width, height, cx: left + width / 2, cy: top + height / 2 }
+}
+// 放大矩形 px
+const hoverRectPx = (h) => {
+  const r = hoverRect(h)
+  const cw = cellW.value, ch = cellH.value
+  const left = MARGIN.left + r.left * (cw + GAP)
+  const top = MARGIN.top + r.top * (ch + GAP)
+  const width = r.w * cw + (r.w - 1) * GAP
+  const height = r.hgt * ch + (r.hgt - 1) * GAP
+  return { left, top, width, height, cx: left + width / 2, cy: top + height / 2 }
+}
+// 最小推挤位移:沿「远离放大中心」方向,把缩放后的邻居推到与放大矩形刚好不相交 + 缓冲
+const hoverPush = (hovered, n, scale) => {
+  const R = hoverRectPx(hovered)
+  const N = cardRectPx(n)
+  const dx = N.cx - R.cx, dy = N.cy - R.cy
+  const len = Math.hypot(dx, dy) || 1
+  const ux = dx / len, uy = dy / len
+  const rHalf = (R.width / 2) * Math.abs(ux) + (R.height / 2) * Math.abs(uy)
+  const nHalf = (N.width / 2 * scale) * Math.abs(ux) + (N.height / 2 * scale) * Math.abs(uy)
+  const push = Math.max(0, rHalf + nHalf - len) + NEIGHBOR_PUSH_BUFFER
+  return { x: ux * push, y: uy * push }
+}
+// GSAP 动效目标(纯 transform,不真实重排):hover 卡片放大,邻居推挤/缩放
+const hoverTarget = (w) => {
   if (editMode.value || !HOVER_CAPABLE || !hoverExpands.value) return null
   if (hoverUid.value === w.uid) {
     const sc = hoverScale(w)
     if (sc <= 1) return null
     const r = hoverRect(w)
-    return { transform: `scale(${sc})`, origin: `${(r.originX * 100).toFixed(1)}% ${(r.originY * 100).toFixed(1)}%`, z: 80 }
+    return { x: 0, y: 0, scale: sc, origin: `${(r.originX * 100).toFixed(1)}% ${(r.originY * 100).toFixed(1)}%`, z: 80 }
   }
   const hovered = widgets.value.find(x => x.uid === hoverUid.value)
   if (!hovered || !hoverAffects(hovered, w)) return null
   const level = neighborLevel(hovered, w)
-  const r = hoverRect(hovered)
-  const dx = (w.col + w.w / 2) - (r.left + r.w / 2)
-  const dy = (w.row + w.h / 2) - (r.top + r.hgt / 2)
-  const len = Math.hypot(dx, dy) || 1
-  if (level === 'graze') return { transform: `scale(${NEIGHBOR_SCALE_GRAZE})`, origin: '50% 50%', z: 10 }
-  if (level === 'partial') return { transform: `translate(${(dx / len) * NEIGHBOR_PUSH_PARTIAL}px, ${(dy / len) * NEIGHBOR_PUSH_PARTIAL}px) scale(${downScaleOf(w)})`, origin: '50% 50%', z: 10 }
-  return { transform: `translate(${(dx / len) * NEIGHBOR_PUSH_FULL}px, ${(dy / len) * NEIGHBOR_PUSH_FULL}px) scale(${NEIGHBOR_SCALE_FULL})`, origin: '50% 50%', z: 10 }
+  if (level === 'graze') return { x: 0, y: 0, scale: NEIGHBOR_SCALE_GRAZE, origin: '50% 50%', z: 10 }
+  if (level === 'partial') { const p = hoverPush(hovered, w, downScaleOf(w)); return { x: p.x, y: p.y, scale: downScaleOf(w), origin: '50% 50%', z: 10 } }
+  const p = hoverPush(hovered, w, NEIGHBOR_SCALE_FULL); return { x: p.x, y: p.y, scale: NEIGHBOR_SCALE_FULL, origin: '50% 50%', z: 10 }
 }
+// 仅 z-index(非动画,进 cardBoxStyle 响应式样式;transform 由 GSAP 接管)
+const hoverZ = (w) => { const t = hoverTarget(w); return t ? t.z : null }
 const cardBoxStyle = (w) => {
   const s = cardStyle(w)
-  const hv = hoverTransform(w)
-  if (hv) {
-    s.transform = hv.transform
-    s.transformOrigin = hv.origin
-    if (hv.z) s.zIndex = hv.z
-  }
+  const hz = hoverZ(w)
+  if (hz) s.zIndex = hz
   return s
 }
+// ---- GSAP 弹性动效接管 transform:进入 back.out(回弹)/ 邻居 elastic.out(水波);离开反向回弹复原 ----
+const cardEls = {}
+const setCardEl = (uid, el) => { if (el) cardEls[uid] = el; else delete cardEls[uid] }
+const applyHoverTweens = () => {
+  gsap.killTweensOf('.dash-card')
+  for (const w of visibleWidgets.value) {
+    const el = cardEls[w.uid]
+    if (!el) continue
+    const t = hoverTarget(w)
+    const hero = w.id === 'weather'
+    if (t) {
+      gsap.to(el, { x: t.x, y: t.y, scale: t.scale, transformOrigin: t.origin, duration: 0.7, ease: hero ? 'back.out(1.4)' : 'elastic.out(1, 0.5)' })
+    } else {
+      gsap.to(el, { x: 0, y: 0, scale: 1, transformOrigin: '50% 50%', duration: 0.6, ease: hero ? 'back.out(1.2)' : 'elastic.out(1, 0.5)' })
+    }
+  }
+}
+watch([hoverUid, hoverExpands, editMode], () => { nextTick(applyHoverTweens) })
 
 // ========== P3 天气 AI 生图背景(排版方案 §4.4) ==========
 const WEATHER_IMAGE_FEATURE = 'WEATHER_IMAGE' // 设置-家庭AI配置「功能绑定」里独立绑定的天气生图功能
@@ -718,6 +768,22 @@ let aiStatusChecked = false
 let aiImageAvail = false
 const seasonLabel = () => { const m = new Date().getMonth() + 1; return (m >= 3 && m <= 5) ? '春' : (m >= 6 && m <= 8) ? '夏' : (m >= 9 && m <= 11) ? '秋' : '冬' }
 const dayNightNow = () => { const h = new Date().getHours(); return (h >= 6 && h < 19) ? 'day' : 'night' }
+// 日期与分时(进 prompt;缓存键仍用粗粒度 day/night,避免分时频繁触发重生成)
+const dateLabel = () => { const d = new Date(); return `${d.getMonth() + 1}月${d.getDate()}日` }
+const timeOfDayLabel = () => {
+  const h = new Date().getHours()
+  if (h < 5) return '凌晨'
+  if (h < 8) return '清晨'
+  if (h < 11) return '上午'
+  if (h < 14) return '午后'
+  if (h < 17) return '下午'
+  if (h < 19) return '傍晚'
+  return '夜晚'
+}
+// 风格/地点随机池:风格不固定(摄影/手绘/油画…),地点不固定(突出天气氛围,弱化地标)
+const WEATHER_STYLES = ['电影感摄影', '水彩手绘', '油画', '极简插画', '复古胶片', '日系动漫', '水墨淡彩']
+const WEATHER_SCENES = ['城市街道', '公园', '海边', '山间', '郊野', '湖边', '窗前']
+const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)]
 const weatherBgKey = () => [weather.value?.city, weather.value?.text, weather.value?.iconCode, dayNightNow(), seasonLabel()].join('|')
 const loadWeatherBg = () => {
   const key = weatherBgKey()
@@ -742,9 +808,7 @@ const loadWeatherBg = () => {
         aiStatusChecked = true
       }
       if (!aiImageAvail) return
-      const dn = dayNightNow() === 'day' ? '白天' : '夜晚'
-      const scene = (cfg.scene || '').trim()
-      const prompt = `${cfg.style},${seasonLabel()}季${dn} ${weather.value?.city || ''} ${weather.value?.text || ''} 的城市街景${scene ? ',' + scene : ''},柔和暖色调,宁静家居感,高清#`
+      const prompt = `${pickRandom(WEATHER_STYLES)},${dateLabel()}${timeOfDayLabel()},${seasonLabel()}季,${weather.value?.city || ''} ${weather.value?.text || ''},${pickRandom(WEATHER_SCENES)},突出天气氛围,弱化地点地标,柔和高级色调,高清#`
       const res = await aiApi.image({
         prompt,
         size: cfg.size || '2048x2048',
@@ -1027,7 +1091,7 @@ onMounted(() => {
   loadAll(); loadPoints(); loadReminders(); loadBookSummary(); loadWishes(); loadTodayRecipes(); loadItemHouses()
   nextTick(() => { if (!root.value) return; ctx = gsap.context(() => { gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, ease: 'power2.out' }) }, root.value) })
 })
-onBeforeUnmount(() => { ctx?.revert() })
+onBeforeUnmount(() => { ctx?.revert(); gsap.killTweensOf('.dash-card') })
 </script>
 
 <style scoped>
@@ -1044,7 +1108,7 @@ onBeforeUnmount(() => { ctx?.revert() })
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
 .edit-toolbar-hover:hover { opacity: 0; transform: translateY(-10px); pointer-events: none; }
-html.dark .edit-toolbar { background: rgba(30,42,72,0.6); border-color: rgba(255,255,255,0.1); }
+html.dark .edit-toolbar { background: rgba(var(--color-card-rgb),0.6); border-color: rgba(255,255,255,0.1); }
 .edit-label { font-size: 12px; opacity: 0.6; }
 
 /* 栅格背景 */
@@ -1055,8 +1119,8 @@ html.dark .edit-toolbar { background: rgba(30,42,72,0.6); border-color: rgba(255
   grid-template-rows: repeat(9, var(--cell-h));
   gap: 40px;
 }
-.grid-cell { border: 1px dashed rgba(184,140,110,0.15); border-radius: 8px; opacity: 0; animation: cellAppear 0.4s ease forwards; }
-html.dark .grid-cell { border-color: rgba(212,178,152,0.1); }
+.grid-cell { border: 1px dashed rgba(var(--color-brand-rgb),0.15); border-radius: 8px; opacity: 0; animation: cellAppear 0.4s ease forwards; }
+html.dark .grid-cell { border-color: rgba(var(--color-brand-rgb),0.1); }
 @keyframes cellAppear { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
 .grid-fade-enter-active, .grid-fade-leave-active { transition: opacity 0.3s ease; }
 .grid-fade-enter-from, .grid-fade-leave-to { opacity: 0; }
@@ -1072,18 +1136,18 @@ html.dark .grid-cell { border-color: rgba(212,178,152,0.1); }
   border-radius: 20px;
   box-shadow: 0 8px 28px rgba(58,46,34,0.1), inset 0 1px 0 rgba(255,255,255,0.6);
   color: #3A2E22; overflow: hidden;
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  transition: box-shadow 0.25s ease;
   contain: layout style;
 }
 .dash-card:not(.edit-active):hover { box-shadow: 0 12px 40px rgba(58,46,34,0.18); }
 .dash-card.edit-active {
   cursor: default;
-  border-color: rgba(184,140,110,0.3);
-  box-shadow: 0 4px 16px rgba(184,140,110,0.15);
+  border-color: rgba(var(--color-brand-rgb),0.3);
+  box-shadow: 0 4px 16px rgba(var(--color-brand-rgb),0.15);
   transition: left 0.15s cubic-bezier(0.4,0,0.2,1), top 0.15s cubic-bezier(0.4,0,0.2,1), width 0.15s cubic-bezier(0.4,0,0.2,1), height 0.15s cubic-bezier(0.4,0,0.2,1), box-shadow 0.25s ease;
 }
 .dash-card.dragging { opacity: 0.9; }
-html.dark .dash-card { background: rgba(30,42,72,0.5); border-color: rgba(255,255,255,0.1); color: #E8DCC8; box-shadow: 0 8px 28px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06); }
+html.dark .dash-card { background: rgba(var(--color-card-rgb),0.5); border-color: rgba(255,255,255,0.1); color: #E8DCC8; box-shadow: 0 8px 28px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06); }
 
 .card-inner { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
 .dash-card.edit-active .card-inner { pointer-events: none; }
@@ -1094,9 +1158,9 @@ html.dark .card-head { opacity: 0.75; }
 .dash-card.h-1 .card-scroll { padding-top: 10px; }
 .card-scroll { flex: 1; overflow-y: auto; padding: 0 18px 14px; min-height: 0; transform: translateZ(0); }
 .card-scroll::-webkit-scrollbar { width: 0; }
-.card-more { font-size: 13px; color: #b88c6e; text-decoration: none; padding: 0 18px 10px; display: block; font-weight: 500; transition: color 0.15s, transform 0.15s; }
+.card-more { font-size: 13px; color: var(--color-brand); text-decoration: none; padding: 0 18px 10px; display: block; font-weight: 500; transition: color 0.15s, transform 0.15s; }
 .card-more:hover { color: #a06a4e; }
-html.dark .card-more { color: #d4b298; }
+html.dark .card-more { color: var(--color-brand); }
 .empty-hint { text-align: center; padding: 16px 12px; font-size: 13px; opacity: 0.4; font-style: italic; }
 .widget-empty { font-size: 12px; color: #9a9088; padding: 14px 0; text-align: center; line-height: 1.6; }
 .widget-empty-hint { font-size: 11px; color: #b0a89e; margin-top: 4px; }
@@ -1105,10 +1169,10 @@ html.dark .widget-empty { color: rgba(232,220,200,0.3); }
 /* 编辑模式拖拽条/删除/缩放 */
 .drag-bar { height: 18px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; cursor: grab; }
 .drag-bar:active { cursor: grabbing; }
-.grip { width: 32px; height: 3px; border-radius: 2px; background: rgba(184,140,110,0.3); }
+.grip { width: 32px; height: 3px; border-radius: 2px; background: rgba(var(--color-brand-rgb),0.3); }
 .del-btn { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border: none; border-radius: 50%; background: rgba(201,116,116,0.15); color: #c97474; font-size: 11px; cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center; }
 .del-btn:hover { background: rgba(201,116,116,0.3); }
-.resize-corner { position: absolute; bottom: 0; right: 0; width: 18px; height: 18px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, rgba(184,140,110,0.25) 50%); border-bottom-right-radius: 20px; z-index: 10; }
+.resize-corner { position: absolute; bottom: 0; right: 0; width: 18px; height: 18px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, rgba(var(--color-brand-rgb),0.25) 50%); border-bottom-right-radius: 20px; z-index: 10; }
 
 /* 家人动态 */
 .feed-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; cursor: pointer; }
@@ -1143,7 +1207,7 @@ html.dark .task-status-dot.s-0 { background: #c4a884; } html.dark .task-status-d
 html.dark .tp-item:hover { background: rgba(255,255,255,0.04); }
 .tp-num { font-size: 20px; font-weight: 700; color: #A8483A; line-height: 1; }
 .tp-label { font-size: 11px; opacity: 0.45; margin-top: 3px; }
-html.dark .tp-num { color: #d4b298; }
+html.dark .tp-num { color: var(--color-brand); }
 .today-reminders { border-top: 1px solid rgba(58,46,34,0.06); padding-top: 4px; }
 html.dark .today-reminders { border-color: rgba(232,220,200,0.05); }
 .today-reminder { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
@@ -1157,7 +1221,7 @@ html.dark .today-reminder:hover { background: rgba(255,255,255,0.04); }
 .weather-scroll { text-align: center; }
 .weather-clickable { cursor: pointer; }
 .weather-main { padding: 10px 12px 12px; border-radius: 14px; background: rgba(255,255,255,0.52); backdrop-filter: blur(10px) saturate(1.2); -webkit-backdrop-filter: blur(10px) saturate(1.2); border: 1px solid rgba(255,255,255,0.45); box-shadow: 0 2px 12px rgba(58,46,34,0.08); }
-html.dark .weather-main { background: rgba(22,32,56,0.58); border-color: rgba(255,255,255,0.12); box-shadow: 0 2px 12px rgba(0,0,0,0.2); }
+html.dark .weather-main { background: rgba(var(--color-card-rgb),0.58); border-color: rgba(255,255,255,0.12); box-shadow: 0 2px 12px rgba(0,0,0,0.2); }
 .weather-city { font-size: 13px; opacity: 0.5; }
 .weather-current { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 4px 0 2px; }
 .weather-icon-float { font-size: 36px; animation: icon-float 3s ease-in-out infinite; display: inline-block; }
@@ -1190,7 +1254,7 @@ html.dark .anni-row:hover { background: rgba(255,255,255,0.04); }
 .anni-days { display: flex; align-items: baseline; gap: 2px; flex-shrink: 0; margin-left: 6px; }
 .days-num { font-size: 20px; font-weight: 700; color: #A8483A; }
 .days-unit { font-size: 11px; opacity: 0.5; }
-html.dark .days-num { color: #d4b298; }
+html.dark .days-num { color: var(--color-brand); }
 
 /* 愿望单 */
 .wish-list { display: flex; flex-direction: column; gap: 5px; }
@@ -1226,8 +1290,8 @@ html.dark .fin-val.income { color: #7dba7d; } html.dark .fin-val.expense { color
 
 /* 音乐 */
 .music-list { display: flex; flex-direction: column; gap: 4px; }
-.music-pl-name { font-size: 13px; font-weight: 600; color: #b88c6e; margin-bottom: 4px; }
-html.dark .music-pl-name { color: #d4b298; }
+.music-pl-name { font-size: 13px; font-weight: 600; color: var(--color-brand); margin-bottom: 4px; }
+html.dark .music-pl-name { color: var(--color-brand); }
 .music-item { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 8px; transition: background 0.2s; }
 .music-item:hover { background: rgba(58,46,34,0.04); }
 html.dark .music-item:hover { background: rgba(255,255,255,0.04); }
@@ -1281,9 +1345,9 @@ html.dark .music-title { color: #E8DCC8; }
   width: 80px; height: 60px;
   margin-left: -40px; margin-top: -30px;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(184,140,110,0.3);
+  background: rgba(var(--color-brand-rgb),0.3);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(184,140,110,0.4);
+  border: 1px solid rgba(var(--color-brand-rgb),0.4);
   border-radius: 14px;
   pointer-events: none;
   transform: scale(0.3);
@@ -1291,7 +1355,7 @@ html.dark .music-title { color: #E8DCC8; }
 }
 .drag-ghost.ghost-grown {
   transform: scale(1);
-  background: rgba(184,140,110,0.15);
+  background: rgba(var(--color-brand-rgb),0.15);
   width: 200px; height: 150px;
   margin-left: -100px; margin-top: -75px;
 }
@@ -1299,16 +1363,16 @@ html.dark .music-title { color: #E8DCC8; }
 html.dark .ghost-label { color: #E8DCC8; }
 
 /* ===== P2 hover:放大的卡片 + 被推开的邻居(全盖→胶囊/部分盖→降档缩小/擦边→轻微缩小) + 波浪引导 ===== */
-.dash-card.is-hovered { box-shadow: 0 20px 52px rgba(58,46,34,0.24); transition: transform 0.35s cubic-bezier(0.34, 1.2, 0.64, 1), box-shadow 0.3s ease; }
+.dash-card.is-hovered { box-shadow: 0 20px 52px rgba(58,46,34,0.24); transition: box-shadow 0.3s ease; }
 html.dark .dash-card.is-hovered { box-shadow: 0 20px 52px rgba(0,0,0,0.4); }
-.dash-card.is-neighbor { transition: transform 0.35s cubic-bezier(0.34, 1.2, 0.64, 1); }
+/* 邻居 transform 由 GSAP elastic.out 接管(水波弹性形变),此处只隐藏内容显示胶囊 */
 .dash-card.is-neighbor .card-inner { opacity: 0; pointer-events: none; }
 .neighbor-capsule { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; z-index: 5; }
 .neighbor-capsule .nc-icon { font-size: 20px; line-height: 1; }
 .neighbor-capsule .nc-label { font-size: 11px; font-weight: 600; opacity: 0.7; }
 /* 小档未展开时的波浪提示:引导 hover 查看更多(方案 §2.2) */
 .dash-card.wave-hint::after { content: 'hover 查看更多'; position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); font-size: 10px; opacity: 0; color: #a06a4e; animation: wavePulse 2.4s ease-in-out infinite; pointer-events: none; }
-html.dark .dash-card.wave-hint::after { color: #d4b298; }
+html.dark .dash-card.wave-hint::after { color: var(--color-brand); }
 @keyframes wavePulse { 0%,100% { opacity: 0; transform: translateX(-50%) translateY(0); } 50% { opacity: 0.75; transform: translateX(-50%) translateY(-3px); } }
 
 /* ===== P3 天气 AI 生图底图(渐变+毛玻璃兜底) ===== */
@@ -1317,18 +1381,21 @@ html.dark .dash-card.wave-hint::after { color: #d4b298; }
 .dash-card.weather .card-inner > .card-scroll { position: relative; z-index: 1; }
 .weather-bg { position: absolute; inset: 0; z-index: 0; overflow: hidden; border-radius: 20px; pointer-events: none; }
 .weather-bg-img { position: absolute; inset: -8%; background-size: cover; background-position: center; filter: saturate(1.08) contrast(1.02); transition: opacity 0.4s ease; }
-.weather-bg-grad { position: absolute; inset: 0; background: linear-gradient(165deg, rgba(255,255,255,0.78) 0%, rgba(255,255,255,0.34) 48%, rgba(196,170,144,0.3) 100%); }
-html.dark .weather-bg-grad { background: linear-gradient(165deg, rgba(24,32,56,0.78) 0%, rgba(24,32,56,0.34) 48%, rgba(64,74,116,0.32) 100%); }
+.weather-bg-grad { position: absolute; inset: 0; background: linear-gradient(115deg, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0.5) 34%, rgba(255,255,255,0.14) 62%, rgba(255,255,255,0.05) 100%); }
+html.dark .weather-bg-grad { background: linear-gradient(115deg, rgba(var(--color-card-rgb),0.8) 0%, rgba(var(--color-card-rgb),0.5) 34%, rgba(var(--color-card-rgb),0.16) 62%, rgba(var(--color-card-rgb),0.06) 100%); }
+/* 巨大档(XL)悬停时:内容面板更透,让 AI 生图背景透出来,文字区靠局部描边/投影保证可读 */
+.dash-card.weather.is-hovered .weather-main { background: rgba(255,255,255,0.34); backdrop-filter: blur(6px) saturate(1.15); -webkit-backdrop-filter: blur(6px) saturate(1.15); border-color: rgba(255,255,255,0.35); box-shadow: 0 2px 14px rgba(58,46,34,0.16), 0 0 0 1px rgba(255,255,255,0.12) inset; text-shadow: 0 1px 2px rgba(255,255,255,0.5); }
+html.dark .dash-card.weather.is-hovered .weather-main { background: rgba(var(--color-card-rgb),0.4); border-color: rgba(255,255,255,0.16); text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
 
 /* ===== P3 寻物组件 = 缩小版 item 页:户型图自适应大小 + 命中放大居中 + 上/下一个导航 ===== */
 .dash-card.search .card-scroll { display: flex; flex-direction: column; overflow: hidden; padding: 0 14px 8px; }
-.fp-wrap { position: relative; flex: 1; min-height: 0; border-radius: 16px; overflow: hidden; border: 1px solid rgba(184,140,110,0.22); background: #f6efe4; }
-html.dark .fp-wrap { border-color: rgba(212,178,152,0.15); background: #212c49; }
+.fp-wrap { position: relative; flex: 1; min-height: 0; border-radius: 16px; overflow: hidden; border: 1px solid rgba(var(--color-brand-rgb),0.22); background: #f6efe4; }
+html.dark .fp-wrap { border-color: rgba(var(--color-brand-rgb),0.15); background: var(--color-card-2); }
 .fp-no-plan { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #9a9088; padding: 0 12px; text-align: center; }
 html.dark .fp-no-plan { color: rgba(232,220,200,0.4); }
 /* 当前命中物品 */
 .fp-match-chip { position: absolute; left: 8px; top: 8px; max-width: calc(100% - 16px); display: flex; flex-direction: column; gap: 2px; padding: 5px 9px; border-radius: 10px; background: rgba(255,255,255,0.66); backdrop-filter: blur(10px) saturate(1.2); border: 1px solid rgba(255,255,255,0.5); box-shadow: 0 4px 12px rgba(58,46,34,0.14); z-index: 2; pointer-events: none; }
-html.dark .fp-match-chip { background: rgba(30,42,72,0.72); border-color: rgba(255,255,255,0.1); }
+html.dark .fp-match-chip { background: rgba(var(--color-card-rgb),0.72); border-color: rgba(255,255,255,0.1); }
 .fm-name { font-size: 12px; font-weight: 600; color: #3A2E22; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fm-src { font-style: normal; font-size: 9px; font-weight: 600; color: #b8860b; background: rgba(232,160,48,0.16); border-radius: 6px; padding: 1px 5px; margin-left: 6px; vertical-align: 1px; }
 .fm-loc { font-size: 10px; color: #9a9088; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1337,25 +1404,25 @@ html.dark .fm-src { color: #e8b04b; background: rgba(232,176,75,0.16); }
 html.dark .fm-loc { color: rgba(232,220,200,0.5); }
 /* 搜索进行/无结果提示(覆盖在户型图上,居中) */
 .fp-search-hint { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 11px; color: #9a9088; padding: 6px 12px; border-radius: 10px; background: rgba(255,255,255,0.7); backdrop-filter: blur(10px) saturate(1.2); border: 1px solid rgba(255,255,255,0.5); z-index: 2; pointer-events: none; white-space: nowrap; }
-html.dark .fp-search-hint { color: rgba(232,220,200,0.55); background: rgba(30,42,72,0.72); border-color: rgba(255,255,255,0.1); }
+html.dark .fp-search-hint { color: rgba(232,220,200,0.55); background: rgba(var(--color-card-rgb),0.72); border-color: rgba(255,255,255,0.1); }
 /* 上/下一个 命中导航(左右箭头) */
 .fp-nav { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 4px 8px; border-radius: 999px; background: rgba(255,255,255,0.7); backdrop-filter: blur(12px) saturate(1.2); border: 1px solid rgba(255,255,255,0.55); box-shadow: 0 4px 14px rgba(58,46,34,0.16); z-index: 2; }
-html.dark .fp-nav { background: rgba(30,42,72,0.78); border-color: rgba(255,255,255,0.1); }
-.fp-nav-btn { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid rgba(184,140,110,0.4); background: rgba(184,140,110,0.12); color: #b88c6e; font-size: 16px; line-height: 1; cursor: pointer; transition: background 0.2s, transform 0.2s, color 0.2s, opacity 0.2s; }
-.fp-nav-btn:hover:not(:disabled) { background: rgba(184,140,110,0.28); color: #a06a4e; transform: scale(1.08); }
+html.dark .fp-nav { background: rgba(var(--color-card-rgb),0.78); border-color: rgba(255,255,255,0.1); }
+.fp-nav-btn { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid rgba(var(--color-brand-rgb),0.4); background: rgba(var(--color-brand-rgb),0.12); color: var(--color-brand); font-size: 16px; line-height: 1; cursor: pointer; transition: background 0.2s, transform 0.2s, color 0.2s, opacity 0.2s; }
+.fp-nav-btn:hover:not(:disabled) { background: rgba(var(--color-brand-rgb),0.28); color: #a06a4e; transform: scale(1.08); }
 .fp-nav-btn:active:not(:disabled) { transform: scale(0.94); }
 .fp-nav-btn:disabled { opacity: 0.32; cursor: default; }
-html.dark .fp-nav-btn { border-color: rgba(212,178,152,0.35); background: rgba(212,178,152,0.12); color: #d4b298; }
+html.dark .fp-nav-btn { border-color: rgba(var(--color-brand-rgb),0.35); background: rgba(var(--color-brand-rgb),0.12); color: var(--color-brand); }
 .fp-nav-count { font-size: 11px; font-weight: 600; color: #3A2E22; font-variant-numeric: tabular-nums; letter-spacing: 0.3px; min-width: 30px; text-align: center; }
 html.dark .fp-nav-count { color: #E8DCC8; }
 .search-input-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
 .search-input-row .el-input { flex: 1; }
-.voice-btn { flex-shrink: 0; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid rgba(184,140,110,0.4); background: rgba(184,140,110,0.12); color: #b88c6e; cursor: pointer; font-size: 15px; transition: background 0.2s, transform 0.2s; }
-.voice-btn:hover { background: rgba(184,140,110,0.25); }
+.voice-btn { flex-shrink: 0; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid rgba(var(--color-brand-rgb),0.4); background: rgba(var(--color-brand-rgb),0.12); color: var(--color-brand); cursor: pointer; font-size: 15px; transition: background 0.2s, transform 0.2s; }
+.voice-btn:hover { background: rgba(var(--color-brand-rgb),0.25); }
 .voice-btn.on { background: rgba(201,116,116,0.28); color: #c97474; animation: voicePulse 1s ease-in-out infinite; }
 @keyframes voicePulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } }
-html.dark .voice-btn { border-color: rgba(212,178,152,0.35); background: rgba(212,178,152,0.12); color: #d4b298; }
-html.dark .voice-btn:hover { background: rgba(212,178,152,0.22); }
+html.dark .voice-btn { border-color: rgba(var(--color-brand-rgb),0.35); background: rgba(var(--color-brand-rgb),0.12); color: var(--color-brand); }
+html.dark .voice-btn:hover { background: rgba(var(--color-brand-rgb),0.22); }
 
 /* Transition */
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }

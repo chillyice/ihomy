@@ -105,7 +105,7 @@ watch([strokes, () => props.page.p], renderDoodle)
   --ruling-color: rgba(100,130,180,0.15);
 }
 html.dark .sheet {
-  background: #1E2A48;
+  background: var(--color-card);
   box-shadow: 0 4px 24px rgba(0,0,0,0.3);
   --ruling-color: rgba(232,220,200,0.06);
 }

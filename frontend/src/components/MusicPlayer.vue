@@ -260,7 +260,7 @@ onMounted(loadBackgroundPlaylist)
 }
 .music-player:active { cursor: grabbing; }
 html.dark .music-player {
-  background: rgba(30, 40, 65, 0.65);
+  background: rgba(var(--color-card-rgb), 0.65);
   border-color: rgba(255, 255, 255, 0.12);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3),
               inset 0 1px 0 rgba(255, 255, 255, 0.08);

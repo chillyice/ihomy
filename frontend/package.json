@@ -20,6 +20,7 @@
     "pinia": "^2.1.7",
     "qweather-icons": "^1.8.0",
     "simple-mind-map": "^0.14.0",
+    "three": "^0.186.0",
     "vue": "^3.4.27",
     "vue-i18n": "^9.14.4",
     "vue-router": "^4.3.2"

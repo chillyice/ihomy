@@ -224,7 +224,7 @@ onMounted(load)
 
 <style scoped>
 .select-count { font-size: 13px; color: var(--color-text-secondary); margin-right: 8px; }
-.album-card.selected { outline: 3px solid var(--color-primary, #b88c6e); outline-offset: -3px; }
+.album-card.selected { outline: 3px solid var(--color-primary, var(--color-brand)); outline-offset: -3px; }
 .pick-badge {
   position: absolute;
   top: 10px;
@@ -239,7 +239,7 @@ onMounted(load)
   justify-content: center;
   z-index: 2;
 }
-.pick-badge.on { background: #b88c6e; border-color: #b88c6e; }
+.pick-badge.on { background: var(--color-brand); border-color: var(--color-brand); }
 .album-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));

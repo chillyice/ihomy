@@ -169,12 +169,12 @@ html.dark .me-family { color: rgba(232,220,200,0.5); }
 .me-login-btn {
   padding: 6px 16px;
   border-radius: 8px;
-  background: var(--color-primary, #b88c6e);
+  background: var(--color-primary, var(--color-brand));
   color: #fff;
   font-size: 13px;
   cursor: pointer;
 }
-html.dark .me-login-btn { background: #d4b298; color: #1a1a1a; }
+html.dark .me-login-btn { background: var(--color-brand); color: #1a1a1a; }
 
 .me-section {
   margin-bottom: 12px;
@@ -222,8 +222,8 @@ html.dark .me-row.logout .me-row-text { color: #c97474; }
 }
 html.dark .family-item { color: #E8DCC8; border-bottom-color: rgba(255,255,255,0.04); }
 .family-item:last-child { border-bottom: none; }
-.family-item.active { color: var(--color-primary, #b88c6e); font-weight: 600; }
-html.dark .family-item.active { color: #d4b298; }
+.family-item.active { color: var(--color-primary, var(--color-brand)); font-weight: 600; }
+html.dark .family-item.active { color: var(--color-brand); }
 .family-item:active { background: rgba(0,0,0,0.03); }
 
 .expand-enter-active, .expand-leave-active { transition: max-height 0.25s ease; overflow: hidden; }

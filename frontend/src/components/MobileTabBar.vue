@@ -37,7 +37,7 @@ defineEmits(['update:modelValue'])
   z-index: 60;
 }
 html.dark .mobile-tabbar {
-  background: rgba(20, 28, 45, 0.92);
+  background: rgba(var(--color-card-rgb), 0.92);
   border-top-color: rgba(255, 255, 255, 0.08);
 }
 .tab-item {
@@ -54,6 +54,6 @@ html.dark .mobile-tabbar {
   -webkit-tap-highlight-color: transparent;
 }
 .tab-item .el-icon { font-size: 22px; }
-.tab-item.active { color: var(--color-primary, #b88c6e); }
-html.dark .tab-item.active { color: #d4b298; }
+.tab-item.active { color: var(--color-primary, var(--color-brand)); }
+html.dark .tab-item.active { color: var(--color-brand); }
 </style>

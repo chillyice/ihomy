@@ -211,7 +211,7 @@ public class AiService {
             }
         }
         if (notBlank(dto.getSize())) {
-            body.put("size", dto.getSize().trim());
+            body.put("size", adaptImageSize(dto.getSize().trim(), pro));
         }
         // 可选参数:仅在前端显式给出时透传(null=用模型默认,不进请求体)
         if (dto.getSeed() != null && dto.getSeed() >= 0) {
@@ -222,6 +222,10 @@ public class AiService {
         }
         if (dto.getWatermark() != null) {
             body.put("watermark", dto.getWatermark());
+        }
+        // 透明背景抠图(Seedream 5.0 pro):background=transparent,须配合 image 输入(PNG 且含透明像素)
+        if (notBlank(dto.getBackground())) {
+            body.put("background", dto.getBackground());
         }
         body.put("response_format", "b64_json".equals(dto.getResponseFormat()) ? "b64_json" : "url");
         Map<String, String> headers = Map.of(
@@ -268,6 +272,35 @@ public class AiService {
         if (seedream && m.contains("pro")) return ImageEngine.SEEDREAM_PRO;
         if (seedream) return ImageEngine.SEEDREAM;
         return ImageEngine.GENERIC;
+    }
+
+    /** Seedream 5.0 pro 与 lite 的 size 规则不同(pro:档位 1K/1.5K/2K、方式2 总像素 [921600,4624220];
+     * lite:档位 2K/3K/4K、[3686400,16777216])。前端可能按 lite 规则传尺寸,给 pro 用会被方舟拒绝,
+     * 这里按引擎归一化:pro 档位 3K/4K 回落 2K,WxH 越界按比例缩放回 pro 范围。 */
+    private String adaptImageSize(String size, boolean pro) {
+        if (!pro || size == null || size.isBlank()) return size;
+        String s = size.trim();
+        if (s.matches("(?i)^[1-9](\\.5)?K$")) {
+            String k = s.toUpperCase();
+            return ("3K".equals(k) || "4K".equals(k)) ? "2K" : s;
+        }
+        String[] parts = s.split("[xX\\*]");
+        if (parts.length == 2) {
+            try {
+                long w = Long.parseLong(parts[0].trim());
+                long h = Long.parseLong(parts[1].trim());
+                long px = w * h;
+                final long MIN = 921600L, MAX = 4624220L;
+                if (px >= MIN && px <= MAX) return s;
+                double scale = px > MAX ? Math.sqrt((double) MAX / px) : Math.sqrt((double) MIN / px);
+                long nw = Math.max(1, Math.round(w * scale));
+                long nh = Math.max(1, Math.round(h * scale));
+                return nw + "x" + nh;
+            } catch (NumberFormatException ignored) {
+                // 解析失败走下方兜底
+            }
+        }
+        return "1536x1024";
     }
 
     /** 语音识别:OpenAI 兼容 multipart(/audio/transcriptions)或百度短语音(provider=BAIDU);主报错/空结果回退兜底 */
