@@ -155,7 +155,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 物品 | 物品定位+户型图+AI 语义 | ItemController / ItemService / ItemAiService+AiService(设计决策见需求设计说明书 §4.8.1) |
 | AI | 图片生成/语音识别接入+AI 测试台+家庭级 AI 配置 | AiService / FamilyAiConfigService / AiController(/ai/status、/ai/config、/ai/chat、/ai/image、/ai/transcribe) |
 | 厨房 | 菜单/菜谱/食材 | RecipeController / RecipeService |
-| 工具 | 工具箱聚合页/脑图设计(simple-mind-map,快照/回滚/协同轮询)/AI 测试台(/tools/ai-playground 临时) | MindMapController / MindMapService |
+| 工具 | 工具箱聚合页/脑图设计(simple-mind-map,快照/回滚/协同轮询)/AI 测试台(/tools/ai-playground 临时)/3D 光影实验台(/tools/light-lab 临时,Three.js 太阳模拟+真实阴影,未来场景主题基础) | MindMapController / MindMapService |
 | 系统 | i18n / 主题 / 字典 | i18n/ + theme/ + utils/dict.js |
 | 移动端 | 设备自适应 | useDevice.js + MobileLayout.vue + Mobile* 组件 |
 
@@ -323,6 +323,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **P1 放映厅 Jellyfin 集成**:方案已定稿,详见 docs/变更归档.md「放映厅 Jellyfin 集成方案」;**启动时先重读该归档小节**。
 - **P2 智能家居中控(Home Assistant 集成)**(2026-09-07 评估定稿):硬件协议层全归 HA(家庭中枢:J4125 PVE 虚拟化 OpenWrt/HAOS/OMV + WireGuard 隧道连 VPS,硬件部署另行推进),ihomy 只做数据沉淀与家人控制入口——S1 Paho 订阅 Mosquitto 入库 sys_iot_device/sys_iot_data + Redis 最新值、S2 HA REST 控制入口(long-lived token)、S3 前端中控页(sys_home_module 模块)+ 物品定位户型图联动;详见需求设计说明书 §9。
 - **P3 物品定位-AI 语义(已完成 V9.46;V9.49 改本地规则+LLM 兜底;V9.52 同义词表+功能兜底)**:后端 V9.40(AiService 统一接入层 + POST /item/ai/find、/item/ai/put);**前端入口 V9.46 已实现**(查看模式搜索框关键词优先+无命中 AI 找物兜底+来源标注;列表模式「AI 登记」弹窗;**删不经过 AI**——AI 找到走既有删除按钮人工确认);**V9.49 本地规则优先+LLM 兜底**(ItemLocalParser 找物闭集反向匹配+放物正则抽取「把X放Y的Z里」,零 token 离线毫秒级;绑定 LLM 时本地覆盖不了才回 chatJson,未配置/LOCAL 则纯本地);**V9.52 同义词表+功能兜底**(sys_synonym + SynonymService:找物读表扩展、放物归一化 name+填别名、LLM 落库后写回学习;fallback_model_id + resolveChain:找物/放物质量兜底、对话/图片/语音容灾兜底);token 节约:put 上下文 items 压缩为紧凑"名称(别名)"文本(find 无清单);详见需求设计说明书 §4.6.9/§4.8。
+- **场景主题方向(2026-09-12)**:2D 沉浸首页场景主题(feature/scene-theme 分支,SceneHome.vue)暂缓开发;3D 光影实验台(/tools/light-lab,Three.js 真实阴影+客户端 NOAA 太阳模拟+房子结构)作为未来场景主题的 3D 基础模型,后续重构时以此为底座;详见需求设计说明书 §4.12.3/§9。
 - 优先级:P1 用户价值高且可行 / P2 锦上添花 / P3 结构性改动 / P4 依赖外部条件。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
 
 ## 文档清单
