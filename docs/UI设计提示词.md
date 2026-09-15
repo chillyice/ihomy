@@ -229,27 +229,24 @@
 - `.sidebar-nav`(滚动区):`transform: translateZ(0)` + `will-change: transform`
 - nav-item hover 用 `transform: translateX(4px) scale(1.03)`(而非 box-shadow,避免触发 backdrop-filter 重算)
 
-## 10. 首页栅格仪表盘(12列×9行,V9.53 四档 snap + hover 推开邻居)
+## 10. 首页自由布局仪表盘(V9.63 自由布局;V9.53 四档 + hover 推开邻居)
 
-- 12 列×9 行栅格,组件按栅格单元定位(col/row/w/h)。
+- **自由布局(V9.63)**:组件改画布比例坐标 `x/y/w/h`(0~1,左上角 + 宽高相对画布宽高比例),渲染折算成 px、窗口缩放等比例自适应;拖拽/缩放不吸附栅格(像素位移 ÷ 画布宽高折算比例位移),缩放最小 150×110px;拖拽条/缩放角「正常模式 hover 浮现、编辑模式常显」;移除编辑态栅格背景 `.grid-overlay`/`.grid-cell`。
 - GAP=40px,四边 margin(top=32/right=40/bottom=40/left=260,左侧=侧边栏220+40)。
-- 栅格尺寸根据 `window.innerWidth/Height` 自适应计算 `cellW`/`cellH`。
-- 组件 `position: fixed`,left/top/width/height 由 `cardBoxStyle(w)` 按栅格计算。
-- **四档尺寸(V9.53)**:档位由面积推导 `displayTier(w)`=`w.w*w.h` → `≤4=S(小)/≤9=M(中)/≤20=L(大)/>20=XL(巨大)`;自由拖拽缩放改 snap 四档(`snapSize` 吸附到最近档);拖入/拖出默认尺寸各组件不同(`WIDGET_DEFAULT_SIZE`);每档内部排版不同(小=一眼核心/中=详略得当/大=完整/巨大=扩展,`nFeed/nTask/nReminder/nAnni/nRecipe/nWish/nForecast(w)` 按档截断列表)。
+- 组件 `position: fixed`,left/top/width/height 由 `cardBoxStyle(w)` 按画布比例计算。
+- **四档尺寸(V9.53;V9.63 口径不变)**:档位由等效栅格面积推导 `displayTier(w)`=`(w.w*12)*(w.h*9)` → `≤4=S(小)/≤9=M(中)/≤20=L(大)/>20=XL(巨大)`;每档内部排版不同(小=一眼核心/中=详略得当/大=完整/巨大=扩展,`nFeed/nTask/nReminder/nAnni/nRecipe/nWish/nForecast(w)` 按档截断列表);拖入/拖出默认尺寸各组件不同(`WIDGET_DEFAULT_SIZE`)。
 - **hover 放大 + 邻居胶囊(V9.53;V9.58 改真实尺寸)**:中/小档 hover 临时升一档(大/巨大档不参与);**V9.58 起**被 hover 卡片 `h-boosted` 不再 `transform: scale`,改由 GSAP 动画把 `left/top/width/height` 真实扩到放大矩形(`hoverRectPx`,字号不缩放,内部内容按 tier 渐进展开);邻居 `h-pushed` 原位 `transform` 缩放(不再平移推挤),锚点取「放大中心→邻居中心」射线在邻居远边界上的出射点(`neighborOrigin`,连续点位);全盖邻居缩成「图标+标题」胶囊,若缩小后仍与放大矩形重叠(`stillOverlapsAfter`)则进一步缩成纯图标小圆角矩形(`.nc-icon-only` 隐藏文字、`NEIGHBOR_SCALE_ICON=0.32`);部分盖原位降档、擦边轻微缩小;V9.53 的 `.wave-hint` 波浪提示「悬停查看更多」已移除;编辑态进场 `clearHover()` + `gsap.set(left/top/width/height)` 复位真实尺寸;悬停延迟防扫视抖动。
 - **编辑模式**:导航栏 EditPen 按钮切换 `appStore.homeEditMode`。
   - 侧边栏导航项变为组件来源(向右下偏移 `translate(4px,4px)` + 暖棕虚线边框 + 半透明底色;hover 进一步 `translate(8px,8px) scale(1.05)`)。
   - 原位置虚线框占位(`::before`)。
   - 从侧边栏拖出到内容区,ghost 由 `scale(0.3)` 弹性增长到 `scale(1)`(cubic-bezier 0.34,1.56,0.64,1),尺寸 80×60→200×150;drop 按 WIDGET_DEFAULT_SIZE 创建组件。
   - 侧边栏右边界气泡融合效果(`::after` radial-gradient pulse)。
-  - 卡片可拖拽移动(drag-bar 顶部手柄)+ 缩放(resize-corner 右下角),缩放 snap 四档、移动栅格吸附(`Math.round(dx/(cw+GAP))`)。
+  - 卡片可拖拽移动(drag-bar 顶部手柄)+ 缩放(resize-corner 右下角);**V9.63 起正常模式也可直接拖拽/缩放**(手柄 hover 浮现),不做栅格吸附,像素位移折算画布比例位移。
   - 编辑模式禁用内部交互(`.card-inner { pointer-events: none }`),仅移动+缩放+删除。
-  - grid-cell 出现动画(逐个渐现 `cellAppear 0.4s ease`,delay `i*5ms`)。
   - 编辑工具栏 hover 隐藏(`opacity:0; translateY(-10px); pointer-events:none`)。
-  - 栅格背景可见(`.grid-overlay` CSS grid,JS 计算的 `--cell-w`/`--cell-h` 变量)。
-- **h=1 时标题行消失**:`.card-head` opacity→0 + max-height→0 + padding→0(0.3s ease 动效)。
+- **h=1 时标题行消失(V9.63 改 tinyCard)**:`w.h*canvasH<120px` 时 `.card-head` opacity→0 + max-height→0 + padding→0(0.3s ease 动效)。
 - 点击组件置顶(zCounter,编辑/非编辑模式均可)。
-- 布局持久化 localStorage `ihomy:dashboard:layout:v2`(版本号升级,旧 v1 布局弃用)。
+- 布局持久化 localStorage `ihomy:dashboard:layout:v3`(V9.63 版本号升级,旧 v1/v2 栅格布局弃用)。
 - **默认布局 9 组件(V9.53)**:feed(4×5)/weather(3×3)/anni(3×3)/today(3×2)/album(4×4)/search(4×5)/recipe(2×2)/wish(2×2)/finance(2×2);task 由侧边栏拖入;**删除「背景音乐」格子**(与悬浮黑胶播放器冗余)。
 - 相册组件照片可溢出边界(`overflow: visible`,z-index:40)。
 
@@ -481,6 +478,9 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 - **签名元素**:「会呼吸的窗」——窗框阴影 + 光柱(尘粒随日光缓漫)+ 天气 AI 生图全屏氛围底图(最底层,压 SunLightLayer 之下)。
 - **侧栏用户信息(V9.61)**:侧栏 `<nav>` 前 `.gc-user` 块(38px 头像 `el-avatar` + 昵称 13.5px/600 + 家庭名 11.5px 弱文字),头像无图时 `--color-green` 底 + 昵称首字,点击进 `/settings`。
 - **晨暮切换扫光(V9.62)**:光尘内晨↔暮切换不再整体 1s 渐变,改「从一侧柔和扫向另一侧」——暗色(晨→暮)沿垂直于光束方向扫过,上午~正午向右上、下午向左上、正午纯水平向右、夜晚默认水平,暮→晨反向;实现为克隆旧主题整页 DOM 为幕布 `.theme-sweep-old` + 方向性柔和 `mask` 蒙版划动(边界两侧真实晨/暮渲染,交界 ±8% 渐变条,`@property --sweep-p` 过渡 **1700ms**),划动期间 `html.theme-sweeping` 禁容器级颜色过渡;克隆内 `.theme-sweep-old :is(...){color:var(--color-text)!important}` 防 `html.dark` 硬编码浅色字泄漏。
+- **晨暮分段滑块(V9.63)**:晨/暮分段开关改「滑块 thumb」——`.gc-seg-thumb` 绝对定位盖在选中按钮下,`segMode` 本地 ref 跟随选中态;扫光结束后才更新滑块位置(`waitSweepEnd`),首次定位关过渡、ResizeObserver 跟随语言切换按钮宽度变化;选中文案 `--color-card`、thumb `--color-brand`、hover `--color-brand-hover`。
+- **天气背景待机浮现(V9.63)**:鼠标停在「背景板」静止 ≥3s 后天气 AI 底图 `.gc-weatherbg.revealed` 浮到最前(z-index 30、opacity 1,`pointer-events:none` 不挡交互),移动鼠标即恢复原状。
+- **光尘首页组件化(V9.63)**:`GuangchenHome` 硬编码卡片改组件注册表——9 富组件(weather/feed/photos/anni/finance/item/task/wish/reminder)+ 20 模块入口(未映射富组件的模块落为「快捷入口」卡片);OWNER 编辑模式(复用 `appStore.homeEditMode`)可增删/拖拽排序/右下角调大小(列宽 4/6/8/12、行高 2/3/4/6)/托盘添加,布局持久化 `ihomy:guangchen:home:v2`;内容丰富度按「行数 row + 列宽 span」两维推导(`vTier`/`hTier` → S/M/L/XL);侧栏模块编辑态可拖入首页。
 
 ## 19. 性能规范(已踩坑)
 
