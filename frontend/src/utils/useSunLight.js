@@ -6,6 +6,7 @@ import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { gsap } from 'gsap'
 import { getSunScene, currentSlotIndex } from '@/utils/windowLight'
 import { applyAutoTheme } from '@/theme'
+import request from '@/api/request'
 
 // provide/inject key(确保 App.vue 与 SunLightLayer/AppSidebar 共享同一状态)
 export const SUN_LIGHT_KEY = Symbol('sunLight')
@@ -330,29 +331,23 @@ export function useSunLight() {
 
   const loadSunInfo = async () => {
     try {
-      const res = await fetch('/api/public/sun-info')
-      if (res.ok) {
-        const json = await res.json()
-        if (json.code === 0 && json.data) {
-          sunInfo.value = json.data
-          slotIdx.value = currentSlotIndex()
-          sunScene.value = getSunScene(json.data, slotIdx.value)
-          applyAutoTheme(sunScene.value.isNight)
-        }
+      const data = await request.get('/public/sun-info')
+      if (data) {
+        sunInfo.value = data
+        slotIdx.value = currentSlotIndex()
+        sunScene.value = getSunScene(data, slotIdx.value)
+        applyAutoTheme(sunScene.value.isNight)
       }
     } catch (e) {}
   }
 
   const loadSunInfoForDate = async (dateStr) => {
     try {
-      const res = await fetch('/api/public/sun-info?date=' + dateStr)
-      if (res.ok) {
-        const json = await res.json()
-        if (json.code === 0 && json.data) {
-          sunInfo.value = json.data
-          sunScene.value = getSunScene(json.data, slotIdx.value)
-          applyAutoTheme(sunScene.value.isNight)
-        }
+      const data = await request.get('/public/sun-info', { params: { date: dateStr } })
+      if (data) {
+        sunInfo.value = data
+        sunScene.value = getSunScene(data, slotIdx.value)
+        applyAutoTheme(sunScene.value.isNight)
       }
     } catch (e) {}
   }
@@ -361,15 +356,13 @@ export function useSunLight() {
   const loadWeather = async () => {
     loadWeatherDetail() // 详情(预警+今日高低温)与简版天气并行,供侧边栏迷你天气/首页天气卡片
     try {
-      const res = await fetch('/api/public/weather')
-      if (!res.ok) return
-      const json = await res.json()
-      if (json.code === 0 && json.data) {
-        weather.value = json.data
+      const data = await request.get('/public/weather')
+      if (data) {
+        weather.value = data
         if (!lightTestMode.value && weatherEffectEnabled.value) {
-          const cond = json.data.condition
+          const cond = data.condition
           if (['rain', 'snow', 'cloud', 'thunder', 'fog'].includes(cond)) {
-            setWeather(cond, json.data.precipLevel || 1)
+            setWeather(cond, data.precipLevel || 1)
           } else {
             setWeather('clear', 0)
           }
@@ -383,10 +376,8 @@ export function useSunLight() {
   // 拉取天气详情(now/7d/24h/预警/空气/指数;后端 Redis 缓存 30 分钟,失败静默)
   const loadWeatherDetail = async () => {
     try {
-      const res = await fetch('/api/public/weather/detail')
-      if (!res.ok) return
-      const json = await res.json()
-      if (json.code === 0 && json.data) weatherDetail.value = json.data
+      const data = await request.get('/public/weather/detail')
+      if (data) weatherDetail.value = data
     } catch (e) {}
   }
 

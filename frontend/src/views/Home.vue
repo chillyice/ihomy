@@ -24,7 +24,7 @@
       <div
         :ref="el => setCardEl(w.uid, el)"
         class="dash-card"
-        :class="[w.id, { 'edit-active': editMode, dragging: w._dragging, 'h-1': w.h === 1, 'is-hovered': hoverExpands && hoverUid === w.uid, 'is-neighbor': isFullNeighbor(w), 'wave-hint': !editMode && displayTier(w) === 'S' && !hoverExpands }]"
+        :class="[w.id, { 'edit-active': editMode, dragging: w._dragging, 'h-1': w.h === 1, 'is-hovered': hoverExpands && hoverUid === w.uid, 'is-neighbor': isFullNeighbor(w) }]"
         :style="cardBoxStyle(w)"
         @mouseenter="onCardEnter(w)"
         @mouseleave="onCardLeave"
@@ -34,10 +34,10 @@
         <button v-if="editMode" class="del-btn" @click.stop="removeWidget(w)">✕</button>
         <div v-if="editMode" class="resize-corner" @mousedown.stop="onResizeStart($event, w)"></div>
 
-        <!-- 邻居胶囊:仅「全盖」级邻居缩成图标+标题(部分盖→降档显示内容,擦边→轻微缩小) -->
-        <div v-if="isFullNeighbor(w)" class="neighbor-capsule">
+        <!-- 邻居胶囊:全盖级邻居原位缩成图标+文字;若仍重叠则进一步缩成纯图标小圆角矩形(部分盖→降档,擦边→轻微缩小) -->
+        <div v-if="isFullNeighbor(w)" class="neighbor-capsule" :class="{ 'nc-icon-only': neighborIconOnly(w) }">
           <span class="nc-icon">{{ WIDGET_ICONS[w.id] || '' }}</span>
-          <span class="nc-label">{{ WIDGET_LABELS[w.id] }}</span>
+          <span v-if="!neighborIconOnly(w)" class="nc-label">{{ WIDGET_LABELS[w.id] }}</span>
         </div>
 
         <div class="card-inner">
@@ -90,7 +90,7 @@
             </div>
           </template>
 
-          <!-- 天气:AI 生图底图(中档以上)+ 图标/温度/高低温/文字 + 预报;点击进入天气详情页 -->
+          <!-- 天气:AI 生图底图(巨大档)+ 图标/温度/高低温/文字;巨大档追加「未来三天 + 湿度/风力/PM2.5」;点击进天气详情页 -->
           <template v-else-if="w.id === 'weather'">
             <div v-if="tierOf(w) === 'XL'" class="weather-bg">
               <div v-if="weatherBg" class="weather-bg-img" :style="{ backgroundImage: `url(${weatherBg})` }"></div>
@@ -109,8 +109,15 @@
                   </span>
                 </div>
                 <div v-if="tierOf(w) !== 'S'" class="weather-condition">{{ weatherText }}</div>
+                <!-- 巨大档:湿度/风力/PM2.5 关键指标(非巨大档不展示,避免同质化数据堆叠) -->
+                <div v-if="tierOf(w) === 'XL'" class="weather-metrics">
+                  <div class="wm-cell"><span class="wm-k">湿度</span><span class="wm-v">{{ humidityText }}</span></div>
+                  <div class="wm-cell"><span class="wm-k">风力</span><span class="wm-v">{{ windText }}</span></div>
+                  <div class="wm-cell"><span class="wm-k">PM2.5</span><span class="wm-v">{{ pm25Text }}</span></div>
+                </div>
+                <!-- 预报:巨大档「未来三天」(不含今天,避免与顶部实况重复);大档「3 天」 -->
                 <div v-if="showForecast(w)" class="weather-forecast">
-                  <div v-for="d in (weatherDetail?.daily || []).slice(0, nForecast(w))" :key="d.fxDate" class="wf-row">
+                  <div v-for="d in forecastDays(w)" :key="d.fxDate" class="wf-row">
                     <span class="wf-date">{{ fmtForecastDate(d.fxDate) }}</span>
                     <i :class="'qi-' + (d.iconDay || '')" class="wf-icon"></i>
                     <span class="wf-range">{{ d.tempMin }}°~{{ d.tempMax }}°</span>
@@ -285,11 +292,19 @@ let ctx
 const editMode = computed(() => appStore.homeEditMode)
 const finishEdit = () => { appStore.toggleHomeEditMode() }
 // 进入编辑模式清除入场动画残留:GSAP from 的中间态 transform 在 tween 被中断(DOM 重建等)后会永久
-// 残留在组件上,使组件偏离栅格线;编辑态语义是精确对齐,进场先 kill 动画并清掉非 Vue 管理的 inline 样式
+// 残留在组件上,使组件偏离栅格线;编辑态语义是精确对齐,进场先 kill 动画并清掉非 Vue 管理的 inline 样式。
+// hover 放大现在走真实尺寸(left/top/width/height),进场也要把这些立即复位回基础网格
 watch(editMode, (on) => {
   if (!on) return
   gsap.killTweensOf('.dash-card')
   gsap.set('.dash-card', { clearProps: 'transform,opacity,visibility' })
+  clearHover()
+  for (const w of visibleWidgets.value) {
+    const el = cardEls[w.uid]
+    if (!el) continue
+    const r = cardRectPx(w)
+    gsap.set(el, { left: r.left, top: r.top, width: r.width, height: r.height })
+  }
 })
 
 // ========== 栅格尺寸:自适应屏幕分辨率 ==========
@@ -545,8 +560,16 @@ const nRecipe = (w) => ({ S: 1, M: 2, L: 4, XL: 6 }[tierOf(w)] ?? 2)
 const nWish = (w) => ({ S: 2, M: 5, L: 8, XL: 50 }[tierOf(w)] ?? 5)
 // 热搜/今日待办/收支明细等大档才出现的功能
 const showForecast = (w) => tierOf(w) === 'L' || tierOf(w) === 'XL'
-const nForecast = (w) => (tierOf(w) === 'XL' ? 7 : 3)
+// 预报天数:巨大档「未来三天」(不含今天,避免与顶部实况重复);大档「3 天」(含今天)
+const forecastDays = (w) => {
+  const daily = weatherDetail.value?.daily || []
+  return tierOf(w) === 'XL' ? daily.slice(1, 4) : daily.slice(0, 3)
+}
 const fmtForecastDate = (d) => { const dt = new Date(d); return `${dt.getMonth() + 1}月${dt.getDate()}日` }
+// 巨大档关键指标(湿度/风力/PM2.5;缺数据显示 —)
+const humidityText = computed(() => { const h = weatherDetail.value?.nowFull?.humidity; return h != null ? `${h}%` : '—' })
+const windText = computed(() => { const f = weatherDetail.value?.nowFull; if (!f) return '—'; const dir = f.windDir || ''; const scale = f.windScale != null ? `${f.windScale} 级` : ''; return (dir || scale) ? `${dir} ${scale}`.trim() : '—' })
+const pm25Text = computed(() => { const p = weatherDetail.value?.air?.pm2p5; return p != null ? `${p}` : '—' })
 const loadLayout = () => {
   try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) return JSON.parse(raw) } catch (e) {}
   return null
@@ -588,8 +611,8 @@ const hoverScale = (hw) => {
   if (hw.id === 'weather') return displayTier(hw) === 'XL' ? 1 : Math.max(1, WEATHER_HERO / Math.max(hw.w, hw.h))
   return ({ S: 1.5, M: 4 / 3, L: 1, XL: 1 }[displayTier(hw)] ?? 1)
 }
-// 放大后组件的视觉矩形(格坐标):中心缩放理想矩形 clamp 进栅格(边缘组件向内收),
-// 并反推 transform-origin(相对原组件尺寸的 0-1 比例)使 scale 视觉与矩形一致
+// 放大后组件的视觉矩形(格坐标):中心缩放理想矩形 clamp 进栅格(边缘组件向内收)。
+// 被 hover 的卡片用该矩形做真实尺寸增长(见 cardBoxStyle),邻居按该矩形判断覆盖/推挤
 const hoverRect = (h) => {
   const sc = hoverScale(h)
   const w = h.w * sc
@@ -598,9 +621,7 @@ const hoverRect = (h) => {
   const idealTop = h.row + h.h / 2 - hgt / 2
   const left = Math.min(Math.max(idealLeft, 0), Math.max(0, COLS - w))
   const top = Math.min(Math.max(idealTop, 0), Math.max(0, ROWS - hgt))
-  const originX = sc > 1 ? (h.col - left) / (h.w * (sc - 1)) : 0.5
-  const originY = sc > 1 ? (h.row - top) / (h.h * (sc - 1)) : 0.5
-  return { left, top, w, hgt, originX, originY }
+  return { left, top, w, hgt }
 }
 // 判断邻居 n 是否被放大后的组件 h 影响:与 clamp 后的放大矩形(格坐标)相交即受影响
 const hoverAffects = (h, n) => {
@@ -615,8 +636,8 @@ const hoverAffects = (h, n) => {
 const NEIGHBOR_FULL = 0.7
 const NEIGHBOR_PARTIAL = 0.3
 const NEIGHBOR_SCALE_FULL = 0.55
+const NEIGHBOR_SCALE_ICON = 0.32 // 胶囊缩小后仍与放大矩形重叠时,进一步缩成纯图标小圆角矩形
 const NEIGHBOR_SCALE_GRAZE = 0.85
-const NEIGHBOR_PUSH_BUFFER = 6 // 最小推挤位移后的缓冲(px),确保邻居有可见移动
 // 放大矩形盖住邻居 n 的面积占比(0~1)
 const hoverCoverage = (h, n) => {
   const r = hoverRect(h)
@@ -643,6 +664,14 @@ const neighborLevelOf = (w) => {
 }
 const isFullNeighbor = (w) => neighborLevelOf(w) === 'full'
 const isPartialNeighbor = (w) => neighborLevelOf(w) === 'partial'
+// full 邻居缩成胶囊后仍被覆盖 → 纯图标小圆角矩形态(模板据此隐藏文字)
+const neighborIconOnly = (w) => {
+  if (!HOVER_CAPABLE || editMode.value || !hoverExpands.value || hoverUid.value === w.uid) return false
+  const hovered = widgets.value.find(x => x.uid === hoverUid.value)
+  if (!hovered || !hoverAffects(hovered, w)) return false
+  if (neighborLevel(hovered, w) !== 'full') return false
+  return stillOverlapsAfter(hovered, w, NEIGHBOR_SCALE_FULL)
+}
 
 // 生效档位:被 hover 的组件临时升一档;被部分盖的邻居临时降一档(内容随之少一些,全盖邻居缩成胶囊);其余保持基础档
 const TIER_UP = { S: 'M', M: 'L' }
@@ -696,43 +725,62 @@ const hoverRectPx = (h) => {
   const height = r.hgt * ch + (r.hgt - 1) * GAP
   return { left, top, width, height, cx: left + width / 2, cy: top + height / 2 }
 }
-// 最小推挤位移:沿「远离放大中心」方向,把缩放后的邻居推到与放大矩形刚好不相交 + 缓冲
-const hoverPush = (hovered, n, scale) => {
+// 原位缩放到 scale 后是否仍与放大矩形重叠(不移位,以邻居中心为锚点缩)
+const stillOverlapsAfter = (hovered, n, scale) => {
+  const R = hoverRectPx(hovered)
+  const N = cardRectPx(n)
+  const nW = N.width * scale, nH = N.height * scale
+  const nL = N.cx - nW / 2, nR = N.cx + nW / 2
+  const nT = N.cy - nH / 2, nB = N.cy + nH / 2
+  return nL < R.left + R.width && nR > R.left && nT < R.top + R.height && nB > R.top
+}
+// 邻居缩放的 transform-origin:锚定在「天气中心→邻居中心」射线在邻居远边界上的出射点——
+// 连续点位(边的任意位置,不限于中点/角),使邻居向该点退缩、近边被拉开
+const neighborOrigin = (hovered, n) => {
   const R = hoverRectPx(hovered)
   const N = cardRectPx(n)
   const dx = N.cx - R.cx, dy = N.cy - R.cy
-  const len = Math.hypot(dx, dy) || 1
-  const ux = dx / len, uy = dy / len
-  const rHalf = (R.width / 2) * Math.abs(ux) + (R.height / 2) * Math.abs(uy)
-  const nHalf = (N.width / 2 * scale) * Math.abs(ux) + (N.height / 2 * scale) * Math.abs(uy)
-  const push = Math.max(0, rHalf + nHalf - len) + NEIGHBOR_PUSH_BUFFER
-  return { x: ux * push, y: uy * push }
+  if (dx === 0 && dy === 0) return '50% 50%'
+  const halfW = N.width / 2, halfH = N.height / 2
+  const tx = dx === 0 ? Infinity : halfW / Math.abs(dx)
+  const ty = dy === 0 ? Infinity : halfH / Math.abs(dy)
+  const t = Math.min(tx, ty)
+  const px = N.cx + dx * t
+  const py = N.cy + dy * t
+  const ox = ((px - N.left) / N.width) * 100
+  const oy = ((py - N.top) / N.height) * 100
+  return `${ox.toFixed(2)}% ${oy.toFixed(2)}%`
 }
-// GSAP 动效目标(纯 transform,不真实重排):hover 卡片放大,邻居推挤/缩放
-const hoverTarget = (w) => {
+// 邻居 GSAP 动效目标(纯 transform,不移位):被 hover 的卡片由 applyHoverTweens 做真实尺寸增长,不缩放字号
+const neighborTarget = (w) => {
   if (editMode.value || !HOVER_CAPABLE || !hoverExpands.value) return null
-  if (hoverUid.value === w.uid) {
-    const sc = hoverScale(w)
-    if (sc <= 1) return null
-    const r = hoverRect(w)
-    return { x: 0, y: 0, scale: sc, origin: `${(r.originX * 100).toFixed(1)}% ${(r.originY * 100).toFixed(1)}%`, z: 80 }
-  }
+  if (hoverUid.value === w.uid) return null
   const hovered = widgets.value.find(x => x.uid === hoverUid.value)
   if (!hovered || !hoverAffects(hovered, w)) return null
   const level = neighborLevel(hovered, w)
-  if (level === 'graze') return { x: 0, y: 0, scale: NEIGHBOR_SCALE_GRAZE, origin: '50% 50%', z: 10 }
-  if (level === 'partial') { const p = hoverPush(hovered, w, downScaleOf(w)); return { x: p.x, y: p.y, scale: downScaleOf(w), origin: '50% 50%', z: 10 } }
-  const p = hoverPush(hovered, w, NEIGHBOR_SCALE_FULL); return { x: p.x, y: p.y, scale: NEIGHBOR_SCALE_FULL, origin: '50% 50%', z: 10 }
+  if (level === 'graze') return { x: 0, y: 0, scale: NEIGHBOR_SCALE_GRAZE, origin: neighborOrigin(hovered, w) }
+  // partial:原位降档缩小(不移位),内容少显示一些
+  if (level === 'partial') return { x: 0, y: 0, scale: downScaleOf(w), origin: neighborOrigin(hovered, w) }
+  // full:原位缩成胶囊(图标+文字);若缩小后仍与放大矩形重叠,进一步缩成纯图标小圆角矩形(仍不移位)
+  const iconOnly = stillOverlapsAfter(hovered, w, NEIGHBOR_SCALE_FULL)
+  return { x: 0, y: 0, scale: iconOnly ? NEIGHBOR_SCALE_ICON : NEIGHBOR_SCALE_FULL, origin: neighborOrigin(hovered, w) }
 }
-// 仅 z-index(非动画,进 cardBoxStyle 响应式样式;transform 由 GSAP 接管)
-const hoverZ = (w) => { const t = hoverTarget(w); return t ? t.z : null }
+// 仅 z-index(非动画,进 cardBoxStyle 响应式样式):被 hover 的卡片 80,邻居 10
+const hoverZ = (w) => {
+  if (!HOVER_CAPABLE || editMode.value || !hoverExpands.value) return null
+  if (hoverUid.value === w.uid) return 80
+  const hovered = widgets.value.find(x => x.uid === hoverUid.value)
+  if (!hovered || !hoverAffects(hovered, w)) return null
+  return 10
+}
 const cardBoxStyle = (w) => {
+  // 基础位置 + z-index(被 hover 卡片 80 / 邻居 10);真实尺寸增长由 applyHoverTweens 用 GSAP 接管,不缩放字号
   const s = cardStyle(w)
   const hz = hoverZ(w)
   if (hz) s.zIndex = hz
   return s
 }
-// ---- GSAP 弹性动效接管 transform:进入 back.out(回弹)/ 邻居 elastic.out(水波);离开反向回弹复原 ----
+// ---- GSAP 弹性动效:被 hover 卡片真实尺寸增长 + 邻居 transform 推挤/缩放,统一 elastic.out(回弹/水波) ----
 const cardEls = {}
 const setCardEl = (uid, el) => { if (el) cardEls[uid] = el; else delete cardEls[uid] }
 const applyHoverTweens = () => {
@@ -740,13 +788,17 @@ const applyHoverTweens = () => {
   for (const w of visibleWidgets.value) {
     const el = cardEls[w.uid]
     if (!el) continue
-    const t = hoverTarget(w)
-    const hero = w.id === 'weather'
-    if (t) {
-      gsap.to(el, { x: t.x, y: t.y, scale: t.scale, transformOrigin: t.origin, duration: 0.7, ease: hero ? 'back.out(1.4)' : 'elastic.out(1, 0.5)' })
-    } else {
-      gsap.to(el, { x: 0, y: 0, scale: 1, transformOrigin: '50% 50%', duration: 0.6, ease: hero ? 'back.out(1.2)' : 'elastic.out(1, 0.5)' })
+    const isHovered = hoverExpands.value && hoverUid.value === w.uid && !editMode.value
+    const nt = neighborTarget(w)
+    // 真实尺寸目标:被 hover 卡片扩到放大矩形(不缩放字号),其余回到基础矩形(离开 hover 时复原)
+    const rect = isHovered ? hoverRectPx(w) : cardRectPx(w)
+    const vars = {
+      left: rect.left, top: rect.top, width: rect.width, height: rect.height,
+      x: nt ? nt.x : 0, y: nt ? nt.y : 0, scale: nt ? nt.scale : 1,
+      duration: 0.7, ease: 'elastic.out(1, 0.5)',
     }
+    if (nt) vars.transformOrigin = nt.origin // 邻居缩放锚点;复位时不改 origin,沿用当前避免缩放基准点跳变
+    gsap.to(el, vars)
   }
 }
 watch([hoverUid, hoverExpands, editMode], () => { nextTick(applyHoverTweens) })
@@ -779,6 +831,16 @@ const timeOfDayLabel = () => {
   if (h < 17) return '下午'
   if (h < 19) return '傍晚'
   return '夜晚'
+}
+// 落库文件名:城市-日期-上下午-时间(如 济南-2026-09-13-下午-17:30,冒号由后端落盘时归一为 _)
+const weatherImageName = () => {
+  const d = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  const city = weather.value?.city || '未知城市'
+  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  const ampm = d.getHours() < 12 ? '上午' : '下午'
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return `${city}-${date}-${ampm}-${time}`
 }
 // 风格/地点随机池:风格不固定(摄影/手绘/油画…),地点不固定(突出天气氛围,弱化地标)
 const WEATHER_STYLES = ['电影感摄影', '水彩手绘', '油画', '极简插画', '复古胶片', '日系动漫', '水墨淡彩']
@@ -819,7 +881,7 @@ const loadWeatherBg = () => {
       if (url) {
         weatherBg.value = url
         try { const c = JSON.parse(localStorage.getItem(WEATHER_BG_CACHE) || '{}'); c[key] = { url, ts: Date.now() }; localStorage.setItem(WEATHER_BG_CACHE, JSON.stringify(c)) } catch {}
-        saveWeatherBgToAlbum(url) // AI 生图落库到家庭相册,不阻塞背景显示
+        saveWeatherBgToAlbum(url, prompt) // AI 生图落库到家庭相册,不阻塞背景显示
       }
     } catch (e) { /* 无模型/出错回落渐变+毛玻璃 */ }
     finally { weatherBgLoading.value = false }
@@ -846,13 +908,13 @@ const ensureWeatherAlbum = () => {
   })()
   return weatherAlbumPromise
 }
-const saveWeatherBgToAlbum = async (imgUrl) => {
+const saveWeatherBgToAlbum = async (imgUrl, prompt) => {
   try {
     const albumId = await ensureWeatherAlbum()
     if (!albumId || !imgUrl) return
     // 网络图走后端下载落库,避免浏览器跨域 fetch 拦截;data: 由后端解码
     if (/^https?:\/\//i.test(imgUrl) || /^data:/i.test(imgUrl)) {
-      await photoApi.saveFromUrl(albumId, { url: imgUrl })
+      await photoApi.saveFromUrl(albumId, { url: imgUrl, name: weatherImageName(), description: prompt || '' })
     }
   } catch (e) { /* 相册保存失败静默(仅影响 AI 图归档,不影响背景展示) */ }
 }
@@ -1233,6 +1295,12 @@ html.dark .weather-main { background: rgba(var(--color-card-rgb),0.58); border-c
 .wh-hi { color: #c07a4a; }
 .wh-lo { color: #6a8ab0; }
 .weather-condition { font-size: 14px; opacity: 0.7; font-weight: 500; }
+/* 巨大档关键指标(湿度/风力/PM2.5) */
+.weather-metrics { margin-top: 10px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.wm-cell { background: rgba(255,255,255,0.42); border-radius: 8px; padding: 6px 4px; display: flex; flex-direction: column; gap: 2px; }
+html.dark .wm-cell { background: rgba(255,255,255,0.06); }
+.wm-k { font-size: 10px; opacity: 0.45; }
+.wm-v { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .weather-loading-text { font-size: 13px; opacity: 0.4; padding: 20px; }
 .weather-forecast { margin-top: 10px; display: flex; flex-direction: column; gap: 4px; text-align: left; }
 .wf-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 3px 6px; border-radius: 6px; }
@@ -1370,10 +1438,7 @@ html.dark .dash-card.is-hovered { box-shadow: 0 20px 52px rgba(0,0,0,0.4); }
 .neighbor-capsule { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; z-index: 5; }
 .neighbor-capsule .nc-icon { font-size: 20px; line-height: 1; }
 .neighbor-capsule .nc-label { font-size: 11px; font-weight: 600; opacity: 0.7; }
-/* 小档未展开时的波浪提示:引导 hover 查看更多(方案 §2.2) */
-.dash-card.wave-hint::after { content: 'hover 查看更多'; position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); font-size: 10px; opacity: 0; color: #a06a4e; animation: wavePulse 2.4s ease-in-out infinite; pointer-events: none; }
-html.dark .dash-card.wave-hint::after { color: var(--color-brand); }
-@keyframes wavePulse { 0%,100% { opacity: 0; transform: translateX(-50%) translateY(0); } 50% { opacity: 0.75; transform: translateX(-50%) translateY(-3px); } }
+.neighbor-capsule.nc-icon-only .nc-icon { font-size: 16px; }
 
 /* ===== P3 天气 AI 生图底图(渐变+毛玻璃兜底) ===== */
 .dash-card.weather .card-inner { position: relative; z-index: 1; }

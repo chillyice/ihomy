@@ -5,6 +5,12 @@ import request from '@/api/request'
 export const publicApi = {
   getHome: (homeId, hid) => request.get('/public/home', { params: { ...(hid ? { hid } : {}), ...(homeId ? { home_id: homeId } : {}) } }),
   getFeed: (limit = 10, homeId, hid) => request.get('/public/feed', { params: { limit, ...(hid ? { hid } : {}), ...(homeId ? { home_id: homeId } : {}) } }),
+  // 天气/太阳:虽为公开接口,但需携带 JWT 才能让后端按「家庭天气地域偏好」定位,
+  // 否则后端只能回退 IP 定位,设置里改地域不生效
+  getWeather: () => request.get('/public/weather'),
+  getWeatherDetail: () => request.get('/public/weather/detail'),
+  getSunInfo: (date) => request.get('/public/sun-info', { params: date ? { date } : {} }),
+  searchWeatherLocations: (keyword) => request.get('/public/weather/locations', { params: { keyword } }),
 }
 
 // 认证相关:图形验证码

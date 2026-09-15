@@ -190,6 +190,7 @@ import { useI18n } from 'vue-i18n'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import { warnLevelColor } from '@/utils/dict'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import { publicApi } from '@/api'
 
 const { t } = useI18n()
 const sunLight = inject(SUN_LIGHT_KEY, null)
@@ -334,13 +335,10 @@ const load = async () => {
   if (sunLight?.weatherDetail?.value) detail.value = sunLight.weatherDetail.value
   loading.value = true
   try {
-    const res = await fetch('/api/public/weather/detail')
-    if (res.ok) {
-      const json = await res.json()
-      if (json.code === 0 && json.data) {
-        detail.value = json.data
-        if (sunLight?.weatherDetail) sunLight.weatherDetail.value = json.data
-      }
+    const data = await publicApi.getWeatherDetail()
+    if (data) {
+      detail.value = data
+      if (sunLight?.weatherDetail) sunLight.weatherDetail.value = data
     }
   } catch (e) {} finally {
     loading.value = false

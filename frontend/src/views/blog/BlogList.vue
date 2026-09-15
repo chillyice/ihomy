@@ -519,10 +519,6 @@ html.dark .side-add-btn { background: rgba(var(--color-brand-rgb),0.1); }
 html.dark .side-add-btn:hover { background: rgba(var(--color-brand-rgb),0.18); color: var(--color-brand); }
 
 .cat-list { flex: 1; overflow-y: auto; min-height: 0; }
-.cat-list::-webkit-scrollbar { width: 4px; }
-.cat-list::-webkit-scrollbar-track { background: transparent; }
-.cat-list::-webkit-scrollbar-thumb { background: rgba(58,46,34,0.12); border-radius: 2px; }
-html.dark .cat-list::-webkit-scrollbar-thumb { background: rgba(232,220,200,0.12); }
 
 .cat-item {
   padding: 8px 10px;

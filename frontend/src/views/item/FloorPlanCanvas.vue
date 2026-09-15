@@ -149,12 +149,36 @@
           <text :x="(calibLine.a.x + calibLine.b.x) / 2" :y="(calibLine.a.y + calibLine.b.y) / 2 - 8 / view.k" class="fp-calib-len"
                 :style="{ fontSize: 11 / view.k + 'px' }">{{ (Math.hypot(calibLine.b.x - calibLine.a.x, calibLine.b.y - calibLine.a.y) / (scale || 100)).toFixed(2) }} m</text>
         </g>
+        <!-- 尺子测量:第一点预览线(不可交互) + 已落测量线段(可拖端点吸附/拖整线平移,米数显示) -->
+        <g v-if="rulerFirst && tool === 'ruler'" class="fp-ruler">
+          <circle :cx="rulerFirst.x" :cy="rulerFirst.y" :r="3 / view.k" class="fp-ruler-dot" style="pointer-events: none" />
+          <line :x1="rulerFirst.x" :y1="rulerFirst.y" :x2="mousePos ? mousePos.x : rulerFirst.x" :y2="mousePos ? mousePos.y : rulerFirst.y" class="fp-ruler-line" style="pointer-events: none" />
+        </g>
+        <g v-for="(ml, i) in rulerLines" :key="ml.id" class="fp-ruler" :class="{ 'is-inactive': mode !== 'edit' || tool !== 'ruler' }">
+          <line :x1="ml.a.x" :y1="ml.a.y" :x2="ml.b.x" :y2="ml.b.y" class="fp-ruler-line" style="pointer-events: stroke" @pointerdown.stop="onRulerLineDown($event, i)" />
+          <circle :cx="ml.a.x" :cy="ml.a.y" :r="10 / view.k" fill="transparent" style="pointer-events: all" @pointerdown.stop="onRulerHandleDown($event, i, 'a')" />
+          <circle :cx="ml.a.x" :cy="ml.a.y" :r="5 / view.k" class="fp-ruler-dot fp-ruler-handle" vector-effect="non-scaling-stroke" @pointerdown.stop="onRulerHandleDown($event, i, 'a')" />
+          <circle :cx="ml.b.x" :cy="ml.b.y" :r="10 / view.k" fill="transparent" style="pointer-events: all" @pointerdown.stop="onRulerHandleDown($event, i, 'b')" />
+          <circle :cx="ml.b.x" :cy="ml.b.y" :r="5 / view.k" class="fp-ruler-dot fp-ruler-handle" vector-effect="non-scaling-stroke" @pointerdown.stop="onRulerHandleDown($event, i, 'b')" />
+          <text :x="(ml.a.x + ml.b.x) / 2" :y="(ml.a.y + ml.b.y) / 2 - 6 / view.k" class="fp-ruler-len" :style="{ fontSize: 11 / view.k + 'px' }">{{ fmtM(Math.hypot(ml.b.x - ml.a.x, ml.b.y - ml.a.y)) }} m</text>
+          <!-- 单条删除(仅编辑态+尺子工具;反缩放保持屏幕尺寸恒定) -->
+          <g v-if="mode === 'edit' && tool === 'ruler'" class="fp-ruler-del" :transform="`translate(${(ml.a.x + ml.b.x) / 2},${(ml.a.y + ml.b.y) / 2 + 12 / view.k}) scale(${1 / view.k})`" @pointerdown.stop="removeRuler(i)">
+            <circle r="8" />
+            <line x1="-3" y1="-3" x2="3" y2="3" />
+            <line x1="3" y1="-3" x2="-3" y2="3" />
+          </g>
+        </g>
       </g>
     </svg>
     <!-- 标定确认按钮:线段放置后显示,双击线段/端点或点此按钮确认输入长度 -->
     <div v-if="calibLine && tool === 'calibrate'" class="fp-calib-confirm" @click="confirmCalibrate">
       <svg viewBox="0 0 16 16" width="14" height="14"><path d="M3 8l3.5 3.5L13 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       {{ $t('item.calibrateConfirm') }}
+    </div>
+    <!-- 尺子清除按钮:有测量线段时显示,一键清除全部测量 -->
+    <div v-if="rulerLines.length && tool === 'ruler'" class="fp-ruler-clear" @click="clearRulerLines">
+      <svg viewBox="0 0 16 16" width="14" height="14"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      {{ $t('item.rulerClear') }}
     </div>
     <!-- 缩略图(迷你地图):右上角悬浮,可折叠成横条;拖拽手柄单击切换折叠/展开,拖动移动位置 -->
     <div
@@ -201,8 +225,9 @@ const props = defineProps({
   fitKey: { type: Number, default: 0 },
   showThumb: { type: Boolean, default: true },
   floorTransition: { type: Object, default: () => ({ direction: 'down', phase: '' }) },
+  rulers: { type: Array, default: () => [] },
 })
-const emit = defineEmits(['save-room', 'save-rooms', 'save-furniture', 'save-item', 'create-room', 'create-furniture', 'place-furniture', 'select-furniture', 'edit-furniture-items', 'calibrate', 'calibrate-confirm', 'edit-edge', 'delete-furniture', 'rename-room', 'rename-furniture', 'cut-room', 'glue-rooms', 'save-image-transform'])
+const emit = defineEmits(['save-room', 'save-rooms', 'save-furniture', 'save-item', 'create-room', 'create-furniture', 'place-furniture', 'select-furniture', 'edit-furniture-items', 'calibrate', 'calibrate-confirm', 'edit-edge', 'delete-furniture', 'rename-room', 'rename-furniture', 'cut-room', 'glue-rooms', 'save-image-transform', 'save-rulers'])
 
 const wrapRef = ref(null)
 const svgRef = ref(null)
@@ -214,6 +239,12 @@ const snapLine = ref(null)
 const calibPoints = ref([]) // 兼容:保留为空数组,标定走 calibLine
 const calibLine = ref(null) // { a:{x,y}, b:{x,y} } 持久标定线段(可拖端点)
 const calibFirst = ref(null) // 第一个点击点(尚未确定B时)
+const rulerLines = ref([]) // 尺子测量线段 [{id,a:{x,y},b:{x,y}}],同步自 props.rulers(持久)
+const rulerFirst = ref(null) // 尺子第一点(尚未落第二点,临时)
+// 持久尺子由父组件下发(props.rulers),画布内维护副本供拖拽;变更通过 save-rulers 回传
+watch(() => props.rulers, (rs) => {
+  rulerLines.value = (rs || []).map((r) => ({ id: r.id, a: { ...r.a }, b: { ...r.b } }))
+}, { immediate: true, deep: true })
 let justDragged = false
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
@@ -868,6 +899,12 @@ const focusItem = (id) => {
   if (r && r.poly.length >= 3) { focusPoint(r.cx, r.cy); return }
   scheduleFit()
 }
+// 定位到尺子:居中到线段中点
+const focusRuler = (id) => {
+  const r = rulerLines.value.find((x) => x.id === id)
+  if (!r) return
+  focusPoint((r.a.x + r.b.x) / 2, (r.a.y + r.b.y) / 2)
+}
 
 const rebuildRoomMeta = (r) => {
   const poly = r.poly
@@ -1065,6 +1102,12 @@ const onPointerMove = (e) => {
     const ba = detectBoundary(roomsLocal.value, na, { th: 12 / view.value.k })
     const bb = detectBoundary(roomsLocal.value, nb, { th: 12 / view.value.k })
     calibLine.value = { a: ba ? ba.point : na, b: bb ? bb.point : nb }
+  } else if (d.type === 'ruler-handle') {
+    rulerLines.value[d.i][d.which] = snapMeasurePoint(p)
+  } else if (d.type === 'ruler-line') {
+    const dx = p.x - d.startX; const dy = p.y - d.startY
+    rulerLines.value[d.i].a = snapMeasurePoint({ x: d.origA.x + dx, y: d.origA.y + dy })
+    rulerLines.value[d.i].b = snapMeasurePoint({ x: d.origB.x + dx, y: d.origB.y + dy })
   }
 }
 
@@ -1109,6 +1152,8 @@ const onPointerUp = (e) => {
       emit('create-room', JSON.stringify([{ x: r.x, y: r.y }, { x: r.x + r.w, y: r.y }, { x: r.x + r.w, y: r.y + r.h }, { x: r.x, y: r.y + r.h }]))
     }
     drawing.value.rect = null
+  } else if (d.type === 'ruler-handle' || d.type === 'ruler-line') {
+    commitRulers()
   }
   drag.value = null
   snapLine.value = null
@@ -1205,7 +1250,9 @@ const onCanvasClick = () => {
   hover.value = null
 }
 // 切换工具清 hover 残留(避免残留 guard 吞掉画图点击)+ 清裁剪/粘合进行中状态
-watch(() => props.tool, () => { hover.value = null; cutStart.value = null; glueStart.value = null; clearCalibLine() })
+watch(() => props.tool, () => { hover.value = null; cutStart.value = null; glueStart.value = null; clearCalibLine(); cancelRulerPending() })
+// 离开编辑态只取消未落第二点的进行中测量,已保存的尺子保留(查看态继续展示)
+watch(() => props.mode, (m) => { if (m !== 'edit') cancelRulerPending() })
 
 // ---- 裁剪(cut)/ 粘合(glue) ----
 const mousePos = ref(null)
@@ -1343,7 +1390,7 @@ const onGlueClick = () => {
     glueStart.value = null
   }
 }
-const cancelPending = () => { cutStart.value = null; glueStart.value = null; clearCalibLine() }
+const cancelPending = () => { cutStart.value = null; glueStart.value = null; clearCalibLine(); cancelRulerPending() }
 
 // 右键:编辑态裁剪/粘合取消已选的起点;浏览模式保留浏览器原生菜单
 const onContextMenu = (e) => {
@@ -1353,7 +1400,7 @@ const onContextMenu = (e) => {
 }
 
 // 画图类工具(十字光标);编辑态其余工具默认箭头,拖动中统一四向箭头
-const drawingTool = computed(() => props.tool === 'draw-rect' || props.tool === 'draw-poly' || props.tool === 'calibrate')
+const drawingTool = computed(() => props.tool === 'draw-rect' || props.tool === 'draw-poly' || props.tool === 'calibrate' || props.tool === 'ruler')
 
 // 楼层切换动画 class
 const svgTransitionClass = computed(() => {
@@ -1381,6 +1428,7 @@ const iconAsCursor = computed(() => {
 // 工具分发:非 select 工具时点击任何元素(房间/家具/物品/手柄)都落到画布层,不被挡住吞点
 const routeTool = (e) => {
   if (props.tool === 'calibrate') { handleCalibrateClick(e); return true }
+  if (props.tool === 'ruler') { handleRulerClick(e); return true }
   if (props.tool === 'draw-rect') { startDrawRect(e); return true }
   if (props.tool === 'draw-poly') { drawPolyPoint(e); return true }
   if (props.tool === 'cut' || props.tool === 'glue') return true // 专属 click 流程,不启动拖拽
@@ -1614,6 +1662,61 @@ const confirmCalibrate = () => {
   calibLine.value = null
 }
 const clearCalibLine = () => { calibLine.value = null; calibFirst.value = null }
+
+// ---- 尺子(测量两点距离,吸附房间边角/家具角点,可连续测多次;持久化由父组件保存) ----
+const genRulerId = () => 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
+// 提交当前尺子列表给父组件持久化
+const commitRulers = () => {
+  emit('save-rulers', rulerLines.value.map((r) => ({ id: r.id, a: { ...r.a }, b: { ...r.b } })))
+}
+// 取消未落第二点的进行中状态(不删除已保存的尺子)
+const cancelRulerPending = () => { rulerFirst.value = null }
+// 清空本层全部尺子并提交(持久删除)
+const clearRulerLines = () => { rulerLines.value = []; rulerFirst.value = null; commitRulers() }
+// 删除单条尺子并提交
+const removeRuler = (i) => { rulerLines.value.splice(i, 1); commitRulers() }
+// 落点吸附:房间边界(顶点/边投影)优先,家具角点次之;阈值内无命中则用原始点
+const snapMeasurePoint = (p) => {
+  const TH = 12 / view.value.k
+  const b = detectBoundary(roomsLocal.value, p, { th: TH })
+  let best = b ? b.point : null
+  let bestDist = best ? Math.hypot(p.x - best.x, p.y - best.y) : TH
+  for (const f of placedFurnitures.value) {
+    for (const c of rectCorners(f)) {
+      const d = Math.hypot(p.x - c.x, p.y - c.y)
+      if (d < bestDist) { bestDist = d; best = c }
+    }
+  }
+  return best || p
+}
+const handleRulerClick = (e) => {
+  const p = snapMeasurePoint(toCanvas(e))
+  if (!rulerFirst.value) {
+    rulerFirst.value = { ...p }
+  } else {
+    // 两点几乎重合(误双击)则忽略,视为重新开始
+    if (Math.hypot(p.x - rulerFirst.value.x, p.y - rulerFirst.value.y) < 2) { rulerFirst.value = null; return }
+    rulerLines.value.push({ id: genRulerId(), a: { ...rulerFirst.value }, b: { ...p } })
+    rulerFirst.value = null
+    commitRulers()
+  }
+  e.preventDefault()
+}
+// 拖端点(吸附房间边角/家具角点)
+const onRulerHandleDown = (e, i, which) => {
+  if (e.button !== 0) { beginDrag(e, { type: 'pan' }); return } // 右键拖动一律平移画布
+  if (!rulerLines.value[i]) return
+  e.stopPropagation()
+  beginDrag(e, { type: 'ruler-handle', i, which })
+}
+// 拖整条测量线(整体平移,两端各自吸附)
+const onRulerLineDown = (e, i) => {
+  if (e.button !== 0) { beginDrag(e, { type: 'pan' }); return }
+  if (!rulerLines.value[i]) return
+  e.stopPropagation()
+  const ln = rulerLines.value[i]
+  beginDrag(e, { type: 'ruler-line', i, origA: { ...ln.a }, origB: { ...ln.b }, startX: toCanvas(e).x, startY: toCanvas(e).y })
+}
 const onCalibHandleDown = (e, which) => {
   if (e.button !== 0) { beginDrag(e, { type: 'pan' }); return } // 右键拖动一律平移画布
   if (!calibLine.value) return
@@ -1634,6 +1737,7 @@ const onSvgDown = (e) => {
   if (e.button !== 0) { beginDrag(e, { type: 'pan' }); return }
   if (e.target !== e.currentTarget) return
   if (props.tool === 'calibrate') { handleCalibrateClick(e); return }
+  if (props.tool === 'ruler') { handleRulerClick(e); return }
   if (props.tool === 'draw-rect') { startDrawRect(e); return }
   if (props.tool === 'draw-poly') { drawPolyPoint(e); return }
   // 裁剪/粘合:贴边(有 hover)时让位给点击落点,空白处仍可拖拽平移
@@ -1712,7 +1816,7 @@ onMounted(() => {
 })
 onBeforeUnmount(() => { stopFocusTween(); detach(); onThumbDragEnd(); if (resizeObserver) resizeObserver.disconnect() })
 
-defineExpose({ finishPoly, fit, cancelPending, focusPoint, focusItem })
+defineExpose({ finishPoly, fit, cancelPending, focusPoint, focusItem, focusRuler })
 </script>
 
 <style scoped>
@@ -1807,6 +1911,19 @@ defineExpose({ finishPoly, fit, cancelPending, focusPoint, focusItem })
 .fp-calib-len { fill: #e0a030; text-anchor: middle; paint-order: stroke; stroke: rgba(255,253,248,0.85); stroke-width: 3; pointer-events: none; font-weight: 600; }
 .fp-calib-confirm { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 6px; padding: 8px 18px; background: rgba(224, 160, 48, 0.92); color: #fff; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.15); user-select: none; }
 .fp-calib-confirm:hover { background: #e0a030; }
+.fp-ruler.is-inactive { pointer-events: none; }
+.fp-ruler-line { stroke: #4a8fc2; stroke-width: 1.5; stroke-dasharray: 5 4; pointer-events: stroke; }
+.fp-ruler-dot { fill: #4a8fc2; stroke: #fff; stroke-width: 1.5; }
+.fp-ruler-handle { cursor: grab; pointer-events: all; }
+.fp-ruler-handle:active { cursor: grabbing; }
+.fp-ruler-len { fill: #4a8fc2; text-anchor: middle; paint-order: stroke; stroke: rgba(255,253,248,0.85); stroke-width: 3; pointer-events: none; font-weight: 600; }
+.fp-ruler-del { cursor: pointer; }
+.fp-ruler-del circle { fill: rgba(255,255,255,0.92); stroke: #b04a3a; stroke-width: 1.5; }
+.fp-ruler-del line { stroke: #b04a3a; stroke-width: 1.5; stroke-linecap: round; }
+.fp-ruler-del:hover circle { fill: #b04a3a; }
+.fp-ruler-del:hover line { stroke: #fff; }
+.fp-ruler-clear { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 6px; padding: 8px 18px; background: rgba(74, 143, 194, 0.92); color: #fff; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.15); user-select: none; }
+.fp-ruler-clear:hover { background: #4a8fc2; }
 .fp-drawing { fill: rgba(184, 140, 110, 0.12); stroke: var(--color-brand); stroke-width: 2; stroke-dasharray: 6 4; }
 /* 缩略图(迷你地图):右上角悬浮,可折叠成横条 */
 .fp-thumb { position: absolute; z-index: 6; width: 168px; background: rgba(255, 253, 248, 0.96); border: 1px solid rgba(184, 140, 110, 0.35); border-radius: 10px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12); user-select: none; touch-action: none; }

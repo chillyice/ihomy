@@ -601,7 +601,7 @@
 import { ref, reactive, computed, inject, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { profileApi, familyApi, fileApi, musicApi, aiApi, weatherApi } from '@/api'
+import { profileApi, familyApi, fileApi, musicApi, aiApi, weatherApi, publicApi } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { CircleCheck, CircleClose, Edit, Delete } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
@@ -694,11 +694,7 @@ const searchLocations = async (query) => {
   if (!query) { locationOptions.value = []; return }
   locLoading.value = true
   try {
-    const res = await fetch(`/api/public/weather/locations?keyword=${encodeURIComponent(query)}`)
-    if (res.ok) {
-      const json = await res.json()
-      if (json.code === 0) locationOptions.value = json.data || []
-    }
+    locationOptions.value = (await publicApi.searchWeatherLocations(query)) || []
   } catch (e) {} finally {
     locLoading.value = false
   }
@@ -724,6 +720,8 @@ const persistRegion = async (city, lat, lng) => {
     weatherLat.value = lat == null ? '' : String(lat)
     weatherLng.value = lng == null ? '' : String(lng)
     ElMessage.success(t('settings.weather.regionSaved'))
+    // 立即按新地域重新拉取天气(首页天气卡片/侧边栏迷你天气/天气页共享同一 sunLight 实例)
+    sunLight?.loadWeather?.()
   } catch (e) {
     // 拦截器已提示
   } finally {

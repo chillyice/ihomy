@@ -99,8 +99,10 @@ public class PhotoController {
         if (!album.getFamilyId().equals(fid)) throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.FORBIDDEN);
         byte[] data = fetchRemote(url);
         String ext = extOf(url);
-        String savedUrl = fileService.upload(data, "ai." + ext, "image/" + (ext.equals("jpg") ? "jpeg" : ext), albumId, album.getName());
-        Photo photo = albumService.addPhoto(albumId, user, fid, savedUrl, "AI 生图");
+        String baseName = (dto.getName() == null || dto.getName().isBlank()) ? "ai" : dto.getName();
+        String savedUrl = fileService.upload(data, baseName + "." + ext, "image/" + (ext.equals("jpg") ? "jpeg" : ext), albumId, album.getName());
+        String desc = (dto.getDescription() == null || dto.getDescription().isBlank()) ? "AI 生图" : dto.getDescription();
+        Photo photo = albumService.addPhoto(albumId, user, fid, savedUrl, desc);
         publicController.invalidateHomeCache(fid);
         return Result.success(List.of(photo));
     }

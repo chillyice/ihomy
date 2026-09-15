@@ -910,13 +910,20 @@ html.dark .el-dropdown-menu .el-dropdown-menu__item:not(.is-disabled):hover {
   min-height: 0 !important;
 }
 
-/* 弹窗内 body 滚动条美化 */
-.el-dialog__body::-webkit-scrollbar { width: 5px; }
-.el-dialog__body::-webkit-scrollbar-track { background: transparent; }
-.el-dialog__body::-webkit-scrollbar-thumb { background: rgba(58,46,34,0.12); border-radius: 3px; }
-.el-dialog__body::-webkit-scrollbar-thumb:hover { background: rgba(58,46,34,0.2); }
-html.dark .el-dialog__body::-webkit-scrollbar-thumb { background: rgba(232,220,200,0.12); }
-html.dark .el-dialog__body::-webkit-scrollbar-thumb:hover { background: rgba(232,220,200,0.2); }
+/* 全局滚动条:统一为侧栏导航同款(4px 细滚动条 + 暖棕半透明滑块),覆盖所有原生滚动条 */
+*::-webkit-scrollbar { width: 4px; height: 4px; }
+*::-webkit-scrollbar-thumb { background: rgba(58, 46, 34, 0.15); border-radius: 2px; }
+* { scrollbar-width: thin; scrollbar-color: rgba(58, 46, 34, 0.15) transparent; }
+
+/* 尺子列表弹层(物品定位尺子角标;el-popover 挂载到 body 需全局样式) */
+.fp-ruler-list { display: flex; flex-direction: column; gap: 2px; }
+.fp-ruler-list-head { font-size: 12px; color: var(--color-text-secondary); padding: 2px 6px 8px; }
+.fp-ruler-list-item { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 8px; }
+.fp-ruler-list-item:hover { background: rgba(var(--color-brand-rgb), 0.1); }
+.fp-ruler-list-info { flex: 1; min-width: 0; display: flex; flex-direction: column; cursor: pointer; }
+.fp-ruler-list-name { font-size: 13px; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fp-ruler-list-meta { font-size: 11px; color: var(--color-text-secondary); }
+.fp-ruler-list-del { flex-shrink: 0; }
 
 /* 弹窗内 checkbox 主题色:低饱和暖棕 */
 .el-dialog .el-checkbox__input.is-checked .el-checkbox__inner {

@@ -133,7 +133,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { diaryApi } from '@/api'
+import { diaryApi, publicApi } from '@/api'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
@@ -438,13 +438,10 @@ const clearPick = () => {
 
 const loadCurrentWeather = async () => {
   try {
-    const res = await fetch('/api/public/weather')
-    if (res.ok) {
-      const json = await res.json()
-      if (json.code === 0 && json.data?.text) {
-        const match = WEATHERS.find(w => json.data.text.includes(w.label) || w.label.includes(json.data.text))
-        form.weather = match ? match.icon : ''
-      }
+    const data = await publicApi.getWeather()
+    if (data?.text) {
+      const match = WEATHERS.find(w => data.text.includes(w.label) || w.label.includes(data.text))
+      form.weather = match ? match.icon : ''
     }
   } catch (e) {}
 }

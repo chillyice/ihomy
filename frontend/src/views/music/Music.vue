@@ -858,16 +858,6 @@ html.dark .pl-delete-btn:hover { background: rgba(185,96,88,0.12) !important; }
   max-height: 300px;
   overflow-y: auto;
 }
-.add-tracks-list::-webkit-scrollbar,
-.add-album-list::-webkit-scrollbar { width: 5px; }
-.add-tracks-list::-webkit-scrollbar-track,
-.add-album-list::-webkit-scrollbar-track { background: transparent; }
-.add-tracks-list::-webkit-scrollbar-thumb,
-.add-album-list::-webkit-scrollbar-thumb { background: rgba(58,46,34,0.12); border-radius: 3px; }
-.add-tracks-list::-webkit-scrollbar-thumb:hover,
-.add-album-list::-webkit-scrollbar-thumb:hover { background: rgba(58,46,34,0.2); }
-html.dark .add-tracks-list::-webkit-scrollbar-thumb,
-html.dark .add-album-list::-webkit-scrollbar-thumb { background: rgba(232,220,200,0.12); }
 
 .add-track-item {
   padding: 12px 0;

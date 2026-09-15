@@ -81,6 +81,29 @@
                     <svg viewBox="0 0 24 24" class="fp-ico"><line x1="5" y1="17.5" x2="19" y2="6.5" stroke-dasharray="3 2.4" /><line x1="3.8" y1="16" x2="6.2" y2="19" /><line x1="17.8" y1="5" x2="20.2" y2="8" /><circle cx="5" cy="17.5" r="1.9" fill="currentColor" stroke="none" /><circle cx="19" cy="6.5" r="1.9" fill="currentColor" stroke="none" /></svg>
                   </el-button>
                 </el-tooltip>
+                <!-- 尺子:测量两点距离;右下角小三角展示已保存尺子列表(点击跳转到对应户型图) -->
+                <div class="fp-ruler-btn">
+                  <el-tooltip :content="$t('item.rulerTip')" placement="top" :show-after="300">
+                    <el-button :type="tool === 'ruler' ? 'primary' : ''" class="fp-tool-ico" @click="tool = tool === 'ruler' ? 'select' : 'ruler'">
+                      <svg viewBox="0 0 24 24" class="fp-ico"><rect x="4" y="9" width="16" height="6" rx="1" /><line x1="7" y1="9" x2="7" y2="12.5" /><line x1="10" y1="9" x2="10" y2="13.5" /><line x1="13" y1="9" x2="13" y2="12.5" /><line x1="16" y1="9" x2="16" y2="13.5" /><line x1="19" y1="9" x2="19" y2="12.5" /></svg>
+                    </el-button>
+                  </el-tooltip>
+                  <el-popover v-if="savedRulers.length" v-model:visible="rulerPopVisible" trigger="click" placement="bottom-end" :width="260" popper-class="fp-ruler-pop">
+                    <template #reference>
+                      <span class="fp-ruler-caret"><svg viewBox="0 0 8 6"><path d="M0 0l4 6 4-6z" /></svg></span>
+                    </template>
+                    <div class="fp-ruler-list">
+                      <div class="fp-ruler-list-head">{{ $t('item.savedRulers') }}</div>
+                      <div v-for="r in savedRulers" :key="r.id" class="fp-ruler-list-item">
+                        <div class="fp-ruler-list-info" @click="jumpToRuler(r)">
+                          <span class="fp-ruler-list-name">{{ r.houseName }}</span>
+                          <span class="fp-ruler-list-meta">{{ r.floor }}F · {{ r.meters }} m</span>
+                        </div>
+                        <el-button text size="small" type="danger" class="fp-ruler-list-del" @click.stop="deleteRuler(r)"><el-icon><Delete /></el-icon></el-button>
+                      </div>
+                    </div>
+                  </el-popover>
+                </div>
                 <!-- 调整底图:图片框+外扩箭头(底图分辨率与画布比例尺不一致时,拖动缩放对齐房间) -->
                 <el-tooltip v-if="floorPlan.imageUrl" :content="$t('item.adjustBg')" placement="top" :show-after="300">
                   <el-button :type="tool === 'image' ? 'primary' : ''" class="fp-tool-ico" @click="tool = tool === 'image' ? 'select' : 'image'">
@@ -208,6 +231,7 @@
           :scale="floorPlan.scale || 100"
           :image-transform="floorPlanImg"
           :fit-key="fitKey"
+          :rulers="currentRulers"
           @save-room="onSaveRoomGeometry"
           @save-rooms="onSaveRoomsBatch"
           @save-furniture="onSaveFurnitureGeometry"
@@ -226,6 +250,7 @@
           @glue-rooms="onGlueRooms"
           @save-image-transform="onSaveImageTransform"
           @place-furniture="onPlaceFurnitureFromDrop"
+          @save-rulers="onSaveRulers"
           :floor-transition="floorTransition"
         />
 
@@ -666,6 +691,7 @@ const listMode = ref(false)
 const mode = ref('view') // view | edit
 const tool = ref('select') // select | draw-rect | draw-poly
 const sidebarTab = ref('rooms')
+const rulerPopVisible = ref(false) // 尺子角标列表弹层显隐
 const currentHouseId = ref(null)
 const currentFloor = ref(1)
 const floorPlan = ref({ rooms: [], furnitures: [], items: [], imageUrl: null, scale: 100 })
@@ -678,7 +704,7 @@ const canvasRef = ref(null)
 const fitKey = ref(0)
 const floorTransition = ref({ direction: 'down', phase: '' })
 // 侧栏提示随当前工具切换:裁剪/粘合/标定/底图显示各自操作说明,其余回退画图提示
-const toolHintKey = computed(() => ({ cut: 'item.cutTip', glue: 'item.glueTip', calibrate: 'item.calibrateTip', image: 'item.adjustBgTip' }[tool.value] || 'item.drawHint'))
+const toolHintKey = computed(() => ({ cut: 'item.cutTip', glue: 'item.glueTip', calibrate: 'item.calibrateTip', ruler: 'item.rulerTip', image: 'item.adjustBgTip' }[tool.value] || 'item.drawHint'))
 
 // ---- 列表模式状态(旧 CRUD) ----
 const tab = ref('houses')
@@ -868,6 +894,72 @@ const floorDesigned = computed(() => {
     try { const g = JSON.parse(r.geometry || '[]'); return Array.isArray(g) && g.length >= 3 } catch { return false }
   })
 })
+// ---- 尺子持久化:存于楼层配置 floorPlans[floor].rulers(与底图/比例尺/不透明度同层) ----
+// 当前层尺子(传给画布)
+const currentRulers = computed(() => {
+  const house = houses.value.find((h) => h.id === currentHouseId.value)
+  if (!house || !house.floorPlans) return []
+  try {
+    const cfg = JSON.parse(house.floorPlans)[currentFloor.value]
+    return Array.isArray(cfg && cfg.rulers) ? cfg.rulers : []
+  } catch { return [] }
+})
+// 全部已保存尺子(跨房子/楼层,供角标列表展示与跳转)
+const savedRulers = computed(() => {
+  const out = []
+  for (const h of houses.value) {
+    let fp = {}
+    if (h.floorPlans) { try { fp = JSON.parse(h.floorPlans) } catch {} }
+    for (const [fk, cfg] of Object.entries(fp)) {
+      if (fk === 'floorOrder' || !cfg || !Array.isArray(cfg.rulers) || !cfg.rulers.length) continue
+      const scale = cfg.scale || 100
+      for (const r of cfg.rulers) {
+        if (!r || !r.a || !r.b) continue
+        out.push({ id: r.id, houseId: h.id, houseName: h.name || '', floor: Number(fk), meters: (Math.hypot(r.b.x - r.a.x, r.b.y - r.a.y) / scale).toFixed(2) })
+      }
+    }
+  }
+  return out
+})
+// 写回某楼层 rulers(空数组则移除键),复用 saveFloorPlans 持久化
+const updateFloorRulers = async (houseId, floor, rulers) => {
+  const house = houses.value.find((h) => h.id === houseId)
+  if (!house) return
+  let fp = {}
+  if (house.floorPlans) { try { fp = JSON.parse(house.floorPlans) } catch {} }
+  const next = { ...(fp[floor] || {}), rulers }
+  if (!rulers || !rulers.length) delete next.rulers
+  fp[floor] = next
+  const json = JSON.stringify(fp)
+  await itemApi.saveFloorPlans(houseId, json)
+  house.floorPlans = json // 本地回写,currentRulers/savedRulers 即时刷新
+}
+const onSaveRulers = (rulers) => updateFloorRulers(currentHouseId.value, currentFloor.value, rulers)
+// 跳转到尺子所在房子+楼层(保持编辑态),并居中聚焦该尺子
+const jumpToRuler = async (r) => {
+  rulerPopVisible.value = false
+  listMode.value = false
+  floorTouched.value = true
+  if (currentHouseId.value !== r.houseId) currentHouseId.value = r.houseId
+  if (currentFloor.value !== r.floor) currentFloor.value = r.floor
+  await loadFloorPlan()
+  await nextTick()
+  canvasRef.value?.focusRuler(r.id)
+}
+// 删除单条尺子(跨层也可)
+const deleteRuler = async (r) => {
+  try {
+    await ElMessageBox.confirm(t('item.rulerDeleteConfirm'), t('common.warning'), { type: 'warning', closeOnClickModal: true })
+  } catch { return }
+  const house = houses.value.find((h) => h.id === r.houseId)
+  if (!house) return
+  let fp = {}
+  if (house.floorPlans) { try { fp = JSON.parse(house.floorPlans) } catch {} }
+  const cfg = fp[r.floor] || {}
+  const rulers = Array.isArray(cfg.rulers) ? cfg.rulers.filter((x) => x.id !== r.id) : []
+  await updateFloorRulers(r.houseId, r.floor, rulers)
+  if (!savedRulers.value.length) rulerPopVisible.value = false
+}
 const onHouseChange = async () => {
   currentFloor.value = defaultFloorOf(houses.value.find((h) => h.id === currentHouseId.value))
   await loadFloorPlan(); fitKey.value++
@@ -1770,6 +1862,9 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown); if (vo
 .fp-tools :deep(.el-button) { width: 36px; height: 36px; padding: 0; }
 .fp-tools :deep(.el-button + .el-button) { margin-left: 0; }
 .fp-tools :deep(.el-upload) { display: inline-flex; }
+.fp-ruler-btn { position: relative; width: 36px; height: 36px; }
+.fp-ruler-caret { position: absolute; right: -2px; bottom: -2px; width: 13px; height: 13px; display: flex; align-items: center; justify-content: center; background: var(--color-brand); border-radius: 3px 0 5px 0; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.22); z-index: 2; }
+.fp-ruler-caret svg { width: 7px; height: 6px; fill: #fff; }
 .fp-ico { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .fp-side-head { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #a89a8a; margin: 14px 0 6px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.06); }
 .fp-side-head:first-child { margin-top: 0; padding-top: 0; border-top: none; }
