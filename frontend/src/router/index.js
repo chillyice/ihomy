@@ -1,13 +1,11 @@
 // 路由表 + 登录守卫:默认所有页面游客可浏览,仅纯写/个人页需登录
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { loadHomeTheme, HOME_THEME_CLASSIC } from '@/theme/homeTheme'
 
 const routes = [
   { path: '/login', name: 'Login', component: () => import('@/views/Login.vue'), meta: { public: true } },
-  // 首页:按偏好重定向到沉浸式场景(/scene)或传统模块化首页(/home)
-  { path: '/', redirect: () => (loadHomeTheme() === HOME_THEME_CLASSIC ? '/home' : '/scene') },
-  { path: '/scene', name: 'SceneHome', component: () => import('@/views/scene/SceneHome.vue'), meta: { public: true, immersive: true } },
+  // 首页:/ 恒重定向到模块化首页 /home(暖居/光尘共用同一首页,由主题切换系统决定外壳)
+  { path: '/', redirect: '/home' },
   { path: '/home', name: 'Home', component: () => import('@/views/Home.vue'), meta: { public: true } },
   { path: '/blog', name: 'BlogList', component: () => import('@/views/blog/BlogList.vue'), meta: { public: true } },
   { path: '/blog/:id', name: 'BlogDetail', component: () => import('@/views/blog/BlogDetail.vue'), meta: { public: true } },

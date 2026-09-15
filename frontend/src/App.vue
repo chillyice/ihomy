@@ -9,7 +9,7 @@
 
     <!-- 桌面端布局 -->
     <template v-else>
-      <!-- 光影层:暖居/光尘共用同一套太阳驱动的丁达尔体积光+窗影+尘+台灯;沉浸式(scene-theme)时隐藏 -->
+      <!-- 光影层:暖居/光尘共用同一套太阳驱动的丁达尔体积光+窗影+尘+台灯;沉浸式页面(如光影实验台)时隐藏 -->
       <SunLightLayer v-if="anyEffectEnabled && !immersive" />
       <!-- 光尘主题:独立外壳(顶栏 + studio 外框 + 侧栏),光影沿用 SunLightLayer -->
       <GuangchenLayout v-if="isGuangchen" />
@@ -58,7 +58,7 @@ const appStore = useAppStore()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
 const route = useRoute()
-// 沉浸式页面(如场景主题 P1)：隐藏侧边栏 / 页脚 / 回顶 / 播放器，内容区占满全屏
+// 沉浸式页面(如 3D 光影实验台)：隐藏侧边栏 / 页脚 / 回顶 / 播放器，内容区占满全屏
 const immersive = computed(() => !!route.meta.immersive)
 const { locale } = useI18n()
 

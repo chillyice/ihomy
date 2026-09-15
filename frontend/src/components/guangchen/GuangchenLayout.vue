@@ -30,24 +30,32 @@
       <!-- 模拟应用 -->
       <div class="gc-studio">
         <div class="gc-app">
-          <!-- 侧栏 -->
+          <!-- 侧栏:按分类分组,组头可折叠,默认只展开内容组 -->
           <aside class="gc-side">
             <nav>
-              <div
-                v-for="m in navModules"
-                :key="m.code"
-                class="gc-nav-item"
-                :class="{ act: isActive(m.path) }"
-                @click="navigate(m.path)"
-              >
-                <span class="gc-dot"></span>{{ m.title }}
+              <div v-for="g in navGroups" :key="g.key" class="gc-nav-group">
+                <button class="gc-nav-group-head" @click="toggleGroup(g.key)">
+                  <svg class="gc-chev" :class="{ open: expanded[g.key] }" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                  <span class="gc-group-label">{{ g.label }}</span>
+                </button>
+                <div v-if="expanded[g.key]" class="gc-nav-group-body">
+                  <div
+                    v-for="m in g.items"
+                    :key="m.code"
+                    class="gc-nav-item"
+                    :class="{ act: isActive(m.path) }"
+                    @click="navigate(m.path)"
+                  >
+                    <span class="gc-dot"></span>{{ m.title }}
+                  </div>
+                </div>
               </div>
             </nav>
           </aside>
 
           <!-- 主区 -->
           <div class="gc-main" ref="mainEl">
-            <GuangchenHome v-if="route.path === '/'" :weather-bg="weatherBg" />
+            <GuangchenHome v-if="route.path === '/home'" :weather-bg="weatherBg" />
             <router-view v-else v-slot="{ Component, route }">
               <transition :name="route.meta.transition || 'fade'" mode="out-in">
                 <component :is="Component" :key="route.path" />
@@ -94,21 +102,32 @@ const NAV_PATHS = {
   storage: '/storage/files', tools: '/tools',
 }
 
-const navModules = computed(() => {
+const GROUP_ORDER = ['content', 'life', 'social', 'system']
+const GROUP_LABELS = { content: '内容', life: '生活', social: '成员', system: '系统' }
+
+// 折叠状态:默认只展开内容组,其余组收起(点击组头切换)
+const expanded = ref({ content: true })
+const toggleGroup = (key) => {
+  expanded.value = { ...expanded.value, [key]: !expanded.value[key] }
+}
+
+// 按 category 分组(相册并入内容),分组顺序 content/life/social/system,组内 sortOrder
+const navGroups = computed(() => {
   const list = !appStore.modules.length ? [] : appStore.modules
     .filter((m) => NAV_PATHS[m.code] && m.enabled !== 0)
     .map((m) => ({ code: m.code, title: m.title, path: NAV_PATHS[m.code] || m.path, category: m.category || 'life', sortOrder: m.sortOrder || 99 }))
   list.push({ code: 'settings', title: '设置', path: '/settings', category: 'system', sortOrder: 90 })
   if (userStore.hasPerm('ops:view')) list.push({ code: 'ops', title: '运维管理', path: '/ops', category: 'system', sortOrder: 95 })
   list.sort((a, b) => a.sortOrder - b.sortOrder)
-  // 顺序对齐暖居:按 category 分组(相册并入内容),分组顺序 content/life/social/system,组内 sortOrder,再平铺
   const groups = {}
   for (const m of list) {
     const cat = m.category === 'album' ? 'content' : m.category
     if (!groups[cat]) groups[cat] = []
     groups[cat].push(m)
   }
-  return ['content', 'life', 'social', 'system'].filter((c) => groups[c]).flatMap((c) => groups[c])
+  return GROUP_ORDER
+    .filter((c) => groups[c] && groups[c].length)
+    .map((c) => ({ key: c, label: GROUP_LABELS[c] || '功能', items: groups[c] }))
 })
 
 const isActive = (path) => (path === '/' ? route.path === '/' : route.path.startsWith(path))
@@ -218,6 +237,30 @@ watch(() => route.fullPath, () => { canBack.value = window.history.state?.back !
 .gc-nav-item:hover { background: var(--color-line); color: var(--color-text); }
 .gc-nav-item.act { background: var(--color-brand); color: var(--color-card); box-shadow: var(--shadow); }
 .gc-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .7; flex-shrink: 0; }
+
+/* 侧栏分组:组头可折叠,默认只展开内容组 */
+.gc-nav-group { margin-bottom: 4px; }
+.gc-nav-group-head {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 9px 12px;
+  box-sizing: border-box;
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: .5px;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition: color .2s;
+}
+.gc-nav-group-head:hover { color: var(--color-text-secondary); }
+.gc-chev { flex-shrink: 0; transition: transform .2s ease; }
+.gc-chev.open { transform: rotate(90deg); }
+.gc-group-label { flex: 1; }
+.gc-nav-group-body { display: flex; flex-direction: column; }
+.gc-nav-group-body .gc-nav-item { padding-left: 28px; }
 
 /* 主区(内部滚动) */
 .gc-main { min-height: 0; overflow-y: auto; padding: 14px 24px 30px; }
