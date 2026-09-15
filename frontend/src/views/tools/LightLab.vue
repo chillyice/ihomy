@@ -1,10 +1,11 @@
-<!-- 3D 光影实验台:真实阴影贴图演示「太阳 → 带两扇平开窗的南墙 → 中古风书桌空间」遮挡投影。
+<!-- 3D 光影实验台:真实阴影贴图演示「太阳 → 带两扇平开窗的南墙 → 书桌空间」遮挡投影。
      交互:OrbitControls 左键旋转/右键平移/滚轮缩放;拖动发光小球移动光源。
      太阳模拟:客户端 NOAA 算法(见 utils/solarPosition.js,与后端 SolarUtil 同源),按日期+经纬度(默认济南)+
                时区 UTC+8 计算高度角/方位角,驱动平行太阳光;支持播放/暂停/加速/步进;窗朝南=方位角 180°(-z)。
-     场景:赫鲁晓夫楼老式小户型,温暖中古风,平视(视线 115cm)看向日字形两扇外开窗 + 窗上雨棚;
-           尺寸规格 cm÷100 换算成米,墙在 z=0、室内 z>0、窗外阳台 z<0;北侧开敞(无后墙)、桌面台灯可开关,
-           暖色漫反射补光随太阳高度/开窗增大;PCSS/PCF 阴影 + 阴影软硬可调。
+     场景:坐北朝南小房间(净宽 4.8×深 4.2×高 2.8m,地面 Y=0),南墙两扇日字形外推平开窗(总宽 2.4×高 1.6,底 0.9)
+           + 窗外小阳台(平台顶 0.75、护栏 0.30、两盆花);尺寸 m,墙在 z=0、室内 z>0、窗外阳台 z<0、Y 向上;
+           北侧开敞(无后墙)、桌面台灯可开关、暖色漫反射补光随太阳高度/开窗增大;PCSS/PCF 阴影 + 阴影软硬可调。
+           中古风配色:暖灰米色墙、深棕黑实木窗框、深胡桃木书桌、布艺台灯。
      手动模式:可拖拽光源 + 光源类型(平行光/聚光/点光)。约定:懒加载路由 + three 独立 chunk,不接 i18n。 -->
 <template>
   <div class="light-lab">
@@ -329,46 +330,50 @@ const _sunColor = new THREE.Color()
 const _skyNight = new THREE.Color(0x0a0c14) // 夜空
 const _skyDay = new THREE.Color(0xa8d0f0)   // 白天明亮天空蓝
 
-// 场景常量(单位:m,规格以 cm ÷100 换算;墙在 z=0,室内 z>0,室外/阳台 z<0,窗朝南=-z)
+// 场景常量(单位:m;坐北朝南小房间,Y 向上;南墙(窗墙)在 z=0、室内 z>0、窗外阳台 z<0,窗朝南=-z)
 const WALL_Z = 0
-const WALL_W = 3.0           // 房间(南墙)宽 300cm(赫鲁晓夫楼小户型)
-const WALL_H = 2.5           // 房间高 250cm(老式住宅净高)
+const WALL_W = 4.8           // 房间净宽(X)480cm
+const WALL_H = 2.8           // 房间净高(Y)280cm(地面 Y=0,天花板 Y=2.8)
 const WALL_T = 0.15          // 墙体厚 15cm
-const ROOM_DEPTH = 3.0       // 房间进深 300cm
+const ROOM_DEPTH = 4.2       // 房间净深(Z)420cm
 
-// 窗(外框 110×105、透明区 100.7×95.7、底 80 顶 185;窗框 4.67cm(原 7cm 缩小 1/3);日字形两扇外开)
-const WIN_W = 1.1
-const WIN_H = 1.05
-const WIN_BOTTOM = 0.8
+// 窗(两扇日字形外推平开,左右各一扇、单扇带中间横向分格;总宽 240×高 160、底 90 顶 250,水平居中)
+const WIN_W = 2.4
+const WIN_H = 1.6
+const WIN_BOTTOM = 0.9
 const WIN_CX = 0
 const WIN_CY = WIN_BOTTOM + WIN_H / 2
-const WIN_GLASS_W = 1.0066
-const WIN_GLASS_H = 0.9566
-const WIN_FRAME = 0.0467
-const SASH_BAR = 0.04        // 窗扇细框 4cm
-const MULLION_BAR = 0.04     // 日字形中横棂 4cm
+const WIN_FRAME = 0.12       // 外窗框 12cm(加厚)
+const SASH_BAR = 0.07        // 窗棂/扇框 7cm(加粗)
+const MULLION_BAR = 0.07     // 日字形中横棂 7cm(加粗)
 
-// 书桌(长120×深65×高75,靠窗墙居中)
-const DESK_W = 1.2
-const DESK_D = 0.65
+// 书桌(长 270×深 70×高 75,靠窗墙居中,略宽于窗;三抽屉朝室内:中 1 大 + 左右 2 小对称)
+const DESK_W = 2.7
+const DESK_D = 0.7
 const DESK_H = 0.75
 
-// 桌下抽屉柜(整条柜体:高 12cm,顶贴桌面下沿 5cm 处,底部悬空留腿部空间)
-const DRAWER_BANK_H = 0.12
-const DRAWER_BOTTOM = DESK_H - 0.05 - DRAWER_BANK_H // 柜底离地 0.58
+// 桌下抽屉柜(整条柜体:高 15cm,顶贴桌面下沿 5cm 处;三扇抽屉面板朝室内 + 拉手)
+const DRAWER_BANK_H = 0.15
+
+// 阳台(窗外南侧:平台顶面 0.75、宽 260、进深 80、护栏高 30;左右两盆圆柱花盆)
+const BALCONY_W = 2.6
+const BALCONY_D = 0.8
+const BALCONY_TOP = 0.75
+const BALCONY_T = 0.12        // 平台板厚
+const BALCONY_RAIL = 0.30     // 护栏高(平台顶面以上,矮护栏)
 
 // 台灯(置于桌面左侧,聚光朝下打亮桌面)
-const LAMP_X = -0.48
-const LAMP_Z = 0.2
+const LAMP_X = -1.05
+const LAMP_Z = 0.25
 const LAMP_BASE_Y = DESK_H // 桌面顶高 75cm
 const LAMP_INTENSITY = 10
 
-// 默认取景:竖直方向刚好框住窗户(窗顶 1.85)+ 桌面与抽屉(抽屉柜底 0.58),上下各留约 15cm 白边
-const CAMERA_FOV_DEG = 50
-const VIEW_TOP = WIN_BOTTOM + WIN_H + 0.15 // 窗顶之上 15cm
-const VIEW_BOTTOM = DRAWER_BOTTOM - 0.15    // 抽屉柜底之下 15cm
-const VIEW_CENTER_Y = (VIEW_TOP + VIEW_BOTTOM) / 2
-const VIEW_DISTANCE = ((VIEW_TOP - VIEW_BOTTOM) / 2) / Math.tan((CAMERA_FOV_DEG / 2) * (Math.PI / 180))
+// 默认相机(房间北侧朝南拍,完整框住窗户+整张桌子+抽屉,抽屉靠近画面底部、上下留白协调)
+const CAMERA_FOV = 36
+const CAMERA_NEAR = 0.1
+const CAMERA_FAR = 20
+const CAMERA_POS = new THREE.Vector3(0, 1.5, 3.6)
+const CAMERA_TARGET = new THREE.Vector3(0, 1.4, 0) // 收窄 fov + 上抬目标,抽屉贴底、下方少留白
 
 const DEFAULT_LIGHT_POS = new THREE.Vector3(0.5, 2.5, -4)
 
@@ -392,12 +397,12 @@ function init() {
   scene = new THREE.Scene()
   scene.background = new THREE.Color(0x15110d)
 
-  camera = new THREE.PerspectiveCamera(CAMERA_FOV_DEG, w / h, 0.1, 100)
-  // 平视取景:刚好框住窗户+桌子+抽屉,上下各留少量白边
-  camera.position.set(0, VIEW_CENTER_Y, VIEW_DISTANCE)
+  camera = new THREE.PerspectiveCamera(CAMERA_FOV, w / h, CAMERA_NEAR, CAMERA_FAR)
+  // 默认机位:房间北侧朝南拍,完整框住窗户+整张桌子+抽屉,上下留白
+  camera.position.copy(CAMERA_POS)
 
   controls = new OrbitControls(camera, renderer.domElement)
-  controls.target.set(0, VIEW_CENTER_Y, WALL_Z)
+  controls.target.copy(CAMERA_TARGET)
   controls.enableDamping = !reducedMotion.value
   controls.dampingFactor = 0.08
   controls.minDistance = 0.6
@@ -435,12 +440,9 @@ function init() {
   buildCeiling()
   buildWindow()
   buildHangings()
+  buildBalcony()
   buildDesk()
   buildLamp()
-  buildTurntable()
-  buildPlants()
-  buildAwning()
-  buildBalcony()
   buildGizmo()
 
   // 手动光源(初始平行光,默认隐藏;进入手动模式才显示)
@@ -474,14 +476,35 @@ function init() {
   loop()
 }
 
+// 墙面极淡肌理:程序化噪点 bump 贴图(一次性生成,共享)
+let wallBumpTex = null
+function getWallBumpTex() {
+  if (wallBumpTex) return wallBumpTex
+  const size = 128
+  const c = document.createElement('canvas')
+  c.width = c.height = size
+  const ctx = c.getContext('2d')
+  const img = ctx.createImageData(size, size)
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = 128 + (Math.random() - 0.5) * 18
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = n
+    img.data[i + 3] = 255
+  }
+  ctx.putImageData(img, 0, 0)
+  wallBumpTex = new THREE.CanvasTexture(c)
+  wallBumpTex.wrapS = wallBumpTex.wrapT = THREE.RepeatWrapping
+  wallBumpTex.repeat.set(5, 5)
+  return wallBumpTex
+}
+
 function buildFloor() {
-  // 地板:覆盖室内 + 窗外室外一小段地面(地面缩小,但保持不小于房间 3×3)
+  // 地板:覆盖室内(0~4.2)+ 窗外阳台下方一小段地面
   const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(5, 5),
-    new THREE.MeshStandardMaterial({ color: 0x8a6a4f, roughness: 0.9, metalness: 0 })
+    new THREE.PlaneGeometry(6, 6),
+    new THREE.MeshStandardMaterial({ color: 0xc8a06b, roughness: 0.85, metalness: 0 })
   )
   floor.rotation.x = -Math.PI / 2
-  floor.position.set(0, 0, 1.5) // 覆盖室内(0~3.0)与窗外室外(z<0)一小段地面
+  floor.position.set(0, 0, 2.0) // 覆盖 x∈[-3,3]、z∈[-1,5]
   floor.receiveShadow = true
   scene.add(floor)
 }
@@ -505,7 +528,7 @@ function buildWall() {
   geo.translate(0, 0, -WALL_T / 2)
   const wall = new THREE.Mesh(
     geo,
-    new THREE.MeshStandardMaterial({ color: 0xd9cbb0, roughness: 0.95, side: THREE.DoubleSide })
+    new THREE.MeshStandardMaterial({ color: 0xe0d5c0, roughness: 0.95, side: THREE.DoubleSide, bumpMap: getWallBumpTex(), bumpScale: 0.4 })
   )
   wall.position.set(0, 0, WALL_Z)
   wall.castShadow = true
@@ -514,7 +537,7 @@ function buildWall() {
 }
 
 function buildSideWalls() {
-  const mat = new THREE.MeshStandardMaterial({ color: 0xc7b795, roughness: 0.95 })
+  const mat = new THREE.MeshStandardMaterial({ color: 0xe0d5c0, roughness: 0.95, bumpMap: getWallBumpTex(), bumpScale: 0.4 })
   // 东西侧墙(北侧开敞,不建后墙)
   const sideGeo = new THREE.BoxGeometry(WALL_T, WALL_H, ROOM_DEPTH)
   ;[-WALL_W / 2, WALL_W / 2].forEach((x) => {
@@ -527,7 +550,7 @@ function buildSideWalls() {
 }
 
 function buildCeiling() {
-  const mat = new THREE.MeshStandardMaterial({ color: 0xe6dcc8, roughness: 0.95 })
+  const mat = new THREE.MeshStandardMaterial({ color: 0xe0d5c0, roughness: 0.95, bumpMap: getWallBumpTex(), bumpScale: 0.4 })
   const ceiling = new THREE.Mesh(new THREE.BoxGeometry(WALL_W, WALL_T, ROOM_DEPTH), mat)
   ceiling.position.set(0, WALL_H - WALL_T / 2, ROOM_DEPTH / 2)
   ceiling.castShadow = true
@@ -536,22 +559,31 @@ function buildCeiling() {
 }
 
 function buildDesk() {
-  const woodMat = new THREE.MeshStandardMaterial({ color: 0x7a5230, roughness: 0.55 })
-  const faceMat = new THREE.MeshStandardMaterial({ color: 0x6b4c30, roughness: 0.5 })
-  const knobMat = new THREE.MeshStandardMaterial({ color: 0xc9b27a, roughness: 0.3, metalness: 0.7 })
+  const woodMat = new THREE.MeshStandardMaterial({ color: 0x5b3a26, roughness: 0.55 })
+  const drawerMat = new THREE.MeshStandardMaterial({ color: 0x4f331f, roughness: 0.5 })
+  const handleMat = new THREE.MeshStandardMaterial({ color: 0xb08d57, roughness: 0.35, metalness: 0.75 })
 
-  // 桌面(120×65cm,厚 5cm),靠墙,桌沿平行窗
+  // 桌面(270×70cm,厚 5cm),靠窗墙,桌沿平行窗
   const top = new THREE.Mesh(new THREE.BoxGeometry(DESK_W, 0.05, DESK_D), woodMat)
   top.position.set(0, DESK_H - 0.025, DESK_D / 2)
   top.castShadow = true
   top.receiveShadow = true
   scene.add(top)
 
-  // 四条实木桌腿(7×7cm)
-  const legGeo = new THREE.BoxGeometry(0.07, DESK_H - 0.05, 0.07)
+  // 桌面边缘细微磨损(前缘浅色磨边)
+  const wearEdge = new THREE.Mesh(
+    new THREE.BoxGeometry(DESK_W, 0.018, 0.008),
+    new THREE.MeshStandardMaterial({ color: 0x8a6644, roughness: 0.7 })
+  )
+  wearEdge.position.set(0, DESK_H - 0.02, DESK_D)
+  wearEdge.castShadow = true
+  scene.add(wearEdge)
+
+  // 四条桌腿(6×6cm)
+  const legGeo = new THREE.BoxGeometry(0.06, DESK_H - 0.05, 0.06)
   const legH = (DESK_H - 0.05) / 2
-  for (const x of [-DESK_W / 2 + 0.05, DESK_W / 2 - 0.05]) {
-    for (const z of [0.05, DESK_D - 0.05]) {
+  for (const x of [-DESK_W / 2 + 0.04, DESK_W / 2 - 0.04]) {
+    for (const z of [0.04, DESK_D - 0.04]) {
       const leg = new THREE.Mesh(legGeo, woodMat)
       leg.position.set(x, legH, z)
       leg.castShadow = true
@@ -560,10 +592,10 @@ function buildDesk() {
     }
   }
 
-  // 桌下抽屉柜(整条,含左/中/右三抽屉,中间偏宽):挂在桌面下沿前方,底部悬空留出腿部空间
-  const bankW = 1.0      // 抽屉柜总宽(略窄于桌面,让开桌腿)
-  const bankH = DRAWER_BANK_H // 柜高(原 0.24 减半,抽屉更浅)
-  const bankD = 0.42     // 柜深(比桌面浅,后面留空)
+  // 桌下抽屉柜(双抽屉,整条柜体挂在桌面下沿前方,朝室内 +z)
+  const bankW = DESK_W - 0.16        // 略窄于桌面,让开两侧桌腿
+  const bankH = DRAWER_BANK_H        // 柜高
+  const bankD = 0.45                 // 柜深(比桌面浅,后面留空)
   const bankY = DESK_H - 0.05 - bankH / 2 // 柜中心高(顶贴桌面下沿)
   const bankZ = DESK_D - bankD / 2        // 柜中心深(前缘与桌面齐平)
   const bank = new THREE.Mesh(new THREE.BoxGeometry(bankW, bankH, bankD), woodMat)
@@ -572,76 +604,87 @@ function buildDesk() {
   bank.receiveShadow = true
   scene.add(bank)
 
-  // 三个抽屉前脸(略凸出于柜前,中间偏宽)+ 拉手
+  // 三扇抽屉面板(中间 1 大 + 左右 2 小对称,略凸出于柜前,朝室内)+ 横向拉手
   const GAP = 0.02
-  const MID_W = 0.4
-  const SIDE_W = 0.28
-  const frontZ = DESK_D + 0.01
+  const MID_W = 1.10
+  const SIDE_W = 0.68
+  const frontZ = DESK_D + 0.012
   const specs = [
-    { w: SIDE_W, x: -(GAP + MID_W / 2 + SIDE_W / 2) },
+    { w: SIDE_W, x: -(MID_W / 2 + GAP + SIDE_W / 2) },
     { w: MID_W, x: 0 },
-    { w: SIDE_W, x: GAP + MID_W / 2 + SIDE_W / 2 },
+    { w: SIDE_W, x: MID_W / 2 + GAP + SIDE_W / 2 },
   ]
   specs.forEach(({ w, x }) => {
-    const face = new THREE.Mesh(new THREE.BoxGeometry(w, bankH - 0.03, 0.015), faceMat)
+    const face = new THREE.Mesh(new THREE.BoxGeometry(w, bankH - 0.03, 0.016), drawerMat)
     face.position.set(x, bankY, frontZ)
     face.castShadow = true
     face.receiveShadow = true
     scene.add(face)
-    const knob = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.03, 12), knobMat)
-    knob.rotation.x = Math.PI / 2
-    knob.position.set(x, bankY, frontZ + 0.02)
-    knob.castShadow = true
-    scene.add(knob)
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(w * 0.5, 0.025, 0.035), handleMat)
+    handle.position.set(x, bankY, frontZ + 0.03)
+    handle.castShadow = true
+    scene.add(handle)
   })
   buildDeskItems()
 }
 
-// 桌面物品:无序自然倾斜,不严格对齐桌沿
+// 桌面物品:笔记本电脑/手机/硬壳相册/4 张拍立得照片,自然散放不拥挤(台灯由 buildLamp 单独摆放)
 function buildDeskItems() {
   const y0 = DESK_H // 桌面顶 75cm
-  // 1. 闭合笔记本(34×23cm,厚 2cm)
-  const laptop = new THREE.Mesh(
-    new THREE.BoxGeometry(0.34, 0.02, 0.23),
+  // 1. 笔记本电脑(翻开:底座 + 后仰屏幕),桌面右半侧
+  const laptop = new THREE.Group()
+  const laptopBase = new THREE.Mesh(
+    new THREE.BoxGeometry(0.34, 0.015, 0.23),
     new THREE.MeshStandardMaterial({ color: 0x3a3f47, roughness: 0.4, metalness: 0.6 })
   )
-  laptop.position.set(0.16, y0 + 0.01, 0.4)
-  laptop.rotation.y = -0.18
-  laptop.castShadow = true
-  laptop.receiveShadow = true
+  laptopBase.position.y = 0.0075
+  laptopBase.castShadow = true
+  laptopBase.receiveShadow = true
+  const hinge = new THREE.Group()
+  hinge.position.set(0, 0.015, -0.115)
+  const laptopScreen = new THREE.Mesh(
+    new THREE.BoxGeometry(0.34, 0.24, 0.008),
+    new THREE.MeshStandardMaterial({ color: 0x1f2329, roughness: 0.3, metalness: 0.4 })
+  )
+  laptopScreen.position.y = 0.12
+  laptopScreen.castShadow = true
+  hinge.add(laptopScreen)
+  hinge.rotation.x = -0.3 // 屏幕后仰约 107°
+  laptop.add(laptopBase, hinge)
+  laptop.position.set(0.35, y0 + 0.005, 0.32)
+  laptop.rotation.y = -0.12
   scene.add(laptop)
 
-  // 2. 横版闭合相册(32×26cm,厚 3cm),斜靠笔记本一角
+  // 2. 硬壳相册(30×24cm,厚 3.5cm),桌面左侧
   const album = new THREE.Mesh(
-    new THREE.BoxGeometry(0.32, 0.03, 0.26),
-    new THREE.MeshStandardMaterial({ color: 0x5d6a4a, roughness: 0.7 })
+    new THREE.BoxGeometry(0.3, 0.035, 0.24),
+    new THREE.MeshStandardMaterial({ color: 0x6e4a30, roughness: 0.6 })
   )
-  album.position.set(-0.16, y0 + 0.02, 0.42)
-  album.rotation.y = 0.35
-  album.rotation.x = -0.12 // 斜靠一角,微倾
+  album.position.set(-0.45, y0 + 0.02, 0.4)
+  album.rotation.y = 0.3
   album.castShadow = true
   album.receiveShadow = true
   scene.add(album)
 
-  // 3. 手机(16×7.5cm,厚 0.8cm),平面轻微旋转
+  // 3. 手机(16×7.5cm,厚 0.8cm),桌面右侧
   const phone = new THREE.Mesh(
     new THREE.BoxGeometry(0.16, 0.008, 0.075),
     new THREE.MeshStandardMaterial({ color: 0x1f2329, roughness: 0.3, metalness: 0.5 })
   )
-  phone.position.set(0.4, y0 + 0.004, 0.2)
+  phone.position.set(1.0, y0 + 0.004, 0.2)
   phone.rotation.y = 0.5
   phone.castShadow = true
   phone.receiveShadow = true
   scene.add(phone)
 
-  // 4. 拍立得照片(8.6×5.4cm,4 张)散落在相册旁,互相轻微叠压
+  // 4. 拍立得照片(8.6×5.4cm,4 张)散落在相册旁,轻微旋转叠压
   const photoMat = new THREE.MeshStandardMaterial({ color: 0xf2ede2, roughness: 0.6 })
   const photoGeo = new THREE.BoxGeometry(0.086, 0.002, 0.054)
   const photoSpots = [
-    { p: [-0.34, 0.005, 0.34], r: -0.4 },
-    { p: [-0.28, 0.004, 0.3], r: 0.3 },
-    { p: [-0.26, 0.003, 0.4], r: -0.12 },
-    { p: [-0.36, 0.006, 0.26], r: 0.55 },
+    { p: [-0.6, 0.005, 0.28], r: -0.4 },
+    { p: [-0.52, 0.004, 0.24], r: 0.3 },
+    { p: [-0.48, 0.003, 0.5], r: -0.15 },
+    { p: [-0.66, 0.006, 0.46], r: 0.55 },
   ]
   photoSpots.forEach(({ p, r }) => {
     const ph = new THREE.Mesh(photoGeo, photoMat)
@@ -655,23 +698,34 @@ function buildDeskItems() {
 
 function buildLamp() {
   lampGroup = new THREE.Group()
-  const metalMat = new THREE.MeshStandardMaterial({ color: 0x30343c, roughness: 0.4, metalness: 0.7 })
-  lampShadeMat = new THREE.MeshStandardMaterial({ color: 0x1e4a3a, roughness: 0.5, metalness: 0.2, emissive: 0x000000, side: THREE.DoubleSide })
+  const woodMat = new THREE.MeshStandardMaterial({ color: 0x5b3a26, roughness: 0.55 })
+  const brassMat = new THREE.MeshStandardMaterial({ color: 0xc9a05a, roughness: 0.35, metalness: 0.8 })
+  lampShadeMat = new THREE.MeshStandardMaterial({ color: 0xd8c8a8, roughness: 0.95, metalness: 0, emissive: 0x000000, side: THREE.DoubleSide })
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0xb89a6a, roughness: 0.9 })
 
-  // 底座
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 0.035, 24), metalMat)
+  // 圆形厚重胡桃木底座(直径 18cm,厚 3.5cm)
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.035, 32), woodMat)
   base.position.y = 0.0175
   base.castShadow = true
   base.receiveShadow = true
-  // 灯杆
-  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.026, 0.4, 16), metalMat)
-  arm.position.y = 0.035 + 0.2
-  arm.castShadow = true
-  // 灯罩(锥体,尖朝上、开口朝下,双面可见)
-  const shade = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.2, 24, 1, true), lampShadeMat)
-  shade.position.y = 0.035 + 0.4 + 0.1
+  // 略带弯曲的黄铜细杆(直径 2.5cm,总高 40cm)
+  const curve = new THREE.QuadraticBezierCurve3(
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(0.015, 0.2, 0),
+    new THREE.Vector3(0, 0.4, 0)
+  )
+  const pole = new THREE.Mesh(new THREE.TubeGeometry(curve, 12, 0.0125, 12, false), brassMat)
+  pole.position.y = 0.035
+  pole.castShadow = true
+  // 倒梯形截顶圆锥布艺灯罩(上口 14cm、下口 21cm、高 15cm,米卡其色,下缘收边)
+  const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.105, 0.15, 32, 1, true), lampShadeMat)
+  shade.position.y = 0.035 + 0.4 + 0.075
   shade.castShadow = true
-  lampGroup.add(base, arm, shade)
+  const trim = new THREE.Mesh(new THREE.TorusGeometry(0.105, 0.008, 12, 32), trimMat)
+  trim.rotation.x = Math.PI / 2
+  trim.position.y = 0.035 + 0.4
+  trim.castShadow = true
+  lampGroup.add(base, pole, shade, trim)
   lampGroup.position.set(LAMP_X, LAMP_BASE_Y, LAMP_Z)
   scene.add(lampGroup)
 
@@ -690,20 +744,6 @@ function buildLamp() {
   lampShadeMat.emissive.setHex(lampOn.value ? 0xffc87a : 0x000000)
 }
 
-function buildAwning() {
-  // 窗上雨棚(悬挑于窗上方;高一点、进深短三分之二)
-  const AW = 1.1   // 与窗同宽 110cm
-  const AD = 0.33  // 进深 33cm(短三分之二)
-  const AT = 0.06  // 板厚 6cm
-  const AY = 2.25  // 底面离地 225cm(窗顶 220 之上,高一点)
-  const mat = new THREE.MeshStandardMaterial({ color: 0x8a7a68, roughness: 0.85 })
-  const awning = new THREE.Mesh(new THREE.BoxGeometry(AW, AT, AD), mat)
-  awning.position.set(0, AY + AT / 2, -AD / 2)
-  awning.castShadow = true
-  awning.receiveShadow = true
-  scene.add(awning)
-}
-
 function windowBar(w, h, d, cx, cy, cz, mat) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat)
   m.position.set(cx, cy, cz)
@@ -713,10 +753,10 @@ function windowBar(w, h, d, cx, cy, cz, mat) {
 }
 
 function buildWindow() {
-  const frameMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2f, roughness: 0.5 })
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0x241a12, roughness: 0.55, metalness: 0 })
   const glassMat = new THREE.MeshStandardMaterial({
-    color: 0xbfd8e8, roughness: 0.05, metalness: 0.1,
-    transparent: true, opacity: 0.18, side: THREE.DoubleSide,
+    color: 0xcfe4f0, roughness: 0.04, metalness: 0.1,
+    transparent: true, opacity: 0.16, side: THREE.DoubleSide,
   })
 
   windowGroup = new THREE.Group()
@@ -724,21 +764,21 @@ function buildWindow() {
   const D = WALL_T
   const f = WIN_FRAME
 
-  // 外窗框(固定):上下左右四根 4.67cm 框,围成 110×105
+  // 外窗框(固定):上下左右四根 12cm 框,围成 240×160
   const addBar = (w, h, cx, cy) => windowGroup.add(windowBar(w, h, D, cx, cy, 0, frameMat))
   addBar(WIN_W, f, WIN_CX, WIN_BOTTOM + WIN_H - f / 2)
   addBar(WIN_W, f, WIN_CX, WIN_BOTTOM + f / 2)
   addBar(f, WIN_H, WIN_CX - WIN_W / 2 + f / 2, WIN_CY)
   addBar(f, WIN_H, WIN_CX + WIN_W / 2 - f / 2, WIN_CY)
 
-  // 两扇日字形向外平开(透明区各 50.3×95.7,中横棂分上下两格),左扇合页在左、右扇合页在右,由中间向外推
+  // 两扇日字形向外平开(各 108 宽,中横棂分上下两格),左扇合页在左、右扇合页在右,由中间向外推
   sashL = buildSash(frameMat, glassMat)
-  sashL.position.set(WIN_CX - WIN_W / 2 + f, 0, 0)
+  sashL.position.set(WIN_CX - WIN_W / 2 + f, WIN_BOTTOM + f, 0)
   windowGroup.add(sashL)
 
   sashR = buildSash(frameMat, glassMat)
   sashR.scale.x = -1
-  sashR.position.set(WIN_CX + WIN_W / 2 - f, 0, 0)
+  sashR.position.set(WIN_CX + WIN_W / 2 - f, WIN_BOTTOM + f, 0)
   windowGroup.add(sashR)
 
   scene.add(windowGroup)
@@ -751,143 +791,133 @@ function buildWindow() {
 
 function buildSash(frameMat, glassMat) {
   const g = new THREE.Group()
-  const SW = WIN_GLASS_W / 2 // 单扇宽 50.3cm
-  const SH = WIN_GLASS_H
+  const SW = WIN_W / 2 - WIN_FRAME   // 单扇总宽 108cm(外框内净半宽)
+  const SH = WIN_H - WIN_FRAME * 2   // 单扇总高 136cm(外框内净高)
+  const GW = SW - SASH_BAR * 2       // 单扇玻璃宽 94cm
+  const GH = SH - SASH_BAR * 2       // 单扇玻璃高 122cm
   const SB = SASH_BAR
   const MB = MULLION_BAR
-  const y0 = WIN_BOTTOM + (WIN_H - WIN_GLASS_H) / 2 // 玻璃下缘(与窗框对齐)
-  const y1 = y0 + SH
-  const ym = y0 + SH / 2
+  const topY = SH - SB / 2  // 上梃中心(扇内)
+  const botY = SB / 2       // 下梃中心
+  const ym = SH / 2         // 竖直中线
 
-  // 四根细扇框(合页梃 / 中缝梃 / 上梃 / 下梃)
-  g.add(windowBar(SB, SH, SB, SB / 2, ym, 0, frameMat))          // 合页梃(左)
-  g.add(windowBar(SB, SH, SB, SW - SB / 2, ym, 0, frameMat))     // 中缝梃(右)
-  g.add(windowBar(SW, SB, SB, SW / 2, y1 - SB / 2, 0, frameMat)) // 上梃
-  g.add(windowBar(SW, SB, SB, SW / 2, y0 + SB / 2, 0, frameMat)) // 下梃
+  // 四根细扇框(合页梃在左 x=0 侧 / 中缝梃在右 / 上梃 / 下梃)
+  g.add(windowBar(SB, GH, SB, SB / 2, ym, 0, frameMat))          // 合页梃(左)
+  g.add(windowBar(SB, GH, SB, SW - SB / 2, ym, 0, frameMat))     // 中缝梃(右)
+  g.add(windowBar(SW, SB, SB, SW / 2, topY, 0, frameMat))        // 上梃
+  g.add(windowBar(SW, SB, SB, SW / 2, botY, 0, frameMat))        // 下梃
   // 日字形中横棂(把扇分成上下两格)
   g.add(windowBar(SW, MB, SB, SW / 2, ym, 0, frameMat))
 
   // 玻璃:上下两格,透明不投影(阳光穿过)
-  const gw = SW - SB * 2
-  const gh = (SH - SB * 2 - MB) / 2
-  const glassGeo = new THREE.PlaneGeometry(gw, gh)
+  const paneH = (GH - MB) / 2
+  const glassGeo = new THREE.PlaneGeometry(GW, paneH)
   const top = new THREE.Mesh(glassGeo, glassMat)
-  top.position.set(SW / 2, ym + MB / 2 + gh / 2, 0)
+  top.position.set(SW / 2, ym + MB / 2 + paneH / 2, 0)
   const bot = new THREE.Mesh(glassGeo, glassMat)
-  bot.position.set(SW / 2, ym - MB / 2 - gh / 2, 0)
+  bot.position.set(SW / 2, ym - MB / 2 - paneH / 2, 0)
   g.add(top, bot)
   return g
 }
 
 function buildHangings() {
-  // 窗户侧边墙面:软木便签框(右,横版 70×45)
-  const cork = new THREE.Mesh(
-    new THREE.BoxGeometry(0.7, 0.45, 0.02),
-    new THREE.MeshStandardMaterial({ color: 0xc9a06a, roughness: 0.9 })
-  )
-  cork.position.set(0.9, 1.95, WALL_T / 2 + 0.01)
+  // 窗户左侧:横版户型图装饰画框
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0x3d2b1a, roughness: 0.6 })
+  const canvasMat = new THREE.MeshStandardMaterial({ color: 0xefe7d6, roughness: 0.8 })
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.45, 0.03), frameMat)
+  frame.position.set(-1.8, 1.7, WALL_T / 2 + 0.01)
+  frame.castShadow = true
+  frame.receiveShadow = true
+  scene.add(frame)
+  const canvas = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.37, 0.012), canvasMat)
+  canvas.position.set(-1.8, 1.7, WALL_T / 2 + 0.035)
+  scene.add(canvas)
+
+  // 窗户右侧:软木板 + 若干便利贴
+  const corkMat = new THREE.MeshStandardMaterial({ color: 0xc9a06a, roughness: 0.9 })
+  const cork = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.5, 0.03), corkMat)
+  cork.position.set(1.8, 1.7, WALL_T / 2 + 0.01)
   cork.castShadow = true
   cork.receiveShadow = true
   scene.add(cork)
-  // 户型图便利框(左,竖版 50×60)
-  const plan = new THREE.Mesh(
-    new THREE.BoxGeometry(0.5, 0.6, 0.02),
-    new THREE.MeshStandardMaterial({ color: 0x8a5a30, roughness: 0.7 })
-  )
-  plan.position.set(-0.85, 1.55, WALL_T / 2 + 0.01)
-  plan.castShadow = true
-  plan.receiveShadow = true
-  scene.add(plan)
-}
 
-function buildTurntable() {
-  // 唱片机机身(42×35×22cm),桌子右侧地面
-  const body = new THREE.Mesh(
-    new THREE.BoxGeometry(0.42, 0.22, 0.35),
-    new THREE.MeshStandardMaterial({ color: 0x5a4632, roughness: 0.6 })
-  )
-  body.position.set(0.9, 0.11, 0.5)
-  body.castShadow = true
-  body.receiveShadow = true
-  scene.add(body)
-
-  // 2-3 张黑胶唱片(直径 30cm,厚 0.6cm),两张斜靠机身、一张平放
-  const recMat = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.4, metalness: 0.3 })
-  const recGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.006, 32)
-  const lean = new THREE.Mesh(recGeo, recMat)
-  lean.position.set(1.15, 0.12, 0.65)
-  lean.rotation.x = Math.PI / 2 - 0.35
-  lean.rotation.z = 0.2
-  lean.castShadow = true
-  lean.receiveShadow = true
-  scene.add(lean)
-  const lean2 = new THREE.Mesh(recGeo, recMat)
-  lean2.position.set(1.17, 0.1, 0.7)
-  lean2.rotation.x = Math.PI / 2 - 0.3
-  lean2.rotation.z = 0.32
-  lean2.castShadow = true
-  lean2.receiveShadow = true
-  scene.add(lean2)
-  const flat = new THREE.Mesh(recGeo, recMat)
-  flat.position.set(0.95, 0.003, 0.9)
-  flat.rotation.x = Math.PI / 2
-  flat.castShadow = true
-  flat.receiveShadow = true
-  scene.add(flat)
-}
-
-function buildPlants() {
-  const clayMat = new THREE.MeshStandardMaterial({ color: 0xa85a38, roughness: 0.8 })
-  const leafMat = new THREE.MeshStandardMaterial({ color: 0x3f6b3a, roughness: 0.9 })
-
-  // 唱片机旁地面盆栽:花盆直径 18cm,植株总高 60cm
-  const pot1 = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.075, 0.18, 24), clayMat)
-  pot1.position.set(1.15, 0.09, 1.3)
-  pot1.castShadow = true
-  pot1.receiveShadow = true
-  scene.add(pot1)
-  const leaf1 = new THREE.Mesh(new THREE.SphereGeometry(0.22, 20, 16), leafMat)
-  leaf1.position.set(1.15, 0.5, 1.3)
-  leaf1.castShadow = true
-  leaf1.receiveShadow = true
-  scene.add(leaf1)
-
-  // 桌角小盆栽:花盆直径 10cm,植株高 25cm
-  const pot2 = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.04, 0.1, 18), clayMat)
-  pot2.position.set(-0.45, DESK_H + 0.05, 0.5)
-  pot2.castShadow = true
-  pot2.receiveShadow = true
-  scene.add(pot2)
-  const leaf2 = new THREE.Mesh(new THREE.SphereGeometry(0.09, 14, 12), leafMat)
-  leaf2.position.set(-0.45, DESK_H + 0.21, 0.5)
-  leaf2.castShadow = true
-  leaf2.receiveShadow = true
-  scene.add(leaf2)
+  const noteColors = [0xc8a97a, 0x9c7a4a, 0xa86a4a, 0x7a6a52]
+  const noteGeo = new THREE.BoxGeometry(0.09, 0.09, 0.006)
+  const noteSpots = [
+    { p: [-0.05, 0.12], r: -0.12 },
+    { p: [0.12, -0.05], r: 0.18 },
+    { p: [-0.18, -0.08], r: 0.08 },
+    { p: [0.06, 0.16], r: -0.05 },
+  ]
+  noteSpots.forEach((n, i) => {
+    const note = new THREE.Mesh(
+      noteGeo,
+      new THREE.MeshStandardMaterial({ color: noteColors[i % noteColors.length], roughness: 0.7 })
+    )
+    note.position.set(1.8 + n.p[0], 1.7 + n.p[1], WALL_T / 2 + 0.03)
+    note.rotation.z = n.r
+    scene.add(note)
+  })
 }
 
 function buildBalcony() {
-  // 窗外阳台(生产结构):悬挑于窗下、比窗台稍低,配一盆绿植
-  const mat = new THREE.MeshStandardMaterial({ color: 0x6e5c4a, roughness: 0.8 })
-  const BW = 1.6  // 阳台宽(略宽于窗 1.1)
-  const BD = 0.55 // 阳台深(向外)
-  const BT = 0.1  // 板厚
-  const TOP = WIN_BOTTOM - 0.08 // 阳台顶比窗底稍低
-  const BZ = WALL_Z - BD / 2
-  const balcony = new THREE.Mesh(new THREE.BoxGeometry(BW, BT, BD), mat)
-  balcony.position.set(0, TOP - BT / 2, BZ)
-  balcony.castShadow = true
-  balcony.receiveShadow = true
-  const potMat = new THREE.MeshStandardMaterial({ color: 0xb0603a, roughness: 0.7 })
-  const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.13, 0.28, 24), potMat)
-  pot.position.set(-0.4, TOP + 0.14, BZ)
-  pot.castShadow = true
-  pot.receiveShadow = true
-  const leafMat = new THREE.MeshStandardMaterial({ color: 0x3f6b3a, roughness: 0.9 })
-  const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), leafMat)
-  leaf.position.set(-0.4, TOP + 0.14 + 0.22, BZ)
-  leaf.castShadow = true
-  leaf.receiveShadow = true
-  scene.add(balcony, pot, leaf)
+  // 窗外小阳台:平台顶面 0.75(略低于窗底 0.9)、护栏 0.30、左右两盆圆柱花盆
+  const slabMat = new THREE.MeshStandardMaterial({ color: 0xa6a6a6, roughness: 0.9 })
+  const railMat = new THREE.MeshStandardMaterial({ color: 0x4a4a4a, roughness: 0.5, metalness: 0.5 })
+  const T = 0.035
+
+  const bz = WALL_Z - BALCONY_D / 2            // 平台中心 z=-0.4
+  const frontZ = WALL_Z - BALCONY_D            // 外沿 z=-0.8
+  const railTop = BALCONY_TOP + BALCONY_RAIL   // 护栏顶 1.05
+  const railMid = BALCONY_TOP + BALCONY_RAIL / 2 // 护栏中 0.9
+
+  // 平台板(浅灰水泥,宽 260×深 80×厚 12)
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(BALCONY_W, BALCONY_T, BALCONY_D), slabMat)
+  slab.position.set(0, BALCONY_TOP - BALCONY_T / 2, bz)
+  slab.castShadow = true
+  slab.receiveShadow = true
+  scene.add(slab)
+
+  const addRail = (w, h, d, x, y, z) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), railMat)
+    m.position.set(x, y, z)
+    m.castShadow = true
+    m.receiveShadow = true
+    scene.add(m)
+  }
+
+  // 护栏:顶部扶手 + 中部横杆(U 形:前 + 左右)
+  addRail(BALCONY_W, T, T, 0, railTop, frontZ + T / 2)
+  addRail(T, T, BALCONY_D, -BALCONY_W / 2 + T / 2, railTop, bz)
+  addRail(T, T, BALCONY_D, BALCONY_W / 2 - T / 2, railTop, bz)
+  addRail(BALCONY_W, T, T, 0, railMid, frontZ + T / 2)
+  // 前缘竖向栏杆(6 根)
+  const balCount = 6
+  for (let i = 0; i < balCount; i++) {
+    const x = -BALCONY_W / 2 + T + ((BALCONY_W - T * 2) / (balCount - 1)) * i
+    addRail(T, BALCONY_RAIL, T, x, railMid, frontZ + T / 2)
+  }
+  // 两侧中间竖杆
+  addRail(T, BALCONY_RAIL, T, -BALCONY_W / 2 + T / 2, railMid, bz - BALCONY_D / 2 + T / 2)
+  addRail(T, BALCONY_RAIL, T, BALCONY_W / 2 - T / 2, railMid, bz - BALCONY_D / 2 + T / 2)
+
+  // 两盆圆柱花盆(哑光陶土),左右各一
+  const potMat = new THREE.MeshStandardMaterial({ color: 0xa85230, roughness: 0.85 })
+  const plantMat = new THREE.MeshStandardMaterial({ color: 0x4a7c46, roughness: 0.9 })
+  const potH = 0.28
+  const potR = 0.16
+  ;[-1, 1].forEach((s) => {
+    const px = s * 0.85
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(potR, potR * 0.82, potH, 24), potMat)
+    pot.position.set(px, BALCONY_TOP + potH / 2, bz)
+    pot.castShadow = true
+    pot.receiveShadow = true
+    const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 12), plantMat)
+    leaf.position.set(px, BALCONY_TOP + potH + 0.1, bz)
+    leaf.castShadow = true
+    leaf.receiveShadow = true
+    scene.add(pot, leaf)
+  })
 }
 
 function buildGizmo() {
