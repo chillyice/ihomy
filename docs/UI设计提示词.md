@@ -236,7 +236,7 @@
 - 栅格尺寸根据 `window.innerWidth/Height` 自适应计算 `cellW`/`cellH`。
 - 组件 `position: fixed`,left/top/width/height 由 `cardBoxStyle(w)` 按栅格计算。
 - **四档尺寸(V9.53)**:档位由面积推导 `displayTier(w)`=`w.w*w.h` → `≤4=S(小)/≤9=M(中)/≤20=L(大)/>20=XL(巨大)`;自由拖拽缩放改 snap 四档(`snapSize` 吸附到最近档);拖入/拖出默认尺寸各组件不同(`WIDGET_DEFAULT_SIZE`);每档内部排版不同(小=一眼核心/中=详略得当/大=完整/巨大=扩展,`nFeed/nTask/nReminder/nAnni/nRecipe/nWish/nForecast(w)` 按档截断列表)。
-- **hover 放大 + 推开邻居(V9.53)**:中/小档 hover 临时升一档(大/巨大档不参与);悬停组件 `h-boosted` 放大(scale+阴影+描边加深),邻居 `h-pushed` 缩成胶囊(`transform` 视觉位移,不触发 grid reflow);小档未展开时右下角 `.wave-hint` 波浪三点+「悬停查看更多」文字;悬停延迟防扫视抖动。
+- **hover 放大 + 邻居胶囊(V9.53;V9.58 改真实尺寸)**:中/小档 hover 临时升一档(大/巨大档不参与);**V9.58 起**被 hover 卡片 `h-boosted` 不再 `transform: scale`,改由 GSAP 动画把 `left/top/width/height` 真实扩到放大矩形(`hoverRectPx`,字号不缩放,内部内容按 tier 渐进展开);邻居 `h-pushed` 原位 `transform` 缩放(不再平移推挤),锚点取「放大中心→邻居中心」射线在邻居远边界上的出射点(`neighborOrigin`,连续点位);全盖邻居缩成「图标+标题」胶囊,若缩小后仍与放大矩形重叠(`stillOverlapsAfter`)则进一步缩成纯图标小圆角矩形(`.nc-icon-only` 隐藏文字、`NEIGHBOR_SCALE_ICON=0.32`);部分盖原位降档、擦边轻微缩小;V9.53 的 `.wave-hint` 波浪提示「悬停查看更多」已移除;编辑态进场 `clearHover()` + `gsap.set(left/top/width/height)` 复位真实尺寸;悬停延迟防扫视抖动。
 - **编辑模式**:导航栏 EditPen 按钮切换 `appStore.homeEditMode`。
   - 侧边栏导航项变为组件来源(向右下偏移 `translate(4px,4px)` + 暖棕虚线边框 + 半透明底色;hover 进一步 `translate(8px,8px) scale(1.05)`)。
   - 原位置虚线框占位(`::before`)。
@@ -268,7 +268,7 @@ color: #3A2E22;
 - **家人动态(feed)**:头像+气泡消息,bubble hover `background` 变化;条目数按档截断 `nFeed(w)`。
 - **悬赏任务(task)**:奖励图标+标题+状态点,行 hover `background`;`nTask(w)`。
 - **今日(today)**:积分余额+连续天数+签到按钮+待办提醒;S 档隐藏待办(`nReminder(w)>0` 才渲染)。
-- **天气(weather,V9.53 AI 生图底图)**:中档以上 `tierOf(w)!=='S'` 渲染 `.weather-bg`(AI 生图 URL 背景+渐变遮罩,叠加毛玻璃 `.weather-main`);S 档只显示图标+温度;大/巨大档加多日预报条 `.weather-forecast`;点击进详情页。
+- **天气(weather,V9.53 AI 生图底图;V9.58 巨大档指标)**:中档以上 `tierOf(w)!=='S'` 渲染 `.weather-bg`(AI 生图 URL 背景+渐变遮罩,叠加毛玻璃 `.weather-main`);S 档只显示图标+温度;大档加多日预报条 `.weather-forecast`(「3 天」含今天);**巨大档(XL)追加湿度/风力/PM2.5 三格 `.weather-metrics`**(`.wm-cell` 半透明格,`.wm-k` 10px 次要色/`.wm-v` 13px 加粗 tabular-nums)+ 预报改「未来三天」(不含今天,避免与顶部实况重复);点击进详情页。
 - **纪念日(anni)**:名称+日期+倒计时天数,行 hover `background`+`border-radius`;`nAnni(w)`。
 - **今日推荐(recipe)**:菜谱列表(封面+名称),行 hover `background`;`nRecipe(w)`。
 - **寻物(search,V9.53 缩小版 item 页)**:搜索框(关键词优先+AI 兜底)+只读户型图 FloorPlanCanvas(mode=view)+命中放大居中+上/下一个导航+语音找物(Web Speech API);无户型图显示引导文案。
@@ -322,6 +322,10 @@ color: #3A2E22;
 ### Popper/Dropdown
 
 - `.el-popper.is-light` `z-index:64`(高于弹窗 overlay=63,低于 bright-spot=65;MusicPlayer=62)。
+
+### 全局滚动条(V9.58)
+
+- `main.css` 全局 `*::-webkit-scrollbar { width:4px; height:4px }` + `* { scrollbar-width:thin; scrollbar-color: rgba(58,46,34,0.15) transparent }`(细滚动条 + 暖棕半透明滑块,与侧栏导航同款);组件内**禁止各自定义滚动条样式**(V9.58 已移除 BlogList `.cat-list`/Music `.add-tracks-list`/`.add-album-list` 的局部滚动条,归并到全局)。
 
 ## 11b. 功能页统一工具栏与多选规范(相册/放映厅/音乐通用)
 
@@ -601,6 +605,7 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 48. **工具箱聚合页**(`/tools`):`.page` 根容器+面包屑+`.section-label`;工具卡片网格 `auto-fill minmax(240px,1fr)`,卡片=图标块(56px 圆角暖棕底)+名称(16px/600)+描述(13px 次要色)+「进入」链接(hover `translateY(-3px)`,transform 而非 box-shadow);占位卡虚线边框+降透明度(`opacity:.55`+`border-style:dashed`),不可点。
 49. **脑图列表页**(`/tools/mindmap`):`page-toolbar card`(左=回收站+新建脑图按钮,右=刷新);卡片网格 `auto-fill minmax(250px,1fr)` gap 16px;卡片(`.mm-card.card`)=缩略图(`width:100%; max-height:150px; object-fit:contain; radius 8px`,无图不渲染 img 布局不塌)+标题(15px/600 单行省略,右侧留 32px 给删除钮)+创建人/更新时间(12px 次要色);hover `translateY(-3px)`;删除钮垃圾桶图标右上角 12px(默认次要色,hover 危险色)。新建对话框=模板选择(`mm-tpl-grid` 卡片:emoji+名称+一句描述,选中描边主色)+标题输入(maxlength 100)+确认;回收站对话框=行列表(标题+创建人·时间+恢复/彻底删除按钮,`max-height:420px` 滚动),彻底删除带 ElMessageBox 二次确认。
 50. **脑图编辑器**(`/tools/mindmap/{id}`,`.page.mm-page` 全屏画布模式 `100dvh` 破 1100px 宽限):顶栏=返回+标题(点改名)+工具按钮组(撤销/重做/加子节点/加同级/删除节点/根居中/样式面板/搜索/**演示模式**/历史)+结构/主题双下拉(116px)+导入/导出下拉+保存状态(12px,saved 次要色/dirty 警告色/failed 危险色)+保存按钮;主体 `.mm-canvas`(`flex:1; radius 14px; border; overflow:hidden`,SVG 单层渲染)。悬浮件:搜索替换栏(顶部居中,z=30,输入 170px+计数+上一个/下一个+替换组);节点样式面板(右上角 z=30,268px,三区=文字/节点/连线,左侧 3px 主色条分区标题);**右键菜单**(`position:fixed` z=2600,200px 宽,15 项+分隔线,`max-height:calc(100vh-16px)` 滚动兜底,**定位 clamp 估算高须取 560**——实测 554px,估算偏小会底部溢出);图标子面板(菜单内嵌展开,24px 图标格 active 主色描边);备注气泡(fixed 320px,`white-space:pre-wrap` max-height 200px);富文本格式工具栏(编辑态选中文字浮现,B/I/U/S+色板+清除,`@mousedown.prevent` 防夺焦);历史版本抽屉(el-dialog,立即快照/回滚(带确认)/删除);保存冲突弹窗(ElMessageBox warning,「用我的版本覆盖」/「加载家人的版本」二选一)。深色模式走 CSS 变量自动适配。
+51. **户型图尺子测量工具(V9.58)**:编辑态工具栏新增「尺子」按钮(内联 SVG 直尺,36px 工具图标同款,与标定/底图/裁剪/粘合并列,点击在 select↔ruler 间切换);按钮右下角小三角角标(`.fp-ruler-caret` 暖棕底白三角,**仅当有已存尺子时显示**),点击弹 el-popover(`.fp-ruler-list` 260px,挂 body 需全局样式)列出跨房子/楼层全部已存尺子——行=房子名(13px 单行省略)+楼层·米数(11px 次要色)+删除钮,点击行进对应房子+楼层并居中聚焦(`focusRuler`);画布内:点两点测距离(第一点蓝色预览虚线跟随鼠标,落第二点成测量线段),落点自动吸附房间边角/家具角点(阈值 12px 屏幕恒定);测量线段=蓝色虚线(`.fp-ruler-line` #4a8fc2 虚线)+两端圆点手柄(拖拽吸附)+中点米数标注(白描边);拖线段整线平移(两端各自吸附)/拖端点改位;单条删除=线段中点红叉(`.fp-ruler-del` 反缩放屏幕恒定)/底部居中「清除测量」按钮(`.fp-ruler-clear` 蓝底白字)一键清空;查看态尺子继续展示但不可交互(`.fp-ruler.is-inactive`)。
 
 ## 验收标准
 
