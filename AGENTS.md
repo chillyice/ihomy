@@ -100,7 +100,7 @@ frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
     i18n/ theme/  # vue-i18n 中英;主题两轴矩阵(暖居/光尘 × 晨/暮)
     utils/        # dict.js / diary.js / doodle.js(涂鸦引擎) / furnitureIcon.js(家具类型图标) / windowLight.js / useSunLight.js / useDragResize.js
     composables/  # useDevice.js(设备检测) / useWeatherBg.js(天气 AI 生图氛围底图)
-    components/   # AppSidebar/BackToTop/Breadcrumb/AvatarCropper/InstallPrompt/SiteFooter/SunLightLayer/LightTestConsole/SyncDialog/Mobile*(移动端)/guangchen/(光尘外壳 GuangchenLayout+GuangchenHome)
+    components/   # AppSidebar/BackToTop/Breadcrumb/AvatarCropper/InstallPrompt/SiteFooter/SunLightLayer/LightTestConsole/SyncDialog/Mobile*(移动端)/warm/(暖居外壳 WarmLayout+WarmHome)
     layouts/MobileLayout.vue  # 移动端壳
     styles/main.css # CSS 变量 + 全局样式 + 深色模式 + EP 组件覆写 + @media
     views/        # 31 个页面(Home/Login/Member/Settings/Anniversary/album/cinema/diary/blog/points/task/reminder/plan/wish/book/chat/tree/cascade/ops/storage/item/kitchen/library/tools)

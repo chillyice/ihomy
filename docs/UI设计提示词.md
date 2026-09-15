@@ -467,20 +467,20 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 
 - 弹窗背景 `#1E2A48`;次级按钮 `rgba(255,255,255,0.12)`;placeholder `rgba(232,220,200,0.35)`。
 
-## 18b. 光尘(Light & Dust)主题(暖木/陶土/鼠尾草绿/奶油,V9.60)
+## 18b. 暖居(Warm Dwelling)主题(暖木/陶土/鼠尾草绿/奶油,V9.60;V9.64 随主题对调改名)
 
-> 光尘是第二套「装修风格」主题,与暖居(暖木米/夜色深蓝)并列;晨暮(mode)是另一条独立轴。完整调色板与组件规格见 `docs/设计想法/光尘主题/光尘-视觉解析.md` 与 `光尘-晨暮预览.html`(晨/暮双态静态对照)。
+> 暖居是第二套「装修风格」主题,与光尘(暖木米/夜色深蓝)并列;晨暮(mode)是另一条独立轴。完整调色板与组件规格见 `docs/设计想法/光尘主题/光尘-视觉解析.md` 与 `光尘-晨暮预览.html`(晨/暮双态静态对照,设计史文件名保留)。
 
 - **材质原则**:卡片不再是玻璃(禁 backdrop-filter),改「家具块」——墙是背景、卡片是屋子里暖木/羊皮家具。圆角 16px、暖木边框、更暖更柔阴影,`hover` 用 `transform: translateY(-2px)` + `box-shadow` 增强(禁用 backdrop-filter 重算)。
 - **调色板(晨 dawn / 暮 dusk)**:背景 `#F1E7D6`/`#241A12`,卡片羊皮 `#FBF3E4`/暖褐 `#33241A`,主色深木 `#8A6A4E`/琥珀木 `#C9A16E`,强调陶土 `#C9807A`/`#E19A8C`,点缀鼠尾草绿 `#7C8B6C`/`#8FA080`,正文深褐 `#4A3A2B`/奶油 `#EFE0C8`。晨暮两态色值**完全不同、不共用**(同 §18a 规则)。
-- **桌面外壳**:`GuangchenLayout` = 顶栏(家庭名/返回/工具栏胞吐插槽/晨暮分段开关)+ 圆角 studio 外框(22px)+ 230px 侧栏(按 category 分组、组头可折叠、默认只展开内容组)+ 主区内部滚动;主区上下边缘 `mask-image` 40px 渐变融入背景。光影(体积光/窗影/尘/台灯)沿用 SunLightLayer。
-- **按钮/标签/角标/圆角**:沿用 §18a 全局统一值,但次级按钮改 `--line` 底/`--text-2` 字、hover `--card-2`(暖木手感,替代暖居硬编码 `#f3eee6/#5c4c3d`)。
+- **桌面外壳**:`WarmLayout` = 顶栏(家庭名/返回/工具栏胞吐插槽/晨暮分段开关)+ 圆角 studio 外框(22px)+ 230px 侧栏(按 category 分组、组头可折叠、默认只展开内容组)+ 主区内部滚动;主区上下边缘 `mask-image` 40px 渐变融入背景。光影(体积光/窗影/尘/台灯)沿用 SunLightLayer。
+- **按钮/标签/角标/圆角**:沿用 §18a 全局统一值,但次级按钮改 `--line` 底/`--text-2` 字、hover `--card-2`(暖木手感,替代光尘硬编码 `#f3eee6/#5c4c3d`)。
 - **签名元素**:「会呼吸的窗」——窗框阴影 + 光柱(尘粒随日光缓漫)+ 天气 AI 生图全屏氛围底图(最底层,压 SunLightLayer 之下)。
 - **侧栏用户信息(V9.61)**:侧栏 `<nav>` 前 `.gc-user` 块(38px 头像 `el-avatar` + 昵称 13.5px/600 + 家庭名 11.5px 弱文字),头像无图时 `--color-green` 底 + 昵称首字,点击进 `/settings`。
-- **晨暮切换扫光(V9.62)**:光尘内晨↔暮切换不再整体 1s 渐变,改「从一侧柔和扫向另一侧」——暗色(晨→暮)沿垂直于光束方向扫过,上午~正午向右上、下午向左上、正午纯水平向右、夜晚默认水平,暮→晨反向;实现为克隆旧主题整页 DOM 为幕布 `.theme-sweep-old` + 方向性柔和 `mask` 蒙版划动(边界两侧真实晨/暮渲染,交界 ±8% 渐变条,`@property --sweep-p` 过渡 **1700ms**),划动期间 `html.theme-sweeping` 禁容器级颜色过渡;克隆内 `.theme-sweep-old :is(...){color:var(--color-text)!important}` 防 `html.dark` 硬编码浅色字泄漏。
+- **晨暮切换扫光(V9.62)**:暖居内晨↔暮切换不再整体 1s 渐变,改「从一侧柔和扫向另一侧」——暗色(晨→暮)沿垂直于光束方向扫过,上午~正午向右上、下午向左上、正午纯水平向右、夜晚默认水平,暮→晨反向;实现为克隆旧主题整页 DOM 为幕布 `.theme-sweep-old` + 方向性柔和 `mask` 蒙版划动(边界两侧真实晨/暮渲染,交界 ±8% 渐变条,`@property --sweep-p` 过渡 **1700ms**),划动期间 `html.theme-sweeping` 禁容器级颜色过渡;克隆内 `.theme-sweep-old :is(...){color:var(--color-text)!important}` 防 `html.dark` 硬编码浅色字泄漏。
 - **晨暮分段滑块(V9.63)**:晨/暮分段开关改「滑块 thumb」——`.gc-seg-thumb` 绝对定位盖在选中按钮下,`segMode` 本地 ref 跟随选中态;扫光结束后才更新滑块位置(`waitSweepEnd`),首次定位关过渡、ResizeObserver 跟随语言切换按钮宽度变化;选中文案 `--color-card`、thumb `--color-brand`、hover `--color-brand-hover`。
 - **天气背景待机浮现(V9.63)**:鼠标停在「背景板」静止 ≥3s 后天气 AI 底图 `.gc-weatherbg.revealed` 浮到最前(z-index 30、opacity 1,`pointer-events:none` 不挡交互),移动鼠标即恢复原状。
-- **光尘首页组件化(V9.63)**:`GuangchenHome` 硬编码卡片改组件注册表——9 富组件(weather/feed/photos/anni/finance/item/task/wish/reminder)+ 20 模块入口(未映射富组件的模块落为「快捷入口」卡片);OWNER 编辑模式(复用 `appStore.homeEditMode`)可增删/拖拽排序/右下角调大小(列宽 4/6/8/12、行高 2/3/4/6)/托盘添加,布局持久化 `ihomy:guangchen:home:v2`;内容丰富度按「行数 row + 列宽 span」两维推导(`vTier`/`hTier` → S/M/L/XL);侧栏模块编辑态可拖入首页。
+- **暖居首页组件化(V9.63)**:`WarmHome` 硬编码卡片改组件注册表——9 富组件(weather/feed/photos/anni/finance/item/task/wish/reminder)+ 20 模块入口(未映射富组件的模块落为「快捷入口」卡片);OWNER 编辑模式(复用 `appStore.homeEditMode`)可增删/拖拽排序/右下角调大小(列宽 4/6/8/12、行高 2/3/4/6)/托盘添加,布局持久化 `ihomy:guangchen:home:v2`(键名保留);内容丰富度按「行数 row + 列宽 span」两维推导(`vTier`/`hTier` → S/M/L/XL);侧栏模块编辑态可拖入首页。
 
 ## 19. 性能规范(已踩坑)
 
