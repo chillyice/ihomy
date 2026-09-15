@@ -482,6 +482,15 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 - **天气背景待机浮现(V9.63)**:鼠标停在「背景板」静止 ≥3s 后天气 AI 底图 `.gc-weatherbg.revealed` 浮到最前(z-index 30、opacity 1,`pointer-events:none` 不挡交互),移动鼠标即恢复原状。
 - **暖居首页组件化(V9.63)**:`WarmHome` 硬编码卡片改组件注册表——9 富组件(weather/feed/photos/anni/finance/item/task/wish/reminder)+ 20 模块入口(未映射富组件的模块落为「快捷入口」卡片);OWNER 编辑模式(复用 `appStore.homeEditMode`)可增删/拖拽排序/右下角调大小(列宽 4/6/8/12、行高 2/3/4/6)/托盘添加,布局持久化 `ihomy:guangchen:home:v2`(键名保留);内容丰富度按「行数 row + 列宽 span」两维推导(`vTier`/`hTier` → S/M/L/XL);侧栏模块编辑态可拖入首页。
 
+## 18c. 主题切换圆形色块(ThemeSwatch,V9.65)
+
+- **结构**:设置页「主题」行的 el-radio 替换为 `ThemeSwatch.vue`——每个主题一个圆(46px),底色在晨/暮两色间 6s 交叉渐变(`--sw-a`/`--sw-b` 取自 theme meta),下方主题名;hover 圆弹性放大 1.5 并展示主题特色动效,选中圆描边 `--color-brand` + 右下对勾。
+- **选中对勾**:`ts-check` 绝对定位在圆右下角外 2px(16px 圆、`--color-brand` 底、`--color-card` 字、`z-index:6`);圆带 `overflow:hidden`(裁特效)会把对勾裁掉,故对勾放在 `.ts-swatch` 相对容器的圆上一层(兄弟层)。
+- **光尘圆动效 = 迷你丁达尔体积光**:hover 时「光晕 bloom + 单条羽毛光柱 + 浮尘」——光晕暖金 radial-gradient(screen);光柱 `linear-gradient(to bottom, 暖金 rgba(255,218,158)→rgba(255,188,108)→transparent)` + `filter:blur(2.5px)` + `mix-blend-mode:screen`,方向**自右上射向左下**(`rotate(31deg)`;负角度在屏幕坐标 y 向下里会把下端往右摆,与直觉相反);光柱缓慢呼吸明暗 + 轻微摆(模拟太阳方位角漂移 + 10s 微闪)。浮尘用 `var(--light-dust)`/`var(--light-dust-glow)`(主题同款)+ screen + 向下漂移淡出,每颗 `--dur/--delay` 错开(时长 5.5~8s、相位 0~3.2s,ease-in-out)。
+- **暖居圆动效**:呼吸暖光 `--glow-warm` radial + 「会呼吸的窗」(旋转窗框)+ 金色尘粒。
+- **暖居配色补充(V9.65)**:陶土粉(`--blob-1`)/鼠尾草绿(`--blob-3`)在暖居主体里原先极少(五色漂移色块被 `html.theme-warm .bg-blobs{display:none}` 关闭)——补充点:①studio 外壳叠极淡双色径向渐变底衬(右上陶土 + 左下鼠尾草绿,`rgba(...,.12)`);②天气窗左下角鼠尾草绿光斑(`rgba(var(--blob-3),.22)`,对角平衡右上陶土光斑);③快捷入口图标 `.gc-link-icon` 鼠尾草绿底 `rgba(var(--blob-3),.16)`、列表图标 `.gc-ic` 陶土粉底 `rgba(var(--blob-1),.14)`。
+- **晨暮分段开关同步(V9.65)**:顶栏 `.gc-seg` 滑块/高亮跟随 `themeStore.mode` 立即同步(去 `waitSweepEnd` 延迟)。
+
 ## 19. 性能规范(已踩坑)
 
 - **100% 缩放卡顿根因**:Element Plus `Setting`/`Monitor` 图标 SVG path 过于复杂,hover 时子像素光栅化开销大 → 用内联 SVG 替代(详见博客 id=18)。
