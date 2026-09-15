@@ -331,8 +331,16 @@ html.dark .msg-icon:hover { color: #E8DCC8; }
 html { transition: background-color 1s ease; }
 body, #app { transition: color 1s ease; }
 
-/* 晨暮切换扫光(光尘):幕布铺旧背景色 + 扫光期间禁容器级颜色过渡(避免与幕布交叉淡入打架) */
-.theme-sweep { position: fixed; z-index: 999999; pointer-events: none; will-change: transform; }
+/* 晨暮切换扫光(光尘):克隆旧主题实时 DOM 为幕布,方向性柔和蒙版从一侧划到另一侧露出新主题;扫光期间禁容器级颜色过渡(避免交叉淡入打架) */
+@property --sweep-p {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: -150%;
+}
+.theme-sweep-old { position: fixed; inset: 0; z-index: 999999; pointer-events: none; overflow: hidden; will-change: mask-position; }
+.theme-sweep-old, .theme-sweep-old * { pointer-events: none !important; }
+/* 冻结的旧主题克隆不受 html.dark 硬编码浅色字影响:回填被冻结的 CSS 变量,保证蒙版边界两侧都是真实晨/暮效果 */
+.theme-sweep-old :is(.nav-item, .user-name, .draggable-panel, .panel-title, .feed-nick, .feed-bubble, .bubble-type, .bubble-body, .bubble-time, .task-title, .task-meta, .task-reward, .date, .weather, .weather-icon, .weather-temp, .anni-name, .anni-date, .anni-days, .days-num, .days-unit, .polaroid-caption, .msg-icon) { color: var(--color-text) !important; }
 html.theme-sweeping, html.theme-sweeping body, html.theme-sweeping #app { transition: none !important; }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }

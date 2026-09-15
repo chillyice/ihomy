@@ -45,7 +45,7 @@ export function loadTheme() {
   }
 }
 
-// —— 晨暮切换扫光(光尘专属):按当前光照角度方向从一侧向另一侧过渡,而非整体渐变 ——
+// —— 晨暮切换扫光(光尘专属):克隆旧主题整页 DOM 为幕布,方向性柔和蒙版从一侧划到另一侧露出新主题 ——
 // 太阳方位角/高度角上下文,由 useSunLight 每次刷新场景时写入(模块级单例,跨 store/composable 共享)
 let _sun = { azimuth: 180, altitude: 0, isNight: true }
 export function setSunContext(ctx) {
@@ -71,26 +71,64 @@ function sweepVector(sun) {
   return { dx: dx / len, dy: dy / len }
 }
 
-// 铺一张「旧主题背景色」全屏幕布,待类切换后让它沿扫光方向滑出、露出新主题
+// 克隆当前(旧主题)整页 DOM 为「旧主题幕布」,冻结旧主题 CSS 变量与滚动位置;
+// 之后蒙版软边从一侧划到另一侧,划过去的地方露出(已切换的)新主题,未划到的仍是旧主题的真实渲染。
+function cloneOldTheme(root) {
+  const overlay = document.createElement('div')
+  overlay.className = 'theme-sweep-old'
+
+  const app = document.getElementById('app')
+  if (app) {
+    const clone = app.cloneNode(true)
+    clone.removeAttribute('id')
+    overlay.appendChild(clone)
+    copyScroll(app, clone)
+  }
+
+  // 冻结旧主题 CSS 变量:把 html 当前所有 --* 计算值内联到幕布,后代 var() 不再跟随 html 类切换
+  const cs = getComputedStyle(root)
+  for (let i = 0; i < cs.length; i++) {
+    const name = cs[i]
+    if (name.startsWith('--')) overlay.style.setProperty(name, cs.getPropertyValue(name))
+  }
+  // 幕布底色:旧主题背景色(克隆 #app 本身透明,需自铺底色遮住 html 背景)
+  const oldBg = cs.getPropertyValue('--color-bg').trim() || '#F1E7D6'
+  overlay.style.background = oldBg
+
+  document.body.appendChild(overlay)
+  return overlay
+}
+
+// 克隆 DOM 不保留内部容器的滚动位置,需按结构一一回填(否则滚动页切换时旧主题会跳到顶部)
+function copyScroll(orig, clone) {
+  const ow = document.createTreeWalker(orig, NodeFilter.SHOW_ELEMENT)
+  const cw = document.createTreeWalker(clone, NodeFilter.SHOW_ELEMENT)
+  let o = ow.currentNode
+  let c = cw.currentNode
+  while (o && c) {
+    if (o.scrollTop || o.scrollLeft) {
+      c.scrollTop = o.scrollTop
+      c.scrollLeft = o.scrollLeft
+    }
+    o = ow.nextNode()
+    c = cw.nextNode()
+  }
+}
+
 function beginModeSweep(root, prevDusk) {
   const toDusk = !prevDusk // true=晨→暮(暗色扫入),false=暮→晨(亮色扫入)
-  const oldBg = getComputedStyle(root).getPropertyValue('--color-bg').trim() || '#F1E7D6'
   const dir = sweepVector(_sun)
-  const vx = toDusk ? dir.dx : -dir.dx
+  const vx = toDusk ? dir.dx : -dir.dx // 扫光前进方向(新主题从该侧露出来)
   const vy = toDusk ? dir.dy : -dir.dy
-  const angle = Math.atan2(vy, vx) * 180 / Math.PI
+  // 蒙版渐变轴:0%(透明=新主题已露出)在扫光来向一侧,100%(不透明=旧主题未划到)在前进方向一侧。
+  // CSS linear-gradient 角度:0deg=向上/90deg=向右/180deg=向下/270deg=向左,故 angle=atan2(vx, -vy)。
+  const angle = Math.atan2(vx, -vy) * 180 / Math.PI
+  const grad = `linear-gradient(${angle}deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0) calc(var(--sweep-p) - 8%), #000 calc(var(--sweep-p) + 8%), #000 100%)`
 
-  const veil = document.createElement('div')
-  veil.className = 'theme-sweep'
-  veil.style.background = oldBg
-  const side = Math.hypot(window.innerWidth, window.innerHeight) * 2.4
-  veil.style.width = side + 'px'
-  veil.style.height = side + 'px'
-  veil.style.left = '50%'
-  veil.style.top = '50%'
-  veil.style.marginLeft = -(side / 2) + 'px'
-  veil.style.marginTop = -(side / 2) + 'px'
-  document.body.appendChild(veil)
+  const overlay = cloneOldTheme(root)
+  overlay.style.webkitMask = `${grad} no-repeat center / 100% 100%`
+  overlay.style.mask = `${grad} no-repeat center / 100% 100%`
+  overlay.style.setProperty('--sweep-p', '-10%')
 
   // 扫光期间禁 html/body/#app 的 1s 颜色过渡(否则与幕布交叉淡入打架)
   root.classList.add('theme-sweeping')
@@ -100,25 +138,22 @@ function beginModeSweep(root, prevDusk) {
     const cleanup = () => {
       if (done) return
       done = true
-      veil.remove()
+      overlay.remove()
       root.classList.remove('theme-sweeping')
     }
-    let anim
+    const travelMs = 1700
     try {
-      anim = veil.animate(
-        [
-          { transform: `rotate(${angle}deg) translateX(0px)` },
-          { transform: `rotate(${angle}deg) translateX(${side}px)` },
-        ],
-        { duration: 700, easing: 'cubic-bezier(.4,0,.2,1)' }
-      )
+      overlay.style.transition = `--sweep-p ${travelMs}ms cubic-bezier(.4,0,.2,1)`
+      // 先提交起点,下一帧再切到终点触发过渡(--sweep-p 已用 @property 注册为可过渡)
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        overlay.style.setProperty('--sweep-p', '110%')
+      }))
     } catch {
       cleanup()
       return
     }
-    anim.onfinish = cleanup
-    anim.oncancel = cleanup
-    setTimeout(cleanup, 900) // 兜底清理(动画异常/被中断时)
+    overlay.addEventListener('transitionend', cleanup, { once: true })
+    setTimeout(cleanup, travelMs + 300) // 兜底清理(过渡异常/被中断时)
   }
 }
 
@@ -130,7 +165,7 @@ export function applyTheme(state) {
   const isModeChange = prevDusk != null && prevDusk !== nextDusk
   const withinGuangchen = _current && _current.theme === 'guangchen' && t.theme === 'guangchen'
 
-  // 光尘内晨↔暮切换:切类前铺旧色幕布,切类后扫光露出新主题
+  // 光尘内晨↔暮切换:切类前克隆旧主题整页为幕布,切类后蒙版扫光露出新主题
   const finishSweep = isModeChange && withinGuangchen ? beginModeSweep(root, prevDusk) : null
 
   root.classList.remove(...THEME_IDS.map((id) => 'theme-' + id))
