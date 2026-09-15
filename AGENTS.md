@@ -95,12 +95,12 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
 frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
   src/
     api/          # request.js(axios+JWT+401 自动刷新) + index.js(31 个 Api 对象)
-    stores/       # user.js(登录+权限) / app.js(首页聚合)
+    stores/       # user.js(登录+权限) / app.js(首页聚合) / theme.js(主题两轴矩阵)
     router/       # 登录守卫 + scrollBehavior;39 个路由(懒加载)
-    i18n/ theme/  # vue-i18n 中英;明暗主题(只 light/dark)
+    i18n/ theme/  # vue-i18n 中英;主题两轴矩阵(暖居/光尘 × 晨/暮)
     utils/        # dict.js / diary.js / doodle.js(涂鸦引擎) / furnitureIcon.js(家具类型图标) / windowLight.js / useSunLight.js / useDragResize.js
-    composables/  # useDevice.js(设备检测)
-    components/   # AppSidebar/BackToTop/Breadcrumb/AvatarCropper/InstallPrompt/SiteFooter/SunLightLayer/LightTestConsole/SyncDialog/Mobile*(移动端)
+    composables/  # useDevice.js(设备检测) / useWeatherBg.js(天气 AI 生图氛围底图)
+    components/   # AppSidebar/BackToTop/Breadcrumb/AvatarCropper/InstallPrompt/SiteFooter/SunLightLayer/LightTestConsole/SyncDialog/Mobile*(移动端)/guangchen/(光尘外壳 GuangchenLayout+GuangchenHome)
     layouts/MobileLayout.vue  # 移动端壳
     styles/main.css # CSS 变量 + 全局样式 + 深色模式 + EP 组件覆写 + @media
     views/        # 31 个页面(Home/Login/Member/Settings/Anniversary/album/cinema/diary/blog/points/task/reminder/plan/wish/book/chat/tree/cascade/ops/storage/item/kitchen/library/tools)
@@ -156,7 +156,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | AI | 图片生成/语音识别接入+AI 测试台+家庭级 AI 配置 | AiService / FamilyAiConfigService / AiController(/ai/status、/ai/config、/ai/chat、/ai/image、/ai/transcribe) |
 | 厨房 | 菜单/菜谱/食材 | RecipeController / RecipeService |
 | 工具 | 工具箱聚合页/脑图设计(simple-mind-map,快照/回滚/协同轮询)/AI 测试台(/tools/ai-playground 临时)/3D 光影实验台(/tools/light-lab 临时,Three.js 太阳模拟+真实阴影,未来场景主题基础) | MindMapController / MindMapService |
-| 系统 | i18n / 主题 / 字典 | i18n/ + theme/ + utils/dict.js |
+| 系统 | i18n / 主题(暖居/光尘 × 晨/暮) / 字典 | i18n/ + theme/(index.js)+stores/theme.js + utils/dict.js |
 | 移动端 | 设备自适应 | useDevice.js + MobileLayout.vue + Mobile* 组件 |
 
 **关键坑速查**(实现细节,详见 docs):日记 date 兼容 `yyyy-MM-dd HH:mm`;纪念日 Hutool ChineseDate 月份 0-based 需 +1;家谱 null 字段须 `LambdaUpdateWrapper` 显式 SET;相册分享 token + Knuth 混淆;博客新建家庭注入 9 默认分类;物品户型图 2 期完成(裁剪/粘合删原房保持最后防家具入库覆盖、端点识别/字号/光标屏幕恒定;**hover 边加号阈值 6px**——原 12px 太大导致 hover 显示但 click 被 `justDragged` 拦截;库内家具拖入画布替代「摆放」+「请选择房间」按钮)、3 期 AI 语义已实现(V9.40:/item/ai/find、/item/ai/put;V9.46 前端入口;V9.49 本地规则+LLM 兜底;V9.51 语音找物/放物入口;V9.52 同义词表+功能兜底);**未设计楼层画布空白+引导**(2026-09-07:表单录入房间无 geometry,画布标签 cx/cy=0 会全堆叠在原点;"已设计"=floorDesigned 有底图或任一房间形状≥3 点,未设计时隐藏家具/物品+引导进编辑+拦截摆放,画完第一间自动恢复);**MP `updateById` 会显式回写实体里的旧 `updated_at` 抑制 `ON UPDATE CURRENT_TIMESTAMP`**——凡依赖 updated_at 做变更检测/排序的表,更新必须 LambdaUpdateWrapper 只 SET 业务字段并重查回传新值(2026-09-06 脑图协同踩坑);**simple-mind-map npm 包只内置 default 主题**,其余主题须 `mindmapThemes.js` defineTheme 本地注册,否则 setTheme 静默回落默认样式;**脑图多端并发保存靠 update 乐观锁**(客户端带 baseUpdatedAt,库中 updated_at 已刷新则 409,前端弹窗裁决覆盖/加载远端——双开 20s 轮询窗口内静默互覆盖实测丢数据);**脑图保存前 stripEmptyNodes 剥空叶子**(新增节点不输入直接确认残留 `<p><br></p>`,须传 getData(true).root 而非整包);**EP dropdown 内嵌 CSS hover 子菜单两坑**(2026-09-07 头像「切换家庭」):hover 容忍期须用 `visibility` 延迟隐藏而非 `display` 切换(L 形 hover 区域有路径死角,`display:none` 后移入面板区无法复活),且绝对定位子面板会撑大 `el-scrollbar__wrap` 的 scrollWidth 让 EP 画出滚不动的幽灵 bar(该 popper 的 `.el-scrollbar__bar` 直接 display:none);**pdfjs-dist 统一 v6**(物品定位 PDF 底图转图 + 书架 PDF 查看器两消费方同版本,worker 用 `build/pdf.worker.min.mjs?url`,降 v3 会因 build 目录无 .mjs 构建失败;**PDF 在浏览器不用裸 iframe**——iOS Safari/安卓 Chrome 的 iframe 不内联渲染 PDF,书架阅读器已换 pdf.js canvas 连续滚动视图 V9.42);详见 docs/变更归档.md 同日小节。
@@ -323,7 +323,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **P1 放映厅 Jellyfin 集成**:方案已定稿,详见 docs/变更归档.md「放映厅 Jellyfin 集成方案」;**启动时先重读该归档小节**。
 - **P2 智能家居中控(Home Assistant 集成)**(2026-09-07 评估定稿):硬件协议层全归 HA(家庭中枢:J4125 PVE 虚拟化 OpenWrt/HAOS/OMV + WireGuard 隧道连 VPS,硬件部署另行推进),ihomy 只做数据沉淀与家人控制入口——S1 Paho 订阅 Mosquitto 入库 sys_iot_device/sys_iot_data + Redis 最新值、S2 HA REST 控制入口(long-lived token)、S3 前端中控页(sys_home_module 模块)+ 物品定位户型图联动;详见需求设计说明书 §9。
 - **P3 物品定位-AI 语义(已完成 V9.46;V9.49 改本地规则+LLM 兜底;V9.52 同义词表+功能兜底)**:后端 V9.40(AiService 统一接入层 + POST /item/ai/find、/item/ai/put);**前端入口 V9.46 已实现**(查看模式搜索框关键词优先+无命中 AI 找物兜底+来源标注;列表模式「AI 登记」弹窗;**删不经过 AI**——AI 找到走既有删除按钮人工确认);**V9.49 本地规则优先+LLM 兜底**(ItemLocalParser 找物闭集反向匹配+放物正则抽取「把X放Y的Z里」,零 token 离线毫秒级;绑定 LLM 时本地覆盖不了才回 chatJson,未配置/LOCAL 则纯本地);**V9.52 同义词表+功能兜底**(sys_synonym + SynonymService:找物读表扩展、放物归一化 name+填别名、LLM 落库后写回学习;fallback_model_id + resolveChain:找物/放物质量兜底、对话/图片/语音容灾兜底);token 节约:put 上下文 items 压缩为紧凑"名称(别名)"文本(find 无清单);详见需求设计说明书 §4.6.9/§4.8。
-- **场景主题方向(2026-09-12)**:2D 沉浸首页场景主题(feature/scene-theme 分支,SceneHome.vue)暂缓开发;3D 光影实验台(/tools/light-lab,Three.js 真实阴影+客户端 NOAA 太阳模拟+房子结构)作为未来场景主题的 3D 基础模型,后续重构时以此为底座;详见需求设计说明书 §4.12.3/§9。
+- **场景主题方向(2026-09-12,2026-09-15 更新)**:2D 沉浸首页场景主题(SceneHome.vue)**已移除**(暂缓后从 main 删除);3D 光影实验台(/tools/light-lab,Three.js 真实阴影+客户端 NOAA 太阳模拟+房子结构)作为未来场景主题的 3D 基础模型,后续重构时以此为底座;详见需求设计说明书 §4.12.3/§9。
 - 优先级:P1 用户价值高且可行 / P2 锦上添花 / P3 结构性改动 / P4 依赖外部条件。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
 
 ## 文档清单
