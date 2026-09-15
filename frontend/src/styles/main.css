@@ -233,8 +233,13 @@ html.theme-guangchen .fp-main::after {
   box-shadow: inset 0 0 56px 24px var(--color-bg);
 }
 
-/* 设置页:光尘下设置导航与内容顶部齐平(gc-main 顶内边距 14px,sticky 对齐到 14px 而非暖居的 42px),保留 sticky 置顶 */
-html.theme-guangchen .settings-side { top: 14px; }
+/* 内容页 sticky 侧栏(设置导航/博客分类/文章目录):光尘下顶部偏移归零——
+ * gc-main 是滚动容器,顶栏已被隔离在容器之外;sticky 相对滚动容器的内容顶定位,
+ * 只有 top:0 才与内容上边界齐平(旧 14px/42px 会额外下移一段,滚动+工具栏胞吐时尤其错位)。
+ * 暖居仍是窗口滚动 + 固定顶栏,保留各组件里的 42px 不动。 */
+html.theme-guangchen .settings-side,
+html.theme-guangchen .category-side,
+html.theme-guangchen .toc-aside { top: 0; }
 
 /* 内容页:gc-main 滚动区上下边缘渐变(同物品定位页「边缘融入背景」),内容滚动不再硬切;物品定位页自带画板渐变,排除 */
 html.theme-guangchen .gc-main:not(:has(.fp-page)) {
@@ -246,9 +251,8 @@ html.theme-guangchen .gc-main:not(:has(.fp-page)) {
 html.theme-guangchen .bg-blobs { display: none; }
 html.theme-guangchen .login-card { background: var(--color-card) !important; border-color: var(--color-border) !important; }
 
-/* 光尘是自包含 studio 框架,页脚/调试台不再需要(避免挤到视口下方) */
+/* 光尘是自包含 studio 框架,页脚不再需要(避免挤到视口下方);光照测试控制台保留——光尘下同样要做光影模拟 */
 html.theme-guangchen .site-footer { display: none; }
-html.theme-guangchen .light-test-console { display: none; }
 
 /* Element Plus 语义变量 → 光尘 token:让表格/输入框/下拉/弹窗/标签全部家具块化(晨暮自动) */
 html.theme-guangchen {

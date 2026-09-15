@@ -39,6 +39,23 @@ export function useWeatherBg() {
     return albumPromise
   }
 
+  // 兜底:上次本地区域(优先当前城市)生成的天气图,供「生成不了新图」时回退展示
+  const latestCached = (w) => {
+    try {
+      const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}')
+      const city = w?.city || ''
+      let same = null
+      let any = null
+      for (const k in cache) {
+        const e = cache[k]
+        if (!e || !e.url) continue
+        if (city && k.startsWith(city + '|') && (!same || e.ts > same.ts)) same = e
+        if (!any || e.ts > any.ts) any = e
+      }
+      return (same || any)?.url || ''
+    } catch { return '' }
+  }
+
   const load = async (w) => {
     const key = keyOf(w)
     if (!key || !w) return
@@ -55,7 +72,7 @@ export function useWeatherBg() {
     loading.value = true
     try {
       if (!aiStatusChecked) { try { aiImageAvail = !!(await aiApi.status())?.weatherImage?.available } catch {} aiStatusChecked = true }
-      if (!aiImageAvail) return
+      if (!aiImageAvail) { weatherBg.value = latestCached(w); return }
       const dn = dayNight() === 'day' ? '白天' : '夜晚'
       const scene = (cfg.scene || '').trim()
       const prompt = `${cfg.style},${season()}季${dn} ${w.city || ''} ${w.text || ''} 的城市街景${scene ? ',' + scene : ''},柔和暖色调,宁静家居感,高清#`
@@ -67,8 +84,12 @@ export function useWeatherBg() {
         try { const c = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); c[key] = { url, ts: Date.now() }; localStorage.setItem(CACHE_KEY, JSON.stringify(c)) } catch {}
         const albumId = await ensureAlbum()
         if (albumId && (/^https?:\/\//i.test(url) || /^data:/i.test(url))) { try { await photoApi.saveFromUrl(albumId, { url }) } catch {} }
+      } else {
+        weatherBg.value = latestCached(w)
       }
-    } catch {}
+    } catch {
+      weatherBg.value = latestCached(w)
+    }
     finally { loading.value = false }
   }
 

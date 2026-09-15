@@ -1,4 +1,4 @@
-<!-- 首页:12列×9行栅格仪表盘,编辑模式可拖拽/缩放/增删组件 -->
+<!-- 首页:自由布局仪表盘(组件大小/位置自由摆放,不吸附栅格),编辑模式可拖拽/缩放/增删组件 -->
 <template>
   <div ref="root" class="home-page" :class="{ 'edit-mode': editMode }">
     <PhotoViewer v-model:visible="viewerVisible" :photos="sevenDayPhotos" :initial-index="viewerIdx" />
@@ -12,27 +12,20 @@
       </div>
     </Transition>
 
-    <!-- 栅格背景(编辑模式可见,出现动画) -->
-    <Transition name="grid-fade" appear>
-      <div v-if="editMode" class="grid-overlay" :style="gridOverlayStyle">
-        <div v-for="i in 108" :key="i" class="grid-cell" :style="{ animationDelay: (i * 5) + 'ms' }"></div>
-      </div>
-    </Transition>
-
     <!-- 组件 -->
     <template v-for="w in visibleWidgets" :key="w.uid">
       <div
         :ref="el => setCardEl(w.uid, el)"
         class="dash-card"
-        :class="[w.id, { 'edit-active': editMode, dragging: w._dragging, 'h-1': w.h === 1, 'is-hovered': hoverExpands && hoverUid === w.uid, 'is-neighbor': isFullNeighbor(w) }]"
+        :class="[w.id, { 'edit-active': editMode, dragging: w._dragging, 'h-1': tinyCard(w), 'is-hovered': hoverExpands && hoverUid === w.uid, 'is-neighbor': isFullNeighbor(w) }]"
         :style="cardBoxStyle(w)"
         @mouseenter="onCardEnter(w)"
         @mouseleave="onCardLeave"
         @click="bringToFront(w)"
       >
-        <div v-if="editMode" class="drag-bar" @mousedown="onDragStart($event, w)"><span class="grip"></span></div>
+        <div class="drag-bar" @mousedown="onDragStart($event, w)"><span class="grip"></span></div>
         <button v-if="editMode" class="del-btn" @click.stop="removeWidget(w)">✕</button>
-        <div v-if="editMode" class="resize-corner" @mousedown.stop="onResizeStart($event, w)"></div>
+        <div class="resize-corner" @mousedown.stop="onResizeStart($event, w)"></div>
 
         <!-- 邻居胶囊:全盖级邻居原位缩成图标+文字;若仍重叠则进一步缩成纯图标小圆角矩形(部分盖→降档,擦边→轻微缩小) -->
         <div v-if="isFullNeighbor(w)" class="neighbor-capsule" :class="{ 'nc-icon-only': neighborIconOnly(w) }">
@@ -307,10 +300,10 @@ watch(editMode, (on) => {
   }
 })
 
-// ========== 栅格尺寸:自适应屏幕分辨率 ==========
+// ========== 画布尺寸:自适应屏幕分辨率(自由布局,无栅格吸附) ==========
+// COLS/ROWS 仅作「等效栅格」参考:用于四档面积推导、天气主角放大、拖入默认尺寸折算
 const COLS = 12
 const ROWS = 9
-const GAP = 40
 const SIDEBAR_W = 220
 const MARGIN = { top: 32, right: 40, bottom: 40, left: SIDEBAR_W + 40 }
 
@@ -320,32 +313,27 @@ const onWinResize = () => { winW.value = window.innerWidth; winH.value = window.
 window.addEventListener('resize', onWinResize)
 onUnmounted(() => window.removeEventListener('resize', onWinResize))
 
-const cellW = computed(() => {
-  const gridW = winW.value - MARGIN.left - MARGIN.right
-  return Math.max(0, (gridW - GAP * (COLS - 1)) / COLS)
-})
-const cellH = computed(() => {
-  const gridH = winH.value - MARGIN.top - MARGIN.bottom
-  return Math.max(0, (gridH - GAP * (ROWS - 1)) / ROWS)
-})
+// 自由布局画布:组件以画布内的比例坐标 x/y/w/h(0~1)存储,渲染时换算成 px,窗口缩放等比例自适应。
+// x/y 为左上角相对画布左上角的比例,w/h 为相对画布宽高的比例。
+const canvasW = computed(() => Math.max(0, winW.value - MARGIN.left - MARGIN.right))
+const canvasH = computed(() => Math.max(0, winH.value - MARGIN.top - MARGIN.bottom))
 
 const cardStyle = (w) => {
-  const cw = cellW.value
-  const ch = cellH.value
-  const left = MARGIN.left + w.col * (cw + GAP)
-  const top = MARGIN.top + w.row * (ch + GAP)
-  const width = w.w * cw + (w.w - 1) * GAP
-  const height = w.h * ch + (w.h - 1) * GAP
-  const s = { left: left + 'px', top: top + 'px', width: width + 'px', height: height + 'px' }
+  const s = {
+    left: (MARGIN.left + w.x * canvasW.value) + 'px',
+    top: (MARGIN.top + w.y * canvasH.value) + 'px',
+    width: (w.w * canvasW.value) + 'px',
+    height: (w.h * canvasH.value) + 'px',
+  }
   if (w._z) s.zIndex = w._z
   return s
 }
 
 // 相册内容尺寸:按组件实际像素的宽高双向预算取 min——宽页面(列宽远大于行高)时受高度约束,
-// 不再随组件宽度撑大;cardStyle 同源的格子数学
+// 不再随组件宽度撑大;cardStyle 同源的画布比例数学
 const albumBox = (w) => ({
-  W: w.w * cellW.value + (w.w - 1) * GAP,
-  H: w.h * cellH.value + (w.h - 1) * GAP,
+  W: w.w * canvasW.value,
+  H: w.h * canvasH.value,
 })
 // 拍立得宽:全高≈0.75P+22(4:3 图+白框+手写条),高向不超组件高 55%,宽向不超组件宽 42%
 const polaroidW = (w) => {
@@ -357,15 +345,6 @@ const albumCoverW = (w) => {
   const { W, H } = albumBox(w)
   return Math.round(Math.min(W * 0.7, H * 0.95))
 }
-
-const gridOverlayStyle = computed(() => ({
-  left: MARGIN.left + 'px',
-  top: MARGIN.top + 'px',
-  right: MARGIN.right + 'px',
-  bottom: MARGIN.bottom + 'px',
-  '--cell-w': cellW.value + 'px',
-  '--cell-h': cellH.value + 'px',
-}))
 
 // ========== 数据 ==========
 const family = ref({})
@@ -491,7 +470,7 @@ const loadAll = async () => {
 }
 
 // ========== 布局状态 ==========
-// 默认布局(排版方案 §五):12 列 × 9 行,9 组件默认展示(task 由用户从侧边栏拖入)
+// 默认布局沿用原排版(12 列 × 9 行视觉),再折算成画布比例坐标 x/y/w/h(0~1)
 const DEFAULT_LAYOUT = [
   { id: 'feed', col: 0, row: 0, w: 4, h: 5 },
   { id: 'weather', col: 4, row: 0, w: 3, h: 3 },
@@ -502,10 +481,10 @@ const DEFAULT_LAYOUT = [
   { id: 'recipe', col: 8, row: 3, w: 2, h: 2 },
   { id: 'wish', col: 10, row: 3, w: 2, h: 2 },
   { id: 'finance', col: 8, row: 5, w: 2, h: 2 },
-]
+].map((g) => ({ id: g.id, x: g.col / COLS, y: g.row / ROWS, w: g.w / COLS, h: g.h / ROWS }))
 
-// 布局键加版本号:v2 让新默认布局真正生效——旧 v1 持久化布局与四档语义不兼容,直接丢弃改用 §五
-const STORAGE_KEY = 'ihomy:dashboard:layout:v2'
+// 布局键加版本号:v3 起组件改为自由布局(x/y/w/h 画布比例),旧 v1/v2 栅格布局语义不兼容,直接丢弃
+const STORAGE_KEY = 'ihomy:dashboard:layout:v3'
 
 // 拖入/拖出默认尺寸(排版方案 §三「拖出默认尺寸」)
 const WIDGET_DEFAULT_SIZE = {
@@ -521,35 +500,22 @@ const WIDGET_DEFAULT_SIZE = {
   task: { w: 3, h: 3 },
 }
 
-// 四档(排版方案 §二/§三):档位由面积推导——小=2×2(≤4)、中=3×3/3×2(≤9)、大=4×4/4×5/5×4(≤20)、巨大=5×5/6×4(>20)
+// 四档(排版方案 §二/§三):档位由等效栅格面积推导——画布比例 w/h × 列/行数 = 等效格宽/格高,
+// 面积阈值与原栅格口径一致(小≤4、中≤9、大≤20、巨大>20)
 function displayTier(w) {
-  const area = w.w * w.h
+  const area = (w.w * COLS) * (w.h * ROWS)
   if (area <= 4) return 'S'
   if (area <= 9) return 'M'
   if (area <= 20) return 'L'
   return 'XL'
 }
 
-// snap 预设档(排版方案 §三):小=2×2 / 中=3×3 / 大=4×4,5×4 / 巨大=5×5,6×4
-const SNAP_SIZES = [
-  { w: 2, h: 2 },
-  { w: 3, h: 3 },
-  { w: 4, h: 4 },
-  { w: 5, h: 4 },
-  { w: 5, h: 5 },
-  { w: 6, h: 4 },
-]
-// 取最接近的预设档(受网格边界约束)
-const snapSize = (nw, nh, col, row) => {
-  let best = null, bestDist = Infinity
-  for (const s of SNAP_SIZES) {
-    if (s.w > COLS - col || s.h > ROWS - row) continue
-    const d = Math.abs(s.w - nw) + Math.abs(s.h - nh)
-    if (d < bestDist) { bestDist = d; best = s }
-  }
-  if (!best) best = { w: Math.max(1, Math.min(COLS - col, nw)), h: Math.max(1, Math.min(ROWS - row, nh)) }
-  return best
-}
+// 卡片高度过小时隐藏标题行(原栅格 h===1 的语义,自由布局按实际像素判断)
+const tinyCard = (w) => w.h * canvasH.value < 120
+
+// 自由缩放最小尺寸(px):避免组件缩到不可见/不可操作
+const MIN_W = 150
+const MIN_H = 110
 
 // 各组件四档内容条数(排版方案 §四):小/中/大/巨大 渐进展开;tierOf 使 hover 升档时内容随之增多
 const nFeed = (w) => ({ S: 2, M: 4, L: 6, XL: 8 }[tierOf(w)] ?? 4)
@@ -574,7 +540,7 @@ const loadLayout = () => {
   try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) return JSON.parse(raw) } catch (e) {}
   return null
 }
-const saveLayout = () => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(widgets.value.map(w => ({ id: w.id, col: w.col, row: w.row, w: w.w, h: w.h })))) } catch (e) {} }
+const saveLayout = () => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(widgets.value.map(w => ({ id: w.id, x: w.x, y: w.y, w: w.w, h: w.h })))) } catch (e) {} }
 
 const makeWidget = (cfg) => ({ ...cfg, uid: cfg.id + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), _z: 0, _dragging: false })
 
@@ -603,33 +569,24 @@ const HOVER_DELAY = 350
 const HOVER_CAPABLE = typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(hover: hover)').matches && window.matchMedia('(pointer: fine)').matches
 const hoverUid = ref(null)
 let hoverTimer = null
+// 拖拽/缩放进行中:抑制 hover 放大展开,避免与拖拽抢焦点(正常模式即可直接拖拽调整)
+const isDragging = ref(false)
 
 // 放大比例:普通组件 小档 2→3(1.5x)/中档 3→4(1.33x),大/巨大不放大;
 // 天气为「主角」:hover 直接放大到 5×5 巨大档(scale = 5 / 较长边,≥1),已 XL 不放大
 const WEATHER_HERO = 5
 const hoverScale = (hw) => {
-  if (hw.id === 'weather') return displayTier(hw) === 'XL' ? 1 : Math.max(1, WEATHER_HERO / Math.max(hw.w, hw.h))
+  // 天气「主角」:hover 放大到 5 格(画布比例 × 列/行数 = 等效格宽/格高),已 XL 不放大
+  if (hw.id === 'weather') return displayTier(hw) === 'XL' ? 1 : Math.max(1, WEATHER_HERO / Math.max(hw.w * COLS, hw.h * ROWS))
   return ({ S: 1.5, M: 4 / 3, L: 1, XL: 1 }[displayTier(hw)] ?? 1)
 }
-// 放大后组件的视觉矩形(格坐标):中心缩放理想矩形 clamp 进栅格(边缘组件向内收)。
-// 被 hover 的卡片用该矩形做真实尺寸增长(见 cardBoxStyle),邻居按该矩形判断覆盖/推挤
-const hoverRect = (h) => {
-  const sc = hoverScale(h)
-  const w = h.w * sc
-  const hgt = h.h * sc
-  const idealLeft = h.col + h.w / 2 - w / 2
-  const idealTop = h.row + h.h / 2 - hgt / 2
-  const left = Math.min(Math.max(idealLeft, 0), Math.max(0, COLS - w))
-  const top = Math.min(Math.max(idealTop, 0), Math.max(0, ROWS - hgt))
-  return { left, top, w, hgt }
-}
-// 判断邻居 n 是否被放大后的组件 h 影响:与 clamp 后的放大矩形(格坐标)相交即受影响
+// 判断邻居 n 是否被放大后的组件 h 影响:与 clamp 后的放大矩形(px)相交即受影响
 const hoverAffects = (h, n) => {
   const sc = hoverScale(h)
   if (sc <= 1) return false
-  const r = hoverRect(h)
-  const nl = n.col, nt = n.row, nr = n.col + n.w, nb = n.row + n.h
-  return nl < r.left + r.w && nr > r.left && nt < r.top + r.hgt && nb > r.top
+  const r = hoverRectPx(h)
+  const N = cardRectPx(n)
+  return N.left < r.left + r.width && N.left + N.width > r.left && N.top < r.top + r.height && N.top + N.height > r.top
 }
 // ---- 推开邻居三档(方案二:按覆盖比例)----
 // 全盖 ≥70% → 胶囊(缩 0.55+位移);部分盖 ≥30% → 降档缩小(内容还在,少显示一些);擦边 → 轻微缩小 0.85、内容不变
@@ -640,13 +597,14 @@ const NEIGHBOR_SCALE_ICON = 0.32 // 胶囊缩小后仍与放大矩形重叠时,�
 const NEIGHBOR_SCALE_GRAZE = 0.85
 // 放大矩形盖住邻居 n 的面积占比(0~1)
 const hoverCoverage = (h, n) => {
-  const r = hoverRect(h)
-  const ox = Math.max(n.col, r.left)
-  const oy = Math.max(n.row, r.top)
-  const ox2 = Math.min(n.col + n.w, r.left + r.w)
-  const oy2 = Math.min(n.row + n.h, r.top + r.hgt)
+  const r = hoverRectPx(h)
+  const N = cardRectPx(n)
+  const ox = Math.max(N.left, r.left)
+  const oy = Math.max(N.top, r.top)
+  const ox2 = Math.min(N.left + N.width, r.left + r.width)
+  const oy2 = Math.min(N.top + N.height, r.top + r.height)
   if (ox >= ox2 || oy >= oy2) return 0
-  return ((ox2 - ox) * (oy2 - oy)) / (n.w * n.h)
+  return ((ox2 - ox) * (oy2 - oy)) / (N.width * N.height)
 }
 // 覆盖等级:full / partial / graze(S 档最小无法降档,部分盖也按全盖处理成胶囊)
 const neighborLevel = (h, n) => {
@@ -687,7 +645,7 @@ const tierOf = (w) => {
 }
 // 当前悬停组件是否真的会放大:天气放大到巨大(XL 前都放大),其余仅中小档放大——只有放大时才推挤邻居
 const hoverExpands = computed(() => {
-  if (!HOVER_CAPABLE || editMode.value) return false
+  if (!HOVER_CAPABLE || editMode.value || isDragging.value) return false
   const h = widgets.value.find(x => x.uid === hoverUid.value)
   if (!h) return false
   if (h.id === 'weather') return displayTier(h) !== 'XL'
@@ -695,7 +653,7 @@ const hoverExpands = computed(() => {
 })
 
 const setHover = (w) => {
-  if (editMode.value || !HOVER_CAPABLE) return
+  if (editMode.value || isDragging.value || !HOVER_CAPABLE) return
   if (hoverTimer) clearTimeout(hoverTimer)
   hoverTimer = setTimeout(() => { hoverUid.value = w.uid }, HOVER_DELAY)
 }
@@ -706,23 +664,22 @@ const clearHover = () => {
 const onCardEnter = (w) => { setHover(w); if (w.id === 'album') onAlbumEnter() }
 const onCardLeave = () => { clearHover(); onAlbumLeave() }
 
-// 卡片 px 矩形(cardStyle 同源格子数学)
+// 卡片 px 矩形(cardStyle 同源画布比例数学)
 const cardRectPx = (w) => {
-  const cw = cellW.value, ch = cellH.value
-  const left = MARGIN.left + w.col * (cw + GAP)
-  const top = MARGIN.top + w.row * (ch + GAP)
-  const width = w.w * cw + (w.w - 1) * GAP
-  const height = w.h * ch + (w.h - 1) * GAP
+  const width = w.w * canvasW.value
+  const height = w.h * canvasH.value
+  const left = MARGIN.left + w.x * canvasW.value
+  const top = MARGIN.top + w.y * canvasH.value
   return { left, top, width, height, cx: left + width / 2, cy: top + height / 2 }
 }
-// 放大矩形 px
+// 放大矩形 px:以卡片中心为锚等比放大,再 clamp 进画布(边缘组件向内收)
 const hoverRectPx = (h) => {
-  const r = hoverRect(h)
-  const cw = cellW.value, ch = cellH.value
-  const left = MARGIN.left + r.left * (cw + GAP)
-  const top = MARGIN.top + r.top * (ch + GAP)
-  const width = r.w * cw + (r.w - 1) * GAP
-  const height = r.hgt * ch + (r.hgt - 1) * GAP
+  const sc = hoverScale(h)
+  const base = cardRectPx(h)
+  const width = base.width * sc
+  const height = base.height * sc
+  const left = Math.min(Math.max(base.cx - width / 2, MARGIN.left), MARGIN.left + canvasW.value - width)
+  const top = Math.min(Math.max(base.cy - height / 2, MARGIN.top), MARGIN.top + canvasH.value - height)
   return { left, top, width, height, cx: left + width / 2, cy: top + height / 2 }
 }
 // 原位缩放到 scale 后是否仍与放大矩形重叠(不移位,以邻居中心为锚点缩)
@@ -1051,7 +1008,7 @@ const loadFloorPlanPreview = async () => {
   } catch (e) {}
 }
 
-// ========== 拖拽 + 缩放(栅格吸附) ==========
+// ========== 拖拽 + 缩放(自由布局,正常模式即可直接调整) ==========
 let zCounter = 20
 let dragState = null
 
@@ -1063,9 +1020,11 @@ const bringToFront = (w) => {
 const onDragStart = (e, w) => {
   if (e.target.classList.contains('resize-corner') || e.target.classList.contains('del-btn')) return
   w._dragging = true
+  isDragging.value = true
+  clearHover()
   zCounter = Math.min(zCounter + 1, 59)
   w._z = zCounter
-  dragState = { w, startX: e.clientX, startY: e.clientY, startCol: w.col, startRow: w.row }
+  dragState = { w, startX: e.clientX, startY: e.clientY, startXf: w.x, startYf: w.y }
   e.preventDefault()
   window.addEventListener('mousemove', onMouseMove)
   window.addEventListener('mouseup', onMouseUp)
@@ -1073,6 +1032,8 @@ const onDragStart = (e, w) => {
 
 const onResizeStart = (e, w) => {
   w._dragging = true
+  isDragging.value = true
+  clearHover()
   zCounter = Math.min(zCounter + 1, 59)
   w._z = zCounter
   dragState = { w, startX: e.clientX, startY: e.clientY, startW: w.w, startH: w.h, isResize: true }
@@ -1084,27 +1045,24 @@ const onResizeStart = (e, w) => {
 const onMouseMove = (e) => {
   if (!dragState) return
   const { w } = dragState
-  const cw = cellW.value
-  const ch = cellH.value
-  const dx = e.clientX - dragState.startX
-  const dy = e.clientY - dragState.startY
-  const dCol = Math.round(dx / (cw + GAP))
-  const dRow = Math.round(dy / (ch + GAP))
+  // 像素位移折算成画布比例位移;自由布局不做栅格吸附
+  const dx = (e.clientX - dragState.startX) / canvasW.value
+  const dy = (e.clientY - dragState.startY) / canvasH.value
   if (dragState.isResize) {
-    const nw = Math.max(1, Math.min(COLS - w.col, dragState.startW + dCol))
-    const nh = Math.max(1, Math.min(ROWS - w.row, dragState.startH + dRow))
-    const snapped = snapSize(nw, nh, w.col, w.row)
-    w.w = snapped.w
-    w.h = snapped.h
+    const nw = Math.max(MIN_W / canvasW.value, Math.min(1 - w.x, dragState.startW + dx))
+    const nh = Math.max(MIN_H / canvasH.value, Math.min(1 - w.y, dragState.startH + dy))
+    w.w = nw
+    w.h = nh
   } else {
-    w.col = Math.max(0, Math.min(COLS - w.w, dragState.startCol + dCol))
-    w.row = Math.max(0, Math.min(ROWS - w.h, dragState.startRow + dRow))
+    w.x = Math.max(0, Math.min(1 - w.w, dragState.startXf + dx))
+    w.y = Math.max(0, Math.min(1 - w.h, dragState.startYf + dy))
   }
 }
 
 const onMouseUp = () => {
   if (dragState) { dragState.w._dragging = false; saveLayout() }
   dragState = null
+  isDragging.value = false
   window.removeEventListener('mousemove', onMouseMove)
   window.removeEventListener('mouseup', onMouseUp)
 }
@@ -1140,11 +1098,11 @@ watch(wdCrossed, (crossed) => {
 
 onDrop((type, x, y) => {
   const size = WIDGET_DEFAULT_SIZE[type] || { w: 3, h: 3 }
-  const cw = cellW.value
-  const ch = cellH.value
-  const col = Math.max(0, Math.min(COLS - size.w, Math.round((x - MARGIN.left) / (cw + GAP))))
-  const row = Math.max(0, Math.min(ROWS - size.h, Math.round((y - MARGIN.top) / (ch + GAP))))
-  widgets.value.push(makeWidget({ id: type, col, row, w: size.w, h: size.h }))
+  const wf = size.w / COLS
+  const hf = size.h / ROWS
+  const wx = Math.max(0, Math.min(1 - wf, (x - MARGIN.left) / canvasW.value))
+  const wy = Math.max(0, Math.min(1 - hf, (y - MARGIN.top) / canvasH.value))
+  widgets.value.push(makeWidget({ id: type, x: wx, y: wy, w: wf, h: hf }))
   saveLayout()
   ElMessage.success(`已添加 ${WIDGET_LABELS[type] || type} 组件`)
 })
@@ -1173,20 +1131,6 @@ onBeforeUnmount(() => { ctx?.revert(); gsap.killTweensOf('.dash-card') })
 html.dark .edit-toolbar { background: rgba(var(--color-card-rgb),0.6); border-color: rgba(255,255,255,0.1); }
 .edit-label { font-size: 12px; opacity: 0.6; }
 
-/* 栅格背景 */
-.grid-overlay {
-  position: fixed; z-index: 15; pointer-events: none;
-  display: grid;
-  grid-template-columns: repeat(12, var(--cell-w));
-  grid-template-rows: repeat(9, var(--cell-h));
-  gap: 40px;
-}
-.grid-cell { border: 1px dashed rgba(var(--color-brand-rgb),0.15); border-radius: 8px; opacity: 0; animation: cellAppear 0.4s ease forwards; }
-html.dark .grid-cell { border-color: rgba(var(--color-brand-rgb),0.1); }
-@keyframes cellAppear { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
-.grid-fade-enter-active, .grid-fade-leave-active { transition: opacity 0.3s ease; }
-.grid-fade-enter-from, .grid-fade-leave-to { opacity: 0; }
-
 /* 卡片通用 */
 .dash-card {
   position: fixed; z-index: 20;
@@ -1208,7 +1152,7 @@ html.dark .grid-cell { border-color: rgba(var(--color-brand-rgb),0.1); }
   box-shadow: 0 4px 16px rgba(var(--color-brand-rgb),0.15);
   transition: left 0.15s cubic-bezier(0.4,0,0.2,1), top 0.15s cubic-bezier(0.4,0,0.2,1), width 0.15s cubic-bezier(0.4,0,0.2,1), height 0.15s cubic-bezier(0.4,0,0.2,1), box-shadow 0.25s ease;
 }
-.dash-card.dragging { opacity: 0.9; }
+.dash-card.dragging { opacity: 0.9; transition: none; }
 html.dark .dash-card { background: rgba(var(--color-card-rgb),0.5); border-color: rgba(255,255,255,0.1); color: #E8DCC8; box-shadow: 0 8px 28px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06); }
 
 .card-inner { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
@@ -1228,13 +1172,27 @@ html.dark .card-more { color: var(--color-brand); }
 .widget-empty-hint { font-size: 11px; color: #b0a89e; margin-top: 4px; }
 html.dark .widget-empty { color: rgba(232,220,200,0.3); }
 
-/* 编辑模式拖拽条/删除/缩放 */
-.drag-bar { height: 18px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; cursor: grab; }
+/* 拖拽条/删除/缩放:拖拽条与缩放角正常模式悬停浮现、编辑模式常显,无需进编辑模式即可直接调整 */
+.drag-bar {
+  position: absolute; top: 0; left: 0; right: 0; height: 18px;
+  display: flex; align-items: center; justify-content: center; cursor: grab; z-index: 9;
+  opacity: 0; transition: opacity 0.2s ease;
+}
+.dash-card:hover .drag-bar,
+.dash-card.edit-active .drag-bar { opacity: 1; }
+.dash-card.edit-active .drag-bar { position: static; flex-shrink: 0; }
 .drag-bar:active { cursor: grabbing; }
 .grip { width: 32px; height: 3px; border-radius: 2px; background: rgba(var(--color-brand-rgb),0.3); }
 .del-btn { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border: none; border-radius: 50%; background: rgba(201,116,116,0.15); color: #c97474; font-size: 11px; cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center; }
 .del-btn:hover { background: rgba(201,116,116,0.3); }
-.resize-corner { position: absolute; bottom: 0; right: 0; width: 18px; height: 18px; cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, rgba(var(--color-brand-rgb),0.25) 50%); border-bottom-right-radius: 20px; z-index: 10; }
+.resize-corner {
+  position: absolute; bottom: 0; right: 0; width: 18px; height: 18px; cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 50%, rgba(var(--color-brand-rgb),0.25) 50%);
+  border-bottom-right-radius: 20px; z-index: 10;
+  opacity: 0; transition: opacity 0.2s ease;
+}
+.dash-card:hover .resize-corner,
+.dash-card.edit-active .resize-corner { opacity: 1; }
 
 /* 家人动态 */
 .feed-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; cursor: pointer; }

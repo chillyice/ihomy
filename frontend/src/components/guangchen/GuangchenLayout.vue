@@ -2,8 +2,8 @@
 <!-- 光影(丁达尔体积光/窗影/尘/台灯)由全局 SunLightLayer 提供,此处只做布局 + 天气 AI 全屏底图 -->
 <template>
   <div class="gc-root" :class="{ scrolled: scrolled }">
-    <!-- 天气→AI 生图的全屏氛围底图层(最底,压在 SunLightLayer 之下) -->
-    <div v-if="weatherBg" class="gc-weatherbg" :style="{ backgroundImage: `url(${weatherBg})` }"></div>
+    <!-- 天气→AI 生图的全屏氛围底图层(最底,压在 SunLightLayer 之下);鼠标静止 3s 浮到最前 -->
+    <div v-if="weatherBg" class="gc-weatherbg" :class="{ revealed: bgRevealed }" :style="{ backgroundImage: `url(${weatherBg})` }"></div>
 
     <div class="gc-wrap">
       <!-- 顶栏:家庭名 + 返回按钮 + 工具栏(滚动时胞吐进来) + 晨/暮分段开关 -->
@@ -20,9 +20,10 @@
         </button>
         <div class="gc-pin" :class="{ on: scrolled }"></div>
         <div class="gc-ctl">
-          <div class="gc-seg">
-            <button :class="{ on: themeStore.mode === 'dawn' }" @click="themeStore.setMode('dawn')">☀ {{ $t('theme.dawn') }}</button>
-            <button :class="{ on: themeStore.mode === 'dusk' }" @click="themeStore.setMode('dusk')">☾ {{ $t('theme.dusk') }}</button>
+          <div class="gc-seg" ref="segEl">
+            <span ref="segThumb" class="gc-seg-thumb" aria-hidden="true"></span>
+            <button ref="dawnBtn" :class="{ on: segMode === 'dawn' }" @click="themeStore.setMode('dawn')">☀ {{ $t('theme.dawn') }}</button>
+            <button ref="duskBtn" :class="{ on: segMode === 'dusk' }" @click="themeStore.setMode('dusk')">☾ {{ $t('theme.dusk') }}</button>
           </div>
         </div>
       </div>
@@ -51,8 +52,10 @@
                     v-for="m in g.items"
                     :key="m.code"
                     class="gc-nav-item"
-                    :class="{ act: isActive(m.path) }"
-                    @click="navigate(m.path)"
+                    :class="{ act: isActive(m.path), 'widget-src': appStore.homeEditMode && draggableCodes.has(m.code) }"
+                    :draggable="appStore.homeEditMode && draggableCodes.has(m.code)"
+                    @click="appStore.homeEditMode && draggableCodes.has(m.code) ? null : navigate(m.path)"
+                    @dragstart="onNavDragStart($event, m.code)"
                   >
                     <span class="gc-dot"></span>{{ m.title }}
                   </div>
@@ -105,6 +108,30 @@ const userInitial = computed(() => (userInfo.value?.nickname || '我').charAt(0)
 const { weatherBg, load: loadWeatherBg } = useWeatherBg()
 watch(() => sunLight?.weather?.value, (w) => { if (w) loadWeatherBg(w) }, { immediate: true })
 
+// 背景照片待机浮现:只有鼠标停在「背景板」上(天气照片实际可见的区域)且确有背景图时,
+// 静止超过 3s → 背景浮到最前;移动鼠标 → 恢复原始状态
+const bgRevealed = ref(false)
+const BG_IDLE_MS = 3000
+// 命中判定:studio 外框内(含侧栏/主区/卡片/间隙)与顶栏内容、浮层都不是背景板
+const CONTENT_SELECTOR = '.gc-brand, .gc-seg, .gc-back, .el-overlay, .el-popper, .el-message'
+const isBackgroundArea = (x, y) => {
+  const el = document.elementFromPoint(x, y)
+  if (!el) return false
+  if (el.closest('.gc-studio')) return false // studio 外框盖住天气照片,内里一律不算背景
+  if (el.closest(CONTENT_SELECTOR)) return false // 顶栏内容/浮层不算背景
+  return true
+}
+let bgIdleTimer = null
+const resetBgIdle = (e) => {
+  clearTimeout(bgIdleTimer)
+  bgRevealed.value = false
+  if (!weatherBg.value) return // 无背景图片时不触发
+  if (!isBackgroundArea(e.clientX, e.clientY)) return // 不是背景板不触发
+  bgIdleTimer = setTimeout(() => { bgRevealed.value = true }, BG_IDLE_MS)
+}
+onMounted(() => { window.addEventListener('mousemove', resetBgIdle, { passive: true }) })
+onBeforeUnmount(() => { clearTimeout(bgIdleTimer); window.removeEventListener('mousemove', resetBgIdle) })
+
 const NAV_PATHS = {
   blog: '/blog', diary: '/diary', album: '/album', anniversary: '/anniversary',
   cinema: '/cinema', music: '/music', member: '/member', points: '/points', task: '/task',
@@ -145,6 +172,14 @@ const navGroups = computed(() => {
 const isActive = (path) => (path === '/' ? route.path === '/' : route.path.startsWith(path))
 const navigate = (path) => { if (route.path !== path) router.push(path) }
 
+// 编辑模式下:侧栏模块可拖入首页(与 GuangchenHome 的 dataTransfer 标记 'application/x-ihomy-widget' 约定)
+// settings/ops 是虚拟入口(不在 appStore.modules 内),不会成为拖拽源
+const draggableCodes = computed(() => new Set(appStore.modules.map((m) => m.code)))
+const onNavDragStart = (e, code) => {
+  e.dataTransfer.setData('application/x-ihomy-widget', code)
+  e.dataTransfer.effectAllowed = 'copy'
+}
+
 // 主区内部滚动:工具栏滚出内容窗口顶部时触发胞吐
 const mainEl = ref(null)
 const scrolled = ref(false)
@@ -163,6 +198,54 @@ onMounted(() => {
 })
 onBeforeUnmount(() => mainEl.value?.removeEventListener('scroll', onMainScroll))
 watch(() => route.fullPath, () => nextTick(measureThreshold))
+
+// 晨暮分段开关滑块:选中态(高亮 + thumb)跟随本地 segMode,扫光结束后才更新,让滑块滑动可见(否则被扫光全屏幕布盖住看不到)
+const segMode = ref(themeStore.mode)
+const segEl = ref(null)
+const segThumb = ref(null)
+const dawnBtn = ref(null)
+const duskBtn = ref(null)
+const positionSegThumb = () => {
+  const seg = segEl.value
+  const thumb = segThumb.value
+  const btn = segMode.value === 'dawn' ? dawnBtn.value : duskBtn.value
+  if (!seg || !thumb || !btn) return
+  const cs = getComputedStyle(seg)
+  const borderL = parseFloat(cs.borderLeftWidth) || 0
+  const borderT = parseFloat(cs.borderTopWidth) || 0
+  const sr = seg.getBoundingClientRect()
+  const br = btn.getBoundingClientRect()
+  thumb.style.left = `${br.left - sr.left - borderL}px`
+  thumb.style.top = `${br.top - sr.top - borderT}px`
+  thumb.style.width = `${br.width}px`
+  thumb.style.height = `${br.height}px`
+}
+// 晨暮切换会触发扫光(html 挂 theme-sweeping),等扫光结束再滑滑块
+const waitSweepEnd = () => new Promise((resolve) => {
+  const root = document.documentElement
+  if (!root.classList.contains('theme-sweeping')) return resolve()
+  const mo = new MutationObserver(() => {
+    if (!root.classList.contains('theme-sweeping')) { mo.disconnect(); resolve() }
+  })
+  mo.observe(root, { attributes: true, attributeFilter: ['class'] })
+  setTimeout(() => { mo.disconnect(); resolve() }, 2100) // 兜底(扫光最长约 2s)
+})
+watch(() => themeStore.mode, async (m) => {
+  await waitSweepEnd()
+  if (themeStore.mode !== m) return // 等待期间又切了,交给最新一次
+  segMode.value = m
+  positionSegThumb()
+})
+onMounted(() => {
+  // 首次定位不播放过渡(否则加载时滑块从 0 尺寸滑入)
+  if (segThumb.value) segThumb.value.style.transition = 'none'
+  positionSegThumb()
+  requestAnimationFrame(() => { if (segThumb.value) segThumb.value.style.transition = '' })
+  // 语言切换等导致按钮宽度变化时重定位
+  const ro = new ResizeObserver(() => positionSegThumb())
+  if (segEl.value) ro.observe(segEl.value)
+  onBeforeUnmount(() => ro.disconnect())
+})
 
 // pinned 跟随 scrolled:正向立即进顶栏,反向延迟回来(等 holder 渐显完成后 toolbar 再回位)
 let pinTimer = null
@@ -219,6 +302,8 @@ watch(() => route.fullPath, () => { canBack.value = window.history.state?.back !
 
 /* 天气 AI 生图全屏底图(最底层,压在 SunLightLayer 之下) */
 .gc-weatherbg { position: fixed; inset: 0; z-index: 0; background-size: cover; background-position: center; opacity: .3; pointer-events: none; transition: opacity 1.2s ease; }
+/* 待机浮现:鼠标静止 3s 后浮到最前(盖过内容层,pointer-events:none 不挡交互;移动鼠标即移除该类恢复) */
+.gc-weatherbg.revealed { z-index: 30; opacity: 1; }
 
 /* ===== 预览壳 ===== */
 .gc-wrap { position: relative; z-index: 10; max-width: 1180px; margin: 0 auto; height: 100vh; padding: 24px 20px 24px; display: flex; flex-direction: column; box-sizing: border-box; }
@@ -234,10 +319,11 @@ watch(() => route.fullPath, () => { canBack.value = window.history.state?.back !
 .gc-back:hover { color: var(--color-text); background: var(--color-card-2); }
 /* 工具栏胞吐进来的插槽(顶栏中间,左对齐) */
 .gc-pin { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: flex-start; height: 100%; overflow: hidden; }
-.gc-seg { display: inline-flex; padding: 4px; gap: 4px; background: var(--color-card); border: 1px solid var(--color-border); border-radius: 14px; box-shadow: var(--shadow); }
-.gc-seg button { all: unset; cursor: pointer; padding: 8px 20px; border-radius: 11px; font-size: 13.5px; color: var(--color-text-secondary); transition: .25s; }
-.gc-seg button.on { background: var(--color-brand); color: var(--color-card); box-shadow: var(--shadow); }
-.gc-seg button.on:hover { background: var(--color-brand-hover); }
+.gc-seg { position: relative; display: inline-flex; padding: 4px; gap: 4px; background: var(--color-card); border: 1px solid var(--color-border); border-radius: 14px; box-shadow: var(--shadow); }
+.gc-seg-thumb { position: absolute; border-radius: 11px; background: var(--color-brand); box-shadow: var(--shadow); transition: left .25s cubic-bezier(.4,0,.2,1), top .25s cubic-bezier(.4,0,.2,1), width .25s cubic-bezier(.4,0,.2,1), height .25s cubic-bezier(.4,0,.2,1); pointer-events: none; z-index: 0; }
+.gc-seg button { all: unset; cursor: pointer; position: relative; z-index: 1; padding: 8px 20px; border-radius: 11px; font-size: 13.5px; color: var(--color-text-secondary); transition: color .25s; }
+.gc-seg button.on { color: var(--color-card); }
+.gc-seg:has(button.on:hover) .gc-seg-thumb { background: var(--color-brand-hover); }
 
 /* ===== studio 外框(钉在浏览器视口内,内容内部滚动) ===== */
 .gc-studio { flex: 1; min-height: 0; display: flex; border-radius: 22px; overflow: hidden; background: var(--color-bg); border: 1px solid var(--color-border); box-shadow: var(--shadow-hover); }
@@ -248,6 +334,10 @@ watch(() => route.fullPath, () => { canBack.value = window.history.state?.back !
 .gc-nav-item { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 11px; font-size: 13.5px; color: var(--color-text-secondary); cursor: pointer; margin-bottom: 2px; transition: .2s; }
 .gc-nav-item:hover { background: var(--color-line); color: var(--color-text); }
 .gc-nav-item.act { background: var(--color-brand); color: var(--color-card); box-shadow: var(--shadow); }
+/* 编辑模式:可拖入首页的模块(背景高亮 + 抓手光标;settings/ops 不受影响) */
+.gc-nav-item.widget-src { cursor: grab; background: rgba(var(--color-brand-rgb), .12); box-shadow: inset 0 0 0 1px rgba(var(--color-brand-rgb), .35); }
+.gc-nav-item.widget-src:hover { background: rgba(var(--color-brand-rgb), .2); box-shadow: inset 0 0 0 1px rgba(var(--color-brand-rgb), .6); }
+.gc-nav-item.widget-src:active { cursor: grabbing; }
 .gc-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .7; flex-shrink: 0; }
 
 /* 侧栏用户信息(预览 .side .user):头像 + 昵称 + 所在家庭 */
