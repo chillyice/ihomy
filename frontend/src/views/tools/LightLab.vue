@@ -336,9 +336,6 @@ const WALL_H = 2.5           // 房间高 250cm(老式住宅净高)
 const WALL_T = 0.15          // 墙体厚 15cm
 const ROOM_DEPTH = 3.0       // 房间进深 300cm
 
-// 平视视线高度 115cm
-const EYE_HEIGHT = 1.15
-
 // 窗(外框 110×105、透明区 100.7×95.7、底 80 顶 185;窗框 4.67cm(原 7cm 缩小 1/3);日字形两扇外开)
 const WIN_W = 1.1
 const WIN_H = 1.05
@@ -356,11 +353,22 @@ const DESK_W = 1.2
 const DESK_D = 0.65
 const DESK_H = 0.75
 
+// 桌下抽屉柜(整条柜体:高 12cm,顶贴桌面下沿 5cm 处,底部悬空留腿部空间)
+const DRAWER_BANK_H = 0.12
+const DRAWER_BOTTOM = DESK_H - 0.05 - DRAWER_BANK_H // 柜底离地 0.58
+
 // 台灯(置于桌面左侧,聚光朝下打亮桌面)
 const LAMP_X = -0.48
 const LAMP_Z = 0.2
 const LAMP_BASE_Y = DESK_H // 桌面顶高 75cm
 const LAMP_INTENSITY = 10
+
+// 默认取景:竖直方向刚好框住窗户(窗顶 1.85)+ 桌面与抽屉(抽屉柜底 0.58),上下各留约 15cm 白边
+const CAMERA_FOV_DEG = 50
+const VIEW_TOP = WIN_BOTTOM + WIN_H + 0.15 // 窗顶之上 15cm
+const VIEW_BOTTOM = DRAWER_BOTTOM - 0.15    // 抽屉柜底之下 15cm
+const VIEW_CENTER_Y = (VIEW_TOP + VIEW_BOTTOM) / 2
+const VIEW_DISTANCE = ((VIEW_TOP - VIEW_BOTTOM) / 2) / Math.tan((CAMERA_FOV_DEG / 2) * (Math.PI / 180))
 
 const DEFAULT_LIGHT_POS = new THREE.Vector3(0.5, 2.5, -4)
 
@@ -384,12 +392,12 @@ function init() {
   scene = new THREE.Scene()
   scene.background = new THREE.Color(0x15110d)
 
-  camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 100)
-  // 平视,视线高度 115cm;坐在桌前(室内 z>0)看向窗,默认贴近窗景
-  camera.position.set(0, EYE_HEIGHT, 1.0)
+  camera = new THREE.PerspectiveCamera(CAMERA_FOV_DEG, w / h, 0.1, 100)
+  // 平视取景:刚好框住窗户+桌子+抽屉,上下各留少量白边
+  camera.position.set(0, VIEW_CENTER_Y, VIEW_DISTANCE)
 
   controls = new OrbitControls(camera, renderer.domElement)
-  controls.target.set(0, EYE_HEIGHT, WALL_Z)
+  controls.target.set(0, VIEW_CENTER_Y, WALL_Z)
   controls.enableDamping = !reducedMotion.value
   controls.dampingFactor = 0.08
   controls.minDistance = 0.6
@@ -554,7 +562,7 @@ function buildDesk() {
 
   // 桌下抽屉柜(整条,含左/中/右三抽屉,中间偏宽):挂在桌面下沿前方,底部悬空留出腿部空间
   const bankW = 1.0      // 抽屉柜总宽(略窄于桌面,让开桌腿)
-  const bankH = 0.12     // 柜高(原 0.24 减半,抽屉更浅)
+  const bankH = DRAWER_BANK_H // 柜高(原 0.24 减半,抽屉更浅)
   const bankD = 0.42     // 柜深(比桌面浅,后面留空)
   const bankY = DESK_H - 0.05 - bankH / 2 // 柜中心高(顶贴桌面下沿)
   const bankZ = DESK_D - bankD / 2        // 柜中心深(前缘与桌面齐平)
