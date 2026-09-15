@@ -104,7 +104,7 @@ export default {
     guangchen: 'Light & Dust',
     dawn: 'Dawn',
     dusk: 'Dusk',
-    autoMode: 'Auto dawn/dusk',
+    autoMode: 'Auto dawn/dusk colors',
   },
   blog: {
     title: 'Blog',

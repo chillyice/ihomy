@@ -108,7 +108,7 @@ export default {
     guangchen: '光尘',
     dawn: '晨',
     dusk: '暮',
-    autoMode: '日出日落自动切换',
+    autoMode: '日出日落自动切换晨幕色彩',
   },
   blog: {
     title: '博客',

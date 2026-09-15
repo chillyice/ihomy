@@ -450,10 +450,7 @@
             <el-form label-position="top" class="settings-form">
               <el-form-item :label="$t('settings.theme')">
                 <div class="theme-row">
-                  <el-radio-group :model-value="themeStore.theme" @change="themeStore.setTheme">
-                    <el-radio value="warm">{{ $t('theme.warm') }}</el-radio>
-                    <el-radio value="guangchen">{{ $t('theme.guangchen') }}</el-radio>
-                  </el-radio-group>
+                  <ThemeSwatch />
                   <el-switch v-model="themeStore.autoMode" @change="themeStore.setAutoMode" :active-text="$t('theme.autoMode')" />
                   <el-radio-group v-if="!themeStore.autoMode" :model-value="themeStore.mode" @change="themeStore.setMode">
                     <el-radio value="dawn">{{ $t('theme.dawn') }}</el-radio>
@@ -607,6 +604,7 @@ import { applyLocale } from '@/i18n'
 import { useThemeStore } from '@/stores/theme'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import StorageView from '@/views/storage/Storage.vue'
+import ThemeSwatch from '@/components/ThemeSwatch.vue'
 
 const { locale, t } = useI18n()
 const userStore = useUserStore()

@@ -372,7 +372,7 @@ watch(() => route.fullPath, () => { canBack.value = window.history.state?.back !
 .gc-nav-group-body .gc-nav-item { padding-left: 28px; }
 
 /* 主区(内部滚动) */
-.gc-main { min-height: 0; overflow-y: auto; padding: 14px 24px 30px; }
+.gc-main { min-height: 0; overflow-y: auto; padding: 24px; }
 
 /* 按钮/标签(暖居专属) */
 .gc-btn { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--color-border); background: var(--color-line); color: var(--color-text-secondary); border-radius: 11px; padding: 9px 16px; font-size: 13px; cursor: pointer; transition: .2s; font-weight: 550; }

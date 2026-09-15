@@ -355,6 +355,9 @@ const ROW_H = 80
 const GAP = 16
 const MAX_COLS = 12
 const MAX_ROWS = 20
+// 可吸附的列宽档(4/6/8/12)与行高档(2/3/4/6),与 .gc-c*/.gc-r* 样式类一一对应
+const ALLOWED_SPANS = [4, 6, 8, 12]
+const ALLOWED_ROWS = [2, 3, 4, 6]
 
 const onDragStart = (e, w) => {
   if (resizing.value) { e.preventDefault(); return } // 调整大小时取消卡片原生拖拽
