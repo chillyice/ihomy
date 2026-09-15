@@ -1,7 +1,7 @@
 <!-- 面包屑导航:首页 + 传入的分级项,带 to/path 的项可点击跳转;移动端隐藏(MobileHeader 已提供返回+标题) -->
-<!-- 光尘主题不渲染面包屑(导航由侧栏/顶栏返回按钮承担) -->
+<!-- 暖居主题不渲染面包屑(导航由侧栏/顶栏返回按钮承担) -->
 <template>
-  <nav v-if="!isMobile && !isGuangchen" class="breadcrumb">
+  <nav v-if="!isMobile && !isWarm" class="breadcrumb">
     <div class="crumb-left">
       <router-link to="/" class="crumb-link">
         <el-icon class="home-icon"><HomeFilled /></el-icon>
@@ -31,7 +31,7 @@ defineProps({
 
 const { isMobile } = useDevice()
 const themeStore = useThemeStore()
-const isGuangchen = computed(() => themeStore.theme === 'guangchen')
+const isWarm = computed(() => themeStore.theme === 'warm')
 </script>
 
 <style scoped>

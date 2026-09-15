@@ -1,4 +1,4 @@
-<!-- 光尘首页:12 列网格,组件化 + 可编辑(OWNER 增删/拖拽排序),布局持久化 localStorage(与暖居仪表盘同款思路) -->
+<!-- 暖居首页:12 列网格,组件化 + 可编辑(OWNER 增删/拖拽排序),布局持久化 localStorage(与光尘仪表盘同款思路) -->
 <template>
   <div class="gc-home" :class="{ 'gc-editing': editMode }">
     <div class="gc-main-head">
@@ -44,7 +44,7 @@
           <div class="gc-resize" title="拖拽调整大小" @mousedown.stop.prevent="onResizeStart($event, w)" @click.stop></div>
         </template>
 
-        <!-- 天气活窗(光尘签名) -->
+        <!-- 天气活窗(暖居签名) -->
         <template v-if="w.id === 'weather'">
           <h3 class="gc-card-h3"><span>天气窗 · {{ weatherCity }}</span></h3>
           <div class="gc-glass" @click="!editMode && $router.push('/weather')">
@@ -88,7 +88,7 @@
           <div v-else class="gc-empty">暂无动态</div>
         </template>
 
-        <!-- 照片(光尘磨砂缩略拼贴) -->
+        <!-- 照片(暖居磨砂缩略拼贴) -->
         <template v-else-if="w.id === 'photos'">
           <h3 class="gc-card-h3">照片<span class="gc-muted">最近</span></h3>
           <div v-if="photos.length" class="gc-photos" :style="{ gridTemplateColumns: `repeat(${photosCols(w)}, 1fr)` }" @click="!editMode && $router.push('/album')">
@@ -331,7 +331,7 @@ const addWidgetFromModule = (code) => addWidget(MODULE_TO_WIDGET[code] || `link:
 const removeWidget = (w) => { applyLayout(layout.value.filter((e) => e.id !== w.id)) }
 const resetLayout = () => { layout.value = DEFAULT_LAYOUT.map((e) => ({ ...e })); saveLayout(); ElMessage.success('布局已重置') }
 
-// ========== 编辑模式(复用 appStore.homeEditMode,与暖居同一开关) ==========
+// ========== 编辑模式(复用 appStore.homeEditMode,与光尘同一开关) ==========
 const editMode = computed(() => appStore.homeEditMode)
 const canEdit = computed(() => userStore.isOwner)
 const startEdit = () => appStore.toggleHomeEditMode()

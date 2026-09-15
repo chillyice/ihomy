@@ -11,8 +11,8 @@
     <template v-else>
       <!-- 光影层:暖居/光尘共用同一套太阳驱动的丁达尔体积光+窗影+尘+台灯;沉浸式页面(如光影实验台)时隐藏 -->
       <SunLightLayer v-if="anyEffectEnabled && !immersive" />
-      <!-- 光尘主题:独立外壳(顶栏 + studio 外框 + 侧栏),光影沿用 SunLightLayer -->
-      <GuangchenLayout v-if="isGuangchen" />
+      <!-- 暖居主题:独立外壳(顶栏 + studio 外框 + 侧栏),光影沿用 SunLightLayer -->
+      <WarmLayout v-if="isWarm" />
       <template v-else>
         <AppSidebar v-if="!userStore.isPureOps && !immersive" />
         <main class="app-main" :class="{ 'with-sidebar': !userStore.isPureOps && !immersive }">
@@ -45,7 +45,7 @@ import { useSunLight, SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useDevice } from '@/composables/useDevice'
 import SunLightLayer from '@/components/SunLightLayer.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
-import GuangchenLayout from '@/components/guangchen/GuangchenLayout.vue'
+import WarmLayout from '@/components/warm/WarmLayout.vue'
 import BackToTop from '@/components/BackToTop.vue'
 import InstallPrompt from '@/components/InstallPrompt.vue'
 import MusicPlayer from '@/components/MusicPlayer.vue'
@@ -62,8 +62,8 @@ const route = useRoute()
 const immersive = computed(() => !!route.meta.immersive)
 const { locale } = useI18n()
 
-// 光尘主题:桌面端 + 非纯 OPS 时启用独立外壳
-const isGuangchen = computed(() => themeStore.theme === 'guangchen' && !isMobile.value && !userStore.isPureOps)
+// 暖居主题:桌面端 + 非纯 OPS 时启用独立外壳
+const isWarm = computed(() => themeStore.theme === 'warm' && !isMobile.value && !userStore.isPureOps)
 
 // 全局光影状态:在 App.vue 创建实例,provide 给 SunLightLayer(渲染)和 AppSidebar(控制台灯)
 const sunLight = useSunLight()

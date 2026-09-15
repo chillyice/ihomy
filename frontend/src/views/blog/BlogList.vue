@@ -2,7 +2,7 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('blog.title') }]" />
 
-    <!-- 顶部工具栏(光尘滚动后胞吐进顶栏) -->
+    <!-- 顶部工具栏(暖居滚动后胞吐进顶栏) -->
     <PageToolbar>
       <div class="tb-left">
         <el-input
@@ -708,9 +708,9 @@ html.dark .blog-tags .tag:hover {
 /* 空状态 */
 .empty-state { padding: 48px 0; }
 
-/* 光尘主题:杂志式瀑布流(竖版卡片,封面置顶,多列 masonry) */
-html.theme-guangchen .blog-main { column-count: 2; column-gap: 16px; }
-html.theme-guangchen .blog-item {
+/* 暖居主题:杂志式瀑布流(竖版卡片,封面置顶,多列 masonry) */
+html.theme-warm .blog-main { column-count: 2; column-gap: 16px; }
+html.theme-warm .blog-item {
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -721,7 +721,7 @@ html.theme-guangchen .blog-item {
   overflow: hidden;
   border-radius: 16px;
 }
-html.theme-guangchen .blog-cover {
+html.theme-warm .blog-cover {
   width: 100%;
   height: auto;
   aspect-ratio: 16 / 9;
@@ -729,15 +729,15 @@ html.theme-guangchen .blog-cover {
   border-radius: 0;
   margin: 0;
 }
-html.theme-guangchen .blog-info { padding: 14px 18px 16px; gap: 6px; }
-html.theme-guangchen .blog-title {
+html.theme-warm .blog-info { padding: 14px 18px 16px; gap: 6px; }
+html.theme-warm .blog-title {
   white-space: normal;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-html.theme-guangchen .blog-summary {
+html.theme-warm .blog-summary {
   white-space: normal;
   max-width: 100%;
   display: -webkit-box;
@@ -745,7 +745,7 @@ html.theme-guangchen .blog-summary {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-html.theme-guangchen .blog-item:hover { transform: translateY(-3px); }
+html.theme-warm .blog-item:hover { transform: translateY(-3px); }
 
 
 /* 删除分类弹窗 */

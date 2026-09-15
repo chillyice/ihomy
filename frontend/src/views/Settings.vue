@@ -483,14 +483,14 @@
                 </div>
                 <div class="share-tip">关闭后窗户阴影和暗角将不显示,画面更干净</div>
               </el-form-item>
-              <el-form-item v-if="themeStore.theme !== 'guangchen'">
+              <el-form-item v-if="themeStore.theme !== 'warm'">
                 <div class="setting-row">
                   <el-switch v-model="blobsEnabled" />
                   <span class="setting-label">背景色块</span>
                 </div>
                 <div class="share-tip">关闭后背景色块飘动动画不显示(可提升低分辨率屏性能)</div>
               </el-form-item>
-              <el-form-item v-if="themeStore.theme !== 'guangchen'">
+              <el-form-item v-if="themeStore.theme !== 'warm'">
                 <div class="setting-row">
                   <el-switch v-model="glassEnabled" />
                   <span class="setting-label">毛玻璃效果</span>

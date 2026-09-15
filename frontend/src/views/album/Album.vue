@@ -316,13 +316,13 @@ onMounted(load)
 .album-actions :deep(.el-button) { padding: 5px 6px; }
 .album-actions :deep(.el-button + .el-button) { margin-left: 4px; }
 
-/* 光尘主题:画廊(暖木阴影 + 深木/陶土徽章 + 封面加高) */
-html.theme-guangchen .album-card { border-radius: 16px; }
-html.theme-guangchen .album-card:hover { box-shadow: var(--shadow-hover); }
-html.theme-guangchen .album-cover-wrap { aspect-ratio: 1 / 1; }
-html.theme-guangchen .album-type { background: var(--color-brand); color: var(--color-card); }
-html.theme-guangchen .album-type.private { background: var(--color-accent); color: #FFF7F0; }
-html.theme-guangchen .album-grid { gap: 18px; }
+/* 暖居主题:画廊(暖木阴影 + 深木/陶土徽章 + 封面加高) */
+html.theme-warm .album-card { border-radius: 16px; }
+html.theme-warm .album-card:hover { box-shadow: var(--shadow-hover); }
+html.theme-warm .album-cover-wrap { aspect-ratio: 1 / 1; }
+html.theme-warm .album-type { background: var(--color-brand); color: var(--color-card); }
+html.theme-warm .album-type.private { background: var(--color-accent); color: #FFF7F0; }
+html.theme-warm .album-grid { gap: 18px; }
 
 @media (max-width: 768px) {
   .album-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }

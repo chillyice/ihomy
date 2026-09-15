@@ -9,7 +9,7 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 
 const visible = ref(false)
-// 光尘主题主区内部滚动(.gc-main),暖居走 window 滚动
+// 暖居主题主区内部滚动(.gc-main),光尘走 window 滚动
 const scroller = () => document.querySelector('.gc-main')
 const onScroll = () => {
   const el = scroller()

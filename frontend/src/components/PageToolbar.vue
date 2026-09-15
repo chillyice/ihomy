@@ -1,4 +1,4 @@
-<!-- 页面统一工具栏包装:光尘下滚动后胞吐进顶栏(.gc-pin)实现「膜泡与细胞膜融合,组件扩散进顶栏」;暖居/非光尘原样渲染 -->
+<!-- 页面统一工具栏包装:暖居下滚动后胞吐进顶栏(.gc-pin)实现「膜泡与细胞膜融合,组件扩散进顶栏」;光尘/非暖居原样渲染 -->
 <template>
   <Teleport to=".gc-pin" :disabled="!(always || pinned)">
     <div :class="rootClasses" ref="toolbarEl">

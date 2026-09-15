@@ -18,11 +18,11 @@
   --color-brand-hover: #a87c5e;
   --color-brand-text: #ffffff;
   --color-brand-rgb: 184, 140, 110;
-  /* 光影层 token(暖居晨):毛玻璃覆盖 / 浮尘 */
+  /* 光影层 token(光尘晨):毛玻璃覆盖 / 浮尘 */
   --light-glass-bg: rgba(250, 246, 236, 0.25);
   --light-dust: rgba(255, 238, 185, 0.85);
   --light-dust-glow: rgba(255, 225, 150, 0.7);
-  /* 背景色块(暖居晨):清新淡雅五色 */
+  /* 背景色块(光尘晨):清新淡雅五色 */
   --blob-1: 156, 208, 181;
   --blob-2: 237, 219, 140;
   --blob-3: 236, 192, 172;
@@ -30,7 +30,7 @@
   --blob-5: 192, 216, 168;
 }
 
-/* Element Plus 主色 → 品牌色(消除默认蓝 #409EFF;暖居/光尘通用,晨暮均覆盖) */
+/* Element Plus 主色 → 品牌色(消除默认蓝 #409EFF;光尘/暖居通用,晨暮均覆盖) */
 :root,
 html.dark {
   --el-color-primary: var(--color-brand);
@@ -42,7 +42,7 @@ html.dark {
   --el-color-primary-dark-2: var(--color-brand-hover);
 }
 
-/* 全局滚动条:主题风格(品牌色 thumb + 透明 track + 胶囊圆角),光尘/暖居统一
+/* 全局滚动条:主题风格(品牌色 thumb + 透明 track + 胶囊圆角),暖居/光尘统一
  * 用 rgba(var(--color-brand-rgb), .45) 自动跟随主题×晨暮,替代浏览器默认灰条 */
 * {
   scrollbar-width: thin;
@@ -59,13 +59,13 @@ html.dark {
 *::-webkit-scrollbar-thumb:hover { background: rgba(var(--color-brand-rgb), 0.72); background-clip: padding-box; }
 *::-webkit-scrollbar-corner { background: transparent; }
 
-/* 毛玻璃关闭:全局禁用 backdrop-filter,用不透明背景替代(性能优化);光尘主题永久禁玻璃(家具块材质) */
+/* 毛玻璃关闭:全局禁用 backdrop-filter,用不透明背景替代(性能优化);暖居主题永久禁玻璃(家具块材质) */
 html.no-glass *,
 html.no-glass *::before,
 html.no-glass *::after,
-html.theme-guangchen *,
-html.theme-guangchen *::before,
-html.theme-guangchen *::after {
+html.theme-warm *,
+html.theme-warm *::before,
+html.theme-warm *::after {
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
@@ -88,7 +88,7 @@ html.dark {
   --color-brand-hover: #e0c2aa;
   --color-brand-text: #2a2018;
   --color-brand-rgb: 212, 178, 152;
-  /* 光影层 token(暖居暮):夜色深蓝覆盖 */
+  /* 光影层 token(光尘暮):夜色深蓝覆盖 */
   --light-glass-bg: rgba(15, 26, 46, 0.3);
   --blob-1: 120, 200, 160;
   --blob-2: 200, 180, 100;
@@ -98,9 +98,9 @@ html.dark {
   color-scheme: dark;
 }
 
-/* ========== 光尘(Light & Dust)主题:暖木 + 陶土 + 鼠尾草绿 + 奶油 ========== */
+/* ========== 暖居(Light & Dust)主题:暖木 + 陶土 + 鼠尾草绿 + 奶油 ========== */
 /* 晨 dawn:暖木米背景 + 羊皮卡片 + 深木主色 */
-html.theme-guangchen {
+html.theme-warm {
   --color-primary: #8A6A4E;
   --color-accent: #C9807A;
   --color-bg: #F1E7D6;
@@ -122,11 +122,11 @@ html.theme-guangchen {
   --color-brand-hover: #7A5B40;
   --color-brand-text: #FBF3E4;
   --color-brand-rgb: 138, 106, 78;
-  /* 光影层 token(光尘晨):羊皮覆盖 + 暖白浮尘 */
+  /* 光影层 token(暖居晨):羊皮覆盖 + 暖白浮尘 */
   --light-glass-bg: rgba(251, 243, 228, 0.25);
   --light-dust: rgba(255, 239, 207, 0.85);
   --light-dust-glow: rgba(255, 236, 196, 0.8);
-  /* 背景色块(光尘晨):陶土/琥珀/鼠尾草绿/暖米,去蓝绿 */
+  /* 背景色块(暖居晨):陶土/琥珀/鼠尾草绿/暖米,去蓝绿 */
   --blob-1: 201, 128, 122;
   --blob-2: 201, 161, 110;
   --blob-3: 124, 139, 108;
@@ -134,7 +134,7 @@ html.theme-guangchen {
   --blob-5: 176, 140, 110;
 }
 /* 暮 dusk:深咖背景 + 暖褐卡片 + 琥珀主色(近烛光) */
-html.theme-guangchen.dark {
+html.theme-warm.dark {
   --color-primary: #EFE0C8;
   --color-accent: #E19A8C;
   --color-bg: #241A12;
@@ -156,7 +156,7 @@ html.theme-guangchen.dark {
   --color-brand-hover: #D8B47E;
   --color-brand-text: #33241A;
   --color-brand-rgb: 201, 161, 110;
-  /* 光影层 token(光尘暮):深咖覆盖 + 琥珀浮尘(视觉解析 §6.1 #F3C983) */
+  /* 光影层 token(暖居暮):深咖覆盖 + 琥珀浮尘(视觉解析 §6.1 #F3C983) */
   --light-glass-bg: rgba(36, 26, 18, 0.3);
   --light-dust: rgba(243, 201, 131, 0.85);
   --light-dust-glow: rgba(243, 201, 131, 0.7);
@@ -167,65 +167,65 @@ html.theme-guangchen.dark {
   --blob-5: 176, 140, 110;
 }
 
-/* ========== 光尘主题:页面 chrome 覆写(家具块 16px 圆角 / 会呼吸的卡片 / 暖木按钮) ========== */
-html.theme-guangchen .card { border-radius: 16px; box-shadow: var(--shadow); }
-html.theme-guangchen .card:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
+/* ========== 暖居主题:页面 chrome 覆写(家具块 16px 圆角 / 会呼吸的卡片 / 暖木按钮) ========== */
+html.theme-warm .card { border-radius: 16px; box-shadow: var(--shadow); }
+html.theme-warm .card:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
 
-/* 次级按钮:暖居硬编码 #f3eee6/#5c4c3d → 光尘 --line 底/--text-2 字,hover --card-2(视觉解析 §6.2) */
-html.theme-guangchen .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):not(.ghost-btn) {
+/* 次级按钮:光尘硬编码 #f3eee6/#5c4c3d → 暖居 --line 底/--text-2 字,hover --card-2(视觉解析 §6.2) */
+html.theme-warm .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):not(.ghost-btn) {
   background: var(--color-line) !important;
   border-color: var(--color-line) !important;
   color: var(--color-text-secondary) !important;
 }
-html.theme-guangchen .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):not(.ghost-btn):hover {
+html.theme-warm .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):not(.ghost-btn):hover {
   background: var(--color-card-2) !important;
   border-color: var(--color-card-2) !important;
   color: var(--color-text) !important;
 }
-html.theme-guangchen .ghost-btn { color: var(--color-text-secondary) !important; border-color: var(--color-border) !important; }
-html.theme-guangchen .ghost-btn:hover { background: var(--color-line) !important; color: var(--color-text) !important; }
-html.theme-guangchen .el-button.is-disabled,
-html.theme-guangchen .el-button.is-loading {
+html.theme-warm .ghost-btn { color: var(--color-text-secondary) !important; border-color: var(--color-border) !important; }
+html.theme-warm .ghost-btn:hover { background: var(--color-line) !important; color: var(--color-text) !important; }
+html.theme-warm .el-button.is-disabled,
+html.theme-warm .el-button.is-loading {
   background: var(--color-line) !important;
   border-color: var(--color-line) !important;
   color: var(--color-text-tertiary) !important;
 }
 
-/* 玻璃组件在光尘下改实底(家具块):弹窗/播放器/面包屑/登录卡 */
-html.theme-guangchen .el-overlay-dialog .el-dialog { background: var(--color-card) !important; }
-html.theme-guangchen .music-player { background: var(--color-card) !important; border-color: var(--color-border) !important; }
+/* 玻璃组件在暖居下改实底(家具块):弹窗/播放器/面包屑/登录卡 */
+html.theme-warm .el-overlay-dialog .el-dialog { background: var(--color-card) !important; }
+html.theme-warm .music-player { background: var(--color-card) !important; border-color: var(--color-border) !important; }
 /* 内容页:去掉 .page 上 padding(顶部留白交给 gc-main 一层,避免两层叠加让工具栏太靠下) */
-html.theme-guangchen .page { padding-top: 0; }
-/* 工具栏:光尘胞吐——Teleport 进顶栏(.gc-pin)后默认保持卡片外壳(膜泡),加 .fused 后外壳渐隐(膜与膜融合,组件扩散) */
-html.theme-guangchen .gc-pin .page-toolbar {
+html.theme-warm .page { padding-top: 0; }
+/* 工具栏:暖居胞吐——Teleport 进顶栏(.gc-pin)后默认保持卡片外壳(膜泡),加 .fused 后外壳渐隐(膜与膜融合,组件扩散) */
+html.theme-warm .gc-pin .page-toolbar {
   margin: 0 !important;
   padding: 8px 12px !important;
   gap: 8px;
   flex-wrap: nowrap;
   transition: background .35s ease, border-color .35s ease, box-shadow .35s ease, border-radius .35s ease, padding .35s ease;
 }
-html.theme-guangchen .gc-pin .page-toolbar.fused {
+html.theme-warm .gc-pin .page-toolbar.fused {
   padding: 0 !important;
   background: transparent;
   border-color: transparent;
   box-shadow: none;
   border-radius: 0;
 }
-html.theme-guangchen .gc-pin .page-toolbar .tb-left,
-html.theme-guangchen .gc-pin .page-toolbar .tb-right { gap: 6px; }
+html.theme-warm .gc-pin .page-toolbar .tb-left,
+html.theme-warm .gc-pin .page-toolbar .tb-right { gap: 6px; }
 
 /* 物品定位页:顶栏胞吐进顶栏后容器样式(.fp-topbar 的 scoped 样式不匹配 Teleport 后元素) + 画板铺满 gc-main + 边缘渐变融入背景 */
-html.theme-guangchen .gc-pin .fp-topbar {
+html.theme-warm .gc-pin .fp-topbar {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 12px !important;
   flex-wrap: nowrap;
 }
-html.theme-guangchen .gc-main:has(.fp-page) { padding: 0; }
-html.theme-guangchen .fp-page { height: 100%; }
-html.theme-guangchen .fp-main { border-radius: 0; }
-html.theme-guangchen .fp-main::after {
+html.theme-warm .gc-main:has(.fp-page) { padding: 0; }
+html.theme-warm .fp-page { height: 100%; }
+html.theme-warm .fp-main { border-radius: 0; }
+html.theme-warm .fp-main::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -233,29 +233,29 @@ html.theme-guangchen .fp-main::after {
   box-shadow: inset 0 0 56px 24px var(--color-bg);
 }
 
-/* 内容页 sticky 侧栏(设置导航/博客分类/文章目录):光尘下顶部偏移归零——
+/* 内容页 sticky 侧栏(设置导航/博客分类/文章目录):暖居下顶部偏移归零——
  * gc-main 是滚动容器,顶栏已被隔离在容器之外;sticky 相对滚动容器的内容顶定位,
  * 只有 top:0 才与内容上边界齐平(旧 14px/42px 会额外下移一段,滚动+工具栏胞吐时尤其错位)。
- * 暖居仍是窗口滚动 + 固定顶栏,保留各组件里的 42px 不动。 */
-html.theme-guangchen .settings-side,
-html.theme-guangchen .category-side,
-html.theme-guangchen .toc-aside { top: 0; }
+ * 光尘仍是窗口滚动 + 固定顶栏,保留各组件里的 42px 不动。 */
+html.theme-warm .settings-side,
+html.theme-warm .category-side,
+html.theme-warm .toc-aside { top: 0; }
 
 /* 内容页:gc-main 滚动区上下边缘渐变(同物品定位页「边缘融入背景」),内容滚动不再硬切;物品定位页自带画板渐变,排除 */
-html.theme-guangchen .gc-main:not(:has(.fp-page)) {
+html.theme-warm .gc-main:not(:has(.fp-page)) {
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
   mask-image: linear-gradient(to bottom, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
 }
 
-/* 光尘不要五色漂移色块(暖居特征),背景回归暖木米 + 天气氛围 + 光柱 + 浮尘(视觉解析 §4) */
-html.theme-guangchen .bg-blobs { display: none; }
-html.theme-guangchen .login-card { background: var(--color-card) !important; border-color: var(--color-border) !important; }
+/* 暖居不要五色漂移色块(光尘特征),背景回归暖木米 + 天气氛围 + 光柱 + 浮尘(视觉解析 §4) */
+html.theme-warm .bg-blobs { display: none; }
+html.theme-warm .login-card { background: var(--color-card) !important; border-color: var(--color-border) !important; }
 
-/* 光尘是自包含 studio 框架,页脚不再需要(避免挤到视口下方);光照测试控制台保留——光尘下同样要做光影模拟 */
-html.theme-guangchen .site-footer { display: none; }
+/* 暖居是自包含 studio 框架,页脚不再需要(避免挤到视口下方);光照测试控制台保留——暖居下同样要做光影模拟 */
+html.theme-warm .site-footer { display: none; }
 
-/* Element Plus 语义变量 → 光尘 token:让表格/输入框/下拉/弹窗/标签全部家具块化(晨暮自动) */
-html.theme-guangchen {
+/* Element Plus 语义变量 → 暖居 token:让表格/输入框/下拉/弹窗/标签全部家具块化(晨暮自动) */
+html.theme-warm {
   --el-bg-color: var(--color-card);
   --el-bg-color-page: var(--color-bg);
   --el-bg-color-overlay: var(--color-card);
@@ -335,7 +335,7 @@ html.dark .msg-icon:hover { color: #E8DCC8; }
 html { transition: background-color 1s ease; }
 body, #app { transition: color 1s ease; }
 
-/* 晨暮切换扫光(光尘):克隆旧主题实时 DOM 为幕布,方向性柔和蒙版从一侧划到另一侧露出新主题;扫光期间禁容器级颜色过渡(避免交叉淡入打架) */
+/* 晨暮切换扫光(暖居):克隆旧主题实时 DOM 为幕布,方向性柔和蒙版从一侧划到另一侧露出新主题;扫光期间禁容器级颜色过渡(避免交叉淡入打架) */
 @property --sweep-p {
   syntax: '<percentage>';
   inherits: false;

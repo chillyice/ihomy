@@ -1,5 +1,5 @@
 // 主题系统:两轴矩阵——主题(theme,装修风格)× 晨暮(mode,时间光照档)
-// theme ∈ 'warm'(现有配色)| 'guangchen'(新旗舰);mode ∈ 'dawn'(晨/浅)| 'dusk'(暮/深)
+// theme ∈ 'warm'(暖居,暖木/陶土·独立外壳)| 'guangchen'(光尘,奶油/夜色·侧栏);mode ∈ 'dawn'(晨/浅)| 'dusk'(暮/深)
 // 应用方式:html.theme-{id} + html.dark(=dusk,驱动 Element Plus 暗色 css-vars)
 // 持久化 key 沿用 'ihomy-theme',做旧 {dark, autoMode} → {theme, mode, autoMode} 迁移
 
@@ -8,13 +8,13 @@ export const THEME_STORAGE_KEY = 'ihomy-theme'
 export const THEMES = {
   warm: {
     id: 'warm',
-    label: { zh: '光尘', en: 'Light & Dust' },
-    meta: { dawn: '#EDE4D3', dusk: '#0F1A2E' },
+    label: { zh: '暖居', en: 'Warm Dwelling' },
+    meta: { dawn: '#F1E7D6', dusk: '#241A12' },
   },
   guangchen: {
     id: 'guangchen',
-    label: { zh: '暖居', en: 'Warm Dwelling' },
-    meta: { dawn: '#F1E7D6', dusk: '#241A12' },
+    label: { zh: '光尘', en: 'Light & Dust' },
+    meta: { dawn: '#EDE4D3', dusk: '#0F1A2E' },
   },
 }
 
@@ -45,7 +45,7 @@ export function loadTheme() {
   }
 }
 
-// —— 晨暮切换扫光(光尘专属):克隆旧主题整页 DOM 为幕布,方向性柔和蒙版从一侧划到另一侧露出新主题 ——
+// —— 晨暮切换扫光(暖居专属):克隆旧主题整页 DOM 为幕布,方向性柔和蒙版从一侧划到另一侧露出新主题 ——
 // 太阳方位角/高度角上下文,由 useSunLight 每次刷新场景时写入(模块级单例,跨 store/composable 共享)
 let _sun = { azimuth: 180, altitude: 0, isNight: true }
 export function setSunContext(ctx) {
@@ -163,10 +163,10 @@ export function applyTheme(state) {
   const nextDusk = t.mode === 'dusk'
   const prevDusk = _current ? _current.mode === 'dusk' : null
   const isModeChange = prevDusk != null && prevDusk !== nextDusk
-  const withinGuangchen = _current && _current.theme === 'guangchen' && t.theme === 'guangchen'
+  const withinWarm = _current && _current.theme === 'warm' && t.theme === 'warm'
 
-  // 光尘内晨↔暮切换:切类前克隆旧主题整页为幕布,切类后蒙版扫光露出新主题
-  const finishSweep = isModeChange && withinGuangchen ? beginModeSweep(root, prevDusk) : null
+  // 暖居内晨↔暮切换:切类前克隆旧主题整页为幕布,切类后蒙版扫光露出新主题
+  const finishSweep = isModeChange && withinWarm ? beginModeSweep(root, prevDusk) : null
 
   root.classList.remove(...THEME_IDS.map((id) => 'theme-' + id))
   root.classList.add('theme-' + t.theme)

@@ -1,4 +1,4 @@
-// 天气→AI 生图背景:生成/缓存/落库(家庭级 7 天缓存),供光尘全屏氛围背景使用
+// 天气→AI 生图背景:生成/缓存/落库(家庭级 7 天缓存),供暖居全屏氛围背景使用
 // 与 Home.vue 的天气卡片背景同源(同一缓存键,家庭内去重)
 import { ref } from 'vue'
 import { aiApi, albumApi, photoApi } from '@/api'

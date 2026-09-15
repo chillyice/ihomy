@@ -310,7 +310,7 @@ onBeforeUnmount(() => {
   -webkit-backdrop-filter: blur(8px);
 }
 html.dark .pv-backdrop { background: rgba(4, 8, 16, 0.9); }
-html.theme-guangchen.dark .pv-backdrop { background: rgba(24, 18, 12, 0.9); }
+html.theme-warm.dark .pv-backdrop { background: rgba(24, 18, 12, 0.9); }
 
 /* 照片舞台 */
 .pv-stage {

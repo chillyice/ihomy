@@ -104,8 +104,8 @@ export default {
     },
   },
   theme: {
-    warm: '光尘',
-    guangchen: '暖居',
+    warm: '暖居',
+    guangchen: '光尘',
     dawn: '晨',
     dusk: '暮',
     autoMode: '日出日落自动切换',

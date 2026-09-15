@@ -100,8 +100,8 @@ export default {
     },
   },
   theme: {
-    warm: 'Light & Dust',
-    guangchen: 'Warm Dwelling',
+    warm: 'Warm Dwelling',
+    guangchen: 'Light & Dust',
     dawn: 'Dawn',
     dusk: 'Dusk',
     autoMode: 'Auto dawn/dusk',

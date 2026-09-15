@@ -1,4 +1,4 @@
-<!-- 光尘(Light & Dust)主题桌面外壳:顶栏 + studio 外框 + 230px 侧栏 + 主区 -->
+<!-- 暖居(Warm Dwelling)主题桌面外壳:顶栏 + studio 外框 + 230px 侧栏 + 主区 -->
 <!-- 光影(丁达尔体积光/窗影/尘/台灯)由全局 SunLightLayer 提供,此处只做布局 + 天气 AI 全屏底图 -->
 <template>
   <div class="gc-root" :class="{ scrolled: scrolled }">
@@ -66,7 +66,7 @@
 
           <!-- 主区 -->
           <div class="gc-main" ref="mainEl">
-            <GuangchenHome v-if="route.path === '/home'" :weather-bg="weatherBg" />
+            <WarmHome v-if="route.path === '/home'" :weather-bg="weatherBg" />
             <router-view v-else v-slot="{ Component, route }">
               <transition :name="route.meta.transition || 'fade'" mode="out-in">
                 <component :is="Component" :key="route.path" />
@@ -87,7 +87,7 @@ import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useWeatherBg } from '@/composables/useWeatherBg'
-import GuangchenHome from '@/components/guangchen/GuangchenHome.vue'
+import WarmHome from '@/components/warm/WarmHome.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -172,7 +172,7 @@ const navGroups = computed(() => {
 const isActive = (path) => (path === '/' ? route.path === '/' : route.path.startsWith(path))
 const navigate = (path) => { if (route.path !== path) router.push(path) }
 
-// 编辑模式下:侧栏模块可拖入首页(与 GuangchenHome 的 dataTransfer 标记 'application/x-ihomy-widget' 约定)
+// 编辑模式下:侧栏模块可拖入首页(与 WarmHome 的 dataTransfer 标记 'application/x-ihomy-widget' 约定)
 // settings/ops 是虚拟入口(不在 appStore.modules 内),不会成为拖拽源
 const draggableCodes = computed(() => new Set(appStore.modules.map((m) => m.code)))
 const onNavDragStart = (e, code) => {
@@ -374,7 +374,7 @@ watch(() => route.fullPath, () => { canBack.value = window.history.state?.back !
 /* 主区(内部滚动) */
 .gc-main { min-height: 0; overflow-y: auto; padding: 14px 24px 30px; }
 
-/* 按钮/标签(光尘专属) */
+/* 按钮/标签(暖居专属) */
 .gc-btn { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--color-border); background: var(--color-line); color: var(--color-text-secondary); border-radius: 11px; padding: 9px 16px; font-size: 13px; cursor: pointer; transition: .2s; font-weight: 550; }
 .gc-btn:hover { background: var(--color-card-2); color: var(--color-text); }
 .gc-btn.ghost { background: transparent; }
