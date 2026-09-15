@@ -450,10 +450,14 @@
             <el-form label-position="top" class="settings-form">
               <el-form-item :label="$t('settings.theme')">
                 <div class="theme-row">
-                  <el-switch v-model="theme.autoMode" @change="onToggleAutoMode" active-text="日出日落自动切换" />
-                  <el-radio-group v-if="!theme.autoMode" :model-value="theme.dark" @change="onChangeTheme">
-                    <el-radio :value="false">{{ $t('theme.light') }}</el-radio>
-                    <el-radio :value="true">{{ $t('theme.dark') }}</el-radio>
+                  <el-radio-group :model-value="themeStore.theme" @change="themeStore.setTheme">
+                    <el-radio value="warm">{{ $t('theme.warm') }}</el-radio>
+                    <el-radio value="guangchen">{{ $t('theme.guangchen') }}</el-radio>
+                  </el-radio-group>
+                  <el-switch v-model="themeStore.autoMode" @change="themeStore.setAutoMode" :active-text="$t('theme.autoMode')" />
+                  <el-radio-group v-if="!themeStore.autoMode" :model-value="themeStore.mode" @change="themeStore.setMode">
+                    <el-radio value="dawn">{{ $t('theme.dawn') }}</el-radio>
+                    <el-radio value="dusk">{{ $t('theme.dusk') }}</el-radio>
                   </el-radio-group>
                 </div>
               </el-form-item>
@@ -487,14 +491,14 @@
                 </div>
                 <div class="share-tip">关闭后窗户阴影和暗角将不显示,画面更干净</div>
               </el-form-item>
-              <el-form-item>
+              <el-form-item v-if="themeStore.theme !== 'guangchen'">
                 <div class="setting-row">
                   <el-switch v-model="blobsEnabled" />
                   <span class="setting-label">背景色块</span>
                 </div>
                 <div class="share-tip">关闭后背景色块飘动动画不显示(可提升低分辨率屏性能)</div>
               </el-form-item>
-              <el-form-item>
+              <el-form-item v-if="themeStore.theme !== 'guangchen'">
                 <div class="setting-row">
                   <el-switch v-model="glassEnabled" />
                   <span class="setting-label">毛玻璃效果</span>
@@ -608,8 +612,8 @@ import { useUserStore } from '@/stores/user'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import AvatarCropper from '@/components/AvatarCropper.vue'
 import { applyLocale } from '@/i18n'
-import { applyTheme, initTheme } from '@/theme'
 import { loadHomeTheme, setHomeTheme, HOME_THEME_SCENE, HOME_THEME_CLASSIC } from '@/theme/homeTheme'
+import { useThemeStore } from '@/stores/theme'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import StorageView from '@/views/storage/Storage.vue'
 
@@ -642,10 +646,8 @@ const saveDaily = () => {
 }
 const onChangeLang = (v) => applyLocale(v)
 
-// 主题:明暗切换 / 主题色选择 / 日出日落自动切换,applyTheme 已含持久化
-const theme = ref(initTheme())
-const onChangeTheme = (dark) => { theme.value = applyTheme({ ...theme.value, dark }) }
-const onToggleAutoMode = (autoMode) => { theme.value = applyTheme({ ...theme.value, autoMode }) }
+// 主题:theme(暖居/光尘)× mode(晨/暮)+ 日出日落自动,统一由 Pinia store 管理
+const themeStore = useThemeStore()
 
 // 首页主题:场景主题(沉浸式) vs 传统主题(模块化首页);切换即跳转到对应首页
 const homeTheme = ref(loadHomeTheme())
@@ -662,7 +664,7 @@ const enterLightTest = () => {
 }
 
 const profile = reactive({ nickname: '', avatar: '', birthday: null, gender: 0 })
-const labelForm = reactive({ label: '', color: '#409EFF' })
+const labelForm = reactive({ label: '', color: '#C9807A' })
 const presets = ['爸爸', '妈妈']
 const showLabelDialog = ref(false)
 const newLabelName = ref('')
@@ -753,7 +755,7 @@ const load = async () => {
   try {
     // 身份标签独立接口拉取(未设置时 data 为 null)
     const l = await profileApi.label()
-    if (l) Object.assign(labelForm, { label: l.label || '', color: l.color || '#409EFF' })
+    if (l) Object.assign(labelForm, { label: l.label || '', color: l.color || '#C9807A' })
   } catch (e) {
     // 忽略
   }

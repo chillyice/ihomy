@@ -104,21 +104,11 @@ export default {
     },
   },
   theme: {
-    dark: '深色模式',
-    light: '浅色模式',
-  },
-  theme: {
-    dark: '深色模式',
-    light: '浅色模式',
-    presets: {
-      oldhouse: '旧物之家',
-      amber: '暮光琥珀',
-      ocean: '海蓝',
-      emerald: '森林',
-      sunset: '日暮',
-      violet: '暮紫',
-      rose: '樱粉',
-    },
+    warm: '暖居',
+    guangchen: '光尘',
+    dawn: '晨',
+    dusk: '暮',
+    autoMode: '日出日落自动切换',
   },
   blog: {
     title: '博客',

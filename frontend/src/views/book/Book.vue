@@ -3,14 +3,14 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('book.title') }]" />
 
-    <div class="page-toolbar card">
+    <PageToolbar>
       <div class="tb-left">
         <el-date-picker v-model="month" type="month" value-format="YYYY-MM" @change="load" style="width: 140px" />
       </div>
       <div class="tb-right">
         <el-button type="primary" @click="openEditor()">{{ $t('book.add') }}</el-button>
       </div>
-    </div>
+    </PageToolbar>
 
     <!-- 统计卡 -->
     <div class="stats-row">
@@ -109,6 +109,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { bookApi } from '@/api'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
 
 // ponytail: 分类为用户自选/自定义数据(入库存储),不做翻译
 const CATEGORIES = ['餐饮', '交通', '购物', '家居', '水电燃气', '医疗', '教育', '娱乐', '工资', '红包', '其他']

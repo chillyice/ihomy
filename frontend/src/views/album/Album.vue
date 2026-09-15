@@ -3,7 +3,7 @@
   <div class="page">
     <Breadcrumb :items="[{ label: t('album.title') }]" />
 
-    <div class="page-toolbar card">
+    <PageToolbar>
       <template v-if="!selectMode">
         <div class="tb-left">
           <el-input v-model="searchKeyword" :placeholder="t('album.searchPlaceholder')" clearable size="small" style="width: 200px">
@@ -33,7 +33,7 @@
         <el-button :disabled="batchDeleting" @click="toggleSelect">{{ t('album.cancelSelect') }}</el-button>
         <el-button type="danger" :loading="batchDeleting" :disabled="!selectedIds.length" @click="onBatchDelete">{{ t('album.deleteSelected') }}</el-button>
       </div>
-    </div>
+    </PageToolbar>
 
     <div v-loading="loading">
       <div v-if="topAlbums.length" class="album-grid">
@@ -110,6 +110,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { Edit, Delete } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
 import SyncDialog from '@/components/SyncDialog.vue'
 import AlbumDefaultCover from '@/components/AlbumDefaultCover.vue'
 
@@ -314,6 +315,14 @@ onMounted(load)
 .album-actions { padding: 6px 8px 10px; text-align: right; }
 .album-actions :deep(.el-button) { padding: 5px 6px; }
 .album-actions :deep(.el-button + .el-button) { margin-left: 4px; }
+
+/* 光尘主题:画廊(暖木阴影 + 深木/陶土徽章 + 封面加高) */
+html.theme-guangchen .album-card { border-radius: 16px; }
+html.theme-guangchen .album-card:hover { box-shadow: var(--shadow-hover); }
+html.theme-guangchen .album-cover-wrap { aspect-ratio: 1 / 1; }
+html.theme-guangchen .album-type { background: var(--color-brand); color: var(--color-card); }
+html.theme-guangchen .album-type.private { background: var(--color-accent); color: #FFF7F0; }
+html.theme-guangchen .album-grid { gap: 18px; }
 
 @media (max-width: 768px) {
   .album-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }

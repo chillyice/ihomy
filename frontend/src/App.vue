@@ -9,15 +9,20 @@
 
     <!-- 桌面端布局 -->
     <template v-else>
+      <!-- 光影层:暖居/光尘共用同一套太阳驱动的丁达尔体积光+窗影+尘+台灯;沉浸式(scene-theme)时隐藏 -->
       <SunLightLayer v-if="anyEffectEnabled && !immersive" />
-      <AppSidebar v-if="!userStore.isPureOps && !immersive" />
-      <main class="app-main" :class="{ 'with-sidebar': !userStore.isPureOps && !immersive }">
-        <router-view v-slot="{ Component, route }">
-          <transition :name="route.meta.transition || 'fade'" mode="out-in">
-            <component :is="Component" :key="route.path" />
-          </transition>
-        </router-view>
-      </main>
+      <!-- 光尘主题:独立外壳(顶栏 + studio 外框 + 侧栏),光影沿用 SunLightLayer -->
+      <GuangchenLayout v-if="isGuangchen" />
+      <template v-else>
+        <AppSidebar v-if="!userStore.isPureOps && !immersive" />
+        <main class="app-main" :class="{ 'with-sidebar': !userStore.isPureOps && !immersive }">
+          <router-view v-slot="{ Component, route }">
+            <transition :name="route.meta.transition || 'fade'" mode="out-in">
+              <component :is="Component" :key="route.path" />
+            </transition>
+          </router-view>
+        </main>
+      </template>
       <BackToTop v-if="!immersive" />
       <InstallPrompt />
       <MusicPlayer v-if="!immersive" />
@@ -35,10 +40,12 @@ import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import en from 'element-plus/es/locale/lang/en'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
+import { useThemeStore } from '@/stores/theme'
 import { useSunLight, SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useDevice } from '@/composables/useDevice'
 import SunLightLayer from '@/components/SunLightLayer.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
+import GuangchenLayout from '@/components/guangchen/GuangchenLayout.vue'
 import BackToTop from '@/components/BackToTop.vue'
 import InstallPrompt from '@/components/InstallPrompt.vue'
 import MusicPlayer from '@/components/MusicPlayer.vue'
@@ -49,10 +56,14 @@ import MobileLayout from '@/layouts/MobileLayout.vue'
 const { isMobile } = useDevice()
 const appStore = useAppStore()
 const userStore = useUserStore()
+const themeStore = useThemeStore()
 const route = useRoute()
 // 沉浸式页面(如场景主题 P1)：隐藏侧边栏 / 页脚 / 回顶 / 播放器，内容区占满全屏
 const immersive = computed(() => !!route.meta.immersive)
 const { locale } = useI18n()
+
+// 光尘主题:桌面端 + 非纯 OPS 时启用独立外壳
+const isGuangchen = computed(() => themeStore.theme === 'guangchen' && !isMobile.value && !userStore.isPureOps)
 
 // 全局光影状态:在 App.vue 创建实例,provide 给 SunLightLayer(渲染)和 AppSidebar(控制台灯)
 const sunLight = useSunLight()

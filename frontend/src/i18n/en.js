@@ -100,8 +100,11 @@ export default {
     },
   },
   theme: {
-    dark: 'Dark mode',
-    light: 'Light mode',
+    warm: 'Warm Dwelling',
+    guangchen: 'Light & Dust',
+    dawn: 'Dawn',
+    dusk: 'Dusk',
+    autoMode: 'Auto dawn/dusk',
   },
   blog: {
     title: 'Blog',

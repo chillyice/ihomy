@@ -11,7 +11,7 @@
     </div>
 
     <template v-else>
-      <div class="card page-toolbar">
+      <PageToolbar>
         <div class="tb-left">
           <el-select v-model="activeDeviceId" size="small" style="width: 180px" clearable
             :placeholder="$t('storage.pickDevice')" @change="onDeviceChange">
@@ -35,7 +35,7 @@
             <el-button size="small" @click="selectMode = false">{{ $t('common.cancel') }}</el-button>
           </template>
         </div>
-      </div>
+      </PageToolbar>
 
       <div class="card" v-loading="loadingFiles">
         <!-- 未选中/选中设备识别不到:显示空态,不调接口不出错 -->
@@ -91,6 +91,7 @@ import { useUserStore } from '@/stores/user'
 import { useDevice } from '@/composables/useDevice'
 import { storageApi } from '@/api'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
 
 const { t } = useI18n()
 const route = useRoute()

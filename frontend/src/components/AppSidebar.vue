@@ -40,8 +40,8 @@
     <!-- 底部:主题/台灯/语言/用户 -->
     <div class="sidebar-foot">
       <div class="foot-row">
-        <span class="foot-btn" :title="theme.dark ? '浅色' : '深色'" @click="onTheme">
-          <el-icon><Sunny v-if="!theme.dark" /><Moon v-else /></el-icon>
+        <span class="foot-btn" :title="themeStore.isDusk ? $t('theme.dawn') : $t('theme.dusk')" @click="onTheme">
+          <el-icon><Sunny v-if="!themeStore.isDusk" /><Moon v-else /></el-icon>
         </span>
         <!-- 台灯三态开关:auto(自动)/on(常开)/off(关闭);关灯时冷蓝微光便于定位 -->
         <span class="foot-btn" :class="{ 'lamp-on': lampMode !== 'off', 'lamp-off': lampMode === 'off' }" :title="'台灯:' + (lampMode === 'auto' ? '自动' : lampMode === 'on' ? '常开' : '关闭')" @click="toggleLamp">
@@ -165,7 +165,7 @@ const ICON_MAP = {
 }
 const iconComp = (code) => ICON_MAP[code] || Document
 import { applyLocale } from '@/i18n'
-import { applyTheme, loadTheme } from '@/theme'
+import { useThemeStore } from '@/stores/theme'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { warnLevelColor, topWarning } from '@/utils/dict'
 
@@ -199,7 +199,7 @@ const toggleLightEffect = () => {
 }
 
 const collapsed = ref(false)
-const theme = ref(loadTheme())
+const themeStore = useThemeStore()
 
 const familyName = computed(() => appStore.familyName)
 const userInfo = computed(() => userStore.userInfo)
@@ -262,9 +262,9 @@ const navigate = (path) => {
   router.push(path)
 }
 
-// 主题切换
+// 主题切换(晨/暮)
 const onTheme = () => {
-  theme.value = applyTheme({ ...theme.value, dark: !theme.value.dark, autoMode: false })
+  themeStore.toggleMode()
   ElMessage.info({ message: '已切换到手动主题,日出日落自动切换已暂停(可在设置中恢复)', duration: 4000 })
 }
 

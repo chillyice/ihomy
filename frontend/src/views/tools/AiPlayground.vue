@@ -2,7 +2,7 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('tools.title') }, { label: $t('tools.aiPlayground.title') }]" />
 
-    <div class="page-toolbar card">
+    <PageToolbar>
       <div class="tb-left">
         <el-radio-group v-model="capability" size="small">
           <el-radio-button value="chat">{{ $t('tools.aiPlayground.chat') }}</el-radio-button>
@@ -16,7 +16,7 @@
           </el-tag>
         </template>
       </div>
-    </div>
+    </PageToolbar>
 
     <el-alert
       v-if="statusLoaded && !currentStatus.available"
@@ -290,6 +290,7 @@ import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { aiApi } from '@/api'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
 
 const { t } = useI18n()
 

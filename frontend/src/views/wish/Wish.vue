@@ -3,11 +3,11 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('wish.title') }]" />
 
-    <div class="page-toolbar card">
+    <PageToolbar>
       <div class="tb-right">
         <el-button type="primary" @click="openEditor()">{{ $t('wish.add') }}</el-button>
       </div>
-    </div>
+    </PageToolbar>
 
     <el-tabs v-model="filter">
       <el-tab-pane :label="$t('more.all')" name="all" />
@@ -78,6 +78,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { wishApi } from '@/api'
 import { dictText } from '@/utils/dict'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
 
 const { t } = useI18n()
 

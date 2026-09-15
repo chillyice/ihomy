@@ -2,8 +2,8 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('blog.title') }]" />
 
-    <!-- 顶部工具栏 -->
-    <div class="page-toolbar card">
+    <!-- 顶部工具栏(光尘滚动后胞吐进顶栏) -->
+    <PageToolbar>
       <div class="tb-left">
         <el-input
           v-model="searchKeyword"
@@ -67,7 +67,7 @@
           {{ $t('blog.newPost') }}
         </button>
       </div>
-    </div>
+    </PageToolbar>
 
     <div class="blog-layout" :class="{ 'no-side': !showSidePanel }">
       <!-- 大屏左侧分类面板 -->
@@ -203,6 +203,7 @@ import { blogApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
 import { thumbUrl } from '@/utils/image'
 
 const { t } = useI18n()
@@ -706,6 +707,46 @@ html.dark .blog-tags .tag:hover {
 
 /* 空状态 */
 .empty-state { padding: 48px 0; }
+
+/* 光尘主题:杂志式瀑布流(竖版卡片,封面置顶,多列 masonry) */
+html.theme-guangchen .blog-main { column-count: 2; column-gap: 16px; }
+html.theme-guangchen .blog-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  margin-bottom: 16px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+  overflow: hidden;
+  border-radius: 16px;
+}
+html.theme-guangchen .blog-cover {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 0;
+  margin: 0;
+}
+html.theme-guangchen .blog-info { padding: 14px 18px 16px; gap: 6px; }
+html.theme-guangchen .blog-title {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+html.theme-guangchen .blog-summary {
+  white-space: normal;
+  max-width: 100%;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+html.theme-guangchen .blog-item:hover { transform: translateY(-3px); }
+
 
 /* 删除分类弹窗 */
 .del-cat-name { font-weight: 600; font-size: 15px; color: var(--color-primary); margin-bottom: 8px; }

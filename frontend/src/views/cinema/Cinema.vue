@@ -3,7 +3,7 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('cinema.title') }]" />
 
-    <div class="page-toolbar card">
+    <PageToolbar>
       <template v-if="!selectMode">
         <div class="tb-left">
           <el-input v-model="searchKeyword" :placeholder="$t('cinema.searchPlaceholder')" clearable size="small" style="width: 200px">
@@ -39,7 +39,7 @@
         <el-button @click="toggleSelect">{{ $t('cinema.cancelSelect') }}</el-button>
         <el-button type="danger" :loading="batchDeleting" :disabled="!selectedIds.length" @click="onBatchDelete">{{ $t('cinema.deleteSelected') }}</el-button>
       </div>
-    </div>
+    </PageToolbar>
 
     <el-tabs v-model="tab">
       <el-tab-pane :label="$t('cinema.library')" name="library">
@@ -238,6 +238,7 @@ import { useUserStore } from '@/stores/user'
 import { useSyncStore } from '@/stores/sync'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
 import SyncDialog from '@/components/SyncDialog.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 

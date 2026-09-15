@@ -36,9 +36,9 @@
     <!-- 设置区 -->
     <div class="me-section">
       <div class="me-row" @click="toggleTheme">
-        <span class="me-row-icon">{{ theme.dark ? '🌙' : '☀️' }}</span>
-        <span class="me-row-text">{{ theme.dark ? $t('theme.dark') : $t('theme.light') }}</span>
-        <el-switch :model-value="theme.dark" size="small" />
+        <span class="me-row-icon">{{ themeStore.isDusk ? '🌙' : '☀️' }}</span>
+        <span class="me-row-text">{{ themeStore.isDusk ? $t('theme.dusk') : $t('theme.dawn') }}</span>
+        <el-switch :model-value="themeStore.isDusk" size="small" />
       </div>
       <div class="me-row" @click="toggleLightEffect">
         <span class="me-row-icon">✨</span>
@@ -88,7 +88,7 @@ import { ArrowRight, Check } from '@element-plus/icons-vue'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { authApi } from '@/api'
-import { applyTheme, loadTheme } from '@/theme'
+import { useThemeStore } from '@/stores/theme'
 import { applyLocale } from '@/i18n'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 
@@ -98,14 +98,14 @@ const userStore = useUserStore()
 const sunLight = inject(SUN_LIGHT_KEY)
 
 const userInfo = computed(() => userStore.userInfo)
-const theme = ref(loadTheme())
+const themeStore = useThemeStore()
 const families = ref([])
 const showFamilySwitch = ref(false)
 
 const lightEffectOn = computed(() => sunLight?.shadowEnabled?.value ?? false)
 
 const toggleTheme = () => {
-  theme.value = applyTheme({ ...theme.value, dark: !theme.value.dark, autoMode: false })
+  themeStore.toggleMode()
 }
 const toggleLightEffect = () => {
   if (sunLight?.shadowEnabled) {

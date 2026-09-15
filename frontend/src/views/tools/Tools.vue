@@ -2,11 +2,11 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('tools.title') }]" />
 
-    <div class="page-toolbar card">
+    <PageToolbar>
       <div class="tb-left">
         <span class="section-label">{{ $t('tools.title') }}</span>
       </div>
-    </div>
+    </PageToolbar>
 
     <div class="tool-grid">
       <div class="tool-card card" @click="$router.push('/tools/mindmap')">
@@ -38,6 +38,7 @@
 <script setup>
 import { Tools, ArrowRight, MagicStick, Sunny } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
 </script>
 
 <style scoped>
@@ -62,7 +63,7 @@ import Breadcrumb from '@/components/Breadcrumb.vue'
   align-items: center;
   justify-content: center;
   background: var(--color-accent-weak, rgba(184, 140, 110, 0.14));
-  color: var(--color-accent, #b88c6e);
+  color: var(--color-accent, var(--color-brand));
   margin-bottom: 14px;
 }
 .tool-name { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
@@ -73,6 +74,6 @@ import Breadcrumb from '@/components/Breadcrumb.vue'
   gap: 4px;
   margin-top: 12px;
   font-size: 13px;
-  color: var(--color-accent, #b88c6e);
+  color: var(--color-accent, var(--color-brand));
 }
 </style>

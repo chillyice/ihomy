@@ -3,11 +3,11 @@
   <div class="page">
     <Breadcrumb :items="[{ label: t('member.title') }]" />
 
-    <div class="page-toolbar card">
+    <PageToolbar>
       <div class="tb-right">
         <el-button type="primary" plain @click="openSearch">{{ t('member.joinFamily') }}</el-button>
       </div>
-    </div>
+    </PageToolbar>
 
     <div v-if="userStore.isOwner" class="card invite-card">
       <div class="invite-title">{{ t('member.inviteNew') }}</div>
@@ -49,7 +49,7 @@
         <div class="member-info">
           <div class="member-name">
             {{ m.nickname || m.username }}
-            <el-tag v-if="m.label" :color="m.labelColor || '#409EFF'" size="small" effect="dark" style="color: #fff; border: none">{{ m.label }}</el-tag>
+            <el-tag v-if="m.label" :color="m.labelColor || '#C9807A'" size="small" effect="dark" style="color: #fff; border: none">{{ m.label }}</el-tag>
           </div>
           <div class="member-un">@{{ m.username }}</div>
         </div>
@@ -109,6 +109,7 @@ import { memberApi, familyApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()

@@ -4,14 +4,14 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('tree.title') }]" />
 
-    <div class="page-toolbar card">
+    <PageToolbar>
       <div class="tb-left">
         <span class="tree-tip">{{ $t('tree.tip') }}</span>
       </div>
       <div class="tb-right">
         <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ $t('tree.add') }}</el-button>
       </div>
-    </div>
+    </PageToolbar>
 
     <div v-loading="loading" class="tree-body">
       <el-empty v-if="!loading && !roots.length" :description="$t('tree.emptyHint')" />
@@ -119,6 +119,7 @@ import { useUserStore } from '@/stores/user'
 import { treeApi, fileApi } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
 
 const { t } = useI18n()
 const userStore = useUserStore()

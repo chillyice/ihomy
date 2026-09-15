@@ -3,11 +3,11 @@
   <div class="page">
     <Breadcrumb :items="[{ label: t('anniversary.title') }]" />
 
-    <div class="page-toolbar card">
+    <PageToolbar>
       <div class="tb-right">
         <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ t('anniversary.add') }}</el-button>
       </div>
-    </div>
+    </PageToolbar>
 
     <div v-loading="loading">
       <div v-if="list.length" class="anni-grid">
@@ -86,6 +86,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { User, Edit, Delete } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
 
 const { t } = useI18n()
 const userStore = useUserStore()

@@ -3,7 +3,7 @@
     <Breadcrumb :items="[{ label: $t('library.title') }]" />
 
     <!-- Toolbar -->
-    <div class="page-toolbar card">
+    <PageToolbar>
       <div class="tb-left">
         <el-input v-model="searchKeyword" :placeholder="$t('library.search')" clearable size="small" style="width: 180px" @keyup.enter="load" @clear="load" />
         <el-cascader
@@ -63,7 +63,7 @@
           {{ $t('library.batchMode') }}
         </button>
       </div>
-    </div>
+    </PageToolbar>
 
     <!-- Book Grid/List -->
     <div v-loading="loading" class="book-area">
@@ -187,6 +187,7 @@ import { libraryApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
 import LibraryDetail from './LibraryDetail.vue'
 import LibraryReader from './LibraryReader.vue'
 

@@ -3,11 +3,11 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('reminder.title') }]" />
 
-    <div class="page-toolbar card">
+    <PageToolbar>
       <div class="tb-right">
         <el-button type="primary" @click="openEditor()">{{ $t('reminder.add') }}</el-button>
       </div>
-    </div>
+    </PageToolbar>
 
     <div v-loading="loading">
       <div v-if="list.length" class="reminder-list">
@@ -74,6 +74,7 @@ import { Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { reminderApi } from '@/api'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
 
 const { t } = useI18n()
 

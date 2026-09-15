@@ -5,7 +5,7 @@
       { label: $t('kitchen.ingredients') },
     ]" />
 
-    <div class="page-toolbar card">
+    <PageToolbar>
       <div class="tb-left">
         <el-input v-model="keyword" :placeholder="$t('kitchen.ingredientName')" clearable prefix-icon="Search"
                    @input="onSearch" style="max-width: 300px" />
@@ -15,7 +15,7 @@
           <el-icon><Plus /></el-icon> {{ $t('kitchen.addIngredient') }}
         </el-button>
       </div>
-    </div>
+    </PageToolbar>
 
     <!-- 横条列表 -->
     <div v-loading="loading" class="ingredient-list">
@@ -110,6 +110,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Bowl, Edit, Delete, Location, Search } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
 import { itemApi, fileApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 

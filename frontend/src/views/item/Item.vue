@@ -1,7 +1,7 @@
 <template>
   <div class="page fp-page">
     <!-- 顶栏 -->
-    <div class="fp-topbar">
+    <PageToolbar root-class="fp-topbar" :holder-margin="0" always>
       <el-select v-model="currentHouseId" :placeholder="$t('item.pickHouse')" class="fp-house" @change="onHouseChange">
         <el-option v-for="h in houses" :key="h.id" :label="h.name" :value="h.id" />
       </el-select>
@@ -21,7 +21,7 @@
         <el-button @click="listMode = !listMode">{{ listMode ? $t('item.done') : $t('item.listView') }}</el-button>
         <el-button v-if="!listMode && houses.length" type="primary" class="fp-edit-btn" @click="toggleEdit">{{ mode === 'edit' ? $t('item.done') : $t('item.editFloorPlan') }}</el-button>
       </div>
-    </div>
+    </PageToolbar>
 
     <!-- 户型图主视图 -->
     <div v-if="!listMode" class="fp-main">
@@ -322,9 +322,9 @@
     <div v-else class="fp-list">
       <el-tabs v-model="tab">
         <el-tab-pane :label="$t('item.houses')" name="houses">
-          <div class="page-toolbar">
+          <PageToolbar :card="false">
             <el-button type="primary" @click="openHouse()">{{ $t('item.addHouse') }}</el-button>
-          </div>
+          </PageToolbar>
           <el-table :data="houses" stripe>
             <el-table-column prop="name" :label="$t('item.houseName')" />
             <el-table-column prop="address" :label="$t('item.houseAddress')" show-overflow-tooltip />
@@ -341,12 +341,12 @@
           </el-table>
         </el-tab-pane>
         <el-tab-pane :label="$t('item.rooms')" name="rooms">
-          <div class="page-toolbar">
+          <PageToolbar :card="false">
             <el-select v-model="roomHouseFilter" :placeholder="$t('item.allHouses')" clearable style="width: 200px" @change="loadRooms">
               <el-option v-for="h in houses" :key="h.id" :label="h.name" :value="h.id" />
             </el-select>
             <el-button type="primary" @click="openRoom()">{{ $t('item.addRoom') }}</el-button>
-          </div>
+          </PageToolbar>
           <el-table :data="rooms" stripe>
             <el-table-column :label="$t('item.houseName')">
               <template #default="{ row }">{{ houseName(row.houseId) }}</template>
@@ -367,12 +367,12 @@
           </el-table>
         </el-tab-pane>
         <el-tab-pane :label="$t('item.furnitures')" name="furnitures">
-          <div class="page-toolbar">
+          <PageToolbar :card="false">
             <el-select v-model="roomFilter" :placeholder="$t('item.allRooms')" clearable style="width: 200px" @change="loadFurnitures">
               <el-option v-for="r in rooms" :key="r.id" :label="r.name" :value="r.id" />
             </el-select>
             <el-button type="primary" @click="openFurniture()">{{ $t('item.addFurniture') }}</el-button>
-          </div>
+          </PageToolbar>
           <el-table :data="furnitures" stripe>
             <el-table-column prop="name" :label="$t('item.furnitureName')">
               <template #default="{ row }">
@@ -399,7 +399,7 @@
           </el-table>
         </el-tab-pane>
         <el-tab-pane :label="$t('item.items')" name="items">
-          <div class="page-toolbar">
+          <PageToolbar :card="false">
             <template v-if="!selectMode">
               <div class="tb-left">
                 <el-input v-model="keyword" :placeholder="$t('item.searchPh')" clearable size="small" style="width: 260px" @keyup.enter="loadItems" @clear="loadItems">
@@ -417,7 +417,7 @@
               <el-button @click="toggleSelect">{{ $t('item.cancelSelect') }}</el-button>
               <el-button type="primary" :disabled="!selectedIds.length" @click="openBatchFurniture()">{{ $t('item.batchEditFurniture') }}</el-button>
             </div>
-          </div>
+          </PageToolbar>
           <el-empty v-if="items.length === 0" :description="$t('item.emptyItems')" />
           <el-card v-for="it in items" :key="it.id" shadow="hover" class="item-card" :class="{ 'is-pick': selectMode, selected: selectMode && selectedIds.includes(it.id) }" @click="selectMode && togglePick(it)">
             <span v-if="selectMode" class="pick-badge" :class="{ on: selectedIds.includes(it.id) }">
@@ -670,6 +670,7 @@ import { furnitureIcon } from '@/utils/furnitureIcon'
 import { splitPoly, mergePolys, pointInPoly, polyBBox, samePt } from '@/utils/floorPlanGeom'
 import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
 import FloorPlanCanvas from './FloorPlanCanvas.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
 
 const { t } = useI18n()
 const itemTypes = ['KITCHENWARE', 'INGREDIENT', 'DAILY', 'CLOTHES', 'TOOL', 'OTHER']

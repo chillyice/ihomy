@@ -3,7 +3,7 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('music.pageTitle') }]" />
 
-    <div class="page-toolbar card">
+    <PageToolbar>
       <template v-if="!selectMode">
         <div class="tb-left">
           <el-input v-model="searchKeyword" :placeholder="$t('music.searchPlaceholder')" clearable size="small" style="width: 200px">
@@ -40,7 +40,7 @@
         <el-button @click="exitSelect">{{ $t('music.cancelSelect') }}</el-button>
         <el-button type="danger" :disabled="tab === 'all' ? !selectedIds.length : !selectedAlbums.length" @click="tab === 'all' ? batchDeleteTracks() : batchDeleteAlbums()">{{ $t('music.deleteSelected') }}</el-button>
       </div>
-    </div>
+    </PageToolbar>
 
     <div class="music-tabs-wrapper">
       <el-tabs v-model="tab" class="music-tabs" @tab-change="exitSelect">
@@ -314,6 +314,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { MoreFilled, Delete } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
 import SyncDialog from '@/components/SyncDialog.vue'
 
 const { t: $t } = useI18n()
