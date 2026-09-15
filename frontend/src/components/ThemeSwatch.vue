@@ -13,9 +13,10 @@
     >
       <span class="ts-swatch">
         <span class="ts-dot" :class="`ts-${s.id}`">
-          <!-- 光尘:斜向光束 + 光尘粒子 -->
+          <!-- 光尘:迷你丁达尔体积光(光晕+自右上射向左下的光柱)+ 主题同款浮尘 -->
           <template v-if="s.id === 'guangchen'">
-            <span class="ts-beam"></span>
+            <span class="ts-bloom"></span>
+            <span class="ts-ray"></span>
             <span v-for="n in 5" :key="n" class="ts-dust" :class="`d${n}`"></span>
           </template>
           <!-- 暖居:呼吸暖光 + 会呼吸的窗 + 金色尘粒 -->
@@ -103,41 +104,63 @@ const swatches = computed(() =>
   z-index: 6;
 }
 
-/* ===== 光尘:不断变化的斜向光束 + 漂浮光尘 ===== */
-.ts-beam {
-  position: absolute; top: 50%; left: 50%;
-  width: 7px; height: 170%;
-  margin: -85% 0 0 -3.5px;
-  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.92) 50%, transparent);
-  filter: blur(0.5px);
+/* ===== 光尘:迷你丁达尔体积光(光晕+自右上射向左下的光柱,screen)+ 主题同款浮尘 ===== */
+/* 光晕:光源处暖金 bloom(对应全局 .light-bloom),坐落在右上光源点 */
+.ts-bloom {
+  position: absolute; left: 72%; top: 8%;
+  width: 24px; height: 24px; margin-left: -12px; margin-top: -12px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 214, 150, 0.95) 0%, rgba(255, 188, 110, 0.4) 45%, transparent 72%);
+  filter: blur(3px);
+  mix-blend-mode: screen;
   opacity: 0;
 }
-.ts-item:hover .ts-beam { animation: ts-beam 3.2s ease-in-out infinite; }
-@keyframes ts-beam {
-  0%   { transform: rotate(36deg) translateX(-30px); opacity: 0; }
-  14%  { opacity: 1; }
-  50%  { transform: rotate(54deg) translateX(30px); opacity: 0.95; }
-  86%  { opacity: 0; }
-  100% { transform: rotate(36deg) translateX(-30px); opacity: 0; }
+/* 光柱:单条羽毛状光束,自右上斜射向左下(对应全局 .light-ray) */
+.ts-ray {
+  position: absolute; left: 72%; top: 8%;
+  width: 14px; height: 128%;
+  margin-left: -7px;
+  transform-origin: top center;
+  transform: rotate(31deg);
+  background: linear-gradient(to bottom, rgba(255, 218, 158, 0.95) 0%, rgba(255, 188, 108, 0.5) 40%, transparent 78%);
+  filter: blur(2.5px);
+  mix-blend-mode: screen;
+  opacity: 0;
 }
 
+/* 变化:与全局体积光一致——缓慢呼吸明暗 + 光柱轻微摆动(模拟太阳方位角漂移 + 10s 微闪) */
+.ts-item:hover .ts-bloom { animation: ts-bloom-breathe 5s ease-in-out infinite; }
+.ts-item:hover .ts-ray { animation: ts-ray-breathe 5s ease-in-out infinite; }
+@keyframes ts-bloom-breathe {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.95; }
+}
+@keyframes ts-ray-breathe {
+  0%, 100% { opacity: 0.55; transform: rotate(34deg); }
+  50% { opacity: 0.95; transform: rotate(28deg); }
+}
+
+/* 浮尘:主题同款(screen + --light-dust 发光;缓起缓落 + 横向轻摆,每颗时长/相位错开,对应全局 .dust) */
 .ts-dust {
-  position: absolute; width: 3px; height: 3px; border-radius: 50%;
-  background: #fff; box-shadow: 0 0 5px 1px rgba(255, 255, 255, 0.85);
+  position: absolute; border-radius: 50%;
+  background: var(--light-dust, rgba(255, 238, 185, 0.85));
+  box-shadow: 0 0 8px var(--light-dust-glow, rgba(255, 225, 150, 0.7));
+  mix-blend-mode: screen;
   opacity: 0;
 }
-.ts-dust.d1 { left: 30%; top: 30%; animation-delay: 0s; }
-.ts-dust.d2 { left: 64%; top: 22%; animation-delay: 0.5s; }
-.ts-dust.d3 { left: 42%; top: 58%; animation-delay: 1s; }
-.ts-dust.d4 { left: 72%; top: 52%; animation-delay: 1.6s; }
-.ts-dust.d5 { left: 22%; top: 68%; animation-delay: 2.2s; }
-.ts-item:hover .ts-dust { animation: ts-dust-float 4s ease-in-out infinite; }
+.ts-dust.d1 { left: 30%; top: 26%; width: 3px; height: 3px; --drift: 6px; --dur: 7s; --delay: 0s; }
+.ts-dust.d2 { left: 64%; top: 20%; width: 2px; height: 2px; --drift: 8px; --dur: 5.5s; --delay: 1.2s; }
+.ts-dust.d3 { left: 44%; top: 54%; width: 3px; height: 3px; --drift: 7px; --dur: 7.5s; --delay: 2.4s; }
+.ts-dust.d4 { left: 72%; top: 48%; width: 2px; height: 2px; --drift: 9px; --dur: 6.5s; --delay: 3.2s; }
+.ts-dust.d5 { left: 22%; top: 64%; width: 2.5px; height: 2.5px; --drift: 6px; --dur: 8s; --delay: 1.6s; }
+.ts-item:hover .ts-dust { animation: ts-dust-float var(--dur, 6s) ease-in-out var(--delay, 0s) infinite; }
 @keyframes ts-dust-float {
   0%   { transform: translate(0, 0); opacity: 0; }
-  25%  { opacity: 0.9; }
-  50%  { transform: translate(3px, -5px); opacity: 0.5; }
-  75%  { opacity: 0.8; }
-  100% { transform: translate(-3px, -9px); opacity: 0; }
+  10%  { opacity: 0.85; }
+  30%  { transform: translate(calc(var(--drift) * 0.6), calc(var(--drift) * 1.2)); opacity: 1; }
+  55%  { transform: translate(calc(var(--drift) * -0.5), calc(var(--drift) * 3)); opacity: 0.8; }
+  80%  { transform: translate(calc(var(--drift) * 0.4), calc(var(--drift) * 5)); opacity: 0.5; }
+  100% { transform: translate(calc(var(--drift) * -0.3), calc(var(--drift) * 7.5)); opacity: 0; }
 }
 
 /* ===== 暖居:呼吸暖光 + 会呼吸的窗 + 金色尘粒 ===== */

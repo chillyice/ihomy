@@ -199,7 +199,7 @@ onMounted(() => {
 onBeforeUnmount(() => mainEl.value?.removeEventListener('scroll', onMainScroll))
 watch(() => route.fullPath, () => nextTick(measureThreshold))
 
-// 晨暮分段开关滑块:选中态(高亮 + thumb)跟随本地 segMode,扫光结束后才更新,让滑块滑动可见(否则被扫光全屏幕布盖住看不到)
+  // 晨暮分段开关滑块:选中态(高亮 + thumb)跟随 themeStore.mode,与主题切换同步立即更新
 const segMode = ref(themeStore.mode)
 const segEl = ref(null)
 const segThumb = ref(null)
@@ -220,19 +220,7 @@ const positionSegThumb = () => {
   thumb.style.width = `${br.width}px`
   thumb.style.height = `${br.height}px`
 }
-// 晨暮切换会触发扫光(html 挂 theme-sweeping),等扫光结束再滑滑块
-const waitSweepEnd = () => new Promise((resolve) => {
-  const root = document.documentElement
-  if (!root.classList.contains('theme-sweeping')) return resolve()
-  const mo = new MutationObserver(() => {
-    if (!root.classList.contains('theme-sweeping')) { mo.disconnect(); resolve() }
-  })
-  mo.observe(root, { attributes: true, attributeFilter: ['class'] })
-  setTimeout(() => { mo.disconnect(); resolve() }, 2100) // 兜底(扫光最长约 2s)
-})
-watch(() => themeStore.mode, async (m) => {
-  await waitSweepEnd()
-  if (themeStore.mode !== m) return // 等待期间又切了,交给最新一次
+watch(() => themeStore.mode, (m) => {
   segMode.value = m
   positionSegThumb()
 })
@@ -326,7 +314,15 @@ watch(() => route.fullPath, () => { canBack.value = window.history.state?.back !
 .gc-seg:has(button.on:hover) .gc-seg-thumb { background: var(--color-brand-hover); }
 
 /* ===== studio 外框(钉在浏览器视口内,内容内部滚动) ===== */
-.gc-studio { flex: 1; min-height: 0; display: flex; border-radius: 22px; overflow: hidden; background: var(--color-bg); border: 1px solid var(--color-border); box-shadow: var(--shadow-hover); }
+.gc-studio {
+  flex: 1; min-height: 0; display: flex; border-radius: 22px; overflow: hidden;
+  /* 极淡双色底衬:右上陶土粉(--blob-1)+ 左下鼠尾草绿(--blob-3),压在最底不抢暖木米主调 */
+  background:
+    radial-gradient(560px 320px at 82% 4%, rgba(var(--blob-1), 0.12), transparent 64%),
+    radial-gradient(520px 340px at 6% 96%, rgba(var(--blob-3), 0.12), transparent 62%),
+    var(--color-bg);
+  border: 1px solid var(--color-border); box-shadow: var(--shadow-hover);
+}
 .gc-app { display: grid; grid-template-columns: 230px 1fr; height: 100%; width: 100%; }
 
 /* 侧栏 */

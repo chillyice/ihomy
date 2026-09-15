@@ -607,7 +607,7 @@ const greeting = computed(() => {
 
 /* 快捷入口卡片 */
 .gc-link-body { display: flex; align-items: center; gap: 10px; padding: 10px 4px 4px; cursor: pointer; }
-.gc-link-icon { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 20px; background: var(--color-line); flex-shrink: 0; }
+.gc-link-icon { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 20px; background: rgba(var(--blob-3), 0.16); flex-shrink: 0; }
 .gc-link-text { font-size: 13px; font-weight: 600; color: var(--color-text); flex: 1; }
 .gc-link-arrow { font-size: 16px; color: var(--color-text-tertiary); transition: transform .2s ease, color .2s ease; }
 .gc-link-body:hover .gc-link-arrow { transform: translateX(3px); color: var(--color-brand); }
@@ -620,7 +620,9 @@ const greeting = computed(() => {
 .gc-weather { display: flex; flex-direction: column; }
 .gc-weather .gc-glass { flex: 1; height: auto; min-height: 120px; }
 .gc-glass::before { content: ""; position: absolute; inset: 0;
-  background: radial-gradient(360px 200px at 74% 18%, var(--glow-warm), transparent 62%); }
+  background:
+    radial-gradient(360px 200px at 74% 18%, var(--glow-warm), transparent 62%),
+    radial-gradient(280px 170px at 8% 90%, rgba(var(--blob-3), 0.22), transparent 58%); }
 .gc-glass::after { content: ""; position: absolute; left: 14%; top: -4%; width: 46%; height: 110%;
   background: url("data:image/svg+xml,%3Csvg width='340' height='760' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='b' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23FFE9C4' stop-opacity='.38'/%3E%3Cstop offset='.55' stop-color='%23FFDDA6' stop-opacity='.13'/%3E%3Cstop offset='1' stop-color='%23FFDDA6' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='340' height='760' fill='url(%23b)' transform='rotate(14 170 380)'/%3E%3C/svg%3E");
   background-size: 100% 100%; mix-blend-mode: screen; opacity: .8; transform: rotate(10deg); }
@@ -675,7 +677,7 @@ html.dark .gc-glass::after { opacity: .5; }
 .gc-list .gc-row { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--color-line); font-size: 13px; cursor: pointer; }
 .gc-list .gc-row:last-child { border-bottom: none; }
 .gc-list .gc-row .gc-muted { margin-left: auto; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 45%; }
-.gc-ic { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-size: 13px; background: var(--color-line); flex-shrink: 0; }
+.gc-ic { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-size: 13px; background: rgba(var(--blob-1), 0.14); flex-shrink: 0; }
 .gc-val { font-weight: 650; color: var(--color-brand); }
 .gc-val.done { color: var(--color-text-tertiary); text-decoration: line-through; }
 
