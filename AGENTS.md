@@ -5,7 +5,7 @@
 
 > **⚠ Git 规定(必须遵守)**:非人工指令,不得主动提交代码(`git commit`/`git add -A`/`git push` 一律禁止)。`git add` 只能指定具体文件路径,禁止 `git add -A`/`git add .`。
 
-> **⚠ 敏感数据规定(必须遵守)**:**生产**密码/密钥/私钥/token 一律不写入仓库文件——生产 DB 密码与 JWT 密钥走服务器上的 external.yml(不入 git,模板见 `external.yml.template`);`Linux部署指导.md`(§〇凭证台账,凭证唯一记录处,两平台共用)/`docs/新人上手指南.md`(含开发账号明文)为本地维护文档(.gitignore 已忽略;部署流程已脱敏入库 `docs/部署指导-*.md`,凭证位置一律占位符);前端演示凭证走 `frontend/.env.development.local`(仅 vite dev 加载,生产构建不读取;**`.env.local` 所有模式都加载会内联进生产 bundle,禁用**)。**schema.sql 为开发安全版已入库(2026-09-07)**:仅含本机 Docker 开发固定凭证(ihomy 账号密码/admin 与 ops 种子的 BCrypt 哈希,明文只在本地新人上手指南),生产凭证完全独立;生产部署时必须 `ALTER USER` 改独立强密码。历史曾因明文生产凭证入公开仓库做过全量清理+凭证轮换(2026-09-07),勿再引入生产凭证。轮换后凭证台账在本地 `Linux部署指导.md` §〇;重写前全量备份(bundle/脱敏文件/WIP 补丁/替换清单)在 `D:\WorkSpace\ihomy-backup-20260907\`;详见 `docs/变更归档.md` 敏感数据治理小节。
+> **⚠ 敏感数据规定(必须遵守)**:**生产**密码/密钥/私钥/token 一律不写入仓库文件——生产 DB 密码与 JWT 密钥走服务器 external.yml(不入 git,模板 `external.yml.template`);凭证台账在本地 `Linux部署指导.md` §〇(两平台共用)、开发账号明文在本地 `docs/新人上手指南.md`(均 .gitignore 忽略,不入 git);前端演示凭证走 `frontend/.env.development.local`(仅 vite dev 加载,生产构建不读取;**`.env.local` 所有模式都加载会内联进生产 bundle,禁用**)。schema.sql 为开发安全版已入库(2026-09-07):仅含本机 Docker 开发固定凭证,生产凭证完全独立,部署时须 `ALTER USER` 改强密码。历史明文凭证清理+轮换见 docs/变更归档.md 敏感数据治理小节。
 
 > **⚠ 路径拼写警示(遵守以防误写)**:
 > - 工作目录绝对路径:`C:\Users\chill\OneDrive\WorkStation\Projects\ihomy`
@@ -55,7 +55,7 @@
 
 ## 数据库约定
 
-- **root 仅用于初始化**:`mysql -uroot -p < backend/src/main/resources/schema.sql`,执行一次(建库、建表、创建 ihomy 账号、初始数据);本地开发直接 `.\scripts\start-db.ps1`(Docker 首次启动自动导入)。**schema.sql 为开发安全版,已入库(2026-09-07)**:ihomy 账号密码为本机开发固定值(与 `scripts/setup.ps1` 生成的 external.yml 一致);admin/ops 初始密码为开发专用值(明文见本地 `docs/新人上手指南.md`,不入 git),生产部署必须改独立强密码(见 docs/部署指导-Linux.md)。
+- **root 仅用于初始化**:`mysql -uroot -p < backend/src/main/resources/schema.sql`(建库/建表/建账号/初始数据),执行一次;本地开发 `.\scripts\start-db.ps1`(Docker 首启自动导入)。schema.sql 为开发安全版(仅本机 Docker 开发凭证,生产须改独立强密码)。
 - **业务运行用 `ihomy` 账号**:仅授予 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`(最小权限,无 CREATE/ALTER/DROP)。application.yml 连接用 `ihomy`,**不要用 root 跑业务**。
 - 账号同时创建 `localhost` 和 `%` 两个 host(本机/远程应用服务器都能连)。
 - **生产 MySQL 密码策略(2026-09-07 轮换踩坑)**:生产库启用 `validate_password` MEDIUM(特殊字符/数字/大小写各≥1,长度≥8)——生成/轮换 DB 密码必须含特殊字符(避开 `' " \ $ |` 转义雷区,建议 `!@%^&*-_+=.`),否则 `ALTER USER` 报 1819;开发 Docker MySQL 无此组件,同一密码 dev 可用 prod 被拒。
@@ -116,7 +116,7 @@ frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
 .\mvnw.cmd -B clean compile -DskipTests       # 仅编译验证
 .\mvnw.cmd spring-boot:run                     # 开发运行(端口8080)
 ```
-- 有 jar 锁先 `taskkill /F /IM java.exe` 再打包(运行中 java 锁定日志文件导致 clean 失败)。日志路径:生产 `/opt/ihomy/logs`(三类子目录 access/server/thirdparty),开发由 external.yml 指定(旧机器 `D:\WorkSpace\ihomy\logs`,setup.ps1 新装的机器为仓库内 `data\logs`,同样三子目录)。
+- 有 jar 锁先 `taskkill /F /IM java.exe` 再打包(运行中 java 锁日志文件导致 clean 失败)。日志路径:生产 `/opt/ihomy/logs`(三子目录 access/server/thirdparty),开发由 external.yml 指定。
 - 临时 Maven(本机未装 mvn):`C:\Users\chill\AppData\Local\Temp\opencode\apache-maven-3.9.9\bin\mvn.cmd`
 - JAVA_HOME:`C:\Program Files\Java\jdk-21`(JDK 21 已装)
 - 运行后端必须用完整路径单实例:`C:\Program Files\Java\jdk-21\bin\java.exe -jar target\ihomy-backend.jar`(javapath launcher + JDK 双实例会分流 8080 请求导致偶发 401/404/500)。
@@ -159,7 +159,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 系统 | i18n / 主题(暖居/光尘 × 晨/暮) / 字典 | i18n/ + theme/(index.js)+stores/theme.js + utils/dict.js |
 | 移动端 | 设备自适应 | useDevice.js + MobileLayout.vue + Mobile* 组件 |
 
-**关键坑速查**(实现细节,详见 docs):日记 date 兼容 `yyyy-MM-dd HH:mm`;纪念日 Hutool ChineseDate 月份 0-based 需 +1;家谱 null 字段须 `LambdaUpdateWrapper` 显式 SET;相册分享 token + Knuth 混淆;博客新建家庭注入 9 默认分类;物品户型图 2 期完成(裁剪/粘合删原房保持最后防家具入库覆盖、端点识别/字号/光标屏幕恒定;**hover 边加号阈值 6px**——原 12px 太大导致 hover 显示但 click 被 `justDragged` 拦截;库内家具拖入画布替代「摆放」+「请选择房间」按钮)、3 期 AI 语义已实现(V9.40:/item/ai/find、/item/ai/put;V9.46 前端入口;V9.49 本地规则+LLM 兜底;V9.51 语音找物/放物入口;V9.52 同义词表+功能兜底);**未设计楼层画布空白+引导**(2026-09-07:表单录入房间无 geometry,画布标签 cx/cy=0 会全堆叠在原点;"已设计"=floorDesigned 有底图或任一房间形状≥3 点,未设计时隐藏家具/物品+引导进编辑+拦截摆放,画完第一间自动恢复);**MP `updateById` 会显式回写实体里的旧 `updated_at` 抑制 `ON UPDATE CURRENT_TIMESTAMP`**——凡依赖 updated_at 做变更检测/排序的表,更新必须 LambdaUpdateWrapper 只 SET 业务字段并重查回传新值(2026-09-06 脑图协同踩坑);**simple-mind-map npm 包只内置 default 主题**,其余主题须 `mindmapThemes.js` defineTheme 本地注册,否则 setTheme 静默回落默认样式;**脑图多端并发保存靠 update 乐观锁**(客户端带 baseUpdatedAt,库中 updated_at 已刷新则 409,前端弹窗裁决覆盖/加载远端——双开 20s 轮询窗口内静默互覆盖实测丢数据);**脑图保存前 stripEmptyNodes 剥空叶子**(新增节点不输入直接确认残留 `<p><br></p>`,须传 getData(true).root 而非整包);**EP dropdown 内嵌 CSS hover 子菜单两坑**(2026-09-07 头像「切换家庭」):hover 容忍期须用 `visibility` 延迟隐藏而非 `display` 切换(L 形 hover 区域有路径死角,`display:none` 后移入面板区无法复活),且绝对定位子面板会撑大 `el-scrollbar__wrap` 的 scrollWidth 让 EP 画出滚不动的幽灵 bar(该 popper 的 `.el-scrollbar__bar` 直接 display:none);**pdfjs-dist 统一 v6**(物品定位 PDF 底图转图 + 书架 PDF 查看器两消费方同版本,worker 用 `build/pdf.worker.min.mjs?url`,降 v3 会因 build 目录无 .mjs 构建失败;**PDF 在浏览器不用裸 iframe**——iOS Safari/安卓 Chrome 的 iframe 不内联渲染 PDF,书架阅读器已换 pdf.js canvas 连续滚动视图 V9.42);详见 docs/变更归档.md 同日小节。
+**关键坑速查**(实现细节详见 docs/变更归档.md):日记 date 兼容 `yyyy-MM-dd HH:mm`;纪念日 Hutool ChineseDate 月份 0-based 需 +1;家谱 null 字段须 `LambdaUpdateWrapper` 显式 SET;**MP `updateById` 会回写实体旧 `updated_at` 抑制 `ON UPDATE CURRENT_TIMESTAMP`**——依赖 updated_at 的表更新必须 LambdaUpdateWrapper 只 SET 业务字段并重查;**simple-mind-map 只内置 default 主题**(其余须 mindmapThemes.js defineTheme 注册);**脑图并发保存靠 update 乐观锁**(带 baseUpdatedAt,库中已刷新则 409);**脑图保存前 stripEmptyNodes 剥空叶子**;**EP dropdown 内嵌 hover 子菜单**用 visibility 延迟隐藏而非 display;物品户型图 hover 边加号阈值 6px、未设计楼层画布空白+引导、库内家具拖入画布替代「摆放」;**pdfjs-dist 统一 v6**(worker 用 `build/pdf.worker.min.mjs?url`,浏览器不用裸 iframe)。
 
 ## 设计规范(统一实现,避免多种方式)
 
@@ -174,25 +174,11 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 7. **家庭隔离**:所有业务数据带 `family_id`;JWT familyId 为快照,refresh 时按优先级解析;跨家庭访问返回 NOT_FOUND。
 8. **多家庭**:`sys_user_role.family_id` 区分;当前家庭存 Redis;`default_family_id` 用户设置的默认家庭。
 9. **N+1 禁令**(强制):列表接口禁止在 for 循环里 `selectById` 取关联字段(authorName/uploaderName/requesterName 等)。**必须先收集所有 userIds,用 `selectBatchIds` 批量查,内存 Map 回填**。参考 `ActivityFeedService.getFeed` / `CommentService.list` / `AnniversaryService.list` / `VideoService.list` 的 `batchUsers()` 写法。已批量化的:Book/Chat/FamilyPlan/Task/Points/ActivityFeed/Comment/Anniversary/Video。
-10. **缓存规范**(强制):
-    - **缓存键**:`ihomy:{domain}:{id}`(如 `ihomy:user:1`、`ihomy:perms:1:1`、`ihomy:home:pub:1`)。
-    - **短 TTL**:用户实体/权限码 5min;公开首页聚合 5min;天气/太阳位置按业务定。
-    - **变更点必须显式 invalidate**:`ProfileController.update` → `invalidateUser`;`MemberController.setRole/remove` → `invalidatePerms`;`AuthService.switchFamily` → `invalidatePerms` + `invalidateUser`;`AuthService.joinFamily` → `invalidatePerms`;模块/照片变更 → `PublicController.invalidateHomeCache`。
-    - **不变数据走内存缓存**:`sys_home_module` 全局模块 `@PostConstruct` 预热 + **懒加载兜底**(`globalLoaded` 双检锁——2026-09-01 生产启动 mapper 偶发未就绪致全局模块永久为空、导航只剩设置/运维;预热失败不再致命,首次查询自动加载),家庭模块按 familyId 缓存 `ConcurrentHashMap`,变更时 evict。**不引 Caffeine 等库**(数据量小,内存够用)。
-    - **敏感数据不缓存**:成员视图的 `/public/home`(含 stats/photos)不缓存,只缓存非成员视图。
+10. **缓存规范**(强制):键 `ihomy:{domain}:{id}`;短 TTL(用户/权限/公开首页 5min);变更点必须显式 invalidate(见下方「缓存失效矩阵」);不变数据走内存缓存(`sys_home_module` 全局 `@PostConstruct` 预热 + `globalLoaded` 双检锁懒加载兜底——预热失败不再致命;家庭模块按 familyId 缓存 `ConcurrentHashMap`,变更 evict;**不引 Caffeine**);敏感数据不缓存(成员视图 `/public/home` 含 stats/photos 不缓存)。
 11. **UPDATE 不先 select**(强制):回写冗余字段(如 `like_count`)用 `LambdaUpdateWrapper.eq(id).set(field, value).update(null)`,不要 `selectById` 再 `updateById`(省一次查询)。参考 `ContentLikeService.syncCount`。
 12. **文件上传流式**(强制):大文件(>1MB)禁止 `file.getBytes()` 全量入堆(生产 `-Xmx384m` 上传 200MB 即 OOM)。**用 `MultipartFile` 重载 + `transferTo` + `Files.copy` 兜底**。FileService 已提供 4 个流式重载(`upload`/`uploadVideo`/`uploadBook` 通用+图片+视频+电子书),Controller 必须传 `MultipartFile` 不调 `getBytes()`。
 13. **JVM/连接池配置**(基线):`spring.threads.virtual.enabled: true`(JDK21 虚拟线程,Tomcat 自动用);HikariCP `maximum-pool-size: 20` + `minimum-idle: 5` + `connection-timeout: 3000`。
-14. **日志规范**(强制,详见 `docs/日志规范.md`):
-    - **三类文件**:access(客户端调接口,`AccessLogFilter` 自动)/server(内部流程+SQL+ERROR 堆栈,业务代码 `log.xxx()` 自动)/thirdparty(三方出站,`ThirdPartyHttp` 统一封装);按天滚动保留 `app.log-retention-days`(默认 7)天。
-    - **六要素**:时间/级别/线程/[tid]/位置(logger)/内容;消息体覆盖 谁/做什么/入参/结果/耗时。
-    - **tid 贯穿**:HTTP 自动(`TraceIdFilter`→MDC);@Async 自动(`AsyncConfig` MDC TaskDecorator);WS 每消息独立 tid;自管线程池必须配同款 TaskDecorator。
-    - **三方调用一律走 `ThirdPartyHttp.get()`**(自动 thirdparty 日志+URL/头脱敏);自定义方法(PROPFIND 等)走 `ThirdPartyHttp.request()`——**JDK HttpURLConnection 不支持自定义 HTTP 方法**(直接抛 Invalid HTTP method),request 内部对非标准方法自动走 java.net.http.HttpClient;流式下载参考 `StorageService.baiduOpen` 手动打 `Loggers.thirdParty()`。
-    - **报错必须带堆栈**:`log.error("xx, param={}", p, e)`(e 恒为最后一个参数);禁止 `e.printStackTrace()` 和只打 `e.getMessage()`。
-    - **级别**:ERROR=需人工介入(带堆栈)/WARN=可自动恢复需关注/INFO=关键业务节点/DEBUG=细节(SQL 恒 DEBUG 只进 server 文件)。
-    - **业务操作日志双写**(强制):`@OperationLog` 切面在落库同时输出 server 日志一行 `[操作] MODULE.TYPE 描述 用户=xx#N 结果=SUCCESS/FAILED 耗时=Nms`——**所有写接口(POST/PUT/DELETE)必须加 @OperationLog**(module 大写/operationType 用 CREATE/UPDATE/DELETE 等标准词/description 中文短句;高频噪音端点如 token 刷新、已读标记除外),业务代码无需再手动打关键节点 INFO。
-    - **新敏感字段进 `AccessLogFilter.SENSITIVE_JSON` 打码清单**(password/token/captcha 等)。
-    - **运维「详细日志」**:`GET /ops/logs/trace?tid=` 按tid扫三类文件;操作日志 TID 列可点;前端 5xx 报错 toast 自带 `[tid:xxx]`。排查方法论见 `docs/日志问题分析方法.md`。
+14. **日志规范**(强制,详见 `docs/日志规范.md`):三类文件 access(接口,`AccessLogFilter` 自动)/server(流程+SQL+ERROR)/thirdparty(三方,`ThirdPartyHttp` 封装),按天滚动保留 7 天;六要素 时间/级别/线程/[tid]/位置/内容;tid 贯穿 HTTP/WS/@Async/自管线程池(配 TaskDecorator);三方调用一律走 `ThirdPartyHttp.get()`(自定义方法走 `.request()`——JDK HttpURLConnection 不支持自定义方法);**报错必须带堆栈** `log.error("xx, p={}", p, e)`(禁止 printStackTrace/只打 getMessage);级别 ERROR=人工/WARN=可恢复/INFO=关键/DEBUG=细节;**所有写接口必须 @OperationLog**(module 大写/operationType 标准词/description 中文;token 刷新/已读等高频噪音端点除外);新敏感字段进 `AccessLogFilter.SENSITIVE_JSON` 打码清单;运维「详细日志」`GET /ops/logs/trace?tid=` 按 tid 扫三类文件,排查见 `docs/日志问题分析方法.md`。
 
 ### 前端规范
 
@@ -212,10 +198,10 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 14. **并行请求**(强制):多个独立的 `await xxxApi.foo()` 必须改 `Promise.all([a, b, c])` 并行(参考 `Home.vue loadAll` + `stores/app.js init`)。串行只在真有依赖时用。
 15. **computed 纯函数**(强制):`computed` 内禁止 `Math.random()`/`Date.now()`/副作用,否则每次访问重算且视觉跳动。需要随机/一次性计算用 `ref` + `watch(source, immediate)` 生成(参考 `Home.vue polaroidLayout`)。
 16. **路由懒加载**:27 个路由全部 `() => import('./views/...')`,不写同步 `import Home from '@/views/Home.vue'`。
-17. **全局 UI 样式统一**(强制):`el-dialog`/`ElMessageBox`/`ElMessage`/`el-popper`/`el-button`/`el-tag`/`el-badge`/`el-input` 及所有 EP 组件的配色、圆角、尺寸、z-index 一律由 `main.css` 全局覆写,**禁止在组件 scoped 内重复定义**。完整样式值(弹窗四档尺寸/遮罩/输入框/Toast 四色/完整 z-index 链)见 `docs/UI设计提示词.md` §11a 与 §3。**命令式 API(ElMessage/ElMessageBox/ElNotification/ElLoading)的组件样式已在 main.js 显式引入**——unplugin 按需加载只覆盖模板组件,新增命令式调用时须确认对应样式已在 main.js 引入,否则弹窗会以裸 DOM 渲染到文档流末尾(不可见,曾误报为「ElMessageBox 动画未生效」)。
-18. **按钮/标签/角标/图标/圆角统一**(强制,`main.css` 全局覆写,禁止 scoped 重复定义):按钮四类(主/次/幽灵/危险,浅色与深色**完全不同色值、不共用**)、`el-tag` 半透明磨砂、`el-badge` 半透明黑、`el-icon` `stroke-width:2px`、圆角统一(button 12px / input 10px / card+dialog 14px)。**完整色值见 `docs/UI设计提示词.md` §18a**。
-19. **页面统一规范**(强制,所有功能页遵守):根容器 `class="page"`(禁止 scoped 覆写 max-width/margin/padding);页面级 H1/H2 移除(面包屑已体现标题),分区标题用 `.section-label`;工具栏统一 `class="page-toolbar card"`(`.tb-left` 筛选组件 `size="small"`,`tb-right` 操作按钮 `gap:8px`,下拉包裹需补 `:deep(.el-dropdown){margin-left:12px}`);多选交互统一 `.pick-badge` 对勾圆标 + 卡片描边(**禁左上 checkbox 角标**);设备映射来源角标 `设备名 + .status-dot`。详见 `docs/UI设计提示词.md` §11b。
-20. **位图资产压缩入库**(强制):装饰性位图(封面/底图/插画)压缩后放 `frontend/src/assets/` 并 ESM 导入(`import x from '@/assets/x.jpg'`,构建出内容哈希名 `assets/x-<hash>.jpg`,配 nginx `expires 7d; immutable` 长期缓存),**不放 `public/`**(无哈希,换图后客户端不刷新)。宽度按实际渲染尺寸 2 倍封顶;带颗粒/噪声的图先做 3×3 中值滤波再压(降高频噪点,同画质约省 1/3 体积),输出渐进式 JPEG。参照相册封面 2560×1920 1.37MB → 800×600 112KB(-92%)。
+17. **全局 UI 样式统一**(强制):所有 EP 组件(el-dialog/ElMessageBox/ElMessage/popper/button/tag/badge/input)配色/圆角/尺寸/z-index 一律由 main.css 全局覆写,**禁止组件 scoped 重复定义**;完整值见 docs/UI设计提示词.md §11a/§3。**命令式 API(ElMessage/ElMessageBox/ElNotification/ElLoading)样式已在 main.js 显式引入**——unplugin 按需只覆盖模板组件,新增命令式调用须确认样式已引入,否则裸 DOM 渲染不可见。
+18. **按钮/标签/角标/图标/圆角统一**(强制,main.css 全局覆写,禁止 scoped):按钮四类(主/次/幽灵/危险,浅深色**不同色值不共用**)、el-tag 半透明磨砂、el-badge 半透明黑、el-icon `stroke-width:2px`、圆角(button 12/input 10/card+dialog 14);完整色值见 docs/UI设计提示词.md §18a。
+19. **页面统一规范**(强制):根容器 `class="page"`(禁 scoped 覆写 max-width/margin/padding);页面级 H1/H2 移除,分区标题 `.section-label`;工具栏 `class="page-toolbar card"`(`.tb-left` 筛选 size=small、`.tb-right` 按钮 gap 8px);多选交互 `.pick-badge` 对勾圆标+卡片描边(**禁左上 checkbox 角标**);详见 docs/UI设计提示词.md §11b。
+20. **位图资产压缩入库**(强制):装饰性位图压缩后放 `frontend/src/assets/` 并 ESM 导入(构建出内容哈希名,配 nginx `expires 7d; immutable`),**不放 `public/`**(无哈希换图不刷新);宽度按实际渲染 2 倍封顶,带噪点先 3×3 中值滤波再压,输出渐进式 JPEG。参照相册封面 2560×1920 1.37MB→800×600 112KB。
 
 ### 性能规范(强制规则)
 
@@ -279,30 +265,21 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 ## 文件存储策略
 
-- **当前阶段(开发期)**:本地磁盘存储(`file.upload-dir`),零成本零内存,FileService 已实现,开箱即用。Nginx `/files/` 托管静态目录(注意负向断言正则 `location ~* ^/(?!files/).+\.(...)$` 排除 /files/)。
-  - **路径配置**:`application.yml` 的 `file.upload-dir` 基线为生产路径 `/opt/ihomy/uploads`(Linux);开发环境通过 external.yml 覆盖为 Windows 路径 `D:\WorkSpace\ihomy\uploads`。DB 存的是相对 `/files/` 的完整 URL,与物理根无关,改路径只需改 yml + 移动 uploads 目录。
-- **未来对接 NAS**:优先 NFS 挂载方案(把 NAS 共享目录挂到 `/opt/ihomy/uploads`,**代码零改动**)。前提是 NAS 与服务器同内网。详细步骤见 `docs/部署指导-Linux.md` 附录"对接 NAS 存储"。若 NAS 异地或要公网 CDN:再改 FileService 用 S3 兼容 SDK(NAS/MinIO/OSS 通用),用 `@ConditionalOnProperty` 切换实现,本地实现保留为默认。
-- **不要主动改 FileService 的存储实现**,除非用户明确要求接 NAS/OSS。当前本地实现满足需求。
-- **统一目录结构(分类目录,无 upload 中间层)**:上传按类型分目录——相册图片→`pictures/{相册名}/{相册ID}_{时间戳}_{文件名}`、视频与海报→`videos/`、音乐(audio/*)→`music/`、电子书→`books/{yyyyMM}/`、通用/头像→`files/{yyyyMM}/`。FileService 提供流式重载(`upload(MultipartFile...)`/`upload(Path,...)` 图片带相册名、`uploadVideo`、`uploadBook`);无相册名时图片平铺到 `pictures/`。DB 存 `/files/...` 完整 URL,与物理根解耦。
-- **存储设备**:`sys_storage_device`(family_id 家庭级隔离,name/device_type SYSTEM|NAS|REMOTE|MOUNT|BAIDU/NEXTCLOUD|WEBDAV/root_path/status/created_by)。`GET /storage/device/list` 首项恒为系统设备(id=0,type=SYSTEM);设备增删改/目录映射需 `@RequirePermission("storage:manage")`(OWNER)。**设备归属=家庭级独立配置**,互不可见。百度网盘已接入(凭证四件套/OAuth/xpan 浏览/dlink 中转);WebDAV/Nextcloud 已接入(2026-09-08,NEXTCLOUD/WEBDAV 类型+轻量客户端 common/WebDavClient,凭证存 root_path `serverUrl|username|ENC(密码)`,添加即测连,流式中转补 Range,详见需求设计说明书 4.6.2 与变更归档同日小节);OSS/S3 暂缓。
-- **文件浏览(独立功能页 `/storage/files`,FileBrowse.vue,2026-09-08 拆分)**:登录用户即可访问(`requiresAuth`);设备选择/面包屑/预览(签名 URL)/下载;设备选择器 clearable,识别不到/浏览失败显示空态不残留旧数据;OWNER 另见新建目录/多选删除/重命名。导航由 `sys_home_module` 记录驱动(桌面 AppSidebar+移动端 MobileMoreGrid,已移除 `m.code !== 'storage'` 排除,NAV_PATHS.storage=`/storage/files`)。
-- **资源管理器**:`GET /storage/browse?deviceId&path`(响应带 fsId+文件项 signedUrl 免登录)+ `GET /storage/file?deviceId&path&download`(流式中转:本地 PathResource 支持 Range/百度 InputStreamResource)。**文件管理写操作(2026-09-08)**:`POST /storage/entry/mkdir`、`PUT /storage/entry/rename`、`DELETE /storage/entry/batch {deviceId, paths}`(均 `@RequirePermission("storage:manage")`+`@OperationLog`;百度一次调用进其回收站可恢复,本地/WebDAV 逐个递归永久删;删除成功后逐出缩略图缓存 `ThumbnailService.evictByPath`)。`StorageService.resolveSafe` 用 `normalize()+startsWith` 防路径遍历(越界返回 400,已实测)。
-- **设备目录映射(替代旧"一键同步",旧 StorageSyncRunner 已退役)**:`POST /storage/map {deviceId, paths}` 勾选目录异步建层级相册+影子照片(不拷贝文件);进度 `GET /storage/sync/progress/{taskId}`(MapTaskRegistry 相册/视频共用);映射规则/签名 URL/缩略图缓存见需求设计说明书 4.3.3 与 4.6.2。
-- **硬删除策略**:删除照片/相册/视频/图书时**物理删除 DB 记录 + 删除磁盘文件**。`FileService.deleteByUrl(url)` 按 `/files/` URL 解析物理路径删文件(外链/空跳过,失败仅告警,带 `normalize()+startsWith` 防越界,顺带删缩略图、尝试清空父目录)。照片删除走 `PhotoMapper.deletePhysicalById`(XML 物理删,绕过全局 logic-delete);相册删除连带照片记录+文件全删(`deletePhysicalByAlbumId`);视频删除**从软删改为硬删** `deletePhysicalById`,并删 `video_url`+`poster`;图书删除硬删 `ContentBookMapper.deletePhysicalById`,并删 `file_url`+`cover_url`;映射的影子照片/视频/曲目物理删但**设备文件永不动**。**关键坑**:MyBatis-Plus 全局配 `logic-delete-field: deleted`(`application.yml`),`deleteById` 实为 UPDATE 软删——要物理删必须用自定义 XML `DELETE` 语句。**覆盖范围**:照片/相册/视频/图书四处;博客封面、头像、家庭封面、背景音乐、家谱照片删除时**未**连带删文件(文件成孤儿,可接受,后续按需扩展)。
+- **当前(开发期)本地磁盘存储**:`file.upload-dir`(生产 `/opt/ihomy/uploads` Linux,开发 external.yml 覆盖),Nginx `/files/` 托管;DB 存 `/files/...` URL,与物理根解耦。**不要主动改 FileService 存储实现**(除非明确要求接 NAS/OSS;未来优先 NFS 挂载,代码零改动,见 docs/部署指导-Linux.md 附录)。
+- **统一目录结构**:相册→`pictures/{相册名}/{相册ID}_{时间戳}_{文件名}`、视频/海报→`videos/`、音乐→`music/`、电子书→`books/{yyyyMM}/`、通用/头像→`files/{yyyyMM}/`;FileService 提供流式重载(upload/uploadVideo/uploadBook)。
+- **存储设备**:`sys_storage_device`(family_id 家庭级隔离,name/device_type SYSTEM|NAS|REMOTE|MOUNT|BAIDU|NEXTCLOUD|WEBDAV/root_path/status);百度网盘/WebDAV/Nextcloud 已接入,OSS/S3 暂缓;设备增删改/目录映射需 `storage:manage`(OWNER)。文件浏览 `/storage/files`、资源管理器 `browse`/`file`、写操作 mkdir/rename/batch(均 storage:manage+@OperationLog)、目录映射 `/storage/map`——详见需求设计说明书 §4.6.2/§4.3.3。
+- **硬删除策略**:照片/相册/视频/图书删除时**物理删 DB 记录+磁盘文件**(自定义 XML DELETE 绕过全局 logic-delete;`FileService.deleteByUrl` 按 URL 解析物理路径删文件,防越界);博客封面/头像/家庭封面/背景音乐/家谱照片删除时**未**连带删文件(孤儿文件,可接受)。
 
 ## 配置与加密
 
-- **外挂配置**:`IHOMY_CONFIG_PATH` 环境变量指定 yml 路径,`ExternalConfigLoader`(EnvironmentPostProcessor)在 Spring Boot 启动早期加载,注入到 Environment 最高优先级(覆盖 application.yml + profile yml)。含:MySQL 密码、Redis 密码、邮件 SMTP、天气四件套。**用户级环境变量曾指向旧路径 `D:\WorkSpace\ihomy\config\external.yml`(陈旧副本,合并单目录前的遗留),2026-09-08 已重定向到仓库副本 `config/external.yml`——改配置前先核实环境变量实际指向:直改仓库副本而环境变量指向别处不生效(已运行进程与新 shell 可能仍旧值,启动命令里显式设置最可靠)。**
-- **DB/Redis/邮件密码明文**:避免鸡生蛋(DB 未连上无法读盐值解密)。
-- **业务凭证(天气私钥)AES-GCM 加密**:`AesUtil`(PBKDF2WithHmacSHA256 派生密钥 100000 次 + 256bit + GCM 128bit tag);密文格式 `ENC(Base64(iv+cipher+tag))`;盐值 16 字节 Base64。
-- **盐值存 DB**:`sys_parameter` 表(name/value),盐值 key=`aes-salt`,首次启动 `ParameterService.getAesSalt()` 自动生成并入库(优先环境变量 `IHOMY_AES_SALT`),之后缓存内存。
-- **WeatherService 改造**:`loadCredential()` 读到的私钥若 `ENC(...)` 包裹,调 `parameterService.decrypt()` 解密;DB 和 yml 两条路径都支持。
-- **天气多源 provider 架构(V9.53)**:`WeatherService` 收敛为门面(凭证解析/坐标定位/缓存/推送/运维统计),取数委托给 `WeatherProvider` 接口实现(和风实现 `QWeatherProvider`,返回 Map 归一化为前端既有字段形状);`sys_weather_credential` 加 `provider`(QWEATHER/OPENWEATHER/AMAP)+ `config_json`(非和风凭证 ENC 加密 JSON);**新增天气源三步**:`WeatherConst.PROVIDERS` 加 code + 新增 WeatherProvider 实现 + 前端下拉加一项,不改 WeatherService;凭证管理走 `WeatherController`(`/weather/credentials` CRUD+启用,family:manage,密钥 ENC 不回传,设置页「天气」tab)。
-- **首页组件重构(V9.53,§4.7.7)**:四档 snap 尺寸(S/M/L/XL 按面积)+ hover 放大推开邻居 + 小档波浪引导,默认布局 9 组件(删 music 冗余格子、加 search 缩小版 item 页),天气组件 AI 生图底图(WEATHER_IMAGE),相册封面 3D 翻开;布局键 `ihomy:dashboard:layout:v2`(旧 v1 弃用)。原 `docs/首页组件重构-排版方案.md`/`设计探询记录.md` 已迁 `docs/设计想法/首页组件/`。
-- **AI 模型接入(V9.40,V9.43 按家庭,V9.47 去全局,V9.48 模型池+功能绑定,V9.49 本地规则,V9.50 百度短语音,V9.52 同义词+兜底,V9.53 天气生图)**:**模型池 + 按功能选模型**——`sys_family_ai_model` 每家庭多条(类型 LLM/IMAGE/ASR/LOCAL,LOCAL=内置本地规则不可删改、每家庭自动一条;自带 base_url/api_key/model/timeout_ms 及 provider/secret_key(V9.50),密钥 ENC 加密不回传),`sys_family_ai_feature` 每家庭每功能一行(feature_code→model_id 主模型 + fallback_model_id 兜底(V9.52),6 个功能:ITEM_FIND 找物/ITEM_PUT 放物/CHAT 对话/IMAGE 图片/WEATHER_IMAGE 天气生图(V9.53)/ASR 语音;功能只能绑允许类型——找物/放物=LOCAL|LLM、对话=LLM、图片/天气生图=IMAGE、语音=ASR,model_id 空=该功能停用);`FamilyAiConfigService.resolveForFeature(familyId, featureCode)` 按功能解析主模型(带 type/provider/secretKey),`resolveChain` 返回 primary+fallback 兜底链(兜底校验同类型+≠主),无全局兜底;设置页「家庭 AI 配置」面板=模型池 el-table+弹窗增删改(LOCAL 内置角标、不显编辑/删除;ASR 可选协议 OpenAI 兼容/百度短语音,百度另填 Secret Key)+ 6 个功能主/兜底双下拉绑定(`/ai/models` CRUD + `/ai/features` 列表 + `PUT /ai/features/{code}` 绑定 body `{modelId,fallbackModelId}`,family:manage 仅家长);OpenAI 兼容 /chat/completions,统一走 `AiService`(chat→CHAT/chatJson→传 featureCode/images→IMAGE 或 featureCode(V9.53,天气生图传 WEATHER_IMAGE)/transcribe→ASR/status→chat/image/weatherImage/asr),出站走 ThirdPartyHttp;**物品找物/放物本地规则优先+LLM 兜底**(ItemLocalParser 零 token 离线,LLM 覆盖不了才回 chatJson);**同义词表(V9.52)**——`sys_synonym`(canonical→alias,source BUILTIN/LLM/USER)+ `SynonymService` 内存缓存(canonicalOf/aliasesOf/expand/upsert),找物读表扩展、放物归一化 name+填别名+修正 type、LLM 落库后写回学到的 (规范词,别名);**功能兜底(V9.52)**——找物/放物质量兜底(本地/便宜 LLM 无命中换 LLM)、对话/图片/天气生图/语音容灾兜底(报错/空结果换次模型,CHAT 不判定「答得不好」防双倍烧 token);**语音识别(ASR)支持 OpenAI 兼容或百度短语音(provider=BAIDU)**——BaiduAsrClient OAuth(API Key+Secret Key 换 access_token 30 天进程内缓存)+ POST vop.baidu.com/server_api JSON(base64 音频,model=dev_pid 如 1537);**dev 已接入**(家庭模型池 DB 行,不入 git):对话=GLM-5.3-Flash(tshl 代理)+图片=doubao-seedream-5-0-260128(豆包 ark 直连,**出图尺寸下限总像素 ≥3686400 即 ≥1920×1920**)+内置 LOCAL+百度短语音(演示家庭+小窝,生产只给小窝),演示家庭/小窝均已迁移;AI 测试台 /tools/ai-playground(/ai/status 配置驱动,临时页;V9.53 改指令(左)/舞台(右)双栏+天气背景 AI 生成配置);后续 AI 功能直接复用 chat/chatJson 并新增 feature_code 即可;**新家庭要用 AI 必须家长先加模型再按功能绑定(找物/放物可直接绑 LOCAL 离线用)**。详见需求设计说明书 §4.6.9。
-- **OPS 加密接口**:`GET /api/ops/crypto/encrypt?plaintext=xxx` 生成密文,`GET /api/ops/crypto/decrypt?ciphertext=ENC(xxx)` 验证解密(均 @RequirePermission("ops:view"))。
-- **外挂模板**:`backend/src/main/resources/external.yml.template`(复制为 external.yml 填真实凭证,设环境变量)。
-- **profile 化(废弃)**:**不再用 application-dev.yml profile**(见 `scripts/start-all.ps1:9`)。`application.yml` 为**生产基线配置**(MySQL 6306/Redis 6379/**DB 密码与 JWT 密钥留空——必须由 external.yml 提供,缺失启动即失败(JwtUtils fail-fast)**/captcha 空/天气留空/`file.upload-dir: /opt/ihomy/uploads` Linux 路径/`spring.threads.virtual.enabled: true` 虚拟线程/HikariCP `maximum-pool-size: 20`/`mybatis.sql: warn` 静默 SQL 日志);**所有环境差异**(开发密码/Windows 路径/captcha=qwer/天气凭证/JWT 密钥/Redis 密码)统一走 `IHOMY_CONFIG_PATH` 指向的 external.yml 覆盖。external.yml 不入 git(.gitignore 已忽略),手动维护,生产部署时也可用 external.yml 注入真实 secrets(密码/密钥)。
+- **外挂配置**:`IHOMY_CONFIG_PATH` 环境变量指定 yml 路径,`ExternalConfigLoader`(EnvironmentPostProcessor)启动早期加载,最高优先级覆盖 application.yml;含 MySQL/Redis 密码、邮件 SMTP、天气四件套、JWT 密钥。**改配置前先核实环境变量实际指向**(曾指向旧路径陈旧副本;启动命令里显式设置最可靠)。模板 `backend/src/main/resources/external.yml.template`;external.yml 不入 git。
+- **DB/Redis/邮件密码明文**(避免鸡生蛋:DB 未连上无法读盐值解密)。
+- **业务凭证 AES-GCM 加密**:`AesUtil`(PBKDF2WithHmacSHA256 派生密钥 100000 次 + GCM 128bit tag);密文 `ENC(Base64(iv+cipher+tag))`;盐值存 `sys_parameter`(key=`aes-salt`,首启自动生成,优先环境变量 `IHOMY_AES_SALT`)。
+- **天气多源(V9.53)**:`WeatherService` 门面 + `WeatherProvider` 接口(和风 `QWeatherProvider`);`sys_weather_credential` 加 provider+config_json;新增天气源三步(WeatherConst.PROVIDERS + 实现 + 前端下拉),凭证走 WeatherController。
+- **首页组件(V9.53,§4.7.7)**:四档 snap 尺寸 + hover 放大推开邻居,默认 9 组件,天气 AI 生图底图,布局键 `ihomy:dashboard:layout:v2`。
+- **AI 模型接入(模型池+按功能绑定)**:`sys_family_ai_model`(每家庭多条,类型 LLM/IMAGE/ASR/LOCAL,密钥 ENC)+ `sys_family_ai_feature`(每功能一行 feature_code→model_id 主+fallback 兜底,6 功能:找物/放物/对话/图片/天气生图/语音);`FamilyAiConfigService.resolveForFeature/resolveChain` 按功能解析主+兜底;物品找物/放物本地规则优先+LLM 兜底(ItemLocalParser);同义词表 `sys_synonym`+SynonymService;语音支持 OpenAI 兼容/百度短语音。**新家庭要用 AI 必须家长先加模型再按功能绑定(找物/放物可直接绑 LOCAL 离线用)**。详见需求设计说明书 §4.6.9。
+- **OPS 加密接口**:`GET /api/ops/crypto/encrypt?plaintext=` 生成密文,`/decrypt?ciphertext=ENC(xxx)` 验证(均 ops:view)。
+- **profile 化(废弃)**:不再用 application-dev.yml profile;application.yml 为生产基线(端口 8080/MySQL 6306/Redis 6379/DB 密码与 JWT 密钥留空必须由 external.yml 提供/`file.upload-dir /opt/ihomy/uploads`/虚拟线程/HikariCP 20/`mybatis.sql: warn`);所有环境差异统一走 external.yml 覆盖。
 
 ## 部署约定(Linux 2GB 求稳)
 
@@ -319,12 +296,10 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 ## 规划事项(未实现)
 
-> 完整规划清单(P1-P4)见 `docs/需求设计说明书.md` 第 9 章「规划事项」,此处只留最需注意的四条:
-- **P1 放映厅 Jellyfin 集成**:方案已定稿,详见 docs/变更归档.md「放映厅 Jellyfin 集成方案」;**启动时先重读该归档小节**。
-- **P2 智能家居中控(Home Assistant 集成)**(2026-09-07 评估定稿):硬件协议层全归 HA(家庭中枢:J4125 PVE 虚拟化 OpenWrt/HAOS/OMV + WireGuard 隧道连 VPS,硬件部署另行推进),ihomy 只做数据沉淀与家人控制入口——S1 Paho 订阅 Mosquitto 入库 sys_iot_device/sys_iot_data + Redis 最新值、S2 HA REST 控制入口(long-lived token)、S3 前端中控页(sys_home_module 模块)+ 物品定位户型图联动;详见需求设计说明书 §9。
-- **P3 物品定位-AI 语义(已完成 V9.46;V9.49 改本地规则+LLM 兜底;V9.52 同义词表+功能兜底)**:后端 V9.40(AiService 统一接入层 + POST /item/ai/find、/item/ai/put);**前端入口 V9.46 已实现**(查看模式搜索框关键词优先+无命中 AI 找物兜底+来源标注;列表模式「AI 登记」弹窗;**删不经过 AI**——AI 找到走既有删除按钮人工确认);**V9.49 本地规则优先+LLM 兜底**(ItemLocalParser 找物闭集反向匹配+放物正则抽取「把X放Y的Z里」,零 token 离线毫秒级;绑定 LLM 时本地覆盖不了才回 chatJson,未配置/LOCAL 则纯本地);**V9.52 同义词表+功能兜底**(sys_synonym + SynonymService:找物读表扩展、放物归一化 name+填别名、LLM 落库后写回学习;fallback_model_id + resolveChain:找物/放物质量兜底、对话/图片/语音容灾兜底);token 节约:put 上下文 items 压缩为紧凑"名称(别名)"文本(find 无清单);详见需求设计说明书 §4.6.9/§4.8。
-- **场景主题方向(2026-09-12,2026-09-15 更新)**:2D 沉浸首页场景主题(SceneHome.vue)**已移除**(暂缓后从 main 删除);3D 光影实验台(/tools/light-lab,Three.js 真实阴影+客户端 NOAA 太阳模拟+房子结构)作为未来场景主题的 3D 基础模型,后续重构时以此为底座;详见需求设计说明书 §4.12.3/§9。
-- 优先级:P1 用户价值高且可行 / P2 锦上添花 / P3 结构性改动 / P4 依赖外部条件。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
+> 完整清单(P1-P4)见 docs/需求设计说明书.md 第 9 章。优先级:P1 用户价值高且可行 / P2 锦上添花 / P3 结构性改动 / P4 依赖外部条件。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
+- **P1 放映厅 Jellyfin 集成**:方案已定稿,**启动时先重读 docs/变更归档.md「放映厅 Jellyfin 集成方案」**。
+- **P2 智能家居中控(Home Assistant 集成)**:硬件协议层全归 HA,ihomy 只做数据沉淀与控制入口——S1 Paho 订阅 Mosquitto 入库 sys_iot_device/sys_iot_data+Redis 最新值、S2 HA REST 控制(long-lived token)、S3 前端中控页+物品定位户型图联动;详见 §9。
+- **场景主题方向**:2D 沉浸场景主题(SceneHome.vue)已移除(暂缓后删除);3D 光影实验台(/tools/light-lab)作为未来场景主题底座,详见 §4.12.3/§9。
 
 ## 文档清单
 
