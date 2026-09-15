@@ -45,15 +45,103 @@ export function loadTheme() {
   }
 }
 
+// —— 晨暮切换扫光(光尘专属):按当前光照角度方向从一侧向另一侧过渡,而非整体渐变 ——
+// 太阳方位角/高度角上下文,由 useSunLight 每次刷新场景时写入(模块级单例,跨 store/composable 共享)
+let _sun = { azimuth: 180, altitude: 0, isNight: true }
+export function setSunContext(ctx) {
+  if (!ctx || ctx.azimuth == null) return
+  _sun = { azimuth: ctx.azimuth, altitude: ctx.altitude ?? 0, isNight: !!ctx.isNight }
+}
+
+// 上次已应用状态(区分「首次加载」与「真实切换」,首次不扫光)
+let _current = null
+
+// 计算「晨→暮」暗色扫过方向(单位向量,屏幕坐标 y 向下)
+// 规则:暗色沿「垂直于光束」的方向扫过,取「暮光从下往上蔓延」的一侧——
+//   上午~正午(太阳在东/正南)向右上扫;下午(太阳在西)向左上扫;正午纯水平向右;夜晚无定向光默认水平向右。
+//   (方位角约定 90=东/180=南/270=西,与 windowLight.sourceX 东左西右一致)
+function sweepVector(sun) {
+  if (sun.isNight) return { dx: 1, dy: 0 }
+  const az = sun.azimuth
+  const bx = -Math.max(-1, Math.min(1, (az - 180) / 90)) // 上午>0、正午=0、下午<0
+  const by = Math.max(0, Math.sin((sun.altitude || 0) * Math.PI / 180)) // 高度角→光束向下分量 0..1
+  const dx = bx >= 0 ? by : -by
+  const dy = bx >= 0 ? -bx : bx
+  const len = Math.hypot(dx, dy) || 1
+  return { dx: dx / len, dy: dy / len }
+}
+
+// 铺一张「旧主题背景色」全屏幕布,待类切换后让它沿扫光方向滑出、露出新主题
+function beginModeSweep(root, prevDusk) {
+  const toDusk = !prevDusk // true=晨→暮(暗色扫入),false=暮→晨(亮色扫入)
+  const oldBg = getComputedStyle(root).getPropertyValue('--color-bg').trim() || '#F1E7D6'
+  const dir = sweepVector(_sun)
+  const vx = toDusk ? dir.dx : -dir.dx
+  const vy = toDusk ? dir.dy : -dir.dy
+  const angle = Math.atan2(vy, vx) * 180 / Math.PI
+
+  const veil = document.createElement('div')
+  veil.className = 'theme-sweep'
+  veil.style.background = oldBg
+  const side = Math.hypot(window.innerWidth, window.innerHeight) * 2.4
+  veil.style.width = side + 'px'
+  veil.style.height = side + 'px'
+  veil.style.left = '50%'
+  veil.style.top = '50%'
+  veil.style.marginLeft = -(side / 2) + 'px'
+  veil.style.marginTop = -(side / 2) + 'px'
+  document.body.appendChild(veil)
+
+  // 扫光期间禁 html/body/#app 的 1s 颜色过渡(否则与幕布交叉淡入打架)
+  root.classList.add('theme-sweeping')
+
+  return () => {
+    let done = false
+    const cleanup = () => {
+      if (done) return
+      done = true
+      veil.remove()
+      root.classList.remove('theme-sweeping')
+    }
+    let anim
+    try {
+      anim = veil.animate(
+        [
+          { transform: `rotate(${angle}deg) translateX(0px)` },
+          { transform: `rotate(${angle}deg) translateX(${side}px)` },
+        ],
+        { duration: 700, easing: 'cubic-bezier(.4,0,.2,1)' }
+      )
+    } catch {
+      cleanup()
+      return
+    }
+    anim.onfinish = cleanup
+    anim.oncancel = cleanup
+    setTimeout(cleanup, 900) // 兜底清理(动画异常/被中断时)
+  }
+}
+
 export function applyTheme(state) {
   const t = { ...DEFAULT_THEME, ...state }
   const root = document.documentElement
+  const nextDusk = t.mode === 'dusk'
+  const prevDusk = _current ? _current.mode === 'dusk' : null
+  const isModeChange = prevDusk != null && prevDusk !== nextDusk
+  const withinGuangchen = _current && _current.theme === 'guangchen' && t.theme === 'guangchen'
+
+  // 光尘内晨↔暮切换:切类前铺旧色幕布,切类后扫光露出新主题
+  const finishSweep = isModeChange && withinGuangchen ? beginModeSweep(root, prevDusk) : null
+
   root.classList.remove(...THEME_IDS.map((id) => 'theme-' + id))
   root.classList.add('theme-' + t.theme)
-  root.classList.toggle('dark', t.mode === 'dusk')
+  root.classList.toggle('dark', nextDusk)
   const meta = document.querySelector('meta[name="theme-color"]')
   if (meta) meta.setAttribute('content', THEMES[t.theme].meta[t.mode])
   localStorage.setItem(THEME_STORAGE_KEY, JSON.stringify(t))
+  _current = { ...t }
+
+  if (finishSweep) finishSweep()
   return t
 }
 

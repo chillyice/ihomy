@@ -6,6 +6,7 @@ import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { gsap } from 'gsap'
 import { getSunScene, currentSlotIndex } from '@/utils/windowLight'
 import { useThemeStore } from '@/stores/theme'
+import { setSunContext } from '@/theme'
 import request from '@/api/request'
 
 // provide/inject key(确保 App.vue 与 SunLightLayer/AppSidebar 共享同一状态)
@@ -444,6 +445,11 @@ export function useSunLight() {
   // 毛玻璃开关:在 <html> 上切换 .no-glass 类,全局禁用 backdrop-filter
   watch(glassEnabled, (on) => {
     document.documentElement.classList.toggle('no-glass', !on)
+  }, { immediate: true })
+
+  // 把太阳方位角/高度角写入 theme 模块,供晨暮切换扫光的方向计算
+  watch(sunScene, (s) => {
+    if (s && s.azimuth != null) setSunContext({ azimuth: s.azimuth, altitude: s.altitude ?? 0, isNight: !!s.isNight })
   }, { immediate: true })
 
   // 播放器启动时暂停特效,关闭后恢复

@@ -331,6 +331,10 @@ html.dark .msg-icon:hover { color: #E8DCC8; }
 html { transition: background-color 1s ease; }
 body, #app { transition: color 1s ease; }
 
+/* 晨暮切换扫光(光尘):幕布铺旧背景色 + 扫光期间禁容器级颜色过渡(避免与幕布交叉淡入打架) */
+.theme-sweep { position: fixed; z-index: 999999; pointer-events: none; will-change: transform; }
+html.theme-sweeping, html.theme-sweeping body, html.theme-sweeping #app { transition: none !important; }
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html {

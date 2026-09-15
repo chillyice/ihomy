@@ -32,6 +32,14 @@
         <div class="gc-app">
           <!-- 侧栏:按分类分组,组头可折叠,默认只展开内容组 -->
           <aside class="gc-side">
+            <!-- 用户信息(预览 .user 位置):头像 + 昵称 + 所在家庭,点击进设置 -->
+            <div class="gc-user" title="个人设置" @click="navigate('/settings')">
+              <el-avatar :size="38" :src="userInfo?.avatar">{{ userInitial }}</el-avatar>
+              <div class="gc-user-meta">
+                <div class="gc-user-name">{{ userInfo?.nickname || '我' }}</div>
+                <div class="gc-user-fam">{{ familyName || 'ihomy' }}</div>
+              </div>
+            </div>
             <nav>
               <div v-for="g in navGroups" :key="g.key" class="gc-nav-group">
                 <button class="gc-nav-group-head" @click="toggleGroup(g.key)">
@@ -88,6 +96,10 @@ const sunLight = inject(SUN_LIGHT_KEY)
 const familyName = computed(() => appStore.familyName)
 const familyDescription = computed(() => appStore.family?.description || '')
 const familyInitial = computed(() => (familyName.value || 'ihomy').charAt(0))
+
+// 当前登录用户信息(侧栏顶部 .user 位置:头像 + 昵称 + 所在家庭)
+const userInfo = computed(() => userStore.userInfo)
+const userInitial = computed(() => (userInfo.value?.nickname || '我').charAt(0))
 
 // 天气→AI 生图的全屏氛围背景(「活窗」放大到整屏,最底层)
 const { weatherBg, load: loadWeatherBg } = useWeatherBg()
@@ -237,6 +249,13 @@ watch(() => route.fullPath, () => { canBack.value = window.history.state?.back !
 .gc-nav-item:hover { background: var(--color-line); color: var(--color-text); }
 .gc-nav-item.act { background: var(--color-brand); color: var(--color-card); box-shadow: var(--shadow); }
 .gc-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .7; flex-shrink: 0; }
+
+/* 侧栏用户信息(预览 .side .user):头像 + 昵称 + 所在家庭 */
+.gc-user { display: flex; align-items: center; gap: 11px; padding: 4px 6px 16px; border-bottom: 1px solid var(--color-line); margin-bottom: 12px; cursor: pointer; }
+.gc-user .el-avatar { flex-shrink: 0; background: var(--color-green); color: var(--color-card); font-weight: 700; }
+.gc-user-meta { min-width: 0; }
+.gc-user-name { font-size: 13.5px; font-weight: 600; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gc-user-fam { font-size: 11.5px; color: var(--color-text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* 侧栏分组:组头可折叠,默认只展开内容组 */
 .gc-nav-group { margin-bottom: 4px; }
