@@ -3,11 +3,11 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('plan.title') }]" />
 
-    <div class="page-toolbar card">
+    <PageToolbar>
       <div class="tb-right">
         <el-button type="primary" @click="openPlanEditor()">{{ $t('plan.newPlan') }}</el-button>
       </div>
-    </div>
+    </PageToolbar>
 
     <div v-loading="loading">
       <div v-if="plans.length" class="plan-list">
@@ -86,6 +86,7 @@ import { Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { planApi } from '@/api'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
 
 const { t } = useI18n()
 

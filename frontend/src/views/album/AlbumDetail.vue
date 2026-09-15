@@ -417,7 +417,7 @@ onMounted(load)
 .child-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
 .child-tile { overflow: hidden; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
 .child-tile:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(31,58,95,0.15); }
-.child-tile.selected { outline: 3px solid var(--color-primary, #b88c6e); outline-offset: -3px; }
+.child-tile.selected { outline: 3px solid var(--color-primary, var(--color-brand)); outline-offset: -3px; }
 .child-tile-cover { position: relative; aspect-ratio: 4 / 3; }
 .child-tile-img { width: 100%; height: 100%; background-size: cover; background-position: center; }
 .child-tile-cover .status-dot { position: absolute; top: 8px; right: 8px; border: 2px solid var(--color-bg, #fcf8f0); }
@@ -434,7 +434,7 @@ onMounted(load)
   transition: transform 0.15s, box-shadow 0.15s;
 }
 .child-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(31,58,95,0.12); }
-.child-card.selected { outline: 3px solid var(--color-primary, #b88c6e); outline-offset: -3px; }
+.child-card.selected { outline: 3px solid var(--color-primary, var(--color-brand)); outline-offset: -3px; }
 .child-cover {
   position: relative;
   width: 52px;
@@ -454,7 +454,7 @@ onMounted(load)
 .child-name { font-size: 14px; font-weight: 600; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .child-meta { font-size: 12px; color: var(--color-text-secondary); }
 .select-count { font-size: 13px; color: var(--color-text-secondary); }
-.photo-card.selected .photo-wrap { outline: 3px solid var(--color-primary, #b88c6e); outline-offset: -3px; }
+.photo-card.selected .photo-wrap { outline: 3px solid var(--color-primary, var(--color-brand)); outline-offset: -3px; }
 .pick-badge {
   position: absolute;
   top: 8px;
@@ -468,7 +468,7 @@ onMounted(load)
   align-items: center;
   justify-content: center;
 }
-.pick-badge.on { background: #b88c6e; border-color: #b88c6e; }
+.pick-badge.on { background: var(--color-brand); border-color: var(--color-brand); }
 .album-desc { margin-top: 8px; color: var(--color-text-secondary); font-size: 13px; }
 .album-head-actions { display: flex; flex-direction: row; align-items: center; gap: 8px; flex-shrink: 0; }
 .album-body { margin-top: 20px; }

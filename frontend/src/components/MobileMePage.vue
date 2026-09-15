@@ -36,9 +36,9 @@
     <!-- 设置区 -->
     <div class="me-section">
       <div class="me-row" @click="toggleTheme">
-        <span class="me-row-icon">{{ theme.dark ? '🌙' : '☀️' }}</span>
-        <span class="me-row-text">{{ theme.dark ? $t('theme.dark') : $t('theme.light') }}</span>
-        <el-switch :model-value="theme.dark" size="small" />
+        <span class="me-row-icon">{{ themeStore.isDusk ? '🌙' : '☀️' }}</span>
+        <span class="me-row-text">{{ themeStore.isDusk ? $t('theme.dusk') : $t('theme.dawn') }}</span>
+        <el-switch :model-value="themeStore.isDusk" size="small" />
       </div>
       <div class="me-row" @click="toggleLightEffect">
         <span class="me-row-icon">✨</span>
@@ -88,7 +88,7 @@ import { ArrowRight, Check } from '@element-plus/icons-vue'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { authApi } from '@/api'
-import { applyTheme, loadTheme } from '@/theme'
+import { useThemeStore } from '@/stores/theme'
 import { applyLocale } from '@/i18n'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 
@@ -98,14 +98,14 @@ const userStore = useUserStore()
 const sunLight = inject(SUN_LIGHT_KEY)
 
 const userInfo = computed(() => userStore.userInfo)
-const theme = ref(loadTheme())
+const themeStore = useThemeStore()
 const families = ref([])
 const showFamilySwitch = ref(false)
 
 const lightEffectOn = computed(() => sunLight?.shadowEnabled?.value ?? false)
 
 const toggleTheme = () => {
-  theme.value = applyTheme({ ...theme.value, dark: !theme.value.dark, autoMode: false })
+  themeStore.toggleMode()
 }
 const toggleLightEffect = () => {
   if (sunLight?.shadowEnabled) {
@@ -169,12 +169,12 @@ html.dark .me-family { color: rgba(232,220,200,0.5); }
 .me-login-btn {
   padding: 6px 16px;
   border-radius: 8px;
-  background: var(--color-primary, #b88c6e);
+  background: var(--color-primary, var(--color-brand));
   color: #fff;
   font-size: 13px;
   cursor: pointer;
 }
-html.dark .me-login-btn { background: #d4b298; color: #1a1a1a; }
+html.dark .me-login-btn { background: var(--color-brand); color: #1a1a1a; }
 
 .me-section {
   margin-bottom: 12px;
@@ -222,8 +222,8 @@ html.dark .me-row.logout .me-row-text { color: #c97474; }
 }
 html.dark .family-item { color: #E8DCC8; border-bottom-color: rgba(255,255,255,0.04); }
 .family-item:last-child { border-bottom: none; }
-.family-item.active { color: var(--color-primary, #b88c6e); font-weight: 600; }
-html.dark .family-item.active { color: #d4b298; }
+.family-item.active { color: var(--color-primary, var(--color-brand)); font-weight: 600; }
+html.dark .family-item.active { color: var(--color-brand); }
 .family-item:active { background: rgba(0,0,0,0.03); }
 
 .expand-enter-active, .expand-leave-active { transition: max-height 0.25s ease; overflow: hidden; }

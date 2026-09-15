@@ -40,8 +40,8 @@
     <!-- 底部:主题/台灯/语言/用户 -->
     <div class="sidebar-foot">
       <div class="foot-row">
-        <span class="foot-btn" :title="theme.dark ? '浅色' : '深色'" @click="onTheme">
-          <el-icon><Sunny v-if="!theme.dark" /><Moon v-else /></el-icon>
+        <span class="foot-btn" :title="themeStore.isDusk ? $t('theme.dawn') : $t('theme.dusk')" @click="onTheme">
+          <el-icon><Sunny v-if="!themeStore.isDusk" /><Moon v-else /></el-icon>
         </span>
         <!-- 台灯三态开关:auto(自动)/on(常开)/off(关闭);关灯时冷蓝微光便于定位 -->
         <span class="foot-btn" :class="{ 'lamp-on': lampMode !== 'off', 'lamp-off': lampMode === 'off' }" :title="'台灯:' + (lampMode === 'auto' ? '自动' : lampMode === 'on' ? '常开' : '关闭')" @click="toggleLamp">
@@ -165,7 +165,7 @@ const ICON_MAP = {
 }
 const iconComp = (code) => ICON_MAP[code] || Document
 import { applyLocale } from '@/i18n'
-import { applyTheme, loadTheme } from '@/theme'
+import { useThemeStore } from '@/stores/theme'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { warnLevelColor, topWarning } from '@/utils/dict'
 
@@ -199,7 +199,7 @@ const toggleLightEffect = () => {
 }
 
 const collapsed = ref(false)
-const theme = ref(loadTheme())
+const themeStore = useThemeStore()
 
 const familyName = computed(() => appStore.familyName)
 const userInfo = computed(() => userStore.userInfo)
@@ -262,9 +262,9 @@ const navigate = (path) => {
   router.push(path)
 }
 
-// 主题切换
+// 主题切换(晨/暮)
 const onTheme = () => {
-  theme.value = applyTheme({ ...theme.value, dark: !theme.value.dark, autoMode: false })
+  themeStore.toggleMode()
   ElMessage.info({ message: '已切换到手动主题,日出日落自动切换已暂停(可在设置中恢复)', duration: 4000 })
 }
 
@@ -366,7 +366,7 @@ onMounted(() => { loadUnread(); loadFamilies() })
   width: 64px;
 }
 html.dark .app-sidebar {
-  background: rgba(20, 28, 45, 0.55);
+  background: rgba(var(--color-card-rgb), 0.55);
   border-right-color: rgba(255, 255, 255, 0.12);
 }
 
@@ -550,9 +550,9 @@ html.dark .foot-user:hover { background: rgba(255, 255, 255, 0.08); }
   transition: background 0.2s, color 0.2s;
 }
 .edit-mode-btn:hover { background: rgba(58,46,34,0.08); }
-.edit-mode-btn.active { background: rgba(184,140,110,0.2); color: var(--color-accent, #b88c6e); }
+.edit-mode-btn.active { background: rgba(var(--color-brand-rgb),0.2); color: var(--color-accent, var(--color-brand)); }
 html.dark .edit-mode-btn:hover { background: rgba(255,255,255,0.08); }
-html.dark .edit-mode-btn.active { background: rgba(212,178,152,0.2); color: #d4b298; }
+html.dark .edit-mode-btn.active { background: rgba(var(--color-brand-rgb),0.2); color: var(--color-brand); }
 .collapsed .edit-mode-btn { display: none; }
 
 /* 编辑模式:导航项变为组件来源,向右下偏移+虚线框占位 */
@@ -561,27 +561,27 @@ html.dark .edit-mode-btn.active { background: rgba(212,178,152,0.2); color: #d4b
 .nav-item.widget-src:active { cursor: grabbing; }
 .nav-item.widget-src {
   transform: translate(4px, 4px);
-  background: rgba(184,140,110,0.1);
-  border: 1px dashed rgba(184,140,110,0.4);
+  background: rgba(var(--color-brand-rgb),0.1);
+  border: 1px dashed rgba(var(--color-brand-rgb),0.4);
   transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), background 0.2s, border-color 0.2s;
 }
 .nav-item.widget-src:hover {
   transform: translate(8px, 8px) scale(1.05);
-  background: rgba(184,140,110,0.2);
-  border-color: rgba(184,140,110,0.6);
-  box-shadow: 0 6px 20px rgba(184,140,110,0.15);
+  background: rgba(var(--color-brand-rgb),0.2);
+  border-color: rgba(var(--color-brand-rgb),0.6);
+  box-shadow: 0 6px 20px rgba(var(--color-brand-rgb),0.15);
 }
 /* 虚线占位框(编辑模式下原位置) */
 .nav-item-wrap:has(.widget-src)::before {
   content: '';
   position: absolute; inset: 0;
-  border: 1px dashed rgba(184,140,110,0.2);
+  border: 1px dashed rgba(var(--color-brand-rgb),0.2);
   border-radius: 10px;
   pointer-events: none;
 }
-html.dark .nav-item.widget-src { background: rgba(212,178,152,0.1); border-color: rgba(212,178,152,0.3); }
-html.dark .nav-item.widget-src:hover { background: rgba(212,178,152,0.2); border-color: rgba(212,178,152,0.5); }
-html.dark .nav-item-wrap:has(.widget-src)::before { border-color: rgba(212,178,152,0.15); }
+html.dark .nav-item.widget-src { background: rgba(var(--color-brand-rgb),0.1); border-color: rgba(var(--color-brand-rgb),0.3); }
+html.dark .nav-item.widget-src:hover { background: rgba(var(--color-brand-rgb),0.2); border-color: rgba(var(--color-brand-rgb),0.5); }
+html.dark .nav-item-wrap:has(.widget-src)::before { border-color: rgba(var(--color-brand-rgb),0.15); }
 
 /* 拖拽时侧边栏右边界气泡效果 */
 .app-sidebar.dragging-edge::after {
@@ -589,7 +589,7 @@ html.dark .nav-item-wrap:has(.widget-src)::before { border-color: rgba(212,178,1
   position: absolute; right: -2px; top: 50%;
   width: 24px; height: 120px;
   transform: translateY(-50%);
-  background: radial-gradient(ellipse 12px 60px at right center, rgba(184,140,110,0.35), transparent 70%);
+  background: radial-gradient(ellipse 12px 60px at right center, rgba(var(--color-brand-rgb),0.35), transparent 70%);
   pointer-events: none;
   animation: bubblePulse 0.8s ease-in-out infinite;
 }

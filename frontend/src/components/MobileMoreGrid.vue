@@ -111,10 +111,10 @@ html.dark .more-section-title { color: rgba(232,220,200,0.5); }
   align-items: center;
   justify-content: center;
   background: rgba(184, 140, 110, 0.08);
-  color: var(--color-primary, #b88c6e);
+  color: var(--color-primary, var(--color-brand));
   font-size: 24px;
 }
-html.dark .more-icon { background: rgba(212,178,152,0.12); color: #d4b298; }
+html.dark .more-icon { background: rgba(var(--color-brand-rgb),0.12); color: var(--color-brand); }
 
 .more-label {
   font-size: 12px;

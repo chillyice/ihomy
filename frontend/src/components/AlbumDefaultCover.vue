@@ -26,5 +26,5 @@ defineProps({ size: { type: Number, default: 64 } })
   height: 100%;
   background: linear-gradient(135deg, #f6f1e7, #ece2d0);
 }
-html.dark .default-cover { background: linear-gradient(135deg, #2a3550, #1E2A48); }
+html.dark .default-cover { background: linear-gradient(135deg, var(--color-card-2), var(--color-card)); }
 </style>

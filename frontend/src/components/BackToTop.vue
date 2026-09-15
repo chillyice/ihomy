@@ -9,13 +9,21 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 
 const visible = ref(false)
-// 滚动超过 400px 才显示按钮,避免页面顶部时碍事
-const onScroll = () => { visible.value = window.scrollY > 400 }
-// 平滑滚动到页首
-const scrollTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
+// 光尘主题主区内部滚动(.gc-main),暖居走 window 滚动
+const scroller = () => document.querySelector('.gc-main')
+const onScroll = () => {
+  const el = scroller()
+  if (el && el.scrollHeight > el.clientHeight + 10) visible.value = el.scrollTop > 400
+  else visible.value = window.scrollY > 400
+}
+const scrollTop = () => {
+  const el = scroller()
+  if (el && el.scrollHeight > el.clientHeight + 10) el.scrollTo({ top: 0, behavior: 'smooth' })
+  else window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 
-onMounted(() => window.addEventListener('scroll', onScroll, { passive: true }))
-onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
+onMounted(() => window.addEventListener('scroll', onScroll, { capture: true, passive: true }))
+onBeforeUnmount(() => window.removeEventListener('scroll', onScroll, { capture: true }))
 </script>
 
 <style scoped>
@@ -27,15 +35,15 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
   height: 46px;
   border: none;
   border-radius: 50%;
-  background: var(--color-primary);
-  color: #fff;
+  background: var(--color-brand);
+  color: var(--color-brand-text);
   font-size: 20px;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(31, 58, 95, 0.3);
+  box-shadow: var(--shadow);
   z-index: 200;
   transition: transform 0.15s, background 0.15s;
 }
-.back-to-top:hover { background: var(--color-accent); transform: translateY(-2px); }
+.back-to-top:hover { background: var(--color-brand-hover); transform: translateY(-2px); }
 .pop-enter-active, .pop-leave-active { transition: opacity 0.2s, transform 0.2s; }
 .pop-enter-from, .pop-leave-to { opacity: 0; transform: translateY(8px); }
 </style>

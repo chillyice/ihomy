@@ -1139,7 +1139,7 @@ onBeforeUnmount(() => {
   color: var(--color-text-secondary, #8a8a8a);
   margin: 10px 0 6px;
   padding-left: 8px;
-  border-left: 3px solid var(--color-primary, #b88c6e);
+  border-left: 3px solid var(--color-primary, var(--color-brand));
   line-height: 1.2;
 }
 .mm-sp-row {
@@ -1195,7 +1195,7 @@ onBeforeUnmount(() => {
   border: 1px solid transparent;
 }
 .mm-icon-item:hover { background: var(--color-card-2, rgba(0, 0, 0, 0.04)); }
-.mm-icon-item.active { border-color: var(--color-primary, #b88c6e); background: var(--color-primary-light, rgba(184, 140, 110, 0.1)); }
+.mm-icon-item.active { border-color: var(--color-primary, var(--color-brand)); background: var(--color-primary-light, rgba(184, 140, 110, 0.1)); }
 .mm-icon-item :deep(svg) { width: 18px; height: 18px; }
 
 /* 备注气泡 */
@@ -1252,7 +1252,7 @@ onBeforeUnmount(() => {
   padding: 0 4px;
 }
 .mm-rt-btn:hover { background: var(--color-card-2, rgba(0, 0, 0, 0.04)); }
-.mm-rt-btn.active { background: var(--color-primary-light, rgba(184, 140, 110, 0.15)); color: var(--color-primary, #b88c6e); }
+.mm-rt-btn.active { background: var(--color-primary-light, rgba(184, 140, 110, 0.15)); color: var(--color-primary, var(--color-brand)); }
 .mm-rt-bg { font-weight: 700; background: rgba(255, 229, 143, 0.4); }
 .mm-rt-divider { width: 1px; height: 16px; background: var(--color-border, #e5e5e5); margin: 0 2px; }
 .mm-rt-bar :deep(.el-color-picker__trigger) { width: 26px; height: 26px; }

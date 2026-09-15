@@ -3,14 +3,14 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('diary.title') }]" />
 
-    <div class="page-toolbar card">
+    <PageToolbar>
       <div class="tb-right">
         <button v-if="userStore.isLoggedIn" class="write-btn" @click="router.push('/diary/edit')">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
           {{ $t('diary.newDiary') }}
         </button>
       </div>
-    </div>
+    </PageToolbar>
 
     <div v-loading="loading" class="shelf-main">
       <div class="shelf">
@@ -46,6 +46,7 @@ import { useI18n } from 'vue-i18n'
 import { diaryApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -166,7 +167,7 @@ html.dark .nb-cover {
     inset -5px 0 8px rgba(0,0,0,0.3),
     inset 0 1px 0 rgba(232,220,200,0.08);
 }
-html.dark .nb-label { background: rgba(30,42,72,0.92); box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+html.dark .nb-label { background: rgba(var(--color-card-rgb),0.92); box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
 html.dark .nb-label::after { border-color: rgba(232,220,200,0.2); }
 html.dark .nb-name { color: #E8DCC8; }
 html.dark .nb-count { color: rgba(232,220,200,0.6); }

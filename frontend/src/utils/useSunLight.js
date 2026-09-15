@@ -5,12 +5,13 @@
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { gsap } from 'gsap'
 import { getSunScene, currentSlotIndex } from '@/utils/windowLight'
-import { applyAutoTheme } from '@/theme'
+import { useThemeStore } from '@/stores/theme'
 
 // provide/inject key(确保 App.vue 与 SunLightLayer/AppSidebar 共享同一状态)
 export const SUN_LIGHT_KEY = Symbol('sunLight')
 
 export function useSunLight() {
+  const themeStore = useThemeStore()
   const sunInfo = ref(null)
   const slotIdx = ref(currentSlotIndex())
   const sunScene = ref({
@@ -337,7 +338,7 @@ export function useSunLight() {
           sunInfo.value = json.data
           slotIdx.value = currentSlotIndex()
           sunScene.value = getSunScene(json.data, slotIdx.value)
-          applyAutoTheme(sunScene.value.isNight)
+          themeStore.applyAuto(sunScene.value.isNight)
         }
       }
     } catch (e) {}
@@ -351,7 +352,7 @@ export function useSunLight() {
         if (json.code === 0 && json.data) {
           sunInfo.value = json.data
           sunScene.value = getSunScene(json.data, slotIdx.value)
-          applyAutoTheme(sunScene.value.isNight)
+          themeStore.applyAuto(sunScene.value.isNight)
         }
       }
     } catch (e) {}
@@ -405,7 +406,7 @@ export function useSunLight() {
         if (newIdx !== slotIdx.value) {
           slotIdx.value = newIdx
           refreshScene()
-          applyAutoTheme(sunScene.value.isNight)
+          themeStore.applyAuto(sunScene.value.isNight)
         }
       }
     }, 300000)

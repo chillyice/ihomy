@@ -1770,7 +1770,7 @@ defineExpose({ finishPoly, fit, cancelPending, focusPoint, focusItem })
 /* 蜡笔边界(查看态手绘):3 遍抖动半透明叠加,与日记本 doodle.js crayon 笔触一致 */
 .fp-crayon { pointer-events: none; }
 .fp-crayon-stroke { fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-opacity: 0.28; }
-.fp-crayon-stroke.room { stroke: #b88c6e; stroke-width: 4; }
+.fp-crayon-stroke.room { stroke: var(--color-brand); stroke-width: 4; }
 .fp-crayon-stroke.furn { stroke: #5f9380; stroke-width: 3; }
 .fp-item { fill: #b04a3a; stroke: #fff; stroke-width: 2; }
 .fp-item.is-hit { fill: #e0a030; stroke-width: 2.5; animation: fpItemPulse 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
@@ -1785,14 +1785,14 @@ defineExpose({ finishPoly, fit, cancelPending, focusPoint, focusItem })
 @keyframes fpItemPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }
 @keyframes fpItemHalo { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
 @keyframes fpItemPing { 0% { transform: scale(1); opacity: 1; } 80% { transform: scale(3.2); opacity: 0; } 100% { transform: scale(3.2); opacity: 0; } }
-.fp-handle { fill: #fff; stroke: #b88c6e; stroke-width: 2; cursor: move; } /* 端点四向箭头:十字中心即热点,尖角端点也能精准落点 */
+.fp-handle { fill: #fff; stroke: var(--color-brand); stroke-width: 2; cursor: move; } /* 端点四向箭头:十字中心即热点,尖角端点也能精准落点 */
 .fp-hit { fill: transparent; cursor: move; } /* 端点透明命中区:可点 12px,可见 6px */
 .fp-handle:hover { stroke: #5c4c3d; }
 .fp-handle.is-snapped { fill: #6b9b6b; stroke: #fff; }
-.fp-edge-handle { fill: #fff; stroke: #b88c6e; stroke-width: 1.5; cursor: move; } /* 实际由内联方向光标(ns/ew/move)覆盖 */
+.fp-edge-handle { fill: #fff; stroke: var(--color-brand); stroke-width: 1.5; cursor: move; } /* 实际由内联方向光标(ns/ew/move)覆盖 */
 .fp-edge-handle:hover { stroke: #5c4c3d; }
-.fp-hover-ring { fill: rgba(255, 255, 255, 0.9); stroke: #b88c6e; stroke-width: 2; }
-.fp-hover-plus { stroke: #b88c6e; stroke-width: 2; stroke-linecap: round; }
+.fp-hover-ring { fill: rgba(255, 255, 255, 0.9); stroke: var(--color-brand); stroke-width: 2; }
+.fp-hover-plus { stroke: var(--color-brand); stroke-width: 2; stroke-linecap: round; }
 .fp-hover-tool circle { fill: none; stroke: #5c4c3d; stroke-width: 2; }
 .fp-hover-tool line { stroke: #5c4c3d; stroke-width: 2; stroke-linecap: round; }
 .fp-hover-tool rect { fill: rgba(255, 253, 248, 0.95); stroke: #5c4c3d; stroke-width: 1.8; }
@@ -1807,7 +1807,7 @@ defineExpose({ finishPoly, fit, cancelPending, focusPoint, focusItem })
 .fp-calib-len { fill: #e0a030; text-anchor: middle; paint-order: stroke; stroke: rgba(255,253,248,0.85); stroke-width: 3; pointer-events: none; font-weight: 600; }
 .fp-calib-confirm { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 6px; padding: 8px 18px; background: rgba(224, 160, 48, 0.92); color: #fff; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.15); user-select: none; }
 .fp-calib-confirm:hover { background: #e0a030; }
-.fp-drawing { fill: rgba(184, 140, 110, 0.12); stroke: #b88c6e; stroke-width: 2; stroke-dasharray: 6 4; }
+.fp-drawing { fill: rgba(184, 140, 110, 0.12); stroke: var(--color-brand); stroke-width: 2; stroke-dasharray: 6 4; }
 /* 缩略图(迷你地图):右上角悬浮,可折叠成横条 */
 .fp-thumb { position: absolute; z-index: 6; width: 168px; background: rgba(255, 253, 248, 0.96); border: 1px solid rgba(184, 140, 110, 0.35); border-radius: 10px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12); user-select: none; touch-action: none; }
 .fp-thumb.is-collapsed { width: 168px; padding: 0; }

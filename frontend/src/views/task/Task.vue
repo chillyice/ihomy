@@ -3,11 +3,11 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('task.title') }]" />
 
-    <div class="page-toolbar card">
+    <PageToolbar>
       <div class="tb-right">
         <el-button type="primary" @click="openEditor()">{{ $t('task.publish') }}</el-button>
       </div>
-    </div>
+    </PageToolbar>
 
     <el-tabs v-model="filter">
       <el-tab-pane :label="$t('more.all')" name="all" />
@@ -78,6 +78,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { taskApi } from '@/api'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
 
 const { t } = useI18n()
 const userStore = useUserStore()

@@ -1,6 +1,7 @@
 <!-- 面包屑导航:首页 + 传入的分级项,带 to/path 的项可点击跳转;移动端隐藏(MobileHeader 已提供返回+标题) -->
+<!-- 光尘主题不渲染面包屑(导航由侧栏/顶栏返回按钮承担) -->
 <template>
-  <nav v-if="!isMobile" class="breadcrumb">
+  <nav v-if="!isMobile && !isGuangchen" class="breadcrumb">
     <div class="crumb-left">
       <router-link to="/" class="crumb-link">
         <el-icon class="home-icon"><HomeFilled /></el-icon>
@@ -19,14 +20,18 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { HomeFilled } from '@element-plus/icons-vue'
 import { useDevice } from '@/composables/useDevice'
+import { useThemeStore } from '@/stores/theme'
 
 defineProps({
   items: { type: Array, default: () => [] },
 })
 
 const { isMobile } = useDevice()
+const themeStore = useThemeStore()
+const isGuangchen = computed(() => themeStore.theme === 'guangchen')
 </script>
 
 <style scoped>

@@ -2,7 +2,7 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('tools.title'), to: '/tools' }, { label: $t('tools.mindmap.title') }]" />
 
-    <div class="page-toolbar card">
+    <PageToolbar>
       <div class="tb-left">
         <span class="section-label">{{ $t('tools.mindmap.title') }}</span>
       </div>
@@ -10,7 +10,7 @@
         <el-button :icon="DeleteFilled" @click="openTrash">{{ $t('tools.mindmap.trashBtn') }}</el-button>
         <el-button type="primary" :icon="Plus" @click="openCreateDialog">{{ $t('tools.mindmap.new') }}</el-button>
       </div>
-    </div>
+    </PageToolbar>
 
     <div v-loading="loading">
       <div v-if="list.length" class="mm-grid">
@@ -78,6 +78,7 @@ import { Plus, Delete, DeleteFilled } from '@element-plus/icons-vue'
 import { mindmapApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
 import { getMindmapTemplates } from './mindmapTemplates'
 
 const { t } = useI18n()
@@ -274,9 +275,9 @@ onMounted(load)
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
-.mm-tpl-card:hover { border-color: var(--color-primary, #b88c6e); }
+.mm-tpl-card:hover { border-color: var(--color-primary, var(--color-brand)); }
 .mm-tpl-card.active {
-  border-color: var(--color-primary, #b88c6e);
+  border-color: var(--color-primary, var(--color-brand));
   background: var(--color-primary-light, rgba(184, 140, 110, 0.08));
 }
 .mm-tpl-name {

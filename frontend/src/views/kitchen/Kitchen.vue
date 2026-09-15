@@ -2,7 +2,7 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('kitchen.title') }]" />
 
-    <div class="page-toolbar card">
+    <PageToolbar>
       <div class="tb-left">
         <el-button v-if="userStore.isLoggedIn" @click="$router.push('/kitchen/ingredients')">
           <el-icon><Bowl /></el-icon>
@@ -15,7 +15,7 @@
           {{ $t('kitchen.addRecipe') }}
         </el-button>
       </div>
-    </div>
+    </PageToolbar>
 
     <div v-loading="loading">
       <!-- 今日推荐 -->
@@ -80,6 +80,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus, Sunny, Bowl } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
 import { kitchenApi } from '@/api'
 import { dictText } from '@/utils/dict'
 import { useUserStore } from '@/stores/user'

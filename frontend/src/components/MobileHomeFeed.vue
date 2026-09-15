@@ -116,7 +116,7 @@ onMounted(async () => {
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 }
-html.dark .filter-bar { background: rgba(20, 28, 45, 0.92); border-bottom-color: rgba(255,255,255,0.06); }
+html.dark .filter-bar { background: rgba(var(--color-card-rgb), 0.92); border-bottom-color: rgba(255,255,255,0.06); }
 
 .filter-scroll {
   display: flex;
@@ -152,7 +152,7 @@ html.dark .filter-chip { color: #9aa0a8; }
   width: 0;
   height: 2.5px;
   border-radius: 2px;
-  background: var(--color-primary, #b88c6e);
+  background: var(--color-primary, var(--color-brand));
   transition: width 0.25s ease;
 }
 .filter-chip.active {
@@ -161,7 +161,7 @@ html.dark .filter-chip { color: #9aa0a8; }
 }
 .filter-chip.active::after { width: 60%; }
 html.dark .filter-chip.active { color: #E8DCC8; }
-html.dark .filter-chip::after { background: #d4b298; }
+html.dark .filter-chip::after { background: var(--color-brand); }
 
 .feed-list { padding: 12px 16px 80px; }
 
@@ -191,9 +191,9 @@ html.dark .feed-author { color: #E8DCC8; }
   padding: 2px 8px;
   border-radius: 6px;
   background: rgba(184, 140, 110, 0.1);
-  color: var(--color-primary, #b88c6e);
+  color: var(--color-primary, var(--color-brand));
 }
-html.dark .feed-type-tag { background: rgba(212,178,152,0.15); color: #d4b298; }
+html.dark .feed-type-tag { background: rgba(var(--color-brand-rgb),0.15); color: var(--color-brand); }
 .feed-time { margin-left: auto; font-size: 12px; color: var(--color-text-secondary, #999); }
 
 .feed-card-body { display: flex; gap: 12px; }
