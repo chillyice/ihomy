@@ -333,6 +333,7 @@ const MODULE_META = {
   tools: { title: '工具箱', path: '/tools', icon: '🧰' },
   member: { title: '家庭成员', path: '/member', icon: '👨‍👩‍👧' },
   storage: { title: '文件浏览', path: '/storage/files', icon: '🗂' },
+  plant: { title: '植物养殖', path: '/plant', icon: '🌱' },
 }
 
 // 布局键:富组件用其 id(如 feed),快捷入口用 'link:<code>'(如 link:diary);每项携带 span(列宽)+ row(行高),可调整

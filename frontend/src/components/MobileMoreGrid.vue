@@ -26,7 +26,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
-import { Document, Notebook, Picture, Calendar, VideoPlay, Trophy, Aim, AlarmClock, List, Star, Wallet, PictureRounded, Share, User, Box, MapLocation, ChatDotRound, Food, Reading, Headset } from '@element-plus/icons-vue'
+import { Document, Notebook, Picture, Calendar, VideoPlay, Trophy, Aim, AlarmClock, List, Star, Wallet, PictureRounded, Share, User, Box, MapLocation, ChatDotRound, Food, Reading, Headset, Sunny } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const appStore = useAppStore()
@@ -36,7 +36,7 @@ const ICON_MAP = {
   blog: Document, diary: Notebook, album: Picture, anniversary: Calendar, cinema: VideoPlay, music: Headset,
   points: Trophy, task: Aim, reminder: AlarmClock, plan: List, wish: Star,
   book: Wallet, cascade: PictureRounded, tree: Share, member: User, storage: Box, item: MapLocation,
-  chat: ChatDotRound, kitchen: Food, library: Reading,
+  chat: ChatDotRound, kitchen: Food, library: Reading, plant: Sunny,
 }
 const iconComp = (code) => ICON_MAP[code] || Document
 
@@ -47,6 +47,7 @@ const NAV_PATHS = {
   chat: '/chat', tree: '/tree', cascade: '/cascade',
   item: '/item', kitchen: '/kitchen', library: '/library', settings: '/settings', ops: '/ops',
   storage: '/storage/files',
+  plant: '/plant',
 }
 
 const CATEGORY_LABELS = { content: '内容', life: '生活', social: '成员', system: '系统' }

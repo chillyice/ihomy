@@ -222,6 +222,16 @@ export const planApi = {
   removeTask: (id) => request.delete(`/plan/task/${id}`),
 }
 
+// 植物养殖(全家共养一棵,实时养成;营养/天气/积分/成长日志)
+export const plantApi = {
+  state: () => request.get('/plant'),
+  plant: (species) => request.post('/plant', { species }),
+  water: (message) => request.post('/plant/water', { message }),
+  sun: (message) => request.post('/plant/sun', { message }),
+  fertilize: (message) => request.post('/plant/fertilize', { message }),
+  harvest: (species, message) => request.post('/plant/harvest', { species, message }),
+}
+
 // 愿望单(家庭共享愿望,分类/达成/放弃)
 export const wishApi = {
   list: () => request.get('/wish/list'),

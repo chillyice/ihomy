@@ -162,6 +162,7 @@ const ICON_MAP = {
   points: Trophy, task: Aim, reminder: AlarmClock, plan: List, wish: Star,
   book: Wallet, cascade: PictureRounded, tree: Share, member: User, storage: Box, item: MapLocation,
   chat: ChatDotRound, kitchen: Food, library: Reading, settings: Setting, ops: Monitor, tools: Tools,
+  plant: Sunny,
 }
 const iconComp = (code) => ICON_MAP[code] || Document
 import { applyLocale } from '@/i18n'
@@ -213,6 +214,7 @@ const NAV_PATHS = {
   item: '/item', kitchen: '/kitchen', library: '/library', settings: '/settings', ops: '/ops',
   storage: '/storage/files',
   tools: '/tools',
+  plant: '/plant',
 }
 
 // 模块列表:从 store 取,过滤出有路径映射的;末尾追加设置+运维管理(仅 OPS)虚拟模块到 system 分组

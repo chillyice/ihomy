@@ -773,6 +773,7 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('cascade',   '照片瀑布', 'icon-photo',     '/cascade','life', 'left', 13, 1),
 ('tree',      '家谱',     'icon-tree',      '/tree',   'life', 'left', 14, 1),
 ('tools',     '工具箱',   'icon-tools',     '/tools',  'life', 'left', 15, 1),
+('plant',     '植物养殖', 'icon-plant',     '/tools/plant',  'life', 'left', 16, 1),
 ('member', '家庭成员', 'icon-member', '/member', 'social',  'right',  1, 1),
 ('cover',  '家庭封面', 'icon-cover',  '/cover',  'system',  'top',    1, 0),
 ('storage','文件浏览','icon-storage','/storage/files','system',  'left',  16, 1);
@@ -987,6 +988,46 @@ CREATE TABLE `family_reminder` (
   KEY `idx_family` (`family_id`),
   KEY `idx_date` (`remind_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='提醒事项表';
+
+-- ------------------------------------------------------------
+-- 33b. 家庭共养植物表（V9.67 小游戏模块:全家共养一棵,实时养成）
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_plant`;
+CREATE TABLE `family_plant` (
+  `id`                  BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`           BIGINT      NOT NULL COMMENT '所属家庭ID',
+  `species`             VARCHAR(20) NOT NULL DEFAULT 'SUNFLOWER' COMMENT '品种:SUNFLOWER向日葵/ROSE玫瑰/SUCCULENT多肉',
+  `planted_at`          DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '种植时间',
+  `last_watered_at`     DATETIME    DEFAULT NULL COMMENT '上次浇水时间',
+  `last_sun_at`         DATETIME    DEFAULT NULL COMMENT '上次晒太阳时间',
+  `last_fertilized_at`  DATETIME    DEFAULT NULL COMMENT '上次施肥时间',
+  `water_count`         INT         NOT NULL DEFAULT 0 COMMENT '累计浇水次数',
+  `sun_count`           INT         NOT NULL DEFAULT 0 COMMENT '累计晒太阳次数',
+  `fertilize_count`     INT         NOT NULL DEFAULT 0 COMMENT '累计施肥次数',
+  `harvest_count`       INT         NOT NULL DEFAULT 0 COMMENT '累计收获次数',
+  `care_boost_minutes`  INT         NOT NULL DEFAULT 0 COMMENT '累计照料加成(分钟,已按天气修正,收获清零)',
+  `created_by`          BIGINT      NOT NULL COMMENT '创建人ID',
+  `created_at`          DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`          DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭共养植物表';
+
+-- ------------------------------------------------------------
+-- 33c. 植物成长日志表（V9.68 家庭内容+交互:照料/收获时间线）
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_plant_log`;
+CREATE TABLE `family_plant_log` (
+  `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`  BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `user_id`    BIGINT       NOT NULL COMMENT '操作人ID',
+  `action`     VARCHAR(20)  NOT NULL COMMENT '动作:PLANT/WATER/SUN/FERTILIZE/HARVEST',
+  `message`    VARCHAR(200) DEFAULT NULL COMMENT '成员寄语(可选)',
+  `detail`     VARCHAR(200) DEFAULT NULL COMMENT '系统描述文案',
+  `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family_created` (`family_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='植物成长日志表';
 
 -- ------------------------------------------------------------
 -- 34. 家庭计划表（V3.4 中长期目标:全家计划含子任务清单）

@@ -151,7 +151,7 @@ const NAV_PATHS = {
   reminder: '/reminder', plan: '/plan', wish: '/wish', book: '/book',
   chat: '/chat', tree: '/tree', cascade: '/cascade',
   item: '/item', kitchen: '/kitchen', library: '/library', settings: '/settings', ops: '/ops',
-  storage: '/storage/files', tools: '/tools',
+  storage: '/storage/files', tools: '/tools', plant: '/plant',
 }
 
 const GROUP_ORDER = ['content', 'life', 'social', 'system']

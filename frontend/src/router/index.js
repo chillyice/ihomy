@@ -24,6 +24,7 @@ const routes = [
   { path: '/task', name: 'Task', component: () => import('@/views/task/Task.vue'), meta: { public: true } },
   { path: '/reminder', name: 'Reminder', component: () => import('@/views/reminder/Reminder.vue'), meta: { public: true } },
   { path: '/plan', name: 'Plan', component: () => import('@/views/plan/Plan.vue'), meta: { public: true } },
+  { path: '/plant', redirect: '/tools/plant' },
   { path: '/wish', name: 'Wish', component: () => import('@/views/wish/Wish.vue'), meta: { public: true } },
   { path: '/book', name: 'Book', component: () => import('@/views/book/Book.vue'), meta: { public: true } },
   { path: '/tree', name: 'Tree', component: () => import('@/views/tree/Tree.vue'), meta: { public: true } },
@@ -51,6 +52,10 @@ const routes = [
   { path: '/tools/ai-playground', name: 'AiPlayground', component: () => import('@/views/tools/AiPlayground.vue'), meta: { requiresAuth: true } },
   // 3D 光影实验台(临时):Three.js 太阳模拟+真实阴影,未来场景主题的 3D 基础模型
   { path: '/tools/light-lab', name: 'LightLab', component: () => import('@/views/tools/LightLab.vue'), meta: { public: true, immersive: true } },
+  // Flash 播放器(Ruffle):本地加载 .swf 怀旧小游戏
+  { path: '/tools/flash', name: 'FlashPlayer', component: () => import('@/views/tools/FlashPlayer.vue'), meta: { public: true } },
+  // 植物养殖小游戏:全家共养一棵,营养/天气/积分/成长日志(需登录,涉及积分与家庭交互)
+  { path: '/tools/plant', name: 'Plant', component: () => import('@/views/plant/Plant.vue'), meta: { requiresAuth: true } },
   // 运维管理页:仅 OPS 角色可访问
   { path: '/ops', name: 'Ops', component: () => import('@/views/ops/Ops.vue'), meta: { ops: true } },
   // 兜底:未匹配的路由重定向回首页

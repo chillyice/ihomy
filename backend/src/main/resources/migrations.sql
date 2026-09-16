@@ -945,3 +945,86 @@ SET @add_wc_cfg := (
 PREPARE add_wc_cfg_stmt FROM @add_wc_cfg;
 EXECUTE add_wc_cfg_stmt;
 DEALLOCATE PREPARE add_wc_cfg_stmt;
+
+-- ------------------------------------------------------------
+-- 2026-09-16 V9.67 小游戏模块:家庭共养植物(family_plant)+ 首页模块种子(植物养殖)
+-- 一、家庭共养植物表(全家一棵,实时养成;幂等)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `family_plant` (
+  `id`               BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`        BIGINT      NOT NULL COMMENT '所属家庭ID',
+  `species`          VARCHAR(20) NOT NULL DEFAULT 'SUNFLOWER' COMMENT '品种:SUNFLOWER向日葵/ROSE玫瑰/SUCCULENT多肉',
+  `planted_at`       DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '种植时间',
+  `last_watered_at`  DATETIME    DEFAULT NULL COMMENT '上次浇水时间',
+  `last_sun_at`      DATETIME    DEFAULT NULL COMMENT '上次晒太阳时间',
+  `water_count`      INT         NOT NULL DEFAULT 0 COMMENT '累计浇水次数',
+  `sun_count`        INT         NOT NULL DEFAULT 0 COMMENT '累计晒太阳次数',
+  `harvest_count`    INT         NOT NULL DEFAULT 0 COMMENT '累计收获次数',
+  `created_by`       BIGINT      NOT NULL COMMENT '创建人ID',
+  `created_at`       DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`       DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭共养植物表';
+
+-- 二、首页模块种子(植物养殖);sys_home_module 无 (code,family_id=NULL) 唯一约束兜底,NULL 可重复,用 NOT EXISTS 防重
+-- ------------------------------------------------------------
+INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`)
+SELECT 'plant', '植物养殖', 'icon-plant', '/tools/plant', 'life', 'left', 16, 1
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM `sys_home_module` WHERE `code` = 'plant' AND `family_id` IS NULL);
+
+-- ------------------------------------------------------------
+-- 2026-09-16 V9.68 植物养殖细化:营养/天气/积分/家庭交互/成长日志 + 迁移到小游戏模块(/tools/plant)
+-- 一、family_plant 新增营养与天气修正相关列(幂等,含新增库跳过逻辑)
+-- ------------------------------------------------------------
+SET @add_plant_fert := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `family_plant` ADD COLUMN `last_fertilized_at` DATETIME DEFAULT NULL COMMENT ''上次施肥时间'' AFTER `last_sun_at`',
+    'SELECT ''skip: last_fertilized_at exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_plant' AND COLUMN_NAME = 'last_fertilized_at'
+);
+PREPARE add_plant_fert_stmt FROM @add_plant_fert;
+EXECUTE add_plant_fert_stmt;
+DEALLOCATE PREPARE add_plant_fert_stmt;
+
+SET @add_plant_fertcnt := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `family_plant` ADD COLUMN `fertilize_count` INT NOT NULL DEFAULT 0 COMMENT ''累计施肥次数'' AFTER `sun_count`',
+    'SELECT ''skip: fertilize_count exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_plant' AND COLUMN_NAME = 'fertilize_count'
+);
+PREPARE add_plant_fertcnt_stmt FROM @add_plant_fertcnt;
+EXECUTE add_plant_fertcnt_stmt;
+DEALLOCATE PREPARE add_plant_fertcnt_stmt;
+
+SET @add_plant_boost := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `family_plant` ADD COLUMN `care_boost_minutes` INT NOT NULL DEFAULT 0 COMMENT ''累计照料加成(分钟,已按天气修正,收获清零)'' AFTER `harvest_count`',
+    'SELECT ''skip: care_boost_minutes exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_plant' AND COLUMN_NAME = 'care_boost_minutes'
+);
+PREPARE add_plant_boost_stmt FROM @add_plant_boost;
+EXECUTE add_plant_boost_stmt;
+DEALLOCATE PREPARE add_plant_boost_stmt;
+
+-- 二、植物成长日志表(家庭内容 + 交互时间线;幂等)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `family_plant_log` (
+  `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`  BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `user_id`    BIGINT       NOT NULL COMMENT '操作人ID',
+  `action`     VARCHAR(20)  NOT NULL COMMENT '动作:PLANT/WATER/SUN/FERTILIZE/HARVEST',
+  `message`    VARCHAR(200) DEFAULT NULL COMMENT '成员寄语(可选)',
+  `detail`     VARCHAR(200) DEFAULT NULL COMMENT '系统描述文案',
+  `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family_created` (`family_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='植物成长日志表';
+
+-- 三、首页模块路径迁移 /plant → /tools/plant(迁入小游戏模块)
+-- ------------------------------------------------------------
+UPDATE `sys_home_module` SET `path` = '/tools/plant' WHERE `code` = 'plant' AND `path` = '/plant';
