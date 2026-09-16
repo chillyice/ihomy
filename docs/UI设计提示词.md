@@ -480,7 +480,15 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 - **晨暮切换扫光(V9.62)**:暖居内晨↔暮切换不再整体 1s 渐变,改「从一侧柔和扫向另一侧」——暗色(晨→暮)沿垂直于光束方向扫过,上午~正午向右上、下午向左上、正午纯水平向右、夜晚默认水平,暮→晨反向;实现为克隆旧主题整页 DOM 为幕布 `.theme-sweep-old` + 方向性柔和 `mask` 蒙版划动(边界两侧真实晨/暮渲染,交界 ±8% 渐变条,`@property --sweep-p` 过渡 **1700ms**),划动期间 `html.theme-sweeping` 禁容器级颜色过渡;克隆内 `.theme-sweep-old :is(...){color:var(--color-text)!important}` 防 `html.dark` 硬编码浅色字泄漏。
 - **晨暮分段滑块(V9.63)**:晨/暮分段开关改「滑块 thumb」——`.gc-seg-thumb` 绝对定位盖在选中按钮下,`segMode` 本地 ref 跟随选中态;扫光结束后才更新滑块位置(`waitSweepEnd`),首次定位关过渡、ResizeObserver 跟随语言切换按钮宽度变化;选中文案 `--color-card`、thumb `--color-brand`、hover `--color-brand-hover`。
 - **天气背景待机浮现(V9.63)**:鼠标停在「背景板」静止 ≥3s 后天气 AI 底图 `.gc-weatherbg.revealed` 浮到最前(z-index 30、opacity 1,`pointer-events:none` 不挡交互),移动鼠标即恢复原状。
-- **暖居首页组件化(V9.63)**:`WarmHome` 硬编码卡片改组件注册表——9 富组件(weather/feed/photos/anni/finance/item/task/wish/reminder)+ 20 模块入口(未映射富组件的模块落为「快捷入口」卡片);OWNER 编辑模式(复用 `appStore.homeEditMode`)可增删/拖拽排序/右下角调大小(列宽 4/6/8/12、行高 2/3/4/6)/托盘添加,布局持久化 `ihomy:guangchen:home:v2`(键名保留);内容丰富度按「行数 row + 列宽 span」两维推导(`vTier`/`hTier` → S/M/L/XL);侧栏模块编辑态可拖入首页。
+- **暖居首页组件化(V9.63;V9.66 组件默认展示优化)**:`WarmHome` 硬编码卡片改组件注册表——9 富组件(weather/feed/photos/anni/finance/item/task/wish/reminder)+ 20 模块入口(未映射富组件的模块落为「快捷入口」卡片);OWNER 编辑模式(复用 `appStore.homeEditMode`)可增删/拖拽排序/右下角调大小(列宽 4/6/8/12、行高 2/3/4/6)/托盘添加,布局持久化 `ihomy:guangchen:home:v3`(V9.66 升版);内容丰富度按「行数 row + 列宽 span」两维推导(`vTier`/`hTier` → S/M/L/XL);侧栏模块编辑态可拖入首页。V9.66 组件默认展示(照片卡牌堆/寻物户型图/收支比例条/色相锚点)见 §18d。
+
+## 18d. 暖居首页组件默认展示规格(V9.66)
+
+- **照片卡牌堆轮播**:`.gc-photo-stack` 相对容器内 `.gc-photo-pcard` 绝对定位扇形摊开(74%×78% 尺寸、中位偏移 translate ±14px / rotate ±6° / 下沉 |i-mid|×9px、`z-index:10-i`),`transition: transform .5s cubic-bezier(.22,1,.36,1)` 翻动顺滑滑位;点击翻动 + 5s 自动轮播(hover 暂停);`.gc-photo-meta` 底部两胶囊(描述白字 12px/600 + `photoIndex+1/n` 计数),`rgba(0,0,0,.4)` 底 + `backdrop-filter:blur(6px)`。头部「相册 →」`.gc-more`(`all:unset` + `margin-left:auto` + hover 主色)。
+- **寻物组件按行数两态**:`.gc-item-card` flex 列。搜索行 `.gc-item-search`(输入框 `.gc-item-input` 圆角 10px 底 `--color-line`、focus 主色,语音钮 `.gc-item-voice` 录音中陶土红脉冲 `gcVoicePulse`)。≥3 行 `.gc-item-plan`(flex:1 圆角 12px)内自绘 SVG:房间多边形 `fill rgba(var(--color-brand-rgb),.1) / stroke .5`、家具矩形 `.2/.45`、物品圆点 `--color-brand`(命中改 `--color-accent`)、标签 `fill var(--color-text-secondary)`;结果列表 `.gc-item-results` 浮动右上(46% 宽、max-height 60%、卡片底+边框+阴影)。<3 行只展示搜索框+语音+列表式结果。
+- **收支比例条**:`.gc-fin-bar` 8px 高两段(收入 `--color-green` / 支出 `--color-accent`),宽度按 `incomePct` 比例;卡头「月/笔数」弱文字。
+- **色相锚点**:每卡 `--chip: var(--blob-N)`(N=1 陶土/2 暖沙/3 鼠尾草/4 暖米/5 暖木)内联注入,`.gc-card-h3::before`(3px×12px 标题竖条)+ `.gc-ic`(26px 图标芯片)取 `var(--chip)` 分色,让 6 张卡不再共用米色面+棕字。
+- **侧栏拖拽幽灵**:`.gc-drag-ghost` 胶囊形态(白卡+陶土虚线边+圆点+标题)随鼠标,进网格 `.is-card` 放大 1.6 + 渐隐;侧栏编辑态三态——待拖入 `widget-src`(虚线抓手 hover 右移 3px)、已拖入 `widget-added`(降透明 0.5 + 禁拖 + 「已在首页」角标)、不可拖入 `widget-none`(降透明 0.45 仍可点)。
 
 ## 18c. 主题切换圆形色块(ThemeSwatch,V9.65)
 
