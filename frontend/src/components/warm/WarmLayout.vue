@@ -52,12 +52,12 @@
                     v-for="m in g.items"
                     :key="m.code"
                     class="gc-nav-item"
-                    :class="{ act: isActive(m.path), 'widget-src': appStore.homeEditMode && draggableCodes.has(m.code) }"
-                    :draggable="appStore.homeEditMode && draggableCodes.has(m.code)"
-                    @click="appStore.homeEditMode && draggableCodes.has(m.code) ? null : navigate(m.path)"
-                    @dragstart="onNavDragStart($event, m.code)"
+                    :class="{ act: isActive(m.path), 'widget-src': canDragNav && m.draggable && !m.added, 'widget-added': canDragNav && m.draggable && m.added, 'widget-none': canDragNav && !m.draggable }"
+                    @click="onNavClick(m)"
+                    @mousedown="onNavMousedown(m, $event)"
                   >
                     <span class="gc-dot"></span>{{ m.title }}
+                    <span v-if="canDragNav && m.draggable && m.added" class="gc-added-badge">已在首页</span>
                   </div>
                 </div>
               </div>
@@ -77,6 +77,14 @@
       </div>
     </div>
   </div>
+
+  <!-- 拖拽幽灵:导航胶囊形态(侧栏) ↔ 4×2 卡片形态(内容区,进入网格后交给网格占位呈现) -->
+  <Teleport to="body">
+    <div v-if="dragging" class="gc-drag-ghost" :class="{ 'is-card': overGrid }" :style="{ left: x + 'px', top: y + 'px' }">
+      <span class="gc-drag-dot"></span>
+      <span class="gc-drag-title">{{ label }}</span>
+    </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -88,6 +96,9 @@ import { useUserStore } from '@/stores/user'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useWeatherBg } from '@/composables/useWeatherBg'
 import WarmHome from '@/components/warm/WarmHome.vue'
+import { useWarmWidgetDrag } from '@/utils/widgetDragData'
+import { addedCodes } from '@/utils/warmHomeShared'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 const route = useRoute()
@@ -95,6 +106,8 @@ const themeStore = useThemeStore()
 const appStore = useAppStore()
 const userStore = useUserStore()
 const sunLight = inject(SUN_LIGHT_KEY)
+// 侧栏模块拖入首页的共享拖拽状态(幽灵形态/位置由本组件渲染)
+const { dragging, label, x, y, overGrid, startDrag } = useWarmWidgetDrag()
 
 const familyName = computed(() => appStore.familyName)
 const familyDescription = computed(() => appStore.family?.description || '')
@@ -154,9 +167,9 @@ const toggleGroup = (key) => {
 const navGroups = computed(() => {
   const list = !appStore.modules.length ? [] : appStore.modules
     .filter((m) => NAV_PATHS[m.code] && m.enabled !== 0)
-    .map((m) => ({ code: m.code, title: m.title, path: NAV_PATHS[m.code] || m.path, category: m.category || 'life', sortOrder: m.sortOrder || 99 }))
-  list.push({ code: 'settings', title: '设置', path: '/settings', category: 'system', sortOrder: 90 })
-  if (userStore.hasPerm('ops:view')) list.push({ code: 'ops', title: '运维管理', path: '/ops', category: 'system', sortOrder: 95 })
+    .map((m) => ({ code: m.code, title: m.title, path: NAV_PATHS[m.code] || m.path, category: m.category || 'life', sortOrder: m.sortOrder || 99, draggable: true, added: addedCodes.value.has(m.code) }))
+  list.push({ code: 'settings', title: '设置', path: '/settings', category: 'system', sortOrder: 90, draggable: false, added: false })
+  if (userStore.hasPerm('ops:view')) list.push({ code: 'ops', title: '运维管理', path: '/ops', category: 'system', sortOrder: 95, draggable: false, added: false })
   list.sort((a, b) => a.sortOrder - b.sortOrder)
   const groups = {}
   for (const m of list) {
@@ -172,12 +185,14 @@ const navGroups = computed(() => {
 const isActive = (path) => (path === '/' ? route.path === '/' : route.path.startsWith(path))
 const navigate = (path) => { if (route.path !== path) router.push(path) }
 
-// 编辑模式下:侧栏模块可拖入首页(与 WarmHome 的 dataTransfer 标记 'application/x-ihomy-widget' 约定)
-// settings/ops 是虚拟入口(不在 appStore.modules 内),不会成为拖拽源
-const draggableCodes = computed(() => new Set(appStore.modules.map((m) => m.code)))
-const onNavDragStart = (e, code) => {
-  e.dataTransfer.setData('application/x-ihomy-widget', code)
-  e.dataTransfer.effectAllowed = 'copy'
+// 编辑模式下:侧栏模块可拖入首页(仅首页,鼠标事件驱动,自定义幽灵随鼠标跨边界变形)
+// settings/ops 是虚拟入口(不在 appStore.modules 内),draggable=false →「不可拖入」状态
+const canDragNav = computed(() => appStore.homeEditMode && route.path === '/home')
+const onNavClick = (m) => { if (canDragNav.value && m.draggable) return; navigate(m.path) }
+const onNavMousedown = (m, e) => {
+  if (!canDragNav.value || !m.draggable) return
+  if (m.added) { ElMessage.info('该组件已在首页'); return } // 已拖入冲突:提示,不启动拖拽
+  startDrag(m.code, m.title, e)
 }
 
 // 主区内部滚动:工具栏滚出内容窗口顶部时触发胞吐
@@ -330,11 +345,42 @@ watch(() => route.fullPath, () => { canBack.value = window.history.state?.back !
 .gc-nav-item { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 11px; font-size: 13.5px; color: var(--color-text-secondary); cursor: pointer; margin-bottom: 2px; transition: .2s; }
 .gc-nav-item:hover { background: var(--color-line); color: var(--color-text); }
 .gc-nav-item.act { background: var(--color-brand); color: var(--color-card); box-shadow: var(--shadow); }
-/* 编辑模式:可拖入首页的模块(背景高亮 + 抓手光标;settings/ops 不受影响) */
-.gc-nav-item.widget-src { cursor: grab; background: rgba(var(--color-brand-rgb), .12); box-shadow: inset 0 0 0 1px rgba(var(--color-brand-rgb), .35); }
-.gc-nav-item.widget-src:hover { background: rgba(var(--color-brand-rgb), .2); box-shadow: inset 0 0 0 1px rgba(var(--color-brand-rgb), .6); }
+/* 编辑模式三态:待拖入(可拖入且未添加)/ 已拖入冲突(已添加)/ 不可拖入(settings·ops) */
+.gc-nav-item.widget-src {
+  cursor: grab;
+  background: rgba(var(--color-brand-rgb), .1);
+  border: 1px dashed rgba(var(--color-brand-rgb), .45);
+  transition: background .2s, border-color .2s, box-shadow .2s, transform .2s;
+}
+.gc-nav-item.widget-src:hover {
+  background: rgba(var(--color-brand-rgb), .22);
+  border-color: rgba(var(--color-brand-rgb), .7);
+  box-shadow: 0 6px 20px rgba(var(--color-brand-rgb), .16);
+  transform: translateX(3px);
+}
 .gc-nav-item.widget-src:active { cursor: grabbing; }
+/* 已拖入冲突:降透明 + 禁用光标 + 灰色虚线,右侧「已在首页」角标 */
+.gc-nav-item.widget-added { cursor: not-allowed; opacity: .5; border: 1px dashed var(--color-border); }
+.gc-nav-item.widget-added:hover { background: transparent; }
+.gc-added-badge { margin-left: auto; flex-shrink: 0; font-size: 10.5px; padding: 2px 7px; border-radius: 8px; color: var(--color-text-tertiary); background: var(--color-line); }
+/* 不可拖入(编辑模式下 settings/ops):降透明,仍可点击导航 */
+.gc-nav-item.widget-none { opacity: .45; }
 .gc-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .7; flex-shrink: 0; }
+
+/* 拖拽幽灵:导航胶囊形态,进入网格时放大并渐隐(交给 WarmHome 网格占位呈现 4×2 卡片) */
+.gc-drag-ghost {
+  position: fixed; z-index: 2000; pointer-events: none;
+  transform: translate(14px, 12px); transform-origin: top left;
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px; border-radius: 11px;
+  background: var(--color-card); border: 1px dashed var(--color-accent, var(--color-brand));
+  box-shadow: var(--shadow-hover); color: var(--color-text); font-size: 13.5px; white-space: nowrap;
+  opacity: 1;
+  transition: transform .3s cubic-bezier(.34, 1.56, .64, 1), opacity .22s ease, padding .3s, border-radius .3s;
+}
+.gc-drag-ghost.is-card { transform: translate(14px, 12px) scale(1.6); opacity: 0; padding: 24px; border-radius: 16px; }
+.gc-drag-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent, var(--color-brand)); flex-shrink: 0; }
+.gc-drag-title { font-weight: 600; }
 
 /* 侧栏用户信息(预览 .side .user):头像 + 昵称 + 所在家庭 */
 .gc-user { display: flex; align-items: center; gap: 11px; padding: 4px 6px 16px; border-bottom: 1px solid var(--color-line); margin-bottom: 12px; cursor: pointer; }

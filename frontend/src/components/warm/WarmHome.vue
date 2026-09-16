@@ -24,21 +24,22 @@
       <div v-if="editMode" class="gc-edit-hint">编辑模式 · 拖拽卡片排序 · 右下角调整大小 · ✕ 移除组件 · 下方托盘添加组件</div>
     </Transition>
 
-    <div class="gc-grid" @dragover.prevent @drop="onSidebarDrop">
+    <div class="gc-grid" ref="gridEl" @dragover="onReorderDragOver" @drop="onReorderDrop">
       <div
-        v-for="w in widgets"
+        v-for="w in displayWidgets"
         :key="w.id"
         class="gc-card"
-        :class="[`gc-c${w.span}`, `gc-r${w.row}`, { 'gc-weather': w.id === 'weather', 'gc-overflow': w.id === 'weather', 'gc-card-edit': editMode, 'gc-card-dragover': dragOverId === w.id, 'gc-card-link': isLinkCard(w) }]"
-        :draggable="editMode"
+        :data-wid="w.id"
+        :class="[`gc-c${w.span}`, `gc-r${w.row}`, { 'gc-weather': w.id === 'weather', 'gc-overflow': w.id === 'weather', 'gc-item-card': w.id === 'item', 'gc-card-edit': editMode, 'gc-card-link': isLinkCard(w), 'gc-card-preview': w.kind === 'preview', 'gc-card-dragging': reorderPreview && reorderPreview.id === w.id }]"
+        :style="cardStyle(w)"
+        :draggable="editMode && w.kind !== 'preview'"
         @dragstart="onDragStart($event, w)"
-        @dragover="onDragOver($event, w)"
-        @drop="onDrop($event, w)"
+        @dragover.prevent
         @dragend="onDragEnd"
         @click="onCardClick(w)"
       >
         <!-- 编辑手柄 -->
-        <template v-if="editMode">
+        <template v-if="editMode && w.kind !== 'preview'">
           <button class="gc-del" title="移除组件" @click.stop="removeWidget(w)">✕</button>
           <div class="gc-grip" title="拖拽排序">⋮⋮</div>
           <div class="gc-resize" title="拖拽调整大小" @mousedown.stop.prevent="onResizeStart($event, w)" @click.stop></div>
@@ -80,7 +81,7 @@
           <h3 class="gc-card-h3">家人动态</h3>
           <div v-if="feeds.length" class="gc-list">
             <div v-for="(f, i) in feeds.slice(0, nFeed(w))" :key="i" class="gc-row" @click="!editMode && goFeed(f)">
-              <span class="gc-ic">{{ feedIcon(f.type) }}</span>
+              <span class="gc-ic" :style="feedChipStyle(f.type)">{{ feedIcon(f.type) }}</span>
               <span class="gc-val">{{ f.authorName || '家人' }}</span>
               <span class="gc-muted">{{ feedSummary(f) }}</span>
             </div>
@@ -88,11 +89,17 @@
           <div v-else class="gc-empty">暂无动态</div>
         </template>
 
-        <!-- 照片(暖居磨砂缩略拼贴) -->
+        <!-- 照片(暖居卡牌堆轮播) -->
         <template v-else-if="w.id === 'photos'">
-          <h3 class="gc-card-h3">照片<span class="gc-muted">最近</span></h3>
-          <div v-if="photos.length" class="gc-photos" :style="{ gridTemplateColumns: `repeat(${photosCols(w)}, 1fr)` }" @click="!editMode && $router.push('/album')">
-            <img v-for="p in photos.slice(0, nPhotos(w))" :key="p.id" :src="p.url" class="gc-photo" :alt="p.description || ''" loading="lazy" />
+          <h3 class="gc-card-h3">照片<button class="gc-more" @click.stop="!editMode && $router.push('/album')">相册 →</button></h3>
+          <div v-if="photos.length" class="gc-photo-stack" @mouseenter="photoHover = true" @mouseleave="photoHover = false" @click="!editMode && advancePhotos()">
+            <div v-for="(p, i) in stackCards" :key="p.id" class="gc-photo-pcard" :style="pcardStyle(i)">
+              <img :src="p.url" :alt="p.description || ''" loading="lazy" />
+            </div>
+            <div class="gc-photo-meta">
+              <span class="gc-photo-cap">{{ topPhoto?.description || '家庭照片' }}</span>
+              <span class="gc-photo-count">{{ photoIndex + 1 }} / {{ photos.length }}</span>
+            </div>
           </div>
           <div v-else class="gc-empty gc-empty-link" @click="!editMode && $router.push('/album')">去相册添加家庭照片</div>
         </template>
@@ -102,7 +109,7 @@
           <h3 class="gc-card-h3">纪念日</h3>
           <template v-if="anniversaries.length">
             <div class="gc-val-lg">{{ anniversaries[0].label }}</div>
-            <div class="gc-muted">{{ anniversaries[0].date }} · 还有 {{ anniversaries[0].days }} 天</div>
+            <div class="gc-muted">{{ anniversaries[0].date }} · 还有 <span class="gc-days">{{ anniversaries[0].days }}</span> 天</div>
             <div class="gc-meter"><i :style="{ width: Math.min(100, anniversaries[0].days) + '%' }"></i></div>
             <div v-if="nAnni(w) > 1" class="gc-list gc-anni-more">
               <div v-for="(a, i) in anniversaries.slice(1, nAnni(w))" :key="i" class="gc-row">
@@ -115,29 +122,73 @@
 
         <!-- 本月收支 -->
         <template v-else-if="w.id === 'finance'">
-          <h3 class="gc-card-h3">本月收支</h3>
+          <h3 class="gc-card-h3">本月收支<span class="gc-muted">{{ bookSummary.month || '' }}</span></h3>
           <div class="gc-flex-baseline">
             <div class="gc-val-lg">¥ {{ fmt(balance) }}</div>
-            <div class="gc-muted">结余</div>
+            <div class="gc-muted">{{ bookSummary.count ?? 0 }} 笔</div>
           </div>
-          <div v-if="showFinanceDetail(w)" class="gc-fin-row">
+          <div class="gc-fin-row">
             <span class="gc-fin in">+{{ fmt(bookSummary.income) }}</span>
             <span class="gc-fin out">-{{ fmt(bookSummary.expense) }}</span>
           </div>
+          <div v-if="financeTotal > 0" class="gc-fin-bar">
+            <i class="in" :style="{ width: incomePct + '%' }"></i>
+            <i class="out" :style="{ width: (100 - incomePct) + '%' }"></i>
+          </div>
+          <div v-else class="gc-empty" style="padding:8px 0">本月还没有记账</div>
         </template>
 
-        <!-- 寻物 -->
+        <!-- 寻物(搜索 + 语音 + 户型图预览 / 列表) -->
         <template v-else-if="w.id === 'item'">
-          <h3 class="gc-card-h3">寻物</h3>
-          <div class="gc-ctrl-row">
-            <button class="gc-btn primary sm" @click="!editMode && $router.push('/item')">找东西 →</button>
+          <h3 class="gc-card-h3">寻物<span class="gc-muted">{{ itemHouse?.name || '' }}</span><button class="gc-more" @click.stop="!editMode && $router.push('/item')">管理 →</button></h3>
+          <div class="gc-item-search">
+            <input v-model="itemKeyword" class="gc-item-input" :placeholder="itemSearching ? '✨ AI 语义找物中…' : '搜索物品 / 位置 / 俗称…'" @keyup.enter="onItemSearch" @input="!itemKeyword && clearItemSearch()" />
+            <button class="gc-btn ghost sm gc-item-voice" :class="{ recording: itemVoiceRecording }" :disabled="itemVoiceProcessing" title="语音找物" @click="toggleItemVoice">🎤</button>
           </div>
-          <div v-if="items.length" class="gc-list">
-            <div v-for="it in items.slice(0, nItem(w))" :key="it.id" class="gc-row">
-              <span class="gc-ic">📦</span><span>{{ it.name }}</span><span class="gc-tag">{{ it.room_name || it.house_name || '—' }}</span>
+
+          <!-- 高行(≥3 行):户型图预览 + 命中高亮 -->
+          <template v-if="itemShowFloorPlan(w)">
+            <div class="gc-item-plan" @click="!editMode && $router.push('/item')">
+              <svg v-if="itemFloorPlanView" :viewBox="itemFloorPlanView.viewBox" preserveAspectRatio="xMidYMid meet" class="gc-item-svg">
+                <image v-if="itemFloorPlanView.imageUrl" :href="itemFloorPlanView.imageUrl" :transform="itemFloorPlanView.imgTransform" class="gc-item-bg" />
+                <g v-for="r in itemFloorPlanView.rooms" :key="r.id">
+                  <polygon :points="r.points" class="gc-item-room" :class="{ hit: itemHitRoomIds.includes(r.id) }" />
+                  <text :x="r.cx" :y="r.cy" class="gc-item-room-label">{{ r.name }}</text>
+                </g>
+                <g v-for="f in itemFloorPlanView.furnitures" :key="f.id">
+                  <rect :x="f.x" :y="f.y" :width="f.w" :height="f.h" rx="2" class="gc-item-furn" />
+                  <text v-if="f.w > 26 && f.h > 16" :x="f.x + f.w / 2" :y="f.y + f.h / 2" class="gc-item-furn-label">{{ f.name }}</text>
+                </g>
+                <g v-for="it in itemFloorPlanView.items" :key="it.id">
+                  <circle :cx="it.ax" :cy="it.ay" r="5" class="gc-item-dot" :class="{ hit: itemHitIds.includes(it.id) }" />
+                  <text :x="it.ax" :y="it.ay - 9" class="gc-item-dot-label">{{ it.name }}</text>
+                </g>
+              </svg>
+              <div v-else class="gc-empty gc-empty-link">去登记户型图与物品</div>
+              <div v-if="itemResults.length" class="gc-item-results" @click.stop>
+                <div v-for="it in itemResults.slice(0, 5)" :key="it.id" class="gc-row" @click="!editMode && $router.push('/item')">
+                  <span class="gc-ic">📦</span><span class="gc-val">{{ it.name }}</span><span class="gc-muted">{{ itemPathOf(it) }}</span>
+                </div>
+              </div>
+              <div v-else-if="itemSearched && !itemSearching" class="gc-item-nohit">没找到，换个说法试试</div>
             </div>
-          </div>
-          <div v-else class="gc-empty">尚未登记物品</div>
+          </template>
+
+          <!-- 矮行(<3 行):列表式搜索结果 -->
+          <template v-else>
+            <div v-if="itemResults.length" class="gc-list">
+              <div v-for="it in itemResults.slice(0, nItem(w))" :key="it.id" class="gc-row" @click="!editMode && $router.push('/item')">
+                <span class="gc-ic">📦</span><span class="gc-val">{{ it.name }}</span><span class="gc-muted">{{ itemPathOf(it) }}</span>
+              </div>
+            </div>
+            <div v-else-if="itemSearched && !itemSearching" class="gc-empty">未找到相关物品</div>
+            <div v-else-if="items.length" class="gc-list">
+              <div v-for="it in items.slice(0, nItem(w))" :key="it.id" class="gc-row" @click="!editMode && $router.push('/item')">
+                <span class="gc-ic">📦</span><span class="gc-val">{{ it.name }}</span><span class="gc-tag">{{ it.room_name || it.house_name || '—' }}</span>
+              </div>
+            </div>
+            <div v-else class="gc-empty gc-empty-link" @click="!editMode && $router.push('/item')">尚未登记物品 · 去添加</div>
+          </template>
         </template>
 
         <!-- 悬赏任务 -->
@@ -147,7 +198,7 @@
             <div v-for="t in tasks.slice(0, nTask(w))" :key="t.id" class="gc-row" @click="!editMode && $router.push('/task')">
               <span class="gc-ic">{{ taskIcon(t.rewardType) }}</span>
               <span class="gc-val">{{ t.title }}</span>
-              <span class="gc-tag">{{ taskStatusLabel(t.status) }}</span>
+              <span class="gc-tag" :class="TASK_STATUS_TAG[t.status]">{{ taskStatusLabel(t.status) }}</span>
             </div>
           </div>
           <div v-else class="gc-empty">暂无任务</div>
@@ -160,7 +211,7 @@
             <div v-for="wi in wishes.slice(0, nWish(w))" :key="wi.id" class="gc-row" @click="!editMode && $router.push('/wish')">
               <span class="gc-ic">⭐</span>
               <span class="gc-val" :class="{ done: wi.status === 'ACHIEVED' }">{{ wi.title }}</span>
-              <span class="gc-muted">{{ wi.status === 'ACHIEVED' ? '已实现' : '' }}</span>
+              <span v-if="wi.status === 'ACHIEVED'" class="gc-tag grn">已实现</span>
             </div>
           </div>
           <div v-else class="gc-empty">暂无愿望</div>
@@ -188,6 +239,15 @@
             <span class="gc-link-arrow">→</span>
           </div>
         </template>
+
+        <!-- 拖入预览占位(4 列 × 2 行,作为真实网格项参与推挤) -->
+        <template v-else-if="w.kind === 'preview'">
+          <div class="gc-preview-body">
+            <span class="gc-preview-icon">{{ w.icon }}</span>
+            <span class="gc-preview-label">{{ w.label }}</span>
+            <span class="gc-preview-hint">{{ w.hint || '松手放置' }}</span>
+          </div>
+        </template>
       </div>
     </div>
 
@@ -204,14 +264,17 @@
 </template>
 
 <script setup>
-import { computed, inject, onMounted, onBeforeUnmount, ref } from 'vue'
+import { computed, inject, onMounted, onBeforeUnmount, ref, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useThemeStore } from '@/stores/theme'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
-import { publicApi, bookApi, itemApi, taskApi, wishApi, reminderApi } from '@/api'
+import { useWarmWidgetDrag } from '@/utils/widgetDragData'
+import { addedCodes } from '@/utils/warmHomeShared'
+import { publicApi, bookApi, itemApi, taskApi, wishApi, reminderApi, aiApi } from '@/api'
+import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
 
 const router = useRouter()
 const themeStore = useThemeStore()
@@ -227,18 +290,21 @@ const anniversaries = computed(() => appStore.stats.upcomingEvents || [])
 
 // ========== 组件注册表 + 布局(localStorage 持久化) ==========
 // 9 个富组件(有专属内容模板);span=8/4 对应 12 列栅格分栏
+// chip = 该卡的色相锚点(--blob-N:1 陶土 / 2 暖沙 / 3 鼠尾草 / 4 暖米 / 5 暖木),标题竖条与列表图标芯片都取此色
 const WIDGETS = [
-  { id: 'weather', label: '天气活窗', icon: '🌤', span: 8 },
-  { id: 'feed', label: '家人动态', icon: '👥', span: 4 },
-  { id: 'photos', label: '照片', icon: '📷', span: 4 },
-  { id: 'anni', label: '纪念日', icon: '🎂', span: 4 },
-  { id: 'finance', label: '本月收支', icon: '💰', span: 4 },
-  { id: 'item', label: '寻物', icon: '📦', span: 4 },
-  { id: 'task', label: '悬赏任务', icon: '🎯', span: 4 },
-  { id: 'wish', label: '愿望单', icon: '⭐', span: 4 },
-  { id: 'reminder', label: '今日提醒', icon: '🔔', span: 4 },
+  { id: 'weather', label: '天气活窗', icon: '🌤', span: 8, chip: 1 },
+  { id: 'feed', label: '家人动态', icon: '👥', span: 4, chip: 3 },
+  { id: 'photos', label: '照片', icon: '📷', span: 4, chip: 2 },
+  { id: 'anni', label: '纪念日', icon: '🎂', span: 4, chip: 1 },
+  { id: 'finance', label: '本月收支', icon: '💰', span: 4, chip: 3 },
+  { id: 'item', label: '寻物', icon: '📦', span: 4, chip: 5 },
+  { id: 'task', label: '悬赏任务', icon: '🎯', span: 4, chip: 5 },
+  { id: 'wish', label: '愿望单', icon: '⭐', span: 4, chip: 3 },
+  { id: 'reminder', label: '今日提醒', icon: '🔔', span: 4, chip: 1 },
 ]
 const WIDGET_BY_ID = Object.fromEntries(WIDGETS.map((w) => [w.id, w]))
+// 卡片色相锚点 → 内联 --chip,供 .gc-card-h3::before 与 .gc-ic 取色(后代继承)
+const cardStyle = (w) => ({ '--chip': `var(--blob-${w.chip || 1})` })
 
 // 侧栏模块 → 富组件映射;未映射的模块拖入后落为「快捷入口」卡片
 const MODULE_TO_WIDGET = {
@@ -280,23 +346,23 @@ const resolveWidget = (entry) => {
   if (id.startsWith('link:')) {
     const meta = MODULE_META[id.slice(5)]
     if (!meta) return null
-    return { id, kind: 'link', code: id.slice(5), label: meta.title, icon: meta.icon, path: meta.path, span: entry.span || 4, row }
+    return { id, kind: 'link', code: id.slice(5), label: meta.title, icon: meta.icon, path: meta.path, span: entry.span || 4, row, chip: 3 }
   }
   const base = WIDGET_BY_ID[id]
   if (!base) return null
   return { ...base, span: entry.span || base.span, row }
 }
 
-// 默认展示 6 张;其余富组件(task/wish/reminder)由托盘加入,其余模块经侧栏拖入为入口卡片
+// 默认展示 6 张(照片/纪念日/收支 3 行、寻物整行户型图);其余富组件(task/wish/reminder)由托盘加入,其余模块经侧栏拖入为入口卡片
 const DEFAULT_LAYOUT = [
   { id: 'weather', span: 8, row: 4 },
   { id: 'feed', span: 4, row: 4 },
-  { id: 'photos', span: 4, row: 2 },
-  { id: 'anni', span: 4, row: 2 },
-  { id: 'finance', span: 4, row: 2 },
-  { id: 'item', span: 4, row: 2 },
+  { id: 'photos', span: 4, row: 3 },
+  { id: 'anni', span: 4, row: 3 },
+  { id: 'finance', span: 4, row: 3 },
+  { id: 'item', span: 12, row: 4 },
 ]
-const STORAGE_KEY = 'ihomy:guangchen:home:v2'
+const STORAGE_KEY = 'ihomy:guangchen:home:v3'
 const LEGACY_KEY = 'ihomy:guangchen:home:v1'
 
 const loadLayout = () => {
@@ -321,13 +387,69 @@ const widgets = computed(() => layout.value.map(resolveWidget).filter(Boolean))
 // 托盘仅列富组件(含无侧栏入口的天气);入口卡片经侧栏拖入
 const availableWidgets = computed(() => WIDGETS.filter((w) => !layout.value.some((e) => e.id === w.id)))
 
-const applyLayout = (entries) => { layout.value = entries.filter((e) => resolveWidget(e)); saveLayout() }
+// ========== 已添加模块集合(供侧栏在编辑模式标记「已拖入冲突」) ==========
+const WIDGET_TO_MODULE = Object.fromEntries(Object.entries(MODULE_TO_WIDGET).map(([code, wid]) => [wid, code]))
+const computeAddedCodes = () => {
+  const codes = new Set()
+  for (const e of layout.value) {
+    const code = e.id.startsWith('link:') ? e.id.slice(5) : WIDGET_TO_MODULE[e.id]
+    if (code) codes.add(code)
+  }
+  return codes
+}
+watch(layout, () => { addedCodes.value = computeAddedCodes() }, { deep: true, immediate: true })
+
+// ========== 布局动画(FLIP:先量后放,统一驱动「变大缩小 / 邻居移动 / 回弹」) ==========
+const gridEl = ref(null)
+const flipAnims = new WeakMap()
+const captureRects = () => {
+  const m = new Map()
+  gridEl.value?.querySelectorAll('.gc-card').forEach((c) => { if (c.dataset.wid) m.set(c.dataset.wid, c.getBoundingClientRect()) })
+  return m
+}
+// 回弹缓动:末段轻微越过目标再回正(overshoot)
+const FLIP_EASE = 'cubic-bezier(.34, 1.56, .64, 1)'
+const flipLayout = (prev) => {
+  const grid = gridEl.value
+  if (!grid) return
+  const moves = []
+  grid.querySelectorAll('.gc-card').forEach((c) => {
+    const id = c.dataset.wid
+    if (!id) return
+    const first = prev.get(id)
+    if (!first) return
+    const last = c.getBoundingClientRect()
+    const dx = first.left - last.left
+    const dy = first.top - last.top
+    const dw = last.width ? first.width / last.width : 1
+    const dh = last.height ? first.height / last.height : 1
+    if (Math.abs(dx) < .5 && Math.abs(dy) < .5 && Math.abs(dw - 1) < .01 && Math.abs(dh - 1) < .01) return
+    moves.push({ el: c, dx, dy, dw, dh })
+  })
+  if (!moves.length) return
+  moves.forEach(({ el, dx, dy, dw, dh }) => {
+    flipAnims.get(el)?.cancel()
+    flipAnims.set(el, el.animate(
+      [
+        { transform: `translate(${dx}px, ${dy}px) scale(${dw}, ${dh})`, transformOrigin: 'top left' },
+        { transform: 'translate(0, 0) scale(1, 1)', transformOrigin: 'top left' },
+      ],
+      { duration: 300, easing: FLIP_EASE }
+    ))
+  })
+}
+
+const applyLayout = (entries) => {
+  const prev = captureRects()
+  layout.value = entries.filter((e) => resolveWidget(e))
+  saveLayout()
+  nextTick(() => flipLayout(prev))
+}
 const addWidget = (id) => {
   if (layout.value.some((e) => e.id === id)) { ElMessage.info('该组件已在首页'); return }
   applyLayout([...layout.value, { id, span: defaultSpan(id), row: defaultRow(id) }])
   ElMessage.success(`已添加 ${resolveWidget({ id, span: defaultSpan(id), row: defaultRow(id) })?.label || ''} 组件`)
 }
-const addWidgetFromModule = (code) => addWidget(MODULE_TO_WIDGET[code] || `link:${code}`)
 const removeWidget = (w) => { applyLayout(layout.value.filter((e) => e.id !== w.id)) }
 const resetLayout = () => { layout.value = DEFAULT_LAYOUT.map((e) => ({ ...e })); saveLayout(); ElMessage.success('布局已重置') }
 
@@ -337,18 +459,18 @@ const canEdit = computed(() => userStore.isOwner)
 const startEdit = () => appStore.toggleHomeEditMode()
 const finishEdit = () => appStore.toggleHomeEditMode()
 
-// 卡片点击:仅整卡可跳转的组件(weather/anni/finance/photos);feed/task/wish/reminder/item 由内部行/按钮跳转
-const LINK_IDS = ['weather', 'anni', 'finance', 'photos']
+// 卡片点击:仅整卡可跳转的组件(weather/anni/finance);photos 点击翻牌、feed/task/wish/reminder/item 由内部行/按钮跳转
+const LINK_IDS = ['weather', 'anni', 'finance']
 const isLinkCard = (w) => LINK_IDS.includes(w.id)
 const onCardClick = (w) => {
   if (editMode.value) return
-  const dest = { weather: '/weather', anni: '/anniversary', finance: '/book', photos: '/album' }[w.id]
+  const dest = { weather: '/weather', anni: '/anniversary', finance: '/book' }[w.id]
   if (dest) router.push(dest)
 }
 
 // ========== 拖拽排序 + 调整大小(原生 HTML5 DnD 排序 + 右下角手柄拖拽改列宽) ==========
 const dragId = ref(null)
-const dragOverId = ref(null)
+const reorderPreview = ref(null) // { id, index, label, icon, span, row } —— 重排时在目标下标插入同尺寸占位
 const resizing = ref(false)
 const resizeState = ref(null)
 const ROW_H = 80
@@ -361,29 +483,116 @@ const ALLOWED_ROWS = [2, 3, 4, 6]
 
 const onDragStart = (e, w) => {
   if (resizing.value) { e.preventDefault(); return } // 调整大小时取消卡片原生拖拽
+  dropPreview.value = null
+  reorderPreview.value = null
   dragId.value = w.id
   e.dataTransfer.effectAllowed = 'move'
 }
-const onDragOver = (e, w) => { e.preventDefault(); e.dataTransfer.dropEffect = dragId.value ? 'move' : 'copy'; if (dragId.value && dragOverId.value !== w.id) dragOverId.value = w.id }
-// 侧栏拖入:dataTransfer 带模块 code 标记;卡片重排不 setData(为空),以此区分两类拖拽
-const onSidebarDrop = (e) => { const code = e.dataTransfer?.getData('application/x-ihomy-widget'); if (code) addWidgetFromModule(code) }
-const onDrop = (e, target) => {
+
+// ========== 侧栏拖入预览(4 列 × 2 行幽灵占位,作为真实网格项参与推挤) ==========
+const { code: dragCode, label: dragLabel, onMove, onDrop: onWidgetDrop, setOverGrid } = useWarmWidgetDrag()
+const dropPreview = ref(null) // { code, label, icon, index }
+const displayWidgets = computed(() => {
+  const list = [...widgets.value]
+  const rp = reorderPreview.value
+  const dp = dropPreview.value
+  if (rp) {
+    // 卡片重排:源卡片保留原位(降透明度表示"被拿起"),在目标下标插入同尺寸占位
+    list.splice(Math.max(0, Math.min(rp.index, list.length)), 0, { id: '__reorder__', kind: 'preview', label: rp.label, icon: rp.icon, span: rp.span, row: rp.row, hint: '移到此处' })
+  } else if (dp) {
+    list.splice(Math.max(0, Math.min(dp.index, list.length)), 0, { id: '__preview__', kind: 'preview', label: dp.label, icon: dp.icon, span: 4, row: 2, hint: '松手放置' })
+  }
+  return list
+})
+const previewMeta = (code) => {
+  const wid = MODULE_TO_WIDGET[code]
+  if (wid) { const base = WIDGET_BY_ID[wid]; if (base) return { label: base.label, icon: base.icon } }
+  const meta = MODULE_META[code]
+  return meta ? { label: meta.title, icon: meta.icon } : null
+}
+// 由鼠标坐标推导插入下标(网格自动流,按视觉顺序逐项判断)
+const insertionIndexAt = (x, y) => {
+  const grid = gridEl.value
+  if (!grid) return layout.value.length
+  const cards = Array.from(grid.querySelectorAll('.gc-card')).filter((c) => {
+    const wid = c.dataset.wid
+    return wid && !wid.startsWith('__') && wid !== dragId.value // 排除占位幽灵与正在拖拽的源卡片
+  })
+  for (let i = 0; i < cards.length; i++) {
+    const r = cards[i].getBoundingClientRect()
+    const cx = r.left + r.width / 2
+    const cy = r.top + r.height / 2
+    if (y < cy) return i
+    if (y >= r.top && y < r.bottom && x < cx) return i
+  }
+  return cards.length
+}
+const insertWidgetAt = (code, idx) => {
+  const id = MODULE_TO_WIDGET[code] || `link:${code}`
+  const resolved = resolveWidget({ id, span: defaultSpan(id), row: defaultRow(id) })
+  if (!resolved) { dropPreview.value = null; return }
+  if (layout.value.some((e) => e.id === id)) { ElMessage.info('该组件已在首页'); dropPreview.value = null; return }
+  dropPreview.value = null
+  const list = [...layout.value]
+  list.splice(Math.max(0, Math.min(idx, list.length)), 0, { id, span: defaultSpan(id), row: defaultRow(id) })
+  applyLayout(list)
+  ElMessage.success(`已添加 ${resolved.label} 组件`)
+}
+// 拖拽移动(鼠标事件驱动,同步更新):进入网格 → 幽灵变形为卡片 + 占位推挤;离开 → 还原
+const updateDragPreview = (nx, ny) => {
+  if (!dragCode.value) return
+  const r = gridEl.value?.getBoundingClientRect()
+  const inside = !!(r && nx >= r.left && nx <= r.right && ny >= r.top && ny <= r.bottom)
+  if (inside) {
+    setOverGrid(true)
+    const idx = insertionIndexAt(nx, ny)
+    const cur = dropPreview.value
+    if (!cur || cur.code !== dragCode.value || cur.index !== idx) {
+      const prev = captureRects()
+      const meta = previewMeta(dragCode.value)
+      dropPreview.value = { code: dragCode.value, label: meta?.label || dragLabel.value || '新组件', icon: meta?.icon || '✨', index: idx }
+      nextTick(() => flipLayout(prev))
+    }
+  } else {
+    setOverGrid(false)
+    if (dropPreview.value) { const prev = captureRects(); dropPreview.value = null; nextTick(() => flipLayout(prev)) }
+  }
+}
+onMove((nx, ny) => updateDragPreview(nx, ny))
+onWidgetDrop((c) => { if (dropPreview.value) insertWidgetAt(c, dropPreview.value.index) })
+
+// 卡片重排预览:拖拽中在目标下标插入同尺寸占位(复用 insertIndex 计算 + FLIP 推挤)
+const onReorderDragOver = (e) => {
+  e.preventDefault()
+  if (!dragId.value) return
+  e.dataTransfer.dropEffect = 'move'
+  const idx = insertionIndexAt(e.clientX, e.clientY)
+  const cur = reorderPreview.value
+  if (!cur || cur.index !== idx) {
+    const prev = captureRects()
+    const dragged = widgets.value.find((w) => w.id === dragId.value)
+    reorderPreview.value = { id: dragId.value, index: idx, label: dragged?.label || '', icon: dragged?.icon || '✨', span: dragged?.span || 4, row: dragged?.row || 2 }
+    nextTick(() => flipLayout(prev))
+  }
+}
+const onReorderDrop = (e) => {
   e.preventDefault()
   const from = dragId.value
-  dragOverId.value = null
+  if (!from) return
+  const k = reorderPreview.value?.index
   dragId.value = null
-  if (!from || from === target.id) return
-  const list = [...layout.value]
-  const fromIdx = list.findIndex((x) => x.id === from)
-  const toIdx = list.findIndex((x) => x.id === target.id)
-  if (fromIdx < 0 || toIdx < 0) return
-  const [moved] = list.splice(fromIdx, 1)
-  list.splice(toIdx, 0, moved)
-  applyLayout(list)
+  reorderPreview.value = null
+  if (k == null) return
+  const dragged = layout.value.find((x) => x.id === from)
+  if (!dragged) return
+  const others = layout.value.filter((x) => x.id !== from)
+  others.splice(Math.max(0, Math.min(k, others.length)), 0, dragged)
+  applyLayout(others)
 }
-const onDragEnd = () => { dragId.value = null; dragOverId.value = null }
+const onDragEnd = () => { dragId.value = null; reorderPreview.value = null }
 
-// 调整大小:按下右下角手柄后横向拖拽,把卡片列宽吸附到 4/6/8/12 档
+// 调整大小:按下右下角手柄拖拽,把卡片列宽吸附 4/6/8/12、行高吸附 2/3/4/6;
+// 拖动中实时改 span/row,邻居经 CSS 栅格自动重排(实时预览),松手才 saveLayout 提交,拖回原位等于还原
 const onResizeStart = (e, w) => {
   const card = e.currentTarget.closest('.gc-card')
   if (!card) return
@@ -424,10 +633,12 @@ const onResizeMove = (e) => {
     if (d < bestDist) { bestDist = d; bestRow = row }
   }
   if (bestSpan !== s.currentSpan || bestRow !== s.currentRow) {
+    const prev = captureRects()
     s.currentSpan = bestSpan
     s.currentRow = bestRow
     const i = layout.value.findIndex((x) => x.id === s.id)
-    if (i >= 0) { layout.value[i] = { ...layout.value[i], span: bestSpan, row: bestRow }; saveLayout() }
+    if (i >= 0) { layout.value[i] = { ...layout.value[i], span: bestSpan, row: bestRow } } // 拖动中仅实时预览,不落库
+    nextTick(() => flipLayout(prev)) // 吸附档变化时动画过渡(放大缩小 + 邻居让位 + 回弹)
   }
 }
 const onResizeUp = () => {
@@ -435,6 +646,7 @@ const onResizeUp = () => {
   resizeState.value = null
   window.removeEventListener('mousemove', onResizeMove)
   window.removeEventListener('mouseup', onResizeUp)
+  saveLayout() // 松手才提交最终布局(拖回原位则等于原布局,无副作用)
 }
 onBeforeUnmount(() => { window.removeEventListener('mousemove', onResizeMove); window.removeEventListener('mouseup', onResizeUp) })
 
@@ -450,7 +662,7 @@ const nTask = (w) => ({ S: 2, M: 3, L: 5, XL: 8 }[vTier(w)] ?? 3)
 const nWish = (w) => ({ S: 2, M: 4, L: 6, XL: 10 }[vTier(w)] ?? 3)
 const nReminder = (w) => ({ S: 2, M: 4, L: 6, XL: 10 }[vTier(w)] ?? 3)
 const nItem = (w) => ({ S: 1, M: 2, L: 3, XL: 5 }[vTier(w)] ?? 2)
-const nAnni = (w) => ({ S: 1, M: 2, L: 3, XL: 5 }[vTier(w)] ?? 1)
+const nAnni = (w) => ({ S: 1, M: 3, L: 4, XL: 6 }[vTier(w)] ?? 1)
 
 // 照片:横向列数看 span,纵向行数看 row(总数 = 列 × 行)
 const photosCols = (w) => (hTier(w) === 'XL' ? 6 : hTier(w) === 'L' ? 4 : 3)
@@ -471,23 +683,191 @@ const wishes = ref([])
 const reminders = ref([])
 const photos = computed(() => appStore.photos || [])
 const balance = computed(() => bookSummary.value?.balance ?? 0)
+// 收支比例条
+const financeTotal = computed(() => (Number(bookSummary.value?.income) || 0) + (Number(bookSummary.value?.expense) || 0))
+const incomePct = computed(() => (financeTotal.value > 0 ? ((Number(bookSummary.value?.income) || 0) / financeTotal.value) * 100 : 0))
+
+// ========== 照片卡牌堆(点击翻动 + 5s 自动轮播,hover 暂停) ==========
+const photoIndex = ref(0)
+const photoHover = ref(false)
+const PHOTO_STACK_N = 4
+const topPhoto = computed(() => photos.value[photoIndex.value] || null)
+const stackCards = computed(() => {
+  const arr = photos.value
+  const n = arr.length
+  if (!n) return []
+  const out = []
+  for (let i = 0; i < Math.min(PHOTO_STACK_N, n); i++) out.push(arr[(photoIndex.value + i) % n])
+  return out
+})
+const pcardStyle = (i) => {
+  const n = Math.min(PHOTO_STACK_N, photos.value.length)
+  const mid = (n - 1) / 2
+  return {
+    transform: `translate(${((i - mid) * 14).toFixed(1)}px, ${(Math.abs(i - mid) * 9).toFixed(1)}px) rotate(${((i - mid) * 6).toFixed(1)}deg)`,
+    zIndex: 10 - i,
+  }
+}
+const advancePhotos = () => { if (photos.value.length > 1) photoIndex.value = (photoIndex.value + 1) % photos.value.length }
+let photoTimer = null
+const startPhotoTimer = () => { if (!photoTimer) photoTimer = setInterval(() => { if (!photoHover.value) advancePhotos() }, 5000) }
+const stopPhotoTimer = () => { if (photoTimer) { clearInterval(photoTimer); photoTimer = null } }
+
+// ========== 寻物(搜索 + 语音 + 户型图预览) ==========
+const itemHouse = ref(null)
+const itemFloorPlan = ref({ rooms: [], furnitures: [], items: [], imageUrl: null, scale: 100 })
+const itemImgTransform = ref(null) // 底图变换 {x,y,k}
+const itemImgSize = ref({ w: 0, h: 0 })
+const itemKeyword = ref('')
+const itemResults = ref([])
+const itemSearched = ref(false)
+const itemSearching = ref(false)
+const { recording: itemVoiceRecording, start: itemVoiceStart, stop: itemVoiceStop } = useVoiceRecorder()
+const itemVoiceProcessing = ref(false)
+let itemVoiceTimer = null
+
+const defaultFloorOfHouse = (house) => {
+  const set = new Set()
+  if (house?.floorPlans) {
+    try { const fp = JSON.parse(house.floorPlans); Object.keys(fp).forEach((k) => { if (k !== 'floorOrder') set.add(Number(k)) }) } catch {}
+  }
+  if (set.has(1)) return 1
+  if (set.size) return Math.max(...set)
+  return 1
+}
+const loadItemFloorPlan = async (house) => {
+  itemHouse.value = house
+  itemImgTransform.value = null
+  itemImgSize.value = { w: 0, h: 0 }
+  if (!house) { itemFloorPlan.value = { rooms: [], furnitures: [], items: [], imageUrl: null, scale: 100 }; return }
+  const floor = defaultFloorOfHouse(house)
+  const data = await itemApi.floorPlan(house.id, floor).catch(() => null)
+  itemFloorPlan.value = data || { rooms: [], furnitures: [], items: [], imageUrl: null, scale: 100 }
+  if (house.floorPlans) {
+    try { const cfg = JSON.parse(house.floorPlans)[floor]; if (cfg?.img) itemImgTransform.value = { ...cfg.img } } catch {}
+  }
+  if (data?.imageUrl) {
+    const img = new Image()
+    img.onload = () => { itemImgSize.value = { w: img.naturalWidth, h: img.naturalHeight } }
+    img.src = data.imageUrl
+  }
+}
+const itemShowFloorPlan = (w) => w.row >= 3
+const itemPathOf = (it) => [it.house_name, it.room_name, it.furniture_name || it.position].filter(Boolean).join(' / ')
+const itemHitIds = computed(() => itemResults.value.map((r) => r.id))
+const itemHitRoomIds = computed(() => {
+  const hit = new Set(itemHitIds.value)
+  const ids = new Set()
+  ;(itemFloorPlan.value.items || []).forEach((it) => { if (hit.has(it.id) && it.roomId != null) ids.add(Number(it.roomId)) })
+  return [...ids]
+})
+const onItemSearch = async () => {
+  const kw = (itemKeyword.value || '').trim()
+  if (!kw) { clearItemSearch(); return }
+  itemSearched.value = true
+  itemResults.value = await itemApi.list({ keyword: kw }).catch(() => [])
+  if (itemResults.value.length) return
+  itemSearching.value = true
+  try {
+    const r = await itemApi.aiFind({ query: kw }).catch(() => null)
+    if (r?.matches?.length) itemResults.value = r.matches
+  } finally { itemSearching.value = false }
+}
+const clearItemSearch = () => { itemKeyword.value = ''; itemResults.value = []; itemSearched.value = false }
+const toggleItemVoice = async () => {
+  if (itemVoiceRecording.value) { await finishItemVoice(); return }
+  if (itemVoiceProcessing.value) return
+  try {
+    await itemVoiceStart()
+    clearTimeout(itemVoiceTimer)
+    itemVoiceTimer = setTimeout(() => { if (itemVoiceRecording.value) finishItemVoice() }, 10000)
+  } catch (e) { ElMessage.warning('麦克风不可用') }
+}
+const finishItemVoice = async () => {
+  clearTimeout(itemVoiceTimer)
+  if (!itemVoiceRecording.value) return
+  itemVoiceProcessing.value = true
+  try {
+    const blob = await itemVoiceStop()
+    const file = new File([blob], 'voice.wav', { type: 'audio/wav' })
+    const r = await aiApi.transcribe(file, null)
+    const text = (r.text || '').trim()
+    if (!text) { ElMessage.warning('未识别到语音'); return }
+    itemKeyword.value = text
+    await onItemSearch()
+  } catch (e) {} finally { itemVoiceProcessing.value = false }
+}
+// 户型图 SVG 视图模型:解析房间多边形/家具/物品绝对坐标,自适应包围盒
+const itemFloorPlanView = computed(() => {
+  const fp = itemFloorPlan.value
+  const rooms = (fp.rooms || []).map((r) => {
+    let poly = []
+    try { poly = JSON.parse(r.geometry || '[]') } catch {}
+    if (!Array.isArray(poly)) poly = []
+    return { id: r.id, name: r.name, poly }
+  }).filter((r) => r.poly.length >= 3)
+  const hasFurn = (fp.furnitures || []).some((f) => f.x != null)
+  if (!rooms.length && !hasFurn && !fp.imageUrl) return null
+
+  const roomBox = {}
+  const roomPts = []
+  for (const r of rooms) {
+    const xs = r.poly.map((p) => p.x), ys = r.poly.map((p) => p.y)
+    const box = { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) }
+    roomBox[r.id] = box
+    roomPts.push({ id: r.id, name: r.name, points: r.poly.map((p) => `${p.x},${p.y}`).join(' '), cx: (box.minX + box.maxX) / 2, cy: (box.minY + box.maxY) / 2 })
+  }
+  const furnitures = (fp.furnitures || []).filter((f) => f.x != null).map((f) => ({ id: f.id, name: f.name, x: f.x, y: f.y, w: f.w, h: f.h }))
+  const furnitureById = Object.fromEntries(furnitures.map((f) => [f.id, f]))
+  const items = (fp.items || []).map((it) => {
+    const fid = it.furnitureId, rid = it.roomId
+    const relX = Number(it.relX ?? 0.5), relY = Number(it.relY ?? 0.5)
+    let ax = null, ay = null
+    if (fid != null && furnitureById[fid]) { const f = furnitureById[fid]; ax = f.x + relX * f.w; ay = f.y + relY * f.h }
+    else if (rid != null && roomBox[rid]) { const b = roomBox[rid]; ax = b.minX + relX * (b.maxX - b.minX); ay = b.minY + relY * (b.maxY - b.minY) }
+    return { id: it.id, name: it.name, ax, ay }
+  }).filter((it) => it.ax != null)
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  const collect = (x, y) => { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y }
+  rooms.forEach((r) => r.poly.forEach((p) => collect(p.x, p.y)))
+  furnitures.forEach((f) => { collect(f.x, f.y); collect(f.x + f.w, f.y + f.h) })
+  items.forEach((it) => collect(it.ax, it.ay))
+  if (fp.imageUrl && itemImgTransform.value && itemImgSize.value.w) {
+    const t = itemImgTransform.value
+    collect(t.x, t.y); collect(t.x + itemImgSize.value.w * t.k, t.y + itemImgSize.value.h * t.k)
+  }
+  if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 100; maxY = 100 }
+  const pad = 26
+  return {
+    rooms: roomPts, furnitures, items,
+    imageUrl: fp.imageUrl || null,
+    imgTransform: itemImgTransform.value ? `translate(${itemImgTransform.value.x},${itemImgTransform.value.y}) scale(${itemImgTransform.value.k})` : '',
+    viewBox: `${minX - pad} ${minY - pad} ${(maxX - minX) + pad * 2} ${(maxY - minY) + pad * 2}`,
+  }
+})
 
 onMounted(async () => {
-  const [feed, book, it, task, wish, rem] = await Promise.all([
+  const [feed, book, it, task, wish, rem, houses] = await Promise.all([
     publicApi.getFeed(20).catch(() => []),
     bookApi.summary().catch(() => null),
     itemApi.list({}).catch(() => []),
     taskApi.list().catch(() => []),
     wishApi.list().catch(() => []),
     reminderApi.list().catch(() => []),
+    itemApi.houses().catch(() => []),
   ])
   feeds.value = feed || []
   if (book) bookSummary.value = book
-  items.value = (it || []).slice(0, 4)
+  items.value = (it || []).slice(0, 8)
   tasks.value = (Array.isArray(task) ? task : (task?.records || [])).filter((t) => t.status !== 'CANCELLED')
   wishes.value = Array.isArray(wish) ? wish : []
   reminders.value = (Array.isArray(rem) ? rem : []).filter((r) => r.done !== 1)
+  const h = Array.isArray(houses) ? houses : []
+  if (h.length) await loadItemFloorPlan(h[0])
+  startPhotoTimer()
 })
+onBeforeUnmount(() => { stopPhotoTimer(); if (itemVoiceRecording.value) itemVoiceStop() })
 
 const weatherCity = computed(() => sunLight?.weather?.value?.city || appStore.familyName || '杭州')
 const weatherTemp = computed(() => sunLight?.weather?.value?.temp ?? 24)
@@ -510,6 +890,9 @@ const pm25Text = computed(() => { const p = weatherDetail.value?.air?.pm2p5; ret
 const FEED_ICON = { blog: '📝', diary: '📖', photo: '📷', video: '🎬', wish: '🎁', task: '🎯', recipe: '🍳', book: '📚' }
 const FEED_ROUTES = { blog: '/blog', diary: '/diary', photo: '/album', video: '/cinema', wish: '/wish', task: '/task', recipe: '/kitchen', book: '/library' }
 const feedIcon = (type) => FEED_ICON[type] || '✨'
+// 动态类型 → 图标芯片色相(博客陶土 / 影像暖沙 / 愿望鼠尾草 / 日记·任务暖木)
+const FEED_CHIP = { blog: 1, diary: 5, photo: 2, video: 2, wish: 3, task: 5, recipe: 1, book: 3 }
+const feedChipStyle = (type) => ({ '--chip': `var(--blob-${FEED_CHIP[type] || 1})` })
 const feedSummary = (f) => {
   if (f.type === 'blog') return f.title || ''
   if (f.type === 'diary') return (f.content || '').slice(0, 40)
@@ -526,6 +909,8 @@ const fmt = (n) => (Number(n) || 0).toFixed(2)
 
 // 任务枚举映射(与 sys_dict_item 一致:OPEN/IN_PROGRESS/REVIEW/DONE/CANCELLED;奖励 NONE/POINTS/ITEM)
 const TASK_STATUS_LABEL = { OPEN: '待领取', IN_PROGRESS: '进行中', REVIEW: '待确认', DONE: '已完成', CANCELLED: '已取消' }
+// 状态语义着色:进行中=主色 / 待确认=陶土 / 已完成=鼠尾草绿(设计稿 §3.4「已找到 绿标签」)
+const TASK_STATUS_TAG = { OPEN: '', IN_PROGRESS: 'pri', REVIEW: 'acc', DONE: 'grn', CANCELLED: '' }
 const TASK_REWARD_ICON = { NONE: '⭕', POINTS: '🎁', ITEM: '📦' }
 const taskStatusLabel = (s) => TASK_STATUS_LABEL[s] || ''
 const taskIcon = (t) => TASK_REWARD_ICON[t] || '⭕'
@@ -544,7 +929,11 @@ const greeting = computed(() => {
 </script>
 
 <style>
-.gc-home { color: var(--color-text); }
+/* 补色强度档:陶土粉(--blob-1)与鼠尾草绿(--blob-3)原先只以 .12~.14 的雾状渐变存在,
+ * 叠在米色卡面上与卡面只差个位数 RGB,读不出色相 —— 统一提到可读区间,并且立一条「标题色相锚点」 */
+.gc-home { color: var(--color-text); --chip-a: .20; --bar-a: .8; --sill-a: .5; --sage-a: .30; }
+/* 暮色是 #33241A 深咖底,同一 alpha 在暗底上更向灰收敛,补色统一再提一档 */
+html.theme-warm.dark .gc-home { --chip-a: .26; --bar-a: 1; --sill-a: .58; --sage-a: .36; }
 
 .gc-main-head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 20px; }
 .gc-h2 { font-size: 20px; margin: 0; font-weight: 650; color: var(--color-text); }
@@ -565,7 +954,13 @@ const greeting = computed(() => {
 .gc-card { background: var(--color-card); border: 1px solid var(--color-border); border-radius: 16px;
   box-shadow: var(--shadow); padding: 18px; position: relative; overflow: hidden; transition: box-shadow .35s ease, transform .35s ease; }
 .gc-card:hover { box-shadow: var(--shadow-hover); }
-.gc-card-h3 { font-size: 13px; font-weight: 650; margin: 0 0 12px; color: var(--color-text); display: flex; align-items: center; justify-content: space-between; }
+.gc-card-h3 { font-size: 13px; font-weight: 650; margin: 0 0 12px; color: var(--color-text); display: flex; align-items: center; gap: 8px; }
+/* 色相锚点:每张卡标题前一条 3px 竖条,取该卡的 --chip(陶土/鼠尾草/暖沙/暖木),
+ * 让 6 张卡不再共用同一个「米色面 + 棕字」 */
+.gc-card-h3::before { content: ''; width: 3px; height: 12px; border-radius: 2px; flex-shrink: 0;
+  background: rgba(var(--chip, var(--color-brand-rgb)), var(--bar-a)); }
+/* 右侧附属文字(收支月份/寻物户型名)推到行尾;末位是「更多」按钮时由 .gc-more 自己的 margin-left:auto 接管 */
+.gc-card-h3 > .gc-muted:last-child { margin-left: auto; }
 .gc-muted { font-size: 11.5px; color: var(--color-text-tertiary); }
 .gc-val-lg { font-size: 16px; font-weight: 650; color: var(--color-brand); margin-bottom: 4px; }
 .gc-flex-baseline { display: flex; justify-content: space-between; align-items: baseline; }
@@ -575,9 +970,16 @@ const greeting = computed(() => {
 
 /* 编辑模式 */
 .gc-card-edit { border-style: dashed; border-color: var(--color-accent, var(--color-brand)); }
-.gc-card-dragover { border-color: var(--color-brand); box-shadow: 0 0 0 3px rgba(var(--color-brand-rgb), .18), var(--shadow-hover); }
 .gc-card-link { cursor: pointer; }
 .gc-overflow { overflow: hidden; }
+/* 卡片重排中被"拿起"的源卡片:保留原位降透明度,目标下标另有同尺寸占位 */
+.gc-card-dragging { opacity: .35; }
+/* 拖入预览占位(4 列 × 2 行幽灵卡片,作为真实网格项参与推挤) */
+.gc-card-preview { border-style: dashed; border-color: var(--color-accent, var(--color-brand)); background: rgba(var(--color-brand-rgb), .05); box-shadow: none; cursor: copy; }
+.gc-preview-body { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--color-text-secondary); }
+.gc-preview-icon { font-size: 30px; line-height: 1; }
+.gc-preview-label { font-size: 14px; font-weight: 650; color: var(--color-text); }
+.gc-preview-hint { font-size: 11.5px; color: var(--color-text-tertiary); }
 .gc-del { position: absolute; top: 10px; right: 10px; z-index: 2; width: 24px; height: 24px; border-radius: 8px; border: none;
   display: grid; place-items: center; cursor: pointer; font-size: 12px; line-height: 1;
   background: var(--color-card-2); color: var(--color-text-secondary); box-shadow: var(--shadow); }
@@ -590,11 +992,55 @@ const greeting = computed(() => {
 .gc-edit-hint { font-size: 12px; color: var(--color-text-secondary); background: var(--color-card-2); border: 1px dashed var(--color-border);
   border-radius: 10px; padding: 8px 14px; margin: -8px 0 16px; }
 
-/* 照片拼贴 */
-.gc-photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; cursor: pointer; }
-.gc-photo { width: 100%; height: 64px; object-fit: cover; border-radius: 8px; background: var(--color-line); transition: transform .25s ease, opacity .25s ease; }
-.gc-photos:hover .gc-photo { opacity: .92; }
-.gc-photo:hover { transform: scale(1.04); opacity: 1; }
+/* 照片卡牌堆 */
+.gc-photo-stack { position: relative; flex: 1; min-height: 0; cursor: pointer; display: grid; place-items: center; overflow: hidden; }
+.gc-photo-pcard { position: absolute; width: 74%; height: 78%; border-radius: 14px; overflow: hidden; background: var(--color-line);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, .16); transition: transform .5s cubic-bezier(.22, 1, .36, 1), opacity .5s ease; }
+.gc-photo-pcard img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gc-photo-meta { position: absolute; left: 10px; right: 10px; bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; z-index: 20; }
+.gc-photo-cap { font-size: 12px; font-weight: 600; color: #fff; padding: 4px 10px; border-radius: 999px; background: rgba(0, 0, 0, .4); backdrop-filter: blur(6px); max-width: 72%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gc-photo-count { font-size: 11px; color: #fff; padding: 3px 9px; border-radius: 999px; background: rgba(0, 0, 0, .4); backdrop-filter: blur(6px); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+
+/* 头部「更多」小链接(照片→相册 / 寻物→管理) */
+.gc-more { all: unset; margin-left: auto; cursor: pointer; font-size: 11.5px; font-weight: 600; color: var(--color-text-tertiary); transition: color .2s; }
+.gc-more:hover { color: var(--color-brand); }
+
+/* 收支比例条 */
+.gc-fin-bar { display: flex; height: 8px; border-radius: 6px; overflow: hidden; margin-top: 12px; background: var(--color-line); }
+.gc-fin-bar i { display: block; height: 100%; }
+.gc-fin-bar i.in { background: var(--color-green); }
+.gc-fin-bar i.out { background: var(--color-accent); }
+
+/* 寻物搜索框 + 语音 */
+.gc-item-card { display: flex; flex-direction: column; }
+.gc-item-search { display: flex; gap: 8px; margin-bottom: 12px; }
+.gc-item-input { flex: 1; min-width: 0; border: 1px solid var(--color-border); background: var(--color-line); color: var(--color-text);
+  border-radius: 10px; padding: 8px 12px; font-size: 13px; outline: none; transition: border-color .2s, background .2s; }
+.gc-item-input:focus { border-color: var(--color-brand); background: var(--color-card); }
+.gc-item-input::placeholder { color: var(--color-text-tertiary); }
+.gc-item-voice { flex-shrink: 0; padding: 6px 12px; }
+.gc-item-voice.recording { background: var(--color-accent); color: #fff7f0; border-color: var(--color-accent); animation: gcVoicePulse 1.2s ease-in-out infinite; }
+@keyframes gcVoicePulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(168, 72, 58, .4); } 50% { box-shadow: 0 0 0 6px rgba(168, 72, 58, 0); } }
+
+/* 户型图预览 */
+.gc-item-plan { position: relative; flex: 1; min-height: 0; border-radius: 12px; overflow: hidden; cursor: pointer;
+  background: linear-gradient(160deg, var(--color-bg-2), var(--color-card-2)); box-shadow: inset 0 0 0 1px var(--color-line); }
+.gc-item-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.gc-item-bg { opacity: .5; }
+/* 户型图:房间/家具原先把「光尘」主色 rgb(184,140,110) 写死,暖居下不跟随主题 —— 改走 --color-brand-rgb */
+.gc-item-room { fill: rgba(var(--color-brand-rgb), .1); stroke: rgba(var(--color-brand-rgb), .5); stroke-width: 1.6; stroke-linejoin: round; }
+.gc-item-room.hit { fill: rgba(var(--color-brand-rgb), .22); stroke: var(--color-brand); }
+.gc-item-room-label { fill: var(--color-text-secondary); font-size: 12px; text-anchor: middle; pointer-events: none; }
+.gc-item-furn { fill: rgba(var(--color-brand-rgb), .2); stroke: rgba(var(--color-brand-rgb), .45); stroke-width: 1.2; }
+.gc-item-furn-label { fill: var(--color-text-tertiary); font-size: 10px; text-anchor: middle; pointer-events: none; }
+.gc-item-dot { fill: var(--color-brand); stroke: var(--color-card); stroke-width: 1.5; }
+.gc-item-dot.hit { fill: var(--color-accent); }
+.gc-item-dot-label { fill: var(--color-text-secondary); font-size: 10px; text-anchor: middle; pointer-events: none; }
+.gc-item-results { position: absolute; top: 10px; right: 10px; width: 46%; max-height: 60%; overflow-y: auto;
+  background: var(--color-card); border: 1px solid var(--color-border); border-radius: 12px; box-shadow: var(--shadow); padding: 6px 10px; z-index: 5; }
+.gc-item-results .gc-row { font-size: 12px; padding: 7px 0; }
+.gc-item-nohit { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); font-size: 12px; color: var(--color-text-tertiary);
+  padding: 6px 12px; border-radius: 999px; background: var(--color-card); box-shadow: var(--shadow); white-space: nowrap; }
 
 /* 添加组件托盘 */
 .gc-add-tray { margin-top: 16px; padding: 14px 16px; border-radius: 16px; background: var(--color-card); border: 1px dashed var(--color-border);
@@ -607,26 +1053,30 @@ const greeting = computed(() => {
 
 /* 快捷入口卡片 */
 .gc-link-body { display: flex; align-items: center; gap: 10px; padding: 10px 4px 4px; cursor: pointer; }
-.gc-link-icon { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 20px; background: rgba(var(--blob-3), 0.16); flex-shrink: 0; }
+.gc-link-icon { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 20px; background: rgba(var(--blob-3), var(--chip-a)); flex-shrink: 0; }
 .gc-link-text { font-size: 13px; font-weight: 600; color: var(--color-text); flex: 1; }
 .gc-link-arrow { font-size: 16px; color: var(--color-text-tertiary); transition: transform .2s ease, color .2s ease; }
 .gc-link-body:hover .gc-link-arrow { transform: translateX(3px); color: var(--color-brand); }
 
 /* 天气活窗 */
+/* 底部 3px 陶土「窗台线」:暖居的隐喻是屋里的窗,一条实色窗台比一层模糊光晕更能说明这是陶土粉 */
 .gc-glass { position: relative; height: 230px; border-radius: 12px; overflow: hidden; cursor: pointer;
   background: linear-gradient(160deg, var(--color-bg-2), var(--color-card-2));
-  box-shadow: inset 0 0 0 1px var(--color-line), inset 0 14px 40px rgba(122, 90, 60, .08); }
+  box-shadow: inset 0 0 0 1px var(--color-line), inset 0 14px 40px rgba(122, 90, 60, .08),
+    inset 0 -3px 0 rgba(var(--blob-1), var(--sill-a)); }
 /* 天气卡在固定行高网格内占满剩余高度(8 列 × 4 行基准) */
 .gc-weather { display: flex; flex-direction: column; }
 .gc-weather .gc-glass { flex: 1; height: auto; min-height: 120px; }
+/* 右上陶土暖光 + 左下鼠尾草绿光斑:半径收小(原 360/280px 铺太开被拉平成「泛黄」)并把绿的 alpha 提到可读 */
 .gc-glass::before { content: ""; position: absolute; inset: 0;
   background:
-    radial-gradient(360px 200px at 74% 18%, var(--glow-warm), transparent 62%),
-    radial-gradient(280px 170px at 8% 90%, rgba(var(--blob-3), 0.22), transparent 58%); }
+    radial-gradient(240px 150px at 76% 16%, var(--glow-warm), transparent 60%),
+    radial-gradient(200px 140px at 8% 92%, rgba(var(--blob-3), var(--sage-a)), transparent 56%); }
 .gc-glass::after { content: ""; position: absolute; left: 14%; top: -4%; width: 46%; height: 110%;
   background: url("data:image/svg+xml,%3Csvg width='340' height='760' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='b' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23FFE9C4' stop-opacity='.38'/%3E%3Cstop offset='.55' stop-color='%23FFDDA6' stop-opacity='.13'/%3E%3Cstop offset='1' stop-color='%23FFDDA6' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='340' height='760' fill='url(%23b)' transform='rotate(14 170 380)'/%3E%3C/svg%3E");
   background-size: 100% 100%; mix-blend-mode: screen; opacity: .8; transform: rotate(10deg); }
-html.dark .gc-glass::after { opacity: .5; }
+/* 暮色:screen 混合叠在深咖窗面上会把 SVG 矩形的直边暴露成一块「硬边米色板」,降透明 + 模糊化回光 */
+html.dark .gc-glass::after { opacity: .3; filter: blur(7px); }
 .gc-win-glow { position: absolute; top: 16px; right: 20px; width: 130px; height: 130px; border-radius: 50%;
   background: radial-gradient(circle, var(--glow-warm), transparent 66%); filter: blur(20px); }
 .gc-win-dust { width: 4px; height: 4px; border-radius: 50%; background: #FFF0D0; position: absolute; left: 6%; top: 6%;
@@ -663,8 +1113,10 @@ html.dark .gc-glass::after { opacity: .5; }
 .gc-tag.pri { background: var(--color-brand); color: var(--color-card); }
 
 /* 进度条 */
-.gc-meter { height: 8px; border-radius: 6px; background: var(--color-line); overflow: hidden; margin-top: 8px; }
-.gc-meter > i { display: block; height: 100%; background: linear-gradient(90deg, var(--color-brand), var(--color-accent)); border-radius: 6px; }
+/* 进度条:填充改纯陶土实色 —— 原先 brand→accent 渐变在窄幅里大半还是棕色,是页面唯一能读出陶土粉的地方却读不出来 */
+.gc-meter { height: 10px; border-radius: 6px; background: var(--color-line); overflow: hidden; margin-top: 8px; }
+.gc-meter > i { display: block; height: 100%; background: var(--color-accent); border-radius: 6px; }
+.gc-days { color: var(--color-accent); font-weight: 650; }
 .gc-anni-more { margin-top: 8px; }
 
 /* 收支 */
@@ -677,7 +1129,8 @@ html.dark .gc-glass::after { opacity: .5; }
 .gc-list .gc-row { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--color-line); font-size: 13px; cursor: pointer; }
 .gc-list .gc-row:last-child { border-bottom: none; }
 .gc-list .gc-row .gc-muted { margin-left: auto; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 45%; }
-.gc-ic { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-size: 13px; background: rgba(var(--blob-1), 0.14); flex-shrink: 0; }
+.gc-list .gc-row > .gc-tag { margin-left: auto; }
+.gc-ic { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-size: 13px; background: rgba(var(--chip, var(--blob-1)), var(--chip-a)); flex-shrink: 0; }
 .gc-val { font-weight: 650; color: var(--color-brand); }
 .gc-val.done { color: var(--color-text-tertiary); text-decoration: line-through; }
 
