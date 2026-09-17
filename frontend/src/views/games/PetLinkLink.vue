@@ -88,6 +88,9 @@
           {{ paused ? '▶' : '⏸' }} {{ $t('games.petlink.pause') }}
         </el-button>
         <el-button size="small" @click="restart">↺ {{ $t('games.petlink.restart') }}</el-button>
+        <el-button size="small" :title="$t('games.petlink.muteToggle')" @click="toggleMute">
+          {{ muted ? '🔇' : '🔊' }} {{ muted ? $t('games.petlink.unmute') : $t('games.petlink.mute') }}
+        </el-button>
       </div>
 
       <!-- 胜负弹层 -->
@@ -109,13 +112,17 @@
 // 黑底白卡蓝边 40 种宠物、9 关(关卡名:入门/增加难度/上下分离/左右分离/向左看齐/
 // 地心引力/飘向天空/向右看齐/中央集中)、150s 倒计时(每消除一对 +3s)、得分 +10/对、
 // 过关时间奖励 = 剩余秒数×4、重排(第 1~9 关 6/7/8/9/11/13/15/17/19 次)、
-// 蓝色连线动画;通关按后端发积分。已移除音效(背景音乐不要了),支持全屏,进入时关闭全局光影特效。
+// 蓝色连线动画 + 点击/消除/胜利音效(无背景音乐,可静音);通关按后端发积分。
+// 支持全屏,进入时关闭全局光影特效(与图片/视频/看书一致)。
 import { ref, computed, onBeforeUnmount, onMounted, nextTick, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { FullScreen } from '@element-plus/icons-vue'
 import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import clickUrl from '@/assets/games/petlink/sounds/15.wav'
+import matchUrl from '@/assets/games/petlink/sounds/294.mp3'
+import winUrl from '@/assets/games/petlink/sounds/301.mp3'
 
 const { t, locale } = useI18n()
 const sunLight = inject(SUN_LIGHT_KEY, null)
@@ -198,6 +205,21 @@ function toggleFullscreen() {
 }
 function onFullscreenChange() { isFullscreen.value = !!document.fullscreenElement }
 
+// ---------- 音频(点击/消除/胜利音效,无背景音乐;可静音) ----------
+
+const muted = ref(localStorage.getItem('ihomy:game:petlink:muted') === '1')
+const audioClick = new Audio(clickUrl)
+const audioMatch = new Audio(matchUrl)
+const audioWin = new Audio(winUrl)
+
+function toggleMute() {
+  muted.value = !muted.value
+  localStorage.setItem('ihomy:game:petlink:muted', muted.value ? '1' : '0')
+}
+function playClick() { if (muted.value) return; try { audioClick.currentTime = 0; audioClick.play() } catch (e) {} }
+function playMatch() { if (muted.value) return; try { audioMatch.currentTime = 0; audioMatch.play() } catch (e) {} }
+function playWin() { if (muted.value) return; try { audioWin.currentTime = 0; audioWin.play() } catch (e) {} }
+
 // ---------- 关卡 ----------
 
 function typeCountOf(lv) {
@@ -278,17 +300,19 @@ function onClick(i) {
   if (frozen.value) return
   if (!board.value[i]) return
   hinted.value = []
-  if (selected.value === -1) { selected.value = i; return }
+  if (selected.value === -1) { selected.value = i; playClick(); return }
   if (selected.value === i) { selected.value = -1; return }
   const s = selected.value
-  if (board.value[i].type !== board.value[s].type) { selected.value = i; return }
+  if (board.value[i].type !== board.value[s].type) { selected.value = i; playClick(); return }
   const path = findPath(Math.floor(s / COLS), s % COLS, Math.floor(i / COLS), i % COLS)
   selected.value = -1
   if (path) match(s, i, path)
+  else playClick()
 }
 
 async function match(a, b, path) {
   animating.value = true
+  playMatch()
   linePoints.value = path.map(([r, c]) => `${centerX(c)},${centerY(r)}`).join(' ')
   await sleep(280)
   linePoints.value = ''
@@ -330,6 +354,7 @@ function doHint() {
 function doShuffle() {
   if (frozen.value || shufflesLeft.value <= 0) return
   applyShuffle()
+  playClick()
 }
 
 function applyShuffle() {
@@ -470,6 +495,7 @@ function toCenter() {
 
 async function levelComplete() {
   stopTicker()
+  playWin()
   // 时间奖励:与原件 (1800 - frame)/3 一致 → 剩余秒数 ×4
   const bonus = Math.round(timeLeft.value * 4)
   score.value += bonus
