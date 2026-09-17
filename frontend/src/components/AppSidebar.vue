@@ -200,7 +200,7 @@ const familyName = computed(() => appStore.familyName)
 const userInfo = computed(() => userStore.userInfo)
 
 // 导航分组:复用共享单一数据源(NAV_PATHS + 分组规则),此处只做渲染
-const groupedModules = computed(() => buildNavGroups(appStore.modules, { hasOps: userStore.hasPerm('ops:view') }))
+const groupedModules = computed(() => buildNavGroups(appStore.modules, { hasOps: userStore.isOps || userStore.isOwner }))
 
 const navigate = (path) => {
   if (route.path === path) return

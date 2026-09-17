@@ -8,6 +8,8 @@ import com.ihomy.common.BizException;
 import com.ihomy.common.ResultCode;
 import com.ihomy.common.ThirdPartyHttp;
 import com.ihomy.dto.AiImageDTO;
+import com.ihomy.entity.AiLog;
+import com.ihomy.mapper.AiLogMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -36,6 +38,7 @@ public class AiService {
     private final FamilyAiConfigService familyAiConfigService;
     private final ParameterService parameterService;
     private final BaiduAsrClient baiduAsrClient;
+    private final AiLogMapper aiLogMapper;
     private final ObjectMapper mapper = new ObjectMapper();
 
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
@@ -69,11 +72,11 @@ public class AiService {
     public String chat(Long familyId, List<Map<String, String>> messages, Double temperature) {
         FamilyAiConfigService.Chain chain = familyAiConfigService.resolveChain(familyId, AiConst.FEATURE_CHAT);
         try {
-            return doChat(chain.primary(), messages, false, temperature);
+            return doChat(familyId, AiConst.FEATURE_CHAT, chain.primary(), messages, false, temperature);
         } catch (RuntimeException e) {
             if (chain.hasFallback()) {
                 log.warn("[AI对话] 主模型失败,回退兜底模型 err={}", e.getMessage());
-                return doChat(chain.fallback(), messages, false, temperature);
+                return doChat(familyId, AiConst.FEATURE_CHAT, chain.fallback(), messages, false, temperature);
             }
             throw e;
         }
@@ -84,34 +87,39 @@ public class AiService {
         List<Map<String, String>> messages = new ArrayList<>();
         messages.add(message("system", systemPrompt));
         messages.add(message("user", userContent));
-        return parseJson(doChat(familyAiConfigService.resolveForFeature(familyId, featureCode), messages, true, null));
+        return parseJson(doChat(familyId, featureCode,
+                familyAiConfigService.resolveForFeature(familyId, featureCode), messages, true, null));
     }
 
     /** 单轮问答并解析 JSON 回复:显式指定模型配置(找物/放物用兜底模型时传 fallback 配置) */
-    public JsonNode chatJson(FamilyAiConfigService.AiConfig c, String systemPrompt, String userContent) {
+    public JsonNode chatJson(Long familyId, String featureCode, FamilyAiConfigService.AiConfig c,
+                             String systemPrompt, String userContent) {
         List<Map<String, String>> messages = new ArrayList<>();
         messages.add(message("system", systemPrompt));
         messages.add(message("user", userContent));
-        return parseJson(doChat(c, messages, true, null));
+        return parseJson(doChat(familyId, featureCode, c, messages, true, null));
     }
 
-    private String doChat(FamilyAiConfigService.AiConfig c, List<Map<String, String>> messages,
-                          boolean jsonMode, Double temperature) {
+    private String doChat(Long familyId, String featureCode, FamilyAiConfigService.AiConfig c,
+                          List<Map<String, String>> messages, boolean jsonMode, Double temperature) {
         if (c == null || !notBlank(c.baseUrl()) || !notBlank(c.apiKey()) || !notBlank(c.model())) {
             throw new BizException(ResultCode.BAD_REQUEST, "AI 服务未配置,请家长在设置-家庭 AI 配置中填写");
         }
-        String url = stripTrailingSlash(c.baseUrl()) + "/chat/completions";
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", c.model().trim());
-        body.put("messages", messages);
-        body.put("temperature", temperature == null ? 0.2 : temperature);
-        if (jsonMode) {
-            body.put("response_format", Map.of("type", "json_object"));
-        }
-        Map<String, String> headers = Map.of(
-                "Content-Type", "application/json",
-                "Authorization", "Bearer " + decryptIfEnc(c.apiKey()));
+        long t0 = System.currentTimeMillis();
+        boolean success = false;
+        String errorMsg = null;
         try {
+            String url = stripTrailingSlash(c.baseUrl()) + "/chat/completions";
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("model", c.model().trim());
+            body.put("messages", messages);
+            body.put("temperature", temperature == null ? 0.2 : temperature);
+            if (jsonMode) {
+                body.put("response_format", Map.of("type", "json_object"));
+            }
+            Map<String, String> headers = Map.of(
+                    "Content-Type", "application/json",
+                    "Authorization", "Bearer " + decryptIfEnc(c.apiKey()));
             ThirdPartyHttp.Resp resp = ThirdPartyHttp.request("ai", "POST", url, headers,
                     mapper.writeValueAsBytes(body), c.timeoutMs());
             // 部分兼容端点不支持 response_format,400 且报文提到该字段时去掉重试一次
@@ -129,11 +137,17 @@ public class AiService {
             if (!content.isTextual() || content.asText().isBlank()) {
                 throw new BizException(ResultCode.INTERNAL_ERROR, "AI 返回内容为空");
             }
+            success = true;
             return content.asText();
         } catch (BizException e) {
+            errorMsg = e.getMessage();
             throw e;
         } catch (Exception e) {
+            errorMsg = e.getMessage();
             throw new BizException(ResultCode.INTERNAL_ERROR, "AI 服务调用失败:" + e.getMessage());
+        } finally {
+            logCall(familyId, featureCode, c, success ? "SUCCESS" : "FAIL",
+                    (int) (System.currentTimeMillis() - t0), errorMsg);
         }
     }
 
@@ -163,75 +177,78 @@ public class AiService {
     public List<Map<String, Object>> images(Long familyId, String featureCode, AiImageDTO dto) {
         FamilyAiConfigService.Chain chain = familyAiConfigService.resolveChain(familyId, featureCode);
         try {
-            return doImages(chain.primary(), dto);
+            return doImages(familyId, featureCode, chain.primary(), dto);
         } catch (RuntimeException e) {
             if (chain.hasFallback()) {
                 log.warn("[AI图片] 主模型失败,回退兜底模型 err={}", e.getMessage());
-                return doImages(chain.fallback(), dto);
+                return doImages(familyId, featureCode, chain.fallback(), dto);
             }
             throw e;
         }
     }
 
-    private List<Map<String, Object>> doImages(FamilyAiConfigService.AiConfig c, AiImageDTO dto) {
+    private List<Map<String, Object>> doImages(Long familyId, String featureCode, FamilyAiConfigService.AiConfig c, AiImageDTO dto) {
         if (c == null || !notBlank(c.baseUrl()) || !notBlank(c.apiKey()) || !notBlank(c.model())) {
             throw new BizException(ResultCode.BAD_REQUEST, "AI 图片生成未配置,请家长在设置-家庭 AI 配置中填写");
         }
         requireText(dto.getPrompt(), "请填写图片描述");
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", c.model().trim());
-        body.put("prompt", dto.getPrompt().trim());
-        // Seedream 5.0 pro 不支持组图(sequential_image_generation)且仅出单图;强制单图,
-        // 不传组图字段、n 恒为 1——避免把 lite 的组图/多图规则套到 pro 上被方舟拒绝
-        boolean pro = detectImageEngine(c) == ImageEngine.SEEDREAM_PRO;
-        // 组图模式由 sequential_image_generation 驱动,此时不再传 n(避免两者语义冲突)
-        boolean groupMode = !pro && "auto".equals(dto.getSequentialMode());
-        if (groupMode) {
-            body.put("sequential_image_generation", "auto");
-            Map<String, Object> seqOpts = new LinkedHashMap<>();
-            int maxImages = dto.getSequentialMaxImages() == null ? 4 : dto.getSequentialMaxImages();
-            seqOpts.put("max_images", Math.min(Math.max(maxImages, 1), 10));
-            body.put("sequential_image_generation_options", seqOpts);
-        } else {
-            int n;
-            if (pro) {
-                n = 1;
-            } else {
-                n = dto.getN() == null || dto.getN() < 1 ? 1 : Math.min(dto.getN(), 4);
-            }
-            body.put("n", n);
-        }
-        if (dto.getImageUrls() != null && !dto.getImageUrls().isEmpty()) {
-            List<String> refs = dto.getImageUrls().stream()
-                    .filter(s -> s != null && !s.isBlank())
-                    .limit(10)
-                    .toList();
-            if (!refs.isEmpty()) {
-                body.put("image", refs.size() == 1 ? refs.get(0) : refs);
-            }
-        }
-        if (notBlank(dto.getSize())) {
-            body.put("size", adaptImageSize(dto.getSize().trim(), pro));
-        }
-        // 可选参数:仅在前端显式给出时透传(null=用模型默认,不进请求体)
-        if (dto.getSeed() != null && dto.getSeed() >= 0) {
-            body.put("seed", Math.min(dto.getSeed(), 2147483647L));
-        }
-        if (dto.getGuidanceScale() != null) {
-            body.put("guidance_scale", Math.min(Math.max(dto.getGuidanceScale(), 1.0), 10.0));
-        }
-        if (dto.getWatermark() != null) {
-            body.put("watermark", dto.getWatermark());
-        }
-        // 透明背景抠图(Seedream 5.0 pro):background=transparent,须配合 image 输入(PNG 且含透明像素)
-        if (notBlank(dto.getBackground())) {
-            body.put("background", dto.getBackground());
-        }
-        body.put("response_format", "b64_json".equals(dto.getResponseFormat()) ? "b64_json" : "url");
-        Map<String, String> headers = Map.of(
-                "Content-Type", "application/json",
-                "Authorization", "Bearer " + decryptIfEnc(c.apiKey()));
+        long t0 = System.currentTimeMillis();
+        boolean success = false;
+        String errorMsg = null;
         try {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("model", c.model().trim());
+            body.put("prompt", dto.getPrompt().trim());
+            // Seedream 5.0 pro 不支持组图(sequential_image_generation)且仅出单图;强制单图,
+            // 不传组图字段、n 恒为 1——避免把 lite 的组图/多图规则套到 pro 上被方舟拒绝
+            boolean pro = detectImageEngine(c) == ImageEngine.SEEDREAM_PRO;
+            // 组图模式由 sequential_image_generation 驱动,此时不再传 n(避免两者语义冲突)
+            boolean groupMode = !pro && "auto".equals(dto.getSequentialMode());
+            if (groupMode) {
+                body.put("sequential_image_generation", "auto");
+                Map<String, Object> seqOpts = new LinkedHashMap<>();
+                int maxImages = dto.getSequentialMaxImages() == null ? 4 : dto.getSequentialMaxImages();
+                seqOpts.put("max_images", Math.min(Math.max(maxImages, 1), 10));
+                body.put("sequential_image_generation_options", seqOpts);
+            } else {
+                int n;
+                if (pro) {
+                    n = 1;
+                } else {
+                    n = dto.getN() == null || dto.getN() < 1 ? 1 : Math.min(dto.getN(), 4);
+                }
+                body.put("n", n);
+            }
+            if (dto.getImageUrls() != null && !dto.getImageUrls().isEmpty()) {
+                List<String> refs = dto.getImageUrls().stream()
+                        .filter(s -> s != null && !s.isBlank())
+                        .limit(10)
+                        .toList();
+                if (!refs.isEmpty()) {
+                    body.put("image", refs.size() == 1 ? refs.get(0) : refs);
+                }
+            }
+            if (notBlank(dto.getSize())) {
+                body.put("size", adaptImageSize(dto.getSize().trim(), pro));
+            }
+            // 可选参数:仅在前端显式给出时透传(null=用模型默认,不进请求体)
+            if (dto.getSeed() != null && dto.getSeed() >= 0) {
+                body.put("seed", Math.min(dto.getSeed(), 2147483647L));
+            }
+            if (dto.getGuidanceScale() != null) {
+                body.put("guidance_scale", Math.min(Math.max(dto.getGuidanceScale(), 1.0), 10.0));
+            }
+            if (dto.getWatermark() != null) {
+                body.put("watermark", dto.getWatermark());
+            }
+            // 透明背景抠图(Seedream 5.0 pro):background=transparent,须配合 image 输入(PNG 且含透明像素)
+            if (notBlank(dto.getBackground())) {
+                body.put("background", dto.getBackground());
+            }
+            body.put("response_format", "b64_json".equals(dto.getResponseFormat()) ? "b64_json" : "url");
+            Map<String, String> headers = Map.of(
+                    "Content-Type", "application/json",
+                    "Authorization", "Bearer " + decryptIfEnc(c.apiKey()));
             String url = stripTrailingSlash(c.baseUrl()) + "/images/generations";
             ThirdPartyHttp.Resp resp = ThirdPartyHttp.request("ai", "POST", url, headers,
                     mapper.writeValueAsBytes(body), c.timeoutMs());
@@ -253,11 +270,17 @@ public class AiService {
             for (JsonNode item : data) {
                 out.add(mapper.convertValue(item, MAP_TYPE));
             }
+            success = true;
             return out;
         } catch (BizException e) {
+            errorMsg = e.getMessage();
             throw e;
         } catch (Exception e) {
+            errorMsg = e.getMessage();
             throw new BizException(ResultCode.INTERNAL_ERROR, "AI 图片生成调用失败:" + e.getMessage());
+        } finally {
+            logCall(familyId, featureCode, c, success ? "SUCCESS" : "FAIL",
+                    (int) (System.currentTimeMillis() - t0), errorMsg);
         }
     }
 
@@ -326,12 +349,34 @@ public class AiService {
 
     private Map<String, Object> doTranscribe(FamilyAiConfigService.AiConfig c, Long familyId, byte[] audio,
                                              String filename, String mimeType, String language, Integer rate) {
-        if (c != null && AiConst.PROVIDER_BAIDU.equals(c.provider())) {
-            return transcribeBaidu(c, familyId, audio, filename, rate);
-        }
-        if (c == null || !notBlank(c.baseUrl()) || !notBlank(c.apiKey()) || !notBlank(c.model())) {
+        boolean baidu = c != null && AiConst.PROVIDER_BAIDU.equals(c.provider());
+        if (!baidu && (c == null || !notBlank(c.baseUrl()) || !notBlank(c.apiKey()) || !notBlank(c.model()))) {
             throw new BizException(ResultCode.BAD_REQUEST, "AI 语音识别未配置,请家长在设置-家庭 AI 配置中填写");
         }
+        long t0 = System.currentTimeMillis();
+        boolean success = false;
+        String errorMsg = null;
+        try {
+            Map<String, Object> out = baidu
+                    ? transcribeBaidu(c, familyId, audio, filename, rate)
+                    : transcribeOpenAi(c, audio, filename, mimeType, language, rate);
+            success = true;
+            return out;
+        } catch (BizException e) {
+            errorMsg = e.getMessage();
+            throw e;
+        } catch (Exception e) {
+            errorMsg = e.getMessage();
+            throw new BizException(ResultCode.INTERNAL_ERROR, "AI 语音识别调用失败:" + e.getMessage());
+        } finally {
+            logCall(familyId, AiConst.FEATURE_ASR, c, success ? "SUCCESS" : "FAIL",
+                    (int) (System.currentTimeMillis() - t0), errorMsg);
+        }
+    }
+
+    /** OpenAI 兼容语音识别:multipart(/audio/transcriptions) */
+    private Map<String, Object> transcribeOpenAi(FamilyAiConfigService.AiConfig c, byte[] audio,
+                                                 String filename, String mimeType, String language, Integer rate) throws Exception {
         if (audio == null || audio.length == 0) {
             throw new BizException(ResultCode.BAD_REQUEST, "请上传音频文件");
         }
@@ -344,24 +389,18 @@ public class AiService {
         Map<String, String> headers = Map.of(
                 "Content-Type", "multipart/form-data; boundary=" + boundary,
                 "Authorization", "Bearer " + decryptIfEnc(c.apiKey()));
-        try {
-            byte[] body = multipart(boundary, fields, "file",
-                    filename == null || filename.isBlank() ? "audio.wav" : filename, mimeType, audio);
-            String url = stripTrailingSlash(c.baseUrl()) + "/audio/transcriptions";
-            ThirdPartyHttp.Resp resp = ThirdPartyHttp.request("ai", "POST", url, headers, body, c.timeoutMs());
-            if (!resp.ok()) {
-                throw new BizException(ResultCode.INTERNAL_ERROR,
-                        "AI 语音识别返回异常(" + resp.status() + "):" + truncate(resp.body(), 200));
-            }
-            String text = mapper.readTree(resp.body()).path("text").asText("");
-            Map<String, Object> out = new LinkedHashMap<>();
-            out.put("text", text);
-            return out;
-        } catch (BizException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new BizException(ResultCode.INTERNAL_ERROR, "AI 语音识别调用失败:" + e.getMessage());
+        byte[] body = multipart(boundary, fields, "file",
+                filename == null || filename.isBlank() ? "audio.wav" : filename, mimeType, audio);
+        String url = stripTrailingSlash(c.baseUrl()) + "/audio/transcriptions";
+        ThirdPartyHttp.Resp resp = ThirdPartyHttp.request("ai", "POST", url, headers, body, c.timeoutMs());
+        if (!resp.ok()) {
+            throw new BizException(ResultCode.INTERNAL_ERROR,
+                    "AI 语音识别返回异常(" + resp.status() + "):" + truncate(resp.body(), 200));
         }
+        String text = mapper.readTree(resp.body()).path("text").asText("");
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("text", text);
+        return out;
     }
 
     /** 百度短语音识别:access_token 由 BaiduAsrClient 缓存换取;format 按扩展名推断,rate 缺省 16000 */
@@ -434,6 +473,26 @@ public class AiService {
             return parameterService.decrypt(v);
         }
         return v;
+    }
+
+    /** 记录 AI 调用日志(report_ai):同步落库,失败不影响主流程(同 QWeatherProvider.logCall 套路)。 */
+    private void logCall(Long familyId, String featureCode, FamilyAiConfigService.AiConfig c,
+                         String status, int costMs, String errorMsg) {
+        try {
+            AiLog entry = new AiLog();
+            entry.setFamilyId(familyId);
+            entry.setFeatureCode(featureCode);
+            entry.setModel(c == null ? null : c.model());
+            entry.setProvider(c == null ? null : c.provider());
+            entry.setStatus(status);
+            entry.setCostMs(costMs);
+            if (errorMsg != null) {
+                entry.setErrorMsg(errorMsg.length() > 500 ? errorMsg.substring(0, 500) : errorMsg);
+            }
+            aiLogMapper.insert(entry);
+        } catch (Exception e) {
+            log.error("[AI调用日志] 落库失败 feature={} family={}", featureCode, familyId, e);
+        }
     }
 
     private Map<String, String> message(String role, String content) {

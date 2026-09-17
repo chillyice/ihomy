@@ -346,14 +346,14 @@ CREATE TABLE `family_notification` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='消息通知表';
 
 -- ------------------------------------------------------------
--- 15. sys_operation_log 系统操作日志表
+-- 15. report_system 系统报表表(操作日志)
 --     AOP 切面自动写入，append-only，不可修改/删除
 --     operation_type: LOGIN/LOGOUT/CREATE/UPDATE/DELETE/CONFIG
 --     module:         AUTH/BLOG/DIARY/ALBUM/PHOTO/USER/COMMENT/HOME
 --     result_status:  0 失败 / 1 成功
 -- ------------------------------------------------------------
-DROP TABLE IF EXISTS `sys_operation_log`;
-CREATE TABLE `sys_operation_log` (
+DROP TABLE IF EXISTS `report_system`;
+CREATE TABLE `report_system` (
   `id`              BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
   `operator_id`     BIGINT        DEFAULT NULL COMMENT '操作人ID（匿名操作为空，如登录失败）',
   `operator_name`   VARCHAR(50)   DEFAULT NULL COMMENT '操作人用户名',
@@ -373,7 +373,7 @@ CREATE TABLE `sys_operation_log` (
   KEY `idx_operator` (`operator_id`),
   KEY `idx_created`  (`created_at`),
   KEY `idx_type`     (`operation_type`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统操作日志表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统报表表(操作日志)';
 
 -- ============================================================
 -- 内容类 (content_) — 共 6 张表
@@ -1462,11 +1462,11 @@ INSERT INTO `sys_weather_credential` (`env`, `name`, `provider`, `api_host`, `pr
  NULL, NULL, 0, '占位示例,部署后替换为真实凭证并 UPDATE status=1');
 
 -- ------------------------------------------------------------
--- 48. 和风天气 API 调用日志(V5.6):每次 callApi 记录一条
+-- 48. 天气 API 调用日志(report_weather):每次 callApi 记录一条
 --     天气数据本身公开,记录无泄露风险;不记录 JWT/凭证/quota 响应(可能含账号信息)
 -- ------------------------------------------------------------
-DROP TABLE IF EXISTS `sys_weather_log`;
-CREATE TABLE `sys_weather_log` (
+DROP TABLE IF EXISTS `report_weather`;
+CREATE TABLE `report_weather` (
   `id`           BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
   `api_type`     VARCHAR(20)  NOT NULL COMMENT '接口类型(now/forecast/warning/indices/air/minutely/location/quota)',
   `location_id`  VARCHAR(20)  DEFAULT NULL COMMENT '城市ID(和风 location 参数)',
@@ -1477,7 +1477,27 @@ CREATE TABLE `sys_weather_log` (
   `created_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '调用时间',
   PRIMARY KEY (`id`),
   KEY `idx_type_time` (`api_type`, `created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='和风天气 API 调用日志';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='天气 API 调用日志';
+
+-- ------------------------------------------------------------
+-- 48b. report_ai 家庭 AI 调用日志(V9.72):每次 AI 调用记录一条
+--      feature_code: ITEM_FIND/ITEM_PUT/CHAT/IMAGE/WEATHER_IMAGE/ASR
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `report_ai`;
+CREATE TABLE `report_ai` (
+  `id`            BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`     BIGINT       NOT NULL COMMENT '家庭ID',
+  `feature_code`  VARCHAR(30)  NOT NULL COMMENT '功能:ITEM_FIND/ITEM_PUT/CHAT/IMAGE/WEATHER_IMAGE/ASR',
+  `model`         VARCHAR(100) DEFAULT NULL COMMENT '模型标识(真实模型名)',
+  `provider`      VARCHAR(20)  DEFAULT NULL COMMENT '服务商:OPENAI/BAIDU',
+  `status`        VARCHAR(10)  NOT NULL COMMENT 'SUCCESS/FAIL',
+  `cost_ms`       INT          DEFAULT NULL COMMENT '耗时(毫秒)',
+  `error_msg`     VARCHAR(500) DEFAULT NULL COMMENT '失败原因',
+  `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '调用时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family_time` (`family_id`, `created_at`),
+  KEY `idx_family_feature` (`family_id`, `feature_code`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭 AI 调用日志';
 
 -- ------------------------------------------------------------
 -- 49. 系统参数表(V5.6续):name/value 键值对,存 AES 加密盐值等

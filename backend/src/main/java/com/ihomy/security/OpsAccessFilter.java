@@ -48,8 +48,8 @@ public class OpsAccessFilter extends OncePerRequestFilter {
                 deny(response);
                 return;
             }
-            // 非 OPS 角色访问运维路径,且没有系统级 OPS 绑定 → 403
-            if (!isPureOps && opsPath && !hasOpsRole) {
+            // 非 OPS 角色访问运维路径:白名单子路径(AI 统计/天气本地统计)放行,其余须系统级 OPS 绑定
+            if (!isPureOps && opsPath && !isOpsWhitelisted(request) && !hasOpsRole) {
                 deny(response);
                 return;
             }
@@ -77,6 +77,18 @@ public class OpsAccessFilter extends OncePerRequestFilter {
     /** 是否为运维接口路径(含 context-path=/api 前缀) */
     private boolean isOpsPath(HttpServletRequest request) {
         return request.getRequestURI().startsWith("/api/ops");
+    }
+
+    /**
+     * 非 OPS 角色可访问的运维白名单子路径:AI 统计全部 + 天气本地统计(趋势/类型占比/本月配额)。
+     * 放行后角色校验仍由接口 @RequirePermission(family:manage) 兜底。
+     */
+    private boolean isOpsWhitelisted(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path.startsWith("/api/ops/ai/")
+                || path.equals("/api/ops/weather/timeline")
+                || path.equals("/api/ops/weather/type-distribution")
+                || path.equals("/api/ops/weather/quota");
     }
 
     /** 放行路径:运维接口、认证接口、预检请求 */

@@ -32,7 +32,7 @@ const router = useRouter()
 const appStore = useAppStore()
 const userStore = useUserStore()
 
-const groups = computed(() => buildNavGroups(appStore.modules, { hasOps: userStore.hasPerm('ops:view') }))
+const groups = computed(() => buildNavGroups(appStore.modules, { hasOps: userStore.isOps || userStore.isOwner }))
 
 const navigate = (path) => router.push(path)
 </script>

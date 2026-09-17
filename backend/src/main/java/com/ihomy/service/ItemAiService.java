@@ -109,7 +109,7 @@ public class ItemAiService {
         boolean aiParsed = true;
         JsonNode plan = null;
         try {
-            plan = aiService.chatJson(cfg, FIND_SYSTEM_PROMPT, "用户找物描述:" + q);
+            plan = aiService.chatJson(familyId, AiConst.FEATURE_ITEM_FIND, cfg, FIND_SYSTEM_PROMPT, "用户找物描述:" + q);
         } catch (Exception e) {
             aiParsed = false;
             log.warn("[AI找物] AI 解析不可用,回退原文关键词 family={} query={}", familyId, q);
@@ -203,7 +203,7 @@ public class ItemAiService {
 
     /** LLM 放物兜底:解析五级粒度目标(防编造),再走统一落库 */
     private Map<String, Object> llmPut(Long userId, Long familyId, String q, FamilyAiConfigService.AiConfig cfg) {
-        JsonNode plan = aiService.chatJson(cfg, putSystemPrompt(),
+        JsonNode plan = aiService.chatJson(familyId, AiConst.FEATURE_ITEM_PUT, cfg, putSystemPrompt(),
                 "家庭上下文清单:\n" + toJson(buildContext(familyId)) + "\n\n用户描述:" + q);
 
         String name = plan.path("name").asText("").trim();

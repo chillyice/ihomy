@@ -222,6 +222,15 @@ html.theme-warm .gc-pin .fp-topbar {
   padding: 8px 12px !important;
   flex-wrap: nowrap;
 }
+/* 小游戏页顶栏(返回+全屏):容器 + 右对齐工具按钮(全局,供 PetLinkLink/FlashPlayer 共用) */
+.game-top-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+html.theme-warm .gc-pin .game-topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px !important;
+  flex-wrap: nowrap;
+}
 html.theme-warm .gc-main:has(.fp-page) { padding: 0; }
 html.theme-warm .fp-page { height: 100%; padding: 0; }
 html.theme-warm .fp-main { border-radius: 0; }

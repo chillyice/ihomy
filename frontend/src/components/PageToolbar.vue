@@ -69,4 +69,6 @@ watch(pinned, (val) => {
 .toolbar-holder { overflow: hidden; }
 /* 物品定位顶栏容器样式(原 Item.vue scoped,Teleport 后元素带 PageToolbar data-v,需在此定义) */
 .fp-topbar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; }
+/* 小游戏页顶栏容器样式(返回+全屏,与物品定位 .fp-topbar 同构) */
+.game-topbar { display: flex; align-items: center; gap: 12px; padding: 10px 16px; }
 </style>

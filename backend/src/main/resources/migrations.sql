@@ -1145,3 +1145,35 @@ INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`,
 ('Nextcloud', 'SERVICE', 'nextcloud/server', NULL, 'AGPL-3.0', 'https://github.com/nextcloud/server', 'WebDAV/Nextcloud 存储后端', 'PARTIAL'),
 ('Jellyfin', 'SERVICE', 'jellyfin/jellyfin', NULL, 'GPL-2.0', 'https://github.com/jellyfin/jellyfin', '放映厅媒体引擎(规划)', 'PLANNED'),
 ('Home Assistant', 'SERVICE', 'home-assistant/core', NULL, 'Apache-2.0', 'https://github.com/home-assistant/core', '智能家居中控(规划)', 'PLANNED');
+
+-- 2026-09-17 V9.72 报表表前缀规范化(report_) + AI 调用统计:
+--   新增 report_ai(家庭 AI 调用日志);重命名 sys_weather_log→report_weather、sys_operation_log→report_system
+--   (RENAME 用 information_schema 守卫,旧表不存在则跳过,幂等且保留数据)
+-- 一、新增 report_ai
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `report_ai` (
+  `id`            BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`     BIGINT       NOT NULL COMMENT '家庭ID',
+  `feature_code`  VARCHAR(30)  NOT NULL COMMENT '功能:ITEM_FIND/ITEM_PUT/CHAT/IMAGE/WEATHER_IMAGE/ASR',
+  `model`         VARCHAR(100) DEFAULT NULL COMMENT '模型标识(真实模型名)',
+  `provider`      VARCHAR(20)  DEFAULT NULL COMMENT '服务商:OPENAI/BAIDU',
+  `status`        VARCHAR(10)  NOT NULL COMMENT 'SUCCESS/FAIL',
+  `cost_ms`       INT          DEFAULT NULL COMMENT '耗时(毫秒)',
+  `error_msg`     VARCHAR(500) DEFAULT NULL COMMENT '失败原因',
+  `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '调用时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family_time` (`family_id`, `created_at`),
+  KEY `idx_family_feature` (`family_id`, `feature_code`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭 AI 调用日志';
+
+-- 二、重命名天气日志表 → report_weather(旧表存在才执行)
+-- ------------------------------------------------------------
+SET @tbl := (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'sys_weather_log');
+SET @sql := IF(@tbl > 0, 'RENAME TABLE `sys_weather_log` TO `report_weather`', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 三、重命名系统操作日志表 → report_system(旧表存在才执行)
+-- ------------------------------------------------------------
+SET @tbl := (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'sys_operation_log');
+SET @sql := IF(@tbl > 0, 'RENAME TABLE `sys_operation_log` TO `report_system`', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

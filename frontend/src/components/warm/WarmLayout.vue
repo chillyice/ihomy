@@ -154,7 +154,7 @@ const toggleGroup = (key) => {
 
 // 导航分组:复用共享单一数据源(NAV_PATHS + 分组规则),仅注入暖居特有的拖拽标记
 const navGroups = computed(() => {
-  const items = buildNavItems(appStore.modules, { hasOps: userStore.hasPerm('ops:view') })
+  const items = buildNavItems(appStore.modules, { hasOps: userStore.isOps || userStore.isOwner })
     .map((m) => {
       const draggable = m.code !== 'settings' && m.code !== 'ops'
       return { ...m, draggable, added: draggable ? addedCodes.value.has(m.code) : false }

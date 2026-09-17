@@ -1,7 +1,19 @@
 <!-- Flash 播放器(Ruffle):本地加载 .swf(不托管/不分发)或按 src 加载已导入的游戏;支持全屏。 -->
 <template>
   <div class="page">
-    <Breadcrumb :items="breadcrumb" />
+    <!-- 顶栏:返回 + 全屏(工具按钮统一进顶栏,与物品定位一致) -->
+    <PageToolbar root-class="game-topbar" :holder-margin="0" always>
+      <div class="game-top-actions">
+        <el-button v-if="backTo" size="small" round @click="router.push(backTo)">
+          <el-icon><ArrowLeft /></el-icon>
+          {{ $t('tools.flash.back') }}
+        </el-button>
+        <el-button v-if="fileName || src" size="small" round @click="toggleFullscreen">
+          <el-icon><FullScreen /></el-icon>
+          {{ isFullscreen ? $t('tools.flash.exitFullscreen') : $t('tools.flash.fullscreen') }}
+        </el-button>
+      </div>
+    </PageToolbar>
 
     <div class="flash-card card">
       <!-- 本地模式:拖拽/点击选择 .swf -->
@@ -22,16 +34,8 @@
       <!-- 已加载:播放器 + 操作条 -->
       <template v-else>
         <div class="flash-bar">
-          <el-button v-if="backTo" size="small" round @click="$router.push(backTo)">
-            <el-icon><ArrowLeft /></el-icon>
-            {{ $t('tools.flash.back') }}
-          </el-button>
           <span class="flash-name">{{ fileName }}</span>
           <el-button v-if="!src" size="small" round @click="pick">{{ $t('tools.flash.reselect') }}</el-button>
-          <el-button size="small" round @click="toggleFullscreen">
-            <el-icon><FullScreen /></el-icon>
-            {{ isFullscreen ? $t('tools.flash.exitFullscreen') : $t('tools.flash.fullscreen') }}
-          </el-button>
           <el-button v-if="!src" size="small" round text type="danger" @click="close">{{ $t('tools.flash.close') }}</el-button>
         </div>
         <div ref="stage" class="flash-stage">
@@ -50,19 +54,18 @@
 <script setup>
 // Flash 播放器:动态加载 /ruffle/ruffle.js(Ruffle 自托管运行时)。
 // 无 src 时为本地模式(Blob URL 播放本地 .swf);有 src 时直接按 URL 播放已导入的游戏。支持浏览器原生全屏。
-import { ref, computed, onMounted, onBeforeUnmount, nextTick, inject } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { FullScreen, ArrowLeft } from '@element-plus/icons-vue'
-import Breadcrumb from '@/components/Breadcrumb.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
 import { loadRuffle } from '@/utils/ruffle'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 
 const props = defineProps({
   src: { type: String, default: '' },
   title: { type: String, default: '' },
-  breadcrumb: { type: Array, default: null },
   backTo: { type: String, default: '' },
 })
 
@@ -80,8 +83,6 @@ const isFullscreen = ref(false)
 
 let player = null
 let objectUrl = null
-
-const breadcrumb = computed(() => props.breadcrumb || [{ label: t('tools.title') }, { label: t('tools.flash.title') }])
 
 const pick = () => fileInput.value?.click()
 

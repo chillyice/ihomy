@@ -5,7 +5,7 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('ops.log') }]" />
     <el-tabs v-model="tab">
-      <el-tab-pane :label="$t('ops.overview')" name="stats">
+      <el-tab-pane v-if="showSystemTabs" :label="$t('ops.overview')" name="stats">
         <div class="filter-row">
           <el-date-picker v-model="filter.startDate" type="date" value-format="YYYY-MM-DD" :placeholder="$t('ops.startDate')" />
           <el-date-picker v-model="filter.endDate" type="date" value-format="YYYY-MM-DD" :placeholder="$t('ops.endDate')" />
@@ -22,7 +22,7 @@
         </div>
       </el-tab-pane>
 
-      <el-tab-pane :label="$t('ops.server')" name="server">
+      <el-tab-pane v-if="showSystemTabs" :label="$t('ops.server')" name="server">
         <div v-loading="serverLoading">
           <el-alert type="info" :closable="false" show-icon style="margin-bottom: 14px"
             :title="$t('ops.alertText')" />
@@ -54,7 +54,7 @@
         </div>
       </el-tab-pane>
 
-      <el-tab-pane :label="$t('ops.traffic')" name="traffic">
+      <el-tab-pane v-if="showSystemTabs" :label="$t('ops.traffic')" name="traffic">
         <div class="filter-row">
           <el-date-picker v-model="trafficFilter.startDate" type="date" value-format="YYYY-MM-DD" :placeholder="$t('ops.startDate')" />
           <el-date-picker v-model="trafficFilter.endDate" type="date" value-format="YYYY-MM-DD" :placeholder="$t('ops.endDate')" />
@@ -100,7 +100,7 @@
         </div>
       </el-tab-pane>
 
-      <el-tab-pane :label="$t('ops.logs')" name="logs">
+      <el-tab-pane v-if="showSystemTabs" :label="$t('ops.logs')" name="logs">
         <div class="filter-row">
           <el-input v-model="logFilter.keyword" :placeholder="$t('ops.logKeyword')" clearable style="width: 200px" @keyup.enter="loadLogs(1)" />
           <el-input v-model.number="logFilter.operatorId" :placeholder="$t('ops.operatorId')" style="width: 130px" />
@@ -147,7 +147,7 @@
           layout="total, sizes, prev, pager, next" style="margin-top: 14px; justify-content: flex-end" @current-change="loadLogs" @size-change="loadLogs(1)" />
       </el-tab-pane>
 
-      <el-tab-pane :label="$t('ops.traceLogs')" name="trace">
+      <el-tab-pane v-if="showSystemTabs" :label="$t('ops.traceLogs')" name="trace">
         <div class="filter-row">
           <el-input v-model="traceFilter.tid" :placeholder="$t('ops.tidPlaceholder')" clearable style="width: 320px" @keyup.enter="loadTrace" />
           <el-date-picker v-model="traceFilter.date" type="date" value-format="YYYY-MM-DD" :placeholder="$t('ops.traceDate')" />
@@ -179,6 +179,81 @@
             </div>
             <pre class="trace-msg">{{ e.message }}</pre>
           </div>
+        </div>
+      </el-tab-pane>
+
+      <el-tab-pane :label="$t('ops.ai')" name="ai">
+        <div v-loading="aiLoading">
+          <!-- 汇总卡:总调用/失败/成功率 -->
+          <div class="quota-grid">
+            <div class="finance-card">
+              <div class="finance-label">{{ $t('ops.aiTotalCalls') }}</div>
+              <div class="finance-value">{{ aiSummary?.total ?? '-' }}</div>
+            </div>
+            <div class="finance-card">
+              <div class="finance-label">{{ $t('ops.aiFailed') }}</div>
+              <div class="finance-value">{{ aiSummary?.failed ?? '-' }}</div>
+            </div>
+            <div class="finance-card">
+              <div class="finance-label">{{ $t('ops.aiSuccessRate') }}</div>
+              <div class="finance-value">{{ aiSummary ? aiSummary.successRate + '%' : '-' }}</div>
+            </div>
+          </div>
+          <!-- 调用趋势 + 功能占比 -->
+          <div class="filter-row section-gap">
+            <el-radio-group v-model="aiRange" size="small" @change="loadAiTimeline">
+              <el-radio-button value="24h">{{ $t('ops.weather24h') }}</el-radio-button>
+              <el-radio-button value="month">{{ $t('ops.weatherMonth') }}</el-radio-button>
+              <el-radio-button value="30d">{{ $t('ops.weather30d') }}</el-radio-button>
+              <el-radio-button value="year">{{ $t('ops.weatherYear') }}</el-radio-button>
+            </el-radio-group>
+            <el-select v-model="aiFeatures" multiple filterable clearable collapse-tags collapse-tags-tooltip
+              :placeholder="$t('ops.aiFeatureFilter')" style="width: 240px" @change="loadAiTimeline">
+              <el-option v-for="f in AI_FEATURES" :key="f" :value="f" :label="$t('ops.aiFeature.' + f)" />
+            </el-select>
+          </div>
+          <div v-if="aiTimelineData.length || aiPieSlices.length" class="charts-row">
+            <div class="chart-wrap chart-hover-wrap" style="flex: 1.6">
+              <div class="chart-summary">
+                <span>{{ $t('ops.aiTotalCalls') }} <b>{{ aiTimelineTotal }}</b></span>
+                <span>{{ $t('ops.aiFailed') }} <b :class="{ 'fail-num': aiTimelineFailed > 0 }">{{ aiTimelineFailed }}</b></span>
+                <span>{{ $t('ops.weatherFailRate') }} <b>{{ aiTimelineFailRate }}%</b></span>
+              </div>
+              <svg :viewBox="`0 0 ${chartW} ${chartH}`" class="line-chart">
+                <line v-for="(t, i) in aiYTicks" :key="'aigrid'+i" :x1="padL" :x2="chartW - padR" :y1="t.y" :y2="t.y" stroke="var(--color-border)" stroke-width="1" stroke-dasharray="3 3" />
+                <text v-for="(t, i) in aiYTicks" :key="'aiyl'+i" :x="padL - 8" :y="t.y + 4" text-anchor="end" fill="var(--color-text-secondary)" font-size="11">{{ t.label }}</text>
+                <text v-for="(lb, i) in aiXLabels" :key="'aixl'+i" :x="lb.x" :y="chartH - padB + 16" text-anchor="middle" fill="var(--color-text-secondary)" font-size="11">{{ lb.label }}</text>
+                <polyline :points="aiLinePoints(aiTimelineData.map(d => d.total))" fill="none" stroke="#b88c6e" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+                <polyline :points="aiLinePoints(aiTimelineData.map(d => d.failed))" fill="none" stroke="#b04a3a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+                <rect v-for="(d, i) in aiTimelineData" :key="'aihv'+i" :x="aiXPos(i) - aiHoverColW / 2" :y="padT"
+                  :width="aiHoverColW" :height="chartH - padB - padT" fill="transparent"
+                  @mouseenter="aiHoverIdx = i" @mouseleave="aiHoverIdx = -1" />
+                <line v-if="aiHoverIdx >= 0 && aiTimelineData[aiHoverIdx]" :x1="aiXPos(aiHoverIdx)" :x2="aiXPos(aiHoverIdx)"
+                  :y1="padT" :y2="chartH - padB" stroke="#b88c6e" stroke-width="1" stroke-dasharray="4 2" />
+                <circle v-if="aiHoverIdx >= 0 && aiTimelineData[aiHoverIdx]" :cx="aiXPos(aiHoverIdx)" :cy="aiYVal(aiTimelineData[aiHoverIdx].total)" r="4" fill="#b88c6e" stroke="#fff" stroke-width="1.5" />
+                <circle v-if="aiHoverIdx >= 0 && aiTimelineData[aiHoverIdx]" :cx="aiXPos(aiHoverIdx)" :cy="aiYVal(aiTimelineData[aiHoverIdx].failed)" r="4" fill="#b04a3a" stroke="#fff" stroke-width="1.5" />
+              </svg>
+              <div class="chart-legend">
+                <span class="legend-item"><span class="legend-dot" style="background:#b88c6e"></span>{{ $t('ops.aiTotalCalls') }}</span>
+                <span class="legend-item"><span class="legend-dot" style="background:#b04a3a"></span>{{ $t('ops.aiFailed') }}</span>
+              </div>
+              <div v-if="aiHoverIdx >= 0 && aiTimelineData[aiHoverIdx]" class="chart-tooltip" :style="aiTooltipStyle">
+                <div class="ct-time">{{ aiTimelineData[aiHoverIdx].time_bucket }}</div>
+                <div class="ct-row"><span class="ct-dot" style="background:#b88c6e"></span>{{ $t('ops.aiTotalCalls') }} <b>{{ aiTimelineData[aiHoverIdx].total }}</b></div>
+                <div class="ct-row"><span class="ct-dot" style="background:#b04a3a"></span>{{ $t('ops.aiFailed') }} <b>{{ aiTimelineData[aiHoverIdx].failed }}</b></div>
+              </div>
+            </div>
+            <div class="chart-wrap" style="flex: 1">
+              <div class="ops-sub-title">{{ $t('ops.aiFeatureShare') }}</div>
+              <svg v-if="aiPieSlices.length" viewBox="0 0 480 260" class="pie-chart">
+                <path v-for="(s, i) in aiPieSlices" :key="'aips'+i" :d="s.path" :fill="s.color" stroke="var(--color-card-2)" stroke-width="2" />
+                <path v-for="(s, i) in aiPieSlices" :key="'aipl'+i" :d="s.line" fill="none" stroke="var(--color-text-secondary)" stroke-width="1" />
+                <text v-for="(s, i) in aiPieSlices" :key="'aipt'+i" :x="s.labelX" :y="s.labelY" :text-anchor="s.anchor" font-size="12" fill="var(--color-text)">{{ s.label }}</text>
+              </svg>
+              <el-empty v-else :description="$t('ops.aiNoData')" :image-size="40" />
+            </div>
+          </div>
+          <el-empty v-else-if="!aiTimelineData.length" :description="$t('ops.aiNoData')" :image-size="40" />
         </div>
       </el-tab-pane>
 
@@ -269,39 +344,41 @@
             <span class="qp-text">{{ (weatherQuota?.used ?? 0).toLocaleString() }} / {{ (weatherQuota?.quota ?? 50000).toLocaleString() }}</span>
           </div>
 
-          <!-- 3) 24h 请求量(按 API,成功/错误/失败率合并一表) -->
-          <h4 class="ops-section-title section-gap">{{ $t('ops.weather24hStats') }}</h4>
-          <el-table v-if="weatherStatRows.length" :data="weatherStatRows" size="small" stripe>
-            <el-table-column prop="api" label="API" min-width="140" />
-            <el-table-column prop="ok" :label="$t('ops.weatherSuccess')" width="110" />
-            <el-table-column prop="err" :label="$t('ops.weatherError')" width="110" />
-            <el-table-column :label="$t('ops.weatherFailRate')" width="110">
-              <template #default="{ row }">{{ row.failRate }}%</template>
-            </el-table-column>
-          </el-table>
-          <el-alert v-else-if="!weatherLoading" type="warning" :closable="false" show-icon :title="$t('ops.weatherStatsFail')" />
+          <!-- 3) 24h 请求量(按 API,成功/错误/失败率合并一表;控制台数据仅 OPS 可见) -->
+          <template v-if="isOps">
+            <h4 class="ops-section-title section-gap">{{ $t('ops.weather24hStats') }}</h4>
+            <el-table v-if="weatherStatRows.length" :data="weatherStatRows" size="small" stripe>
+              <el-table-column prop="api" label="API" min-width="140" />
+              <el-table-column prop="ok" :label="$t('ops.weatherSuccess')" width="110" />
+              <el-table-column prop="err" :label="$t('ops.weatherError')" width="110" />
+              <el-table-column :label="$t('ops.weatherFailRate')" width="110">
+                <template #default="{ row }">{{ row.failRate }}%</template>
+              </el-table-column>
+            </el-table>
+            <el-alert v-else-if="!weatherLoading" type="warning" :closable="false" show-icon :title="$t('ops.weatherStatsFail')" />
 
-          <!-- 4) 财务汇总(最不关注,放最底) -->
-          <h4 class="ops-section-title section-gap">{{ $t('ops.weatherFinance') }}</h4>
-          <div v-if="weatherFinance" class="finance-grid">
-            <div class="finance-card">
-              <div class="finance-label">{{ $t('ops.weatherBalance') }}</div>
-              <div class="finance-value">{{ weatherFinance.currency || 'CNY' }} {{ weatherFinance.balance ?? '-' }}</div>
+            <!-- 4) 财务汇总(最不关注,放最底) -->
+            <h4 class="ops-section-title section-gap">{{ $t('ops.weatherFinance') }}</h4>
+            <div v-if="weatherFinance" class="finance-grid">
+              <div class="finance-card">
+                <div class="finance-label">{{ $t('ops.weatherBalance') }}</div>
+                <div class="finance-value">{{ weatherFinance.currency || 'CNY' }} {{ weatherFinance.balance ?? '-' }}</div>
+              </div>
+              <div class="finance-card">
+                <div class="finance-label">{{ $t('ops.weatherThisMonth') }}</div>
+                <div class="finance-value">{{ weatherFinance.currency || 'CNY' }} {{ weatherFinance.thisMonth ?? '0' }}</div>
+              </div>
+              <div class="finance-card">
+                <div class="finance-label">{{ $t('ops.weatherYesterday') }}</div>
+                <div class="finance-value">{{ weatherFinance.currency || 'CNY' }} {{ weatherFinance.previousDay ?? '0' }}</div>
+              </div>
             </div>
-            <div class="finance-card">
-              <div class="finance-label">{{ $t('ops.weatherThisMonth') }}</div>
-              <div class="finance-value">{{ weatherFinance.currency || 'CNY' }} {{ weatherFinance.thisMonth ?? '0' }}</div>
-            </div>
-            <div class="finance-card">
-              <div class="finance-label">{{ $t('ops.weatherYesterday') }}</div>
-              <div class="finance-value">{{ weatherFinance.currency || 'CNY' }} {{ weatherFinance.previousDay ?? '0' }}</div>
-            </div>
-          </div>
-          <el-alert v-else-if="!weatherLoading" type="warning" :closable="false" show-icon :title="$t('ops.weatherFinanceFail')" />
+            <el-alert v-else-if="!weatherLoading" type="warning" :closable="false" show-icon :title="$t('ops.weatherFinanceFail')" />
+          </template>
         </div>
       </el-tab-pane>
 
-      <el-tab-pane :label="$t('ops.oss.title')" name="oss">
+      <el-tab-pane v-if="showSystemTabs" :label="$t('ops.oss.title')" name="oss">
         <div class="filter-row">
           <el-button type="primary" :loading="ossChecking" @click="checkOss">
             {{ ossChecking ? $t('ops.oss.checking') : $t('ops.oss.checkNow') }}
@@ -410,11 +487,18 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { opsApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 
 const { t } = useI18n()
 const route = useRoute()
+const userStore = useUserStore()
+
+// 角色渲染:家长(OWNER 非 OPS)只见「AI 统计」「天气」;OPS 见全部标签(含系统级报表)
+const isOps = computed(() => userStore.isOps)
+const isOwner = computed(() => userStore.isOwner)
+const showSystemTabs = computed(() => isOps.value)
 
 // 资源卡片定义(键与后端 stats 返回字段一一对应,名称走 i18n)
 const STAT_CARDS = [
@@ -424,7 +508,7 @@ const STAT_CARDS = [
 ]
 const statCards = STAT_CARDS.map(key => ({ key, name: t('ops.stat.' + key) }))
 
-const tab = ref('stats')
+const tab = ref(isOps.value ? 'stats' : 'ai')
 const stats = ref({})
 const statsLoading = ref(false)
 const filter = reactive({ startDate: '', endDate: '', userId: '', familyId: '' })
@@ -499,42 +583,56 @@ const tYTicks = computed(() => {
   return ticks
 })
 
-const yMax = computed(() => {
-  const mx = Math.max(...timelineData.value.map(d => d.total), 1)
+// ---------- 折线图几何(纯函数,天气/AI 共用;数据点为 {time_bucket,total,failed}) ----------
+const yMaxFor = (data) => {
+  const mx = Math.max(...data.map(d => d.total), 1)
   return mx <= 5 ? 5 : Math.ceil(mx / 5) * 5
-})
-const yTicks = computed(() => {
+}
+const yTicksFor = (ymax) => {
   const ticks = []
   for (let i = 0; i <= 4; i++) {
-    const val = Math.round(yMax.value * i / 4)
+    const val = Math.round(ymax * i / 4)
     ticks.push({ y: chartH - padB - (chartH - padB - padT) * i / 4, label: val })
   }
   return ticks
-})
-const xLabels = computed(() => {
-  const n = timelineData.value.length
+}
+const xPosFor = (data, i) => {
+  const n = data.length
+  if (n <= 1) return padL
+  return padL + (chartW - padL - padR) * i / (n - 1)
+}
+// 采样标签:约 8 个 + 恒含首末;坐标用真实数据下标计算(修标签全挤左侧的 bug)
+const xLabelsFor = (data) => {
+  const n = data.length
   if (n === 0) return []
-  // 采样标签:约 8 个 + 恒含首末;坐标用真实数据下标计算(修标签全挤左侧的 bug)
   const step = Math.max(1, Math.ceil(n / 8))
   const indices = []
   for (let i = 0; i < n; i += step) indices.push(i)
   if (indices[indices.length - 1] !== n - 1) indices.push(n - 1)
-  return indices.map(i => ({ x: xPos(i), label: timelineData.value[i].time_bucket }))
-})
-const xPos = (i) => {
-  const n = timelineData.value.length
-  if (n <= 1) return padL
-  return padL + (chartW - padL - padR) * i / (n - 1)
+  return indices.map(i => ({ x: xPosFor(data, i), label: data[i].time_bucket }))
 }
-const linePoints = (vals) => {
+const linePointsFor = (data, ymax, vals) => {
   const n = vals.length
   if (n === 0) return ''
   return vals.map((v, i) => {
     const x = n <= 1 ? padL : padL + (chartW - padL - padR) * i / (n - 1)
-    const y = chartH - padB - (chartH - padB - padT) * v / yMax.value
+    const y = chartH - padB - (chartH - padB - padT) * v / ymax
     return `${x},${y}`
   }).join(' ')
 }
+// 悬浮提示:比例定位 + 边缘 clamp,防止 tooltip 超出容器
+const tooltipStyleFor = (data, idx) => {
+  if (idx < 0) return {}
+  const ratio = Math.min(Math.max(xPosFor(data, idx) / chartW, 0.15), 0.85)
+  return { left: (ratio * 100) + '%' }
+}
+
+// 天气折线图(绑定天气数据)
+const yMax = computed(() => yMaxFor(timelineData.value))
+const yTicks = computed(() => yTicksFor(yMax.value))
+const xLabels = computed(() => xLabelsFor(timelineData.value))
+const xPos = (i) => xPosFor(timelineData.value, i)
+const linePoints = (vals) => linePointsFor(timelineData.value, yMax.value, vals)
 
 // 天气 API 类型(与后端 parseApiType 对齐)
 const WEATHER_API_TYPES = ['now', 'forecast', 'hourly', 'warning', 'air', 'indices', 'minutely', 'location', 'quota', 'finance', 'metrics', 'other']
@@ -553,12 +651,7 @@ const loadTimeline = async () => {
 const hoverIdx = ref(-1)
 const hoverColW = computed(() => (chartW - padL - padR) / Math.max(timelineData.value.length, 1))
 const yVal = (v) => chartH - padB - (chartH - padB - padT) * v / yMax.value
-const tooltipStyle = computed(() => {
-  if (hoverIdx.value < 0) return {}
-  // 比例定位 + 边缘 clamp,防止 tooltip 超出容器
-  const ratio = Math.min(Math.max(xPos(hoverIdx.value) / chartW, 0.15), 0.85)
-  return { left: (ratio * 100) + '%' }
-})
+const tooltipStyle = computed(() => tooltipStyleFor(timelineData.value, hoverIdx.value))
 
 // ---------- API 类型占比饼图(与折线图共用时间范围) ----------
 const typeDist = ref([])
@@ -572,8 +665,9 @@ const loadTypeDist = async () => {
 // 标签防重叠:相邻小占比扇区的引导线终点彼此靠近,按左右分侧自上而下强制最小垂直间距,
 // 引导线随标签位移自然弯折(扇区外缘 → 标签尖端 → 水平短线)
 const PIE_COLORS = ['#b88c6e', '#a87c5e', '#c4a884', '#8a6d3b', '#b04a3a', '#d4b298', '#6b8a6b', '#e0862f', '#4a90d9', '#9b8ec4', '#c97474', '#9a9a9a']
-const pieSlices = computed(() => {
-  const dist = typeDist.value || []
+// 饼图(纯函数):标签防重叠——相邻小占比扇区引导线终点彼此靠近,按左右分侧自上而下强制最小垂直间距,
+// 引导线随标签位移自然弯折(扇区外缘 → 标签尖端 → 水平短线);labelOf 由调用方提供切片名。
+const buildPieSlices = (dist, labelOf) => {
   const total = dist.reduce((a, d) => a + (d.count || 0), 0)
   if (!total) return []
   const cx = 240, cy = 130, r = 64
@@ -599,12 +693,11 @@ const pieSlices = computed(() => {
       naturalY: cy + (r + 12) * sin,
       right,
       color: PIE_COLORS[i % PIE_COLORS.length],
-      label: `${t('ops.apiType.' + (d.apiType || 'other'))} ${Math.round(frac * 1000) / 10}%`,
+      label: `${labelOf(d)} ${Math.round(frac * 1000) / 10}%`,
     }
     angle = a2
     return slice
   })
-  // 左右两侧分别排序后自上而下推开;底部越界时自下而上回压
   for (const side of [true, false]) {
     const group = slices.filter(s => s.right === side).sort((a, b) => a.naturalY - b.naturalY)
     let prev = -Infinity
@@ -626,7 +719,63 @@ const pieSlices = computed(() => {
     labelY: s.labelY + 4,
     anchor: s.right ? 'start' : 'end',
   }))
-})
+}
+const pieSlices = computed(() => buildPieSlices(typeDist.value || [], d => t('ops.apiType.' + (d.apiType || 'other'))))
+
+// ---------- AI 调用统计(按当前家庭;与天气共用折线/饼图几何) ----------
+const AI_FEATURES = ['ITEM_FIND', 'ITEM_PUT', 'CHAT', 'IMAGE', 'WEATHER_IMAGE', 'ASR']
+const aiLoading = ref(false)
+const aiSummary = ref(null)
+const aiRange = ref('24h')
+const aiFeatures = ref([])
+const aiTimelineData = ref([])
+const aiTypeDist = ref([])
+const aiHoverIdx = ref(-1)
+
+const aiYMax = computed(() => yMaxFor(aiTimelineData.value))
+const aiYTicks = computed(() => yTicksFor(aiYMax.value))
+const aiXLabels = computed(() => xLabelsFor(aiTimelineData.value))
+const aiXPos = (i) => xPosFor(aiTimelineData.value, i)
+const aiYVal = (v) => chartH - padB - (chartH - padB - padT) * v / aiYMax.value
+const aiLinePoints = (vals) => linePointsFor(aiTimelineData.value, aiYMax.value, vals)
+const aiHoverColW = computed(() => (chartW - padL - padR) / Math.max(aiTimelineData.value.length, 1))
+const aiTooltipStyle = computed(() => tooltipStyleFor(aiTimelineData.value, aiHoverIdx.value))
+const aiPieSlices = computed(() => buildPieSlices(aiTypeDist.value || [], d => t('ops.aiFeature.' + (d.featureCode || 'OTHER'))))
+
+const aiTimelineTotal = computed(() => aiTimelineData.value.reduce((a, d) => a + d.total, 0))
+const aiTimelineFailed = computed(() => aiTimelineData.value.reduce((a, d) => a + d.failed, 0))
+const aiTimelineFailRate = computed(() => aiTimelineTotal.value === 0 ? 0 : Math.round(aiTimelineFailed.value * 1000 / aiTimelineTotal.value) / 10)
+
+const loadAiSummary = async () => {
+  try {
+    aiSummary.value = await opsApi.aiSummary()
+  } catch (e) {
+    aiSummary.value = null
+  }
+}
+const loadAiTypeDist = async () => {
+  try {
+    aiTypeDist.value = await opsApi.aiTypeDistribution(aiRange.value)
+  } catch (e) {
+    aiTypeDist.value = []
+  }
+}
+const loadAiTimeline = async () => {
+  loadAiTypeDist() // 饼图与折线图共用时间范围,并行加载
+  try {
+    aiTimelineData.value = await opsApi.aiTimeline(aiRange.value, aiFeatures.value)
+  } catch (e) {
+    aiTimelineData.value = []
+  }
+}
+const loadAi = async () => {
+  aiLoading.value = true
+  try {
+    await Promise.all([loadAiSummary(), loadAiTimeline()])
+  } finally {
+    aiLoading.value = false
+  }
+}
 
 // ---------- 配额进度条 ----------
 const quotaBarClass = computed(() => {
@@ -754,16 +903,21 @@ const levelTagType = (l) => (l === 'ERROR' ? 'danger' : l === 'WARN' ? 'warning'
 
 const loadWeatherQuota = async () => {
   weatherLoading.value = true
-  loadTimeline() // 与下面三个并行,不串行等待
+  loadTimeline() // 与下面并行,不串行等待
   try {
-    const [quota, finance, stats] = await Promise.allSettled([
-      opsApi.weatherQuota(),
-      opsApi.weatherFinance(),
-      opsApi.weatherStats(),
-    ])
-    weatherQuota.value = quota.status === 'fulfilled' ? quota.value : null
-    weatherFinance.value = finance.status === 'fulfilled' ? finance.value : null
-    weatherStats.value = stats.status === 'fulfilled' ? stats.value : null
+    if (isOps.value) {
+      const [quota, finance, stats] = await Promise.allSettled([
+        opsApi.weatherQuota(),
+        opsApi.weatherFinance(),
+        opsApi.weatherStats(),
+      ])
+      weatherQuota.value = quota.status === 'fulfilled' ? quota.value : null
+      weatherFinance.value = finance.status === 'fulfilled' ? finance.value : null
+      weatherStats.value = stats.status === 'fulfilled' ? stats.value : null
+    } else {
+      // 家长:仅本地统计(趋势/类型占比/本月配额),控制台财务/请求量需 ops:view 故跳过
+      weatherQuota.value = await opsApi.weatherQuota()
+    }
   } catch (e) {
     weatherQuota.value = null
     weatherFinance.value = null
@@ -896,21 +1050,26 @@ const fmtTime = (d) => {
 }
 
 onMounted(async () => {
-  // 支持 /ops?tab=trace&tid=xxx&date=yyyy-MM-dd 或 /ops?tab=traffic 直达(分享/书签)
-  if (route.query.tab === 'trace' && route.query.tid) {
-    tab.value = 'trace'
-    traceFilter.tid = String(route.query.tid)
-    if (route.query.date) traceFilter.date = String(route.query.date)
-    loadTrace()
+  if (isOps.value) {
+    // 支持 /ops?tab=trace&tid=xxx&date=yyyy-MM-dd 或 /ops?tab=traffic 直达(分享/书签)
+    if (route.query.tab === 'trace' && route.query.tid) {
+      tab.value = 'trace'
+      traceFilter.tid = String(route.query.tid)
+      if (route.query.date) traceFilter.date = String(route.query.date)
+      loadTrace()
+    }
+    if (route.query.tab === 'traffic') tab.value = 'traffic'
+    await Promise.all([loadStats(), loadLogs(1), loadOptions()])
   }
-  if (route.query.tab === 'traffic') tab.value = 'traffic'
-  await Promise.all([loadStats(), loadLogs(1), loadOptions()])
+  // 家长默认落在「AI 统计」,进入即取数;OPS 切到该标签时由 watch 懒加载
+  if (tab.value === 'ai') loadAi()
 })
 
-// 切到访问统计/天气标签页时懒加载
+// 切到访问统计/天气/AI 标签页时懒加载
 watch(tab, (v) => {
   if (v === 'traffic' && !traffic.value) loadTraffic()
   if (v === 'weather' && !weatherQuota.value) loadWeatherQuota()
+  if (v === 'ai' && aiSummary.value === null) loadAi()
   if (v === 'oss' && !ossLoaded.value) loadOss()
 })
 </script>

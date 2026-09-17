@@ -1,17 +1,22 @@
 <template>
-  <div ref="pageEl" class="game-page" :class="{ 'is-cover': screen === 'cover' }">
-    <!-- 全屏按钮(原生 Fullscreen API,对 .game-page 全屏) -->
-    <button
-      class="fullscreen-btn"
-      type="button"
-      :title="isFullscreen ? $t('games.petlink.exitFullscreen') : $t('games.petlink.fullscreen')"
-      @click="toggleFullscreen"
-    >
-      <el-icon><FullScreen /></el-icon>
-    </button>
+  <div class="page">
+    <!-- 顶栏:返回 + 全屏(工具按钮统一进顶栏,与物品定位一致) -->
+    <PageToolbar root-class="game-topbar" :holder-margin="0" always>
+      <div class="game-top-actions">
+        <el-button size="small" round @click="router.push('/games')">
+          <el-icon><ArrowLeft /></el-icon>
+          {{ $t('games.back') }}
+        </el-button>
+        <el-button size="small" round @click="toggleFullscreen">
+          <el-icon><FullScreen /></el-icon>
+          {{ isFullscreen ? $t('games.petlink.exitFullscreen') : $t('games.petlink.fullscreen') }}
+        </el-button>
+      </div>
+    </PageToolbar>
 
-    <!-- 封面(复刻原版标题屏):多色标题 + ihomy 版后缀 + 开始 + 版权) -->
-    <div v-if="screen === 'cover'" class="cover">
+    <div ref="gameCardEl" class="game-card">
+      <!-- 封面(复刻原版标题屏):多色标题 + ihomy 版后缀 + 开始 + 版权) -->
+      <div v-if="screen === 'cover'" class="cover">
       <h1 class="cover-title">
         <span class="ct-pet">宠</span><span class="ct-pet">物</span><span class="ct-lian">连</span><span class="ct-lian">连</span><span class="ct-kan">看</span>
         <span class="ct-ihomy">-ihomy版</span>
@@ -103,7 +108,8 @@
           <el-button type="primary" size="small" round @click="restart">{{ $t('games.petlink.playAgain') }}</el-button>
         </div>
       </div>
-    </template>
+      </template>
+    </div>
   </div>
 </template>
 
@@ -115,16 +121,19 @@
 // 蓝色连线动画 + 点击/消除/胜利音效(无背景音乐,可静音);通关按后端发积分。
 // 支持全屏,进入时关闭全局光影特效(与图片/视频/看书一致)。
 import { ref, computed, onBeforeUnmount, onMounted, nextTick, inject } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { FullScreen } from '@element-plus/icons-vue'
+import { FullScreen, ArrowLeft } from '@element-plus/icons-vue'
 import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import PageToolbar from '@/components/PageToolbar.vue'
 import clickUrl from '@/assets/games/petlink/sounds/15.wav'
 import matchUrl from '@/assets/games/petlink/sounds/294.mp3'
 import winUrl from '@/assets/games/petlink/sounds/301.mp3'
 
 const { t, locale } = useI18n()
+const router = useRouter()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 
 // 原版棋盘:16×12 格(含一圈 1 格外圈用于绕外圈连线),内圈 14×10 为可玩区;
@@ -193,12 +202,12 @@ let ticker = null
 let hintTimer = null
 let resizeObserver = null
 
-// 全屏(原生 Fullscreen API,对 .game-page 全屏)
-const pageEl = ref(null)
+// 全屏(原生 Fullscreen API,对 .game-card 全屏)
+const gameCardEl = ref(null)
 const isFullscreen = ref(false)
 function toggleFullscreen() {
   if (!document.fullscreenElement) {
-    pageEl.value?.requestFullscreen?.()
+    gameCardEl.value?.requestFullscreen?.()
   } else {
     document.exitFullscreen?.()
   }
@@ -641,9 +650,9 @@ function onKeydown(e) {
 </script>
 
 <style scoped>
-.game-page {
+.game-card {
   position: relative;
-  min-height: calc(100vh - 120px);
+  min-height: 480px;
   background: #000;
   border-radius: 14px;
   overflow: hidden;
@@ -654,29 +663,7 @@ function onKeydown(e) {
   padding: 20px;
   color: #fff;
 }
-.game-page.is-cover { justify-content: center; }
-.game-page:fullscreen { width: 100vw; height: 100vh; min-height: 100vh; border-radius: 0; }
-
-/* 全屏按钮(右上角固定,封面/游戏态均可用) */
-.fullscreen-btn {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 6;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.4);
-  color: #cfe6ff;
-  font-size: 16px;
-  cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-}
-.fullscreen-btn:hover { background: rgba(0, 0, 0, 0.65); color: #fff; border-color: rgba(255, 255, 255, 0.45); }
+.game-card:fullscreen { width: 100vw; height: 100vh; min-height: 100vh; border-radius: 0; }
 
 /* 封面 */
 .cover { display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }

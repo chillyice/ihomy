@@ -8,10 +8,10 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 操作日志实体(sys_operation_log):AOP 自动写入,含请求/结果/耗时与 traceId(链路串联)。
+ * 系统报表实体(report_system,操作日志):AOP 自动写入,含请求/结果/耗时与 traceId(链路串联)。
  */
 @Data
-@TableName("sys_operation_log")
+@TableName("report_system")
 public class SysOperationLog {
     @TableId(type = IdType.AUTO)
     private Long id;

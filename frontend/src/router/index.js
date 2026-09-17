@@ -83,8 +83,8 @@ router.beforeEach((to) => {
   if (userStore.isPureOps && to.name !== 'Ops') {
     return { name: 'Ops' }
   }
-  // 运维页要求 ops:view 权限
-  if (to.meta.ops && !userStore.hasPerm('ops:view')) {
+  // 运维页要求 OPS 或家长(OWNER)身份;家长仅看 AI 统计/天气,其余由页面内角色渲染控制
+  if (to.meta.ops && !(userStore.isOps || userStore.isOwner)) {
     return { name: 'Home' }
   }
 })

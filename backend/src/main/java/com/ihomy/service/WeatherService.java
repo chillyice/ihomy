@@ -2,6 +2,7 @@ package com.ihomy.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ihomy.common.ReportAggregateUtil;
 import com.ihomy.common.ThirdPartyHttp;
 import com.ihomy.common.WeatherConst;
 import com.ihomy.entity.Family;
@@ -21,8 +22,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -233,62 +232,20 @@ public class WeatherService {
 
     /**
      * 本地日志聚合:按时间范围返回调用总量+失败量折线图数据,可按 API 类型过滤。
-     * 零填充整个时间范围(缺数据的桶补 0)。
+     * 时间范围解析与时间桶零填充复用 ReportAggregateUtil(缺数据的桶补 0)。
      */
     public List<Map<String, Object>> getTimeline(String range, List<String> apiTypes) {
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
-        java.time.LocalDateTime start;
-        String fmt;
-        String javaPattern;
-        java.time.temporal.ChronoUnit unit;
-        switch (range) {
-            case "month" -> {
-                start = now.toLocalDate().withDayOfMonth(1).atStartOfDay();
-                fmt = "%Y-%m-%d"; javaPattern = "yyyy-MM-dd"; unit = java.time.temporal.ChronoUnit.DAYS;
-            }
-            case "30d" -> {
-                start = now.toLocalDate().minusDays(29).atStartOfDay();
-                fmt = "%Y-%m-%d"; javaPattern = "yyyy-MM-dd"; unit = java.time.temporal.ChronoUnit.DAYS;
-            }
-            case "year" -> {
-                start = now.toLocalDate().withDayOfYear(1).atStartOfDay();
-                fmt = "%Y-%m"; javaPattern = "yyyy-MM"; unit = java.time.temporal.ChronoUnit.MONTHS;
-            }
-            default -> {
-                start = now.minusHours(23).truncatedTo(java.time.temporal.ChronoUnit.HOURS);
-                fmt = "%m-%d %H:00"; javaPattern = "MM-dd HH:00"; unit = java.time.temporal.ChronoUnit.HOURS;
-            }
-        }
-        List<Map<String, Object>> rows = weatherLogMapper.selectTimeline(start, now, fmt, apiTypes);
-        Map<String, Map<String, Object>> byBucket = new HashMap<>();
-        for (Map<String, Object> r : rows) {
-            byBucket.put(String.valueOf(r.get("time_bucket")), r);
-        }
-        DateTimeFormatter jf = DateTimeFormatter.ofPattern(javaPattern);
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (java.time.LocalDateTime t = start; !t.isAfter(now); t = t.plus(1, unit)) {
-            String bucket = t.format(jf);
-            Map<String, Object> r = byBucket.get(bucket);
-            Map<String, Object> point = new HashMap<>();
-            point.put("time_bucket", bucket);
-            point.put("total", r == null ? 0L : ((Number) r.getOrDefault("total", 0)).longValue());
-            point.put("failed", r == null ? 0L : ((Number) r.getOrDefault("failed", 0)).longValue());
-            result.add(point);
-        }
+        ReportAggregateUtil.RangeSpec spec = ReportAggregateUtil.resolveRange(range);
+        List<Map<String, Object>> rows = weatherLogMapper.selectTimeline(spec.start(), spec.end(), spec.fmt(), apiTypes);
+        List<Map<String, Object>> result = ReportAggregateUtil.zeroFillTimeline(spec, rows);
         log.debug("[getTimeline] range={}, types={}, 数据点={}", range, apiTypes, result.size());
         return result;
     }
 
     /** API 类型分布(饼图):所选时间范围内各类型调用量占比 */
     public List<Map<String, Object>> getTypeDistribution(String range) {
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
-        java.time.LocalDateTime start = switch (range) {
-            case "month" -> now.toLocalDate().withDayOfMonth(1).atStartOfDay();
-            case "30d" -> now.toLocalDate().minusDays(29).atStartOfDay();
-            case "year" -> now.toLocalDate().withDayOfYear(1).atStartOfDay();
-            default -> now.minusHours(23).truncatedTo(java.time.temporal.ChronoUnit.HOURS);
-        };
-        return weatherLogMapper.selectTypeDistribution(start, now);
+        ReportAggregateUtil.RangeSpec spec = ReportAggregateUtil.resolveRange(range);
+        return weatherLogMapper.selectTypeDistribution(spec.start(), spec.end());
     }
 
     // ---------- 坐标/城市解析(provider 无关,门面共享) ----------

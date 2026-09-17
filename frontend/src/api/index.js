@@ -309,6 +309,10 @@ export const opsApi = {
   weatherStats: () => request.get('/ops/weather/stats'),
   weatherTimeline: (range, types) => request.get('/ops/weather/timeline', { params: { range, types: types?.length ? types.join(',') : null } }),
   weatherTypeDistribution: (range) => request.get('/ops/weather/type-distribution', { params: { range } }),
+  // AI 调用统计(按当前家庭)
+  aiSummary: () => request.get('/ops/ai/summary'),
+  aiTimeline: (range, features) => request.get('/ops/ai/timeline', { params: { range, features: features?.length ? features.join(',') : null } }),
+  aiTypeDistribution: (range) => request.get('/ops/ai/type-distribution', { params: { range } }),
   // 开源组件台账(版本检测 + 升级提示)
   ossList: () => request.get('/ops/oss/list'),
   ossSummary: () => request.get('/ops/oss/summary'),

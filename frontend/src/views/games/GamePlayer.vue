@@ -3,7 +3,6 @@
     v-if="game"
     :src="game.fileUrl"
     :title="game.name"
-    :breadcrumb="[{ label: $t('games.title') }, { label: game.name }]"
     back-to="/games"
   />
 </template>

@@ -8,19 +8,21 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 天气 API 调用日志实体(report_weather):每次 callApi 记录一条。
- * 天气数据公开可存;quota 接口响应可能含账号信息不存。
+ * 家庭 AI 调用日志实体(report_ai):每次 AI 调用记录一条。
+ * feature_code 区分功能(ITEM_FIND/ITEM_PUT/CHAT/IMAGE/WEATHER_IMAGE/ASR);family_id 家庭隔离;
+ * status=SUCCESS/FAIL,不记录请求/响应内容(可能含用户隐私)。
  */
 @Data
-@TableName("report_weather")
-public class WeatherLog {
+@TableName("report_ai")
+public class AiLog {
     @TableId(type = IdType.AUTO)
     private Long id;
-    private String apiType;
-    private String locationId;
+    private Long familyId;
+    private String featureCode;
+    private String model;
+    private String provider;
     private String status;
     private Integer costMs;
-    private String response;
     private String errorMsg;
     private LocalDateTime createdAt;
 }

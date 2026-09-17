@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.AiLogMapper">
+
+    <!-- 时间线聚合:有数据的桶(零填充在 Service 层做,保证 x 轴覆盖全时间范围) -->
+    <select id="selectTimeline" resultType="java.util.HashMap">
+        SELECT DATE_FORMAT(created_at, #{fmt}) AS time_bucket, COUNT(*) AS total,
+               SUM(CASE WHEN status = 'FAIL' THEN 1 ELSE 0 END) AS failed
+        FROM report_ai
+        WHERE family_id = #{familyId} AND created_at &gt;= #{start} AND created_at &lt; #{end}
+        <if test="features != null and features.size() > 0">
+            AND feature_code IN
+            <foreach collection="features" item="f" open="(" separator="," close=")">#{f}</foreach>
+        </if>
+        GROUP BY time_bucket
+        ORDER BY time_bucket
+    </select>
+
+    <!-- 功能分布(饼图):按 feature_code 统计调用量 -->
+    <select id="selectTypeDistribution" resultType="java.util.HashMap">
+        SELECT feature_code AS featureCode, COUNT(*) AS count
+        FROM report_ai
+        WHERE family_id = #{familyId} AND created_at &gt;= #{start} AND created_at &lt; #{end}
+        GROUP BY feature_code
+        ORDER BY count DESC
+    </select>
+
+    <!-- 汇总(全量):按 feature_code 聚合总调用/失败量 -->
+    <select id="selectSummary" resultType="java.util.HashMap">
+        SELECT feature_code AS featureCode, COUNT(*) AS total,
+               SUM(CASE WHEN status = 'FAIL' THEN 1 ELSE 0 END) AS failed
+        FROM report_ai
+        WHERE family_id = #{familyId}
+        GROUP BY feature_code
+        ORDER BY total DESC
+    </select>
+</mapper>

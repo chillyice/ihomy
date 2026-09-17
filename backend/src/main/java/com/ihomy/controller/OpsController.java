@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.ihomy.annotation.RequirePermission;
 import com.ihomy.common.Result;
 import com.ihomy.entity.SysOperationLog;
+import com.ihomy.security.SecurityHelper;
+import com.ihomy.service.AiStatsService;
 import com.ihomy.service.OpsService;
 import com.ihomy.service.ParameterService;
 import com.ihomy.service.WeatherService;
@@ -35,7 +37,14 @@ public class OpsController {
 
     private final OpsService opsService;
     private final WeatherService weatherService;
+    private final AiStatsService aiStatsService;
     private final ParameterService parameterService;
+    private final SecurityHelper securityHelper;
+
+    /** AI/天气本地统计按当前家庭隔离;纯 OPS 无家庭则返回空 */
+    private Long currentFamilyId() {
+        return securityHelper.current().getFamilyId();
+    }
 
     @Operation(summary = "系统资源总数(可按时间/用户/家庭过滤)")
     @RequirePermission("ops:view")
@@ -98,8 +107,8 @@ public class OpsController {
         return Result.success(opsService.traceLogs(tid, date, sources, levels));
     }
 
-    @Operation(summary = "和风天气 API 用量统计(控制台 API,凭证未配返回 null)")
-    @RequirePermission("ops:view")
+    @Operation(summary = "和风天气 API 本月配额(本地统计,家长/运维可见)")
+    @RequirePermission("family:manage")
     @GetMapping("/weather/quota")
     public Result<Map<String, Object>> weatherQuota() {
         return Result.success(weatherService.getQuota());
@@ -120,7 +129,7 @@ public class OpsController {
     }
 
     @Operation(summary = "天气API调用折线图(24h/本月/30天/一年,可按 API 类型多选过滤;零填充覆盖全时间范围)")
-    @RequirePermission("ops:view")
+    @RequirePermission("family:manage")
     @GetMapping("/weather/timeline")
     public Result<List<Map<String, Object>>> weatherTimeline(
             @RequestParam(defaultValue = "24h") String range,
@@ -129,7 +138,7 @@ public class OpsController {
     }
 
     @Operation(summary = "天气API类型分布(饼图,与折线图共用时间范围)")
-    @RequirePermission("ops:view")
+    @RequirePermission("family:manage")
     @GetMapping("/weather/type-distribution")
     public Result<List<Map<String, Object>>> weatherTypeDistribution(
             @RequestParam(defaultValue = "24h") String range) {
@@ -141,6 +150,30 @@ public class OpsController {
     @GetMapping("/weather/compare")
     public Result<Map<String, Object>> weatherCompare() {
         return Result.success(weatherService.compareV7V1());
+    }
+
+    @Operation(summary = "AI 调用汇总卡(总调用/失败/成功率,按当前家庭)")
+    @RequirePermission("family:manage")
+    @GetMapping("/ai/summary")
+    public Result<Map<String, Object>> aiSummary() {
+        return Result.success(aiStatsService.summary(currentFamilyId()));
+    }
+
+    @Operation(summary = "AI 调用趋势折线(24h/本月/30天/一年,可按功能多选过滤;零填充覆盖全时间范围)")
+    @RequirePermission("family:manage")
+    @GetMapping("/ai/timeline")
+    public Result<List<Map<String, Object>>> aiTimeline(
+            @RequestParam(defaultValue = "24h") String range,
+            @RequestParam(required = false) List<String> features) {
+        return Result.success(aiStatsService.timeline(currentFamilyId(), range, features));
+    }
+
+    @Operation(summary = "AI 功能占比饼图(与折线图共用时间范围)")
+    @RequirePermission("family:manage")
+    @GetMapping("/ai/type-distribution")
+    public Result<List<Map<String, Object>>> aiTypeDistribution(
+            @RequestParam(defaultValue = "24h") String range) {
+        return Result.success(aiStatsService.typeDistribution(currentFamilyId(), range));
     }
 
     @Operation(summary = "加密明文为 ENC(...) 格式(供外挂配置文件使用)")
