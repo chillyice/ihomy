@@ -22,8 +22,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 家庭小游戏业务:导入 .swf(存 games/{游戏名}/)、列表/详情/改名/改描述/删除,家庭隔离。
- * 本次仅支持 SWF;type 字段预留 GBA 等后续扩展。改名不移动物理文件夹(文件夹名在导入时固定)。
+ * 家庭小游戏业务:导入 .swf(存 games/{游戏名}/)与 .gba、列表/详情/改名/改描述/删除,家庭隔离。
+ * 仅支持 SWF/GBA 两种导入类型(.gbc/.gb 仅前端本地模式播放,不入库)。改名不移动物理文件夹(文件夹名在导入时固定)。
  */
 @Service
 @RequiredArgsConstructor

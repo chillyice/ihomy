@@ -578,14 +578,14 @@ export default {
   },
   gba: {
     dropTitle: '拖入或点击选择 ROM 文件',
-    dropSub: '支持 .gba / .gbc / .gb / .nes 格式',
+    dropSub: '支持 .gba / .gbc / .gb 格式',
     reselect: '重新选择',
     close: '关闭',
     loading: '正在加载模拟器…',
     loadFailed: '模拟器加载失败，请重试',
     fullscreen: '全屏',
     exitFullscreen: '退出全屏',
-    invalidType: '请选择 .gba / .gbc / .gb / .nes 格式的 ROM 文件',
+    invalidType: '请选择 .gba / .gbc / .gb 格式的 ROM 文件',
   },
   points: {
     title: '积分商城',

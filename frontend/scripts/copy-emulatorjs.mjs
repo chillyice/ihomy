@@ -1,7 +1,7 @@
 // 把 EmulatorJS 运行时(node_modules)拷贝到 public/emulatorjs/,供 GBA 播放器动态加载。
 // 与 copy-ruffle.mjs 同理:WASM 运行时无法被 Vite 打进 bundle,需作为静态资源由 nginx 托管。
 // 产物 public/emulatorjs/ 已 gitignore,由本脚本在 dev/build 时重新生成。
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -46,6 +46,21 @@ if (existsSync(coreSrc)) {
     if (f.endsWith('.data') || f.endsWith('.wasm')) {
       copyFileSync(join(coreSrc, f), join(coreDst, f))
     }
+  }
+}
+
+// 3. patch loader.js:npm 包 data/ 只有 src/ 源码(无 emulator.min.js/css),loader.js 默认先请求
+//    min 文件会 404 再回退;把 min 分支条件置 true 直接走 src/*.js。
+//    注意不能设 window.EJS_DEBUG_XX=true(那会同时打开 emulator.js 里 this.debug 调试模式)。
+const loaderPath = join(dest, 'loader.js')
+if (existsSync(loaderPath)) {
+  const loader = readFileSync(loaderPath, 'utf8')
+  const needle = '"undefined" != typeof EJS_DEBUG_XX && true === EJS_DEBUG_XX'
+  if (loader.includes(needle)) {
+    writeFileSync(loaderPath, loader.replace(needle, 'true'), 'utf8')
+    console.log('[copy-emulatorjs] 已 patch loader.js:直接加载 src/*.js(跳过不存在的 min 产物)')
+  } else {
+    console.warn('[copy-emulatorjs] 未匹配 loader.js 的 min 分支条件,可能版本升级,请人工检查')
   }
 }
 

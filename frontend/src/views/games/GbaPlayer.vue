@@ -43,19 +43,18 @@
       <div v-if="loading" class="gba-status">{{ $t('gba.loading') }}</div>
       <div v-if="error" class="gba-status error">{{ error }}</div>
 
-      <input v-if="!src" ref="fileInput" type="file" accept=".gba,.gbc,.gb,.nes,.smc,.sfc" class="hidden-input" @change="onPick" />
+      <input v-if="!src" ref="fileInput" type="file" accept=".gba,.gbc,.gb" class="hidden-input" @change="onPick" />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, inject } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { FullScreen, ArrowLeft } from '@element-plus/icons-vue'
 import PageToolbar from '@/components/PageToolbar.vue'
-import { loadEmulatorJS } from '@/utils/emulatorjs'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 
 const props = defineProps({
@@ -77,25 +76,33 @@ const error = ref('')
 const isFullscreen = ref(false)
 
 let objectUrl = null
-let observer = null
+let loadFallbackTimer = null
 
 const pick = () => fileInput.value?.click()
 
-const cleanup = () => {
-  if (observer) { observer.disconnect(); observer = null }
-  if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null }
+// 清理旧模拟器(只清 DOM + 释放全局引用;objectUrl 由调用方在合适时机释放,否则会提前失效)
+const teardownEmulator = () => {
+  if (loadFallbackTimer) { clearTimeout(loadFallbackTimer); loadFallbackTimer = null }
   if (container.value) container.value.innerHTML = ''
+  delete window.EJS_emulator
+  delete window.EJS_ready
+  delete window.EJS_onGameStart
+}
+
+const onEmulatorReady = () => {
+  loading.value = false
+  if (loadFallbackTimer) { clearTimeout(loadFallbackTimer); loadFallbackTimer = null }
 }
 
 const loadRom = async (romUrl) => {
   loading.value = true
   error.value = ''
   try {
-    await loadEmulatorJS()
-    cleanup()
-    await new Promise(r => setTimeout(r, 50))
+    teardownEmulator()
+    // fileName/src 变更后 v-else 分支(含 container ref)可能尚未渲染,等下一拍确保 DOM 就位
+    await nextTick()
 
-    // 设置 EmulatorJS 全局配置
+    // 设置 EmulatorJS 全局配置(必须在注入 loader.js 前就位;loader.js 读取后 new EmulatorJS 启动)
     window.EJS_player = container.value
     window.EJS_core = 'gba'
     window.EJS_gameUrl = romUrl
@@ -103,25 +110,17 @@ const loadRom = async (romUrl) => {
     window.EJS_startOnLoaded = true
     window.EJS_controlScheme = 0
     window.EJS_hideSettings = false
+    // 用官方回调关 loading(loader.js 在实例就绪/游戏开始时触发),替代 MutationObserver
+    window.EJS_ready = onEmulatorReady
+    window.EJS_onGameStart = onEmulatorReady
 
-    // 注入 loader.js 触发模拟器初始化
+    // 只注入一次 loader.js(其内部读取全局配置并启动模拟器)
     const s = document.createElement('script')
     s.src = '/emulatorjs/data/loader.js'
     document.head.appendChild(s)
 
-    // 监听模拟器 canvas 出现(EmulatorJS 在 init 后创建 canvas)
-    observer = new MutationObserver(() => {
-      const canvas = container.value?.querySelector('canvas')
-      if (canvas) {
-        loading.value = false
-        observer?.disconnect()
-        observer = null
-      }
-    })
-    observer.observe(container.value, { childList: true, subtree: true })
-
-    // 兜底:5 秒后停止等待
-    setTimeout(() => { loading.value = false }, 5000)
+    // 兜底:回调因异常未触发时,15s 后关 loading 避免永久转圈
+    loadFallbackTimer = setTimeout(() => { loading.value = false }, 15000)
   } catch (e) {
     error.value = t('gba.loadFailed')
     ElMessage.error(t('gba.loadFailed'))
@@ -131,11 +130,12 @@ const loadRom = async (romUrl) => {
 
 const playFile = async (file) => {
   if (!file) return
-  if (!/\.(gba|gbc|gb|nes|smc|sfc)$/i.test(file.name)) {
+  if (!/\.(gba|gbc|gb)$/i.test(file.name)) {
     ElMessage.warning(t('gba.invalidType'))
     return
   }
   fileName.value = file.name
+  if (objectUrl) URL.revokeObjectURL(objectUrl) // 释放上一个本地 ROM 的 blob URL
   objectUrl = URL.createObjectURL(file)
   await loadRom(objectUrl)
 }
@@ -151,7 +151,8 @@ const onDrop = (e) => {
   if (f) playFile(f)
 }
 const close = () => {
-  cleanup()
+  teardownEmulator()
+  if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null }
   fileName.value = ''
   error.value = ''
 }
@@ -178,13 +179,13 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   document.removeEventListener('fullscreenchange', onFullscreenChange)
-  if (observer) { observer.disconnect(); observer = null }
-  cleanup()
+  teardownEmulator()
+  if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null }
   // 清理 EmulatorJS 全局变量
   delete window.EJS_player
   delete window.EJS_core
   delete window.EJS_gameUrl
-  delete window.EJS_emulator
+  delete window.EJS_pathtodata
   sunLight?.restoreEffects()
 })
 </script>

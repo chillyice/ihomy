@@ -58,7 +58,7 @@
     <el-dialog v-model="importVisible" :title="$t('games.import')" width="440px" destroy-on-close>
       <el-form label-position="top">
         <el-form-item :label="$t('games.file')">
-          <input ref="fileInput" type="file" accept=".swf,.gba,.gbc,.gb,.nes,.smc,.sfc" class="game-file-input" @change="onFilePicked" />
+          <input ref="fileInput" type="file" accept=".swf,.gba" class="game-file-input" @change="onFilePicked" />
         </el-form-item>
         <el-form-item :label="$t('games.name')">
           <el-input v-model="importForm.name" maxlength="100" :placeholder="$t('games.namePlaceholder')" />
@@ -138,7 +138,7 @@ const onFilePicked = (e) => {
   if (!f) return
   importForm.file = f
   if (!importForm.name.trim()) {
-    importForm.name = f.name.replace(/\.(swf|gba|gbc|gb|nes|smc|sfc)$/i, '')
+    importForm.name = f.name.replace(/\.(swf|gba)$/i, '')
   }
   e.target.value = ''
 }

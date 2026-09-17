@@ -2,7 +2,7 @@ package com.ihomy.common;
 
 /**
  * 小游戏常量:类型/状态/长度上限。
- * 本次仅支持 SWF 导入;type 字段预留 GBA 等后续扩展。
+ * 支持 SWF(Flash 播放器)与 GBA(GBA 模拟器)两种导入类型。
  */
 public final class GameConst {
 

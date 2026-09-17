@@ -574,14 +574,14 @@ export default {
   },
   gba: {
     dropTitle: 'Drop or click to select a ROM file',
-    dropSub: 'Supports .gba / .gbc / .gb / .nes formats',
+    dropSub: 'Supports .gba / .gbc / .gb formats',
     reselect: 'Reselect',
     close: 'Close',
     loading: 'Loading emulator…',
     loadFailed: 'Emulator failed to load, please retry',
     fullscreen: 'Fullscreen',
     exitFullscreen: 'Exit fullscreen',
-    invalidType: 'Please select a .gba / .gbc / .gb / .nes ROM file',
+    invalidType: 'Please select a .gba / .gbc / .gb ROM file',
   },
   points: {
     title: 'Points Mall',
