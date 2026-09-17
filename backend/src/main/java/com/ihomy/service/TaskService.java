@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
+import com.ihomy.common.PointsRuleConst;
 import com.ihomy.dto.TaskDTO;
 import com.ihomy.entity.SysUser;
 import com.ihomy.entity.Task;
@@ -120,7 +121,8 @@ public class TaskService {
         }
         task.setStatus(DictConst.TASK_DONE);
         taskMapper.updateById(task);
-        if (DictConst.REWARD_POINTS.equals(task.getRewardType()) && task.getRewardPoints() != null && task.getRewardPoints() > 0) {
+        if (DictConst.REWARD_POINTS.equals(task.getRewardType()) && task.getRewardPoints() != null && task.getRewardPoints() > 0
+                && pointsService.ruleEnabled(familyId, PointsRuleConst.TASK)) {
             pointsService.addRecord(task.getAssigneeId(), familyId, "REWARD",
                     task.getRewardPoints(), "完成任务【" + task.getTitle() + "】");
         }

@@ -51,11 +51,8 @@ public final class PlantConst {
     public static final int NUTRIENT_BASELINE = 50;
     public static final long NUTRIENT_DECAY_HOURS = 72;
 
-    /** 积分:施肥消耗 / 照料奖励 / 收获奖励 */
+    /** 积分:施肥消耗(扣分,消费侧;照料/收获的获取分值已由 PointsRuleConst 家庭级规则接管) */
     public static final int FERTILIZE_POINTS_COST = 15;
-    public static final int POINTS_WATER = 2;
-    public static final int POINTS_SUN = 2;
-    public static final int POINTS_HARVEST = 30;
 
     public static boolean isSpecies(String species) {
         return species != null && SPECIES.contains(species.toUpperCase());

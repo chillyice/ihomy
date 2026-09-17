@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ihomy.common.BizException;
 import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
+import com.ihomy.common.PointsRuleConst;
 import com.ihomy.dto.DiaryDTO;
 import com.ihomy.entity.Diary;
 import com.ihomy.entity.SysUser;
@@ -77,7 +78,7 @@ public class DiaryService {
         diary.setVisibility(DictConst.visibility(dto.getVisibility()));
         diary.setCreatedAt(parseDate(dto.getDate()));
         diaryMapper.insert(diary);
-        pointsService.addRecord(authorId, familyId, "REWARD", PointsService.REWARD_DIARY, "写日记");
+        pointsService.addRecordIfEnabled(authorId, familyId, PointsRuleConst.DIARY, "REWARD", "写日记");
         return diary;
     }
 

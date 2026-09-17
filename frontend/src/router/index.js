@@ -56,6 +56,11 @@ const routes = [
   { path: '/tools/flash', name: 'FlashPlayer', component: () => import('@/views/tools/FlashPlayer.vue'), meta: { public: true } },
   // 植物养殖小游戏:全家共养一棵,营养/天气/积分/成长日志(需登录,涉及积分与家庭交互)
   { path: '/tools/plant', name: 'Plant', component: () => import('@/views/plant/Plant.vue'), meta: { requiresAuth: true } },
+  // 小游戏:家庭游戏库(花园 + 导入的 swf 游戏),需登录
+  { path: '/games', name: 'Games', component: () => import('@/views/games/Games.vue'), meta: { requiresAuth: true } },
+  { path: '/games/play/:id', name: 'GamePlayer', component: () => import('@/views/games/GamePlayer.vue'), meta: { requiresAuth: true } },
+  // 宠物连连看 H5(自 Flash 移植的原生小游戏,通关发积分),需登录
+  { path: '/games/petlink', name: 'PetLinkLink', component: () => import('@/views/games/PetLinkLink.vue'), meta: { requiresAuth: true } },
   // 运维管理页:仅 OPS 角色可访问
   { path: '/ops', name: 'Ops', component: () => import('@/views/ops/Ops.vue'), meta: { ops: true } },
   // 兜底:未匹配的路由重定向回首页

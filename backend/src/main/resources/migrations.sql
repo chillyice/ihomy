@@ -1028,3 +1028,120 @@ CREATE TABLE IF NOT EXISTS `family_plant_log` (
 -- 三、首页模块路径迁移 /plant → /tools/plant(迁入小游戏模块)
 -- ------------------------------------------------------------
 UPDATE `sys_home_module` SET `path` = '/tools/plant' WHERE `code` = 'plant' AND `path` = '/plant';
+
+-- ------------------------------------------------------------
+-- 2026-09-16 V9.69 小游戏模块:家庭游戏库(game_info)+ 小游戏入口种子 + 植物养殖改名「花园」并迁入小游戏页
+-- 一、家庭小游戏表(导入 .swf,家庭隔离,幂等)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `game_info` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `user_id`     BIGINT       NOT NULL COMMENT '导入人ID',
+  `name`        VARCHAR(100) NOT NULL COMMENT '游戏名',
+  `description` VARCHAR(500) DEFAULT NULL COMMENT '描述',
+  `type`        VARCHAR(20)  NOT NULL DEFAULT 'SWF' COMMENT '类型:SWF/GBA(预留)',
+  `file_url`    VARCHAR(500) NOT NULL COMMENT '文件URL(/files/games/...)',
+  `status`      VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE' COMMENT '状态:ACTIVE启用/DISABLED禁用',
+  `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family_created` (`family_id`, `deleted`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭小游戏表';
+
+-- 二、首页模块种子(小游戏,content 组末尾 sort_order=21);NOT EXISTS 防重
+-- ------------------------------------------------------------
+INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`)
+SELECT 'games', '小游戏', 'icon-games', '/games', 'content', 'left', 21, 1
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM `sys_home_module` WHERE `code` = 'games' AND `family_id` IS NULL);
+
+-- 三、植物养殖改名「花园」并从侧栏隐藏(迁入小游戏页,作为花园卡片)
+-- ------------------------------------------------------------
+UPDATE `sys_home_module` SET `title` = '花园', `enabled` = 0 WHERE `code` = 'plant' AND `family_id` IS NULL;
+
+-- ------------------------------------------------------------
+-- 2026-09-17 V9.70 积分获取规则:家长配置各功能能否得积分、得多少(幂等)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `family_points_rule` (
+  `id`           BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`    BIGINT      NOT NULL COMMENT '所属家庭ID',
+  `feature_code` VARCHAR(40) NOT NULL COMMENT '功能code(checkin/blog/diary/photo/video/task/game_petlink/plant_water/plant_sun/plant_harvest)',
+  `enabled`      TINYINT     NOT NULL DEFAULT 1 COMMENT '是否允许该功能获取积分:0关闭 1开启',
+  `points`       INT         NOT NULL DEFAULT 0 COMMENT '每次/每单位获取积分(任务此项不生效)',
+  `created_at`   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_family_feature` (`family_id`, `feature_code`),
+  KEY `idx_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='积分获取规则表';
+
+-- ------------------------------------------------------------
+-- 2026-09-17 V9.71 开源组件台账:登记 + 版本检测 + 升级提示(幂等)
+-- 一、台账表(NPM/MAVEN/SERVICE 三类;uk_type_ref 供种子幂等)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `sys_oss_component` (
+  `id`                 BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `name`               VARCHAR(100) NOT NULL COMMENT '显示名',
+  `component_type`     VARCHAR(20)  NOT NULL COMMENT '类型:NPM/MAVEN/SERVICE',
+  `package_ref`        VARCHAR(255) NOT NULL COMMENT '包引用:NPM包名/MAVEN group:artifact/SERVICE owner/repo',
+  `current_version`    VARCHAR(50)  DEFAULT NULL COMMENT '当前使用/运行版本(SERVICE 由管理员维护)',
+  `latest_version`     VARCHAR(50)  DEFAULT NULL COMMENT '检测到的最新稳定版',
+  `update_type`        VARCHAR(20)  NOT NULL DEFAULT 'NONE' COMMENT '更新类型:MAJOR/MINOR/PATCH/NONE',
+  `license`            VARCHAR(50)  DEFAULT NULL COMMENT '许可证',
+  `repo_url`           VARCHAR(255) DEFAULT NULL COMMENT '主页/仓库链接',
+  `purpose`            VARCHAR(255) DEFAULT NULL COMMENT '用途说明',
+  `integration_status` VARCHAR(20)  NOT NULL DEFAULT 'FULL' COMMENT '集成状态:FULL/PARTIAL/PLANNED',
+  `status`             VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE' COMMENT '状态:ACTIVE/IGNORED',
+  `last_checked_at`    DATETIME     DEFAULT NULL COMMENT '最近检测时间',
+  `remark`             VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  `created_at`         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_type_ref` (`component_type`, `package_ref`),
+  KEY `idx_type_status` (`component_type`, `status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='开源组件台账(登记+版本检测+升级提示)';
+
+-- 二、字典种子(uk_group_value 幂等)
+-- ------------------------------------------------------------
+INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('oss_component_type', 'NPM',     'NPM 依赖'),
+('oss_component_type', 'MAVEN',   'Maven 依赖'),
+('oss_component_type', 'SERVICE', '独立服务'),
+('oss_update_type', 'MAJOR', '大版本更新'),
+('oss_update_type', 'MINOR', '次版本更新'),
+('oss_update_type', 'PATCH', '补丁更新'),
+('oss_update_type', 'NONE',  '无更新'),
+('oss_status', 'ACTIVE',   '启用'),
+('oss_status', 'IGNORED',  '忽略'),
+('oss_integration', 'FULL',     '已完整集成'),
+('oss_integration', 'PARTIAL',  '部分集成'),
+('oss_integration', 'PLANNED',  '规划中');
+
+-- 三、组件种子(uk_type_ref 幂等):前端 NPM 直接依赖 15 + 后端 Maven 显式依赖 6 + 独立服务 3
+-- ------------------------------------------------------------
+INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`) VALUES
+('Vue', 'NPM', 'vue', '3.4.27', 'MIT', 'https://github.com/vuejs/core', '前端框架', 'FULL'),
+('Vue Router', 'NPM', 'vue-router', '4.3.2', 'MIT', 'https://github.com/vuejs/router', '前端路由', 'FULL'),
+('Pinia', 'NPM', 'pinia', '2.1.7', 'MIT', 'https://github.com/vuejs/pinia', '状态管理', 'FULL'),
+('Vue I18n', 'NPM', 'vue-i18n', '9.14.4', 'MIT', 'https://github.com/intlify/vue-i18n', '中英双语', 'FULL'),
+('Element Plus', 'NPM', 'element-plus', '2.7.3', 'MIT', 'https://github.com/element-plus/element-plus', 'UI 组件库', 'FULL'),
+('Element Plus Icons', 'NPM', '@element-plus/icons-vue', '2.3.1', 'MIT', 'https://github.com/element-plus/element-plus-icons', '图标', 'FULL'),
+('Axios', 'NPM', 'axios', '1.7.2', 'MIT', 'https://github.com/axios/axios', 'HTTP 客户端', 'FULL'),
+('GSAP', 'NPM', 'gsap', '3.15.0', 'Standard', 'https://github.com/greensock/GSAP', '动画引擎', 'FULL'),
+('Three.js', 'NPM', 'three', '0.186.0', 'MIT', 'https://github.com/mrdoob/three.js', '3D 光影实验台', 'FULL'),
+('epub.js', 'NPM', 'epubjs', '0.3.93', 'BSD-2-Clause', 'https://github.com/futurepress/epub.js', '书架 EPUB 阅读器', 'FULL'),
+('PDF.js', 'NPM', 'pdfjs-dist', '6.3.289', 'Apache-2.0', 'https://github.com/mozilla/pdf.js', 'PDF 查看器/户型图底图', 'FULL'),
+('simple-mind-map', 'NPM', 'simple-mind-map', '0.14.0', 'MIT', 'https://github.com/wanglin2/mind-map', '工具箱脑图设计', 'FULL'),
+('Marked', 'NPM', 'marked', '18.0.9', 'MIT', 'https://github.com/markedjs/marked', 'Markdown 渲染', 'FULL'),
+('QWeather Icons', 'NPM', 'qweather-icons', '1.8.0', 'MIT', 'https://github.com/qwd/Icons', '天气图标字体', 'FULL'),
+('Ruffle (Flash 播放器)', 'NPM', '@ruffle-rs/ruffle', '0.6.0', 'MIT/Apache-2.0', 'https://github.com/ruffle-rs/ruffle', '放映厅/小游戏 Flash 播放', 'FULL'),
+('Spring Boot', 'MAVEN', 'org.springframework.boot:spring-boot-starter-parent', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端框架', 'FULL'),
+('MyBatis-Plus', 'MAVEN', 'com.baomidou:mybatis-plus-spring-boot3-starter', '3.5.5', 'Apache-2.0', 'https://github.com/baomidou/mybatis-plus', 'ORM', 'FULL'),
+('Hutool', 'MAVEN', 'cn.hutool:hutool-all', '5.8.27', 'MulanPSL-2.0', 'https://github.com/dromara/hutool', '工具库(农历/文本等)', 'FULL'),
+('JJWT', 'MAVEN', 'io.jsonwebtoken:jjwt-api', '0.12.5', 'Apache-2.0', 'https://github.com/jwtk/jjwt', 'JWT 双 token', 'FULL'),
+('Knife4j', 'MAVEN', 'com.github.xiaoymin:knife4j-openapi3-jakarta-spring-boot-starter', '4.5.0', 'Apache-2.0', 'https://github.com/xiaoymin/knife4j', '接口文档', 'FULL'),
+('mp3agic', 'MAVEN', 'com.mpatric:mp3agic', '0.9.1', 'MIT', 'https://github.com/mpatric/mp3agic', '音乐元数据解析', 'FULL'),
+('Nextcloud', 'SERVICE', 'nextcloud/server', NULL, 'AGPL-3.0', 'https://github.com/nextcloud/server', 'WebDAV/Nextcloud 存储后端', 'PARTIAL'),
+('Jellyfin', 'SERVICE', 'jellyfin/jellyfin', NULL, 'GPL-2.0', 'https://github.com/jellyfin/jellyfin', '放映厅媒体引擎(规划)', 'PLANNED'),
+('Home Assistant', 'SERVICE', 'home-assistant/core', NULL, 'Apache-2.0', 'https://github.com/home-assistant/core', '智能家居中控(规划)', 'PLANNED');

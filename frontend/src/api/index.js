@@ -189,6 +189,8 @@ export const pointsApi = {
   myOrders: () => request.get('/points/orders'),
   familyOrders: () => request.get('/points/orders/all'),
   markTaken: (id) => request.put(`/points/orders/${id}/taken`),
+  rules: () => request.get('/points/rules'),
+  saveRules: (data) => request.put('/points/rules', data),
 }
 
 // 任务悬赏(发布/领取/完成/确认结算)
@@ -230,6 +232,16 @@ export const plantApi = {
   sun: (message) => request.post('/plant/sun', { message }),
   fertilize: (message) => request.post('/plant/fertilize', { message }),
   harvest: (species, message) => request.post('/plant/harvest', { species, message }),
+}
+
+// 小游戏(家庭游戏库:导入 .swf,列表/详情/改名/改描述/删除;H5 通关奖励)
+export const gameApi = {
+  list: () => request.get('/game'),
+  get: (id) => request.get(`/game/${id}`),
+  import: (formData) => request.post('/game/import', formData),
+  update: (id, data) => request.put(`/game/${id}`, data),
+  remove: (id) => request.delete(`/game/${id}`),
+  petLinkReward: () => request.post('/game/petlink/reward'),
 }
 
 // 愿望单(家庭共享愿望,分类/达成/放弃)
@@ -297,6 +309,15 @@ export const opsApi = {
   weatherStats: () => request.get('/ops/weather/stats'),
   weatherTimeline: (range, types) => request.get('/ops/weather/timeline', { params: { range, types: types?.length ? types.join(',') : null } }),
   weatherTypeDistribution: (range) => request.get('/ops/weather/type-distribution', { params: { range } }),
+  // 开源组件台账(版本检测 + 升级提示)
+  ossList: () => request.get('/ops/oss/list'),
+  ossSummary: () => request.get('/ops/oss/summary'),
+  ossCheck: () => request.post('/ops/oss/check', null, { timeout: 60000 }),
+  ossUpgradePlan: (id) => request.get(`/ops/oss/${id}/upgrade-plan`),
+  ossUpdate: (id, data) => request.put(`/ops/oss/${id}`, data),
+  ossAdd: (data) => request.post('/ops/oss', data),
+  ossConfirm: (id) => request.put(`/ops/oss/${id}/confirm`),
+  ossIgnore: (id, ignored) => request.put(`/ops/oss/${id}/ignore`, null, { params: { ignored } }),
 }
 
 // 家谱(家庭隐私数据,需登录)

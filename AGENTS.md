@@ -59,7 +59,7 @@
 - **业务运行用 `ihomy` 账号**:仅授予 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`(最小权限,无 CREATE/ALTER/DROP)。application.yml 连接用 `ihomy`,**不要用 root 跑业务**。
 - 账号同时创建 `localhost` 和 `%` 两个 host(本机/远程应用服务器都能连)。
 - **生产 MySQL 密码策略(2026-09-07 轮换踩坑)**:生产库启用 `validate_password` MEDIUM(特殊字符/数字/大小写各≥1,长度≥8)——生成/轮换 DB 密码必须含特殊字符(避开 `' " \ $ |` 转义雷区,建议 `!@%^&*-_+=.`),否则 `ALTER USER` 报 1819;开发 Docker MySQL 无此组件,同一密码 dev 可用 prod 被拒。
-- **64 张表**,前缀分类:`sys_` 21 张(系统/账号/权限/配置/日志/天气/存储)、`family_` 22 张(家庭事务)、`content_` 21 张(内容数据)。**完整表清单见 `docs/需求设计说明书.md` §6.2**。
+- **69 张表**,前缀分类:`sys_` 22 张(系统/账号/权限/配置/日志/天气/存储)、`family_` 25 张(家庭事务)、`content_` 21 张(内容数据)、另 `game_info` 1 张(家庭小游戏,命名未加 family_ 前缀——遗留)。**完整表清单见 `docs/需求设计说明书.md` §6.2**。
   - **命名规则**:家庭事务业务表一律 `family_` 前缀;内容数据 `content_` 前缀;账号/权限/配置/日志/天气/存储保留 `sys_`。新增表必须遵守。前缀取最顶层祖先类别;上下级关系体现在表名(如 `sys_user_role`)。
 - **引用开源软件必须对接自动升级(强制)**:新增任何 npm/Maven 直接依赖或独立开源服务(如 Ruffle/Nextcloud/Jellyfin/Home Assistant)时,**必须同时在 `sys_oss_component` 台账登记一条记录**(`component_type`=NPM/MAVEN/SERVICE + `package_ref` + `current_version` + `license` + `repo_url`),否则该软件不会被版本跟踪与升级提示覆盖。检测纯规则(无 AI):npm registry / Maven Central / GitHub Releases;升级只「提示 + 一键生成方案」,不改源码、不碰运行时。运维入口 `/ops/oss`(OPS 角色,`ops:view`),种子见 schema.sql / migrations.sql V9.71 段,规则实现见 `common/OssVersionUtil` + `service/OssComponentService`。
 - **枚举不再用数字**:状态/类型字段一律大写英文单词(`PUBLISHED/DRAFT/PUBLIC/FAMILY/ACTIVE...`),含义存字典表 `sys_dict_item`,Java 常量集中于 `common/DictConst.java`,前端映射 `utils/dict.js`。**不要写回 0/1/2 判断**。
@@ -104,7 +104,7 @@ frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
     components/   # AppSidebar/BackToTop/Breadcrumb/AvatarCropper/InstallPrompt/SiteFooter/SunLightLayer/LightTestConsole/SyncDialog/Mobile*(移动端)/warm/(暖居外壳 WarmLayout+WarmHome)
     layouts/MobileLayout.vue  # 移动端壳
     styles/main.css # CSS 变量 + 全局样式 + 深色模式 + EP 组件覆写 + @media
-    views/        # 31 个页面(Home/Login/Member/Settings/Anniversary/album/cinema/diary/blog/points/task/reminder/plan/wish/book/chat/tree/cascade/ops/storage/item/kitchen/library/tools)
+    views/        # 33 个页面(Home/Login/Member/Settings/Anniversary/album/cinema/diary/blog/points/task/reminder/plan/wish/book/chat/tree/cascade/ops/storage/item/kitchen/library/tools/games(Games+GamePlayer+PetLinkLink)/plant(花园))
     App.vue
   vite.config.js   # PWA + 代理 /api->8080 + manualChunks 分块 + ElementPlus 按需
 ```
@@ -151,6 +151,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 内容 | 博客 / 日记 / 相册照片 / 放映厅 / 照片瀑布 / 愿望单 / 书架 | Blog / Diary / Album+Photo / Video / Cascade / Wish / Library 各 Controller |
 | 互动 | 点赞 / 评论 / 通知 / 聊天室 | Like / Comment / Notification / Chat Controller + ChatWebSocketHandler |
 | 生活 | 纪念日 / 提醒 / 计划 / 任务 / 记账 / 家谱 / 签到积分 / 背景音乐 | Anniversary / Reminder / Plan / Task / Points / Music 各 Controller |
+| 游戏 | 花园植物养殖(全家共养一棵)/ 小游戏库(导入 SWF + Flash 播放器 Ruffle)/ 宠物连连看 H5(通关发积分) | FamilyPlant / GameInfo 各 Controller + FlashPlayer.vue + PetLinkLink.vue |
 | 基础 | 文件上传 / 存储管理 / 首页聚合 / 运维 / 开源组件台账 / 每日内容 / 操作日志 / 系统参数 | File / Storage / Home+Public / Ops+Oss / Daily / Log 各 Controller |
 | 光影 | 太阳位置/体积光/台灯/天气 / 天气代理 / 天气详情 / 首页仪表盘 | SolarUtil+SunService + windowLight.js + SunLightLayer.vue |
 | 物品 | 物品定位+户型图+AI 语义 | ItemController / ItemService / ItemAiService+AiService(设计决策见需求设计说明书 §4.8.1) |

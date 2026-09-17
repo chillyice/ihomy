@@ -100,6 +100,11 @@ public class FileService {
         return saveTo(file, originalName, "books", yyyyMM, null);
     }
 
+    /** 小游戏上传(流式):存 games/{游戏名}/ 平铺 */
+    public String uploadGame(MultipartFile file, String gameName) {
+        return saveTo(file, file.getOriginalFilename(), "games", gameName, null);
+    }
+
     /** 按 URL 删除已上传文件:仅处理本站 URL(外链/空直接忽略),文件不存在容忍,失败仅告警 */
     public void deleteByUrl(String url) {
         String prefix = urlPrefix.replaceAll("/+$", "");

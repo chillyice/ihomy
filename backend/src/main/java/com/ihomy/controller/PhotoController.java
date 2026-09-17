@@ -60,8 +60,7 @@ public class PhotoController {
             photos.add(albumService.addPhoto(albumId, user, fid, url, null));
         }
         if (!photos.isEmpty()) {
-            pointsService.addRecord(user.getId(), fid, "REWARD",
-                    PointsService.REWARD_PHOTO * photos.size(), "上传照片 ×" + photos.size());
+            pointsService.rewardPhotoUpload(user.getId(), fid, photos.size());
             publicController.invalidateHomeCache(fid);
         }
         return Result.success(photos);

@@ -3,6 +3,7 @@ package com.ihomy.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.DictConst;
+import com.ihomy.common.PointsRuleConst;
 import com.ihomy.common.ResultCode;
 import com.ihomy.dto.PointsProductDTO;
 import com.ihomy.entity.Checkin;
@@ -27,30 +28,24 @@ import java.util.stream.Collectors;
 
 /**
  * 积分体系业务(V3.4):每日签到 / 内容发布奖励 / 积分商城兑换。
- * 签到规则:基础 5 分 + 连续签到加成((连续天数-1)%7,7 天一轮回),断签重计。
+ * 签到规则:基础分(家庭级可配)+ 连续签到加成((连续天数-1)%7,7 天一轮回),断签重计。
+ * 各功能获取积分的开关与分值统一由 PointsRuleService(家庭级规则)控制,默认值与历史硬编码一致。
  */
 @Service
 @RequiredArgsConstructor
 public class PointsService {
-
-    /** 签到基础分;连续加成上限为 7 天一轮回 */
-    public static final int CHECKIN_BASE = 5;
-    /** 发布内容奖励分(写流水大改时同步前端提示) */
-    public static final int REWARD_BLOG = 10;
-    public static final int REWARD_DIARY = 8;
-    public static final int REWARD_PHOTO = 2;
-    public static final int REWARD_VIDEO = 15;
 
     private final CheckinMapper checkinMapper;
     private final PointsRecordMapper recordMapper;
     private final PointsProductMapper productMapper;
     private final PointsOrderMapper orderMapper;
     private final SysUserMapper sysUserMapper;
+    private final PointsRuleService pointsRuleService;
 
     // ---------- 查询 ----------
 
     /** 我的积分概览:总积分/今日是否已签/当前连续天数/今日签到可得积分 */
-    public Map<String, Object> stats(Long userId) {
+    public Map<String, Object> stats(Long userId, Long familyId) {
         LocalDate today = LocalDate.now();
         Checkin todayCheckin = checkinMapper.selectOne(new LambdaQueryWrapper<Checkin>()
                 .eq(Checkin::getUserId, userId).eq(Checkin::getCheckinDate, today));
@@ -63,7 +58,9 @@ public class PointsService {
         map.put("balance", balance(userId));
         map.put("checkedToday", todayCheckin != null);
         map.put("streak", streak);
-        map.put("todayPoints", todayCheckin != null ? 0 : CHECKIN_BASE + streak % 7);
+        map.put("todayPoints", todayCheckin != null ? 0
+                : (ruleEnabled(familyId, PointsRuleConst.CHECKIN)
+                ? rulePoints(familyId, PointsRuleConst.CHECKIN) + streak % 7 : 0));
         return map;
     }
 
@@ -85,7 +82,8 @@ public class PointsService {
         if (yesterday != null) {
             nextStreak = yesterday.getStreak() + 1;
         }
-        int points = CHECKIN_BASE + (nextStreak - 1) % 7;
+        int points = ruleEnabled(familyId, PointsRuleConst.CHECKIN)
+                ? rulePoints(familyId, PointsRuleConst.CHECKIN) + (nextStreak - 1) % 7 : 0;
         Checkin checkin = new Checkin();
         checkin.setUserId(userId);
         checkin.setFamilyId(familyId);
@@ -98,7 +96,9 @@ public class PointsService {
             // UNIQUE(user_id, checkin_date) 冲突即今日已签,并发下同样生效
             throw new BizException(ResultCode.ALREADY_CHECKIN);
         }
-        addRecord(userId, familyId, "CHECKIN", points, "每日签到(连续第" + nextStreak + "天)");
+        if (points > 0) {
+            addRecord(userId, familyId, "CHECKIN", points, "每日签到(连续第" + nextStreak + "天)");
+        }
         Map<String, Object> map = new HashMap<>();
         map.put("points", points);
         map.put("streak", nextStreak);
@@ -116,6 +116,42 @@ public class PointsService {
         record.setBalance(balance(userId) + change);
         record.setRemark(remark);
         recordMapper.insert(record);
+    }
+
+    // ---------- 积分获取规则 ----------
+
+    /** 某功能是否允许获取积分(未配置默认开启) */
+    public boolean ruleEnabled(Long familyId, String code) {
+        return pointsRuleService.effective(familyId, code).enabled();
+    }
+
+    /** 某功能生效分值(未配置回退常量默认) */
+    public int rulePoints(Long familyId, String code) {
+        return pointsRuleService.effective(familyId, code).points();
+    }
+
+    /** 按规则发放一笔奖励:功能关闭或分值为 0 时不落账;返回实际发放分值 */
+    public int addRecordIfEnabled(Long userId, Long familyId, String code, String type, String remark) {
+        if (!ruleEnabled(familyId, code)) {
+            return 0;
+        }
+        int pts = rulePoints(familyId, code);
+        if (pts > 0) {
+            addRecord(userId, familyId, type, pts, remark);
+        }
+        return pts;
+    }
+
+    /** 上传照片奖励(单张分值 × 张数);关闭或 0 分不落账,返回实发分值 */
+    public int rewardPhotoUpload(Long userId, Long familyId, int count) {
+        if (count <= 0 || !ruleEnabled(familyId, PointsRuleConst.PHOTO)) {
+            return 0;
+        }
+        int pts = rulePoints(familyId, PointsRuleConst.PHOTO) * count;
+        if (pts > 0) {
+            addRecord(userId, familyId, "REWARD", pts, "上传照片 ×" + count);
+        }
+        return pts;
     }
 
     // ---------- 积分商城 ----------

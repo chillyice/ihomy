@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.PlantConst;
+import com.ihomy.common.PointsRuleConst;
 import com.ihomy.common.ResultCode;
 import com.ihomy.common.UserNames;
 import com.ihomy.dto.PlantDTO;
@@ -139,7 +140,7 @@ public class FamilyPlantService {
                 .set(FamilyPlant::getCareBoostMinutes, 0)
                 .setSql("harvest_count = harvest_count + 1");
         plantMapper.update(null, uw);
-        pointsService.addRecord(userId, familyId, "PLANT_HARVEST", PlantConst.POINTS_HARVEST, "收获植物");
+        pointsService.addRecordIfEnabled(userId, familyId, PointsRuleConst.PLANT_HARVEST, "PLANT_HARVEST", "收获植物");
         addLog(familyId, userId, "HARVEST", message(dto), "收获了成熟的植物,开启新的一轮");
         notifyFamily(familyId, userId, "收获了家里的植物");
         return state(familyId);
@@ -174,9 +175,9 @@ public class FamilyPlantService {
             throw new BizException(ResultCode.CONFLICT,
                     (isWater ? "浇水冷却中" : "晒太阳冷却中") + (remain > 0 ? ",还需 " + remain + " 分钟" : ""));
         }
-        int pts = isWater ? PlantConst.POINTS_WATER : PlantConst.POINTS_SUN;
-        pointsService.addRecord(userId, familyId, isWater ? "PLANT_WATER" : "PLANT_SUN", pts,
-                isWater ? "给植物浇水" : "给植物晒太阳");
+        String plantCode = isWater ? PointsRuleConst.PLANT_WATER : PointsRuleConst.PLANT_SUN;
+        pointsService.addRecordIfEnabled(userId, familyId, plantCode,
+                isWater ? "PLANT_WATER" : "PLANT_SUN", isWater ? "给植物浇水" : "给植物晒太阳");
         addLog(familyId, userId, isWater ? "WATER" : "SUN", message(dto), isWater ? "浇了水" : "晒了太阳");
         notifyFamily(familyId, userId, isWater ? "给家里的植物浇了水" : "带家里的植物晒了太阳");
         return state(familyId);

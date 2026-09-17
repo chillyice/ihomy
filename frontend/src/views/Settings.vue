@@ -15,6 +15,9 @@
           <el-menu-item v-if="userStore.hasPerm('family:manage')" index="ai">
             <span class="menu-icon">🤖</span>{{ $t('settings.cat.ai') }}
           </el-menu-item>
+          <el-menu-item v-if="userStore.hasPerm('points:manage')" index="pointsRule">
+            <span class="menu-icon">🏅</span>{{ $t('settings.cat.pointsRule') }}
+          </el-menu-item>
           <el-menu-item index="daily">
             <span class="menu-icon">📅</span>{{ $t('settings.cat.daily') }}
           </el-menu-item>
@@ -79,6 +82,13 @@
                 <el-button type="primary" :loading="profileSaving" @click="saveProfile">{{ $t('settings.saveProfile') }}</el-button>
               </div>
             </el-form>
+          </div>
+
+          <!-- 退出登录:个人设置最下方 -->
+          <div class="card settings-card">
+            <div class="section-label">{{ $t('nav.logout') }}</div>
+            <p class="share-tip">退出当前账号的登录状态,返回未登录的首页。</p>
+            <el-button type="danger" plain @click="onLogout">{{ $t('nav.logout') }}</el-button>
           </div>
         </template>
 
@@ -161,6 +171,19 @@
               </el-form-item>
                 <div class="share-tip">歌单是BGM播放的最小单元;播放器只播放当前家庭绑定的BGM歌单。详细配置请<a href="javascript:void(0)" class="link-text" @click="$router.push('/music')">跳转音乐页面</a></div>
             </el-form>
+          </div>
+
+          <!-- 切换家庭:在当前加入的家庭之间切换(全部主题通用) -->
+          <div class="card settings-card">
+            <div class="section-label">{{ $t('nav.switchFamily') }}</div>
+            <div v-if="families.length" class="family-switch-list">
+              <div v-for="f in families" :key="f.familyId" class="family-switch-item">
+                <span class="family-switch-name">{{ f.name }}</span>
+                <el-tag v-if="f.isCurrent" size="small" type="success">当前家庭</el-tag>
+                <el-button v-else size="small" type="primary" plain @click="switchFamily(f.familyId)">切换</el-button>
+              </div>
+            </div>
+            <el-empty v-else :description="$t('common.empty')" :image-size="40" />
           </div>
 
           <!-- 创建新家庭:放在家庭设置最下方 -->
@@ -292,6 +315,33 @@
               <el-button type="primary" :loading="aiSaving" @click="saveAiModel">{{ $t('common.confirm') }}</el-button>
             </template>
           </el-dialog>
+        </template>
+
+        <!-- 积分获取规则:家长配置各功能能否得积分、得多少 -->
+        <template v-if="active === 'pointsRule'">
+          <div class="card settings-card" v-loading="pointsRuleLoading">
+            <div class="section-label">{{ $t('settings.pointsRule.title') }}</div>
+            <div class="share-tip">{{ $t('settings.pointsRule.hint') }}</div>
+            <div v-for="g in pointsRuleGroups" :key="g.code" class="points-rule-group">
+              <div class="ai-sub-label">{{ $t('settings.pointsRule.group.' + g.code) }}</div>
+              <div v-for="r in pointsRuleGroup(g.code)" :key="r.featureCode" class="ai-feature-row">
+                <span class="ai-feature-name">{{ $t('settings.pointsRule.feature.' + r.featureCode) }}</span>
+                <el-switch v-model="r.enabled" />
+                <el-input-number
+                  v-if="r.hasPoints"
+                  v-model="r.points"
+                  :min="0"
+                  :max="9999"
+                  :step="1"
+                  class="points-rule-input"
+                />
+                <span v-else class="points-rule-na">{{ $t('settings.pointsRule.taskPoints') }}</span>
+              </div>
+            </div>
+            <div class="ai-toolbar">
+              <el-button type="primary" :loading="pointsRuleSaving" @click="savePointsRule">{{ $t('common.save') }}</el-button>
+            </div>
+          </div>
         </template>
 
         <!-- 每日内容 -->
@@ -594,7 +644,7 @@
 import { ref, reactive, computed, inject, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { profileApi, familyApi, fileApi, musicApi, aiApi, weatherApi, publicApi } from '@/api'
+import { profileApi, familyApi, fileApi, musicApi, aiApi, weatherApi, publicApi, authApi, pointsApi } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { CircleCheck, CircleClose, Edit, Delete } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
@@ -757,7 +807,9 @@ const load = async () => {
     // 忽略
   }
   loadPlaylists()
+  loadFamilies()
   loadAiConfig()
+  loadPointsRule()
   loadWeatherCreds()
 }
 
@@ -920,6 +972,39 @@ const confirmCreateFamily = async () => {
   }
 }
 
+// 退出登录:个人设置最下方,确认后登出并刷新回未登录首页
+const onLogout = () => {
+  ElMessageBox.confirm('确定退出登录吗？', t('nav.logout'), {
+    confirmButtonText: t('common.confirm'),
+    cancelButtonText: t('common.cancel'),
+    type: 'warning',
+    closeOnClickModal: true,
+  }).then(() => {
+    userStore.logout()
+    location.reload()
+  }).catch(() => {})
+}
+
+// 切换家庭:列出当前账号加入的所有家庭,点击非当前家庭切换(与侧栏切换家庭同口径)
+const families = ref([])
+const loadFamilies = async () => {
+  if (!userStore.isLoggedIn) return
+  try {
+    families.value = (await authApi.families()) || []
+  } catch (e) {
+    families.value = []
+  }
+}
+const switchFamily = async (familyId) => {
+  try {
+    await userStore.switchFamily(familyId, true)
+    ElMessage.success(t('nav.switchFamily') + ' ✓')
+    location.reload()
+  } catch (e) {
+    ElMessage.error(e.message || t('common.failed'))
+  }
+}
+
 // 家庭 AI 配置:模型池 + 功能绑定(家长可编辑;密钥留空保留原值)
 const canManageAi = computed(() => userStore.hasPerm('family:manage'))
 const aiModels = ref([])
@@ -1026,6 +1111,50 @@ const bindAiFeature = async (f) => {
   } catch (e) {
     // 拦截器已提示
     await loadAiConfig()
+  }
+}
+
+// ===== 积分获取规则(家长配置各功能能否得积分、得多少) =====
+const canManagePointsRule = computed(() => userStore.hasPerm('points:manage'))
+const pointsRules = ref([])
+const pointsRuleLoading = ref(false)
+const pointsRuleSaving = ref(false)
+const pointsRuleGroups = [
+  { code: 'content' },
+  { code: 'task' },
+  { code: 'game' },
+  { code: 'garden' },
+]
+const pointsRuleGroup = (code) => pointsRules.value.filter((r) => r.group === code)
+
+const loadPointsRule = async () => {
+  if (!userStore.isLoggedIn || !canManagePointsRule.value) return
+  pointsRuleLoading.value = true
+  try {
+    const rules = await pointsApi.rules()
+    pointsRules.value = rules || []
+  } catch (e) {
+    // 拦截器已提示(非家长 403 时静默)
+  } finally {
+    pointsRuleLoading.value = false
+  }
+}
+
+const savePointsRule = async () => {
+  pointsRuleSaving.value = true
+  try {
+    const body = pointsRules.value.map((r) => ({
+      featureCode: r.featureCode,
+      enabled: r.enabled,
+      points: r.hasPoints ? r.points : null,
+    }))
+    await pointsApi.saveRules(body)
+    ElMessage.success(t('settings.pointsRule.saved'))
+    await loadPointsRule()
+  } catch (e) {
+    // 拦截器已提示
+  } finally {
+    pointsRuleSaving.value = false
   }
 }
 
@@ -1218,6 +1347,11 @@ html.dark .form-tip, html.dark .share-tip { color: #9a9088; }
 .ai-feature-state .el-icon { font-size: 16px; }
 .ai-feature-state.ok { color: var(--color-primary); }
 
+/* 积分获取规则:分组 + 数值输入 */
+.points-rule-group { margin-bottom: 4px; }
+.points-rule-input { width: 120px; }
+.points-rule-na { font-size: 13px; color: var(--color-text-secondary); }
+
 /* 个性化设置:控件行 + 标签水平排列,垂直居中 */
 .setting-row { display: flex; align-items: center; gap: 10px; }
 .setting-label { font-size: 14px; font-weight: 500; color: var(--color-text); }
@@ -1269,6 +1403,11 @@ html.dark .form-tip, html.dark .share-tip { color: #9a9088; }
 html.dark .create-family-btn { background: rgba(232,220,200,0.1); color: #E8DCC8; }
 html.dark .create-family-btn:hover { background: rgba(232,220,200,0.15); }
 .fm-hint { font-size: 13px; color: var(--color-text-secondary); line-height: 1.5; margin-bottom: 16px; }
+
+/* 切换家庭列表 */
+.family-switch-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.family-switch-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--color-card-2); border-radius: 10px; }
+.family-switch-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 500; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* 背景音乐歌单列表 */
 .bg-playlist-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }

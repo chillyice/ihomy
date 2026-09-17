@@ -33,26 +33,26 @@
         <div class="gc-app">
           <!-- 侧栏:按分类分组,组头可折叠,默认只展开内容组 -->
           <aside class="gc-side">
-            <!-- 用户信息(预览 .user 位置):头像 + 昵称 + 所在家庭,点击进设置 -->
-            <div class="gc-user" title="个人设置" @click="navigate('/settings')">
+            <!-- 用户信息(固定,不随侧栏滚动):头像 + 昵称 + 所在家庭,点击进设置;未登录显示登录/注册 -->
+            <div class="gc-user" :title="userStore.isLoggedIn ? '个人设置' : $t('home.loginRegister')" @click="userStore.isLoggedIn ? navigate('/settings') : navigate('/login')">
               <el-avatar :size="38" :src="userInfo?.avatar">{{ userInitial }}</el-avatar>
               <div class="gc-user-meta">
-                <div class="gc-user-name">{{ userInfo?.nickname || '我' }}</div>
+                <div class="gc-user-name">{{ userStore.isLoggedIn ? (userInfo?.nickname || '我') : $t('home.loginRegister') }}</div>
                 <div class="gc-user-fam">{{ familyName || 'ihomy' }}</div>
               </div>
             </div>
-            <nav>
-              <div v-for="g in navGroups" :key="g.key" class="gc-nav-group">
-                <button class="gc-nav-group-head" @click="toggleGroup(g.key)">
-                  <svg class="gc-chev" :class="{ open: expanded[g.key] }" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+            <nav class="gc-nav">
+              <div v-for="g in navGroups" :key="g.category" class="gc-nav-group">
+                <button class="gc-nav-group-head" @click="toggleGroup(g.category)">
+                  <svg class="gc-chev" :class="{ open: expanded[g.category] }" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
                   <span class="gc-group-label">{{ g.label }}</span>
                 </button>
-                <div v-if="expanded[g.key]" class="gc-nav-group-body">
+                <div v-if="expanded[g.category]" class="gc-nav-group-body">
                   <div
                     v-for="m in g.items"
                     :key="m.code"
                     class="gc-nav-item"
-                    :class="{ act: isActive(m.path), 'widget-src': canDragNav && m.draggable && !m.added, 'widget-added': canDragNav && m.draggable && m.added, 'widget-none': canDragNav && !m.draggable }"
+                    :class="{ act: isActive(m.path, route), 'widget-src': canDragNav && m.draggable && !m.added, 'widget-added': canDragNav && m.draggable && m.added, 'widget-none': canDragNav && !m.draggable }"
                     @click="onNavClick(m)"
                     @mousedown="onNavMousedown(m, $event)"
                   >
@@ -98,6 +98,7 @@ import { useWeatherBg } from '@/composables/useWeatherBg'
 import WarmHome from '@/components/warm/WarmHome.vue'
 import { useWarmWidgetDrag } from '@/utils/widgetDragData'
 import { addedCodes } from '@/utils/warmHomeShared'
+import { buildNavItems, groupNavItems, isActive } from '@/utils/navModules'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
@@ -145,44 +146,21 @@ const resetBgIdle = (e) => {
 onMounted(() => { window.addEventListener('mousemove', resetBgIdle, { passive: true }) })
 onBeforeUnmount(() => { clearTimeout(bgIdleTimer); window.removeEventListener('mousemove', resetBgIdle) })
 
-const NAV_PATHS = {
-  blog: '/blog', diary: '/diary', album: '/album', anniversary: '/anniversary',
-  cinema: '/cinema', music: '/music', member: '/member', points: '/points', task: '/task',
-  reminder: '/reminder', plan: '/plan', wish: '/wish', book: '/book',
-  chat: '/chat', tree: '/tree', cascade: '/cascade',
-  item: '/item', kitchen: '/kitchen', library: '/library', settings: '/settings', ops: '/ops',
-  storage: '/storage/files', tools: '/tools', plant: '/plant',
-}
-
-const GROUP_ORDER = ['content', 'life', 'social', 'system']
-const GROUP_LABELS = { content: '内容', life: '生活', social: '成员', system: '系统' }
-
 // 折叠状态:默认只展开内容组,其余组收起(点击组头切换)
 const expanded = ref({ content: true })
 const toggleGroup = (key) => {
   expanded.value = { ...expanded.value, [key]: !expanded.value[key] }
 }
 
-// 按 category 分组(相册并入内容),分组顺序 content/life/social/system,组内 sortOrder
+// 导航分组:复用共享单一数据源(NAV_PATHS + 分组规则),仅注入暖居特有的拖拽标记
 const navGroups = computed(() => {
-  const list = !appStore.modules.length ? [] : appStore.modules
-    .filter((m) => NAV_PATHS[m.code] && m.enabled !== 0)
-    .map((m) => ({ code: m.code, title: m.title, path: NAV_PATHS[m.code] || m.path, category: m.category || 'life', sortOrder: m.sortOrder || 99, draggable: true, added: addedCodes.value.has(m.code) }))
-  list.push({ code: 'settings', title: '设置', path: '/settings', category: 'system', sortOrder: 90, draggable: false, added: false })
-  if (userStore.hasPerm('ops:view')) list.push({ code: 'ops', title: '运维管理', path: '/ops', category: 'system', sortOrder: 95, draggable: false, added: false })
-  list.sort((a, b) => a.sortOrder - b.sortOrder)
-  const groups = {}
-  for (const m of list) {
-    const cat = m.category === 'album' ? 'content' : m.category
-    if (!groups[cat]) groups[cat] = []
-    groups[cat].push(m)
-  }
-  return GROUP_ORDER
-    .filter((c) => groups[c] && groups[c].length)
-    .map((c) => ({ key: c, label: GROUP_LABELS[c] || '功能', items: groups[c] }))
+  const items = buildNavItems(appStore.modules, { hasOps: userStore.hasPerm('ops:view') })
+    .map((m) => {
+      const draggable = m.code !== 'settings' && m.code !== 'ops'
+      return { ...m, draggable, added: draggable ? addedCodes.value.has(m.code) : false }
+    })
+  return groupNavItems(items)
 })
-
-const isActive = (path) => (path === '/' ? route.path === '/' : route.path.startsWith(path))
 const navigate = (path) => { if (route.path !== path) router.push(path) }
 
 // 编辑模式下:侧栏模块可拖入首页(仅首页,鼠标事件驱动,自定义幽灵随鼠标跨边界变形)
@@ -340,8 +318,9 @@ watch(() => route.fullPath, () => { canBack.value = window.history.state?.back !
 }
 .gc-app { display: grid; grid-template-columns: 230px 1fr; height: 100%; width: 100%; }
 
-/* 侧栏 */
-.gc-side { min-height: 0; overflow-y: auto; background: linear-gradient(180deg, var(--color-card), var(--color-card-2)); border-right: 1px solid var(--color-line); padding: 16px 14px; }
+/* 侧栏:纵向 flex,用户信息固定在顶部,导航在下方独立滚动 */
+.gc-side { min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: linear-gradient(180deg, var(--color-card), var(--color-card-2)); border-right: 1px solid var(--color-line); }
+.gc-nav { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px 16px; }
 .gc-nav-item { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 11px; font-size: 13.5px; color: var(--color-text-secondary); cursor: pointer; margin-bottom: 2px; transition: .2s; }
 .gc-nav-item:hover { background: var(--color-line); color: var(--color-text); }
 .gc-nav-item.act { background: var(--color-brand); color: var(--color-card); box-shadow: var(--shadow); }
@@ -382,8 +361,8 @@ watch(() => route.fullPath, () => { canBack.value = window.history.state?.back !
 .gc-drag-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent, var(--color-brand)); flex-shrink: 0; }
 .gc-drag-title { font-weight: 600; }
 
-/* 侧栏用户信息(预览 .side .user):头像 + 昵称 + 所在家庭 */
-.gc-user { display: flex; align-items: center; gap: 11px; padding: 4px 6px 16px; border-bottom: 1px solid var(--color-line); margin-bottom: 12px; cursor: pointer; }
+/* 侧栏用户信息(预览 .side .user):头像 + 昵称 + 所在家庭;固定在侧栏顶部不随导航滚动 */
+.gc-user { flex-shrink: 0; display: flex; align-items: center; gap: 11px; padding: 20px 20px 16px; border-bottom: 1px solid var(--color-line); cursor: pointer; }
 .gc-user .el-avatar { flex-shrink: 0; background: var(--color-green); color: var(--color-card); font-weight: 700; }
 .gc-user-meta { min-width: 0; }
 .gc-user-name { font-size: 13.5px; font-weight: 600; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

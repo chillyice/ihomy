@@ -4,7 +4,7 @@
       <div class="more-section-title">{{ g.label }}</div>
       <div class="more-grid">
         <div
-          v-for="m in g.modules"
+          v-for="m in g.items"
           :key="m.code"
           class="more-item"
           @click="navigate(m.path)"
@@ -26,51 +26,13 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
-import { Document, Notebook, Picture, Calendar, VideoPlay, Trophy, Aim, AlarmClock, List, Star, Wallet, PictureRounded, Share, User, Box, MapLocation, ChatDotRound, Food, Reading, Headset, Sunny } from '@element-plus/icons-vue'
+import { iconComp, buildNavGroups } from '@/utils/navModules'
 
 const router = useRouter()
 const appStore = useAppStore()
 const userStore = useUserStore()
 
-const ICON_MAP = {
-  blog: Document, diary: Notebook, album: Picture, anniversary: Calendar, cinema: VideoPlay, music: Headset,
-  points: Trophy, task: Aim, reminder: AlarmClock, plan: List, wish: Star,
-  book: Wallet, cascade: PictureRounded, tree: Share, member: User, storage: Box, item: MapLocation,
-  chat: ChatDotRound, kitchen: Food, library: Reading, plant: Sunny,
-}
-const iconComp = (code) => ICON_MAP[code] || Document
-
-const NAV_PATHS = {
-  blog: '/blog', diary: '/diary', album: '/album', anniversary: '/anniversary',
-  cinema: '/cinema', music: '/music', member: '/member', points: '/points', task: '/task',
-  reminder: '/reminder', plan: '/plan', wish: '/wish', book: '/book',
-  chat: '/chat', tree: '/tree', cascade: '/cascade',
-  item: '/item', kitchen: '/kitchen', library: '/library', settings: '/settings', ops: '/ops',
-  storage: '/storage/files',
-  plant: '/plant',
-}
-
-const CATEGORY_LABELS = { content: '内容', life: '生活', social: '成员', system: '系统' }
-
-const groups = computed(() => {
-  const list = !appStore.modules.length ? [] : appStore.modules
-    .filter(m => NAV_PATHS[m.code] && m.enabled !== 0)
-    .map(m => ({
-      code: m.code, title: m.title, path: NAV_PATHS[m.code],
-      category: m.category === 'album' ? 'content' : (m.category || 'life'),
-    }))
-  list.push({ code: 'settings', title: '设置', path: '/settings', category: 'system' })
-  if (userStore.hasPerm('ops:view')) {
-    list.push({ code: 'ops', title: '运维管理', path: '/ops', category: 'system' })
-  }
-  const grouped = {}
-  for (const m of list) {
-    if (!grouped[m.category]) grouped[m.category] = []
-    grouped[m.category].push(m)
-  }
-  const order = ['content', 'life', 'social', 'system']
-  return order.filter(c => grouped[c]?.length).map(c => ({ category: c, label: CATEGORY_LABELS[c] || '功能', modules: grouped[c] }))
-})
+const groups = computed(() => buildNavGroups(appStore.modules, { hasOps: userStore.hasPerm('ops:view') }))
 
 const navigate = (path) => router.push(path)
 </script>

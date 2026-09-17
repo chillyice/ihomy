@@ -13,22 +13,24 @@
     <!-- 导航列表 -->
     <nav class="sidebar-nav">
       <div v-for="g in groupedModules" :key="g.category" class="nav-group">
-        <div v-if="!collapsed && g.modules.length" class="group-label">{{ categoryLabel(g.category) }}</div>
+        <div v-if="!collapsed && g.items.length" class="group-label">{{ g.label }}</div>
         <div
-          v-for="m in g.modules"
+          v-for="m in g.items"
           :key="m.code"
           class="nav-item-wrap"
         >
           <div
             class="nav-item"
-            :class="{ active: isActive(m.path), 'widget-src': appStore.homeEditMode && widgetType(m.code) }"
+            :class="{ active: isActive(m.path, route), 'widget-src': appStore.homeEditMode && widgetType(m.code) }"
             :title="m.title"
             @click="appStore.homeEditMode ? null : navigate(m.path)"
             @mousedown="appStore.homeEditMode && widgetType(m.code) && startWidgetDrag(widgetType(m.code), $event)"
           >
             <span class="nav-icon">
               <svg v-if="m.code === 'settings'" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2L9.5 4.5L6 4L5 7.5L2 9.5L3.5 13L2 16.5L5 18.5L6 22L9.5 21.5L12 24L14.5 21.5L18 22L19 18.5L22 16.5L20.5 13L22 9.5L19 7.5L18 4L14.5 4.5L12 2ZM12 16A4 4 0 1 1 12 8A4 4 0 0 1 12 16Z"/></svg>
-              <svg v-else-if="m.code === 'ops'" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 4H21V16H3V4ZM5 6V14H19V6H5ZM2 18H22V20H2V18Z"/></svg>
+              <el-badge v-else-if="m.code === 'ops'" :value="ossUpdateCount" :hidden="!ossUpdateCount" :max="99" class="nav-badge">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 4H21V16H3V4ZM5 6V14H19V6H5ZM2 18H22V20H2V18Z"/></svg>
+              </el-badge>
               <el-icon v-else><component :is="iconComp(m.code)" /></el-icon>
             </span>
             <span v-if="!collapsed" class="nav-text">{{ m.title }}</span>
@@ -114,7 +116,7 @@
           </el-dropdown-menu>
         </template>
       </el-dropdown>
-        <span v-else class="foot-btn" @click="$router.push('/login')">{{ $t('home.loginToView') }}</span>
+        <span v-else class="foot-btn" @click="$router.push('/login')">{{ $t('home.loginRegister') }}</span>
         <span v-if="userStore.isLoggedIn && route.path === '/home'" class="edit-mode-btn" :class="{ active: appStore.homeEditMode }" :title="appStore.homeEditMode ? '退出编辑' : '编辑首页'" @click="appStore.toggleHomeEditMode()">
           <!-- 四个圆角方块(2×2 网格):桌面布局编辑语义;内联 SVG 替代 EP 图标(性能规范) -->
           <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
@@ -152,19 +154,11 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { useWidgetDrag } from '@/utils/useWidgetDrag'
-import { notificationApi, authApi } from '@/api'
+import { notificationApi, authApi, opsApi } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Sunny, Moon, Bell, Fold, Expand, Document, Notebook, Picture, Calendar, VideoPlay, Trophy, Aim, AlarmClock, List, Star, Wallet, PictureRounded, Share, User, Box, MapLocation, ChatDotRound, Food, Reading, Setting, Monitor, ArrowRight, Check, Headset, WarningFilled, Tools } from '@element-plus/icons-vue'
+import { Sunny, Moon, Bell, Fold, Expand, ArrowRight, Check, WarningFilled } from '@element-plus/icons-vue'
+import { iconComp, buildNavGroups, isActive } from '@/utils/navModules'
 
-// 导航图标:Element Plus 简约线性图标(统一风格,非彩色 emoji)
-const ICON_MAP = {
-  blog: Document, diary: Notebook, album: Picture, anniversary: Calendar, cinema: VideoPlay, music: Headset,
-  points: Trophy, task: Aim, reminder: AlarmClock, plan: List, wish: Star,
-  book: Wallet, cascade: PictureRounded, tree: Share, member: User, storage: Box, item: MapLocation,
-  chat: ChatDotRound, kitchen: Food, library: Reading, settings: Setting, ops: Monitor, tools: Tools,
-  plant: Sunny,
-}
-const iconComp = (code) => ICON_MAP[code] || Document
 import { applyLocale } from '@/i18n'
 import { useThemeStore } from '@/stores/theme'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
@@ -205,59 +199,8 @@ const themeStore = useThemeStore()
 const familyName = computed(() => appStore.familyName)
 const userInfo = computed(() => userStore.userInfo)
 
-// 导航路径映射(后端 icon 字段是字符串名,这里映射 code→路由路径)
-const NAV_PATHS = {
-  blog: '/blog', diary: '/diary', album: '/album', anniversary: '/anniversary',
-  cinema: '/cinema', music: '/music', member: '/member', points: '/points', task: '/task',
-  reminder: '/reminder', plan: '/plan', wish: '/wish', book: '/book',
-  chat: '/chat', tree: '/tree', cascade: '/cascade',
-  item: '/item', kitchen: '/kitchen', library: '/library', settings: '/settings', ops: '/ops',
-  storage: '/storage/files',
-  tools: '/tools',
-  plant: '/plant',
-}
-
-// 模块列表:从 store 取,过滤出有路径映射的;末尾追加设置+运维管理(仅 OPS)虚拟模块到 system 分组
-const navModules = computed(() => {
-  const list = !appStore.modules.length ? [] : appStore.modules
-    .filter(m => NAV_PATHS[m.code] && m.enabled !== 0)
-    .map(m => ({
-      code: m.code,
-      title: m.title,
-      path: NAV_PATHS[m.code] || m.path,
-      category: m.category || 'life',
-      sortOrder: m.sortOrder || 99,
-    }))
-  // 追加设置(所有人可见)和运维管理(有 ops:view 权限)到 system 分组
-  list.push({ code: 'settings', title: '设置', path: '/settings', category: 'system', sortOrder: 90 })
-  if (userStore.hasPerm('ops:view')) {
-    list.push({ code: 'ops', title: '运维管理', path: '/ops', category: 'system', sortOrder: 95 })
-  }
-  return list.sort((a, b) => a.sortOrder - b.sortOrder)
-})
-
-// 按 category 分组(相册合并到内容分组)
-const groupedModules = computed(() => {
-  const groups = {}
-  for (const m of navModules.value) {
-    const cat = m.category === 'album' ? 'content' : m.category
-    if (!groups[cat]) groups[cat] = []
-    groups[cat].push(m)
-  }
-  const order = ['content', 'life', 'social', 'system']
-  return order
-    .filter(c => groups[c] && groups[c].length)
-    .map(c => ({ category: c, modules: groups[c] }))
-})
-
-const categoryLabel = (cat) => ({
-  content: '内容', life: '生活', social: '成员', system: '系统',
-}[cat] || '功能')
-
-const isActive = (path) => {
-  if (path === '/') return route.path === '/'
-  return route.path.startsWith(path)
-}
+// 导航分组:复用共享单一数据源(NAV_PATHS + 分组规则),此处只做渲染
+const groupedModules = computed(() => buildNavGroups(appStore.modules, { hasOps: userStore.hasPerm('ops:view') }))
 
 const navigate = (path) => {
   if (route.path === path) return
@@ -283,6 +226,15 @@ const notifications = ref([])
 const loadUnread = async () => {
   if (!userStore.isLoggedIn) return
   try { unreadCount.value = await notificationApi.unreadCount() } catch (e) {}
+}
+// 开源组件可升级数(仅 OPS,导航角标)
+const ossUpdateCount = ref(0)
+const loadOssUpdateCount = async () => {
+  if (!userStore.hasPerm('ops:view')) return
+  try {
+    const sum = await opsApi.ossSummary()
+    ossUpdateCount.value = sum?.updatable ?? 0
+  } catch (e) {}
 }
 const loadNotifications = async () => {
   try {
@@ -344,7 +296,7 @@ const switchFamily = async (familyId) => {
 }
 
 // 预加载家庭列表:首次打开下拉即完整渲染,避免家栏后到导致菜单向上长高、鼠标下突然出现 hover 项
-onMounted(() => { loadUnread(); loadFamilies() })
+onMounted(() => { loadUnread(); loadFamilies(); loadOssUpdateCount() })
 </script>
 
 <style scoped>

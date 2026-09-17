@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ihomy.common.BizException;
 import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
+import com.ihomy.common.PointsRuleConst;
 import com.ihomy.dto.BlogDTO;
 import com.ihomy.entity.Blog;
 import com.ihomy.entity.BlogCategory;
@@ -321,7 +322,7 @@ public class BlogService {
         blog.setCategory(StringUtils.hasText(dto.getCategory()) ? dto.getCategory() : CATEGORY_UNCATEGORIZED);
         blog.setViewCount(0);
         blogMapper.insert(blog);
-        pointsService.addRecord(authorId, familyId, "REWARD", PointsService.REWARD_BLOG, "发布博客");
+        pointsService.addRecordIfEnabled(authorId, familyId, PointsRuleConst.BLOG, "REWARD", "发布博客");
         return blog;
     }
 

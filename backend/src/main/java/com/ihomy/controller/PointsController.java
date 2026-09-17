@@ -37,7 +37,8 @@ public class PointsController {
     @Operation(summary = "我的积分概览(总积分/今日签到状态/连续天数)")
     @GetMapping("/stats")
     public Result<Map<String, Object>> stats() {
-        return Result.success(pointsService.stats(current().getUserId()));
+        LoginUser user = current();
+        return Result.success(pointsService.stats(user.getUserId(), user.getFamilyId()));
     }
 
     @Operation(summary = "每日签到")

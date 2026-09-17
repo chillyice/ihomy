@@ -121,6 +121,26 @@ public final class DictConst {
     public static final String BORROW_READING = "READING";
     public static final String BORROW_FINISHED = "FINISHED";
 
+    /** 开源组件类型 oss_component_type */
+    public static final String OSS_TYPE_NPM = "NPM";
+    public static final String OSS_TYPE_MAVEN = "MAVEN";
+    public static final String OSS_TYPE_SERVICE = "SERVICE";
+
+    /** 开源组件更新类型 oss_update_type */
+    public static final String OSS_UPDATE_MAJOR = "MAJOR";
+    public static final String OSS_UPDATE_MINOR = "MINOR";
+    public static final String OSS_UPDATE_PATCH = "PATCH";
+    public static final String OSS_UPDATE_NONE = "NONE";
+
+    /** 开源组件状态 oss_status */
+    public static final String OSS_ACTIVE = "ACTIVE";
+    public static final String OSS_IGNORED = "IGNORED";
+
+    /** 开源组件集成状态 oss_integration */
+    public static final String OSS_INTEG_FULL = "FULL";
+    public static final String OSS_INTEG_PARTIAL = "PARTIAL";
+    public static final String OSS_INTEG_PLANNED = "PLANNED";
+
     /* ---------------- 整数(历史 DTO 入参)→ 字典词 转换 ---------------- */
 
     public static String visibility(Integer v) {

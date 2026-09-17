@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
+import com.ihomy.common.PointsRuleConst;
 import com.ihomy.common.UserNames;
 import com.ihomy.dto.VideoDTO;
 import com.ihomy.entity.StorageDevice;
@@ -92,7 +93,7 @@ public class VideoService {
         v.setVisibility(DictConst.VIS_FAMILY);
         v.setDeleted(0);
         videoMapper.insert(v);
-        pointsService.addRecord(userId, familyId, "REWARD", PointsService.REWARD_VIDEO, "发布视频");
+        pointsService.addRecordIfEnabled(userId, familyId, PointsRuleConst.VIDEO, "REWARD", "发布视频");
         return v;
     }
 

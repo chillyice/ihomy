@@ -300,6 +300,105 @@
           <el-alert v-else-if="!weatherLoading" type="warning" :closable="false" show-icon :title="$t('ops.weatherFinanceFail')" />
         </div>
       </el-tab-pane>
+
+      <el-tab-pane :label="$t('ops.oss.title')" name="oss">
+        <div class="filter-row">
+          <el-button type="primary" :loading="ossChecking" @click="checkOss">
+            {{ ossChecking ? $t('ops.oss.checking') : $t('ops.oss.checkNow') }}
+          </el-button>
+          <el-button @click="openOssAdd">{{ $t('ops.oss.add') }}</el-button>
+          <span class="traffic-hint">
+            <template v-if="ossLastChecked">{{ $t('ops.oss.lastChecked') }}: {{ fmtTime(ossLastChecked) }}</template>
+            <el-tag v-if="ossUpdatable" type="danger" size="small" style="margin-left: 8px">{{ $t('ops.oss.updatable', { n: ossUpdatable }) }}</el-tag>
+            <el-tag v-else-if="ossLoaded && !ossChecking" type="success" size="small" style="margin-left: 8px">{{ $t('ops.oss.allUpToDate') }}</el-tag>
+          </span>
+        </div>
+        <el-table v-loading="ossLoading" :data="ossRows" border stripe size="small">
+          <el-table-column :label="$t('ops.oss.name')" min-width="180">
+            <template #default="{ row }">
+              <div>{{ row.name }}</div>
+              <div class="oss-purpose">{{ row.purpose }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column :label="$t('ops.oss.componentType')" width="90">
+            <template #default="{ row }">
+              <el-tag size="small" :type="ossTypeTag(row.componentType)">{{ $t('ops.oss.type_' + String(row.componentType).toLowerCase()) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column :label="$t('ops.oss.currentVersion')" width="110">
+            <template #default="{ row }"><span class="mono">{{ row.currentVersion || '—' }}</span></template>
+          </el-table-column>
+          <el-table-column :label="$t('ops.oss.latestVersion')" width="110">
+            <template #default="{ row }"><span class="mono">{{ row.latestVersion || '—' }}</span></template>
+          </el-table-column>
+          <el-table-column :label="$t('ops.oss.updateType')" width="90">
+            <template #default="{ row }">
+              <el-tag v-if="isOssUpdatable(row)" size="small" :type="ossUpdateTag(row.updateType)">{{ $t('ops.oss.update_' + String(row.updateType).toLowerCase()) }}</el-tag>
+              <span v-else class="oss-none">—</span>
+            </template>
+          </el-table-column>
+          <el-table-column :label="$t('ops.oss.integration')" width="100">
+            <template #default="{ row }">{{ $t('ops.oss.integ_' + String(row.integrationStatus).toLowerCase()) }}</template>
+          </el-table-column>
+          <el-table-column prop="license" :label="$t('ops.oss.license')" width="120" show-overflow-tooltip />
+          <el-table-column :label="$t('ops.oss.actions')" width="250">
+            <template #default="{ row }">
+              <el-button v-if="isOssUpdatable(row)" link type="primary" size="small" @click="openOssPlan(row)">{{ $t('ops.oss.genPlan') }}</el-button>
+              <el-button v-if="isOssUpdatable(row)" link type="success" size="small" @click="confirmOss(row)">{{ $t('ops.oss.confirm') }}</el-button>
+              <el-button v-if="isOssUpdatable(row)" link type="warning" size="small" @click="ignoreOss(row, true)">{{ $t('ops.oss.ignore') }}</el-button>
+              <el-button v-else-if="row.status === 'IGNORED'" link size="small" @click="ignoreOss(row, false)">{{ $t('ops.oss.unignore') }}</el-button>
+              <el-button link size="small" @click="openOssEdit(row)">{{ $t('common.edit') }}</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <el-dialog v-model="ossPlanVisible" :title="$t('ops.oss.plan')" width="560px">
+          <div v-if="ossPlan">
+            <div class="oss-plan-head">
+              <b>{{ ossPlan.name }}</b>
+              <span class="mono">{{ ossPlan.currentVersion }} → {{ ossPlan.latestVersion }}</span>
+            </div>
+            <ol class="oss-plan-steps">
+              <li v-for="(s, i) in ossPlan.steps" :key="i">{{ s }}</li>
+            </ol>
+            <div style="margin-top: 14px">
+              <el-button size="small" @click="copyOssPlan">{{ ossCopied ? $t('ops.oss.copied') : $t('ops.oss.copy') }}</el-button>
+              <el-button v-if="ossPlan.repoUrl" size="small" @click="openRepo(ossPlan.repoUrl)">{{ $t('ops.oss.viewChange') }}</el-button>
+            </div>
+          </div>
+        </el-dialog>
+
+        <el-dialog v-model="ossEditVisible" :title="ossEditForm.id ? $t('ops.oss.edit') : $t('ops.oss.add')" width="520px">
+          <el-form :model="ossEditForm" label-width="100px">
+            <el-form-item :label="$t('ops.oss.name')"><el-input v-model="ossEditForm.name" /></el-form-item>
+            <el-form-item :label="$t('ops.oss.componentType')">
+              <el-select v-model="ossEditForm.componentType" style="width: 100%">
+                <el-option value="NPM" :label="$t('ops.oss.type_npm')" />
+                <el-option value="MAVEN" :label="$t('ops.oss.type_maven')" />
+                <el-option value="SERVICE" :label="$t('ops.oss.type_service')" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="Package / Ref">
+              <el-input v-model="ossEditForm.packageRef" placeholder="NPM: element-plus · MAVEN: group:artifact · SERVICE: owner/repo" />
+            </el-form-item>
+            <el-form-item :label="$t('ops.oss.currentVersion')"><el-input v-model="ossEditForm.currentVersion" /></el-form-item>
+            <el-form-item :label="$t('ops.oss.license')"><el-input v-model="ossEditForm.license" /></el-form-item>
+            <el-form-item label="Repo"><el-input v-model="ossEditForm.repoUrl" /></el-form-item>
+            <el-form-item :label="$t('ops.oss.purpose')"><el-input v-model="ossEditForm.purpose" /></el-form-item>
+            <el-form-item :label="$t('ops.oss.integration')">
+              <el-select v-model="ossEditForm.integrationStatus" style="width: 100%">
+                <el-option value="FULL" :label="$t('ops.oss.integ_full')" />
+                <el-option value="PARTIAL" :label="$t('ops.oss.integ_partial')" />
+                <el-option value="PLANNED" :label="$t('ops.oss.integ_planned')" />
+              </el-select>
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="ossEditVisible = false">{{ $t('common.cancel') }}</el-button>
+            <el-button type="primary" @click="saveOss">{{ $t('common.save') }}</el-button>
+          </template>
+        </el-dialog>
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -311,6 +410,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { opsApi } from '@/api'
+import { ElMessage } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 
 const { t } = useI18n()
@@ -673,6 +773,128 @@ const loadWeatherQuota = async () => {
   }
 }
 
+// ---------- 开源组件台账(版本检测 + 升级提示) ----------
+const ossLoading = ref(false)
+const ossChecking = ref(false)
+const ossRows = ref([])
+const ossLoaded = ref(false)
+const ossLastChecked = ref(null)
+const ossUpdatable = ref(0)
+
+const ossPlanVisible = ref(false)
+const ossPlan = ref(null)
+const ossCopied = ref(false)
+
+const ossEditVisible = ref(false)
+const ossEditForm = reactive({ id: null, name: '', componentType: 'NPM', packageRef: '', currentVersion: '', license: '', repoUrl: '', purpose: '', integrationStatus: 'FULL' })
+
+const loadOss = async () => {
+  ossLoading.value = true
+  try {
+    const [rows, sum] = await Promise.all([opsApi.ossList(), opsApi.ossSummary()])
+    ossRows.value = rows || []
+    ossUpdatable.value = sum?.updatable ?? 0
+    ossLastChecked.value = sum?.lastCheckedAt ?? null
+    ossLoaded.value = true
+  } catch (e) {
+    ossRows.value = []
+  } finally {
+    ossLoading.value = false
+  }
+}
+
+const checkOss = async () => {
+  ossChecking.value = true
+  try {
+    ossRows.value = (await opsApi.ossCheck()) || []
+    const sum = await opsApi.ossSummary()
+    ossUpdatable.value = sum?.updatable ?? 0
+    ossLastChecked.value = sum?.lastCheckedAt ?? null
+    ossLoaded.value = true
+  } finally {
+    ossChecking.value = false
+  }
+}
+
+const isOssUpdatable = (row) => row.status === 'ACTIVE' && row.updateType && row.updateType !== 'NONE'
+const ossTypeTag = (t) => (t === 'MAVEN' ? 'success' : t === 'SERVICE' ? 'warning' : 'primary')
+const ossUpdateTag = (ut) => (ut === 'MAJOR' ? 'danger' : ut === 'MINOR' ? 'warning' : 'info')
+
+const openOssPlan = async (row) => {
+  try {
+    ossPlan.value = await opsApi.ossUpgradePlan(row.id)
+    ossCopied.value = false
+    ossPlanVisible.value = true
+  } catch (e) { /* 错误由 request.js 统一 toast */ }
+}
+
+const copyOssPlan = async () => {
+  if (!ossPlan.value) return
+  const text = ossPlan.value.steps.join('\n')
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text)
+    } else {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
+    ossCopied.value = true
+  } catch (e) {
+    ElMessage.error(t('common.failed'))
+  }
+}
+
+const confirmOss = async (row) => {
+  await opsApi.ossConfirm(row.id)
+  ElMessage.success(t('common.success'))
+  await loadOss()
+}
+
+const ignoreOss = async (row, ignored) => {
+  await opsApi.ossIgnore(row.id, ignored)
+  await loadOss()
+}
+
+const openOssEdit = (row) => {
+  Object.assign(ossEditForm, {
+    id: row.id, name: row.name, componentType: row.componentType, packageRef: row.packageRef,
+    currentVersion: row.currentVersion, license: row.license, repoUrl: row.repoUrl,
+    purpose: row.purpose, integrationStatus: row.integrationStatus,
+  })
+  ossEditVisible.value = true
+}
+
+const openOssAdd = () => {
+  Object.assign(ossEditForm, { id: null, name: '', componentType: 'NPM', packageRef: '', currentVersion: '', license: '', repoUrl: '', purpose: '', integrationStatus: 'FULL' })
+  ossEditVisible.value = true
+}
+
+const saveOss = async () => {
+  if (!ossEditForm.name || !ossEditForm.packageRef || !ossEditForm.componentType) {
+    ElMessage.warning(t('ops.oss.name') + ' / Package/Ref 必填')
+    return
+  }
+  if (ossEditForm.id) {
+    await opsApi.ossUpdate(ossEditForm.id, { ...ossEditForm })
+  } else {
+    await opsApi.ossAdd({ ...ossEditForm })
+  }
+  ossEditVisible.value = false
+  ElMessage.success(t('common.success'))
+  await loadOss()
+}
+
+const openRepo = (url) => { if (url) window.open(url, '_blank') }
+const fmtTime = (d) => {
+  if (!d) return ''
+  const date = new Date(d)
+  return Number.isNaN(date.getTime()) ? String(d) : date.toLocaleString()
+}
+
 onMounted(async () => {
   // 支持 /ops?tab=trace&tid=xxx&date=yyyy-MM-dd 或 /ops?tab=traffic 直达(分享/书签)
   if (route.query.tab === 'trace' && route.query.tid) {
@@ -689,6 +911,7 @@ onMounted(async () => {
 watch(tab, (v) => {
   if (v === 'traffic' && !traffic.value) loadTraffic()
   if (v === 'weather' && !weatherQuota.value) loadWeatherQuota()
+  if (v === 'oss' && !ossLoaded.value) loadOss()
 })
 </script>
 
@@ -787,4 +1010,9 @@ watch(tab, (v) => {
 @media (max-width: 768px) {
   .traffic-grid { grid-template-columns: repeat(3, 1fr); }
 }
+.oss-purpose { font-size: 12px; color: var(--color-text-secondary); margin-top: 2px; }
+.oss-none { color: var(--color-text-secondary); }
+.oss-plan-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+.oss-plan-steps { margin: 0; padding-left: 20px; line-height: 1.9; }
+.oss-plan-steps li { word-break: break-all; }
 </style>

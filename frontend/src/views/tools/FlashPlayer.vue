@@ -1,12 +1,12 @@
-<!-- Flash 播放器(Ruffle):本地加载 .swf 怀旧小游戏,不托管/不分发任何游戏文件。 -->
+<!-- Flash 播放器(Ruffle):本地加载 .swf(不托管/不分发)或按 src 加载已导入的游戏;支持全屏。 -->
 <template>
   <div class="page">
-    <Breadcrumb :items="[{ label: $t('tools.title') }, { label: $t('tools.flash.title') }]" />
+    <Breadcrumb :items="breadcrumb" />
 
     <div class="flash-card card">
-      <!-- 空态:拖拽/点击选择 .swf -->
+      <!-- 本地模式:拖拽/点击选择 .swf -->
       <div
-        v-if="!fileName"
+        v-if="!fileName && !src"
         class="drop-zone"
         :class="{ dragging }"
         @click="pick"
@@ -22,59 +22,68 @@
       <!-- 已加载:播放器 + 操作条 -->
       <template v-else>
         <div class="flash-bar">
+          <el-button v-if="backTo" size="small" round @click="$router.push(backTo)">
+            <el-icon><ArrowLeft /></el-icon>
+            {{ $t('tools.flash.back') }}
+          </el-button>
           <span class="flash-name">{{ fileName }}</span>
-          <el-button size="small" round @click="pick">{{ $t('tools.flash.reselect') }}</el-button>
-          <el-button size="small" round text type="danger" @click="close">{{ $t('tools.flash.close') }}</el-button>
+          <el-button v-if="!src" size="small" round @click="pick">{{ $t('tools.flash.reselect') }}</el-button>
+          <el-button size="small" round @click="toggleFullscreen">
+            <el-icon><FullScreen /></el-icon>
+            {{ isFullscreen ? $t('tools.flash.exitFullscreen') : $t('tools.flash.fullscreen') }}
+          </el-button>
+          <el-button v-if="!src" size="small" round text type="danger" @click="close">{{ $t('tools.flash.close') }}</el-button>
         </div>
-        <div ref="container" class="flash-stage"></div>
+        <div ref="stage" class="flash-stage">
+          <div ref="container" class="flash-stage-inner"></div>
+        </div>
       </template>
 
       <div v-if="loading" class="flash-status">{{ $t('tools.flash.loading') }}</div>
       <div v-if="error" class="flash-status error">{{ error }}</div>
 
-      <input ref="fileInput" type="file" accept=".swf" class="hidden-input" @change="onPick" />
+      <input v-if="!src" ref="fileInput" type="file" accept=".swf" class="hidden-input" @change="onPick" />
     </div>
   </div>
 </template>
 
 <script setup>
-// Flash 播放器:动态加载 /ruffle/ruffle.js(Ruffle 自托管运行时),用 Blob URL 播放本地 .swf
-import { ref, onBeforeUnmount, nextTick } from 'vue'
+// Flash 播放器:动态加载 /ruffle/ruffle.js(Ruffle 自托管运行时)。
+// 无 src 时为本地模式(Blob URL 播放本地 .swf);有 src 时直接按 URL 播放已导入的游戏。支持浏览器原生全屏。
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, inject } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
+import { FullScreen, ArrowLeft } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import { loadRuffle } from '@/utils/ruffle'
+import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 
+const props = defineProps({
+  src: { type: String, default: '' },
+  title: { type: String, default: '' },
+  breadcrumb: { type: Array, default: null },
+  backTo: { type: String, default: '' },
+})
+
+const router = useRouter()
 const { t } = useI18n()
+const sunLight = inject(SUN_LIGHT_KEY, null)
 const container = ref(null)
+const stage = ref(null)
 const fileInput = ref(null)
 const fileName = ref('')
 const dragging = ref(false)
 const loading = ref(false)
 const error = ref('')
+const isFullscreen = ref(false)
 
 let player = null
 let objectUrl = null
 
-const pick = () => fileInput.value?.click()
+const breadcrumb = computed(() => props.breadcrumb || [{ label: t('tools.title') }, { label: t('tools.flash.title') }])
 
-/** 懒加载 Ruffle 运行时(脚本标签加载自托管文件,自动解析 wasm 路径) */
-const loadRuffle = async () => {
-  if (window.RufflePlayer) return window.RufflePlayer
-  await new Promise((resolve, reject) => {
-    const s = document.createElement('script')
-    s.src = '/ruffle/ruffle.js'
-    s.onload = resolve
-    s.onerror = () => reject(new Error('Ruffle runtime load failed'))
-    document.head.appendChild(s)
-  })
-  try {
-    const cfg = window.RufflePlayer.config || (window.RufflePlayer.config = {})
-    cfg.publicPath = '/ruffle'
-  } catch (e) {
-    // 脚本按自身 src 自动推导 publicPath,显式设置失败也不致命
-  }
-  return window.RufflePlayer
-}
+const pick = () => fileInput.value?.click()
 
 const destroyPlayer = () => {
   if (player) {
@@ -87,33 +96,43 @@ const destroyPlayer = () => {
   }
 }
 
-const playFile = async (file) => {
-  if (!file) return
-  if (!/\.swf$/i.test(file.name)) {
-    ElMessage.warning(t('tools.flash.invalidType'))
-    return
-  }
+/** 创建 Ruffle 播放器并调用 loadFn 加载(loadFn 接收 player api) */
+const mountAndLoad = async (loadFn) => {
   loading.value = true
   error.value = ''
   try {
     const RufflePlayer = await loadRuffle()
     destroyPlayer()
-    objectUrl = URL.createObjectURL(file)
     const p = RufflePlayer.newest().createPlayer()
     p.style.width = '100%'
     p.style.height = '100%'
     player = p
-    fileName.value = file.name
     await nextTick()
     container.value.appendChild(p)
     const api = typeof p.ruffle === 'function' ? p.ruffle() : p
-    await api.load(objectUrl)
+    await loadFn(api)
   } catch (e) {
     error.value = t('tools.flash.loadFailed')
     ElMessage.error(t('tools.flash.loadFailed'))
   } finally {
     loading.value = false
   }
+}
+
+const playFile = async (file) => {
+  if (!file) return
+  if (!/\.swf$/i.test(file.name)) {
+    ElMessage.warning(t('tools.flash.invalidType'))
+    return
+  }
+  fileName.value = file.name
+  objectUrl = URL.createObjectURL(file)
+  await mountAndLoad((api) => api.load(objectUrl))
+}
+
+const loadUrl = (url) => {
+  fileName.value = props.title || (url.split('/').pop() || '')
+  mountAndLoad((api) => api.load(url))
 }
 
 const onPick = (e) => {
@@ -132,7 +151,30 @@ const close = () => {
   error.value = ''
 }
 
-onBeforeUnmount(destroyPlayer)
+// 全屏:对 .flash-stage 走浏览器原生 Fullscreen API,Ruffle 播放器随容器尺寸自适应
+const toggleFullscreen = () => {
+  if (!stage.value) return
+  if (!document.fullscreenElement) {
+    stage.value.requestFullscreen?.()
+  } else {
+    document.exitFullscreen?.()
+  }
+}
+const onFullscreenChange = () => {
+  isFullscreen.value = !!document.fullscreenElement
+}
+
+onMounted(() => {
+  document.addEventListener('fullscreenchange', onFullscreenChange)
+  // 播放 Flash/小游戏时关闭全局光影特效(与图片/视频/看书一致),离开时恢复
+  sunLight?.suspendEffects()
+  if (props.src) loadUrl(props.src)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('fullscreenchange', onFullscreenChange)
+  destroyPlayer()
+  sunLight?.restoreEffects()
+})
 </script>
 
 <style scoped>
@@ -186,10 +228,20 @@ onBeforeUnmount(destroyPlayer)
   white-space: nowrap;
 }
 .flash-stage {
+  position: relative;
   height: 480px;
   border-radius: 12px;
   background: #000;
   overflow: hidden;
+}
+.flash-stage-inner {
+  width: 100%;
+  height: 100%;
+}
+.flash-stage:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
 }
 .flash-status {
   margin-top: 14px;
