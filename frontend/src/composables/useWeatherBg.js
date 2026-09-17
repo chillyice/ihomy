@@ -7,8 +7,13 @@ import { useUserStore } from '@/stores/user'
 const FEATURE = 'WEATHER_IMAGE'
 const CACHE_KEY = 'ihomy:weather-bg:v1'
 const CFG_KEY = 'ihomy:weather-bg-config:v1'
-const CFG_DEFAULT = { enabled: true, style: '温柔插画风格', size: '2048x2048', refreshDays: 7, scene: '', watermark: false }
+const CFG_DEFAULT = { enabled: true, size: '2048x2048', refreshDays: 7, watermark: false }
 const ALBUM_NAME = 'AI 生图'
+
+// 风格/地点随机池:风格不固定(摄影/手绘/油画…),地点不固定(突出天气氛围,弱化地标)
+const WEATHER_STYLES = ['电影感摄影', '水彩手绘', '油画', '极简插画', '复古胶片', '日系动漫', '水墨淡彩']
+const WEATHER_SCENES = ['城市街道', '公园', '海边', '山间', '郊野', '湖边', '窗前']
+const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)]
 
 export function useWeatherBg() {
   const weatherBg = ref('')
@@ -24,6 +29,28 @@ export function useWeatherBg() {
   const season = () => { const m = new Date().getMonth() + 1; return (m >= 3 && m <= 5) ? '春' : (m >= 6 && m <= 8) ? '夏' : (m >= 9 && m <= 11) ? '秋' : '冬' }
   const dayNight = () => { const h = new Date().getHours(); return (h >= 6 && h < 19) ? 'day' : 'night' }
   const keyOf = (w) => [w?.city, w?.text, w?.iconCode, dayNight(), season()].join('|')
+
+  const dateLabel = () => { const d = new Date(); return `${d.getMonth() + 1}月${d.getDate()}日` }
+  const timeOfDayLabel = () => {
+    const h = new Date().getHours()
+    if (h < 5) return '凌晨'
+    if (h < 8) return '清晨'
+    if (h < 11) return '上午'
+    if (h < 14) return '午后'
+    if (h < 17) return '下午'
+    if (h < 19) return '傍晚'
+    return '夜晚'
+  }
+  // 落库文件名:城市-日期-上下午-时间(如 济南-2026-09-13-下午-17:30,冒号由后端落盘时归一为 _)
+  const weatherImageName = (city) => {
+    const d = new Date()
+    const pad = (n) => String(n).padStart(2, '0')
+    const c = city || '未知城市'
+    const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    const ampm = d.getHours() < 12 ? '上午' : '下午'
+    const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`
+    return `${c}-${date}-${ampm}-${time}`
+  }
 
   const ensureAlbum = () => {
     if (albumPromise) return albumPromise
@@ -73,9 +100,7 @@ export function useWeatherBg() {
     try {
       if (!aiStatusChecked) { try { aiImageAvail = !!(await aiApi.status())?.weatherImage?.available } catch {} aiStatusChecked = true }
       if (!aiImageAvail) { weatherBg.value = latestCached(w); return }
-      const dn = dayNight() === 'day' ? '白天' : '夜晚'
-      const scene = (cfg.scene || '').trim()
-      const prompt = `${cfg.style},${season()}季${dn} ${w.city || ''} ${w.text || ''} 的城市街景${scene ? ',' + scene : ''},柔和暖色调,宁静家居感,高清#`
+      const prompt = `${pickRandom(WEATHER_STYLES)},${dateLabel()}${timeOfDayLabel()},${season()}季,${w.city || ''} ${w.text || ''},${pickRandom(WEATHER_SCENES)},突出天气氛围,弱化地点地标,柔和高级色调,高清#`
       const res = await aiApi.image({ prompt, size: cfg.size || '2048x2048', watermark: cfg.watermark === true }, FEATURE)
       const first = res?.[0] || {}
       const url = first.url || (first.b64_json ? 'data:image/png;base64,' + first.b64_json : '')
@@ -83,7 +108,7 @@ export function useWeatherBg() {
         weatherBg.value = url
         try { const c = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); c[key] = { url, ts: Date.now() }; localStorage.setItem(CACHE_KEY, JSON.stringify(c)) } catch {}
         const albumId = await ensureAlbum()
-        if (albumId && (/^https?:\/\//i.test(url) || /^data:/i.test(url))) { try { await photoApi.saveFromUrl(albumId, { url }) } catch {} }
+        if (albumId && (/^https?:\/\//i.test(url) || /^data:/i.test(url))) { try { await photoApi.saveFromUrl(albumId, { url, name: weatherImageName(w.city), description: prompt }) } catch {} }
       } else {
         weatherBg.value = latestCached(w)
       }
