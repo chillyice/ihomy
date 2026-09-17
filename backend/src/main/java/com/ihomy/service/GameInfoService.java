@@ -47,11 +47,17 @@ public class GameInfoService {
     public GameInfo importGame(Long userId, Long familyId, MultipartFile file, String name, String description) {
         String cleanName = normalizeName(name);
         if (file == null || file.isEmpty()) {
-            throw new BizException(ResultCode.BAD_REQUEST, "请选择要导入的 .swf 文件");
+            throw new BizException(ResultCode.BAD_REQUEST, "请选择要导入的游戏文件");
         }
         String original = file.getOriginalFilename();
-        if (original == null || !original.toLowerCase().endsWith(GameConst.SWF_EXTENSION)) {
-            throw new BizException(ResultCode.BAD_REQUEST, "仅支持导入 .swf 文件");
+        String lower = original != null ? original.toLowerCase() : "";
+        String type;
+        if (lower.endsWith(GameConst.SWF_EXTENSION)) {
+            type = GameConst.TYPE_SWF;
+        } else if (lower.endsWith(GameConst.GBA_EXTENSION)) {
+            type = GameConst.TYPE_GBA;
+        } else {
+            throw new BizException(ResultCode.BAD_REQUEST, "仅支持导入 .swf 或 .gba 文件");
         }
         String url = fileService.uploadGame(file, cleanName);
         GameInfo g = new GameInfo();
@@ -59,7 +65,7 @@ public class GameInfoService {
         g.setUserId(userId);
         g.setName(cleanName);
         g.setDescription(normalizeDescription(description));
-        g.setType(GameConst.TYPE_SWF);
+        g.setType(type);
         g.setFileUrl(url);
         g.setStatus(GameConst.STATUS_ACTIVE);
         gameMapper.insert(g);

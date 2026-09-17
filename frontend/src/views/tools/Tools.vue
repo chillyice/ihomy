@@ -33,6 +33,12 @@
         <div class="tool-desc">{{ $t('tools.flash.desc') }}</div>
         <span class="tool-enter">{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon></span>
       </div>
+      <div class="tool-card card" @click="$router.push('/tools/gba')">
+        <div class="tool-icon"><el-icon :size="30"><VideoPlay /></el-icon></div>
+        <div class="tool-name">{{ $t('tools.gba.title') }}</div>
+        <div class="tool-desc">{{ $t('tools.gba.desc') }}</div>
+        <span class="tool-enter">{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon></span>
+      </div>
       <div class="tool-card card tool-disabled">
         <div class="tool-icon"><el-icon :size="30"><MagicStick /></el-icon></div>
         <div class="tool-name">{{ $t('tools.more') }}</div>

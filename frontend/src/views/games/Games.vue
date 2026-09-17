@@ -31,12 +31,13 @@
         <span class="tool-enter">{{ $t('games.enter') }}<el-icon><ArrowRight /></el-icon></span>
       </div>
 
-      <!-- 导入的 swf 小游戏 -->
+      <!-- 导入的小游戏 -->
       <div v-for="g in games" :key="g.id" class="tool-card card" @click="play(g)">
         <div class="tool-icon"><el-icon :size="30"><VideoPlay /></el-icon></div>
         <div class="tool-name">{{ g.name }}</div>
         <div class="tool-desc">{{ g.description || $t('games.noDesc') }}</div>
         <div class="tool-meta">
+          <div class="tool-type-tag">{{ g.type }}</div>
           <span class="tool-enter">{{ $t('games.play') }}<el-icon><ArrowRight /></el-icon></span>
           <el-dropdown trigger="click" @command="(cmd) => onGameAction(cmd, g)">
             <span class="game-more" @click.stop><el-icon><MoreFilled /></el-icon></span>
@@ -57,7 +58,7 @@
     <el-dialog v-model="importVisible" :title="$t('games.import')" width="440px" destroy-on-close>
       <el-form label-position="top">
         <el-form-item :label="$t('games.file')">
-          <input ref="fileInput" type="file" accept=".swf" class="game-file-input" @change="onFilePicked" />
+          <input ref="fileInput" type="file" accept=".swf,.gba,.gbc,.gb,.nes,.smc,.sfc" class="game-file-input" @change="onFilePicked" />
         </el-form-item>
         <el-form-item :label="$t('games.name')">
           <el-input v-model="importForm.name" maxlength="100" :placeholder="$t('games.namePlaceholder')" />
@@ -137,7 +138,7 @@ const onFilePicked = (e) => {
   if (!f) return
   importForm.file = f
   if (!importForm.name.trim()) {
-    importForm.name = f.name.replace(/\.swf$/i, '')
+    importForm.name = f.name.replace(/\.(swf|gba|gbc|gb|nes|smc|sfc)$/i, '')
   }
   e.target.value = ''
 }
@@ -245,6 +246,14 @@ onMounted(load)
   align-items: center;
   justify-content: space-between;
   margin-top: 12px;
+}
+.tool-type-tag {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--color-text-secondary, #999);
+  font-weight: 500;
 }
 .tool-enter {
   display: inline-flex;

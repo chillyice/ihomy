@@ -24,3 +24,5 @@ frontend/.env.development.local
 
 # Ruffle 自托管运行时(由 scripts/copy-ruffle.mjs 从 node_modules 拷贝生成,与 dist 同属构建产物)
 frontend/public/ruffle/
+# EmulatorJS 运行时(由 scripts/copy-emulatorjs.mjs 从 node_modules 拷贝生成)
+frontend/public/emulatorjs/

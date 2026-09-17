@@ -4,13 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node scripts/copy-ruffle.mjs && vite",
-    "build": "node scripts/copy-ruffle.mjs && vite build",
+    "dev": "node scripts/copy-ruffle.mjs && node scripts/copy-emulatorjs.mjs && vite",
+    "build": "node scripts/copy-ruffle.mjs && node scripts/copy-emulatorjs.mjs && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "@babel/helper-module-imports": "^8.0.0",
     "@element-plus/icons-vue": "^2.3.1",
+    "@emulatorjs/emulatorjs": "^4.2.3",
     "@ruffle-rs/ruffle": "^0.6.0",
     "axios": "^1.7.2",
     "element-plus": "^2.7.3",

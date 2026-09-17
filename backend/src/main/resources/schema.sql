@@ -1872,6 +1872,7 @@ INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `curre
 ('Marked', 'NPM', 'marked', '18.0.9', 'MIT', 'https://github.com/markedjs/marked', 'Markdown 渲染', 'FULL'),
 ('QWeather Icons', 'NPM', 'qweather-icons', '1.8.0', 'MIT', 'https://github.com/qwd/Icons', '天气图标字体', 'FULL'),
 ('Ruffle (Flash 播放器)', 'NPM', '@ruffle-rs/ruffle', '0.6.0', 'MIT/Apache-2.0', 'https://github.com/ruffle-rs/ruffle', '放映厅/小游戏 Flash 播放', 'FULL'),
+('EmulatorJS (GBA 模拟器)', 'NPM', '@emulatorjs/emulatorjs', '4.2.3', 'GPL-3.0', 'https://github.com/EmulatorJS/EmulatorJS', '小游戏 GBA/FC 等复古游戏模拟', 'FULL'),
 ('Spring Boot', 'MAVEN', 'org.springframework.boot:spring-boot-starter-parent', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端框架', 'FULL'),
 ('MyBatis-Plus', 'MAVEN', 'com.baomidou:mybatis-plus-spring-boot3-starter', '3.5.5', 'Apache-2.0', 'https://github.com/baomidou/mybatis-plus', 'ORM', 'FULL'),
 ('Hutool', 'MAVEN', 'cn.hutool:hutool-all', '5.8.27', 'MulanPSL-2.0', 'https://github.com/dromara/hutool', '工具库(农历/文本等)', 'FULL'),

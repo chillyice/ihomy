@@ -151,13 +151,13 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 内容 | 博客 / 日记 / 相册照片 / 放映厅 / 照片瀑布 / 愿望单 / 书架 | Blog / Diary / Album+Photo / Video / Cascade / Wish / Library 各 Controller |
 | 互动 | 点赞 / 评论 / 通知 / 聊天室 | Like / Comment / Notification / Chat Controller + ChatWebSocketHandler |
 | 生活 | 纪念日 / 提醒 / 计划 / 任务 / 记账 / 家谱 / 签到积分 / 背景音乐 | Anniversary / Reminder / Plan / Task / Points / Music 各 Controller |
-| 游戏 | 花园植物养殖(全家共养一棵)/ 小游戏库(导入 SWF + Flash 播放器 Ruffle)/ 宠物连连看 H5(通关发积分) | FamilyPlant / GameInfo 各 Controller + FlashPlayer.vue + PetLinkLink.vue |
+| 游戏 | 花园植物养殖(全家共养一棵)/ 小游戏库(导入 SWF/GBA + Flash 播放器 Ruffle + GBA 模拟器 EmulatorJS)/ 宠物连连看 H5(通关发积分) | FamilyPlant / GameInfo 各 Controller + FlashPlayer.vue + GbaPlayer.vue + PetLinkLink.vue |
 | 基础 | 文件上传 / 存储管理 / 首页聚合 / 运维 / 开源组件台账 / 每日内容 / 操作日志 / 系统参数 | File / Storage / Home+Public / Ops+Oss / Daily / Log 各 Controller |
 | 光影 | 太阳位置/体积光/台灯/天气 / 天气代理 / 天气详情 / 首页仪表盘 | SolarUtil+SunService + windowLight.js + SunLightLayer.vue |
 | 物品 | 物品定位+户型图+AI 语义 | ItemController / ItemService / ItemAiService+AiService(设计决策见需求设计说明书 §4.8.1) |
 | AI | 图片生成/语音识别接入+AI 测试台+家庭级 AI 配置+AI 调用统计 | AiService / FamilyAiConfigService / AiController(/ai/status、/ai/config、/ai/chat、/ai/image、/ai/transcribe)+ AiStatsService(/ops/ai/**) |
 | 厨房 | 菜单/菜谱/食材 | RecipeController / RecipeService |
-| 工具 | 工具箱聚合页/脑图设计(simple-mind-map,快照/回滚/协同轮询)/AI 测试台(/tools/ai-playground 临时)/3D 光影实验台(/tools/light-lab 临时,Three.js 太阳模拟+真实阴影,未来场景主题基础) | MindMapController / MindMapService |
+| 工具 | 工具箱聚合页/脑图设计(simple-mind-map,快照/回滚/协同轮询)/AI 测试台(/tools/ai-playground 临时)/3D 光影实验台(/tools/light-lab 临时,Three.js 太阳模拟+真实阴影,未来场景主题基础)/Flash 播放器(/tools/flash)/GBA 播放器(/tools/gba) | MindMapController / MindMapService |
 | 系统 | i18n / 主题(暖居/光尘 × 晨/暮) / 字典 | i18n/ + theme/(index.js)+stores/theme.js + utils/dict.js |
 | 移动端 | 设备自适应 | useDevice.js + MobileLayout.vue + Mobile* 组件 |
 

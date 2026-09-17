@@ -11,6 +11,7 @@ public final class GameConst {
 
     /** 游戏类型 type */
     public static final String TYPE_SWF = "SWF";
+    public static final String TYPE_GBA = "GBA";
 
     /** 状态 status */
     public static final String STATUS_ACTIVE = "ACTIVE";
@@ -20,8 +21,9 @@ public final class GameConst {
     public static final int NAME_MAX_LENGTH = 100;
     public static final int DESC_MAX_LENGTH = 500;
 
-    /** 支持的 swf 扩展名 */
+    /** 支持的扩展名 */
     public static final String SWF_EXTENSION = ".swf";
+    public static final String GBA_EXTENSION = ".gba";
 
     /** H5 小游戏通关奖励每日上限(防刷:宠物连连看等前端上报分数的游戏按天限次) */
     public static final int PETLINK_DAILY_LIMIT = 5;
