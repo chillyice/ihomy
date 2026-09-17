@@ -342,6 +342,8 @@ color: #3A2E22;
 
 **设备映射来源角标(统一)**:卡片封面角落 `设备名 + .status-dot` 状态点,半透明白底(`rgba(255,255,255,0.85)`)磨砂圆角小标签(11px,#6b5d4c);状态点 6px 圆点带辉光:VALID 绿 `#67b26b` / OFFLINE 灰 `#9a9a9a` / MISSING 红 `#b96058`;暗色模式 `rgba(30,42,72,0.85)` 底 `#c9b8a0` 字。
 
+**游戏/播放页顶栏变体(`.game-topbar`,V9.72)**:宠物连连看/Flash 播放器顶部「返回+全屏」不适用 §11b 多选工具栏,改用 `PageToolbar root-class="game-topbar" :holder-margin="0" always`,右侧 `.game-top-actions`(`margin-left:auto;flex gap:8px`)放圆角小按钮(返回 ArrowLeft + 全屏 FullScreen);容器样式定义在 `PageToolbar.vue`、`.game-top-actions` 与暖居 `.gc-pin .game-topbar` 胞吐适配定义在 `main.css`,与物品定位 `.fp-topbar` 同构;全屏目标为 `.game-card`(非 `.page`)。
+
 ## 11c. 音乐页(Music)
 
 - **结构**:Breadcrumb + 标准工具栏(11b 规范)+ 三 Tab(全部曲目/按专辑/歌单);Tab 项 15px/40px 高,active `#5c4c3d` + 下划线 `#c4a884` 2px `opacity:0.7`,无 nav 底边线;切 Tab 自动退出多选。
