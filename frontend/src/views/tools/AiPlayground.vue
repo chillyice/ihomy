@@ -288,7 +288,7 @@
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
-import { aiApi } from '@/api'
+import { aiApi, albumApi, photoApi } from '@/api'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 
@@ -393,6 +393,39 @@ const onRefPick = (e) => {
 }
 const removeRefImage = (i) => { refImages.value.splice(i, 1) }
 
+// AI 生图落库:找到或新建「AI 生图」相册(private),再把图保存为照片(照 Home.vue/useWeatherBg 同款,切走/刷新不丢)
+const AI_ALBUM_NAME = 'AI 生图'
+let aiAlbumPromise = null
+const ensureAiAlbum = () => {
+  if (aiAlbumPromise) return aiAlbumPromise
+  aiAlbumPromise = (async () => {
+    try {
+      const albums = await albumApi.list()
+      const found = (albums || []).find((a) => a.name === AI_ALBUM_NAME)
+      if (found) return found.id
+      const created = await albumApi.create({ name: AI_ALBUM_NAME, type: 'private' })
+      return created.id
+    } catch { aiAlbumPromise = null; return null }
+  })()
+  return aiAlbumPromise
+}
+const aiImageName = (i) => {
+  const d = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  return `AI-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}-${pad(d.getMinutes())}-${i + 1}`
+}
+const saveToAlbum = async (url, prompt, i) => {
+  try {
+    const albumId = await ensureAiAlbum()
+    if (!albumId || !url) return false
+    if (/^https?:\/\//i.test(url) || /^data:/i.test(url)) {
+      await photoApi.saveFromUrl(albumId, { url, name: aiImageName(i), description: prompt || '' })
+      return true
+    }
+  } catch { /* 相册保存失败静默(不影响结果展示) */ }
+  return false
+}
+
 const genImage = async () => {
   const prompt = imagePrompt.value.trim()
   if (!prompt || imageLoading.value) return
@@ -418,6 +451,9 @@ const genImage = async () => {
       url: d.url || (d.b64_json ? 'data:image/png;base64,' + d.b64_json : ''),
     })).filter((d) => d.url)
     imageMeta.value = `${imageResults.value.length} · ${Date.now() - start}ms`
+    // 自动归档到「AI 生图」相册:切走/刷新不丢(同天气生图落库逻辑)
+    const saved = (await Promise.all(imageResults.value.map((d, i) => saveToAlbum(d.url, prompt, i)))).filter(Boolean).length
+    if (saved > 0) imageMeta.value += ` · 已存「AI 生图」相册 ${saved} 张`
   } catch (e) {
     // 报错 toast 已由 request.js 统一弹出
   } finally {

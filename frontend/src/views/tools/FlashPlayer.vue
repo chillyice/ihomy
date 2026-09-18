@@ -86,15 +86,23 @@ let objectUrl = null
 
 const pick = () => fileInput.value?.click()
 
-const destroyPlayer = () => {
+const removePlayerElement = () => {
   if (player) {
     try { player.remove() } catch (e) { /* 忽略卸载异常 */ }
     player = null
   }
+}
+
+const revokeObjectUrl = () => {
   if (objectUrl) {
     URL.revokeObjectURL(objectUrl)
     objectUrl = null
   }
+}
+
+const destroyPlayer = () => {
+  removePlayerElement()
+  revokeObjectUrl()
 }
 
 /** 创建 Ruffle 播放器并调用 loadFn 加载(loadFn 接收 player api) */
@@ -103,7 +111,8 @@ const mountAndLoad = async (loadFn) => {
   error.value = ''
   try {
     const RufflePlayer = await loadRuffle()
-    destroyPlayer()
+    // 只卸载旧播放器元素,不动 blob URL(URL 生命周期由 playFile/close 管理,避免把待加载的新 URL 误 revoke)
+    removePlayerElement()
     const p = RufflePlayer.newest().createPlayer()
     p.style.width = '100%'
     p.style.height = '100%'
@@ -127,11 +136,15 @@ const playFile = async (file) => {
     return
   }
   fileName.value = file.name
-  objectUrl = URL.createObjectURL(file)
-  await mountAndLoad((api) => api.load(objectUrl))
+  // 先释放旧 blob,再建新 blob;新 URL 用局部变量传入,避免 mountAndLoad 卸载旧播放器时把它 revoke 掉
+  revokeObjectUrl()
+  const url = URL.createObjectURL(file)
+  objectUrl = url
+  await mountAndLoad((api) => api.load(url))
 }
 
 const loadUrl = (url) => {
+  revokeObjectUrl()
   fileName.value = props.title || (url.split('/').pop() || '')
   mountAndLoad((api) => api.load(url))
 }

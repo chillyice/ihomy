@@ -36,7 +36,7 @@
           <el-button v-if="!src" size="small" round text type="danger" @click="close">{{ $t('gba.close') }}</el-button>
         </div>
         <div ref="stage" class="gba-stage">
-          <div ref="container" class="gba-stage-inner"></div>
+          <div ref="container" :id="playerId" class="gba-stage-inner"></div>
         </div>
       </template>
 
@@ -68,6 +68,9 @@ const { t } = useI18n()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 const container = ref(null)
 const stage = ref(null)
+// EmulatorJS 的 setElements() 用 document.querySelector(element) 定位容器,要求传 CSS 选择器字符串(官方约定 EJS_player='#game'),
+// 不能传 DOM 元素(否则抛 "[object HTMLDivElement] is not a valid selector" 导致模拟器永不初始化)。故给容器分配稳定 id。
+const playerId = 'gba-stage-inner'
 const fileInput = ref(null)
 const fileName = ref('')
 const dragging = ref(false)
@@ -103,7 +106,7 @@ const loadRom = async (romUrl) => {
     await nextTick()
 
     // 设置 EmulatorJS 全局配置(必须在注入 loader.js 前就位;loader.js 读取后 new EmulatorJS 启动)
-    window.EJS_player = container.value
+    window.EJS_player = '#' + playerId
     window.EJS_core = 'gba'
     window.EJS_gameUrl = romUrl
     window.EJS_pathtodata = '/emulatorjs/data/'

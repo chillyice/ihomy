@@ -149,6 +149,8 @@ const MAX_LEVEL = 9
 const LEVEL_TIME = 150 // 秒,与原件 1800 帧 @12fps 一致
 const TIME_BONUS = 3 // 每消除一对补充 3 秒(原件 36 帧)
 const BASE_SHUFFLE = 6
+const MATCH_LINE_MS = 150 // 消除连线展示时长(原 280,贴近原版 12fps 连线瞬时节奏)
+const MATCH_FLIP_MS = 120 // 消除后牌位滑行动画时长(原 220)
 
 // 40 种宠物(按 sprite 149 帧序),用 import.meta.glob 按文件名排序加载
 const petModules = import.meta.glob('@/assets/games/petlink/*.png', { eager: true, import: 'default' })
@@ -212,7 +214,11 @@ function toggleFullscreen() {
     document.exitFullscreen?.()
   }
 }
-function onFullscreenChange() { isFullscreen.value = !!document.fullscreenElement }
+function onFullscreenChange() {
+  isFullscreen.value = !!document.fullscreenElement
+  // 全屏/退出后可用宽高变化,重新计算缩放(退出恢复 1.6 上限)
+  nextTick(() => updateBoardScale())
+}
 
 // ---------- 音频(点击/消除/胜利音效,无背景音乐;可静音) ----------
 
@@ -323,7 +329,7 @@ async function match(a, b, path) {
   animating.value = true
   playMatch()
   linePoints.value = path.map(([r, c]) => `${centerX(c)},${centerY(r)}`).join(' ')
-  await sleep(280)
+  await sleep(MATCH_LINE_MS)
   linePoints.value = ''
 
   // FLIP:先记录各牌当前屏幕位置,再应用消除/牌位移动,最后从旧位置滑到新位置
@@ -333,8 +339,8 @@ async function match(a, b, path) {
   // 消除补充倒计时:每消除一对 +3 秒(原件 thetimer 回退 36 帧)
   timeLeft.value = Math.min(LEVEL_TIME, timeLeft.value + TIME_BONUS)
   await nextTick()
-  flipAnimate(before)
-  await sleep(220)
+  flipAnimate(before, MATCH_FLIP_MS)
+  await sleep(MATCH_FLIP_MS)
   animating.value = false
 
   if (board.value.every(v => v === null)) {
@@ -561,9 +567,22 @@ function togglePause() {
 function updateBoardScale() {
   const el = boardScrollRef.value
   if (!el) return
-  const avail = el.clientWidth
-  // 基准 1:1,允许缩放(最小 0.5 保底、最大 1.6 放大,40 种图源为 120×120 三倍图,放大仍清晰)
-  boardScale.value = avail > 0 ? Math.min(1.6, Math.max(0.5, avail / svgW)) : 1
+  const availW = el.clientWidth
+  let scale = availW > 0 ? availW / svgW : 1
+  if (isFullscreen.value) {
+    // 全屏:同时按可用宽/高取较小者,让棋盘铺满屏幕(不再 1.6 封顶),大屏不累眼
+    const card = gameCardEl.value
+    const hud = card?.querySelector('.game-hud')
+    const bar = card?.querySelector('.game-bottombar')
+    const hudH = hud ? hud.offsetHeight + 12 : 0 // .game-hud margin-bottom 12px
+    const barH = bar ? bar.offsetHeight + 12 : 0 // .game-bottombar margin-top 12px
+    const availH = (card ? card.clientHeight : window.innerHeight) - 40 - hudH - barH // 40 = .game-card 上下 padding
+    if (availH > 0) scale = Math.min(scale, availH / svgH)
+    scale = Math.max(0.5, scale)
+  } else {
+    scale = Math.min(1.6, Math.max(0.5, scale))
+  }
+  boardScale.value = scale
 }
 
 function startGame() {
@@ -604,7 +623,7 @@ function snapshotPositions() {
   return map
 }
 
-function flipAnimate(before) {
+function flipAnimate(before, ms = 200) {
   const els = boardEl.value ? boardEl.value.querySelectorAll('[data-tid]') : []
   const s = boardScale.value || 1
   els.forEach(el => {
@@ -619,14 +638,15 @@ function flipAnimate(before) {
     el.style.transition = 'none'
     el.style.transform = `translate(${dx}px, ${dy}px)`
     void el.offsetWidth // 强制回流,确保初始 transform 生效
-    el.style.transition = 'transform 200ms ease'
+    el.style.transition = `transform ${ms}ms ease`
     el.style.transform = 'translate(0, 0)'
-    setTimeout(() => { el.style.transition = ''; el.style.transform = '' }, 200)
+    setTimeout(() => { el.style.transition = ''; el.style.transform = '' }, ms)
   })
 }
 
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
+  window.addEventListener('resize', updateBoardScale)
   document.addEventListener('fullscreenchange', onFullscreenChange)
   // 进入游戏即关闭全局光影特效(与图片/视频/看书一致),离开时恢复
   sunLight?.suspendEffects()
@@ -636,6 +656,7 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   stopTicker(); clearTimeout(hintTimer); window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('resize', updateBoardScale)
   document.removeEventListener('fullscreenchange', onFullscreenChange)
   if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null }
   sunLight?.restoreEffects()

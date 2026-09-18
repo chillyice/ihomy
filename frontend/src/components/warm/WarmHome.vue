@@ -267,7 +267,6 @@
 import { computed, inject, onMounted, onBeforeUnmount, ref, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { useThemeStore } from '@/stores/theme'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
@@ -277,7 +276,6 @@ import { publicApi, bookApi, itemApi, taskApi, wishApi, reminderApi, aiApi } fro
 import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
 
 const router = useRouter()
-const themeStore = useThemeStore()
 const appStore = useAppStore()
 const userStore = useUserStore()
 const sunLight = inject(SUN_LIGHT_KEY)
@@ -918,13 +916,9 @@ const taskIcon = (t) => TASK_REWARD_ICON[t] || '⭕'
 
 const greeting = computed(() => {
   const h = new Date().getHours()
-  const dawn = themeStore.mode === 'dawn'
-  if (dawn) {
-    if (h < 6) return '凌晨 · 好梦'
-    if (h < 12) return '早安'
-    if (h < 18) return '午后'
-    return '傍晚'
-  }
+  if (h < 6) return '凌晨 · 好梦'
+  if (h < 12) return '早安'
+  if (h < 18) return '午后'
   return '晚上好 · 家人都在'
 })
 </script>
