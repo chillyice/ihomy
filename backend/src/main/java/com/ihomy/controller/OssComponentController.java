@@ -4,6 +4,7 @@ import com.ihomy.annotation.OperationLog;
 import com.ihomy.annotation.RequirePermission;
 import com.ihomy.common.Result;
 import com.ihomy.entity.OssComponent;
+import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.OssComponentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,6 +32,7 @@ import java.util.Map;
 public class OssComponentController {
 
     private final OssComponentService ossComponentService;
+    private final SecurityHelper securityHelper;
 
     @Operation(summary = "开源组件列表(可升级项排前)")
     @RequirePermission("ops:view")
@@ -59,6 +61,22 @@ public class OssComponentController {
     @GetMapping("/{id}/upgrade-plan")
     public Result<Map<String, Object>> upgradePlan(@PathVariable Long id) {
         return Result.success(ossComponentService.buildUpgradePlan(id));
+    }
+
+    @Operation(summary = "AI 升级评估(风险分级/迁移点/可行性)")
+    @RequirePermission("ops:view")
+    @OperationLog(module = "OSS", operationType = "QUERY", description = "AI 评估开源组件升级", saveArgs = false)
+    @PostMapping("/{id}/assess")
+    public Result<Map<String, Object>> assess(@PathVariable Long id) {
+        return Result.success(ossComponentService.assess(id, securityHelper.current().getFamilyId()));
+    }
+
+    @Operation(summary = "生成升级 PR(AI 评估可行后触发 Renovate)")
+    @RequirePermission("ops:view")
+    @OperationLog(module = "OSS", operationType = "CREATE", description = "触发开源组件升级 PR", saveArgs = false)
+    @PostMapping("/{id}/upgrade")
+    public Result<Map<String, Object>> upgrade(@PathVariable Long id) {
+        return Result.success(ossComponentService.requestUpgrade(id));
     }
 
     @Operation(summary = "编辑组件台账")

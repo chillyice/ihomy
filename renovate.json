@@ -1,0 +1,21 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "dependencyDashboard": true,
+  "dependencyDashboardApproval": true,
+  "automerge": false,
+  "rebaseWhen": "conflicted",
+  "timezone": "Asia/Shanghai",
+  "packageRules": [
+    {
+      "matchManagers": ["npm"],
+      "groupName": "frontend-npm",
+      "commitMessagePrefix": "chore(deps): "
+    },
+    {
+      "matchManagers": ["maven"],
+      "groupName": "backend-maven",
+      "commitMessagePrefix": "chore(deps): "
+    }
+  ]
+}

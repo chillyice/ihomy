@@ -1846,6 +1846,13 @@ CREATE TABLE `sys_oss_component` (
   `purpose`            VARCHAR(255) DEFAULT NULL COMMENT '用途说明',
   `integration_status` VARCHAR(20)  NOT NULL DEFAULT 'FULL' COMMENT '集成状态:FULL/PARTIAL/PLANNED',
   `status`             VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE' COMMENT '状态:ACTIVE/IGNORED',
+  `managed_by`         VARCHAR(20)  NOT NULL DEFAULT 'INTERNAL' COMMENT '管理方:RENOVATE/INTERNAL',
+  `deploy_type`        VARCHAR(20)  DEFAULT NULL COMMENT 'SERVICE 部署方式:CONTAINER/SYSTEMD/OTHER',
+  `assess_json`        TEXT         DEFAULT NULL COMMENT '最近一次 AI 升级评估结果(JSON)',
+  `assessed_at`        DATETIME     DEFAULT NULL COMMENT '最近一次 AI 评估时间',
+  `vuln_count`         INT          DEFAULT NULL COMMENT '漏洞数(预留)',
+  `vuln_severity`      VARCHAR(20)  DEFAULT NULL COMMENT '最高漏洞等级(预留)',
+  `last_vuln_scan_at`  DATETIME     DEFAULT NULL COMMENT '最近漏洞扫描时间(预留)',
   `last_checked_at`    DATETIME     DEFAULT NULL COMMENT '最近检测时间',
   `remark`             VARCHAR(255) DEFAULT NULL COMMENT '备注',
   `created_at`         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -1882,3 +1889,6 @@ INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `curre
 ('Nextcloud', 'SERVICE', 'nextcloud/server', NULL, 'AGPL-3.0', 'https://github.com/nextcloud/server', 'WebDAV/Nextcloud 存储后端', 'PARTIAL'),
 ('Jellyfin', 'SERVICE', 'jellyfin/jellyfin', NULL, 'GPL-2.0', 'https://github.com/jellyfin/jellyfin', '放映厅媒体引擎(规划)', 'PLANNED'),
 ('Home Assistant', 'SERVICE', 'home-assistant/core', NULL, 'Apache-2.0', 'https://github.com/home-assistant/core', '智能家居中控(规划)', 'PLANNED');
+
+-- NPM/MAVEN 直接依赖交由 Renovate 检测 + 生成 PR,SERVICE 独立服务由台账内部维护(默认 INTERNAL)
+UPDATE `sys_oss_component` SET `managed_by` = 'RENOVATE' WHERE `component_type` IN ('NPM', 'MAVEN');

@@ -37,6 +37,20 @@ public class OssComponent {
     private String integrationStatus;
     /** 状态:ACTIVE / IGNORED(忽略后不再提示) */
     private String status;
+    /** 管理方:RENOVATE(由 Renovate 检测+生成 PR)/ INTERNAL(台账内部维护,如独立服务) */
+    private String managedBy;
+    /** 独立服务部署方式:CONTAINER / SYSTEMD / OTHER(SERVICE 专用,可空) */
+    private String deployType;
+    /** 最近一次 AI 升级评估结果(JSON:{riskLevel,feasible,summary,breakingChanges,migrationSteps}) */
+    private String assessJson;
+    /** 最近一次 AI 评估时间 */
+    private LocalDateTime assessedAt;
+    /** 漏洞数(漏洞扫描回写,预留) */
+    private Integer vulnCount;
+    /** 最高漏洞等级(CRITICAL/HIGH/MEDIUM/LOW,预留) */
+    private String vulnSeverity;
+    /** 最近漏洞扫描时间(预留) */
+    private LocalDateTime lastVulnScanAt;
     private LocalDateTime lastCheckedAt;
     private String remark;
     private LocalDateTime createdAt;

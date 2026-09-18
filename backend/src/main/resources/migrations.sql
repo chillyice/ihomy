@@ -1093,6 +1093,13 @@ CREATE TABLE IF NOT EXISTS `sys_oss_component` (
   `purpose`            VARCHAR(255) DEFAULT NULL COMMENT '用途说明',
   `integration_status` VARCHAR(20)  NOT NULL DEFAULT 'FULL' COMMENT '集成状态:FULL/PARTIAL/PLANNED',
   `status`             VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE' COMMENT '状态:ACTIVE/IGNORED',
+  `managed_by`         VARCHAR(20)  NOT NULL DEFAULT 'INTERNAL' COMMENT '管理方:RENOVATE/INTERNAL',
+  `deploy_type`        VARCHAR(20)  DEFAULT NULL COMMENT 'SERVICE 部署方式:CONTAINER/SYSTEMD/OTHER',
+  `assess_json`        TEXT         DEFAULT NULL COMMENT '最近一次 AI 升级评估结果(JSON)',
+  `assessed_at`        DATETIME     DEFAULT NULL COMMENT '最近一次 AI 评估时间',
+  `vuln_count`         INT          DEFAULT NULL COMMENT '漏洞数(预留)',
+  `vuln_severity`      VARCHAR(20)  DEFAULT NULL COMMENT '最高漏洞等级(预留)',
+  `last_vuln_scan_at`  DATETIME     DEFAULT NULL COMMENT '最近漏洞扫描时间(预留)',
   `last_checked_at`    DATETIME     DEFAULT NULL COMMENT '最近检测时间',
   `remark`             VARCHAR(255) DEFAULT NULL COMMENT '备注',
   `created_at`         DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -1178,3 +1185,16 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 SET @tbl := (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'sys_operation_log');
 SET @sql := IF(@tbl > 0, 'RENAME TABLE `sys_operation_log` TO `report_system`', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ------------------------------------------------------------
+-- V9.76 开源组件台账升级闸门化:sys_oss_component 新增 7 列
+--   managed_by/deploy_type/assess_json/assessed_at/vuln_count/vuln_severity/last_vuln_scan_at
+--   用 information_schema 守卫(managed_by 不存在才整体加,幂等);NPM/MAVEN 置 RENOVATE
+-- ------------------------------------------------------------
+SET @has := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'sys_oss_component' AND column_name = 'managed_by');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `sys_oss_component` ADD COLUMN `managed_by` VARCHAR(20) NOT NULL DEFAULT ''INTERNAL'' AFTER `status`, ADD COLUMN `deploy_type` VARCHAR(20) DEFAULT NULL AFTER `managed_by`, ADD COLUMN `assess_json` TEXT DEFAULT NULL AFTER `deploy_type`, ADD COLUMN `assessed_at` DATETIME DEFAULT NULL AFTER `assess_json`, ADD COLUMN `vuln_count` INT DEFAULT NULL AFTER `assessed_at`, ADD COLUMN `vuln_severity` VARCHAR(20) DEFAULT NULL AFTER `vuln_count`, ADD COLUMN `last_vuln_scan_at` DATETIME DEFAULT NULL AFTER `vuln_severity`',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+UPDATE `sys_oss_component` SET `managed_by` = 'RENOVATE' WHERE `component_type` IN ('NPM','MAVEN');

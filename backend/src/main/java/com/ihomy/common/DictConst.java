@@ -141,6 +141,15 @@ public final class DictConst {
     public static final String OSS_INTEG_PARTIAL = "PARTIAL";
     public static final String OSS_INTEG_PLANNED = "PLANNED";
 
+    /** 开源组件管理方 oss_managed_by:RENOVATE 由 Renovate 检测+生成 PR / INTERNAL 台账内部维护 */
+    public static final String OSS_MANAGED_RENOVATE = "RENOVATE";
+    public static final String OSS_MANAGED_INTERNAL = "INTERNAL";
+
+    /** 独立服务部署方式 oss_deploy_type(SERVICE 专用) */
+    public static final String OSS_DEPLOY_CONTAINER = "CONTAINER";
+    public static final String OSS_DEPLOY_SYSTEMD = "SYSTEMD";
+    public static final String OSS_DEPLOY_OTHER = "OTHER";
+
     /* ---------------- 整数(历史 DTO 入参)→ 字典词 转换 ---------------- */
 
     public static String visibility(Integer v) {

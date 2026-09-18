@@ -322,6 +322,8 @@ export const opsApi = {
   ossAdd: (data) => request.post('/ops/oss', data),
   ossConfirm: (id) => request.put(`/ops/oss/${id}/confirm`),
   ossIgnore: (id, ignored) => request.put(`/ops/oss/${id}/ignore`, null, { params: { ignored } }),
+  ossAssess: (id) => request.post(`/ops/oss/${id}/assess`, null, { timeout: 120000 }),
+  ossUpgrade: (id) => request.post(`/ops/oss/${id}/upgrade`),
 }
 
 // 家谱(家庭隐私数据,需登录)
