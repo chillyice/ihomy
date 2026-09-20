@@ -394,8 +394,9 @@ watch(() => route.fullPath, () => { canBack.value = window.history.state?.back !
 
 /* 主区(内部滚动) */
 .gc-main { min-height: 0; overflow-y: auto; padding: 24px; }
-/* 登录/注册页在暖居内容区内垂直居中:覆盖 .login-page 的 100vh,按内容区实际高度填充(否则被顶栏/studio 顶得偏下并产生滚动) */
-.gc-main .login-page { min-height: 100%; }
+/* 登录/注册页在暖居内容区内垂直居中:覆盖 .login-page 的 100vh,按内容区实际高度填充(否则被顶栏/studio 顶得偏下并产生滚动)。
+ * 加 html.theme-warm 前缀提权:Login.vue 的 scoped .login-page{min-height:100vh} 懒加载注入更晚、同权时会把这里覆盖掉。 */
+html.theme-warm .gc-main .login-page { min-height: 100%; }
 
 /* 按钮/标签(暖居专属) */
 .gc-btn { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--color-border); background: var(--color-line); color: var(--color-text-secondary); border-radius: 11px; padding: 9px 16px; font-size: 13px; cursor: pointer; transition: .2s; font-weight: 550; }

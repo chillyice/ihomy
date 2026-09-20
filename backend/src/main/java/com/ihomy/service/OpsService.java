@@ -12,15 +12,20 @@ import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
-import java.lang.management.OperatingSystemMXBean;
+import java.lang.management.MemoryMXBean;
+import java.lang.management.MemoryUsage;
+import java.lang.management.RuntimeMXBean;
 import java.lang.management.ThreadMXBean;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -126,38 +131,80 @@ public class OpsService {
     }
 
     /**
-     * 服务器状态:JVM 内存/线程/运行时长 + OS 摘要 + 磁盘用量。
-     * 数据来自 JDK(ManagementFactory/FileStore),无需外部监控组件。
+     * 服务器状态:JVM 内存/线程/GC/运行时长 + OS 摘要 + CPU/物理内存 + 磁盘用量。
+     * 数据来自 JDK(ManagementFactory/FileStore/com.sun.management),无需外部监控组件。
+     * 前端「服务器状态」标签页按 5 秒轮询,实时刷新。
      */
     public Map<String, Object> server() {
         Runtime rt = Runtime.getRuntime();
-        long used = rt.totalMemory() - rt.freeMemory();
-        OperatingSystemMXBean osBean = ManagementFactory.getOperatingSystemMXBean();
+        MemoryMXBean memoryBean = ManagementFactory.getMemoryMXBean();
         ThreadMXBean threadBean = ManagementFactory.getThreadMXBean();
+        RuntimeMXBean runtimeBean = ManagementFactory.getRuntimeMXBean();
 
+        // JVM:进程 + 版本 + 堆/非堆内存 + 线程 + 运行信息
+        long heapUsed = rt.totalMemory() - rt.freeMemory();
+        MemoryUsage nonHeap = memoryBean.getNonHeapMemoryUsage();
         Map<String, Object> jvm = new LinkedHashMap<>();
-        jvm.put("heapUsed", used);
-        jvm.put("heapMax", rt.maxMemory());
-        jvm.put("heapCommitted", rt.totalMemory());
-        jvm.put("threads", threadBean.getThreadCount());
-        jvm.put("uptimeSec", ManagementFactory.getRuntimeMXBean().getUptime() / 1000);
+        jvm.put("pid", ProcessHandle.current().pid());
         jvm.put("javaVersion", System.getProperty("java.version"));
+        jvm.put("heapUsed", heapUsed);
+        jvm.put("heapCommitted", rt.totalMemory());
+        jvm.put("heapMax", rt.maxMemory());
+        jvm.put("nonHeapUsed", nonHeap.getUsed());
+        jvm.put("nonHeapCommitted", nonHeap.getCommitted());
+        jvm.put("threads", threadBean.getThreadCount());
+        jvm.put("peakThreads", threadBean.getPeakThreadCount());
+        jvm.put("uptimeSec", runtimeBean.getUptime() / 1000);
+        jvm.put("startTime", LocalDateTime.ofInstant(Instant.ofEpochMilli(runtimeBean.getStartTime()), ZoneId.systemDefault())
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
 
+        // GC 汇总 + 各回收器明细(次数/耗时)
+        List<Map<String, Object>> gcList = new ArrayList<>();
+        long gcCount = 0;
+        long gcTime = 0;
+        for (GarbageCollectorMXBean gc : ManagementFactory.getGarbageCollectorMXBeans()) {
+            long c = gc.getCollectionCount() >= 0 ? gc.getCollectionCount() : 0;
+            long t = gc.getCollectionTime() >= 0 ? gc.getCollectionTime() : 0;
+            gcCount += c;
+            gcTime += t;
+            Map<String, Object> g = new LinkedHashMap<>();
+            g.put("name", gc.getName());
+            g.put("count", c);
+            g.put("timeMs", t);
+            gcList.add(g);
+        }
+        jvm.put("gcCount", gcCount);
+        jvm.put("gcTimeMs", gcTime);
+        jvm.put("gc", gcList);
+
+        // OS:系统信息 + CPU 使用率 + 物理内存(com.sun.management 扩展,HotSpot/OpenJDK 均可用)
+        com.sun.management.OperatingSystemMXBean osBean =
+                ManagementFactory.getPlatformMXBean(com.sun.management.OperatingSystemMXBean.class);
         Map<String, Object> os = new LinkedHashMap<>();
         os.put("name", System.getProperty("os.name"));
         os.put("arch", System.getProperty("os.arch"));
         os.put("cores", rt.availableProcessors());
         os.put("loadAvg", osBean.getSystemLoadAverage());
+        os.put("cpuSystem", percent(osBean.getCpuLoad()));
+        os.put("cpuProcess", percent(osBean.getProcessCpuLoad()));
+        os.put("memTotal", osBean.getTotalMemorySize());
+        os.put("memFree", osBean.getFreeMemorySize());
+        os.put("memUsed", osBean.getTotalMemorySize() - osBean.getFreeMemorySize());
 
-        // 磁盘挂载点用量(仅根分区,对运维有意义的层)
+        // 磁盘挂载点用量(总量/可用/已用/使用率)
         List<Map<String, Object>> disks = new ArrayList<>();
         for (File root : File.listRoots()) {
             try {
                 FileStore store = Files.getFileStore(root.toPath());
+                long total = store.getTotalSpace();
+                long free = store.getUsableSpace();
+                long used = total - free;
                 Map<String, Object> d = new LinkedHashMap<>();
                 d.put("path", root.getPath());
-                d.put("total", store.getTotalSpace());
-                d.put("free", store.getUsableSpace());
+                d.put("total", total);
+                d.put("free", free);
+                d.put("used", used);
+                d.put("usedPercent", total == 0 ? 0 : Math.round(used * 1000.0 / total) / 10.0);
                 d.put("type", store.type());
                 disks.add(d);
             } catch (Exception ignored) {
@@ -170,6 +217,14 @@ public class OpsService {
         result.put("disks", disks);
         result.put("time", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         return result;
+    }
+
+    /** CPU 负载 0~1 转百分比(保留 1 位);<0(尚未采集到样本)返回 null,前端显示为「—」 */
+    private Double percent(double v) {
+        if (v < 0) {
+            return null;
+        }
+        return Math.round(v * 1000.0) / 10.0;
     }
 
     /** 操作日志检索:过滤分页(时间/操作人/模块列表/操作类型列表/结果列表/关键字),时间倒序 */

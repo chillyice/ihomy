@@ -69,9 +69,9 @@
       </div>
     </PageToolbar>
 
-    <div class="blog-layout" :class="{ 'no-side': !showSidePanel }">
+    <div class="blog-layout" :class="{ 'no-side': !hasSidePanel }">
       <!-- 大屏左侧分类面板 -->
-      <aside v-if="showSidePanel && (catCountRaw.length || userStore.isLoggedIn)" class="category-side">
+      <aside v-if="hasSidePanel" class="category-side">
         <div class="side-head">
           <span class="side-title">{{ $t('blog.category') }}</span>
           <button v-if="userStore.isLoggedIn" class="side-add-btn" :title="$t('blog.newCategory')" @click="openCategoryDialog('add')">
@@ -225,6 +225,10 @@ const showSidePanel = ref(window.innerWidth >= 1400)
 const onResize = () => { showSidePanel.value = window.innerWidth >= 1400 }
 window.addEventListener('resize', onResize)
 onUnmounted(() => window.removeEventListener('resize', onResize))
+
+// 侧栏实际是否渲染:大屏 + (有分类数据 或 已登录)。无分类且未登录时不渲染侧栏,
+// 布局须同步收成单列,否则 blog-main 会落进 grid 空的 220px 首列、博客挤在左侧。
+const hasSidePanel = computed(() => showSidePanel.value && (catCountRaw.value.length > 0 || userStore.isLoggedIn))
 
 const getSummary = (b) => {
   if (b.summary) return b.summary

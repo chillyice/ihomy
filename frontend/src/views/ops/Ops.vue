@@ -4,7 +4,7 @@
 <template>
   <div class="page">
     <Breadcrumb :items="[{ label: $t('ops.log') }]" />
-    <el-tabs v-model="tab">
+    <el-tabs v-model="tab" class="ops-tabs">
       <el-tab-pane v-if="showSystemTabs" :label="$t('ops.overview')" name="stats">
         <div class="filter-row">
           <el-date-picker v-model="filter.startDate" type="date" value-format="YYYY-MM-DD" :placeholder="$t('ops.startDate')" />
@@ -26,29 +26,102 @@
         <div v-loading="serverLoading">
           <el-alert type="info" :closable="false" show-icon style="margin-bottom: 14px"
             :title="$t('ops.alertText')" />
+
+          <!-- 操作行:手动刷新 + 自动刷新开关 + 采集时间 -->
+          <div class="server-head">
+            <el-button size="small" @click="loadServer()">{{ $t('ops.refresh') }}</el-button>
+            <label class="auto-refresh">
+              <el-switch v-model="serverAutoRefresh" size="small" />
+              <span>{{ $t('ops.autoRefresh') }}</span>
+            </label>
+            <span class="server-time">{{ $t('ops.time') }}: {{ server.time || '—' }}</span>
+          </div>
+
+          <!-- 指标卡:CPU / 物理内存 / 堆内存 / 线程 / GC -->
+          <div class="metric-grid">
+            <div class="metric-card card">
+              <div class="metric-name">{{ $t('ops.cpu') }}</div>
+              <div class="metric-num">{{ fmtPct(server.os?.cpuProcess) }}</div>
+              <div class="metric-bar"><div class="metric-bar-fill" :style="{ width: barWidth((server.os?.cpuProcess || 0) / 100) }"></div></div>
+              <div class="metric-sub">{{ $t('ops.cpuSystem') }} {{ fmtPct(server.os?.cpuSystem) }}</div>
+            </div>
+            <div class="metric-card card">
+              <div class="metric-name">{{ $t('ops.memory') }}</div>
+              <div class="metric-num">{{ fmtMb(server.os?.memUsed) }} MB</div>
+              <div class="metric-bar"><div class="metric-bar-fill" :style="{ width: barWidth((server.os?.memUsed || 0) / (server.os?.memTotal || 1)) }"></div></div>
+              <div class="metric-sub">{{ $t('ops.memTotal') }} {{ fmtMb(server.os?.memTotal) }} MB</div>
+            </div>
+            <div class="metric-card card">
+              <div class="metric-name">{{ $t('ops.heapUsed') }}</div>
+              <div class="metric-num">{{ fmtMb(server.jvm?.heapUsed) }} MB</div>
+              <div class="metric-bar"><div class="metric-bar-fill" :style="{ width: barWidth((server.jvm?.heapUsed || 0) / (server.jvm?.heapMax || 1)) }"></div></div>
+              <div class="metric-sub">{{ $t('ops.heapMax') }} {{ fmtMb(server.jvm?.heapMax) }} MB</div>
+            </div>
+            <div class="metric-card card">
+              <div class="metric-name">{{ $t('ops.threads') }}</div>
+              <div class="metric-num">{{ server.jvm?.threads ?? 0 }}</div>
+              <div class="metric-bar"></div>
+              <div class="metric-sub">{{ $t('ops.peakThreads') }} {{ server.jvm?.peakThreads ?? '—' }}</div>
+            </div>
+            <div class="metric-card card">
+              <div class="metric-name">{{ $t('ops.gc') }}</div>
+              <div class="metric-num">{{ server.jvm?.gcCount ?? 0 }}</div>
+              <div class="metric-bar"></div>
+              <div class="metric-sub">{{ $t('ops.gcTime') }} {{ fmtMs(server.jvm?.gcTimeMs) }}</div>
+            </div>
+          </div>
+
           <div class="server-row">
             <div class="card server-block">
               <h3>JVM</h3>
               <el-descriptions :column="1" border size="small">
                 <el-descriptions-item :label="$t('ops.javaVersion')">{{ server.jvm?.javaVersion }}</el-descriptions-item>
+                <el-descriptions-item :label="$t('ops.pid')">{{ server.jvm?.pid }}</el-descriptions-item>
                 <el-descriptions-item :label="$t('ops.heapUsed')">{{ fmtMb(server.jvm?.heapUsed) }} MB</el-descriptions-item>
                 <el-descriptions-item :label="$t('ops.heapMax')">{{ fmtMb(server.jvm?.heapMax) }} MB</el-descriptions-item>
+                <el-descriptions-item :label="$t('ops.nonHeapUsed')">{{ fmtMb(server.jvm?.nonHeapUsed) }} MB</el-descriptions-item>
                 <el-descriptions-item :label="$t('ops.threads')">{{ server.jvm?.threads }}</el-descriptions-item>
                 <el-descriptions-item :label="$t('ops.uptime')">{{ fmtUptime(server.jvm?.uptimeSec) }}</el-descriptions-item>
+                <el-descriptions-item :label="$t('ops.startTime')">{{ server.jvm?.startTime }}</el-descriptions-item>
               </el-descriptions>
+              <h4 class="ops-section-title" style="margin-top: 16px">{{ $t('ops.gc') }}</h4>
+              <el-table :data="server.jvm?.gc || []" size="small" border>
+                <el-table-column prop="name" :label="$t('ops.gcName')" min-width="160" />
+                <el-table-column prop="count" :label="$t('ops.gcCount')" width="100" />
+                <el-table-column :label="$t('ops.gcTime')" width="110">
+                  <template #default="{ row }">{{ fmtMs(row.timeMs) }}</template>
+                </el-table-column>
+              </el-table>
             </div>
             <div class="card">
               <h3>{{ $t('ops.os') }}</h3>
               <el-descriptions :column="1" border size="small">
                 <el-descriptions-item :label="$t('ops.system')">{{ server.os?.name }} ({{ server.os?.arch }})</el-descriptions-item>
                 <el-descriptions-item :label="$t('ops.cores')">{{ server.os?.cores }}</el-descriptions-item>
-                <el-descriptions-item :label="$t('ops.load')">{{ server.os?.loadAvg ?? 'N/A' }}</el-descriptions-item>
+                <el-descriptions-item :label="$t('ops.load')">{{ fmtLoad(server.os?.loadAvg) }}</el-descriptions-item>
+                <el-descriptions-item :label="$t('ops.cpuProcess')">{{ fmtPct(server.os?.cpuProcess) }}</el-descriptions-item>
+                <el-descriptions-item :label="$t('ops.cpuSystem')">{{ fmtPct(server.os?.cpuSystem) }}</el-descriptions-item>
+                <el-descriptions-item :label="$t('ops.memory')">{{ fmtMb(server.os?.memUsed) }} / {{ fmtMb(server.os?.memTotal) }} MB</el-descriptions-item>
                 <el-descriptions-item :label="$t('ops.time')">{{ server.time }}</el-descriptions-item>
               </el-descriptions>
               <h3 style="margin-top: 16px">{{ $t('ops.disk') }}</h3>
-              <el-descriptions :column="1" border size="small" v-for="d in server.disks" :key="d.path">
-                <el-descriptions-item :label="d.path">{{ $t('ops.diskInfo', { free: fmtMb(d.free), total: fmtMb(d.total) }) }}</el-descriptions-item>
-              </el-descriptions>
+              <el-table :data="server.disks || []" size="small" border>
+                <el-table-column prop="path" :label="$t('ops.diskPath')" min-width="100" />
+                <el-table-column prop="type" :label="$t('ops.diskType')" width="110" />
+                <el-table-column :label="$t('ops.diskUsage')" min-width="170">
+                  <template #default="{ row }">
+                    <div class="disk-usage">
+                      <div class="disk-bar">
+                        <div class="disk-bar-fill" :class="row.usedPercent >= 90 ? 'danger' : row.usedPercent >= 70 ? 'warn' : ''" :style="{ width: row.usedPercent + '%' }"></div>
+                      </div>
+                      <span class="disk-pct">{{ row.usedPercent }}%</span>
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column :label="$t('ops.diskSpace')" min-width="180">
+                  <template #default="{ row }">{{ fmtMb(row.free) }} / {{ fmtMb(row.total) }} MB</template>
+                </el-table-column>
+              </el-table>
             </div>
           </div>
         </div>
@@ -556,7 +629,7 @@
 <script setup>
 // 运维管理:标签聚合页;数据接口须 ops:view 权限,后端 OpsAccessFilter 还会把 OPS 角色限定在 /ops 与 /auth
 // 详细日志:按 tid 检索 access/server/thirdparty 三类日志文件;操作日志 TID 列可点击跳转并自动查询
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { opsApi } from '@/api'
@@ -888,6 +961,15 @@ const fmtUptime = (sec) => {
   const m = Math.floor((sec % 3600) / 60)
   return t('ops.uptimeFormat', { d, h, m })
 }
+// 服务器监控格式化:百分比(空值显示 —)/进度条宽(0~1 分数)/GC 耗时/系统负载
+const fmtPct = (v) => (v == null ? '—' : v + '%')
+const barWidth = (frac) => {
+  const f = Number(frac)
+  if (!Number.isFinite(f)) return '0%'
+  return Math.min(Math.max(f * 100, 0), 100) + '%'
+}
+const fmtMs = (ms) => (ms == null ? '—' : ms < 1000 ? ms + ' ms' : (ms / 1000).toFixed(1) + ' s')
+const fmtLoad = (v) => (v == null || v < 0 ? 'N/A' : Number(v).toFixed(2))
 
 const loadStats = async () => {
   statsLoading.value = true
@@ -908,14 +990,28 @@ const resetFilter = () => {
   loadStats()
 }
 
-const loadServer = async () => {
-  serverLoading.value = true
+const loadServer = async (silent = false) => {
+  if (serverLoading.value) return
+  if (!silent) serverLoading.value = true
   try {
     server.value = await opsApi.server()
   } finally {
-    serverLoading.value = false
+    if (!silent) serverLoading.value = false
   }
 }
+
+// 服务器状态自动轮询(5s):仅停留在该标签页时开启,离开即停止;手动刷新走非静默(显示 loading)
+const serverAutoRefresh = ref(true)
+let serverTimer = null
+const startServerPoll = () => {
+  stopServerPoll()
+  if (serverAutoRefresh.value) serverTimer = setInterval(() => loadServer(true), 5000)
+}
+const stopServerPoll = () => {
+  if (serverTimer) { clearInterval(serverTimer); serverTimer = null }
+}
+watch(serverAutoRefresh, (v) => { if (v) startServerPoll(); else stopServerPoll() })
+onUnmounted(stopServerPoll)
 
 const loadLogs = async (page = logPageNum.value) => {
   logsLoading.value = true
@@ -1178,16 +1274,26 @@ onMounted(async () => {
   if (tab.value === 'ai') loadAi()
 })
 
-// 切到访问统计/天气/AI 标签页时懒加载
+// 切到访问统计/天气/AI/开源台账/服务器状态标签页时懒加载;服务器状态额外开启轮询
 watch(tab, (v) => {
   if (v === 'traffic' && !traffic.value) loadTraffic()
   if (v === 'weather' && !weatherQuota.value) loadWeatherQuota()
   if (v === 'ai' && aiSummary.value === null) loadAi()
   if (v === 'oss' && !ossLoaded.value) loadOss()
+  if (v === 'server') { loadServer(); startServerPoll() }
+  else stopServerPoll()
 })
 </script>
 
 <style scoped>
+/* 标签页头随滚动冻结:光尘下窗口滚动,顶到 sticky 面包屑下方(42px);暖居下 gc-main 内部滚动,
+ * 顶到内容上边界(0,由 main.css html.theme-warm 覆写)。背景取页面底色,盖住滚过的卡片。 */
+.ops-tabs :deep(.el-tabs__header) {
+  position: sticky;
+  top: 42px;
+  z-index: 15;
+  background: var(--color-bg);
+}
 .filter-row {
   display: flex;
   gap: 10px;
@@ -1222,9 +1328,26 @@ watch(tab, (v) => {
   margin: 0 0 12px;
   font-size: 15px;
 }
+.server-head { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; }
+.auto-refresh { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-secondary); cursor: pointer; }
+.server-time { font-size: 12px; color: var(--color-text-secondary); margin-left: auto; font-variant-numeric: tabular-nums; }
+.metric-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 16px; }
+.metric-card { padding: 14px 16px; }
+.metric-name { font-size: 12px; color: var(--color-text-secondary); }
+.metric-num { font-size: 22px; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.metric-sub { font-size: 12px; color: var(--color-text-secondary); margin-top: 4px; }
+.metric-bar { height: 6px; background: var(--color-card-2); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+.metric-bar-fill { height: 100%; border-radius: 3px; background: var(--color-brand); transition: width 0.4s ease; }
+.disk-usage { display: flex; align-items: center; gap: 8px; }
+.disk-bar { flex: 1; height: 6px; background: var(--color-card-2); border-radius: 3px; overflow: hidden; }
+.disk-bar-fill { height: 100%; border-radius: 3px; background: var(--color-brand); transition: width 0.4s ease; }
+.disk-bar-fill.warn { background: #d4a13f; }
+.disk-bar-fill.danger { background: #b04a3a; }
+.disk-pct { font-size: 12px; color: var(--color-text-secondary); width: 48px; text-align: right; font-variant-numeric: tabular-nums; }
 @media (max-width: 768px) {
   .stats-grid { grid-template-columns: repeat(3, 1fr); }
   .server-row { grid-template-columns: 1fr; }
+  .metric-grid { grid-template-columns: repeat(2, 1fr); }
 }
 .ops-section-title { font-size: 14px; font-weight: 600; margin: 0 0 10px; color: var(--color-text); }
 .ops-sub-title { font-size: 13px; font-weight: 500; margin: 0 0 6px; color: var(--color-text-secondary); }

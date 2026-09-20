@@ -248,7 +248,8 @@ html.theme-warm .fp-main::after {
  * 光尘仍是窗口滚动 + 固定顶栏,保留各组件里的 42px 不动。 */
 html.theme-warm .settings-side,
 html.theme-warm .category-side,
-html.theme-warm .toc-aside { top: 0; }
+html.theme-warm .toc-aside,
+html.theme-warm .ops-tabs .el-tabs__header { top: 0; }
 
 /* 内容页:gc-main 滚动区上下边缘渐变(同物品定位页「边缘融入背景」),内容滚动不再硬切;物品定位页自带画板渐变,排除 */
 html.theme-warm .gc-main:not(:has(.fp-page)) {
