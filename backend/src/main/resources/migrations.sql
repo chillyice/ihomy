@@ -1198,3 +1198,14 @@ SET @sql := IF(@has = 0,
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 UPDATE `sys_oss_component` SET `managed_by` = 'RENOVATE' WHERE `component_type` IN ('NPM','MAVEN');
+
+-- ------------------------------------------------------------
+-- V9.79 食材录入增加存入时间与保质期:family_item 新增 3 列
+--   stored_at(存入时间)/shelf_life(保质期数值)/shelf_life_unit(HOUR/DAY/MONTH)
+--   用 information_schema 守卫(stored_at 不存在才整体加,幂等)
+-- ------------------------------------------------------------
+SET @has := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'family_item' AND column_name = 'stored_at');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `family_item` ADD COLUMN `stored_at` DATETIME DEFAULT NULL COMMENT ''存入时间(食材,默认录入时)'' AFTER `note`, ADD COLUMN `shelf_life` INT DEFAULT NULL COMMENT ''保质期数值(食材)'' AFTER `stored_at`, ADD COLUMN `shelf_life_unit` VARCHAR(10) DEFAULT NULL COMMENT ''保质期单位:HOUR小时/DAY天/MONTH月(食材,录入默认天)'' AFTER `shelf_life`',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

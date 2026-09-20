@@ -1670,7 +1670,7 @@ const classifyVoice = (text) => {
 // ---- 旧 CRUD ----
 const openItem = (row) => {
   itemForm.value = row
-    ? { id: row.id, houseId: row.house_id, roomId: row.room_id, furnitureId: row.furniture_id, name: row.name, aliases: row.aliases, position: row.position, image_url: row.image_url, type: row.type, quantity: row.quantity != null ? Number(row.quantity) : null, unit: row.unit, note: row.note }
+    ? { id: row.id, houseId: row.house_id, roomId: row.room_id, furnitureId: row.furniture_id, name: row.name, aliases: row.aliases, position: row.position, image_url: row.image_url, type: row.type, quantity: row.quantity != null ? Number(row.quantity) : null, unit: row.unit, note: row.note, storedAt: row.stored_at || '', shelfLife: row.shelf_life != null ? Number(row.shelf_life) : null, shelfLifeUnit: row.shelf_life_unit || '' }
     : { houseId: null, roomId: null, furnitureId: null, name: '', aliases: '', position: '', image_url: '', type: 'OTHER', quantity: null, unit: '', note: '' }
   itemDlg.value = true
 }
@@ -1694,6 +1694,9 @@ const saveItem = async () => {
     quantity: itemForm.value.quantity,
     unit: itemForm.value.unit,
     note: itemForm.value.note,
+    storedAt: itemForm.value.storedAt || null,
+    shelfLife: itemForm.value.shelfLife,
+    shelfLifeUnit: itemForm.value.shelfLifeUnit || null,
     relX: itemForm.value.furnitureId ? 0.5 : null,
     relY: itemForm.value.furnitureId ? 0.5 : null,
   }

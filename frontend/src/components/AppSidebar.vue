@@ -256,8 +256,9 @@ const onNotifyClick = async (n) => {
   if (n.contentType === 'blog') router.push(`/blog/${n.contentId}`)
   else if (n.contentType === 'diary') router.push('/diary')
   else if (n.contentType === 'photo' && n.contentId) router.push('/album')
+  else if (n.contentType === 'item') router.push('/kitchen/ingredients')
 }
-const notifyType = (type) => type === 'reply' ? t('notify.typeReply') : type === 'system' ? t('notify.typeSystem') : t('notify.typeComment')
+const notifyType = (type) => type === 'reply' ? t('notify.typeReply') : type === 'system' ? t('notify.typeSystem') : type === 'item_expiry' ? t('notify.typeExpiry') : t('notify.typeComment')
 const notifyTime = (d) => {
   if (!d) return ''
   const date = new Date(d)

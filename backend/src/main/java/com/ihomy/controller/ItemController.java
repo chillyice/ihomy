@@ -7,6 +7,7 @@ import com.ihomy.dto.HouseDTO;
 import com.ihomy.dto.ItemAiDTO;
 import com.ihomy.dto.ItemBatchDTO;
 import com.ihomy.dto.ItemDTO;
+import com.ihomy.dto.ItemTakeDTO;
 import com.ihomy.dto.RoomDTO;
 import com.ihomy.entity.Furniture;
 import com.ihomy.entity.House;
@@ -114,6 +115,12 @@ public class ItemController {
         return Result.success(itemService.furnitureList(current().getFamilyId(), roomId));
     }
 
+    @Operation(summary = "家庭默认冰箱(无则创建)")
+    @GetMapping("/furniture/default-fridge")
+    public Result<Furniture> furnitureDefaultFridge() {
+        return Result.success(itemService.getDefaultFridge(current().getFamilyId()));
+    }
+
     @Operation(summary = "新增家具")
     @OperationLog(module = "ITEM", operationType = "CREATE", description = "新增家具")
     @PostMapping("/furniture")
@@ -178,6 +185,14 @@ public class ItemController {
     @DeleteMapping("/{id}")
     public Result<Void> itemDelete(@PathVariable Long id) {
         itemService.itemDelete(id, current().getFamilyId());
+        return Result.success();
+    }
+
+    @Operation(summary = "取出食材(减少库存)")
+    @OperationLog(module = "ITEM", operationType = "UPDATE", description = "取出食材")
+    @PostMapping("/{id}/take")
+    public Result<Void> itemTake(@PathVariable Long id, @RequestBody ItemTakeDTO dto) {
+        itemService.takeItem(id, current().getFamilyId(), dto.getAmount());
         return Result.success();
     }
 

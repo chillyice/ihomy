@@ -19,7 +19,7 @@
 
     <!-- 横条列表 -->
     <div v-loading="loading" class="ingredient-list">
-      <div v-for="item in items" :key="item.id" class="ingredient-bar glass" @click="openEdit(item)">
+      <div v-for="item in items" :key="item.id" class="ingredient-bar glass" @click="openTake(item)">
         <!-- 左半:图片 + 透明渐变 -->
         <div class="bar-image-wrap">
           <img v-if="item.image_url" :src="item.image_url" :alt="item.name" class="bar-image" loading="lazy" />
@@ -30,7 +30,10 @@
         </div>
         <!-- 右半:名称 + 数量 -->
         <div class="bar-info">
-          <div class="bar-name">{{ item.name }}</div>
+          <div class="bar-name-row">
+            <span class="bar-name">{{ item.name }}</span>
+            <span v-if="warnInfo(item)" class="warn-badge" :class="warnInfo(item).level">{{ warnInfo(item).text }}</span>
+          </div>
           <div class="bar-quantity">
             <span v-if="item.quantity != null" class="qty-num">{{ item.quantity }}</span>
             <span v-if="item.unit" class="qty-unit">{{ item.unit }}</span>
@@ -43,6 +46,7 @@
         </div>
         <!-- 操作按钮 -->
         <div class="bar-actions" @click.stop>
+          <el-button size="small" circle :title="$t('kitchen.takeOutOne')" :disabled="!item.quantity || Number(item.quantity) < 1" @click="takeOne(item)"><el-icon><Minus /></el-icon></el-button>
           <el-button size="small" circle @click="openEdit(item)"><el-icon><Edit /></el-icon></el-button>
           <el-button size="small" type="danger" circle plain @click="onDelete(item)"><el-icon><Delete /></el-icon></el-button>
         </div>
@@ -79,6 +83,23 @@
           </el-form-item>
         </div>
 
+        <!-- 存入时间 + 保质期 -->
+        <el-form-item :label="$t('kitchen.storedAt')">
+          <el-date-picker v-model="form.storedAt" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" :placeholder="$t('kitchen.storedAtPh')" style="width: 100%" />
+        </el-form-item>
+        <div class="form-row-2">
+          <el-form-item :label="$t('kitchen.shelfLife')">
+            <el-input-number v-model="form.shelfLife" :min="0" :precision="0" :step="1" :controls="false" style="width: 100%" />
+          </el-form-item>
+          <el-form-item :label="$t('kitchen.shelfLifeUnit')">
+            <el-select v-model="form.shelfLifeUnit" style="width: 100%">
+              <el-option value="HOUR" :label="$t('kitchen.shelfLifeUnitHour')" />
+              <el-option value="DAY" :label="$t('kitchen.shelfLifeUnitDay')" />
+              <el-option value="MONTH" :label="$t('kitchen.shelfLifeUnitMonth')" />
+            </el-select>
+          </el-form-item>
+        </div>
+
         <!-- 存放位置(三级级联) -->
         <el-form-item :label="$t('kitchen.ingredientLocation')">
           <el-cascader
@@ -101,6 +122,27 @@
         <el-button type="primary" :loading="saving" @click="onSave">{{ $t('kitchen.save') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- 取出弹窗 -->
+    <el-dialog v-model="takeDlg" append-to-body :title="$t('kitchen.takeOut')" width="420px">
+      <div class="take-total">
+        {{ $t('kitchen.currentQty') }}：
+        <span class="take-total-num">{{ takeForm.total != null ? takeForm.total : '—' }}</span>
+        <span v-if="takeForm.unit">{{ takeForm.unit }}</span>
+      </div>
+      <el-form label-position="top">
+        <el-form-item :label="$t('kitchen.takeAmount')">
+          <el-input-number v-model="takeForm.amount" :min="0" :precision="2" :step="1" style="width: 100%" />
+        </el-form-item>
+      </el-form>
+      <div class="take-quick">
+        <el-button v-for="q in quickAmounts" :key="q" size="small" round @click="takeForm.amount = q">{{ q }}</el-button>
+      </div>
+      <template #footer>
+        <el-button @click="takeDlg = false">{{ $t('kitchen.cancel') }}</el-button>
+        <el-button type="primary" :loading="takeSaving" @click="confirmTake">{{ $t('kitchen.takeOut') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -108,7 +150,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Bowl, Edit, Delete, Location, Search } from '@element-plus/icons-vue'
+import { Plus, Bowl, Edit, Delete, Location, Search, Minus } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import { itemApi, fileApi } from '@/api'
@@ -124,6 +166,42 @@ const saving = ref(false)
 
 const units = ['个', '斤', '瓶', '袋', '克', '千克', '升', '毫升', '把', '根', '盒', '包']
 
+const pad2 = (n) => String(n).padStart(2, '0')
+const nowStr = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`
+}
+const shelfTotalMs = (item) => {
+  if (item.shelf_life == null || item.shelf_life === '' || Number(item.shelf_life) <= 0) return null
+  const unit = item.shelf_life_unit || 'DAY'
+  const factor = unit === 'HOUR' ? 3600e3 : unit === 'MONTH' ? 30 * 86400e3 : 86400e3
+  return Number(item.shelf_life) * factor
+}
+const expiryOf = (item) => {
+  if (!item.stored_at) return null
+  const totalMs = shelfTotalMs(item)
+  if (!totalMs) return null
+  const base = new Date(String(item.stored_at).replace(' ', 'T')).getTime()
+  if (Number.isNaN(base)) return null
+  return new Date(base + totalMs)
+}
+// 三档预警:红=已过期;黄=总时长≤3天或剩余≤10%;绿=健康
+const warnInfo = (item) => {
+  const e = expiryOf(item)
+  const totalMs = shelfTotalMs(item)
+  if (!e || !totalMs) return null
+  const date = `${e.getFullYear()}-${pad2(e.getMonth() + 1)}-${pad2(e.getDate())}`
+  const remainingMs = e.getTime() - Date.now()
+  if (remainingMs < 0) {
+    const d = Math.ceil(-remainingMs / 86400e3)
+    const text = d >= 1 ? $t('kitchen.overdueDays', { n: d }) : $t('kitchen.overdue')
+    return { level: 'red', text: `${text} · ${$t('kitchen.expiresAt')} ${date}` }
+  }
+  const level = (totalMs / 86400e3 <= 3 || remainingMs <= totalMs * 0.10) ? 'yellow' : 'green'
+  const d = Math.ceil(remainingMs / 86400e3)
+  const text = $t('kitchen.remainingDays', { n: d })
+  return { level, text: `${text} · ${$t('kitchen.expiresAt')} ${date}` }
+}
 const form = reactive({
   id: null,
   name: '',
@@ -133,6 +211,28 @@ const form = reactive({
   furnitureId: null,
   locationPath: [],
   note: '',
+  storedAt: '',
+  shelfLife: null,
+  shelfLifeUnit: 'DAY',
+})
+
+// 取出(减少库存)
+const takeDlg = ref(false)
+const takeSaving = ref(false)
+const takeForm = reactive({ id: null, total: null, unit: '', amount: 1 })
+
+// 快捷取出数量:1/5/10 + 总数的 25%/33%/50%/66%/75%/100%(与 1/5/10 相同的去重)
+const quickAmounts = computed(() => {
+  const total = takeForm.total
+  const set = new Set()
+  ;[1, 5, 10].forEach((n) => set.add(n))
+  if (total != null && total > 0) {
+    ;[0.25, 0.33, 0.5, 0.66, 0.75, 1].forEach((p) => {
+      const v = Math.round(total * p * 100) / 100
+      if (v > 0) set.add(v)
+    })
+  }
+  return [...set].sort((a, b) => a - b)
 })
 
 // 存放位置树(house > room > furniture)
@@ -167,6 +267,7 @@ const loadList = async () => {
 
 const loadLocations = async () => {
   try {
+    try { await itemApi.defaultFridge() } catch (e) {} // 确保家庭默认冰箱存在(无则创建),失败不阻断位置树
     houses.value = await itemApi.houses()
     // 批量拉所有 room 和 furniture
     const roomPromises = houses.value.map(h => itemApi.rooms(h.id))
@@ -178,9 +279,16 @@ const loadLocations = async () => {
   } catch (e) {}
 }
 
-// 默认选中"厨房"相关位置
+// 默认选中"冰箱"(家庭默认冰箱),没有则回退到"厨房"相关房间
 const defaultLocation = () => {
-  // 找名称含"厨房"的 room
+  // 优先:冰箱(type 或名称含「冰箱」,已摆放进房间的)
+  const fridge = furnitures.value.find(f => f.type === '冰箱' || (f.name && f.name.includes('冰箱')))
+  if (fridge && fridge.roomId) {
+    const room = rooms.value.find(r => r.id === fridge.roomId)
+    const house = room ? houses.value.find(h => h.id === room.houseId) : null
+    if (house && room) return [house.id, room.id, fridge.id]
+  }
+  // 兜底:找名称含"厨房"的 room
   const kitchenRoom = rooms.value.find(r => r.name && r.name.includes('厨房'))
   if (kitchenRoom) {
     const house = houses.value.find(h => h.id === kitchenRoom.houseId)
@@ -198,6 +306,7 @@ const openAdd = () => {
   Object.assign(form, {
     id: null, name: '', image_url: '', quantity: null, unit: '',
     furnitureId: null, locationPath: defaultLocation(), note: '',
+    storedAt: nowStr(), shelfLife: null, shelfLifeUnit: 'DAY',
   })
   dlg.value = true
 }
@@ -208,6 +317,9 @@ const openEdit = (item) => {
     quantity: item.quantity != null ? Number(item.quantity) : null,
     unit: item.unit || '', furnitureId: item.furniture_id || null,
     locationPath: [], note: item.note || '',
+    storedAt: item.stored_at || '',
+    shelfLife: item.shelf_life != null ? Number(item.shelf_life) : null,
+    shelfLifeUnit: item.shelf_life_unit || 'DAY',
   })
   // 反查级联路径
   if (item.furniture_id && item.room_id && item.house_id) {
@@ -241,6 +353,9 @@ const onSave = async () => {
       unit: form.unit,
       furnitureId: furnId,
       note: form.note,
+      storedAt: form.storedAt || null,
+      shelfLife: form.shelfLife,
+      shelfLifeUnit: form.shelfLifeUnit,
     }
     if (form.id) {
       await itemApi.update(form.id, body)
@@ -259,6 +374,44 @@ const onDelete = async (item) => {
     await ElMessageBox.confirm($t('kitchen.deleteConfirm'), { type: 'warning', closeOnClickModal: true })
     await itemApi.remove(item.id)
     ElMessage.success($t('common.deleted'))
+    loadList()
+  } catch (e) {}
+}
+
+const openTake = (item) => {
+  Object.assign(takeForm, {
+    id: item.id,
+    total: item.quantity != null ? Number(item.quantity) : null,
+    unit: item.unit || '',
+    amount: 1,
+  })
+  takeDlg.value = true
+}
+
+const confirmTake = async () => {
+  const amount = Number(takeForm.amount)
+  if (!amount || amount <= 0) {
+    ElMessage.warning($t('kitchen.takeAmountRequired'))
+    return
+  }
+  if (takeForm.total != null && amount > takeForm.total) {
+    ElMessage.warning($t('kitchen.takeExceeds'))
+    return
+  }
+  takeSaving.value = true
+  try {
+    await itemApi.take(takeForm.id, amount)
+    ElMessage.success($t('kitchen.taken'))
+    takeDlg.value = false
+    loadList()
+  } catch (e) {}
+  takeSaving.value = false
+}
+
+const takeOne = async (item) => {
+  try {
+    await itemApi.take(item.id, 1)
+    ElMessage.success($t('kitchen.taken'))
     loadList()
   } catch (e) {}
 }
@@ -337,6 +490,24 @@ onMounted(() => {
   font-weight: 600;
   color: var(--text-primary, #303133);
 }
+.bar-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.warn-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.warn-badge.red { color: var(--el-color-danger, #f56c6c); background: rgba(245, 108, 108, 0.14); }
+.warn-badge.yellow { color: var(--el-color-warning, #e6a23c); background: rgba(230, 162, 60, 0.16); }
+.warn-badge.green { color: var(--el-color-success, #67c23a); background: rgba(103, 194, 58, 0.14); }
 .bar-quantity {
   display: flex;
   align-items: baseline;
@@ -385,6 +556,27 @@ onMounted(() => {
   height: 140px;
   object-fit: cover;
   border-radius: 8px;
+}
+
+/* 取出弹窗 */
+.take-total {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-secondary, #909399);
+  margin-bottom: 12px;
+}
+.take-total-num {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--el-color-primary, #409eff);
+}
+.take-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
 }
 
 :global(html.dark) .ingredient-bar {

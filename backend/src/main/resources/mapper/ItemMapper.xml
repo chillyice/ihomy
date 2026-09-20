@@ -11,6 +11,9 @@
                i.quantity,
                IFNULL(i.unit,'')      AS unit,
                IFNULL(i.note,'')      AS note,
+               DATE_FORMAT(i.stored_at, '%Y-%m-%d %H:%i:%s') AS stored_at,
+               i.shelf_life,
+               IFNULL(i.shelf_life_unit,'') AS shelf_life_unit,
                i.rel_x,
                i.rel_y,
                i.room_id              AS item_room_id,
@@ -48,5 +51,14 @@
         </if>
         ORDER BY COALESCE(h.id, ih.id), COALESCE(r.floor, ir.floor), COALESCE(r.sort_order, ir.sort_order), COALESCE(r.id, ir.id), f.id, i.id
     </select>
+
+    <update id="takeAmount">
+        UPDATE family_item
+        SET quantity = quantity - #{amount}
+        WHERE id = #{id}
+          AND family_id = #{familyId}
+          AND quantity IS NOT NULL
+          AND quantity &gt;= #{amount}
+    </update>
 
 </mapper>

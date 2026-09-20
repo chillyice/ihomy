@@ -143,6 +143,35 @@ public class ItemService {
                 .orderByAsc(Furniture::getId));
     }
 
+    /**
+     * 家庭默认冰箱(食材默认存放位置):按类型/名称找已有冰箱,无则创建。
+     * 优先选择已摆放进房间的冰箱;创建时若有厨房房间则放入厨房,否则进家具库(room_id 空)。
+     */
+    public Furniture getDefaultFridge(Long familyId) {
+        List<Furniture> fridges = furnitureMapper.selectList(new LambdaQueryWrapper<Furniture>()
+                .eq(Furniture::getFamilyId, familyId)
+                .and(w -> w.eq(Furniture::getType, "冰箱").or().like(Furniture::getName, "冰箱"))
+                .orderByAsc(Furniture::getId));
+        Furniture fridge = fridges.stream()
+                .filter(f -> f.getRoomId() != null)
+                .findFirst()
+                .orElse(fridges.isEmpty() ? null : fridges.get(0));
+        if (fridge == null) {
+            Room kitchen = roomMapper.selectList(new LambdaQueryWrapper<Room>()
+                    .eq(Room::getFamilyId, familyId)
+                    .like(Room::getName, "厨房")
+                    .orderByAsc(Room::getId))
+                    .stream().findFirst().orElse(null);
+            fridge = new Furniture();
+            fridge.setFamilyId(familyId);
+            fridge.setRoomId(kitchen != null ? kitchen.getId() : null);
+            fridge.setName("冰箱");
+            fridge.setType("冰箱");
+            furnitureMapper.insert(fridge);
+        }
+        return fridge;
+    }
+
     public Furniture furnitureCreate(Long userId, Long familyId, FurnitureDTO dto) {
         requireText(dto.getName(), "请填写家具名");
         if (dto.getRoomId() != null) {
@@ -234,6 +263,12 @@ public class ItemService {
         i.setQuantity(dto.getQuantity());
         i.setUnit(dto.getUnit());
         i.setNote(dto.getNote());
+        i.setStoredAt(dto.getStoredAt());
+        if (i.getStoredAt() == null && "INGREDIENT".equals(i.getType())) {
+            i.setStoredAt(java.time.LocalDateTime.now());
+        }
+        i.setShelfLife(dto.getShelfLife());
+        i.setShelfLifeUnit(dto.getShelfLifeUnit());
         i.setRelX(dto.getRelX());
         i.setRelY(dto.getRelY());
         i.setCreatedBy(userId);
@@ -259,6 +294,9 @@ public class ItemService {
         i.setQuantity(dto.getQuantity());
         i.setUnit(dto.getUnit());
         i.setNote(dto.getNote());
+        i.setStoredAt(dto.getStoredAt());
+        i.setShelfLife(dto.getShelfLife());
+        i.setShelfLifeUnit(dto.getShelfLifeUnit());
         if (dto.getRelX() != null) i.setRelX(dto.getRelX());
         if (dto.getRelY() != null) i.setRelY(dto.getRelY());
         itemMapper.updateById(i);
@@ -266,6 +304,20 @@ public class ItemService {
 
     public void itemDelete(Long id, Long familyId) {
         itemMapper.deleteById(requireItem(id, familyId).getId());
+    }
+
+    /**
+     * 取出食材:原子扣减库存(quantity = quantity - amount)。amount 必须 > 0,且不超过现有数量。
+     */
+    public void takeItem(Long id, Long familyId, java.math.BigDecimal amount) {
+        requireItem(id, familyId);
+        if (amount == null || amount.compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "取出数量必须大于 0");
+        }
+        int updated = itemMapper.takeAmount(id, familyId, amount);
+        if (updated == 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "取出数量超过现有库存");
+        }
     }
 
     /**

@@ -27,6 +27,9 @@ public class Item {
     private java.math.BigDecimal quantity;
     private String unit;
     private String note;
+    private LocalDateTime storedAt;
+    private Integer shelfLife;
+    private String shelfLifeUnit;
     private java.math.BigDecimal relX;
     private java.math.BigDecimal relY;
     private Long createdBy;

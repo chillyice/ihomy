@@ -18,4 +18,10 @@ public interface ItemMapper extends BaseMapper<Item> {
                                                  @Param("roomId") Long roomId,
                                                  @Param("furnitureId") Long furnitureId,
                                                  @Param("type") String type);
+
+    /**
+     * 取出食材:原子扣减库存(quantity = quantity - amount)。
+     * 仅当 quantity 非空且 >= amount 时命中,返回受影响行数(0 = 库存不足)。
+     */
+    int takeAmount(@Param("id") Long id, @Param("familyId") Long familyId, @Param("amount") java.math.BigDecimal amount);
 }
