@@ -7,6 +7,10 @@
 # GUI 测试截图(测试产物,不入库)
 gui-test-screenshots/
 
+# Python 字节码缓存(py_compile/pytest 生成,不入库)
+__pycache__/
+*.pyc
+
 # 本地维护文档(含凭证/部署细节,不入库;OneDrive 本地副本是唯一来源)
 /Linux部署指导.md
 /docs/新人上手指南.md

@@ -311,7 +311,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - `docs/UI设计提示词.md` — 沉浸式首页 UI 设计完整规格(可作为 AI 提示词重新生成)
 - `docs/日志规范.md` — 日志开发规范(三类文件/六要素/tid 规则/级别标准/三方调用/脱敏清单)
 - `docs/日志问题分析方法.md` — 报错排查方法论(拿 tid → 详细日志页 → 四步分析;面向运维/业务人员)
-- `docs/功能测试用例.md` — 全站功能测试用例(32 域 ~320 条,含脑图 48 条+执行记录)
+- `test/cases/功能测试用例.md` — 全站功能测试用例(341 条,32+ 域,含脑图 48 条+执行记录+风险清单);测试资产统一收敛到 `test/` 目录(用例 `test/cases/`、接口自动化 `test/automation/`、UI 自动化+截图证据 `test/ui-automation/`、测试报告 `test/reports/`、测试结果 `test/results/`,总览见 `test/README.md`)
 - `scripts/setup.ps1`(新人一次性环境初始化:前置软件检查+生成 config\external.yml+docker compose 起库+前端依赖,幂等)/ `start-all.ps1`(日常一键启动前后端,双击 `start.bat` 调用,设 `IHOMY_CONFIG_PATH` 环境变量)/ `start-db.ps1`(docker compose 起 MySQL+Redis,首启自动导 schema.sql,每次启动把 ihomy 账号密码对齐 external.yml,端口 6306/6379 与生产一致);根目录 `docker-compose.yml`(开发中间件定义,含健康检查,数据卷 ihomy-mysql-data); `.github/workflows/ci.yml`(GitHub Actions CI); `config/mysql/my.cnf`(端口 6306,内存优化,仅 Linux 本机部署用)
 - 完整接口清单:见 `docs/需求设计说明书.md` 第 7 章。代码事实以 `backend/src/main/java` + `resources/schema.sql`(开发安全版,已入库) 为准,如需检索先 `grep` 再动手。
 
