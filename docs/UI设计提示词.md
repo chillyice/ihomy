@@ -487,6 +487,7 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 ## 18d. 暖居首页组件默认展示规格(V9.66)
 
 - **照片卡牌堆轮播**:`.gc-photo-stack` 相对容器内 `.gc-photo-pcard` 绝对定位扇形摊开(74%×78% 尺寸、中位偏移 translate ±14px / rotate ±6° / 下沉 |i-mid|×9px、`z-index:10-i`),`transition: transform .5s cubic-bezier(.22,1,.36,1)` 翻动顺滑滑位;点击翻动 + 5s 自动轮播(hover 暂停);`.gc-photo-meta` 底部两胶囊(描述白字 12px/600 + `photoIndex+1/n` 计数),`rgba(0,0,0,.4)` 底 + `backdrop-filter:blur(6px)`。头部「相册 →」`.gc-more`(`all:unset` + `margin-left:auto` + hover 主色)。
+- **照片卡牌堆 flex 容器(V9.83)**:`.gc-photo-pcard` 为 absolute 定位、不撑高度,`.gc-photo-stack` 靠 `flex:1` 撑满——前提是父卡牌 `.gc-card` 为 flex 纵向容器,故 photos 卡牌加 `.gc-photos{display:flex;flex-direction:column}`;漏此步卡牌高度塌缩为 0、照片整体不可见。
 - **寻物组件按行数两态**:`.gc-item-card` flex 列。搜索行 `.gc-item-search`(输入框 `.gc-item-input` 圆角 10px 底 `--color-line`、focus 主色,语音钮 `.gc-item-voice` 录音中陶土红脉冲 `gcVoicePulse`)。≥3 行 `.gc-item-plan`(flex:1 圆角 12px)内自绘 SVG:房间多边形 `fill rgba(var(--color-brand-rgb),.1) / stroke .5`、家具矩形 `.2/.45`、物品圆点 `--color-brand`(命中改 `--color-accent`)、标签 `fill var(--color-text-secondary)`;结果列表 `.gc-item-results` 浮动右上(46% 宽、max-height 60%、卡片底+边框+阴影)。<3 行只展示搜索框+语音+列表式结果。
 - **收支比例条**:`.gc-fin-bar` 8px 高两段(收入 `--color-green` / 支出 `--color-accent`),宽度按 `incomePct` 比例;卡头「月/笔数」弱文字。
 - **色相锚点**:每卡 `--chip: var(--blob-N)`(N=1 陶土/2 暖沙/3 鼠尾草/4 暖米/5 暖木)内联注入,`.gc-card-h3::before`(3px×12px 标题竖条)+ `.gc-ic`(26px 图标芯片)取 `var(--chip)` 分色,让 6 张卡不再共用米色面+棕字。
