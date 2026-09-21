@@ -136,7 +136,10 @@
         </el-form-item>
       </el-form>
       <div class="take-quick">
-        <el-button v-for="q in quickAmounts" :key="q" size="small" round @click="takeForm.amount = q">{{ q }}</el-button>
+        <el-button v-for="q in quickAmounts" :key="q" size="small" round :type="isQuickActive(q) ? 'primary' : ''" @click="takeForm.amount = q">{{ q }}</el-button>
+      </div>
+      <div v-if="sliderMax > 1" class="take-slider">
+        <el-slider v-model="sliderVal" :min="1" :max="sliderMax" :marks="sliderMarks" @change="onSliderChange" />
       </div>
       <template #footer>
         <el-button @click="takeDlg = false">{{ $t('kitchen.cancel') }}</el-button>
@@ -234,6 +237,54 @@ const quickAmounts = computed(() => {
   }
   return [...set].sort((a, b) => a - b)
 })
+
+// 取出弹窗横向拖拉条:左 1 → 右 100%(总数),吸附点 = 1 + 25%/33%/50%/66%/75%/100%
+const sliderMax = computed(() => {
+  const t = Number(takeForm.total)
+  return (t == null || isNaN(t) || t < 1) ? 1 : t
+})
+const sliderStops = computed(() => {
+  const total = Number(takeForm.total)
+  const stops = []
+  const seen = new Set()
+  const add = (value, label) => {
+    if (value != null && !isNaN(value) && value >= 1 && !seen.has(value)) {
+      seen.add(value)
+      stops.push({ value, label })
+    }
+  }
+  add(1, '1')
+  if (total != null && !isNaN(total) && total > 1) {
+    ;[0.25, 0.33, 0.5, 0.66, 0.75, 1].forEach((p) => {
+      add(Math.round(total * p * 100) / 100, Math.round(p * 100) + '%')
+    })
+  }
+  return stops.sort((a, b) => a.value - b.value)
+})
+const sliderMarks = computed(() => {
+  const m = {}
+  sliderStops.value.forEach((s) => { m[s.value] = s.label })
+  return m
+})
+const sliderVal = computed({
+  get: () => {
+    const a = Number(takeForm.amount)
+    return (a == null || isNaN(a) || a < 1) ? 1 : Math.min(a, sliderMax.value)
+  },
+  set: (v) => { takeForm.amount = v },
+})
+const onSliderChange = (val) => {
+  const stops = sliderStops.value
+  if (!stops.length) return
+  let nearest = stops[0]
+  let minDist = Infinity
+  for (const s of stops) {
+    const d = Math.abs(s.value - val)
+    if (d < minDist) { minDist = d; nearest = s }
+  }
+  takeForm.amount = nearest.value
+}
+const isQuickActive = (q) => Math.abs(Number(takeForm.amount) - q) < 0.005
 
 // 存放位置树(house > room > furniture)
 const houses = ref([])
@@ -577,6 +628,10 @@ onMounted(() => {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 4px;
+}
+.take-slider {
+  margin-top: 14px;
+  padding: 0 6px 10px;
 }
 
 :global(html.dark) .ingredient-bar {

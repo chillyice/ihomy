@@ -30,7 +30,7 @@
         :key="w.id"
         class="gc-card"
         :data-wid="w.id"
-        :class="[`gc-c${w.span}`, `gc-r${w.row}`, { 'gc-weather': w.id === 'weather', 'gc-overflow': w.id === 'weather', 'gc-item-card': w.id === 'item', 'gc-card-edit': editMode, 'gc-card-link': isLinkCard(w), 'gc-card-preview': w.kind === 'preview', 'gc-card-dragging': reorderPreview && reorderPreview.id === w.id }]"
+        :class="[`gc-c${w.span}`, `gc-r${w.row}`, { 'gc-weather': w.id === 'weather', 'gc-overflow': w.id === 'weather', 'gc-item-card': w.id === 'item', 'gc-photos': w.id === 'photos', 'gc-card-edit': editMode, 'gc-card-link': isLinkCard(w), 'gc-card-preview': w.kind === 'preview', 'gc-card-dragging': reorderPreview && reorderPreview.id === w.id }]"
         :style="cardStyle(w)"
         :draggable="editMode && w.kind !== 'preview'"
         @dragstart="onDragStart($event, w)"
@@ -987,7 +987,8 @@ html.theme-warm.dark .gc-home { --chip-a: .26; --bar-a: 1; --sill-a: .58; --sage
 .gc-edit-hint { font-size: 12px; color: var(--color-text-secondary); background: var(--color-card-2); border: 1px dashed var(--color-border);
   border-radius: 10px; padding: 8px 14px; margin: -8px 0 16px; }
 
-/* 照片卡牌堆 */
+/* 照片卡牌堆:卡片须为 flex 纵向容器,stack 的 flex:1 才能撑满剩余高度(否则子项全 absolute → 高度塌缩为 0 → 照片不可见) */
+.gc-photos { display: flex; flex-direction: column; }
 .gc-photo-stack { position: relative; flex: 1; min-height: 0; cursor: pointer; display: grid; place-items: center; overflow: hidden; }
 .gc-photo-pcard { position: absolute; width: 74%; height: 78%; border-radius: 14px; overflow: hidden; background: var(--color-line);
   box-shadow: 0 14px 30px rgba(0, 0, 0, .16); transition: transform .5s cubic-bezier(.22, 1, .36, 1), opacity .5s ease; }
