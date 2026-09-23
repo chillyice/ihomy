@@ -17,7 +17,7 @@ public class AiModel {
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long familyId;
-    /** 显示名(如 tshl GLM 快模型) */
+    /** 显示名(如 GLM 快模型) */
     private String name;
     /** 模型类型 LLM/IMAGE/ASR/LOCAL */
     private String type;

@@ -894,7 +894,7 @@ export default {
       models: 'Model pool',
       addModel: 'Add model',
       modelName: 'Model name',
-      modelNamePh: 'e.g. tshl GLM fast model',
+      modelNamePh: 'e.g. GLM fast model',
       modelType: 'Type',
       type: { LLM: 'Language model', IMAGE: 'Image model', ASR: 'Voice model', LOCAL: 'Local rules' },
       providerLabel: 'Protocol / provider',

@@ -1767,7 +1767,7 @@ DROP TABLE IF EXISTS `sys_family_ai_model`;
 CREATE TABLE `sys_family_ai_model` (
   `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
   `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
-  `name`        VARCHAR(50)  NOT NULL COMMENT '显示名(如 tshl GLM 快模型)',
+  `name`        VARCHAR(50)  NOT NULL COMMENT '显示名(如 GLM 快模型)',
   `type`        VARCHAR(20)  NOT NULL COMMENT '模型类型:LLM/IMAGE/ASR/LOCAL(本地规则内置)',
   `provider`    VARCHAR(20)  NOT NULL DEFAULT 'OPENAI' COMMENT '服务商:OPENAI(OpenAI兼容)/BAIDU(百度短语音,仅ASR)',
   `base_url`    VARCHAR(200) DEFAULT NULL COMMENT 'OpenAI 兼容服务地址(不含路径,如 https://api.deepseek.com);百度为识别接口地址',

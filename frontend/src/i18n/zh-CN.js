@@ -844,7 +844,7 @@ export default {
       models: '模型池',
       addModel: '添加模型',
       modelName: '模型名称',
-      modelNamePh: '如 tshl GLM 快模型',
+      modelNamePh: '如 GLM 快模型',
       modelType: '类型',
       type: { LLM: '语言模型', IMAGE: '图片模型', ASR: '语音模型', LOCAL: '本地规则' },
       providerLabel: '协议/服务商',
