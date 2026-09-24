@@ -521,6 +521,29 @@ EOF
 > - 图片扩展名缓存 location 用负向断言 `^/(?!files/)` 排除 `/files/`，避免 `root` 覆盖 `alias`。
 > - `/.well-known/acme-challenge/` 必须保留，certbot 续期时要用。
 > - WebSocket 的 `proxy_read_timeout 3600s` 防止长连接被 nginx 默认 60s 超时断开。
+> - **必须显式配 `gzip_types`**（见下）：Ubuntu 自带的 `/etc/nginx/nginx.conf` 只写了 `gzip on;`，
+>   `gzip_types` 整行是注释状态，默认仅压缩 `text/html` —— JS/CSS/API JSON 全部以原始体积传输。
+
+**gzip 压缩（2026-09-24 发现线上未生效，新部署必须补）**：在上面 `server {}` 块内加：
+
+```nginx
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+    gzip_vary on;
+```
+
+`gzip_types` 可在 `http`/`server`/`location` 上下文设置，故直接放进站点 conf 即可，无需改发行版
+`nginx.conf`。`gzip_vary on` 补 `Vary: Accept-Encoding`（给中间缓存用）。`text/html` 无需列出
+（nginx 恒压缩）。量化收益：入口 JS 341.9KB → ~127KB、主 CSS 174.2KB → ~28KB。
+
+验证（前两条要出现 `Content-Encoding: gzip`，第三条本就压缩、作对照；JS/CSS 路径用 `dist/assets/` 里
+带 hash 的文件名）：
+```bash
+curl -sI -H 'Accept-Encoding: gzip' https://ihomy.top/assets/index-<hash>.js   # JS
+curl -sI -H 'Accept-Encoding: gzip' https://ihomy.top/api/public/home          # API JSON
+curl -sI -H 'Accept-Encoding: gzip' https://ihomy.top/                         # HTML（对照）
+```
 
 测试并重载：
 ```bash

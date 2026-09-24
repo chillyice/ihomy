@@ -258,11 +258,13 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **Edge 硬件加速整页频闪**(遗留,环境/驱动问题,非应用代码):切走再切回窗口(或开关硬件加速+重启 Edge)即恢复;Chrome 不复现。用户侧处置按序:开关硬件加速+重启 Edge → 更新显卡驱动 → 注册表禁 MPO(`OverlayTestMode`=5)→ 应用内关"毛玻璃"。详见 docs/变更归档.md「首页频闪排查与修复」。
 - ~~**ElMessageBox 动画未生效**~~（2026-09-06 已定位并修复）：真因是命令式 API 的 EP 样式未被按需加载——弹窗以裸 DOM 渲染在文档流末尾（`.el-overlay` position:static）而非"动画问题"。已在 main.js 显式引入 message/message-box/notification/loading 四个组件样式；**新增命令式 API 调用时必须同步确认对应样式已引入**（模板按需加载不覆盖命令式调用）。
 - **未登录浏览家庭首页时 `GET /api/book/summary` 返回 500**（既有缺陷,至少 2026-09-17 起每天 1-4 次,与 V9.84-V9.86 无关）：暖居外壳「本月收支」卡片(`WarmHome.vue` finance 组件)不判断登录态就调 `bookApi.summary()`,而该接口需登录——后端 `BookController.current()` 返回 null 触发 NPE(`Cannot invoke "com.ihomy.security.LoginUser.getFamilyId()" because the return value ... is null`),返回 500 且前端弹「服务器内部错误」(带 tid)。影响面:游客/未登录用户打开家庭首页(`/`,公开演示家庭入口)。**复现**:登出后打开 `https://ihomy.top/`,看「本月收支」卡片 + 右上错误提示。**修法二选一**:①后端 `/api/book/summary` 对匿名返回空汇总(不 NPE);②前端 finance 卡片按 `userStore.isLoggedIn` 跳过请求。
+- **生产 nginx 未压缩 JS/CSS/JSON**(2026-09-24 发布 V9.87 时实测发现,既有的部署配置缺口,非应用代码)：`/etc/nginx/nginx.conf` 只有 `gzip on;`,**`gzip_types` 整行是注释状态**(Ubuntu 默认)→ 仅 `text/html` 被压缩。实测线上:`/`(HTML)有 `Content-Encoding: gzip`,而入口 JS `Content-Length: 341924`、主 CSS `174224`、`/api/public/home` JSON `7216` 全部原始体积直传(构建里那些 gzip 数字从未在线上兑现)。**量化**:开压缩后入口 JS 341.9KB→~127KB、主 CSS 174.2KB→~28KB,首屏少传约 360KB。**修法**(站点 `server{}` 内加四行 + reload,详见 docs/部署指导-Linux.md §3.7 nginx 小节)：`gzip_types text/css application/javascript application/json image/svg+xml;` + `gzip_min_length 1024;` + `gzip_vary on;` → `nginx -t && systemctl reload nginx`。
 
 #### 验证基线
 
 - 后端编译:`cd backend; .\mvnw.cmd -B clean compile -DskipTests` → BUILD SUCCESS
-- 前端构建:`cd frontend; npm run build` → 入口 chunk ≈317.4KB(2026-09-24 V9.87 实测 317.39KB/gzip 126.99KB,较 V9.86 的 316.22KB 增 1.17KB=壁纸路由+i18n 文案;旧基线 2026-09-08 V9.48 为 246.35KB/97.70KB;pdfjs 已隔离为独立异步 chunk ~483KB 仅 PDF 场景加载;simple-mind-map ~341KB 仅脑图编辑页加载;壁纸页独立 chunk 6.18KB/4.78KB 懒加载)
+- 前端构建:`cd frontend; npm run build` → 入口 chunk ≈317.4KB(2026-09-24 V9.87 实测 317.39KB/gzip 126.99KB,较 V9.86 的 316.22KB 增 1.17KB=壁纸路由+i18n 文案;旧基线 2026-09-08 V9.48 为 246.35KB/97.70KB;pdfjs 已隔离为独立异步 chunk ~483KB 仅 PDF 场景加载;simple-mind-map ~341KB 仅脑图编辑页加载;壁纸页独立 chunk 6.47KB/4.78KB 懒加载)
+  - **⚠ 口径:vite 报的是「字符数」不是「字节数」**(2026-09-24 实测)。入口 chunk vite 报 317.39KB,`wc -c` 却是 341,924 字节,`wc -m` 才是 317,392 字符——差值是中文注释/字符串的 UTF-8 多字节开销。**别拿 `ls -la` 的字节数跟这个基线比**(会误判成涨了 24KB);要比特字节就 `wc -c` 对 `wc -c`。gzip 那个数即压缩后真实字节数。
 - 接口测试:同级独立项目(不在本仓库)`cd ..\autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed;**CI(GitHub Actions,`.github/workflows/ci.yml`)每次推送自动验证:前后端构建+compose 起库导入 schema+后端启动+登录冒烟**
 
 ## 已实现变更归档(已外置)
