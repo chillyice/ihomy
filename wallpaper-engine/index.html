@@ -27,7 +27,7 @@
   不开机就一直有效)。令牌获取方式:ihomy 普通浏览器 → 个人设置 → 个性化设置 → 「壁纸氛围屏」卡片
   → 点「复制壁纸令牌」→ 粘到 WE 属性面板的 token 栏(壁纸页右下角也有同一个复制按钮)。
 
-  注意:WE 只在页面加载时投递一次属性,所以**改完属性要用 文件 → 重启预览**才生效。
+  注意:WE 只在页面加载时投递属性(**分次**,见下方 go() 的注释),所以**改完属性要用 文件 → 重启预览**才生效。
   下方保留一个本地时钟,用于跳转完成前的过渡,以及离线时至少还有个钟。
 -->
 <style>
@@ -48,10 +48,34 @@
   var TARGET = 'https://ihomy.top/wallpaper'
   var props = {}
   var navigated = false
+  var settleTimer = null
+
+  // ⚠ 别在第一次 applyUserProperties 里直接跳(V9.90 修,实测踩坑):
+  // WE 的属性是**分次**投递的 —— 首次只带 project.json 里声明的值(主题/晨暮/语言这些默认值),
+  // 用户在属性面板里**改过**的值会晚一拍才到。而「壁纸令牌」天生就是「改过的值」(默认是空串),
+  // 于是它正好落在后一次投递里:第一次投递就跳走 → 令牌被整个丢掉 → 表现为「粘了令牌也不登录」。
+  // 实测取证:WE 浏览器历史里只有 wallpaper?theme=guangchen&lang=zh,7 次访问**从不带 #token=**;
+  // 同期的 config.json wproperties 里令牌明明存着,壁纸页的 localStorage 里却从没出现过 token 键。
+  // 改法:拿到令牌才快跳(再等一小会,把同批后续投递带上),没拿到就等到硬上限 ——
+  // 代价是不填令牌的用户每次开屏多看 ~3s 过渡时钟,换令牌投递多晚都追得上。
+  var SETTLE_MS = 400   // 令牌已到手:再等这么一小会就跳(防同一批里还有别的属性后到)
+  var HARD_MS = 3000    // 还没拿到令牌:等满这个上限再跳(给后到的「用户改动值」留机会);WE 完全不投时也照跳
+
+  function collect(p) {
+    for (var k in p) {
+      var v = p[k] && p[k].value
+      if (v !== undefined && v !== null && String(v) !== '') props[k] = String(v).trim()
+    }
+  }
 
   function go() {
     if (navigated) return
     navigated = true
+    clearTimeout(settleTimer)
+    // 诊断:这行会落进 <WE 安装目录>\ui\wpcache\monitor*\base\chrome_debug.log(INFO:CONSOLE),
+    // 属性/令牌投递出问题时先看它。只记令牌长度,不落明文。
+    console.log('[ihomy-shell] props=' + Object.keys(props).join(',') +
+      ' token=' + (props.token ? props.token.length + '字符' : '无'))
     // 非敏感项(query):主题 / 晨暮 / 语言
     var qs = []
     if (props.theme) qs.push('theme=' + encodeURIComponent(props.theme))
@@ -64,18 +88,17 @@
 
   window.wallpaperPropertyListener = {
     applyUserProperties: function (p) {
-      if (p.theme && p.theme.value) props.theme = p.theme.value
-      if (p.mode && p.mode.value) props.mode = p.mode.value
-      if (p.lang && p.lang.value) props.lang = p.lang.value
-      if (p.token && p.token.value) props.token = String(p.token.value).trim()
-      go() // 属性一到就跳,不必等满超时
+      collect(p)
+      clearTimeout(settleTimer)
+      // 拿到令牌 → 稍等即走;还没拿到 → 不动,交给下面的硬上限继续等
+      if (props.token) settleTimer = setTimeout(go, SETTLE_MS)
     },
     // WE 暂停时直接冻结渲染进程,这里无需处理;fps 同理(页面只用 CSS 动画)
     setPaused: function () {}
   }
 
-  // 不在 WE 里(普通浏览器打开)、或 WE 迟迟没投属性:给个短上限就跳,不干等
-  setTimeout(go, 1200)
+  // 兜底跳转:没拿到令牌(没填令牌 / 不在 WE 里打开 / WE 不投属性)时,到上限也必须跳,不能干等
+  setTimeout(go, HARD_MS)
 </script>
 </head>
 <body>
