@@ -97,14 +97,14 @@ frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
   src/
     api/          # request.js(axios+JWT+401 自动刷新) + index.js(31 个 Api 对象)
     stores/       # user.js(登录+权限) / app.js(首页聚合) / theme.js(主题两轴矩阵)
-    router/       # 登录守卫 + scrollBehavior;39 个路由(懒加载)
+    router/       # 登录守卫 + scrollBehavior;49 个路由(懒加载)
     i18n/ theme/  # vue-i18n 中英;主题两轴矩阵(暖居/光尘 × 晨/暮)
     utils/        # dict.js / diary.js / doodle.js(涂鸦引擎) / furnitureIcon.js(家具类型图标) / windowLight.js / useSunLight.js / useDragResize.js
     composables/  # useDevice.js(设备检测) / useWeatherBg.js(天气 AI 生图氛围底图)
     components/   # AppSidebar/BackToTop/Breadcrumb/AvatarCropper/InstallPrompt/SiteFooter/SunLightLayer/LightTestConsole/SyncDialog/Mobile*(移动端)/warm/(暖居外壳 WarmLayout+WarmHome)
     layouts/MobileLayout.vue  # 移动端壳
     styles/main.css # CSS 变量 + 全局样式 + 深色模式 + EP 组件覆写 + @media
-    views/        # 33 个页面(Home/Login/Member/Settings/Anniversary/album/cinema/diary/blog/points/task/reminder/plan/wish/book/chat/tree/cascade/ops/storage/item/kitchen/library/tools/games(Games+GamePlayer+PetLinkLink)/plant(花园))
+    views/        # 47 个页面(唯一视图文件计数;Home/Login/Member/Settings/Anniversary/album/cinema/diary/blog/points/task/reminder/plan/wish/book/chat/tree/cascade/ops/storage/item/kitchen/library/tools/games(Games+GamePlayer+PetLinkLink)/plant(花园)/kada(咔哒独立下载页))
     App.vue
   vite.config.js   # PWA + 代理 /api->8080 + manualChunks 分块 + ElementPlus 按需
 ```
@@ -158,10 +158,10 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | AI | 图片生成/语音识别接入+AI 测试台+家庭级 AI 配置+AI 调用统计 | AiService / FamilyAiConfigService / AiController(/ai/status、/ai/config、/ai/chat、/ai/image、/ai/transcribe)+ AiStatsService(/ops/ai/**) |
 | 厨房 | 菜单/菜谱/食材 | RecipeController / RecipeService |
 | 工具 | 工具箱聚合页/脑图设计(simple-mind-map,快照/回滚/协同轮询)/AI 测试台(/tools/ai-playground 临时)/3D 光影实验台(/tools/light-lab 临时,Three.js 太阳模拟+真实阴影,未来场景主题基础)/Flash 播放器(/tools/flash)/GBA 播放器(/tools/gba) | MindMapController / MindMapService |
-| 系统 | i18n / 主题(暖居/光尘 × 晨/暮) / 字典 | i18n/ + theme/(index.js)+stores/theme.js + utils/dict.js |
+| 系统 | i18n / 主题(暖居/光尘 × 晨/暮) / 字典 / 独立产品页(咔哒 Kada 下载页 `/kada`,`meta.standalone`) | i18n/ + theme/(index.js)+stores/theme.js + utils/dict.js + views/Kada.vue |
 | 移动端 | 设备自适应 | useDevice.js + MobileLayout.vue + Mobile* 组件 |
 
-**关键坑速查**(实现细节详见 docs/变更归档.md):日记 date 兼容 `yyyy-MM-dd HH:mm`;纪念日 Hutool ChineseDate 月份 0-based 需 +1;家谱 null 字段须 `LambdaUpdateWrapper` 显式 SET;**MP `updateById` 会回写实体旧 `updated_at` 抑制 `ON UPDATE CURRENT_TIMESTAMP`**——依赖 updated_at 的表更新必须 LambdaUpdateWrapper 只 SET 业务字段并重查;**simple-mind-map 只内置 default 主题**(其余须 mindmapThemes.js defineTheme 注册);**脑图并发保存靠 update 乐观锁**(带 baseUpdatedAt,库中已刷新则 409);**脑图保存前 stripEmptyNodes 剥空叶子**;**EP dropdown 内嵌 hover 子菜单**用 visibility 延迟隐藏而非 display;物品户型图 hover 边加号阈值 6px、未设计楼层画布空白+引导、库内家具拖入画布替代「摆放」;**CSS `rotate()` 负角度在屏幕坐标(y 向下)里把元素下端往右摆(与直觉相反),要「右上→左下」须正角度;`animation` 简写覆盖同元素长写的 `animation-*`(如 delay),多粒子动画须用 `--var` 喂时长/相位**;**pdfjs-dist 统一 v6**(worker 用 `build/pdf.worker.min.mjs?url`,浏览器不用裸 iframe)。
+**关键坑速查**(实现细节详见 docs/变更归档.md):日记 date 兼容 `yyyy-MM-dd HH:mm`;纪念日 Hutool ChineseDate 月份 0-based 需 +1;家谱 null 字段须 `LambdaUpdateWrapper` 显式 SET;**MP `updateById` 会回写实体旧 `updated_at` 抑制 `ON UPDATE CURRENT_TIMESTAMP`**——依赖 updated_at 的表更新必须 LambdaUpdateWrapper 只 SET 业务字段并重查;**simple-mind-map 只内置 default 主题**(其余须 mindmapThemes.js defineTheme 注册);**脑图并发保存靠 update 乐观锁**(带 baseUpdatedAt,库中已刷新则 409);**脑图保存前 stripEmptyNodes 剥空叶子**;**EP dropdown 内嵌 hover 子菜单**用 visibility 延迟隐藏而非 display;物品户型图 hover 边加号阈值 6px、未设计楼层画布空白+引导、库内家具拖入画布替代「摆放」;**CSS `rotate()` 负角度在屏幕坐标(y 向下)里把元素下端往右摆(与直觉相反),要「右上→左下」须正角度;`animation` 简写覆盖同元素长写的 `animation-*`(如 delay),多粒子动画须用 `--var` 喂时长/相位**;**pdfjs-dist 统一 v6**(worker 用 `build/pdf.worker.min.mjs?url`,浏览器不用裸 iframe);**天气 AI 生图背景只有一份实现 `useWeatherBg`**(首页卡与暖居外壳同源、同一缓存键,不要再在 `Home.vue` 里写第二份——V9.86 已删掉那 115 行重复代码);**暖居照片卡牌扇形重叠时别用纯 CSS `:hover`**(命中的是 DOM 靠后那张而非视觉最上那张,须 JS `@mouseenter` 追踪索引再驱动类名);**要能被类覆写的内联样式走 CSS 变量**(transform 写死在 `:style` 里就无法被 hover 类覆盖,故卡牌位移/旋转/层级抽 `--dx/--dy/--rot/--z`)。
 
 ## 设计规范(统一实现,避免多种方式)
 
@@ -187,6 +187,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 1. **API 分组**:`api/index.js` 按模块导出 `xxxApi` 对象;统一走 `api/request.js`(axios+JWT+401 自动刷新)。
 2. **状态管理**:Pinia;`stores/user.js`(登录+权限)、`stores/app.js`(首页聚合)。
 3. **路由守卫**:`meta.public` 无需登录;`meta.ops` 需 `ops:view`;纯 OPS 账号只能访问 `/ops`。
+   - **`meta.standalone`(独立产品页,V9.84)**:在 ihomy 域名下挂「另一款产品的独立页」时给它加 `meta.standalone`——`App.vue` 走独立分支,只渲染 `<router-view :key="route.path">`,**不套** ihomy 外壳(光影层/侧栏/页脚/播放器/回顶);`onMounted` 见 standalone 直接 return,跳过 `appStore.init()` 与 `userStore.ensureUserInfo()`(不调 ihomy 后端接口)。同类页照此办理(已用:咔哒 Kada 下载页 `/kada`,见需求设计说明书 §4.14)。
 4. **样式**:CSS 变量(`main.css`)+ 深色模式 `html.dark` 覆写;**不显式声明 serif 字体**,继承 body sans-serif。
 5. **图标**:Element Plus `el-icon`(线性图标);**Setting/Monitor 图标用内联 SVG 替代**(复杂 path 在 100% 缩放触发子像素光栅化开销,见性能优化博客 id=18)。
 6. **动画**:GSAP 入场;`transform: translateZ(0)` 隔离合成层;`contain: layout style` 隔离布局;避免 `background-attachment: fixed`(性能杀手)。
