@@ -301,6 +301,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **Docker 安装源**:Ubuntu 用阿里云镜像源(`mirrors.cloud.aliyuncs.com/docker-ce`),固定版本 29.7.0。
 - **Redis 镜像**:`docker pull redis`(默认 latest)。**Git 克隆**:用 SSH 地址,ihomy 用户先生成 ed25519 key 并加到 GitHub。
 - **nginx .mjs MIME(2026-09-08 坑)**:mime.types 默认无 mjs 映射,`.mjs` 服为 `application/octet-stream` 会被浏览器拒绝执行 module worker/动态 import——生产 `/etc/nginx/mime.types` 已改 `application/javascript js mjs;`,**重装/新服务器部署必须补**(否则书架 PDF 查看器/户型图 PDF 底图「加载失败」)。
+- **⚠ 部署新前端后,老客户端仍在跑旧 bundle(PWA Service Worker 预缓存)**(2026-09-24 发布 V9.87 踩坑):workbox 预缓存(`workbox-precache-v2-https://ihomy.top/`)会把旧的 `index-*.js` 连同 SPA 外壳一起留在浏览器里,新构建要等 SW 更新+再访问才生效。**症状极易误判**:访问新路由(如 `/wallpaper`)被旧 bundle 的兜底路由 `/:pathMatch(.*)*` 接走重定向到 `/home`,看起来像「新路由没发布」——实际线上 dist 已是最新。**辨认方法**:页面里读当前入口脚本 hash(`document.querySelectorAll('script[src]')`)与构建产物名对比,旧的是 `index-vQqJcikP.js`(V9.86/316,224 字符)这种上一版 hash;直接看 `fetch(src).then(r=>r.text())` 是否含新路由字符串最准。**冒烟前先清**:`navigator.serviceWorker.getRegistrations()` 逐个 `unregister()` + `caches.keys()` 逐个 `caches.delete()` 再刷新,否则验收结论是错的。用户侧刷 Ctrl+Shift+R 即可。
 - 详细步骤在 `docs/部署指导-Linux.md`(入库脱敏版;本地 `Linux部署指导.md` 只留凭证台账)。
 
 ## 规划事项(未实现)
