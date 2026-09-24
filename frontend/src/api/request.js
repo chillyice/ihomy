@@ -22,6 +22,13 @@ request.interceptors.request.use((config) => {
 // 全部等待刷新完成后各自携新 token 重放,避免刷新期间的请求被误报"登录已过期"
 let refreshPromise = null
 
+// 独立产品页(meta.standalone:/wallpaper、/kada)不套 ihomy 外壳、也没有登录页可跳 ——
+// 续期失败就地保持未登录,不要把整页顶到 /login(壁纸场景尤其糟:墙上会变成 ihomy 登录页)
+const redirectToLogin = (query) => {
+  if (router.currentRoute.value.meta?.standalone) return
+  router.push(query ? { name: 'Login', query } : '/login')
+}
+
 request.interceptors.response.use(
   (response) => {
     const res = response.data
@@ -33,7 +40,7 @@ request.interceptors.response.use(
       if (res.code === 401) {
         const userStore = useUserStore()
         userStore.logout()
-        if (response.config.method !== 'get') router.push('/login')
+        if (response.config.method !== 'get') redirectToLogin()
       }
       return Promise.reject(res)
     }
@@ -47,7 +54,7 @@ request.interceptors.response.use(
       const userStore = useUserStore()
       if (!userStore.token) {
         // 未登录用户触发写操作 401 → 跳登录页带回调
-        if (error.config.method !== 'get') router.push({ name: 'Login', query: { redirect: router.currentRoute.value.fullPath } })
+        if (error.config.method !== 'get') redirectToLogin({ redirect: router.currentRoute.value.fullPath })
         return Promise.reject(error)
       }
       if (!refreshPromise) {
@@ -65,7 +72,7 @@ request.interceptors.response.use(
         return request(error.config)
       } catch (e) {
         // 刷新失败(refresh token 过期):已登出,写操作跳登录页
-        if (error.config.method !== 'get') router.push('/login')
+        if (error.config.method !== 'get') redirectToLogin()
         return Promise.reject(e)
       }
     }

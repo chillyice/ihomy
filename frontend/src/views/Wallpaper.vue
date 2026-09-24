@@ -170,6 +170,12 @@ const startPhotoRefresh = () => {
   if (photoRefreshTimer) return
   photoRefreshTimer = setInterval(loadPhotos, 600000)
 }
+// 进入已登录状态后的统一收尾:页内登录、hash 令牌、WE 晚到令牌三条路都走这里
+const enterLoggedIn = async () => {
+  await loadPhotos()
+  scheduleReveal()
+  startPhotoRefresh()
+}
 
 // ========== 待机浮现 & 控件隐去(沿用 V9.63 约定) ==========
 const PHOTO_IDLE_MS = 3000 // 鼠标静止 3s → 照片浮现
@@ -242,9 +248,7 @@ const doLogin = async () => {
     })
     form.password = ''
     form.captchaCode = ''
-    await loadPhotos()
-    scheduleReveal()
-    startPhotoRefresh()
+    await enterLoggedIn()
   } catch (e) {
     loginError.value = t('wallpaper.loginFailed')
     form.captchaCode = ''
@@ -274,23 +278,47 @@ const setLang = (l) => applyLocale(l)
 // ========== 壁纸令牌:桌面壁纸拿不到键盘,登录卡填不了,改由属性面板粘令牌换取正式会话 ==========
 // 令牌走 URL hash(不发给服务器);换到会话后由 userStore 落进 WE 自己的 localStorage,
 // 之后靠 request.js 的 401 自动续期(两个 token 都轮换)保活,不必每次开屏都靠属性面板。
-const bootstrapToken = async () => {
-  const m = /(?:^|[#&])token=([^&]+)/.exec(window.location.hash || '')
-  if (!m) return
-  let tk = ''
-  try { tk = decodeURIComponent(m[1]) } catch (e) { return }
-  if (!tk) return
+// 注:令牌的投递时机见壳页(wallpaper-engine/index.html)的 go() —— WE 分次投递属性,壳页要等静默再跳,
+// 否则令牌会被丢掉(V9.90 修)。
+const exchangeToken = async (tk) => {
+  if (!tk) return false
   // ⚠ 本地已有会话时不要用属性里的令牌覆盖:续期会轮换 refresh token,属性面板那份是用户最初粘的旧值
   // (已失效),覆盖会把有效登录态冲掉。等到会话真的失效时,401 流程会登出清空,下个开屏自然重新引导。
-  if (userStore.refreshToken) return
+  if (userStore.refreshToken) return false
   try {
     userStore.setToken('', tk)
     await userStore.refresh()
+    return true
   } catch (e) {
     // 令牌无效/过期:清掉,静默保持未登录(壁纸不弹错误提示),重新复制一个即可
     userStore.setToken('', '')
     localStorage.removeItem('userInfo')
+    return false
   }
+}
+
+const bootstrapToken = async () => {
+  const m = /(?:^|[#&])token=([^&]+)/.exec(window.location.hash || '')
+  console.log('[ihomy-wallpaper] hash 令牌:' + (m ? m[1].length + '字符' : '无'))
+  if (!m) return
+  let tk = ''
+  try { tk = decodeURIComponent(m[1]) } catch (e) { return }
+  console.log('[ihomy-wallpaper] 令牌换会话:' + (await exchangeToken(tk) ? '成功' : '失败'))
+}
+
+// WE 属性桥补充:WE 也会在**页面已加载之后**才把用户改过的值(令牌就是)投给当前页面。挂一份监听,
+// 令牌晚到就当场换会话,不必等下个开屏;没有这个桥时,晚到的令牌到不了页面(壳页已经带着 hash 跳走了)。
+// 页内 localStorage 一旦拿到会话就长期有效,所以「晚到一次」也够用。诊断行同 bootstrapToken。
+const wePropsListener = {
+  applyUserProperties: (p) => {
+    const tk = p && p.token ? String(p.token.value || '').trim() : ''
+    if (!tk) return
+    console.log('[ihomy-wallpaper] WE 属性到达:令牌 ' + tk.length + ' 字符')
+    exchangeToken(tk).then(async (ok) => {
+      console.log('[ihomy-wallpaper] 晚到令牌换会话:' + (ok ? '成功' : '失败'))
+      if (ok) await enterLoggedIn()
+    })
+  },
 }
 
 // 「复制壁纸令牌」:给普通浏览器里已登录的用户取令牌用(桌面壁纸没法点,故与语言切换同在角落控件)
@@ -328,6 +356,8 @@ const onMessage = (e) => {
 
 onMounted(async () => {
   window.addEventListener('message', onMessage)
+  // 注册 WE 属性桥(见 wePropsListener):令牌晚到时还能当场换会话
+  window.wallpaperPropertyListener = wePropsListener
   applyQueryPrefs()
   document.title = 'ihomy'
   syncClock()
@@ -335,9 +365,7 @@ onMounted(async () => {
   // 先尝试用属性面板带来的令牌换会话,再决定拉照片还是拉验证码
   await bootstrapToken()
   if (userStore.isLoggedIn) {
-    await loadPhotos()
-    scheduleReveal()
-    startPhotoRefresh()
+    await enterLoggedIn()
   } else {
     loadCaptcha()
   }
@@ -345,6 +373,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('message', onMessage)
+  if (window.wallpaperPropertyListener === wePropsListener) delete window.wallpaperPropertyListener
   clearInterval(clockTimer)
   clearInterval(photoRefreshTimer)
   clearTimeout(revealTimer)
