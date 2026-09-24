@@ -82,6 +82,7 @@
 
 <script setup>
 import { ref, reactive, computed, inject, onMounted, onBeforeUnmount } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import SunLightLayer from '@/components/SunLightLayer.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
@@ -90,6 +91,7 @@ import { useThemeStore } from '@/stores/theme'
 import { authApi, publicApi } from '@/api'
 
 const { locale, t } = useI18n()
+const route = useRoute()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
 // 全局光影状态(App.vue provide):天气与太阳时隙都从这里取,本页不重复请求
@@ -238,6 +240,17 @@ const doLogin = async () => {
   }
 }
 
+// ========== Wallpaper Engine 偏好:URL 参数优先于 postMessage ==========
+// WE 桌面壁纸不能再用 iframe 嵌本页(跨域 iframe 会崩 WE 的 CEF,详见 wallpaper-engine/index.html),
+// 壳页改成顶层跳转并把属性面板的 theme/mode 挂在查询串上带过来。普通浏览器访问不受影响(参数可选)。
+// 只做一次、且在挂载时执行:属性本身就是页面加载时一次性送达的,后续改面板需重启预览。
+const applyQueryPrefs = () => {
+  const q = route.query
+  if (q.theme === 'warm' || q.theme === 'guangchen') themeStore.setTheme(q.theme)
+  if (q.mode === 'auto') themeStore.setAutoMode(true)
+  else if (q.mode === 'dawn' || q.mode === 'dusk') themeStore.setMode(q.mode)
+}
+
 // ========== Wallpaper Engine 属性桥(可选) ==========
 // WE 网页壁纸的壳页(wallpaper-engine/index.html)把属性面板的主题/晨暮 postMessage 进来,
 // 因为桌面壁纸未必拿得到鼠标,控件点不动时靠这里换主题。普通浏览器访问完全不受影响。
@@ -253,6 +266,7 @@ const onMessage = (e) => {
 
 onMounted(async () => {
   window.addEventListener('message', onMessage)
+  applyQueryPrefs()
   document.title = 'ihomy'
   syncClock()
   clockTimer = setInterval(syncClock, 1000)

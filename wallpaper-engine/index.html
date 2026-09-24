@@ -6,50 +6,78 @@
 <!--
   ihomy 壁纸 · Wallpaper Engine 壳页(网页壁纸入口)
 
-  本目录不包含 ihomy 前端构建产物:内层 iframe 直接指向线上的 https://ihomy.top/wallpaper,
-  时钟 / 天气 / 家人照片 / 登录 / 主题全部由线上页面自己完成,ihomy 改版后壁纸自动跟着更新,
-  这个目录不需要重新打包。前提是壁纸页已发布(否则线上路由会兜底显示 ihomy 首页)。
+  ⚠ 这里刻意「不用」iframe 嵌线上壁纸页,而是顶层跳转(location.replace)。原因(2026-09-24 实测):
 
-  主题:project.json 的 theme / mode 属性经 postMessage 转给内层页面(桌面壁纸未必拿得到鼠标,
-  控件点不动时靠 WE 属性面板换主题)。内层页面的接收逻辑见 frontend/src/views/Wallpaper.vue 的 onMessage。
+  Wallpaper Engine 2.8.42 自带的 CEF(Chromium 146,welibs cef_7680)在渲染**跨域 iframe**(OOPIF)时
+  会让渲染进程崩溃:编辑器预览区变成整片纯灰,WE 的 chrome_debug.log 里能看到
+  "FATAL ... cef_scoped_refptr.h:329 Check failed: ptr_." 以及 "blink.mojom.FrameWidgetHost" 消息被拒。
+  当时页面其实已经加载并执行了(CEF 缓存里有入口 chunk + 壁纸页 chunk,localStorage 里写入了
+  ihomy-theme),只是主 frame 崩掉所以什么都看不见——表现为「导入后无法显示」。
+  顶层跳转不产生 OOPIF,绕开这个崩溃。Steam 讨论区 2026-08 也有同样现象的报告
+  ("IFrame in Web Wallpaper Doesn't Load",控制台无任何报错)。
 
-  想省掉 iframe 这一层,可把 <iframe> 换成 location.replace('https://ihomy.top/wallpaper');
-  代价是 WE 属性面板失效 —— WE 注入的 API 只存在于它自己加载的那个顶层页面上。
+  代价与前提:壁纸内容就是线上页面,ihomy 改版后壁纸自动跟着更新,无需重新打包;断网时只剩本地时钟。
+
+  主题:WE 属性面板的 theme / mode 在跳转时作为 URL 参数带走(?theme=warm&mode=dawn),
+  由壁纸页 frontend/src/views/Wallpaper.vue 的 applyQueryPrefs() 读取。属性是页面加载时一次性送达的,
+  所以**页面起来之后再改属性面板不会实时生效**,改完请用 文件 → 重启预览(或干脆用页面右下角的按钮)。
+  下方保留一个本地时钟,用于跳转完成前的过渡,以及离线时至少还有个钟。
 -->
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; background: #0F1A2E; }
-  #wp { border: 0; width: 100vw; height: 100vh; display: block; }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    color: #F1E7D6; font-family: system-ui, "Segoe UI", sans-serif;
+  }
+  .boot { text-align: center; opacity: .82; }
+  .boot-time {
+    font-size: clamp(40px, 7vw, 96px); font-weight: 250; line-height: 1;
+    letter-spacing: .01em; font-variant-numeric: tabular-nums;
+  }
+  .boot-brand { margin-top: 10px; font-size: 12px; letter-spacing: .2em; }
 </style>
-</head>
-<body>
-<iframe id="wp" src="https://ihomy.top/wallpaper" referrerpolicy="no-referrer"></iframe>
 <script>
-  var TARGET_ORIGIN = 'https://ihomy.top'
-  var frame = document.getElementById('wp')
+  // ---- WE 属性桥 + 跳转(尽早注册:WE 在页面加载之初就投递初始属性,注册晚了会漏) ----
+  var TARGET = 'https://ihomy.top/wallpaper'
+  var props = {}
+  var navigated = false
 
-  function pushToPage(properties) {
-    var msg = {}
-    if (properties.theme && properties.theme.value) msg.theme = properties.theme.value
-    if (properties.mode && properties.mode.value) msg.mode = properties.mode.value
-    if (!Object.keys(msg).length) return
-    if (frame.contentWindow) frame.contentWindow.postMessage({ ihomyWallpaper: msg }, TARGET_ORIGIN)
+  function go() {
+    if (navigated) return
+    navigated = true
+    var qs = []
+    if (props.theme) qs.push('theme=' + encodeURIComponent(props.theme))
+    if (props.mode) qs.push('mode=' + encodeURIComponent(props.mode))
+    location.replace(qs.length ? TARGET + '?' + qs.join('&') : TARGET)
   }
 
-  // 官方约定:必须注册成全局对象,且不能放在 window.onload 等事件里,否则会漏掉初始属性事件
   window.wallpaperPropertyListener = {
-    applyUserProperties: function (properties) {
-      // 累计最近一次属性:WE 在页面刚加载时就发初次属性,此时 iframe 内层还没就绪会丢消息,
-      // 故等 iframe load 后再补发一次(见下方 load 监听)
-      window.__lastProps = Object.assign({}, window.__lastProps, properties)
-      pushToPage(window.__lastProps)
+    applyUserProperties: function (p) {
+      if (p.theme && p.theme.value) props.theme = p.theme.value
+      if (p.mode && p.mode.value) props.mode = p.mode.value
+      go() // 属性一到就跳,不必等满超时
     },
-    // 暂停:WE 会直接冻结渲染进程,这里无需处理;applyGeneralProperties 的 fps 同理(页面只用 CSS 动画)
+    // WE 暂停时直接冻结渲染进程,这里无需处理;fps 同理(页面只用 CSS 动画)
     setPaused: function () {}
   }
 
-  frame.addEventListener('load', function () {
-    if (window.__lastProps) pushToPage(window.__lastProps)
-  })
+  // 不在 WE 里(普通浏览器打开)、或 WE 迟迟没投属性:给个短上限就跳,不干等
+  setTimeout(go, 1200)
+</script>
+</head>
+<body>
+<div class="boot">
+  <div class="boot-time" id="bootTime">--:--</div>
+  <div class="boot-brand">ihomy</div>
+</div>
+<script>
+  function tick() {
+    var d = new Date()
+    document.getElementById('bootTime').textContent =
+      String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0')
+  }
+  tick()
+  setInterval(tick, 1000)
 </script>
 </body>
 </html>
