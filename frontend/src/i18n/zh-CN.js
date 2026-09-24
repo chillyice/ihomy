@@ -2060,5 +2060,13 @@ export default {
     loggingIn: '登录中…',
     loginFailed: '登录失败,请检查邮箱密码与验证码',
     dateFmt: '{m}月{d}日',
+    copyToken: '复制壁纸令牌',
+    copied: '已复制',
+    settingsTitle: '壁纸氛围屏',
+    settingsHint: '壁纸氛围屏(/wallpaper)挂在桌面或副屏上只做展示:时钟、天气、家人照片。桌面壁纸环境填不了账号密码,登录改用「壁纸令牌」——复制下方令牌,粘到 Wallpaper Engine 壁纸属性面板的「壁纸令牌」栏,再用 文件 → 重启预览 生效。',
+    tokenLabel: '壁纸令牌',
+    tokenWarn: '令牌等同登录凭证,请勿分享;有效期 7 天、每次使用自动续期,过期或改密码后重新复制一次即可。壁纸在 WE 里是独立环境(语言在属性面板「语言」栏,或壁纸页角落的中/EN 按钮切换),与浏览器里的 ihomy 登录互不影响。',
+    openPage: '打开壁纸页',
+    tokenEmpty: '当前未登录,没有可复制的令牌',
   },
 }

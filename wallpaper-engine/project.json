@@ -25,6 +25,23 @@
           { "label": "晨 Dawn", "value": "dawn" },
           { "label": "暮 Dusk", "value": "dusk" }
         ]
+      },
+      "lang": {
+        "order": 2,
+        "text": "语言 Language",
+        "type": "combo",
+        "value": "zh",
+        "options": [
+          { "label": "中文 Chinese", "value": "zh" },
+          { "label": "English", "value": "en" },
+          { "label": "跟随系统 System", "value": "auto" }
+        ]
+      },
+      "token": {
+        "order": 3,
+        "text": "壁纸令牌 Wallpaper token(可选,登录后显示家人照片)",
+        "type": "textinput",
+        "value": ""
       }
     }
   }

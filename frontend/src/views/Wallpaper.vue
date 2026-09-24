@@ -55,6 +55,19 @@
         <button class="wp-segbtn" :class="{ on: !themeStore.autoMode && themeStore.mode === 'dusk' }"
                 @click="themeStore.setMode('dusk')">{{ $t('wallpaper.dusk') }}</button>
       </div>
+      <!-- 语言:WE 里 CEF 是 en-us,i18n 默认跟随浏览器语言会走英文,这里可显式切(WE 属性面板亦有同名选项) -->
+      <div class="wp-seg">
+        <button class="wp-segbtn" :class="{ on: locale === 'zh-CN' }" @click="setLang('zh-CN')">中</button>
+        <button class="wp-segbtn" :class="{ on: locale === 'en' }" @click="setLang('en')">EN</button>
+      </div>
+      <!-- 复制壁纸令牌:桌面壁纸填不了登录卡,在普通浏览器里复制,粘进 WE 属性面板的 token 栏。
+           设置页(个性化设置 → 壁纸氛围屏)也有同一入口,是给用户看的主路径;这里保留一份,
+           是为了已经站在壁纸页上的用户不用再跳一趟。 -->
+      <div v-if="userStore.isLoggedIn" class="wp-seg">
+        <button class="wp-segbtn" @click="copyToken">
+          {{ tokenCopied ? $t('wallpaper.copied') : $t('wallpaper.copyToken') }}
+        </button>
+      </div>
     </div>
 
     <!-- 未登录:一次性登录卡(登录后本页只读;未登录时不显示任何家庭内容,演示家庭数据也不显示) -->
@@ -89,6 +102,7 @@ import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { authApi, publicApi } from '@/api'
+import { applyLocale } from '@/i18n'
 
 const { locale, t } = useI18n()
 const route = useRoute()
@@ -242,13 +256,61 @@ const doLogin = async () => {
 
 // ========== Wallpaper Engine 偏好:URL 参数优先于 postMessage ==========
 // WE 桌面壁纸不能再用 iframe 嵌本页(跨域 iframe 会崩 WE 的 CEF,详见 wallpaper-engine/index.html),
-// 壳页改成顶层跳转并把属性面板的 theme/mode 挂在查询串上带过来。普通浏览器访问不受影响(参数可选)。
+// 壳页改成顶层跳转并把属性面板的 theme/mode/lang 挂在查询串上带过来。普通浏览器访问不受影响(参数可选)。
 // 只做一次、且在挂载时执行:属性本身就是页面加载时一次性送达的,后续改面板需重启预览。
 const applyQueryPrefs = () => {
   const q = route.query
   if (q.theme === 'warm' || q.theme === 'guangchen') themeStore.setTheme(q.theme)
   if (q.mode === 'auto') themeStore.setAutoMode(true)
   else if (q.mode === 'dawn' || q.mode === 'dusk') themeStore.setMode(q.mode)
+  // WE 的 CEF 语言是 en-us,i18n 默认跟随浏览器语言 → 壁纸在 WE 里会走英文,故用属性显式指定
+  if (q.lang === 'zh') applyLocale('zh-CN')
+  else if (q.lang === 'en') applyLocale('en')
+}
+
+// 角落控件里的语言切换(与 WE 属性面板等效;未登录时也能用)。applyLocale 会一并写进 ihomy-lang。
+const setLang = (l) => applyLocale(l)
+
+// ========== 壁纸令牌:桌面壁纸拿不到键盘,登录卡填不了,改由属性面板粘令牌换取正式会话 ==========
+// 令牌走 URL hash(不发给服务器);换到会话后由 userStore 落进 WE 自己的 localStorage,
+// 之后靠 request.js 的 401 自动续期(两个 token 都轮换)保活,不必每次开屏都靠属性面板。
+const bootstrapToken = async () => {
+  const m = /(?:^|[#&])token=([^&]+)/.exec(window.location.hash || '')
+  if (!m) return
+  let tk = ''
+  try { tk = decodeURIComponent(m[1]) } catch (e) { return }
+  if (!tk) return
+  // ⚠ 本地已有会话时不要用属性里的令牌覆盖:续期会轮换 refresh token,属性面板那份是用户最初粘的旧值
+  // (已失效),覆盖会把有效登录态冲掉。等到会话真的失效时,401 流程会登出清空,下个开屏自然重新引导。
+  if (userStore.refreshToken) return
+  try {
+    userStore.setToken('', tk)
+    await userStore.refresh()
+  } catch (e) {
+    // 令牌无效/过期:清掉,静默保持未登录(壁纸不弹错误提示),重新复制一个即可
+    userStore.setToken('', '')
+    localStorage.removeItem('userInfo')
+  }
+}
+
+// 「复制壁纸令牌」:给普通浏览器里已登录的用户取令牌用(桌面壁纸没法点,故与语言切换同在角落控件)
+const tokenCopied = ref(false)
+let copiedTimer = null
+const copyToken = async () => {
+  const tk = userStore.refreshToken
+  if (!tk) return
+  let ok = false
+  try {
+    await navigator.clipboard.writeText(tk)
+    ok = true
+  } catch (e) {
+    ok = false
+  }
+  // 剪贴板不可用(非安全上下文/无权限):退回弹窗让用户手动复制,不谎报"已复制"
+  if (!ok) { window.prompt(t('wallpaper.copyToken'), tk); return }
+  tokenCopied.value = true
+  clearTimeout(copiedTimer)
+  copiedTimer = setTimeout(() => { tokenCopied.value = false }, 2500)
 }
 
 // ========== Wallpaper Engine 属性桥(可选) ==========
@@ -270,6 +332,8 @@ onMounted(async () => {
   document.title = 'ihomy'
   syncClock()
   clockTimer = setInterval(syncClock, 1000)
+  // 先尝试用属性面板带来的令牌换会话,再决定拉照片还是拉验证码
+  await bootstrapToken()
   if (userStore.isLoggedIn) {
     await loadPhotos()
     scheduleReveal()
@@ -285,6 +349,7 @@ onBeforeUnmount(() => {
   clearInterval(photoRefreshTimer)
   clearTimeout(revealTimer)
   clearTimeout(uiHideTimer)
+  clearTimeout(copiedTimer)
   stopSlide()
 })
 </script>

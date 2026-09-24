@@ -2056,5 +2056,13 @@ export default {
     loggingIn: 'Signing in…',
     loginFailed: 'Sign-in failed, check email, password and captcha',
     dateFmt: '{m}/{d}',
+    copyToken: 'Copy wallpaper token',
+    copied: 'Copied',
+    settingsTitle: 'Ambient wallpaper',
+    settingsHint: 'The ambient wallpaper (/wallpaper) is a display-only screen for a desktop or secondary monitor: clock, weather, family photos. A desktop wallpaper cannot type an email and password, so it signs in with a wallpaper token — copy the token below, paste it into the "Wallpaper token" field of the Wallpaper Engine property panel, then use File → Restart preview.',
+    tokenLabel: 'Wallpaper token',
+    tokenWarn: 'The token is a credential, do not share it. It is valid for 7 days and renews on every use; copy a fresh one after it expires or after a password change. Inside Wallpaper Engine the wallpaper runs in its own environment (switch language in the panel Language field, or with the 中/EN buttons in the page corner) and is independent of your browser sign-in.',
+    openPage: 'Open wallpaper screen',
+    tokenEmpty: 'Not signed in — no token to copy',
   },
 }

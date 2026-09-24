@@ -18,9 +18,16 @@
 
   代价与前提:壁纸内容就是线上页面,ihomy 改版后壁纸自动跟着更新,无需重新打包;断网时只剩本地时钟。
 
-  主题:WE 属性面板的 theme / mode 在跳转时作为 URL 参数带走(?theme=warm&mode=dawn),
-  由壁纸页 frontend/src/views/Wallpaper.vue 的 applyQueryPrefs() 读取。属性是页面加载时一次性送达的,
-  所以**页面起来之后再改属性面板不会实时生效**,改完请用 文件 → 重启预览(或干脆用页面右下角的按钮)。
+  主题 / 语言:WE 属性面板的 theme / mode / lang 在跳转时作为 URL 查询参数带走
+  (?theme=warm&mode=dawn&lang=zh),由壁纸页 frontend/src/views/Wallpaper.vue 的 applyQueryPrefs() 读取。
+
+  登录:桌面壁纸拿不到键盘,登录卡填不了账号密码和验证码。故改用「壁纸令牌」——属性面板的 token 会被
+  放在 URL 的 **hash** 里带走(#token=...,hash 不会发给服务器,不进 nginx 访问日志),壁纸页用它调
+  /auth/refresh 换取正式会话并落进 WE 自己的 localStorage,之后靠滑动续期自动保活(只要不是连续 7 天
+  不开机就一直有效)。令牌获取方式:ihomy 普通浏览器 → 个人设置 → 个性化设置 → 「壁纸氛围屏」卡片
+  → 点「复制壁纸令牌」→ 粘到 WE 属性面板的 token 栏(壁纸页右下角也有同一个复制按钮)。
+
+  注意:WE 只在页面加载时投递一次属性,所以**改完属性要用 文件 → 重启预览**才生效。
   下方保留一个本地时钟,用于跳转完成前的过渡,以及离线时至少还有个钟。
 -->
 <style>
@@ -45,16 +52,22 @@
   function go() {
     if (navigated) return
     navigated = true
+    // 非敏感项(query):主题 / 晨暮 / 语言
     var qs = []
     if (props.theme) qs.push('theme=' + encodeURIComponent(props.theme))
-    if (props.mode) qs.push('mode=' + encodeURIComponent(props.mode))
-    location.replace(qs.length ? TARGET + '?' + qs.join('&') : TARGET)
+    if (props.mode && props.mode !== 'auto') qs.push('mode=' + encodeURIComponent(props.mode))
+    if (props.lang && props.lang !== 'auto') qs.push('lang=' + encodeURIComponent(props.lang))
+    // 敏感项(hash):令牌不发给服务器,避免落进 nginx 访问日志
+    var frag = props.token ? '#token=' + encodeURIComponent(props.token) : ''
+    location.replace(TARGET + (qs.length ? '?' + qs.join('&') : '') + frag)
   }
 
   window.wallpaperPropertyListener = {
     applyUserProperties: function (p) {
       if (p.theme && p.theme.value) props.theme = p.theme.value
       if (p.mode && p.mode.value) props.mode = p.mode.value
+      if (p.lang && p.lang.value) props.lang = p.lang.value
+      if (p.token && p.token.value) props.token = String(p.token.value).trim()
       go() // 属性一到就跳,不必等满超时
     },
     // WE 暂停时直接冻结渲染进程,这里无需处理;fps 同理(页面只用 CSS 动画)
