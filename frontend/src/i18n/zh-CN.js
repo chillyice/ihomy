@@ -2042,4 +2042,23 @@ export default {
     empty: '天气数据暂不可用(未配置凭证或服务异常)',
     w0: '周日', w1: '周一', w2: '周二', w3: '周三', w4: '周四', w5: '周五', w6: '周六',
   },
+  // 壁纸页(/wallpaper):家庭私有只读氛围屏
+  wallpaper: {
+    hoverHint: '鼠标停在此处 3 秒显示照片',
+    auto: '自动',
+    autoHint: '跟随日出日落自动切换晨暮',
+    dawn: '晨',
+    dusk: '暮',
+    loginSub: '登录后显示家人照片(本页只读)',
+    email: '邮箱',
+    password: '密码',
+    captcha: '验证码',
+    captchaRefresh: '点击刷新',
+    captchaFailed: '验证码加载失败,点击图片重试',
+    needAll: '请填写邮箱、密码与验证码',
+    login: '登录',
+    loggingIn: '登录中…',
+    loginFailed: '登录失败,请检查邮箱密码与验证码',
+    dateFmt: '{m}月{d}日',
+  },
 }

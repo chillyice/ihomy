@@ -1,0 +1,31 @@
+{
+  "type": "web",
+  "file": "index.html",
+  "title": "ihomy 壁纸",
+  "preview": "preview.jpg",
+  "general": {
+    "properties": {
+      "theme": {
+        "order": 0,
+        "text": "主题 Theme",
+        "type": "combo",
+        "value": "guangchen",
+        "options": [
+          { "label": "光尘 Light & Dust", "value": "guangchen" },
+          { "label": "暖居 Warm Dwelling", "value": "warm" }
+        ]
+      },
+      "mode": {
+        "order": 1,
+        "text": "晨暮 Dawn / Dusk",
+        "type": "combo",
+        "value": "auto",
+        "options": [
+          { "label": "自动 Auto(跟随日出日落)", "value": "auto" },
+          { "label": "晨 Dawn", "value": "dawn" },
+          { "label": "暮 Dusk", "value": "dusk" }
+        ]
+      }
+    }
+  }
+}

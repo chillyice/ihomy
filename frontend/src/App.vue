@@ -6,7 +6,7 @@
       <router-view v-if="standalone" v-slot="{ Component, route }">
         <component :is="Component" :key="route.path" />
       </router-view>
-      <template v-else>
+      <template v-else-if="routeReady">
         <SunLightLayer v-if="anyEffectEnabled && !immersive" />
         <MobileLayout />
       </template>
@@ -18,7 +18,7 @@
       <router-view v-if="standalone" v-slot="{ Component, route }">
         <component :is="Component" :key="route.path" />
       </router-view>
-      <template v-else>
+      <template v-else-if="routeReady">
         <!-- 光影层:暖居/光尘共用同一套太阳驱动的丁达尔体积光+窗影+尘+台灯;沉浸式页面(如光影实验台)时隐藏 -->
         <SunLightLayer v-if="anyEffectEnabled && !immersive" />
         <!-- 暖居主题:独立外壳(顶栏 + studio 外框 + 侧栏),光影沿用 SunLightLayer -->
@@ -45,7 +45,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, provide } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import en from 'element-plus/es/locale/lang/en'
@@ -69,10 +69,15 @@ const appStore = useAppStore()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
 const route = useRoute()
+const router = useRouter()
 // 沉浸式页面(如 3D 光影实验台)：隐藏侧边栏 / 页脚 / 回顶 / 播放器，内容区占满全屏
 const immersive = computed(() => !!route.meta.immersive)
+// 路由首次解析完成前 currentRoute 是 START_LOCATION(meta 为空),此时按「非独立页」渲染会先挂载整个
+// 外壳(侧栏/播放器/暖居/首页)再被卸载——独立页(Kada/壁纸)因此会打出一批与它无关的 ihomy 接口
+// (含 OPS 权限 403 弹错、appStore 重复拉首页)。故外壳一律等解析完成后再渲染。
+const routeReady = ref(false)
 // 独立站点页(咔哒软件首页等)：完全独立全屏，不套 ihomy 外壳/光影/侧栏/页脚
-const standalone = computed(() => !!route.meta.standalone)
+const standalone = computed(() => routeReady.value && !!route.meta.standalone)
 const { locale } = useI18n()
 
 // 暖居主题:桌面端 + 非纯 OPS 时启用独立外壳
@@ -97,7 +102,10 @@ watch(isMobile, (mobile) => {
 
 const elLocale = computed(() => (locale.value === 'en' ? en : zhCn))
 
-onMounted(() => {
+onMounted(async () => {
+  // 等首次导航解析完再判定独立页,否则会把独立页当普通页初始化一次 ihomy 家庭数据
+  await router.isReady()
+  routeReady.value = true
   // 独立站点页(咔哒软件首页等)不初始化 ihomy 家庭数据,避免调用 ihomy 后端接口
   if (standalone.value) return
   appStore.init()
@@ -107,6 +115,8 @@ onMounted(() => {
 watch(
   () => userStore.isLoggedIn,
   () => {
+    // 独立页自带登录(壁纸页):登录态变化不触发 ihomy 首页聚合,由该页自己按需取数
+    if (standalone.value) return
     appStore.reset()
     appStore.init()
   },

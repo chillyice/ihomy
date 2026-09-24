@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>ihomy 壁纸</title>
+<!--
+  ihomy 壁纸 · Wallpaper Engine 壳页(网页壁纸入口)
+
+  本目录不包含 ihomy 前端构建产物:内层 iframe 直接指向线上的 https://ihomy.top/wallpaper,
+  时钟 / 天气 / 家人照片 / 登录 / 主题全部由线上页面自己完成,ihomy 改版后壁纸自动跟着更新,
+  这个目录不需要重新打包。前提是壁纸页已发布(否则线上路由会兜底显示 ihomy 首页)。
+
+  主题:project.json 的 theme / mode 属性经 postMessage 转给内层页面(桌面壁纸未必拿得到鼠标,
+  控件点不动时靠 WE 属性面板换主题)。内层页面的接收逻辑见 frontend/src/views/Wallpaper.vue 的 onMessage。
+
+  想省掉 iframe 这一层,可把 <iframe> 换成 location.replace('https://ihomy.top/wallpaper');
+  代价是 WE 属性面板失效 —— WE 注入的 API 只存在于它自己加载的那个顶层页面上。
+-->
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0F1A2E; }
+  #wp { border: 0; width: 100vw; height: 100vh; display: block; }
+</style>
+</head>
+<body>
+<iframe id="wp" src="https://ihomy.top/wallpaper" referrerpolicy="no-referrer"></iframe>
+<script>
+  var TARGET_ORIGIN = 'https://ihomy.top'
+  var frame = document.getElementById('wp')
+
+  function pushToPage(properties) {
+    var msg = {}
+    if (properties.theme && properties.theme.value) msg.theme = properties.theme.value
+    if (properties.mode && properties.mode.value) msg.mode = properties.mode.value
+    if (!Object.keys(msg).length) return
+    if (frame.contentWindow) frame.contentWindow.postMessage({ ihomyWallpaper: msg }, TARGET_ORIGIN)
+  }
+
+  // 官方约定:必须注册成全局对象,且不能放在 window.onload 等事件里,否则会漏掉初始属性事件
+  window.wallpaperPropertyListener = {
+    applyUserProperties: function (properties) {
+      // 累计最近一次属性:WE 在页面刚加载时就发初次属性,此时 iframe 内层还没就绪会丢消息,
+      // 故等 iframe load 后再补发一次(见下方 load 监听)
+      window.__lastProps = Object.assign({}, window.__lastProps, properties)
+      pushToPage(window.__lastProps)
+    },
+    // 暂停:WE 会直接冻结渲染进程,这里无需处理;applyGeneralProperties 的 fps 同理(页面只用 CSS 动画)
+    setPaused: function () {}
+  }
+
+  frame.addEventListener('load', function () {
+    if (window.__lastProps) pushToPage(window.__lastProps)
+  })
+</script>
+</body>
+</html>

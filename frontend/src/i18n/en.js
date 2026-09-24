@@ -2038,4 +2038,23 @@ export default {
     empty: 'Weather data unavailable (no credential or service error)',
     w0: 'Sun', w1: 'Mon', w2: 'Tue', w3: 'Wed', w4: 'Thu', w5: 'Fri', w6: 'Sat',
   },
+  // Wallpaper page (/wallpaper): family-private read-only ambient screen
+  wallpaper: {
+    hoverHint: 'Rest the cursor here 3s to show photos',
+    auto: 'Auto',
+    autoHint: 'Follow sunrise/sunset to switch dawn/dusk',
+    dawn: 'Dawn',
+    dusk: 'Dusk',
+    loginSub: 'Sign in to show family photos (read-only)',
+    email: 'Email',
+    password: 'Password',
+    captcha: 'Captcha',
+    captchaRefresh: 'Click to refresh',
+    captchaFailed: 'Captcha failed to load, click image to retry',
+    needAll: 'Email, password and captcha are required',
+    login: 'Sign in',
+    loggingIn: 'Signing in…',
+    loginFailed: 'Sign-in failed, check email, password and captcha',
+    dateFmt: '{m}/{d}',
+  },
 }

@@ -67,6 +67,8 @@ const routes = [
   { path: '/ops', name: 'Ops', component: () => import('@/views/ops/Ops.vue'), meta: { ops: true } },
   // 咔哒软件首页:独立下载页(托管在 ihomy 域名下),standalone 不套 ihomy 外壳
   { path: '/kada', name: 'Kada', component: () => import('@/views/Kada.vue'), meta: { public: true, standalone: true } },
+  // 壁纸页:家庭私有只读氛围屏(桌面壁纸/常开副屏用),登录后只展示照片/光影/天气;standalone 不套外壳
+  { path: '/wallpaper', name: 'Wallpaper', component: () => import('@/views/Wallpaper.vue'), meta: { public: true, standalone: true } },
   // 兜底:未匹配的路由重定向回首页
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]

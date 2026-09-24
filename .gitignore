@@ -30,3 +30,6 @@ frontend/.env.development.local
 frontend/public/ruffle/
 # EmulatorJS 运行时(由 scripts/copy-emulatorjs.mjs 从 node_modules 拷贝生成)
 frontend/public/emulatorjs/
+
+# 壁纸包 zip(源在 wallpaper-engine/,一条 tar 命令即可重生成;不入库)
+/wallpaper-engine.zip
