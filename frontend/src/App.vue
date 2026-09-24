@@ -3,31 +3,42 @@
   <el-config-provider :locale="elLocale">
     <!-- 移动端布局:特效开启时同样挂载光影层(全部 pointer-events:none 不挡触摸) -->
     <template v-if="isMobile">
-      <SunLightLayer v-if="anyEffectEnabled && !immersive" />
-      <MobileLayout />
+      <router-view v-if="standalone" v-slot="{ Component, route }">
+        <component :is="Component" :key="route.path" />
+      </router-view>
+      <template v-else>
+        <SunLightLayer v-if="anyEffectEnabled && !immersive" />
+        <MobileLayout />
+      </template>
     </template>
 
     <!-- 桌面端布局 -->
     <template v-else>
-      <!-- 光影层:暖居/光尘共用同一套太阳驱动的丁达尔体积光+窗影+尘+台灯;沉浸式页面(如光影实验台)时隐藏 -->
-      <SunLightLayer v-if="anyEffectEnabled && !immersive" />
-      <!-- 暖居主题:独立外壳(顶栏 + studio 外框 + 侧栏),光影沿用 SunLightLayer -->
-      <WarmLayout v-if="isWarm" />
+      <!-- 独立站点页(咔哒软件首页等):完全独立全屏,不套 ihomy 外壳/光影/侧栏/页脚 -->
+      <router-view v-if="standalone" v-slot="{ Component, route }">
+        <component :is="Component" :key="route.path" />
+      </router-view>
       <template v-else>
-        <AppSidebar v-if="!userStore.isPureOps && !immersive" />
-        <main class="app-main" :class="{ 'with-sidebar': !userStore.isPureOps && !immersive }">
-          <router-view v-slot="{ Component, route }">
-            <transition :name="route.meta.transition || 'fade'" mode="out-in">
-              <component :is="Component" :key="route.path" />
-            </transition>
-          </router-view>
-        </main>
+        <!-- 光影层:暖居/光尘共用同一套太阳驱动的丁达尔体积光+窗影+尘+台灯;沉浸式页面(如光影实验台)时隐藏 -->
+        <SunLightLayer v-if="anyEffectEnabled && !immersive" />
+        <!-- 暖居主题:独立外壳(顶栏 + studio 外框 + 侧栏),光影沿用 SunLightLayer -->
+        <WarmLayout v-if="isWarm" />
+        <template v-else>
+          <AppSidebar v-if="!userStore.isPureOps && !immersive" />
+          <main class="app-main" :class="{ 'with-sidebar': !userStore.isPureOps && !immersive }">
+            <router-view v-slot="{ Component, route }">
+              <transition :name="route.meta.transition || 'fade'" mode="out-in">
+                <component :is="Component" :key="route.path" />
+              </transition>
+            </router-view>
+          </main>
+        </template>
+        <BackToTop v-if="!immersive" />
+        <InstallPrompt />
+        <MusicPlayer v-if="!immersive" />
+        <LightTestConsole />
+        <SiteFooter v-if="!immersive" />
       </template>
-      <BackToTop v-if="!immersive" />
-      <InstallPrompt />
-      <MusicPlayer v-if="!immersive" />
-      <LightTestConsole />
-      <SiteFooter v-if="!immersive" />
     </template>
   </el-config-provider>
 </template>
@@ -60,6 +71,8 @@ const themeStore = useThemeStore()
 const route = useRoute()
 // 沉浸式页面(如 3D 光影实验台)：隐藏侧边栏 / 页脚 / 回顶 / 播放器，内容区占满全屏
 const immersive = computed(() => !!route.meta.immersive)
+// 独立站点页(咔哒软件首页等)：完全独立全屏，不套 ihomy 外壳/光影/侧栏/页脚
+const standalone = computed(() => !!route.meta.standalone)
 const { locale } = useI18n()
 
 // 暖居主题:桌面端 + 非纯 OPS 时启用独立外壳
@@ -85,6 +98,8 @@ watch(isMobile, (mobile) => {
 const elLocale = computed(() => (locale.value === 'en' ? en : zhCn))
 
 onMounted(() => {
+  // 独立站点页(咔哒软件首页等)不初始化 ihomy 家庭数据,避免调用 ihomy 后端接口
+  if (standalone.value) return
   appStore.init()
   userStore.ensureUserInfo()
 })

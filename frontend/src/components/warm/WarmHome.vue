@@ -93,13 +93,19 @@
         <template v-else-if="w.id === 'photos'">
           <h3 class="gc-card-h3">照片<button class="gc-more" @click.stop="!editMode && $router.push('/album')">相册 →</button></h3>
           <div v-if="photos.length" class="gc-photo-stack" @mouseenter="photoHover = true" @mouseleave="photoHover = false" @click="!editMode && advancePhotos()">
-            <div v-for="(p, i) in stackCards" :key="p.id" class="gc-photo-pcard" :style="pcardStyle(i)">
+            <div v-for="(p, i) in stackCards" :key="p.id" class="gc-photo-pcard" :class="{ 'gc-photo-hovered': hoveredCard === i }" :style="pcardStyle(i)" @mouseenter="onCardEnter(i)" @mouseleave="onCardLeave()">
               <img :src="p.url" :alt="p.description || ''" loading="lazy" />
             </div>
             <div class="gc-photo-meta">
               <span class="gc-photo-cap">{{ topPhoto?.description || '家庭照片' }}</span>
               <span class="gc-photo-count">{{ photoIndex + 1 }} / {{ photos.length }}</span>
             </div>
+            <button v-if="photos.length > 1 && !editMode" class="gc-photo-nav gc-photo-prev" @click.stop="prevPhotos()" aria-label="上一张">
+              <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" /></svg>
+            </button>
+            <button v-if="photos.length > 1 && !editMode" class="gc-photo-nav gc-photo-next" @click.stop="advancePhotos()" aria-label="下一张">
+              <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" /></svg>
+            </button>
           </div>
           <div v-else class="gc-empty gc-empty-link" @click="!editMode && $router.push('/album')">去相册添加家庭照片</div>
         </template>
@@ -686,9 +692,10 @@ const balance = computed(() => bookSummary.value?.balance ?? 0)
 const financeTotal = computed(() => (Number(bookSummary.value?.income) || 0) + (Number(bookSummary.value?.expense) || 0))
 const incomePct = computed(() => (financeTotal.value > 0 ? ((Number(bookSummary.value?.income) || 0) / financeTotal.value) * 100 : 0))
 
-// ========== 照片卡牌堆(点击翻动 + 5s 自动轮播,hover 暂停) ==========
+// ========== 照片卡牌堆(点击翻动 + 5s 自动轮播 + hover 摆正放大/暂停) ==========
 const photoIndex = ref(0)
 const photoHover = ref(false)
+const hoveredCard = ref(-1) // 当前 hover 的照片卡索引(-1 = 无),hover 时该卡摆正放大(JS 追踪,正确处理扇形重叠)
 const PHOTO_STACK_N = 4
 const topPhoto = computed(() => photos.value[photoIndex.value] || null)
 const stackCards = computed(() => {
@@ -703,11 +710,16 @@ const pcardStyle = (i) => {
   const n = Math.min(PHOTO_STACK_N, photos.value.length)
   const mid = (n - 1) / 2
   return {
-    transform: `translate(${((i - mid) * 14).toFixed(1)}px, ${(Math.abs(i - mid) * 9).toFixed(1)}px) rotate(${((i - mid) * 6).toFixed(1)}deg)`,
-    zIndex: 10 - i,
+    '--dx': `${((i - mid) * 12).toFixed(1)}px`,
+    '--dy': `${(Math.abs(i - mid) * 8).toFixed(1)}px`,
+    '--rot': `${((i - mid) * 5).toFixed(1)}deg`,
+    '--z': 10 - i,
   }
 }
+const onCardEnter = (i) => { hoveredCard.value = i }
+const onCardLeave = () => { hoveredCard.value = -1 }
 const advancePhotos = () => { if (photos.value.length > 1) photoIndex.value = (photoIndex.value + 1) % photos.value.length }
+const prevPhotos = () => { if (photos.value.length > 1) photoIndex.value = (photoIndex.value - 1 + photos.value.length) % photos.value.length }
 let photoTimer = null
 const startPhotoTimer = () => { if (!photoTimer) photoTimer = setInterval(() => { if (!photoHover.value) advancePhotos() }, 5000) }
 const stopPhotoTimer = () => { if (photoTimer) { clearInterval(photoTimer); photoTimer = null } }
@@ -990,12 +1002,21 @@ html.theme-warm.dark .gc-home { --chip-a: .26; --bar-a: 1; --sill-a: .58; --sage
 /* 照片卡牌堆:卡片须为 flex 纵向容器,stack 的 flex:1 才能撑满剩余高度(否则子项全 absolute → 高度塌缩为 0 → 照片不可见) */
 .gc-photos { display: flex; flex-direction: column; }
 .gc-photo-stack { position: relative; flex: 1; min-height: 0; cursor: pointer; display: grid; place-items: center; overflow: hidden; }
-.gc-photo-pcard { position: absolute; width: 74%; height: 78%; border-radius: 14px; overflow: hidden; background: var(--color-line);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, .16); transition: transform .5s cubic-bezier(.22, 1, .36, 1), opacity .5s ease; }
+.gc-photo-pcard { position: absolute; width: 72%; height: 76%; border-radius: 14px; overflow: hidden; background: var(--color-line);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, .16); z-index: var(--z, 10);
+  transform: translate(var(--dx, 0), var(--dy, 0)) rotate(var(--rot, 0deg));
+  transition: transform .45s cubic-bezier(.22, 1, .36, 1), box-shadow .3s ease, opacity .5s ease; }
+.gc-photo-pcard.gc-photo-hovered { z-index: 40; transform: translate(0, 0) rotate(0deg) scale(1.1); box-shadow: 0 22px 44px rgba(0, 0, 0, .28); }
 .gc-photo-pcard img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.gc-photo-meta { position: absolute; left: 10px; right: 10px; bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; z-index: 20; }
+.gc-photo-meta { position: absolute; left: 10px; right: 10px; bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; z-index: 45; opacity: 0; transform: translateY(6px); transition: opacity .3s ease, transform .3s ease; pointer-events: none; }
+.gc-photo-stack:hover .gc-photo-meta { opacity: 1; transform: translateY(0); }
 .gc-photo-cap { font-size: 12px; font-weight: 600; color: #fff; padding: 4px 10px; border-radius: 999px; background: rgba(0, 0, 0, .4); backdrop-filter: blur(6px); max-width: 72%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gc-photo-count { font-size: 11px; color: #fff; padding: 3px 9px; border-radius: 999px; background: rgba(0, 0, 0, .4); backdrop-filter: blur(6px); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.gc-photo-nav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 50; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; border-radius: 50%; cursor: pointer; color: #fff; background: rgba(0, 0, 0, .35); backdrop-filter: blur(6px); transition: background .2s ease, transform .2s ease; }
+.gc-photo-nav:hover { background: rgba(0, 0, 0, .6); transform: translateY(-50%) scale(1.06); }
+.gc-photo-nav svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.gc-photo-prev { left: 2px; }
+.gc-photo-next { right: 2px; }
 
 /* 头部「更多」小链接(照片→相册 / 寻物→管理) */
 .gc-more { all: unset; margin-left: auto; cursor: pointer; font-size: 11.5px; font-weight: 600; color: var(--color-text-tertiary); transition: color .2s; }

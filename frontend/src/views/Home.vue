@@ -256,7 +256,8 @@ import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
 import { useI18n } from 'vue-i18n'
-import { publicApi, homeApi, taskApi, pointsApi, reminderApi, bookApi, wishApi, itemApi, kitchenApi, aiApi, albumApi, photoApi } from '@/api'
+import { publicApi, homeApi, taskApi, pointsApi, reminderApi, bookApi, wishApi, itemApi, kitchenApi } from '@/api'
+import { useWeatherBg } from '@/composables/useWeatherBg'
 import { gsap } from 'gsap'
 import { ElMessage } from 'element-plus'
 import { Search, Microphone } from '@element-plus/icons-vue'
@@ -558,121 +559,9 @@ const onCardEnter = (w) => { if (w.id === 'album') onAlbumEnter() }
 const onCardLeave = () => { onAlbumLeave() }
 
 // ========== P3 天气 AI 生图背景(排版方案 §4.4) ==========
-const WEATHER_IMAGE_FEATURE = 'WEATHER_IMAGE' // 设置-家庭AI配置「功能绑定」里独立绑定的天气生图功能
-const weatherBg = ref('')
-const weatherBgLoading = ref(false)
-const WEATHER_BG_CACHE = 'ihomy:weather-bg:v1'
-const WEATHER_CFG_KEY = 'ihomy:weather-bg-config:v1'
-const WEATHER_CFG_DEFAULT = { enabled: true, style: '温柔插画风格', size: '2048x2048', refreshDays: 7, scene: '', watermark: false }
-const readWeatherCfg = () => {
-  try {
-    const raw = localStorage.getItem(WEATHER_CFG_KEY)
-    return raw ? { ...WEATHER_CFG_DEFAULT, ...JSON.parse(raw) } : { ...WEATHER_CFG_DEFAULT }
-  } catch { return { ...WEATHER_CFG_DEFAULT } }
-}
-let aiStatusChecked = false
-let aiImageAvail = false
-const seasonLabel = () => { const m = new Date().getMonth() + 1; return (m >= 3 && m <= 5) ? '春' : (m >= 6 && m <= 8) ? '夏' : (m >= 9 && m <= 11) ? '秋' : '冬' }
-const dayNightNow = () => { const h = new Date().getHours(); return (h >= 6 && h < 19) ? 'day' : 'night' }
-// 日期与分时(进 prompt;缓存键仍用粗粒度 day/night,避免分时频繁触发重生成)
-const dateLabel = () => { const d = new Date(); return `${d.getMonth() + 1}月${d.getDate()}日` }
-const timeOfDayLabel = () => {
-  const h = new Date().getHours()
-  if (h < 5) return '凌晨'
-  if (h < 8) return '清晨'
-  if (h < 11) return '上午'
-  if (h < 14) return '午后'
-  if (h < 17) return '下午'
-  if (h < 19) return '傍晚'
-  return '夜晚'
-}
-// 落库文件名:城市-日期-上下午-时间(如 济南-2026-09-13-下午-17:30,冒号由后端落盘时归一为 _)
-const weatherImageName = () => {
-  const d = new Date()
-  const pad = (n) => String(n).padStart(2, '0')
-  const city = weather.value?.city || '未知城市'
-  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-  const ampm = d.getHours() < 12 ? '上午' : '下午'
-  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`
-  return `${city}-${date}-${ampm}-${time}`
-}
-// 风格/地点随机池:风格不固定(摄影/手绘/油画…),地点不固定(突出天气氛围,弱化地标)
-const WEATHER_STYLES = ['电影感摄影', '水彩手绘', '油画', '极简插画', '复古胶片', '日系动漫', '水墨淡彩']
-const WEATHER_SCENES = ['城市街道', '公园', '海边', '山间', '郊野', '湖边', '窗前']
-const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)]
-const weatherBgKey = () => [weather.value?.city, weather.value?.text, weather.value?.iconCode, dayNightNow(), seasonLabel()].join('|')
-const loadWeatherBg = () => {
-  const key = weatherBgKey()
-  if (!key || !weather.value) return
-  // 读取「天气背景 AI 生成」配置(AiPlayground 面板);关闭则回落渐变
-  const cfg = readWeatherCfg()
-  if (cfg.enabled === false) return
-  const ttl = Math.max(1, (cfg.refreshDays ?? 7)) * 86400000
-  // 分组缓存 + 保鲜(排版方案:一周一换)
-  try {
-    const cache = JSON.parse(localStorage.getItem(WEATHER_BG_CACHE) || '{}')
-    const hit = cache[key]
-    if (hit && Date.now() - hit.ts < ttl) { weatherBg.value = hit.url; return }
-  } catch {}
-  if (!userStore.isLoggedIn) return // /ai/* 需登录,公开首页仅渐变兜底
-  if (weatherBgLoading.value) return
-  weatherBgLoading.value = true
-  const attempt = async () => {
-    try {
-      if (!aiStatusChecked) {
-        try { aiImageAvail = !!(await aiApi.status())?.weatherImage?.available } catch {}
-        aiStatusChecked = true
-      }
-      if (!aiImageAvail) return
-      const prompt = `${pickRandom(WEATHER_STYLES)},${dateLabel()}${timeOfDayLabel()},${seasonLabel()}季,${weather.value?.city || ''} ${weather.value?.text || ''},${pickRandom(WEATHER_SCENES)},突出天气氛围,弱化地点地标,柔和高级色调,高清#`
-      const res = await aiApi.image({
-        prompt,
-        size: cfg.size || '2048x2048',
-        watermark: cfg.watermark === true, // 背景图默认不带水印,配置里显式开才带
-      }, WEATHER_IMAGE_FEATURE)
-      const first = res?.[0] || {}
-      const url = first.url || (first.b64_json ? 'data:image/png;base64,' + first.b64_json : '')
-      if (url) {
-        weatherBg.value = url
-        try { const c = JSON.parse(localStorage.getItem(WEATHER_BG_CACHE) || '{}'); c[key] = { url, ts: Date.now() }; localStorage.setItem(WEATHER_BG_CACHE, JSON.stringify(c)) } catch {}
-        saveWeatherBgToAlbum(url, prompt) // AI 生图落库到家庭相册,不阻塞背景显示
-      }
-    } catch (e) { /* 无模型/出错回落渐变+毛玻璃 */ }
-    finally { weatherBgLoading.value = false }
-  }
-  attempt()
-}
-
-// AI 生图落库:找到或新建「AI 生图」相册(private 类型 → 照片 FAMILY 家庭内可见),再把图片保存为照片
-const WEATHER_ALBUM_NAME = 'AI 生图'
-let weatherAlbumPromise = null
-const ensureWeatherAlbum = () => {
-  if (weatherAlbumPromise) return weatherAlbumPromise
-  weatherAlbumPromise = (async () => {
-    try {
-      const albums = await albumApi.list()
-      const found = (albums || []).find((a) => a.name === WEATHER_ALBUM_NAME)
-      if (found) return found.id
-      const created = await albumApi.create({ name: WEATHER_ALBUM_NAME, type: 'private' })
-      return created.id
-    } catch (e) {
-      weatherAlbumPromise = null // 失败允许下次重试
-      return null
-    }
-  })()
-  return weatherAlbumPromise
-}
-const saveWeatherBgToAlbum = async (imgUrl, prompt) => {
-  try {
-    const albumId = await ensureWeatherAlbum()
-    if (!albumId || !imgUrl) return
-    // 网络图走后端下载落库,避免浏览器跨域 fetch 拦截;data: 由后端解码
-    if (/^https?:\/\//i.test(imgUrl) || /^data:/i.test(imgUrl)) {
-      await photoApi.saveFromUrl(albumId, { url: imgUrl, name: weatherImageName(), description: prompt || '' })
-    }
-  } catch (e) { /* 相册保存失败静默(仅影响 AI 图归档,不影响背景展示) */ }
-}
-watch([() => weather.value?.city, () => weather.value?.text, () => weather.value?.iconCode], () => { if (weather.value) loadWeatherBg() }, { immediate: true })
+// 生成/缓存/落库/无图兜底统一走 useWeatherBg(与暖居外壳 WarmLayout 同源,同一缓存键,家庭内去重)
+const { weatherBg, load: loadWeatherBg } = useWeatherBg()
+watch([() => weather.value?.city, () => weather.value?.text, () => weather.value?.iconCode], () => { if (weather.value) loadWeatherBg(weather.value) }, { immediate: true })
 
 // ========== P3 找物语音输入(浏览器 Web Speech API,无需后端 ASR 模型) ==========
 const voiceListening = ref(false)
