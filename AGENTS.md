@@ -14,6 +14,7 @@
 > - **⚠ PowerShell 5.1 原生命令传参两坑**(2026-09-07 start-db.ps1 踩坑):① 不带引号的点号参数会被拆词(`mysqladmin ping -h127.0.0.1` 实际收到主机 `127`),必须写成 `'-h127.0.0.1'`;② 传给原生命令的参数里嵌双引号会被吃掉(`docker inspect --format '{{ index .X "key" }}'` 必然探测失败),改用无引号模板 `{{.Config.Labels}}` 或行为式判断。另:**.ps1 含中文必须带 UTF-8 BOM**(无 BOM 时 PS 5.1 按 GBK 解析直接语法错误);Write 工具默认无 BOM,新建中文 .ps1 后须补 BOM。
 > - **⚠ Git Bash(MSYS)路径自动转换坑**(2026-09-08 踩坑):Git Bash 调 Windows 原生命令(docker.exe 等)时,参数里的 POSIX 风格路径会被自动转成 Windows 路径(`/tmp/x.sql` → `C:/Users/.../Temp/x.sql`),导致 `docker cp file ihomy-mysql:/tmp/` 与 `docker exec ... source /tmp/x.sql` 静默失效报 `error: 2`——**docker 容器内路径参数一律加 `MSYS_NO_PATHCONV=1` 前缀**(如 `MSYS_NO_PATHCONV=1 docker exec ihomy-mysql mysql -e "source /tmp/x.sql"`)。
 > - **⚠ 后端内存缓存直改 DB 不生效**(2026-09-08 踩坑):`HomeModuleService` 全局模块 `@PostConstruct` 预热进内存(**无 TTL 无兜底刷新**),直接 UPDATE `sys_home_module` 不会失效——直改 DB 后必须重启后端才生效(或走模块管理接口触发 evict);同理适用于其他启动时预热的内存缓存。
+> - **⚠ 打包 zip 别用 `Compress-Archive`**(2026-09-24 壁纸包踩坑):PowerShell 5.1 的 `Compress-Archive` 写出的条目用**反斜杠**分隔(`wallpaper-engine\index.html`),不符合 ZIP 规范(应正斜杠),Windows 资源管理器/7-Zip 能忍,但 Info-ZIP 等非 Windows 解压工具会把整条路径当成一个文件名。**用 Windows 自带 bsdtar**:`tar -a -c -f out.zip dir`(`-a` 按扩展名选格式)。
 > - **⚠ 数据库写中文警示**:向 MySQL 写入含中文的 SQL 时,**禁止**用 PowerShell 管道 `Get-Content file.sql | docker exec -i mysql mysql ...`(PS 5.1 管道编码非 UTF-8 导致中文乱码)。**正确方式**:① 用本工具 Write 写 SQL 文件(UTF-8 无 BOM)→ `docker cp file.sql ihomy-mysql:/tmp/` → `docker exec ihomy-mysql mysql --default-character-set=utf8mb4 ihomy -e "source /tmp/file.sql"` → 清理临时文件;② 纯 ASCII SQL 可直接 `docker exec mysql -e "..."`;③ 远程用 `scp -P 19068 file.sql root@ihomy.top:/tmp/` → SSH 执行 `mysql -e "source /tmp/file.sql"`。终端显示中文为 `?` 是 GBK 终端问题,不代表存储乱码,用 `python -c "import subprocess; ..."` 验证。
 
 ## 项目概述
@@ -97,16 +98,18 @@ frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
   src/
     api/          # request.js(axios+JWT+401 自动刷新) + index.js(31 个 Api 对象)
     stores/       # user.js(登录+权限) / app.js(首页聚合) / theme.js(主题两轴矩阵)
-    router/       # 登录守卫 + scrollBehavior;49 个路由(懒加载)
+    router/       # 登录守卫 + scrollBehavior;50 个路由(懒加载)
     i18n/ theme/  # vue-i18n 中英;主题两轴矩阵(暖居/光尘 × 晨/暮)
     utils/        # dict.js / diary.js / doodle.js(涂鸦引擎) / furnitureIcon.js(家具类型图标) / windowLight.js / useSunLight.js / useDragResize.js
     composables/  # useDevice.js(设备检测) / useWeatherBg.js(天气 AI 生图氛围底图)
     components/   # AppSidebar/BackToTop/Breadcrumb/AvatarCropper/InstallPrompt/SiteFooter/SunLightLayer/LightTestConsole/SyncDialog/Mobile*(移动端)/warm/(暖居外壳 WarmLayout+WarmHome)
     layouts/MobileLayout.vue  # 移动端壳
     styles/main.css # CSS 变量 + 全局样式 + 深色模式 + EP 组件覆写 + @media
-    views/        # 47 个页面(唯一视图文件计数;Home/Login/Member/Settings/Anniversary/album/cinema/diary/blog/points/task/reminder/plan/wish/book/chat/tree/cascade/ops/storage/item/kitchen/library/tools/games(Games+GamePlayer+PetLinkLink)/plant(花园)/kada(咔哒独立下载页))
+    views/        # 48 个页面(唯一视图文件计数;Home/Login/Member/Settings/Anniversary/album/cinema/diary/blog/points/task/reminder/plan/wish/book/chat/tree/cascade/ops/storage/item/kitchen/library/tools/games(Games+GamePlayer+PetLinkLink)/plant(花园)/kada(咔哒独立下载页)/Wallpaper(壁纸氛围屏))
     App.vue
   vite.config.js   # PWA + 代理 /api->8080 + manualChunks 分块 + ElementPlus 按需
+wallpaper-engine/   # Wallpaper Engine 网页壁纸包(壳页 iframe 嵌线上 /wallpaper + 属性桥;不含构建产物,
+                    # ihomy 改版自动跟随;不是前端源码也不是构建产物,不进 dist)。导入步骤见该目录 README
 ```
 
 ## 构建与验证命令
@@ -158,10 +161,10 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | AI | 图片生成/语音识别接入+AI 测试台+家庭级 AI 配置+AI 调用统计 | AiService / FamilyAiConfigService / AiController(/ai/status、/ai/config、/ai/chat、/ai/image、/ai/transcribe)+ AiStatsService(/ops/ai/**) |
 | 厨房 | 菜单/菜谱/食材 | RecipeController / RecipeService |
 | 工具 | 工具箱聚合页/脑图设计(simple-mind-map,快照/回滚/协同轮询)/AI 测试台(/tools/ai-playground 临时)/3D 光影实验台(/tools/light-lab 临时,Three.js 太阳模拟+真实阴影,未来场景主题基础)/Flash 播放器(/tools/flash)/GBA 播放器(/tools/gba) | MindMapController / MindMapService |
-| 系统 | i18n / 主题(暖居/光尘 × 晨/暮) / 字典 / 独立产品页(咔哒 Kada 下载页 `/kada`,`meta.standalone`) | i18n/ + theme/(index.js)+stores/theme.js + utils/dict.js + views/Kada.vue |
+| 系统 | i18n / 主题(暖居/光尘 × 晨/暮) / 字典 / 独立产品页(咔哒 Kada 下载页 `/kada`;壁纸氛围屏 `/wallpaper`,均 `meta.standalone`) | i18n/ + theme/(index.js)+stores/theme.js + utils/dict.js + views/Kada.vue + views/Wallpaper.vue |
 | 移动端 | 设备自适应 | useDevice.js + MobileLayout.vue + Mobile* 组件 |
 
-**关键坑速查**(实现细节详见 docs/变更归档.md):日记 date 兼容 `yyyy-MM-dd HH:mm`;纪念日 Hutool ChineseDate 月份 0-based 需 +1;家谱 null 字段须 `LambdaUpdateWrapper` 显式 SET;**MP `updateById` 会回写实体旧 `updated_at` 抑制 `ON UPDATE CURRENT_TIMESTAMP`**——依赖 updated_at 的表更新必须 LambdaUpdateWrapper 只 SET 业务字段并重查;**simple-mind-map 只内置 default 主题**(其余须 mindmapThemes.js defineTheme 注册);**脑图并发保存靠 update 乐观锁**(带 baseUpdatedAt,库中已刷新则 409);**脑图保存前 stripEmptyNodes 剥空叶子**;**EP dropdown 内嵌 hover 子菜单**用 visibility 延迟隐藏而非 display;物品户型图 hover 边加号阈值 6px、未设计楼层画布空白+引导、库内家具拖入画布替代「摆放」;**CSS `rotate()` 负角度在屏幕坐标(y 向下)里把元素下端往右摆(与直觉相反),要「右上→左下」须正角度;`animation` 简写覆盖同元素长写的 `animation-*`(如 delay),多粒子动画须用 `--var` 喂时长/相位**;**pdfjs-dist 统一 v6**(worker 用 `build/pdf.worker.min.mjs?url`,浏览器不用裸 iframe);**天气 AI 生图背景只有一份实现 `useWeatherBg`**(首页卡与暖居外壳同源、同一缓存键,不要再在 `Home.vue` 里写第二份——V9.86 已删掉那 115 行重复代码);**暖居照片卡牌扇形重叠时别用纯 CSS `:hover`**(命中的是 DOM 靠后那张而非视觉最上那张,须 JS `@mouseenter` 追踪索引再驱动类名);**要能被类覆写的内联样式走 CSS 变量**(transform 写死在 `:style` 里就无法被 hover 类覆盖,故卡牌位移/旋转/层级抽 `--dx/--dy/--rot/--z`)。
+**关键坑速查**(实现细节详见 docs/变更归档.md):日记 date 兼容 `yyyy-MM-dd HH:mm`;纪念日 Hutool ChineseDate 月份 0-based 需 +1;家谱 null 字段须 `LambdaUpdateWrapper` 显式 SET;**MP `updateById` 会回写实体旧 `updated_at` 抑制 `ON UPDATE CURRENT_TIMESTAMP`**——依赖 updated_at 的表更新必须 LambdaUpdateWrapper 只 SET 业务字段并重查;**simple-mind-map 只内置 default 主题**(其余须 mindmapThemes.js defineTheme 注册);**脑图并发保存靠 update 乐观锁**(带 baseUpdatedAt,库中已刷新则 409);**脑图保存前 stripEmptyNodes 剥空叶子**;**EP dropdown 内嵌 hover 子菜单**用 visibility 延迟隐藏而非 display;物品户型图 hover 边加号阈值 6px、未设计楼层画布空白+引导、库内家具拖入画布替代「摆放」;**CSS `rotate()` 负角度在屏幕坐标(y 向下)里把元素下端往右摆(与直觉相反),要「右上→左下」须正角度;`animation` 简写覆盖同元素长写的 `animation-*`(如 delay),多粒子动画须用 `--var` 喂时长/相位**;**pdfjs-dist 统一 v6**(worker 用 `build/pdf.worker.min.mjs?url`,浏览器不用裸 iframe);**天气 AI 生图背景只有一份实现 `useWeatherBg`**(首页卡与暖居外壳同源、同一缓存键,不要再在 `Home.vue` 里写第二份——V9.86 已删掉那 115 行重复代码);**暖居照片卡牌扇形重叠时别用纯 CSS `:hover`**(命中的是 DOM 靠后那张而非视觉最上那张,须 JS `@mouseenter` 追踪索引再驱动类名);**要能被类覆写的内联样式走 CSS 变量**(transform 写死在 `:style` 里就无法被 hover 类覆盖,故卡牌位移/旋转/层级抽 `--dx/--dy/--rot/--z`);**`meta.standalone` 独立页的空壳期陷阱**——路由首次解析前 `currentRoute` 是 START_LOCATION(meta 为空),`v-if="route.meta.standalone"` 会先判为 false 而挂载整个 ihomy 外壳再卸载,独立页启动瞬间因此打出一批无关接口(含 OPS 权限 403 弹错);外壳一律等 `router.isReady()`(`routeReady` 标记)后再渲染;**待机计时类交互别只在 mousemove 里起算**(壁纸/副屏场景鼠标根本不动,须挂载后也调一次 `scheduleReveal()`);**窄屏右下角浮层会压住左下角文字**(壁纸页控件 ≤768px 改挂右上角 + 触屏隐藏鼠标提示,`@media (hover: none)`)。
 
 ## 设计规范(统一实现,避免多种方式)
 
@@ -187,7 +190,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 1. **API 分组**:`api/index.js` 按模块导出 `xxxApi` 对象;统一走 `api/request.js`(axios+JWT+401 自动刷新)。
 2. **状态管理**:Pinia;`stores/user.js`(登录+权限)、`stores/app.js`(首页聚合)。
 3. **路由守卫**:`meta.public` 无需登录;`meta.ops` 需 `ops:view`;纯 OPS 账号只能访问 `/ops`。
-   - **`meta.standalone`(独立产品页,V9.84)**:在 ihomy 域名下挂「另一款产品的独立页」时给它加 `meta.standalone`——`App.vue` 走独立分支,只渲染 `<router-view :key="route.path">`,**不套** ihomy 外壳(光影层/侧栏/页脚/播放器/回顶);`onMounted` 见 standalone 直接 return,跳过 `appStore.init()` 与 `userStore.ensureUserInfo()`(不调 ihomy 后端接口)。同类页照此办理(已用:咔哒 Kada 下载页 `/kada`,见需求设计说明书 §4.14)。
+   - **`meta.standalone`(独立产品页,V9.84;V9.87 修首次渲染)**:在 ihomy 域名下挂「另一款产品的独立页」时给它加 `meta.standalone`——`App.vue` 走独立分支,只渲染 `<router-view :key="route.path">`,**不套** ihomy 外壳(光影层/侧栏/页脚/播放器/回顶);`onMounted` 见 standalone 直接 return,跳过 `appStore.init()` 与 `userStore.ensureUserInfo()`(不调 ihomy 后端接口)。**外壳必须等路由首次解析完成再渲染**(`routeReady`,见 `App.vue`):解析前 `currentRoute` 是 START_LOCATION(meta 为空),按「非独立页」渲染会让外壳先挂载再卸载,独立页启动瞬间打出一批无关接口(OPS 403 弹错/通知数/音乐/首页聚合)。同类页照此办理(已用:咔哒 Kada 下载页 `/kada`、壁纸氛围屏 `/wallpaper`,见需求设计说明书 §4.14/§4.15)。
 4. **样式**:CSS 变量(`main.css`)+ 深色模式 `html.dark` 覆写;**不显式声明 serif 字体**,继承 body sans-serif。
 5. **图标**:Element Plus `el-icon`(线性图标);**Setting/Monitor 图标用内联 SVG 替代**(复杂 path 在 100% 缩放触发子像素光栅化开销,见性能优化博客 id=18)。
 6. **动画**:GSAP 入场;`transform: translateZ(0)` 隔离合成层;`contain: layout style` 隔离布局;避免 `background-attachment: fixed`(性能杀手)。
@@ -259,7 +262,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 #### 验证基线
 
 - 后端编译:`cd backend; .\mvnw.cmd -B clean compile -DskipTests` → BUILD SUCCESS
-- 前端构建:`cd frontend; npm run build` → 入口 chunk ≈316.2KB(2026-09-24 V9.86 实测 316.22KB/gzip 126.46KB;旧基线 2026-09-08 V9.48 为 246.35KB/97.70KB,此后各版本累积增长约 70KB;pdfjs 已隔离为独立异步 chunk ~483KB 仅 PDF 场景加载;simple-mind-map ~341KB 仅脑图编辑页加载)
+- 前端构建:`cd frontend; npm run build` → 入口 chunk ≈317.4KB(2026-09-24 V9.87 实测 317.39KB/gzip 126.99KB,较 V9.86 的 316.22KB 增 1.17KB=壁纸路由+i18n 文案;旧基线 2026-09-08 V9.48 为 246.35KB/97.70KB;pdfjs 已隔离为独立异步 chunk ~483KB 仅 PDF 场景加载;simple-mind-map ~341KB 仅脑图编辑页加载;壁纸页独立 chunk 6.18KB/4.78KB 懒加载)
 - 接口测试:同级独立项目(不在本仓库)`cd ..\autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed;**CI(GitHub Actions,`.github/workflows/ci.yml`)每次推送自动验证:前后端构建+compose 起库导入 schema+后端启动+登录冒烟**
 
 ## 已实现变更归档(已外置)
