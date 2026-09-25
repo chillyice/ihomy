@@ -106,6 +106,17 @@ V9.90 修的正是这一点 —— **别再改回「第一次回调就跳」**:�
 3. **登录态**:WE 的 CEF 是独立环境,有自己的 localStorage/cookie(实测壁纸页写入的 `ihomy-theme`
    确实落到了 WE 的 CEF 存储里),与你浏览器里的 ihomy 登录互不影响 —— 故登录要在属性面板填令牌
    (见上节)。不填令牌时壁纸只显示时钟/天气/光影。
+4. **⚠ ihomy 改版后壁纸「看起来没更新」**:本包虽然是跳线上页面、改版自动跟随,但壁纸页是 PWA,
+   会在 **WE 自己的 CEF 里注册 Service Worker 并预缓存**入口 chunk(`registerSW.js` + workbox precache)。
+   于是 ihomy 发布新版本后,WE 这边可能仍拿**预缓存里的旧 bundle** 渲染 —— 现象是「线上明明更新了,
+   壁纸还是老样子」。处置按序试:① 文件 → 重启预览(项目用 `registerType: 'autoUpdate'`,新的 SW
+   生效后会自行接管并刷新,常常要重启两次);② 仍不生效就在 WE 设置 → 常规 → **CEF devtools** 里
+   Application → Service Workers → **Unregister**,再 Application → Storage → **Clear site data**,
+   然后重启预览。③ 判断手上跑的是哪版:CEF devtools 控制台执行
+   `[...document.querySelectorAll('script[src]')].map(s=>s.src)` 看入口文件名,与线上
+   `curl -s https://ihomy.top/ | grep -o 'assets/index-[^"]*\.js'` 比对是否同一个 hash。
+   (2026-09-25 V9.93 发布时实测:未清预缓存的标签页仍加载上一版入口 `index-LWuSqQS3.js`,
+   清掉 SW + caches 后立刻变成新入口。)
 
 **调试手段**(官方文档):WE 设置 → 常规 → **CEF devtools**,可像 Chrome DevTools 一样看壁纸页的
 console / 网络 / 存储。壁纸进程的 CEF 控制台与崩溃日志在
