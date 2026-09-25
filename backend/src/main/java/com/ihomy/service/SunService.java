@@ -10,13 +10,15 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.*;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 太阳信息服务:IP 定位(lat/lng/timezone)→ NOAA 算法计算 96 时隙太阳位置。
+ * 太阳信息服务:IP 定位(lat/lng/timezone)→ NOAA/Meeus 算法计算 96 时隙太阳位置、日月与晨昏时刻。
  * Redis 缓存 6 小时(IP→位置) + 当日缓存(时隙表)。
  */
 @Slf4j
@@ -29,8 +31,10 @@ public class SunService {
 
     private static final String LOC_PREFIX = "ihomy:sun:loc:";
     private static final String SLOTS_PREFIX = "ihomy:sun:slots:";
+    /** 每日月相列表天数(天气页「日月与晨昏」卡片的月相条) */
+    private static final int MOON_DAYS = 7;
 
-    /** 主入口:返回位置 + 日出日落月相 + 96 时隙表。date 为 null 时取当日。familyLocation 非空时优先使用。 */
+    /** 主入口:返回位置 + 日出日落/三档晨昏/月出月落月相 + 96 时隙表。date 为 null 时取当日。familyLocation 非空时优先使用。 */
     public Map<String, Object> getSunInfo(String ip, LocalDate date, String[] familyLocation) {
         String[] loc = resolveLocation(ip, familyLocation);
         double lat = Double.parseDouble(loc[0]);
@@ -48,15 +52,21 @@ public class SunService {
             data.put("city", familyLocation[2]);
         }
 
-        // 日出日落
-        Map<String, String> sun = SolarUtil.sunTimes(lat, lng, today, tz);
-        data.putAll(sun);
+        // 日月与晨昏时刻(纯天文计算,不经任何天气 API):日出日落/太阳正午子夜 + 民用航海天文三档晨昏 + 月出月落/月中天月下中天
+        data.putAll(SolarUtil.astroTimes(lat, lng, today, tz));
 
-        // 月相 + 月出月落
-        double phase = SolarUtil.moonPhase(today);
-        data.put("moonPhase", phase);
-        Map<String, String> moon = SolarUtil.moonTimes(lat, lng, today, tz);
-        data.putAll(moon);
+        // 月相:当前时刻的相位/8 档代码/照明比例(含向后兼容的 moonPhase 0~1 数值)
+        data.putAll(SolarUtil.moonPhaseInfo(Instant.now()));
+
+        // 每日月相列表:逐日取当地正午为代表时刻,避免跨午夜跳档
+        List<Map<String, Object>> moonDays = new ArrayList<>(MOON_DAYS);
+        for (int i = 0; i < MOON_DAYS; i++) {
+            LocalDate d = today.plusDays(i);
+            Map<String, Object> md = new LinkedHashMap<>(SolarUtil.moonPhaseInfo(d.atTime(12, 0).atZone(tz).toInstant()));
+            md.put("fxDate", d.toString());
+            moonDays.add(md);
+        }
+        data.put("moonDays", moonDays);
 
         // 96 时隙表(按日期+坐标缓存)
         String slotsKey = SLOTS_PREFIX + today + ":" + Math.round(lat * 100) + ":" + Math.round(lng * 100);

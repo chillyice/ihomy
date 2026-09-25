@@ -859,14 +859,17 @@ const itemFloorPlanView = computed(() => {
 })
 
 onMounted(async () => {
+  // 未登录(公开首页)只拉公开动态流:其余卡片数据都要登录态,直接跳过,
+  // 别打一批注定 401 的请求(与 Home.vue 的 loadXxx 登录态守卫一致)
+  const loggedIn = userStore.isLoggedIn
   const [feed, book, it, task, wish, rem, houses] = await Promise.all([
     publicApi.getFeed(20).catch(() => []),
-    bookApi.summary().catch(() => null),
-    itemApi.list({}).catch(() => []),
-    taskApi.list().catch(() => []),
-    wishApi.list().catch(() => []),
-    reminderApi.list().catch(() => []),
-    itemApi.houses().catch(() => []),
+    loggedIn ? bookApi.summary().catch(() => null) : Promise.resolve(null),
+    loggedIn ? itemApi.list({}).catch(() => []) : Promise.resolve([]),
+    loggedIn ? taskApi.list().catch(() => []) : Promise.resolve([]),
+    loggedIn ? wishApi.list().catch(() => []) : Promise.resolve([]),
+    loggedIn ? reminderApi.list().catch(() => []) : Promise.resolve([]),
+    loggedIn ? itemApi.houses().catch(() => []) : Promise.resolve([]),
   ])
   feeds.value = feed || []
   if (book) bookSummary.value = book

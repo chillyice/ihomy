@@ -22,3 +22,23 @@ export const topWarning = (warnings) => {
   }
   return best
 }
+
+// 空气质量等级(和风 AQI level 1-6,对应优/良/轻度/中度/重度/严重污染):
+// 沿用国标色系顺序(绿→黄→橙→红→紫→褐),按项目暖色底做了轻微降饱和;未知等级按良处理
+export const AQI_LEVEL_COLOR = {
+  1: '#6b9b6b', 2: '#c9a227', 3: '#e0862f', 4: '#d94a3f', 5: '#9b5a9e', 6: '#7d3c4a',
+}
+export const aqiColor = (level) => AQI_LEVEL_COLOR[Number(level)] || '#c9a227'
+
+// 月相(和风 v1 astro.moonPhase 代码)→ emoji 图标;名称走 i18n weatherPage.moon.<code>
+export const MOON_PHASE_ICON = {
+  'new-moon': '🌑',
+  'waxing-crescent': '🌒',
+  'first-quarter': '🌓',
+  'waxing-gibbous': '🌔',
+  'full-moon': '🌕',
+  'waning-gibbous': '🌖',
+  'last-quarter': '🌗',
+  'waning-crescent': '🌘',
+}
+export const moonIcon = (code) => MOON_PHASE_ICON[code] || '🌙'

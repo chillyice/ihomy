@@ -1,20 +1,25 @@
 <!-- 壁纸页 /wallpaper(meta.public + meta.standalone):家庭私有「只读氛围屏」。
-     定位:桌面壁纸/常开副屏用,只做展示——时钟、天气、家人照片、太阳驱动的光影。
+     定位:桌面壁纸/常开副屏用,只做展示——时钟、天气、家人照片轮播、纪念日、待办、太阳驱动的光影。
      设计边界(勿扩张):除首次登录外不含任何写操作、不上传、不导航;要写博客传照片回正常 ihomy 窗口。
-     交互:鼠标静止在背景上 3s → 家人照片浮现、角落控件同时隐去;移动鼠标回到常态
-          (沿用 V9.63 暖居「天气背景待机浮现」约定:静默计时 + 移动即复位)。
+     交互(V9.93 起):天气 AI 生图为常驻底图(与暖居外壳同源 useWeatherBg);照片轮播/纪念日/待办
+          三个小组件常驻显示,整卡可拖拽,位置固化进 localStorage(浏览器与 WE 环境各自记忆);
+          角落控件仍保留「移动浮现、静止 2.2s 淡出」(待机浮现照片的旧逻辑已移除)。
      主题:复用全局 themeStore(与站点共享 ihomy-theme 偏好);「自动」由太阳高度角驱动(useSunLight 内 applyAuto)。
      体积:本页刻意不引 Element Plus(原生 input/button + 主题 CSS 变量),保证壁纸首屏轻量。
-     Wallpaper Engine:壳页(wallpaper-engine/)以 iframe 嵌入本页,属性面板的主题/晨暮走 postMessage 桥(见 onMessage)。 -->
+     Wallpaper Engine:壳页(wallpaper-engine/)顶层跳转本页,属性面板的主题/晨暮走查询参数、令牌走 hash(见 onMessage)。 -->
 <template>
-  <div class="wp" @mousemove="onMove" @touchstart.passive="onMove">
+  <div class="wp" :class="{ 'has-bg': !!weatherBg }" @mousemove="onMove" @touchstart.passive="onMove">
     <!-- 兜底底色:用户关掉毛玻璃等特效时也不留白 -->
     <div class="wp-base" aria-hidden="true"></div>
+
+    <!-- 天气→AI 生图氛围底图(z=1,压在兜底底色之上、光影层之下;无图时隐藏走主题渐变) -->
+    <div class="wp-weatherbg" :class="{ on: weatherBg }"
+         :style="weatherBg ? { backgroundImage: `url(${weatherBg})` } : null" aria-hidden="true"></div>
 
     <!-- 全局光影层(体积光/窗影/尘/台灯/天气特效);太阳与天气状态由 App.vue provide -->
     <SunLightLayer />
 
-    <!-- 常态环境层:时钟 + 天气(壁纸的主体内容) -->
+    <!-- 常态环境层:时钟 + 天气(壁纸的主体内容,固定左下不可拖) -->
     <div class="wp-ambient">
       <div class="wp-time">{{ clock.time }}</div>
       <div class="wp-meta">
@@ -28,19 +33,53 @@
       </div>
     </div>
 
-    <!-- 家人照片:静止 3s 浮现(光影层仍在其上,照片被光柱/浮尘覆盖) -->
-    <div class="wp-photos" :class="{ revealed: photosRevealed }" aria-hidden="true">
-      <div v-if="stackCards.length" class="wp-stack">
+    <!-- 小组件:照片轮播 / 纪念日 / 待办(常驻,整卡可拖拽,位置记忆;光影层仍在其上,照片被光柱/浮尘覆盖) -->
+    <div v-if="stackCards.length" class="wp-widget wpw-photos"
+         :class="{ placed: widgetPos.photos, dragging: dragId === 'photos' }"
+         :style="widgetStyle('photos')" @pointerdown="onWidgetDown('photos', $event)">
+      <div class="wp-stack">
         <div v-for="(p, i) in stackCards" :key="p.id" class="wp-pcard" :style="pcardStyle(i)">
-          <img :src="p.url" :alt="p.description || ''" loading="lazy" />
+          <img :src="p.url" :alt="p.description || ''" loading="lazy" draggable="false" />
         </div>
       </div>
-      <div v-if="topPhoto?.description && photosRevealed" class="wp-cap">{{ topPhoto.description }}</div>
+      <div v-if="topPhoto?.description" class="wp-cap">{{ topPhoto.description }}</div>
+    </div>
+
+    <div v-if="userStore.isLoggedIn && anniEvents.length" class="wp-widget wpw-anni"
+         :class="{ placed: widgetPos.anni, dragging: dragId === 'anni' }"
+         :style="widgetStyle('anni')" @pointerdown="onWidgetDown('anni', $event)">
+      <div class="wpw-title">{{ $t('wallpaper.widgetAnni') }}</div>
+      <div class="wpw-body">
+        <div v-for="(ev, i) in anniEvents" :key="i" class="wpw-row">
+          <div class="wpw-info">
+            <div class="wpw-name">{{ ev.label }}</div>
+            <div class="wpw-sub">{{ fmtEventDate(ev.date) }}</div>
+          </div>
+          <div class="wpw-days" :class="{ today: ev.days === 0 }">
+            <template v-if="ev.days === 0">{{ $t('wallpaper.today') }}</template>
+            <template v-else>{{ ev.days }}<span class="wpw-days-unit">{{ $t('wallpaper.daysUnit') }}</span></template>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="userStore.isLoggedIn && todoTasks.length" class="wp-widget wpw-task"
+         :class="{ placed: widgetPos.task, dragging: dragId === 'task' }"
+         :style="widgetStyle('task')" @pointerdown="onWidgetDown('task', $event)">
+      <div class="wpw-title">{{ $t('wallpaper.widgetTodo') }}</div>
+      <div class="wpw-body">
+        <div v-for="tk in todoTasks" :key="tk.id" class="wpw-row">
+          <div class="wpw-name wpw-task-name">{{ tk.title }}</div>
+          <div v-if="tk.rewardType === 'POINTS'" class="wpw-reward">
+            {{ $t('task.rewardPointsText', { points: tk.rewardPoints }) }}
+          </div>
+          <div v-else-if="tk.rewardType === 'ITEM'" class="wpw-reward">{{ tk.rewardItem }}</div>
+        </div>
+      </div>
     </div>
 
     <!-- 角落控件:鼠标移动浮现、静止隐去(壁纸不留常驻界面) -->
     <div class="wp-ui" :class="{ visible: uiVisible }">
-      <span v-if="photos.length && !photosRevealed" class="wp-hint">{{ $t('wallpaper.hoverHint') }}</span>
       <div class="wp-seg">
         <button v-for="t in themeStore.themes" :key="t.id" class="wp-segbtn"
                 :class="{ on: themeStore.theme === t.id }" @click="themeStore.setTheme(t.id)">
@@ -94,14 +133,15 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, inject, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, inject, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import SunLightLayer from '@/components/SunLightLayer.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
-import { authApi, publicApi } from '@/api'
+import { useWeatherBg } from '@/composables/useWeatherBg'
+import { authApi, publicApi, taskApi } from '@/api'
 import { applyLocale } from '@/i18n'
 
 const { locale, t } = useI18n()
@@ -111,6 +151,10 @@ const themeStore = useThemeStore()
 // 全局光影状态(App.vue provide):天气与太阳时隙都从这里取,本页不重复请求
 const sunLight = inject(SUN_LIGHT_KEY, null)
 const weather = computed(() => sunLight?.weather?.value || null)
+
+// 天气→AI 生图氛围底图(与暖居外壳同源同缓存键;当前天气无图自动回退上一张,不留白)
+const { weatherBg, load: loadWeatherBg } = useWeatherBg()
+watch(() => sunLight?.weather?.value, (w) => { if (w) loadWeatherBg(w) }, { immediate: true })
 
 // ========== 时钟(每秒对表,仅在显示串变化时写 ref,避免每帧无谓渲染) ==========
 const clock = reactive({ time: '', date: '', week: '' })
@@ -125,10 +169,12 @@ const syncClock = () => {
   if (week !== clock.week) clock.week = week
 }
 
-// ========== 家人照片(仅登录后拉取;未登录不显示任何家庭内容) ==========
+// ========== 家人照片轮播(仅登录后拉取;未登录不显示任何家庭内容) ==========
 const photos = ref([])
 const photoIndex = ref(0)
 const familyName = ref('')
+// 纪念日组件数据:后端已算好下一次日期与剩余天数(stats.upcomingEvents,与首页卡片同源)
+const anniEvents = ref([])
 const PHOTO_STACK_N = 4
 const topPhoto = computed(() => photos.value[photoIndex.value] || null)
 const stackCards = computed(() => {
@@ -153,67 +199,137 @@ const pcardStyle = (i) => {
 const loadPhotos = async () => {
   if (!userStore.isLoggedIn) return
   try {
-    // 带 JWT 调公开聚合:后端识别为成员 → 返回family 全量最新照片(非成员只回公开照片)
+    // 带 JWT 调公开聚合:后端识别为成员 → 返回 family 全量最新照片 + stats(纪念日 upcomingEvents 一并复用)
     const data = await publicApi.getHome()
     const list = Array.isArray(data?.photos) ? data.photos : []
     photos.value = list.filter((p) => p && p.url)
     if (photoIndex.value >= photos.value.length) photoIndex.value = 0
+    if (!photos.value.length) stopSlide()
     if (data?.family?.name) familyName.value = data.family.name
+    // 纪念日组件数据:后端已算好下一次日期与剩余天数(与首页卡片同源,零新增请求)
+    anniEvents.value = Array.isArray(data?.stats?.upcomingEvents) ? data.stats.upcomingEvents.slice(0, 5) : []
   } catch (e) {
-    // 网络/权限异常:保持环境层,照片区留空即可(壁纸不弹错误提示)
+    // 网络/权限异常:保持环境层,照片/纪念日区留空即可(壁纸不弹错误提示)
   }
 }
+
+// ========== 待办组件(悬赏任务里进行中/待领取的,只读展示;壁纸不做任何写操作) ==========
+const TODO_N = 5
+const todoTasks = ref([])
+const loadTodos = async () => {
+  if (!userStore.isLoggedIn) return
+  try {
+    const list = await taskApi.list()
+    // 进行中的排前面(更具体),待领取的在后;各保内部原有顺序
+    todoTasks.value = (Array.isArray(list) ? list : [])
+      .filter((tk) => tk && (tk.status === 'IN_PROGRESS' || tk.status === 'OPEN'))
+      .sort((a, b) => (a.status === 'IN_PROGRESS' ? 0 : 1) - (b.status === 'IN_PROGRESS' ? 0 : 1))
+      .slice(0, TODO_N)
+  } catch (e) {
+    // 静默:壁纸不弹错误
+  }
+}
+
 let photoRefreshTimer = null
-// 家人随时会加照片:10 分钟级刷新(成员视图后端不缓存,别频繁打)。
-// 页内登录的场景也要起算,否则登录后只加载一次、之后新照片再不出现。
+// 家人随时会加照片/领任务:10 分钟级刷新(成员视图后端不缓存,别频繁打)。
+// 页内登录的场景也要起算,否则登录后只加载一次、之后新数据再不出现。
 const startPhotoRefresh = () => {
   if (photoRefreshTimer) return
-  photoRefreshTimer = setInterval(loadPhotos, 600000)
-}
-// 进入已登录状态后的统一收尾:页内登录、hash 令牌、WE 晚到令牌三条路都走这里
-const enterLoggedIn = async () => {
-  await loadPhotos()
-  scheduleReveal()
-  startPhotoRefresh()
+  photoRefreshTimer = setInterval(() => { loadPhotos(); loadTodos() }, 600000)
 }
 
-// ========== 待机浮现 & 控件隐去(沿用 V9.63 约定) ==========
-const PHOTO_IDLE_MS = 3000 // 鼠标静止 3s → 照片浮现
-const UI_HIDE_MS = 2200 // 控件先一步淡出,让"进入展示模式"有层次
-const photosRevealed = ref(false)
-const uiVisible = ref(false)
-let revealTimer = null
-let uiHideTimer = null
+// 轮播:常驻跑(每 6s 换一张);照片不足 2 张不起
 let slideTimer = null
-
 const startSlide = () => {
   if (slideTimer || photos.value.length < 2) return
-  slideTimer = setInterval(() => { photoIndex.value = (photoIndex.value + 1) % photos.value.length }, 6000)
+  slideTimer = setInterval(() => {
+    const n = photos.value.length
+    photoIndex.value = n ? (photoIndex.value + 1) % n : 0
+  }, 6000)
 }
 const stopSlide = () => { if (slideTimer) { clearInterval(slideTimer); slideTimer = null } }
 
-// 照片浮现倒计时:鼠标静止 3s 触发。页面刚加载(壁纸/副屏场景鼠标根本没动过)也要起算,
-// 否则照片要等用户先动一下鼠标才会出现——留给挂载与登录完成后各调一次。
-const scheduleReveal = () => {
-  clearTimeout(revealTimer)
-  if (!photos.value.length) return
-  revealTimer = setTimeout(() => {
-    photosRevealed.value = true
-    uiVisible.value = false
-    startSlide()
-  }, PHOTO_IDLE_MS)
+// 进入已登录状态后的统一收尾:页内登录、hash 令牌、WE 晚到令牌三条路都走这里
+const enterLoggedIn = async () => {
+  await loadPhotos()
+  loadTodos()
+  startSlide()
+  startPhotoRefresh()
 }
 
-const onMove = (e) => {
-  clearTimeout(revealTimer)
-  clearTimeout(uiHideTimer)
-  // 移动即回到常态:照片收起、轮播暂停(壁纸不在无人看时白跑定时器)
-  if (photosRevealed.value) { photosRevealed.value = false; stopSlide() }
+// ========== 角落控件隐去(移动浮现、静止 2.2s 淡出;照片/小组件已常驻,不再有待机浮现) ==========
+const UI_HIDE_MS = 2200
+const uiVisible = ref(false)
+let uiHideTimer = null
+const onMove = () => {
   uiVisible.value = true
+  clearTimeout(uiHideTimer)
   uiHideTimer = setTimeout(() => { uiVisible.value = false }, UI_HIDE_MS)
-  // 落在角落控件/登录卡上不算"停在背景":只复位,不重新起算浮现
-  if (e?.target?.closest?.('.wp-ui, .wp-login')) return
-  scheduleReveal()
+}
+
+// ========== 小组件拖拽:pointerdown 拖动,位置固化 px 落 localStorage ==========
+// 默认位置由 CSS 给(照片居中、纪念日右上、待办右下);拖过一次就固化为 px 坐标,
+// 浏览器与 Wallpaper Engine 各是独立 localStorage,互不影响。
+const WIDGET_POS_KEY = 'ihomy:wallpaper:widget-pos:v1'
+const widgetPos = reactive((() => {
+  try { return JSON.parse(localStorage.getItem(WIDGET_POS_KEY) || '{}') } catch (e) { return {} }
+})())
+const dragId = ref('')
+let dragCtx = null
+const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi))
+
+const saveWidgetPos = () => {
+  try { localStorage.setItem(WIDGET_POS_KEY, JSON.stringify(widgetPos)) } catch (e) { /* 无痕环境存不了就仅本次会话生效 */ }
+}
+
+const onWidgetDown = (id, e) => {
+  if (e.button !== 0) return
+  const r = e.currentTarget.getBoundingClientRect()
+  // 把 CSS 默认位置固化成 px 坐标,从当前视觉位置无缝接管
+  widgetPos[id] = { x: r.left, y: r.top }
+  dragCtx = { id, dx: e.clientX - r.left, dy: e.clientY - r.top, w: r.width, h: r.height }
+  dragId.value = id
+  // 拖拽开始才挂监听器,结束即摘(事件监听器按需挂载,不要常驻)
+  window.addEventListener('pointermove', onWidgetMove)
+  window.addEventListener('pointerup', onWidgetUp)
+  e.preventDefault()
+}
+const onWidgetMove = (e) => {
+  if (!dragCtx) return
+  const { id, dx, dy, w, h } = dragCtx
+  widgetPos[id] = {
+    x: clamp(e.clientX - dx, 0, window.innerWidth - w),
+    y: clamp(e.clientY - dy, 0, window.innerHeight - h),
+  }
+}
+const onWidgetUp = () => {
+  dragCtx = null
+  dragId.value = ''
+  window.removeEventListener('pointermove', onWidgetMove)
+  window.removeEventListener('pointerup', onWidgetUp)
+  saveWidgetPos()
+}
+const widgetStyle = (id) => ({
+  ...(widgetPos[id] ? { left: `${Math.round(widgetPos[id].x)}px`, top: `${Math.round(widgetPos[id].y)}px` } : {}),
+  zIndex: dragId.value === id ? 60 : 30,
+})
+// 显示器切换/分辨率调整:把已固化的位置拉回可视区内
+const onWinResize = () => {
+  for (const id of Object.keys(widgetPos)) {
+    const p = widgetPos[id]
+    if (!p) continue
+    const el = document.querySelector('.wpw-' + id)
+    if (!el) continue
+    const r = el.getBoundingClientRect()
+    widgetPos[id] = { x: clamp(p.x, 0, window.innerWidth - r.width), y: clamp(p.y, 0, window.innerHeight - r.height) }
+  }
+}
+
+// 纪念日下次日期后端给 ISO 串(YYYY-MM-DD),按当前语言格式化(复用 dateFmt)
+const fmtEventDate = (iso) => {
+  const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(iso || '')
+  if (!m) return iso || ''
+  return t('wallpaper.dateFmt', { m: Number(m[2]), d: Number(m[3]) })
 }
 
 // ========== 登录(一次性;token 落 localStorage,后续由 request.js 401 自动续期) ==========
@@ -356,6 +472,7 @@ const onMessage = (e) => {
 
 onMounted(async () => {
   window.addEventListener('message', onMessage)
+  window.addEventListener('resize', onWinResize)
   // 注册 WE 属性桥(见 wePropsListener):令牌晚到时还能当场换会话
   window.wallpaperPropertyListener = wePropsListener
   applyQueryPrefs()
@@ -373,13 +490,16 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('message', onMessage)
+  window.removeEventListener('resize', onWinResize)
   if (window.wallpaperPropertyListener === wePropsListener) delete window.wallpaperPropertyListener
   clearInterval(clockTimer)
   clearInterval(photoRefreshTimer)
-  clearTimeout(revealTimer)
   clearTimeout(uiHideTimer)
   clearTimeout(copiedTimer)
   stopSlide()
+  // 若卸载时还挂着拖拽监听(极端时序),一并摘掉
+  window.removeEventListener('pointermove', onWidgetMove)
+  window.removeEventListener('pointerup', onWidgetUp)
 })
 </script>
 
@@ -392,7 +512,23 @@ onBeforeUnmount(() => {
   background: linear-gradient(160deg, var(--color-bg) 0%, var(--color-bg-2) 100%);
 }
 
-/* ===== 常态环境层:时钟 + 天气(左下) ===== */
+/* 天气 AI 生图底图(z=1,兜底底色之上、光影层之下);无图时 opacity 0 走主题渐变,有图 1s 淡入。
+   ::after 自下而上压一层暗色渐变,保证左下时钟/天气行在浅色图片上仍可读 */
+.wp-weatherbg {
+  position: fixed; inset: 0; z-index: 1; pointer-events: none;
+  background-size: cover; background-position: center;
+  opacity: 0; transition: opacity 1.2s ease;
+}
+.wp-weatherbg.on { opacity: 1; }
+.wp-weatherbg::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, .16) 0%, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, .02) 55%, rgba(0, 0, 0, .42) 100%);
+}
+/* 有底图时环境层文字压白(浅色图片上保持可读) */
+.wp.has-bg .wp-time, .wp.has-bg .wp-wtext, .wp.has-bg .wp-temp { color: #fff; text-shadow: 0 2px 20px rgba(0, 0, 0, .4); }
+.wp.has-bg .wp-meta, .wp.has-bg .wp-wcity { color: rgba(255, 255, 255, .85); text-shadow: 0 1px 12px rgba(0, 0, 0, .35); }
+
+/* ===== 常态环境层:时钟 + 天气(左下,固定不可拖) ===== */
 .wp-ambient {
   position: fixed; inset: 0; z-index: 10; pointer-events: none;
   display: flex; flex-direction: column; justify-content: flex-end;
@@ -410,13 +546,34 @@ onBeforeUnmount(() => {
 .wp-wtext { font-size: 15px; }
 .wp-wcity { font-size: 13px; color: var(--color-text-secondary); }
 
-/* ===== 家人照片:待机 3s 浮现(z=30,低于浮尘/体积光 76/78,照片被光覆盖) ===== */
-.wp-photos {
-  position: fixed; inset: 0; z-index: 30; pointer-events: none;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  opacity: 0; transition: opacity .9s ease;
+/* ===== 小组件:常驻可拖拽卡(照片轮播/纪念日/待办;z=30,拖拽中 60,仍低于光影浮尘/体积光 76/78) =====
+   不用 backdrop-filter:壁纸长开、光影层持续动画,磨砂会每帧重算(性能规范) */
+.wp-widget {
+  position: fixed; z-index: 30; cursor: grab; box-sizing: border-box;
+  border-radius: 16px; background: rgba(var(--color-card-rgb), .82);
+  border: 1px solid var(--color-border); box-shadow: 0 14px 40px rgba(0, 0, 0, .16);
+  user-select: none; -webkit-user-drag: none; touch-action: none;
 }
-.wp-photos.revealed { opacity: 1; }
+.wp-widget.dragging { cursor: grabbing; box-shadow: 0 22px 56px rgba(0, 0, 0, .26); }
+/* 拖过一次位置固化为 left/top px(内联),清掉默认定位的 right/bottom/transform */
+.wp-widget.placed { right: auto; bottom: auto; transform: none; }
+.wpw-photos { left: 50%; top: 45%; transform: translate(-50%, -50%); background: none; border: none; box-shadow: none; border-radius: 0; padding: 0; display: flex; flex-direction: column; align-items: center; }
+.wpw-anni { top: clamp(20px, 4vh, 48px); right: clamp(24px, 4vw, 64px); width: 264px; padding: 12px 16px 10px; }
+.wpw-task { bottom: clamp(88px, 13vh, 150px); right: clamp(24px, 4vw, 64px); width: 264px; padding: 12px 16px 10px; }
+.wpw-title { font-size: 11.5px; font-weight: 650; letter-spacing: .14em; color: var(--color-text-secondary); margin-bottom: 4px; }
+.wpw-body { display: flex; flex-direction: column; }
+.wpw-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 7px 0; }
+.wpw-row + .wpw-row { border-top: 1px solid var(--color-border); }
+.wpw-info { min-width: 0; }
+.wpw-name { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wpw-sub { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.wpw-days { flex-shrink: 0; font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.wpw-days-unit { font-size: 11px; font-weight: 500; margin-left: 2px; color: var(--color-text-secondary); }
+.wpw-days.today { color: var(--color-accent); font-size: 13px; font-weight: 700; }
+.wpw-task-name { flex: 1; }
+.wpw-reward { flex-shrink: 0; font-size: 11.5px; font-weight: 600; color: var(--color-brand); font-variant-numeric: tabular-nums; }
+
+/* 照片轮播卡堆 */
 .wp-stack { position: relative; width: min(46vw, 640px); aspect-ratio: 4 / 3; }
 .wp-pcard {
   position: absolute; inset: 0; border-radius: 14px; overflow: hidden;
@@ -427,7 +584,7 @@ onBeforeUnmount(() => {
 }
 .wp-pcard img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .wp-cap {
-  margin-top: 28px; padding: 7px 18px; border-radius: 999px; max-width: 46vw;
+  margin-top: 20px; padding: 7px 18px; border-radius: 999px; max-width: 46vw;
   font-size: 13px; color: #fff; background: rgba(0, 0, 0, .38);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
@@ -440,13 +597,9 @@ onBeforeUnmount(() => {
   transition: opacity .5s ease, transform .5s ease;
 }
 .wp-ui.visible { opacity: 1; transform: none; pointer-events: auto; }
-.wp-hint { font-size: 12px; letter-spacing: .04em; color: var(--color-text-secondary); }
-/* 触屏没有光标,"鼠标停 3 秒"的提示无意义 */
-@media (hover: none) { .wp-hint { display: none; } }
 /* 窄屏(手机/竖屏副屏):右下角控件会换行并压住左下角的日期/天气行,改挂右上角 */
 @media (max-width: 768px) {
   .wp-ui { top: clamp(18px, 4vw, 28px); bottom: auto; }
-  .wp-hint { display: none; }
 }
 .wp-seg {
   display: flex; gap: 2px; padding: 3px; border-radius: 12px;

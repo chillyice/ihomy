@@ -24,8 +24,9 @@ public interface WeatherProvider {
     Map<String, Object> current(String coords, WeatherCredential cred);
 
     /**
-     * 天气详情:归一化 Map 含 {daily, hourly, warning, air, indices, minutely} 中支持的字段;
-     * 失败返回 null(部分字段可缺)。
+     * 天气详情:归一化 Map 含 {daily, hourly, hourly72, warning, air, airHourly, airDaily, indices, minutely}
+     * 中支持的字段;失败返回 null(部分字段可缺)。
+     * 日月与晨昏时刻不在本接口内(纯天文计算,见 SunService 的 `/public/sun-info`)。
      */
     Map<String, Object> detail(String coords, WeatherCredential cred);
 
