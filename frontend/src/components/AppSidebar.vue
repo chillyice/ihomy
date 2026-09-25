@@ -228,9 +228,11 @@ const loadUnread = async () => {
   try { unreadCount.value = await notificationApi.unreadCount() } catch (e) {}
 }
 // 开源组件可升级数(仅 OPS,导航角标)
+// 判定必须用 isOps(系统级 OPS 角色绑定):家庭 OWNER 的权限数组带 ops:view 却无 OPS 绑定,
+// 后端 OpsAccessFilter 按 OPS 绑定放行 → 会 403,每个页面白弹一次「无权限访问」
 const ossUpdateCount = ref(0)
 const loadOssUpdateCount = async () => {
-  if (!userStore.hasPerm('ops:view')) return
+  if (!userStore.isOps) return
   try {
     const sum = await opsApi.ossSummary()
     ossUpdateCount.value = sum?.updatable ?? 0

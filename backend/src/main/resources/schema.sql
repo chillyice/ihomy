@@ -703,8 +703,12 @@ INSERT INTO `sys_auth` (`auth_code`, `auth_name`, `module`, `description`) VALUE
 --     GUEST:  仅查看公开内容
 -- ------------------------------------------------------------
 -- OWNER 拥有全部权限
+-- OWNER 拥有全部权限(ops:view 除外:该权限属系统级 OPS 角色,由 OpsAccessFilter 按 OPS 绑定
+-- 判定,不随家庭角色发放——发给 OWNER 会让前端权限数组与后端隔离口径不一致)
 INSERT INTO `sys_role_auth` (`role_id`, `auth_id`)
-SELECT r.id, a.id FROM `sys_role` r, `sys_auth` a WHERE r.role_code = 'OWNER';
+SELECT r.id, a.id FROM `sys_role` r, `sys_auth` a
+WHERE r.role_code = 'OWNER'
+  AND a.auth_code <> 'ops:view';
 
 -- MEMBER 权限
 INSERT INTO `sys_role_auth` (`role_id`, `auth_id`)
@@ -804,9 +808,11 @@ UPDATE `sys_family_info` SET `owner_id` = @uid WHERE `id` = @fid;
 -- ------------------------------------------------------------
 -- 26.1 运维管理员账号（V3.8）
 --     ops / ops@ihomy.local,初始密码为开发专用值（明文记于本地 docs/新人上手指南.md，与 admin 不同），登录后请立即改密
---     OPS 角色绑定演示家庭作占位（family_id 仅用于填充 NOT NULL 关联）,
---     实际访问由 OpsAccessFilter 白名单限制为 /ops/** 与 /auth/**,
---     不会读到任何家庭数据。
+--     两条角色绑定：① family_id=NULL 的系统级绑定（OpsAccessFilter/AuthService 的 isOps 判定依据，
+--     countOpsRole 要求 family_id IS NULL）；② 带演示家庭的占位绑定（仅为了让登录时
+--     selectRoleCodeByUserAndFamily 解析出 role=OPS → 前端识别为纯运维账号并被路由到 /ops）。
+--     缺 ① 会让该账号 isOps=false（运维页按「家长」渲染、看不到系统级标签）。
+--     实际访问由 OpsAccessFilter 白名单限制为 /ops/** 与 /auth/**,不会读到任何家庭数据。
 -- ------------------------------------------------------------
 INSERT INTO `sys_user` (`username`, `password`, `nickname`, `email`, `family_id`, `status`)
 VALUES ('ops',
@@ -814,6 +820,11 @@ VALUES ('ops',
         '运维管理员', 'ops@ihomy.local', @fid, 'ACTIVE');
 SET @opsid = LAST_INSERT_ID();
 
+-- ① 系统级 OPS 绑定（family_id=NULL）
+INSERT INTO `sys_user_role` (`user_id`, `role_id`, `family_id`)
+SELECT @opsid, id, NULL FROM `sys_role` WHERE `role_code` = 'OPS';
+
+-- ② 家庭占位绑定（承载登录时的角色解析）
 INSERT INTO `sys_user_role` (`user_id`, `role_id`, `family_id`)
 SELECT @opsid, id, @fid FROM `sys_role` WHERE `role_code` = 'OPS';
 

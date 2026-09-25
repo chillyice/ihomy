@@ -524,7 +524,7 @@ EOF
 > - **必须显式配 `gzip_types`**（见下）：Ubuntu 自带的 `/etc/nginx/nginx.conf` 只写了 `gzip on;`，
 >   `gzip_types` 整行是注释状态，默认仅压缩 `text/html` —— JS/CSS/API JSON 全部以原始体积传输。
 
-**gzip 压缩（2026-09-24 发现线上未生效，新部署必须补）**：在上面 `server {}` 块内加：
+**gzip 压缩（2026-09-24 发现线上未生效；**同日已在生产补上并实测生效**，新部署照抄本节即自带）**：在上面 `server {}` 块内加：
 
 ```nginx
     gzip on;
@@ -535,7 +535,10 @@ EOF
 
 `gzip_types` 可在 `http`/`server`/`location` 上下文设置，故直接放进站点 conf 即可，无需改发行版
 `nginx.conf`。`gzip_vary on` 补 `Vary: Accept-Encoding`（给中间缓存用）。`text/html` 无需列出
-（nginx 恒压缩）。量化收益：入口 JS 341.9KB → ~127KB、主 CSS 174.2KB → ~28KB。
+（nginx 恒压缩）。**2026-09-24 实测（V9.91）**：入口 JS 343730 → **143202B**、主 CSS 174224 →
+**38302B**、`/api/public/home` JSON 7216 → **1813B**，首屏少传约 336KB（改前的预测值 341.9KB→~127KB
+偏乐观，实际压缩率按默认 `gzip_comp_level 1` 计）。生产改动前旧配置备份为
+`/etc/nginx/conf.d/ihomy.conf.bak-20260924`，回滚即 `mv` 回来 + `nginx -t && systemctl reload nginx`。
 
 验证（前两条要出现 `Content-Encoding: gzip`，第三条本就压缩、作对照；JS/CSS 路径用 `dist/assets/` 里
 带 hash 的文件名）：

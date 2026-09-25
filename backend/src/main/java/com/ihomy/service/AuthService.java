@@ -334,7 +334,14 @@ public class AuthService {
         boolean hasOps = sysRoleMapper.countOpsRole(user.getId()) > 0;
         u.put("isOps", hasOps);
         if (hasOps) {
-            perms.add("ops:view");
+            // 家庭角色授权里可能已带 ops:view(占位家庭绑定),去重后再补
+            if (!perms.contains("ops:view")) {
+                perms.add("ops:view");
+            }
+        } else {
+            // ops:view 是系统级权限,只随 OPS 角色绑定(family_id=NULL)生效(见 OpsAccessFilter);
+            // 家庭角色授权里不该带它(历史种子给 OWNER 发过全量权限),否则前端按权限码判 OPS 会误判
+            perms.remove("ops:view");
         }
         u.put("permissions", perms);
         data.put("user", u);

@@ -39,7 +39,9 @@ public class BookController {
     @Operation(summary = "本月收支摘要(供首页卡片)")
     @GetMapping("/summary")
     public Result<Map<String, Object>> summary() {
-        return Result.success(bookService.summary(current().getFamilyId()));
+        // 本接口在 SecurityConfig 里对游客放行(公开首页卡片),匿名时无家庭可算:返回空摘要,不能 NPE
+        LoginUser user = current();
+        return Result.success(bookService.summary(user == null ? null : user.getFamilyId()));
     }
 
     @Operation(summary = "记一笔(支出/收入/转账)")

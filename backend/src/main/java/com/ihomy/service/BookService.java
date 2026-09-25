@@ -91,13 +91,14 @@ public class BookService {
         return result;
     }
 
-    /** 本月收支摘要(供首页卡片,轻量查询) */
+    /** 本月收支摘要(供首页卡片,轻量查询);familyId 为 null(游客,本接口对游客放行)时返回空摘要 */
     public Map<String, Object> summary(Long familyId) {
         LocalDate start = YearMonth.now().atDay(1);
         LocalDate end = YearMonth.now().atEndOfMonth();
-        List<BookRecord> records = bookMapper.selectList(new LambdaQueryWrapper<BookRecord>()
-                .eq(BookRecord::getFamilyId, familyId)
-                .between(BookRecord::getRecordDate, start, end));
+        List<BookRecord> records = familyId == null ? List.of()
+                : bookMapper.selectList(new LambdaQueryWrapper<BookRecord>()
+                        .eq(BookRecord::getFamilyId, familyId)
+                        .between(BookRecord::getRecordDate, start, end));
         BigDecimal income = BigDecimal.ZERO;
         BigDecimal expense = BigDecimal.ZERO;
         for (BookRecord r : records) {

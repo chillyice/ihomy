@@ -1209,3 +1209,31 @@ SET @sql := IF(@has = 0,
   'ALTER TABLE `family_item` ADD COLUMN `stored_at` DATETIME DEFAULT NULL COMMENT ''存入时间(食材,默认录入时)'' AFTER `note`, ADD COLUMN `shelf_life` INT DEFAULT NULL COMMENT ''保质期数值(食材)'' AFTER `stored_at`, ADD COLUMN `shelf_life_unit` VARCHAR(10) DEFAULT NULL COMMENT ''保质期单位:HOUR小时/DAY天/MONTH月(食材,录入默认天)'' AFTER `shelf_life`',
   'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ------------------------------------------------------------
+-- V9.91 ops:view 归还系统级:从 OWNER 家庭角色授权中摘除(2026-09-24)
+--   历史种子「OWNER 拥有全部权限」把系统级 ops:view 也发给了家长,而 OpsAccessFilter 只认
+--   系统级 OPS 角色绑定(family_id=NULL)→ 家长权限数组含 ops:view 却访问 /api/ops/** 被 403,
+--   现象是侧栏拉开源组件可升级数、每个页面弹一次「无权限访问」。
+--   幂等:无匹配行时 DELETE 影响 0 行;后端鉴权不受影响(hasPermission 对 OWNER 恒真)。
+-- ------------------------------------------------------------
+DELETE ra FROM `sys_role_auth` ra
+JOIN `sys_role` r ON r.id = ra.role_id
+JOIN `sys_auth` a ON a.id = ra.auth_id
+WHERE r.role_code = 'OWNER' AND a.auth_code = 'ops:view';
+
+-- ------------------------------------------------------------
+-- V9.91(二) 运维账号补「系统级」OPS 角色绑定(2026-09-24)
+--   countOpsRole / AuthService.isOps / OpsAccessFilter 均要求 family_id IS NULL,
+--   而历史种子只建了带家庭占位的绑定 → 运维账号自己 isOps 也是 false(运维页按「家长」渲染、
+--   不显示系统级标签)。补一条 family_id=NULL 的绑定,登录仍走占位绑定解析 role=OPS。
+--   NOT EXISTS 守卫保证幂等:NULL 在 uk_user_role_family 里不去重,无守卫会重复插入。
+-- ------------------------------------------------------------
+INSERT INTO `sys_user_role` (`user_id`, `role_id`, `family_id`)
+SELECT DISTINCT ur.user_id, ur.role_id, NULL
+FROM `sys_user_role` ur
+JOIN `sys_role` r ON r.id = ur.role_id
+WHERE r.role_code = 'OPS'
+  AND ur.family_id IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM `sys_user_role` x
+                  WHERE x.user_id = ur.user_id AND x.role_id = ur.role_id AND x.family_id IS NULL);

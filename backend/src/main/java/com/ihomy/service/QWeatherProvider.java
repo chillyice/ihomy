@@ -66,24 +66,43 @@ public class QWeatherProvider implements WeatherProvider {
         return data;
     }
 
-    /** 天气详情:归一化 {daily, hourly, warning, air, indices, minutely}(字段可缺);now 由门面组装 */
+    /** 天气详情:归一化 {daily, hourly, hourly72, warning, air, airHourly, airDaily, indices, minutely}(字段可缺);now 由门面组装 */
     @Override
     public Map<String, Object> detail(String coords, WeatherCredential cred) {
         Map<String, Object> data = new HashMap<>();
         String[] ll = toLatLon(coords);
         JsonNode dailyResp = callApi("/weather/v1/daily/" + ll[0] + "/" + ll[1] + "?days=10&localTime=true", cred);
         if (dailyResp != null && dailyResp.has("days")) data.put("daily", mapDailyV1(dailyResp.get("days")));
-        JsonNode hourlyResp = callApi("/weather/v1/hourly/" + ll[0] + "/" + ll[1] + "?localTime=true", cred);
-        if (hourlyResp != null && hourlyResp.has("hours")) data.put("hourly", mapHourlyV1(hourlyResp.get("hours")));
+        // 逐小时:一次请求 72 小时,24 小时视图(hourly,前 24 条)与 72 小时/逐 2 小时趋势(hourly72)共用同一份数据,
+        // 不多打一次 API;凭证明细不支持 hours 参数时回退默认 24 小时请求,不让原有 24h 展示因本次扩展丢数据
+        JsonNode hours = hourlySource(ll, cred);
+        if (hours != null) {
+            data.put("hourly", mapHourlyV1(hours, 1, 24));
+            data.put("hourly72", mapHourlyV1(hours, 2, 0));
+        }
         List<Map<String, Object>> warnings = fetchAlertsCached(coords, cred);
         if (!warnings.isEmpty()) data.put("warning", warnings);
         Map<String, Object> air = fetchAir(coords, cred);
         if (air != null) data.put("air", air);
+        List<Map<String, Object>> airHourly = fetchAirForecast(coords, cred, false);
+        if (!airHourly.isEmpty()) data.put("airHourly", airHourly);
+        List<Map<String, Object>> airDaily = fetchAirForecast(coords, cred, true);
+        if (!airDaily.isEmpty()) data.put("airDaily", airDaily);
         JsonNode indices = callApi("/v7/indices/1d?location=" + coords + "&type=0", cred);
         if (indices != null && indices.has("daily")) data.put("indices", indices.get("daily"));
         JsonNode minutely = callApi("/v7/minutely/5m?location=" + coords, cred);
         if (minutely != null && minutely.has("minutely")) data.put("minutely", minutely);
         return data;
+    }
+
+    /** 逐小时源数据:优先 72 小时(hours=72),凭证不支持时回退默认 24 小时 */
+    private JsonNode hourlySource(String[] ll, WeatherCredential cred) {
+        JsonNode resp = callApi("/weather/v1/hourly/" + ll[0] + "/" + ll[1] + "?hours=72&localTime=true", cred);
+        if (resp == null || !resp.has("hours")) {
+            log.warn("[hourlySource] hours=72 不可用,回退默认 24 小时请求");
+            resp = callApi("/weather/v1/hourly/" + ll[0] + "/" + ll[1] + "?localTime=true", cred);
+        }
+        return resp == null ? null : (resp.has("hours") ? resp.get("hours") : null);
     }
 
     /** 当前生效预警(坐标级共享缓存,供详情与主动推送共用) */
@@ -244,11 +263,15 @@ public class QWeatherProvider implements WeatherProvider {
             Map<String, Object> d = new LinkedHashMap<>();
             String start = day.path("forecastStartTime").asText();
             d.put("fxDate", start.length() >= 10 ? start.substring(0, 10) : start);
-            d.put("sunrise", day.path("astro").path("sunrise").asText());
-            d.put("sunset", day.path("astro").path("sunset").asText());
-            d.put("moonrise", day.path("astro").path("moonrise").asText());
-            d.put("moonset", day.path("astro").path("moonset").asText());
-            d.put("moonPhase", day.path("astro").path("moonPhase").asText());
+            JsonNode astro = day.path("astro");
+            d.put("sunrise", astro.path("sunrise").asText());
+            d.put("sunset", astro.path("sunset").asText());
+            d.put("moonrise", astro.path("moonrise").asText());
+            d.put("moonset", astro.path("moonset").asText());
+            d.put("moonPhase", astro.path("moonPhase").asText());
+            // 注意:三档晨昏/太阳正午/月中天这些**不在**这里取。和风 v1 的 astro 虽同样带这些字段,
+            // 但天气页「日月与晨昏」卡走的是本地天文计算(SolarUtil → /public/sun-info,与日历页共用),
+            // 免得同一事实两处来源;和风那份实测与本地计算差 0~2 分钟,做备用数据源时可直接拿来对照。
             d.put("tempMax", (int) Math.round(day.path("temperatureMax").path("value").asDouble()));
             d.put("tempMin", (int) Math.round(day.path("temperatureMin").path("value").asDouble()));
             JsonNode dt = day.path("daytime");
@@ -270,9 +293,12 @@ public class QWeatherProvider implements WeatherProvider {
         return list;
     }
 
-    private List<Map<String, Object>> mapHourlyV1(JsonNode hours) {
+    /** 逐小时映射:step=1 逐小时 / step=2 逐 2 小时(72 小时趋势);limit>0 时最多取 limit 条 */
+    private List<Map<String, Object>> mapHourlyV1(JsonNode hours, int step, int limit) {
         List<Map<String, Object>> list = new ArrayList<>();
+        int i = 0;
         for (JsonNode h : hours) {
+            if (i++ % step != 0) continue;
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("fxTime", h.path("forecastTime").asText());
             m.put("temp", (int) Math.round(h.path("temperature").path("value").asDouble()));
@@ -284,6 +310,7 @@ public class QWeatherProvider implements WeatherProvider {
             m.put("precip", round2(h.path("precipitation").path("amount").path("value").asDouble()));
             m.put("humidity", (int) Math.round(h.path("humidity").asDouble() * 100));
             list.add(m);
+            if (limit > 0 && list.size() >= limit) break;
         }
         return list;
     }
@@ -317,24 +344,10 @@ public class QWeatherProvider implements WeatherProvider {
             String[] ll = toLatLon(coords);
             JsonNode resp = callApi("/airquality/v1/current/" + ll[0] + "/" + ll[1], cred);
             if (resp == null) return null;
-            JsonNode picked = null;
-            for (JsonNode idx : resp.path("indexes")) {
-                String code = idx.path("code").asText();
-                if ("cn".equals(code) || "aqi-cn".equals(code)) { picked = idx; break; }
-                if (picked == null) picked = idx;
-            }
+            JsonNode picked = pickAirIndex(resp);
             if (picked == null) return null;
             Map<String, Object> m = new HashMap<>();
-            m.put("aqi", picked.path("aqiDisplay").asText(picked.path("aqi").asText()));
-            m.put("category", picked.path("category").asText());
-            m.put("level", picked.path("level").asText());
-            String pp = picked.path("primaryPollutant").path("name").asText("");
-            if (!pp.isBlank()) m.put("primary", pp);
-            JsonNode advice = picked.path("health").path("advice");
-            if (!advice.isMissingNode()) {
-                m.put("adviceGeneral", advice.path("generalPopulation").asText(""));
-                m.put("adviceSensitive", advice.path("sensitivePopulation").asText(""));
-            }
+            fillAirIndex(m, picked, true);
             for (JsonNode p : resp.path("pollutants")) {
                 m.put(p.path("code").asText(), p.path("concentration").path("value").asText());
             }
@@ -342,6 +355,65 @@ public class QWeatherProvider implements WeatherProvider {
         } catch (Exception e) {
             log.warn("[fetchAir] airquality lookup failed: {}", e.getMessage());
             return null;
+        }
+    }
+
+    /**
+     * 空气质量预报(逐小时 24 条 / 逐日 3 条,V9.92):归一化为
+     * [{fxTime 或 fxDate, aqi, level, category, primary}(逐日另带健康建议)]。
+     * 失败返回空列表(前端隐藏该区块,不影响其余详情)。
+     */
+    private List<Map<String, Object>> fetchAirForecast(String coords, WeatherCredential cred, boolean daily) {
+        List<Map<String, Object>> list = new ArrayList<>();
+        try {
+            String[] ll = toLatLon(coords);
+            JsonNode resp = callApi("/airquality/v1/" + (daily ? "daily" : "hourly")
+                    + "/" + ll[0] + "/" + ll[1] + "?localTime=true", cred);
+            if (resp == null) return list;
+            for (JsonNode node : resp.path(daily ? "days" : "hours")) {
+                JsonNode idx = pickAirIndex(node);
+                if (idx == null) continue;
+                Map<String, Object> m = new LinkedHashMap<>();
+                String t = node.path(daily ? "forecastStartTime" : "forecastTime").asText();
+                if (daily) {
+                    m.put("fxDate", t.length() >= 10 ? t.substring(0, 10) : t);
+                } else {
+                    m.put("fxTime", t);
+                }
+                fillAirIndex(m, idx, daily);
+                list.add(m);
+            }
+        } catch (Exception e) {
+            log.warn("[fetchAirForecast] air forecast failed, daily={}: {}", daily, e.getMessage());
+        }
+        return list;
+    }
+
+    /** 取 AQI 指数:优先国标(cn-mee / cn / aqi-cn),都没有时取第一条 */
+    private JsonNode pickAirIndex(JsonNode resp) {
+        JsonNode fallback = null;
+        for (JsonNode idx : resp.path("indexes")) {
+            String code = idx.path("code").asText();
+            if ("cn-mee".equals(code)) return idx;
+            if (("cn".equals(code) || "aqi-cn".equals(code)) && fallback == null) fallback = idx;
+            if (fallback == null) fallback = idx;
+        }
+        return fallback;
+    }
+
+    /** AQI 指数 → 统一字段(aqi/level/category/primary;withAdvice 时带健康建议,逐小时不带以省传输) */
+    private void fillAirIndex(Map<String, Object> m, JsonNode idx, boolean withAdvice) {
+        m.put("aqi", idx.path("aqiDisplay").asText(idx.path("aqi").asText()));
+        m.put("category", idx.path("category").asText());
+        m.put("level", idx.path("level").asText());
+        String pp = idx.path("primaryPollutant").path("name").asText("");
+        if (!pp.isBlank()) m.put("primary", pp);
+        if (withAdvice) {
+            JsonNode advice = idx.path("health").path("advice");
+            if (!advice.isMissingNode()) {
+                m.put("adviceGeneral", advice.path("generalPopulation").asText(""));
+                m.put("adviceSensitive", advice.path("sensitivePopulation").asText(""));
+            }
         }
     }
 
