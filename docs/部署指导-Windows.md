@@ -179,7 +179,7 @@ Get-Content C:\app\ihomy\backend\src\main\resources\schema.sql -Raw -Encoding UT
 
 > **编码坑（重要）**：schema.sql 含中文 COMMENT（如 `'BCrypt密码'`）和初始数据（如 `'我的家庭'`）。PowerShell 5.1 默认按 GBK 读取文件，不加 `-Encoding UTF8` 会导致中文写入数据库时变成 `?` 字符（不可逆），首页全部显示问号。**推荐用方案 A**（docker cp + 容器内执行），完全绕过 PowerShell 管道编码问题。
 
-该脚本由 root 执行一次，会创建 `ihomy` 库、**61 张表**（`sys_` 系统与账号权限 / `family_` 家庭事务 / `content_` 内容数据三前缀，含 RBAC 权限模型）、应用专用账号 `ihomy`（仅 DML 权限）、5 个预设角色（OWNER/MEMBER/CHILD/GUEST/OPS）+ 31 个权限点 + 角色权限映射、默认首页模块、管理员账号 `admin`（自动绑定 OWNER 角色）与运维账号 `ops`（初始密码为开发安全版，见下方警告）。
+该脚本由 root 执行一次，会创建 `ihomy` 库、**70 张表**（`sys_` 系统与账号权限 / `report_` 报表日志 / `family_` 家庭事务 / `content_` 内容数据四前缀，含 RBAC 权限模型）、应用专用账号 `ihomy`（仅 DML 权限）、5 个预设角色（OWNER/MEMBER/CHILD/GUEST/OPS）+ 权限点 + 角色权限映射、默认首页模块、管理员账号 `admin`（自动绑定 OWNER 角色）与运维账号 `ops`（初始密码为开发安全版，见下方警告）。
 
 > **⚠️ 生产必须改密（schema.sql 为开发安全版）**：入库版 schema.sql 内置的是本机 Docker 开发固定凭证（ihomy 账号开发密码 + admin/ops 开发专用 BCrypt 哈希，明文只在维护者本地文档）。生产建库后立即执行（MySQL 8 若启用 `validate_password` MEDIUM，密码须含特殊字符/数字/大小写各≥1）：
 > ```sql
@@ -427,7 +427,7 @@ npm run build
 | 后端接口 | 浏览器 `http://localhost:8080/api/auth/me` | 返回 401 JSON |
 | 前端访问 | 浏览器 `https://你的域名` | 登录页 |
 | 登录 | admin + 密码（初始密码为开发安全版，生产部署后已按 3.3 改密则用新密码） | 进入首页 |
-| 数据库 | `mysql -uihomy -p -P6306 ihomy -e "show tables;"` | 61 张表 |
+| 数据库 | `mysql -uihomy -p -P6306 ihomy -e "show tables;"` | 70 张表 |
 | Redis | `memurai-cli ping` | PONG |
 | 上传文件 | 浏览器访问 `/files/pictures/...` 图片 URL | 200 OK |
 | WebSocket | 登录后进入聊天室 | 实时收发消息 |

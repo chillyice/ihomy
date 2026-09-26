@@ -11,6 +11,7 @@
 > - 工作目录绝对路径:`C:\Users\chill\OneDrive\WorkStation\Projects\ihomy`
 > - 每次读/写/移动文件前先逐字核对路径;发现读不到文件时优先怀疑路径拼写而非文件不存在。
 > - **⚠ 编码警示(必须遵守)**:含中文的源码/配置/SQL 一律走本工具的 Read/Write/Edit 读写,禁止用 PowerShell `Get-Content`/`Set-Content`/`WriteAllText` 读写(PS 5.1 默认 GBK 会破坏 UTF-8 中文,且 `[IO.File]::WriteAllText` 默认带 BOM 导致 javac 报非法字符)。PowerShell 仅用于:npm/mvn 构建、HTTP 冒烟。
+> - **⚠ 脚本化改写文档会吃掉 CRLF(2026-09-26 踩坑)**:本仓 `core.autocrlf=true`、工作区 md 为 CRLF,而 `io.open(p,encoding='utf-8').read()` 默认把 `\r\n` 折成 `\n`,写回即把整份文件换成 LF(`git diff` 会警告 `LF will be replaced by CRLF`)。**批量/行级改写一律 `'rb'` 读 + `split(b'\r\n')` + `b'\r\n'.join()` 写**(零编码风险);小改用 Edit 工具(按文件原约定写)。复核:`open(p,'rb').read()` 的 `\n` 数减 `\r\n` 数应为 0。
 > - **⚠ PowerShell 5.1 原生命令传参两坑**(2026-09-07 start-db.ps1 踩坑):① 不带引号的点号参数会被拆词(`mysqladmin ping -h127.0.0.1` 实际收到主机 `127`),必须写成 `'-h127.0.0.1'`;② 传给原生命令的参数里嵌双引号会被吃掉(`docker inspect --format '{{ index .X "key" }}'` 必然探测失败),改用无引号模板 `{{.Config.Labels}}` 或行为式判断。另:**.ps1 含中文必须带 UTF-8 BOM**(无 BOM 时 PS 5.1 按 GBK 解析直接语法错误);Write 工具默认无 BOM,新建中文 .ps1 后须补 BOM。
 > - **⚠ Git Bash(MSYS)路径自动转换坑**(2026-09-08 踩坑):Git Bash 调 Windows 原生命令(docker.exe 等)时,参数里的 POSIX 风格路径会被自动转成 Windows 路径(`/tmp/x.sql` → `C:/Users/.../Temp/x.sql`),导致 `docker cp file ihomy-mysql:/tmp/` 与 `docker exec ... source /tmp/x.sql` 静默失效报 `error: 2`——**docker 容器内路径参数一律加 `MSYS_NO_PATHCONV=1` 前缀**(如 `MSYS_NO_PATHCONV=1 docker exec ihomy-mysql mysql -e "source /tmp/x.sql"`)。
 > - **⚠ 后端内存缓存直改 DB 不生效**(2026-09-08 踩坑):`HomeModuleService` 全局模块 `@PostConstruct` 预热进内存(**无 TTL 无兜底刷新**),直接 UPDATE `sys_home_module` 不会失效——直改 DB 后必须重启后端才生效(或走模块管理接口触发 evict);同理适用于其他启动时预热的内存缓存。
@@ -81,10 +82,10 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
     annotation/  # @RequirePermission / @OperationLog
     aspect/      # RequirePermissionAspect / OperationLogAspect
     filter/      # TraceIdFilter / AccessLogFilter / CaptureRequestWrapper / CaptureResponseWrapper
-    entity/      # 53 个实体类(8 张关联/字典表无实体)
-    mapper/      # MyBatis-Plus BaseMapper(自定义 SQL 全放 resources/mapper/*.xml,接口不写注解,参数统一 @Param)
-    service/     # 44 个 @Service(单实现无接口层)
-    controller/  # 33 个 Controller
+    entity/      # 63 个实体类(70 张表里 7 张关联/字典表无实体)
+    mapper/      # 63 个 MyBatis-Plus BaseMapper(自定义 SQL 全放 resources/mapper/*.xml,接口不写注解,参数统一 @Param)
+    service/     # 58 个 @Service(单实现无接口层)
+    controller/  # 39 个 Controller
     dto/         # 请求/响应 DTO
     websocket/   # ChatWebSocketHandler(原生 WebSocket 聊天室)
   src/main/resources/
@@ -92,20 +93,20 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
     logback-spring.xml  # 三类日志分流(access/server/thirdparty,六要素 pattern,按天滚动)
     external.yml.template  # 外挂配置模板(IHOMY_CONFIG_PATH 覆盖密码/密钥/路径/captcha/天气,唯一开发生产差异机制)
     mapper/*.xml        # 每个 Mapper 一个同名 XML
-    schema.sql          # 建库+建号+建表(61张)+种子(开发安全版,已入库;本地开发由 start-db.ps1 自动导入)
+    schema.sql          # 建库+建号+建表(70 张)+种子(开发安全版,已入库;本地开发由 start-db.ps1 自动导入)
   mvnw / mvnw.cmd       # Maven Wrapper
 frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
   src/
-    api/          # request.js(axios+JWT+401 自动刷新) + index.js(31 个 Api 对象)
+    api/          # request.js(axios+JWT+401 自动刷新) + index.js(35 个 Api 对象)
     stores/       # user.js(登录+权限) / app.js(首页聚合) / theme.js(主题两轴矩阵)
-    router/       # 登录守卫 + scrollBehavior;50 个路由(懒加载)
+    router/       # 登录守卫 + scrollBehavior;53 条路由(50 条懒加载,另 3 条 redirect: /、/plant、兜底)
     i18n/ theme/  # vue-i18n 中英;主题两轴矩阵(暖居/光尘 × 晨/暮)
     utils/        # dict.js / diary.js / doodle.js(涂鸦引擎) / furnitureIcon.js(家具类型图标) / windowLight.js / useSunLight.js / useDragResize.js
     composables/  # useDevice.js(设备检测) / useWeatherBg.js(天气 AI 生图氛围底图)
     components/   # AppSidebar/BackToTop/Breadcrumb/AvatarCropper/InstallPrompt/SiteFooter/SunLightLayer/LightTestConsole/SyncDialog/Mobile*(移动端)/warm/(暖居外壳 WarmLayout+WarmHome)
     layouts/MobileLayout.vue  # 移动端壳
     styles/main.css # CSS 变量 + 全局样式 + 深色模式 + EP 组件覆写 + @media
-    views/        # 48 个页面(唯一视图文件计数;Home/Login/Member/Settings/Anniversary/album/cinema/diary/blog/points/task/reminder/plan/wish/book/chat/tree/cascade/ops/storage/item/kitchen/library/tools/games(Games+GamePlayer+PetLinkLink)/plant(花园)/kada(咔哒独立下载页)/Wallpaper(壁纸氛围屏))
+    views/        # 55 个页面(唯一视图文件计数;Home/Login/Member/Settings/Anniversary/album/cinema/diary/blog/points/task/reminder/plan/wish/book/chat/tree/cascade/ops/storage/item/kitchen/library/tools/games(Games+GamePlayer+PetLinkLink)/plant(花园)/kada(咔哒独立下载页)/Wallpaper(壁纸氛围屏))
     App.vue
   vite.config.js   # PWA + 代理 /api->8080 + manualChunks 分块 + ElementPlus 按需
 wallpaper-engine/   # Wallpaper Engine 网页壁纸包(壳页顶层跳转线上 /wallpaper;WE 属性 theme/mode/lang 走查询参数、
@@ -164,7 +165,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 系统 | i18n / 主题(暖居/光尘 × 晨/暮) / 字典 / 独立产品页(咔哒 Kada 下载页 `/kada`;壁纸氛围屏 `/wallpaper`,均 `meta.standalone`) | i18n/ + theme/(index.js)+stores/theme.js + utils/dict.js + views/Kada.vue + views/Wallpaper.vue |
 | 移动端 | 设备自适应 | useDevice.js + MobileLayout.vue + Mobile* 组件 |
 
-**关键坑速查**(实现细节详见 docs/变更归档.md):日记 date 兼容 `yyyy-MM-dd HH:mm`;纪念日 Hutool ChineseDate 月份 0-based 需 +1;家谱 null 字段须 `LambdaUpdateWrapper` 显式 SET;**MP `updateById` 会回写实体旧 `updated_at` 抑制 `ON UPDATE CURRENT_TIMESTAMP`**——依赖 updated_at 的表更新必须 LambdaUpdateWrapper 只 SET 业务字段并重查;**simple-mind-map 只内置 default 主题**(其余须 mindmapThemes.js defineTheme 注册);**脑图并发保存靠 update 乐观锁**(带 baseUpdatedAt,库中已刷新则 409);**脑图保存前 stripEmptyNodes 剥空叶子**;**EP dropdown 内嵌 hover 子菜单**用 visibility 延迟隐藏而非 display;物品户型图 hover 边加号阈值 6px、未设计楼层画布空白+引导、库内家具拖入画布替代「摆放」;**CSS `rotate()` 负角度在屏幕坐标(y 向下)里把元素下端往右摆(与直觉相反),要「右上→左下」须正角度;`animation` 简写覆盖同元素长写的 `animation-*`(如 delay),多粒子动画须用 `--var` 喂时长/相位**;**pdfjs-dist 统一 v6**(worker 用 `build/pdf.worker.min.mjs?url`,浏览器不用裸 iframe);**天气 AI 生图背景只有一份实现 `useWeatherBg`**(首页卡与暖居外壳同源、同一缓存键,不要再在 `Home.vue` 里写第二份——V9.86 已删掉那 115 行重复代码);**暖居照片卡牌扇形重叠时别用纯 CSS `:hover`**(命中的是 DOM 靠后那张而非视觉最上那张,须 JS `@mouseenter` 追踪索引再驱动类名);**要能被类覆写的内联样式走 CSS 变量**(transform 写死在 `:style` 里就无法被 hover 类覆盖,故卡牌位移/旋转/层级抽 `--dx/--dy/--rot/--z`);**`meta.standalone` 独立页的空壳期陷阱**——路由首次解析前 `currentRoute` 是 START_LOCATION(meta 为空),`v-if="route.meta.standalone"` 会先判为 false 而挂载整个 ihomy 外壳再卸载,独立页启动瞬间因此打出一批无关接口(含 OPS 权限 403 弹错);外壳一律等 `router.isReady()`(`routeReady` 标记)后再渲染;**待机计时类交互别只在 mousemove 里起算**(壁纸/副屏场景鼠标根本不动,须挂载后即起算;V9.93 起壁纸页已弃用待机浮现——照片轮播/纪念日/待办三小组件常驻,整卡可拖拽、pointerdown 固化 px 位置落 localStorage `ihomy:wallpaper:widget-pos:v1`,天气 AI 生图为常驻底图;**长开页组件卡别用 backdrop-filter**——底下光影层持续动画会让磨砂每帧重算);**窄屏右下角浮层会压住左下角文字**(壁纸页控件 ≤768px 改挂右上角);**⚠ Wallpaper Engine 网页壁纸里别用跨域 iframe**(V9.88 实测):WE 2.8.42 的 CEF(Chromium 146)渲染跨域 iframe(OOPIF)时**崩渲染进程**,表现为「导入后编辑器预览一整片纯灰、什么都看不见」,而 `chrome_debug.log` 里是 `FATAL ...cef_scoped_refptr.h:329 Check failed: ptr_.` + `blink.mojom.FrameWidgetHost` 消息被拒;此时页面其实**已加载并执行**(CEF 缓存里有 `index-*.js`/`Wallpaper-*.js`,localStorage 里写入了 `ihomy-theme`),所以别误判成网络或脚本问题——改 `location.replace` 顶层跳转(不产生 OOPIF)即绕过;WE **只在页面加载时投递属性,而且是分次投递的**(V9.90 实测):第一次只带 `project.json` 里声明的值(主题/晨暮/语言这些默认值),用户**改过**的值晚一拍才到——故壳页 `go()` **绝不能挂在第一次 `applyUserProperties` 上**(「壁纸令牌」天生就是「改过的值」,必然落在后一次投递里被丢掉,现象是「复制令牌后没有效果、无法实现登录」):改为「**拿到令牌再等 400ms 就走,还没拿到就等到 3s 硬上限**」,`theme`/`mode`/`lang` 作为查询参数 `?theme=x&mode=y&lang=zh` 由页面 `applyQueryPrefs()` 读取、`token` 单独走 hash;壁纸页另挂一份 `wallpaperPropertyListener` 双保险(令牌若比跳转还晚到,页面上当场换会话)。**取证路径**(WE 安装目录 `C:\Program Files\Steam\steamapps\common\wallpaper_engine`):CEF 崩溃日志与控制台 `ui\wpcache\monitor<N>\base\chrome_debug.log`(**哪个 monitor 看哪个 —— 本机壁纸实例是 `monitor100`,别只盯 `monitor0`**;壳页/壁纸页的 `console.log` 以 `INFO:CONSOLE` 落这里,自带诊断前缀 `[ihomy-shell]`/`[ihomy-wallpaper]`)、**WE 自记浏览历史 `ui\wpcache\monitor<N>\base\Default\History`(SQLite,`urls` 表存**带 `#token=` 的完整导航 URL**——判「壳页有没有把令牌带走」最直接)**、属性面板存的值 `config.json` 的 `wproperties`(按 壁纸文件路径→显示器 分组)、WE 操作日志 `bin\wallpaperuilog.txt`(含 `Created process: webwallpaper64.exe`)、壁纸页 localStorage `ui\wpcache\monitor<N>\base\Default\Local Storage\leveldb\`(格式见 `wallpaper-engine/README.md`);**⚠ WE 是「拷贝」导入的**(V9.89)—`wallpaper-engine/` 改 `project.json`(加属性)后**已导入的用户看不到新属性**,要重新拖一次 `index.html` 或在 WE 编辑器里手加;改 `index.html`(改逻辑)则**就地覆盖** `myprojects\<项目名>\index.html` 再 文件→重启预览 即可(本机那份是 `myprojects\ihomy1\`),**`project.json` 千万别覆盖**——属性面板里粘的令牌存在那儿;**改完别忘了一句:重新拖导入会新建项目、令牌要重粘**;壁纸令牌流程=设置页复制 refresh token → WE 属性面板「壁纸令牌」→ 壳页放 **URL hash**(`#token=...`,hash 不发给服务器、不进 nginx 访问日志) → 页面 `bootstrapToken()` 调 `POST /auth/refresh` 换会话并落 WE 自己的 localStorage(本地已有会话时不覆盖,面板那份会随续期变成旧值);**后端 `AuthService.refresh` 不拉黑旧 refresh token**(只校验不写黑名单,`logout()` 才拉黑),故同一份令牌浏览器与壁纸可各持一份、各自滑动续期互不踢;本地 IAB/Playwright **点不动这个应用**(持续动画让「连续两帧稳定」的可操作性检查永不通过,`click()`/force/坐标点击均超时)——验证交互改用页面内 `el.click()` 派发真实 Vue handler,剪贴板用桩 `Object.defineProperty(navigator.clipboard,'writeText')` 断言写入内容(后台标签页 `document.hasFocus()===false`,真剪贴板必被拒并走「复制失败」兜底,别误判成 bug)。**⚠ 日月与晨昏(晨昏三档/月相/月出月落)走纯天文计算,不取天气 API**(V9.92):后端 `SolarUtil.astroTimes`/`moonPhaseInfo` → `GET /public/sun-info`(天气页「日月与晨昏」卡与日历页共用;和风 v1 `daily[].astro` 其实也带这些字段,实测与本地差 0~2 分钟,但**同一事实只留一份来源**,那 10 个透传字段已删,别再往 `daily` 里塞第二份);月亮时角**必须用地方恒星时**(`gmstDeg`),照搬太阳那套「距太阳正午分钟数」近似会错;当日不发生的事件(极昼极夜、月亮不升不落)**返回空串由前端隐藏**,别填占位假时刻;求解统一按「采样找穿越 + 二分/三分细化」(太阳阈值 -0.833°、三档晨昏 96°/102°/108° 天顶角、月亮 +0.125°)。
+**关键坑速查**(实现细节详见 docs/变更归档.md):日记 date 兼容 `yyyy-MM-dd HH:mm`;纪念日 Hutool ChineseDate 月份 0-based 需 +1;家谱 null 字段须 `LambdaUpdateWrapper` 显式 SET;**MP `updateById` 会回写实体旧 `updated_at` 抑制 `ON UPDATE CURRENT_TIMESTAMP`**——依赖 updated_at 的表更新必须 LambdaUpdateWrapper 只 SET 业务字段并重查;**simple-mind-map 只内置 default 主题**(其余须 mindmapThemes.js defineTheme 注册);**脑图并发保存靠 update 乐观锁**(带 baseUpdatedAt,库中已刷新则 409);**脑图保存前 stripEmptyNodes 剥空叶子**;**EP dropdown 内嵌 hover 子菜单**用 visibility 延迟隐藏而非 display;物品户型图 hover 边加号阈值 6px、未设计楼层画布空白+引导、库内家具拖入画布替代「摆放」;**CSS `rotate()` 负角度在屏幕坐标(y 向下)里把元素下端往右摆(与直觉相反),要「右上→左下」须正角度;`animation` 简写覆盖同元素长写的 `animation-*`(如 delay),多粒子动画须用 `--var` 喂时长/相位**;**pdfjs-dist 统一 v6**(worker 用 `build/pdf.worker.min.mjs?url`,浏览器不用裸 iframe);**天气 AI 生图背景只有一份实现 `useWeatherBg`**(首页卡与暖居外壳同源、同一缓存键,不要再在 `Home.vue` 里写第二份——V9.86 已删掉那 115 行重复代码);**暖居照片卡牌扇形重叠时别用纯 CSS `:hover`**(命中的是 DOM 靠后那张而非视觉最上那张,须 JS `@mouseenter` 追踪索引再驱动类名);**要能被类覆写的内联样式走 CSS 变量**(transform 写死在 `:style` 里就无法被 hover 类覆盖,故卡牌位移/旋转/层级抽 `--dx/--dy/--rot/--z`);**`meta.standalone` 独立页的空壳期陷阱**——路由首次解析前 `currentRoute` 是 START_LOCATION(meta 为空),`v-if="route.meta.standalone"` 会先判为 false 而挂载整个 ihomy 外壳再卸载,独立页启动瞬间因此打出一批无关接口(含 OPS 权限 403 弹错);外壳一律等 `router.isReady()`(`routeReady` 标记)后再渲染;**待机计时类交互别只在 mousemove 里起算**(壁纸/副屏场景鼠标根本不动,须挂载后即起算;V9.93 起壁纸页已弃用待机浮现——照片轮播/纪念日/待办三小组件常驻,整卡可拖拽、pointerdown 固化 px 位置落 localStorage `ihomy:wallpaper:widget-pos:v1`,天气 AI 生图为常驻底图;**长开页组件卡别用 backdrop-filter**——底下光影层持续动画会让磨砂每帧重算);**窄屏右下角浮层会压住左下角文字**(壁纸页控件 ≤768px 改挂右上角);**⚠ Wallpaper Engine 壁纸包(源在 `wallpaper-engine/`,机制/导入步骤/取证路径见该目录 `README.md`,踩坑细节见 docs/变更归档.md V9.88–V9.90)**:①**别用跨域 iframe**——WE 2.8.42 的 CEF 渲染 OOPIF 会崩渲染进程(现象「导入后编辑器预览整片纯灰」,但页面其实**已加载并执行**:CEF 缓存里有 chunk、localStorage 有 `ihomy-theme`,别误判成网络或脚本问题),改 `location.replace` 顶层跳转即绕过;②**WE 分次投递用户属性**——第一次只带 `project.json` 里声明的值,用户**改过**的值(壁纸令牌天生是)晚一拍才到,故壳页 `go()` **绝不能挂在第一次 `applyUserProperties` 上**(令牌会被整个丢掉,现象「复制令牌后没有效果」),改为「拿到令牌再等 400ms 就走、没拿到等到 3s 硬上限」;`theme/mode/lang` 走查询参数 `?theme=x&mode=y&lang=zh`、`token` 单独走 **URL hash**(不发给服务器、不进 nginx 日志),壁纸页另挂 `wallpaperPropertyListener` 双保险;③**WE 是「拷贝」导入**——改 `index.html` 就地覆盖 `myprojects\<项目名>\index.html` 再「文件→重启预览」,**`project.json` 千万别覆盖**(属性面板里粘的令牌存在那儿);重新拖导入会新建项目、令牌要重粘;④**壁纸令牌流程**=设置页复制 refresh token → WE 属性面板 → 页面 `bootstrapToken()` 调 `POST /auth/refresh` 换会话并落 WE 自己的 localStorage;后端 `AuthService.refresh` **不拉黑**旧 refresh token(只 `logout()` 才拉黑),故浏览器与壁纸可各持一份、各自滑动续期互不踢;⑤**本地 IAB/Playwright 点不动这个应用**(持续动画让「连续两帧稳定」的可操作性检查永不通过,`click()`/force/坐标点击均超时)——验证交互改用页面内 `el.click()` 派发真实 Vue handler,剪贴板用桩 `Object.defineProperty(navigator.clipboard,'writeText')` 断言写入内容(后台标签页 `document.hasFocus()===false`,真剪贴板必被拒并走「复制失败」兜底,别误判成 bug)。**⚠ 日月与晨昏(晨昏三档/月相/月出月落)走纯天文计算,不取天气 API**(V9.92):后端 `SolarUtil.astroTimes`/`moonPhaseInfo` → `GET /public/sun-info`(天气页「日月与晨昏」卡与日历页共用;和风 v1 `daily[].astro` 其实也带这些字段,实测与本地差 0~2 分钟,但**同一事实只留一份来源**,那 10 个透传字段已删,别再往 `daily` 里塞第二份);月亮时角**必须用地方恒星时**(`gmstDeg`),照搬太阳那套「距太阳正午分钟数」近似会错;当日不发生的事件(极昼极夜、月亮不升不落)**返回空串由前端隐藏**,别填占位假时刻;求解统一按「采样找穿越 + 二分/三分细化」(太阳阈值 -0.833°、三档晨昏 96°/102°/108° 天顶角、月亮 +0.125°)。
 
 ## 设计规范(统一实现,避免多种方式)
 
@@ -203,7 +204,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 13. **动画优先级**(强制):持续型动画(钟摆/心跳/呼吸)优先级 **CSS `@keyframes` > GSAP 直接操作 DOM ref > `requestAnimationFrame` + 响应式 ref**。**禁止用 rAF 每帧写 Vue ref 触发响应式重渲染**(参考 `useSunLight.js` 钟摆已改 CSS `@keyframes lampSwing`)。
 14. **并行请求**(强制):多个独立的 `await xxxApi.foo()` 必须改 `Promise.all([a, b, c])` 并行(参考 `Home.vue loadAll` + `stores/app.js init`)。串行只在真有依赖时用。
 15. **computed 纯函数**(强制):`computed` 内禁止 `Math.random()`/`Date.now()`/副作用,否则每次访问重算且视觉跳动。需要随机/一次性计算用 `ref` + `watch(source, immediate)` 生成(参考 `Home.vue polaroidLayout`)。
-16. **路由懒加载**:27 个路由全部 `() => import('./views/...')`,不写同步 `import Home from '@/views/Home.vue'`。
+16. **路由懒加载**:50 条页面路由全部 `() => import('./views/...')`(另 3 条是 redirect),不写同步 `import Home from '@/views/Home.vue'`。
 17. **全局 UI 样式统一**(强制):所有 EP 组件(el-dialog/ElMessageBox/ElMessage/popper/button/tag/badge/input)配色/圆角/尺寸/z-index 一律由 main.css 全局覆写,**禁止组件 scoped 重复定义**;完整值见 docs/UI设计提示词.md §11a/§3。**命令式 API(ElMessage/ElMessageBox/ElNotification/ElLoading)样式已在 main.js 显式引入**——unplugin 按需只覆盖模板组件,新增命令式调用须确认样式已引入,否则裸 DOM 渲染不可见。
 18. **按钮/标签/角标/图标/圆角统一**(强制,main.css 全局覆写,禁止 scoped):按钮四类(主/次/幽灵/危险,浅深色**不同色值不共用**)、el-tag 半透明磨砂、el-badge 半透明黑、el-icon `stroke-width:2px`、圆角(button 12/input 10/card+dialog 14);完整色值见 docs/UI设计提示词.md §18a。
 19. **页面统一规范**(强制):根容器 `class="page"`(禁 scoped 覆写 max-width/margin/padding);页面级 H1/H2 移除,分区标题 `.section-label`;工具栏 `class="page-toolbar card"`(`.tb-left` 筛选 size=small、`.tb-right` 按钮 gap 8px);多选交互 `.pick-badge` 对勾圆标+卡片描边(**禁左上 checkbox 角标**);详见 docs/UI设计提示词.md §11b。
@@ -270,8 +271,8 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 ## 已实现变更归档(已外置)
 
-> 历史归档(86KB,30 个功能域子节:性能优化/首页仪表盘/音乐×2/光影/UI 规范/厨房/运维/UX/图书/移动端×2/播放器/博客/日记/相册×5/百度凭证/放映厅×2/生产发布/频闪排查/天气/日志追溯/户型图)已整体迁至 **`docs/变更归档.md`**,内容原样保留。含文件级改动表、设计决策、踩坑记录与 live DB 同步 SQL。
-> **检索历史实现/设计决策/live DB 迁移 SQL 时读该文件;新的变更归档继续追加到该文件末尾**(新增 `#####` 子节),不要再写回 AGENTS.md。
+> 历史归档已整体迁至 **`docs/变更归档.md`**(现约 470KB / **117 小节**:开头 14 个**功能域**小节——性能优化/首页仪表盘/音乐/光影/UI 规范/厨房/运维/UX/图书/移动端/播放器/博客/日记/相册×5/放映厅/天气/日志追溯/户型图等,其后 103 个**版本**小节按 V9.x 顺序追加),内容原样保留。含文件级改动表、设计决策、踩坑记录与 live DB 同步 SQL。
+> **该文件开头有章节目录**(或 `grep -n "^##### " docs/变更归档.md` 列全部小节);**检索历史实现/设计决策/live DB 迁移 SQL 时读该文件;新的变更归档继续追加到文件末尾**(新增 `#####` 子节),不要再写回 AGENTS.md。
 
 ## 文件存储策略
 
@@ -310,13 +311,15 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 > 完整清单(P1-P4)见 docs/需求设计说明书.md 第 9 章。优先级:P1 用户价值高且可行 / P2 锦上添花 / P3 结构性改动 / P4 依赖外部条件。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
 - **P1 放映厅 Jellyfin 集成**:方案已定稿,**启动时先重读 docs/变更归档.md「放映厅 Jellyfin 集成方案」**。
 - **P2 智能家居中控(Home Assistant 集成)**:硬件协议层全归 HA,ihomy 只做数据沉淀与控制入口——S1 Paho 订阅 Mosquitto 入库 sys_iot_device/sys_iot_data+Redis 最新值、S2 HA REST 控制(long-lived token)、S3 前端中控页+物品定位户型图联动;详见 §9。
+- **P2 密码管理器(家庭保险箱)**:家庭共享的账号密码保管箱,预期新增 `family_vault_item`(family_id 隔离 + AES-GCM 密文存储 + PRIVATE/FAMILY 可见范围)+ 分类/搜索/一键复制/密码生成器;明文查看/复制走 `@OperationLog` 审计 + 前端 10 秒自动清剪贴板;分期 S1 表+CRUD+加密存储、S2 用户主密码(前端零知识、忘记不可找回)、S3 明确不做浏览器扩展;详见 §9。
 - **场景主题方向**:2D 沉浸场景主题(SceneHome.vue)已移除(暂缓后删除);3D 光影实验台(/tools/light-lab)作为未来场景主题底座,详见 §4.12.3/§9。
 
 ## 文档清单
 
 - `README.md`(项目简介,GitHub 展示,不含密码); `docs/README.md`(文档索引:每份文档一句话定位+新人阅读顺序); `docs/架构设计.md`(系统上下文/请求流转/模块分域/关键机制/部署拓扑); `docs/部署指导-Linux.md` / `docs/部署指导-Windows.md`(生产部署全流程 systemd/NSSM/Nginx/Let's Encrypt/Docker Compose/备份/NAS,**脱敏入库版**,凭证一律占位符); `Linux部署指导.md`(本地,**只剩 §〇凭证台账**,两平台共用,不入 git); `docs/新人上手指南.md`(新成员环境搭建+开发账号初始密码;**本地维护不入 git**,给新成员时直接发该文件)
-- `docs/需求设计说明书.md` — **完整功能需求唯一活文档**(功能模块清单+数据库设计 61 表+接口设计+规划事项+修订记录),随迭代持续更新;§4.8.1 含原户型图设计.md 并入的设计决策存档(2026-09-07,原文件已删)
-- `docs/变更归档.md` — 已实现变更归档(按功能域的文件级改动表+设计决策+踩坑+live DB 同步 SQL);新变更归档追加到该文件末尾
+- `docs/需求设计说明书.md` — **完整功能需求唯一活文档**(功能模块清单+数据库设计 70 表+接口设计+规划事项+修订记录),随迭代持续更新;§4.8.1 含原户型图设计.md 并入的设计决策存档(2026-09-07,原文件已删)
+- `docs/变更归档.md` — 已实现变更归档(按功能域的文件级改动表+设计决策+踩坑+live DB 同步 SQL);**开头有章节目录**,新变更追加到文件末尾
+- `docs/设计想法/` — 设计稿与探询记录(主题/光尘·暖居·场景、功能/小游戏);目录索引见该目录 `README.md`,其中多数已落地为现行实现,属**历史草稿、不再维护**
 - `docs/UI设计提示词.md` — 沉浸式首页 UI 设计完整规格(可作为 AI 提示词重新生成)
 - `docs/日志规范.md` — 日志开发规范(三类文件/六要素/tid 规则/级别标准/三方调用/脱敏清单)
 - `docs/日志问题分析方法.md` — 报错排查方法论(拿 tid → 详细日志页 → 四步分析;面向运维/业务人员)

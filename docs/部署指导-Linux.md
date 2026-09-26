@@ -331,7 +331,7 @@ exit
 # 用数据库 root 执行 schema.sql（建库、建表、创建应用账号 ihomy 并授权）
 mysql -uroot -p --default-character-set=utf8mb4 < /opt/ihomy/backend/src/main/resources/schema.sql
 ```
-该脚本由数据库 root 执行一次，会创建 `ihomy` 库、**61 张表**（`sys_` 系统与账号权限 / `family_` 家庭事务 / `content_` 内容数据三前缀）、应用专用账号 `ihomy`（仅 DML 权限）、默认首页模块、管理员 `admin` 与运维账号 `ops`（初始密码为开发安全版，见下方警告）。
+该脚本由数据库 root 执行一次，会创建 `ihomy` 库、**70 张表**（`sys_` 系统与账号权限 / `report_` 报表日志 / `family_` 家庭事务 / `content_` 内容数据四前缀）、应用专用账号 `ihomy`（仅 DML 权限）、默认首页模块、管理员 `admin` 与运维账号 `ops`（初始密码为开发安全版，见下方警告）。
 
 > **⚠️ 生产必须改密（schema.sql 为开发安全版）**：入库版 schema.sql 内置的是本机 Docker 开发固定凭证（ihomy 账号开发密码 + admin/ops 开发专用 BCrypt 哈希，明文只在维护者本地文档）。生产部署后立即执行：
 > ```bash
@@ -744,7 +744,7 @@ powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1
 | 前端访问 | 浏览器 `https://你的域名` | 登录页 |
 | 登录 | 邮箱 + 密码 + 图形验证码 | 进入首页 |
 | 运维登录 | `ops` + 密码（初始密码为开发安全版，生产部署后已按 3.4 改密则用新密码） | 进入运维页 |
-| 数据库 | `mysql -uihomy -p ihomy -e "show tables;"` | 61 张表 |
+| 数据库 | `mysql -uihomy -p ihomy -e "show tables;"` | 70 张表 |
 | Redis | `docker exec ihomy-redis redis-cli ping` | PONG |
 | Nginx | `sudo nginx -t` | syntax ok |
 | 证书 | `sudo certbot certificates` | 有效 |
