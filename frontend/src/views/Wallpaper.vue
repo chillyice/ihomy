@@ -1,9 +1,14 @@
 <!-- 壁纸页 /wallpaper(meta.public + meta.standalone):家庭私有「只读氛围屏」。
-     定位:桌面壁纸/常开副屏用,只做展示——时钟、天气、家人照片轮播、纪念日、待办、太阳驱动的光影。
+     定位:桌面壁纸/常开副屏用,只做展示——时钟、天气、家人照片轮播、纪念日、待办、动态流、计划、提醒、太阳驱动的光影。
      设计边界(勿扩张):除首次登录外不含任何写操作、不上传、不导航;要写博客传照片回正常 ihomy 窗口。
      交互(V9.93 起):天气 AI 生图为常驻底图(与暖居外壳同源 useWeatherBg);照片轮播/纪念日/待办
           三个小组件常驻显示,整卡可拖拽,位置固化进 localStorage(浏览器与 WE 环境各自记忆);
           角落控件仍保留「移动浮现、静止 2.2s 淡出」(待机浮现照片的旧逻辑已移除)。
+     组件可增删(本轮):组件库 WIDGET_DEFS 列出可用小组件(照片/纪念日/待办 + 动态流/家庭计划/提醒),
+          在角落控件的「组件」面板里点一下即添加/移除,启用态落 localStorage ihomy:wallpaper:widgets:v1
+          (默认开照片/纪念日/待办,与旧版视觉一致;新组件默认关)。新增组件的落点:注册表加一条 +
+          模板加 isOn('id') 分支 + 样式补默认坐标;未启用的组件不取数(壁纸请求数不随组件库膨胀)。
+          原角落控件里的「复制壁纸令牌」按钮已移除,令牌入口只留设置页一处。
      主题:复用全局 themeStore(与站点共享 ihomy-theme 偏好);「自动」由太阳高度角驱动(useSunLight 内 applyAuto)。
      体积:本页刻意不引 Element Plus(原生 input/button + 主题 CSS 变量),保证壁纸首屏轻量。
      Wallpaper Engine:壳页(wallpaper-engine/)顶层跳转本页,属性面板的主题/晨暮走查询参数、令牌走 hash(见 onMessage)。 -->
@@ -33,8 +38,9 @@
       </div>
     </div>
 
-    <!-- 小组件:照片轮播 / 纪念日 / 待办(常驻,整卡可拖拽,位置记忆;光影层仍在其上,照片被光柱/浮尘覆盖) -->
-    <div v-if="stackCards.length" class="wp-widget wpw-photos"
+    <!-- 小组件:组件库见 WIDGET_DEFS,默认只开照片/纪念日/待办,其余在角落「组件」面板里添加。
+         常驻显示、整卡可拖拽、位置记忆;光影层仍在其上(照片被光柱/浮尘覆盖) -->
+    <div v-if="isOn('photos') && stackCards.length" class="wp-widget wpw-photos"
          :class="{ placed: widgetPos.photos, dragging: dragId === 'photos' }"
          :style="widgetStyle('photos')" @pointerdown="onWidgetDown('photos', $event)">
       <div class="wp-stack">
@@ -45,7 +51,7 @@
       <div v-if="topPhoto?.description" class="wp-cap">{{ topPhoto.description }}</div>
     </div>
 
-    <div v-if="userStore.isLoggedIn && anniEvents.length" class="wp-widget wpw-anni"
+    <div v-if="isOn('anni') && userStore.isLoggedIn && anniEvents.length" class="wp-widget wpw-anni"
          :class="{ placed: widgetPos.anni, dragging: dragId === 'anni' }"
          :style="widgetStyle('anni')" @pointerdown="onWidgetDown('anni', $event)">
       <div class="wpw-title">{{ $t('wallpaper.widgetAnni') }}</div>
@@ -63,7 +69,7 @@
       </div>
     </div>
 
-    <div v-if="userStore.isLoggedIn && todoTasks.length" class="wp-widget wpw-task"
+    <div v-if="isOn('task') && userStore.isLoggedIn && todoTasks.length" class="wp-widget wpw-task"
          :class="{ placed: widgetPos.task, dragging: dragId === 'task' }"
          :style="widgetStyle('task')" @pointerdown="onWidgetDown('task', $event)">
       <div class="wpw-title">{{ $t('wallpaper.widgetTodo') }}</div>
@@ -74,6 +80,51 @@
             {{ $t('task.rewardPointsText', { points: tk.rewardPoints }) }}
           </div>
           <div v-else-if="tk.rewardType === 'ITEM'" class="wpw-reward">{{ tk.rewardItem }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 家庭动态流(只读;启用才取数,未开时不打这个请求) -->
+    <div v-if="isOn('feed') && feedItems.length" class="wp-widget wpw-feed"
+         :class="{ placed: widgetPos.feed, dragging: dragId === 'feed' }"
+         :style="widgetStyle('feed')" @pointerdown="onWidgetDown('feed', $event)">
+      <div class="wpw-title">{{ $t('wallpaper.wFeed') }}</div>
+      <div class="wpw-body">
+        <div v-for="(f, i) in feedItems" :key="i" class="wpw-row">
+          <div class="wpw-info">
+            <div class="wpw-name">{{ feedText(f) }}</div>
+            <div class="wpw-sub">{{ feedTypeLabel(f) }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 家庭计划(只读) -->
+    <div v-if="isOn('plan') && plans.length" class="wp-widget wpw-plan"
+         :class="{ placed: widgetPos.plan, dragging: dragId === 'plan' }"
+         :style="widgetStyle('plan')" @pointerdown="onWidgetDown('plan', $event)">
+      <div class="wpw-title">{{ $t('wallpaper.wPlan') }}</div>
+      <div class="wpw-body">
+        <div v-for="p in plans" :key="p.id" class="wpw-row">
+          <div class="wpw-info">
+            <div class="wpw-name">{{ p.title }}</div>
+            <div class="wpw-sub">{{ fmtPlanSub(p) }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 提醒事项(只读) -->
+    <div v-if="isOn('reminder') && reminders.length" class="wp-widget wpw-reminder"
+         :class="{ placed: widgetPos.reminder, dragging: dragId === 'reminder' }"
+         :style="widgetStyle('reminder')" @pointerdown="onWidgetDown('reminder', $event)">
+      <div class="wpw-title">{{ $t('wallpaper.wReminder') }}</div>
+      <div class="wpw-body">
+        <div v-for="r in reminders" :key="r.id" class="wpw-row">
+          <div class="wpw-info">
+            <div class="wpw-name">{{ r.title }}</div>
+            <div class="wpw-sub">{{ fmtRemindSub(r) }}</div>
+          </div>
         </div>
       </div>
     </div>
@@ -99,12 +150,17 @@
         <button class="wp-segbtn" :class="{ on: locale === 'zh-CN' }" @click="setLang('zh-CN')">中</button>
         <button class="wp-segbtn" :class="{ on: locale === 'en' }" @click="setLang('en')">EN</button>
       </div>
-      <!-- 复制壁纸令牌:桌面壁纸填不了登录卡,在普通浏览器里复制,粘进 WE 属性面板的 token 栏。
-           设置页(个性化设置 → 壁纸氛围屏)也有同一入口,是给用户看的主路径;这里保留一份,
-           是为了已经站在壁纸页上的用户不用再跳一趟。 -->
-      <div v-if="userStore.isLoggedIn" class="wp-seg">
-        <button class="wp-segbtn" @click="copyToken">
-          {{ tokenCopied ? $t('wallpaper.copied') : $t('wallpaper.copyToken') }}
+      <!-- 组件:壁纸上显示哪些小组件在这里增删(点一下即添加/移除,启停记忆在 localStorage)。
+           面板打开期间角落控件不自动淡出,否则用户点第二下之前控件就没了 -->
+      <div class="wp-seg">
+        <button class="wp-segbtn" :class="{ on: panelOpen }" @click="togglePanel">{{ $t('wallpaper.widgets') }}</button>
+      </div>
+      <div v-if="panelOpen" class="wp-widgets">
+        <div class="wp-widgets-cap">{{ $t('wallpaper.widgetsTitle') }}</div>
+        <button v-for="w in WIDGET_DEFS" :key="w.id" class="wp-widgets-row"
+                :class="{ on: isOn(w.id) }" @click="toggleWidget(w.id)">
+          <span class="wp-widgets-mark">{{ isOn(w.id) ? '✓' : '＋' }}</span>
+          <span>{{ $t(w.label) }}</span>
         </button>
       </div>
     </div>
@@ -141,7 +197,7 @@ import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { useWeatherBg } from '@/composables/useWeatherBg'
-import { authApi, publicApi, taskApi } from '@/api'
+import { authApi, publicApi, taskApi, planApi, reminderApi } from '@/api'
 import { applyLocale } from '@/i18n'
 
 const { locale, t } = useI18n()
@@ -230,12 +286,108 @@ const loadTodos = async () => {
   }
 }
 
+// ========== 壁纸组件库:壁纸上显示哪些小组件,由角落「组件」面板增删 ==========
+// 新增一种组件 = 这里加一条 + 模板里加一个 isOn('id') 的渲染分支(默认坐标在样式里)。
+// 组件一律只读;未启用的组件不取数,组件库变大也不会多打请求(壁纸请求数是刻意控住的)。
+const WIDGET_DEFS = [
+  { id: 'photos', label: 'wallpaper.wPhotos' },
+  { id: 'anni', label: 'wallpaper.widgetAnni' },
+  { id: 'task', label: 'wallpaper.widgetTodo' },
+  { id: 'feed', label: 'wallpaper.wFeed' },
+  { id: 'plan', label: 'wallpaper.wPlan' },
+  { id: 'reminder', label: 'wallpaper.wReminder' },
+]
+// 默认开照片/纪念日/待办(与 V9.93 的常驻组件一致,升级后视觉不变);新增组件默认关,由用户自己添加
+const DEFAULT_WIDGETS = ['photos', 'anni', 'task']
+const WIDGETS_KEY = 'ihomy:wallpaper:widgets:v1'
+const enabled = ref((() => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(WIDGETS_KEY) || 'null')
+    return Array.isArray(raw) ? raw.filter((id) => WIDGET_DEFS.some((w) => w.id === id)) : [...DEFAULT_WIDGETS]
+  } catch (e) { return [...DEFAULT_WIDGETS] }
+})())
+const isOn = (id) => enabled.value.includes(id)
+const saveWidgets = () => {
+  try { localStorage.setItem(WIDGETS_KEY, JSON.stringify(enabled.value)) } catch (e) { /* 无痕环境:仅本次会话生效 */ }
+}
+const panelOpen = ref(false)
+const togglePanel = () => {
+  panelOpen.value = !panelOpen.value
+  if (panelOpen.value) onMove()
+}
+const toggleWidget = (id) => {
+  const i = enabled.value.indexOf(id)
+  if (i >= 0) enabled.value.splice(i, 1)
+  else enabled.value.push(id)
+  saveWidgets()
+  // 只补拉「刚加进来」这一个组件的数据(移除的留着数据无副作用,再加回来时立即可见);
+  // 逐个全量重载会让连点几下变成一串重复请求
+  if (i < 0) loadWidgetData(id)
+  if (id === 'photos') startSlide()
+}
+
+// 组件数据:动态流/计划/提醒各自独立取数,只有启用了才打请求;
+// 传 only 时只拉这一个(面板里新添一个组件时不惊动其它组件)
+const feedItems = ref([])
+const plans = ref([])
+const reminders = ref([])
+const WIDGET_ROWS = 4
+const loadWidgetData = async (only) => {
+  if (!userStore.isLoggedIn) return
+  if ((!only || only === 'feed') && isOn('feed')) {
+    try {
+      const list = await publicApi.getFeed(8)
+      feedItems.value = (Array.isArray(list) ? list : []).slice(0, WIDGET_ROWS)
+    } catch (e) { /* 静默:壁纸不弹错误 */ }
+  }
+  if ((!only || only === 'plan') && isOn('plan')) {
+    try {
+      const list = await planApi.list()
+      plans.value = (Array.isArray(list) ? list : [])
+        .filter((p) => p && p.status === 'ACTIVE')
+        .sort((a, b) => String(a.targetDate || '9999').localeCompare(String(b.targetDate || '9999')))
+        .slice(0, WIDGET_ROWS)
+    } catch (e) { /* 静默 */ }
+  }
+  if ((!only || only === 'reminder') && isOn('reminder')) {
+    try {
+      const list = await reminderApi.list()
+      reminders.value = (Array.isArray(list) ? list : [])
+        .filter((r) => r && r.done !== 1)
+        .sort((a, b) => String(a.remindDate + a.remindTime).localeCompare(String(b.remindDate + b.remindTime)))
+        .slice(0, WIDGET_ROWS)
+    } catch (e) { /* 静默 */ }
+  }
+}
+
+// 动态流一行:一行文本 + 类型标签(与移动端首页动态流同口径,文案走 i18n)
+const FEED_TYPES = ['blog', 'diary', 'photo', 'video', 'wish', 'task', 'recipe', 'book']
+const feedTypeLabel = (f) => (FEED_TYPES.includes(f.type) ? t('wallpaper.feedType.' + f.type) : '')
+const feedText = (f) => {
+  if (f.type === 'photo') return t('wallpaper.feedPhotoCount', { n: f.count || 0 })
+  if (f.type === 'diary') return (f.content || '').slice(0, 40)
+  return f.title || ''
+}
+// 计划一行:目标日期 + 子任务进度(后端 list 已带 doneCount/totalCount)
+const fmtPlanSub = (p) => {
+  const parts = []
+  if (p.targetDate) parts.push(fmtEventDate(p.targetDate))
+  if (p.totalCount) parts.push(`${p.doneCount || 0}/${p.totalCount}`)
+  return parts.join(' · ')
+}
+// 提醒一行:重复型显示「每日/每周/每月」(复用提醒页文案),一次性显示日期,后面统一带时间
+const REPEAT_KEYS = { DAILY: 'reminder.daily', WEEKLY: 'reminder.weekly', MONTHLY: 'reminder.monthly' }
+const fmtRemindSub = (r) => {
+  const when = REPEAT_KEYS[r.repeatType] ? t(REPEAT_KEYS[r.repeatType]) : fmtEventDate(r.remindDate)
+  return [when, (r.remindTime || '').slice(0, 5)].filter(Boolean).join(' ')
+}
+
 let photoRefreshTimer = null
 // 家人随时会加照片/领任务:10 分钟级刷新(成员视图后端不缓存,别频繁打)。
 // 页内登录的场景也要起算,否则登录后只加载一次、之后新数据再不出现。
 const startPhotoRefresh = () => {
   if (photoRefreshTimer) return
-  photoRefreshTimer = setInterval(() => { loadPhotos(); loadTodos() }, 600000)
+  photoRefreshTimer = setInterval(() => { loadPhotos(); loadTodos(); loadWidgetData() }, 600000)
 }
 
 // 轮播:常驻跑(每 6s 换一张);照片不足 2 张不起
@@ -253,18 +405,24 @@ const stopSlide = () => { if (slideTimer) { clearInterval(slideTimer); slideTime
 const enterLoggedIn = async () => {
   await loadPhotos()
   loadTodos()
+  loadWidgetData()
   startSlide()
   startPhotoRefresh()
 }
 
 // ========== 角落控件隐去(移动浮现、静止 2.2s 淡出;照片/小组件已常驻,不再有待机浮现) ==========
 const UI_HIDE_MS = 2200
+// 组件面板开着时给更长的停留:用户要连点几下增删,2.2s 太短会点到一半控件就淡走
+const PANEL_HIDE_MS = 15000
 const uiVisible = ref(false)
 let uiHideTimer = null
 const onMove = () => {
   uiVisible.value = true
   clearTimeout(uiHideTimer)
-  uiHideTimer = setTimeout(() => { uiVisible.value = false }, UI_HIDE_MS)
+  uiHideTimer = setTimeout(() => {
+    if (panelOpen.value) panelOpen.value = false
+    uiVisible.value = false
+  }, panelOpen.value ? PANEL_HIDE_MS : UI_HIDE_MS)
 }
 
 // ========== 小组件拖拽:pointerdown 拖动,位置固化 px 落 localStorage ==========
@@ -437,25 +595,8 @@ const wePropsListener = {
   },
 }
 
-// 「复制壁纸令牌」:给普通浏览器里已登录的用户取令牌用(桌面壁纸没法点,故与语言切换同在角落控件)
-const tokenCopied = ref(false)
-let copiedTimer = null
-const copyToken = async () => {
-  const tk = userStore.refreshToken
-  if (!tk) return
-  let ok = false
-  try {
-    await navigator.clipboard.writeText(tk)
-    ok = true
-  } catch (e) {
-    ok = false
-  }
-  // 剪贴板不可用(非安全上下文/无权限):退回弹窗让用户手动复制,不谎报"已复制"
-  if (!ok) { window.prompt(t('wallpaper.copyToken'), tk); return }
-  tokenCopied.value = true
-  clearTimeout(copiedTimer)
-  copiedTimer = setTimeout(() => { tokenCopied.value = false }, 2500)
-}
+// 「复制壁纸令牌」已从本页移除(只保留设置页 个性化设置 → 壁纸氛围屏 那一个入口):
+// 壁纸页是给桌面/副屏看的,令牌复制属于「配置」动作,留在设置页一处即可。
 
 // ========== Wallpaper Engine 属性桥(可选) ==========
 // WE 网页壁纸的壳页(wallpaper-engine/index.html)把属性面板的主题/晨暮 postMessage 进来,
@@ -495,7 +636,6 @@ onBeforeUnmount(() => {
   clearInterval(clockTimer)
   clearInterval(photoRefreshTimer)
   clearTimeout(uiHideTimer)
-  clearTimeout(copiedTimer)
   stopSlide()
   // 若卸载时还挂着拖拽监听(极端时序),一并摘掉
   window.removeEventListener('pointermove', onWidgetMove)
@@ -560,6 +700,11 @@ onBeforeUnmount(() => {
 .wpw-photos { left: 50%; top: 45%; transform: translate(-50%, -50%); background: none; border: none; box-shadow: none; border-radius: 0; padding: 0; display: flex; flex-direction: column; align-items: center; }
 .wpw-anni { top: clamp(20px, 4vh, 48px); right: clamp(24px, 4vw, 64px); width: 264px; padding: 12px 16px 10px; }
 .wpw-task { bottom: clamp(88px, 13vh, 150px); right: clamp(24px, 4vw, 64px); width: 264px; padding: 12px 16px 10px; }
+/* 组件面板加进来的三个默认位:左列上/中 + 右列中部(避开左下的时钟与已占的三处)。
+   只是初始位置,拖过一次即固化为 px,与屏幕尺寸无关 */
+.wpw-feed { top: clamp(20px, 5vh, 56px); left: clamp(24px, 4vw, 64px); width: 288px; padding: 12px 16px 10px; }
+.wpw-plan { top: clamp(190px, 34vh, 360px); left: clamp(24px, 4vw, 64px); width: 288px; padding: 12px 16px 10px; }
+.wpw-reminder { top: clamp(150px, 27vh, 290px); right: clamp(24px, 4vw, 64px); width: 288px; padding: 12px 16px 10px; }
 .wpw-title { font-size: 11.5px; font-weight: 650; letter-spacing: .14em; color: var(--color-text-secondary); margin-bottom: 4px; }
 .wpw-body { display: flex; flex-direction: column; }
 .wpw-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 7px 0; }
@@ -597,9 +742,11 @@ onBeforeUnmount(() => {
   transition: opacity .5s ease, transform .5s ease;
 }
 .wp-ui.visible { opacity: 1; transform: none; pointer-events: auto; }
-/* 窄屏(手机/竖屏副屏):右下角控件会换行并压住左下角的日期/天气行,改挂右上角 */
+/* 窄屏(手机/竖屏副屏):右下角控件会换行并压住左下角的日期/天气行,改挂右上角;
+   面板此时要排在控件行下方(挂右上时往上排会顶出屏幕) */
 @media (max-width: 768px) {
   .wp-ui { top: clamp(18px, 4vw, 28px); bottom: auto; }
+  .wp-widgets { order: 1; }
 }
 .wp-seg {
   display: flex; gap: 2px; padding: 3px; border-radius: 12px;
@@ -612,6 +759,25 @@ onBeforeUnmount(() => {
 }
 .wp-segbtn:hover { color: var(--color-text); }
 .wp-segbtn.on { background: var(--color-brand); color: var(--color-brand-text); }
+
+/* 组件面板:撑满一行浮在控件行上方(order:-1);窄屏控件挂右上时改排到下方(见文件末尾 media) */
+.wp-widgets {
+  order: -1; width: 100%; box-sizing: border-box; padding: 8px;
+  border-radius: 12px; background: rgba(var(--color-card-rgb), .86);
+  border: 1px solid var(--color-border); box-shadow: 0 14px 40px rgba(0, 0, 0, .18);
+}
+.wp-widgets-cap {
+  font-size: 11px; font-weight: 650; letter-spacing: .14em; color: var(--color-text-secondary);
+  padding: 2px 6px 6px;
+}
+.wp-widgets-row {
+  all: unset; cursor: pointer; display: flex; align-items: center; gap: 8px;
+  padding: 7px 8px; border-radius: 8px; font-size: 12.5px; color: var(--color-text-secondary);
+  transition: background .2s ease, color .2s ease;
+}
+.wp-widgets-row:hover { background: var(--color-card-2); color: var(--color-text); }
+.wp-widgets-row.on { color: var(--color-text); }
+.wp-widgets-mark { width: 14px; text-align: center; font-weight: 700; color: var(--color-brand); }
 
 /* ===== 登录卡(z=90,压在体积光 78 之上保证表单清晰;灯光层 pointer-events:none 不挡输入) =====
    遮罩本身 pointer-events:none、只让卡片吃点击 —— 否则未登录时全屏遮罩会把右下角主题切换按钮一起挡住 */
