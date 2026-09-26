@@ -96,14 +96,23 @@ if (-not $FrontendOnly) {
 
   if ($Build) {
     Write-Host '    [Build] 编译打包...'
-    & (Join-Path $Backend 'mvnw.cmd') -B -q -f $Backend clean package -DskipTests
-    if ($LASTEXITCODE -ne 0) { Die '后端构建失败' }
+    # mvnw.cmd 在「当前目录」找 .mvn/wrapper（仓库根没有 .mvn，wrapper 在 backend 下），
+    # 故必须切到 backend 再调，否则报「找不到 maven-wrapper.properties / 主类 MavenWrapperMain」
+    Push-Location -LiteralPath $Backend
+    try {
+      & '.\mvnw.cmd' -B -q clean package -DskipTests
+      if ($LASTEXITCODE -ne 0) { Die '后端构建失败' }
+    } finally { Pop-Location }
     Write-Ok '后端构建完成'
     $jar = Get-ChildItem (Join-Path $Backend 'target') -Filter 'ihomy-backend.jar' -ErrorAction SilentlyContinue | Select-Object -First 1
     if (-not $jar) { Die '未找到后端 jar' }
     # 设环境变量 IHOMY_CONFIG_PATH 指向外挂配置文件
     $env:IHOMY_CONFIG_PATH = $ExternalConfig
-    Start-Process -FilePath 'java' -ArgumentList "-jar", $jar.FullName -WorkingDirectory $Backend
+    # 用完整路径启动，避免 javapath launcher 与 JDK 双实例分流 8080 请求(偶发 401/404/500)
+    $javaExe = if ($env:JAVA_HOME -and (Test-Path (Join-Path $env:JAVA_HOME 'bin\java.exe'))) {
+      Join-Path $env:JAVA_HOME 'bin\java.exe'
+    } else { (Get-Command java).Source }
+    Start-Process -FilePath $javaExe -ArgumentList "-jar", $jar.FullName -WorkingDirectory $Backend
     Write-Ok "后端已启动（java -jar $($jar.Name)），端口 8080，外挂配置: $ExternalConfig"
   } else {
     $env:IHOMY_CONFIG_PATH = $ExternalConfig
