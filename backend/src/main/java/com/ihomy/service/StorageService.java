@@ -462,7 +462,7 @@ public class StorageService {
         }
         String accessToken = resp.path("access_token").asText(null);
         if (accessToken == null || accessToken.isBlank()) {
-            throw new BizException(ResultCode.INTERNAL_ERROR, "百度授权响应缺少 access_token");
+            throw new BizException(ResultCode.INTERNAL_ERROR, "百度授权失败,请重新授权");
         }
         c.setAccessToken(parameterService.encrypt(accessToken));
         if (resp.hasNonNull("refresh_token")) {
@@ -564,7 +564,7 @@ public class StorageService {
                     + "&fsids=" + URLEncoder.encode("[" + fid + "]", StandardCharsets.UTF_8));
             String dlink = metas.path("list").path(0).path("dlink").asText(null);
             if (dlink == null || dlink.isBlank()) {
-                throw new BizException(ResultCode.INTERNAL_ERROR, "百度网盘未返回下载链接(dlink)");
+                throw new BizException(ResultCode.INTERNAL_ERROR, "百度网盘未返回文件下载地址");
             }
 
             // 3) 打开 dlink 流(手动跟随 302 到 CDN,重放 UA 防丢失);流关闭时释放限流槽
@@ -580,7 +580,7 @@ public class StorageService {
                 String loc = conn.getHeaderField("Location");
                 long length = conn.getContentLengthLong();
                 conn.disconnect();
-                if (loc == null) throw new BizException(ResultCode.INTERNAL_ERROR, "百度网盘下载重定向缺少 Location");
+                if (loc == null) throw new BizException(ResultCode.INTERNAL_ERROR, "百度网盘下载失败,请稍后重试");
                 conn = baiduDlinkConnect(loc);
                 if (length <= 0) length = conn.getContentLengthLong();
                 status = conn.getResponseCode();
@@ -670,7 +670,7 @@ public class StorageService {
         }
         String at = resp.path("access_token").asText(null);
         if (at == null || at.isBlank()) {
-            throw new BizException(ResultCode.INTERNAL_ERROR, "刷新百度授权响应缺少 access_token");
+            throw new BizException(ResultCode.INTERNAL_ERROR, "百度授权已失效,请重新授权");
         }
         c.setAccessToken(parameterService.encrypt(at));
         if (resp.hasNonNull("refresh_token")) {

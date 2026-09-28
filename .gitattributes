@@ -1,0 +1,3 @@
+# shell 脚本检出时保持 LF:本仓 core.autocrlf=true,若被改成 CRLF,
+# `bash scripts/docs-gen/pipeline.sh` 每行会带上 \r 而报错(命令找不到)。
+*.sh text eol=lf

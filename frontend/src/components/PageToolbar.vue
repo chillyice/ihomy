@@ -1,6 +1,8 @@
 <!-- 页面统一工具栏包装:暖居下滚动后胞吐进顶栏(.gc-pin)实现「膜泡与细胞膜融合,组件扩散进顶栏」;光尘/非暖居原样渲染 -->
 <template>
-  <Teleport to=".gc-pin" :disabled="!(always || pinned)">
+  <!-- defer:直达 URL 首屏加载时,外壳(.gc-pin)与页面在同一次渲染里构建,teleport 解析时
+       .gc-pin 尚未插入 document,不加 defer 工具栏会整个消失(SPA 内导航不受影响) -->
+  <Teleport to=".gc-pin" :disabled="teleportDisabled" defer>
     <div :class="rootClasses" ref="toolbarEl">
       <slot />
     </div>
@@ -19,8 +21,12 @@ const props = defineProps({
   always: { type: Boolean, default: false },
 })
 
-const scrolled = inject('gc-scrolled', ref(false))
-const pinned = inject('gc-pinned', ref(false))
+const scrolled = inject('gc-scrolled', null)
+const pinned = inject('gc-pinned', null)
+// 胞吐是暖居外壳专属(gc-scrolled 仅 WarmLayout provide):光尘等无 .gc-pin 的环境
+// 强制原位渲染,否则 teleport 目标缺失会导致工具栏整个消失
+const inWarm = computed(() => scrolled !== null && pinned !== null)
+const teleportDisabled = computed(() => !inWarm.value || !(props.always || pinned.value))
 const toolbarEl = ref(null)
 const holderEl = ref(null)
 const holderH = ref(0)
@@ -34,8 +40,8 @@ const rootClasses = computed(() => {
 const toolbarH = () => (toolbarEl.value?.offsetHeight ?? 0) + props.holderMargin
 
 // 正向:瞬时占位(高度=工具栏高+下边距)抵消内容上移,下一帧渐隐到 0,内容平滑上移
-// 反向:渐显到工具栏高度,内容平滑下移(给 toolbar 让位)
-watch(scrolled, async (val) => {
+// 反向:渐显到工具栏高度,内容平滑下移(给 toolbar 让位);光尘下源为 null,getter 恒 undefined 不触发
+watch(() => scrolled?.value, async (val) => {
   if (props.always) return
   if (val) {
     if (holderEl.value) holderEl.value.style.transition = 'none'
@@ -57,7 +63,7 @@ watch(scrolled, async (val) => {
 })
 
 // toolbar 回位时(pinned=false),holder 瞬时消失,抵消 toolbar 回来带来的内容下移
-watch(pinned, (val) => {
+watch(() => pinned?.value, (val) => {
   if (!val && !props.always) {
     if (holderEl.value) holderEl.value.style.transition = 'none'
     holderH.value = 0

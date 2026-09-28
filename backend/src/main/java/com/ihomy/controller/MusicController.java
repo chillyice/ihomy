@@ -45,7 +45,7 @@ public class MusicController {
         return Result.success(musicService.listByFamily(user.getFamilyId()));
     }
 
-    @Operation(summary = "播放地址(storage:// 逻辑地址现签,签名 URL 过期后重新获取)")
+    @Operation(summary = "获取音乐播放地址")
     @GetMapping("/{id}/play-url")
     public Result<Map<String, String>> playUrl(@PathVariable Long id) {
         LoginUser user = requireLogin();

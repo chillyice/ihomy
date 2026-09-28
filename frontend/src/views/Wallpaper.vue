@@ -742,11 +742,10 @@ onBeforeUnmount(() => {
   transition: opacity .5s ease, transform .5s ease;
 }
 .wp-ui.visible { opacity: 1; transform: none; pointer-events: auto; }
-/* 窄屏(手机/竖屏副屏):右下角控件会换行并压住左下角的日期/天气行,改挂右上角;
-   面板此时要排在控件行下方(挂右上时往上排会顶出屏幕) */
+/* 窄屏(手机/竖屏副屏):右下角控件会换行并压住左下角的日期/天气行,改挂右上角。
+   注意 `.wp-widgets` 的覆写要写在它自己的基础规则之后(同特异性看源序),故放在文件此处下方 */
 @media (max-width: 768px) {
   .wp-ui { top: clamp(18px, 4vw, 28px); bottom: auto; }
-  .wp-widgets { order: 1; }
 }
 .wp-seg {
   display: flex; gap: 2px; padding: 3px; border-radius: 12px;
@@ -760,9 +759,11 @@ onBeforeUnmount(() => {
 .wp-segbtn:hover { color: var(--color-text); }
 .wp-segbtn.on { background: var(--color-brand); color: var(--color-brand-text); }
 
-/* 组件面板:撑满一行浮在控件行上方(order:-1);窄屏控件挂右上时改排到下方(见文件末尾 media) */
+/* 组件面板:浮在控件行上方、右对齐,宽度随内容收窄(不再跟着按钮行拉满整行);
+   脱离文档流以免撑开 .wp-ui 的换行布局;窄屏改排到下方(见紧随其后的 media) */
 .wp-widgets {
-  order: -1; width: 100%; box-sizing: border-box; padding: 8px;
+  position: absolute; right: 0; bottom: calc(100% + 10px);
+  width: max-content; min-width: 140px; box-sizing: border-box; padding: 8px;
   border-radius: 12px; background: rgba(var(--color-card-rgb), .86);
   border: 1px solid var(--color-border); box-shadow: 0 14px 40px rgba(0, 0, 0, .18);
 }
@@ -778,6 +779,10 @@ onBeforeUnmount(() => {
 .wp-widgets-row:hover { background: var(--color-card-2); color: var(--color-text); }
 .wp-widgets-row.on { color: var(--color-text); }
 .wp-widgets-mark { width: 14px; text-align: center; font-weight: 700; color: var(--color-brand); }
+/* 窄屏控件挂右上角,面板改排到控件行下方(往上排会顶出屏幕) */
+@media (max-width: 768px) {
+  .wp-widgets { top: calc(100% + 10px); bottom: auto; }
+}
 
 /* ===== 登录卡(z=90,压在体积光 78 之上保证表单清晰;灯光层 pointer-events:none 不挡输入) =====
    遮罩本身 pointer-events:none、只让卡片吃点击 —— 否则未登录时全屏遮罩会把右下角主题切换按钮一起挡住 */

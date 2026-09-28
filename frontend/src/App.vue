@@ -139,6 +139,10 @@ watch(
   position: relative;
 }
 
+/* 户型图编辑专注模式(Item 页编辑态时在 <html> 上挂 fp-edit-focus):隐藏左侧导航,内容区占满整屏,画板优先 */
+html.fp-edit-focus .app-sidebar { display: none; }
+html.fp-edit-focus .app-main.with-sidebar { margin-left: 0; }
+
 /* 页面滑动过渡:当前页面整体向下滑出,新页面从上方滑入 */
 /* 仿佛平板手机滑动屏幕切换,配合全局光影层看不出页面在切换 */
 .slide-down-enter-active,

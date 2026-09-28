@@ -548,7 +548,8 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 
 - 筛选行:起止日期选择器+查询按钮+灰色小字提示「数据来自 access 日志文件扫描,按天聚合(上限 14 天)」。
 - 6 指标卡片一行(`.traffic-grid` 6 列,768px 折 3 列):总请求/失败请求/慢请求(>3s)/独立用户/独立 IP/平均耗时(ms)。
-- 24 小时分布图(`.chart-wrap` SVG 800×280 **等比缩放** width:100% height:auto):24 根暖棕 `#b88c6e` 柱(总请求)+底部红色 `#b04a3a` 叠层(失败数);x 轴每 3 小时一个标签(0h/3h/.../21h);图例两项。
+- 24 小时分布图(`.chart-wrap` SVG 800×280 **等比缩放** width:100% height:auto):24 根暖棕 `#b88c6e` 柱(总请求)+底部红色 `#b04a3a` 叠层(失败数);x 轴每 3 小时一个标签(0h/3h/.../21h);图例两项;hover 交互见下方图表 hover 规范(V9.95)。
+- **图表 hover 数值规范(V9.95,强制——全站所有柱状图/折线图统一)**:手写 SVG 图表**必须**带 hover 数值提示,不为此引 ECharts(at_pf「执行趋势」的 axis tooltip 用十几行即可复刻)。交互三件套:① **整列透明拾取 rect**(柱图取 `barStep` 整列宽消除柱间死区,折线图取相邻点中点列宽)+`mouseenter`/`mouseleave` 驱动 `hoverIdx`;② **轴指示器**——柱图用整列高亮(ECharts axisPointer shadow 风格,如 `.tb-hover-col` 暖棕 12% 半透明),折线图用竖虚线+数据点圆点;③ **数值提示**复用 `.chart-tooltip` 体系(时间标题 + `.ct-row` 色点/名称/数值,色点与图例同款),定位取数据点(柱图取柱心)横向比例并 clamp 0.15~0.85 防出界。既有实现:Ops.vue 访问量柱状图/操作日志与 AI 调用趋势折线图、Weather.vue 逐小时气温与空气质量走势。
 - 接口 Top15 表:接口(mono 字体)/请求数/失败/平均耗时;无数据显示空态。
 - 懒加载(切到 tab 才查)+`/ops?tab=traffic` 路由直达。
 

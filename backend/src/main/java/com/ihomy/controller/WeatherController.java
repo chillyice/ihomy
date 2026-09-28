@@ -54,7 +54,7 @@ public class WeatherController {
         return Result.success(out);
     }
 
-    @Operation(summary = "新增天气 API 凭证(密钥加密入库)")
+    @Operation(summary = "新增天气 API 凭证")
     @OperationLog(module = "WEATHER", operationType = "CREATE", description = "新增天气 API 凭证", saveArgs = false)
     @RequirePermission("family:manage")
     @PostMapping("/credentials")
@@ -129,7 +129,7 @@ public class WeatherController {
             c.setProvider(WeatherConst.PROVIDER_QWEATHER);
         }
         if (!WeatherConst.isValidProvider(c.getProvider())) {
-            throw new BizException(ResultCode.BAD_REQUEST, "未知的天气源:" + c.getProvider());
+            throw new BizException(ResultCode.BAD_REQUEST, "未知的天气源,请重新选择");
         }
         applyField(c::setName, body.get("name"));
         applyField(c::setEnv, body.get("env"));
@@ -163,7 +163,7 @@ public class WeatherController {
                     String json = mapper.writeValueAsString(Map.of("apiKey", apiKey.trim()));
                     c.setConfigJson(parameterService.encrypt(json));
                 } catch (Exception e) {
-                    throw new BizException(ResultCode.BAD_REQUEST, "API Key 序列化失败");
+                    throw new BizException(ResultCode.BAD_REQUEST, "API Key 保存失败,请重试");
                 }
             }
         }

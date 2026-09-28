@@ -690,6 +690,9 @@ const furnPresets = [
 // ---- 户型图状态 ----
 const listMode = ref(false)
 const mode = ref('view') // view | edit
+// 编辑态广播到 <html>(fp-edit-focus):外壳按它进「画板专注模式」——隐藏导航栏、主区拉宽、去底衬渐变
+watch(mode, (m) => document.documentElement.classList.toggle('fp-edit-focus', m === 'edit'))
+onBeforeUnmount(() => document.documentElement.classList.remove('fp-edit-focus'))
 const tool = ref('select') // select | draw-rect | draw-poly
 const sidebarTab = ref('rooms')
 const rulerPopVisible = ref(false) // 尺子角标列表弹层显隐

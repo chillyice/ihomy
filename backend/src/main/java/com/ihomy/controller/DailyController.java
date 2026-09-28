@@ -68,7 +68,7 @@ public class DailyController {
                 "蔬菜水果放同一个塑料袋会加快腐烂,香蕉苹果和马铃薯分开存放更耐久。"));
     }
 
-    @Operation(summary = "微软必应每日一图(当日缓存)")
+    @Operation(summary = "微软必应每日一图")
     @GetMapping("/daily-image")
     public Result<Map<String, Object>> dailyImage() {
         String today = LocalDate.now().toString();

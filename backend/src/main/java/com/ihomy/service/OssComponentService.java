@@ -186,7 +186,7 @@ public class OssComponentService {
             r = aiService.chatJson(familyId, AiConst.FEATURE_OSS_UPGRADE_EVAL, systemPrompt, userContent);
         } catch (BizException e) {
             throw new BizException(ResultCode.BAD_REQUEST,
-                    "AI 评估不可用:" + e.getMessage() + "(需在「设置-家庭 AI 配置」为 OSS_UPGRADE_EVAL 功能绑定 LLM 模型)");
+                    "AI 评估不可用:" + e.getMessage() + "(需在「设置 → 家庭 AI 配置」里为「升级评估」绑定一个语言模型)");
         }
         Map<String, Object> assess = new LinkedHashMap<>();
         assess.put("componentId", id);

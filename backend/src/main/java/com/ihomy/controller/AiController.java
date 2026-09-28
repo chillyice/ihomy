@@ -58,7 +58,7 @@ public class AiController {
         return Result.success(familyAiConfigService.listModels(currentFamilyId()));
     }
 
-    @Operation(summary = "新增家庭 AI 模型(密钥加密入库)")
+    @Operation(summary = "新增家庭 AI 模型")
     @OperationLog(module = "AI", operationType = "CREATE", description = "新增 AI 模型", saveArgs = false)
     @RequirePermission("family:manage")
     @PostMapping("/models")
