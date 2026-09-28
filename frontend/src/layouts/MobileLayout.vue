@@ -51,7 +51,7 @@ const PAGE_TITLES = {
   '/task': '任务', '/reminder': '提醒', '/plan': '计划', '/wish': '愿望单',
   '/book': '记账', '/chat': '聊天室', '/tree': '家谱', '/cascade': '照片瀑布',
   '/item': '物品', '/kitchen': '厨房', '/library': '书架', '/settings': '设置',
-  '/ops': '运维管理', '/login': '登录',
+  '/ops': '运维管理', '/vault': '保险箱', '/login': '登录',
 }
 const pageTitle = computed(() => {
   if (route.path.startsWith('/blog/')) return route.path.includes('/edit/') ? '编辑博客' : '博客详情'

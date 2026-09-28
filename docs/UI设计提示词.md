@@ -342,6 +342,8 @@ color: #3A2E22;
 
 **设备映射来源角标(统一)**:卡片封面角落 `设备名 + .status-dot` 状态点,半透明白底(`rgba(255,255,255,0.85)`)磨砂圆角小标签(11px,#6b5d4c);状态点 6px 圆点带辉光:VALID 绿 `#67b26b` / OFFLINE 灰 `#9a9a9a` / MISSING 红 `#b96058`;暗色模式 `rgba(30,42,72,0.85)` 底 `#c9b8a0` 字。
 
+**页签组变体(`.tb-left` 放 `el-radio-group`,`size="small"`,V9.99 起 / V9.105 二例)**:页面内部有多个平级视图时,视图切换用 `el-radio-group` 放 `.tb-left`(按钮型 `el-radio-button`,与 `.tb-left` 筛选组件同 `size="small"` 保持 24px 高),该视图专属的操作与筛选整组放 `.tb-right` 并用 `v-if` 跟随当前页签隐藏(切走时不给无关操作留位置)。**页签不写进 URL**(刷新回默认页签,避免与「从侧栏进入」的期望冲突),除非该页签本身需要可分享(如运维页 `?tab=trace&tid=`,见 §20)。已用:`/tools/loan`(贷款试算/提前还款/反推利率/贷款记录)、`/book`(记账本/贷款记录)。
+
 **游戏/播放页顶栏变体(`.game-topbar`,V9.72)**:宠物连连看/Flash 播放器顶部「返回+全屏」不适用 §11b 多选工具栏,改用 `PageToolbar root-class="game-topbar" :holder-margin="0" always`,右侧 `.game-top-actions`(`margin-left:auto;flex gap:8px`)放圆角小按钮(返回 ArrowLeft + 全屏 FullScreen);容器样式定义在 `PageToolbar.vue`、`.game-top-actions` 与暖居 `.gc-pin .game-topbar` 胞吐适配定义在 `main.css`,与物品定位 `.fp-topbar` 同构;全屏目标为 `.game-card`(非 `.page`)。
 
 ## 11c. 音乐页(Music)

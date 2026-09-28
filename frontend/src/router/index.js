@@ -27,6 +27,8 @@ const routes = [
   { path: '/plant', redirect: '/tools/plant' },
   { path: '/wish', name: 'Wish', component: () => import('@/views/wish/Wish.vue'), meta: { public: true } },
   { path: '/book', name: 'Book', component: () => import('@/views/book/Book.vue'), meta: { public: true } },
+  // 家庭保险箱(密码管理器):家庭共享的账号密码保管箱,须登录
+  { path: '/vault', name: 'Vault', component: () => import('@/views/vault/Vault.vue'), meta: { requiresAuth: true } },
   { path: '/tree', name: 'Tree', component: () => import('@/views/tree/Tree.vue'), meta: { public: true } },
   { path: '/cascade', name: 'Cascade', component: () => import('@/views/cascade/Cascade.vue'), meta: { public: true } },
   { path: '/weather', name: 'Weather', component: () => import('@/views/weather/Weather.vue'), meta: { public: true } },
@@ -52,6 +54,8 @@ const routes = [
   { path: '/tools/ai-playground', name: 'AiPlayground', component: () => import('@/views/tools/AiPlayground.vue'), meta: { requiresAuth: true } },
   // 3D 光影实验台(临时):Three.js 太阳模拟+真实阴影,未来场景主题的 3D 基础模型
   { path: '/tools/light-lab', name: 'LightLab', component: () => import('@/views/tools/LightLab.vue'), meta: { public: true, immersive: true } },
+  // 贷款计算器:纯前端试算(等额本息/等额本金、商业/公积金/组合贷、提前还款对比),不依赖后端
+  { path: '/tools/loan', name: 'LoanCalculator', component: () => import('@/views/tools/LoanCalculator.vue'), meta: { public: true } },
   // Flash 播放器(Ruffle):本地加载 .swf 怀旧小游戏
   { path: '/tools/flash', name: 'FlashPlayer', component: () => import('@/views/tools/FlashPlayer.vue'), meta: { public: true } },
   // GBA 播放器(EmulatorJS):本地加载 .gba/.gbc/.gb 复古游戏

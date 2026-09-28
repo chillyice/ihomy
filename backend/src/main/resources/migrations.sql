@@ -1237,3 +1237,166 @@ WHERE r.role_code = 'OPS'
   AND ur.family_id IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM `sys_user_role` x
                   WHERE x.user_id = ur.user_id AND x.role_id = ur.role_id AND x.family_id IS NULL);
+
+-- ------------------------------------------------------------
+-- V9.98 家庭保险箱(密码管理器 / 账号密码保管箱,2026-09-28)
+--   S1 落地:family_vault_item 表 + AES-GCM 密文存储(盐值 sys_parameter.aes-salt)+ 操作审计。
+--   密文列 password_enc 只出库内,列表接口仅回掩码;明文只在「揭示密码」接口解密返回并写操作日志。
+--   全部语句幂等(表 CREATE IF NOT EXISTS / 授权与模块 NOT EXISTS / 字典 INSERT IGNORE),
+--   可重复执行;schema.sql 为全量版,本段供已部署库增量升级。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `family_vault_item` (
+  `id`           BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`    BIGINT        NOT NULL COMMENT '所属家庭ID',
+  `name`         VARCHAR(100)  NOT NULL COMMENT '条目名称(如:家庭网盘)',
+  `category`     VARCHAR(30)   NOT NULL DEFAULT 'OTHER' COMMENT '分类: SITE网站/APP应用/BANK银行卡/DEVICE设备/WIFI无线网络/SOCIAL社交/OTHER其他',
+  `username`     VARCHAR(200)  DEFAULT NULL COMMENT '账号/用户名',
+  `password_enc` VARCHAR(1024) DEFAULT NULL COMMENT '密码密文 ENC(...)(AES-GCM,盐值 sys_parameter.aes-salt)',
+  `url`          VARCHAR(500)  DEFAULT NULL COMMENT '登录地址',
+  `tags`         VARCHAR(200)  DEFAULT NULL COMMENT '标签(逗号分隔,可搜索)',
+  `note`         VARCHAR(1000) DEFAULT NULL COMMENT '备注',
+  `owner_id`     BIGINT        NOT NULL COMMENT '创建人ID(PRIVATE 条目仅创建人可见)',
+  `visibility`   VARCHAR(20)   NOT NULL DEFAULT 'FAMILY' COMMENT '可见范围: PRIVATE仅自己/FAMILY家庭可见',
+  `deleted`      TINYINT       NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0正常/1已删除',
+  `created_at`   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family_created` (`family_id`, `deleted`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭保险箱条目(账号密码保管箱)';
+
+-- 权限码:uk_auth_code 唯一,INSERT IGNORE 幂等
+INSERT IGNORE INTO `sys_auth` (`auth_code`, `auth_name`, `module`, `description`) VALUES
+('vault:view',   '查看保险箱', 'VAULT', '查看账号密码条目(受可见范围限制)'),
+('vault:manage', '管理保险箱', 'VAULT', '新增/修改/删除账号密码条目');
+
+-- 角色授权:OWNER 由「全量减去 ops:view」的既有规则覆盖(此处补 OWNER 以防历史库已跑过那条 INSERT);
+-- MEMBER/CHILD 纳入保险箱读写,GUEST 不给(仅浏览公开内容)。NOT EXISTS 守卫保证幂等。
+INSERT INTO `sys_role_auth` (`role_id`, `auth_id`)
+SELECT r.id, a.id FROM `sys_role` r JOIN `sys_auth` a
+WHERE r.role_code IN ('OWNER', 'MEMBER', 'CHILD')
+  AND a.auth_code IN ('vault:view', 'vault:manage')
+  AND NOT EXISTS (SELECT 1 FROM `sys_role_auth` x WHERE x.role_id = r.id AND x.auth_id = a.id);
+
+-- 字典:分类下拉(uk_group_value 唯一,INSERT IGNORE 幂等)
+INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('vault_category', 'SITE',   '网站'),
+('vault_category', 'APP',    '应用'),
+('vault_category', 'BANK',   '银行卡'),
+('vault_category', 'SOCIAL', '社交'),
+('vault_category', 'DEVICE', '设备'),
+('vault_category', 'WIFI',   '无线网络'),
+('vault_category', 'OTHER',  '其他');
+
+-- 首页模块:保险箱入口(生活组,sort 17);sys_home_module 无唯一约束兜底,用 NOT EXISTS 防重
+INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`)
+SELECT 'vault', '保险箱', 'icon-vault', '/vault', 'life', 'left', 17, 1
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM `sys_home_module` WHERE `code` = 'vault' AND `family_id` IS NULL);
+
+-- ------------------------------------------------------------
+-- V9.101 家庭贷款记录(2026-09-28)
+--   family_loan(真实贷款登记) + family_loan_event(事件时间轴:利率调整/提前还款),
+--   还款流水由前端按事件重算(utils/loan.js loanLedger);工具箱子页,不新增首页模块。
+--   全部语句幂等(表 CREATE IF NOT EXISTS / 授权 NOT EXISTS / 字典 INSERT IGNORE),可重复执行。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `family_loan` (
+  `id`             BIGINT         NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`      BIGINT         NOT NULL COMMENT '所属家庭ID',
+  `name`           VARCHAR(100)   NOT NULL COMMENT '贷款名称(如:建行房贷)',
+  `channel`        VARCHAR(20)    NOT NULL DEFAULT 'OTHER' COMMENT '资金渠道: COMMERCIAL商业贷款/FUND公积金贷款/OTHER其他',
+  `method`         VARCHAR(30)    NOT NULL DEFAULT 'EQUAL_INSTALLMENT' COMMENT '还款方式: EQUAL_INSTALLMENT等额本息/EQUAL_PRINCIPAL等额本金',
+  `amount`         DECIMAL(14, 2) NOT NULL COMMENT '贷款本金(元)',
+  `months`         INT            NOT NULL COMMENT '还款期数(月)',
+  `loan_date`      DATE           DEFAULT NULL COMMENT '放款日(可空;与首期还款日一起推出首期计息天数)',
+  `first_pay_date` DATE           DEFAULT NULL COMMENT '首期还款日(可空;期次换算真实年月与推算已还期数)',
+  `first_payment`  DECIMAL(14, 2) DEFAULT NULL COMMENT '首期还款额(元,可空;空=按整月口径推算)',
+  `rate`           DECIMAL(6, 4)  NOT NULL COMMENT '初始年利率(%)',
+  `group_name`     VARCHAR(100)   DEFAULT NULL COMMENT '贷款组名称(选填;同组贷款合并展示合计,如商贷+公积金同填「组合贷」)',
+  `note`           VARCHAR(500)   DEFAULT NULL COMMENT '备注',
+  `created_by`     BIGINT         NOT NULL COMMENT '创建人ID',
+  `deleted`        TINYINT        NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0正常/1已删除',
+  `created_at`     DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`     DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family_created` (`family_id`, `deleted`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭贷款记录(真实贷款登记)';
+
+CREATE TABLE IF NOT EXISTS `family_loan_event` (
+  `id`               BIGINT         NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `loan_id`          BIGINT         NOT NULL COMMENT '所属贷款ID(family_loan.id)',
+  `effective_period` INT            NOT NULL COMMENT '生效期次:在第N期还款之后生效',
+  `type`             VARCHAR(20)    NOT NULL COMMENT '事件类型: RATE_CHANGE利率调整/PREPAY提前还款',
+  `rate`             DECIMAL(6, 4)  DEFAULT NULL COMMENT '调整后的年利率(%)(RATE_CHANGE时有效)',
+  `amount`           DECIMAL(14, 2) DEFAULT NULL COMMENT '提前还款金额(元)(PREPAY时有效)',
+  `strategy`         VARCHAR(20)    DEFAULT NULL COMMENT '提前还款处理: SHORTEN缩短年限/REDUCE减少月供',
+  `note`             VARCHAR(500)   DEFAULT NULL COMMENT '备注',
+  `created_at`       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_loan` (`loan_id`, `effective_period`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭贷款事件时间轴(利率调整/提前还款)';
+
+-- 权限码:uk_auth_code 唯一,INSERT IGNORE 幂等
+INSERT IGNORE INTO `sys_auth` (`auth_code`, `auth_name`, `module`, `description`) VALUES
+('loan:view',   '查看贷款记录', 'LOAN', '查看家庭贷款与还款流水'),
+('loan:manage', '管理贷款记录', 'LOAN', '新增/修改/删除贷款、利率调整与提前还款事件');
+
+-- 角色授权:OWNER 由「全量减去 ops:view」的既有规则覆盖(此处补 OWNER 以防历史库已跑过那条 INSERT);
+-- MEMBER/CHILD 读写家庭贷款,GUEST 不给。NOT EXISTS 守卫保证幂等。
+INSERT INTO `sys_role_auth` (`role_id`, `auth_id`)
+SELECT r.id, a.id FROM `sys_role` r JOIN `sys_auth` a
+WHERE r.role_code IN ('OWNER', 'MEMBER', 'CHILD')
+  AND a.auth_code IN ('loan:view', 'loan:manage')
+  AND NOT EXISTS (SELECT 1 FROM `sys_role_auth` x WHERE x.role_id = r.id AND x.auth_id = a.id);
+
+-- 字典:渠道/还款方式/事件类型/提前还款处理(uk_group_value 唯一,INSERT IGNORE 幂等)
+INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('loan_channel', 'COMMERCIAL', '商业贷款'),
+('loan_channel', 'FUND',       '公积金贷款'),
+('loan_channel', 'OTHER',      '其他贷款'),
+('loan_method', 'EQUAL_INSTALLMENT', '等额本息'),
+('loan_method', 'EQUAL_PRINCIPAL',   '等额本金'),
+('loan_event_type', 'RATE_CHANGE', '利率调整'),
+('loan_event_type', 'PREPAY',      '提前还款'),
+('loan_prepay_strategy', 'SHORTEN', '缩短年限（月供不变）'),
+('loan_prepay_strategy', 'REDUCE',  '减少月供（期限不变）');
+-- ------------------------------------------------------------
+-- V9.102 贷款组 + 事件触发时间(2026-09-28)
+--   family_loan 加 group_name(同组贷款前端合并展示合计,如商贷+公积金同填「组合贷」)。
+--   MySQL 8 无 ADD COLUMN IF NOT EXISTS,用 information_schema 条件 + prepared statement 幂等。
+-- ------------------------------------------------------------
+SET @has_group_name := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_loan' AND COLUMN_NAME = 'group_name');
+SET @ddl := IF(@has_group_name = 0,
+  "ALTER TABLE `family_loan` ADD COLUMN `group_name` VARCHAR(100) DEFAULT NULL COMMENT '贷款组名称(选填;同组贷款合并展示合计,如商贷+公积金同填「组合贷」)' AFTER `rate`",
+  'SELECT 1');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ------------------------------------------------------------
+-- V9.103 事件触发日落库(2026-09-28)
+--   family_loan_event 加 trigger_date:填了事件时间的记录,流水线上重新拖拽时弹编辑重新确认日期;
+--   没填的只挪生效期次(前端据此判断,故必须落库)。此列只作录入日期的留存,还款流水不读它。
+--   MySQL 8 无 ADD COLUMN IF NOT EXISTS,用 information_schema 条件 + prepared statement 幂等。
+-- ------------------------------------------------------------
+SET @has_trigger_date := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_loan_event' AND COLUMN_NAME = 'trigger_date');
+SET @ddl := IF(@has_trigger_date = 0,
+  "ALTER TABLE `family_loan_event` ADD COLUMN `trigger_date` DATE DEFAULT NULL COMMENT '事件触发日(选填;与生效期次互为表述,重新拖拽时据它确认日期)' AFTER `effective_period`",
+  'SELECT 1');
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ------------------------------------------------------------
+-- V9.104 保险箱入口移到工具箱上方(2026-09-28)
+--   生活组排序调整为 …家谱 14 → 保险箱 15 → 工具箱 16 → 花园 17(V9.98 时保险箱落在组尾 17)。
+--   按 code 定位全局行(family_id IS NULL,与模块种子的守卫口径一致);带 sort_order 守卫,重复执行无害。
+--   ⚠ 直改 DB 后 HomeModuleService 的全局内存缓存不失效,须重启后端(或走模块管理接口触发 evict)才生效。
+-- ------------------------------------------------------------
+UPDATE `sys_home_module` SET `sort_order` = 15 WHERE `code` = 'vault' AND `family_id` IS NULL AND `sort_order` <> 15;
+UPDATE `sys_home_module` SET `sort_order` = 16 WHERE `code` = 'tools' AND `family_id` IS NULL AND `sort_order` <> 16;
+UPDATE `sys_home_module` SET `sort_order` = 17 WHERE `code` = 'plant' AND `family_id` IS NULL AND `sort_order` <> 17;
+

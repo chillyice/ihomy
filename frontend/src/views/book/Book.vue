@@ -1,70 +1,79 @@
-<!-- 记账本页：家庭共享账本,月切换/收支统计卡/分类支出排行/明细列表 -->
+<!-- 记账本页:家庭共享账本(月切换/收支统计卡/分类支出排行/明细列表)+ 贷款记录(复用工具箱的贷款记录组件) -->
 <template>
   <div class="page">
     <Breadcrumb :items="[{ label: $t('book.title') }]" />
 
     <PageToolbar>
       <div class="tb-left">
-        <el-date-picker v-model="month" type="month" value-format="YYYY-MM" @change="load" style="width: 140px" />
+        <el-radio-group v-model="tab" size="small">
+          <el-radio-button value="book">{{ $t('book.tabBook') }}</el-radio-button>
+          <el-radio-button value="loan">{{ $t('book.tabLoan') }}</el-radio-button>
+        </el-radio-group>
       </div>
-      <div class="tb-right">
+      <div v-if="tab === 'book'" class="tb-right">
+        <el-date-picker v-model="month" type="month" value-format="YYYY-MM" @change="load" style="width: 140px" />
         <el-button type="primary" @click="openEditor()">{{ $t('book.add') }}</el-button>
       </div>
     </PageToolbar>
 
-    <!-- 统计卡 -->
-    <div class="stats-row">
-      <div class="stat-card card income">
-        <div class="stat-label">{{ $t('book.income') }}</div>
-        <div class="stat-value">+{{ stats.income?.toFixed(2) ?? '0.00' }}</div>
+    <template v-if="tab === 'book'">
+      <!-- 统计卡 -->
+      <div class="stats-row">
+        <div class="stat-card card income">
+          <div class="stat-label">{{ $t('book.income') }}</div>
+          <div class="stat-value">+{{ stats.income?.toFixed(2) ?? '0.00' }}</div>
+        </div>
+        <div class="stat-card card expense">
+          <div class="stat-label">{{ $t('book.expense') }}</div>
+          <div class="stat-value">-{{ stats.expense?.toFixed(2) ?? '0.00' }}</div>
+        </div>
+        <div class="stat-card card">
+          <div class="stat-label">{{ $t('book.balance') }}</div>
+          <div class="stat-value">{{ stats.balance?.toFixed(2) ?? '0.00' }}</div>
+        </div>
       </div>
-      <div class="stat-card card expense">
-        <div class="stat-label">{{ $t('book.expense') }}</div>
-        <div class="stat-value">-{{ stats.expense?.toFixed(2) ?? '0.00' }}</div>
-      </div>
-      <div class="stat-card card">
-        <div class="stat-label">{{ $t('book.balance') }}</div>
-        <div class="stat-value">{{ stats.balance?.toFixed(2) ?? '0.00' }}</div>
-      </div>
-    </div>
 
-    <div class="content">
-      <!-- 明细列表 -->
-      <div class="records card">
-        <h3>{{ $t('book.records') }}</h3>
-        <div v-loading="loading">
-          <div v-for="r in records" :key="r.id" class="record-row">
-            <div class="record-main">
-              <span class="record-cat" :class="typeCls(r)">{{ catText(r) }}</span>
-              <div class="record-info">
-                <div class="record-remark">{{ r.remark || r.category }}</div>
-                <div class="record-meta">{{ r.recordDate }} · {{ r.creatorName }}</div>
+      <div class="content">
+        <!-- 明细列表 -->
+        <div class="records card">
+          <h3>{{ $t('book.records') }}</h3>
+          <div v-loading="loading">
+            <div v-for="r in records" :key="r.id" class="record-row">
+              <div class="record-main">
+                <span class="record-cat" :class="typeCls(r)">{{ catText(r) }}</span>
+                <div class="record-info">
+                  <div class="record-remark">{{ r.remark || r.category }}</div>
+                  <div class="record-meta">{{ r.recordDate }} · {{ r.creatorName }}</div>
+                </div>
+              </div>
+              <div class="record-amount" :class="typeCls(r)">{{ (r.type === 'EXPENSE' ? '-' : '+') + r.amount }}</div>
+              <div class="record-actions">
+                <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
+                  <el-button size="small" text @click="openEditor(r)"><el-icon><Edit /></el-icon></el-button>
+                </el-tooltip>
+                <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+                  <el-button size="small" text type="danger" @click="onDel(r)"><el-icon><Delete /></el-icon></el-button>
+                </el-tooltip>
               </div>
             </div>
-            <div class="record-amount" :class="typeCls(r)">{{ (r.type === 'EXPENSE' ? '-' : '+') + r.amount }}</div>
-            <div class="record-actions">
-              <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
-                <el-button size="small" text @click="openEditor(r)"><el-icon><Edit /></el-icon></el-button>
-              </el-tooltip>
-              <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
-                <el-button size="small" text type="danger" @click="onDel(r)"><el-icon><Delete /></el-icon></el-button>
-              </el-tooltip>
-            </div>
+            <el-empty v-if="!records.length" :description="$t('book.noRecords')" />
           </div>
-          <el-empty v-if="!records.length" :description="$t('book.noRecords')" />
         </div>
-      </div>
 
-      <!-- 分类排行 -->
-      <div class="cats card">
-        <h3>{{ $t('book.expenseCategories') }}</h3>
-        <div v-for="c in stats.categoryStats || []" :key="c.category" class="cat-row">
-          <span class="cat-name">{{ c.category }}</span>
-          <span class="cat-total">{{ c.total.toFixed(2) }}</span>
+        <!-- 分类排行 -->
+        <div class="cats card">
+          <h3>{{ $t('book.expenseCategories') }}</h3>
+          <div v-for="c in stats.categoryStats || []" :key="c.category" class="cat-row">
+            <span class="cat-name">{{ c.category }}</span>
+            <span class="cat-total">{{ c.total.toFixed(2) }}</span>
+          </div>
+          <div v-if="!stats.categoryStats?.length" class="cat-empty">{{ $t('common.empty') }}</div>
         </div>
-        <div v-if="!stats.categoryStats?.length" class="cat-empty">{{ $t('common.empty') }}</div>
       </div>
-    </div>
+    </template>
+
+    <!-- 贷款记录:与工具箱/贷款计算器同一组件同一份数据(家庭共享) -->
+    <LoanRecords v-else />
 
     <el-dialog v-model="editor.visible" append-to-body :title="editor.form.id ? $t('book.editRecord') : $t('book.add')" width="420px">
       <el-form :model="editor.form" label-position="top">
@@ -102,7 +111,7 @@
 
 <script setup>
 // 记账本:月度明细+收支统计;改删仅记录人/家长(后端校验),前端按条件隐藏按钮
-import { onMounted, reactive, ref } from 'vue'
+import { defineAsyncComponent, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -111,11 +120,15 @@ import { bookApi } from '@/api'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 
+// 贷款记录与工具箱/贷款计算器是同一组件同一份家庭数据;异步加载,首屏(记账本)不为它买单
+const LoanRecords = defineAsyncComponent(() => import('@/views/tools/LoanRecords.vue'))
+
 // ponytail: 分类为用户自选/自定义数据(入库存储),不做翻译
 const CATEGORIES = ['餐饮', '交通', '购物', '家居', '水电燃气', '医疗', '教育', '娱乐', '工资', '红包', '其他']
 
 const { t } = useI18n()
 const userStore = useUserStore()
+const tab = ref('book')
 const loading = ref(false)
 const saving = ref(false)
 const month = ref(new Date().toISOString().slice(0, 7))
