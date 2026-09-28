@@ -42,7 +42,7 @@ public class ItemAiService {
 
     private static final String FIND_SYSTEM_PROMPT = """
             你是家庭物品定位助手。用户会用自然语言描述要找的物品(如"我的充电器在哪""谁看见遥控器了")。
-            你的任务是从描述中提取用于搜索物品表的关键词。物品可搜索的字段:物品名、别名、位置描述,以及所在家具名、房间名、房子名。
+            你的任务是从描述中提取用于查找物品的关键词:物品名(含常见叫法/别名)、可能的位置词(家具、房间、房子)。
             物品类型仅六种:KITCHENWARE(厨具)、INGREDIENT(食材)、DAILY(日化)、CLOTHES(衣服)、TOOL(工具)、OTHER(其他)。
             只输出 JSON 对象,不要输出任何其他内容:
             {"keywords": ["关键词1", "关键词2", "关键词3"], "type": null}
@@ -51,13 +51,13 @@ public class ItemAiService {
     private static final String PUT_SYSTEM_PROMPT = """
             你是家庭物品位置记录助手。用户会说"把X放在Y""X在Y的Z里"等,请解析出物品与位置。
             规则:
-            1. 目标位置 furnitureId/roomId 必须从提供的上下文清单(furnitures/rooms)中选 id,严禁编造;
+            1. 目标位置必须从给出的家具/房间清单中选择(furnitureId / roomId 只能填清单里已有的项),严禁编造;
             2. 用户提到家具时优先给 furnitureId(家具会决定房间);只提到房间(如"在客厅地上")给 roomId;
-            3. 上下文里找不到匹配的家具/房间时对应字段填 null(物品仍会登记,位置留空);
+            3. 清单里找不到匹配的家具/房间时,对应字段填 null(物品仍会被记录,位置留空);
             4. type 仅六种:KITCHENWARE/INGREDIENT/DAILY/CLOTHES/TOOL/OTHER,判断不出填 OTHER;
-            5. 物品名提取简短通用叫法(如"剪刀"),优先复用已知规范词集合中的词;aliases 数组给 3~5 个常见同义叫法;quantity/unit 仅在用户说明数量时给;
+            5. 物品名提取简短通用叫法(如"剪刀"),优先复用家庭里常用的叫法;aliases 数组给 3~5 个常见同义叫法;quantity/unit 仅在用户说明数量时给;
             6. 若用户描述的是已有物品换了位置(如"剪刀现在在厨房"),move 填 true;明确是新买的物品填 false。
-               items 清单是"名称(别名1/别名2)"紧凑文本,仅供判定用户说的是否为已有物品,不含位置信息。
+               给出的已有物品清单形如「名称(别名1/别名2)」,不含位置信息,仅用于判断用户说的是否是已有物品。
             只输出 JSON 对象,不要输出任何其他内容:
             {"name":"物品名","aliases":["别名"],"type":"TOOL","position":"最上层抽屉","quantity":null,"unit":null,"roomId":null,"furnitureId":null,"move":true}""";
 
@@ -299,7 +299,7 @@ public class ItemAiService {
     private String putSystemPrompt() {
         String canonicals = synonymService.canonicalList();
         if (canonicals.isEmpty()) return PUT_SYSTEM_PROMPT;
-        return PUT_SYSTEM_PROMPT + "\n已知规范词集合(物品名优先从中复用,勿另造同义新词):" + canonicals;
+        return PUT_SYSTEM_PROMPT + "\n家庭里常用的物品叫法(物品名优先从中复用,勿另造同义新词):" + canonicals;
     }
 
     /** 把(规范词, 别名)写回同义词表:逐个别名 upsert(source=LLM),已存在幂等跳过 */

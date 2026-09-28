@@ -190,7 +190,7 @@
           <div class="card settings-card">
             <div class="section-label">创建新家庭</div>
             <button class="create-family-btn" @click="showCreateFamily = true">创建新家庭</button>
-            <p class="share-tip">创建一个新的家庭组,你将成为新家庭的家长(OWNER)。创建后自动切换到新家庭,可在顶栏切换回原家庭。</p>
+            <p class="share-tip">创建一个新的家庭组,你将成为新家庭的家长。创建后自动切换到新家庭,可在顶栏切换回原家庭。</p>
           </div>
         </template>
 
@@ -402,7 +402,7 @@
                   <el-switch v-model="alertPushEnabled" @change="onAlertPushChange" />
                   <span class="setting-label">推送到通知铃铛</span>
                 </div>
-                <div class="share-tip">开启后当地发布的气象预警(暴雨/大风等)自动推送给全部家庭成员站内通知,约每 30 分钟检查一次</div>
+                <div class="share-tip">开启后当地发布的气象预警(暴雨/大风等)会自动通知全部家庭成员(不是实时推送,可能延迟半小时左右)</div>
               </el-form-item>
             </el-form>
           </div>
@@ -602,7 +602,7 @@
 
     <!-- 创建新家庭弹窗 -->
     <el-dialog v-model="showCreateFamily" title="创建新家庭" width="380px" append-to-body @keyup.esc="showCreateFamily = false">
-      <div class="fm-hint">你将成为新家庭的家长(OWNER),创建后自动切换到新家庭。</div>
+      <div class="fm-hint">你将成为新家庭的家长,创建后自动切换到新家庭。</div>
       <el-input
         ref="familyNameInputRef"
         v-model="newFamilyName"

@@ -166,7 +166,7 @@ public class FamilyAiConfigService {
         if (name != null) m.setName(name);
         String type = trimToNull(body.get("type"));
         if (type != null) {
-            if (!AiConst.isValidType(type)) throw new BizException(ResultCode.BAD_REQUEST, "模型类型须为 LLM/IMAGE/ASR");
+            if (!AiConst.isValidType(type)) throw new BizException(ResultCode.BAD_REQUEST, "模型类型不正确,请重新选择");
             m.setType(type);
         }
         if (m.getType() == null) throw new BizException(ResultCode.BAD_REQUEST, "模型类型不能为空");
@@ -176,7 +176,7 @@ public class FamilyAiConfigService {
         // 服务商 provider 仅 ASR 有意义;非 ASR 一律 OPENAI,ASR 缺省 OPENAI
         String provider = trimToNull(body.get("provider"));
         if (provider != null && !AiConst.isValidProvider(provider)) {
-            throw new BizException(ResultCode.BAD_REQUEST, "服务商须为 OPENAI/BAIDU");
+                throw new BizException(ResultCode.BAD_REQUEST, "服务商不受支持,请重新选择");
         }
         if (AiConst.TYPE_ASR.equals(m.getType())) {
             m.setProvider(provider == null && m.getProvider() == null ? AiConst.PROVIDER_OPENAI : (provider != null ? provider : m.getProvider()));
@@ -262,7 +262,7 @@ public class FamilyAiConfigService {
             AiModel m = requireModel(modelId, familyId);
             Set<String> allowed = AiConst.allowedTypes(featureCode);
             if (!allowed.contains(m.getType())) {
-                throw new BizException(ResultCode.BAD_REQUEST, "该功能只能绑定" + String.join("/", allowed) + "类型的模型");
+                throw new BizException(ResultCode.BAD_REQUEST, "选择的模型类型不适用于该功能,请重新选择");
             }
             target = m.getId();
         }
@@ -274,7 +274,7 @@ public class FamilyAiConfigService {
             AiModel fm = requireModel(fallbackModelId, familyId);
             Set<String> allowed = AiConst.allowedTypes(featureCode);
             if (!allowed.contains(fm.getType())) {
-                throw new BizException(ResultCode.BAD_REQUEST, "兜底模型只能绑定" + String.join("/", allowed) + "类型的模型");
+                throw new BizException(ResultCode.BAD_REQUEST, "选择的兜底模型类型不适用于该功能,请重新选择");
             }
             targetFallback = fm.getId();
         }

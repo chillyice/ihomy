@@ -152,7 +152,7 @@
           <el-empty v-if="traffic && !traffic.total" :description="$t('ops.traceEmpty')" :image-size="40" />
           <template v-if="traffic && traffic.total">
             <h4 class="ops-section-title" style="margin-top: 20px">{{ $t('ops.hourly') }}</h4>
-            <div class="chart-wrap">
+            <div class="chart-wrap chart-hover-wrap">
               <svg :viewBox="`0 0 ${chartW} ${chartH}`" class="line-chart">
                 <line v-for="(tk, i) in tYTicks" :key="'tg'+i" :x1="padL" :x2="chartW - padR" :y1="tk.y" :y2="tk.y" stroke="var(--color-border)" stroke-width="1" stroke-dasharray="3 3" />
                 <text v-for="(tk, i) in tYTicks" :key="'tl'+i" :x="padL - 8" :y="tk.y + 4" text-anchor="end" fill="var(--color-text-secondary)" font-size="11">{{ tk.label }}</text>
@@ -162,10 +162,20 @@
                 </template>
                 <text v-for="hx in [0, 3, 6, 9, 12, 15, 18, 21]" :key="'hx'+hx" :x="padL + (hx + 0.5) * barStep"
                   :y="chartH - padB + 16" text-anchor="middle" fill="var(--color-text-secondary)" font-size="11">{{ hx }}h</text>
+                <rect v-if="tHoverIdx >= 0" class="tb-hover-col" :x="padL + tHoverIdx * barStep" :y="padT"
+                  :width="barStep" :height="chartH - padB - padT" />
+                <rect v-for="(h, i) in traffic.hours" :key="'thv'+i" :x="padL + i * barStep" :y="padT"
+                  :width="barStep" :height="chartH - padB - padT" fill="transparent"
+                  @mouseenter="tHoverIdx = i" @mouseleave="tHoverIdx = -1" />
               </svg>
               <div class="chart-legend">
                 <span class="legend-item"><span class="legend-dot" style="background:#b88c6e"></span>{{ $t('ops.trafficTotal') }}</span>
                 <span class="legend-item"><span class="legend-dot" style="background:#b04a3a"></span>{{ $t('ops.trafficFailed') }}</span>
+              </div>
+              <div v-if="tHoverIdx >= 0 && traffic.hours[tHoverIdx]" class="chart-tooltip" :style="tTooltipStyle">
+                <div class="ct-time">{{ String(traffic.hours[tHoverIdx].hour).padStart(2, '0') }}:00</div>
+                <div class="ct-row"><span class="ct-dot" style="background:#b88c6e"></span>{{ $t('ops.trafficTotal') }} <b>{{ traffic.hours[tHoverIdx].total }}</b></div>
+                <div class="ct-row"><span class="ct-dot" style="background:#b04a3a"></span>{{ $t('ops.trafficFailed') }} <b>{{ traffic.hours[tHoverIdx].failed }}</b></div>
               </div>
             </div>
             <h4 class="ops-section-title" style="margin-top: 20px">{{ $t('ops.topPaths') }}</h4>
@@ -743,6 +753,13 @@ const tYTicks = computed(() => {
     ticks.push({ y: chartH - padB - (chartH - padB - padT) * i / 4, label: Math.round(tYMax.value * i / 4) })
   }
   return ticks
+})
+// 柱状图悬浮提示:整列拾取 + 高亮列 + 数值提示(与折线图同一套交互)
+const tHoverIdx = ref(-1)
+const tTooltipStyle = computed(() => {
+  if (tHoverIdx.value < 0) return {}
+  const ratio = Math.min(Math.max((padL + (tHoverIdx.value + 0.5) * barStep) / chartW, 0.15), 0.85)
+  return { left: (ratio * 100) + '%' }
 })
 
 // ---------- 折线图几何(纯函数,天气/AI 共用;数据点为 {time_bucket,total,failed}) ----------
@@ -1396,6 +1413,7 @@ watch(tab, (v) => {
 .ct-row { display: flex; align-items: center; gap: 6px; color: var(--color-text); }
 .ct-row b { font-variant-numeric: tabular-nums; }
 .ct-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.tb-hover-col { fill: rgba(184, 140, 110, 0.12); pointer-events: none; }
 .quota-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .quota-progress { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
 .qp-track { flex: 1; height: 10px; background: var(--color-card-2); border-radius: 5px; overflow: hidden; }

@@ -129,8 +129,8 @@ public class AiService {
                         mapper.writeValueAsBytes(body), c.timeoutMs());
             }
             if (!resp.ok()) {
-                throw new BizException(ResultCode.INTERNAL_ERROR,
-                        "AI 服务返回异常(" + resp.status() + "):" + truncate(resp.body(), 200));
+                log.warn("[AI] 服务返回异常 status={} body={}", resp.status(), truncate(resp.body(), 500));
+                throw new BizException(ResultCode.INTERNAL_ERROR, "AI 服务暂时不可用,请稍后重试");
             }
             JsonNode root = mapper.readTree(resp.body());
             JsonNode content = root.path("choices").path(0).path("message").path("content");
@@ -259,8 +259,8 @@ public class AiService {
                         mapper.writeValueAsBytes(body), c.timeoutMs());
             }
             if (!resp.ok()) {
-                throw new BizException(ResultCode.INTERNAL_ERROR,
-                        "AI 图片生成返回异常(" + resp.status() + "):" + truncate(resp.body(), 200));
+                log.warn("[AI] 图片生成返回异常 status={} body={}", resp.status(), truncate(resp.body(), 500));
+                throw new BizException(ResultCode.INTERNAL_ERROR, "AI 生图暂时不可用,请稍后重试");
             }
             JsonNode data = mapper.readTree(resp.body()).path("data");
             if (!data.isArray() || data.isEmpty()) {
@@ -394,8 +394,8 @@ public class AiService {
         String url = stripTrailingSlash(c.baseUrl()) + "/audio/transcriptions";
         ThirdPartyHttp.Resp resp = ThirdPartyHttp.request("ai", "POST", url, headers, body, c.timeoutMs());
         if (!resp.ok()) {
-            throw new BizException(ResultCode.INTERNAL_ERROR,
-                    "AI 语音识别返回异常(" + resp.status() + "):" + truncate(resp.body(), 200));
+            log.warn("[AI] 语音识别返回异常 status={} body={}", resp.status(), truncate(resp.body(), 500));
+            throw new BizException(ResultCode.INTERNAL_ERROR, "语音识别服务暂时不可用,请稍后重试");
         }
         String text = mapper.readTree(resp.body()).path("text").asText("");
         Map<String, Object> out = new LinkedHashMap<>();
@@ -417,7 +417,7 @@ public class AiService {
         }
         int r = rate == null ? 16000 : rate;
         if (r != 16000 && r != 8000) {
-            throw new BizException(ResultCode.BAD_REQUEST, "采样率仅支持 16000/8000");
+                throw new BizException(ResultCode.BAD_REQUEST, "音频格式不支持,请换一段音频重试");
         }
         String text = baiduAsrClient.recognize(
                 stripTrailingSlash(c.baseUrl()),

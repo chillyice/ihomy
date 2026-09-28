@@ -99,7 +99,7 @@ public class MindMapController {
 
     // ---------- 历史版本快照 ----------
 
-    @Operation(summary = "创建快照(source=MANUAL手动/AUTO自动,默认MANUAL)")
+    @Operation(summary = "创建脑图快照(手动/自动来源)")
     @OperationLog(module = "MINDMAP", operationType = "CREATE", description = "创建脑图快照")
     @PostMapping("/{id}/snapshot")
     public Result<Void> snapshot(@PathVariable Long id, @RequestParam(defaultValue = "MANUAL") String source) {
@@ -108,13 +108,13 @@ public class MindMapController {
         return Result.success();
     }
 
-    @Operation(summary = "快照列表(不含 data 大字段)")
+    @Operation(summary = "脑图快照列表")
     @GetMapping("/{id}/snapshot/list")
     public Result<List<Map<String, Object>>> listSnapshots(@PathVariable Long id) {
         return Result.success(mindMapService.listSnapshots(id, current().getFamilyId()));
     }
 
-    @Operation(summary = "快照详情(含 data,回滚预览用)")
+    @Operation(summary = "脑图快照详情(回滚预览用)")
     @GetMapping("/{id}/snapshot/{snapshotId}")
     public Result<ContentMindmapSnapshot> getSnapshot(@PathVariable Long id, @PathVariable Long snapshotId) {
         return Result.success(mindMapService.getSnapshot(id, snapshotId, current().getFamilyId()));

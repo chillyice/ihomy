@@ -101,7 +101,7 @@ public class StorageController {
         return streamFromDevice(device, path, null, download, false, range);
     }
 
-    @Operation(summary = "签名中转读取设备文件(img/video 标签专用,签名即凭证,10 分钟有效;thumb=1 返回 480px 缓存缩略图)")
+    @Operation(summary = "读取设备文件(供页面图片展示与视频播放)")
     @GetMapping("/file-signed")
     public ResponseEntity<?> fileSigned(@RequestParam Long deviceId,
                                         @RequestParam String path,
@@ -238,7 +238,7 @@ public class StorageController {
         return Result.success(storageService.getBaiduCredential(currentFamilyId()));
     }
 
-    @Operation(summary = "保存百度网盘接入凭证(密钥加密入库,留空保留原值)")
+    @Operation(summary = "保存百度网盘接入凭证(密钥留空则保留原值)")
     @OperationLog(module = "STORAGE", operationType = "UPDATE", description = "保存百度网盘凭证", saveArgs = false)
     @RequirePermission("storage:manage")
     @PutMapping("/baidu/credential")
@@ -255,7 +255,7 @@ public class StorageController {
         return Result.success(Map.of("url", storageService.getBaiduAuthUrl(currentFamilyId(), redirectUri)));
     }
 
-    @Operation(summary = "百度网盘 OAuth 授权回调:授权码换 token 并加密存储")
+    @Operation(summary = "百度网盘 OAuth 授权回调")
     @OperationLog(module = "STORAGE", operationType = "UPDATE", description = "百度网盘OAuth授权", saveArgs = false)
     @RequirePermission("storage:manage")
     @PostMapping("/baidu/auth/callback")
@@ -276,8 +276,8 @@ public class StorageController {
         return Result.success(Map.of("taskId", taskId));
     }
 
-    @Operation(summary = "清空设备缩略图缓存(下次打开相册重新生成)")
-    @OperationLog(module = "STORAGE", operationType = "DELETE", description = "清理缩略图缓存")
+    @Operation(summary = "清空设备缩略图(下次打开相册重新生成)")
+    @OperationLog(module = "STORAGE", operationType = "DELETE", description = "清理缩略图")
     @RequirePermission("storage:manage")
     @DeleteMapping("/thumbs")
     public Result<Integer> clearThumbs() {

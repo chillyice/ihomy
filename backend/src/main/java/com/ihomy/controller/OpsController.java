@@ -145,7 +145,7 @@ public class OpsController {
         return Result.success(weatherService.getTypeDistribution(range));
     }
 
-    @Operation(summary = "新旧版本并行验证(v7 vs v1,同一位置关键字段对照;每次约 6 次调用,手动触发)")
+    @Operation(summary = "天气接口新旧版本结果对照(手动触发)")
     @RequirePermission("ops:view")
     @GetMapping("/weather/compare")
     public Result<Map<String, Object>> weatherCompare() {

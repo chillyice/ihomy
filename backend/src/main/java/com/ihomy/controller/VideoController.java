@@ -47,7 +47,7 @@ public class VideoController {
         return Result.success(videoService.list(familyId, keyword, mediaType));
     }
 
-    @Operation(summary = "播放地址(storage:// 逻辑地址现签,列表签名 URL 过期后重新获取)")
+    @Operation(summary = "获取视频播放地址")
     @GetMapping("/{id}/play-url")
     public Result<Map<String, String>> playUrl(@PathVariable Long id) {
         SysUser user = securityHelper.currentUser();

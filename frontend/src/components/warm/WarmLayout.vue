@@ -287,7 +287,7 @@ watch(() => route.fullPath, () => { canBack.value = window.history.state?.back !
 .gc-weatherbg.revealed { z-index: 30; opacity: 1; }
 
 /* ===== 预览壳 ===== */
-.gc-wrap { position: relative; z-index: 10; max-width: 1180px; margin: 0 auto; height: 100vh; padding: 24px 20px 24px; display: flex; flex-direction: column; box-sizing: border-box; }
+.gc-wrap { position: relative; z-index: 10; max-width: 1180px; margin: 0 auto; height: 100vh; padding: 24px 20px 24px; display: flex; flex-direction: column; box-sizing: border-box; transition: max-width .35s ease; }
 .gc-topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; flex-shrink: 0; height: 44px; }
 .gc-brand { display: flex; align-items: center; gap: 14px; cursor: pointer; }
 .gc-logo { width: 44px; height: 44px; border-radius: 14px; background: var(--color-brand); color: var(--color-card);
@@ -397,6 +397,18 @@ watch(() => route.fullPath, () => { canBack.value = window.history.state?.back !
 /* 登录/注册页在暖居内容区内垂直居中:覆盖 .login-page 的 100vh,按内容区实际高度填充(否则被顶栏/studio 顶得偏下并产生滚动)。
  * 加 html.theme-warm 前缀提权:Login.vue 的 scoped .login-page{min-height:100vh} 懒加载注入更晚、同权时会把这里覆盖掉。 */
 html.theme-warm .gc-main .login-page { min-height: 100%; }
+
+/* ===== 户型图编辑专注模式(Item 页编辑态时在 <html> 上挂 fp-edit-focus)=====
+ * 画板优先:隐藏侧栏导航,外壳拉宽到主区净宽=85vw(gc-wrap 左右 padding 共 40px),
+ * studio 的双色渐变底衬一并取消,减少画布周围的视觉噪音。 */
+html.fp-edit-focus .gc-side { display: none; }
+html.fp-edit-focus .gc-app { grid-template-columns: 1fr; }
+html.fp-edit-focus .gc-wrap { max-width: calc(85vw + 40px); }
+html.fp-edit-focus .gc-studio { background: var(--color-bg); }
+
+/* 暖居下 Item 页按主区可视高度撑满(fp-page 默认 100dvh 比 gc-main 可视区高约 158px,
+ * 画板底部被裁掉要滚动才能看全);height:100% 让画板一屏铺满、不再产生内部滚动。 */
+html.theme-warm .gc-main .fp-page { height: 100%; }
 
 /* 按钮/标签(暖居专属) */
 .gc-btn { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--color-border); background: var(--color-line); color: var(--color-text-secondary); border-radius: 11px; padding: 9px 16px; font-size: 13px; cursor: pointer; transition: .2s; font-weight: 550; }

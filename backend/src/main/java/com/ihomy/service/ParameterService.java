@@ -40,7 +40,7 @@ public class ParameterService {
                 SysParameter p = new SysParameter();
                 p.setName(SALT_KEY);
                 p.setValue(envSalt);
-                p.setDescription("AES-GCM 盐值(来自环境变量 IHOMY_AES_SALT)");
+                p.setDescription("敏感信息加密用的盐值(请勿修改;由部署环境提供)");
                 parameterMapper.upsert(p);
             } catch (Exception e) {
                 log.warn("Sync env salt to DB failed: {}", e.getMessage());
@@ -58,7 +58,7 @@ public class ParameterService {
         SysParameter newParam = new SysParameter();
         newParam.setName(SALT_KEY);
         newParam.setValue(cachedSalt);
-        newParam.setDescription("AES-GCM 加密盐值(PBKDF2 派生密钥用),首次启动自动生成");
+        newParam.setDescription("敏感信息加密用的盐值(请勿修改;首次启动自动生成)");
         try {
             parameterMapper.upsert(newParam);
             log.info("AES salt generated and persisted to sys_parameter");
