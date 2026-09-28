@@ -1191,6 +1191,19 @@ html.dark .el-tag.el-tag--warning { background: rgba(var(--color-brand-rgb),0.15
 html.dark .el-tag.el-tag--danger { background: rgba(201,116,116,0.15) !important; border-color: rgba(201,116,116,0.2) !important; color: #c97474 !important; }
 html.dark .el-tag.el-tag--info { background: rgba(255,255,255,0.08) !important; border-color: rgba(255,255,255,0.1) !important; color: rgba(232,220,200,0.6) !important; }
 
+/* 贷款流水线「未生效 / 下一期」标签:鼠尾草绿(与事件/未来节点配色同源,取暖居调色板,晨暮各一套)
+ * —— EP 标签配色统一在全局覆写,组件 scoped 样式会被上面这些 !important 盖掉 */
+.el-tag.lr-tag-sage {
+  background: rgba(124, 139, 108, 0.12) !important;
+  border-color: rgba(124, 139, 108, 0.24) !important;
+  color: #6c7a5d !important;
+}
+html.dark .el-tag.lr-tag-sage {
+  background: rgba(143, 160, 128, 0.18) !important;
+  border-color: rgba(143, 160, 128, 0.26) !important;
+  color: #a3b492 !important;
+}
+
 /* ========== 数量角标 ========== */
 .el-badge__content {
   background: rgba(58,46,34,0.7) !important;

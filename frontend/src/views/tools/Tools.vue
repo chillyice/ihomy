@@ -33,6 +33,12 @@
         <div class="tool-desc">{{ $t('tools.flash.desc') }}</div>
         <span class="tool-enter">{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon></span>
       </div>
+      <div class="tool-card card" @click="$router.push('/tools/loan')">
+        <div class="tool-icon"><el-icon :size="30"><Coin /></el-icon></div>
+        <div class="tool-name">{{ $t('tools.loan.title') }}</div>
+        <div class="tool-desc">{{ $t('tools.loan.desc') }}</div>
+        <span class="tool-enter">{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon></span>
+      </div>
       <div class="tool-card card" @click="$router.push('/tools/gba')">
         <div class="tool-icon"><el-icon :size="30"><VideoPlay /></el-icon></div>
         <div class="tool-name">{{ $t('tools.gba.title') }}</div>
@@ -48,7 +54,7 @@
 </template>
 
 <script setup>
-import { Tools, ArrowRight, MagicStick, Sunny, VideoPlay } from '@element-plus/icons-vue'
+import { Tools, ArrowRight, MagicStick, Sunny, VideoPlay, Coin } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 </script>

@@ -693,7 +693,13 @@ INSERT INTO `sys_auth` (`auth_code`, `auth_name`, `module`, `description`) VALUE
 -- 运维模块（V3.8）
 ('ops:view',           '运维查看',     'OPS',    '查看系统资源统计/服务器状态/操作日志（仅运维管理员）'),
 -- 电子图书模块（V7.1）
-('library:manage',     '图书管理',     'LIBRARY', '上传/修改/删除电子书');
+('library:manage',     '图书管理',     'LIBRARY', '上传/修改/删除电子书'),
+-- 家庭保险箱模块（V9.98）
+('vault:view',         '查看保险箱',   'VAULT',   '查看账号密码条目（受可见范围限制）'),
+('vault:manage',       '管理保险箱',   'VAULT',   '新增/修改/删除账号密码条目'),
+-- 家庭贷款记录模块（V9.101）
+('loan:view',          '查看贷款记录', 'LOAN',    '查看家庭贷款与还款流水'),
+('loan:manage',        '管理贷款记录', 'LOAN',    '新增/修改/删除贷款、利率调整与提前还款事件');
 
 -- ------------------------------------------------------------
 -- 24. 角色-权限映射
@@ -722,7 +728,9 @@ WHERE r.role_code = 'MEMBER'
     'album:create','album:view',
     'photo:upload','photo:delete','photo:view',
     'comment:create','comment:delete',
-    'library:manage'
+    'library:manage',
+    'vault:view','vault:manage',
+    'loan:view','loan:manage'
   );
 
 -- CHILD 权限
@@ -735,7 +743,9 @@ WHERE r.role_code = 'CHILD'
     'blog:create','blog:update','blog:delete','blog:view',
     'diary:create','diary:update','diary:delete','diary:view',
     'album:view','photo:upload','photo:view',
-    'comment:create','comment:delete'
+    'comment:create','comment:delete',
+    'vault:view','vault:manage',
+    'loan:view','loan:manage'
   );
 
 -- GUEST 权限（仅浏览公开内容）
@@ -777,8 +787,9 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('book',      '记账本',   'icon-book',      '/book',   'life', 'left', 12, 1),
 ('cascade',   '照片瀑布', 'icon-photo',     '/cascade','life', 'left', 13, 1),
 ('tree',      '家谱',     'icon-tree',      '/tree',   'life', 'left', 14, 1),
-('tools',     '工具箱',   'icon-tools',     '/tools',  'life', 'left', 15, 1),
-('plant',     '花园',     'icon-plant',     '/tools/plant',  'life', 'left', 16, 0),
+('vault',     '保险箱',   'icon-vault',     '/vault',        'life', 'left', 15, 1),
+('tools',     '工具箱',   'icon-tools',     '/tools',  'life', 'left', 16, 1),
+('plant',     '花园',     'icon-plant',     '/tools/plant',  'life', 'left', 17, 0),
 ('member', '家庭成员', 'icon-member', '/member', 'social',  'right',  1, 1),
 ('cover',  '家庭封面', 'icon-cover',  '/cover',  'system',  'top',    1, 0),
 ('storage','文件浏览','icon-storage','/storage/files','system',  'left',  16, 1);
@@ -1303,7 +1314,25 @@ INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
 ('oss_status', 'IGNORED',  '忽略'),
 ('oss_integration', 'FULL',     '已完整集成'),
 ('oss_integration', 'PARTIAL',  '部分集成'),
-('oss_integration', 'PLANNED',  '规划中');
+('oss_integration', 'PLANNED',  '规划中'),
+-- 家庭保险箱字典(V9.98)
+('vault_category', 'SITE',   '网站'),
+('vault_category', 'APP',    '应用'),
+('vault_category', 'BANK',   '银行卡'),
+('vault_category', 'SOCIAL', '社交'),
+('vault_category', 'DEVICE', '设备'),
+('vault_category', 'WIFI',   '无线网络'),
+('vault_category', 'OTHER',  '其他'),
+-- 家庭贷款记录字典(V9.101)
+('loan_channel', 'COMMERCIAL', '商业贷款'),
+('loan_channel', 'FUND',       '公积金贷款'),
+('loan_channel', 'OTHER',      '其他贷款'),
+('loan_method', 'EQUAL_INSTALLMENT', '等额本息'),
+('loan_method', 'EQUAL_PRINCIPAL',   '等额本金'),
+('loan_event_type', 'RATE_CHANGE', '利率调整'),
+('loan_event_type', 'PREPAY',      '提前还款'),
+('loan_prepay_strategy', 'SHORTEN', '缩短年限（月供不变）'),
+('loan_prepay_strategy', 'REDUCE',  '减少月供（期限不变）');
 -- ------------------------------------------------------------
 -- 41. 身份标签表(V3.9): 成员在家庭内的身份标签(如"爸爸""妈妈"),每家庭一套
 --     预设 爸爸/妈妈;其余(如"大宝")为自定义。user_id+family_id 唯一。
@@ -1903,6 +1932,82 @@ INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `curre
 ('Nextcloud', 'SERVICE', 'nextcloud/server', NULL, 'AGPL-3.0', 'https://github.com/nextcloud/server', 'WebDAV/Nextcloud 存储后端', 'PARTIAL'),
 ('Jellyfin', 'SERVICE', 'jellyfin/jellyfin', NULL, 'GPL-2.0', 'https://github.com/jellyfin/jellyfin', '放映厅媒体引擎(规划)', 'PLANNED'),
 ('Home Assistant', 'SERVICE', 'home-assistant/core', NULL, 'Apache-2.0', 'https://github.com/home-assistant/core', '智能家居中控(规划)', 'PLANNED');
+
+-- NPM/MAVEN 直接依赖交由 Renovate 检测 + 生成 PR,SERVICE 独立服务由台账内部维护(默认 INTERNAL)
+
+-- ------------------------------------------------------------
+-- 60. family_vault_item 家庭保险箱条目(V9.98):家庭共享的账号密码保管箱
+--     password_enc 存 ENC(Base64(iv+密文+tag)) 密文(盐值 sys_parameter.aes-salt);
+--     列表接口只出掩码,明文仅经 /vault/{id}/password 揭示(写操作日志)
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_vault_item`;
+CREATE TABLE `family_vault_item` (
+  `id`           BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`    BIGINT        NOT NULL COMMENT '所属家庭ID',
+  `name`         VARCHAR(100)  NOT NULL COMMENT '条目名称(如:家庭网盘)',
+  `category`     VARCHAR(30)   NOT NULL DEFAULT 'OTHER' COMMENT '分类: SITE网站/APP应用/BANK银行卡/DEVICE设备/WIFI无线网络/SOCIAL社交/OTHER其他',
+  `username`     VARCHAR(200)  DEFAULT NULL COMMENT '账号/用户名',
+  `password_enc` VARCHAR(1024) DEFAULT NULL COMMENT '密码密文 ENC(...)(AES-GCM,盐值 sys_parameter.aes-salt)',
+  `url`          VARCHAR(500)  DEFAULT NULL COMMENT '登录地址',
+  `tags`         VARCHAR(200)  DEFAULT NULL COMMENT '标签(逗号分隔,可搜索)',
+  `note`         VARCHAR(1000) DEFAULT NULL COMMENT '备注',
+  `owner_id`     BIGINT        NOT NULL COMMENT '创建人ID(PRIVATE 条目仅创建人可见)',
+  `visibility`   VARCHAR(20)   NOT NULL DEFAULT 'FAMILY' COMMENT '可见范围: PRIVATE仅自己/FAMILY家庭可见',
+  `deleted`      TINYINT       NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0正常/1已删除',
+  `created_at`   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family_created` (`family_id`, `deleted`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭保险箱条目(账号密码保管箱)';
+
+-- ------------------------------------------------------------
+-- 61. family_loan 家庭贷款记录(V9.101):登记真实贷款,还款流水由前端按事件时间轴重算
+--     金额单位为元;rate 为年利率百分数(3.1 = 3.1%)。组合贷按渠道拆成多条记录。
+--     loan_date/first_pay_date 填写后首期按实际天数计息;first_payment 可按账单覆盖首期还款额。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_loan`;
+CREATE TABLE `family_loan` (
+  `id`             BIGINT         NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`      BIGINT         NOT NULL COMMENT '所属家庭ID',
+  `name`           VARCHAR(100)   NOT NULL COMMENT '贷款名称(如:建行房贷)',
+  `channel`        VARCHAR(20)    NOT NULL DEFAULT 'OTHER' COMMENT '资金渠道: COMMERCIAL商业贷款/FUND公积金贷款/OTHER其他',
+  `method`         VARCHAR(30)    NOT NULL DEFAULT 'EQUAL_INSTALLMENT' COMMENT '还款方式: EQUAL_INSTALLMENT等额本息/EQUAL_PRINCIPAL等额本金',
+  `amount`         DECIMAL(14, 2) NOT NULL COMMENT '贷款本金(元)',
+  `months`         INT            NOT NULL COMMENT '还款期数(月)',
+  `loan_date`      DATE           DEFAULT NULL COMMENT '放款日(可空;与首期还款日一起推出首期计息天数)',
+  `first_pay_date` DATE           DEFAULT NULL COMMENT '首期还款日(可空;期次换算真实年月与推算已还期数)',
+  `first_payment`  DECIMAL(14, 2) DEFAULT NULL COMMENT '首期还款额(元,可空;空=按整月口径推算)',
+  `rate`           DECIMAL(6, 4)  NOT NULL COMMENT '初始年利率(%)',
+  `group_name`     VARCHAR(100)   DEFAULT NULL COMMENT '贷款组名称(选填;同组贷款合并展示合计,如商贷+公积金同填「组合贷」)',
+  `note`           VARCHAR(500)   DEFAULT NULL COMMENT '备注',
+  `created_by`     BIGINT         NOT NULL COMMENT '创建人ID',
+  `deleted`        TINYINT        NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0正常/1已删除',
+  `created_at`     DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`     DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family_created` (`family_id`, `deleted`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭贷款记录(真实贷款登记)';
+
+-- ------------------------------------------------------------
+-- 62. family_loan_event 贷款事件时间轴(V9.101):利率调整/提前还款,编辑时整体重写(物理删,无逻辑删列)
+--     事件在第 N 期还款之后生效:利率调整 → 第 N+1 期起按新利率;提前还款 → 第 N 期后减少剩余本金。
+--     子表不带 family_id(家庭隔离由主记录保证)。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_loan_event`;
+CREATE TABLE `family_loan_event` (
+  `id`               BIGINT         NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `loan_id`          BIGINT         NOT NULL COMMENT '所属贷款ID(family_loan.id)',
+  `effective_period` INT            NOT NULL COMMENT '生效期次:在第N期还款之后生效',
+  `trigger_date`     DATE           DEFAULT NULL COMMENT '事件触发日(选填;与生效期次互为表述,重新拖拽时据它确认日期)',
+  `type`             VARCHAR(20)    NOT NULL COMMENT '事件类型: RATE_CHANGE利率调整/PREPAY提前还款',
+  `rate`             DECIMAL(6, 4)  DEFAULT NULL COMMENT '调整后的年利率(%)(RATE_CHANGE时有效)',
+  `amount`           DECIMAL(14, 2) DEFAULT NULL COMMENT '提前还款金额(元)(PREPAY时有效)',
+  `strategy`         VARCHAR(20)    DEFAULT NULL COMMENT '提前还款处理: SHORTEN缩短年限/REDUCE减少月供',
+  `note`             VARCHAR(500)   DEFAULT NULL COMMENT '备注',
+  `created_at`       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_loan` (`loan_id`, `effective_period`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭贷款事件时间轴(利率调整/提前还款)';
 
 -- NPM/MAVEN 直接依赖交由 Renovate 检测 + 生成 PR,SERVICE 独立服务由台账内部维护(默认 INTERNAL)
 UPDATE `sys_oss_component` SET `managed_by` = 'RENOVATE' WHERE `component_type` IN ('NPM', 'MAVEN');

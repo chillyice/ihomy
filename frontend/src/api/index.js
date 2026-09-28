@@ -252,6 +252,15 @@ export const wishApi = {
   remove: (id) => request.delete(`/wish/${id}`),
 }
 
+// 家庭保险箱(账号密码保管箱):列表只回掩码,密码明文单独走 password 接口
+export const vaultApi = {
+  list: () => request.get('/vault/list'),
+  create: (data) => request.post('/vault', data),
+  update: (id, data) => request.put(`/vault/${id}`, data),
+  remove: (id) => request.delete(`/vault/${id}`),
+  password: (id) => request.get(`/vault/${id}/password`),
+}
+
 // 音乐曲库 + 歌单管理
 export const musicApi = {
   list: () => request.get('/music/list'),
@@ -294,6 +303,14 @@ export const bookApi = {
   create: (data) => request.post('/book', data),
   update: (id, data) => request.put(`/book/${id}`, data),
   remove: (id) => request.delete(`/book/${id}`),
+}
+
+// 家庭贷款记录(真实贷款登记 + 事件时间轴,还款流水由前端按事件重算)
+export const loanApi = {
+  list: () => request.get('/loan/list'),
+  create: (data) => request.post('/loan', data),
+  update: (id, data) => request.put(`/loan/${id}`, data),
+  remove: (id) => request.delete(`/loan/${id}`),
 }
 
 // 运维管理(仅 OPS 角色)

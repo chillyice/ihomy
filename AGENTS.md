@@ -7,6 +7,8 @@
 
 > **⚠ 敏感数据规定(必须遵守)**:**生产**密码/密钥/私钥/token 一律不写入仓库文件——生产 DB 密码与 JWT 密钥走服务器 external.yml(不入 git,模板 `external.yml.template`);凭证台账在本地 `Linux部署指导.md` §〇(两平台共用)、开发账号明文在本地 `docs/新人上手指南.md`(均 .gitignore 忽略,不入 git);前端演示凭证走 `frontend/.env.development.local`(仅 vite dev 加载,生产构建不读取;**`.env.local` 所有模式都加载会内联进生产 bundle,禁用**)。schema.sql 为开发安全版已入库(2026-09-07):仅含本机 Docker 开发固定凭证,生产凭证完全独立,部署时须 `ALTER USER` 改强密码。历史明文凭证清理+轮换见 docs/变更归档.md 敏感数据治理小节。
 
+> **⚠ 多会话并行警示(必须遵守)**:**多会话同时改本仓时禁用 `git stash`**(2026-09-28 踩坑:path-limited `git stash push` 把共享文件 i18n/router 里**其他会话未提交的改动**一起回滚,现象是「刚加好的文案与路由突然消失」);**他人 stash 不 pop**,取自己那部分只读不写:`git show "stash@{0}:<path>"` 按块插回。也别并行 `npm run build`(争 `public/emulatorjs`、`dist/`)。
+
 > **⚠ 路径拼写警示(遵守以防误写)**:
 > - 工作目录绝对路径:`C:\Users\chill\OneDrive\WorkStation\Projects\ihomy`
 > - 每次读/写/移动文件前先逐字核对路径;发现读不到文件时优先怀疑路径拼写而非文件不存在。
@@ -61,7 +63,7 @@
 - **业务运行用 `ihomy` 账号**:仅授予 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`(最小权限,无 CREATE/ALTER/DROP)。application.yml 连接用 `ihomy`,**不要用 root 跑业务**。
 - 账号同时创建 `localhost` 和 `%` 两个 host(本机/远程应用服务器都能连)。
 - **生产 MySQL 密码策略(2026-09-07 轮换踩坑)**:生产库启用 `validate_password` MEDIUM(特殊字符/数字/大小写各≥1,长度≥8)——生成/轮换 DB 密码必须含特殊字符(避开 `' " \ $ |` 转义雷区,建议 `!@%^&*-_+=.`),否则 `ALTER USER` 报 1819;开发 Docker MySQL 无此组件,同一密码 dev 可用 prod 被拒。
-- **70 张表**,前缀分类:`sys_` 20 张(系统/账号/权限/配置/存储)、`report_` 3 张(报表/日志:report_ai / report_weather / report_system)、`family_` 25 张(家庭事务)、`content_` 21 张(内容数据)、另 `game_info` 1 张(家庭小游戏,命名未加 family_ 前缀——遗留)。**完整表清单见 `docs/需求设计说明书.md` §6.2**。
+- **73 张表**,前缀分类:`sys_` 20 张(系统/账号/权限/配置/存储)、`report_` 3 张(报表/日志:report_ai / report_weather / report_system)、`family_` 28 张(家庭事务,含 V9.98 保险箱 `family_vault_item`、V9.101 贷款 `family_loan`/`family_loan_event`)、`content_` 21 张(内容数据)、另 `game_info` 1 张(家庭小游戏,命名未加 family_ 前缀——遗留)。**完整表清单见 `docs/需求设计说明书.md` §6.2**。
   - **命名规则**:家庭事务业务表一律 `family_` 前缀;内容数据 `content_` 前缀;账号/权限/配置/存储保留 `sys_`;**报表/日志表一律 `report_` 前缀**(2026-09-17 V9.72 起,原 sys_weather_log→report_weather、sys_operation_log→report_system,新增 AI 调用日志 report_ai)。新增表必须遵守。前缀取最顶层祖先类别;上下级关系体现在表名(如 `sys_user_role`)。
 - **引用开源软件必须对接自动升级(强制)**:新增任何 npm/Maven 直接依赖或独立开源服务时,**必须同时在 `sys_oss_component` 台账登记一条记录**(`component_type`=NPM/MAVEN/SERVICE + `package_ref` + `current_version` + `license` + `repo_url` + `managed_by`),否则不会被版本跟踪与升级覆盖。**升级闸门(V9.76)**:NPM/MAVEN 交 Renovate 管理(`managed_by=RENOVATE`,`renovate.json` `dependencyDashboardApproval` 检测模式只列 Dashboard 不开 PR)——台账「AI 评估」(`OSS_UPGRADE_EVAL` 功能码)判断升级影响→评估可行→「生成升级 PR」勾选 Dashboard 触发 Renovate 开 PR;SERVICE 独立服务仍台账内部维护(`managed_by=INTERNAL`),按 `deploy_type` 生成方案。漏洞扫描预留 `vuln_count/vuln_severity` 列。运维入口 `/ops/oss`(OPS 角色,`ops:view`),规则实现见 `common/OssVersionUtil` + `service/OssComponentService`。
 - **枚举不再用数字**:状态/类型字段一律大写英文单词(`PUBLISHED/DRAFT/PUBLIC/FAMILY/ACTIVE...`),含义存字典表 `sys_dict_item`,Java 常量集中于 `common/DictConst.java`,前端映射 `utils/dict.js`。**不要写回 0/1/2 判断**。
@@ -82,10 +84,10 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
     annotation/  # @RequirePermission / @OperationLog
     aspect/      # RequirePermissionAspect / OperationLogAspect
     filter/      # TraceIdFilter / AccessLogFilter / CaptureRequestWrapper / CaptureResponseWrapper
-    entity/      # 63 个实体类(70 张表里 7 张关联/字典表无实体)
-    mapper/      # 63 个 MyBatis-Plus BaseMapper(自定义 SQL 全放 resources/mapper/*.xml,接口不写注解,参数统一 @Param)
-    service/     # 58 个 @Service(单实现无接口层)
-    controller/  # 39 个 Controller
+    entity/      # 66 个实体类(73 张表里 7 张关联/字典表无实体)
+    mapper/      # 64 个 MyBatis-Plus BaseMapper(自定义 SQL 全放 resources/mapper/*.xml,接口不写注解,参数统一 @Param)
+    service/     # 60 个 @Service(单实现无接口层)
+    controller/  # 41 个 Controller
     dto/         # 请求/响应 DTO
     websocket/   # ChatWebSocketHandler(原生 WebSocket 聊天室)
   src/main/resources/
@@ -93,20 +95,20 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
     logback-spring.xml  # 三类日志分流(access/server/thirdparty,六要素 pattern,按天滚动)
     external.yml.template  # 外挂配置模板(IHOMY_CONFIG_PATH 覆盖密码/密钥/路径/captcha/天气,唯一开发生产差异机制)
     mapper/*.xml        # 每个 Mapper 一个同名 XML
-    schema.sql          # 建库+建号+建表(70 张)+种子(开发安全版,已入库;本地开发由 start-db.ps1 自动导入)
+    schema.sql          # 建库+建号+建表(73 张)+种子(开发安全版,已入库;本地开发由 start-db.ps1 自动导入)
   mvnw / mvnw.cmd       # Maven Wrapper
 frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
   src/
-    api/          # request.js(axios+JWT+401 自动刷新) + index.js(35 个 Api 对象)
+    api/          # request.js(axios+JWT+401 自动刷新) + index.js(36 个 Api 对象)
     stores/       # user.js(登录+权限) / app.js(首页聚合) / theme.js(主题两轴矩阵)
-    router/       # 登录守卫 + scrollBehavior;53 条路由(50 条懒加载,另 3 条 redirect: /、/plant、兜底)
+    router/       # 登录守卫 + scrollBehavior;56 条路由(53 条懒加载,另 3 条 redirect: /、/plant、兜底)
     i18n/ theme/  # vue-i18n 中英;主题两轴矩阵(暖居/光尘 × 晨/暮)
-    utils/        # dict.js / diary.js / doodle.js(涂鸦引擎) / furnitureIcon.js(家具类型图标) / windowLight.js / useSunLight.js / useDragResize.js
+    utils/        # dict.js / diary.js / doodle.js(涂鸦引擎) / furnitureIcon.js(家具类型图标) / windowLight.js / useSunLight.js / useDragResize.js / password.js(密码生成+强度,纯函数) / loan.js(贷款计算核心,纯函数)
     composables/  # useDevice.js(设备检测) / useWeatherBg.js(天气 AI 生图氛围底图)
     components/   # AppSidebar/BackToTop/Breadcrumb/AvatarCropper/InstallPrompt/SiteFooter/SunLightLayer/LightTestConsole/SyncDialog/Mobile*(移动端)/warm/(暖居外壳 WarmLayout+WarmHome)
     layouts/MobileLayout.vue  # 移动端壳
     styles/main.css # CSS 变量 + 全局样式 + 深色模式 + EP 组件覆写 + @media
-    views/        # 55 个页面(唯一视图文件计数;Home/Login/Member/Settings/Anniversary/album/cinema/diary/blog/points/task/reminder/plan/wish/book/chat/tree/cascade/ops/storage/item/kitchen/library/tools/games(Games+GamePlayer+PetLinkLink)/plant(花园)/kada(咔哒独立下载页)/Wallpaper(壁纸氛围屏))
+    views/        # 58 个页面(唯一视图文件计数;Home/Login/Member/Settings/Anniversary/album/cinema/diary/blog/points/task/reminder/plan/wish/book/chat/tree/cascade/ops/storage/item/kitchen/library/vault(保险箱)/tools(含贷款计算器)/games(Games+GamePlayer+PetLinkLink)/plant(花园)/kada(咔哒独立下载页)/Wallpaper(壁纸氛围屏))
     App.vue
   vite.config.js   # PWA + 代理 /api->8080 + manualChunks 分块 + ElementPlus 按需
 wallpaper-engine/   # Wallpaper Engine 网页壁纸包(壳页顶层跳转线上 /wallpaper;WE 属性 theme/mode/lang 走查询参数、
@@ -155,14 +157,14 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 家庭 | 家庭管理/多家庭切换/成员/邀请码/入家申请 | FamilyController / AuthController / MemberController |
 | 内容 | 博客 / 日记 / 相册照片 / 放映厅 / 照片瀑布 / 愿望单 / 书架 | Blog / Diary / Album+Photo / Video / Cascade / Wish / Library 各 Controller |
 | 互动 | 点赞 / 评论 / 通知 / 聊天室 | Like / Comment / Notification / Chat Controller + ChatWebSocketHandler |
-| 生活 | 纪念日 / 提醒 / 计划 / 任务 / 记账 / 家谱 / 签到积分 / 背景音乐 | Anniversary / Reminder / Plan / Task / Points / Music 各 Controller |
+| 生活 | 纪念日 / 提醒 / 计划 / 任务 / 记账(含贷款记录页签,V9.105,§4.5.5) / 家谱 / 签到积分 / 背景音乐 / 家庭保险箱(V9.98,密码保管箱,§4.5.9) | Anniversary / Reminder / Plan / Task / Points / Music / Vault 各 Controller |
 | 游戏 | 花园植物养殖(全家共养一棵)/ 小游戏库(导入 SWF/GBA + Flash 播放器 Ruffle + GBA 模拟器 EmulatorJS)/ 宠物连连看 H5(通关发积分) | FamilyPlant / GameInfo 各 Controller + FlashPlayer.vue + GbaPlayer.vue + PetLinkLink.vue |
 | 基础 | 文件上传 / 存储管理 / 首页聚合 / 运维 / 开源组件台账 / 每日内容 / 操作日志 / 系统参数 | File / Storage / Home+Public / Ops+Oss / Daily / Log 各 Controller |
 | 光影 | 太阳位置/**日月与晨昏(三档晨昏+月相+月出月落,纯天文计算)**/体积光/台灯/天气 / 天气代理 / 天气详情 / 首页仪表盘 | SolarUtil+SunService(`/public/sun-info` 含 288 时隙+全部日月时刻) + windowLight.js + SunLightLayer.vue |
 | 物品 | 物品定位+户型图+AI 语义 | ItemController / ItemService / ItemAiService+AiService(设计决策见需求设计说明书 §4.8.1) |
 | AI | 图片生成/语音识别接入+AI 测试台+家庭级 AI 配置+AI 调用统计 | AiService / FamilyAiConfigService / AiController(/ai/status、/ai/config、/ai/chat、/ai/image、/ai/transcribe)+ AiStatsService(/ops/ai/**) |
 | 厨房 | 菜单/菜谱/食材 | RecipeController / RecipeService |
-| 工具 | 工具箱聚合页/脑图设计(simple-mind-map,快照/回滚/协同轮询)/AI 测试台(/tools/ai-playground 临时)/3D 光影实验台(/tools/light-lab 临时,Three.js 太阳模拟+真实阴影,未来场景主题基础)/Flash 播放器(/tools/flash)/GBA 播放器(/tools/gba) | MindMapController / MindMapService |
+| 工具 | 工具箱聚合页/脑图设计(simple-mind-map,快照/回滚/协同轮询)/AI 测试台(/tools/ai-playground 临时)/3D 光影实验台(/tools/light-lab 临时,Three.js 太阳模拟+真实阴影,未来场景主题基础)/贷款计算器(/tools/loan,纯前端:等额本息/等额本金 + 商贷/公积金/组合贷 + 提前还款两方案对比 + 利率反推(总额/期限/每期还款额 → 年利率,附实际年化与表面费率),贷款记录(家庭后端 `family_loan`/`family_loan_event` 两表 + `/loan` 接口,事件时间轴自动重算还款流水),核心 `utils/loan.js`)/Flash 播放器(/tools/flash)/GBA 播放器(/tools/gba) | MindMapController / MindMapService |
 | 系统 | i18n / 主题(暖居/光尘 × 晨/暮) / 字典 / 独立产品页(咔哒 Kada 下载页 `/kada`;壁纸氛围屏 `/wallpaper`,均 `meta.standalone`) | i18n/ + theme/(index.js)+stores/theme.js + utils/dict.js + views/Kada.vue + views/Wallpaper.vue |
 | 移动端 | 设备自适应 | useDevice.js + MobileLayout.vue + Mobile* 组件 |
 
@@ -268,13 +270,13 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 #### 验证基线
 
 - 后端编译:`cd backend; .\mvnw.cmd -B clean compile -DskipTests` → BUILD SUCCESS
-- 前端构建:`cd frontend; npm run build` → 入口 chunk ≈321KB(2026-09-26 提示文案清理后实测 **321.12KB/gzip 128.75KB**;V9.94 为 321.43KB/129.07KB;pdfjs ~483KB / simple-mind-map ~341KB / epubjs ~346KB 均为独立异步 chunk,仅对应场景加载;历史基线见 docs/变更归档.md)
+- 前端构建:`cd frontend; npm run build` → 入口 chunk ≈344KB(2026-09-28 V9.105 记账本贷款页签文案后实测 **343.84KB/gzip 139.32KB**;此前 V9.104 后 343.69KB/139.25KB、V9.101–V9.103 后 343.72KB/139.27KB、342.94KB/138.93KB、341.26KB/138.11KB——**涨幅全来自中英双语文案进共享入口 chunk**;各功能页/pdfjs/simple-mind-map/epubjs 均为独立异步 chunk 仅对应场景加载;历史基线见 docs/变更归档.md)
   - **⚠ 口径:vite 报的是「字符数」不是「字节数」**(2026-09-24 实测)。入口 chunk vite 报 318.71KB,`wc -c` 却是 343,667 字节,`wc -m` 才是 318,707 字符——差值是中文注释/字符串的 UTF-8 多字节开销。**别拿 `ls -la` 的字节数跟这个基线比**(会误判成涨了 24KB);要比特字节就 `wc -c` 对 `wc -c`。gzip 那个数即压缩后真实字节数。
 - 接口测试:同级独立项目(不在本仓库)`cd ..\autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed;**CI(GitHub Actions,`.github/workflows/ci.yml`)每次推送自动验证:前后端构建+compose 起库导入 schema+后端启动+登录冒烟**
 
 ## 已实现变更归档(已外置)
 
-> 历史归档已整体迁至 **`docs/变更归档.md`**(现约 496KB / **123 小节**:开头 14 个**功能域**小节——性能优化/首页仪表盘/音乐/光影/UI 规范/厨房/运维/UX/图书/移动端/播放器/博客/日记/相册×5/放映厅/天气/日志追溯/户型图等,其后 109 个**版本**小节按 V9.x 顺序追加),内容原样保留。含文件级改动表、设计决策、踩坑记录与 live DB 同步 SQL。
+> 历史归档已整体迁至 **`docs/变更归档.md`**(现约 553KB / **131 小节** = 开头 14 个**功能域**小节 + 其后 117 个**版本**小节按 V9.x 顺序追加,域清单见该文件开头章节目录),内容原样保留。含文件级改动表、设计决策、踩坑记录与 live DB 同步 SQL。
 > **该文件开头有章节目录**(或 `grep -n "^##### " docs/变更归档.md` 列全部小节);**检索历史实现/设计决策/live DB 迁移 SQL 时读该文件;新的变更归档继续追加到文件末尾**(新增 `#####` 子节),不要再写回 AGENTS.md。
 
 ## 文件存储策略
@@ -314,7 +316,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 > 完整清单(P1-P4)见 docs/需求设计说明书.md 第 9 章。优先级:P1 用户价值高且可行 / P2 锦上添花 / P3 结构性改动 / P4 依赖外部条件。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
 - **P1 放映厅 Jellyfin 集成**:方案已定稿,**启动时先重读 docs/变更归档.md「放映厅 Jellyfin 集成方案」**。
 - **P2 智能家居中控(Home Assistant 集成)**:硬件协议层全归 HA,ihomy 只做数据沉淀与控制入口——S1 Paho 订阅 Mosquitto 入库 sys_iot_device/sys_iot_data+Redis 最新值、S2 HA REST 控制(long-lived token)、S3 前端中控页+物品定位户型图联动;详见 §9。
-- **P2 密码管理器(家庭保险箱)**:家庭共享的账号密码保管箱,预期新增 `family_vault_item`(family_id 隔离 + AES-GCM 密文存储 + PRIVATE/FAMILY 可见范围)+ 分类/搜索/一键复制/密码生成器;明文查看/复制走 `@OperationLog` 审计 + 前端 10 秒自动清剪贴板;分期 S1 表+CRUD+加密存储、S2 用户主密码(前端零知识、忘记不可找回)、S3 明确不做浏览器扩展;详见 §9。
+- **P2 家庭保险箱 主密码(前端零知识)**:S1(表+CRUD+AES-GCM 加密+审计+生成器/强度评估)**已落地 V9.98**(§4.5.9)。剩余主密码方案——密钥只存浏览器、忘记即不可找回、会替换 S1 服务端解密路径(揭示接口与日志口径作废),属不可逆 UX 变更,**待定夺**;S3 明确不做扩展自动填充/跨家庭共享;详见 §9。
 - **场景主题方向**:2D 沉浸场景主题(SceneHome.vue)已移除(暂缓后删除);3D 光影实验台(/tools/light-lab)作为未来场景主题底座,详见 §4.12.3/§9。
 
 ## 文档清单
