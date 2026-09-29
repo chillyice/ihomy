@@ -33,3 +33,6 @@ frontend/public/emulatorjs/
 
 # 壁纸包 zip(源在 wallpaper-engine/,一条 tar 命令即可重生成;不入库)
 /wallpaper-engine.zip
+
+# 本地 Jellyfin 联调的测试媒体(docker-compose.yml 的 jellyfin 服务挂载,容器内 ffmpeg 生成)
+/.dev-media/

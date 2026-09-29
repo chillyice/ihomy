@@ -1332,7 +1332,10 @@ INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
 ('loan_event_type', 'RATE_CHANGE', '利率调整'),
 ('loan_event_type', 'PREPAY',      '提前还款'),
 ('loan_prepay_strategy', 'SHORTEN', '缩短年限（月供不变）'),
-('loan_prepay_strategy', 'REDUCE',  '减少月供（期限不变）');
+('loan_prepay_strategy', 'REDUCE',  '减少月供（期限不变）'),
+-- 放映厅媒体引擎字典(V9.106)
+('media_server_type', 'JELLYFIN', 'Jellyfin'),
+('media_server_type', 'EMBY',     'Emby');
 -- ------------------------------------------------------------
 -- 41. 身份标签表(V3.9): 成员在家庭内的身份标签(如"爸爸""妈妈"),每家庭一套
 --     预设 爸爸/妈妈;其余(如"大宝")为自定义。user_id+family_id 唯一。
@@ -1930,7 +1933,7 @@ INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `curre
 ('Knife4j', 'MAVEN', 'com.github.xiaoymin:knife4j-openapi3-jakarta-spring-boot-starter', '4.5.0', 'Apache-2.0', 'https://github.com/xiaoymin/knife4j', '接口文档', 'FULL'),
 ('mp3agic', 'MAVEN', 'com.mpatric:mp3agic', '0.9.1', 'MIT', 'https://github.com/mpatric/mp3agic', '音乐元数据解析', 'FULL'),
 ('Nextcloud', 'SERVICE', 'nextcloud/server', NULL, 'AGPL-3.0', 'https://github.com/nextcloud/server', 'WebDAV/Nextcloud 存储后端', 'PARTIAL'),
-('Jellyfin', 'SERVICE', 'jellyfin/jellyfin', NULL, 'GPL-2.0', 'https://github.com/jellyfin/jellyfin', '放映厅媒体引擎(规划)', 'PLANNED'),
+('Jellyfin', 'SERVICE', 'jellyfin/jellyfin', '10.9.11', 'GPL-2.0', 'https://github.com/jellyfin/jellyfin', '放映厅媒体引擎(刮削/转码/TV 客户端;API 集成,界面自建)', 'PARTIAL'),
 ('Home Assistant', 'SERVICE', 'home-assistant/core', NULL, 'Apache-2.0', 'https://github.com/home-assistant/core', '智能家居中控(规划)', 'PLANNED');
 
 -- NPM/MAVEN 直接依赖交由 Renovate 检测 + 生成 PR,SERVICE 独立服务由台账内部维护(默认 INTERNAL)
@@ -2008,6 +2011,30 @@ CREATE TABLE `family_loan_event` (
   PRIMARY KEY (`id`),
   KEY `idx_loan` (`loan_id`, `effective_period`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭贷款事件时间轴(利率调整/提前还款)';
+
+-- ------------------------------------------------------------
+-- 63. sys_media_server 放映厅媒体引擎配置(V9.106):每家庭一条(一家庭一个媒体服务器)。
+--     ihomy 只通过 HTTP 调它的 REST API(列表/详情/播放地址/观看状态),视频流量由客户端直连;
+--     password 存 ENC(Base64(iv+密文+tag)) 密文(盐值 sys_parameter.aes-salt),接口只回 hasPassword。
+--     配置表按家庭唯一,不做逻辑删除(清空即删行,避免 uk_family 与软删互斥)。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_media_server`;
+CREATE TABLE `sys_media_server` (
+  `id`                BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`         BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `server_type`       VARCHAR(20)  NOT NULL DEFAULT 'JELLYFIN' COMMENT '引擎类型: JELLYFIN/EMBY',
+  `server_url`        VARCHAR(255) NOT NULL COMMENT '后端访问地址(家庭网络/隧道地址)',
+  `public_url`        VARCHAR(255) DEFAULT NULL COMMENT '客户端播放直连地址(空=同 server_url)',
+  `username`          VARCHAR(100) NOT NULL COMMENT '媒体服务器账号',
+  `password`          VARCHAR(500) NOT NULL COMMENT '账号密码(ENC 加密)',
+  `enabled`           TINYINT      NOT NULL DEFAULT 1 COMMENT '是否启用: 1启用/0停用',
+  `last_connected_at` DATETIME     DEFAULT NULL COMMENT '最近一次连接成功时间',
+  `created_by`        BIGINT       DEFAULT NULL COMMENT '创建人',
+  `created_at`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='放映厅媒体引擎接入配置(家庭级)';
 
 -- NPM/MAVEN 直接依赖交由 Renovate 检测 + 生成 PR,SERVICE 独立服务由台账内部维护(默认 INTERNAL)
 UPDATE `sys_oss_component` SET `managed_by` = 'RENOVATE' WHERE `component_type` IN ('NPM', 'MAVEN');

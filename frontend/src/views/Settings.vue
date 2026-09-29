@@ -24,6 +24,9 @@
           <el-menu-item v-if="userStore.hasPerm('family:manage')" index="weather">
             <span class="menu-icon">🌤️</span>{{ $t('settings.cat.weather') }}
           </el-menu-item>
+          <el-menu-item v-if="userStore.hasPerm('storage:manage')" index="media">
+            <span class="menu-icon">🎬</span>{{ $t('settings.cat.media') }}
+          </el-menu-item>
           <el-menu-item index="storage">
             <span class="menu-icon">🗄️</span>{{ $t('settings.cat.storage') }}
           </el-menu-item>
@@ -493,6 +496,66 @@
           <StorageView />
         </template>
 
+        <!-- 放映厅引擎(家庭媒体服务器;家长可编辑) -->
+        <template v-if="active === 'media'">
+          <div class="card settings-card" v-loading="mediaLoading">
+            <div class="section-label">{{ $t('settings.media.title') }}</div>
+            <div class="share-tip">{{ $t('settings.media.hint') }}</div>
+
+            <div class="media-status">
+              <el-tag :type="mediaStatusTag.type" size="small">{{ mediaStatusTag.text }}</el-tag>
+              <span v-if="mediaCfg.lastConnectedAt" class="media-status-sub">
+                {{ $t('settings.media.lastConnected') }}{{ formatDateTime(mediaCfg.lastConnectedAt) }}
+              </span>
+              <span v-if="mediaStatus.connected && mediaStatus.counts" class="media-status-sub">
+                {{ $t('settings.media.counts', { m: mediaStatus.counts.movies || 0, s: mediaStatus.counts.series || 0, e: mediaStatus.counts.episodes || 0 }) }}
+              </span>
+            </div>
+            <div v-if="mediaStatus.connected && mediaStatus.libraries?.length" class="media-libs">
+              <el-tag v-for="l in mediaStatus.libraries" :key="l.name" size="small" type="info">{{ l.name }}</el-tag>
+            </div>
+
+            <el-form :model="mediaForm" label-position="top" class="settings-form">
+              <el-form-item :label="$t('settings.media.serverType')">
+                <el-select v-model="mediaForm.serverType" style="width: 100%">
+                  <el-option :label="$t('dict.media_server_type.JELLYFIN')" value="JELLYFIN" />
+                  <el-option :label="$t('dict.media_server_type.EMBY')" value="EMBY" />
+                </el-select>
+              </el-form-item>
+              <el-form-item :label="$t('settings.media.serverUrl')">
+                <el-input v-model="mediaForm.serverUrl" placeholder="http://192.168.1.10:8096" />
+                <div class="share-tip">{{ $t('settings.media.serverUrlHint') }}</div>
+              </el-form-item>
+              <el-form-item :label="$t('settings.media.publicUrl')">
+                <el-input v-model="mediaForm.publicUrl" placeholder="http://192.168.1.10:8096" />
+                <div class="share-tip">{{ $t('settings.media.publicUrlHint') }}</div>
+              </el-form-item>
+              <el-form-item :label="$t('settings.media.username')">
+                <el-input v-model="mediaForm.username" />
+              </el-form-item>
+              <el-form-item :label="$t('settings.media.password')">
+                <el-input
+                  v-model="mediaForm.password"
+                  type="password"
+                  show-password
+                  :placeholder="mediaCfg.hasPassword ? $t('settings.media.passwordKeep') : ''"
+                />
+              </el-form-item>
+              <el-form-item>
+                <div class="setting-row">
+                  <el-switch v-model="mediaForm.enabled" />
+                  <span class="setting-label">{{ $t('settings.media.enabled') }}</span>
+                </div>
+              </el-form-item>
+              <div class="media-actions">
+                <el-button type="primary" :loading="mediaSaving" @click="saveMediaConfig">{{ $t('common.save') }}</el-button>
+                <el-button :loading="mediaTesting" @click="testMediaConfig">{{ $t('settings.media.test') }}</el-button>
+                <el-button v-if="mediaCfg.configured" type="danger" plain @click="removeMediaConfig">{{ $t('settings.media.remove') }}</el-button>
+              </div>
+            </el-form>
+          </div>
+        </template>
+
         <!-- 个性化设置:主题 + 台灯/色温/亮度/阴影/天气效果/天气地区/夜间超时关灯/光照测试入口 -->
         <template v-if="active === 'light'">
           <div class="card settings-card">
@@ -658,7 +721,7 @@
 import { ref, reactive, computed, inject, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { profileApi, familyApi, fileApi, musicApi, aiApi, weatherApi, publicApi, authApi, pointsApi } from '@/api'
+import { profileApi, familyApi, fileApi, musicApi, aiApi, weatherApi, publicApi, authApi, pointsApi, mediaApi } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { CircleCheck, CircleClose, Edit, Delete } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
@@ -1346,7 +1409,82 @@ const uploadCover = async (options) => {
   }
 }
 
-onMounted(load)
+// ===== 放映厅引擎(家庭媒体服务器,家长可管理) =====
+const mediaCfg = reactive({ configured: false, serverType: 'JELLYFIN', serverUrl: '', publicUrl: '', username: '', hasPassword: false, enabled: true, lastConnectedAt: null })
+const mediaStatus = reactive({ configured: false, connected: false, enabled: true, libraries: [], counts: null })
+const mediaForm = reactive({ serverType: 'JELLYFIN', serverUrl: '', publicUrl: '', username: '', password: '', enabled: true })
+const mediaLoading = ref(false)
+const mediaSaving = ref(false)
+const mediaTesting = ref(false)
+
+const mediaStatusTag = computed(() => {
+  if (!mediaCfg.configured) return { type: 'info', text: t('settings.media.stateUnconfigured') }
+  if (mediaCfg.enabled === false) return { type: 'info', text: t('settings.media.stateDisabled') }
+  if (mediaStatus.connected) return { type: 'success', text: t('settings.media.stateConnected') }
+  return { type: 'warning', text: t('settings.media.stateOffline') }
+})
+
+const formatDateTime = (v) => (v ? new Date(v).toLocaleString() : '')
+
+const loadMediaConfig = async () => {
+  if (!userStore.hasPerm('storage:manage')) return
+  mediaLoading.value = true
+  try {
+    const cfg = await mediaApi.config()
+    Object.assign(mediaCfg, cfg)
+    Object.assign(mediaForm, {
+      serverType: cfg.serverType || 'JELLYFIN',
+      serverUrl: cfg.serverUrl || '',
+      publicUrl: cfg.publicUrl || '',
+      username: cfg.username || '',
+      password: '',
+      enabled: cfg.enabled !== false,
+    })
+    Object.assign(mediaStatus, { serverName: null, version: null, libraries: [], counts: null }, await mediaApi.status())
+  } finally {
+    mediaLoading.value = false
+  }
+}
+
+// 保存:密码留空表示沿用已保存的密码;保存后顺带告知是否已能连上
+const saveMediaConfig = async () => {
+  if (!mediaForm.serverUrl) return ElMessage.warning(t('settings.media.serverUrlRequired'))
+  if (!mediaForm.username) return ElMessage.warning(t('settings.media.usernameRequired'))
+  if (!mediaCfg.configured && !mediaForm.password) return ElMessage.warning(t('settings.media.passwordRequired'))
+  mediaSaving.value = true
+  try {
+    const r = await mediaApi.saveConfig({ ...mediaForm })
+    ElMessage.success(r.connected ? t('settings.media.savedConnected') : t('settings.media.savedOffline'))
+    await loadMediaConfig()
+  } finally {
+    mediaSaving.value = false
+  }
+}
+
+// 连通测试:用表单里当前填的值试一次(未保存也能测)
+const testMediaConfig = async () => {
+  mediaTesting.value = true
+  try {
+    const r = await mediaApi.test({ ...mediaForm })
+    if (r.ok) ElMessage.success(t('settings.media.testOk', { name: r.serverName || '', version: r.version || '' }))
+    else ElMessage.error(r.message || t('settings.media.testFail'))
+  } finally {
+    mediaTesting.value = false
+  }
+}
+
+const removeMediaConfig = async () => {
+  await ElMessageBox.confirm(t('settings.media.removeConfirm'), t('common.tip'), { type: 'warning', closeOnClickModal: true })
+  await mediaApi.removeConfig()
+  ElMessage.success(t('common.deleted'))
+  await loadMediaConfig()
+}
+
+// 放映厅引擎配置在挂载时一并拉取(家长才有权限,内部自行判断)
+onMounted(() => {
+  load()
+  loadMediaConfig()
+})
 </script>
 
 <style scoped>
@@ -1354,6 +1492,10 @@ onMounted(load)
 .settings-side { width: 180px; flex-shrink: 0; background: var(--color-card); border-radius: var(--radius); border: 1px solid var(--color-border); box-shadow: var(--shadow), var(--shadow-inset); padding: 8px; position: sticky; top: 42px; }
 .settings-menu { border-right: none; background: transparent; }
 .menu-icon { margin-right: 8px; }
+.media-status { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.media-status-sub { font-size: 12px; color: var(--color-text-secondary); }
+.media-libs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.media-actions { display: flex; gap: 10px; }
 .settings-body { flex: 1; min-width: 0; }
 .settings-card { margin-bottom: 16px; background: var(--color-card); }
 .settings-card h2 { color: var(--color-primary); margin-bottom: 16px; font-size: 17px; }

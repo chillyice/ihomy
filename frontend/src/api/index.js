@@ -177,6 +177,21 @@ export const videoApi = {
   wishRemove: (id) => request.delete(`/video/wish/${id}`),
 }
 
+// 放映厅媒体引擎:家庭媒体服务器上的作品(海报墙/详情/播放/观看状态)+ 引擎配置
+export const mediaApi = {
+  status: () => request.get('/media/status'),
+  works: () => request.get('/media/works'),
+  work: (itemId) => request.get(`/media/works/${itemId}`),
+  play: (itemId) => request.get(`/media/works/${itemId}/play`),
+  played: (itemId, played) => request.post(`/media/works/${itemId}/played`, { played }),
+  progress: (itemId, data) => request.post(`/media/works/${itemId}/progress`, data),
+  resume: () => request.get('/media/resume'),
+  config: () => request.get('/media/config'),
+  saveConfig: (data) => request.put('/media/config', data),
+  removeConfig: () => request.delete('/media/config'),
+  test: (data) => request.post('/media/test', data),
+}
+
 // 积分商城(签到/兑换/上架管理)
 export const pointsApi = {
   stats: () => request.get('/points/stats'),

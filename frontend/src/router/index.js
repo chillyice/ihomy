@@ -18,6 +18,7 @@ const routes = [
   { path: '/album/shared/:token', name: 'AlbumShared', component: () => import('@/views/album/AlbumDetail.vue'), meta: { public: true } },
   { path: '/album/:id', name: 'AlbumDetail', component: () => import('@/views/album/AlbumDetail.vue'), meta: { public: true } },
   { path: '/cinema', name: 'Cinema', component: () => import('@/views/cinema/Cinema.vue'), meta: { public: true } },
+  { path: '/cinema/:itemId', name: 'CinemaDetail', component: () => import('@/views/cinema/CinemaDetail.vue'), meta: { public: true } },
   { path: '/music', name: 'Music', component: () => import('@/views/music/Music.vue'), meta: { public: true } },
   { path: '/member', name: 'Member', component: () => import('@/views/Member.vue'), meta: { requiresAuth: true } },
   { path: '/points', name: 'Points', component: () => import('@/views/points/Points.vue'), meta: { public: true } },

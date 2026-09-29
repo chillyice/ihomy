@@ -7,6 +7,7 @@
 | 脚本 | 用途 | 依赖 | 说明 |
 |------|------|------|------|
 | `smoke_login.py` | 登录冒烟:取验证码 → 登录 → 校验 token | 标准库 | 从 `.github/workflows/ci.yml` 冒烟逻辑提取的本地可重复版 |
+| `media_engine_check.py` | 放映厅媒体引擎:`/api/media/**` 配置与状态、作品海报墙、电影/剧集详情、播放地址与直连取流、看过标记、进度与续看、海报签名(含篡改必须被拒)、连通测试 | 标准库 | 需本机已在设置页配好引擎,未配置则打印 SKIP 退出 0;动过的观看状态收尾自动恢复;`--read-only` 只跑读类断言 |
 
 ## 运行
 
@@ -17,6 +18,10 @@ IHOMY_TEST_PWD=<开发账号密码> python smoke_login.py
 
 # 或显式传参
 python smoke_login.py --base http://localhost:8080 --email admin@ihomy.local --password <pwd>
+
+# 放映厅媒体引擎(需本机已配好引擎;动观看状态的断言收尾会恢复原状态)
+IHOMY_TEST_PWD=<开发账号密码> python media_engine_check.py
+python media_engine_check.py --read-only          # 只读断言,不写观看状态
 ```
 
 - 开发环境验证码固定 `qwer`(external.yml `app.captcha-fixed-code`)。
