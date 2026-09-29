@@ -63,7 +63,7 @@
 - **业务运行用 `ihomy` 账号**:仅授予 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`(最小权限,无 CREATE/ALTER/DROP)。application.yml 连接用 `ihomy`,**不要用 root 跑业务**。
 - 账号同时创建 `localhost` 和 `%` 两个 host(本机/远程应用服务器都能连)。
 - **生产 MySQL 密码策略(2026-09-07 轮换踩坑)**:生产库启用 `validate_password` MEDIUM(特殊字符/数字/大小写各≥1,长度≥8)——生成/轮换 DB 密码必须含特殊字符(避开 `' " \ $ |` 转义雷区,建议 `!@%^&*-_+=.`),否则 `ALTER USER` 报 1819;开发 Docker MySQL 无此组件,同一密码 dev 可用 prod 被拒。
-- **73 张表**,前缀分类:`sys_` 20 张(系统/账号/权限/配置/存储)、`report_` 3 张(报表/日志:report_ai / report_weather / report_system)、`family_` 28 张(家庭事务,含 V9.98 保险箱 `family_vault_item`、V9.101 贷款 `family_loan`/`family_loan_event`)、`content_` 21 张(内容数据)、另 `game_info` 1 张(家庭小游戏,命名未加 family_ 前缀——遗留)。**完整表清单见 `docs/需求设计说明书.md` §6.2**。
+- **74 张表**,前缀分类:`sys_` 21 张(系统/账号/权限/配置/存储,含 V9.106 放映厅 `sys_media_server`)、`report_` 3 张(报表/日志:report_ai / report_weather / report_system)、`family_` 28 张(家庭事务,含 V9.98 保险箱 `family_vault_item`、V9.101 贷款 `family_loan`/`family_loan_event`)、`content_` 21 张(内容数据)、另 `game_info` 1 张(家庭小游戏,命名未加 family_ 前缀——遗留)。**完整表清单见 `docs/需求设计说明书.md` §6.2**。
   - **命名规则**:家庭事务业务表一律 `family_` 前缀;内容数据 `content_` 前缀;账号/权限/配置/存储保留 `sys_`;**报表/日志表一律 `report_` 前缀**(2026-09-17 V9.72 起,原 sys_weather_log→report_weather、sys_operation_log→report_system,新增 AI 调用日志 report_ai)。新增表必须遵守。前缀取最顶层祖先类别;上下级关系体现在表名(如 `sys_user_role`)。
 - **引用开源软件必须对接自动升级(强制)**:新增任何 npm/Maven 直接依赖或独立开源服务时,**必须同时在 `sys_oss_component` 台账登记一条记录**(`component_type`=NPM/MAVEN/SERVICE + `package_ref` + `current_version` + `license` + `repo_url` + `managed_by`),否则不会被版本跟踪与升级覆盖。**升级闸门(V9.76)**:NPM/MAVEN 交 Renovate 管理(`managed_by=RENOVATE`,`renovate.json` `dependencyDashboardApproval` 检测模式只列 Dashboard 不开 PR)——台账「AI 评估」(`OSS_UPGRADE_EVAL` 功能码)判断升级影响→评估可行→「生成升级 PR」勾选 Dashboard 触发 Renovate 开 PR;SERVICE 独立服务仍台账内部维护(`managed_by=INTERNAL`),按 `deploy_type` 生成方案。漏洞扫描预留 `vuln_count/vuln_severity` 列。运维入口 `/ops/oss`(OPS 角色,`ops:view`),规则实现见 `common/OssVersionUtil` + `service/OssComponentService`。
 - **枚举不再用数字**:状态/类型字段一律大写英文单词(`PUBLISHED/DRAFT/PUBLIC/FAMILY/ACTIVE...`),含义存字典表 `sys_dict_item`,Java 常量集中于 `common/DictConst.java`,前端映射 `utils/dict.js`。**不要写回 0/1/2 判断**。
@@ -84,31 +84,31 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
     annotation/  # @RequirePermission / @OperationLog
     aspect/      # RequirePermissionAspect / OperationLogAspect
     filter/      # TraceIdFilter / AccessLogFilter / CaptureRequestWrapper / CaptureResponseWrapper
-    entity/      # 66 个实体类(73 张表里 7 张关联/字典表无实体)
-    mapper/      # 64 个 MyBatis-Plus BaseMapper(自定义 SQL 全放 resources/mapper/*.xml,接口不写注解,参数统一 @Param)
-    service/     # 60 个 @Service(单实现无接口层)
-    controller/  # 41 个 Controller
-    dto/         # 请求/响应 DTO
+    entity/      # 67 个实体类(74 张表里 7 张关联/字典表无实体)
+    mapper/      # 67 个 MyBatis-Plus BaseMapper(自定义 SQL 全放 resources/mapper/*.xml,接口不写注解,参数统一 @Param)
+    service/     # 61 个服务类(单实现无接口层)
+    controller/  # 42 个 Controller
+    dto/         # 请求/响应 DTO(44 个)
     websocket/   # ChatWebSocketHandler(原生 WebSocket 聊天室)
   src/main/resources/
     application.yml     # 端口8080 context-path=/api;生产基线配置(MySQL 6306/Redis 6379;DB密码/JWT密钥留空,由 external.yml 提供);file.upload-dir /opt/ihomy/uploads;logging.file.path /opt/ihomy/logs
     logback-spring.xml  # 三类日志分流(access/server/thirdparty,六要素 pattern,按天滚动)
     external.yml.template  # 外挂配置模板(IHOMY_CONFIG_PATH 覆盖密码/密钥/路径/captcha/天气,唯一开发生产差异机制)
     mapper/*.xml        # 每个 Mapper 一个同名 XML
-    schema.sql          # 建库+建号+建表(73 张)+种子(开发安全版,已入库;本地开发由 start-db.ps1 自动导入)
+    schema.sql          # 建库+建号+建表(74 张)+种子(开发安全版,已入库;本地开发由 start-db.ps1 自动导入)
   mvnw / mvnw.cmd       # Maven Wrapper
 frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
   src/
-    api/          # request.js(axios+JWT+401 自动刷新) + index.js(36 个 Api 对象)
+    api/          # request.js(axios+JWT+401 自动刷新) + index.js(38 个 Api 对象)
     stores/       # user.js(登录+权限) / app.js(首页聚合) / theme.js(主题两轴矩阵)
     router/       # 登录守卫 + scrollBehavior;56 条路由(53 条懒加载,另 3 条 redirect: /、/plant、兜底)
     i18n/ theme/  # vue-i18n 中英;主题两轴矩阵(暖居/光尘 × 晨/暮)
     utils/        # dict.js / diary.js / doodle.js(涂鸦引擎) / furnitureIcon.js(家具类型图标) / windowLight.js / useSunLight.js / useDragResize.js / password.js(密码生成+强度,纯函数) / loan.js(贷款计算核心,纯函数)
     composables/  # useDevice.js(设备检测) / useWeatherBg.js(天气 AI 生图氛围底图)
-    components/   # AppSidebar/BackToTop/Breadcrumb/AvatarCropper/InstallPrompt/SiteFooter/SunLightLayer/LightTestConsole/SyncDialog/Mobile*(移动端)/warm/(暖居外壳 WarmLayout+WarmHome)
+    components/   # AppSidebar/BackToTop/Breadcrumb/AvatarCropper/InstallPrompt/SiteFooter/SunLightLayer/LightTestConsole/SyncDialog/MediaPlayer(媒体引擎播放器)/Mobile*(移动端)/warm/(暖居外壳 WarmLayout+WarmHome)
     layouts/MobileLayout.vue  # 移动端壳
     styles/main.css # CSS 变量 + 全局样式 + 深色模式 + EP 组件覆写 + @media
-    views/        # 58 个页面(唯一视图文件计数;Home/Login/Member/Settings/Anniversary/album/cinema/diary/blog/points/task/reminder/plan/wish/book/chat/tree/cascade/ops/storage/item/kitchen/library/vault(保险箱)/tools(含贷款计算器)/games(Games+GamePlayer+PetLinkLink)/plant(花园)/kada(咔哒独立下载页)/Wallpaper(壁纸氛围屏))
+    views/        # 59 个页面(唯一视图文件计数;Home/Login/Member/Settings/Anniversary/album/cinema(放映厅 Cinema+媒体库详情 CinemaDetail)/diary/blog/points/task/reminder/plan/wish/book/chat/tree/cascade/ops/storage/item/kitchen/library/vault(保险箱)/tools(含贷款计算器)/games(Games+GamePlayer+PetLinkLink)/plant(花园)/kada(咔哒独立下载页)/Wallpaper(壁纸氛围屏))
     App.vue
   vite.config.js   # PWA + 代理 /api->8080 + manualChunks 分块 + ElementPlus 按需
 wallpaper-engine/   # Wallpaper Engine 网页壁纸包(壳页顶层跳转线上 /wallpaper;WE 属性 theme/mode/lang 走查询参数、
@@ -138,6 +138,8 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 冒烟:登录 `POST /api/auth/login {email, password, captchaId, captchaCode:'qwer'}`(开发环境验证码固定 `qwer`,先 `GET /api/auth/captcha` 取 id),响应 code=0 即有 token。**新人环境初始化**:`.\scripts\setup.ps1`(前置检查+生成 config\external.yml+起库+前端依赖,幂等;详见本地 `docs/新人上手指南.md`)。**CI**:GitHub Actions(`.github/workflows/ci.yml`)每次推送自动做前后端构建+compose 起库导入 schema+后端启动+登录冒烟,验证仓库自给自足。数据库重导:整库 `schema.sql`;增量建表/改表直接执行对应 SQL 段(docker exec -i ihomy-mysql mysql -uroot -p<root密码> --default-character-set=utf8mb4)。
 
+**放映厅联调(Jellyfin,可选)**:`docker compose --profile jellyfin up -d jellyfin`(镜像走国内源 `docker.m.daocloud.io/jellyfin/jellyfin:10.9.11`,测试媒体挂 `.dev-media/` 已 ignore)→ `bash scripts/dev-jellyfin-seed.sh`(用容器自带 ffmpeg 造 20 秒测试片源 + NFO + 海报,宿主不必装 ffmpeg)→ 首次访问 `http://localhost:8096` 走完初始化向导(建账号、加「电影/剧集」两个库分别指向 `/media/Movies`、`/media/Shows`)→ 设置页-放映厅填地址与账号。接口检查脚本:`IHOMY_TEST_PWD=<密码> python test/automation/media_engine_check.py`(24 项;`--read-only` 只跑读类断言)。
+
 ## 统一响应与鉴权
 
 - 响应 `{code: 0, message: "success", data: ...}`;code != 0 = 失败。
@@ -155,7 +157,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 |----|------|---------|
 | 账号 | 注册/登录/验证码/密码找回/个人资料 | AuthController / ProfileController |
 | 家庭 | 家庭管理/多家庭切换/成员/邀请码/入家申请 | FamilyController / AuthController / MemberController |
-| 内容 | 博客 / 日记 / 相册照片 / 放映厅 / 照片瀑布 / 愿望单 / 书架 | Blog / Diary / Album+Photo / Video / Cascade / Wish / Library 各 Controller |
+| 内容 | 博客 / 日记 / 相册照片 / 放映厅(媒体库+视频库) / 照片瀑布 / 愿望单 / 书架 | Blog / Diary / Album+Photo / Video / **Media(媒体引擎)** / Cascade / Wish / Library 各 Controller |
 | 互动 | 点赞 / 评论 / 通知 / 聊天室 | Like / Comment / Notification / Chat Controller + ChatWebSocketHandler |
 | 生活 | 纪念日 / 提醒 / 计划 / 任务 / 记账(含贷款记录页签,V9.105,§4.5.5) / 家谱 / 签到积分 / 背景音乐 / 家庭保险箱(V9.98,密码保管箱,§4.5.9) | Anniversary / Reminder / Plan / Task / Points / Music / Vault 各 Controller |
 | 游戏 | 花园植物养殖(全家共养一棵)/ 小游戏库(导入 SWF/GBA + Flash 播放器 Ruffle + GBA 模拟器 EmulatorJS)/ 宠物连连看 H5(通关发积分) | FamilyPlant / GameInfo 各 Controller + FlashPlayer.vue + GbaPlayer.vue + PetLinkLink.vue |
@@ -168,7 +170,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 系统 | i18n / 主题(暖居/光尘 × 晨/暮) / 字典 / 独立产品页(咔哒 Kada 下载页 `/kada`;壁纸氛围屏 `/wallpaper`,均 `meta.standalone`) | i18n/ + theme/(index.js)+stores/theme.js + utils/dict.js + views/Kada.vue + views/Wallpaper.vue |
 | 移动端 | 设备自适应 | useDevice.js + MobileLayout.vue + Mobile* 组件 |
 
-**关键坑速查**(实现细节详见 docs/变更归档.md):日记 date 兼容 `yyyy-MM-dd HH:mm`;纪念日 Hutool ChineseDate 月份 0-based 需 +1;家谱 null 字段须 `LambdaUpdateWrapper` 显式 SET;**MP `updateById` 会回写实体旧 `updated_at` 抑制 `ON UPDATE CURRENT_TIMESTAMP`**——依赖 updated_at 的表更新必须 LambdaUpdateWrapper 只 SET 业务字段并重查;**simple-mind-map 只内置 default 主题**(其余须 mindmapThemes.js defineTheme 注册);**脑图并发保存靠 update 乐观锁**(带 baseUpdatedAt,库中已刷新则 409);**脑图保存前 stripEmptyNodes 剥空叶子**;**EP dropdown 内嵌 hover 子菜单**用 visibility 延迟隐藏而非 display;物品户型图 hover 边加号阈值 6px、未设计楼层画布空白+引导、库内家具拖入画布替代「摆放」;**PageToolbar 胞吐 Teleport 必须 `defer` 且只在暖居启用**(V9.96 固化在组件内:直达 URL 首屏加载时 `.gc-pin` 随外壳同帧构建、尚未插入 document,不加 defer 工具栏整个消失;用 `inject('gc-scrolled', null)` 判暖居,光尘等无 `.gc-pin` 环境强制原位渲染);**户型图编辑专注模式**=Item 页把编辑态广播成 `html.fp-edit-focus`、外壳按它覆写(隐藏导航栏/gc-wrap 拉宽主区净宽 85vw/去 studio 渐变),以后第二个专注页复用同一 class;**CSS `rotate()` 负角度在屏幕坐标(y 向下)里把元素下端往右摆(与直觉相反),要「右上→左下」须正角度;`animation` 简写覆盖同元素长写的 `animation-*`(如 delay),多粒子动画须用 `--var` 喂时长/相位**;**pdfjs-dist 统一 v6**(worker 用 `build/pdf.worker.min.mjs?url`,浏览器不用裸 iframe);**天气 AI 生图背景只有一份实现 `useWeatherBg`**(首页卡与暖居外壳同源、同一缓存键,不要再在 `Home.vue` 里写第二份——V9.86 已删掉那 115 行重复代码);**暖居照片卡牌扇形重叠时别用纯 CSS `:hover`**(命中的是 DOM 靠后那张而非视觉最上那张,须 JS `@mouseenter` 追踪索引再驱动类名);**要能被类覆写的内联样式走 CSS 变量**(transform 写死在 `:style` 里就无法被 hover 类覆盖,故卡牌位移/旋转/层级抽 `--dx/--dy/--rot/--z`);**`meta.standalone` 独立页的空壳期陷阱**——路由首次解析前 `currentRoute` 是 START_LOCATION(meta 为空),`v-if="route.meta.standalone"` 会先判为 false 而挂载整个 ihomy 外壳再卸载,独立页启动瞬间因此打出一批无关接口(含 OPS 权限 403 弹错);外壳一律等 `router.isReady()`(`routeReady` 标记)后再渲染;**待机计时类交互别只在 mousemove 里起算**(壁纸/副屏场景鼠标根本不动,须挂载后即起算;V9.93 起壁纸页已弃用待机浮现——照片轮播/纪念日/待办三小组件常驻,整卡可拖拽、pointerdown 固化 px 位置落 localStorage `ihomy:wallpaper:widget-pos:v1`,天气 AI 生图为常驻底图;V9.94 起小组件改**组件库可增删**——注册表 `WIDGET_DEFS`(6 类:照片/纪念日/待办/动态流/家庭计划/提醒)+ 角落「组件」面板启停落 `ihomy:wallpaper:widgets:v1`(读盘按注册表过滤未知 id,**新增组件 = 注册表加一条 + 模板加 `isOn('id')` 分支 + 样式补默认坐标**三步),**未启用的组件不取数**;壁纸页角落的「复制壁纸令牌」入口已删,令牌只在设置页一处;**长开页组件卡别用 backdrop-filter**——底下光影层持续动画会让磨砂每帧重算);**窄屏右下角浮层会压住左下角文字**(壁纸页控件 ≤768px 改挂右上角);**⚠ Wallpaper Engine 壁纸包(源在 `wallpaper-engine/`,机制/导入步骤/取证路径见该目录 `README.md`,踩坑细节见 docs/变更归档.md V9.88–V9.90)**:①**别用跨域 iframe**——WE 2.8.42 的 CEF 渲染 OOPIF 会崩渲染进程(现象「导入后编辑器预览整片纯灰」,但页面其实**已加载并执行**:CEF 缓存里有 chunk、localStorage 有 `ihomy-theme`,别误判成网络或脚本问题),改 `location.replace` 顶层跳转即绕过;②**WE 分次投递用户属性**——第一次只带 `project.json` 里声明的值,用户**改过**的值(壁纸令牌天生是)晚一拍才到,故壳页 `go()` **绝不能挂在第一次 `applyUserProperties` 上**(令牌会被整个丢掉,现象「复制令牌后没有效果」),改为「拿到令牌再等 400ms 就走、没拿到等到 3s 硬上限」;`theme/mode/lang` 走查询参数 `?theme=x&mode=y&lang=zh`、`token` 单独走 **URL hash**(不发给服务器、不进 nginx 日志),壁纸页另挂 `wallpaperPropertyListener` 双保险;③**WE 是「拷贝」导入**——改 `index.html` 就地覆盖 `myprojects\<项目名>\index.html` 再「文件→重启预览」,**`project.json` 千万别覆盖**(属性面板里粘的令牌存在那儿);重新拖导入会新建项目、令牌要重粘;**WE 只在「一次加载」时读工程文件、无文件监视**——覆盖过去本身即生效、无需清缓存,但必须制造一次加载事件(编辑器开着工程时**保存即自动重载**,不必每次点重启预览);判有没有重读看 `ui\wpcache\monitor<N>ase\Default\History`(桌面实例日志不记 console、实例重启即截断),测之前先确认壁纸没被 `playbackmaximized=pause` 冻结;细节见 docs/变更归档.md「Wallpaper Engine 重读文件机制取证」;④**壁纸令牌流程**=设置页复制 refresh token → WE 属性面板 → 页面 `bootstrapToken()` 调 `POST /auth/refresh` 换会话并落 WE 自己的 localStorage;后端 `AuthService.refresh` **不拉黑**旧 refresh token(只 `logout()` 才拉黑),故浏览器与壁纸可各持一份、各自滑动续期互不踢;⑤**本地 IAB/Playwright 点不动这个应用**(持续动画让「连续两帧稳定」的可操作性检查永不通过,`click()`/force/坐标点击均超时)——验证交互改用页面内 `el.click()` 派发真实 Vue handler,剪贴板用桩 `Object.defineProperty(navigator.clipboard,'writeText')` 断言写入内容(后台标签页 `document.hasFocus()===false`,真剪贴板必被拒并走「复制失败」兜底,别误判成 bug)。**⚠ 日月与晨昏(晨昏三档/月相/月出月落)走纯天文计算,不取天气 API**(V9.92):后端 `SolarUtil.astroTimes`/`moonPhaseInfo` → `GET /public/sun-info`(天气页「日月与晨昏」卡与日历页共用;和风 v1 `daily[].astro` 其实也带这些字段,实测与本地差 0~2 分钟,但**同一事实只留一份来源**,那 10 个透传字段已删,别再往 `daily` 里塞第二份);月亮时角**必须用地方恒星时**(`gmstDeg`),照搬太阳那套「距太阳正午分钟数」近似会错;当日不发生的事件(极昼极夜、月亮不升不落)**返回空串由前端隐藏**,别填占位假时刻;求解统一按「采样找穿越 + 二分/三分细化」(太阳阈值 -0.833°、三档晨昏 96°/102°/108° 天顶角、月亮 +0.125°)。
+**关键坑速查**(实现细节详见 docs/变更归档.md):日记 date 兼容 `yyyy-MM-dd HH:mm`;纪念日 Hutool ChineseDate 月份 0-based 需 +1;家谱 null 字段须 `LambdaUpdateWrapper` 显式 SET;**MP `updateById` 会回写实体旧 `updated_at` 抑制 `ON UPDATE CURRENT_TIMESTAMP`**——依赖 updated_at 的表更新必须 LambdaUpdateWrapper 只 SET 业务字段并重查;**simple-mind-map 只内置 default 主题**(其余须 mindmapThemes.js defineTheme 注册);**脑图并发保存靠 update 乐观锁**(带 baseUpdatedAt,库中已刷新则 409);**脑图保存前 stripEmptyNodes 剥空叶子**;**EP dropdown 内嵌 hover 子菜单**用 visibility 延迟隐藏而非 display;物品户型图 hover 边加号阈值 6px、未设计楼层画布空白+引导、库内家具拖入画布替代「摆放」;**PageToolbar 胞吐 Teleport 必须 `defer` 且只在暖居启用**(V9.96 固化在组件内:直达 URL 首屏加载时 `.gc-pin` 随外壳同帧构建、尚未插入 document,不加 defer 工具栏整个消失;用 `inject('gc-scrolled', null)` 判暖居,光尘等无 `.gc-pin` 环境强制原位渲染);**户型图编辑专注模式**=Item 页把编辑态广播成 `html.fp-edit-focus`、外壳按它覆写(隐藏导航栏/gc-wrap 拉宽主区净宽 85vw/去 studio 渐变),以后第二个专注页复用同一 class;**CSS `rotate()` 负角度在屏幕坐标(y 向下)里把元素下端往右摆(与直觉相反),要「右上→左下」须正角度;`animation` 简写覆盖同元素长写的 `animation-*`(如 delay),多粒子动画须用 `--var` 喂时长/相位**;**pdfjs-dist 统一 v6**(worker 用 `build/pdf.worker.min.mjs?url`,浏览器不用裸 iframe);**天气 AI 生图背景只有一份实现 `useWeatherBg`**(首页卡与暖居外壳同源、同一缓存键,不要再在 `Home.vue` 里写第二份——V9.86 已删掉那 115 行重复代码);**暖居照片卡牌扇形重叠时别用纯 CSS `:hover`**(命中的是 DOM 靠后那张而非视觉最上那张,须 JS `@mouseenter` 追踪索引再驱动类名);**要能被类覆写的内联样式走 CSS 变量**(transform 写死在 `:style` 里就无法被 hover 类覆盖,故卡牌位移/旋转/层级抽 `--dx/--dy/--rot/--z`);**`meta.standalone` 独立页的空壳期陷阱**——路由首次解析前 `currentRoute` 是 START_LOCATION(meta 为空),`v-if="route.meta.standalone"` 会先判为 false 而挂载整个 ihomy 外壳再卸载,独立页启动瞬间因此打出一批无关接口(含 OPS 权限 403 弹错);外壳一律等 `router.isReady()`(`routeReady` 标记)后再渲染;**待机计时类交互别只在 mousemove 里起算**(壁纸/副屏场景鼠标根本不动,须挂载后即起算;V9.93 起壁纸页已弃用待机浮现——照片轮播/纪念日/待办三小组件常驻,整卡可拖拽、pointerdown 固化 px 位置落 localStorage `ihomy:wallpaper:widget-pos:v1`,天气 AI 生图为常驻底图;V9.94 起小组件改**组件库可增删**——注册表 `WIDGET_DEFS`(6 类:照片/纪念日/待办/动态流/家庭计划/提醒)+ 角落「组件」面板启停落 `ihomy:wallpaper:widgets:v1`(读盘按注册表过滤未知 id,**新增组件 = 注册表加一条 + 模板加 `isOn('id')` 分支 + 样式补默认坐标**三步),**未启用的组件不取数**;壁纸页角落的「复制壁纸令牌」入口已删,令牌只在设置页一处;**长开页组件卡别用 backdrop-filter**——底下光影层持续动画会让磨砂每帧重算);**窄屏右下角浮层会压住左下角文字**(壁纸页控件 ≤768px 改挂右上角);**⚠ Wallpaper Engine 壁纸包(源在 `wallpaper-engine/`,机制/导入步骤/取证路径见该目录 `README.md`,踩坑细节见 docs/变更归档.md V9.88–V9.90)**:①**别用跨域 iframe**——WE 2.8.42 的 CEF 渲染 OOPIF 会崩渲染进程(现象「导入后编辑器预览整片纯灰」,但页面其实**已加载并执行**:CEF 缓存里有 chunk、localStorage 有 `ihomy-theme`,别误判成网络或脚本问题),改 `location.replace` 顶层跳转即绕过;②**WE 分次投递用户属性**——第一次只带 `project.json` 里声明的值,用户**改过**的值(壁纸令牌天生是)晚一拍才到,故壳页 `go()` **绝不能挂在第一次 `applyUserProperties` 上**(令牌会被整个丢掉,现象「复制令牌后没有效果」),改为「拿到令牌再等 400ms 就走、没拿到等到 3s 硬上限」;`theme/mode/lang` 走查询参数 `?theme=x&mode=y&lang=zh`、`token` 单独走 **URL hash**(不发给服务器、不进 nginx 日志),壁纸页另挂 `wallpaperPropertyListener` 双保险;③**WE 是「拷贝」导入**——改 `index.html` 就地覆盖 `myprojects\<项目名>\index.html` 再「文件→重启预览」,**`project.json` 千万别覆盖**(属性面板里粘的令牌存在那儿);重新拖导入会新建项目、令牌要重粘;**WE 只在「一次加载」时读工程文件、无文件监视**——覆盖过去本身即生效、无需清缓存,但必须制造一次加载事件(编辑器开着工程时**保存即自动重载**,不必每次点重启预览);判有没有重读看 `ui\wpcache\monitor<N>ase\Default\History`(桌面实例日志不记 console、实例重启即截断),测之前先确认壁纸没被 `playbackmaximized=pause` 冻结;细节见 docs/变更归档.md「Wallpaper Engine 重读文件机制取证」;④**壁纸令牌流程**=设置页复制 refresh token → WE 属性面板 → 页面 `bootstrapToken()` 调 `POST /auth/refresh` 换会话并落 WE 自己的 localStorage;后端 `AuthService.refresh` **不拉黑**旧 refresh token(只 `logout()` 才拉黑),故浏览器与壁纸可各持一份、各自滑动续期互不踢;⑤**本地 IAB/Playwright 点不动这个应用**(持续动画让「连续两帧稳定」的可操作性检查永不通过,`click()`/force/坐标点击均超时)——验证交互改用页面内 `el.click()` 派发真实 Vue handler,剪贴板用桩 `Object.defineProperty(navigator.clipboard,'writeText')` 断言写入内容(后台标签页 `document.hasFocus()===false`,真剪贴板必被拒并走「复制失败」兜底,别误判成 bug)。**⚠ 日月与晨昏(晨昏三档/月相/月出月落)走纯天文计算,不取天气 API**(V9.92):后端 `SolarUtil.astroTimes`/`moonPhaseInfo` → `GET /public/sun-info`(天气页「日月与晨昏」卡与日历页共用;和风 v1 `daily[].astro` 其实也带这些字段,实测与本地差 0~2 分钟,但**同一事实只留一份来源**,那 10 个透传字段已删,别再往 `daily` 里塞第二份);月亮时角**必须用地方恒星时**(`gmstDeg`),照搬太阳那套「距太阳正午分钟数」近似会错;当日不发生的事件(极昼极夜、月亮不升不落)**返回空串由前端隐藏**,别填占位假时刻;求解统一按「采样找穿越 + 二分/三分细化」(太阳阈值 -0.833°、三档晨昏 96°/102°/108° 天顶角、月亮 +0.125°)。**⚠ 放映厅媒体引擎(Jellyfin,Infuse 模式:引擎用媒体服务器、界面与家庭层 ihomy 自建,V9.106)**:① 续看列表**必须带 `fields=SeriesInfo`**——不带给的是分集裸条目,剧名与季集号全缺,只能显示成「S01E01」;② 播放走 `static=true` 直连原文件,**URL 必须带容器扩展名**(不带时 Content-Type 报 `video/quicktime`,浏览器可能拒播)且**每次现取**(带 api_key、会过期,不许存进列表);③ 海报 `<img>` 走 HMAC 签名中转 `/api/media/image-signed`(签名覆盖 familyId/itemId/type/maxWidth/exp,媒体服务器令牌不出后端),配置读写复用 `storage:manage`(受众同为家长,免新增 auth 种子);④ 进度上报**只报位置就别带 `played`**(会把已看过的翻回未看),且自然播完时前端须静默片尾那次位置上报——否则 `pause`/`ended` 竞态让位置晚于「看过」落库,该集永远挂在续看;⑤ `sys_media_server` 按家庭唯一(uk_family)**不做逻辑删除**(清空即删行)。
 
 ## 设计规范(统一实现,避免多种方式)
 
@@ -270,13 +272,13 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 #### 验证基线
 
 - 后端编译:`cd backend; .\mvnw.cmd -B clean compile -DskipTests` → BUILD SUCCESS
-- 前端构建:`cd frontend; npm run build` → 入口 chunk ≈344KB(2026-09-28 V9.105 记账本贷款页签文案后实测 **343.84KB/gzip 139.32KB**;此前 V9.104 后 343.69KB/139.25KB、V9.101–V9.103 后 343.72KB/139.27KB、342.94KB/138.93KB、341.26KB/138.11KB——**涨幅全来自中英双语文案进共享入口 chunk**;各功能页/pdfjs/simple-mind-map/epubjs 均为独立异步 chunk 仅对应场景加载;历史基线见 docs/变更归档.md)
+- 前端构建:`cd frontend; npm run build` → 入口 chunk ≈348KB(2026-09-29 V9.106 放映厅媒体引擎后实测 **348.47KB/gzip 141.43KB**——放映厅页/详情页/播放器均为独立懒加载 chunk,本次未增依赖;此前 V9.105 后 343.84KB/139.32KB、V9.104 后 343.69KB/139.25KB、V9.101–V9.103 后 343.72KB/139.27KB、342.94KB/138.93KB、341.26KB/138.11KB——**涨幅全来自中英双语文案进共享入口 chunk**;各功能页/pdfjs/simple-mind-map/epubjs 均为独立异步 chunk 仅对应场景加载;历史基线见 docs/变更归档.md)
   - **⚠ 口径:vite 报的是「字符数」不是「字节数」**(2026-09-24 实测)。入口 chunk vite 报 318.71KB,`wc -c` 却是 343,667 字节,`wc -m` 才是 318,707 字符——差值是中文注释/字符串的 UTF-8 多字节开销。**别拿 `ls -la` 的字节数跟这个基线比**(会误判成涨了 24KB);要比特字节就 `wc -c` 对 `wc -c`。gzip 那个数即压缩后真实字节数。
 - 接口测试:同级独立项目(不在本仓库)`cd ..\autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed;**CI(GitHub Actions,`.github/workflows/ci.yml`)每次推送自动验证:前后端构建+compose 起库导入 schema+后端启动+登录冒烟**
 
 ## 已实现变更归档(已外置)
 
-> 历史归档已整体迁至 **`docs/变更归档.md`**(现约 553KB / **131 小节** = 开头 14 个**功能域**小节 + 其后 117 个**版本**小节按 V9.x 顺序追加,域清单见该文件开头章节目录),内容原样保留。含文件级改动表、设计决策、踩坑记录与 live DB 同步 SQL。
+> 历史归档已整体迁至 **`docs/变更归档.md`**(现约 565KB / **132 小节** = 开头 14 个**功能域**小节 + 其后 118 个**版本**小节按 V9.x 顺序追加,域清单见该文件开头章节目录),内容原样保留。含文件级改动表、设计决策、踩坑记录与 live DB 同步 SQL。
 > **该文件开头有章节目录**(或 `grep -n "^##### " docs/变更归档.md` 列全部小节);**检索历史实现/设计决策/live DB 迁移 SQL 时读该文件;新的变更归档继续追加到文件末尾**(新增 `#####` 子节),不要再写回 AGENTS.md。
 
 ## 文件存储策略
@@ -314,6 +316,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 ## 规划事项(未实现)
 
 > 完整清单(P1-P4)见 docs/需求设计说明书.md 第 9 章。优先级:P1 用户价值高且可行 / P2 锦上添花 / P3 结构性改动 / P4 依赖外部条件。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
+> **代码级优化待办(2026-09-29 全量审计,36 项,分安全/性能/前端/工程化四组)见该文件 §9.2**;已核验的 P1:Service Worker 缓存 `/api/**`(含保险箱响应)且登出不清、生产 Redis 无密码发布 `0.0.0.0`、登出/刷新不吊销 refresh token(受壁纸令牌流程约束)、`/files/**` 直连无鉴权、音频转写 `getBytes()` 20MB 入堆、AI 放物跨家庭 id、warm 外壳硬编码中文约 56 处、前后端零自动化测试、`docs/项目文档/*.docx` 停在 V9.98 前。
 - **P1 放映厅 Jellyfin 集成**:方案已定稿,**启动时先重读 docs/变更归档.md「放映厅 Jellyfin 集成方案」**。
 - **P2 智能家居中控(Home Assistant 集成)**:硬件协议层全归 HA,ihomy 只做数据沉淀与控制入口——S1 Paho 订阅 Mosquitto 入库 sys_iot_device/sys_iot_data+Redis 最新值、S2 HA REST 控制(long-lived token)、S3 前端中控页+物品定位户型图联动;详见 §9。
 - **P2 家庭保险箱 主密码(前端零知识)**:S1(表+CRUD+AES-GCM 加密+审计+生成器/强度评估)**已落地 V9.98**(§4.5.9)。剩余主密码方案——密钥只存浏览器、忘记即不可找回、会替换 S1 服务端解密路径(揭示接口与日志口径作废),属不可逆 UX 变更,**待定夺**;S3 明确不做扩展自动填充/跨家庭共享;详见 §9。

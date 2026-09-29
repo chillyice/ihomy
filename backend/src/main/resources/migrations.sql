@@ -1400,3 +1400,39 @@ UPDATE `sys_home_module` SET `sort_order` = 15 WHERE `code` = 'vault' AND `famil
 UPDATE `sys_home_module` SET `sort_order` = 16 WHERE `code` = 'tools' AND `family_id` IS NULL AND `sort_order` <> 16;
 UPDATE `sys_home_module` SET `sort_order` = 17 WHERE `code` = 'plant' AND `family_id` IS NULL AND `sort_order` <> 17;
 
+-- ------------------------------------------------------------
+-- V9.106 放映厅媒体引擎接入(2026-09-29)
+--   sys_media_server:每家庭一条配置(媒体服务器地址/账号/密码 ENC),ihomy 只调其 REST API,
+--   视频流量由客户端直连,不经 ihomy 后端。password 走 ParameterService.encrypt 落库。
+--   配置表按家庭唯一且不做逻辑删除,故不带 deleted 列(避免 uk_family 与软删互斥)。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `sys_media_server` (
+  `id`                BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`         BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `server_type`       VARCHAR(20)  NOT NULL DEFAULT 'JELLYFIN' COMMENT '引擎类型: JELLYFIN/EMBY',
+  `server_url`        VARCHAR(255) NOT NULL COMMENT '后端访问地址(家庭网络/隧道地址)',
+  `public_url`        VARCHAR(255) DEFAULT NULL COMMENT '客户端播放直连地址(空=同 server_url)',
+  `username`          VARCHAR(100) NOT NULL COMMENT '媒体服务器账号',
+  `password`          VARCHAR(500) NOT NULL COMMENT '账号密码(ENC 加密)',
+  `enabled`           TINYINT      NOT NULL DEFAULT 1 COMMENT '是否启用: 1启用/0停用',
+  `last_connected_at` DATETIME     DEFAULT NULL COMMENT '最近一次连接成功时间',
+  `created_by`        BIGINT       DEFAULT NULL COMMENT '创建人',
+  `created_at`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='放映厅媒体引擎接入配置(家庭级)';
+
+-- 引擎类型字典
+INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('media_server_type', 'JELLYFIN', 'Jellyfin'),
+('media_server_type', 'EMBY',     'Emby');
+
+-- 开源组件台账:Jellyfin 由「规划」转「部分集成」(API 集成 + 界面自建,转码/字幕轨未接),补版本号
+UPDATE `sys_oss_component` SET `current_version` = '10.9.11',
+       `purpose` = '放映厅媒体引擎(刮削/转码/TV 客户端;API 集成,界面自建)',
+       `integration_status` = 'PARTIAL'
+ WHERE `component_type` = 'SERVICE' AND `package_ref` = 'jellyfin/jellyfin'
+   AND (`integration_status` <> 'PARTIAL' OR `current_version` IS NULL);
+
+

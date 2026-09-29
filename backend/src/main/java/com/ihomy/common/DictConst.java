@@ -40,6 +40,11 @@ public final class DictConst {
     public static final String VWISH_IMPORTED = "IMPORTED";
     private static final String WISH_FALLBACK = WISH_PENDING;
 
+    /** 放映厅媒体引擎类型 media_server_type */
+    public static final String MEDIA_JELLYFIN = "JELLYFIN";
+    public static final String MEDIA_EMBY = "EMBY";
+    private static final String MEDIA_FALLBACK = MEDIA_JELLYFIN;
+
     /** 家庭计划状态 plan_status */
     public static final String PLAN_ACTIVE = "ACTIVE";
     public static final String PLAN_DONE = "DONE";
@@ -220,5 +225,10 @@ public final class DictConst {
             case 2 -> BOOK_TRANSFER;
             default -> BOOK_EXPENSE;
         };
+    }
+
+    /** 放映厅引擎类型(字符串枚举,非历史整数):未知值一律按 Jellyfin 处理 */
+    public static String mediaServerType(String v) {
+        return v != null && MEDIA_EMBY.equalsIgnoreCase(v.trim()) ? MEDIA_EMBY : MEDIA_FALLBACK;
     }
 }

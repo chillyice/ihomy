@@ -11,15 +11,18 @@ import java.security.MessageDigest;
 import java.util.Base64;
 
 /**
- * 设备文件短期签名 URL:让 <img>/<video> 标签无需 JWT 即可访问中转端点(签名即凭证,10 分钟有效)。
+ * 短期签名 URL:让 <img>/<video> 标签无需 JWT 即可访问中转端点(签名即凭证)。
  * 影子照片在 content_photo.url 存逻辑地址 storage://{deviceId}/{远程路径}?fsid={fsId},
- * 出接口时由 resolve() 动态换成带签名的 /api/storage/file-signed URL。
+ * 出接口时由 resolve() 动态换成带签名的 /api/storage/file-signed URL;
+ * 放映厅海报走同一套签名(/api/media/image-signed),令牌只留在后端。
  */
 @Service
 public class SignedUrlService {
 
     private static final String SCHEME = "storage://";
     private static final long TTL_SECONDS = 600;
+    /** 海报是静态资源,签名有效期给长一些(横幅在页面上可能停留很久) */
+    private static final long IMAGE_TTL_SECONDS = 24 * 3600;
 
     @Value("${jwt.secret}")
     private String secret;
@@ -67,6 +70,34 @@ public class SignedUrlService {
 
     private String payload(Long deviceId, String path, Long fsId, long exp) {
         return deviceId + "|" + path + "|" + (fsId == null ? "" : fsId) + "|" + exp;
+    }
+
+    /** 放映厅海报的签名中转 URL(与设备文件共用密钥,签名带用途前缀防跨端点重放) */
+    public String signMediaImage(Long familyId, String itemId, String type, Integer maxWidth) {
+        long exp = System.currentTimeMillis() / 1000 + IMAGE_TTL_SECONDS;
+        int width = maxWidth == null ? 0 : maxWidth;
+        String imageType = type == null ? "Primary" : type;
+        // familyId 也进签名:端点免登录,靠它定位家庭配置,被篡改即签名不通过
+        return "/api/media/image-signed?familyId=" + familyId
+                + "&itemId=" + URLEncoder.encode(itemId, StandardCharsets.UTF_8)
+                + "&type=" + URLEncoder.encode(imageType, StandardCharsets.UTF_8)
+                + "&maxWidth=" + width
+                + "&exp=" + exp
+                + "&sig=" + hmac(mediaPayload(familyId, itemId, imageType, width, exp));
+    }
+
+    /** 校验海报签名与有效期(常量时间比较);maxWidth 未传按 0 参与校验,与签发口径一致 */
+    public boolean verifyMediaImage(Long familyId, String itemId, String type, Integer maxWidth, long exp, String sig) {
+        if (sig == null || exp < System.currentTimeMillis() / 1000) return false;
+        String imageType = type == null ? "Primary" : type;
+        int width = maxWidth == null ? 0 : maxWidth;
+        return MessageDigest.isEqual(
+                hmac(mediaPayload(familyId, itemId, imageType, width, exp)).getBytes(StandardCharsets.UTF_8),
+                sig.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String mediaPayload(Long familyId, String itemId, String type, int maxWidth, long exp) {
+        return "media|" + familyId + "|" + itemId + "|" + type + "|" + maxWidth + "|" + exp;
     }
 
     private String hmac(String payload) {
