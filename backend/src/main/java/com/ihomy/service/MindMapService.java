@@ -14,6 +14,7 @@ import com.ihomy.mapper.ContentMindmapSnapshotMapper;
 import com.ihomy.mapper.SysUserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
@@ -196,6 +197,7 @@ public class MindMapService {
     }
 
     /** 回滚:用快照数据覆盖当前脑图(当前内容先自动存一份快照防手滑) */
+    @Transactional
     public ContentMindmap restoreSnapshot(Long id, Long snapshotId, Long userId, Long familyId) {
         require(id, familyId);
         ContentMindmapSnapshot s = getSnapshot(id, snapshotId, familyId);

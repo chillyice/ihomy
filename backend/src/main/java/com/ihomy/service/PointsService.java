@@ -158,23 +158,33 @@ public class PointsService {
 
     /** 本家庭上架商品列表(附当前用户已兑换次数,便于前端显示限兑) */
     public List<Map<String, Object>> products(Long familyId, Long userId) {
-        return productMapper.selectList(new LambdaQueryWrapper<PointsProduct>()
-                        .eq(PointsProduct::getFamilyId, familyId)
-                        .orderByDesc(PointsProduct::getCreatedAt))
-                .stream().map(p -> {
-                    Map<String, Object> map = new HashMap<>();
-                    map.put("id", p.getId());
-                    map.put("name", p.getName());
-                    map.put("icon", p.getIcon());
-                    map.put("points", p.getPoints());
-                    map.put("stock", p.getStock());
-                    map.put("perLimit", p.getPerLimit());
-                    map.put("enabled", p.getEnabled());
-                    map.put("redeemedCount", orderMapper.selectCount(new LambdaQueryWrapper<PointsOrder>()
-                            .eq(PointsOrder::getProductId, p.getId())
-                            .eq(PointsOrder::getUserId, userId)));
-                    return map;
-                }).collect(Collectors.toList());
+        List<PointsProduct> products = productMapper.selectList(new LambdaQueryWrapper<PointsProduct>()
+                .eq(PointsProduct::getFamilyId, familyId)
+                .orderByDesc(PointsProduct::getCreatedAt));
+        // 一次 GROUP BY 取每个商品当前用户的已兑换次数,免逐商品 COUNT
+        Map<Long, Long> redeemed = new HashMap<>();
+        if (!products.isEmpty()) {
+            List<Long> ids = products.stream().map(PointsProduct::getId).collect(Collectors.toList());
+            com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<PointsOrder> qw =
+                    new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<>();
+            qw.select("product_id", "COUNT(*) AS cnt")
+              .eq("user_id", userId).in("product_id", ids).groupBy("product_id");
+            for (Map<String, Object> row : orderMapper.selectMaps(qw)) {
+                redeemed.put(((Number) row.get("product_id")).longValue(), ((Number) row.get("cnt")).longValue());
+            }
+        }
+        return products.stream().map(p -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", p.getId());
+            map.put("name", p.getName());
+            map.put("icon", p.getIcon());
+            map.put("points", p.getPoints());
+            map.put("stock", p.getStock());
+            map.put("perLimit", p.getPerLimit());
+            map.put("enabled", p.getEnabled());
+            map.put("redeemedCount", redeemed.getOrDefault(p.getId(), 0L));
+            return map;
+        }).collect(Collectors.toList());
     }
 
     /** 家长上架商品 */

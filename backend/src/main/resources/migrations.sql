@@ -1513,5 +1513,55 @@ UPDATE `sys_user` SET `must_change_password` = 1
      '$2a$10$hZckSawNUXiKhncldpY78.W00HZjp8WC/XCBlL6Z8SXc9Y3wrIuIK',
      '$2a$10$EBR.GIYUae6QGVabdcEHKuXgVwuTT6Kz/KtnMTCzn0ND0gcepNvhK');
 
+-- ------------------------------------------------------------
+-- V10.2 列表查询复合索引补齐(2026-09-29)
+--   消除以下列表接口的全表扫 + filesort(等值字段在前、排序字段在后):
+--   family_notification 按 receiver_id 过滤 + created_at 排序(铃铛每次拉取)
+--   content_comment      按 (content_type,content_id,deleted) 等值 + created_at 排序
+--   family_points_order  按 user_id/family_id 过滤 + created_at 排序
+--   family_task          按 family_id 过滤 + created_at 排序
+--   family_reminder      按 family_id 过滤 + done/remind_time 排序
+--   family_plan          按 family_id 过滤 + status/created_at 排序
+--   content_wish         按 family_id 过滤 + status/created_at 排序
+--   既有单列索引若被复合索引覆盖则同名重建;information_schema 守卫幂等
+-- ------------------------------------------------------------
+-- family_notification:新增复合索引(保留 idx_receiver_read 服务未读数查询)
+SET @has := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'family_notification' AND index_name = 'idx_receiver_created');
+SET @sql := IF(@has = 0, 'ALTER TABLE `family_notification` ADD INDEX `idx_receiver_created` (`receiver_id`, `created_at`)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- content_comment.idx_content → (content_type, content_id, deleted, created_at)
+SET @has := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'content_comment' AND index_name = 'idx_content' AND column_name = 'created_at');
+SET @sql := IF(@has = 0, 'ALTER TABLE `content_comment` DROP INDEX `idx_content`, ADD INDEX `idx_content` (`content_type`, `content_id`, `deleted`, `created_at`)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- family_points_order.idx_user → (user_id, created_at);idx_family → (family_id, created_at)
+SET @has := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'family_points_order' AND index_name = 'idx_user' AND column_name = 'created_at');
+SET @sql := IF(@has = 0, 'ALTER TABLE `family_points_order` DROP INDEX `idx_user`, ADD INDEX `idx_user` (`user_id`, `created_at`)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+SET @has := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'family_points_order' AND index_name = 'idx_family' AND column_name = 'created_at');
+SET @sql := IF(@has = 0, 'ALTER TABLE `family_points_order` DROP INDEX `idx_family`, ADD INDEX `idx_family` (`family_id`, `created_at`)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- family_task.idx_family → (family_id, created_at)
+SET @has := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'family_task' AND index_name = 'idx_family' AND column_name = 'created_at');
+SET @sql := IF(@has = 0, 'ALTER TABLE `family_task` DROP INDEX `idx_family`, ADD INDEX `idx_family` (`family_id`, `created_at`)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- family_reminder.idx_family → (family_id, done, remind_time)
+SET @has := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'family_reminder' AND index_name = 'idx_family' AND column_name = 'done');
+SET @sql := IF(@has = 0, 'ALTER TABLE `family_reminder` DROP INDEX `idx_family`, ADD INDEX `idx_family` (`family_id`, `done`, `remind_time`)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- family_plan.idx_family → (family_id, status, created_at DESC)(status 升序 + created_at 降序,混向须降序索引才免 filesort)
+SET @has := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'family_plan' AND index_name = 'idx_family' AND column_name = 'status');
+SET @sql := IF(@has = 0, 'ALTER TABLE `family_plan` DROP INDEX `idx_family`, ADD INDEX `idx_family` (`family_id`, `status`, `created_at` DESC)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- content_wish.idx_family → (family_id, status, created_at DESC)(同上,混向排序)
+SET @has := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = 'content_wish' AND index_name = 'idx_family' AND column_name = 'status');
+SET @sql := IF(@has = 0, 'ALTER TABLE `content_wish` DROP INDEX `idx_family`, ADD INDEX `idx_family` (`family_id`, `status`, `created_at` DESC)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 
 

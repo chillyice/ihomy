@@ -46,8 +46,12 @@ public class CommentService {
         LambdaQueryWrapper<Comment> qw = new LambdaQueryWrapper<>();
         qw.eq(Comment::getContentType, contentType)
           .eq(Comment::getContentId, contentId)
-          .orderByAsc(Comment::getCreatedAt);
+          .orderByDesc(Comment::getCreatedAt)
+          .last("LIMIT 500");
+        // ponytail: 单条内容最多载入最近 500 条评论防内存膨胀;取最新再翻回升序组树。
+        // 超出上限的旧评论被丢弃,其后续回复因父节点缺失会自动升为根节点
         List<Comment> all = commentMapper.selectList(qw);
+        java.util.Collections.reverse(all);
 
         // 收集所有 userIds(authorId + replyToUserId)批量查用户,避免 N+1
         java.util.Set<Long> userIds = new java.util.HashSet<>();

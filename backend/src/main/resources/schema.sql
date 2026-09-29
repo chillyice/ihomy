@@ -343,7 +343,8 @@ CREATE TABLE `family_notification` (
   `is_read`      TINYINT      NOT NULL DEFAULT 0 COMMENT '0未读 1已读',
   `created_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   PRIMARY KEY (`id`),
-  KEY `idx_receiver_read` (`receiver_id`, `is_read`)
+  KEY `idx_receiver_read` (`receiver_id`, `is_read`),
+  KEY `idx_receiver_created` (`receiver_id`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='消息通知表';
 
 -- ------------------------------------------------------------
@@ -573,7 +574,7 @@ CREATE TABLE `content_comment` (
   `created_at`       DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '评论时间',
   `deleted`          TINYINT     NOT NULL DEFAULT 0 COMMENT '逻辑删除',
   PRIMARY KEY (`id`),
-  KEY `idx_content` (`content_type`, `content_id`),
+  KEY `idx_content` (`content_type`, `content_id`, `deleted`, `created_at`),
   KEY `idx_parent`  (`parent_id`),
   KEY `idx_author`  (`author_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='评论表';
@@ -966,8 +967,8 @@ CREATE TABLE `family_points_order` (
 `status`       VARCHAR(20)   NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING待核销 REDEEMED已核销',
   `created_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '兑换时间',
   PRIMARY KEY (`id`),
-  KEY `idx_user` (`user_id`),
-  KEY `idx_family` (`family_id`)
+  KEY `idx_user` (`user_id`, `created_at`),
+  KEY `idx_family` (`family_id`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='积分兑换订单表';
 
 -- ------------------------------------------------------------
@@ -1005,7 +1006,7 @@ CREATE TABLE `family_task` (
   `created_at`    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发布时间',
   `updated_at`    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
-  KEY `idx_family` (`family_id`),
+  KEY `idx_family` (`family_id`, `created_at`),
   KEY `idx_created` (`created_by`),
   KEY `idx_assignee` (`assignee_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='悬赏任务表';
@@ -1027,7 +1028,7 @@ CREATE TABLE `family_reminder` (
   `created_by`  BIGINT        NOT NULL COMMENT '创建人ID',
   `created_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   PRIMARY KEY (`id`),
-  KEY `idx_family` (`family_id`),
+  KEY `idx_family` (`family_id`, `done`, `remind_time`),
   KEY `idx_date` (`remind_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='提醒事项表';
 
@@ -1106,7 +1107,7 @@ CREATE TABLE `family_plan` (
   `created_at`   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at`   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
-  KEY `idx_family` (`family_id`)
+  KEY `idx_family` (`family_id`, `status`, `created_at` DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭计划表';
 
 -- ------------------------------------------------------------
@@ -1141,7 +1142,7 @@ CREATE TABLE `content_wish` (
   `achieved_at`  DATETIME      DEFAULT NULL COMMENT '达成时间（标记实现时记录）',
   `created_at`   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '提出时间',
   PRIMARY KEY (`id`),
-  KEY `idx_family` (`family_id`)
+  KEY `idx_family` (`family_id`, `status`, `created_at` DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='愿望单表';
 
 -- ------------------------------------------------------------

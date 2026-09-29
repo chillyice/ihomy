@@ -15,6 +15,7 @@ import com.ihomy.mapper.FamilyMapper;
 import com.ihomy.mapper.SysRoleMapper;
 import com.ihomy.mapper.SysUserMapper;
 import com.ihomy.mapper.SysUserRoleMapper;
+import com.ihomy.security.SecurityHelper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 多家庭业务:公开家庭搜索、入家申请与审核(通知联动)、
@@ -40,6 +44,7 @@ public class MultiFamilyService {
     private final SysUserRoleMapper sysUserRoleMapper;
     private final SysRoleMapper sysRoleMapper;
     private final NotificationService notificationService;
+    private final SecurityHelper securityHelper;
 
     /** 用户是否已是该家庭成员(查角色绑定) */
     public boolean isMember(Long userId, Long familyId) {
@@ -136,14 +141,21 @@ public class MultiFamilyService {
         qw.eq(FamilyApply::getFamilyId, familyId)
           .orderByAsc(FamilyApply::getStatus)
           .orderByDesc(FamilyApply::getCreatedAt);
+        List<FamilyApply> applies = familyApplyMapper.selectList(qw);
+        // 批量取申请人,免逐行 selectById(N+1)
+        Set<Long> userIds = applies.stream().map(FamilyApply::getUserId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, SysUser> userMap = userIds.isEmpty() ? Map.of()
+                : sysUserMapper.selectBatchIds(userIds).stream()
+                        .collect(Collectors.toMap(SysUser::getId, u -> u));
         List<Map<String, Object>> result = new ArrayList<>();
-        for (FamilyApply a : familyApplyMapper.selectList(qw)) {
+        for (FamilyApply a : applies) {
             Map<String, Object> m = new HashMap<>();
             m.put("id", a.getId());
             m.put("message", a.getMessage());
             m.put("status", a.getStatus());
             m.put("createdAt", a.getCreatedAt());
-            SysUser u = sysUserMapper.selectById(a.getUserId());
+            SysUser u = userMap.get(a.getUserId());
             m.put("applicantId", a.getUserId());
             m.put("applicantName", u == null ? "未知" : UserNames.of(u));
             result.add(m);
@@ -177,6 +189,8 @@ public class MultiFamilyService {
                     ur.setRoleId(memberRoleId);
                     ur.setFamilyId(familyId);
                     sysUserRoleMapper.insert(ur);
+                    // 角色绑定变更后失效该用户此家庭的权限码缓存(曾退家又重入者不再持旧权限)
+                    securityHelper.invalidatePerms(a.getUserId(), familyId);
                 }
             }
             notificationService.create(a.getUserId(), "system",

@@ -78,7 +78,7 @@
 - **注意**:`content_blog/diary/photo/video/wish` 5 张内容表 `visibility` 列为 `VARCHAR(20) DEFAULT 'FAMILY'`(PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开),schema.sql 与 live DB 已对齐(曾误写 TINYINT)。
 - 权力 4 角色:OWNER/MEMBER/CHILD/GUEST + OPS(运维,不属任何家庭,绑定须含 `family_id=NULL` 的系统级行)。同一用户不同家庭可不同角色(`sys_user_role.family_id` 区别)。
 - **新增带 `@RequirePermission` 接口前**:确保 auth_code 进 `sys_auth` + `sys_role_auth` 种子(OWNER 豁免,MEMBER 显式授权),否则 403。
-- **索引规范**(强制):列表查询的 WHERE + ORDER BY 字段必须落在同一复合索引内。复合索引顺序:等值字段在前,范围/排序字段在后;`deleted` 进索引(逻辑删除几乎每查必带)。已建关键复合索引:`content_blog.idx_family_status_created(family_id,status,deleted,created_at)`、`content_diary.idx_family_created(family_id,deleted,created_at)`、`content_photo.idx_family_created(family_id,deleted,created_at)`、`family_notification.idx_receiver_read(receiver_id,is_read)`。新增表/接口前先 `EXPLAIN` 验证走索引。
+- **索引规范**(强制):列表查询的 WHERE + ORDER BY 字段必须落在同一复合索引内。复合索引顺序:等值字段在前,范围/排序字段在后;`deleted` 进索引(逻辑删除几乎每查必带);**混向排序**(如 `status` 升序配 `created_at` 降序)纯升序复合索引仍 filesort,索引列须带 `DESC`(MySQL 8.0.13+,见踩坑速查 §8.4)。已建关键复合索引:`content_blog.idx_family_status_created(family_id,status,deleted,created_at)`、`content_diary.idx_family_created(family_id,deleted,created_at)`、`content_photo.idx_family_created(family_id,deleted,created_at)`、`family_notification.idx_receiver_read(receiver_id,is_read)`。新增表/接口前先 `EXPLAIN` 验证走索引。
 
 ## 代码结构
 
@@ -101,7 +101,7 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
     logback-spring.xml  # 三类日志分流(access/server/thirdparty,六要素 pattern,按天滚动)
     external.yml.template  # 外挂配置模板(IHOMY_CONFIG_PATH 覆盖密码/密钥/路径/captcha/天气,唯一开发生产差异机制)
     mapper/*.xml        # 每个 Mapper 一个同名 XML
-    schema.sql          # 建库+建号+建表(74 张)+种子(开发安全版,已入库;与 migrations.sql 必须同步;本地由 start-db.ps1 自动导入)
+    schema.sql          # 建库+建号+建表(75 张)+种子(开发安全版,已入库;与 migrations.sql 必须同步;本地由 start-db.ps1 自动导入)
   mvnw / mvnw.cmd       # Maven Wrapper
 frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
   src/
@@ -189,9 +189,9 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 6. **软删**:`@TableLogic deleted`;**物理删必须用自定义 XML DELETE 语句**(MP `deleteById` 实为 UPDATE)。目前照片/相册/视频/图书四处硬删。
 7. **家庭隔离**:所有业务数据带 `family_id`;JWT familyId 为快照,refresh 时按优先级解析;跨家庭访问返回 NOT_FOUND。
 8. **多家庭**:`sys_user_role.family_id` 区分;当前家庭存 Redis;`default_family_id` 用户设置的默认家庭。**`family_id=NULL` 表示系统级**(OPS 绑定等),别用占位值填充。
-9. **N+1 禁令**(强制):列表接口禁止在 for 循环里 `selectById` 取关联字段(authorName/uploaderName/requesterName 等)。**必须先收集所有 userIds,用 `selectBatchIds` 批量查,内存 Map 回填**。参考 `ActivityFeedService.getFeed` / `CommentService.list` / `AnniversaryService.list` / `VideoService.list` 的 `batchUsers()` 写法。已批量化的:Book/Chat/FamilyPlan/Task/Points/ActivityFeed/Comment/Anniversary/Video。
+9. **N+1 禁令**(强制):列表接口禁止在 for 循环里 `selectById` 取关联字段(authorName/uploaderName/requesterName 等)。**必须先收集所有 userIds,用 `selectBatchIds` 批量查,内存 Map 回填**。参考 `ActivityFeedService.getFeed` / `CommentService.list` / `AnniversaryService.list` / `VideoService.list` 的 `batchUsers()` 写法。已批量化的:Book/Chat/FamilyPlan/Task/Points/ActivityFeed/Comment/Anniversary/Video + 家庭列表/入家申请/家庭 AI 功能绑定/歌单加曲(V10.2)。
 10. **缓存规范**(强制):键 `ihomy:{domain}:{id}`;短 TTL(用户/权限/公开首页 5min);**变更点必须显式 invalidate(矩阵见踩坑速查 §9)**;不变数据走内存缓存(`sys_home_module` 全局预热 + 双检锁懒加载兜底;家庭模块按 familyId 缓存 `ConcurrentHashMap`,变更 evict;**不引 Caffeine**);敏感数据不缓存(成员视图 `/public/home`)。
-11. **UPDATE 不先 select**(强制):回写冗余字段(如 `like_count`)用 `LambdaUpdateWrapper.eq(id).set(field, value).update(null)`,不要 `selectById` 再 `updateById`。参考 `ContentLikeService.syncCount`。**依赖 `updated_at` 的表更新必须用 `LambdaUpdateWrapper` 只 SET 业务字段并重查**(MP `updateById` 会回写实体旧 `updated_at`、抑制 `ON UPDATE CURRENT_TIMESTAMP`,见踩坑速查 §2.2)。
+11. **UPDATE 不先 select**(强制):回写冗余字段用 `LambdaUpdateWrapper.eq(...).set(...).update(null)`,不要 `selectById` 再 `updateById`;**计数类字段(点赞/评论数)用 `setSql("like_count = like_count + delta")` 原子增量,禁止「先 COUNT 再 SET」**(并发快照互相覆盖,见踩坑速查 §8.3),参考 `ContentLikeService.adjustCount`。**依赖 `updated_at` 的表更新必须用 `LambdaUpdateWrapper` 只 SET 业务字段并重查**(MP `updateById` 会回写实体旧 `updated_at`、抑制 `ON UPDATE CURRENT_TIMESTAMP`,见踩坑速查 §2.2)。
 12. **文件上传流式**(强制):大文件(>1MB)禁止 `file.getBytes()` 全量入堆(生产 `-Xmx384m` 上传 200MB 即 OOM)。**用 `MultipartFile` 重载 + `transferTo` + `Files.copy` 兜底**。FileService 已提供 4 个流式重载(`upload`/`uploadVideo`/`uploadBook` 通用+图片+视频+电子书),Controller 必须传 `MultipartFile` 不调 `getBytes()`。
 13. **JVM/连接池配置**(基线):`spring.threads.virtual.enabled: true`(JDK21 虚拟线程,Tomcat 自动用);HikariCP `maximum-pool-size: 20` + `minimum-idle: 5` + `connection-timeout: 3000`。
 14. **日志规范**(强制,详见 `docs/设计想法/日志/日志规范.md`):三类文件 access(接口,`AccessLogFilter` 自动)/server(流程+SQL+ERROR)/thirdparty(三方,`ThirdPartyHttp` 封装),按天滚动保留 7 天;六要素 时间/级别/线程/[tid]/位置/内容;tid 贯穿 HTTP/WS/@Async/自管线程池(配 TaskDecorator);三方调用一律走 `ThirdPartyHttp.get()`(自定义方法走 `.request()`);**报错必须带堆栈** `log.error("xx, p={}", p, e)`(禁止 printStackTrace/只打 getMessage);级别 ERROR=人工/WARN=可恢复/INFO=关键/DEBUG=细节;**所有写接口必须 @OperationLog**(module 大写/operationType 标准词/description 中文;token 刷新/已读等高频噪音端点除外);新敏感字段进 `AccessLogFilter.SENSITIVE_JSON` 打码清单;运维「详细日志」`GET /ops/logs/trace?tid=` 按 tid 扫三类文件,排查方法见 `docs/设计想法/日志/日志问题分析方法.md`。
@@ -284,14 +284,14 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 > **这里只做指引,不记内容**。完整规划(P1-P4)、实施计划与验收口径见 **`docs/需求设计说明书.md` §9**;代码级优化待办见 **§9.2(36 项,分安全/性能/前端/工程化四组)** 与 **§9.3(21 项,V9.98–V9.106 新增代码复审 + §9.2 逐条复核)**。**启动任何规划项前先读该章对应小节**,不要凭本文件或记忆开工。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
 - **V9.110(2026-09-29)已完成 5 项 P1 代码级**:音频转写流式化(`AiController`/`AiService`/`ThirdPartyHttp.requestStreaming`)、Service Worker 排除 `/api/{vault,auth,ops,profile}` + 登出清 `api-cache`、上传黑名单补 xhtml/xml 等、登出/refresh 吊销(新增 `WALLPAPER` 令牌类型 + 60s 轮换宽限 + JWT `jti` 唯一化)、前后端自动化测试骨架(vitest + `spring-boot-starter-test`,CI 去掉 `-DskipTests`)。详见 `docs/变更归档.md` V9.110。
-- 当前判断:**§9.2 剩余 P1** 为生产 Redis 无密码发布 `0.0.0.0`、`/files/**` 直连无鉴权与 nginx `nosniff`/CSP、`docs/项目文档/*.docx` 重生成;其余为 §9.2 的 P2(含 AI 放物跨家庭 id、warm 外壳硬编码中文约 56 处等)。**§9.3 的两条 P1 已收口**(踩坑速查入库、部署文档补媒体引擎章节 —— V9.108),余下 P2:媒体引擎令牌直出前端、媒体服务器地址未限目标(SSRF)、年利率上限与列精度冲突必 500。
+- 当前判断:**§9.2 剩余 P1** 为生产 Redis 无密码发布 `0.0.0.0`、`/files/**` 直连无鉴权与 nginx `nosniff`/CSP、`docs/项目文档/*.docx` 重生成;§9.2 的 P2 中 **A 组(安全与数据保护)与 B 组(性能与数据一致性)各 6 条已解决(V10.1 / V10.2)**,余下为 **C 组(前端体验与规范:如 warm 外壳硬编码中文约 56 处、请求串行未并行、缺 i18n key)** 与 **D 组(工程化:台账漏登/版本漂移、CI 闸门、备份/健康检查等)**。**§9.3 的两条 P1 已收口**(踩坑速查入库、部署文档补媒体引擎章节 —— V9.108),余下 P2:媒体引擎令牌直出前端、媒体服务器地址未限目标(SSRF)、年利率上限与列精度冲突必 500。
 - 功能侧还剩:P1 放映厅 **S4 收尾**(S1–S4 已落地 V9.106–V9.108:转码 HLS 回退/字幕轨/成员播放档案/NAS 上线文档;剩 Emby 实测、多家庭共用一台媒体服务器、转码清晰度与多音轨选择)、P2 智能家居中控(Home Assistant,分 S1-S3)、P2 保险箱主密码(前端零知识,不可逆 UX 变更,待定夺)、场景主题方向(3D 光影实验台 `/tools/light-lab` 为底座)。
 
 ## 文档清单
 
 - `README.md`(项目简介,GitHub 展示,不含密码); `docs/README.md`(**文档索引**:每份文档一句话定位+新人阅读顺序)
 - `docs/架构设计.md`(系统上下文/请求流转/模块分域/关键机制/部署拓扑)
-- `docs/需求设计说明书.md` — **完整功能需求唯一活文档**(功能模块清单+数据库设计 74 表+接口设计+规划事项 §9+修订记录),随迭代持续更新
+- `docs/需求设计说明书.md` — **完整功能需求唯一活文档**(功能模块清单+数据库设计 75 表+接口设计+规划事项 §9+修订记录),随迭代持续更新
 - `docs/变更归档.md` — 已实现变更归档(文件级改动表+设计决策+踩坑+live DB 同步 SQL);**开头有章节目录**,新变更追加到文件末尾
 - `docs/踩坑速查.md` — **踩坑/机制细节/维护清单**(工具链/后端/前端/天文/媒体引擎/WE/部署/性能/缓存失效矩阵/已知问题);本文件凡写「详见踩坑速查 §x」者均指它
 - `docs/UI设计提示词.md` — 沉浸式首页 UI 设计完整规格(可作为 AI 提示词重新生成)

@@ -324,17 +324,28 @@ public class AuthService {
 
         Long current = resolveFamily(userId);
         java.util.Set<Long> seen = new java.util.HashSet<>();
-        for (SysUserRole ur : sysUserRoleMapper.selectList(
+        List<SysUserRole> roles = sysUserRoleMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysUserRole>()
-                        .eq(SysUserRole::getUserId, userId))) {
+                        .eq(SysUserRole::getUserId, userId));
+        // 批量取家庭与角色码,免逐家庭 2 次查询(N+1)
+        java.util.Set<Long> familyIds = roles.stream().map(SysUserRole::getFamilyId)
+                .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+        Map<Long, Family> familyMap = familyIds.isEmpty() ? Map.of()
+                : familyMapper.selectBatchIds(familyIds).stream()
+                        .collect(java.util.stream.Collectors.toMap(Family::getId, f -> f));
+        Map<Long, String> roleMap = sysRoleMapper.selectRoleCodesByUser(userId).stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        row -> ((Number) row.get("familyId")).longValue(),
+                        row -> (String) row.get("roleCode"), (a, b) -> a));
+        for (SysUserRole ur : roles) {
             if (ur.getFamilyId() == null || !seen.add(ur.getFamilyId())) continue;
-            Family f = familyMapper.selectById(ur.getFamilyId());
+            Family f = familyMap.get(ur.getFamilyId());
             if (f == null) continue;
             Map<String, Object> m = new HashMap<>();
             m.put("familyId", f.getId());
             m.put("name", f.getName());
             m.put("isDemo", f.getIsDemo());
-            m.put("role", sysRoleMapper.selectRoleCodeByUserAndFamily(userId, f.getId()));
+            m.put("role", roleMap.get(f.getId()));
             m.put("isPrimary", user.getFamilyId() != null && user.getFamilyId().equals(f.getId()));
             m.put("isDefault", user.getDefaultFamilyId() != null && user.getDefaultFamilyId().equals(f.getId()));
             m.put("isCurrent", current != null && current.equals(f.getId()));

@@ -251,6 +251,7 @@ public class AlbumService {
     }
 
     /** 添加照片:可见性随相册类型(public→PUBLIC,private→FAMILY);首张自动成为相册封面 */
+    @Transactional
     public Photo addPhoto(Long albumId, SysUser user, Long currentFamilyId, String url, String description) {
         Album a = albumMapper.selectById(albumId);
         if (a == null) throw new BizException(ResultCode.NOT_FOUND);

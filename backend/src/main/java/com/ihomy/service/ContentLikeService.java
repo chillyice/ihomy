@@ -13,6 +13,7 @@ import com.ihomy.mapper.DiaryMapper;
 import com.ihomy.mapper.PhotoMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -31,6 +32,7 @@ public class ContentLikeService {
     private final PhotoMapper photoMapper;
 
     /** 切换点赞:已赞则取消,未赞则插入(表 UNIQUE 防重复),返回最新状态与总数 */
+    @Transactional
     public Map<String, Object> toggle(Long userId, Long familyId, String contentType, Long contentId) {
         if (!validContent(contentType, contentId, familyId)) {
             throw new BizException(ResultCode.NOT_FOUND);
@@ -41,9 +43,11 @@ public class ContentLikeService {
           .eq(ContentLike::getUserId, userId);
         ContentLike existing = likeMapper.selectOne(qw);
         boolean liked;
+        int delta;
         if (existing != null) {
             likeMapper.deleteById(existing.getId());
             liked = false;
+            delta = -1;
         } else {
             ContentLike like = new ContentLike();
             like.setContentType(contentType);
@@ -53,21 +57,24 @@ public class ContentLikeService {
             try {
                 likeMapper.insert(like);
                 liked = true;
+                delta = 1;
             } catch (org.springframework.dao.DuplicateKeyException e) {
                 ContentLike existing2 = likeMapper.selectOne(qw);
                 if (existing2 != null) {
                     likeMapper.deleteById(existing2.getId());
                     liked = false;
+                    delta = -1;
                 } else {
                     liked = true;
+                    delta = 0;
                 }
             }
         }
-        long count = likeMapper.countByContent(contentType, contentId);
-        syncCount(contentType, contentId, (int) count);
+        // 原子增量更新 like_count(并发交错不再互相覆盖),与 content_like 的增删同事务落库
+        adjustCount(contentType, contentId, delta);
         Map<String, Object> result = new HashMap<>();
         result.put("liked", liked);
-        result.put("likeCount", count);
+        result.put("likeCount", likeMapper.countByContent(contentType, contentId));
         return result;
     }
 
@@ -106,27 +113,30 @@ public class ContentLikeService {
         }
     }
 
-    /** 把最新点赞数回写到内容表的 likeCount 字段,便于列表直接展示。
-     * 直接 UPDATE 不先 select,避免一次额外查询;不存在的 id 自然不会受影响。
+    /** 把点赞数增量原子回写到内容表的 like_count 字段。
+     * 用 like_count = like_count + delta 而非「先 COUNT 再 SET」,并发交错时不会互相覆盖;
+     * delta 为内部常量(±1/0),拼进 SQL 无注入风险。不存在的 id 自然不会受影响。
      */
-    private void syncCount(String contentType, Long contentId, int count) {
+    private void adjustCount(String contentType, Long contentId, int delta) {
+        if (delta == 0) return;
+        String expr = "like_count = like_count + " + delta;
         switch (contentType) {
             case "blog" -> {
                 com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Blog> uw =
                         new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<>();
-                uw.eq(Blog::getId, contentId).set(Blog::getLikeCount, count);
+                uw.eq(Blog::getId, contentId).setSql(expr);
                 blogMapper.update(null, uw);
             }
             case "diary" -> {
                 com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Diary> uw =
                         new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<>();
-                uw.eq(Diary::getId, contentId).set(Diary::getLikeCount, count);
+                uw.eq(Diary::getId, contentId).setSql(expr);
                 diaryMapper.update(null, uw);
             }
             case "photo" -> {
                 com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Photo> uw =
                         new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<>();
-                uw.eq(Photo::getId, contentId).set(Photo::getLikeCount, count);
+                uw.eq(Photo::getId, contentId).setSql(expr);
                 photoMapper.update(null, uw);
             }
             default -> {

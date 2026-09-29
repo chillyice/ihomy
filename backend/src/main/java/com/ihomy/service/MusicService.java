@@ -53,10 +53,12 @@ public class MusicService {
     // ========== 曲库管理 ==========
 
     public List<Map<String, Object>> listByFamily(Long familyId) {
+        // ponytail: 家庭曲库整体载入,加 1000 条上限防超大库撑爆内存;需真分页时再改游标
         List<ContentMusic> musics = musicMapper.selectList(
                 new LambdaQueryWrapper<ContentMusic>()
                         .eq(ContentMusic::getFamilyId, familyId)
-                        .orderByDesc(ContentMusic::getCreatedAt));
+                        .orderByDesc(ContentMusic::getCreatedAt)
+                        .last("LIMIT 1000"));
         // 批量查映射设备名(免 N+1),storage:// 逻辑地址保持原样,播放时走 play-url 现签
         Set<Long> deviceIds = musics.stream().map(ContentMusic::getSourceDeviceId)
                 .filter(Objects::nonNull).collect(Collectors.toSet());
@@ -98,12 +100,14 @@ public class MusicService {
     }
 
     public List<Map<String, Object>> albumsByFamily(Long familyId) {
+        // ponytail: 同上,1000 条上限防超大库撑爆内存
         List<ContentMusic> all = musicMapper.selectList(
                 new LambdaQueryWrapper<ContentMusic>()
                         .eq(ContentMusic::getFamilyId, familyId)
                         .isNotNull(ContentMusic::getAlbum)
                         .ne(ContentMusic::getAlbum, "")
-                        .orderByAsc(ContentMusic::getAlbum));
+                        .orderByAsc(ContentMusic::getAlbum)
+                        .last("LIMIT 1000"));
         Map<String, List<ContentMusic>> grouped = all.stream()
                 .collect(Collectors.groupingBy(ContentMusic::getAlbum, LinkedHashMap::new, Collectors.toList()));
         List<Map<String, Object>> result = new ArrayList<>();
@@ -257,6 +261,7 @@ public class MusicService {
         }
     }
 
+    @org.springframework.transaction.annotation.Transactional
     public void addTracksToPlaylist(Long familyId, Long playlistId, List<Long> musicIds) {
         ContentMusicPlaylist p = playlistMapper.selectById(playlistId);
         if (p == null || !p.getFamilyId().equals(familyId)) throw new BizException(ResultCode.NOT_FOUND);
@@ -266,19 +271,24 @@ public class MusicService {
                                 .orderByDesc(ContentMusicPlaylistTrack::getSortOrder)
                                 .last("LIMIT 1"))
                 .stream().findFirst().map(ContentMusicPlaylistTrack::getSortOrder).orElse(0);
-        for (Long musicId : musicIds) {
-            ContentMusic m = musicMapper.selectById(musicId);
-            if (m == null || !m.getFamilyId().equals(familyId)) continue;
-            Long count = trackMapper.selectCount(
-                    new LambdaQueryWrapper<ContentMusicPlaylistTrack>()
-                            .eq(ContentMusicPlaylistTrack::getPlaylistId, playlistId)
-                            .eq(ContentMusicPlaylistTrack::getMusicId, musicId));
-            if (count > 0) continue;
-            ContentMusicPlaylistTrack t = new ContentMusicPlaylistTrack();
-            t.setPlaylistId(playlistId);
-            t.setMusicId(musicId);
-            t.setSortOrder(maxOrder++);
-            trackMapper.insert(t);
+        // 批量取目标曲目与已存在关联,免逐曲 selectById/selectCount(N+1)
+        Set<Long> validIds = musicIds == null || musicIds.isEmpty() ? Set.of()
+                : musicMapper.selectBatchIds(musicIds).stream()
+                        .filter(m -> m.getFamilyId().equals(familyId))
+                        .map(ContentMusic::getId).collect(Collectors.toSet());
+        Set<Long> existing = trackMapper.selectList(new LambdaQueryWrapper<ContentMusicPlaylistTrack>()
+                        .eq(ContentMusicPlaylistTrack::getPlaylistId, playlistId)).stream()
+                .map(ContentMusicPlaylistTrack::getMusicId).collect(Collectors.toSet());
+        if (musicIds != null) {
+            for (Long musicId : musicIds) {
+                // validIds 保证归属;existing.add 同时去重库中已有与本次入参重复项
+                if (!validIds.contains(musicId) || !existing.add(musicId)) continue;
+                ContentMusicPlaylistTrack t = new ContentMusicPlaylistTrack();
+                t.setPlaylistId(playlistId);
+                t.setMusicId(musicId);
+                t.setSortOrder(maxOrder++);
+                trackMapper.insert(t);
+            }
         }
         updatePlaylistCount(p);
         updatePlaylistCover(p);

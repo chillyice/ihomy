@@ -17,4 +17,11 @@
         WHERE ur.user_id = #{userId} AND ur.family_id = #{familyId}
     </select>
 
+    <select id="selectRoleCodesByUser" resultType="map">
+        SELECT ur.family_id AS familyId, r.role_code AS roleCode
+        FROM sys_user_role ur
+        JOIN sys_role r ON ur.role_id = r.id AND r.status = 'ENABLED'
+        WHERE ur.user_id = #{userId} AND ur.family_id IS NOT NULL
+    </select>
+
 </mapper>

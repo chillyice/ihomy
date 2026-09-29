@@ -14,6 +14,7 @@ import com.ihomy.mapper.BlogCategoryMapper;
 import com.ihomy.mapper.BlogMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.*;
@@ -239,6 +240,7 @@ public class BlogService {
     }
 
     /** 删除分类:删分类表记录(含子分类) + 按mode处理博客表 */
+    @Transactional
     public void deleteCategory(Long familyId, Long categoryId, String mode) {
         BlogCategory cat = blogCategoryMapper.selectById(categoryId);
         if (cat == null || !cat.getFamilyId().equals(familyId)) throw new BizException(ResultCode.NOT_FOUND);

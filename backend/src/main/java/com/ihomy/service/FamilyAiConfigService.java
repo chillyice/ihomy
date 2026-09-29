@@ -229,11 +229,15 @@ public class FamilyAiConfigService {
         Map<String, AiFeature> bindings = aiFeatureMapper.selectList(new LambdaQueryWrapper<AiFeature>()
                         .eq(AiFeature::getFamilyId, familyId)).stream()
                 .collect(Collectors.toMap(AiFeature::getFeatureCode, f -> f, (a, b) -> a));
+        // 一次取全家庭模型,按 id 内存回填,免逐功能 selectById(resolveForFeature)
+        Map<Long, AiModel> modelMap = aiModelMapper.selectList(new LambdaQueryWrapper<AiModel>()
+                        .eq(AiModel::getFamilyId, familyId)).stream()
+                .collect(Collectors.toMap(AiModel::getId, m -> m, (a, b) -> a));
         List<Map<String, Object>> out = new ArrayList<>();
         for (String code : AiConst.FEATURES) {
             AiFeature binding = bindings.get(code);
-            AiModel model = binding != null && binding.getModelId() != null ? aiModelMapper.selectById(binding.getModelId()) : null;
-            AiModel fallback = binding != null && binding.getFallbackModelId() != null ? aiModelMapper.selectById(binding.getFallbackModelId()) : null;
+            AiModel model = binding != null && binding.getModelId() != null ? modelMap.get(binding.getModelId()) : null;
+            AiModel fallback = binding != null && binding.getFallbackModelId() != null ? modelMap.get(binding.getFallbackModelId()) : null;
             Map<String, Object> o = new LinkedHashMap<>();
             o.put("featureCode", code);
             o.put("modelTypes", AiConst.allowedTypes(code).stream().sorted().toList());
@@ -244,8 +248,7 @@ public class FamilyAiConfigService {
             o.put("fallbackModelId", fallback != null ? fallback.getId() : null);
             o.put("fallbackModelName", fallback != null ? nullToEmpty(fallback.getName()) : "");
             o.put("fallbackModelType", fallback != null ? fallback.getType() : null);
-            AiConfig c = resolveForFeature(familyId, code);
-            o.put("available", isAvailable(c));
+            o.put("available", isAvailable(model != null ? toConfig(model) : empty()));
             out.add(o);
         }
         return out;
