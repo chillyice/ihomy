@@ -1563,5 +1563,36 @@ SET @has := (SELECT COUNT(*) FROM information_schema.statistics WHERE table_sche
 SET @sql := IF(@has = 0, 'ALTER TABLE `content_wish` DROP INDEX `idx_family`, ADD INDEX `idx_family` (`family_id`, `status`, `created_at` DESC)', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- ------------------------------------------------------------
+-- V10.4 开源组件台账补登直接依赖 + 回填实际锁定版本(2026-09-30)
+--   规则「每条直接依赖必须登记」此前有遗漏:NPM 漏 5 条 devDependencies、
+--   MAVEN 漏 10 条(6 starter + mysql-connector-j + jjwt-impl/jackson + lombok)。
+--   另有 6 条 NPM 的 current_version 填的是 package.json caret 区间下限而非实际锁定版本,按 package-lock.json 回填。
+--   uk_type_ref 幂等;UPDATE 恒定值重跑无害。
+-- ------------------------------------------------------------
+INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`) VALUES
+('Vite', 'NPM', 'vite', '5.4.21', 'MIT', 'https://github.com/vitejs/vite', '前端构建工具', 'FULL'),
+('@vitejs/plugin-vue', 'NPM', '@vitejs/plugin-vue', '5.2.4', 'MIT', 'https://github.com/vitejs/vite-plugin-vue', 'Vite 的 Vue 单文件组件支持', 'FULL'),
+('unplugin-auto-import', 'NPM', 'unplugin-auto-import', '0.17.8', 'MIT', 'https://github.com/unplugin/unplugin-auto-import', '自动导入(Vue/Element Plus API)', 'FULL'),
+('unplugin-vue-components', 'NPM', 'unplugin-vue-components', '0.27.5', 'MIT', 'https://github.com/unplugin/unplugin-vue-components', '组件自动注册(Element Plus 按需引入)', 'FULL'),
+('vite-plugin-pwa', 'NPM', 'vite-plugin-pwa', '1.3.0', 'MIT', 'https://github.com/vite-pwa/vite-plugin-pwa', 'PWA(Service Worker/应用清单)', 'FULL'),
+('Spring Boot Web', 'MAVEN', 'org.springframework.boot:spring-boot-starter-web', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Web/REST(MVC)', 'FULL'),
+('Spring Boot Security', 'MAVEN', 'org.springframework.boot:spring-boot-starter-security', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '认证授权(过滤链)', 'FULL'),
+('Spring Boot Validation', 'MAVEN', 'org.springframework.boot:spring-boot-starter-validation', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '参数校验', 'FULL'),
+('Spring Boot Data Redis', 'MAVEN', 'org.springframework.boot:spring-boot-starter-data-redis', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Redis(缓存/令牌/验证码)', 'FULL'),
+('Spring Boot AOP', 'MAVEN', 'org.springframework.boot:spring-boot-starter-aop', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '切面(权限/操作日志)', 'FULL'),
+('Spring Boot WebSocket', 'MAVEN', 'org.springframework.boot:spring-boot-starter-websocket', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '聊天室 WebSocket', 'FULL'),
+('MySQL Connector/J', 'MAVEN', 'com.mysql:mysql-connector-j', '8.3.0', 'GPL-2.0', 'https://github.com/mysql/mysql-connector-j', 'MySQL 驱动', 'FULL'),
+('JJWT Impl', 'MAVEN', 'io.jsonwebtoken:jjwt-impl', '0.12.5', 'Apache-2.0', 'https://github.com/jwtk/jjwt', 'JWT 实现(runtime)', 'FULL'),
+('JJWT Jackson', 'MAVEN', 'io.jsonwebtoken:jjwt-jackson', '0.12.5', 'Apache-2.0', 'https://github.com/jwtk/jjwt', 'JWT JSON 序列化(runtime)', 'FULL'),
+('Lombok', 'MAVEN', 'org.projectlombok:lombok', '1.18.32', 'MIT', 'https://github.com/projectlombok/lombok', '编译期样板代码生成', 'FULL');
+
+UPDATE `sys_oss_component` SET `current_version` = '3.5.40'  WHERE `component_type` = 'NPM' AND `package_ref` = 'vue';
+UPDATE `sys_oss_component` SET `current_version` = '4.6.4'   WHERE `component_type` = 'NPM' AND `package_ref` = 'vue-router';
+UPDATE `sys_oss_component` SET `current_version` = '2.3.1'   WHERE `component_type` = 'NPM' AND `package_ref` = 'pinia';
+UPDATE `sys_oss_component` SET `current_version` = '2.14.3'  WHERE `component_type` = 'NPM' AND `package_ref` = 'element-plus';
+UPDATE `sys_oss_component` SET `current_version` = '2.3.2'   WHERE `component_type` = 'NPM' AND `package_ref` = '@element-plus/icons-vue';
+UPDATE `sys_oss_component` SET `current_version` = '1.18.1'  WHERE `component_type` = 'NPM' AND `package_ref` = 'axios';
+
 
 

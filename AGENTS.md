@@ -73,7 +73,7 @@
 - **75 张表**,前缀分类:`sys_` 22 张(系统/账号/权限/配置/存储,含放映厅 `sys_media_server` + 成员播放档案 `sys_media_user_config`)、`report_` 3 张(报表/日志:report_ai / report_weather / report_system)、`family_` 28 张(家庭事务,含保险箱 `family_vault_item`、贷款 `family_loan`/`family_loan_event`)、`content_` 21 张(内容数据)、另 `game_info` 1 张(家庭小游戏,命名未加 family_ 前缀——遗留)。**完整表清单见 `docs/需求设计说明书.md` §6.2**。
   - **命名规则**:家庭事务业务表一律 `family_` 前缀;内容数据 `content_` 前缀;账号/权限/配置/存储保留 `sys_`;**报表/日志表一律 `report_` 前缀**。新增表必须遵守。前缀取最顶层祖先类别;上下级关系体现在表名(如 `sys_user_role`)。
 - **结构变更双文件**(强制):同时更新 `schema.sql`(全量)与 `migrations.sql`(增量、**幂等**),并按 CI 同路径做空库全量导入实测——`migrations` 跑通 ≠ `schema.sql` 可用。详见踩坑速查 §7.4。
-- **引用开源软件必须对接自动升级(强制)**:新增任何 npm/Maven 直接依赖或独立开源服务时,**必须同时在 `sys_oss_component` 台账登记一条**(component_type=NPM/MAVEN/SERVICE + package_ref + current_version + license + repo_url + managed_by),否则不会被版本跟踪覆盖。**升级闸门**:NPM/MAVEN 交 Renovate(`managed_by=RENOVATE`;`renovate.json` 的 `dependencyDashboardApproval` 只列 Dashboard 不开 PR),台账「AI 评估」(`OSS_UPGRADE_EVAL` 功能码)判断影响→勾选「生成升级 PR」触发开 PR;SERVICE 走 `managed_by=INTERNAL` 按 `deploy_type` 出方案,**其当前版本可按 `probe_type` 自动探测**(Nextcloud/Jellyfin 的探测地址自动取已接入的存储设备/放映厅配置,HA 需填地址 + 令牌;探不到保留人工值)。漏洞列 `vuln_count/vuln_severity` 预留(CVE 扫描不做,2026-09-29)。入口 `/ops/oss`(OPS),实现 `common/OssVersionUtil` + `service/OssComponentService`。
+- **引用开源软件必须对接自动升级(强制)**:新增任何 npm/Maven 直接依赖或独立开源服务时,**必须同时在 `sys_oss_component` 台账登记一条**(component_type=NPM/MAVEN/SERVICE + package_ref + current_version + license + repo_url + managed_by),否则不会被版本跟踪覆盖;**`current_version` 记实际锁定版本**(package-lock.json / 解析后的 Maven 依赖),不写 package.json/pom.xml 的声明区间下限(devDependencies 也要登,不只是 dependencies)。**升级闸门**:NPM/MAVEN 交 Renovate(`managed_by=RENOVATE`;`renovate.json` 的 `dependencyDashboardApproval` 只列 Dashboard 不开 PR),台账「AI 评估」(`OSS_UPGRADE_EVAL` 功能码)判断影响→勾选「生成升级 PR」触发开 PR;SERVICE 走 `managed_by=INTERNAL` 按 `deploy_type` 出方案,**其当前版本可按 `probe_type` 自动探测**(Nextcloud/Jellyfin 的探测地址自动取已接入的存储设备/放映厅配置,HA 需填地址 + 令牌;探不到保留人工值)。漏洞列 `vuln_count/vuln_severity` 预留(CVE 扫描不做,2026-09-29)。入口 `/ops/oss`(OPS),实现 `common/OssVersionUtil` + `service/OssComponentService`。
 - **枚举不再用数字**:状态/类型字段一律大写英文单词(`PUBLISHED/DRAFT/PUBLIC/FAMILY/ACTIVE...`),含义存字典表 `sys_dict_item`,Java 常量集中于 `common/DictConst.java`,前端映射 `utils/dict.js`。**不要写回 0/1/2 判断**。
 - **注意**:`content_blog/diary/photo/video/wish` 5 张内容表 `visibility` 列为 `VARCHAR(20) DEFAULT 'FAMILY'`(PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开),schema.sql 与 live DB 已对齐(曾误写 TINYINT)。
 - 权力 4 角色:OWNER/MEMBER/CHILD/GUEST + OPS(运维,不属任何家庭,绑定须含 `family_id=NULL` 的系统级行)。同一用户不同家庭可不同角色(`sys_user_role.family_id` 区别)。
@@ -252,7 +252,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 ## 已实现变更归档(已外置)
 
-> 历史归档已整体迁至 **`docs/变更归档.md`**(现约 613KB / **141 小节** = 开头 14 个**功能域**小节 + 其后 127 个版本/治理小节),内容原样保留。含文件级改动表、设计决策、踩坑记录与 live DB 同步 SQL。
+> 历史归档已整体迁至 **`docs/变更归档.md`**(现约 651KB / **146 小节** = 开头 14 个**功能域**小节 + 其后 132 个版本/治理小节),内容原样保留。含文件级改动表、设计决策、踩坑记录与 live DB 同步 SQL。
 > **该文件开头有章节目录**(或 `grep -n "^##### " docs/变更归档.md` 列全部小节);**检索历史实现/设计决策/live DB 迁移 SQL 时读该文件;新的变更归档继续追加到文件末尾**(新增 `#####` 子节),不要再写回 AGENTS.md。
 
 ## 文件存储策略
@@ -286,7 +286,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 > **这里只做指引,不记内容**。完整规划(P1-P4)、实施计划与验收口径见 **`docs/需求设计说明书.md` §9**;代码级优化待办见 **§9.2(36 项,分安全/性能/前端/工程化四组)** 与 **§9.3(21 项,V9.98–V9.106 新增代码复审 + §9.2 逐条复核)**。**启动任何规划项前先读该章对应小节**,不要凭本文件或记忆开工。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
 - **V9.110(2026-09-29)已完成 5 项 P1 代码级**:音频转写流式化(`AiController`/`AiService`/`ThirdPartyHttp.requestStreaming`)、Service Worker 排除 `/api/{vault,auth,ops,profile}` + 登出清 `api-cache`、上传黑名单补 xhtml/xml 等、登出/refresh 吊销(新增 `WALLPAPER` 令牌类型 + 60s 轮换宽限 + JWT `jti` 唯一化)、前后端自动化测试骨架(vitest + `spring-boot-starter-test`,CI 去掉 `-DskipTests`)。详见 `docs/变更归档.md` V9.110。
-- 当前判断:**§9.2 剩余 P1** 为生产 Redis 无密码发布 `0.0.0.0`、`/files/**` 直连无鉴权与 nginx `nosniff`/CSP、`docs/项目文档/*.docx` 重生成;§9.2 的 P2 中 **A 组(安全与数据保护)、B 组(性能与数据一致性)、C 组(前端体验与规范)各 6/6/9 条已解决(V10.1 / V10.2 / V10.3)**,余下为 **D 组(工程化:台账漏登/版本漂移、CI 闸门、备份/健康检查等)**。**§9.3 的两条 P1 已收口**(踩坑速查入库、部署文档补媒体引擎章节 —— V9.108),余下 P2:媒体引擎令牌直出前端、媒体服务器地址未限目标(SSRF)、年利率上限与列精度冲突必 500。前端遗留(P3,见 §9.2 C 末尾):超大单文件拆分 + ESLint/Prettier 配置、纯展示页剩余可点击 div 的键盘处理。
+- 当前判断:**§9.2 剩余 P1** 为生产 Redis 无密码发布 `0.0.0.0`、`/files/**` 直连无鉴权与 nginx `nosniff`/CSP、`docs/项目文档/*.docx` 重生成;§9.2 的 P2 中 **A 组(安全与数据保护)、B 组(性能与数据一致性)、C 组(前端体验与规范)、D 组台账漏登/版本漂移已解决(V10.1 / V10.2 / V10.3 / V10.4)**,余下 D 组为 **CI 闸门、备份/健康检查等**。**§9.3 的两条 P1 已收口**(踩坑速查入库、部署文档补媒体引擎章节 —— V9.108),余下 P2:媒体引擎令牌直出前端、媒体服务器地址未限目标(SSRF)、年利率上限与列精度冲突必 500。前端遗留(P3,见 §9.2 C 末尾):超大单文件拆分 + ESLint/Prettier 配置、纯展示页剩余可点击 div 的键盘处理。
 - 功能侧还剩:P1 放映厅 **S4 收尾**(S1–S4 已落地 V9.106–V9.108:转码 HLS 回退/字幕轨/成员播放档案/NAS 上线文档;剩 Emby 实测、多家庭共用一台媒体服务器、转码清晰度与多音轨选择)、P2 智能家居中控(Home Assistant,分 S1-S3)、P2 保险箱主密码(前端零知识,不可逆 UX 变更,待定夺)、场景主题方向(3D 光影实验台 `/tools/light-lab` 为底座)。
 
 ## 文档清单
