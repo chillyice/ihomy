@@ -54,7 +54,7 @@ jobs:
           /tmp/ci-venv/bin/pip install --quiet bcrypt
           CI_PWD="ci-smoke-${RANDOM}"
           HASH=$(/tmp/ci-venv/bin/python -c "import bcrypt; print(bcrypt.hashpw('${CI_PWD}'.encode(), bcrypt.gensalt(10, prefix=b'2a')).decode())")
-          docker exec ihomy-mysql mysql -uroot -proot -e "UPDATE ihomy.sys_user SET password='${HASH}' WHERE username='admin';"
+          docker exec ihomy-mysql mysql -uroot -proot -e "UPDATE ihomy.sys_user SET password='${HASH}', must_change_password=0 WHERE username='admin';"
           echo "CI_PWD=${CI_PWD}" >> "$GITHUB_ENV"
 
       - name: Prepare external config

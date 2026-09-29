@@ -35,7 +35,7 @@
           <el-alert type="info" :closable="false" show-icon style="margin-bottom: 14px"
             :title="$t('ops.alertText')" />
 
-          <!-- 操作行:手动刷新 + 自动刷新开关 + 采集时间 -->
+          <!-- 操作行:手动刷新 + 自动刷新开关 + 采集时间 + 前端构建版本 -->
           <div class="server-head">
             <el-button size="small" @click="loadServer()">{{ $t('ops.refresh') }}</el-button>
             <label class="auto-refresh">
@@ -43,6 +43,7 @@
               <span>{{ $t('ops.autoRefresh') }}</span>
             </label>
             <span class="server-time">{{ $t('ops.time') }}: {{ server.time || '—' }}</span>
+            <span class="server-time">{{ $t('ops.version') }}: {{ appVersion }}</span>
           </div>
 
           <!-- 指标卡:CPU / 物理内存 / 堆内存 / 线程 / GC -->
@@ -678,6 +679,9 @@ import Breadcrumb from '@/components/Breadcrumb.vue'
 const { t } = useI18n()
 const route = useRoute()
 const userStore = useUserStore()
+
+// 本次部署的前端构建版本(构建时由 VERSION 文件注入),用于核对线上跑的是哪一版
+const appVersion = __APP_VERSION__
 
 // 角色渲染:家长(OWNER 非 OPS)只见「AI 统计」「天气」;OPS 见全部标签(含系统级报表)
 const isOps = computed(() => userStore.isOps)

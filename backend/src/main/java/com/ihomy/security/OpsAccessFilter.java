@@ -91,14 +91,15 @@ public class OpsAccessFilter extends OncePerRequestFilter {
                 || path.equals("/api/ops/weather/quota");
     }
 
-    /** 放行路径:运维接口、认证接口、预检请求 */
+    /** 放行路径:运维接口、认证接口、本人改密(首登强制改密)、预检请求 */
     private boolean isAllowed(HttpServletRequest request) {
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
             return true;
         }
         String path = request.getRequestURI();
         return path.startsWith("/api/ops")
-                || path.startsWith("/api/auth");
+                || path.startsWith("/api/auth")
+                || path.equals("/api/profile/password");
     }
 
     private void deny(HttpServletResponse response) throws IOException {

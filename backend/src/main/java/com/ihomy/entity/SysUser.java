@@ -28,6 +28,8 @@ public class SysUser {
     private Long defaultFamilyId;
     private String status;
     private Integer isFake;
+    /** 首登强制改密:1=需改密(种子账号防默认密码滥用),改密前访问令牌仅可调改密/登出 */
+    private Integer mustChangePassword;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
     @TableField(fill = FieldFill.INSERT_UPDATE)

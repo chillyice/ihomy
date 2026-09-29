@@ -25,6 +25,8 @@ export const useUserStore = defineStore('user', {
       return perms.includes(code)
     },
     isGuest: (state) => !state.token,
+    // 首登强制改密(种子账号 admin/ops):为 true 时必须先改密才能使用其它功能
+    mustChangePassword: (state) => !!state.userInfo?.mustChangePassword,
   },
   actions: {
     async login(payload) {
@@ -61,11 +63,20 @@ export const useUserStore = defineStore('user', {
       localStorage.setItem('userInfo', JSON.stringify(data.user))
       return data
     },
+    async changePassword(payload) {
+      // 修改密码:后端重签令牌并清除强制改密标记,整体替换本地凭证
+      const data = await request.put('/profile/password', payload)
+      this.setToken(data.accessToken, data.refreshToken)
+      this.userInfo = data.user
+      localStorage.setItem('userInfo', JSON.stringify(data.user))
+      return data
+    },
     setToken(token, refreshToken) {
       this.token = token
-      this.refreshToken = refreshToken
-      localStorage.setItem('token', token)
-      localStorage.setItem('refreshToken', refreshToken)
+      // 首登强制改密时后端不签发刷新令牌(refreshToken 为 null),归一为空串避免存成 "null"
+      this.refreshToken = refreshToken || ''
+      localStorage.setItem('token', token || '')
+      localStorage.setItem('refreshToken', refreshToken || '')
     },
     bumpBgMusic() {
       this.bgMusicVersion++

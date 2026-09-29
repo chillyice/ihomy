@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
  * 过滤结果集输出(<== 列/行/Total),减少日志占用。
  *
  * logger 名统一加 "mybatis.sql." 前缀,可在 application.yml/logback-spring.xml 单独调级
- * (当前 DEBUG 恒开,只进 server 日志文件)。
+ * (默认 warn 静默防敏感数据入日志;排查 SQL 时经 external.yml 设 logging.level.mybatis.sql: debug)。
  *
  * 内部类过滤(mybatis-spring 的 SqlSessionUtils/Transaction 每条 SQL 多打 4-6 行会话管理噪音):
  * org.mybatis / org.apache.ibatis 开头的内部类改挂 "mybatis.sql.internal." 前缀,

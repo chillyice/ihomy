@@ -1,13 +1,16 @@
-<!-- 站点底部:工信部 ICP 备案号 + 公安备案号(左下角,与导航栏同层,受光效影响) -->
+<!-- 站点底部:工信部 ICP 备案号 + 公安备案号 + 版本号(左下角,与导航栏同层,受光效影响) -->
 <template>
   <footer class="site-footer">
     <a href="https://beian.miit.gov.cn" target="_blank" rel="noopener noreferrer" class="footer-link">鲁ICP备2026045543号-1</a>
     <span class="footer-sep">·</span>
     <a href="http://www.beian.gov.cn/portal/registerSystemInfo?recordcode=37010202700748" target="_blank" rel="noopener noreferrer" class="footer-link">鲁公网安备37010202700748号</a>
+    <span class="footer-sep">·</span>
+    <span class="footer-version">ihomy {{ appVersion }}</span>
   </footer>
 </template>
 
 <script setup>
+const appVersion = __APP_VERSION__
 </script>
 
 <style scoped>
@@ -40,6 +43,11 @@
 }
 .footer-sep {
   opacity: 0.4;
+}
+.footer-version {
+  opacity: 0.55;
+  letter-spacing: 0.2px;
+  cursor: default;
 }
 :global(html.dark) .site-footer {
   color: rgba(232,220,200,0.55);

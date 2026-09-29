@@ -71,6 +71,7 @@ CREATE TABLE `sys_user` (
   `default_family_id` BIGINT DEFAULT NULL COMMENT '默认家庭ID（多家庭时优先访问，空=主家庭）',
   `status`     VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE正常 DISABLED锁定',
   `is_fake`    TINYINT      NOT NULL DEFAULT 0 COMMENT '0真实用户 1演示假用户（禁止登录）',
+  `must_change_password` TINYINT NOT NULL DEFAULT 0 COMMENT '首登强制改密：1=需改密（种子账号，防默认密码滥用）',
   `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted`    TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
@@ -797,16 +798,16 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 -- ------------------------------------------------------------
 -- 26. 初始家庭 + 管理员账号
 --     admin 初始密码为开发专用值（明文记于本地 docs/新人上手指南.md，不入 git），
---     下方为其 BCrypt 哈希；生产部署后请立即改为独立强密码
+--     下方为其 BCrypt 哈希；must_change_password=1：首次登录后强制改密（防公开仓库默认密码滥用）
 -- ------------------------------------------------------------
 INSERT INTO `sys_family_info` (`name`, `cover_text`, `cover_subtitle`, `is_default`)
 VALUES ('我的家庭', '欢迎来到我们的家庭空间', '记录点滴 共享温情', 1);
 SET @fid = LAST_INSERT_ID();
 
-INSERT INTO `sys_user` (`username`, `password`, `nickname`, `email`, `family_id`, `status`)
+INSERT INTO `sys_user` (`username`, `password`, `nickname`, `email`, `family_id`, `status`, `must_change_password`)
 VALUES ('admin',
         '$2a$10$hZckSawNUXiKhncldpY78.W00HZjp8WC/XCBlL6Z8SXc9Y3wrIuIK',
-        '管理员', 'admin@ihomy.local', @fid, 'ACTIVE');
+        '管理员', 'admin@ihomy.local', @fid, 'ACTIVE', 1);
 SET @uid = LAST_INSERT_ID();
 
 -- 绑定 admin 为该家庭的 OWNER
@@ -818,17 +819,18 @@ UPDATE `sys_family_info` SET `owner_id` = @uid WHERE `id` = @fid;
 
 -- ------------------------------------------------------------
 -- 26.1 运维管理员账号（V3.8）
---     ops / ops@ihomy.local,初始密码为开发专用值（明文记于本地 docs/新人上手指南.md，与 admin 不同），登录后请立即改密
+--     ops / ops@ihomy.local,初始密码为开发专用值（明文记于本地 docs/新人上手指南.md，与 admin 不同）；
+--     must_change_password=1：首次登录强制改密（公开仓库哈希可离线爆破，改密前令牌被后端限制只能改密/登出）
 --     两条角色绑定：① family_id=NULL 的系统级绑定（OpsAccessFilter/AuthService 的 isOps 判定依据，
 --     countOpsRole 要求 family_id IS NULL）；② 带演示家庭的占位绑定（仅为了让登录时
 --     selectRoleCodeByUserAndFamily 解析出 role=OPS → 前端识别为纯运维账号并被路由到 /ops）。
 --     缺 ① 会让该账号 isOps=false（运维页按「家长」渲染、看不到系统级标签）。
 --     实际访问由 OpsAccessFilter 白名单限制为 /ops/** 与 /auth/**,不会读到任何家庭数据。
 -- ------------------------------------------------------------
-INSERT INTO `sys_user` (`username`, `password`, `nickname`, `email`, `family_id`, `status`)
+INSERT INTO `sys_user` (`username`, `password`, `nickname`, `email`, `family_id`, `status`, `must_change_password`)
 VALUES ('ops',
         '$2a$10$EBR.GIYUae6QGVabdcEHKuXgVwuTT6Kz/KtnMTCzn0ND0gcepNvhK',
-        '运维管理员', 'ops@ihomy.local', @fid, 'ACTIVE');
+        '运维管理员', 'ops@ihomy.local', @fid, 'ACTIVE', 1);
 SET @opsid = LAST_INSERT_ID();
 
 -- ① 系统级 OPS 绑定（family_id=NULL）

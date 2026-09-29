@@ -154,7 +154,8 @@ const onSubmit = async () => {
         captchaCode: form.captchaCode.trim(),
       })
       ElMessage.success(t('login.loginSuccess'))
-      router.push(route.query.redirect || '/')
+      // 首登强制改密:留在登录页让全局改密弹窗处理,改完再跳转(否则会拉一串被后端拦的接口)
+      if (!userStore.mustChangePassword) router.push(route.query.redirect || '/')
     }
   } catch (e) {
     // 验证码一次性:失败后强制刷新,避免用旧验证码反复试

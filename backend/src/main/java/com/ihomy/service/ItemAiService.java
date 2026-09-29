@@ -221,8 +221,13 @@ public class ItemAiService {
         String unit = truncateTo(blankToNull(plan.path("unit").asText(null)), 20);
         boolean move = plan.path("move").asBoolean(true);
 
-        Set<Long> roomIds = roomMapper.selectList(null).stream().map(Room::getId).collect(Collectors.toSet());
-        Set<Long> furnitureIds = furnitureMapper.selectList(null).stream().map(Furniture::getId).collect(Collectors.toSet());
+        // 只认本家庭的房间/家具(防 LLM 编造或越权写入他家庭 id)
+        Set<Long> roomIds = roomMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Room>()
+                        .eq(Room::getFamilyId, familyId))
+                .stream().map(Room::getId).collect(Collectors.toSet());
+        Set<Long> furnitureIds = furnitureMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Furniture>()
+                        .eq(Furniture::getFamilyId, familyId))
+                .stream().map(Furniture::getId).collect(Collectors.toSet());
         Long furnitureId = validId(plan.path("furnitureId"), furnitureIds);
         Long roomId = validId(plan.path("roomId"), roomIds);
         Furniture furniture = furnitureId == null ? null : furnitureMapper.selectById(furnitureId);

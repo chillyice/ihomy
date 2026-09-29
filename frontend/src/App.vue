@@ -40,6 +40,8 @@
         <SiteFooter v-if="!immersive" />
       </template>
     </template>
+    <!-- 首登强制改密(种子账号):全局弹窗,由 store 标记驱动 -->
+    <ChangePasswordDialog />
   </el-config-provider>
 </template>
 
@@ -62,6 +64,7 @@ import InstallPrompt from '@/components/InstallPrompt.vue'
 import MusicPlayer from '@/components/MusicPlayer.vue'
 import SiteFooter from '@/components/SiteFooter.vue'
 import LightTestConsole from '@/components/LightTestConsole.vue'
+import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue'
 import MobileLayout from '@/layouts/MobileLayout.vue'
 
 const { isMobile } = useDevice()
@@ -108,6 +111,8 @@ onMounted(async () => {
   routeReady.value = true
   // 独立站点页(咔哒软件首页等)不初始化 ihomy 家庭数据,避免调用 ihomy 后端接口
   if (standalone.value) return
+  // 首登强制改密:改密前后端只放行改密/登出,不拉家庭聚合数据(否则一连串 403)
+  if (userStore.mustChangePassword) return
   appStore.init()
   userStore.ensureUserInfo()
 })
@@ -118,6 +123,8 @@ watch(
     // 独立页自带登录(壁纸页):登录态变化不触发 ihomy 首页聚合,由该页自己按需取数
     if (standalone.value) return
     appStore.reset()
+    // 首登强制改密:不初始化家庭聚合,等改密完成后再加载
+    if (userStore.mustChangePassword) return
     appStore.init()
   },
 )

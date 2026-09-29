@@ -71,6 +71,8 @@ file:
 # 加密工具:启动后调用 GET /api/ops/crypto/encrypt?plaintext=xxx 生成密文(OPS 角色)
 app:
   captcha-fixed-code:
+  # 跨域白名单(逗号分隔):生产域名 + 开发前端地址;经 external.yml 按环境覆盖
+  cors-allowed-origins: https://ihomy.top,http://localhost:5173,http://127.0.0.1:5173
   weather-api-host:
   weather-project-id:
   weather-key-id:
@@ -86,7 +88,7 @@ logging:
     path: /opt/ihomy/logs
   level:
     com.ihomy: info
-    # SQL 语句+入参日志(进 server 日志文件,不进控制台)
-    mybatis.sql: debug
+    # SQL 语句+入参日志(进 server 日志文件,不进控制台);默认 warn 静默,排查时经 external.yml 覆盖为 debug
+    mybatis.sql: warn
     org.mybatis: warn
     org.springframework.jdbc: warn

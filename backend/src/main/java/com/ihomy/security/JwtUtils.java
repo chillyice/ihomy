@@ -40,14 +40,14 @@ public class JwtUtils {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
-    /** 签发短期访问令牌(携带角色与当前家庭 ID) */
-    public String generateAccessToken(Long userId, String username, String role, Long familyId) {
-        return build(userId, username, role, familyId, accessExpire, "ACCESS");
+    /** 签发短期访问令牌(携带角色与当前家庭 ID);mustChangePwd=首登强制改密(令牌受限) */
+    public String generateAccessToken(Long userId, String username, String role, Long familyId, boolean mustChangePwd) {
+        return build(userId, username, role, familyId, accessExpire, "ACCESS", mustChangePwd);
     }
 
     /** 签发长期刷新令牌(仅含身份,不含角色/家庭) */
     public String generateRefreshToken(Long userId, String username) {
-        return build(userId, username, null, null, refreshExpire, "REFRESH");
+        return build(userId, username, null, null, refreshExpire, "REFRESH", false);
     }
 
     /**
@@ -55,11 +55,12 @@ public class JwtUtils {
      * 普通刷新令牌轮换后即拉黑(单次有效),壁纸令牌不轮换拉黑,允许浏览器会话与多个壁纸实例各持一份、各自滑动续期。
      */
     public String generateWallpaperToken(Long userId, String username) {
-        return build(userId, username, null, null, refreshExpire, "WALLPAPER");
+        return build(userId, username, null, null, refreshExpire, "WALLPAPER", false);
     }
 
-    /** 组装 JWT:type 区分 ACCESS/REFRESH,角色与家庭 ID 仅在访问令牌中携带 */
-    private String build(Long userId, String username, String role, Long familyId, long expire, String type) {
+    /** 组装 JWT:type 区分 ACCESS/REFRESH,角色与家庭 ID 仅在访问令牌中携带;pwdChange=首登强制改密标记 */
+    private String build(Long userId, String username, String role, Long familyId, long expire, String type,
+                         boolean mustChangePwd) {
         Date now = new Date();
         var builder = Jwts.builder()
                 .subject(String.valueOf(userId))
@@ -73,6 +74,10 @@ public class JwtUtils {
         }
         if (familyId != null) {
             builder.claim("familyId", familyId);
+        }
+        if (mustChangePwd) {
+            // 首登强制改密:令牌带此标记,JwtAuthenticationFilter 只放行改密/登出
+            builder.claim("pwdChange", true);
         }
         return builder.issuedAt(now)
                 .expiration(new Date(now.getTime() + expire * 1000))

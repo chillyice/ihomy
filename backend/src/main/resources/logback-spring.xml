@@ -14,6 +14,8 @@
 
     <property name="LOG_HOME" value="${LOG_PATH:-logs}"/>
     <springProperty scope="context" name="RETENTION_DAYS" source="app.log-retention-days" defaultValue="7"/>
+    <!-- SQL 日志级别单一来源:application.yml / external.yml 的 logging.level.mybatis.sql(默认 warn 静默) -->
+    <springProperty scope="context" name="MYBATIS_SQL_LEVEL" source="logging.level.mybatis.sql" defaultValue="warn"/>
     <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [tid:%X{traceId:-}] %-5level %logger{36} - %msg%n"/>
 
     <!-- 控制台(开发终端,人类可读;不含 SQL) -->
@@ -99,8 +101,10 @@
         <appender-ref ref="THIRD_ASYNC"/>
     </logger>
 
-    <!-- SQL 语句+入参(不记结果集):只进 server 文件,不刷控制台 -->
-    <logger name="mybatis.sql" level="DEBUG" additivity="false">
+    <!-- SQL 语句+入参(不记结果集):只进 server 文件,不刷控制台。
+         级别由 logging.level.mybatis.sql 控制,默认 warn(生产静默,防 BCrypt 哈希/密文/明文入日志);
+         排查 SQL 时在 external.yml 设 logging.level.mybatis.sql: debug -->
+    <logger name="mybatis.sql" level="${MYBATIS_SQL_LEVEL}" additivity="false">
         <appender-ref ref="SERVER_ASYNC"/>
     </logger>
 

@@ -10,15 +10,17 @@ import com.ihomy.entity.UserLabel;
 import com.ihomy.mapper.SysUserMapper;
 import com.ihomy.mapper.UserLabelMapper;
 import com.ihomy.security.SecurityHelper;
+import com.ihomy.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 /**
- * 个人资料接口:查看/更新当前用户(昵称/头像/生日/性别)。
+ * 个人资料接口:查看/更新当前用户(昵称/头像/生日/性别),以及修改密码。
  */
 @Tag(name = "个人资料")
 @RestController
@@ -29,6 +31,16 @@ public class ProfileController {
     private final SysUserMapper sysUserMapper;
     private final UserLabelMapper userLabelMapper;
     private final SecurityHelper securityHelper;
+    private final AuthService authService;
+
+    @Operation(summary = "修改密码(含首次登录强制改密;成功返回重签的令牌)")
+    @OperationLog(module = "USER", operationType = "UPDATE", description = "修改密码", saveArgs = false)
+    @PutMapping("/password")
+    public Result<Map<String, Object>> changePassword(@RequestBody Map<String, String> body) {
+        SysUser user = securityHelper.currentUser();
+        if (user == null) throw new BizException(ResultCode.UNAUTHORIZED);
+        return Result.success(authService.changePassword(user.getId(), body.get("oldPassword"), body.get("newPassword")));
+    }
 
     @Operation(summary = "当前用户资料")
     @GetMapping

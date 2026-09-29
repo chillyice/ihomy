@@ -51,6 +51,7 @@ public class AuthService {
     private final SecurityHelper securityHelper;
     private final InvitationCodeMapper invitationCodeMapper;
     private final CaptchaService captchaService;
+    private final AuthGuardService authGuard;
     private final BlogService blogService;
 
     private static final String BLACKLIST_PREFIX = "jwt:blacklist:";
@@ -74,7 +75,9 @@ public class AuthService {
     }
 
     /** 登录:验证码校验 + 邮箱密码校验,下发令牌并携带当前家庭 */
-    public Map<String, Object> login(LoginDTO dto) {
+    public Map<String, Object> login(LoginDTO dto, String ip) {
+        // 防爆破:账号或来源 IP 失败过多直接拒绝(成功登录后清零)
+        authGuard.checkLoginBlocked(ip, dto.getEmail());
         // 图形验证码校验(一次性,与注册同一套)
         if (!captchaService.verify(dto.getCaptchaId(), dto.getCaptchaCode())) {
             throw new BizException(ResultCode.CAPTCHA_ERROR);
@@ -82,22 +85,32 @@ public class AuthService {
         // 登录账号 = 注册邮箱(大小写不敏感)
         SysUser user = sysUserMapper.selectByEmail(dto.getEmail().trim());
         if (user == null) {
+            authGuard.recordLoginFail(ip, dto.getEmail());
             throw new BizException(ResultCode.USER_NOT_FOUND);
         }
         if (user.getIsFake() != null && user.getIsFake() == 1) {
+            authGuard.recordLoginFail(ip, dto.getEmail());
             throw new BizException(ResultCode.FORBIDDEN);
         }
         if (!passwordEncoder.matches(dto.getPassword(), user.getPassword())) {
+            authGuard.recordLoginFail(ip, dto.getEmail());
             throw new BizException(ResultCode.PASSWORD_ERROR);
         }
         if (DictConst.USER_DISABLED.equals(user.getStatus())) {
+            authGuard.recordLoginFail(ip, dto.getEmail());
             throw new BizException(ResultCode.FORBIDDEN);
         }
+        authGuard.clearLoginFail(ip, dto.getEmail());
         Long familyId = resolveFamily(user.getId());
         if (familyId == null) familyId = user.getFamilyId();
         String roleCode = sysRoleMapper.selectRoleCodeByUserAndFamily(user.getId(), familyId);
         if (roleCode == null) {
             roleCode = "GUEST";
+        }
+        if (Boolean.TRUE.equals(user.getMustChangePassword())) {
+            // 首登强制改密:不签发长期刷新令牌——否则改密后旧刷新令牌仍能换出不受限的访问令牌,
+            // 等于默认密码登录者可在家长改密后继续使用。改密成功时再补发完整令牌。
+            return buildTokens(user, roleCode, familyId, null);
         }
         return buildTokens(user, roleCode, familyId);
     }
@@ -180,6 +193,34 @@ public class AuthService {
 
         redisTemplate.opsForValue().set(CUR_FAMILY_PREFIX + user.getId(), String.valueOf(family.getId()));
         return buildTokens(user, "OWNER", family.getId());
+    }
+
+    /**
+     * 修改密码:校验原密码后更新哈希,并清除首登强制改密标记。
+     * 返回重签的令牌——原令牌带 pwdChange 标记受限,改密后必须换成新令牌才能正常访问。
+     */
+    public Map<String, Object> changePassword(Long userId, String oldPassword, String newPassword) {
+        if (!StringUtils.hasText(oldPassword)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "请输入原密码");
+        }
+        if (newPassword == null || newPassword.length() < 6 || newPassword.length() > 30) {
+            throw new BizException(ResultCode.BAD_REQUEST, "新密码长度 6-30 位");
+        }
+        SysUser user = sysUserMapper.selectById(userId);
+        if (user == null) {
+            throw new BizException(ResultCode.USER_NOT_FOUND);
+        }
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            throw new BizException(ResultCode.PASSWORD_ERROR);
+        }
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new BizException(ResultCode.BAD_REQUEST, "新密码不能与原密码相同");
+        }
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setMustChangePassword(0);
+        sysUserMapper.updateById(user);
+        securityHelper.invalidateUser(userId);
+        return buildTokens(user, roleOf(user), familyOf(user));
     }
 
     /** 登出:access token 与本次会话的 refresh token 一并拉黑,彻底终止会话 */
@@ -374,7 +415,8 @@ public class AuthService {
 
     /** 组装令牌响应:access token + 指定 refresh token(壁纸令牌/轮换复用)+ 用户信息 + 分享 token + 权限码 */
     private Map<String, Object> buildTokens(SysUser user, String roleCode, Long familyId, String refresh) {
-        String access = jwtUtils.generateAccessToken(user.getId(), user.getUsername(), roleCode, familyId);
+        boolean mustChange = Boolean.TRUE.equals(user.getMustChangePassword());
+        String access = jwtUtils.generateAccessToken(user.getId(), user.getUsername(), roleCode, familyId, mustChange);
         Map<String, Object> data = new HashMap<>();
         data.put("accessToken", access);
         data.put("refreshToken", refresh);
@@ -386,6 +428,8 @@ public class AuthService {
         u.put("avatar", user.getAvatar());
         u.put("role", roleCode);
         u.put("familyId", familyId);
+        // 首登强制改密标记:前端登录后据此弹强制改密框(改密成功后消失)
+        u.put("mustChangePassword", mustChange);
         // 权限码列表:当前家庭角色权限 + 系统级 OPS 权限(若有 OPS 绑定)
         java.util.List<String> perms = new java.util.ArrayList<>();
         if (familyId != null) {

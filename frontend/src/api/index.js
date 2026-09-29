@@ -152,6 +152,7 @@ export const weatherApi = {
 export const profileApi = {
   get: () => request.get('/profile'),
   update: (data) => request.put('/profile', data),
+  changePassword: (data) => request.put('/profile/password', data),
   label: () => request.get('/profile/label'),
   saveLabel: (data) => request.put('/profile/label', data),
   removeLabel: () => request.delete('/profile/label'),

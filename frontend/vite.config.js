@@ -5,8 +5,22 @@ import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import { fileURLToPath, URL } from 'node:url'
+import { readFileSync } from 'node:fs'
+
+// 版本号唯一事实来源:仓库根 VERSION 文件(规则见 AGENTS.md「版本号规则」)
+// 构建时注入 __APP_VERSION__ 供页脚与运维页展示;读取失败回落 'unknown',不阻塞构建
+const appVersion = (() => {
+  try {
+    return readFileSync(fileURLToPath(new URL('../VERSION', import.meta.url)), 'utf8').trim()
+  } catch {
+    return 'unknown'
+  }
+})()
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   plugins: [
     vue(),
     AutoImport({

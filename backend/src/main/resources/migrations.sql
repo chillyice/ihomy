@@ -1492,4 +1492,26 @@ INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`,
 ('Vitest', 'NPM', 'vitest', '2.1.9', 'MIT', 'https://github.com/vitest-dev/vitest', '前端单元测试(utils 纯逻辑)', 'FULL'),
 ('Spring Boot Test', 'MAVEN', 'org.springframework.boot:spring-boot-starter-test', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端单元测试(JUnit5/AssertJ)', 'FULL');
 
+-- ------------------------------------------------------------
+-- V10.1 首登强制改密(2026-09-29)
+--   sys_user 加 must_change_password:公开仓库 schema.sql 里的种子账号(admin/ops)哈希可离线爆破,
+--   标记为 1 后首次登录必须改密,改密前访问令牌被 JwtAuthenticationFilter 限制为只能改密/登出。
+--   MySQL 8 无 ADD COLUMN IF NOT EXISTS,用 information_schema 条件 + prepared statement 幂等。
+--   回填:仅现状仍等于 schema.sql 种子哈希的 admin/ops 才置 1(已被改过密码的账户不动)。
+-- ------------------------------------------------------------
+SET @has_mcp := (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sys_user' AND COLUMN_NAME = 'must_change_password');
+SET @ddl := IF(@has_mcp = 0,
+  "ALTER TABLE `sys_user` ADD COLUMN `must_change_password` TINYINT NOT NULL DEFAULT 0 COMMENT '首登强制改密：1=需改密（种子账号，防默认密码滥用）' AFTER `is_fake`",
+  'SELECT 1');
+PREPARE stmt FROM @ddl; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+UPDATE `sys_user` SET `must_change_password` = 1
+ WHERE `must_change_password` = 0
+   AND `password` IN (
+     '$2a$10$hZckSawNUXiKhncldpY78.W00HZjp8WC/XCBlL6Z8SXc9Y3wrIuIK',
+     '$2a$10$EBR.GIYUae6QGVabdcEHKuXgVwuTT6Kz/KtnMTCzn0ND0gcepNvhK');
+
+
 

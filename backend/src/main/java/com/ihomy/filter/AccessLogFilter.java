@@ -40,11 +40,13 @@ public class AccessLogFilter extends OncePerRequestFilter {
     /** JSON 入参/响应敏感字段打码(值替换为 ***) */
     private static final Pattern SENSITIVE_JSON =
             Pattern.compile("(?i)(\"(?:password|passwd|oldPassword|newPassword|token|accessToken|access_token"
-                    + "|refreshToken|refresh_token|secret|secretKey|privateKey|captcha|captchaCode|authorization)"
+                    + "|refreshToken|refresh_token|secret|secretKey|privateKey|apiKey|api_key|captcha|captchaCode"
+                    + "|plaintext|ciphertext|authorization)"
                     + "\"\\s*:\\s*\")([^\"]*)(\")");
     /** query 敏感参数打码 */
     private static final Pattern SENSITIVE_QUERY =
-            Pattern.compile("(?i)((?:password|token|access_token|refresh_token|secret|captcha)=)[^&]*");
+            Pattern.compile("(?i)((?:password|token|access_token|refresh_token|secret|captcha"
+                    + "|apiKey|api_key|plaintext|ciphertext)=)[^&]*");
     /** 统一响应体首个 code 字段(判定业务成败) */
     private static final Pattern RESP_CODE = Pattern.compile("\"code\"\\s*:\\s*(\\d+)");
     /** 统一响应体首个 message 字段(大响应摘要用) */

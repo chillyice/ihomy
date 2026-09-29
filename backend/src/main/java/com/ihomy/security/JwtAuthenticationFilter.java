@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -15,12 +16,17 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ihomy.common.Result;
+import com.ihomy.common.ResultCode;
+
 import java.io.IOException;
 import java.util.List;
 
 /**
  * JWT 认证过滤器:从 Authorization: Bearer 头解析访问令牌,
  * 成功后把 LoginUser 注入 SecurityContext,供后续接口取当前用户。
+ * 首登强制改密(pwdChange 标记)的令牌只放行改密/登出,其余接口 403。
  */
 @Slf4j
 @Component
@@ -29,6 +35,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
     private final com.ihomy.mapper.SysUserMapper sysUserMapper;
+    private final ObjectMapper objectMapper;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
@@ -61,6 +68,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     // 操作人放请求属性:AccessLogFilter 在 SecurityContext 清理后仍能记录谁在调用
                     request.setAttribute("ihomy.userId", userId);
                     request.setAttribute("ihomy.username", username);
+                    // 首登强制改密:令牌受限,仅放行改密与登出,防止用默认密码拿到的令牌调业务接口
+                    if (Boolean.TRUE.equals(claims.get("pwdChange", Boolean.class)) && !passwordChangeAllowed(request)) {
+                        denyPasswordChangeRequired(response);
+                        return;
+                    }
                 }
             } catch (Exception e) {
                 // 解析失败视为未登录,交由下游拦截器返回 401
@@ -68,5 +80,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
         }
         chain.doFilter(request, response);
+    }
+
+    /** 首登强制改密期间允许的路径:改密本身与登出(不含 context-path) */
+    private boolean passwordChangeAllowed(HttpServletRequest request) {
+        String path = request.getServletPath();
+        return "/profile/password".equals(path) || "/auth/logout".equals(path);
+    }
+
+    private void denyPasswordChangeRequired(HttpServletResponse response) throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        response.getWriter().write(objectMapper.writeValueAsString(Result.fail(ResultCode.PASSWORD_CHANGE_REQUIRED)));
     }
 }

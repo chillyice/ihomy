@@ -58,6 +58,13 @@
 
 **业务概念不改(注意区分)**:`family` 表、`Family` 实体类、`family_id` 字段、`OWNER/MEMBER` 角色名 —— 这些是"家庭"业务领域概念,不是应用标识。
 
+## 版本号规则(自 V10.0 起)
+
+- **形态**:`V<主>.<次>`(如 `V10.0`,次位不补零)。**根目录 `VERSION` 文件是唯一事实来源**(一行纯文本、含 `V` 前缀):前端构建经 `define __APP_VERSION__` 注入,页脚与运维页「服务器状态」展示;**改版本只改这一处**。
+- **进位**:每次可交付迭代次位 +1;**次位满 100 强制进位主版本**(`.99` → 主 +1、次归 0),或出现结构性里程碑(新增功能域/不兼容变更)时提前进位;禁止再出现 `V9.110` 这类三位次位。**`V1.0–V9.110` 历史编号与旧写法(`V5.6续`)冻结不改**,以免打断 `grep V9.x` 检索。
+- **收尾**:同一版本登记 `docs/需求设计说明书.md` 修订记录一行 + `docs/变更归档.md` 末尾 `#####` 小节;收尾时更新 `VERSION` 并在该版本收尾提交上打 annotated tag `V<主>.<次>`(消息 = 日期 + 一句话摘要),随发布 `git push origin <tag>`。
+- **不对齐代码制品**:`frontend/package.json` / `backend/pom.xml` 的版本字段**不参与**本规则(仍为 `1.0.0`/`1.0-SNAPSHOT`),避免与构建产物命名耦合。
+
 ## 数据库约定
 
 - **root 仅用于初始化**:`mysql -uroot -p < backend/src/main/resources/schema.sql`(建库/建表/建账号/初始数据),执行一次;本地开发 `.\scripts\start-db.ps1`(Docker 首启自动导入)。schema.sql 为开发安全版(仅本机 Docker 凭证,生产须改独立强密码)。
@@ -145,6 +152,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **OPS 隔离**:`OpsAccessFilter` 只放行 OPS 到 `/api/ops/**`+`/api/auth/**`,其余 403;非 OPS 访问 `/api/ops/**` 一律 403;支持复合角色(OWNER+OPS)。**⚠ 判 OPS 只认系统级绑定**(查 `sys_user_role.family_id IS NULL` + 5 分钟缓存):前端一律 `userStore.isOps`,**禁止 `hasPerm('ops:view')`**;OPS 角色的绑定必须带一条 `family_id=NULL` 的系统级行,否则 `isOps` 恒 false、运维页按「家长」渲染。成因见踩坑速查 §2.5。
 - 点赞/评论/通知严格同家庭:`validateTarget` 校验内容 family_id 与用户一致,跨家庭返回 NOT_FOUND。
 - 匿名(permitAll)接口按登录态返回空数据,不许 NPE(见踩坑速查 §2.6)。
+- **防爆破 + 首登改密(V10.1)**:`/auth/login|captcha|register` 按 IP 限流、登录失败按「账号+IP」Redis 计数(超限 429);种子账号 admin/ops 带 `sys_user.must_change_password=1`,登录发的访问令牌带 `pwdChange` claim 时 `JwtAuthenticationFilter` 仅放行 `PUT /profile/password` 与登出(前端 `ChangePasswordDialog` 强制弹窗),需改密账号**不签发刷新令牌**。CORS 走白名单 `app.cors-allowed-origins`(external.yml),SQL 日志(`logging.level.mybatis.sql`)默认 warn。
 
 ## 功能模块清单(索引)
 
@@ -235,7 +243,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 - 后端编译/测试:`cd backend; .\mvnw.cmd -B clean package` → BUILD SUCCESS(`Tests run: 8`,纯逻辑不起 Spring 上下文);只求编译加 `-DskipTests`
 - 前端测试:`cd frontend; npx vitest run` → 18 passed(utils 纯逻辑:loan/password;CI 在构建前执行)
-- 前端构建:`cd frontend; npm run build` → 入口 chunk ≈354KB(实测 **354.44KB/gzip 143.95KB**;各功能页/pdfjs/simple-mind-map/epubjs/hls.js 均为独立异步 chunk 仅对应场景加载,**涨幅几乎全来自中英双语文案进共享入口 chunk**;历史数字见 docs/变更归档.md)
+- 前端构建:`cd frontend; npm run build` → 入口 chunk ≈358KB(实测 **358.10KB/gzip 144.94KB**;各功能页/pdfjs/simple-mind-map/epubjs/hls.js 均为独立异步 chunk 仅对应场景加载,**涨幅几乎全来自中英双语文案进共享入口 chunk**;历史数字见 docs/变更归档.md)
   - **⚠ 口径:vite 报的是「字符数」不是「字节数」**(实测)。入口 chunk vite 报 318.71KB,`wc -c` 却是 343,667 字节,`wc -m` 才是 318,707 字符——差值是中文注释/字符串的 UTF-8 多字节开销。**别拿 `ls -la` 的字节数跟这个基线比**(会误判成涨了 24KB);要比特字节就 `wc -c` 对 `wc -c`。gzip 那个数即压缩后真实字节数。
 - 界面/交互验证:harness 不要放 `target/`;持续动画页面用页面内 `evaluate` 量几何、派发 `el.click()`,别用截图或真实点击(必超时,见踩坑速查 §6 本地 IAB/Playwright 条)。
 - 接口测试:同级独立项目(不在本仓库)`cd ..\autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed;**CI(GitHub Actions)每次推送自动验证:前后端构建+compose 起库导入 schema+后端启动+登录冒烟**。
