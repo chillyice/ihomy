@@ -63,8 +63,9 @@ public class SecurityConfig {
                         // 书架读类接口允许游客访问(服务层匿名只返回 PUBLIC 书;写接口仍需登录)
                         "/library/list", "/library/categories", "/library/*",
                         "/storage/file-signed").permitAll()
-                // 放映厅海报中转同样走签名 URL(<img> 带不了 JWT,签名即凭证)
-                .requestMatchers(org.springframework.http.HttpMethod.GET, "/media/image-signed").permitAll()
+                // 放映厅海报/字幕轨中转同样走签名 URL(<img>/<track> 带不了 JWT,签名即凭证)
+                .requestMatchers(org.springframework.http.HttpMethod.GET,
+                        "/media/image-signed", "/media/subtitle-signed").permitAll()
                 .anyRequest().authenticated())
             .exceptionHandling(e -> e
                 // 未登录与无权限均以统一 JSON 结构返回,而非跳转登录页

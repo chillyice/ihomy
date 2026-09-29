@@ -177,12 +177,14 @@ export const videoApi = {
   wishRemove: (id) => request.delete(`/video/wish/${id}`),
 }
 
-// 放映厅媒体引擎:家庭媒体服务器上的作品(海报墙/详情/播放/观看状态)+ 引擎配置
+// 放映厅媒体引擎:家庭媒体服务器上的作品(海报墙/详情/播放/观看状态)+ 引擎配置 + 我的播放档案
 export const mediaApi = {
   status: () => request.get('/media/status'),
   works: () => request.get('/media/works'),
   work: (itemId) => request.get(`/media/works/${itemId}`),
-  play: (itemId) => request.get(`/media/works/${itemId}/play`),
+  // subtitleIndex:位图字幕(PGS/DVDSUB)只能烧进转码画面,传了它就按转码流取地址
+  play: (itemId, subtitleIndex) => request.get(`/media/works/${itemId}/play`,
+    subtitleIndex == null ? {} : { params: { subtitleIndex } }),
   played: (itemId, played) => request.post(`/media/works/${itemId}/played`, { played }),
   progress: (itemId, data) => request.post(`/media/works/${itemId}/progress`, data),
   resume: () => request.get('/media/resume'),
@@ -190,6 +192,10 @@ export const mediaApi = {
   saveConfig: (data) => request.put('/media/config', data),
   removeConfig: () => request.delete('/media/config'),
   test: (data) => request.post('/media/test', data),
+  // 我的播放档案(成员自助:用自己在媒体服务器上的账号,各自续看)
+  myAccount: () => request.get('/media/my-account'),
+  saveMyAccount: (data) => request.put('/media/my-account', data),
+  removeMyAccount: () => request.delete('/media/my-account'),
 }
 
 // 积分商城(签到/兑换/上架管理)

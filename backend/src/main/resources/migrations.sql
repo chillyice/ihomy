@@ -1435,4 +1435,32 @@ UPDATE `sys_oss_component` SET `current_version` = '10.9.11',
  WHERE `component_type` = 'SERVICE' AND `package_ref` = 'jellyfin/jellyfin'
    AND (`integration_status` <> 'PARTIAL' OR `current_version` IS NULL);
 
+-- ------------------------------------------------------------
+-- V9.107 放映厅 S4 打磨(2026-09-29)
+--   sys_media_user_config:成员在媒体服务器上的个人账号,用于「各自续看」
+--   (网页/详情/续看/进度按当前登录成员取账号;没配的成员沿用家庭账号,即全家共用一份进度)。
+--   password 存 ENC 密文,按「家庭 + 成员」唯一且不做逻辑删除。
+--   hls.js:浏览器放不了的片源(如 HEVC/10bit)回退到媒体服务器 HLS 转码流的播放库,入开源台账。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `sys_media_user_config` (
+  `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`  BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `user_id`    BIGINT       NOT NULL COMMENT '成员用户ID',
+  `username`   VARCHAR(100) NOT NULL COMMENT '该成员在媒体服务器上的账号',
+  `password`   VARCHAR(500) NOT NULL COMMENT '账号密码(ENC 加密)',
+  `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_family_user` (`family_id`, `user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='成员在放映厅媒体服务器上的个人账号(各自续看)';
+
+INSERT IGNORE INTO `sys_oss_component`
+  (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`, `managed_by`) VALUES
+('hls.js', 'NPM', 'hls.js', '1.7.3', 'Apache-2.0', 'https://github.com/video-dev/hls.js', '放映厅 HLS 播放(浏览器放不了的片源回退转码流)', 'FULL', 'RENOVATE');
+
+-- Jellyfin 台账:转码(HLS 回退)与字幕轨已接通,说明同步(Emby 实测与 NAS 上线仍未做,状态维持 PARTIAL)
+UPDATE `sys_oss_component` SET `purpose` = '放映厅媒体引擎(刮削/转码/字幕轨/TV 客户端;API 集成,界面自建)'
+ WHERE `component_type` = 'SERVICE' AND `package_ref` = 'jellyfin/jellyfin'
+   AND `purpose` <> '放映厅媒体引擎(刮削/转码/字幕轨/TV 客户端;API 集成,界面自建)';
+
 

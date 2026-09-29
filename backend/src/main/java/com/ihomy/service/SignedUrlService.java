@@ -23,6 +23,8 @@ public class SignedUrlService {
     private static final long TTL_SECONDS = 600;
     /** 海报是静态资源,签名有效期给长一些(横幅在页面上可能停留很久) */
     private static final long IMAGE_TTL_SECONDS = 24 * 3600;
+    /** 字幕轨:<track> 在播放器打开时取一次,给 12 小时够覆盖一次长时间观影 */
+    private static final long SUBTITLE_TTL_SECONDS = 12 * 3600;
 
     @Value("${jwt.secret}")
     private String secret;
@@ -98,6 +100,37 @@ public class SignedUrlService {
 
     private String mediaPayload(Long familyId, String itemId, String type, int maxWidth, long exp) {
         return "media|" + familyId + "|" + itemId + "|" + type + "|" + maxWidth + "|" + exp;
+    }
+
+    /**
+     * 放映厅字幕轨的签名中转 URL(轨道列表随播放地址一起下发,<track> 同样带不了 JWT)。
+     * userId 与 sourceId 一并进签名:前者让后端按同一成员账号取字幕(与播放同口径),后者是媒体源 id ——
+     * 多版本条目里字幕挂在自己的媒体源下,拿条目 id 顶替会取不到。
+     */
+    public String signMediaSubtitle(Long familyId, Long userId, String itemId, String sourceId, int index) {
+        long exp = System.currentTimeMillis() / 1000 + SUBTITLE_TTL_SECONDS;
+        long uid = userId == null ? 0L : userId;
+        return "/api/media/subtitle-signed?familyId=" + familyId
+                + "&userId=" + uid
+                + "&itemId=" + URLEncoder.encode(itemId, StandardCharsets.UTF_8)
+                + "&sourceId=" + URLEncoder.encode(sourceId, StandardCharsets.UTF_8)
+                + "&index=" + index
+                + "&exp=" + exp
+                + "&sig=" + hmac(subtitlePayload(familyId, uid, itemId, sourceId, index, exp));
+    }
+
+    /** 校验字幕签名与有效期(常量时间比较);userId 未登录按 0 参与校验,与签发口径一致 */
+    public boolean verifyMediaSubtitle(Long familyId, long userId, String itemId, String sourceId,
+                                       int index, long exp, String sig) {
+        if (sig == null || exp < System.currentTimeMillis() / 1000) return false;
+        return MessageDigest.isEqual(
+                hmac(subtitlePayload(familyId, userId, itemId, sourceId, index, exp)).getBytes(StandardCharsets.UTF_8),
+                sig.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** 用途前缀与海报区分开:两端点免登录,签名不可跨端点重放 */
+    private String subtitlePayload(Long familyId, long userId, String itemId, String sourceId, int index, long exp) {
+        return "media-sub|" + familyId + "|" + userId + "|" + itemId + "|" + sourceId + "|" + index + "|" + exp;
     }
 
     private String hmac(String payload) {

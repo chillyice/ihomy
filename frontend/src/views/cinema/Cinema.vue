@@ -18,10 +18,10 @@
             <el-option value="Series" :label="$t('cinema.series')" />
           </el-select>
           <el-select v-model="mediaGenreFilter" size="small" clearable filterable style="width: 130px" :placeholder="$t('cinema.filterGenre')">
-            <el-option v-for="g in mediaGenreOptions" :key="g" :value="g" :label="g" />
+            <el-option v-for="g in mediaGenreOptions" :key="g" :value="g" :label="optLabel(g)" />
           </el-select>
           <el-select v-model="mediaCountryFilter" size="small" clearable filterable style="width: 130px" :placeholder="$t('cinema.filterCountry')">
-            <el-option v-for="c in mediaCountryOptions" :key="c" :value="c" :label="c" />
+            <el-option v-for="c in mediaCountryOptions" :key="c" :value="c" :label="optLabel(c)" />
           </el-select>
           <el-select v-model="mediaYearFilter" size="small" clearable style="width: 120px" :placeholder="$t('cinema.filterYear')">
             <el-option v-for="y in mediaYearOptions" :key="y" :value="y" :label="String(y)" />
@@ -50,7 +50,7 @@
             <el-option value="other" :label="$t('cinema.other')" />
           </el-select>
           <el-select v-model="genreFilter" size="small" clearable filterable style="width: 140px" :placeholder="$t('cinema.filterGenre')">
-            <el-option v-for="g in genreOptions" :key="g" :value="g" :label="g" />
+            <el-option v-for="g in genreOptions" :key="g" :value="g" :label="optLabel(g)" />
           </el-select>
         </div>
         <div class="tb-right">
@@ -230,7 +230,7 @@
         </el-form-item>
         <el-form-item :label="$t('cinema.genres')">
           <el-select v-model="wishDialog.form.genres" multiple filterable allow-create default-first-option :placeholder="$t('cinema.genrePlaceholder')" style="width: 100%">
-            <el-option v-for="g in genresOptions" :key="g" :label="g" :value="g" />
+            <el-option v-for="g in genresOptions" :key="g" :label="optLabel(g)" :value="g" />
           </el-select>
         </el-form-item>
         <el-form-item :label="$t('cinema.reason')">
@@ -263,14 +263,14 @@
           </el-form-item>
           <el-form-item :label="$t('cinema.genresDouban')">
             <el-select v-model="editor.form.genres" multiple filterable allow-create default-first-option :placeholder="$t('cinema.selectOrInput')" style="width: 100%">
-              <el-option v-for="g in genresOptions" :key="g" :label="g" :value="g" />
+              <el-option v-for="g in genresOptions" :key="g" :label="optLabel(g)" :value="g" />
             </el-select>
           </el-form-item>
         </div>
         <div class="form-row">
           <el-form-item :label="$t('cinema.region')">
             <el-select v-model="editor.form.region" filterable allow-create default-first-option :placeholder="$t('cinema.selectOrInput')" style="width: 100%">
-              <el-option v-for="r in regionOptions" :key="r" :label="r" :value="r" />
+              <el-option v-for="r in regionOptions" :key="r" :label="optLabel(r)" :value="r" />
             </el-select>
           </el-form-item>
           <el-form-item :label="$t('cinema.year')">
@@ -367,6 +367,28 @@ const regionOptions = [
   '西班牙', '印度', '泰国', '俄罗斯', '加拿大', '澳大利亚', '巴西', '瑞典', '丹麦', '其他',
 ]
 
+// 题材/地区:值沿用中文(与库中既有数据一致),标签走 i18n —— 英文界面不再显示中文
+const GENRE_KEYS = {
+  剧情: 'drama', 喜剧: 'comedy', 动作: 'action', 爱情: 'romance', 科幻: 'scifi', 动画: 'animation',
+  悬疑: 'mystery', 惊悚: 'thriller', 恐怖: 'horror', 纪录片: 'documentary', 音乐: 'music', 犯罪: 'crime',
+  冒险: 'adventure', 奇幻: 'fantasy', 家庭: 'family', 历史: 'history', 战争: 'war', 武侠: 'wuxia',
+  灾难: 'disaster', 运动: 'sports', 歌舞: 'musical', 西部: 'western', 儿童: 'kids', 短片: 'short',
+  经典: 'classic', 文艺: 'arthouse', 枪战: 'gunfight', 写实: 'realistic', 实验: 'experimental', 戏曲: 'opera',
+}
+
+const REGION_KEYS = {
+  中国大陆: 'cn', 香港: 'hk', 台湾: 'tw', 美国: 'us', 英国: 'uk', 日本: 'jp', 韩国: 'kr',
+  法国: 'fr', 德国: 'de', 意大利: 'it', 西班牙: 'es', 印度: 'in', 泰国: 'th', 俄罗斯: 'ru',
+  加拿大: 'ca', 澳大利亚: 'au', 巴西: 'br', 瑞典: 'se', 丹麦: 'dk', 其他: 'other',
+}
+
+// 认不出来的值(用户在库里自己输入的题材)原样显示
+const optLabel = (v) => {
+  if (GENRE_KEYS[v]) return t(`cinema.genreTag.${GENRE_KEYS[v]}`)
+  if (REGION_KEYS[v]) return t(`cinema.regionTag.${REGION_KEYS[v]}`)
+  return v
+}
+
 // ---------- 筛选(相册式前端过滤,家庭数据量小) ----------
 const searchKeyword = ref('')
 const sourceFilter = ref('')
@@ -422,6 +444,9 @@ const load = async () => {
   loading.value = true
   try {
     list.value = await videoApi.list({})
+  } catch {
+    // 取数失败按空库渲染(筛选/空状态照常),不留未捕获拒绝
+    list.value = []
   } finally {
     loading.value = false
   }
@@ -432,6 +457,8 @@ const loadWishes = async () => {
   wishLoading.value = true
   try {
     wishes.value = await videoApi.wishList()
+  } catch {
+    wishes.value = []
   } finally {
     wishLoading.value = false
   }

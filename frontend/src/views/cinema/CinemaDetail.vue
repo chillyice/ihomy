@@ -7,7 +7,9 @@
     <Breadcrumb :items="[{ label: $t('cinema.title'), to: '/cinema' }, { label: detail?.name || '...' }]" />
 
     <div v-loading="loading" class="detail">
-      <el-empty v-if="!loading && !detail" :description="$t('cinema.notFound')" />
+      <el-empty v-if="!loading && !detail" :description="userStore.isLoggedIn ? $t('cinema.notFound') : $t('cinema.loginRequired')">
+        <el-button v-if="!userStore.isLoggedIn" type="primary" @click="goLogin">{{ $t('cinema.goLogin') }}</el-button>
+      </el-empty>
 
       <template v-else-if="detail">
         <div class="detail-head card">
@@ -109,7 +111,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { VideoPlay } from '@element-plus/icons-vue'
 import { mediaApi } from '@/api'
@@ -120,6 +122,7 @@ import MediaPlayer from '@/components/MediaPlayer.vue'
 
 const { t } = useI18n()
 const route = useRoute()
+const router = useRouter()
 const userStore = useUserStore()
 
 const detail = ref(null)
@@ -169,6 +172,9 @@ const load = async () => {
 }
 
 const reload = () => load()
+
+// 分享链接进来的游客:给登录引导并带回本页(不要显示成「作品不存在」)
+const goLogin = () => router.push({ name: 'Login', query: { redirect: route.fullPath } })
 
 // 剧集主按钮:定位到「该看的那一集」= 季度内第一个未看,没有则第一集
 const primaryTarget = () => {

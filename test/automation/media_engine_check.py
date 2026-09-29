@@ -3,8 +3,9 @@
 """
 ihomy 放映厅媒体引擎接口检查(接口自动化)
 
-覆盖 `/api/media/**`:配置与状态、作品海报墙、电影/剧集详情、播放地址与直连取流、
-标记看过、进度上报与继续观看、海报签名中转(含签名被篡改必须拒绝)、连通测试与参数校验。
+覆盖 `/api/media/**`:配置与状态、作品海报墙、电影/剧集详情、播放地址与取流(直出/转码两条线路)、
+字幕轨签名中转、标记看过、进度上报与继续观看、成员播放档案(各自续看)、
+海报签名中转(含签名被篡改必须拒绝)、连通测试与参数校验。
 
 依赖:仅 Python 标准库(urllib/json/argparse),无需 pip 安装。
 
@@ -48,6 +49,25 @@ def check(name, ok, detail=""):
 def brief(value, limit=180):
     text = json.dumps(value, ensure_ascii=False)
     return text if len(text) <= limit else text[:limit] + "..."
+
+
+def site_base(base):
+    """含 context-path 的 base 还原成站点根(海报/字幕中转下发的是站点相对路径)"""
+    return base[:-4] if base.endswith("/api") else base
+
+
+def fetch(url, headers=None):
+    """取原始响应:签名中转端点是站点相对路径、内容可能是图片/字幕字节,不走 Api.call"""
+    req = urllib.request.Request(url, headers=headers or {})
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return resp.status, resp.headers, resp.read()
+    except urllib.error.HTTPError as e:
+        return e.code, e.headers, e.read()
+
+
+def status_of(url):
+    return fetch(url)[0]
 
 
 class Api:
@@ -109,9 +129,18 @@ class Api:
         return res["data"]
 
     def post(self, path, body=None):
-        status, res = self.call("POST", path, body=body)
+        return self._write("POST", path, body)
+
+    def put(self, path, body=None):
+        return self._write("PUT", path, body)
+
+    def delete(self, path, body=None):
+        return self._write("DELETE", path, body)
+
+    def _write(self, method, path, body=None):
+        status, res = self.call(method, path, body=body)
         if status != 200 or not isinstance(res, dict) or res.get("code") != 0:
-            raise RuntimeError("POST %s 失败:%s %s" % (path, status, brief(res)))
+            raise RuntimeError("%s %s 失败:%s %s" % (method, path, status, brief(res)))
         return res.get("data")
 
 
@@ -221,19 +250,29 @@ def main():
                                       for e in episodes),
                   brief([(e.get("name"), e.get("seasonNumber"), e.get("episodeNumber")) for e in episodes[:3]]))
 
-            # 6. 播放地址 + 直连取流(播放器实际会做的事)
+            # 6. 播放地址 + 取流(播放器实际会做的事)
             play = api.data("/media/works/%s/play" % episodes[0]["id"])
             check("播放地址带令牌", str(play.get("url", "")).startswith("http") and "api_key=" in str(play.get("url")),
-                  brief({"playable": play.get("playable"), "video": play.get("videoCodec"), "audio": play.get("audioCodec")}))
-            req = urllib.request.Request(play["url"], headers={"Range": "bytes=0-1023"})
-            try:
-                with urllib.request.urlopen(req) as resp:
-                    chunk = resp.read()
-                    check("直连取流支持 Range 断点", resp.status == 206 and len(chunk) == 1024,
-                          "status=%s type=%s acceptRanges=%s" % (resp.status, resp.headers.get("Content-Type"),
-                                                                 resp.headers.get("Accept-Ranges")))
-            except Exception as e:  # noqa: BLE001
-                check("直连取流支持 Range 断点", False, repr(e))
+                  brief({"mode": play.get("mode"), "playable": play.get("playable"),
+                         "video": play.get("videoCodec"), "audio": play.get("audioCodec")}))
+            check("播放地址带线路信息(mode/playable/hlsUrl/subtitles)",
+                  play.get("mode") in ("direct", "hls") and isinstance(play.get("playable"), bool)
+                  and "hlsUrl" in play and isinstance(play.get("subtitles"), list),
+                  brief({"mode": play.get("mode"), "playable": play.get("playable"),
+                         "hls": bool(play.get("hlsUrl")), "subtitles": len(play.get("subtitles") or [])}))
+            if play.get("mode") == "direct":
+                req = urllib.request.Request(play["url"], headers={"Range": "bytes=0-1023"})
+                try:
+                    with urllib.request.urlopen(req) as resp:
+                        chunk = resp.read()
+                        check("直连取流支持 Range 断点", resp.status == 206 and len(chunk) == 1024,
+                              "status=%s type=%s acceptRanges=%s" % (resp.status, resp.headers.get("Content-Type"),
+                                                                     resp.headers.get("Accept-Ranges")))
+                except Exception as e:  # noqa: BLE001
+                    check("直连取流支持 Range 断点", False, repr(e))
+            else:
+                # 转码线路给的是 HLS 播放列表,不能按字节范围断言
+                check("转码线路可取播放列表(master.m3u8)", status_of(play["url"]) == 200, play["url"][:90])
 
             # 7. 看过标记 + 继续观看(写类断言,结束后恢复)
             if not args.read_only:
@@ -273,6 +312,58 @@ def main():
                 finally:
                     restore(api, target, before)
                     print("      已恢复条目观看状态:" + brief(before))
+
+    # 6b. 编码回退:浏览器放不了的片源(HEVC/10bit 等)必须改走转码流,能放的直出(省媒体服务器 CPU)
+    movie_plays = [(w, api.data("/media/works/%s/play" % w["id"])) for w in movies]
+    check("线路与编码能力一致(playable=false → mode=hls)",
+          all((p.get("playable") is False) == (p.get("mode") == "hls") for _, p in movie_plays),
+          brief([{"name": w["name"], "video": p.get("videoCodec"), "playable": p.get("playable"),
+                  "mode": p.get("mode")} for w, p in movie_plays]))
+    hls_play = next((p for _, p in movie_plays if p.get("mode") == "hls"), None)
+    if hls_play:
+        check("转码流播放列表可取(master.m3u8)", status_of(hls_play["url"]) == 200, hls_play["url"][:90])
+    else:
+        print("SKIP  本机片源都能直出,未覆盖 HLS 回退线路")
+
+    # 6c. 字幕轨:文本字幕走签名中转(<track> 带不了 JWT),位图字幕标记为需烧进转码画面
+    all_subs = [s for _, p in movie_plays for s in (p.get("subtitles") or [])]
+    text_subs = [s for s in all_subs if s.get("text") and s.get("url")]
+    check("文本字幕轨道带签名中转 URL(含来源与成员,防跨端点重放)",
+          all("sourceId=" in s["url"] and "userId=" in s["url"] for s in text_subs),
+          "text=%d burnIn=%d" % (len(text_subs), len(all_subs) - len(text_subs)))
+    if text_subs:
+        sub = text_subs[0]
+        sub_url = site_base(args.base) + sub["url"]
+        status, headers, body = fetch(sub_url)
+        check("字幕中转免登录可取(WebVTT)",
+              status == 200 and "text/vtt" in (headers.get("Content-Type") or "") and body.startswith(b"WEBVTT"),
+              "status=%s type=%s bytes=%d" % (status, headers.get("Content-Type"), len(body)))
+        for label, tampered in (
+            ("index", re.sub(r"index=\d+", "index=%d" % (sub["index"] + 1), sub_url)),
+            ("sourceId", sub_url.replace("sourceId=", "sourceId=x")),
+            ("userId", re.sub(r"userId=\d+", "userId=99999", sub_url)),
+        ):
+            status, _, body2 = fetch(tampered)
+            text2 = body2.decode("utf-8", "replace") if isinstance(body2, bytes) else str(body2)
+            check("字幕签名覆盖 %s(被篡改必须拒绝)" % label,
+                  status == 401 or '"code":401' in text2, text2[:110])
+    else:
+        print("SKIP  本机片源无文本字幕轨,未覆盖字幕中转断言")
+
+    # 7b. 成员播放档案(成员用自己在媒体服务器上的账号看片,各自续看;没配的回落家庭账号)
+    mine = api.data("/media/my-account")
+    check("GET /media/my-account 回报引擎就绪且默认未配置",
+          mine.get("engineReady") is True and mine.get("configured") is False, brief(mine))
+    if not args.read_only:
+        saved = api.put("/media/my-account", {"username": "no-such-member-ihomy", "password": "x"})
+        check("成员账号连不上时保存成功但标记不可用(播放回落家庭账号)",
+              saved.get("saved") is True and saved.get("usable") is False, brief(saved))
+        mid = api.data("/media/my-account")
+        check("成员档案已保存且只回账号不回密码",
+              mid.get("configured") is True and "password" not in mid, brief(mid))
+        api.delete("/media/my-account")
+        back = api.data("/media/my-account")
+        check("清除成员档案后回到家庭账号", back.get("configured") is False, brief(back))
 
     # 8. 连通测试(表单留空时回退已保存配置)
     test = api.post("/media/test", {})

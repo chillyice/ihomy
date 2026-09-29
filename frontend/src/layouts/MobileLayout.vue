@@ -31,6 +31,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import MobileTabBar from '@/components/MobileTabBar.vue'
 import MobileHeader from '@/components/MobileHeader.vue'
 import MobileHomeFeed from '@/components/MobileHomeFeed.vue'
@@ -41,26 +42,34 @@ import InstallPrompt from '@/components/InstallPrompt.vue'
 import MusicPlayer from '@/components/MusicPlayer.vue'
 
 const route = useRoute()
+const { t } = useI18n()
 const activeTab = ref('home')
 
 const isHomeRoute = computed(() => route.path === '/')
 
+// 页头标题:走 i18n(切语言即时跟着变),键为空即不显示标题
 const PAGE_TITLES = {
-  '/blog': '博客', '/diary': '日记', '/album': '相册', '/anniversary': '纪念日',
-  '/cinema': '放映厅', '/music': '音乐', '/member': '成员', '/points': '积分',
-  '/task': '任务', '/reminder': '提醒', '/plan': '计划', '/wish': '愿望单',
-  '/book': '记账', '/chat': '聊天室', '/tree': '家谱', '/cascade': '照片瀑布',
-  '/item': '物品', '/kitchen': '厨房', '/library': '书架', '/settings': '设置',
-  '/ops': '运维管理', '/vault': '保险箱', '/login': '登录',
+  '/blog': 'blog.title', '/diary': 'diary.title', '/album': 'album.title', '/anniversary': 'anniversary.title',
+  '/cinema': 'cinema.title', '/music': 'music.title', '/member': 'member.title', '/points': 'points.title',
+  '/task': 'task.title', '/reminder': 'reminder.title', '/plan': 'plan.title', '/wish': 'wish.title',
+  '/book': 'book.title', '/chat': 'chat.title', '/tree': 'tree.title', '/cascade': 'cascade.title',
+  '/item': 'mobile.title.item', '/kitchen': 'kitchen.title', '/library': 'library.title',
+  '/settings': 'settings.title', '/ops': 'mobile.title.ops', '/vault': 'vault.title',
+  '/login': 'mobile.title.login',
 }
 const pageTitle = computed(() => {
-  if (route.path.startsWith('/blog/')) return route.path.includes('/edit/') ? '编辑博客' : '博客详情'
-  if (route.path.startsWith('/diary')) return route.path.includes('/edit/') ? '写日记' : '日记'
-  if (route.path.startsWith('/album/')) return '相册详情'
-  if (route.path.startsWith('/library/')) return route.path.includes('/edit/') ? '编辑图书' : '图书详情'
-  if (route.path.startsWith('/kitchen/recipe/')) return route.path.includes('/edit/') ? '编辑菜谱' : '菜谱详情'
-  if (route.path.startsWith('/kitchen/ingredients')) return '食材'
-  return PAGE_TITLES[route.path] || ''
+  const p = route.path
+  const edit = p.includes('/edit/')
+  if (p.startsWith('/blog/')) return t(edit ? 'mobile.title.blogEdit' : 'mobile.title.blogDetail')
+  if (p.startsWith('/diary')) return t(edit ? 'mobile.title.diaryWrite' : 'diary.title')
+  if (p.startsWith('/album/')) return t('mobile.title.albumDetail')
+  if (p.startsWith('/library/')) return t(edit ? 'mobile.title.bookEdit' : 'mobile.title.bookDetail')
+  if (p.startsWith('/kitchen/recipe/')) return t(edit ? 'mobile.title.recipeEdit' : 'mobile.title.recipeDetail')
+  if (p.startsWith('/kitchen/ingredients')) return t('mobile.title.ingredients')
+  if (p.startsWith('/cinema/')) return t('mobile.title.cinemaDetail')
+  if (p.startsWith('/tools/loan')) return t('mobile.title.loan')
+  const key = PAGE_TITLES[p]
+  return key ? t(key) : ''
 })
 
 watch(() => route.path, () => { window.scrollTo(0, 0) })

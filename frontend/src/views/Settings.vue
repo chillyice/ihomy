@@ -24,7 +24,7 @@
           <el-menu-item v-if="userStore.hasPerm('family:manage')" index="weather">
             <span class="menu-icon">🌤️</span>{{ $t('settings.cat.weather') }}
           </el-menu-item>
-          <el-menu-item v-if="userStore.hasPerm('storage:manage')" index="media">
+          <el-menu-item index="media">
             <span class="menu-icon">🎬</span>{{ $t('settings.cat.media') }}
           </el-menu-item>
           <el-menu-item index="storage">
@@ -496,9 +496,43 @@
           <StorageView />
         </template>
 
-        <!-- 放映厅引擎(家庭媒体服务器;家长可编辑) -->
+        <!-- 放映厅:我的播放档案(每位成员自助)+ 引擎配置(家长) -->
         <template v-if="active === 'media'">
-          <div class="card settings-card" v-loading="mediaLoading">
+          <div v-if="mediaMine.engineReady" class="card settings-card">
+            <div class="section-label">{{ $t('settings.mediaMine.title') }}</div>
+            <div class="share-tip">{{ $t('settings.mediaMine.hint') }}</div>
+
+            <div class="media-status">
+              <el-tag :type="mediaMineTag.type" size="small">{{ mediaMineTag.text }}</el-tag>
+              <span v-if="mediaMine.configured" class="media-status-sub">{{ mediaMine.username }}</span>
+              <span v-if="mediaMine.message" class="media-status-sub">{{ mediaMine.message }}</span>
+            </div>
+
+            <el-form :model="mediaMineForm" label-position="top" class="settings-form">
+              <el-form-item :label="$t('settings.mediaMine.username')">
+                <el-input v-model="mediaMineForm.username" />
+              </el-form-item>
+              <el-form-item :label="$t('settings.mediaMine.password')">
+                <el-input
+                  v-model="mediaMineForm.password"
+                  type="password"
+                  show-password
+                  :placeholder="mediaMine.configured ? $t('settings.media.passwordKeep') : $t('settings.mediaMine.passwordHint')"
+                />
+              </el-form-item>
+              <div class="media-actions">
+                <el-button type="primary" :loading="mediaMineSaving" @click="saveMediaMine">{{ $t('common.save') }}</el-button>
+                <el-button v-if="mediaMine.configured" type="danger" plain @click="removeMediaMine">
+                  {{ $t('settings.mediaMine.remove') }}
+                </el-button>
+              </div>
+            </el-form>
+          </div>
+          <div v-else-if="!userStore.hasPerm('storage:manage')" class="card settings-card">
+            <div class="share-tip">{{ $t('settings.media.ownerOnly') }}</div>
+          </div>
+
+          <div v-if="userStore.hasPerm('storage:manage')" class="card settings-card" v-loading="mediaLoading">
             <div class="section-label">{{ $t('settings.media.title') }}</div>
             <div class="share-tip">{{ $t('settings.media.hint') }}</div>
 
@@ -530,6 +564,14 @@
                 <el-input v-model="mediaForm.publicUrl" placeholder="http://192.168.1.10:8096" />
                 <div class="share-tip">{{ $t('settings.media.publicUrlHint') }}</div>
               </el-form-item>
+              <el-alert
+                v-if="mediaUrlInsecure"
+                type="warning"
+                :closable="false"
+                show-icon
+                :title="$t('settings.media.insecureUrl')"
+                style="margin-bottom: 18px"
+              />
               <el-form-item :label="$t('settings.media.username')">
                 <el-input v-model="mediaForm.username" />
               </el-form-item>
@@ -1424,12 +1466,58 @@ const mediaStatusTag = computed(() => {
   return { type: 'warning', text: t('settings.media.stateOffline') }
 })
 
+// 站点走 HTTPS 时,http 的媒体地址会被浏览器按混合内容拦掉(直出视频与转码取流都拦),
+// 先提示一句,免得去翻播放失败的日志
+const mediaUrlInsecure = computed(() => {
+  if (window.location.protocol !== 'https:') return false
+  return [mediaForm.serverUrl, mediaForm.publicUrl].some((u) => /^http:\/\//i.test((u || '').trim()))
+})
+
+// ===== 我的播放档案(成员用自己的媒体服务器账号,各自续看) =====
+const mediaMine = reactive({ configured: false, usable: false, engineReady: false, username: '', message: null })
+const mediaMineForm = reactive({ username: '', password: '' })
+const mediaMineSaving = ref(false)
+
+const mediaMineTag = computed(() => {
+  if (!mediaMine.configured) return { type: 'info', text: t('settings.mediaMine.stateOff') }
+  if (mediaMine.usable) return { type: 'success', text: t('settings.mediaMine.stateOn') }
+  return { type: 'warning', text: t('settings.mediaMine.stateBad') }
+})
+
+const saveMediaMine = async () => {
+  if (!mediaMineForm.username) return ElMessage.warning(t('settings.media.usernameRequired'))
+  mediaMineSaving.value = true
+  try {
+    const r = await mediaApi.saveMyAccount({ ...mediaMineForm })
+    if (r.usable) ElMessage.success(t('settings.mediaMine.savedOk'))
+    else ElMessage.warning(r.message || t('settings.mediaMine.savedBad'))
+    mediaMineForm.password = ''
+    await loadMediaConfig()
+  } finally {
+    mediaMineSaving.value = false
+  }
+}
+
+const removeMediaMine = async () => {
+  await ElMessageBox.confirm(t('settings.mediaMine.removeConfirm'), t('common.tip'), { type: 'warning', closeOnClickModal: true })
+  await mediaApi.removeMyAccount()
+  ElMessage.success(t('common.deleted'))
+  mediaMineForm.password = ''
+  await loadMediaConfig()
+}
+
 const formatDateTime = (v) => (v ? new Date(v).toLocaleString() : '')
 
 const loadMediaConfig = async () => {
-  if (!userStore.hasPerm('storage:manage')) return
   mediaLoading.value = true
   try {
+    // 我的播放档案:每位成员都读(接口未配置引擎时回 engineReady=false)
+    try {
+      const mine = await mediaApi.myAccount()
+      Object.assign(mediaMine, mine)
+      if (!mediaMineForm.username) mediaMineForm.username = mine.username || ''
+    } catch { /* 拿不到就按未配置渲染,不打断设置页其它区块 */ }
+    if (!userStore.hasPerm('storage:manage')) return
     const cfg = await mediaApi.config()
     Object.assign(mediaCfg, cfg)
     Object.assign(mediaForm, {
@@ -1441,6 +1529,8 @@ const loadMediaConfig = async () => {
       enabled: cfg.enabled !== false,
     })
     Object.assign(mediaStatus, { serverName: null, version: null, libraries: [], counts: null }, await mediaApi.status())
+  } catch {
+    // 引擎配置读取失败(权限变更/后端未就绪):保持上一次的展示,不产生未捕获拒绝
   } finally {
     mediaLoading.value = false
   }
