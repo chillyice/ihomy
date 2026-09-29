@@ -139,7 +139,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 ## 统一响应与鉴权
 
 - 响应 `{code: 0, message: "success", data: ...}`;code != 0 = 失败。
-- 登录:access token(2h)+ refresh(7d,Redis 黑名单登出失效)。请求头 `Authorization: Bearer <token>`,axios 自动续期;续期时两个 token 都轮换(滑动续期),仅连续 7 天不访问才需重新登录。**约定(踩坑)**:后端 `authenticationEntryPoint` 必须返回**真实 HTTP 401 状态码**(JSON 体照写),否则前端续期永不执行、用户每 2h 被登出(成因与共享 `refreshPromise` 重放机制见踩坑速查 §2.4)。
+- 登录:access token(2h)+ refresh(7d,Redis 黑名单登出失效)。普通 refresh **每次使用即轮换拉黑**(轮换宽限 60s:并发/多标签重复提交返回同一份新令牌;JWT 带 `jti` 防同秒签发撞值),登出把 access 与本次会话 refresh 一并吊销;壁纸走独立 `type=WALLPAPER` 令牌(`POST /auth/wallpaper-token` 签发,不轮换不拉黑)——**改回「所有 refresh 一律轮换拉黑」前必读踩坑速查 §6**。请求头 `Authorization: Bearer <token>`,axios 自动续期;仅连续 7 天不访问才需重新登录。**约定(踩坑)**:后端 `authenticationEntryPoint` 必须返回**真实 HTTP 401 状态码**(JSON 体照写),否则前端续期永不执行、用户每 2h 被登出(成因与共享 `refreshPromise` 重放机制见踩坑速查 §2.4)。
 - 接口前缀 `/api`;Knife4j 文档 `http://localhost:8080/api/doc.html`。
 - **权限模型**:`buildTokens` 返回 `permissions` 数组 + `isOps` 标志;前端 `userStore.hasPerm(code)`/`isOps`/`isPureOps`。OWNER 恒真,其余查 `SysRoleMapper.selectAuthCodesByUserAndFamily`。
 - **OPS 隔离**:`OpsAccessFilter` 只放行 OPS 到 `/api/ops/**`+`/api/auth/**`,其余 403;非 OPS 访问 `/api/ops/**` 一律 403;支持复合角色(OWNER+OPS)。**⚠ 判 OPS 只认系统级绑定**(查 `sys_user_role.family_id IS NULL` + 5 分钟缓存):前端一律 `userStore.isOps`,**禁止 `hasPerm('ops:view')`**;OPS 角色的绑定必须带一条 `family_id=NULL` 的系统级行,否则 `isOps` 恒 false、运维页按「家长」渲染。成因见踩坑速查 §2.5。
@@ -233,15 +233,16 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 #### 验证基线
 
-- 后端编译:`cd backend; .\mvnw.cmd -B clean compile -DskipTests` → BUILD SUCCESS
-- 前端构建:`cd frontend; npm run build` → 入口 chunk ≈353KB(实测 **353.17KB/gzip 143.47KB**;各功能页/pdfjs/simple-mind-map/epubjs/hls.js 均为独立异步 chunk 仅对应场景加载,**涨幅几乎全来自中英双语文案进共享入口 chunk**;历史数字见 docs/变更归档.md)
+- 后端编译/测试:`cd backend; .\mvnw.cmd -B clean package` → BUILD SUCCESS(`Tests run: 8`,纯逻辑不起 Spring 上下文);只求编译加 `-DskipTests`
+- 前端测试:`cd frontend; npx vitest run` → 18 passed(utils 纯逻辑:loan/password;CI 在构建前执行)
+- 前端构建:`cd frontend; npm run build` → 入口 chunk ≈354KB(实测 **354.44KB/gzip 143.95KB**;各功能页/pdfjs/simple-mind-map/epubjs/hls.js 均为独立异步 chunk 仅对应场景加载,**涨幅几乎全来自中英双语文案进共享入口 chunk**;历史数字见 docs/变更归档.md)
   - **⚠ 口径:vite 报的是「字符数」不是「字节数」**(实测)。入口 chunk vite 报 318.71KB,`wc -c` 却是 343,667 字节,`wc -m` 才是 318,707 字符——差值是中文注释/字符串的 UTF-8 多字节开销。**别拿 `ls -la` 的字节数跟这个基线比**(会误判成涨了 24KB);要比特字节就 `wc -c` 对 `wc -c`。gzip 那个数即压缩后真实字节数。
 - 界面/交互验证:harness 不要放 `target/`;持续动画页面用页面内 `evaluate` 量几何、派发 `el.click()`,别用截图或真实点击(必超时,见踩坑速查 §6 本地 IAB/Playwright 条)。
 - 接口测试:同级独立项目(不在本仓库)`cd ..\autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed;**CI(GitHub Actions)每次推送自动验证:前后端构建+compose 起库导入 schema+后端启动+登录冒烟**。
 
 ## 已实现变更归档(已外置)
 
-> 历史归档已整体迁至 **`docs/变更归档.md`**(现约 597KB / **138 小节** = 开头 14 个**功能域**小节 + 其后按版本顺序追加的版本/治理小节),内容原样保留。含文件级改动表、设计决策、踩坑记录与 live DB 同步 SQL。
+> 历史归档已整体迁至 **`docs/变更归档.md`**(现约 613KB / **141 小节** = 开头 14 个**功能域**小节 + 其后 127 个版本/治理小节),内容原样保留。含文件级改动表、设计决策、踩坑记录与 live DB 同步 SQL。
 > **该文件开头有章节目录**(或 `grep -n "^##### " docs/变更归档.md` 列全部小节);**检索历史实现/设计决策/live DB 迁移 SQL 时读该文件;新的变更归档继续追加到文件末尾**(新增 `#####` 子节),不要再写回 AGENTS.md。
 
 ## 文件存储策略
@@ -274,9 +275,9 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 ## 规划事项(未实现)
 
 > **这里只做指引,不记内容**。完整规划(P1-P4)、实施计划与验收口径见 **`docs/需求设计说明书.md` §9**;代码级优化待办见 **§9.2(36 项,分安全/性能/前端/工程化四组)** 与 **§9.3(21 项,V9.98–V9.106 新增代码复审 + §9.2 逐条复核)**。**启动任何规划项前先读该章对应小节**,不要凭本文件或记忆开工。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
-- 当前判断:**优先做 §9.2 的 P1 安全项**(Service Worker 缓存 `/api/**`(含保险箱响应)且登出不清、生产 Redis 无密码发布 `0.0.0.0`、登出/刷新不吊销 refresh token(受壁纸令牌流程约束,见踩坑速查 §6 壁纸令牌条)、`/files/**` 直连无鉴权、音频转写 `getBytes()` 20MB 入堆、AI 放物跨家庭 id、warm 外壳硬编码中文约 56 处、前后端零自动化测试、`docs/项目文档/*.docx` 停在 V9.98 前需重生成);**§9.3 的两条 P1 已收口**(踩坑速查入库、部署文档补媒体引擎章节 —— V9.108),余下 P2:媒体引擎令牌直出前端、媒体服务器地址未限目标(SSRF)、年利率上限与列精度冲突必 500。
+- **V9.110(2026-09-29)已完成 5 项 P1 代码级**:音频转写流式化(`AiController`/`AiService`/`ThirdPartyHttp.requestStreaming`)、Service Worker 排除 `/api/{vault,auth,ops,profile}` + 登出清 `api-cache`、上传黑名单补 xhtml/xml 等、登出/refresh 吊销(新增 `WALLPAPER` 令牌类型 + 60s 轮换宽限 + JWT `jti` 唯一化)、前后端自动化测试骨架(vitest + `spring-boot-starter-test`,CI 去掉 `-DskipTests`)。详见 `docs/变更归档.md` V9.110。
+- 当前判断:**§9.2 剩余 P1** 为生产 Redis 无密码发布 `0.0.0.0`、`/files/**` 直连无鉴权与 nginx `nosniff`/CSP、`docs/项目文档/*.docx` 重生成;其余为 §9.2 的 P2(含 AI 放物跨家庭 id、warm 外壳硬编码中文约 56 处等)。**§9.3 的两条 P1 已收口**(踩坑速查入库、部署文档补媒体引擎章节 —— V9.108),余下 P2:媒体引擎令牌直出前端、媒体服务器地址未限目标(SSRF)、年利率上限与列精度冲突必 500。
 - 功能侧还剩:P1 放映厅 **S4 收尾**(S1–S4 已落地 V9.106–V9.108:转码 HLS 回退/字幕轨/成员播放档案/NAS 上线文档;剩 Emby 实测、多家庭共用一台媒体服务器、转码清晰度与多音轨选择)、P2 智能家居中控(Home Assistant,分 S1-S3)、P2 保险箱主密码(前端零知识,不可逆 UX 变更,待定夺)、场景主题方向(3D 光影实验台 `/tools/light-lab` 为底座)。
-- 功能侧还剩:P1 放映厅 **S4 打磨**(S1–S3 已落地 V9.106;转码 HLS 回退/字幕轨/多用户映射/NAS 上线与 Emby 实测)、P2 智能家居中控(Home Assistant,分 S1-S3)、P2 保险箱主密码(前端零知识,不可逆 UX 变更,待定夺)、场景主题方向(3D 光影实验台 `/tools/light-lab` 为底座)。
 
 ## 文档清单
 
