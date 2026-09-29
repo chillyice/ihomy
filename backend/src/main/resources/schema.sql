@@ -1877,6 +1877,7 @@ INSERT INTO `sys_synonym` (`canonical`, `alias`, `source`) VALUES
 -- ------------------------------------------------------------
 -- 59. sys_oss_component 开源组件台账(V9.71):登记 ihomy 集成的开源软件(直接依赖 + 独立服务)
 --     版本检测纯规则(无 AI):npm registry / Maven Central / GitHub Releases;升级仅提示 + 生成方案(不改源码)
+--     SERVICE 的当前版本可自动探测(probe_type,见 V9.109):Nextcloud /status.php、Jellyfin /System/Info/Public、HA /api/config
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `sys_oss_component`;
 CREATE TABLE `sys_oss_component` (
@@ -1894,6 +1895,11 @@ CREATE TABLE `sys_oss_component` (
   `status`             VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE' COMMENT '状态:ACTIVE/IGNORED',
   `managed_by`         VARCHAR(20)  NOT NULL DEFAULT 'INTERNAL' COMMENT '管理方:RENOVATE/INTERNAL',
   `deploy_type`        VARCHAR(20)  DEFAULT NULL COMMENT 'SERVICE 部署方式:CONTAINER/SYSTEMD/OTHER',
+  `probe_type`         VARCHAR(20)  DEFAULT NULL COMMENT 'SERVICE 当前版本探测方式:NEXTCLOUD_STATUS/JELLYFIN_INFO/HA_CONFIG(空=管理员手工维护)',
+  `probe_url`          VARCHAR(255) DEFAULT NULL COMMENT '探测地址(空=自动取已接入配置里的服务地址)',
+  `probe_token`        VARCHAR(255) DEFAULT NULL COMMENT '探测令牌(HA 必填,ENC 加密;接口只回 hasProbeToken)',
+  `probed_at`          DATETIME     DEFAULT NULL COMMENT '最近一次当前版本探测时间',
+  `probe_message`      VARCHAR(255) DEFAULT NULL COMMENT '最近一次探测结果说明(来源/失败原因,排查用)',
   `assess_json`        TEXT         DEFAULT NULL COMMENT '最近一次 AI 升级评估结果(JSON)',
   `assessed_at`        DATETIME     DEFAULT NULL COMMENT '最近一次 AI 评估时间',
   `vuln_count`         INT          DEFAULT NULL COMMENT '漏洞数(预留)',
@@ -1906,7 +1912,7 @@ CREATE TABLE `sys_oss_component` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_type_ref` (`component_type`, `package_ref`),
   KEY `idx_type_status` (`component_type`, `status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='开源组件台账(登记+版本检测+升级提示)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='开源组件台账(登记+版本检测+当前版本探测+升级提示)';
 
 -- 种子:26 项 = 前端 NPM 直接依赖 17 + 后端 Maven 显式依赖 6 + 独立服务 3(Nextcloud 部分集成 / Jellyfin 部分集成 / Home Assistant 规划)
 INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`) VALUES
@@ -2057,3 +2063,8 @@ CREATE TABLE `sys_media_user_config` (
 
 -- NPM/MAVEN 直接依赖交由 Renovate 检测 + 生成 PR,SERVICE 独立服务由台账内部维护(默认 INTERNAL)
 UPDATE `sys_oss_component` SET `managed_by` = 'RENOVATE' WHERE `component_type` IN ('NPM', 'MAVEN');
+
+-- SERVICE 当前版本探测方式:Nextcloud/Jellyfin 走各自公开状态接口(免令牌),HA 走带令牌的配置接口
+UPDATE `sys_oss_component` SET `probe_type` = 'NEXTCLOUD_STATUS' WHERE `component_type` = 'SERVICE' AND `package_ref` = 'nextcloud/server';
+UPDATE `sys_oss_component` SET `probe_type` = 'JELLYFIN_INFO'    WHERE `component_type` = 'SERVICE' AND `package_ref` = 'jellyfin/jellyfin';
+UPDATE `sys_oss_component` SET `probe_type` = 'HA_CONFIG'        WHERE `component_type` = 'SERVICE' AND `package_ref` = 'home-assistant/core';

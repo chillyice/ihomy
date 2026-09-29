@@ -56,6 +56,14 @@ public class OssComponentController {
         return Result.success(ossComponentService.checkNow());
     }
 
+    @Operation(summary = "探测独立服务当前运行版本")
+    @RequirePermission("ops:view")
+    @OperationLog(module = "OSS", operationType = "QUERY", description = "探测开源组件当前版本")
+    @PostMapping("/{id}/probe")
+    public Result<OssComponent> probe(@PathVariable Long id) {
+        return Result.success(ossComponentService.probe(id));
+    }
+
     @Operation(summary = "生成组件升级方案")
     @RequirePermission("ops:view")
     @GetMapping("/{id}/upgrade-plan")

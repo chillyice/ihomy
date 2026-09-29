@@ -515,8 +515,13 @@
               <el-tag size="small" :type="ossTypeTag(row.componentType)">{{ $t('ops.oss.type_' + String(row.componentType).toLowerCase()) }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column :label="$t('ops.oss.currentVersion')" width="110">
-            <template #default="{ row }"><span class="mono">{{ row.currentVersion || '—' }}</span></template>
+          <el-table-column :label="$t('ops.oss.currentVersion')" width="140">
+            <template #default="{ row }">
+              <span class="mono">{{ row.currentVersion || '—' }}</span>
+              <el-tooltip v-if="row.probeType" :content="ossProbeTip(row)" placement="top">
+                <span class="oss-probe-tag">{{ $t('ops.oss.probed') }}</span>
+              </el-tooltip>
+            </template>
           </el-table-column>
           <el-table-column :label="$t('ops.oss.latestVersion')" width="110">
             <template #default="{ row }"><span class="mono">{{ row.latestVersion || '—' }}</span></template>
@@ -543,8 +548,9 @@
               <span v-else class="oss-none">—</span>
             </template>
           </el-table-column>
-          <el-table-column :label="$t('ops.oss.actions')" width="250">
+          <el-table-column :label="$t('ops.oss.actions')" width="300">
             <template #default="{ row }">
+              <el-button v-if="row.probeType" link type="primary" size="small" :loading="probingOssId === row.id" @click="probeOss(row)">{{ $t('ops.oss.probe') }}</el-button>
               <el-button v-if="isOssUpdatable(row)" link type="primary" size="small" @click="openOssPlan(row)">{{ $t('ops.oss.genPlan') }}</el-button>
               <el-button v-if="isOssUpdatable(row)" link type="success" size="small" @click="confirmOss(row)">{{ $t('ops.oss.confirm') }}</el-button>
               <el-button v-if="isOssUpdatable(row)" link type="warning" size="small" @click="ignoreOss(row, true)">{{ $t('ops.oss.ignore') }}</el-button>
@@ -632,6 +638,20 @@
                 <el-option value="SYSTEMD" :label="$t('ops.oss.deploySystemd')" />
                 <el-option value="OTHER" :label="$t('ops.oss.deployOther')" />
               </el-select>
+            </el-form-item>
+            <el-form-item v-if="ossEditForm.componentType === 'SERVICE'" :label="$t('ops.oss.probeMode')">
+              <el-select v-model="ossEditForm.probeType" style="width: 100%" clearable :placeholder="$t('ops.oss.probeNone')">
+                <el-option value="NEXTCLOUD_STATUS" :label="$t('ops.oss.probe_nextcloud')" />
+                <el-option value="JELLYFIN_INFO" :label="$t('ops.oss.probe_jellyfin')" />
+                <el-option value="HA_CONFIG" :label="$t('ops.oss.probe_ha')" />
+              </el-select>
+            </el-form-item>
+            <el-form-item v-if="ossEditForm.componentType === 'SERVICE' && ossEditForm.probeType" :label="$t('ops.oss.probeUrl')">
+              <el-input v-model="ossEditForm.probeUrl" :placeholder="$t('ops.oss.probeUrlHint')" />
+            </el-form-item>
+            <el-form-item v-if="ossEditForm.probeType === 'HA_CONFIG'" :label="$t('ops.oss.probeToken')">
+              <el-input v-model="ossEditForm.probeToken" type="password" show-password
+                        :placeholder="ossEditForm.hasProbeToken ? $t('ops.oss.probeTokenKeep') : $t('ops.oss.probeTokenHint')" />
             </el-form-item>
           </el-form>
           <template #footer>
@@ -1142,11 +1162,12 @@ const ossPlan = ref(null)
 const ossCopied = ref(false)
 
 const ossEditVisible = ref(false)
-const ossEditForm = reactive({ id: null, name: '', componentType: 'NPM', packageRef: '', currentVersion: '', license: '', repoUrl: '', purpose: '', integrationStatus: 'FULL', managedBy: '', deployType: '' })
+const ossEditForm = reactive({ id: null, name: '', componentType: 'NPM', packageRef: '', currentVersion: '', license: '', repoUrl: '', purpose: '', integrationStatus: 'FULL', managedBy: '', deployType: '', probeType: '', probeUrl: '', probeToken: '', hasProbeToken: false })
 const ossFilter = reactive({ keyword: '', componentType: '', updateType: '', status: '', integrationStatus: '' })
 const ossPlanComponent = ref(null)
 const ossAssess = ref(null)
 const ossAssessing = ref(false)
+const probingOssId = ref(null)
 
 const loadOss = async () => {
   ossLoading.value = true
@@ -1207,6 +1228,22 @@ const openOssPlan = async (row) => {
 
 const ossAssessRiskTag = (level) => (level === 'HIGH' ? 'danger' : level === 'MEDIUM' ? 'warning' : 'success')
 
+// 当前版本自动探测:探到就回写当前版本,没探到后端会把原因写进 probeMessage,原样提示给运维
+const probeOss = async (row) => {
+  probingOssId.value = row.id
+  try {
+    const updated = await opsApi.ossProbe(row.id)
+    const msg = updated?.probeMessage
+    if (msg && msg.startsWith('探测失败')) ElMessage.warning(msg)
+    else ElMessage.success(msg || t('common.success'))
+    await loadOss()
+  } catch (e) { /* 错误由 request.js 统一 toast */ } finally {
+    probingOssId.value = null
+  }
+}
+
+const ossProbeTip = (row) => [row.probedAt ? fmtTime(row.probedAt) : '', row.probeMessage].filter(Boolean).join(' · ')
+
 const assessOss = async (row) => {
   ossAssessing.value = true
   try {
@@ -1260,12 +1297,13 @@ const openOssEdit = (row) => {
     currentVersion: row.currentVersion, license: row.license, repoUrl: row.repoUrl,
     purpose: row.purpose, integrationStatus: row.integrationStatus,
     managedBy: row.managedBy || '', deployType: row.deployType || '',
+    probeType: row.probeType || '', probeUrl: row.probeUrl || '', probeToken: '', hasProbeToken: !!row.hasProbeToken,
   })
   ossEditVisible.value = true
 }
 
 const openOssAdd = () => {
-  Object.assign(ossEditForm, { id: null, name: '', componentType: 'NPM', packageRef: '', currentVersion: '', license: '', repoUrl: '', purpose: '', integrationStatus: 'FULL', managedBy: '', deployType: '' })
+  Object.assign(ossEditForm, { id: null, name: '', componentType: 'NPM', packageRef: '', currentVersion: '', license: '', repoUrl: '', purpose: '', integrationStatus: 'FULL', managedBy: '', deployType: '', probeType: '', probeUrl: '', probeToken: '', hasProbeToken: false })
   ossEditVisible.value = true
 }
 
@@ -1451,6 +1489,7 @@ watch(tab, (v) => {
 }
 .oss-purpose { font-size: 12px; color: var(--color-text-secondary); margin-top: 2px; }
 .oss-none { color: var(--color-text-secondary); }
+.oss-probe-tag { margin-left: 4px; font-size: 11px; padding: 0 4px; border-radius: 4px; background: var(--color-card-2); color: var(--color-text-secondary); cursor: help; }
 .oss-plan-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
 .oss-plan-steps { margin: 0; padding-left: 20px; line-height: 1.9; }
 .oss-plan-steps li { word-break: break-all; }

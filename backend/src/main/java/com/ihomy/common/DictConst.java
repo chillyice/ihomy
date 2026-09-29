@@ -155,6 +155,11 @@ public final class DictConst {
     public static final String OSS_DEPLOY_SYSTEMD = "SYSTEMD";
     public static final String OSS_DEPLOY_OTHER = "OTHER";
 
+    /** 独立服务当前版本探测方式 oss_probe_type(SERVICE 专用;空=管理员手工维护当前版本) */
+    public static final String OSS_PROBE_NEXTCLOUD = "NEXTCLOUD_STATUS";
+    public static final String OSS_PROBE_JELLYFIN = "JELLYFIN_INFO";
+    public static final String OSS_PROBE_HA = "HA_CONFIG";
+
     /* ---------------- 整数(历史 DTO 入参)→ 字典词 转换 ---------------- */
 
     public static String visibility(Integer v) {

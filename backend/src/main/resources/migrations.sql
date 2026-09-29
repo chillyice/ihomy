@@ -1463,4 +1463,24 @@ UPDATE `sys_oss_component` SET `purpose` = '放映厅媒体引擎(刮削/转码/
  WHERE `component_type` = 'SERVICE' AND `package_ref` = 'jellyfin/jellyfin'
    AND `purpose` <> '放映厅媒体引擎(刮削/转码/字幕轨/TV 客户端;API 集成,界面自建)';
 
+-- ------------------------------------------------------------
+-- V9.109 开源组件 SERVICE 当前版本自动探测(2026-09-29)
+--   sys_oss_component 新增 5 列:probe_type/probe_url/probe_token/probed_at/probe_message
+--   探测方式 NEXTCLOUD_STATUS(站点 /status.php)/ JELLYFIN_INFO(/System/Info/Public)/
+--   HA_CONFIG(/api/config,需令牌);probe_url 留空=自动取已接入配置里的服务地址
+--   (Nextcloud 取 sys_storage_device 的 NEXTCLOUD 设备并剥掉 /remote.php/dav 回站点根,
+--    Jellyfin 取 sys_media_server.server_url)。探测结果只回写 current_version,
+--   失败保留管理员手工值。information_schema 守卫(probe_type 不存在才整体加,幂等)
+-- ------------------------------------------------------------
+SET @has := (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'sys_oss_component' AND column_name = 'probe_type');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `sys_oss_component` ADD COLUMN `probe_type` VARCHAR(20) DEFAULT NULL AFTER `deploy_type`, ADD COLUMN `probe_url` VARCHAR(255) DEFAULT NULL AFTER `probe_type`, ADD COLUMN `probe_token` VARCHAR(255) DEFAULT NULL AFTER `probe_url`, ADD COLUMN `probed_at` DATETIME DEFAULT NULL AFTER `probe_token`, ADD COLUMN `probe_message` VARCHAR(255) DEFAULT NULL AFTER `probed_at`',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- SERVICE 当前版本探测方式种子(Nextcloud/Jellyfin 免令牌,HA 需令牌)
+UPDATE `sys_oss_component` SET `probe_type` = 'NEXTCLOUD_STATUS' WHERE `component_type` = 'SERVICE' AND `package_ref` = 'nextcloud/server';
+UPDATE `sys_oss_component` SET `probe_type` = 'JELLYFIN_INFO'    WHERE `component_type` = 'SERVICE' AND `package_ref` = 'jellyfin/jellyfin';
+UPDATE `sys_oss_component` SET `probe_type` = 'HA_CONFIG'        WHERE `component_type` = 'SERVICE' AND `package_ref` = 'home-assistant/core';
+
 

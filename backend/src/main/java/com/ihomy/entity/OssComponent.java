@@ -1,6 +1,7 @@
 package com.ihomy.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -22,7 +23,7 @@ public class OssComponent {
     private String componentType;
     /** 包引用:NPM 用包名、MAVEN 用 group:artifact、SERVICE 用 owner/repo */
     private String packageRef;
-    /** 当前使用/运行版本(SERVICE 由管理员维护) */
+    /** 当前使用/运行版本(SERVICE 配了探测方式则由探测回写,否则由管理员维护) */
     private String currentVersion;
     /** 检测到的最新稳定版 */
     private String latestVersion;
@@ -41,6 +42,19 @@ public class OssComponent {
     private String managedBy;
     /** 独立服务部署方式:CONTAINER / SYSTEMD / OTHER(SERVICE 专用,可空) */
     private String deployType;
+    /** 独立服务当前版本探测方式:NEXTCLOUD_STATUS / JELLYFIN_INFO / HA_CONFIG(SERVICE 专用,空=管理员手工维护) */
+    private String probeType;
+    /** 探测地址(空=自动取已接入配置里的服务地址) */
+    private String probeUrl;
+    /** 探测令牌(HA 必填,ENC 密文;出接口只回 hasProbeToken,不回显密文) */
+    private String probeToken;
+    /** 最近一次当前版本探测时间 */
+    private LocalDateTime probedAt;
+    /** 最近一次探测结果说明(版本来源/失败原因,供 OPS 排查) */
+    private String probeMessage;
+    /** 是否已配置探测令牌(非库字段,出接口用,避免回显密文) */
+    @TableField(exist = false)
+    private Boolean hasProbeToken;
     /** 最近一次 AI 升级评估结果(JSON:{riskLevel,feasible,summary,breakingChanges,migrationSteps}) */
     private String assessJson;
     /** 最近一次 AI 评估时间 */

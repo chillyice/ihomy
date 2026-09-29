@@ -10,20 +10,28 @@ import com.ihomy.common.DictConst;
 import com.ihomy.common.OssVersionUtil;
 import com.ihomy.common.ResultCode;
 import com.ihomy.common.ThirdPartyHttp;
+import com.ihomy.entity.MediaServer;
 import com.ihomy.entity.OssComponent;
+import com.ihomy.entity.StorageDevice;
+import com.ihomy.mapper.MediaServerMapper;
 import com.ihomy.mapper.OssComponentMapper;
+import com.ihomy.mapper.StorageDeviceMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
 import java.net.URLEncoder;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -44,6 +52,8 @@ import java.util.regex.Pattern;
 public class OssComponentService {
 
     private final OssComponentMapper mapper;
+    private final StorageDeviceMapper storageDeviceMapper;
+    private final MediaServerMapper mediaServerMapper;
     private final ParameterService parameterService;
     private final AiService aiService;
     private final ObjectMapper json = new ObjectMapper();
@@ -67,7 +77,7 @@ public class OssComponentService {
             String nb = b.getName() == null ? "" : b.getName();
             return na.compareTo(nb);
         });
-        return all;
+        return maskAll(all);
     }
 
     /** 汇总:总数 / 可升级数 / 最近检测时间(供导航角标) */
@@ -145,7 +155,11 @@ public class OssComponentService {
                 } else {
                     steps.add("该组件为独立部署服务,升级在其自身管理界面/服务器完成(参考官方文档)");
                 }
-                steps.add("升级完成后回到本页,点击「确认已升级」把当前版本更新为 " + c.getLatestVersion());
+                if (hasProbe(c)) {
+                    steps.add("该组件已开启当前版本自动探测:升级完成后点「探测当前版本」即可读回真实版本,无需手工确认");
+                } else {
+                    steps.add("升级完成后回到本页,点击「确认已升级」把当前版本更新为 " + c.getLatestVersion());
+                }
             }
             default -> steps.add("未知组件类型,请参考官方文档手动升级");
         }
@@ -238,7 +252,8 @@ public class OssComponentService {
     }
 
     public void edit(Long id, OssComponent body) {
-        if (mapper.selectById(id) == null) {
+        OssComponent old = mapper.selectById(id);
+        if (old == null) {
             throw new BizException(ResultCode.NOT_FOUND, "组件不存在");
         }
         mapper.update(null, new LambdaUpdateWrapper<OssComponent>()
@@ -254,6 +269,11 @@ public class OssComponentService {
                 .set(OssComponent::getManagedBy, resolveManagedBy(body))
                 .set(OssComponent::getDeployType,
                         DictConst.OSS_TYPE_SERVICE.equals(body.getComponentType()) ? body.getDeployType() : null)
+                .set(OssComponent::getProbeType,
+                        DictConst.OSS_TYPE_SERVICE.equals(body.getComponentType()) ? blankToNull(body.getProbeType()) : null)
+                .set(OssComponent::getProbeUrl,
+                        DictConst.OSS_TYPE_SERVICE.equals(body.getComponentType()) ? blankToNull(body.getProbeUrl()) : null)
+                .set(OssComponent::getProbeToken, resolveProbeToken(body, old))
                 .set(OssComponent::getRemark, body.getRemark()));
     }
 
@@ -267,6 +287,15 @@ public class OssComponentService {
         }
         if (body.getManagedBy() == null || body.getManagedBy().isBlank()) {
             body.setManagedBy(resolveManagedBy(body.getComponentType()));
+        }
+        if (!DictConst.OSS_TYPE_SERVICE.equals(body.getComponentType())) {
+            body.setDeployType(null);
+            body.setProbeType(null);
+            body.setProbeUrl(null);
+            body.setProbeToken(null);
+        } else {
+            body.setProbeUrl(blankToNull(body.getProbeUrl()));
+            body.setProbeToken(encryptToken(body.getProbeToken()));
         }
         mapper.insert(body);
     }
@@ -314,6 +343,31 @@ public class OssComponentService {
             return body.getManagedBy();
         }
         return resolveManagedBy(body.getComponentType());
+    }
+
+    /** 探测令牌:填了新的就加密存,留空沿用旧值(与存储设备密码同一惯例);非独立服务一律清空 */
+    private String resolveProbeToken(OssComponent body, OssComponent old) {
+        if (!DictConst.OSS_TYPE_SERVICE.equals(body.getComponentType())) {
+            return null;
+        }
+        String t = body.getProbeToken();
+        if (t != null && !t.isBlank()) {
+            return parameterService.encrypt(t.trim());
+        }
+        return old == null ? null : old.getProbeToken();
+    }
+
+    private String encryptToken(String raw) {
+        return raw == null || raw.isBlank() ? null : parameterService.encrypt(raw.trim());
+    }
+
+    private String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
+    }
+
+    private List<OssComponent> maskAll(List<OssComponent> rows) {
+        rows.forEach(this::mask);
+        return rows;
     }
 
     private boolean isAssessFeasible(String assessJson) {
@@ -481,19 +535,24 @@ public class OssComponentService {
 
     private void checkOne(OssComponent c) {
         try {
-            String latest = fetchLatest(c);
-            if (latest != null) {
-                mapper.update(null, new LambdaUpdateWrapper<OssComponent>()
-                        .eq(OssComponent::getId, c.getId())
-                        .set(OssComponent::getLatestVersion, latest)
-                        .set(OssComponent::getUpdateType, OssVersionUtil.updateType(c.getCurrentVersion(), latest))
-                        .set(OssComponent::getLastCheckedAt, LocalDateTime.now()));
-            } else {
-                // 拉取失败:仅刷新检测时间,保留上次结果
-                mapper.update(null, new LambdaUpdateWrapper<OssComponent>()
-                        .eq(OssComponent::getId, c.getId())
-                        .set(OssComponent::getLastCheckedAt, LocalDateTime.now()));
+            // 独立服务先探测当前运行版本(回写 current_version),再拿它跟最新版比
+            if (hasProbe(c)) {
+                probeAndPersist(c);
+                OssComponent probed = mapper.selectById(c.getId());
+                if (probed != null) {
+                    c = probed;
+                }
             }
+            String latest = fetchLatest(c);
+            LambdaUpdateWrapper<OssComponent> w = new LambdaUpdateWrapper<OssComponent>()
+                    .eq(OssComponent::getId, c.getId())
+                    .set(OssComponent::getLastCheckedAt, LocalDateTime.now());
+            if (latest != null) {
+                w.set(OssComponent::getLatestVersion, latest)
+                        .set(OssComponent::getUpdateType, OssVersionUtil.updateType(c.getCurrentVersion(), latest));
+            }
+            // 拉取失败:仅刷新检测时间,保留上次结果
+            mapper.update(null, w);
         } catch (Exception e) {
             log.warn("oss check failed, name={}, ref={}", c.getName(), c.getPackageRef(), e);
         }
@@ -563,5 +622,207 @@ public class OssComponentService {
             return null;
         }
         return raw.startsWith("ENC(") ? parameterService.decrypt(raw) : raw;
+    }
+
+    /* ---------- 独立服务当前版本探测 ---------- */
+
+    /** 手动探测单个组件的当前运行版本(仅配了探测方式的独立服务);失败原因写 probeMessage,不抛业务异常 */
+    public OssComponent probe(Long id) {
+        OssComponent c = mapper.selectById(id);
+        if (c == null) {
+            throw new BizException(ResultCode.NOT_FOUND, "组件不存在");
+        }
+        if (!DictConst.OSS_TYPE_SERVICE.equals(c.getComponentType())) {
+            throw new BizException(ResultCode.BAD_REQUEST, "仅独立服务支持当前版本探测");
+        }
+        if (!hasProbe(c)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "该组件未开启当前版本探测,请先在编辑里选择探测方式");
+        }
+        probeAndPersist(c);
+        return mask(mapper.selectById(id));
+    }
+
+    private boolean hasProbe(OssComponent c) {
+        return DictConst.OSS_TYPE_SERVICE.equals(c.getComponentType())
+                && c.getProbeType() != null && !c.getProbeType().isBlank();
+    }
+
+    /** 探测并回写当前版本:探到就覆盖 current_version(顺带按最新版重算更新类型),没探到只记原因保留原值 */
+    private void probeAndPersist(OssComponent c) {
+        String version = null;
+        String message;
+        try {
+            version = probeCurrentVersion(c);
+            if (version != null && version.isBlank()) {
+                version = null;
+            }
+            message = version == null ? "服务未返回版本号" : "已探测到当前运行版本";
+        } catch (BizException e) {
+            message = e.getMessage();
+        } catch (Exception e) {
+            log.warn("oss current version probe failed, name={}, probeType={}", c.getName(), c.getProbeType(), e);
+            message = "探测失败:" + brief(e);
+        }
+        LambdaUpdateWrapper<OssComponent> w = new LambdaUpdateWrapper<OssComponent>()
+                .eq(OssComponent::getId, c.getId())
+                .set(OssComponent::getProbedAt, LocalDateTime.now())
+                .set(OssComponent::getProbeMessage, truncate(message, 240));
+        if (version != null) {
+            w.set(OssComponent::getCurrentVersion, version);
+            if (c.getLatestVersion() != null && !c.getLatestVersion().isBlank()) {
+                w.set(OssComponent::getUpdateType, OssVersionUtil.updateType(version, c.getLatestVersion()));
+            }
+        }
+        mapper.update(null, w);
+    }
+
+    /** 按探测方式调对方接口取运行版本 */
+    private String probeCurrentVersion(OssComponent c) throws IOException {
+        String base = probeBaseUrl(c);
+        return switch (c.getProbeType()) {
+            // Nextcloud 公开状态接口:取 versionstring(与发布 tag 同口径,如 30.0.2)
+            case DictConst.OSS_PROBE_NEXTCLOUD ->
+                    fetchJson("nextcloud", base + "/status.php", null).path("versionstring").asText(null);
+            // Jellyfin 公开信息接口(免认证):Version 如 10.9.11
+            case DictConst.OSS_PROBE_JELLYFIN ->
+                    fetchJson("jellyfin", base + "/System/Info/Public", null).path("Version").asText(null);
+            // Home Assistant 配置接口:需长期访问令牌
+            case DictConst.OSS_PROBE_HA ->
+                    fetchJson("homeassistant", base + "/api/config", bearer(probeToken(c))).path("version").asText(null);
+            default -> null;
+        };
+    }
+
+    private JsonNode fetchJson(String service, String url, Map<String, String> headers) throws IOException {
+        ThirdPartyHttp.Resp r = ThirdPartyHttp.get(service, url, headers, TIMEOUT_MS);
+        if (!r.ok()) {
+            throw new BizException(ResultCode.INTERNAL_ERROR, httpMessage(r.status()));
+        }
+        return json.readTree(r.body());
+    }
+
+    /** 探测地址:先用手工填的,留空则从已接入的服务配置里取 */
+    private String probeBaseUrl(OssComponent c) {
+        String explicit = c.getProbeUrl();
+        if (explicit != null && !explicit.isBlank()) {
+            return trimSlash(normalizeHttp(explicit));
+        }
+        String auto = switch (c.getProbeType()) {
+            case DictConst.OSS_PROBE_NEXTCLOUD -> nextcloudRootFromDevice();
+            case DictConst.OSS_PROBE_JELLYFIN -> mediaServerUrl();
+            default -> null;
+        };
+        if (auto == null || auto.isBlank()) {
+            throw new BizException(ResultCode.BAD_REQUEST, "未找到已接入的服务地址,请在编辑里填写探测地址");
+        }
+        return trimSlash(auto);
+    }
+
+    /**
+     * 已接入 Nextcloud 设备的站点根地址:存储设备里存的是 WebDAV 目录地址
+     * (站点根 + /remote.php/dav/files/{用户名}),探测状态接口要剥回站点根。
+     */
+    private String nextcloudRootFromDevice() {
+        List<StorageDevice> rows = storageDeviceMapper.selectList(new LambdaQueryWrapper<StorageDevice>()
+                .eq(StorageDevice::getDeviceType, "NEXTCLOUD")
+                .eq(StorageDevice::getStatus, "ACTIVE")
+                .orderByAsc(StorageDevice::getId));
+        for (StorageDevice d : rows) {
+            String root = d.getRootPath();
+            if (root == null || root.isBlank()) {
+                continue;
+            }
+            int sep = root.indexOf('|');
+            String url = sep > 0 ? root.substring(0, sep) : root;
+            int dav = url.indexOf("/remote.php/");
+            if (dav > 0) {
+                url = url.substring(0, dav);
+            }
+            return url;
+        }
+        return null;
+    }
+
+    /** 放映厅媒体引擎地址(每家庭一条,取首条启用的) */
+    private String mediaServerUrl() {
+        MediaServer row = mediaServerMapper.selectOne(new LambdaQueryWrapper<MediaServer>()
+                .eq(MediaServer::getEnabled, 1)
+                .orderByAsc(MediaServer::getId)
+                .last("limit 1"));
+        return row == null ? null : row.getServerUrl();
+    }
+
+    private Map<String, String> bearer(String token) {
+        return token == null || token.isBlank() ? null : Map.of("Authorization", "Bearer " + token);
+    }
+
+    /** 探测令牌:与 GitHub 令牌同一套(ENC 密文,明文兼容) */
+    private String probeToken(OssComponent c) {
+        String raw = c.getProbeToken();
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        return raw.startsWith("ENC(") ? parameterService.decrypt(raw) : raw;
+    }
+
+    /** 探测地址规范化:补 http:// 前缀、去尾斜杠;带非 http(s) 协议的直接拒绝 */
+    private String normalizeHttp(String raw) {
+        String v = raw.trim();
+        String lower = v.toLowerCase(Locale.ROOT);
+        if (!lower.startsWith("http://") && !lower.startsWith("https://")) {
+            if (lower.contains("://")) {
+                throw new BizException(ResultCode.BAD_REQUEST, "探测地址必须以 http(s):// 开头");
+            }
+            v = "http://" + v;
+        }
+        return v;
+    }
+
+    private String trimSlash(String u) {
+        String v = u.trim();
+        return v.endsWith("/") ? v.substring(0, v.length() - 1) : v;
+    }
+
+    private String httpMessage(int status) {
+        if (status == 401 || status == 403) {
+            return "服务拒绝访问,请检查探测令牌";
+        }
+        if (status == 404) {
+            return "该地址上找不到探测接口,请确认填的是站点根地址";
+        }
+        return "服务返回状态码 " + status;
+    }
+
+    /** 异常摘要:取最内层原因(连接类异常外层消息通常没信息量),常见网络故障给中文提示 */
+    private String brief(Throwable e) {
+        Throwable t = e;
+        while (t.getCause() != null && t.getCause() != t) {
+            t = t.getCause();
+        }
+        if (t instanceof UnknownHostException) {
+            return "无法解析该地址,请检查域名";
+        }
+        if (t instanceof ConnectException) {
+            return "无法连接该地址,请检查地址与端口";
+        }
+        if (t instanceof SocketTimeoutException) {
+            return "连接超时,请检查地址与网络";
+        }
+        String msg = t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage();
+        return truncate(msg, 120);
+    }
+
+    private String truncate(String s, int max) {
+        return s == null || s.length() <= max ? s : s.substring(0, max);
+    }
+
+    /** 出接口前抹掉令牌密文,只留「是否已配」标记 */
+    private OssComponent mask(OssComponent c) {
+        if (c == null) {
+            return null;
+        }
+        c.setHasProbeToken(c.getProbeToken() != null && !c.getProbeToken().isBlank());
+        c.setProbeToken(null);
+        return c;
     }
 }

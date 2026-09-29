@@ -355,6 +355,7 @@ export const opsApi = {
   ossList: () => request.get('/ops/oss/list'),
   ossSummary: () => request.get('/ops/oss/summary'),
   ossCheck: () => request.post('/ops/oss/check', null, { timeout: 60000 }),
+  ossProbe: (id) => request.post(`/ops/oss/${id}/probe`, null, { timeout: 30000 }),
   ossUpgradePlan: (id) => request.get(`/ops/oss/${id}/upgrade-plan`),
   ossUpdate: (id, data) => request.put(`/ops/oss/${id}`, data),
   ossAdd: (data) => request.post('/ops/oss', data),
