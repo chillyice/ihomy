@@ -917,6 +917,122 @@ ps -eo pid,rss,cmd --sort=-rss | grep -E 'java|mysql|redis|nginx|dockerd' | head
 
 ---
 
+## 十二、放映厅媒体引擎（NAS 上的 Jellyfin，可选）
+
+> 放映厅的影片由**媒体服务器**（Jellyfin 10.9.x）提供：刮削信息、播放令牌、观看进度由 ihomy 后端与它交互，**视频流量由客户端直连媒体服务器**，不经过应用服务器。所以媒体服务器放 NAS 或家里另一台常开的机器上最合适——这台 2GB 应用服务器不适合跑转码。
+> 对应数据是一行家庭级配置 `sys_media_server`（引擎类型/服务器地址/播放地址/账号/密码），由设置页-放映厅-「放映厅引擎」读写，密码加密存库。
+
+### 12.1 部署位置与容器
+
+放在 NAS（Docker）或另一台常开机器上，**不要装在应用服务器上**（转码吃 CPU 与内存，与求稳方案冲突；`docker-compose.yml` 里的 jellyfin profile 只是本机联调用）。
+
+NAS 上的 compose 片段，版本与开发环境对齐（固定版本，别用 latest）：
+
+```yaml
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:10.9.11
+    container_name: jellyfin
+    restart: unless-stopped
+    ports:
+      - "8096:8096"
+    volumes:
+      - /volume1/docker/jellyfin/config:/config
+      - /volume1/docker/jellyfin/cache:/cache
+      - /volume1/media/Movies:/media/Movies:ro     # 电影库（只读即可）
+      - /volume1/media/Shows:/media/Shows:ro       # 剧集库（只读即可）
+```
+
+- 媒体目录给容器**只读**挂载；`/config`、`/cache` 需可写。
+- 首次访问 `http://<NAS 地址>:8096` 走完初始化向导：建管理员账号，加「电影」「剧集」两个媒体库分别指向 `/media/Movies`、`/media/Shows`（与本地联调一致，放映厅按库读取）。
+- 元数据由媒体服务器刮削，NAS 需能出网访问 TMDB。
+- **为每位成员各建一个账号**（可选）：在 ihomy 侧填进「我的播放档案」即可各自续看（见 12.4）。
+
+### 12.2 两个地址与网络（最容易踩的一条）
+
+| 设置项 | 填什么 | 谁在用 |
+|--------|--------|--------|
+| 服务器地址 | 应用服务器**能访问到**的地址（如 `http://192.168.1.10:8096` 或隧道地址） | 后端：取元数据、发播放令牌、读写观看进度 |
+| 播放地址 | **客户端（手机/平板/TV）能直连**的地址；留空表示与服务器地址相同 | 浏览器/播放器：直接拉视频流 |
+
+**⚠ 混合内容拦截（HTTPS 站点必看）**：生产站点是 `https://`，若播放地址填 `http://…`，浏览器会把视频请求按混合内容拦掉——**能直出的影片与需要转码的影片都放不出来**，且现象不明显（播放器只是报错或一直转圈）。两种可行做法：
+
+**做法 A（推荐）：在同一个 nginx 上加子域名，反代到 NAS**
+
+```bash
+sudo tee /etc/nginx/conf.d/ihomy-media.conf > /dev/null <<'EOF'
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name media.ihomy.top;
+
+    ssl_certificate     /etc/letsencrypt/live/media.ihomy.top/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/media.ihomy.top/privkey.pem;
+
+    location / {
+        proxy_pass http://192.168.1.10:8096;     # NAS 上的 Jellyfin
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade           $http_upgrade;
+        proxy_set_header Connection        "upgrade";
+        proxy_buffering   off;                   # 视频流不要缓冲
+        proxy_read_timeout  3600s;
+        proxy_send_timeout  3600s;
+    }
+}
+EOF
+
+sudo nginx -t && sudo systemctl reload nginx
+
+# 子域名解析到本机的 443 后签证书（详见第六章）
+sudo certbot --nginx -d media.<你的域名> -m <你的邮箱> --agree-tos --no-eff-email
+```
+
+「播放地址」填 `https://media.<你的域名>`。DNS 里把子域名解析到**应用服务器**即可，NAS 的 8096 **不必对公网开放**（只要应用服务器能连到它）——把 Jellyfin 直接暴露到公网等于把整个媒体库敞开。
+
+**做法 B：只在家里看**
+内网访问走 `http://192.168.x.x`，页面本身是 HTTP，不存在拦截；但外网 HTTPS 访问时播放依旧放不出来。适合「只在家看」的用法。
+
+**防火墙（仅做法 A 之外的直连场景）**：若坚持让客户端直连 NAS，放行端口并限制来源网段：
+
+```bash
+sudo ufw allow from 192.168.1.0/24 to any port 8096 proto tcp
+```
+
+### 12.3 媒体服务器侧准备
+
+- 媒体库两个：电影（类型「电影」）、剧集（类型「电视剧」）。
+- 建一个管理员账号供 ihomy 后端使用（后端用它出播放令牌）。
+- 成员账号（可选，用于各自续看）。
+- **限制并发转码数**：NAS 性能弱时多人同看会卡，在 Jellyfin 控制台限制同时转码数量；启用硬解（若 NAS 支持）能显著降负载。
+
+### 12.4 ihomy 侧配置
+
+1. **家长**：设置页 → 放映厅 → 「放映厅引擎」，填引擎类型（Jellyfin / Emby）、服务器地址、播放地址、账号、密码 → 保存 → 点「测试连接」，应回报服务器版本与媒体库计数。
+2. **每位成员（可选）**：设置页 → 放映厅 → 「我的播放档案」，填自己在媒体服务器上的账号 → 生效后各自续看；未填写或账号失效时**回落家庭账号**（进度变成全家共用的那一份）。
+
+### 12.5 上线核对
+
+```bash
+# 应用服务器能连到媒体服务器（后端走的就是这个地址）
+curl -s -o /dev/null -w '%{http_code}\n' http://192.168.1.10:8096/System/Info/Public
+# 期望 200
+
+# 接口检查（在能访问后端的机器上跑，密码用测试账号）
+IHOMY_TEST_PWD=<密码> python test/automation/media_engine_check.py --base http://localhost:8080
+```
+
+浏览器上再确认三件事：① 列表与详情能出海报；② 能直出的影片点开即播；③ **放不了的编码（HEVC/10bit 等）能自动走转码播起来**；控制台不应出现混合内容被拦的报错。
+
+### 12.6 Emby
+
+「引擎类型」选 `EMBY`，地址与账号口径完全相同。Emby 与 Jellyfin 接口同源，但版本差异会影响转码与字幕行为，**切换后重跑 12.5**。
+
+---
+
 ## 附：目录规划
 
 ```

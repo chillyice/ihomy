@@ -482,3 +482,11 @@ C:\win-acme\                  # 证书工具
 - **数据库**:`mysqldump -uroot -p ihomy > D:\backup\ihomy\ihomy-%date:~0,4%%date:~5,2%%date:~8,2%.sql`,任务计划程序每日执行,保留 14 天。
 - **上传文件**:`C:\app\ihomy\uploads` 目录(含 pictures/videos/files/music 分类子目录),用 robocopy 或手动复制到备份盘,与数据库同周期。
 - **恢复**:先恢复数据库,再恢复 uploads 目录;DB 里的文件 URL(`/files/...`)与物理路径解耦,目录还原后即可访问。
+
+---
+
+## 附:放映厅媒体引擎(可选)
+
+放映厅的影片由独立的媒体服务器(Jellyfin)提供,引擎一般放 NAS 或家里另一台机器上,与本站部署在哪一平台无关。容器、地址口径、转码与防火墙步骤见 **`docs/部署指导-Linux.md` 第十二章**,Windows 部署同样适用。
+
+Windows 部署时特别注意一条:**站点是 HTTPS 时,播放地址也必须是 HTTPS**——浏览器会拦掉指向 HTTP 的播放请求(直出与转码都放不出来);做法见 Linux 文档 12.2 的子域名反代。

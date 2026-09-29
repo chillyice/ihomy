@@ -36,3 +36,8 @@ frontend/public/emulatorjs/
 
 # 本地 Jellyfin 联调的测试媒体(docker-compose.yml 的 jellyfin 服务挂载,容器内 ffmpeg 生成)
 /.dev-media/
+
+# 一次性工具/生成器的临时产物(本机用后即弃,不入库)
+/.agents-compress.py
+/.docgen/
+/.tmp_swf_ref/
