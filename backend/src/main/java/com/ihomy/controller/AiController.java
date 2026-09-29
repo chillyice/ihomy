@@ -17,7 +17,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +36,7 @@ public class AiController {
     private final FamilyAiConfigService familyAiConfigService;
     private final SecurityHelper securityHelper;
 
-    /** 语音识别单文件上限:multipart 需整包进内存,短语音场景 20MB 足够(生产 -Xmx384m 占比 ~5%) */
+    /** 语音识别单文件上限(音频流式转发,不整包入堆;短语音场景 20MB 足够) */
     private static final long MAX_AUDIO_BYTES = 20L * 1024 * 1024;
 
     private Long currentFamilyId() {
@@ -136,12 +135,14 @@ public class AiController {
     @PostMapping("/transcribe")
     public Result<Map<String, Object>> transcribe(@RequestParam("file") MultipartFile file,
                                                   @RequestParam(required = false) String language,
-                                                  @RequestParam(required = false) Integer rate) throws IOException {
+                                                  @RequestParam(required = false) Integer rate) {
         securityHelper.current();
+        if (file == null || file.isEmpty()) {
+            throw new BizException(ResultCode.BAD_REQUEST, "请上传音频文件");
+        }
         if (file.getSize() > MAX_AUDIO_BYTES) {
             throw new BizException(ResultCode.BAD_REQUEST, "音频文件过大(上限 20MB)");
         }
-        return Result.success(aiService.transcribe(currentFamilyId(), file.getBytes(), file.getOriginalFilename(),
-                file.getContentType(), language, rate));
+        return Result.success(aiService.transcribe(currentFamilyId(), file, language, rate));
     }
 }

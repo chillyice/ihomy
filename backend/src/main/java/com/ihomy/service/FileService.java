@@ -188,7 +188,8 @@ public class FileService {
             int dot = originalName.lastIndexOf('.');
             if (dot >= 0) {
                 String ext = originalName.substring(dot + 1).toLowerCase();
-                if (java.util.Set.of("html", "htm", "svg", "js", "jsp", "php", "asp", "aspx", "exe", "bat", "cmd", "sh", "css").contains(ext)) {
+                if (java.util.Set.of("html", "htm", "xhtml", "xht", "shtml", "phtml", "mhtml", "xml", "svg", "js",
+                        "jsp", "jspx", "php", "asp", "aspx", "exe", "bat", "cmd", "sh", "css").contains(ext)) {
                     throw new BizException(ResultCode.BAD_REQUEST, "不支持的文件类型: " + ext);
                 }
             }

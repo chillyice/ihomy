@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node scripts/copy-ruffle.mjs && node scripts/copy-emulatorjs.mjs && vite",
     "build": "node scripts/copy-ruffle.mjs && node scripts/copy-emulatorjs.mjs && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run"
   },
   "dependencies": {
     "@babel/helper-module-imports": "^8.0.0",
@@ -33,6 +34,7 @@
     "unplugin-auto-import": "^0.17.6",
     "unplugin-vue-components": "^0.27.0",
     "vite": "^5.2.11",
-    "vite-plugin-pwa": "^1.3.0"
+    "vite-plugin-pwa": "^1.3.0",
+    "vitest": "^2.1.9"
   }
 }

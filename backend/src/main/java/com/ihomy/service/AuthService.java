@@ -55,6 +55,8 @@ public class AuthService {
 
     private static final String BLACKLIST_PREFIX = "jwt:blacklist:";
     private static final String CUR_FAMILY_PREFIX = "user:curfamily:";
+    /** 轮换宽限:同一 refresh token 在此窗口内被重复提交(多标签/多端并发)时返回同一份新令牌 */
+    private static final long ROTATE_GRACE_MS = 60_000L;
 
     /** 生成 16 位混淆分享 token(UUID 去横线截取) */
     private String genShareToken() {
@@ -180,43 +182,97 @@ public class AuthService {
         return buildTokens(user, "OWNER", family.getId());
     }
 
-    /** 登出:access token 加入 Redis 黑名单直至过期,refresh token 同步失效 */
-    public void logout(String token) {
-        if (StringUtils.hasText(token) && token.startsWith("Bearer ")) {
-            token = token.substring(7);
-        }
-        if (StringUtils.hasText(token) && jwtUtils.isValid(token)) {
-            long ttl = jwtUtils.parse(token).getExpiration().getTime() - System.currentTimeMillis();
-            if (ttl > 0) {
-                redisTemplate.opsForValue().set(BLACKLIST_PREFIX + token, "1", ttl, TimeUnit.MILLISECONDS);
-            }
+    /** 登出:access token 与本次会话的 refresh token 一并拉黑,彻底终止会话 */
+    public void logout(String token, String refreshToken) {
+        blacklist(stripBearer(token), "out");
+        // 壁纸令牌(WALLPAPER)是桌面壁纸的独立长存凭据,刻意不随浏览器登出吊销
+        if (StringUtils.hasText(refreshToken) && jwtUtils.isValid(refreshToken)
+                && "REFRESH".equals(jwtUtils.parse(refreshToken).get("type", String.class))) {
+            blacklist(refreshToken, "out");
         }
     }
 
-    /** 刷新令牌:校验 refresh token 未过期/未拉黑后重签 access token */
+    /** 签发壁纸令牌(供桌面壁纸首次接入,之后由 /auth/refresh 滑动续期) */
+    public Map<String, String> wallpaperToken(SysUser user) {
+        return Map.of("refreshToken", jwtUtils.generateWallpaperToken(user.getId(), user.getUsername()));
+    }
+
+    /**
+     * 刷新令牌:校验 refresh token 未过期/未拉黑后重签 access token。
+     * 普通刷新令牌每次使用后即拉黑(轮换,单次有效,被盗令牌无法在登出后继续续期);
+     * 壁纸令牌(WALLPAPER)不轮换拉黑,允许浏览器会话与多个壁纸实例各持一份、各自滑动续期。
+     */
     public Map<String, Object> refresh(String refreshToken) {
         if (!jwtUtils.isValid(refreshToken)) {
             throw new BizException(ResultCode.UNAUTHORIZED);
         }
         var claims = jwtUtils.parse(refreshToken);
-        if (!"REFRESH".equals(claims.get("type", String.class))) {
+        String type = claims.get("type", String.class);
+        boolean wallpaper = "WALLPAPER".equals(type);
+        if (!"REFRESH".equals(type) && !wallpaper) {
             throw new BizException(ResultCode.UNAUTHORIZED);
         }
-        if (Boolean.TRUE.equals(redisTemplate.hasKey(BLACKLIST_PREFIX + refreshToken))) {
-            throw new BizException(ResultCode.UNAUTHORIZED);
+        String black = redisTemplate.opsForValue().get(BLACKLIST_PREFIX + refreshToken);
+        if (black != null) {
+            // 轮换宽限:60s 内重复提交同一令牌(多标签/多端并发续期)返回首次轮换出的同一份新令牌,
+            // 避免并发把某一端踢下线;登出标记 out 与超出宽限的轮换一律拒绝
+            String reused = replayWithinGrace(black);
+            if (reused == null) throw new BizException(ResultCode.UNAUTHORIZED);
+            SysUser u = sysUserMapper.selectById(Long.valueOf(claims.getSubject()));
+            if (u == null) throw new BizException(ResultCode.USER_NOT_FOUND);
+            return buildTokens(u, roleOf(u), familyOf(u), reused);
         }
         Long userId = Long.valueOf(claims.getSubject());
         SysUser user = sysUserMapper.selectById(userId);
         if (user == null) {
             throw new BizException(ResultCode.USER_NOT_FOUND);
         }
-        Long familyId = resolveFamily(user.getId());
-        if (familyId == null) familyId = user.getFamilyId();
-        String roleCode = sysRoleMapper.selectRoleCodeByUserAndFamily(user.getId(), familyId);
-        if (roleCode == null) {
-            roleCode = "GUEST";
+        Long familyId = familyOf(user);
+        String roleCode = roleOf(user);
+        if (wallpaper) {
+            return buildTokens(user, roleCode, familyId,
+                    jwtUtils.generateWallpaperToken(user.getId(), user.getUsername()));
         }
-        return buildTokens(user, roleCode, familyId);
+        Map<String, Object> out = buildTokens(user, roleCode, familyId);
+        blacklist(refreshToken, "rot:" + System.currentTimeMillis() + ":" + out.get("refreshToken"));
+        return out;
+    }
+
+    private String stripBearer(String token) {
+        return token != null && token.startsWith("Bearer ") ? token.substring(7) : token;
+    }
+
+    /** 拉黑 token:value=out(登出,一律拒绝)/ rot:时刻:替换令牌(轮换宽限内可复得同一份新令牌) */
+    private void blacklist(String token, String value) {
+        if (!StringUtils.hasText(token) || !jwtUtils.isValid(token)) return;
+        long ttl = jwtUtils.parse(token).getExpiration().getTime() - System.currentTimeMillis();
+        if (ttl > 0) {
+            redisTemplate.opsForValue().set(BLACKLIST_PREFIX + token, value, ttl, TimeUnit.MILLISECONDS);
+        }
+    }
+
+    /** 轮换宽限判定:黑名单值形如 rot:时刻:替换令牌,宽限期内返回替换令牌,否则 null */
+    private String replayWithinGrace(String black) {
+        if (black == null || !black.startsWith("rot:")) return null;
+        int i = black.indexOf(':', 4);
+        if (i < 0) return null;
+        try {
+            if (System.currentTimeMillis() - Long.parseLong(black.substring(4, i)) > ROTATE_GRACE_MS) return null;
+            return black.substring(i + 1);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /** 当前家庭解析(优先 Redis 会话切换/默认家庭,回落主家庭) */
+    private Long familyOf(SysUser user) {
+        Long familyId = resolveFamily(user.getId());
+        return familyId != null ? familyId : user.getFamilyId();
+    }
+
+    private String roleOf(SysUser user) {
+        String roleCode = sysRoleMapper.selectRoleCodeByUserAndFamily(user.getId(), familyOf(user));
+        return roleCode == null ? "GUEST" : roleCode;
     }
 
     /** 我的家庭列表:来自角色绑定,标记主家庭/默认家庭/当前家庭 */
@@ -311,10 +367,14 @@ public class AuthService {
         return securityHelper.current();
     }
 
-    /** 组装令牌响应:access/refresh token + 用户信息 + 当前家庭分享 token + 权限码列表 */
+    /** 组装令牌响应(普通会话):签发新的 refresh token */
     private Map<String, Object> buildTokens(SysUser user, String roleCode, Long familyId) {
+        return buildTokens(user, roleCode, familyId, jwtUtils.generateRefreshToken(user.getId(), user.getUsername()));
+    }
+
+    /** 组装令牌响应:access token + 指定 refresh token(壁纸令牌/轮换复用)+ 用户信息 + 分享 token + 权限码 */
+    private Map<String, Object> buildTokens(SysUser user, String roleCode, Long familyId, String refresh) {
         String access = jwtUtils.generateAccessToken(user.getId(), user.getUsername(), roleCode, familyId);
-        String refresh = jwtUtils.generateRefreshToken(user.getId(), user.getUsername());
         Map<String, Object> data = new HashMap<>();
         data.put("accessToken", access);
         data.put("refreshToken", refresh);

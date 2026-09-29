@@ -13,9 +13,10 @@ import com.ihomy.mapper.AiLogMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -326,29 +327,31 @@ public class AiService {
         return "1536x1024";
     }
 
+    /** 百度短语音识别 API 单次上限约 10MB(且需整段 base64),超限拒绝以免整包压进堆 */
+    private static final long MAX_BAIDU_BYTES = 10L * 1024 * 1024;
+
     /** 语音识别:OpenAI 兼容 multipart(/audio/transcriptions)或百度短语音(provider=BAIDU);主报错/空结果回退兜底 */
-    public Map<String, Object> transcribe(Long familyId, byte[] audio, String filename, String mimeType,
-                                          String language, Integer rate) {
+    public Map<String, Object> transcribe(Long familyId, MultipartFile audio, String language, Integer rate) {
         FamilyAiConfigService.Chain chain = familyAiConfigService.resolveChain(familyId, AiConst.FEATURE_ASR);
         try {
-            Map<String, Object> out = doTranscribe(chain.primary(), familyId, audio, filename, mimeType, language, rate);
+            Map<String, Object> out = doTranscribe(chain.primary(), familyId, audio, language, rate);
             if (out != null && !String.valueOf(out.getOrDefault("text", "")).isBlank()) return out;
             if (chain.hasFallback()) {
                 log.warn("[AI语音] 主模型空结果,回退兜底模型");
-                return doTranscribe(chain.fallback(), familyId, audio, filename, mimeType, language, rate);
+                return doTranscribe(chain.fallback(), familyId, audio, language, rate);
             }
             return out;
         } catch (RuntimeException e) {
             if (chain.hasFallback()) {
                 log.warn("[AI语音] 主模型失败,回退兜底模型 err={}", e.getMessage());
-                return doTranscribe(chain.fallback(), familyId, audio, filename, mimeType, language, rate);
+                return doTranscribe(chain.fallback(), familyId, audio, language, rate);
             }
             throw e;
         }
     }
 
-    private Map<String, Object> doTranscribe(FamilyAiConfigService.AiConfig c, Long familyId, byte[] audio,
-                                             String filename, String mimeType, String language, Integer rate) {
+    private Map<String, Object> doTranscribe(FamilyAiConfigService.AiConfig c, Long familyId, MultipartFile audio,
+                                             String language, Integer rate) {
         boolean baidu = c != null && AiConst.PROVIDER_BAIDU.equals(c.provider());
         if (!baidu && (c == null || !notBlank(c.baseUrl()) || !notBlank(c.apiKey()) || !notBlank(c.model()))) {
             throw new BizException(ResultCode.BAD_REQUEST, "AI 语音识别未配置,请家长在设置-家庭 AI 配置中填写");
@@ -358,8 +361,8 @@ public class AiService {
         String errorMsg = null;
         try {
             Map<String, Object> out = baidu
-                    ? transcribeBaidu(c, familyId, audio, filename, rate)
-                    : transcribeOpenAi(c, audio, filename, mimeType, language, rate);
+                    ? transcribeBaidu(c, familyId, audio, rate)
+                    : transcribeOpenAi(c, audio, language, rate);
             success = true;
             return out;
         } catch (BizException e) {
@@ -374,10 +377,10 @@ public class AiService {
         }
     }
 
-    /** OpenAI 兼容语音识别:multipart(/audio/transcriptions) */
-    private Map<String, Object> transcribeOpenAi(FamilyAiConfigService.AiConfig c, byte[] audio,
-                                                 String filename, String mimeType, String language, Integer rate) throws Exception {
-        if (audio == null || audio.length == 0) {
+    /** OpenAI 兼容语音识别:multipart(/audio/transcriptions),音频流式写入请求体,不整包入堆 */
+    private Map<String, Object> transcribeOpenAi(FamilyAiConfigService.AiConfig c, MultipartFile audio,
+                                                 String language, Integer rate) throws Exception {
+        if (audio == null || audio.isEmpty()) {
             throw new BizException(ResultCode.BAD_REQUEST, "请上传音频文件");
         }
         String boundary = "ihomy-ai-" + UUID.randomUUID().toString().replace("-", "");
@@ -386,13 +389,22 @@ public class AiService {
         if (notBlank(language)) {
             fields.put("language", language.trim());
         }
+        String filename = audio.getOriginalFilename();
+        if (filename == null || filename.isBlank()) filename = "audio.wav";
+        byte[] head = multipartHead(boundary, fields, "file", filename, audio.getContentType());
+        byte[] tail = multipartTail(boundary);
+        long contentLength = head.length + audio.getSize() + tail.length;
         Map<String, String> headers = Map.of(
                 "Content-Type", "multipart/form-data; boundary=" + boundary,
                 "Authorization", "Bearer " + decryptIfEnc(c.apiKey()));
-        byte[] body = multipart(boundary, fields, "file",
-                filename == null || filename.isBlank() ? "audio.wav" : filename, mimeType, audio);
         String url = stripTrailingSlash(c.baseUrl()) + "/audio/transcriptions";
-        ThirdPartyHttp.Resp resp = ThirdPartyHttp.request("ai", "POST", url, headers, body, c.timeoutMs());
+        ThirdPartyHttp.Resp resp = ThirdPartyHttp.requestStreaming("ai", "POST", url, headers, contentLength, out -> {
+            out.write(head);
+            try (InputStream in = audio.getInputStream()) {
+                in.transferTo(out);
+            }
+            out.write(tail);
+        }, c.timeoutMs());
         if (!resp.ok()) {
             log.warn("[AI] 语音识别返回异常 status={} body={}", resp.status(), truncate(resp.body(), 500));
             throw new BizException(ResultCode.INTERNAL_ERROR, "语音识别服务暂时不可用,请稍后重试");
@@ -405,29 +417,38 @@ public class AiService {
 
     /** 百度短语音识别:access_token 由 BaiduAsrClient 缓存换取;format 按扩展名推断,rate 缺省 16000 */
     private Map<String, Object> transcribeBaidu(FamilyAiConfigService.AiConfig c, Long familyId,
-                                                byte[] audio, String filename, Integer rate) {
+                                                MultipartFile audio, Integer rate) {
         if (!notBlank(c.baseUrl()) || !notBlank(c.apiKey()) || !notBlank(c.model())) {
             throw new BizException(ResultCode.BAD_REQUEST, "百度语音识别未配置,请家长在设置-家庭 AI 配置中填写");
         }
         if (!notBlank(c.secretKey())) {
             throw new BizException(ResultCode.BAD_REQUEST, "百度语音识别缺 Secret Key,请在模型配置中填写");
         }
-        if (audio == null || audio.length == 0) {
+        if (audio == null || audio.isEmpty()) {
             throw new BizException(ResultCode.BAD_REQUEST, "请上传音频文件");
+        }
+        if (audio.getSize() > MAX_BAIDU_BYTES) {
+            throw new BizException(ResultCode.BAD_REQUEST, "音频过长,请换一段更短的音频重试");
         }
         int r = rate == null ? 16000 : rate;
         if (r != 16000 && r != 8000) {
                 throw new BizException(ResultCode.BAD_REQUEST, "音频格式不支持,请换一段音频重试");
+        }
+        byte[] bytes;
+        try {
+            bytes = audio.getBytes();
+        } catch (IOException e) {
+            throw new BizException(ResultCode.INTERNAL_ERROR, "音频读取失败,请重试");
         }
         String text = baiduAsrClient.recognize(
                 stripTrailingSlash(c.baseUrl()),
                 decryptIfEnc(c.apiKey()),
                 decryptIfEnc(c.secretKey()),
                 c.model(),
-                audioFormat(filename),
+                audioFormat(audio.getOriginalFilename()),
                 r,
                 "ihomy-family-" + familyId,
-                audio,
+                bytes,
                 c.timeoutMs());
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("text", text);
@@ -444,26 +465,24 @@ public class AiService {
         return "pcm";
     }
 
-    /** 手工构建 multipart/form-data 请求体(字段 + 单文件;ThirdPartyHttp 只收 byte[] body) */
-    private byte[] multipart(String boundary, Map<String, String> fields,
-                             String fileField, String filename, String mimeType, byte[] file) {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
+    /** 构建 multipart/form-data 头部字节(字段 + 单文件声明);文件体由调用方流式写入,不整包入堆 */
+    private byte[] multipartHead(String boundary, Map<String, String> fields,
+                                 String fileField, String filename, String mimeType) {
+        StringBuilder sb = new StringBuilder();
         String prefix = "--" + boundary + "\r\n";
-        try {
-            for (Map.Entry<String, String> e : fields.entrySet()) {
-                out.write((prefix + "Content-Disposition: form-data; name=\"" + e.getKey()
-                        + "\"\r\n\r\n" + e.getValue() + "\r\n").getBytes(StandardCharsets.UTF_8));
-            }
-            out.write((prefix + "Content-Disposition: form-data; name=\"" + fileField
-                    + "\"; filename=\"" + filename + "\"\r\n"
-                    + "Content-Type: " + (mimeType == null || mimeType.isBlank()
-                    ? "application/octet-stream" : mimeType) + "\r\n\r\n").getBytes(StandardCharsets.UTF_8));
-            out.write(file);
-            out.write(("\r\n--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
-            return out.toByteArray();
-        } catch (IOException e) {
-            throw new BizException(ResultCode.INTERNAL_ERROR, "语音识别请求构建失败:" + e.getMessage());
+        for (Map.Entry<String, String> e : fields.entrySet()) {
+            sb.append(prefix).append("Content-Disposition: form-data; name=\"").append(e.getKey())
+                    .append("\"\r\n\r\n").append(e.getValue()).append("\r\n");
         }
+        sb.append(prefix).append("Content-Disposition: form-data; name=\"").append(fileField)
+                .append("\"; filename=\"").append(filename).append("\"\r\n")
+                .append("Content-Type: ").append(mimeType == null || mimeType.isBlank()
+                        ? "application/octet-stream" : mimeType).append("\r\n\r\n");
+        return sb.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    private byte[] multipartTail(String boundary) {
+        return ("\r\n--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8);
     }
 
     /** 密钥支持 ENC(...) 密文(盐值 sys_parameter.aes-salt) */

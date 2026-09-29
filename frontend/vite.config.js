@@ -38,9 +38,17 @@ export default defineConfig({
         globIgnores: ['ruffle/**', 'emulatorjs/**'],
         runtimeCaching: [
           {
-            urlPattern: /^\/api\/.*/i,
+            // 缓存 GET 接口(离线浏览/弱网);排除敏感接口:保险箱、认证、运维、个人资料
+            // 这些响应含明文密码/凭证/权限,不能落 Cache Storage(登出也无法保证清除)
+            urlPattern: ({ url }) =>
+              url.pathname.startsWith('/api/') &&
+              !/^\/api\/(vault|auth|ops|profile)(\/|$)/.test(url.pathname),
             handler: 'NetworkFirst',
-            options: { cacheName: 'api-cache' },
+            options: {
+              cacheName: 'api-cache',
+              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
           },
         ],
       },

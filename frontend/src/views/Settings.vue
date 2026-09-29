@@ -681,7 +681,7 @@
             <div class="section-label">{{ $t('wallpaper.settingsTitle') }}</div>
             <p class="share-tip">{{ $t('wallpaper.settingsHint') }}</p>
             <!-- 令牌宽度占满整行(EP 全局 el-input 宽度 100%),两个动作用页面通用 .form-footer 右对齐 -->
-            <el-input :model-value="userStore.refreshToken" readonly
+            <el-input :model-value="wallpaperToken" readonly
                       :placeholder="$t('wallpaper.tokenEmpty')" :aria-label="$t('wallpaper.tokenLabel')" />
             <div class="form-footer">
               <el-button type="primary" @click="copyWallpaperToken">{{ $t('wallpaper.copyToken') }}</el-button>
@@ -1064,11 +1064,15 @@ const copyShare = async () => {
   }
 }
 
-// 壁纸令牌:桌面壁纸(WE)环境填不了账号密码,登录改由壁纸页用 refresh token 调 /auth/refresh 换会话。
-// 后端 refresh 不拉黑旧 refresh token(可重复使用),故这里复制的令牌与浏览器自身会话互不干扰,
-// 两条链各自滑动续期;令牌失效(7 天过期/改密码)后回来重新复制一次即可。
+// 壁纸令牌:桌面壁纸(WE)环境填不了账号密码,登录改由壁纸页用令牌调 /auth/refresh 换会话。
+// 令牌由后端单独签发(与浏览器会话的 refresh token 区分:后者轮换后即作废,壁纸令牌可长期滑动续期),
+// 故这里复制的令牌与浏览器自身会话互不干扰;令牌失效(过期)后回来重新复制一次即可。
+const wallpaperToken = ref('')
+const loadWallpaperToken = async () => {
+  try { wallpaperToken.value = (await authApi.wallpaperToken()).refreshToken || '' } catch (e) { wallpaperToken.value = '' }
+}
 const copyWallpaperToken = async () => {
-  const tk = userStore.refreshToken
+  const tk = wallpaperToken.value
   if (!tk) return ElMessage.warning(t('wallpaper.tokenEmpty'))
   try {
     await navigator.clipboard.writeText(tk)
@@ -1574,6 +1578,7 @@ const removeMediaConfig = async () => {
 onMounted(() => {
   load()
   loadMediaConfig()
+  loadWallpaperToken()
 })
 </script>
 

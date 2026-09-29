@@ -50,11 +50,22 @@ public class JwtUtils {
         return build(userId, username, null, null, refreshExpire, "REFRESH");
     }
 
+    /**
+     * 签发壁纸介质令牌(type=WALLPAPER):桌面壁纸(WE)无法输入账号密码,用它与普通刷新令牌区分——
+     * 普通刷新令牌轮换后即拉黑(单次有效),壁纸令牌不轮换拉黑,允许浏览器会话与多个壁纸实例各持一份、各自滑动续期。
+     */
+    public String generateWallpaperToken(Long userId, String username) {
+        return build(userId, username, null, null, refreshExpire, "WALLPAPER");
+    }
+
     /** 组装 JWT:type 区分 ACCESS/REFRESH,角色与家庭 ID 仅在访问令牌中携带 */
     private String build(Long userId, String username, String role, Long familyId, long expire, String type) {
         Date now = new Date();
         var builder = Jwts.builder()
                 .subject(String.valueOf(userId))
+                // jti 唯一化:同一秒内同用户重复签发(登录后立即刷新/切换家庭)不会得到字节相同的令牌,
+                // 否则轮换拉黑会与被签发的新令牌撞值,把有效会话误判成已拉黑
+                .id(java.util.UUID.randomUUID().toString())
                 .claim("username", username)
                 .claim("type", type);
         if (role != null) {

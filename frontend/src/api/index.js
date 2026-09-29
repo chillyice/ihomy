@@ -17,6 +17,7 @@ export const publicApi = {
 export const authApi = {
   captcha: () => request.get('/auth/captcha'),
   families: () => request.get('/auth/families'),
+  wallpaperToken: () => request.post('/auth/wallpaper-token'),
 }
 
 // 首页模块:仪表盘 + 动态流

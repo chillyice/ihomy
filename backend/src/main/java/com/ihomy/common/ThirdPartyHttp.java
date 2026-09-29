@@ -3,6 +3,7 @@ package com.ihomy.common;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
@@ -81,16 +82,7 @@ public final class ThirdPartyHttp {
                     conn.getOutputStream().close();
                 }
                 status = conn.getResponseCode();
-                InputStream is = status >= 200 && status < 300 ? conn.getInputStream() : conn.getErrorStream();
-                respBody = "";
-                if (is != null) {
-                    if ("gzip".equalsIgnoreCase(conn.getContentEncoding())) {
-                        is = new GZIPInputStream(is);
-                    }
-                    respBody = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-                    is.close();
-                }
-                conn.disconnect();
+                respBody = readResponse(conn, status);
             } else {
                 HttpRequest.Builder rb = HttpRequest.newBuilder().uri(URI.create(url)).timeout(Duration.ofMillis(timeoutMs));
                 if (headers != null) {
@@ -118,6 +110,67 @@ public final class ThirdPartyHttp {
             log.error("!!! {} {} interrupted costMs={}", method, maskedUrl, System.currentTimeMillis() - start, e);
             throw new IOException("请求被中断", e);
         }
+    }
+
+    /** 流式请求体:直接把内容写入连接输出流 */
+    @FunctionalInterface
+    public interface BodyWriter {
+        void writeTo(OutputStream out) throws IOException;
+    }
+
+    /**
+     * 流式请求(仅标准方法,走 HttpURLConnection):请求体由 bodyWriter 直接写入连接输出流,
+     * 不再整包进 byte[]。用于大文件(音频/视频)转发,避免并发上传把整包压进堆。
+     * contentLength 为 -1 时分块传输。GET 等无体方法请用 {@link #request}。
+     */
+    public static Resp requestStreaming(String service, String method, String url, Map<String, String> headers,
+                                        long contentLength, BodyWriter bodyWriter, int timeoutMs) throws IOException {
+        var log = Loggers.thirdParty(service);
+        String maskedUrl = maskUrl(url);
+        long start = System.currentTimeMillis();
+        log.info(">>> {} {} headers={} bodyLen={}", method, maskedUrl, describeHeaders(headers), contentLength);
+        try {
+            URL u = URI.create(url).toURL();
+            HttpURLConnection conn = (HttpURLConnection) u.openConnection();
+            conn.setRequestMethod(method);
+            conn.setConnectTimeout(timeoutMs);
+            conn.setReadTimeout(timeoutMs);
+            if (headers != null) {
+                headers.forEach(conn::setRequestProperty);
+            }
+            conn.setDoOutput(true);
+            if (contentLength >= 0) {
+                conn.setFixedLengthStreamingMode(contentLength);
+            } else {
+                conn.setChunkedStreamingMode(8192);
+            }
+            try (OutputStream os = conn.getOutputStream()) {
+                bodyWriter.writeTo(os);
+            }
+            int status = conn.getResponseCode();
+            String respBody = readResponse(conn, status);
+            log.info("<<< {} {} status={} costMs={} body={}", method, maskedUrl, status,
+                    System.currentTimeMillis() - start, truncate(respBody));
+            return new Resp(status, respBody);
+        } catch (IOException e) {
+            log.error("!!! {} {} failed costMs={}", method, maskedUrl, System.currentTimeMillis() - start, e);
+            throw e;
+        }
+    }
+
+    /** 读取 HttpURLConnection 响应体(自动 gunzip,非 2xx 读错误流),并断开连接 */
+    private static String readResponse(HttpURLConnection conn, int status) throws IOException {
+        InputStream is = status >= 200 && status < 300 ? conn.getInputStream() : conn.getErrorStream();
+        String respBody = "";
+        if (is != null) {
+            if ("gzip".equalsIgnoreCase(conn.getContentEncoding())) {
+                is = new GZIPInputStream(is);
+            }
+            respBody = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            is.close();
+        }
+        conn.disconnect();
+        return respBody;
     }
 
     /** JDK HttpURLConnection 仅支持这些标准方法 */

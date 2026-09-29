@@ -25,10 +25,10 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Build backend
+      - name: Build backend (含单元测试)
         working-directory: backend
-        # 用 sh 调用:mvnw 在 git 里无执行位(Windows 仓库惯例)
-        run: sh ./mvnw -B clean package -DskipTests
+        # 用 sh 调用:mvnw 在 git 里无执行位(Windows 仓库惯例);测试为纯逻辑(不起 Spring),可离线跑
+        run: sh ./mvnw -B clean package
 
       - name: Set up Node 20
         uses: actions/setup-node@v4
@@ -41,6 +41,7 @@ jobs:
         working-directory: frontend
         run: |
           npm ci
+          npm test
           npm run build
 
       - name: Start MySQL + Redis (docker compose)

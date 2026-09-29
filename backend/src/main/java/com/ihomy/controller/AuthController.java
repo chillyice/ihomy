@@ -53,11 +53,11 @@ public class AuthController {
         return Result.success(authService.register(dto));
     }
 
-    @Operation(summary = "登出")
-    @OperationLog(module = "AUTH", operationType = "LOGOUT", description = "用户登出")
+    @Operation(summary = "登出(同时吊销本次会话的刷新令牌)")
+    @OperationLog(module = "AUTH", operationType = "LOGOUT", description = "用户登出", saveArgs = false)
     @PostMapping("/logout")
-    public Result<Void> logout(HttpServletRequest request) {
-        authService.logout(request.getHeader("Authorization"));
+    public Result<Void> logout(HttpServletRequest request, @RequestBody(required = false) Map<String, String> body) {
+        authService.logout(request.getHeader("Authorization"), body == null ? null : body.get("refreshToken"));
         return Result.success();
     }
 
@@ -65,6 +65,15 @@ public class AuthController {
     @PostMapping("/refresh")
     public Result<Map<String, Object>> refresh(@RequestBody Map<String, String> body) {
         return Result.success(authService.refresh(body.get("refreshToken")));
+    }
+
+    @Operation(summary = "获取壁纸令牌(桌面壁纸专用)")
+    @OperationLog(module = "AUTH", operationType = "CREATE", description = "获取壁纸令牌", saveArgs = false)
+    @PostMapping("/wallpaper-token")
+    public Result<Map<String, String>> wallpaperToken() {
+        SysUser user = securityHelper.currentUser();
+        if (user == null) throw new BizException(ResultCode.UNAUTHORIZED);
+        return Result.success(authService.wallpaperToken(user));
     }
 
     @Operation(summary = "当前用户信息")

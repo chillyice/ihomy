@@ -1483,4 +1483,13 @@ UPDATE `sys_oss_component` SET `probe_type` = 'NEXTCLOUD_STATUS' WHERE `componen
 UPDATE `sys_oss_component` SET `probe_type` = 'JELLYFIN_INFO'    WHERE `component_type` = 'SERVICE' AND `package_ref` = 'jellyfin/jellyfin';
 UPDATE `sys_oss_component` SET `probe_type` = 'HA_CONFIG'        WHERE `component_type` = 'SERVICE' AND `package_ref` = 'home-assistant/core';
 
+-- ------------------------------------------------------------
+-- V9.110 补登测试依赖(2026-09-29):前后端自动化测试骨架引入的两个直接依赖
+--   Vitest(NPM,前端 utils 纯逻辑单测)/ spring-boot-starter-test(MAVEN,后端 JUnit5+AssertJ)
+--   uk_type_ref 幂等
+-- ------------------------------------------------------------
+INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`) VALUES
+('Vitest', 'NPM', 'vitest', '2.1.9', 'MIT', 'https://github.com/vitest-dev/vitest', '前端单元测试(utils 纯逻辑)', 'FULL'),
+('Spring Boot Test', 'MAVEN', 'org.springframework.boot:spring-boot-starter-test', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端单元测试(JUnit5/AssertJ)', 'FULL');
+
 

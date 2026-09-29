@@ -71,14 +71,28 @@ export const useUserStore = defineStore('user', {
       this.bgMusicVersion++
     },
     logout() {
-      // 通知后端登出(使其 refresh token 进入黑名单),再清空本地登录态
-      if (this.token) request.post('/auth/logout').catch(() => {})
+      // 通知后端登出(access 与本次会话的 refresh token 一并吊销),再清空本地登录态
+      if (this.token || this.refreshToken) request.post('/auth/logout', { refreshToken: this.refreshToken }).catch(() => {})
       this.token = ''
       this.refreshToken = ''
       this.userInfo = null
       localStorage.removeItem('token')
       localStorage.removeItem('refreshToken')
       localStorage.removeItem('userInfo')
+      // 清掉 Service Worker 缓存过的接口响应,避免登出后仍可离线读到上一账号的数据
+      if (typeof caches !== 'undefined') caches.delete('api-cache').catch(() => {})
     },
   },
 })
+
+// 多标签共享登录态:refresh token 每次续期即轮换(旧值作废),另一标签轮换后必须同步到本标签,
+// 否则本标签仍拿旧令牌续期会被判失效、把自己(乃至整个浏览器)登出。storage 事件只在其他标签发写时触发。
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key !== 'token' && e.key !== 'refreshToken' && e.key !== 'userInfo') return
+    const store = useUserStore()
+    store.token = localStorage.getItem('token') || ''
+    store.refreshToken = localStorage.getItem('refreshToken') || ''
+    try { store.userInfo = JSON.parse(localStorage.getItem('userInfo') || 'null') } catch { store.userInfo = null }
+  })
+}

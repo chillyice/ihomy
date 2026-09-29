@@ -105,6 +105,13 @@
             <artifactId>mp3agic</artifactId>
             <version>0.9.1</version>
         </dependency>
+
+        <!-- 单元测试(JUnit5 + AssertJ):仅纯逻辑测试,不起 Spring 上下文 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
