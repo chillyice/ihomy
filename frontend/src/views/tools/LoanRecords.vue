@@ -65,6 +65,9 @@
                 </div>
               </template>
             </template>
+            <div v-else-if="loadError" style="padding: 20px 0; text-align: center; color: var(--color-text-secondary)">
+              {{ $t('common.loadFailed') }} <el-button text size="small" @click="load">{{ $t('common.retry') }}</el-button>
+            </div>
             <el-empty v-else-if="!loading" :description="$t('tools.loan.rec.emptyHint')" :image-size="72" />
             <p v-if="!canManage && loans.length" class="lc-hint">{{ $t('tools.loan.rec.viewOnlyHint') }}</p>
           </div>
@@ -505,7 +508,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Close, Lock } from '@element-plus/icons-vue'
@@ -540,11 +543,23 @@ const LEDGER_ERROR_KEYS = {
 }
 
 const loading = ref(false)
+const loadError = ref(false)
 const loans = ref([])
 const selectedKey = ref('') // 'g:<组名>' 看合计,或 '<贷款id>' 看单笔
 const detailMode = ref('month')
 const page = ref(1)
 const pageSize = ref(12)
+
+// 已还期数/还款进度依赖「今天」;定时 + 回到页面可见时刷新 now,跨还款日自动重算
+const now = ref(new Date())
+const tickNow = () => { now.value = new Date() }
+const nowTimer = setInterval(tickNow, 60000)
+const onVisibility = () => { if (!document.hidden) tickNow() }
+document.addEventListener('visibilitychange', onVisibility)
+onBeforeUnmount(() => {
+  clearInterval(nowTimer)
+  document.removeEventListener('visibilitychange', onVisibility)
+})
 
 const canManage = computed(() => userStore.isOwner || userStore.hasPerm('loan:manage'))
 
@@ -570,7 +585,7 @@ const engineInput = (loan) => ({
 /** 卡片/详情用的逐笔视图:流水 + 进度快照(列表量级小,直接全算) */
 const cardViews = computed(() => loans.value.map((loan) => {
   const ledger = loanLedger(engineInput(loan))
-  const paidPeriods = loan.firstPayDate ? periodsPaid(loan.firstPayDate) : 0
+  const paidPeriods = loan.firstPayDate ? periodsPaid(loan.firstPayDate, now.value) : 0
   const snapshot = ledgerSnapshot(ledger, paidPeriods)
   return { ...loan, ledger, snapshot, paidPeriods, valid: ledger.valid }
 }))
@@ -697,10 +712,13 @@ const segmentRows = computed(() => (current.value && current.value.ledger.segmen
 
 const load = async () => {
   loading.value = true
+  loadError.value = false
   try {
     loans.value = await loanApi.list()
     const keys = new Set(listRows.value.map((r) => (r.type === 'group' ? r.view.id : String(r.view.id))))
     if (!keys.has(selectedKey.value)) selectedKey.value = firstListKey()
+  } catch (e) {
+    loadError.value = true
   } finally {
     loading.value = false
   }

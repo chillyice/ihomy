@@ -48,6 +48,9 @@
               </div>
             </div>
           </div>
+          <div v-else-if="loadError" style="padding: 20px 0; text-align: center; color: var(--color-text-secondary)">
+            {{ $t('common.loadFailed') }} <el-button text size="small" @click="loadProducts">{{ $t('common.retry') }}</el-button>
+          </div>
           <el-empty v-else :description="$t('points.noProducts')" />
         </div>
       </el-tab-pane>
@@ -128,6 +131,7 @@ const userStore = useUserStore()
 const stats = ref({})
 const checkingIn = ref(false)
 const loading = ref(false)
+const loadError = ref(false)
 const loadingOrders = ref(false)
 const products = ref([])
 const orders = ref([])
@@ -146,8 +150,11 @@ const loadStats = async () => {
 
 const loadProducts = async () => {
   loading.value = true
+  loadError.value = false
   try {
     products.value = await pointsApi.products()
+  } catch (e) {
+    loadError.value = true
   } finally {
     loading.value = false
   }

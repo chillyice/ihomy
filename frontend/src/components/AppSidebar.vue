@@ -4,8 +4,8 @@
   <aside class="app-sidebar" :class="{ collapsed, 'dragging-edge': widgetDragging && !crossedEdge }">
     <!-- 顶部:家庭名 + 折叠按钮 -->
     <div class="sidebar-head">
-      <span class="sidebar-brand" @click="$router.push('/')">{{ familyName || 'ihomy' }}</span>
-      <span class="sidebar-toggle" @click="collapsed = !collapsed" :title="collapsed ? '展开' : '收起'">
+      <span class="sidebar-brand" v-a11y-click @click="$router.push('/')">{{ familyName || 'ihomy' }}</span>
+      <span class="sidebar-toggle" v-a11y-click @click="collapsed = !collapsed" :title="collapsed ? $t('common.expand') : $t('common.collapse')">
         <el-icon><Fold v-if="!collapsed" /><Expand v-else /></el-icon>
       </span>
     </div>
@@ -23,6 +23,7 @@
             class="nav-item"
             :class="{ active: isActive(m.path, route), 'widget-src': appStore.homeEditMode && widgetType(m.code) }"
             :title="m.title"
+            v-a11y-click
             @click="appStore.homeEditMode ? null : navigate(m.path)"
             @mousedown="appStore.homeEditMode && widgetType(m.code) && startWidgetDrag(widgetType(m.code), $event)"
           >
@@ -42,24 +43,24 @@
     <!-- 底部:主题/台灯/语言/用户 -->
     <div class="sidebar-foot">
       <div class="foot-row">
-        <span class="foot-btn" :title="themeStore.isDusk ? $t('theme.dawn') : $t('theme.dusk')" @click="onTheme">
+        <span class="foot-btn" v-a11y-click :title="themeStore.isDusk ? $t('theme.dawn') : $t('theme.dusk')" @click="onTheme">
           <el-icon><Sunny v-if="!themeStore.isDusk" /><Moon v-else /></el-icon>
         </span>
         <!-- 台灯三态开关:auto(自动)/on(常开)/off(关闭);关灯时冷蓝微光便于定位 -->
-        <span class="foot-btn" :class="{ 'lamp-on': lampMode !== 'off', 'lamp-off': lampMode === 'off' }" :title="'台灯:' + (lampMode === 'auto' ? '自动' : lampMode === 'on' ? '常开' : '关闭')" @click="toggleLamp">
+        <span class="foot-btn" v-a11y-click :class="{ 'lamp-on': lampMode !== 'off', 'lamp-off': lampMode === 'off' }" :title="t('sidebar.lamp') + ': ' + (lampMode === 'auto' ? t('sidebar.lampAuto') : lampMode === 'on' ? t('sidebar.lampOn') : t('sidebar.lampOff'))" @click="toggleLamp">
           {{ lampMode === 'auto' ? '🌑' : lampMode === 'on' ? '💡' : '⬛' }}
         </span>
         <!-- 光影效果开关 -->
-        <span class="foot-btn" :class="{ 'lamp-on': sunLight?.shadowEnabled?.value }" :title="sunLight?.shadowEnabled?.value ? '光影效果:开' : '光影效果:关'" @click="toggleLightEffect">
+        <span class="foot-btn" v-a11y-click :class="{ 'lamp-on': sunLight?.shadowEnabled?.value }" :title="sunLight?.shadowEnabled?.value ? t('sidebar.lightEffectOn') : t('sidebar.lightEffectOff')" @click="toggleLightEffect">
           {{ sunLight?.shadowEnabled?.value ? '☀' : '☁' }}
         </span>
-        <span class="foot-btn" title="语言" @click="onLang">
+        <span class="foot-btn" v-a11y-click :title="$t('sidebar.language')" @click="onLang">
           {{ locale === 'en' ? 'EN' : '中' }}
         </span>
         <el-popover v-if="userStore.isLoggedIn" placement="top-end" :width="340" trigger="click" @show="loadNotifications">
           <template #reference>
             <el-badge :value="unreadCount" :hidden="!unreadCount" class="foot-badge">
-              <span class="foot-btn" title="消息"><el-icon><Bell /></el-icon></span>
+              <span class="foot-btn" v-a11y-click :title="$t('sidebar.message')"><el-icon><Bell /></el-icon></span>
             </el-badge>
           </template>
           <div class="notify-panel">
@@ -86,9 +87,9 @@
       </div>
       <div class="foot-user-row">
         <el-dropdown v-if="userStore.isLoggedIn" trigger="click" @command="onUserCommand" placement="top-start" popper-class="sidebar-user-popper" @visible-change="onDropdownVisible">
-          <span class="foot-user">
+          <span class="foot-user" v-a11y-click>
             <el-avatar :size="28" :src="userInfo?.avatar">{{ (userInfo?.nickname || 'U').charAt(0) }}</el-avatar>
-            <span v-if="!collapsed" class="user-name">{{ userInfo?.nickname || '我' }}</span>
+            <span v-if="!collapsed" class="user-name">{{ userInfo?.nickname || t('sidebar.me') }}</span>
           </span>
         <template #dropdown>
           <el-dropdown-menu>
@@ -116,8 +117,8 @@
           </el-dropdown-menu>
         </template>
       </el-dropdown>
-        <span v-else class="foot-btn" @click="$router.push('/login')">{{ $t('home.loginRegister') }}</span>
-        <span v-if="userStore.isLoggedIn && route.path === '/home'" class="edit-mode-btn" :class="{ active: appStore.homeEditMode }" :title="appStore.homeEditMode ? '退出编辑' : '编辑首页'" @click="appStore.toggleHomeEditMode()">
+        <span v-else class="foot-btn" v-a11y-click @click="$router.push('/login')">{{ $t('home.loginRegister') }}</span>
+        <span v-if="userStore.isLoggedIn && route.path === '/home'" class="edit-mode-btn" v-a11y-click :class="{ active: appStore.homeEditMode }" :title="appStore.homeEditMode ? t('sidebar.exitEdit') : t('sidebar.editHome')" @click="appStore.toggleHomeEditMode()">
           <!-- 四个圆角方块(2×2 网格):桌面布局编辑语义;内联 SVG 替代 EP 图标(性能规范) -->
           <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
             <rect x="3" y="3" width="8" height="8" rx="2" />
@@ -131,10 +132,10 @@
           <template #content>
             <div v-for="w in sidebarWarnings" :key="w.id" class="mw-warn-row">
               <span class="mw-warn-dot" :style="{ background: warnLevelColor(w.level) }"></span>
-              <span>{{ w.typeName }} {{ w.level }}预警 {{ (w.startTime || '').slice(5, 16) }} ~ {{ (w.endTime || '').slice(5, 16) }}</span>
+              <span>{{ w.typeName }} {{ w.level }}{{ $t('sidebar.warning') }} {{ (w.startTime || '').slice(5, 16) }} ~ {{ (w.endTime || '').slice(5, 16) }}</span>
             </div>
           </template>
-          <span class="mini-weather" :title="sidebarWeather.city" @click="$router.push('/weather')">
+          <span class="mini-weather" v-a11y-click :title="sidebarWeather.city" @click="$router.push('/weather')">
             <i :class="'qi-' + sidebarWeather.iconCode" class="mw-icon"></i>
             <span v-if="!collapsed" class="mw-temp">{{ sidebarWeather.temp }}°</span>
             <span v-if="topWarningBadge" class="mw-warn-badge" :style="{ color: warnLevelColor(topWarningBadge.level) }">
@@ -210,7 +211,7 @@ const navigate = (path) => {
 // 主题切换(晨/暮)
 const onTheme = () => {
   themeStore.toggleMode()
-  ElMessage.info({ message: '已切换到手动主题,日出日落自动切换已暂停(可在设置中恢复)', duration: 4000 })
+  ElMessage.info({ message: t('sidebar.manualTheme'), duration: 4000 })
 }
 
 // 语言切换
@@ -265,8 +266,8 @@ const notifyTime = (d) => {
   if (!d) return ''
   const date = new Date(d)
   const diff = Date.now() - date.getTime()
-  if (diff < 3600000) return Math.max(1, Math.floor(diff / 60000)) + ' 分钟前'
-  if (diff < 86400000) return Math.floor(diff / 3600000) + ' 小时前'
+  if (diff < 3600000) return t('sidebar.minutesAgo', { n: Math.max(1, Math.floor(diff / 60000)) })
+  if (diff < 86400000) return t('sidebar.hoursAgo', { n: Math.floor(diff / 3600000) })
   return date.toLocaleDateString(locale.value === 'en' ? 'en-US' : 'zh-CN')
 }
 

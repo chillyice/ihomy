@@ -79,7 +79,7 @@
               <div class="step-num">{{ i + 1 }}</div>
               <div class="step-body glass">
                 <p v-if="st.content" class="step-content">{{ st.content }}</p>
-                <img v-if="st.image_url" :src="st.image_url" class="step-media step-image" loading="lazy" />
+                <img v-if="st.image_url" :src="st.image_url" class="step-media step-image" loading="lazy" alt="" />
                 <video v-if="st.video_url" :src="st.video_url" class="step-media step-video" controls />
               </div>
             </div>

@@ -8,6 +8,7 @@
           :key="f.key"
           class="filter-chip"
           :class="{ active: activeFilter === f.key }"
+          v-a11y-click
           @click="activeFilter = f.key"
         >{{ f.label }}</span>
       </div>
@@ -16,7 +17,7 @@
     <!-- 动态流 -->
     <div class="feed-list" v-loading="loading">
       <template v-if="filteredFeeds.length">
-        <div v-for="(f, i) in filteredFeeds" :key="i" class="feed-card" @click="goFeed(f)">
+        <div v-for="(f, i) in filteredFeeds" :key="i" class="feed-card" v-a11y-click @click="goFeed(f)">
           <div class="feed-card-head">
             <el-avatar :size="32" :src="f.authorAvatar">{{ (f.authorName || 'U').charAt(0) }}</el-avatar>
             <span class="feed-author">{{ f.authorName || $t('feed.authorFallback') }}</span>
@@ -42,54 +43,31 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { publicApi, homeApi } from '@/api'
+import { feedTypeLabel as feedTypeLabelOf, feedSummary as feedSummaryOf, formatFeedTime } from '@/utils/feed'
 
 const router = useRouter()
 const userStore = useUserStore()
+const { t } = useI18n()
 const feeds = ref([])
 const loading = ref(true)
 const activeFilter = ref('all')
 
-const filters = [
-  { key: 'all', label: '全部' },
-  { key: 'blog', label: '博客' },
-  { key: 'diary', label: '日记' },
-  { key: 'photo', label: '照片' },
-  { key: 'video', label: '放映厅' },
-  { key: 'wish', label: '愿望' },
-  { key: 'task', label: '任务' },
-  { key: 'recipe', label: '菜谱' },
-  { key: 'book', label: '书架' },
-]
+const FILTER_KEYS = ['all', 'blog', 'diary', 'photo', 'video', 'wish', 'task', 'recipe', 'book']
+const filters = computed(() => FILTER_KEYS.map((k) => ({ key: k, label: k === 'all' ? t('feed.all') : t('feed.type.' + k) })))
 
 const filteredFeeds = computed(() => {
   if (activeFilter.value === 'all') return feeds.value
   return feeds.value.filter(f => f.type === activeFilter.value)
 })
 
-const TYPE_LABELS = { blog: '博客', diary: '日记', photo: '照片', video: '放映厅', wish: '愿望', task: '任务', recipe: '菜谱', book: '书架' }
-const feedTypeLabel = (type) => TYPE_LABELS[type] || ''
+// 类型标签/摘要/相对时间走共享 utils/feed.js(与首页、暖居首页同口径;移动端历史摘要截断 60)
+const feedTypeLabel = (type) => feedTypeLabelOf(t, type)
 const feedCover = (f) => f.coverImage || (Array.isArray(f.urls) && f.urls.length ? f.urls[0] : '')
-const feedSummary = (f) => {
-  if (f.type === 'blog') return f.title || ''
-  if (f.type === 'diary') return (f.content || '').slice(0, 60)
-  if (f.type === 'photo') return `${f.count || 0} 张照片`
-  if (f.type === 'video') return `上传了影片:${f.title || ''}`
-  if (f.type === 'wish') return f.status === 'ACHIEVED' ? `实现了愿望:${f.title || ''}` : `许下愿望:${f.title || ''}`
-  if (f.type === 'task') return `发布任务:${f.title || ''}`
-  if (f.type === 'recipe') return `分享菜谱:${f.title || ''}`
-  if (f.type === 'book') return `上架图书:《${f.title || ''}》`
-  return ''
-}
-const formatTime = (d) => {
-  if (!d) return ''
-  const date = new Date(d)
-  const diff = (Date.now() - date.getTime()) / 1000
-  if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前'
-  if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前'
-  return date.toLocaleDateString('zh-CN')
-}
+const feedSummary = (f) => feedSummaryOf(t, f, 60)
+const formatTime = (d) => formatFeedTime(t, d)
 const FEED_ROUTES = { diary: '/diary', photo: '/album', video: '/cinema', wish: '/wish', task: '/task', recipe: '/kitchen', book: '/library' }
 const goFeed = (f) => {
   if (f.type === 'blog' && f.id) router.push(`/blog/${f.id}`)

@@ -1,5 +1,23 @@
 // 户型图几何工具(画布渲染与页面执行共享)
 
+// 默认楼层:有 1 楼选 1 楼;没有 1 楼(纯地下/跳层编号)选最高层。
+// floorPlans 为 JSON 字符串(键为楼层,floorOrder 为排序元数据);
+// extraFloors 为额外楼层来源(如房间 floor,可能不在楼层配置里)。
+// 与 Item 页 defaultFloorOf、首页 defaultFloorOfPreview、暖居 defaultFloorOfHouse 同口径。
+export const pickDefaultFloor = (floorPlans, extraFloors = []) => {
+  const set = new Set()
+  if (floorPlans) {
+    try {
+      const fp = JSON.parse(floorPlans)
+      Object.keys(fp).forEach((k) => { if (k !== 'floorOrder') set.add(Number(k)) })
+    } catch {}
+  }
+  for (const f of extraFloors) if (f != null) set.add(Number(f))
+  if (set.has(1)) return 1
+  if (set.size) return Math.max(...set)
+  return 1
+}
+
 export const samePt = (p, q, eps = 0.5) => Math.hypot(p.x - q.x, p.y - q.y) < eps
 
 export const pointInPoly = (p, poly) => {

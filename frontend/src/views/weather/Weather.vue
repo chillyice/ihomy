@@ -268,7 +268,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, inject } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import { aqiColor, moonIcon, warnLevelColor } from '@/utils/dict'
@@ -284,10 +284,14 @@ const warnings = computed(() => detail.value?.warning || [])
 const todayHigh = computed(() => detail.value?.daily?.[0]?.tempMax ?? '—')
 const todayLow = computed(() => detail.value?.daily?.[0]?.tempMin ?? '—')
 const minutelySummary = computed(() => detail.value?.minutely?.summary || '')
-const todayLabel = computed(() => {
+// 今日日期标签:跨零点自动刷新(每分钟检查一次)
+const fmtToday = () => {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-})
+}
+const todayLabel = ref(fmtToday())
+const todayTimer = setInterval(() => { todayLabel.value = fmtToday() }, 60000)
+onBeforeUnmount(() => clearInterval(todayTimer))
 const nf = (key) => detail.value?.nowFull?.[key] ?? '—'
 const fmtHour = (s) => (s || '').slice(11, 16)
 const fmtDate = (s) => {

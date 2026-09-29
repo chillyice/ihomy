@@ -98,6 +98,9 @@
         </div>
       </div>
 
+      <div v-else-if="loadError" style="padding: 20px 0; text-align: center; color: var(--color-text-secondary)">
+        {{ $t('common.loadFailed') }} <el-button text size="small" @click="load">{{ $t('common.retry') }}</el-button>
+      </div>
       <el-empty v-else-if="!loading && !list.length" :description="$t('vault.emptyTitle')">
         <div class="vault-empty-hint">{{ $t('vault.emptyHint') }}</div>
       </el-empty>
@@ -235,6 +238,7 @@ const CLIPBOARD_CLEAR_MS = 10000
 const REVEAL_HIDE_MS = 30000
 
 const loading = ref(false)
+const loadError = ref(false)
 const saving = ref(false)
 const list = ref([])
 const keyword = ref('')
@@ -268,8 +272,11 @@ const strengthHintText = computed(() =>
 
 const load = async () => {
   loading.value = true
+  loadError.value = false
   try {
     list.value = await vaultApi.list()
+  } catch (e) {
+    loadError.value = true
   } finally {
     loading.value = false
   }

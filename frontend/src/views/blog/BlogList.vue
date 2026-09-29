@@ -112,7 +112,7 @@
       <!-- 博客列表 -->
       <div v-loading="loading" class="blog-main">
         <div v-for="b in filteredList" :key="b.id" class="blog-item card" @click="router.push(`/blog/${b.id}`)">
-          <img v-if="b.coverImage" :src="thumbUrl(b.coverImage)" class="blog-cover" />
+          <img v-if="b.coverImage" :src="thumbUrl(b.coverImage)" class="blog-cover" :alt="b.title || ''" />
           <div class="blog-info">
             <!-- 第一行:标题+草稿标记 -->
             <div class="blog-title-row">

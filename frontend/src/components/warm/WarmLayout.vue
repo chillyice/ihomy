@@ -8,14 +8,14 @@
     <div class="gc-wrap">
       <!-- 顶栏:家庭名 + 返回按钮 + 工具栏(滚动时胞吐进来) + 晨/暮分段开关 -->
       <div class="gc-topbar">
-        <div class="gc-brand" title="返回首页" @click="navigate('/')">
+        <div class="gc-brand" :title="$t('warm.backHome')" @click="navigate('/')">
           <div class="gc-logo">{{ familyInitial }}</div>
           <div>
             <h1 class="gc-title">{{ familyName || 'ihomy' }}</h1>
-            <p class="gc-sub">{{ familyDescription || '一扇会呼吸的窗' }}</p>
+            <p class="gc-sub">{{ familyDescription || $t('warm.tagline') }}</p>
           </div>
         </div>
-        <button v-if="canBack" class="gc-back" title="返回上一页" @click="goBack">
+        <button v-if="canBack" class="gc-back" :title="$t('warm.backPrev')" @click="goBack">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
         </button>
         <div class="gc-pin" :class="{ on: scrolled }"></div>
@@ -34,10 +34,10 @@
           <!-- 侧栏:按分类分组,组头可折叠,默认只展开内容组 -->
           <aside class="gc-side">
             <!-- 用户信息(固定,不随侧栏滚动):头像 + 昵称 + 所在家庭,点击进设置;未登录显示登录/注册 -->
-            <div class="gc-user" :title="userStore.isLoggedIn ? '个人设置' : $t('home.loginRegister')" @click="userStore.isLoggedIn ? navigate('/settings') : navigate('/login')">
+            <div class="gc-user" :title="userStore.isLoggedIn ? $t('warm.personalSettings') : $t('home.loginRegister')" @click="userStore.isLoggedIn ? navigate('/settings') : navigate('/login')">
               <el-avatar :size="38" :src="userInfo?.avatar">{{ userInitial }}</el-avatar>
               <div class="gc-user-meta">
-                <div class="gc-user-name">{{ userStore.isLoggedIn ? (userInfo?.nickname || '我') : $t('home.loginRegister') }}</div>
+                <div class="gc-user-name">{{ userStore.isLoggedIn ? (userInfo?.nickname || $t('warm.me')) : $t('home.loginRegister') }}</div>
                 <div class="gc-user-fam">{{ familyName || 'ihomy' }}</div>
               </div>
             </div>
@@ -57,7 +57,7 @@
                     @mousedown="onNavMousedown(m, $event)"
                   >
                     <span class="gc-dot"></span>{{ m.title }}
-                    <span v-if="canDragNav && m.draggable && m.added" class="gc-added-badge">已在首页</span>
+                    <span v-if="canDragNav && m.draggable && m.added" class="gc-added-badge">{{ $t('warm.addedBadge') }}</span>
                   </div>
                 </div>
               </div>
@@ -90,6 +90,7 @@
 <script setup>
 import { computed, inject, watch, ref, onMounted, onBeforeUnmount, provide, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useThemeStore } from '@/stores/theme'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
@@ -103,6 +104,7 @@ import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 const route = useRoute()
+const { t } = useI18n()
 const themeStore = useThemeStore()
 const appStore = useAppStore()
 const userStore = useUserStore()
@@ -116,7 +118,7 @@ const familyInitial = computed(() => (familyName.value || 'ihomy').charAt(0))
 
 // 当前登录用户信息(侧栏顶部 .user 位置:头像 + 昵称 + 所在家庭)
 const userInfo = computed(() => userStore.userInfo)
-const userInitial = computed(() => (userInfo.value?.nickname || '我').charAt(0))
+const userInitial = computed(() => (userInfo.value?.nickname || t('warm.me')).charAt(0))
 
 // 天气→AI 生图的全屏氛围背景(「活窗」放大到整屏,最底层)
 const { weatherBg, load: loadWeatherBg } = useWeatherBg()
@@ -169,7 +171,7 @@ const canDragNav = computed(() => appStore.homeEditMode && route.path === '/home
 const onNavClick = (m) => { if (canDragNav.value && m.draggable) return; navigate(m.path) }
 const onNavMousedown = (m, e) => {
   if (!canDragNav.value || !m.draggable) return
-  if (m.added) { ElMessage.info('该组件已在首页'); return } // 已拖入冲突:提示,不启动拖拽
+  if (m.added) { ElMessage.info(t('warm.alreadyAdded')); return } // 已拖入冲突:提示,不启动拖拽
   startDrag(m.code, m.title, e)
 }
 

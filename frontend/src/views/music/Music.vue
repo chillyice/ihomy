@@ -49,7 +49,7 @@
             <div v-if="filteredTracks.length" class="music-grid">
               <div v-for="t in filteredTracks" :key="t.id" class="music-card card" :class="{ selected: selectMode && selectedIds.includes(t.id) }">
                 <div class="music-cover" @click="selectMode ? toggleTrack(t.id) : play(t)">
-                  <img v-if="t.coverUrl" :src="t.coverUrl" class="cover-img" />
+                  <img v-if="t.coverUrl" :src="t.coverUrl" class="cover-img" alt="" />
                   <div v-else class="cover-placeholder"><span>🎵</span></div>
                   <div class="play-btn-overlay"><div class="play-btn-circle">▶</div></div>
                   <span v-if="t.sourceDeviceName && !selectMode" class="music-source">
@@ -94,7 +94,7 @@
             <div v-if="albums.length" class="album-grid">
               <div v-for="al in albums" :key="al.album" class="album-card card" :class="{ selected: selectMode && selectedAlbums.includes(al.album) }">
                 <div class="album-cover" @click="selectMode ? toggleAlbum(al.album) : playAlbum(al)">
-                  <img v-if="al.coverUrl" :src="al.coverUrl" class="cover-img" />
+                  <img v-if="al.coverUrl" :src="al.coverUrl" class="cover-img" alt="" />
                   <div v-else class="cover-placeholder"><span>💿</span></div>
                   <div class="play-btn-overlay"><div class="play-btn-circle">▶</div></div>
                   <span v-if="selectMode" class="pick-badge" :class="{ on: selectedAlbums.includes(al.album) }">
@@ -133,7 +133,7 @@
             <div v-if="playlists.length" class="playlist-grid">
               <div v-for="p in playlists" :key="p.id" class="pl-card card">
                 <div class="pl-cover" @click="viewPlaylist(p)">
-                  <img v-if="p.coverUrl" :src="p.coverUrl" class="cover-img" />
+                  <img v-if="p.coverUrl" :src="p.coverUrl" class="cover-img" alt="" />
                   <div v-else class="cover-placeholder pl-cover-placeholder">
                     <svg class="pl-cover-icon" viewBox="0 0 48 48" fill="none">
                       <rect x="8" y="12" width="32" height="24" rx="3" fill="#c9b8a0" opacity="0.5"/>
@@ -220,7 +220,7 @@
       <div v-loading="plDetail.loading">
         <div v-if="plDetail.tracks.length" class="pl-detail-list">
           <div v-for="(t, i) in plDetail.tracks" :key="t.id || i" class="pl-detail-item">
-            <img v-if="t.coverUrl" :src="t.coverUrl" class="pl-detail-cover" />
+            <img v-if="t.coverUrl" :src="t.coverUrl" class="pl-detail-cover" alt="" />
             <div v-else class="pl-detail-cover placeholder">🎵</div>
             <div class="pl-detail-info">
               <div class="pl-detail-title">{{ t.title || $t('music.unknownTrack') }}</div>
@@ -247,7 +247,7 @@
               <div v-for="t in addTracksDialog.candidates" :key="t.id" class="add-track-item">
                 <el-checkbox :value="t.id">
                   <div class="add-track-row">
-                    <img v-if="t.coverUrl" :src="t.coverUrl" class="add-track-cover" />
+                    <img v-if="t.coverUrl" :src="t.coverUrl" class="add-track-cover" alt="" />
                     <div v-else class="add-track-cover placeholder">
                       <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><path d="M9 18V5l12-2v13" stroke="#b8a890" stroke-width="1.5" stroke-linecap="round"/><circle cx="6" cy="18" r="3" stroke="#b8a890" stroke-width="1.5"/><circle cx="18" cy="16" r="3" stroke="#b8a890" stroke-width="1.5"/></svg>
                     </div>
@@ -268,7 +268,7 @@
             <div v-for="al in addTracksDialog.albumCandidates" :key="al.album" class="add-album-item">
               <div class="add-album-info" @click="toggleAlbumInDialog(al)">
                 <el-checkbox :model-value="addTracksDialog.selectedAlbums.includes(al.album)" />
-                <img v-if="al.coverUrl" :src="al.coverUrl" class="add-album-cover" />
+                <img v-if="al.coverUrl" :src="al.coverUrl" class="add-album-cover" alt="" />
                 <div v-else class="add-album-cover placeholder">
                   <svg viewBox="0 0 24 24" fill="none" width="20" height="20"><circle cx="12" cy="12" r="10" stroke="#b8a890" stroke-width="1.5"/><circle cx="12" cy="12" r="3" stroke="#b8a890" stroke-width="1.5"/></svg>
                 </div>
@@ -291,7 +291,7 @@
     <!-- 播放器弹窗 -->
     <el-dialog v-model="player.visible" append-to-body :title="player.track?.title || $t('music.playAction')" class="dialog-md" destroy-on-close>
       <div v-if="player.track" class="player-wrap">
-        <img v-if="player.track.coverUrl" :src="player.track.coverUrl" class="player-cover" />
+        <img v-if="player.track.coverUrl" :src="player.track.coverUrl" class="player-cover" alt="" />
         <div v-if="player.track.artist" class="player-artist">{{ player.track.artist }}</div>
         <audio v-if="player.url" :src="player.url" controls autoplay class="player-audio" />
       </div>

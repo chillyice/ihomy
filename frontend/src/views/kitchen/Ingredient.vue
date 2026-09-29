@@ -61,7 +61,7 @@
         <!-- 图片上传 -->
         <el-form-item :label="$t('kitchen.ingredientImage')">
           <el-upload :show-file-list="false" :http-request="onUpload" accept="image/*">
-            <img v-if="form.image_url" :src="form.image_url" class="image-preview" />
+            <img v-if="form.image_url" :src="form.image_url" class="image-preview" :alt="form.name || ''" />
             <el-button v-else><el-icon><Plus /></el-icon> {{ $t('kitchen.ingredientImage') }}</el-button>
           </el-upload>
         </el-form-item>

@@ -2,7 +2,7 @@
 <template>
   <el-dialog v-model="visible" append-to-body :title="title" width="500px" :close-on-click-modal="false" @closed="onClosed">
     <div v-if="imgSrc" class="cropper-box" ref="boxRef" @wheel.prevent="onWheel">
-      <img :src="imgSrc" class="cropper-img" :style="{ width: imgW + 'px', height: imgH + 'px' }" @load="onImgLoad" ref="imgRef" />
+      <img :src="imgSrc" class="cropper-img" alt="" :style="{ width: imgW + 'px', height: imgH + 'px' }" @load="onImgLoad" ref="imgRef" />
       <!-- 遮罩 + 正方形选区 -->
       <div class="cropper-overlay" :style="overlayStyle"></div>
       <div class="crop-square" :style="squareStyle" @mousedown="onDragStart" @touchstart="onDragStart">

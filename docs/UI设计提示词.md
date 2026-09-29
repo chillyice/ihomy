@@ -655,6 +655,14 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
    - **壁纸令牌入口(V9.89,两处)**:①壁纸页角落控件里的「复制壁纸令牌」按钮(登录后出现,与主题按钮同款 `.wp-segbtn`,复制成功文案切「已复制」2.5s,剪贴板不可用退回 `window.prompt` 让用户手动取);②**ihomy 设置页** 设置 → 个性化设置 → 「壁纸氛围屏」`.settings-card` = 区块标题 + 说明 `.share-tip`(12px 次要色)+ **整行只读令牌框**(`el-input` 只读,令牌完整可见——供剪贴板不可用时手动选中)+ `.form-footer` 右对齐两个按钮(主色「复制壁纸令牌」+ 幽灵「打开壁纸页」)+ 尾部 `.share-tip` 凭证提示。**两个按钮别塞进 `.share-row`**:EP 全局 `el-input` 宽度 100%,同行的输入框会撑满整行、把按钮顶到下一行且左对齐(实测 1280px 下输入框 758px + 按钮换行)。
    - **两种语言入口的分工**:WE 属性面板的「语言」下拉(加载时一次性投递,改完需重启预览)负责 WE 环境;页内 中/EN 按钮负责即时切换;两者都落 `applyLocale()`,写同一个 `ihomy-lang`(与站点共享偏好键)。
 
+## 25. 前端体验与规范补充(i18n 命名空间 / 无障碍 / 列表错误态 / 共享纯逻辑,V10.3)
+
+1. **外壳文案的 i18n 命名空间**:外壳与首页文案按命名空间落键,新增用户可见文案必须进对应命名空间并 **zh-CN / en 同步**(键数须对齐,当前 2739=2739)。四组:`warm.*`(暖居外壳:问候、编辑态、组件与模块标签、空态、提示)、`sidebar.*`(侧栏:展开收起、台灯三态、光影开关、语言、消息、编辑首页、相对时间)、`home.dashboard.*`(光尘首页仪表盘卡片标题/空态/天气指标/日期风力/寻物/愿望/收支/添加组件)、`feed.type|summary|time`(动态流类型标签、摘要模板、相对时间)。**暖居模块入口标签自持 key(`warm.module.*`)**,不复用后端 `sys_home_module.title`(后端标题不随前端语言切换)。
+2. **无障碍(a11y)**:可点击的非按钮元素一律用全局指令 **`v-a11y-click`**(`utils/a11y.js`,`main.js` 注册),自动补 `role="button"` / `tabindex="0"` 并监听 Enter/Space 触发 `el.click()`——**不要逐处手写三行键盘处理**。`<img>` 必须带 `alt`:有语义用标题/名称,纯装饰用 `alt=""`。已覆盖侧栏、首页仪表盘、暖居首页、移动动态流等主交互容器;纯展示页其余可点击 div 仍待收口(P3)。
+3. **列表页错误态与重试(区别于空态)**:列表 loader 必须 `try/catch`,失败置 `loadError` 并渲染错误态 + 重试按钮(`common.loadFailed` / `common.retry`),**不得让失败静默落成「暂无数据」空态**(既误导用户又留未捕获 rejection)。已覆盖 Album / Member / Points / DiaryList / Wish / Vault / LoanRecords / Cinema 等。
+4. **重复纯逻辑抽 utils(禁止三份实现)**:动态流类型标签/摘要/相对时间走 `utils/feed.js`(`feedTypeLabel` / `feedSummary(t, f, sliceLen=40)` / `formatFeedTime`;移动端传 60 保持既有摘要长度,不强行统一文案);默认楼层走 `floorPlanGeom.pickDefaultFloor`。新增重复逻辑先找现成 util。
+5. **与「当前时刻」有关的展示走 `ref` + 定时**:问候语、今日日期、还款进度等一律 `ref` + 60s 定时刷新(必要时加 `visibilitychange`),**不用无响应式依赖的 computed**(否则跨小时/跨午夜不刷新,见踩坑速查 §3.17)。
+
 ## 验收标准
 
 1. 打开页面,背景米白渐变 + 5 个色块缓慢飘移,右下角拍立得堆/闭合相册,左右毛玻璃面板从两侧滑入。

@@ -190,6 +190,9 @@
               </div>
             </div>
           </div>
+          <div v-else-if="loadError" style="padding: 20px 0; text-align: center; color: var(--color-text-secondary)">
+            {{ $t('common.loadFailed') }} <el-button text size="small" @click="load">{{ $t('common.retry') }}</el-button>
+          </div>
           <el-empty v-else :description="userStore.isGuest ? $t('cinema.noData') : $t('cinema.emptyHint')" />
         </div>
       </el-tab-pane>
@@ -354,6 +357,7 @@ const syncVisible = ref(false)
 const list = ref([])
 const wishes = ref([])
 const loading = ref(false)
+const loadError = ref(false)
 const wishLoading = ref(false)
 
 const genresOptions = [
@@ -442,10 +446,12 @@ const formatDate = (d) => (d ? new Date(d).toLocaleDateString('zh-CN') : '')
 // 拉取视频库(筛选在前端做,全量拉取)
 const load = async () => {
   loading.value = true
+  loadError.value = false
   try {
     list.value = await videoApi.list({})
   } catch {
-    // 取数失败按空库渲染(筛选/空状态照常),不留未捕获拒绝
+    // 取数失败:标记错误供重试,列表置空(筛选/空状态照常),不留未捕获拒绝
+    loadError.value = true
     list.value = []
   } finally {
     loading.value = false

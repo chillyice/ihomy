@@ -208,24 +208,26 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 7. **毛玻璃**:`backdrop-filter: blur(24px) saturate(1.1)`;子元素 hover 用 `transform` 而非 `box-shadow`(避免触发 backdrop-filter 重算);**长开页/持续动画页别用 backdrop-filter**(踩坑速查 §3.10)。
 8. **可拖拽面板**:`useDragResize` 组合式函数;位置/大小持久化 localStorage;**事件监听器按需挂载**(`onDragStart`/`onResizeStart` 时挂 `mousemove`/`mouseup`,`onMouseUp` 时移除,不要 `onMounted` 常驻——参考 `AvatarCropper.vue`)。
 9. **光影层全局化**:`SunLightLayer` + `AppSidebar` + `SiteFooter` 在 `App.vue` 全局挂载;`useSunLight` provide/inject 共享状态。
-10. **i18n**:所有用户可见文本用 `$t('key')`;中英双语;`utils/dict.js` 枚举映射。
-11. **打包分块**(强制):`vite.config.js` 必须配 `build.rollupOptions.output.manualChunks` 拆分大 vendor(当前 `element-plus`/`gsap`/`vue-i18n`/`epubjs`/`pdfjs`/`simple-mind-map` 六块)。**public/ 下静态资源不得与 npm 包重复**。
-12. **重型资源异步加载**(强制):字体包/CSS(如 `qweather-icons.css` 44.9KB)阻塞首屏的,必须 `import('...')` 异步加载,不要同步 `import`。
-13. **动画优先级**(强制):持续型动画(钟摆/心跳/呼吸)优先级 **CSS `@keyframes` > GSAP 直接操作 DOM ref > `requestAnimationFrame` + 响应式 ref**。**禁止用 rAF 每帧写 Vue ref 触发响应式重渲染**。
-14. **并行请求**(强制):多个独立的 `await xxxApi.foo()` 必须改 `Promise.all([a, b, c])` 并行(参考 `Home.vue loadAll` + `stores/app.js init`)。串行只在真有依赖时用。
-15. **computed 纯函数**(强制):`computed` 内禁止 `Math.random()`/`Date.now()`/副作用,否则每次访问重算且视觉跳动。需要随机/一次性计算用 `ref` + `watch(source, immediate)` 生成(参考 `Home.vue polaroidLayout`)。
-16. **路由懒加载**:页面路由全部 `() => import('./views/...')`,不写同步 import。
-17. **全局 UI 样式统一**(强制):所有 EP 组件(el-dialog/ElMessageBox/ElMessage/popper/button/tag/badge/input)配色/圆角/尺寸/z-index 一律由 main.css 全局覆写,**禁止组件 scoped 重复定义**;完整值见 `docs/UI设计提示词.md` §11a/§3。**命令式 API(ElMessage/ElMessageBox/ElNotification/ElLoading)样式已在 main.js 显式引入**——新增命令式调用须确认样式已引入,否则裸 DOM 渲染不可见(踩坑速查 §3.15)。
-18. **按钮/标签/角标/图标/圆角统一**(强制,main.css 全局覆写,禁止 scoped):按钮四类(主/次/幽灵/危险,浅深色**不同色值不共用**)、el-tag 半透明磨砂、el-badge 半透明黑、el-icon `stroke-width:2px`、圆角(button 12/input 10/card+dialog 14);完整色值见 `docs/UI设计提示词.md` §18a。
-19. **页面统一规范**(强制):根容器 `class="page"`(禁 scoped 覆写 max-width/margin/padding);页面级 H1/H2 移除,分区标题 `.section-label`;工具栏 `class="page-toolbar card"`(`.tb-left` 筛选 size=small、`.tb-right` 按钮 gap 8px);多选交互 `.pick-badge` 对勾圆标+卡片描边(**禁左上 checkbox 角标**);详见 `docs/UI设计提示词.md` §11b。
-20. **位图资产压缩入库**(强制):装饰性位图压缩后放 `frontend/src/assets/` 并 ESM 导入(构建出内容哈希名,配 nginx `expires 7d; immutable`),**不放 `public/`**(无哈希换图不刷新);宽度按实际渲染 2 倍封顶,带噪点先 3×3 中值滤波再压,输出渐进式 JPEG。参照相册封面 2560×1920 1.37MB→800×600 112KB。
-21. **提示说明不写实现**(强制,后端同守):所有用户可见的提示/说明/占位符/空状态/tooltip(i18n 值与硬编码文案)及后端报错文案(`BizException` 消息)与接口文档摘要(`@Operation`——`/doc.html` 无需登录公开可见),只讲「用户能做什么/发生了什么」,**不写实现方式、内部逻辑、实体信息**(库名表名字段名、配置文件/配置键/环境变量、机制参数与内部枚举码当解释、内部节律如「每 30 分钟检查一次」、三方响应字段名);密钥类只说「保存后不再显示,请自行留底」。机制细节归代码注释与日志(`log.warn` 带上下文),不进提示。**给 LLM 的提示词例外**:输出 JSON 字段名/枚举码是解析契约必须保留,但描述性语句同样不用库表/内部词汇。
+10. **i18n**:所有用户可见文本用 `$t('key')`;中英双语(键结构必须 zh-CN/en 对齐);`utils/dict.js` 枚举映射。外壳文案命名空间:`warm.*`(暖居)/`sidebar.*`(侧栏)/`home.dashboard.*`(光尘首页)/`feed.*`(动态流)。
+11. **共享逻辑抽 utils(禁止三份实现)**:动态流类型标签/摘要/相对时间走 `utils/feed.js`(`feedTypeLabel`/`feedSummary`/`formatFeedTime`),默认楼层走 `floorPlanGeom.pickDefaultFloor`,枚举文案走 `dictText(t,...)`;新增重复逻辑先找现成 util。
+12. **可点击非按钮元素**:用全局指令 `v-a11y-click`(自动补 `role=button`/`tabindex=0` + Enter/Space 触发 click),不要逐处手写三行键盘处理;`<img>` 必须带 `alt`(装饰图 `alt=""`)。
+13. **打包分块**(强制):`vite.config.js` 必须配 `build.rollupOptions.output.manualChunks` 拆分大 vendor(当前 `element-plus`/`gsap`/`vue-i18n`/`epubjs`/`pdfjs`/`simple-mind-map` 六块)。**public/ 下静态资源不得与 npm 包重复**。
+14. **重型资源异步加载**(强制):字体包/CSS(如 `qweather-icons.css` 44.9KB)阻塞首屏的,必须 `import('...')` 异步加载,不要同步 `import`。
+15. **动画优先级**(强制):持续型动画(钟摆/心跳/呼吸)优先级 **CSS `@keyframes` > GSAP 直接操作 DOM ref > `requestAnimationFrame` + 响应式 ref**。**禁止用 rAF 每帧写 Vue ref 触发响应式重渲染**。
+16. **并行请求**(强制):多个独立的 `await xxxApi.foo()` 必须改 `Promise.all([a, b, c])` 并行(参考 `Home.vue loadAll` + `stores/app.js init`)。串行只在真有依赖时用。
+17. **computed 纯函数**(强制):`computed` 内禁止 `Math.random()`/`Date.now()`/副作用,否则每次访问重算且视觉跳动。需要随机/一次性计算用 `ref` + `watch(source, immediate)` 生成(参考 `Home.vue polaroidLayout`)。
+18. **路由懒加载**:页面路由全部 `() => import('./views/...')`,不写同步 import。
+19. **全局 UI 样式统一**(强制):所有 EP 组件(el-dialog/ElMessageBox/ElMessage/popper/button/tag/badge/input)配色/圆角/尺寸/z-index 一律由 main.css 全局覆写,**禁止组件 scoped 重复定义**;完整值见 `docs/UI设计提示词.md` §11a/§3。**命令式 API(ElMessage/ElMessageBox/ElNotification/ElLoading)样式已在 main.js 显式引入**——新增命令式调用须确认样式已引入,否则裸 DOM 渲染不可见(踩坑速查 §3.15)。
+20. **按钮/标签/角标/图标/圆角统一**(强制,main.css 全局覆写,禁止 scoped):按钮四类(主/次/幽灵/危险,浅深色**不同色值不共用**)、el-tag 半透明磨砂、el-badge 半透明黑、el-icon `stroke-width:2px`、圆角(button 12/input 10/card+dialog 14);完整色值见 `docs/UI设计提示词.md` §18a。
+21. **页面统一规范**(强制):根容器 `class="page"`(禁 scoped 覆写 max-width/margin/padding);页面级 H1/H2 移除,分区标题 `.section-label`;工具栏 `class="page-toolbar card"`(`.tb-left` 筛选 size=small、`.tb-right` 按钮 gap 8px);多选交互 `.pick-badge` 对勾圆标+卡片描边(**禁左上 checkbox 角标**);详见 `docs/UI设计提示词.md` §11b。
+22. **位图资产压缩入库**(强制):装饰性位图压缩后放 `frontend/src/assets/` 并 ESM 导入(构建出内容哈希名,配 nginx `expires 7d; immutable`),**不放 `public/`**(无哈希换图不刷新);宽度按实际渲染 2 倍封顶,带噪点先 3×3 中值滤波再压,输出渐进式 JPEG。参照相册封面 2560×1920 1.37MB→800×600 112KB。
+23. **提示说明不写实现**(强制,后端同守):所有用户可见的提示/说明/占位符/空状态/tooltip(i18n 值与硬编码文案)及后端报错文案(`BizException` 消息)与接口文档摘要(`@Operation`——`/doc.html` 无需登录公开可见),只讲「用户能做什么/发生了什么」,**不写实现方式、内部逻辑、实体信息**(库名表名字段名、配置文件/配置键/环境变量、机制参数与内部枚举码当解释、内部节律如「每 30 分钟检查一次」、三方响应字段名);密钥类只说「保存后不再显示,请自行留底」。机制细节归代码注释与日志(`log.warn` 带上下文),不进提示。**给 LLM 的提示词例外**:输出 JSON 字段名/枚举码是解析契约必须保留,但描述性语句同样不用库表/内部词汇。
 
 ### 性能规范(强制规则)
 
 > **已踩坑清单**(100% 缩放卡顿 / backdrop-filter 滚动炸弹 / rAF 写 Vue ref / 常驻事件监听器 / 同步 import 阻塞首屏 / 入口 chunk 过大 / `getBytes()` OOM / SQL 日志同步 I/O / N+1)与「不建议改」清单见 **`docs/踩坑速查.md` §8**,完整取证见 `docs/变更归档.md`「性能优化」与 `docs/UI设计提示词.md` §19。由此固化的强制规则:
 
-- **动画优先级**:持续型动画 CSS `@keyframes` > GSAP 直接操作 DOM ref > `requestAnimationFrame`;**禁止 rAF 每帧写 Vue ref**(见前端规范 13)。
+- **动画优先级**:持续型动画 CSS `@keyframes` > GSAP 直接操作 DOM ref > `requestAnimationFrame`;**禁止 rAF 每帧写 Vue ref**(见前端规范 15)。
 - **事件监听器按需挂载**:`onDragStart`/`onResizeStart` 时挂 `mousemove`/`mouseup`,`onMouseUp` 时移除,不要 `onMounted` 常驻。
 - **重型资源异步加载**:字体包/大 CSS(如 `qweather-icons.css`)必须 `import('...')` 异步,不要同步 `import`。
 - **入口 chunk 分块**:`vite.config.js` 必须配 `manualChunks`(element-plus/gsap/vue-i18n/epubjs/pdfjs/simple-mind-map)。
@@ -242,8 +244,8 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 #### 验证基线
 
 - 后端编译/测试:`cd backend; .\mvnw.cmd -B clean package` → BUILD SUCCESS(`Tests run: 8`,纯逻辑不起 Spring 上下文);只求编译加 `-DskipTests`
-- 前端测试:`cd frontend; npx vitest run` → 18 passed(utils 纯逻辑:loan/password;CI 在构建前执行)
-- 前端构建:`cd frontend; npm run build` → 入口 chunk ≈358KB(实测 **358.10KB/gzip 144.94KB**;各功能页/pdfjs/simple-mind-map/epubjs/hls.js 均为独立异步 chunk 仅对应场景加载,**涨幅几乎全来自中英双语文案进共享入口 chunk**;历史数字见 docs/变更归档.md)
+- 前端测试:`cd frontend; npx vitest run` → 25 passed(utils 纯逻辑:loan/password/feed;CI 在构建前执行)
+- 前端构建:`cd frontend; npm run build` → 入口 chunk ≈373KB(实测 **373.33KB/gzip 149.43KB**,V10.3 起;基线 358.10KB 的 +15KB 全为新增中英双语文案进共享入口 chunk;各功能页/pdfjs/simple-mind-map/epubjs/hls.js 均为独立异步 chunk 仅对应场景加载;历史数字见 docs/变更归档.md)
   - **⚠ 口径:vite 报的是「字符数」不是「字节数」**(实测)。入口 chunk vite 报 318.71KB,`wc -c` 却是 343,667 字节,`wc -m` 才是 318,707 字符——差值是中文注释/字符串的 UTF-8 多字节开销。**别拿 `ls -la` 的字节数跟这个基线比**(会误判成涨了 24KB);要比特字节就 `wc -c` 对 `wc -c`。gzip 那个数即压缩后真实字节数。
 - 界面/交互验证:harness 不要放 `target/`;持续动画页面用页面内 `evaluate` 量几何、派发 `el.click()`,别用截图或真实点击(必超时,见踩坑速查 §6 本地 IAB/Playwright 条)。
 - 接口测试:同级独立项目(不在本仓库)`cd ..\autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed;**CI(GitHub Actions)每次推送自动验证:前后端构建+compose 起库导入 schema+后端启动+登录冒烟**。
@@ -284,7 +286,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 > **这里只做指引,不记内容**。完整规划(P1-P4)、实施计划与验收口径见 **`docs/需求设计说明书.md` §9**;代码级优化待办见 **§9.2(36 项,分安全/性能/前端/工程化四组)** 与 **§9.3(21 项,V9.98–V9.106 新增代码复审 + §9.2 逐条复核)**。**启动任何规划项前先读该章对应小节**,不要凭本文件或记忆开工。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
 - **V9.110(2026-09-29)已完成 5 项 P1 代码级**:音频转写流式化(`AiController`/`AiService`/`ThirdPartyHttp.requestStreaming`)、Service Worker 排除 `/api/{vault,auth,ops,profile}` + 登出清 `api-cache`、上传黑名单补 xhtml/xml 等、登出/refresh 吊销(新增 `WALLPAPER` 令牌类型 + 60s 轮换宽限 + JWT `jti` 唯一化)、前后端自动化测试骨架(vitest + `spring-boot-starter-test`,CI 去掉 `-DskipTests`)。详见 `docs/变更归档.md` V9.110。
-- 当前判断:**§9.2 剩余 P1** 为生产 Redis 无密码发布 `0.0.0.0`、`/files/**` 直连无鉴权与 nginx `nosniff`/CSP、`docs/项目文档/*.docx` 重生成;§9.2 的 P2 中 **A 组(安全与数据保护)与 B 组(性能与数据一致性)各 6 条已解决(V10.1 / V10.2)**,余下为 **C 组(前端体验与规范:如 warm 外壳硬编码中文约 56 处、请求串行未并行、缺 i18n key)** 与 **D 组(工程化:台账漏登/版本漂移、CI 闸门、备份/健康检查等)**。**§9.3 的两条 P1 已收口**(踩坑速查入库、部署文档补媒体引擎章节 —— V9.108),余下 P2:媒体引擎令牌直出前端、媒体服务器地址未限目标(SSRF)、年利率上限与列精度冲突必 500。
+- 当前判断:**§9.2 剩余 P1** 为生产 Redis 无密码发布 `0.0.0.0`、`/files/**` 直连无鉴权与 nginx `nosniff`/CSP、`docs/项目文档/*.docx` 重生成;§9.2 的 P2 中 **A 组(安全与数据保护)、B 组(性能与数据一致性)、C 组(前端体验与规范)各 6/6/9 条已解决(V10.1 / V10.2 / V10.3)**,余下为 **D 组(工程化:台账漏登/版本漂移、CI 闸门、备份/健康检查等)**。**§9.3 的两条 P1 已收口**(踩坑速查入库、部署文档补媒体引擎章节 —— V9.108),余下 P2:媒体引擎令牌直出前端、媒体服务器地址未限目标(SSRF)、年利率上限与列精度冲突必 500。前端遗留(P3,见 §9.2 C 末尾):超大单文件拆分 + ESLint/Prettier 配置、纯展示页剩余可点击 div 的键盘处理。
 - 功能侧还剩:P1 放映厅 **S4 收尾**(S1–S4 已落地 V9.106–V9.108:转码 HLS 回退/字幕轨/成员播放档案/NAS 上线文档;剩 Emby 实测、多家庭共用一台媒体服务器、转码清晰度与多音轨选择)、P2 智能家居中控(Home Assistant,分 S1-S3)、P2 保险箱主密码(前端零知识,不可逆 UX 变更,待定夺)、场景主题方向(3D 光影实验台 `/tools/light-lab` 为底座)。
 
 ## 文档清单

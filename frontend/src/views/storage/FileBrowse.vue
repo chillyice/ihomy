@@ -74,7 +74,7 @@
     <!-- 图片/视频预览 -->
     <el-dialog v-model="previewDialog" append-to-body :title="previewName" width="70%" top="6vh">
       <div class="preview-box">
-        <img v-if="previewIsImage" :src="previewSrc" class="preview-img" />
+        <img v-if="previewIsImage" :src="previewSrc" class="preview-img" alt="" />
         <video v-else-if="previewIsVideo" :src="previewSrc" class="preview-video" controls autoplay />
         <div v-else class="preview-file">{{ $t('storage.noPreview') }}</div>
       </div>

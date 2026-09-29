@@ -6,9 +6,9 @@
     <!-- 编辑模式工具栏(hover隐藏) -->
     <Transition name="fade">
       <div v-if="editMode" class="edit-toolbar edit-toolbar-hover">
-        <span class="edit-label">编辑模式 · 拖拽移动 · 右下角调整大小</span>
-        <el-button size="small" @click="resetLayout">恢复默认</el-button>
-        <el-button size="small" type="primary" @click="finishEdit">完成</el-button>
+        <span class="edit-label">{{ $t('home.dashboard.editHint') }}</span>
+        <el-button size="small" @click="resetLayout">{{ $t('home.dashboard.resetLayout') }}</el-button>
+        <el-button size="small" type="primary" @click="finishEdit">{{ $t('home.dashboard.done') }}</el-button>
       </div>
     </Transition>
 
@@ -29,13 +29,13 @@
         <div class="card-inner">
           <!-- 家人动态 -->
           <template v-if="w.id === 'feed'">
-            <div class="card-head">家人动态</div>
+            <div class="card-head">{{ $t('home.familyFeed') }}</div>
             <div class="card-scroll">
-              <div v-if="!feeds.length" class="empty-hint">暂无动态</div>
-              <div v-for="(f, i) in feeds.slice(0, nFeed(w))" :key="i" class="feed-row" @click="!editMode && goFeed(f)">
+              <div v-if="!feeds.length" class="empty-hint">{{ $t('home.dashboard.noFeed') }}</div>
+              <div v-for="(f, i) in feeds.slice(0, nFeed(w))" :key="i" class="feed-row" v-a11y-click @click="!editMode && goFeed(f)">
                 <el-avatar :size="36" :src="f.authorAvatar" class="feed-avatar">{{ (f.authorName || 'U').charAt(0) }}</el-avatar>
                 <div class="feed-content">
-                  <div class="feed-nick">{{ f.authorName || '家人' }}</div>
+                  <div class="feed-nick">{{ f.authorName || $t('feed.authorFallback') }}</div>
                   <div class="feed-bubble">
                     <div class="bubble-type">{{ feedTypeLabel(f.type) }}</div>
                     <div class="bubble-body">{{ feedSummary(f) }}</div>
@@ -48,10 +48,10 @@
 
           <!-- 悬赏任务 -->
           <template v-else-if="w.id === 'task'">
-            <div class="card-head">悬赏任务</div>
+            <div class="card-head">{{ $t('home.dashboard.taskReward') }}</div>
             <div class="card-scroll">
-              <div v-if="!tasks.length" class="empty-hint">暂无任务</div>
-              <div v-for="t in tasks.slice(0, nTask(w))" :key="t.id" class="task-row" @click="!editMode && $router.push('/task')">
+              <div v-if="!tasks.length" class="empty-hint">{{ $t('home.noTasks') }}</div>
+              <div v-for="t in tasks.slice(0, nTask(w))" :key="t.id" class="task-row" v-a11y-click @click="!editMode && $router.push('/task')">
                 <span class="task-reward">{{ rewardIcon(t.rewardType) }}</span>
                 <div class="task-info"><div class="task-title">{{ t.title }}</div><div class="task-meta"><span class="task-status-dot" :class="'s-' + t.status"></span>{{ taskStatusLabel(t.status) }}</div></div>
               </div>
@@ -60,17 +60,17 @@
 
           <!-- 今日 -->
           <template v-else-if="w.id === 'today'">
-            <div class="card-head">今日</div>
+            <div class="card-head">{{ $t('home.dashboard.today') }}</div>
             <div class="card-scroll">
               <div class="today-points">
-                <div class="tp-item" @click="!editMode && $router.push('/points')"><span class="tp-num">{{ pointsStats.balance ?? 0 }}</span><span class="tp-label">积分</span></div>
-                <div class="tp-item" @click="!editMode && $router.push('/points')"><span class="tp-num">{{ pointsStats.streak ?? 0 }}</span><span class="tp-label">连续天数</span></div>
-                <el-button size="small" type="primary" round :disabled="pointsStats.checkedToday" @click="doCheckin">{{ pointsStats.checkedToday ? '已签到' : '签到 +' + (pointsStats.todayPoints ?? 5) }}</el-button>
+                <div class="tp-item" v-a11y-click @click="!editMode && $router.push('/points')"><span class="tp-num">{{ pointsStats.balance ?? 0 }}</span><span class="tp-label">{{ $t('home.dashboard.points') }}</span></div>
+                <div class="tp-item" v-a11y-click @click="!editMode && $router.push('/points')"><span class="tp-num">{{ pointsStats.streak ?? 0 }}</span><span class="tp-label">{{ $t('home.dashboard.streak') }}</span></div>
+                <el-button size="small" type="primary" round :disabled="pointsStats.checkedToday" @click="doCheckin">{{ pointsStats.checkedToday ? $t('home.dashboard.checkedIn') : $t('home.dashboard.checkin', { n: pointsStats.todayPoints ?? 5 }) }}</el-button>
               </div>
               <template v-if="nReminder(w) > 0">
                 <div class="today-reminders">
-                  <div v-if="!reminders.length" class="empty-hint">今日无待办</div>
-                  <div v-for="r in reminders.slice(0, nReminder(w))" :key="r.id" class="today-reminder" @click="!editMode && $router.push('/reminder')"><span class="tr-dot"></span><span class="tr-title">{{ r.title }}</span><span class="tr-time">{{ (r.remindTime || '').slice(0, 5) }}</span></div>
+                  <div v-if="!reminders.length" class="empty-hint">{{ $t('home.dashboard.noReminder') }}</div>
+                  <div v-for="r in reminders.slice(0, nReminder(w))" :key="r.id" class="today-reminder" v-a11y-click @click="!editMode && $router.push('/reminder')"><span class="tr-dot"></span><span class="tr-title">{{ r.title }}</span><span class="tr-time">{{ (r.remindTime || '').slice(0, 5) }}</span></div>
                 </div>
               </template>
             </div>
@@ -82,7 +82,7 @@
               <div v-if="weatherBg" class="weather-bg-img" :style="{ backgroundImage: `url(${weatherBg})` }"></div>
               <div class="weather-bg-grad"></div>
             </div>
-            <div class="card-head">天气</div>
+            <div class="card-head">{{ $t('home.dashboard.weather') }}</div>
             <div class="card-scroll weather-scroll weather-clickable" @click="!editMode && $router.push('/weather')">
               <div v-if="weather" class="weather-main">
                 <div class="weather-city">{{ weather.city || '济南' }}</div>
@@ -97,8 +97,8 @@
                 <div v-if="tierOf(w) !== 'S'" class="weather-condition">{{ weatherText }}</div>
                 <!-- 巨大档:湿度/风力/PM2.5 关键指标(非巨大档不展示,避免同质化数据堆叠) -->
                 <div v-if="tierOf(w) === 'XL'" class="weather-metrics">
-                  <div class="wm-cell"><span class="wm-k">湿度</span><span class="wm-v">{{ humidityText }}</span></div>
-                  <div class="wm-cell"><span class="wm-k">风力</span><span class="wm-v">{{ windText }}</span></div>
+                  <div class="wm-cell"><span class="wm-k">{{ $t('home.dashboard.humidity') }}</span><span class="wm-v">{{ humidityText }}</span></div>
+                  <div class="wm-cell"><span class="wm-k">{{ $t('home.dashboard.wind') }}</span><span class="wm-v">{{ windText }}</span></div>
                   <div class="wm-cell"><span class="wm-k">PM2.5</span><span class="wm-v">{{ pm25Text }}</span></div>
                 </div>
                 <!-- 预报:巨大档「未来三天」(不含今天,避免与顶部实况重复);大档「3 天」 -->
@@ -110,46 +110,46 @@
                   </div>
                 </div>
               </div>
-              <div v-else class="weather-loading-text">天气加载中…</div>
+              <div v-else class="weather-loading-text">{{ $t('home.dashboard.weatherLoading') }}</div>
             </div>
           </template>
 
           <!-- 纪念日 -->
           <template v-else-if="w.id === 'anni'">
-            <div class="card-head">近期纪念日</div>
+            <div class="card-head">{{ $t('home.upcomingEvents') }}</div>
             <div class="card-scroll">
-              <div v-for="(a, i) in anniversaries.slice(0, nAnni(w))" :key="i" class="anni-row" @click="!editMode && $router.push('/anniversary')">
+              <div v-for="(a, i) in anniversaries.slice(0, nAnni(w))" :key="i" class="anni-row" v-a11y-click @click="!editMode && $router.push('/anniversary')">
                 <div class="anni-info"><div class="anni-name">{{ a.label }}</div><div class="anni-date">{{ a.date }}</div></div>
-                <div class="anni-days"><span class="days-num">{{ a.days }}</span><span class="days-unit">天</span></div>
+                <div class="anni-days"><span class="days-num">{{ a.days }}</span><span class="days-unit">{{ $t('home.dashboard.dayUnit') }}</span></div>
               </div>
             </div>
           </template>
 
           <!-- 今日推荐 -->
           <template v-else-if="w.id === 'recipe'">
-            <div class="card-head">今日推荐</div>
+            <div class="card-head">{{ $t('home.dashboard.recipes') }}</div>
             <div class="card-scroll">
               <div v-if="todayRecipes.length" class="recipe-list">
                 <router-link v-for="r in todayRecipes.slice(0, nRecipe(w))" :key="r.id" :to="`/kitchen/recipe/${r.id}`" class="recipe-item">
-                  <img v-if="r.coverImage" :src="r.coverImage" class="recipe-cover" />
+                  <img v-if="r.coverImage" :src="r.coverImage" :alt="r.name" class="recipe-cover" />
                   <div v-else class="recipe-cover placeholder">🍳</div>
                   <span class="recipe-name">{{ r.name }}</span>
                 </router-link>
               </div>
-              <div v-else class="widget-empty">暂无推荐<div class="widget-empty-hint">去厨房添加菜谱</div></div>
+              <div v-else class="widget-empty">{{ $t('home.dashboard.noRecipes') }}<div class="widget-empty-hint">{{ $t('home.dashboard.goKitchen') }}</div></div>
             </div>
-            <router-link to="/kitchen" class="card-more">查看菜谱 →</router-link>
+            <router-link to="/kitchen" class="card-more">{{ $t('home.dashboard.viewRecipes') }}</router-link>
           </template>
 
           <!-- 寻物(item 页缩小版):搜索 + 只读户型图(自适应大小)· 命中放大居中 + 上/下一个 -->
           <template v-else-if="w.id === 'search'">
-            <div class="card-head">寻物</div>
+            <div class="card-head">{{ $t('home.dashboard.searchItems') }}</div>
             <div class="card-scroll search-scroll">
               <div class="search-input-row">
-                <el-input v-model="itemKeyword" placeholder="搜物品名/别名/位置/家具/房间" clearable @keyup.enter="searchItems" @clear="clearItemSearch">
+                <el-input v-model="itemKeyword" :placeholder="$t('home.dashboard.searchPlaceholder')" clearable @keyup.enter="searchItems" @clear="clearItemSearch">
                   <template #prefix><el-icon><Search /></el-icon></template>
                 </el-input>
-                <button v-if="tierOf(w) === 'L' || tierOf(w) === 'XL'" :class="['voice-btn', { on: voiceListening }]" type="button" :title="voiceListening ? '停止' : '语音找物'" @click="toggleVoice">
+                <button v-if="tierOf(w) === 'L' || tierOf(w) === 'XL'" :class="['voice-btn', { on: voiceListening }]" type="button" :title="voiceListening ? $t('home.dashboard.stop') : $t('home.dashboard.voiceSearch')" @click="toggleVoice">
                   <el-icon><Microphone /></el-icon>
                 </button>
               </div>
@@ -169,47 +169,47 @@
                   :fit-key="fpFitKey"
                   :show-thumb="false"
                 />
-                <div v-else class="fp-no-plan">暂无户型图 · 到「寻物」管理页绘制</div>
+                <div v-else class="fp-no-plan">{{ $t('home.dashboard.noFloorPlan') }}</div>
                 <!-- 当前命中物品 -->
                 <div v-if="currentMatch" class="fp-match-chip">
                   <span class="fm-name">{{ currentMatch.name }}<em v-if="searchSource === 'ai'" class="fm-src">✨ AI</em></span>
                   <span class="fm-loc">{{ [currentMatch.house_name, currentMatch.room_name, currentMatch.furniture_name].filter(Boolean).join(' · ') }}</span>
                 </div>
                 <!-- 搜索进行/无结果提示(与物品定位页语义一致) -->
-                <div v-if="aiSearching && hasFloorPlan" class="fp-search-hint">✨ AI 找物中…</div>
-                <div v-else-if="searched && !searchResults.length && hasFloorPlan" class="fp-search-hint">未找到相关物品,换个说法试试</div>
+                <div v-if="aiSearching && hasFloorPlan" class="fp-search-hint">{{ $t('home.dashboard.aiSearching') }}</div>
+                <div v-else-if="searched && !searchResults.length && hasFloorPlan" class="fp-search-hint">{{ $t('home.dashboard.noItemHit') }}</div>
                 <!-- 上/下一个 命中导航(左右箭头) -->
                 <div v-if="searchResults.length > 1" class="fp-nav">
-                  <button class="fp-nav-btn" :disabled="matchIdx <= 0" @click="prevMatch" aria-label="上一个">‹</button>
+                  <button class="fp-nav-btn" :disabled="matchIdx <= 0" @click="prevMatch" :aria-label="$t('home.dashboard.prevMatch')">‹</button>
                   <span class="fp-nav-count">{{ matchIdx + 1 }} / {{ searchResults.length }}</span>
-                  <button class="fp-nav-btn" :disabled="matchIdx >= searchResults.length - 1" @click="nextMatch" aria-label="下一个">›</button>
+                  <button class="fp-nav-btn" :disabled="matchIdx >= searchResults.length - 1" @click="nextMatch" :aria-label="$t('home.dashboard.nextMatch')">›</button>
                 </div>
               </div>
             </div>
-            <router-link to="/item" class="card-more">物品管理 →</router-link>
+            <router-link to="/item" class="card-more">{{ $t('home.dashboard.itemManage') }}</router-link>
           </template>
 
           <!-- 愿望单 -->
           <template v-else-if="w.id === 'wish'">
-            <div class="card-head">愿望单</div>
+            <div class="card-head">{{ $t('home.dashboard.wishlist') }}</div>
             <div class="card-scroll">
               <div v-if="wishes.length" class="wish-list">
                 <div v-for="w in wishes.slice(0, nWish(w))" :key="w.id" class="wish-item" :class="{ done: w.status === 'ACHIEVED' }"><span class="wish-dot" :class="w.status"></span><span class="wish-name">{{ w.title }}</span></div>
               </div>
-              <div v-else class="widget-empty">暂无愿望<div class="widget-empty-hint">去愿望单记录家庭心愿</div></div>
+              <div v-else class="widget-empty">{{ $t('home.dashboard.noWish') }}<div class="widget-empty-hint">{{ $t('home.dashboard.wishHint') }}</div></div>
             </div>
-            <router-link to="/wish" class="card-more">查看全部 →</router-link>
+            <router-link to="/wish" class="card-more">{{ $t('home.dashboard.viewAll') }}</router-link>
           </template>
 
           <!-- 本月收支 -->
           <template v-else-if="w.id === 'finance'">
-            <div class="card-head">本月收支</div>
+            <div class="card-head">{{ $t('home.dashboard.finance') }}</div>
             <div class="finance-body">
-              <div class="fin-item"><span class="fin-label">收入</span><span class="fin-val income">+{{ bookSummary?.income || 0 }}</span></div>
-              <div class="fin-item"><span class="fin-label">支出</span><span class="fin-val expense">-{{ bookSummary?.expense || 0 }}</span></div>
-              <div class="fin-item"><span class="fin-label">结余</span><span class="fin-val" :class="(bookSummary?.balance || 0) >= 0 ? 'income' : 'expense'">{{ bookSummary?.balance || 0 }}</span></div>
+              <div class="fin-item"><span class="fin-label">{{ $t('home.dashboard.income') }}</span><span class="fin-val income">+{{ bookSummary?.income || 0 }}</span></div>
+              <div class="fin-item"><span class="fin-label">{{ $t('home.dashboard.expense') }}</span><span class="fin-val expense">-{{ bookSummary?.expense || 0 }}</span></div>
+              <div class="fin-item"><span class="fin-label">{{ $t('home.dashboard.balance') }}</span><span class="fin-val" :class="(bookSummary?.balance || 0) >= 0 ? 'income' : 'expense'">{{ bookSummary?.balance || 0 }}</span></div>
             </div>
-            <router-link to="/book" class="card-more">查看明细 →</router-link>
+            <router-link to="/book" class="card-more">{{ $t('home.dashboard.viewDetail') }}</router-link>
           </template>
 
           <!-- 拍立得 -->
@@ -217,10 +217,10 @@
             <div class="album-container" :style="{ '--polaroid-w': polaroidW(w) + 'px' }">
               <div v-if="recentPhotos.length" class="polaroid-stack">
                 <div v-for="(p, i) in recentPhotos" :key="p.id" class="polaroid-pos" :style="{ transform: `rotate(${polaroidLayout[i]?.rotate || 0}deg) translate(${polaroidLayout[i]?.dx || 0}px, ${polaroidLayout[i]?.dy || 0}px)`, zIndex: polaroidLayout[i]?.z || 1 }">
-                  <div class="polaroid" @click="!editMode && openViewer(i)"><img :src="p.url" :alt="p.description || ''" /><div v-if="p.description" class="polaroid-caption">{{ p.description }}</div></div>
+                  <div class="polaroid" v-a11y-click @click="!editMode && openViewer(i)"><img :src="p.url" :alt="p.description || ''" /><div v-if="p.description" class="polaroid-caption">{{ p.description }}</div></div>
                 </div>
               </div>
-              <div v-else class="album-closed" :style="{ width: albumCoverW(w) + 'px' }" @click="!editMode && $router.push('/album')">
+              <div v-else class="album-closed" v-a11y-click :style="{ width: albumCoverW(w) + 'px' }" @click="!editMode && $router.push('/album')">
                 <div class="album-book" :class="{ open: albumOpen }">
                   <div class="album-page">
                     <Transition name="album-page">
@@ -228,11 +228,11 @@
                         <img :src="historyPhotos[albumIdx]?.url" :alt="historyPhotos[albumIdx]?.description || ''" class="album-page-img" />
                         <div class="album-page-back"></div>
                       </div>
-                      <div v-else key="empty" class="album-page-img album-page-empty"><span>去添加家庭照片</span></div>
+                      <div v-else key="empty" class="album-page-img album-page-empty"><span>{{ $t('home.dashboard.addPhoto') }}</span></div>
                     </Transition>
                   </div>
                   <div class="album-cover">
-                    <div class="album-cover-front"><img :src="albumCoverUrl" alt="家庭相册" class="album-cover-img" /></div>
+                    <div class="album-cover-front"><img :src="albumCoverUrl" :alt="$t('home.dashboard.album')" class="album-cover-img" /></div>
                     <div class="album-cover-back"></div>
                   </div>
                 </div>
@@ -266,6 +266,9 @@ import albumCoverUrl from '@/assets/album-cover.jpg'
 import FloorPlanCanvas from '@/views/item/FloorPlanCanvas.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useWidgetDrag } from '@/utils/useWidgetDrag'
+import { feedTypeLabel as feedTypeLabelOf, feedSummary as feedSummaryOf, formatFeedTime } from '@/utils/feed'
+import { pickDefaultFloor } from '@/utils/floorPlanGeom'
+import { dictText } from '@/utils/dict'
 
 const router = useRouter()
 const route = useRoute()
@@ -382,7 +385,7 @@ const searchItems = async () => {
 }
 const clearItemSearch = () => { itemKeyword.value = ''; searchResults.value = []; matchIdx.value = 0; searched.value = false; searchSource.value = ''; aiSearching.value = false }
 const loadTodayRecipes = async () => { if (userStore.isLoggedIn) { try { const data = await kitchenApi.menu(); todayRecipes.value = data?.todayRecommend || [] } catch (e) {} } }
-const doCheckin = async () => { try { const r = await pointsApi.checkin(); ElMessage.success(`签到成功 +${r.points} 积分,连续 ${r.streak} 天`); await loadPoints() } catch (e) {} }
+const doCheckin = async () => { try { const r = await pointsApi.checkin(); ElMessage.success(t('home.dashboard.checkinToast', { points: r.points, streak: r.streak })); await loadPoints() } catch (e) {} }
 
 const SEVEN_DAYS = 7 * 86400000
 // 近7天照片与拍立得抽样:ref + watch 一次性生成(computed 内禁 Date.now()/Math.random(),
@@ -435,14 +438,14 @@ const onAlbumLeave = () => {
   albumIdx.value = 0
 }
 
-const TYPE_LABELS = { blog: '博客', diary: '日记', photo: '照片', video: '放映厅', wish: '愿望', task: '任务', recipe: '菜谱', book: '书架' }
-const feedTypeLabel = (type) => TYPE_LABELS[type] || ''
-const feedSummary = (f) => { if (f.type === 'blog') return f.title || ''; if (f.type === 'diary') return (f.content || '').slice(0, 40); if (f.type === 'photo') return `${f.count || 0} 张照片`; if (f.type === 'video') return `上传了影片:${f.title || ''}`; if (f.type === 'wish') return f.status === 'ACHIEVED' ? `实现了愿望:${f.title || ''}` : `许下愿望:${f.title || ''}`; if (f.type === 'task') return `发布任务:${f.title || ''}`; if (f.type === 'recipe') return `分享菜谱:${f.title || ''}`; if (f.type === 'book') return `上架图书:《${f.title || ''}》`; return '' }
-const formatTime = (d) => { if (!d) return ''; const date = new Date(d); const now = new Date(); const diff = (now - date) / 1000; if (diff < 3600) return Math.floor(diff / 60) + ' 分钟前'; if (diff < 86400) return Math.floor(diff / 3600) + ' 小时前'; return date.toLocaleDateString('zh-CN') }
+// 动态类型标签/摘要/相对时间走共享 utils/feed.js(与移动端首页、暖居首页同口径)
+const feedTypeLabel = (type) => feedTypeLabelOf(t, type)
+const feedSummary = (f) => feedSummaryOf(t, f)
+const formatTime = (d) => formatFeedTime(t, d)
 const FEED_ROUTES = { diary: '/diary', photo: '/album', video: '/cinema', wish: '/wish', task: '/task', recipe: '/kitchen', book: '/library' }
 const goFeed = (f) => { if (f.type === 'blog' && f.id) router.push(`/blog/${f.id}`); else if (FEED_ROUTES[f.type]) router.push(FEED_ROUTES[f.type]) }
 const rewardIcon = (t) => t === 1 ? '🎁' : t === 2 ? '📦' : '⭕'
-const taskStatusLabel = (s) => ({ 0: '待领取', 1: '进行中', 2: '待确认', 3: '已完成', 4: '已取消' }[s] || '')
+const taskStatusLabel = (s) => dictText(t, 'taskStatus', s)
 const weatherText = computed(() => weather.value?.text || '')
 
 const homeId = computed(() => route.query.home_id || '')
@@ -517,10 +520,10 @@ const forecastDays = (w) => {
   const daily = weatherDetail.value?.daily || []
   return tierOf(w) === 'XL' ? daily.slice(1, 4) : daily.slice(0, 3)
 }
-const fmtForecastDate = (d) => { const dt = new Date(d); return `${dt.getMonth() + 1}月${dt.getDate()}日` }
+const fmtForecastDate = (d) => { const dt = new Date(d); return t('home.dashboard.dateFmt', { m: dt.getMonth() + 1, d: dt.getDate() }) }
 // 巨大档关键指标(湿度/风力/PM2.5;缺数据显示 —)
 const humidityText = computed(() => { const h = weatherDetail.value?.nowFull?.humidity; return h != null ? `${h}%` : '—' })
-const windText = computed(() => { const f = weatherDetail.value?.nowFull; if (!f) return '—'; const dir = f.windDir || ''; const scale = f.windScale != null ? `${f.windScale} 级` : ''; return (dir || scale) ? `${dir} ${scale}`.trim() : '—' })
+const windText = computed(() => { const f = weatherDetail.value?.nowFull; if (!f) return '—'; const dir = f.windDir || ''; const scale = f.windScale != null ? t('home.dashboard.windScale', { n: f.windScale }) : ''; return (dir || scale) ? `${dir} ${scale}`.trim() : '—' })
 const pm25Text = computed(() => { const p = weatherDetail.value?.air?.pm2p5; return p != null ? `${p}` : '—' })
 const loadLayout = () => {
   try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) return JSON.parse(raw) } catch (e) {}
@@ -541,7 +544,7 @@ const visibleWidgets = computed(() => widgets.value.filter(w => {
 const resetLayout = () => {
   widgets.value = DEFAULT_LAYOUT.map(makeWidget)
   saveLayout()
-  ElMessage.success('布局已重置')
+  ElMessage.success(t('warm.layoutReset'))
 }
 
 const removeWidget = (w) => {
@@ -568,7 +571,7 @@ const voiceListening = ref(false)
 let voiceRecog = null
 const startVoice = () => {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-  if (!SR) { ElMessage.info('当前浏览器不支持语音输入'); return }
+  if (!SR) { ElMessage.info(t('home.dashboard.voiceUnsupported')); return }
   try {
     voiceRecog = new SR()
     voiceRecog.lang = 'zh-CN'
@@ -579,7 +582,7 @@ const startVoice = () => {
       if (txt) { itemKeyword.value = txt; searchItems() }
     }
     voiceRecog.onend = () => { voiceListening.value = false }
-    voiceRecog.onerror = () => { voiceListening.value = false; ElMessage.error('语音识别失败') }
+    voiceRecog.onerror = () => { voiceListening.value = false; ElMessage.error(t('home.dashboard.voiceFailed')) }
     voiceRecog.start()
     voiceListening.value = true
   } catch (e) { voiceListening.value = false }
@@ -657,20 +660,12 @@ const nextMatch = () => { if (matchIdx.value < searchResults.value.length - 1) f
 // 与 item 页 defaultFloorOf 口径一致:默认楼层 = floorPlans 键 ∪ 该房房间楼层;
 // 有 1 楼选 1 楼,无 1 楼选最高层。硬编码 floor=1 会在无 1 楼(如 -1/3/15)的房子上拉到空户型图。
 const defaultFloorOfPreview = async (house) => {
-  const set = new Set()
-  if (house && house.floorPlans) {
-    try {
-      const fp = JSON.parse(house.floorPlans)
-      Object.keys(fp).forEach((k) => { if (k !== 'floorOrder') set.add(Number(k)) })
-    } catch {}
-  }
+  const extra = []
   try {
     const houseRooms = await itemApi.rooms(house.id)
-    ;(houseRooms || []).forEach((r) => set.add(r.floor))
+    ;(houseRooms || []).forEach((r) => extra.push(r.floor))
   } catch {}
-  if (set.has(1)) return 1
-  if (set.size) return Math.max(...set)
-  return 1
+  return pickDefaultFloor(house?.floorPlans, extra)
 }
 const loadItemHouses = async () => {
   if (!userStore.isLoggedIn) return
@@ -751,7 +746,8 @@ const onMouseUp = () => {
 onUnmounted(() => { window.removeEventListener('mousemove', onMouseMove); window.removeEventListener('mouseup', onMouseUp) })
 
 // ========== 从侧边栏拖入组件 ==========
-const WIDGET_LABELS = { feed: '家人动态', task: '悬赏任务', today: '今日', weather: '天气', anni: '纪念日', recipe: '今日推荐', search: '寻物', wish: '愿望单', finance: '本月收支', album: '相册' }
+const WIDGET_LABEL_KEYS = { feed: 'home.familyFeed', task: 'home.dashboard.taskReward', today: 'home.dashboard.today', weather: 'home.dashboard.weather', anni: 'home.upcomingEvents', recipe: 'home.dashboard.recipes', search: 'home.dashboard.searchItems', wish: 'home.dashboard.wishlist', finance: 'home.dashboard.finance', album: 'home.dashboard.album' }
+const widgetLabel = (type) => (WIDGET_LABEL_KEYS[type] ? t(WIDGET_LABEL_KEYS[type]) : type)
 const ghostActive = ref(false)
 const ghostGrown = ref(false)
 const ghostX = ref(0)
@@ -764,7 +760,7 @@ watch(wdDragging, (active) => {
   if (active) {
     ghostActive.value = true
     ghostGrown.value = false
-    ghostLabel.value = WIDGET_LABELS[wdType.value] || wdType.value
+    ghostLabel.value = widgetLabel(wdType.value)
   } else {
     ghostActive.value = false
     ghostGrown.value = false
@@ -784,7 +780,7 @@ onDrop((type, x, y) => {
   const wy = Math.max(0, Math.min(1 - hf, (y - MARGIN.top) / canvasH.value))
   widgets.value.push(makeWidget({ id: type, x: wx, y: wy, w: wf, h: hf }))
   saveLayout()
-  ElMessage.success(`已添加 ${WIDGET_LABELS[type] || type} 组件`)
+  ElMessage.success(t('warm.addedToast', { label: widgetLabel(type) }))
 })
 
 onMounted(() => {

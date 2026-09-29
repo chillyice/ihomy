@@ -4,24 +4,24 @@
     <div class="gc-main-head">
       <div>
         <h2 class="gc-h2">{{ greeting }}</h2>
-        <div class="gc-subline">{{ familyName }} · {{ memberCount }} 位家人</div>
+        <div class="gc-subline">{{ familyName }} · {{ $t('warm.members', { n: memberCount }) }}</div>
       </div>
       <div class="gc-head-btns">
         <template v-if="!editMode">
-          <button v-if="canEdit" class="gc-btn ghost sm" @click="startEdit">编辑首页</button>
-          <button class="gc-btn primary sm" @click="$router.push('/blog')">+ 发点什么</button>
-          <button class="gc-btn ghost sm" @click="$router.push('/member')">家人</button>
+          <button v-if="canEdit" class="gc-btn ghost sm" @click="startEdit">{{ $t('warm.editHome') }}</button>
+          <button class="gc-btn primary sm" @click="$router.push('/blog')">{{ $t('warm.postSomething') }}</button>
+          <button class="gc-btn ghost sm" @click="$router.push('/member')">{{ $t('warm.family') }}</button>
         </template>
         <template v-else>
-          <button class="gc-btn ghost sm" @click="resetLayout">恢复默认</button>
-          <button class="gc-btn primary sm" @click="finishEdit">完成</button>
+          <button class="gc-btn ghost sm" @click="resetLayout">{{ $t('warm.resetLayout') }}</button>
+          <button class="gc-btn primary sm" @click="finishEdit">{{ $t('warm.done') }}</button>
         </template>
       </div>
     </div>
 
     <!-- 编辑提示条 -->
     <Transition name="gc-fade">
-      <div v-if="editMode" class="gc-edit-hint">编辑模式 · 拖拽卡片排序 · 右下角调整大小 · ✕ 移除组件 · 下方托盘添加组件</div>
+      <div v-if="editMode" class="gc-edit-hint">{{ $t('warm.editHint') }}</div>
     </Transition>
 
     <div class="gc-grid" ref="gridEl" @dragover="onReorderDragOver" @drop="onReorderDrop">
@@ -40,15 +40,15 @@
       >
         <!-- 编辑手柄 -->
         <template v-if="editMode && w.kind !== 'preview'">
-          <button class="gc-del" title="移除组件" @click.stop="removeWidget(w)">✕</button>
-          <div class="gc-grip" title="拖拽排序">⋮⋮</div>
-          <div class="gc-resize" title="拖拽调整大小" @mousedown.stop.prevent="onResizeStart($event, w)" @click.stop></div>
+          <button class="gc-del" :title="$t('warm.removeWidget')" @click.stop="removeWidget(w)">✕</button>
+          <div class="gc-grip" :title="$t('warm.dragSort')">⋮⋮</div>
+          <div class="gc-resize" :title="$t('warm.resizeWidget')" @mousedown.stop.prevent="onResizeStart($event, w)" @click.stop></div>
         </template>
 
         <!-- 天气活窗(暖居签名) -->
         <template v-if="w.id === 'weather'">
-          <h3 class="gc-card-h3"><span>天气窗 · {{ weatherCity }}</span></h3>
-          <div class="gc-glass" @click="!editMode && $router.push('/weather')">
+          <h3 class="gc-card-h3"><span>{{ $t('warm.weatherWindow', { city: weatherCity }) }}</span></h3>
+          <div class="gc-glass" v-a11y-click @click="!editMode && $router.push('/weather')">
             <div v-if="weatherBg" class="gc-win-bg" :style="{ backgroundImage: `url(${weatherBg})` }"></div>
             <div class="gc-win-glow"></div>
             <span class="gc-win-dust" style="animation-delay:-1s"></span>
@@ -78,60 +78,60 @@
 
         <!-- 家人动态 -->
         <template v-else-if="w.id === 'feed'">
-          <h3 class="gc-card-h3">家人动态</h3>
+          <h3 class="gc-card-h3">{{ $t('warm.widget.feed') }}</h3>
           <div v-if="feeds.length" class="gc-list">
-            <div v-for="(f, i) in feeds.slice(0, nFeed(w))" :key="i" class="gc-row" @click="!editMode && goFeed(f)">
+            <div v-for="(f, i) in feeds.slice(0, nFeed(w))" :key="i" class="gc-row" v-a11y-click @click="!editMode && goFeed(f)">
               <span class="gc-ic" :style="feedChipStyle(f.type)">{{ feedIcon(f.type) }}</span>
-              <span class="gc-val">{{ f.authorName || '家人' }}</span>
+              <span class="gc-val">{{ f.authorName || $t('feed.authorFallback') }}</span>
               <span class="gc-muted">{{ feedSummary(f) }}</span>
             </div>
           </div>
-          <div v-else class="gc-empty">暂无动态</div>
+          <div v-else class="gc-empty">{{ $t('warm.noFeed') }}</div>
         </template>
 
         <!-- 照片(暖居卡牌堆轮播) -->
         <template v-else-if="w.id === 'photos'">
-          <h3 class="gc-card-h3">照片<button class="gc-more" @click.stop="!editMode && $router.push('/album')">相册 →</button></h3>
-          <div v-if="photos.length" class="gc-photo-stack" @mouseenter="photoHover = true" @mouseleave="photoHover = false" @click="!editMode && advancePhotos()">
+          <h3 class="gc-card-h3">{{ $t('warm.widget.photos') }}<button class="gc-more" @click.stop="!editMode && $router.push('/album')">{{ $t('warm.albumArrow') }}</button></h3>
+          <div v-if="photos.length" class="gc-photo-stack" v-a11y-click @mouseenter="photoHover = true" @mouseleave="photoHover = false" @click="!editMode && advancePhotos()">
             <div v-for="(p, i) in stackCards" :key="p.id" class="gc-photo-pcard" :class="{ 'gc-photo-hovered': hoveredCard === i }" :style="pcardStyle(i)" @mouseenter="onCardEnter(i)" @mouseleave="onCardLeave()">
               <img :src="p.url" :alt="p.description || ''" loading="lazy" />
             </div>
             <div class="gc-photo-meta">
-              <span class="gc-photo-cap">{{ topPhoto?.description || '家庭照片' }}</span>
+              <span class="gc-photo-cap">{{ topPhoto?.description || $t('warm.familyPhoto') }}</span>
               <span class="gc-photo-count">{{ photoIndex + 1 }} / {{ photos.length }}</span>
             </div>
-            <button v-if="photos.length > 1 && !editMode" class="gc-photo-nav gc-photo-prev" @click.stop="prevPhotos()" aria-label="上一张">
+            <button v-if="photos.length > 1 && !editMode" class="gc-photo-nav gc-photo-prev" @click.stop="prevPhotos()" :aria-label="$t('warm.prevPhoto')">
               <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" /></svg>
             </button>
-            <button v-if="photos.length > 1 && !editMode" class="gc-photo-nav gc-photo-next" @click.stop="advancePhotos()" aria-label="下一张">
+            <button v-if="photos.length > 1 && !editMode" class="gc-photo-nav gc-photo-next" @click.stop="advancePhotos()" :aria-label="$t('warm.nextPhoto')">
               <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" /></svg>
             </button>
           </div>
-          <div v-else class="gc-empty gc-empty-link" @click="!editMode && $router.push('/album')">去相册添加家庭照片</div>
+          <div v-else class="gc-empty gc-empty-link" v-a11y-click @click="!editMode && $router.push('/album')">{{ $t('warm.addPhoto') }}</div>
         </template>
 
         <!-- 纪念日 -->
         <template v-else-if="w.id === 'anni'">
-          <h3 class="gc-card-h3">纪念日</h3>
+          <h3 class="gc-card-h3">{{ $t('warm.widget.anni') }}</h3>
           <template v-if="anniversaries.length">
             <div class="gc-val-lg">{{ anniversaries[0].label }}</div>
-            <div class="gc-muted">{{ anniversaries[0].date }} · 还有 <span class="gc-days">{{ anniversaries[0].days }}</span> 天</div>
+            <div class="gc-muted">{{ anniversaries[0].date }} · <span class="gc-days">{{ $t('warm.daysLeft', { n: anniversaries[0].days }) }}</span></div>
             <div class="gc-meter"><i :style="{ width: Math.min(100, anniversaries[0].days) + '%' }"></i></div>
             <div v-if="nAnni(w) > 1" class="gc-list gc-anni-more">
               <div v-for="(a, i) in anniversaries.slice(1, nAnni(w))" :key="i" class="gc-row">
-                <span class="gc-ic">🎂</span><span class="gc-val">{{ a.label }}</span><span class="gc-muted">{{ a.days }} 天</span>
+                <span class="gc-ic">🎂</span><span class="gc-val">{{ a.label }}</span><span class="gc-muted">{{ $t('warm.daysUnit', { n: a.days }) }}</span>
               </div>
             </div>
           </template>
-          <div v-else class="gc-empty">暂无纪念日</div>
+          <div v-else class="gc-empty">{{ $t('warm.noAnni') }}</div>
         </template>
 
         <!-- 本月收支 -->
         <template v-else-if="w.id === 'finance'">
-          <h3 class="gc-card-h3">本月收支<span class="gc-muted">{{ bookSummary.month || '' }}</span></h3>
+          <h3 class="gc-card-h3">{{ $t('warm.widget.finance') }}<span class="gc-muted">{{ bookSummary.month || '' }}</span></h3>
           <div class="gc-flex-baseline">
             <div class="gc-val-lg">¥ {{ fmt(balance) }}</div>
-            <div class="gc-muted">{{ bookSummary.count ?? 0 }} 笔</div>
+            <div class="gc-muted">{{ $t('warm.entries', { n: bookSummary.count ?? 0 }) }}</div>
           </div>
           <div class="gc-fin-row">
             <span class="gc-fin in">+{{ fmt(bookSummary.income) }}</span>
@@ -141,20 +141,20 @@
             <i class="in" :style="{ width: incomePct + '%' }"></i>
             <i class="out" :style="{ width: (100 - incomePct) + '%' }"></i>
           </div>
-          <div v-else class="gc-empty" style="padding:8px 0">本月还没有记账</div>
+          <div v-else class="gc-empty" style="padding:8px 0">{{ $t('warm.noBook') }}</div>
         </template>
 
         <!-- 寻物(搜索 + 语音 + 户型图预览 / 列表) -->
         <template v-else-if="w.id === 'item'">
-          <h3 class="gc-card-h3">寻物<span class="gc-muted">{{ itemHouse?.name || '' }}</span><button class="gc-more" @click.stop="!editMode && $router.push('/item')">管理 →</button></h3>
+          <h3 class="gc-card-h3">{{ $t('warm.widget.item') }}<span class="gc-muted">{{ itemHouse?.name || '' }}</span><button class="gc-more" @click.stop="!editMode && $router.push('/item')">{{ $t('warm.itemManage') }}</button></h3>
           <div class="gc-item-search">
-            <input v-model="itemKeyword" class="gc-item-input" :placeholder="itemSearching ? '✨ AI 语义找物中…' : '搜索物品 / 位置 / 俗称…'" @keyup.enter="onItemSearch" @input="!itemKeyword && clearItemSearch()" />
-            <button class="gc-btn ghost sm gc-item-voice" :class="{ recording: itemVoiceRecording }" :disabled="itemVoiceProcessing" title="语音找物" @click="toggleItemVoice">🎤</button>
+            <input v-model="itemKeyword" class="gc-item-input" :placeholder="itemSearching ? $t('warm.searchingAI') : $t('warm.searchPlaceholder')" @keyup.enter="onItemSearch" @input="!itemKeyword && clearItemSearch()" />
+            <button class="gc-btn ghost sm gc-item-voice" :class="{ recording: itemVoiceRecording }" :disabled="itemVoiceProcessing" :title="$t('warm.voiceFindItem')" @click="toggleItemVoice">🎤</button>
           </div>
 
           <!-- 高行(≥3 行):户型图预览 + 命中高亮 -->
           <template v-if="itemShowFloorPlan(w)">
-            <div class="gc-item-plan" @click="!editMode && $router.push('/item')">
+            <div class="gc-item-plan" v-a11y-click @click="!editMode && $router.push('/item')">
               <svg v-if="itemFloorPlanView" :viewBox="itemFloorPlanView.viewBox" preserveAspectRatio="xMidYMid meet" class="gc-item-svg">
                 <image v-if="itemFloorPlanView.imageUrl" :href="itemFloorPlanView.imageUrl" :transform="itemFloorPlanView.imgTransform" class="gc-item-bg" />
                 <g v-for="r in itemFloorPlanView.rooms" :key="r.id">
@@ -170,78 +170,78 @@
                   <text :x="it.ax" :y="it.ay - 9" class="gc-item-dot-label">{{ it.name }}</text>
                 </g>
               </svg>
-              <div v-else class="gc-empty gc-empty-link">去登记户型图与物品</div>
+              <div v-else class="gc-empty gc-empty-link">{{ $t('warm.goRegisterFloor') }}</div>
               <div v-if="itemResults.length" class="gc-item-results" @click.stop>
-                <div v-for="it in itemResults.slice(0, 5)" :key="it.id" class="gc-row" @click="!editMode && $router.push('/item')">
+                <div v-for="it in itemResults.slice(0, 5)" :key="it.id" class="gc-row" v-a11y-click @click="!editMode && $router.push('/item')">
                   <span class="gc-ic">📦</span><span class="gc-val">{{ it.name }}</span><span class="gc-muted">{{ itemPathOf(it) }}</span>
                 </div>
               </div>
-              <div v-else-if="itemSearched && !itemSearching" class="gc-item-nohit">没找到，换个说法试试</div>
+              <div v-else-if="itemSearched && !itemSearching" class="gc-item-nohit">{{ $t('warm.noItemHit') }}</div>
             </div>
           </template>
 
           <!-- 矮行(<3 行):列表式搜索结果 -->
           <template v-else>
             <div v-if="itemResults.length" class="gc-list">
-              <div v-for="it in itemResults.slice(0, nItem(w))" :key="it.id" class="gc-row" @click="!editMode && $router.push('/item')">
+              <div v-for="it in itemResults.slice(0, nItem(w))" :key="it.id" class="gc-row" v-a11y-click @click="!editMode && $router.push('/item')">
                 <span class="gc-ic">📦</span><span class="gc-val">{{ it.name }}</span><span class="gc-muted">{{ itemPathOf(it) }}</span>
               </div>
             </div>
-            <div v-else-if="itemSearched && !itemSearching" class="gc-empty">未找到相关物品</div>
+            <div v-else-if="itemSearched && !itemSearching" class="gc-empty">{{ $t('warm.noItems') }}</div>
             <div v-else-if="items.length" class="gc-list">
-              <div v-for="it in items.slice(0, nItem(w))" :key="it.id" class="gc-row" @click="!editMode && $router.push('/item')">
+              <div v-for="it in items.slice(0, nItem(w))" :key="it.id" class="gc-row" v-a11y-click @click="!editMode && $router.push('/item')">
                 <span class="gc-ic">📦</span><span class="gc-val">{{ it.name }}</span><span class="gc-tag">{{ it.room_name || it.house_name || '—' }}</span>
               </div>
             </div>
-            <div v-else class="gc-empty gc-empty-link" @click="!editMode && $router.push('/item')">尚未登记物品 · 去添加</div>
+            <div v-else class="gc-empty gc-empty-link" v-a11y-click @click="!editMode && $router.push('/item')">{{ $t('warm.noItemsRegistered') }}</div>
           </template>
         </template>
 
         <!-- 悬赏任务 -->
         <template v-else-if="w.id === 'task'">
-          <h3 class="gc-card-h3">悬赏任务</h3>
+          <h3 class="gc-card-h3">{{ $t('warm.widget.task') }}</h3>
           <div v-if="tasks.length" class="gc-list">
-            <div v-for="t in tasks.slice(0, nTask(w))" :key="t.id" class="gc-row" @click="!editMode && $router.push('/task')">
+            <div v-for="t in tasks.slice(0, nTask(w))" :key="t.id" class="gc-row" v-a11y-click @click="!editMode && $router.push('/task')">
               <span class="gc-ic">{{ taskIcon(t.rewardType) }}</span>
               <span class="gc-val">{{ t.title }}</span>
               <span class="gc-tag" :class="TASK_STATUS_TAG[t.status]">{{ taskStatusLabel(t.status) }}</span>
             </div>
           </div>
-          <div v-else class="gc-empty">暂无任务</div>
+          <div v-else class="gc-empty">{{ $t('warm.noTask') }}</div>
         </template>
 
         <!-- 愿望单 -->
         <template v-else-if="w.id === 'wish'">
-          <h3 class="gc-card-h3">愿望单</h3>
+          <h3 class="gc-card-h3">{{ $t('warm.widget.wish') }}</h3>
           <div v-if="wishes.length" class="gc-list">
-            <div v-for="wi in wishes.slice(0, nWish(w))" :key="wi.id" class="gc-row" @click="!editMode && $router.push('/wish')">
+            <div v-for="wi in wishes.slice(0, nWish(w))" :key="wi.id" class="gc-row" v-a11y-click @click="!editMode && $router.push('/wish')">
               <span class="gc-ic">⭐</span>
               <span class="gc-val" :class="{ done: wi.status === 'ACHIEVED' }">{{ wi.title }}</span>
-              <span v-if="wi.status === 'ACHIEVED'" class="gc-tag grn">已实现</span>
+              <span v-if="wi.status === 'ACHIEVED'" class="gc-tag grn">{{ $t('warm.achieved') }}</span>
             </div>
           </div>
-          <div v-else class="gc-empty">暂无愿望</div>
+          <div v-else class="gc-empty">{{ $t('warm.noWish') }}</div>
         </template>
 
         <!-- 今日提醒 -->
         <template v-else-if="w.id === 'reminder'">
-          <h3 class="gc-card-h3">今日提醒</h3>
+          <h3 class="gc-card-h3">{{ $t('warm.widget.reminder') }}</h3>
           <div v-if="reminders.length" class="gc-list">
-            <div v-for="r in reminders.slice(0, nReminder(w))" :key="r.id" class="gc-row" @click="!editMode && $router.push('/reminder')">
+            <div v-for="r in reminders.slice(0, nReminder(w))" :key="r.id" class="gc-row" v-a11y-click @click="!editMode && $router.push('/reminder')">
               <span class="gc-ic">🔔</span>
               <span class="gc-val">{{ r.title }}</span>
               <span class="gc-muted">{{ (r.remindTime || '').slice(0, 5) }}</span>
             </div>
           </div>
-          <div v-else class="gc-empty">今日无待办</div>
+          <div v-else class="gc-empty">{{ $t('warm.noReminder') }}</div>
         </template>
 
         <!-- 快捷入口(无专属内容的模块拖入后生成) -->
         <template v-else-if="w.kind === 'link'">
           <h3 class="gc-card-h3">{{ w.label }}</h3>
-          <div class="gc-link-body" @click="!editMode && $router.push(w.path)">
+          <div class="gc-link-body" v-a11y-click @click="!editMode && $router.push(w.path)">
             <span class="gc-link-icon">{{ w.icon }}</span>
-            <span class="gc-link-text">打开{{ w.label }}</span>
+            <span class="gc-link-text">{{ $t('warm.linkOpen', { label: w.label }) }}</span>
             <span class="gc-link-arrow">→</span>
           </div>
         </template>
@@ -251,7 +251,7 @@
           <div class="gc-preview-body">
             <span class="gc-preview-icon">{{ w.icon }}</span>
             <span class="gc-preview-label">{{ w.label }}</span>
-            <span class="gc-preview-hint">{{ w.hint || '松手放置' }}</span>
+            <span class="gc-preview-hint">{{ w.hint || $t('warm.dropHere') }}</span>
           </div>
         </template>
       </div>
@@ -260,7 +260,7 @@
     <!-- 添加组件托盘(编辑态) -->
     <Transition name="gc-fade">
       <div v-if="editMode && availableWidgets.length" class="gc-add-tray">
-        <div class="gc-add-label">添加组件</div>
+        <div class="gc-add-label">{{ $t('warm.addWidget') }}</div>
         <button v-for="w in availableWidgets" :key="w.id" class="gc-add-item" @click="addWidget(w.id)">
           <span class="gc-add-icon">{{ w.icon }}</span>{{ w.label }}
         </button>
@@ -272,6 +272,7 @@
 <script setup>
 import { computed, inject, onMounted, onBeforeUnmount, ref, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
@@ -280,8 +281,12 @@ import { useWarmWidgetDrag } from '@/utils/widgetDragData'
 import { addedCodes } from '@/utils/warmHomeShared'
 import { publicApi, bookApi, itemApi, taskApi, wishApi, reminderApi, aiApi } from '@/api'
 import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
+import { feedSummary as feedSummaryOf } from '@/utils/feed'
+import { pickDefaultFloor } from '@/utils/floorPlanGeom'
+import { dictText } from '@/utils/dict'
 
 const router = useRouter()
+const { t, locale } = useI18n()
 const appStore = useAppStore()
 const userStore = useUserStore()
 const sunLight = inject(SUN_LIGHT_KEY)
@@ -296,17 +301,18 @@ const anniversaries = computed(() => appStore.stats.upcomingEvents || [])
 // 9 个富组件(有专属内容模板);span=8/4 对应 12 列栅格分栏
 // chip = 该卡的色相锚点(--blob-N:1 陶土 / 2 暖沙 / 3 鼠尾草 / 4 暖米 / 5 暖木),标题竖条与列表图标芯片都取此色
 const WIDGETS = [
-  { id: 'weather', label: '天气活窗', icon: '🌤', span: 8, chip: 1 },
-  { id: 'feed', label: '家人动态', icon: '👥', span: 4, chip: 3 },
-  { id: 'photos', label: '照片', icon: '📷', span: 4, chip: 2 },
-  { id: 'anni', label: '纪念日', icon: '🎂', span: 4, chip: 1 },
-  { id: 'finance', label: '本月收支', icon: '💰', span: 4, chip: 3 },
-  { id: 'item', label: '寻物', icon: '📦', span: 4, chip: 5 },
-  { id: 'task', label: '悬赏任务', icon: '🎯', span: 4, chip: 5 },
-  { id: 'wish', label: '愿望单', icon: '⭐', span: 4, chip: 3 },
-  { id: 'reminder', label: '今日提醒', icon: '🔔', span: 4, chip: 1 },
+  { id: 'weather', labelKey: 'warm.widget.weather', icon: '🌤', span: 8, chip: 1 },
+  { id: 'feed', labelKey: 'warm.widget.feed', icon: '👥', span: 4, chip: 3 },
+  { id: 'photos', labelKey: 'warm.widget.photos', icon: '📷', span: 4, chip: 2 },
+  { id: 'anni', labelKey: 'warm.widget.anni', icon: '🎂', span: 4, chip: 1 },
+  { id: 'finance', labelKey: 'warm.widget.finance', icon: '💰', span: 4, chip: 3 },
+  { id: 'item', labelKey: 'warm.widget.item', icon: '📦', span: 4, chip: 5 },
+  { id: 'task', labelKey: 'warm.widget.task', icon: '🎯', span: 4, chip: 5 },
+  { id: 'wish', labelKey: 'warm.widget.wish', icon: '⭐', span: 4, chip: 3 },
+  { id: 'reminder', labelKey: 'warm.widget.reminder', icon: '🔔', span: 4, chip: 1 },
 ]
 const WIDGET_BY_ID = Object.fromEntries(WIDGETS.map((w) => [w.id, w]))
+const widgetLabel = (base) => t(base.labelKey)
 // 卡片色相锚点 → 内联 --chip,供 .gc-card-h3::before 与 .gc-ic 取色(后代继承)
 const cardStyle = (w) => ({ '--chip': `var(--blob-${w.chip || 1})` })
 
@@ -317,27 +323,27 @@ const MODULE_TO_WIDGET = {
 }
 // 全部模块的入口元信息(标题/路径/图标),快捷入口卡片据此渲染
 const MODULE_META = {
-  blog: { title: '博客', path: '/blog', icon: '📝' },
-  diary: { title: '日记本', path: '/diary', icon: '📖' },
-  album: { title: '相册', path: '/album', icon: '📷' },
-  cinema: { title: '放映厅', path: '/cinema', icon: '🎬' },
-  music: { title: '音乐', path: '/music', icon: '🎵' },
-  library: { title: '书架', path: '/library', icon: '📚' },
-  item: { title: '物品定位', path: '/item', icon: '📦' },
-  kitchen: { title: '厨房', path: '/kitchen', icon: '🍳' },
-  anniversary: { title: '纪念日', path: '/anniversary', icon: '🎂' },
-  points: { title: '积分商城', path: '/points', icon: '🏆' },
-  task: { title: '任务悬赏', path: '/task', icon: '🎯' },
-  reminder: { title: '今日提醒', path: '/reminder', icon: '🔔' },
-  plan: { title: '家庭计划', path: '/plan', icon: '📋' },
-  wish: { title: '愿望单', path: '/wish', icon: '⭐' },
-  book: { title: '记账本', path: '/book', icon: '💰' },
-  cascade: { title: '照片瀑布', path: '/cascade', icon: '🖼' },
-  tree: { title: '家谱', path: '/tree', icon: '🌳' },
-  tools: { title: '工具箱', path: '/tools', icon: '🧰' },
-  member: { title: '家庭成员', path: '/member', icon: '👨‍👩‍👧' },
-  storage: { title: '文件浏览', path: '/storage/files', icon: '🗂' },
-  plant: { title: '花园', path: '/plant', icon: '🌱' },
+  blog: { titleKey: 'warm.module.blog', path: '/blog', icon: '📝' },
+  diary: { titleKey: 'warm.module.diary', path: '/diary', icon: '📖' },
+  album: { titleKey: 'warm.module.album', path: '/album', icon: '📷' },
+  cinema: { titleKey: 'warm.module.cinema', path: '/cinema', icon: '🎬' },
+  music: { titleKey: 'warm.module.music', path: '/music', icon: '🎵' },
+  library: { titleKey: 'warm.module.library', path: '/library', icon: '📚' },
+  item: { titleKey: 'warm.module.item', path: '/item', icon: '📦' },
+  kitchen: { titleKey: 'warm.module.kitchen', path: '/kitchen', icon: '🍳' },
+  anniversary: { titleKey: 'warm.module.anniversary', path: '/anniversary', icon: '🎂' },
+  points: { titleKey: 'warm.module.points', path: '/points', icon: '🏆' },
+  task: { titleKey: 'warm.module.task', path: '/task', icon: '🎯' },
+  reminder: { titleKey: 'warm.module.reminder', path: '/reminder', icon: '🔔' },
+  plan: { titleKey: 'warm.module.plan', path: '/plan', icon: '📋' },
+  wish: { titleKey: 'warm.module.wish', path: '/wish', icon: '⭐' },
+  book: { titleKey: 'warm.module.book', path: '/book', icon: '💰' },
+  cascade: { titleKey: 'warm.module.cascade', path: '/cascade', icon: '🖼' },
+  tree: { titleKey: 'warm.module.tree', path: '/tree', icon: '🌳' },
+  tools: { titleKey: 'warm.module.tools', path: '/tools', icon: '🧰' },
+  member: { titleKey: 'warm.module.member', path: '/member', icon: '👨‍👩‍👧' },
+  storage: { titleKey: 'warm.module.storage', path: '/storage/files', icon: '🗂' },
+  plant: { titleKey: 'warm.module.plant', path: '/plant', icon: '🌱' },
 }
 
 // 布局键:富组件用其 id(如 feed),快捷入口用 'link:<code>'(如 link:diary);每项携带 span(列宽)+ row(行高),可调整
@@ -351,11 +357,11 @@ const resolveWidget = (entry) => {
   if (id.startsWith('link:')) {
     const meta = MODULE_META[id.slice(5)]
     if (!meta) return null
-    return { id, kind: 'link', code: id.slice(5), label: meta.title, icon: meta.icon, path: meta.path, span: entry.span || 4, row, chip: 3 }
+    return { id, kind: 'link', code: id.slice(5), label: t(meta.titleKey), icon: meta.icon, path: meta.path, span: entry.span || 4, row, chip: 3 }
   }
   const base = WIDGET_BY_ID[id]
   if (!base) return null
-  return { ...base, span: entry.span || base.span, row }
+  return { ...base, label: widgetLabel(base), span: entry.span || base.span, row }
 }
 
 // 默认展示 6 张(照片/纪念日/收支 3 行、寻物整行户型图);其余富组件(task/wish/reminder)由托盘加入,其余模块经侧栏拖入为入口卡片
@@ -390,7 +396,7 @@ const saveLayout = () => { try { localStorage.setItem(STORAGE_KEY, JSON.stringif
 const layout = ref((loadLayout() || DEFAULT_LAYOUT).map((e) => ({ ...e })))
 const widgets = computed(() => layout.value.map(resolveWidget).filter(Boolean))
 // 托盘仅列富组件(含无侧栏入口的天气);入口卡片经侧栏拖入
-const availableWidgets = computed(() => WIDGETS.filter((w) => !layout.value.some((e) => e.id === w.id)))
+const availableWidgets = computed(() => WIDGETS.filter((w) => !layout.value.some((e) => e.id === w.id)).map((w) => ({ ...w, label: widgetLabel(w) })))
 
 // ========== 已添加模块集合(供侧栏在编辑模式标记「已拖入冲突」) ==========
 const WIDGET_TO_MODULE = Object.fromEntries(Object.entries(MODULE_TO_WIDGET).map(([code, wid]) => [wid, code]))
@@ -451,12 +457,12 @@ const applyLayout = (entries) => {
   nextTick(() => flipLayout(prev))
 }
 const addWidget = (id) => {
-  if (layout.value.some((e) => e.id === id)) { ElMessage.info('该组件已在首页'); return }
+  if (layout.value.some((e) => e.id === id)) { ElMessage.info(t('warm.alreadyAdded')); return }
   applyLayout([...layout.value, { id, span: defaultSpan(id), row: defaultRow(id) }])
-  ElMessage.success(`已添加 ${resolveWidget({ id, span: defaultSpan(id), row: defaultRow(id) })?.label || ''} 组件`)
+  ElMessage.success(t('warm.addedToast', { label: resolveWidget({ id, span: defaultSpan(id), row: defaultRow(id) })?.label || '' }))
 }
 const removeWidget = (w) => { applyLayout(layout.value.filter((e) => e.id !== w.id)) }
-const resetLayout = () => { layout.value = DEFAULT_LAYOUT.map((e) => ({ ...e })); saveLayout(); ElMessage.success('布局已重置') }
+const resetLayout = () => { layout.value = DEFAULT_LAYOUT.map((e) => ({ ...e })); saveLayout(); ElMessage.success(t('warm.layoutReset')) }
 
 // ========== 编辑模式(复用 appStore.homeEditMode,与光尘同一开关) ==========
 const editMode = computed(() => appStore.homeEditMode)
@@ -503,17 +509,17 @@ const displayWidgets = computed(() => {
   const dp = dropPreview.value
   if (rp) {
     // 卡片重排:源卡片保留原位(降透明度表示"被拿起"),在目标下标插入同尺寸占位
-    list.splice(Math.max(0, Math.min(rp.index, list.length)), 0, { id: '__reorder__', kind: 'preview', label: rp.label, icon: rp.icon, span: rp.span, row: rp.row, hint: '移到此处' })
+    list.splice(Math.max(0, Math.min(rp.index, list.length)), 0, { id: '__reorder__', kind: 'preview', label: rp.label, icon: rp.icon, span: rp.span, row: rp.row, hint: t('warm.moveHere') })
   } else if (dp) {
-    list.splice(Math.max(0, Math.min(dp.index, list.length)), 0, { id: '__preview__', kind: 'preview', label: dp.label, icon: dp.icon, span: 4, row: 2, hint: '松手放置' })
+    list.splice(Math.max(0, Math.min(dp.index, list.length)), 0, { id: '__preview__', kind: 'preview', label: dp.label, icon: dp.icon, span: 4, row: 2, hint: t('warm.dropHere') })
   }
   return list
 })
 const previewMeta = (code) => {
   const wid = MODULE_TO_WIDGET[code]
-  if (wid) { const base = WIDGET_BY_ID[wid]; if (base) return { label: base.label, icon: base.icon } }
+  if (wid) { const base = WIDGET_BY_ID[wid]; if (base) return { label: widgetLabel(base), icon: base.icon } }
   const meta = MODULE_META[code]
-  return meta ? { label: meta.title, icon: meta.icon } : null
+  return meta ? { label: t(meta.titleKey), icon: meta.icon } : null
 }
 // 由鼠标坐标推导插入下标(网格自动流,按视觉顺序逐项判断)
 const insertionIndexAt = (x, y) => {
@@ -536,12 +542,12 @@ const insertWidgetAt = (code, idx) => {
   const id = MODULE_TO_WIDGET[code] || `link:${code}`
   const resolved = resolveWidget({ id, span: defaultSpan(id), row: defaultRow(id) })
   if (!resolved) { dropPreview.value = null; return }
-  if (layout.value.some((e) => e.id === id)) { ElMessage.info('该组件已在首页'); dropPreview.value = null; return }
+  if (layout.value.some((e) => e.id === id)) { ElMessage.info(t('warm.alreadyAdded')); dropPreview.value = null; return }
   dropPreview.value = null
   const list = [...layout.value]
   list.splice(Math.max(0, Math.min(idx, list.length)), 0, { id, span: defaultSpan(id), row: defaultRow(id) })
   applyLayout(list)
-  ElMessage.success(`已添加 ${resolved.label} 组件`)
+  ElMessage.success(t('warm.addedToast', { label: resolved.label }))
 }
 // 拖拽移动(鼠标事件驱动,同步更新):进入网格 → 幽灵变形为卡片 + 占位推挤;离开 → 还原
 const updateDragPreview = (nx, ny) => {
@@ -555,7 +561,7 @@ const updateDragPreview = (nx, ny) => {
     if (!cur || cur.code !== dragCode.value || cur.index !== idx) {
       const prev = captureRects()
       const meta = previewMeta(dragCode.value)
-      dropPreview.value = { code: dragCode.value, label: meta?.label || dragLabel.value || '新组件', icon: meta?.icon || '✨', index: idx }
+      dropPreview.value = { code: dragCode.value, label: meta?.label || dragLabel.value || t('warm.newWidget'), icon: meta?.icon || '✨', index: idx }
       nextTick(() => flipLayout(prev))
     }
   } else {
@@ -737,15 +743,7 @@ const { recording: itemVoiceRecording, start: itemVoiceStart, stop: itemVoiceSto
 const itemVoiceProcessing = ref(false)
 let itemVoiceTimer = null
 
-const defaultFloorOfHouse = (house) => {
-  const set = new Set()
-  if (house?.floorPlans) {
-    try { const fp = JSON.parse(house.floorPlans); Object.keys(fp).forEach((k) => { if (k !== 'floorOrder') set.add(Number(k)) }) } catch {}
-  }
-  if (set.has(1)) return 1
-  if (set.size) return Math.max(...set)
-  return 1
-}
+const defaultFloorOfHouse = (house) => pickDefaultFloor(house?.floorPlans)
 const loadItemFloorPlan = async (house) => {
   itemHouse.value = house
   itemImgTransform.value = null
@@ -792,7 +790,7 @@ const toggleItemVoice = async () => {
     await itemVoiceStart()
     clearTimeout(itemVoiceTimer)
     itemVoiceTimer = setTimeout(() => { if (itemVoiceRecording.value) finishItemVoice() }, 10000)
-  } catch (e) { ElMessage.warning('麦克风不可用') }
+  } catch (e) { ElMessage.warning(t('warm.micUnavailable')) }
 }
 const finishItemVoice = async () => {
   clearTimeout(itemVoiceTimer)
@@ -803,7 +801,7 @@ const finishItemVoice = async () => {
     const file = new File([blob], 'voice.wav', { type: 'audio/wav' })
     const r = await aiApi.transcribe(file, null)
     const text = (r.text || '').trim()
-    if (!text) { ElMessage.warning('未识别到语音'); return }
+    if (!text) { ElMessage.warning(t('warm.noVoice')); return }
     itemKeyword.value = text
     await onItemSearch()
   } catch (e) {} finally { itemVoiceProcessing.value = false }
@@ -880,15 +878,16 @@ onMounted(async () => {
   const h = Array.isArray(houses) ? houses : []
   if (h.length) await loadItemFloorPlan(h[0])
   startPhotoTimer()
+  clockTimer = setInterval(() => { now.value = new Date() }, 60000)
 })
-onBeforeUnmount(() => { stopPhotoTimer(); if (itemVoiceRecording.value) itemVoiceStop() })
+onBeforeUnmount(() => { stopPhotoTimer(); clearInterval(clockTimer); if (itemVoiceRecording.value) itemVoiceStop() })
 
-const weatherCity = computed(() => sunLight?.weather?.value?.city || appStore.familyName || '杭州')
+const weatherCity = computed(() => sunLight?.weather?.value?.city || appStore.familyName || '')
 const weatherTemp = computed(() => sunLight?.weather?.value?.temp ?? 24)
-const weatherText = computed(() => sunLight?.weather?.value?.text || (sunLight?.weather?.value?.condition === 'cloud' ? '多云' : '晴 · 白云缓移'))
+const weatherText = computed(() => sunLight?.weather?.value?.text || (sunLight?.weather?.value?.condition === 'cloud' ? t('warm.weatherCloudy') : t('warm.weatherSunny')))
 const weatherSub = computed(() => {
-  const t = sunLight?.weather?.value?.temp
-  if (t != null) return t >= 28 ? '仿佛窗外就是午后阳光' : t >= 15 ? '不冷不热，正好在家' : '屋里有灯，心里就暖'
+  const temp = sunLight?.weather?.value?.temp
+  if (temp != null) return temp >= 28 ? t('warm.weatherHot') : temp >= 15 ? t('warm.weatherMild') : t('warm.weatherCold')
   return ''
 })
 const weatherDetail = computed(() => sunLight?.weatherDetail?.value)
@@ -898,7 +897,7 @@ const forecast = computed(() => (weatherDetail.value?.daily || []).slice(1, 4))
 const fcDate = (d) => { const dt = new Date(d); return `${dt.getMonth() + 1}/${dt.getDate()}` }
 // 巨大档关键指标(湿度/风力/PM2.5;缺数据显示 —)
 const humidityText = computed(() => { const h = weatherDetail.value?.nowFull?.humidity; return h != null ? `${h}%` : '—' })
-const windText = computed(() => { const f = weatherDetail.value?.nowFull; if (!f) return '—'; const dir = f.windDir || ''; const scale = f.windScale != null ? `${f.windScale} 级` : ''; return (dir || scale) ? `${dir} ${scale}`.trim() : '—' })
+const windText = computed(() => { const f = weatherDetail.value?.nowFull; if (!f) return '—'; const dir = f.windDir || ''; const scale = f.windScale != null ? t('home.dashboard.windScale', { n: f.windScale }) : ''; return (dir || scale) ? `${dir} ${scale}`.trim() : '—' })
 const pm25Text = computed(() => { const p = weatherDetail.value?.air?.pm2p5; return p != null ? `${p}` : '—' })
 
 const FEED_ICON = { blog: '📝', diary: '📖', photo: '📷', video: '🎬', wish: '🎁', task: '🎯', recipe: '🍳', book: '📚' }
@@ -907,34 +906,26 @@ const feedIcon = (type) => FEED_ICON[type] || '✨'
 // 动态类型 → 图标芯片色相(博客陶土 / 影像暖沙 / 愿望鼠尾草 / 日记·任务暖木)
 const FEED_CHIP = { blog: 1, diary: 5, photo: 2, video: 2, wish: 3, task: 5, recipe: 1, book: 3 }
 const feedChipStyle = (type) => ({ '--chip': `var(--blob-${FEED_CHIP[type] || 1})` })
-const feedSummary = (f) => {
-  if (f.type === 'blog') return f.title || ''
-  if (f.type === 'diary') return (f.content || '').slice(0, 40)
-  if (f.type === 'photo') return `${f.count || 0} 张照片`
-  if (f.type === 'video') return `上传了影片:${f.title || ''}`
-  if (f.type === 'wish') return f.status === 'ACHIEVED' ? `实现了愿望:${f.title || ''}` : `许下愿望:${f.title || ''}`
-  if (f.type === 'task') return `发布任务:${f.title || ''}`
-  if (f.type === 'recipe') return `分享菜谱:${f.title || ''}`
-  if (f.type === 'book') return `上架图书:《${f.title || ''}》`
-  return ''
-}
+const feedSummary = (f) => feedSummaryOf(t, f)
 const goFeed = (f) => { if (f.type === 'blog' && f.id) router.push(`/blog/${f.id}`); else if (FEED_ROUTES[f.type]) router.push(FEED_ROUTES[f.type]) }
 const fmt = (n) => (Number(n) || 0).toFixed(2)
 
 // 任务枚举映射(与 sys_dict_item 一致:OPEN/IN_PROGRESS/REVIEW/DONE/CANCELLED;奖励 NONE/POINTS/ITEM)
-const TASK_STATUS_LABEL = { OPEN: '待领取', IN_PROGRESS: '进行中', REVIEW: '待确认', DONE: '已完成', CANCELLED: '已取消' }
 // 状态语义着色:进行中=主色 / 待确认=陶土 / 已完成=鼠尾草绿(设计稿 §3.4「已找到 绿标签」)
 const TASK_STATUS_TAG = { OPEN: '', IN_PROGRESS: 'pri', REVIEW: 'acc', DONE: 'grn', CANCELLED: '' }
 const TASK_REWARD_ICON = { NONE: '⭕', POINTS: '🎁', ITEM: '📦' }
-const taskStatusLabel = (s) => TASK_STATUS_LABEL[s] || ''
-const taskIcon = (t) => TASK_REWARD_ICON[t] || '⭕'
+const taskStatusLabel = (s) => dictText(t, 'taskStatus', s)
+const taskIcon = (type) => TASK_REWARD_ICON[type] || '⭕'
 
+// 问候语:走 now ref + interval,跨小时/切语言都能刷新(computed 内禁 new Date())
+const now = ref(new Date())
+let clockTimer = null
 const greeting = computed(() => {
-  const h = new Date().getHours()
-  if (h < 6) return '凌晨 · 好梦'
-  if (h < 12) return '早安'
-  if (h < 18) return '午后'
-  return '晚上好 · 家人都在'
+  const h = now.value.getHours()
+  if (h < 6) return t('warm.greeting.lateNight')
+  if (h < 12) return t('warm.greeting.morning')
+  if (h < 18) return t('warm.greeting.afternoon')
+  return t('warm.greeting.evening')
 })
 </script>
 

@@ -305,7 +305,7 @@
             </span>
           </div>
           <div v-for="it in searchResults" :key="it.id" class="fp-result" :class="{ on: highlightItemIds.includes(it.id) }" @click="locateItem(it)">
-            <img v-if="it.image_url" :src="it.image_url" class="fp-result-ava" />
+            <img v-if="it.image_url" :src="it.image_url" class="fp-result-ava" :alt="it.name || ''" />
             <div class="fp-result-text">
               <span class="fp-result-name">{{ it.name }}</span>
               <span class="fp-result-path">{{ it.house_name }} / {{ it.room_name }} / {{ it.furniture_name || it.position }}</span>
@@ -424,7 +424,7 @@
               <svg viewBox="0 0 16 16" width="12" height="12"><path d="M3 8.5 L6.5 12 L13 4.5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </span>
             <div class="item-main">
-              <img v-if="it.image_url" :src="it.image_url" class="item-avatar" />
+              <img v-if="it.image_url" :src="it.image_url" class="item-avatar" :alt="it.name || ''" />
               <span class="item-name">{{ it.name }}</span>
               <el-tag size="small">{{ dictText(t, 'item_type', it.type) }}</el-tag>
               <el-tag v-if="it.position" size="small" type="info">{{ it.position }}</el-tag>
@@ -488,7 +488,7 @@
         </el-form-item>
         <el-form-item :label="$t('item.itemImage')">
           <el-upload :show-file-list="false" :before-upload="(f) => uploadItemImage(f)" accept="image/*">
-            <img v-if="itemForm.image_url" :src="itemForm.image_url" class="item-image-preview" />
+            <img v-if="itemForm.image_url" :src="itemForm.image_url" class="item-image-preview" :alt="itemForm.name || ''" />
             <el-button v-else size="small"><el-icon><Plus /></el-icon> {{ $t('item.itemImage') }}</el-button>
           </el-upload>
         </el-form-item>
@@ -667,7 +667,7 @@ import { itemApi, fileApi, aiApi } from '@/api'
 import { useI18n } from 'vue-i18n'
 import { dictText } from '@/utils/dict'
 import { furnitureIcon } from '@/utils/furnitureIcon'
-import { splitPoly, mergePolys, pointInPoly, polyBBox, samePt } from '@/utils/floorPlanGeom'
+import { splitPoly, mergePolys, pointInPoly, polyBBox, samePt, pickDefaultFloor } from '@/utils/floorPlanGeom'
 import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
 import FloorPlanCanvas from './FloorPlanCanvas.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -843,19 +843,7 @@ const loadHouses = async () => {
 
 // 默认楼层:有 1 楼选 1 楼;没有 1 楼(纯地下/跳层编号)选最高层。
 // 楼层来源 = floorPlans JSON 键 ∪ 房间 floor(房间可能未进楼层配置)。
-const defaultFloorOf = (house) => {
-  const set = new Set()
-  if (house && house.floorPlans) {
-    try {
-      const fp = JSON.parse(house.floorPlans)
-      Object.keys(fp).forEach((k) => { if (k !== 'floorOrder') set.add(Number(k)) })
-    } catch {}
-  }
-  rooms.value.forEach((r) => { if (r.houseId === house?.id) set.add(r.floor) })
-  if (set.has(1)) return 1
-  if (set.size) return Math.max(...set)
-  return 1
-}
+const defaultFloorOf = (house) => pickDefaultFloor(house?.floorPlans, rooms.value.filter((r) => r.houseId === house?.id).map((r) => r.floor))
 const loadRooms = async () => {
   rooms.value = await itemApi.rooms(roomHouseFilter.value)
   // 默认楼层兜底:loadHouses 阶段 rooms 还没到位,默认层只按 floorPlans 键计算,

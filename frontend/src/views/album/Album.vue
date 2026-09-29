@@ -77,6 +77,9 @@
           </div>
         </div>
       </div>
+      <div v-else-if="loadError" style="padding: 20px 0; text-align: center; color: var(--color-text-secondary)">
+        {{ t('common.loadFailed') }} <el-button text size="small" @click="load">{{ t('common.retry') }}</el-button>
+      </div>
       <el-empty v-else :description="userStore.isGuest ? t('album.noPublicAlbum') : t('album.emptyHint')" />
     </div>
 
@@ -119,6 +122,7 @@ const userStore = useUserStore()
 const syncVisible = ref(false)
 const albums = ref([])
 const loading = ref(false)
+const loadError = ref(false)
 const editor = reactive({ visible: false, form: { id: null, name: '', type: 'public' } })
 
 // 顶层相册:层级映射的子相册不直接出现在列表页,进入父相册查看;再按关键词/来源/类型前端过滤(数据量小)
@@ -149,8 +153,11 @@ const formatDate = (d) => (d ? new Date(d).toLocaleDateString('zh-CN') : '')
 
 const load = async () => {
   loading.value = true
+  loadError.value = false
   try {
     albums.value = await albumApi.list()
+  } catch (e) {
+    loadError.value = true
   } finally {
     loading.value = false
   }

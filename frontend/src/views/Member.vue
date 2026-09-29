@@ -43,6 +43,10 @@
       </div>
     </div>
 
+    <div v-if="loadError" style="padding: 20px 0; text-align: center; color: var(--color-text-secondary)">
+      {{ t('common.loadFailed') }} <el-button text size="small" @click="load">{{ t('common.retry') }}</el-button>
+    </div>
+
     <div v-loading="loading" class="member-list">
       <div v-for="m in members" :key="m.id" class="member-row card">
         <el-avatar :size="40" :src="m.avatar">{{ (m.nickname || m.username || 'U').charAt(0) }}</el-avatar>
@@ -116,6 +120,7 @@ const { t } = useI18n()
 const userStore = useUserStore()
 const members = ref([])
 const loading = ref(false)
+const loadError = ref(false)
 const inviteCodes = ref([])
 const inviteRole = ref('MEMBER')
 const applies = ref([])
@@ -130,15 +135,23 @@ const roleName = (r) =>
 
 const formatDate = (d) => (d ? new Date(d).toLocaleString('zh-CN') : '')
 
-// 拉取成员列表;OWNER 额外加载邀请码与入家申请
+// 拉取成员列表;OWNER 额外加载邀请码与入家申请(三者并行,失败显示重试)
 const load = async () => {
   loading.value = true
+  loadError.value = false
   try {
-    members.value = await memberApi.list()
+    const [m, inv, app] = await Promise.all([
+      memberApi.list(),
+      userStore.isOwner ? memberApi.inviteList() : Promise.resolve([]),
+      userStore.isOwner ? familyApi.applyList() : Promise.resolve([]),
+    ])
+    members.value = m
     if (userStore.isOwner) {
-      inviteCodes.value = await memberApi.inviteList()
-      applies.value = await familyApi.applyList()
+      inviteCodes.value = inv
+      applies.value = app
     }
+  } catch (e) {
+    loadError.value = true
   } finally {
     loading.value = false
   }

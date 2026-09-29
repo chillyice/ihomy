@@ -30,7 +30,11 @@
         </div>
       </div>
 
-      <div v-if="!loading && !books.length" class="empty-state">
+      <div v-if="loadError" style="padding: 20px 0; text-align: center; color: var(--color-text-secondary)">
+        {{ $t('common.loadFailed') }} <el-button text size="small" @click="load">{{ $t('common.retry') }}</el-button>
+      </div>
+
+      <div v-if="!loading && !books.length && !loadError" class="empty-state">
         <el-empty :description="$t('diary.noData')">
           <button v-if="userStore.isLoggedIn" class="write-btn" @click="router.push('/diary/edit')">{{ $t('diary.emptyWriteBtn') }}</button>
         </el-empty>
@@ -53,11 +57,13 @@ const router = useRouter()
 const userStore = useUserStore()
 const books = ref([])
 const loading = ref(false)
+const loadError = ref(false)
 
 const fmtShort = (s) => String(s || '').slice(0, 10)
 
 const load = async () => {
   loading.value = true
+  loadError.value = false
   try {
     // ponytail: 一次拉 200 条客户端按作者分组;单作者超 200 篇再改服务端按作者分页
     const data = await diaryApi.list({ current: 1, size: 200 })
@@ -73,6 +79,8 @@ const load = async () => {
       if (!b.earliest || day < b.earliest) b.earliest = day
     }
     books.value = [...map.values()].sort((a, b) => (a.latest < b.latest ? 1 : -1))
+  } catch (e) {
+    loadError.value = true
   } finally {
     loading.value = false
   }

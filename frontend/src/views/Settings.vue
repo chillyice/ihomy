@@ -157,7 +157,7 @@
               <el-form-item label="BGM 歌单">
                 <div class="bg-playlist-list">
                   <div v-for="p in visiblePlaylists" :key="p.id" class="bg-playlist-item" :class="{ active: p.isBackground }">
-                    <img v-if="p.coverUrl" :src="p.coverUrl" class="bg-pl-cover" />
+                    <img v-if="p.coverUrl" :src="p.coverUrl" class="bg-pl-cover" alt="" />
                     <div v-else class="bg-pl-cover placeholder">🎼</div>
                     <div class="bg-pl-info">
                       <div class="bg-pl-name">{{ p.name }}</div>
@@ -745,7 +745,7 @@
     <el-dialog v-model="showAllPlaylists" title="全部歌单" width="560px" append-to-body>
       <div class="bg-playlist-list">
         <div v-for="p in allPlaylists" :key="p.id" class="bg-playlist-item" :class="{ active: p.isBackground }">
-          <img v-if="p.coverUrl" :src="p.coverUrl" class="bg-pl-cover" />
+          <img v-if="p.coverUrl" :src="p.coverUrl" class="bg-pl-cover" alt="" />
           <div v-else class="bg-pl-cover placeholder">🎼</div>
           <div class="bg-pl-info">
             <div class="bg-pl-name">{{ p.name }}</div>
@@ -894,23 +894,17 @@ const shareUrl = computed(() => {
   return `${base}/?hid=${shareToken.value}`
 })
 
-// 页面挂载时分别拉取个人资料与家庭设置,回填表单
+// 页面挂载时并行拉取个人资料、身份标签与家庭设置,回填表单(三者相互独立,各自 catch 互不影响)
 const load = async () => {
-  try {
-    const p = await profileApi.get()
-    Object.assign(profile, { nickname: p.nickname || '', avatar: p.avatar || '', birthday: p.birthday || null, gender: p.gender ?? 0 })
-  } catch (e) {
-    // 忽略
-  }
-  try {
-    // 身份标签独立接口拉取(未设置时 data 为 null)
-    const l = await profileApi.label()
-    if (l) Object.assign(labelForm, { label: l.label || '', color: l.color || '#C9807A' })
-  } catch (e) {
-    // 忽略
-  }
-  try {
-    const f = await familyApi.get()
+  const [p, l, f] = await Promise.all([
+    profileApi.get().catch(() => null),
+    profileApi.label().catch(() => null),
+    familyApi.get().catch(() => null),
+  ])
+  if (p) Object.assign(profile, { nickname: p.nickname || '', avatar: p.avatar || '', birthday: p.birthday || null, gender: p.gender ?? 0 })
+  // 身份标签独立接口拉取(未设置时 data 为 null)
+  if (l) Object.assign(labelForm, { label: l.label || '', color: l.color || '#C9807A' })
+  if (f) {
     Object.assign(family, {
       name: f.name || '', description: f.description || '', coverImage: f.coverImage || '',
       coverText: f.coverText || '', coverSubtitle: f.coverSubtitle || '', isPublic: f.isPublic ?? 1,
@@ -922,8 +916,6 @@ const load = async () => {
     weatherLocationId.value = ''
     shareToken.value = f.shareToken || ''
     loadAlertPush()
-  } catch (e) {
-    // 忽略
   }
   loadPlaylists()
   loadFamilies()

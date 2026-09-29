@@ -74,7 +74,7 @@
                 <svg v-if="selectedIds.includes(b.id)" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg>
               </div>
               <div class="book-cover-wrap">
-                <img v-if="b.coverUrl" :src="b.coverUrl" class="book-cover" />
+                <img v-if="b.coverUrl" :src="b.coverUrl" class="book-cover" :alt="b.title || ''" />
                 <div v-else class="book-cover placeholder">
                   <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
                 </div>
@@ -104,7 +104,7 @@
               <div v-if="batchMode" class="book-check" @click.stop="toggleSelect(b.id)">
                 <svg v-if="selectedIds.includes(b.id)" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg>
               </div>
-              <img v-if="b.coverUrl" :src="b.coverUrl" class="row-cover" />
+              <img v-if="b.coverUrl" :src="b.coverUrl" class="row-cover" :alt="b.title || ''" />
               <div v-else class="row-cover placeholder"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
               <div class="row-info">
                 <div class="row-title">{{ b.title }}</div>

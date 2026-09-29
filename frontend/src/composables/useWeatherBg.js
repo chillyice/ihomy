@@ -16,6 +16,32 @@ const WEATHER_STYLES = ['电影感摄影', '水彩手绘', '油画', '极简插�
 const WEATHER_SCENES = ['城市街道', '公园', '海边', '山间', '郊野', '湖边', '窗前']
 const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)]
 
+// 本机缓存治理:data: URL(内联图,体积大)只留内存不落盘;条目上限 + 最长保留期,写入前裁剪
+const CACHE_MAX = 12
+const CACHE_MAX_AGE = 30 * 86400000
+const isPersistable = (e) => Boolean(e && e.url && !/^data:/i.test(e.url))
+
+// 写本机缓存:data: URL 跳过;裁剪过期/超量条目;配额超限删最旧一条重试一次
+const writeCache = (key, url) => {
+  if (/^data:/i.test(url)) return
+  try {
+    const now = Date.now()
+    const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}')
+    cache[key] = { url, ts: now }
+    const kept = Object.entries(cache)
+      .filter(([, e]) => isPersistable(e) && now - e.ts < CACHE_MAX_AGE)
+      .sort((a, b) => b[1].ts - a[1].ts)
+      .slice(0, CACHE_MAX)
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(Object.fromEntries(kept)))
+    } catch {
+      // 配额超限:丢最旧一条再试一次
+      if (kept.length > 1) localStorage.setItem(CACHE_KEY, JSON.stringify(Object.fromEntries(kept.slice(0, -1))))
+      else localStorage.removeItem(CACHE_KEY)
+    }
+  } catch {}
+}
+
 // 兜底:本机缓存里最新的天气图(优先当前城市,其次任意城市)
 const latestCached = (w) => {
   try {
@@ -25,7 +51,7 @@ const latestCached = (w) => {
     let any = null
     for (const k in cache) {
       const e = cache[k]
-      if (!e || !e.url) continue
+      if (!isPersistable(e)) continue
       if (city && k.startsWith(city + '|') && (!same || e.ts > same.ts)) same = e
       if (!any || e.ts > any.ts) any = e
     }
@@ -138,7 +164,7 @@ export function useWeatherBg() {
       const url = first.url || (first.b64_json ? 'data:image/png;base64,' + first.b64_json : '')
       if (url) {
         weatherBg.value = url
-        try { const c = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); c[key] = { url, ts: Date.now() }; localStorage.setItem(CACHE_KEY, JSON.stringify(c)) } catch {}
+        writeCache(key, url)
         const albumId = await ensureAlbum()
         if (albumId && (/^https?:\/\//i.test(url) || /^data:/i.test(url))) { try { await photoApi.saveFromUrl(albumId, { url, name: weatherImageName(w.city), description: prompt }) } catch {} }
       } else if (!weatherBg.value) {

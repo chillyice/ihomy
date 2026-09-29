@@ -17,7 +17,7 @@
           <div class="form-row">
             <el-form-item :label="$t('kitchen.coverImage')">
               <el-upload :show-file-list="false" :before-upload="(f) => uploadFile(f, 'coverImage')" accept="image/*">
-                <img v-if="form.coverImage" :src="form.coverImage" class="cover-preview" />
+                <img v-if="form.coverImage" :src="form.coverImage" class="cover-preview" :alt="form.name || ''" />
                 <el-button v-else size="small"><el-icon><Plus /></el-icon> {{ $t('kitchen.coverImage') }}</el-button>
               </el-upload>
             </el-form-item>
@@ -97,7 +97,7 @@
               <div class="media-up">
                 <div class="media-label">{{ $t('kitchen.stepImage') }}</div>
                 <el-upload :show-file-list="false" :before-upload="(f) => uploadStepFile(f, i, 'image_url')" accept="image/*">
-                  <img v-if="st.image_url" :src="st.image_url" class="step-preview" />
+                  <img v-if="st.image_url" :src="st.image_url" class="step-preview" alt="" />
                   <el-button v-else size="small">+ {{ $t('kitchen.stepImage') }}</el-button>
                 </el-upload>
               </div>

@@ -12,7 +12,7 @@
             <span v-for="t in tagList" :key="t" class="tag">#{{ t }}</span>
           </span>
         </div>
-        <img v-if="blog.coverImage" :src="blog.coverImage" class="cover" />
+        <img v-if="blog.coverImage" :src="blog.coverImage" class="cover" :alt="blog.title || ''" />
         <div class="content markdown-body" ref="contentRef" v-html="renderedContent"></div>
 
         <div class="like-bar">
@@ -80,7 +80,7 @@
         </div>
       </div>
     </div>
-    <el-empty v-else :description="$t('blog.notFound') || '博客不存在或无权查看'" />
+    <el-empty v-else :description="$t('blog.notFound')" />
   </div>
 </template>
 
@@ -183,25 +183,18 @@ onBeforeUnmount(() => {
 const canDelete = (c) =>
   userStore.isLoggedIn && (userStore.isOwner || c.authorId === userStore.userInfo?.id)
 
-// 并行拉取博客详情、评论树与当前用户点赞状态
+// 并行拉取博客详情、评论树与当前用户点赞状态(三者独立,各自 catch)
 const loadAll = async () => {
-  try {
-    blog.value = await blogApi.detail(route.params.id)
-  } catch (e) {
+  const tasks = [
     // 博客详情加载失败(可能不存在或无权查看),保持 blog=null 显示空状态
-  }
-  try {
-    comments.value = await commentApi.list('blog', route.params.id)
-  } catch (e) {
+    blogApi.detail(route.params.id).then((b) => { blog.value = b }).catch(() => {}),
     // 评论加载失败不影响博客展示
-  }
+    commentApi.list('blog', route.params.id).then((c) => { comments.value = c }).catch(() => {}),
+  ]
   if (userStore.isLoggedIn) {
-    try {
-      likeState.value = await likeApi.state('blog', route.params.id)
-    } catch (e) {
-      // 忽略
-    }
+    tasks.push(likeApi.state('blog', route.params.id).then((s) => { likeState.value = s }).catch(() => {}))
   }
+  await Promise.all(tasks)
 }
 
 // 点赞/取消点赞:结果同步回博客浏览数的点赞字段

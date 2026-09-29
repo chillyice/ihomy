@@ -13,6 +13,7 @@ import 'element-plus/es/components/message-box/style/css'
 import 'element-plus/es/components/notification/style/css'
 import 'element-plus/es/components/loading/style/css'
 import { initTheme } from './theme'
+import { a11yClick } from './utils/a11y'
 
 // 天气图标字体仅在天气面板/光照测试台用,异步加载不阻塞首屏
 import('qweather-icons/font/qweather-icons.css')
@@ -23,4 +24,5 @@ const app = createApp(App)
 app.use(createPinia())
 app.use(router)
 app.use(i18n)
+app.directive('a11y-click', a11yClick)
 app.mount('#app')
