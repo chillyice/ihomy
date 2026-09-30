@@ -541,23 +541,31 @@ server {
         proxy_read_timeout 3600s;
     }
 
-    # 上传文件静态目录（注意 alias 末尾必须带斜杠）
+    # 上传文件：一律反代给后端做读取鉴权（登录态 / PUBLIC 反查，V10.7），
+    # 千万别改回 alias 直出——直出等于把「拿到 URL 就能读」的老问题放回来
     location /files/ {
-        alias /opt/ihomy/uploads/;
+        proxy_pass http://127.0.0.1:8080/api/files/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 3600s;   # 视频/电子书大文件下载别被默认 60s 掐断
     }
 
-    # 静态资源缓存（排除 /files/ 避免覆盖 alias）
+    # 静态资源缓存（排除 /files/；本 location 有 add_header，必须自带 HSTS，否则被继承规则吃掉）
     location ~* ^/(?!files/).+\.(js|css|png|jpg|jpeg|gif|ico|svg|woff2)$ {
         expires 7d;
         add_header Cache-Control "public, immutable";
+        add_header Strict-Transport-Security "max-age=31536000" always;
     }
 }
 EOF
 ```
 
 > **注意**：
-> - `location /files/` 的 `alias` 末尾必须带 `/`，否则 404。
-> - 图片扩展名缓存 location 用负向断言 `^/(?!files/)` 排除 `/files/`，避免 `root` 覆盖 `alias`。
+> - `location /files/` 必须**反代到后端**（`proxy_pass .../api/files/`）。改回 `alias` 静态直出 = 绕过读取鉴权，拿到 URL 的任何人都能读私有文件（V10.7 起文件访问由后端判定，见踩坑速查 §7.8）。
+> - nginx 有条硬规则：**location 里只要写了一条 `add_header`，server 级的同类头就不再继承**——所以图片/JS 缓存 location 必须自己带一行 HSTS（上面已带），否则 HSTS 只对 HTML 生效。
+> - 图片扩展名缓存 location 用负向断言 `^/(?!files/)` 排除 `/files/`，避免其 `root`/`add_header` 影响文件路径。
 > - `/.well-known/acme-challenge/` 必须保留，certbot 续期时要用。
 > - WebSocket 的 `proxy_read_timeout 3600s` 防止长连接被 nginx 默认 60s 超时断开。
 > - **必须显式配 `gzip_types`**（见下）：Ubuntu 自带的 `/etc/nginx/nginx.conf` 只写了 `gzip on;`，
@@ -818,7 +826,7 @@ nginx 缺少 `try_files $uri $uri/ /index.html;`。
 nginx `client_max_body_size` 已配置为 `500m`（放映厅视频大文件必需）。若仍报错，检查 nginx 配置是否已重载，以及是否有反向代理层（如 CDN）也需调大。
 
 **Q7：上传文件访问 404？**
-检查 nginx `location /files/` 的 `alias` 是否末尾带 `/`（必须 `alias /opt/ihomy/uploads/;`），以及图片扩展名缓存 location 是否用负向断言 `^/(?!files/)` 排除了 `/files/`。
+检查 nginx `location /files/` 是否是**反代到后端**（`proxy_pass http://127.0.0.1:8080/api/files/;`）。若还是 `alias` 静态直出，私有文件会绕过鉴权（V10.7 起判定在后端，见踩坑速查 §7.8）；另外确认图片扩展名缓存 location 用负向断言 `^/(?!files/)` 排除了 `/files/`。
 
 **Q8：聊天室连不上？**
 检查 nginx 是否配置了 `/api/ws` 的 WebSocket 反代（`proxy_http_version 1.1` + `Upgrade` 头）。前端握手 URL 为 `wss://域名/api/ws/chat?token=...`（HTTPS）或 `ws://域名/api/ws/chat?token=...`（HTTP）。
@@ -1116,7 +1124,7 @@ IHOMY_TEST_PWD=<密码> python test/automation/media_engine_check.py --base http
 | DB 里的文件 URL(`/files/...`) | 相对 URL 与物理根解耦 | 不变,原样用 | 无需动作 |
 | 存储设备 `sys_storage_device.root_path`(DB 数据) | 配的 Windows 盘路径 | 需改成 Linux 路径(如 `/mnt/nas/photo`) | 上线后在存储管理页重新添加/编辑设备,或 SQL UPDATE |
 | 日志路径 | 本机路径(旧机器 `D:\WorkSpace\ihomy\logs`,新装机器为仓库 `data\logs`;external.yml 覆盖) | `/opt/ihomy/logs/{access,server,thirdparty}/`(三类分流,按天滚动) | external.yml 覆盖,无需手动改 |
-| Nginx `/files/` alias | 指向 Windows uploads | `/opt/ihomy/uploads/` | 部署时 nginx 配置(一次性) |
+| Nginx `/files/` | 开发由 vite 代理到 8080(同样走后端鉴权) | `proxy_pass http://127.0.0.1:8080/api/files/`(读取鉴权在后端,勿改回 alias 直出) | 部署时 nginx 配置(一次性) |
 
 代码侧已验证平台无关,无需改动:`Paths.get`/`Files` 全平台自适应;上传文件名的清洗正则兼容 UTF-8 中文;
 同步去重键 `source_path` 与防遍历校验(`resolveSafe`)均反斜杠归一,Win/Linux 行为一致。
@@ -1302,7 +1310,7 @@ cd /opt/ihomy && docker compose up -d
 ```
 > 容器化部署时，数据库/Redis 地址、上传目录经 **external.yml 覆盖**为容器内视角（host=`mysql`/`redis`，upload-dir=`/app/uploads`）。应用连接账号仍用 `ihomy`（schema.sql 开发安全版内置开发固定密码；**生产环境初始化后必须 `ALTER USER` 改强密码**，新密码经 external.yml 注入；该账号对 `ihomy` 库有 DML 权限）。
 >
-> **nginx.conf**：Docker Compose 的 `./nginx.conf` 需包含与第五节相同的 `location /files/`（alias 指向 `/opt/ihomy/uploads/`）、`location /api/ws`（WebSocket 反代）、`client_max_body_size 500m` 等配置，反代目标改为 `http://backend:8080`（容器服务名）。
+> **nginx.conf**：Docker Compose 的 `./nginx.conf` 需包含与第五节相同的 `location /files/`（**反代** `proxy_pass http://127.0.0.1:8080/api/files/;`，别写成 alias 直出，见踩坑速查 §7.8）、`location /api/ws`（WebSocket 反代）、`client_max_body_size 500m` 等配置，反代目标改为 `http://backend:8080`（容器服务名）。
 >
 > **⚠️ schema.sql 种子缺失注意**：`schema.sql` 的 `sys_home_module` 种子缺 `chat` 行（聊天室模块），容器化全新部署后首页会缺聊天室入口。容器启动后需手动补一行（列名 `position`/`sort_order`）：
 > ```sql

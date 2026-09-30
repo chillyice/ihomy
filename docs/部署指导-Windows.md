@@ -276,21 +276,27 @@ server {
         proxy_read_timeout 3600s;
     }
 
-    # 上传文件静态目录（注意 alias 末尾必须带斜杠）
+    # 上传文件：一律反代给后端做读取鉴权（登录态 / PUBLIC 反查，V10.7），
+    # 千万别改回 alias 直出——直出等于把「拿到 URL 就能读」的老问题放回来
     location /files/ {
-        alias C:/app/ihomy/uploads/;
+        proxy_pass http://127.0.0.1:8080/api/files/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_read_timeout 3600s;   # 视频/电子书大文件下载别被默认 60s 掐断
     }
 
-    # 静态资源缓存（排除 /files/ 避免覆盖 alias）
+    # 静态资源缓存（排除 /files/；本 location 有 add_header，须自带 HSTS，否则继承的 server 级 HSTS 失效）
     location ~* ^/(?!files/).+\.(js|css|png|jpg|jpeg|gif|ico|svg|woff2)$ {
         expires 7d;
         add_header Cache-Control "public, immutable";
+        add_header Strict-Transport-Security "max-age=31536000" always;
     }
 }
 ```
 
 > Windows 路径用正斜杠 `/`，且不要加盘符前的反斜杠。
-> `location /files/` 的 `alias` 末尾必须带 `/`，否则 404；图片扩展名缓存 location 用负向断言 `^/(?!files/)` 排除 `/files/`，避免 `root` 覆盖 `alias`（与 Linux 版第五节一致）。
+> `location /files/` 必须**反代到后端**（`proxy_pass .../api/files/`）：改回 `alias` 静态直出 = 绕过读取鉴权（V10.7 起判定在后端，见踩坑速查 §7.8）。图片扩展名缓存 location 用负向断言 `^/(?!files/)` 排除 `/files/`，避免 `root` 覆盖（与 Linux 版第五节一致）。
 
 重载：
 ```powershell
@@ -338,7 +344,7 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
-    # WebSocket 与上传文件目录同第四节(/api/ws 反代 + /files/ alias),此处不重复展开
+    # WebSocket 与上传文件目录同第四节(/api/ws 反代 + /files/ 反代给后端做读取鉴权),此处不重复展开
 }
 
 # 80 跳转 443
@@ -455,7 +461,7 @@ nginx 缺少 `try_files $uri $uri/ /index.html;` 单页回退配置。
 必须 HTTPS + 有效证书，且用 Safari 打开。自签证书不行。
 
 **Q5：上传图片失败 / 上传后访问 404？**
-检查 external.yml 的 `file.upload-dir` 目录是否存在且有写权限；nginx `client_max_body_size` 是否够大；`location /files/` 的 `alias` 是否末尾带 `/` 且指向同一目录。
+检查 external.yml 的 `file.upload-dir` 目录是否存在且有写权限；nginx `client_max_body_size` 是否够大；`location /files/` 是否为反代 `proxy_pass http://127.0.0.1:8080/api/files/;`（改回 `alias` 直出会绕过读取鉴权，见踩坑速查 §7.8）。
 
 **Q6：端口被占用？**
 - 8080：改 `application.yml` 的 `server.port`

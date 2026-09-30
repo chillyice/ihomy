@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.FileAccessMapper">
+
+    <!--
+      游客可见判定:URL 反查各内容表,只认 visibility='PUBLIC' 行。
+      无 visibility 列的表按各自口径:sys_user.avatar 一律公开;sys_family_info 仅 is_public=1 家庭的封面/背景乐;
+      相册封面与相册内照片在 share_token 非空(已开启分享)时对游客可见。
+      保险箱 family_vault_item 刻意不进本 SQL:密码库文件一律需登录。
+      ponytail:不校验内容所属家庭是否 public,与现有 PUBLIC 读接口口径一致(游客本就取不到非公开家庭的列表)。
+    -->
+    <select id="countPublicHits" resultType="int">
+        SELECT COUNT(1) FROM (
+            SELECT 1 FROM content_photo
+             WHERE url = #{path} AND visibility = 'PUBLIC' AND deleted = 0
+            UNION ALL SELECT 1 FROM content_blog
+             WHERE cover_image = #{path} AND visibility = 'PUBLIC' AND deleted = 0
+            UNION ALL SELECT 1 FROM content_video
+             WHERE poster = #{path} AND visibility = 'PUBLIC' AND deleted = 0
+            UNION ALL SELECT 1 FROM content_video
+             WHERE video_url = #{path} AND visibility = 'PUBLIC' AND deleted = 0
+            UNION ALL SELECT 1 FROM content_book
+             WHERE cover_url = #{path} AND visibility = 'PUBLIC' AND deleted = 0
+            UNION ALL SELECT 1 FROM content_book
+             WHERE file_url = #{path} AND visibility = 'PUBLIC' AND deleted = 0
+            UNION ALL SELECT 1 FROM sys_user
+             WHERE avatar = #{path} AND deleted = 0
+            UNION ALL SELECT 1 FROM sys_family_info
+             WHERE cover_image = #{path} AND is_public = 1 AND deleted = 0
+            UNION ALL SELECT 1 FROM sys_family_info
+             WHERE music_url = #{path} AND is_public = 1 AND deleted = 0
+            UNION ALL SELECT 1 FROM content_photo_album
+             WHERE cover_photo_url = #{path} AND share_token IS NOT NULL AND deleted = 0
+            UNION ALL SELECT 1 FROM content_photo_album
+             WHERE cover_url = #{path} AND share_token IS NOT NULL AND deleted = 0
+            UNION ALL SELECT 1
+             FROM content_photo p JOIN content_photo_album a ON p.album_id = a.id
+             WHERE p.url = #{path} AND p.deleted = 0
+               AND a.share_token IS NOT NULL AND a.deleted = 0
+        ) t
+    </select>
+
+</mapper>

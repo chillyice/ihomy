@@ -35,6 +35,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtils jwtUtils;
     private final com.ihomy.mapper.SysUserMapper sysUserMapper;
+    private final AuthCookie authCookie;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -68,6 +69,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     // 操作人放请求属性:AccessLogFilter 在 SecurityContext 清理后仍能记录谁在调用
                     request.setAttribute("ihomy.userId", userId);
                     request.setAttribute("ihomy.username", username);
+                    // cookie 缺失/令牌已轮换则补发:图片等静态资源请求带不了 Authorization 头,
+                    // 登录态只认这枚 cookie,否则发版后的老会话(登录时还没有该 cookie)图片全 403
+                    if (!token.equals(authCookie.read(request))) authCookie.attach(request, response, token);
                     // 首登强制改密:令牌受限,仅放行改密与登出,防止用默认密码拿到的令牌调业务接口
                     if (Boolean.TRUE.equals(claims.get("pwdChange", Boolean.class)) && !passwordChangeAllowed(request)) {
                         denyPasswordChangeRequired(response);

@@ -5,6 +5,8 @@ import com.ihomy.common.ResultCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ihomy.security.JwtAuthenticationFilter;
 import com.ihomy.security.OpsAccessFilter;
+import com.ihomy.service.FileAccessService;
+import org.springframework.security.authorization.AuthorizationDecision;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,6 +30,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final OpsAccessFilter opsAccessFilter;
+    private final FileAccessService fileAccessService;
     private final ObjectMapper objectMapper;
 
     /** 密码加密器:统一使用 BCrypt */
@@ -43,9 +46,14 @@ public class SecurityConfig {
             .cors(c -> {})
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // 认证/文件/公开接口/接口文档无需登录;ws 握手自校验 JWT
-                .requestMatchers("/auth/**", "/files/**", "/public/**", "/ws/**",
+                // 认证/公开接口/接口文档无需登录;ws 握手自校验 JWT
+                .requestMatchers("/auth/**", "/public/**", "/ws/**",
                         "/doc.html", "/webjars/**", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                // 咔哒安装包目录刻意公开(登录页/咔哒页免登录直接下载)
+                .requestMatchers("/files/kada/**").permitAll()
+                // 上传文件目录:登录态(Bearer 或 ihomy_at cookie)放行,游客只放行 PUBLIC 内容
+                .requestMatchers("/files/**").access((authentication, context) ->
+                        new AuthorizationDecision(fileAccessService.allowed(context.getRequest())))
                 // 读类接口(列表/详情/评论/点赞状态)也允许游客访问
                 .requestMatchers(org.springframework.http.HttpMethod.GET,
                         "/home/modules", "/home/feed", "/home/dashboard",
@@ -67,6 +75,15 @@ public class SecurityConfig {
                 .requestMatchers(org.springframework.http.HttpMethod.GET,
                         "/media/image-signed", "/media/subtitle-signed").permitAll()
                 .anyRequest().authenticated())
+            // /files 响应按「不可执行文档」下发:nosniff 关掉 MIME 嗅探,CSP 让 HTML/SVG 即使被上传也跑不了脚本
+            .headers(h -> h.addHeaderWriter((req, resp) -> {
+                String uri = req.getRequestURI();
+                if (uri == null || !uri.contains("/files/")) return;
+                resp.setHeader("X-Content-Type-Options", "nosniff");
+                resp.setHeader("Content-Security-Policy",
+                        "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data: blob:;"
+                                + " media-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
+            }))
             .exceptionHandling(e -> e
                 // 未登录与无权限均以统一 JSON 结构返回,而非跳转登录页
                 // 401 必须带真实 HTTP 状态码:前端 axios 只对 HTTP 401 触发 refresh token 自动续期,

@@ -25,7 +25,7 @@
 > - **打包 zip 用 Windows 自带 bsdtar**:`tar -a -c -f out.zip dir`;别用 `Compress-Archive`(条目用反斜杠分隔,非 Windows 解压工具会当成文件名)。
 > - **写 MySQL 中文**:Write 写 UTF-8 无 BOM 的 SQL → `MSYS_NO_PATHCONV=1 docker cp` 进容器 → `docker exec ihomy-mysql mysql --default-character-set=utf8mb4 ihomy -e "source /tmp/x.sql"`;禁 PowerShell 管道喂 mysql。终端显示 `?` 是终端编码问题,不代表落库乱码。
 > - **`mvnw.cmd` 必须在 `backend` 目录内调用**(wrapper 在当前目录找,在仓库根调会报找不到 maven-wrapper.properties);运行后端用完整路径单实例 `C:\Program Files\Java\jdk-21\bin\java.exe -jar target\ihomy-backend.jar`(javapath + 双实例会分流 8080 导致偶发 401/404/500);jar 锁按 PID 结束本地后端进程(命令行含 JetBrains/IntelliJ 的是 IDEA 本体,绝不能杀;**禁止 `taskkill /IM java.exe` 全杀**)。
-> - **后端内存缓存直改 DB 不生效**:`HomeModuleService` 全局模块 `@PostConstruct` 预热进内存(无 TTL 无兜底刷新),直接 UPDATE `sys_home_module` 后必须重启后端才生效(或走模块管理接口 evict);同理适用于其他启动时预热的内存缓存。
+> - **后端内存缓存直改 DB 不生效**:启动时预热的内存缓存(如 `HomeModuleService` 全局模块)直改 DB 不刷新,须重启后端或走模块管理接口 evict——成因与清单见踩坑速查 §2.1。
 
 ## 项目概述
 
@@ -262,6 +262,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **统一目录结构**:相册→`pictures/{相册名}/{相册ID}_{时间戳}_{文件名}`、视频/海报→`videos/`、音乐→`music/`、电子书→`books/{yyyyMM}/`、通用/头像→`files/{yyyyMM}/`;FileService 提供流式重载(upload/uploadVideo/uploadBook)。
 - **存储设备**:`sys_storage_device`(family_id 家庭级隔离,name/device_type SYSTEM|NAS|REMOTE|MOUNT|BAIDU|NEXTCLOUD|WEBDAV/root_path/status);百度网盘/WebDAV/Nextcloud 已接入,OSS/S3 暂缓;设备增删改/目录映射需 `storage:manage`(OWNER)。文件浏览 `/storage/files`、资源管理器 `browse`/`file`、写操作 mkdir/rename/batch(均 `storage:manage`+@OperationLog)、目录映射 `/storage/map`——功能现状见需求设计说明书 §4.6.2/§4.3.3。
 - **硬删除策略**:照片/相册/视频/图书删除时**物理删 DB 记录+磁盘文件**(自定义 XML DELETE 绕过全局 logic-delete;`FileService.deleteByUrl` 按 URL 解析物理路径删文件,防越界);博客封面/头像/家庭封面/背景音乐/家谱照片删除时**未**连带删文件(孤儿文件,可接受)。
+- **`/files/**` 读取鉴权(V10.7)**:登录态(Bearer 或 `ihomy_at` cookie)放行,游客按 URL 反查只放 `visibility='PUBLIC'`(清单在 `mapper/FileAccessMapper.xml`,**新增带文件 URL 的内容表必须补一行**,保险箱不放);`/files/kada/**` 免登录;`/files/*` 响应带 nosniff+CSP;**nginx 必须反代、不得 alias 直出**。判定与取证见踩坑速查 §7.8。
 
 ## 配置与加密
 
@@ -280,7 +281,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **⚠ Redis 只绑回环 + 强密码(V10.6,开发/CI/生产一致)**:容器一律 `-p 127.0.0.1:6379:6379` + `--requirepass`(docker run 中必须写在**镜像名之后**),密码进 external.yml `spring.data.redis.password`(同值);Docker 发布端口会绕过 ufw,绑回环才是真门闩。**改密码顺序固定**:先改 external.yml → `stop ihomy-backend` → 重建容器 → 起后端 → 冒烟(反了全站 `WRONGPASS`,验证码/刷新/限流全挂);重建即清空黑名单/验证码/限流计数/当前家庭。手工 redis-cli 带 `-a`。运行手册与取证见 `docs/部署指导-Linux.md` §2.6.1 与踩坑速查 §7.7。
 - **SSH 端口**:生产服务器统一 **19068**(禁止 22);所有 ssh/scp 加 `-p 19068`/`-P 19068`;防火墙放行 19068、关闭 22。
 - **Docker 安装源**:Ubuntu 用阿里云镜像源(`mirrors.cloud.aliyuncs.com/docker-ce`),固定版本 29.7.0;**Redis 镜像** `docker pull redis`;**Git 克隆**用 SSH 地址(ihomy 用户先生成 ed25519 key 加到 GitHub)。
-- **⚠ 三条部署必查(重装/新服务器)**:① nginx `mime.types` 的 `.mjs` 映射必须存在(`application/javascript js mjs;`),否则书架 PDF 查看器/户型图 PDF 底图「加载失败」;② 站点 conf 的 `server{}` 必须有 gzip 四行,否则首屏多传约 336KB;③ 放映厅媒体引擎的**播放地址必须与站点同为 HTTPS**——站点是 HTTPS 而播放地址填 HTTP 时,浏览器按混合内容拦掉视频请求(直出与转码都放不出来),而 36 项接口断言全绿查不出(它们不走浏览器)。①②详见踩坑速查 §7.1/§7.3,③见 §5(第 10 条)与 `docs/部署指导-Linux.md` §12.2。
+- **⚠ 三条部署必查(重装/新服务器)**:① nginx `mime.types` 必须有 `.mjs` 映射;② 站点 conf 必须带 gzip 四行;③ 媒体引擎**播放地址必须与站点同为 HTTPS**(36 项接口断言查不出,浏览器按混合内容拦掉视频请求)。细节与取证见踩坑速查 §7.1/§7.3/§5 与 `docs/部署指导-Linux.md` §12.2。
 - **⚠ 部署新前端后老客户端仍跑旧 bundle**(PWA Service Worker 预缓存):访问新路由会被旧 bundle 的兜底路由重定向到 `/home`,看着像「新路由没发布」;**冒烟前先 unregister SW + 清 caches**,用户侧 Ctrl+Shift+R。辨认方法与取证见踩坑速查 §7.2。
 - 详细步骤在 `docs/部署指导-Linux.md`(入库脱敏版;本地 `Linux部署指导.md` 只留凭证台账)。
 
@@ -288,7 +289,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 > **这里只做指引,不记内容**。完整规划(P1-P4)、实施计划与验收口径见 **`docs/需求设计说明书.md` §9**;代码级优化待办见 **§9.2(36 项,分安全/性能/前端/工程化四组)** 与 **§9.3(21 项,V9.98–V9.106 新增代码复审 + §9.2 逐条复核)**。**启动任何规划项前先读该章对应小节**,不要凭本文件或记忆开工。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
 - **V9.110(2026-09-29)已完成 5 项 P1 代码级**:音频转写流式化(`AiController`/`AiService`/`ThirdPartyHttp.requestStreaming`)、Service Worker 排除 `/api/{vault,auth,ops,profile}` + 登出清 `api-cache`、上传黑名单补 xhtml/xml 等、登出/refresh 吊销(新增 `WALLPAPER` 令牌类型 + 60s 轮换宽限 + JWT `jti` 唯一化)、前后端自动化测试骨架(vitest + `spring-boot-starter-test`,CI 去掉 `-DskipTests`)。详见 `docs/变更归档.md` V9.110。
-- 当前判断:**§9.2 剩余 P1** 为 `/files/**` 直连无鉴权与 nginx `nosniff`/CSP、`docs/项目文档/*.docx` 重生成(**生产 Redis 无密码/0.0.0.0 已解决 —— V10.6**,绑回环 + requirepass,见部署约定);§9.2 的 P2 中 **A 组(安全与数据保护)、B 组(性能与数据一致性)、C 组(前端体验与规范)、D 组台账漏登/版本漂移已解决(V10.1 / V10.2 / V10.3 / V10.4)**,余下 D 组为 **CI 闸门、备份/健康检查等**。**§9.3 的两条 P1 已收口**(踩坑速查入库、部署文档补媒体引擎章节 —— V9.108),余下 P2:媒体引擎令牌直出前端、媒体服务器地址未限目标(SSRF)、年利率上限与列精度冲突必 500。前端遗留(P3,见 §9.2 C 末尾):超大单文件拆分 + ESLint/Prettier 配置、纯展示页剩余可点击 div 的键盘处理。
+- 当前判断:**§9.2 剩余 P1** 只剩 `docs/项目文档/*.docx` 重生成(**生产 Redis 已解决 —— V10.6**,绑回环 + requirepass;**`/files/**` 读取鉴权与 nosniff/CSP 已解决 —— V10.7**,读路径鉴权 + PUBLIC 反查 + nginx 反代,见踩坑速查 §7.8);§9.2 的 P2 中 **A 组(安全与数据保护)、B 组(性能与数据一致性)、C 组(前端体验与规范)、D 组台账漏登/版本漂移已解决(V10.1 / V10.2 / V10.3 / V10.4)**,余下 D 组为 **CI 闸门、备份/健康检查等**。**§9.3 的两条 P1 已收口**(踩坑速查入库、部署文档补媒体引擎章节 —— V9.108),余下 P2:媒体引擎令牌直出前端、媒体服务器地址未限目标(SSRF)、年利率上限与列精度冲突必 500。前端遗留(P3,见 §9.2 C 末尾):超大单文件拆分 + ESLint/Prettier 配置、纯展示页剩余可点击 div 的键盘处理。
 - 功能侧还剩:P1 放映厅 **S4 收尾**(S1–S4 已落地 V9.106–V9.108:转码 HLS 回退/字幕轨/成员播放档案/NAS 上线文档;剩 Emby 实测、多家庭共用一台媒体服务器、转码清晰度与多音轨选择)、P2 保险箱主密码(前端零知识,不可逆 UX 变更,待定夺)、场景主题方向(3D 光影实验台 `/tools/light-lab` 为底座)。**P2 智能家居中控 S1–S3 已落地(V10.5,需求 §4.16)**:采集改后端 60s 轮询 `GET /api/states`(**未按原计划引 MQTT/Mosquitto 与 Paho 依赖**),控制走 `POST /api/services/**`;剩余为 HA 侧硬件部署与户型图房间读数联动(不在本仓)。
 
 ## 文档清单
