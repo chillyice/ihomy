@@ -505,3 +505,16 @@ export const mindmapApi = {
   snapshotRestore: (id, sid) => request.put(`/mindmap/${id}/snapshot/${sid}/restore`),
   snapshotDelete: (id, sid) => request.delete(`/mindmap/${id}/snapshot/${sid}`),
 }
+
+// 智能家居中控(Home Assistant 接入:设备列表/历史曲线/开关控制;接入配置为家长权限)
+export const iotApi = {
+  config: () => request.get('/iot/config'),
+  saveConfig: (data) => request.put('/iot/config', data),
+  removeConfig: () => request.delete('/iot/config'),
+  test: (data) => request.post('/iot/test', data),
+  devices: () => request.get('/iot/devices'),
+  updateDevice: (id, data) => request.put(`/iot/devices/${id}`, data),
+  history: (deviceId, hours) => request.get('/iot/history', { params: { deviceId, hours } }),
+  control: (data) => request.post('/iot/control', data),
+}
+

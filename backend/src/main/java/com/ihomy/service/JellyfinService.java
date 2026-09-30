@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.DictConst;
+import com.ihomy.common.HttpUrlUtil;
 import com.ihomy.common.Loggers;
 import com.ihomy.common.ResultCode;
 import com.ihomy.common.ThirdPartyHttp;
@@ -120,11 +121,6 @@ public class JellyfinService {
     /** 图片中转只放行位图类型:该端点免登录,nosniff 挡不住「直接导航到 URL」,不能透传 svg */
     private static final Set<String> SAFE_IMAGE_CONTENT_TYPES =
             Set.of("image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp", "image/avif");
-
-    /** 云元数据/链路本地地址:任何情况下都不许后端去连(SSRF 底线;家庭内网按设计放行) */
-    private static final Set<String> BLOCKED_HOSTS = Set.of(
-            "169.254.169.254", "metadata.google.internal", "metadata.goog", "100.100.100.200",
-            "192.0.0.192", "fd00:ec2::254", "instance-data");
 
     /** 条目 id 只允许媒体服务器的 GUID 形态(拼进上游 URL 前校验,防路径穿越) */
     private static final Pattern ITEM_ID = Pattern.compile(
@@ -1053,38 +1049,8 @@ public class JellyfinService {
      */
     private String normalizeUrl(String raw, String errorMessage) {
         if (raw == null || raw.isBlank()) throw new BizException(ResultCode.BAD_REQUEST, errorMessage);
-        String v = raw.trim();
-        String lower = v.toLowerCase(Locale.ROOT);
-        if (!lower.startsWith("http://") && !lower.startsWith("https://")) {
-            // 带协议但不是 http(s) 的直接判非法,否则会补成 http://ftp://… 这种怪地址
-            if (lower.contains("://")) throw new BizException(ResultCode.BAD_REQUEST, errorMessage);
-            v = "http://" + v;
-        }
-        String bare = v.endsWith("/") ? v.substring(0, v.length() - 1) : v;
-        URI uri;
-        try {
-            uri = URI.create(bare);
-            if (uri.getHost() == null || uri.getScheme() == null) throw new IllegalArgumentException("no host");
-            if (!"http".equalsIgnoreCase(uri.getScheme()) && !"https".equalsIgnoreCase(uri.getScheme())) {
-                throw new IllegalArgumentException("bad scheme");
-            }
-        } catch (IllegalArgumentException e) {
-            throw new BizException(ResultCode.BAD_REQUEST, errorMessage);
-        }
-        if (isBlockedHost(uri.getHost())) {
-            throw new BizException(ResultCode.BAD_REQUEST, "这个地址不能作为媒体服务器地址,请填家里能访问到的地址");
-        }
-        return bare;
-    }
-
-    /** 云元数据端点/链路本地地址:后端主动请求的目标里出现这些一律拒绝 */
-    private static boolean isBlockedHost(String host) {
-        String h = host.toLowerCase(Locale.ROOT);
-        if (h.startsWith("[") && h.endsWith("]")) h = h.substring(1, h.length() - 1);
-        if (BLOCKED_HOSTS.contains(h) || "0.0.0.0".equals(h)) return true;
-        if (h.startsWith("169.254.") || h.startsWith("fe80:")) return true;
-        // 整型/十六进制形式的 IP(169.254.169.254 可以写成 2852039166 或 0xA9FEA9FE)不是合法主机名
-        return h.matches("^\\d+$") || h.matches("^0x[0-9a-f]+$");
+        return HttpUrlUtil.normalize(raw, errorMessage,
+                "这个地址不能作为媒体服务器地址,请填家里能访问到的地址");
     }
 
     private String base(String serverUrl) {

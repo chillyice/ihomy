@@ -28,6 +28,8 @@ const routes = [
   { path: '/plant', redirect: '/tools/plant' },
   { path: '/wish', name: 'Wish', component: () => import('@/views/wish/Wish.vue'), meta: { public: true } },
   { path: '/book', name: 'Book', component: () => import('@/views/book/Book.vue'), meta: { public: true } },
+  // 智能家居中控(Home Assistant 接入):设备/历史/控制属家庭内部数据,要登录
+  { path: '/iot', name: 'Iot', component: () => import('@/views/iot/Iot.vue'), meta: { requiresAuth: true } },
   // 家庭保险箱(密码管理器):家庭共享的账号密码保管箱,须登录
   { path: '/vault', name: 'Vault', component: () => import('@/views/vault/Vault.vue'), meta: { requiresAuth: true } },
   { path: '/tree', name: 'Tree', component: () => import('@/views/tree/Tree.vue'), meta: { public: true } },

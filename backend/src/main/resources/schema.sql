@@ -701,7 +701,9 @@ INSERT INTO `sys_auth` (`auth_code`, `auth_name`, `module`, `description`) VALUE
 ('vault:manage',       '管理保险箱',   'VAULT',   '新增/修改/删除账号密码条目'),
 -- 家庭贷款记录模块（V9.101）
 ('loan:view',          '查看贷款记录', 'LOAN',    '查看家庭贷款与还款流水'),
-('loan:manage',        '管理贷款记录', 'LOAN',    '新增/修改/删除贷款、利率调整与提前还款事件');
+('loan:manage',        '管理贷款记录', 'LOAN',    '新增/修改/删除贷款、利率调整与提前还款事件'),
+-- 智能家居中控模块（V10.5）
+('iot:control',        '控制智能设备', 'IOT',     '开关/调节家里的灯光、开关与传感器设备');
 
 -- ------------------------------------------------------------
 -- 24. 角色-权限映射
@@ -732,7 +734,8 @@ WHERE r.role_code = 'MEMBER'
     'comment:create','comment:delete',
     'library:manage',
     'vault:view','vault:manage',
-    'loan:view','loan:manage'
+    'loan:view','loan:manage',
+    'iot:control'
   );
 
 -- CHILD 权限
@@ -747,7 +750,8 @@ WHERE r.role_code = 'CHILD'
     'album:view','photo:upload','photo:view',
     'comment:create','comment:delete',
     'vault:view','vault:manage',
-    'loan:view','loan:manage'
+    'loan:view','loan:manage',
+    'iot:control'
   );
 
 -- GUEST 权限（仅浏览公开内容）
@@ -1917,7 +1921,7 @@ CREATE TABLE `sys_oss_component` (
   KEY `idx_type_status` (`component_type`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='开源组件台账(登记+版本检测+当前版本探测+升级提示)';
 
--- 种子:43 项 = 前端 NPM 直接依赖 23 + 后端 Maven 显式依赖 17 + 独立服务 3(Nextcloud 部分集成 / Jellyfin 部分集成 / Home Assistant 规划)
+-- 种子:43 项 = 前端 NPM 直接依赖 23 + 后端 Maven 显式依赖 17 + 独立服务 3(Nextcloud 部分集成 / Jellyfin 部分集成 / Home Assistant 部分集成)
 -- 版本为实际锁定版本(与 package-lock.json / 解析后的 Maven 依赖一致),不是 package.json/pom.xml 里的声明区间下限
 INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`) VALUES
 ('Vue', 'NPM', 'vue', '3.5.40', 'MIT', 'https://github.com/vuejs/core', '前端框架', 'FULL'),
@@ -1962,7 +1966,7 @@ INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `curre
 ('Spring Boot Test', 'MAVEN', 'org.springframework.boot:spring-boot-starter-test', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端单元测试(JUnit5/AssertJ)', 'FULL'),
 ('Nextcloud', 'SERVICE', 'nextcloud/server', NULL, 'AGPL-3.0', 'https://github.com/nextcloud/server', 'WebDAV/Nextcloud 存储后端', 'PARTIAL'),
 ('Jellyfin', 'SERVICE', 'jellyfin/jellyfin', '10.9.11', 'GPL-2.0', 'https://github.com/jellyfin/jellyfin', '放映厅媒体引擎(刮削/转码/字幕轨/TV 客户端;API 集成,界面自建)', 'PARTIAL'),
-('Home Assistant', 'SERVICE', 'home-assistant/core', NULL, 'Apache-2.0', 'https://github.com/home-assistant/core', '智能家居中控(规划)', 'PLANNED');
+('Home Assistant', 'SERVICE', 'home-assistant/core', NULL, 'Apache-2.0', 'https://github.com/home-assistant/core', '智能家居中控(实体状态采集/设备控制;API 集成,界面自建)', 'PARTIAL');
 
 -- NPM/MAVEN 直接依赖交由 Renovate 检测 + 生成 PR,SERVICE 独立服务由台账内部维护(默认 INTERNAL)
 
@@ -2081,6 +2085,73 @@ CREATE TABLE `sys_media_user_config` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_family_user` (`family_id`, `user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='成员在放映厅媒体服务器上的个人账号(各自续看)';
+
+-- ------------------------------------------------------------
+-- 65. sys_iot_config 智能家居接入配置(V10.5):每家庭一条,填 Home Assistant 站点地址与长期访问令牌。
+--     ihomy 只调 HA 的 REST API(读实体状态 / 调服务控制设备),协议与设备接入全归 HA。
+--     token 存 ENC(Base64(iv+密文+tag)) 密文(盐值 sys_parameter.aes-salt),接口只回 hasToken。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_iot_config`;
+CREATE TABLE `sys_iot_config` (
+  `id`           BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`    BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `base_url`     VARCHAR(300) NOT NULL COMMENT 'HA 站点地址(http(s)://host:8123,不含 /api)',
+  `token`        VARCHAR(512) NOT NULL COMMENT '长期访问令牌(ENC 加密)',
+  `enabled`      TINYINT      NOT NULL DEFAULT 1 COMMENT '是否启用采集: 1启用/0停用',
+  `last_sync_at` DATETIME     DEFAULT NULL COMMENT '最近一次同步成功时间',
+  `last_error`   VARCHAR(255) DEFAULT NULL COMMENT '最近一次同步失败原因',
+  `created_by`   BIGINT       DEFAULT NULL COMMENT '创建人',
+  `created_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='智能家居(Home Assistant)接入配置(家庭级)';
+
+-- ------------------------------------------------------------
+-- 66. sys_iot_device 家庭智能设备(V10.5):从 HA 实体状态同步,family_id 隔离。
+--     entity_id 即 HA 实体 ID(sensor.xxx / switch.xxx),按家庭唯一;
+--     room 为自由文本(仪表盘分组用),由家长在中控页填写;enabled=0 隐藏不参与展示与历史。
+--     last_seen_at 取 HA 的 last_updated(实体最近一次上报),state 取最近状态值。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_iot_device`;
+CREATE TABLE `sys_iot_device` (
+  `id`              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`       BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `entity_id`       VARCHAR(100) NOT NULL COMMENT 'HA 实体ID(如 sensor.living_room_temp)',
+  `name`            VARCHAR(100) NOT NULL COMMENT '显示名称(取 HA friendly_name)',
+  `domain`          VARCHAR(30)  NOT NULL COMMENT '实体域: sensor/binary_sensor/switch/light/climate/...',
+  `device_class`    VARCHAR(40)  DEFAULT NULL COMMENT '设备类别(HA device_class,如 temperature/humidity)',
+  `unit`            VARCHAR(20)  DEFAULT NULL COMMENT '计量单位(如 °C / %)',
+  `room`            VARCHAR(50)  DEFAULT NULL COMMENT '所属房间(自由文本,中控页手工分组)',
+  `state`           VARCHAR(255) DEFAULT NULL COMMENT '最近状态值',
+  `enabled`         TINYINT      NOT NULL DEFAULT 1 COMMENT '是否展示: 1展示/0隐藏',
+  `last_seen_at`    DATETIME     DEFAULT NULL COMMENT 'HA 最近一次上报时间',
+  `last_sample_at`  DATETIME     DEFAULT NULL COMMENT '最近一次写入历史的时间(采样节流用)',
+  `created_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_family_entity` (`family_id`, `entity_id`),
+  KEY `idx_family_enabled_room` (`family_id`, `enabled`, `room`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭智能设备(从 Home Assistant 同步)';
+
+-- ------------------------------------------------------------
+-- 67. sys_iot_data 智能设备时序数据(V10.5):温湿度等传感值按变更/最短 10 分钟采样一条,
+--     每晚清理 90 天前旧数据(家庭规模数据量小)。历史曲线按 (device_id, created_at) 查。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_iot_data`;
+CREATE TABLE `sys_iot_data` (
+  `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `device_id`  BIGINT       NOT NULL COMMENT '设备ID(sys_iot_device.id)',
+  `value`      VARCHAR(255) NOT NULL COMMENT '状态值',
+  `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '采样时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_device_created` (`device_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='智能设备历史数据(按天清理,只留近期)';
+
+-- 首页模块:智能家居中控入口(生活组);sys_home_module 无唯一约束兜底,用 NOT EXISTS 防重
+INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`)
+SELECT 'iot', '智能家居', 'icon-iot', '/iot', 'life', 'left', 18, 1
+WHERE NOT EXISTS (SELECT 1 FROM `sys_home_module` WHERE `code` = 'iot' AND `family_id` IS NULL);
 
 -- NPM/MAVEN 直接依赖交由 Renovate 检测 + 生成 PR,SERVICE 独立服务由台账内部维护(默认 INTERNAL)
 UPDATE `sys_oss_component` SET `managed_by` = 'RENOVATE' WHERE `component_type` IN ('NPM', 'MAVEN');

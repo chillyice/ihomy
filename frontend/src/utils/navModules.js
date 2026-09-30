@@ -5,7 +5,7 @@
 import {
   Document, Notebook, Picture, Calendar, VideoPlay, Headset, Trophy, Aim,
   AlarmClock, List, Star, Wallet, PictureRounded, Share, User, Box, MapLocation,
-  ChatDotRound, Food, Reading, Setting, Monitor, Tools, Sunny, Lock,
+  ChatDotRound, Food, Reading, Setting, Monitor, Tools, Sunny, Lock, MagicStick,
 } from '@element-plus/icons-vue'
 
 // code → 路由路径(后端 sys_home_module.code 为字符串标识)
@@ -16,6 +16,7 @@ export const NAV_PATHS = {
   chat: '/chat', tree: '/tree', cascade: '/cascade',
   item: '/item', kitchen: '/kitchen', library: '/library', settings: '/settings', ops: '/ops',
   storage: '/storage/files', tools: '/tools', plant: '/plant', games: '/games', vault: '/vault',
+  iot: '/iot',
 }
 
 // code → 图标组件(Element Plus 线性图标,统一风格)
@@ -24,7 +25,7 @@ export const ICON_MAP = {
   points: Trophy, task: Aim, reminder: AlarmClock, plan: List, wish: Star,
   book: Wallet, cascade: PictureRounded, tree: Share, member: User, storage: Box, item: MapLocation,
   chat: ChatDotRound, kitchen: Food, library: Reading, settings: Setting, ops: Monitor, tools: Tools,
-  plant: Sunny, games: Aim, vault: Lock,
+  plant: Sunny, games: Aim, vault: Lock, iot: MagicStick,
 }
 export const iconComp = (code) => ICON_MAP[code] || Document
 

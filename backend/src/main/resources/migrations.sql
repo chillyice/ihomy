@@ -1594,5 +1594,78 @@ UPDATE `sys_oss_component` SET `current_version` = '2.14.3'  WHERE `component_ty
 UPDATE `sys_oss_component` SET `current_version` = '2.3.2'   WHERE `component_type` = 'NPM' AND `package_ref` = '@element-plus/icons-vue';
 UPDATE `sys_oss_component` SET `current_version` = '1.18.1'  WHERE `component_type` = 'NPM' AND `package_ref` = 'axios';
 
+-- ------------------------------------------------------------
+-- V10.5 智能家居中控(Home Assistant 接入)(2026-09-30)
+--   sys_iot_config:每家庭一条 HA 站点地址 + 长期访问令牌(ENC),ihomy 只调其 REST API;
+--   sys_iot_device:从 HA 实体状态同步的家庭设备(family_id 隔离,room 自由文本分组);
+--   sys_iot_data:传感值历史(变更/最短 10 分钟采样一条,每晚清理 90 天前)。
+--   采集走后端 60s 轮询 /api/states(不引 MQTT broker 与新依赖),控制走 /api/services/**。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `sys_iot_config` (
+  `id`           BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`    BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `base_url`     VARCHAR(300) NOT NULL COMMENT 'HA 站点地址(http(s)://host:8123,不含 /api)',
+  `token`        VARCHAR(512) NOT NULL COMMENT '长期访问令牌(ENC 加密)',
+  `enabled`      TINYINT      NOT NULL DEFAULT 1 COMMENT '是否启用采集: 1启用/0停用',
+  `last_sync_at` DATETIME     DEFAULT NULL COMMENT '最近一次同步成功时间',
+  `last_error`   VARCHAR(255) DEFAULT NULL COMMENT '最近一次同步失败原因',
+  `created_by`   BIGINT       DEFAULT NULL COMMENT '创建人',
+  `created_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='智能家居(Home Assistant)接入配置(家庭级)';
+
+CREATE TABLE IF NOT EXISTS `sys_iot_device` (
+  `id`              BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`       BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `entity_id`       VARCHAR(100) NOT NULL COMMENT 'HA 实体ID(如 sensor.living_room_temp)',
+  `name`            VARCHAR(100) NOT NULL COMMENT '显示名称(取 HA friendly_name)',
+  `domain`          VARCHAR(30)  NOT NULL COMMENT '实体域: sensor/binary_sensor/switch/light/climate/...',
+  `device_class`    VARCHAR(40)  DEFAULT NULL COMMENT '设备类别(HA device_class,如 temperature/humidity)',
+  `unit`            VARCHAR(20)  DEFAULT NULL COMMENT '计量单位(如 °C / %)',
+  `room`            VARCHAR(50)  DEFAULT NULL COMMENT '所属房间(自由文本,中控页手工分组)',
+  `state`           VARCHAR(255) DEFAULT NULL COMMENT '最近状态值',
+  `enabled`         TINYINT      NOT NULL DEFAULT 1 COMMENT '是否展示: 1展示/0隐藏',
+  `last_seen_at`    DATETIME     DEFAULT NULL COMMENT 'HA 最近一次上报时间',
+  `last_sample_at`  DATETIME     DEFAULT NULL COMMENT '最近一次写入历史的时间(采样节流用)',
+  `created_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_family_entity` (`family_id`, `entity_id`),
+  KEY `idx_family_enabled_room` (`family_id`, `enabled`, `room`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭智能设备(从 Home Assistant 同步)';
+
+CREATE TABLE IF NOT EXISTS `sys_iot_data` (
+  `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `device_id`  BIGINT       NOT NULL COMMENT '设备ID(sys_iot_device.id)',
+  `value`      VARCHAR(255) NOT NULL COMMENT '状态值',
+  `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '采样时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_device_created` (`device_id`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='智能设备历史数据(按天清理,只留近期)';
+
+-- 权限点:开关/调节设备(CONTROL 归 OWNER/MEMBER/CHILD,GUEST 无;配置页沿用 storage:manage)
+INSERT IGNORE INTO `sys_auth` (`auth_code`, `auth_name`, `module`, `description`) VALUES
+('iot:control', '控制智能设备', 'IOT', '开关/调节家里的灯光、开关与传感器设备');
+
+INSERT IGNORE INTO `sys_role_auth` (`role_id`, `auth_id`)
+SELECT r.id, a.id FROM `sys_role` r JOIN `sys_auth` a
+  ON a.auth_code = 'iot:control'
+WHERE r.role_code IN ('MEMBER', 'CHILD')
+  AND NOT EXISTS (SELECT 1 FROM `sys_role_auth` x WHERE x.role_id = r.id AND x.auth_id = a.id);
+
+-- 首页模块:智能家居中控入口(生活组);sys_home_module 无唯一约束兜底,用 NOT EXISTS 防重
+INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`)
+SELECT 'iot', '智能家居', 'icon-iot', '/iot', 'life', 'left', 18, 1
+WHERE NOT EXISTS (SELECT 1 FROM `sys_home_module` WHERE `code` = 'iot' AND `family_id` IS NULL);
+
+-- 开源组件台账:Home Assistant 由「规划」转「部分集成」(REST 读状态 + 服务控制,界面自建)
+UPDATE `sys_oss_component`
+   SET `purpose` = '智能家居中控(实体状态采集/设备控制;API 集成,界面自建)',
+       `integration_status` = 'PARTIAL'
+ WHERE `component_type` = 'SERVICE' AND `package_ref` = 'home-assistant/core'
+   AND `integration_status` <> 'PARTIAL';
+
 
 
