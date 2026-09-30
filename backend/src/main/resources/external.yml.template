@@ -13,7 +13,7 @@ spring:
     password: CHANGE_ME_DB_PASSWORD
   data:
     redis:
-      password:                # 无密码留空
+      password: CHANGE_ME_REDIS_PASSWORD  # 必填:Redis 已要求密码(--requirepass),与容器/redis-server 的密码同值
 
 # === JWT 签名密钥(必填:缺失则后端启动即失败;≥32 字符随机串,泄露等于全部 token 可伪造)===
 jwt:

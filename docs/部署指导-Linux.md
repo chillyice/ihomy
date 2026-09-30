@@ -168,17 +168,21 @@ docker pull redis
 
 **启动 Redis 容器：**
 ```bash
+# 强密码：openssl rand -base64 24（记入本地台账 §〇，并写进 external.yml 的 spring.data.redis.password）
 docker run -d --name ihomy-redis \
-  -p 6379:6379 \
+  -p 127.0.0.1:6379:6379 \
   --restart unless-stopped \
-  redis
+  redis redis-server --requirepass '<Redis密码>'
 ```
 > 默认拉取 `redis:latest`。如需固定版本，用 `docker pull redis:7-alpine` 并在 `docker run` 时用 `redis:7-alpine`。
+> **只绑 `127.0.0.1`**：Redis 只给本机后端用，公网/局域网一律不给；Docker 能绕过 ufw，绑定回环才是真门闩（V10.6）。`--requirepass` 与 external.yml 的 `spring.data.redis.password` 必须同值。
 
 验证：
 ```bash
-docker exec ihomy-redis redis-cli ping
+docker exec ihomy-redis redis-cli -a '<Redis密码>' --no-auth-warning ping
 # PONG
+docker exec ihomy-redis redis-cli ping
+# NOAUTH Authentication required.   ← 不带密码被拒，说明密码生效
 ```
 管理：
 ```bash
@@ -186,10 +190,43 @@ docker stop ihomy-redis      # 停止
 docker start ihomy-redis     # 启动
 docker restart ihomy-redis   # 重启
 docker logs ihomy-redis      # 查看日志
-docker pull redis && docker rm -f ihomy-redis && docker run -d --name ihomy-redis -p 6379:6379 --restart unless-stopped redis   # 升级
+docker pull redis && docker rm -f ihomy-redis && docker run -d --name ihomy-redis -p 127.0.0.1:6379:6379 --restart unless-stopped redis redis-server --requirepass '<Redis密码>'   # 升级
 ```
+> ⚠️ 重建容器会**清空全部 Redis 数据**（无持久化卷）：刷新令牌黑名单、验证码、登录限流计数、当前家庭选择。顺序永远是「先改 external.yml → 停后端 → 重建 Redis → 起后端 → 冒烟」，详见 §2.6.1。
 
 > 若不想装 Docker，Redis 也可本机安装：`sudo apt install -y redis-server`。但求稳方案推荐 Docker 化 Redis。
+
+#### 2.6.1 生产 Redis 加固 / 改密码运行手册（V10.6）
+
+老实例是 `-p 6379:6379`（0.0.0.0 全网卡）且无密码——公网若放行 6379 就是裸奔，且能绕过 ufw。按下面顺序一次性加固或换密（**顺序不可颠倒**，反了会让验证码、令牌刷新、登录限流全线认证失败，表现为登录不了/每 2 小时被登出）：
+
+```bash
+pw="$(openssl rand -base64 24)"     # 1) 生成强密码，先记进本地台账（不入 git）
+echo "$pw"                          # 2) 一会儿抄进 external.yml
+
+# 3) 改服务器外挂配置（/opt/ihomy/config/external.yml）
+#    spring.data.redis.password: <与 --requirepass 完全同值>
+
+sudo systemctl stop ihomy-backend   # 4) 先停后端，避免中间窗口反复 WRONGPASS
+
+docker stop ihomy-redis && docker rm ihomy-redis        # 5) 重建（旧容器无卷，数据本就易失）
+docker run -d --name ihomy-redis \
+  -p 127.0.0.1:6379:6379 \
+  --restart unless-stopped \
+  redis redis-server --requirepass '<Redis密码>'
+
+sudo systemctl start ihomy-backend  # 6) 起后端（配置启动早期即加载新密码）
+
+# 7) 冒烟
+docker exec ihomy-redis redis-cli -a '<Redis密码>' --no-auth-warning ping   # PONG
+curl -s http://localhost:8080/api/public/home | head -c 80                   # 正常 JSON
+sudo systemctl is-active ihomy-backend                                       # active
+# 外网验证：从别的机器 telnet/nc <公网IP> 6379 应「拒绝」(绑定回环)
+```
+
+**副作用（可接受，但要知道）**：Redis 无持久化，重建即清空——此前已吊销的刷新令牌会重新有效（最长 7 天，仅当令牌本身已泄露才有影响）、验证码/登录限流计数/当前家庭选择丢失（用户下次自选家庭即可）。家庭场景风险低，窗口期内正常访问不受影响（访问令牌是无状态 JWT，2 小时内照常有效）。
+
+**改密后手工命令都要带 `-a`**：`docker exec ihomy-redis redis-cli -a '<Redis密码>' --no-auth-warning ...`（或先 `export REDISCLI_AUTH='<Redis密码>'`）。`--requirepass` 写在 `docker run` 参数里，`docker inspect` 可见，故密码只放台账与 external.yml，不写进任何入库文件。
 
 ### 2.7 安装 Nginx
 
@@ -276,15 +313,16 @@ git clone git@github.com:<你的用户名>/ihomy.git /opt/ihomy
 
 ### 3.3 配置后端（ihomy 用户，编辑项目内文件无需 root）
 
-> **配置机制（生产基线 + 外挂覆盖）**：源码 `application.yml` 已是生产基线（MySQL 6306/Redis 6379/Linux 路径/captcha 空/天气留空），jar 内嵌即生产。**DB 密码与 JWT 密钥在基线中留空，必须由外挂配置 external.yml 提供**——缺失时 JwtUtils 启动即失败（fail-closed，防误用默认密钥）；开发环境差异同样走 external.yml 覆盖，不使用 profile。
+> **配置机制（生产基线 + 外挂覆盖）**：源码 `application.yml` 已是生产基线（MySQL 6306/Redis 6379/Linux 路径/captcha 空/天气留空），jar 内嵌即生产。**DB 密码、Redis 密码与 JWT 密钥在基线中留空/缺席，必须由外挂配置 external.yml 提供**——缺失时 JwtUtils 启动即失败（fail-closed，防误用默认密钥）；开发环境差异同样走 external.yml 覆盖，不使用 profile。
 
 **1) 从模板复制外挂配置并填写：**
 ```bash
 mkdir -p /opt/ihomy/config
 cp /opt/ihomy/backend/src/main/resources/external.yml.template /opt/ihomy/config/external.yml
 vim /opt/ihomy/config/external.yml
-# 必填：spring.datasource.password（DB 强密码）、jwt.secret（≥32 字符随机串）
-# 按需：Redis 密码、邮件 SMTP、天气四件套、上传/日志路径覆盖、captcha 固定码（生产留空）
+# 必填：spring.datasource.password（DB 强密码）、jwt.secret（≥32 字符随机串）、
+#        spring.data.redis.password（与 Redis 容器 --requirepass 同值，见 2.6.1）
+# 按需：邮件 SMTP、天气四件套、上传/日志路径覆盖、captcha 固定码（生产留空）
 chmod 640 /opt/ihomy/config/external.yml
 ```
 
@@ -300,7 +338,8 @@ spring:
   data:
     redis:
       host: localhost
-      port: 6379                                    # Redis(Docker 映射)
+      port: 6379                                    # Redis(Docker 映射,只绑 127.0.0.1)
+      password:                                     # 留空,由 external.yml 提供(必填,同 --requirepass)
 file:
   upload-dir: /opt/ihomy/uploads                    # Linux 绝对路径
 app:
@@ -654,6 +693,7 @@ sudo firewall-cmd --reload
 ```
 
 > MySQL(6306)、Redis(6379) **不要**开放公网，仅本机访问。
+> Redis 已用 `-p 127.0.0.1:6379:6379` 只绑回环（Docker 发布端口会绕过 ufw，防火墙不是唯一防线）+ `--requirepass` 双保险，见 §2.6.1。
 > SSH 端口 19068 必须放行，22 禁止。
 
 ---
@@ -744,8 +784,9 @@ powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1
 | 前端访问 | 浏览器 `https://你的域名` | 登录页 |
 | 登录 | 邮箱 + 密码 + 图形验证码 | 进入首页 |
 | 运维登录 | `ops` + 密码（初始密码为开发安全版，生产部署后已按 3.4 改密则用新密码） | 进入运维页 |
-| 数据库 | `mysql -uihomy -p ihomy -e "show tables;"` | 70 张表 |
-| Redis | `docker exec ihomy-redis redis-cli ping` | PONG |
+| 数据库 | `mysql -uihomy -p ihomy -e "show tables;"` | 78 张表 |
+| Redis | `docker exec ihomy-redis redis-cli -a '<Redis密码>' --no-auth-warning ping`(不带 `-a` 应报 `NOAUTH`) | PONG |
+| Redis 端口 | 从外网 `nc -vz <公网IP> 6379` | 拒绝连接(只绑回环) |
 | Nginx | `sudo nginx -t` | syntax ok |
 | 证书 | `sudo certbot certificates` | 有效 |
 | PWA 安装 | Chrome/Safari 地址栏安装图标 | 可安装到桌面 |
@@ -1215,7 +1256,8 @@ services:
     image: redis:7-alpine
     container_name: ihomy-redis
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"   # 只绑回环(V10.6);密码与 external.yml 的 spring.data.redis.password 同值
+    command: redis-server --requirepass <Redis密码>
     restart: unless-stopped
 
   backend:

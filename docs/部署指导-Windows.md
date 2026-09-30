@@ -81,16 +81,21 @@ Windows 官方不提供 Redis，任选一种方式：
 **方式 A：Memurai（推荐，Windows 原生 Redis 兼容服务）**
 1. 下载：https://www.memurai.com/get-memurai
 2. 安装后作为服务 `Memurai` 自动运行，监听 6379。
-3. 验证：`memurai-cli ping` → `PONG`
+3. **建议设密码**（`memurai-cli CONFIG SET requirepass '<密码>'`，持久化到配置文件 `requirepass <密码>`），并把同值写进 external.yml 的 `spring.data.redis.password`。
+4. 验证：`memurai-cli -a '<密码>' ping` → `PONG`（未设密码则 `memurai-cli ping`）
 
 **方式 B：Docker 运行 Redis（需 Docker Desktop）**
 ```powershell
 # 拉取 Redis 镜像
 docker pull redis
 
-# 启动 Redis 容器（端口 6379，与 Linux 生产环境一致）
-docker run -d --name ihomy_redis --restart unless-stopped -p 6379:6379 -v <你的Redis配置目录>:/etc/redis/redis.conf -v <你的数据目录>:/data redis redis-server /etc/redis/redis.conf
+# 启动 Redis 容器：只绑本机回环 + 密码（与 Linux 生产一致，V10.6；密码写进 external.yml）
+docker run -d --name ihomy_redis --restart unless-stopped -p 127.0.0.1:6379:6379 -v <你的Redis配置目录>:/etc/redis/redis.conf -v <你的数据目录>:/data redis redis-server /etc/redis/redis.conf --requirepass '<Redis密码>'
 ```
+> 挂了 `redis.conf` 时**命令行参数要写在配置文件路径之后**（`redis-server /etc/redis/redis.conf --requirepass '<Redis密码>'`）才覆盖文件里的值；写在前面会被文件同名项盖掉。两者保持同值最省心。
+
+**方式 C：社区维护的 Windows Redis**
+- 下载 `tporadowski/redis` releases（GitHub），解压后运行 `redis-server.exe`；同样建议在 `redis.windows.conf` 里设 `requirepass` 并绑 `bind 127.0.0.1`。
 
 **方式 C：社区维护的 Windows Redis**
 - 下载 `tporadowski/redis` releases（GitHub），解压后运行 `redis-server.exe`。
@@ -146,7 +151,7 @@ spring:
     redis:
       host: localhost
       port: 6379
-      # password: <你的Redis密码>    # 如有
+      password: <你的Redis密码>      # 必填：与 Redis 的 requirepass 同值（见 2.4）
 jwt:
   secret: <你的JWT密钥,至少32字符随机串>
 file:
@@ -427,8 +432,8 @@ npm run build
 | 后端接口 | 浏览器 `http://localhost:8080/api/auth/me` | 返回 401 JSON |
 | 前端访问 | 浏览器 `https://你的域名` | 登录页 |
 | 登录 | admin + 密码（初始密码为开发安全版，生产部署后已按 3.3 改密则用新密码） | 进入首页 |
-| 数据库 | `mysql -uihomy -p -P6306 ihomy -e "show tables;"` | 70 张表 |
-| Redis | `memurai-cli ping` | PONG |
+| 数据库 | `mysql -uihomy -p -P6306 ihomy -e "show tables;"` | 78 张表 |
+| Redis | `memurai-cli -a '<Redis密码>' ping`(未设密码则 `memurai-cli ping`) | PONG |
 | 上传文件 | 浏览器访问 `/files/pictures/...` 图片 URL | 200 OK |
 | WebSocket | 登录后进入聊天室 | 实时收发消息 |
 | PWA 安装 | Chrome 地址栏右侧安装图标 | 可安装到桌面 |
@@ -441,7 +446,7 @@ npm run build
 配阿里云 Maven 镜像（见项目 README "加速建议"），或手动装 Maven 后直接用 `mvn`。
 
 **Q2：后端启动报数据库连接失败 / jwt.secret 缺失？**
-依次检查：`IHOMY_CONFIG_PATH` 是否已设置且指向存在的 external.yml（服务化走 NSSM `AppEnvironmentExtra`）、external.yml 里 `spring.datasource.password`/`jwt.secret` 是否已填、MySQL 服务是否运行、`localhost:6306` 是否被占用。JwtUtils 对空 secret 启动即失败是 fail-closed 设计。
+依次检查：`IHOMY_CONFIG_PATH` 是否已设置且指向存在的 external.yml（服务化走 NSSM `AppEnvironmentExtra`）、external.yml 里 `spring.datasource.password`/`jwt.secret` 是否已填、MySQL 服务是否运行、`localhost:6306` 是否被占用。JwtUtils 对空 secret 启动即失败是 fail-closed 设计。Redis 报 `WRONGPASS`/`NOAUTH` 则是 `spring.data.redis.password` 与 Redis 的 `requirepass` 不一致（或改密码时没停后端，见 2.4）。
 
 **Q3：前端访问白屏 / 刷新 404？**
 nginx 缺少 `try_files $uri $uri/ /index.html;` 单页回退配置。

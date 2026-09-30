@@ -1,6 +1,7 @@
 # ihomy 本地开发中间件(MySQL + Redis)
 # 用法:docker compose up -d(或 .\scripts\start-db.ps1 / setup.ps1,首次启动自动导入 schema.sql)
 # 端口与生产对齐:MySQL 6306(容器内 3306)/ Redis 6379;容器名 ihomy-mysql / ihomy-redis。
+# Redis 只绑 127.0.0.1 且带开发密码(见 redis 段),后端由 config/external.yml 的 spring.data.redis.password 接入。
 # 数据持久化:命名卷 ihomy-mysql-data(重置数据库 = docker compose down -v)。
 name: ihomy
 
@@ -35,9 +36,12 @@ services:
     image: redis:latest
     container_name: ihomy-redis
     ports:
-      - "6379:6379"
+      # 只绑本机回环:开发机/CI 的局域网不暴露 Redis(V10.6 加固)
+      - "127.0.0.1:6379:6379"
+    # 开发密码写在本文件(与 MYSQL_ROOT_PASSWORD 同性质,不入库外凭证);生产密码走 external.yml + 台账
+    command: redis-server --requirepass ihomy-redis-dev-2026
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a ihomy-redis-dev-2026 ping | grep -q PONG"]
       interval: 5s
       timeout: 3s
       retries: 20

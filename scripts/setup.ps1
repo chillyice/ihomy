@@ -89,7 +89,7 @@ spring:
     password: $DevDbPassword
   data:
     redis:
-      password:
+      password: ihomy-redis-dev-2026   # 与 docker-compose.yml 的 redis --requirepass 一致(V10.6)
 
 # JWT 签名密钥（本机随机生成，仅开发用）
 jwt:

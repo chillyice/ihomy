@@ -64,6 +64,9 @@ jobs:
           spring:
             datasource:
               password: ihomy-dev-2026!
+            data:
+              redis:
+                password: ihomy-redis-dev-2026
           jwt:
             secret: ci-only-jwt-secret-0123456789abcdef0123456789abcdef
           file:
