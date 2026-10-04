@@ -191,6 +191,22 @@ def main():
     check("GET /media/config 不回密码明文", cfg.get("hasPassword") is True and "password" not in cfg,
           "serverUrl=%s hasPassword=%s" % (cfg.get("serverUrl"), cfg.get("hasPassword")))
 
+    # 2b. 配置局部更新(只改地址/账号):未带的字段一律保留,不能被默认值降级或清空
+    if not args.read_only:
+        api.put("/media/config", {
+            "serverUrl": cfg.get("serverUrl"),
+            "username": cfg.get("username"),
+            # 故意不带 serverType/enabled/publicUrl/password:都应按「不动」处理
+        })
+        kept = api.data("/media/config")
+        check("配置局部更新不降级类型/不被动改开关/不丢密码",
+              kept.get("serverType") == cfg.get("serverType") and kept.get("enabled") == cfg.get("enabled")
+              and kept.get("hasPassword") is True,
+              brief({k: [cfg.get(k), kept.get(k)] for k in ("serverType", "enabled", "hasPassword")}))
+        check("配置局部更新不清空直连播放地址",
+              kept.get("publicUrl") == cfg.get("publicUrl"),
+              brief({"before": cfg.get("publicUrl"), "after": kept.get("publicUrl")}))
+
     st = api.data("/media/status")
     check("GET /media/status 已连接", st.get("connected") is True,
           brief({"serverName": st.get("serverName"), "version": st.get("version"),
@@ -216,6 +232,11 @@ def main():
         status, blob = api.call("GET", url, auth=False, raw=True)
         check("海报中转免登录可取图", status == 200 and isinstance(blob, bytes) and len(blob) > 1000,
               "status=%s bytes=%s" % (status, len(blob) if isinstance(blob, bytes) else blob))
+        # 上游若是 svg 等活动内容,免登录端点直接导航就能同源执行:只许出位图类型
+        _, headers, _ = fetch(site_base(args.base) + url)
+        ctype = (headers.get("Content-Type") or "").lower()
+        check("海报中转只出位图类型(不透传 svg)",
+              ctype.startswith("image/") and "svg" not in ctype, "Content-Type=%s" % headers.get("Content-Type"))
         status, res = api.call("GET", url.replace("sig=", "sig=x"), auth=False)
         check("海报签名被篡改必须拒绝", status == 200 and isinstance(res, dict) and res.get("code") == 401,
               brief(res))

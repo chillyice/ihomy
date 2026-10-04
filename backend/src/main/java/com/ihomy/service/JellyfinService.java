@@ -170,11 +170,19 @@ public class JellyfinService {
         String serverUrl = normalizeUrl(dto.getServerUrl(), "请填写媒体服务器地址");
         String username = dto.getUsername() == null ? "" : dto.getUsername().trim();
         if (username.isEmpty()) throw new BizException(ResultCode.BAD_REQUEST, "请填写账号");
-        String publicUrl = dto.getPublicUrl() == null || dto.getPublicUrl().isBlank()
-                ? null : normalizeUrl(dto.getPublicUrl(), "播放地址不正确");
 
         MediaServer row = find(familyId);
         boolean isNew = row == null;
+        // 直连播放地址:null(未带此字段)保留原值,空串表示显式清空——与 serverType/enabled 同口径;
+        // 否则只改密码/账号的局部请求会把已配的客户端直连地址清掉(HTTPS 站点上直接触发混合内容拦截)
+        String publicUrl;
+        if (dto.getPublicUrl() == null) {
+            publicUrl = isNew ? null : row.getPublicUrl();
+        } else if (dto.getPublicUrl().isBlank()) {
+            publicUrl = null;
+        } else {
+            publicUrl = normalizeUrl(dto.getPublicUrl(), "播放地址不正确");
+        }
         String password;
         if (isNew) {
             row = new MediaServer();

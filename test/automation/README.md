@@ -7,7 +7,7 @@
 | 脚本 | 用途 | 依赖 | 说明 |
 |------|------|------|------|
 | `smoke_login.py` | 登录冒烟:取验证码 → 登录 → 校验 token | 标准库 | 从 `.github/workflows/ci.yml` 冒烟逻辑提取的本地可重复版 |
-| `media_engine_check.py` | 放映厅媒体引擎:`/api/media/**` 配置与状态、作品海报墙、电影/剧集详情、播放地址与两条线路(直出/转码 HLS)一致性、直连取流与转码播放列表、字幕轨与签名中转(改 index/sourceId/userId 均须被拒)、成员播放档案(各自续看)、看过标记、进度与续看、海报签名(含篡改必须被拒)、连通测试 | 标准库 | **36 项断言**;需本机已在设置页配好引擎,未配置则打印 SKIP 退出 0;动过的观看状态收尾自动恢复;`--read-only` 只跑读类断言 |
+| `media_engine_check.py` | 放映厅媒体引擎:`/api/media/**` 配置与状态、配置局部更新不降级(未带字段保留)、作品海报墙、电影/剧集详情、播放地址与两条线路(直出/转码 HLS)一致性、直连取流与转码播放列表、字幕轨与签名中转(改 index/sourceId/userId 均须被拒)、成员播放档案(各自续看)、看过标记、进度与续看、海报签名(含篡改必须被拒;只出位图类型不透传 svg)、连通测试 | 标准库 | **39 项断言**;需本机已在设置页配好引擎,未配置则打印 SKIP 退出 0;动过的观看状态收尾自动恢复;`--read-only` 只跑读类断言(跳过配置写类 2 项) |
 
 ## 运行
 
@@ -37,3 +37,5 @@ python media_engine_check.py --read-only          # 只读断言,不写观看状
 ## 与 CI 的关系
 
 `.github/workflows/ci.yml` 内联了「captcha + login」冒烟(用 `curl` + `jq`)。`smoke_login.py` 与其断言等价,作为本地/Windows 环境下的可重复替代;两边改动时应保持断言一致。
+
+`media_engine_check.py` 已接入 CI:同名流水线起 Jellyfin(profile 容器)→ `scripts/dev-jellyfin-seed.sh` 造测试媒体 → `scripts/ci-jellyfin-setup.sh` 自动完成首次启动向导并建库扫描 → 配置引擎后跑本脚本。

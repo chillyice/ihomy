@@ -139,9 +139,9 @@ npm run dev        # 开发(端口5173,代理/api到8080)
 npm run build      # 生产构建,产物 dist/,含 PWA service worker
 ```
 
-冒烟:登录 `POST /api/auth/login {email, password, captchaId, captchaCode:'qwer'}`(开发环境验证码固定 `qwer`,先 `GET /api/auth/captcha` 取 id),响应 code=0 即有 token。**新人环境初始化** `.\scripts\setup.ps1`(幂等;详见本地 `docs/新人上手指南.md`)。**CI**(`.github/workflows/ci.yml`)每次推送自动做前后端构建+compose 起库导 schema+后端启动+登录冒烟。数据库重导:整库 `schema.sql`;增量建表/改表执行对应幂等 SQL 段。
+冒烟:登录 `POST /api/auth/login {email, password, captchaId, captchaCode:'qwer'}`(开发环境验证码固定 `qwer`,先 `GET /api/auth/captcha` 取 id),响应 code=0 即有 token。**新人环境初始化** `.\scripts\setup.ps1`(幂等;详见本地 `docs/新人上手指南.md`)。**CI**(`.github/workflows/ci.yml`)每次推送自动做前后端构建+compose 起库导 schema+后端启动+登录冒烟,并起 Jellyfin 跑媒体引擎接口检查(39 项)。数据库重导:整库 `schema.sql`;增量建表/改表执行对应幂等 SQL 段。
 
-**放映厅联调(Jellyfin,可选)**:`docker compose --profile jellyfin up -d jellyfin` → `bash scripts/dev-jellyfin-seed.sh`(容器内造测试片源)→ 首次访问 `http://localhost:8096` 走初始化向导 → 设置页-放映厅填地址与账号;接口检查 `IHOMY_TEST_PWD=<密码> python test/automation/media_engine_check.py`(36 项,`--read-only` 只跑读类)。细节与踩坑见踩坑速查 §5,生产上线(引擎放 NAS)见 `docs/部署指导-Linux.md` §12。
+**放映厅联调(Jellyfin,可选)**:`docker compose --profile jellyfin up -d jellyfin` → `bash scripts/dev-jellyfin-seed.sh`(容器内造测试片源)→ `bash scripts/ci-jellyfin-setup.sh`(自动走完初始化向导 + 建库扫描;也可手访问 `http://localhost:8096` 走向导)→ 设置页-放映厅填地址与账号;接口检查 `IHOMY_TEST_PWD=<密码> python test/automation/media_engine_check.py`(39 项,`--read-only` 只跑读类)。细节与踩坑见踩坑速查 §5,生产上线(引擎放 NAS)见 `docs/部署指导-Linux.md` §12。
 
 ## 统一响应与鉴权
 
@@ -243,7 +243,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 ## 已实现变更归档(已外置)
 
-> 历史归档已整体迁至 **`docs/变更归档.md`**(现约 697KB / **152 小节** = 开头 16 个**功能域**小节 + 其后 136 个版本/治理小节),内容原样保留。含文件级改动表、设计决策、踩坑记录与 live DB 同步 SQL。
+> 历史归档已整体迁至 **`docs/变更归档.md`**(现约 712KB / **154 小节** = 开头 16 个**功能域**小节 + 其后 138 个版本/治理小节),内容原样保留。含文件级改动表、设计决策、踩坑记录与 live DB 同步 SQL。
 > **该文件开头有章节目录**(或 `grep -n "^##### " docs/变更归档.md` 列全部小节);**检索历史实现/设计决策/live DB 迁移 SQL 时读该文件;新的变更归档继续追加到文件末尾**(新增 `#####` 子节),不要再写回 AGENTS.md。
 
 ## 文件存储策略
@@ -271,7 +271,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **⚠ Redis 只绑回环 + 强密码(V10.6,开发/CI/生产一致)**:容器一律 `-p 127.0.0.1:6379:6379` + `--requirepass`(docker run 中必须写在**镜像名之后**),密码进 external.yml `spring.data.redis.password`(同值);Docker 发布端口会绕过 ufw,绑回环才是真门闩。**改密码顺序固定**:先改 external.yml → `stop ihomy-backend` → 重建容器 → 起后端 → 冒烟(反了全站 `WRONGPASS`,验证码/刷新/限流全挂);重建即清空黑名单/验证码/限流计数/当前家庭。手工 redis-cli 带 `-a`。运行手册与取证见 `docs/部署指导-Linux.md` §2.6.1 与踩坑速查 §7.7。
 - **SSH 端口**:生产服务器统一 **19068**(禁止 22);所有 ssh/scp 加 `-p 19068`/`-P 19068`;防火墙放行 19068、关闭 22。
 - **Docker 安装源**:Ubuntu 用阿里云镜像源(`mirrors.cloud.aliyuncs.com/docker-ce`),固定版本 29.7.0;**Redis 镜像** `docker pull redis`;**Git 克隆**用 SSH 地址(ihomy 用户先生成 ed25519 key 加到 GitHub)。
-- **⚠ 三条部署必查(重装/新服务器)**:① nginx `mime.types` 必须有 `.mjs` 映射;② 站点 conf 必须带 gzip 四行;③ 媒体引擎**播放地址必须与站点同为 HTTPS**(36 项接口断言查不出,浏览器按混合内容拦掉视频请求)。细节与取证见踩坑速查 §7.1/§7.3/§5 与 `docs/部署指导-Linux.md` §12.2。
+- **⚠ 三条部署必查(重装/新服务器)**:① nginx `mime.types` 必须有 `.mjs` 映射;② 站点 conf 必须带 gzip 四行;③ 媒体引擎**播放地址必须与站点同为 HTTPS**(39 项接口断言查不出,浏览器按混合内容拦掉视频请求)。细节与取证见踩坑速查 §7.1/§7.3/§5 与 `docs/部署指导-Linux.md` §12.2。
 - **⚠ 部署新前端后老客户端仍跑旧 bundle**(PWA Service Worker 预缓存):访问新路由会被旧 bundle 的兜底路由重定向到 `/home`,看着像「新路由没发布」;**冒烟前先 unregister SW + 清 caches**,用户侧 Ctrl+Shift+R。辨认方法与取证见踩坑速查 §7.2。
 - 详细步骤在 `docs/部署指导-Linux.md`(入库脱敏版;本地 `Linux部署指导.md` 只留凭证台账)。
 

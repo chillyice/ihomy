@@ -49,9 +49,10 @@ services:
   # 放映厅媒体引擎(开发/联调用)。生产跑在家庭 NAS 上,ihomy 只通过 HTTP 调它的 REST API。
   # 带 profile,默认 `docker compose up -d` 不会启动;要用时:
   #   docker compose --profile jellyfin up -d jellyfin
-  # 镜像走国内源(Docker Hub 直连被 DNS 污染)。测试媒体放 .dev-media/(不入库,容器内 /media)。
+  # 镜像默认走国内源(Docker Hub 直连被 DNS 污染);CI(海外 runner)用 JELLYFIN_IMAGE 覆盖为官方源。
+  # 测试媒体放 .dev-media/(不入库,容器内 /media)。
   jellyfin:
-    image: docker.m.daocloud.io/jellyfin/jellyfin:10.9.11
+    image: ${JELLYFIN_IMAGE:-docker.m.daocloud.io/jellyfin/jellyfin:10.9.11}
     container_name: ihomy-jellyfin
     profiles: ["jellyfin"]
     ports:

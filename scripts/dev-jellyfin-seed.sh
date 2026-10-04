@@ -11,6 +11,9 @@
 #   电影=一个作品一个目录;剧集=作品目录/Season NN/季度内单集。
 set -euo pipefail
 
+# Windows Git Bash 会把传给 docker 的容器内绝对路径(/usr/...、/media/...)转成 Windows 路径,必须关掉
+export MSYS_NO_PATHCONV=1
+
 CONTAINER=ihomy-jellyfin
 FFMPEG=/usr/lib/jellyfin-ffmpeg/ffmpeg
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

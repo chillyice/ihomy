@@ -109,6 +109,37 @@ jobs:
             || { echo "::error::登录冒烟失败: $LOGIN"; exit 1; }
           echo "login smoke passed"
 
-      - name: Dump backend log on failure
+      - name: Start Jellyfin media engine
+        # 复用已构建的后端与已起的 MySQL/Redis;海外 runner 用官方镜像覆盖国内源
+        env:
+          JELLYFIN_IMAGE: jellyfin/jellyfin:10.9.11
+        run: |
+          mkdir -p .dev-media   # 先建:否则 docker 会以 root 建挂载源目录,runner 无法写 NFO
+          docker compose --profile jellyfin up -d jellyfin
+          bash scripts/dev-jellyfin-seed.sh
+          bash scripts/ci-jellyfin-setup.sh | tee /tmp/jellyfin-setup.txt
+          grep '^JELLYFIN_' /tmp/jellyfin-setup.txt >> "$GITHUB_ENV"
+
+      - name: Configure media engine
+        run: |
+          CAPTCHA_ID=$(curl -sf http://localhost:8080/api/auth/captcha | jq -r '.data.captchaId')
+          TOKEN=$(curl -sf -X POST http://localhost:8080/api/auth/login \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"admin@ihomy.local\",\"password\":\"${CI_PWD}\",\"captchaId\":\"${CAPTCHA_ID}\",\"captchaCode\":\"qwer\"}" \
+            | jq -r '.data.accessToken')
+          RESP=$(curl -sf -X PUT http://localhost:8080/api/media/config \
+            -H "Authorization: Bearer ${TOKEN}" -H 'Content-Type: application/json' \
+            -d "{\"serverType\":\"JELLYFIN\",\"serverUrl\":\"http://localhost:8096\",\"publicUrl\":\"http://localhost:8096\",\"username\":\"${JELLYFIN_USER}\",\"password\":\"${JELLYFIN_PASS}\",\"enabled\":true}")
+          echo "$RESP" | jq -e '.code == 0' > /dev/null \
+            || { echo "::error::配置媒体引擎失败: $RESP"; exit 1; }
+
+      - name: Media engine check (接口自动化)
+        run: |
+          IHOMY_TEST_PWD="${CI_PWD}" python3 test/automation/media_engine_check.py \
+            --base http://localhost:8080/api
+
+      - name: Dump logs on failure
         if: failure()
-        run: tail -200 /tmp/backend.log 2>/dev/null || true
+        run: |
+          tail -200 /tmp/backend.log 2>/dev/null || true
+          docker logs --tail 200 ihomy-jellyfin 2>/dev/null || true
