@@ -6,7 +6,7 @@ from collections import OrderedDict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from docx_kit import DocBuilder
+from docx_kit import DocBuilder, app_version
 
 ROOT = Path(r"C:\Users\chill\OneDrive\WorkStation\Projects\ihomy")
 OUTDIR = ROOT / "docs" / "项目文档"
@@ -23,6 +23,7 @@ GROUP_DESC = {
     "游戏与工具": "花园植物养殖、小游戏库与脑图设计等休闲与工具类功能。",
     "基础设施": "文件上传、存储管理、首页配置、公开数据、天气与 AI 能力等支撑性接口。",
     "运维": "面向运维管理员的系统资源、日志与台账接口，家庭角色无法访问。",
+    "其他": "尚未归入业务域的接口。",
 }
 MODULE_DESC = {
     "认证与账号": "注册、登录、登出、图形验证码、令牌续期、家庭切换与加入家庭。",
@@ -64,6 +65,10 @@ MODULE_DESC = {
     "AI 能力": "AI 运行状态、家庭模型配置、对话、图片生成与语音识别。",
     "运维管理": "服务器资源统计、运行状态、日志追溯与统计报表。",
     "开源组件台账": "开源组件清单、版本检查与升级评估。",
+    "放映厅-媒体引擎": "媒体服务器地址与账号配置、播放授权、观看进度续播。",
+    "智能家居中控": "智能家居设备的同步、状态历史与开关窗帘门锁及数值控制。",
+    "家庭保险箱": "保险箱条目的增删改查，主密码校验与解锁。",
+    "家庭贷款记录": "贷款的登记、还款与提前结清，以及还款事件流水。",
 }
 POS = {"query": "查询参数", "path": "路径参数", "body": "请求体", "other": "—"}
 
@@ -89,6 +94,8 @@ def main():
     groups = OrderedDict()
     for (g, m, c), items in modules.items():
         groups.setdefault(g, []).append((m, c, items))
+    # any group the endpoints carry but GROUP_ORDER forgets still gets a chapter
+    group_order = [g for g in GROUP_ORDER if g in groups] + [g for g in groups if g not in GROUP_ORDER]
 
     b.build_cover(
         title="ihomy 接口文档",
@@ -98,7 +105,7 @@ def main():
             "接口总数：%d 个　模块数：%d 个" % (len(EP), len(modules)),
             "接口前缀：/api　认证方式：Bearer 令牌",
             "来源：backend/src/main/java/com/ihomy/controller",
-            "版本：V9.94",
+            "版本：%s" % app_version(),
         ],
         footer_left="ihomy 项目文档",
         footer_right="接口文档",
@@ -156,7 +163,7 @@ def main():
 
     b.h2("1.5 接口分布")
     rows = [["业务域", "模块数", "接口数", "说明"]]
-    for g in GROUP_ORDER:
+    for g in group_order:
         items = groups.get(g, [])
         rows.append([g, str(len(items)), str(sum(len(i[2]) for i in items)), GROUP_DESC.get(g, "")])
     rows.append(["合计", str(len(modules)), str(len(EP)), "—"])
@@ -177,7 +184,7 @@ def main():
 
     # ---------------- 第2章起：各业务域 ----------------
     ch = 1
-    for g in GROUP_ORDER:
+    for g in group_order:
         items = groups.get(g, [])
         if not items:
             continue

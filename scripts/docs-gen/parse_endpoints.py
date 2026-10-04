@@ -49,6 +49,10 @@ MODULE = {
     "AiController": ("AI 能力", "基础设施"),
     "OpsController": ("运维管理", "运维"),
     "OssComponentController": ("开源组件台账", "运维"),
+    "MediaController": ("放映厅-媒体引擎", "内容创作"),
+    "IotController": ("智能家居中控", "家庭生活"),
+    "VaultController": ("家庭保险箱", "家庭生活"),
+    "LoanRecordController": ("家庭贷款记录", "家庭生活"),
 }
 
 ANN_BLOCK = re.compile(
@@ -164,7 +168,10 @@ def main():
         if base is None:
             base = ""
         base = base.rstrip("/")
-        module, group = MODULE.get(cls, (cls.replace("Controller", ""), "其他"))
+        # unmapped controllers fall back to their @Tag name so a new controller can
+        # never be dropped from the document by forgetting this table
+        tag = ann_value(head, "Tag") or cls.replace("Controller", "")
+        module, group = MODULE.get(cls, (tag, "其他"))
 
         for m in ANN_BLOCK.finditer(text):
             blob, name, params = m.group("anns"), m.group("name"), m.group("params")

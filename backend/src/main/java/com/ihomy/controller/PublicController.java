@@ -214,6 +214,23 @@ public class PublicController {
         return Result.success(activityFeedService.getFeed(family.getId(), limit, true, null, false));
     }
 
+    /**
+     * 解析当前请求可见的家庭ID:成员=当前家庭;游客=hid/home_id 指定的公开家庭(或默认家庭),否则 404。
+     * 供公开可读模块(如家庭公告)复用同一套家庭定位与公开性判定。
+     */
+    public Long resolveVisibleFamilyId(String hid, Long homeId) {
+        SysUser user = securityHelper.currentUser();
+        Long currentFamily = user != null ? user.getFamilyId() : null;
+        Family family = resolveFamily(hid, homeId, currentFamily);
+        Long familyId = family.getId();
+        boolean member = user != null && (currentFamily != null && currentFamily.equals(familyId)
+                || multiFamilyService.isMember(user.getId(), familyId));
+        if (!member && (family.getIsPublic() == null || family.getIsPublic() != 1)) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
+        return familyId;
+    }
+
     /** 家庭定位:hid(混淆 share_token) > home_id > 当前家庭/默认家庭;定位不到 404 */
     private Family resolveFamily(String hid, Long homeId, Long currentFamily) {
         if (StringUtils.hasText(hid)) {

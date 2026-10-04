@@ -75,6 +75,22 @@ export const anniversaryApi = {
   remove: (id) => request.delete(`/anniversary/${id}`),
 }
 
+// 家庭公告/广告位(图片横幅 + 链接,家长维护)
+export const announcementApi = {
+  list: (params) => request.get('/announcement/list', { params }),
+  create: (data) => request.post('/announcement', data),
+  update: (id, data) => request.put(`/announcement/${id}`, data),
+  remove: (id) => request.delete(`/announcement/${id}`),
+}
+
+// 回收站(照片/相册/视频/图书的逻辑删内容)
+export const recycleApi = {
+  list: (type) => request.get('/recycle/list', { params: { type } }),
+  restore: (type, id) => request.post(`/recycle/${id}/restore`, null, { params: { type } }),
+  purge: (type, id) => request.delete(`/recycle/${id}`, { params: { type } }),
+  empty: (type) => request.delete('/recycle/empty', { params: { type } }),
+}
+
 // 相册
 export const albumApi = {
   list: () => request.get('/album/list'),

@@ -6,31 +6,29 @@ import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * 相册实体(content_photo_album):type public/private,决定照片可见性与游客访问;shareToken 用于混淆分享链接。
+ * 家庭公告/广告位实体(family_announcement):图片横幅 + 跳转链接,按排序值展示。
+ * startDate/endDate 可空表示长期有效;enabled=0 为停用(仅家长可见)。
  */
 @Data
-@TableName("content_photo_album")
-public class Album {
+@TableName("family_announcement")
+public class Announcement {
     @TableId(type = IdType.AUTO)
     private Long id;
-    private String name;
-    private String type;
-    private String coverPhotoUrl;
-    private String coverUrl;
-    private String shareToken;
     private Long familyId;
-    private Long parentId;
-    private Long sourceDeviceId;
-    private String sourcePath;
-    private String syncStatus;
-    private LocalDateTime lastSyncedAt;
+    private String title;
+    private String imageUrl;
+    private String linkUrl;
+    private Integer sortOrder;
+    private Integer enabled;
+    private LocalDate startDate;
+    private LocalDate endDate;
     private Long createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     @TableLogic
     private Integer deleted;
-    private LocalDateTime deletedAt;
 }

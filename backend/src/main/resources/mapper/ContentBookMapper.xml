@@ -47,4 +47,27 @@
         DELETE FROM content_book_category_rel WHERE category_id = #{categoryId}
     </delete>
 
+    <!-- ---------- 回收站 ---------- -->
+    <select id="selectTrashByFamily" resultType="com.ihomy.entity.ContentBook">
+        SELECT * FROM content_book WHERE family_id = #{familyId} AND deleted = 1
+        ORDER BY deleted_at DESC
+    </select>
+
+    <select id="selectDeletedById" resultType="com.ihomy.entity.ContentBook">
+        SELECT * FROM content_book WHERE id = #{id} AND deleted = 1
+    </select>
+
+    <select id="selectExpiredTrashIds" resultType="java.lang.Long">
+        SELECT id FROM content_book
+        WHERE deleted = 1 AND deleted_at IS NOT NULL AND deleted_at &lt; #{cutoff}
+    </select>
+
+    <update id="softDeleteById">
+        UPDATE content_book SET deleted = 1, deleted_at = NOW() WHERE id = #{id} AND deleted = 0
+    </update>
+
+    <update id="restoreById">
+        UPDATE content_book SET deleted = 0, deleted_at = NULL WHERE id = #{id} AND deleted = 1
+    </update>
+
 </mapper>

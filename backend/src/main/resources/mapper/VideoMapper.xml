@@ -4,4 +4,27 @@
 
     <delete id="deletePhysicalById">DELETE FROM content_video WHERE id = #{id}</delete>
 
+    <!-- ---------- 回收站 ---------- -->
+    <select id="selectTrashByFamily" resultType="com.ihomy.entity.Video">
+        SELECT * FROM content_video WHERE family_id = #{familyId} AND deleted = 1
+        ORDER BY deleted_at DESC
+    </select>
+
+    <select id="selectDeletedById" resultType="com.ihomy.entity.Video">
+        SELECT * FROM content_video WHERE id = #{id} AND deleted = 1
+    </select>
+
+    <select id="selectExpiredTrashIds" resultType="java.lang.Long">
+        SELECT id FROM content_video
+        WHERE deleted = 1 AND deleted_at IS NOT NULL AND deleted_at &lt; #{cutoff}
+    </select>
+
+    <update id="softDeleteById">
+        UPDATE content_video SET deleted = 1, deleted_at = NOW() WHERE id = #{id} AND deleted = 0
+    </update>
+
+    <update id="restoreById">
+        UPDATE content_video SET deleted = 0, deleted_at = NULL WHERE id = #{id} AND deleted = 1
+    </update>
+
 </mapper>

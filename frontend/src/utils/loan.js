@@ -839,7 +839,9 @@ function normalizeLedgerEvents(events, months) {
     }
   }
   // 同一期两者都有时:利率先生效(第 N+1 期起),提前还款再按新利率推算结清期次
-  list.sort((a, b) => a.period - b.period || (a.type === LOAN_EVENT.RATE_CHANGE ? -1 : 1))
+  // 比较器必须自洽(同型事件返回 0):V8 排序对「a<b 且 b<a」的输入顺序未定义,后端已按 (期次,id) 定序,这里靠稳定排序原样保留
+  list.sort((a, b) => a.period - b.period
+    || (a.type === LOAN_EVENT.RATE_CHANGE ? 0 : 1) - (b.type === LOAN_EVENT.RATE_CHANGE ? 0 : 1))
   return { events: list, error: '' }
 }
 

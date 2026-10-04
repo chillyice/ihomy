@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from docx_kit import DocBuilder
+from docx_kit import DocBuilder, app_version
 
 ROOT = Path(r"C:\Users\chill\OneDrive\WorkStation\Projects\ihomy")
 OUTDIR = ROOT / "docs" / "项目文档"
@@ -67,7 +67,7 @@ def main():
         subtitle="家庭共用软件 · 功能使用指南",
         english_label="USER MANUAL",
         meta_lines=[
-            "适用版本：V9.94",
+            "适用版本：%s" % app_version(),
             "适用对象：家长、成员、孩童、访客与运维管理员",
             "覆盖范围：%d 章 %d 节，含操作步骤与使用提示" % (len(chapters), n_sec),
             "运行环境：电脑浏览器、安卓与 iOS 手机、平板",

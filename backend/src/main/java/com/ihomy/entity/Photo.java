@@ -30,4 +30,5 @@ public class Photo {
     private LocalDateTime createdAt;
     @TableLogic
     private Integer deleted;
+    private LocalDateTime deletedAt;
 }

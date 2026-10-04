@@ -4,4 +4,46 @@
 
     <delete id="deletePhysicalById">DELETE FROM content_photo_album WHERE id = #{id}</delete>
 
+    <!-- ---------- 回收站(逻辑删数据 MP 常规查询不可见,走 XML) ---------- -->
+    <!-- 顶层相册(父不在回收站内),避免子树在回收站重复展示 -->
+    <select id="selectTrashRoots" resultType="com.ihomy.entity.Album">
+        SELECT a.* FROM content_photo_album a
+        WHERE a.family_id = #{familyId} AND a.deleted = 1
+          AND (a.parent_id IS NULL OR NOT EXISTS (
+                SELECT 1 FROM content_photo_album p WHERE p.id = a.parent_id AND p.deleted = 1))
+        ORDER BY a.deleted_at DESC
+    </select>
+
+    <!-- 家庭全部相册(含已删),回收站子树遍历/彻底删除用 -->
+    <select id="selectAllByFamily" resultType="com.ihomy.entity.Album">
+        SELECT * FROM content_photo_album WHERE family_id = #{familyId}
+    </select>
+
+    <select id="selectDeletedById" resultType="com.ihomy.entity.Album">
+        SELECT * FROM content_photo_album WHERE id = #{id} AND deleted = 1
+    </select>
+
+    <select id="selectExpiredTrashIds" resultType="java.lang.Long">
+        SELECT a.id FROM content_photo_album a
+        WHERE a.deleted = 1 AND a.deleted_at IS NOT NULL AND a.deleted_at &lt; #{cutoff}
+          AND (a.parent_id IS NULL OR NOT EXISTS (
+                SELECT 1 FROM content_photo_album p WHERE p.id = a.parent_id AND p.deleted = 1))
+    </select>
+
+    <update id="softDeleteById">
+        UPDATE content_photo_album SET deleted = 1, deleted_at = NOW() WHERE id = #{id} AND deleted = 0
+    </update>
+
+    <update id="softDeleteByIds">
+        UPDATE content_photo_album SET deleted = 1, deleted_at = NOW()
+        WHERE deleted = 0 AND id IN
+        <foreach item="id" collection="ids" open="(" separator="," close=")">#{id}</foreach>
+    </update>
+
+    <update id="restoreByIds">
+        UPDATE content_photo_album SET deleted = 0, deleted_at = NULL
+        WHERE deleted = 1 AND id IN
+        <foreach item="id" collection="ids" open="(" separator="," close=")">#{id}</foreach>
+    </update>
+
 </mapper>

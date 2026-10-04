@@ -37,6 +37,9 @@
              FROM content_photo p JOIN content_photo_album a ON p.album_id = a.id
              WHERE p.url = #{path} AND p.deleted = 0
                AND a.share_token IS NOT NULL AND a.deleted = 0
+            UNION ALL SELECT 1
+             FROM family_announcement a JOIN sys_family_info f ON a.family_id = f.id
+             WHERE a.image_url = #{path} AND a.enabled = 1 AND f.is_public = 1 AND a.deleted = 0
         ) t
     </select>
 

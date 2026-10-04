@@ -14,6 +14,9 @@ const routes = [
   { path: '/diary/book/:authorId', name: 'DiaryBook', component: () => import('@/views/diary/DiaryBook.vue'), meta: { public: true } },
   { path: '/diary/edit/:id?', name: 'DiaryEdit', component: () => import('@/views/diary/DiaryEdit.vue'), meta: { requiresAuth: true } },
   { path: '/anniversary', name: 'Anniversary', component: () => import('@/views/Anniversary.vue'), meta: { public: true } },
+  { path: '/announcement', name: 'Announcement', component: () => import('@/views/Announcement.vue'), meta: { public: true } },
+  // 回收站:照片/相册/视频/图书的逻辑删内容恢复与彻底删除,家庭内部数据须登录
+  { path: '/recycle', name: 'Recycle', component: () => import('@/views/Recycle.vue'), meta: { requiresAuth: true } },
   { path: '/album', name: 'Album', component: () => import('@/views/album/Album.vue'), meta: { public: true } },
   { path: '/album/shared/:token', name: 'AlbumShared', component: () => import('@/views/album/AlbumDetail.vue'), meta: { public: true } },
   { path: '/album/:id', name: 'AlbumDetail', component: () => import('@/views/album/AlbumDetail.vue'), meta: { public: true } },
@@ -76,6 +79,8 @@ const routes = [
   { path: '/kada', name: 'Kada', component: () => import('@/views/Kada.vue'), meta: { public: true, standalone: true } },
   // 壁纸页:家庭私有只读氛围屏(桌面壁纸/常开副屏用),登录后只展示照片/光影/天气;standalone 不套外壳
   { path: '/wallpaper', name: 'Wallpaper', component: () => import('@/views/Wallpaper.vue'), meta: { public: true, standalone: true } },
+  // 使用帮助:给家人看的纯文案页,不需要登录
+  { path: '/help', name: 'Help', component: () => import('@/views/Help.vue'), meta: { public: true } },
   // 兜底:未匹配的路由重定向回首页
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]

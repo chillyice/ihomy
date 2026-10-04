@@ -22,4 +22,22 @@ public interface PhotoMapper extends BaseMapper<Photo> {
     int deletePhysicalByAlbumId(@Param("albumId") Long albumId);
 
     List<Map<String, Object>> countByAlbumIds(@Param("ids") List<Long> ids);
+
+    // ---------- 回收站 ----------
+    List<Photo> selectTrashByFamily(@Param("familyId") Long familyId);
+
+    Photo selectDeletedById(@Param("id") Long id);
+
+    List<Long> selectExpiredTrashIds(@Param("cutoff") java.time.LocalDateTime cutoff);
+
+    int softDeleteById(@Param("id") Long id);
+
+    int softDeleteByAlbumIds(@Param("ids") List<Long> ids);
+
+    int restoreById(@Param("id") Long id);
+
+    int restoreByAlbumIds(@Param("ids") List<Long> ids);
+
+    /** 取相册子树内全部照片(含已删),彻底删除时连文件一并清理 */
+    List<Photo> selectByAlbumIdsAny(@Param("ids") List<Long> ids);
 }

@@ -1664,8 +1664,85 @@ WHERE NOT EXISTS (SELECT 1 FROM `sys_home_module` WHERE `code` = 'iot' AND `fami
 UPDATE `sys_oss_component`
    SET `purpose` = '智能家居中控(实体状态采集/设备控制;API 集成,界面自建)',
        `integration_status` = 'PARTIAL'
- WHERE `component_type` = 'SERVICE' AND `package_ref` = 'home-assistant/core'
-   AND `integration_status` <> 'PARTIAL';
+WHERE `component_type` = 'SERVICE' AND `package_ref` = 'home-assistant/core'
+  AND `integration_status` <> 'PARTIAL';
+
+-- ------------------------------------------------------------
+-- V10.8 放映厅播放权限点(2026-09-30)
+--   /media/works/{id}/play 返回的地址带媒体服务器直连令牌,收口为 media:play:
+--   OWNER 走「全量减去 ops:view」规则(历史库在此补),MEMBER/CHILD 给,GUEST 不给。
+-- ------------------------------------------------------------
+INSERT IGNORE INTO `sys_auth` (`auth_code`, `auth_name`, `module`, `description`) VALUES
+('media:play', '播放媒体库作品', 'MEDIA', '获取放映厅作品播放地址');
+
+INSERT INTO `sys_role_auth` (`role_id`, `auth_id`)
+SELECT r.id, a.id FROM `sys_role` r JOIN `sys_auth` a
+  ON a.auth_code = 'media:play'
+WHERE r.role_code IN ('OWNER', 'MEMBER', 'CHILD')
+  AND NOT EXISTS (SELECT 1 FROM `sys_role_auth` x WHERE x.role_id = r.id AND x.auth_id = a.id);
+
+-- ------------------------------------------------------------
+-- V10.9 家庭公告/广告位(2026-10-04)
+--   family_announcement:家长维护图片横幅+链接,按 sort_order 升序;生效日期可空=长期。
+--   成员与公开家庭访客可读(/announcement/list 复用 /public 家庭定位);
+--   游客可见图片需 FileAccessMapper.xml 反查(已代码侧处理)。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `family_announcement` (
+  `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`  BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `title`      VARCHAR(100) NOT NULL COMMENT '公告标题',
+  `image_url`  VARCHAR(500) DEFAULT NULL COMMENT '横幅图片URL',
+  `link_url`   VARCHAR(500) DEFAULT NULL COMMENT '跳转链接',
+  `sort_order` INT          NOT NULL DEFAULT 0 COMMENT '排序值(小在前)',
+  `enabled`    TINYINT      NOT NULL DEFAULT 1 COMMENT '0停用 1启用',
+  `start_date` DATE         DEFAULT NULL COMMENT '生效开始(空=立即)',
+  `end_date`   DATE         DEFAULT NULL COMMENT '生效结束(空=长期)',
+  `created_by` BIGINT       DEFAULT NULL COMMENT '创建人ID',
+  `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted`    TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  PRIMARY KEY (`id`),
+  KEY `idx_family_deleted` (`family_id`, `deleted`, `enabled`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭公告/广告位表(自建,图片+链接)';
+
+-- 首页模块:家庭公告入口(生活组);sys_home_module 无唯一约束兜底,用 NOT EXISTS 防重
+INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`)
+SELECT 'announcement', '家庭公告', 'icon-announcement', '/announcement', 'life', 'left', 19, 1
+WHERE NOT EXISTS (SELECT 1 FROM `sys_home_module` WHERE `code` = 'announcement' AND `family_id` IS NULL);
+
+-- ------------------------------------------------------------
+-- V10.10 回收站/版本历史(2026-10-04)
+--   照片/相册/视频/图书原为物理硬删(删 DB + 磁盘文件,无法恢复);改为逻辑删入回收站:
+--   四表加 deleted_at(逻辑删时间),删除仅置 deleted=1 且保留磁盘文件；
+--   /recycle 页可恢复或彻底删除,每日 03:00 定时物理清理 deleted_at 超 7 天的项(含磁盘文件)。
+--   MySQL 8 无 ADD COLUMN IF NOT EXISTS,information_schema 守卫幂等。
+-- ------------------------------------------------------------
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_photo' AND COLUMN_NAME = 'deleted_at');
+SET @sql := IF(@has = 0, 'ALTER TABLE `content_photo` ADD COLUMN `deleted_at` DATETIME DEFAULT NULL COMMENT ''逻辑删除时间(回收站,7天后物理清理)'' AFTER `deleted`', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_photo_album' AND COLUMN_NAME = 'deleted_at');
+SET @sql := IF(@has = 0, 'ALTER TABLE `content_photo_album` ADD COLUMN `deleted_at` DATETIME DEFAULT NULL COMMENT ''逻辑删除时间(回收站,7天后物理清理)'' AFTER `deleted`', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_video' AND COLUMN_NAME = 'deleted_at');
+SET @sql := IF(@has = 0, 'ALTER TABLE `content_video` ADD COLUMN `deleted_at` DATETIME DEFAULT NULL COMMENT ''逻辑删除时间(回收站,7天后物理清理)'' AFTER `deleted`', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_book' AND COLUMN_NAME = 'deleted_at');
+SET @sql := IF(@has = 0, 'ALTER TABLE `content_book` ADD COLUMN `deleted_at` DATETIME DEFAULT NULL COMMENT ''逻辑删除时间(回收站,7天后物理清理)'' AFTER `deleted`', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- 历史逻辑删行补删时间(此前硬删无此类行,兜底幂等)
+UPDATE `content_photo`       SET `deleted_at` = NOW() WHERE `deleted` = 1 AND `deleted_at` IS NULL;
+UPDATE `content_photo_album` SET `deleted_at` = NOW() WHERE `deleted` = 1 AND `deleted_at` IS NULL;
+UPDATE `content_video`       SET `deleted_at` = NOW() WHERE `deleted` = 1 AND `deleted_at` IS NULL;
+UPDATE `content_book`        SET `deleted_at` = NOW() WHERE `deleted` = 1 AND `deleted_at` IS NULL;
+
+-- 首页模块:回收站入口(系统组)
+INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`)
+SELECT 'recycle', '回收站', 'icon-recycle', '/recycle', 'system', 'left', 88, 1
+WHERE NOT EXISTS (SELECT 1 FROM `sys_home_module` WHERE `code` = 'recycle' AND `family_id` IS NULL);
 
 
 

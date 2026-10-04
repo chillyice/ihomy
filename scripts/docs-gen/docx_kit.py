@@ -9,6 +9,8 @@ Implements the document house rules:
   * body line spacing 1.3, CJK first-line indent 2 chars on prose paragraphs
   * tables: percentage column widths, repeating header row, cantSplit, cell margins
 """
+from pathlib import Path
+
 from docx import Document
 from docx.enum.section import WD_SECTION
 from docx.enum.table import WD_TABLE_ALIGNMENT
@@ -26,6 +28,11 @@ BODY_MARGIN = dict(top=1440, bottom=1440, left=1701, right=1417)
 # occupied would show as a white strip at the foot of the cover.
 COVER_H = PAGE_H
 COVER_BREAK_TWIPS = 1
+
+
+def app_version():
+    """Version stamped on every cover, read from the root VERSION file."""
+    return (Path(__file__).resolve().parents[2] / "VERSION").read_text(encoding="utf-8").strip()
 
 PALETTES = {
     "DS-1": {

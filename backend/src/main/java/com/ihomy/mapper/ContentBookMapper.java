@@ -5,6 +5,7 @@ import com.ihomy.entity.ContentBook;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper
@@ -30,4 +31,15 @@ public interface ContentBookMapper extends BaseMapper<ContentBook> {
     int deleteRelByBookId(@Param("bookId") Long bookId);
 
     int deleteRelByCategory(@Param("categoryId") Long categoryId);
+
+    // ---------- 回收站 ----------
+    List<ContentBook> selectTrashByFamily(@Param("familyId") Long familyId);
+
+    ContentBook selectDeletedById(@Param("id") Long id);
+
+    List<Long> selectExpiredTrashIds(@Param("cutoff") LocalDateTime cutoff);
+
+    int softDeleteById(@Param("id") Long id);
+
+    int restoreById(@Param("id") Long id);
 }

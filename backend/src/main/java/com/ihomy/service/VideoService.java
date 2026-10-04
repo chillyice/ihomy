@@ -119,12 +119,10 @@ public class VideoService {
         return Map.of("url", signedUrlService.resolve(v.getVideoUrl()));
     }
 
-    /** 删除视频:硬删记录并删除视频文件与海报 */
+    /** 删除视频:改为逻辑删入回收站,视频文件与海报保留至彻底删除 */
     public void delete(Long id, Long familyId, Long currentUserId, boolean isOwner) {
-        Video v = requireOwn(id, familyId, currentUserId, isOwner);
-        videoMapper.deletePhysicalById(id);
-        fileService.deleteByUrl(v.getVideoUrl());
-        fileService.deleteByUrl(v.getPoster());
+        requireOwn(id, familyId, currentUserId, isOwner);
+        videoMapper.softDeleteById(id);
     }
 
     /** DTO 字段落库,mediaType 缺省补 movie */

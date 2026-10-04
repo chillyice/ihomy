@@ -230,24 +230,17 @@ public class AlbumService {
         if (old != null && !old.isBlank()) fileService.deleteByUrl(old); // 换封面/清除时删旧文件
     }
 
-    /** 删除相册(连同子相册、照片与文件):仅创建者或家长;映射相册删除=解除映射,源文件不受影响 */
+    /** 删除相册(连同子相册与照片):仅创建者或家长;改为逻辑删入回收站,磁盘文件保留至彻底删除 */
     @Transactional
     public void delete(Long id, SysUser user, boolean isOwner) {
         Album root = requireOwn(id, user, isOwner);
-        List<Album> all = albumMapper.selectList(new LambdaQueryWrapper<Album>()
-                .eq(Album::getFamilyId, root.getFamilyId()));
+        // 含已删行以便遍历完整子树;softDeleteByIds 只置 deleted=0 的行,不会刷新已删行时间
+        List<Album> all = albumMapper.selectAllByFamily(root.getFamilyId());
         List<Album> subtree = new ArrayList<>();
         collectSubtree(root, all, subtree);
-        for (Album a : subtree) {
-            List<Photo> photos = photoMapper.selectList(new LambdaQueryWrapper<Photo>()
-                    .eq(Photo::getAlbumId, a.getId()));
-            photoMapper.deletePhysicalByAlbumId(a.getId());
-            albumMapper.deletePhysicalById(a.getId());
-            for (Photo p : photos) {
-                fileService.deleteByUrl(p.getUrl()); // storage:// 逻辑地址自动跳过,设备文件永不删除
-                thumbnailService.evictByUrl(p.getUrl()); // 影子照片的缩略图缓存一并清理
-            }
-        }
+        List<Long> ids = subtree.stream().map(Album::getId).toList();
+        albumMapper.softDeleteByIds(ids);
+        photoMapper.softDeleteByAlbumIds(ids);
     }
 
     /** 添加照片:可见性随相册类型(public→PUBLIC,private→FAMILY);首张自动成为相册封面 */
@@ -280,13 +273,11 @@ public class AlbumService {
         photoMapper.updateById(p);
     }
 
-    /** 删除照片:仅上传者或家长(连带删除文件与缩略图缓存;影子记录仅删数据库行) */
+    /** 删除照片:仅上传者或家长;改为逻辑删入回收站,文件保留至彻底删除 */
     @Transactional
     public void deletePhoto(Long photoId, SysUser user, boolean isOwner) {
-        Photo p = requirePhoto(photoId, user, isOwner);
-        photoMapper.deletePhysicalById(photoId);
-        fileService.deleteByUrl(p.getUrl());
-        thumbnailService.evictByUrl(p.getUrl());
+        requirePhoto(photoId, user, isOwner);
+        photoMapper.softDeleteById(photoId);
     }
 
     /* ---------- 私有工具 ---------- */

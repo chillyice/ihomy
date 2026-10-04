@@ -114,6 +114,7 @@ public class MediaController {
     }
 
     @Operation(summary = "获取播放地址(浏览器放不了原片编码时给转码流;字幕轨随地址一起回)")
+    @RequirePermission("media:play")
     @GetMapping("/works/{itemId}/play")
     public Result<Map<String, Object>> play(@PathVariable String itemId,
                                             @RequestParam(required = false) Integer subtitleIndex) {

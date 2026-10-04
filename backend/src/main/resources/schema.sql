@@ -470,6 +470,7 @@ CREATE TABLE `content_photo_album` (
   `created_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted`        TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  `deleted_at`     DATETIME     DEFAULT NULL COMMENT '逻辑删除时间(回收站,7天后物理清理)',
   PRIMARY KEY (`id`),
   KEY `idx_family` (`family_id`),
   KEY `idx_family_parent` (`family_id`, `parent_id`, `deleted`),
@@ -495,6 +496,7 @@ CREATE TABLE `content_photo` (
   `source_fs_id` BIGINT      DEFAULT NULL COMMENT '远程文件fs_id(百度网盘,免列目录直达dlink)',
   `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
   `deleted`    TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  `deleted_at` DATETIME     DEFAULT NULL COMMENT '逻辑删除时间(回收站,7天后物理清理)',
   PRIMARY KEY (`id`),
   KEY `idx_album` (`album_id`),
   KEY `idx_author` (`author_id`),
@@ -532,6 +534,7 @@ CREATE TABLE `content_video` (
   `sync_status`    VARCHAR(20)  DEFAULT NULL COMMENT 'VALID正常/OFFLINE设备离线/MISSING目录不存在',
   `created_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
   `deleted`        TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  `deleted_at`     DATETIME     DEFAULT NULL COMMENT '逻辑删除时间(回收站,7天后物理清理)',
   PRIMARY KEY (`id`),
   KEY `idx_family` (`family_id`),
   KEY `idx_family_created` (`family_id`, `deleted`, `created_at`),
@@ -703,7 +706,9 @@ INSERT INTO `sys_auth` (`auth_code`, `auth_name`, `module`, `description`) VALUE
 ('loan:view',          '查看贷款记录', 'LOAN',    '查看家庭贷款与还款流水'),
 ('loan:manage',        '管理贷款记录', 'LOAN',    '新增/修改/删除贷款、利率调整与提前还款事件'),
 -- 智能家居中控模块（V10.5）
-('iot:control',        '控制智能设备', 'IOT',     '开关/调节家里的灯光、开关与传感器设备');
+('iot:control',        '控制智能设备', 'IOT',     '开关/调节家里的灯光、开关与传感器设备'),
+-- 放映厅播放（V10.8:播放地址带媒体服务器直连令牌,不发 GUEST）
+('media:play',         '播放媒体库作品', 'MEDIA', '获取放映厅作品播放地址');
 
 -- ------------------------------------------------------------
 -- 24. 角色-权限映射
@@ -735,7 +740,8 @@ WHERE r.role_code = 'MEMBER'
     'library:manage',
     'vault:view','vault:manage',
     'loan:view','loan:manage',
-    'iot:control'
+    'iot:control',
+    'media:play'
   );
 
 -- CHILD 权限
@@ -751,7 +757,8 @@ WHERE r.role_code = 'CHILD'
     'comment:create','comment:delete',
     'vault:view','vault:manage',
     'loan:view','loan:manage',
-    'iot:control'
+    'iot:control',
+    'media:play'
   );
 
 -- GUEST 权限（仅浏览公开内容）
@@ -1698,6 +1705,7 @@ CREATE TABLE `content_book` (
   `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  `deleted_at`  DATETIME     DEFAULT NULL COMMENT '逻辑删除时间(回收站,7天后物理清理)',
   PRIMARY KEY (`id`),
   KEY `idx_family_created` (`family_id`, `deleted`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='电子图书表';
@@ -2148,10 +2156,44 @@ CREATE TABLE `sys_iot_data` (
   KEY `idx_device_created` (`device_id`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='智能设备历史数据(按天清理,只留近期)';
 
+-- ------------------------------------------------------------
+-- V10.9 family_announcement 家庭公告/广告位表(自建,不接第三方)
+--   家长维护图片横幅 + 跳转链接,按 sort_order 升序展示;成员与公开家庭访客可读。
+--   start_date/end_date 可空=长期有效;enabled=0 停用(仅家长可见)。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_announcement`;
+CREATE TABLE `family_announcement` (
+  `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`  BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `title`      VARCHAR(100) NOT NULL COMMENT '公告标题',
+  `image_url`  VARCHAR(500) DEFAULT NULL COMMENT '横幅图片URL',
+  `link_url`   VARCHAR(500) DEFAULT NULL COMMENT '跳转链接',
+  `sort_order` INT          NOT NULL DEFAULT 0 COMMENT '排序值(小在前)',
+  `enabled`    TINYINT      NOT NULL DEFAULT 1 COMMENT '0停用 1启用',
+  `start_date` DATE         DEFAULT NULL COMMENT '生效开始(空=立即)',
+  `end_date`   DATE         DEFAULT NULL COMMENT '生效结束(空=长期)',
+  `created_by` BIGINT       DEFAULT NULL COMMENT '创建人ID',
+  `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted`    TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  PRIMARY KEY (`id`),
+  KEY `idx_family_deleted` (`family_id`, `deleted`, `enabled`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭公告/广告位表(自建,图片+链接)';
+
 -- 首页模块:智能家居中控入口(生活组);sys_home_module 无唯一约束兜底,用 NOT EXISTS 防重
 INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`)
 SELECT 'iot', '智能家居', 'icon-iot', '/iot', 'life', 'left', 18, 1
 WHERE NOT EXISTS (SELECT 1 FROM `sys_home_module` WHERE `code` = 'iot' AND `family_id` IS NULL);
+
+-- 首页模块:家庭公告入口(生活组)
+INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`)
+SELECT 'announcement', '家庭公告', 'icon-announcement', '/announcement', 'life', 'left', 19, 1
+WHERE NOT EXISTS (SELECT 1 FROM `sys_home_module` WHERE `code` = 'announcement' AND `family_id` IS NULL);
+
+-- 首页模块:回收站入口(系统组,排在设置之前)
+INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`)
+SELECT 'recycle', '回收站', 'icon-recycle', '/recycle', 'system', 'left', 88, 1
+WHERE NOT EXISTS (SELECT 1 FROM `sys_home_module` WHERE `code` = 'recycle' AND `family_id` IS NULL);
 
 -- NPM/MAVEN 直接依赖交由 Renovate 检测 + 生成 PR,SERVICE 独立服务由台账内部维护(默认 INTERNAL)
 UPDATE `sys_oss_component` SET `managed_by` = 'RENOVATE' WHERE `component_type` IN ('NPM', 'MAVEN');

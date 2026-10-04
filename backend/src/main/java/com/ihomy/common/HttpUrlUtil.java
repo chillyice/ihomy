@@ -57,6 +57,9 @@ public final class HttpUrlUtil {
         if (BLOCKED_HOSTS.contains(h) || "0.0.0.0".equals(h)) return true;
         if (h.startsWith("169.254.") || h.startsWith("fe80:")) return true;
         // 十进制/十六进制形式的 IP(169.254.169.254 可写成 2852039166 或 0xA9FEA9FE),当非法地址
-        return h.matches("^\\d+$") || h.matches("^0x[0-9a-f]+$");
+        if (h.matches("^\\d+$") || h.matches("^0x[0-9a-f]+$")) return true;
+        // IPv4 映射 IPv6(::ffff:169.254.169.254)绕过上面的前缀判断,取出内嵌 IPv4 再判一次
+        int mapped = h.lastIndexOf(":ffff:");
+        return mapped >= 0 && isBlockedHost(h.substring(mapped + 6));
     }
 }

@@ -5,7 +5,8 @@
 import {
   Document, Notebook, Picture, Calendar, VideoPlay, Headset, Trophy, Aim,
   AlarmClock, List, Star, Wallet, PictureRounded, Share, User, Box, MapLocation,
-  ChatDotRound, Food, Reading, Setting, Monitor, Tools, Sunny, Lock, MagicStick,
+  ChatDotRound, Food, Reading, Setting, Monitor, Tools, Sunny, Lock, MagicStick, QuestionFilled,
+  Promotion, Delete,
 } from '@element-plus/icons-vue'
 
 // code → 路由路径(后端 sys_home_module.code 为字符串标识)
@@ -16,7 +17,7 @@ export const NAV_PATHS = {
   chat: '/chat', tree: '/tree', cascade: '/cascade',
   item: '/item', kitchen: '/kitchen', library: '/library', settings: '/settings', ops: '/ops',
   storage: '/storage/files', tools: '/tools', plant: '/plant', games: '/games', vault: '/vault',
-  iot: '/iot',
+  iot: '/iot', help: '/help', announcement: '/announcement', recycle: '/recycle',
 }
 
 // code → 图标组件(Element Plus 线性图标,统一风格)
@@ -25,7 +26,8 @@ export const ICON_MAP = {
   points: Trophy, task: Aim, reminder: AlarmClock, plan: List, wish: Star,
   book: Wallet, cascade: PictureRounded, tree: Share, member: User, storage: Box, item: MapLocation,
   chat: ChatDotRound, kitchen: Food, library: Reading, settings: Setting, ops: Monitor, tools: Tools,
-  plant: Sunny, games: Aim, vault: Lock, iot: MagicStick,
+  plant: Sunny, games: Aim, vault: Lock, iot: MagicStick, help: QuestionFilled, announcement: Promotion,
+  recycle: Delete,
 }
 export const iconComp = (code) => ICON_MAP[code] || Document
 
@@ -50,6 +52,8 @@ export function buildNavItems(modules, { hasOps = false } = {}) {
       sortOrder: m.sortOrder ?? 99,
     }))
   list.push({ code: 'settings', title: '设置', path: '/settings', category: 'system', sortOrder: 90 })
+  // 帮助:与设置/运维同为不入 sys_home_module 的虚拟入口(标题同样写死,nav 现状即如此)
+  list.push({ code: 'help', title: '帮助', path: '/help', category: 'system', sortOrder: 92 })
   if (hasOps) list.push({ code: 'ops', title: '运维管理', path: '/ops', category: 'system', sortOrder: 95 })
   return list.sort((a, b) => a.sortOrder - b.sortOrder)
 }

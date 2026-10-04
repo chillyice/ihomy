@@ -61,6 +61,7 @@ public class SecurityConfig {
                         "/diary/list",
                         "/album/**",
                         "/anniversary/list",
+                        "/announcement/list",
                         "/video/list", "/video/*",
                         "/photo/cascade",
                         "/comment/list",

@@ -34,4 +34,5 @@ public class ContentBook {
     private LocalDateTime updatedAt;
     @TableLogic
     private Integer deleted;
+    private LocalDateTime deletedAt;
 }

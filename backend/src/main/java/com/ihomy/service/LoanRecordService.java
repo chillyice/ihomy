@@ -47,7 +47,8 @@ public class LoanRecordService {
     private static final Set<String> PREPAY_STRATEGIES = Set.of("SHORTEN", "REDUCE");
 
     private static final int MAX_MONTHS = 1200;
-    private static final int MAX_RATE = 100;
+    /** 年利率上限与 rate 列 DECIMAL(6,4) 对齐:填 100 或第五位小数四舍五入进位都会落库越界走 500 */
+    private static final BigDecimal MAX_RATE = new BigDecimal("99.9999");
 
     /** 贷款列表(含各自的事件时间轴),创建人昵称批量回填(不做 N+1) */
     public List<Map<String, Object>> list(Long familyId) {
@@ -59,7 +60,8 @@ public class LoanRecordService {
         List<Long> loanIds = loans.stream().map(FamilyLoan::getId).collect(Collectors.toList());
         Map<Long, List<Map<String, Object>>> eventsByLoan = familyLoanEventMapper.selectList(
                         new LambdaQueryWrapper<FamilyLoanEvent>().in(FamilyLoanEvent::getLoanId, loanIds)
-                                .orderByAsc(FamilyLoanEvent::getEffectivePeriod))
+                                // 同期次事件按 id 定序:事件序决定前端 loanLedger 重算结果,必须全客户端一致
+                                .orderByAsc(FamilyLoanEvent::getEffectivePeriod, FamilyLoanEvent::getId))
                 .stream().collect(Collectors.groupingBy(FamilyLoanEvent::getLoanId,
                         Collectors.mapping(this::toEventMap, Collectors.toList())));
 
@@ -154,9 +156,8 @@ public class LoanRecordService {
             throw new BizException(ResultCode.BAD_REQUEST, "请填写 1~1200 期内的还款期数");
         }
         BigDecimal rate = dto.getRate();
-        if (rate == null || rate.compareTo(BigDecimal.ZERO) < 0
-                || rate.compareTo(BigDecimal.valueOf(MAX_RATE)) > 0) {
-            throw new BizException(ResultCode.BAD_REQUEST, "请填写 0~100 之间的年利率");
+        if (!validRate(rate)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "请填写 0~99.9999 之间的年利率(最多四位小数)");
         }
         LocalDate loanDate = dto.getLoanDate();
         LocalDate firstPayDate = dto.getFirstPayDate();
@@ -202,9 +203,8 @@ public class LoanRecordService {
             row.setType(type);
             if ("RATE_CHANGE".equals(type)) {
                 BigDecimal rate = e.getRate();
-                if (rate == null || rate.compareTo(BigDecimal.ZERO) < 0
-                        || rate.compareTo(BigDecimal.valueOf(MAX_RATE)) > 0) {
-                    throw new BizException(ResultCode.BAD_REQUEST, "调整后的年利率需在 0~100 之间");
+                if (!validRate(rate)) {
+                    throw new BizException(ResultCode.BAD_REQUEST, "调整后的年利率需在 0~99.9999 之间(最多四位小数)");
                 }
                 row.setRate(rate);
             } else {
@@ -242,6 +242,14 @@ public class LoanRecordService {
         if (value == null) return fallback;
         String upper = value.trim().toUpperCase();
         return allowed.contains(upper) ? upper : fallback;
+    }
+
+    /** 年利率边界:非负、不超列上限 99.9999、最多四位小数(第五位会被四舍五入进位成 100.0000 越界) */
+    private boolean validRate(BigDecimal rate) {
+        return rate != null
+                && rate.compareTo(BigDecimal.ZERO) >= 0
+                && rate.compareTo(MAX_RATE) <= 0
+                && rate.stripTrailingZeros().scale() <= 4;
     }
 
     private String blankToNull(String value) {

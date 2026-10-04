@@ -43,4 +43,5 @@ public class Video {
     private LocalDateTime createdAt;
     @TableLogic
     private Integer deleted;
+    private LocalDateTime deletedAt;
 }

@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from docx_kit import DocBuilder
+from docx_kit import DocBuilder, app_version
 
 ROOT = Path(r"C:\Users\chill\OneDrive\WorkStation\Projects\ihomy")
 OUTDIR = ROOT / "docs" / "项目文档"
@@ -87,7 +87,7 @@ def main():
             "数据库：MySQL 8.0 ／ 字符集 utf8mb4 ／ 存储引擎 InnoDB",
             "表数量：%d 张　字段总数：%d 个" % (stats["table_count"], stats["column_total"]),
             "来源：backend/src/main/resources/schema.sql",
-            "版本：V9.94",
+            "版本：%s" % app_version(),
         ],
         footer_left="ihomy 项目文档",
         footer_right="数据库结构文档",

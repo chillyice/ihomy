@@ -56,4 +56,48 @@
         GROUP BY album_id
     </select>
 
+    <!-- ---------- 回收站(逻辑删数据 MP 常规查询不可见,走 XML) ---------- -->
+    <!-- 家庭内已删照片(其相册未删;相册子树中的照片随相册在回收站内展示,不单列) -->
+    <select id="selectTrashByFamily" resultType="com.ihomy.entity.Photo">
+        SELECT p.* FROM content_photo p
+        WHERE p.family_id = #{familyId} AND p.deleted = 1
+          AND NOT EXISTS (SELECT 1 FROM content_photo_album a WHERE a.id = p.album_id AND a.deleted = 1)
+        ORDER BY p.deleted_at DESC
+    </select>
+
+    <select id="selectDeletedById" resultType="com.ihomy.entity.Photo">
+        SELECT * FROM content_photo WHERE id = #{id} AND deleted = 1
+    </select>
+
+    <select id="selectExpiredTrashIds" resultType="java.lang.Long">
+        SELECT p.id FROM content_photo p
+        WHERE p.deleted = 1 AND p.deleted_at IS NOT NULL AND p.deleted_at &lt; #{cutoff}
+          AND NOT EXISTS (SELECT 1 FROM content_photo_album a WHERE a.id = p.album_id AND a.deleted = 1)
+    </select>
+
+    <update id="softDeleteById">
+        UPDATE content_photo SET deleted = 1, deleted_at = NOW() WHERE id = #{id} AND deleted = 0
+    </update>
+
+    <update id="softDeleteByAlbumIds">
+        UPDATE content_photo SET deleted = 1, deleted_at = NOW()
+        WHERE deleted = 0 AND album_id IN
+        <foreach item="id" collection="ids" open="(" separator="," close=")">#{id}</foreach>
+    </update>
+
+    <update id="restoreById">
+        UPDATE content_photo SET deleted = 0, deleted_at = NULL WHERE id = #{id} AND deleted = 1
+    </update>
+
+    <update id="restoreByAlbumIds">
+        UPDATE content_photo SET deleted = 0, deleted_at = NULL
+        WHERE deleted = 1 AND album_id IN
+        <foreach item="id" collection="ids" open="(" separator="," close=")">#{id}</foreach>
+    </update>
+
+    <select id="selectByAlbumIdsAny" resultType="com.ihomy.entity.Photo">
+        SELECT * FROM content_photo WHERE album_id IN
+        <foreach item="id" collection="ids" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
 </mapper>

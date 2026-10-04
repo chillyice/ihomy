@@ -13,6 +13,9 @@ SO="${SOFFICE:-/c/Users/chill/AppData/Local/Temp/lo-root/LibreOffice/program/sof
 P="${POPPLER:-/d/Program Files/poppler-24.07.0/Library/bin}"
 RENDER="${RENDER_DIR:-/c/Users/chill/AppData/Local/Temp/render}"
 
+# Windows consoles default to GBK and crash on the CJK/emoji output of the helpers
+export PYTHONIOENCODING=utf-8
+
 echo "===== parse sources ====="
 python parse_schema.py
 python parse_endpoints.py

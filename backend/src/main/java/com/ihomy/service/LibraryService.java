@@ -198,10 +198,8 @@ public class LibraryService {
         ContentBook book = bookMapper.selectById(id);
         if (book == null) throw new BizException(ResultCode.NOT_FOUND);
         if (!isOwner && !book.getUploaderId().equals(currentUserId)) throw new BizException(ResultCode.FORBIDDEN);
-        bookMapper.deleteRelByBookId(id);
-        bookMapper.deletePhysicalById(id);
-        fileService.deleteByUrl(book.getFileUrl());
-        fileService.deleteByUrl(book.getCoverUrl());
+        // 逻辑删入回收站;分类关系与文件保留至彻底删除
+        bookMapper.softDeleteById(id);
     }
 
     @Transactional
