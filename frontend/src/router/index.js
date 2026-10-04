@@ -36,8 +36,9 @@ const routes = [
   // 家庭保险箱(密码管理器):家庭共享的账号密码保管箱,须登录
   { path: '/vault', name: 'Vault', component: () => import('@/views/vault/Vault.vue'), meta: { requiresAuth: true } },
   { path: '/tree', name: 'Tree', component: () => import('@/views/tree/Tree.vue'), meta: { public: true } },
-  { path: '/cascade', name: 'Cascade', component: () => import('@/views/cascade/Cascade.vue'), meta: { public: true } },
   { path: '/weather', name: 'Weather', component: () => import('@/views/weather/Weather.vue'), meta: { public: true } },
+  // 照片瀑布已并入相册(相册页内视图):保留旧链接/书签,重定向到相册并自动打开瀑布
+  { path: '/cascade', redirect: { path: '/album', query: { cascade: '1' } } },
   { path: '/chat', name: 'Chat', component: () => import('@/views/chat/Chat.vue'), meta: { requiresAuth: true } },
   { path: '/settings', name: 'Settings', component: () => import('@/views/Settings.vue'), meta: { requiresAuth: true } },
   // 百度网盘 OAuth 授权回调页(须与百度开放平台注册的「授权回调页地址」一致)

@@ -20,7 +20,7 @@
           <div class="anni-name">{{ a.name }}</div>
           <div class="anni-owner">
             <el-icon><User /></el-icon>
-            <span>{{ a.userName || t('anniversary.familyAnniversary') }}</span>
+            <span>{{ memberText(a) }}</span>
           </div>
           <div v-if="userStore.isLoggedIn" class="anni-actions">
             <el-tooltip :content="t('common.edit')" placement="top" :show-after="300">
@@ -62,7 +62,15 @@
           <el-switch v-model="editor.form.isLeap" :active-value="1" :inactive-value="0" />
         </el-form-item>
         <el-form-item :label="t('anniversary.memberLabel')">
-          <el-select v-model="editor.form.userId" :placeholder="t('anniversary.memberPlaceholder')" clearable style="width: 100%">
+          <el-select
+            v-model="editor.form.memberIds"
+            multiple
+            collapse-tags
+            collapse-tags-tooltip
+            clearable
+            :placeholder="t('anniversary.memberPlaceholder')"
+            style="width: 100%"
+          >
             <el-option v-for="m in members" :key="m.id" :label="m.nickname || m.username" :value="m.id" />
           </el-select>
         </el-form-item>
@@ -93,11 +101,17 @@ const userStore = useUserStore()
 const list = ref([])
 const members = ref([])
 const loading = ref(false)
-// 编辑框状态:form 同时承担新增与编辑(以 id 区分)
+// 编辑框状态:form 同时承担新增与编辑(以 id 区分);memberIds 可不选(家庭级纪念日)
 const editor = reactive({
   visible: false,
-  form: { id: null, name: '', calendar: 'solar', month: 1, day: 1, isLeap: 0, userId: null, recurring: 1 },
+  form: { id: null, name: '', calendar: 'solar', month: 1, day: 1, isLeap: 0, memberIds: [], recurring: 1 },
 })
+
+// 关联成员展示:多位用顿号连接,未关联即为家庭级纪念日
+const memberText = (a) =>
+  (Array.isArray(a.memberNames) && a.memberNames.length)
+    ? a.memberNames.join('、')
+    : t('anniversary.familyAnniversary')
 
 // 拉取纪念日列表
 const load = async () => {
@@ -123,10 +137,11 @@ const openEditor = (a) => {
   if (a) {
     Object.assign(editor.form, {
       id: a.id, name: a.name, calendar: a.calendar, month: a.month, day: a.day,
-      isLeap: a.isLeap, userId: a.userId, recurring: a.recurring === 'ONCE' ? 0 : 1,
+      isLeap: a.isLeap, memberIds: Array.isArray(a.memberIds) ? [...a.memberIds] : [],
+      recurring: a.recurring === 'ONCE' ? 0 : 1,
     })
   } else {
-    Object.assign(editor.form, { id: null, name: '', calendar: 'solar', month: 1, day: 1, isLeap: 0, userId: null, recurring: 1 })
+    Object.assign(editor.form, { id: null, name: '', calendar: 'solar', month: 1, day: 1, isLeap: 0, memberIds: [], recurring: 1 })
   }
   editor.visible = true
 }

@@ -4,17 +4,18 @@
 // 新增功能模块时,只需在 NAV_PATHS 加一行 code→路由,三端自动同步。
 import {
   Document, Notebook, Picture, Calendar, VideoPlay, Headset, Trophy, Aim,
-  AlarmClock, List, Star, Wallet, PictureRounded, Share, User, Box, MapLocation,
+  AlarmClock, List, Star, Wallet, Share, User, Box, MapLocation,
   ChatDotRound, Food, Reading, Setting, Monitor, Tools, Sunny, Lock, MagicStick, QuestionFilled,
   Promotion, Delete,
 } from '@element-plus/icons-vue'
 
 // code → 路由路径(后端 sys_home_module.code 为字符串标识)
+// 注意:照片瀑布(cascade)已并入相册页内视图,不再是独立模块,故此处无其映射(旧链接由路由重定向兜底)
 export const NAV_PATHS = {
   blog: '/blog', diary: '/diary', album: '/album', anniversary: '/anniversary',
   cinema: '/cinema', music: '/music', member: '/member', points: '/points', task: '/task',
   reminder: '/reminder', plan: '/plan', wish: '/wish', book: '/book',
-  chat: '/chat', tree: '/tree', cascade: '/cascade',
+  chat: '/chat', tree: '/tree',
   item: '/item', kitchen: '/kitchen', library: '/library', settings: '/settings', ops: '/ops',
   storage: '/storage/files', tools: '/tools', plant: '/plant', games: '/games', vault: '/vault',
   iot: '/iot', help: '/help', announcement: '/announcement', recycle: '/recycle',
@@ -24,7 +25,7 @@ export const NAV_PATHS = {
 export const ICON_MAP = {
   blog: Document, diary: Notebook, album: Picture, anniversary: Calendar, cinema: VideoPlay, music: Headset,
   points: Trophy, task: Aim, reminder: AlarmClock, plan: List, wish: Star,
-  book: Wallet, cascade: PictureRounded, tree: Share, member: User, storage: Box, item: MapLocation,
+  book: Wallet, tree: Share, member: User, storage: Box, item: MapLocation,
   chat: ChatDotRound, kitchen: Food, library: Reading, settings: Setting, ops: Monitor, tools: Tools,
   plant: Sunny, games: Aim, vault: Lock, iot: MagicStick, help: QuestionFilled, announcement: Promotion,
   recycle: Delete,

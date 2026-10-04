@@ -4,7 +4,7 @@
 
     <delete id="deletePhysicalById">DELETE FROM content_photo_album WHERE id = #{id}</delete>
 
-    <!-- ---------- 回收站(逻辑删数据 MP 常规查询不可见,走 XML) ---------- -->
+    <!-- ========== 回收站(逻辑删数据 MP 常规查询不可见,走 XML) ========== -->
     <!-- 顶层相册(父不在回收站内),避免子树在回收站重复展示 -->
     <select id="selectTrashRoots" resultType="com.ihomy.entity.Album">
         SELECT a.* FROM content_photo_album a

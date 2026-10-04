@@ -47,6 +47,10 @@
         <el-select v-model="themeTemplate" size="small" class="mm-select" @change="onThemeChange">
           <el-option v-for="th in themeOptions" :key="th.value" :label="th.label" :value="th.value" />
         </el-select>
+        <!-- 深色编辑:只切换画布观感(背景/节点配色),作为编辑偏好本地保存,不写入脑图数据 -->
+        <el-tooltip :content="darkEdit ? $t('tools.mindmap.lightEdit') : $t('tools.mindmap.darkEdit')" placement="bottom">
+          <el-button :icon="darkEdit ? Sunny : Moon" circle size="small" :disabled="!inited" @click="toggleDarkEdit" />
+        </el-tooltip>
         <el-dropdown trigger="click" @command="onImport">
           <el-button size="small">
             {{ $t('tools.mindmap.import') }}
@@ -304,6 +308,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowLeft, ArrowDown, ArrowUp, EditPen, RefreshLeft, RefreshRight,
   CirclePlus, Plus, Delete, Aim, Brush, Close, Search as SearchIcon, CaretRight, Clock, Camera,
+  Moon, Sunny,
 } from '@element-plus/icons-vue'
 import MindMap from 'simple-mind-map'
 import Drag from 'simple-mind-map/src/plugins/Drag.js'
@@ -377,6 +382,77 @@ const themeOptions = [
   { value: 'colored', label: t('tools.mindmap.themeColored') },
 ]
 const dashOptions = ['none', '5,5', '10,5', '15,5,5,5', '20,10,5,10']
+
+// ---------- 深色编辑模式(编辑偏好,不写入脑图数据) ----------
+// simple-mind-map 的画布背景来自 themeConfig.backgroundColor,内置主题都不含此键 → 画布恒为浅色 #fafafa,
+// 与夜间/暮色外壳不搭。此处提供一层只作用于编辑期的覆盖:深色背景 + 适配深底的节点配色;
+// 关闭即还原脑图自身的主题配置。偏好仅存 localStorage(每人每设备独立),保存时写入的是用户主题配置。
+const DARK_KEY = 'ihomy:mindmap:dark'
+// 深色画布底色按装修主题取各自的暮色值(暖居深咖/光尘深蓝),与外壳暮色同源,观感统一
+const darkOverlayConfig = () => {
+  const warm = document.documentElement.classList.contains('theme-warm')
+  return {
+    backgroundColor: warm ? '#241a12' : '#0f1a2e',
+    lineColor: 'rgba(255, 255, 255, 0.3)',
+    root: { fillColor: '#4a5568', color: '#f2f5f9', startColor: '#4a5568' },
+    second: { fillColor: '#2a303c', color: '#e2e8f0', borderColor: '#4a5364' },
+    node: { color: '#c3cbd8' },
+  }
+}
+const deepClone = (o) => (o ? JSON.parse(JSON.stringify(o)) : {})
+// 浅合并一层节点档位(root/second/node),避免深色覆盖把用户自定义档位整块顶掉
+const mergeThemeConfig = (base, overlay) => {
+  const out = { ...deepClone(base), ...deepClone(overlay) }
+  for (const key of ['root', 'second', 'node', 'generalization']) {
+    if (overlay[key]) out[key] = { ...(base?.[key] || {}), ...overlay[key] }
+  }
+  return out
+}
+const storedDark = localStorage.getItem(DARK_KEY)
+const darkEdit = ref(storedDark === null
+  ? document.documentElement.classList.contains('dark')
+  : storedDark === '1')
+// 脑图自身的主题配置(来自保存数据/导入),深色覆盖从它派生
+let userThemeConfig = {}
+
+// 渲染完成信号:库的渲染是异步 SVG 重绘,靠 node_tree_render_end 等待,超时兜底
+const waitRender = () => new Promise((resolve) => {
+  if (!mm) return resolve()
+  let done = false
+  const finish = () => {
+    if (done) return
+    done = true
+    try { mm.off('node_tree_render_end', finish) } catch (e) { /* 忽略 */ }
+    resolve()
+  }
+  try { mm.on('node_tree_render_end', finish) } catch (e) { return resolve() }
+  setTimeout(finish, 240)
+})
+
+const applyCanvasTheme = () => {
+  if (!mm) return
+  mm.setThemeConfig(darkEdit.value
+    ? mergeThemeConfig(userThemeConfig, darkOverlayConfig())
+    : deepClone(userThemeConfig))
+}
+
+const toggleDarkEdit = () => {
+  darkEdit.value = !darkEdit.value
+  localStorage.setItem(DARK_KEY, darkEdit.value ? '1' : '0')
+  applyCanvasTheme()
+}
+
+// 导出/缩略图代表脑图作品本身,不带编辑期的深色覆盖:临时换回用户主题,渲染完成后再导出
+const withUserTheme = async (fn) => {
+  if (!darkEdit.value || !mm) return fn()
+  mm.setThemeConfig(deepClone(userThemeConfig))
+  await waitRender()
+  try {
+    return await fn()
+  } finally {
+    applyCanvasTheme()
+  }
+}
 
 const saveStateText = computed(() => {
   if (saveState.value === 'dirty') return t('tools.mindmap.dirty')
@@ -681,10 +757,11 @@ const applyTree = (tree, full) => {
     if (full.theme && full.theme.template && themeOptions.some(o => o.value === full.theme.template)) {
       themeTemplate.value = full.theme.template
       mm.setTheme(full.theme.template)
-      if (full.theme.config) mm.setThemeConfig(full.theme.config)
     }
+    if (full.theme) userThemeConfig = deepClone(full.theme.config || {})
   }
   mm.setData(tree)
+  applyCanvasTheme()
   scheduleSave()
 }
 
@@ -777,11 +854,12 @@ const load = async () => {
 }
 
 const init = (root, theme) => {
+  userThemeConfig = deepClone(theme?.config || {})
   mm = new MindMap({
     el: elRef.value,
     data: root,
     layout: layout.value,
-    theme: { template: themeTemplate.value, config: theme?.config || {} },
+    theme: { template: themeTemplate.value, config: deepClone(userThemeConfig) },
   })
   mm.on('data_change', () => scheduleSave())
   mm.on('node_active', (node, list) => {
@@ -796,8 +874,9 @@ const init = (root, theme) => {
   if (theme) {
     themeTemplate.value = theme.template
     mm.setTheme(theme.template)
-    if (theme.config) mm.setThemeConfig(theme.config)
   }
+  // 深色编辑覆盖最后应用(材质化于脑图自身主题之上)
+  applyCanvasTheme()
   nextTick(() => {
     initing = false
     // 不调用 view.fit():库的渲染是 setTimeout 异步的,fit 在空画布上会把视图平移半个画布,
@@ -822,7 +901,7 @@ const scheduleSave = () => {
 // 生成列表缩略图:全图导出 PNG 后等比压到 320px 宽(失败返回 null,不阻塞保存)
 const buildThumb = async () => {
   try {
-    const dataUrl = await mm.doExport.png(title.value || 'mindmap', false)
+    const dataUrl = await withUserTheme(() => mm.doExport.png(title.value || 'mindmap', false))
     const img = new Image()
     await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = dataUrl })
     const scale = Math.min(1, 320 / img.width)
@@ -860,6 +939,8 @@ const saveNow = async (force = false) => {
     // 乐观锁:带最后一次看到的 updated_at,家人先保存过则后端 409,由用户决定覆盖还是加载远端
     const exportData = mm.getData(true)
     stripEmptyNodes(exportData.root) // getData(true) 返回整包,节点树在 .root
+    // 深色编辑是编辑偏好而非脑图数据:落库写回用户自身的主题配置,避免把深色覆盖带去别处
+    exportData.theme.config = deepClone(userThemeConfig)
     const saved = await mindmapApi.update(id, {
       title: title.value,
       data: JSON.stringify(exportData),
@@ -929,7 +1010,7 @@ const onExport = async (command) => {
         : 'simple-mind-map/src/plugins/ExportXMind.js')
       if (!MindMap.hasPlugin(mod.default)) mm.addPlugin(mod.default)
     }
-    mm.export(command, true, title.value || 'mindmap')
+    await withUserTheme(() => mm.export(command, true, title.value || 'mindmap'))
   } catch (e) {
     ElMessage.error(t('tools.mindmap.exportFailed'))
   }
@@ -1011,7 +1092,9 @@ const applyRemoteData = (record) => {
       themeTemplate.value = parsed.theme.template
       mm.setTheme(parsed.theme.template)
     }
+    if (parsed.theme) userThemeConfig = deepClone(parsed.theme.config || {})
     mm.setData(parsed.root)
+    applyCanvasTheme()
     remoteUpdatedAt = record.updatedAt || ''
   } catch (e) { /* 数据损坏忽略 */ }
 }

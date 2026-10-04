@@ -262,7 +262,8 @@ CREATE TABLE `sys_user_group_member` (
 
 -- ------------------------------------------------------------
 -- 13. family_anniversary 家庭纪念日表
---     关联用户表（user_id 可空:NULL=家庭级纪念日）,支持阳历/农历
+--     关联成员为多对多(V10.11 起),见 family_anniversary_member;无关联行=家庭级纪念日。
+--     支持阳历/农历(闰月 is_leap)
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `family_anniversary`;
 CREATE TABLE `family_anniversary` (
@@ -273,16 +274,32 @@ CREATE TABLE `family_anniversary` (
   `day`         TINYINT      NOT NULL COMMENT '日期（阳历日期或农历日期）',
   `is_leap`     TINYINT      NOT NULL DEFAULT 0 COMMENT '农历是否闰月: 0非闰 1闰',
   `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
-  `user_id`     BIGINT       DEFAULT NULL COMMENT '关联用户ID（NULL为家庭级纪念日）',
   `recurring`   VARCHAR(20)  NOT NULL DEFAULT 'YEARLY' COMMENT 'ONCE一次性/YEARLY每年',
   `created_by`  BIGINT       DEFAULT NULL COMMENT '创建人ID',
   `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
   PRIMARY KEY (`id`),
+  KEY `idx_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭纪念日表（支持农历）';
+
+-- ------------------------------------------------------------
+-- 13.2 family_anniversary_member 纪念日关联成员表(V10.11)
+--     一条纪念日可关联多位家庭成员(共同纪念日/夫妻生日);唯一键防重复关联,
+--     family_id 冗余存放便于按家庭清理与越权校验。删除纪念日时一并删除关联行。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_anniversary_member`;
+CREATE TABLE `family_anniversary_member` (
+  `id`             BIGINT   NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `anniversary_id` BIGINT   NOT NULL COMMENT '纪念日ID(family_anniversary.id)',
+  `user_id`        BIGINT   NOT NULL COMMENT '关联成员账号ID(sys_user.id)',
+  `family_id`      BIGINT   NOT NULL COMMENT '所属家庭ID(冗余,便于按家庭清理/越权校验)',
+  `created_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_anniversary_user` (`anniversary_id`, `user_id`),
   KEY `idx_family` (`family_id`),
   KEY `idx_user` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭纪念日表（支持农历）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='纪念日关联成员表（多对多,V10.11）';
 
 -- ------------------------------------------------------------
 -- 13.1 sys_storage_device 存储设备表（V4.1 存储管理）
@@ -787,22 +804,22 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('music',  '音乐',   'icon-music',  '/music',  'content', 'left', 6, 1),
 ('library','书架',     'icon-library','/library','content',  'left',  20, 1),
 ('games',  '小游戏', 'icon-games',   '/games',  'content',  'left',  21, 1);
--- 生活组:物品定位/厨房置顶(V9.27),其余依次后移;组内相对序生效,与 content 组数值交错无影响
+-- 生活组:物品定位/厨房恒为第 1、2 位(V9.27 起),工具箱殿后(V10.11 重排);
+-- 组内相对序生效,与 content 组数值交错无影响。照片瀑布已并入相册,不再单列为模块。
 INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`) VALUES
 ('item',      '物品定位', 'icon-item',      '/item',   'life', 'left',  4, 1),
 ('kitchen',   '厨房',     'icon-kitchen',   '/kitchen','life', 'left',  5, 1),
-('anniversary','纪念日',  'icon-anniversary','/anniversary','life','left', 6, 1),
-('points',    '积分商城', 'icon-points',    '/points', 'life', 'left',  7, 1),
-('task',      '任务悬赏', 'icon-task',      '/task',   'life', 'left',  8, 1),
-('reminder',  '今日提醒', 'icon-reminder',  '/reminder','life','left', 9, 1),
-('plan',      '家庭计划', 'icon-plan',      '/plan',   'life', 'left', 10, 1),
-('wish',      '愿望单',   'icon-wish',      '/wish',   'life', 'left', 11, 1),
-('book',      '记账本',   'icon-book',      '/book',   'life', 'left', 12, 1),
-('cascade',   '照片瀑布', 'icon-photo',     '/cascade','life', 'left', 13, 1),
-('tree',      '家谱',     'icon-tree',      '/tree',   'life', 'left', 14, 1),
-('vault',     '保险箱',   'icon-vault',     '/vault',        'life', 'left', 15, 1),
-('tools',     '工具箱',   'icon-tools',     '/tools',  'life', 'left', 16, 1),
-('plant',     '花园',     'icon-plant',     '/tools/plant',  'life', 'left', 17, 0),
+('reminder',  '今日提醒', 'icon-reminder',  '/reminder','life','left',  6, 1),
+('plan',      '家庭计划', 'icon-plan',      '/plan',   'life', 'left',  7, 1),
+('anniversary','纪念日',  'icon-anniversary','/anniversary','life','left', 8, 1),
+('book',      '记账本',   'icon-book',      '/book',   'life', 'left',  9, 1),
+('wish',      '愿望单',   'icon-wish',      '/wish',   'life', 'left', 10, 1),
+('task',      '任务悬赏', 'icon-task',      '/task',   'life', 'left', 11, 1),
+('points',    '积分商城', 'icon-points',    '/points', 'life', 'left', 12, 1),
+('tree',      '家谱',     'icon-tree',      '/tree',   'life', 'left', 13, 1),
+('vault',     '保险箱',   'icon-vault',     '/vault',  'life', 'left', 14, 1),
+('tools',     '工具箱',   'icon-tools',     '/tools',  'life', 'left', 17, 1),
+('plant',     '花园',     'icon-plant',     '/tools/plant',  'life', 'left', 40, 0),
 ('member', '家庭成员', 'icon-member', '/member', 'social',  'right',  1, 1),
 ('cover',  '家庭封面', 'icon-cover',  '/cover',  'system',  'top',    1, 0),
 ('storage','文件浏览','icon-storage','/storage/files','system',  'left',  16, 1);
@@ -855,13 +872,16 @@ SELECT @opsid, id, @fid FROM `sys_role` WHERE `role_code` = 'OPS';
 
 -- ------------------------------------------------------------
 -- 27. 初始化家庭纪念日（示例,家长登录后可增改）
---     家庭纪念日: 阳历 5月20日（家庭级,user_id 为空）
---     管理员生日: 农历 五月初三（关联用户）
+--     家庭纪念日: 阳历 5月20日（家庭级,无关联成员）
+--     管理员生日: 农历 五月初三（关联管理员账号,经 family_anniversary_member）
 -- ------------------------------------------------------------
-INSERT INTO `family_anniversary` (`name`, `calendar`, `month`, `day`, `is_leap`, `family_id`, `user_id`, `recurring`, `created_by`)
-VALUES ('家庭纪念日', 'solar', 5, 20, 0, @fid, NULL, 'YEARLY', @uid);
-INSERT INTO `family_anniversary` (`name`, `calendar`, `month`, `day`, `is_leap`, `family_id`, `user_id`, `recurring`, `created_by`)
-VALUES ('管理员的生日', 'lunar', 5, 3, 0, @fid, @uid, 'YEARLY', @uid);
+INSERT INTO `family_anniversary` (`name`, `calendar`, `month`, `day`, `is_leap`, `family_id`, `recurring`, `created_by`)
+VALUES ('家庭纪念日', 'solar', 5, 20, 0, @fid, 'YEARLY', @uid);
+INSERT INTO `family_anniversary` (`name`, `calendar`, `month`, `day`, `is_leap`, `family_id`, `recurring`, `created_by`)
+VALUES ('管理员的生日', 'lunar', 5, 3, 0, @fid, 'YEARLY', @uid);
+SET @anniv_birthday = LAST_INSERT_ID();
+INSERT INTO `family_anniversary_member` (`anniversary_id`, `user_id`, `family_id`)
+VALUES (@anniv_birthday, @uid, @fid);
 
 -- ------------------------------------------------------------
 -- 28. 演示家庭（V3.6）
@@ -907,8 +927,8 @@ VALUES ('今天全家一起去爬山，山顶的风景特别美，拍了好多�
 ('晚饭后一家人坐在沙发上看电影，小宝看着看着睡着了。', '温馨', '阴',
  (SELECT id FROM `sys_user` WHERE username = 'demo_member'), @fid, 'FAMILY');
 
-INSERT INTO `family_anniversary` (`name`, `calendar`, `month`, `day`, `is_leap`, `family_id`, `user_id`, `recurring`, `created_by`)
-VALUES ('结婚纪念日', 'solar', 6, 18, 0, @fid, NULL, 'YEARLY', (SELECT id FROM `sys_user` WHERE username = 'demo_owner'));
+INSERT INTO `family_anniversary` (`name`, `calendar`, `month`, `day`, `is_leap`, `family_id`, `recurring`, `created_by`)
+VALUES ('结婚纪念日', 'solar', 6, 18, 0, @fid, 'YEARLY', (SELECT id FROM `sys_user` WHERE username = 'demo_owner'));
 
 -- ------------------------------------------------------------
 -- 28. 签到表（积分商城 V3.4，user_id+checkin_date 唯一，每日一次）
@@ -1369,6 +1389,7 @@ CREATE TABLE `family_user_label` (
 -- ------------------------------------------------------------
 -- 42. 家谱成员表(V5.0 家庭关系树): 成员通过 father_id/mother_id/spouse_id 自关联,
 --     构成多代血缘+婚姻关系;generation 从根(0)向下递增,支持世代视图。
+--     user_id 关联家庭成员账号(V10.11):把家谱里的人物与其 ihomy 账号对上,可展示是谁。
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `family_tree`;
 CREATE TABLE `family_tree` (
@@ -1378,6 +1399,7 @@ CREATE TABLE `family_tree` (
   `gender`      TINYINT       NOT NULL DEFAULT 0 COMMENT '性别: 0未知 1男 2女',
   `birth_date`  DATE          DEFAULT NULL COMMENT '出生日期',
   `photo`       VARCHAR(255)  DEFAULT NULL COMMENT '头像照片URL',
+  `user_id`     BIGINT        DEFAULT NULL COMMENT '关联的家庭成员账号ID(sys_user.id,空=未关联账号)',
   `father_id`   BIGINT        DEFAULT NULL COMMENT '父亲成员ID(自关联)',
   `mother_id`   BIGINT        DEFAULT NULL COMMENT '母亲成员ID(自关联)',
   `spouse_id`   BIGINT        DEFAULT NULL COMMENT '配偶成员ID(自关联,双向共用)',
@@ -1387,7 +1409,8 @@ CREATE TABLE `family_tree` (
   `created_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
-  KEY `idx_family` (`family_id`)
+  KEY `idx_family` (`family_id`),
+  KEY `idx_user` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家谱成员表';
 
 -- ------------------------------------------------------------
@@ -2180,14 +2203,14 @@ CREATE TABLE `family_announcement` (
   KEY `idx_family_deleted` (`family_id`, `deleted`, `enabled`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭公告/广告位表(自建,图片+链接)';
 
--- 首页模块:智能家居中控入口(生活组);sys_home_module 无唯一约束兜底,用 NOT EXISTS 防重
+-- 首页模块:智能家居中控入口(生活组,排工具箱前);sys_home_module 无唯一约束兜底,用 NOT EXISTS 防重
 INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`)
-SELECT 'iot', '智能家居', 'icon-iot', '/iot', 'life', 'left', 18, 1
+SELECT 'iot', '智能家居', 'icon-iot', '/iot', 'life', 'left', 16, 1
 WHERE NOT EXISTS (SELECT 1 FROM `sys_home_module` WHERE `code` = 'iot' AND `family_id` IS NULL);
 
 -- 首页模块:家庭公告入口(生活组)
 INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`)
-SELECT 'announcement', '家庭公告', 'icon-announcement', '/announcement', 'life', 'left', 19, 1
+SELECT 'announcement', '家庭公告', 'icon-announcement', '/announcement', 'life', 'left', 15, 1
 WHERE NOT EXISTS (SELECT 1 FROM `sys_home_module` WHERE `code` = 'announcement' AND `family_id` IS NULL);
 
 -- 首页模块:回收站入口(系统组,排在设置之前)

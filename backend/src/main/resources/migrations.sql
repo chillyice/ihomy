@@ -1744,5 +1744,86 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 SELECT 'recycle', '回收站', 'icon-recycle', '/recycle', 'system', 'left', 88, 1
 WHERE NOT EXISTS (SELECT 1 FROM `sys_home_module` WHERE `code` = 'recycle' AND `family_id` IS NULL);
 
+-- ------------------------------------------------------------
+-- V10.11 生活组导航重排 + 照片瀑布并入相册(2026-10-04)
+--   ① 照片瀑布不再是独立功能模块:入口移入相册页内的「照片瀑布」视图
+--      (前端路由 /cascade 已重定向到 /album?cascade=1);删除全局模块行即可,
+--      侧栏(光尘/暖居/移动端)随 NAV_PATHS 一并隐去。
+--   ② 生活组重排:物品定位、厨房恒为第 1、2 位,工具箱殿后;排布按
+--      每日高频(提醒/计划) → 周期记录(纪念日/记账/愿望) → 家庭协作(任务/积分)
+--      → 资料归档(家谱/保险箱) → 信息与设备(公告/智能家居) → 工具集合(工具箱)。
+--   幂等:DELETE 命中 0 行无副作用;UPDATE 带 <> 守卫,重复执行结果不变。
+-- ------------------------------------------------------------
+DELETE FROM `sys_home_module` WHERE `code` = 'cascade' AND `family_id` IS NULL;
+
+UPDATE `sys_home_module` SET `sort_order` = 4  WHERE `code` = 'item'         AND `family_id` IS NULL AND `sort_order` <> 4;
+UPDATE `sys_home_module` SET `sort_order` = 5  WHERE `code` = 'kitchen'      AND `family_id` IS NULL AND `sort_order` <> 5;
+UPDATE `sys_home_module` SET `sort_order` = 6  WHERE `code` = 'reminder'     AND `family_id` IS NULL AND `sort_order` <> 6;
+UPDATE `sys_home_module` SET `sort_order` = 7  WHERE `code` = 'plan'         AND `family_id` IS NULL AND `sort_order` <> 7;
+UPDATE `sys_home_module` SET `sort_order` = 8  WHERE `code` = 'anniversary'  AND `family_id` IS NULL AND `sort_order` <> 8;
+UPDATE `sys_home_module` SET `sort_order` = 9  WHERE `code` = 'book'         AND `family_id` IS NULL AND `sort_order` <> 9;
+UPDATE `sys_home_module` SET `sort_order` = 10 WHERE `code` = 'wish'         AND `family_id` IS NULL AND `sort_order` <> 10;
+UPDATE `sys_home_module` SET `sort_order` = 11 WHERE `code` = 'task'         AND `family_id` IS NULL AND `sort_order` <> 11;
+UPDATE `sys_home_module` SET `sort_order` = 12 WHERE `code` = 'points'       AND `family_id` IS NULL AND `sort_order` <> 12;
+UPDATE `sys_home_module` SET `sort_order` = 13 WHERE `code` = 'tree'         AND `family_id` IS NULL AND `sort_order` <> 13;
+UPDATE `sys_home_module` SET `sort_order` = 14 WHERE `code` = 'vault'        AND `family_id` IS NULL AND `sort_order` <> 14;
+UPDATE `sys_home_module` SET `sort_order` = 15 WHERE `code` = 'announcement' AND `family_id` IS NULL AND `sort_order` <> 15;
+UPDATE `sys_home_module` SET `sort_order` = 16 WHERE `code` = 'iot'          AND `family_id` IS NULL AND `sort_order` <> 16;
+UPDATE `sys_home_module` SET `sort_order` = 17 WHERE `code` = 'tools'        AND `family_id` IS NULL AND `sort_order` <> 17;
+UPDATE `sys_home_module` SET `sort_order` = 40 WHERE `code` = 'plant'        AND `family_id` IS NULL AND `sort_order` <> 40;
+
+-- ------------------------------------------------------------
+-- V10.11 家谱成员关联家庭成员账号(2026-10-04)
+--   family_tree 增 user_id:把家谱里的人物对上 ihomy 账号,列表附带展示名。
+--   可空——家谱允许存在未开户的祖先/亲属。
+--   幂等:information_schema 守卫 + 索引同法,重复执行无副作用。
+-- ------------------------------------------------------------
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_tree' AND COLUMN_NAME = 'user_id');
+SET @sql := IF(@has = 0, 'ALTER TABLE `family_tree` ADD COLUMN `user_id` BIGINT DEFAULT NULL COMMENT ''关联的家庭成员账号ID(sys_user.id,空=未关联账号)'' AFTER `photo`', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_tree' AND INDEX_NAME = 'idx_user');
+SET @sql := IF(@has = 0, 'ALTER TABLE `family_tree` ADD KEY `idx_user` (`user_id`)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ------------------------------------------------------------
+-- V10.11 纪念日支持关联多成员(2026-10-04)
+--   原 family_anniversary.user_id 单成员列改为多对多表 family_anniversary_member:
+--   ① 先建关联表并把存量单成员数据迁入(仅迁未删除的纪念日);
+--   ② 再删除单成员列(数据已转移,删除不可逆,故置于迁移之后)。
+--   幂等:CREATE TABLE IF NOT EXISTS;迁移 INSERT 用 NOT EXISTS 防重;
+--   DROP COLUMN 用 information_schema 守卫(已删则跳过)。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `family_anniversary_member` (
+  `id`             BIGINT   NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `anniversary_id` BIGINT   NOT NULL COMMENT '纪念日ID(family_anniversary.id)',
+  `user_id`        BIGINT   NOT NULL COMMENT '关联成员账号ID(sys_user.id)',
+  `family_id`      BIGINT   NOT NULL COMMENT '所属家庭ID(冗余,便于按家庭清理/越权校验)',
+  `created_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_anniversary_user` (`anniversary_id`, `user_id`),
+  KEY `idx_family` (`family_id`),
+  KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='纪念日关联成员表（多对多,V10.11）';
+
+-- 存量单成员关联迁移进关联表(列可能已删,故先用 information_schema 判断再拼 SQL)
+SET @has_col := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_anniversary' AND COLUMN_NAME = 'user_id');
+SET @sql := IF(@has_col > 0,
+  'INSERT INTO `family_anniversary_member` (`anniversary_id`, `user_id`, `family_id`)
+     SELECT a.`id`, a.`user_id`, a.`family_id` FROM `family_anniversary` a
+     WHERE a.`user_id` IS NOT NULL AND a.`deleted` = 0
+       AND NOT EXISTS (SELECT 1 FROM `family_anniversary_member` m
+                       WHERE m.`anniversary_id` = a.`id` AND m.`user_id` = a.`user_id`)',
+  'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_anniversary' AND INDEX_NAME = 'idx_user');
+SET @sql := IF(@has > 0, 'ALTER TABLE `family_anniversary` DROP INDEX `idx_user`', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_anniversary' AND COLUMN_NAME = 'user_id');
+SET @sql := IF(@has > 0, 'ALTER TABLE `family_anniversary` DROP COLUMN `user_id`', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 
 

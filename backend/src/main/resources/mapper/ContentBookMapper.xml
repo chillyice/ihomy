@@ -47,7 +47,7 @@
         DELETE FROM content_book_category_rel WHERE category_id = #{categoryId}
     </delete>
 
-    <!-- ---------- 回收站 ---------- -->
+    <!-- ========== 回收站 ========== -->
     <select id="selectTrashByFamily" resultType="com.ihomy.entity.ContentBook">
         SELECT * FROM content_book WHERE family_id = #{familyId} AND deleted = 1
         ORDER BY deleted_at DESC

@@ -338,7 +338,6 @@ const MODULE_META = {
   plan: { titleKey: 'warm.module.plan', path: '/plan', icon: '📋' },
   wish: { titleKey: 'warm.module.wish', path: '/wish', icon: '⭐' },
   book: { titleKey: 'warm.module.book', path: '/book', icon: '💰' },
-  cascade: { titleKey: 'warm.module.cascade', path: '/cascade', icon: '🖼' },
   tree: { titleKey: 'warm.module.tree', path: '/tree', icon: '🌳' },
   tools: { titleKey: 'warm.module.tools', path: '/tools', icon: '🧰' },
   member: { titleKey: 'warm.module.member', path: '/member', icon: '👨‍👩‍👧' },

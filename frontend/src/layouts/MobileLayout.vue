@@ -52,7 +52,7 @@ const PAGE_TITLES = {
   '/blog': 'blog.title', '/diary': 'diary.title', '/album': 'album.title', '/anniversary': 'anniversary.title',
   '/cinema': 'cinema.title', '/music': 'music.title', '/member': 'member.title', '/points': 'points.title',
   '/task': 'task.title', '/reminder': 'reminder.title', '/plan': 'plan.title', '/wish': 'wish.title',
-  '/book': 'book.title', '/chat': 'chat.title', '/tree': 'tree.title', '/cascade': 'cascade.title',
+  '/book': 'book.title', '/chat': 'chat.title', '/tree': 'tree.title',
   '/item': 'mobile.title.item', '/kitchen': 'kitchen.title', '/library': 'library.title',
   '/settings': 'settings.title', '/ops': 'mobile.title.ops', '/vault': 'vault.title',
   '/login': 'mobile.title.login',

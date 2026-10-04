@@ -4,31 +4,38 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.ResultCode;
+import com.ihomy.common.UserNames;
 import com.ihomy.dto.TreeMemberDTO;
 import com.ihomy.entity.FamilyTreeMember;
+import com.ihomy.entity.SysUser;
 import com.ihomy.mapper.FamilyTreeMapper;
+import com.ihomy.mapper.SysUserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
  * 家谱业务:成员 CRUD + 世代计算。
  * 新增成员时若指定了父亲/母亲,世代取其父/母 generation+1(父母是祖先则新成员辈分再+1);
  * 删除成员时同步清空其他成员对它的父/母/配偶引用,避免悬空关联。
+ * 家谱成员可关联家庭成员账号(user_id,须同家庭),列表附展示名。
  */
 @Service
 @RequiredArgsConstructor
 public class FamilyTreeService {
 
     private final FamilyTreeMapper treeMapper;
+    private final SysUserMapper sysUserMapper;
 
-    /** 家庭全部成员(附 father/mother/spouse 姓名,前端组树用) */
+    /** 家庭全部成员(附 father/mother/spouse 姓名与关联账号展示名,前端组树用) */
     public List<Map<String, Object>> list(Long familyId) {
         List<FamilyTreeMember> all = treeMapper.selectList(new LambdaQueryWrapper<FamilyTreeMember>()
                 .eq(FamilyTreeMember::getFamilyId, familyId)
@@ -36,6 +43,7 @@ public class FamilyTreeService {
                 .orderByAsc(FamilyTreeMember::getId));
         Map<Long, String> names = all.stream()
                 .collect(Collectors.toMap(FamilyTreeMember::getId, FamilyTreeMember::getName, (a, b) -> a));
+        Map<Long, SysUser> userMap = batchUsers(all);
         return all.stream().map(m -> {
             Map<String, Object> map = new HashMap<>();
             map.put("id", m.getId());
@@ -43,6 +51,8 @@ public class FamilyTreeService {
             map.put("gender", m.getGender());
             map.put("birthDate", m.getBirthDate());
             map.put("photo", m.getPhoto());
+            map.put("userId", m.getUserId());
+            map.put("userName", m.getUserId() == null ? null : UserNames.of(userMap.get(m.getUserId())));
             map.put("fatherId", m.getFatherId());
             map.put("fatherName", m.getFatherId() == null ? null : names.get(m.getFatherId()));
             map.put("motherId", m.getMotherId());
@@ -55,9 +65,23 @@ public class FamilyTreeService {
         }).collect(Collectors.toList());
     }
 
+    /** 批量取关联账号,返回 id→SysUser 映射(避免列表 N+1) */
+    private Map<Long, SysUser> batchUsers(List<FamilyTreeMember> members) {
+        Set<Long> ids = new HashSet<>();
+        for (FamilyTreeMember m : members) {
+            if (m.getUserId() != null) ids.add(m.getUserId());
+        }
+        if (ids.isEmpty()) return Map.of();
+        List<SysUser> users = sysUserMapper.selectBatchIds(ids);
+        Map<Long, SysUser> map = new HashMap<>(users.size() * 2);
+        for (SysUser u : users) map.put(u.getId(), u);
+        return map;
+    }
+
     /** 新增成员:世代按父母辈分+1自动推导;配偶双向绑定 */
     @Transactional
     public FamilyTreeMember create(Long familyId, TreeMemberDTO dto) {
+        validateUser(familyId, dto.getUserId());
         FamilyTreeMember m = new FamilyTreeMember();
         m.setFamilyId(familyId);
         apply(m, dto);
@@ -71,6 +95,7 @@ public class FamilyTreeService {
     @Transactional
     public void update(Long id, Long familyId, TreeMemberDTO dto) {
         FamilyTreeMember m = require(id, familyId);
+        validateUser(familyId, dto.getUserId());
         // 配偶被更换或解除时,先解除旧配偶的指向
         Long oldSpouse = m.getSpouseId();
         if (oldSpouse != null && !Objects.equals(oldSpouse, dto.getSpouseId())) {
@@ -81,6 +106,7 @@ public class FamilyTreeService {
                 .set(FamilyTreeMember::getGender, dto.getGender())
                 .set(FamilyTreeMember::getBirthDate, dto.getBirthDate())
                 .set(FamilyTreeMember::getPhoto, dto.getPhoto())
+                .set(FamilyTreeMember::getUserId, dto.getUserId())
                 .set(FamilyTreeMember::getFatherId, dto.getFatherId())
                 .set(FamilyTreeMember::getMotherId, dto.getMotherId())
                 .set(FamilyTreeMember::getSpouseId, dto.getSpouseId())
@@ -114,10 +140,20 @@ public class FamilyTreeService {
         if (dto.getGender() != null) m.setGender(dto.getGender());
         if (dto.getBirthDate() != null) m.setBirthDate(dto.getBirthDate());
         if (dto.getPhoto() != null) m.setPhoto(dto.getPhoto());
+        if (dto.getUserId() != null) m.setUserId(dto.getUserId());
         if (dto.getFatherId() != null) m.setFatherId(dto.getFatherId());
         if (dto.getMotherId() != null) m.setMotherId(dto.getMotherId());
         if (dto.getSpouseId() != null) m.setSpouseId(dto.getSpouseId());
         if (dto.getNote() != null) m.setNote(dto.getNote());
+    }
+
+    /** 关联账号必须是本家庭成员(跨家庭按不存在处理,不泄露他家庭用户) */
+    private void validateUser(Long familyId, Long userId) {
+        if (userId == null) return;
+        SysUser u = sysUserMapper.selectById(userId);
+        if (u == null || familyId == null || !familyId.equals(u.getFamilyId())) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
     }
 
     /** 世代 = 父/母中较大 generation + 1;无父母则为 0(新祖先) */

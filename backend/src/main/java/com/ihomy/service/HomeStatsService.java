@@ -4,8 +4,10 @@ import cn.hutool.core.date.ChineseDate;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ihomy.common.DictConst;
 import com.ihomy.entity.Anniversary;
+import com.ihomy.entity.FamilyAnniversaryMember;
 import com.ihomy.entity.SysUser;
 import com.ihomy.mapper.AnniversaryMapper;
+import com.ihomy.mapper.FamilyAnniversaryMemberMapper;
 import com.ihomy.mapper.SysUserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -16,8 +18,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 首页统计:家庭成员数 + 最近纪念日倒计时。
@@ -31,6 +35,7 @@ public class HomeStatsService {
 
     private final SysUserMapper sysUserMapper;
     private final AnniversaryMapper anniversaryMapper;
+    private final FamilyAnniversaryMemberMapper anniversaryMemberMapper;
 
     /** 组装首页统计:成员数 + 未来 3 个纪念日(按剩余天数排序)+ 今日纪念日(无则 null) */
     public Map<String, Object> getStats(Long familyId) {
@@ -41,8 +46,9 @@ public class HomeStatsService {
             LambdaQueryWrapper<Anniversary> qw = new LambdaQueryWrapper<>();
             qw.eq(Anniversary::getFamilyId, familyId);
             List<Anniversary> all = anniversaryMapper.selectList(qw);
-            stats.put("todayEvent", todayEvent(all));
-            stats.put("upcomingEvents", upcomingEvents(all));
+            Set<Long> linkedIds = linkedAnniversaryIds(all);
+            stats.put("todayEvent", todayEvent(all, linkedIds));
+            stats.put("upcomingEvents", upcomingEvents(all, linkedIds));
         } else {
             stats.put("todayEvent", null);
             stats.put("upcomingEvents", new ArrayList<>());
@@ -50,15 +56,30 @@ public class HomeStatsService {
         return stats;
     }
 
+    /** 有关联成员的纪念日ID集合(一次查询,避免逐条判断);关联成员即视为生日/成员纪念日 */
+    private Set<Long> linkedAnniversaryIds(List<Anniversary> anniversaries) {
+        Set<Long> linked = new HashSet<>();
+        if (anniversaries == null || anniversaries.isEmpty()) return linked;
+        List<Long> ids = new ArrayList<>(anniversaries.size());
+        for (Anniversary a : anniversaries) ids.add(a.getId());
+        for (FamilyAnniversaryMember rel : anniversaryMemberMapper.selectList(
+                new LambdaQueryWrapper<FamilyAnniversaryMember>()
+                        .select(FamilyAnniversaryMember::getAnniversaryId)
+                        .in(FamilyAnniversaryMember::getAnniversaryId, ids))) {
+            linked.add(rel.getAnniversaryId());
+        }
+        return linked;
+    }
+
     /** 今天(阳历/农历均可)是否有纪念日:有则返回 {name, type: birthday|anniversary} */
-    private Map<String, Object> todayEvent(List<Anniversary> anniversaries) {
+    private Map<String, Object> todayEvent(List<Anniversary> anniversaries, Set<Long> linkedIds) {
         if (anniversaries == null || anniversaries.isEmpty()) return null;
         LocalDate today = LocalDate.now();
         for (Anniversary a : anniversaries) {
             if (isOn(a, today)) {
                 Map<String, Object> e = new HashMap<>();
                 e.put("name", a.getName());
-                e.put("type", a.getUserId() != null ? "birthday" : "anniversary");
+                e.put("type", linkedIds.contains(a.getId()) ? "birthday" : "anniversary");
                 return e;
             }
         }
@@ -91,7 +112,7 @@ public class HomeStatsService {
     }
 
     /** 计算每年重复纪念日的下一次日期与剩余天数,关联成员记为生日类型 */
-    private List<Map<String, Object>> upcomingEvents(List<Anniversary> anniversaries) {
+    private List<Map<String, Object>> upcomingEvents(List<Anniversary> anniversaries, Set<Long> linkedIds) {
         List<Map<String, Object>> events = new ArrayList<>();
         if (anniversaries == null || anniversaries.isEmpty()) return events;
         LocalDate today = LocalDate.now();
@@ -100,7 +121,7 @@ public class HomeStatsService {
             LocalDate next = nextOccurrence(a, today);
             if (next == null) continue;
             Map<String, Object> e = new HashMap<>();
-            e.put("type", a.getUserId() != null ? "birthday" : "anniversary");
+            e.put("type", linkedIds.contains(a.getId()) ? "birthday" : "anniversary");
             e.put("label", a.getName());
             e.put("calendar", a.getCalendar());
             e.put("date", next.toString());

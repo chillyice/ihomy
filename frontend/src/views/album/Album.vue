@@ -23,6 +23,7 @@
           </el-select>
         </div>
         <div class="tb-right">
+          <el-button v-if="userStore.isLoggedIn" @click="cascadeVisible = true">{{ t('cascade.title') }}</el-button>
           <el-button v-if="userStore.isLoggedIn && topAlbums.length" @click="toggleSelect">{{ t('album.select') }}</el-button>
           <el-button v-if="userStore.isOwner" @click="syncVisible = true">{{ t('album.syncFromDevice') }}</el-button>
           <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ t('album.newAlbum') }}</el-button>
@@ -101,11 +102,14 @@
       </template>
     </el-dialog>
     <SyncDialog v-model="syncVisible" @synced="load" />
+    <!-- 照片瀑布:原独立页已并入相册,由本页按钮唤起(兼容旧链接 /album?cascade=1) -->
+    <PhotoCascade v-model:visible="cascadeVisible" />
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { albumApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useSyncStore } from '@/stores/sync'
@@ -116,10 +120,14 @@ import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import SyncDialog from '@/components/SyncDialog.vue'
 import AlbumDefaultCover from '@/components/AlbumDefaultCover.vue'
+import PhotoCascade from './PhotoCascade.vue'
 
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
 const userStore = useUserStore()
 const syncVisible = ref(false)
+const cascadeVisible = ref(false)
 const albums = ref([])
 const loading = ref(false)
 const loadError = ref(false)
@@ -227,7 +235,14 @@ const onBatchDelete = async () => {
 const syncStore = useSyncStore()
 watch(syncStore.doneCount, () => load())
 
-onMounted(load)
+onMounted(() => {
+  // 兼容旧链接 /cascade 重定向来的 /album?cascade=1:进页即打开照片瀑布,并清掉参数(刷新不再自动弹出)
+  if (route.query.cascade && userStore.isLoggedIn) {
+    cascadeVisible.value = true
+    router.replace({ path: '/album' })
+  }
+  load()
+})
 </script>
 
 <style scoped>

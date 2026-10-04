@@ -1,5 +1,15 @@
+<!-- 照片瀑布(相册内视图):家庭照片随风飘落的沉浸式浏览,悬停暂停看信息,点击进全屏查看器。
+     原独立页 /cascade 已并入相册:由相册页「照片瀑布」按钮或 /album?cascade=1 唤起,不再单独占导航入口。 -->
 <template>
-  <div class="page cascade-page">
+  <div v-if="visible" class="pc-overlay">
+    <div class="pc-head">
+      <span class="pc-title">{{ $t('cascade.title') }}</span>
+      <span class="pc-hint">{{ $t('cascade.hint') }}</span>
+      <span class="pc-close" v-a11y-click :title="$t('common.close')" @click="close">
+        <el-icon><Close /></el-icon>
+      </span>
+    </div>
+
     <div ref="stage" class="cascade-stage">
       <div
         v-for="c in cards"
@@ -42,14 +52,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
-import { useUserStore } from '@/stores/user'
+import { ref, watch, onBeforeUnmount } from 'vue'
+import { Close } from '@element-plus/icons-vue'
 import { photoApi } from '@/api'
 import PhotoViewer from '@/components/PhotoViewer.vue'
 
-const router = useRouter()
-const userStore = useUserStore()
+const props = defineProps({ visible: { type: Boolean, default: false } })
+const emit = defineEmits(['update:visible'])
 
 const stage = ref(null)
 const photos = ref([])
@@ -60,7 +69,13 @@ const viewerIdx = ref(0)
 
 let cardSeq = 0
 let spawnTimer = null
-let rafId = null
+let fadeTimers = []
+
+const clearTimers = () => {
+  if (spawnTimer) { clearInterval(spawnTimer); spawnTimer = null }
+  fadeTimers.forEach((t) => clearTimeout(t))
+  fadeTimers = []
+}
 
 const spawnCard = () => {
   if (!photos.value.length) return
@@ -73,7 +88,6 @@ const spawnCard = () => {
     key: ++cardSeq,
     photo,
     x: narrow ? 5 + Math.random() * 70 : 5 + Math.random() * 90,
-    delay: 0,
     duration: 15 + Math.random() * 12,
     size: minSize + Math.random() * (maxSize - minSize),
     rot: (Math.random() - 0.5) * 30,
@@ -85,9 +99,9 @@ const spawnCard = () => {
   if (cards.value.length > 20) {
     const old = cards.value[0]
     old.fading = true
-    setTimeout(() => {
-      cards.value = cards.value.filter(c => c !== old)
-    }, 1500)
+    fadeTimers.push(setTimeout(() => {
+      cards.value = cards.value.filter((c) => c !== old)
+    }, 1500))
   }
 }
 
@@ -104,7 +118,7 @@ const cardStyle = (c) => ({
 })
 
 const openViewer = (c) => {
-  const idx = photos.value.findIndex(p => p.id === c.photo.id)
+  const idx = photos.value.findIndex((p) => p.id === c.photo.id)
   viewerIdx.value = Math.max(0, idx)
   viewerVisible.value = true
 }
@@ -115,40 +129,77 @@ const formatDate = (d) => {
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
 }
 
+const close = () => emit('update:visible', false)
+
 const load = async () => {
-  if (!userStore.isLoggedIn) {
-    router.push('/login')
-    return
-  }
+  loading.value = true
+  cards.value = []
   try {
     photos.value = await photoApi.cascade() || []
-    for (let i = 0; i < 5; i++) {
-      setTimeout(() => spawnCard(), i * 1000)
+    if (photos.value.length) {
+      for (let i = 0; i < 5; i++) {
+        fadeTimers.push(setTimeout(() => spawnCard(), i * 1000))
+      }
+      spawnTimer = setInterval(spawnCard, 3000)
     }
-    spawnTimer = setInterval(spawnCard, 3000)
   } catch (e) {
-    // 忽略
+    photos.value = []
   } finally {
     loading.value = false
   }
 }
 
-onMounted(() => { load() })
-onBeforeUnmount(() => {
-  if (spawnTimer) clearInterval(spawnTimer)
-  if (rafId) cancelAnimationFrame(rafId)
+// 每次打开重新拉取并起飘落;关闭即停表并清空,避免后台空转(持续动画页性能规范)
+watch(() => props.visible, (v) => {
+  if (v) load()
+  else { clearTimers(); cards.value = []; viewerVisible.value = false }
 })
+
+onBeforeUnmount(clearTimers)
 </script>
 
 <style scoped>
-.cascade-page { min-height: 100vh; padding: 0; }
-
-.cascade-stage {
+.pc-overlay {
   position: fixed;
+  inset: 0;
+  z-index: 2000;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+.pc-head {
+  position: absolute;
   top: 0;
-  bottom: 0;
   left: 0;
   right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  pointer-events: none;
+}
+.pc-title { font-size: 16px; font-weight: 600; color: var(--color-text); }
+.pc-hint { font-size: 12px; color: var(--color-text-secondary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pc-close {
+  pointer-events: auto;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  transition: color 0.2s, transform 0.2s;
+}
+.pc-close:hover { color: var(--color-primary); transform: scale(1.08); }
+
+.cascade-stage {
+  position: absolute;
+  inset: 0;
   overflow: hidden;
   pointer-events: auto;
 }
@@ -183,9 +234,6 @@ onBeforeUnmount(() => {
   transform: scale(1.15);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
 }
-.leaf-wrap.hovered-paused {
-  animation-play-state: paused;
-}
 
 @keyframes leaf-fall {
   0% {
@@ -218,7 +266,7 @@ onBeforeUnmount(() => {
 .info-meta { display: flex; gap: 8px; opacity: 0.85; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
 
 .cascade-empty {
-  position: fixed;
+  position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
@@ -228,5 +276,6 @@ onBeforeUnmount(() => {
 @media (max-width: 768px) {
   .leaf-card { border-radius: 6px; }
   .photo-info { font-size: 10px; }
+  .pc-hint { display: none; }
 }
 </style>

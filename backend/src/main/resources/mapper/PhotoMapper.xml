@@ -56,7 +56,7 @@
         GROUP BY album_id
     </select>
 
-    <!-- ---------- 回收站(逻辑删数据 MP 常规查询不可见,走 XML) ---------- -->
+    <!-- ========== 回收站(逻辑删数据 MP 常规查询不可见,走 XML) ========== -->
     <!-- 家庭内已删照片(其相册未删;相册子树中的照片随相册在回收站内展示,不单列) -->
     <select id="selectTrashByFamily" resultType="com.ihomy.entity.Photo">
         SELECT p.* FROM content_photo p

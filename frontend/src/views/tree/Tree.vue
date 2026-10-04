@@ -34,6 +34,9 @@
                   </div>
                   <div class="member-name">{{ m.name }}</div>
                   <div v-if="m.birthDate" class="member-birth">{{ m.birthDate }}</div>
+                  <div v-if="m.userName" class="member-account" :title="$t('tree.account')">
+                    <el-icon><UserFilled /></el-icon>{{ m.userName }}
+                  </div>
                 </div>
                 <span v-if="unit[0] && unit[1]" class="couple-mark">💞</span>
               </div>
@@ -47,6 +50,9 @@
                         <span v-else class="photo-fallback">{{ genderIcon(c.gender) }}</span>
                       </div>
                       <div class="member-name">{{ c.name }}</div>
+                      <div v-if="c.userName" class="member-account" :title="$t('tree.account')">
+                        <el-icon><UserFilled /></el-icon>{{ c.userName }}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -82,6 +88,11 @@
             <el-button v-if="form.photo" link type="danger" @click="form.photo = ''">{{ $t('common.remove') }}</el-button>
           </div>
         </el-form-item>
+        <el-form-item :label="$t('tree.account')">
+          <el-select v-model="form.userId" clearable filterable style="width: 100%" :placeholder="$t('tree.accountPlaceholder')">
+            <el-option v-for="u in linkableAccounts" :key="u.id" :label="u.nickname || u.username" :value="u.id" />
+          </el-select>
+        </el-form-item>
         <el-form-item :label="$t('tree.spouse')">
           <el-select v-model="form.spouseId" clearable filterable style="width: 100%">
             <el-option v-for="m in otherMembers" :key="m.id" :label="m.name" :value="m.id" />
@@ -116,8 +127,9 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
-import { treeApi, fileApi } from '@/api'
+import { treeApi, fileApi, memberApi } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { UserFilled } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 
@@ -126,6 +138,8 @@ const userStore = useUserStore()
 
 const loading = ref(false)
 const members = ref([])
+// 家庭成员账号(用于把家谱人物与账号对上)
+const accounts = ref([])
 const dialog = ref(false)
 const saving = ref(false)
 
@@ -168,17 +182,25 @@ const unitKey = (unit) => unit.map((m) => m.id).join('-')
 const genderIcon = (g) => (g === 1 ? '👨' : g === 2 ? '👩' : '🧑')
 
 // 编辑表单:排除本人后作为 父亲/母亲/配偶 候选项
-const form = reactive({ id: null, name: '', gender: 0, birthDate: null, photo: '', spouseId: null, fatherId: null, motherId: null, note: '' })
+const form = reactive({ id: null, name: '', gender: 0, birthDate: null, photo: '', userId: null, spouseId: null, fatherId: null, motherId: null, note: '' })
 const otherMembers = computed(() => members.value.filter((m) => m.id !== form.id))
+// 可关联账号:已被其他家谱人物占用的账号不再重复出现(一个账号对应一位家人)
+const linkableAccounts = computed(() => {
+  const taken = new Set()
+  for (const m of members.value) {
+    if (m.userId && m.id !== form.id) taken.add(m.userId)
+  }
+  return accounts.value.filter((u) => !taken.has(u.id))
+})
 
 const openEditor = (m) => {
   if (!m) {
-    Object.assign(form, { id: null, name: '', gender: 0, birthDate: null, photo: '', spouseId: null, fatherId: null, motherId: null, note: '' })
+    Object.assign(form, { id: null, name: '', gender: 0, birthDate: null, photo: '', userId: null, spouseId: null, fatherId: null, motherId: null, note: '' })
   } else {
     Object.assign(form, {
       id: m.id, name: m.name || '', gender: m.gender ?? 0,
       birthDate: m.birthDate || null, photo: m.photo || '',
-      spouseId: m.spouseId || null, fatherId: m.fatherId || null,
+      userId: m.userId || null, spouseId: m.spouseId || null, fatherId: m.fatherId || null,
       motherId: m.motherId || null, note: m.note || '',
     })
   }
@@ -194,13 +216,23 @@ const load = async () => {
   }
 }
 
+// 家庭成员账号列表:仅登录可用(游客不请求,避免无谓 401)
+const loadAccounts = async () => {
+  if (!userStore.isLoggedIn) return
+  try {
+    accounts.value = await memberApi.list()
+  } catch {
+    accounts.value = []
+  }
+}
+
 const save = async () => {
   if (!form.name.trim()) return ElMessage.warning(t('tree.nameRequired'))
   saving.value = true
   try {
     const payload = {
       name: form.name.trim(), gender: form.gender, birthDate: form.birthDate || null,
-      photo: form.photo || null, spouseId: form.spouseId || null,
+      photo: form.photo || null, userId: form.userId || null, spouseId: form.spouseId || null,
       fatherId: form.fatherId || null, motherId: form.motherId || null, note: form.note || null,
     }
     if (form.id) await treeApi.update(form.id, payload)
@@ -234,7 +266,10 @@ const uploadPhoto = async (options) => {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  loadAccounts()
+})
 </script>
 
 <style scoped>
@@ -286,6 +321,21 @@ onMounted(load)
 .member-card.mini .photo-fallback { font-size: 20px; }
 .member-name { font-size: 13px; font-weight: 600; color: var(--color-text); }
 .member-birth { font-size: 11px; color: var(--color-text-2); margin-top: 2px; }
+/* 关联账号徽标:小而不抢眼,仅提示此人与某账号对应 */
+.member-account {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  margin-top: 3px;
+  font-size: 10px;
+  line-height: 1.3;
+  color: var(--color-accent, var(--color-brand));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.member-account :deep(.el-icon) { font-size: 11px; flex: none; }
 .children { display: flex; flex-direction: column; align-items: center; }
 .children-line { width: 2px; height: 12px; background: var(--color-border-strong, #c5cfd9); }
 .children-cards { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }

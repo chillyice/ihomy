@@ -4,7 +4,7 @@
 
     <delete id="deletePhysicalById">DELETE FROM content_video WHERE id = #{id}</delete>
 
-    <!-- ---------- 回收站 ---------- -->
+    <!-- ========== 回收站 ========== -->
     <select id="selectTrashByFamily" resultType="com.ihomy.entity.Video">
         SELECT * FROM content_video WHERE family_id = #{familyId} AND deleted = 1
         ORDER BY deleted_at DESC

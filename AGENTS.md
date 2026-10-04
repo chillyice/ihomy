@@ -70,7 +70,7 @@
 - **root 仅用于初始化**:`mysql -uroot -p < schema.sql`(建库/建表/建账号/初始数据),执行一次;本地开发 `.\scripts\start-db.ps1`(Docker 首启自动导入)。schema.sql 为开发安全版(仅本机 Docker 凭证)。
 - **业务运行用 `ihomy` 账号**:仅授予 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`(最小权限,无 DDL),application.yml 连接用 `ihomy`,**不要用 root 跑业务**;账号同时建 `localhost` 与 `%` 两个 host。
 - **生产 MySQL 密码策略**(轮换踩坑):`validate_password` MEDIUM,密码必须含特殊字符(避开 `' " \ $ |`,建议 `!@%^&*-_+=.`),否则 `ALTER USER` 报 1819;开发 Docker MySQL 无此组件,同一密码 dev 能过 prod 被拒。详见踩坑速查 §2.7。
-- **79 张表**,前缀分类:`sys_` 25(系统/账号/权限/配置/存储)、`report_` 3(报表/日志)、`family_` 29(家庭事务)、`content_` 21(内容数据)、另 `game_info` 1(家庭小游戏,命名未加 family_ 前缀的遗留)。**各表用途与完整清单见 `docs/需求设计说明书.md` §6.2**。
+- **80 张表**,前缀分类:`sys_` 25(系统/账号/权限/配置/存储)、`report_` 3(报表/日志)、`family_` 30(家庭事务)、`content_` 21(内容数据)、另 `game_info` 1(家庭小游戏,命名未加 family_ 前缀的遗留)。**各表用途与完整清单见 `docs/需求设计说明书.md` §6.2**。
   - **命名规则**:家庭事务业务表一律 `family_` 前缀;内容数据 `content_` 前缀;账号/权限/配置/存储保留 `sys_`;**报表/日志表一律 `report_` 前缀**。新增表必须遵守。前缀取最顶层祖先类别;上下级关系体现在表名(如 `sys_user_role`)。
 - **结构变更双文件**(强制):同时更新 `schema.sql`(全量)与 `migrations.sql`(增量、**幂等**),并按 CI 同路径做空库全量导入实测——`migrations` 跑通 ≠ `schema.sql` 可用。详见踩坑速查 §7.4。
 - **引用开源软件必须对接自动升级(强制)**:新增任何 npm/Maven 直接依赖或独立开源服务,**必须同时在 `sys_oss_component` 台账登记一条**(component_type=NPM/MAVEN/SERVICE + package_ref + current_version + license + repo_url + managed_by),否则不会被版本跟踪覆盖;**`current_version` 记实际锁定版本**(package-lock.json / 解析后的 Maven 依赖),不写声明区间下限(devDependencies 也登)。**升级闸门**:NPM/MAVEN 交 Renovate(`managed_by=RENOVATE`),台账「AI 评估」(`OSS_UPGRADE_EVAL` 功能码)判断影响后勾选「生成升级 PR」;SERVICE 走 `managed_by=INTERNAL` 按 `deploy_type` 出方案,**当前版本可按 `probe_type` 自动探测**(探不到保留人工值)。漏洞列 `vuln_count/vuln_severity` 仅预留(CVE 扫描已决策不做)。入口 `/ops/oss`;台账字段、探测方式与 AI 评估细则见 需求 §4.6.10 与踩坑速查。
@@ -90,8 +90,8 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
     config/      # SecurityConfig/CorsConfig/MybatisPlusConfig/Knife4jConfig/WebMvcConfig/WebSocketConfig/SqlStatementLog/ExternalConfigLoader/AsyncConfig
     security/    # JwtUtils/JwtAuthenticationFilter/LoginUser/SecurityHelper/OpsAccessFilter
     annotation/ aspect/ filter/  # @RequirePermission/@OperationLog + 两个 Aspect;TraceIdFilter/AccessLogFilter/请求响应 Wrapper
-    entity/      # 72 个实体类(79 张表里 7 张关联/字典表无实体)
-    mapper/      # 73 个 MyBatis-Plus BaseMapper(自定义 SQL 全放 resources/mapper/*.xml,接口不写注解,参数统一 @Param)
+    entity/      # 73 个实体类(80 张表里 7 张关联/字典表无实体)
+    mapper/      # 74 个 MyBatis-Plus BaseMapper(自定义 SQL 全放 resources/mapper/*.xml,接口不写注解,参数统一 @Param)
     service/     # 67 个服务类(单实现无接口层)
     controller/  # 45 个 Controller
     dto/         # 请求/响应 DTO(49 个)
@@ -101,7 +101,7 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
     logback-spring.xml  # 三类日志分流(access/server/thirdparty,六要素 pattern,按天滚动)
     external.yml.template  # 外挂配置模板(唯一开发生产差异机制)
     mapper/*.xml        # 每个 Mapper 一个同名 XML
-    schema.sql          # 建库+建账号+建表(79 张)+种子(开发安全版;与 migrations.sql 必须同步;本地由 start-db.ps1 自动导入)
+    schema.sql          # 建库+建账号+建表(80 张)+种子(开发安全版;与 migrations.sql 必须同步;本地由 start-db.ps1 自动导入)
   mvnw / mvnw.cmd       # Maven Wrapper
 frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
   src/
@@ -157,12 +157,13 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 ## 功能模块清单(索引)
 
 > 完整功能描述(Controller/Service/关键表/要点/接口清单)见 **docs/需求设计说明书.md** 第 4 章;历史踩坑、机制细节与 live DB 迁移 SQL 见 **docs/踩坑速查.md** 与 **docs/变更归档.md**。本节仅作导航索引。
+> **生活组导航排序(V10.11)**:`sys_home_module.sort_order` 决定三端顺序,当前口径——物品定位/厨房恒为第 1、2 位,工具箱殿后;调整排序改 DB(或种子)后须重启后端(全局模块内存缓存)。照片瀑布已并入相册,无模块行。
 
 | 域 | 模块 | 关键入口 |
 |----|------|---------|
 | 账号 | 注册/登录/验证码/密码找回/个人资料 | AuthController / ProfileController |
 | 家庭 | 家庭管理/多家庭切换/成员/邀请码/入家申请 | FamilyController / AuthController / MemberController |
-| 内容 | 博客 / 日记 / 相册照片 / 放映厅(媒体引擎+本地视频库) / 照片瀑布 / 愿望单 / 书架 | Blog / Diary / Album+Photo / Video / Media / Cascade / Wish / Library 各 Controller |
+| 内容 | 博客 / 日记 / 相册照片(含照片瀑布内嵌视图,V10.11) / 放映厅(媒体引擎+本地视频库) / 愿望单 / 书架 | Blog / Diary / Album+Photo / Video / Media / Wish / Library 各 Controller |
 | 互动 | 点赞 / 评论 / 通知 / 聊天室 / 家庭公告 | Like / Comment / Notification / Chat / Announcement 各 Controller + ChatWebSocketHandler |
 | 生活 | 纪念日 / 提醒 / 计划 / 任务 / 记账(含贷款页签) / 家谱 / 签到积分 / 背景音乐 / 家庭保险箱 | Anniversary / Reminder / Plan / Task / Points / Music / Vault 各 Controller |
 | 游戏 | 花园共养植物 / 小游戏库(SWF/GBA,Flash Ruffle + EmulatorJS) / 宠物连连看 | FamilyPlant / GameInfo 各 Controller + FlashPlayer.vue + GbaPlayer.vue + PetLinkLink.vue |
