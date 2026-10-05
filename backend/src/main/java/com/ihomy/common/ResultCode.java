@@ -23,7 +23,10 @@ public enum ResultCode {
     ALREADY_CHECKIN(1007, "今日已签到"),
     INSUFFICIENT_POINTS(1008, "积分不足"),
     PRODUCT_SOLD_OUT(1009, "该商品已兑完或已达限兑次数"),
-    PASSWORD_CHANGE_REQUIRED(1010, "首次登录需先修改密码");
+    PASSWORD_CHANGE_REQUIRED(1010, "首次登录需先修改密码"),
+    MAIL_NOT_CONFIGURED(1011, "暂时无法发送邮件，请联系管理员重置密码"),
+    MAIL_SEND_FAILED(1012, "邮件发送失败，请稍后重试"),
+    RESET_TOKEN_INVALID(1013, "重置链接无效或已过期");
 
     private final int code;
     private final String message;

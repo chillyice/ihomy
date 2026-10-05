@@ -818,6 +818,7 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('points',    '积分商城', 'icon-points',    '/points', 'life', 'left', 12, 1),
 ('tree',      '家谱',     'icon-tree',      '/tree',   'life', 'left', 13, 1),
 ('vault',     '保险箱',   'icon-vault',     '/vault',  'life', 'left', 14, 1),
+('chat',      '聊天室',   'icon-chat',      '/chat',   'life', 'left', 16, 1),
 ('tools',     '工具箱',   'icon-tools',     '/tools',  'life', 'left', 17, 1),
 ('plant',     '花园',     'icon-plant',     '/tools/plant',  'life', 'left', 40, 0),
 ('member', '家庭成员', 'icon-member', '/member', 'social',  'right',  1, 1),
@@ -1952,7 +1953,7 @@ CREATE TABLE `sys_oss_component` (
   KEY `idx_type_status` (`component_type`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='开源组件台账(登记+版本检测+当前版本探测+升级提示)';
 
--- 种子:43 项 = 前端 NPM 直接依赖 23 + 后端 Maven 显式依赖 17 + 独立服务 3(Nextcloud 部分集成 / Jellyfin 部分集成 / Home Assistant 部分集成)
+-- 种子:44 项 = 前端 NPM 直接依赖 23 + 后端 Maven 显式依赖 18 + 独立服务 3(Nextcloud 部分集成 / Jellyfin 部分集成 / Home Assistant 部分集成)
 -- 版本为实际锁定版本(与 package-lock.json / 解析后的 Maven 依赖一致),不是 package.json/pom.xml 里的声明区间下限
 INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`) VALUES
 ('Vue', 'NPM', 'vue', '3.5.40', 'MIT', 'https://github.com/vuejs/core', '前端框架', 'FULL'),
@@ -1985,6 +1986,7 @@ INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `curre
 ('Spring Boot Data Redis', 'MAVEN', 'org.springframework.boot:spring-boot-starter-data-redis', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Redis(缓存/令牌/验证码)', 'FULL'),
 ('Spring Boot AOP', 'MAVEN', 'org.springframework.boot:spring-boot-starter-aop', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '切面(权限/操作日志)', 'FULL'),
 ('Spring Boot WebSocket', 'MAVEN', 'org.springframework.boot:spring-boot-starter-websocket', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '聊天室 WebSocket', 'FULL'),
+('Spring Boot Mail', 'MAVEN', 'org.springframework.boot:spring-boot-starter-mail', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '密码找回邮件(SMTP)', 'FULL'),
 ('MyBatis-Plus', 'MAVEN', 'com.baomidou:mybatis-plus-spring-boot3-starter', '3.5.5', 'Apache-2.0', 'https://github.com/baomidou/mybatis-plus', 'ORM', 'FULL'),
 ('MySQL Connector/J', 'MAVEN', 'com.mysql:mysql-connector-j', '8.3.0', 'GPL-2.0', 'https://github.com/mysql/mysql-connector-j', 'MySQL 驱动', 'FULL'),
 ('Hutool', 'MAVEN', 'cn.hutool:hutool-all', '5.8.27', 'MulanPSL-2.0', 'https://github.com/dromara/hutool', '工具库(农历/文本等)', 'FULL'),

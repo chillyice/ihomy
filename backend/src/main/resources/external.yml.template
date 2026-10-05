@@ -14,6 +14,18 @@ spring:
   data:
     redis:
       password: CHANGE_ME_REDIS_PASSWORD  # 必填:Redis 已要求密码(--requirepass),与容器/redis-server 的密码同值
+  # === 密码找回邮件(SMTP,可选)===
+  # 不配置(整段保持注释)时「忘记密码」不可用:用户会看到「暂时无法发送邮件,请联系管理员重置密码」。
+  # 启用时取消下方注释并填真实值;password 支持 ENC(...) 加密。
+  # mail:
+  #   host: smtp.example.com
+  #   port: 465
+  #   username: no-reply@example.com
+  #   password: CHANGE_ME_SMTP_PASSWORD
+  #   default-encoding: UTF-8
+  #   properties:
+  #     mail.smtp.auth: true
+  #     mail.smtp.ssl.enable: true
 
 # === JWT 签名密钥(必填:缺失则后端启动即失败;≥32 字符随机串,泄露等于全部 token 可伪造)===
 jwt:
@@ -39,4 +51,8 @@ app:
   weather-project-id:
   weather-key-id:
   weather-private-key:         # Ed25519 私钥 PEM;不入 git,推荐只配 DB 并用 ENC(...) 加密
+  # 密码找回邮件:发件人(空=取 spring.mail.username);重置链接基址(指向前端重置页)
+  mail:
+    from:                      # 如 no-reply@example.com
+    reset-url-base:            # 如 https://ihomy.top/reset-password(留空用 application.yml 基线)
   # AI 大模型配置已按家庭(模型池 sys_family_ai_model + 功能绑定 sys_family_ai_feature),在应用内「设置-家庭 AI 配置」维护,不再走全局 yml(V9.48)

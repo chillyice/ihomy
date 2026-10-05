@@ -570,11 +570,10 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
-import LoanRecords from '@/views/tools/LoanRecords.vue'
 import {
   calculateLoan,
   prepaymentComparison,
@@ -585,6 +584,9 @@ import {
   PREPAY_STRATEGY,
   PREPAY_ALLOC,
 } from '@/utils/loan'
+
+// 贷款记录与记账本/工具箱共用同一组件同一份家庭数据;异步加载,只做试算的用户不为它买单
+const LoanRecords = defineAsyncComponent(() => import('@/views/tools/LoanRecords.vue'))
 
 const { t } = useI18n()
 

@@ -161,7 +161,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 | 域 | 模块 | 关键入口 |
 |----|------|---------|
-| 账号 | 注册/登录/验证码/密码找回/个人资料 | AuthController / ProfileController |
+| 账号 | 注册/登录/验证码/个人资料/密码找回(邮箱自助重置,30 分钟一次性 token,邮件通道可选) | AuthController+PasswordResetService / ProfileController |
 | 家庭 | 家庭管理/多家庭切换/成员/邀请码/入家申请 | FamilyController / AuthController / MemberController |
 | 内容 | 博客 / 日记 / 相册照片(含照片瀑布内嵌视图,V10.11) / 放映厅(媒体引擎+本地视频库) / 愿望单 / 书架 | Blog / Diary / Album+Photo / Video / Media / Wish / Library 各 Controller |
 | 互动 | 点赞 / 评论 / 通知 / 聊天室 / 家庭公告 | Like / Comment / Notification / Chat / Announcement 各 Controller + ChatWebSocketHandler |
@@ -236,14 +236,14 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 - 后端:`cd backend; .\mvnw.cmd -B clean package` → BUILD SUCCESS(`Tests run: 23`,纯逻辑不起 Spring 上下文);只求编译加 `-DskipTests`。**clean 被运行中的后端锁 jar 时改跑 `-B test`**。
 - 前端测试:`cd frontend; npx vitest run` → 30 passed(loan/password/feed/nav + i18n 中英键对齐;CI 在构建前执行)
-- 前端构建:`cd frontend; npm run build` → 入口 chunk **385.45KB/gzip 155.40KB**(V10.10 实测;+7.8KB 全为新增中英双语文案进共享入口 chunk;功能页/pdfjs/epubjs/hls.js 均为独立异步 chunk;历史数字见 docs/变更归档.md)
+- 前端构建:`cd frontend; npm run build` → 入口 chunk **386.76KB/gzip 155.84KB**(V10.14 实测;V10.13 时为 385.33KB,新增密码找回页/接口/i18n 后微增;功能页/pdfjs/epubjs/hls.js 均为独立异步 chunk;历史数字见 docs/变更归档.md)
   - **⚠ 口径:vite 报的是「字符数」不是「字节数」**(实测 318.71KB 字符 = 343,667 字节)——**别拿 `ls -la` 字节数跟基线比**;比特字节就 `wc -c` 对 `wc -c`。
 - 界面/交互验证:harness 别放 `target/`;持续动画页面用页面内 `evaluate` 量几何、派发 `el.click()`,别用截图或真实点击(必超时,见踩坑速查 §6)。
 - 接口测试:同级独立项目(不在本仓库)`cd ..\autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed;CI 每次推送自动做前后端构建+compose 起库导 schema+后端启动+登录冒烟。
 
 ## 已实现变更归档(已外置)
 
-> 历史归档已整体迁至 **`docs/变更归档.md`**(现约 712KB / **154 小节** = 开头 16 个**功能域**小节 + 其后 138 个版本/治理小节),内容原样保留。含文件级改动表、设计决策、踩坑记录与 live DB 同步 SQL。
+> 历史归档已整体迁至 **`docs/变更归档.md`**(现约 724KB / **156 小节** = 开头 16 个**功能域**小节 + 其后 140 个版本/治理小节),内容原样保留。含文件级改动表、设计决策、踩坑记录与 live DB 同步 SQL。
 > **该文件开头有章节目录**(或 `grep -n "^##### " docs/变更归档.md` 列全部小节);**检索历史实现/设计决策/live DB 迁移 SQL 时读该文件;新的变更归档继续追加到文件末尾**(新增 `#####` 子节),不要再写回 AGENTS.md。
 
 ## 文件存储策略
@@ -256,8 +256,8 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 ## 配置与加密
 
-- **外挂配置**(唯一开发生产差异机制):`IHOMY_CONFIG_PATH` 环境变量指向 yml 路径,`ExternalConfigLoader` 启动早期加载、最高优先级覆盖 application.yml(MySQL/Redis 密码、SMTP、天气、JWT 密钥)。**改配置前先核实该变量实际指向**(曾指向旧路径陈旧副本;启动命令里显式设置最可靠)。模板 `backend/src/main/resources/external.yml.template`;external.yml 不入 git。
-- **DB/Redis/邮件密码明文**(避免鸡生蛋:DB 未连上无法读盐值解密);**业务凭证 AES-GCM 加密**:`AesUtil`(PBKDF2WithHmacSHA256 100000 次 + GCM 128bit tag);密文 `ENC(Base64(iv+cipher+tag))`;盐值存 `sys_parameter`(key=`aes-salt`,首启生成,可被 `IHOMY_AES_SALT` 覆盖)。
+- **外挂配置**(唯一开发生产差异机制):`IHOMY_CONFIG_PATH` 环境变量指向 yml 路径,`ExternalConfigLoader` 启动早期加载、最高优先级覆盖 application.yml(MySQL/Redis 密码、天气、JWT 密钥、密码找回 SMTP `spring.mail.*` 与 `app.mail.*`)。**改配置前先核实该变量实际指向**(曾指向旧路径陈旧副本;启动命令里显式设置最可靠)。模板 `backend/src/main/resources/external.yml.template`;external.yml 不入 git。
+- **DB/Redis 密码明文**(避免鸡生蛋:DB 未连上无法读盐值解密);**业务凭证 AES-GCM 加密**:`AesUtil`(PBKDF2WithHmacSHA256 100000 次 + GCM 128bit tag);密文 `ENC(Base64(iv+cipher+tag))`;盐值存 `sys_parameter`(key=`aes-salt`,首启生成,可被 `IHOMY_AES_SALT` 覆盖)。
 - **OPS 加密接口**:`GET /api/ops/crypto/encrypt?plaintext=` 生成密文,`/decrypt?ciphertext=ENC(xxx)` 验证(均 `ops:view`)。
 - **三处可扩展点**(现状见需求设计说明书——天气多源 §4.7.5、首页仪表盘 §4.7.7、AI 模型接入 §4.6.9):①天气源=门面 `WeatherService` + `WeatherProvider`(现和风 `QWeatherProvider`,凭证表 `sys_weather_credential`),新增三步(WeatherConst.PROVIDERS + 实现 + 前端下拉);②首页组件=四档 snap 尺寸 + hover 推开邻居,布局键 `ihomy:dashboard:layout:v2`;③AI=家庭级模型池 `sys_family_ai_model`(LLM/IMAGE/ASR/LOCAL,密钥 ENC)+ 按功能绑定 `sys_family_ai_feature`(6 功能,`resolveForFeature/resolveChain` 主+兜底,同义词表 `sys_synonym`),**新家庭要用 AI 必须家长先加模型再按功能绑定**(找物/放物可绑 LOCAL 离线用)。
 - **profile 化(废弃)**:不用 application-dev.yml profile;application.yml 即生产基线,所有环境差异统一走 external.yml 覆盖。

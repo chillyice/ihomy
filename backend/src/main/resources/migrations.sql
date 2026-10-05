@@ -1825,5 +1825,35 @@ SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA 
 SET @sql := IF(@has > 0, 'ALTER TABLE `family_anniversary` DROP COLUMN `user_id`', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- ------------------------------------------------------------
+-- V10.12 首页模块补「聊天室」入口(2026-10-04)
+--   schema.sql 种子历来缺 chat 行,容器化全新部署首页/侧栏缺聊天室入口
+--   (部署文档一直要求在 schema 执行后手工补一行)。此处补齐,存量库幂等补种。
+--   NOT EXISTS 防重:重复执行结果不变。
+-- ------------------------------------------------------------
+INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`)
+SELECT 'chat', '聊天室', 'icon-chat', '/chat', 'life', 'left', 16, 1
+WHERE NOT EXISTS (SELECT 1 FROM `sys_home_module` WHERE `code` = 'chat' AND `family_id` IS NULL);
+
+-- ------------------------------------------------------------
+-- V10.14 密码找回(邮箱自助重置):预留表 + 开源组件台账(2026-10-05)
+--   sys_password_reset_token 此前仅存在于 schema.sql;存量库若缺表则补建(幂等)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `sys_password_reset_token` (
+  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`    BIGINT      NOT NULL COMMENT '用户ID',
+  `token`      VARCHAR(64) NOT NULL COMMENT '重置令牌（UUID）',
+  `expires_at` DATETIME    NOT NULL COMMENT '过期时间（30分钟）',
+  `used`       TINYINT     NOT NULL DEFAULT 0 COMMENT '0未用 1已用',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_token` (`token`),
+  KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='密码重置令牌表';
+
+INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`) VALUES
+('Spring Boot Mail', 'MAVEN', 'org.springframework.boot:spring-boot-starter-mail', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '密码找回邮件(SMTP)', 'FULL');
+UPDATE `sys_oss_component` SET `managed_by` = 'RENOVATE' WHERE `component_type` = 'MAVEN' AND `package_ref` = 'org.springframework.boot:spring-boot-starter-mail';
+
 
 

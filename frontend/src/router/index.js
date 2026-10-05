@@ -4,6 +4,8 @@ import { useUserStore } from '@/stores/user'
 
 const routes = [
   { path: '/login', name: 'Login', component: () => import('@/views/Login.vue'), meta: { public: true } },
+  // 密码找回:无 token=请求发送邮件;带 ?token=... =凭邮件链接设置新密码。公开页,不套登录守卫
+  { path: '/reset-password', name: 'ResetPassword', component: () => import('@/views/ResetPassword.vue'), meta: { public: true } },
   // 首页:/ 恒重定向到模块化首页 /home(暖居/光尘共用同一首页,由主题切换系统决定外壳)
   { path: '/', redirect: '/home' },
   { path: '/home', name: 'Home', component: () => import('@/views/Home.vue'), meta: { public: true } },

@@ -44,6 +44,10 @@
         </el-button>
       </el-form>
 
+      <div v-if="!isRegister" class="forgot" @click="router.push('/reset-password')">
+        {{ $t('login.forgotPassword') }}
+      </div>
+
       <div class="toggle" @click="toggleMode">
         {{ isRegister ? $t('login.hasAccount') : $t('login.noAccount') }}
       </div>
@@ -240,6 +244,13 @@ html.dark .login-card {
 .submit-btn {
   width: 100%;
   margin-top: 8px;
+}
+.forgot {
+  text-align: right;
+  margin-top: 10px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  cursor: pointer;
 }
 .toggle {
   text-align: center;

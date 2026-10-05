@@ -78,6 +78,11 @@ app:
   weather-key-id:
   weather-private-key:
   # AI 大模型配置已按家庭(模型池 sys_family_ai_model + 功能绑定 sys_family_ai_feature,设置页-家庭 AI 配置维护),不再走全局 yml(V9.48)
+  # 密码找回邮件:发件人(空=取 spring.mail.username);重置链接基址(指向前端重置页,邮件内拼接 ?token=)
+  # SMTP 连接信息(spring.mail.*)留空即视为未开通,见 external.yml.template
+  mail:
+    from:
+    reset-url-base: https://ihomy.top/reset-password
   # 日志保留天数(logback 三类日志文件共用,按天滚动)
   log-retention-days: 7
 

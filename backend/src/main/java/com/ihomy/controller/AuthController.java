@@ -13,6 +13,7 @@ import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.AuthGuardService;
 import com.ihomy.service.AuthService;
 import com.ihomy.service.CaptchaService;
+import com.ihomy.service.PasswordResetService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -38,6 +39,7 @@ public class AuthController {
     private final CaptchaService captchaService;
     private final AuthGuardService authGuard;
     private final AuthCookie authCookie;
+    private final PasswordResetService passwordResetService;
 
     @Operation(summary = "获取图形验证码(注册用)")
     @GetMapping("/captcha")
@@ -71,6 +73,23 @@ public class AuthController {
         Map<String, Object> data = authService.register(dto);
         attachAccessToken(request, response, data);
         return Result.success(data);
+    }
+
+    @Operation(summary = "请求重置密码(发送邮件)")
+    @OperationLog(module = "AUTH", operationType = "CREATE", description = "请求密码重置", saveArgs = false)
+    @PostMapping("/forgot-password")
+    public Result<Void> forgotPassword(@RequestBody Map<String, String> body, HttpServletRequest request) {
+        passwordResetService.requestReset(body.get("email"), body.get("captchaId"), body.get("captchaCode"),
+                Ips.realIp(request));
+        return Result.success();
+    }
+
+    @Operation(summary = "重置密码(凭邮件一次性令牌)")
+    @OperationLog(module = "AUTH", operationType = "UPDATE", description = "重置密码", saveArgs = false)
+    @PostMapping("/reset-password")
+    public Result<Void> resetPassword(@RequestBody Map<String, String> body, HttpServletRequest request) {
+        passwordResetService.reset(body.get("token"), body.get("password"), Ips.realIp(request));
+        return Result.success();
     }
 
     @Operation(summary = "登出(同时吊销本次会话的刷新令牌)")
