@@ -9,6 +9,7 @@ import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.VaultService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -42,7 +43,7 @@ public class VaultController {
     @RequirePermission("vault:manage")
     @OperationLog(module = "VAULT", operationType = "CREATE", description = "新增保险箱条目", saveArgs = false)
     @PostMapping
-    public Result<Long> create(@RequestBody VaultItemDTO dto) {
+    public Result<Long> create(@Valid @RequestBody VaultItemDTO dto) {
         LoginUser user = securityHelper.current();
         return Result.success(vaultService.create(user.getUserId(), user.getFamilyId(), dto));
     }
@@ -51,7 +52,7 @@ public class VaultController {
     @RequirePermission("vault:manage")
     @OperationLog(module = "VAULT", operationType = "UPDATE", description = "编辑保险箱条目", saveArgs = false)
     @PutMapping("/{id}")
-    public Result<Void> update(@PathVariable Long id, @RequestBody VaultItemDTO dto) {
+    public Result<Void> update(@PathVariable Long id, @Valid @RequestBody VaultItemDTO dto) {
         LoginUser user = securityHelper.current();
         vaultService.update(id, user.getFamilyId(), user.getUserId(), dto);
         return Result.success();

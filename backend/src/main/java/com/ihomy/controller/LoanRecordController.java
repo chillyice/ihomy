@@ -9,6 +9,7 @@ import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.LoanRecordService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,7 +41,7 @@ public class LoanRecordController {
     @RequirePermission("loan:manage")
     @OperationLog(module = "LOAN", operationType = "CREATE", description = "新增贷款记录")
     @PostMapping
-    public Result<Long> create(@RequestBody FamilyLoanDTO dto) {
+    public Result<Long> create(@Valid @RequestBody FamilyLoanDTO dto) {
         LoginUser user = securityHelper.current();
         return Result.success(loanRecordService.create(user.getUserId(), user.getFamilyId(), dto));
     }
@@ -49,7 +50,7 @@ public class LoanRecordController {
     @RequirePermission("loan:manage")
     @OperationLog(module = "LOAN", operationType = "UPDATE", description = "编辑贷款记录")
     @PutMapping("/{id}")
-    public Result<Void> update(@PathVariable Long id, @RequestBody FamilyLoanDTO dto) {
+    public Result<Void> update(@PathVariable Long id, @Valid @RequestBody FamilyLoanDTO dto) {
         LoginUser user = securityHelper.current();
         loanRecordService.update(id, user.getFamilyId(), dto);
         return Result.success();

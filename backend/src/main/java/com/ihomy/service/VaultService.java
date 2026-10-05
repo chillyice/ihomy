@@ -1,6 +1,7 @@
 package com.ihomy.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
@@ -97,18 +98,46 @@ public class VaultService {
 
     /** 编辑条目:password 为空表示不改密码(只改其他字段) */
     public void update(Long id, Long familyId, Long userId, VaultItemDTO dto) {
-        VaultItem item = require(id, familyId, userId);
-        if (dto.getName() != null) item.setName(requireName(dto.getName()));
-        if (dto.getCategory() != null) item.setCategory(normalizeCategory(dto.getCategory()));
-        if (dto.getUsername() != null) item.setUsername(blankToNull(dto.getUsername()));
-        if (dto.getUrl() != null) item.setUrl(blankToNull(dto.getUrl()));
-        if (dto.getTags() != null) item.setTags(blankToNull(dto.getTags()));
-        if (dto.getNote() != null) item.setNote(blankToNull(dto.getNote()));
-        if (dto.getVisibility() != null) item.setVisibility(normalizeVisibility(dto.getVisibility()));
-        if (dto.getPassword() != null && !dto.getPassword().isEmpty()) {
-            item.setPasswordEnc(parameterService.encrypt(dto.getPassword()));
+        require(id, familyId, userId);
+        // 只 SET 本次提交的业务字段:updateById 会把实体里读出的旧 updated_at 一起写回,
+        // 抑制列上 ON UPDATE CURRENT_TIMESTAMP,前端「更新于」永远停在创建时间
+        LambdaUpdateWrapper<VaultItem> uw = new LambdaUpdateWrapper<VaultItem>()
+                .eq(VaultItem::getId, id);
+        boolean changed = false;
+        if (dto.getName() != null) {
+            uw.set(VaultItem::getName, requireName(dto.getName()));
+            changed = true;
         }
-        vaultItemMapper.updateById(item);
+        if (dto.getCategory() != null) {
+            uw.set(VaultItem::getCategory, normalizeCategory(dto.getCategory()));
+            changed = true;
+        }
+        if (dto.getUsername() != null) {
+            uw.set(VaultItem::getUsername, blankToNull(dto.getUsername()));
+            changed = true;
+        }
+        if (dto.getUrl() != null) {
+            uw.set(VaultItem::getUrl, blankToNull(dto.getUrl()));
+            changed = true;
+        }
+        if (dto.getTags() != null) {
+            uw.set(VaultItem::getTags, blankToNull(dto.getTags()));
+            changed = true;
+        }
+        if (dto.getNote() != null) {
+            uw.set(VaultItem::getNote, blankToNull(dto.getNote()));
+            changed = true;
+        }
+        if (dto.getVisibility() != null) {
+            uw.set(VaultItem::getVisibility, normalizeVisibility(dto.getVisibility()));
+            changed = true;
+        }
+        if (dto.getPassword() != null && !dto.getPassword().isEmpty()) {
+            uw.set(VaultItem::getPasswordEnc, parameterService.encrypt(dto.getPassword()));
+            changed = true;
+        }
+        if (!changed) return;
+        vaultItemMapper.update(null, uw);
     }
 
     public void delete(Long id, Long familyId, Long userId) {

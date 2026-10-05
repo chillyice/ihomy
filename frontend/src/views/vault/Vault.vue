@@ -139,7 +139,7 @@
               type="text"
               autocomplete="new-password"
               :placeholder="editor.form.id ? $t('vault.passwordKeep') : $t('vault.passwordPlaceholder')"
-              maxlength="200"
+              maxlength="128"
             />
             <el-popover v-model:visible="generator.visible" placement="bottom-end" :width="300" trigger="click">
               <template #reference>
