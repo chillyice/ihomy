@@ -18,7 +18,7 @@
         :class="{ fading: c.fading }"
         :style="cardStyle(c)"
       >
-        <div
+        <div v-a11y-click
           class="leaf-card"
           :class="{ hovered: c.hovered }"
           @mouseenter="pauseCard(c)"

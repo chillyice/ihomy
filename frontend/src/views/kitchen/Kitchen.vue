@@ -25,7 +25,7 @@
           {{ $t('kitchen.todayRecommend') }}
         </h2>
         <div class="recommend-row">
-          <div
+          <div v-a11y-click
             v-for="r in recommend"
             :key="r.id"
             class="recommend-card card"
@@ -47,7 +47,7 @@
           <span class="title-count">{{ g.items.length }}</span>
         </h2>
         <div class="menu-grid">
-          <div
+          <div v-a11y-click
             v-for="r in g.items"
             :key="r.id"
             class="menu-card card"

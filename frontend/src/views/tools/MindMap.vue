@@ -14,7 +14,7 @@
 
     <div v-loading="loading">
       <div v-if="list.length" class="mm-grid">
-        <div v-for="m in list" :key="m.id" class="mm-card card" @click="openMap(m)">
+        <div v-a11y-click v-for="m in list" :key="m.id" class="mm-card card" @click="openMap(m)">
           <el-button class="mm-del" :icon="Delete" circle text size="small" @click.stop="removeMindMap(m)" />
           <img v-if="m.thumbUrl" class="mm-card-thumb" :src="m.thumbUrl" loading="lazy" alt="" />
           <div class="mm-card-title">{{ m.title }}</div>
@@ -31,7 +31,7 @@
     <el-dialog v-model="createVisible" :title="$t('tools.mindmap.new')" width="560px">
       <div class="mm-tpl-label">{{ $t('tools.mindmap.tpl.pick') }}</div>
       <div class="mm-tpl-grid">
-        <div
+        <div v-a11y-click
           v-for="tpl in tplOptions"
           :key="tpl.key"
           class="mm-tpl-card"

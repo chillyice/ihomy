@@ -90,7 +90,7 @@
             <div v-if="mediaResume.length" class="resume-block">
               <div class="section-label">{{ $t('cinema.continueWatching') }}</div>
               <div class="resume-row">
-                <div v-for="r in mediaResume" :key="r.id" class="resume-card" @click="openMediaPlayer(r)">
+                <div v-a11y-click v-for="r in mediaResume" :key="r.id" class="resume-card" @click="openMediaPlayer(r)">
                   <div class="resume-thumb">
                     <img v-if="r.imageUrl" :src="r.imageUrl" :alt="r.name" loading="lazy" />
                     <div v-else class="poster-placeholder">🎬</div>
@@ -106,7 +106,7 @@
             </div>
 
             <div v-if="mediaFiltered.length" class="media-grid">
-              <div v-for="w in mediaFiltered" :key="w.id" class="media-card" @click="goDetail(w)">
+              <div v-a11y-click v-for="w in mediaFiltered" :key="w.id" class="media-card" @click="goDetail(w)">
                 <div class="media-poster">
                   <img v-if="w.imageUrl" :src="w.imageUrl" :alt="w.name" loading="lazy" />
                   <div v-else class="poster-placeholder">🎬</div>
@@ -150,7 +150,7 @@
               class="video-card card"
               :class="{ selected: selectMode && selectedIds.includes(v.id) }"
             >
-              <div class="video-poster" @click="selectMode ? togglePick(v) : play(v)">
+              <div v-a11y-click class="video-poster" @click="selectMode ? togglePick(v) : play(v)">
                 <img v-if="v.poster" :src="v.poster" class="poster-img" :alt="$t('cinema.poster')" />
                 <div v-else class="poster-placeholder">🎬</div>
                 <div v-if="!selectMode" class="play-overlay">▶ {{ $t('cinema.play') }}</div>

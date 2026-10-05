@@ -7,19 +7,19 @@
         <div class="me-nickname">{{ userInfo?.nickname || $t('home.loginToView') }}</div>
         <div class="me-family">{{ appStore.familyName || 'ihomy' }}</div>
       </div>
-      <span v-if="!userStore.isLoggedIn" class="me-login-btn" @click="$router.push('/login')">{{ $t('home.loginToView') }}</span>
+      <span v-a11y-click v-if="!userStore.isLoggedIn" class="me-login-btn" @click="$router.push('/login')">{{ $t('home.loginToView') }}</span>
     </div>
 
     <!-- 家庭切换 -->
     <div v-if="userStore.isLoggedIn && families.length > 1" class="me-section">
-      <div class="me-row" @click="showFamilySwitch = !showFamilySwitch">
+      <div v-a11y-click class="me-row" @click="showFamilySwitch = !showFamilySwitch">
         <span class="me-row-icon">🔄</span>
         <span class="me-row-text">{{ $t('nav.switchFamily') }}</span>
         <el-icon class="me-row-arrow" :class="{ open: showFamilySwitch }"><ArrowRight /></el-icon>
       </div>
       <transition name="expand">
         <div v-show="showFamilySwitch" class="family-list">
-          <div
+          <div v-a11y-click
             v-for="f in families"
             :key="f.familyId"
             class="family-item"
@@ -35,17 +35,17 @@
 
     <!-- 设置区 -->
     <div class="me-section">
-      <div class="me-row" @click="toggleTheme">
+      <div v-a11y-click class="me-row" @click="toggleTheme">
         <span class="me-row-icon">{{ themeStore.isDusk ? '🌙' : '☀️' }}</span>
         <span class="me-row-text">{{ themeStore.isDusk ? $t('theme.dusk') : $t('theme.dawn') }}</span>
         <el-switch :model-value="themeStore.isDusk" size="small" />
       </div>
-      <div class="me-row" @click="toggleLightEffect">
+      <div v-a11y-click class="me-row" @click="toggleLightEffect">
         <span class="me-row-icon">✨</span>
         <span class="me-row-text">光影特效</span>
         <el-switch :model-value="lightEffectOn" size="small" />
       </div>
-      <div class="me-row" @click="toggleLang">
+      <div v-a11y-click class="me-row" @click="toggleLang">
         <span class="me-row-icon">🌐</span>
         <span class="me-row-text">{{ $t('mobile.language') }}</span>
         <span class="me-row-value">{{ locale === 'en' ? 'EN' : '中' }}</span>
@@ -54,17 +54,17 @@
 
     <!-- 功能入口 -->
     <div class="me-section">
-      <div v-if="userStore.isLoggedIn" class="me-row" @click="$router.push('/settings')">
+      <div v-a11y-click v-if="userStore.isLoggedIn" class="me-row" @click="$router.push('/settings')">
         <span class="me-row-icon">⚙️</span>
         <span class="me-row-text">{{ $t('nav.settings') }}</span>
         <el-icon class="me-row-arrow"><ArrowRight /></el-icon>
       </div>
-      <div v-if="userStore.isLoggedIn" class="me-row" @click="$router.push('/member')">
+      <div v-a11y-click v-if="userStore.isLoggedIn" class="me-row" @click="$router.push('/member')">
         <span class="me-row-icon">👥</span>
         <span class="me-row-text">{{ $t('mobile.members') }}</span>
         <el-icon class="me-row-arrow"><ArrowRight /></el-icon>
       </div>
-      <div v-if="userStore.isLoggedIn" class="me-row" @click="$router.push({ path: '/settings', query: { tab: 'profile' } })">
+      <div v-a11y-click v-if="userStore.isLoggedIn" class="me-row" @click="$router.push({ path: '/settings', query: { tab: 'profile' } })">
         <span class="me-row-icon">👤</span>
         <span class="me-row-text">{{ $t('settings.profile') }}</span>
         <el-icon class="me-row-arrow"><ArrowRight /></el-icon>
@@ -73,7 +73,7 @@
 
     <!-- 退出 -->
     <div v-if="userStore.isLoggedIn" class="me-section">
-      <div class="me-row logout" @click="doLogout">
+      <div v-a11y-click class="me-row logout" @click="doLogout">
         <span class="me-row-text">{{ $t('nav.logout') }}</span>
       </div>
     </div>

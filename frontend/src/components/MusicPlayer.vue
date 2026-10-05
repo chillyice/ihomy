@@ -4,7 +4,7 @@
     :style="{ left: pos.x + 'px', bottom: pos.bottom + 'px' }"
     @mousedown="onDragStart">
     <!-- 黑胶可视化 + 展开切换 -->
-    <div class="player-left" @click.stop="expanded = !expanded">
+    <div v-a11y-click class="player-left" @click.stop="expanded = !expanded">
       <div class="vinyl" :class="{ playing }">
         <div class="vinyl-disc">
           <div class="vinyl-groove"></div>
@@ -25,7 +25,7 @@
       <!-- 进度条 -->
       <div class="progress-row">
         <span class="time">{{ formatTime(currentTime) }}</span>
-        <div class="progress-bar" @click="onSeek">
+        <div v-a11y-click class="progress-bar" @click="onSeek">
           <div class="progress-buffered" :style="{ width: bufferedPct + '%' }"></div>
           <div class="progress-played" :style="{ width: playedPct + '%' }"></div>
         </div>
@@ -46,7 +46,7 @@
 
       <!-- 歌单 -->
       <div v-if="showList" class="playlist">
-        <div
+        <div v-a11y-click
           v-for="(t, i) in playlist"
           :key="t.id || i"
           class="playlist-item"

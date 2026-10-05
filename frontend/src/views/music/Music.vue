@@ -48,7 +48,7 @@
           <div v-loading="loading">
             <div v-if="filteredTracks.length" class="music-grid">
               <div v-for="t in filteredTracks" :key="t.id" class="music-card card" :class="{ selected: selectMode && selectedIds.includes(t.id) }">
-                <div class="music-cover" @click="selectMode ? toggleTrack(t.id) : play(t)">
+                <div v-a11y-click class="music-cover" @click="selectMode ? toggleTrack(t.id) : play(t)">
                   <img v-if="t.coverUrl" :src="t.coverUrl" class="cover-img" alt="" />
                   <div v-else class="cover-placeholder"><span>🎵</span></div>
                   <div class="play-btn-overlay"><div class="play-btn-circle">▶</div></div>
@@ -93,7 +93,7 @@
           <div v-loading="loading">
             <div v-if="albums.length" class="album-grid">
               <div v-for="al in albums" :key="al.album" class="album-card card" :class="{ selected: selectMode && selectedAlbums.includes(al.album) }">
-                <div class="album-cover" @click="selectMode ? toggleAlbum(al.album) : playAlbum(al)">
+                <div v-a11y-click class="album-cover" @click="selectMode ? toggleAlbum(al.album) : playAlbum(al)">
                   <img v-if="al.coverUrl" :src="al.coverUrl" class="cover-img" alt="" />
                   <div v-else class="cover-placeholder"><span>💿</span></div>
                   <div class="play-btn-overlay"><div class="play-btn-circle">▶</div></div>
@@ -107,7 +107,7 @@
                   <div class="album-tracks">
                     <div v-for="(t, i) in al.tracks" :key="t.id || i" class="album-track-item">
                       <span class="track-idx">{{ i + 1 }}</span>
-                      <span class="track-name" @click="play(t)">{{ t.title || $t('music.unknownTrack') }}</span>
+                      <span v-a11y-click class="track-name" @click="play(t)">{{ t.title || $t('music.unknownTrack') }}</span>
                       <span v-if="t.duration" class="track-dur">{{ formatDuration(t.duration) }}</span>
                     </div>
                   </div>
@@ -132,7 +132,7 @@
           <div v-loading="playlistLoading">
             <div v-if="playlists.length" class="playlist-grid">
               <div v-for="p in playlists" :key="p.id" class="pl-card card">
-                <div class="pl-cover" @click="viewPlaylist(p)">
+                <div v-a11y-click class="pl-cover" @click="viewPlaylist(p)">
                   <img v-if="p.coverUrl" :src="p.coverUrl" class="cover-img" alt="" />
                   <div v-else class="cover-placeholder pl-cover-placeholder">
                     <svg class="pl-cover-icon" viewBox="0 0 48 48" fill="none">
@@ -266,7 +266,7 @@
         <el-tab-pane :label="$t('music.byAlbum')" name="album">
           <div class="add-album-list">
             <div v-for="al in addTracksDialog.albumCandidates" :key="al.album" class="add-album-item">
-              <div class="add-album-info" @click="toggleAlbumInDialog(al)">
+              <div v-a11y-click class="add-album-info" @click="toggleAlbumInDialog(al)">
                 <el-checkbox :model-value="addTracksDialog.selectedAlbums.includes(al.album)" />
                 <img v-if="al.coverUrl" :src="al.coverUrl" class="add-album-cover" alt="" />
                 <div v-else class="add-album-cover placeholder">

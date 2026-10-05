@@ -136,6 +136,7 @@ wallpaper-engine/   # Wallpaper Engine 网页壁纸包(壳页跳转线上 /wallp
 ```powershell
 npm install        # 首次
 npm run dev        # 开发(端口5173,代理/api到8080)
+npm run lint       # 代码检查(扁平配置 eslint.config.js;只查正确性,格式交 Prettier,CI 构建前必跑)
 npm run build      # 生产构建,产物 dist/,含 PWA service worker
 ```
 
@@ -235,15 +236,15 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 ## 验证基线(每版更新,当前值)
 
 - 后端:`cd backend; .\mvnw.cmd -B clean package` → BUILD SUCCESS(`Tests run: 48`,纯逻辑不起 Spring 上下文);只求编译加 `-DskipTests`。**clean 被运行中的后端锁 jar 时改跑 `-B test`**。
-- 前端测试:`cd frontend; npx vitest run` → 31 passed(loan/password/feed/nav + i18n 中英键对齐 + i18n 引用键存在性;CI 在构建前执行)
-- 前端构建:`cd frontend; npm run build` → 入口 chunk **388.06KB/gzip 156.36KB**(V10.16 实测;V10.15 时 gzip 156.33KB、V10.14 时 386.76KB;功能页/pdfjs/epubjs/hls.js 均为独立异步 chunk;历史数字见 docs/变更归档.md)
+- 前端测试:`cd frontend; npx vitest run` → 31 passed(loan/password/feed/nav + i18n 中英键对齐 + i18n 引用键存在性;CI 在构建前执行)。同一步跑 `npm run lint` → **0 error**(27 warning = 存量未使用变量,不拦构建)。
+- 前端构建:`cd frontend; npm run build` → 入口 chunk **388.76KB/gzip 156.52KB**(V10.17 实测;V10.16 时 388.06KB/156.36KB、V10.15 时 gzip 156.33KB、V10.14 时 386.76KB;功能页/pdfjs/epubjs/hls.js 均为独立异步 chunk;历史数字见 docs/变更归档.md)
   - **⚠ 口径:vite 报的是「字符数」不是「字节数」**(实测 318.71KB 字符 = 343,667 字节)——**别拿 `ls -la` 字节数跟基线比**;比特字节就 `wc -c` 对 `wc -c`。
 - 界面/交互验证:harness 别放 `target/`;持续动画页面用页面内 `evaluate` 量几何、派发 `el.click()`,别用截图或真实点击(必超时,见踩坑速查 §6)。
 - 接口测试:同级独立项目(不在本仓库)`cd ..\autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed;CI 每次推送自动做前后端构建+compose 起库导 schema+后端启动+登录冒烟。
 
 ## 已实现变更归档(已外置)
 
-> 历史归档已整体迁至 **`docs/变更归档.md`**(现约 738KB / **158 小节** = 开头 16 个**功能域**小节 + 其后 142 个版本/治理小节),内容原样保留。含文件级改动表、设计决策、踩坑记录与 live DB 同步 SQL。
+> 历史归档已整体迁至 **`docs/变更归档.md`**(现约 746KB / **159 小节** = 开头 16 个**功能域**小节 + 其后 143 个版本/治理小节),内容原样保留。含文件级改动表、设计决策、踩坑记录与 live DB 同步 SQL。
 > **该文件开头有章节目录**(或 `grep -n "^##### " docs/变更归档.md` 列全部小节);**检索历史实现/设计决策/live DB 迁移 SQL 时读该文件;新的变更归档继续追加到文件末尾**(新增 `#####` 子节),不要再写回 AGENTS.md。
 
 ## 文件存储策略

@@ -16,7 +16,7 @@
 
     <div v-loading="loading" class="tool-grid">
       <!-- 花园固定入口(植物养殖改名而来) -->
-      <div class="tool-card card" @click="$router.push('/tools/plant')">
+      <div v-a11y-click class="tool-card card" @click="$router.push('/tools/plant')">
         <div class="tool-icon"><el-icon :size="30"><Sunny /></el-icon></div>
         <div class="tool-name">{{ $t('games.garden.title') }}</div>
         <div class="tool-desc">{{ $t('games.garden.desc') }}</div>
@@ -24,7 +24,7 @@
       </div>
 
       <!-- 宠物连连看固定入口(H5 原生小游戏,通关发积分) -->
-      <div class="tool-card card" @click="$router.push('/games/petlink')">
+      <div v-a11y-click class="tool-card card" @click="$router.push('/games/petlink')">
         <div class="tool-icon"><el-icon :size="30"><Grid /></el-icon></div>
         <div class="tool-name">{{ $t('games.petlink.title') }}</div>
         <div class="tool-desc">{{ $t('games.petlink.desc') }}</div>
@@ -32,7 +32,7 @@
       </div>
 
       <!-- 导入的小游戏 -->
-      <div v-for="g in games" :key="g.id" class="tool-card card" @click="play(g)">
+      <div v-a11y-click v-for="g in games" :key="g.id" class="tool-card card" @click="play(g)">
         <div class="tool-icon"><el-icon :size="30"><VideoPlay /></el-icon></div>
         <div class="tool-name">{{ g.name }}</div>
         <div class="tool-desc">{{ g.description || $t('games.noDesc') }}</div>

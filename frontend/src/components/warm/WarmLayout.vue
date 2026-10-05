@@ -8,7 +8,7 @@
     <div class="gc-wrap">
       <!-- 顶栏:家庭名 + 返回按钮 + 工具栏(滚动时胞吐进来) + 晨/暮分段开关 -->
       <div class="gc-topbar">
-        <div class="gc-brand" :title="$t('warm.backHome')" @click="navigate('/')">
+        <div v-a11y-click class="gc-brand" :title="$t('warm.backHome')" @click="navigate('/')">
           <div class="gc-logo">{{ familyInitial }}</div>
           <div>
             <h1 class="gc-title">{{ familyName || 'ihomy' }}</h1>
@@ -34,7 +34,7 @@
           <!-- 侧栏:按分类分组,组头可折叠,默认只展开内容组 -->
           <aside class="gc-side">
             <!-- 用户信息(固定,不随侧栏滚动):头像 + 昵称 + 所在家庭,点击进设置;未登录显示登录/注册 -->
-            <div class="gc-user" :title="userStore.isLoggedIn ? $t('warm.personalSettings') : $t('home.loginRegister')" @click="userStore.isLoggedIn ? navigate('/settings') : navigate('/login')">
+            <div v-a11y-click class="gc-user" :title="userStore.isLoggedIn ? $t('warm.personalSettings') : $t('home.loginRegister')" @click="userStore.isLoggedIn ? navigate('/settings') : navigate('/login')">
               <el-avatar :size="38" :src="userInfo?.avatar">{{ userInitial }}</el-avatar>
               <div class="gc-user-meta">
                 <div class="gc-user-name">{{ userStore.isLoggedIn ? (userInfo?.nickname || $t('warm.me')) : $t('home.loginRegister') }}</div>
@@ -48,7 +48,7 @@
                   <span class="gc-group-label">{{ g.label }}</span>
                 </button>
                 <div v-if="expanded[g.category]" class="gc-nav-group-body">
-                  <div
+                  <div v-a11y-click
                     v-for="m in g.items"
                     :key="m.code"
                     class="gc-nav-item"

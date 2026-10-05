@@ -69,8 +69,8 @@
     <div v-loading="loading" class="book-area">
           <!-- Grid View -->
           <div v-if="viewMode === 'grid'" class="book-grid">
-            <div v-for="b in list" :key="b.id" class="book-card card" :class="{ selected: selectedIds.includes(b.id) }" @click="onBookClick(b)">
-              <div v-if="batchMode" class="book-check" @click.stop="toggleSelect(b.id)">
+            <div v-a11y-click v-for="b in list" :key="b.id" class="book-card card" :class="{ selected: selectedIds.includes(b.id) }" @click="onBookClick(b)">
+              <div v-a11y-click v-if="batchMode" class="book-check" @click.stop="toggleSelect(b.id)">
                 <svg v-if="selectedIds.includes(b.id)" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg>
               </div>
               <div class="book-cover-wrap">
@@ -100,8 +100,8 @@
 
           <!-- List View -->
           <div v-else class="book-list">
-            <div v-for="b in list" :key="b.id" class="book-row card" :class="{ selected: selectedIds.includes(b.id) }" @click="onBookClick(b)">
-              <div v-if="batchMode" class="book-check" @click.stop="toggleSelect(b.id)">
+            <div v-a11y-click v-for="b in list" :key="b.id" class="book-row card" :class="{ selected: selectedIds.includes(b.id) }" @click="onBookClick(b)">
+              <div v-a11y-click v-if="batchMode" class="book-check" @click.stop="toggleSelect(b.id)">
                 <svg v-if="selectedIds.includes(b.id)" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="3"><path d="M5 12l5 5L20 7"/></svg>
               </div>
               <img v-if="b.coverUrl" :src="b.coverUrl" class="row-cover" :alt="b.title || ''" />

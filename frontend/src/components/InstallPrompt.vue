@@ -8,7 +8,7 @@
       </div>
       <el-button v-if="!ios" type="primary" size="small" round @click="install">{{ $t('pwa.install') }}</el-button>
       <el-button v-else size="small" round @click="iosHint">{{ $t('pwa.gotIt') }}</el-button>
-      <span class="install-close" @click="dismiss"></span>
+      <span v-a11y-click class="install-close" @click="dismiss"></span>
     </div>
   </div>
 </template>

@@ -176,7 +176,7 @@
                :placeholder="$t('wallpaper.password')" />
         <div class="wp-captcha">
           <input v-model="form.captchaCode" class="wp-input" :placeholder="$t('wallpaper.captcha')" />
-          <img v-if="captchaImage" :src="captchaImage" class="wp-captcha-img"
+          <img v-a11y-click v-if="captchaImage" :src="captchaImage" class="wp-captcha-img"
                :alt="$t('wallpaper.captcha')" :title="$t('wallpaper.captchaRefresh')" @click="loadCaptcha" />
         </div>
         <div v-if="loginError" class="wp-login-err">{{ loginError }}</div>

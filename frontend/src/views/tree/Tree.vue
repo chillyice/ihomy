@@ -21,7 +21,7 @@
           <div class="gen-cards">
             <div v-for="unit in unitsByGen(gen)" :key="unitKey(unit)" class="family-unit">
               <div class="couple">
-                <div
+                <div v-a11y-click
                   v-for="m in unit"
                   :key="m.id"
                   class="member-card"
@@ -44,7 +44,7 @@
                 <div class="children-line"></div>
                 <div class="children-cards">
                   <div v-for="c in childrenOf(unit)" :key="c.id" class="child-node">
-                    <div class="member-card mini" @click="userStore.isLoggedIn && openEditor(c)">
+                    <div v-a11y-click class="member-card mini" @click="userStore.isLoggedIn && openEditor(c)">
                       <div class="member-photo">
                         <img v-if="c.photo" :src="c.photo" :alt="c.name" />
                         <span v-else class="photo-fallback">{{ genderIcon(c.gender) }}</span>

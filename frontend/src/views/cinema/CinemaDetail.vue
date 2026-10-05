@@ -75,7 +75,7 @@
           </div>
           <div v-if="currentEpisodes.length" class="ep-list">
             <div v-for="e in currentEpisodes" :key="e.id" class="ep-item" :class="{ played: e.played }">
-              <div class="ep-thumb" @click="openPlayer(e)">
+              <div v-a11y-click class="ep-thumb" @click="openPlayer(e)">
                 <img v-if="e.imageUrl" :src="e.imageUrl" :alt="e.name" loading="lazy" />
                 <div v-else class="ep-thumb-ph">▶</div>
                 <span v-if="progressOf(e)" class="ep-progress" :style="{ width: progressOf(e) + '%' }" />

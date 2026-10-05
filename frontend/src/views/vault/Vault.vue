@@ -42,7 +42,7 @@
             <span class="vc-label">{{ $t('vault.username') }}</span>
             <span v-if="item.username" class="vc-value" :title="item.username">{{ item.username }}</span>
             <span v-else class="vc-empty">{{ $t('vault.noUsername') }}</span>
-            <span
+            <span v-a11y-click
               v-if="item.username"
               class="vc-icon"
               :title="$t('vault.copyUsername')"
@@ -58,14 +58,14 @@
             <span v-else-if="item.passwordMasked" class="vc-value vc-mask">{{ item.passwordMasked }}</span>
             <span v-else class="vc-empty">{{ $t('vault.noPassword') }}</span>
             <template v-if="item.passwordMasked">
-              <span
+              <span v-a11y-click
                 class="vc-icon"
                 :title="revealed[item.id] !== undefined ? $t('vault.hide') : $t('vault.reveal')"
                 @click="toggleReveal(item)"
               >
                 <el-icon><View v-if="revealed[item.id] === undefined" /><Hide v-else /></el-icon>
               </span>
-              <span class="vc-icon" :title="$t('vault.copyPassword')" @click="copyPassword(item)">
+              <span v-a11y-click class="vc-icon" :title="$t('vault.copyPassword')" @click="copyPassword(item)">
                 <el-icon><DocumentCopy /></el-icon>
               </span>
             </template>
@@ -197,7 +197,7 @@
             :placeholder="$t('vault.tagsPlaceholder')"
             style="width: 100%"
           >
-            <el-option v-for="tg in TAG_SUGGEST" :key="tg" :label="tg" :value="tg" />
+            <el-option v-for="tg in tagSuggest" :key="tg" :label="tg" :value="tg" />
           </el-select>
         </el-form-item>
         <el-form-item :label="$t('vault.note')">
@@ -230,7 +230,9 @@ const { t } = useI18n()
 const userStore = useUserStore()
 
 const CATEGORIES = ['SITE', 'APP', 'BANK', 'SOCIAL', 'DEVICE', 'WIFI', 'OTHER']
-const TAG_SUGGEST = ['家庭共用', '常用', '重要', '会员', '工作']
+/** 标签建议项的 i18n 键后缀(选中即按当前语言落成标签文本) */
+const TAG_SUGGEST_KEYS = ['family', 'common', 'important', 'member', 'work']
+const tagSuggest = computed(() => TAG_SUGGEST_KEYS.map((k) => t('vault.tagSuggest.' + k)))
 const STRENGTH_COLORS = ['#c0453c', '#d9772f', '#c9a227', '#6b9b6b', '#4a7f5f']
 /** 剪贴板自动清空延时(毫秒) */
 const CLIPBOARD_CLEAR_MS = 10000

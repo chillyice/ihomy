@@ -69,7 +69,7 @@
               <el-button v-if="notifications.length" text size="small" @click="markAllRead">{{ $t('nav.allRead') }}</el-button>
             </div>
             <div v-if="notifications.length" class="notify-list">
-              <div
+              <div v-a11y-click
                 v-for="n in notifications"
                 :key="n.id"
                 class="notify-item"
@@ -101,7 +101,7 @@
                 <el-icon class="el-icon--right"><ArrowRight /></el-icon>
               </el-dropdown-item>
               <div class="family-switch-panel">
-                <div
+                <div v-a11y-click
                   v-for="f in families"
                   :key="f.familyId"
                   class="family-switch-item"

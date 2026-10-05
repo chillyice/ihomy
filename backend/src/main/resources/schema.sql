@@ -1984,7 +1984,7 @@ CREATE TABLE `sys_oss_component` (
   KEY `idx_type_status` (`component_type`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='开源组件台账(登记+版本检测+当前版本探测+升级提示)';
 
--- 种子:44 项 = 前端 NPM 直接依赖 23 + 后端 Maven 显式依赖 18 + 独立服务 3(Nextcloud 部分集成 / Jellyfin 部分集成 / Home Assistant 部分集成)
+-- 种子:49 项 = 前端 NPM 直接依赖 28 + 后端 Maven 显式依赖 18 + 独立服务 3(Nextcloud 部分集成 / Jellyfin 部分集成 / Home Assistant 部分集成)
 -- 版本为实际锁定版本(与 package-lock.json / 解析后的 Maven 依赖一致),不是 package.json/pom.xml 里的声明区间下限
 INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`) VALUES
 ('Vue', 'NPM', 'vue', '3.5.40', 'MIT', 'https://github.com/vuejs/core', '前端框架', 'FULL'),
@@ -2010,6 +2010,11 @@ INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `curre
 ('unplugin-auto-import', 'NPM', 'unplugin-auto-import', '0.17.8', 'MIT', 'https://github.com/unplugin/unplugin-auto-import', '自动导入(Vue/Element Plus API)', 'FULL'),
 ('unplugin-vue-components', 'NPM', 'unplugin-vue-components', '0.27.5', 'MIT', 'https://github.com/unplugin/unplugin-vue-components', '组件自动注册(Element Plus 按需引入)', 'FULL'),
 ('vite-plugin-pwa', 'NPM', 'vite-plugin-pwa', '1.3.0', 'MIT', 'https://github.com/vite-pwa/vite-plugin-pwa', 'PWA(Service Worker/应用清单)', 'FULL'),
+('ESLint', 'NPM', 'eslint', '9.39.4', 'MIT', 'https://github.com/eslint/eslint', '代码检查(前端 lint 闸门)', 'FULL'),
+('@eslint/js', 'NPM', '@eslint/js', '9.39.5', 'MIT', 'https://github.com/eslint/eslint', 'ESLint 内置推荐规则集', 'FULL'),
+('eslint-plugin-vue', 'NPM', 'eslint-plugin-vue', '10.11.1', 'MIT', 'https://github.com/vuejs/eslint-plugin-vue', 'Vue 单文件组件 lint 规则', 'FULL'),
+('globals', 'NPM', 'globals', '15.15.0', 'MIT', 'https://github.com/sindresorhus/globals', 'ESLint 环境全局变量定义(浏览器/Node)', 'FULL'),
+('Prettier', 'NPM', 'prettier', '3.9.9', 'MIT', 'https://github.com/prettier/prettier', '代码格式化(配置落地,未做全仓重排)', 'FULL'),
 ('Spring Boot', 'MAVEN', 'org.springframework.boot:spring-boot-starter-parent', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端框架', 'FULL'),
 ('Spring Boot Web', 'MAVEN', 'org.springframework.boot:spring-boot-starter-web', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Web/REST(MVC)', 'FULL'),
 ('Spring Boot Security', 'MAVEN', 'org.springframework.boot:spring-boot-starter-security', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '认证授权(过滤链)', 'FULL'),

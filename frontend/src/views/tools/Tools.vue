@@ -9,37 +9,37 @@
     </PageToolbar>
 
     <div class="tool-grid">
-      <div class="tool-card card" @click="$router.push('/tools/mindmap')">
+      <div v-a11y-click class="tool-card card" @click="$router.push('/tools/mindmap')">
         <div class="tool-icon"><el-icon :size="30"><Tools /></el-icon></div>
         <div class="tool-name">{{ $t('tools.mindmap.title') }}</div>
         <div class="tool-desc">{{ $t('tools.mindmap.desc') }}</div>
         <span class="tool-enter">{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon></span>
       </div>
-      <div class="tool-card card" @click="$router.push('/tools/ai-playground')">
+      <div v-a11y-click class="tool-card card" @click="$router.push('/tools/ai-playground')">
         <div class="tool-icon"><el-icon :size="30"><MagicStick /></el-icon></div>
         <div class="tool-name">{{ $t('tools.aiPlayground.title') }}</div>
         <div class="tool-desc">{{ $t('tools.aiPlayground.desc') }}</div>
         <span class="tool-enter">{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon></span>
       </div>
-      <div class="tool-card card" @click="$router.push('/tools/light-lab')">
+      <div v-a11y-click class="tool-card card" @click="$router.push('/tools/light-lab')">
         <div class="tool-icon"><el-icon :size="30"><Sunny /></el-icon></div>
         <div class="tool-name">{{ $t('tools.lightLab.title') }}</div>
         <div class="tool-desc">{{ $t('tools.lightLab.desc') }}</div>
         <span class="tool-enter">{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon></span>
       </div>
-      <div class="tool-card card" @click="$router.push('/tools/flash')">
+      <div v-a11y-click class="tool-card card" @click="$router.push('/tools/flash')">
         <div class="tool-icon"><el-icon :size="30"><VideoPlay /></el-icon></div>
         <div class="tool-name">{{ $t('tools.flash.title') }}</div>
         <div class="tool-desc">{{ $t('tools.flash.desc') }}</div>
         <span class="tool-enter">{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon></span>
       </div>
-      <div class="tool-card card" @click="$router.push('/tools/loan')">
+      <div v-a11y-click class="tool-card card" @click="$router.push('/tools/loan')">
         <div class="tool-icon"><el-icon :size="30"><Coin /></el-icon></div>
         <div class="tool-name">{{ $t('tools.loan.title') }}</div>
         <div class="tool-desc">{{ $t('tools.loan.desc') }}</div>
         <span class="tool-enter">{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon></span>
       </div>
-      <div class="tool-card card" @click="$router.push('/tools/gba')">
+      <div v-a11y-click class="tool-card card" @click="$router.push('/tools/gba')">
         <div class="tool-icon"><el-icon :size="30"><VideoPlay /></el-icon></div>
         <div class="tool-name">{{ $t('tools.gba.title') }}</div>
         <div class="tool-desc">{{ $t('tools.gba.desc') }}</div>

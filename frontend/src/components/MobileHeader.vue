@@ -1,10 +1,10 @@
 <template>
   <div class="mobile-header">
-    <span class="back-btn" @click="goBack">
+    <span v-a11y-click class="back-btn" @click="goBack">
       <el-icon><ArrowLeft /></el-icon>
     </span>
     <!-- 直达首页:功能页可能有多级历史(列表→详情→编辑),返回键逐级回退太深 -->
-    <span class="home-btn" :title="$t('mobile.home')" @click="goHome">
+    <span v-a11y-click class="home-btn" :title="$t('mobile.home')" @click="goHome">
       <el-icon><HomeFilled /></el-icon>
     </span>
     <span class="header-title">{{ title }}</span>

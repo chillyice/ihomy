@@ -1885,5 +1885,19 @@ CREATE TABLE IF NOT EXISTS `report_alert` (
   KEY `idx_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统报表表(同类异常聚合预警)';
 
+-- ------------------------------------------------------------
+-- V10.17 工程化:ESLint/Prettier 落地,5 个前端直接依赖补登开源组件台账
+--   eslint/@eslint/js/eslint-plugin-vue/globals/prettier(devDependencies 也登;版本为 package-lock 锁定值)
+--   uk_type_ref 幂等;NPM 行统一置 RENOVATE(与既有台账口径一致)
+-- ------------------------------------------------------------
+INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`) VALUES
+('ESLint', 'NPM', 'eslint', '9.39.4', 'MIT', 'https://github.com/eslint/eslint', '代码检查(前端 lint 闸门)', 'FULL'),
+('@eslint/js', 'NPM', '@eslint/js', '9.39.5', 'MIT', 'https://github.com/eslint/eslint', 'ESLint 内置推荐规则集', 'FULL'),
+('eslint-plugin-vue', 'NPM', 'eslint-plugin-vue', '10.11.1', 'MIT', 'https://github.com/vuejs/eslint-plugin-vue', 'Vue 单文件组件 lint 规则', 'FULL'),
+('globals', 'NPM', 'globals', '15.15.0', 'MIT', 'https://github.com/sindresorhus/globals', 'ESLint 环境全局变量定义(浏览器/Node)', 'FULL'),
+('Prettier', 'NPM', 'prettier', '3.9.9', 'MIT', 'https://github.com/prettier/prettier', '代码格式化(配置落地,未做全仓重排)', 'FULL');
+UPDATE `sys_oss_component` SET `managed_by` = 'RENOVATE'
+ WHERE `component_type` = 'NPM' AND `package_ref` IN ('eslint', '@eslint/js', 'eslint-plugin-vue', 'globals', 'prettier');
+
 
 

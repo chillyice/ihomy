@@ -4,7 +4,7 @@
       <el-tooltip :content="$t('tools.mindmap.back')" placement="bottom">
         <el-button :icon="ArrowLeft" circle size="small" @click="goList" />
       </el-tooltip>
-      <div class="mm-title" @click="rename">
+      <div v-a11y-click class="mm-title" @click="rename">
         <span class="mm-title-text">{{ title }}</span>
         <el-icon class="mm-title-edit"><EditPen /></el-icon>
       </div>
@@ -159,7 +159,7 @@
     <div v-if="ctxMenu.visible" ref="ctxMenuRef" class="mm-ctx-menu card" :style="ctxMenuPos" @contextmenu.prevent>
       <div v-for="(item, i) in ctxItems" :key="i">
         <div v-if="item.divider" class="mm-ctx-divider"></div>
-        <div
+        <div v-a11y-click
           v-else-if="!item.children"
           class="mm-ctx-item"
           :class="{ disabled: item.disabled }"
@@ -169,7 +169,7 @@
         </div>
       </div>
       <!-- 图标子面板 -->
-      <div class="mm-ctx-item" :class="{ disabled: ctxDisabled() }" @click="ctxIconOpen = !ctxIconOpen">
+      <div v-a11y-click class="mm-ctx-item" :class="{ disabled: ctxDisabled() }" @click="ctxIconOpen = !ctxIconOpen">
         {{ $t('tools.mindmap.icon') }}
         <el-icon class="mm-ctx-arrow" :class="{ open: ctxIconOpen }"><ArrowDown /></el-icon>
       </div>
@@ -177,7 +177,7 @@
         <div v-for="g in iconGroups" :key="g.type" class="mm-icon-group">
           <div class="mm-icon-group-name">{{ g.name }}</div>
           <div class="mm-icon-list">
-            <span
+            <span v-a11y-click
               v-for="ic in g.list"
               :key="ic.name"
               class="mm-icon-item"
@@ -210,15 +210,15 @@
       @mousedown.prevent
       @contextmenu.prevent
     >
-      <span class="mm-rt-btn" :class="{ active: rtBar.formats.bold }" @click="rtToggle('bold')"><b>B</b></span>
-      <span class="mm-rt-btn" :class="{ active: rtBar.formats.italic }" @click="rtToggle('italic')"><i>I</i></span>
-      <span class="mm-rt-btn" :class="{ active: rtBar.formats.underline }" @click="rtToggle('underline')"><u>U</u></span>
-      <span class="mm-rt-btn" :class="{ active: rtBar.formats.strike }" @click="rtToggle('strike')"><s>S</s></span>
+      <span v-a11y-click class="mm-rt-btn" :class="{ active: rtBar.formats.bold }" @click="rtToggle('bold')"><b>B</b></span>
+      <span v-a11y-click class="mm-rt-btn" :class="{ active: rtBar.formats.italic }" @click="rtToggle('italic')"><i>I</i></span>
+      <span v-a11y-click class="mm-rt-btn" :class="{ active: rtBar.formats.underline }" @click="rtToggle('underline')"><u>U</u></span>
+      <span v-a11y-click class="mm-rt-btn" :class="{ active: rtBar.formats.strike }" @click="rtToggle('strike')"><s>S</s></span>
       <span class="mm-rt-divider"></span>
       <el-color-picker size="small" :model-value="rtBar.formats.color || null" @change="rtSetColor" />
-      <span class="mm-rt-btn mm-rt-bg" :class="{ active: rtBar.formats.background }" @click="rtToggle('background')" title="背景色">A</span>
+      <span v-a11y-click class="mm-rt-btn mm-rt-bg" :class="{ active: rtBar.formats.background }" @click="rtToggle('background')" title="背景色">A</span>
       <span class="mm-rt-divider"></span>
-      <span class="mm-rt-btn" :title="$t('tools.mindmap.clearFormat')" @click="rtClear">{{ $t('tools.mindmap.clearFormatShort') }}</span>
+      <span v-a11y-click class="mm-rt-btn" :title="$t('tools.mindmap.clearFormat')" @click="rtClear">{{ $t('tools.mindmap.clearFormatShort') }}</span>
     </div>
 
     <!-- 历史版本抽屉 -->

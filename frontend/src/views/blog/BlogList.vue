@@ -79,11 +79,11 @@
           </button>
         </div>
         <div class="cat-list">
-          <div class="cat-item" :class="{ active: !activeCategory }" @click="setCategory('')">
+          <div v-a11y-click class="cat-item" :class="{ active: !activeCategory }" @click="setCategory('')">
             <span class="cat-name">{{ $t('blog.allCategories') }}</span>
             <span class="cat-count">{{ totalCatCount }}</span>
           </div>
-          <div
+          <div v-a11y-click
             v-for="node in flatTree"
             :key="node.path"
             class="cat-item"
@@ -91,7 +91,7 @@
             :style="{ paddingLeft: (10 + node.depth * 16) + 'px' }"
             @click="setCategory(node.path)"
           >
-            <span v-if="node.childCount > 0" class="cat-toggle" @click.stop="toggleExpand(node.path)">
+            <span v-a11y-click v-if="node.childCount > 0" class="cat-toggle" @click.stop="toggleExpand(node.path)">
               <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" :style="{ transform: expanded[node.path] ? 'rotate(90deg)' : '' }"><path d="M9 18l6-6-6-6"/></svg>
             </span>
             <span v-else class="cat-toggle-placeholder"></span>
@@ -111,7 +111,7 @@
 
       <!-- 博客列表 -->
       <div v-loading="loading" class="blog-main">
-        <div v-for="b in filteredList" :key="b.id" class="blog-item card" @click="router.push(`/blog/${b.id}`)">
+        <div v-a11y-click v-for="b in filteredList" :key="b.id" class="blog-item card" @click="router.push(`/blog/${b.id}`)">
           <img v-if="b.coverImage" :src="thumbUrl(b.coverImage)" class="blog-cover" :alt="b.title || ''" />
           <div class="blog-info">
             <!-- 第一行:标题+草稿标记 -->
@@ -126,7 +126,7 @@
               <div class="blog-sub">
                 <span v-if="b.category" class="blog-cat">{{ b.category }}</span>
                 <span v-if="b.tags" class="blog-tags">
-                  <span
+                  <span v-a11y-click
                     v-for="tg in String(b.tags).split(',').filter(Boolean)"
                     :key="tg"
                     class="tag"
@@ -233,7 +233,7 @@ const hasSidePanel = computed(() => showSidePanel.value && (catCountRaw.value.le
 const getSummary = (b) => {
   if (b.summary) return b.summary
   if (!b.content) return ''
-  const text = b.content.replace(/[#*`>\-_\[\]\(\)!]/g, '').replace(/\n+/g, ' ').trim()
+  const text = b.content.replace(/[#*`>\-_()![\]]/g, '').replace(/\n+/g, ' ').trim()
   return text.slice(0, 80) + (text.length > 80 ? '...' : '')
 }
 

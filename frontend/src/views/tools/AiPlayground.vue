@@ -37,7 +37,7 @@
             <el-input v-model="chatSystem" type="textarea" :rows="3" resize="none" :placeholder="$t('tools.aiPlayground.systemPlaceholder')" />
           </div>
           <div class="pg-more">
-            <div class="pg-more-toggle" @click="chatMore = !chatMore">
+            <div v-a11y-click class="pg-more-toggle" @click="chatMore = !chatMore">
               <span>{{ $t('tools.aiPlayground.moreSettings') }}</span>
               <span class="pg-more-hint">{{ $t('tools.aiPlayground.temperature') }}</span>
               <span class="pg-more-chev">{{ chatMore ? '▴' : '▾' }}</span>
@@ -103,7 +103,7 @@
             <div class="pg-ref-list">
               <div v-for="(img, i) in refImages" :key="i" class="pg-ref-item">
                 <img :src="img.dataUrl" :alt="img.name" />
-                <span class="pg-ref-del" @click="removeRefImage(i)">×</span>
+                <span v-a11y-click class="pg-ref-del" @click="removeRefImage(i)">×</span>
               </div>
               <el-button v-if="refImages.length < 10" size="small" plain @click="refInputRef && refInputRef.click()">+ {{ $t('tools.aiPlayground.addRef') }}</el-button>
             </div>
@@ -121,7 +121,7 @@
 
           <!-- 专业参数:张数/种子/引导/组图/水印/响应格式进「更多设置」 -->
           <div class="pg-more">
-            <div class="pg-more-toggle" @click="imageMore = !imageMore">
+            <div v-a11y-click class="pg-more-toggle" @click="imageMore = !imageMore">
               <span>{{ $t('tools.aiPlayground.moreSettings') }}</span>
               <span class="pg-more-hint">{{ $t('tools.aiPlayground.advancedHint') }}</span>
               <span class="pg-more-chev">{{ imageMore ? '▴' : '▾' }}</span>

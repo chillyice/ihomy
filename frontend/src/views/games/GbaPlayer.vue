@@ -15,7 +15,7 @@
     </PageToolbar>
 
     <div class="gba-card card">
-      <div
+      <div v-a11y-click
         v-if="!fileName && !src"
         class="drop-zone"
         :class="{ dragging }"

@@ -31,14 +31,14 @@
           <el-form-item :label="$t('login.captcha')" prop="captchaCode">
             <div class="captcha-row">
               <el-input v-model="forgotForm.captchaCode" :placeholder="$t('login.captchaPlaceholder')" @keyup.enter="onForgot" />
-              <img v-if="captchaImage" :src="captchaImage" class="captcha-img" alt="captcha" :title="$t('login.captchaRefresh')" @click="loadCaptcha" />
+              <img v-a11y-click v-if="captchaImage" :src="captchaImage" class="captcha-img" alt="captcha" :title="$t('login.captchaRefresh')" @click="loadCaptcha" />
             </div>
           </el-form-item>
           <el-button type="primary" class="submit-btn" :loading="loading" @click="onForgot">{{ $t('passwordReset.sendMail') }}</el-button>
         </el-form>
       </template>
 
-      <div class="toggle" @click="router.push('/login')">{{ $t('passwordReset.backToLogin') }}</div>
+      <div v-a11y-click class="toggle" @click="router.push('/login')">{{ $t('passwordReset.backToLogin') }}</div>
     </div>
   </div>
 </template>

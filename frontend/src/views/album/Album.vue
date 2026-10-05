@@ -38,7 +38,7 @@
 
     <div v-loading="loading">
       <div v-if="topAlbums.length" class="album-grid">
-        <div
+        <div v-a11y-click
           v-for="a in topAlbums"
           :key="a.id"
           class="album-card card"

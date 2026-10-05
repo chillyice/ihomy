@@ -230,7 +230,7 @@
           <el-table-column prop="costTime" :label="$t('ops.costTime')" width="90" />
           <el-table-column prop="traceId" label="TID" width="150">
             <template #default="{ row }">
-              <span v-if="row.traceId" class="tid-link mono" :title="$t('ops.tidJump')" @click="jumpToTrace(row)">{{ row.traceId }}</span>
+              <span v-a11y-click v-if="row.traceId" class="tid-link mono" :title="$t('ops.tidJump')" @click="jumpToTrace(row)">{{ row.traceId }}</span>
               <span v-else>-</span>
             </template>
           </el-table-column>
@@ -330,7 +330,7 @@
           <el-table-column :label="$t('ops.alertSample')" min-width="240">
             <template #default="{ row }">
               <span class="alert-sample mono" :title="row.sampleMessage">{{ row.sampleMessage }}</span>
-              <span v-if="row.sampleTraceId" class="tid-link mono" :title="$t('ops.tidJump')" @click="jumpAlertTrace(row)">TID</span>
+              <span v-a11y-click v-if="row.sampleTraceId" class="tid-link mono" :title="$t('ops.tidJump')" @click="jumpAlertTrace(row)">TID</span>
             </template>
           </el-table-column>
           <el-table-column label="" width="120" fixed="right">

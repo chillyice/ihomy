@@ -19,7 +19,7 @@
           </el-select>
           <el-button size="small" :disabled="!activePath" @click="goParent">{{ $t('storage.backToParent') }}</el-button>
           <el-breadcrumb v-if="pathParts.length" separator="/" class="crumb">
-            <el-breadcrumb-item v-for="(seg, i) in pathParts" :key="i" @click="navigateToPath(seg.path)">
+            <el-breadcrumb-item v-a11y-click v-for="(seg, i) in pathParts" :key="i" @click="navigateToPath(seg.path)">
               {{ seg.name }}
             </el-breadcrumb-item>
           </el-breadcrumb>
@@ -110,6 +110,11 @@ const loadingFiles = ref(false)
 const canManage = computed(() => userStore.isOwner && activeDeviceId.value > 0)
 const selectMode = ref(false)
 const selectedPaths = ref([])
+const previewDialog = ref(false)
+const previewSrc = ref('')
+const previewName = ref('')
+const previewIsImage = ref(false)
+const previewIsVideo = ref(false)
 const entryPath = (row) => (activePath.value ? `${activePath.value}/${row.name}` : row.name)
 const isSelected = (row) => selectedPaths.value.includes(entryPath(row))
 

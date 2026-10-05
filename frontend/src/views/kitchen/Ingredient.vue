@@ -19,7 +19,7 @@
 
     <!-- 横条列表 -->
     <div v-loading="loading" class="ingredient-list">
-      <div v-for="item in items" :key="item.id" class="ingredient-bar glass" @click="openTake(item)">
+      <div v-a11y-click v-for="item in items" :key="item.id" class="ingredient-bar glass" @click="openTake(item)">
         <!-- 左半:图片 + 透明渐变 -->
         <div class="bar-image-wrap">
           <img v-if="item.image_url" :src="item.image_url" :alt="item.name" class="bar-image" loading="lazy" />

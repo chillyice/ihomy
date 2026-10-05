@@ -14,7 +14,7 @@
 
     <!-- 组件 -->
     <template v-for="w in visibleWidgets" :key="w.uid">
-      <div
+      <div v-a11y-click
         class="dash-card"
         :class="[w.id, { 'edit-active': editMode, dragging: w._dragging, 'h-1': tinyCard(w) }]"
         :style="cardStyle(w)"
@@ -83,7 +83,7 @@
               <div class="weather-bg-grad"></div>
             </div>
             <div class="card-head">{{ $t('home.dashboard.weather') }}</div>
-            <div class="card-scroll weather-scroll weather-clickable" @click="!editMode && $router.push('/weather')">
+            <div v-a11y-click class="card-scroll weather-scroll weather-clickable" @click="!editMode && $router.push('/weather')">
               <div v-if="weather" class="weather-main">
                 <div class="weather-city">{{ weather.city || '济南' }}</div>
                 <div class="weather-current">
@@ -251,7 +251,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, inject, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, inject, nextTick, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'

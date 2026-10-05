@@ -17,7 +17,7 @@
 
     <div class="flash-card card">
       <!-- 本地模式:拖拽/点击选择 .swf -->
-      <div
+      <div v-a11y-click
         v-if="!fileName && !src"
         class="drop-zone"
         :class="{ dragging }"

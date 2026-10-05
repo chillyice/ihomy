@@ -35,7 +35,7 @@
         <el-form-item :label="$t('login.captcha')" prop="captchaCode">
           <div class="captcha-row">
             <el-input v-model="form.captchaCode" :placeholder="$t('login.captchaPlaceholder')" @keyup.enter="onSubmit" />
-            <img v-if="captchaImage" :src="captchaImage" class="captcha-img" alt="captcha" :title="$t('login.captchaRefresh')" @click="loadCaptcha" />
+            <img v-a11y-click v-if="captchaImage" :src="captchaImage" class="captcha-img" alt="captcha" :title="$t('login.captchaRefresh')" @click="loadCaptcha" />
           </div>
         </el-form-item>
 
@@ -44,11 +44,11 @@
         </el-button>
       </el-form>
 
-      <div v-if="!isRegister" class="forgot" @click="router.push('/reset-password')">
+      <div v-a11y-click v-if="!isRegister" class="forgot" @click="router.push('/reset-password')">
         {{ $t('login.forgotPassword') }}
       </div>
 
-      <div class="toggle" @click="toggleMode">
+      <div v-a11y-click class="toggle" @click="toggleMode">
         {{ isRegister ? $t('login.hasAccount') : $t('login.noAccount') }}
       </div>
     </div>

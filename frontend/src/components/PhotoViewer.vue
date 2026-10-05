@@ -104,7 +104,7 @@
 
         <!-- 缩略图条 -->
         <div v-if="photos.length > 1" ref="stripRef" class="pv-thumb-strip">
-          <div
+          <div v-a11y-click
             v-for="(p, i) in photos"
             :key="p.id"
             class="pv-thumb"

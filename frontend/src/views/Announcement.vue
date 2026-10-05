@@ -15,7 +15,7 @@
     <div v-loading="loading">
       <div v-if="list.length" class="ann-grid">
         <div v-for="a in list" :key="a.id" class="ann-card card" :class="{ off: a.enabled === 0 }">
-          <div class="ann-banner" :class="{ clickable: !!a.linkUrl }" @click="openLink(a)">
+          <div v-a11y-click class="ann-banner" :class="{ clickable: !!a.linkUrl }" @click="openLink(a)">
             <img v-if="a.imageUrl" :src="a.imageUrl" :alt="a.title" loading="lazy" />
             <div v-else class="ann-fallback">{{ a.title }}</div>
             <span v-if="userStore.isOwner && statusText(a)" class="ann-status" :class="statusClass(a)">{{ statusText(a) }}</span>

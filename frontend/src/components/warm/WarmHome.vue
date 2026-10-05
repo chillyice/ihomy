@@ -25,7 +25,7 @@
     </Transition>
 
     <div class="gc-grid" ref="gridEl" @dragover="onReorderDragOver" @drop="onReorderDrop">
-      <div
+      <div v-a11y-click
         v-for="w in displayWidgets"
         :key="w.id"
         class="gc-card"

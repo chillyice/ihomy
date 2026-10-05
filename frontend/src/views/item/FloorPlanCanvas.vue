@@ -171,12 +171,12 @@
       </g>
     </svg>
     <!-- 标定确认按钮:线段放置后显示,双击线段/端点或点此按钮确认输入长度 -->
-    <div v-if="calibLine && tool === 'calibrate'" class="fp-calib-confirm" @click="confirmCalibrate">
+    <div v-a11y-click v-if="calibLine && tool === 'calibrate'" class="fp-calib-confirm" @click="confirmCalibrate">
       <svg viewBox="0 0 16 16" width="14" height="14"><path d="M3 8l3.5 3.5L13 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       {{ $t('item.calibrateConfirm') }}
     </div>
     <!-- 尺子清除按钮:有测量线段时显示,一键清除全部测量 -->
-    <div v-if="rulerLines.length && tool === 'ruler'" class="fp-ruler-clear" @click="clearRulerLines">
+    <div v-a11y-click v-if="rulerLines.length && tool === 'ruler'" class="fp-ruler-clear" @click="clearRulerLines">
       <svg viewBox="0 0 16 16" width="14" height="14"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       {{ $t('item.rulerClear') }}
     </div>

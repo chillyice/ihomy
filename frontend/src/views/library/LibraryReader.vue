@@ -41,7 +41,7 @@
         <div v-if="showToc" class="toc-drawer">
           <div class="drawer-head">{{ $t('library.toc') }}</div>
           <div class="toc-list">
-            <div v-for="(item, i) in toc" :key="i" class="toc-item" :class="{ active: activeToc === i }" @click="goToToc(item)">
+            <div v-a11y-click v-for="(item, i) in toc" :key="i" class="toc-item" :class="{ active: activeToc === i }" @click="goToToc(item)">
               <span class="toc-indent" :style="{ width: (item.depth || 0) * 12 + 'px' }"></span>
               <span class="toc-text">{{ item.label }}</span>
             </div>
@@ -64,8 +64,8 @@
             <a :href="book?.fileUrl" :download="book?.title" class="r-btn primary" style="margin-top: 12px">{{ $t('library.download') }}</a>
           </div>
         </div>
-        <div v-else-if="book?.fileFormat === 'TXT'" ref="txtRef" class="txt-reader" @click="onTxtClick">{{ currentPageText }}</div>
-        <div v-else-if="book?.fileFormat === 'EPUB'" ref="epubRef" class="epub-reader" @click="onEpubClick"></div>
+        <div v-a11y-click v-else-if="book?.fileFormat === 'TXT'" ref="txtRef" class="txt-reader" @click="onTxtClick">{{ currentPageText }}</div>
+        <div v-a11y-click v-else-if="book?.fileFormat === 'EPUB'" ref="epubRef" class="epub-reader" @click="onEpubClick"></div>
         <div v-else class="unsupported">
           <div>{{ $t('library.unsupportedFormat') }}</div>
           <a :href="book?.fileUrl" :download="book?.title" class="r-btn primary" style="margin-top: 12px">{{ $t('library.download') }}</a>
@@ -115,7 +115,7 @@
           <div v-else-if="activePanel === 'bookmarks'" class="drawer-content">
             <div class="drawer-head">{{ $t('library.bookmark') }}</div>
             <div class="bm-list">
-              <div v-for="bm in bookmarks" :key="bm.id" class="bm-item" @click="goToBookmark(bm)">
+              <div v-a11y-click v-for="bm in bookmarks" :key="bm.id" class="bm-item" @click="goToBookmark(bm)">
                 <span class="bm-label">{{ bm.label || $t('library.bookmark') }}</span>
                 <button class="bm-del" @click.stop="deleteBookmark(bm.id)">
                   <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>

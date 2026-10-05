@@ -14,7 +14,7 @@
 
     <div v-loading="loading" class="shelf-main">
       <div class="shelf">
-        <div v-for="b in books" :key="b.authorId" class="notebook" @click="router.push(`/diary/book/${b.authorId}`)">
+        <div v-a11y-click v-for="b in books" :key="b.authorId" class="notebook" @click="router.push(`/diary/book/${b.authorId}`)">
           <div class="nb-cover">
             <div class="nb-spine"></div>
             <div class="nb-label">

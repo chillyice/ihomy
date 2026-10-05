@@ -166,7 +166,7 @@
                     <div v-if="p.isBackground" class="bg-pl-tag">当前BGM</div>
                     <el-button v-else size="small" type="primary" @click="setBackground(p)">设为BGM</el-button>
                   </div>
-                  <div v-if="allPlaylists.length > 5" class="bg-more" @click="showAllPlaylists = true">
+                  <div v-a11y-click v-if="allPlaylists.length > 5" class="bg-more" @click="showAllPlaylists = true">
                     更多 ({{ allPlaylists.length - 5 }}) 个歌单
                   </div>
                 </div>

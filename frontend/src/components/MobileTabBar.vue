@@ -1,14 +1,14 @@
 <template>
   <div class="mobile-tabbar">
-    <div class="tab-item" :class="{ active: modelValue === 'home' }" @click="$emit('update:modelValue', 'home')">
+    <div v-a11y-click class="tab-item" :class="{ active: modelValue === 'home' }" @click="$emit('update:modelValue', 'home')">
       <el-icon><HomeFilled /></el-icon>
       <span>{{ $t('mobile.home') }}</span>
     </div>
-    <div class="tab-item" :class="{ active: modelValue === 'more' }" @click="$emit('update:modelValue', 'more')">
+    <div v-a11y-click class="tab-item" :class="{ active: modelValue === 'more' }" @click="$emit('update:modelValue', 'more')">
       <el-icon><Grid /></el-icon>
       <span>{{ $t('mobile.more') }}</span>
     </div>
-    <div class="tab-item" :class="{ active: modelValue === 'me' }" @click="$emit('update:modelValue', 'me')">
+    <div v-a11y-click class="tab-item" :class="{ active: modelValue === 'me' }" @click="$emit('update:modelValue', 'me')">
       <el-icon><User /></el-icon>
       <span>{{ $t('mobile.me') }}</span>
     </div>

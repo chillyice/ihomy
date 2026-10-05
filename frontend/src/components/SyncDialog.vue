@@ -5,7 +5,7 @@
     <!-- 步骤一:选设备 -->
     <div v-if="step === 1">
       <p class="wizard-hint">{{ $t(target === 'video' ? 'storage.mapHintVideo' : target === 'music' ? 'storage.mapHintMusic' : 'storage.mapHint') }}</p>
-      <div
+      <div v-a11y-click
         v-for="d in devices"
         :key="d.id"
         class="device-row card"

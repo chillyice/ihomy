@@ -26,7 +26,7 @@
     <!-- 户型图主视图 -->
     <div v-if="!listMode" class="fp-main">
       <!-- 空态 -->
-      <div v-if="!houses.length" class="fp-empty" @click="openHouse()">
+      <div v-a11y-click v-if="!houses.length" class="fp-empty" @click="openHouse()">
         <div class="fp-empty-plus">+</div>
         <div class="fp-empty-text">{{ $t('item.emptyFloorPlan') }}</div>
       </div>
@@ -35,8 +35,8 @@
         <!-- 编辑侧栏(酷家乐式) -->
         <div v-if="mode === 'edit'" class="fp-sidebar">
           <div class="fp-side-tabs">
-            <div :class="['fp-side-tab', { on: sidebarTab === 'rooms' }]" @click="sidebarTab = 'rooms'">{{ $t('item.rooms') }}</div>
-            <div :class="['fp-side-tab', { on: sidebarTab === 'furnitures' }]" @click="sidebarTab = 'furnitures'">{{ $t('item.furnitures') }}</div>
+            <div v-a11y-click :class="['fp-side-tab', { on: sidebarTab === 'rooms' }]" @click="sidebarTab = 'rooms'">{{ $t('item.rooms') }}</div>
+            <div v-a11y-click :class="['fp-side-tab', { on: sidebarTab === 'furnitures' }]" @click="sidebarTab = 'furnitures'">{{ $t('item.furnitures') }}</div>
           </div>
           <div class="fp-side-body">
             <!-- 房间 tab -->
@@ -95,7 +95,7 @@
                     <div class="fp-ruler-list">
                       <div class="fp-ruler-list-head">{{ $t('item.savedRulers') }}</div>
                       <div v-for="r in savedRulers" :key="r.id" class="fp-ruler-list-item">
-                        <div class="fp-ruler-list-info" @click="jumpToRuler(r)">
+                        <div v-a11y-click class="fp-ruler-list-info" @click="jumpToRuler(r)">
                           <span class="fp-ruler-list-name">{{ r.houseName }}</span>
                           <span class="fp-ruler-list-meta">{{ r.floor }}F · {{ r.meters }} m</span>
                         </div>
@@ -164,7 +164,7 @@
                     @keyup.enter="commitEditFurnName"
                     @blur="commitEditFurnName"
                   />
-                  <span v-else class="fp-side-name fp-side-name-editable" @click="startEditFurnName(f)">{{ f.name }}</span>
+                  <span v-a11y-click v-else class="fp-side-name fp-side-name-editable" @click="startEditFurnName(f)">{{ f.name }}</span>
                   <span class="fp-side-icons">
                     <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
                       <el-button size="small" text @click="openFurniture(f)"><el-icon><Edit /></el-icon></el-button>
@@ -196,7 +196,7 @@
                     @keyup.enter="commitEditFurnName"
                     @blur="commitEditFurnName"
                   />
-                  <span v-else class="fp-side-name fp-side-name-editable" @click="startEditFurnName(f)">{{ f.name }}</span>
+                  <span v-a11y-click v-else class="fp-side-name fp-side-name-editable" @click="startEditFurnName(f)">{{ f.name }}</span>
                   <span class="fp-side-icons">
                     <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
                       <el-button size="small" text @click="openFurniture(f)"><el-icon><Edit /></el-icon></el-button>
@@ -255,7 +255,7 @@
         />
 
         <!-- 空楼层/未设计引导:无房间,或只录了房间数据还没画户型图(有底图或任一房间有形状才算已设计) -->
-        <div v-if="!floorDesigned && mode !== 'edit'" class="fp-guide" @click="toggleEdit">
+        <div v-a11y-click v-if="!floorDesigned && mode !== 'edit'" class="fp-guide" @click="toggleEdit">
           <div class="fp-guide-title">{{ floorPlan.rooms.length ? $t('item.undesignedTitle') : $t('item.emptyFloorRoomsTitle') }}</div>
           <div class="fp-guide-text">{{ floorPlan.rooms.length ? $t('item.undesignedText') : $t('item.emptyFloorRoomsText') }}</div>
           <el-button type="primary" size="small">{{ $t('item.editFloorPlan') }}</el-button>
@@ -276,23 +276,23 @@
                 @blur="confirmRenameFloor(f)"
               />
               <template v-else>
-                <div :class="['fp-floor', { on: f === currentFloor }]" @click="switchFloor(f)">
+                <div v-a11y-click :class="['fp-floor', { on: f === currentFloor }]" @click="switchFloor(f)">
                   {{ f }}F
                 </div>
                 <div v-if="mode === 'edit' && floors.length > 1" class="fp-floor-arrows">
-                  <div v-if="fi > 0" class="fp-floor fp-floor-arrow" :title="$t('item.floorUp')" @click.stop="swapFloor(f, floors[fi - 1])">↑</div>
-                  <div v-if="fi < floors.length - 1" class="fp-floor fp-floor-arrow" @click.stop="swapFloor(f, floors[fi + 1])" :title="$t('item.floorDown')">↓</div>
+                  <div v-a11y-click v-if="fi > 0" class="fp-floor fp-floor-arrow" :title="$t('item.floorUp')" @click.stop="swapFloor(f, floors[fi - 1])">↑</div>
+                  <div v-a11y-click v-if="fi < floors.length - 1" class="fp-floor fp-floor-arrow" @click.stop="swapFloor(f, floors[fi + 1])" :title="$t('item.floorDown')">↓</div>
                 </div>
-                <div v-if="mode === 'edit'" class="fp-floor fp-floor-arrow" :title="$t('item.floorRename')" @click.stop="startRenameFloor(f)">✎</div>
-                <div v-if="mode === 'edit' && floors.length > 1" class="fp-floor fp-floor-arrow fp-floor-del" :title="$t('item.floorDelete')" @click.stop="deleteFloor(f)">🗑</div>
+                <div v-a11y-click v-if="mode === 'edit'" class="fp-floor fp-floor-arrow" :title="$t('item.floorRename')" @click.stop="startRenameFloor(f)">✎</div>
+                <div v-a11y-click v-if="mode === 'edit' && floors.length > 1" class="fp-floor fp-floor-arrow fp-floor-del" :title="$t('item.floorDelete')" @click.stop="deleteFloor(f)">🗑</div>
               </template>
             </div>
           </template>
-          <div v-if="mode === 'edit'" class="fp-floor" @click="addFloor">+</div>
+          <div v-a11y-click v-if="mode === 'edit'" class="fp-floor" @click="addFloor">+</div>
         </div>
 
         <!-- 适配视图:缩放平移后一键回到全景(撤销/保存不再自动重置视图) -->
-        <div class="fp-fit" :title="$t('item.fitView')" @click="canvasRef?.fit()">
+        <div v-a11y-click class="fp-fit" :title="$t('item.fitView')" @click="canvasRef?.fit()">
           <svg viewBox="0 0 24 24" class="fp-fit-ico"><path d="M4 9 V6.5 A2.5 2.5 0 0 1 6.5 4 H9 M15 4 h2.5 A2.5 2.5 0 0 1 20 6.5 V9 M20 15 v2.5 a2.5 2.5 0 0 1 -2.5 2.5 H15 M9 20 H6.5 A2.5 2.5 0 0 1 4 17.5 V15" /></svg>
         </div>
 
@@ -304,7 +304,7 @@
               {{ searchSource === 'ai' ? '✨ ' + $t('item.aiFindTag') : $t('item.keywordTag') }}
             </span>
           </div>
-          <div v-for="it in searchResults" :key="it.id" class="fp-result" :class="{ on: highlightItemIds.includes(it.id) }" @click="locateItem(it)">
+          <div v-a11y-click v-for="it in searchResults" :key="it.id" class="fp-result" :class="{ on: highlightItemIds.includes(it.id) }" @click="locateItem(it)">
             <img v-if="it.image_url" :src="it.image_url" class="fp-result-ava" :alt="it.name || ''" />
             <div class="fp-result-text">
               <span class="fp-result-name">{{ it.name }}</span>
@@ -419,7 +419,7 @@
             </div>
           </PageToolbar>
           <el-empty v-if="items.length === 0" :description="$t('item.emptyItems')" />
-          <el-card v-for="it in items" :key="it.id" shadow="hover" class="item-card" :class="{ 'is-pick': selectMode, selected: selectMode && selectedIds.includes(it.id) }" @click="selectMode && togglePick(it)">
+          <el-card v-a11y-click v-for="it in items" :key="it.id" shadow="hover" class="item-card" :class="{ 'is-pick': selectMode, selected: selectMode && selectedIds.includes(it.id) }" @click="selectMode && togglePick(it)">
             <span v-if="selectMode" class="pick-badge" :class="{ on: selectedIds.includes(it.id) }">
               <svg viewBox="0 0 16 16" width="12" height="12"><path d="M3 8.5 L6.5 12 L13 4.5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </span>

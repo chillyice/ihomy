@@ -67,7 +67,7 @@
     <div v-if="children.length" class="child-section">
       <!-- 方块模式:大封面卡片 -->
       <div v-if="childView === 'grid'" class="child-grid">
-        <div
+        <div v-a11y-click
           v-for="c in children"
           :key="c.id"
           class="child-tile card"
@@ -94,7 +94,7 @@
       </div>
       <!-- 列表模式:横条(单个占一整行) -->
       <div v-else class="child-list">
-        <div
+        <div v-a11y-click
           v-for="c in children"
           :key="c.id"
           class="child-card card"
@@ -121,14 +121,14 @@
     <div v-loading="loading" class="album-body">
       <div v-if="photos.length" class="photo-wall">
         <div v-for="p in photos" :key="p.id" class="photo-card" :class="{ selected: selectMode && selectedIds.includes(p.id) }">
-          <div class="photo-wrap" @click="selectMode ? togglePick(p) : openViewer(p)">
+          <div v-a11y-click class="photo-wrap" @click="selectMode ? togglePick(p) : openViewer(p)">
             <img :src="thumbUrl(p.url)" :alt="p.description || album.name" loading="lazy" />
             <span v-if="selectMode" class="pick-badge" :class="{ on: selectedIds.includes(p.id) }">
               <svg viewBox="0 0 16 16" width="11" height="11"><path d="M3 8.5 L6.5 12 L13 4.5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </span>
             <div v-if="!selectMode" class="photo-hover">
-              <span v-if="canManagePhoto(p)" @click.stop="openDesc(p)"><el-icon><Edit /></el-icon>{{ t('album.editNote') }}</span>
-              <span v-if="canManagePhoto(p)" class="danger" @click.stop="onDelPhoto(p)"><el-icon><Delete /></el-icon>{{ t('common.delete') }}</span>
+              <span v-a11y-click v-if="canManagePhoto(p)" @click.stop="openDesc(p)"><el-icon><Edit /></el-icon>{{ t('album.editNote') }}</span>
+              <span v-a11y-click v-if="canManagePhoto(p)" class="danger" @click.stop="onDelPhoto(p)"><el-icon><Delete /></el-icon>{{ t('common.delete') }}</span>
             </div>
           </div>
           <div v-if="p.description" class="photo-desc">{{ p.description }}</div>

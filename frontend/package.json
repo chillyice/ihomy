@@ -7,7 +7,10 @@
     "dev": "node scripts/copy-ruffle.mjs && node scripts/copy-emulatorjs.mjs && vite",
     "build": "node scripts/copy-ruffle.mjs && node scripts/copy-emulatorjs.mjs && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.{js,vue,css}\""
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",
@@ -29,7 +32,12 @@
     "vue-router": "^4.3.2"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@vitejs/plugin-vue": "^5.0.4",
+    "eslint": "^9.39.4",
+    "eslint-plugin-vue": "^10.11.1",
+    "globals": "^15.15.0",
+    "prettier": "^3.9.9",
     "unplugin-auto-import": "^0.17.6",
     "unplugin-vue-components": "^0.27.0",
     "vite": "^5.2.11",

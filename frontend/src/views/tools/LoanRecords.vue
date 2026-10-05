@@ -21,7 +21,7 @@
             <template v-if="listRows.length">
               <template v-for="row in listRows" :key="row.view.id">
                 <!-- 组表头:点看合计 -->
-                <div
+                <div v-a11y-click
                   v-if="row.type === 'group'"
                   class="lr-item lr-group-item"
                   :class="{ on: selectedKey === row.view.id }"
@@ -38,7 +38,7 @@
                   </div>
                 </div>
                 <!-- 单笔贷款 -->
-                <div
+                <div v-a11y-click
                   v-else
                   class="lr-item"
                   :class="{ on: selectedKey === String(row.view.id), child: row.child }"
@@ -126,7 +126,7 @@
                 </div>
               </div>
               <div v-if="current.events.length" class="lr-timeline">
-                <div v-for="(ev, idx) in current.events" :key="ev.id || idx" class="lr-event" :class="'lr-event-' + ev.type.toLowerCase()" @click="onEventClick(ev)">
+                <div v-a11y-click v-for="(ev, idx) in current.events" :key="ev.id || idx" class="lr-event" :class="'lr-event-' + ev.type.toLowerCase()" @click="onEventClick(ev)">
                   <span class="lr-event-dot" />
                   <div class="lr-event-body">
                     <div class="lr-event-head">
@@ -145,7 +145,7 @@
                       <span v-if="ev.note" class="lr-event-note">· {{ ev.note }}</span>
                     </div>
                   </div>
-                  <el-icon v-if="canManage" class="lr-event-del" @click.stop="onEventDelete(ev)"><Close /></el-icon>
+                  <el-icon v-a11y-click v-if="canManage" class="lr-event-del" @click.stop="onEventDelete(ev)"><Close /></el-icon>
                 </div>
               </div>
               <p v-else class="lc-hint lc-hint-block">{{ $t('tools.loan.rec.timelineEmpty') }}</p>
@@ -1299,7 +1299,6 @@ html.dark .lr-root {
   flex-shrink: 0;
 }
 .lr-badge-group { color: var(--color-accent, #a8483a); }
-.lr-tag { border-radius: 999px; }
 .lr-item-sub {
   display: flex;
   justify-content: space-between;

@@ -11,7 +11,7 @@
       </div>
       <div class="tb-right">
         <el-button size="small" :loading="loading" @click="load">{{ $t('iot.refresh') }}</el-button>
-        <el-button v-if="canManage" size="small" @click="openManage">{{ $t('iot.manage') }}</el-button>
+        <el-button v-if="canManage" size="small" @click="openManage">{{ $t('iot.manageBtn') }}</el-button>
         <el-button v-if="canManage" size="small" type="primary" @click="openConfig">{{ $t('iot.setup') }}</el-button>
       </div>
     </PageToolbar>

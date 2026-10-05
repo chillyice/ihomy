@@ -126,7 +126,7 @@
           <template v-if="state.harvestable">
             <div class="harvest-next">
               <span class="next-label">{{ $t('plant.nextSpecies') }}</span>
-              <span
+              <span v-a11y-click
                 v-for="s in species"
                 :key="s"
                 class="next-chip"
@@ -155,7 +155,7 @@
       <p class="empty-desc">{{ $t('plant.emptyDesc') }}</p>
 
       <div class="species-picker">
-        <div
+        <div v-a11y-click
           v-for="s in species"
           :key="s"
           class="species-card"

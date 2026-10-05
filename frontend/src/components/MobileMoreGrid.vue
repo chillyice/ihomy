@@ -3,7 +3,7 @@
     <div class="more-section" v-for="g in groups" :key="g.category">
       <div class="more-section-title">{{ g.label }}</div>
       <div class="more-grid">
-        <div
+        <div v-a11y-click
           v-for="m in g.items"
           :key="m.code"
           class="more-item"
