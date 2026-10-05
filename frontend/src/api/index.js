@@ -362,6 +362,11 @@ export const opsApi = {
   logOptions: () => request.get('/ops/logs/options'),
   trafficStats: (params) => request.get('/ops/traffic/stats', { params }),
   traceLogs: (params) => request.get('/ops/logs/trace', { params }),
+  // 同类异常聚合预警(日志里同一类问题在窗口内反复出现时汇总成一条)
+  alerts: (params) => request.get('/ops/alerts', { params }),
+  alertSummary: () => request.get('/ops/alerts/summary'),
+  ackAlert: (id) => request.post(`/ops/alerts/${id}/ack`),
+  ackAllAlerts: () => request.post('/ops/alerts/ack-all'),
   weatherQuota: () => request.get('/ops/weather/quota'),
   weatherFinance: () => request.get('/ops/weather/finance'),
   weatherStats: () => request.get('/ops/weather/stats'),

@@ -91,14 +91,26 @@
         <appender-ref ref="THIRD_FILE"/>
     </appender>
 
+    <!-- 同类异常聚合预警采集端(V10.15):只做内存计数/入队,无文件 IO,不阻塞业务线程。
+         真正落库与邮件提醒在 LogAlertService 的后台单线程完成。
+         ThresholdFilter 先挡掉 INFO 以下,避免每个 INFO 事件都进 appender;参与聚合的级别
+         由 app.config 的 app.log-alert.levels 决定(默认只 ERROR)。 -->
+    <appender name="LOG_ALERT" class="com.ihomy.common.LogAlertAppender">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>WARN</level>
+        </filter>
+    </appender>
+
     <!-- 客户端接口调用:AccessLogFilter 专用 -->
     <logger name="ACCESS" level="INFO" additivity="false">
         <appender-ref ref="ACCESS_ASYNC"/>
+        <appender-ref ref="LOG_ALERT"/>
     </logger>
 
     <!-- 第三方服务出站调用:ThirdPartyHttp 专用 -->
     <logger name="thirdparty" level="INFO" additivity="false">
         <appender-ref ref="THIRD_ASYNC"/>
+        <appender-ref ref="LOG_ALERT"/>
     </logger>
 
     <!-- SQL 语句+入参(不记结果集):只进 server 文件,不刷控制台。
@@ -112,10 +124,11 @@
          DEBUG 静默;WARN 以上走 root(控制台+server 文件) -->
     <logger name="mybatis.sql.internal" level="INFO"/>
 
-    <!-- 应用内部流程 + 框架日志:控制台 + server 文件 -->
+    <!-- 应用内部流程 + 框架日志:控制台 + server 文件 + 异常聚合预警 -->
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="SERVER_ASYNC"/>
+        <appender-ref ref="LOG_ALERT"/>
     </root>
 
 </configuration>

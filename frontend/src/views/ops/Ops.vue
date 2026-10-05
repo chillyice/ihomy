@@ -274,6 +274,76 @@
         </div>
       </el-tab-pane>
 
+      <el-tab-pane v-if="showSystemTabs" name="alerts">
+        <template #label>
+          <span>{{ $t('ops.alerts') }}<em v-if="alertSummary.open" class="alert-count">{{ alertSummary.open > 99 ? '99+' : alertSummary.open }}</em></span>
+        </template>
+        <div class="filter-row">
+          <el-radio-group v-model="alertFilter.status" @change="loadAlerts(1)">
+            <el-radio-button value="OPEN">{{ $t('ops.alertStatusOpen') }}</el-radio-button>
+            <el-radio-button value="ACKED">{{ $t('ops.alertStatusAcked') }}</el-radio-button>
+            <el-radio-button value="">{{ $t('ops.alertStatusAll') }}</el-radio-button>
+          </el-radio-group>
+          <el-select v-model="alertFilter.level" clearable :placeholder="$t('ops.alertLevel')" style="width: 130px" @change="loadAlerts(1)">
+            <el-option value="ERROR" label="ERROR" />
+            <el-option value="WARN" label="WARN" />
+          </el-select>
+          <el-button type="primary" @click="loadAlerts(alertPageNum)">{{ $t('ops.query') }}</el-button>
+          <el-button :disabled="!alertSummary.open" @click="ackAllAlerts">{{ $t('ops.alertAckAll') }}</el-button>
+        </div>
+        <div class="alert-summary">
+          <div class="alert-sum-item">
+            <span class="alert-sum-num danger">{{ alertSummary.open }}</span>
+            <span class="alert-sum-lbl">{{ $t('ops.alertSummaryOpen') }}</span>
+          </div>
+          <div class="alert-sum-item">
+            <span class="alert-sum-num">{{ alertSummary.today }}</span>
+            <span class="alert-sum-lbl">{{ $t('ops.alertSummaryToday') }}</span>
+          </div>
+          <div class="alert-sum-item">
+            <span class="alert-sum-num">{{ alertSummary.total }}</span>
+            <span class="alert-sum-lbl">{{ $t('ops.alertSummaryTotal') }}</span>
+          </div>
+        </div>
+        <el-alert v-if="!alertsLoading && !alertPage.records.length" type="info" :closable="false" show-icon :title="$t('ops.alertEmpty')" />
+        <el-table v-else v-loading="alertsLoading" :data="alertPage.records" border stripe>
+          <el-table-column prop="lastSeen" :label="$t('ops.alertLastSeen')" width="165" />
+          <el-table-column prop="level" :label="$t('ops.alertLevel')" width="80">
+            <template #default="{ row }">
+              <el-tag size="small" :type="levelTagType(row.level)">{{ row.level }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="title" :label="$t('ops.alertTitle')" min-width="230" show-overflow-tooltip />
+          <el-table-column prop="logger" :label="$t('ops.alertLogger')" width="170" show-overflow-tooltip />
+          <el-table-column :label="$t('ops.alertCount')" width="150">
+            <template #default="{ row }">
+              {{ $t('ops.alertTimes', { n: row.occurrenceCount }) }} / {{ $t('ops.alertSeconds', { n: row.windowSeconds }) }}
+            </template>
+          </el-table-column>
+          <el-table-column :label="$t('ops.alertStatus')" width="90">
+            <template #default="{ row }">
+              <el-tag size="small" :type="row.status === 'OPEN' ? 'danger' : 'success'">
+                {{ row.status === 'OPEN' ? $t('ops.alertStatusOpen') : $t('ops.alertStatusAcked') }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column :label="$t('ops.alertSample')" min-width="240">
+            <template #default="{ row }">
+              <span class="alert-sample mono" :title="row.sampleMessage">{{ row.sampleMessage }}</span>
+              <span v-if="row.sampleTraceId" class="tid-link mono" :title="$t('ops.tidJump')" @click="jumpAlertTrace(row)">TID</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="" width="120" fixed="right">
+            <template #default="{ row }">
+              <el-button v-if="row.status === 'OPEN'" size="small" @click="ackAlert(row)">{{ $t('ops.alertAck') }}</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-pagination v-if="alertTotal > alertPageSize" v-model:current-page="alertPageNum" v-model:page-size="alertPageSize"
+          :page-sizes="[20, 50, 100]" :total="alertTotal" layout="total, sizes, prev, pager, next"
+          style="margin-top: 14px; justify-content: flex-end" @current-change="loadAlerts" @size-change="loadAlerts(1)" />
+      </el-tab-pane>
+
       <el-tab-pane :label="$t('ops.ai')" name="ai">
         <div v-loading="aiLoading">
           <!-- 汇总卡:总调用/失败/成功率 -->
@@ -724,6 +794,56 @@ const loadOptions = async () => {
   try {
     logOptions.value = await opsApi.logOptions()
   } catch (e) { /* 选项加载失败不阻塞列表 */ }
+}
+
+// ---------- 异常预警(同类日志问题在窗口内反复出现时汇总成一条) ----------
+const alertsLoading = ref(false)
+const alertPage = ref({ records: [] })
+const alertTotal = ref(0)
+const alertPageNum = ref(1)
+const alertPageSize = ref(20)
+const alertFilter = reactive({ status: 'OPEN', level: '' })
+const alertSummary = ref({ open: 0, today: 0, total: 0 })
+const loadAlerts = async (page = alertPageNum.value) => {
+  alertsLoading.value = true
+  try {
+    const data = await opsApi.alerts({
+      current: page,
+      size: alertPageSize.value,
+      status: alertFilter.status || null,
+      level: alertFilter.level || null,
+    })
+    alertPage.value = data
+    alertTotal.value = data.total || 0
+    alertPageNum.value = data.current || page
+  } finally {
+    alertsLoading.value = false
+  }
+}
+// 角标用汇总数(进入运维页即取,不必切到该标签)
+const loadAlertSummary = async () => {
+  try {
+    alertSummary.value = await opsApi.alertSummary()
+  } catch (e) { /* 角标失败不阻塞其它标签 */ }
+}
+const ackAlert = async (row) => {
+  await opsApi.ackAlert(row.id)
+  ElMessage.success(t('ops.alertAckDone'))
+  await Promise.all([loadAlerts(), loadAlertSummary()])
+}
+const ackAllAlerts = async () => {
+  const n = await opsApi.ackAllAlerts()
+  ElMessage.success(t('ops.alertAckAllDone', { n }))
+  await Promise.all([loadAlerts(1), loadAlertSummary()])
+}
+// 预警摘录里的 tid 跳「详细日志」:异步链路(定时任务)没有 tid 时不跳
+const jumpAlertTrace = (row) => {
+  if (!row.sampleTraceId) return
+  tab.value = 'trace'
+  traceFilter.tid = row.sampleTraceId
+  traceFilter.date = (row.lastSeen || '').slice(0, 10) || ''
+  traceResult.value = null
+  loadTrace()
 }
 
 // ---------- 访问量统计(扫描 access 日志文件按天聚合) ----------
@@ -1343,7 +1463,8 @@ onMounted(async () => {
       loadTrace()
     }
     if (route.query.tab === 'traffic') tab.value = 'traffic'
-    await Promise.all([loadStats(), loadLogs(1), loadOptions()])
+    if (route.query.tab === 'alerts') tab.value = 'alerts'
+    await Promise.all([loadStats(), loadLogs(1), loadOptions(), loadAlertSummary()])
   }
   // 家长默认落在「AI 统计」,进入即取数;OPS 切到该标签时由 watch 懒加载
   if (tab.value === 'ai') loadAi()
@@ -1355,6 +1476,7 @@ watch(tab, (v) => {
   if (v === 'weather' && !weatherQuota.value) loadWeatherQuota()
   if (v === 'ai' && aiSummary.value === null) loadAi()
   if (v === 'oss' && !ossLoaded.value) loadOss()
+  if (v === 'alerts') { loadAlerts(1); loadAlertSummary() }
   if (v === 'server') { loadServer(); startServerPoll() }
   else stopServerPoll()
 })
@@ -1375,6 +1497,34 @@ watch(tab, (v) => {
   flex-wrap: wrap;
   margin-bottom: 16px;
   align-items: center;
+}
+/* 异常预警:标签页角标 + 汇总卡 + 日志摘录(同类问题汇总入口) */
+.alert-count {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 16px;
+  vertical-align: 1px;
+}
+.alert-summary { display: flex; gap: 28px; margin-bottom: 14px; }
+.alert-sum-item { display: flex; flex-direction: column; gap: 2px; }
+.alert-sum-num { font-size: 22px; font-weight: 600; line-height: 1.2; }
+.alert-sum-num.danger { color: var(--color-accent); }
+.alert-sum-lbl { font-size: 12px; color: var(--color-text-secondary); }
+.alert-sample {
+  display: inline-block;
+  max-width: calc(100% - 40px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+  font-size: 12px;
+  color: var(--color-text-secondary);
 }
 .stat-groups { display: flex; flex-direction: column; gap: 18px; }
 .stat-group-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }

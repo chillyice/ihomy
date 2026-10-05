@@ -24,4 +24,13 @@
         WHERE ur.user_id = #{userId} AND ur.family_id IS NOT NULL
     </select>
 
+    <!-- 异常预警邮件收件人:系统级 OPS(family_id IS NULL)的邮箱 -->
+    <select id="selectOpsEmails" resultType="string">
+        SELECT DISTINCT u.email FROM sys_user u
+        JOIN sys_user_role ur ON ur.user_id = u.id
+        JOIN sys_role r ON r.id = ur.role_id
+        WHERE r.role_code = 'OPS' AND ur.family_id IS NULL
+        AND u.deleted = 0 AND u.email IS NOT NULL AND u.email &lt;&gt; ''
+    </select>
+
 </mapper>

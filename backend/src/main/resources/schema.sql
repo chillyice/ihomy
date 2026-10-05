@@ -1584,6 +1584,37 @@ CREATE TABLE `report_ai` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭 AI 调用日志';
 
 -- ------------------------------------------------------------
+-- 48c. report_alert 同类异常聚合预警(V10.15):同类问题在窗口内达到阈值时落一条
+--      fingerprint = 级别 + logger + 异常类型 + 首个应用栈帧(无异常时用归一化消息) 的哈希
+--      status: OPEN待处理/ACKED已处理;sample_trace_id 供运维页跳「详细日志」按 tid 追查
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `report_alert`;
+CREATE TABLE `report_alert` (
+  `id`               BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `fingerprint`      VARCHAR(64)   NOT NULL COMMENT '同类问题指纹(归一化后哈希)',
+  `level`            VARCHAR(10)   NOT NULL COMMENT '日志级别:ERROR/WARN',
+  `logger`           VARCHAR(128)  DEFAULT NULL COMMENT '来源 logger',
+  `title`            VARCHAR(255)  NOT NULL COMMENT '问题摘要(异常类型或归一化消息)',
+  `sample_message`   VARCHAR(1000) DEFAULT NULL COMMENT '首次出现时的原始日志消息',
+  `sample_trace_id`  VARCHAR(64)   DEFAULT NULL COMMENT '首次出现时的追踪号 tid(定时任务等可能为空)',
+  `occurrence_count` INT           NOT NULL DEFAULT 0 COMMENT '窗口内出现次数',
+  `window_seconds`   INT           NOT NULL DEFAULT 0 COMMENT '统计窗口(秒)',
+  `threshold`        INT           NOT NULL DEFAULT 0 COMMENT '触发阈值',
+  `first_seen`       DATETIME      NOT NULL COMMENT '窗口内首次出现时间',
+  `last_seen`        DATETIME      NOT NULL COMMENT '窗口内末次出现时间',
+  `status`           VARCHAR(20)   NOT NULL DEFAULT 'OPEN' COMMENT 'OPEN待处理/ACKED已处理',
+  `notified`         TINYINT       NOT NULL DEFAULT 0 COMMENT '0未推送 1已推送邮件',
+  `acked_by`         BIGINT        DEFAULT NULL COMMENT '处理人ID',
+  `acked_at`         DATETIME      DEFAULT NULL COMMENT '处理时间',
+  `created_at`       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_status_last` (`status`, `last_seen`),
+  KEY `idx_last_seen` (`last_seen`),
+  KEY `idx_fingerprint_last` (`fingerprint`, `last_seen`),
+  KEY `idx_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统报表表(同类异常聚合预警)';
+
+-- ------------------------------------------------------------
 -- 49. 系统参数表(V5.6续):name/value 键值对,存 AES 加密盐值等
 --     盐值首次启动自动生成(16 字节 Base64),用于解密外挂文件中的 ENC(...) 密文
 -- ------------------------------------------------------------

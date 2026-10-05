@@ -70,7 +70,7 @@
 - **root 仅用于初始化**:`mysql -uroot -p < schema.sql`(建库/建表/建账号/初始数据),执行一次;本地开发 `.\scripts\start-db.ps1`(Docker 首启自动导入)。schema.sql 为开发安全版(仅本机 Docker 凭证)。
 - **业务运行用 `ihomy` 账号**:仅授予 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`(最小权限,无 DDL),application.yml 连接用 `ihomy`,**不要用 root 跑业务**;账号同时建 `localhost` 与 `%` 两个 host。
 - **生产 MySQL 密码策略**(轮换踩坑):`validate_password` MEDIUM,密码必须含特殊字符(避开 `' " \ $ |`,建议 `!@%^&*-_+=.`),否则 `ALTER USER` 报 1819;开发 Docker MySQL 无此组件,同一密码 dev 能过 prod 被拒。详见踩坑速查 §2.7。
-- **80 张表**,前缀分类:`sys_` 25(系统/账号/权限/配置/存储)、`report_` 3(报表/日志)、`family_` 30(家庭事务)、`content_` 21(内容数据)、另 `game_info` 1(家庭小游戏,命名未加 family_ 前缀的遗留)。**各表用途与完整清单见 `docs/需求设计说明书.md` §6.2**。
+- **81 张表**,前缀分类:`sys_` 25(系统/账号/权限/配置/存储)、`report_` 4(报表/日志)、`family_` 30(家庭事务)、`content_` 21(内容数据)、另 `game_info` 1(家庭小游戏,命名未加 family_ 前缀的遗留)。**各表用途与完整清单见 `docs/需求设计说明书.md` §6.2**。
   - **命名规则**:家庭事务业务表一律 `family_` 前缀;内容数据 `content_` 前缀;账号/权限/配置/存储保留 `sys_`;**报表/日志表一律 `report_` 前缀**。新增表必须遵守。前缀取最顶层祖先类别;上下级关系体现在表名(如 `sys_user_role`)。
 - **结构变更双文件**(强制):同时更新 `schema.sql`(全量)与 `migrations.sql`(增量、**幂等**),并按 CI 同路径做空库全量导入实测——`migrations` 跑通 ≠ `schema.sql` 可用。详见踩坑速查 §7.4。
 - **引用开源软件必须对接自动升级(强制)**:新增任何 npm/Maven 直接依赖或独立开源服务,**必须同时在 `sys_oss_component` 台账登记一条**(component_type=NPM/MAVEN/SERVICE + package_ref + current_version + license + repo_url + managed_by),否则不会被版本跟踪覆盖;**`current_version` 记实际锁定版本**(package-lock.json / 解析后的 Maven 依赖),不写声明区间下限(devDependencies 也登)。**升级闸门**:NPM/MAVEN 交 Renovate(`managed_by=RENOVATE`),台账「AI 评估」(`OSS_UPGRADE_EVAL` 功能码)判断影响后勾选「生成升级 PR」;SERVICE 走 `managed_by=INTERNAL` 按 `deploy_type` 出方案,**当前版本可按 `probe_type` 自动探测**(探不到保留人工值)。漏洞列 `vuln_count/vuln_severity` 仅预留(CVE 扫描已决策不做)。入口 `/ops/oss`;台账字段、探测方式与 AI 评估细则见 需求 §4.6.10 与踩坑速查。
@@ -90,10 +90,10 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
     config/      # SecurityConfig/CorsConfig/MybatisPlusConfig/Knife4jConfig/WebMvcConfig/WebSocketConfig/SqlStatementLog/ExternalConfigLoader/AsyncConfig
     security/    # JwtUtils/JwtAuthenticationFilter/LoginUser/SecurityHelper/OpsAccessFilter
     annotation/ aspect/ filter/  # @RequirePermission/@OperationLog + 两个 Aspect;TraceIdFilter/AccessLogFilter/请求响应 Wrapper
-    entity/      # 73 个实体类(80 张表里 7 张关联/字典表无实体)
-    mapper/      # 74 个 MyBatis-Plus BaseMapper(自定义 SQL 全放 resources/mapper/*.xml,接口不写注解,参数统一 @Param)
-    service/     # 67 个服务类(单实现无接口层)
-    controller/  # 45 个 Controller
+    entity/      # 75 个实体类(81 张表里 6 张关联/字典表无实体)
+    mapper/      # 76 个 MyBatis-Plus BaseMapper(自定义 SQL 全放 resources/mapper/*.xml,接口不写注解,参数统一 @Param)
+    service/     # 69 个服务类(单实现无接口层)
+    controller/  # 46 个 Controller
     dto/         # 请求/响应 DTO(49 个)
     websocket/   # ChatWebSocketHandler(原生 WebSocket 聊天室)
   src/main/resources/
@@ -167,7 +167,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 互动 | 点赞 / 评论 / 通知 / 聊天室 / 家庭公告 | Like / Comment / Notification / Chat / Announcement 各 Controller + ChatWebSocketHandler |
 | 生活 | 纪念日 / 提醒 / 计划 / 任务 / 记账(含贷款页签) / 家谱 / 签到积分 / 背景音乐 / 家庭保险箱 | Anniversary / Reminder / Plan / Task / Points / Music / Vault 各 Controller |
 | 游戏 | 花园共养植物 / 小游戏库(SWF/GBA,Flash Ruffle + EmulatorJS) / 宠物连连看 | FamilyPlant / GameInfo 各 Controller + FlashPlayer.vue + GbaPlayer.vue + PetLinkLink.vue |
-| 基础 | 文件上传 / 存储管理 / 首页聚合 / 运维 / 开源组件台账 / 每日内容 / 操作日志 / 系统参数 / 回收站 | File / Storage / Home+Public / Ops+Oss / Daily / Log / Recycle 各 Controller |
+| 基础 | 文件上传 / 存储管理 / 首页聚合 / 运维(含同类异常聚合预警) / 开源组件台账 / 每日内容 / 操作日志 / 系统参数 / 回收站 | File / Storage / Home+Public / Ops+Oss(**OpsAlert**) / Daily / Log / Recycle 各 Controller |
 | 光影 | 太阳位置 / 日月晨昏 / 体积光 / 台灯 / 天气(特效/代理/详情) / 首页仪表盘 | SolarUtil+SunService(`/public/sun-info`) + windowLight.js + SunLightLayer.vue |
 | 物品 | 物品定位 + 户型图 + AI 语义 | ItemController / ItemAiService+AiService(决策见 需求 §4.8.1) |
 | AI | 图片生成/语音识别 + AI 测试台 + 家庭级 AI 配置 + 调用统计 | AiService / FamilyAiConfigService / AiController + AiStatsService(`/ops/ai/**`) |
@@ -196,7 +196,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 11. **UPDATE 不先 select**(强制):回写冗余字段用 `LambdaUpdateWrapper.eq(...).set(...).update(null)`,不要 `selectById` 再 `updateById`;**计数类字段用 `setSql("like_count = like_count + delta")` 原子增量,禁止「先 COUNT 再 SET」**(踩坑速查 §8.3),参考 `ContentLikeService.adjustCount`。**依赖 `updated_at` 的表更新必须用 `LambdaUpdateWrapper` 只 SET 业务字段并重查**(MP `updateById` 会回写旧 `updated_at`、抑制 `ON UPDATE CURRENT_TIMESTAMP`,见踩坑速查 §2.2)。
 12. **文件上传流式**(强制):大文件(>1MB)禁止 `file.getBytes()` 全量入堆(生产 `-Xmx384m` 传 200MB 即 OOM),**必须用 `MultipartFile` 重载 + `transferTo` + `Files.copy` 兜底**;FileService 已提供 4 个流式重载,Controller 传 `MultipartFile` 不调 `getBytes()`。
 13. **JVM/连接池配置**(基线):`spring.threads.virtual.enabled: true`(JDK21 虚拟线程);HikariCP `maximum-pool-size: 20` + `minimum-idle: 5` + `connection-timeout: 3000`。
-14. **日志规范**(强制,细则见 `docs/设计想法/日志/`):三类文件 access(接口,`AccessLogFilter` 自动)/server(流程+SQL+ERROR)/thirdparty(三方,`ThirdPartyHttp` 封装),按天滚动留 7 天;六要素 时间/级别/线程/[tid]/位置/内容,tid 贯穿 HTTP/WS/@Async/线程池(配 TaskDecorator);三方调用一律走 `ThirdPartyHttp.get()`(自定义方法 `.request()`);**报错必须带堆栈** `log.error("xx, p={}", p, e)`(禁 printStackTrace);级别 ERROR=人工/WARN=可恢复/INFO=关键/DEBUG=细节;**所有写接口必须 @OperationLog**(module 大写/operationType 标准词/description 中文;token 刷新、已读等高频噪音端点除外);新敏感字段进 `AccessLogFilter.SENSITIVE_JSON` 打码清单;运维「详细日志」`GET /ops/logs/trace?tid=` 按 tid 扫三类文件。
+14. **日志规范**(强制,细则见 `docs/设计想法/日志/`):三类文件 access(接口,`AccessLogFilter` 自动)/server(流程+SQL+ERROR)/thirdparty(三方,`ThirdPartyHttp` 封装),按天滚动留 7 天;六要素 时间/级别/线程/[tid]/位置/内容,tid 贯穿 HTTP/WS/@Async/线程池(配 TaskDecorator);三方调用一律走 `ThirdPartyHttp.get()`(自定义方法 `.request()`);**报错必须带堆栈** `log.error("xx, p={}", p, e)`(禁 printStackTrace);级别 ERROR=人工/WARN=可恢复/INFO=关键/DEBUG=细节;**所有写接口必须 @OperationLog**(module 大写/operationType 标准词/description 中文;token 刷新、已读等高频噪音端点除外);新敏感字段进 `AccessLogFilter.SENSITIVE_JSON` 打码清单;运维「详细日志」`GET /ops/logs/trace?tid=` 按 tid 扫三类文件;**同类异常聚合预警(V10.15)**:`LogAlertAppender` 挂在 root + ACCESS + thirdparty 三处 logger(后两者 `additivity=false`,不挂就收不到),同类判定=级别+logger+异常类型+首个应用栈帧,阈值/级别/排除项走 `app.log-alert.*`,详见需求 §4.6.4。
 
 ### 前端规范
 
@@ -234,9 +234,9 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 ## 验证基线(每版更新,当前值)
 
-- 后端:`cd backend; .\mvnw.cmd -B clean package` → BUILD SUCCESS(`Tests run: 23`,纯逻辑不起 Spring 上下文);只求编译加 `-DskipTests`。**clean 被运行中的后端锁 jar 时改跑 `-B test`**。
-- 前端测试:`cd frontend; npx vitest run` → 30 passed(loan/password/feed/nav + i18n 中英键对齐;CI 在构建前执行)
-- 前端构建:`cd frontend; npm run build` → 入口 chunk **386.76KB/gzip 155.84KB**(V10.14 实测;V10.13 时为 385.33KB,新增密码找回页/接口/i18n 后微增;功能页/pdfjs/epubjs/hls.js 均为独立异步 chunk;历史数字见 docs/变更归档.md)
+- 后端:`cd backend; .\mvnw.cmd -B clean package` → BUILD SUCCESS(`Tests run: 43`,纯逻辑不起 Spring 上下文);只求编译加 `-DskipTests`。**clean 被运行中的后端锁 jar 时改跑 `-B test`**。
+- 前端测试:`cd frontend; npx vitest run` → 31 passed(loan/password/feed/nav + i18n 中英键对齐 + i18n 引用键存在性;CI 在构建前执行)
+- 前端构建:`cd frontend; npm run build` → 入口 chunk **388.06KB/gzip 156.33KB**(V10.15 实测;V10.14 时为 386.76KB,新增运维「异常预警」页签文案与 i18n 键后微增;功能页/pdfjs/epubjs/hls.js 均为独立异步 chunk;历史数字见 docs/变更归档.md)
   - **⚠ 口径:vite 报的是「字符数」不是「字节数」**(实测 318.71KB 字符 = 343,667 字节)——**别拿 `ls -la` 字节数跟基线比**;比特字节就 `wc -c` 对 `wc -c`。
 - 界面/交互验证:harness 别放 `target/`;持续动画页面用页面内 `evaluate` 量几何、派发 `el.click()`,别用截图或真实点击(必超时,见踩坑速查 §6)。
 - 接口测试:同级独立项目(不在本仓库)`cd ..\autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed;CI 每次推送自动做前后端构建+compose 起库导 schema+后端启动+登录冒烟。
@@ -284,7 +284,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 - `README.md`(项目简介,GitHub 展示,不含密码); `docs/README.md`(**文档索引**:每份文档一句话定位+新人阅读顺序)
 - `docs/架构设计.md`(系统上下文/请求流转/模块分域/关键机制/部署拓扑)
-- `docs/需求设计说明书.md` — **完整功能需求唯一活文档**(功能模块清单+数据库设计 79 表+接口设计+规划事项 §9+修订记录),随迭代持续更新
+- `docs/需求设计说明书.md` — **完整功能需求唯一活文档**(功能模块清单+数据库设计 81 表+接口设计+规划事项 §9+修订记录),随迭代持续更新
 - `docs/变更归档.md` — 已实现变更归档(文件级改动表+设计决策+踩坑+live DB 同步 SQL);**开头有章节目录**,新变更追加到文件末尾
 - `docs/踩坑速查.md` — **踩坑/机制细节/维护清单**(工具链/后端/前端/天文/媒体引擎/WE/部署/性能/缓存失效矩阵/已知问题);本文件凡写「详见踩坑速查 §x」者均指它
 - `docs/UI设计提示词.md` — 沉浸式首页 UI 设计完整规格(可作为 AI 提示词重新生成)

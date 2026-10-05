@@ -663,6 +663,19 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 4. **重复纯逻辑抽 utils(禁止三份实现)**:动态流类型标签/摘要/相对时间走 `utils/feed.js`(`feedTypeLabel` / `feedSummary(t, f, sliceLen=40)` / `formatFeedTime`;移动端传 60 保持既有摘要长度,不强行统一文案);默认楼层走 `floorPlanGeom.pickDefaultFloor`。新增重复逻辑先找现成 util。
 5. **与「当前时刻」有关的展示走 `ref` + 定时**:问候语、今日日期、还款进度等一律 `ref` + 60s 定时刷新(必要时加 `visibilitychange`),**不用无响应式依赖的 computed**(否则跨小时/跨午夜不刷新,见踩坑速查 §3.17)。
 
+## 26. 运维页·异常预警(`/ops` 第 6 个 tab,V10.15)
+
+同类日志问题在统计窗口内反复出现时(默认 10 次 / 10 分钟)汇总成一条,在此页提醒 OPS;页签顺序排在「详细日志」之后、「AI 统计」之前(仅 OPS 可见,与其余系统级 tab 同 `v-if="showSystemTabs"`)。
+
+1. **页签角标**:`异常预警<角标>`——待处理数 >0 时才显示,红底白字小圆角药丸(`.alert-count`,背景 `var(--color-accent)`,11px,`margin-left:6px`),>99 显示 `99+`;角标数取 `/ops/alerts/summary` 的 `open`,**进运维页即取**(不必切到该页签),标记已处理后立即刷新(角标消失)。
+2. **工具栏**(`.filter-row`,与其余 tab 同构):左侧 `el-radio-group` 状态筛选(待处理 / 已处理 / 全部,默认待处理)+ 级别下拉(ERROR / WARN,可清空);右侧「查询」+「全部标记已处理」(无待处理时禁用)。
+3. **汇总卡**:三格横排(待处理 / 今日新增 / 累计),数字 22px 加粗,待处理数字用 `var(--color-accent)` 强调,标签 12px 次要色——与访问统计的指标卡语言一致但更轻,不占整行。
+4. **列表**:列 `最近出现 | 级别(tag:ERROR 红 / WARN 黄)| 问题(标题含异常简名+出错位置,超长省略)| 来源(logger)| 次数 / 窗口(如「10 次 / 600 秒」)| 状态(待处理红 / 已处理绿)| 日志摘录(等宽 12px 次要色,单行省略,悬停看全;有 tid 时附 TID 链接)| 操作(待处理行显示「标记已处理」)`;
+   - **TID 链接**复用操作日志/详细日志的既有交互:点击切到「详细日志」页签并带 `tid` + 日期自动查询(异步链路如定时任务无 tid,则不渲染链接)。
+   - 分页与操作日志 tab 同款(20/50/100,`.el-pagination` 右对齐)。
+5. **空态**:`el-alert`(info,show-icon)「暂无异常预警;同类问题反复出现时会自动汇总在这里」——不用空表格。
+6. **提示文案只讲现象**:不写采集机制、指纹口径、阈值与窗口参数(那些进代码注释与需求 §4.6.4);「标记已处理」只表示人工已知悉,不做任何自动收敛动作。
+
 ## 验收标准
 
 1. 打开页面,背景米白渐变 + 5 个色块缓慢飘移,右下角拍立得堆/闭合相册,左右毛玻璃面板从两侧滑入。
@@ -711,6 +724,8 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 43. **文件浏览页与存储管理 tab**(`/storage/files` 独立功能页 2026-09-08 拆分;存储管理=设置页 tab 统一设计):文件浏览页=面包屑(文件浏览)+`.page-toolbar.card` 工具栏(tb-left=设备下拉 180px clearable+占位「请选择设备后浏览」→返回上一级→路径面包屑可点,tb-right=新建目录/多选,选择态=选中计数+删除所选(danger)+取消)+文件表(名称/大小/修改时间/操作,行内 pick-badge 对勾圆标多选与相册同款;预览/下载/重命名行按钮,重命名 OWNER);**设备识别不到/清空/浏览失败→卡片空态显示,不残留旧数据**;无自定义设备→el-empty 空态引导(OWNER 带「去添加设备」跳设置)。存储管理 tab=三张 `.card.settings-card`+`.section-label` 竖线标题(与其他设置 tab 同款,完成 §9 P2 统一):设备管理卡(设备表+添加设备 `.mgmt-toolbar`+浏览按钮跳转文件浏览页)、百度网盘接入卡(授权状态 tag+回调地址 code 块+复制)、从设备同步卡(映射说明+清理缩略图/从设备同步按钮);设置页所有操作按钮收敛 `.mgmt-toolbar`(`display:flex; gap:8px; margin-bottom:12px`),不再用功能页 `.page-toolbar`。
 
 44. **AI 测试台**(`/tools/ai-playground`,2026-09-08 V9.41 临时页,工具箱入口卡片,requiresAuth;V9.53 改「指令(左)+舞台(右)」双栏):面包屑(工具箱→AI 测试台)+`.wk-bar card` 能力切换区(tb-left=能力 el-radio-group small(对话/图片生成/语音识别)+模型名 `el-tag` type=info+可用状态 tag(success=可用/danger=未配置),由 GET /ai/status 配置驱动);未配置能力→`el-alert` warning 提示+面板按钮禁用。**V9.53 起双栏 `.wk-grid`**:左 `.wk-deck`(输入区)=内容区 `.wk-eyebrow`(内容)+`.wk-adv`(更多设置折叠,含温度等高级参数),右 `.wk-stage`(输出区)=气泡消息/结果展示。**对话面板**=系统提示词 textarea 2 行+温度滑杆 0~2 step 0.1(折叠)+多轮气泡消息区(max-height 滚动,user 右侧 accent 白字/assistant 左侧 card)+输入 textarea(Enter 发送)+清空/发送+耗时 meta。**图片面板**=prompt+参考图+尺寸/张数/种子/引导强度/水印/响应格式(方舟参数,V9.44)+生成+结果网格。**语音面板**=选音频+语言+转写+结果。**天气背景 AI 生成配置(V9.53)**:启用开关/画面风格/图片尺寸/图组保鲜(天)/水印/自定义场景,保存 localStorage,作用于首页天气组件 AI 生图底图。页面本体独立 chunk 懒加载。
+
+45. **运维异常预警页**(`/ops` 异常预警 tab,V10.15):同类日志问题在窗口内反复出现时汇总成一条——页签角标=待处理数(>0 才显示,>99 显示 `99+`)→状态(待处理/已处理/全部)+级别(ERROR/WARN)筛选+「全部标记已处理」→三格汇总卡(待处理 accent 强调/今日新增/累计)→列表(最近出现/级别 tag/问题/来源 logger/次数·窗口/状态 tag/日志摘录+有 tid 时 TID 跳详细日志/标记已处理)→空态 el-alert「暂无异常预警」。详见 §26。
 
 45. **设置页·家庭 AI 配置面板**(`Settings` 分类「AI 配置」🤖,2026-09-08 V9.43,V9.47 去全局兜底,V9.48 改模型池+功能绑定,V9.49 加 LOCAL 本地规则,V9.50 加百度短语音,V9.52 加功能兜底模型,V9.53 加天气生图 WEATHER_IMAGE,仅家长可见——菜单项 `v-if userStore.hasPerm('family:manage')`,与其他设置大类同款侧栏导航):单张 `.card.settings-card` v-loading+`.section-label` 标题「家庭 AI 配置(模型池 + 功能绑定)」+说明文案 `.share-tip`(先加模型再按功能选/服务地址+Key+模型标识配齐即启用/Key 加密不回传)。**模型池区**:`.ai-sub-label` 分节标题「模型池」+`.ai-toolbar` 右上「添加模型」primary plain 按钮+`el-table`(列:模型名称/类型 el-tag size=small(语言模型/图片模型/语音模型/本地规则,LOCAL 内置行另加 type=info「内置」角标 `.ai-builtin`,百度短语音行(provider=BAIDU)另加「百度短语音」角标 `.ai-builtin`)/模型标识/服务地址 overflow-tooltip/操作=编辑+删除 text 按钮,LOCAL 内置行显「—」不渲染编辑/删除);模型编辑 `el-dialog`(append-to-body,480px,label-width 110px:模型名称/类型 el-select 三选一(LLM/IMAGE/ASR,不含 LOCAL)/协议·服务商 el-select(仅 ASR 显,OpenAI 兼容|百度短语音,选百度才显后续百度专属字段,切非 ASR 自动回 OpenAI)/服务地址(动态 label+占位:百度=「识别接口地址(百度 server_api)」+`https://vop.baidu.com/server_api`)/API Key type=password show-password 占位「已配置,留空保留原值」或「必填」/Secret Key(仅百度显,type=password show-password,占位「已配置,留空保留原值」或「百度 Secret Key(换 access_token)」)/模型标识(动态占位:百度=`dev_pid 如 1537(普通话)`)/超时 el-input-number 1000~600000 step 1000),底部取消+确定。**功能绑定区(V9.52 起每行双下拉,V9.53 起 6 行)**:`.ai-sub-label`「功能绑定」+6 行 `.ai-feature-row`(flex:左侧 `.ai-feature-name` 96px 功能名「物品寻找/物品放物/AI 对话/图片生成/天气生图/语音识别」+两个 `.ai-feature-select` el-select filterable clearable——第一个=主模型(选项=允许类型的模型池条目——找物/放物=LOCAL+LLM、对话=LLM、图片/天气生图=IMAGE、语音=ASR,由后端 modelTypes 数组过滤 `modelsByTypes`,label「名称(模型标识)」,placeholder「未选择(该功能停用)」),第二个=兜底模型(同类型过滤且排除主模型 `modelsByTypesExcluding`,placeholder「兜底模型(可选)」);两者选择均 PUT 保存 `{modelId,fallbackModelId}`)+右侧 `.ai-feature-state`(可用=主题色/未配置=灰,LOCAL 恒可用,百度 ASR 需 baseUrl+API Key+Secret Key+dev_pid 配齐));删除模型用 ElMessageBox 确认「删除后绑定它的功能将变为未配置(停用)」。
 

@@ -1855,5 +1855,35 @@ INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`,
 ('Spring Boot Mail', 'MAVEN', 'org.springframework.boot:spring-boot-starter-mail', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '密码找回邮件(SMTP)', 'FULL');
 UPDATE `sys_oss_component` SET `managed_by` = 'RENOVATE' WHERE `component_type` = 'MAVEN' AND `package_ref` = 'org.springframework.boot:spring-boot-starter-mail';
 
+-- ------------------------------------------------------------
+-- V10.15 同类异常聚合预警 report_alert(2026-10-05)
+--   日志里同类问题在窗口内达到阈值时落一条,供运维页「异常预警」查看/标记已处理。
+--   纯新增表,存量库幂等补建;无种子数据。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `report_alert` (
+  `id`               BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `fingerprint`      VARCHAR(64)   NOT NULL COMMENT '同类问题指纹(归一化后哈希)',
+  `level`            VARCHAR(10)   NOT NULL COMMENT '日志级别:ERROR/WARN',
+  `logger`           VARCHAR(128)  DEFAULT NULL COMMENT '来源 logger',
+  `title`            VARCHAR(255)  NOT NULL COMMENT '问题摘要(异常类型或归一化消息)',
+  `sample_message`   VARCHAR(1000) DEFAULT NULL COMMENT '首次出现时的原始日志消息',
+  `sample_trace_id`  VARCHAR(64)   DEFAULT NULL COMMENT '首次出现时的追踪号 tid(定时任务等可能为空)',
+  `occurrence_count` INT           NOT NULL DEFAULT 0 COMMENT '窗口内出现次数',
+  `window_seconds`   INT           NOT NULL DEFAULT 0 COMMENT '统计窗口(秒)',
+  `threshold`        INT           NOT NULL DEFAULT 0 COMMENT '触发阈值',
+  `first_seen`       DATETIME      NOT NULL COMMENT '窗口内首次出现时间',
+  `last_seen`        DATETIME      NOT NULL COMMENT '窗口内末次出现时间',
+  `status`           VARCHAR(20)   NOT NULL DEFAULT 'OPEN' COMMENT 'OPEN待处理/ACKED已处理',
+  `notified`         TINYINT       NOT NULL DEFAULT 0 COMMENT '0未推送 1已推送邮件',
+  `acked_by`         BIGINT        DEFAULT NULL COMMENT '处理人ID',
+  `acked_at`         DATETIME      DEFAULT NULL COMMENT '处理时间',
+  `created_at`       DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_status_last` (`status`, `last_seen`),
+  KEY `idx_last_seen` (`last_seen`),
+  KEY `idx_fingerprint_last` (`fingerprint`, `last_seen`),
+  KEY `idx_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统报表表(同类异常聚合预警)';
+
 
 

@@ -85,6 +85,26 @@ app:
     reset-url-base: https://ihomy.top/reset-password
   # 日志保留天数(logback 三类日志文件共用,按天滚动)
   log-retention-days: 7
+  # 同类异常聚合预警(运维页「异常预警」):同类问题在窗口内达到阈值时汇总成一条并提醒 OPS。
+  # 采集端是 logback 的 LogAlertAppender(见 logback-spring.xml),计数在内存,落库/发信走后台单线程。
+  log-alert:
+    enabled: true
+    # 参与聚合的级别(逗号分隔);含 WARN 会连访问慢请求一起统计,故默认只 ERROR
+    levels: ERROR
+    # 统计窗口(秒):窗口内同一指纹累加,到点重新计数
+    window-seconds: 600
+    # 阈值:窗口内同一指纹达到该次数即预警
+    threshold: 10
+    # 冷却(秒):同一指纹两次预警的最短间隔
+    cooldown-seconds: 1800
+    # 内存中同时跟踪的指纹上限(防异常消息含高基数内容撑爆内存)
+    max-fingerprints: 200
+    # 不参与聚合的 logger(逗号分隔),默认排除预警自身
+    exclude-loggers: com.ihomy.service.LogAlertService
+    # 预警记录保留天数
+    retention-days: 30
+    # 配好邮件通道(spring.mail.host)时是否向 OPS 邮箱发提醒;未配置则只在运维页展示
+    mail-enabled: true
 
 logging:
   file:

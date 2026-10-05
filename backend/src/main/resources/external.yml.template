@@ -56,3 +56,8 @@ app:
     from:                      # 如 no-reply@example.com
     reset-url-base:            # 如 https://ihomy.top/reset-password(留空用 application.yml 基线)
   # AI 大模型配置已按家庭(模型池 sys_family_ai_model + 功能绑定 sys_family_ai_feature),在应用内「设置-家庭 AI 配置」维护,不再走全局 yml(V9.48)
+  # 同类异常聚合预警(可选覆盖,基线见 application.yml):
+  #   enabled/levels/window-seconds/threshold/cooldown-seconds/max-fingerprints/exclude-loggers/retention-days/mail-enabled
+  #   收件人取系统级 OPS 角色的邮箱;未配 spring.mail.host 时不发信,只在运维页「异常预警」展示
+  # log-alert:
+  #   threshold: 10
