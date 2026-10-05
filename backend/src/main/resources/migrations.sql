@@ -1899,5 +1899,13 @@ INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`,
 UPDATE `sys_oss_component` SET `managed_by` = 'RENOVATE'
  WHERE `component_type` = 'NPM' AND `package_ref` IN ('eslint', '@eslint/js', 'eslint-plugin-vue', 'globals', 'prettier');
 
+-- ------------------------------------------------------------
+-- 2026-10-05 治理轮:删除死种子行 sys_home_module.cover
+--   「家庭封面 /cover」是早期设计的遗留模块行:前端无 `/cover` 路由,navModules.js 的
+--   NAV_PATHS 也没有 cover 映射,故 enabled 置 1 也进不了导航,任何状态下都到不了页面。
+--   同轮 schema.sql 已一并删除。DELETE 幂等,存量库命中 0 行无副作用。
+-- ------------------------------------------------------------
+DELETE FROM `sys_home_module` WHERE `code` = 'cover' AND `family_id` IS NULL;
+
 
 

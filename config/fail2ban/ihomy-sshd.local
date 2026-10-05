@@ -1,0 +1,18 @@
+# fail2ban SSH 防爆破(安装见 docs/部署指导-Linux.md §7.3)
+#
+# 安装(root):
+#   sudo apt install -y fail2ban
+#   sudo cp /opt/ihomy/config/fail2ban/ihomy-sshd.local /etc/fail2ban/jail.d/ihomy-sshd.local
+#   sudo systemctl enable --now fail2ban && sudo systemctl restart fail2ban
+#   sudo fail2ban-client status sshd          # 查看当前封禁统计
+#
+# 说明:port 必须写改后的 SSH 端口 19068(见 §7.1);用 systemd backend 读 journal,
+# 免去 sshd 单独写日志文件的配置。
+[sshd]
+enabled  = true
+port     = 19068
+backend  = systemd
+# 10 分钟内失败 5 次即封禁 1 小时
+maxretry = 5
+findtime = 10m
+bantime  = 1h

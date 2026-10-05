@@ -44,8 +44,8 @@ winget install -e --id TheDocumentFoundation.LibreOffice   # 正常路径
 
 | 文件 | 作用 |
 |------|------|
-| `parse_schema.py` | schema.sql → `schema.json`（79 表 / 810 字段 / 索引 / 逻辑关联 / 角色权限矩阵） |
-| `parse_endpoints.py` | controller → `endpoints.json`（341 接口：方法、路径、@Operation 摘要、权限码、参数）。`MODULE` 表只写「模块名 + 业务域分组」，**漏登记的新 controller 自动取源码里的 `@Tag(name=...)` 作模块名、归入「其他」域并照样出章**，不会被静默丢掉 |
+| `parse_schema.py` | schema.sql → `schema.json`（81 表 / 832 字段 / 索引 / 逻辑关联 / 角色权限矩阵） |
+| `parse_endpoints.py` | controller → `endpoints.json`（349 接口：方法、路径、@Operation 摘要、权限码、参数）。`MODULE` 表只写「模块名 + 业务域分组」，**漏登记的新 controller 自动取源码里的 `@Tag(name=...)` 作模块名、归入「其他」域并照样出章**，不会被静默丢掉 |
 | `parse_dtos.py` | dto → `dtos.json`（49 个请求体对象的字段） |
 | `docx_kit.py` | 排版内核：封面 R1 版式、三区页码、字体/行距/首行缩进、表格样式。改动版式只改这里 |
 | `build_db_doc.py` / `build_api_doc.py` / `build_manual_doc.py` | 三份文档的章节组织 |

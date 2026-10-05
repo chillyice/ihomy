@@ -18,6 +18,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Doc drift check (文档/代码一致性闸门)
+        # 纯静态、只读仓库文件、无依赖,最先跑快速失败:VERSION 格式 / 表数一致 /
+        # 实体↔建表 / mapper 不写 SQL 注解 / Controller @Tag / 权限码已种子 / 模块种↔路由
+        run: bash scripts/doc-drift-check.sh
+
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:

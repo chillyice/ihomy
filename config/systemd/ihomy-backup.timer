@@ -1,0 +1,15 @@
+# ihomy 每日 03:00 触发备份
+#
+# Persistent=true:服务器若在触发点停机,开机后补跑一次。
+# RandomizedDelaySec:在 03:00 后随机推迟最多 10 分钟,避免整点 I/O 尖峰。
+[Unit]
+Description=每日 03:00 触发 ihomy 备份
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+RandomizedDelaySec=10m
+Unit=ihomy-backup.service
+
+[Install]
+WantedBy=timers.target

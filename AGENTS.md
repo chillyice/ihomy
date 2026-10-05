@@ -90,10 +90,10 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
     config/      # SecurityConfig/CorsConfig/MybatisPlusConfig/Knife4jConfig/WebMvcConfig/WebSocketConfig/SqlStatementLog/ExternalConfigLoader/AsyncConfig
     security/    # JwtUtils/JwtAuthenticationFilter/LoginUser/SecurityHelper/OpsAccessFilter
     annotation/ aspect/ filter/  # @RequirePermission/@OperationLog + 两个 Aspect;TraceIdFilter/AccessLogFilter/请求响应 Wrapper
-    entity/      # 75 个实体类(81 张表里 6 张关联/字典表无实体)
-    mapper/      # 76 个 MyBatis-Plus BaseMapper(自定义 SQL 全放 resources/mapper/*.xml,接口不写注解,参数统一 @Param)
+    entity/      # 74 个实体类(81 张表里 7 张关联/字典表无实体)
+    mapper/      # 75 个 MyBatis-Plus BaseMapper(自定义 SQL 全放 resources/mapper/*.xml,接口不写注解,参数统一 @Param)
     service/     # 69 个服务类(单实现无接口层)
-    controller/  # 46 个 Controller
+    controller/  # 47 个 Controller(含 HealthController:/public/health + /ops/health)
     dto/         # 请求/响应 DTO(49 个)
     websocket/   # ChatWebSocketHandler(原生 WebSocket 聊天室)
   src/main/resources/
@@ -140,7 +140,7 @@ npm run lint       # 代码检查(扁平配置 eslint.config.js;只查正确性,
 npm run build      # 生产构建,产物 dist/,含 PWA service worker
 ```
 
-冒烟:登录 `POST /api/auth/login {email, password, captchaId, captchaCode:'qwer'}`(开发环境验证码固定 `qwer`,先 `GET /api/auth/captcha` 取 id),响应 code=0 即有 token。**新人环境初始化** `.\scripts\setup.ps1`(幂等;详见本地 `docs/新人上手指南.md`)。**CI**(`.github/workflows/ci.yml`)每次推送自动做前后端构建+compose 起库导 schema+后端启动+登录冒烟,并起 Jellyfin 跑媒体引擎接口检查(39 项)。数据库重导:整库 `schema.sql`;增量建表/改表执行对应幂等 SQL 段。
+冒烟:登录 `POST /api/auth/login {email, password, captchaId, captchaCode:'qwer'}`(开发环境验证码固定 `qwer`,先 `GET /api/auth/captcha` 取 id),响应 code=0 即有 token。**新人环境初始化** `.\scripts\setup.ps1`(幂等;详见本地 `docs/新人上手指南.md`)。**CI**(`.github/workflows/ci.yml`)每次推送先跑文档/代码一致性闸门 `bash scripts/doc-drift-check.sh`(VERSION 格式 / 表数 / 实体↔建表 / mapper 无 SQL 注解 / Controller `@Tag` / 权限码种子 / 模块种子↔路由),再做前后端构建(lint+test+build)+compose 起库导 schema+后端启动+登录冒烟,并起 Jellyfin 跑媒体引擎接口检查(39 项)。数据库重导:整库 `schema.sql`;增量建表/改表执行对应幂等 SQL 段。**健康检查**:`GET /api/public/health`(免登录,DB/Redis 探活,UP→200、DEGRADED→503;`deploy.ps1` 就绪判定用它)、`GET /api/ops/health`(OPS,含各依赖耗时)。
 
 **放映厅联调(Jellyfin,可选)**:`docker compose --profile jellyfin up -d jellyfin` → `bash scripts/dev-jellyfin-seed.sh`(容器内造测试片源)→ `bash scripts/ci-jellyfin-setup.sh`(自动走完初始化向导 + 建库扫描;也可手访问 `http://localhost:8096` 走向导)→ 设置页-放映厅填地址与账号;接口检查 `IHOMY_TEST_PWD=<密码> python test/automation/media_engine_check.py`(39 项,`--read-only` 只跑读类)。细节与踩坑见踩坑速查 §5,生产上线(引擎放 NAS)见 `docs/部署指导-Linux.md` §12。
 
@@ -235,16 +235,17 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 ## 验证基线(每版更新,当前值)
 
-- 后端:`cd backend; .\mvnw.cmd -B clean package` → BUILD SUCCESS(`Tests run: 48`,纯逻辑不起 Spring 上下文);只求编译加 `-DskipTests`。**clean 被运行中的后端锁 jar 时改跑 `-B test`**。
+- 后端:`cd backend; .\mvnw.cmd -B clean package` → BUILD SUCCESS(`Tests run: 52`,纯逻辑不起 Spring 上下文;V10.18 起含 `HealthControllerTest` 4 项);只求编译加 `-DskipTests`。**clean 被运行中的后端锁 jar 时改跑 `-B test`**。
 - 前端测试:`cd frontend; npx vitest run` → 31 passed(loan/password/feed/nav + i18n 中英键对齐 + i18n 引用键存在性;CI 在构建前执行)。同一步跑 `npm run lint` → **0 error**(27 warning = 存量未使用变量,不拦构建)。
-- 前端构建:`cd frontend; npm run build` → 入口 chunk **388.76KB/gzip 156.52KB**(V10.17 实测;V10.16 时 388.06KB/156.36KB、V10.15 时 gzip 156.33KB、V10.14 时 386.76KB;功能页/pdfjs/epubjs/hls.js 均为独立异步 chunk;历史数字见 docs/变更归档.md)
+- 文档/代码一致性闸门:`bash scripts/doc-drift-check.sh` → 全部 [OK](CI 最先跑;表数/实体↔建表/mapper 注解/@Tag/权限码种子/模块↔路由)。
+- 前端构建:`cd frontend; npm run build` → 入口 chunk **388.76KB/gzip 156.53KB**(V10.18 实测,与 V10.17 的 388.76KB/156.52KB 实质持平——本轮改动全在后端/脚本/文档,未动前端源码,0.01KB 差异来自版本串 V10.17→V10.18;V10.16 时 388.06KB/156.36KB、V10.14 时 386.76KB;功能页/pdfjs/epubjs/hls.js 均为独立异步 chunk;历史数字见 docs/变更归档.md)
   - **⚠ 口径:vite 报的是「字符数」不是「字节数」**(实测 318.71KB 字符 = 343,667 字节)——**别拿 `ls -la` 字节数跟基线比**;比特字节就 `wc -c` 对 `wc -c`。
 - 界面/交互验证:harness 别放 `target/`;持续动画页面用页面内 `evaluate` 量几何、派发 `el.click()`,别用截图或真实点击(必超时,见踩坑速查 §6)。
 - 接口测试:同级独立项目(不在本仓库)`cd ..\autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed;CI 每次推送自动做前后端构建+compose 起库导 schema+后端启动+登录冒烟。
 
 ## 已实现变更归档(已外置)
 
-> 历史归档已整体迁至 **`docs/变更归档.md`**(现约 746KB / **159 小节** = 开头 16 个**功能域**小节 + 其后 143 个版本/治理小节),内容原样保留。含文件级改动表、设计决策、踩坑记录与 live DB 同步 SQL。
+> 历史归档已整体迁至 **`docs/变更归档.md`**(现约 783KB / **161 小节** = 开头 16 个**功能域**小节 + 其后 145 个版本/治理小节),内容原样保留。含文件级改动表、设计决策、踩坑记录与 live DB 同步 SQL。
 > **该文件开头有章节目录**(或 `grep -n "^##### " docs/变更归档.md` 列全部小节);**检索历史实现/设计决策/live DB 迁移 SQL 时读该文件;新的变更归档继续追加到文件末尾**(新增 `#####` 子节),不要再写回 AGENTS.md。
 
 ## 文件存储策略
@@ -270,7 +271,8 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **JVM 调优**(systemd ExecStart):`-Xmx384m -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC -Xss512k`。
 - **MySQL 调优**:`config/mysql/my.cnf` → `cp` 到 `/etc/mysql/conf.d/ihomy.cnf`,关键项 `performance_schema=OFF`(省 80-100MB)。MySQL 端口 6306。
 - **⚠ Redis 只绑回环 + 强密码(V10.6,开发/CI/生产一致)**:容器一律 `-p 127.0.0.1:6379:6379` + `--requirepass`(docker run 中必须写在**镜像名之后**),密码进 external.yml `spring.data.redis.password`(同值);Docker 发布端口会绕过 ufw,绑回环才是真门闩。**改密码顺序固定**:先改 external.yml → `stop ihomy-backend` → 重建容器 → 起后端 → 冒烟(反了全站 `WRONGPASS`,验证码/刷新/限流全挂);重建即清空黑名单/验证码/限流计数/当前家庭。手工 redis-cli 带 `-a`。运行手册与取证见 `docs/部署指导-Linux.md` §2.6.1 与踩坑速查 §7.7。
-- **SSH 端口**:生产服务器统一 **19068**(禁止 22);所有 ssh/scp 加 `-p 19068`/`-P 19068`;防火墙放行 19068、关闭 22。
+- **SSH 端口 + 加固**:生产服务器统一 **19068**(禁止 22);所有 ssh/scp 加 `-p 19068`/`-P 19068`;防火墙放行 19068、关闭 22。再加 fail2ban(`config/fail2ban/ihomy-sshd.local`,`port=19068`,10 分钟 5 次封 1h)与自动安全更新(apt `unattended-upgrades` / dnf `dnf-automatic`,只装补丁不自动重启),装机步骤见 `docs/部署指导-Linux.md` §7.3/§7.4。
+- **备份与恢复(V10.18)**:`scripts/prod-backup.sh`(mysqldump 单事务 + `gzip -t` 校验 + uploads `rsync -a` **只增不删** + 数据库转储留 14 天 + 写 `.last-success`)由 systemd timer **每日 03:00** 触发(`config/systemd/ihomy-backup.{service,timer}`,`Persistent=true` 停机补跑);恢复/演练用 `scripts/prod-restore.sh <dump> <目标库>`(目标库必须显式给;恢复生产库前自动快照)。**误删兜底两层**:内容误删走 `/recycle` 回收站(7 天),回收站超期与整库/整机故障才靠备份。安装与演练记录见 `docs/部署指导-Linux.md`「附:数据备份」。
 - **Docker 安装源**:Ubuntu 用阿里云镜像源(`mirrors.cloud.aliyuncs.com/docker-ce`),固定版本 29.7.0;**Redis 镜像** `docker pull redis`;**Git 克隆**用 SSH 地址(ihomy 用户先生成 ed25519 key 加到 GitHub)。
 - **⚠ 三条部署必查(重装/新服务器)**:① nginx `mime.types` 必须有 `.mjs` 映射;② 站点 conf 必须带 gzip 四行;③ 媒体引擎**播放地址必须与站点同为 HTTPS**(39 项接口断言查不出,浏览器按混合内容拦掉视频请求)。细节与取证见踩坑速查 §7.1/§7.3/§5 与 `docs/部署指导-Linux.md` §12.2。
 - **⚠ 部署新前端后老客户端仍跑旧 bundle**(PWA Service Worker 预缓存):访问新路由会被旧 bundle 的兜底路由重定向到 `/home`,看着像「新路由没发布」;**冒烟前先 unregister SW + 清 caches**,用户侧 Ctrl+Shift+R。辨认方法与取证见踩坑速查 §7.2。
@@ -279,7 +281,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 ## 规划事项(未实现)
 
 > **本章只做指引,不记内容**——**未实现规划的唯一去处是 `docs/需求设计说明书.md` §9**:产品级规划见 §9.1,代码级待办见 §9.2(全量审计)/ §9.3(新增代码复审),两张表**只列仍未做的条目**;启动任何规划项前先读该章对应小节,不要凭本文件或记忆开工。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
-> **当前概览(截至 V10.10,要点一律见 §9)**:代码级 P1 已全部解决;剩余 = 产品级(放映厅 Emby 实测/多家庭共用/清晰度多音轨、HA 侧硬件与户型图联动(不在本仓)、保险箱主密码(待定夺)、场景主题方向)+ 代码级 P3 打磨(无障碍补全、超大文件拆分 + ESLint、CI 闸门、健康检查、备份自动化、SSH 加固等,见 §9.2 C/D 与 §9.3)。
+> **当前概览(截至 V10.18,要点一律见 §9)**:**代码级仅剩 §9.2 C 组一条**「超大单文件拆分 + 全仓 Prettier 重排」(已量化:129 个文件需重排;须先有 UI 回归 harness 才拆,单独排期);**§9.2 D 组 6 条与 §9.3 四组已全部无剩余条目**。剩余产品级 = 放映厅 Emby 实测/多家庭共用/清晰度多音轨、HA 侧硬件与户型图联动(不在本仓)、保险箱主密码(待定夺)、场景主题方向。
 
 ## 文档清单
 
@@ -292,8 +294,8 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - `docs/部署指导-Linux.md` / `docs/部署指导-Windows.md` — 生产部署全流程(systemd/NSSM/Nginx/Let's Encrypt/Docker Compose/备份/NAS,**脱敏入库版**,凭证一律占位符)
 - `docs/新人上手指南.md` — 新成员环境搭建+开发账号初始密码(**本地维护不入 git**);`docs/设计想法/` — 历史设计稿(不再维护,唯 `日志/` 子目录仍维护:日志规范/问题分析方法)
 - `docs/项目文档/` — 成套 Word 交付物(数据库结构/接口/用户手册);**由代码与库结构生成** `bash scripts/docs-gen/pipeline.sh`(改内容改源文件,不要手改 docx)
-- `test/cases/功能测试用例.md` — 全站功能测试用例(341 条,32+ 域);测试资产统一在 `test/`(用例/接口自动化/UI 自动化/报告,总览 `test/README.md`)
-- `scripts/`:`setup.ps1`(新人一次性环境初始化,幂等)/ `start-all.ps1`(日常一键启动前后端)/ `restart-all.ps1`(一键重建重启:`-SkipBuild` 只停起)/ `start-db.ps1`(起 MySQL+Redis,首启自动导 schema.sql);根 `docker-compose.yml`(开发中间件);`.github/workflows/ci.yml`;`config/mysql/my.cnf`
+- `test/cases/功能测试用例.md` — 全站功能测试用例(**388 条** = §1–§33 共 344 + §35 补录 44,后者覆盖 V9.53–V10.18 的 11 个新功能域);测试资产统一在 `test/`(用例/接口自动化/UI 自动化/报告,总览 `test/README.md`)
+- `scripts/`:`setup.ps1`(新人一次性环境初始化,幂等)/ `start-all.ps1`(日常一键启动前后端,根目录双击 `start.bat` 即可)/ `restart-all.ps1`(一键重建重启:`-SkipBuild` 只停起)/ `start-db.ps1`(起 MySQL+Redis,首启自动导 schema.sql)/ `doc-drift-check.sh`(文档/代码一致性闸门,CI 与本地同跑)/ `prod-backup.sh` + `prod-restore.sh`(生产每日备份与恢复/演练)/ `db_diff.py`(生产↔测试两库逐表 ID 差集与行级对比,环境数据同步用)/ `ci-jellyfin-setup.sh` + `dev-jellyfin-seed.sh`(放映厅联调)/ `docs-gen/`(Word 交付物生成流水线);根 `docker-compose.yml`(开发中间件);`.github/workflows/ci.yml`;`config/mysql/my.cnf`、`config/systemd/ihomy-backup.{service,timer}`、`config/fail2ban/ihomy-sshd.local`
 - 完整接口清单见 `docs/需求设计说明书.md` 第 7 章。代码事实以 `backend/src/main/java` + `resources/schema.sql` 为准,检索前先 `grep`。
 
 ## 环境检查(参考)

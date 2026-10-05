@@ -11,7 +11,7 @@
 
 | # | 软件 | 版本要求 | 用途 | 是否必须 |
 |---|------|----------|------|----------|
-| 1 | OpenJDK | 17 或 21（推荐 21 LTS） | 运行后端 | ✅ 必须 |
+| 1 | OpenJDK | 21 LTS（`pom.xml` 已对齐 21） | 运行后端 | ✅ 必须 |
 | 2 | Node.js | 18+（推荐 20 LTS） | 构建前端 | ✅ 必须（仅构建时） |
 | 3 | MySQL | 8.0+ | 主数据库 | ✅ 必须（本机部署） |
 | 4 | Redis | 6+ | 缓存 / JWT 令牌 | ✅ 必须（Docker 部署） |
@@ -20,6 +20,8 @@
 | 7 | Certbot | 最新 | 申请/续期 Let's Encrypt 证书 | 🔒 HTTPS 时需要 |
 | 8 | systemd | 系统自带 | 服务管理与开机自启 | ✅ 自带 |
 | 9 | ufw / firewalld | 系统自带 | 防火墙 | ✅ 自带 |
+| 10 | rsync | 最新 | 每日备份镜像 `uploads` 目录（见「附:数据备份」） | 🔒 备份时需要 |
+| 11 | fail2ban / unattended-upgrades | 最新 | SSH 防爆破 / 自动安全更新（见 §7.3/§7.4） | 🔒 加固推荐 |
 
 > 说明：Maven **无需单独安装**，项目自带 `mvnw`；Git 按需安装。
 
@@ -370,7 +372,7 @@ exit
 # 用数据库 root 执行 schema.sql（建库、建表、创建应用账号 ihomy 并授权）
 mysql -uroot -p --default-character-set=utf8mb4 < /opt/ihomy/backend/src/main/resources/schema.sql
 ```
-该脚本由数据库 root 执行一次，会创建 `ihomy` 库、**70 张表**（`sys_` 系统与账号权限 / `report_` 报表日志 / `family_` 家庭事务 / `content_` 内容数据四前缀）、应用专用账号 `ihomy`（仅 DML 权限）、默认首页模块、管理员 `admin` 与运维账号 `ops`（初始密码为开发安全版，见下方警告）。
+该脚本由数据库 root 执行一次，会创建 `ihomy` 库、**81 张表**（`sys_` 系统与账号权限 / `report_` 报表日志 / `family_` 家庭事务 / `content_` 内容数据四前缀）、应用专用账号 `ihomy`（仅 DML 权限）、默认首页模块（含聊天室 `chat` 行）、管理员 `admin` 与运维账号 `ops`（初始密码为开发安全版，见下方警告）。
 
 > **⚠️ 生产必须改密（schema.sql 为开发安全版）**：入库版 schema.sql 内置的是本机 Docker 开发固定凭证（ihomy 账号开发密码 + admin/ops 开发专用 BCrypt 哈希，明文只在维护者本地文档）。生产部署后立即执行：
 > ```bash
@@ -380,10 +382,7 @@ mysql -uroot -p --default-character-set=utf8mb4 < /opt/ihomy/backend/src/main/re
 > - external.yml 的 `spring.datasource.password` 同步填同一新密码
 > - admin/ops 首次登录后立即在页面改密
 
-> **⚠️ schema.sql 种子缺失**：`sys_home_module` 种子缺 `chat`（聊天室）行，全新部署后首页会缺聊天室入口。执行 schema.sql 后补一行（注意列名是 `position`/`sort_order`，sort 可按需调整）：
-> ```bash
-> mysql -uroot -p ihomy -e "INSERT INTO sys_home_module (code, title, icon, path, category, position, sort_order, enabled) VALUES ('chat', '聊天室', 'icon-chat', '/chat', 'life', 'left', 16, 1);"
-> ```
+> 校验建表结果：`mysql -uroot -p ihomy -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='ihomy';"` 应为 **81**。
 
 ### 3.5 构建后端（ihomy 用户）
 
@@ -704,6 +703,41 @@ sudo firewall-cmd --reload
 > Redis 已用 `-p 127.0.0.1:6379:6379` 只绑回环（Docker 发布端口会绕过 ufw，防火墙不是唯一防线）+ `--requirepass` 双保险，见 §2.6.1。
 > SSH 端口 19068 必须放行，22 禁止。
 
+### 7.3 SSH 防爆破(fail2ban,root)
+
+改端口只能避开无差别扫描，挡不住针对端口的持续爆破；再用 fail2ban 按来源 IP 自动封禁。
+
+```bash
+sudo apt install -y fail2ban
+sudo cp /opt/ihomy/config/fail2ban/ihomy-sshd.local /etc/fail2ban/jail.d/ihomy-sshd.local
+sudo systemctl enable --now fail2ban
+sudo systemctl restart fail2ban
+sudo fail2ban-client status sshd        # 查看当前封禁统计(banned IP 列表)
+```
+
+> 仓库配置 `config/fail2ban/ihomy-sshd.local`:10 分钟内失败 5 次即封禁 1 小时;`port` 必须写改后的 **19068**;`backend = systemd` 直接读 journal,无需给 sshd 单独配日志文件。
+> CentOS/RHEL 用 `sudo dnf install -y fail2ban` + `sudo systemctl enable --now fail2ban`,配置文件路径同为 `/etc/fail2ban/jail.d/`。
+> 解封:`sudo fail2ban-client set sshd unbanip <IP>`。
+
+### 7.4 自动安全更新(unattended-upgrades,root)
+
+Ubuntu 默认装有 `unattended-upgrades`,只开「安全源」自动升级即可,既补漏洞又不引入功能性重启风险;需要重启内核时会落 `/var/run/reboot-required`。
+
+```bash
+sudo apt install -y unattended-upgrades
+sudo dpkg-reconfigure -plow unattended-upgrades     # 交互选 Yes(启用自动更新)
+# 非交互环境可直接落配置:
+sudo tee /etc/apt/apt.conf.d/20auto-upgrades > /dev/null <<'EOF'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+EOF
+systemctl status unattended-upgrades --no-pager     # 确认服务在跑
+cat /var/run/reboot-required 2>/dev/null            # 存在则说明需要择机重启
+```
+
+> CentOS/RHEL 用 `sudo dnf install -y dnf-automatic` + 编辑 `/etc/dnf/automatic.conf`(`upgrade_type = security`,`apply_updates = yes`)+ `sudo systemctl enable --now dnf-automatic.timer`。
+> **重启由人决定**:自动更新只装补丁不自动重启(默认行为),需要重启时按 §11 的低峰时段手动执行并复核「九、验证清单」。
+
 ---
 
 ## 八、更新部署流程
@@ -788,11 +822,12 @@ powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1
 | 检查项 | 命令/方式 | 预期 |
 |--------|-----------|------|
 | 后端服务 | `sudo systemctl status ihomy-backend` | active (running) |
+| 后端健康 | `curl -i http://localhost:8080/api/public/health` | HTTP 200，body `data.status=UP`（依赖不可用时 503/DEGRADED） |
 | 后端接口 | `curl http://localhost:8080/api/public/home` | 返回 JSON（含 modules） |
 | 前端访问 | 浏览器 `https://你的域名` | 登录页 |
 | 登录 | 邮箱 + 密码 + 图形验证码 | 进入首页 |
 | 运维登录 | `ops` + 密码（初始密码为开发安全版，生产部署后已按 3.4 改密则用新密码） | 进入运维页 |
-| 数据库 | `mysql -uihomy -p ihomy -e "show tables;"` | 78 张表 |
+| 数据库 | `mysql -uihomy -p ihomy -e "show tables;"` | 81 张表 |
 | Redis | `docker exec ihomy-redis redis-cli -a '<Redis密码>' --no-auth-warning ping`(不带 `-a` 应报 `NOAUTH`) | PONG |
 | Redis 端口 | 从外网 `nc -vz <公网IP> 6379` | 拒绝连接(只绑回环) |
 | Nginx | `sudo nginx -t` | syntax ok |
@@ -1092,12 +1127,18 @@ IHOMY_TEST_PWD=<密码> python test/automation/media_engine_check.py --base http
 ├── frontend/dist/             # 前端构建产物（nginx 读取）
 ├── uploads/                   # 上传文件（属主 ihomy）
 ├── logs/                      # 三类日志 access/server/thirdparty（logback 写入，属主 ihomy）
+├── scripts/                   # prod-backup.sh / prod-restore.sh 等运维脚本
 └── config/
     ├── mysql/my.cnf           # MySQL 调优配置（部署时 cp 到 /etc）
-    └── external.yml           # 外挂配置（DB 密码/JWT 密钥等，chmod 640，不入 git）
+    ├── external.yml           # 外挂配置（DB 密码/JWT 密钥等，chmod 640，不入 git）
+    ├── fail2ban/ihomy-sshd.local   # SSH 防爆破配置（部署时 cp 到 /etc/fail2ban/jail.d/）
+    └── systemd/ihomy-backup.{service,timer}   # 每日备份定时器（部署时 cp 到 /etc/systemd/system/）
+/var/backups/ihomy/            # 每日备份：db/*.sql.gz（保留 14 天）+ uploads/ 只增不删镜像 + .last-success
 /var/log/ihomy/                # systemd 标准输出日志（属主 ihomy）
 /etc/nginx/conf.d/ihomy.conf   # nginx 站点配置（root 管理）
 /etc/systemd/system/ihomy-backend.service   # root 管理，User=ihomy + IHOMY_CONFIG_PATH
+/etc/systemd/system/ihomy-backup.{service,timer}   # root 管理，每日 03:00 备份（安装见「附:数据备份」）
+/etc/systemd/system/multi-user.target.wants/ihomy-backup.timer   # enable 后生成
 /etc/letsencrypt/live/ihomy.top/    # HTTPS 证书（root 管理）
 ```
 
@@ -1105,11 +1146,55 @@ IHOMY_TEST_PWD=<密码> python test/automation/media_engine_check.py --base http
 
 ## 附:数据备份
 
-> ihomy 删除照片/相册/视频时为**硬删除**(物理删 DB 记录 + 删除磁盘文件,无回收站),误删不可恢复。生产环境务必定期备份:
+> **误删兜底分两层**:①内容误删(照片/相册/视频/图书)先进 `/recycle` 回收站,7 天内可自行恢复(V10.10);②回收站超期清理、整库/整机级故障,靠本节备份。两层职责不同,都不可省。
+> 备份脚本与 systemd 单元已随仓库提供(`scripts/prod-backup.sh`、`config/systemd/ihomy-backup.{service,timer}`),装机时安装一次即可每日自动执行。
 
-- **数据库**:`mysqldump -uroot -p ihomy | gzip > /var/backups/ihomy/ihomy-$(date +%F).sql.gz`,crontab 每日 03:00 执行,保留 14 天。
-- **上传文件**:`/opt/ihomy/uploads` 目录(含 pictures/videos/files/music 分类子目录),`rsync -a /opt/ihomy/uploads/ /var/backups/ihomy/uploads/`,与数据库同周期。
-- **恢复**:先恢复数据库,再恢复 uploads 目录;DB 里的文件 URL(`/files/...`)与物理路径解耦,目录还原后即可访问。
+### 1. 安装每日定时备份(root,一次)
+
+```bash
+sudo apt install -y rsync          # 备份用 rsync 镜像 uploads(已装可跳过)
+sudo cp /opt/ihomy/config/systemd/ihomy-backup.service /opt/ihomy/config/systemd/ihomy-backup.timer /etc/systemd/system/
+sudo chmod +x /opt/ihomy/scripts/prod-backup.sh /opt/ihomy/scripts/prod-restore.sh
+sudo systemctl daemon-reload
+sudo systemctl enable --now ihomy-backup.timer
+systemctl list-timers ihomy-backup.timer       # 确认下次触发时间
+sudo systemctl start ihomy-backup.service      # 立即手动跑一次,验证通路
+journalctl -u ihomy-backup.service -n 50       # 查看本次结果
+```
+
+脚本做什么:`mysqldump --single-transaction` 逻辑备份(含存储过程/触发器/事件)→ `/var/backups/ihomy/db/ihomy-<日期>_<时分>.sql.gz`,随即 `gzip -t` 校验;`rsync -a` **只增不删**地把 `/opt/ihomy/uploads` 镜像到 `/var/backups/ihomy/uploads/`(故意不加 `--delete`:源目录误删时备份里仍留有历史文件);数据库转储保留 14 天,每次成功写 `/var/backups/ihomy/.last-success`,便于巡检判断是否按期执行。备份是重 I/O 任务,单元设了 `Nice=10` + `IOSchedulingClass=idle`,不与后端争资源。
+
+> 定时点默认 **每日 03:00**(`OnCalendar=*-*-* 03:00:00`,`Persistent=true` 服务器停机后开机补跑,`RandomizedDelaySec=10m` 避开整点尖峰)。改时间/保留天数:编辑 timer 的 `OnCalendar` 或 service 的 `IHOMY_BACKUP_RETENTION_DAYS` 后 `systemctl daemon-reload && systemctl restart ihomy-backup.timer`。
+> 备份落在同一台机器上,只防「误删/库损坏」不防「整机故障」。重要数据请再异地同步一份(如 NAS,见文末)。
+
+### 2. 恢复(先演练再用)
+
+**恢复前务必先演练**,确认转储可用;演练导入临时库,不碰生产:
+
+```bash
+# 演练:导入 ihomy_drill,核对表数与关键行数后删除
+sudo /opt/ihomy/scripts/prod-restore.sh /var/backups/ihomy/db/ihomy-2026-10-05_0300.sql.gz ihomy_drill
+mysql -uroot -N -B -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='ihomy_drill';"   # 应为 81
+mysql -uroot -e "DROP DATABASE ihomy_drill;"
+
+# 真恢复:目标库写 ihomy(脚本会先把当前库自动导出到 pre-restore-*.sql.gz 再覆盖)
+sudo /opt/ihomy/scripts/prod-restore.sh /var/backups/ihomy/db/ihomy-<日期>_<时分>.sql.gz ihomy
+
+# uploads 目录恢复(目录级同步,恢复前先确认目标目录内容)
+sudo rsync -a --delete /var/backups/ihomy/uploads/ /opt/ihomy/uploads/
+sudo chown -R ihomy:ihomy /opt/ihomy/uploads
+sudo systemctl restart ihomy-backend
+```
+
+DB 里的文件 URL(`/files/...`)与物理路径解耦,目录还原后即可访问。恢复后按「九、验证清单」复核。
+
+### 3. 恢复演练记录
+
+| 日期 | 范围 | 结论 | 证据 |
+|------|------|------|------|
+| 2026-10-05 | 本机开发库(81 表/近 500KB 转储) | 通过:演练库表数 81、抽查 `sys_user`/`sys_auth`/`sys_role_auth`/`sys_home_module`/`content_blog`/`report_system`/`sys_parameter`/`family_item` 行数与源库一致,`admin` 账号值一致 | `test/reports/2026-10-05_V10.18_回归_测试报告.md` |
+
+> **建议**:每次改动脚本或更换服务器后重跑一次演练,并把结论追加到上表。
 
 ---
 
@@ -1311,12 +1396,5 @@ cd /opt/ihomy && docker compose up -d
 > 容器化部署时，数据库/Redis 地址、上传目录经 **external.yml 覆盖**为容器内视角（host=`mysql`/`redis`，upload-dir=`/app/uploads`）。应用连接账号仍用 `ihomy`（schema.sql 开发安全版内置开发固定密码；**生产环境初始化后必须 `ALTER USER` 改强密码**，新密码经 external.yml 注入；该账号对 `ihomy` 库有 DML 权限）。
 >
 > **nginx.conf**：Docker Compose 的 `./nginx.conf` 需包含与第五节相同的 `location /files/`（**反代** `proxy_pass http://127.0.0.1:8080/api/files/;`，别写成 alias 直出，见踩坑速查 §7.8）、`location /api/ws`（WebSocket 反代）、`client_max_body_size 500m` 等配置，反代目标改为 `http://backend:8080`（容器服务名）。
->
-> **⚠️ schema.sql 种子缺失注意**：`schema.sql` 的 `sys_home_module` 种子缺 `chat` 行（聊天室模块），容器化全新部署后首页会缺聊天室入口。容器启动后需手动补一行（列名 `position`/`sort_order`）：
-> ```sql
-> INSERT INTO sys_home_module (code, title, icon, path, category, position, sort_order, enabled)
-> VALUES ('chat', '聊天室', 'icon-chat', '/chat', 'life', 'left', 16, 1);
-> ```
-> （本机部署用 schema.sql 同样需要补，但 live DB 已有，重导整库会丢。）
 >
 > 容器化时 backend 需要在 `command` 中带上 JVM 调优参数（2GB 内存方案）：`command: java -Xms256m -Xmx384m -XX:MetaspaceSize=128m -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC -Xss512k -jar app.jar`。

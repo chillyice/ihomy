@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.SysParameterMapper">
+
+    <select id="findByName" resultType="com.ihomy.entity.SysParameter">
+        SELECT name, value, description, created_at, updated_at
+        FROM sys_parameter
+        WHERE name = #{name}
+    </select>
+
+    <insert id="upsert" parameterType="com.ihomy.entity.SysParameter">
+        INSERT INTO sys_parameter (name, value, description)
+        VALUES (#{name}, #{value}, #{description})
+        ON DUPLICATE KEY UPDATE value = #{value}
+    </insert>
+
+</mapper>

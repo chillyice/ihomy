@@ -359,12 +359,13 @@ echo 'DONE'
 
 # ---------- 健康检查 ----------
 # Spring Boot 在 2GB 服务器启动较慢,is-active 只表示进程在跑,不代表 HTTP 已就绪
+# 探 /api/public/health:独立探活端点,内部已确认 DB/Redis 可用才回 200(比探业务接口更贴近"就绪")
 Write-Step '健康检查'
 Start-Sleep -Seconds 5
 $healthOk = $false
 for ($i = 1; $i -le 12; $i++) {
   try {
-    $resp = Invoke-WebRequest -Uri "https://$Server/api/public/home" -UseBasicParsing -TimeoutSec 8
+    $resp = Invoke-WebRequest -Uri "https://$Server/api/public/health" -UseBasicParsing -TimeoutSec 8
     if ($resp.StatusCode -eq 200) {
       Write-Ok "API 健康检查通过(尝试 $i 次)"
       $healthOk = $true

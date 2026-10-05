@@ -12,6 +12,7 @@ import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.MusicMapService;
 import com.ihomy.service.MusicService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -21,6 +22,7 @@ import java.util.*;
 /**
  * 音乐曲库 + 歌单管理(背景音乐播放单元)
  */
+@Tag(name = "音乐曲库")
 @RestController
 @RequestMapping("/music")
 @RequiredArgsConstructor

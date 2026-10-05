@@ -822,8 +822,10 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('tools',     '工具箱',   'icon-tools',     '/tools',  'life', 'left', 17, 1),
 ('plant',     '花园',     'icon-plant',     '/tools/plant',  'life', 'left', 40, 0),
 ('member', '家庭成员', 'icon-member', '/member', 'social',  'right',  1, 1),
-('cover',  '家庭封面', 'icon-cover',  '/cover',  'system',  'top',    1, 0),
 ('storage','文件浏览','icon-storage','/storage/files','system',  'left',  16, 1);
+-- 停用行说明:`plant`(花园)入口在「小游戏」页(Games.vue → /tools/plant),首页/侧栏不重复占位;
+-- `NAV_PATHS` 已映射 plant,启用即回导航。原 `cover`(家庭封面 /cover)停用行已删除——无路由、
+-- 无 NAV_PATHS 映射,任何状态下都到不了,属死种子(2026-10-05 治理轮)。
 
 -- ------------------------------------------------------------
 -- 26. 初始家庭 + 管理员账号

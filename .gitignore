@@ -42,5 +42,5 @@ frontend/public/emulatorjs/
 /.docgen/
 /.tmp_swf_ref/
 
-# 本机前端 dev server 日志(npm run dev 重定向产生的临时文件,不入库)
-/frontend-dev.log
+# 本机前端 dev/preview server 日志(npm run dev|preview 重定向产生的临时文件,不入库)
+/frontend-*.log

@@ -1,0 +1,23 @@
+# ihomy 每日备份(MySQL 逻辑备份 + uploads 目录同步)
+#
+# 安装(root):
+#   sudo cp config/systemd/ihomy-backup.service config/systemd/ihomy-backup.timer /etc/systemd/system/
+#   sudo chmod +x /opt/ihomy/scripts/prod-backup.sh
+#   sudo systemctl daemon-reload && sudo systemctl enable --now ihomy-backup.timer
+#   systemctl list-timers ihomy-backup.timer        # 确认下次触发时间
+#   sudo systemctl start ihomy-backup.service       # 立即手动跑一次验证
+#   journalctl -u ihomy-backup.service -n 50        # 查看本次结果
+[Unit]
+Description=ihomy 每日备份(MySQL 转储 + uploads 同步)
+Documentation=file:/opt/ihomy/docs/部署指导-Linux.md
+
+[Service]
+Type=oneshot
+Environment=IHOMY_BACKUP_DIR=/var/backups/ihomy
+Environment=IHOMY_UPLOADS_DIR=/opt/ihomy/uploads
+Environment=IHOMY_BACKUP_RETENTION_DAYS=14
+ExecStart=/opt/ihomy/scripts/prod-backup.sh
+# 备份是重 I/O 任务:降优先级,避免与后端争资源(2GB 服务器)
+Nice=10
+IOSchedulingClass=idle
+CPUSchedulingPolicy=batch
