@@ -11,6 +11,7 @@ import com.ihomy.mapper.AiFeatureMapper;
 import com.ihomy.mapper.AiModelMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -197,6 +198,7 @@ public class FamilyAiConfigService {
     }
 
     /** 删除模型:内置 LOCAL 拒绝删除;其余删除后把引用它的功能绑定置 null(该功能随之停用) */
+    @Transactional
     public void deleteModel(Long familyId, Long id) {
         AiModel m = requireModel(id, familyId);
         if (AiConst.TYPE_LOCAL.equals(m.getType())) {

@@ -346,6 +346,7 @@ import PageToolbar from '@/components/PageToolbar.vue'
 import SyncDialog from '@/components/SyncDialog.vue'
 import MediaPlayer from '@/components/MediaPlayer.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import { formatDate } from '@/utils/datetime'
 
 const { t } = useI18n()
 const userStore = useUserStore()
@@ -441,7 +442,6 @@ const wishDialog = reactive({ visible: false, form: { title: '', genres: [], rea
 const player = reactive({ visible: false, video: null })
 watch(() => player.visible, (v) => { v ? sunLight?.suspendEffects() : sunLight?.restoreEffects() })
 
-const formatDate = (d) => (d ? new Date(d).toLocaleDateString('zh-CN') : '')
 
 // 拉取视频库(筛选在前端做,全量拉取)
 const load = async () => {

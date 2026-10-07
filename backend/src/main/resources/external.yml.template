@@ -46,7 +46,7 @@ logging:
 # === 应用差异化配置 ===
 app:
   captcha-fixed-code:          # 开发可填固定验证码方便测试;生产必须留空(随机验证码)
-  cors-allowed-origins:        # 跨域白名单(逗号分隔),留空用基线 ihomy.top + localhost:5173
+  cors-allowed-origins: http://localhost:5173,http://127.0.0.1:5173   # 跨域白名单(逗号分隔);生产留空用基线 https://ihomy.top,开发填本地前端地址
   weather-api-host:            # 和风天气 JWT 凭证(可全留空:优先从 DB sys_weather_credential 读 status=1 记录)
   weather-project-id:
   weather-key-id:

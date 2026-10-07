@@ -12,7 +12,8 @@ export const WARN_LEVEL_ORDER = ['白色', '蓝色', '黄色', '橙色', '红色
 export const warnLevelColor = (level) => ({
   白色: '#9a9a9a', 蓝色: '#4a90d9', 黄色: '#d4a13f', 橙色: '#e0862f', 红色: '#d94a3f',
 }[level] || '#e0862f')
-/** 取预警列表里级别最高的一条(颜色用) */
+/** 取预警列表里级别最高的一条(颜色用)。
+ *  未知级别经 indexOf 得 -1,按最低级别对待:只有全部未知时才会返回列表首个元素。 */
 export const topWarning = (warnings) => {
   const list = warnings || []
   let best = null

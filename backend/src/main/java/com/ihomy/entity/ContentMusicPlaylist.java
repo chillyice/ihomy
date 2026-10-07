@@ -8,6 +8,10 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+/**
+ * 歌单实体(content_music_playlist):is_background=1 表示该歌单是家庭背景歌单
+ * (/music/background 免登录取用,首页/壁纸全局播放),一个家庭至多一个。
+ */
 @Data
 @TableName("content_music_playlist")
 public class ContentMusicPlaylist {

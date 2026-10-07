@@ -3,6 +3,8 @@ package com.ihomy.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -19,5 +21,6 @@ public class ChatRead {
     private Long userId;
     private Long familyId;
     private Long lastReadMsgId;
+    @TableField(updateStrategy = FieldStrategy.NEVER)
     private LocalDateTime updatedAt;
 }

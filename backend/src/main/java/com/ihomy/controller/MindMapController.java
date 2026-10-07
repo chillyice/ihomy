@@ -114,7 +114,7 @@ public class MindMapController {
         return Result.success(mindMapService.listSnapshots(id, current().getFamilyId()));
     }
 
-    @Operation(summary = "脑图快照详情(回滚预览用)")
+    @Operation(summary = "脑图快照详情(回滚预览用)(预留接口,前端暂未接入)")
     @GetMapping("/{id}/snapshot/{snapshotId}")
     public Result<ContentMindmapSnapshot> getSnapshot(@PathVariable Long id, @PathVariable Long snapshotId) {
         return Result.success(mindMapService.getSnapshot(id, snapshotId, current().getFamilyId()));

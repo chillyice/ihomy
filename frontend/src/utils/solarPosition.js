@@ -103,6 +103,8 @@ export function sunPosition(lat, lng, dateStr, minutesOfDay) {
   const T = julianCentury(jd)
   const dec = sunDeclination(T)
   const eot = eqOfTime(T)
+  // 均以「分钟」为单位(UTC 口径):太阳正午 = 12:00(720 分)− 经度时差(每度 4 分钟,东经为正)− 均时差;
+  // 时角 = (当前 UTC 分钟 − 正午分钟) / 4,地球每小时转 15°(即每 4 分钟 1°),再归一化到 ±180°
   const solarNoonMin = 720 - 4 * lng - eot
   const utcMin = ud.getUTCHours() * 60 + ud.getUTCMinutes()
   let ha = (utcMin - solarNoonMin) / 4

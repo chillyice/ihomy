@@ -89,7 +89,7 @@ public class OssComponentController {
 
     @Operation(summary = "编辑组件台账")
     @RequirePermission("ops:view")
-    @OperationLog(module = "OSS", operationType = "UPDATE", description = "编辑开源组件台账")
+    @OperationLog(module = "OSS", operationType = "UPDATE", description = "编辑开源组件台账", saveArgs = false)
     @PutMapping("/{id}")
     public Result<Void> edit(@PathVariable Long id, @RequestBody OssComponent body) {
         ossComponentService.edit(id, body);
@@ -98,7 +98,7 @@ public class OssComponentController {
 
     @Operation(summary = "新增组件台账")
     @RequirePermission("ops:view")
-    @OperationLog(module = "OSS", operationType = "CREATE", description = "新增开源组件台账")
+    @OperationLog(module = "OSS", operationType = "CREATE", description = "新增开源组件台账", saveArgs = false)
     @PostMapping
     public Result<Void> add(@RequestBody OssComponent body) {
         ossComponentService.add(body);

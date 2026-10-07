@@ -121,6 +121,7 @@ import PageToolbar from '@/components/PageToolbar.vue'
 import SyncDialog from '@/components/SyncDialog.vue'
 import AlbumDefaultCover from '@/components/AlbumDefaultCover.vue'
 import PhotoCascade from './PhotoCascade.vue'
+import { formatDate } from '@/utils/datetime'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -157,7 +158,6 @@ const sourceOptions = computed(() => {
 // 管理权限:家长或相册创建者本人
 const canManage = (a) =>
   userStore.isLoggedIn && (userStore.isOwner || a.createdBy === userStore.userInfo?.id)
-const formatDate = (d) => (d ? new Date(d).toLocaleDateString('zh-CN') : '')
 
 const load = async () => {
   loading.value = true

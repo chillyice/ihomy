@@ -20,6 +20,7 @@ import com.ihomy.mapper.ItemMapper;
 import com.ihomy.mapper.RoomMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -120,6 +121,7 @@ public class ItemService {
         roomMapper.updateById(r);
     }
 
+    @Transactional
     public void roomDelete(Long id, Long familyId) {
         requireRoom(id, familyId);
         // 家具进家具库(room_id 置空),与物品绑定不动;散放物品(room_id 指向本房间)同步清空
@@ -208,6 +210,7 @@ public class ItemService {
         furnitureMapper.updateById(f);
     }
 
+    @Transactional
     public void furnitureDelete(Long id, Long familyId) {
         requireFurniture(id, familyId);
         // 库里删除才是真正删除:家具上的物品不删除,仅解除归属(furniture_id/相对坐标置空)
@@ -341,6 +344,8 @@ public class ItemService {
                 .eq(Item::getFamilyId, familyId)
                 .in(Item::getId, ids);
         if (furnitureId != null) {
+            // relX/relY 是家具画布内的归一化坐标(0–1),批量归入家具时置 0.5 即摆到画布中心,
+            // 避免所有物品堆在左上角;离开家具则清空坐标(回到房间级,无相对坐标)
             uw.set(Item::getFurnitureId, furnitureId)
                     .set(Item::getRoomId, null)
                     .set(Item::getRelX, new java.math.BigDecimal("0.5"))

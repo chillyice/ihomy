@@ -19,11 +19,3 @@ export const feedSummary = (t, f, sliceLen = 40) => {
   }
 }
 
-export const formatFeedTime = (t, d) => {
-  if (!d) return ''
-  const date = new Date(d)
-  const diff = (Date.now() - date.getTime()) / 1000
-  if (diff < 3600) return t('feed.minutesAgo', { n: Math.max(1, Math.floor(diff / 60)) })
-  if (diff < 86400) return t('feed.hoursAgo', { n: Math.floor(diff / 3600) })
-  return date.toLocaleDateString()
-}

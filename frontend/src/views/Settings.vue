@@ -31,7 +31,7 @@
             <span class="menu-icon">🗄️</span>{{ $t('settings.cat.storage') }}
           </el-menu-item>
           <el-menu-item index="light">
-            <span class="menu-icon">🎨</span>个性化设置
+            <span class="menu-icon">🎨</span>{{ $t('settings.personalize') }}
           </el-menu-item>
         </el-menu>
       </aside>
@@ -90,7 +90,7 @@
           <!-- 退出登录:个人设置最下方 -->
           <div class="card settings-card">
             <div class="section-label">{{ $t('nav.logout') }}</div>
-            <p class="share-tip">退出当前账号的登录状态,返回未登录的首页。</p>
+            <p class="share-tip">{{ $t('settings.logoutHint') }}</p>
             <el-button type="danger" plain @click="onLogout">{{ $t('nav.logout') }}</el-button>
           </div>
         </template>
@@ -142,37 +142,28 @@
 
           <!-- 背景音乐设置:上传单曲/专辑 + 歌单管理(设为背景音乐) -->
           <div class="card settings-card">
-            <div class="section-label">BGM 设置</div>
+            <div class="section-label">{{ $t('settings.bgmTitle') }}</div>
             <el-form label-position="top">
-              <el-form-item label="上传音乐">
+              <el-form-item :label="$t('settings.bgmUploadMusic')">
                 <div class="music-actions">
                   <el-upload :show-file-list="false" :http-request="uploadMusic" accept="audio/*">
-                    <el-button>上传单曲</el-button>
+                    <el-button>{{ $t('settings.bgmUploadTrack') }}</el-button>
                   </el-upload>
-                  <el-button @click="triggerFolderInput">上传专辑文件夹</el-button>
+                  <el-button @click="triggerFolderInput">{{ $t('settings.bgmUploadFolder') }}</el-button>
                   <input ref="folderInputRef" type="file" webkitdirectory multiple accept="audio/*" style="display:none" @change="onFolderChange" />
-                  <el-button class="ghost-btn" @click="openPlaylistDialog">新建歌单</el-button>
+                  <el-button class="ghost-btn" @click="openPlaylistDialog">{{ $t('settings.bgmNewPlaylist') }}</el-button>
                 </div>
               </el-form-item>
-              <el-form-item label="BGM 歌单">
+              <el-form-item :label="$t('settings.bgmPlaylists')">
                 <div class="bg-playlist-list">
-                  <div v-for="p in visiblePlaylists" :key="p.id" class="bg-playlist-item" :class="{ active: p.isBackground }">
-                    <img v-if="p.coverUrl" :src="p.coverUrl" class="bg-pl-cover" alt="" />
-                    <div v-else class="bg-pl-cover placeholder">🎼</div>
-                    <div class="bg-pl-info">
-                      <div class="bg-pl-name">{{ p.name }}</div>
-                      <div class="bg-pl-count">{{ p.trackCount || 0 }} 首</div>
-                    </div>
-                    <div v-if="p.isBackground" class="bg-pl-tag">当前BGM</div>
-                    <el-button v-else size="small" type="primary" @click="setBackground(p)">设为BGM</el-button>
-                  </div>
+                  <BgmPlaylistItem v-for="p in visiblePlaylists" :key="p.id" :p="p" @set="setBackground" />
                   <div v-a11y-click v-if="allPlaylists.length > 5" class="bg-more" @click="showAllPlaylists = true">
-                    更多 ({{ allPlaylists.length - 5 }}) 个歌单
+                    {{ $t('settings.bgmMore', { n: allPlaylists.length - 5 }) }}
                   </div>
                 </div>
-                <el-empty v-if="!allPlaylists.length && !playlistLoading" description="暂无歌单,创建第一个吧" :image-size="40" />
+                <el-empty v-if="!allPlaylists.length && !playlistLoading" :description="$t('settings.bgmEmpty')" :image-size="40" />
               </el-form-item>
-                <div class="share-tip">歌单是BGM播放的最小单元;播放器只播放当前家庭绑定的BGM歌单。详细配置请<a href="javascript:void(0)" class="link-text" @click="$router.push('/music')">跳转音乐页面</a></div>
+                <div class="share-tip">{{ $t('settings.bgmTip') }}<a href="javascript:void(0)" class="link-text" @click="$router.push('/music')">{{ $t('settings.bgmTipLink') }}</a></div>
             </el-form>
           </div>
 
@@ -182,8 +173,8 @@
             <div v-if="families.length" class="family-switch-list">
               <div v-for="f in families" :key="f.familyId" class="family-switch-item">
                 <span class="family-switch-name">{{ f.name }}</span>
-                <el-tag v-if="f.isCurrent" size="small" type="success">当前家庭</el-tag>
-                <el-button v-else size="small" type="primary" plain @click="switchFamily(f.familyId)">切换</el-button>
+                <el-tag v-if="f.isCurrent" size="small" type="success">{{ $t('settings.currentFamily') }}</el-tag>
+                <el-button v-else size="small" type="primary" plain @click="switchFamily(f.familyId)">{{ $t('settings.switchTo') }}</el-button>
               </div>
             </div>
             <el-empty v-else :description="$t('common.empty')" :image-size="40" />
@@ -191,9 +182,9 @@
 
           <!-- 创建新家庭:放在家庭设置最下方 -->
           <div class="card settings-card">
-            <div class="section-label">创建新家庭</div>
-            <button class="create-family-btn" @click="showCreateFamily = true">创建新家庭</button>
-            <p class="share-tip">创建一个新的家庭组,你将成为新家庭的家长。创建后自动切换到新家庭,可在顶栏切换回原家庭。</p>
+            <div class="section-label">{{ $t('settings.createFamily') }}</div>
+            <button class="create-family-btn" @click="showCreateFamily = true">{{ $t('settings.createFamily') }}</button>
+            <p class="share-tip">{{ $t('settings.createFamilyHint') }}</p>
           </div>
         </template>
 
@@ -378,14 +369,14 @@
           <div class="card settings-card">
             <div class="section-label">{{ $t('settings.weather.regionTitle') }}</div>
             <el-form label-position="top">
-              <el-form-item label="天气地区">
+              <el-form-item :label="$t('settings.weatherRegion')">
                 <div class="weather-loc-row">
                   <el-select
                     v-model="weatherLocationId"
                     filterable
                     remote
                     clearable
-                    placeholder="搜索城市名(如:济南)"
+                    :placeholder="$t('settings.weatherSearchPh')"
                     :remote-method="searchLocations"
                     :loading="locLoading"
                     style="width: 240px"
@@ -396,16 +387,16 @@
                   <el-button v-if="weatherCity" :loading="savingWeather" @click="clearLocation">{{ $t('settings.weather.useIp') }}</el-button>
                 </div>
                 <div class="share-tip">
-                  {{ $t('settings.weather.currentRegion') }}：<strong>{{ weatherCity || $t('settings.weather.ipAuto') }}</strong>
+                  {{ $t('settings.weather.currentRegion') }}: <strong>{{ weatherCity || $t('settings.weather.ipAuto') }}</strong>
                   · {{ $t('settings.weather.regionHint') }}
                 </div>
               </el-form-item>
-              <el-form-item label="气象预警推送">
+              <el-form-item :label="$t('settings.alertPushTitle')">
                 <div class="setting-row">
                   <el-switch v-model="alertPushEnabled" @change="onAlertPushChange" />
-                  <span class="setting-label">推送到通知铃铛</span>
+                  <span class="setting-label">{{ $t('settings.alertPushLabel') }}</span>
                 </div>
-                <div class="share-tip">开启后当地发布的气象预警(暴雨/大风等)会自动通知全部家庭成员(不是实时推送,可能延迟半小时左右)</div>
+                <div class="share-tip">{{ $t('settings.alertPushHint') }}</div>
               </el-form-item>
             </el-form>
           </div>
@@ -601,7 +592,7 @@
         <!-- 个性化设置:主题 + 台灯/色温/亮度/阴影/天气效果/天气地区/夜间超时关灯/光照测试入口 -->
         <template v-if="active === 'light'">
           <div class="card settings-card">
-            <div class="section-label">个性化设置</div>
+            <div class="section-label">{{ $t('settings.personalize') }}</div>
             <el-form label-position="top" class="settings-form">
               <el-form-item :label="$t('settings.theme')">
                 <div class="theme-row">
@@ -614,64 +605,64 @@
                 </div>
               </el-form-item>
               <el-divider />
-              <el-form-item label="台灯模式">
+              <el-form-item :label="$t('settings.lampMode')">
                 <el-radio-group :model-value="lampMode" @change="(v) => lampMode = v">
-                  <el-radio value="auto">自动(夜间开灯/日间关灯)</el-radio>
-                  <el-radio value="on">常开</el-radio>
-                  <el-radio value="off">关闭</el-radio>
+                  <el-radio value="auto">{{ $t('settings.lampAuto') }}</el-radio>
+                  <el-radio value="on">{{ $t('settings.lampOn') }}</el-radio>
+                  <el-radio value="off">{{ $t('settings.lampOff') }}</el-radio>
                 </el-radio-group>
               </el-form-item>
-              <el-form-item label="色温">
+              <el-form-item :label="$t('settings.colorTemp')">
                 <el-slider v-model.number="lampTemp" :min="0" :max="100" show-input />
-                <div class="share-tip">0=暖光(橙黄),100=冷光(蓝白)</div>
+                <div class="share-tip">{{ $t('settings.colorTempHint') }}</div>
               </el-form-item>
-              <el-form-item label="亮度">
+              <el-form-item :label="$t('settings.brightness')">
                 <el-slider v-model.number="lampBrightness" :min="0" :max="100" show-input />
               </el-form-item>
               <el-form-item>
                 <div class="setting-row">
                   <el-switch v-model="shadowEnabled" />
-                  <span class="setting-label">阴影效果</span>
+                  <span class="setting-label">{{ $t('settings.shadowEffect') }}</span>
                 </div>
-                <div class="share-tip">关闭后窗户阴影和暗角将不显示,画面更干净</div>
+                <div class="share-tip">{{ $t('settings.shadowHint') }}</div>
               </el-form-item>
               <el-form-item v-if="themeStore.theme !== 'warm'">
                 <div class="setting-row">
                   <el-switch v-model="blobsEnabled" />
-                  <span class="setting-label">背景色块</span>
+                  <span class="setting-label">{{ $t('settings.blobs') }}</span>
                 </div>
-                <div class="share-tip">关闭后背景色块飘动动画不显示(可提升低分辨率屏性能)</div>
+                <div class="share-tip">{{ $t('settings.blobsHint') }}</div>
               </el-form-item>
               <el-form-item v-if="themeStore.theme !== 'warm'">
                 <div class="setting-row">
                   <el-switch v-model="glassEnabled" />
-                  <span class="setting-label">毛玻璃效果</span>
+                  <span class="setting-label">{{ $t('settings.glass') }}</span>
                 </div>
-                <div class="share-tip">关闭后导航栏/弹窗/面板的磨砂模糊效果将停用,改用不透明背景(大幅降低 GPU 占用)</div>
+                <div class="share-tip">{{ $t('settings.glassHint') }}</div>
               </el-form-item>
               <el-divider />
               <el-form-item>
                 <div class="setting-row">
                   <el-switch v-model="weatherEffectEnabled" />
-                  <span class="setting-label">天气效果</span>
+                  <span class="setting-label">{{ $t('settings.weatherEffect') }}</span>
                 </div>
-                <div class="share-tip">开启后根据真实天气显示光柱/阴影/雨雪粒子等效果,关闭后仅按时间做光影</div>
+                <div class="share-tip">{{ $t('settings.weatherEffectHint') }}</div>
               </el-form-item>
               <el-divider />
-              <el-form-item label="夜间超时关灯(分钟)">
+              <el-form-item :label="$t('settings.idleLabel')">
                 <div class="setting-row">
                   <el-input-number v-model.number="idleMinutes" :min="1" :max="120" :step="1" />
                 </div>
-                <div class="share-tip">夜间无操作超过此时长后自动关灯,有操作时立即开灯(仅"自动"模式生效)</div>
-                <div v-if="isIdle" class="share-tip" style="color: var(--color-accent)">当前状态:已超时关灯</div>
+                <div class="share-tip">{{ $t('settings.idleHint') }}</div>
+                <div v-if="isIdle" class="share-tip" style="color: var(--color-accent)">{{ $t('settings.idleState') }}</div>
               </el-form-item>
               <el-form-item>
-                <el-button @click="enterLightTest">进入光照测试</el-button>
+                <el-button @click="enterLightTest">{{ $t('settings.enterLightTest') }}</el-button>
               </el-form-item>
               <el-divider />
-              <el-form-item label="面板布局">
-                <el-button type="warning" plain @click="resetPanelLayout">恢复默认面板布局</el-button>
-                <div class="share-tip">重置首页所有可拖动面板的位置和大小(家人动态/任务/天气/纪念日/今日/音乐播放器)</div>
+              <el-form-item :label="$t('settings.panelLayout')">
+                <el-button type="warning" plain @click="resetPanelLayout">{{ $t('settings.resetPanelLayout') }}</el-button>
+                <div class="share-tip">{{ $t('settings.resetPanelHint') }}</div>
               </el-form-item>
             </el-form>
           </div>
@@ -694,7 +685,13 @@
     </div>
     <!-- 图片/视频预览 -->
     <!-- 头像裁剪对话框 -->
-    <AvatarCropper ref="avatarCropperRef" @cropped="onAvatarCropped" />
+    <AvatarCropper
+      ref="avatarCropperRef"
+      :title="$t('settings.avatarCropTitle')"
+      :cancel-text="$t('common.cancel')"
+      :confirm-text="$t('common.confirm')"
+      @cropped="onAvatarCropped"
+    />
 
     <!-- 新建身份标签对话框 -->
     <el-dialog v-model="showLabelDialog" :title="$t('settings.newLabel')" width="360px" append-to-body>
@@ -706,54 +703,45 @@
     </el-dialog>
 
     <!-- 创建新家庭弹窗 -->
-    <el-dialog v-model="showCreateFamily" title="创建新家庭" width="380px" append-to-body @keyup.esc="showCreateFamily = false">
-      <div class="fm-hint">你将成为新家庭的家长,创建后自动切换到新家庭。</div>
+    <el-dialog v-model="showCreateFamily" :title="$t('settings.createFamily')" width="380px" append-to-body @keyup.esc="showCreateFamily = false">
+      <div class="fm-hint">{{ $t('settings.createFamilyDialogHint') }}</div>
       <el-input
         ref="familyNameInputRef"
         v-model="newFamilyName"
-        placeholder="如：张家的小院"
+        :placeholder="$t('settings.familyNamePh')"
         @keyup.enter="confirmCreateFamily"
       />
       <template #footer>
-        <el-button @click="showCreateFamily = false">取消</el-button>
+        <el-button @click="showCreateFamily = false">{{ $t('common.cancel') }}</el-button>
         <el-button type="primary" :disabled="!newFamilyName.trim() || creatingFamily" :loading="creatingFamily" @click="confirmCreateFamily">
-          {{ creatingFamily ? '创建中...' : '创建' }}
+          {{ creatingFamily ? $t('settings.creating') : $t('settings.create') }}
         </el-button>
       </template>
     </el-dialog>
 
     <!-- 专辑上传弹窗:输入专辑名后批量上传 -->
-    <el-dialog v-model="albumDialog.visible" title="上传专辑" width="380px" append-to-body>
-      <div class="share-tip">已选择 {{ albumDialog.files.length }} 个音乐文件,请输入专辑名称:</div>
-      <el-input v-model="albumDialog.name" placeholder="专辑名称" @keyup.enter="confirmUploadAlbum" />
+    <el-dialog v-model="albumDialog.visible" :title="$t('settings.uploadAlbumTitle')" width="380px" append-to-body>
+      <div class="share-tip">{{ $t('settings.albumFilesHint', { n: albumDialog.files.length }) }}</div>
+      <el-input v-model="albumDialog.name" :placeholder="$t('settings.albumNamePh')" @keyup.enter="confirmUploadAlbum" />
       <template #footer>
-        <el-button @click="albumDialog.visible = false">取消</el-button>
-        <el-button type="primary" :disabled="!albumDialog.name.trim() || albumDialog.uploading" :loading="albumDialog.uploading" @click="confirmUploadAlbum">上传</el-button>
+        <el-button @click="albumDialog.visible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :disabled="!albumDialog.name.trim() || albumDialog.uploading" :loading="albumDialog.uploading" @click="confirmUploadAlbum">{{ $t('common.upload') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 新建歌单弹窗 -->
-    <el-dialog v-model="plDialog.visible" title="新建歌单" width="380px" append-to-body>
-      <el-input v-model="plDialog.name" placeholder="歌单名称" @keyup.enter="createPlaylist" />
+    <el-dialog v-model="plDialog.visible" :title="$t('settings.bgmNewPlaylist')" width="380px" append-to-body>
+      <el-input v-model="plDialog.name" :placeholder="$t('settings.playlistNamePh')" @keyup.enter="createPlaylist" />
       <template #footer>
-        <el-button @click="plDialog.visible = false">取消</el-button>
-        <el-button type="primary" @click="createPlaylist">创建</el-button>
+        <el-button @click="plDialog.visible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="createPlaylist">{{ $t('settings.create') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 全部歌单弹窗 -->
-    <el-dialog v-model="showAllPlaylists" title="全部歌单" width="560px" append-to-body>
+    <el-dialog v-model="showAllPlaylists" :title="$t('settings.bgmAllPlaylists')" width="560px" append-to-body>
       <div class="bg-playlist-list">
-        <div v-for="p in allPlaylists" :key="p.id" class="bg-playlist-item" :class="{ active: p.isBackground }">
-          <img v-if="p.coverUrl" :src="p.coverUrl" class="bg-pl-cover" alt="" />
-          <div v-else class="bg-pl-cover placeholder">🎼</div>
-          <div class="bg-pl-info">
-            <div class="bg-pl-name">{{ p.name }}</div>
-            <div class="bg-pl-count">{{ p.trackCount || 0 }} 首</div>
-          </div>
-          <div v-if="p.isBackground" class="bg-pl-tag">当前BGM</div>
-          <el-button v-else size="small" type="primary" @click="setBackground(p)">设为BGM</el-button>
-        </div>
+        <BgmPlaylistItem v-for="p in allPlaylists" :key="p.id" :p="p" @set="setBackground" />
       </div>
     </el-dialog>
   </div>
@@ -774,6 +762,8 @@ import { useThemeStore } from '@/stores/theme'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import StorageView from '@/views/storage/Storage.vue'
 import ThemeSwatch from '@/components/ThemeSwatch.vue'
+import BgmPlaylistItem from '@/components/BgmPlaylistItem.vue'
+import { formatDateTime } from '@/utils/datetime'
 
 const { locale, t } = useI18n()
 const userStore = useUserStore()
@@ -815,7 +805,7 @@ const enterLightTest = () => {
 
 const profile = reactive({ nickname: '', avatar: '', birthday: null, gender: 0 })
 const labelForm = reactive({ label: '', color: '#C9807A' })
-const presets = ['爸爸', '妈妈']
+const presets = [t('settings.presetDad'), t('settings.presetMom')]
 const showLabelDialog = ref(false)
 const newLabelName = ref('')
 
@@ -962,12 +952,6 @@ const saveFamily = async () => {
   }
 }
 
-const removeMusic = async () => {
-  family.musicUrl = ''
-  family.musicTitle = ''
-  await saveFamily()
-}
-
 // 背景音乐设置:歌单管理
 const allPlaylists = ref([])
 const playlistLoading = ref(false)
@@ -989,7 +973,7 @@ const loadPlaylists = async () => {
 const uploadMusic = async (options) => {
   try {
     await musicApi.upload(options.file)
-    ElMessage.success('已上传到曲库')
+    ElMessage.success(t('settings.uploadedToLibrary'))
   } catch {
     ElMessage.error(t('settings.uploadFailed'))
   }
@@ -1000,7 +984,7 @@ const triggerFolderInput = () => folderInputRef.value?.click()
 const albumDialog = reactive({ visible: false, name: '', files: [], uploading: false })
 const onFolderChange = (e) => {
   const files = Array.from(e.target.files || []).filter(f => f.type.startsWith('audio/'))
-  if (!files.length) { ElMessage.warning('文件夹中没有音频文件'); e.target.value = ''; return }
+  if (!files.length) { ElMessage.warning(t('settings.noAudioInFolder')); e.target.value = ''; return }
   const rel = files[0].webkitRelativePath || ''
   albumDialog.files = files
   albumDialog.name = rel ? rel.split('/')[0] : ''
@@ -1013,7 +997,7 @@ const confirmUploadAlbum = async () => {
   albumDialog.uploading = true
   try {
     await musicApi.uploadAlbum(albumDialog.files, albumName)
-    ElMessage.success(`已上传专辑《${albumName}》共 ${albumDialog.files.length} 首`)
+    ElMessage.success(t('settings.albumUploaded', { name: albumName, n: albumDialog.files.length }))
     albumDialog.visible = false
   } catch (e) {
     ElMessage.error(t('settings.uploadFailed'))
@@ -1028,22 +1012,22 @@ const createPlaylist = async () => {
   if (!plDialog.name.trim()) return
   try {
     await musicApi.createPlaylist(plDialog.name.trim())
-    ElMessage.success('歌单已创建')
+    ElMessage.success(t('settings.playlistCreated'))
     plDialog.visible = false
     await loadPlaylists()
   } catch (e) {
-    ElMessage.error('创建失败')
+    ElMessage.error(t('settings.createFailed'))
   }
 }
 
 const setBackground = async (p) => {
   try {
     await musicApi.setBackground(p.id)
-    ElMessage.success(`已将《${p.name}》设为BGM`)
+    ElMessage.success(t('settings.bgmSetDone', { name: p.name }))
     userStore.bumpBgMusic()
     await loadPlaylists()
   } catch (e) {
-    ElMessage.error('设置失败')
+    ElMessage.error(t('settings.setFailed'))
   }
 }
 
@@ -1097,10 +1081,10 @@ const confirmCreateFamily = async () => {
   creatingFamily.value = true
   try {
     await familyApi.create({ name })
-    ElMessage.success('家庭创建成功,已切换到新家庭')
+    ElMessage.success(t('settings.familyCreated'))
     location.reload()
   } catch (e) {
-    ElMessage.error(e.message || '创建失败')
+    ElMessage.error(e.message || t('settings.createFailed'))
   } finally {
     creatingFamily.value = false
   }
@@ -1108,7 +1092,7 @@ const confirmCreateFamily = async () => {
 
 // 退出登录:个人设置最下方,确认后登出并刷新回未登录首页
 const onLogout = () => {
-  ElMessageBox.confirm('确定退出登录吗？', t('nav.logout'), {
+  ElMessageBox.confirm(t('settings.logoutConfirm'), t('nav.logout'), {
     confirmButtonText: t('common.confirm'),
     cancelButtonText: t('common.cancel'),
     type: 'warning',
@@ -1404,11 +1388,15 @@ const removeWeatherCred = (row) => {
   }).catch(() => {})
 }
 
-// 恢复默认面板布局:清除 localStorage 中所有面板持久化记录,刷新页面生效
+// 恢复默认面板布局:清除 localStorage 中所有面板持久化记录,刷新页面生效。
+// 当前确实在写的键:ihomy:music:pos(MusicPlayer 拖拽位置);ihomy:panel:* 与 ihomy:vinyl:pos
+// 是历史键(现已无写入方),保留清理是为了清掉老浏览器里的残留。
+// 注意:光尘首页仪表盘(ihomy:dashboard:layout:v3)与暖居首页(ihomy:guangchen:home:v)布局
+// 各有页面内自带的「恢复默认」按钮,不在这里覆盖——新增可拖拽面板时记得回来补键。
 const resetPanelLayout = () => {
-  ElMessageBox.confirm('确定恢复首页所有面板的默认位置和大小?当前自定义布局将被清除。', '恢复默认布局', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
+  ElMessageBox.confirm(t('settings.resetPanelConfirm'), t('settings.resetPanelTitle'), {
+    confirmButtonText: t('common.confirm'),
+    cancelButtonText: t('common.cancel'),
     type: 'warning',
     closeOnClickModal: true,
   }).then(() => {
@@ -1416,7 +1404,7 @@ const resetPanelLayout = () => {
     keys.forEach(k => localStorage.removeItem(k))
     localStorage.removeItem('ihomy:vinyl:pos')
     localStorage.removeItem('ihomy:music:pos')
-    ElMessage.success('面板布局已重置,即将刷新...')
+    ElMessage.success(t('settings.resetPanelDone'))
     setTimeout(() => location.reload(), 800)
   }).catch(() => {})
 }
@@ -1435,7 +1423,6 @@ const onAvatarCropped = async (file) => {
     ElMessage.error(t('settings.uploadFailed'))
   }
 }
-const uploadAvatar = onAvatarCropped  // 兼容旧引用
 
 const uploadCover = async (options) => {
   try {
@@ -1502,7 +1489,6 @@ const removeMediaMine = async () => {
   await loadMediaConfig()
 }
 
-const formatDateTime = (v) => (v ? new Date(v).toLocaleString() : '')
 
 const loadMediaConfig = async () => {
   mediaLoading.value = true
@@ -1671,16 +1657,8 @@ html.dark .create-family-btn:hover { background: rgba(232,220,200,0.15); }
 .family-switch-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--color-card-2); border-radius: 10px; }
 .family-switch-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 500; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* 背景音乐歌单列表 */
+/* 背景音乐歌单列表(条目样式见 BgmPlaylistItem.vue) */
 .bg-playlist-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
-.bg-playlist-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--color-card-2); border-radius: 10px; transition: background 0.15s; }
-.bg-playlist-item.active { background: rgba(168,72,58,0.08); border: 1px solid rgba(168,72,58,0.2); }
-.bg-pl-cover { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
-.bg-pl-cover.placeholder { display: flex; align-items: center; justify-content: center; background: rgba(58,46,34,0.06); font-size: 18px; }
-.bg-pl-info { flex: 1; min-width: 0; }
-.bg-pl-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bg-pl-count { font-size: 12px; color: var(--color-text-secondary); }
-.bg-pl-tag { font-size: 12px; color: var(--color-accent); font-weight: 500; white-space: nowrap; }
 .bg-more { text-align: center; padding: 8px; font-size: 13px; color: var(--color-accent); cursor: pointer; border-radius: 8px; }
 .bg-more:hover { background: rgba(168,72,58,0.06); }
 .link-text { color: var(--color-accent); text-decoration: underline; }
@@ -1698,8 +1676,6 @@ html.dark .create-family-btn:hover { background: rgba(232,220,200,0.15); }
   /* 窄屏下横向操作行换行,避免溢出 */
   .music-actions { flex-wrap: wrap; }
   .setting-row { flex-wrap: wrap; }
-  .bg-playlist-item { flex-wrap: wrap; }
-  .bg-pl-tag { margin-left: 52px; }
   .settings-card .el-input, .settings-card .el-select { width: 100%; }
 }
 </style>

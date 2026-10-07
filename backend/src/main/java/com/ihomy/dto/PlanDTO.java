@@ -12,5 +12,5 @@ public class PlanDTO {
     private String title;
     private String description;
     private LocalDate targetDate;
-    private Integer status;
+    private String status;
 }

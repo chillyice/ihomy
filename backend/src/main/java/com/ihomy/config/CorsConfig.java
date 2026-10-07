@@ -9,13 +9,13 @@ import org.springframework.web.filter.CorsFilter;
 
 /**
  * 跨域配置:仅放行白名单来源(app.cors-allowed-origins,经 external.yml 按环境覆盖),允许携带凭证。
- * 默认 https://ihomy.top(生产) + 本机 5173(开发,前端 dev)。
+ * 基线为生产 https://ihomy.top;开发端 localhost:5173 由本机 external.yml 覆盖(生产基线不含 localhost)。
  * 不再反射任意来源——此前 addAllowedOriginPattern("*") + allowCredentials 任意站点可带凭证读响应。
  */
 @Configuration
 public class CorsConfig {
 
-    @Value("${app.cors-allowed-origins:https://ihomy.top,http://localhost:5173,http://127.0.0.1:5173}")
+    @Value("${app.cors-allowed-origins:https://ihomy.top}")
     private String allowedOrigins;
 
     @Bean

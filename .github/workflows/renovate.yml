@@ -1,5 +1,7 @@
 # Renovate 依赖检测(检测模式):只更新 Dependency Dashboard,不自动开 PR。
 # 升级 PR 需在台账 /ops/oss 里先 AI 评估可行,再由后端勾选 Dashboard 对应项触发。
+# 注意:Renovate 开出的 PR 要让 CI 正常跑,必须用 PAT/App token(secrets.RENOVATE_TOKEN);
+# 用默认 GITHUB_TOKEN 创建的 PR 不会触发其它 workflow(GitHub 防递归),CI 闸门就形同虚设。
 name: Renovate
 
 on:
@@ -23,4 +25,4 @@ jobs:
         uses: renovatebot/github-action@v40
         with:
           configurationFile: renovate.json
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.RENOVATE_TOKEN || secrets.GITHUB_TOKEN }}

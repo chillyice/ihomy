@@ -22,6 +22,6 @@ public class LibraryDTO {
     private String category;
     private List<Long> categoryIds;
     private String tags;
-    private Integer status;
-    private Integer visibility;
+    private String status;
+    private String visibility;
 }

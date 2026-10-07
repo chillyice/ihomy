@@ -964,8 +964,6 @@ const moveEvent = async (ev, period, view) => {
 
 /** ==================== 事件弹窗(触发时间 ↔ 生效期次) ==================== */
 
-const eventMaxPeriod = computed(() => (current.value ? Number(current.value.months) : 1200))
-
 const eventDlg = reactive({
   visible: false,
   saving: false,

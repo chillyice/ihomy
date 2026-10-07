@@ -40,7 +40,8 @@ public class AccessLogFilter extends OncePerRequestFilter {
     /** JSON 入参/响应敏感字段打码(值替换为 ***) */
     private static final Pattern SENSITIVE_JSON =
             Pattern.compile("(?i)(\"(?:password|passwd|oldPassword|newPassword|token|accessToken|access_token"
-                    + "|refreshToken|refresh_token|secret|secretKey|privateKey|apiKey|api_key|captcha|captchaCode"
+                    + "|refreshToken|refresh_token|secret|secretKey|privateKey|publicKey|apiKey|api_key"
+                    + "|appKey|signKey|probeToken|captcha|captchaCode"
                     + "|plaintext|ciphertext|authorization)"
                     + "\"\\s*:\\s*\")([^\"]*)(\")");
     /** query 敏感参数打码 */
@@ -164,7 +165,8 @@ public class AccessLogFilter extends OncePerRequestFilter {
         return t.contains("json") || t.contains("x-www-form-urlencoded") || t.contains("text/");
     }
 
-    private String maskJson(String body) {
+    /** JSON 敏感字段打码:访问日志与操作日志切面共用同一套清单 */
+    public static String maskJson(String body) {
         return SENSITIVE_JSON.matcher(body).replaceAll("$1***$3");
     }
 

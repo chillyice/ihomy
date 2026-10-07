@@ -7,9 +7,9 @@ import en from './en'
 export const SUPPORTED_LOCALES = ['zh-CN', 'en']
 
 function detectLocale() {
-  const saved = localStorage.getItem('ihomy-lang')
+  const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('ihomy-lang') : null
   if (saved && SUPPORTED_LOCALES.includes(saved)) return saved
-  const nav = (navigator.language || 'zh-CN').toLowerCase()
+  const nav = (typeof navigator !== 'undefined' && navigator.language ? navigator.language : 'zh-CN').toLowerCase()
   return nav.startsWith('zh') ? 'zh-CN' : 'en'
 }
 
@@ -27,6 +27,6 @@ const i18n = createI18n({
   messages: { 'zh-CN': zhCN, en },
 })
 
-document.documentElement.lang = i18n.global.locale.value
+if (typeof document !== 'undefined') document.documentElement.lang = i18n.global.locale.value
 
 export default i18n

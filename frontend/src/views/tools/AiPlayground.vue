@@ -514,7 +514,7 @@ const saveWeatherCfg = () => {
   try {
     localStorage.setItem(WEATHER_CFG_KEY, JSON.stringify(weatherCfg.value))
     ElMessage.success(t('tools.aiPlayground.weatherBgSaved'))
-  } catch (e) { ElMessage.error('保存失败') }
+  } catch (e) { ElMessage.error(t('common.saveFailed')) }
 }
 </script>
 

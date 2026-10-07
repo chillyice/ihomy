@@ -256,7 +256,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
 import { useI18n } from 'vue-i18n'
-import { publicApi, homeApi, taskApi, pointsApi, reminderApi, bookApi, wishApi, itemApi, kitchenApi } from '@/api'
+import { publicApi, taskApi, pointsApi, reminderApi, bookApi, wishApi, itemApi, kitchenApi } from '@/api'
 import { useWeatherBg } from '@/composables/useWeatherBg'
 import { gsap } from 'gsap'
 import { ElMessage } from 'element-plus'
@@ -266,7 +266,8 @@ import albumCoverUrl from '@/assets/album-cover.jpg'
 import FloorPlanCanvas from '@/views/item/FloorPlanCanvas.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useWidgetDrag } from '@/utils/useWidgetDrag'
-import { feedTypeLabel as feedTypeLabelOf, feedSummary as feedSummaryOf, formatFeedTime } from '@/utils/feed'
+import { feedTypeLabel as feedTypeLabelOf, feedSummary as feedSummaryOf } from '@/utils/feed'
+import { formatRelativeTime } from '@/utils/datetime'
 import { pickDefaultFloor } from '@/utils/floorPlanGeom'
 import { dictText } from '@/utils/dict'
 
@@ -438,10 +439,10 @@ const onAlbumLeave = () => {
   albumIdx.value = 0
 }
 
-// 动态类型标签/摘要/相对时间走共享 utils/feed.js(与移动端首页、暖居首页同口径)
+// 动态类型标签/摘要走共享 utils/feed.js;相对时间走 utils/datetime.js(与移动端首页、暖居首页同口径)
 const feedTypeLabel = (type) => feedTypeLabelOf(t, type)
 const feedSummary = (f) => feedSummaryOf(t, f)
-const formatTime = (d) => formatFeedTime(t, d)
+const formatTime = (d) => formatRelativeTime(t, d)
 const FEED_ROUTES = { diary: '/diary', photo: '/album', video: '/cinema', wish: '/wish', task: '/task', recipe: '/kitchen', book: '/library' }
 const goFeed = (f) => { if (f.type === 'blog' && f.id) router.push(`/blog/${f.id}`); else if (FEED_ROUTES[f.type]) router.push(FEED_ROUTES[f.type]) }
 const rewardIcon = (t) => t === 1 ? '🎁' : t === 2 ? '📦' : '⭕'

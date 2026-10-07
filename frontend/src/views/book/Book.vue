@@ -79,9 +79,9 @@
       <el-form :model="editor.form" label-position="top">
         <el-form-item :label="$t('book.typeLabel')">
           <el-radio-group v-model="editor.form.type">
-            <el-radio :value="0">{{ $t('book.type.EXPENSE') }}</el-radio>
-            <el-radio :value="1">{{ $t('book.type.INCOME') }}</el-radio>
-            <el-radio :value="2">{{ $t('book.type.TRANSFER') }}</el-radio>
+            <el-radio value="EXPENSE">{{ $t('book.type.EXPENSE') }}</el-radio>
+            <el-radio value="INCOME">{{ $t('book.type.INCOME') }}</el-radio>
+            <el-radio value="TRANSFER">{{ $t('book.type.TRANSFER') }}</el-radio>
           </el-radio-group>
         </el-form-item>
         <div class="form-row">
@@ -115,7 +115,7 @@ import { defineAsyncComponent, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { useUserStore } from '@/stores/user'
+
 import { bookApi } from '@/api'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -127,7 +127,6 @@ const LoanRecords = defineAsyncComponent(() => import('@/views/tools/LoanRecords
 const CATEGORIES = ['餐饮', '交通', '购物', '家居', '水电燃气', '医疗', '教育', '娱乐', '工资', '红包', '其他']
 
 const { t } = useI18n()
-const userStore = useUserStore()
 const tab = ref('book')
 const loading = ref(false)
 const saving = ref(false)
@@ -139,9 +138,8 @@ const editor = reactive({ visible: false, form: {} })
 const catText = (r) =>
   (r.type === 'INCOME' ? t('book.type.INCOME') : r.type === 'TRANSFER' ? t('book.type.TRANSFER') : r.category)
 
-// 后端返回英文单词(type: EXPENSE/INCOME/TRANSFER),表单提交仍是数字由后端转换
+// 后端返回英文单词(type: EXPENSE/INCOME/TRANSFER),表单直接沿用字典词提交
 const typeCls = (r) => ({ EXPENSE: 't0', INCOME: 't1', TRANSFER: 't2' }[r.type] || 't0')
-const typeNum = (r) => ({ EXPENSE: 0, INCOME: 1, TRANSFER: 2 }[r.type] ?? 0)
 
 const load = async () => {
   loading.value = true
@@ -157,8 +155,8 @@ const load = async () => {
 const openEditor = (r) => {
   editor.visible = true
   editor.form = r
-    ? { id: r.id, type: typeNum(r), amount: Number(r.amount), category: r.category, remark: r.remark || '', recordDate: r.recordDate }
-    : { id: null, type: 0, amount: 0, category: '其他', remark: '', recordDate: new Date().toISOString().slice(0, 10) }
+    ? { id: r.id, type: r.type, amount: Number(r.amount), category: r.category, remark: r.remark || '', recordDate: r.recordDate }
+    : { id: null, type: 'EXPENSE', amount: 0, category: '其他', remark: '', recordDate: new Date().toISOString().slice(0, 10) }
 }
 
 const onSave = async () => {

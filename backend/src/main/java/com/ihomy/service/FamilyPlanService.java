@@ -14,6 +14,7 @@ import com.ihomy.mapper.FamilyPlanTaskMapper;
 import com.ihomy.mapper.SysUserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -86,6 +87,7 @@ public class FamilyPlanService {
         planMapper.updateById(plan);
     }
 
+    @Transactional
     public void delete(Long id, Long familyId) {
         require(id, familyId);
         planMapper.deleteById(id);
@@ -93,6 +95,7 @@ public class FamilyPlanService {
     }
 
     /** 添加子任务 */
+    @Transactional
     public PlanTask addTask(Long planId, Long familyId, PlanTaskDTO dto) {
         require(planId, familyId);
         PlanTask t = new PlanTask();
@@ -107,6 +110,7 @@ public class FamilyPlanService {
     }
 
     /** 更新子任务(勾选完成/换指派/改截止),并同步计划状态 */
+    @Transactional
     public void updateTask(Long taskId, Long familyId, PlanTaskDTO dto) {
         PlanTask t = taskMapper.selectById(taskId);
         if (t == null) throw new BizException(ResultCode.NOT_FOUND);
@@ -119,6 +123,7 @@ public class FamilyPlanService {
         syncPlanStatus(t.getPlanId());
     }
 
+    @Transactional
     public void deleteTask(Long taskId, Long familyId) {
         PlanTask t = taskMapper.selectById(taskId);
         if (t == null) throw new BizException(ResultCode.NOT_FOUND);

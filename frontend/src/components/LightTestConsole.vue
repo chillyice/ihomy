@@ -2,44 +2,44 @@
 <template>
   <div v-if="light?.lightTestMode?.value" class="light-test-console" :style="{ left: pos.x + 'px', top: pos.y + 'px' }">
     <div class="lt-header">
-      <span class="lt-title lt-drag" @mousedown="onDragStart" title="拖动">≡ 光照测试</span>
-      <input type="date" v-model="dateInput" @change="onDateChange" class="lt-date-input" title="日期(济南)" />
+      <span class="lt-title lt-drag" @mousedown="onDragStart" :title="$t('lightTest.drag')">≡ {{ $t('lightTest.title') }}</span>
+      <input type="date" v-model="dateInput" @change="onDateChange" class="lt-date-input" :title="$t('lightTest.dateHint')" />
       <input type="time" v-model="timeInput" @change="onTimeChange" class="lt-time-input" />
-      <button class="lt-btn lt-reset" @click="light.stopLightTest" title="重置到真实时间并关闭">⏹</button>
+      <button class="lt-btn lt-reset" @click="light.stopLightTest" :title="$t('lightTest.resetTitle')">⏹</button>
     </div>
     <div class="lt-info">
-      <span>高度 {{ light.sunScene.value.altitude?.toFixed(1) }}°</span>
-      <span>方位 {{ light.sunScene.value.azimuth?.toFixed(1) }}°</span>
-      <span>窗角 {{ (light.sunScene.value.windowAngle ?? 0).toFixed(1) }}°</span>
+      <span>{{ $t('lightTest.altitude') }} {{ light.sunScene.value.altitude?.toFixed(1) }}°</span>
+      <span>{{ $t('lightTest.azimuth') }} {{ light.sunScene.value.azimuth?.toFixed(1) }}°</span>
+      <span>{{ $t('lightTest.windowAngle') }} {{ (light.sunScene.value.windowAngle ?? 0).toFixed(1) }}°</span>
       <span class="lt-phase">{{ testPhase }}</span>
     </div>
     <div class="lt-info" v-if="light?.sunInfo?.value">
-      <span>日出 {{ light.sunInfo.value.sunrise || '--' }}</span>
-      <span>日落 {{ light.sunInfo.value.sunset || '--' }}</span>
+      <span>{{ $t('lightTest.sunrise') }} {{ light.sunInfo.value.sunrise || '--' }}</span>
+      <span>{{ $t('lightTest.sunset') }} {{ light.sunInfo.value.sunset || '--' }}</span>
     </div>
     <div class="lt-controls">
-      <button class="lt-btn" @click="light.stepLightTest(-1)" title="后退 5 分钟">⏮</button>
+      <button class="lt-btn" @click="light.stepLightTest(-1)" :title="$t('lightTest.back5')">⏮</button>
       <button class="lt-btn lt-main" @click="light.pauseLightTest">{{ light.lightTestPaused.value ? '▶' : '⏸' }}</button>
-      <button class="lt-btn" @click="light.stepLightTest(1)" title="前进 5 分钟">⏭</button>
+      <button class="lt-btn" @click="light.stepLightTest(1)" :title="$t('lightTest.forward5')">⏭</button>
     </div>
     <div class="lt-speed">
       <button v-for="sp in speeds" :key="sp" class="lt-btn lt-speed-btn" :class="{ active: light.testSpeed.value === sp }" @click="light.setTestSpeed(sp)">{{ sp }}x</button>
     </div>
     <div class="lt-weather">
-      <button class="lt-btn" :class="{ active: light.weatherMode.value === 'clear' }" @click="light.setWeather('clear', 0)" title="晴天">☀️</button>
-      <button class="lt-btn" :class="{ active: light.weatherMode.value === 'cloud' }" @click="light.setWeather('cloud', 0)" title="多云">⛅</button>
-      <button class="lt-btn" :class="{ active: light.weatherMode.value === 'overcast' }" @click="light.setWeather('overcast', 0)" title="阴天">☁️</button>
-      <button class="lt-btn" :class="{ active: light.weatherMode.value === 'fog' }" @click="light.setWeather('fog', 0)" title="雾">🌫️</button>
-      <button class="lt-btn" :class="{ active: light.weatherMode.value === 'rain' }" @click="light.setWeather('rain', light.precipLevel.value || 3)" title="下雨">🌧️</button>
-      <button class="lt-btn" :class="{ active: light.weatherMode.value === 'snow' }" @click="light.setWeather('snow', light.precipLevel.value || 3)" title="下雪">❄️</button>
-      <button class="lt-btn" :class="{ active: light.weatherMode.value === 'thunder' }" @click="light.setWeather('thunder', light.precipLevel.value || 3)" title="雷雨">⛈️</button>
+      <button class="lt-btn" :class="{ active: light.weatherMode.value === 'clear' }" @click="light.setWeather('clear', 0)" :title="$t('lightTest.weatherClear')">☀️</button>
+      <button class="lt-btn" :class="{ active: light.weatherMode.value === 'cloud' }" @click="light.setWeather('cloud', 0)" :title="$t('lightTest.weatherCloud')">⛅</button>
+      <button class="lt-btn" :class="{ active: light.weatherMode.value === 'overcast' }" @click="light.setWeather('overcast', 0)" :title="$t('lightTest.weatherOvercast')">☁️</button>
+      <button class="lt-btn" :class="{ active: light.weatherMode.value === 'fog' }" @click="light.setWeather('fog', 0)" :title="$t('lightTest.weatherFog')">🌫️</button>
+      <button class="lt-btn" :class="{ active: light.weatherMode.value === 'rain' }" @click="light.setWeather('rain', light.precipLevel.value || 3)" :title="$t('lightTest.weatherRain')">🌧️</button>
+      <button class="lt-btn" :class="{ active: light.weatherMode.value === 'snow' }" @click="light.setWeather('snow', light.precipLevel.value || 3)" :title="$t('lightTest.weatherSnow')">❄️</button>
+      <button class="lt-btn" :class="{ active: light.weatherMode.value === 'thunder' }" @click="light.setWeather('thunder', light.precipLevel.value || 3)" :title="$t('lightTest.weatherThunder')">⛈️</button>
     </div>
     <div v-if="light.weatherMode.value === 'rain' || light.weatherMode.value === 'snow' || light.weatherMode.value === 'thunder'" class="lt-sliders">
-      <label class="lt-slider-row"><span>{{ light.weatherMode.value === 'snow' ? '雪量' : '雨量' }}</span><input type="range" min="1" max="6" v-model.number="light.precipLevel.value" class="lt-slider" @input="light.setWeather(light.weatherMode.value, light.precipLevel.value)" /></label>
+      <label class="lt-slider-row"><span>{{ light.weatherMode.value === 'snow' ? $t('lightTest.snowAmount') : $t('lightTest.rainAmount') }}</span><input type="range" min="1" max="6" v-model.number="light.precipLevel.value" class="lt-slider" @input="light.setWeather(light.weatherMode.value, light.precipLevel.value)" /></label>
     </div>
     <div class="lt-sliders">
-      <label class="lt-slider-row"><span>色温</span><input type="range" min="0" max="100" v-model.number="light.lampTemp.value" class="lt-slider" /></label>
-      <label class="lt-slider-row"><span>亮度</span><input type="range" min="0" max="100" v-model.number="light.lampBrightness.value" class="lt-slider" /></label>
+      <label class="lt-slider-row"><span>{{ $t('lightTest.colorTemp') }}</span><input type="range" min="0" max="100" v-model.number="light.lampTemp.value" class="lt-slider" /></label>
+      <label class="lt-slider-row"><span>{{ $t('lightTest.brightness') }}</span><input type="range" min="0" max="100" v-model.number="light.lampBrightness.value" class="lt-slider" /></label>
     </div>
     <div class="lt-progress"><div class="lt-progress-fill" :style="{ width: ((light.slotIdx.value / 288) * 100) + '%' }"></div></div>
   </div>

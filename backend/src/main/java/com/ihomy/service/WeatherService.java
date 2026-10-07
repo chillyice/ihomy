@@ -30,7 +30,8 @@ import java.util.Map;
  * 天气服务门面(V9.53 起多天气源):解析生效凭证(status=1 或 yml 兜底)、IP/家庭坐标定位、缓存读写、
  * 运维统计(本地日志聚合),并把取数委托给按 provider 匹配的 WeatherProvider(和风实现见 QWeatherProvider)。
  * 凭证未配置/未适配时返回 null,前端降级为只按时间做光影。
- * Redis 缓存:now 30 分钟 / detail 30 分钟(坐标级,与预警推送共用同一告警缓存)。
+ * Redis 缓存:now 30 分钟 / detail 30 分钟,键为 ihomy:weather:now:{坐标}(家庭偏好位置带 fam: 前缀)——
+ * 坐标进键,不同地域的访客各取各的,不会互相复用别人的城市(与预警推送共用同一告警缓存)。
  */
 @Slf4j
 @Service
@@ -131,12 +132,13 @@ public class WeatherService {
         if (cred == null) return null;
         WeatherProvider p = providerOf(cred.getProvider());
         if (p == null) return null;
-        String cacheKey = familyLocation != null ? "ihomy:weather:now:fam:" + familyLocation[0] + ":" + familyLocation[1] : "ihomy:weather:now";
-        Map<String, Object> cached = readCache(cacheKey);
-        if (cached != null) return cached;
-
+        // 先定位再取缓存:缓存键必须带坐标,否则所有匿名访客共用一个键,
+        // 谁先请求谁的城市就会被别人的响应复用(家庭偏好位置同理,按坐标区分)
         String coords = resolveLocation(clientIp, cred, familyLocation);
         if (coords == null) return null;
+        String cacheKey = "ihomy:weather:now:" + (familyLocation != null ? "fam:" : "") + coords;
+        Map<String, Object> cached = readCache(cacheKey);
+        if (cached != null) return cached;
 
         Map<String, Object> data = p.current(coords, cred);
         if (data == null) return null;
@@ -153,12 +155,11 @@ public class WeatherService {
         if (cred == null) return null;
         WeatherProvider p = providerOf(cred.getProvider());
         if (p == null) return null;
-        String cacheKey = familyLocation != null ? "ihomy:weather:detail:fam:" + familyLocation[0] + ":" + familyLocation[1] : "ihomy:weather:detail";
-        Map<String, Object> cached = readCache(cacheKey);
-        if (cached != null) return cached;
-
         String coords = resolveLocation(clientIp, cred, familyLocation);
         if (coords == null) return null;
+        String cacheKey = "ihomy:weather:detail:" + (familyLocation != null ? "fam:" : "") + coords;
+        Map<String, Object> cached = readCache(cacheKey);
+        if (cached != null) return cached;
 
         Map<String, Object> data = new HashMap<>();
         data.put("locationId", coords);
@@ -199,6 +200,7 @@ public class WeatherService {
         Map<String, Object> result = new HashMap<>();
         result.put("month", java.time.YearMonth.now().toString());
         result.put("used", used);
+        // 配额 50000 与 QWeatherProvider.MONTHLY_QUOTA 是同一口径,改动须两处同步(否则展示值与实际熔断阈值漂移)
         result.put("quota", 50000);
         result.put("remaining", Math.max(0, 50000 - used));
         result.put("usagePercent", Math.round(used * 1000.0 / 50000) / 10.0);
@@ -257,6 +259,7 @@ public class WeatherService {
             return familyLocation[1] + "," + familyLocation[0];
         }
         String lookupIp = clientIp;
+        // 内网/本机 IP 无法做地理定位,统一回退到服务器默认位置(济南 117.1201,36.6512)
         if (clientIp == null || clientIp.isBlank()
                 || clientIp.equals("0:0:0:0:0:0:0:1") || clientIp.equals("127.0.0.1")
                 || clientIp.startsWith("192.168.") || clientIp.startsWith("10.")) {
@@ -288,6 +291,7 @@ public class WeatherService {
         } catch (Exception e) {
             log.warn("ip-api lookup failed: {}", e.getMessage());
         }
+        // 定位服务不可用/查询失败:同样退回默认位置(济南),别让天气整体不可用
         redis.opsForValue().set("ihomy:weather:city:" + (clientIp == null ? "default" : clientIp), "济南", LOCATION_TTL);
         return "117.1201,36.6512";
     }

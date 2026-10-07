@@ -10,6 +10,7 @@ import com.ihomy.entity.InvitationCode;
 import com.ihomy.mapper.SysUserMapper;
 import com.ihomy.security.LoginUser;
 import com.ihomy.security.SecurityHelper;
+import com.ihomy.service.AuthService;
 import com.ihomy.service.MemberManagementService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,6 +32,7 @@ public class MemberController {
     private final SysUserMapper sysUserMapper;
     private final SecurityHelper securityHelper;
     private final MemberManagementService memberService;
+    private final AuthService authService;
 
     @Operation(summary = "家庭成员列表（含角色）")
     @GetMapping("/list")
@@ -59,6 +61,7 @@ public class MemberController {
         LoginUser user = securityHelper.current();
         memberService.removeMember(user.getUserId(), user.getFamilyId(), userId);
         securityHelper.invalidatePerms(userId, user.getFamilyId());
+        authService.clearCurFamilyIf(userId, user.getFamilyId());
         return Result.success();
     }
 

@@ -125,6 +125,8 @@ const openViewer = (c) => {
 
 const formatDate = (d) => {
   if (!d) return ''
+  // 纯日期串(10 位)补上 T00:00:00 再解析:new Date('yyyy-MM-dd') 按 UTC 解析,
+  // 在东八区会退成前一天,补时间后按本地时区解析才对得上拍摄日期
   const dt = new Date(String(d).length === 10 ? d + 'T00:00:00' : d)
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
 }

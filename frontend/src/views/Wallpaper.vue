@@ -573,23 +573,20 @@ const exchangeToken = async (tk) => {
 
 const bootstrapToken = async () => {
   const m = /(?:^|[#&])token=([^&]+)/.exec(window.location.hash || '')
-  console.log('[ihomy-wallpaper] hash 令牌:' + (m ? m[1].length + '字符' : '无'))
   if (!m) return
   let tk = ''
   try { tk = decodeURIComponent(m[1]) } catch (e) { return }
-  console.log('[ihomy-wallpaper] 令牌换会话:' + (await exchangeToken(tk) ? '成功' : '失败'))
+  await exchangeToken(tk)
 }
 
 // WE 属性桥补充:WE 也会在**页面已加载之后**才把用户改过的值(令牌就是)投给当前页面。挂一份监听,
 // 令牌晚到就当场换会话,不必等下个开屏;没有这个桥时,晚到的令牌到不了页面(壳页已经带着 hash 跳走了)。
-// 页内 localStorage 一旦拿到会话就长期有效,所以「晚到一次」也够用。诊断行同 bootstrapToken。
+// 页内 localStorage 一旦拿到会话就长期有效,所以「晚到一次」也够用。
 const wePropsListener = {
   applyUserProperties: (p) => {
     const tk = p && p.token ? String(p.token.value || '').trim() : ''
     if (!tk) return
-    console.log('[ihomy-wallpaper] WE 属性到达:令牌 ' + tk.length + ' 字符')
     exchangeToken(tk).then(async (ok) => {
-      console.log('[ihomy-wallpaper] 晚到令牌换会话:' + (ok ? '成功' : '失败'))
       if (ok) await enterLoggedIn()
     })
   },

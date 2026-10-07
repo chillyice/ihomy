@@ -2,6 +2,7 @@
   <div class="mobile-layout">
     <!-- 首页路由:三 Tab 模式 -->
     <template v-if="isHomeRoute">
+      <!-- 用 v-show 而非 v-if:三个 Tab 常驻挂载,切回时不重新拉数据、不丢滚动位置与输入状态 -->
       <div class="mobile-tab-content">
         <MobileHomeFeed v-show="activeTab === 'home'" />
         <MobileMoreGrid v-show="activeTab === 'more'" />
@@ -77,6 +78,8 @@ watch(() => route.path, () => { window.scrollTo(0, 0) })
 
 <style scoped>
 .mobile-layout { min-height: 100vh; }
+/* 这两个 padding 是跨文件高度契约:56px 必须与 MobileTabBar 的高度一致、48px 与 MobileHeader 一致,
+   改任一处都要同步改这里,否则内容会被底栏压住或顶部露出(含 safe-area 刘海/小白条) */
 .mobile-tab-content { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); min-height: 100vh; }
 .mobile-sub-content { padding-top: calc(48px + env(safe-area-inset-top, 0px)); min-height: 100vh; }
 </style>

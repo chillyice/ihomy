@@ -59,7 +59,8 @@ const latestCached = (w) => {
   } catch { return '' }
 }
 
-// 兜底:家庭「AI 生图」相册的最新一张(跨设备持久;本机缓存为空时兜底),会话内只查一次
+// 兜底:家庭「AI 生图」相册的最新一张(跨设备持久;本机缓存为空时兜底)。
+// 会话内只查一次——成功结果常驻缓存;请求失败则重置,允许下次调用重试(否则一次失败会锁死整个会话)
 let lastAlbumPromise = null
 const lastFromAlbum = () => {
   if (lastAlbumPromise) return lastAlbumPromise
@@ -94,6 +95,8 @@ export function useWeatherBg() {
   }
   const season = () => { const m = new Date().getMonth() + 1; return (m >= 3 && m <= 5) ? '春' : (m >= 6 && m <= 8) ? '夏' : (m >= 9 && m <= 11) ? '秋' : '冬' }
   const dayNight = () => { const h = new Date().getHours(); return (h >= 6 && h < 19) ? 'day' : 'night' }
+  // 缓存键 = 城市|天气文字|图标码|昼夜|季节:任一变化都视为新场景,需重新取图/生图
+  // (键太粗会张冠李戴地复用别的天气的图,太细则频繁触发生图)
   const keyOf = (w) => [w?.city, w?.text, w?.iconCode, dayNight(), season()].join('|')
 
   const dateLabel = () => { const d = new Date(); return `${d.getMonth() + 1}月${d.getDate()}日` }

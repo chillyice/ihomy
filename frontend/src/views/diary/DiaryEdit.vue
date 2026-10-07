@@ -78,12 +78,12 @@
 
           <!-- 页脚 -->
           <div class="paper-footer">
-            <span class="page-num">{{ pageCount }} 页 · {{ wordCount }} 字</span>
+            <span class="page-num">{{ pageCount }} {{ $t('diary.pagesUnit') }} · {{ wordCount }} {{ $t('diary.words') }}</span>
             <div class="vis-row">
               <el-radio-group v-model="form.visibility" size="small">
-                <el-radio-button :value="0">{{ $t('diary.onlySelf') }}</el-radio-button>
-                <el-radio-button :value="3">{{ $t('diary.familyVisible') }}</el-radio-button>
-                <el-radio-button :value="4">{{ $t('diary.publicVisible') }}</el-radio-button>
+                <el-radio-button value="PRIVATE">{{ $t('diary.onlySelf') }}</el-radio-button>
+                <el-radio-button value="FAMILY">{{ $t('diary.familyVisible') }}</el-radio-button>
+                <el-radio-button value="PUBLIC">{{ $t('diary.publicVisible') }}</el-radio-button>
               </el-radio-group>
               <el-button type="primary" :loading="loading" @click="onSave">{{ $t('common.save') }}</el-button>
             </div>
@@ -123,7 +123,7 @@
               <span class="cell-label">{{ item.label }}</span>
             </button>
           </div>
-          <button v-if="(pickerOpen === 'mood' ? form.mood : form.weather)" type="button" class="picker-clear" @click="clearPick">清除选择</button>
+          <button v-if="(pickerOpen === 'mood' ? form.mood : form.weather)" type="button" class="picker-clear" @click="clearPick">{{ $t('diary.clearPick') }}</button>
         </div>
       </div>
     </teleport>
@@ -152,7 +152,7 @@ const isEdit = computed(() => !!route.params.id)
 const loading = ref(false)
 const authorId = ref(null)
 
-const form = reactive({ mood: '', weather: '', date: new Date().toISOString().slice(0, 10), time: new Date().toTimeString().slice(0, 5), visibility: 0 })
+const form = reactive({ mood: '', weather: '', date: new Date().toISOString().slice(0, 10), time: new Date().toTimeString().slice(0, 5), visibility: 'PRIVATE' })
 const content = ref('')
 const pickerOpen = ref(null)
 const pickerStyle = ref({})
@@ -216,7 +216,7 @@ const applyDraft = (o) => {
   if (typeof o.w === 'string') form.weather = o.w
   if (typeof o.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.d)) form.date = o.d
   if (typeof o.t === 'string' && /^\d{2}:\d{2}$/.test(o.t)) form.time = o.t
-  if ([0, 3, 4].includes(o.v)) form.visibility = o.v
+  if (['PRIVATE', 'FAMILY', 'PUBLIC'].includes(o.v)) form.visibility = o.v
   if (Array.isArray(o.s)) strokes.value = o.s.filter((s) => s && typeof s.t === 'string' && Array.isArray(s.pts) && s.pts.length)
 }
 const flushDraftIfDirty = () => { if (draftDirty) saveDraft() } // pagehide/切后台立即落盘(旋转 reload 前的最后时机)
@@ -474,7 +474,7 @@ onMounted(async () => {
       mood: d.mood || '', weather: d.weather || '',
       date: raw.slice(0, 10) || form.date,
       time: raw.slice(11, 16) || form.time,
-      visibility: d.visibility === 'PRIVATE' ? 0 : d.visibility === 'PUBLIC' ? 4 : 3,
+      visibility: d.visibility === 'PRIVATE' ? 'PRIVATE' : d.visibility === 'PUBLIC' ? 'PUBLIC' : 'FAMILY',
     })
     if (draft) applyDraft(draft) // 旋转/刷新丢内容后回来:草稿是本设备最近一次编辑,覆盖服务端数据
   } else {

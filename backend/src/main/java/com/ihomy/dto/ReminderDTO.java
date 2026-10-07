@@ -14,5 +14,5 @@ public class ReminderDTO {
     private String content;
     private LocalDate remindDate;
     private LocalTime remindTime;
-    private Integer repeatType;
+    private String repeatType;
 }

@@ -72,7 +72,7 @@ file:
 app:
   captcha-fixed-code:
   # 跨域白名单(逗号分隔):生产域名 + 开发前端地址;经 external.yml 按环境覆盖
-  cors-allowed-origins: https://ihomy.top,http://localhost:5173,http://127.0.0.1:5173
+  cors-allowed-origins: https://ihomy.top
   weather-api-host:
   weather-project-id:
   weather-key-id:

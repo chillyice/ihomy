@@ -14,6 +14,7 @@ import com.ihomy.service.VideoMapService;
 import com.ihomy.service.VideoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -89,7 +90,7 @@ public class VideoController {
     @Operation(summary = "新增视频")
     @OperationLog(module = "VIDEO", operationType = "CREATE", description = "发布视频")
     @PostMapping
-    public Result<Video> create(@RequestBody VideoDTO dto) {
+    public Result<Video> create(@Valid @RequestBody VideoDTO dto) {
         SysUser user = securityHelper.currentUser();
         return Result.success(videoService.create(user.getId(), user.getFamilyId(), dto));
     }
@@ -97,7 +98,7 @@ public class VideoController {
     @Operation(summary = "更新视频")
     @OperationLog(module = "VIDEO", operationType = "UPDATE", description = "编辑视频")
     @PutMapping("/{id}")
-    public Result<Video> update(@PathVariable Long id, @RequestBody VideoDTO dto) {
+    public Result<Video> update(@PathVariable Long id, @Valid @RequestBody VideoDTO dto) {
         SysUser user = securityHelper.currentUser();
         return Result.success(videoService.update(id, user.getFamilyId(), user.getId(), securityHelper.isOwner(), dto));
     }

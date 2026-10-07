@@ -57,6 +57,7 @@ public class ChatService {
         ChatRead read = readMapper.selectOne(new LambdaQueryWrapper<ChatRead>()
                 .eq(ChatRead::getUserId, userId).eq(ChatRead::getFamilyId, familyId));
         long readId = read == null ? 0 : read.getLastReadMsgId();
+        // 未读数按 ID 差值估算(依赖消息 ID 递增且不被清理);后退到 0,避免已读位点超前时出现负数
         long count = Math.max(0, lastId - readId);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("unread", count);

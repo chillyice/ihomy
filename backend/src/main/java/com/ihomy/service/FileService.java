@@ -89,6 +89,13 @@ public class FileService {
         return url;
     }
 
+    /** 相册图片上传(本地文件源,流式 Files.copy):外部抓图先落临时文件再转存用这个 */
+    public String upload(Path source, String originalName, String contentType, Long albumId, String albumName) {
+        String url = saveTo(source, originalName, "pictures", albumName, albumId);
+        generateThumbIfImage(url, contentType);
+        return url;
+    }
+
     /** 视频/海报上传(流式) */
     public String uploadVideo(MultipartFile file, String originalName, String contentType) {
         return saveTo(file, originalName, "videos", null, null);

@@ -318,6 +318,7 @@ public class OpsService {
                         failed++;
                         hourFailed[hour]++;
                     }
+                    // 慢请求口径:耗时 > 3000ms 计一次(与慢请求列表/概览的 slow 字段同一阈值)
                     if (cost > 3000) {
                         slow++;
                     }
@@ -445,6 +446,7 @@ public class OpsService {
             }
         } catch (Exception e) {
             Map<String, Object> err = new LinkedHashMap<>();
+            // 占位时间取纪元起点:前端按时间字符串倒序展示,这样"读取失败"条目会稳定排在最后(不污染最近日志)
             err.put("time", "1970-01-01 00:00:00.000");
             err.put("level", "WARN");
             err.put("logger", OpsService.class.getName());

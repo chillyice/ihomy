@@ -46,6 +46,7 @@ import { Picture } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
+import { formatDateTime as fmt } from '@/utils/datetime'
 
 const { t } = useI18n()
 const tabs = ['photo', 'album', 'video', 'book']
@@ -53,7 +54,6 @@ const tab = ref('photo')
 const list = ref([])
 const loading = ref(false)
 
-const fmt = (d) => (d ? new Date(d).toLocaleString('zh-CN') : '')
 
 const load = async () => {
   loading.value = true

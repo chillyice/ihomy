@@ -22,6 +22,8 @@ defineEmits(['update:modelValue'])
 </script>
 
 <style scoped>
+/* 固定底栏:高度 56px 与 MobileLayout 的 .mobile-tab-content padding-bottom 是同一契约,须同步改。
+   这里用 backdrop-filter 是刻意保留的例外——只在固定的窄条上生效、不随长页面滚动,不触发重算开销。 */
 .mobile-tabbar {
   position: fixed;
   bottom: 0;

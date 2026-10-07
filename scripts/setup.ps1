@@ -121,12 +121,17 @@ Write-Step '步骤 3/5 启动 MySQL + Redis 并初始化数据库'
 Write-Step '步骤 4/5 校验数据库'
 $tables = "$(docker exec ihomy-mysql mysql -uroot -proot -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='ihomy';" 2>$null)".Trim()
 if (-not ($tables -match '^\d+$')) { Die '数据库校验失败，请查看 docker logs ihomy-mysql' }
+$schemaFile = Join-Path $Backend 'src\main\resources\schema.sql'
+$expectTables = 0
+if (Test-Path $schemaFile) {
+  $expectTables = @(Select-String -Path $schemaFile -Pattern '^CREATE TABLE `').Count
+}
 if ([int]$tables -eq 0) {
   Die 'ihomy 库为空：schema.sql 未导入。请执行 docker compose down -v 重置数据卷后重跑本脚本'
-} elseif ([int]$tables -lt 61) {
-  Write-Warn "表数量 $tables 少于当前版本 61 张（旧版本数据卷），建议对照 schema.sql 增量补表"
+} elseif ($expectTables -gt 0 -and [int]$tables -lt $expectTables) {
+  Write-Warn "表数量 $tables 少于当前 schema.sql 的 $expectTables 张（旧版本数据卷），建议 docker compose down -v 重置后重跑"
 } else {
-  Write-Ok "表数量 $tables（预期 61）"
+  Write-Ok "表数量 $tables（预期 $expectTables）"
 }
 $admin = "$(docker exec ihomy-mysql mysql -uroot -proot -N -e "SELECT COUNT(*) FROM ihomy.sys_user WHERE username='admin';" 2>$null)".Trim()
 if ($admin -eq '1') { Write-Ok 'admin 账号存在' }

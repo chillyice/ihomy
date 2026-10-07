@@ -381,20 +381,11 @@
                 <span>{{ $t('ops.aiFailed') }} <b :class="{ 'fail-num': aiTimelineFailed > 0 }">{{ aiTimelineFailed }}</b></span>
                 <span>{{ $t('ops.weatherFailRate') }} <b>{{ aiTimelineFailRate }}%</b></span>
               </div>
-              <svg :viewBox="`0 0 ${chartW} ${chartH}`" class="line-chart">
-                <line v-for="(t, i) in aiYTicks" :key="'aigrid'+i" :x1="padL" :x2="chartW - padR" :y1="t.y" :y2="t.y" stroke="var(--color-border)" stroke-width="1" stroke-dasharray="3 3" />
-                <text v-for="(t, i) in aiYTicks" :key="'aiyl'+i" :x="padL - 8" :y="t.y + 4" text-anchor="end" fill="var(--color-text-secondary)" font-size="11">{{ t.label }}</text>
-                <text v-for="(lb, i) in aiXLabels" :key="'aixl'+i" :x="lb.x" :y="chartH - padB + 16" text-anchor="middle" fill="var(--color-text-secondary)" font-size="11">{{ lb.label }}</text>
-                <polyline :points="aiLinePoints(aiTimelineData.map(d => d.total))" fill="none" stroke="#b88c6e" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
-                <polyline :points="aiLinePoints(aiTimelineData.map(d => d.failed))" fill="none" stroke="#b04a3a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
-                <rect v-for="(d, i) in aiTimelineData" :key="'aihv'+i" :x="aiXPos(i) - aiHoverColW / 2" :y="padT"
-                  :width="aiHoverColW" :height="chartH - padB - padT" fill="transparent"
-                  @mouseenter="aiHoverIdx = i" @mouseleave="aiHoverIdx = -1" />
-                <line v-if="aiHoverIdx >= 0 && aiTimelineData[aiHoverIdx]" :x1="aiXPos(aiHoverIdx)" :x2="aiXPos(aiHoverIdx)"
-                  :y1="padT" :y2="chartH - padB" stroke="#b88c6e" stroke-width="1" stroke-dasharray="4 2" />
-                <circle v-if="aiHoverIdx >= 0 && aiTimelineData[aiHoverIdx]" :cx="aiXPos(aiHoverIdx)" :cy="aiYVal(aiTimelineData[aiHoverIdx].total)" r="4" fill="#b88c6e" stroke="#fff" stroke-width="1.5" />
-                <circle v-if="aiHoverIdx >= 0 && aiTimelineData[aiHoverIdx]" :cx="aiXPos(aiHoverIdx)" :cy="aiYVal(aiTimelineData[aiHoverIdx].failed)" r="4" fill="#b04a3a" stroke="#fff" stroke-width="1.5" />
-              </svg>
+              <OpsLineChart :data="aiTimelineData" :y-ticks="aiYTicks" :x-ticks="aiXLabels"
+                :total-points="aiLinePoints(aiTimelineData.map(d => d.total))"
+                :failed-points="aiLinePoints(aiTimelineData.map(d => d.failed))"
+                :x-pos="aiXPos" :y-val="aiYVal" :hover-col-w="aiHoverColW"
+                v-model:hoverIdx="aiHoverIdx" />
               <div class="chart-legend">
                 <span class="legend-item"><span class="legend-dot" style="background:#b88c6e"></span>{{ $t('ops.aiTotalCalls') }}</span>
                 <span class="legend-item"><span class="legend-dot" style="background:#b04a3a"></span>{{ $t('ops.aiFailed') }}</span>
@@ -441,21 +432,11 @@
                 <span>{{ $t('ops.trafficFailed') }} <b :class="{ 'fail-num': timelineFailed > 0 }">{{ timelineFailed }}</b></span>
                 <span>{{ $t('ops.weatherFailRate') }} <b>{{ timelineFailRate }}%</b></span>
               </div>
-              <svg :viewBox="`0 0 ${chartW} ${chartH}`" class="line-chart">
-                <line v-for="(t, i) in yTicks" :key="'grid'+i" :x1="padL" :x2="chartW - padR" :y1="t.y" :y2="t.y" stroke="var(--color-border)" stroke-width="1" stroke-dasharray="3 3" />
-                <text v-for="(t, i) in yTicks" :key="'yl'+i" :x="padL - 8" :y="t.y + 4" text-anchor="end" fill="var(--color-text-secondary)" font-size="11">{{ t.label }}</text>
-                <text v-for="(lb, i) in xLabels" :key="'xl'+i" :x="lb.x" :y="chartH - padB + 16" text-anchor="middle" fill="var(--color-text-secondary)" font-size="11">{{ lb.label }}</text>
-                <polyline :points="linePoints(timelineData.map(d => d.total))" fill="none" stroke="#b88c6e" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
-                <polyline :points="linePoints(timelineData.map(d => d.failed))" fill="none" stroke="#b04a3a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
-                <!-- 悬浮列:透明矩形全高捕获 hover -->
-                <rect v-for="(d, i) in timelineData" :key="'hv'+i" :x="xPos(i) - hoverColW / 2" :y="padT"
-                  :width="hoverColW" :height="chartH - padB - padT" fill="transparent"
-                  @mouseenter="hoverIdx = i" @mouseleave="hoverIdx = -1" />
-                <line v-if="hoverIdx >= 0 && timelineData[hoverIdx]" :x1="xPos(hoverIdx)" :x2="xPos(hoverIdx)"
-                  :y1="padT" :y2="chartH - padB" stroke="#b88c6e" stroke-width="1" stroke-dasharray="4 2" />
-                <circle v-if="hoverIdx >= 0 && timelineData[hoverIdx]" :cx="xPos(hoverIdx)" :cy="yVal(timelineData[hoverIdx].total)" r="4" fill="#b88c6e" stroke="#fff" stroke-width="1.5" />
-                <circle v-if="hoverIdx >= 0 && timelineData[hoverIdx]" :cx="xPos(hoverIdx)" :cy="yVal(timelineData[hoverIdx].failed)" r="4" fill="#b04a3a" stroke="#fff" stroke-width="1.5" />
-              </svg>
+              <OpsLineChart :data="timelineData" :y-ticks="yTicks" :x-ticks="xLabels"
+                :total-points="linePoints(timelineData.map(d => d.total))"
+                :failed-points="linePoints(timelineData.map(d => d.failed))"
+                :x-pos="xPos" :y-val="yVal" :hover-col-w="hoverColW"
+                v-model:hoverIdx="hoverIdx" />
               <div class="chart-legend">
                 <span class="legend-item"><span class="legend-dot" style="background:#b88c6e"></span>{{ $t('ops.weatherTotalCalls') }}</span>
                 <span class="legend-item"><span class="legend-dot" style="background:#b04a3a"></span>{{ $t('ops.trafficFailed') }}</span>
@@ -745,6 +726,8 @@ import { opsApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import OpsLineChart from '@/components/OpsLineChart.vue'
+import { formatDateTime } from '@/utils/datetime'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -755,7 +738,6 @@ const appVersion = __APP_VERSION__
 
 // 角色渲染:家长(OWNER 非 OPS)只见「AI 统计」「天气」;OPS 见全部标签(含系统级报表)
 const isOps = computed(() => userStore.isOps)
-const isOwner = computed(() => userStore.isOwner)
 const showSystemTabs = computed(() => isOps.value)
 
 // 资源卡片定义(键与后端 stats 返回字段一一对应,名称走 i18n),按类型分组罗列;
@@ -1433,7 +1415,7 @@ const openOssAdd = () => {
 
 const saveOss = async () => {
   if (!ossEditForm.name || !ossEditForm.packageRef || !ossEditForm.componentType) {
-    ElMessage.warning(t('ops.oss.name') + ' / Package/Ref 必填')
+    ElMessage.warning(t('ops.oss.name') + ' / ' + t('ops.oss.requiredHint'))
     return
   }
   if (ossEditForm.id) {
@@ -1450,7 +1432,7 @@ const openRepo = (url) => { if (url) window.open(url, '_blank') }
 const fmtTime = (d) => {
   if (!d) return ''
   const date = new Date(d)
-  return Number.isNaN(date.getTime()) ? String(d) : date.toLocaleString()
+  return Number.isNaN(date.getTime()) ? String(d) : formatDateTime(date)
 }
 
 onMounted(async () => {

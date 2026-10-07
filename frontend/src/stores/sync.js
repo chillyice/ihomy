@@ -31,6 +31,8 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   async function poll() {
+    // 拷贝后再遍历:循环体内会把完成的 id 从 tasks 里剔除(filter 重建数组),直接遍历原数组会漏项;
+    // 轮询间隔 3s 而单次查询可能更久,允许「上一轮未走完就进入下一轮」——重复查询同一任务是幂等的
     for (const id of [...tasks.value]) {
       try {
         const p = await storageApi.syncProgress(id)

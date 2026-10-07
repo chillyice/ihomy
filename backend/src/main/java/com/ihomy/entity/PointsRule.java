@@ -3,6 +3,8 @@ package com.ihomy.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -24,5 +26,6 @@ public class PointsRule {
     /** 每次/每单位获取积分(任务此项不生效) */
     private Integer points;
     private LocalDateTime createdAt;
+    @TableField(updateStrategy = FieldStrategy.NEVER)
     private LocalDateTime updatedAt;
 }

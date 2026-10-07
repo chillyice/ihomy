@@ -28,7 +28,7 @@ public class Recipe {
     private Long authorId;
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
-    @TableField(fill = FieldFill.INSERT_UPDATE)
+    @TableField(fill = FieldFill.INSERT, updateStrategy = FieldStrategy.NEVER)
     private LocalDateTime updatedAt;
     @TableLogic
     private Integer deleted;

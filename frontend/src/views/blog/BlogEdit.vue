@@ -35,15 +35,15 @@
         </el-form-item>
         <el-form-item :label="$t('blog.status')">
           <el-radio-group v-model="form.status">
-            <el-radio :value="0">{{ $t('blog.draft') }}</el-radio>
-            <el-radio :value="1">{{ $t('blog.publish') }}</el-radio>
+            <el-radio value="DRAFT">{{ $t('blog.draft') }}</el-radio>
+            <el-radio value="PUBLISHED">{{ $t('blog.publish') }}</el-radio>
           </el-radio-group>
         </el-form-item>
         <el-form-item :label="$t('blog.visibility')">
           <el-radio-group v-model="form.visibility">
-            <el-radio :value="0">{{ $t('blog.onlySelf') }}</el-radio>
-            <el-radio :value="3">{{ $t('blog.familyVisible') }}</el-radio>
-            <el-radio :value="4">{{ $t('blog.publicVisible') }}</el-radio>
+            <el-radio value="PRIVATE">{{ $t('blog.onlySelf') }}</el-radio>
+            <el-radio value="FAMILY">{{ $t('blog.familyVisible') }}</el-radio>
+            <el-radio value="PUBLIC">{{ $t('blog.publicVisible') }}</el-radio>
           </el-radio-group>
         </el-form-item>
         <div class="form-footer">
@@ -92,7 +92,7 @@ const router = useRouter()
 const isEdit = computed(() => !!route.params.id)
 const loading = ref(false)
 
-const form = reactive({ title: '', content: '', coverImage: '', category: '', status: 1, visibility: 3 })
+const form = reactive({ title: '', content: '', coverImage: '', category: '', status: 'PUBLISHED', visibility: 'FAMILY' })
 const categories = ref([])
 const legacyCategory = ref(null)
 const showCategoryDialog = ref(false)
@@ -179,7 +179,7 @@ const onSave = async () => {
 }
 
 onMounted(async () => {
-  // 编辑模式下拉取详情回填表单(后端 status/visibility 为字符串枚举,表单用数字码,同 DiaryEdit 转换)
+  // 编辑模式下拉取详情回填表单(后端 status/visibility 为字符串枚举,直接用)
   if (isEdit.value) {
     const b = await blogApi.detail(route.params.id)
     Object.assign(form, {
@@ -187,8 +187,8 @@ onMounted(async () => {
       content: b.content,
       coverImage: b.coverImage,
       category: b.category || '',
-      status: b.status === 'PUBLISHED' ? 1 : 0,
-      visibility: b.visibility === 'PRIVATE' ? 0 : b.visibility === 'PUBLIC' ? 4 : 3,
+      status: b.status === 'PUBLISHED' ? 'PUBLISHED' : 'DRAFT',
+      visibility: b.visibility || 'FAMILY',
     })
   }
   loadCategories()

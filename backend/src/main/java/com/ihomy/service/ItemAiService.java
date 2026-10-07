@@ -255,6 +255,7 @@ public class ItemAiService {
                     .set(Item::getRoomId, p.roomId())
                     .set(Item::getFurnitureId, p.furnitureId())
                     .set(Item::getPosition, p.position());
+            // 只有换了家具才把画布内相对坐标重置到中心(0.5);仅仅改文字位置描述时保留原摆放坐标
             if (!Objects.equals(existing.getFurnitureId(), p.furnitureId())) {
                 uw.set(Item::getRelX, BigDecimal.valueOf(0.5)).set(Item::getRelY, BigDecimal.valueOf(0.5));
             }

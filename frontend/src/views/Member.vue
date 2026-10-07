@@ -115,6 +115,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import { useI18n } from 'vue-i18n'
+import { formatDateTime as formatDate } from '@/utils/datetime'
 
 const { t } = useI18n()
 const userStore = useUserStore()
@@ -133,7 +134,6 @@ const searchResult = ref([])
 const roleName = (r) =>
   ({ OWNER: t('member.owner'), MEMBER: t('member.member'), CHILD: t('member.child') }[r] || r)
 
-const formatDate = (d) => (d ? new Date(d).toLocaleString('zh-CN') : '')
 
 // 拉取成员列表;OWNER 额外加载邀请码与入家申请(三者并行,失败显示重试)
 const load = async () => {

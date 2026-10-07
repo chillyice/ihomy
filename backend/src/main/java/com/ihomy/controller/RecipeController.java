@@ -11,6 +11,7 @@ import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.RecipeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -47,7 +48,7 @@ public class RecipeController {
     @Operation(summary = "新增菜谱")
     @OperationLog(module = "RECIPE", operationType = "CREATE", description = "新增菜谱", saveArgs = false)
     @PostMapping("/recipe")
-    public Result<Recipe> create(@RequestBody RecipeDTO dto) {
+    public Result<Recipe> create(@Valid @RequestBody RecipeDTO dto) {
         SysUser user = securityHelper.currentUser();
         if (user == null) throw new BizException(ResultCode.UNAUTHORIZED);
         return Result.success(recipeService.create(user.getId(), user.getFamilyId(), dto));
@@ -56,7 +57,7 @@ public class RecipeController {
     @Operation(summary = "更新菜谱")
     @OperationLog(module = "RECIPE", operationType = "UPDATE", description = "更新菜谱", saveArgs = false)
     @PutMapping("/recipe/{id}")
-    public Result<Recipe> update(@PathVariable Long id, @RequestBody RecipeDTO dto) {
+    public Result<Recipe> update(@PathVariable Long id, @Valid @RequestBody RecipeDTO dto) {
         SysUser user = securityHelper.currentUser();
         return Result.success(recipeService.update(id, user.getFamilyId(), user.getId(), securityHelper.isOwner(), dto));
     }

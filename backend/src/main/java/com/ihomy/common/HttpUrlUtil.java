@@ -1,6 +1,8 @@
 package com.ihomy.common;
 
+import java.net.InetAddress;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.util.Locale;
 import java.util.Set;
 
@@ -61,5 +63,38 @@ public final class HttpUrlUtil {
         // IPv4 映射 IPv6(::ffff:169.254.169.254)绕过上面的前缀判断,取出内嵌 IPv4 再判一次
         int mapped = h.lastIndexOf(":ffff:");
         return mapped >= 0 && isBlockedHost(h.substring(mapped + 6));
+    }
+
+    /**
+     * 是否落在私有/回环/链路本地/组播网段:抓取用户给的外部地址(如图片直链)时用,
+     * 与 isBlockedHost 互补——后者按主机名字符串拦,这里按解析结果拦(域名可指向内网)。
+     * 注意家庭自建服务地址(HA/本地模型)走 normalize() 不做此检查,别混用。
+     * ponytail:解析与建连之间仍有 DNS 重绑定窗口,家庭场景可接受
+     */
+    public static boolean isPrivateAddress(InetAddress addr) {
+        if (addr.isAnyLocalAddress() || addr.isLoopbackAddress() || addr.isLinkLocalAddress()
+                || addr.isSiteLocalAddress() || addr.isMulticastAddress()) {
+            return true;
+        }
+        byte[] b = addr.getAddress();
+        if (b.length == 4) {
+            // 100.64.0.0/10 共享地址段:云厂商内网与运营商级 NAT(阿里云元数据 100.100.100.200 在此段)
+            return b[0] == 100 && (b[1] & 0xC0) == 0x40;
+        }
+        if (b.length != 16) return false;
+        if ((b[0] & 0xFE) == 0xFC) return true; // fc00::/7 IPv6 唯一本地地址
+        boolean v4mapped = true;
+        for (int i = 0; i < 10; i++) {
+            if (b[i] != 0) { v4mapped = false; break; }
+        }
+        if (v4mapped && b[10] == (byte) 0xFF && b[11] == (byte) 0xFF) {
+            try {
+                // ::ffff:a.b.c.d 映射地址取内嵌 IPv4 再判(192.168.1.1 可这样绕前缀)
+                return isPrivateAddress(InetAddress.getByAddress(new byte[]{b[12], b[13], b[14], b[15]}));
+            } catch (UnknownHostException e) {
+                return true; // 4 字节数组恒合法,不会发生;保守判私有
+            }
+        }
+        return false;
     }
 }

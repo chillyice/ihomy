@@ -9,8 +9,6 @@ const SYMBOL = '!@#$%^&*()-_=+[]{};:,.?/'
 /** 易混淆字符(0/O、1/l/I),勾选后从字符集中剔除,便于手抄 */
 const AMBIGUOUS = /[0O1lI]/g
 
-const CHARSET = { LOWER, UPPER, DIGIT, SYMBOL }
-
 /** 常见弱密码前缀,命中直接判最弱(长度再长也不加分) */
 const COMMON = ['password', '123456', 'qwerty', 'abc123', 'admin', 'iloveyou', '888888', '111111']
 

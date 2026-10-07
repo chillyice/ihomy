@@ -46,13 +46,11 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { diaryApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 
-const { t } = useI18n()
 const router = useRouter()
 const userStore = useUserStore()
 const books = ref([])

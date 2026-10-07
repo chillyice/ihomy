@@ -216,7 +216,7 @@
       <span v-a11y-click class="mm-rt-btn" :class="{ active: rtBar.formats.strike }" @click="rtToggle('strike')"><s>S</s></span>
       <span class="mm-rt-divider"></span>
       <el-color-picker size="small" :model-value="rtBar.formats.color || null" @change="rtSetColor" />
-      <span v-a11y-click class="mm-rt-btn mm-rt-bg" :class="{ active: rtBar.formats.background }" @click="rtToggle('background')" title="背景色">A</span>
+      <span v-a11y-click class="mm-rt-btn mm-rt-bg" :class="{ active: rtBar.formats.background }" @click="rtToggle('background')" :title="$t('tools.mindmap.bgColor')">A</span>
       <span class="mm-rt-divider"></span>
       <span v-a11y-click class="mm-rt-btn" :title="$t('tools.mindmap.clearFormat')" @click="rtClear">{{ $t('tools.mindmap.clearFormatShort') }}</span>
     </div>
@@ -654,7 +654,6 @@ const rtToggle = (key) => {
   try { mm.richText.formatText({ [key]: val }) } catch (e) { /* 忽略 */ }
 }
 const rtSetColor = (v) => { if (v) { try { mm.richText.formatText({ color: v }) } catch (e) { /* 忽略 */ } } }
-const rtSetBg = (v) => { if (v) { try { mm.richText.formatText({ background: v }) } catch (e) { /* 忽略 */ } } }
 const rtClear = () => { try { mm.richText.removeFormat() } catch (e) { /* 忽略 */ } }
 
 // ---------- 备注气泡 / 编辑 ----------

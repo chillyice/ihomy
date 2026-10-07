@@ -100,10 +100,10 @@
         </template>
         <template v-if="deviceForm.deviceType === 'BAIDU'">
           <el-form-item label="AppID" required>
-            <el-input v-model="deviceForm.appId" placeholder="百度网盘开放平台 AppID" />
+            <el-input v-model="deviceForm.appId" :placeholder="$t('storage.baidu.appIdPlaceholder')" />
           </el-form-item>
           <el-form-item label="AppKey" required>
-            <el-input v-model="deviceForm.appKey" placeholder="百度网盘开放平台 AppKey" />
+            <el-input v-model="deviceForm.appKey" :placeholder="$t('storage.baidu.appKeyPlaceholder')" />
           </el-form-item>
           <el-form-item label="SecretKey">
             <el-input v-model="deviceForm.secretKey" type="password" show-password
@@ -133,6 +133,7 @@ import { useUserStore } from '@/stores/user'
 import { useDevice } from '@/composables/useDevice'
 import { storageApi } from '@/api'
 import SyncDialog from '@/components/SyncDialog.vue'
+import { formatDateTime } from '@/utils/datetime'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -198,7 +199,7 @@ async function loadBaidu() {
 }
 
 function formatTokenExpiry(d) {
-  return new Date(d).toLocaleString('zh-CN')
+  return formatDateTime(d)
 }
 
 async function copyCallbackUrl() {

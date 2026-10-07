@@ -5,6 +5,10 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+/**
+ * 书架分类实体(content_book_category):parentId 自关联成树,同级按 sortOrder 排序。
+ * 注意与关系表 content_book_category_rel 的分工——分类树在本表,书↔分类归属在关系表(一本书可属多类)。
+ */
 @Data
 @TableName("content_book_category")
 public class BookCategory {

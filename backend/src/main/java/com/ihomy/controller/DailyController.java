@@ -68,7 +68,7 @@ public class DailyController {
                 "蔬菜水果放同一个塑料袋会加快腐烂,香蕉苹果和马铃薯分开存放更耐久。"));
     }
 
-    @Operation(summary = "微软必应每日一图")
+    @Operation(summary = "微软必应每日一图(预留接口,前端暂未接入)")
     @GetMapping("/daily-image")
     public Result<Map<String, Object>> dailyImage() {
         String today = LocalDate.now().toString();
@@ -91,7 +91,7 @@ public class DailyController {
         }
     }
 
-    @Operation(summary = "每日知识:按开启分类返回一条(types 逗号分隔,缺省=仅历史)")
+    @Operation(summary = "每日知识:按开启分类返回一条(types 逗号分隔,缺省=仅历史)(预留接口,前端暂未接入)")
     @GetMapping("/daily-knowledge")
     public Result<Map<String, Object>> dailyKnowledge(
             @RequestParam(defaultValue = "history") String types) {

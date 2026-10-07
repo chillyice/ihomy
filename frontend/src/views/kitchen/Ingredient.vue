@@ -153,7 +153,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Bowl, Edit, Delete, Location, Search, Minus } from '@element-plus/icons-vue'
+import { Plus, Bowl, Edit, Delete, Location, Minus } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import { itemApi, fileApi } from '@/api'

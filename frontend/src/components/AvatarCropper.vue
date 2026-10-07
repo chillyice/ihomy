@@ -9,9 +9,9 @@
         <div class="crop-grid"></div>
       </div>
     </div>
-    <div v-else class="cropper-loading">加载中...</div>
+    <div v-else class="cropper-loading">{{ $t('common.loading') }}</div>
     <div v-if="imgLoaded" class="zoom-row">
-      <span class="zoom-label">选择框</span>
+      <span class="zoom-label">{{ $t('common.selectBox') }}</span>
       <el-slider v-model.number="zoom" :min="0.2" :max="1" :step="0.05" :show-tooltip="false" style="flex:1" @input="applyZoom" />
       <span class="zoom-value">{{ Math.round(zoom * 100) }}%</span>
     </div>
@@ -25,10 +25,10 @@
 <script setup>
 import { ref, computed } from 'vue'
 
-const props = defineProps({
-  title: { type: String, default: '裁剪头像' },
-  cancelText: { type: String, default: '取消' },
-  confirmText: { type: String, default: '确定' },
+defineProps({
+  title: { type: String, default: '' },
+  cancelText: { type: String, default: '' },
+  confirmText: { type: String, default: '' },
 })
 const emit = defineEmits(['cropped'])
 

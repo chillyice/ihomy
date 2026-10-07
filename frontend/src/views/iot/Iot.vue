@@ -199,6 +199,7 @@ import { iotApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
+import { formatDateTime } from '@/utils/datetime'
 
 const { t } = useI18n()
 const userStore = useUserStore()
@@ -246,7 +247,6 @@ const numOf = (v) => {
   return Number.isNaN(n) ? null : n
 }
 const fmtNum = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1))
-const formatDateTime = (v) => (v ? new Date(v).toLocaleString() : '')
 
 const filtered = computed(() => {
   const k = keyword.value.trim().toLowerCase()

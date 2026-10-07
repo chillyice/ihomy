@@ -205,6 +205,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import { thumbUrl } from '@/utils/image'
+import { formatDate } from '@/utils/datetime'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -218,7 +219,6 @@ const sortBy = ref('recent')
 const loading = ref(false)
 const expanded = ref({})
 
-const formatDate = (d) => (d ? new Date(d).toLocaleDateString('zh-CN') : '')
 const canEdit = (b) => userStore.isOwner || b.authorId === userStore.userInfo?.id
 
 const showSidePanel = ref(window.innerWidth >= 1400)

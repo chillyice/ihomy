@@ -504,6 +504,7 @@ public class StorageService {
             m.put("name", n.path("server_filename").asText(""));
             m.put("isDir", isDir);
             m.put("size", isDir ? null : n.path("size").asLong());
+            // 百度返回秒级时间戳,×1000 转毫秒,与本地/WebDAV 分支的 modified 口径对齐
             m.put("modified", n.path("server_mtime").asLong() * 1000);
             m.put("fsId", isDir ? null : n.path("fs_id").asLong());
             items.add(m);

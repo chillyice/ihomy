@@ -108,14 +108,14 @@ const openPlanEditor = (p) => {
   editor.visible = true
   editor.form = p
     ? { id: p.id, title: p.title, description: p.description || '', targetDate: p.targetDate || '', status: p.status }
-    : { id: null, title: '', description: '', targetDate: '', status: 0 }
+    : { id: null, title: '', description: '', targetDate: '', status: 'ACTIVE' }
 }
 
 const onSavePlan = async () => {
   if (!editor.form.title?.trim()) return ElMessage.warning(t('plan.fillTitle'))
   saving.value = true
   try {
-    const { id, status, ...data } = editor.form
+    const { id, status: _status, ...data } = editor.form
     if (id) await planApi.update(id, data)
     else await planApi.create(data)
     ElMessage.success(t('common.saveSuccess'))

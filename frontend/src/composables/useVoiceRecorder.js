@@ -46,6 +46,8 @@ export function useVoiceRecorder() {
       }
     }
     source.connect(processor)
+    // 必须接到 destination 才会被音频图拉动、持续触发 onaudioprocess(即便输出不用);
+    // 回调只往 pcm 里写、不写 outputBuffer,故输出是静音,不会经由扬声器回采啸叫
     processor.connect(ctx.destination)
     recording.value = true
   }

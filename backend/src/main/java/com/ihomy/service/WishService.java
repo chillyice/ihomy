@@ -54,6 +54,9 @@ public class WishService {
 
 /** 新增愿望:默认待实现、家庭可见 */
     public Wish create(Long userId, Long familyId, WishDTO dto) {
+        if (dto.getTitle() == null || dto.getTitle().isBlank()) {
+            throw new BizException(ResultCode.BAD_REQUEST, "请填写愿望名称");
+        }
         Wish wish = new Wish();
         wish.setFamilyId(familyId);
         wish.setTitle(dto.getTitle());

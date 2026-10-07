@@ -27,7 +27,7 @@
       <!-- 目录导航:右侧 sticky -->
       <aside v-if="toc.length" class="toc-aside">
         <nav class="toc">
-          <div class="toc-title">目录</div>
+          <div class="toc-title">{{ $t('blog.toc') }}</div>
           <ul>
             <li v-for="h in toc" :key="h.id" :class="'toc-l' + h.level">
               <a :href="'#' + h.id" :class="{ active: activeHeading === h.id }" @click.prevent="scrollTo(h.id)">{{ h.text }}</a>
@@ -94,6 +94,7 @@ import { ElMessage } from 'element-plus'
 import { Star, Delete } from '@element-plus/icons-vue'
 import { marked } from 'marked'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import { formatDateTime as formatTime, formatDate } from '@/utils/datetime'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -245,8 +246,6 @@ const delComment = async (c) => {
   comments.value = await commentApi.list('blog', route.params.id)
 }
 
-const formatTime = (d) => (d ? new Date(d).toLocaleString('zh-CN') : '')
-const formatDate = (d) => (d ? new Date(d).toLocaleDateString('zh-CN') : '')
 
 onMounted(loadAll)
 </script>

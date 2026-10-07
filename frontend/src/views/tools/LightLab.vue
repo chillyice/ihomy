@@ -12,26 +12,26 @@
     <div ref="canvasRef" class="light-lab-canvas"></div>
 
     <div class="hud">
-      <button class="hud-back" @click="goBack" title="返回工具箱">← 返回</button>
-      <div class="hud-title">3D 光影实验台</div>
+      <button class="hud-back" @click="goBack" :title="$t('lightLab.backToTools')">← {{ $t('lightLab.back') }}</button>
+      <div class="hud-title">{{ $t('lightLab.title') }}</div>
 
       <div class="hud-row">
         <div class="hud-seg">
-          <button :class="{ active: mode === 'sun' }" @click="setMode('sun')">太阳模拟</button>
-          <button :class="{ active: mode === 'manual' }" @click="setMode('manual')">手动拖拽</button>
+          <button :class="{ active: mode === 'sun' }" @click="setMode('sun')">{{ $t('lightLab.modeSun') }}</button>
+          <button :class="{ active: mode === 'manual' }" @click="setMode('manual')">{{ $t('lightLab.modeManual') }}</button>
         </div>
       </div>
 
       <div class="hud-row">
-        <span class="hud-label">阴影算法</span>
+        <span class="hud-label">{{ $t('lightLab.shadowAlgo') }}</span>
         <div class="hud-seg">
-          <button :class="{ active: shadowMode === 'pcf' }" @click="shadowMode = 'pcf'">PCF 软阴影</button>
+          <button :class="{ active: shadowMode === 'pcf' }" @click="shadowMode = 'pcf'">{{ $t('lightLab.pcfSoft') }}</button>
           <button :class="{ active: shadowMode === 'pcss' }" @click="shadowMode = 'pcss'">PCSS</button>
         </div>
       </div>
 
       <div class="hud-row" v-if="shadowMode === 'pcss'">
-        <span class="hud-label">阴影软硬</span>
+        <span class="hud-label">{{ $t('lightLab.shadowSoftness') }}</span>
         <input type="range" min="0" max="0.0015" step="0.0001" v-model.number="pcssLightSize" class="hud-range" />
         <span class="hud-unit">{{ pcssLightSize.toFixed(4) }}</span>
       </div>
@@ -39,28 +39,28 @@
       <!-- 太阳模拟面板 -->
       <template v-if="mode === 'sun'">
         <div class="hud-row">
-          <span class="hud-label">日期</span>
+          <span class="hud-label">{{ $t('lightLab.date') }}</span>
           <input type="date" v-model="dateStr" class="hud-input" />
           <span class="hud-time">{{ hudTime }}</span>
         </div>
         <div class="hud-row">
-          <span class="hud-label">地点</span>
+          <span class="hud-label">{{ $t('lightLab.location') }}</span>
           <span class="hud-city">{{ locationLabel }}</span>
-          <input type="number" v-model.number="lat" step="0.01" class="hud-input num" title="纬度" />
-          <input type="number" v-model.number="lng" step="0.01" class="hud-input num" title="经度" />
+          <input type="number" v-model.number="lat" step="0.01" class="hud-input num" :title="$t('lightLab.lat')" />
+          <input type="number" v-model.number="lng" step="0.01" class="hud-input num" :title="$t('lightLab.lng')" />
         </div>
         <div class="hud-stats">
-          <span>高度角 <b>{{ hudAlt }}°</b></span>
-          <span>方位角 <b>{{ hudAz }}°</b></span>
-          <span>窗角 <b>{{ hudWindowAngle }}°</b></span>
-          <span v-if="isNight" class="hud-night">夜间</span>
+          <span>{{ $t('lightLab.altitude') }} <b>{{ hudAlt }}°</b></span>
+          <span>{{ $t('lightLab.azimuth') }} <b>{{ hudAz }}°</b></span>
+          <span>{{ $t('lightLab.windowAngle') }} <b>{{ hudWindowAngle }}°</b></span>
+          <span v-if="isNight" class="hud-night">{{ $t('lightLab.night') }}</span>
         </div>
         <div class="hud-row">
           <div class="hud-seg">
-            <button class="hud-btn" @click="stepTime(-15)" title="后退 15 分钟">⏮</button>
+            <button class="hud-btn" @click="stepTime(-15)" :title="$t('lightLab.back15')">⏮</button>
             <button class="hud-btn main" @click="playing = !playing">{{ playing ? '⏸' : '▶' }}</button>
-            <button class="hud-btn" @click="stepTime(15)" title="前进 15 分钟">⏭</button>
-            <button class="hud-btn" @click="resetToNow" title="回到当前时刻">现在</button>
+            <button class="hud-btn" @click="stepTime(15)" :title="$t('lightLab.forward15')">⏭</button>
+            <button class="hud-btn" @click="resetToNow" :title="$t('lightLab.backToNow')">{{ $t('lightLab.now') }}</button>
           </div>
         </div>
         <div class="hud-row">
@@ -73,32 +73,32 @@
       <!-- 手动拖拽面板 -->
       <template v-else>
         <div class="hud-row">
-          <span class="hud-label">光源</span>
+          <span class="hud-label">{{ $t('lightLab.lightSource') }}</span>
           <div class="hud-seg">
-            <button :class="{ active: lightType === 'directional' }" @click="lightType = 'directional'">平行光</button>
-            <button :class="{ active: lightType === 'spot' }" @click="lightType = 'spot'">聚光</button>
-            <button :class="{ active: lightType === 'point' }" @click="lightType = 'point'">点光</button>
+            <button :class="{ active: lightType === 'directional' }" @click="lightType = 'directional'">{{ $t('lightLab.directional') }}</button>
+            <button :class="{ active: lightType === 'spot' }" @click="lightType = 'spot'">{{ $t('lightLab.spot') }}</button>
+            <button :class="{ active: lightType === 'point' }" @click="lightType = 'point'">{{ $t('lightLab.point') }}</button>
           </div>
         </div>
         <div class="hud-row">
-          <span class="hud-label">阴影</span>
-          <button class="hud-btn" :class="{ on: shadowOn }" @click="toggleShadow">{{ shadowOn ? '开' : '关' }}</button>
-          <button class="hud-btn" @click="resetManualLight">重置光源</button>
+          <span class="hud-label">{{ $t('lightLab.shadow') }}</span>
+          <button class="hud-btn" :class="{ on: shadowOn }" @click="toggleShadow">{{ shadowOn ? $t('lightLab.on') : $t('lightLab.off') }}</button>
+          <button class="hud-btn" @click="resetManualLight">{{ $t('lightLab.resetLight') }}</button>
         </div>
-        <div class="hud-coords">光源 {{ lightCoords || '—' }}</div>
+        <div class="hud-coords">{{ $t('lightLab.lightSource') }} {{ lightCoords || '—' }}</div>
       </template>
 
       <div class="hud-row">
-        <span class="hud-label">开窗</span>
+        <span class="hud-label">{{ $t('lightLab.windowOpen') }}</span>
         <input type="range" min="0" max="90" step="1" v-model.number="windowOpen" class="hud-range" />
         <span class="hud-unit">{{ windowOpen }}°</span>
       </div>
 
       <div class="hud-row hud-footer">
-        <button class="hud-btn" :class="{ on: lampOn }" @click="toggleLamp">台灯 {{ lampOn ? '开' : '关' }}</button>
-        <button class="hud-btn" @click="resetCamera">重置视角</button>
+        <button class="hud-btn" :class="{ on: lampOn }" @click="toggleLamp">{{ $t('lightLab.lamp') }} {{ lampOn ? $t('lightLab.on') : $t('lightLab.off') }}</button>
+        <button class="hud-btn" @click="resetCamera">{{ $t('lightLab.resetView') }}</button>
       </div>
-      <div class="hud-hint">左键旋转 · 右键平移 · 滚轮缩放 · 拖动发光小球移动光源</div>
+      <div class="hud-hint">{{ $t('lightLab.hint') }}</div>
     </div>
   </div>
 </template>
@@ -106,6 +106,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { sunPosition } from '@/utils/solarPosition'
@@ -267,6 +268,7 @@ const JINAN_LNG = 117.1201
 const SUN_DISTANCE = 15
 const SUN_BASE_INTENSITY = 6
 
+const { t } = useI18n()
 const canvasRef = ref(null)
 const router = useRouter()
 const goBack = () => router.push('/tools')
@@ -292,7 +294,9 @@ const lampOn = ref(true) // 台灯开关(默认开)
 const reducedMotion = ref(false)
 
 const locationLabel = computed(() =>
-  Math.abs(lat.value - JINAN_LAT) < 0.5 && Math.abs(lng.value - JINAN_LNG) < 0.5 ? '济南' : '自定义'
+  Math.abs(lat.value - JINAN_LAT) < 0.5 && Math.abs(lng.value - JINAN_LNG) < 0.5
+    ? t('lightLab.cityJinan')
+    : t('lightLab.cityCustom')
 )
 
 let renderer = null

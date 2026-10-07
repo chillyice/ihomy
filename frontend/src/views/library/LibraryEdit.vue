@@ -54,8 +54,8 @@
         </el-form-item>
         <el-form-item :label="$t('library.visibility')">
           <el-radio-group v-model="form.visibility">
-            <el-radio :value="0">{{ $t('library.onlySelf') }}</el-radio>
-            <el-radio :value="3">{{ $t('library.familyVisible') }}</el-radio>
+            <el-radio value="PRIVATE">{{ $t('library.onlySelf') }}</el-radio>
+            <el-radio value="FAMILY">{{ $t('library.familyVisible') }}</el-radio>
           </el-radio-group>
         </el-form-item>
         <div class="form-footer">
@@ -103,7 +103,8 @@ const isEdit = computed(() => !!route.params.id)
 const loading = ref(false)
 const uploading = ref(false)
 
-const form = reactive({ title: '', author: '', description: '', coverUrl: '', fileUrl: '', fileFormat: '', fileSize: null, categoryIds: [], tags: '', status: 1, visibility: 3 })
+// visibility/status 走字典词(PRIVATE/FAMILY、DRAFT/PUBLISHED/HIDDEN),与后端枚举一致
+const form = reactive({ title: '', author: '', description: '', coverUrl: '', fileUrl: '', fileFormat: '', fileSize: null, categoryIds: [], tags: '', status: 'PUBLISHED', visibility: 'FAMILY' })
 const categories = ref([])
 const showCategoryDialog = ref(false)
 const newCategoryName = ref('')
@@ -117,6 +118,7 @@ const categoryCascader = computed(() => {
     if (!byParent[pid]) byParent[pid] = []
     byParent[pid].push(c)
   }
+  // 叶子节点 children 必须为 undefined(不能给空数组,否则级联选择器仍显示可展开箭头)
   const build = (pid) => (byParent[pid] || []).map(c => ({
     value: c.id,
     label: c.name,
@@ -155,6 +157,8 @@ const addCategory = async () => {
 }
 
 const onUploadFile = async (file) => {
+  // 书籍文件走书架专用上传接口(会解析格式/大小),封面走通用文件接口;
+  // 末尾 return false 是阻止 el-upload 的自动上传,上传由这里手动发起
   uploading.value = true
   try {
     const data = await libraryApi.upload(file)
@@ -180,6 +184,7 @@ const onUploadCover = async (file) => {
   } catch (e) {
     ElMessage.error(e.message || 'Failed')
   }
+  // 同上:拦下 el-upload 的自动上传
   return false
 }
 

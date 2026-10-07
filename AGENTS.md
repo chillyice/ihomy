@@ -12,7 +12,7 @@
 
 > **⚠ Git 规定(必须遵守)**:非人工指令,不得主动提交代码(`git commit`/`git add -A`/`git push` 一律禁止)。`git add` 只能指定具体文件路径,禁止 `git add -A`/`git add .`。
 
-> **⚠ 敏感数据规定(必须遵守)**:**生产**密码/密钥/私钥/token 一律不写入仓库文件——生产 DB 密码与 JWT 密钥走服务器 external.yml(不入 git,模板 `external.yml.template`);凭证台账在本地 `Linux部署指导.md` §〇、开发账号明文在本地 `docs/新人上手指南.md`(均 .gitignore 忽略);前端演示凭证走 `frontend/.env.development.local`(仅 vite dev 加载;**`.env.local` 会内联进生产 bundle,禁用**)。schema.sql 为开发安全版:仅含本机 Docker 开发凭证,生产凭证完全独立,部署时须 `ALTER USER` 改强密码。历史明文凭证清理见 docs/变更归档.md 敏感数据治理小节。
+> **⚠ 敏感数据规定(必须遵守)**:**生产**密码/密钥/私钥/token 一律不写入仓库文件——生产 DB 密码与 JWT 密钥走服务器 external.yml(不入 git,模板 `external.yml.template`);凭证台账在本地 `Linux部署指导.md` §〇、开发账号明文在本地 `docs/新人上手指南.md`(均 .gitignore);前端演示凭证走 `frontend/.env.development.local`(仅 vite dev 加载;**`.env.local` 会内联进生产 bundle,禁用**)。schema.sql 为开发安全版(仅本机 Docker 凭证),生产须 `ALTER USER` 改强密码;历史明文清理见变更归档。
 
 > **⚠ 多会话并行警示(必须遵守)**:**多会话同时改本仓时禁用 `git stash`**(path-limited `git stash push` 把共享文件 i18n/router 里**其他会话未提交的改动**一起回滚,现象是「刚加好的文案与路由突然消失」);**他人 stash 不 pop**,取自己那部分只读不写:`git show "stash@{0}:<path>"` 按块插回。也别并行 `npm run build`(争 `public/emulatorjs`、`dist/`)。
 
@@ -24,20 +24,19 @@
 > - **Git Bash 调 Windows 原生命令**:容器内路径参数一律加 `MSYS_NO_PATHCONV=1`(否则 `/tmp/x.sql` 被转成 Windows 路径,`docker cp`/`source` 静默失效报 `error: 2`)。
 > - **打包 zip 用 Windows 自带 bsdtar**:`tar -a -c -f out.zip dir`;别用 `Compress-Archive`(条目用反斜杠分隔,非 Windows 解压工具会当成文件名)。
 > - **写 MySQL 中文**:Write 写 UTF-8 无 BOM 的 SQL → `MSYS_NO_PATHCONV=1 docker cp` 进容器 → `docker exec ihomy-mysql mysql --default-character-set=utf8mb4 ihomy -e "source /tmp/x.sql"`;禁 PowerShell 管道喂 mysql。终端显示 `?` 是终端编码问题,不代表落库乱码。
-> - **`mvnw.cmd` 必须在 `backend` 目录内调用**(wrapper 在当前目录找,在仓库根调会报找不到 maven-wrapper.properties);运行后端用完整路径单实例 `C:\Program Files\Java\jdk-21\bin\java.exe -jar target\ihomy-backend.jar`(javapath + 双实例会分流 8080 导致偶发 401/404/500);jar 锁按 PID 结束本地后端进程(命令行含 JetBrains/IntelliJ 的是 IDEA 本体,绝不能杀;**禁止 `taskkill /IM java.exe` 全杀**)。
+> - **`mvnw.cmd` 必须在 `backend` 目录内调用**(wrapper 在当前目录找);运行后端用完整路径单实例 `C:\Program Files\Java\jdk-21\bin\java.exe -jar target\ihomy-backend.jar`(双实例会分流 8080 致偶发 401/404/500);jar 锁按 PID 结束本地后端(含 JetBrains/IntelliJ 的是 IDEA 本体,绝不能杀;**禁 `taskkill /IM java.exe`**)。
 > - **后端内存缓存直改 DB 不生效**:启动时预热的内存缓存(如 `HomeModuleService` 全局模块)直改 DB 不刷新,须重启后端或走模块管理接口 evict——成因与清单见踩坑速查 §2.1。
 
 ## 项目概述
 
 - **应用名**:ihomy(家庭共用软件)。家庭内部内容共享平台,PC 浏览器 / 安卓 / iOS(均 PWA)。
-- **核心功能**:登录注册、博客、日记、相册、纪念日、留言板、放映厅、聊天室、积分商城、任务悬赏、提醒、家庭计划、愿望单、记账、家谱、书架、工具箱(脑图设计)、运维。首页模块化可扩展(新增功能只需插入一条 `sys_home_module` 记录)。
-- **技术栈**:前端 Vue3 + Vite + ElementPlus + PWA(`ihomy-frontend`);后端 Spring Boot 3 + MyBatis-Plus + MySQL 8 + Redis(JWT 双 token + 验证码 + WebSocket),包 `com.ihomy`,主类 `IhomyApplication`,`ihomy-backend`。
+- **核心功能**:登录注册、博客、日记、相册、纪念日、留言板、放映厅、聊天室、积分商城、任务悬赏、提醒、计划、愿望单、记账、家谱、书架、工具箱、运维等;首页模块化可扩展(新增功能只需插一条 `sys_home_module` 记录)。
+- **技术栈**:前端 Vue3 + Vite + ElementPlus + PWA(`ihomy-frontend`);后端 Spring Boot 3 + MyBatis-Plus + MySQL 8 + Redis(双 token JWT + 验证码 + WebSocket),包 `com.ihomy`,主类 `IhomyApplication`,`ihomy-backend`。
 
 ## 工作目录
 
-- 唯一工作目录 `C:\Users\chill\OneDrive\WorkStation\Projects\ihomy`(代码编辑 + 构建验证 + 部署文档均在此;已从双目录合并为单目录)。
-- Nginx 静态根指向 `frontend/dist`,构建后直接生效(Ctrl+Shift+R 刷新浏览器)。
-- 部署文档:`docs/部署指导-Linux.md` / `docs/部署指导-Windows.md`(入库脱敏版);本地 `Linux部署指导.md` 只剩 §〇凭证台账。
+- 唯一工作目录 `C:\Users\chill\OneDrive\WorkStation\Projects\ihomy`(代码编辑 + 构建验证 + 部署文档均在此)。
+- Nginx 静态根指向 `frontend/dist`,构建后直接生效(Ctrl+Shift+R 刷新)。
 
 ## 命名约定(务必遵守)
 
@@ -107,14 +106,14 @@ frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
   src/
     api/          # request.js(axios+JWT+401 自动刷新) + index.js(41 个 Api 对象)
     stores/       # user.js(登录+权限) / app.js(首页聚合) / theme.js(主题两轴矩阵)
-    router/       # 登录守卫 + scrollBehavior;60 条路由(57 条懒加载,另 3 条 redirect)
+    router/       # 登录守卫 + scrollBehavior;61 条路由(57 条懒加载,另 4 条 redirect)
     i18n/ theme/  # vue-i18n 中英;主题两轴矩阵(暖居/光尘 × 晨/暮)
     utils/        # dict.js / doodle.js(涂鸦引擎) / useDragResize.js / password.js / loan.js 等纯函数与组合逻辑
     composables/  # useDevice.js(设备检测) / useWeatherBg.js(天气 AI 生图氛围底图)
     components/   # AppSidebar/Breadcrumb/AvatarCropper/MediaPlayer/Mobile*(移动端)/warm/(暖居外壳)等
     layouts/MobileLayout.vue  # 移动端壳
     styles/main.css # CSS 变量 + 全局样式 + 深色模式 + EP 组件覆写 + @media
-    views/        # 63 个页面(顶层 Home/Login/Member/Settings/Announcement/Recycle/Help/Vault/Kada/Wallpaper 等 + 各功能域子目录 album/blog/diary/cinema/iot/tools/games/…;完整清单见 需求 §4)
+    views/        # 64 个页面(顶层 Home/Login/Member/Settings/Announcement/Recycle/Help/Vault/Kada/Wallpaper 等 + 各功能域子目录 album/blog/diary/cinema/iot/tools/games/…;完整清单见 需求 §4)
     App.vue
   vite.config.js   # PWA + 代理 /api->8080 + manualChunks 分块 + ElementPlus 按需
 wallpaper-engine/   # Wallpaper Engine 网页壁纸包(壳页跳转线上 /wallpaper;不含构建产物、不进 dist,机制见该目录 README)
@@ -152,8 +151,9 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **权限模型**:`buildTokens` 返回 `permissions` 数组 + `isOps` 标志;前端 `userStore.hasPerm(code)`/`isOps`/`isPureOps`。OWNER 恒真,其余查 `SysRoleMapper.selectAuthCodesByUserAndFamily`。
 - **OPS 隔离**:`OpsAccessFilter` 只放行 OPS 到 `/api/ops/**`+`/api/auth/**`,其余 403;非 OPS 访问 `/api/ops/**` 一律 403;支持复合角色(OWNER+OPS)。**⚠ 判 OPS 只认系统级绑定**(`sys_user_role.family_id IS NULL` + 5 分钟缓存):前端一律 `userStore.isOps`,**禁止 `hasPerm('ops:view')`**;OPS 绑定必须带一条 `family_id=NULL` 的系统级行,否则 `isOps` 恒 false、运维页按「家长」渲染(见踩坑速查 §2.5)。
 - 点赞/评论/通知严格同家庭:`validateTarget` 校验内容 family_id 与用户一致,跨家庭返回 NOT_FOUND。
+- **令牌过期预检(强制,V10.19)**:`api/request.js` 发请求前用 `utils/jwt.js` 的 `isTokenExpired` 读 exp,已过期且刷新令牌仍有效就先续期再发——permitAll 接口(`/api/public/**`)对过期令牌静默按未登录处理并返回 200,只靠 401 续期会让它们永远拿不到登录态(天气/日出日落退回 IP 定位、首页聚合成游客视图,见踩坑速查 §3.20);`/auth/*` 自身跳过预检防递归。
 - 匿名(permitAll)接口按登录态返回空数据,不许 NPE(见踩坑速查 §2.6)。
-- **防爆破 + 首登改密(V10.1)**:`/auth/login|captcha|register` 按 IP 限流、登录失败按「账号+IP」Redis 计数(超限 429);种子账号 admin/ops 带 `must_change_password=1`,其令牌带 `pwdChange` claim 时只放行改密与登出(前端 `ChangePasswordDialog` 强制弹窗),且**不签发刷新令牌**;CORS 走白名单 `app.cors-allowed-origins`(external.yml);SQL 日志(`logging.level.mybatis.sql`)默认 warn。
+- **防爆破 + 首登改密(V10.1)**:`/auth/login|captcha|register` 按 IP 限流、登录失败按「账号+IP」Redis 计数(超限 429);种子账号 admin/ops 带 `must_change_password=1`,其令牌带 `pwdChange` claim 时只放行改密与登出(前端 `ChangePasswordDialog` 强制弹窗),且**不签发刷新令牌**;CORS 走白名单 `app.cors-allowed-origins`(基线仅生产域名,开发端 `localhost:5173` 由本机 external.yml 覆盖);SQL 日志(`logging.level.mybatis.sql`)默认 warn。
 
 ## 功能模块清单(索引)
 
@@ -162,23 +162,23 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 | 域 | 模块 | 关键入口 |
 |----|------|---------|
-| 账号 | 注册/登录/验证码/个人资料/密码找回(邮箱自助重置,30 分钟一次性 token,邮件通道可选) | AuthController+PasswordResetService / ProfileController |
+| 账号 | 注册/登录/验证码/个人资料/密码找回(邮箱自助重置) | AuthController+PasswordResetService / ProfileController |
 | 家庭 | 家庭管理/多家庭切换/成员/邀请码/入家申请 | FamilyController / AuthController / MemberController |
-| 内容 | 博客 / 日记 / 相册照片(含照片瀑布内嵌视图,V10.11) / 放映厅(媒体引擎+本地视频库) / 愿望单 / 书架 | Blog / Diary / Album+Photo / Video / Media / Wish / Library 各 Controller |
+| 内容 | 博客 / 日记 / 相册照片(含瀑布内嵌) / 放映厅(媒体引擎+本地库) / 愿望单 / 书架 | Blog / Diary / Album+Photo / Video / Media / Wish / Library 各 Controller |
 | 互动 | 点赞 / 评论 / 通知 / 聊天室 / 家庭公告 | Like / Comment / Notification / Chat / Announcement 各 Controller + ChatWebSocketHandler |
-| 生活 | 纪念日 / 提醒 / 计划 / 任务 / 记账(含贷款页签) / 家谱 / 签到积分 / 背景音乐 / 家庭保险箱 | Anniversary / Reminder / Plan / Task / Points / Music / Vault 各 Controller |
-| 游戏 | 花园共养植物 / 小游戏库(SWF/GBA,Flash Ruffle + EmulatorJS) / 宠物连连看 | FamilyPlant / GameInfo 各 Controller + FlashPlayer.vue + GbaPlayer.vue + PetLinkLink.vue |
-| 基础 | 文件上传 / 存储管理 / 首页聚合 / 运维(含同类异常聚合预警) / 开源组件台账 / 每日内容 / 操作日志 / 系统参数 / 回收站 | File / Storage / Home+Public / Ops+Oss(**OpsAlert**) / Daily / Log / Recycle 各 Controller |
-| 光影 | 太阳位置 / 日月晨昏 / 体积光 / 台灯 / 天气(特效/代理/详情) / 首页仪表盘 | SolarUtil+SunService(`/public/sun-info`) + windowLight.js + SunLightLayer.vue |
-| 物品 | 物品定位 + 户型图 + AI 语义 | ItemController / ItemAiService+AiService(决策见 需求 §4.8.1) |
+| 生活 | 纪念日 / 提醒 / 计划 / 任务 / 记账(含贷款) / 家谱 / 签到积分 / 背景音乐 / 保险箱 | Anniversary / Reminder / Plan / Task / Points / Music / Vault 各 Controller |
+| 游戏 | 花园共养植物 / 小游戏库(SWF/GBA) / 宠物连连看 | FamilyPlant / GameInfo 各 Controller + FlashPlayer.vue + GbaPlayer.vue + PetLinkLink.vue |
+| 基础 | 文件上传 / 存储管理 / 首页聚合 / 运维(含异常聚合预警) / 开源组件台账 / 每日内容 / 操作日志 / 系统参数 / 回收站 | File / Storage / Home+Public / Ops+Oss(OpsAlert) / Daily / Log / Recycle 各 Controller |
+| 光影 | 太阳位置 / 日月晨昏 / 体积光 / 台灯 / 天气 / 首页仪表盘 | SolarUtil+SunService(`/public/sun-info`) + windowLight.js + SunLightLayer.vue |
+| 物品 | 物品定位 + 户型图 + AI 语义 | ItemController / ItemAiService+AiService(见需求 §4.8.1) |
 | AI | 图片生成/语音识别 + AI 测试台 + 家庭级 AI 配置 + 调用统计 | AiService / FamilyAiConfigService / AiController + AiStatsService(`/ops/ai/**`) |
 | 厨房 | 菜单/菜谱/食材 | RecipeController / RecipeService |
-| 物联 | 智能家居中控(HA 接入:同步/历史曲线/开关·窗帘·门锁·数值控制) | IotController / HomeAssistantService + IotSyncService + views/iot/Iot.vue |
-| 工具 | 工具箱聚合页 / 脑图设计 / AI 测试台 / 3D 光影实验台 / 贷款计算器+贷款记录 / Flash·GBA 播放器 | MindMapController / MindMapService(详见 需求 §4.12) |
-| 系统 | i18n / 主题(暖居/光尘 × 晨/暮) / 字典 / 帮助页 `/help` / 独立产品页(咔哒 `/kada`、壁纸屏 `/wallpaper`,`meta.standalone`) | i18n/ + theme/ + stores/theme.js + utils/dict.js + views/Help.vue + Kada.vue + Wallpaper.vue |
+| 物联 | 智能家居中控(HA 接入) | IotController / HomeAssistantService + IotSyncService + views/iot/Iot.vue |
+| 工具 | 工具箱聚合页 / 脑图设计 / AI 测试台 / 3D 光影实验台 / 贷款计算器+贷款记录 / Flash·GBA 播放器 | MindMapController / MindMapService(见需求 §4.12) |
+| 系统 | i18n / 主题(暖居/光尘 × 晨/暮) / 字典 / 帮助页 / 独立产品页(咔哒/壁纸) | i18n/ + theme/ + stores/theme.js + utils/dict.js + views/Help.vue + Kada.vue + Wallpaper.vue |
 | 移动端 | 设备自适应 | useDevice.js + MobileLayout.vue + Mobile* 组件 |
 
-**关键坑速查**:已外移到 **`docs/踩坑速查.md`**(后端 §2 / 前端 §3 / 天文 §4 / 媒体引擎 §5 / WE §6 / 部署 §7),动手前按关键词 grep 该文件。
+**关键坑速查**:已外移到 **`docs/踩坑速查.md`**,动手前按关键词 grep 该文件。
 
 ## 设计规范(统一实现,避免多种方式)
 
@@ -194,7 +194,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 8. **多家庭**:`sys_user_role.family_id` 区分;当前家庭存 Redis;`default_family_id` 用户设置的默认家庭。**`family_id=NULL` 表示系统级**(OPS 绑定等),别用占位值填充。
 9. **N+1 禁令**(强制):列表接口禁止在 for 循环里 `selectById` 取关联字段(authorName/uploaderName 等)。**先收集 userIds,用 `selectBatchIds` 批量查,内存 Map 回填**;参考 `ActivityFeedService.getFeed` / `CommentService.list` 的 `batchUsers()` 写法。已批量化的清单见 变更归档 V10.2。
 10. **缓存规范**(强制):键 `ihomy:{domain}:{id}`;短 TTL(用户/权限/公开首页 5min);**变更点必须显式 invalidate(矩阵见踩坑速查 §9)**;不变数据走内存缓存(全局预热 + 双检锁兜底,按 familyId 分桶,**不引 Caffeine**);敏感数据不缓存(成员视图 `/public/home`)。
-11. **UPDATE 不先 select**(强制):回写冗余字段用 `LambdaUpdateWrapper.eq(...).set(...).update(null)`,不要 `selectById` 再 `updateById`;**计数类字段用 `setSql("like_count = like_count + delta")` 原子增量,禁止「先 COUNT 再 SET」**(踩坑速查 §8.3),参考 `ContentLikeService.adjustCount`。**依赖 `updated_at` 的表更新必须用 `LambdaUpdateWrapper` 只 SET 业务字段并重查**(MP `updateById` 会回写旧 `updated_at`、抑制 `ON UPDATE CURRENT_TIMESTAMP`,见踩坑速查 §2.2)。
+11. **UPDATE 不先 select**(强制):回写冗余字段用 `LambdaUpdateWrapper.eq(...).set(...).update(null)`,不要 `selectById` 再 `updateById`;**计数类字段用 `setSql("like_count = like_count + delta")` 原子增量,禁止「先 COUNT 再 SET」**(踩坑速查 §8.3),参考 `ContentLikeService.adjustCount`。**依赖 `updated_at` 的表更新必须用 `LambdaUpdateWrapper` 只 SET 业务字段并重查**(MP `updateById` 会回写旧 `updated_at`、抑制 `ON UPDATE CURRENT_TIMESTAMP`,见踩坑速查 §2.2);**把字段清成 null 必须 `LambdaUpdateWrapper.set(col, null)`**(实体 `setXxx(null)` + `updateById` 整体跳过 null、字段清不掉,见踩坑速查 §2.3)。
 12. **文件上传流式**(强制):大文件(>1MB)禁止 `file.getBytes()` 全量入堆(生产 `-Xmx384m` 传 200MB 即 OOM),**必须用 `MultipartFile` 重载 + `transferTo` + `Files.copy` 兜底**;FileService 已提供 4 个流式重载,Controller 传 `MultipartFile` 不调 `getBytes()`。
 13. **JVM/连接池配置**(基线):`spring.threads.virtual.enabled: true`(JDK21 虚拟线程);HikariCP `maximum-pool-size: 20` + `minimum-idle: 5` + `connection-timeout: 3000`。
 14. **日志规范**(强制,细则见 `docs/设计想法/日志/`):三类文件 access(接口,`AccessLogFilter` 自动)/server(流程+SQL+ERROR)/thirdparty(三方,`ThirdPartyHttp` 封装),按天滚动留 7 天;六要素 时间/级别/线程/[tid]/位置/内容,tid 贯穿 HTTP/WS/@Async/线程池(配 TaskDecorator);三方调用一律走 `ThirdPartyHttp.get()`(自定义方法 `.request()`);**报错必须带堆栈** `log.error("xx, p={}", p, e)`(禁 printStackTrace);级别 ERROR=人工/WARN=可恢复/INFO=关键/DEBUG=细节;**所有写接口必须 @OperationLog**(module 大写/operationType 标准词/description 中文;token 刷新、已读等高频噪音端点除外);新敏感字段进 `AccessLogFilter.SENSITIVE_JSON` 打码清单;运维「详细日志」`GET /ops/logs/trace?tid=` 按 tid 扫三类文件;**同类异常聚合预警(V10.15)**:`LogAlertAppender` 挂在 root + ACCESS + thirdparty 三处 logger(后两者 `additivity=false`,不挂就收不到),同类判定=级别+logger+异常类型+首个应用栈帧,阈值/级别/排除项走 `app.log-alert.*`,详见需求 §4.6.4。
@@ -211,7 +211,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 7. **毛玻璃**:`backdrop-filter: blur(24px) saturate(1.1)`;子元素 hover 用 `transform` 而非 `box-shadow`(避免触发 backdrop-filter 重算);**长开页/持续动画页别用 backdrop-filter**(踩坑速查 §3.10)。
 8. **可拖拽面板**:`useDragResize` 组合式函数;位置/大小持久化 localStorage;**事件监听器按需挂载**(`onDragStart`/`onResizeStart` 时挂 `mousemove`/`mouseup`,`onMouseUp` 时移除,不要 `onMounted` 常驻——参考 `AvatarCropper.vue`)。
 9. **光影层全局化**:`SunLightLayer` + `AppSidebar` + `SiteFooter` 在 `App.vue` 全局挂载;`useSunLight` provide/inject 共享状态。
-10. **i18n**:所有用户可见文本用 `$t('key')`;中英双语(键结构必须 zh-CN/en 对齐);`utils/dict.js` 枚举映射。外壳文案命名空间:`warm.*`(暖居)/`sidebar.*`(侧栏)/`home.dashboard.*`(光尘首页)/`feed.*`(动态流)。
+10. **i18n**:所有用户可见文本用 `$t('key')`;中英双语(键结构必须 zh-CN/en 对齐);`utils/dict.js` 枚举映射。外壳文案命名空间:`warm.*`(暖居)/`sidebar.*`(侧栏)/`home.dashboard.*`(光尘首页)/`feed.*`(动态流)。**CI 有硬编码中文守门** `i18n/hardcoded-cjk.spec.js`(扫 `<template>` 文本/静态属性 + `ElMessage(Box/Notification)` 字面量;有意保留项进其 `ALLOW`);`<script>` 内枚举数据/`console.*` 不在扫描内。
 11. **共享逻辑抽 utils(禁止三份实现)**:动态流类型标签/摘要/相对时间走 `utils/feed.js`(`feedTypeLabel`/`feedSummary`/`formatFeedTime`),默认楼层走 `floorPlanGeom.pickDefaultFloor`,枚举文案走 `dictText(t,...)`;新增重复逻辑先找现成 util。
 12. **可点击非按钮元素**:用全局指令 `v-a11y-click`(自动补 `role=button`/`tabindex=0` + Enter/Space 触发 click),不要逐处手写三行键盘处理;`<img>` 必须带 `alt`(装饰图 `alt=""`)。
 13. **打包分块**(强制):`vite.config.js` 必须配 `build.rollupOptions.output.manualChunks` 拆分大 vendor(当前 `element-plus`/`gsap`/`vue-i18n`/`epubjs`/`pdfjs`/`simple-mind-map` 六块)。**public/ 下静态资源不得与 npm 包重复**。
@@ -235,18 +235,17 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 ## 验证基线(每版更新,当前值)
 
-- 后端:`cd backend; .\mvnw.cmd -B clean package` → BUILD SUCCESS(`Tests run: 52`,纯逻辑不起 Spring 上下文;V10.18 起含 `HealthControllerTest` 4 项);只求编译加 `-DskipTests`。**clean 被运行中的后端锁 jar 时改跑 `-B test`**。
-- 前端测试:`cd frontend; npx vitest run` → 31 passed(loan/password/feed/nav + i18n 中英键对齐 + i18n 引用键存在性;CI 在构建前执行)。同一步跑 `npm run lint` → **0 error**(27 warning = 存量未使用变量,不拦构建)。
+- 后端:`cd backend; .\mvnw.cmd -B clean package` → BUILD SUCCESS(`Tests run: 53`,纯逻辑不起 Spring 上下文);只求编译加 `-DskipTests`。**clean 被运行中后端锁 jar 时改跑 `-B test`**。
+- 前端测试:`cd frontend; npx vitest run` → 45 passed(jwt/loan/password/feed/nav + i18n 中英键对齐 + 引用键存在性 + 模板/消息硬编码中文守门;CI 构建前执行)。同一步跑 `npm run lint` → **0 error / 0 warning**(V10.21 起存量 warning 清零,不拦构建)。
 - 文档/代码一致性闸门:`bash scripts/doc-drift-check.sh` → 全部 [OK](CI 最先跑;表数/实体↔建表/mapper 注解/@Tag/权限码种子/模块↔路由)。
-- 前端构建:`cd frontend; npm run build` → 入口 chunk **388.76KB/gzip 156.53KB**(V10.18 实测,与 V10.17 的 388.76KB/156.52KB 实质持平——本轮改动全在后端/脚本/文档,未动前端源码,0.01KB 差异来自版本串 V10.17→V10.18;V10.16 时 388.06KB/156.36KB、V10.14 时 386.76KB;功能页/pdfjs/epubjs/hls.js 均为独立异步 chunk;历史数字见 docs/变更归档.md)
+- 前端构建:`cd frontend; npm run build` → 入口 chunk **399.94KB/gzip 161.97KB**(V10.22 实测;功能页/pdfjs/epubjs/hls.js 均为独立异步 chunk;历史数字见 docs/变更归档.md)
   - **⚠ 口径:vite 报的是「字符数」不是「字节数」**(实测 318.71KB 字符 = 343,667 字节)——**别拿 `ls -la` 字节数跟基线比**;比特字节就 `wc -c` 对 `wc -c`。
 - 界面/交互验证:harness 别放 `target/`;持续动画页面用页面内 `evaluate` 量几何、派发 `el.click()`,别用截图或真实点击(必超时,见踩坑速查 §6)。
-- 接口测试:同级独立项目(不在本仓库)`cd ..\autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed;CI 每次推送自动做前后端构建+compose 起库导 schema+后端启动+登录冒烟。
+- 接口测试:同级独立项目(不在本仓库)`cd ..\autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed;CI 每次推送自动构建前后端+起库导 schema+后端启动+登录冒烟。
 
 ## 已实现变更归档(已外置)
 
-> 历史归档已整体迁至 **`docs/变更归档.md`**(现约 783KB / **161 小节** = 开头 16 个**功能域**小节 + 其后 145 个版本/治理小节),内容原样保留。含文件级改动表、设计决策、踩坑记录与 live DB 同步 SQL。
-> **该文件开头有章节目录**(或 `grep -n "^##### " docs/变更归档.md` 列全部小节);**检索历史实现/设计决策/live DB 迁移 SQL 时读该文件;新的变更归档继续追加到文件末尾**(新增 `#####` 子节),不要再写回 AGENTS.md。
+> 历史归档整体在 **`docs/变更归档.md`**(开头有章节目录,`grep -n "^##### " docs/变更归档.md` 列小节),含文件级改动表、设计决策、踩坑与 live DB 迁移 SQL。**检索历史实现/迁移 SQL 读该文件;新变更继续追加到末尾**(新增 `#####` 子节),不写回本文件。
 
 ## 文件存储策略
 
@@ -261,7 +260,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **外挂配置**(唯一开发生产差异机制):`IHOMY_CONFIG_PATH` 环境变量指向 yml 路径,`ExternalConfigLoader` 启动早期加载、最高优先级覆盖 application.yml(MySQL/Redis 密码、天气、JWT 密钥、密码找回 SMTP `spring.mail.*` 与 `app.mail.*`)。**改配置前先核实该变量实际指向**(曾指向旧路径陈旧副本;启动命令里显式设置最可靠)。模板 `backend/src/main/resources/external.yml.template`;external.yml 不入 git。
 - **DB/Redis 密码明文**(避免鸡生蛋:DB 未连上无法读盐值解密);**业务凭证 AES-GCM 加密**:`AesUtil`(PBKDF2WithHmacSHA256 100000 次 + GCM 128bit tag);密文 `ENC(Base64(iv+cipher+tag))`;盐值存 `sys_parameter`(key=`aes-salt`,首启生成,可被 `IHOMY_AES_SALT` 覆盖)。
 - **OPS 加密接口**:`GET /api/ops/crypto/encrypt?plaintext=` 生成密文,`/decrypt?ciphertext=ENC(xxx)` 验证(均 `ops:view`)。
-- **三处可扩展点**(现状见需求设计说明书——天气多源 §4.7.5、首页仪表盘 §4.7.7、AI 模型接入 §4.6.9):①天气源=门面 `WeatherService` + `WeatherProvider`(现和风 `QWeatherProvider`,凭证表 `sys_weather_credential`),新增三步(WeatherConst.PROVIDERS + 实现 + 前端下拉);②首页组件=四档 snap 尺寸 + hover 推开邻居,布局键 `ihomy:dashboard:layout:v2`;③AI=家庭级模型池 `sys_family_ai_model`(LLM/IMAGE/ASR/LOCAL,密钥 ENC)+ 按功能绑定 `sys_family_ai_feature`(6 功能,`resolveForFeature/resolveChain` 主+兜底,同义词表 `sys_synonym`),**新家庭要用 AI 必须家长先加模型再按功能绑定**(找物/放物可绑 LOCAL 离线用)。
+- **三处可扩展点**(细节见需求 §4.7.5 天气多源 / §4.7.7 首页仪表盘 / §4.6.9 AI):①天气源=门面 `WeatherService` + `WeatherProvider`(现和风,凭证表 `sys_weather_credential`),新增=WeatherConst.PROVIDERS+实现+前端下拉;②首页组件=四档 snap 尺寸+hover 推开邻居,布局键 `ihomy:dashboard:layout:v2`;③AI=家庭级模型池 `sys_family_ai_model` + 按功能绑定 `sys_family_ai_feature`(`resolveForFeature/resolveChain` 主+兜底),**新家庭用 AI 须家长先加模型再绑定**(找物/放物可绑 LOCAL 离线)。
 - **profile 化(废弃)**:不用 application-dev.yml profile;application.yml 即生产基线,所有环境差异统一走 external.yml 覆盖。
 
 ## 部署约定(Linux 2GB 求稳)
@@ -270,7 +269,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **每应用一用户,权利分散**:后端 Spring Boot 以 `ihomy` 应用用户运行(systemd `User=ihomy`);MySQL 用 `mysql` 用户;Redis 容器隔离;Nginx 用 `www-data`。**除关键步骤(装包/建用户/systemd/`/etc/` 配置/防火墙/certbot/执行 schema.sql)外不用 root**。
 - **JVM 调优**(systemd ExecStart):`-Xmx384m -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC -Xss512k`。
 - **MySQL 调优**:`config/mysql/my.cnf` → `cp` 到 `/etc/mysql/conf.d/ihomy.cnf`,关键项 `performance_schema=OFF`(省 80-100MB)。MySQL 端口 6306。
-- **⚠ Redis 只绑回环 + 强密码(V10.6,开发/CI/生产一致)**:容器一律 `-p 127.0.0.1:6379:6379` + `--requirepass`(docker run 中必须写在**镜像名之后**),密码进 external.yml `spring.data.redis.password`(同值);Docker 发布端口会绕过 ufw,绑回环才是真门闩。**改密码顺序固定**:先改 external.yml → `stop ihomy-backend` → 重建容器 → 起后端 → 冒烟(反了全站 `WRONGPASS`,验证码/刷新/限流全挂);重建即清空黑名单/验证码/限流计数/当前家庭。手工 redis-cli 带 `-a`。运行手册与取证见 `docs/部署指导-Linux.md` §2.6.1 与踩坑速查 §7.7。
+- **⚠ Redis 只绑回环 + 强密码(V10.6,开发/CI/生产一致)**:容器一律 `-p 127.0.0.1:6379:6379` + `--requirepass`(必须写在**镜像名之后**),密码进 external.yml `spring.data.redis.password`(同值);Docker 发布端口绕过 ufw,绑回环才是真门闩。**改密顺序**:external.yml → stop 后端 → 重建容器 → 起后端 → 冒烟(反了全站 `WRONGPASS`)。运行手册与取证见部署指导 §2.6.1 与踩坑速查 §7.7。
 - **SSH 端口 + 加固**:生产服务器统一 **19068**(禁止 22);所有 ssh/scp 加 `-p 19068`/`-P 19068`;防火墙放行 19068、关闭 22。再加 fail2ban(`config/fail2ban/ihomy-sshd.local`,`port=19068`,10 分钟 5 次封 1h)与自动安全更新(apt `unattended-upgrades` / dnf `dnf-automatic`,只装补丁不自动重启),装机步骤见 `docs/部署指导-Linux.md` §7.3/§7.4。
 - **备份与恢复(V10.18)**:`scripts/prod-backup.sh`(mysqldump 单事务 + `gzip -t` 校验 + uploads `rsync -a` **只增不删** + 数据库转储留 14 天 + 写 `.last-success`)由 systemd timer **每日 03:00** 触发(`config/systemd/ihomy-backup.{service,timer}`,`Persistent=true` 停机补跑);恢复/演练用 `scripts/prod-restore.sh <dump> <目标库>`(目标库必须显式给;恢复生产库前自动快照)。**误删兜底两层**:内容误删走 `/recycle` 回收站(7 天),回收站超期与整库/整机故障才靠备份。安装与演练记录见 `docs/部署指导-Linux.md`「附:数据备份」。
 - **Docker 安装源**:Ubuntu 用阿里云镜像源(`mirrors.cloud.aliyuncs.com/docker-ce`),固定版本 29.7.0;**Redis 镜像** `docker pull redis`;**Git 克隆**用 SSH 地址(ihomy 用户先生成 ed25519 key 加到 GitHub)。
@@ -280,23 +279,14 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 ## 规划事项(未实现)
 
-> **本章只做指引,不记内容**——**未实现规划的唯一去处是 `docs/需求设计说明书.md` §9**:产品级规划见 §9.1,代码级待办见 §9.2(全量审计)/ §9.3(新增代码复审),两张表**只列仍未做的条目**;启动任何规划项前先读该章对应小节,不要凭本文件或记忆开工。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
-> **当前概览(截至 V10.18,要点一律见 §9)**:**代码级仅剩 §9.2 C 组一条**「超大单文件拆分 + 全仓 Prettier 重排」(已量化:129 个文件需重排;须先有 UI 回归 harness 才拆,单独排期);**§9.2 D 组 6 条与 §9.3 四组已全部无剩余条目**。剩余产品级 = 放映厅 Emby 实测/多家庭共用/清晰度多音轨、HA 侧硬件与户型图联动(不在本仓)、保险箱主密码(待定夺)、场景主题方向。
+> **本章只做指引,不记内容**——**未实现规划的唯一去处是 `docs/需求设计说明书.md` §9**:产品级规划见 §9.1,代码级待办见 §9.2(全量审计)/ §9.3(新增代码复审)/ §9.5(2026-10-05 全量复检),各表**只列仍未做的条目**;启动任何规划项前先读该章对应小节,不要凭本文件或记忆开工。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
+> **当前概览(截至 V10.22,要点一律见 §9)**:§9.2/§9.3 已无剩余,仅 §9.2 C 组「超大单文件拆分 + 全仓 Prettier 重排」留(须先有 UI 回归 harness,单独排期);§9.5 全量复检条目已收口,剩 Boot 4.x 阻塞登记。剩余产品级 = 放映厅 Emby 实测/多家庭共用/清晰度多音轨、HA 侧硬件与户型图联动(不在本仓)、保险箱主密码(待定夺)、场景主题方向。
 
 ## 文档清单
 
-- `README.md`(项目简介,GitHub 展示,不含密码); `docs/README.md`(**文档索引**:每份文档一句话定位+新人阅读顺序)
-- `docs/架构设计.md`(系统上下文/请求流转/模块分域/关键机制/部署拓扑)
-- `docs/需求设计说明书.md` — **完整功能需求唯一活文档**(功能模块清单+数据库设计 81 表+接口设计+规划事项 §9+修订记录),随迭代持续更新
-- `docs/变更归档.md` — 已实现变更归档(文件级改动表+设计决策+踩坑+live DB 同步 SQL);**开头有章节目录**,新变更追加到文件末尾
-- `docs/踩坑速查.md` — **踩坑/机制细节/维护清单**(工具链/后端/前端/天文/媒体引擎/WE/部署/性能/缓存失效矩阵/已知问题);本文件凡写「详见踩坑速查 §x」者均指它
-- `docs/UI设计提示词.md` — 沉浸式首页 UI 设计完整规格(可作为 AI 提示词重新生成)
-- `docs/部署指导-Linux.md` / `docs/部署指导-Windows.md` — 生产部署全流程(systemd/NSSM/Nginx/Let's Encrypt/Docker Compose/备份/NAS,**脱敏入库版**,凭证一律占位符)
-- `docs/新人上手指南.md` — 新成员环境搭建+开发账号初始密码(**本地维护不入 git**);`docs/设计想法/` — 历史设计稿(不再维护,唯 `日志/` 子目录仍维护:日志规范/问题分析方法)
-- `docs/项目文档/` — 成套 Word 交付物(数据库结构/接口/用户手册);**由代码与库结构生成** `bash scripts/docs-gen/pipeline.sh`(改内容改源文件,不要手改 docx)
-- `test/cases/功能测试用例.md` — 全站功能测试用例(**388 条** = §1–§33 共 344 + §35 补录 44,后者覆盖 V9.53–V10.18 的 11 个新功能域);测试资产统一在 `test/`(用例/接口自动化/UI 自动化/报告,总览 `test/README.md`)
-- `scripts/`:`setup.ps1`(新人一次性环境初始化,幂等)/ `start-all.ps1`(日常一键启动前后端,根目录双击 `start.bat` 即可)/ `restart-all.ps1`(一键重建重启:`-SkipBuild` 只停起)/ `start-db.ps1`(起 MySQL+Redis,首启自动导 schema.sql)/ `doc-drift-check.sh`(文档/代码一致性闸门,CI 与本地同跑)/ `prod-backup.sh` + `prod-restore.sh`(生产每日备份与恢复/演练)/ `db_diff.py`(生产↔测试两库逐表 ID 差集与行级对比,环境数据同步用)/ `ci-jellyfin-setup.sh` + `dev-jellyfin-seed.sh`(放映厅联调)/ `docs-gen/`(Word 交付物生成流水线);根 `docker-compose.yml`(开发中间件);`.github/workflows/ci.yml`;`config/mysql/my.cnf`、`config/systemd/ihomy-backup.{service,timer}`、`config/fail2ban/ihomy-sshd.local`
-- 完整接口清单见 `docs/需求设计说明书.md` 第 7 章。代码事实以 `backend/src/main/java` + `resources/schema.sql` 为准,检索前先 `grep`。
+> 完整文档索引(每份一句话定位 + 新人阅读顺序)见 `docs/README.md`。核心入口:
+> `docs/需求设计说明书.md`(功能/数据库 81 表/接口/规划 §9 唯一活文档)、`docs/变更归档.md`(已实现变更归档,开头有章节目录,新变更追加末尾)、`docs/踩坑速查.md`(踩坑/机制/维护清单,「详见踩坑速查 §x」均指它)、`docs/架构设计.md`、`docs/UI设计提示词.md`、`docs/部署指导-Linux.md`/`docs/部署指导-Windows.md`(脱敏版)、`docs/项目文档/`(Word 交付物,由 `scripts/docs-gen/pipeline.sh` 生成,勿手改 docx)、`test/cases/功能测试用例.md`(389 条)。
+> `scripts/`(setup / start-all / restart-all / start-db / doc-drift-check / prod-backup / prod-restore / db_diff / ci-jellyfin-setup / docs-gen 等)与完整接口清单(需求 §7)见各脚本头部与文档;代码事实以 `backend/src/main/java` + `resources/schema.sql` 为准,检索前先 `grep`。
 
 ## 环境检查(参考)
 

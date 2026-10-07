@@ -23,6 +23,8 @@ public class WebSocketConfig implements WebSocketConfigurer {
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(chatWebSocketHandler, "/ws/chat")
                 .addInterceptors(wsHandshakeInterceptor)
+                // 与 CorsConfig 的 Origin 白名单不同,这里放开任意来源:WS 不带 cookie 凭证
+                // (鉴权走 ?token=),没有 CSRF 面;放宽可让 Nginx 前置/局域网直连/App 壳等各来源都能连。
                 .setAllowedOriginPatterns("*");
     }
 }

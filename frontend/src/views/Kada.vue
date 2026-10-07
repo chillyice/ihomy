@@ -8,8 +8,7 @@
       <header class="ktop">
         <div class="kmark" aria-hidden="true"><span>K</span></div>
         <div class="kname">
-          <span class="kname-cn">咔哒</span>
-          <span class="kname-en">Kada</span>
+          <span class="kname-cn">{{ $t('kada.brand') }}</span>
         </div>
       </header>
 
@@ -19,14 +18,14 @@
           <span class="kkey-top">K</span>
           <span class="kkey-base"></span>
         </div>
-        <h1 class="ktitle">咔哒 <span class="ktitle-en">Kada</span></h1>
-        <p class="ktag">轻快跨平台快捷键工具</p>
-        <p class="ksub">全局快捷键 · 改键 · 宏 · 文本扩展 —— 纯本地运行，托盘常驻</p>
+        <h1 class="ktitle">{{ $t('kada.brand') }}</h1>
+        <p class="ktag">{{ $t('kada.tag') }}</p>
+        <p class="ksub">{{ $t('kada.sub') }}</p>
 
         <div class="kcta">
           <a class="kdl" :href="downloadUrl" download>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></svg>
-            下载 Windows 版
+            {{ $t('kada.download') }}
           </a>
         </div>
 
@@ -39,32 +38,32 @@
         <div class="kplatforms">
           <span class="kp"><i class="kdot kdot-on"></i>Windows</span>
           <span class="kp"><i class="kdot kdot-on"></i>Linux</span>
-          <span class="kp"><i class="kdot"></i>macOS 规划中</span>
+          <span class="kp"><i class="kdot"></i>{{ $t('kada.macPlanned') }}</span>
         </div>
       </section>
 
       <!-- 特性 -->
       <section class="kfeat">
-        <div v-for="f in features" :key="f.title" class="kcard">
+        <div v-for="f in features" :key="f.titleKey" class="kcard">
           <div class="kcard-ic" v-html="f.icon"></div>
-          <h3 class="kcard-t">{{ f.title }}</h3>
-          <p class="kcard-d">{{ f.desc }}</p>
+          <h3 class="kcard-t">{{ $t(f.titleKey) }}</h3>
+          <p class="kcard-d">{{ $t(f.descKey) }}</p>
         </div>
       </section>
 
       <!-- 安装提示 -->
       <section class="knote">
-        <div class="knote-t">首次运行提示</div>
-        <p>咔哒为本地小工具、暂未做代码签名，Windows 可能弹出「Windows 已保护你的电脑」。点「更多信息」→「仍要运行」即可。</p>
+        <div class="knote-t">{{ $t('kada.noteTitle') }}</div>
+        <p>{{ $t('kada.noteBody') }}</p>
       </section>
 
       <!-- 页脚 -->
       <footer class="kfoot">
-        <span>咔哒 Kada v{{ version }}</span>
+        <span>{{ $t('kada.footer', { version }) }}</span>
         <span class="kdot-sep">·</span>
         <span>MIT License</span>
         <span class="kdot-sep">·</span>
-        <span>由 ihomy 托管</span>
+        <span>{{ $t('kada.hostedBy') }}</span>
       </footer>
     </div>
   </div>
@@ -72,6 +71,7 @@
 
 <script setup>
 import { onMounted, onBeforeUnmount } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 // 下载配置:安装包放在 ihomy 服务器 /opt/ihomy/uploads/kada/kada.exe(nginx /files/ alias 托管),
 // 换版本时更新 filename 与 version 即可(建议版本化文件名避免浏览器缓存旧包)。
@@ -80,41 +80,43 @@ const downloadUrl = `/files/kada/${filename}`
 const version = '0.1.0'
 const fileSize = '9.7 MB'
 
+const { t } = useI18n()
+
 const features = [
   {
-    title: '全局快捷键',
-    desc: '自定义组合键触发文本输入与动作链（宏），任一触发组合命中即执行。',
+    titleKey: 'kada.f1Title',
+    descKey: 'kada.f1Desc',
     icon: '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M19 10h.01M7 14h.01M11 14h.01M15 14h.01M7 16h6"/></svg>',
   },
   {
-    title: '改键',
-    desc: '任意键改发另一键（如 CapsLock → Ctrl），支持短按/长按/双击/三击、单次与粘滞修饰、多层键位。',
+    titleKey: 'kada.f2Title',
+    descKey: 'kada.f2Desc',
     icon: '<svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M8 9h8M12 9v6"/></svg>',
   },
   {
-    title: '宏录制',
-    desc: '录制真实按键序列，自动折叠重复、补齐停顿，一键回放整串操作。',
+    titleKey: 'kada.f3Title',
+    descKey: 'kada.f3Desc',
     icon: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 9v3l2 2"/></svg>',
   },
   {
-    title: '文本扩展',
-    desc: '输入触发词 + 后缀自动展开，支持 {date}/{time}/{clipboard} 动态片段。',
+    titleKey: 'kada.f4Title',
+    descKey: 'kada.f4Desc',
     icon: '<svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></svg>',
   },
   {
-    title: '键序列 / 和弦 / 层',
-    desc: 'leader key 按键序列、多键同时按下的和弦触发，以及可切换的多层键位。',
+    titleKey: 'kada.f5Title',
+    descKey: 'kada.f5Desc',
     icon: '<svg viewBox="0 0 24 24"><path d="M7 7h4v4H7zM13 7h4v4h-4zM7 13h4v4H7zM13 13h4v4h-4z"/></svg>',
   },
   {
-    title: '托盘常驻 · 纯本地',
-    desc: '关窗隐藏到托盘不退出，数据只保存在本机、不会上传，换设备时配置可跟着走。',
+    titleKey: 'kada.f6Title',
+    descKey: 'kada.f6Desc',
     icon: '<svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>',
   },
 ]
 
 onMounted(() => {
-  document.title = '咔哒 Kada'
+  document.title = t('kada.docTitle')
 })
 onBeforeUnmount(() => {
   document.title = 'ihomy'

@@ -20,6 +20,7 @@ import com.ihomy.mapper.IotDeviceMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -143,6 +144,7 @@ public class HomeAssistantService {
     }
 
     /** 移除接入:配置 + 同步来的设备与历史一并清掉(数据源仍是 HA,重新接入会再同步回来) */
+    @Transactional
     public void removeConfig(Long familyId) {
         if (familyId == null) return;
         IotConfig row = find(familyId);
@@ -478,14 +480,17 @@ public class HomeAssistantService {
         return entityId.substring(entityId.indexOf('.') + 1).replace('_', ' ').trim();
     }
 
+    /** 取实体最近更新时间:优先 last_updated,缺失退 last_changed */
     private static LocalDateTime lastUpdated(JsonNode st) {
         String s = text(st, "last_updated");
         if (!notBlank(s)) s = text(st, "last_changed");
         if (!notBlank(s)) return null;
         try {
+            // 先按带时区格式解析(HA 新旧版本格式不同):成功则换算成本机时区
             return LocalDateTime.ofInstant(OffsetDateTime.parse(s).toInstant(), ZoneId.systemDefault());
         } catch (Exception e) {
             try {
+                // 退回无时区格式;两层都失败才返回 null(去掉任一层都会静默丢 lastSeenAt)
                 return LocalDateTime.parse(s);
             } catch (Exception e2) {
                 return null;

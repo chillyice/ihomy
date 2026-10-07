@@ -9,6 +9,7 @@ import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.BookService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -47,7 +48,7 @@ public class BookController {
     @Operation(summary = "记一笔(支出/收入/转账)")
     @OperationLog(module = "BOOK", operationType = "CREATE", description = "记账", saveArgs = false)
     @PostMapping
-    public Result<BookRecord> create(@RequestBody BookDTO dto) {
+    public Result<BookRecord> create(@Valid @RequestBody BookDTO dto) {
         LoginUser user = current();
         return Result.success(bookService.create(user.getUserId(), user.getFamilyId(), dto));
     }
@@ -55,7 +56,7 @@ public class BookController {
     @Operation(summary = "改账(记录人本人或家长)")
     @OperationLog(module = "BOOK", operationType = "UPDATE", description = "修改账目")
     @PutMapping("/{id}")
-    public Result<Void> update(@PathVariable Long id, @RequestBody BookDTO dto) {
+    public Result<Void> update(@PathVariable Long id, @Valid @RequestBody BookDTO dto) {
         LoginUser user = current();
         bookService.update(id, user.getFamilyId(), user.getUserId(), securityHelper.isOwner(), dto);
         return Result.success();

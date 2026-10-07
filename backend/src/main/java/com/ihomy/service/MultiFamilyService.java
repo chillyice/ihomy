@@ -1,6 +1,7 @@
 package com.ihomy.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
@@ -69,6 +70,31 @@ public class MultiFamilyService {
         }
         List<Family> list = familyMapper.selectList(qw);
         List<Map<String, Object>> result = new ArrayList<>();
+        if (list.isEmpty()) return result;
+        List<Long> familyIds = list.stream().map(Family::getId).toList();
+
+        // 成员数一次 GROUP BY 取回,免逐家庭 COUNT(N+1)
+        Map<Long, Long> memberCounts = new HashMap<>();
+        for (Map<String, Object> row : sysUserRoleMapper.selectMaps(new QueryWrapper<SysUserRole>()
+                .select("family_id AS familyId", "COUNT(*) AS cnt")
+                .in("family_id", familyIds)
+                .groupBy("family_id"))) {
+            memberCounts.put(((Number) row.get("familyId")).longValue(), ((Number) row.get("cnt")).longValue());
+        }
+        // 当前用户已加入 / 待审核:各一次批量查询
+        Set<Long> joinedIds = Set.of();
+        Set<Long> pendingIds = Set.of();
+        if (currentUserId != null) {
+            joinedIds = sysUserRoleMapper.selectList(new LambdaQueryWrapper<SysUserRole>()
+                            .eq(SysUserRole::getUserId, currentUserId)
+                            .in(SysUserRole::getFamilyId, familyIds)).stream()
+                    .map(SysUserRole::getFamilyId).collect(Collectors.toSet());
+            pendingIds = familyApplyMapper.selectList(new LambdaQueryWrapper<FamilyApply>()
+                            .eq(FamilyApply::getUserId, currentUserId)
+                            .eq(FamilyApply::getStatus, DictConst.APPLY_PENDING)
+                            .in(FamilyApply::getFamilyId, familyIds)).stream()
+                    .map(FamilyApply::getFamilyId).collect(Collectors.toSet());
+        }
         for (Family f : list) {
             Map<String, Object> m = new HashMap<>();
             m.put("id", f.getId());
@@ -77,10 +103,9 @@ public class MultiFamilyService {
             m.put("coverSubtitle", f.getCoverSubtitle());
             m.put("description", f.getDescription());
             m.put("isDemo", f.getIsDemo());
-            m.put("memberCount", sysUserRoleMapper.selectCount(
-                    new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getFamilyId, f.getId())));
-            m.put("joined", currentUserId != null && isMember(currentUserId, f.getId()));
-            m.put("pending", currentUserId != null && hasPendingApply(currentUserId, f.getId()));
+            m.put("memberCount", memberCounts.getOrDefault(f.getId(), 0L));
+            m.put("joined", joinedIds.contains(f.getId()));
+            m.put("pending", pendingIds.contains(f.getId()));
             result.add(m);
         }
         return result;

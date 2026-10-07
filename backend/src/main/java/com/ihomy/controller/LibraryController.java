@@ -19,6 +19,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
 
+/**
+ * 书架控制器:图书列表/详情/增删改、分类树维护、借阅与归还、书签、阅读进度。
+ * 列表为公开可见接口的一部分——未登录(securityHelper.currentUser() 为 null)时按游客口径只回公开图书,
+ * 故这里不直接取当前用户,而是允许 user 为 null 再交给 Service 决定可见范围。
+ */
 @Tag(name = "书架")
 @RestController
 @RequestMapping("/library")
@@ -44,7 +49,7 @@ public class LibraryController {
         boolean isOwner = securityHelper.isOwner();
         IPage<ContentBook> page = libraryService.page(current, size, familyId, userId, isOwner, keyword, categoryId, fileFormat, borrowStatus, sortBy);
         List<ContentBook> books = page.getRecords();
-        // Attach categoryIds to each book
+        // 批量取每本书的分类 ID,回填到列表项(避免逐本查询)
         List<Long> bookIds = books.stream().map(ContentBook::getId).toList();
         Map<Long, List<Long>> bookCatMap = libraryService.getBookCategoryIds(bookIds);
         List<Map<String, Object>> records = new ArrayList<>();
@@ -190,15 +195,14 @@ public class LibraryController {
     @Operation(summary = "批量删除图书")
     @OperationLog(module = "LIBRARY", operationType = "DELETE", description = "批量删除图书")
     @DeleteMapping("/batch")
-    public Result<Void> batchDelete(@RequestBody Map<String, Object> body) {
+    public Result<List<Long>> batchDelete(@RequestBody Map<String, Object> body) {
         SysUser user = securityHelper.currentUser();
         if (user == null) throw new BizException(ResultCode.UNAUTHORIZED);
         @SuppressWarnings("unchecked")
         List<Number> ids = (List<Number>) body.get("ids");
         if (ids == null || ids.isEmpty()) throw new BizException(ResultCode.BAD_REQUEST);
         List<Long> longIds = ids.stream().map(Number::longValue).toList();
-        libraryService.batchDelete(longIds, user.getFamilyId(), user.getId(), securityHelper.isOwner());
-        return Result.success();
+        return Result.success(libraryService.batchDelete(longIds, user.getFamilyId(), user.getId(), securityHelper.isOwner()));
     }
 
     @Operation(summary = "批量移动分类")
@@ -236,7 +240,7 @@ public class LibraryController {
         return Result.success(libraryService.getBorrowStatus(id, user.getId()));
     }
 
-    // === Bookmarks ===
+    // ========== 书签 ==========
 
     @Operation(summary = "书签列表")
     @GetMapping("/{id}/bookmarks")

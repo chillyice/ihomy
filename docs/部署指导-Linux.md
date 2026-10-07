@@ -13,7 +13,7 @@
 |---|------|----------|------|----------|
 | 1 | OpenJDK | 21 LTS（`pom.xml` 已对齐 21） | 运行后端 | ✅ 必须 |
 | 2 | Node.js | 18+（推荐 20 LTS） | 构建前端 | ✅ 必须（仅构建时） |
-| 3 | MySQL | 8.0+ | 主数据库 | ✅ 必须（本机部署） |
+| 3 | MySQL | 8.4.10（基线版本） | 主数据库 | ✅ 必须（本机部署） |
 | 4 | Redis | 6+ | 缓存 / JWT 令牌 | ✅ 必须（Docker 部署） |
 | 5 | Docker Engine | 24+ | 运行 Redis 容器 | ✅ 必须（仅 Redis 用） |
 | 6 | Nginx | 1.18+ | 托管前端 + 反向代理 + HTTPS | ✅ 生产推荐 |
@@ -1329,7 +1329,7 @@ ls /opt/ihomy/uploads/nfs-test.txt
 ```yaml
 services:
   mysql:
-    image: mysql:8.0
+    image: mysql:8.4.10
     container_name: ihomy-mysql
     environment:
       MYSQL_ROOT_PASSWORD: <容器root密码,仅初始化管理用>

@@ -17,7 +17,7 @@
 <script setup>
 import { ArrowLeft, HomeFilled } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
-const props = defineProps({ title: { type: String, default: '' } })
+defineProps({ title: { type: String, default: '' } })
 const router = useRouter()
 const goBack = () => {
   // vue-router 会在 history.state.back 记录应用内上一条路由;无记录说明是外链/PWA 直达深页,

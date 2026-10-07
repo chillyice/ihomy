@@ -1,6 +1,7 @@
 package com.ihomy.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
@@ -97,9 +98,14 @@ public class TaskService {
         if (!userId.equals(task.getAssigneeId()) || !DictConst.TASK_IN_PROGRESS.equals(task.getStatus())) {
             throw new BizException(ResultCode.BAD_REQUEST, "仅领取人可在进行中放弃任务");
         }
-        task.setAssigneeId(null);
-        task.setStatus(DictConst.TASK_OPEN);
-        taskMapper.updateById(task);
+        // 清领取人必须用 wrapper 显式 SET null(updateById 跳过 null,任务会回 OPEN 却仍挂原领取人);
+        // WHERE 带状态与领取人复核,并发下别处已推进状态时本条不再生效
+        taskMapper.update(null, new LambdaUpdateWrapper<Task>()
+                .eq(Task::getId, taskId)
+                .eq(Task::getAssigneeId, userId)
+                .eq(Task::getStatus, DictConst.TASK_IN_PROGRESS)
+                .set(Task::getAssigneeId, null)
+                .set(Task::getStatus, DictConst.TASK_OPEN));
     }
 
     /** 完成申报:领取人标记任务做完,等待发布者确认 */

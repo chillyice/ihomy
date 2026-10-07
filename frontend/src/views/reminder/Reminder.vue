@@ -51,10 +51,10 @@
         </el-form-item>
         <el-form-item :label="$t('reminder.repeat')">
           <el-radio-group v-model="editor.form.repeatType">
-            <el-radio :value="0">{{ $t('reminder.once') }}</el-radio>
-            <el-radio :value="1">{{ $t('reminder.daily') }}</el-radio>
-            <el-radio :value="2">{{ $t('reminder.weekly') }}</el-radio>
-            <el-radio :value="3">{{ $t('reminder.monthly') }}</el-radio>
+            <el-radio value="ONCE">{{ $t('reminder.once') }}</el-radio>
+            <el-radio value="DAILY">{{ $t('reminder.daily') }}</el-radio>
+            <el-radio value="WEEKLY">{{ $t('reminder.weekly') }}</el-radio>
+            <el-radio value="MONTHLY">{{ $t('reminder.monthly') }}</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>
@@ -83,10 +83,9 @@ const saving = ref(false)
 const list = ref([])
 const editor = reactive({ visible: false, form: {} })
 
-// 后端返回英文单词(ONCE/DAILY/WEEKLY/MONTHLY),表单仍提交数字由后端转换
+// 后端返回英文单词(ONCE/DAILY/WEEKLY/MONTHLY),表单直接沿用字典词提交
 const repeatKey = { ONCE: 'once', DAILY: 'daily', WEEKLY: 'weekly', MONTHLY: 'monthly' }
 const repeatText = (x) => t('reminder.' + (repeatKey[x] || 'once'))
-const repeatNum = (x) => ({ ONCE: 0, DAILY: 1, WEEKLY: 2, MONTHLY: 3 }[x] ?? 0)
 
 const load = async () => {
   loading.value = true
@@ -100,8 +99,8 @@ const load = async () => {
 const openEditor = (r) => {
   editor.visible = true
   editor.form = r
-    ? { id: r.id, title: r.title, content: r.content || '', remindDate: r.remindDate, remindTime: r.remindTime, repeatType: repeatNum(r.repeatType) }
-    : { id: null, title: '', content: '', remindDate: '', remindTime: '08:00:00', repeatType: 0 }
+    ? { id: r.id, title: r.title, content: r.content || '', remindDate: r.remindDate, remindTime: r.remindTime, repeatType: r.repeatType }
+    : { id: null, title: '', content: '', remindDate: '', remindTime: '08:00:00', repeatType: 'ONCE' }
 }
 
 const onSave = async () => {

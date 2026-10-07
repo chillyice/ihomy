@@ -592,6 +592,11 @@ public class QWeatherProvider implements WeatherProvider {
         return "cloud";
     }
 
+    /**
+     * 天气码 → 降水强度档 1–6(前端据此决定雨/雪粒子密度与特效强度,0 = 无降水)。
+     * 档位按和风码表的水量递增排布:1 小雨/毛毛雨/阵雨 …,4 暴雨/暴雪,5 大暴雨,6 特大暴雨;
+     * 雪(400–499)最高只到 4。码位先精确查表,查不到的落回区间兜底(300–399 归 1、400–499 归 1)。
+     */
     private int codeToPrecipLevel(String code) {
         if (code == null) return 0;
         int c = Integer.parseInt(code);

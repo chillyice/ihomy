@@ -761,14 +761,20 @@ const libraryFurnitures = computed(() => furnitures.value.filter((f) => !f.roomI
 // 家具当前所在房间名 / 存放物品数(侧栏家具列表展示)
 const furnRoomName = (f) => floorPlan.value.rooms.find((r) => Number(r.id) === Number(f.roomId))?.name || ''
 const furnItemCount = (f) => floorPlan.value.items.filter((it) => Number(it.furnitureId) === Number(f.id)).length
+const currentHouse = computed(() => houses.value.find((h) => h.id === currentHouseId.value))
+// 解析某房子的 floorPlans JSON(缺失或脏数据一律返回空对象)
+const floorPlansOf = (house) => {
+  if (house && house.floorPlans) { try { return JSON.parse(house.floorPlans) } catch { return {} } }
+  return {}
+}
 
 const floors = computed(() => {
   const set = new Set()
   floorPlan.value.rooms.forEach((r) => set.add(r.floor))
-  const house = houses.value.find((h) => h.id === currentHouseId.value)
+  const house = currentHouse.value
   if (house && house.floorPlans) {
     try {
-      const fp = JSON.parse(house.floorPlans)
+      const fp = floorPlansOf(house)
       Object.keys(fp).forEach((k) => { if (k !== 'floorOrder') set.add(Number(k)) })
       // 按 floorOrder 排序(若配置了)
       const order = fp.floorOrder || []
@@ -793,12 +799,12 @@ const floors = computed(() => {
 const floorPlanOpacity = ref(1)
 const floorPlanImg = ref({ x: 0, y: 0, k: 1 })
 watch([() => houses.value, currentHouseId, currentFloor], () => {
-  const h = houses.value.find((x) => x.id === currentHouseId.value)
+  const h = currentHouse.value
   let v = 1
   let img = { x: 0, y: 0, k: 1 }
   if (h && h.floorPlans) {
     try {
-      const cfg = JSON.parse(h.floorPlans)[currentFloor.value]
+      const cfg = floorPlansOf(h)[currentFloor.value]
       v = cfg?.opacity ?? 1
       if (cfg?.img) img = { ...cfg.img }
     } catch {}
@@ -807,9 +813,8 @@ watch([() => houses.value, currentHouseId, currentFloor], () => {
   floorPlanImg.value = img
 }, { immediate: true })
 const saveOpacity = async (val) => {
-  const house = houses.value.find((h) => h.id === currentHouseId.value)
-  let floorPlans = {}
-  if (house && house.floorPlans) { try { floorPlans = JSON.parse(house.floorPlans) } catch {} }
+  const house = currentHouse.value
+  const floorPlans = floorPlansOf(house)
   const cur = floorPlans[currentFloor.value] || {}
   floorPlans[currentFloor.value] = { ...cur, opacity: val }
   const json = JSON.stringify(floorPlans)
@@ -818,9 +823,8 @@ const saveOpacity = async (val) => {
   if (house) house.floorPlans = json
 }
 const onSaveImageTransform = async (img) => {
-  const house = houses.value.find((h) => h.id === currentHouseId.value)
-  let floorPlans = {}
-  if (house && house.floorPlans) { try { floorPlans = JSON.parse(house.floorPlans) } catch {} }
+  const house = currentHouse.value
+  const floorPlans = floorPlansOf(house)
   const cur = floorPlans[currentFloor.value] || {}
   floorPlans[currentFloor.value] = { ...cur, img }
   const json = JSON.stringify(floorPlans)
@@ -850,7 +854,7 @@ const loadRooms = async () => {
   // 会漏掉"房间存在但楼层不在楼层配置里"的 1 楼;房间到位后重算一次(用户手动切过层则不覆盖)。
   if (!defaultFloorDone && !floorTouched.value && currentHouseId.value) {
     defaultFloorDone = true
-    const house = houses.value.find((h) => h.id === currentHouseId.value)
+    const house = currentHouse.value
     const nf = defaultFloorOf(house)
     if (nf !== currentFloor.value) {
       currentFloor.value = nf
@@ -889,10 +893,10 @@ const floorDesigned = computed(() => {
 // ---- 尺子持久化:存于楼层配置 floorPlans[floor].rulers(与底图/比例尺/不透明度同层) ----
 // 当前层尺子(传给画布)
 const currentRulers = computed(() => {
-  const house = houses.value.find((h) => h.id === currentHouseId.value)
+  const house = currentHouse.value
   if (!house || !house.floorPlans) return []
   try {
-    const cfg = JSON.parse(house.floorPlans)[currentFloor.value]
+    const cfg = floorPlansOf(house)[currentFloor.value]
     return Array.isArray(cfg && cfg.rulers) ? cfg.rulers : []
   } catch { return [] }
 })
@@ -900,8 +904,7 @@ const currentRulers = computed(() => {
 const savedRulers = computed(() => {
   const out = []
   for (const h of houses.value) {
-    let fp = {}
-    if (h.floorPlans) { try { fp = JSON.parse(h.floorPlans) } catch {} }
+    const fp = floorPlansOf(h)
     for (const [fk, cfg] of Object.entries(fp)) {
       if (fk === 'floorOrder' || !cfg || !Array.isArray(cfg.rulers) || !cfg.rulers.length) continue
       const scale = cfg.scale || 100
@@ -917,8 +920,7 @@ const savedRulers = computed(() => {
 const updateFloorRulers = async (houseId, floor, rulers) => {
   const house = houses.value.find((h) => h.id === houseId)
   if (!house) return
-  let fp = {}
-  if (house.floorPlans) { try { fp = JSON.parse(house.floorPlans) } catch {} }
+  const fp = floorPlansOf(house)
   const next = { ...(fp[floor] || {}), rulers }
   if (!rulers || !rulers.length) delete next.rulers
   fp[floor] = next
@@ -945,15 +947,14 @@ const deleteRuler = async (r) => {
   } catch { return }
   const house = houses.value.find((h) => h.id === r.houseId)
   if (!house) return
-  let fp = {}
-  if (house.floorPlans) { try { fp = JSON.parse(house.floorPlans) } catch {} }
+  const fp = floorPlansOf(house)
   const cfg = fp[r.floor] || {}
   const rulers = Array.isArray(cfg.rulers) ? cfg.rulers.filter((x) => x.id !== r.id) : []
   await updateFloorRulers(r.houseId, r.floor, rulers)
   if (!savedRulers.value.length) rulerPopVisible.value = false
 }
 const onHouseChange = async () => {
-  currentFloor.value = defaultFloorOf(houses.value.find((h) => h.id === currentHouseId.value))
+  currentFloor.value = defaultFloorOf(currentHouse.value)
   await loadFloorPlan(); fitKey.value++
 }
 // PDF 底图:渲染第一页为 PNG 再上传(SVG image 不支持 PDF)
@@ -978,9 +979,8 @@ const uploadFloorPlan = async (file) => {
   try {
     const img = file.type === 'application/pdf' ? await pdfToImage(file) : file
     const data = await fileApi.upload(img)
-    const house = houses.value.find((h) => h.id === currentHouseId.value)
-    let floorPlans = {}
-    if (house && house.floorPlans) { try { floorPlans = JSON.parse(house.floorPlans) } catch {} }
+    const house = currentHouse.value
+    const floorPlans = floorPlansOf(house)
     const cur = floorPlans[currentFloor.value] || {}
     floorPlans[currentFloor.value] = { ...cur, imageUrl: data.url }
     await itemApi.saveFloorPlans(currentHouseId.value, JSON.stringify(floorPlans))
@@ -997,9 +997,8 @@ const onCalibrate = async (pxDist) => {
     const meters = parseFloat(value)
     if (!meters || meters <= 0) return
     const scale = pxDist / meters
-    const house = houses.value.find((h) => h.id === currentHouseId.value)
-    let floorPlans = {}
-    if (house && house.floorPlans) { try { floorPlans = JSON.parse(house.floorPlans) } catch {} }
+    const house = currentHouse.value
+    const floorPlans = floorPlansOf(house)
     const cur = floorPlans[currentFloor.value] || {}
     floorPlans[currentFloor.value] = { ...cur, scale }
     await itemApi.saveFloorPlans(currentHouseId.value, JSON.stringify(floorPlans))
@@ -1015,9 +1014,8 @@ const onCalibrateConfirm = async (pxDist) => {
     const meters = parseFloat(value)
     if (!meters || meters <= 0) return
     const scale = pxDist / meters
-    const house = houses.value.find((h) => h.id === currentHouseId.value)
-    let floorPlans = {}
-    if (house && house.floorPlans) { try { floorPlans = JSON.parse(house.floorPlans) } catch {} }
+    const house = currentHouse.value
+    const floorPlans = floorPlansOf(house)
     const cur = floorPlans[currentFloor.value] || {}
     floorPlans[currentFloor.value] = { ...cur, scale }
     await itemApi.saveFloorPlans(currentHouseId.value, JSON.stringify(floorPlans))
@@ -1086,10 +1084,9 @@ const addFloor = async () => {
   const newFloor = Math.max(...floors.value) + 1
   currentFloor.value = newFloor
   // 持久化空楼层到 floorPlans JSON,防止切走后消失
-  const house = houses.value.find((h) => h.id === currentHouseId.value)
+  const house = currentHouse.value
   if (house) {
-    let fp = {}
-    if (house.floorPlans) { try { fp = JSON.parse(house.floorPlans) } catch {} }
+    const fp = floorPlansOf(house)
     if (!fp[newFloor]) {
       fp[newFloor] = { scale: 100 }
       await itemApi.saveFloorPlans(house.id, JSON.stringify(fp))
@@ -1102,10 +1099,9 @@ const addFloor = async () => {
 // 楼层互换显示顺序(不改房间floor字段,只改floorPlans.floorOrder)
 const swapFloor = async (a, b) => {
   if (a === b) return
-  const house = houses.value.find((h) => h.id === currentHouseId.value)
+  const house = currentHouse.value
   if (!house) return
-  let fp = {}
-  if (house.floorPlans) { try { fp = JSON.parse(house.floorPlans) } catch {} }
+  const fp = floorPlansOf(house)
   // 从 floors computed 推导完整楼层列表(包含所有层)
   const allFloors = [...floors.value]
   let order = fp.floorOrder || [...allFloors]
@@ -1140,10 +1136,9 @@ const confirmRenameFloor = async (oldF) => {
   renamingFloor.value = null
   if (Number.isNaN(nf) || nf === oldF) return
   if (floors.value.includes(nf)) { ElMessage.error(t('item.floorRenameExists')); return }
-  const house = houses.value.find((h) => h.id === currentHouseId.value)
+  const house = currentHouse.value
   if (!house) return
-  let fp = {}
-  if (house.floorPlans) { try { fp = JSON.parse(house.floorPlans) } catch {} }
+  const fp = floorPlansOf(house)
   const fp2 = {}
   Object.keys(fp).forEach((k) => { if (k !== 'floorOrder') fp2[Number(k) === oldF ? String(nf) : k] = fp[k] })
   if (Array.isArray(fp.floorOrder)) fp2.floorOrder = fp.floorOrder.map((x) => (Number(x) === oldF ? nf : x))
@@ -1161,7 +1156,7 @@ const confirmRenameFloor = async (oldF) => {
 // 最后一个楼层不可删(按钮已隐藏,此处兜底);删的是当前层则按默认楼层规则(有1楼选1楼,无1楼选最高层)落回剩余楼层
 const deleteFloor = async (f) => {
   if (floors.value.length <= 1) return
-  const house = houses.value.find((h) => h.id === currentHouseId.value)
+  const house = currentHouse.value
   if (!house) return
   const allRooms = await itemApi.rooms(house.id)
   const floorRooms = allRooms.filter((r) => r.floor === f) // 不叫 rooms:遮蔽外层 rooms ref
@@ -1170,8 +1165,7 @@ const deleteFloor = async (f) => {
     : t('item.floorDeleteConfirm', { floor: f })
   await ElMessageBox.confirm(msg, t('common.warning'), { type: 'warning', closeOnClickModal: true })
   await Promise.all(floorRooms.map((r) => itemApi.removeRoom(r.id)))
-  let fp = {}
-  if (house.floorPlans) { try { fp = JSON.parse(house.floorPlans) } catch {} }
+  const fp = floorPlansOf(house)
   const fp2 = {}
   Object.keys(fp).forEach((k) => { if (k !== 'floorOrder' && Number(k) !== f) fp2[k] = fp[k] })
   if (Array.isArray(fp.floorOrder)) {
@@ -1308,22 +1302,6 @@ const onCreateRoom = (geometry) => {
   roomDlg.value = true
   tool.value = 'select'
 }
-const placeFurniture = async (f) => {
-  if (!floorDesigned.value) return ElMessage.warning(t('item.noFloorPlanYet'))
-  let roomId = f.roomId
-  if (!roomId) {
-    const room = floorPlan.value.rooms[0]
-    if (!room) { ElMessage.warning(t('item.drawRoomFirst')); return }
-    roomId = room.id
-  }
-  // 已摆放数递增错开,避免多件家具叠在同一点
-  const placed = floorPlan.value.furnitures.filter((x) => x.x != null).length
-  const x = 200 + (placed % 5) * 50
-  const y = 200 + Math.floor(placed / 5) * 50
-  await itemApi.updateFurniture(f.id, { roomId, name: f.name, type: f.type, note: f.note, x, y, w: 200, h: 100 })
-  loadRooms()
-  loadFloorPlan()
-}
 // 从画布拖放摆放库内家具:指定房间+精确坐标(未设计楼层拦截,避免摆到看不见的默认坐标)
 const onPlaceFurnitureFromDrop = async ({ id, roomId, x, y }) => {
   if (!floorDesigned.value) return ElMessage.warning(t('item.noFloorPlanYet'))
@@ -1336,11 +1314,6 @@ const onPlaceFurnitureFromDrop = async ({ id, roomId, x, y }) => {
   loadRooms()
   loadFloorPlan()
 }
-const moveFurnitureToRoom = (f) => {
-  furForm.value = { id: f.id, roomId: null, name: f.name, type: f.type, note: f.note }
-  furDlg.value = true
-}
-
 // ---- 预设家具拖入 ----
 const onPresetDragStart = (e, p) => {
   e.dataTransfer.setData('text/furn-type', p.type)

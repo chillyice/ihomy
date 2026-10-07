@@ -39,6 +39,8 @@ export function useSunLight() {
   const blobsEnabled = ref(_saved.blobsEnabled ?? true)
   const glassEnabled = ref(_saved.glassEnabled ?? true)
   watch([lampMode, lampTemp, lampBrightness, shadowEnabled, weatherEffectEnabled, blobsEnabled, glassEnabled], () => {
+    // 挂起期间(suspendEffects 批量置 false / restoreEffects 批量还原)绝不落盘:
+    // 否则播放器挂起时写下的「全关」会覆盖掉用户真正保存的偏好
     if (_suspended) return
     localStorage.setItem('ihomy:effects', JSON.stringify({
       lampMode: lampMode.value, lampTemp: lampTemp.value, lampBrightness: lampBrightness.value,
@@ -169,6 +171,8 @@ export function useSunLight() {
       refreshScene()
     }, 208 / testSpeed.value)
   }
+  // 调试用变速:改速度要重建定时器,且只在「测试运行中且未暂停」时才重建;
+  // 208ms 是一帧时隙基准(288 个时隙 ≈ 一天),间隔 = 208 / 速度
   const setTestSpeed = (sp) => {
     testSpeed.value = sp
     if (testTimer && lightTestMode.value && !lightTestPaused.value) {
@@ -227,6 +231,10 @@ export function useSunLight() {
   // 钟摆运动已改为 CSS @keyframes lampSwing(见 main.css .lamp-light-pendulum),
   // 不再用 requestAnimationFrame 每帧写 ref,完全绕过 Vue 响应式。
 
+  // 台灯遮罩:用 radial-gradient 拼出「中心透光、向外渐暗」的胶光;光源点取 38.2%(黄金分割),
+  // 视觉上比正中更自然。透明半径 tr 随亮度与台灯强度缩放(灯越亮/越强,透光区越大),
+  // 外圈 te = r + 30 为羽化外边界,中间三段 stop(0.15/0.4/0.7)把过渡拉成软边,避免出现硬光圈。
+  // 全灭(强度≈0)时返回 none,直接不下发遮罩。
   const lampMask = computed(() => {
     const s = lampStrengthAnim.value
     if (s <= 0.01) return 'none'
@@ -236,6 +244,8 @@ export function useSunLight() {
     return `radial-gradient(circle at 38.2% 38.2%, transparent 0%, transparent ${tr}vw, rgba(0,0,0,0.15) ${tr + (te - tr) * 0.3}vw, rgba(0,0,0,0.4) ${tr + (te - tr) * 0.55}vw, rgba(0,0,0,0.7) ${tr + (te - tr) * 0.8}vw, black ${te}vw)`
   })
 
+  // 台灯色温插值:lampTemp 0 → 暖橙(255,180,100),100 → 冷白(220,230,255),
+  // 三通道各按 t 线性推进,得到中间色温的连续过渡
   const lampColor = computed(() => {
     const t = lampTemp.value / 100
     const r = Math.round(255 - t * 35)
@@ -313,6 +323,8 @@ export function useSunLight() {
     background: `radial-gradient(circle, ${sunScene.value.palette.bloom} 0%, ${sunScene.value.palette.mid} 35%, transparent 70%)`,
   }))
 
+  // 高光亮斑:白天下任何非晴天气(雨/雪/云/雷/阴/雾)一律压成 0——云层遮住太阳就不该有直射亮点;
+  // 夜间直接用后端的 brightSpotOpacity(月光/夜景点),不受天气压制
   const brightSpotStyle = computed(() => ({
     background: sunScene.value.brightSpotColor || 'transparent',
     opacity: shadowEnabled.value ? (sunScene.value.isNight ? (sunScene.value.brightSpotOpacity ?? 0) : (['rain', 'snow', 'cloud', 'thunder', 'overcast', 'fog'].includes(weatherMode.value) ? 0 : (sunScene.value.brightSpotOpacity ?? 0))) : 0,

@@ -13,8 +13,11 @@ import org.springframework.web.socket.server.HandshakeInterceptor;
 import java.util.Map;
 
 /**
- * WebSocket 鎻℃墜鎷︽埅鍣?浠??token= 瑙ｆ瀽 JWT,
- * 鏍￠獙閫氳繃鍚庢妸 userId/familyId/鏄电О鏀惧叆 session attributes(渚?Handler 鍙栫敤)銆? */
+ * WebSocket 握手拦截器:浏览器 WebSocket 握手无法携带 Authorization 头,
+ * 故改从 URL 查询参数 ?token= 取 JWT,校验 type=ACCESS(刷新令牌/壁纸令牌不放行)后,
+ * 把 userId/familyId/username 写入 session attributes 供 ChatWebSocketHandler 取用。
+ * 校验不通过返回 false 直接拒绝握手(不抛异常,避免把失败原因回给客户端)。
+ */
 @Component
 @RequiredArgsConstructor
 public class WsHandshakeInterceptor implements HandshakeInterceptor {

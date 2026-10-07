@@ -46,7 +46,8 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { publicApi, homeApi } from '@/api'
-import { feedTypeLabel as feedTypeLabelOf, feedSummary as feedSummaryOf, formatFeedTime } from '@/utils/feed'
+import { feedTypeLabel as feedTypeLabelOf, feedSummary as feedSummaryOf } from '@/utils/feed'
+import { formatRelativeTime } from '@/utils/datetime'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -63,11 +64,11 @@ const filteredFeeds = computed(() => {
   return feeds.value.filter(f => f.type === activeFilter.value)
 })
 
-// 类型标签/摘要/相对时间走共享 utils/feed.js(与首页、暖居首页同口径;移动端历史摘要截断 60)
+// 类型标签/摘要走共享 utils/feed.js;相对时间走 utils/datetime.js(与首页、暖居首页同口径;移动端历史摘要截断 60)
 const feedTypeLabel = (type) => feedTypeLabelOf(t, type)
 const feedCover = (f) => f.coverImage || (Array.isArray(f.urls) && f.urls.length ? f.urls[0] : '')
 const feedSummary = (f) => feedSummaryOf(t, f, 60)
-const formatTime = (d) => formatFeedTime(t, d)
+const formatTime = (d) => formatRelativeTime(t, d)
 const FEED_ROUTES = { diary: '/diary', photo: '/album', video: '/cinema', wish: '/wish', task: '/task', recipe: '/kitchen', book: '/library' }
 const goFeed = (f) => {
   if (f.type === 'blog' && f.id) router.push(`/blog/${f.id}`)

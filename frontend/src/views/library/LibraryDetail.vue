@@ -56,12 +56,16 @@
 </template>
 
 <script setup>
+// 图书详情弹窗:展示元信息/分类,并提供借阅状态流转、在线阅读、下载、编辑入口。
+// 借阅状态机 WANT_READ → READING → FINISHED;「重读」是状态机之外的分支(FINISHED 时上面三个
+// v-else-if 全部落空,单独出这个按钮,点了回到 READING),不是写漏。
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { libraryApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
+import { formatDate } from '@/utils/datetime'
 
 const props = defineProps({ bookId: [Number, String] })
 const emit = defineEmits(['close', 'updated', 'deleted', 'read'])
@@ -76,11 +80,12 @@ const loading = ref(false)
 const categories = ref([])
 
 const canEdit = computed(() => book.value && (userStore.isOwner || book.value.uploaderId === userStore.userInfo?.id))
+// 在线阅读只支持 PDF/EPUB/TXT(与 LibraryReader 的三种渲染一致);
+// 上传时 accept 含 .mobi,MOBI 可入库/下载但这里不给在线阅读入口——两处格式清单需一起改
 const canReadOnline = computed(() => book.value && ['PDF', 'EPUB', 'TXT'].includes(book.value.fileFormat))
 
 const catName = (id) => categories.value.find(c => c.id === id)?.name || ''
 
-const formatDate = (d) => (d ? new Date(d).toLocaleDateString('zh-CN') : '')
 const formatSize = (bytes) => {
   if (!bytes) return ''
   if (bytes < 1024) return bytes + ' B'

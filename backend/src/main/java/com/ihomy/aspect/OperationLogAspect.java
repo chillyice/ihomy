@@ -141,20 +141,23 @@ public class OperationLogAspect {
         return null;
     }
 
-    /** 序列化对象为 JSON,排除请求/响应对象,序列化失败时降级为 toString */
+    /** 序列化对象为 JSON 并按访问日志同一套清单打码敏感字段,排除请求/响应对象,失败降级 toString */
     private String safeJson(Object obj) {
+        if (obj == null) return null;
+        String raw;
         try {
-            if (obj == null) return null;
             if (obj instanceof Object[] arr) {
-                return JSONUtil.toJsonStr(Arrays.stream(arr)
+                raw = JSONUtil.toJsonStr(Arrays.stream(arr)
                         .filter(x -> !(x instanceof HttpServletRequest)
                                 && !(x instanceof jakarta.servlet.http.HttpServletResponse))
                         .toList());
+            } else {
+                raw = JSONUtil.toJsonStr(obj);
             }
-            return JSONUtil.toJsonStr(obj);
         } catch (Exception e) {
-            return String.valueOf(obj);
+            raw = String.valueOf(obj);
         }
+        return com.ihomy.filter.AccessLogFilter.maskJson(raw);
     }
 
     private String appendResult(String desc, String result) {

@@ -170,6 +170,7 @@ import Breadcrumb from '@/components/Breadcrumb.vue'
 import PhotoViewer from '@/components/PhotoViewer.vue'
 import AlbumDefaultCover from '@/components/AlbumDefaultCover.vue'
 import { shareId } from '@/utils/shareId'
+import { formatRelativeTime, formatDateTime } from '@/utils/datetime'
 import { useSyncStore } from '@/stores/sync'
 
 const route = useRoute()
@@ -194,13 +195,7 @@ const statusText = computed(() => ({
 }[album.value.syncStatus] || ''))
 
 // 相对时间(x 前)
-const timeAgo = (d) => {
-  const s = (Date.now() - new Date(d).getTime()) / 1000
-  if (s < 60) return t('album.justNow')
-  if (s < 3600) return Math.floor(s / 60) + t('album.minutesAgo')
-  if (s < 86400) return Math.floor(s / 3600) + t('album.hoursAgo')
-  return Math.floor(s / 86400) + t('album.daysAgo')
-}
+const timeAgo = (d) => formatRelativeTime(t, d)
 
 // 照片管理权限:家长或上传者本人;映射相册只读,不提供编辑/删除
 const canManagePhoto = (p) =>
@@ -210,8 +205,6 @@ const canManagePhoto = (p) =>
 const shareBase = computed(() =>
   album.value.shareToken ? `${location.origin}/album/shared/${album.value.shareToken}` : ''
 )
-
-const formatDateTime = (d) => (d ? new Date(d).toLocaleString('zh-CN') : '')
 
 // 拉取相册详情与照片列表:分享模式走令牌接口(游客可访问),普通模式走详情接口
 const load = async () => {

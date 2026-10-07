@@ -11,6 +11,7 @@ import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.AnnouncementService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,7 +41,7 @@ public class AnnouncementController {
     @Operation(summary = "新增公告")
     @OperationLog(module = "ANNOUNCEMENT", operationType = "CREATE", description = "新增家庭公告")
     @PostMapping
-    public Result<Announcement> create(@RequestBody AnnouncementDTO dto) {
+    public Result<Announcement> create(@Valid @RequestBody AnnouncementDTO dto) {
         SysUser user = currentOwner();
         return Result.success(announcementService.create(user.getId(), user.getFamilyId(), dto));
     }
@@ -48,7 +49,7 @@ public class AnnouncementController {
     @Operation(summary = "更新公告")
     @OperationLog(module = "ANNOUNCEMENT", operationType = "UPDATE", description = "修改家庭公告")
     @PutMapping("/{id}")
-    public Result<Announcement> update(@PathVariable Long id, @RequestBody AnnouncementDTO dto) {
+    public Result<Announcement> update(@PathVariable Long id, @Valid @RequestBody AnnouncementDTO dto) {
         SysUser user = currentOwner();
         return Result.success(announcementService.update(id, user.getFamilyId(), dto));
     }

@@ -236,7 +236,6 @@ const drawing = ref({ poly: null, rect: null })
 const drag = ref(null)
 const hover = ref(null) // 边界 hover:{ kind: 'vertex'|'edge', room, point, vertexIdx?/edgeIdx? }
 const snapLine = ref(null)
-const calibPoints = ref([]) // 兼容:保留为空数组,标定走 calibLine
 const calibLine = ref(null) // { a:{x,y}, b:{x,y} } 持久标定线段(可拖端点)
 const calibFirst = ref(null) // 第一个点击点(尚未确定B时)
 const rulerLines = ref([]) // 尺子测量线段 [{id,a:{x,y},b:{x,y}}],同步自 props.rulers(持久)
@@ -553,7 +552,6 @@ watch(() => props.furnitures, (fs) => {
 // ---- 缩略图(迷你地图):右上角悬浮,可折叠成横条、可拖动 ----
 const THUMB_W = 168
 const THUMB_H = 112
-const THUMB_BAR_H = 26
 const thumbCollapsed = ref(false)
 const thumbPos = ref({ x: 0, y: 0 })
 const thumbMoved = ref(false)
@@ -1116,6 +1114,8 @@ const onPointerUp = (e) => {
   const d = drag.value
   if (!d) return
   if (d.type === 'draw-poly') return // 逐点描绘:点击间保持状态,双击闭合/切工具时 finishPoly
+  // 拖拽结束要压掉紧随其后的那次 click(否则选中/落地会被当成一次新点击):
+  // click 在 pointerup 之后的同轮任务里派发,故用 setTimeout(…, 0) 把它放到下一宏任务再复位
   justDragged = true
   setTimeout(() => { justDragged = false }, 0)
   if (d.type === 'room-body' || d.type === 'room-vertex' || d.type === 'room-edge') {

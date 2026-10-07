@@ -159,6 +159,7 @@ import { notificationApi, authApi, opsApi } from '@/api'
 import { ElMessage } from 'element-plus'
 import { Sunny, Moon, Bell, Fold, Expand, ArrowRight, Check, WarningFilled } from '@element-plus/icons-vue'
 import { iconComp, buildNavGroups, isActive } from '@/utils/navModules'
+import { formatRelativeTime } from '@/utils/datetime'
 
 import { applyLocale } from '@/i18n'
 import { useThemeStore } from '@/stores/theme'
@@ -262,14 +263,7 @@ const onNotifyClick = async (n) => {
   else if (n.contentType === 'item') router.push('/kitchen/ingredients')
 }
 const notifyType = (type) => type === 'reply' ? t('notify.typeReply') : type === 'system' ? t('notify.typeSystem') : type === 'item_expiry' ? t('notify.typeExpiry') : t('notify.typeComment')
-const notifyTime = (d) => {
-  if (!d) return ''
-  const date = new Date(d)
-  const diff = Date.now() - date.getTime()
-  if (diff < 3600000) return t('sidebar.minutesAgo', { n: Math.max(1, Math.floor(diff / 60000)) })
-  if (diff < 86400000) return t('sidebar.hoursAgo', { n: Math.floor(diff / 3600000) })
-  return date.toLocaleDateString(locale.value === 'en' ? 'en-US' : 'zh-CN')
-}
+const notifyTime = (d) => formatRelativeTime(t, d)
 
 // 用户下拉
 const onUserCommand = (cmd) => {

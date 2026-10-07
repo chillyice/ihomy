@@ -17,6 +17,7 @@ set -euo pipefail
 DUMP="${1:-}"
 TARGET_DB="${2:-}"
 DB_NAME="${IHOMY_DB_NAME:-ihomy}"
+BACKUP_DIR="${IHOMY_BACKUP_DIR:-/var/backups/ihomy}"
 
 # root@localhost 走 socket 免密;指定 host/port 时密码由调用方经 MYSQL_PWD 注入(勿写命令行)
 MYSQL_ARGS=(-uroot)
@@ -33,7 +34,7 @@ gzip -t "$DUMP" || die "转储 gzip 校验失败:$DUMP"
 
 # 恢复到生产库:先自动把当前库导出一份,给一次后悔机会
 if [[ "$TARGET_DB" == "$DB_NAME" ]]; then
-  SAFETY="/var/backups/ihomy/pre-restore-${DB_NAME}-$(date +%F_%H%M).sql.gz"
+  SAFETY="$BACKUP_DIR/pre-restore-${DB_NAME}-$(date +%F_%H%M).sql.gz"
   log "目标为生产库 $DB_NAME,先做安全快照:$SAFETY"
   mkdir -p "$(dirname "$SAFETY")"
   mysqldump "${MYSQL_ARGS[@]}" --default-character-set=utf8mb4 --single-transaction "$DB_NAME" | gzip -9 > "$SAFETY"

@@ -69,9 +69,10 @@ else { Die 'MySQL 未在 120s 内就绪，请查看 docker logs ihomy-mysql' }
 # schema.sql 的 ihomy 账号密码为开发固定值；若 external.yml 配了其他密码则在此对齐（幂等，每次启动都执行）
 if ($ExternalConfig) {
   $raw = Get-Content $ExternalConfig -Raw -Encoding UTF8
-  $m = [regex]::Match($raw, '(?s)datasource:\s*password:\s*([A-Za-z0-9_@#$%^&*+!.-]+)')
-  if ($m.Success -and $m.Groups[1].Value -notmatch '^CHANGE_ME') {
-    $appPwd = $m.Groups[1].Value
+  $m = [regex]::Match($raw, '(?s)datasource:.*?password:\s*([^\r\n]+)')
+  if ($m.Success -and $m.Groups[1].Value.Trim().Trim('"').Trim("'") -notmatch '^CHANGE_ME') {
+    # 取整行后去首尾空白与外层引号,避免字符集过窄漏掉含 = ~ : 等字符的密码而静默跳过对齐
+    $appPwd = $m.Groups[1].Value.Trim().Trim('"').Trim("'")
     # 纯 ASCII SQL，直接 docker exec 执行（符合编码规范）
     docker exec ihomy-mysql mysql -uroot -proot -e "ALTER USER 'ihomy'@'localhost' IDENTIFIED BY '$appPwd'; ALTER USER 'ihomy'@'%' IDENTIFIED BY '$appPwd'; FLUSH PRIVILEGES;" 2>$null
     if ($LASTEXITCODE -eq 0) { Write-Ok "应用账号 ihomy 密码已与 $ExternalConfig 对齐" }

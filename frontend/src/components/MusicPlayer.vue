@@ -120,6 +120,8 @@ const onDragStart = (e) => {
     document.removeEventListener('mousemove', onMove)
     document.removeEventListener('mouseup', onUp)
     if (moved) {
+      // 拖拽结束后浏览器还会补发一次 click(会被播放器当成点击 → 松手即切歌/展开):
+      // 在捕获阶段吞掉紧随其后的这一次 click,用完自摘(不留常驻监听)
       ev.stopPropagation()
       ev.preventDefault()
       const blocker = (e) => { e.stopPropagation(); e.preventDefault(); document.removeEventListener('click', blocker, true) }

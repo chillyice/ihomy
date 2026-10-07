@@ -42,7 +42,7 @@
       </div>
       <div v-a11y-click class="me-row" @click="toggleLightEffect">
         <span class="me-row-icon">✨</span>
-        <span class="me-row-text">光影特效</span>
+        <span class="me-row-text">{{ $t('mobile.lightEffect') }}</span>
         <el-switch :model-value="lightEffectOn" size="small" />
       </div>
       <div v-a11y-click class="me-row" @click="toggleLang">
@@ -107,6 +107,9 @@ const lightEffectOn = computed(() => sunLight?.shadowEnabled?.value ?? false)
 const toggleTheme = () => {
   themeStore.toggleMode()
 }
+// 光影总开关:关掉时级联关掉整组特效(云团/天气/台灯/毛玻璃),开时恢复。
+// 不能只切 shadowEnabled——那样会出现「总开关已关、其他特效仍在跑」(与 AppSidebar 同款开关踩过的坑)。
+// 注意:本处重新打开时不回置 glassEnabled(与 AppSidebar 的实现略有差异),改动时留意保持三端语义一致。
 const toggleLightEffect = () => {
   if (sunLight?.shadowEnabled) {
     sunLight.shadowEnabled.value = !sunLight.shadowEnabled.value

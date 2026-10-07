@@ -20,6 +20,7 @@ import com.mpatric.mp3agic.ID3v2;
 import com.mpatric.mp3agic.Mp3File;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
@@ -31,6 +32,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * 背景音乐/家庭曲库服务:曲目列表与播放地址、上传(含 ID3 元数据与内嵌封面提取)、
+ * 存储设备映射曲目的同步状态回写、歌单增删与排序、背景歌单设置。
+ * 曲目保留期与删除策略:设备映射曲目只删记录(设备上的文件永不触碰);
+ * 本地上传/外链曲目软删记录并连带删磁盘文件——见 removeMusicRow。
+ * 家庭曲库整表载入并设 1000 条上限(见各列表方法处的 ponytail 说明),大库需改游标分页。
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -183,6 +191,7 @@ public class MusicService {
         }
     }
 
+    @Transactional
     public void deleteMusic(Long familyId, Long id) {
         ContentMusic m = musicMapper.selectById(id);
         if (m == null || !m.getFamilyId().equals(familyId)) throw new BizException(ResultCode.NOT_FOUND);
@@ -191,6 +200,7 @@ public class MusicService {
                 .eq(ContentMusicPlaylistTrack::getMusicId, id));
     }
 
+    @Transactional
     public void batchDeleteMusic(Long familyId, List<Long> ids) {
         if (ids == null || ids.isEmpty()) return;
         List<ContentMusic> musics = musicMapper.selectBatchIds(ids);
@@ -250,6 +260,7 @@ public class MusicService {
         return p;
     }
 
+    @Transactional
     public void deletePlaylist(Long familyId, Long id) {
         ContentMusicPlaylist p = playlistMapper.selectById(id);
         if (p == null || !p.getFamilyId().equals(familyId)) throw new BizException(ResultCode.NOT_FOUND);
@@ -261,7 +272,7 @@ public class MusicService {
         }
     }
 
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public void addTracksToPlaylist(Long familyId, Long playlistId, List<Long> musicIds) {
         ContentMusicPlaylist p = playlistMapper.selectById(playlistId);
         if (p == null || !p.getFamilyId().equals(familyId)) throw new BizException(ResultCode.NOT_FOUND);
@@ -294,6 +305,7 @@ public class MusicService {
         updatePlaylistCover(p);
     }
 
+    @Transactional
     public void removeTrackFromPlaylist(Long familyId, Long playlistId, Long musicId) {
         ContentMusicPlaylist p = playlistMapper.selectById(playlistId);
         if (p == null || !p.getFamilyId().equals(familyId)) throw new BizException(ResultCode.NOT_FOUND);
@@ -318,6 +330,7 @@ public class MusicService {
         return ids.stream().map(map::get).filter(Objects::nonNull).collect(Collectors.toList());
     }
 
+    @Transactional
     public void setBackground(Long familyId, Long playlistId) {
         ContentMusicPlaylist p = playlistMapper.selectById(playlistId);
         if (p == null || !p.getFamilyId().equals(familyId)) throw new BizException(ResultCode.NOT_FOUND);
@@ -346,12 +359,11 @@ public class MusicService {
     }
 
     private void updatePlaylistCount(ContentMusicPlaylist p) {
-        Long count = trackMapper.selectCount(
-                new LambdaQueryWrapper<ContentMusicPlaylistTrack>()
-                        .eq(ContentMusicPlaylistTrack::getPlaylistId, p.getId()));
+        // 计数在单条 UPDATE 内子查询重算,避免「先 selectCount 再 set」两次读写的竞态
         playlistMapper.update(null, new LambdaUpdateWrapper<ContentMusicPlaylist>()
                 .eq(ContentMusicPlaylist::getId, p.getId())
-                .set(ContentMusicPlaylist::getTrackCount, count.intValue()));
+                .setSql("track_count = (SELECT COUNT(*) FROM content_music_playlist_track"
+                        + " WHERE playlist_id = " + p.getId() + ")"));
     }
 
     private void updatePlaylistCover(ContentMusicPlaylist p) {

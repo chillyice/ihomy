@@ -94,7 +94,7 @@ public class AlbumController {
         return Result.success();
     }
 
-    @Operation(summary = "清除自定义封面(回退为照片封面)")
+    @Operation(summary = "清除自定义封面(回退为照片封面)(预留接口,前端暂未接入)")
     @OperationLog(module = "ALBUM", operationType = "UPDATE", description = "清除相册封面")
     @DeleteMapping("/{id}/cover")
     public Result<Void> clearCover(@PathVariable Long id) {

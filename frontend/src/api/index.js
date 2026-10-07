@@ -355,6 +355,8 @@ export const loanApi = {
 }
 
 // 运维管理(仅 OPS 角色)
+// 注意 timeline 类接口的 types/features 入参:后端按逗号分隔串解析,数组需 join 成串;
+// 传 null 表示不带该参数(空数组同样传 null,避免出现 types= 这种空值参数)
 export const opsApi = {
   stats: (params) => request.get('/ops/stats', { params }),
   server: () => request.get('/ops/server'),

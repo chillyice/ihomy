@@ -1673,7 +1673,8 @@ CREATE TABLE `content_music_playlist` (
   `deleted`        TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
   `created_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_family_bg` (`family_id`, `is_background`, `deleted`)
+  KEY `idx_family_bg` (`family_id`, `is_background`, `deleted`),
+  KEY `idx_family_created` (`family_id`, `deleted`, `created_at` DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='音乐歌单表';
 
 -- ------------------------------------------------------------
@@ -1986,7 +1987,7 @@ CREATE TABLE `sys_oss_component` (
   KEY `idx_type_status` (`component_type`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='开源组件台账(登记+版本检测+当前版本探测+升级提示)';
 
--- 种子:49 项 = 前端 NPM 直接依赖 28 + 后端 Maven 显式依赖 18 + 独立服务 3(Nextcloud 部分集成 / Jellyfin 部分集成 / Home Assistant 部分集成)
+-- 种子:51 项 = 前端 NPM 直接依赖 28 + 后端 Maven 显式依赖 18 + 独立服务 5(Nextcloud / Jellyfin / Home Assistant + MySQL / Redis)
 -- 版本为实际锁定版本(与 package-lock.json / 解析后的 Maven 依赖一致),不是 package.json/pom.xml 里的声明区间下限
 INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`) VALUES
 ('Vue', 'NPM', 'vue', '3.5.40', 'MIT', 'https://github.com/vuejs/core', '前端框架', 'FULL'),
@@ -2017,14 +2018,14 @@ INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `curre
 ('eslint-plugin-vue', 'NPM', 'eslint-plugin-vue', '10.11.1', 'MIT', 'https://github.com/vuejs/eslint-plugin-vue', 'Vue 单文件组件 lint 规则', 'FULL'),
 ('globals', 'NPM', 'globals', '15.15.0', 'MIT', 'https://github.com/sindresorhus/globals', 'ESLint 环境全局变量定义(浏览器/Node)', 'FULL'),
 ('Prettier', 'NPM', 'prettier', '3.9.9', 'MIT', 'https://github.com/prettier/prettier', '代码格式化(配置落地,未做全仓重排)', 'FULL'),
-('Spring Boot', 'MAVEN', 'org.springframework.boot:spring-boot-starter-parent', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端框架', 'FULL'),
-('Spring Boot Web', 'MAVEN', 'org.springframework.boot:spring-boot-starter-web', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Web/REST(MVC)', 'FULL'),
-('Spring Boot Security', 'MAVEN', 'org.springframework.boot:spring-boot-starter-security', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '认证授权(过滤链)', 'FULL'),
-('Spring Boot Validation', 'MAVEN', 'org.springframework.boot:spring-boot-starter-validation', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '参数校验', 'FULL'),
-('Spring Boot Data Redis', 'MAVEN', 'org.springframework.boot:spring-boot-starter-data-redis', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Redis(缓存/令牌/验证码)', 'FULL'),
-('Spring Boot AOP', 'MAVEN', 'org.springframework.boot:spring-boot-starter-aop', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '切面(权限/操作日志)', 'FULL'),
-('Spring Boot WebSocket', 'MAVEN', 'org.springframework.boot:spring-boot-starter-websocket', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '聊天室 WebSocket', 'FULL'),
-('Spring Boot Mail', 'MAVEN', 'org.springframework.boot:spring-boot-starter-mail', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '密码找回邮件(SMTP)', 'FULL'),
+('Spring Boot', 'MAVEN', 'org.springframework.boot:spring-boot-starter-parent', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端框架', 'FULL'),
+('Spring Boot Web', 'MAVEN', 'org.springframework.boot:spring-boot-starter-web', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Web/REST(MVC)', 'FULL'),
+('Spring Boot Security', 'MAVEN', 'org.springframework.boot:spring-boot-starter-security', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '认证授权(过滤链)', 'FULL'),
+('Spring Boot Validation', 'MAVEN', 'org.springframework.boot:spring-boot-starter-validation', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '参数校验', 'FULL'),
+('Spring Boot Data Redis', 'MAVEN', 'org.springframework.boot:spring-boot-starter-data-redis', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Redis(缓存/令牌/验证码)', 'FULL'),
+('Spring Boot AOP', 'MAVEN', 'org.springframework.boot:spring-boot-starter-aop', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '切面(权限/操作日志)', 'FULL'),
+('Spring Boot WebSocket', 'MAVEN', 'org.springframework.boot:spring-boot-starter-websocket', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '聊天室 WebSocket', 'FULL'),
+('Spring Boot Mail', 'MAVEN', 'org.springframework.boot:spring-boot-starter-mail', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '密码找回邮件(SMTP)', 'FULL'),
 ('MyBatis-Plus', 'MAVEN', 'com.baomidou:mybatis-plus-spring-boot3-starter', '3.5.5', 'Apache-2.0', 'https://github.com/baomidou/mybatis-plus', 'ORM', 'FULL'),
 ('MySQL Connector/J', 'MAVEN', 'com.mysql:mysql-connector-j', '8.3.0', 'GPL-2.0', 'https://github.com/mysql/mysql-connector-j', 'MySQL 驱动', 'FULL'),
 ('Hutool', 'MAVEN', 'cn.hutool:hutool-all', '5.8.27', 'MulanPSL-2.0', 'https://github.com/dromara/hutool', '工具库(农历/文本等)', 'FULL'),
@@ -2034,10 +2035,12 @@ INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `curre
 ('Knife4j', 'MAVEN', 'com.github.xiaoymin:knife4j-openapi3-jakarta-spring-boot-starter', '4.5.0', 'Apache-2.0', 'https://github.com/xiaoymin/knife4j', '接口文档', 'FULL'),
 ('Lombok', 'MAVEN', 'org.projectlombok:lombok', '1.18.32', 'MIT', 'https://github.com/projectlombok/lombok', '编译期样板代码生成', 'FULL'),
 ('mp3agic', 'MAVEN', 'com.mpatric:mp3agic', '0.9.1', 'MIT', 'https://github.com/mpatric/mp3agic', '音乐元数据解析', 'FULL'),
-('Spring Boot Test', 'MAVEN', 'org.springframework.boot:spring-boot-starter-test', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端单元测试(JUnit5/AssertJ)', 'FULL'),
+('Spring Boot Test', 'MAVEN', 'org.springframework.boot:spring-boot-starter-test', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端单元测试(JUnit5/AssertJ)', 'FULL'),
 ('Nextcloud', 'SERVICE', 'nextcloud/server', NULL, 'AGPL-3.0', 'https://github.com/nextcloud/server', 'WebDAV/Nextcloud 存储后端', 'PARTIAL'),
 ('Jellyfin', 'SERVICE', 'jellyfin/jellyfin', '10.9.11', 'GPL-2.0', 'https://github.com/jellyfin/jellyfin', '放映厅媒体引擎(刮削/转码/字幕轨/TV 客户端;API 集成,界面自建)', 'PARTIAL'),
-('Home Assistant', 'SERVICE', 'home-assistant/core', NULL, 'Apache-2.0', 'https://github.com/home-assistant/core', '智能家居中控(实体状态采集/设备控制;API 集成,界面自建)', 'PARTIAL');
+('Home Assistant', 'SERVICE', 'home-assistant/core', NULL, 'Apache-2.0', 'https://github.com/home-assistant/core', '智能家居中控(实体状态采集/设备控制;API 集成,界面自建)', 'PARTIAL'),
+('MySQL', 'SERVICE', 'mysql/mysql-server', '8.4.10', 'GPL-2.0', 'https://github.com/mysql/mysql-server', '关系型数据库(业务数据持久化,端口 6306)', 'FULL'),
+('Redis', 'SERVICE', 'redis/redis', '8.8.1', 'AGPL-3.0', 'https://github.com/redis/redis', '缓存/令牌/验证码/限流(内存数据存储,只绑回环)', 'FULL');
 
 -- NPM/MAVEN 直接依赖交由 Renovate 检测 + 生成 PR,SERVICE 独立服务由台账内部维护(默认 INTERNAL)
 
@@ -2240,7 +2243,8 @@ CREATE TABLE `family_announcement` (
   `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted`    TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
   PRIMARY KEY (`id`),
-  KEY `idx_family_deleted` (`family_id`, `deleted`, `enabled`)
+  KEY `idx_family_deleted` (`family_id`, `deleted`, `enabled`),
+  KEY `idx_family_sort` (`family_id`, `deleted`, `sort_order`, `id` DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭公告/广告位表(自建,图片+链接)';
 
 -- 首页模块:智能家居中控入口(生活组,排工具箱前);sys_home_module 无唯一约束兜底,用 NOT EXISTS 防重
@@ -2265,3 +2269,7 @@ UPDATE `sys_oss_component` SET `managed_by` = 'RENOVATE' WHERE `component_type` 
 UPDATE `sys_oss_component` SET `probe_type` = 'NEXTCLOUD_STATUS' WHERE `component_type` = 'SERVICE' AND `package_ref` = 'nextcloud/server';
 UPDATE `sys_oss_component` SET `probe_type` = 'JELLYFIN_INFO'    WHERE `component_type` = 'SERVICE' AND `package_ref` = 'jellyfin/jellyfin';
 UPDATE `sys_oss_component` SET `probe_type` = 'HA_CONFIG'        WHERE `component_type` = 'SERVICE' AND `package_ref` = 'home-assistant/core';
+
+-- 基础设施服务部署方式:MySQL 生产为本机部署,Redis 走 Docker(见 docs/部署指导-Linux.md)
+UPDATE `sys_oss_component` SET `deploy_type` = 'SYSTEMD'   WHERE `component_type` = 'SERVICE' AND `package_ref` = 'mysql/mysql-server';
+UPDATE `sys_oss_component` SET `deploy_type` = 'CONTAINER' WHERE `component_type` = 'SERVICE' AND `package_ref` = 'redis/redis';

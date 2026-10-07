@@ -129,7 +129,7 @@ public class AuthController {
         if (token instanceof String s && !s.isBlank()) authCookie.attach(request, response, s);
     }
 
-    @Operation(summary = "当前用户信息")
+    @Operation(summary = "当前用户信息(预留接口,前端暂未接入)")
     @GetMapping("/me")
     public Result<Object> me() {
         return Result.success(authService.currentUser());
@@ -154,7 +154,7 @@ public class AuthController {
         return Result.success(authService.switchFamily(user.getId(), familyId, setDefault));
     }
 
-    @Operation(summary = "已登录用户通过邀请码加入家庭")
+    @Operation(summary = "已登录用户通过邀请码加入家庭(预留接口,加入家庭统一走注册带邀请码)")
     @OperationLog(module = "AUTH", operationType = "CREATE", description = "加入家庭", saveArgs = false)
     @PostMapping("/join")
     public Result<Void> join(@RequestBody Map<String, String> body) {

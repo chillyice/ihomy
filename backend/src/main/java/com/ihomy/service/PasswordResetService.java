@@ -18,6 +18,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
@@ -82,7 +83,8 @@ public class PasswordResetService {
         sendResetMail(sender, normalized, token.getToken());
     }
 
-    /** 重置密码:校验一次性 token(未用/未过期)后更新密码并作废 token */
+    /** 重置密码:校验一次性 token(未用/未过期)后更新密码并条件作废 token(并发下仅一方成功) */
+    @Transactional
     public void reset(String token, String newPassword, String ip) {
         authGuard.checkRate("resetpwd", ip, 20, 3600);
         if (!StringUtils.hasText(token)) {
@@ -97,6 +99,14 @@ public class PasswordResetService {
         if (t == null || t.getExpiresAt() == null || t.getExpiresAt().isBefore(LocalDateTime.now())) {
             throw new BizException(ResultCode.RESET_TOKEN_INVALID);
         }
+        // 先条件作废:仅当 token 仍未被使用才置 1,影响行数 0 说明已被并发消费
+        int affected = resetTokenMapper.update(null, new LambdaUpdateWrapper<PasswordResetToken>()
+                .eq(PasswordResetToken::getId, t.getId())
+                .eq(PasswordResetToken::getUsed, 0)
+                .set(PasswordResetToken::getUsed, 1));
+        if (affected == 0) {
+            throw new BizException(ResultCode.RESET_TOKEN_INVALID);
+        }
         SysUser user = sysUserMapper.selectById(t.getUserId());
         if (user == null) {
             throw new BizException(ResultCode.RESET_TOKEN_INVALID);
@@ -107,10 +117,6 @@ public class PasswordResetService {
                 .set(SysUser::getPassword, passwordEncoder.encode(newPassword))
                 .set(SysUser::getMustChangePassword, 0));
 
-        PasswordResetToken used = new PasswordResetToken();
-        used.setId(t.getId());
-        used.setUsed(1);
-        resetTokenMapper.updateById(used);
         securityHelper.invalidateUser(user.getId());
         log.info("密码已通过邮箱重置 uid={}", user.getId());
     }

@@ -32,9 +32,9 @@
             <span v-else>{{ w.createdAt.slice(0, 10) }}</span>
           </div>
           <div class="wish-actions">
-            <el-button v-if="w.status === 'PENDING'" size="small" type="success" plain @click="onSetStatus(w, 1)">{{ $t('wish.achieved') }}</el-button>
-            <el-button v-if="w.status === 'PENDING'" size="small" type="info" plain @click="onSetStatus(w, 2)">{{ $t('wish.abandon') }}</el-button>
-            <el-button v-if="w.status !== 'PENDING'" size="small" @click="onSetStatus(w, 0)">{{ $t('wish.restore') }}</el-button>
+            <el-button v-if="w.status === 'PENDING'" size="small" type="success" plain @click="onSetStatus(w, 'ACHIEVED')">{{ $t('wish.achieved') }}</el-button>
+            <el-button v-if="w.status === 'PENDING'" size="small" type="info" plain @click="onSetStatus(w, 'ABANDONED')">{{ $t('wish.abandon') }}</el-button>
+            <el-button v-if="w.status !== 'PENDING'" size="small" @click="onSetStatus(w, 'PENDING')">{{ $t('wish.restore') }}</el-button>
             <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
               <el-button size="small" text @click="openEditor(w)"><el-icon><Edit /></el-icon></el-button>
             </el-tooltip>
@@ -140,7 +140,7 @@ const onSave = async () => {
 
 const onSetStatus = async (w, status) => {
   await wishApi.update(w.id, { status })
-  ElMessage.success(status === 1 ? t('wish.achievedMsg') : status === 2 ? t('wish.abandonedMsg') : t('wish.restoredMsg'))
+  ElMessage.success(status === 'ACHIEVED' ? t('wish.achievedMsg') : status === 'ABANDONED' ? t('wish.abandonedMsg') : t('wish.restoredMsg'))
   await load()
 }
 

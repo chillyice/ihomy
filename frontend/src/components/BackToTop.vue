@@ -1,7 +1,7 @@
 <!-- 回到顶部按钮:滚动超过阈值时显示,点击平滑滚回页首 -->
 <template>
   <transition name="pop">
-    <button v-if="visible" class="back-to-top" @click="scrollTop" aria-label="回到顶部">↑</button>
+    <button v-if="visible" class="back-to-top" @click="scrollTop" :aria-label="$t('common.backToTop')">↑</button>
   </transition>
 </template>
 

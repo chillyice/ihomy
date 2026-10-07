@@ -169,6 +169,7 @@ public final class WebDavClient {
         try {
             DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
             f.setNamespaceAware(true);
+            // XXE 加固:响应 XML 来自外部 WebDAV 服务器(不可信),禁 DOCTYPE 与外部实体,防实体注入/本地文件读取
             f.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
             f.setFeature("http://xml.org/sax/features/external-general-entities", false);
             f.setFeature("http://xml.org/sax/features/external-parameter-entities", false);

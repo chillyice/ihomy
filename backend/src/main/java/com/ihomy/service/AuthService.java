@@ -1,5 +1,6 @@
 package com.ihomy.service;
 
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
@@ -158,8 +159,7 @@ public class AuthService {
             ur.setFamilyId(ic.getFamilyId());
             sysUserRoleMapper.insert(ur);
 
-            ic.setUsedCount(ic.getUsedCount() + 1);
-            invitationCodeMapper.updateById(ic);
+            consumeInvite(ic);
 
             String roleCode = sysRoleMapper.selectRoleCodeByUserAndFamily(user.getId(), ic.getFamilyId());
             redisTemplate.opsForValue().set(CUR_FAMILY_PREFIX + user.getId(), String.valueOf(ic.getFamilyId()));
@@ -398,10 +398,20 @@ public class AuthService {
         ur.setFamilyId(ic.getFamilyId());
         sysUserRoleMapper.insert(ur);
 
-        ic.setUsedCount(ic.getUsedCount() + 1);
-        invitationCodeMapper.updateById(ic);
+        consumeInvite(ic);
         // 新加入家庭后权限码列表变化,主动失效
         securityHelper.invalidatePerms(userId, ic.getFamilyId());
+    }
+
+    /** 原子消费邀请码:带 used_count < max_uses 守卫,并发下超过上限的请求影响行数为 0 即拒绝 */
+    private void consumeInvite(InvitationCode ic) {
+        int affected = invitationCodeMapper.update(null, new LambdaUpdateWrapper<InvitationCode>()
+                .eq(InvitationCode::getId, ic.getId())
+                .apply("used_count < max_uses")
+                .setSql("used_count = used_count + 1"));
+        if (affected == 0) {
+            throw new BizException(ResultCode.CONFLICT, "邀请码已使用完");
+        }
     }
 
     private Long curFamily(Long userId) {
@@ -411,6 +421,15 @@ public class AuthService {
             return Long.valueOf(v);
         } catch (NumberFormatException e) {
             return null;
+        }
+    }
+
+    /** 被移出家庭时清掉仍指向该家庭的会话当前家庭——resolveFamily 优先读它,不清则下次登录/刷新仍解析到旧家庭 */
+    public void clearCurFamilyIf(Long userId, Long familyId) {
+        if (userId == null || familyId == null) return;
+        String key = CUR_FAMILY_PREFIX + userId;
+        if (familyId.toString().equals(redisTemplate.opsForValue().get(key))) {
+            redisTemplate.delete(key);
         }
     }
 

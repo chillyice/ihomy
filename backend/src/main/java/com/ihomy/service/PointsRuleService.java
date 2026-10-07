@@ -68,7 +68,12 @@ public class PointsRuleService {
         return out;
     }
 
-    /** 批量保存(只 upsert 请求中出现的项,其余保持不变);写后失效缓存 */
+    /**
+     * 批量保存(只 upsert 请求中出现的项,其余保持不变);写后失效缓存。
+     * 注意:本方法未包事务,且校验与写入在同一循环里——若第 N 项非法抛错,前 N-1 项已落库,
+     * 而 familyCache.remove 在循环之后不会执行,缓存会与库短暂不一致(直到下次保存或重启)。
+     * 要收紧需「先整体校验、再写入」或给本方法加 @Transactional。
+     */
     public void save(Long familyId, List<PointsRuleDTO> body) {
         if (body == null) {
             return;

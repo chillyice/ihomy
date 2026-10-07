@@ -1144,7 +1144,7 @@ INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`,
 ('QWeather Icons', 'NPM', 'qweather-icons', '1.8.0', 'MIT', 'https://github.com/qwd/Icons', '天气图标字体', 'FULL'),
 ('Ruffle (Flash 播放器)', 'NPM', '@ruffle-rs/ruffle', '0.6.0', 'MIT/Apache-2.0', 'https://github.com/ruffle-rs/ruffle', '放映厅/小游戏 Flash 播放', 'FULL'),
 ('EmulatorJS (GBA 模拟器)', 'NPM', '@emulatorjs/emulatorjs', '4.2.3', 'GPL-3.0', 'https://github.com/EmulatorJS/EmulatorJS', '小游戏 GBA/FC 等复古游戏模拟', 'FULL'),
-('Spring Boot', 'MAVEN', 'org.springframework.boot:spring-boot-starter-parent', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端框架', 'FULL'),
+('Spring Boot', 'MAVEN', 'org.springframework.boot:spring-boot-starter-parent', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端框架', 'FULL'),
 ('MyBatis-Plus', 'MAVEN', 'com.baomidou:mybatis-plus-spring-boot3-starter', '3.5.5', 'Apache-2.0', 'https://github.com/baomidou/mybatis-plus', 'ORM', 'FULL'),
 ('Hutool', 'MAVEN', 'cn.hutool:hutool-all', '5.8.27', 'MulanPSL-2.0', 'https://github.com/dromara/hutool', '工具库(农历/文本等)', 'FULL'),
 ('JJWT', 'MAVEN', 'io.jsonwebtoken:jjwt-api', '0.12.5', 'Apache-2.0', 'https://github.com/jwtk/jjwt', 'JWT 双 token', 'FULL'),
@@ -1490,7 +1490,7 @@ UPDATE `sys_oss_component` SET `probe_type` = 'HA_CONFIG'        WHERE `componen
 -- ------------------------------------------------------------
 INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`) VALUES
 ('Vitest', 'NPM', 'vitest', '2.1.9', 'MIT', 'https://github.com/vitest-dev/vitest', '前端单元测试(utils 纯逻辑)', 'FULL'),
-('Spring Boot Test', 'MAVEN', 'org.springframework.boot:spring-boot-starter-test', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端单元测试(JUnit5/AssertJ)', 'FULL');
+('Spring Boot Test', 'MAVEN', 'org.springframework.boot:spring-boot-starter-test', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端单元测试(JUnit5/AssertJ)', 'FULL');
 
 -- ------------------------------------------------------------
 -- V10.1 首登强制改密(2026-09-29)
@@ -1576,12 +1576,12 @@ INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`,
 ('unplugin-auto-import', 'NPM', 'unplugin-auto-import', '0.17.8', 'MIT', 'https://github.com/unplugin/unplugin-auto-import', '自动导入(Vue/Element Plus API)', 'FULL'),
 ('unplugin-vue-components', 'NPM', 'unplugin-vue-components', '0.27.5', 'MIT', 'https://github.com/unplugin/unplugin-vue-components', '组件自动注册(Element Plus 按需引入)', 'FULL'),
 ('vite-plugin-pwa', 'NPM', 'vite-plugin-pwa', '1.3.0', 'MIT', 'https://github.com/vite-pwa/vite-plugin-pwa', 'PWA(Service Worker/应用清单)', 'FULL'),
-('Spring Boot Web', 'MAVEN', 'org.springframework.boot:spring-boot-starter-web', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Web/REST(MVC)', 'FULL'),
-('Spring Boot Security', 'MAVEN', 'org.springframework.boot:spring-boot-starter-security', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '认证授权(过滤链)', 'FULL'),
-('Spring Boot Validation', 'MAVEN', 'org.springframework.boot:spring-boot-starter-validation', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '参数校验', 'FULL'),
-('Spring Boot Data Redis', 'MAVEN', 'org.springframework.boot:spring-boot-starter-data-redis', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Redis(缓存/令牌/验证码)', 'FULL'),
-('Spring Boot AOP', 'MAVEN', 'org.springframework.boot:spring-boot-starter-aop', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '切面(权限/操作日志)', 'FULL'),
-('Spring Boot WebSocket', 'MAVEN', 'org.springframework.boot:spring-boot-starter-websocket', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '聊天室 WebSocket', 'FULL'),
+('Spring Boot Web', 'MAVEN', 'org.springframework.boot:spring-boot-starter-web', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Web/REST(MVC)', 'FULL'),
+('Spring Boot Security', 'MAVEN', 'org.springframework.boot:spring-boot-starter-security', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '认证授权(过滤链)', 'FULL'),
+('Spring Boot Validation', 'MAVEN', 'org.springframework.boot:spring-boot-starter-validation', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '参数校验', 'FULL'),
+('Spring Boot Data Redis', 'MAVEN', 'org.springframework.boot:spring-boot-starter-data-redis', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Redis(缓存/令牌/验证码)', 'FULL'),
+('Spring Boot AOP', 'MAVEN', 'org.springframework.boot:spring-boot-starter-aop', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '切面(权限/操作日志)', 'FULL'),
+('Spring Boot WebSocket', 'MAVEN', 'org.springframework.boot:spring-boot-starter-websocket', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '聊天室 WebSocket', 'FULL'),
 ('MySQL Connector/J', 'MAVEN', 'com.mysql:mysql-connector-j', '8.3.0', 'GPL-2.0', 'https://github.com/mysql/mysql-connector-j', 'MySQL 驱动', 'FULL'),
 ('JJWT Impl', 'MAVEN', 'io.jsonwebtoken:jjwt-impl', '0.12.5', 'Apache-2.0', 'https://github.com/jwtk/jjwt', 'JWT 实现(runtime)', 'FULL'),
 ('JJWT Jackson', 'MAVEN', 'io.jsonwebtoken:jjwt-jackson', '0.12.5', 'Apache-2.0', 'https://github.com/jwtk/jjwt', 'JWT JSON 序列化(runtime)', 'FULL'),
@@ -1852,7 +1852,7 @@ CREATE TABLE IF NOT EXISTS `sys_password_reset_token` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='密码重置令牌表';
 
 INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`) VALUES
-('Spring Boot Mail', 'MAVEN', 'org.springframework.boot:spring-boot-starter-mail', '3.2.5', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '密码找回邮件(SMTP)', 'FULL');
+('Spring Boot Mail', 'MAVEN', 'org.springframework.boot:spring-boot-starter-mail', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '密码找回邮件(SMTP)', 'FULL');
 UPDATE `sys_oss_component` SET `managed_by` = 'RENOVATE' WHERE `component_type` = 'MAVEN' AND `package_ref` = 'org.springframework.boot:spring-boot-starter-mail';
 
 -- ------------------------------------------------------------
@@ -1906,6 +1906,42 @@ UPDATE `sys_oss_component` SET `managed_by` = 'RENOVATE'
 --   同轮 schema.sql 已一并删除。DELETE 幂等,存量库命中 0 行无副作用。
 -- ------------------------------------------------------------
 DELETE FROM `sys_home_module` WHERE `code` = 'cover' AND `family_id` IS NULL;
+
+-- ------------------------------------------------------------
+-- 2026-10-06 §9.5 D1:Spring Boot 3.2.5 → 3.5.16(3.2.x 支持期已于 2024-11 终止)
+--   上方 9 条种子 INSERT 的版本值已同步改 3.5.16(新库走 schema.sql 直接带新值);
+--   存量库命中 INSERT IGNORE 不会改版本,故补一条幂等 UPDATE 刷台账 current_version。
+-- ------------------------------------------------------------
+UPDATE `sys_oss_component` SET `current_version` = '3.5.16'
+ WHERE `component_type` = 'MAVEN' AND `package_ref` LIKE 'org.springframework.boot:%';
+
+-- ------------------------------------------------------------
+-- 2026-10-06 §9.5 B6:补两处混向排序的复合索引,消除 filesort
+--   family_announcement 列表 family_id + deleted 过滤后 ORDER BY sort_order ASC, id DESC
+--   content_music_playlist 列表 family_id + deleted 过滤后 ORDER BY created_at DESC
+--   同名索引不存在才建;information_schema 守卫幂等。schema.sql 全量建表已同步带此二索引。
+-- ------------------------------------------------------------
+SET @has := (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE()
+             AND TABLE_NAME = 'family_announcement' AND INDEX_NAME = 'idx_family_sort');
+SET @sql := IF(@has = 0, 'ALTER TABLE `family_announcement` ADD INDEX `idx_family_sort` (`family_id`, `deleted`, `sort_order`, `id` DESC)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE()
+             AND TABLE_NAME = 'content_music_playlist' AND INDEX_NAME = 'idx_family_created');
+SET @sql := IF(@has = 0, 'ALTER TABLE `content_music_playlist` ADD INDEX `idx_family_created` (`family_id`, `deleted`, `created_at` DESC)', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- ------------------------------------------------------------
+-- 2026-10-06 §9.5 D3:MySQL/Redis 基础设施服务登记台账 + Redis 镜像固定大版本
+--   二者此前未登记(AGENTS 强制:独立开源服务必须进 sys_oss_component);docker-compose 的 redis
+--   同时由 :latest 固定为 :8,避免隐式跨大版本升级。INSERT IGNORE 幂等;schema.sql 全量种子已同步。
+-- ------------------------------------------------------------
+INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`) VALUES
+('MySQL', 'SERVICE', 'mysql/mysql-server', '8.4.10', 'GPL-2.0', 'https://github.com/mysql/mysql-server', '关系型数据库(业务数据持久化,端口 6306)', 'FULL'),
+('Redis', 'SERVICE', 'redis/redis', '8.8.1', 'AGPL-3.0', 'https://github.com/redis/redis', '缓存/令牌/验证码/限流(内存数据存储,只绑回环)', 'FULL');
+
+UPDATE `sys_oss_component` SET `deploy_type` = 'SYSTEMD'   WHERE `component_type` = 'SERVICE' AND `package_ref` = 'mysql/mysql-server';
+UPDATE `sys_oss_component` SET `deploy_type` = 'CONTAINER' WHERE `component_type` = 'SERVICE' AND `package_ref` = 'redis/redis';
 
 
 

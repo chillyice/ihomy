@@ -20,6 +20,10 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+# 每次运行独占临时目录(固定 /tmp/_ddc_*.txt 在并发运行时会互相覆盖)
+TMPD="$(mktemp -d)"
+trap 'rm -rf "$TMPD"' EXIT
+
 SCHEMA="backend/src/main/resources/schema.sql"
 REQ="docs/需求设计说明书.md"
 AGENTS="AGENTS.md"
@@ -78,11 +82,11 @@ if [[ -z "$game_decl" ]]; then game_decl="$(grep -m1 -oE 'game_info[^0-9]{0,4}[0
 # ------------------------------------------------------- 3. 实体 ↔ 表
 echo "[3] 实体 @TableName ↔ schema.sql 建表"
 grep -rhoE '@TableName\("[^"]+"\)' "$JAVA_DIR" 2>/dev/null \
-  | grep -oE '"[^"]+"' | tr -d '"' | sort -u > /tmp/_ddc_ents.txt
-grep -oE '^CREATE TABLE `[^`]+`' "$SCHEMA" | sed 's/.*`\(.*\)`/\1/' | sort -u > /tmp/_ddc_tabs.txt
-MISSING_ENT="$(comm -23 /tmp/_ddc_ents.txt /tmp/_ddc_tabs.txt || true)"
+  | grep -oE '"[^"]+"' | tr -d '"' | sort -u > $TMPD/_ddc_ents.txt
+grep -oE '^CREATE TABLE `[^`]+`' "$SCHEMA" | sed 's/.*`\(.*\)`/\1/' | sort -u > $TMPD/_ddc_tabs.txt
+MISSING_ENT="$(comm -23 $TMPD/_ddc_ents.txt $TMPD/_ddc_tabs.txt || true)"
 if [[ -z "$MISSING_ENT" ]]; then
-  pass "全部 $(wc -l < /tmp/_ddc_ents.txt | tr -d ' ') 个 @TableName 都能在建表语句中找到"
+  pass "全部 $(wc -l < $TMPD/_ddc_ents.txt | tr -d ' ') 个 @TableName 都能在建表语句中找到"
 else
   fail "以下 @TableName 在 schema.sql 无对应建表(表已改名/删除?):"
   printf '         %s\n' $MISSING_ENT
@@ -116,12 +120,12 @@ done < <(find "$JAVA_DIR/controller" -name '*Controller.java' 2>/dev/null)
 # ------------------------------------------------------- 6. 权限码已种子化
 echo "[6] @RequirePermission 权限码已在 sys_auth 种子"
 # 权限码出现在 schema.sql 的 sys_auth INSERT 值里(形如 ('xxx:yyy', ...)
-grep -oE "\('[a-z]+:[a-z_]+'" "$SCHEMA" | tr -d "('" | sort -u > /tmp/_ddc_seeded.txt
+grep -oE "\('[a-z]+:[a-z_]+'" "$SCHEMA" | tr -d "('" | sort -u > $TMPD/_ddc_seeded.txt
 grep -rhoE '@RequirePermission\("[^"]+"\)' "$JAVA_DIR" 2>/dev/null \
-  | grep -oE '"[^"]+"' | tr -d '"' | sort -u > /tmp/_ddc_used.txt
-NOT_SEEDED="$(comm -23 /tmp/_ddc_used.txt /tmp/_ddc_seeded.txt || true)"
+  | grep -oE '"[^"]+"' | tr -d '"' | sort -u > $TMPD/_ddc_used.txt
+NOT_SEEDED="$(comm -23 $TMPD/_ddc_used.txt $TMPD/_ddc_seeded.txt || true)"
 if [[ -z "$NOT_SEEDED" ]]; then
-  pass "代码用到的全部 $(wc -l < /tmp/_ddc_used.txt | tr -d ' ') 个权限码都已种子化"
+  pass "代码用到的全部 $(wc -l < $TMPD/_ddc_used.txt | tr -d ' ') 个权限码都已种子化"
 else
   fail "以下权限码未进 sys_auth 种子(新增接口前须补种子,否则 403):"
   printf '         %s\n' $NOT_SEEDED

@@ -50,15 +50,15 @@
         </el-form-item>
         <el-form-item :label="$t('task.reward')">
           <el-radio-group v-model="editor.form.rewardType">
-            <el-radio :value="0">{{ $t('task.rewardNone') }}</el-radio>
-            <el-radio :value="1">{{ $t('task.pointsLabel') }}</el-radio>
-            <el-radio :value="2">{{ $t('task.itemDesc') }}</el-radio>
+            <el-radio value="NONE">{{ $t('task.rewardNone') }}</el-radio>
+            <el-radio value="POINTS">{{ $t('task.pointsLabel') }}</el-radio>
+            <el-radio value="ITEM">{{ $t('task.itemDesc') }}</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item v-if="editor.form.rewardType === 1" :label="$t('task.pointsCount')">
+        <el-form-item v-if="editor.form.rewardType === 'POINTS'" :label="$t('task.pointsCount')">
           <el-input-number v-model="editor.form.rewardPoints" :min="1" />
         </el-form-item>
-        <el-form-item v-if="editor.form.rewardType === 2" :label="$t('task.rewardItem')">
+        <el-form-item v-if="editor.form.rewardType === 'ITEM'" :label="$t('task.rewardItem')">
           <el-input v-model="editor.form.rewardItem" :placeholder="$t('task.itemPlaceholder')" />
         </el-form-item>
       </el-form>
@@ -79,6 +79,7 @@ import { useUserStore } from '@/stores/user'
 import { taskApi } from '@/api'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
+import { formatDateTime } from '@/utils/datetime'
 
 const { t } = useI18n()
 const userStore = useUserStore()
@@ -92,7 +93,7 @@ const editor = reactive({ visible: false, form: {} })
 const statusText = (s) => t(`task.status.${s}`)
 const tagType = (s) => ({ OPEN: 'danger', IN_PROGRESS: 'warning', REVIEW: 'info', DONE: 'success', CANCELLED: 'info' })[s] || 'info'
 
-const formatTime = (task) => new Date(task.createdAt).toLocaleString('zh-CN', { hour12: false }).slice(0, 16)
+const formatTime = (task) => formatDateTime(task.createdAt, { hour12: false }).slice(0, 16)
 
 /** 过滤:全部 / 我发布的 / 我领取的 */
 const filtered = computed(() => {
@@ -135,7 +136,7 @@ const doAction = async (key, task) => {
 
 const openEditor = () => {
   editor.visible = true
-  editor.form = { title: '', description: '', rewardType: 0, rewardPoints: 10, rewardItem: '' }
+  editor.form = { title: '', description: '', rewardType: 'NONE', rewardPoints: 10, rewardItem: '' }
 }
 
 const onPublish = async () => {
@@ -145,7 +146,7 @@ const onPublish = async () => {
       ElMessage.warning(t('task.fillTitle'))
       return
     }
-    if (editor.form.rewardType === 1 && !editor.form.rewardPoints) {
+    if (editor.form.rewardType === 'POINTS' && !editor.form.rewardPoints) {
       ElMessage.warning(t('task.fillPoints'))
       return
     }

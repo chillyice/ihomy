@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -242,6 +243,7 @@ public class JellyfinService {
     }
 
     /** 删除配置(停用引擎,不动物媒体服务器上的任何数据);成员播放档案一并清掉,它们只对这台服务器有效 */
+    @Transactional
     public void removeConfig(Long familyId) {
         mediaServerMapper.delete(new LambdaQueryWrapper<MediaServer>().eq(MediaServer::getFamilyId, familyId));
         mediaUserConfigMapper.delete(new LambdaQueryWrapper<MediaUserConfig>().eq(MediaUserConfig::getFamilyId, familyId));
@@ -564,6 +566,7 @@ public class JellyfinService {
     public void reportProgress(Long familyId, Long userId, String itemId, MediaProgressDTO dto) {
         String id = requireItemId(itemId);
         Map<String, Object> body = new LinkedHashMap<>();
+        // 负值钳到 0:上游(或断点续播计算)偶发传负数,直接透传会把已看进度写成负值
         if (dto.getPositionTicks() != null) body.put("PlaybackPositionTicks", Math.max(0L, dto.getPositionTicks()));
         if (dto.getPlayed() != null) body.put("Played", dto.getPlayed());
         if (body.isEmpty()) return;

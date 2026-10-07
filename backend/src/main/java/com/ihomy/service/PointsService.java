@@ -92,8 +92,8 @@ public class PointsService {
         checkin.setStreak(nextStreak);
         try {
             checkinMapper.insert(checkin);
-        } catch (Exception e) {
-            // UNIQUE(user_id, checkin_date) 冲突即今日已签,并发下同样生效
+        } catch (org.springframework.dao.DuplicateKeyException e) {
+            // 仅唯一键冲突(UNIQUE(user_id, checkin_date))视为今日已签;其他 DB 故障照常抛出,不误报
             throw new BizException(ResultCode.ALREADY_CHECKIN);
         }
         if (points > 0) {
@@ -194,6 +194,7 @@ public class PointsService {
         product.setName(dto.getName());
         product.setIcon(dto.getIcon());
         product.setPoints(dto.getPoints());
+        // stock 哨兵值:-1 = 不限库存(与 0 = 已售罄相对);未填默认不限
         product.setStock(dto.getStock() == null ? -1 : dto.getStock());
         product.setPerLimit(dto.getPerLimit() == null ? 0 : dto.getPerLimit());
         product.setEnabled(dto.getEnabled() == null ? 1 : dto.getEnabled());
@@ -234,6 +235,7 @@ public class PointsService {
         if (product == null || !product.getFamilyId().equals(familyId) || product.getEnabled() != 1) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
+        // stock = -1 为不限库存,跳过售罄判断;0 才是真售罄
         if (product.getStock() != null && product.getStock() != -1 && product.getStock() <= 0) {
             throw new BizException(ResultCode.PRODUCT_SOLD_OUT);
         }
@@ -249,6 +251,7 @@ public class PointsService {
             throw new BizException(ResultCode.INSUFFICIENT_POINTS);
         }
         // ponytail: 低并发家庭场景,未加行锁;若需严格防超卖可改 UPDATE ... WHERE stock>0
+        // 不限库存(=-1)时不递减,库存字段保持哨兵值
         if (product.getStock() != null && product.getStock() != -1) {
             product.setStock(product.getStock() - 1);
             productMapper.updateById(product);

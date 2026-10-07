@@ -313,19 +313,6 @@ const saveCategory = async () => {
   }
 }
 
-const onDeleteCategory = async (cat) => {
-  try {
-    await ElMessageBox.confirm(`${t('library.deleteCategory')}: ${cat.name}? ${t('library.deleteCategoryHint')}`, { type: 'warning', confirmButtonText: t('common.confirm'), cancelButtonText: t('common.cancel'), closeOnClickModal: true })
-    await libraryApi.deleteCategory(cat.id, 'move')
-    ElMessage.success(t('common.deleted'))
-    if (activeCategoryId.value === cat.id) activeCategoryId.value = null
-    await loadCategories()
-    await load()
-  } catch (e) {
-    if (e !== 'cancel') ElMessage.error(e.message || 'Failed')
-  }
-}
-
 // Book actions
 const onBookClick = (b) => {
   if (batchMode.value) {
@@ -413,8 +400,12 @@ const batchDeleteAction = async () => {
   if (!selectedIds.value.length) return
   try {
     await ElMessageBox.confirm(t('library.batchDeleteConfirm', { n: selectedIds.value.length }), { type: 'warning', confirmButtonText: t('common.delete'), cancelButtonText: t('common.cancel'), closeOnClickModal: true })
-    await libraryApi.batchDelete(selectedIds.value)
-    ElMessage.success(t('common.deleted'))
+    const failed = await libraryApi.batchDelete(selectedIds.value)
+    if (Array.isArray(failed) && failed.length) {
+      ElMessage.warning(t('library.batchDeletePartial', { fail: failed.length }))
+    } else {
+      ElMessage.success(t('common.deleted'))
+    }
     exitBatch()
     await load()
   } catch (e) {

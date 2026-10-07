@@ -236,4 +236,72 @@ public final class DictConst {
     public static String mediaServerType(String v) {
         return v != null && MEDIA_EMBY.equalsIgnoreCase(v.trim()) ? MEDIA_EMBY : MEDIA_FALLBACK;
     }
+
+    /* ---------------- 字符串(字典词)入参 → 规范化:未知值回退默认,兼容历史数字串 ---------------- */
+
+    public static String visibility(String v) {
+        if (v == null || v.isBlank()) return VIS_FALLBACK;
+        return switch (v.trim().toUpperCase()) {
+            case VIS_PRIVATE, "0" -> VIS_PRIVATE;
+            case VIS_MEMBERS, "1" -> VIS_MEMBERS;
+            case VIS_GROUPS, "2" -> VIS_GROUPS;
+            case VIS_PUBLIC, "4" -> VIS_PUBLIC;
+            default -> VIS_FAMILY;
+        };
+    }
+
+    public static String blogStatus(String v) {
+        if (v == null || v.isBlank()) return BLOG_FALLBACK;
+        return switch (v.trim().toUpperCase()) {
+            case BLOG_PUBLISHED, "1" -> BLOG_PUBLISHED;
+            case BLOG_HIDDEN, "2" -> BLOG_HIDDEN;
+            default -> BLOG_DRAFT;
+        };
+    }
+
+    public static String wishStatus(String v) {
+        if (v == null || v.isBlank()) return WISH_FALLBACK;
+        return switch (v.trim().toUpperCase()) {
+            case WISH_ACHIEVED, "1" -> WISH_ACHIEVED;
+            case WISH_ABANDONED, "2" -> WISH_ABANDONED;
+            default -> WISH_PENDING;
+        };
+    }
+
+    public static String planStatus(String v) {
+        if (v == null || v.isBlank()) return PLAN_FALLBACK;
+        return switch (v.trim().toUpperCase()) {
+            case PLAN_DONE, "1" -> PLAN_DONE;
+            case PLAN_CANCELLED, "2" -> PLAN_CANCELLED;
+            default -> PLAN_ACTIVE;
+        };
+    }
+
+    public static String rewardType(String v) {
+        if (v == null || v.isBlank()) return REWARD_FALLBACK;
+        return switch (v.trim().toUpperCase()) {
+            case REWARD_POINTS, "1" -> REWARD_POINTS;
+            case REWARD_ITEM, "2" -> REWARD_ITEM;
+            default -> REWARD_NONE;
+        };
+    }
+
+    public static String repeatType(String v) {
+        if (v == null || v.isBlank()) return REPEAT_FALLBACK;
+        return switch (v.trim().toUpperCase()) {
+            case REPEAT_DAILY, "1" -> REPEAT_DAILY;
+            case REPEAT_WEEKLY, "2" -> REPEAT_WEEKLY;
+            case REPEAT_MONTHLY, "3" -> REPEAT_MONTHLY;
+            default -> REPEAT_ONCE;
+        };
+    }
+
+    public static String bookType(String v) {
+        if (v == null || v.isBlank()) return BOOK_FALLBACK;
+        return switch (v.trim().toUpperCase()) {
+            case BOOK_INCOME, "1" -> BOOK_INCOME;
+            case BOOK_TRANSFER, "2" -> BOOK_TRANSFER;
+            default -> BOOK_EXPENSE;
+        };
+    }
 }

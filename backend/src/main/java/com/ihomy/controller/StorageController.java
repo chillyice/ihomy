@@ -54,7 +54,7 @@ public class StorageController {
     }
 
     @Operation(summary = "添加存储设备")
-    @OperationLog(module = "STORAGE", operationType = "CREATE", description = "添加存储设备")
+    @OperationLog(module = "STORAGE", operationType = "CREATE", description = "添加存储设备", saveArgs = false)
     @RequirePermission("storage:manage")
     @PostMapping("/device")
     public Result<StorageDevice> addDevice(@RequestBody Map<String, String> body) {
@@ -64,7 +64,7 @@ public class StorageController {
     }
 
     @Operation(summary = "修改存储设备")
-    @OperationLog(module = "STORAGE", operationType = "UPDATE", description = "修改存储设备")
+    @OperationLog(module = "STORAGE", operationType = "UPDATE", description = "修改存储设备", saveArgs = false)
     @RequirePermission("storage:manage")
     @PutMapping("/device/{id}")
     public Result<Void> updateDevice(@PathVariable Long id, @RequestBody Map<String, String> body) {

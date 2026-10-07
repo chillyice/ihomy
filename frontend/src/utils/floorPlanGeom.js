@@ -20,6 +20,7 @@ export const pickDefaultFloor = (floorPlans, extraFloors = []) => {
 
 export const samePt = (p, q, eps = 0.5) => Math.hypot(p.x - q.x, p.y - q.y) < eps
 
+/** 点是否在多边形内:射线法(向 +x 作射线,与边相交次数为奇数即在内) */
 export const pointInPoly = (p, poly) => {
   let inside = false
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -29,6 +30,7 @@ export const pointInPoly = (p, poly) => {
   return inside
 }
 
+/** 点是否落在线段上:叉积≈0 判共线 + 包围盒夹取;1e-9 为浮点容差 */
 export const onSegment = (p, a, b) => {
   const cross = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)
   if (Math.abs(cross) > 1e-9) return false
@@ -36,6 +38,10 @@ export const onSegment = (p, a, b) => {
     p.y >= Math.min(a.y, b.y) - 1e-9 && p.y <= Math.max(a.y, b.y) + 1e-9
 }
 
+/**
+ * 两线段是否「严格相交」:快速排斥/跨立判定,任一端点落在另一线段上(共线、端点相接)都算不相交。
+ * 裁剪合法性判定依赖这条「严格」语义——碰到边界视为合法,由调用方另行处理。
+ */
 export const segsIntersect = (p1, p2, p3, p4) => {
   const d = (a, b, c) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
   const d1 = d(p3, p4, p1); const d2 = d(p3, p4, p2); const d3 = d(p1, p2, p3); const d4 = d(p1, p2, p4)

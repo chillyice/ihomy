@@ -9,6 +9,7 @@ import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.TaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -42,7 +43,7 @@ public class TaskController {
     @Operation(summary = "发布悬赏任务")
     @OperationLog(module = "TASK", operationType = "CREATE", description = "发布悬赏任务")
     @PostMapping
-    public Result<Task> create(@RequestBody TaskDTO dto) {
+    public Result<Task> create(@Valid @RequestBody TaskDTO dto) {
         LoginUser user = current();
         return Result.success(taskService.create(user.getUserId(), user.getFamilyId(), dto));
     }

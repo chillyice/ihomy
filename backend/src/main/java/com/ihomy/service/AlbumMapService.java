@@ -202,7 +202,11 @@ public class AlbumMapService {
         return new int[]{0, photos};
     }
 
-    /** 新增或更新影子照片,返回新增数;fs_id 变化时回写(百度免列目录加速) */
+    /**
+     * 新增或更新影子照片,返回新增数(已存在返回 0);fs_id 变化时回写(百度免列目录加速)。
+     * 已存在的记录只回写 sourceFsId,刻意不刷 url/takenAt 等——避免每次扫描都写库,
+     * 也避免覆盖用户后来手工补的说明/时间(此处看似「漏更新」,是有意为之)。
+     */
     private int upsertShadowPhoto(SysUser user, Long familyId, StorageDevice device, Album album,
                                   String filePath, String key, Long fsId, long modified) {
         Photo exist = photoMapper.selectOne(new LambdaQueryWrapper<Photo>()

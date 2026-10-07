@@ -286,7 +286,7 @@ import { pickDefaultFloor } from '@/utils/floorPlanGeom'
 import { dictText } from '@/utils/dict'
 
 const router = useRouter()
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const appStore = useAppStore()
 const userStore = useUserStore()
 const sunLight = inject(SUN_LIGHT_KEY)
@@ -485,8 +485,6 @@ const resizing = ref(false)
 const resizeState = ref(null)
 const ROW_H = 80
 const GAP = 16
-const MAX_COLS = 12
-const MAX_ROWS = 20
 // 可吸附的列宽档(4/6/8/12)与行高档(2/3/4/6),与 .gc-c*/.gc-r* 样式类一一对应
 const ALLOWED_SPANS = [4, 6, 8, 12]
 const ALLOWED_ROWS = [2, 3, 4, 6]
@@ -674,15 +672,9 @@ const nReminder = (w) => ({ S: 2, M: 4, L: 6, XL: 10 }[vTier(w)] ?? 3)
 const nItem = (w) => ({ S: 1, M: 2, L: 3, XL: 5 }[vTier(w)] ?? 2)
 const nAnni = (w) => ({ S: 1, M: 3, L: 4, XL: 6 }[vTier(w)] ?? 1)
 
-// 照片:横向列数看 span,纵向行数看 row(总数 = 列 × 行)
-const photosCols = (w) => (hTier(w) === 'XL' ? 6 : hTier(w) === 'L' ? 4 : 3)
-const photosRows = (w) => ({ S: 1, M: 2, L: 2, XL: 3 }[vTier(w)] ?? 1)
-const nPhotos = (w) => photosCols(w) * photosRows(w)
-
 // 横向丰富度:天气预报/指标、收支明细看 span
 const showWeatherForecast = (w) => hTier(w) !== 'S' && forecast.value.length > 0
 const showWeatherMetrics = (w) => hTier(w) === 'XL'
-const showFinanceDetail = (w) => hTier(w) !== 'S'
 
 // ========== 数据 ==========
 const feeds = ref([])

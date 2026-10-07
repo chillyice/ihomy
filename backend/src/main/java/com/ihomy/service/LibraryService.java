@@ -17,6 +17,12 @@ import org.springframework.util.StringUtils;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * 书架服务:图书分页/增删改、分类树(删分类递归)、借阅状态、书签(EPUB CFI 定位)、在线阅读。
+ * 书与分类是多对多:分类树在 content_book_category,归属关系在 content_book_category_rel;
+ * 删分类只清关系行,书籍本身保留(变成未分类),不因删类而删书。
+ * 可见性口径:家长(isOwner)看全部;非家长看自己上传的 + 家庭/公开的;未登录只看公开。
+ */
 @Service
 @RequiredArgsConstructor
 public class LibraryService {
@@ -27,18 +33,18 @@ public class LibraryService {
     private final BookBookmarkMapper bookmarkMapper;
     private final FileService fileService;
 
-    // ponytail: raw JDBC via MyBatis XML would be cleaner but this is simpler for small data
+    // ponytail: 关系表查询本可拆独立 Mapper 更规整,家庭数据量小,先复用 bookMapper 的自定义 XML
 
     public IPage<ContentBook> page(int current, int size, Long familyId, Long currentUserId, boolean isOwner,
                                    String keyword, Long categoryId, String fileFormat, String borrowStatus, String sortBy) {
-        // If filtering by category, get book IDs from rel table first
+        // 按分类筛选:先从关系表取出书 ID 集,再与后面的查询条件取交集
         Set<Long> bookIds = null;
         if (categoryId != null) {
             bookIds = getBookIdsByCategory(categoryId);
             if (bookIds.isEmpty()) return new Page<>(current, size);
         }
 
-        // If filtering by borrow status, get book IDs from borrow table
+        // 按借阅状态筛选:同样先查借阅表拿到书 ID 集,与分类条件取交集(取交集是因为两个条件都要满足)
         if (StringUtils.hasText(borrowStatus) && currentUserId != null) {
             Set<Long> borrowBookIds = getBookIdsByBorrowStatus(currentUserId, borrowStatus);
             bookIds = bookIds == null ? borrowBookIds : intersection(bookIds, borrowBookIds);
@@ -67,7 +73,7 @@ public class LibraryService {
         if ("title".equals(sortBy)) {
             qw.orderByAsc(ContentBook::getTitle);
         } else if ("recent".equals(sortBy) && currentUserId != null) {
-            // Sort by last read time — need custom SQL, fallback to created_at
+            // 按最近阅读时间排序需 JOIN 阅读进度表,当前回退为按创建时间倒序
             qw.orderByDesc(ContentBook::getCreatedAt);
         } else {
             qw.orderByDesc(ContentBook::getCreatedAt);
@@ -77,7 +83,7 @@ public class LibraryService {
 
     public Map<Long, List<Long>> getBookCategoryIds(List<Long> bookIds) {
         if (bookIds == null || bookIds.isEmpty()) return Map.of();
-        // ponytail: raw query via mapper would be cleaner; using selectList on rel table
+        // ponytail: 逐本查关系表(未批量),家庭书架数据量小,先不优化
         Map<Long, List<Long>> result = new HashMap<>();
         for (Long bookId : bookIds) {
             result.put(bookId, getCategoryIdsByBookId(bookId));
@@ -86,7 +92,7 @@ public class LibraryService {
     }
 
     public List<Long> getCategoryIdsByBookId(Long bookId) {
-        // ponytail: should use a dedicated mapper for rel table, using JDBC via bookMapper custom XML
+        // ponytail: 关系表未单独建 Mapper,复用 bookMapper 的自定义 XML
         return bookMapper.selectCategoryIdsByBookId(bookId);
     }
 
@@ -129,17 +135,17 @@ public class LibraryService {
     public void deleteCategory(Long id, Long familyId, String mode) {
         BookCategory cat = categoryMapper.selectById(id);
         if (cat == null || !cat.getFamilyId().equals(familyId)) throw new BizException(ResultCode.NOT_FOUND);
-        // Delete children recursively
+        // 递归删子分类(先深后浅),否则子分类会挂在已删父节点下成为孤儿
         List<BookCategory> children = categoryMapper.selectList(new LambdaQueryWrapper<BookCategory>()
                 .eq(BookCategory::getParentId, id).eq(BookCategory::getDeleted, 0));
         for (BookCategory child : children) {
             deleteCategory(child.getId(), familyId, mode);
         }
-        // Delete rel records
+        // 先清关系行,避免中间表留下指向已删分类的悬空引用
         bookMapper.deleteRelByCategory(id);
+        // mode=delete 时按设计应连同「只属于本分类」的书一并处理,当前简化实现只清关系(书变未分类)
         if ("delete".equals(mode)) {
-            // Soft-delete books that only have this category
-            // ponytail: simplified — just remove rel, books become uncategorized
+            // ponytail: 简化处理——只删关系,书本身保留为未分类
         }
         categoryMapper.deleteById(id);
     }
@@ -202,11 +208,19 @@ public class LibraryService {
         bookMapper.softDeleteById(id);
     }
 
+    /** 批量删除:返回未能删除的 id 列表(无权限/已不存在),供前端提示,不再静默吞掉失败 */
     @Transactional
-    public void batchDelete(List<Long> ids, Long familyId, Long currentUserId, boolean isOwner) {
+    public List<Long> batchDelete(List<Long> ids, Long familyId, Long currentUserId, boolean isOwner) {
+        List<Long> failed = new ArrayList<>();
         for (Long id : ids) {
-            try { delete(id, familyId, currentUserId, isOwner); } catch (Exception ignored) {}
+            // delete 在写入前完成归属/权限校验,抛错即跳过(不污染本事务)
+            try {
+                delete(id, familyId, currentUserId, isOwner);
+            } catch (Exception e) {
+                failed.add(id);
+            }
         }
+        return failed;
     }
 
     @Transactional
@@ -259,7 +273,7 @@ public class LibraryService {
         return borrowMapper.selectOne(qw);
     }
 
-    // === Bookmarks ===
+    // ========== 书签(仅本人可见) ==========
 
     public List<BookBookmark> getBookmarks(Long bookId, Long userId) {
         LambdaQueryWrapper<BookBookmark> qw = new LambdaQueryWrapper<>();
@@ -285,7 +299,7 @@ public class LibraryService {
         bookmarkMapper.deleteById(id);
     }
 
-    // === Private helpers ===
+    // ========== 私有辅助 ==========
 
     private void saveCategoryRels(Long bookId, List<Long> categoryIds) {
         if (categoryIds == null) return;
@@ -295,7 +309,7 @@ public class LibraryService {
     }
 
     private Set<Long> getBookIdsByCategory(Long categoryId) {
-        // ponytail: using mapper custom XML
+        // ponytail: 走 bookMapper 的自定义 XML
         List<Long> ids = bookMapper.selectBookIdsByCategory(categoryId);
         return new HashSet<>(ids);
     }

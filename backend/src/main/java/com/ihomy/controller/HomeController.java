@@ -34,14 +34,14 @@ public class HomeController {
     private final ActivityFeedService activityFeedService;
     private final PublicController publicController;
 
-    @Operation(summary = "获取首页启用的模块列表")
+    @Operation(summary = "获取首页启用的模块列表(预留接口,前端暂未接入)")
     @GetMapping("/modules")
     public Result<List<HomeModule>> modules() {
         SysUser user = securityHelper.currentUser();
         Long familyId = user == null ? null : user.getFamilyId();
         return Result.success(homeModuleService.listEnabled(familyId));
     }
-    @Operation(summary = "获取全部模块（含禁用，Owner）")
+    @Operation(summary = "获取全部模块（含禁用，Owner）(预留接口,前端暂未接入)")
     @GetMapping("/modules/all")
     public Result<List<HomeModule>> allModules() {
         assertOwner();
@@ -49,7 +49,7 @@ public class HomeController {
         return Result.success(homeModuleService.listAll(user.getFamilyId()));
     }
 
-    @Operation(summary = "更新模块配置（位置/排序/启用，Owner）")
+    @Operation(summary = "更新模块配置（位置/排序/启用，Owner）(预留接口,前端暂未接入)")
     @OperationLog(module = "HOME", operationType = "CONFIG", description = "更新首页模块配置")
     @PutMapping("/modules")
     public Result<Void> updateModules(@RequestBody HomeModuleDTO dto) {
@@ -60,7 +60,7 @@ public class HomeController {
         return Result.success();
     }
 
-    @Operation(summary = "新增模块（后期扩展新功能用）")
+    @Operation(summary = "新增模块（后期扩展新功能用）(预留接口,前端暂未接入)")
     @OperationLog(module = "HOME", operationType = "CREATE", description = "新增首页模块")
     @PostMapping("/modules")
     public Result<HomeModule> addModule(@RequestBody HomeModule module) {

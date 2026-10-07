@@ -1,6 +1,7 @@
 package com.ihomy.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
@@ -53,21 +54,24 @@ public class MemberManagementService {
         sysUserRoleMapper.insert(ur);
     }
 
-    /** 移出成员:禁止移出自己;若该家庭是目标主家庭则清空其 family_id */
+    /** 移出成员:禁止移出自己;删角色绑定并清空其指向该家庭的主/默认家庭(授权残留) */
     @Transactional
     public void removeMember(Long operatorUserId, Long operatorFamilyId, Long targetUserId) {
         if (operatorUserId.equals(targetUserId)) throw new BizException(ResultCode.BAD_REQUEST);
         SysUser target = sysUserMapper.selectById(targetUserId);
+        // 走到这里必有 operatorFamilyId == target.familyId,故清空主家庭无条件成立
         if (target == null || !operatorFamilyId.equals(target.getFamilyId())) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
         LambdaQueryWrapper<SysUserRole> qw = new LambdaQueryWrapper<>();
         qw.eq(SysUserRole::getUserId, targetUserId).eq(SysUserRole::getFamilyId, operatorFamilyId);
         sysUserRoleMapper.delete(qw);
-        if (operatorFamilyId.equals(target.getFamilyId())) {
-            target.setFamilyId(null);
-            sysUserMapper.updateById(target);
-        }
+        // null 值必须用 wrapper 显式 SET:updateById 会跳过 null 字段,清空不生效
+        sysUserMapper.update(null, new LambdaUpdateWrapper<SysUser>()
+                .eq(SysUser::getId, targetUserId)
+                .set(SysUser::getFamilyId, null)
+                // 默认家庭仍是别的家庭时保留(他还属于那个家庭),同为被移出家庭才清
+                .set(operatorFamilyId.equals(target.getDefaultFamilyId()), SysUser::getDefaultFamilyId, null));
     }
 
     /** 生成邀请码:12 位随机码,预设角色(默认 MEMBER),7 天有效、最多使用 10 次 */

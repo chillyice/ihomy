@@ -9,6 +9,7 @@ import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.WishService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,7 +41,7 @@ public class WishController {
     @Operation(summary = "新增愿望")
     @OperationLog(module = "WISH", operationType = "CREATE", description = "新增愿望")
     @PostMapping
-    public Result<Wish> create(@RequestBody WishDTO dto) {
+    public Result<Wish> create(@Valid @RequestBody WishDTO dto) {
         LoginUser user = current();
         return Result.success(wishService.create(user.getUserId(), user.getFamilyId(), dto));
     }
@@ -48,7 +49,7 @@ public class WishController {
     @Operation(summary = "编辑愿望(含达成/放弃状态切换)")
     @OperationLog(module = "WISH", operationType = "UPDATE", description = "编辑愿望")
     @PutMapping("/{id}")
-    public Result<Void> update(@PathVariable Long id, @RequestBody WishDTO dto) {
+    public Result<Void> update(@PathVariable Long id, @Valid @RequestBody WishDTO dto) {
         wishService.update(id, current().getFamilyId(), dto);
         return Result.success();
     }
