@@ -12,7 +12,7 @@
     <div v-else class="cropper-loading">{{ $t('common.loading') }}</div>
     <div v-if="imgLoaded" class="zoom-row">
       <span class="zoom-label">{{ $t('common.selectBox') }}</span>
-      <el-slider v-model.number="zoom" :min="0.2" :max="1" :step="0.05" :show-tooltip="false" style="flex:1" @input="applyZoom" />
+      <el-slider v-model.number="zoom" :min="0.2" :max="1" :step="0.05" :show-tooltip="false" style="flex: 1" @input="applyZoom" />
       <span class="zoom-value">{{ Math.round(zoom * 100) }}%</span>
     </div>
     <template #footer>
@@ -41,12 +41,12 @@ const imgRef = ref(null)
 // 图片实际显示尺寸 + 选区位置(正方形)
 const imgW = ref(0)
 const imgH = ref(0)
-const baseW = ref(0)  // 适配容器的基准宽度(图片固定显示,不再缩放)
-const baseH = ref(0)  // 适配容器的基准高度
-const zoom = ref(1)   // 选择框大小 = 图片短边 × zoom(0.2~1)
-const natW = ref(0)  // 原图尺寸
+const baseW = ref(0) // 适配容器的基准宽度(图片固定显示,不再缩放)
+const baseH = ref(0) // 适配容器的基准高度
+const zoom = ref(1) // 选择框大小 = 图片短边 × zoom(0.2~1)
+const natW = ref(0) // 原图尺寸
 const natH = ref(0)
-const sqX = ref(0)   // 选区左上角(相对显示图)
+const sqX = ref(0) // 选区左上角(相对显示图)
 const sqSize = ref(0)
 
 // 图片加载后初始化:计算固定显示尺寸,选区居中铺满短边
@@ -56,7 +56,8 @@ const onImgLoad = () => {
   natW.value = img.naturalWidth
   natH.value = img.naturalHeight
   // 显示尺寸:容器宽 460,高限 360,按比例缩放
-  const maxW = 460, maxH = 360
+  const maxW = 460,
+    maxH = 360
   const ratio = Math.min(maxW / natW.value, maxH / natH.value, 1)
   baseW.value = natW.value * ratio
   baseH.value = natH.value * ratio
@@ -105,7 +106,10 @@ const overlayStyle = computed(() => ({
 
 // 拖动选区
 let dragging = false
-let startX = 0, startY = 0, origX = 0, origY = 0
+let startX = 0,
+  startY = 0,
+  origX = 0,
+  origY = 0
 
 const onDragStart = (e) => {
   dragging = true
@@ -196,8 +200,17 @@ defineExpose({ open })
   margin-top: 12px;
   padding: 0 4px;
 }
-.zoom-label { font-size: 13px; color: var(--el-text-color-secondary); white-space: nowrap; }
-.zoom-value { font-size: 12px; color: var(--el-text-color-secondary); width: 40px; text-align: right; }
+.zoom-label {
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
+  white-space: nowrap;
+}
+.zoom-value {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  width: 40px;
+  text-align: right;
+}
 .cropper-overlay {
   position: absolute;
   inset: 0;
@@ -207,15 +220,14 @@ defineExpose({ open })
   position: absolute;
   cursor: move;
   border: 2px solid #fff;
-  box-shadow: 0 0 0 9999px rgba(0,0,0,0);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0);
 }
 .crop-grid {
   position: absolute;
   inset: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.3) 1px, transparent 1px);
   background-size: 33.33% 33.33%;
 }
 .cropper-loading {

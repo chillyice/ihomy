@@ -16,7 +16,19 @@
           </div>
         </div>
         <button v-if="canBack" class="gc-back" :title="$t('warm.backPrev')" @click="goBack">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M19 12H5" />
+            <path d="M12 19l-7-7 7-7" />
+          </svg>
         </button>
         <div class="gc-pin" :class="{ on: scrolled }"></div>
         <div class="gc-ctl">
@@ -34,25 +46,49 @@
           <!-- 侧栏:按分类分组,组头可折叠,默认只展开内容组 -->
           <aside class="gc-side">
             <!-- 用户信息(固定,不随侧栏滚动):头像 + 昵称 + 所在家庭,点击进设置;未登录显示登录/注册 -->
-            <div v-a11y-click class="gc-user" :title="userStore.isLoggedIn ? $t('warm.personalSettings') : $t('home.loginRegister')" @click="userStore.isLoggedIn ? navigate('/settings') : navigate('/login')">
+            <div
+              v-a11y-click
+              class="gc-user"
+              :title="userStore.isLoggedIn ? $t('warm.personalSettings') : $t('home.loginRegister')"
+              @click="userStore.isLoggedIn ? navigate('/settings') : navigate('/login')"
+            >
               <el-avatar :size="38" :src="userInfo?.avatar">{{ userInitial }}</el-avatar>
               <div class="gc-user-meta">
-                <div class="gc-user-name">{{ userStore.isLoggedIn ? (userInfo?.nickname || $t('warm.me')) : $t('home.loginRegister') }}</div>
+                <div class="gc-user-name">{{ userStore.isLoggedIn ? userInfo?.nickname || $t('warm.me') : $t('home.loginRegister') }}</div>
                 <div class="gc-user-fam">{{ familyName || 'ihomy' }}</div>
               </div>
             </div>
             <nav class="gc-nav">
               <div v-for="g in navGroups" :key="g.category" class="gc-nav-group">
                 <button class="gc-nav-group-head" @click="toggleGroup(g.category)">
-                  <svg class="gc-chev" :class="{ open: expanded[g.category] }" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                  <svg
+                    class="gc-chev"
+                    :class="{ open: expanded[g.category] }"
+                    viewBox="0 0 24 24"
+                    width="12"
+                    height="12"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M9 18l6-6-6-6" />
+                  </svg>
                   <span class="gc-group-label">{{ g.label }}</span>
                 </button>
                 <div v-if="expanded[g.category]" class="gc-nav-group-body">
-                  <div v-a11y-click
+                  <div
+                    v-a11y-click
                     v-for="m in g.items"
                     :key="m.code"
                     class="gc-nav-item"
-                    :class="{ act: isActive(m.path, route), 'widget-src': canDragNav && m.draggable && !m.added, 'widget-added': canDragNav && m.draggable && m.added, 'widget-none': canDragNav && !m.draggable }"
+                    :class="{
+                      act: isActive(m.path, route),
+                      'widget-src': canDragNav && m.draggable && !m.added,
+                      'widget-added': canDragNav && m.draggable && m.added,
+                      'widget-none': canDragNav && !m.draggable,
+                    }"
                     @click="onNavClick(m)"
                     @mousedown="onNavMousedown(m, $event)"
                   >
@@ -122,7 +158,13 @@ const userInitial = computed(() => (userInfo.value?.nickname || t('warm.me')).ch
 
 // 天气→AI 生图的全屏氛围背景(「活窗」放大到整屏,最底层)
 const { weatherBg, load: loadWeatherBg } = useWeatherBg()
-watch(() => sunLight?.weather?.value, (w) => { if (w) loadWeatherBg(w) }, { immediate: true })
+watch(
+  () => sunLight?.weather?.value,
+  (w) => {
+    if (w) loadWeatherBg(w)
+  },
+  { immediate: true },
+)
 
 // 背景照片待机浮现:只有鼠标停在「背景板」上(天气照片实际可见的区域)且确有背景图时,
 // 静止超过 3s → 背景浮到最前;移动鼠标 → 恢复原始状态
@@ -143,10 +185,17 @@ const resetBgIdle = (e) => {
   bgRevealed.value = false
   if (!weatherBg.value) return // 无背景图片时不触发
   if (!isBackgroundArea(e.clientX, e.clientY)) return // 不是背景板不触发
-  bgIdleTimer = setTimeout(() => { bgRevealed.value = true }, BG_IDLE_MS)
+  bgIdleTimer = setTimeout(() => {
+    bgRevealed.value = true
+  }, BG_IDLE_MS)
 }
-onMounted(() => { window.addEventListener('mousemove', resetBgIdle, { passive: true }) })
-onBeforeUnmount(() => { clearTimeout(bgIdleTimer); window.removeEventListener('mousemove', resetBgIdle) })
+onMounted(() => {
+  window.addEventListener('mousemove', resetBgIdle, { passive: true })
+})
+onBeforeUnmount(() => {
+  clearTimeout(bgIdleTimer)
+  window.removeEventListener('mousemove', resetBgIdle)
+})
 
 // 折叠状态:默认只展开内容组,其余组收起(点击组头切换)
 const expanded = ref({ content: true })
@@ -156,22 +205,29 @@ const toggleGroup = (key) => {
 
 // 导航分组:复用共享单一数据源(NAV_PATHS + 分组规则),仅注入暖居特有的拖拽标记
 const navGroups = computed(() => {
-  const items = buildNavItems(appStore.modules, { hasOps: userStore.isOps || userStore.isOwner })
-    .map((m) => {
-      const draggable = m.code !== 'settings' && m.code !== 'ops'
-      return { ...m, draggable, added: draggable ? addedCodes.value.has(m.code) : false }
-    })
+  const items = buildNavItems(appStore.modules, { hasOps: userStore.isOps || userStore.isOwner }).map((m) => {
+    const draggable = m.code !== 'settings' && m.code !== 'ops'
+    return { ...m, draggable, added: draggable ? addedCodes.value.has(m.code) : false }
+  })
   return groupNavItems(items)
 })
-const navigate = (path) => { if (route.path !== path) router.push(path) }
+const navigate = (path) => {
+  if (route.path !== path) router.push(path)
+}
 
 // 编辑模式下:侧栏模块可拖入首页(仅首页,鼠标事件驱动,自定义幽灵随鼠标跨边界变形)
 // settings/ops 是虚拟入口(不在 appStore.modules 内),draggable=false →「不可拖入」状态
 const canDragNav = computed(() => appStore.homeEditMode && route.path === '/home')
-const onNavClick = (m) => { if (canDragNav.value && m.draggable) return; navigate(m.path) }
+const onNavClick = (m) => {
+  if (canDragNav.value && m.draggable) return
+  navigate(m.path)
+}
 const onNavMousedown = (m, e) => {
   if (!canDragNav.value || !m.draggable) return
-  if (m.added) { ElMessage.info(t('warm.alreadyAdded')); return } // 已拖入冲突:提示,不启动拖拽
+  if (m.added) {
+    ElMessage.info(t('warm.alreadyAdded'))
+    return
+  } // 已拖入冲突:提示,不启动拖拽
   startDrag(m.code, m.title, e)
 }
 
@@ -186,15 +242,20 @@ const measureThreshold = () => {
     threshold.value = toolbar.getBoundingClientRect().top - mainEl.value.getBoundingClientRect().top
   }
 }
-const onMainScroll = () => { scrolled.value = (mainEl.value?.scrollTop ?? 0) > threshold.value - 4 }
+const onMainScroll = () => {
+  scrolled.value = (mainEl.value?.scrollTop ?? 0) > threshold.value - 4
+}
 onMounted(() => {
   measureThreshold()
   mainEl.value?.addEventListener('scroll', onMainScroll, { passive: true })
 })
 onBeforeUnmount(() => mainEl.value?.removeEventListener('scroll', onMainScroll))
-watch(() => route.fullPath, () => nextTick(measureThreshold))
+watch(
+  () => route.fullPath,
+  () => nextTick(measureThreshold),
+)
 
-  // 晨暮分段开关滑块:选中态(高亮 + thumb)跟随 themeStore.mode,与主题切换同步立即更新
+// 晨暮分段开关滑块:选中态(高亮 + thumb)跟随 themeStore.mode,与主题切换同步立即更新
 const segMode = ref(themeStore.mode)
 const segEl = ref(null)
 const segThumb = ref(null)
@@ -215,15 +276,20 @@ const positionSegThumb = () => {
   thumb.style.width = `${br.width}px`
   thumb.style.height = `${br.height}px`
 }
-watch(() => themeStore.mode, (m) => {
-  segMode.value = m
-  positionSegThumb()
-})
+watch(
+  () => themeStore.mode,
+  (m) => {
+    segMode.value = m
+    positionSegThumb()
+  },
+)
 onMounted(() => {
   // 首次定位不播放过渡(否则加载时滑块从 0 尺寸滑入)
   if (segThumb.value) segThumb.value.style.transition = 'none'
   positionSegThumb()
-  requestAnimationFrame(() => { if (segThumb.value) segThumb.value.style.transition = '' })
+  requestAnimationFrame(() => {
+    if (segThumb.value) segThumb.value.style.transition = ''
+  })
   // 语言切换等导致按钮宽度变化时重定位
   const ro = new ResizeObserver(() => positionSegThumb())
   if (segEl.value) ro.observe(segEl.value)
@@ -237,7 +303,9 @@ watch(scrolled, (val) => {
   if (val) {
     pinned.value = true
   } else {
-    pinTimer = setTimeout(() => { pinned.value = false }, 450)
+    pinTimer = setTimeout(() => {
+      pinned.value = false
+    }, 450)
   }
 })
 
@@ -253,7 +321,8 @@ watch(pinned, async (val) => {
   const first = toolbar.getBoundingClientRect()
   await nextTick()
   const last = toolbar.getBoundingClientRect()
-  let dx = 0, dy = 0
+  let dx = 0,
+    dy = 0
   if (val) {
     // 正向:钳制起始位置到内容窗口顶部(避免滚动过快时从屏幕外滑入)
     const mainTop = mainEl.value?.getBoundingClientRect().top ?? last.top
@@ -265,10 +334,10 @@ watch(pinned, async (val) => {
     dy = first.top - last.top
   }
   if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-    toolbar.animate(
-      [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
-      { duration: 450, easing: 'cubic-bezier(.4,0,.2,1)' }
-    )
+    toolbar.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }], {
+      duration: 450,
+      easing: 'cubic-bezier(.4,0,.2,1)',
+    })
   }
   // 外壳渐隐:FLIP 位移后半段开始膜融合
   if (val) setTimeout(() => toolbar.classList.add('fused'), 200)
@@ -277,101 +346,358 @@ watch(pinned, async (val) => {
 // 返回按钮:历史返回(无历史时隐藏)
 const canBack = ref(false)
 const goBack = () => router.back()
-watch(() => route.fullPath, () => { canBack.value = window.history.state?.back !== null }, { immediate: true })
+watch(
+  () => route.fullPath,
+  () => {
+    canBack.value = window.history.state?.back !== null
+  },
+  { immediate: true },
+)
 </script>
 
 <style>
-.gc-root { min-height: 100vh; color: var(--color-text); }
+.gc-root {
+  min-height: 100vh;
+  color: var(--color-text);
+}
 
 /* 天气 AI 生图全屏底图(最底层,压在 SunLightLayer 之下) */
-.gc-weatherbg { position: fixed; inset: 0; z-index: 0; background-size: cover; background-position: center; opacity: .3; pointer-events: none; transition: opacity 1.2s ease; }
+.gc-weatherbg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.3;
+  pointer-events: none;
+  transition: opacity 1.2s ease;
+}
 /* 待机浮现:鼠标静止 3s 后浮到最前(盖过内容层,pointer-events:none 不挡交互;移动鼠标即移除该类恢复) */
-.gc-weatherbg.revealed { z-index: 30; opacity: 1; }
+.gc-weatherbg.revealed {
+  z-index: 30;
+  opacity: 1;
+}
 
 /* ===== 预览壳 ===== */
-.gc-wrap { position: relative; z-index: 10; max-width: 1180px; margin: 0 auto; height: 100vh; padding: 24px 20px 24px; display: flex; flex-direction: column; box-sizing: border-box; transition: max-width .35s ease; }
-.gc-topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; flex-shrink: 0; height: 44px; }
-.gc-brand { display: flex; align-items: center; gap: 14px; cursor: pointer; }
-.gc-logo { width: 44px; height: 44px; border-radius: 14px; background: var(--color-brand); color: var(--color-card);
-  display: grid; place-items: center; font-weight: 700; font-size: 20px; box-shadow: var(--shadow); }
-.gc-title { font-size: 18px; margin: 0; font-weight: 650; letter-spacing: .3px; color: var(--color-text); }
-.gc-sub { margin: 2px 0 0; font-size: 12.5px; color: var(--color-text-secondary); }
-.gc-ctl { display: flex; gap: 10px; align-items: center; }
+.gc-wrap {
+  position: relative;
+  z-index: 10;
+  max-width: 1180px;
+  margin: 0 auto;
+  height: 100vh;
+  padding: 24px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  transition: max-width 0.35s ease;
+}
+.gc-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  height: 44px;
+}
+.gc-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+}
+.gc-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--color-brand);
+  color: var(--color-card);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 20px;
+  box-shadow: var(--shadow);
+}
+.gc-title {
+  font-size: 18px;
+  margin: 0;
+  font-weight: 650;
+  letter-spacing: 0.3px;
+  color: var(--color-text);
+}
+.gc-sub {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+.gc-ctl {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
 /* 返回按钮(历史返回,无历史时隐藏) */
-.gc-back { all: unset; cursor: pointer; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--color-border); background: var(--color-card); color: var(--color-text-secondary); flex-shrink: 0; box-shadow: var(--shadow); transition: color .2s, background .2s; }
-.gc-back:hover { color: var(--color-text); background: var(--color-card-2); }
+.gc-back {
+  all: unset;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+  box-shadow: var(--shadow);
+  transition:
+    color 0.2s,
+    background 0.2s;
+}
+.gc-back:hover {
+  color: var(--color-text);
+  background: var(--color-card-2);
+}
 /* 工具栏胞吐进来的插槽(顶栏中间,左对齐) */
-.gc-pin { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: flex-start; height: 100%; overflow: hidden; }
-.gc-seg { position: relative; display: inline-flex; padding: 4px; gap: 4px; background: var(--color-card); border: 1px solid var(--color-border); border-radius: 14px; box-shadow: var(--shadow); }
-.gc-seg-thumb { position: absolute; border-radius: 11px; background: var(--color-brand); box-shadow: var(--shadow); transition: left .25s cubic-bezier(.4,0,.2,1), top .25s cubic-bezier(.4,0,.2,1), width .25s cubic-bezier(.4,0,.2,1), height .25s cubic-bezier(.4,0,.2,1); pointer-events: none; z-index: 0; }
-.gc-seg button { all: unset; cursor: pointer; position: relative; z-index: 1; padding: 8px 20px; border-radius: 11px; font-size: 13.5px; color: var(--color-text-secondary); transition: color .25s; }
-.gc-seg button.on { color: var(--color-card); }
-.gc-seg:has(button.on:hover) .gc-seg-thumb { background: var(--color-brand-hover); }
+.gc-pin {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  height: 100%;
+  overflow: hidden;
+}
+.gc-seg {
+  position: relative;
+  display: inline-flex;
+  padding: 4px;
+  gap: 4px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+.gc-seg-thumb {
+  position: absolute;
+  border-radius: 11px;
+  background: var(--color-brand);
+  box-shadow: var(--shadow);
+  transition:
+    left 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    top 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    height 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  z-index: 0;
+}
+.gc-seg button {
+  all: unset;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  padding: 8px 20px;
+  border-radius: 11px;
+  font-size: 13.5px;
+  color: var(--color-text-secondary);
+  transition: color 0.25s;
+}
+.gc-seg button.on {
+  color: var(--color-card);
+}
+.gc-seg:has(button.on:hover) .gc-seg-thumb {
+  background: var(--color-brand-hover);
+}
 
 /* ===== studio 外框(钉在浏览器视口内,内容内部滚动) ===== */
 .gc-studio {
-  flex: 1; min-height: 0; display: flex; border-radius: 22px; overflow: hidden;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  border-radius: 22px;
+  overflow: hidden;
   /* 极淡双色底衬:右上陶土粉(--blob-1)+ 左下鼠尾草绿(--blob-3),压在最底不抢暖木米主调 */
   background:
     radial-gradient(560px 320px at 82% 4%, rgba(var(--blob-1), 0.12), transparent 64%),
-    radial-gradient(520px 340px at 6% 96%, rgba(var(--blob-3), 0.12), transparent 62%),
-    var(--color-bg);
-  border: 1px solid var(--color-border); box-shadow: var(--shadow-hover);
+    radial-gradient(520px 340px at 6% 96%, rgba(var(--blob-3), 0.12), transparent 62%), var(--color-bg);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-hover);
 }
-.gc-app { display: grid; grid-template-columns: 230px 1fr; height: 100%; width: 100%; }
+.gc-app {
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  height: 100%;
+  width: 100%;
+}
 
 /* 侧栏:纵向 flex,用户信息固定在顶部,导航在下方独立滚动 */
-.gc-side { min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: linear-gradient(180deg, var(--color-card), var(--color-card-2)); border-right: 1px solid var(--color-line); }
-.gc-nav { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px 16px; }
-.gc-nav-item { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 11px; font-size: 13.5px; color: var(--color-text-secondary); cursor: pointer; margin-bottom: 2px; transition: .2s; }
-.gc-nav-item:hover { background: var(--color-line); color: var(--color-text); }
-.gc-nav-item.act { background: var(--color-brand); color: var(--color-card); box-shadow: var(--shadow); }
+.gc-side {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--color-card), var(--color-card-2));
+  border-right: 1px solid var(--color-line);
+}
+.gc-nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 14px 16px;
+}
+.gc-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border-radius: 11px;
+  font-size: 13.5px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  margin-bottom: 2px;
+  transition: 0.2s;
+}
+.gc-nav-item:hover {
+  background: var(--color-line);
+  color: var(--color-text);
+}
+.gc-nav-item.act {
+  background: var(--color-brand);
+  color: var(--color-card);
+  box-shadow: var(--shadow);
+}
 /* 编辑模式三态:待拖入(可拖入且未添加)/ 已拖入冲突(已添加)/ 不可拖入(settings·ops) */
 .gc-nav-item.widget-src {
   cursor: grab;
-  background: rgba(var(--color-brand-rgb), .1);
-  border: 1px dashed rgba(var(--color-brand-rgb), .45);
-  transition: background .2s, border-color .2s, box-shadow .2s, transform .2s;
+  background: rgba(var(--color-brand-rgb), 0.1);
+  border: 1px dashed rgba(var(--color-brand-rgb), 0.45);
+  transition:
+    background 0.2s,
+    border-color 0.2s,
+    box-shadow 0.2s,
+    transform 0.2s;
 }
 .gc-nav-item.widget-src:hover {
-  background: rgba(var(--color-brand-rgb), .22);
-  border-color: rgba(var(--color-brand-rgb), .7);
-  box-shadow: 0 6px 20px rgba(var(--color-brand-rgb), .16);
+  background: rgba(var(--color-brand-rgb), 0.22);
+  border-color: rgba(var(--color-brand-rgb), 0.7);
+  box-shadow: 0 6px 20px rgba(var(--color-brand-rgb), 0.16);
   transform: translateX(3px);
 }
-.gc-nav-item.widget-src:active { cursor: grabbing; }
+.gc-nav-item.widget-src:active {
+  cursor: grabbing;
+}
 /* 已拖入冲突:降透明 + 禁用光标 + 灰色虚线,右侧「已在首页」角标 */
-.gc-nav-item.widget-added { cursor: not-allowed; opacity: .5; border: 1px dashed var(--color-border); }
-.gc-nav-item.widget-added:hover { background: transparent; }
-.gc-added-badge { margin-left: auto; flex-shrink: 0; font-size: 10.5px; padding: 2px 7px; border-radius: 8px; color: var(--color-text-tertiary); background: var(--color-line); }
+.gc-nav-item.widget-added {
+  cursor: not-allowed;
+  opacity: 0.5;
+  border: 1px dashed var(--color-border);
+}
+.gc-nav-item.widget-added:hover {
+  background: transparent;
+}
+.gc-added-badge {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 10.5px;
+  padding: 2px 7px;
+  border-radius: 8px;
+  color: var(--color-text-tertiary);
+  background: var(--color-line);
+}
 /* 不可拖入(编辑模式下 settings/ops):降透明,仍可点击导航 */
-.gc-nav-item.widget-none { opacity: .45; }
-.gc-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .7; flex-shrink: 0; }
+.gc-nav-item.widget-none {
+  opacity: 0.45;
+}
+.gc-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.7;
+  flex-shrink: 0;
+}
 
 /* 拖拽幽灵:导航胶囊形态,进入网格时放大并渐隐(交给 WarmHome 网格占位呈现 4×2 卡片) */
 .gc-drag-ghost {
-  position: fixed; z-index: 2000; pointer-events: none;
-  transform: translate(14px, 12px); transform-origin: top left;
-  display: flex; align-items: center; gap: 10px;
-  padding: 11px 14px; border-radius: 11px;
-  background: var(--color-card); border: 1px dashed var(--color-accent, var(--color-brand));
-  box-shadow: var(--shadow-hover); color: var(--color-text); font-size: 13.5px; white-space: nowrap;
+  position: fixed;
+  z-index: 2000;
+  pointer-events: none;
+  transform: translate(14px, 12px);
+  transform-origin: top left;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: 11px;
+  background: var(--color-card);
+  border: 1px dashed var(--color-accent, var(--color-brand));
+  box-shadow: var(--shadow-hover);
+  color: var(--color-text);
+  font-size: 13.5px;
+  white-space: nowrap;
   opacity: 1;
-  transition: transform .3s cubic-bezier(.34, 1.56, .64, 1), opacity .22s ease, padding .3s, border-radius .3s;
+  transition:
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 0.22s ease,
+    padding 0.3s,
+    border-radius 0.3s;
 }
-.gc-drag-ghost.is-card { transform: translate(14px, 12px) scale(1.6); opacity: 0; padding: 24px; border-radius: 16px; }
-.gc-drag-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent, var(--color-brand)); flex-shrink: 0; }
-.gc-drag-title { font-weight: 600; }
+.gc-drag-ghost.is-card {
+  transform: translate(14px, 12px) scale(1.6);
+  opacity: 0;
+  padding: 24px;
+  border-radius: 16px;
+}
+.gc-drag-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-accent, var(--color-brand));
+  flex-shrink: 0;
+}
+.gc-drag-title {
+  font-weight: 600;
+}
 
 /* 侧栏用户信息(预览 .side .user):头像 + 昵称 + 所在家庭;固定在侧栏顶部不随导航滚动 */
-.gc-user { flex-shrink: 0; display: flex; align-items: center; gap: 11px; padding: 20px 20px 16px; border-bottom: 1px solid var(--color-line); cursor: pointer; }
-.gc-user .el-avatar { flex-shrink: 0; background: var(--color-green); color: var(--color-card); font-weight: 700; }
-.gc-user-meta { min-width: 0; }
-.gc-user-name { font-size: 13.5px; font-weight: 600; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.gc-user-fam { font-size: 11.5px; color: var(--color-text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gc-user {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--color-line);
+  cursor: pointer;
+}
+.gc-user .el-avatar {
+  flex-shrink: 0;
+  background: var(--color-green);
+  color: var(--color-card);
+  font-weight: 700;
+}
+.gc-user-meta {
+  min-width: 0;
+}
+.gc-user-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gc-user-fam {
+  font-size: 11.5px;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* 侧栏分组:组头可折叠,默认只展开内容组 */
-.gc-nav-group { margin-bottom: 4px; }
+.gc-nav-group {
+  margin-bottom: 4px;
+}
 .gc-nav-group-head {
   all: unset;
   display: flex;
@@ -382,44 +708,100 @@ watch(() => route.fullPath, () => { canBack.value = window.history.state?.back !
   box-sizing: border-box;
   font-size: 11.5px;
   font-weight: 650;
-  letter-spacing: .5px;
+  letter-spacing: 0.5px;
   color: var(--color-text-tertiary);
   cursor: pointer;
-  transition: color .2s;
+  transition: color 0.2s;
 }
-.gc-nav-group-head:hover { color: var(--color-text-secondary); }
-.gc-chev { flex-shrink: 0; transition: transform .2s ease; }
-.gc-chev.open { transform: rotate(90deg); }
-.gc-group-label { flex: 1; }
-.gc-nav-group-body { display: flex; flex-direction: column; }
-.gc-nav-group-body .gc-nav-item { padding-left: 28px; }
+.gc-nav-group-head:hover {
+  color: var(--color-text-secondary);
+}
+.gc-chev {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+.gc-chev.open {
+  transform: rotate(90deg);
+}
+.gc-group-label {
+  flex: 1;
+}
+.gc-nav-group-body {
+  display: flex;
+  flex-direction: column;
+}
+.gc-nav-group-body .gc-nav-item {
+  padding-left: 28px;
+}
 
 /* 主区(内部滚动) */
-.gc-main { min-height: 0; overflow-y: auto; padding: 24px; }
+.gc-main {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px;
+}
 /* 登录/注册页在暖居内容区内垂直居中:覆盖 .login-page 的 100vh,按内容区实际高度填充(否则被顶栏/studio 顶得偏下并产生滚动)。
  * 加 html.theme-warm 前缀提权:Login.vue 的 scoped .login-page{min-height:100vh} 懒加载注入更晚、同权时会把这里覆盖掉。 */
-html.theme-warm .gc-main .login-page { min-height: 100%; }
+html.theme-warm .gc-main .login-page {
+  min-height: 100%;
+}
 
 /* ===== 户型图编辑专注模式(Item 页编辑态时在 <html> 上挂 fp-edit-focus)=====
  * 画板优先:隐藏侧栏导航,外壳拉宽到主区净宽=85vw(gc-wrap 左右 padding 共 40px),
  * studio 的双色渐变底衬一并取消,减少画布周围的视觉噪音。 */
-html.fp-edit-focus .gc-side { display: none; }
-html.fp-edit-focus .gc-app { grid-template-columns: 1fr; }
-html.fp-edit-focus .gc-wrap { max-width: calc(85vw + 40px); }
-html.fp-edit-focus .gc-studio { background: var(--color-bg); }
+html.fp-edit-focus .gc-side {
+  display: none;
+}
+html.fp-edit-focus .gc-app {
+  grid-template-columns: 1fr;
+}
+html.fp-edit-focus .gc-wrap {
+  max-width: calc(85vw + 40px);
+}
+html.fp-edit-focus .gc-studio {
+  background: var(--color-bg);
+}
 
 /* 暖居下 Item 页按主区可视高度撑满(fp-page 默认 100dvh 比 gc-main 可视区高约 158px,
  * 画板底部被裁掉要滚动才能看全);height:100% 让画板一屏铺满、不再产生内部滚动。 */
-html.theme-warm .gc-main .fp-page { height: 100%; }
+html.theme-warm .gc-main .fp-page {
+  height: 100%;
+}
 
 /* 按钮/标签(暖居专属) */
-.gc-btn { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--color-border); background: var(--color-line); color: var(--color-text-secondary); border-radius: 11px; padding: 9px 16px; font-size: 13px; cursor: pointer; transition: .2s; font-weight: 550; }
-.gc-btn:hover { background: var(--color-card-2); color: var(--color-text); }
-.gc-btn.ghost { background: transparent; }
-.gc-btn.sm { padding: 6px 12px; font-size: 12px; border-radius: 9px; }
+.gc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  background: var(--color-line);
+  color: var(--color-text-secondary);
+  border-radius: 11px;
+  padding: 9px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: 0.2s;
+  font-weight: 550;
+}
+.gc-btn:hover {
+  background: var(--color-card-2);
+  color: var(--color-text);
+}
+.gc-btn.ghost {
+  background: transparent;
+}
+.gc-btn.sm {
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 9px;
+}
 
 @media (max-width: 880px) {
-  .gc-app { grid-template-columns: 1fr; }
-  .gc-side { display: none; }
+  .gc-app {
+    grid-template-columns: 1fr;
+  }
+  .gc-side {
+    display: none;
+  }
 }
 </style>

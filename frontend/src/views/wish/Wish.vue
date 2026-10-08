@@ -17,7 +17,12 @@
 
     <div v-loading="loading">
       <div v-if="filtered.length" class="wish-grid">
-        <div v-for="w in filtered" :key="w.id" class="wish-card card" :class="'st' + (w.status === 'ACHIEVED' ? 1 : w.status === 'ABANDONED' ? 2 : 0)">
+        <div
+          v-for="w in filtered"
+          :key="w.id"
+          class="wish-card card"
+          :class="'st' + (w.status === 'ACHIEVED' ? 1 : w.status === 'ABANDONED' ? 2 : 0)"
+        >
           <div class="wish-top">
             <span class="wish-title">{{ w.title }}</span>
             <el-tag :type="statusTag(w.status)" size="small">{{ statusText(w.status) }}</el-tag>
@@ -32,14 +37,22 @@
             <span v-else>{{ w.createdAt.slice(0, 10) }}</span>
           </div>
           <div class="wish-actions">
-            <el-button v-if="w.status === 'PENDING'" size="small" type="success" plain @click="onSetStatus(w, 'ACHIEVED')">{{ $t('wish.achieved') }}</el-button>
-            <el-button v-if="w.status === 'PENDING'" size="small" type="info" plain @click="onSetStatus(w, 'ABANDONED')">{{ $t('wish.abandon') }}</el-button>
+            <el-button v-if="w.status === 'PENDING'" size="small" type="success" plain @click="onSetStatus(w, 'ACHIEVED')">{{
+              $t('wish.achieved')
+            }}</el-button>
+            <el-button v-if="w.status === 'PENDING'" size="small" type="info" plain @click="onSetStatus(w, 'ABANDONED')">{{
+              $t('wish.abandon')
+            }}</el-button>
             <el-button v-if="w.status !== 'PENDING'" size="small" @click="onSetStatus(w, 'PENDING')">{{ $t('wish.restore') }}</el-button>
             <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
-              <el-button size="small" text @click="openEditor(w)"><el-icon><Edit /></el-icon></el-button>
+              <el-button size="small" text @click="openEditor(w)"
+                ><el-icon><Edit /></el-icon
+              ></el-button>
             </el-tooltip>
             <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
-              <el-button size="small" text type="danger" @click="onDelete(w)"><el-icon><Delete /></el-icon></el-button>
+              <el-button size="small" text type="danger" @click="onDelete(w)"
+                ><el-icon><Delete /></el-icon
+              ></el-button>
             </el-tooltip>
           </div>
         </div>
@@ -59,7 +72,15 @@
           <el-input v-model="editor.form.reason" type="textarea" :rows="2" :placeholder="$t('wish.reasonPlaceholder')" />
         </el-form-item>
         <el-form-item :label="$t('wish.category')">
-          <el-select v-model="editor.cats" multiple filterable allow-create default-first-option :placeholder="$t('wish.categoryPlaceholder')" style="width: 100%">
+          <el-select
+            v-model="editor.cats"
+            multiple
+            filterable
+            allow-create
+            default-first-option
+            :placeholder="$t('wish.categoryPlaceholder')"
+            style="width: 100%"
+          >
             <el-option v-for="c in CATEGORIES" :key="c" :label="c" :value="c" />
           </el-select>
         </el-form-item>
@@ -145,7 +166,10 @@ const onSetStatus = async (w, status) => {
 }
 
 const onDelete = async (w) => {
-  await ElMessageBox.confirm(t('wish.deleteConfirm', { title: w.title }), t('common.deleteConfirm'), { type: 'warning', closeOnClickModal: true })
+  await ElMessageBox.confirm(t('wish.deleteConfirm', { title: w.title }), t('common.deleteConfirm'), {
+    type: 'warning',
+    closeOnClickModal: true,
+  })
   await wishApi.remove(w.id)
   ElMessage.success(t('common.deleted'))
   await load()
@@ -205,11 +229,21 @@ onMounted(load)
   gap: 6px;
   flex-wrap: wrap;
 }
-.wish-actions :deep(.el-button.is-text) { padding: 5px 6px; }
-.wish-actions :deep(.el-button.is-text + .el-button.is-text) { margin-left: 4px; }
+.wish-actions :deep(.el-button.is-text) {
+  padding: 5px 6px;
+}
+.wish-actions :deep(.el-button.is-text + .el-button.is-text) {
+  margin-left: 4px;
+}
 
 @media (max-width: 768px) {
-  .wish-actions .el-button { flex: 1; min-width: 60px; }
-  .wish-meta { flex-direction: column; gap: 4px; }
+  .wish-actions .el-button {
+    flex: 1;
+    min-width: 60px;
+  }
+  .wish-meta {
+    flex-direction: column;
+    gap: 4px;
+  }
 }
 </style>

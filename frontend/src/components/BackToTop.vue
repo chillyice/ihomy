@@ -41,9 +41,23 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll, { capture: 
   cursor: pointer;
   box-shadow: var(--shadow);
   z-index: 200;
-  transition: transform 0.15s, background 0.15s;
+  transition:
+    transform 0.15s,
+    background 0.15s;
 }
-.back-to-top:hover { background: var(--color-brand-hover); transform: translateY(-2px); }
-.pop-enter-active, .pop-leave-active { transition: opacity 0.2s, transform 0.2s; }
-.pop-enter-from, .pop-leave-to { opacity: 0; transform: translateY(8px); }
+.back-to-top:hover {
+  background: var(--color-brand-hover);
+  transform: translateY(-2px);
+}
+.pop-enter-active,
+.pop-leave-active {
+  transition:
+    opacity 0.2s,
+    transform 0.2s;
+}
+.pop-enter-from,
+.pop-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
 </style>

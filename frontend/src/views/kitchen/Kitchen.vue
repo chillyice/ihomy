@@ -25,12 +25,7 @@
           {{ $t('kitchen.todayRecommend') }}
         </h2>
         <div class="recommend-row">
-          <div v-a11y-click
-            v-for="r in recommend"
-            :key="r.id"
-            class="recommend-card card"
-            @click="goDetail(r.id)"
-          >
+          <div v-a11y-click v-for="r in recommend" :key="r.id" class="recommend-card card" @click="goDetail(r.id)">
             <img v-if="r.coverImage" :src="r.coverImage" :alt="r.name" class="recommend-img" />
             <div v-else class="recommend-img recommend-img-empty">
               <el-icon><Bowl /></el-icon>
@@ -47,7 +42,8 @@
           <span class="title-count">{{ g.items.length }}</span>
         </h2>
         <div class="menu-grid">
-          <div v-a11y-click
+          <div
+            v-a11y-click
             v-for="r in g.items"
             :key="r.id"
             class="menu-card card"
@@ -151,7 +147,9 @@ onMounted(loadMenu)
   overflow: hidden;
   cursor: pointer;
 }
-.recommend-card:hover { transform: translateY(-4px); }
+.recommend-card:hover {
+  transform: translateY(-4px);
+}
 .recommend-img {
   width: 100%;
   height: 140px;
@@ -189,7 +187,9 @@ onMounted(loadMenu)
   display: flex;
   flex-direction: column;
 }
-.menu-card:hover { transform: translateY(-4px); }
+.menu-card:hover {
+  transform: translateY(-4px);
+}
 .menu-img {
   width: 100%;
   flex: 1;
@@ -207,7 +207,7 @@ onMounted(loadMenu)
 }
 .menu-info {
   padding: 10px 12px;
-  background: var(--el-bg-color, rgba(255,255,255,0.85));
+  background: var(--el-bg-color, rgba(255, 255, 255, 0.85));
 }
 .menu-name {
   font-size: 15px;
@@ -241,18 +241,29 @@ onMounted(loadMenu)
 }
 
 @media (max-width: 1200px) {
-  .menu-grid { columns: 4 200px; }
+  .menu-grid {
+    columns: 4 200px;
+  }
 }
 @media (max-width: 900px) {
-  .menu-grid { columns: 3 180px; }
-  .recommend-card { max-width: 200px; }
+  .menu-grid {
+    columns: 3 180px;
+  }
+  .recommend-card {
+    max-width: 200px;
+  }
 }
 @media (max-width: 600px) {
-  .menu-grid { columns: 2 150px; }
-  .recommend-card { flex: 1 1 140px; min-width: 140px; }
+  .menu-grid {
+    columns: 2 150px;
+  }
+  .recommend-card {
+    flex: 1 1 140px;
+    min-width: 140px;
+  }
 }
 
 :global(html.dark) .menu-info {
-  background: rgba(40,44,52,0.85);
+  background: rgba(40, 44, 52, 0.85);
 }
 </style>

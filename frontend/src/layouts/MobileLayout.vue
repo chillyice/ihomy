@@ -50,12 +50,27 @@ const isHomeRoute = computed(() => route.path === '/')
 
 // 页头标题:走 i18n(切语言即时跟着变),键为空即不显示标题
 const PAGE_TITLES = {
-  '/blog': 'blog.title', '/diary': 'diary.title', '/album': 'album.title', '/anniversary': 'anniversary.title',
-  '/cinema': 'cinema.title', '/music': 'music.title', '/member': 'member.title', '/points': 'points.title',
-  '/task': 'task.title', '/reminder': 'reminder.title', '/plan': 'plan.title', '/wish': 'wish.title',
-  '/book': 'book.title', '/chat': 'chat.title', '/tree': 'tree.title',
-  '/item': 'mobile.title.item', '/kitchen': 'kitchen.title', '/library': 'library.title',
-  '/settings': 'settings.title', '/ops': 'mobile.title.ops', '/vault': 'vault.title',
+  '/blog': 'blog.title',
+  '/diary': 'diary.title',
+  '/album': 'album.title',
+  '/anniversary': 'anniversary.title',
+  '/cinema': 'cinema.title',
+  '/music': 'music.title',
+  '/member': 'member.title',
+  '/points': 'points.title',
+  '/task': 'task.title',
+  '/reminder': 'reminder.title',
+  '/plan': 'plan.title',
+  '/wish': 'wish.title',
+  '/book': 'book.title',
+  '/chat': 'chat.title',
+  '/tree': 'tree.title',
+  '/item': 'mobile.title.item',
+  '/kitchen': 'kitchen.title',
+  '/library': 'library.title',
+  '/settings': 'settings.title',
+  '/ops': 'mobile.title.ops',
+  '/vault': 'vault.title',
   '/login': 'mobile.title.login',
 }
 const pageTitle = computed(() => {
@@ -73,13 +88,26 @@ const pageTitle = computed(() => {
   return key ? t(key) : ''
 })
 
-watch(() => route.path, () => { window.scrollTo(0, 0) })
+watch(
+  () => route.path,
+  () => {
+    window.scrollTo(0, 0)
+  },
+)
 </script>
 
 <style scoped>
-.mobile-layout { min-height: 100vh; }
+.mobile-layout {
+  min-height: 100vh;
+}
 /* 这两个 padding 是跨文件高度契约:56px 必须与 MobileTabBar 的高度一致、48px 与 MobileHeader 一致,
    改任一处都要同步改这里,否则内容会被底栏压住或顶部露出(含 safe-area 刘海/小白条) */
-.mobile-tab-content { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); min-height: 100vh; }
-.mobile-sub-content { padding-top: calc(48px + env(safe-area-inset-top, 0px)); min-height: 100vh; }
+.mobile-tab-content {
+  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  min-height: 100vh;
+}
+.mobile-sub-content {
+  padding-top: calc(48px + env(safe-area-inset-top, 0px));
+  min-height: 100vh;
+}
 </style>

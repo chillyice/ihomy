@@ -1,16 +1,6 @@
 <template>
-  <GbaPlayer
-    v-if="game && game.type === 'GBA'"
-    :src="game.fileUrl"
-    :title="game.name"
-    back-to="/games"
-  />
-  <FlashPlayer
-    v-else-if="game"
-    :src="game.fileUrl"
-    :title="game.name"
-    back-to="/games"
-  />
+  <GbaPlayer v-if="game && game.type === 'GBA'" :src="game.fileUrl" :title="game.name" back-to="/games" />
+  <FlashPlayer v-else-if="game" :src="game.fileUrl" :title="game.name" back-to="/games" />
 </template>
 
 <script setup>

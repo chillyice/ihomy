@@ -16,17 +16,16 @@ export const useAppStore = defineStore('app', {
     familyName: (s) => s.family?.name || '',
   },
   actions: {
-    toggleHomeEditMode() { this.homeEditMode = !this.homeEditMode },
+    toggleHomeEditMode() {
+      this.homeEditMode = !this.homeEditMode
+    },
     // 初始化首页数据:公开数据 + 登录后私有仪表盘并行拉取(原串行两个 RTT)
     async init(force = false) {
       if (this.loaded && !force) return
       if (this.loading) return
       this.loading = true
       try {
-        const [pub, dash] = await Promise.all([
-          publicApi.getHome().catch(() => null),
-          homeApi.getDashboard().catch(() => null),
-        ])
+        const [pub, dash] = await Promise.all([publicApi.getHome().catch(() => null), homeApi.getDashboard().catch(() => null)])
         if (pub) {
           this.family = pub.family || null
           this.modules = pub.modules || []

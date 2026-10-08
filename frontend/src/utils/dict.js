@@ -4,14 +4,19 @@
 export const dictText = (t, group, value) => {
   const key = `dict.${group}.${value}`
   const msg = t(key)
-  return msg === key ? (value || '') : msg
+  return msg === key ? value || '' : msg
 }
 
 // 气象预警级别(和风天气国内预警): 升序 + 颜色;未知级别按橙色处理
 export const WARN_LEVEL_ORDER = ['白色', '蓝色', '黄色', '橙色', '红色']
-export const warnLevelColor = (level) => ({
-  白色: '#9a9a9a', 蓝色: '#4a90d9', 黄色: '#d4a13f', 橙色: '#e0862f', 红色: '#d94a3f',
-}[level] || '#e0862f')
+export const warnLevelColor = (level) =>
+  ({
+    白色: '#9a9a9a',
+    蓝色: '#4a90d9',
+    黄色: '#d4a13f',
+    橙色: '#e0862f',
+    红色: '#d94a3f',
+  })[level] || '#e0862f'
 /** 取预警列表里级别最高的一条(颜色用)。
  *  未知级别经 indexOf 得 -1,按最低级别对待:只有全部未知时才会返回列表首个元素。 */
 export const topWarning = (warnings) => {
@@ -27,7 +32,12 @@ export const topWarning = (warnings) => {
 // 空气质量等级(和风 AQI level 1-6,对应优/良/轻度/中度/重度/严重污染):
 // 沿用国标色系顺序(绿→黄→橙→红→紫→褐),按项目暖色底做了轻微降饱和;未知等级按良处理
 export const AQI_LEVEL_COLOR = {
-  1: '#6b9b6b', 2: '#c9a227', 3: '#e0862f', 4: '#d94a3f', 5: '#9b5a9e', 6: '#7d3c4a',
+  1: '#6b9b6b',
+  2: '#c9a227',
+  3: '#e0862f',
+  4: '#d94a3f',
+  5: '#9b5a9e',
+  6: '#7d3c4a',
 }
 export const aqiColor = (level) => AQI_LEVEL_COLOR[Number(level)] || '#c9a227'
 

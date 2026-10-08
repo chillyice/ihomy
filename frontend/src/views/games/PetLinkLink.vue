@@ -17,97 +17,98 @@
     <div ref="gameCardEl" class="game-card">
       <!-- 封面(复刻原版标题屏):多色标题 + ihomy 版后缀 + 开始 + 版权) -->
       <div v-if="screen === 'cover'" class="cover">
-      <h1 class="cover-title">
-        <span class="ct-pet">宠</span><span class="ct-pet">物</span><span class="ct-lian">连</span><span class="ct-lian">连</span><span class="ct-kan">看</span>
-        <span class="ct-ihomy">-ihomy版</span>
-      </h1>
-      <button class="start-btn" type="button" @click="startGame">
-        {{ $t('games.petlink.start') }}
-      </button>
-      <div class="cover-credits">{{ $t('games.petlink.credits') }}</div>
-      <div class="cover-hint">{{ $t('games.petlink.coverHint') }}</div>
-    </div>
-
-    <!-- 游戏 -->
-    <template v-else>
-      <!-- 顶部信息栏(复刻原版 HUD):关卡+关卡名 / 重排 / 倒计时条 / 得分 -->
-      <div class="game-hud">
-        <div class="hud-level">
-          <span class="hud-level-no">{{ levelLabel }}</span>
-          <span class="hud-level-name">{{ levelName }}</span>
-        </div>
-        <div class="hud-life" :title="$t('games.petlink.shufflesLeft', { n: shufflesLeft })">
-          <b class="life-num">{{ shufflesLeft }}</b>
-          <span class="life-label">{{ $t('games.petlink.life') }}</span>
-        </div>
-        <div class="hud-timer">
-          <div class="timer-bar" :class="{ warn: timeLeft <= 20 }">
-            <div class="timer-fill" :style="{ width: timePct + '%' }"></div>
-          </div>
-          <span class="timer-text" :class="{ warn: timeLeft <= 20 }">{{ timeText }}</span>
-        </div>
-        <div class="hud-score">
-          <span class="hud-score-label">{{ $t('games.petlink.score') }}</span>
-          <b>{{ score }}</b>
-        </div>
+        <h1 class="cover-title">
+          <span class="ct-pet">宠</span><span class="ct-pet">物</span><span class="ct-lian">连</span><span class="ct-lian">连</span
+          ><span class="ct-kan">看</span>
+          <span class="ct-ihomy">-ihomy版</span>
+        </h1>
+        <button class="start-btn" type="button" @click="startGame">
+          {{ $t('games.petlink.start') }}
+        </button>
+        <div class="cover-credits">{{ $t('games.petlink.credits') }}</div>
+        <div class="cover-hint">{{ $t('games.petlink.coverHint') }}</div>
       </div>
 
-      <div class="board-scroll" ref="boardScrollRef">
-        <div class="board-scale" :style="{ width: scaledW + 'px', height: scaledH + 'px' }">
-          <div class="board-wrap" :class="{ 'is-frozen': animating || paused }" :style="{ transform: `scale(${boardScale})` }">
-            <div class="board" ref="boardEl">
-              <button
-                v-for="cell in cells"
-                :key="cell.tid ? 't' + cell.tid : 'e' + cell.idx"
-                :data-tid="cell.tid"
-                class="tile"
-                :class="{
-                  'is-empty': cell.value === 0,
-                  'is-selected': selected === cell.idx,
-                  'is-hint': hinted.includes(cell.idx),
-                }"
-                :disabled="animating || paused || won || lost"
-                @click="onClick(cell.idx)"
-              >
-                <img v-if="cell.value !== 0" :src="petImages[cell.value - 1]" alt="" class="pet" />
-              </button>
+      <!-- 游戏 -->
+      <template v-else>
+        <!-- 顶部信息栏(复刻原版 HUD):关卡+关卡名 / 重排 / 倒计时条 / 得分 -->
+        <div class="game-hud">
+          <div class="hud-level">
+            <span class="hud-level-no">{{ levelLabel }}</span>
+            <span class="hud-level-name">{{ levelName }}</span>
+          </div>
+          <div class="hud-life" :title="$t('games.petlink.shufflesLeft', { n: shufflesLeft })">
+            <b class="life-num">{{ shufflesLeft }}</b>
+            <span class="life-label">{{ $t('games.petlink.life') }}</span>
+          </div>
+          <div class="hud-timer">
+            <div class="timer-bar" :class="{ warn: timeLeft <= 20 }">
+              <div class="timer-fill" :style="{ width: timePct + '%' }"></div>
             </div>
-
-            <svg class="board-line" :viewBox="`0 0 ${svgW} ${svgH}`">
-              <polyline v-if="linePoints" :points="linePoints" class="line" />
-            </svg>
-
-            <div v-if="paused" class="pause-mask">
-              <div class="pause-label">{{ $t('games.petlink.paused') }}</div>
-            </div>
+            <span class="timer-text" :class="{ warn: timeLeft <= 20 }">{{ timeText }}</span>
+          </div>
+          <div class="hud-score">
+            <span class="hud-score-label">{{ $t('games.petlink.score') }}</span>
+            <b>{{ score }}</b>
           </div>
         </div>
-      </div>
 
-      <div class="game-bottombar">
-        <el-button size="small" :disabled="frozen" @click="doHint">💡 {{ $t('games.petlink.hint') }}</el-button>
-        <el-button size="small" :disabled="frozen || shufflesLeft <= 0" @click="doShuffle">
-          🔀 {{ $t('games.petlink.shuffle') }}
-        </el-button>
-        <el-button size="small" :disabled="won || lost" @click="togglePause">
-          {{ paused ? '▶' : '⏸' }} {{ $t('games.petlink.pause') }}
-        </el-button>
-        <el-button size="small" @click="restart">↺ {{ $t('games.petlink.restart') }}</el-button>
-        <el-button size="small" :title="$t('games.petlink.muteToggle')" @click="toggleMute">
-          {{ muted ? '🔇' : '🔊' }} {{ muted ? $t('games.petlink.unmute') : $t('games.petlink.mute') }}
-        </el-button>
-      </div>
+        <div class="board-scroll" ref="boardScrollRef">
+          <div class="board-scale" :style="{ width: scaledW + 'px', height: scaledH + 'px' }">
+            <div class="board-wrap" :class="{ 'is-frozen': animating || paused }" :style="{ transform: `scale(${boardScale})` }">
+              <div class="board" ref="boardEl">
+                <button
+                  v-for="cell in cells"
+                  :key="cell.tid ? 't' + cell.tid : 'e' + cell.idx"
+                  :data-tid="cell.tid"
+                  class="tile"
+                  :class="{
+                    'is-empty': cell.value === 0,
+                    'is-selected': selected === cell.idx,
+                    'is-hint': hinted.includes(cell.idx),
+                  }"
+                  :disabled="animating || paused || won || lost"
+                  @click="onClick(cell.idx)"
+                >
+                  <img v-if="cell.value !== 0" :src="petImages[cell.value - 1]" alt="" class="pet" />
+                </button>
+              </div>
 
-      <!-- 胜负弹层 -->
-      <div v-if="won || lost" class="overlay">
-        <div class="overlay-card">
-          <div class="overlay-icon">{{ won ? '🎉' : '😿' }}</div>
-          <div class="overlay-title">{{ won ? $t('games.petlink.win') : $t('games.petlink.lose') }}</div>
-          <div class="overlay-score">{{ $t('games.petlink.score') }} {{ score }}</div>
-          <div v-if="won && rewardMsg" class="overlay-reward">{{ rewardMsg }}</div>
-          <el-button type="primary" size="small" round @click="restart">{{ $t('games.petlink.playAgain') }}</el-button>
+              <svg class="board-line" :viewBox="`0 0 ${svgW} ${svgH}`">
+                <polyline v-if="linePoints" :points="linePoints" class="line" />
+              </svg>
+
+              <div v-if="paused" class="pause-mask">
+                <div class="pause-label">{{ $t('games.petlink.paused') }}</div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+
+        <div class="game-bottombar">
+          <el-button size="small" :disabled="frozen" @click="doHint">💡 {{ $t('games.petlink.hint') }}</el-button>
+          <el-button size="small" :disabled="frozen || shufflesLeft <= 0" @click="doShuffle">
+            🔀 {{ $t('games.petlink.shuffle') }}
+          </el-button>
+          <el-button size="small" :disabled="won || lost" @click="togglePause">
+            {{ paused ? '▶' : '⏸' }} {{ $t('games.petlink.pause') }}
+          </el-button>
+          <el-button size="small" @click="restart">↺ {{ $t('games.petlink.restart') }}</el-button>
+          <el-button size="small" :title="$t('games.petlink.muteToggle')" @click="toggleMute">
+            {{ muted ? '🔇' : '🔊' }} {{ muted ? $t('games.petlink.unmute') : $t('games.petlink.mute') }}
+          </el-button>
+        </div>
+
+        <!-- 胜负弹层 -->
+        <div v-if="won || lost" class="overlay">
+          <div class="overlay-card">
+            <div class="overlay-icon">{{ won ? '🎉' : '😿' }}</div>
+            <div class="overlay-title">{{ won ? $t('games.petlink.win') : $t('games.petlink.lose') }}</div>
+            <div class="overlay-score">{{ $t('games.petlink.score') }} {{ score }}</div>
+            <div v-if="won && rewardMsg" class="overlay-reward">{{ rewardMsg }}</div>
+            <el-button type="primary" size="small" round @click="restart">{{ $t('games.petlink.playAgain') }}</el-button>
+          </div>
+        </div>
       </template>
     </div>
   </div>
@@ -154,7 +155,9 @@ const MATCH_FLIP_MS = 120 // 消除后牌位滑行动画时长(原 220)
 
 // 40 种宠物(按 sprite 149 帧序),用 import.meta.glob 按文件名排序加载
 const petModules = import.meta.glob('@/assets/games/petlink/*.png', { eager: true, import: 'default' })
-const petImages = Object.keys(petModules).sort().map(k => petModules[k])
+const petImages = Object.keys(petModules)
+  .sort()
+  .map((k) => petModules[k])
 
 const screen = ref('cover')
 
@@ -231,9 +234,27 @@ function toggleMute() {
   muted.value = !muted.value
   localStorage.setItem('ihomy:game:petlink:muted', muted.value ? '1' : '0')
 }
-function playClick() { if (muted.value) return; try { audioClick.currentTime = 0; audioClick.play() } catch (e) {} }
-function playMatch() { if (muted.value) return; try { audioMatch.currentTime = 0; audioMatch.play() } catch (e) {} }
-function playWin() { if (muted.value) return; try { audioWin.currentTime = 0; audioWin.play() } catch (e) {} }
+function playClick() {
+  if (muted.value) return
+  try {
+    audioClick.currentTime = 0
+    audioClick.play()
+  } catch (e) {}
+}
+function playMatch() {
+  if (muted.value) return
+  try {
+    audioMatch.currentTime = 0
+    audioMatch.play()
+  } catch (e) {}
+}
+function playWin() {
+  if (muted.value) return
+  try {
+    audioWin.currentTime = 0
+    audioWin.play()
+  } catch (e) {}
+}
 
 // ---------- 关卡 ----------
 
@@ -251,7 +272,7 @@ function buildBoard(lv) {
     const m = Math.floor(Math.random() * (k + 1))
     ;[pairs[k], pairs[m]] = [pairs[m], pairs[k]]
   }
-  return pairs.map(type => ({ id: ++tileSeq, type }))
+  return pairs.map((type) => ({ id: ++tileSeq, type }))
 }
 
 // ---------- 连线算法(移植原 findlu:最多两拐 + 可绕外圈) ----------
@@ -261,47 +282,83 @@ function get(r, c) {
   const t = board.value[r * COLS + c]
   return t ? t.type : 0
 }
-function walkable(r, c) { return get(r, c) === 0 }
+function walkable(r, c) {
+  return get(r, c) === 0
+}
 function horizClear(r, c1, c2) {
-  const lo = Math.min(c1, c2), hi = Math.max(c1, c2)
+  const lo = Math.min(c1, c2),
+    hi = Math.max(c1, c2)
   for (let c = lo + 1; c < hi; c++) if (get(r, c) !== 0) return false
   return true
 }
 function vertClear(c, r1, r2) {
-  const lo = Math.min(r1, r2), hi = Math.max(r1, r2)
+  const lo = Math.min(r1, r2),
+    hi = Math.max(r1, r2)
   for (let r = lo + 1; r < hi; r++) if (get(r, c) !== 0) return false
   return true
 }
 function findPath(r1, c1, r2, c2) {
   if (r1 === r2 && c1 === c2) return null
-  const a = get(r1, c1), b = get(r2, c2)
+  const a = get(r1, c1),
+    b = get(r2, c2)
   if (a === 0 || b === 0 || a !== b) return null
-  if (r1 === r2 && horizClear(r1, c1, c2)) return [[r1, c1], [r2, c2]]
-  if (c1 === c2 && vertClear(c1, r1, r2)) return [[r1, c1], [r2, c2]]
-  if (walkable(r1, c2) && horizClear(r1, c1, c2) && vertClear(c2, r1, r2)) return [[r1, c1], [r1, c2], [r2, c2]]
-  if (walkable(r2, c1) && vertClear(c1, r1, r2) && horizClear(r2, c1, c2)) return [[r1, c1], [r2, c1], [r2, c2]]
+  if (r1 === r2 && horizClear(r1, c1, c2))
+    return [
+      [r1, c1],
+      [r2, c2],
+    ]
+  if (c1 === c2 && vertClear(c1, r1, r2))
+    return [
+      [r1, c1],
+      [r2, c2],
+    ]
+  if (walkable(r1, c2) && horizClear(r1, c1, c2) && vertClear(c2, r1, r2))
+    return [
+      [r1, c1],
+      [r1, c2],
+      [r2, c2],
+    ]
+  if (walkable(r2, c1) && vertClear(c1, r1, r2) && horizClear(r2, c1, c2))
+    return [
+      [r1, c1],
+      [r2, c1],
+      [r2, c2],
+    ]
   for (let c = -1; c <= COLS; c++) {
     if (c === c1 || c === c2) continue
     if (walkable(r1, c) && walkable(r2, c) && horizClear(r1, c1, c) && horizClear(r2, c2, c) && vertClear(c, r1, r2)) {
-      return [[r1, c1], [r1, c], [r2, c], [r2, c2]]
+      return [
+        [r1, c1],
+        [r1, c],
+        [r2, c],
+        [r2, c2],
+      ]
     }
   }
   for (let r = -1; r <= ROWS; r++) {
     if (r === r1 || r === r2) continue
     if (walkable(r, c1) && walkable(r, c2) && vertClear(c1, r1, r) && vertClear(c2, r2, r) && horizClear(r, c1, c2)) {
-      return [[r1, c1], [r, c1], [r, c2], [r2, c2]]
+      return [
+        [r1, c1],
+        [r, c1],
+        [r, c2],
+        [r2, c2],
+      ]
     }
   }
   return null
 }
 function findAnyPair() {
   const groups = {}
-  board.value.forEach((t, i) => { if (t) (groups[t.type] ||= []).push(i) })
+  board.value.forEach((t, i) => {
+    if (t) (groups[t.type] ||= []).push(i)
+  })
   for (const v in groups) {
     const arr = groups[v]
     for (let a = 0; a < arr.length; a++) {
       for (let b = a + 1; b < arr.length; b++) {
-        const i = arr[a], j = arr[b]
+        const i = arr[a],
+          j = arr[b]
         if (findPath(Math.floor(i / COLS), i % COLS, Math.floor(j / COLS), j % COLS)) return [i, j]
       }
     }
@@ -315,10 +372,21 @@ function onClick(i) {
   if (frozen.value) return
   if (!board.value[i]) return
   hinted.value = []
-  if (selected.value === -1) { selected.value = i; playClick(); return }
-  if (selected.value === i) { selected.value = -1; return }
+  if (selected.value === -1) {
+    selected.value = i
+    playClick()
+    return
+  }
+  if (selected.value === i) {
+    selected.value = -1
+    return
+  }
   const s = selected.value
-  if (board.value[i].type !== board.value[s].type) { selected.value = i; playClick(); return }
+  if (board.value[i].type !== board.value[s].type) {
+    selected.value = i
+    playClick()
+    return
+  }
   const path = findPath(Math.floor(s / COLS), s % COLS, Math.floor(i / COLS), i % COLS)
   selected.value = -1
   if (path) match(s, i, path)
@@ -343,7 +411,7 @@ async function match(a, b, path) {
   await sleep(MATCH_FLIP_MS)
   animating.value = false
 
-  if (board.value.every(v => v === null)) {
+  if (board.value.every((v) => v === null)) {
     await levelComplete()
     return
   }
@@ -351,7 +419,7 @@ async function match(a, b, path) {
     applyShuffle()
     ElMessage.info(t('games.petlink.autoShuffle'))
   }
-  if (board.value.some(v => v !== null) && !findAnyPair()) {
+  if (board.value.some((v) => v !== null) && !findAnyPair()) {
     lost.value = true
     stopTicker()
   }
@@ -363,7 +431,9 @@ function doHint() {
   if (!pair) return
   hinted.value = [...pair]
   clearTimeout(hintTimer)
-  hintTimer = setTimeout(() => { hinted.value = [] }, 1600)
+  hintTimer = setTimeout(() => {
+    hinted.value = []
+  }, 1600)
 }
 
 function doShuffle() {
@@ -373,13 +443,13 @@ function doShuffle() {
 }
 
 function applyShuffle() {
-  const remaining = board.value.filter(v => v !== null)
+  const remaining = board.value.filter((v) => v !== null)
   for (let k = remaining.length - 1; k > 0; k--) {
     const m = Math.floor(Math.random() * (k + 1))
     ;[remaining[k], remaining[m]] = [remaining[m], remaining[k]]
   }
   let p = 0
-  board.value = board.value.map(v => (v !== null ? remaining[p++] : null))
+  board.value = board.value.map((v) => (v !== null ? remaining[p++] : null))
   shufflesLeft.value -= 1
   selected.value = -1
   hinted.value = []
@@ -397,9 +467,12 @@ function applyGravity(a, b) {
     board.value[b] = null
     return
   }
-  const ra = Math.floor(a / COLS), ca = a % COLS
-  const rb = Math.floor(b / COLS), cb = b % COLS
-  let t1 = { r: ra, c: ca }, t2 = { r: rb, c: cb }
+  const ra = Math.floor(a / COLS),
+    ca = a % COLS
+  const rb = Math.floor(b / COLS),
+    cb = b % COLS
+  let t1 = { r: ra, c: ca },
+    t2 = { r: rb, c: cb }
 
   if (lv === 3) {
     // 上下分离:同列且同半区时,上半区行大者先(上移)、下半区行小者先(下移)
@@ -407,30 +480,36 @@ function applyGravity(a, b) {
       if (ra <= 4 && rb <= 4 && ra < rb) [t1, t2] = [t2, t1]
       if (ra >= 5 && rb >= 5 && rb < ra) [t1, t2] = [t2, t1]
     }
-    shiftVertHalf(t1.r, t1.c); shiftVertHalf(t2.r, t2.c)
+    shiftVertHalf(t1.r, t1.c)
+    shiftVertHalf(t2.r, t2.c)
   } else if (lv === 4) {
     // 左右分离:同行且同半区时,左半区列大者先(左移)、右半区列小者先(右移)
     if (ra === rb) {
       if (ca <= 6 && cb <= 6 && ca < cb) [t1, t2] = [t2, t1]
       if (ca >= 7 && cb >= 7 && cb < ca) [t1, t2] = [t2, t1]
     }
-    shiftHorizHalf(t1.r, t1.c); shiftHorizHalf(t2.r, t2.c)
+    shiftHorizHalf(t1.r, t1.c)
+    shiftHorizHalf(t2.r, t2.c)
   } else if (lv === 5) {
     // 向左看齐:同行时右者先
     if (cb < ca) [t1, t2] = [t2, t1]
-    shiftRowLeft(t1.r, t1.c); shiftRowLeft(t2.r, t2.c)
+    shiftRowLeft(t1.r, t1.c)
+    shiftRowLeft(t2.r, t2.c)
   } else if (lv === 6) {
     // 地心引力(整列下移):同列时上者先
     if (rb < ra) [t1, t2] = [t2, t1]
-    shiftColDown(t1.r, t1.c); shiftColDown(t2.r, t2.c)
+    shiftColDown(t1.r, t1.c)
+    shiftColDown(t2.r, t2.c)
   } else if (lv === 7) {
     // 飘向天空(整列上移):同列时下者先
     if (ra < rb) [t1, t2] = [t2, t1]
-    shiftColUp(t1.r, t1.c); shiftColUp(t2.r, t2.c)
+    shiftColUp(t1.r, t1.c)
+    shiftColUp(t2.r, t2.c)
   } else if (lv === 8) {
     // 向右看齐:同行时左者先
     if (ca < cb) [t1, t2] = [t2, t1]
-    shiftRowRight(t1.r, t1.c); shiftRowRight(t2.r, t2.c)
+    shiftRowRight(t1.r, t1.c)
+    shiftRowRight(t2.r, t2.c)
   } else if (lv === 9) {
     board.value[a] = null
     board.value[b] = null
@@ -439,19 +518,23 @@ function applyGravity(a, b) {
 }
 
 function shiftVertHalf(r, c) {
-  if (r <= 4) { // 上半区向上
+  if (r <= 4) {
+    // 上半区向上
     for (let rr = r; rr < 4; rr++) board.value[rr * COLS + c] = board.value[(rr + 1) * COLS + c]
     board.value[4 * COLS + c] = null
-  } else { // 下半区向下
+  } else {
+    // 下半区向下
     for (let rr = r; rr > 5; rr--) board.value[rr * COLS + c] = board.value[(rr - 1) * COLS + c]
     board.value[5 * COLS + c] = null
   }
 }
 function shiftHorizHalf(r, c) {
-  if (c <= 6) { // 左半区向左
+  if (c <= 6) {
+    // 左半区向左
     for (let cc = c; cc < 6; cc++) board.value[r * COLS + cc] = board.value[r * COLS + cc + 1]
     board.value[r * COLS + 6] = null
-  } else { // 右半区向右
+  } else {
+    // 右半区向右
     for (let cc = c; cc > 7; cc--) board.value[r * COLS + cc] = board.value[r * COLS + cc - 1]
     board.value[r * COLS + 7] = null
   }
@@ -478,25 +561,32 @@ function toCenter() {
     moved = false
     for (let i = 0; i < ROWS * COLS; i++) {
       if (board.value[i] !== null) continue
-      const r = Math.floor(i / COLS), c = i % COLS
-      if (r > 0 && r < ROWS - 1) { // 排除首末行
-        if (r < 5 && board.value[i - COLS] !== null) { // 上半区:上方牌下移
+      const r = Math.floor(i / COLS),
+        c = i % COLS
+      if (r > 0 && r < ROWS - 1) {
+        // 排除首末行
+        if (r < 5 && board.value[i - COLS] !== null) {
+          // 上半区:上方牌下移
           board.value[i] = board.value[i - COLS]
           board.value[i - COLS] = null
           moved = true
-        } else if (r >= 5 && board.value[i + COLS] !== null) { // 下半区:下方牌上移
+        } else if (r >= 5 && board.value[i + COLS] !== null) {
+          // 下半区:下方牌上移
           board.value[i] = board.value[i + COLS]
           board.value[i + COLS] = null
           moved = true
         }
       }
       if (board.value[i] !== null) continue
-      if (c > 0 && c < COLS - 1) { // 排除首末列
-        if (c < 7 && board.value[i - 1] !== null) { // 左半区:左方牌右移
+      if (c > 0 && c < COLS - 1) {
+        // 排除首末列
+        if (c < 7 && board.value[i - 1] !== null) {
+          // 左半区:左方牌右移
           board.value[i] = board.value[i - 1]
           board.value[i - 1] = null
           moved = true
-        } else if (c >= 7 && board.value[i + 1] !== null) { // 右半区:右方牌左移
+        } else if (c >= 7 && board.value[i + 1] !== null) {
+          // 右半区:右方牌左移
           board.value[i] = board.value[i + 1]
           board.value[i + 1] = null
           moved = true
@@ -534,9 +624,10 @@ async function levelComplete() {
 async function grantReward() {
   try {
     const res = await gameApi.petLinkReward()
-    rewardMsg.value = res && res.awarded > 0
-      ? `${t('games.petlink.rewarded', { n: res.awarded })}（${t('points.points')} ${res.balance}）`
-      : t('games.petlink.rewardCapped')
+    rewardMsg.value =
+      res && res.awarded > 0
+        ? `${t('games.petlink.rewarded', { n: res.awarded })}（${t('points.points')} ${res.balance}）`
+        : t('games.petlink.rewardCapped')
   } catch (e) {
     rewardMsg.value = t('games.petlink.rewardFailed')
   }
@@ -556,7 +647,12 @@ function startTicker() {
     }
   }, 1000)
 }
-function stopTicker() { if (ticker) { clearInterval(ticker); ticker = null } }
+function stopTicker() {
+  if (ticker) {
+    clearInterval(ticker)
+    ticker = null
+  }
+}
 function togglePause() {
   if (won.value || lost.value) return
   paused.value = !paused.value
@@ -607,16 +703,22 @@ function restart() {
   startTicker()
 }
 
-function centerX(c) { return PAD + c * (CELL_W + GAP_X) + CELL_W / 2 }
-function centerY(r) { return PAD + r * (CELL_H + GAP_Y) + CELL_H / 2 }
-function sleep(ms) { return new Promise(res => setTimeout(res, ms)) }
+function centerX(c) {
+  return PAD + c * (CELL_W + GAP_X) + CELL_W / 2
+}
+function centerY(r) {
+  return PAD + r * (CELL_H + GAP_Y) + CELL_H / 2
+}
+function sleep(ms) {
+  return new Promise((res) => setTimeout(res, ms))
+}
 
 // ---------- FLIP 滑行动画(牌对象按 id 稳定身份) ----------
 
 function snapshotPositions() {
   const map = new Map()
   const els = boardEl.value ? boardEl.value.querySelectorAll('[data-tid]') : []
-  els.forEach(el => {
+  els.forEach((el) => {
     const tid = el.getAttribute('data-tid')
     if (tid && tid !== '0') map.set(tid, el.getBoundingClientRect())
   })
@@ -626,7 +728,7 @@ function snapshotPositions() {
 function flipAnimate(before, ms = 200) {
   const els = boardEl.value ? boardEl.value.querySelectorAll('[data-tid]') : []
   const s = boardScale.value || 1
-  els.forEach(el => {
+  els.forEach((el) => {
     const tid = el.getAttribute('data-tid')
     if (!tid || tid === '0' || !before.has(tid)) return
     const b = before.get(tid)
@@ -640,7 +742,10 @@ function flipAnimate(before, ms = 200) {
     void el.offsetWidth // 强制回流,确保初始 transform 生效
     el.style.transition = `transform ${ms}ms ease`
     el.style.transform = 'translate(0, 0)'
-    setTimeout(() => { el.style.transition = ''; el.style.transform = '' }, ms)
+    setTimeout(() => {
+      el.style.transition = ''
+      el.style.transform = ''
+    }, ms)
   })
 }
 
@@ -655,18 +760,28 @@ onMounted(() => {
   if (boardScrollRef.value) resizeObserver.observe(boardScrollRef.value)
 })
 onBeforeUnmount(() => {
-  stopTicker(); clearTimeout(hintTimer); window.removeEventListener('keydown', onKeydown)
+  stopTicker()
+  clearTimeout(hintTimer)
+  window.removeEventListener('keydown', onKeydown)
   window.removeEventListener('resize', updateBoardScale)
   document.removeEventListener('fullscreenchange', onFullscreenChange)
-  if (resizeObserver) { resizeObserver.disconnect(); resizeObserver = null }
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  }
   sunLight?.restoreEffects()
 })
 
 // 原版快捷键:空格暂停、F5 重排
 function onKeydown(e) {
   if (screen.value !== 'game') return
-  if (e.code === 'Space') { e.preventDefault(); togglePause() }
-  else if (e.key === 'F5') { e.preventDefault(); doShuffle() }
+  if (e.code === 'Space') {
+    e.preventDefault()
+    togglePause()
+  } else if (e.key === 'F5') {
+    e.preventDefault()
+    doShuffle()
+  }
 }
 </script>
 
@@ -684,10 +799,21 @@ function onKeydown(e) {
   padding: 20px;
   color: #fff;
 }
-.game-card:fullscreen { width: 100vw; height: 100vh; min-height: 100vh; border-radius: 0; }
+.game-card:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  min-height: 100vh;
+  border-radius: 0;
+}
 
 /* 封面 */
-.cover { display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
+.cover {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
 .cover-title {
   display: flex;
   align-items: baseline;
@@ -697,13 +823,26 @@ function onKeydown(e) {
   font-weight: 800;
   letter-spacing: 4px;
   margin: 0;
-  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.35), 0 0 30px rgba(255, 255, 255, 0.12);
+  text-shadow:
+    0 3px 0 rgba(0, 0, 0, 0.35),
+    0 0 30px rgba(255, 255, 255, 0.12);
 }
 /* 原版标题配色:宠物=蓝、连连=粉红、看=蓝、-ihomy版=青绿 */
-.ct-pet { color: #00ccff; }
-.ct-lian { color: #ff0066; }
-.ct-kan { color: #00ccff; }
-.ct-ihomy { font-size: 28px; color: #66ffcc; margin-left: 8px; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4); }
+.ct-pet {
+  color: #00ccff;
+}
+.ct-lian {
+  color: #ff0066;
+}
+.ct-kan {
+  color: #00ccff;
+}
+.ct-ihomy {
+  font-size: 28px;
+  color: #66ffcc;
+  margin-left: 8px;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+}
 .start-btn {
   font-size: 20px;
   font-weight: 700;
@@ -714,13 +853,37 @@ function onKeydown(e) {
   border-radius: 999px;
   cursor: pointer;
   background: linear-gradient(180deg, #ff9a3d 0%, #ff6a88 55%, #ff3d81 100%);
-  box-shadow: 0 6px 0 #c2273d, 0 10px 24px rgba(255, 90, 120, 0.4);
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  box-shadow:
+    0 6px 0 #c2273d,
+    0 10px 24px rgba(255, 90, 120, 0.4);
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
 }
-.start-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 0 #c2273d, 0 14px 28px rgba(255, 90, 120, 0.5); }
-.start-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 #c2273d, 0 6px 14px rgba(255, 90, 120, 0.4); }
-.cover-credits { font-size: 12px; color: #8899aa; letter-spacing: 1px; margin-top: 6px; }
-.cover-hint { font-size: 12px; color: #667; max-width: 420px; line-height: 1.6; }
+.start-btn:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 0 #c2273d,
+    0 14px 28px rgba(255, 90, 120, 0.5);
+}
+.start-btn:active {
+  transform: translateY(3px);
+  box-shadow:
+    0 3px 0 #c2273d,
+    0 6px 14px rgba(255, 90, 120, 0.4);
+}
+.cover-credits {
+  font-size: 12px;
+  color: #8899aa;
+  letter-spacing: 1px;
+  margin-top: 6px;
+}
+.cover-hint {
+  font-size: 12px;
+  color: #667;
+  max-width: 420px;
+  line-height: 1.6;
+}
 
 /* 顶部信息栏(原版 HUD) */
 .game-hud {
@@ -733,16 +896,54 @@ function onKeydown(e) {
   font-size: 13px;
   color: #b8c4d8;
 }
-.hud-level { display: flex; align-items: baseline; gap: 8px; }
-.hud-level-no { color: #ff0066; font-weight: 700; font-size: 16px; }
-.hud-level-name { color: #00ccff; font-size: 14px; font-weight: 600; }
-.hud-life { display: flex; align-items: baseline; gap: 4px; }
-.hud-life .life-num { color: #00ff00; font-size: 16px; font-weight: 700; }
-.hud-life .life-label { color: #00ff00; font-size: 12px; }
-.hud-timer { display: flex; align-items: center; gap: 8px; flex: 1; }
-.hud-score { display: flex; align-items: baseline; gap: 6px; margin-left: auto; }
-.hud-score-label { color: #b8c4d8; }
-.hud-score b { color: #ffcc66; font-size: 18px; }
+.hud-level {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.hud-level-no {
+  color: #ff0066;
+  font-weight: 700;
+  font-size: 16px;
+}
+.hud-level-name {
+  color: #00ccff;
+  font-size: 14px;
+  font-weight: 600;
+}
+.hud-life {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.hud-life .life-num {
+  color: #00ff00;
+  font-size: 16px;
+  font-weight: 700;
+}
+.hud-life .life-label {
+  color: #00ff00;
+  font-size: 12px;
+}
+.hud-timer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+.hud-score {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-left: auto;
+}
+.hud-score-label {
+  color: #b8c4d8;
+}
+.hud-score b {
+  color: #ffcc66;
+  font-size: 18px;
+}
 
 /* 倒计时条(复刻原版:白框 + 蓝→红渐变填充 + 马赛克像素分段质感) */
 .timer-bar {
@@ -759,39 +960,58 @@ function onKeydown(e) {
   border-radius: 1px;
   /* 马赛克质感:横向分段(10px 块 + 2px 暗缝)叠纵向像素线(7px)叠底色渐变 */
   background:
-    repeating-linear-gradient(90deg,
-      rgba(0, 0, 0, 0.22) 0px, rgba(0, 0, 0, 0.22) 2px,
-      transparent 2px, transparent 10px),
-    repeating-linear-gradient(0deg,
-      rgba(255, 255, 255, 0.10) 0px, rgba(255, 255, 255, 0.10) 1px,
-      transparent 1px, transparent 7px),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.22) 0px, rgba(0, 0, 0, 0.22) 2px, transparent 2px, transparent 10px),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.1) 0px, rgba(255, 255, 255, 0.1) 1px, transparent 1px, transparent 7px),
     linear-gradient(180deg, #b9e4ff 0%, #6db4ff 45%, #4a8cff 100%);
   image-rendering: pixelated;
   transition: width 1s linear;
 }
-.timer-text { font-size: 13px; font-variant-numeric: tabular-nums; color: #4dd2ff; min-width: 34px; text-align: right; }
-.timer-bar.warn { border-color: #ff7a7a; }
+.timer-text {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: #4dd2ff;
+  min-width: 34px;
+  text-align: right;
+}
+.timer-bar.warn {
+  border-color: #ff7a7a;
+}
 .timer-bar.warn .timer-fill {
   background:
-    repeating-linear-gradient(90deg,
-      rgba(0, 0, 0, 0.22) 0px, rgba(0, 0, 0, 0.22) 2px,
-      transparent 2px, transparent 10px),
-    repeating-linear-gradient(0deg,
-      rgba(255, 255, 255, 0.10) 0px, rgba(255, 255, 255, 0.10) 1px,
-      transparent 1px, transparent 7px),
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.22) 0px, rgba(0, 0, 0, 0.22) 2px, transparent 2px, transparent 10px),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.1) 0px, rgba(255, 255, 255, 0.1) 1px, transparent 1px, transparent 7px),
     linear-gradient(180deg, #ffb3a0 0%, #ff5a5a 55%, #ff2f4d 100%);
   animation: timeBarPulse 1s ease-in-out infinite;
 }
-.timer-text.warn { color: #ff5a5a; }
+.timer-text.warn {
+  color: #ff5a5a;
+}
 @keyframes timeBarPulse {
-  0%, 100% { filter: brightness(1); }
-  50% { filter: brightness(1.5); }
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.5);
+  }
 }
 
 /* 棋盘 */
-.board-scroll { width: 100%; max-width: 100%; }
-.board-scale { position: relative; margin: 0 auto; overflow: hidden; }
-.board-wrap { position: relative; width: fit-content; padding: 44px; transform-origin: top left; }
+.board-scroll {
+  width: 100%;
+  max-width: 100%;
+}
+.board-scale {
+  position: relative;
+  margin: 0 auto;
+  overflow: hidden;
+}
+.board-wrap {
+  position: relative;
+  width: fit-content;
+  padding: 44px;
+  transform-origin: top left;
+}
 .board {
   display: grid;
   grid-template-columns: repeat(14, 42px);
@@ -810,22 +1030,52 @@ function onKeydown(e) {
   border-radius: 3px;
   cursor: pointer;
   padding: 0;
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
   contain: layout style;
 }
-.tile:hover:not(:disabled):not(.is-empty) { transform: translateY(-1px); }
-.tile .pet { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
-.tile.is-empty { background: transparent; border-color: transparent; cursor: default; }
-.tile.is-selected {
-  box-shadow: 0 0 0 2px #0033ff, inset 0 0 0 1px rgba(27, 28, 250, 0.25);
+.tile:hover:not(:disabled):not(.is-empty) {
   transform: translateY(-1px);
 }
-.tile.is-hint { animation: hintPulse 0.8s ease-in-out infinite; border-color: #cc0066; }
-@keyframes hintPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(204, 0, 102, 0.6); }
-  50% { box-shadow: 0 0 0 4px rgba(204, 0, 102, 0.25); }
+.tile .pet {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
 }
-.board-line { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+.tile.is-empty {
+  background: transparent;
+  border-color: transparent;
+  cursor: default;
+}
+.tile.is-selected {
+  box-shadow:
+    0 0 0 2px #0033ff,
+    inset 0 0 0 1px rgba(27, 28, 250, 0.25);
+  transform: translateY(-1px);
+}
+.tile.is-hint {
+  animation: hintPulse 0.8s ease-in-out infinite;
+  border-color: #cc0066;
+}
+@keyframes hintPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(204, 0, 102, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(204, 0, 102, 0.25);
+  }
+}
+.board-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
 .board-line .line {
   fill: none;
   stroke: #0099ff;
@@ -834,7 +1084,9 @@ function onKeydown(e) {
   stroke-linejoin: round;
   filter: drop-shadow(0 0 4px rgba(0, 153, 255, 0.8));
 }
-.board-wrap.is-frozen .tile { cursor: default; }
+.board-wrap.is-frozen .tile {
+  cursor: default;
+}
 
 .pause-mask {
   position: absolute;
@@ -845,10 +1097,19 @@ function onKeydown(e) {
   background: rgba(0, 0, 0, 0.55);
   border-radius: 8px;
 }
-.pause-label { font-size: 26px; font-weight: 700; color: #fff; letter-spacing: 3px; }
+.pause-label {
+  font-size: 26px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 3px;
+}
 
 /* 底部操作 */
-.game-bottombar { display: flex; gap: 8px; margin-top: 12px; }
+.game-bottombar {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
 
 /* 胜负弹层 */
 .overlay {
@@ -871,8 +1132,20 @@ function onKeydown(e) {
   color: #333;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
-.overlay-icon { font-size: 42px; }
-.overlay-title { font-size: 20px; font-weight: 700; }
-.overlay-score { font-size: 14px; color: #888; }
-.overlay-reward { font-size: 14px; color: #f0a04b; font-weight: 700; }
+.overlay-icon {
+  font-size: 42px;
+}
+.overlay-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+.overlay-score {
+  font-size: 14px;
+  color: #888;
+}
+.overlay-reward {
+  font-size: 14px;
+  color: #f0a04b;
+  font-weight: 700;
+}
 </style>

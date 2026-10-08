@@ -3,31 +3,100 @@
 // 未来新增主题或导航样式时,只需写自己的渲染层,复用这里的数据与分组规则。
 // 新增功能模块时,只需在 NAV_PATHS 加一行 code→路由,三端自动同步。
 import {
-  Document, Notebook, Picture, Calendar, VideoPlay, Headset, Trophy, Aim,
-  AlarmClock, List, Star, Wallet, Share, User, Box, MapLocation,
-  ChatDotRound, Food, Reading, Setting, Monitor, Tools, Sunny, Lock, MagicStick, QuestionFilled,
-  Promotion, Delete,
+  Document,
+  Notebook,
+  Picture,
+  Calendar,
+  VideoPlay,
+  Headset,
+  Trophy,
+  Aim,
+  AlarmClock,
+  List,
+  Star,
+  Wallet,
+  Share,
+  User,
+  Box,
+  MapLocation,
+  ChatDotRound,
+  Food,
+  Reading,
+  Setting,
+  Monitor,
+  Tools,
+  Sunny,
+  Lock,
+  MagicStick,
+  QuestionFilled,
+  Promotion,
+  Delete,
 } from '@element-plus/icons-vue'
 
 // code → 路由路径(后端 sys_home_module.code 为字符串标识)
 // 注意:照片瀑布(cascade)已并入相册页内视图,不再是独立模块,故此处无其映射(旧链接由路由重定向兜底)
 export const NAV_PATHS = {
-  blog: '/blog', diary: '/diary', album: '/album', anniversary: '/anniversary',
-  cinema: '/cinema', music: '/music', member: '/member', points: '/points', task: '/task',
-  reminder: '/reminder', plan: '/plan', wish: '/wish', book: '/book',
-  chat: '/chat', tree: '/tree',
-  item: '/item', kitchen: '/kitchen', library: '/library', settings: '/settings', ops: '/ops',
-  storage: '/storage/files', tools: '/tools', plant: '/plant', games: '/games', vault: '/vault',
-  iot: '/iot', help: '/help', announcement: '/announcement', recycle: '/recycle',
+  blog: '/blog',
+  diary: '/diary',
+  album: '/album',
+  anniversary: '/anniversary',
+  cinema: '/cinema',
+  music: '/music',
+  member: '/member',
+  points: '/points',
+  task: '/task',
+  reminder: '/reminder',
+  plan: '/plan',
+  wish: '/wish',
+  book: '/book',
+  chat: '/chat',
+  tree: '/tree',
+  item: '/item',
+  kitchen: '/kitchen',
+  library: '/library',
+  settings: '/settings',
+  ops: '/ops',
+  storage: '/storage/files',
+  tools: '/tools',
+  plant: '/plant',
+  games: '/games',
+  vault: '/vault',
+  iot: '/iot',
+  help: '/help',
+  announcement: '/announcement',
+  recycle: '/recycle',
 }
 
 // code → 图标组件(Element Plus 线性图标,统一风格)
 export const ICON_MAP = {
-  blog: Document, diary: Notebook, album: Picture, anniversary: Calendar, cinema: VideoPlay, music: Headset,
-  points: Trophy, task: Aim, reminder: AlarmClock, plan: List, wish: Star,
-  book: Wallet, tree: Share, member: User, storage: Box, item: MapLocation,
-  chat: ChatDotRound, kitchen: Food, library: Reading, settings: Setting, ops: Monitor, tools: Tools,
-  plant: Sunny, games: Aim, vault: Lock, iot: MagicStick, help: QuestionFilled, announcement: Promotion,
+  blog: Document,
+  diary: Notebook,
+  album: Picture,
+  anniversary: Calendar,
+  cinema: VideoPlay,
+  music: Headset,
+  points: Trophy,
+  task: Aim,
+  reminder: AlarmClock,
+  plan: List,
+  wish: Star,
+  book: Wallet,
+  tree: Share,
+  member: User,
+  storage: Box,
+  item: MapLocation,
+  chat: ChatDotRound,
+  kitchen: Food,
+  library: Reading,
+  settings: Setting,
+  ops: Monitor,
+  tools: Tools,
+  plant: Sunny,
+  games: Aim,
+  vault: Lock,
+  iot: MagicStick,
+  help: QuestionFilled,
+  announcement: Promotion,
   recycle: Delete,
 }
 export const iconComp = (code) => ICON_MAP[code] || Document
@@ -38,7 +107,7 @@ export const CATEGORY_LABELS = { content: '内容', life: '生活', social: '成
 export const categoryLabel = (cat) => CATEGORY_LABELS[cat] || '功能'
 
 // album 归入 content;空分类兜底 life
-const normalizeCategory = (cat) => (cat === 'album' ? 'content' : (cat || 'life'))
+const normalizeCategory = (cat) => (cat === 'album' ? 'content' : cat || 'life')
 
 // 原始模块 → 扁平导航项:过滤无路径映射/停用模块,追加「设置」+「运维管理」虚拟入口,按 sortOrder 升序。
 // hasOps:是否展示运维管理(拥有 ops:view 权限)。
@@ -67,9 +136,11 @@ export function groupNavItems(items) {
     if (!groups[cat]) groups[cat] = []
     groups[cat].push(m)
   }
-  return NAV_GROUP_ORDER
-    .filter((c) => groups[c] && groups[c].length)
-    .map((c) => ({ category: c, label: CATEGORY_LABELS[c] || '功能', items: groups[c] }))
+  return NAV_GROUP_ORDER.filter((c) => groups[c] && groups[c].length).map((c) => ({
+    category: c,
+    label: CATEGORY_LABELS[c] || '功能',
+    items: groups[c],
+  }))
 }
 
 // 便捷入口:原始模块 → 分组导航(无需二次加工的主题直接渲染用)

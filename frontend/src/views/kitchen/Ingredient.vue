@@ -1,14 +1,17 @@
 <template>
   <div class="page">
-    <Breadcrumb :items="[
-      { label: $t('kitchen.title'), to: '/kitchen' },
-      { label: $t('kitchen.ingredients') },
-    ]" />
+    <Breadcrumb :items="[{ label: $t('kitchen.title'), to: '/kitchen' }, { label: $t('kitchen.ingredients') }]" />
 
     <PageToolbar>
       <div class="tb-left">
-        <el-input v-model="keyword" :placeholder="$t('kitchen.ingredientName')" clearable prefix-icon="Search"
-                   @input="onSearch" style="max-width: 300px" />
+        <el-input
+          v-model="keyword"
+          :placeholder="$t('kitchen.ingredientName')"
+          clearable
+          prefix-icon="Search"
+          @input="onSearch"
+          style="max-width: 300px"
+        />
       </div>
       <div class="tb-right">
         <el-button v-if="userStore.isLoggedIn" type="primary" round @click="openAdd">
@@ -46,9 +49,20 @@
         </div>
         <!-- 操作按钮 -->
         <div class="bar-actions" @click.stop>
-          <el-button size="small" circle :title="$t('kitchen.takeOutOne')" :disabled="!item.quantity || Number(item.quantity) < 1" @click="takeOne(item)"><el-icon><Minus /></el-icon></el-button>
-          <el-button size="small" circle @click="openEdit(item)"><el-icon><Edit /></el-icon></el-button>
-          <el-button size="small" type="danger" circle plain @click="onDelete(item)"><el-icon><Delete /></el-icon></el-button>
+          <el-button
+            size="small"
+            circle
+            :title="$t('kitchen.takeOutOne')"
+            :disabled="!item.quantity || Number(item.quantity) < 1"
+            @click="takeOne(item)"
+            ><el-icon><Minus /></el-icon
+          ></el-button>
+          <el-button size="small" circle @click="openEdit(item)"
+            ><el-icon><Edit /></el-icon
+          ></el-button>
+          <el-button size="small" type="danger" circle plain @click="onDelete(item)"
+            ><el-icon><Delete /></el-icon
+          ></el-button>
         </div>
       </div>
 
@@ -62,7 +76,9 @@
         <el-form-item :label="$t('kitchen.ingredientImage')">
           <el-upload :show-file-list="false" :http-request="onUpload" accept="image/*">
             <img v-if="form.image_url" :src="form.image_url" class="image-preview" :alt="form.name || ''" />
-            <el-button v-else><el-icon><Plus /></el-icon> {{ $t('kitchen.ingredientImage') }}</el-button>
+            <el-button v-else
+              ><el-icon><Plus /></el-icon> {{ $t('kitchen.ingredientImage') }}</el-button
+            >
           </el-upload>
         </el-form-item>
 
@@ -77,7 +93,14 @@
             <el-input-number v-model="form.quantity" :min="0" :precision="2" :step="1" :controls="false" style="width: 100%" />
           </el-form-item>
           <el-form-item :label="$t('kitchen.ingredientUnit')">
-            <el-select v-model="form.unit" allow-create filterable clearable :placeholder="$t('kitchen.ingredientUnit')" style="width: 100%">
+            <el-select
+              v-model="form.unit"
+              allow-create
+              filterable
+              clearable
+              :placeholder="$t('kitchen.ingredientUnit')"
+              style="width: 100%"
+            >
               <el-option v-for="u in units" :key="u" :label="u" :value="u" />
             </el-select>
           </el-form-item>
@@ -85,7 +108,13 @@
 
         <!-- 存入时间 + 保质期 -->
         <el-form-item :label="$t('kitchen.storedAt')">
-          <el-date-picker v-model="form.storedAt" type="datetime" value-format="YYYY-MM-DD HH:mm:ss" :placeholder="$t('kitchen.storedAtPh')" style="width: 100%" />
+          <el-date-picker
+            v-model="form.storedAt"
+            type="datetime"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            :placeholder="$t('kitchen.storedAtPh')"
+            style="width: 100%"
+          />
         </el-form-item>
         <div class="form-row-2">
           <el-form-item :label="$t('kitchen.shelfLife')">
@@ -136,7 +165,15 @@
         </el-form-item>
       </el-form>
       <div class="take-quick">
-        <el-button v-for="q in quickAmounts" :key="q" size="small" round :type="isQuickActive(q) ? 'primary' : ''" @click="takeForm.amount = q">{{ q }}</el-button>
+        <el-button
+          v-for="q in quickAmounts"
+          :key="q"
+          size="small"
+          round
+          :type="isQuickActive(q) ? 'primary' : ''"
+          @click="takeForm.amount = q"
+          >{{ q }}</el-button
+        >
       </div>
       <div v-if="sliderMax > 1" class="take-slider">
         <el-slider v-model="sliderVal" :min="1" :max="sliderMax" :marks="sliderMarks" @change="onSliderChange" />
@@ -200,7 +237,7 @@ const warnInfo = (item) => {
     const text = d >= 1 ? $t('kitchen.overdueDays', { n: d }) : $t('kitchen.overdue')
     return { level: 'red', text: `${text} · ${$t('kitchen.expiresAt')} ${date}` }
   }
-  const level = (totalMs / 86400e3 <= 3 || remainingMs <= totalMs * 0.10) ? 'yellow' : 'green'
+  const level = totalMs / 86400e3 <= 3 || remainingMs <= totalMs * 0.1 ? 'yellow' : 'green'
   const d = Math.ceil(remainingMs / 86400e3)
   const text = $t('kitchen.remainingDays', { n: d })
   return { level, text: `${text} · ${$t('kitchen.expiresAt')} ${date}` }
@@ -241,7 +278,7 @@ const quickAmounts = computed(() => {
 // 取出弹窗横向拖拉条:左 1 → 右 100%(总数),吸附点 = 1 + 25%/33%/50%/66%/75%/100%
 const sliderMax = computed(() => {
   const t = Number(takeForm.total)
-  return (t == null || isNaN(t) || t < 1) ? 1 : t
+  return t == null || isNaN(t) || t < 1 ? 1 : t
 })
 const sliderStops = computed(() => {
   const total = Number(takeForm.total)
@@ -263,15 +300,19 @@ const sliderStops = computed(() => {
 })
 const sliderMarks = computed(() => {
   const m = {}
-  sliderStops.value.forEach((s) => { m[s.value] = s.label })
+  sliderStops.value.forEach((s) => {
+    m[s.value] = s.label
+  })
   return m
 })
 const sliderVal = computed({
   get: () => {
     const a = Number(takeForm.amount)
-    return (a == null || isNaN(a) || a < 1) ? 1 : Math.min(a, sliderMax.value)
+    return a == null || isNaN(a) || a < 1 ? 1 : Math.min(a, sliderMax.value)
   },
-  set: (v) => { takeForm.amount = v },
+  set: (v) => {
+    takeForm.amount = v
+  },
 })
 const onSliderChange = (val) => {
   const stops = sliderStops.value
@@ -280,7 +321,10 @@ const onSliderChange = (val) => {
   let minDist = Infinity
   for (const s of stops) {
     const d = Math.abs(s.value - val)
-    if (d < minDist) { minDist = d; nearest = s }
+    if (d < minDist) {
+      minDist = d
+      nearest = s
+    }
   }
   takeForm.amount = nearest.value
 }
@@ -292,21 +336,27 @@ const rooms = ref([])
 const furnitures = ref([])
 
 const locationTree = computed(() => {
-  return houses.value.map(h => ({
+  return houses.value.map((h) => ({
     value: h.id,
     label: h.name,
-    children: rooms.value.filter(r => r.houseId === h.id).map(r => ({
-      value: r.id,
-      label: r.name,
-      children: furnitures.value.filter(f => f.roomId === r.id).map(f => ({
-        value: f.id,
-        label: f.name,
+    children: rooms.value
+      .filter((r) => r.houseId === h.id)
+      .map((r) => ({
+        value: r.id,
+        label: r.name,
+        children: furnitures.value
+          .filter((f) => f.roomId === r.id)
+          .map((f) => ({
+            value: f.id,
+            label: f.name,
+          })),
       })),
-    })),
   }))
 })
 
-const onSearch = () => { loadList() }
+const onSearch = () => {
+  loadList()
+}
 
 const loadList = async () => {
   loading.value = true
@@ -318,13 +368,15 @@ const loadList = async () => {
 
 const loadLocations = async () => {
   try {
-    try { await itemApi.defaultFridge() } catch (e) {} // 确保家庭默认冰箱存在(无则创建),失败不阻断位置树
+    try {
+      await itemApi.defaultFridge()
+    } catch (e) {} // 确保家庭默认冰箱存在(无则创建),失败不阻断位置树
     houses.value = await itemApi.houses()
     // 批量拉所有 room 和 furniture
-    const roomPromises = houses.value.map(h => itemApi.rooms(h.id))
+    const roomPromises = houses.value.map((h) => itemApi.rooms(h.id))
     const roomResults = await Promise.all(roomPromises)
     rooms.value = roomResults.flat()
-    const furnPromises = rooms.value.map(r => itemApi.furnitures(r.id))
+    const furnPromises = rooms.value.map((r) => itemApi.furnitures(r.id))
     const furnResults = await Promise.all(furnPromises)
     furnitures.value = furnResults.flat()
   } catch (e) {}
@@ -333,17 +385,17 @@ const loadLocations = async () => {
 // 默认选中"冰箱"(家庭默认冰箱),没有则回退到"厨房"相关房间
 const defaultLocation = () => {
   // 优先:冰箱(type 或名称含「冰箱」,已摆放进房间的)
-  const fridge = furnitures.value.find(f => f.type === '冰箱' || (f.name && f.name.includes('冰箱')))
+  const fridge = furnitures.value.find((f) => f.type === '冰箱' || (f.name && f.name.includes('冰箱')))
   if (fridge && fridge.roomId) {
-    const room = rooms.value.find(r => r.id === fridge.roomId)
-    const house = room ? houses.value.find(h => h.id === room.houseId) : null
+    const room = rooms.value.find((r) => r.id === fridge.roomId)
+    const house = room ? houses.value.find((h) => h.id === room.houseId) : null
     if (house && room) return [house.id, room.id, fridge.id]
   }
   // 兜底:找名称含"厨房"的 room
-  const kitchenRoom = rooms.value.find(r => r.name && r.name.includes('厨房'))
+  const kitchenRoom = rooms.value.find((r) => r.name && r.name.includes('厨房'))
   if (kitchenRoom) {
-    const house = houses.value.find(h => h.id === kitchenRoom.houseId)
-    const furn = furnitures.value.find(f => f.roomId === kitchenRoom.id)
+    const house = houses.value.find((h) => h.id === kitchenRoom.houseId)
+    const furn = furnitures.value.find((f) => f.roomId === kitchenRoom.id)
     if (house && furn) {
       return [house.id, kitchenRoom.id, furn.id]
     }
@@ -355,19 +407,31 @@ const defaultLocation = () => {
 
 const openAdd = () => {
   Object.assign(form, {
-    id: null, name: '', image_url: '', quantity: null, unit: '',
-    furnitureId: null, locationPath: defaultLocation(), note: '',
-    storedAt: nowStr(), shelfLife: null, shelfLifeUnit: 'DAY',
+    id: null,
+    name: '',
+    image_url: '',
+    quantity: null,
+    unit: '',
+    furnitureId: null,
+    locationPath: defaultLocation(),
+    note: '',
+    storedAt: nowStr(),
+    shelfLife: null,
+    shelfLifeUnit: 'DAY',
   })
   dlg.value = true
 }
 
 const openEdit = (item) => {
   Object.assign(form, {
-    id: item.id, name: item.name, image_url: item.image_url || '',
+    id: item.id,
+    name: item.name,
+    image_url: item.image_url || '',
     quantity: item.quantity != null ? Number(item.quantity) : null,
-    unit: item.unit || '', furnitureId: item.furniture_id || null,
-    locationPath: [], note: item.note || '',
+    unit: item.unit || '',
+    furnitureId: item.furniture_id || null,
+    locationPath: [],
+    note: item.note || '',
     storedAt: item.stored_at || '',
     shelfLife: item.shelf_life != null ? Number(item.shelf_life) : null,
     shelfLifeUnit: item.shelf_life_unit || 'DAY',
@@ -394,8 +458,7 @@ const onSave = async () => {
   saving.value = true
   try {
     // 级联取最后一级作为 furnitureId(仅 3 级路径时才有 furniture)
-    const furnId = form.locationPath && form.locationPath.length === 3
-      ? form.locationPath[2] : null
+    const furnId = form.locationPath && form.locationPath.length === 3 ? form.locationPath[2] : null
     const body = {
       name: form.name,
       imageUrl: form.image_url,
@@ -487,14 +550,16 @@ onMounted(() => {
   overflow: hidden;
   cursor: pointer;
   transition: transform 0.3s ease;
-  background: var(--el-bg-color, rgba(255,255,255,0.6));
+  background: var(--el-bg-color, rgba(255, 255, 255, 0.6));
   backdrop-filter: blur(24px) saturate(1.1);
   -webkit-backdrop-filter: blur(24px) saturate(1.1);
-  border: 1px solid rgba(255,255,255,0.2);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
   height: 84px;
 }
-.ingredient-bar:hover { transform: translateX(4px); }
+.ingredient-bar:hover {
+  transform: translateX(4px);
+}
 
 /* 左侧:图片占条目宽度 1/3,居中裁切 */
 .bar-image-wrap {
@@ -523,7 +588,7 @@ onMounted(() => {
 .bar-image-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to right, transparent 0%, transparent 50%, var(--el-bg-color, rgba(255,255,255,0.9)) 100%);
+  background: linear-gradient(to right, transparent 0%, transparent 50%, var(--el-bg-color, rgba(255, 255, 255, 0.9)) 100%);
   pointer-events: none;
 }
 
@@ -556,9 +621,18 @@ onMounted(() => {
   font-weight: 600;
   white-space: nowrap;
 }
-.warn-badge.red { color: var(--el-color-danger, #f56c6c); background: rgba(245, 108, 108, 0.14); }
-.warn-badge.yellow { color: var(--el-color-warning, #e6a23c); background: rgba(230, 162, 60, 0.16); }
-.warn-badge.green { color: var(--el-color-success, #67c23a); background: rgba(103, 194, 58, 0.14); }
+.warn-badge.red {
+  color: var(--el-color-danger, #f56c6c);
+  background: rgba(245, 108, 108, 0.14);
+}
+.warn-badge.yellow {
+  color: var(--el-color-warning, #e6a23c);
+  background: rgba(230, 162, 60, 0.16);
+}
+.warn-badge.green {
+  color: var(--el-color-success, #67c23a);
+  background: rgba(103, 194, 58, 0.14);
+}
 .bar-quantity {
   display: flex;
   align-items: baseline;
@@ -593,7 +667,9 @@ onMounted(() => {
   opacity: 0;
   transition: opacity 0.2s;
 }
-.ingredient-bar:hover .bar-actions { opacity: 1; }
+.ingredient-bar:hover .bar-actions {
+  opacity: 1;
+}
 
 /* 编辑弹窗 */
 .form-row-2 {
@@ -635,17 +711,25 @@ onMounted(() => {
 }
 
 :global(html.dark) .ingredient-bar {
-  background: rgba(40,44,52,0.6);
-  border-color: rgba(255,255,255,0.08);
+  background: rgba(40, 44, 52, 0.6);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 :global(html.dark) .bar-image-overlay {
-  background: linear-gradient(to right, transparent 0%, transparent 40%, rgba(40,44,52,0.9) 100%);
+  background: linear-gradient(to right, transparent 0%, transparent 40%, rgba(40, 44, 52, 0.9) 100%);
 }
 
 @media (max-width: 600px) {
-  .form-row-2 { grid-template-columns: 1fr; }
-  .bar-image-wrap { flex: 0 0 35%; }
-  .bar-info { padding: 10px 14px; }
-  .bar-name { font-size: 16px; }
+  .form-row-2 {
+    grid-template-columns: 1fr;
+  }
+  .bar-image-wrap {
+    flex: 0 0 35%;
+  }
+  .bar-info {
+    padding: 10px 14px;
+  }
+  .bar-name {
+    font-size: 16px;
+  }
 }
 </style>

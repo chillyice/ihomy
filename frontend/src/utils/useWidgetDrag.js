@@ -41,8 +41,12 @@ export function useWidgetDrag() {
     window.addEventListener('mousemove', onMouseMove)
     window.addEventListener('mouseup', onMouseUp)
   }
-  const onDrop = (cb) => { dropCb = cb }
-  const onMove = (cb) => { moveCb = cb }
+  const onDrop = (cb) => {
+    dropCb = cb
+  }
+  const onMove = (cb) => {
+    moveCb = cb
+  }
   return {
     dragging: readonly(dragging),
     dragType: readonly(dragType),

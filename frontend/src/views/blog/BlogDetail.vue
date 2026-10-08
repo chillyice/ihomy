@@ -63,7 +63,9 @@
           <div class="c-ops">
             <el-button v-if="userStore.isLoggedIn" text size="small" @click="setReply(c)">{{ $t('blog.reply') }}</el-button>
             <el-tooltip v-if="canDelete(c)" :content="$t('common.delete')" placement="top" :show-after="300">
-              <el-button text size="small" type="danger" @click="delComment(c)"><el-icon><Delete /></el-icon></el-button>
+              <el-button text size="small" type="danger" @click="delComment(c)"
+                ><el-icon><Delete /></el-icon
+              ></el-button>
             </el-tooltip>
           </div>
 
@@ -73,7 +75,9 @@
               <span v-if="r.replyToName" class="reply-to">{{ $t('blog.replyTo', { name: r.replyToName }) }}</span>
               <span class="reply-content">{{ r.content }}</span>
               <el-tooltip v-if="canDelete(r)" :content="$t('common.delete')" placement="top" :show-after="300">
-                <el-button text size="small" type="danger" class="reply-del" @click="delComment(r)"><el-icon><Delete /></el-icon></el-button>
+                <el-button text size="small" type="danger" class="reply-del" @click="delComment(r)"
+                  ><el-icon><Delete /></el-icon
+                ></el-button>
               </el-tooltip>
             </div>
           </div>
@@ -112,9 +116,7 @@ const toc = ref([])
 const activeHeading = ref('')
 
 // 标签字符串按逗号拆分
-const tagList = computed(() =>
-  blog.value?.tags ? String(blog.value.tags).split(',').filter(Boolean) : [],
-)
+const tagList = computed(() => (blog.value?.tags ? String(blog.value.tags).split(',').filter(Boolean) : []))
 
 // Markdown 渲染:用 marked.lexer + walkTokens 把 h1 降级为 h2(避免与博客标题的 h1 重复),
 // 同时给每个标题加 id 用于目录跳转
@@ -123,23 +125,30 @@ marked.use({
     heading({ text, depth }) {
       // h1 降级为 h2,避免与页面标题重复;最大 depth=4
       const level = Math.min(depth + (depth === 1 ? 1 : 0), 4)
-      const id = 'h-' + text.replace(/[^\w\u4e00-\u9fa5]+/g, '-').replace(/^-|-$/g, '').toLowerCase().slice(0, 50)
+      const id =
+        'h-' +
+        text
+          .replace(/[^\w\u4e00-\u9fa5]+/g, '-')
+          .replace(/^-|-$/g, '')
+          .toLowerCase()
+          .slice(0, 50)
       return `<h${level} id="${id}">${text}</h${level}>`
     },
   },
 })
 
 // Markdown 渲染为 HTML
-const renderedContent = computed(() =>
-  blog.value?.content ? marked.parse(blog.value.content) : '',
-)
+const renderedContent = computed(() => (blog.value?.content ? marked.parse(blog.value.content) : ''))
 
 // 从渲染后的 DOM 提取标题列表(用于目录导航)
 const extractToc = () => {
   nextTick(() => {
-    if (!contentRef.value) { toc.value = []; return }
+    if (!contentRef.value) {
+      toc.value = []
+      return
+    }
     const headings = contentRef.value.querySelectorAll('h2, h3, h4')
-    toc.value = Array.from(headings).map(h => ({
+    toc.value = Array.from(headings).map((h) => ({
       id: h.id,
       text: h.textContent || '',
       level: parseInt(h.tagName.slice(1)),
@@ -164,16 +173,16 @@ let spyObserver = null
 const initScrollSpy = () => {
   if (spyObserver) spyObserver.disconnect()
   if (!toc.value.length) return
-  const headings = toc.value.map(h => document.getElementById(h.id)).filter(Boolean)
+  const headings = toc.value.map((h) => document.getElementById(h.id)).filter(Boolean)
   if (!headings.length) return
   spyObserver = new IntersectionObserver(
     (entries) => {
-      const visible = entries.filter(e => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
+      const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
       if (visible.length) activeHeading.value = visible[0].target.id
     },
-    { rootMargin: '-80px 0px -70% 0px', threshold: 0 }
+    { rootMargin: '-80px 0px -70% 0px', threshold: 0 },
   )
-  headings.forEach(h => spyObserver.observe(h))
+  headings.forEach((h) => spyObserver.observe(h))
 }
 
 onBeforeUnmount(() => {
@@ -181,19 +190,35 @@ onBeforeUnmount(() => {
 })
 
 // 删除权限:家长或评论作者本人
-const canDelete = (c) =>
-  userStore.isLoggedIn && (userStore.isOwner || c.authorId === userStore.userInfo?.id)
+const canDelete = (c) => userStore.isLoggedIn && (userStore.isOwner || c.authorId === userStore.userInfo?.id)
 
 // 并行拉取博客详情、评论树与当前用户点赞状态(三者独立,各自 catch)
 const loadAll = async () => {
   const tasks = [
     // 博客详情加载失败(可能不存在或无权查看),保持 blog=null 显示空状态
-    blogApi.detail(route.params.id).then((b) => { blog.value = b }).catch(() => {}),
+    blogApi
+      .detail(route.params.id)
+      .then((b) => {
+        blog.value = b
+      })
+      .catch(() => {}),
     // 评论加载失败不影响博客展示
-    commentApi.list('blog', route.params.id).then((c) => { comments.value = c }).catch(() => {}),
+    commentApi
+      .list('blog', route.params.id)
+      .then((c) => {
+        comments.value = c
+      })
+      .catch(() => {}),
   ]
   if (userStore.isLoggedIn) {
-    tasks.push(likeApi.state('blog', route.params.id).then((s) => { likeState.value = s }).catch(() => {}))
+    tasks.push(
+      likeApi
+        .state('blog', route.params.id)
+        .then((s) => {
+          likeState.value = s
+        })
+        .catch(() => {}),
+    )
   }
   await Promise.all(tasks)
 }
@@ -246,7 +271,6 @@ const delComment = async (c) => {
   comments.value = await commentApi.list('blog', route.params.id)
 }
 
-
 onMounted(loadAll)
 </script>
 
@@ -282,8 +306,14 @@ onMounted(loadAll)
   padding-bottom: 6px;
   border-bottom: 1px solid var(--color-border);
 }
-.toc ul { list-style: none; padding: 0; margin: 0; }
-.toc li { margin: 0; }
+.toc ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.toc li {
+  margin: 0;
+}
 .toc a {
   display: block;
   padding: 4px 8px;
@@ -296,87 +326,320 @@ onMounted(loadAll)
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.toc a:hover, .toc a.active { background: rgba(168, 72, 58, 0.12); color: var(--color-accent); font-weight: 600; }
-.toc-l2 { padding-left: 0; }
-.toc-l3 { padding-left: 12px; }
-.toc-l4 { padding-left: 24px; }
+.toc a:hover,
+.toc a.active {
+  background: rgba(168, 72, 58, 0.12);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+.toc-l2 {
+  padding-left: 0;
+}
+.toc-l3 {
+  padding-left: 12px;
+}
+.toc-l4 {
+  padding-left: 24px;
+}
 
 /* 正文卡片 */
-.detail { flex: 1; min-width: 0; padding: 24px 28px; }
-.blog-title-text { font-size: 24px; font-weight: 700; color: var(--color-primary); margin-bottom: 8px; line-height: 1.4; }
-.meta { font-size: 13px; color: var(--color-text-secondary); margin-bottom: 16px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-.tags { display: flex; gap: 6px; }
-.tag { background: rgba(46, 116, 181, 0.08); color: var(--color-accent); padding: 1px 8px; border-radius: 10px; font-size: 12px; }
-.cover { width: 100%; max-height: 300px; object-fit: cover; border-radius: 8px; margin-bottom: 16px; }
+.detail {
+  flex: 1;
+  min-width: 0;
+  padding: 24px 28px;
+}
+.blog-title-text {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+.meta {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-bottom: 16px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.tags {
+  display: flex;
+  gap: 6px;
+}
+.tag {
+  background: rgba(46, 116, 181, 0.08);
+  color: var(--color-accent);
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+.cover {
+  width: 100%;
+  max-height: 300px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
 
 /* Markdown 正文:行间距 2.0,字号 15px;层级:段落间距 > 小节间距 > 正文行间距 */
-.content { font-size: 15px; line-height: 2.0; }
-.markdown-body { white-space: normal; word-wrap: break-word; overflow-wrap: break-word; }
-.markdown-body h2, .markdown-body h3, .markdown-body h4 { color: var(--color-primary); line-height: 1.5; }
+.content {
+  font-size: 15px;
+  line-height: 2;
+}
+.markdown-body {
+  white-space: normal;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  color: var(--color-primary);
+  line-height: 1.5;
+}
 /* 小节标题:小节间距 */
-.markdown-body h2 { font-size: 20px; margin: 28px 0 16px; border-bottom: 1px solid var(--color-border); padding-bottom: 6px; }
-.markdown-body h3 { font-size: 17px; margin: 24px 0 12px; }
-.markdown-body h4 { font-size: 15px; margin: 20px 0 10px; }
+.markdown-body h2 {
+  font-size: 20px;
+  margin: 28px 0 16px;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 6px;
+}
+.markdown-body h3 {
+  font-size: 17px;
+  margin: 24px 0 12px;
+}
+.markdown-body h4 {
+  font-size: 15px;
+  margin: 20px 0 10px;
+}
 /* 段落:段落间距(最大),拉大阅读呼吸感 */
-.markdown-body p { margin: 20px 0; line-height: 2.0; }
+.markdown-body p {
+  margin: 20px 0;
+  line-height: 2;
+}
 /* ul/ol 加大缩进,凸显列表子内容的层级 */
-.markdown-body ul, .markdown-body ol { margin: 20px 0; padding-left: 44px; }
-.markdown-body li { margin: 8px 0; line-height: 2.0; }
+.markdown-body ul,
+.markdown-body ol {
+  margin: 20px 0;
+  padding-left: 44px;
+}
+.markdown-body li {
+  margin: 8px 0;
+  line-height: 2;
+}
 /* 粗体列表项(- **xx**)额外缩进 */
-.markdown-body li > strong:first-child { display: inline-block; margin-left: 8px; }
-.markdown-body blockquote { margin: 20px 0; padding: 12px 18px; border-left: 4px solid var(--color-accent); background: rgba(168,72,58,0.05); color: var(--color-text-secondary); border-radius: 0 8px 8px 0; line-height: 2.0; }
-.markdown-body blockquote p { margin: 6px 0; }
+.markdown-body li > strong:first-child {
+  display: inline-block;
+  margin-left: 8px;
+}
+.markdown-body blockquote {
+  margin: 20px 0;
+  padding: 12px 18px;
+  border-left: 4px solid var(--color-accent);
+  background: rgba(168, 72, 58, 0.05);
+  color: var(--color-text-secondary);
+  border-radius: 0 8px 8px 0;
+  line-height: 2;
+}
+.markdown-body blockquote p {
+  margin: 6px 0;
+}
 /* 行内代码 */
-.markdown-body code { background: rgba(58,46,34,0.08); padding: 2px 6px; border-radius: 4px; font-size: 13px; font-family: 'Consolas', 'Monaco', 'Courier New', monospace; word-break: break-all; }
+.markdown-body code {
+  background: rgba(58, 46, 34, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  word-break: break-all;
+}
 /* 代码块:深色背景+滚动+自动换行防溢出 */
-.markdown-body pre { background: #1e2a3a; color: #e8dcc8; padding: 16px 20px; border-radius: 10px; overflow-x: auto; margin: 20px 0; line-height: 1.6; }
-.markdown-body pre code { background: none; padding: 0; color: inherit; font-size: 13px; white-space: pre-wrap; word-break: break-all; word-wrap: break-word; }
+.markdown-body pre {
+  background: #1e2a3a;
+  color: #e8dcc8;
+  padding: 16px 20px;
+  border-radius: 10px;
+  overflow-x: auto;
+  margin: 20px 0;
+  line-height: 1.6;
+}
+.markdown-body pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  word-wrap: break-word;
+}
 /* 表格:边框+斑马纹+滚动容器 */
-.markdown-body table { border-collapse: collapse; margin: 20px 0; width: 100%; display: block; overflow-x: auto; }
-.markdown-body thead { background: rgba(58,46,34,0.06); }
-.markdown-body th, .markdown-body td { border: 1px solid var(--color-border); padding: 10px 14px; text-align: left; line-height: 1.8; }
-.markdown-body th { font-weight: 600; white-space: nowrap; }
-.markdown-body tbody tr:nth-child(even) { background: rgba(58,46,34,0.02); }
-.markdown-body img { max-width: 100%; border-radius: 8px; margin: 20px 0; }
-.markdown-body a { color: var(--color-accent); text-decoration: underline; }
-.markdown-body hr { border: none; border-top: 1px solid var(--color-border); margin: 40px 0; }
+.markdown-body table {
+  border-collapse: collapse;
+  margin: 20px 0;
+  width: 100%;
+  display: block;
+  overflow-x: auto;
+}
+.markdown-body thead {
+  background: rgba(58, 46, 34, 0.06);
+}
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid var(--color-border);
+  padding: 10px 14px;
+  text-align: left;
+  line-height: 1.8;
+}
+.markdown-body th {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.markdown-body tbody tr:nth-child(even) {
+  background: rgba(58, 46, 34, 0.02);
+}
+.markdown-body img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 20px 0;
+}
+.markdown-body a {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 40px 0;
+}
 
-.like-bar { margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(31, 58, 95, 0.08); }
-.comments { margin-top: 16px; margin-right: calc(200px + 24px); padding: 20px 28px; }
-.comments-title { font-weight: 600; color: var(--color-primary); margin-bottom: 12px; }
-.comment-input { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
-.comment-actions { display: flex; justify-content: flex-end; gap: 8px; }
-.comment-list { display: flex; flex-direction: column; gap: 14px; }
-.comment-item { border-bottom: 1px solid rgba(31, 58, 95, 0.06); padding-bottom: 12px; }
-.comment-head { display: flex; gap: 10px; align-items: center; margin-bottom: 4px; }
-.c-author { font-weight: 600; font-size: 13px; color: var(--color-accent); }
-.c-time { font-size: 12px; color: var(--color-text-secondary); }
-.c-body { font-size: 14px; line-height: 1.6; }
-.c-ops { margin-top: 4px; }
-.reply-list { margin-top: 10px; padding-left: 16px; border-left: 2px solid rgba(46, 116, 181, 0.15); display: flex; flex-direction: column; gap: 6px; }
-.reply-item { font-size: 13px; }
-.reply-to { color: var(--color-text-secondary); margin: 0 4px; }
-.reply-content { color: var(--color-text); }
-.reply-del { margin-left: 6px; }
+.like-bar {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(31, 58, 95, 0.08);
+}
+.comments {
+  margin-top: 16px;
+  margin-right: calc(200px + 24px);
+  padding: 20px 28px;
+}
+.comments-title {
+  font-weight: 600;
+  color: var(--color-primary);
+  margin-bottom: 12px;
+}
+.comment-input {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.comment-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.comment-item {
+  border-bottom: 1px solid rgba(31, 58, 95, 0.06);
+  padding-bottom: 12px;
+}
+.comment-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.c-author {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--color-accent);
+}
+.c-time {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.c-body {
+  font-size: 14px;
+  line-height: 1.6;
+}
+.c-ops {
+  margin-top: 4px;
+}
+.reply-list {
+  margin-top: 10px;
+  padding-left: 16px;
+  border-left: 2px solid rgba(46, 116, 181, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.reply-item {
+  font-size: 13px;
+}
+.reply-to {
+  color: var(--color-text-secondary);
+  margin: 0 4px;
+}
+.reply-content {
+  color: var(--color-text);
+}
+.reply-del {
+  margin-left: 6px;
+}
 
 /* 目录滚动条 */
-.toc::-webkit-scrollbar { width: 4px; }
-.toc::-webkit-scrollbar-thumb { background: rgba(58, 46, 34, 0.15); border-radius: 2px; }
+.toc::-webkit-scrollbar {
+  width: 4px;
+}
+.toc::-webkit-scrollbar-thumb {
+  background: rgba(58, 46, 34, 0.15);
+  border-radius: 2px;
+}
 
 /* 移动端:目录隐藏,只显示正文 */
 @media (max-width: 900px) {
-  .blog-layout { flex-direction: column; }
-  .toc-aside { display: none; }
-  .detail { padding: 20px; }
-  .comments { margin-right: 0; }
+  .blog-layout {
+    flex-direction: column;
+  }
+  .toc-aside {
+    display: none;
+  }
+  .detail {
+    padding: 20px;
+  }
+  .comments {
+    margin-right: 0;
+  }
 }
 @media (max-width: 768px) {
-  .detail { padding: 14px; }
-  .blog-title-text { font-size: 20px !important; }
-  .blog-meta { font-size: 12px; }
-  .comment-input { flex-direction: column; gap: 8px; }
-  .comment-input .el-button { width: 100%; }
-  .reply-input { flex-direction: column; gap: 8px; }
-  .reply-input .el-button { width: 100%; }
+  .detail {
+    padding: 14px;
+  }
+  .blog-title-text {
+    font-size: 20px !important;
+  }
+  .blog-meta {
+    font-size: 12px;
+  }
+  .comment-input {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .comment-input .el-button {
+    width: 100%;
+  }
+  .reply-input {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .reply-input .el-button {
+    width: 100%;
+  }
 }
 </style>

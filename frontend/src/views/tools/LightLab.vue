@@ -50,9 +50,15 @@
           <input type="number" v-model.number="lng" step="0.01" class="hud-input num" :title="$t('lightLab.lng')" />
         </div>
         <div class="hud-stats">
-          <span>{{ $t('lightLab.altitude') }} <b>{{ hudAlt }}°</b></span>
-          <span>{{ $t('lightLab.azimuth') }} <b>{{ hudAz }}°</b></span>
-          <span>{{ $t('lightLab.windowAngle') }} <b>{{ hudWindowAngle }}°</b></span>
+          <span
+            >{{ $t('lightLab.altitude') }} <b>{{ hudAlt }}°</b></span
+          >
+          <span
+            >{{ $t('lightLab.azimuth') }} <b>{{ hudAz }}°</b></span
+          >
+          <span
+            >{{ $t('lightLab.windowAngle') }} <b>{{ hudWindowAngle }}°</b></span
+          >
           <span v-if="isNight" class="hud-night">{{ $t('lightLab.night') }}</span>
         </div>
         <div class="hud-row">
@@ -75,14 +81,18 @@
         <div class="hud-row">
           <span class="hud-label">{{ $t('lightLab.lightSource') }}</span>
           <div class="hud-seg">
-            <button :class="{ active: lightType === 'directional' }" @click="lightType = 'directional'">{{ $t('lightLab.directional') }}</button>
+            <button :class="{ active: lightType === 'directional' }" @click="lightType = 'directional'">
+              {{ $t('lightLab.directional') }}
+            </button>
             <button :class="{ active: lightType === 'spot' }" @click="lightType = 'spot'">{{ $t('lightLab.spot') }}</button>
             <button :class="{ active: lightType === 'point' }" @click="lightType = 'point'">{{ $t('lightLab.point') }}</button>
           </div>
         </div>
         <div class="hud-row">
           <span class="hud-label">{{ $t('lightLab.shadow') }}</span>
-          <button class="hud-btn" :class="{ on: shadowOn }" @click="toggleShadow">{{ shadowOn ? $t('lightLab.on') : $t('lightLab.off') }}</button>
+          <button class="hud-btn" :class="{ on: shadowOn }" @click="toggleShadow">
+            {{ shadowOn ? $t('lightLab.on') : $t('lightLab.off') }}
+          </button>
           <button class="hud-btn" @click="resetManualLight">{{ $t('lightLab.resetLight') }}</button>
         </div>
         <div class="hud-coords">{{ $t('lightLab.lightSource') }} {{ lightCoords || '—' }}</div>
@@ -95,7 +105,9 @@
       </div>
 
       <div class="hud-row hud-footer">
-        <button class="hud-btn" :class="{ on: lampOn }" @click="toggleLamp">{{ $t('lightLab.lamp') }} {{ lampOn ? $t('lightLab.on') : $t('lightLab.off') }}</button>
+        <button class="hud-btn" :class="{ on: lampOn }" @click="toggleLamp">
+          {{ $t('lightLab.lamp') }} {{ lampOn ? $t('lightLab.on') : $t('lightLab.off') }}
+        </button>
         <button class="hud-btn" @click="resetCamera">{{ $t('lightLab.resetView') }}</button>
       </div>
       <div class="hud-hint">{{ $t('lightLab.hint') }}</div>
@@ -294,9 +306,7 @@ const lampOn = ref(true) // 台灯开关(默认开)
 const reducedMotion = ref(false)
 
 const locationLabel = computed(() =>
-  Math.abs(lat.value - JINAN_LAT) < 0.5 && Math.abs(lng.value - JINAN_LNG) < 0.5
-    ? t('lightLab.cityJinan')
-    : t('lightLab.cityCustom')
+  Math.abs(lat.value - JINAN_LAT) < 0.5 && Math.abs(lng.value - JINAN_LNG) < 0.5 ? t('lightLab.cityJinan') : t('lightLab.cityCustom'),
 )
 
 let renderer = null
@@ -332,14 +342,14 @@ let latestSun = { time: '--:--', altitude: 0, azimuth: 180 }
 const _tmpNormal = new THREE.Vector3()
 const _sunColor = new THREE.Color()
 const _skyNight = new THREE.Color(0x0a0c14) // 夜空
-const _skyDay = new THREE.Color(0xa8d0f0)   // 白天明亮天空蓝
+const _skyDay = new THREE.Color(0xa8d0f0) // 白天明亮天空蓝
 
 // 场景常量(单位:m;坐北朝南小房间,Y 向上;南墙(窗墙)在 z=0、室内 z>0、窗外阳台 z<0,窗朝南=-z)
 const WALL_Z = 0
-const WALL_W = 4.8           // 房间净宽(X)480cm
-const WALL_H = 2.8           // 房间净高(Y)280cm(地面 Y=0,天花板 Y=2.8)
-const WALL_T = 0.15          // 墙体厚 15cm
-const ROOM_DEPTH = 4.2       // 房间净深(Z)420cm
+const WALL_W = 4.8 // 房间净宽(X)480cm
+const WALL_H = 2.8 // 房间净高(Y)280cm(地面 Y=0,天花板 Y=2.8)
+const WALL_T = 0.15 // 墙体厚 15cm
+const ROOM_DEPTH = 4.2 // 房间净深(Z)420cm
 
 // 窗(两扇日字形外推平开,左右各一扇、单扇带中间横向分格;总宽 240×高 160、底 90 顶 250,水平居中)
 const WIN_W = 2.4
@@ -347,9 +357,9 @@ const WIN_H = 1.6
 const WIN_BOTTOM = 0.9
 const WIN_CX = 0
 const WIN_CY = WIN_BOTTOM + WIN_H / 2
-const WIN_FRAME = 0.12       // 外窗框 12cm(加厚)
-const SASH_BAR = 0.07        // 窗棂/扇框 7cm(加粗)
-const MULLION_BAR = 0.07     // 日字形中横棂 7cm(加粗)
+const WIN_FRAME = 0.12 // 外窗框 12cm(加厚)
+const SASH_BAR = 0.07 // 窗棂/扇框 7cm(加粗)
+const MULLION_BAR = 0.07 // 日字形中横棂 7cm(加粗)
 
 // 书桌(长 270×深 70×高 75,靠窗墙居中,略宽于窗;三抽屉朝室内:中 1 大 + 左右 2 小对称)
 const DESK_W = 2.7
@@ -363,8 +373,8 @@ const DRAWER_BANK_H = 0.15
 const BALCONY_W = 2.6
 const BALCONY_D = 0.8
 const BALCONY_TOP = 0.75
-const BALCONY_T = 0.12        // 平台板厚
-const BALCONY_RAIL = 0.30     // 护栏高(平台顶面以上,矮护栏)
+const BALCONY_T = 0.12 // 平台板厚
+const BALCONY_RAIL = 0.3 // 护栏高(平台顶面以上,矮护栏)
 
 // 台灯(置于桌面左侧,聚光朝下打亮桌面)
 const LAMP_X = -1.05
@@ -505,7 +515,7 @@ function buildFloor() {
   // 地板:覆盖室内(0~4.2)+ 窗外阳台下方一小段地面
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(6, 6),
-    new THREE.MeshStandardMaterial({ color: 0xc8a06b, roughness: 0.85, metalness: 0 })
+    new THREE.MeshStandardMaterial({ color: 0xc8a06b, roughness: 0.85, metalness: 0 }),
   )
   floor.rotation.x = -Math.PI / 2
   floor.position.set(0, 0, 2.0) // 覆盖 x∈[-3,3]、z∈[-1,5]
@@ -532,7 +542,7 @@ function buildWall() {
   geo.translate(0, 0, -WALL_T / 2)
   const wall = new THREE.Mesh(
     geo,
-    new THREE.MeshStandardMaterial({ color: 0xe0d5c0, roughness: 0.95, side: THREE.DoubleSide, bumpMap: getWallBumpTex(), bumpScale: 0.4 })
+    new THREE.MeshStandardMaterial({ color: 0xe0d5c0, roughness: 0.95, side: THREE.DoubleSide, bumpMap: getWallBumpTex(), bumpScale: 0.4 }),
   )
   wall.position.set(0, 0, WALL_Z)
   wall.castShadow = true
@@ -577,7 +587,7 @@ function buildDesk() {
   // 桌面边缘细微磨损(前缘浅色磨边)
   const wearEdge = new THREE.Mesh(
     new THREE.BoxGeometry(DESK_W, 0.018, 0.008),
-    new THREE.MeshStandardMaterial({ color: 0x8a6644, roughness: 0.7 })
+    new THREE.MeshStandardMaterial({ color: 0x8a6644, roughness: 0.7 }),
   )
   wearEdge.position.set(0, DESK_H - 0.02, DESK_D)
   wearEdge.castShadow = true
@@ -597,11 +607,11 @@ function buildDesk() {
   }
 
   // 桌下抽屉柜(双抽屉,整条柜体挂在桌面下沿前方,朝室内 +z)
-  const bankW = DESK_W - 0.16        // 略窄于桌面,让开两侧桌腿
-  const bankH = DRAWER_BANK_H        // 柜高
-  const bankD = 0.45                 // 柜深(比桌面浅,后面留空)
+  const bankW = DESK_W - 0.16 // 略窄于桌面,让开两侧桌腿
+  const bankH = DRAWER_BANK_H // 柜高
+  const bankD = 0.45 // 柜深(比桌面浅,后面留空)
   const bankY = DESK_H - 0.05 - bankH / 2 // 柜中心高(顶贴桌面下沿)
-  const bankZ = DESK_D - bankD / 2        // 柜中心深(前缘与桌面齐平)
+  const bankZ = DESK_D - bankD / 2 // 柜中心深(前缘与桌面齐平)
   const bank = new THREE.Mesh(new THREE.BoxGeometry(bankW, bankH, bankD), woodMat)
   bank.position.set(0, bankY, bankZ)
   bank.castShadow = true
@@ -610,7 +620,7 @@ function buildDesk() {
 
   // 三扇抽屉面板(中间 1 大 + 左右 2 小对称,略凸出于柜前,朝室内)+ 横向拉手
   const GAP = 0.02
-  const MID_W = 1.10
+  const MID_W = 1.1
   const SIDE_W = 0.68
   const frontZ = DESK_D + 0.012
   const specs = [
@@ -639,7 +649,7 @@ function buildDeskItems() {
   const laptop = new THREE.Group()
   const laptopBase = new THREE.Mesh(
     new THREE.BoxGeometry(0.34, 0.015, 0.23),
-    new THREE.MeshStandardMaterial({ color: 0x3a3f47, roughness: 0.4, metalness: 0.6 })
+    new THREE.MeshStandardMaterial({ color: 0x3a3f47, roughness: 0.4, metalness: 0.6 }),
   )
   laptopBase.position.y = 0.0075
   laptopBase.castShadow = true
@@ -648,7 +658,7 @@ function buildDeskItems() {
   hinge.position.set(0, 0.015, -0.115)
   const laptopScreen = new THREE.Mesh(
     new THREE.BoxGeometry(0.34, 0.24, 0.008),
-    new THREE.MeshStandardMaterial({ color: 0x1f2329, roughness: 0.3, metalness: 0.4 })
+    new THREE.MeshStandardMaterial({ color: 0x1f2329, roughness: 0.3, metalness: 0.4 }),
   )
   laptopScreen.position.y = 0.12
   laptopScreen.castShadow = true
@@ -660,10 +670,7 @@ function buildDeskItems() {
   scene.add(laptop)
 
   // 2. 硬壳相册(30×24cm,厚 3.5cm),桌面左侧
-  const album = new THREE.Mesh(
-    new THREE.BoxGeometry(0.3, 0.035, 0.24),
-    new THREE.MeshStandardMaterial({ color: 0x6e4a30, roughness: 0.6 })
-  )
+  const album = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.035, 0.24), new THREE.MeshStandardMaterial({ color: 0x6e4a30, roughness: 0.6 }))
   album.position.set(-0.45, y0 + 0.02, 0.4)
   album.rotation.y = 0.3
   album.castShadow = true
@@ -673,7 +680,7 @@ function buildDeskItems() {
   // 3. 手机(16×7.5cm,厚 0.8cm),桌面右侧
   const phone = new THREE.Mesh(
     new THREE.BoxGeometry(0.16, 0.008, 0.075),
-    new THREE.MeshStandardMaterial({ color: 0x1f2329, roughness: 0.3, metalness: 0.5 })
+    new THREE.MeshStandardMaterial({ color: 0x1f2329, roughness: 0.3, metalness: 0.5 }),
   )
   phone.position.set(1.0, y0 + 0.004, 0.2)
   phone.rotation.y = 0.5
@@ -704,7 +711,13 @@ function buildLamp() {
   lampGroup = new THREE.Group()
   const woodMat = new THREE.MeshStandardMaterial({ color: 0x5b3a26, roughness: 0.55 })
   const brassMat = new THREE.MeshStandardMaterial({ color: 0xc9a05a, roughness: 0.35, metalness: 0.8 })
-  lampShadeMat = new THREE.MeshStandardMaterial({ color: 0xd8c8a8, roughness: 0.95, metalness: 0, emissive: 0x000000, side: THREE.DoubleSide })
+  lampShadeMat = new THREE.MeshStandardMaterial({
+    color: 0xd8c8a8,
+    roughness: 0.95,
+    metalness: 0,
+    emissive: 0x000000,
+    side: THREE.DoubleSide,
+  })
   const trimMat = new THREE.MeshStandardMaterial({ color: 0xb89a6a, roughness: 0.9 })
 
   // 圆形厚重胡桃木底座(直径 18cm,厚 3.5cm)
@@ -713,11 +726,7 @@ function buildLamp() {
   base.castShadow = true
   base.receiveShadow = true
   // 略带弯曲的黄铜细杆(直径 2.5cm,总高 40cm)
-  const curve = new THREE.QuadraticBezierCurve3(
-    new THREE.Vector3(0, 0, 0),
-    new THREE.Vector3(0.015, 0.2, 0),
-    new THREE.Vector3(0, 0.4, 0)
-  )
+  const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.015, 0.2, 0), new THREE.Vector3(0, 0.4, 0))
   const pole = new THREE.Mesh(new THREE.TubeGeometry(curve, 12, 0.0125, 12, false), brassMat)
   pole.position.y = 0.035
   pole.castShadow = true
@@ -759,8 +768,12 @@ function windowBar(w, h, d, cx, cy, cz, mat) {
 function buildWindow() {
   const frameMat = new THREE.MeshStandardMaterial({ color: 0x241a12, roughness: 0.55, metalness: 0 })
   const glassMat = new THREE.MeshStandardMaterial({
-    color: 0xcfe4f0, roughness: 0.04, metalness: 0.1,
-    transparent: true, opacity: 0.16, side: THREE.DoubleSide,
+    color: 0xcfe4f0,
+    roughness: 0.04,
+    metalness: 0.1,
+    transparent: true,
+    opacity: 0.16,
+    side: THREE.DoubleSide,
   })
 
   windowGroup = new THREE.Group()
@@ -795,21 +808,21 @@ function buildWindow() {
 
 function buildSash(frameMat, glassMat) {
   const g = new THREE.Group()
-  const SW = WIN_W / 2 - WIN_FRAME   // 单扇总宽 108cm(外框内净半宽)
-  const SH = WIN_H - WIN_FRAME * 2   // 单扇总高 136cm(外框内净高)
-  const GW = SW - SASH_BAR * 2       // 单扇玻璃宽 94cm
-  const GH = SH - SASH_BAR * 2       // 单扇玻璃高 122cm
+  const SW = WIN_W / 2 - WIN_FRAME // 单扇总宽 108cm(外框内净半宽)
+  const SH = WIN_H - WIN_FRAME * 2 // 单扇总高 136cm(外框内净高)
+  const GW = SW - SASH_BAR * 2 // 单扇玻璃宽 94cm
+  const GH = SH - SASH_BAR * 2 // 单扇玻璃高 122cm
   const SB = SASH_BAR
   const MB = MULLION_BAR
-  const topY = SH - SB / 2  // 上梃中心(扇内)
-  const botY = SB / 2       // 下梃中心
-  const ym = SH / 2         // 竖直中线
+  const topY = SH - SB / 2 // 上梃中心(扇内)
+  const botY = SB / 2 // 下梃中心
+  const ym = SH / 2 // 竖直中线
 
   // 四根细扇框(合页梃在左 x=0 侧 / 中缝梃在右 / 上梃 / 下梃)
-  g.add(windowBar(SB, GH, SB, SB / 2, ym, 0, frameMat))          // 合页梃(左)
-  g.add(windowBar(SB, GH, SB, SW - SB / 2, ym, 0, frameMat))     // 中缝梃(右)
-  g.add(windowBar(SW, SB, SB, SW / 2, topY, 0, frameMat))        // 上梃
-  g.add(windowBar(SW, SB, SB, SW / 2, botY, 0, frameMat))        // 下梃
+  g.add(windowBar(SB, GH, SB, SB / 2, ym, 0, frameMat)) // 合页梃(左)
+  g.add(windowBar(SB, GH, SB, SW - SB / 2, ym, 0, frameMat)) // 中缝梃(右)
+  g.add(windowBar(SW, SB, SB, SW / 2, topY, 0, frameMat)) // 上梃
+  g.add(windowBar(SW, SB, SB, SW / 2, botY, 0, frameMat)) // 下梃
   // 日字形中横棂(把扇分成上下两格)
   g.add(windowBar(SW, MB, SB, SW / 2, ym, 0, frameMat))
 
@@ -854,10 +867,7 @@ function buildHangings() {
     { p: [0.06, 0.16], r: -0.05 },
   ]
   noteSpots.forEach((n, i) => {
-    const note = new THREE.Mesh(
-      noteGeo,
-      new THREE.MeshStandardMaterial({ color: noteColors[i % noteColors.length], roughness: 0.7 })
-    )
+    const note = new THREE.Mesh(noteGeo, new THREE.MeshStandardMaterial({ color: noteColors[i % noteColors.length], roughness: 0.7 }))
     note.position.set(1.8 + n.p[0], 1.7 + n.p[1], WALL_T / 2 + 0.03)
     note.rotation.z = n.r
     scene.add(note)
@@ -870,9 +880,9 @@ function buildBalcony() {
   const railMat = new THREE.MeshStandardMaterial({ color: 0x4a4a4a, roughness: 0.5, metalness: 0.5 })
   const T = 0.035
 
-  const bz = WALL_Z - BALCONY_D / 2            // 平台中心 z=-0.4
-  const frontZ = WALL_Z - BALCONY_D            // 外沿 z=-0.8
-  const railTop = BALCONY_TOP + BALCONY_RAIL   // 护栏顶 1.05
+  const bz = WALL_Z - BALCONY_D / 2 // 平台中心 z=-0.4
+  const frontZ = WALL_Z - BALCONY_D // 外沿 z=-0.8
+  const railTop = BALCONY_TOP + BALCONY_RAIL // 护栏顶 1.05
   const railMid = BALCONY_TOP + BALCONY_RAIL / 2 // 护栏中 0.9
 
   // 平台板(浅灰水泥,宽 260×深 80×厚 12)
@@ -925,20 +935,14 @@ function buildBalcony() {
 }
 
 function buildGizmo() {
-  gizmo = new THREE.Mesh(
-    new THREE.SphereGeometry(0.16, 24, 24),
-    new THREE.MeshBasicMaterial({ color: 0xffd98a })
-  )
+  gizmo = new THREE.Mesh(new THREE.SphereGeometry(0.16, 24, 24), new THREE.MeshBasicMaterial({ color: 0xffd98a }))
   const halo = new THREE.Mesh(
     new THREE.SphereGeometry(0.3, 24, 24),
-    new THREE.MeshBasicMaterial({ color: 0xffcf7a, transparent: true, opacity: 0.28 })
+    new THREE.MeshBasicMaterial({ color: 0xffcf7a, transparent: true, opacity: 0.28 }),
   )
   gizmo.add(halo)
   // 不可见的放大命中球,便于点选(Raycaster 不校验 visible)
-  gizmoHit = new THREE.Mesh(
-    new THREE.SphereGeometry(0.5, 12, 12),
-    new THREE.MeshBasicMaterial({ visible: false })
-  )
+  gizmoHit = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 12), new THREE.MeshBasicMaterial({ visible: false }))
   gizmo.add(gizmoHit)
   gizmo.position.copy(DEFAULT_LIGHT_POS)
   scene.add(gizmo)
@@ -1027,11 +1031,7 @@ function setMode(m) {
 function sunDirection(alt, az) {
   const altR = alt * RAD
   const azR = az * RAD
-  return new THREE.Vector3(
-    -Math.sin(azR) * Math.cos(altR),
-    Math.sin(altR),
-    Math.cos(azR) * Math.cos(altR)
-  )
+  return new THREE.Vector3(-Math.sin(azR) * Math.cos(altR), Math.sin(altR), Math.cos(azR) * Math.cos(altR))
 }
 
 function sunColorHex(alt) {
@@ -1075,10 +1075,7 @@ function flushHud() {
 
 function toNDC(e) {
   const rect = renderer.domElement.getBoundingClientRect()
-  return new THREE.Vector2(
-    ((e.clientX - rect.left) / rect.width) * 2 - 1,
-    -((e.clientY - rect.top) / rect.height) * 2 + 1
-  )
+  return new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1)
 }
 
 function hitGizmo(e) {
@@ -1190,7 +1187,12 @@ function onResize() {
 
 function onVisibility() {
   if (document.hidden) {
-    if (rafId) { cancelAnimationFrame(rafId); rafId = null; lastTickMs = null; lastFrameMs = null }
+    if (rafId) {
+      cancelAnimationFrame(rafId)
+      rafId = null
+      lastTickMs = null
+      lastFrameMs = null
+    }
   } else if (!rafId) {
     lastTickMs = null
     lastFrameMs = null
@@ -1230,7 +1232,10 @@ function loop(now) {
 }
 
 function dispose() {
-  if (rafId) { cancelAnimationFrame(rafId); rafId = null }
+  if (rafId) {
+    cancelAnimationFrame(rafId)
+    rafId = null
+  }
   controls.dispose()
   disposeManualLight()
   scene.traverse((obj) => {
@@ -1397,7 +1402,9 @@ onBeforeUnmount(dispose)
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
   cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
 }
 .hud-seg button:hover,
 .hud-btn:hover {

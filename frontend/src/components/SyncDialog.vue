@@ -1,11 +1,20 @@
 <!-- 从设备同步向导:选设备 → 目录树懒加载勾选 → 确定后目录映射为影子记录(不拷贝文件);完成后通知父组件刷新 -->
 <!-- target: album=映射为相册(默认) / video=映射为放映厅视频 / music=映射为音乐曲库 -->
 <template>
-  <el-dialog v-model="visible" append-to-body :title="$t(target === 'video' ? 'cinema.syncFromDevice' : target === 'music' ? 'music.syncFromDevice' : 'album.syncFromDevice')" width="560px" @closed="cleanup">
+  <el-dialog
+    v-model="visible"
+    append-to-body
+    :title="$t(target === 'video' ? 'cinema.syncFromDevice' : target === 'music' ? 'music.syncFromDevice' : 'album.syncFromDevice')"
+    width="560px"
+    @closed="cleanup"
+  >
     <!-- 步骤一:选设备 -->
     <div v-if="step === 1">
-      <p class="wizard-hint">{{ $t(target === 'video' ? 'storage.mapHintVideo' : target === 'music' ? 'storage.mapHintMusic' : 'storage.mapHint') }}</p>
-      <div v-a11y-click
+      <p class="wizard-hint">
+        {{ $t(target === 'video' ? 'storage.mapHintVideo' : target === 'music' ? 'storage.mapHintMusic' : 'storage.mapHint') }}
+      </p>
+      <div
+        v-a11y-click
         v-for="d in devices"
         :key="d.id"
         class="device-row card"
@@ -48,12 +57,9 @@
     <template #footer>
       <el-button v-if="step === 2 && !syncing" @click="step = 1">{{ $t('common.back') }}</el-button>
       <el-button @click="visible = false">{{ syncing ? $t('storage.syncInBackground') : $t('common.cancel') }}</el-button>
-      <el-button
-        v-if="step === 2 && !syncing"
-        type="primary"
-        :disabled="!checkedPaths.length"
-        @click="start"
-      >{{ $t('storage.mapNow', { n: checkedPaths.length }) }}</el-button>
+      <el-button v-if="step === 2 && !syncing" type="primary" :disabled="!checkedPaths.length" @click="start">{{
+        $t('storage.mapNow', { n: checkedPaths.length })
+      }}</el-button>
     </template>
   </el-dialog>
 </template>
@@ -71,7 +77,13 @@ const props = defineProps({ modelValue: Boolean, target: { type: String, default
 const emit = defineEmits(['update:modelValue', 'synced'])
 
 const visible = ref(props.modelValue)
-watch(() => props.modelValue, (v) => { visible.value = v; if (v) loadDevices() })
+watch(
+  () => props.modelValue,
+  (v) => {
+    visible.value = v
+    if (v) loadDevices()
+  },
+)
 watch(visible, (v) => emit('update:modelValue', v))
 
 const step = ref(1)
@@ -88,9 +100,9 @@ let timer = null
 let runningTaskId = null
 
 // 百度/WebDAV 系路径以 / 开头,本地设备为相对路径;根层调用 path 传空
-const ROOT = (id) => ['BAIDU', 'NEXTCLOUD', 'WEBDAV'].includes(devices.value.find((d) => d.id === id)?.deviceType) ? '/' : ''
+const ROOT = (id) => (['BAIDU', 'NEXTCLOUD', 'WEBDAV'].includes(devices.value.find((d) => d.id === id)?.deviceType) ? '/' : '')
 
-const deviceIcon = (type) => ({ BAIDU: '☁️', NEXTCLOUD: '☁️', WEBDAV: '🔗', NAS: '🗄️', MOUNT: '📁', REMOTE: '🌐' }[type] || '💾')
+const deviceIcon = (type) => ({ BAIDU: '☁️', NEXTCLOUD: '☁️', WEBDAV: '🔗', NAS: '🗄️', MOUNT: '📁', REMOTE: '🌐' })[type] || '💾'
 
 async function loadDevices() {
   step.value = 1
@@ -112,11 +124,15 @@ async function loadNode(node, resolve) {
   loadingTree.value = true
   try {
     const items = await storageApi.browse(deviceId.value, path)
-    resolve(items.filter((i) => i.isDir).map((i) => ({
-      name: i.name,
-      path: joinPath(path, i.name),
-      isLeaf: false, // 是否有子目录未知,展开后见分晓;空目录显示为可展开但无内容
-    })))
+    resolve(
+      items
+        .filter((i) => i.isDir)
+        .map((i) => ({
+          name: i.name,
+          path: joinPath(path, i.name),
+          isLeaf: false, // 是否有子目录未知,展开后见分晓;空目录显示为可展开但无内容
+        })),
+    )
   } catch (e) {
     ElMessage.error(e.message || t('storage.browseFailed'))
     resolve([])
@@ -144,9 +160,12 @@ async function start() {
   result.value = null
   try {
     const payload = { deviceId: deviceId.value, paths: checkedPaths.value }
-    const { taskId } = props.target === 'video' ? await videoApi.map(payload)
-      : props.target === 'music' ? await musicApi.map(payload)
-      : await storageApi.map(payload)
+    const { taskId } =
+      props.target === 'video'
+        ? await videoApi.map(payload)
+        : props.target === 'music'
+          ? await musicApi.map(payload)
+          : await storageApi.map(payload)
     runningTaskId = taskId
     timer = setInterval(async () => {
       try {
@@ -159,14 +178,21 @@ async function start() {
             result.value = p
             ElMessage.success(p.message || t('storage.syncDone'))
             emit('synced')
-            setTimeout(() => { visible.value = false }, 800) // 前台等待:展示 100% 片刻后自动关闭
+            setTimeout(() => {
+              visible.value = false
+            }, 800) // 前台等待:展示 100% 片刻后自动关闭
           } else {
             ElMessage.error(p.message || t('storage.syncFailed'))
           }
         }
-      } catch { stopTimer(); syncing.value = false }
+      } catch {
+        stopTimer()
+        syncing.value = false
+      }
     }, 1000)
-  } catch { syncing.value = false }
+  } catch {
+    syncing.value = false
+  }
 }
 
 const progressPct = computed(() => {
@@ -175,11 +201,16 @@ const progressPct = computed(() => {
   return Math.min(100, Math.round(((p.doneDirs || 0) / p.totalDirs) * 100))
 })
 const progressStatus = computed(() => (progressData.value?.status === 'DONE' ? 'success' : undefined))
-const progressMsg = computed(() => progressData.value?.lastAlbum
-  ? `${t('storage.syncing')} · ${progressData.value.lastAlbum}`
-  : t('storage.syncing'))
+const progressMsg = computed(() =>
+  progressData.value?.lastAlbum ? `${t('storage.syncing')} · ${progressData.value.lastAlbum}` : t('storage.syncing'),
+)
 
-function stopTimer() { if (timer) { clearInterval(timer); timer = null } }
+function stopTimer() {
+  if (timer) {
+    clearInterval(timer)
+    timer = null
+  }
+}
 function cleanup() {
   // 同步进行中关窗 = 转后台:全局 store 继续轮询,完成时弹通知
   if (syncing.value && runningTaskId) syncStore.watch(runningTaskId)
@@ -190,20 +221,69 @@ function cleanup() {
 </script>
 
 <style scoped>
-.wizard-hint { margin: 0 0 12px; font-size: 13px; color: var(--color-text-secondary); }
-.device-row {
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 16px; margin-bottom: 10px; cursor: pointer;
-  border: 1px solid transparent; transition: border-color 0.15s, transform 0.15s;
+.wizard-hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
 }
-.device-row:hover { transform: translateY(-1px); }
-.device-row.active { border-color: var(--color-primary, var(--color-brand)); }
-.device-icon { font-size: 22px; }
-.device-info { display: flex; flex-direction: column; gap: 2px; flex: 1; }
-.device-name { font-size: 14px; font-weight: 600; color: var(--color-text); }
-.device-type { font-size: 11px; color: var(--color-text-secondary); }
-.tree-wrap { max-height: 380px; overflow-y: auto; border: 1px solid var(--color-border, #e4ddd0); border-radius: 10px; padding: 8px; }
-.sync-progress { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
-.progress-msg { font-size: 12px; color: var(--color-text-secondary); }
-.sync-result { margin-top: 8px; padding: 8px 12px; background: var(--color-bg-2); border-radius: 6px; font-size: 13px; }
+.device-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition:
+    border-color 0.15s,
+    transform 0.15s;
+}
+.device-row:hover {
+  transform: translateY(-1px);
+}
+.device-row.active {
+  border-color: var(--color-primary, var(--color-brand));
+}
+.device-icon {
+  font-size: 22px;
+}
+.device-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+.device-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.device-type {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+.tree-wrap {
+  max-height: 380px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border, #e4ddd0);
+  border-radius: 10px;
+  padding: 8px;
+}
+.sync-progress {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.progress-msg {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.sync-result {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--color-bg-2);
+  border-radius: 6px;
+  font-size: 13px;
+}
 </style>

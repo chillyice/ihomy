@@ -21,43 +21,51 @@
         <template v-if="selectMode">
           <span class="select-count">{{ selectSummary }}</span>
           <el-button :disabled="batchDeleting" @click="toggleSelect">{{ t('album.cancelSelect') }}</el-button>
-          <el-button type="danger" :loading="batchDeleting" :disabled="!selectedChildIds.length && !selectedIds.length" @click="onBatchDelete">{{ t('album.deleteSelected') }}</el-button>
+          <el-button
+            type="danger"
+            :loading="batchDeleting"
+            :disabled="!selectedChildIds.length && !selectedIds.length"
+            @click="onBatchDelete"
+            >{{ t('album.deleteSelected') }}</el-button
+          >
         </template>
         <template v-else>
-        <div v-if="children.length" class="view-toggle">
-          <button class="vt-btn" :class="{ active: childView === 'grid' }" :title="t('album.gridView')" @click="setChildView('grid')">
-            <svg viewBox="0 0 16 16" width="14" height="14"><rect x="1.5" y="1.5" width="5" height="5" rx="1" fill="currentColor"/><rect x="9.5" y="1.5" width="5" height="5" rx="1" fill="currentColor"/><rect x="1.5" y="9.5" width="5" height="5" rx="1" fill="currentColor"/><rect x="9.5" y="9.5" width="5" height="5" rx="1" fill="currentColor"/></svg>
-          </button>
-          <button class="vt-btn" :class="{ active: childView === 'list' }" :title="t('album.listView')" @click="setChildView('list')">
-            <svg viewBox="0 0 16 16" width="14" height="14"><rect x="1.5" y="2.5" width="13" height="3" rx="1" fill="currentColor"/><rect x="1.5" y="6.5" width="13" height="3" rx="1" fill="currentColor"/><rect x="1.5" y="10.5" width="13" height="3" rx="1" fill="currentColor"/></svg>
-          </button>
-        </div>
-        <el-button
-          v-if="isMapped && userStore.isOwner"
-          class="ghost-btn"
-          :loading="refreshing"
-          @click="onRefresh"
-        >{{ t('album.refreshMap') }}</el-button>
-        <el-button v-if="canManageAlbum" class="ghost-btn" @click="pickCover">{{ t('album.setCover') }}</el-button>
-        <el-button
-          v-if="canManageAlbum && ((photos.length && !isMapped) || children.length)"
-          class="ghost-btn"
-          @click="toggleSelect"
-        >{{ t('album.select') }}</el-button>
-        <el-button
-          v-if="album.type === 'public' && album.shareToken"
-          class="ghost-btn"
-          @click="copyAlbumShare"
-        >{{ t('album.share') }}</el-button>
-        <el-upload
-          v-if="userStore.isLoggedIn && !shareToken && !isMapped"
-          multiple
-          :show-file-list="false"
-          :http-request="uploadPhoto"
-          accept="image/*"
-        >
-          <el-button type="primary">{{ t('album.uploadPhotos') }}</el-button>
-        </el-upload>
+          <div v-if="children.length" class="view-toggle">
+            <button class="vt-btn" :class="{ active: childView === 'grid' }" :title="t('album.gridView')" @click="setChildView('grid')">
+              <svg viewBox="0 0 16 16" width="14" height="14">
+                <rect x="1.5" y="1.5" width="5" height="5" rx="1" fill="currentColor" />
+                <rect x="9.5" y="1.5" width="5" height="5" rx="1" fill="currentColor" />
+                <rect x="1.5" y="9.5" width="5" height="5" rx="1" fill="currentColor" />
+                <rect x="9.5" y="9.5" width="5" height="5" rx="1" fill="currentColor" />
+              </svg>
+            </button>
+            <button class="vt-btn" :class="{ active: childView === 'list' }" :title="t('album.listView')" @click="setChildView('list')">
+              <svg viewBox="0 0 16 16" width="14" height="14">
+                <rect x="1.5" y="2.5" width="13" height="3" rx="1" fill="currentColor" />
+                <rect x="1.5" y="6.5" width="13" height="3" rx="1" fill="currentColor" />
+                <rect x="1.5" y="10.5" width="13" height="3" rx="1" fill="currentColor" />
+              </svg>
+            </button>
+          </div>
+          <el-button v-if="isMapped && userStore.isOwner" class="ghost-btn" :loading="refreshing" @click="onRefresh">{{
+            t('album.refreshMap')
+          }}</el-button>
+          <el-button v-if="canManageAlbum" class="ghost-btn" @click="pickCover">{{ t('album.setCover') }}</el-button>
+          <el-button v-if="canManageAlbum && ((photos.length && !isMapped) || children.length)" class="ghost-btn" @click="toggleSelect">{{
+            t('album.select')
+          }}</el-button>
+          <el-button v-if="album.type === 'public' && album.shareToken" class="ghost-btn" @click="copyAlbumShare">{{
+            t('album.share')
+          }}</el-button>
+          <el-upload
+            v-if="userStore.isLoggedIn && !shareToken && !isMapped"
+            multiple
+            :show-file-list="false"
+            :http-request="uploadPhoto"
+            accept="image/*"
+          >
+            <el-button type="primary">{{ t('album.uploadPhotos') }}</el-button>
+          </el-upload>
         </template>
       </div>
     </div>
@@ -67,7 +75,8 @@
     <div v-if="children.length" class="child-section">
       <!-- 方块模式:大封面卡片 -->
       <div v-if="childView === 'grid'" class="child-grid">
-        <div v-a11y-click
+        <div
+          v-a11y-click
           v-for="c in children"
           :key="c.id"
           class="child-tile card"
@@ -81,20 +90,31 @@
             <AlbumDefaultCover v-else :size="56" />
             <span class="status-dot" :class="c.syncStatus || 'OFFLINE'"></span>
             <span v-if="selectMode" class="pick-badge" :class="{ on: selectedChildIds.includes(c.id) }">
-              <svg viewBox="0 0 16 16" width="11" height="11"><path d="M3 8.5 L6.5 12 L13 4.5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg viewBox="0 0 16 16" width="11" height="11">
+                <path
+                  d="M3 8.5 L6.5 12 L13 4.5"
+                  fill="none"
+                  stroke="#fff"
+                  stroke-width="2.4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
             </span>
           </div>
           <div class="child-tile-info">
             <span class="child-tile-name">{{ c.name }}</span>
             <span class="child-tile-meta">
-              {{ t('album.photoCount', { n: c.photoCount }) }}<template v-if="c.childCount"> · {{ t('album.subAlbumCount', { n: c.childCount }) }}</template>
+              {{ t('album.photoCount', { n: c.photoCount })
+              }}<template v-if="c.childCount"> · {{ t('album.subAlbumCount', { n: c.childCount }) }}</template>
             </span>
           </div>
         </div>
       </div>
       <!-- 列表模式:横条(单个占一整行) -->
       <div v-else class="child-list">
-        <div v-a11y-click
+        <div
+          v-a11y-click
           v-for="c in children"
           :key="c.id"
           class="child-card card"
@@ -105,13 +125,23 @@
             <AlbumDefaultCover v-if="!c.cover" :size="30" />
             <span class="status-dot" :class="c.syncStatus || 'OFFLINE'"></span>
             <span v-if="selectMode" class="pick-badge" :class="{ on: selectedChildIds.includes(c.id) }">
-              <svg viewBox="0 0 16 16" width="11" height="11"><path d="M3 8.5 L6.5 12 L13 4.5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg viewBox="0 0 16 16" width="11" height="11">
+                <path
+                  d="M3 8.5 L6.5 12 L13 4.5"
+                  fill="none"
+                  stroke="#fff"
+                  stroke-width="2.4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
             </span>
           </div>
           <div class="child-info">
             <span class="child-name">{{ c.name }}</span>
             <span class="child-meta">
-              {{ t('album.photoCount', { n: c.photoCount }) }}<template v-if="c.childCount"> · {{ t('album.subAlbumCount', { n: c.childCount }) }}</template>
+              {{ t('album.photoCount', { n: c.photoCount })
+              }}<template v-if="c.childCount"> · {{ t('album.subAlbumCount', { n: c.childCount }) }}</template>
             </span>
           </div>
         </div>
@@ -124,17 +154,30 @@
           <div v-a11y-click class="photo-wrap" @click="selectMode ? togglePick(p) : openViewer(p)">
             <img :src="thumbUrl(p.url)" :alt="p.description || album.name" loading="lazy" />
             <span v-if="selectMode" class="pick-badge" :class="{ on: selectedIds.includes(p.id) }">
-              <svg viewBox="0 0 16 16" width="11" height="11"><path d="M3 8.5 L6.5 12 L13 4.5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg viewBox="0 0 16 16" width="11" height="11">
+                <path
+                  d="M3 8.5 L6.5 12 L13 4.5"
+                  fill="none"
+                  stroke="#fff"
+                  stroke-width="2.4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
             </span>
             <div v-if="!selectMode" class="photo-hover">
-              <span v-a11y-click v-if="canManagePhoto(p)" @click.stop="openDesc(p)"><el-icon><Edit /></el-icon>{{ t('album.editNote') }}</span>
-              <span v-a11y-click v-if="canManagePhoto(p)" class="danger" @click.stop="onDelPhoto(p)"><el-icon><Delete /></el-icon>{{ t('common.delete') }}</span>
+              <span v-a11y-click v-if="canManagePhoto(p)" @click.stop="openDesc(p)"
+                ><el-icon><Edit /></el-icon>{{ t('album.editNote') }}</span
+              >
+              <span v-a11y-click v-if="canManagePhoto(p)" class="danger" @click.stop="onDelPhoto(p)"
+                ><el-icon><Delete /></el-icon>{{ t('common.delete') }}</span
+              >
             </div>
           </div>
           <div v-if="p.description" class="photo-desc">{{ p.description }}</div>
           <div v-if="p.location || p.takenAt" class="photo-meta">
-            <el-icon v-if="p.location"><Location /></el-icon>{{ p.location }}
-            <el-icon v-if="p.takenAt"><Clock /></el-icon>{{ formatDateTime(p.takenAt) }}
+            <el-icon v-if="p.location"><Location /></el-icon>{{ p.location }} <el-icon v-if="p.takenAt"><Clock /></el-icon
+            >{{ formatDateTime(p.takenAt) }}
           </div>
         </div>
       </div>
@@ -149,12 +192,7 @@
       </template>
     </el-dialog>
 
-    <PhotoViewer
-      v-model:visible="viewer.visible"
-      :photos="photos"
-      :initial-index="viewer.index"
-      :share-base="shareBase"
-    />
+    <PhotoViewer v-model:visible="viewer.visible" :photos="photos" :initial-index="viewer.index" :share-base="shareBase" />
   </div>
 </template>
 
@@ -187,24 +225,24 @@ const viewer = reactive({ visible: false, index: 0 })
 
 // 映射相册:只读(影子记录),隐藏上传与照片管理
 const isMapped = computed(() => !!album.value.sourceDeviceId)
-const statusText = computed(() => ({
-  VALID: t('album.statusValid'),
-  OFFLINE: t('album.statusOffline'),
-  MISSING: t('album.statusMissing'),
-  SYNCING: t('album.statusSyncing'),
-}[album.value.syncStatus] || ''))
+const statusText = computed(
+  () =>
+    ({
+      VALID: t('album.statusValid'),
+      OFFLINE: t('album.statusOffline'),
+      MISSING: t('album.statusMissing'),
+      SYNCING: t('album.statusSyncing'),
+    })[album.value.syncStatus] || '',
+)
 
 // 相对时间(x 前)
 const timeAgo = (d) => formatRelativeTime(t, d)
 
 // 照片管理权限:家长或上传者本人;映射相册只读,不提供编辑/删除
-const canManagePhoto = (p) =>
-  !isMapped.value && userStore.isLoggedIn && (userStore.isOwner || p.authorId === userStore.userInfo?.id)
+const canManagePhoto = (p) => !isMapped.value && userStore.isLoggedIn && (userStore.isOwner || p.authorId === userStore.userInfo?.id)
 
 // 相册分享链接基准(公开相册才有):游客凭链接查看,家庭需已公开
-const shareBase = computed(() =>
-  album.value.shareToken ? `${location.origin}/album/shared/${album.value.shareToken}` : ''
-)
+const shareBase = computed(() => (album.value.shareToken ? `${location.origin}/album/shared/${album.value.shareToken}` : ''))
 
 // 拉取相册详情与照片列表:分享模式走令牌接口(游客可访问),普通模式走详情接口
 const load = async () => {
@@ -216,7 +254,7 @@ const load = async () => {
   // 分享链接带 ?p= 混淆照片ID时,定位到该照片并打开播放页
   const p = route.query.p
   if (p) {
-    const idx = photos.value.findIndex(x => shareId(x.id) === String(p))
+    const idx = photos.value.findIndex((x) => shareId(x.id) === String(p))
     if (idx >= 0) {
       viewer.index = idx
       viewer.visible = true
@@ -286,7 +324,7 @@ const onDelPhoto = async (p) => {
 }
 
 const openViewer = (p) => {
-  viewer.index = photos.value.findIndex(x => x.id === p.id)
+  viewer.index = photos.value.findIndex((x) => x.id === p.id)
   if (viewer.index < 0) viewer.index = 0
   viewer.visible = true
 }
@@ -294,8 +332,8 @@ const openViewer = (p) => {
 // ---------- 相册封面(自定义,优先于照片封面) ----------
 const coverInput = ref(null)
 // 相册管理权限:家长或创建者,且非游客分享模式
-const canManageAlbum = computed(() =>
-  !shareToken && userStore.isLoggedIn && (userStore.isOwner || album.value.createdBy === userStore.userInfo?.id)
+const canManageAlbum = computed(
+  () => !shareToken && userStore.isLoggedIn && (userStore.isOwner || album.value.createdBy === userStore.userInfo?.id),
 )
 const pickCover = () => coverInput.value?.click()
 const onCoverPicked = async (e) => {
@@ -316,8 +354,8 @@ const setChildView = (v) => {
 
 // ---------- 子相册 + 照片多选删除(混合选择) ----------
 const selectMode = ref(false)
-const selectedIds = ref([])          // 选中照片 id
-const selectedChildIds = ref([])     // 选中子相册 id
+const selectedIds = ref([]) // 选中照片 id
+const selectedChildIds = ref([]) // 选中子相册 id
 const batchDeleting = ref(false)
 const toggleSelect = () => {
   selectMode.value = !selectMode.value
@@ -367,7 +405,9 @@ onMounted(load)
 </script>
 
 <style scoped>
-.hidden-input { display: none; }
+.hidden-input {
+  display: none;
+}
 .album-header {
   display: flex;
   justify-content: space-between;
@@ -376,8 +416,16 @@ onMounted(load)
   margin-bottom: 16px;
   padding: 10px 16px; /* 对齐全局 .page-toolbar 规范高度 */
 }
-.album-header h2 { color: var(--color-primary); margin-bottom: 6px; }
-.album-head-info { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.album-header h2 {
+  color: var(--color-primary);
+  margin-bottom: 6px;
+}
+.album-head-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
 .album-name {
   font-size: 17px;
   font-weight: 600;
@@ -385,7 +433,10 @@ onMounted(load)
   display: inline-flex;
   align-items: center;
 }
-.photo-count { font-size: 13px; color: var(--color-text-secondary); }
+.photo-count {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
 .mapped-badge {
   display: inline-flex;
   align-items: center;
@@ -396,38 +447,108 @@ onMounted(load)
   border-radius: 8px;
   background: var(--color-bg-2, #f3eee6);
 }
-.mapped-badge .synced-at { color: var(--color-text-secondary); opacity: 0.7; }
+.mapped-badge .synced-at {
+  color: var(--color-text-secondary);
+  opacity: 0.7;
+}
 .status-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   display: inline-block;
 }
-.status-dot.VALID { background: #67b26b; box-shadow: 0 0 4px rgba(103, 178, 107, 0.9); }
-.status-dot.OFFLINE, .status-dot.SYNCING { background: #9a9a9a; }
-.status-dot.MISSING { background: #b96058; box-shadow: 0 0 4px rgba(185, 96, 88, 0.9); }
-.child-section { margin-bottom: 20px; }
-.child-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
-.child-tile { overflow: hidden; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
-.child-tile:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(31,58,95,0.15); }
-.child-tile.selected { outline: 3px solid var(--color-primary, var(--color-brand)); outline-offset: -3px; }
-.child-tile-cover { position: relative; aspect-ratio: 4 / 3; }
-.child-tile-img { width: 100%; height: 100%; background-size: cover; background-position: center; }
-.child-tile-cover .status-dot { position: absolute; top: 8px; right: 8px; border: 2px solid var(--color-bg, #fcf8f0); }
-.child-tile-info { padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
-.child-tile-name { font-size: 14px; font-weight: 600; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.child-tile-meta { font-size: 12px; color: var(--color-text-secondary); }
-.child-list { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.status-dot.VALID {
+  background: #67b26b;
+  box-shadow: 0 0 4px rgba(103, 178, 107, 0.9);
+}
+.status-dot.OFFLINE,
+.status-dot.SYNCING {
+  background: #9a9a9a;
+}
+.status-dot.MISSING {
+  background: #b96058;
+  box-shadow: 0 0 4px rgba(185, 96, 88, 0.9);
+}
+.child-section {
+  margin-bottom: 20px;
+}
+.child-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+}
+.child-tile {
+  overflow: hidden;
+  cursor: pointer;
+  transition:
+    transform 0.15s,
+    box-shadow 0.15s;
+}
+.child-tile:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(31, 58, 95, 0.15);
+}
+.child-tile.selected {
+  outline: 3px solid var(--color-primary, var(--color-brand));
+  outline-offset: -3px;
+}
+.child-tile-cover {
+  position: relative;
+  aspect-ratio: 4 / 3;
+}
+.child-tile-img {
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+}
+.child-tile-cover .status-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  border: 2px solid var(--color-bg, #fcf8f0);
+}
+.child-tile-info {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.child-tile-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.child-tile-meta {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.child-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
 .child-card {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
   cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
+  transition:
+    transform 0.15s,
+    box-shadow 0.15s;
 }
-.child-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(31,58,95,0.12); }
-.child-card.selected { outline: 3px solid var(--color-primary, var(--color-brand)); outline-offset: -3px; }
+.child-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(31, 58, 95, 0.12);
+}
+.child-card.selected {
+  outline: 3px solid var(--color-primary, var(--color-brand));
+  outline-offset: -3px;
+}
 .child-cover {
   position: relative;
   width: 52px;
@@ -442,12 +563,38 @@ onMounted(load)
   align-items: center;
   justify-content: center;
 }
-.child-cover .status-dot { position: absolute; bottom: -2px; right: -2px; border: 2px solid var(--color-bg, #fcf8f0); }
-.child-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.child-name { font-size: 14px; font-weight: 600; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.child-meta { font-size: 12px; color: var(--color-text-secondary); }
-.select-count { font-size: 13px; color: var(--color-text-secondary); }
-.photo-card.selected .photo-wrap { outline: 3px solid var(--color-primary, var(--color-brand)); outline-offset: -3px; }
+.child-cover .status-dot {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  border: 2px solid var(--color-bg, #fcf8f0);
+}
+.child-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.child-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.child-meta {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.select-count {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.photo-card.selected .photo-wrap {
+  outline: 3px solid var(--color-primary, var(--color-brand));
+  outline-offset: -3px;
+}
 .pick-badge {
   position: absolute;
   top: 8px;
@@ -461,16 +608,33 @@ onMounted(load)
   align-items: center;
   justify-content: center;
 }
-.pick-badge.on { background: var(--color-brand); border-color: var(--color-brand); }
-.album-desc { margin-top: 8px; color: var(--color-text-secondary); font-size: 13px; }
-.album-head-actions { display: flex; flex-direction: row; align-items: center; gap: 8px; flex-shrink: 0; }
-.album-body { margin-top: 20px; }
+.pick-badge.on {
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+}
+.album-desc {
+  margin-top: 8px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+.album-head-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.album-body {
+  margin-top: 20px;
+}
 .photo-wall {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 14px;
 }
-.photo-card { position: relative; }
+.photo-card {
+  position: relative;
+}
 .photo-wrap {
   position: relative;
   aspect-ratio: 1 / 1;
@@ -484,7 +648,9 @@ onMounted(load)
   object-fit: cover;
   transition: transform 0.2s;
 }
-.photo-wrap:hover img { transform: scale(1.05); }
+.photo-wrap:hover img {
+  transform: scale(1.05);
+}
 .photo-hover {
   position: absolute;
   inset: 0;
@@ -496,7 +662,9 @@ onMounted(load)
   opacity: 0;
   transition: opacity 0.2s;
 }
-.photo-wrap:hover .photo-hover { opacity: 1; }
+.photo-wrap:hover .photo-hover {
+  opacity: 1;
+}
 .photo-hover span {
   color: #fff;
   font-size: 12px;
@@ -508,7 +676,9 @@ onMounted(load)
   align-items: center;
   gap: 3px;
 }
-.photo-hover span.danger:hover { background: rgba(214, 48, 49, 0.7); }
+.photo-hover span.danger:hover {
+  background: rgba(214, 48, 49, 0.7);
+}
 .photo-desc {
   margin-top: 6px;
   font-size: 12px;
@@ -525,9 +695,20 @@ onMounted(load)
 }
 
 @media (max-width: 768px) {
-  .photo-wall { grid-template-columns: repeat(2, 1fr); gap: 6px; }
-  .album-header { flex-direction: column; align-items: flex-start; }
-  .album-title { font-size: 18px; }
-  .upload-bar { flex-direction: column; gap: 8px; }
+  .photo-wall {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+  .album-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .album-title {
+    font-size: 18px;
+  }
+  .upload-bar {
+    flex-direction: column;
+    gap: 8px;
+  }
 }
 </style>

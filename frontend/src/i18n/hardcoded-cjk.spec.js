@@ -17,6 +17,8 @@ const ALLOW = [
   'label="中文 (zh)"',
   'wp-segbtn',
   'ct-pet',
+  'ct-lian',
+  'ct-kan',
   'ct-ihomy',
   'Language switched',
   "startsWith('探测失败')", // 比对后端返回的探测失败文案,非展示文本
@@ -36,9 +38,7 @@ function templateUiLines(src) {
   if (!m) return []
   // 注释保留换行,保持行号与原文件一致
   const body = m[1].replace(/<!--[\s\S]*?-->/g, (c) => '\n'.repeat((c.match(/\n/g) || []).length))
-  return body.split(/\r?\n/).map((l) =>
-    l.replace(/\{\{[\s\S]*?\}\}/g, ' ').replace(/\s(?::|@|v-)[\w:.-]+="[^"]*"/g, ' '),
-  )
+  return body.split(/\r?\n/).map((l) => l.replace(/\{\{[\s\S]*?\}\}/g, ' ').replace(/\s(?::|@|v-)[\w:.-]+="[^"]*"/g, ' '))
 }
 
 // 消息字面量:ElMessage/ElMessageBox/ElNotification 的文本必须走 i18n

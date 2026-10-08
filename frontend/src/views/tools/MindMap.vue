@@ -31,7 +31,8 @@
     <el-dialog v-model="createVisible" :title="$t('tools.mindmap.new')" width="560px">
       <div class="mm-tpl-label">{{ $t('tools.mindmap.tpl.pick') }}</div>
       <div class="mm-tpl-grid">
-        <div v-a11y-click
+        <div
+          v-a11y-click
           v-for="tpl in tplOptions"
           :key="tpl.key"
           class="mm-tpl-card"
@@ -39,7 +40,8 @@
           @click="tplKey = tpl.key"
         >
           <div class="mm-tpl-name">
-            <span class="mm-tpl-emoji">{{ tpl.emoji }}</span>{{ tpl.label }}
+            <span class="mm-tpl-emoji">{{ tpl.emoji }}</span
+            >{{ tpl.label }}
           </div>
           <div class="mm-tpl-desc">{{ tpl.desc }}</div>
         </div>
@@ -56,7 +58,11 @@
         <div v-for="m in trashList" :key="m.id" class="mm-trash-item">
           <div class="mm-trash-info">
             <div class="mm-trash-title">{{ m.title }}</div>
-            <div class="mm-trash-meta">{{ $t('tools.mindmap.creator') }}：{{ m.creatorName || '-' }} · {{ $t('tools.mindmap.updatedAt') }}：{{ formatTime(m.updatedAt) }}</div>
+            <div class="mm-trash-meta">
+              {{ $t('tools.mindmap.creator') }}：{{ m.creatorName || '-' }} · {{ $t('tools.mindmap.updatedAt') }}：{{
+                formatTime(m.updatedAt)
+              }}
+            </div>
           </div>
           <div class="mm-trash-ops">
             <el-button size="small" type="primary" text @click="restoreMap(m)">{{ $t('tools.mindmap.restore') }}</el-button>
@@ -113,7 +119,14 @@ const buildTplOptions = () => {
   // 空白模板置顶;预设模板带图标与描述
   const emojis = { project: '📋', weekly: '🗓️', reading: '📖', meeting: '📝', problem: '🧩', trip: '🧳' }
   tplOptions.value = [
-    { key: 'blank', emoji: '📄', label: t('tools.mindmap.tpl.blank'), desc: t('tools.mindmap.tpl.blankDesc'), tree: null, layout: 'logicalStructure' },
+    {
+      key: 'blank',
+      emoji: '📄',
+      label: t('tools.mindmap.tpl.blank'),
+      desc: t('tools.mindmap.tpl.blankDesc'),
+      tree: null,
+      layout: 'logicalStructure',
+    },
     ...getMindmapTemplates(t).map((tpl) => ({
       ...tpl,
       emoji: emojis[tpl.key] || '📄',
@@ -138,9 +151,7 @@ const confirmCreate = async () => {
     return
   }
   const tpl = tplOptions.value.find((o) => o.key === tplKey.value)
-  const root = tpl?.tree
-    ? JSON.parse(JSON.stringify(tpl.tree))
-    : { data: { text: title, expand: true }, children: [] }
+  const root = tpl?.tree ? JSON.parse(JSON.stringify(tpl.tree)) : { data: { text: title, expand: true }, children: [] }
   // data 存 simple-mind-map 全量结构,编辑器 load() 按 root/layout/theme 解析
   const data = JSON.stringify({ root, layout: tpl?.layout || 'logicalStructure', theme: { template: 'default', config: {} } })
   creating.value = true
@@ -208,14 +219,18 @@ onMounted(load)
   transition: transform 0.2s ease;
   contain: layout style;
 }
-.mm-card:hover { transform: translateY(-3px); }
+.mm-card:hover {
+  transform: translateY(-3px);
+}
 .mm-del {
   position: absolute;
   top: 12px;
   right: 12px;
   color: var(--color-text-secondary, #8a8a8a);
 }
-.mm-del:hover { color: var(--color-danger, #e05c5c); }
+.mm-del:hover {
+  color: var(--color-danger, #e05c5c);
+}
 .mm-card-title {
   font-size: 15px;
   font-weight: 600;
@@ -242,7 +257,13 @@ onMounted(load)
 }
 
 /* 回收站 */
-.mm-trash-list { display: flex; flex-direction: column; gap: 8px; max-height: 420px; overflow: auto; }
+.mm-trash-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 420px;
+  overflow: auto;
+}
 .mm-trash-item {
   display: flex;
   align-items: center;
@@ -252,9 +273,18 @@ onMounted(load)
   border: 1px solid var(--color-border, #e5e5e5);
   border-radius: 10px;
 }
-.mm-trash-title { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
-.mm-trash-meta { font-size: 12px; color: var(--color-text-secondary, #8a8a8a); }
-.mm-trash-ops { flex-shrink: 0; }
+.mm-trash-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.mm-trash-meta {
+  font-size: 12px;
+  color: var(--color-text-secondary, #8a8a8a);
+}
+.mm-trash-ops {
+  flex-shrink: 0;
+}
 
 /* 新建模板选择 */
 .mm-tpl-label {
@@ -273,9 +303,13 @@ onMounted(load)
   border-radius: 10px;
   padding: 10px 12px;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 }
-.mm-tpl-card:hover { border-color: var(--color-primary, var(--color-brand)); }
+.mm-tpl-card:hover {
+  border-color: var(--color-primary, var(--color-brand));
+}
 .mm-tpl-card.active {
   border-color: var(--color-primary, var(--color-brand));
   background: var(--color-primary-light, rgba(184, 140, 110, 0.08));
@@ -288,7 +322,9 @@ onMounted(load)
   align-items: center;
   gap: 5px;
 }
-.mm-tpl-emoji { font-size: 15px; }
+.mm-tpl-emoji {
+  font-size: 15px;
+}
 .mm-tpl-desc {
   font-size: 12px;
   color: var(--color-text-secondary, #8a8a8a);
@@ -297,6 +333,8 @@ onMounted(load)
   white-space: nowrap;
 }
 @media (max-width: 768px) {
-  .mm-tpl-grid { grid-template-columns: repeat(2, 1fr); }
+  .mm-tpl-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 </style>

@@ -89,24 +89,10 @@
         />
 
         <div class="care-actions">
-          <el-button
-            type="primary"
-            size="large"
-            round
-            :disabled="!state.waterReady"
-            :loading="acting === 'water'"
-            @click="onWater"
-          >
+          <el-button type="primary" size="large" round :disabled="!state.waterReady" :loading="acting === 'water'" @click="onWater">
             {{ state.waterReady ? $t('plant.water') : $t('plant.waterCooldown', { min: state.waterCooldownMin }) }}
           </el-button>
-          <el-button
-            type="warning"
-            size="large"
-            round
-            :disabled="!state.sunReady"
-            :loading="acting === 'sun'"
-            @click="onSun"
-          >
+          <el-button type="warning" size="large" round :disabled="!state.sunReady" :loading="acting === 'sun'" @click="onSun">
             {{ state.sunReady ? $t('plant.sun') : $t('plant.sunCooldown', { min: state.sunCooldownMin }) }}
           </el-button>
           <el-button
@@ -126,21 +112,17 @@
           <template v-if="state.harvestable">
             <div class="harvest-next">
               <span class="next-label">{{ $t('plant.nextSpecies') }}</span>
-              <span v-a11y-click
+              <span
+                v-a11y-click
                 v-for="s in species"
                 :key="s"
                 class="next-chip"
                 :class="{ active: harvestSpecies === s }"
                 @click="harvestSpecies = s"
-              >{{ $t('plant.species.' + s) }}</span>
+                >{{ $t('plant.species.' + s) }}</span
+              >
             </div>
-            <el-button
-              type="danger"
-              size="large"
-              round
-              :loading="acting === 'harvest'"
-              @click="onHarvest"
-            >
+            <el-button type="danger" size="large" round :loading="acting === 'harvest'" @click="onHarvest">
               {{ $t('plant.harvest') }}
             </el-button>
           </template>
@@ -155,13 +137,7 @@
       <p class="empty-desc">{{ $t('plant.emptyDesc') }}</p>
 
       <div class="species-picker">
-        <div v-a11y-click
-          v-for="s in species"
-          :key="s"
-          class="species-card"
-          :class="{ active: selected === s }"
-          @click="selected = s"
-        >
+        <div v-a11y-click v-for="s in species" :key="s" class="species-card" :class="{ active: selected === s }" @click="selected = s">
           <div class="species-sprite"><PlantSprite :species="s" stage="FLOWER" /></div>
           <span>{{ $t('plant.species.' + s) }}</span>
         </div>
@@ -241,8 +217,7 @@ const weatherEffect = computed(() => {
 })
 
 const nutrientColor = computed(() => {
-  return state.value.nutrientLevel === 'HIGH' ? '#7fb069'
-    : state.value.nutrientLevel === 'MEDIUM' ? '#e6a23c' : '#f56c6c'
+  return state.value.nutrientLevel === 'HIGH' ? '#7fb069' : state.value.nutrientLevel === 'MEDIUM' ? '#e6a23c' : '#f56c6c'
 })
 
 const formatDuration = (min) => {
@@ -260,7 +235,12 @@ const formatTime = (s) => {
 }
 
 // 植物就绪后,「下一轮品种」默认沿用当前品种
-watch(() => state.value.species, (s) => { if (s) harvestSpecies.value = s })
+watch(
+  () => state.value.species,
+  (s) => {
+    if (s) harvestSpecies.value = s
+  },
+)
 
 const loadState = async () => {
   try {
@@ -395,7 +375,9 @@ html.dark .env-item {
 .nutrient-fill {
   height: 100%;
   border-radius: 5px;
-  transition: width 0.5s ease, background 0.3s ease;
+  transition:
+    width 0.5s ease,
+    background 0.3s ease;
 }
 html.dark .nutrient-bar {
   background: rgba(255, 255, 255, 0.1);

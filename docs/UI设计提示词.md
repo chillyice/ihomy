@@ -170,14 +170,16 @@
 - 不透明度:无直射光时 0,有直射光时 `sin(dayProgress * π) * 0.22`(正午最强,轻微)。
 - soft-light 模式:效果极其微妙,只给内容组件顶部边缘加一点暖光。
 
-## 6. 窗户阴影(分层重构)
+## 6. 窗户阴影(z-index 68)
 
-阴影拆为上下两层,光柱穿过中间。6 条 div bar,全部 `mix-blend-mode: darken`。
+**现行实现(V10.23 口径)**:单个 `.window-shadow` 层(fixed 全屏,`mix-blend-mode: multiply`,整层 `opacity: var(--shadow-alpha)`,台灯 mask 统一挖洞),内含 6 条 `filter: blur(16px)` 的 bar(颜色 `--shadow-color`:夜间 `rgb(8,12,28)`、其余 `rgb(0,0,0)`)+ 1 条固定不移动、随天气显隐的天气覆盖阴影。
 
-### 灰阶防叠加(关键)
-- bar 用不透明灰 `rgb(G,G,G)`,G = `(1 - shadowIntensity) * 255`(夜间 G=0 全黑,正午 G=178 浅灰)。
-- `mix-blend-mode: darken` → `min(backdrop, G)`,min 是幂等运算,跨层重叠 `min(min(backdrop,G),G) = min(backdrop,G)`,**永不叠加**。
-- 阴影强度 `shadowIntensity`:夜间 1(最深)→ 正午 0.3(最浅),`1 - sin(π·dayProgress) × 0.7`。
+### 强度与深度(关键)
+- 阴影强度 `shadowIntensity`:`isNight ? 0.7 : 0.7 - sin(π·dayProgress) × 0.4`(夜间 0.7 最深 → 正午 0.3 最浅)。
+- 层不透明度 `--shadow-alpha = min(1, shadowIntensity × shadowDepth / 70)`;`shadowDepth` = **个性化设置「阴影深度」滑块 0~100(V10.23 起可手动调)**,默认 70 即乘数 1(与旧版观感一致),深度 0 时整层不渲染;上限 clamp 1 防与暗角/天气阴影叠成全黑。
+- 台灯 mask(`--lamp-mask`)仍整层挖洞,不随深度变化。
+
+> 下文各 bar 的「下层 z=35 / 上层 z=49」「不透明灰 + `mix-blend-mode: darken` 幂等」是 V5.x 分层重构期的写法——后已合并为单层 `multiply` + 层不透明度(不再依赖 darken 幂等,重叠也不加深);bar 尺寸与旋转参数大体沿用,新增/改动一律以 `components/SunLightLayer.vue` 为准。
 
 ### 下层(window-shadow-lower,z=35):4 条 bar
 - **shadow-v**(内框竖):`top: -50vh; left: 50%; width: 112px; margin-left: -56px; height: 337.5vh; transform-origin: 50% 40vh; transform: rotate(var(--rot))`。
@@ -363,8 +365,7 @@ color: #3A2E22;
 - 信息面板:地区/日期/高度角/方位角/窗角度/日出/日落/时段标签(9 段:深夜/凌晨/日出/清晨/上午/正午/下午/日落/黄昏)+ 进度条。
 - 播放控件:后退/暂停/前进/停止 + **速度控制** 5 档(0.5x/1x/2x/4x/8x,间隔 `208/testSpeed` ms)。
 - 天气控制:☀️/☁️/🌧️/❄️/⛈️ + 降水等级滑块(雨雪雷专用)。
-- 图层开关:阴影/环境光复选框。
-- 台灯模式:自动/开/关按钮 + 色温/亮度滑块。
+- 台灯模式:自动/开/关按钮 + 色温/亮度/阴影深度滑块(色温/亮度/阴影深度与个性化设置同一状态)。
 - 循环 288 时隙,停止=重置真实时间+关闭控制台。
 - `useSunLight.js` provide/inject 全局共享光影状态。
 

@@ -71,7 +71,9 @@
       </el-form>
       <template #footer>
         <el-button @click="showCategoryDialog = false">{{ $t('common.cancel') }}</el-button>
-        <el-button type="primary" :disabled="!newCatName.trim() || savingCategory" :loading="savingCategory" @click="addCategory">{{ $t('common.confirm') }}</el-button>
+        <el-button type="primary" :disabled="!newCatName.trim() || savingCategory" :loading="savingCategory" @click="addCategory">{{
+          $t('common.confirm')
+        }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -108,14 +110,15 @@ const categoryTree = computed(() => {
     if (!byParent[pid]) byParent[pid] = []
     byParent[pid].push(item)
   }
-  const build = (parentId) => (byParent[parentId] || []).map(item => ({
-    value: item.path,
-    label: item.name,
-    children: item.childCount > 0 ? build(item.id) : undefined,
-  }))
+  const build = (parentId) =>
+    (byParent[parentId] || []).map((item) => ({
+      value: item.path,
+      label: item.name,
+      children: item.childCount > 0 ? build(item.id) : undefined,
+    }))
   const tree = build(0)
   // 旧分类(不在分类表,如迁移前的自由文本)注入顶级选项,保证编辑时 cascader 能回显
-  if (legacyCategory.value && !categories.value.some(c => c.path === legacyCategory.value)) {
+  if (legacyCategory.value && !categories.value.some((c) => c.path === legacyCategory.value)) {
     tree.push({ value: legacyCategory.value, label: legacyCategory.value })
   }
   return tree
@@ -130,10 +133,10 @@ const openNewCatDialog = () => {
 // 拉取家庭已有分类
 const loadCategories = async () => {
   try {
-    categories.value = await blogApi.categories() || []
+    categories.value = (await blogApi.categories()) || []
   } catch (e) {}
   // 编辑回填的分类不在分类表中(旧数据):记录为顶级选项,cascader 对不上的值显示空白
-  if (form.category && !categories.value.some(c => c.path === form.category)) legacyCategory.value = form.category
+  if (form.category && !categories.value.some((c) => c.path === form.category)) legacyCategory.value = form.category
 }
 
 // 新建分类:加入下拉列表并选中
@@ -143,9 +146,9 @@ const addCategory = async () => {
   savingCategory.value = true
   try {
     await blogApi.addCategory(name, newCatParent.value)
-    categories.value = await blogApi.categories() || []
+    categories.value = (await blogApi.categories()) || []
     // 选中新建的分类:拼路径
-    const parent = categories.value.find(c => c.id === newCatParent.value)
+    const parent = categories.value.find((c) => c.id === newCatParent.value)
     form.category = parent ? parent.path + '/' + name : name
     showCategoryDialog.value = false
   } catch (e) {
@@ -196,15 +199,53 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.category-row { display: flex; gap: 8px; width: 100%; }
-.form-footer { display: flex; justify-content: flex-end; margin-top: 4px; }
-.cover-uploader { display: flex; align-items: flex-end; gap: 12px; }
-.cover-preview { width: 180px; height: 100px; object-fit: cover; border-radius: 8px; border: 1px solid var(--color-border); cursor: pointer; }
-.cover-uploader-btn { width: 180px; height: 100px; border-radius: 8px; border: 1px dashed var(--color-border); display: flex; align-items: center; justify-content: center; color: var(--color-text-secondary); font-size: 12px; cursor: pointer; background: var(--color-bg); }
+.category-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+.form-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+.cover-uploader {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+.cover-preview {
+  width: 180px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+}
+.cover-uploader-btn {
+  width: 180px;
+  height: 100px;
+  border-radius: 8px;
+  border: 1px dashed var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  background: var(--color-bg);
+}
 
 @media (max-width: 768px) {
-  .category-row { flex-direction: column; }
-  .form-footer { flex-direction: column; gap: 8px; }
-  .form-footer .el-button { width: 100%; }
+  .category-row {
+    flex-direction: column;
+  }
+  .form-footer {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .form-footer .el-button {
+    width: 100%;
+  }
 }
 </style>

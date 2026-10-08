@@ -24,7 +24,9 @@
 
         <div class="kcta">
           <a class="kdl" :href="downloadUrl" download>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" /></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+            </svg>
             {{ $t('kada.download') }}
           </a>
         </div>
@@ -128,8 +130,7 @@ onBeforeUnmount(() => {
   min-height: 100vh;
   background:
     radial-gradient(1100px 560px at 50% -12%, rgba(240, 165, 74, 0.16), transparent 60%),
-    radial-gradient(760px 480px at 88% 6%, rgba(120, 170, 255, 0.08), transparent 60%),
-    #0c0f14;
+    radial-gradient(760px 480px at 88% 6%, rgba(120, 170, 255, 0.08), transparent 60%), #0c0f14;
   color: #e9edf3;
 }
 .kada-wrap {
@@ -202,7 +203,9 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 10px 28px rgba(240, 165, 74, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  box-shadow:
+    0 10px 28px rgba(240, 165, 74, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 .kkey-base {
   position: absolute;
@@ -256,8 +259,13 @@ onBeforeUnmount(() => {
   font-size: 16px;
   font-weight: 700;
   text-decoration: none;
-  box-shadow: 0 10px 28px rgba(240, 165, 74, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
+  box-shadow:
+    0 10px 28px rgba(240, 165, 74, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    filter 0.16s ease;
 }
 .kdl svg {
   width: 19px;
@@ -271,7 +279,9 @@ onBeforeUnmount(() => {
 .kdl:hover {
   transform: translateY(-2px);
   filter: brightness(1.04);
-  box-shadow: 0 14px 34px rgba(240, 165, 74, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  box-shadow:
+    0 14px 34px rgba(240, 165, 74, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 .kmeta {
   display: flex;
@@ -325,7 +335,10 @@ onBeforeUnmount(() => {
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.035);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
 }
 .kcard:hover {
   border-color: rgba(240, 165, 74, 0.4);
@@ -400,13 +413,26 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 720px) {
-  .khero { padding: 44px 0 40px; }
-  .ktitle { font-size: 40px; }
-  .ktitle-en { font-size: 20px; }
-  .kfeat { grid-template-columns: 1fr 1fr; }
+  .khero {
+    padding: 44px 0 40px;
+  }
+  .ktitle {
+    font-size: 40px;
+  }
+  .ktitle-en {
+    font-size: 20px;
+  }
+  .kfeat {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 @media (max-width: 460px) {
-  .kfeat { grid-template-columns: 1fr; }
-  .kplatforms { flex-wrap: wrap; gap: 12px 18px; }
+  .kfeat {
+    grid-template-columns: 1fr;
+  }
+  .kplatforms {
+    flex-wrap: wrap;
+    gap: 12px 18px;
+  }
 }
 </style>

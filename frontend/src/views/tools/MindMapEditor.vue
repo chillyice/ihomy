@@ -94,7 +94,7 @@
           clearable
           @keyup.enter="doSearch"
         />
-        <span class="mm-search-count">{{ search.info.total ? (search.info.currentIndex + 1) + '/' + search.info.total : '0/0' }}</span>
+        <span class="mm-search-count">{{ search.info.total ? search.info.currentIndex + 1 + '/' + search.info.total : '0/0' }}</span>
         <el-button :icon="ArrowUp" size="small" circle :title="$t('tools.mindmap.prev')" @click="searchPrev" />
         <el-button :icon="ArrowDown" size="small" circle :title="$t('tools.mindmap.next')" @click="searchNext" />
         <el-input
@@ -118,38 +118,70 @@
           <div class="mm-sp-section">{{ $t('tools.mindmap.textSection') }}</div>
           <div class="mm-sp-row">
             <span class="mm-sp-label">{{ $t('tools.mindmap.textColor') }}</span>
-            <el-color-picker size="small" :model-value="styleForm.color" @change="v => applyStyle('color', v)" />
+            <el-color-picker size="small" :model-value="styleForm.color" @change="(v) => applyStyle('color', v)" />
             <span class="mm-sp-label">{{ $t('tools.mindmap.fontSize') }}</span>
-            <el-input-number size="small" :min="10" :max="100" :model-value="styleForm.fontSize" @change="v => applyStyle('fontSize', v)" />
+            <el-input-number
+              size="small"
+              :min="10"
+              :max="100"
+              :model-value="styleForm.fontSize"
+              @change="(v) => applyStyle('fontSize', v)"
+            />
           </div>
           <div class="mm-sp-row">
-            <el-checkbox size="small" :model-value="styleForm.bold" @change="v => applyStyle('fontWeight', v ? 'bold' : 'normal')">{{ $t('tools.mindmap.bold') }}</el-checkbox>
-            <el-checkbox size="small" :model-value="styleForm.italic" @change="v => applyStyle('fontStyle', v ? 'italic' : 'normal')">{{ $t('tools.mindmap.italic') }}</el-checkbox>
-            <el-checkbox size="small" :model-value="styleForm.underline" @change="v => applyStyle('textDecoration', v ? 'underline' : 'none')">{{ $t('tools.mindmap.underline') }}</el-checkbox>
+            <el-checkbox size="small" :model-value="styleForm.bold" @change="(v) => applyStyle('fontWeight', v ? 'bold' : 'normal')">{{
+              $t('tools.mindmap.bold')
+            }}</el-checkbox>
+            <el-checkbox size="small" :model-value="styleForm.italic" @change="(v) => applyStyle('fontStyle', v ? 'italic' : 'normal')">{{
+              $t('tools.mindmap.italic')
+            }}</el-checkbox>
+            <el-checkbox
+              size="small"
+              :model-value="styleForm.underline"
+              @change="(v) => applyStyle('textDecoration', v ? 'underline' : 'none')"
+              >{{ $t('tools.mindmap.underline') }}</el-checkbox
+            >
           </div>
           <div class="mm-sp-section">{{ $t('tools.mindmap.nodeSection') }}</div>
           <div class="mm-sp-row">
             <span class="mm-sp-label">{{ $t('tools.mindmap.fillColor') }}</span>
-            <el-color-picker size="small" :model-value="styleForm.fillColor" @change="v => applyStyle('fillColor', v)" />
+            <el-color-picker size="small" :model-value="styleForm.fillColor" @change="(v) => applyStyle('fillColor', v)" />
             <span class="mm-sp-label">{{ $t('tools.mindmap.borderColor') }}</span>
-            <el-color-picker size="small" :model-value="styleForm.borderColor" @change="v => applyStyle('borderColor', v)" />
+            <el-color-picker size="small" :model-value="styleForm.borderColor" @change="(v) => applyStyle('borderColor', v)" />
           </div>
           <div class="mm-sp-row">
             <span class="mm-sp-label">{{ $t('tools.mindmap.borderWidth') }}</span>
-            <el-input-number size="small" :min="0" :max="20" :model-value="styleForm.borderWidth" @change="v => applyStyle('borderWidth', v)" />
+            <el-input-number
+              size="small"
+              :min="0"
+              :max="20"
+              :model-value="styleForm.borderWidth"
+              @change="(v) => applyStyle('borderWidth', v)"
+            />
             <span class="mm-sp-label">{{ $t('tools.mindmap.borderRadius') }}</span>
-            <el-input-number size="small" :min="0" :max="50" :model-value="styleForm.borderRadius" @change="v => applyStyle('borderRadius', v)" />
+            <el-input-number
+              size="small"
+              :min="0"
+              :max="50"
+              :model-value="styleForm.borderRadius"
+              @change="(v) => applyStyle('borderRadius', v)"
+            />
           </div>
           <div class="mm-sp-row">
             <span class="mm-sp-label">{{ $t('tools.mindmap.borderDasharray') }}</span>
-            <el-select size="small" class="mm-sp-dash" :model-value="styleForm.borderDasharray" @change="v => applyStyle('borderDasharray', v)">
+            <el-select
+              size="small"
+              class="mm-sp-dash"
+              :model-value="styleForm.borderDasharray"
+              @change="(v) => applyStyle('borderDasharray', v)"
+            >
               <el-option v-for="d in dashOptions" :key="d" :label="d === 'none' ? $t('tools.mindmap.solidLine') : d" :value="d" />
             </el-select>
           </div>
           <div class="mm-sp-section">{{ $t('tools.mindmap.lineSection') }}</div>
           <div class="mm-sp-row">
             <span class="mm-sp-label">{{ $t('tools.mindmap.lineColor') }}</span>
-            <el-color-picker size="small" :model-value="styleForm.lineColor" @change="v => applyStyle('lineColor', v)" />
+            <el-color-picker size="small" :model-value="styleForm.lineColor" @change="(v) => applyStyle('lineColor', v)" />
           </div>
         </template>
       </div>
@@ -159,7 +191,8 @@
     <div v-if="ctxMenu.visible" ref="ctxMenuRef" class="mm-ctx-menu card" :style="ctxMenuPos" @contextmenu.prevent>
       <div v-for="(item, i) in ctxItems" :key="i">
         <div v-if="item.divider" class="mm-ctx-divider"></div>
-        <div v-a11y-click
+        <div
+          v-a11y-click
           v-else-if="!item.children"
           class="mm-ctx-item"
           :class="{ disabled: item.disabled }"
@@ -177,7 +210,8 @@
         <div v-for="g in iconGroups" :key="g.type" class="mm-icon-group">
           <div class="mm-icon-group-name">{{ g.name }}</div>
           <div class="mm-icon-list">
-            <span v-a11y-click
+            <span
+              v-a11y-click
               v-for="ic in g.list"
               :key="ic.name"
               class="mm-icon-item"
@@ -192,33 +226,30 @@
     </div>
 
     <!-- 备注气泡 -->
-    <div
-      v-if="noteBubble.visible"
-      class="mm-note-bubble card"
-      :style="noteBubblePos"
-      @mousedown.stop
-      @contextmenu.prevent
-    >
+    <div v-if="noteBubble.visible" class="mm-note-bubble card" :style="noteBubblePos" @mousedown.stop @contextmenu.prevent>
       <div class="mm-note-bubble-text">{{ noteBubble.text }}</div>
     </div>
 
     <!-- 富文本格式工具栏(节点文字编辑时,选中即现;mousedown 阻止夺焦保住 quill 选区) -->
-    <div
-      v-if="rtBar.visible"
-      class="mm-rt-bar card"
-      :style="rtBarPos"
-      @mousedown.prevent
-      @contextmenu.prevent
-    >
+    <div v-if="rtBar.visible" class="mm-rt-bar card" :style="rtBarPos" @mousedown.prevent @contextmenu.prevent>
       <span v-a11y-click class="mm-rt-btn" :class="{ active: rtBar.formats.bold }" @click="rtToggle('bold')"><b>B</b></span>
       <span v-a11y-click class="mm-rt-btn" :class="{ active: rtBar.formats.italic }" @click="rtToggle('italic')"><i>I</i></span>
       <span v-a11y-click class="mm-rt-btn" :class="{ active: rtBar.formats.underline }" @click="rtToggle('underline')"><u>U</u></span>
       <span v-a11y-click class="mm-rt-btn" :class="{ active: rtBar.formats.strike }" @click="rtToggle('strike')"><s>S</s></span>
       <span class="mm-rt-divider"></span>
       <el-color-picker size="small" :model-value="rtBar.formats.color || null" @change="rtSetColor" />
-      <span v-a11y-click class="mm-rt-btn mm-rt-bg" :class="{ active: rtBar.formats.background }" @click="rtToggle('background')" :title="$t('tools.mindmap.bgColor')">A</span>
+      <span
+        v-a11y-click
+        class="mm-rt-btn mm-rt-bg"
+        :class="{ active: rtBar.formats.background }"
+        @click="rtToggle('background')"
+        :title="$t('tools.mindmap.bgColor')"
+        >A</span
+      >
       <span class="mm-rt-divider"></span>
-      <span v-a11y-click class="mm-rt-btn" :title="$t('tools.mindmap.clearFormat')" @click="rtClear">{{ $t('tools.mindmap.clearFormatShort') }}</span>
+      <span v-a11y-click class="mm-rt-btn" :title="$t('tools.mindmap.clearFormat')" @click="rtClear">{{
+        $t('tools.mindmap.clearFormatShort')
+      }}</span>
     </div>
 
     <!-- 历史版本抽屉 -->
@@ -241,7 +272,9 @@
             <div class="mm-hist-ops">
               <el-button size="small" type="primary" text @click="restoreSnapshot(s)">{{ $t('tools.mindmap.rollback') }}</el-button>
               <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
-                <el-button size="small" type="danger" text @click="deleteSnapshot(s)"><el-icon><Delete /></el-icon></el-button>
+                <el-button size="small" type="danger" text @click="deleteSnapshot(s)"
+                  ><el-icon><Delete /></el-icon
+                ></el-button>
               </el-tooltip>
             </div>
           </div>
@@ -283,11 +316,7 @@
         <el-tag v-for="(tag, i) in tagsDialog.list" :key="tag + i" closable @close="tagsDialog.list.splice(i, 1)">{{ tag }}</el-tag>
         <span v-if="!tagsDialog.list.length" class="mm-tags-empty">{{ $t('tools.mindmap.tagsEmpty') }}</span>
       </div>
-      <el-input
-        v-model="tagsDialog.input"
-        :placeholder="$t('tools.mindmap.tagsPlaceholder')"
-        @keyup.enter="addTag"
-      >
+      <el-input v-model="tagsDialog.input" :placeholder="$t('tools.mindmap.tagsPlaceholder')" @keyup.enter="addTag">
         <template #append>
           <el-button @click="addTag">{{ $t('tools.mindmap.addTag') }}</el-button>
         </template>
@@ -306,9 +335,24 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  ArrowLeft, ArrowDown, ArrowUp, EditPen, RefreshLeft, RefreshRight,
-  CirclePlus, Plus, Delete, Aim, Brush, Close, Search as SearchIcon, CaretRight, Clock, Camera,
-  Moon, Sunny,
+  ArrowLeft,
+  ArrowDown,
+  ArrowUp,
+  EditPen,
+  RefreshLeft,
+  RefreshRight,
+  CirclePlus,
+  Plus,
+  Delete,
+  Aim,
+  Brush,
+  Close,
+  Search as SearchIcon,
+  CaretRight,
+  Clock,
+  Camera,
+  Moon,
+  Sunny,
 } from '@element-plus/icons-vue'
 import MindMap from 'simple-mind-map'
 import Drag from 'simple-mind-map/src/plugins/Drag.js'
@@ -409,31 +453,36 @@ const mergeThemeConfig = (base, overlay) => {
   return out
 }
 const storedDark = localStorage.getItem(DARK_KEY)
-const darkEdit = ref(storedDark === null
-  ? document.documentElement.classList.contains('dark')
-  : storedDark === '1')
+const darkEdit = ref(storedDark === null ? document.documentElement.classList.contains('dark') : storedDark === '1')
 // 脑图自身的主题配置(来自保存数据/导入),深色覆盖从它派生
 let userThemeConfig = {}
 
 // 渲染完成信号:库的渲染是异步 SVG 重绘,靠 node_tree_render_end 等待,超时兜底
-const waitRender = () => new Promise((resolve) => {
-  if (!mm) return resolve()
-  let done = false
-  const finish = () => {
-    if (done) return
-    done = true
-    try { mm.off('node_tree_render_end', finish) } catch (e) { /* 忽略 */ }
-    resolve()
-  }
-  try { mm.on('node_tree_render_end', finish) } catch (e) { return resolve() }
-  setTimeout(finish, 240)
-})
+const waitRender = () =>
+  new Promise((resolve) => {
+    if (!mm) return resolve()
+    let done = false
+    const finish = () => {
+      if (done) return
+      done = true
+      try {
+        mm.off('node_tree_render_end', finish)
+      } catch (e) {
+        /* 忽略 */
+      }
+      resolve()
+    }
+    try {
+      mm.on('node_tree_render_end', finish)
+    } catch (e) {
+      return resolve()
+    }
+    setTimeout(finish, 240)
+  })
 
 const applyCanvasTheme = () => {
   if (!mm) return
-  mm.setThemeConfig(darkEdit.value
-    ? mergeThemeConfig(userThemeConfig, darkOverlayConfig())
-    : deepClone(userThemeConfig))
+  mm.setThemeConfig(darkEdit.value ? mergeThemeConfig(userThemeConfig, darkOverlayConfig()) : deepClone(userThemeConfig))
 }
 
 const toggleDarkEdit = () => {
@@ -476,31 +525,71 @@ const ctxItems = computed(() => [
   { divider: true },
   { label: t('tools.mindmap.copy'), action: () => mm.renderer.copy() },
   { label: t('tools.mindmap.cut'), action: () => exec('CUT_NODE') },
-  { label: t('tools.mindmap.paste'), action: () => { try { mm.renderer.paste() } catch (e) { /* 剪贴板权限被拒时静默 */ } } },
+  {
+    label: t('tools.mindmap.paste'),
+    action: () => {
+      try {
+        mm.renderer.paste()
+      } catch (e) {
+        /* 剪贴板权限被拒时静默 */
+      }
+    },
+  },
   { label: t('tools.mindmap.removeNode'), action: () => exec('REMOVE_NODE'), disabled: ctxMenu.isRoot },
   { divider: true },
   { label: t('tools.mindmap.expandAll'), action: () => exec('EXPAND_ALL') },
   { label: t('tools.mindmap.unexpandAll'), action: () => exec('UNEXPAND_ALL') },
   { divider: true },
-  { label: t('tools.mindmap.assocLine'), action: () => { try { mm.associativeLine.createLineFromActiveNode() } catch (e) { /* 忽略 */ } }, disabled: ctxMenu.isRoot },
-  { label: t('tools.mindmap.outerFrame'), action: () => { try { mm.outerFrame.addOuterFrame() } catch (e) { /* 忽略 */ } }, disabled: ctxMenu.isRoot },
-  { label: t('tools.mindmap.removeOuterFrame'), action: () => {
-    try {
-      if (mm.outerFrame.activeOuterFrame) { mm.outerFrame.removeActiveOuterFrame(); return }
-      // 未点击激活外框时,退化清除激活节点(含其子孙)上的外框数据,避免菜单点了没反应
-      const node = activeNode()
-      if (!node) { ElMessage.warning(t('tools.mindmap.selectFrameFirst')); return }
-      const targets = [node, ...(node.children || [])]
-      let cleared = 0
-      targets.forEach(n => {
-        if (n.getData('outerFrame')) {
-          mm.execCommand('SET_NODE_DATA', n, { outerFrame: null })
-          cleared++
+  {
+    label: t('tools.mindmap.assocLine'),
+    action: () => {
+      try {
+        mm.associativeLine.createLineFromActiveNode()
+      } catch (e) {
+        /* 忽略 */
+      }
+    },
+    disabled: ctxMenu.isRoot,
+  },
+  {
+    label: t('tools.mindmap.outerFrame'),
+    action: () => {
+      try {
+        mm.outerFrame.addOuterFrame()
+      } catch (e) {
+        /* 忽略 */
+      }
+    },
+    disabled: ctxMenu.isRoot,
+  },
+  {
+    label: t('tools.mindmap.removeOuterFrame'),
+    action: () => {
+      try {
+        if (mm.outerFrame.activeOuterFrame) {
+          mm.outerFrame.removeActiveOuterFrame()
+          return
         }
-      })
-      if (!cleared) ElMessage.warning(t('tools.mindmap.selectFrameFirst'))
-    } catch (e) { /* 忽略 */ }
-  } },
+        // 未点击激活外框时,退化清除激活节点(含其子孙)上的外框数据,避免菜单点了没反应
+        const node = activeNode()
+        if (!node) {
+          ElMessage.warning(t('tools.mindmap.selectFrameFirst'))
+          return
+        }
+        const targets = [node, ...(node.children || [])]
+        let cleared = 0
+        targets.forEach((n) => {
+          if (n.getData('outerFrame')) {
+            mm.execCommand('SET_NODE_DATA', n, { outerFrame: null })
+            cleared++
+          }
+        })
+        if (!cleared) ElMessage.warning(t('tools.mindmap.selectFrameFirst'))
+      } catch (e) {
+        /* 忽略 */
+      }
+    },
+  },
   { divider: true },
   { label: t('tools.mindmap.note'), action: openNoteDialog },
   { label: t('tools.mindmap.hyperlink'), action: openLinkDialog },
@@ -513,7 +602,8 @@ const ctxDisabled = () => !activeNode()
 const ctxMenuPos = computed(() => {
   // 视口内 clamp:菜单实测高约 554px(16 项,图标子面板展开更高,CSS max-height 会兜底滚动),
   // 估算 H 必须取大值,否则 clamp 后菜单底部仍会溢出视口(小屏实测 BUG:原 380 导致底部 4 项不可点)
-  const W = 220, H = 560
+  const W = 220,
+    H = 560
   const x = Math.min(ctxMenu.x, window.innerWidth - W - 8)
   const y = Math.min(ctxMenu.y, window.innerHeight - H - 8)
   return { left: Math.max(8, x) + 'px', top: Math.max(8, y) + 'px' }
@@ -540,18 +630,30 @@ const toggleIcon = (type, iconId) => {
   const node = activeNode()
   if (!node) return
   const wasSelected = (node.getData('icon') || []).includes(iconId)
-  let icons = (node.getData('icon') || []).filter(i => i !== iconId)
+  let icons = (node.getData('icon') || []).filter((i) => i !== iconId)
   // 同组互斥(如优先级只能有一个)
-  icons = icons.filter(i => !i.startsWith(type + '_'))
+  icons = icons.filter((i) => !i.startsWith(type + '_'))
   if (!wasSelected) icons.push(iconId)
-  try { mm.execCommand('SET_NODE_ICON', node, icons) } catch (e) { /* 忽略 */ }
+  try {
+    mm.execCommand('SET_NODE_ICON', node, icons)
+  } catch (e) {
+    /* 忽略 */
+  }
 }
 
 // ---------- 节点样式面板 ----------
 const stylePanel = reactive({ visible: false })
 const styleForm = reactive({
-  color: '', fontSize: 16, bold: false, italic: false, underline: false,
-  fillColor: '', borderColor: '', borderWidth: 0, borderRadius: 5, borderDasharray: 'none',
+  color: '',
+  fontSize: 16,
+  bold: false,
+  italic: false,
+  underline: false,
+  fillColor: '',
+  borderColor: '',
+  borderWidth: 0,
+  borderRadius: 5,
+  borderDasharray: 'none',
   lineColor: '',
 })
 const dashToArr = (s) => (s === 'none' ? 'none' : String(s).split(',').map(Number))
@@ -562,7 +664,7 @@ const loadStyleForm = () => {
   if (!node || !mm) return
   // 节点未自定义时回退主题默认(root/second/node 三档)
   const tc = mm.getThemeConfig()
-  const base = node.isRoot ? tc.root : (node.layerIndex === 1 ? tc.second : tc.node)
+  const base = node.isRoot ? tc.root : node.layerIndex === 1 ? tc.second : tc.node
   const d = node.getData()
   styleForm.color = d.color ?? base.color
   styleForm.fontSize = d.fontSize ?? base.fontSize
@@ -575,7 +677,7 @@ const loadStyleForm = () => {
   styleForm.borderRadius = d.borderRadius ?? base.borderRadius
   styleForm.borderDasharray = (() => {
     const v = d.borderDasharray ?? base.borderDasharray
-    return Array.isArray(v) ? v.join(',') : (v || 'none')
+    return Array.isArray(v) ? v.join(',') : v || 'none'
   })()
   styleForm.lineColor = d.lineColor ?? base.lineColor
 }
@@ -585,7 +687,9 @@ const applyStyle = (prop, value) => {
   if (!node || value === undefined || value === null || value === '') return
   try {
     mm.execCommand('SET_NODE_STYLE', node, prop, prop.endsWith('Dasharray') ? dashToArr(value) : value)
-  } catch (e) { /* 忽略 */ }
+  } catch (e) {
+    /* 忽略 */
+  }
 }
 
 const toggleStylePanel = () => {
@@ -613,19 +717,45 @@ const closeSearch = () => {
 }
 const doSearch = () => {
   if (!search.text.trim()) return
-  try { mm.search.search(search.text.trim()) } catch (e) { /* 忽略 */ }
+  try {
+    mm.search.search(search.text.trim())
+  } catch (e) {
+    /* 忽略 */
+  }
 }
-const searchNext = () => { try { mm.search.searchNext() } catch (e) { /* 忽略 */ } }
-const searchPrev = () => { try { mm.search.searchPrev() } catch (e) { /* 忽略 */ } }
+const searchNext = () => {
+  try {
+    mm.search.searchNext()
+  } catch (e) {
+    /* 忽略 */
+  }
+}
+const searchPrev = () => {
+  try {
+    mm.search.searchPrev()
+  } catch (e) {
+    /* 忽略 */
+  }
+}
 const doReplace = () => {
   if (!search.text.trim()) return
-  try { mm.search.replace(search.replaceText) } catch (e) { /* 忽略 */ }
+  try {
+    mm.search.replace(search.replaceText)
+  } catch (e) {
+    /* 忽略 */
+  }
 }
 const doReplaceAll = () => {
   if (!search.text.trim()) return
-  try { mm.search.replaceAll(search.replaceText) } catch (e) { /* 忽略 */ }
+  try {
+    mm.search.replaceAll(search.replaceText)
+  } catch (e) {
+    /* 忽略 */
+  }
 }
-const onSearchInfoChange = (info) => { search.info = info }
+const onSearchInfoChange = (info) => {
+  search.info = info
+}
 
 // ---------- 富文本工具栏(库事件驱动,quill 选区由库维护) ----------
 const rtBar = reactive({ visible: false, x: 0, y: 0, formats: {} })
@@ -648,13 +778,29 @@ const onRichTextSelectionChange = (hasRange, rectInfo, formatInfo) => {
 
 const rtToggle = (key) => {
   // background 需要具体色值,开关用默认高亮黄
-  const val = key === 'background'
-    ? (rtBar.formats.background ? false : '#ffe58f')
-    : !rtBar.formats[key]
-  try { mm.richText.formatText({ [key]: val }) } catch (e) { /* 忽略 */ }
+  const val = key === 'background' ? (rtBar.formats.background ? false : '#ffe58f') : !rtBar.formats[key]
+  try {
+    mm.richText.formatText({ [key]: val })
+  } catch (e) {
+    /* 忽略 */
+  }
 }
-const rtSetColor = (v) => { if (v) { try { mm.richText.formatText({ color: v }) } catch (e) { /* 忽略 */ } } }
-const rtClear = () => { try { mm.richText.removeFormat() } catch (e) { /* 忽略 */ } }
+const rtSetColor = (v) => {
+  if (v) {
+    try {
+      mm.richText.formatText({ color: v })
+    } catch (e) {
+      /* 忽略 */
+    }
+  }
+}
+const rtClear = () => {
+  try {
+    mm.richText.removeFormat()
+  } catch (e) {
+    /* 忽略 */
+  }
+}
 
 // ---------- 备注气泡 / 编辑 ----------
 const noteBubble = reactive({ visible: false, x: 0, y: 0, text: '' })
@@ -682,7 +828,11 @@ const saveNote = () => {
   const node = activeNode()
   if (!node) return
   const text = noteDialog.text.trim()
-  try { mm.execCommand('SET_NODE_NOTE', node, text || null) } catch (e) { /* 忽略 */ }
+  try {
+    mm.execCommand('SET_NODE_NOTE', node, text || null)
+  } catch (e) {
+    /* 忽略 */
+  }
   noteDialog.visible = false
 }
 
@@ -704,7 +854,11 @@ const saveLink = () => {
     ElMessage.warning(t('tools.mindmap.linkInvalid'))
     return
   }
-  try { mm.execCommand('SET_NODE_HYPERLINK', node, url || null, linkDialog.text.trim()) } catch (e) { /* 忽略 */ }
+  try {
+    mm.execCommand('SET_NODE_HYPERLINK', node, url || null, linkDialog.text.trim())
+  } catch (e) {
+    /* 忽略 */
+  }
   linkDialog.visible = false
 }
 
@@ -719,7 +873,10 @@ const openTagsDialog = () => {
   tagsDialog.visible = true
 }
 const addTag = () => {
-  const parts = tagsDialog.input.split(/[,，]/).map(s => s.trim()).filter(Boolean)
+  const parts = tagsDialog.input
+    .split(/[,，]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
   for (const p of parts) {
     if (!tagsDialog.list.includes(p)) tagsDialog.list.push(p)
   }
@@ -728,7 +885,11 @@ const addTag = () => {
 const saveTags = () => {
   const node = activeNode()
   if (!node) return
-  try { mm.execCommand('SET_NODE_TAG', node, tagsDialog.list.length ? tagsDialog.list : null) } catch (e) { /* 忽略 */ }
+  try {
+    mm.execCommand('SET_NODE_TAG', node, tagsDialog.list.length ? tagsDialog.list : null)
+  } catch (e) {
+    /* 忽略 */
+  }
   tagsDialog.visible = false
 }
 
@@ -749,11 +910,11 @@ const applyTree = (tree, full) => {
   if (!tree || !tree.data) throw new Error('invalid')
   // 完整导出 JSON 带 layout/theme,一并还原
   if (full) {
-    if (full.layout && layoutOptions.some(o => o.value === full.layout)) {
+    if (full.layout && layoutOptions.some((o) => o.value === full.layout)) {
       layout.value = full.layout
       mm.setLayout(full.layout)
     }
-    if (full.theme && full.theme.template && themeOptions.some(o => o.value === full.theme.template)) {
+    if (full.theme && full.theme.template && themeOptions.some((o) => o.value === full.theme.template)) {
       themeTemplate.value = full.theme.template
       mm.setTheme(full.theme.template)
     }
@@ -814,9 +975,18 @@ const onKeydown = (e) => {
     return
   }
   if (e.key === 'Escape') {
-    if (ctxMenu.visible) { ctxMenu.visible = false; return }
-    if (noteBubble.visible) { noteBubble.visible = false; return }
-    if (search.visible) { closeSearch(); return }
+    if (ctxMenu.visible) {
+      ctxMenu.visible = false
+      return
+    }
+    if (noteBubble.visible) {
+      noteBubble.visible = false
+      return
+    }
+    if (search.visible) {
+      closeSearch()
+      return
+    }
   }
 }
 
@@ -838,14 +1008,16 @@ const load = async () => {
       const parsed = JSON.parse(record.data)
       if (parsed && parsed.root) {
         root = parsed.root
-        if (parsed.theme && parsed.theme.template && themeOptions.some(o => o.value === parsed.theme.template)) {
+        if (parsed.theme && parsed.theme.template && themeOptions.some((o) => o.value === parsed.theme.template)) {
           theme = parsed.theme
         }
-        if (parsed.layout && layoutOptions.some(o => o.value === parsed.layout)) {
+        if (parsed.layout && layoutOptions.some((o) => o.value === parsed.layout)) {
           layout.value = parsed.layout
         }
       }
-    } catch (e) { /* 数据损坏时用默认根节点重建 */ }
+    } catch (e) {
+      /* 数据损坏时用默认根节点重建 */
+    }
   }
   await nextTick()
   init(root, theme)
@@ -887,7 +1059,9 @@ const exec = (cmd) => {
   if (!mm) return
   try {
     mm.execCommand(cmd)
-  } catch (e) { /* 无选中节点时静默忽略 */ }
+  } catch (e) {
+    /* 无选中节点时静默忽略 */
+  }
 }
 
 const scheduleSave = () => {
@@ -902,7 +1076,11 @@ const buildThumb = async () => {
   try {
     const dataUrl = await withUserTheme(() => mm.doExport.png(title.value || 'mindmap', false))
     const img = new Image()
-    await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = dataUrl })
+    await new Promise((resolve, reject) => {
+      img.onload = resolve
+      img.onerror = reject
+      img.src = dataUrl
+    })
     const scale = Math.min(1, 320 / img.width)
     const canvas = document.createElement('canvas')
     canvas.width = Math.max(1, Math.round(img.width * scale))
@@ -920,7 +1098,9 @@ const stripEmptyNodes = (root) => {
   const strip = (node) => {
     if (!node || !node.data) return node
     if (Array.isArray(node.children)) node.children = node.children.map(strip).filter(Boolean)
-    const text = String(node.data.text || '').replace(/<[^>]+>/g, '').trim()
+    const text = String(node.data.text || '')
+      .replace(/<[^>]+>/g, '')
+      .trim()
     if (!text && !(node.children && node.children.length)) return null
     return node
   }
@@ -968,7 +1148,9 @@ const saveNow = async (force = false) => {
           applyRemoteData(fresh)
           saveState.value = 'saved'
           ElMessage.success(t('tools.mindmap.conflictLoaded'))
-        } catch (e2) { /* 拉取失败保持 failed */ }
+        } catch (e2) {
+          /* 拉取失败保持 failed */
+        }
       }
     } else {
       saveState.value = 'failed'
@@ -1004,9 +1186,9 @@ const onExport = async (command) => {
   try {
     // pdf/xmind 导出依赖重(pdf-lib/jszip),插件在首次导出时动态注册
     if (command === 'pdf' || command === 'xmind') {
-      const mod = await import(command === 'pdf'
-        ? 'simple-mind-map/src/plugins/ExportPDF.js'
-        : 'simple-mind-map/src/plugins/ExportXMind.js')
+      const mod = await import(
+        command === 'pdf' ? 'simple-mind-map/src/plugins/ExportPDF.js' : 'simple-mind-map/src/plugins/ExportXMind.js'
+      )
       if (!MindMap.hasPlugin(mod.default)) mm.addPlugin(mod.default)
     }
     await withUserTheme(() => mm.export(command, true, title.value || 'mindmap'))
@@ -1017,7 +1199,11 @@ const onExport = async (command) => {
 
 const enterDemonstrate = () => {
   if (!mm) return
-  try { mm.demonstrate.enter() } catch (e) { /* 忽略 */ }
+  try {
+    mm.demonstrate.enter()
+  } catch (e) {
+    /* 忽略 */
+  }
 }
 
 // ---------- 历史版本快照 ----------
@@ -1030,7 +1216,9 @@ let lastSnapAt = Date.now()
 const maybeAutoSnapshot = () => {
   if (Date.now() - lastSnapAt < AUTO_SNAP_INTERVAL) return
   lastSnapAt = Date.now()
-  mindmapApi.snapshotCreate(id, 'AUTO').catch(() => { /* 快照失败不打扰编辑 */ })
+  mindmapApi.snapshotCreate(id, 'AUTO').catch(() => {
+    /* 快照失败不打扰编辑 */
+  })
 }
 
 const openHistory = async () => {
@@ -1068,7 +1256,7 @@ const restoreSnapshot = async (s) => {
 
 const deleteSnapshot = async (s) => {
   await mindmapApi.snapshotDelete(id, s.id)
-  history.list = history.list.filter(x => x.id !== s.id)
+  history.list = history.list.filter((x) => x.id !== s.id)
 }
 
 const formatSnapTime = (s) => (s ? String(s).slice(0, 16).replace('T', ' ') : '-')
@@ -1083,11 +1271,11 @@ const applyRemoteData = (record) => {
     const parsed = JSON.parse(record.data)
     if (!parsed?.root) return
     if (record.title) title.value = record.title
-    if (parsed.layout && layoutOptions.some(o => o.value === parsed.layout)) {
+    if (parsed.layout && layoutOptions.some((o) => o.value === parsed.layout)) {
       layout.value = parsed.layout
       mm.setLayout(parsed.layout)
     }
-    if (parsed.theme?.template && themeOptions.some(o => o.value === parsed.theme.template)) {
+    if (parsed.theme?.template && themeOptions.some((o) => o.value === parsed.theme.template)) {
       themeTemplate.value = parsed.theme.template
       mm.setTheme(parsed.theme.template)
     }
@@ -1095,7 +1283,9 @@ const applyRemoteData = (record) => {
     mm.setData(parsed.root)
     applyCanvasTheme()
     remoteUpdatedAt = record.updatedAt || ''
-  } catch (e) { /* 数据损坏忽略 */ }
+  } catch (e) {
+    /* 数据损坏忽略 */
+  }
 }
 
 const pollRemote = async () => {
@@ -1112,7 +1302,9 @@ const pollRemote = async () => {
         ElMessage.info(t('tools.mindmap.remoteUpdated'))
       }
     }
-  } catch (e) { /* 网络失败静默 */ }
+  } catch (e) {
+    /* 网络失败静默 */
+  }
 }
 
 const goList = () => {
@@ -1144,7 +1336,13 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
   window.removeEventListener('beforeunload', onBeforeUnload)
   if (mm) {
-    if (search.visible) { try { mm.search.endSearch() } catch (e) { /* 忽略 */ } }
+    if (search.visible) {
+      try {
+        mm.search.endSearch()
+      } catch (e) {
+        /* 忽略 */
+      }
+    }
     mm.destroy()
     mm = null
   }
@@ -1153,9 +1351,28 @@ onBeforeUnmount(() => {
 
 <style scoped>
 /* 全屏画布型编辑页:参照 Item.vue 的 .fp-page 模式覆写 .page 宽高限制 */
-.mm-page { display: flex; flex-direction: column; max-width: none; width: 100%; height: 100vh; height: 100dvh; }
-.mm-topbar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; flex-wrap: wrap; }
-.mm-title { display: flex; align-items: center; gap: 6px; cursor: pointer; min-width: 0; }
+.mm-page {
+  display: flex;
+  flex-direction: column;
+  max-width: none;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+}
+.mm-topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  flex-wrap: wrap;
+}
+.mm-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  min-width: 0;
+}
 .mm-title-text {
   font-size: 16px;
   font-weight: 600;
@@ -1164,13 +1381,35 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.mm-title-edit { color: var(--color-text-secondary, #8a8a8a); }
-.mm-tools { display: flex; align-items: center; gap: 8px; margin-left: 8px; }
-.mm-right { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-wrap: wrap; }
-.mm-select { width: 116px; }
-.mm-save-state { font-size: 12px; color: var(--color-text-secondary, #8a8a8a); }
-.mm-save-state.failed { color: var(--color-danger, #e05c5c); }
-.mm-save-state.dirty { color: var(--color-warning, #d9a24a); }
+.mm-title-edit {
+  color: var(--color-text-secondary, #8a8a8a);
+}
+.mm-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 8px;
+}
+.mm-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+.mm-select {
+  width: 116px;
+}
+.mm-save-state {
+  font-size: 12px;
+  color: var(--color-text-secondary, #8a8a8a);
+}
+.mm-save-state.failed {
+  color: var(--color-danger, #e05c5c);
+}
+.mm-save-state.dirty {
+  color: var(--color-warning, #d9a24a);
+}
 .mm-canvas {
   position: relative;
   flex: 1;
@@ -1194,8 +1433,15 @@ onBeforeUnmount(() => {
   max-width: calc(100% - 24px);
   flex-wrap: wrap;
 }
-.mm-search-input { width: 170px; }
-.mm-search-count { font-size: 12px; color: var(--color-text-secondary, #8a8a8a); min-width: 34px; text-align: center; }
+.mm-search-input {
+  width: 170px;
+}
+.mm-search-count {
+  font-size: 12px;
+  color: var(--color-text-secondary, #8a8a8a);
+  min-width: 34px;
+  text-align: center;
+}
 
 /* 节点样式面板(悬浮画布右侧) */
 .mm-style-panel {
@@ -1231,9 +1477,16 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   margin-bottom: 6px;
 }
-.mm-sp-label { font-size: 12px; color: var(--color-text-secondary, #8a8a8a); }
-.mm-sp-dash { width: 120px; }
-.mm-sp-row :deep(.el-input-number) { width: 90px; }
+.mm-sp-label {
+  font-size: 12px;
+  color: var(--color-text-secondary, #8a8a8a);
+}
+.mm-sp-dash {
+  width: 120px;
+}
+.mm-sp-row :deep(.el-input-number) {
+  width: 90px;
+}
 
 /* 右键菜单(fixed 定位到视口) */
 .mm-ctx-menu {
@@ -1254,18 +1507,46 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   user-select: none;
 }
-.mm-ctx-item:hover { background: var(--color-card-2, rgba(0, 0, 0, 0.04)); }
-.mm-ctx-item.disabled { color: var(--color-text-secondary, #aaa); cursor: not-allowed; }
-.mm-ctx-item.disabled:hover { background: transparent; }
-.mm-ctx-divider { height: 1px; background: var(--color-border, #e5e5e5); margin: 5px 8px; }
-.mm-ctx-arrow { transition: transform 0.15s; font-size: 12px; }
-.mm-ctx-arrow.open { transform: rotate(180deg); }
+.mm-ctx-item:hover {
+  background: var(--color-card-2, rgba(0, 0, 0, 0.04));
+}
+.mm-ctx-item.disabled {
+  color: var(--color-text-secondary, #aaa);
+  cursor: not-allowed;
+}
+.mm-ctx-item.disabled:hover {
+  background: transparent;
+}
+.mm-ctx-divider {
+  height: 1px;
+  background: var(--color-border, #e5e5e5);
+  margin: 5px 8px;
+}
+.mm-ctx-arrow {
+  transition: transform 0.15s;
+  font-size: 12px;
+}
+.mm-ctx-arrow.open {
+  transform: rotate(180deg);
+}
 
 /* 图标子面板 */
-.mm-icon-groups { padding: 4px 6px 6px; }
-.mm-icon-group { margin-bottom: 8px; }
-.mm-icon-group-name { font-size: 11px; color: var(--color-text-secondary, #8a8a8a); margin-bottom: 4px; }
-.mm-icon-list { display: flex; flex-wrap: wrap; gap: 4px; }
+.mm-icon-groups {
+  padding: 4px 6px 6px;
+}
+.mm-icon-group {
+  margin-bottom: 8px;
+}
+.mm-icon-group-name {
+  font-size: 11px;
+  color: var(--color-text-secondary, #8a8a8a);
+  margin-bottom: 4px;
+}
+.mm-icon-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
 .mm-icon-item {
   width: 24px;
   height: 24px;
@@ -1276,9 +1557,17 @@ onBeforeUnmount(() => {
   cursor: pointer;
   border: 1px solid transparent;
 }
-.mm-icon-item:hover { background: var(--color-card-2, rgba(0, 0, 0, 0.04)); }
-.mm-icon-item.active { border-color: var(--color-primary, var(--color-brand)); background: var(--color-primary-light, rgba(184, 140, 110, 0.1)); }
-.mm-icon-item :deep(svg) { width: 18px; height: 18px; }
+.mm-icon-item:hover {
+  background: var(--color-card-2, rgba(0, 0, 0, 0.04));
+}
+.mm-icon-item.active {
+  border-color: var(--color-primary, var(--color-brand));
+  background: var(--color-primary-light, rgba(184, 140, 110, 0.1));
+}
+.mm-icon-item :deep(svg) {
+  width: 18px;
+  height: 18px;
+}
 
 /* 备注气泡 */
 .mm-note-bubble {
@@ -1307,8 +1596,14 @@ onBeforeUnmount(() => {
 }
 
 /* 历史版本抽屉 */
-.mm-hist-toolbar { margin-bottom: 12px; }
-.mm-hist-list { display: flex; flex-direction: column; gap: 8px; }
+.mm-hist-toolbar {
+  margin-bottom: 12px;
+}
+.mm-hist-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 .mm-hist-item {
   display: flex;
   align-items: center;
@@ -1318,9 +1613,18 @@ onBeforeUnmount(() => {
   border: 1px solid var(--color-border, #e5e5e5);
   border-radius: 10px;
 }
-.mm-hist-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
-.mm-hist-meta { font-size: 12px; color: var(--color-text-secondary, #8a8a8a); }
-.mm-hist-ops { flex-shrink: 0; }
+.mm-hist-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.mm-hist-meta {
+  font-size: 12px;
+  color: var(--color-text-secondary, #8a8a8a);
+}
+.mm-hist-ops {
+  flex-shrink: 0;
+}
 .mm-rt-btn {
   min-width: 26px;
   height: 26px;
@@ -1333,20 +1637,53 @@ onBeforeUnmount(() => {
   user-select: none;
   padding: 0 4px;
 }
-.mm-rt-btn:hover { background: var(--color-card-2, rgba(0, 0, 0, 0.04)); }
-.mm-rt-btn.active { background: var(--color-primary-light, rgba(184, 140, 110, 0.15)); color: var(--color-primary, var(--color-brand)); }
-.mm-rt-bg { font-weight: 700; background: rgba(255, 229, 143, 0.4); }
-.mm-rt-divider { width: 1px; height: 16px; background: var(--color-border, #e5e5e5); margin: 0 2px; }
-.mm-rt-bar :deep(.el-color-picker__trigger) { width: 26px; height: 26px; }
+.mm-rt-btn:hover {
+  background: var(--color-card-2, rgba(0, 0, 0, 0.04));
+}
+.mm-rt-btn.active {
+  background: var(--color-primary-light, rgba(184, 140, 110, 0.15));
+  color: var(--color-primary, var(--color-brand));
+}
+.mm-rt-bg {
+  font-weight: 700;
+  background: rgba(255, 229, 143, 0.4);
+}
+.mm-rt-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--color-border, #e5e5e5);
+  margin: 0 2px;
+}
+.mm-rt-bar :deep(.el-color-picker__trigger) {
+  width: 26px;
+  height: 26px;
+}
 
 /* 标签编辑 */
-.mm-tags-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; min-height: 24px; }
-.mm-tags-empty { font-size: 12px; color: var(--color-text-secondary, #8a8a8a); }
+.mm-tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+  min-height: 24px;
+}
+.mm-tags-empty {
+  font-size: 12px;
+  color: var(--color-text-secondary, #8a8a8a);
+}
 
 @media (max-width: 768px) {
-  .mm-page { height: calc(100dvh - 120px); }
-  .mm-title-text { max-width: 140px; }
-  .mm-search-input { width: 120px; }
-  .mm-style-panel { width: calc(100% - 24px); }
+  .mm-page {
+    height: calc(100dvh - 120px);
+  }
+  .mm-title-text {
+    max-width: 140px;
+  }
+  .mm-search-input {
+    width: 120px;
+  }
+  .mm-style-panel {
+    width: calc(100% - 24px);
+  }
 }
 </style>

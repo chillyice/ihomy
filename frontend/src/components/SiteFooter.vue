@@ -3,7 +3,13 @@
   <footer class="site-footer">
     <a href="https://beian.miit.gov.cn" target="_blank" rel="noopener noreferrer" class="footer-link">鲁ICP备2026045543号-1</a>
     <span class="footer-sep">·</span>
-    <a href="http://www.beian.gov.cn/portal/registerSystemInfo?recordcode=37010202700748" target="_blank" rel="noopener noreferrer" class="footer-link">鲁公网安备37010202700748号</a>
+    <a
+      href="http://www.beian.gov.cn/portal/registerSystemInfo?recordcode=37010202700748"
+      target="_blank"
+      rel="noopener noreferrer"
+      class="footer-link"
+      >鲁公网安备37010202700748号</a
+    >
     <span class="footer-sep">·</span>
     <span class="footer-version">ihomy {{ appVersion }}</span>
   </footer>
@@ -23,10 +29,10 @@ const appVersion = __APP_VERSION__
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  color: var(--color-text-secondary, rgba(58,46,34,0.65));
+  color: var(--color-text-secondary, rgba(58, 46, 34, 0.65));
   font-family: Georgia, serif;
   pointer-events: auto;
-  text-shadow: 0 1px 2px rgba(255,255,255,0.5);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
 }
 .footer-link {
   color: inherit;
@@ -35,7 +41,7 @@ const appVersion = __APP_VERSION__
   transition: color 0.15s;
 }
 .footer-link:hover {
-  color: var(--color-accent, #C9A876);
+  color: var(--color-accent, #c9a876);
 }
 .footer-pending {
   opacity: 0.55;
@@ -50,10 +56,12 @@ const appVersion = __APP_VERSION__
   cursor: default;
 }
 :global(html.dark) .site-footer {
-  color: rgba(232,220,200,0.55);
-  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  color: rgba(232, 220, 200, 0.55);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 @media (max-width: 768px) {
-  .site-footer { font-size: 10px; }
+  .site-footer {
+    font-size: 10px;
+  }
 }
 </style>

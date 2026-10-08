@@ -53,7 +53,9 @@
         <div class="member-info">
           <div class="member-name">
             {{ m.nickname || m.username }}
-            <el-tag v-if="m.label" :color="m.labelColor || '#C9807A'" size="small" effect="dark" style="color: #fff; border: none">{{ m.label }}</el-tag>
+            <el-tag v-if="m.label" :color="m.labelColor || '#C9807A'" size="small" effect="dark" style="color: #fff; border: none">{{
+              m.label
+            }}</el-tag>
           </div>
           <div class="member-un">@{{ m.username }}</div>
         </div>
@@ -70,13 +72,9 @@
             <el-option :label="t('member.child')" value="CHILD" />
           </el-select>
           <el-tag v-else size="small">{{ roleName(m.roleCode) }}</el-tag>
-          <el-button
-            v-if="userStore.isOwner && m.id !== userStore.userInfo?.id"
-            size="small"
-            type="danger"
-            text
-            @click="removeMember(m)"
-          >{{ t('member.remove') }}</el-button>
+          <el-button v-if="userStore.isOwner && m.id !== userStore.userInfo?.id" size="small" type="danger" text @click="removeMember(m)">{{
+            t('member.remove')
+          }}</el-button>
         </div>
       </div>
     </div>
@@ -131,9 +129,7 @@ const searchLoading = ref(false)
 const searchResult = ref([])
 
 // 角色码转中文展示
-const roleName = (r) =>
-  ({ OWNER: t('member.owner'), MEMBER: t('member.member'), CHILD: t('member.child') }[r] || r)
-
+const roleName = (r) => ({ OWNER: t('member.owner'), MEMBER: t('member.member'), CHILD: t('member.child') })[r] || r
 
 // 拉取成员列表;OWNER 额外加载邀请码与入家申请(三者并行,失败显示重试)
 const load = async () => {
@@ -176,7 +172,10 @@ const changeRole = async (m, roleCode) => {
 
 // 移出成员:二次确认后删除并刷新列表
 const removeMember = async (m) => {
-  await ElMessageBox.confirm(t('member.removeConfirm', { name: m.nickname || m.username }), t('common.tip'), { type: 'warning', closeOnClickModal: true })
+  await ElMessageBox.confirm(t('member.removeConfirm', { name: m.nickname || m.username }), t('common.tip'), {
+    type: 'warning',
+    closeOnClickModal: true,
+  })
   await memberApi.remove(m.id)
   ElMessage.success(t('member.removed'))
   load()
@@ -217,37 +216,154 @@ onMounted(load)
 </script>
 
 <style scoped>
-.card-header h2 { color: var(--color-primary); }
-.card-header { display: flex; justify-content: space-between; align-items: center; }
-.invite-card { margin-bottom: 16px; }
-.invite-title { font-weight: 600; color: var(--color-primary); margin-bottom: 10px; }
-.invite-row { display: flex; gap: 10px; align-items: center; }
-.invite-list { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
-.invite-code { display: flex; gap: 12px; align-items: center; font-size: 13px; }
-.invite-expire { color: var(--color-text-secondary); font-size: 12px; }
-.member-list { display: flex; flex-direction: column; gap: 10px; }
-.member-row { display: flex; align-items: center; gap: 14px; padding: 12px 16px; }
-.member-info { flex: 1; }
-.member-name { font-weight: 600; font-size: 15px; color: var(--color-text); display: flex; align-items: center; gap: 6px; }
-.member-right { display: flex; align-items: center; gap: 10px; }
-.apply-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px dashed var(--color-border); }
-.apply-info { flex: 1; }
-.apply-name { font-weight: 600; font-size: 14px; }
-.apply-msg { color: var(--color-text-secondary); font-size: 12px; }
-.apply-time { color: var(--color-text-secondary); font-size: 12px; }
-.apply-actions { display: flex; gap: 8px; }
-.search-result { margin-top: 14px; max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
-.search-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 8px; }
-.search-item-info { flex: 1; min-width: 0; }
-.search-item-name { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px; }
-.search-item-desc { color: var(--color-text-secondary); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.search-item-meta { color: var(--color-text-secondary); font-size: 12px; }
+.card-header h2 {
+  color: var(--color-primary);
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.invite-card {
+  margin-bottom: 16px;
+}
+.invite-title {
+  font-weight: 600;
+  color: var(--color-primary);
+  margin-bottom: 10px;
+}
+.invite-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.invite-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.invite-code {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 13px;
+}
+.invite-expire {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+.member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.member-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+}
+.member-info {
+  flex: 1;
+}
+.member-name {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.member-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.apply-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--color-border);
+}
+.apply-info {
+  flex: 1;
+}
+.apply-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+.apply-msg {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+.apply-time {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+.apply-actions {
+  display: flex;
+  gap: 8px;
+}
+.search-result {
+  margin-top: 14px;
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.search-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+.search-item-info {
+  flex: 1;
+  min-width: 0;
+}
+.search-item-name {
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.search-item-desc {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.search-item-meta {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
 
 @media (max-width: 768px) {
-  .member-row { flex-wrap: wrap; gap: 8px; }
-  .member-right { flex-wrap: wrap; gap: 6px; }
-  .apply-row { flex-wrap: wrap; gap: 8px; }
-  .apply-actions { width: 100%; justify-content: flex-end; }
-  .search-item { flex-wrap: wrap; }
+  .member-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .member-right {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .apply-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .apply-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .search-item {
+    flex-wrap: wrap;
+  }
 }
 </style>

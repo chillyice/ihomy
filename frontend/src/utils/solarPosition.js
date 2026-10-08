@@ -7,7 +7,10 @@ const DEG = 180 / Math.PI
 const TZ_OFFSET_HOURS = 8 // 中国标准时间 UTC+8
 
 function julianDay(y, m, d, hour) {
-  if (m <= 2) { y--; m += 12 }
+  if (m <= 2) {
+    y--
+    m += 12
+  }
   const a = Math.floor(y / 100)
   const b = 2 - a + Math.floor(a / 4)
   return Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + d + hour / 24.0 + b - 1524.5
@@ -27,9 +30,7 @@ function earthEccentricity(T) {
 }
 function sunEqCenter(T) {
   const m = sunGeomMeanAnom(T) * RAD
-  return Math.sin(m) * (1.914602 - T * (0.004817 + 0.000014 * T))
-    + Math.sin(2 * m) * (0.019993 - 0.000101 * T)
-    + Math.sin(3 * m) * 0.000289
+  return Math.sin(m) * (1.914602 - T * (0.004817 + 0.000014 * T)) + Math.sin(2 * m) * (0.019993 - 0.000101 * T) + Math.sin(3 * m) * 0.000289
 }
 function sunTrueLong(T) {
   return sunGeomMeanLong(T) + sunEqCenter(T)
@@ -62,8 +63,7 @@ function eqOfTime(T) {
   const cos2l0 = Math.cos(2 * l0 * RAD)
   const sin4l0 = Math.sin(4 * l0 * RAD)
   const sin2m = Math.sin(2 * m * RAD)
-  const Etime = y * sin2l0 - 2 * e * sinm + 4 * e * y * sinm * cos2l0
-    - 0.5 * y * y * sin4l0 - 1.25 * e * e * sin2m
+  const Etime = y * sin2l0 - 2 * e * sinm + 4 * e * y * sinm * cos2l0 - 0.5 * y * y * sin4l0 - 1.25 * e * e * sin2m
   return Etime * DEG * 4.0 // minutes
 }
 function sunAltAz(lat, dec, haDeg) {

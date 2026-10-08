@@ -10,43 +10,69 @@
 
     <div class="tool-grid">
       <div v-a11y-click class="tool-card card" @click="$router.push('/tools/mindmap')">
-        <div class="tool-icon"><el-icon :size="30"><Tools /></el-icon></div>
+        <div class="tool-icon">
+          <el-icon :size="30"><Tools /></el-icon>
+        </div>
         <div class="tool-name">{{ $t('tools.mindmap.title') }}</div>
         <div class="tool-desc">{{ $t('tools.mindmap.desc') }}</div>
-        <span class="tool-enter">{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon></span>
+        <span class="tool-enter"
+          >{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon
+        ></span>
       </div>
       <div v-a11y-click class="tool-card card" @click="$router.push('/tools/ai-playground')">
-        <div class="tool-icon"><el-icon :size="30"><MagicStick /></el-icon></div>
+        <div class="tool-icon">
+          <el-icon :size="30"><MagicStick /></el-icon>
+        </div>
         <div class="tool-name">{{ $t('tools.aiPlayground.title') }}</div>
         <div class="tool-desc">{{ $t('tools.aiPlayground.desc') }}</div>
-        <span class="tool-enter">{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon></span>
+        <span class="tool-enter"
+          >{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon
+        ></span>
       </div>
       <div v-a11y-click class="tool-card card" @click="$router.push('/tools/light-lab')">
-        <div class="tool-icon"><el-icon :size="30"><Sunny /></el-icon></div>
+        <div class="tool-icon">
+          <el-icon :size="30"><Sunny /></el-icon>
+        </div>
         <div class="tool-name">{{ $t('tools.lightLab.title') }}</div>
         <div class="tool-desc">{{ $t('tools.lightLab.desc') }}</div>
-        <span class="tool-enter">{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon></span>
+        <span class="tool-enter"
+          >{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon
+        ></span>
       </div>
       <div v-a11y-click class="tool-card card" @click="$router.push('/tools/flash')">
-        <div class="tool-icon"><el-icon :size="30"><VideoPlay /></el-icon></div>
+        <div class="tool-icon">
+          <el-icon :size="30"><VideoPlay /></el-icon>
+        </div>
         <div class="tool-name">{{ $t('tools.flash.title') }}</div>
         <div class="tool-desc">{{ $t('tools.flash.desc') }}</div>
-        <span class="tool-enter">{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon></span>
+        <span class="tool-enter"
+          >{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon
+        ></span>
       </div>
       <div v-a11y-click class="tool-card card" @click="$router.push('/tools/loan')">
-        <div class="tool-icon"><el-icon :size="30"><Coin /></el-icon></div>
+        <div class="tool-icon">
+          <el-icon :size="30"><Coin /></el-icon>
+        </div>
         <div class="tool-name">{{ $t('tools.loan.title') }}</div>
         <div class="tool-desc">{{ $t('tools.loan.desc') }}</div>
-        <span class="tool-enter">{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon></span>
+        <span class="tool-enter"
+          >{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon
+        ></span>
       </div>
       <div v-a11y-click class="tool-card card" @click="$router.push('/tools/gba')">
-        <div class="tool-icon"><el-icon :size="30"><VideoPlay /></el-icon></div>
+        <div class="tool-icon">
+          <el-icon :size="30"><VideoPlay /></el-icon>
+        </div>
         <div class="tool-name">{{ $t('tools.gba.title') }}</div>
         <div class="tool-desc">{{ $t('tools.gba.desc') }}</div>
-        <span class="tool-enter">{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon></span>
+        <span class="tool-enter"
+          >{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon
+        ></span>
       </div>
       <div class="tool-card card tool-disabled">
-        <div class="tool-icon"><el-icon :size="30"><MagicStick /></el-icon></div>
+        <div class="tool-icon">
+          <el-icon :size="30"><MagicStick /></el-icon>
+        </div>
         <div class="tool-name">{{ $t('tools.more') }}</div>
       </div>
     </div>
@@ -71,8 +97,14 @@ import PageToolbar from '@/components/PageToolbar.vue'
   transition: transform 0.2s ease;
   contain: layout style;
 }
-.tool-card:hover { transform: translateY(-3px); }
-.tool-disabled { cursor: default; opacity: 0.55; border-style: dashed; }
+.tool-card:hover {
+  transform: translateY(-3px);
+}
+.tool-disabled {
+  cursor: default;
+  opacity: 0.55;
+  border-style: dashed;
+}
 .tool-icon {
   width: 56px;
   height: 56px;
@@ -84,8 +116,16 @@ import PageToolbar from '@/components/PageToolbar.vue'
   color: var(--color-accent, var(--color-brand));
   margin-bottom: 14px;
 }
-.tool-name { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
-.tool-desc { font-size: 13px; color: var(--color-text-secondary, #8a8a8a); line-height: 1.5; }
+.tool-name {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.tool-desc {
+  font-size: 13px;
+  color: var(--color-text-secondary, #8a8a8a);
+  line-height: 1.5;
+}
 .tool-enter {
   display: inline-flex;
   align-items: center;

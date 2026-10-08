@@ -102,9 +102,7 @@ function normalizeDays(days) {
 /** 'YYYY-MM-DD' 或 Date → { y, m, d };解析失败返回 null */
 function parseDate(value) {
   if (value instanceof Date) {
-    return Number.isNaN(value.getTime())
-      ? null
-      : { y: value.getFullYear(), m: value.getMonth() + 1, d: value.getDate() }
+    return Number.isNaN(value.getTime()) ? null : { y: value.getFullYear(), m: value.getMonth() + 1, d: value.getDate() }
   }
   const m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(String(value || ''))
   return m ? { y: Number(m[1]), m: Number(m[2]), d: Number(m[3]) } : null
@@ -179,9 +177,10 @@ export function firstPaymentPreview(input) {
   const rate = Math.max(0, Number(input && input.rate) || 0)
   const days = normalizeDays(input && input.firstDays)
   const interest = firstPeriodInterestC(amountC, rate, days)
-  const principal = input && input.method === REPAY_METHOD.EQUAL_PRINCIPAL
-    ? Math.round(amountC / months)
-    : annuityPaymentC(amountC, rate, months) - Math.round(amountC * rateOf(rate))
+  const principal =
+    input && input.method === REPAY_METHOD.EQUAL_PRINCIPAL
+      ? Math.round(amountC / months)
+      : annuityPaymentC(amountC, rate, months) - Math.round(amountC * rateOf(rate))
   return toYuan(Math.max(0, principal) + interest)
 }
 
@@ -372,9 +371,7 @@ function mergePlansC(plans) {
 /** 分单位内部模型:各部分计划 + 合并计划 + 固定的月供/月还本金(供提前还款复用) */
 function computeCoreC(input) {
   const months = Math.round(Number(input.months) || 0)
-  const method = input.method === REPAY_METHOD.EQUAL_PRINCIPAL
-    ? REPAY_METHOD.EQUAL_PRINCIPAL
-    : REPAY_METHOD.EQUAL_INSTALLMENT
+  const method = input.method === REPAY_METHOD.EQUAL_PRINCIPAL ? REPAY_METHOD.EQUAL_PRINCIPAL : REPAY_METHOD.EQUAL_INSTALLMENT
   const parts = buildPartsC(input).map((p) => {
     const schedule = planByPeriodsC(p.amount, p.rate, months, method)
     return {
@@ -523,9 +520,10 @@ function simulateStrategyC(core, parts, alloc, strategy) {
     let schedule
     if (strategy === PREPAY_STRATEGY.SHORTEN) {
       // 月供(等额本息)或每月本金(等额本金)保持不变,期限随之缩短;期数上限 = 原剩余期数
-      schedule = core.method === REPAY_METHOD.EQUAL_PRINCIPAL
-        ? planByPrincipalC(balance, p.rate, p.perPrincipalC, remainPeriods)
-        : planByPaymentC(balance, p.rate, p.paymentC, remainPeriods)
+      schedule =
+        core.method === REPAY_METHOD.EQUAL_PRINCIPAL
+          ? planByPrincipalC(balance, p.rate, p.perPrincipalC, remainPeriods)
+          : planByPaymentC(balance, p.rate, p.paymentC, remainPeriods)
     } else {
       schedule = planByPeriodsC(balance, p.rate, remainPeriods, core.method)
     }
@@ -713,9 +711,7 @@ function solveCashFlowRate(balanceC, periods, paymentC, firstPaymentC = 0, first
  */
 export function solveRate(input) {
   const months = Math.round(Number(input && input.months) || 0)
-  const method = input && input.method === REPAY_METHOD.EQUAL_PRINCIPAL
-    ? REPAY_METHOD.EQUAL_PRINCIPAL
-    : REPAY_METHOD.EQUAL_INSTALLMENT
+  const method = input && input.method === REPAY_METHOD.EQUAL_PRINCIPAL ? REPAY_METHOD.EQUAL_PRINCIPAL : REPAY_METHOD.EQUAL_INSTALLMENT
   const amountC = toCents(input && input.amount)
   const paymentC = toCents(input && input.payment)
   const firstDaysRaw = Number(input && input.firstDays) || 0
@@ -743,9 +739,10 @@ export function solveRate(input) {
   if (paymentC <= amountC / months) return invalid('PAYMENT_TOO_LOW')
   if (firstDaysRaw && !(firstDays >= 1 && firstDays <= MAX_FIRST_DAYS)) return invalid('BAD_FIRST_DAYS')
 
-  const monthly = method === REPAY_METHOD.EQUAL_PRINCIPAL
-    ? (paymentC - amountC / months) / (amountC * (firstDays / 30))
-    : solveCashFlowRate(amountC, months, paymentC, firstPaymentC, firstDays)
+  const monthly =
+    method === REPAY_METHOD.EQUAL_PRINCIPAL
+      ? (paymentC - amountC / months) / (amountC * (firstDays / 30))
+      : solveCashFlowRate(amountC, months, paymentC, firstPaymentC, firstDays)
   if (!Number.isFinite(monthly) || monthly > MAX_SOLVE_MONTHLY_RATE) return invalid('RATE_TOO_HIGH')
   // 首期还款额连首期利息都不够 → 本金不减反增,账面对不上
   if (firstPaymentC > 0 && firstPaymentC <= firstPeriodInterestC(amountC, monthly * 1200, firstDays)) {
@@ -754,15 +751,17 @@ export function solveRate(input) {
 
   const annualPct = monthly * 1200
   // 明细与「每期还款额」自证都用流水引擎出,首期金额/天数与输入的账单一致
-  const schedule = ledgerToScheduleC(runLedgerC({
-    amountC,
-    months,
-    method,
-    rate0: annualPct,
-    firstDays,
-    firstPaymentC,
-    events: [],
-  }))
+  const schedule = ledgerToScheduleC(
+    runLedgerC({
+      amountC,
+      months,
+      method,
+      rate0: annualPct,
+      firstDays,
+      firstPaymentC,
+      events: [],
+    }),
+  )
   return {
     valid: true,
     error: '',
@@ -804,9 +803,7 @@ function periodsToPayoffC(balanceC, ratePct, stepC, method) {
   while (remain > 0 && n < MAX_PERIODS) {
     n++
     const interest = Math.round(remain * i)
-    const principal = method === REPAY_METHOD.EQUAL_PRINCIPAL
-      ? Math.min(stepC, remain)
-      : Math.min(stepC - interest, remain)
+    const principal = method === REPAY_METHOD.EQUAL_PRINCIPAL ? Math.min(stepC, remain) : Math.min(stepC - interest, remain)
     if (principal <= 0) return MAX_PERIODS // 月供不足以覆盖利息,不再往下滚
     remain -= principal
   }
@@ -840,8 +837,7 @@ function normalizeLedgerEvents(events, months) {
   }
   // 同一期两者都有时:利率先生效(第 N+1 期起),提前还款再按新利率推算结清期次
   // 比较器必须自洽(同型事件返回 0):V8 排序对「a<b 且 b<a」的输入顺序未定义,后端已按 (期次,id) 定序,这里靠稳定排序原样保留
-  list.sort((a, b) => a.period - b.period
-    || (a.type === LOAN_EVENT.RATE_CHANGE ? 0 : 1) - (b.type === LOAN_EVENT.RATE_CHANGE ? 0 : 1))
+  list.sort((a, b) => a.period - b.period || (a.type === LOAN_EVENT.RATE_CHANGE ? 0 : 1) - (b.type === LOAN_EVENT.RATE_CHANGE ? 0 : 1))
   return { events: list, error: '' }
 }
 
@@ -944,9 +940,7 @@ function runLedgerC({ amountC, months, method, rate0, firstDays, firstPaymentC, 
     } else {
       // 第 1 期:首期本金按整月口径不变、利息按实际天数 → 首期还款额自然与后续不同(天数 30 时即标准月供);
       // 账单上有准确金额时优先用它,首期本金随之倒推。
-      pay = k === 1
-        ? (firstPaymentC > 0 ? firstPaymentC : payment - Math.round(remain * rateOf(rate)) + interest)
-        : payment
+      pay = k === 1 ? (firstPaymentC > 0 ? firstPaymentC : payment - Math.round(remain * rateOf(rate)) + interest) : payment
       principal = pay - interest
     }
     if (principal <= 0) break // 还款额不足以覆盖利息:参数异常,不再往下滚
@@ -997,9 +991,7 @@ function runLedgerC({ amountC, months, method, rate0, firstDays, firstPaymentC, 
  */
 export function loanLedger(input) {
   const months = Math.round(Number(input && input.months) || 0)
-  const method = input && input.method === REPAY_METHOD.EQUAL_PRINCIPAL
-    ? REPAY_METHOD.EQUAL_PRINCIPAL
-    : REPAY_METHOD.EQUAL_INSTALLMENT
+  const method = input && input.method === REPAY_METHOD.EQUAL_PRINCIPAL ? REPAY_METHOD.EQUAL_PRINCIPAL : REPAY_METHOD.EQUAL_INSTALLMENT
   const amountC = toCents(input && input.amount)
   const rate0 = Math.max(0, Number(input && input.rate) || 0)
   const firstDaysRaw = Number(input && input.firstDays) || 0
@@ -1149,17 +1141,15 @@ export function ledgerSnapshot(ledger, paidPeriods) {
   const paidRows = ledger.rows.slice(0, paid)
   const settled = Boolean(ledger.settled) && paid >= ledger.settledAt
   // 已还 0 期时的「剩余本金」就是贷款本金(第 1 期还没扣)
-  const balance = paid === 0
-    ? ledger.rows[0].principal + ledger.rows[0].balance
-    : paidRows[paidRows.length - 1].balance
+  const balance = paid === 0 ? ledger.rows[0].principal + ledger.rows[0].balance : paidRows[paidRows.length - 1].balance
   const next = ledger.rows[paid]
   return {
     paidPeriods: paid,
     settled,
     balance,
     remainingPeriods: settled ? 0 : Math.max(0, ledger.rows.length - paid),
-    currentPayment: settled ? 0 : (next ? next.payment : 0),
-    currentRate: settled ? ledger.summary.currentRate : (next ? next.rate : ledger.summary.currentRate),
+    currentPayment: settled ? 0 : next ? next.payment : 0,
+    currentRate: settled ? ledger.summary.currentRate : next ? next.rate : ledger.summary.currentRate,
     paidPrincipal: sumBy(paidRows, 'principal'),
     paidInterest: sumBy(paidRows, 'interest'),
   }

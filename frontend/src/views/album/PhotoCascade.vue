@@ -11,14 +11,9 @@
     </div>
 
     <div ref="stage" class="cascade-stage">
-      <div
-        v-for="c in cards"
-        :key="c.key"
-        class="leaf-wrap"
-        :class="{ fading: c.fading }"
-        :style="cardStyle(c)"
-      >
-        <div v-a11y-click
+      <div v-for="c in cards" :key="c.key" class="leaf-wrap" :class="{ fading: c.fading }" :style="cardStyle(c)">
+        <div
+          v-a11y-click
           class="leaf-card"
           :class="{ hovered: c.hovered }"
           @mouseenter="pauseCard(c)"
@@ -27,7 +22,11 @@
           @touchend="resumeCard(c)"
           @click.stop="openViewer(c)"
         >
-          <img :src="c.photo.url && c.photo.url.includes('?') ? c.photo.url + '&thumb=1' : c.photo.url" draggable="false" :alt="c.photo.description || ''" />
+          <img
+            :src="c.photo.url && c.photo.url.includes('?') ? c.photo.url + '&thumb=1' : c.photo.url"
+            draggable="false"
+            :alt="c.photo.description || ''"
+          />
           <div v-if="c.hovered" class="photo-info">
             <div v-if="c.photo.description" class="info-desc">{{ c.photo.description }}</div>
             <div class="info-meta">
@@ -43,11 +42,7 @@
       <el-empty :description="$t('cascade.empty')" />
     </div>
 
-    <PhotoViewer
-      v-model:visible="viewerVisible"
-      :photos="photos"
-      :initial-index="viewerIdx"
-    />
+    <PhotoViewer v-model:visible="viewerVisible" :photos="photos" :initial-index="viewerIdx" />
   </div>
 </template>
 
@@ -72,7 +67,10 @@ let spawnTimer = null
 let fadeTimers = []
 
 const clearTimers = () => {
-  if (spawnTimer) { clearInterval(spawnTimer); spawnTimer = null }
+  if (spawnTimer) {
+    clearInterval(spawnTimer)
+    spawnTimer = null
+  }
   fadeTimers.forEach((t) => clearTimeout(t))
   fadeTimers = []
 }
@@ -99,14 +97,20 @@ const spawnCard = () => {
   if (cards.value.length > 20) {
     const old = cards.value[0]
     old.fading = true
-    fadeTimers.push(setTimeout(() => {
-      cards.value = cards.value.filter((c) => c !== old)
-    }, 1500))
+    fadeTimers.push(
+      setTimeout(() => {
+        cards.value = cards.value.filter((c) => c !== old)
+      }, 1500),
+    )
   }
 }
 
-const pauseCard = (c) => { c.hovered = true }
-const resumeCard = (c) => { c.hovered = false }
+const pauseCard = (c) => {
+  c.hovered = true
+}
+const resumeCard = (c) => {
+  c.hovered = false
+}
 
 const cardStyle = (c) => ({
   left: c.x + '%',
@@ -137,7 +141,7 @@ const load = async () => {
   loading.value = true
   cards.value = []
   try {
-    photos.value = await photoApi.cascade() || []
+    photos.value = (await photoApi.cascade()) || []
     if (photos.value.length) {
       for (let i = 0; i < 5; i++) {
         fadeTimers.push(setTimeout(() => spawnCard(), i * 1000))
@@ -152,10 +156,17 @@ const load = async () => {
 }
 
 // 每次打开重新拉取并起飘落;关闭即停表并清空,避免后台空转(持续动画页性能规范)
-watch(() => props.visible, (v) => {
-  if (v) load()
-  else { clearTimers(); cards.value = []; viewerVisible.value = false }
-})
+watch(
+  () => props.visible,
+  (v) => {
+    if (v) load()
+    else {
+      clearTimers()
+      cards.value = []
+      viewerVisible.value = false
+    }
+  },
+)
 
 onBeforeUnmount(clearTimers)
 </script>
@@ -180,8 +191,20 @@ onBeforeUnmount(clearTimers)
   padding: 14px 20px;
   pointer-events: none;
 }
-.pc-title { font-size: 16px; font-weight: 600; color: var(--color-text); }
-.pc-hint { font-size: 12px; color: var(--color-text-secondary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pc-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.pc-hint {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .pc-close {
   pointer-events: auto;
   flex: none;
@@ -195,9 +218,14 @@ onBeforeUnmount(clearTimers)
   color: var(--color-text-secondary);
   background: var(--color-card);
   border: 1px solid var(--color-border);
-  transition: color 0.2s, transform 0.2s;
+  transition:
+    color 0.2s,
+    transform 0.2s;
 }
-.pc-close:hover { color: var(--color-primary); transform: scale(1.08); }
+.pc-close:hover {
+  color: var(--color-primary);
+  transform: scale(1.08);
+}
 
 .cascade-stage {
   position: absolute;
@@ -216,15 +244,21 @@ onBeforeUnmount(clearTimers)
   animation: leaf-fade-out 1.5s ease forwards;
 }
 @keyframes leaf-fade-out {
-  0% { opacity: 1; }
-  100% { opacity: 0; }
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 .leaf-card {
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
   cursor: pointer;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
 }
 .leaf-card img {
   display: block;
@@ -242,10 +276,18 @@ onBeforeUnmount(clearTimers)
     transform: translate3d(0, 0, 0) rotate(var(--leaf-rot));
     opacity: 0;
   }
-  10% { opacity: 1; }
-  25% { transform: translate3d(calc(var(--leaf-drift) * 0.3), 25vh, 0) rotate(calc(var(--leaf-rot) + 15deg)); }
-  50% { transform: translate3d(calc(var(--leaf-drift) * -0.2), 50vh, 0) rotate(calc(var(--leaf-rot) - 10deg)); }
-  75% { transform: translate3d(calc(var(--leaf-drift) * 0.4), 75vh, 0) rotate(calc(var(--leaf-rot) + 20deg)); }
+  10% {
+    opacity: 1;
+  }
+  25% {
+    transform: translate3d(calc(var(--leaf-drift) * 0.3), 25vh, 0) rotate(calc(var(--leaf-rot) + 15deg));
+  }
+  50% {
+    transform: translate3d(calc(var(--leaf-drift) * -0.2), 50vh, 0) rotate(calc(var(--leaf-rot) - 10deg));
+  }
+  75% {
+    transform: translate3d(calc(var(--leaf-drift) * 0.4), 75vh, 0) rotate(calc(var(--leaf-rot) + 20deg));
+  }
   100% {
     transform: translate3d(var(--leaf-drift), 105vh, 0) rotate(calc(var(--leaf-rot) + 30deg));
     opacity: 0.6;
@@ -264,8 +306,19 @@ onBeforeUnmount(clearTimers)
   font-size: 11px;
   line-height: 1.4;
 }
-.info-desc { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.info-meta { display: flex; gap: 8px; opacity: 0.85; flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
+.info-desc {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.info-meta {
+  display: flex;
+  gap: 8px;
+  opacity: 0.85;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  white-space: nowrap;
+}
 
 .cascade-empty {
   position: absolute;
@@ -276,8 +329,14 @@ onBeforeUnmount(clearTimers)
 }
 
 @media (max-width: 768px) {
-  .leaf-card { border-radius: 6px; }
-  .photo-info { font-size: 10px; }
-  .pc-hint { display: none; }
+  .leaf-card {
+    border-radius: 6px;
+  }
+  .photo-info {
+    font-size: 10px;
+  }
+  .pc-hint {
+    display: none;
+  }
 }
 </style>

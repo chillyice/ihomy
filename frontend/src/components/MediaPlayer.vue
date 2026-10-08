@@ -43,13 +43,7 @@
       <div v-else-if="!loading" class="player-error">{{ $t('cinema.playFailed') }}</div>
 
       <div v-if="rendered" class="player-bar">
-        <el-select
-          v-if="subtitles.length"
-          :model-value="subtitleIndex"
-          size="small"
-          class="sub-select"
-          @change="onSubtitleChange"
-        >
+        <el-select v-if="subtitles.length" :model-value="subtitleIndex" size="small" class="sub-select" @change="onSubtitleChange">
           <el-option :value="-1" :label="$t('cinema.subtitleOff')" />
           <el-option
             v-for="s in subtitles"
@@ -58,7 +52,9 @@
             :label="labelOf(s) + (s.burnIn ? ` · ${$t('cinema.subtitleBurnIn')}` : '')"
           />
         </el-select>
-        <span v-if="transcoding" class="player-warn">{{ $t(transcodeReason === 'subtitle' ? 'cinema.transcodingSubtitle' : 'cinema.notDirectPlayable') }}</span>
+        <span v-if="transcoding" class="player-warn">{{
+          $t(transcodeReason === 'subtitle' ? 'cinema.transcodingSubtitle' : 'cinema.notDirectPlayable')
+        }}</span>
         <span v-else-if="failed" class="player-warn">{{ $t('cinema.playFailed') }}</span>
       </div>
     </div>
@@ -91,11 +87,33 @@ const TICKS_PER_SECOND = 10000000
 const REPORT_INTERVAL_MS = 15000
 /** 常见字幕语言码 → 界面语言名(认不出来的直接显示原码) */
 const LANG_KEYS = {
-  chi: 'zh', zho: 'zh', zh: 'zh', cmn: 'zh', yue: 'zh',
-  eng: 'en', en: 'en', jpn: 'ja', ja: 'ja', kor: 'ko', ko: 'ko',
-  fra: 'fr', fre: 'fr', fr: 'fr', deu: 'de', ger: 'de', de: 'de',
-  spa: 'es', es: 'es', rus: 'ru', ru: 'ru', por: 'pt', pt: 'pt',
-  ita: 'it', it: 'it', tha: 'th', th: 'th',
+  chi: 'zh',
+  zho: 'zh',
+  zh: 'zh',
+  cmn: 'zh',
+  yue: 'zh',
+  eng: 'en',
+  en: 'en',
+  jpn: 'ja',
+  ja: 'ja',
+  kor: 'ko',
+  ko: 'ko',
+  fra: 'fr',
+  fre: 'fr',
+  fr: 'fr',
+  deu: 'de',
+  ger: 'de',
+  de: 'de',
+  spa: 'es',
+  es: 'es',
+  rus: 'ru',
+  ru: 'ru',
+  por: 'pt',
+  pt: 'pt',
+  ita: 'it',
+  it: 'it',
+  tha: 'th',
+  th: 'th',
 }
 
 const rendered = ref(false)
@@ -140,19 +158,22 @@ const textTracks = computed(() => subtitles.value.filter((s) => s.text && s.url)
 
 const labelOf = (s) => {
   const key = LANG_KEYS[String(s.language || '').toLowerCase()]
-  const name = key ? t(`cinema.lang.${key}`) : (s.language || s.title || '')
-  return s.isForced ? `${name} (${t('cinema.subtitleForced')})` : (name || `${t('cinema.subtitle')} ${s.index}`)
+  const name = key ? t(`cinema.lang.${key}`) : s.language || s.title || ''
+  return s.isForced ? `${name} (${t('cinema.subtitleForced')})` : name || `${t('cinema.subtitle')} ${s.index}`
 }
 
 // 打开:取地址并定位到上次进度;关闭:把最终位置补报一次,并恢复光影层
-watch(() => props.modelValue, async (open) => {
-  if (open) {
-    sunLight?.suspendEffects()
-    await load()
-  } else {
-    reportProgress()
-  }
-})
+watch(
+  () => props.modelValue,
+  async (open) => {
+    if (open) {
+      sunLight?.suspendEffects()
+      await load()
+    } else {
+      reportProgress()
+    }
+  },
+)
 
 /**
  * 装载播放地址。
@@ -163,8 +184,8 @@ watch(() => props.modelValue, async (open) => {
 const load = async (burnInIdx, preferredIdx, atTicks) => {
   // 重建播放器前先记下当前位置:切字幕重取地址后要接着播,不能跳回打开时那一处
   const el = videoRef.value
-  const fromTicks = atTicks != null ? atTicks
-    : (el && el.currentTime > 0 ? Math.round(el.currentTime * TICKS_PER_SECOND) : (props.item?.positionTicks || 0))
+  const fromTicks =
+    atTicks != null ? atTicks : el && el.currentTime > 0 ? Math.round(el.currentTime * TICKS_PER_SECOND) : props.item?.positionTicks || 0
   reset()
   if (!props.item?.id) return
   loading.value = true
@@ -176,8 +197,7 @@ const load = async (burnInIdx, preferredIdx, atTicks) => {
     subtitles.value = r.subtitles || []
     burnIn = typeof r.burnInSubtitle === 'number' ? r.burnInSubtitle : -1
     // 烧进画面的位图轨不挂 <track>(避免重影);没有烧进去时才按默认文本轨/指定项打开
-    subtitleIndex.value = burnIn >= 0 ? burnIn
-      : (preferredIdx != null ? preferredIdx : pickSubtitle(subtitles.value))
+    subtitleIndex.value = burnIn >= 0 ? burnIn : preferredIdx != null ? preferredIdx : pickSubtitle(subtitles.value)
     transcodeReason.value = burnIn >= 0 ? 'subtitle' : 'codec'
     seekToTicks = fromTicks
     lastReportAt = 0
@@ -222,13 +242,19 @@ const playHls = async (url) => {
       hls.attachMedia(el)
       return
     }
-  } catch { /* 库加载失败就退回原生 src(能省一步是一步) */ }
+  } catch {
+    /* 库加载失败就退回原生 src(能省一步是一步) */
+  }
   src.value = url
 }
 
 const destroyHls = () => {
   if (hls) {
-    try { hls.destroy() } catch { /* 已销毁 */ }
+    try {
+      hls.destroy()
+    } catch {
+      /* 已销毁 */
+    }
     hls = null
   }
 }
@@ -262,8 +288,7 @@ const onPlaybackError = () => {
     transcodeReason.value = 'codec'
     transcoding.value = true
     // 报错也可能发生在播放中途:位置从当前播放器取,取不到(刚起播就失败)才回到打开时的续看点
-    seekToTicks = (el.currentTime > 0 ? Math.round(el.currentTime * TICKS_PER_SECOND) : 0)
-      || (props.item?.positionTicks || 0)
+    seekToTicks = (el.currentTime > 0 ? Math.round(el.currentTime * TICKS_PER_SECOND) : 0) || props.item?.positionTicks || 0
     playHls(hlsUrl)
     return
   }
@@ -336,7 +361,9 @@ const onEnded = async () => {
   try {
     await mediaApi.progress(props.item.id, { positionTicks: 0, played: true })
     emit('played', props.item.id)
-  } catch { /* 静默:下次进详情页会看到真实状态 */ }
+  } catch {
+    /* 静默:下次进详情页会看到真实状态 */
+  }
 }
 
 const onClosed = () => {
@@ -352,11 +379,38 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.media-player { min-height: 120px; }
-.player-video { width: 100%; max-height: 72vh; background: #000; border-radius: 8px; }
-.player-error { padding: 40px 0; text-align: center; color: var(--color-text-secondary); }
-.player-bar { display: flex; align-items: center; gap: 12px; margin-top: 8px; min-height: 24px; }
-.sub-select { width: 200px; }
-.player-warn { font-size: 12px; color: var(--color-text-secondary); }
-.player-foot { float: left; font-size: 13px; color: var(--color-text-secondary); line-height: 32px; }
+.media-player {
+  min-height: 120px;
+}
+.player-video {
+  width: 100%;
+  max-height: 72vh;
+  background: #000;
+  border-radius: 8px;
+}
+.player-error {
+  padding: 40px 0;
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+.player-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  min-height: 24px;
+}
+.sub-select {
+  width: 200px;
+}
+.player-warn {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.player-foot {
+  float: left;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 32px;
+}
 </style>

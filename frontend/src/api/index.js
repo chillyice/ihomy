@@ -4,7 +4,8 @@ import request from '@/api/request'
 // 公开接口:无需登录,支持 hid(混淆 token)优先、home_id 兜底指定家庭
 export const publicApi = {
   getHome: (homeId, hid) => request.get('/public/home', { params: { ...(hid ? { hid } : {}), ...(homeId ? { home_id: homeId } : {}) } }),
-  getFeed: (limit = 10, homeId, hid) => request.get('/public/feed', { params: { limit, ...(hid ? { hid } : {}), ...(homeId ? { home_id: homeId } : {}) } }),
+  getFeed: (limit = 10, homeId, hid) =>
+    request.get('/public/feed', { params: { limit, ...(hid ? { hid } : {}), ...(homeId ? { home_id: homeId } : {}) } }),
   // 天气/太阳:虽为公开接口,但需携带 JWT 才能让后端按「家庭天气地域偏好」定位,
   // 否则后端只能回退 IP 定位,设置里改地域不生效
   getWeather: () => request.get('/public/weather'),
@@ -117,7 +118,7 @@ export const photoApi = {
     files.forEach((f) => form.append('files', f))
     return request.post(`/album/${albumId}/photos`, form, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 0 }) // 上传不限时(家庭宽带上行慢,15s 默认超时曾致并发上传全部取消)
   },
-updateDesc: (id, description) => request.put(`/photo/${id}`, { description }),
+  updateDesc: (id, description) => request.put(`/photo/${id}`, { description }),
   remove: (id) => request.delete(`/photo/${id}`),
   cascade: (limit = 60) => request.get('/photo/cascade', { params: { limit } }),
   saveFromUrl: (albumId, data) => request.post(`/album/${albumId}/photos/from-url`, data),
@@ -203,8 +204,7 @@ export const mediaApi = {
   works: () => request.get('/media/works'),
   work: (itemId) => request.get(`/media/works/${itemId}`),
   // subtitleIndex:位图字幕(PGS/DVDSUB)只能烧进转码画面,传了它就按转码流取地址
-  play: (itemId, subtitleIndex) => request.get(`/media/works/${itemId}/play`,
-    subtitleIndex == null ? {} : { params: { subtitleIndex } }),
+  play: (itemId, subtitleIndex) => request.get(`/media/works/${itemId}/play`, subtitleIndex == null ? {} : { params: { subtitleIndex } }),
   played: (itemId, played) => request.post(`/media/works/${itemId}/played`, { played }),
   progress: (itemId, data) => request.post(`/media/works/${itemId}/progress`, data),
   resume: () => request.get('/media/resume'),
@@ -314,7 +314,7 @@ export const musicApi = {
   },
   uploadAlbum: (files, album) => {
     const fd = new FormData()
-    files.forEach(f => fd.append('files', f))
+    files.forEach((f) => fd.append('files', f))
     if (album) fd.append('album', album)
     return request.post('/music/upload-album', fd, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 0 })
   },
@@ -372,11 +372,13 @@ export const opsApi = {
   weatherQuota: () => request.get('/ops/weather/quota'),
   weatherFinance: () => request.get('/ops/weather/finance'),
   weatherStats: () => request.get('/ops/weather/stats'),
-  weatherTimeline: (range, types) => request.get('/ops/weather/timeline', { params: { range, types: types?.length ? types.join(',') : null } }),
+  weatherTimeline: (range, types) =>
+    request.get('/ops/weather/timeline', { params: { range, types: types?.length ? types.join(',') : null } }),
   weatherTypeDistribution: (range) => request.get('/ops/weather/type-distribution', { params: { range } }),
   // AI 调用统计(按当前家庭)
   aiSummary: () => request.get('/ops/ai/summary'),
-  aiTimeline: (range, features) => request.get('/ops/ai/timeline', { params: { range, features: features?.length ? features.join(',') : null } }),
+  aiTimeline: (range, features) =>
+    request.get('/ops/ai/timeline', { params: { range, features: features?.length ? features.join(',') : null } }),
   aiTypeDistribution: (range) => request.get('/ops/ai/type-distribution', { params: { range } }),
   // 开源组件台账(版本检测 + 升级提示)
   ossList: () => request.get('/ops/oss/list'),
@@ -470,7 +472,8 @@ export const aiApi = {
   updateModel: (id, data) => request.put(`/ai/models/${id}`, data),
   deleteModel: (id) => request.delete(`/ai/models/${id}`),
   features: () => request.get('/ai/features'),
-  bindFeature: (featureCode, modelId, fallbackModelId) => request.put(`/ai/features/${featureCode}`, { modelId, fallbackModelId: fallbackModelId ?? null }),
+  bindFeature: (featureCode, modelId, fallbackModelId) =>
+    request.put(`/ai/features/${featureCode}`, { modelId, fallbackModelId: fallbackModelId ?? null }),
   chat: (data) => request.post('/ai/chat', data, { timeout: 150000 }),
   image: (data, featureCode) => request.post(`/ai/image${featureCode ? `?featureCode=${featureCode}` : ''}`, data, { timeout: 180000 }),
   transcribe: (file, language) => {
@@ -542,4 +545,3 @@ export const iotApi = {
   history: (deviceId, hours) => request.get('/iot/history', { params: { deviceId, hours } }),
   control: (data) => request.post('/iot/control', data),
 }
-

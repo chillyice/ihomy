@@ -49,10 +49,14 @@
               <div class="record-amount" :class="typeCls(r)">{{ (r.type === 'EXPENSE' ? '-' : '+') + r.amount }}</div>
               <div class="record-actions">
                 <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
-                  <el-button size="small" text @click="openEditor(r)"><el-icon><Edit /></el-icon></el-button>
+                  <el-button size="small" text @click="openEditor(r)"
+                    ><el-icon><Edit /></el-icon
+                  ></el-button>
                 </el-tooltip>
                 <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
-                  <el-button size="small" text type="danger" @click="onDel(r)"><el-icon><Delete /></el-icon></el-button>
+                  <el-button size="small" text type="danger" @click="onDel(r)"
+                    ><el-icon><Delete /></el-icon
+                  ></el-button>
                 </el-tooltip>
               </div>
             </div>
@@ -93,7 +97,14 @@
           </el-form-item>
         </div>
         <el-form-item :label="$t('book.category')">
-          <el-select v-model="editor.form.category" filterable allow-create default-first-option :placeholder="$t('book.categoryPlaceholder')" style="width: 100%">
+          <el-select
+            v-model="editor.form.category"
+            filterable
+            allow-create
+            default-first-option
+            :placeholder="$t('book.categoryPlaceholder')"
+            style="width: 100%"
+          >
             <el-option v-for="c in CATEGORIES" :key="c" :label="c" :value="c" />
           </el-select>
         </el-form-item>
@@ -135,11 +146,10 @@ const records = ref([])
 const stats = ref({})
 const editor = reactive({ visible: false, form: {} })
 
-const catText = (r) =>
-  (r.type === 'INCOME' ? t('book.type.INCOME') : r.type === 'TRANSFER' ? t('book.type.TRANSFER') : r.category)
+const catText = (r) => (r.type === 'INCOME' ? t('book.type.INCOME') : r.type === 'TRANSFER' ? t('book.type.TRANSFER') : r.category)
 
 // 后端返回英文单词(type: EXPENSE/INCOME/TRANSFER),表单直接沿用字典词提交
-const typeCls = (r) => ({ EXPENSE: 't0', INCOME: 't1', TRANSFER: 't2' }[r.type] || 't0')
+const typeCls = (r) => ({ EXPENSE: 't0', INCOME: 't1', TRANSFER: 't2' })[r.type] || 't0'
 
 const load = async () => {
   loading.value = true
@@ -175,7 +185,10 @@ const onSave = async () => {
 }
 
 const onDel = async (r) => {
-  await ElMessageBox.confirm(t('book.deleteMessage', { amount: r.amount }), t('common.deleteConfirm'), { type: 'warning', closeOnClickModal: true })
+  await ElMessageBox.confirm(t('book.deleteMessage', { amount: r.amount }), t('common.deleteConfirm'), {
+    type: 'warning',
+    closeOnClickModal: true,
+  })
   await bookApi.remove(r.id)
   ElMessage.success(t('common.deleted'))
   await load()
@@ -271,8 +284,12 @@ onMounted(load)
 .record-amount.t1 {
   color: #67c23a;
 }
-.record-actions :deep(.el-button) { padding: 5px 6px; }
-.record-actions :deep(.el-button + .el-button) { margin-left: 4px; }
+.record-actions :deep(.el-button) {
+  padding: 5px 6px;
+}
+.record-actions :deep(.el-button + .el-button) {
+  margin-left: 4px;
+}
 .cat-row {
   display: flex;
   justify-content: space-between;
@@ -294,7 +311,12 @@ onMounted(load)
 }
 
 @media (max-width: 768px) {
-  .form-row { flex-direction: column; gap: 0; }
-  .summary-cards { grid-template-columns: repeat(2, 1fr) !important; }
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+  .summary-cards {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
 }
 </style>

@@ -51,7 +51,8 @@ html.dark .mobile-header {
   background: rgba(var(--color-card-rgb), 0.92);
   border-bottom-color: rgba(255, 255, 255, 0.08);
 }
-.back-btn, .home-btn {
+.back-btn,
+.home-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -63,9 +64,18 @@ html.dark .mobile-header {
   -webkit-tap-highlight-color: transparent;
   font-size: 18px;
 }
-.back-btn:active, .home-btn:active { background: rgba(0, 0, 0, 0.06); }
-html.dark .back-btn, html.dark .home-btn { color: #E8DCC8; }
-html.dark .back-btn:active, html.dark .home-btn:active { background: rgba(255, 255, 255, 0.08); }
+.back-btn:active,
+.home-btn:active {
+  background: rgba(0, 0, 0, 0.06);
+}
+html.dark .back-btn,
+html.dark .home-btn {
+  color: #e8dcc8;
+}
+html.dark .back-btn:active,
+html.dark .home-btn:active {
+  background: rgba(255, 255, 255, 0.08);
+}
 .header-title {
   flex: 1;
   font-size: 16px;
@@ -75,6 +85,12 @@ html.dark .back-btn:active, html.dark .home-btn:active { background: rgba(255, 2
   overflow: hidden;
   text-overflow: ellipsis;
 }
-html.dark .header-title { color: #E8DCC8; }
-.header-right { display: flex; align-items: center; gap: 8px; }
+html.dark .header-title {
+  color: #e8dcc8;
+}
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 </style>

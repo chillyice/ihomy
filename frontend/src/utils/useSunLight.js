@@ -21,12 +21,20 @@ export function useSunLight() {
     rotation: 0,
     palette: { bloom: 'transparent', core: 'transparent', mid: 'transparent', ambient: 'transparent' },
     rays: [],
-    shadowVRotation: 0, shadowHTop: 50, frameTopOffset: 0,
-    shadowIntensity: 0.7, shadowColor: 'rgb(8,12,28)',
-    brightSpotColor: 'rgb(8,12,28)', brightSpotOpacity: 0.7,
-    reflectionOpacity: 0, lightOpacity: 0, lampOpacity: 1,
-    isNight: true, dayProgress: 0,
-    windowAngle: 0, hasDirectLight: false,
+    shadowVRotation: 0,
+    shadowHTop: 50,
+    frameTopOffset: 0,
+    shadowIntensity: 0.7,
+    shadowColor: 'rgb(8,12,28)',
+    brightSpotColor: 'rgb(8,12,28)',
+    brightSpotOpacity: 0.7,
+    reflectionOpacity: 0,
+    lightOpacity: 0,
+    lampOpacity: 1,
+    isNight: true,
+    dayProgress: 0,
+    windowAngle: 0,
+    hasDirectLight: false,
   })
 
   const _saved = JSON.parse(localStorage.getItem('ihomy:effects') || 'null') || {}
@@ -35,22 +43,32 @@ export function useSunLight() {
   const lampTemp = ref(_saved.lampTemp ?? 30)
   const lampBrightness = ref(_saved.lampBrightness ?? 50)
   const shadowEnabled = ref(_saved.shadowEnabled ?? true)
+  // 阴影深度(个性化滑块 0~100):70 = 出厂默认,此时窗口阴影与 V5.4 以来的观感完全一致
+  const shadowDepth = ref(_saved.shadowDepth ?? 70)
   const weatherEffectEnabled = ref(_saved.weatherEffectEnabled ?? true)
   const blobsEnabled = ref(_saved.blobsEnabled ?? true)
   const glassEnabled = ref(_saved.glassEnabled ?? true)
-  watch([lampMode, lampTemp, lampBrightness, shadowEnabled, weatherEffectEnabled, blobsEnabled, glassEnabled], () => {
+  watch([lampMode, lampTemp, lampBrightness, shadowEnabled, shadowDepth, weatherEffectEnabled, blobsEnabled, glassEnabled], () => {
     // 挂起期间(suspendEffects 批量置 false / restoreEffects 批量还原)绝不落盘:
     // 否则播放器挂起时写下的「全关」会覆盖掉用户真正保存的偏好
     if (_suspended) return
-    localStorage.setItem('ihomy:effects', JSON.stringify({
-      lampMode: lampMode.value, lampTemp: lampTemp.value, lampBrightness: lampBrightness.value,
-      shadowEnabled: shadowEnabled.value, weatherEffectEnabled: weatherEffectEnabled.value,
-      blobsEnabled: blobsEnabled.value, glassEnabled: glassEnabled.value,
-    }))
+    localStorage.setItem(
+      'ihomy:effects',
+      JSON.stringify({
+        lampMode: lampMode.value,
+        lampTemp: lampTemp.value,
+        lampBrightness: lampBrightness.value,
+        shadowEnabled: shadowEnabled.value,
+        shadowDepth: shadowDepth.value,
+        weatherEffectEnabled: weatherEffectEnabled.value,
+        blobsEnabled: blobsEnabled.value,
+        glassEnabled: glassEnabled.value,
+      }),
+    )
   })
   // 总开关:所有特效都关闭时为 false,用于门控定时器/API 调用/组件挂载
-  const anyEffectEnabled = computed(() =>
-    shadowEnabled.value || blobsEnabled.value || weatherEffectEnabled.value || lampMode.value !== 'off'
+  const anyEffectEnabled = computed(
+    () => shadowEnabled.value || blobsEnabled.value || weatherEffectEnabled.value || lampMode.value !== 'off',
   )
   // 光照测试模式:开启后可手动控制 slotIdx 循环
   const lightTestMode = ref(false)
@@ -75,9 +93,18 @@ export function useSunLight() {
 
   // 多云闪烁:每 4~8 秒随机一个目标(0.1~1),GSAP 3~5s 缓慢补间,模拟云彩遮阳
   const startCloudFlicker = (on) => {
-    if (cloudTimer) { clearInterval(cloudTimer); cloudTimer = null }
-    if (cloudTween) { cloudTween.kill(); cloudTween = null }
-    if (!on) { cloudFlicker.value = 1; return }
+    if (cloudTimer) {
+      clearInterval(cloudTimer)
+      cloudTimer = null
+    }
+    if (cloudTween) {
+      cloudTween.kill()
+      cloudTween = null
+    }
+    if (!on) {
+      cloudFlicker.value = 1
+      return
+    }
     const tick = () => {
       const target = 0.1 + Math.random() * 0.9
       cloudTween = gsap.to(cloudFlicker, { value: target, duration: 3 + Math.random() * 2, ease: 'power2.inOut', overwrite: true })
@@ -90,20 +117,29 @@ export function useSunLight() {
   const lightningFlash = ref(0)
   let lightningTimer = null
   const startLightning = (on) => {
-    if (lightningTimer) { clearTimeout(lightningTimer); lightningTimer = null }
-    if (!on) { lightningFlash.value = 0; return }
+    if (lightningTimer) {
+      clearTimeout(lightningTimer)
+      lightningTimer = null
+    }
+    if (!on) {
+      lightningFlash.value = 0
+      return
+    }
     const scheduleNext = () => {
       const isThunder = weatherMode.value === 'thunder'
       const minMs = isThunder ? 3000 : 10000
       const rangeMs = isThunder ? 7000 : 30000
-      lightningTimer = setTimeout(() => {
-        const tl = gsap.timeline()
-        tl.to(lightningFlash, { value: 1, duration: 0.05 })
-          .to(lightningFlash, { value: 0.3, duration: 0.1 })
-          .to(lightningFlash, { value: 1, duration: 0.05 })
-          .to(lightningFlash, { value: 0, duration: 0.4, ease: 'power2.out' })
-        scheduleNext()
-      }, minMs + Math.random() * rangeMs)
+      lightningTimer = setTimeout(
+        () => {
+          const tl = gsap.timeline()
+          tl.to(lightningFlash, { value: 1, duration: 0.05 })
+            .to(lightningFlash, { value: 0.3, duration: 0.1 })
+            .to(lightningFlash, { value: 1, duration: 0.05 })
+            .to(lightningFlash, { value: 0, duration: 0.4, ease: 'power2.out' })
+          scheduleNext()
+        },
+        minMs + Math.random() * rangeMs,
+      )
     }
     scheduleNext()
   }
@@ -134,6 +170,10 @@ export function useSunLight() {
     if (weatherMode.value === 'cloud') return Math.max(0, 1 - cloudFlicker.value)
     return 0
   })
+  // 阴影层不透明度:把时间曲线强度(夜间 0.7 → 正午 0.3)按个性化「阴影深度」等比缩放。
+  // 深度 70 = 乘数 1(与旧版观感一致);100 = 夜间压到近全黑;0 = 无阴影。上限 1 防止叠加过黑。
+  const shadowAlpha = computed(() => Math.max(0, Math.min(1, (shadowDepth.value / 70) * (sunScene.value.shadowIntensity ?? 0.7))))
+
   // 夜间超时关灯:X 分钟无操作自动关灯,有操作时立即开灯(仅 auto 模式 + 夜间生效)
   // mousemove 节流:避免高频触发(每 2 秒最多一次 resetIdle)
   const idleMinutes = ref(5)
@@ -145,13 +185,16 @@ export function useSunLight() {
 
   const resetIdle = () => {
     const now = Date.now()
-    if (now - lastIdleReset < 2000) return  // 节流:2秒内只处理一次
+    if (now - lastIdleReset < 2000) return // 节流:2秒内只处理一次
     lastIdleReset = now
     if (isIdle.value) isIdle.value = false
     if (idleTimer) clearTimeout(idleTimer)
-    idleTimer = setTimeout(() => {
-      isIdle.value = true
-    }, idleMinutes.value * 60 * 1000)
+    idleTimer = setTimeout(
+      () => {
+        isIdle.value = true
+      },
+      idleMinutes.value * 60 * 1000,
+    )
   }
 
   const toggleLamp = () => {
@@ -184,7 +227,9 @@ export function useSunLight() {
       }, 208 / sp)
     }
   }
-  const pauseLightTest = () => { lightTestPaused.value = !lightTestPaused.value }
+  const pauseLightTest = () => {
+    lightTestPaused.value = !lightTestPaused.value
+  }
   const stepLightTest = (dir) => {
     slotIdx.value = (slotIdx.value + dir + 288) % 288
     refreshScene()
@@ -195,7 +240,10 @@ export function useSunLight() {
     precipLevel.value = 0
     startCloudFlicker(false)
     startLightning(false)
-    if (testTimer) { clearInterval(testTimer); testTimer = null }
+    if (testTimer) {
+      clearInterval(testTimer)
+      testTimer = null
+    }
     slotIdx.value = currentSlotIndex()
     if (sunInfo.value) {
       sunScene.value = getSunScene(sunInfo.value, slotIdx.value)
@@ -264,7 +312,7 @@ export function useSunLight() {
       duration: 10 + Math.random() * 15,
       delay: Math.random() * 12,
       drift: 40 + Math.random() * 80,
-    }))
+    })),
   )
 
   // 雪花粒子:数量=precipLevel×10,六瓣雪花字符,缓落+横向飘移+自转
@@ -310,7 +358,7 @@ export function useSunLight() {
   })
 
   // 光源整体不透明度(天气系数实时应用,控制 bloom 辉光)
-  const lightLayerOpacity = computed(() => shadowEnabled.value ? (sunScene.value.lightOpacity ?? 0) * weatherLightMul.value : 0)
+  const lightLayerOpacity = computed(() => (shadowEnabled.value ? (sunScene.value.lightOpacity ?? 0) * weatherLightMul.value : 0))
 
   const sourceStyle = computed(() => ({
     left: sunScene.value.source.x,
@@ -327,7 +375,13 @@ export function useSunLight() {
   // 夜间直接用后端的 brightSpotOpacity(月光/夜景点),不受天气压制
   const brightSpotStyle = computed(() => ({
     background: sunScene.value.brightSpotColor || 'transparent',
-    opacity: shadowEnabled.value ? (sunScene.value.isNight ? (sunScene.value.brightSpotOpacity ?? 0) : (['rain', 'snow', 'cloud', 'thunder', 'overcast', 'fog'].includes(weatherMode.value) ? 0 : (sunScene.value.brightSpotOpacity ?? 0))) : 0,
+    opacity: shadowEnabled.value
+      ? sunScene.value.isNight
+        ? (sunScene.value.brightSpotOpacity ?? 0)
+        : ['rain', 'snow', 'cloud', 'thunder', 'overcast', 'fog'].includes(weatherMode.value)
+          ? 0
+          : (sunScene.value.brightSpotOpacity ?? 0)
+      : 0,
   }))
   const reflectionStyle = computed(() => ({
     background: `radial-gradient(ellipse 60% 50% at ${sunScene.value.source.x} ${sunScene.value.source.y}, rgba(255,245,220,1) 0%, rgba(255,235,200,0.6) 30%, transparent 70%)`,
@@ -400,8 +454,8 @@ export function useSunLight() {
     loadWeather()
     // 钟摆运动已改为 CSS @keyframes,无需 JS rAF;lampStrength 变化只决定元素是否渲染
     // 空闲检测:注册用户活动事件(mousemove 节流),启动超时定时器
-    IDLE_EVENTS.forEach(e => window.addEventListener(e, resetIdle, { passive: true }))
-    IDLE_EVENTS_THROTTLED.forEach(e => window.addEventListener(e, resetIdle, { passive: true }))
+    IDLE_EVENTS.forEach((e) => window.addEventListener(e, resetIdle, { passive: true }))
+    IDLE_EVENTS_THROTTLED.forEach((e) => window.addEventListener(e, resetIdle, { passive: true }))
     resetIdle()
     // 每 5 分钟更新时隙
     slotTimer = setInterval(() => {
@@ -441,8 +495,8 @@ export function useSunLight() {
     if (flickerTimer) clearInterval(flickerTimer)
     if (weatherTimer) clearInterval(weatherTimer)
     if (testTimer) clearInterval(testTimer)
-    IDLE_EVENTS.forEach(e => window.removeEventListener(e, resetIdle))
-    IDLE_EVENTS_THROTTLED.forEach(e => window.removeEventListener(e, resetIdle))
+    IDLE_EVENTS.forEach((e) => window.removeEventListener(e, resetIdle))
+    IDLE_EVENTS_THROTTLED.forEach((e) => window.removeEventListener(e, resetIdle))
     if (idleTimer) clearTimeout(idleTimer)
   })
 
@@ -455,34 +509,102 @@ export function useSunLight() {
   })
 
   // 毛玻璃开关:在 <html> 上切换 .no-glass 类,全局禁用 backdrop-filter
-  watch(glassEnabled, (on) => {
-    document.documentElement.classList.toggle('no-glass', !on)
-  }, { immediate: true })
+  watch(
+    glassEnabled,
+    (on) => {
+      document.documentElement.classList.toggle('no-glass', !on)
+    },
+    { immediate: true },
+  )
 
   // 把太阳方位角/高度角写入 theme 模块,供晨暮切换扫光的方向计算
-  watch(sunScene, (s) => {
-    if (s && s.azimuth != null) setSunContext({ azimuth: s.azimuth, altitude: s.altitude ?? 0, isNight: !!s.isNight })
-  }, { immediate: true })
+  watch(
+    sunScene,
+    (s) => {
+      if (s && s.azimuth != null) setSunContext({ azimuth: s.azimuth, altitude: s.altitude ?? 0, isNight: !!s.isNight })
+    },
+    { immediate: true },
+  )
 
   // 播放器启动时暂停特效,关闭后恢复
   const suspendEffects = () => {
     if (_suspended) return
-    _suspended = { shadowEnabled: shadowEnabled.value, weatherEffectEnabled: weatherEffectEnabled.value, blobsEnabled: blobsEnabled.value, glassEnabled: glassEnabled.value, lampMode: lampMode.value }
-    shadowEnabled.value = false; weatherEffectEnabled.value = false; blobsEnabled.value = false; glassEnabled.value = false; lampMode.value = 'off'
+    _suspended = {
+      shadowEnabled: shadowEnabled.value,
+      weatherEffectEnabled: weatherEffectEnabled.value,
+      blobsEnabled: blobsEnabled.value,
+      glassEnabled: glassEnabled.value,
+      lampMode: lampMode.value,
+    }
+    shadowEnabled.value = false
+    weatherEffectEnabled.value = false
+    blobsEnabled.value = false
+    glassEnabled.value = false
+    lampMode.value = 'off'
   }
   const restoreEffects = () => {
     if (!_suspended) return
-    shadowEnabled.value = _suspended.shadowEnabled; weatherEffectEnabled.value = _suspended.weatherEffectEnabled; blobsEnabled.value = _suspended.blobsEnabled; glassEnabled.value = _suspended.glassEnabled; lampMode.value = _suspended.lampMode
+    shadowEnabled.value = _suspended.shadowEnabled
+    weatherEffectEnabled.value = _suspended.weatherEffectEnabled
+    blobsEnabled.value = _suspended.blobsEnabled
+    glassEnabled.value = _suspended.glassEnabled
+    lampMode.value = _suspended.lampMode
     _suspended = null
   }
 
   return {
-    sunInfo, slotIdx, sunScene, weather, weatherDetail, loadWeather, loadSunInfoForDate,
-    lampMode, lampTemp, lampBrightness, shadowEnabled, weatherEffectEnabled, blobsEnabled, glassEnabled, anyEffectEnabled, toggleLamp,
-    idleMinutes, isIdle,
-    lampStrength, lampStrengthAnim, lampDivOpacity, lampRadius, lampMask, lampColor,
-    dustParticles, snowParticles, rainParticles, weatherShadowOpacity, lightLayerOpacity, rayStyles, sourceStyle, bloomStyle, brightSpotStyle, reflectionStyle, lightningFlash,
-    lightTestMode, lightTestPaused, testSpeed, setTestSpeed, weatherMode, cloudFlicker, precipLevel, setWeather, startLightTest, pauseLightTest, stepLightTest, stopLightTest, setSlot, refreshScene,
-    suspendEffects, restoreEffects,
+    sunInfo,
+    slotIdx,
+    sunScene,
+    weather,
+    weatherDetail,
+    loadWeather,
+    loadSunInfoForDate,
+    lampMode,
+    lampTemp,
+    lampBrightness,
+    shadowEnabled,
+    shadowDepth,
+    shadowAlpha,
+    weatherEffectEnabled,
+    blobsEnabled,
+    glassEnabled,
+    anyEffectEnabled,
+    toggleLamp,
+    idleMinutes,
+    isIdle,
+    lampStrength,
+    lampStrengthAnim,
+    lampDivOpacity,
+    lampRadius,
+    lampMask,
+    lampColor,
+    dustParticles,
+    snowParticles,
+    rainParticles,
+    weatherShadowOpacity,
+    lightLayerOpacity,
+    rayStyles,
+    sourceStyle,
+    bloomStyle,
+    brightSpotStyle,
+    reflectionStyle,
+    lightningFlash,
+    lightTestMode,
+    lightTestPaused,
+    testSpeed,
+    setTestSpeed,
+    weatherMode,
+    cloudFlicker,
+    precipLevel,
+    setWeather,
+    startLightTest,
+    pauseLightTest,
+    stepLightTest,
+    stopLightTest,
+    setSlot,
+    refreshScene,
+    suspendEffects,
+    restoreEffects,
   }
 }

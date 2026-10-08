@@ -4,7 +4,9 @@
   <div class="page chat-page">
     <Breadcrumb :items="[{ label: $t('chat.title') }]" />
     <div class="chat-box card">
-      <div class="chat-title">{{ $t('chat.roomTitle') }} <span class="online-hint">{{ $t('chat.onlineHint') }}</span></div>
+      <div class="chat-title">
+        {{ $t('chat.roomTitle') }} <span class="online-hint">{{ $t('chat.onlineHint') }}</span>
+      </div>
 
       <!-- 消息区(自动滚动到底部) -->
       <div ref="msgBox" class="msg-list" v-loading="loading">
@@ -20,11 +22,18 @@
 
       <!-- 输入区 -->
       <div class="msg-input">
-        <el-input v-model="draft" :placeholder="$t('chat.placeholder')" @keyup.enter="send" :disabled="!connected" maxlength="2000" show-word-limit />
+        <el-input
+          v-model="draft"
+          :placeholder="$t('chat.placeholder')"
+          @keyup.enter="send"
+          :disabled="!connected"
+          maxlength="2000"
+          show-word-limit
+        />
         <el-button type="primary" :disabled="!connected" @click="send">{{ $t('chat.send') }}</el-button>
       </div>
       <div class="conn-hint" :class="connected ? 'ok' : 'bad'">
-        {{ connected ? $t('chat.connected') : (connecting ? $t('chat.connecting') : $t('chat.reconnecting')) }}
+        {{ connected ? $t('chat.connected') : connecting ? $t('chat.connecting') : $t('chat.reconnecting') }}
       </div>
     </div>
   </div>
@@ -58,27 +67,42 @@ const fmtTime = (t) => (t ? String(t).replace('T', ' ').slice(5, 16) : '')
 const cleanup = () => {
   if (heartbeatTimer) clearInterval(heartbeatTimer)
   if (reconnectTimer) clearTimeout(reconnectTimer)
-  if (ws) { ws.onclose = null; ws.close() }
+  if (ws) {
+    ws.onclose = null
+    ws.close()
+  }
 }
 
 const connect = () => {
   cleanup() // 先断开旧的,再建立新连接
   const proto = location.protocol === 'https:' ? 'wss' : 'ws'
   // @vite 开发代理不转发 WS,直连 8080 端口即可(Vite HTTP 代理不支持 WS 时后端同源)
-  const base = (import.meta.env.DEV ? `ws://localhost:8080` : `${proto}://${location.host}`)
+  const base = import.meta.env.DEV ? `ws://localhost:8080` : `${proto}://${location.host}`
   ws = new WebSocket(`${base}/api/ws/chat?token=${userStore.token}`)
   connecting.value = true
-  ws.onopen = () => { connected.value = true; connectedError.value = false; connecting.value = false }
+  ws.onopen = () => {
+    connected.value = true
+    connectedError.value = false
+    connecting.value = false
+  }
   ws.onclose = () => {
     connected.value = false
     connecting.value = false
     // 断开后 3 秒自动重连(服务端停机重启或网络波动恢复)
-    reconnectTimer = setTimeout(() => { if (userStore.isLoggedIn) connect() }, 3000)
+    reconnectTimer = setTimeout(() => {
+      if (userStore.isLoggedIn) connect()
+    }, 3000)
   }
-  ws.onerror = () => { connectedError.value = true }
+  ws.onerror = () => {
+    connectedError.value = true
+  }
   ws.onmessage = (evt) => {
     let pkt
-    try { pkt = JSON.parse(evt.data) } catch { return }
+    try {
+      pkt = JSON.parse(evt.data)
+    } catch {
+      return
+    }
     if (pkt.type === 'message') {
       pushMsg(pkt.data)
       // 自己发的也回显(服务端广播全房间),这里统一推进已读
@@ -210,13 +234,34 @@ onBeforeUnmount(cleanup)
     min-height: 300px;
     padding: 12px;
   }
-  .chat-title { font-size: 14px; margin-bottom: 8px; }
-  .online-hint { display: none; }
-  .msg-avatar { width: 28px !important; height: 28px !important; }
-  .msg-meta { font-size: 11px; }
-  .msg-bubble { max-width: 75%; font-size: 14px; padding: 8px 10px; }
-  .msg-input { gap: 8px; }
-  .msg-input .el-button { flex-shrink: 0; }
-  .conn-hint { font-size: 11px; margin-top: 6px; }
+  .chat-title {
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+  .online-hint {
+    display: none;
+  }
+  .msg-avatar {
+    width: 28px !important;
+    height: 28px !important;
+  }
+  .msg-meta {
+    font-size: 11px;
+  }
+  .msg-bubble {
+    max-width: 75%;
+    font-size: 14px;
+    padding: 8px 10px;
+  }
+  .msg-input {
+    gap: 8px;
+  }
+  .msg-input .el-button {
+    flex-shrink: 0;
+  }
+  .conn-hint {
+    font-size: 11px;
+    margin-top: 6px;
+  }
 }
 </style>

@@ -17,30 +17,44 @@
     <div v-loading="loading" class="tool-grid">
       <!-- 花园固定入口(植物养殖改名而来) -->
       <div v-a11y-click class="tool-card card" @click="$router.push('/tools/plant')">
-        <div class="tool-icon"><el-icon :size="30"><Sunny /></el-icon></div>
+        <div class="tool-icon">
+          <el-icon :size="30"><Sunny /></el-icon>
+        </div>
         <div class="tool-name">{{ $t('games.garden.title') }}</div>
         <div class="tool-desc">{{ $t('games.garden.desc') }}</div>
-        <span class="tool-enter">{{ $t('games.enter') }}<el-icon><ArrowRight /></el-icon></span>
+        <span class="tool-enter"
+          >{{ $t('games.enter') }}<el-icon><ArrowRight /></el-icon
+        ></span>
       </div>
 
       <!-- 宠物连连看固定入口(H5 原生小游戏,通关发积分) -->
       <div v-a11y-click class="tool-card card" @click="$router.push('/games/petlink')">
-        <div class="tool-icon"><el-icon :size="30"><Grid /></el-icon></div>
+        <div class="tool-icon">
+          <el-icon :size="30"><Grid /></el-icon>
+        </div>
         <div class="tool-name">{{ $t('games.petlink.title') }}</div>
         <div class="tool-desc">{{ $t('games.petlink.desc') }}</div>
-        <span class="tool-enter">{{ $t('games.enter') }}<el-icon><ArrowRight /></el-icon></span>
+        <span class="tool-enter"
+          >{{ $t('games.enter') }}<el-icon><ArrowRight /></el-icon
+        ></span>
       </div>
 
       <!-- 导入的小游戏 -->
       <div v-a11y-click v-for="g in games" :key="g.id" class="tool-card card" @click="play(g)">
-        <div class="tool-icon"><el-icon :size="30"><VideoPlay /></el-icon></div>
+        <div class="tool-icon">
+          <el-icon :size="30"><VideoPlay /></el-icon>
+        </div>
         <div class="tool-name">{{ g.name }}</div>
         <div class="tool-desc">{{ g.description || $t('games.noDesc') }}</div>
         <div class="tool-meta">
           <div class="tool-type-tag">{{ g.type }}</div>
-          <span class="tool-enter">{{ $t('games.play') }}<el-icon><ArrowRight /></el-icon></span>
+          <span class="tool-enter"
+            >{{ $t('games.play') }}<el-icon><ArrowRight /></el-icon
+          ></span>
           <el-dropdown trigger="click" @command="(cmd) => onGameAction(cmd, g)">
-            <span class="game-more" @click.stop><el-icon><MoreFilled /></el-icon></span>
+            <span class="game-more" @click.stop
+              ><el-icon><MoreFilled /></el-icon
+            ></span>
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item command="edit">{{ $t('games.edit') }}</el-dropdown-item>
@@ -222,7 +236,9 @@ onMounted(load)
   transition: transform 0.2s ease;
   contain: layout style;
 }
-.tool-card:hover { transform: translateY(-3px); }
+.tool-card:hover {
+  transform: translateY(-3px);
+}
 .tool-icon {
   width: 56px;
   height: 56px;
@@ -234,7 +250,11 @@ onMounted(load)
   color: var(--color-accent, var(--color-brand));
   margin-bottom: 14px;
 }
-.tool-name { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+.tool-name {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
 .tool-desc {
   font-size: 13px;
   color: var(--color-text-secondary, #8a8a8a);
@@ -270,7 +290,10 @@ onMounted(load)
   color: var(--color-text-secondary, #999);
   cursor: pointer;
 }
-.game-more:hover { color: var(--color-accent, var(--color-brand)); background: rgba(0, 0, 0, 0.04); }
+.game-more:hover {
+  color: var(--color-accent, var(--color-brand));
+  background: rgba(0, 0, 0, 0.04);
+}
 .tool-empty {
   grid-column: 1 / -1;
   text-align: center;

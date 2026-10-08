@@ -55,7 +55,13 @@ html.dark .mobile-tabbar {
   transition: color 0.2s;
   -webkit-tap-highlight-color: transparent;
 }
-.tab-item .el-icon { font-size: 22px; }
-.tab-item.active { color: var(--color-primary, var(--color-brand)); }
-html.dark .tab-item.active { color: var(--color-brand); }
+.tab-item .el-icon {
+  font-size: 22px;
+}
+.tab-item.active {
+  color: var(--color-primary, var(--color-brand));
+}
+html.dark .tab-item.active {
+  color: var(--color-brand);
+}
 </style>

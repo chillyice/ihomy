@@ -17,17 +17,19 @@
             <div class="reminder-body">
               <div class="reminder-title">{{ r.title }}</div>
               <div v-if="r.content" class="reminder-content">{{ r.content }}</div>
-              <div class="reminder-meta">
-                {{ repeatText(r.repeatType) }} · {{ r.remindDate }} {{ (r.remindTime || '').slice(0, 5) }}
-              </div>
+              <div class="reminder-meta">{{ repeatText(r.repeatType) }} · {{ r.remindDate }} {{ (r.remindTime || '').slice(0, 5) }}</div>
             </div>
           </div>
           <div class="reminder-actions">
             <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
-              <el-button size="small" text @click="openEditor(r)"><el-icon><Edit /></el-icon></el-button>
+              <el-button size="small" text @click="openEditor(r)"
+                ><el-icon><Edit /></el-icon
+              ></el-button>
             </el-tooltip>
             <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
-              <el-button size="small" text type="danger" @click="onDel(r)"><el-icon><Delete /></el-icon></el-button>
+              <el-button size="small" text type="danger" @click="onDel(r)"
+                ><el-icon><Delete /></el-icon
+              ></el-button>
             </el-tooltip>
           </div>
         </div>
@@ -35,7 +37,12 @@
       <el-empty v-else :description="$t('reminder.noData')" />
     </div>
 
-    <el-dialog v-model="editor.visible" append-to-body :title="editor.form.id ? $t('reminder.editTitle') : $t('reminder.add')" width="440px">
+    <el-dialog
+      v-model="editor.visible"
+      append-to-body
+      :title="editor.form.id ? $t('reminder.editTitle') : $t('reminder.add')"
+      width="440px"
+    >
       <el-form :model="editor.form" label-position="top">
         <el-form-item :label="$t('reminder.headline')">
           <el-input v-model="editor.form.title" :placeholder="$t('reminder.titlePlaceholder')" />
@@ -124,7 +131,10 @@ const onToggle = async (r) => {
 }
 
 const onDel = async (r) => {
-  await ElMessageBox.confirm(t('reminder.deleteMessage', { title: r.title }), t('common.deleteConfirm'), { type: 'warning', closeOnClickModal: true })
+  await ElMessageBox.confirm(t('reminder.deleteMessage', { title: r.title }), t('common.deleteConfirm'), {
+    type: 'warning',
+    closeOnClickModal: true,
+  })
   await reminderApi.remove(r.id)
   ElMessage.success(t('common.deleted'))
   await load()
@@ -171,11 +181,20 @@ onMounted(load)
   font-size: 12px;
   margin-top: 6px;
 }
-.reminder-actions :deep(.el-button) { padding: 5px 6px; }
-.reminder-actions :deep(.el-button + .el-button) { margin-left: 4px; }
+.reminder-actions :deep(.el-button) {
+  padding: 5px 6px;
+}
+.reminder-actions :deep(.el-button + .el-button) {
+  margin-left: 4px;
+}
 
 @media (max-width: 768px) {
-  .reminder-item { flex-wrap: wrap; }
-  .reminder-actions { width: 100%; justify-content: flex-end; }
+  .reminder-item {
+    flex-wrap: wrap;
+  }
+  .reminder-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 </style>

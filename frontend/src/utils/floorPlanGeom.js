@@ -9,7 +9,9 @@ export const pickDefaultFloor = (floorPlans, extraFloors = []) => {
   if (floorPlans) {
     try {
       const fp = JSON.parse(floorPlans)
-      Object.keys(fp).forEach((k) => { if (k !== 'floorOrder') set.add(Number(k)) })
+      Object.keys(fp).forEach((k) => {
+        if (k !== 'floorOrder') set.add(Number(k))
+      })
     } catch {}
   }
   for (const f of extraFloors) if (f != null) set.add(Number(f))
@@ -24,8 +26,8 @@ export const samePt = (p, q, eps = 0.5) => Math.hypot(p.x - q.x, p.y - q.y) < ep
 export const pointInPoly = (p, poly) => {
   let inside = false
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-    if (((poly[i].y > p.y) !== (poly[j].y > p.y)) &&
-      (p.x < ((poly[j].x - poly[i].x) * (p.y - poly[i].y)) / (poly[j].y - poly[i].y) + poly[i].x)) inside = !inside
+    if (poly[i].y > p.y !== poly[j].y > p.y && p.x < ((poly[j].x - poly[i].x) * (p.y - poly[i].y)) / (poly[j].y - poly[i].y) + poly[i].x)
+      inside = !inside
   }
   return inside
 }
@@ -34,8 +36,12 @@ export const pointInPoly = (p, poly) => {
 export const onSegment = (p, a, b) => {
   const cross = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)
   if (Math.abs(cross) > 1e-9) return false
-  return p.x >= Math.min(a.x, b.x) - 1e-9 && p.x <= Math.max(a.x, b.x) + 1e-9 &&
-    p.y >= Math.min(a.y, b.y) - 1e-9 && p.y <= Math.max(a.y, b.y) + 1e-9
+  return (
+    p.x >= Math.min(a.x, b.x) - 1e-9 &&
+    p.x <= Math.max(a.x, b.x) + 1e-9 &&
+    p.y >= Math.min(a.y, b.y) - 1e-9 &&
+    p.y <= Math.max(a.y, b.y) + 1e-9
+  )
 }
 
 /**
@@ -44,13 +50,17 @@ export const onSegment = (p, a, b) => {
  */
 export const segsIntersect = (p1, p2, p3, p4) => {
   const d = (a, b, c) => (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
-  const d1 = d(p3, p4, p1); const d2 = d(p3, p4, p2); const d3 = d(p1, p2, p3); const d4 = d(p1, p2, p4)
+  const d1 = d(p3, p4, p1)
+  const d2 = d(p3, p4, p2)
+  const d3 = d(p1, p2, p3)
+  const d4 = d(p1, p2, p4)
   return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))
 }
 
 // 点到线段的投影(最近点与距离)
 export const projectToSegment = (p, a, b) => {
-  const abx = b.x - a.x; const aby = b.y - a.y
+  const abx = b.x - a.x
+  const aby = b.y - a.y
   const len2 = abx * abx + aby * aby
   let t = 0
   if (len2 > 0) t = ((p.x - a.x) * abx + (p.y - a.y) * aby) / len2
@@ -144,7 +154,14 @@ export const cutPlanValid = (poly, iA, pA, iB, pB) => {
 
 // 拆分:边 iA 上点 pA、边 iB 上点 pB(点在边内部或恰为顶点),把多边形切成两个
 export const splitPoly = (poly, iA, pA, iB, pB) => {
-  if (iA > iB) { const ti = iA; iA = iB; iB = ti; const tp = pA; pA = pB; pB = tp }
+  if (iA > iB) {
+    const ti = iA
+    iA = iB
+    iB = ti
+    const tp = pA
+    pA = pB
+    pB = tp
+  }
   const first = [{ ...pA }]
   for (let i = iA + 1; i <= iB; i++) first.push({ ...poly[i] })
   first.push({ ...pB })
@@ -157,7 +174,8 @@ export const splitPoly = (poly, iA, pA, iB, pB) => {
 
 // 两线段共线重叠检测(粘合的吸附边):返回重叠段 { s, t }(沿 a1→a2 方向,s 靠 a1)或 null
 export const segOverlap = (a1, a2, b1, b2) => {
-  const ux = a2.x - a1.x; const uy = a2.y - a1.y
+  const ux = a2.x - a1.x
+  const uy = a2.y - a1.y
   const len2 = ux * ux + uy * uy
   if (len2 < 1e-9) return null
   const cross1 = Math.abs(ux * (b1.y - a1.y) - uy * (b1.x - a1.x))
@@ -176,7 +194,8 @@ export const segOverlap = (a1, a2, b1, b2) => {
 
 // 顶点冗余判定:落在两邻点连线上(垂直距离 < 0.5px 且投影在两点之间)
 const collinearBetween = (p, a, b) => {
-  const ux = b.x - a.x; const uy = b.y - a.y
+  const ux = b.x - a.x
+  const uy = b.y - a.y
   const len2 = ux * ux + uy * uy
   if (len2 < 1e-9) return false
   const cross = Math.abs(ux * (p.y - a.y) - uy * (p.x - a.x))
@@ -195,7 +214,11 @@ const dropCollinear = (pts) => {
     for (let i = 0; i < out.length; i++) {
       const prev = out[(i - 1 + out.length) % out.length]
       const next = out[(i + 1) % out.length]
-      if (collinearBetween(out[i], prev, next)) { out.splice(i, 1); changed = true; break }
+      if (collinearBetween(out[i], prev, next)) {
+        out.splice(i, 1)
+        changed = true
+        break
+      }
     }
   }
   return out
@@ -203,11 +226,14 @@ const dropCollinear = (pts) => {
 
 // 合并:两多边形沿共线重叠边拼接为一个;找不到共享边返回 null
 export const mergePolys = (A, B) => {
-  const n = A.length; const m = B.length
+  const n = A.length
+  const m = B.length
   for (let i = 0; i < n; i++) {
-    const a1 = A[i]; const a2 = A[(i + 1) % n]
+    const a1 = A[i]
+    const a2 = A[(i + 1) % n]
     for (let j = 0; j < m; j++) {
-      const b1 = B[j]; const b2 = B[(j + 1) % m]
+      const b1 = B[j]
+      const b2 = B[(j + 1) % m]
       const ov = segOverlap(a1, a2, b1, b2)
       if (!ov) continue
       const { s, t } = ov
@@ -229,6 +255,7 @@ export const mergePolys = (A, B) => {
 }
 
 export const polyBBox = (poly) => {
-  const xs = poly.map((p) => p.x); const ys = poly.map((p) => p.y)
+  const xs = poly.map((p) => p.x)
+  const ys = poly.map((p) => p.y)
   return { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) }
 }

@@ -15,7 +15,10 @@
           @clear="load"
         >
           <template #prefix>
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="11" cy="11" r="8" />
+              <path d="M21 21l-4.35-4.35" />
+            </svg>
           </template>
         </el-input>
 
@@ -49,7 +52,18 @@
         <!-- 排序图标 -->
         <el-tooltip :content="sortBy === 'recent' ? $t('blog.sortRecent') : $t('blog.sortViews')" placement="top">
           <button class="sort-icon-btn" @click="toggleSort">
-            <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l7 7 7-7"/></svg>
+            <svg
+              viewBox="0 0 24 24"
+              width="10"
+              height="10"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M5 9l7 7 7-7" />
+            </svg>
             <span class="sort-label">{{ sortBy === 'recent' ? 'NEW' : 'MOST' }}</span>
           </button>
         </el-tooltip>
@@ -59,11 +73,30 @@
       </div>
 
       <div class="tb-right">
-        <button v-if="!showSidePanel && userStore.isLoggedIn" class="cat-mgr-btn" :title="$t('blog.manageCategory')" @click="openCategoryDialog('add')">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        <button
+          v-if="!showSidePanel && userStore.isLoggedIn"
+          class="cat-mgr-btn"
+          :title="$t('blog.manageCategory')"
+          @click="openCategoryDialog('add')"
+        >
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
         </button>
         <button v-if="userStore.isLoggedIn" class="write-btn" @click="router.push('/blog/edit')">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          <svg
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+          </svg>
           {{ $t('blog.newPost') }}
         </button>
       </div>
@@ -75,7 +108,9 @@
         <div class="side-head">
           <span class="side-title">{{ $t('blog.category') }}</span>
           <button v-if="userStore.isLoggedIn" class="side-add-btn" :title="$t('blog.newCategory')" @click="openCategoryDialog('add')">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
           </button>
         </div>
         <div class="cat-list">
@@ -83,26 +118,41 @@
             <span class="cat-name">{{ $t('blog.allCategories') }}</span>
             <span class="cat-count">{{ totalCatCount }}</span>
           </div>
-          <div v-a11y-click
+          <div
+            v-a11y-click
             v-for="node in flatTree"
             :key="node.path"
             class="cat-item"
             :class="{ active: activeCategory === node.path }"
-            :style="{ paddingLeft: (10 + node.depth * 16) + 'px' }"
+            :style="{ paddingLeft: 10 + node.depth * 16 + 'px' }"
             @click="setCategory(node.path)"
           >
             <span v-a11y-click v-if="node.childCount > 0" class="cat-toggle" @click.stop="toggleExpand(node.path)">
-              <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" :style="{ transform: expanded[node.path] ? 'rotate(90deg)' : '' }"><path d="M9 18l6-6-6-6"/></svg>
+              <svg
+                viewBox="0 0 24 24"
+                width="10"
+                height="10"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                :style="{ transform: expanded[node.path] ? 'rotate(90deg)' : '' }"
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
             </span>
             <span v-else class="cat-toggle-placeholder"></span>
             <span class="cat-name">{{ node.name }}</span>
             <span class="cat-count">{{ countWithChildren(node) }}</span>
             <span v-if="userStore.isLoggedIn && node.id != null" class="cat-ops" @click.stop>
               <el-tooltip :content="$t('blog.editCategory')" placement="top" :show-after="300">
-                <el-button size="small" text @click="openCategoryDialog('edit', node)"><el-icon><Edit /></el-icon></el-button>
+                <el-button size="small" text @click="openCategoryDialog('edit', node)"
+                  ><el-icon><Edit /></el-icon
+                ></el-button>
               </el-tooltip>
               <el-tooltip :content="$t('blog.deleteCategory')" placement="top" :show-after="300">
-                <el-button size="small" text type="danger" @click="openDeleteCategory(node)"><el-icon><Delete /></el-icon></el-button>
+                <el-button size="small" text type="danger" @click="openDeleteCategory(node)"
+                  ><el-icon><Delete /></el-icon
+                ></el-button>
               </el-tooltip>
             </span>
           </div>
@@ -126,12 +176,14 @@
               <div class="blog-sub">
                 <span v-if="b.category" class="blog-cat">{{ b.category }}</span>
                 <span v-if="b.tags" class="blog-tags">
-                  <span v-a11y-click
+                  <span
+                    v-a11y-click
                     v-for="tg in String(b.tags).split(',').filter(Boolean)"
                     :key="tg"
                     class="tag"
                     @click.stop="filterByTag(tg)"
-                  >#{{ tg }}</span>
+                    >#{{ tg }}</span
+                  >
                 </span>
               </div>
               <span class="blog-meta">{{ b.viewCount }} {{ $t('blog.views') }} · {{ formatDate(b.createdAt) }}</span>
@@ -139,15 +191,27 @@
           </div>
           <div v-if="userStore.isLoggedIn && canEdit(b)" class="blog-actions" @click.stop>
             <el-tooltip :content="$t('blog.editPost')" placement="top" :show-after="300">
-              <el-button size="small" text @click="router.push(`/blog/edit/${b.id}`)"><el-icon><Edit /></el-icon></el-button>
+              <el-button size="small" text @click="router.push(`/blog/edit/${b.id}`)"
+                ><el-icon><Edit /></el-icon
+              ></el-button>
             </el-tooltip>
             <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
-              <el-button size="small" text type="danger" @click="onBlogDelete(b)"><el-icon><Delete /></el-icon></el-button>
+              <el-button size="small" text type="danger" @click="onBlogDelete(b)"
+                ><el-icon><Delete /></el-icon
+              ></el-button>
             </el-tooltip>
           </div>
         </div>
         <div v-if="!loading && !filteredList.length" class="empty-state">
-          <el-empty :description="activeCategory ? $t('blog.noPostsInCategory', { cat: activeCategory }) : (userStore.isGuest ? $t('blog.noPublicBlog') : $t('blog.firstHint'))">
+          <el-empty
+            :description="
+              activeCategory
+                ? $t('blog.noPostsInCategory', { cat: activeCategory })
+                : userStore.isGuest
+                  ? $t('blog.noPublicBlog')
+                  : $t('blog.firstHint')
+            "
+          >
             <button v-if="userStore.isLoggedIn" class="write-btn" @click="router.push('/blog/edit')">{{ $t('blog.emptyWriteBtn') }}</button>
           </el-empty>
         </div>
@@ -155,7 +219,12 @@
     </div>
 
     <!-- 分类弹窗 -->
-    <el-dialog v-model="catDialog.visible" :title="catDialog.mode === 'add' ? $t('blog.newCategory') : $t('blog.editCategory')" width="360px" append-to-body>
+    <el-dialog
+      v-model="catDialog.visible"
+      :title="catDialog.mode === 'add' ? $t('blog.newCategory') : $t('blog.editCategory')"
+      width="360px"
+      append-to-body
+    >
       <el-form label-position="top">
         <el-form-item :label="$t('blog.parentCategory')">
           <el-cascader
@@ -173,7 +242,13 @@
       </el-form>
       <template #footer>
         <el-button @click="catDialog.visible = false">{{ $t('common.cancel') }}</el-button>
-        <el-button type="primary" :disabled="!catDialog.name.trim() || catDialog.saving" :loading="catDialog.saving" @click="saveCategory">{{ $t('common.confirm') }}</el-button>
+        <el-button
+          type="primary"
+          :disabled="!catDialog.name.trim() || catDialog.saving"
+          :loading="catDialog.saving"
+          @click="saveCategory"
+          >{{ $t('common.confirm') }}</el-button
+        >
       </template>
     </el-dialog>
 
@@ -222,7 +297,9 @@ const expanded = ref({})
 const canEdit = (b) => userStore.isOwner || b.authorId === userStore.userInfo?.id
 
 const showSidePanel = ref(window.innerWidth >= 1400)
-const onResize = () => { showSidePanel.value = window.innerWidth >= 1400 }
+const onResize = () => {
+  showSidePanel.value = window.innerWidth >= 1400
+}
 window.addEventListener('resize', onResize)
 onUnmounted(() => window.removeEventListener('resize', onResize))
 
@@ -233,14 +310,21 @@ const hasSidePanel = computed(() => showSidePanel.value && (catCountRaw.value.le
 const getSummary = (b) => {
   if (b.summary) return b.summary
   if (!b.content) return ''
-  const text = b.content.replace(/[#*`>\-_()![\]]/g, '').replace(/\n+/g, ' ').trim()
+  const text = b.content
+    .replace(/[#*`>\-_()![\]]/g, '')
+    .replace(/\n+/g, ' ')
+    .trim()
   return text.slice(0, 80) + (text.length > 80 ? '...' : '')
 }
 
 const allTags = computed(() => {
   const set = new Set()
   for (const b of list.value) {
-    if (b.tags) String(b.tags).split(',').filter(Boolean).forEach(tg => set.add(tg))
+    if (b.tags)
+      String(b.tags)
+        .split(',')
+        .filter(Boolean)
+        .forEach((tg) => set.add(tg))
   }
   return [...set]
 })
@@ -248,7 +332,7 @@ const allTags = computed(() => {
 const filteredList = computed(() => {
   let arr = list.value
   if (activeTag.value) {
-    arr = arr.filter(b => b.tags && String(b.tags).split(',').filter(Boolean).includes(activeTag.value))
+    arr = arr.filter((b) => b.tags && String(b.tags).split(',').filter(Boolean).includes(activeTag.value))
   }
   if (sortBy.value === 'views') {
     arr = [...arr].sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0))
@@ -267,11 +351,12 @@ const categoryCascaderOptions = computed(() => {
     if (!byParent[pid]) byParent[pid] = []
     byParent[pid].push(item)
   }
-  const build = (parentId) => (byParent[parentId] || []).map(item => ({
-    value: item.path,
-    label: item.name,
-    children: item.childCount > 0 ? build(item.id) : undefined,
-  }))
+  const build = (parentId) =>
+    (byParent[parentId] || []).map((item) => ({
+      value: item.path,
+      label: item.name,
+      children: item.childCount > 0 ? build(item.id) : undefined,
+    }))
   return build(0)
 })
 
@@ -287,7 +372,10 @@ const parentCategoryTree = computed(() => {
     excludeIds.add(catDialog.id)
     const collectDescendants = (pid) => {
       for (const item of catCountRaw.value) {
-        if (item.parentId === pid) { excludeIds.add(item.id); collectDescendants(item.id) }
+        if (item.parentId === pid) {
+          excludeIds.add(item.id)
+          collectDescendants(item.id)
+        }
       }
     }
     collectDescendants(catDialog.id)
@@ -299,11 +387,12 @@ const parentCategoryTree = computed(() => {
     if (!byParent[pid]) byParent[pid] = []
     byParent[pid].push(item)
   }
-  const build = (parentId) => (byParent[parentId] || []).map(item => ({
-    value: item.id,
-    label: item.name,
-    children: item.childCount > 0 ? build(item.id) : undefined,
-  }))
+  const build = (parentId) =>
+    (byParent[parentId] || []).map((item) => ({
+      value: item.id,
+      label: item.name,
+      children: item.childCount > 0 ? build(item.id) : undefined,
+    }))
   return build(0)
 })
 
@@ -317,7 +406,7 @@ const flatTree = computed(() => {
     byParent[pid].push(item)
   }
   const walk = (parentId, depth) => {
-    for (const item of (byParent[parentId] || [])) {
+    for (const item of byParent[parentId] || []) {
       arr.push({ ...item, depth })
       if (item.childCount > 0 && expanded.value[item.path]) walk(item.id, depth + 1)
     }
@@ -351,7 +440,7 @@ const load = async () => {
 
 const loadCategoryCounts = async () => {
   try {
-    catCountRaw.value = await blogApi.categoryCounts() || []
+    catCountRaw.value = (await blogApi.categoryCounts()) || []
   } catch (e) {}
 }
 
@@ -436,7 +525,12 @@ const confirmDeleteCategory = async () => {
 
 const onBlogDelete = async (b) => {
   try {
-    await ElMessageBox.confirm(t('blog.deleteConfirm'), { type: 'warning', confirmButtonText: t('common.delete'), cancelButtonText: t('common.cancel'), closeOnClickModal: true })
+    await ElMessageBox.confirm(t('blog.deleteConfirm'), {
+      type: 'warning',
+      confirmButtonText: t('common.delete'),
+      cancelButtonText: t('common.cancel'),
+      closeOnClickModal: true,
+    })
     await blogApi.delete(b.id)
     ElMessage.success(t('common.deleted'))
     await load()
@@ -454,76 +548,144 @@ onMounted(() => {
 
 <style scoped>
 /* ========== 工具栏(全局 .page-toolbar 补充) ========== */
-.blog-stats { font-size: 12px; color: var(--color-text-secondary); opacity: 0.7; white-space: nowrap; }
+.blog-stats {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  opacity: 0.7;
+  white-space: nowrap;
+}
 
 .sort-icon-btn {
-  height: 24px; width: 56px;
-  border: none; background: transparent;
-  cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 2px;
-  font-size: 11px; font-weight: 700; color: var(--color-text-secondary);
+  height: 24px;
+  width: 56px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
   transition: color 0.2s;
 }
-.sort-icon-btn:hover { color: var(--color-accent, var(--color-brand)); }
-html.dark .sort-icon-btn:hover { color: var(--color-brand); }
-.sort-label { letter-spacing: 0.5px; }
+.sort-icon-btn:hover {
+  color: var(--color-accent, var(--color-brand));
+}
+html.dark .sort-icon-btn:hover {
+  color: var(--color-brand);
+}
+.sort-label {
+  letter-spacing: 0.5px;
+}
 
 .cat-mgr-btn {
-  width: 32px; height: 32px;
-  border: none; background: rgba(var(--color-brand-rgb),0.06);
-  border-radius: 10px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(var(--color-brand-rgb), 0.06);
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--color-text-secondary);
-  transition: background 0.2s, color 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s;
 }
-.cat-mgr-btn:hover { background: rgba(var(--color-brand-rgb),0.12); color: var(--color-accent, var(--color-brand)); }
-html.dark .cat-mgr-btn { background: rgba(var(--color-brand-rgb),0.08); }
-html.dark .cat-mgr-btn:hover { background: rgba(var(--color-brand-rgb),0.15); color: var(--color-brand); }
+.cat-mgr-btn:hover {
+  background: rgba(var(--color-brand-rgb), 0.12);
+  color: var(--color-accent, var(--color-brand));
+}
+html.dark .cat-mgr-btn {
+  background: rgba(var(--color-brand-rgb), 0.08);
+}
+html.dark .cat-mgr-btn:hover {
+  background: rgba(var(--color-brand-rgb), 0.15);
+  color: var(--color-brand);
+}
 
 /* ========== 布局 ========== */
-.blog-layout { display: grid; grid-template-columns: 220px 1fr; gap: 20px; }
-.blog-layout.no-side { grid-template-columns: 1fr; }
+.blog-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 20px;
+}
+.blog-layout.no-side {
+  grid-template-columns: 1fr;
+}
 
 /* ========== 左侧分类面板 ========== */
 .category-side {
-  background: rgba(255,255,255,0.45);
+  background: rgba(255, 255, 255, 0.45);
   backdrop-filter: blur(24px) saturate(1.2);
   -webkit-backdrop-filter: blur(24px) saturate(1.2);
   border-radius: 14px;
-  box-shadow: 0 2px 12px rgba(58,46,34,0.06);
+  box-shadow: 0 2px 12px rgba(58, 46, 34, 0.06);
   padding: 12px 10px;
   height: fit-content;
   position: sticky;
   top: 42px;
-  border: 1px solid rgba(255,255,255,0.4);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   max-height: calc(100vh - 120px);
   display: flex;
   flex-direction: column;
 }
 html.dark .category-side {
-  background: rgba(var(--color-card-rgb),0.45);
-  border-color: rgba(255,255,255,0.08);
-  box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+  background: rgba(var(--color-card-rgb), 0.45);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
 }
-.side-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 0 6px; flex-shrink: 0; }
-.side-title { font-size: 13px; font-weight: 600; color: var(--color-text-secondary); }
+.side-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding: 0 6px;
+  flex-shrink: 0;
+}
+.side-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
 
 .side-add-btn {
-  width: 32px; height: 32px;
-  border: none; background: rgba(var(--color-brand-rgb),0.08);
-  border-radius: 8px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(var(--color-brand-rgb), 0.08);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--color-text-secondary);
-  transition: background 0.2s, color 0.2s, transform 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s,
+    transform 0.2s;
 }
 .side-add-btn:hover {
-  background: rgba(var(--color-brand-rgb),0.15);
+  background: rgba(var(--color-brand-rgb), 0.15);
   color: var(--color-accent, var(--color-brand));
   transform: scale(1.1);
 }
-html.dark .side-add-btn { background: rgba(var(--color-brand-rgb),0.1); }
-html.dark .side-add-btn:hover { background: rgba(var(--color-brand-rgb),0.18); color: var(--color-brand); }
+html.dark .side-add-btn {
+  background: rgba(var(--color-brand-rgb), 0.1);
+}
+html.dark .side-add-btn:hover {
+  background: rgba(var(--color-brand-rgb), 0.18);
+  color: var(--color-brand);
+}
 
-.cat-list { flex: 1; overflow-y: auto; min-height: 0; }
+.cat-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
 
 .cat-item {
   padding: 8px 10px;
@@ -531,46 +693,98 @@ html.dark .side-add-btn:hover { background: rgba(var(--color-brand-rgb),0.18); c
   cursor: pointer;
   font-size: 14px;
   color: var(--color-text);
-  transition: background 0.2s ease, color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
   display: flex;
   align-items: center;
   gap: 4px;
   position: relative;
   margin-bottom: 2px;
 }
-.cat-item:hover { background: rgba(var(--color-brand-rgb),0.06); }
-html.dark .cat-item:hover { background: rgba(var(--color-brand-rgb),0.08); }
+.cat-item:hover {
+  background: rgba(var(--color-brand-rgb), 0.06);
+}
+html.dark .cat-item:hover {
+  background: rgba(var(--color-brand-rgb), 0.08);
+}
 
 .cat-item.active {
-  background: rgba(var(--color-brand-rgb),0.12);
+  background: rgba(var(--color-brand-rgb), 0.12);
   color: var(--color-accent, var(--color-brand));
   font-weight: 600;
 }
 .cat-item.active::before {
   content: '';
   position: absolute;
-  left: 0; top: 6px; bottom: 6px;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
   width: 3px;
   border-radius: 2px;
   background: var(--color-accent, var(--color-brand));
 }
-html.dark .cat-item.active { background: rgba(var(--color-brand-rgb),0.15); color: var(--color-brand); }
-html.dark .cat-item.active::before { background: var(--color-brand); }
+html.dark .cat-item.active {
+  background: rgba(var(--color-brand-rgb), 0.15);
+  color: var(--color-brand);
+}
+html.dark .cat-item.active::before {
+  background: var(--color-brand);
+}
 
-.cat-toggle { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--color-text-secondary); cursor: pointer; }
-.cat-toggle svg { transition: transform 0.2s; }
-.cat-toggle-placeholder { width: 16px; flex-shrink: 0; }
+.cat-toggle {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.cat-toggle svg {
+  transition: transform 0.2s;
+}
+.cat-toggle-placeholder {
+  width: 16px;
+  flex-shrink: 0;
+}
 
-.cat-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-.cat-count { font-size: 11px; color: var(--color-text-secondary); opacity: 0.6; flex-shrink: 0; font-variant-numeric: tabular-nums; }
-.cat-ops { display: none; gap: 2px; flex-shrink: 0; }
-.cat-ops :deep(.el-button) { padding: 5px 6px; }
-.cat-ops :deep(.el-button + .el-button) { margin-left: 4px; }
-.cat-item:hover .cat-ops { display: flex; }
-.cat-item:hover .cat-count { display: none; }
+.cat-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.cat-count {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  opacity: 0.6;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.cat-ops {
+  display: none;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.cat-ops :deep(.el-button) {
+  padding: 5px 6px;
+}
+.cat-ops :deep(.el-button + .el-button) {
+  margin-left: 4px;
+}
+.cat-item:hover .cat-ops {
+  display: flex;
+}
+.cat-item:hover .cat-count {
+  display: none;
+}
 
 /* ========== 博客卡片 ========== */
-.blog-main { min-width: 0; }
+.blog-main {
+  min-width: 0;
+}
 .blog-item {
   display: flex;
   gap: 16px;
@@ -580,26 +794,41 @@ html.dark .cat-item.active::before { background: var(--color-brand); }
   border-radius: 14px;
   position: relative;
   min-height: 90px;
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
 }
 .blog-item:hover {
   transform: translateY(-3px);
-  box-shadow: 0 8px 28px rgba(58,46,34,0.12);
+  box-shadow: 0 8px 28px rgba(58, 46, 34, 0.12);
 }
-html.dark .blog-item:hover { box-shadow: 0 8px 28px rgba(0,0,0,0.3); }
+html.dark .blog-item:hover {
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3);
+}
 
 .blog-cover {
-  width: 120px; height: 80px;
+  width: 120px;
+  height: 80px;
   object-fit: cover;
   object-position: center;
   border-radius: 10px;
   flex-shrink: 0;
 }
 
-.blog-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.blog-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 
 /* 第一行:标题 */
-.blog-title-row { display: flex; align-items: center; gap: 8px; }
+.blog-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .blog-title {
   font-size: 16px;
   font-weight: 600;
@@ -614,11 +843,14 @@ html.dark .blog-item:hover { box-shadow: 0 8px 28px rgba(0,0,0,0.3); }
   font-size: 11px;
   padding: 1px 8px;
   border-radius: 6px;
-  background: rgba(138,109,59,0.12);
+  background: rgba(138, 109, 59, 0.12);
   color: #8a6d3b;
   font-weight: 500;
 }
-html.dark .draft-badge { background: rgba(var(--color-brand-rgb),0.15); color: #d4b86a; }
+html.dark .draft-badge {
+  background: rgba(var(--color-brand-rgb), 0.15);
+  color: #d4b86a;
+}
 
 /* 第二行:摘要 */
 .blog-summary {
@@ -639,10 +871,16 @@ html.dark .draft-badge { background: rgba(var(--color-brand-rgb),0.15); color: #
   gap: 8px;
   margin-top: 2px;
 }
-.blog-sub { display: flex; gap: 6px; flex-wrap: nowrap; align-items: center; overflow: hidden; }
+.blog-sub {
+  display: flex;
+  gap: 6px;
+  flex-wrap: nowrap;
+  align-items: center;
+  overflow: hidden;
+}
 .blog-cat {
-  background: rgba(var(--color-brand-rgb),0.1);
-  border: 1px solid rgba(var(--color-brand-rgb),0.15);
+  background: rgba(var(--color-brand-rgb), 0.1);
+  border: 1px solid rgba(var(--color-brand-rgb), 0.15);
   color: var(--color-accent, var(--color-brand));
   padding: 2px 8px;
   border-radius: 8px;
@@ -652,15 +890,20 @@ html.dark .draft-badge { background: rgba(var(--color-brand-rgb),0.15); color: #
   flex-shrink: 0;
 }
 html.dark .blog-cat {
-  background: rgba(var(--color-brand-rgb),0.15);
-  border-color: rgba(var(--color-brand-rgb),0.2);
+  background: rgba(var(--color-brand-rgb), 0.15);
+  border-color: rgba(var(--color-brand-rgb), 0.2);
   color: var(--color-brand);
 }
 
-.blog-tags { display: flex; gap: 4px; flex-wrap: nowrap; overflow: hidden; }
+.blog-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
 .blog-tags .tag {
-  background: rgba(var(--color-brand-rgb),0.06);
-  border: 1px solid rgba(var(--color-brand-rgb),0.1);
+  background: rgba(var(--color-brand-rgb), 0.06);
+  border: 1px solid rgba(var(--color-brand-rgb), 0.1);
   color: var(--color-text-secondary);
   padding: 2px 7px;
   border-radius: 8px;
@@ -668,21 +911,23 @@ html.dark .blog-cat {
   line-height: 1.4;
   backdrop-filter: blur(8px);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
   white-space: nowrap;
   flex-shrink: 0;
 }
 .blog-tags .tag:hover {
-  background: rgba(var(--color-brand-rgb),0.15);
+  background: rgba(var(--color-brand-rgb), 0.15);
   color: var(--color-accent, var(--color-brand));
 }
 html.dark .blog-tags .tag {
-  background: rgba(var(--color-brand-rgb),0.1);
-  border-color: rgba(var(--color-brand-rgb),0.12);
-  color: rgba(232,220,200,0.6);
+  background: rgba(var(--color-brand-rgb), 0.1);
+  border-color: rgba(var(--color-brand-rgb), 0.12);
+  color: rgba(232, 220, 200, 0.6);
 }
 html.dark .blog-tags .tag:hover {
-  background: rgba(var(--color-brand-rgb),0.18);
+  background: rgba(var(--color-brand-rgb), 0.18);
   color: var(--color-brand);
 }
 
@@ -705,15 +950,26 @@ html.dark .blog-tags .tag:hover {
   opacity: 0;
   transition: opacity 0.2s;
 }
-.blog-actions :deep(.el-button) { padding: 5px 6px; }
-.blog-actions :deep(.el-button + .el-button) { margin-left: 4px; }
-.blog-item:hover .blog-actions { opacity: 1; }
+.blog-actions :deep(.el-button) {
+  padding: 5px 6px;
+}
+.blog-actions :deep(.el-button + .el-button) {
+  margin-left: 4px;
+}
+.blog-item:hover .blog-actions {
+  opacity: 1;
+}
 
 /* 空状态 */
-.empty-state { padding: 48px 0; }
+.empty-state {
+  padding: 48px 0;
+}
 
 /* 暖居主题:杂志式瀑布流(竖版卡片,封面置顶,多列 masonry) */
-html.theme-warm .blog-main { column-count: 2; column-gap: 16px; }
+html.theme-warm .blog-main {
+  column-count: 2;
+  column-gap: 16px;
+}
 html.theme-warm .blog-item {
   display: flex;
   flex-direction: column;
@@ -733,7 +989,10 @@ html.theme-warm .blog-cover {
   border-radius: 0;
   margin: 0;
 }
-html.theme-warm .blog-info { padding: 14px 18px 16px; gap: 6px; }
+html.theme-warm .blog-info {
+  padding: 14px 18px 16px;
+  gap: 6px;
+}
 html.theme-warm .blog-title {
   white-space: normal;
   display: -webkit-box;
@@ -749,22 +1008,57 @@ html.theme-warm .blog-summary {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-html.theme-warm .blog-item:hover { transform: translateY(-3px); }
-
+html.theme-warm .blog-item:hover {
+  transform: translateY(-3px);
+}
 
 /* 删除分类弹窗 */
-.del-cat-name { font-weight: 600; font-size: 15px; color: var(--color-primary); margin-bottom: 8px; }
-.del-cat-hint { font-size: 13px; color: var(--color-text-secondary); line-height: 1.5; }
-.del-cat-radios { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.del-cat-name {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--color-primary);
+  margin-bottom: 8px;
+}
+.del-cat-hint {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+.del-cat-radios {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
 
 @media (max-width: 768px) {
-  .page-toolbar { padding: 8px 12px; gap: 8px; }
-  .tb-left { width: 100%; }
-  .blog-cover { width: 90px; height: 64px; }
-  .blog-actions { opacity: 1; }
-  .blog-item { padding: 12px; }
-  .blog-title { font-size: 15px; }
-  .blog-meta { font-size: 12px; }
-  .blog-footer { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .page-toolbar {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .tb-left {
+    width: 100%;
+  }
+  .blog-cover {
+    width: 90px;
+    height: 64px;
+  }
+  .blog-actions {
+    opacity: 1;
+  }
+  .blog-item {
+    padding: 12px;
+  }
+  .blog-title {
+    font-size: 15px;
+  }
+  .blog-meta {
+    font-size: 12px;
+  }
+  .blog-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
 }
 </style>

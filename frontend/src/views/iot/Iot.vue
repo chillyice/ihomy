@@ -6,7 +6,9 @@
     <PageToolbar>
       <div class="tb-left">
         <el-input v-model="keyword" size="small" clearable style="width: 220px" :placeholder="$t('iot.search')">
-          <template #prefix><el-icon><Search /></el-icon></template>
+          <template #prefix
+            ><el-icon><Search /></el-icon
+          ></template>
         </el-input>
       </div>
       <div class="tb-right">
@@ -21,16 +23,14 @@
       <div v-if="!groups.length && !keyword" class="card iot-empty">
         <div class="iot-empty-title">{{ devices.length ? $t('iot.empty') : $t('iot.notConfigured') }}</div>
         <div class="iot-empty-hint">
-          {{ devices.length ? $t('iot.emptyHint') : (canManage ? $t('iot.notConfiguredHint') : $t('iot.noPermissionHint')) }}
+          {{ devices.length ? $t('iot.emptyHint') : canManage ? $t('iot.notConfiguredHint') : $t('iot.noPermissionHint') }}
         </div>
         <el-button v-if="canManage" type="primary" @click="openConfig">{{ $t('iot.setup') }}</el-button>
       </div>
       <el-empty v-else-if="!groups.length" :description="$t('iot.search')" :image-size="80" />
 
       <template v-else>
-        <div v-if="canManage && cfg.lastError" class="card iot-banner">
-          {{ $t('iot.config.lastError') }}:{{ cfg.lastError }}
-        </div>
+        <div v-if="canManage && cfg.lastError" class="card iot-banner">{{ $t('iot.config.lastError') }}:{{ cfg.lastError }}</div>
 
         <section v-for="g in groups" :key="g.room || '_'">
           <div class="section-label">
@@ -74,9 +74,15 @@
               <div v-else-if="d.domain === 'cover'" class="iot-reading iot-reading-col">
                 <span class="iot-value">{{ stateText(d) }}</span>
                 <div class="iot-actions">
-                  <el-button size="small" :loading="busyId === d.id" @click.stop="control(d, 'open_cover')">{{ $t('iot.action.open') }}</el-button>
-                  <el-button size="small" :loading="busyId === d.id" @click.stop="control(d, 'close_cover')">{{ $t('iot.action.close') }}</el-button>
-                  <el-button v-if="d.state === 'opening' || d.state === 'closing'" size="small" @click.stop="control(d, 'stop_cover')">{{ $t('iot.action.stop') }}</el-button>
+                  <el-button size="small" :loading="busyId === d.id" @click.stop="control(d, 'open_cover')">{{
+                    $t('iot.action.open')
+                  }}</el-button>
+                  <el-button size="small" :loading="busyId === d.id" @click.stop="control(d, 'close_cover')">{{
+                    $t('iot.action.close')
+                  }}</el-button>
+                  <el-button v-if="d.state === 'opening' || d.state === 'closing'" size="small" @click.stop="control(d, 'stop_cover')">{{
+                    $t('iot.action.stop')
+                  }}</el-button>
                 </div>
               </div>
 
@@ -94,7 +100,11 @@
               <div v-else-if="d.domain === 'media_player'" class="iot-reading iot-reading-col">
                 <span class="iot-value" :class="{ on: d.state === 'playing' }">{{ stateText(d) }}</span>
                 <div class="iot-actions">
-                  <el-button size="small" :loading="busyId === d.id" @click.stop="control(d, d.state === 'playing' ? 'media_pause' : 'media_play')">
+                  <el-button
+                    size="small"
+                    :loading="busyId === d.id"
+                    @click.stop="control(d, d.state === 'playing' ? 'media_pause' : 'media_play')"
+                  >
                     {{ d.state === 'playing' ? $t('iot.action.pause') : $t('iot.action.play') }}
                   </el-button>
                 </div>
@@ -124,11 +134,24 @@
       </div>
       <div v-loading="hist.loading" class="hist-box">
         <template v-if="shape">
-          <div class="hist-axis"><span>{{ shape.hi }}</span><span>{{ shape.lo }}</span></div>
+          <div class="hist-axis">
+            <span>{{ shape.hi }}</span
+            ><span>{{ shape.lo }}</span>
+          </div>
           <svg class="hist-svg" :viewBox="'0 0 ' + shape.w + ' ' + shape.h" preserveAspectRatio="none" aria-hidden="true">
-            <polyline :points="shape.line" fill="none" stroke="currentColor" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round" />
+            <polyline
+              :points="shape.line"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              vector-effect="non-scaling-stroke"
+              stroke-linejoin="round"
+            />
           </svg>
-          <div class="hist-axis"><span>{{ shape.from }}</span><span>{{ shape.to }}</span></div>
+          <div class="hist-axis">
+            <span>{{ shape.from }}</span
+            ><span>{{ shape.to }}</span>
+          </div>
         </template>
         <el-empty v-else-if="!hist.loading" :description="$t('iot.historyEmpty')" :image-size="80" />
       </div>
@@ -305,7 +328,9 @@ const load = async () => {
     if (canManage.value) {
       try {
         Object.assign(cfg, await iotApi.config())
-      } catch { /* 配置读不到就按现状渲染,不打断设备列表 */ }
+      } catch {
+        /* 配置读不到就按现状渲染,不打断设备列表 */
+      }
     }
   } finally {
     loading.value = false
@@ -334,7 +359,9 @@ const saveDevice = async (row, extra) => {
   }
 }
 
-const openManage = () => { manage.visible = true }
+const openManage = () => {
+  manage.visible = true
+}
 
 const openHistory = (d) => {
   hist.device = d
@@ -361,7 +388,9 @@ const openConfig = async () => {
     Object.assign(cfg, v)
     cfgForm.baseUrl = v.baseUrl || ''
     cfgForm.enabled = v.enabled !== false
-  } catch { /* 读不到就按未接入渲染 */ }
+  } catch {
+    /* 读不到就按未接入渲染 */
+  }
 }
 
 const onSaveCfg = async () => {
@@ -444,7 +473,7 @@ onMounted(load)
   padding: 14px 16px;
   cursor: pointer;
   contain: layout style;
-  transition: transform .18s ease;
+  transition: transform 0.18s ease;
 }
 .iot-card:hover {
   transform: translateY(-2px);

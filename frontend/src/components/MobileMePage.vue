@@ -7,7 +7,9 @@
         <div class="me-nickname">{{ userInfo?.nickname || $t('home.loginToView') }}</div>
         <div class="me-family">{{ appStore.familyName || 'ihomy' }}</div>
       </div>
-      <span v-a11y-click v-if="!userStore.isLoggedIn" class="me-login-btn" @click="$router.push('/login')">{{ $t('home.loginToView') }}</span>
+      <span v-a11y-click v-if="!userStore.isLoggedIn" class="me-login-btn" @click="$router.push('/login')">{{
+        $t('home.loginToView')
+      }}</span>
     </div>
 
     <!-- 家庭切换 -->
@@ -19,7 +21,8 @@
       </div>
       <transition name="expand">
         <div v-show="showFamilySwitch" class="family-list">
-          <div v-a11y-click
+          <div
+            v-a11y-click
             v-for="f in families"
             :key="f.familyId"
             class="family-item"
@@ -140,18 +143,26 @@ const switchFamily = async (familyId) => {
     await userStore.switchFamily(familyId, true)
     ElMessage.success(t('nav.switchFamily') + ' ✓')
     location.reload()
-  } catch (e) { ElMessage.error(e.message || 'Failed') }
+  } catch (e) {
+    ElMessage.error(e.message || 'Failed')
+  }
 }
 
 onMounted(async () => {
   if (userStore.isLoggedIn) {
-    try { families.value = await authApi.families() } catch (e) { families.value = [] }
+    try {
+      families.value = await authApi.families()
+    } catch (e) {
+      families.value = []
+    }
   }
 })
 </script>
 
 <style scoped>
-.mobile-me { padding: 16px 16px 80px; }
+.mobile-me {
+  padding: 16px 16px 80px;
+}
 
 .me-header {
   display: flex;
@@ -159,16 +170,33 @@ onMounted(async () => {
   gap: 14px;
   padding: 20px 16px;
   margin-bottom: 16px;
-  background: rgba(255,255,255,0.5);
+  background: rgba(255, 255, 255, 0.5);
   border-radius: 16px;
-  border: 1px solid rgba(0,0,0,0.04);
+  border: 1px solid rgba(0, 0, 0, 0.04);
 }
-html.dark .me-header { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.06); }
-.me-user-info { flex: 1; }
-.me-nickname { font-size: 18px; font-weight: 600; color: var(--color-text-primary, #333); }
-html.dark .me-nickname { color: #E8DCC8; }
-.me-family { font-size: 13px; color: var(--color-text-secondary, #888); margin-top: 2px; }
-html.dark .me-family { color: rgba(232,220,200,0.5); }
+html.dark .me-header {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+.me-user-info {
+  flex: 1;
+}
+.me-nickname {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-primary, #333);
+}
+html.dark .me-nickname {
+  color: #e8dcc8;
+}
+.me-family {
+  font-size: 13px;
+  color: var(--color-text-secondary, #888);
+  margin-top: 2px;
+}
+html.dark .me-family {
+  color: rgba(232, 220, 200, 0.5);
+}
 .me-login-btn {
   padding: 6px 16px;
   border-radius: 8px;
@@ -177,16 +205,22 @@ html.dark .me-family { color: rgba(232,220,200,0.5); }
   font-size: 13px;
   cursor: pointer;
 }
-html.dark .me-login-btn { background: var(--color-brand); color: #1a1a1a; }
+html.dark .me-login-btn {
+  background: var(--color-brand);
+  color: #1a1a1a;
+}
 
 .me-section {
   margin-bottom: 12px;
-  background: rgba(255,255,255,0.5);
+  background: rgba(255, 255, 255, 0.5);
   border-radius: 14px;
-  border: 1px solid rgba(0,0,0,0.04);
+  border: 1px solid rgba(0, 0, 0, 0.04);
   overflow: hidden;
 }
-html.dark .me-section { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.06); }
+html.dark .me-section {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.06);
+}
 
 .me-row {
   display: flex;
@@ -194,25 +228,59 @@ html.dark .me-section { background: rgba(255,255,255,0.06); border-color: rgba(2
   gap: 12px;
   padding: 14px 16px;
   cursor: pointer;
-  border-bottom: 1px solid rgba(0,0,0,0.03);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.03);
   -webkit-tap-highlight-color: transparent;
 }
-html.dark .me-row { border-bottom-color: rgba(255,255,255,0.04); }
-.me-row:last-child { border-bottom: none; }
-.me-row:active { background: rgba(0,0,0,0.03); }
-html.dark .me-row:active { background: rgba(255,255,255,0.04); }
+html.dark .me-row {
+  border-bottom-color: rgba(255, 255, 255, 0.04);
+}
+.me-row:last-child {
+  border-bottom: none;
+}
+.me-row:active {
+  background: rgba(0, 0, 0, 0.03);
+}
+html.dark .me-row:active {
+  background: rgba(255, 255, 255, 0.04);
+}
 
-.me-row-icon { font-size: 18px; width: 24px; text-align: center; }
-.me-row-text { flex: 1; font-size: 15px; color: var(--color-text-primary, #333); }
-html.dark .me-row-text { color: #E8DCC8; }
-.me-row-value { font-size: 14px; color: var(--color-text-secondary, #888); }
-.me-row-arrow { color: var(--color-text-secondary, #aaa); transition: transform 0.2s; font-size: 14px; }
-.me-row-arrow.open { transform: rotate(90deg); }
+.me-row-icon {
+  font-size: 18px;
+  width: 24px;
+  text-align: center;
+}
+.me-row-text {
+  flex: 1;
+  font-size: 15px;
+  color: var(--color-text-primary, #333);
+}
+html.dark .me-row-text {
+  color: #e8dcc8;
+}
+.me-row-value {
+  font-size: 14px;
+  color: var(--color-text-secondary, #888);
+}
+.me-row-arrow {
+  color: var(--color-text-secondary, #aaa);
+  transition: transform 0.2s;
+  font-size: 14px;
+}
+.me-row-arrow.open {
+  transform: rotate(90deg);
+}
 
-.me-row.logout .me-row-text { text-align: center; color: #b04a3a; }
-html.dark .me-row.logout .me-row-text { color: #c97474; }
+.me-row.logout .me-row-text {
+  text-align: center;
+  color: #b04a3a;
+}
+html.dark .me-row.logout .me-row-text {
+  color: #c97474;
+}
 
-.family-list { overflow: hidden; }
+.family-list {
+  overflow: hidden;
+}
 .family-item {
   display: flex;
   align-items: center;
@@ -221,15 +289,37 @@ html.dark .me-row.logout .me-row-text { color: #c97474; }
   font-size: 14px;
   color: var(--color-text-primary, #333);
   cursor: pointer;
-  border-bottom: 1px solid rgba(0,0,0,0.03);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.03);
 }
-html.dark .family-item { color: #E8DCC8; border-bottom-color: rgba(255,255,255,0.04); }
-.family-item:last-child { border-bottom: none; }
-.family-item.active { color: var(--color-primary, var(--color-brand)); font-weight: 600; }
-html.dark .family-item.active { color: var(--color-brand); }
-.family-item:active { background: rgba(0,0,0,0.03); }
+html.dark .family-item {
+  color: #e8dcc8;
+  border-bottom-color: rgba(255, 255, 255, 0.04);
+}
+.family-item:last-child {
+  border-bottom: none;
+}
+.family-item.active {
+  color: var(--color-primary, var(--color-brand));
+  font-weight: 600;
+}
+html.dark .family-item.active {
+  color: var(--color-brand);
+}
+.family-item:active {
+  background: rgba(0, 0, 0, 0.03);
+}
 
-.expand-enter-active, .expand-leave-active { transition: max-height 0.25s ease; overflow: hidden; }
-.expand-enter-from, .expand-leave-to { max-height: 0; }
-.expand-enter-to, .expand-leave-from { max-height: 300px; }
+.expand-enter-active,
+.expand-leave-active {
+  transition: max-height 0.25s ease;
+  overflow: hidden;
+}
+.expand-enter-from,
+.expand-leave-to {
+  max-height: 0;
+}
+.expand-enter-to,
+.expand-leave-from {
+  max-height: 300px;
+}
 </style>

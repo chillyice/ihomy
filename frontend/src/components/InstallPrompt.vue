@@ -22,13 +22,9 @@ const ios = ref(false)
 let deferredPrompt = null
 
 // 已安装(PWA standalone 模式)或用户关闭过 → 不再弹
-const alreadyInstalled = () =>
-  window.matchMedia('(display-mode: standalone)').matches ||
-  window.navigator.standalone === true
+const alreadyInstalled = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
 
-const isIOS = () =>
-  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-  (navigator.userAgent.includes('Mac') && 'ontouchend' in document)
+const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes('Mac') && 'ontouchend' in document)
 
 // Android/Chrome:捕获安装事件并显示引导(iOS 不触发,只在 4s 后兜底显示 iOS 提示)
 const show = () => {
@@ -48,8 +44,14 @@ const install = async () => {
 }
 
 // iOS 无安装 API,点击"知道了"直接收起;提示文案已说明手动步骤
-const iosHint = () => { visible.value = false; localStorage.setItem(DISMISS_KEY, '1') }
-const dismiss = () => { visible.value = false; localStorage.setItem(DISMISS_KEY, '1') }
+const iosHint = () => {
+  visible.value = false
+  localStorage.setItem(DISMISS_KEY, '1')
+}
+const dismiss = () => {
+  visible.value = false
+  localStorage.setItem(DISMISS_KEY, '1')
+}
 
 onMounted(() => {
   window.addEventListener('beforeinstallprompt', (e) => {
@@ -81,8 +83,15 @@ onMounted(() => {
   align-items: center;
   gap: 12px;
 }
-.install-text { flex: 1; min-width: 0; }
-.install-title { font-size: 14px; font-weight: 600; color: var(--color-text); }
+.install-text {
+  flex: 1;
+  min-width: 0;
+}
+.install-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
 .install-desc {
   font-size: 12px;
   color: var(--color-text-secondary);
@@ -108,6 +117,10 @@ onMounted(() => {
   height: 1.5px;
   background: var(--color-text-secondary);
 }
-.install-close::before { transform: translate(-50%, -50%) rotate(45deg); }
-.install-close::after { transform: translate(-50%, -50%) rotate(-45deg); }
+.install-close::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+.install-close::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
 </style>

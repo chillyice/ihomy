@@ -17,7 +17,8 @@
 
     <div class="flash-card card">
       <!-- 本地模式:拖拽/点击选择 .swf -->
-      <div v-a11y-click
+      <div
+        v-a11y-click
         v-if="!fileName && !src"
         class="drop-zone"
         :class="{ dragging }"
@@ -88,7 +89,11 @@ const pick = () => fileInput.value?.click()
 
 const removePlayerElement = () => {
   if (player) {
-    try { player.remove() } catch (e) { /* 忽略卸载异常 */ }
+    try {
+      player.remove()
+    } catch (e) {
+      /* 忽略卸载异常 */
+    }
     player = null
   }
 }
@@ -145,7 +150,7 @@ const playFile = async (file) => {
 
 const loadUrl = (url) => {
   revokeObjectUrl()
-  fileName.value = props.title || (url.split('/').pop() || '')
+  fileName.value = props.title || url.split('/').pop() || ''
   mountAndLoad((api) => api.load(url))
 }
 
@@ -270,6 +275,8 @@ onBeforeUnmount(() => {
   display: none;
 }
 @media (max-width: 768px) {
-  .flash-stage { height: 320px; }
+  .flash-stage {
+    height: 320px;
+  }
 }
 </style>

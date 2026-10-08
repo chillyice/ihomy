@@ -17,7 +17,9 @@ function init() {
   initialized = true
   isMobile.value = detect()
   const mql = window.matchMedia('(max-width: 768px)')
-  const handler = () => { isMobile.value = detect() }
+  const handler = () => {
+    isMobile.value = detect()
+  }
   // 兼容旧浏览器:老版 Safari/部分 WebView 只有 addListener,没有 addEventListener
   if (mql.addEventListener) mql.addEventListener('change', handler)
   else mql.addListener(handler)

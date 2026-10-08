@@ -8,88 +8,87 @@
       <div class="paper-scaler" :style="scalerStyle">
         <div ref="paperRef" class="paper-stack" :style="paperTransform">
           <div class="paper-sheet">
-          <!-- 页眉 -->
-          <div class="paper-header">
-            <div class="header-row">
-              <div class="header-left">
-                <div class="date-wrap">
-                  <el-date-picker
-                    ref="dateRef"
-                    v-model="form.date"
-                    type="date"
-                    value-format="YYYY-MM-DD"
-                    :clearable="false"
-                    size="small"
-                    class="date-picker-line"
-                  />
-                  <div class="date-underline"></div>
+            <!-- 页眉 -->
+            <div class="paper-header">
+              <div class="header-row">
+                <div class="header-left">
+                  <div class="date-wrap">
+                    <el-date-picker
+                      ref="dateRef"
+                      v-model="form.date"
+                      type="date"
+                      value-format="YYYY-MM-DD"
+                      :clearable="false"
+                      size="small"
+                      class="date-picker-line"
+                    />
+                    <div class="date-underline"></div>
+                  </div>
+                  <div class="date-wrap">
+                    <el-time-picker v-model="form.time" value-format="HH:mm" :clearable="false" size="small" class="time-picker-line" />
+                    <div class="date-underline time-underline"></div>
+                  </div>
                 </div>
-                <div class="date-wrap">
-                  <el-time-picker
-                    v-model="form.time"
-                    value-format="HH:mm"
-                    :clearable="false"
-                    size="small"
-                    class="time-picker-line"
-                  />
-                  <div class="date-underline time-underline"></div>
+                <div class="header-right">
+                  <button type="button" ref="moodBtnRef" class="mw-display" @click="togglePicker('mood')">
+                    <span class="mw-icon">{{ form.mood || '😊' }}</span>
+                    <span class="mw-label">{{ moodLabel }}</span>
+                  </button>
+                  <button type="button" ref="weatherBtnRef" class="mw-display" @click="togglePicker('weather')">
+                    <span class="mw-icon">{{ form.weather || '☀️' }}</span>
+                    <span class="mw-label">{{ weatherLabel }}</span>
+                  </button>
                 </div>
-              </div>
-              <div class="header-right">
-                <button type="button" ref="moodBtnRef" class="mw-display" @click="togglePicker('mood')">
-                  <span class="mw-icon">{{ form.mood || '😊' }}</span>
-                  <span class="mw-label">{{ moodLabel }}</span>
-                </button>
-                <button type="button" ref="weatherBtnRef" class="mw-display" @click="togglePicker('weather')">
-                  <span class="mw-icon">{{ form.weather || '☀️' }}</span>
-                  <span class="mw-label">{{ weatherLabel }}</span>
-                </button>
               </div>
             </div>
-          </div>
 
-          <!-- 正文:按整页自适应高度,横线背景+分页线+涂鸦画布层 -->
-          <div class="paper-body" :style="{ height: bodyHeight + 'px' }">
-            <div class="ruling-bg" :style="{ height: bodyHeight + 'px' }"></div>
-            <div class="page-break-bg" :style="{ height: bodyHeight + 'px' }"></div>
-            <textarea
-              ref="textareaRef"
-              v-model="content"
-              class="paper-textarea"
-              :style="{ height: bodyHeight + 'px' }"
-              :placeholder="$t('diary.inputContent')"
-              spellcheck="false"
-              @input="autoResize"
-            ></textarea>
-            <!-- 涂鸦:荧光画布(multiply 叠文字)→ 墨迹画布 → 实时画布(接收指针) -->
-            <canvas ref="markBaseRef" class="doodle-canvas doodle-mark" :style="{ height: bodyHeight + 'px' }"></canvas>
-            <canvas ref="inkBaseRef" class="doodle-canvas" :style="{ height: bodyHeight + 'px' }"></canvas>
-            <canvas
-              ref="liveRef"
-              class="doodle-canvas doodle-live"
-              :class="{ 'doodle-mark': activeBrush === 'marker' }"
-              :style="{ height: bodyHeight + 'px', pointerEvents: activeBrush ? 'auto' : 'none', cursor: drawCursor, touchAction: activeBrush ? 'none' : 'auto' }"
-              @pointerdown="onPointerDown"
-              @pointermove="onPointerMove"
-              @pointerup="onPointerUp"
-              @pointercancel="onPointerUp"
-            ></canvas>
-          </div>
+            <!-- 正文:按整页自适应高度,横线背景+分页线+涂鸦画布层 -->
+            <div class="paper-body" :style="{ height: bodyHeight + 'px' }">
+              <div class="ruling-bg" :style="{ height: bodyHeight + 'px' }"></div>
+              <div class="page-break-bg" :style="{ height: bodyHeight + 'px' }"></div>
+              <textarea
+                ref="textareaRef"
+                v-model="content"
+                class="paper-textarea"
+                :style="{ height: bodyHeight + 'px' }"
+                :placeholder="$t('diary.inputContent')"
+                spellcheck="false"
+                @input="autoResize"
+              ></textarea>
+              <!-- 涂鸦:荧光画布(multiply 叠文字)→ 墨迹画布 → 实时画布(接收指针) -->
+              <canvas ref="markBaseRef" class="doodle-canvas doodle-mark" :style="{ height: bodyHeight + 'px' }"></canvas>
+              <canvas ref="inkBaseRef" class="doodle-canvas" :style="{ height: bodyHeight + 'px' }"></canvas>
+              <canvas
+                ref="liveRef"
+                class="doodle-canvas doodle-live"
+                :class="{ 'doodle-mark': activeBrush === 'marker' }"
+                :style="{
+                  height: bodyHeight + 'px',
+                  pointerEvents: activeBrush ? 'auto' : 'none',
+                  cursor: drawCursor,
+                  touchAction: activeBrush ? 'none' : 'auto',
+                }"
+                @pointerdown="onPointerDown"
+                @pointermove="onPointerMove"
+                @pointerup="onPointerUp"
+                @pointercancel="onPointerUp"
+              ></canvas>
+            </div>
 
-          <!-- 页脚 -->
-          <div class="paper-footer">
-            <span class="page-num">{{ pageCount }} {{ $t('diary.pagesUnit') }} · {{ wordCount }} {{ $t('diary.words') }}</span>
-            <div class="vis-row">
-              <el-radio-group v-model="form.visibility" size="small">
-                <el-radio-button value="PRIVATE">{{ $t('diary.onlySelf') }}</el-radio-button>
-                <el-radio-button value="FAMILY">{{ $t('diary.familyVisible') }}</el-radio-button>
-                <el-radio-button value="PUBLIC">{{ $t('diary.publicVisible') }}</el-radio-button>
-              </el-radio-group>
-              <el-button type="primary" :loading="loading" @click="onSave">{{ $t('common.save') }}</el-button>
+            <!-- 页脚 -->
+            <div class="paper-footer">
+              <span class="page-num">{{ pageCount }} {{ $t('diary.pagesUnit') }} · {{ wordCount }} {{ $t('diary.words') }}</span>
+              <div class="vis-row">
+                <el-radio-group v-model="form.visibility" size="small">
+                  <el-radio-button value="PRIVATE">{{ $t('diary.onlySelf') }}</el-radio-button>
+                  <el-radio-button value="FAMILY">{{ $t('diary.familyVisible') }}</el-radio-button>
+                  <el-radio-button value="PUBLIC">{{ $t('diary.publicVisible') }}</el-radio-button>
+                </el-radio-group>
+                <el-button type="primary" :loading="loading" @click="onSave">{{ $t('common.save') }}</el-button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
       </div>
 
       <!-- 右侧:涂鸦笔盘 sticky -->
@@ -112,7 +111,7 @@
           <div class="picker-title">{{ pickerOpen === 'mood' ? $t('diary.mood') : $t('diary.weather') }}</div>
           <div class="picker-grid">
             <button
-              v-for="item in (pickerOpen === 'mood' ? MOODS : WEATHERS)"
+              v-for="item in pickerOpen === 'mood' ? MOODS : WEATHERS"
               :key="item.icon"
               type="button"
               class="picker-cell"
@@ -123,7 +122,9 @@
               <span class="cell-label">{{ item.label }}</span>
             </button>
           </div>
-          <button v-if="(pickerOpen === 'mood' ? form.mood : form.weather)" type="button" class="picker-clear" @click="clearPick">{{ $t('diary.clearPick') }}</button>
+          <button v-if="pickerOpen === 'mood' ? form.mood : form.weather" type="button" class="picker-clear" @click="clearPick">
+            {{ $t('diary.clearPick') }}
+          </button>
         </div>
       </div>
     </teleport>
@@ -152,7 +153,13 @@ const isEdit = computed(() => !!route.params.id)
 const loading = ref(false)
 const authorId = ref(null)
 
-const form = reactive({ mood: '', weather: '', date: new Date().toISOString().slice(0, 10), time: new Date().toTimeString().slice(0, 5), visibility: 'PRIVATE' })
+const form = reactive({
+  mood: '',
+  weather: '',
+  date: new Date().toISOString().slice(0, 10),
+  time: new Date().toTimeString().slice(0, 5),
+  visibility: 'PRIVATE',
+})
 const content = ref('')
 const pickerOpen = ref(null)
 const pickerStyle = ref({})
@@ -166,10 +173,15 @@ const bodyHeight = ref(PAGE_H)
 const paperRef = ref(null)
 const paperScale = ref(1)
 const scalerH = ref(PAGE_H)
-const paperTransform = computed(() => (paperScale.value < 1 ? { transform: `scale(${paperScale.value})`, transformOrigin: 'top left' } : {}))
+const paperTransform = computed(() =>
+  paperScale.value < 1 ? { transform: `scale(${paperScale.value})`, transformOrigin: 'top left' } : {},
+)
 const scalerStyle = computed(() => (paperScale.value < 1 ? { width: `${PAPER_W * paperScale.value}px`, height: `${scalerH.value}px` } : {}))
 const syncScale = () => {
-  if (!isMobile.value) { paperScale.value = 1; return }
+  if (!isMobile.value) {
+    paperScale.value = 1
+    return
+  }
   const avail = window.innerWidth - 24 // .page 移动端左右 padding 12px*2
   paperScale.value = Math.min(1, avail / PAPER_W)
 }
@@ -190,7 +202,10 @@ let draftDirty = false
 let draftTimer = null
 const saveDraft = () => {
   try {
-    sessionStorage.setItem(draftKey.value, JSON.stringify({ c: content.value, m: form.mood, w: form.weather, d: form.date, t: form.time, v: form.visibility, s: strokes.value }))
+    sessionStorage.setItem(
+      draftKey.value,
+      JSON.stringify({ c: content.value, m: form.mood, w: form.weather, d: form.date, t: form.time, v: form.visibility, s: strokes.value }),
+    )
   } catch (e) {} // 隐私模式/存储满:静默降级,不阻断书写
 }
 const queueSaveDraft = () => {
@@ -200,7 +215,9 @@ const queueSaveDraft = () => {
 const clearDraft = () => {
   clearTimeout(draftTimer)
   draftDirty = false
-  try { sessionStorage.removeItem(draftKey.value) } catch (e) {}
+  try {
+    sessionStorage.removeItem(draftKey.value)
+  } catch (e) {}
 }
 const readDraft = () => {
   try {
@@ -208,7 +225,9 @@ const readDraft = () => {
     if (!raw) return null
     const o = JSON.parse(raw)
     return o && typeof o === 'object' ? o : null
-  } catch { return null }
+  } catch {
+    return null
+  }
 }
 const applyDraft = (o) => {
   if (typeof o.c === 'string' && o.c) content.value = o.c
@@ -219,7 +238,9 @@ const applyDraft = (o) => {
   if (['PRIVATE', 'FAMILY', 'PUBLIC'].includes(o.v)) form.visibility = o.v
   if (Array.isArray(o.s)) strokes.value = o.s.filter((s) => s && typeof s.t === 'string' && Array.isArray(s.pts) && s.pts.length)
 }
-const flushDraftIfDirty = () => { if (draftDirty) saveDraft() } // pagehide/切后台立即落盘(旋转 reload 前的最后时机)
+const flushDraftIfDirty = () => {
+  if (draftDirty) saveDraft()
+} // pagehide/切后台立即落盘(旋转 reload 前的最后时机)
 
 const autoResize = () => {
   nextTick(() => {
@@ -299,7 +320,10 @@ const redrawBase = () => {
 const queueRedraw = () => {
   if (redrawQueued) return
   redrawQueued = true
-  requestAnimationFrame(() => { redrawQueued = false; redrawBase() })
+  requestAnimationFrame(() => {
+    redrawQueued = false
+    redrawBase()
+  })
 }
 
 const drawLive = () => {
@@ -321,9 +345,7 @@ const canvasPos = (e) => {
 
 const applyErase = (x, y) => {
   const r = eraserRadius.value
-  strokes.value = activeBrush.value === 'eraserO'
-    ? eraseObject(strokes.value, x, y, r)
-    : erasePixel(strokes.value, x, y, r)
+  strokes.value = activeBrush.value === 'eraserO' ? eraseObject(strokes.value, x, y, r) : erasePixel(strokes.value, x, y, r)
   queueRedraw()
 }
 
@@ -345,7 +367,14 @@ const onPointerDown = (e) => {
     lastErase = [x, y]
     applyErase(x, y)
   } else {
-    curStroke = { t: activeBrush.value, c: brushColor.value, w: brushSize.value, a: Math.round(brushAlpha.value) / 100, s: (Math.random() * 1e9) | 0, pts: [[Math.round(x), Math.round(y)]] }
+    curStroke = {
+      t: activeBrush.value,
+      c: brushColor.value,
+      w: brushSize.value,
+      a: Math.round(brushAlpha.value) / 100,
+      s: (Math.random() * 1e9) | 0,
+      pts: [[Math.round(x), Math.round(y)]],
+    }
     drawLive()
   }
 }
@@ -359,7 +388,7 @@ const onPointerMove = (e) => {
     const [lx, ly] = lastErase
     const d = Math.hypot(x - lx, y - ly)
     const steps = Math.max(1, Math.floor(d / Math.max(2, eraserRadius.value * 0.4)))
-    for (let i = 1; i <= steps; i++) applyErase(lx + (x - lx) * i / steps, ly + (y - ly) * i / steps)
+    for (let i = 1; i <= steps; i++) applyErase(lx + ((x - lx) * i) / steps, ly + ((y - ly) * i) / steps)
     lastErase = [x, y]
   } else if (curStroke) {
     const last = curStroke.pts[curStroke.pts.length - 1]
@@ -389,7 +418,10 @@ const onPointerUp = (e) => {
 }
 
 const onKeydown = (e) => {
-  if (e.key === 'Escape' && activeBrush.value) { activeBrush.value = null; return }
+  if (e.key === 'Escape' && activeBrush.value) {
+    activeBrush.value = null
+    return
+  }
   // 撤销/重做仅在非文字输入焦点时生效(不劫持 textarea 原生撤销)
   const tag = e.target && e.target.tagName
   if (tag === 'TEXTAREA' || tag === 'INPUT') return
@@ -406,7 +438,10 @@ const onKeydown = (e) => {
 watch(bodyHeight, () => nextTick(redrawBase))
 
 const togglePicker = (type) => {
-  if (pickerOpen.value === type) { pickerOpen.value = null; return }
+  if (pickerOpen.value === type) {
+    pickerOpen.value = null
+    return
+  }
   if (isMobile.value) {
     // 手机:信纸缩放铺满屏宽,按钮贴右缘,锚点定位会把弹窗推出屏幕外 → 固定居中展示
     pickerCentered.value = true
@@ -440,7 +475,7 @@ const loadCurrentWeather = async () => {
   try {
     const data = await publicApi.getWeather()
     if (data?.text) {
-      const match = WEATHERS.find(w => data.text.includes(w.label) || w.label.includes(data.text))
+      const match = WEATHERS.find((w) => data.text.includes(w.label) || w.label.includes(data.text))
       form.weather = match ? match.icon : ''
     }
   } catch (e) {}
@@ -450,7 +485,14 @@ const onSave = async () => {
   if (!content.value.trim()) return ElMessage.warning(t('diary.inputContent'))
   loading.value = true
   try {
-    const payload = { content: content.value, mood: form.mood, weather: form.weather, date: form.date + ' ' + form.time, visibility: form.visibility, doodle: strokes.value.length ? JSON.stringify({ v: 1, strokes: strokes.value }) : null }
+    const payload = {
+      content: content.value,
+      mood: form.mood,
+      weather: form.weather,
+      date: form.date + ' ' + form.time,
+      visibility: form.visibility,
+      doodle: strokes.value.length ? JSON.stringify({ v: 1, strokes: strokes.value }) : null,
+    }
     if (isEdit.value) await diaryApi.update(route.params.id, payload)
     else await diaryApi.create(payload)
     clearDraft() // 保存成功,草稿使命完成
@@ -471,7 +513,8 @@ onMounted(async () => {
     strokes.value = parseDoodle(d.doodle)
     const raw = String(d.createdAt || '')
     Object.assign(form, {
-      mood: d.mood || '', weather: d.weather || '',
+      mood: d.mood || '',
+      weather: d.weather || '',
       date: raw.slice(0, 10) || form.date,
       time: raw.slice(11, 16) || form.time,
       visibility: d.visibility === 'PRIVATE' ? 'PRIVATE' : d.visibility === 'PUBLIC' ? 'PUBLIC' : 'FAMILY',
@@ -483,7 +526,11 @@ onMounted(async () => {
   }
   history.value = [strokes.value]
   hIndex.value = 0
-  nextTick(() => { autoResize(); redrawBase(); textareaRef.value?.focus() })
+  nextTick(() => {
+    autoResize()
+    redrawBase()
+    textareaRef.value?.focus()
+  })
   window.addEventListener('keydown', onKeydown)
   syncScale()
   syncHeight()
@@ -497,7 +544,10 @@ onMounted(async () => {
   draftReady = true
 })
 
-const onResize = () => { syncScale(); syncHeight() }
+const onResize = () => {
+  syncScale()
+  syncHeight()
+}
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
@@ -509,7 +559,10 @@ onBeforeUnmount(() => {
 
 watch(content, () => autoResize())
 watch(paperScale, () => syncHeight())
-watch(isMobile, () => { syncScale(); syncHeight() })
+watch(isMobile, () => {
+  syncScale()
+  syncHeight()
+})
 // 草稿自动保存:任何内容/心情天气/涂鸦变更(初始装载完成后)防抖落盘
 watch([content, () => form.mood, () => form.weather, () => form.date, () => form.time, () => form.visibility, strokes], () => {
   if (!draftReady) return
@@ -519,128 +572,327 @@ watch([content, () => form.mood, () => form.weather, () => form.date, () => form
 </script>
 
 <style scoped>
-.diary-layout { display: flex; gap: 8px; justify-content: center; align-items: flex-start; }
+.diary-layout {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: flex-start;
+}
 
-.paper-scaler { flex-shrink: 0; overflow: hidden; }
-.paper-stack { display: flex; flex-direction: column; flex-shrink: 0; width: calc(28 * 16px + 24px * 2); }
+.paper-scaler {
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.paper-stack {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  width: calc(28 * 16px + 24px * 2);
+}
 
 .paper-sheet {
-  background: #fffdf8; border-radius: 14px; box-shadow: 0 4px 24px rgba(58,46,34,0.1);
-  overflow: hidden; position: relative;
-  --ruling-color: rgba(100,130,180,0.15);
-  --break-color: rgba(100,130,180,0.35);
+  background: #fffdf8;
+  border-radius: 14px;
+  box-shadow: 0 4px 24px rgba(58, 46, 34, 0.1);
+  overflow: hidden;
+  position: relative;
+  --ruling-color: rgba(100, 130, 180, 0.15);
+  --break-color: rgba(100, 130, 180, 0.35);
 }
 html.dark .paper-sheet {
-  background: var(--color-card); box-shadow: 0 4px 24px rgba(0,0,0,0.3);
-  --ruling-color: rgba(232,220,200,0.06);
-  --break-color: rgba(232,220,200,0.15);
+  background: var(--color-card);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  --ruling-color: rgba(232, 220, 200, 0.06);
+  --break-color: rgba(232, 220, 200, 0.15);
 }
 
-:deep(.el-date-editor.el-input), :deep(.el-time-editor.el-input) { --el-border-color: transparent; width: 100px !important; }
+:deep(.el-date-editor.el-input),
+:deep(.el-time-editor.el-input) {
+  --el-border-color: transparent;
+  width: 100px !important;
+}
 :deep(.el-date-editor.el-input .el-input__wrapper),
 :deep(.el-time-editor.el-input .el-input__wrapper) {
-  box-shadow: none !important; background: transparent !important; padding: 0 4px;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 4px;
 }
 :deep(.el-date-editor.el-input .el-input__inner),
-:deep(.el-time-editor.el-input .el-input__inner) { font-size: 13px; }
-
-.paper-header { padding: 8px 24px 0; }
-/* header-row: left 和 right 都是纵向排列,底端对齐 */
-.header-row { display: flex; justify-content: space-between; align-items: flex-end; min-height: 56px; }
-/* header-left: 日期和时间上下排列 */
-.header-left { display: flex; flex-direction: column; gap: 2px; padding-bottom: 3px; }
-.date-wrap { display: flex; flex-direction: column; align-items: stretch; }
-.date-underline { width: 100px; border-bottom: 1px solid var(--ruling-color); margin-top: 1px; }
-/* header-right: 心情和天气上下排列 */
-.header-right { display: flex; flex-direction: column; gap: 0; align-items: flex-start; }
-.mw-display {
-  display: flex; align-items: center; gap: 4px;
-  border: none; border-bottom: 1px solid var(--ruling-color); border-radius: 0;
-  padding: 0 0 3px; background: transparent; cursor: pointer;
-  transition: opacity 0.15s; opacity: 0.7;
-  line-height: 28px; height: 28px; width: 80px;
+:deep(.el-time-editor.el-input .el-input__inner) {
+  font-size: 13px;
 }
-.mw-display:hover { opacity: 1; }
-.mw-icon { font-size: 16px; line-height: 1; }
-.mw-label { font-size: 13px; color: var(--color-text); }
+
+.paper-header {
+  padding: 8px 24px 0;
+}
+/* header-row: left 和 right 都是纵向排列,底端对齐 */
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  min-height: 56px;
+}
+/* header-left: 日期和时间上下排列 */
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 3px;
+}
+.date-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.date-underline {
+  width: 100px;
+  border-bottom: 1px solid var(--ruling-color);
+  margin-top: 1px;
+}
+/* header-right: 心情和天气上下排列 */
+.header-right {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  align-items: flex-start;
+}
+.mw-display {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  border-bottom: 1px solid var(--ruling-color);
+  border-radius: 0;
+  padding: 0 0 3px;
+  background: transparent;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  opacity: 0.7;
+  line-height: 28px;
+  height: 28px;
+  width: 80px;
+}
+.mw-display:hover {
+  opacity: 1;
+}
+.mw-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+.mw-label {
+  font-size: 13px;
+  color: var(--color-text);
+}
 
 /* 正文区:正文从 y=0 起(与查看页 DiaryPage 坐标系一致,涂鸦/分页两页对齐) */
-.paper-body { position: relative; padding: 0 24px; overflow: hidden; }
+.paper-body {
+  position: relative;
+  padding: 0 24px;
+  overflow: hidden;
+}
 /* 横线背景:每28px一条浅线 */
 .ruling-bg {
-  position: absolute; top: 0; left: 24px; right: 24px;
-  background-image: repeating-linear-gradient(to bottom,
-    transparent, transparent 27px,
-    var(--ruling-color) 27px, var(--ruling-color) 28px);
-  pointer-events: none; z-index: 0;
+  position: absolute;
+  top: 0;
+  left: 24px;
+  right: 24px;
+  background-image: repeating-linear-gradient(to bottom, transparent, transparent 27px, var(--ruling-color) 27px, var(--ruling-color) 28px);
+  pointer-events: none;
+  z-index: 0;
 }
 /* 分页线:每18行(504px)一条深色实线 */
 .page-break-bg {
-  position: absolute; top: 0; left: 12px; right: 12px;
-  background-image: repeating-linear-gradient(to bottom,
-    transparent, transparent calc(504px - 2px),
-    var(--break-color) calc(504px - 2px), var(--break-color) 504px);
-  pointer-events: none; z-index: 0;
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent calc(504px - 2px),
+    var(--break-color) calc(504px - 2px),
+    var(--break-color) 504px
+  );
+  pointer-events: none;
+  z-index: 0;
 }
 .paper-textarea {
-  position: relative; width: 100%;
-  border: none; outline: none; resize: none; background: transparent;
+  position: relative;
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
   font-family: 'Cascadia Mono', 'Consolas', 'Courier New', monospace;
-  font-size: 16px; line-height: 28px; color: var(--color-text);
-  z-index: 1; overflow: hidden; word-break: break-all; padding: 0;
+  font-size: 16px;
+  line-height: 28px;
+  color: var(--color-text);
+  z-index: 1;
+  overflow: hidden;
+  word-break: break-all;
+  padding: 0;
 }
-.paper-textarea::placeholder { color: var(--color-text-secondary); opacity: 0.4; }
+.paper-textarea::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 0.4;
+}
 
 .paper-footer {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 10px 24px 14px; border-top: 1px solid var(--ruling-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 24px 14px;
+  border-top: 1px solid var(--ruling-color);
 }
-.page-num { font-size: 12px; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
-.vis-row { display: flex; align-items: center; gap: 12px; }
+.page-num {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.vis-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 
 /* 涂鸦画布层:荧光笔专用画布 multiply 叠在文字上(深色模式 screen),墨迹/实时画布普通叠加 */
 .doodle-canvas {
-  position: absolute; top: 0; left: 0; width: 100%;
-  pointer-events: none; z-index: 3;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+  z-index: 3;
 }
-.doodle-mark { z-index: 2; mix-blend-mode: multiply; opacity: 0.55; }
-html.dark .doodle-mark { mix-blend-mode: screen; }
-.doodle-live { z-index: 4; }
+.doodle-mark {
+  z-index: 2;
+  mix-blend-mode: multiply;
+  opacity: 0.55;
+}
+html.dark .doodle-mark {
+  mix-blend-mode: screen;
+}
+.doodle-live {
+  z-index: 4;
+}
 
 /* 心情/天气弹窗:z-index 61(高于导航栏60,低于光影层65+) */
-.picker-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 61; }
+.picker-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 61;
+}
 .picker-pop {
-  background: rgba(255,253,248,0.85); backdrop-filter: blur(24px) saturate(1.2);
-  -webkit-backdrop-filter: blur(24px) saturate(1.2); border-radius: 14px;
-  box-shadow: 0 8px 32px rgba(58,46,34,0.12); padding: 14px; width: 240px;
+  background: rgba(255, 253, 248, 0.85);
+  backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(58, 46, 34, 0.12);
+  padding: 14px;
+  width: 240px;
   animation: pickerIn 0.2s ease;
 }
-html.dark .picker-pop { background: rgba(var(--color-card-rgb),0.9); box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
-@keyframes pickerIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+html.dark .picker-pop {
+  background: rgba(var(--color-card-rgb), 0.9);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+@keyframes pickerIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 /* 手机居中模式:transform 已用于居中定位,入场动画只走透明度避免覆盖位移 */
-.picker-pop.centered { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); animation: pickerInCenter 0.2s ease; }
-@keyframes pickerInCenter { from { opacity: 0; } to { opacity: 1; } }
-.picker-title { font-size: 12px; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 10px; text-align: center; }
-.picker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.picker-pop.centered {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: pickerInCenter 0.2s ease;
+}
+@keyframes pickerInCenter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.picker-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: 10px;
+  text-align: center;
+}
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
 .picker-cell {
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  padding: 8px 4px; border: none; border-radius: 10px; background: transparent;
-  cursor: pointer; transition: all 0.15s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 4px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s;
 }
-.picker-cell:hover { background: rgba(var(--color-brand-rgb),0.08); }
-.picker-cell.active { background: rgba(var(--color-brand-rgb),0.12); }
-html.dark .picker-cell:hover { background: rgba(var(--color-brand-rgb),0.08); }
-html.dark .picker-cell.active { background: rgba(var(--color-brand-rgb),0.12); }
-.cell-icon { font-size: 22px; line-height: 1; }
-.cell-label { font-size: 11px; color: var(--color-text-secondary); }
+.picker-cell:hover {
+  background: rgba(var(--color-brand-rgb), 0.08);
+}
+.picker-cell.active {
+  background: rgba(var(--color-brand-rgb), 0.12);
+}
+html.dark .picker-cell:hover {
+  background: rgba(var(--color-brand-rgb), 0.08);
+}
+html.dark .picker-cell.active {
+  background: rgba(var(--color-brand-rgb), 0.12);
+}
+.cell-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+.cell-label {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
 .picker-clear {
-  width: 100%; margin-top: 8px; border: none; border-radius: 8px; padding: 6px;
-  background: rgba(185,96,88,0.06); color: #b04a3a; font-size: 12px; cursor: pointer;
+  width: 100%;
+  margin-top: 8px;
+  border: none;
+  border-radius: 8px;
+  padding: 6px;
+  background: rgba(185, 96, 88, 0.06);
+  color: #b04a3a;
+  font-size: 12px;
+  cursor: pointer;
 }
-html.dark .picker-clear { background: rgba(201,116,116,0.08); color: #c97474; }
+html.dark .picker-clear {
+  background: rgba(201, 116, 116, 0.08);
+  color: #c97474;
+}
 
 @media (max-width: 768px) {
-  .diary-layout { flex-direction: column; align-items: center; padding-bottom: 96px; }
-  .paper-scaler { margin: 0 auto; }
+  .diary-layout {
+    flex-direction: column;
+    align-items: center;
+    padding-bottom: 96px;
+  }
+  .paper-scaler {
+    margin: 0 auto;
+  }
 }
 </style>

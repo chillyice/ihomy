@@ -67,6 +67,11 @@ onMounted(async () => {
   font-size: 15px;
   margin-bottom: 20px;
 }
-.cb-text.ok { color: var(--el-color-success); }
-.cb-text.fail { color: var(--el-color-danger); word-break: break-all; }
+.cb-text.ok {
+  color: var(--el-color-success);
+}
+.cb-text.fail {
+  color: var(--el-color-danger);
+  word-break: break-all;
+}
 </style>

@@ -13,10 +13,20 @@
       <div v-if="list.length" class="anni-grid">
         <div v-for="a in list" :key="a.id" class="anni-card card">
           <div class="anni-top">
-            <span class="calendar-badge" :class="a.calendar">{{ a.calendar === 'lunar' ? t('anniversary.lunar') : t('anniversary.solar') }}</span>
+            <span class="calendar-badge" :class="a.calendar">{{
+              a.calendar === 'lunar' ? t('anniversary.lunar') : t('anniversary.solar')
+            }}</span>
             <span v-if="a.recurring === 'ONCE'" class="once-badge">{{ t('anniversary.once') }}</span>
           </div>
-          <div class="anni-date">{{ t('anniversary.dateFormat', { leap: a.isLeap && a.calendar === 'lunar' ? t('anniversary.leap') : '', month: a.month, day: a.day }) }}</div>
+          <div class="anni-date">
+            {{
+              t('anniversary.dateFormat', {
+                leap: a.isLeap && a.calendar === 'lunar' ? t('anniversary.leap') : '',
+                month: a.month,
+                day: a.day,
+              })
+            }}
+          </div>
           <div class="anni-name">{{ a.name }}</div>
           <div class="anni-owner">
             <el-icon><User /></el-icon>
@@ -24,10 +34,14 @@
           </div>
           <div v-if="userStore.isLoggedIn" class="anni-actions">
             <el-tooltip :content="t('common.edit')" placement="top" :show-after="300">
-              <el-button size="small" text @click="openEditor(a)"><el-icon><Edit /></el-icon></el-button>
+              <el-button size="small" text @click="openEditor(a)"
+                ><el-icon><Edit /></el-icon
+              ></el-button>
             </el-tooltip>
             <el-tooltip :content="t('common.delete')" placement="top" :show-after="300">
-              <el-button size="small" text type="danger" @click="onDel(a)"><el-icon><Delete /></el-icon></el-button>
+              <el-button size="small" text type="danger" @click="onDel(a)"
+                ><el-icon><Delete /></el-icon
+              ></el-button>
             </el-tooltip>
           </div>
         </div>
@@ -109,9 +123,7 @@ const editor = reactive({
 
 // 关联成员展示:多位用顿号连接,未关联即为家庭级纪念日
 const memberText = (a) =>
-  (Array.isArray(a.memberNames) && a.memberNames.length)
-    ? a.memberNames.join('、')
-    : t('anniversary.familyAnniversary')
+  Array.isArray(a.memberNames) && a.memberNames.length ? a.memberNames.join('、') : t('anniversary.familyAnniversary')
 
 // 拉取纪念日列表
 const load = async () => {
@@ -136,8 +148,13 @@ const loadMembers = async () => {
 const openEditor = (a) => {
   if (a) {
     Object.assign(editor.form, {
-      id: a.id, name: a.name, calendar: a.calendar, month: a.month, day: a.day,
-      isLeap: a.isLeap, memberIds: Array.isArray(a.memberIds) ? [...a.memberIds] : [],
+      id: a.id,
+      name: a.name,
+      calendar: a.calendar,
+      month: a.month,
+      day: a.day,
+      isLeap: a.isLeap,
+      memberIds: Array.isArray(a.memberIds) ? [...a.memberIds] : [],
       recurring: a.recurring === 'ONCE' ? 0 : 1,
     })
   } else {
@@ -157,7 +174,10 @@ const onSave = async () => {
 }
 
 const onDel = async (a) => {
-  await ElMessageBox.confirm(t('anniversary.deleteConfirm', { name: a.name }), t('common.tip'), { type: 'warning', closeOnClickModal: true })
+  await ElMessageBox.confirm(t('anniversary.deleteConfirm', { name: a.name }), t('common.tip'), {
+    type: 'warning',
+    closeOnClickModal: true,
+  })
   await anniversaryApi.remove(a.id)
   ElMessage.success(t('common.deleted'))
   load()
@@ -175,18 +195,42 @@ onMounted(() => {
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 16px;
 }
-.anni-card { padding: 20px; display: flex; flex-direction: column; gap: 8px; }
-.anni-top { display: flex; justify-content: space-between; }
+.anni-card {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.anni-top {
+  display: flex;
+  justify-content: space-between;
+}
 .calendar-badge {
   font-size: 11px;
   padding: 2px 10px;
   border-radius: 10px;
 }
-.calendar-badge.solar { background: rgba(46, 116, 181, 0.1); color: var(--color-accent); }
-.calendar-badge.lunar { background: rgba(230, 162, 60, 0.12); color: #B8860B; }
-.once-badge { font-size: 11px; color: var(--color-text-secondary); }
-.anni-date { font-size: 26px; font-weight: 700; color: var(--color-primary); }
-.anni-name { font-size: 15px; color: var(--color-text); }
+.calendar-badge.solar {
+  background: rgba(46, 116, 181, 0.1);
+  color: var(--color-accent);
+}
+.calendar-badge.lunar {
+  background: rgba(230, 162, 60, 0.12);
+  color: #b8860b;
+}
+.once-badge {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+.anni-date {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+.anni-name {
+  font-size: 15px;
+  color: var(--color-text);
+}
 .anni-owner {
   display: flex;
   align-items: center;
@@ -194,12 +238,27 @@ onMounted(() => {
   font-size: 13px;
   color: var(--color-text-secondary);
 }
-.anni-actions { margin-top: 4px; text-align: right; border-top: 1px solid rgba(31, 58, 95, 0.06); padding-top: 8px; }
-.anni-actions :deep(.el-button) { padding: 5px 6px; }
-.anni-actions :deep(.el-button + .el-button) { margin-left: 4px; }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.anni-actions {
+  margin-top: 4px;
+  text-align: right;
+  border-top: 1px solid rgba(31, 58, 95, 0.06);
+  padding-top: 8px;
+}
+.anni-actions :deep(.el-button) {
+  padding: 5px 6px;
+}
+.anni-actions :deep(.el-button + .el-button) {
+  margin-left: 4px;
+}
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
 
 @media (max-width: 768px) {
-  .anni-grid { grid-template-columns: 1fr; }
+  .anni-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

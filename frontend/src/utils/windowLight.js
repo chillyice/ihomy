@@ -63,9 +63,7 @@ export function getSunScene(sunInfo, slotIndex) {
   const lightRotation = shadowVRotation
 
   // 光源水平位置:由方位角驱动,夜间 hold 在日出位置(左侧 7.5%)
-  const sourceX = isNight
-    ? 7.5
-    : Math.max(7.5, Math.min(92.5, ((az - 90) / 180) * 100))
+  const sourceX = isNight ? 7.5 : Math.max(7.5, Math.min(92.5, ((az - 90) / 180) * 100))
 
   // 内框横条 top:太阳越高越靠近顶部
   const shadowHTop = Math.max(5, Math.min(85, 80 - Math.max(0, alt) * 0.8))
@@ -164,7 +162,7 @@ export function getSunScene(sunInfo, slotIndex) {
   const reflectionOpacity = hasDirectLight ? Math.sin(dayProgress * Math.PI) * 0.22 : 0
 
   // 台灯:太阳方位角>260°(日落西方)开灯,>100°且≤260°(白天)关灯
-  const lampOpacity = (az > 260 || az <= 100 || isNight) ? 1 : 0
+  const lampOpacity = az > 260 || az <= 100 || isNight ? 1 : 0
 
   return {
     source: { x: sourceX + '%', y: '-15%' },

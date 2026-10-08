@@ -8,7 +8,10 @@
         <div class="tb-left">
           <el-input v-model="searchKeyword" :placeholder="t('album.searchPlaceholder')" clearable size="small" style="width: 200px">
             <template #prefix>
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <circle cx="11" cy="11" r="8" />
+                <path d="M21 21l-4.35-4.35" />
+              </svg>
             </template>
           </el-input>
           <el-select v-model="sourceFilter" size="small" style="width: 150px" :placeholder="t('album.filterSource')">
@@ -32,13 +35,16 @@
       <div v-else class="tb-right">
         <span class="select-count">{{ t('album.selectedAlbums', { n: selectedIds.length }) }}</span>
         <el-button :disabled="batchDeleting" @click="toggleSelect">{{ t('album.cancelSelect') }}</el-button>
-        <el-button type="danger" :loading="batchDeleting" :disabled="!selectedIds.length" @click="onBatchDelete">{{ t('album.deleteSelected') }}</el-button>
+        <el-button type="danger" :loading="batchDeleting" :disabled="!selectedIds.length" @click="onBatchDelete">{{
+          t('album.deleteSelected')
+        }}</el-button>
       </div>
     </PageToolbar>
 
     <div v-loading="loading">
       <div v-if="topAlbums.length" class="album-grid">
-        <div v-a11y-click
+        <div
+          v-a11y-click
           v-for="a in topAlbums"
           :key="a.id"
           class="album-card card"
@@ -46,22 +52,29 @@
           @click="selectMode ? togglePick(a) : $router.push(`/album/${a.id}`)"
         >
           <div class="album-cover-wrap">
-            <div
-              v-if="a.cover"
-              class="album-cover"
-              :style="{ backgroundImage: `url(${a.cover})` }"
-            ></div>
+            <div v-if="a.cover" class="album-cover" :style="{ backgroundImage: `url(${a.cover})` }"></div>
             <div v-else class="album-cover">
               <AlbumDefaultCover :size="64" />
             </div>
-            <span v-if="!selectMode" class="album-type" :class="a.type">{{ a.type === 'public' ? t('album.public') : t('album.private') }}</span>
+            <span v-if="!selectMode" class="album-type" :class="a.type">{{
+              a.type === 'public' ? t('album.public') : t('album.private')
+            }}</span>
             <span v-if="a.sourceDeviceName" class="album-source">
               <span class="status-dot" :class="a.syncStatus || 'OFFLINE'"></span>{{ a.sourceDeviceName }}
             </span>
             <span class="album-count">{{ t('album.photoCount', { n: a.totalPhotoCount ?? a.photoCount }) }}</span>
             <span v-if="a.childCount" class="album-subcount">{{ t('album.subAlbumCount', { n: a.childCount }) }}</span>
             <span v-if="selectMode" class="pick-badge" :class="{ on: selectedIds.includes(a.id) }">
-              <svg viewBox="0 0 16 16" width="12" height="12"><path d="M3 8.5 L6.5 12 L13 4.5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg viewBox="0 0 16 16" width="12" height="12">
+                <path
+                  d="M3 8.5 L6.5 12 L13 4.5"
+                  fill="none"
+                  stroke="#fff"
+                  stroke-width="2.4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
             </span>
           </div>
           <div class="album-info">
@@ -70,10 +83,14 @@
           </div>
           <div v-if="!selectMode && canManage(a)" class="album-actions" @click.stop>
             <el-tooltip :content="t('common.edit')" placement="top" :show-after="300">
-              <el-button size="small" text @click="openEditor(a)"><el-icon><Edit /></el-icon></el-button>
+              <el-button size="small" text @click="openEditor(a)"
+                ><el-icon><Edit /></el-icon
+              ></el-button>
             </el-tooltip>
             <el-tooltip :content="t('common.delete')" placement="top" :show-after="300">
-              <el-button size="small" text type="danger" @click="onDel(a)"><el-icon><Delete /></el-icon></el-button>
+              <el-button size="small" text type="danger" @click="onDel(a)"
+                ><el-icon><Delete /></el-icon
+              ></el-button>
             </el-tooltip>
           </div>
         </div>
@@ -138,14 +155,16 @@ const editor = reactive({ visible: false, form: { id: null, name: '', type: 'pub
 const searchKeyword = ref('')
 const sourceFilter = ref('')
 const typeFilter = ref('')
-const topAlbums = computed(() => albums.value.filter((a) => {
-  if (a.parentId) return false
-  if (searchKeyword.value && !a.name.toLowerCase().includes(searchKeyword.value.toLowerCase())) return false
-  if (typeFilter.value && a.type !== typeFilter.value) return false
-  if (sourceFilter.value === 'LOCAL' && a.sourceDeviceId) return false
-  if (sourceFilter.value && sourceFilter.value !== 'LOCAL' && String(a.sourceDeviceId) !== sourceFilter.value) return false
-  return true
-}))
+const topAlbums = computed(() =>
+  albums.value.filter((a) => {
+    if (a.parentId) return false
+    if (searchKeyword.value && !a.name.toLowerCase().includes(searchKeyword.value.toLowerCase())) return false
+    if (typeFilter.value && a.type !== typeFilter.value) return false
+    if (sourceFilter.value === 'LOCAL' && a.sourceDeviceId) return false
+    if (sourceFilter.value && sourceFilter.value !== 'LOCAL' && String(a.sourceDeviceId) !== sourceFilter.value) return false
+    return true
+  }),
+)
 // 来源筛选选项:列表数据中出现的映射设备(去重)
 const sourceOptions = computed(() => {
   const map = new Map()
@@ -156,8 +175,7 @@ const sourceOptions = computed(() => {
 })
 
 // 管理权限:家长或相册创建者本人
-const canManage = (a) =>
-  userStore.isLoggedIn && (userStore.isOwner || a.createdBy === userStore.userInfo?.id)
+const canManage = (a) => userStore.isLoggedIn && (userStore.isOwner || a.createdBy === userStore.userInfo?.id)
 
 const load = async () => {
   loading.value = true
@@ -246,8 +264,15 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.select-count { font-size: 13px; color: var(--color-text-secondary); margin-right: 8px; }
-.album-card.selected { outline: 3px solid var(--color-primary, var(--color-brand)); outline-offset: -3px; }
+.select-count {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-right: 8px;
+}
+.album-card.selected {
+  outline: 3px solid var(--color-primary, var(--color-brand));
+  outline-offset: -3px;
+}
 .pick-badge {
   position: absolute;
   top: 10px;
@@ -262,15 +287,30 @@ onMounted(() => {
   justify-content: center;
   z-index: 2;
 }
-.pick-badge.on { background: var(--color-brand); border-color: var(--color-brand); }
+.pick-badge.on {
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+}
 .album-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 16px;
 }
-.album-card { overflow: hidden; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
-.album-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(31,58,95,0.15); }
-.album-cover-wrap { position: relative; aspect-ratio: 4 / 3; }
+.album-card {
+  overflow: hidden;
+  cursor: pointer;
+  transition:
+    transform 0.15s,
+    box-shadow 0.15s;
+}
+.album-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(31, 58, 95, 0.15);
+}
+.album-cover-wrap {
+  position: relative;
+  aspect-ratio: 4 / 3;
+}
 .album-cover {
   width: 100%;
   height: 100%;
@@ -287,7 +327,9 @@ onMounted(() => {
   border-radius: 10px;
   background: rgba(46, 116, 181, 0.85);
 }
-.album-type.private { background: rgba(230, 162, 60, 0.9); }
+.album-type.private {
+  background: rgba(230, 162, 60, 0.9);
+}
 .album-source {
   position: absolute;
   top: 10px;
@@ -308,9 +350,18 @@ onMounted(() => {
   border-radius: 50%;
   display: inline-block;
 }
-.status-dot.VALID { background: #67b26b; box-shadow: 0 0 4px rgba(103, 178, 107, 0.9); }
-.status-dot.OFFLINE, .status-dot.SYNCING { background: #9a9a9a; }
-.status-dot.MISSING { background: #b96058; box-shadow: 0 0 4px rgba(185, 96, 88, 0.9); }
+.status-dot.VALID {
+  background: #67b26b;
+  box-shadow: 0 0 4px rgba(103, 178, 107, 0.9);
+}
+.status-dot.OFFLINE,
+.status-dot.SYNCING {
+  background: #9a9a9a;
+}
+.status-dot.MISSING {
+  background: #b96058;
+  box-shadow: 0 0 4px rgba(185, 96, 88, 0.9);
+}
 .album-count {
   position: absolute;
   bottom: 10px;
@@ -331,23 +382,59 @@ onMounted(() => {
   padding: 2px 10px;
   border-radius: 10px;
 }
-.album-info { padding: 14px 16px 6px; }
-.album-name { font-size: 15px; font-weight: 600; color: var(--color-text); }
-.album-meta { font-size: 12px; color: var(--color-text-secondary); margin-top: 4px; }
-.album-actions { padding: 6px 8px 10px; text-align: right; }
-.album-actions :deep(.el-button) { padding: 5px 6px; }
-.album-actions :deep(.el-button + .el-button) { margin-left: 4px; }
+.album-info {
+  padding: 14px 16px 6px;
+}
+.album-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.album-meta {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+}
+.album-actions {
+  padding: 6px 8px 10px;
+  text-align: right;
+}
+.album-actions :deep(.el-button) {
+  padding: 5px 6px;
+}
+.album-actions :deep(.el-button + .el-button) {
+  margin-left: 4px;
+}
 
 /* 暖居主题:画廊(暖木阴影 + 深木/陶土徽章 + 封面加高) */
-html.theme-warm .album-card { border-radius: 16px; }
-html.theme-warm .album-card:hover { box-shadow: var(--shadow-hover); }
-html.theme-warm .album-cover-wrap { aspect-ratio: 1 / 1; }
-html.theme-warm .album-type { background: var(--color-brand); color: var(--color-card); }
-html.theme-warm .album-type.private { background: var(--color-accent); color: #FFF7F0; }
-html.theme-warm .album-grid { gap: 18px; }
+html.theme-warm .album-card {
+  border-radius: 16px;
+}
+html.theme-warm .album-card:hover {
+  box-shadow: var(--shadow-hover);
+}
+html.theme-warm .album-cover-wrap {
+  aspect-ratio: 1 / 1;
+}
+html.theme-warm .album-type {
+  background: var(--color-brand);
+  color: var(--color-card);
+}
+html.theme-warm .album-type.private {
+  background: var(--color-accent);
+  color: #fff7f0;
+}
+html.theme-warm .album-grid {
+  gap: 18px;
+}
 
 @media (max-width: 768px) {
-  .album-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .album-name { font-size: 14px; }
+  .album-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .album-name {
+    font-size: 14px;
+  }
 }
 </style>

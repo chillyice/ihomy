@@ -21,7 +21,9 @@
         <div v-for="it in list" :key="it.id" class="rc-card card">
           <div class="rc-thumb">
             <img v-if="it.url" :src="it.url" :alt="it.title" loading="lazy" />
-            <div v-else class="rc-noimg"><el-icon><Picture /></el-icon></div>
+            <div v-else class="rc-noimg">
+              <el-icon><Picture /></el-icon>
+            </div>
           </div>
           <div class="rc-body">
             <div class="rc-title" :title="it.title">{{ it.title }}</div>
@@ -54,7 +56,6 @@ const tab = ref('photo')
 const list = ref([])
 const loading = ref(false)
 
-
 const load = async () => {
   loading.value = true
   try {
@@ -78,7 +79,10 @@ const onPurge = async (it) => {
 }
 
 const onEmpty = async () => {
-  await ElMessageBox.confirm(t('recycle.emptyConfirm', { tab: t('recycle.' + tab.value) }), t('common.tip'), { type: 'warning', closeOnClickModal: true })
+  await ElMessageBox.confirm(t('recycle.emptyConfirm', { tab: t('recycle.' + tab.value) }), t('common.tip'), {
+    type: 'warning',
+    closeOnClickModal: true,
+  })
   await recycleApi.empty(tab.value)
   ElMessage.success(t('recycle.emptied'))
   load()
@@ -88,19 +92,31 @@ onMounted(load)
 </script>
 
 <style scoped>
-.rc-hint { font-size: 12px; color: var(--color-text-secondary); }
+.rc-hint {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
 .rc-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 16px;
 }
-.rc-card { overflow: hidden; display: flex; flex-direction: column; }
+.rc-card {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
 .rc-thumb {
   aspect-ratio: 4 / 3;
   background: rgba(31, 58, 95, 0.06);
   overflow: hidden;
 }
-.rc-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rc-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 .rc-noimg {
   width: 100%;
   height: 100%;
@@ -110,7 +126,9 @@ onMounted(load)
   color: var(--color-text-secondary);
   font-size: 26px;
 }
-.rc-body { padding: 10px 14px 0; }
+.rc-body {
+  padding: 10px 14px 0;
+}
 .rc-title {
   font-size: 14px;
   font-weight: 600;
@@ -119,11 +137,24 @@ onMounted(load)
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.rc-time { margin-top: 4px; font-size: 12px; color: var(--color-text-secondary); }
-.rc-actions { padding: 8px 12px 12px; display: flex; justify-content: flex-end; gap: 6px; }
-.rc-actions :deep(.el-button + .el-button) { margin-left: 0; }
+.rc-time {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.rc-actions {
+  padding: 8px 12px 12px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.rc-actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
 
 @media (max-width: 768px) {
-  .rc-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .rc-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
 }
 </style>

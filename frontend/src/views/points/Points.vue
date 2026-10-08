@@ -6,17 +6,13 @@
     <!-- 签到卡 -->
     <div class="checkin-card card">
       <div class="checkin-info">
-        <div class="checkin-balance"><b>{{ stats.balance ?? 0 }}</b><span>{{ $t('points.myPoints') }}</span></div>
+        <div class="checkin-balance">
+          <b>{{ stats.balance ?? 0 }}</b
+          ><span>{{ $t('points.myPoints') }}</span>
+        </div>
         <div class="checkin-streak">{{ $t('points.streak', { n: stats.streak ?? 0 }) }}</div>
       </div>
-      <el-button
-        type="primary"
-        size="large"
-        round
-        :disabled="stats.checkedToday"
-        :loading="checkingIn"
-        @click="onCheckin"
-      >
+      <el-button type="primary" size="large" round :disabled="stats.checkedToday" :loading="checkingIn" @click="onCheckin">
         {{ stats.checkedToday ? $t('points.checkedToday') : $t('points.bonus', { n: stats.todayPoints ?? 0 }) }}
       </el-button>
     </div>
@@ -32,17 +28,18 @@
               <div class="product-icon">{{ p.icon || '🎁' }}</div>
               <div class="product-name">{{ p.name }}</div>
               <div class="product-points">{{ p.points }} {{ $t('points.points') }}</div>
-              <div v-if="p.perLimit > 0" class="product-limit">{{ $t('points.redeemedCount', { count: p.redeemedCount, limit: p.perLimit }) }}</div>
+              <div v-if="p.perLimit > 0" class="product-limit">
+                {{ $t('points.redeemedCount', { count: p.redeemedCount, limit: p.perLimit }) }}
+              </div>
               <div v-if="p.enabled !== 1" class="product-off">{{ $t('points.offShelf') }}</div>
               <div class="product-actions">
-                <el-button
-                  size="small"
-                  type="primary"
-                  :disabled="p.enabled !== 1 || soldOut(p)"
-                  @click="onRedeem(p)"
-                >{{ $t('points.redeem') }}</el-button>
+                <el-button size="small" type="primary" :disabled="p.enabled !== 1 || soldOut(p)" @click="onRedeem(p)">{{
+                  $t('points.redeem')
+                }}</el-button>
                 <el-tooltip v-if="userStore.isOwner" :content="$t('common.edit')" placement="top" :show-after="300">
-                  <el-button size="small" text @click="openEditor(p)"><el-icon><Edit /></el-icon></el-button>
+                  <el-button size="small" text @click="openEditor(p)"
+                    ><el-icon><Edit /></el-icon
+                  ></el-button>
                 </el-tooltip>
                 <el-button v-if="userStore.isOwner" size="small" text type="danger" @click="onOff(p)">{{ $t('points.takeOff') }}</el-button>
               </div>
@@ -73,7 +70,9 @@
             </el-table-column>
             <el-table-column v-if="userStore.isOwner" :label="$t('common.actions')" width="100">
               <template #default="{ row }">
-                <el-button v-if="row.status === 'PENDING'" size="small" type="success" plain @click="onTaken(row)">{{ $t('points.taken') }}</el-button>
+                <el-button v-if="row.status === 'PENDING'" size="small" type="success" plain @click="onTaken(row)">{{
+                  $t('points.taken')
+                }}</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -83,7 +82,12 @@
     </el-tabs>
 
     <!-- 上架/编辑商品弹窗 -->
-    <el-dialog v-model="editor.visible" append-to-body :title="editor.form.id ? $t('points.editProduct') : $t('points.publish')" width="420px">
+    <el-dialog
+      v-model="editor.visible"
+      append-to-body
+      :title="editor.form.id ? $t('points.editProduct') : $t('points.publish')"
+      width="420px"
+    >
       <el-form :model="editor.form" label-position="top">
         <el-form-item :label="$t('points.productName')">
           <el-input v-model="editor.form.name" :placeholder="$t('points.namePlaceholder')" />
@@ -103,7 +107,13 @@
           </el-form-item>
         </div>
         <el-form-item :label="$t('points.publishStatus')">
-          <el-switch v-model="editor.form.enabled" :active-value="1" :inactive-value="0" :active-text="$t('points.onSale')" :inactive-text="$t('points.takeOff')" />
+          <el-switch
+            v-model="editor.form.enabled"
+            :active-value="1"
+            :inactive-value="0"
+            :active-text="$t('points.onSale')"
+            :inactive-text="$t('points.takeOff')"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -141,8 +151,7 @@ const saving = ref(false)
 const editor = reactive({ visible: false, form: {} })
 
 /** 商品是否不可兑:已下架/已兑完/已达限兑次数 */
-const soldOut = (p) =>
-  p.enabled !== 1 || (p.stock === 0) || (p.perLimit > 0 && p.redeemedCount >= p.perLimit)
+const soldOut = (p) => p.enabled !== 1 || p.stock === 0 || (p.perLimit > 0 && p.redeemedCount >= p.perLimit)
 
 const loadStats = async () => {
   stats.value = await pointsApi.stats()
@@ -183,7 +192,10 @@ const onCheckin = async () => {
 
 // 兑换确认 -> 落单后刷新余额/商品/订单
 const onRedeem = async (p) => {
-  await ElMessageBox.confirm(t('points.redeemMessage', { points: p.points, item: p.name }), t('points.redeemTitle'), { type: 'warning', closeOnClickModal: true })
+  await ElMessageBox.confirm(t('points.redeemMessage', { points: p.points, item: p.name }), t('points.redeemTitle'), {
+    type: 'warning',
+    closeOnClickModal: true,
+  })
   await pointsApi.redeem(p.id)
   ElMessage.success(t('points.redeemSuccess'))
   await Promise.all([loadStats(), loadProducts(), loadOrders()])
@@ -293,7 +305,12 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
-  .form-row { flex-direction: column; gap: 0; }
-  .product-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+  .product-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
 }
 </style>

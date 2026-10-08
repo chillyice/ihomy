@@ -34,7 +34,13 @@
         <div class="pg-panel-body">
           <div class="pg-field-block">
             <span class="section-label">{{ $t('tools.aiPlayground.systemPrompt') }}</span>
-            <el-input v-model="chatSystem" type="textarea" :rows="3" resize="none" :placeholder="$t('tools.aiPlayground.systemPlaceholder')" />
+            <el-input
+              v-model="chatSystem"
+              type="textarea"
+              :rows="3"
+              resize="none"
+              :placeholder="$t('tools.aiPlayground.systemPlaceholder')"
+            />
           </div>
           <div class="pg-more">
             <div v-a11y-click class="pg-more-toggle" @click="chatMore = !chatMore">
@@ -94,7 +100,13 @@
         <div class="pg-panel-body">
           <div class="pg-field-block">
             <span class="section-label">{{ $t('tools.aiPlayground.imagePrompt') }}</span>
-            <el-input v-model="imagePrompt" type="textarea" :rows="4" resize="none" :placeholder="$t('tools.aiPlayground.imagePlaceholder')" />
+            <el-input
+              v-model="imagePrompt"
+              type="textarea"
+              :rows="4"
+              resize="none"
+              :placeholder="$t('tools.aiPlayground.imagePlaceholder')"
+            />
           </div>
 
           <div class="pg-field-block">
@@ -105,7 +117,9 @@
                 <img :src="img.dataUrl" :alt="img.name" />
                 <span v-a11y-click class="pg-ref-del" @click="removeRefImage(i)">×</span>
               </div>
-              <el-button v-if="refImages.length < 10" size="small" plain @click="refInputRef && refInputRef.click()">+ {{ $t('tools.aiPlayground.addRef') }}</el-button>
+              <el-button v-if="refImages.length < 10" size="small" plain @click="refInputRef && refInputRef.click()"
+                >+ {{ $t('tools.aiPlayground.addRef') }}</el-button
+              >
             </div>
           </div>
 
@@ -272,7 +286,12 @@
             </div>
             <div class="pg-field pg-field-wide">
               <span class="section-label">{{ $t('tools.aiPlayground.weatherBgScene') }}</span>
-              <el-input v-model="weatherCfg.scene" type="textarea" :rows="2" :placeholder="$t('tools.aiPlayground.weatherBgScenePlaceholder')" />
+              <el-input
+                v-model="weatherCfg.scene"
+                type="textarea"
+                :rows="2"
+                :placeholder="$t('tools.aiPlayground.weatherBgScenePlaceholder')"
+              />
             </div>
           </div>
           <div class="pg-panel-actions">
@@ -305,7 +324,9 @@ onMounted(async () => {
   try {
     statusMap.value = await aiApi.status()
     statusLoaded.value = true
-  } catch (e) { /* toast 已由 request.js 统一弹出 */ }
+  } catch (e) {
+    /* toast 已由 request.js 统一弹出 */
+  }
 })
 
 // ---- 对话 ----
@@ -324,9 +345,10 @@ const buildMessages = () => {
   return sys ? [{ role: 'system', content: sys }, ...history] : history
 }
 
-const scrollChat = () => nextTick(() => {
-  if (chatListRef.value) chatListRef.value.scrollTop = chatListRef.value.scrollHeight
-})
+const scrollChat = () =>
+  nextTick(() => {
+    if (chatListRef.value) chatListRef.value.scrollTop = chatListRef.value.scrollHeight
+  })
 
 const sendChat = async () => {
   const text = chatInput.value.trim()
@@ -346,7 +368,10 @@ const sendChat = async () => {
   }
 }
 
-const clearChat = () => { chatMessages.value = []; chatMeta.value = '' }
+const clearChat = () => {
+  chatMessages.value = []
+  chatMeta.value = ''
+}
 
 // ---- 图片生成 ----
 // Seedream 5.0 lite 要求总像素 ≥ 3686400(≥1920×1920);Seedream 5.0 pro 仅单图、档位 1K/1.5K/2K、
@@ -355,9 +380,9 @@ const isProImage = computed(() => {
   const m = (statusMap.value.image?.model || '').toLowerCase()
   return m.includes('seedream') && m.includes('pro')
 })
-const sizePresets = computed(() => (isProImage.value
-  ? ['1K', '1.5K', '2K']
-  : ['2048x2048', '1920x1920', '1440x2560', '2560x1440', '2K', '4K', 'adaptive']))
+const sizePresets = computed(() =>
+  isProImage.value ? ['1K', '1.5K', '2K'] : ['2048x2048', '1920x1920', '1440x2560', '2560x1440', '2K', '4K', 'adaptive'],
+)
 const sizeTierNote = computed(() => (isProImage.value ? t('tools.aiPlayground.sizeTierNotePro') : t('tools.aiPlayground.sizeTierNote')))
 const imageCountMax = computed(() => (isProImage.value ? 1 : 4))
 const imagePrompt = ref('')
@@ -391,7 +416,9 @@ const onRefPick = (e) => {
   }
   e.target.value = ''
 }
-const removeRefImage = (i) => { refImages.value.splice(i, 1) }
+const removeRefImage = (i) => {
+  refImages.value.splice(i, 1)
+}
 
 // AI 生图落库:找到或新建「AI 生图」相册(private),再把图保存为照片(照 Home.vue/useWeatherBg 同款,切走/刷新不丢)
 const AI_ALBUM_NAME = 'AI 生图'
@@ -405,7 +432,10 @@ const ensureAiAlbum = () => {
       if (found) return found.id
       const created = await albumApi.create({ name: AI_ALBUM_NAME, type: 'private' })
       return created.id
-    } catch { aiAlbumPromise = null; return null }
+    } catch {
+      aiAlbumPromise = null
+      return null
+    }
   })()
   return aiAlbumPromise
 }
@@ -422,7 +452,9 @@ const saveToAlbum = async (url, prompt, i) => {
       await photoApi.saveFromUrl(albumId, { url, name: aiImageName(i), description: prompt || '' })
       return true
     }
-  } catch { /* 相册保存失败静默(不影响结果展示) */ }
+  } catch {
+    /* 相册保存失败静默(不影响结果展示) */
+  }
   return false
 }
 
@@ -438,7 +470,7 @@ const genImage = async () => {
     const data = await aiApi.image({
       prompt,
       size: imageSize.value || null,
-      n: groupMode ? null : (isProImage.value ? 1 : imageCount.value),
+      n: groupMode ? null : isProImage.value ? 1 : imageCount.value,
       imageUrls: refImages.value.map((r) => r.dataUrl),
       seed: imageSeed.value >= 0 ? imageSeed.value : null,
       guidanceScale: guidanceCustom.value ? imageGuidance.value : null,
@@ -447,9 +479,11 @@ const genImage = async () => {
       sequentialMode: groupMode ? 'auto' : null,
       sequentialMaxImages: groupMode ? imageMaxImages.value : null,
     })
-    imageResults.value = data.map((d) => ({
-      url: d.url || (d.b64_json ? 'data:image/png;base64,' + d.b64_json : ''),
-    })).filter((d) => d.url)
+    imageResults.value = data
+      .map((d) => ({
+        url: d.url || (d.b64_json ? 'data:image/png;base64,' + d.b64_json : ''),
+      }))
+      .filter((d) => d.url)
     imageMeta.value = `${imageResults.value.length} · ${Date.now() - start}ms`
     // 自动归档到「AI 生图」相册:切走/刷新不丢(同天气生图落库逻辑)
     const saved = (await Promise.all(imageResults.value.map((d, i) => saveToAlbum(d.url, prompt, i)))).filter(Boolean).length
@@ -465,7 +499,9 @@ const copyUrl = async (url) => {
   try {
     await navigator.clipboard.writeText(url)
     ElMessage.success(t('tools.aiPlayground.copied'))
-  } catch (e) { /* 剪贴板权限失败静默 */ }
+  } catch (e) {
+    /* 剪贴板权限失败静默 */
+  }
 }
 
 // ---- 语音识别 ----
@@ -508,90 +544,193 @@ const loadWeatherCfg = () => {
   try {
     const raw = localStorage.getItem(WEATHER_CFG_KEY)
     if (raw) weatherCfg.value = { ...weatherCfg.value, ...JSON.parse(raw) }
-  } catch (e) { /* ignore */ }
+  } catch (e) {
+    /* ignore */
+  }
 }
 const saveWeatherCfg = () => {
   try {
     localStorage.setItem(WEATHER_CFG_KEY, JSON.stringify(weatherCfg.value))
     ElMessage.success(t('tools.aiPlayground.weatherBgSaved'))
-  } catch (e) { ElMessage.error(t('common.saveFailed')) }
+  } catch (e) {
+    ElMessage.error(t('common.saveFailed'))
+  }
 }
 </script>
 
 <style scoped>
-.pg-alert { margin-bottom: 16px; }
+.pg-alert {
+  margin-bottom: 16px;
+}
 
 /* ---- 左右分栏:输入(l) / 输出(r) 对齐全高,窄屏纵向堆叠 ---- */
-.pg-split { display: flex; gap: 18px; align-items: stretch; }
+.pg-split {
+  display: flex;
+  gap: 18px;
+  align-items: stretch;
+}
 .pg-panel {
-  flex: 1 1 auto; min-width: 0;
-  display: flex; flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--color-border, rgba(58, 46, 34, 0.12));
   border-radius: 14px;
   background: var(--color-card, #faf6ec);
   overflow: hidden;
 }
-.pg-input { flex: 0 0 40%; max-width: 420px; }
-.pg-output { flex: 1 1 auto; }
+.pg-input {
+  flex: 0 0 40%;
+  max-width: 420px;
+}
+.pg-output {
+  flex: 1 1 auto;
+}
 
 .pg-panel-head {
   padding: 10px 14px;
-  font-size: 12px; font-weight: 600; letter-spacing: 0.06em;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   color: var(--color-text-secondary, #7a6b5a);
   background: var(--color-bg-2, #e2d5bc);
   border-bottom: 1px solid var(--color-border, rgba(58, 46, 34, 0.1));
   flex-shrink: 0;
 }
 .pg-panel-body {
-  flex: 1; min-height: 300px;
-  display: flex; flex-direction: column; gap: 14px;
+  flex: 1;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   padding: 14px;
 }
-.pg-field-block { display: flex; flex-direction: column; gap: 8px; }
-.pg-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.pg-field-wide { grid-column: 1 / -1; }
-.pg-field-hint { font-size: 12px; color: var(--color-text-secondary, #7a6b5a); }
-.pg-param-inline { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.pg-slider { width: 140px; flex-shrink: 2; }
-.pg-meta { font-size: 12px; color: var(--color-text-secondary, #7a6b5a); }
-.pg-hint { font-size: 12px; color: var(--color-text-secondary, #7a6b5a); line-height: 1.5; }
+.pg-field-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pg-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.pg-field-wide {
+  grid-column: 1 / -1;
+}
+.pg-field-hint {
+  font-size: 12px;
+  color: var(--color-text-secondary, #7a6b5a);
+}
+.pg-param-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.pg-slider {
+  width: 140px;
+  flex-shrink: 2;
+}
+.pg-meta {
+  font-size: 12px;
+  color: var(--color-text-secondary, #7a6b5a);
+}
+.pg-hint {
+  font-size: 12px;
+  color: var(--color-text-secondary, #7a6b5a);
+  line-height: 1.5;
+}
 
 /* 输入类操作按钮固定在面板底部 */
-.pg-panel-actions { margin-top: auto; display: flex; justify-content: flex-end; gap: 8px; }
+.pg-panel-actions {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
 
 /* ---- 「更多设置」折叠区 ---- */
-.pg-more { border-top: 1px solid var(--color-border, rgba(58,46,34,0.1)); padding-top: 8px; }
+.pg-more {
+  border-top: 1px solid var(--color-border, rgba(58, 46, 34, 0.1));
+  padding-top: 8px;
+}
 .pg-more-toggle {
-  display: flex; align-items: center; gap: 8px;
-  padding: 6px 2px; cursor: pointer; user-select: none;
-  font-size: 13px; font-weight: 500; color: var(--color-text, #3a2e22);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 2px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text, #3a2e22);
   border-radius: 8px;
 }
-.pg-more-toggle:hover { color: var(--color-accent, #a8483a); }
-.pg-more-hint { flex: 1; font-size: 11px; color: var(--color-text-secondary, #7a6b5a); }
-.pg-more-chev { font-size: 11px; color: var(--color-text-secondary, #7a6b5a); }
-.pg-more-body { display: flex; flex-direction: column; gap: 12px; padding: 10px 2px 4px; }
-.pg-more-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+.pg-more-toggle:hover {
+  color: var(--color-accent, #a8483a);
+}
+.pg-more-hint {
+  flex: 1;
+  font-size: 11px;
+  color: var(--color-text-secondary, #7a6b5a);
+}
+.pg-more-chev {
+  font-size: 11px;
+  color: var(--color-text-secondary, #7a6b5a);
+}
+.pg-more-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 10px 2px 4px;
+}
+.pg-more-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 14px;
+}
 
 /* 温度滑杆 */
-.pg-temp { display: flex; align-items: center; gap: 10px; }
-.pg-temp :deep(.el-slider) { flex: 1; }
-.pg-temp-val { font-size: 13px; color: var(--color-text-secondary, #7a6b5a); min-width: 28px; text-align: right; }
+.pg-temp {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pg-temp :deep(.el-slider) {
+  flex: 1;
+}
+.pg-temp-val {
+  font-size: 13px;
+  color: var(--color-text-secondary, #7a6b5a);
+  min-width: 28px;
+  text-align: right;
+}
 
 /* ---- 对话输出(右侧消息窗) ---- */
-.pg-chat-output { gap: 10px; }
+.pg-chat-output {
+  gap: 10px;
+}
 .pg-chat-list {
-  flex: 1; min-height: 0;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  display: flex; flex-direction: column; gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   padding: 12px;
   border: 1px solid var(--color-border, rgba(58, 46, 34, 0.12));
   border-radius: 10px;
   background: var(--color-bg-2, #e2d5bc);
   contain: layout style;
 }
-.pg-msg { display: flex; }
-.pg-msg.user { justify-content: flex-end; }
+.pg-msg {
+  display: flex;
+}
+.pg-msg.user {
+  justify-content: flex-end;
+}
 .pg-msg-bubble {
   max-width: 78%;
   padding: 8px 12px;
@@ -601,21 +740,47 @@ const saveWeatherCfg = () => {
   white-space: pre-wrap;
   word-break: break-word;
 }
-.pg-msg.user .pg-msg-bubble { background: var(--color-accent, #a8483a); color: #fff; }
-.pg-msg.assistant .pg-msg-bubble { background: var(--color-card, #faf6ec); color: var(--color-text, #3a2e22); }
-.pg-empty { margin: auto; font-size: 13px; color: var(--color-text-secondary, #7a6b5a); }
-.pg-input-row { display: flex; gap: 10px; align-items: flex-end; }
-.pg-input-row :deep(.el-textarea) { flex: 1; }
+.pg-msg.user .pg-msg-bubble {
+  background: var(--color-accent, #a8483a);
+  color: #fff;
+}
+.pg-msg.assistant .pg-msg-bubble {
+  background: var(--color-card, #faf6ec);
+  color: var(--color-text, #3a2e22);
+}
+.pg-empty {
+  margin: auto;
+  font-size: 13px;
+  color: var(--color-text-secondary, #7a6b5a);
+}
+.pg-input-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+.pg-input-row :deep(.el-textarea) {
+  flex: 1;
+}
 
 /* ---- 图片输出(右侧结果) ---- */
-.pg-image-output { gap: 12px; }
-.pg-img-loading { flex: 1; min-height: 200px; border-radius: 10px; }
+.pg-image-output {
+  gap: 12px;
+}
+.pg-img-loading {
+  flex: 1;
+  min-height: 200px;
+  border-radius: 10px;
+}
 .pg-img-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 12px;
 }
-.pg-img-item { display: flex; flex-direction: column; gap: 6px; }
+.pg-img-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 .pg-img-item :deep(.el-image) {
   width: 100%;
   aspect-ratio: 1;
@@ -623,7 +788,10 @@ const saveWeatherCfg = () => {
   background: var(--color-bg-2, #e2d5bc);
   overflow: hidden;
 }
-.pg-output-empty { align-self: center; text-align: center; }
+.pg-output-empty {
+  align-self: center;
+  text-align: center;
+}
 
 /* ---- 语音转写输出 ---- */
 .pg-asr-result {
@@ -638,36 +806,99 @@ const saveWeatherCfg = () => {
 }
 
 /* 输出面板底部耗时条 */
-.pg-output-meta { padding: 0 14px 10px; margin-top: auto; flex-shrink: 0; }
+.pg-output-meta {
+  padding: 0 14px 10px;
+  margin-top: auto;
+  flex-shrink: 0;
+}
 
 /* 参考图 */
-.pg-ref-list { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pg-ref-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
 .pg-ref-item {
   position: relative;
-  width: 56px; height: 56px;
-  border-radius: 8px; overflow: hidden;
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  overflow: hidden;
   border: 1px solid var(--color-border, rgba(58, 46, 34, 0.12));
 }
-.pg-ref-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pg-ref-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 .pg-ref-del {
-  position: absolute; top: 0; right: 0;
-  width: 16px; height: 16px; line-height: 14px; text-align: center;
-  background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 12px; cursor: pointer;
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  line-height: 14px;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
   border-radius: 0 0 0 8px;
 }
-.pg-file { font-size: 13px; color: var(--color-text-secondary, #7a6b5a); }
+.pg-file {
+  font-size: 13px;
+  color: var(--color-text-secondary, #7a6b5a);
+}
 
 /* 窄屏:输入/输出纵向堆叠 */
 @media (max-width: 920px) {
-  .pg-split { flex-direction: column; }
-  .pg-input { flex: none; max-width: none; }
-  .pg-panel-body { min-height: 200px; }
+  .pg-split {
+    flex-direction: column;
+  }
+  .pg-input {
+    flex: none;
+    max-width: none;
+  }
+  .pg-panel-body {
+    min-height: 200px;
+  }
 }
 
 /* ---- 天气背景 AI 生成(关联设置,独立卡片) ---- */
-.pg-weather { margin-top: 16px; padding: 20px; }
-.pg-weatherhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 0; background: transparent; border: none; cursor: pointer; color: inherit; }
-.pg-weathertitle { font-size: 14px; font-weight: 600; color: var(--color-text, #3a2e22); }
-.pg-weatherhint { margin: 0 0 4px; font-size: 12px; color: var(--color-text-secondary, #7a6b5a); line-height: 1.6; }
-.pg-weatherbody { display: flex; flex-direction: column; gap: 14px; padding-top: 12px; border-top: 1px dashed var(--color-border, rgba(58, 46, 34, 0.12)); }
+.pg-weather {
+  margin-top: 16px;
+  padding: 20px;
+}
+.pg-weatherhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+}
+.pg-weathertitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text, #3a2e22);
+}
+.pg-weatherhint {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--color-text-secondary, #7a6b5a);
+  line-height: 1.6;
+}
+.pg-weatherbody {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--color-border, rgba(58, 46, 34, 0.12));
+}
 </style>

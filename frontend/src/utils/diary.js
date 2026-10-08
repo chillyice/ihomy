@@ -12,13 +12,28 @@ export const PAPER_W = 28 * 16 + 24 * 2 // 信纸总宽 496px(= 448 内容 + 24*
 export const PAPER_TEXT_FONT = "'Cascadia Mono', 'Consolas', 'Courier New', monospace"
 
 export const MOODS = [
-  { icon: '😊', label: '开心' }, { icon: '😌', label: '平静' }, { icon: '😢', label: '难过' }, { icon: '😡', label: '生气' },
-  { icon: '😰', label: '焦虑' }, { icon: '🥰', label: '温馨' }, { icon: '😴', label: '疲倦' }, { icon: '🤔', label: '思考' },
-  { icon: '🥳', label: '兴奋' }, { icon: '😎', label: '得意' }, { icon: '🥺', label: '感动' }, { icon: '😔', label: '失落' },
+  { icon: '😊', label: '开心' },
+  { icon: '😌', label: '平静' },
+  { icon: '😢', label: '难过' },
+  { icon: '😡', label: '生气' },
+  { icon: '😰', label: '焦虑' },
+  { icon: '🥰', label: '温馨' },
+  { icon: '😴', label: '疲倦' },
+  { icon: '🤔', label: '思考' },
+  { icon: '🥳', label: '兴奋' },
+  { icon: '😎', label: '得意' },
+  { icon: '🥺', label: '感动' },
+  { icon: '😔', label: '失落' },
 ]
 export const WEATHERS = [
-  { icon: '☀️', label: '晴' }, { icon: '⛅', label: '多云' }, { icon: '☁️', label: '阴' }, { icon: '🌧️', label: '雨' },
-  { icon: '⛈️', label: '雷雨' }, { icon: '❄️', label: '雪' }, { icon: '🌫️', label: '雾' }, { icon: '🌪️', label: '大风' },
+  { icon: '☀️', label: '晴' },
+  { icon: '⛅', label: '多云' },
+  { icon: '☁️', label: '阴' },
+  { icon: '🌧️', label: '雨' },
+  { icon: '⛈️', label: '雷雨' },
+  { icon: '❄️', label: '雪' },
+  { icon: '🌫️', label: '雾' },
+  { icon: '🌪️', label: '大风' },
 ]
 
 export const moodLabel = (icon) => MOODS.find((m) => m.icon === icon)?.label || '心情'

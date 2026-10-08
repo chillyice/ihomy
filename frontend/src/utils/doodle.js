@@ -16,17 +16,42 @@ export const BRUSHES = [
 ]
 
 export const INK_COLORS = [
-  '#1A1A1A', '#3A2E22', '#6B5C4A', '#9AA0A6', '#C8CDD2', '#F5F2EA', '#EFE6D0',
-  '#A8483A', '#C05B4D', '#D97B29', '#E8963C', '#E3B23C', '#E8CC5A', '#F0E4A0',
-  '#7BA05B', '#5B8C5A', '#3D6B4F', '#4A9E8F', '#7FB3D5', '#4A7FB5', '#2E5A8F',
-  '#1E3A5F', '#7B5EA7', '#A98FC9', '#C96A8B', '#E8B4C8', '#8B6F47', '#B5976B',
+  '#1A1A1A',
+  '#3A2E22',
+  '#6B5C4A',
+  '#9AA0A6',
+  '#C8CDD2',
+  '#F5F2EA',
+  '#EFE6D0',
+  '#A8483A',
+  '#C05B4D',
+  '#D97B29',
+  '#E8963C',
+  '#E3B23C',
+  '#E8CC5A',
+  '#F0E4A0',
+  '#7BA05B',
+  '#5B8C5A',
+  '#3D6B4F',
+  '#4A9E8F',
+  '#7FB3D5',
+  '#4A7FB5',
+  '#2E5A8F',
+  '#1E3A5F',
+  '#7B5EA7',
+  '#A98FC9',
+  '#C96A8B',
+  '#E8B4C8',
+  '#8B6F47',
+  '#B5976B',
 ]
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
 
 function mulberry32(a) {
   return function () {
-    a |= 0; a = (a + 0x6D2B79F5) | 0
+    a |= 0
+    a = (a + 0x6d2b79f5) | 0
     let t = Math.imul(a ^ (a >>> 15), 1 | a)
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296
@@ -78,7 +103,8 @@ export function renderStroke(ctx, s) {
       ctx.lineWidth = Math.max(3, s.w * 1.7)
       for (let pass = 0; pass < 3; pass++) pathThrough(ctx, jitterPts(pts, mulberry32((s.s || 1) + pass * 104729), s.w * 1.4))
       break
-    case 'brush': { // 画笔:随运笔速度变宽(慢粗快细)
+    case 'brush': {
+      // 画笔:随运笔速度变宽(慢粗快细)
       ctx.lineCap = 'round'
       ctx.globalAlpha = 0.9 * sa
       let w = s.w * 1.2
@@ -116,11 +142,20 @@ export function erasePixel(strokes, x, y, r) {
     let cur = []
     for (const p of s.pts) {
       if (Math.hypot(p[0] - x, p[1] - y) > r) cur.push(p)
-      else if (cur.length) { runs.push(cur); cur = [] }
+      else if (cur.length) {
+        runs.push(cur)
+        cur = []
+      }
     }
     if (cur.length) runs.push(cur)
-    if (!runs.length) { changed = true; continue }
-    if (runs.length === 1 && runs[0].length === s.pts.length) { out.push(s); continue }
+    if (!runs.length) {
+      changed = true
+      continue
+    }
+    if (runs.length === 1 && runs[0].length === s.pts.length) {
+      out.push(s)
+      continue
+    }
     changed = true
     for (const run of runs) out.push({ ...s, pts: run })
   }
@@ -156,7 +191,10 @@ export function setupCanvas(cv) {
   const dpr = window.devicePixelRatio || 1
   const w = Math.max(1, Math.round((cv.clientWidth || 1) * dpr))
   const h = Math.max(1, Math.round((cv.clientHeight || 1) * dpr))
-  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h }
+  if (cv.width !== w || cv.height !== h) {
+    cv.width = w
+    cv.height = h
+  }
   const ctx = cv.getContext('2d')
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   return ctx

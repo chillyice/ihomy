@@ -9,7 +9,10 @@
         <div class="tb-left">
           <el-input v-model="mediaKeyword" :placeholder="$t('cinema.searchPlaceholder')" clearable size="small" style="width: 180px">
             <template #prefix>
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <circle cx="11" cy="11" r="8" />
+                <path d="M21 21l-4.35-4.35" />
+              </svg>
             </template>
           </el-input>
           <el-select v-model="mediaTypeFilter" size="small" style="width: 110px" :placeholder="$t('cinema.filterMediaType')">
@@ -17,10 +20,24 @@
             <el-option value="Movie" :label="$t('cinema.movie')" />
             <el-option value="Series" :label="$t('cinema.series')" />
           </el-select>
-          <el-select v-model="mediaGenreFilter" size="small" clearable filterable style="width: 130px" :placeholder="$t('cinema.filterGenre')">
+          <el-select
+            v-model="mediaGenreFilter"
+            size="small"
+            clearable
+            filterable
+            style="width: 130px"
+            :placeholder="$t('cinema.filterGenre')"
+          >
             <el-option v-for="g in mediaGenreOptions" :key="g" :value="g" :label="optLabel(g)" />
           </el-select>
-          <el-select v-model="mediaCountryFilter" size="small" clearable filterable style="width: 130px" :placeholder="$t('cinema.filterCountry')">
+          <el-select
+            v-model="mediaCountryFilter"
+            size="small"
+            clearable
+            filterable
+            style="width: 130px"
+            :placeholder="$t('cinema.filterCountry')"
+          >
             <el-option v-for="c in mediaCountryOptions" :key="c" :value="c" :label="optLabel(c)" />
           </el-select>
           <el-select v-model="mediaYearFilter" size="small" clearable style="width: 120px" :placeholder="$t('cinema.filterYear')">
@@ -35,7 +52,10 @@
         <div class="tb-left">
           <el-input v-model="searchKeyword" :placeholder="$t('cinema.searchPlaceholder')" clearable size="small" style="width: 200px">
             <template #prefix>
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <circle cx="11" cy="11" r="8" />
+                <path d="M21 21l-4.35-4.35" />
+              </svg>
             </template>
           </el-input>
           <el-select v-model="sourceFilter" size="small" style="width: 150px" :placeholder="$t('cinema.filterSource')">
@@ -56,7 +76,9 @@
         <div class="tb-right">
           <el-button v-if="userStore.isLoggedIn && filteredList.length" @click="toggleSelect">{{ $t('cinema.select') }}</el-button>
           <el-button v-if="userStore.isLoggedIn" @click="openWishDialog">{{ $t('cinema.wish') }}</el-button>
-          <el-button v-if="userStore.isOwner && hasMapped" :loading="refreshing" @click="onRefreshMap">{{ $t('cinema.refreshMap') }}</el-button>
+          <el-button v-if="userStore.isOwner && hasMapped" :loading="refreshing" @click="onRefreshMap">{{
+            $t('cinema.refreshMap')
+          }}</el-button>
           <el-button v-if="userStore.isOwner" @click="syncVisible = true">{{ $t('cinema.syncFromDevice') }}</el-button>
           <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ $t('cinema.upload') }}</el-button>
         </div>
@@ -64,7 +86,9 @@
       <div v-else class="tb-right">
         <span class="select-count">{{ $t('cinema.selectedVideos', { n: selectedIds.length }) }}</span>
         <el-button @click="toggleSelect">{{ $t('cinema.cancelSelect') }}</el-button>
-        <el-button type="danger" :loading="batchDeleting" :disabled="!selectedIds.length" @click="onBatchDelete">{{ $t('cinema.deleteSelected') }}</el-button>
+        <el-button type="danger" :loading="batchDeleting" :disabled="!selectedIds.length" @click="onBatchDelete">{{
+          $t('cinema.deleteSelected')
+        }}</el-button>
       </div>
     </PageToolbar>
 
@@ -98,7 +122,9 @@
                   </div>
                   <div class="resume-name">{{ r.seriesName || r.name }}</div>
                   <div class="resume-sub">
-                    <span v-if="r.seriesName">S{{ String(r.seasonNumber || 1).padStart(2, '0') }}E{{ String(r.episodeNumber || 1).padStart(2, '0') }}</span>
+                    <span v-if="r.seriesName"
+                      >S{{ String(r.seasonNumber || 1).padStart(2, '0') }}E{{ String(r.episodeNumber || 1).padStart(2, '0') }}</span
+                    >
                     <span v-if="progressOf(r)">{{ $t('cinema.resumePercent', { p: Math.round(progressOf(r)) }) }}</span>
                   </div>
                 </div>
@@ -158,7 +184,16 @@
                   <span class="status-dot" :class="v.syncStatus || 'OFFLINE'"></span>{{ v.sourceDeviceName }}
                 </span>
                 <span v-if="selectMode" class="pick-badge" :class="{ on: selectedIds.includes(v.id) }">
-                  <svg viewBox="0 0 16 16" width="12" height="12"><path d="M3 8.5 L6.5 12 L13 4.5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <svg viewBox="0 0 16 16" width="12" height="12">
+                    <path
+                      d="M3 8.5 L6.5 12 L13 4.5"
+                      fill="none"
+                      stroke="#fff"
+                      stroke-width="2.4"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
                 </span>
               </div>
               <div class="video-info">
@@ -180,10 +215,14 @@
                   <span class="video-uploader">{{ v.uploaderName }}</span>
                   <span v-if="userStore.isLoggedIn" class="video-actions">
                     <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
-                      <el-button size="small" text @click="openEditor(v)"><el-icon><Edit /></el-icon></el-button>
+                      <el-button size="small" text @click="openEditor(v)"
+                        ><el-icon><Edit /></el-icon
+                      ></el-button>
                     </el-tooltip>
                     <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
-                      <el-button size="small" text type="danger" @click="onDel(v)"><el-icon><Delete /></el-icon></el-button>
+                      <el-button size="small" text type="danger" @click="onDel(v)"
+                        ><el-icon><Delete /></el-icon
+                      ></el-button>
                     </el-tooltip>
                   </span>
                 </div>
@@ -214,9 +253,13 @@
                 <div class="wish-meta">{{ w.requesterName }} · {{ formatDate(w.createdAt) }}</div>
               </div>
               <div class="wish-actions">
-                <el-button v-if="userStore.isLoggedIn && w.status === 'PENDING'" size="small" type="primary" plain @click="onWishDone(w)">{{ $t('cinema.markImported') }}</el-button>
+                <el-button v-if="userStore.isLoggedIn && w.status === 'PENDING'" size="small" type="primary" plain @click="onWishDone(w)">{{
+                  $t('cinema.markImported')
+                }}</el-button>
                 <el-tooltip v-if="userStore.isLoggedIn" :content="$t('common.delete')" placement="top" :show-after="300">
-                  <el-button size="small" text type="danger" @click="onWishDel(w)"><el-icon><Delete /></el-icon></el-button>
+                  <el-button size="small" text type="danger" @click="onWishDel(w)"
+                    ><el-icon><Delete /></el-icon
+                  ></el-button>
                 </el-tooltip>
               </div>
             </div>
@@ -232,7 +275,15 @@
           <el-input v-model="wishDialog.form.title" :placeholder="$t('cinema.namePlaceholder')" />
         </el-form-item>
         <el-form-item :label="$t('cinema.genres')">
-          <el-select v-model="wishDialog.form.genres" multiple filterable allow-create default-first-option :placeholder="$t('cinema.genrePlaceholder')" style="width: 100%">
+          <el-select
+            v-model="wishDialog.form.genres"
+            multiple
+            filterable
+            allow-create
+            default-first-option
+            :placeholder="$t('cinema.genrePlaceholder')"
+            style="width: 100%"
+          >
             <el-option v-for="g in genresOptions" :key="g" :label="optLabel(g)" :value="g" />
           </el-select>
         </el-form-item>
@@ -246,7 +297,13 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="editor.visible" append-to-body :title="editor.form.id ? $t('cinema.editVideo') : $t('cinema.upload')" width="640px" top="5vh">
+    <el-dialog
+      v-model="editor.visible"
+      append-to-body
+      :title="editor.form.id ? $t('cinema.editVideo') : $t('cinema.upload')"
+      width="640px"
+      top="5vh"
+    >
       <el-form :model="editor.form" label-position="top">
         <div class="form-row">
           <el-form-item :label="$t('cinema.name')">
@@ -265,14 +322,29 @@
             </el-select>
           </el-form-item>
           <el-form-item :label="$t('cinema.genresDouban')">
-            <el-select v-model="editor.form.genres" multiple filterable allow-create default-first-option :placeholder="$t('cinema.selectOrInput')" style="width: 100%">
+            <el-select
+              v-model="editor.form.genres"
+              multiple
+              filterable
+              allow-create
+              default-first-option
+              :placeholder="$t('cinema.selectOrInput')"
+              style="width: 100%"
+            >
               <el-option v-for="g in genresOptions" :key="g" :label="optLabel(g)" :value="g" />
             </el-select>
           </el-form-item>
         </div>
         <div class="form-row">
           <el-form-item :label="$t('cinema.region')">
-            <el-select v-model="editor.form.region" filterable allow-create default-first-option :placeholder="$t('cinema.selectOrInput')" style="width: 100%">
+            <el-select
+              v-model="editor.form.region"
+              filterable
+              allow-create
+              default-first-option
+              :placeholder="$t('cinema.selectOrInput')"
+              style="width: 100%"
+            >
               <el-option v-for="r in regionOptions" :key="r" :label="optLabel(r)" :value="r" />
             </el-select>
           </el-form-item>
@@ -293,7 +365,15 @@
             <el-input v-model="editor.form.director" />
           </el-form-item>
           <el-form-item :label="$t('cinema.ratingDouban')">
-            <el-input-number v-model="editor.form.rating" :min="0" :max="10" :precision="1" :step="0.1" controls-position="right" style="width: 100%" />
+            <el-input-number
+              v-model="editor.form.rating"
+              :min="0"
+              :max="10"
+              :precision="1"
+              :step="0.1"
+              controls-position="right"
+              style="width: 100%"
+            />
           </el-form-item>
         </div>
         <el-form-item :label="$t('cinema.actors')">
@@ -362,29 +442,116 @@ const loadError = ref(false)
 const wishLoading = ref(false)
 
 const genresOptions = [
-  '剧情', '喜剧', '动作', '爱情', '科幻', '动画', '悬疑', '惊悚', '恐怖', '纪录片',
-  '音乐', '犯罪', '冒险', '奇幻', '家庭', '历史', '战争', '武侠', '灾难', '运动',
-  '歌舞', '西部', '儿童', '短片', '经典', '文艺', '枪战', '写实', '实验', '戏曲',
+  '剧情',
+  '喜剧',
+  '动作',
+  '爱情',
+  '科幻',
+  '动画',
+  '悬疑',
+  '惊悚',
+  '恐怖',
+  '纪录片',
+  '音乐',
+  '犯罪',
+  '冒险',
+  '奇幻',
+  '家庭',
+  '历史',
+  '战争',
+  '武侠',
+  '灾难',
+  '运动',
+  '歌舞',
+  '西部',
+  '儿童',
+  '短片',
+  '经典',
+  '文艺',
+  '枪战',
+  '写实',
+  '实验',
+  '戏曲',
 ]
 
 const regionOptions = [
-  '中国大陆', '香港', '台湾', '美国', '英国', '日本', '韩国', '法国', '德国', '意大利',
-  '西班牙', '印度', '泰国', '俄罗斯', '加拿大', '澳大利亚', '巴西', '瑞典', '丹麦', '其他',
+  '中国大陆',
+  '香港',
+  '台湾',
+  '美国',
+  '英国',
+  '日本',
+  '韩国',
+  '法国',
+  '德国',
+  '意大利',
+  '西班牙',
+  '印度',
+  '泰国',
+  '俄罗斯',
+  '加拿大',
+  '澳大利亚',
+  '巴西',
+  '瑞典',
+  '丹麦',
+  '其他',
 ]
 
 // 题材/地区:值沿用中文(与库中既有数据一致),标签走 i18n —— 英文界面不再显示中文
 const GENRE_KEYS = {
-  剧情: 'drama', 喜剧: 'comedy', 动作: 'action', 爱情: 'romance', 科幻: 'scifi', 动画: 'animation',
-  悬疑: 'mystery', 惊悚: 'thriller', 恐怖: 'horror', 纪录片: 'documentary', 音乐: 'music', 犯罪: 'crime',
-  冒险: 'adventure', 奇幻: 'fantasy', 家庭: 'family', 历史: 'history', 战争: 'war', 武侠: 'wuxia',
-  灾难: 'disaster', 运动: 'sports', 歌舞: 'musical', 西部: 'western', 儿童: 'kids', 短片: 'short',
-  经典: 'classic', 文艺: 'arthouse', 枪战: 'gunfight', 写实: 'realistic', 实验: 'experimental', 戏曲: 'opera',
+  剧情: 'drama',
+  喜剧: 'comedy',
+  动作: 'action',
+  爱情: 'romance',
+  科幻: 'scifi',
+  动画: 'animation',
+  悬疑: 'mystery',
+  惊悚: 'thriller',
+  恐怖: 'horror',
+  纪录片: 'documentary',
+  音乐: 'music',
+  犯罪: 'crime',
+  冒险: 'adventure',
+  奇幻: 'fantasy',
+  家庭: 'family',
+  历史: 'history',
+  战争: 'war',
+  武侠: 'wuxia',
+  灾难: 'disaster',
+  运动: 'sports',
+  歌舞: 'musical',
+  西部: 'western',
+  儿童: 'kids',
+  短片: 'short',
+  经典: 'classic',
+  文艺: 'arthouse',
+  枪战: 'gunfight',
+  写实: 'realistic',
+  实验: 'experimental',
+  戏曲: 'opera',
 }
 
 const REGION_KEYS = {
-  中国大陆: 'cn', 香港: 'hk', 台湾: 'tw', 美国: 'us', 英国: 'uk', 日本: 'jp', 韩国: 'kr',
-  法国: 'fr', 德国: 'de', 意大利: 'it', 西班牙: 'es', 印度: 'in', 泰国: 'th', 俄罗斯: 'ru',
-  加拿大: 'ca', 澳大利亚: 'au', 巴西: 'br', 瑞典: 'se', 丹麦: 'dk', 其他: 'other',
+  中国大陆: 'cn',
+  香港: 'hk',
+  台湾: 'tw',
+  美国: 'us',
+  英国: 'uk',
+  日本: 'jp',
+  韩国: 'kr',
+  法国: 'fr',
+  德国: 'de',
+  意大利: 'it',
+  西班牙: 'es',
+  印度: 'in',
+  泰国: 'th',
+  俄罗斯: 'ru',
+  加拿大: 'ca',
+  澳大利亚: 'au',
+  巴西: 'br',
+  瑞典: 'se',
+  丹麦: 'dk',
+  其他: 'other',
 }
 
 // 认不出来的值(用户在库里自己输入的题材)原样显示
@@ -399,18 +566,28 @@ const searchKeyword = ref('')
 const sourceFilter = ref('')
 const typeFilter = ref('')
 const genreFilter = ref('')
-const filteredList = computed(() => list.value.filter((v) => {
-  if (searchKeyword.value) {
-    const k = searchKeyword.value.toLowerCase()
-    const hay = `${v.title || ''} ${v.originalTitle || ''}`.toLowerCase()
-    if (!hay.includes(k)) return false
-  }
-  if (sourceFilter.value === 'LOCAL' && v.sourceDeviceId) return false
-  if (sourceFilter.value && sourceFilter.value !== 'LOCAL' && String(v.sourceDeviceId) !== sourceFilter.value) return false
-  if (typeFilter.value && v.mediaType !== typeFilter.value) return false
-  if (genreFilter.value && !String(v.genres || '').split(',').map((s) => s.trim()).filter(Boolean).includes(genreFilter.value)) return false
-  return true
-}))
+const filteredList = computed(() =>
+  list.value.filter((v) => {
+    if (searchKeyword.value) {
+      const k = searchKeyword.value.toLowerCase()
+      const hay = `${v.title || ''} ${v.originalTitle || ''}`.toLowerCase()
+      if (!hay.includes(k)) return false
+    }
+    if (sourceFilter.value === 'LOCAL' && v.sourceDeviceId) return false
+    if (sourceFilter.value && sourceFilter.value !== 'LOCAL' && String(v.sourceDeviceId) !== sourceFilter.value) return false
+    if (typeFilter.value && v.mediaType !== typeFilter.value) return false
+    if (
+      genreFilter.value &&
+      !String(v.genres || '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .includes(genreFilter.value)
+    )
+      return false
+    return true
+  }),
+)
 // 来源筛选选项:列表数据中出现的映射设备(去重)
 const sourceOptions = computed(() => {
   const map = new Map()
@@ -423,7 +600,11 @@ const sourceOptions = computed(() => {
 const genreOptions = computed(() => {
   const set = new Set(genresOptions)
   for (const v of list.value) {
-    for (const g of String(v.genres || '').split(',').map((s) => s.trim()).filter(Boolean)) set.add(g)
+    for (const g of String(v.genres || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean))
+      set.add(g)
   }
   return [...set]
 })
@@ -431,17 +612,33 @@ const hasMapped = computed(() => list.value.some((v) => v.sourceDeviceId))
 
 // 新影片/编辑共用的空表单(剧集数保存时由 duration 字段转换而来,表单内不单独维护)
 const emptyForm = () => ({
-  id: null, title: '', originalTitle: '', mediaType: 'movie', genres: [],
-  region: '', year: null, language: '', duration: null,
-  director: '', actors: '', rating: null, intro: '', poster: '', videoUrl: '',
+  id: null,
+  title: '',
+  originalTitle: '',
+  mediaType: 'movie',
+  genres: [],
+  region: '',
+  year: null,
+  language: '',
+  duration: null,
+  director: '',
+  actors: '',
+  rating: null,
+  intro: '',
+  poster: '',
+  videoUrl: '',
   sourceDeviceId: null,
 })
 
 const editor = reactive({ visible: false, form: emptyForm() })
 const wishDialog = reactive({ visible: false, form: { title: '', genres: [], reason: '' } })
 const player = reactive({ visible: false, video: null })
-watch(() => player.visible, (v) => { v ? sunLight?.suspendEffects() : sunLight?.restoreEffects() })
-
+watch(
+  () => player.visible,
+  (v) => {
+    v ? sunLight?.suspendEffects() : sunLight?.restoreEffects()
+  },
+)
 
 // 拉取视频库(筛选在前端做,全量拉取)
 const load = async () => {
@@ -616,7 +813,10 @@ const onWishDone = async (w) => {
 }
 
 const onWishDel = async (w) => {
-  await ElMessageBox.confirm(t('cinema.wishDeleteConfirm', { title: w.title }), t('common.tip'), { type: 'warning', closeOnClickModal: true })
+  await ElMessageBox.confirm(t('cinema.wishDeleteConfirm', { title: w.title }), t('common.tip'), {
+    type: 'warning',
+    closeOnClickModal: true,
+  })
   await videoApi.wishRemove(w.id)
   ElMessage.success(t('common.deleted'))
   loadWishes()
@@ -637,18 +837,20 @@ const mediaCountryFilter = ref('')
 const mediaYearFilter = ref('')
 
 // 筛选与选项均在前端算(家庭库几百条,与相册同款做法)
-const mediaFiltered = computed(() => mediaWorks.value.filter((w) => {
-  if (mediaKeyword.value) {
-    const k = mediaKeyword.value.toLowerCase()
-    const hay = `${w.name || ''} ${w.originalTitle || ''}`.toLowerCase()
-    if (!hay.includes(k)) return false
-  }
-  if (mediaTypeFilter.value && w.type !== mediaTypeFilter.value) return false
-  if (mediaGenreFilter.value && !(w.genres || []).includes(mediaGenreFilter.value)) return false
-  if (mediaCountryFilter.value && !(w.countries || []).includes(mediaCountryFilter.value)) return false
-  if (mediaYearFilter.value && w.year !== mediaYearFilter.value) return false
-  return true
-}))
+const mediaFiltered = computed(() =>
+  mediaWorks.value.filter((w) => {
+    if (mediaKeyword.value) {
+      const k = mediaKeyword.value.toLowerCase()
+      const hay = `${w.name || ''} ${w.originalTitle || ''}`.toLowerCase()
+      if (!hay.includes(k)) return false
+    }
+    if (mediaTypeFilter.value && w.type !== mediaTypeFilter.value) return false
+    if (mediaGenreFilter.value && !(w.genres || []).includes(mediaGenreFilter.value)) return false
+    if (mediaCountryFilter.value && !(w.countries || []).includes(mediaCountryFilter.value)) return false
+    if (mediaYearFilter.value && w.year !== mediaYearFilter.value) return false
+    return true
+  }),
+)
 const mediaGenreOptions = computed(() => {
   const set = new Set()
   mediaWorks.value.forEach((w) => (w.genres || []).forEach((g) => set.add(g)))
@@ -723,8 +925,15 @@ onMounted(() => {
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 16px;
 }
-.video-card { overflow: hidden; display: flex; flex-direction: column; }
-.video-card.selected { outline: 3px solid var(--color-primary, var(--color-brand)); outline-offset: -3px; }
+.video-card {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.video-card.selected {
+  outline: 3px solid var(--color-primary, var(--color-brand));
+  outline-offset: -3px;
+}
 .video-poster {
   position: relative;
   height: 170px;
@@ -732,10 +941,17 @@ onMounted(() => {
   cursor: pointer;
   overflow: hidden;
 }
-.poster-img { width: 100%; height: 100%; object-fit: cover; }
+.poster-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .poster-placeholder {
-  width: 100%; height: 100%;
-  display: flex; align-items: center; justify-content: center;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 48px;
   color: rgba(255, 255, 255, 0.25);
 }
@@ -751,7 +967,9 @@ onMounted(() => {
   opacity: 0;
   transition: opacity 0.15s;
 }
-.video-poster:hover .play-overlay { opacity: 1; }
+.video-poster:hover .play-overlay {
+  opacity: 1;
+}
 .video-source {
   position: absolute;
   top: 10px;
@@ -772,9 +990,18 @@ onMounted(() => {
   border-radius: 50%;
   display: inline-block;
 }
-.status-dot.VALID { background: #67b26b; box-shadow: 0 0 4px rgba(103, 178, 107, 0.9); }
-.status-dot.OFFLINE, .status-dot.SYNCING { background: #9a9a9a; }
-.status-dot.MISSING { background: #b96058; box-shadow: 0 0 4px rgba(185, 96, 88, 0.9); }
+.status-dot.VALID {
+  background: #67b26b;
+  box-shadow: 0 0 4px rgba(103, 178, 107, 0.9);
+}
+.status-dot.OFFLINE,
+.status-dot.SYNCING {
+  background: #9a9a9a;
+}
+.status-dot.MISSING {
+  background: #b96058;
+  box-shadow: 0 0 4px rgba(185, 96, 88, 0.9);
+}
 .pick-badge {
   position: absolute;
   top: 10px;
@@ -789,15 +1016,54 @@ onMounted(() => {
   justify-content: center;
   z-index: 2;
 }
-.pick-badge.on { background: var(--color-brand); border-color: var(--color-brand); }
-.select-count { font-size: 13px; color: var(--color-text-secondary); margin-right: 8px; }
-.video-info { padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
-.video-title { font-size: 16px; font-weight: 600; color: var(--color-text); }
-.video-original { font-size: 12px; color: var(--color-text-secondary); }
-.video-genres { display: flex; gap: 6px; flex-wrap: wrap; }
-.video-genres .tag { background: rgba(46, 116, 181, 0.08); color: var(--color-accent); padding: 1px 8px; border-radius: 10px; font-size: 12px; }
-.video-meta { font-size: 12px; color: var(--color-text-secondary); }
-.video-credit { font-size: 12px; color: var(--color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-badge.on {
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+}
+.select-count {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-right: 8px;
+}
+.video-info {
+  padding: 14px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+.video-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.video-original {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.video-genres {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.video-genres .tag {
+  background: rgba(46, 116, 181, 0.08);
+  color: var(--color-accent);
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+.video-meta {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.video-credit {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .video-footer {
   margin-top: auto;
   padding-top: 8px;
@@ -806,27 +1072,107 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
 }
-.video-uploader { font-size: 12px; color: var(--color-text-secondary); }
-.video-actions { display: flex; }
-.video-actions :deep(.el-button) { padding: 5px 6px; }
-.video-actions :deep(.el-button + .el-button) { margin-left: 4px; }
-.wish-list { display: flex; flex-direction: column; gap: 12px; max-width: 720px; }
-.wish-item { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 20px; }
-.wish-title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-.wish-genres { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
-.wish-genres .tag { background: rgba(46, 116, 181, 0.08); color: var(--color-accent); padding: 1px 8px; border-radius: 10px; font-size: 12px; }
-.wish-reason { font-size: 13px; color: var(--color-text); margin-top: 6px; }
-.wish-meta { font-size: 12px; color: var(--color-text-secondary); margin-top: 6px; }
-.wish-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
-.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.poster-upload-preview { width: 120px; height: 170px; object-fit: cover; border-radius: 8px; display: block; }
-.video-uploaded { font-size: 12px; color: var(--color-text-secondary); margin-top: 6px; word-break: break-all; }
-.player-video { width: 100%; max-height: 70vh; background: #000; border-radius: 8px; }
+.video-uploader {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.video-actions {
+  display: flex;
+}
+.video-actions :deep(.el-button) {
+  padding: 5px 6px;
+}
+.video-actions :deep(.el-button + .el-button) {
+  margin-left: 4px;
+}
+.wish-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 720px;
+}
+.wish-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+}
+.wish-title {
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wish-genres {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.wish-genres .tag {
+  background: rgba(46, 116, 181, 0.08);
+  color: var(--color-accent);
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+.wish-reason {
+  font-size: 13px;
+  color: var(--color-text);
+  margin-top: 6px;
+}
+.wish-meta {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 6px;
+}
+.wish-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.poster-upload-preview {
+  width: 120px;
+  height: 170px;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+}
+.video-uploaded {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 6px;
+  word-break: break-all;
+}
+.player-video {
+  width: 100%;
+  max-height: 70vh;
+  background: #000;
+  border-radius: 8px;
+}
 
 /* ---------- 媒体库(海报墙) ---------- */
-.resume-block { margin-bottom: 18px; }
-.resume-row { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; }
-.resume-card { flex: 0 0 168px; cursor: pointer; }
+.resume-block {
+  margin-bottom: 18px;
+}
+.resume-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+.resume-card {
+  flex: 0 0 168px;
+  cursor: pointer;
+}
 .resume-thumb {
   position: relative;
   height: 96px;
@@ -834,16 +1180,40 @@ onMounted(() => {
   overflow: hidden;
   background: #1c2b3a;
 }
-.resume-thumb img { width: 100%; height: 100%; object-fit: cover; }
-.resume-progress { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--color-brand); }
-.resume-name { margin-top: 6px; font-size: 13px; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.resume-sub { font-size: 12px; color: var(--color-text-secondary); display: flex; gap: 8px; }
+.resume-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.resume-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--color-brand);
+}
+.resume-name {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.resume-sub {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  display: flex;
+  gap: 8px;
+}
 .media-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 16px;
 }
-.media-card { cursor: pointer; }
+.media-card {
+  cursor: pointer;
+}
 .media-poster {
   position: relative;
   aspect-ratio: 2 / 3;
@@ -851,8 +1221,15 @@ onMounted(() => {
   overflow: hidden;
   background: #1c2b3a;
 }
-.media-poster img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.25s; }
-.media-card:hover .media-poster img { transform: scale(1.04); }
+.media-poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.25s;
+}
+.media-card:hover .media-poster img {
+  transform: scale(1.04);
+}
 .media-badge {
   position: absolute;
   top: 8px;
@@ -864,7 +1241,8 @@ onMounted(() => {
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(4px);
 }
-.media-unplayed, .media-played {
+.media-unplayed,
+.media-played {
   position: absolute;
   top: 8px;
   right: 8px;
@@ -878,8 +1256,16 @@ onMounted(() => {
   color: #fff;
   background: var(--color-brand);
 }
-.media-played { background: #67b26b; }
-.media-resume-bar { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--color-brand); }
+.media-played {
+  background: #67b26b;
+}
+.media-resume-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--color-brand);
+}
 .media-hover {
   position: absolute;
   inset: 0;
@@ -890,17 +1276,52 @@ onMounted(() => {
   opacity: 0;
   transition: opacity 0.15s;
 }
-.media-card:hover .media-hover { opacity: 1; }
-.media-hover-hint { color: #fff; font-size: 13px; }
-.media-info { padding: 8px 2px 0; }
-.media-name { font-size: 14px; font-weight: 600; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.media-meta { font-size: 12px; color: var(--color-text-secondary); display: flex; gap: 8px; margin-top: 2px; }
-.media-genres { font-size: 12px; color: var(--color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-card:hover .media-hover {
+  opacity: 1;
+}
+.media-hover-hint {
+  color: #fff;
+  font-size: 13px;
+}
+.media-info {
+  padding: 8px 2px 0;
+}
+.media-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.media-meta {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+.media-genres {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 @media (max-width: 768px) {
-  .video-grid { grid-template-columns: 1fr; }
-  .form-row { grid-template-columns: 1fr; }
-  .media-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
-  .resume-card { flex: 0 0 132px; }
+  .video-grid {
+    grid-template-columns: 1fr;
+  }
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  .media-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 12px;
+  }
+  .resume-card {
+    flex: 0 0 132px;
+  }
 }
 </style>

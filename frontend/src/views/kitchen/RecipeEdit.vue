@@ -1,12 +1,10 @@
 <template>
   <div class="page" v-loading="loading">
-    <Breadcrumb :items="[
-      { label: $t('kitchen.title'), to: '/kitchen' },
-      { label: isEdit ? $t('kitchen.editRecipe') : $t('kitchen.addRecipe') },
-    ]" />
+    <Breadcrumb
+      :items="[{ label: $t('kitchen.title'), to: '/kitchen' }, { label: isEdit ? $t('kitchen.editRecipe') : $t('kitchen.addRecipe') }]"
+    />
 
     <div class="form-wrap">
-
       <!-- 基础信息 -->
       <div class="form-section">
         <el-form label-position="top">
@@ -18,7 +16,9 @@
             <el-form-item :label="$t('kitchen.coverImage')">
               <el-upload :show-file-list="false" :before-upload="(f) => uploadFile(f, 'coverImage')" accept="image/*">
                 <img v-if="form.coverImage" :src="form.coverImage" class="cover-preview" :alt="form.name || ''" />
-                <el-button v-else size="small"><el-icon><Plus /></el-icon> {{ $t('kitchen.coverImage') }}</el-button>
+                <el-button v-else size="small"
+                  ><el-icon><Plus /></el-icon> {{ $t('kitchen.coverImage') }}</el-button
+                >
               </el-upload>
             </el-form-item>
           </div>
@@ -197,7 +197,11 @@ const load = async () => {
 
 const parseJson = (s, fallback) => {
   if (!s) return Array.isArray(fallback) ? [...fallback] : fallback
-  try { return JSON.parse(s) } catch (e) { return Array.isArray(fallback) ? [...fallback] : fallback }
+  try {
+    return JSON.parse(s)
+  } catch (e) {
+    return Array.isArray(fallback) ? [...fallback] : fallback
+  }
 }
 
 const onSave = async () => {
@@ -214,9 +218,9 @@ const onSave = async () => {
       category: form.category,
       flavor: form.flavor,
       description: form.description,
-      ingredients: JSON.stringify(form.ingredients.filter(i => i.name)),
-      equipment: JSON.stringify(form.equipment.filter(e => e.name)),
-      steps: JSON.stringify(form.steps.filter(s => s.content || s.image_url || s.video_url)),
+      ingredients: JSON.stringify(form.ingredients.filter((i) => i.name)),
+      equipment: JSON.stringify(form.equipment.filter((e) => e.name)),
+      steps: JSON.stringify(form.steps.filter((s) => s.content || s.image_url || s.video_url)),
     }
     if (isEdit.value) {
       await kitchenApi.update(route.params.id, payload)
@@ -233,14 +237,13 @@ onMounted(load)
 </script>
 
 <style scoped>
-
 .form-section {
   margin-bottom: 32px;
   padding: 20px;
   border-radius: 16px;
-  background: var(--el-bg-color, rgba(255,255,255,0.6));
+  background: var(--el-bg-color, rgba(255, 255, 255, 0.6));
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(255,255,255,0.15);
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .section-header {
@@ -329,12 +332,16 @@ onMounted(load)
 }
 
 @media (max-width: 700px) {
-  .form-row-3 { grid-template-columns: 1fr; }
-  .step-media-edit { flex-direction: column; }
+  .form-row-3 {
+    grid-template-columns: 1fr;
+  }
+  .step-media-edit {
+    flex-direction: column;
+  }
 }
 
 :global(html.dark) .form-section {
-  background: rgba(40,44,52,0.6);
-  border-color: rgba(255,255,255,0.08);
+  background: rgba(40, 44, 52, 0.6);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 </style>

@@ -55,10 +55,26 @@ export function useVoiceRecorder() {
   const stop = () =>
     new Promise((resolve) => {
       recording.value = false
-      try { processor && processor.disconnect() } catch (e) { /* ignore */ }
-      try { source && source.disconnect() } catch (e) { /* ignore */ }
-      try { stream && stream.getTracks().forEach((t) => t.stop()) } catch (e) { /* ignore */ }
-      try { ctx && ctx.close() } catch (e) { /* ignore */ }
+      try {
+        processor && processor.disconnect()
+      } catch (e) {
+        /* ignore */
+      }
+      try {
+        source && source.disconnect()
+      } catch (e) {
+        /* ignore */
+      }
+      try {
+        stream && stream.getTracks().forEach((t) => t.stop())
+      } catch (e) {
+        /* ignore */
+      }
+      try {
+        ctx && ctx.close()
+      } catch (e) {
+        /* ignore */
+      }
       const blob = encodeWav(pcm, TARGET_RATE)
       pcm = []
       ctx = source = processor = stream = null

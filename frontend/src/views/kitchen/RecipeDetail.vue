@@ -7,7 +7,9 @@
       <div class="recipe-header">
         <div class="cover-wrap">
           <img v-if="recipe.coverImage" :src="recipe.coverImage" :alt="recipe.name" class="cover" />
-          <div v-else class="cover cover-empty"><el-icon><Bowl /></el-icon></div>
+          <div v-else class="cover cover-empty">
+            <el-icon><Bowl /></el-icon>
+          </div>
         </div>
         <div class="info">
           <span class="name">{{ recipe.name }}</span>
@@ -113,7 +115,11 @@ const loading = ref(false)
 
 const parseJson = (s, fallback) => {
   if (!s) return fallback
-  try { return JSON.parse(s) } catch (e) { return fallback }
+  try {
+    return JSON.parse(s)
+  } catch (e) {
+    return fallback
+  }
 }
 
 const ingredients = computed(() => parseJson(recipe.value?.ingredients, []))
@@ -214,8 +220,12 @@ onMounted(load)
   gap: 8px;
 }
 
-.sections { margin-top: 16px; }
-.block { margin-bottom: 32px; }
+.sections {
+  margin-top: 16px;
+}
+.block {
+  margin-bottom: 32px;
+}
 .block-title {
   display: flex;
   align-items: center;
@@ -237,12 +247,17 @@ onMounted(load)
   padding: 10px 14px;
   border-radius: 10px;
   font-size: 14px;
-  background: var(--el-bg-color, rgba(255,255,255,0.6));
+  background: var(--el-bg-color, rgba(255, 255, 255, 0.6));
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.15);
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
-.ing-name { color: var(--text-primary, #303133); font-weight: 500; }
-.ing-qty { color: var(--text-secondary, #909399); }
+.ing-name {
+  color: var(--text-primary, #303133);
+  font-weight: 500;
+}
+.ing-qty {
+  color: var(--text-secondary, #909399);
+}
 
 .equipment-list {
   display: flex;
@@ -256,9 +271,9 @@ onMounted(load)
   padding: 8px 14px;
   border-radius: 10px;
   font-size: 14px;
-  background: var(--el-bg-color, rgba(255,255,255,0.6));
+  background: var(--el-bg-color, rgba(255, 255, 255, 0.6));
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.15);
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .step-list {
@@ -287,9 +302,9 @@ onMounted(load)
   flex: 1;
   padding: 14px 18px;
   border-radius: 12px;
-  background: var(--el-bg-color, rgba(255,255,255,0.6));
+  background: var(--el-bg-color, rgba(255, 255, 255, 0.6));
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.15);
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 .step-content {
   margin: 0 0 10px;
@@ -303,23 +318,34 @@ onMounted(load)
   display: block;
   margin-top: 8px;
 }
-.step-image { max-height: 400px; object-fit: cover; }
-.step-video { max-height: 400px; }
+.step-image {
+  max-height: 400px;
+  object-fit: cover;
+}
+.step-video {
+  max-height: 400px;
+}
 
 .glass {
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 @media (max-width: 700px) {
-  .recipe-header { flex-direction: column; }
-  .cover-wrap { flex: 0 0 auto; }
-  .cover { height: 200px; }
+  .recipe-header {
+    flex-direction: column;
+  }
+  .cover-wrap {
+    flex: 0 0 auto;
+  }
+  .cover {
+    height: 200px;
+  }
 }
 
 :global(html.dark) .ingredient-item,
 :global(html.dark) .equipment-item,
 :global(html.dark) .step-body {
-  background: rgba(40,44,52,0.6);
-  border-color: rgba(255,255,255,0.08);
+  background: rgba(40, 44, 52, 0.6);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 </style>

@@ -83,9 +83,7 @@ describe('loanLedger 贷款流水', () => {
       months: 360,
       method: REPAY_METHOD.EQUAL_INSTALLMENT,
       rate: 3.6,
-      events: [
-        { type: LOAN_EVENT.PREPAY, effectivePeriod: 12, amount: 500000, strategy: PREPAY_STRATEGY.SHORTEN },
-      ],
+      events: [{ type: LOAN_EVENT.PREPAY, effectivePeriod: 12, amount: 500000, strategy: PREPAY_STRATEGY.SHORTEN }],
     })
     expect(led.valid).toBe(true)
     expect(led.settled).toBe(true)

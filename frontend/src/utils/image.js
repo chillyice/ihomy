@@ -11,19 +11,19 @@ export function thumbUrl(url) {
   if (!url.includes('/files/')) return url
   const dot = url.lastIndexOf('.')
   const slash = url.lastIndexOf('/')
-  if (dot <= slash) return url  // 无扩展名
+  if (dot <= slash) return url // 无扩展名
   return url.substring(0, dot) + '_thumb.jpg'
 }
 
 /** img onerror 回退原图(配合 thumbUrl 使用) */
 export function onThumbError(e) {
   const img = e.target
-  if (img.dataset.fallback) return  // 已回退过,避免死循环
+  if (img.dataset.fallback) return // 已回退过,避免死循环
   const src = img.src
   const dot = src.lastIndexOf('.')
   const slash = src.lastIndexOf('/')
   if (dot > slash && src.includes('_thumb')) {
     img.dataset.fallback = '1'
-    img.src = src.substring(0, dot - 5) + src.substring(dot)  // 去掉 _thumb
+    img.src = src.substring(0, dot - 5) + src.substring(dot) // 去掉 _thumb
   }
 }

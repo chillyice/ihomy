@@ -43,8 +43,14 @@ export function useWarmWidgetDrag() {
     window.addEventListener('mousemove', onMouseMove)
     window.addEventListener('mouseup', onMouseUp)
   }
-  const onDrop = (cb) => { dropCb = cb }
-  const onMove = (cb) => { moveCb = cb }
-  const setOverGrid = (v) => { overGrid.value = v }
+  const onDrop = (cb) => {
+    dropCb = cb
+  }
+  const onMove = (cb) => {
+    moveCb = cb
+  }
+  const setOverGrid = (v) => {
+    overGrid.value = v
+  }
   return { dragging, code, label, x, y, overGrid, startDrag, onDrop, onMove, setOverGrid }
 }

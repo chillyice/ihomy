@@ -40,7 +40,11 @@ export const useUserStore = defineStore('user', {
     // 检查 userInfo 是否完整(含 permissions 字段),不完整则静默刷新一次
     async ensureUserInfo() {
       if (this.token && this.userInfo && this.userInfo.permissions === undefined) {
-        try { await this.refresh() } catch (e) { /* 忽略,下次 401 会处理 */ }
+        try {
+          await this.refresh()
+        } catch (e) {
+          /* 忽略,下次 401 会处理 */
+        }
       }
     },
     async register(payload) {
@@ -104,6 +108,10 @@ if (typeof window !== 'undefined') {
     const store = useUserStore()
     store.token = localStorage.getItem('token') || ''
     store.refreshToken = localStorage.getItem('refreshToken') || ''
-    try { store.userInfo = JSON.parse(localStorage.getItem('userInfo') || 'null') } catch { store.userInfo = null }
+    try {
+      store.userInfo = JSON.parse(localStorage.getItem('userInfo') || 'null')
+    } catch {
+      store.userInfo = null
+    }
   })
 }

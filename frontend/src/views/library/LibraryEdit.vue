@@ -1,6 +1,8 @@
 <template>
   <div class="page">
-    <Breadcrumb :items="[{ label: $t('library.title'), to: '/library' }, { label: isEdit ? $t('library.editBook') : $t('library.upload') }]" />
+    <Breadcrumb
+      :items="[{ label: $t('library.title'), to: '/library' }, { label: isEdit ? $t('library.editBook') : $t('library.upload') }]"
+    />
     <div class="card">
       <el-form :model="form" label-position="top">
         <el-form-item :label="$t('library.bookTitle')">
@@ -19,7 +21,9 @@
               </template>
             </el-input>
           </div>
-          <div v-if="form.fileFormat" class="format-info">{{ form.fileFormat }} <span v-if="form.fileSize">· {{ formatSize(form.fileSize) }}</span></div>
+          <div v-if="form.fileFormat" class="format-info">
+            {{ form.fileFormat }} <span v-if="form.fileSize">· {{ formatSize(form.fileSize) }}</span>
+          </div>
         </el-form-item>
         <el-form-item :label="$t('library.coverImage')">
           <el-input v-model="form.coverUrl" :placeholder="$t('library.coverUrlPlaceholder')">
@@ -82,7 +86,9 @@
       </el-form>
       <template #footer>
         <el-button @click="showCategoryDialog = false">{{ $t('common.cancel') }}</el-button>
-        <el-button type="primary" :disabled="!newCategoryName.trim() || savingCategory" :loading="savingCategory" @click="addCategory">{{ $t('common.confirm') }}</el-button>
+        <el-button type="primary" :disabled="!newCategoryName.trim() || savingCategory" :loading="savingCategory" @click="addCategory">{{
+          $t('common.confirm')
+        }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -104,7 +110,19 @@ const loading = ref(false)
 const uploading = ref(false)
 
 // visibility/status 走字典词(PRIVATE/FAMILY、DRAFT/PUBLISHED/HIDDEN),与后端枚举一致
-const form = reactive({ title: '', author: '', description: '', coverUrl: '', fileUrl: '', fileFormat: '', fileSize: null, categoryIds: [], tags: '', status: 'PUBLISHED', visibility: 'FAMILY' })
+const form = reactive({
+  title: '',
+  author: '',
+  description: '',
+  coverUrl: '',
+  fileUrl: '',
+  fileFormat: '',
+  fileSize: null,
+  categoryIds: [],
+  tags: '',
+  status: 'PUBLISHED',
+  visibility: 'FAMILY',
+})
 const categories = ref([])
 const showCategoryDialog = ref(false)
 const newCategoryName = ref('')
@@ -119,11 +137,12 @@ const categoryCascader = computed(() => {
     byParent[pid].push(c)
   }
   // 叶子节点 children 必须为 undefined(不能给空数组,否则级联选择器仍显示可展开箭头)
-  const build = (pid) => (byParent[pid] || []).map(c => ({
-    value: c.id,
-    label: c.name,
-    children: build(c.id).length ? build(c.id) : undefined,
-  }))
+  const build = (pid) =>
+    (byParent[pid] || []).map((c) => ({
+      value: c.id,
+      label: c.name,
+      children: build(c.id).length ? build(c.id) : undefined,
+    }))
   return build(0)
 })
 
@@ -135,7 +154,9 @@ const formatSize = (bytes) => {
 }
 
 const loadCategories = async () => {
-  try { categories.value = await libraryApi.categories() || [] } catch (e) {}
+  try {
+    categories.value = (await libraryApi.categories()) || []
+  } catch (e) {}
 }
 
 const addCategory = async () => {
@@ -205,22 +226,60 @@ const onSave = async () => {
 onMounted(async () => {
   if (isEdit.value) {
     const b = await libraryApi.detail(route.params.id)
-    Object.assign(form, { title: b.title, author: b.author, description: b.description, coverUrl: b.coverUrl, fileUrl: b.fileUrl, fileFormat: b.fileFormat, fileSize: b.fileSize, categoryIds: b.categoryIds || [], tags: b.tags || '', status: b.status, visibility: b.visibility })
+    Object.assign(form, {
+      title: b.title,
+      author: b.author,
+      description: b.description,
+      coverUrl: b.coverUrl,
+      fileUrl: b.fileUrl,
+      fileFormat: b.fileFormat,
+      fileSize: b.fileSize,
+      categoryIds: b.categoryIds || [],
+      tags: b.tags || '',
+      status: b.status,
+      visibility: b.visibility,
+    })
   }
   loadCategories()
 })
 </script>
 
 <style scoped>
-.category-row { display: flex; gap: 8px; width: 100%; }
-.upload-row { width: 100%; }
-.format-info { font-size: 12px; color: var(--color-text-secondary); margin-top: 4px; }
-.cat-hint { font-size: 12px; color: var(--color-text-secondary); opacity: 0.6; margin-top: 4px; }
-.form-footer { display: flex; justify-content: flex-end; margin-top: 4px; }
+.category-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+.upload-row {
+  width: 100%;
+}
+.format-info {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+}
+.cat-hint {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  opacity: 0.6;
+  margin-top: 4px;
+}
+.form-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
 
 @media (max-width: 768px) {
-  .category-row { flex-direction: column; }
-  .form-footer { flex-direction: column; gap: 8px; }
-  .form-footer .el-button { width: 100%; }
+  .category-row {
+    flex-direction: column;
+  }
+  .form-footer {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .form-footer .el-button {
+    width: 100%;
+  }
 }
 </style>

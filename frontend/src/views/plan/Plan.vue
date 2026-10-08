@@ -21,10 +21,14 @@
             </div>
             <div class="plan-actions">
               <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
-                <el-button size="small" text @click="openPlanEditor(p)"><el-icon><Edit /></el-icon></el-button>
+                <el-button size="small" text @click="openPlanEditor(p)"
+                  ><el-icon><Edit /></el-icon
+                ></el-button>
               </el-tooltip>
               <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
-                <el-button size="small" text type="danger" @click="onDelPlan(p)"><el-icon><Delete /></el-icon></el-button>
+                <el-button size="small" text type="danger" @click="onDelPlan(p)"
+                  ><el-icon><Delete /></el-icon
+                ></el-button>
               </el-tooltip>
             </div>
           </div>
@@ -45,11 +49,19 @@
               <span class="task-sub-title" :class="{ done: t.done === 1 }">{{ t.title }}</span>
               <span v-if="t.dueDate" class="task-sub-due">{{ t.dueDate }}</span>
               <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
-                <el-button size="small" text type="danger" @click="onDelTask(p, t)"><el-icon><Delete /></el-icon></el-button>
+                <el-button size="small" text type="danger" @click="onDelTask(p, t)"
+                  ><el-icon><Delete /></el-icon
+                ></el-button>
               </el-tooltip>
             </div>
             <div class="task-add-row">
-              <el-input v-model="p._newTask" size="small" :placeholder="$t('plan.taskPlaceholder')" @keyup.enter="onAddTask(p)" style="max-width: 300px" />
+              <el-input
+                v-model="p._newTask"
+                size="small"
+                :placeholder="$t('plan.taskPlaceholder')"
+                @keyup.enter="onAddTask(p)"
+                style="max-width: 300px"
+              />
               <el-button size="small" type="primary" plain @click="onAddTask(p)">{{ $t('plan.addTask') }}</el-button>
             </div>
           </div>
@@ -127,7 +139,10 @@ const onSavePlan = async () => {
 }
 
 const onDelPlan = async (p) => {
-  await ElMessageBox.confirm(t('plan.deleteMessage', { name: p.title }), t('common.deleteConfirm'), { type: 'warning', closeOnClickModal: true })
+  await ElMessageBox.confirm(t('plan.deleteMessage', { name: p.title }), t('common.deleteConfirm'), {
+    type: 'warning',
+    closeOnClickModal: true,
+  })
   await planApi.remove(p.id)
   ElMessage.success(t('common.deleted'))
   await load()
@@ -180,8 +195,12 @@ onMounted(load)
 .plan-title .el-tag {
   margin-left: 8px;
 }
-.plan-actions :deep(.el-button) { padding: 5px 6px; }
-.plan-actions :deep(.el-button + .el-button) { margin-left: 4px; }
+.plan-actions :deep(.el-button) {
+  padding: 5px 6px;
+}
+.plan-actions :deep(.el-button + .el-button) {
+  margin-left: 4px;
+}
 .plan-desc {
   color: #666;
   font-size: 13px;
@@ -235,9 +254,19 @@ onMounted(load)
 }
 
 @media (max-width: 768px) {
-  .task-sub { flex-wrap: wrap; }
-  .task-sub-due { width: 100%; text-align: right; margin-left: 0; }
-  .task-add-row { flex-direction: column; }
-  .task-add-row .el-button { width: 100%; }
+  .task-sub {
+    flex-wrap: wrap;
+  }
+  .task-sub-due {
+    width: 100%;
+    text-align: right;
+    margin-left: 0;
+  }
+  .task-add-row {
+    flex-direction: column;
+  }
+  .task-add-row .el-button {
+    width: 100%;
+  }
 }
 </style>

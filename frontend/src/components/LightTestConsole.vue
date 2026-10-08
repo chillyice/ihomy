@@ -23,25 +23,104 @@
       <button class="lt-btn" @click="light.stepLightTest(1)" :title="$t('lightTest.forward5')">⏭</button>
     </div>
     <div class="lt-speed">
-      <button v-for="sp in speeds" :key="sp" class="lt-btn lt-speed-btn" :class="{ active: light.testSpeed.value === sp }" @click="light.setTestSpeed(sp)">{{ sp }}x</button>
+      <button
+        v-for="sp in speeds"
+        :key="sp"
+        class="lt-btn lt-speed-btn"
+        :class="{ active: light.testSpeed.value === sp }"
+        @click="light.setTestSpeed(sp)"
+      >
+        {{ sp }}x
+      </button>
     </div>
     <div class="lt-weather">
-      <button class="lt-btn" :class="{ active: light.weatherMode.value === 'clear' }" @click="light.setWeather('clear', 0)" :title="$t('lightTest.weatherClear')">☀️</button>
-      <button class="lt-btn" :class="{ active: light.weatherMode.value === 'cloud' }" @click="light.setWeather('cloud', 0)" :title="$t('lightTest.weatherCloud')">⛅</button>
-      <button class="lt-btn" :class="{ active: light.weatherMode.value === 'overcast' }" @click="light.setWeather('overcast', 0)" :title="$t('lightTest.weatherOvercast')">☁️</button>
-      <button class="lt-btn" :class="{ active: light.weatherMode.value === 'fog' }" @click="light.setWeather('fog', 0)" :title="$t('lightTest.weatherFog')">🌫️</button>
-      <button class="lt-btn" :class="{ active: light.weatherMode.value === 'rain' }" @click="light.setWeather('rain', light.precipLevel.value || 3)" :title="$t('lightTest.weatherRain')">🌧️</button>
-      <button class="lt-btn" :class="{ active: light.weatherMode.value === 'snow' }" @click="light.setWeather('snow', light.precipLevel.value || 3)" :title="$t('lightTest.weatherSnow')">❄️</button>
-      <button class="lt-btn" :class="{ active: light.weatherMode.value === 'thunder' }" @click="light.setWeather('thunder', light.precipLevel.value || 3)" :title="$t('lightTest.weatherThunder')">⛈️</button>
+      <button
+        class="lt-btn"
+        :class="{ active: light.weatherMode.value === 'clear' }"
+        @click="light.setWeather('clear', 0)"
+        :title="$t('lightTest.weatherClear')"
+      >
+        ☀️
+      </button>
+      <button
+        class="lt-btn"
+        :class="{ active: light.weatherMode.value === 'cloud' }"
+        @click="light.setWeather('cloud', 0)"
+        :title="$t('lightTest.weatherCloud')"
+      >
+        ⛅
+      </button>
+      <button
+        class="lt-btn"
+        :class="{ active: light.weatherMode.value === 'overcast' }"
+        @click="light.setWeather('overcast', 0)"
+        :title="$t('lightTest.weatherOvercast')"
+      >
+        ☁️
+      </button>
+      <button
+        class="lt-btn"
+        :class="{ active: light.weatherMode.value === 'fog' }"
+        @click="light.setWeather('fog', 0)"
+        :title="$t('lightTest.weatherFog')"
+      >
+        🌫️
+      </button>
+      <button
+        class="lt-btn"
+        :class="{ active: light.weatherMode.value === 'rain' }"
+        @click="light.setWeather('rain', light.precipLevel.value || 3)"
+        :title="$t('lightTest.weatherRain')"
+      >
+        🌧️
+      </button>
+      <button
+        class="lt-btn"
+        :class="{ active: light.weatherMode.value === 'snow' }"
+        @click="light.setWeather('snow', light.precipLevel.value || 3)"
+        :title="$t('lightTest.weatherSnow')"
+      >
+        ❄️
+      </button>
+      <button
+        class="lt-btn"
+        :class="{ active: light.weatherMode.value === 'thunder' }"
+        @click="light.setWeather('thunder', light.precipLevel.value || 3)"
+        :title="$t('lightTest.weatherThunder')"
+      >
+        ⛈️
+      </button>
     </div>
-    <div v-if="light.weatherMode.value === 'rain' || light.weatherMode.value === 'snow' || light.weatherMode.value === 'thunder'" class="lt-sliders">
-      <label class="lt-slider-row"><span>{{ light.weatherMode.value === 'snow' ? $t('lightTest.snowAmount') : $t('lightTest.rainAmount') }}</span><input type="range" min="1" max="6" v-model.number="light.precipLevel.value" class="lt-slider" @input="light.setWeather(light.weatherMode.value, light.precipLevel.value)" /></label>
+    <div
+      v-if="light.weatherMode.value === 'rain' || light.weatherMode.value === 'snow' || light.weatherMode.value === 'thunder'"
+      class="lt-sliders"
+    >
+      <label class="lt-slider-row"
+        ><span>{{ light.weatherMode.value === 'snow' ? $t('lightTest.snowAmount') : $t('lightTest.rainAmount') }}</span
+        ><input
+          type="range"
+          min="1"
+          max="6"
+          v-model.number="light.precipLevel.value"
+          class="lt-slider"
+          @input="light.setWeather(light.weatherMode.value, light.precipLevel.value)"
+      /></label>
     </div>
     <div class="lt-sliders">
-      <label class="lt-slider-row"><span>{{ $t('lightTest.colorTemp') }}</span><input type="range" min="0" max="100" v-model.number="light.lampTemp.value" class="lt-slider" /></label>
-      <label class="lt-slider-row"><span>{{ $t('lightTest.brightness') }}</span><input type="range" min="0" max="100" v-model.number="light.lampBrightness.value" class="lt-slider" /></label>
+      <label class="lt-slider-row"
+        ><span>{{ $t('lightTest.colorTemp') }}</span
+        ><input type="range" min="0" max="100" v-model.number="light.lampTemp.value" class="lt-slider"
+      /></label>
+      <label class="lt-slider-row"
+        ><span>{{ $t('lightTest.brightness') }}</span
+        ><input type="range" min="0" max="100" v-model.number="light.lampBrightness.value" class="lt-slider"
+      /></label>
+      <label class="lt-slider-row"
+        ><span>{{ $t('lightTest.shadowDepth') }}</span
+        ><input type="range" min="0" max="100" v-model.number="light.shadowDepth.value" class="lt-slider"
+      /></label>
     </div>
-    <div class="lt-progress"><div class="lt-progress-fill" :style="{ width: ((light.slotIdx.value / 288) * 100) + '%' }"></div></div>
+    <div class="lt-progress"><div class="lt-progress-fill" :style="{ width: (light.slotIdx.value / 288) * 100 + '%' }"></div></div>
   </div>
 </template>
 
@@ -72,13 +151,17 @@ const testPhase = computed(() => {
 })
 
 const timeInput = ref('')
-watch(() => light?.slotIdx?.value, (idx) => {
-  if (idx == null) return
-  const totalMin = idx * 5
-  const h = Math.floor(totalMin / 60)
-  const m = totalMin % 60
-  timeInput.value = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-}, { immediate: true })
+watch(
+  () => light?.slotIdx?.value,
+  (idx) => {
+    if (idx == null) return
+    const totalMin = idx * 5
+    const h = Math.floor(totalMin / 60)
+    const m = totalMin % 60
+    timeInput.value = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+  },
+  { immediate: true },
+)
 
 const onTimeChange = () => {
   const [h, m] = timeInput.value.split(':').map(Number)
@@ -108,33 +191,102 @@ const onDateChange = () => {
   color: #fff;
   min-width: 280px;
 }
-.lt-header { display: flex; align-items: center; margin-bottom: 8px; gap: 6px; }
-.lt-title { font-size: 13px; font-weight: 600; opacity: 0.8; cursor: grab; user-select: none; white-space: nowrap; }
-.lt-title:active { cursor: grabbing; }
+.lt-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  gap: 6px;
+}
+.lt-title {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.8;
+  cursor: grab;
+  user-select: none;
+  white-space: nowrap;
+}
+.lt-title:active {
+  cursor: grabbing;
+}
 .lt-date-input {
-  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 8px; color: #fff; font-size: 12px; padding: 3px 6px; cursor: pointer;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 12px;
+  padding: 3px 6px;
+  cursor: pointer;
   color-scheme: dark;
 }
 .lt-time-input {
-  flex: 1; text-align: center;
-  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 8px; color: #fff; font-size: 18px; font-weight: 700;
-  font-variant-numeric: tabular-nums; padding: 4px 8px; cursor: pointer;
+  flex: 1;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 8px;
+  cursor: pointer;
   color-scheme: dark;
 }
-.lt-info { display: flex; gap: 12px; font-size: 11px; opacity: 0.7; margin-bottom: 6px; flex-wrap: wrap; }
-.lt-phase { color: #C9A876; font-weight: 600; }
-.lt-controls { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; }
-.lt-speed { display: flex; gap: 4px; justify-content: center; margin-bottom: 8px; }
-.lt-speed .lt-btn { padding: 3px 8px; font-size: 11px; }
-.lt-weather { display: flex; gap: 4px; justify-content: center; margin-bottom: 8px; flex-wrap: wrap; }
-.lt-sliders { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
-.lt-slider-row { display: flex; align-items: center; gap: 8px; font-size: 11px; opacity: 0.8; }
-.lt-slider { flex: 1; cursor: pointer; }
+.lt-info {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  opacity: 0.7;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.lt-phase {
+  color: #c9a876;
+  font-weight: 600;
+}
+.lt-controls {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+.lt-speed {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+.lt-speed .lt-btn {
+  padding: 3px 8px;
+  font-size: 11px;
+}
+.lt-weather {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.lt-sliders {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.lt-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  opacity: 0.8;
+}
+.lt-slider {
+  flex: 1;
+  cursor: pointer;
+}
 .lt-btn {
-  background: rgba(255,255,255,0.1);
-  border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
   color: #fff;
   padding: 5px 12px;
@@ -142,11 +294,32 @@ const onDateChange = () => {
   cursor: pointer;
   transition: background 0.2s;
 }
-.lt-btn:hover { background: rgba(255,255,255,0.2); }
-.lt-btn.active { background: rgba(255,200,100,0.3); border-color: rgba(255,200,100,0.5); }
-.lt-btn.lt-main { font-size: 17px; }
-.lt-btn.lt-reset { background: rgba(244,67,54,0.3); border-color: rgba(244,67,54,0.5); }
-.lt-btn.lt-reset:hover { background: rgba(244,67,54,0.5); }
-.lt-progress { height: 3px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
-.lt-progress-fill { height: 100%; background: linear-gradient(90deg, #C9A876, #A8483A); transition: width 0.2s; }
+.lt-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.lt-btn.active {
+  background: rgba(255, 200, 100, 0.3);
+  border-color: rgba(255, 200, 100, 0.5);
+}
+.lt-btn.lt-main {
+  font-size: 17px;
+}
+.lt-btn.lt-reset {
+  background: rgba(244, 67, 54, 0.3);
+  border-color: rgba(244, 67, 54, 0.5);
+}
+.lt-btn.lt-reset:hover {
+  background: rgba(244, 67, 54, 0.5);
+}
+.lt-progress {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.lt-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #c9a876, #a8483a);
+  transition: width 0.2s;
+}
 </style>

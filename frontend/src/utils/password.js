@@ -32,14 +32,7 @@ const randInt = (max) => {
  * @returns {string} 未勾选任何字符集时回退小写字母
  */
 export const generatePassword = (opts = {}) => {
-  const {
-    length = 16,
-    upper = true,
-    lower = true,
-    digit = true,
-    symbol = true,
-    noAmbiguous = false,
-  } = opts
+  const { length = 16, upper = true, lower = true, digit = true, symbol = true, noAmbiguous = false } = opts
   const strip = (s) => (noAmbiguous ? s.replace(AMBIGUOUS, '') : s)
   const pools = []
   if (lower) pools.push(strip(LOWER))

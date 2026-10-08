@@ -14,8 +14,8 @@ const token = (expOffsetSec) => {
   const seg = (o) => Buffer.from(JSON.stringify(o)).toString('base64url')
   return `${seg({ alg: 'HS512', typ: 'JWT' })}.${seg({ sub: '6', exp: Math.floor(Date.now() / 1000) + expOffsetSec })}.sig`
 }
-const EXPIRED = token(-60)          // access token 已过期
-const VALID = token(3600)           // 未过期
+const EXPIRED = token(-60) // access token 已过期
+const VALID = token(3600) // 未过期
 const REFRESH_OK = token(7 * 86400) // 刷新令牌仍在有效期
 
 // 假 adapter:记录每次真正发出的请求,直接回成功响应
@@ -32,7 +32,9 @@ beforeEach(() => {
   store.refresh.mockReset()
   store.logout.mockReset()
   // 续期成功:以新令牌替换过期令牌(与 stores/user.js 的 setToken 行为一致)
-  store.refresh.mockImplementation(async () => { store.token = VALID })
+  store.refresh.mockImplementation(async () => {
+    store.token = VALID
+  })
 })
 
 describe('请求预检续期', () => {

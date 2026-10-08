@@ -1,8 +1,12 @@
 <!-- 悬浮音乐播放器:整体可拖拽,展开/收缩带动画,左下角不动;播放当前家庭绑定的背景音乐歌单 -->
 <template>
-  <div v-if="playlist.length" class="music-player" :class="{ expanded }"
+  <div
+    v-if="playlist.length"
+    class="music-player"
+    :class="{ expanded }"
     :style="{ left: pos.x + 'px', bottom: pos.bottom + 'px' }"
-    @mousedown="onDragStart">
+    @mousedown="onDragStart"
+  >
     <!-- 黑胶可视化 + 展开切换 -->
     <div v-a11y-click class="player-left" @click.stop="expanded = !expanded">
       <div class="vinyl" :class="{ playing }">
@@ -17,47 +21,52 @@
     <!-- 展开内容:歌名+控件+进度条+歌单(带收缩动画) -->
     <transition name="player-expand">
       <div v-show="expanded" class="player-body" @click.stop>
-      <div class="track-info">
-        <div class="track-title" :title="currentTrack.title">{{ currentTrack.title || t('music.unknownTrack') }}</div>
-        <div class="track-sub">{{ playing ? t('music.playerPlaying') : t('music.playerPaused') }}</div>
-      </div>
-
-      <!-- 进度条 -->
-      <div class="progress-row">
-        <span class="time">{{ formatTime(currentTime) }}</span>
-        <div v-a11y-click class="progress-bar" @click="onSeek">
-          <div class="progress-buffered" :style="{ width: bufferedPct + '%' }"></div>
-          <div class="progress-played" :style="{ width: playedPct + '%' }"></div>
+        <div class="track-info">
+          <div class="track-title" :title="currentTrack.title">{{ currentTrack.title || t('music.unknownTrack') }}</div>
+          <div class="track-sub">{{ playing ? t('music.playerPlaying') : t('music.playerPaused') }}</div>
         </div>
-        <span class="time">{{ formatTime(duration) }}</span>
-      </div>
 
-      <!-- 控件 -->
-      <div class="controls">
-        <button class="ctrl-btn" @click="prev" :title="t('music.prevTrack')"><el-icon><CaretLeft /></el-icon></button>
-        <button class="ctrl-btn ctrl-main" @click="togglePlay" :title="playing ? t('music.pauseToggle') : t('music.playToggle')">
-          <el-icon><VideoPause v-if="playing" /><VideoPlay v-else /></el-icon>
-        </button>
-        <button class="ctrl-btn" @click="next" :title="t('music.nextTrack')"><el-icon><CaretRight /></el-icon></button>
-        <button class="ctrl-btn ctrl-list" @click="showList = !showList" :title="t('music.playlists')">
-          <el-icon><List /></el-icon>
-        </button>
-      </div>
-
-      <!-- 歌单 -->
-      <div v-if="showList" class="playlist">
-        <div v-a11y-click
-          v-for="(t, i) in playlist"
-          :key="t.id || i"
-          class="playlist-item"
-          :class="{ active: i === trackIdx }"
-          @click="selectTrack(i)"
-        >
-          <span class="pl-idx">{{ i + 1 }}</span>
-          <span class="pl-title" :title="t.title">{{ t.title || t('music.unknownTrack') }}</span>
-          <el-icon v-if="i === trackIdx && playing" class="pl-playing"><VideoPlay /></el-icon>
+        <!-- 进度条 -->
+        <div class="progress-row">
+          <span class="time">{{ formatTime(currentTime) }}</span>
+          <div v-a11y-click class="progress-bar" @click="onSeek">
+            <div class="progress-buffered" :style="{ width: bufferedPct + '%' }"></div>
+            <div class="progress-played" :style="{ width: playedPct + '%' }"></div>
+          </div>
+          <span class="time">{{ formatTime(duration) }}</span>
         </div>
-      </div>
+
+        <!-- 控件 -->
+        <div class="controls">
+          <button class="ctrl-btn" @click="prev" :title="t('music.prevTrack')">
+            <el-icon><CaretLeft /></el-icon>
+          </button>
+          <button class="ctrl-btn ctrl-main" @click="togglePlay" :title="playing ? t('music.pauseToggle') : t('music.playToggle')">
+            <el-icon><VideoPause v-if="playing" /><VideoPlay v-else /></el-icon>
+          </button>
+          <button class="ctrl-btn" @click="next" :title="t('music.nextTrack')">
+            <el-icon><CaretRight /></el-icon>
+          </button>
+          <button class="ctrl-btn ctrl-list" @click="showList = !showList" :title="t('music.playlists')">
+            <el-icon><List /></el-icon>
+          </button>
+        </div>
+
+        <!-- 歌单 -->
+        <div v-if="showList" class="playlist">
+          <div
+            v-a11y-click
+            v-for="(t, i) in playlist"
+            :key="t.id || i"
+            class="playlist-item"
+            :class="{ active: i === trackIdx }"
+            @click="selectTrack(i)"
+          >
+            <span class="pl-idx">{{ i + 1 }}</span>
+            <span class="pl-title" :title="t.title">{{ t.title || t('music.unknownTrack') }}</span>
+            <el-icon v-if="i === trackIdx && playing" class="pl-playing"><VideoPlay /></el-icon>
+          </div>
+        </div>
       </div>
     </transition>
 
@@ -108,7 +117,7 @@ const onDragStart = (e) => {
   let moved = false
   const onMove = (ev) => {
     const dx = ev.clientX - startX - pos.value.x
-    const dy = (window.innerHeight - ev.clientY - startBottom) - pos.value.bottom
+    const dy = window.innerHeight - ev.clientY - startBottom - pos.value.bottom
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true
     let x = ev.clientX - startX
     let bottom = window.innerHeight - ev.clientY - startBottom
@@ -124,7 +133,11 @@ const onDragStart = (e) => {
       // 在捕获阶段吞掉紧随其后的这一次 click,用完自摘(不留常驻监听)
       ev.stopPropagation()
       ev.preventDefault()
-      const blocker = (e) => { e.stopPropagation(); e.preventDefault(); document.removeEventListener('click', blocker, true) }
+      const blocker = (e) => {
+        e.stopPropagation()
+        e.preventDefault()
+        document.removeEventListener('click', blocker, true)
+      }
       document.addEventListener('click', blocker, true)
       localStorage.setItem('ihomy:music:pos', JSON.stringify(pos.value))
     }
@@ -134,29 +147,42 @@ const onDragStart = (e) => {
 }
 
 const currentTrack = computed(() => playlist.value[trackIdx.value] || {})
-const playedPct = computed(() => duration.value ? (currentTime.value / duration.value) * 100 : 0)
-const bufferedPct = computed(() => duration.value ? (buffered.value / duration.value) * 100 : 0)
+const playedPct = computed(() => (duration.value ? (currentTime.value / duration.value) * 100 : 0))
+const bufferedPct = computed(() => (duration.value ? (buffered.value / duration.value) * 100 : 0))
 
 // 播放地址:设备映射曲目 url 为 storage:// 逻辑地址,切歌时现签(签名 10 分钟过期);本地/外链直用
 const playSrc = ref('')
-watch(currentTrack, async (track) => {
-  if (!track?.url) { playSrc.value = ''; return }
-  if (!String(track.url).startsWith('storage://')) { playSrc.value = track.url; return }
-  const id = track.id
-  try {
-    const { url } = await musicApi.playUrl(id)
-    if (currentTrack.value?.id === id) playSrc.value = url  // 防快速切歌竞态
-  } catch {
-    if (currentTrack.value?.id === id) playSrc.value = ''
-  }
-}, { immediate: true })
+watch(
+  currentTrack,
+  async (track) => {
+    if (!track?.url) {
+      playSrc.value = ''
+      return
+    }
+    if (!String(track.url).startsWith('storage://')) {
+      playSrc.value = track.url
+      return
+    }
+    const id = track.id
+    try {
+      const { url } = await musicApi.playUrl(id)
+      if (currentTrack.value?.id === id) playSrc.value = url // 防快速切歌竞态
+    } catch {
+      if (currentTrack.value?.id === id) playSrc.value = ''
+    }
+  },
+  { immediate: true },
+)
 
 const loadBackgroundPlaylist = async () => {
-  if (!userStore.isLoggedIn) { playlist.value = []; return }
+  if (!userStore.isLoggedIn) {
+    playlist.value = []
+    return
+  }
   try {
     const data = await musicApi.getBackground()
     const tracks = data?.tracks || []
-    playlist.value = tracks.filter(t => t && t.url)
+    playlist.value = tracks.filter((t) => t && t.url)
     if (trackIdx.value >= playlist.value.length) trackIdx.value = 0
     if (playlist.value.length) {
       await nextTick()
@@ -173,7 +199,14 @@ const togglePlay = () => {
     audioEl.value.pause()
     playing.value = false
   } else {
-    audioEl.value.play().then(() => { playing.value = true }).catch(() => { playing.value = false })
+    audioEl.value
+      .play()
+      .then(() => {
+        playing.value = true
+      })
+      .catch(() => {
+        playing.value = false
+      })
   }
 }
 
@@ -196,7 +229,14 @@ const playAfterSwitch = () => {
   playing.value = false
   nextTick(() => {
     if (wasPlaying && audioEl.value) {
-      audioEl.value.play().then(() => { playing.value = true }).catch(() => { playing.value = false })
+      audioEl.value
+        .play()
+        .then(() => {
+          playing.value = true
+        })
+        .catch(() => {
+          playing.value = false
+        })
     }
   })
 }
@@ -252,20 +292,27 @@ onMounted(loadBackgroundPlaylist)
   -webkit-backdrop-filter: blur(24px) saturate(1.3);
   border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: 20px;
-  box-shadow: 0 12px 40px rgba(58, 46, 34, 0.18), 0 2px 8px rgba(58, 46, 34, 0.08),
-              inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -1px 0 rgba(58, 46, 34, 0.04);
+  box-shadow:
+    0 12px 40px rgba(58, 46, 34, 0.18),
+    0 2px 8px rgba(58, 46, 34, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -1px 0 rgba(58, 46, 34, 0.04);
   overflow: hidden;
   cursor: grab;
   user-select: none;
   contain: layout style;
   transform: translateZ(0);
 }
-.music-player:active { cursor: grabbing; }
+.music-player:active {
+  cursor: grabbing;
+}
 html.dark .music-player {
   background: rgba(var(--color-card-rgb), 0.65);
   border-color: rgba(255, 255, 255, 0.12);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3),
-              inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .player-left {
@@ -273,7 +320,9 @@ html.dark .music-player {
   cursor: grab;
   flex-shrink: 0;
 }
-.player-left:active { cursor: grabbing; }
+.player-left:active {
+  cursor: grabbing;
+}
 
 /* 黑胶可视化 */
 .vinyl {
@@ -282,14 +331,18 @@ html.dark .music-player {
   height: 56px;
   transition: transform 0.3s ease;
 }
-.music-player:hover .vinyl { transform: scale(1.05); }
+.music-player:hover .vinyl {
+  transform: scale(1.05);
+}
 .vinyl-disc {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: radial-gradient(circle, #3A2E22 0%, #1A1410 30%, #2A2018 60%, #1A1410 100%);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 0 10px rgba(0,0,0,0.5);
-  border: 1px solid #5C4332;
+  background: radial-gradient(circle, #3a2e22 0%, #1a1410 30%, #2a2018 60%, #1a1410 100%);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    inset 0 0 10px rgba(0, 0, 0, 0.5);
+  border: 1px solid #5c4332;
 }
 .vinyl-groove {
   position: absolute;
@@ -305,8 +358,8 @@ html.dark .music-player {
   height: 16px;
   margin: -8px 0 0 -8px;
   border-radius: 50%;
-  background: radial-gradient(circle, #A8483A 0%, #6B2E26 100%);
-  border: 1px solid #3A2E22;
+  background: radial-gradient(circle, #a8483a 0%, #6b2e26 100%);
+  border: 1px solid #3a2e22;
 }
 .vinyl-arm {
   position: absolute;
@@ -314,7 +367,7 @@ html.dark .music-player {
   right: 10px;
   width: 3px;
   height: 28px;
-  background: linear-gradient(to bottom, #C9A876, #8B6F47);
+  background: linear-gradient(to bottom, #c9a876, #8b6f47);
   border-radius: 2px;
   transform-origin: top center;
   transform: rotate(-15deg);
@@ -327,12 +380,20 @@ html.dark .music-player {
   left: -2px;
   width: 6px;
   height: 6px;
-  background: #C9A876;
+  background: #c9a876;
   border-radius: 50%;
 }
-.vinyl.playing .vinyl-disc { animation: spin 4s linear infinite; }
-.vinyl.playing .vinyl-arm { transform: rotate(15deg); }
-@keyframes spin { to { transform: rotate(360deg); } }
+.vinyl.playing .vinyl-disc {
+  animation: spin 4s linear infinite;
+}
+.vinyl.playing .vinyl-arm {
+  transform: rotate(15deg);
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 /* 展开内容 */
 .player-body {
@@ -352,19 +413,23 @@ html.dark .music-player {
 .track-title {
   font-size: 13px;
   font-weight: 600;
-  color: #3A2E22;
+  color: #3a2e22;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
 }
-html.dark .track-title { color: #E8DCC8; }
+html.dark .track-title {
+  color: #e8dcc8;
+}
 .track-sub {
   font-size: 11px;
-  color: #7A6B5A;
+  color: #7a6b5a;
   flex-shrink: 0;
 }
-html.dark .track-sub { color: #B0A898; }
+html.dark .track-sub {
+  color: #b0a898;
+}
 
 /* 进度条 */
 .progress-row {
@@ -374,12 +439,14 @@ html.dark .track-sub { color: #B0A898; }
 }
 .time {
   font-size: 10px;
-  color: #7A6B5A;
+  color: #7a6b5a;
   min-width: 28px;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
-html.dark .time { color: #B0A898; }
+html.dark .time {
+  color: #b0a898;
+}
 .progress-bar {
   flex: 1;
   height: 4px;
@@ -389,20 +456,24 @@ html.dark .time { color: #B0A898; }
   cursor: pointer;
   overflow: hidden;
 }
-html.dark .progress-bar { background: rgba(232, 220, 200, 0.1); }
+html.dark .progress-bar {
+  background: rgba(232, 220, 200, 0.1);
+}
 .progress-buffered {
   position: absolute;
   inset: 0;
   background: rgba(58, 46, 34, 0.12);
   border-radius: 2px;
 }
-html.dark .progress-buffered { background: rgba(232, 220, 200, 0.12); }
+html.dark .progress-buffered {
+  background: rgba(232, 220, 200, 0.12);
+}
 .progress-played {
   position: absolute;
   top: 0;
   left: 0;
   bottom: 0;
-  background: linear-gradient(to right, #A8483A, #C9A876);
+  background: linear-gradient(to right, #a8483a, #c9a876);
   border-radius: 2px;
   transition: width 0.1s linear;
 }
@@ -420,7 +491,7 @@ html.dark .progress-buffered { background: rgba(232, 220, 200, 0.12); }
   border: none;
   background: rgba(58, 46, 34, 0.06);
   border-radius: 50%;
-  color: #3A2E22;
+  color: #3a2e22;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -429,25 +500,29 @@ html.dark .progress-buffered { background: rgba(232, 220, 200, 0.12); }
 }
 html.dark .ctrl-btn {
   background: rgba(232, 220, 200, 0.08);
-  color: #E8DCC8;
+  color: #e8dcc8;
 }
 .ctrl-btn:hover {
   background: rgba(58, 46, 34, 0.12);
   transform: scale(1.1);
 }
-html.dark .ctrl-btn:hover { background: rgba(232, 220, 200, 0.15); }
+html.dark .ctrl-btn:hover {
+  background: rgba(232, 220, 200, 0.15);
+}
 .ctrl-main {
   width: 36px;
   height: 36px;
-  background: linear-gradient(135deg, #A8483A, #6B2E26);
-  color: #F5EFE0;
+  background: linear-gradient(135deg, #a8483a, #6b2e26);
+  color: #f5efe0;
   box-shadow: 0 4px 12px rgba(168, 72, 58, 0.3);
 }
 .ctrl-main:hover {
-  background: linear-gradient(135deg, #B8584A, #7B3E36);
+  background: linear-gradient(135deg, #b8584a, #7b3e36);
   transform: scale(1.1);
 }
-.ctrl-list { margin-left: 4px; }
+.ctrl-list {
+  margin-left: 4px;
+}
 
 /* 歌单 */
 .playlist {
@@ -457,7 +532,9 @@ html.dark .ctrl-btn:hover { background: rgba(232, 220, 200, 0.15); }
   padding-top: 6px;
   margin-top: 2px;
 }
-html.dark .playlist { border-top-color: rgba(232, 220, 200, 0.08); }
+html.dark .playlist {
+  border-top-color: rgba(232, 220, 200, 0.08);
+}
 .playlist-item {
   display: flex;
   align-items: center;
@@ -466,20 +543,26 @@ html.dark .playlist { border-top-color: rgba(232, 220, 200, 0.08); }
   border-radius: 6px;
   cursor: pointer;
   font-size: 12px;
-  color: #3A2E22;
+  color: #3a2e22;
   transition: background 0.15s;
 }
-html.dark .playlist-item { color: #E8DCC8; }
-.playlist-item:hover { background: rgba(58, 46, 34, 0.06); }
-html.dark .playlist-item:hover { background: rgba(232, 220, 200, 0.06); }
+html.dark .playlist-item {
+  color: #e8dcc8;
+}
+.playlist-item:hover {
+  background: rgba(58, 46, 34, 0.06);
+}
+html.dark .playlist-item:hover {
+  background: rgba(232, 220, 200, 0.06);
+}
 .playlist-item.active {
   background: rgba(168, 72, 58, 0.1);
-  color: #A8483A;
+  color: #a8483a;
   font-weight: 600;
 }
 html.dark .playlist-item.active {
   background: rgba(168, 72, 58, 0.2);
-  color: #D4886A;
+  color: #d4886a;
 }
 .pl-idx {
   width: 18px;
@@ -495,16 +578,23 @@ html.dark .playlist-item.active {
 }
 .pl-playing {
   font-size: 12px;
-  color: #A8483A;
+  color: #a8483a;
 }
 
 /* 滚动条 */
-.playlist::-webkit-scrollbar { width: 4px; }
-.playlist::-webkit-scrollbar-thumb { background: rgba(58, 46, 34, 0.15); border-radius: 2px; }
+.playlist::-webkit-scrollbar {
+  width: 4px;
+}
+.playlist::-webkit-scrollbar-thumb {
+  background: rgba(58, 46, 34, 0.15);
+  border-radius: 2px;
+}
 
 /* 移动端 */
 @media (max-width: 768px) {
-  .player-body { width: 240px; }
+  .player-body {
+    width: 240px;
+  }
 }
 
 /* 展开/收缩动画:以左下角为锚点,body 从右侧长出/缩回 */
@@ -518,13 +608,29 @@ html.dark .playlist-item.active {
   animation-direction: reverse;
 }
 @keyframes player-expand {
-  0% { opacity: 0; transform: scaleX(0); width: 0; }
-  100% { opacity: 1; transform: scaleX(1); width: 280px; }
+  0% {
+    opacity: 0;
+    transform: scaleX(0);
+    width: 0;
+  }
+  100% {
+    opacity: 1;
+    transform: scaleX(1);
+    width: 280px;
+  }
 }
 @media (max-width: 768px) {
   @keyframes player-expand {
-    0% { opacity: 0; transform: scaleX(0); width: 0; }
-    100% { opacity: 1; transform: scaleX(1); width: 240px; }
+    0% {
+      opacity: 0;
+      transform: scaleX(0);
+      width: 0;
+    }
+    100% {
+      opacity: 1;
+      transform: scaleX(1);
+      width: 240px;
+    }
   }
 }
 </style>

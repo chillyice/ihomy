@@ -16,14 +16,7 @@
       </div>
     </PageToolbar>
 
-    <el-alert
-      v-if="inputError"
-      :title="inputError"
-      type="warning"
-      :closable="false"
-      show-icon
-      class="lc-alert"
-    />
+    <el-alert v-if="inputError" :title="inputError" type="warning" :closable="false" show-icon class="lc-alert" />
 
     <div v-if="tab !== 'rec'" class="lc-layout">
       <!-- 左:参数 -->
@@ -43,7 +36,9 @@
           <!-- 单一贷款:总额 + 利率 -->
           <template v-if="!isCombined">
             <div class="lc-field">
-              <label>{{ $t('tools.loan.totalAmount') }}<span class="lc-unit">{{ $t('tools.loan.wanUnit') }}</span></label>
+              <label
+                >{{ $t('tools.loan.totalAmount') }}<span class="lc-unit">{{ $t('tools.loan.wanUnit') }}</span></label
+              >
               <el-input-number
                 v-model="form.amount"
                 :min="0"
@@ -55,16 +50,11 @@
               />
             </div>
             <div class="lc-field">
-              <label>{{ isFund ? $t('tools.loan.fundRate') : $t('tools.loan.commercialRate') }}<span class="lc-unit">{{ $t('tools.loan.percentUnit') }}</span></label>
-              <el-input-number
-                v-model="singleRate"
-                :min="0"
-                :max="36"
-                :step="0.05"
-                :precision="4"
-                :controls="false"
-                style="width: 100%"
-              />
+              <label
+                >{{ isFund ? $t('tools.loan.fundRate') : $t('tools.loan.commercialRate')
+                }}<span class="lc-unit">{{ $t('tools.loan.percentUnit') }}</span></label
+              >
+              <el-input-number v-model="singleRate" :min="0" :max="36" :step="0.05" :precision="4" :controls="false" style="width: 100%" />
               <span class="lc-hint">{{ $t('tools.loan.rateHint') }}</span>
             </div>
           </template>
@@ -72,7 +62,9 @@
           <!-- 组合贷款:商贷 + 公积金 -->
           <template v-else>
             <div class="lc-field">
-              <label>{{ $t('tools.loan.commercialAmount') }}<span class="lc-unit">{{ $t('tools.loan.wanUnit') }}</span></label>
+              <label
+                >{{ $t('tools.loan.commercialAmount') }}<span class="lc-unit">{{ $t('tools.loan.wanUnit') }}</span></label
+              >
               <el-input-number
                 v-model="form.commercialAmount"
                 :min="0"
@@ -84,7 +76,9 @@
               />
             </div>
             <div class="lc-field">
-              <label>{{ $t('tools.loan.commercialRate') }}<span class="lc-unit">{{ $t('tools.loan.percentUnit') }}</span></label>
+              <label
+                >{{ $t('tools.loan.commercialRate') }}<span class="lc-unit">{{ $t('tools.loan.percentUnit') }}</span></label
+              >
               <el-input-number
                 v-model="form.commercialRate"
                 :min="0"
@@ -96,7 +90,9 @@
               />
             </div>
             <div class="lc-field">
-              <label>{{ $t('tools.loan.fundAmount') }}<span class="lc-unit">{{ $t('tools.loan.wanUnit') }}</span></label>
+              <label
+                >{{ $t('tools.loan.fundAmount') }}<span class="lc-unit">{{ $t('tools.loan.wanUnit') }}</span></label
+              >
               <el-input-number
                 v-model="form.fundAmount"
                 :min="0"
@@ -108,7 +104,9 @@
               />
             </div>
             <div class="lc-field">
-              <label>{{ $t('tools.loan.fundRate') }}<span class="lc-unit">{{ $t('tools.loan.percentUnit') }}</span></label>
+              <label
+                >{{ $t('tools.loan.fundRate') }}<span class="lc-unit">{{ $t('tools.loan.percentUnit') }}</span></label
+              >
               <el-input-number
                 v-model="form.fundRate"
                 :min="0"
@@ -121,22 +119,22 @@
               <span class="lc-hint">{{ $t('tools.loan.rateHint') }}</span>
             </div>
             <div class="lc-mini">
-              <div><span>{{ $t('tools.loan.combinedTotal') }}</span><b>{{ money(combinedTotalWan, 2) }} {{ $t('tools.loan.wanShort') }}</b></div>
-              <div><span>{{ $t('tools.loan.months') }}</span><b>{{ months }} {{ $t('tools.loan.periodUnit') }}</b></div>
+              <div>
+                <span>{{ $t('tools.loan.combinedTotal') }}</span
+                ><b>{{ money(combinedTotalWan, 2) }} {{ $t('tools.loan.wanShort') }}</b>
+              </div>
+              <div>
+                <span>{{ $t('tools.loan.months') }}</span
+                ><b>{{ months }} {{ $t('tools.loan.periodUnit') }}</b>
+              </div>
             </div>
           </template>
 
           <div class="lc-field">
-            <label>{{ $t('tools.loan.years') }}<span class="lc-unit">{{ $t('tools.loan.yearUnit') }}</span></label>
-            <el-input-number
-              v-model="form.years"
-              :min="1"
-              :max="40"
-              :step="1"
-              :precision="0"
-              :controls="false"
-              style="width: 100%"
-            />
+            <label
+              >{{ $t('tools.loan.years') }}<span class="lc-unit">{{ $t('tools.loan.yearUnit') }}</span></label
+            >
+            <el-input-number v-model="form.years" :min="1" :max="40" :step="1" :precision="0" :controls="false" style="width: 100%" />
             <div class="lc-quick">
               <button v-for="y in YEARS_QUICK" :key="y" type="button" :class="{ on: form.years === y }" @click="form.years = y">
                 {{ y }}{{ $t('tools.loan.yearShort') }}
@@ -159,29 +157,17 @@
           <div class="section-label">{{ $t('tools.loan.solveParams') }}</div>
 
           <div class="lc-field">
-            <label>{{ $t('tools.loan.totalAmount') }}<span class="lc-unit">{{ $t('tools.loan.wanUnit') }}</span></label>
-            <el-input-number
-              v-model="solve.amount"
-              :min="0"
-              :max="99999"
-              :step="10"
-              :precision="2"
-              :controls="false"
-              style="width: 100%"
-            />
+            <label
+              >{{ $t('tools.loan.totalAmount') }}<span class="lc-unit">{{ $t('tools.loan.wanUnit') }}</span></label
+            >
+            <el-input-number v-model="solve.amount" :min="0" :max="99999" :step="10" :precision="2" :controls="false" style="width: 100%" />
           </div>
 
           <div class="lc-field">
-            <label>{{ $t('tools.loan.years') }}<span class="lc-unit">{{ $t('tools.loan.yearUnit') }}</span></label>
-            <el-input-number
-              v-model="solve.years"
-              :min="1"
-              :max="40"
-              :step="1"
-              :precision="0"
-              :controls="false"
-              style="width: 100%"
-            />
+            <label
+              >{{ $t('tools.loan.years') }}<span class="lc-unit">{{ $t('tools.loan.yearUnit') }}</span></label
+            >
+            <el-input-number v-model="solve.years" :min="1" :max="40" :step="1" :precision="0" :controls="false" style="width: 100%" />
             <div class="lc-quick">
               <button v-for="y in YEARS_QUICK" :key="y" type="button" :class="{ on: solve.years === y }" @click="solve.years = y">
                 {{ y }}{{ $t('tools.loan.yearShort') }}
@@ -194,14 +180,7 @@
               {{ isSolvePrincipal ? $t('tools.loan.solveFirstPayment') : $t('tools.loan.solvePayment') }}
               <span class="lc-unit">{{ $t('tools.loan.yuanUnit') }}</span>
             </label>
-            <el-input-number
-              v-model="solve.payment"
-              :min="0"
-              :step="100"
-              :precision="2"
-              :controls="false"
-              style="width: 100%"
-            />
+            <el-input-number v-model="solve.payment" :min="0" :step="100" :precision="2" :controls="false" style="width: 100%" />
             <span class="lc-hint">
               {{ isSolvePrincipal ? $t('tools.loan.solveFirstPaymentHint') : $t('tools.loan.solvePaymentHint') }}
             </span>
@@ -209,15 +188,10 @@
 
           <!-- 首期与后续不同(放款日到首期还款日不足/超过整月)时,照账单补两个选填项 -->
           <div class="lc-field">
-            <label>{{ $t('tools.loan.solveFirstPaymentOpt') }}<span class="lc-unit">{{ $t('tools.loan.yuanUnit') }}</span></label>
-            <el-input-number
-              v-model="solve.firstPayment"
-              :min="0"
-              :step="100"
-              :precision="2"
-              :controls="false"
-              style="width: 100%"
-            />
+            <label
+              >{{ $t('tools.loan.solveFirstPaymentOpt') }}<span class="lc-unit">{{ $t('tools.loan.yuanUnit') }}</span></label
+            >
+            <el-input-number v-model="solve.firstPayment" :min="0" :step="100" :precision="2" :controls="false" style="width: 100%" />
             <div class="lc-field lc-solve-days">
               <label>{{ $t('tools.loan.solveFirstDays') }}</label>
               <el-input-number
@@ -248,7 +222,9 @@
           <div class="section-label">{{ $t('tools.loan.prepayParams') }}</div>
 
           <div class="lc-field">
-            <label>{{ $t('tools.loan.paidPeriods') }}<span class="lc-unit">{{ $t('tools.loan.monthUnit') }}</span></label>
+            <label
+              >{{ $t('tools.loan.paidPeriods') }}<span class="lc-unit">{{ $t('tools.loan.monthUnit') }}</span></label
+            >
             <el-input-number
               v-model="prepay.paidMonths"
               :min="0"
@@ -262,15 +238,10 @@
           </div>
 
           <div class="lc-field">
-            <label>{{ $t('tools.loan.prepayAmount') }}<span class="lc-unit">{{ $t('tools.loan.yuanUnit') }}</span></label>
-            <el-input-number
-              v-model="prepay.amount"
-              :min="0"
-              :step="10000"
-              :precision="2"
-              :controls="false"
-              style="width: 100%"
-            />
+            <label
+              >{{ $t('tools.loan.prepayAmount') }}<span class="lc-unit">{{ $t('tools.loan.yuanUnit') }}</span></label
+            >
+            <el-input-number v-model="prepay.amount" :min="0" :step="10000" :precision="2" :controls="false" style="width: 100%" />
             <div class="lc-quick">
               <button v-for="q in QUICK_PREPAY" :key="q.value" type="button" @click="prepay.amount = q.value">
                 {{ $t('tools.loan.' + q.key) }}
@@ -292,10 +263,22 @@
           </div>
 
           <div v-if="prepayResult.valid" class="lc-mini">
-            <div><span>{{ $t('tools.loan.paidPrincipal') }}</span><b>{{ money(prepayResult.paid.principal) }}</b></div>
-            <div><span>{{ $t('tools.loan.paidInterest') }}</span><b>{{ money(prepayResult.paid.interest) }}</b></div>
-            <div v-if="isCombined"><span>{{ $t('tools.loan.splitCommercial') }}</span><b>{{ money(prepayResult.alloc.commercial || 0) }}</b></div>
-            <div v-if="isCombined"><span>{{ $t('tools.loan.splitFund') }}</span><b>{{ money(prepayResult.alloc.fund || 0) }}</b></div>
+            <div>
+              <span>{{ $t('tools.loan.paidPrincipal') }}</span
+              ><b>{{ money(prepayResult.paid.principal) }}</b>
+            </div>
+            <div>
+              <span>{{ $t('tools.loan.paidInterest') }}</span
+              ><b>{{ money(prepayResult.paid.interest) }}</b>
+            </div>
+            <div v-if="isCombined">
+              <span>{{ $t('tools.loan.splitCommercial') }}</span
+              ><b>{{ money(prepayResult.alloc.commercial || 0) }}</b>
+            </div>
+            <div v-if="isCombined">
+              <span>{{ $t('tools.loan.splitFund') }}</span
+              ><b>{{ money(prepayResult.alloc.fund || 0) }}</b>
+            </div>
           </div>
         </div>
       </div>
@@ -368,7 +351,9 @@
               <div class="lc-tile">
                 <span>{{ $t('tools.loan.originalTotalInterest') }}</span>
                 <b>{{ money(prepayResult.baseline.totalInterest) }}</b>
-                <em>{{ $t('tools.loan.paidPlusLeft', { a: money(prepayResult.paid.interest), b: money(prepayResult.remaining.interest) }) }}</em>
+                <em>{{
+                  $t('tools.loan.paidPlusLeft', { a: money(prepayResult.paid.interest), b: money(prepayResult.remaining.interest) })
+                }}</em>
               </div>
             </div>
             <p v-if="prepayResult.prepayZero" class="lc-hint lc-hint-block">{{ $t('tools.loan.prepayZeroHint') }}</p>
@@ -402,8 +387,14 @@
               </div>
             </div>
             <div class="lc-mini">
-              <div><span>{{ $t('tools.loan.surfaceRate') }}</span><b>{{ rate(solveResult.surfaceRate) }}%</b></div>
-              <div><span>{{ $t('tools.loan.checkPayment') }}</span><b>{{ money(solveResult.checkPayment) }}</b></div>
+              <div>
+                <span>{{ $t('tools.loan.surfaceRate') }}</span
+                ><b>{{ rate(solveResult.surfaceRate) }}%</b>
+              </div>
+              <div>
+                <span>{{ $t('tools.loan.checkPayment') }}</span
+                ><b>{{ money(solveResult.checkPayment) }}</b>
+              </div>
             </div>
             <p class="lc-hint lc-hint-block">{{ $t('tools.loan.solveExplain') }}</p>
           </template>
@@ -431,7 +422,9 @@
           <template #default="{ row }">
             <div>{{ row.periods > 0 ? money(row.payment) : '—' }}</div>
             <span v-if="row.decrease > 0" class="lc-sub">{{ $t('tools.loan.decreasePerMonth', { v: money(row.decrease) }) }}</span>
-            <span v-else-if="row.monthlySaved > 0 && row.periods > 0" class="lc-sub">{{ $t('tools.loan.monthlySaved', { v: money(row.monthlySaved) }) }}</span>
+            <span v-else-if="row.monthlySaved > 0 && row.periods > 0" class="lc-sub">{{
+              $t('tools.loan.monthlySaved', { v: money(row.monthlySaved) })
+            }}</span>
           </template>
         </el-table-column>
         <el-table-column :label="$t('tools.loan.colPeriodsLeft')" min-width="118" align="right">
@@ -499,7 +492,9 @@
         <el-table-column :label="$t('tools.loan.colFirstPayment')" min-width="118" align="right">
           <template #default="{ row }">
             <div>{{ row.periods > 0 ? money(row.firstPayment) : '—' }}</div>
-            <span v-if="row.monthlyDecrease > 0" class="lc-sub">{{ $t('tools.loan.decreasePerMonth', { v: money(row.monthlyDecrease) }) }}</span>
+            <span v-if="row.monthlyDecrease > 0" class="lc-sub">{{
+              $t('tools.loan.decreasePerMonth', { v: money(row.monthlyDecrease) })
+            }}</span>
           </template>
         </el-table-column>
         <el-table-column :label="$t('tools.loan.remainingPeriods')" width="104" align="right">
@@ -792,9 +787,18 @@ const yearlyRows = computed(() => {
 })
 
 // 任何参数变化都回到第一页,避免停留在超出范围的页码上
-watch(viewRows, () => { page.value = 1 })
-watch(pageSize, () => { page.value = 1 })
-watch(() => form.type, () => { if (!isCombined.value) prepay.alloc = PREPAY_ALLOC.PROPORTION })
+watch(viewRows, () => {
+  page.value = 1
+})
+watch(pageSize, () => {
+  page.value = 1
+})
+watch(
+  () => form.type,
+  () => {
+    if (!isCombined.value) prepay.alloc = PREPAY_ALLOC.PROPORTION
+  },
+)
 
 const money = (v, digits = 2) => formatYuan(v, digits)
 const percent = (v) => `${((Number(v) || 0) * 100).toFixed(2)}%`
@@ -812,22 +816,41 @@ function resetForm() {
 </script>
 
 <style scoped>
-.lc-alert { margin-bottom: 12px; }
+.lc-alert {
+  margin-bottom: 12px;
+}
 .lc-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
-.lc-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-.lc-card { padding: 18px 20px; }
-.lc-card .section-label { margin-bottom: 14px; }
-.lc-block { margin-top: 16px; }
+.lc-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.lc-card {
+  padding: 18px 20px;
+}
+.lc-card .section-label {
+  margin-bottom: 14px;
+}
+.lc-block {
+  margin-top: 16px;
+}
 
 /* ---- 表单 ---- */
-.lc-field { margin-bottom: 16px; }
-.lc-field-last { margin-bottom: 0; }
-.lc-solve-days { margin: 12px 0 0; }
+.lc-field {
+  margin-bottom: 16px;
+}
+.lc-field-last {
+  margin-bottom: 0;
+}
+.lc-solve-days {
+  margin: 12px 0 0;
+}
 .lc-field > label {
   display: block;
   font-size: 13px;
@@ -835,7 +858,9 @@ function resetForm() {
   color: var(--color-text-secondary, #7a6b5a);
   margin-bottom: 6px;
 }
-.lc-unit { font-weight: 400; }
+.lc-unit {
+  font-weight: 400;
+}
 .lc-hint {
   display: block;
   margin-top: 6px;
@@ -843,9 +868,18 @@ function resetForm() {
   line-height: 1.6;
   color: var(--color-text-secondary, #7a6b5a);
 }
-.lc-hint-block { margin: 0; }
-.lc-hint-inline { margin: 0; }
-.lc-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.lc-hint-block {
+  margin: 0;
+}
+.lc-hint-inline {
+  margin: 0;
+}
+.lc-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
 .lc-quick button {
   height: 26px;
   padding: 0 10px;
@@ -855,10 +889,19 @@ function resetForm() {
   color: var(--color-text-secondary, #7a6b5a);
   font-size: 12px;
   cursor: pointer;
-  transition: color 0.2s, border-color 0.2s;
+  transition:
+    color 0.2s,
+    border-color 0.2s;
 }
-.lc-quick button:hover { color: var(--color-brand); border-color: var(--color-brand); }
-.lc-quick button.on { color: var(--color-brand); border-color: var(--color-brand); background: rgba(var(--color-brand-rgb), 0.1); }
+.lc-quick button:hover {
+  color: var(--color-brand);
+  border-color: var(--color-brand);
+}
+.lc-quick button.on {
+  color: var(--color-brand);
+  border-color: var(--color-brand);
+  background: rgba(var(--color-brand-rgb), 0.1);
+}
 
 /* ---- 概览磁贴 ---- */
 .lc-tiles {
@@ -872,7 +915,11 @@ function resetForm() {
   background: var(--color-card-2, #e8dec8);
   min-width: 0;
 }
-.lc-tile span { display: block; font-size: 12px; color: var(--color-text-secondary, #7a6b5a); }
+.lc-tile span {
+  display: block;
+  font-size: 12px;
+  color: var(--color-text-secondary, #7a6b5a);
+}
 .lc-tile b {
   display: block;
   margin-top: 4px;
@@ -888,8 +935,12 @@ function resetForm() {
   font-style: normal;
   color: var(--color-text-secondary, #7a6b5a);
 }
-.lc-tile.emph { background: rgba(var(--color-brand-rgb), 0.16); }
-.lc-tile.emph b { color: var(--color-accent, #a8483a); }
+.lc-tile.emph {
+  background: rgba(var(--color-brand-rgb), 0.16);
+}
+.lc-tile.emph b {
+  color: var(--color-accent, #a8483a);
+}
 
 /* ---- 参数/结果里的小结行 ---- */
 .lc-mini {
@@ -900,9 +951,22 @@ function resetForm() {
   padding-top: 12px;
   border-top: 1px dashed var(--color-border, rgba(58, 46, 34, 0.12));
 }
-.lc-mini div { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; min-width: 0; }
-.lc-mini span { color: var(--color-text-secondary, #7a6b5a); flex-shrink: 0; }
-.lc-mini b { color: var(--color-text, #3a2e22); font-weight: 600; word-break: break-all; }
+.lc-mini div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  min-width: 0;
+}
+.lc-mini span {
+  color: var(--color-text-secondary, #7a6b5a);
+  flex-shrink: 0;
+}
+.lc-mini b {
+  color: var(--color-text, #3a2e22);
+  font-weight: 600;
+  word-break: break-all;
+}
 
 /* ---- 卡片头 ---- */
 .lc-head {
@@ -912,32 +976,72 @@ function resetForm() {
   gap: 12px;
   flex-wrap: wrap;
 }
-.lc-head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.lc-label-flat { margin-bottom: 0 !important; }
-.lc-head .lc-hint-inline { flex: 1; min-width: 180px; }
-.lc-part-table { margin-top: 16px; }
-.lc-part-table-block { margin: 0 0 14px; }
+.lc-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.lc-label-flat {
+  margin-bottom: 0 !important;
+}
+.lc-head .lc-hint-inline {
+  flex: 1;
+  min-width: 180px;
+}
+.lc-part-table {
+  margin-top: 16px;
+}
+.lc-part-table-block {
+  margin: 0 0 14px;
+}
 
 /* ---- 表格内小字 ---- */
-.lc-sub { display: block; font-size: 11px; line-height: 1.5; color: var(--color-text-secondary, #7a6b5a); }
-.lc-good { color: var(--color-brand, #b88c6e); }
-.lc-best { font-weight: 700; color: var(--color-accent, #a8483a); }
-.lc-pager { display: flex; justify-content: flex-end; margin-top: 12px; }
+.lc-sub {
+  display: block;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--color-text-secondary, #7a6b5a);
+}
+.lc-good {
+  color: var(--color-brand, #b88c6e);
+}
+.lc-best {
+  font-weight: 700;
+  color: var(--color-accent, #a8483a);
+}
+.lc-pager {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
 .lc-foot {
   margin: 12px 0 0;
   font-size: 12px;
   line-height: 1.7;
   color: var(--color-text-secondary, #7a6b5a);
 }
-.lc-card > .lc-foot:last-child { margin-top: 16px; }
+.lc-card > .lc-foot:last-child {
+  margin-top: 16px;
+}
 
 /* 表格数字右对齐后避免末尾空格挤字 */
-.lc-card :deep(.el-table .cell) { word-break: break-word; }
+.lc-card :deep(.el-table .cell) {
+  word-break: break-word;
+}
 
 @media (max-width: 920px) {
-  .lc-layout { grid-template-columns: minmax(0, 1fr); }
-  .lc-tiles { grid-template-columns: minmax(0, 1fr); }
-  .lc-mini { grid-template-columns: minmax(0, 1fr); }
-  .lc-head-actions { width: 100%; }
+  .lc-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lc-tiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lc-mini {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lc-head-actions {
+    width: 100%;
+  }
 }
 </style>

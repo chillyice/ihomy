@@ -44,25 +44,65 @@ const routes = [
   { path: '/chat', name: 'Chat', component: () => import('@/views/chat/Chat.vue'), meta: { requiresAuth: true } },
   { path: '/settings', name: 'Settings', component: () => import('@/views/Settings.vue'), meta: { requiresAuth: true } },
   // 百度网盘 OAuth 授权回调页(须与百度开放平台注册的「授权回调页地址」一致)
-  { path: '/storage/baidu/callback', name: 'BaiduCallback', component: () => import('@/views/storage/BaiduCallback.vue'), meta: { public: true } },
+  {
+    path: '/storage/baidu/callback',
+    name: 'BaiduCallback',
+    component: () => import('@/views/storage/BaiduCallback.vue'),
+    meta: { public: true },
+  },
   // 文件浏览:独立功能页,登录用户浏览/预览/下载存储设备文件(管理操作仅 OWNER)
   { path: '/storage/files', name: 'FileBrowse', component: () => import('@/views/storage/FileBrowse.vue'), meta: { requiresAuth: true } },
   { path: '/item', name: 'Item', component: () => import('@/views/item/Item.vue'), meta: { public: true } },
   { path: '/kitchen', name: 'Kitchen', component: () => import('@/views/kitchen/Kitchen.vue'), meta: { public: true } },
   { path: '/kitchen/ingredients', name: 'Ingredient', component: () => import('@/views/kitchen/Ingredient.vue'), meta: { public: true } },
-  { path: '/kitchen/recipe/:id', name: 'RecipeDetail', component: () => import('@/views/kitchen/RecipeDetail.vue'), meta: { public: true } },
-  { path: '/kitchen/recipe/new', name: 'RecipeNew', component: () => import('@/views/kitchen/RecipeEdit.vue'), meta: { requiresAuth: true } },
-  { path: '/kitchen/recipe/:id/edit', name: 'RecipeEdit', component: () => import('@/views/kitchen/RecipeEdit.vue'), meta: { requiresAuth: true } },
+  {
+    path: '/kitchen/recipe/:id',
+    name: 'RecipeDetail',
+    component: () => import('@/views/kitchen/RecipeDetail.vue'),
+    meta: { public: true },
+  },
+  {
+    path: '/kitchen/recipe/new',
+    name: 'RecipeNew',
+    component: () => import('@/views/kitchen/RecipeEdit.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/kitchen/recipe/:id/edit',
+    name: 'RecipeEdit',
+    component: () => import('@/views/kitchen/RecipeEdit.vue'),
+    meta: { requiresAuth: true },
+  },
   { path: '/library', name: 'LibraryList', component: () => import('@/views/library/LibraryList.vue'), meta: { public: true } },
-  { path: '/library/edit/:id?', name: 'LibraryEdit', component: () => import('@/views/library/LibraryEdit.vue'), meta: { requiresAuth: true } },
+  {
+    path: '/library/edit/:id?',
+    name: 'LibraryEdit',
+    component: () => import('@/views/library/LibraryEdit.vue'),
+    meta: { requiresAuth: true },
+  },
   // 工具箱:功能聚合页 + 脑图设计(列表游客可见,编辑器需登录)
   { path: '/tools', name: 'Tools', component: () => import('@/views/tools/Tools.vue'), meta: { public: true } },
   { path: '/tools/mindmap', name: 'MindMapList', component: () => import('@/views/tools/MindMap.vue'), meta: { public: true } },
-  { path: '/tools/mindmap/:id', name: 'MindMapEditor', component: () => import('@/views/tools/MindMapEditor.vue'), meta: { requiresAuth: true } },
+  {
+    path: '/tools/mindmap/:id',
+    name: 'MindMapEditor',
+    component: () => import('@/views/tools/MindMapEditor.vue'),
+    meta: { requiresAuth: true },
+  },
   // AI 测试台(临时):对话/图片/语音输入输出调试,依赖 /ai/** 登录接口
-  { path: '/tools/ai-playground', name: 'AiPlayground', component: () => import('@/views/tools/AiPlayground.vue'), meta: { requiresAuth: true } },
+  {
+    path: '/tools/ai-playground',
+    name: 'AiPlayground',
+    component: () => import('@/views/tools/AiPlayground.vue'),
+    meta: { requiresAuth: true },
+  },
   // 3D 光影实验台(临时):Three.js 太阳模拟+真实阴影,未来场景主题的 3D 基础模型
-  { path: '/tools/light-lab', name: 'LightLab', component: () => import('@/views/tools/LightLab.vue'), meta: { public: true, immersive: true } },
+  {
+    path: '/tools/light-lab',
+    name: 'LightLab',
+    component: () => import('@/views/tools/LightLab.vue'),
+    meta: { public: true, immersive: true },
+  },
   // 贷款计算器:纯前端试算(等额本息/等额本金、商业/公积金/组合贷、提前还款对比),不依赖后端
   { path: '/tools/loan', name: 'LoanCalculator', component: () => import('@/views/tools/LoanCalculator.vue'), meta: { public: true } },
   // Flash 播放器(Ruffle):本地加载 .swf 怀旧小游戏
@@ -115,9 +155,7 @@ router.beforeEach((to) => {
 router.onError((error, to) => {
   const msg = (error?.message || '').toLowerCase()
   const chunkFailed =
-    msg.includes('dynamically imported module') ||
-    msg.includes('importing a module script') ||
-    msg.includes('loading chunk')
+    msg.includes('dynamically imported module') || msg.includes('importing a module script') || msg.includes('loading chunk')
   if (!chunkFailed || !to) return
   const key = `ihomy:chunk-reload:${to.fullPath}`
   if (Date.now() - Number(sessionStorage.getItem(key) || 0) < 30_000) return

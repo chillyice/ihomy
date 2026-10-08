@@ -18,7 +18,9 @@ let refreshPromise = null
 // 共享一次续期;成功后再取 userStore.token 即为新令牌
 const renewToken = (userStore) => {
   if (!refreshPromise) {
-    refreshPromise = userStore.refresh().finally(() => { refreshPromise = null })
+    refreshPromise = userStore.refresh().finally(() => {
+      refreshPromise = null
+    })
   }
   return refreshPromise
 }
@@ -29,8 +31,13 @@ request.interceptors.request.use(async (config) => {
   // 认证类端点自身(登录/续期/登出)不预检,否则续期会递归触发自己;
   // 刷新令牌也过期说明会话是真的没了,按未登录发出去即可(不惊动登录页)
   const isAuthCall = /(^|\/)auth\//.test(config.url || '')
-  if (!isAuthCall && userStore.token && userStore.refreshToken
-      && isTokenExpired(userStore.token) && !isTokenExpired(userStore.refreshToken, 0)) {
+  if (
+    !isAuthCall &&
+    userStore.token &&
+    userStore.refreshToken &&
+    isTokenExpired(userStore.token) &&
+    !isTokenExpired(userStore.refreshToken, 0)
+  ) {
     // 过期令牌对公开接口表现为"未登录"且照常返回 200,不会触发下面的 401 续期 →
     // 家庭天气位置、日出日落等会静默退回游客口径(按 IP 定位),故这里先就地续期
     try {
@@ -95,7 +102,7 @@ request.interceptors.response.use(
     const tid = error.response?.headers?.['x-trace-id']
     ElMessage.error((tid ? `[tid:${tid}] ` : '') + (error.response?.data?.message || error.message || i18n.global.t('common.networkError')))
     return Promise.reject(error)
-  }
+  },
 )
 
 export default request

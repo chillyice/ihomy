@@ -5,14 +5,10 @@
 
     <PageToolbar>
       <div class="tb-left">
-        <el-input
-          v-model="keyword"
-          size="small"
-          clearable
-          class="vault-search"
-          :placeholder="$t('vault.searchPlaceholder')"
-        >
-          <template #prefix><el-icon><Search /></el-icon></template>
+        <el-input v-model="keyword" size="small" clearable class="vault-search" :placeholder="$t('vault.searchPlaceholder')">
+          <template #prefix
+            ><el-icon><Search /></el-icon
+          ></template>
         </el-input>
         <el-select v-model="category" size="small" class="vault-cat">
           <el-option :label="$t('vault.allCategories')" value="" />
@@ -42,12 +38,7 @@
             <span class="vc-label">{{ $t('vault.username') }}</span>
             <span v-if="item.username" class="vc-value" :title="item.username">{{ item.username }}</span>
             <span v-else class="vc-empty">{{ $t('vault.noUsername') }}</span>
-            <span v-a11y-click
-              v-if="item.username"
-              class="vc-icon"
-              :title="$t('vault.copyUsername')"
-              @click="copyUsername(item)"
-            >
+            <span v-a11y-click v-if="item.username" class="vc-icon" :title="$t('vault.copyUsername')" @click="copyUsername(item)">
               <el-icon><DocumentCopy /></el-icon>
             </span>
           </div>
@@ -58,7 +49,8 @@
             <span v-else-if="item.passwordMasked" class="vc-value vc-mask">{{ item.passwordMasked }}</span>
             <span v-else class="vc-empty">{{ $t('vault.noPassword') }}</span>
             <template v-if="item.passwordMasked">
-              <span v-a11y-click
+              <span
+                v-a11y-click
                 class="vc-icon"
                 :title="revealed[item.id] !== undefined ? $t('vault.hide') : $t('vault.reveal')"
                 @click="toggleReveal(item)"
@@ -89,10 +81,14 @@
 
           <div v-if="canManage" class="vc-actions">
             <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
-              <el-button size="small" text @click="openEditor(item)"><el-icon><Edit /></el-icon></el-button>
+              <el-button size="small" text @click="openEditor(item)"
+                ><el-icon><Edit /></el-icon
+              ></el-button>
             </el-tooltip>
             <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
-              <el-button size="small" text type="danger" @click="onDelete(item)"><el-icon><Delete /></el-icon></el-button>
+              <el-button size="small" text type="danger" @click="onDelete(item)"
+                ><el-icon><Delete /></el-icon
+              ></el-button>
             </el-tooltip>
           </div>
         </div>
@@ -108,12 +104,7 @@
     </div>
 
     <!-- 条目编辑:密码留空表示不改;生成器挂在密码输入框旁 -->
-    <el-dialog
-      v-model="editor.visible"
-      append-to-body
-      :title="editor.form.id ? $t('vault.edit') : $t('vault.add')"
-      width="480px"
-    >
+    <el-dialog v-model="editor.visible" append-to-body :title="editor.form.id ? $t('vault.edit') : $t('vault.add')" width="480px">
       <el-form :model="editor.form" label-position="top">
         <el-form-item :label="$t('vault.name')">
           <el-input v-model="editor.form.name" :placeholder="$t('vault.namePlaceholder')" maxlength="100" />
@@ -161,7 +152,9 @@
                 </div>
                 <div class="vault-gen-foot">
                   <el-button size="small" @click="rollPassword">{{ $t('vault.generate') }}</el-button>
-                  <el-button size="small" type="primary" :disabled="!generator.preview" @click="useGenerated">{{ $t('vault.genUse') }}</el-button>
+                  <el-button size="small" type="primary" :disabled="!generator.preview" @click="useGenerated">{{
+                    $t('vault.genUse')
+                  }}</el-button>
                 </div>
               </div>
             </el-popover>
@@ -262,15 +255,12 @@ const filtered = computed(() => {
   return list.value.filter((i) => {
     if (category.value && i.category !== category.value) return false
     if (!kw) return true
-    return [i.name, i.username, i.tags, i.note, i.url]
-      .filter(Boolean)
-      .some((v) => String(v).toLowerCase().includes(kw))
+    return [i.name, i.username, i.tags, i.note, i.url].filter(Boolean).some((v) => String(v).toLowerCase().includes(kw))
   })
 })
 
 const strength = computed(() => passwordStrength(editor.form.password))
-const strengthHintText = computed(() =>
-  strength.value.hints.map((h) => t(`vault.hint${h[0].toUpperCase()}${h.slice(1)}`)).join('；'))
+const strengthHintText = computed(() => strength.value.hints.map((h) => t(`vault.hint${h[0].toUpperCase()}${h.slice(1)}`)).join('；'))
 
 const load = async () => {
   loading.value = true
@@ -360,7 +350,10 @@ const toggleReveal = async (item) => {
   try {
     revealed[item.id] = await fetchPlain(item.id)
     clearTimeout(revealTimers.get(item.id))
-    revealTimers.set(item.id, setTimeout(() => hideReveal(item.id), REVEAL_HIDE_MS))
+    revealTimers.set(
+      item.id,
+      setTimeout(() => hideReveal(item.id), REVEAL_HIDE_MS),
+    )
   } catch (e) {
     ElMessage.error(t('vault.revealFailed'))
   }
@@ -380,7 +373,12 @@ const rollPassword = () => {
 }
 
 /** 打开面板即先摇一个,否则首屏预览为空、「使用」按钮点了没反应 */
-watch(() => generator.visible, (open) => { if (open) rollPassword() })
+watch(
+  () => generator.visible,
+  (open) => {
+    if (open) rollPassword()
+  },
+)
 
 const useGenerated = () => {
   if (!generator.preview) return
@@ -434,11 +432,10 @@ const onSave = async () => {
 }
 
 const onDelete = async (item) => {
-  await ElMessageBox.confirm(
-    t('vault.deleteConfirm', { name: item.name }),
-    t('common.deleteConfirm'),
-    { type: 'warning', closeOnClickModal: true },
-  )
+  await ElMessageBox.confirm(t('vault.deleteConfirm', { name: item.name }), t('common.deleteConfirm'), {
+    type: 'warning',
+    closeOnClickModal: true,
+  })
   await vaultApi.remove(item.id)
   hideReveal(item.id)
   ElMessage.success(t('common.deleted'))
@@ -460,9 +457,17 @@ onBeforeUnmount(() => {
 
 <style scoped>
 /* 工具栏 */
-.vault-search { width: 260px; }
-.vault-cat { width: 130px; }
-.vault-count { color: #999; font-size: 12px; margin-right: 4px; }
+.vault-search {
+  width: 260px;
+}
+.vault-cat {
+  width: 130px;
+}
+.vault-count {
+  color: #999;
+  font-size: 12px;
+  margin-right: 4px;
+}
 
 /* 卡片墙 */
 .vault-grid {
@@ -488,7 +493,11 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.vc-tags { display: flex; gap: 6px; flex-shrink: 0; }
+.vc-tags {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
 .vc-row {
   display: flex;
   align-items: center;
@@ -496,16 +505,28 @@ onBeforeUnmount(() => {
   font-size: 13px;
   min-width: 0;
 }
-.vc-label { color: #999; flex-shrink: 0; width: 40px; }
+.vc-label {
+  color: #999;
+  flex-shrink: 0;
+  width: 40px;
+}
 .vc-value {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
 }
-.vc-plain { font-family: monospace; }
-.vc-mask { letter-spacing: 2px; color: #777; }
-.vc-empty { color: #bbb; font-size: 12px; }
+.vc-plain {
+  font-family: monospace;
+}
+.vc-mask {
+  letter-spacing: 2px;
+  color: #777;
+}
+.vc-empty {
+  color: #bbb;
+  font-size: 12px;
+}
 .vc-link {
   color: var(--el-color-primary);
   text-decoration: none;
@@ -520,16 +541,25 @@ onBeforeUnmount(() => {
   color: #999;
   flex-shrink: 0;
   display: inline-flex;
-  transition: color .2s, transform .2s;
+  transition:
+    color 0.2s,
+    transform 0.2s;
 }
-.vc-icon:hover { color: var(--el-color-primary); transform: scale(1.15); }
+.vc-icon:hover {
+  color: var(--el-color-primary);
+  transform: scale(1.15);
+}
 .vc-note {
   font-size: 13px;
   color: #666;
   white-space: pre-wrap;
   word-break: break-word;
 }
-.vc-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.vc-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
 .vc-foot {
   display: flex;
   justify-content: space-between;
@@ -537,13 +567,27 @@ onBeforeUnmount(() => {
   font-size: 12px;
   margin-top: auto;
 }
-.vc-actions { display: flex; gap: 6px; }
-.vc-actions :deep(.el-button.is-text) { padding: 5px 6px; }
-.vc-actions :deep(.el-button.is-text + .el-button.is-text) { margin-left: 4px; }
-.vault-empty-hint { color: #999; font-size: 13px; }
+.vc-actions {
+  display: flex;
+  gap: 6px;
+}
+.vc-actions :deep(.el-button.is-text) {
+  padding: 5px 6px;
+}
+.vc-actions :deep(.el-button.is-text + .el-button.is-text) {
+  margin-left: 4px;
+}
+.vault-empty-hint {
+  color: #999;
+  font-size: 13px;
+}
 
 /* 编辑弹窗:密码行 + 生成器 + 强度条 */
-.vault-pw-row { display: flex; gap: 8px; width: 100%; }
+.vault-pw-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
 .vault-strength {
   display: flex;
   align-items: center;
@@ -551,38 +595,85 @@ onBeforeUnmount(() => {
   margin-top: 8px;
   width: 100%;
 }
-.vault-strength-bar { display: flex; gap: 4px; flex: 1; }
+.vault-strength-bar {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
 .vault-strength-seg {
   flex: 1;
   height: 4px;
   border-radius: 2px;
-  background: rgba(128, 128, 128, .25);
-  transition: background-color .25s;
+  background: rgba(128, 128, 128, 0.25);
+  transition: background-color 0.25s;
 }
-.vault-strength-seg.on { background: var(--seg-color); }
-.vault-strength-text { font-size: 12px; flex-shrink: 0; }
-.vault-strength-hint { color: #999; font-size: 12px; margin-top: 4px; }
+.vault-strength-seg.on {
+  background: var(--seg-color);
+}
+.vault-strength-text {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.vault-strength-hint {
+  color: #999;
+  font-size: 12px;
+  margin-top: 4px;
+}
 
-.vault-gen { display: flex; flex-direction: column; gap: 10px; }
+.vault-gen {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 .vault-gen-preview {
   font-family: monospace;
   font-size: 13px;
   word-break: break-all;
   padding: 8px 10px;
   border-radius: 8px;
-  background: rgba(128, 128, 128, .12);
+  background: rgba(128, 128, 128, 0.12);
 }
-.vault-gen-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
-.vault-gen-row :deep(.el-slider) { flex: 1; }
-.vault-gen-len { width: 20px; text-align: right; }
-.vault-gen-checks { display: flex; flex-direction: column; gap: 2px; }
-.vault-gen-foot { display: flex; justify-content: flex-end; gap: 8px; }
+.vault-gen-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.vault-gen-row :deep(.el-slider) {
+  flex: 1;
+}
+.vault-gen-len {
+  width: 20px;
+  text-align: right;
+}
+.vault-gen-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.vault-gen-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
 
 @media (max-width: 768px) {
-  .vault-search { width: 100%; }
-  .vault-cat { width: 110px; }
-  .vault-grid { grid-template-columns: 1fr; }
-  .vc-actions .el-button { flex: 1; }
-  .vault-gen-checks { flex-direction: row; flex-wrap: wrap; gap: 0 12px; }
+  .vault-search {
+    width: 100%;
+  }
+  .vault-cat {
+    width: 110px;
+  }
+  .vault-grid {
+    grid-template-columns: 1fr;
+  }
+  .vc-actions .el-button {
+    flex: 1;
+  }
+  .vault-gen-checks {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0 12px;
+  }
 }
 </style>

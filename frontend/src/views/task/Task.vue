@@ -118,7 +118,8 @@ const act = (task) => {
     actions.push({ key: 'finish', label: t('task.finish'), type: 'primary' }, { key: 'abandon', label: t('task.abandon'), type: 'default' })
   }
   if (task.status === 'REVIEW' && task.createdBy === uid) actions.push({ key: 'confirm', label: t('task.confirm'), type: 'success' })
-  if ((task.status === 'OPEN' || task.status === 'IN_PROGRESS') && task.createdBy === uid) actions.push({ key: 'cancel', label: t('task.cancel'), type: 'danger' })
+  if ((task.status === 'OPEN' || task.status === 'IN_PROGRESS') && task.createdBy === uid)
+    actions.push({ key: 'cancel', label: t('task.cancel'), type: 'danger' })
   return actions
 }
 
@@ -214,7 +215,12 @@ onMounted(loadTasks)
 }
 
 @media (max-width: 768px) {
-  .task-actions { flex-wrap: wrap; }
-  .task-actions .el-button { flex: 1; min-width: 80px; }
+  .task-actions {
+    flex-wrap: wrap;
+  }
+  .task-actions .el-button {
+    flex: 1;
+    min-width: 80px;
+  }
 }
 </style>

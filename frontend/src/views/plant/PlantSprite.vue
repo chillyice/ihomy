@@ -10,15 +10,7 @@
     <ellipse cx="100" cy="190" rx="27" ry="8" fill="#7a5233" />
 
     <!-- 茎(种子阶段无茎) -->
-    <rect
-      v-if="cfg.head !== 'none'"
-      x="96"
-      :y="cfg.stemTop"
-      width="8"
-      :height="188 - cfg.stemTop"
-      rx="4"
-      :fill="palette.stem"
-    />
+    <rect v-if="cfg.head !== 'none'" x="96" :y="cfg.stemTop" width="8" :height="188 - cfg.stemTop" rx="4" :fill="palette.stem" />
 
     <!-- 茎生叶(成对,数量随阶段增多) -->
     <g v-for="(y, i) in leafPairs" :key="i">

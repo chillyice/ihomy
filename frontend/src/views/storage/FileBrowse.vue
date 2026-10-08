@@ -13,8 +13,14 @@
     <template v-else>
       <PageToolbar>
         <div class="tb-left">
-          <el-select v-model="activeDeviceId" size="small" style="width: 180px" clearable
-            :placeholder="$t('storage.pickDevice')" @change="onDeviceChange">
+          <el-select
+            v-model="activeDeviceId"
+            size="small"
+            style="width: 180px"
+            clearable
+            :placeholder="$t('storage.pickDevice')"
+            @change="onDeviceChange"
+          >
             <el-option v-for="d in customDevices" :key="d.id" :label="d.name" :value="d.id" />
           </el-select>
           <el-button size="small" :disabled="!activePath" @click="goParent">{{ $t('storage.backToParent') }}</el-button>
@@ -31,7 +37,9 @@
           </template>
           <template v-else>
             <span class="select-count">{{ $t('storage.selectedCount', { n: selectedPaths.length }) }}</span>
-            <el-button size="small" type="danger" plain :disabled="!selectedPaths.length" @click="deleteSelected">{{ $t('common.delete') }}</el-button>
+            <el-button size="small" type="danger" plain :disabled="!selectedPaths.length" @click="deleteSelected">{{
+              $t('common.delete')
+            }}</el-button>
             <el-button size="small" @click="selectMode = false">{{ $t('common.cancel') }}</el-button>
           </template>
         </div>
@@ -44,7 +52,16 @@
             <template #default="{ row }">
               <div class="file-cell" :class="{ selectable: selectMode }">
                 <span v-if="selectMode" class="pick-badge" :class="{ on: isSelected(row) }">
-                  <svg viewBox="0 0 16 16" width="12" height="12"><path d="M3 8.5 L6.5 12 L13 4.5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <svg viewBox="0 0 16 16" width="12" height="12">
+                    <path
+                      d="M3 8.5 L6.5 12 L13 4.5"
+                      fill="none"
+                      stroke="#fff"
+                      stroke-width="2.4"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
                 </span>
                 <span class="file-ico">{{ row.isDir ? '📁' : fileIcon(row.name) }}</span>
                 <span class="file-name">{{ row.name }}</span>
@@ -155,9 +172,10 @@ async function renameEntry(row) {
 }
 
 async function deleteSelected() {
-  await ElMessageBox.confirm(
-    t('storage.confirmDeleteEntries', { n: selectedPaths.value.length }),
-    t('common.warning'), { type: 'warning', closeOnClickModal: true })
+  await ElMessageBox.confirm(t('storage.confirmDeleteEntries', { n: selectedPaths.value.length }), t('common.warning'), {
+    type: 'warning',
+    closeOnClickModal: true,
+  })
   await storageApi.removeEntries(activeDeviceId.value, selectedPaths.value)
   ElMessage.success(t('common.deleted'))
   selectMode.value = false
@@ -329,6 +347,8 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
-  .page { overflow-x: hidden; }
+  .page {
+    overflow-x: hidden;
+  }
 }
 </style>

@@ -5,7 +5,12 @@
     <!-- 顶部:家庭名 + 折叠按钮 -->
     <div class="sidebar-head">
       <span class="sidebar-brand" v-a11y-click @click="$router.push('/')">{{ familyName || 'ihomy' }}</span>
-      <span class="sidebar-toggle" v-a11y-click @click="collapsed = !collapsed" :title="collapsed ? $t('common.expand') : $t('common.collapse')">
+      <span
+        class="sidebar-toggle"
+        v-a11y-click
+        @click="collapsed = !collapsed"
+        :title="collapsed ? $t('common.expand') : $t('common.collapse')"
+      >
         <el-icon><Fold v-if="!collapsed" /><Expand v-else /></el-icon>
       </span>
     </div>
@@ -14,11 +19,7 @@
     <nav class="sidebar-nav">
       <div v-for="g in groupedModules" :key="g.category" class="nav-group">
         <div v-if="!collapsed && g.items.length" class="group-label">{{ g.label }}</div>
-        <div
-          v-for="m in g.items"
-          :key="m.code"
-          class="nav-item-wrap"
-        >
+        <div v-for="m in g.items" :key="m.code" class="nav-item-wrap">
           <div
             class="nav-item"
             :class="{ active: isActive(m.path, route), 'widget-src': appStore.homeEditMode && widgetType(m.code) }"
@@ -28,9 +29,15 @@
             @mousedown="appStore.homeEditMode && widgetType(m.code) && startWidgetDrag(widgetType(m.code), $event)"
           >
             <span class="nav-icon">
-              <svg v-if="m.code === 'settings'" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2L9.5 4.5L6 4L5 7.5L2 9.5L3.5 13L2 16.5L5 18.5L6 22L9.5 21.5L12 24L14.5 21.5L18 22L19 18.5L22 16.5L20.5 13L22 9.5L19 7.5L18 4L14.5 4.5L12 2ZM12 16A4 4 0 1 1 12 8A4 4 0 0 1 12 16Z"/></svg>
+              <svg v-if="m.code === 'settings'" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <path
+                  d="M12 2L9.5 4.5L6 4L5 7.5L2 9.5L3.5 13L2 16.5L5 18.5L6 22L9.5 21.5L12 24L14.5 21.5L18 22L19 18.5L22 16.5L20.5 13L22 9.5L19 7.5L18 4L14.5 4.5L12 2ZM12 16A4 4 0 1 1 12 8A4 4 0 0 1 12 16Z"
+                />
+              </svg>
               <el-badge v-else-if="m.code === 'ops'" :value="ossUpdateCount" :hidden="!ossUpdateCount" :max="99" class="nav-badge">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3 4H21V16H3V4ZM5 6V14H19V6H5ZM2 18H22V20H2V18Z"/></svg>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                  <path d="M3 4H21V16H3V4ZM5 6V14H19V6H5ZM2 18H22V20H2V18Z" />
+                </svg>
               </el-badge>
               <el-icon v-else><component :is="iconComp(m.code)" /></el-icon>
             </span>
@@ -47,11 +54,27 @@
           <el-icon><Sunny v-if="!themeStore.isDusk" /><Moon v-else /></el-icon>
         </span>
         <!-- 台灯三态开关:auto(自动)/on(常开)/off(关闭);关灯时冷蓝微光便于定位 -->
-        <span class="foot-btn" v-a11y-click :class="{ 'lamp-on': lampMode !== 'off', 'lamp-off': lampMode === 'off' }" :title="t('sidebar.lamp') + ': ' + (lampMode === 'auto' ? t('sidebar.lampAuto') : lampMode === 'on' ? t('sidebar.lampOn') : t('sidebar.lampOff'))" @click="toggleLamp">
+        <span
+          class="foot-btn"
+          v-a11y-click
+          :class="{ 'lamp-on': lampMode !== 'off', 'lamp-off': lampMode === 'off' }"
+          :title="
+            t('sidebar.lamp') +
+            ': ' +
+            (lampMode === 'auto' ? t('sidebar.lampAuto') : lampMode === 'on' ? t('sidebar.lampOn') : t('sidebar.lampOff'))
+          "
+          @click="toggleLamp"
+        >
           {{ lampMode === 'auto' ? '🌑' : lampMode === 'on' ? '💡' : '⬛' }}
         </span>
         <!-- 光影效果开关 -->
-        <span class="foot-btn" v-a11y-click :class="{ 'lamp-on': sunLight?.shadowEnabled?.value }" :title="sunLight?.shadowEnabled?.value ? t('sidebar.lightEffectOn') : t('sidebar.lightEffectOff')" @click="toggleLightEffect">
+        <span
+          class="foot-btn"
+          v-a11y-click
+          :class="{ 'lamp-on': sunLight?.shadowEnabled?.value }"
+          :title="sunLight?.shadowEnabled?.value ? t('sidebar.lightEffectOn') : t('sidebar.lightEffectOff')"
+          @click="toggleLightEffect"
+        >
           {{ sunLight?.shadowEnabled?.value ? '☀' : '☁' }}
         </span>
         <span class="foot-btn" v-a11y-click :title="$t('sidebar.language')" @click="onLang">
@@ -60,7 +83,9 @@
         <el-popover v-if="userStore.isLoggedIn" placement="top-end" :width="340" trigger="click" @show="loadNotifications">
           <template #reference>
             <el-badge :value="unreadCount" :hidden="!unreadCount" class="foot-badge">
-              <span class="foot-btn" v-a11y-click :title="$t('sidebar.message')"><el-icon><Bell /></el-icon></span>
+              <span class="foot-btn" v-a11y-click :title="$t('sidebar.message')"
+                ><el-icon><Bell /></el-icon
+              ></span>
             </el-badge>
           </template>
           <div class="notify-panel">
@@ -69,7 +94,8 @@
               <el-button v-if="notifications.length" text size="small" @click="markAllRead">{{ $t('nav.allRead') }}</el-button>
             </div>
             <div v-if="notifications.length" class="notify-list">
-              <div v-a11y-click
+              <div
+                v-a11y-click
                 v-for="n in notifications"
                 :key="n.id"
                 class="notify-item"
@@ -86,39 +112,54 @@
         </el-popover>
       </div>
       <div class="foot-user-row">
-        <el-dropdown v-if="userStore.isLoggedIn" trigger="click" @command="onUserCommand" placement="top-start" popper-class="sidebar-user-popper" @visible-change="onDropdownVisible">
+        <el-dropdown
+          v-if="userStore.isLoggedIn"
+          trigger="click"
+          @command="onUserCommand"
+          placement="top-start"
+          popper-class="sidebar-user-popper"
+          @visible-change="onDropdownVisible"
+        >
           <span class="foot-user" v-a11y-click>
             <el-avatar :size="28" :src="userInfo?.avatar">{{ (userInfo?.nickname || 'U').charAt(0) }}</el-avatar>
             <span v-if="!collapsed" class="user-name">{{ userInfo?.nickname || t('sidebar.me') }}</span>
           </span>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item command="profile">{{ $t('settings.profile') }}</el-dropdown-item>
-            <el-dropdown-item command="settings">{{ $t('nav.settings') }}</el-dropdown-item>
-            <div v-if="families.length > 1" class="family-switch-wrapper">
-              <el-dropdown-item class="family-switch-trigger">
-                {{ $t('nav.switchFamily') }}
-                <el-icon class="el-icon--right"><ArrowRight /></el-icon>
-              </el-dropdown-item>
-              <div class="family-switch-panel">
-                <div v-a11y-click
-                  v-for="f in families"
-                  :key="f.familyId"
-                  class="family-switch-item"
-                  :class="{ active: f.isCurrent }"
-                  @click="switchFamily(f.familyId)"
-                >
-                  <span>{{ f.name }}</span>
-                  <el-icon v-if="f.isCurrent"><Check /></el-icon>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="profile">{{ $t('settings.profile') }}</el-dropdown-item>
+              <el-dropdown-item command="settings">{{ $t('nav.settings') }}</el-dropdown-item>
+              <div v-if="families.length > 1" class="family-switch-wrapper">
+                <el-dropdown-item class="family-switch-trigger">
+                  {{ $t('nav.switchFamily') }}
+                  <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+                </el-dropdown-item>
+                <div class="family-switch-panel">
+                  <div
+                    v-a11y-click
+                    v-for="f in families"
+                    :key="f.familyId"
+                    class="family-switch-item"
+                    :class="{ active: f.isCurrent }"
+                    @click="switchFamily(f.familyId)"
+                  >
+                    <span>{{ f.name }}</span>
+                    <el-icon v-if="f.isCurrent"><Check /></el-icon>
+                  </div>
                 </div>
               </div>
-            </div>
-            <el-dropdown-item divided command="logout">{{ $t('nav.logout') }}</el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
+              <el-dropdown-item divided command="logout">{{ $t('nav.logout') }}</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <span v-else class="foot-btn" v-a11y-click @click="$router.push('/login')">{{ $t('home.loginRegister') }}</span>
-        <span v-if="userStore.isLoggedIn && route.path === '/home'" class="edit-mode-btn" v-a11y-click :class="{ active: appStore.homeEditMode }" :title="appStore.homeEditMode ? t('sidebar.exitEdit') : t('sidebar.editHome')" @click="appStore.toggleHomeEditMode()">
+        <span
+          v-if="userStore.isLoggedIn && route.path === '/home'"
+          class="edit-mode-btn"
+          v-a11y-click
+          :class="{ active: appStore.homeEditMode }"
+          :title="appStore.homeEditMode ? t('sidebar.exitEdit') : t('sidebar.editHome')"
+          @click="appStore.toggleHomeEditMode()"
+        >
           <!-- 四个圆角方块(2×2 网格):桌面布局编辑语义;内联 SVG 替代 EP 图标(性能规范) -->
           <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
             <rect x="3" y="3" width="8" height="8" rx="2" />
@@ -132,7 +173,10 @@
           <template #content>
             <div v-for="w in sidebarWarnings" :key="w.id" class="mw-warn-row">
               <span class="mw-warn-dot" :style="{ background: warnLevelColor(w.level) }"></span>
-              <span>{{ w.typeName }} {{ w.level }}{{ $t('sidebar.warning') }} {{ (w.startTime || '').slice(5, 16) }} ~ {{ (w.endTime || '').slice(5, 16) }}</span>
+              <span
+                >{{ w.typeName }} {{ w.level }}{{ $t('sidebar.warning') }} {{ (w.startTime || '').slice(5, 16) }} ~
+                {{ (w.endTime || '').slice(5, 16) }}</span
+              >
             </div>
           </template>
           <span class="mini-weather" v-a11y-click :title="sidebarWeather.city" @click="$router.push('/weather')">
@@ -173,7 +217,18 @@ const userStore = useUserStore()
 const { locale, t } = useI18n()
 const { startDrag: startWidgetDrag, dragging: widgetDragging, crossed: crossedEdge } = useWidgetDrag()
 
-const WIDGET_MAP = { blog: 'feed', task: 'task', points: 'today', weather: 'weather', anniversary: 'anni', kitchen: 'recipe', item: 'search', wish: 'wish', book: 'finance', album: 'album' }
+const WIDGET_MAP = {
+  blog: 'feed',
+  task: 'task',
+  points: 'today',
+  weather: 'weather',
+  anniversary: 'anni',
+  kitchen: 'recipe',
+  item: 'search',
+  wish: 'wish',
+  book: 'finance',
+  album: 'album',
+}
 const widgetType = (code) => WIDGET_MAP[code] || null
 
 // 注入全局光影状态(与 SunLightLayer 共享同一实例);导航栏只用台灯开关,其余设置在 Settings 页
@@ -227,7 +282,9 @@ const unreadCount = ref(0)
 const notifications = ref([])
 const loadUnread = async () => {
   if (!userStore.isLoggedIn) return
-  try { unreadCount.value = await notificationApi.unreadCount() } catch (e) {}
+  try {
+    unreadCount.value = await notificationApi.unreadCount()
+  } catch (e) {}
 }
 // 开源组件可升级数(仅 OPS,导航角标)
 // 判定必须用 isOps(系统级 OPS 角色绑定):家庭 OWNER 的权限数组带 ops:view 却无 OPS 绑定,
@@ -248,7 +305,7 @@ const loadNotifications = async () => {
 }
 const markAllRead = async () => {
   await notificationApi.markAllRead()
-  notifications.value = notifications.value.map(n => ({ ...n, isRead: 1 }))
+  notifications.value = notifications.value.map((n) => ({ ...n, isRead: 1 }))
   unreadCount.value = 0
 }
 const onNotifyClick = async (n) => {
@@ -262,7 +319,14 @@ const onNotifyClick = async (n) => {
   else if (n.contentType === 'photo' && n.contentId) router.push('/album')
   else if (n.contentType === 'item') router.push('/kitchen/ingredients')
 }
-const notifyType = (type) => type === 'reply' ? t('notify.typeReply') : type === 'system' ? t('notify.typeSystem') : type === 'item_expiry' ? t('notify.typeExpiry') : t('notify.typeComment')
+const notifyType = (type) =>
+  type === 'reply'
+    ? t('notify.typeReply')
+    : type === 'system'
+      ? t('notify.typeSystem')
+      : type === 'item_expiry'
+        ? t('notify.typeExpiry')
+        : t('notify.typeComment')
 const notifyTime = (d) => formatRelativeTime(t, d)
 
 // 用户下拉
@@ -282,25 +346,39 @@ const onUserCommand = (cmd) => {
 const families = ref([])
 const loadFamilies = async () => {
   if (!userStore.isLoggedIn) return
-  try { families.value = await authApi.families() } catch (e) { families.value = [] }
+  try {
+    families.value = await authApi.families()
+  } catch (e) {
+    families.value = []
+  }
 }
-const onDropdownVisible = (visible) => { if (visible) loadFamilies() }
+const onDropdownVisible = (visible) => {
+  if (visible) loadFamilies()
+}
 const switchFamily = async (familyId) => {
   try {
     await userStore.switchFamily(familyId, true)
     ElMessage.success(t('nav.switchFamily') + ' ✓')
     location.reload()
-  } catch (e) { ElMessage.error(e.message || 'Failed') }
+  } catch (e) {
+    ElMessage.error(e.message || 'Failed')
+  }
 }
 
 // 预加载家庭列表:首次打开下拉即完整渲染,避免家栏后到导致菜单向上长高、鼠标下突然出现 hover 项
-onMounted(() => { loadUnread(); loadFamilies(); loadOssUpdateCount() })
+onMounted(() => {
+  loadUnread()
+  loadFamilies()
+  loadOssUpdateCount()
+})
 </script>
 
 <style scoped>
 .app-sidebar {
   position: fixed;
-  left: 0; top: 0; bottom: 0;
+  left: 0;
+  top: 0;
+  bottom: 0;
   width: 220px;
   z-index: 60;
   background: rgba(255, 255, 255, 0.35);
@@ -309,7 +387,10 @@ onMounted(() => { loadUnread(); loadFamilies(); loadOssUpdateCount() })
   border-right: 1px solid rgba(255, 255, 255, 0.4);
   display: flex;
   flex-direction: column;
-  transition: width 0.3s ease, background 1s ease, border-color 1s ease;
+  transition:
+    width 0.3s ease,
+    background 1s ease,
+    border-color 1s ease;
   overflow: hidden;
   contain: layout style;
   transform: translateZ(0);
@@ -340,8 +421,12 @@ html.dark .app-sidebar {
   text-overflow: ellipsis;
   transition: color 0.2s;
 }
-.sidebar-brand:hover { color: var(--color-accent); }
-.collapsed .sidebar-brand { display: none; }
+.sidebar-brand:hover {
+  color: var(--color-accent);
+}
+.collapsed .sidebar-brand {
+  display: none;
+}
 .sidebar-toggle {
   cursor: pointer;
   color: var(--color-text-secondary);
@@ -350,7 +435,9 @@ html.dark .app-sidebar {
   align-items: center;
   padding: 4px;
   border-radius: 6px;
-  transition: background 0.2s, color 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s;
 }
 .sidebar-toggle:hover {
   background: rgba(58, 46, 34, 0.08);
@@ -365,8 +452,13 @@ html.dark .app-sidebar {
   transform: translateZ(0);
   will-change: transform;
 }
-.sidebar-nav::-webkit-scrollbar { width: 4px; }
-.sidebar-nav::-webkit-scrollbar-thumb { background: rgba(58,46,34,0.15); border-radius: 2px; }
+.sidebar-nav::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(58, 46, 34, 0.15);
+  border-radius: 2px;
+}
 
 .nav-group {
   margin-bottom: 8px;
@@ -388,7 +480,11 @@ html.dark .app-sidebar {
   cursor: pointer;
   color: var(--color-text);
   white-space: nowrap;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
   position: relative;
 }
 .nav-item:hover {
@@ -425,7 +521,9 @@ html.dark .nav-item.active {
   justify-content: center;
   padding: 9px 0;
 }
-.collapsed .nav-text { display: none; }
+.collapsed .nav-text {
+  display: none;
+}
 
 .sidebar-foot {
   padding: 10px 12px 16px;
@@ -441,7 +539,9 @@ html.dark .sidebar-foot {
   margin-bottom: 8px;
   justify-content: center;
 }
-.collapsed .foot-row { gap: 0; }
+.collapsed .foot-row {
+  gap: 0;
+}
 .foot-btn {
   cursor: pointer;
   color: var(--color-text-secondary);
@@ -451,7 +551,10 @@ html.dark .sidebar-foot {
   align-items: center;
   gap: 4px;
   font-size: 14px;
-  transition: background 0.2s, color 0.2s, transform 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s,
+    transform 0.2s;
 }
 .foot-btn:hover {
   background: rgba(58, 46, 34, 0.08);
@@ -461,18 +564,62 @@ html.dark .sidebar-foot {
 html.dark .foot-btn:hover {
   background: rgba(255, 255, 255, 0.08);
 }
-.foot-user-row { display: flex; align-items: center; gap: 6px; }
-.foot-user-row > :deep(.el-dropdown) { flex: 1; min-width: 0; }
+.foot-user-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.foot-user-row > :deep(.el-dropdown) {
+  flex: 1;
+  min-width: 0;
+}
 /* 迷你天气(非首页时占编辑按钮位置) */
-.mini-weather { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; padding: 3px 6px; border-radius: 8px; flex: none; }
-.mini-weather:hover { background: rgba(58, 46, 34, 0.06); }
-.mw-icon { font-size: 16px; line-height: 1; color: var(--color-text); }
-.mw-temp { font-size: 13px; font-weight: 600; color: var(--color-text); font-variant-numeric: tabular-nums; }
-.mw-warn-badge { display: inline-flex; align-items: center; }
-.mw-warn-badge :deep(.el-icon) { font-size: 14px; }
-:global(.mini-weather-popper) { max-width: 320px; }
-.mw-warn-row { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 1.6; }
-.mw-warn-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.mini-weather {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 8px;
+  flex: none;
+}
+.mini-weather:hover {
+  background: rgba(58, 46, 34, 0.06);
+}
+.mw-icon {
+  font-size: 16px;
+  line-height: 1;
+  color: var(--color-text);
+}
+.mw-temp {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+.mw-warn-badge {
+  display: inline-flex;
+  align-items: center;
+}
+.mw-warn-badge :deep(.el-icon) {
+  font-size: 14px;
+}
+:global(.mini-weather-popper) {
+  max-width: 320px;
+}
+.mw-warn-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.mw-warn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
 .foot-user {
   cursor: pointer;
   display: flex;
@@ -483,87 +630,170 @@ html.dark .foot-btn:hover {
   transition: background 0.2s;
   flex: 1;
 }
-.foot-user:hover { background: rgba(58, 46, 34, 0.08); }
-html.dark .foot-user:hover { background: rgba(255, 255, 255, 0.08); }
+.foot-user:hover {
+  background: rgba(58, 46, 34, 0.08);
+}
+html.dark .foot-user:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
 .user-name {
   font-size: 13px;
   color: var(--color-text);
 }
-.collapsed .user-name { display: none; }
-.collapsed .foot-user { justify-content: center; }
+.collapsed .user-name {
+  display: none;
+}
+.collapsed .foot-user {
+  justify-content: center;
+}
 
 .edit-mode-btn {
   flex-shrink: 0;
-  width: 28px; height: 28px;
-  display: flex; align-items: center; justify-content: center;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 8px;
   cursor: pointer;
   color: var(--color-text-secondary);
-  transition: background 0.2s, color 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s;
 }
-.edit-mode-btn:hover { background: rgba(58,46,34,0.08); }
-.edit-mode-btn.active { background: rgba(var(--color-brand-rgb),0.2); color: var(--color-accent, var(--color-brand)); }
-html.dark .edit-mode-btn:hover { background: rgba(255,255,255,0.08); }
-html.dark .edit-mode-btn.active { background: rgba(var(--color-brand-rgb),0.2); color: var(--color-brand); }
-.collapsed .edit-mode-btn { display: none; }
+.edit-mode-btn:hover {
+  background: rgba(58, 46, 34, 0.08);
+}
+.edit-mode-btn.active {
+  background: rgba(var(--color-brand-rgb), 0.2);
+  color: var(--color-accent, var(--color-brand));
+}
+html.dark .edit-mode-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+html.dark .edit-mode-btn.active {
+  background: rgba(var(--color-brand-rgb), 0.2);
+  color: var(--color-brand);
+}
+.collapsed .edit-mode-btn {
+  display: none;
+}
 
 /* 编辑模式:导航项变为组件来源,向右下偏移+虚线框占位 */
-.nav-item-wrap { position: relative; margin: 2px 0; }
-.nav-item.widget-src { cursor: grab; }
-.nav-item.widget-src:active { cursor: grabbing; }
+.nav-item-wrap {
+  position: relative;
+  margin: 2px 0;
+}
+.nav-item.widget-src {
+  cursor: grab;
+}
+.nav-item.widget-src:active {
+  cursor: grabbing;
+}
 .nav-item.widget-src {
   transform: translate(4px, 4px);
-  background: rgba(var(--color-brand-rgb),0.1);
-  border: 1px dashed rgba(var(--color-brand-rgb),0.4);
-  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), background 0.2s, border-color 0.2s;
+  background: rgba(var(--color-brand-rgb), 0.1);
+  border: 1px dashed rgba(var(--color-brand-rgb), 0.4);
+  transition:
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background 0.2s,
+    border-color 0.2s;
 }
 .nav-item.widget-src:hover {
   transform: translate(8px, 8px) scale(1.05);
-  background: rgba(var(--color-brand-rgb),0.2);
-  border-color: rgba(var(--color-brand-rgb),0.6);
-  box-shadow: 0 6px 20px rgba(var(--color-brand-rgb),0.15);
+  background: rgba(var(--color-brand-rgb), 0.2);
+  border-color: rgba(var(--color-brand-rgb), 0.6);
+  box-shadow: 0 6px 20px rgba(var(--color-brand-rgb), 0.15);
 }
 /* 虚线占位框(编辑模式下原位置) */
 .nav-item-wrap:has(.widget-src)::before {
   content: '';
-  position: absolute; inset: 0;
-  border: 1px dashed rgba(var(--color-brand-rgb),0.2);
+  position: absolute;
+  inset: 0;
+  border: 1px dashed rgba(var(--color-brand-rgb), 0.2);
   border-radius: 10px;
   pointer-events: none;
 }
-html.dark .nav-item.widget-src { background: rgba(var(--color-brand-rgb),0.1); border-color: rgba(var(--color-brand-rgb),0.3); }
-html.dark .nav-item.widget-src:hover { background: rgba(var(--color-brand-rgb),0.2); border-color: rgba(var(--color-brand-rgb),0.5); }
-html.dark .nav-item-wrap:has(.widget-src)::before { border-color: rgba(var(--color-brand-rgb),0.15); }
+html.dark .nav-item.widget-src {
+  background: rgba(var(--color-brand-rgb), 0.1);
+  border-color: rgba(var(--color-brand-rgb), 0.3);
+}
+html.dark .nav-item.widget-src:hover {
+  background: rgba(var(--color-brand-rgb), 0.2);
+  border-color: rgba(var(--color-brand-rgb), 0.5);
+}
+html.dark .nav-item-wrap:has(.widget-src)::before {
+  border-color: rgba(var(--color-brand-rgb), 0.15);
+}
 
 /* 拖拽时侧边栏右边界气泡效果 */
 .app-sidebar.dragging-edge::after {
   content: '';
-  position: absolute; right: -2px; top: 50%;
-  width: 24px; height: 120px;
+  position: absolute;
+  right: -2px;
+  top: 50%;
+  width: 24px;
+  height: 120px;
   transform: translateY(-50%);
-  background: radial-gradient(ellipse 12px 60px at right center, rgba(var(--color-brand-rgb),0.35), transparent 70%);
+  background: radial-gradient(ellipse 12px 60px at right center, rgba(var(--color-brand-rgb), 0.35), transparent 70%);
   pointer-events: none;
   animation: bubblePulse 0.8s ease-in-out infinite;
 }
-@keyframes bubblePulse { 0%,100% { opacity: 0.6; transform: translateY(-50%) scaleX(1); } 50% { opacity: 1; transform: translateY(-50%) scaleX(1.3); } }
+@keyframes bubblePulse {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: translateY(-50%) scaleX(1);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-50%) scaleX(1.3);
+  }
+}
 
 /* 通知面板 */
-.notify-panel { max-height: 400px; overflow-y: auto; }
-.notify-head {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 4px 0 10px; border-bottom: 1px solid var(--color-border);
-  margin-bottom: 8px; font-weight: 600;
+.notify-panel {
+  max-height: 400px;
+  overflow-y: auto;
 }
-.notify-list { display: flex; flex-direction: column; gap: 6px; }
+.notify-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0 10px;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+.notify-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 .notify-item {
-  padding: 8px 10px; border-radius: 8px; cursor: pointer;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
   transition: background 0.2s;
 }
-.notify-item:hover { background: rgba(58,46,34,0.06); }
-.notify-item.unread { background: rgba(168,72,58,0.08); }
-.notify-type { font-size: 12px; color: var(--color-text-secondary); }
-.notify-content { font-size: 13px; margin: 2px 0; }
-.notify-time { font-size: 11px; color: var(--color-text-secondary); }
+.notify-item:hover {
+  background: rgba(58, 46, 34, 0.06);
+}
+.notify-item.unread {
+  background: rgba(168, 72, 58, 0.08);
+}
+.notify-type {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.notify-content {
+  font-size: 13px;
+  margin: 2px 0;
+}
+.notify-time {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
 
 /* 台灯按钮点亮态:暖黄背景+辉光 */
 .foot-btn.lamp-on {
@@ -586,8 +816,15 @@ html.dark .nav-item-wrap:has(.widget-src)::before { border-color: rgba(var(--col
   animation: lamp-glow 2.5s ease-in-out infinite;
 }
 @keyframes lamp-glow {
-  0%, 100% { transform: scale(0.9); opacity: 0.6; }
-  50% { transform: scale(1.2); opacity: 1; }
+  0%,
+  100% {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
 }
 html.dark .foot-btn.lamp-off::after {
   background: radial-gradient(circle, rgba(100, 150, 220, 0.7) 0%, rgba(100, 150, 220, 0.3) 40%, transparent 70%);
@@ -604,9 +841,17 @@ html.dark .foot-btn.lamp-off::after {
 /* 隐藏 EP 滚动条:子面板绝对定位仍会撑大 wrap 的 scrollWidth,el-scrollbar update()
    会给水平 bar 算出尺寸并显示——一个永远滚不动的"幽灵滚动条";本菜单内容短且
    overflow 已强制 visible,EP 自定义 bar 无用,直接隐藏 */
-.sidebar-user-popper .el-scrollbar__bar { display: none !important; }
-.sidebar-user-popper .family-switch-wrapper { position: relative; }
-.sidebar-user-popper .family-switch-trigger { display: flex; justify-content: space-between; align-items: center; }
+.sidebar-user-popper .el-scrollbar__bar {
+  display: none !important;
+}
+.sidebar-user-popper .family-switch-wrapper {
+  position: relative;
+}
+.sidebar-user-popper .family-switch-trigger {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 .sidebar-user-popper .family-switch-panel {
   /* 不用 display:none 切换:hover 区域是 L 形(触发行+右挂面板),触发行正下方是
      「退出登录」,鼠标斜向下够第二个家庭时会先穿出 hover 区导致面板闪没(实测复现)。
@@ -614,7 +859,9 @@ html.dark .foot-btn.lamp-off::after {
      面板即恢复 hover;真正离开(如移向退出登录)300ms 后才隐藏 */
   visibility: hidden;
   opacity: 0;
-  transition: opacity 0.2s ease, visibility 0s linear 0.3s;
+  transition:
+    opacity 0.2s ease,
+    visibility 0s linear 0.3s;
   position: absolute;
   left: 100%;
   top: 0;
@@ -644,6 +891,11 @@ html.dark .foot-btn.lamp-off::after {
   font-size: 13px;
   transition: background 0.15s;
 }
-.sidebar-user-popper .family-switch-item:hover { background: var(--el-fill-color-light, #f5f7fa); }
-.sidebar-user-popper .family-switch-item.active { color: var(--el-color-primary, #a8483a); font-weight: 600; }
+.sidebar-user-popper .family-switch-item:hover {
+  background: var(--el-fill-color-light, #f5f7fa);
+}
+.sidebar-user-popper .family-switch-item.active {
+  color: var(--el-color-primary, #a8483a);
+  font-weight: 600;
+}
 </style>

@@ -6,24 +6,71 @@
     <div v-loading="loading" class="book-main" ref="mainRef">
       <div v-if="!loading && entries.length" class="book-wrap">
         <!-- 缩放外壳:小屏按可用宽度等比缩放信纸(与编辑页一致);翻页动画挂在外壳,缩放 transform 挂在内层互不覆盖 -->
-        <div :key="pos + (isMobile ? 'm' : 'd')" class="book-scaler" :class="['flip-' + dir, { scaled: spreadScale < 1 }]" :style="scalerStyle">
+        <div
+          :key="pos + (isMobile ? 'm' : 'd')"
+          class="book-scaler"
+          :class="['flip-' + dir, { scaled: spreadScale < 1 }]"
+          :style="scalerStyle"
+        >
           <div ref="spreadRef" class="book-spread" :style="spreadStyle">
             <template v-if="!isMobile">
-              <DiaryPage :page="pages[pos * 2] || blankPage" :no="pos * 2 + 1" side="left" :can-edit="canEdit(pages[pos * 2])" @action="(a) => onAction(a, pages[pos * 2])" />
-              <DiaryPage :page="pages[pos * 2 + 1] || blankPage" :no="pos * 2 + 2" side="right" :can-edit="canEdit(pages[pos * 2 + 1])" @action="(a) => onAction(a, pages[pos * 2 + 1])" />
+              <DiaryPage
+                :page="pages[pos * 2] || blankPage"
+                :no="pos * 2 + 1"
+                side="left"
+                :can-edit="canEdit(pages[pos * 2])"
+                @action="(a) => onAction(a, pages[pos * 2])"
+              />
+              <DiaryPage
+                :page="pages[pos * 2 + 1] || blankPage"
+                :no="pos * 2 + 2"
+                side="right"
+                :can-edit="canEdit(pages[pos * 2 + 1])"
+                @action="(a) => onAction(a, pages[pos * 2 + 1])"
+              />
             </template>
-            <DiaryPage v-else :page="pages[pos] || blankPage" :no="pos + 1" side="single" :can-edit="canEdit(pages[pos])" @action="(a) => onAction(a, pages[pos])" />
+            <DiaryPage
+              v-else
+              :page="pages[pos] || blankPage"
+              :no="pos + 1"
+              side="single"
+              :can-edit="canEdit(pages[pos])"
+              @action="(a) => onAction(a, pages[pos])"
+            />
           </div>
         </div>
 
         <div class="book-toolbar">
           <button class="ghost-btn" :disabled="!canPrev" @click="flip(-1)">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            <svg
+              viewBox="0 0 24 24"
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
             {{ $t('diary.prevPage') }}
           </button>
           <el-dropdown trigger="click" @command="jumpToEntry">
             <button class="ghost-btn">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+              <svg
+                viewBox="0 0 24 24"
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+              </svg>
               {{ $t('diary.toc') }}
             </button>
             <template #dropdown>
@@ -38,7 +85,18 @@
           <span class="page-indicator">{{ indicator }}</span>
           <button class="ghost-btn" :disabled="!canNext" @click="flip(1)">
             {{ $t('diary.nextPage') }}
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+            <svg
+              viewBox="0 0 24 24"
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M9 18l6-6-6-6" />
+            </svg>
           </button>
         </div>
       </div>
@@ -92,7 +150,9 @@ const spreadRef = ref(null)
 const spreadScale = ref(1)
 const scalerH = ref(0)
 const spreadW = computed(() => (isMobile.value ? PAPER_W : DESKTOP_SPREAD_W))
-const spreadStyle = computed(() => (spreadScale.value < 1 ? { transform: `scale(${spreadScale.value})`, transformOrigin: 'top left', width: spreadW.value + 'px' } : {}))
+const spreadStyle = computed(() =>
+  spreadScale.value < 1 ? { transform: `scale(${spreadScale.value})`, transformOrigin: 'top left', width: spreadW.value + 'px' } : {},
+)
 const scalerStyle = computed(() => {
   const s = spreadScale.value
   const style = { width: Math.round(spreadW.value * s) + 'px' }
@@ -172,7 +232,12 @@ const onAction = async (action, page) => {
     router.push(`/diary/edit/${page.e.id}`)
   } else if (action === 'delete') {
     try {
-      await ElMessageBox.confirm(t('diary.deleteConfirm'), { type: 'warning', confirmButtonText: t('common.delete'), cancelButtonText: t('common.cancel'), closeOnClickModal: true })
+      await ElMessageBox.confirm(t('diary.deleteConfirm'), {
+        type: 'warning',
+        confirmButtonText: t('common.delete'),
+        cancelButtonText: t('common.cancel'),
+        closeOnClickModal: true,
+      })
       await diaryApi.remove(page.e.id)
       ElMessage.success(t('common.deleted'))
       await load()
@@ -208,50 +273,118 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.book-main { min-width: 0; }
+.book-main {
+  min-width: 0;
+}
 
-.book-wrap { display: flex; flex-direction: column; align-items: center; gap: 18px; padding-bottom: 20px; }
+.book-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding-bottom: 20px;
+}
 
-.book-spread { display: flex; justify-content: center; gap: 10px; }
+.book-spread {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
 
 /* 缩放外壳:收窄时 overflow 裁掉内层未缩放的布局盒,防止多余滚动空间;缩放 transform 在内层 .book-spread */
-.book-scaler { position: relative; }
-.book-scaler.scaled { overflow: hidden; }
+.book-scaler {
+  position: relative;
+}
+.book-scaler.scaled {
+  overflow: hidden;
+}
 
 /* 翻页动画:方向性滑入(下次翻页重挂载触发),挂在外壳避免覆盖内层缩放 transform */
-.book-scaler { will-change: transform, opacity; }
-.book-scaler.flip-next { animation: flipNext 0.28s ease both; }
-.book-scaler.flip-prev { animation: flipPrev 0.28s ease both; }
-@keyframes flipNext { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: translateX(0); } }
-@keyframes flipPrev { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: translateX(0); } }
+.book-scaler {
+  will-change: transform, opacity;
+}
+.book-scaler.flip-next {
+  animation: flipNext 0.28s ease both;
+}
+.book-scaler.flip-prev {
+  animation: flipPrev 0.28s ease both;
+}
+@keyframes flipNext {
+  from {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes flipPrev {
+  from {
+    opacity: 0;
+    transform: translateX(-28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
 
 .book-toolbar {
-  display: flex; align-items: center; gap: 14px;
-  background: rgba(255,255,255,0.45);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.45);
   backdrop-filter: blur(24px) saturate(1.2);
   -webkit-backdrop-filter: blur(24px) saturate(1.2);
-  border: 1px solid rgba(255,255,255,0.4);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   border-radius: 14px;
   padding: 8px 14px;
-  box-shadow: 0 2px 12px rgba(58,46,34,0.06);
+  box-shadow: 0 2px 12px rgba(58, 46, 34, 0.06);
 }
 html.dark .book-toolbar {
-  background: rgba(var(--color-card-rgb),0.45);
-  border-color: rgba(255,255,255,0.08);
-  box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+  background: rgba(var(--color-card-rgb), 0.45);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
 }
 
-.page-indicator { font-size: 13px; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; min-width: 150px; text-align: center; }
+.page-indicator {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+  min-width: 150px;
+  text-align: center;
+}
 
-:deep(.toc-menu) { max-height: 320px; overflow-y: auto; }
-.toc-date { font-variant-numeric: tabular-nums; }
-.toc-pages { margin-left: 10px; font-size: 11px; color: var(--color-text-secondary); opacity: 0.7; }
+:deep(.toc-menu) {
+  max-height: 320px;
+  overflow-y: auto;
+}
+.toc-date {
+  font-variant-numeric: tabular-nums;
+}
+.toc-pages {
+  margin-left: 10px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  opacity: 0.7;
+}
 
-.empty-state { padding: 48px 0; }
+.empty-state {
+  padding: 48px 0;
+}
 
 @media (max-width: 768px) {
-  .book-spread { gap: 0; }
-  .book-toolbar { gap: 8px; padding: 6px 10px; }
-  .page-indicator { min-width: 90px; font-size: 12px; }
+  .book-spread {
+    gap: 0;
+  }
+  .book-toolbar {
+    gap: 8px;
+    padding: 6px 10px;
+  }
+  .page-indicator {
+    min-width: 90px;
+    font-size: 12px;
+  }
 }
 </style>

@@ -10,7 +10,8 @@
           :class="{ active: activeFilter === f.key }"
           v-a11y-click
           @click="activeFilter = f.key"
-        >{{ f.label }}</span>
+          >{{ f.label }}</span
+        >
       </div>
     </div>
 
@@ -61,7 +62,7 @@ const filters = computed(() => FILTER_KEYS.map((k) => ({ key: k, label: k === 'a
 
 const filteredFeeds = computed(() => {
   if (activeFilter.value === 'all') return feeds.value
-  return feeds.value.filter(f => f.type === activeFilter.value)
+  return feeds.value.filter((f) => f.type === activeFilter.value)
 })
 
 // 类型标签/摘要走共享 utils/feed.js;相对时间走 utils/datetime.js(与首页、暖居首页同口径;移动端历史摘要截断 60)
@@ -69,7 +70,15 @@ const feedTypeLabel = (type) => feedTypeLabelOf(t, type)
 const feedCover = (f) => f.coverImage || (Array.isArray(f.urls) && f.urls.length ? f.urls[0] : '')
 const feedSummary = (f) => feedSummaryOf(t, f, 60)
 const formatTime = (d) => formatRelativeTime(t, d)
-const FEED_ROUTES = { diary: '/diary', photo: '/album', video: '/cinema', wish: '/wish', task: '/task', recipe: '/kitchen', book: '/library' }
+const FEED_ROUTES = {
+  diary: '/diary',
+  photo: '/album',
+  video: '/cinema',
+  wish: '/wish',
+  task: '/task',
+  recipe: '/kitchen',
+  book: '/library',
+}
 const goFeed = (f) => {
   if (f.type === 'blog' && f.id) router.push(`/blog/${f.id}`)
   else if (FEED_ROUTES[f.type]) router.push(FEED_ROUTES[f.type])
@@ -79,12 +88,18 @@ onMounted(async () => {
   try {
     const fn = userStore.isLoggedIn ? homeApi.getFeed : publicApi.getFeed
     feeds.value = await fn(20)
-  } catch (e) { feeds.value = [] } finally { loading.value = false }
+  } catch (e) {
+    feeds.value = []
+  } finally {
+    loading.value = false
+  }
 })
 </script>
 
 <style scoped>
-.mobile-home { min-height: 100%; }
+.mobile-home {
+  min-height: 100%;
+}
 
 .filter-bar {
   position: sticky;
@@ -95,7 +110,10 @@ onMounted(async () => {
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid rgba(0, 0, 0, 0.04);
 }
-html.dark .filter-bar { background: rgba(var(--color-card-rgb), 0.92); border-bottom-color: rgba(255,255,255,0.06); }
+html.dark .filter-bar {
+  background: rgba(var(--color-card-rgb), 0.92);
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
 
 .filter-scroll {
   display: flex;
@@ -105,7 +123,9 @@ html.dark .filter-bar { background: rgba(var(--color-card-rgb), 0.92); border-bo
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
-.filter-scroll::-webkit-scrollbar { display: none; }
+.filter-scroll::-webkit-scrollbar {
+  display: none;
+}
 
 .filter-chip {
   flex-shrink: 0;
@@ -119,7 +139,9 @@ html.dark .filter-bar { background: rgba(var(--color-card-rgb), 0.92); border-bo
   transition: color 0.2s;
   -webkit-tap-highlight-color: transparent;
 }
-html.dark .filter-chip { color: #9aa0a8; }
+html.dark .filter-chip {
+  color: #9aa0a8;
+}
 
 /* 选中态下划线:从中心展开 */
 .filter-chip::after {
@@ -138,11 +160,19 @@ html.dark .filter-chip { color: #9aa0a8; }
   color: var(--color-text-primary, #3a2e22);
   font-weight: 600;
 }
-.filter-chip.active::after { width: 60%; }
-html.dark .filter-chip.active { color: #E8DCC8; }
-html.dark .filter-chip::after { background: var(--color-brand); }
+.filter-chip.active::after {
+  width: 60%;
+}
+html.dark .filter-chip.active {
+  color: #e8dcc8;
+}
+html.dark .filter-chip::after {
+  background: var(--color-brand);
+}
 
-.feed-list { padding: 12px 16px 80px; }
+.feed-list {
+  padding: 12px 16px 80px;
+}
 
 .feed-card {
   background: rgba(255, 255, 255, 0.6);
@@ -154,8 +184,13 @@ html.dark .filter-chip::after { background: var(--color-brand); }
   transition: transform 0.15s;
   -webkit-tap-highlight-color: transparent;
 }
-.feed-card:active { transform: scale(0.98); }
-html.dark .feed-card { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.06); }
+.feed-card:active {
+  transform: scale(0.98);
+}
+html.dark .feed-card {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.06);
+}
 
 .feed-card-head {
   display: flex;
@@ -163,8 +198,14 @@ html.dark .feed-card { background: rgba(255,255,255,0.06); border-color: rgba(25
   gap: 8px;
   margin-bottom: 10px;
 }
-.feed-author { font-size: 14px; font-weight: 500; color: var(--color-text-primary, #333); }
-html.dark .feed-author { color: #E8DCC8; }
+.feed-author {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-primary, #333);
+}
+html.dark .feed-author {
+  color: #e8dcc8;
+}
 .feed-type-tag {
   font-size: 11px;
   padding: 2px 8px;
@@ -172,17 +213,65 @@ html.dark .feed-author { color: #E8DCC8; }
   background: rgba(184, 140, 110, 0.1);
   color: var(--color-primary, var(--color-brand));
 }
-html.dark .feed-type-tag { background: rgba(var(--color-brand-rgb),0.15); color: var(--color-brand); }
-.feed-time { margin-left: auto; font-size: 12px; color: var(--color-text-secondary, #999); }
+html.dark .feed-type-tag {
+  background: rgba(var(--color-brand-rgb), 0.15);
+  color: var(--color-brand);
+}
+.feed-time {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--color-text-secondary, #999);
+}
 
-.feed-card-body { display: flex; gap: 12px; }
-.feed-cover { flex-shrink: 0; width: 80px; height: 80px; border-radius: 10px; overflow: hidden; }
-.feed-cover img { width: 100%; height: 100%; object-fit: cover; }
-.feed-text { flex: 1; min-width: 0; }
-.feed-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; color: var(--color-text-primary, #333); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-html.dark .feed-title { color: #E8DCC8; }
-.feed-summary { font-size: 13px; color: var(--color-text-secondary, #666); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-html.dark .feed-summary { color: #aaa; }
+.feed-card-body {
+  display: flex;
+  gap: 12px;
+}
+.feed-cover {
+  flex-shrink: 0;
+  width: 80px;
+  height: 80px;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.feed-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.feed-text {
+  flex: 1;
+  min-width: 0;
+}
+.feed-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--color-text-primary, #333);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+html.dark .feed-title {
+  color: #e8dcc8;
+}
+.feed-summary {
+  font-size: 13px;
+  color: var(--color-text-secondary, #666);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+html.dark .feed-summary {
+  color: #aaa;
+}
 
-.feed-empty { text-align: center; padding: 60px 0; color: var(--color-text-secondary, #999); font-size: 14px; }
+.feed-empty {
+  text-align: center;
+  padding: 60px 0;
+  color: var(--color-text-secondary, #999);
+  font-size: 14px;
+}
 </style>

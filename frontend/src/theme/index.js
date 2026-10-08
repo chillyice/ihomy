@@ -64,7 +64,7 @@ function sweepVector(sun) {
   if (sun.isNight) return { dx: 1, dy: 0 }
   const az = sun.azimuth
   const bx = -Math.max(-1, Math.min(1, (az - 180) / 90)) // 上午>0、正午=0、下午<0
-  const by = Math.max(0, Math.sin((sun.altitude || 0) * Math.PI / 180)) // 高度角→光束向下分量 0..1
+  const by = Math.max(0, Math.sin(((sun.altitude || 0) * Math.PI) / 180)) // 高度角→光束向下分量 0..1
   const dx = bx >= 0 ? by : -by
   const dy = bx >= 0 ? -bx : bx
   const len = Math.hypot(dx, dy) || 1
@@ -122,7 +122,7 @@ function beginModeSweep(root, prevDusk) {
   const vy = toDusk ? dir.dy : -dir.dy
   // 蒙版渐变轴:0%(透明=新主题已露出)在扫光来向一侧,100%(不透明=旧主题未划到)在前进方向一侧。
   // CSS linear-gradient 角度:0deg=向上/90deg=向右/180deg=向下/270deg=向左,故 angle=atan2(vx, -vy)。
-  const angle = Math.atan2(vx, -vy) * 180 / Math.PI
+  const angle = (Math.atan2(vx, -vy) * 180) / Math.PI
   const grad = `linear-gradient(${angle}deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0) calc(var(--sweep-p) - 8%), #000 calc(var(--sweep-p) + 8%), #000 100%)`
 
   const overlay = cloneOldTheme(root)
@@ -145,9 +145,11 @@ function beginModeSweep(root, prevDusk) {
     try {
       overlay.style.transition = `--sweep-p ${travelMs}ms cubic-bezier(.4,0,.2,1)`
       // 先提交起点,下一帧再切到终点触发过渡(--sweep-p 已用 @property 注册为可过渡)
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        overlay.style.setProperty('--sweep-p', '110%')
-      }))
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          overlay.style.setProperty('--sweep-p', '110%')
+        }),
+      )
     } catch {
       cleanup()
       return

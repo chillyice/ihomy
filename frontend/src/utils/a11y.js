@@ -5,7 +5,10 @@ export const a11yClick = {
     if (!el.hasAttribute('role')) el.setAttribute('role', 'button')
     if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0')
     el.__a11yKey = (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click() }
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        el.click()
+      }
     }
     el.addEventListener('keydown', el.__a11yKey)
   },

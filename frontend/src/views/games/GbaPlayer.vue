@@ -15,7 +15,8 @@
     </PageToolbar>
 
     <div class="gba-card card">
-      <div v-a11y-click
+      <div
+        v-a11y-click
         v-if="!fileName && !src"
         class="drop-zone"
         :class="{ dragging }"
@@ -85,7 +86,10 @@ const pick = () => fileInput.value?.click()
 
 // 清理旧模拟器(只清 DOM + 释放全局引用;objectUrl 由调用方在合适时机释放,否则会提前失效)
 const teardownEmulator = () => {
-  if (loadFallbackTimer) { clearTimeout(loadFallbackTimer); loadFallbackTimer = null }
+  if (loadFallbackTimer) {
+    clearTimeout(loadFallbackTimer)
+    loadFallbackTimer = null
+  }
   if (container.value) container.value.innerHTML = ''
   delete window.EJS_emulator
   delete window.EJS_ready
@@ -94,7 +98,10 @@ const teardownEmulator = () => {
 
 const onEmulatorReady = () => {
   loading.value = false
-  if (loadFallbackTimer) { clearTimeout(loadFallbackTimer); loadFallbackTimer = null }
+  if (loadFallbackTimer) {
+    clearTimeout(loadFallbackTimer)
+    loadFallbackTimer = null
+  }
 }
 
 const loadRom = async (romUrl) => {
@@ -123,7 +130,9 @@ const loadRom = async (romUrl) => {
     document.head.appendChild(s)
 
     // 兜底:回调因异常未触发时,15s 后关 loading 避免永久转圈
-    loadFallbackTimer = setTimeout(() => { loading.value = false }, 15000)
+    loadFallbackTimer = setTimeout(() => {
+      loading.value = false
+    }, 15000)
   } catch (e) {
     error.value = t('gba.loadFailed')
     ElMessage.error(t('gba.loadFailed'))
@@ -155,7 +164,10 @@ const onDrop = (e) => {
 }
 const close = () => {
   teardownEmulator()
-  if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null }
+  if (objectUrl) {
+    URL.revokeObjectURL(objectUrl)
+    objectUrl = null
+  }
   fileName.value = ''
   error.value = ''
 }
@@ -183,7 +195,10 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('fullscreenchange', onFullscreenChange)
   teardownEmulator()
-  if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null }
+  if (objectUrl) {
+    URL.revokeObjectURL(objectUrl)
+    objectUrl = null
+  }
   // 清理 EmulatorJS 全局变量
   delete window.EJS_player
   delete window.EJS_core
@@ -194,31 +209,86 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.gba-card { padding: 24px; }
+.gba-card {
+  padding: 24px;
+}
 .drop-zone {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 8px; min-height: 260px; border: 2px dashed rgba(0,0,0,0.14); border-radius: 14px;
-  cursor: pointer; transition: all 0.2s ease; padding: 32px; text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 260px;
+  border: 2px dashed rgba(0, 0, 0, 0.14);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 32px;
+  text-align: center;
 }
-.drop-zone:hover, .drop-zone.dragging {
+.drop-zone:hover,
+.drop-zone.dragging {
   border-color: var(--color-accent, var(--color-brand));
-  background: rgba(var(--color-brand-rgb, 184,140,110), 0.06);
+  background: rgba(var(--color-brand-rgb, 184, 140, 110), 0.06);
 }
-.drop-icon { font-size: 42px; }
-.drop-title { font-size: 16px; font-weight: 600; color: var(--color-text-primary, #333); }
-.drop-sub { font-size: 13px; color: var(--color-text-secondary, #888); }
-.gba-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.drop-icon {
+  font-size: 42px;
+}
+.drop-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary, #333);
+}
+.drop-sub {
+  font-size: 13px;
+  color: var(--color-text-secondary, #888);
+}
+.gba-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
 .gba-name {
-  flex: 1; font-size: 14px; font-weight: 600; color: var(--color-text-primary, #333);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary, #333);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .gba-stage {
-  position: relative; height: 480px; border-radius: 12px; background: #000; overflow: hidden;
+  position: relative;
+  height: 480px;
+  border-radius: 12px;
+  background: #000;
+  overflow: hidden;
 }
-.gba-stage-inner { width: 100%; height: 100%; }
-.gba-stage:fullscreen { width: 100vw; height: 100vh; border-radius: 0; }
-.gba-status { margin-top: 14px; font-size: 13px; color: var(--color-text-secondary, #888); text-align: center; }
-.gba-status.error { color: #f56c6c; }
-.hidden-input { display: none; }
-@media (max-width: 768px) { .gba-stage { height: 320px; } }
+.gba-stage-inner {
+  width: 100%;
+  height: 100%;
+}
+.gba-stage:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  border-radius: 0;
+}
+.gba-status {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--color-text-secondary, #888);
+  text-align: center;
+}
+.gba-status.error {
+  color: #f56c6c;
+}
+.hidden-input {
+  display: none;
+}
+@media (max-width: 768px) {
+  .gba-stage {
+    height: 320px;
+  }
+}
 </style>

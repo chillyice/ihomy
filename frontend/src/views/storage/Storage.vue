@@ -11,7 +11,9 @@
         <el-table-column prop="name" :label="$t('storage.deviceName')" :min-width="isMobile ? 120 : 140">
           <template #default="{ row }">
             {{ row.name }}
-            <el-tag v-if="row.id === defaultDeviceId" size="small" type="success" style="margin-left: 6px">{{ $t('storage.defaultTag') }}</el-tag>
+            <el-tag v-if="row.id === defaultDeviceId" size="small" type="success" style="margin-left: 6px">{{
+              $t('storage.defaultTag')
+            }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column v-if="!isMobile" prop="deviceType" :label="$t('storage.deviceType')" width="130" />
@@ -24,12 +26,23 @@
         <el-table-column :label="$t('common.actions')" :width="isMobile ? 140 : 280" :fixed="isMobile ? false : 'right'">
           <template #default="{ row }">
             <el-button v-if="row.id !== 0" size="small" @click="goBrowse(row)">{{ $t('storage.browse') }}</el-button>
-            <el-button v-if="row.id !== 0 && row.id !== defaultDeviceId && userStore.isOwner" size="small" text type="success" @click="setDefaultDevice(row)">{{ $t('storage.setDefault') }}</el-button>
+            <el-button
+              v-if="row.id !== 0 && row.id !== defaultDeviceId && userStore.isOwner"
+              size="small"
+              text
+              type="success"
+              @click="setDefaultDevice(row)"
+              >{{ $t('storage.setDefault') }}</el-button
+            >
             <el-tooltip v-if="row.id !== 0 && userStore.isOwner" :content="$t('common.edit')" placement="top" :show-after="300">
-              <el-button size="small" text @click="openDevice(row)"><el-icon><Edit /></el-icon></el-button>
+              <el-button size="small" text @click="openDevice(row)"
+                ><el-icon><Edit /></el-icon
+              ></el-button>
             </el-tooltip>
             <el-tooltip v-if="row.id !== 0 && userStore.isOwner" :content="$t('common.delete')" placement="top" :show-after="300">
-              <el-button size="small" text type="danger" @click="removeDevice(row)"><el-icon><Delete /></el-icon></el-button>
+              <el-button size="small" text type="danger" @click="removeDevice(row)"
+                ><el-icon><Delete /></el-icon
+              ></el-button>
             </el-tooltip>
           </template>
         </el-table-column>
@@ -82,20 +95,30 @@
             <el-option v-for="dt in deviceTypes" :key="dt.value" :label="dt.label" :value="dt.value" />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="deviceForm.deviceType !== 'BAIDU' && !isWebDavType(deviceForm.deviceType)" :label="$t('storage.rootPath')" required>
+        <el-form-item
+          v-if="deviceForm.deviceType !== 'BAIDU' && !isWebDavType(deviceForm.deviceType)"
+          :label="$t('storage.rootPath')"
+          required
+        >
           <el-input v-model="deviceForm.rootPath" :placeholder="$t('storage.rootPathPh')" />
         </el-form-item>
         <template v-if="isWebDavType(deviceForm.deviceType)">
           <el-form-item :label="$t('storage.webdav.server')" required>
-            <el-input v-model="deviceForm.serverUrl"
-              :placeholder="deviceForm.deviceType === 'NEXTCLOUD' ? $t('storage.webdav.serverPhNc') : $t('storage.webdav.serverPh')" />
+            <el-input
+              v-model="deviceForm.serverUrl"
+              :placeholder="deviceForm.deviceType === 'NEXTCLOUD' ? $t('storage.webdav.serverPhNc') : $t('storage.webdav.serverPh')"
+            />
           </el-form-item>
           <el-form-item :label="$t('storage.webdav.username')" required>
             <el-input v-model="deviceForm.username" :placeholder="$t('storage.webdav.usernamePh')" />
           </el-form-item>
           <el-form-item :label="$t('storage.webdav.password')">
-            <el-input v-model="deviceForm.password" type="password" show-password
-              :placeholder="deviceForm.id ? $t('storage.webdav.keepPlaceholder') : $t('storage.webdav.passwordPh')" />
+            <el-input
+              v-model="deviceForm.password"
+              type="password"
+              show-password
+              :placeholder="deviceForm.id ? $t('storage.webdav.keepPlaceholder') : $t('storage.webdav.passwordPh')"
+            />
           </el-form-item>
         </template>
         <template v-if="deviceForm.deviceType === 'BAIDU'">
@@ -106,12 +129,20 @@
             <el-input v-model="deviceForm.appKey" :placeholder="$t('storage.baidu.appKeyPlaceholder')" />
           </el-form-item>
           <el-form-item label="SecretKey">
-            <el-input v-model="deviceForm.secretKey" type="password" show-password
-              :placeholder="deviceForm.secretKeySet ? $t('storage.baidu.keepPlaceholder') : $t('storage.baidu.secretPlaceholder')" />
+            <el-input
+              v-model="deviceForm.secretKey"
+              type="password"
+              show-password
+              :placeholder="deviceForm.secretKeySet ? $t('storage.baidu.keepPlaceholder') : $t('storage.baidu.secretPlaceholder')"
+            />
           </el-form-item>
           <el-form-item label="SignKey">
-            <el-input v-model="deviceForm.signKey" type="password" show-password
-              :placeholder="deviceForm.signKeySet ? $t('storage.baidu.keepPlaceholder') : $t('storage.baidu.signPlaceholder')" />
+            <el-input
+              v-model="deviceForm.signKey"
+              type="password"
+              show-password
+              :placeholder="deviceForm.signKeySet ? $t('storage.baidu.keepPlaceholder') : $t('storage.baidu.signPlaceholder')"
+            />
           </el-form-item>
         </template>
       </el-form>
@@ -182,7 +213,15 @@ const setDefaultDevice = (row) => {
 const goBrowse = (row) => router.push({ path: '/storage/files', query: { deviceId: row.id } })
 
 // 百度网盘接入状态(凭证在设备模态框中维护,此处只读展示)
-const baiduForm = ref({ appId: '', appKey: '', secretKeySet: false, signKeySet: false, configured: false, authorized: false, tokenExpiresAt: null })
+const baiduForm = ref({
+  appId: '',
+  appKey: '',
+  secretKeySet: false,
+  signKeySet: false,
+  configured: false,
+  authorized: false,
+  tokenExpiresAt: null,
+})
 const baiduCallbackUrl = `${location.origin}/storage/baidu/callback`
 
 async function loadBaidu() {
@@ -227,11 +266,22 @@ async function loadDevices() {
 }
 
 function openDevice(row) {
-  const base = { secretKey: '', signKey: '', appId: '', appKey: '', secretKeySet: false, signKeySet: false, serverUrl: '', username: '', password: '' }
+  const base = {
+    secretKey: '',
+    signKey: '',
+    appId: '',
+    appKey: '',
+    secretKeySet: false,
+    signKeySet: false,
+    serverUrl: '',
+    username: '',
+    password: '',
+  }
   if (row) {
     // 编辑:百度网盘设备带出已存凭证(密钥只显示"留空保持不变")
     const form = {
-      ...row, ...base,
+      ...row,
+      ...base,
       appId: baiduForm.value.appId || '',
       appKey: baiduForm.value.appKey || '',
       secretKeySet: baiduForm.value.secretKeySet,
@@ -317,7 +367,9 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.storage-settings { width: 100%; }
+.storage-settings {
+  width: 100%;
+}
 .settings-card {
   margin-bottom: 16px;
 }
@@ -364,12 +416,21 @@ onMounted(() => {
   opacity: 0.5;
 }
 /* 设备表内编辑/删除图标按钮:紧凑间距(排除「设为默认」等文本按钮) */
-:deep(.el-table .el-button.is-text:not(.el-button--success)) { padding: 5px 6px; }
-:deep(.el-table .el-button.is-text:not(.el-button--success) + .el-button.is-text:not(.el-button--success)) { margin-left: 4px; }
+:deep(.el-table .el-button.is-text:not(.el-button--success)) {
+  padding: 5px 6px;
+}
+:deep(.el-table .el-button.is-text:not(.el-button--success) + .el-button.is-text:not(.el-button--success)) {
+  margin-left: 4px;
+}
 
 @media (max-width: 768px) {
-  .storage-settings { max-width: 100%; overflow-x: hidden; }
+  .storage-settings {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
   /* 移动端设备表:去掉 fixed 后表格自身横向滚动,这里限制卡片不撑破页面 */
-  .settings-card :deep(.el-table) { font-size: 12px; }
+  .settings-card :deep(.el-table) {
+    font-size: 12px;
+  }
 }
 </style>

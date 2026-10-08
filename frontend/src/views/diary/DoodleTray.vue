@@ -4,14 +4,40 @@
     <!-- 仅箭头把手可收起/展开:整行标题不做开关,防止手写笔书写时手掌误触抽屉弹跳 -->
     <div class="tray-title">
       <span class="tray-name">{{ collapsed && brush ? activeBrushLabel : $t('diary.doodleTitle') }}</span>
-      <button v-if="isMobile" type="button" class="tray-toggle" :class="{ up: !collapsed }" :title="collapsed ? $t('common.expand') : $t('common.collapse')" @click="toggle">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>
+      <button
+        v-if="isMobile"
+        type="button"
+        class="tray-toggle"
+        :class="{ up: !collapsed }"
+        :title="collapsed ? $t('common.expand') : $t('common.collapse')"
+        @click="toggle"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M6 15l6-6 6 6" />
+        </svg>
       </button>
     </div>
 
     <div v-show="!collapsed || !isMobile" class="tray-body">
       <div class="pen-grid">
-        <button v-for="b in BRUSHES" :key="b.id" type="button" class="pen-item" :class="{ active: brush === b.id }" :title="$t(b.labelKey)" @click="pickBrush(b)">
+        <button
+          v-for="b in BRUSHES"
+          :key="b.id"
+          type="button"
+          class="pen-item"
+          :class="{ active: brush === b.id }"
+          :title="$t(b.labelKey)"
+          @click="pickBrush(b)"
+        >
           <span class="pen-svg">
             <!-- 签字笔 -->
             <svg v-if="b.id === 'gel'" viewBox="0 0 26 52">
@@ -29,34 +55,64 @@
             </svg>
             <!-- 蜡笔 -->
             <svg v-else-if="b.id === 'crayon'" viewBox="0 0 26 52">
-              <path d="M8 6 h10 v22 q0 3 -2 4 l-2 9 h-2 l-2 -9 q-2 -1 -2 -4 Z" :fill="brushColor" fill-opacity="0.75" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+              <path
+                d="M8 6 h10 v22 q0 3 -2 4 l-2 9 h-2 l-2 -9 q-2 -1 -2 -4 Z"
+                :fill="brushColor"
+                fill-opacity="0.75"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linejoin="round"
+              />
               <path d="M8 14 h10 M8 18 h10" stroke="currentColor" stroke-width="1" opacity="0.45" />
             </svg>
             <!-- 荧光笔 -->
             <svg v-else-if="b.id === 'marker'" viewBox="0 0 26 52">
               <rect x="9" y="3" width="8" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="1.5" />
               <path d="M9 9 h8" stroke="currentColor" stroke-width="1.2" />
-              <path d="M8.5 23 L17.5 23 L15.5 41 L10.5 39 Z" :fill="brushColor" fill-opacity="0.7" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+              <path
+                d="M8.5 23 L17.5 23 L15.5 41 L10.5 39 Z"
+                :fill="brushColor"
+                fill-opacity="0.7"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linejoin="round"
+              />
             </svg>
             <!-- 画笔 -->
             <svg v-else-if="b.id === 'brush'" viewBox="0 0 26 52">
               <rect x="11.5" y="3" width="3" height="19" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5" />
               <rect x="10.5" y="22" width="5" height="5" fill="none" stroke="currentColor" stroke-width="1.3" />
-              <path d="M10.5 27 Q13.5 34 11 44 Q13 50 15.5 44 Q14.5 34 15.5 27 Z" :fill="brushColor" fill-opacity="0.85" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+              <path
+                d="M10.5 27 Q13.5 34 11 44 Q13 50 15.5 44 Q14.5 34 15.5 27 Z"
+                :fill="brushColor"
+                fill-opacity="0.85"
+                stroke="currentColor"
+                stroke-width="1.3"
+                stroke-linejoin="round"
+              />
             </svg>
             <!-- 像素橡皮 -->
             <svg v-else-if="b.id === 'eraserP'" viewBox="0 0 26 52">
               <rect x="7" y="12" width="12" height="22" rx="3" fill="none" stroke="currentColor" stroke-width="1.5" />
               <path d="M7 19 h12" stroke="currentColor" stroke-width="1" opacity="0.45" />
               <g :fill="brushColor">
-                <rect x="9" y="41" width="3" height="3" /><rect x="14" y="41" width="3" height="3" /><rect x="11.5" y="45" width="3" height="3" />
+                <rect x="9" y="41" width="3" height="3" />
+                <rect x="14" y="41" width="3" height="3" />
+                <rect x="11.5" y="45" width="3" height="3" />
               </g>
             </svg>
             <!-- 对象橡皮 -->
             <svg v-else viewBox="0 0 26 52">
               <rect x="7" y="12" width="12" height="22" rx="3" fill="none" stroke="currentColor" stroke-width="1.5" />
               <path d="M7 19 h12" stroke="currentColor" stroke-width="1" opacity="0.45" />
-              <path d="M7 45 q3.5 -5 6.5 0 t6.5 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity="0.55" />
+              <path
+                d="M7 45 q3.5 -5 6.5 0 t6.5 0"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                opacity="0.55"
+              />
               <path d="M18.5 40.5 l5 5 M23.5 40.5 l-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
             </svg>
           </span>
@@ -77,8 +133,20 @@
       <div class="tray-row palette-row">
         <span class="tray-label">{{ $t('diary.colorLabel') }}</span>
         <div class="palette">
-          <button v-for="c in INK_COLORS" :key="c" type="button" class="swatch" :class="{ active: brushColor.toLowerCase() === c.toLowerCase() }" :style="{ background: c }" @click="$emit('update:brushColor', c)" />
-          <label class="swatch custom" :class="{ active: !INK_COLORS.some((c) => c.toLowerCase() === brushColor.toLowerCase()) }" :title="$t('diary.customColor')">
+          <button
+            v-for="c in INK_COLORS"
+            :key="c"
+            type="button"
+            class="swatch"
+            :class="{ active: brushColor.toLowerCase() === c.toLowerCase() }"
+            :style="{ background: c }"
+            @click="$emit('update:brushColor', c)"
+          />
+          <label
+            class="swatch custom"
+            :class="{ active: !INK_COLORS.some((c) => c.toLowerCase() === brushColor.toLowerCase()) }"
+            :title="$t('diary.customColor')"
+          >
             <input type="color" :value="safeColor" @input="(e) => $emit('update:brushColor', e.target.value)" />
           </label>
         </div>
@@ -86,11 +154,35 @@
 
       <div class="tray-actions">
         <button type="button" class="ghost-btn small" :disabled="!canUndo" @click="$emit('undo')">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
+          <svg
+            viewBox="0 0 24 24"
+            width="13"
+            height="13"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M9 14L4 9l5-5" />
+            <path d="M4 9h10a6 6 0 0 1 0 12h-3" />
+          </svg>
           {{ $t('diary.undo') }}
         </button>
         <button type="button" class="ghost-btn small" :disabled="!canRedo" @click="$emit('redo')">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg>
+          <svg
+            viewBox="0 0 24 24"
+            width="13"
+            height="13"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M15 14l5-5-5-5" />
+            <path d="M20 9H10a6 6 0 0 0 0 12h3" />
+          </svg>
           {{ $t('diary.redo') }}
         </button>
       </div>
@@ -110,7 +202,9 @@ const { t } = useI18n()
 const { isMobile } = useDevice()
 const collapsed = ref(true)
 
-const toggle = () => { if (isMobile.value) collapsed.value = !collapsed.value }
+const toggle = () => {
+  if (isMobile.value) collapsed.value = !collapsed.value
+}
 
 const props = defineProps({
   brush: { type: String, default: null },
@@ -135,97 +229,251 @@ const safeColor = computed(() => (/^#[0-9a-fA-F]{6}$/.test(props.brushColor) ? p
 
 <style scoped>
 .doodle-area {
-  background: rgba(255,255,255,0.45); backdrop-filter: blur(24px) saturate(1.2);
-  -webkit-backdrop-filter: blur(24px) saturate(1.2); border-radius: 14px;
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  border-radius: 14px;
   width: calc(14 * 16px + 24px * 2);
   padding: 14px 16px;
-  border: 1px solid rgba(255,255,255,0.4); box-shadow: 0 2px 12px rgba(58,46,34,0.06);
-  flex-shrink: 0; position: sticky; top: 16px; align-self: flex-start;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 2px 12px rgba(58, 46, 34, 0.06);
+  flex-shrink: 0;
+  position: sticky;
+  top: 16px;
+  align-self: flex-start;
 }
 html.dark .doodle-area {
-  background: rgba(var(--color-card-rgb),0.45); border-color: rgba(255,255,255,0.08);
-  box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+  background: rgba(var(--color-card-rgb), 0.45);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
 }
 
-.tray-title { font-size: 12px; font-weight: 600; color: var(--color-text-secondary); margin-bottom: 10px; text-align: center; letter-spacing: 2px; }
+.tray-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: 10px;
+  text-align: center;
+  letter-spacing: 2px;
+}
 
 /* 移动端标题栏 + 箭头把手(唯一开关,触控目标 ≥40px) */
 .mobile .tray-title {
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  margin-bottom: 0; padding: 2px 0;
-  -webkit-tap-highlight-color: transparent; user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 0;
+  padding: 2px 0;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
-.mobile .tray-title .tray-name { line-height: 36px; }
+.mobile .tray-title .tray-name {
+  line-height: 36px;
+}
 .tray-toggle {
-  display: inline-flex; align-items: center; justify-content: center;
-  min-width: 40px; height: 36px; margin: 0 -6px; padding: 0;
-  border: none; background: transparent; color: var(--color-text-secondary);
-  cursor: pointer; -webkit-tap-highlight-color: transparent;
-  transition: transform 0.25s ease, background 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 36px;
+  margin: 0 -6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 0.25s ease,
+    background 0.15s;
   border-radius: 8px;
 }
-.tray-toggle:active { background: rgba(var(--color-brand-rgb),0.12); }
-.tray-toggle.up { transform: rotate(180deg); }
+.tray-toggle:active {
+  background: rgba(var(--color-brand-rgb), 0.12);
+}
+.tray-toggle.up {
+  transform: rotate(180deg);
+}
 
-.pen-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px 2px; }
+.pen-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px 2px;
+}
 
 .pen-item {
-  border: none; background: transparent; cursor: pointer; padding: 4px 0 6px;
-  border-radius: 10px; color: var(--color-text-secondary);
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 4px 0 6px;
+  border-radius: 10px;
+  color: var(--color-text-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
   transition: background 0.2s;
 }
-.pen-item:hover { background: rgba(var(--color-brand-rgb),0.08); }
-html.dark .pen-item:hover { background: rgba(var(--color-brand-rgb),0.08); }
-
-.pen-svg { display: block; width: 26px; height: 52px; transition: transform 0.22s ease; }
-.pen-item:hover .pen-svg { transform: translateY(-5px) rotate(-4deg); }
-.pen-item.active { color: var(--color-text); background: rgba(var(--color-brand-rgb),0.1); }
-html.dark .pen-item.active { background: rgba(var(--color-brand-rgb),0.12); color: #E8DCC8; }
-.pen-item.active .pen-svg { transform: translateY(-5px) rotate(-4deg); filter: drop-shadow(0 4px 6px rgba(58,46,34,0.25)); }
-
-.pen-name { font-size: 10.5px; color: var(--color-text-secondary); opacity: 0.75; }
-.pen-item.active .pen-name { color: var(--color-brand); opacity: 1; font-weight: 600; }
-html.dark .pen-item.active .pen-name { color: var(--color-brand); }
-
-.tray-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
-.tray-label { font-size: 12px; color: var(--color-text-secondary); flex-shrink: 0; min-width: 3.2em; }
-.tray-row .el-slider { flex: 1; }
-
-.palette { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; flex: 1; justify-items: center; }
-.swatch {
-  width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.8);
-  cursor: pointer; padding: 0; position: relative;
-  box-shadow: 0 1px 3px rgba(58,46,34,0.2);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+.pen-item:hover {
+  background: rgba(var(--color-brand-rgb), 0.08);
 }
-.swatch:hover { transform: scale(1.18); }
-.swatch.active { box-shadow: 0 0 0 2px var(--color-brand), 0 1px 4px rgba(58,46,34,0.3); transform: scale(1.12); }
-html.dark .swatch { border-color: rgba(255,255,255,0.25); }
-.swatch.custom { border: none; background: conic-gradient(#E3B23C, #5B8C5A, #4A7FB5, #7B5EA7, #C96A8B, #D97B29, #E3B23C); }
+html.dark .pen-item:hover {
+  background: rgba(var(--color-brand-rgb), 0.08);
+}
+
+.pen-svg {
+  display: block;
+  width: 26px;
+  height: 52px;
+  transition: transform 0.22s ease;
+}
+.pen-item:hover .pen-svg {
+  transform: translateY(-5px) rotate(-4deg);
+}
+.pen-item.active {
+  color: var(--color-text);
+  background: rgba(var(--color-brand-rgb), 0.1);
+}
+html.dark .pen-item.active {
+  background: rgba(var(--color-brand-rgb), 0.12);
+  color: #e8dcc8;
+}
+.pen-item.active .pen-svg {
+  transform: translateY(-5px) rotate(-4deg);
+  filter: drop-shadow(0 4px 6px rgba(58, 46, 34, 0.25));
+}
+
+.pen-name {
+  font-size: 10.5px;
+  color: var(--color-text-secondary);
+  opacity: 0.75;
+}
+.pen-item.active .pen-name {
+  color: var(--color-brand);
+  opacity: 1;
+  font-weight: 600;
+}
+html.dark .pen-item.active .pen-name {
+  color: var(--color-brand);
+}
+
+.tray-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+.tray-label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+  min-width: 3.2em;
+}
+.tray-row .el-slider {
+  flex: 1;
+}
+
+.palette {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  flex: 1;
+  justify-items: center;
+}
+.swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  padding: 0;
+  position: relative;
+  box-shadow: 0 1px 3px rgba(58, 46, 34, 0.2);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.swatch:hover {
+  transform: scale(1.18);
+}
+.swatch.active {
+  box-shadow:
+    0 0 0 2px var(--color-brand),
+    0 1px 4px rgba(58, 46, 34, 0.3);
+  transform: scale(1.12);
+}
+html.dark .swatch {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.swatch.custom {
+  border: none;
+  background: conic-gradient(#e3b23c, #5b8c5a, #4a7fb5, #7b5ea7, #c96a8b, #d97b29, #e3b23c);
+}
 .swatch.custom::after {
-  content: '+'; position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 700; color: #fff; text-shadow: 0 0 3px rgba(0,0,0,0.6);
+  content: '+';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.6);
   pointer-events: none;
 }
-.swatch.custom input { position: absolute; inset: -4px; opacity: 0; cursor: pointer; }
+.swatch.custom input {
+  position: absolute;
+  inset: -4px;
+  opacity: 0;
+  cursor: pointer;
+}
 
-.tray-actions { display: flex; gap: 8px; margin-top: 14px; }
-.tray-actions .ghost-btn { flex: 1; justify-content: center; }
+.tray-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+.tray-actions .ghost-btn {
+  flex: 1;
+  justify-content: center;
+}
 
-.tray-hint { font-size: 11px; color: var(--color-text-secondary); opacity: 0.55; line-height: 1.6; margin-top: 12px; }
+.tray-hint {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  opacity: 0.55;
+  line-height: 1.6;
+  margin-top: 12px;
+}
 
 @media (max-width: 768px) {
   .doodle-area {
-    width: 100%; position: fixed; left: 0; right: 0; bottom: 0; top: auto;
-    border-radius: 14px 14px 0 0; z-index: 55;
+    width: 100%;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    border-radius: 14px 14px 0 0;
+    z-index: 55;
     max-height: 48vh;
-    display: flex; flex-direction: column; overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
   }
   /* 标题栏固定抽屉顶部,工具内容在 body 内部滚动(收起把手始终可见) */
-  .mobile .tray-body { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 4px; }
-  .pen-svg { width: 22px; height: 44px; }
+  .mobile .tray-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: 4px;
+  }
+  .pen-svg {
+    width: 22px;
+    height: 44px;
+  }
 }
 </style>

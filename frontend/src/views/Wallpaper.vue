@@ -18,8 +18,12 @@
     <div class="wp-base" aria-hidden="true"></div>
 
     <!-- 天气→AI 生图氛围底图(z=1,压在兜底底色之上、光影层之下;无图时隐藏走主题渐变) -->
-    <div class="wp-weatherbg" :class="{ on: weatherBg }"
-         :style="weatherBg ? { backgroundImage: `url(${weatherBg})` } : null" aria-hidden="true"></div>
+    <div
+      class="wp-weatherbg"
+      :class="{ on: weatherBg }"
+      :style="weatherBg ? { backgroundImage: `url(${weatherBg})` } : null"
+      aria-hidden="true"
+    ></div>
 
     <!-- 全局光影层(体积光/窗影/尘/台灯/天气特效);太阳与天气状态由 App.vue provide -->
     <SunLightLayer />
@@ -40,9 +44,13 @@
 
     <!-- 小组件:组件库见 WIDGET_DEFS,默认只开照片/纪念日/待办,其余在角落「组件」面板里添加。
          常驻显示、整卡可拖拽、位置记忆;光影层仍在其上(照片被光柱/浮尘覆盖) -->
-    <div v-if="isOn('photos') && stackCards.length" class="wp-widget wpw-photos"
-         :class="{ placed: widgetPos.photos, dragging: dragId === 'photos' }"
-         :style="widgetStyle('photos')" @pointerdown="onWidgetDown('photos', $event)">
+    <div
+      v-if="isOn('photos') && stackCards.length"
+      class="wp-widget wpw-photos"
+      :class="{ placed: widgetPos.photos, dragging: dragId === 'photos' }"
+      :style="widgetStyle('photos')"
+      @pointerdown="onWidgetDown('photos', $event)"
+    >
       <div class="wp-stack">
         <div v-for="(p, i) in stackCards" :key="p.id" class="wp-pcard" :style="pcardStyle(i)">
           <img :src="p.url" :alt="p.description || ''" loading="lazy" draggable="false" />
@@ -51,9 +59,13 @@
       <div v-if="topPhoto?.description" class="wp-cap">{{ topPhoto.description }}</div>
     </div>
 
-    <div v-if="isOn('anni') && userStore.isLoggedIn && anniEvents.length" class="wp-widget wpw-anni"
-         :class="{ placed: widgetPos.anni, dragging: dragId === 'anni' }"
-         :style="widgetStyle('anni')" @pointerdown="onWidgetDown('anni', $event)">
+    <div
+      v-if="isOn('anni') && userStore.isLoggedIn && anniEvents.length"
+      class="wp-widget wpw-anni"
+      :class="{ placed: widgetPos.anni, dragging: dragId === 'anni' }"
+      :style="widgetStyle('anni')"
+      @pointerdown="onWidgetDown('anni', $event)"
+    >
       <div class="wpw-title">{{ $t('wallpaper.widgetAnni') }}</div>
       <div class="wpw-body">
         <div v-for="(ev, i) in anniEvents" :key="i" class="wpw-row">
@@ -63,15 +75,21 @@
           </div>
           <div class="wpw-days" :class="{ today: ev.days === 0 }">
             <template v-if="ev.days === 0">{{ $t('wallpaper.today') }}</template>
-            <template v-else>{{ ev.days }}<span class="wpw-days-unit">{{ $t('wallpaper.daysUnit') }}</span></template>
+            <template v-else
+              >{{ ev.days }}<span class="wpw-days-unit">{{ $t('wallpaper.daysUnit') }}</span></template
+            >
           </div>
         </div>
       </div>
     </div>
 
-    <div v-if="isOn('task') && userStore.isLoggedIn && todoTasks.length" class="wp-widget wpw-task"
-         :class="{ placed: widgetPos.task, dragging: dragId === 'task' }"
-         :style="widgetStyle('task')" @pointerdown="onWidgetDown('task', $event)">
+    <div
+      v-if="isOn('task') && userStore.isLoggedIn && todoTasks.length"
+      class="wp-widget wpw-task"
+      :class="{ placed: widgetPos.task, dragging: dragId === 'task' }"
+      :style="widgetStyle('task')"
+      @pointerdown="onWidgetDown('task', $event)"
+    >
       <div class="wpw-title">{{ $t('wallpaper.widgetTodo') }}</div>
       <div class="wpw-body">
         <div v-for="tk in todoTasks" :key="tk.id" class="wpw-row">
@@ -85,9 +103,13 @@
     </div>
 
     <!-- 家庭动态流(只读;启用才取数,未开时不打这个请求) -->
-    <div v-if="isOn('feed') && feedItems.length" class="wp-widget wpw-feed"
-         :class="{ placed: widgetPos.feed, dragging: dragId === 'feed' }"
-         :style="widgetStyle('feed')" @pointerdown="onWidgetDown('feed', $event)">
+    <div
+      v-if="isOn('feed') && feedItems.length"
+      class="wp-widget wpw-feed"
+      :class="{ placed: widgetPos.feed, dragging: dragId === 'feed' }"
+      :style="widgetStyle('feed')"
+      @pointerdown="onWidgetDown('feed', $event)"
+    >
       <div class="wpw-title">{{ $t('wallpaper.wFeed') }}</div>
       <div class="wpw-body">
         <div v-for="(f, i) in feedItems" :key="i" class="wpw-row">
@@ -100,9 +122,13 @@
     </div>
 
     <!-- 家庭计划(只读) -->
-    <div v-if="isOn('plan') && plans.length" class="wp-widget wpw-plan"
-         :class="{ placed: widgetPos.plan, dragging: dragId === 'plan' }"
-         :style="widgetStyle('plan')" @pointerdown="onWidgetDown('plan', $event)">
+    <div
+      v-if="isOn('plan') && plans.length"
+      class="wp-widget wpw-plan"
+      :class="{ placed: widgetPos.plan, dragging: dragId === 'plan' }"
+      :style="widgetStyle('plan')"
+      @pointerdown="onWidgetDown('plan', $event)"
+    >
       <div class="wpw-title">{{ $t('wallpaper.wPlan') }}</div>
       <div class="wpw-body">
         <div v-for="p in plans" :key="p.id" class="wpw-row">
@@ -115,9 +141,13 @@
     </div>
 
     <!-- 提醒事项(只读) -->
-    <div v-if="isOn('reminder') && reminders.length" class="wp-widget wpw-reminder"
-         :class="{ placed: widgetPos.reminder, dragging: dragId === 'reminder' }"
-         :style="widgetStyle('reminder')" @pointerdown="onWidgetDown('reminder', $event)">
+    <div
+      v-if="isOn('reminder') && reminders.length"
+      class="wp-widget wpw-reminder"
+      :class="{ placed: widgetPos.reminder, dragging: dragId === 'reminder' }"
+      :style="widgetStyle('reminder')"
+      @pointerdown="onWidgetDown('reminder', $event)"
+    >
       <div class="wpw-title">{{ $t('wallpaper.wReminder') }}</div>
       <div class="wpw-body">
         <div v-for="r in reminders" :key="r.id" class="wpw-row">
@@ -132,18 +162,31 @@
     <!-- 角落控件:鼠标移动浮现、静止隐去(壁纸不留常驻界面) -->
     <div class="wp-ui" :class="{ visible: uiVisible }">
       <div class="wp-seg">
-        <button v-for="t in themeStore.themes" :key="t.id" class="wp-segbtn"
-                :class="{ on: themeStore.theme === t.id }" @click="themeStore.setTheme(t.id)">
+        <button
+          v-for="t in themeStore.themes"
+          :key="t.id"
+          class="wp-segbtn"
+          :class="{ on: themeStore.theme === t.id }"
+          @click="themeStore.setTheme(t.id)"
+        >
           {{ t.label[locale === 'en' ? 'en' : 'zh'] }}
         </button>
       </div>
       <div class="wp-seg">
-        <button class="wp-segbtn" :class="{ on: themeStore.autoMode }"
-                :title="$t('wallpaper.autoHint')" @click="themeStore.setAutoMode(true)">{{ $t('wallpaper.auto') }}</button>
-        <button class="wp-segbtn" :class="{ on: !themeStore.autoMode && themeStore.mode === 'dawn' }"
-                @click="themeStore.setMode('dawn')">{{ $t('wallpaper.dawn') }}</button>
-        <button class="wp-segbtn" :class="{ on: !themeStore.autoMode && themeStore.mode === 'dusk' }"
-                @click="themeStore.setMode('dusk')">{{ $t('wallpaper.dusk') }}</button>
+        <button
+          class="wp-segbtn"
+          :class="{ on: themeStore.autoMode }"
+          :title="$t('wallpaper.autoHint')"
+          @click="themeStore.setAutoMode(true)"
+        >
+          {{ $t('wallpaper.auto') }}
+        </button>
+        <button class="wp-segbtn" :class="{ on: !themeStore.autoMode && themeStore.mode === 'dawn' }" @click="themeStore.setMode('dawn')">
+          {{ $t('wallpaper.dawn') }}
+        </button>
+        <button class="wp-segbtn" :class="{ on: !themeStore.autoMode && themeStore.mode === 'dusk' }" @click="themeStore.setMode('dusk')">
+          {{ $t('wallpaper.dusk') }}
+        </button>
       </div>
       <!-- 语言:WE 里 CEF 是 en-us,i18n 默认跟随浏览器语言会走英文,这里可显式切(WE 属性面板亦有同名选项) -->
       <div class="wp-seg">
@@ -157,8 +200,7 @@
       </div>
       <div v-if="panelOpen" class="wp-widgets">
         <div class="wp-widgets-cap">{{ $t('wallpaper.widgetsTitle') }}</div>
-        <button v-for="w in WIDGET_DEFS" :key="w.id" class="wp-widgets-row"
-                :class="{ on: isOn(w.id) }" @click="toggleWidget(w.id)">
+        <button v-for="w in WIDGET_DEFS" :key="w.id" class="wp-widgets-row" :class="{ on: isOn(w.id) }" @click="toggleWidget(w.id)">
           <span class="wp-widgets-mark">{{ isOn(w.id) ? '✓' : '＋' }}</span>
           <span>{{ $t(w.label) }}</span>
         </button>
@@ -170,14 +212,25 @@
       <form class="wp-login-card" @submit.prevent="doLogin">
         <div class="wp-login-title">ihomy</div>
         <div class="wp-login-sub">{{ $t('wallpaper.loginSub') }}</div>
-        <input v-model="form.email" class="wp-input" type="email" autocomplete="username"
-               :placeholder="$t('wallpaper.email')" />
-        <input v-model="form.password" class="wp-input" type="password" autocomplete="current-password"
-               :placeholder="$t('wallpaper.password')" />
+        <input v-model="form.email" class="wp-input" type="email" autocomplete="username" :placeholder="$t('wallpaper.email')" />
+        <input
+          v-model="form.password"
+          class="wp-input"
+          type="password"
+          autocomplete="current-password"
+          :placeholder="$t('wallpaper.password')"
+        />
         <div class="wp-captcha">
           <input v-model="form.captchaCode" class="wp-input" :placeholder="$t('wallpaper.captcha')" />
-          <img v-a11y-click v-if="captchaImage" :src="captchaImage" class="wp-captcha-img"
-               :alt="$t('wallpaper.captcha')" :title="$t('wallpaper.captchaRefresh')" @click="loadCaptcha" />
+          <img
+            v-a11y-click
+            v-if="captchaImage"
+            :src="captchaImage"
+            class="wp-captcha-img"
+            :alt="$t('wallpaper.captcha')"
+            :title="$t('wallpaper.captchaRefresh')"
+            @click="loadCaptcha"
+          />
         </div>
         <div v-if="loginError" class="wp-login-err">{{ loginError }}</div>
         <button class="wp-login-btn" type="submit" :disabled="loggingIn">
@@ -210,7 +263,13 @@ const weather = computed(() => sunLight?.weather?.value || null)
 
 // 天气→AI 生图氛围底图(与暖居外壳同源同缓存键;当前天气无图自动回退上一张,不留白)
 const { weatherBg, load: loadWeatherBg } = useWeatherBg()
-watch(() => sunLight?.weather?.value, (w) => { if (w) loadWeatherBg(w) }, { immediate: true })
+watch(
+  () => sunLight?.weather?.value,
+  (w) => {
+    if (w) loadWeatherBg(w)
+  },
+  { immediate: true },
+)
 
 // ========== 时钟(每秒对表,仅在显示串变化时写 ref,避免每帧无谓渲染) ==========
 const clock = reactive({ time: '', date: '', week: '' })
@@ -300,15 +359,23 @@ const WIDGET_DEFS = [
 // 默认开照片/纪念日/待办(与 V9.93 的常驻组件一致,升级后视觉不变);新增组件默认关,由用户自己添加
 const DEFAULT_WIDGETS = ['photos', 'anni', 'task']
 const WIDGETS_KEY = 'ihomy:wallpaper:widgets:v1'
-const enabled = ref((() => {
-  try {
-    const raw = JSON.parse(localStorage.getItem(WIDGETS_KEY) || 'null')
-    return Array.isArray(raw) ? raw.filter((id) => WIDGET_DEFS.some((w) => w.id === id)) : [...DEFAULT_WIDGETS]
-  } catch (e) { return [...DEFAULT_WIDGETS] }
-})())
+const enabled = ref(
+  (() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(WIDGETS_KEY) || 'null')
+      return Array.isArray(raw) ? raw.filter((id) => WIDGET_DEFS.some((w) => w.id === id)) : [...DEFAULT_WIDGETS]
+    } catch (e) {
+      return [...DEFAULT_WIDGETS]
+    }
+  })(),
+)
 const isOn = (id) => enabled.value.includes(id)
 const saveWidgets = () => {
-  try { localStorage.setItem(WIDGETS_KEY, JSON.stringify(enabled.value)) } catch (e) { /* 无痕环境:仅本次会话生效 */ }
+  try {
+    localStorage.setItem(WIDGETS_KEY, JSON.stringify(enabled.value))
+  } catch (e) {
+    /* 无痕环境:仅本次会话生效 */
+  }
 }
 const panelOpen = ref(false)
 const togglePanel = () => {
@@ -338,7 +405,9 @@ const loadWidgetData = async (only) => {
     try {
       const list = await publicApi.getFeed(8)
       feedItems.value = (Array.isArray(list) ? list : []).slice(0, WIDGET_ROWS)
-    } catch (e) { /* 静默:壁纸不弹错误 */ }
+    } catch (e) {
+      /* 静默:壁纸不弹错误 */
+    }
   }
   if ((!only || only === 'plan') && isOn('plan')) {
     try {
@@ -347,7 +416,9 @@ const loadWidgetData = async (only) => {
         .filter((p) => p && p.status === 'ACTIVE')
         .sort((a, b) => String(a.targetDate || '9999').localeCompare(String(b.targetDate || '9999')))
         .slice(0, WIDGET_ROWS)
-    } catch (e) { /* 静默 */ }
+    } catch (e) {
+      /* 静默 */
+    }
   }
   if ((!only || only === 'reminder') && isOn('reminder')) {
     try {
@@ -356,7 +427,9 @@ const loadWidgetData = async (only) => {
         .filter((r) => r && r.done !== 1)
         .sort((a, b) => String(a.remindDate + a.remindTime).localeCompare(String(b.remindDate + b.remindTime)))
         .slice(0, WIDGET_ROWS)
-    } catch (e) { /* 静默 */ }
+    } catch (e) {
+      /* 静默 */
+    }
   }
 }
 
@@ -387,7 +460,11 @@ let photoRefreshTimer = null
 // 页内登录的场景也要起算,否则登录后只加载一次、之后新数据再不出现。
 const startPhotoRefresh = () => {
   if (photoRefreshTimer) return
-  photoRefreshTimer = setInterval(() => { loadPhotos(); loadTodos(); loadWidgetData() }, 600000)
+  photoRefreshTimer = setInterval(() => {
+    loadPhotos()
+    loadTodos()
+    loadWidgetData()
+  }, 600000)
 }
 
 // 轮播:常驻跑(每 6s 换一张);照片不足 2 张不起
@@ -399,7 +476,12 @@ const startSlide = () => {
     photoIndex.value = n ? (photoIndex.value + 1) % n : 0
   }, 6000)
 }
-const stopSlide = () => { if (slideTimer) { clearInterval(slideTimer); slideTimer = null } }
+const stopSlide = () => {
+  if (slideTimer) {
+    clearInterval(slideTimer)
+    slideTimer = null
+  }
+}
 
 // 进入已登录状态后的统一收尾:页内登录、hash 令牌、WE 晚到令牌三条路都走这里
 const enterLoggedIn = async () => {
@@ -419,25 +501,38 @@ let uiHideTimer = null
 const onMove = () => {
   uiVisible.value = true
   clearTimeout(uiHideTimer)
-  uiHideTimer = setTimeout(() => {
-    if (panelOpen.value) panelOpen.value = false
-    uiVisible.value = false
-  }, panelOpen.value ? PANEL_HIDE_MS : UI_HIDE_MS)
+  uiHideTimer = setTimeout(
+    () => {
+      if (panelOpen.value) panelOpen.value = false
+      uiVisible.value = false
+    },
+    panelOpen.value ? PANEL_HIDE_MS : UI_HIDE_MS,
+  )
 }
 
 // ========== 小组件拖拽:pointerdown 拖动,位置固化 px 落 localStorage ==========
 // 默认位置由 CSS 给(照片居中、纪念日右上、待办右下);拖过一次就固化为 px 坐标,
 // 浏览器与 Wallpaper Engine 各是独立 localStorage,互不影响。
 const WIDGET_POS_KEY = 'ihomy:wallpaper:widget-pos:v1'
-const widgetPos = reactive((() => {
-  try { return JSON.parse(localStorage.getItem(WIDGET_POS_KEY) || '{}') } catch (e) { return {} }
-})())
+const widgetPos = reactive(
+  (() => {
+    try {
+      return JSON.parse(localStorage.getItem(WIDGET_POS_KEY) || '{}')
+    } catch (e) {
+      return {}
+    }
+  })(),
+)
 const dragId = ref('')
 let dragCtx = null
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi))
 
 const saveWidgetPos = () => {
-  try { localStorage.setItem(WIDGET_POS_KEY, JSON.stringify(widgetPos)) } catch (e) { /* 无痕环境存不了就仅本次会话生效 */ }
+  try {
+    localStorage.setItem(WIDGET_POS_KEY, JSON.stringify(widgetPos))
+  } catch (e) {
+    /* 无痕环境存不了就仅本次会话生效 */
+  }
 }
 
 const onWidgetDown = (id, e) => {
@@ -575,7 +670,11 @@ const bootstrapToken = async () => {
   const m = /(?:^|[#&])token=([^&]+)/.exec(window.location.hash || '')
   if (!m) return
   let tk = ''
-  try { tk = decodeURIComponent(m[1]) } catch (e) { return }
+  try {
+    tk = decodeURIComponent(m[1])
+  } catch (e) {
+    return
+  }
   await exchangeToken(tk)
 }
 
@@ -641,177 +740,473 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.wp { position: fixed; inset: 0; overflow: hidden; color: var(--color-text); }
+.wp {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  color: var(--color-text);
+}
 
 /* 兜底底色(压在所有光影层之下:SunLightLayer 的 glass-bg 是 z=2) */
 .wp-base {
-  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
   background: linear-gradient(160deg, var(--color-bg) 0%, var(--color-bg-2) 100%);
 }
 
 /* 天气 AI 生图底图(z=1,兜底底色之上、光影层之下);无图时 opacity 0 走主题渐变,有图 1s 淡入。
    ::after 自下而上压一层暗色渐变,保证左下时钟/天气行在浅色图片上仍可读 */
 .wp-weatherbg {
-  position: fixed; inset: 0; z-index: 1; pointer-events: none;
-  background-size: cover; background-position: center;
-  opacity: 0; transition: opacity 1.2s ease;
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 1.2s ease;
 }
-.wp-weatherbg.on { opacity: 1; }
+.wp-weatherbg.on {
+  opacity: 1;
+}
 .wp-weatherbg::after {
-  content: ''; position: absolute; inset: 0;
-  background: linear-gradient(180deg, rgba(0, 0, 0, .16) 0%, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, .02) 55%, rgba(0, 0, 0, .42) 100%);
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.16) 0%, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, 0.02) 55%, rgba(0, 0, 0, 0.42) 100%);
 }
 /* 有底图时环境层文字压白(浅色图片上保持可读) */
-.wp.has-bg .wp-time, .wp.has-bg .wp-wtext, .wp.has-bg .wp-temp { color: #fff; text-shadow: 0 2px 20px rgba(0, 0, 0, .4); }
-.wp.has-bg .wp-meta, .wp.has-bg .wp-wcity { color: rgba(255, 255, 255, .85); text-shadow: 0 1px 12px rgba(0, 0, 0, .35); }
+.wp.has-bg .wp-time,
+.wp.has-bg .wp-wtext,
+.wp.has-bg .wp-temp {
+  color: #fff;
+  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.4);
+}
+.wp.has-bg .wp-meta,
+.wp.has-bg .wp-wcity {
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.35);
+}
 
 /* ===== 常态环境层:时钟 + 天气(左下,固定不可拖) ===== */
 .wp-ambient {
-  position: fixed; inset: 0; z-index: 10; pointer-events: none;
-  display: flex; flex-direction: column; justify-content: flex-end;
-  padding: clamp(28px, 4.5vw, 72px); gap: 2px;
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: clamp(28px, 4.5vw, 72px);
+  gap: 2px;
 }
 .wp-time {
-  font-size: clamp(52px, 8.5vw, 118px); font-weight: 250; line-height: 1;
-  letter-spacing: .01em; font-variant-numeric: tabular-nums;
+  font-size: clamp(52px, 8.5vw, 118px);
+  font-weight: 250;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
 }
 .wp-meta {
-  margin-top: 6px; font-size: 13.5px; letter-spacing: .08em; color: var(--color-text-secondary);
+  margin-top: 6px;
+  font-size: 13.5px;
+  letter-spacing: 0.08em;
+  color: var(--color-text-secondary);
 }
-.wp-weather { display: flex; align-items: baseline; gap: 10px; margin-top: 14px; }
-.wp-temp { font-size: 26px; font-weight: 500; font-variant-numeric: tabular-nums; }
-.wp-wtext { font-size: 15px; }
-.wp-wcity { font-size: 13px; color: var(--color-text-secondary); }
+.wp-weather {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 14px;
+}
+.wp-temp {
+  font-size: 26px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.wp-wtext {
+  font-size: 15px;
+}
+.wp-wcity {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
 
 /* ===== 小组件:常驻可拖拽卡(照片轮播/纪念日/待办;z=30,拖拽中 60,仍低于光影浮尘/体积光 76/78) =====
    不用 backdrop-filter:壁纸长开、光影层持续动画,磨砂会每帧重算(性能规范) */
 .wp-widget {
-  position: fixed; z-index: 30; cursor: grab; box-sizing: border-box;
-  border-radius: 16px; background: rgba(var(--color-card-rgb), .82);
-  border: 1px solid var(--color-border); box-shadow: 0 14px 40px rgba(0, 0, 0, .16);
-  user-select: none; -webkit-user-drag: none; touch-action: none;
+  position: fixed;
+  z-index: 30;
+  cursor: grab;
+  box-sizing: border-box;
+  border-radius: 16px;
+  background: rgba(var(--color-card-rgb), 0.82);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.16);
+  user-select: none;
+  -webkit-user-drag: none;
+  touch-action: none;
 }
-.wp-widget.dragging { cursor: grabbing; box-shadow: 0 22px 56px rgba(0, 0, 0, .26); }
+.wp-widget.dragging {
+  cursor: grabbing;
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.26);
+}
 /* 拖过一次位置固化为 left/top px(内联),清掉默认定位的 right/bottom/transform */
-.wp-widget.placed { right: auto; bottom: auto; transform: none; }
-.wpw-photos { left: 50%; top: 45%; transform: translate(-50%, -50%); background: none; border: none; box-shadow: none; border-radius: 0; padding: 0; display: flex; flex-direction: column; align-items: center; }
-.wpw-anni { top: clamp(20px, 4vh, 48px); right: clamp(24px, 4vw, 64px); width: 264px; padding: 12px 16px 10px; }
-.wpw-task { bottom: clamp(88px, 13vh, 150px); right: clamp(24px, 4vw, 64px); width: 264px; padding: 12px 16px 10px; }
+.wp-widget.placed {
+  right: auto;
+  bottom: auto;
+  transform: none;
+}
+.wpw-photos {
+  left: 50%;
+  top: 45%;
+  transform: translate(-50%, -50%);
+  background: none;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.wpw-anni {
+  top: clamp(20px, 4vh, 48px);
+  right: clamp(24px, 4vw, 64px);
+  width: 264px;
+  padding: 12px 16px 10px;
+}
+.wpw-task {
+  bottom: clamp(88px, 13vh, 150px);
+  right: clamp(24px, 4vw, 64px);
+  width: 264px;
+  padding: 12px 16px 10px;
+}
 /* 组件面板加进来的三个默认位:左列上/中 + 右列中部(避开左下的时钟与已占的三处)。
    只是初始位置,拖过一次即固化为 px,与屏幕尺寸无关 */
-.wpw-feed { top: clamp(20px, 5vh, 56px); left: clamp(24px, 4vw, 64px); width: 288px; padding: 12px 16px 10px; }
-.wpw-plan { top: clamp(190px, 34vh, 360px); left: clamp(24px, 4vw, 64px); width: 288px; padding: 12px 16px 10px; }
-.wpw-reminder { top: clamp(150px, 27vh, 290px); right: clamp(24px, 4vw, 64px); width: 288px; padding: 12px 16px 10px; }
-.wpw-title { font-size: 11.5px; font-weight: 650; letter-spacing: .14em; color: var(--color-text-secondary); margin-bottom: 4px; }
-.wpw-body { display: flex; flex-direction: column; }
-.wpw-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 7px 0; }
-.wpw-row + .wpw-row { border-top: 1px solid var(--color-border); }
-.wpw-info { min-width: 0; }
-.wpw-name { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wpw-sub { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; font-variant-numeric: tabular-nums; }
-.wpw-days { flex-shrink: 0; font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; }
-.wpw-days-unit { font-size: 11px; font-weight: 500; margin-left: 2px; color: var(--color-text-secondary); }
-.wpw-days.today { color: var(--color-accent); font-size: 13px; font-weight: 700; }
-.wpw-task-name { flex: 1; }
-.wpw-reward { flex-shrink: 0; font-size: 11.5px; font-weight: 600; color: var(--color-brand); font-variant-numeric: tabular-nums; }
+.wpw-feed {
+  top: clamp(20px, 5vh, 56px);
+  left: clamp(24px, 4vw, 64px);
+  width: 288px;
+  padding: 12px 16px 10px;
+}
+.wpw-plan {
+  top: clamp(190px, 34vh, 360px);
+  left: clamp(24px, 4vw, 64px);
+  width: 288px;
+  padding: 12px 16px 10px;
+}
+.wpw-reminder {
+  top: clamp(150px, 27vh, 290px);
+  right: clamp(24px, 4vw, 64px);
+  width: 288px;
+  padding: 12px 16px 10px;
+}
+.wpw-title {
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  color: var(--color-text-secondary);
+  margin-bottom: 4px;
+}
+.wpw-body {
+  display: flex;
+  flex-direction: column;
+}
+.wpw-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+}
+.wpw-row + .wpw-row {
+  border-top: 1px solid var(--color-border);
+}
+.wpw-info {
+  min-width: 0;
+}
+.wpw-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wpw-sub {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+.wpw-days {
+  flex-shrink: 0;
+  font-size: 17px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.wpw-days-unit {
+  font-size: 11px;
+  font-weight: 500;
+  margin-left: 2px;
+  color: var(--color-text-secondary);
+}
+.wpw-days.today {
+  color: var(--color-accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+.wpw-task-name {
+  flex: 1;
+}
+.wpw-reward {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--color-brand);
+  font-variant-numeric: tabular-nums;
+}
 
 /* 照片轮播卡堆 */
-.wp-stack { position: relative; width: min(46vw, 640px); aspect-ratio: 4 / 3; }
+.wp-stack {
+  position: relative;
+  width: min(46vw, 640px);
+  aspect-ratio: 4 / 3;
+}
 .wp-pcard {
-  position: absolute; inset: 0; border-radius: 14px; overflow: hidden;
-  background: var(--color-line); box-shadow: 0 18px 46px rgba(0, 0, 0, .24);
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--color-line);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.24);
   z-index: var(--z, 10);
   transform: translate(var(--dx, 0), var(--dy, 0)) rotate(var(--rot, 0deg));
-  transition: transform .8s cubic-bezier(.22, 1, .36, 1);
+  transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.wp-pcard img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.wp-pcard img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 .wp-cap {
-  margin-top: 20px; padding: 7px 18px; border-radius: 999px; max-width: 46vw;
-  font-size: 13px; color: #fff; background: rgba(0, 0, 0, .38);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  margin-top: 20px;
+  padding: 7px 18px;
+  border-radius: 999px;
+  max-width: 46vw;
+  font-size: 13px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.38);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ===== 角落控件:移动浮现、静止隐去(右下,避让左下时钟) ===== */
 .wp-ui {
-  position: fixed; right: clamp(24px, 4vw, 64px); bottom: clamp(24px, 4vw, 64px); z-index: 40;
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end;
-  opacity: 0; transform: translateY(6px); pointer-events: none;
-  transition: opacity .5s ease, transform .5s ease;
+  position: fixed;
+  right: clamp(24px, 4vw, 64px);
+  bottom: clamp(24px, 4vw, 64px);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s ease;
 }
-.wp-ui.visible { opacity: 1; transform: none; pointer-events: auto; }
+.wp-ui.visible {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
 /* 窄屏(手机/竖屏副屏):右下角控件会换行并压住左下角的日期/天气行,改挂右上角。
    注意 `.wp-widgets` 的覆写要写在它自己的基础规则之后(同特异性看源序),故放在文件此处下方 */
 @media (max-width: 768px) {
-  .wp-ui { top: clamp(18px, 4vw, 28px); bottom: auto; }
+  .wp-ui {
+    top: clamp(18px, 4vw, 28px);
+    bottom: auto;
+  }
 }
 .wp-seg {
-  display: flex; gap: 2px; padding: 3px; border-radius: 12px;
-  background: rgba(var(--color-card-rgb), .74); border: 1px solid var(--color-border);
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: rgba(var(--color-card-rgb), 0.74);
+  border: 1px solid var(--color-border);
 }
 .wp-segbtn {
-  all: unset; cursor: pointer; padding: 6px 12px; border-radius: 9px;
-  font-size: 12.5px; font-weight: 600; color: var(--color-text-secondary);
-  transition: background .2s ease, color .2s ease; white-space: nowrap;
+  all: unset;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+  white-space: nowrap;
 }
-.wp-segbtn:hover { color: var(--color-text); }
-.wp-segbtn.on { background: var(--color-brand); color: var(--color-brand-text); }
+.wp-segbtn:hover {
+  color: var(--color-text);
+}
+.wp-segbtn.on {
+  background: var(--color-brand);
+  color: var(--color-brand-text);
+}
 
 /* 组件面板:浮在控件行上方、右对齐,宽度随内容收窄(不再跟着按钮行拉满整行);
    脱离文档流以免撑开 .wp-ui 的换行布局;窄屏改排到下方(见紧随其后的 media) */
 .wp-widgets {
-  position: absolute; right: 0; bottom: calc(100% + 10px);
-  width: max-content; min-width: 140px; box-sizing: border-box; padding: 8px;
-  border-radius: 12px; background: rgba(var(--color-card-rgb), .86);
-  border: 1px solid var(--color-border); box-shadow: 0 14px 40px rgba(0, 0, 0, .18);
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 10px);
+  width: max-content;
+  min-width: 140px;
+  box-sizing: border-box;
+  padding: 8px;
+  border-radius: 12px;
+  background: rgba(var(--color-card-rgb), 0.86);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.18);
 }
 .wp-widgets-cap {
-  font-size: 11px; font-weight: 650; letter-spacing: .14em; color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  color: var(--color-text-secondary);
   padding: 2px 6px 6px;
 }
 .wp-widgets-row {
-  all: unset; cursor: pointer; display: flex; align-items: center; gap: 8px;
-  padding: 7px 8px; border-radius: 8px; font-size: 12.5px; color: var(--color-text-secondary);
-  transition: background .2s ease, color .2s ease;
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
 }
-.wp-widgets-row:hover { background: var(--color-card-2); color: var(--color-text); }
-.wp-widgets-row.on { color: var(--color-text); }
-.wp-widgets-mark { width: 14px; text-align: center; font-weight: 700; color: var(--color-brand); }
+.wp-widgets-row:hover {
+  background: var(--color-card-2);
+  color: var(--color-text);
+}
+.wp-widgets-row.on {
+  color: var(--color-text);
+}
+.wp-widgets-mark {
+  width: 14px;
+  text-align: center;
+  font-weight: 700;
+  color: var(--color-brand);
+}
 /* 窄屏控件挂右上角,面板改排到控件行下方(往上排会顶出屏幕) */
 @media (max-width: 768px) {
-  .wp-widgets { top: calc(100% + 10px); bottom: auto; }
+  .wp-widgets {
+    top: calc(100% + 10px);
+    bottom: auto;
+  }
 }
 
 /* ===== 登录卡(z=90,压在体积光 78 之上保证表单清晰;灯光层 pointer-events:none 不挡输入) =====
    遮罩本身 pointer-events:none、只让卡片吃点击 —— 否则未登录时全屏遮罩会把右下角主题切换按钮一起挡住 */
 .wp-login {
-  position: fixed; inset: 0; z-index: 90; pointer-events: none;
-  display: flex; align-items: center; justify-content: center; padding: 24px;
-  background: rgba(0, 0, 0, .3);
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.3);
 }
 .wp-login-card {
-  width: min(360px, 92vw); padding: 30px 26px 24px; border-radius: 16px;
-  display: flex; flex-direction: column; gap: 12px; pointer-events: auto;
-  background: var(--color-card); border: 1px solid var(--color-border); box-shadow: var(--shadow-hover);
+  width: min(360px, 92vw);
+  padding: 30px 26px 24px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: auto;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-hover);
 }
-.wp-login-title { font-size: 22px; font-weight: 600; letter-spacing: .04em; }
-.wp-login-sub { font-size: 12.5px; color: var(--color-text-secondary); margin-bottom: 4px; }
+.wp-login-title {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.wp-login-sub {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+  margin-bottom: 4px;
+}
 .wp-input {
-  width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 10px;
-  border: 1px solid var(--color-border); background: var(--color-card-2);
-  color: var(--color-text); font-size: 14px; font-family: inherit; outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card-2);
+  color: var(--color-text);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
 }
-.wp-input:focus { border-color: var(--color-brand); }
-.wp-captcha { display: flex; gap: 10px; align-items: center; }
+.wp-input:focus {
+  border-color: var(--color-brand);
+}
+.wp-captcha {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
 .wp-captcha-img {
-  height: 40px; width: 108px; flex-shrink: 0; border-radius: 8px; cursor: pointer;
-  object-fit: cover; border: 1px solid var(--color-border);
+  height: 40px;
+  width: 108px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  object-fit: cover;
+  border: 1px solid var(--color-border);
 }
-.wp-login-err { font-size: 12.5px; color: var(--color-accent); }
+.wp-login-err {
+  font-size: 12.5px;
+  color: var(--color-accent);
+}
 .wp-login-btn {
-  all: unset; cursor: pointer; text-align: center; padding: 11px 16px; border-radius: 12px;
-  font-size: 14px; font-weight: 600; background: var(--color-brand); color: var(--color-brand-text);
-  transition: background .2s ease;
+  all: unset;
+  cursor: pointer;
+  text-align: center;
+  padding: 11px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--color-brand);
+  color: var(--color-brand-text);
+  transition: background 0.2s ease;
 }
-.wp-login-btn:hover { background: var(--color-brand-hover); }
-.wp-login-btn[disabled] { opacity: .6; cursor: default; }
+.wp-login-btn:hover {
+  background: var(--color-brand-hover);
+}
+.wp-login-btn[disabled] {
+  opacity: 0.6;
+  cursor: default;
+}
 </style>

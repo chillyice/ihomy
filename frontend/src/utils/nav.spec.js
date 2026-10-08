@@ -20,9 +20,7 @@ describe('buildNavItems 虚拟入口', () => {
   })
 
   it('DB 模块与虚拟入口一起进「系统」组', () => {
-    const groups = buildNavGroups([
-      { code: 'blog', title: '博客', path: '/blog', category: 'content', sortOrder: 1, enabled: 1 },
-    ])
+    const groups = buildNavGroups([{ code: 'blog', title: '博客', path: '/blog', category: 'content', sortOrder: 1, enabled: 1 }])
     const system = groups.find((g) => g.category === 'system')
     expect(system.items.map((i) => i.code)).toEqual(['settings', 'help'])
   })

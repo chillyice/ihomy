@@ -93,15 +93,19 @@ const { anyEffectEnabled } = sunLight
 
 // 移动端首次使用(本设备无保存偏好)默认关闭所有光影特效(GPU/内存敏感);
 // 用户开启过则写入 ihomy:effects,刷新后尊重用户选择不再强制关闭
-watch(isMobile, (mobile) => {
-  if (mobile && !localStorage.getItem('ihomy:effects')) {
-    sunLight.shadowEnabled.value = false
-    sunLight.weatherEffectEnabled.value = false
-    sunLight.blobsEnabled.value = false
-    sunLight.lampMode.value = 'off'
-    sunLight.glassEnabled.value = false
-  }
-}, { immediate: true })
+watch(
+  isMobile,
+  (mobile) => {
+    if (mobile && !localStorage.getItem('ihomy:effects')) {
+      sunLight.shadowEnabled.value = false
+      sunLight.weatherEffectEnabled.value = false
+      sunLight.blobsEnabled.value = false
+      sunLight.lampMode.value = 'off'
+      sunLight.glassEnabled.value = false
+    }
+  },
+  { immediate: true },
+)
 
 const elLocale = computed(() => (locale.value === 'en' ? en : zhCn))
 
@@ -147,14 +151,20 @@ watch(
 }
 
 /* 户型图编辑专注模式(Item 页编辑态时在 <html> 上挂 fp-edit-focus):隐藏左侧导航,内容区占满整屏,画板优先 */
-html.fp-edit-focus .app-sidebar { display: none; }
-html.fp-edit-focus .app-main.with-sidebar { margin-left: 0; }
+html.fp-edit-focus .app-sidebar {
+  display: none;
+}
+html.fp-edit-focus .app-main.with-sidebar {
+  margin-left: 0;
+}
 
 /* 页面滑动过渡:当前页面整体向下滑出,新页面从上方滑入 */
 /* 仿佛平板手机滑动屏幕切换,配合全局光影层看不出页面在切换 */
 .slide-down-enter-active,
 .slide-down-leave-active {
-  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
+  transition:
+    transform 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.4s ease;
 }
 .slide-down-enter-from {
   transform: translateY(-100%);
@@ -167,11 +177,24 @@ html.fp-edit-focus .app-main.with-sidebar { margin-left: 0; }
 
 /* 兼容性:若浏览器不支持 transform 过渡,fallback 到 fade */
 @supports not (transform: translateY(-100%)) {
-  .slide-down-enter-active, .slide-down-leave-active { transition: opacity 0.3s ease; }
-  .slide-down-enter-from, .slide-down-leave-to { opacity: 0; transform: none; }
+  .slide-down-enter-active,
+  .slide-down-leave-active {
+    transition: opacity 0.3s ease;
+  }
+  .slide-down-enter-from,
+  .slide-down-leave-to {
+    opacity: 0;
+    transform: none;
+  }
 }
 
 /* 全局页面切换过渡(默认):淡入淡出,无 transform 避免 fixed 定位偏移 */
-.fade-enter-active, .fade-leave-active { transition: opacity 0.5s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.5s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
 </style>

@@ -21,7 +21,8 @@
           <div class="gen-cards">
             <div v-for="unit in unitsByGen(gen)" :key="unitKey(unit)" class="family-unit">
               <div class="couple">
-                <div v-a11y-click
+                <div
+                  v-a11y-click
                   v-for="m in unit"
                   :key="m.id"
                   class="member-card"
@@ -173,16 +174,25 @@ const unitsByGen = (gen) => {
 // 某夫妻单元的孩子:有 fatherId 或 motherId 指向单元内任一成员,且不在更早世代(防重复计数按自身世代呈现)
 const childrenOf = (unit) => {
   const ids = new Set(unit.map((m) => m.id))
-  return members.value.filter(
-    (m) => (m.fatherId && ids.has(m.fatherId)) || (m.motherId && ids.has(m.motherId)),
-  )
+  return members.value.filter((m) => (m.fatherId && ids.has(m.fatherId)) || (m.motherId && ids.has(m.motherId)))
 }
 
 const unitKey = (unit) => unit.map((m) => m.id).join('-')
 const genderIcon = (g) => (g === 1 ? '👨' : g === 2 ? '👩' : '🧑')
 
 // 编辑表单:排除本人后作为 父亲/母亲/配偶 候选项
-const form = reactive({ id: null, name: '', gender: 0, birthDate: null, photo: '', userId: null, spouseId: null, fatherId: null, motherId: null, note: '' })
+const form = reactive({
+  id: null,
+  name: '',
+  gender: 0,
+  birthDate: null,
+  photo: '',
+  userId: null,
+  spouseId: null,
+  fatherId: null,
+  motherId: null,
+  note: '',
+})
 const otherMembers = computed(() => members.value.filter((m) => m.id !== form.id))
 // 可关联账号:已被其他家谱人物占用的账号不再重复出现(一个账号对应一位家人)
 const linkableAccounts = computed(() => {
@@ -195,13 +205,30 @@ const linkableAccounts = computed(() => {
 
 const openEditor = (m) => {
   if (!m) {
-    Object.assign(form, { id: null, name: '', gender: 0, birthDate: null, photo: '', userId: null, spouseId: null, fatherId: null, motherId: null, note: '' })
+    Object.assign(form, {
+      id: null,
+      name: '',
+      gender: 0,
+      birthDate: null,
+      photo: '',
+      userId: null,
+      spouseId: null,
+      fatherId: null,
+      motherId: null,
+      note: '',
+    })
   } else {
     Object.assign(form, {
-      id: m.id, name: m.name || '', gender: m.gender ?? 0,
-      birthDate: m.birthDate || null, photo: m.photo || '',
-      userId: m.userId || null, spouseId: m.spouseId || null, fatherId: m.fatherId || null,
-      motherId: m.motherId || null, note: m.note || '',
+      id: m.id,
+      name: m.name || '',
+      gender: m.gender ?? 0,
+      birthDate: m.birthDate || null,
+      photo: m.photo || '',
+      userId: m.userId || null,
+      spouseId: m.spouseId || null,
+      fatherId: m.fatherId || null,
+      motherId: m.motherId || null,
+      note: m.note || '',
     })
   }
   dialog.value = true
@@ -231,9 +258,15 @@ const save = async () => {
   saving.value = true
   try {
     const payload = {
-      name: form.name.trim(), gender: form.gender, birthDate: form.birthDate || null,
-      photo: form.photo || null, userId: form.userId || null, spouseId: form.spouseId || null,
-      fatherId: form.fatherId || null, motherId: form.motherId || null, note: form.note || null,
+      name: form.name.trim(),
+      gender: form.gender,
+      birthDate: form.birthDate || null,
+      photo: form.photo || null,
+      userId: form.userId || null,
+      spouseId: form.spouseId || null,
+      fatherId: form.fatherId || null,
+      motherId: form.motherId || null,
+      note: form.note || null,
     }
     if (form.id) await treeApi.update(form.id, payload)
     else await treeApi.create(payload)
@@ -273,9 +306,20 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.tree-tip { color: var(--color-text-2); font-size: 12px; }
-.generation-list { display: flex; flex-direction: column; gap: 26px; }
-.generation-row { display: flex; align-items: flex-start; gap: 14px; }
+.tree-tip {
+  color: var(--color-text-2);
+  font-size: 12px;
+}
+.generation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+.generation-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
 .gen-label {
   flex-shrink: 0;
   width: 64px;
@@ -287,10 +331,27 @@ onMounted(() => {
   font-size: 12px;
   font-weight: 600;
 }
-.gen-cards { display: flex; flex-wrap: wrap; gap: 26px; align-items: flex-start; }
-.family-unit { display: flex; flex-direction: column; align-items: center; }
-.couple { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; }
-.couple-mark { color: #e85d75; font-size: 16px; }
+.gen-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 26px;
+  align-items: flex-start;
+}
+.family-unit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.couple {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+}
+.couple-mark {
+  color: #e85d75;
+  font-size: 16px;
+}
 .member-card {
   width: 96px;
   padding: 10px 8px;
@@ -299,11 +360,21 @@ onMounted(() => {
   border: 1px solid var(--color-border);
   text-align: center;
   cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s;
+  transition:
+    transform 0.15s,
+    box-shadow 0.15s;
 }
-.member-card:hover { transform: translateY(-3px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12); }
-.member-card.mini { width: 78px; }
-.ghost { opacity: 0.35; cursor: default; }
+.member-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+.member-card.mini {
+  width: 78px;
+}
+.ghost {
+  opacity: 0.35;
+  cursor: default;
+}
 .member-photo {
   width: 56px;
   height: 56px;
@@ -315,12 +386,31 @@ onMounted(() => {
   justify-content: center;
   background: #eef2f7;
 }
-.member-card.mini .member-photo { width: 44px; height: 44px; }
-.member-photo img { width: 100%; height: 100%; object-fit: cover; }
-.photo-fallback { font-size: 26px; }
-.member-card.mini .photo-fallback { font-size: 20px; }
-.member-name { font-size: 13px; font-weight: 600; color: var(--color-text); }
-.member-birth { font-size: 11px; color: var(--color-text-2); margin-top: 2px; }
+.member-card.mini .member-photo {
+  width: 44px;
+  height: 44px;
+}
+.member-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.photo-fallback {
+  font-size: 26px;
+}
+.member-card.mini .photo-fallback {
+  font-size: 20px;
+}
+.member-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.member-birth {
+  font-size: 11px;
+  color: var(--color-text-2);
+  margin-top: 2px;
+}
 /* 关联账号徽标:小而不抢眼,仅提示此人与某账号对应 */
 .member-account {
   display: inline-flex;
@@ -335,17 +425,56 @@ onMounted(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.member-account :deep(.el-icon) { font-size: 11px; flex: none; }
-.children { display: flex; flex-direction: column; align-items: center; }
-.children-line { width: 2px; height: 12px; background: var(--color-border-strong, #c5cfd9); }
-.children-cards { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-.child-node { display: flex; flex-direction: column; align-items: center; }
-.upload-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.photo-preview { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; border: 1px solid var(--color-border); }
+.member-account :deep(.el-icon) {
+  font-size: 11px;
+  flex: none;
+}
+.children {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.children-line {
+  width: 2px;
+  height: 12px;
+  background: var(--color-border-strong, #c5cfd9);
+}
+.children-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+.child-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.upload-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.photo-preview {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+}
 
 @media (max-width: 768px) {
-  .tree-container { overflow-x: auto; padding: 8px 0; }
-  .member-card { min-width: 120px; }
-  .upload-row { flex-direction: column; align-items: flex-start; }
+  .tree-container {
+    overflow-x: auto;
+    padding: 8px 0;
+  }
+  .member-card {
+    min-width: 120px;
+  }
+  .upload-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>

@@ -1,10 +1,10 @@
 <template>
   <div class="login-page">
     <div class="bg-blobs">
-      <div class="blob" style="background:#9CD0B5; top:8%; left:6%; width:340px; height:340px;"></div>
-      <div class="blob" style="background:#EDDB8C; top:55%; left:62%; width:300px; height:300px;"></div>
-      <div class="blob" style="background:#ECC0AC; top:70%; left:12%; width:260px; height:260px;"></div>
-      <div class="blob" style="background:#A8C9DE; top:15%; left:70%; width:280px; height:280px;"></div>
+      <div class="blob" style="background: #9cd0b5; top: 8%; left: 6%; width: 340px; height: 340px"></div>
+      <div class="blob" style="background: #eddb8c; top: 55%; left: 62%; width: 300px; height: 300px"></div>
+      <div class="blob" style="background: #ecc0ac; top: 70%; left: 12%; width: 260px; height: 260px"></div>
+      <div class="blob" style="background: #a8c9de; top: 15%; left: 70%; width: 280px; height: 280px"></div>
     </div>
     <div class="login-card">
       <div class="login-title">ihomy</div>
@@ -16,7 +16,13 @@
           <el-input v-model="resetForm.password" type="password" show-password :placeholder="$t('passwordReset.newPasswordPlaceholder')" />
         </el-form-item>
         <el-form-item :label="$t('passwordReset.confirmPassword')" prop="confirmPassword">
-          <el-input v-model="resetForm.confirmPassword" type="password" show-password :placeholder="$t('passwordReset.confirmPasswordPlaceholder')" @keyup.enter="onReset" />
+          <el-input
+            v-model="resetForm.confirmPassword"
+            type="password"
+            show-password
+            :placeholder="$t('passwordReset.confirmPasswordPlaceholder')"
+            @keyup.enter="onReset"
+          />
         </el-form-item>
         <el-button type="primary" class="submit-btn" :loading="loading" @click="onReset">{{ $t('passwordReset.submitReset') }}</el-button>
       </el-form>
@@ -31,7 +37,15 @@
           <el-form-item :label="$t('login.captcha')" prop="captchaCode">
             <div class="captcha-row">
               <el-input v-model="forgotForm.captchaCode" :placeholder="$t('login.captchaPlaceholder')" @keyup.enter="onForgot" />
-              <img v-a11y-click v-if="captchaImage" :src="captchaImage" class="captcha-img" alt="captcha" :title="$t('login.captchaRefresh')" @click="loadCaptcha" />
+              <img
+                v-a11y-click
+                v-if="captchaImage"
+                :src="captchaImage"
+                class="captcha-img"
+                alt="captcha"
+                :title="$t('login.captchaRefresh')"
+                @click="loadCaptcha"
+              />
             </div>
           </el-form-item>
           <el-button type="primary" class="submit-btn" :loading="loading" @click="onForgot">{{ $t('passwordReset.sendMail') }}</el-button>
@@ -136,11 +150,16 @@ const onReset = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #EDE4D3 0%, #E2D8C4 50%, #D6CBB4 100%);
+  background: linear-gradient(135deg, #ede4d3 0%, #e2d8c4 50%, #d6cbb4 100%);
   padding: 16px;
   overflow: hidden;
 }
-.bg-blobs { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.bg-blobs {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
 .blob {
   position: absolute;
   border-radius: 50%;
@@ -163,7 +182,9 @@ const onReset = async () => {
 html.dark .login-page {
   background: linear-gradient(135deg, var(--color-bg) 0%, var(--color-bg-2) 50%, var(--color-card) 100%);
 }
-html.dark .blob { opacity: 0.1; }
+html.dark .blob {
+  opacity: 0.1;
+}
 html.dark .login-card {
   background: rgba(var(--color-card-rgb), 0.55);
   border-color: rgba(255, 255, 255, 0.12);
@@ -211,7 +232,13 @@ html.dark .login-card {
 }
 
 @media (max-width: 768px) {
-  .login-card { width: 92vw !important; max-width: 400px; padding: 24px 20px; }
-  .login-title { font-size: 22px; }
+  .login-card {
+    width: 92vw !important;
+    max-width: 400px;
+    padding: 24px 20px;
+  }
+  .login-title {
+    font-size: 22px;
+  }
 }
 </style>

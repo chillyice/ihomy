@@ -55,8 +55,18 @@ const isWarm = computed(() => themeStore.theme === 'warm')
   -webkit-mask-image: linear-gradient(to right, transparent 0%, black 24px, black calc(100% - 24px), transparent 100%);
   mask-image: linear-gradient(to right, transparent 0%, black 24px, black calc(100% - 24px), transparent 100%);
 }
-.crumb-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.crumb-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.crumb-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.crumb-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
 .crumb-link {
   display: inline-flex;
   align-items: center;
@@ -64,8 +74,17 @@ const isWarm = computed(() => themeStore.theme === 'warm')
   color: var(--color-text-secondary);
   transition: color 0.15s;
 }
-.crumb-link:hover { color: var(--color-accent); }
-.home-icon { font-size: 14px; }
-.sep { color: #cdd5df; }
-.crumb-current { color: var(--color-text); font-weight: 500; }
+.crumb-link:hover {
+  color: var(--color-accent);
+}
+.home-icon {
+  font-size: 14px;
+}
+.sep {
+  color: #cdd5df;
+}
+.crumb-current {
+  color: var(--color-text);
+  font-weight: 500;
+}
 </style>
