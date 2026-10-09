@@ -27,6 +27,7 @@ public class Photo {
     private String visibility;
     private String sourcePath;
     private Long sourceFsId;
+    private String liveVideoUrl;
     private LocalDateTime createdAt;
     @TableLogic
     private Integer deleted;

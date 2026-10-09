@@ -383,6 +383,7 @@ export default {
     download: 'Download photo',
     linkCopied: 'Share link copied',
     copyFailed: 'Copy failed, please copy manually',
+    live: 'Play Live Photo',
   },
   member: {
     title: 'Members',

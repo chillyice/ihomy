@@ -14,8 +14,27 @@
         <!-- 照片舞台 -->
         <div class="pv-stage" @click.self="close">
           <transition :name="slideDir === 'next' ? 'pv-slide-next' : 'pv-slide-prev'" mode="out-in">
-            <div :key="current.id" class="pv-photo-frame" :class="{ 'ken-burns': playing }">
-              <img :src="current.url" :alt="current.description || ''" draggable="false" @load="onImgLoad" />
+            <div :key="current.id" class="pv-photo-frame" :class="{ 'ken-burns': playing && !livePlaying }">
+              <video
+                v-if="current.liveVideoUrl && livePlaying"
+                ref="liveVideoRef"
+                class="pv-live-video"
+                :src="current.liveVideoUrl"
+                :poster="current.url"
+                autoplay
+                loop
+                playsinline
+                controls
+              />
+              <img v-else :src="current.url" :alt="current.description || ''" draggable="false" @load="onImgLoad" />
+              <button
+                v-if="current.liveVideoUrl && !livePlaying"
+                class="pv-live-badge"
+                :title="t('photoViewer.live')"
+                @click.stop="playLive"
+              >
+                <span class="pv-live-dot" />LIVE
+              </button>
             </div>
           </transition>
 
@@ -165,6 +184,7 @@ const playing = ref(false)
 const speed = ref(5) // seconds per slide
 const slideDir = ref('next')
 const imgLoading = ref(false)
+const livePlaying = ref(false) // 实况照片短片播放中(替代静态图显示)
 const progressKey = ref(0) // force progress bar animation restart
 const speeds = [
   { label: '3s', value: 3 },
@@ -186,6 +206,10 @@ const scrollThumbIntoView = () => {
 }
 
 watch(index, scrollThumbIntoView)
+// 切换照片时停止实况短片,回到静态图
+watch(index, () => {
+  livePlaying.value = false
+})
 
 const current = computed(() => props.photos[index.value] || {})
 const hasMeta = computed(() => current.value.description || current.value.uploaderName || current.value.location || current.value.takenAt)
@@ -198,6 +222,12 @@ const formatDate = (d) => {
 
 const onImgLoad = () => {
   imgLoading.value = false
+}
+
+// 播放实况照片短片(苹果 Live Photo):点击 LIVE 角标以内联视频替代静态图
+const playLive = () => {
+  imgLoading.value = false
+  livePlaying.value = true
 }
 
 // 复制当前照片分享链接(相册分享链接 + ?p= 混淆照片ID)
@@ -267,6 +297,7 @@ const stopPlay = () => {
 
 const close = () => {
   playing.value = false
+  livePlaying.value = false
   stopPlay()
   emit('update:visible', false)
   emit('close')
@@ -305,6 +336,7 @@ watch(
     } else {
       document.body.style.overflow = ''
       stopPlay()
+      livePlaying.value = false
       sunLight?.restoreEffects()
     }
   },
@@ -386,6 +418,38 @@ html.theme-warm.dark .pv-backdrop {
   max-height: 78vh;
   object-fit: contain;
   display: block;
+}
+
+/* 实况照片短片:替代静态图内联播放 */
+.pv-live-video {
+  max-width: 88vw;
+  max-height: 78vh;
+  display: block;
+  background: #000;
+}
+.pv-live-badge {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border: none;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+.pv-live-badge .pv-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff453a;
 }
 
 /* Ken Burns 缓推效果(播放时) */
@@ -690,7 +754,8 @@ html.theme-warm.dark .pv-backdrop {
 /* 移动端适配 */
 @media (max-width: 768px) {
   .pv-photo-frame,
-  .pv-photo-frame img {
+  .pv-photo-frame img,
+  .pv-live-video {
     max-width: 96vw;
     max-height: 70vh;
   }

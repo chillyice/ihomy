@@ -57,19 +57,14 @@
           <el-button v-if="album.type === 'public' && album.shareToken" class="ghost-btn" @click="copyAlbumShare">{{
             t('album.share')
           }}</el-button>
-          <el-upload
-            v-if="userStore.isLoggedIn && !shareToken && !isMapped"
-            multiple
-            :show-file-list="false"
-            :http-request="uploadPhoto"
-            accept="image/*"
-          >
-            <el-button type="primary">{{ t('album.uploadPhotos') }}</el-button>
-          </el-upload>
+          <el-button v-if="userStore.isLoggedIn && !shareToken && !isMapped" type="primary" @click="photoInput?.click()">{{
+            t('album.uploadPhotos')
+          }}</el-button>
         </template>
       </div>
     </div>
     <input ref="coverInput" type="file" accept="image/*" class="hidden-input" @change="onCoverPicked" />
+    <input ref="photoInput" type="file" accept="image/*,video/quicktime,.mov" multiple class="hidden-input" @change="onPhotosPicked" />
 
     <!-- 子相册(设备目录映射层级):方块/列表两种展示模式,支持多选删除 -->
     <div v-if="children.length" class="child-section">
@@ -153,6 +148,7 @@
         <div v-for="p in photos" :key="p.id" class="photo-card" :class="{ selected: selectMode && selectedIds.includes(p.id) }">
           <div v-a11y-click class="photo-wrap" @click="selectMode ? togglePick(p) : openViewer(p)">
             <img :src="thumbUrl(p.url)" :alt="p.description || album.name" loading="lazy" />
+            <span v-if="p.liveVideoUrl" class="live-badge">LIVE</span>
             <span v-if="selectMode" class="pick-badge" :class="{ on: selectedIds.includes(p.id) }">
               <svg viewBox="0 0 16 16" width="11" height="11">
                 <path
@@ -285,11 +281,18 @@ const onRefresh = async () => {
   }
 }
 
-// 上传单张照片成功后刷新照片墙
-const uploadPhoto = async (options) => {
-  await photoApi.upload(albumId, [options.file])
-  ElMessage.success(t('album.uploadSuccess'))
-  load()
+// 批量上传照片(含实况照片:静态图 + 同名 MOV 一并提交,后端按同名配对)
+const photoInput = ref(null)
+const onPhotosPicked = async (e) => {
+  const files = Array.from(e.target.files || [])
+  if (!files.length) return
+  try {
+    await photoApi.upload(albumId, files)
+    ElMessage.success(t('album.uploadSuccess'))
+  } finally {
+    e.target.value = ''
+    load()
+  }
 }
 
 // 复制相册分享链接(仅家庭已公开时外人可打开,否则 404)
@@ -611,6 +614,20 @@ onMounted(load)
 .pick-badge.on {
   background: var(--color-brand);
   border-color: var(--color-brand);
+}
+.live-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
 }
 .album-desc {
   margin-top: 8px;

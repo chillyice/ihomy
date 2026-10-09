@@ -164,7 +164,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 |----|------|---------|
 | 账号 | 注册/登录/验证码/个人资料/密码找回(邮箱自助重置) | AuthController+PasswordResetService / ProfileController |
 | 家庭 | 家庭管理/多家庭切换/成员/邀请码/入家申请 | FamilyController / AuthController / MemberController |
-| 内容 | 博客 / 日记 / 相册照片(含瀑布内嵌) / 放映厅(媒体引擎+本地库) / 愿望单 / 书架 | Blog / Diary / Album+Photo / Video / Media / Wish / Library 各 Controller |
+| 内容 | 博客 / 日记 / 相册照片(含瀑布内嵌、实况照片) / 放映厅(媒体引擎+本地库) / 愿望单 / 书架 | Blog / Diary / Album+Photo / Video / Media / Wish / Library 各 Controller |
 | 互动 | 点赞 / 评论 / 通知 / 聊天室 / 家庭公告 | Like / Comment / Notification / Chat / Announcement 各 Controller + ChatWebSocketHandler |
 | 生活 | 纪念日 / 提醒 / 计划 / 任务 / 记账(含贷款) / 家谱 / 签到积分 / 背景音乐 / 保险箱 | Anniversary / Reminder / Plan / Task / Points / Music / Vault 各 Controller |
 | 游戏 | 花园共养植物 / 小游戏库(SWF/GBA) / 宠物连连看 | FamilyPlant / GameInfo 各 Controller + FlashPlayer.vue + GbaPlayer.vue + PetLinkLink.vue |
@@ -235,10 +235,10 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 ## 验证基线(每版更新,当前值)
 
-- 后端:`cd backend; .\mvnw.cmd -B clean package` → BUILD SUCCESS(`Tests run: 53`,纯逻辑不起 Spring 上下文);只求编译加 `-DskipTests`。**clean 被运行中后端锁 jar 时改跑 `-B test`**。
-- 前端测试:`cd frontend; npx vitest run` → 45 passed(jwt/loan/password/feed/nav + i18n 中英键对齐 + 引用键存在性 + 模板/消息硬编码中文守门;CI 构建前执行)。同一步跑 `npm run lint` → **0 error / 0 warning**(V10.21 起存量 warning 清零,不拦构建)。
+- 后端:`cd backend; .\mvnw.cmd -B clean package` → BUILD SUCCESS(`Tests run: 56`,纯逻辑不起 Spring 上下文);只求编译加 `-DskipTests`。**clean 被运行中后端锁 jar 时改跑 `-B test`**。
+- 前端测试:`cd frontend; npx vitest run` → 45 passed(jwt/loan/password/feed/nav + i18n 中英键对齐 + 引用键存在性 + 模板/消息硬编码中文守门;CI 构建前执行)。同一步跑 `npm run lint` → **0 error / 0 warning**(V10.21 起存量 warning 清零,不拦构建)。另跑 `npm run format:check`(`prettier --check "src/**/*.{js,vue,css}"`)→ 全通过(V10.23 起接 CI)。
 - 文档/代码一致性闸门:`bash scripts/doc-drift-check.sh` → 全部 [OK](CI 最先跑;表数/实体↔建表/mapper 注解/@Tag/权限码种子/模块↔路由)。
-- 前端构建:`cd frontend; npm run build` → 入口 chunk **400.64KB/gzip 162.19KB**(V10.22 实测;功能页/pdfjs/epubjs/hls.js 均为独立异步 chunk;历史数字见 docs/变更归档.md)
+- 前端构建:`cd frontend; npm run build` → 入口 chunk **400.66KB/gzip 162.22KB**(V10.24 实测;功能页/pdfjs/epubjs/hls.js 均为独立异步 chunk;历史数字见 docs/变更归档.md)
   - **⚠ 口径:vite 报的是「字符数」不是「字节数」**(实测 318.71KB 字符 = 343,667 字节)——**别拿 `ls -la` 字节数跟基线比**;比特字节就 `wc -c` 对 `wc -c`。
 - 界面/交互验证:harness 别放 `target/`;持续动画页面用页面内 `evaluate` 量几何、派发 `el.click()`,别用截图或真实点击(必超时,见踩坑速查 §6)。
 - 接口测试:同级独立项目(不在本仓库)`cd ..\autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed;CI 每次推送自动构建前后端+起库导 schema+后端启动+登录冒烟。

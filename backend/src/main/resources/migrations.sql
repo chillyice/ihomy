@@ -1943,5 +1943,15 @@ INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`,
 UPDATE `sys_oss_component` SET `deploy_type` = 'SYSTEMD'   WHERE `component_type` = 'SERVICE' AND `package_ref` = 'mysql/mysql-server';
 UPDATE `sys_oss_component` SET `deploy_type` = 'CONTAINER' WHERE `component_type` = 'SERVICE' AND `package_ref` = 'redis/redis';
 
+-- ------------------------------------------------------------
+-- Apple Live Photos 支持:content_photo 加 live_video_url(2026-10-09)
+--   实况照片=静态图(HEIC/JPEG)+ 短视频(MOV),同一次上传内按同名基底配对;
+--   短视频 URL 记在此列,普通照片为 NULL。schema.sql 全量建表已同步。
+--   幂等:information_schema 守卫,重复执行无副作用。
+-- ------------------------------------------------------------
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_photo' AND COLUMN_NAME = 'live_video_url');
+SET @sql := IF(@has = 0, 'ALTER TABLE `content_photo` ADD COLUMN `live_video_url` VARCHAR(255) DEFAULT NULL COMMENT ''实况照片关联短视频URL(苹果 Live Photo,MOV;普通照片为空)'' AFTER `source_fs_id`', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 
 

@@ -2,6 +2,7 @@ package com.ihomy.controller;
 
 import com.ihomy.annotation.OperationLog;
 import com.ihomy.common.HttpUrlUtil;
+import com.ihomy.common.LivePhotoUtil;
 import com.ihomy.common.Result;
 import com.ihomy.dto.PhotoDTO;
 import com.ihomy.dto.PhotoFromUrlDTO;
@@ -33,8 +34,10 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * 照片接口:批量上传(走 FileService 落盘)/改备注/删除。
@@ -67,10 +70,23 @@ public class PhotoController {
         Long fid = securityHelper.current().getFamilyId();
         if (!album.getFamilyId().equals(fid)) throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.FORBIDDEN);
         List<Photo> photos = new ArrayList<>();
+        // 实况照片:同一次上传内,同名的静态图 + 短片(苹果 Live Photo)配对后关联
+        Map<String, MultipartFile> liveVideos = new HashMap<>();
+        List<MultipartFile> images = new ArrayList<>();
         for (MultipartFile f : files) {
+            if (LivePhotoUtil.isVideo(f.getOriginalFilename(), f.getContentType())) {
+                liveVideos.put(LivePhotoUtil.baseKey(f.getOriginalFilename()), f);
+            } else {
+                images.add(f);
+            }
+        }
+        for (MultipartFile f : images) {
             String url = fileService.upload(f, f.getOriginalFilename(), f.getContentType(),
                     albumId, album == null ? null : album.getName());
-            photos.add(albumService.addPhoto(albumId, user, fid, url, null));
+            MultipartFile mov = liveVideos.get(LivePhotoUtil.baseKey(f.getOriginalFilename()));
+            String liveVideoUrl = mov == null ? null
+                    : fileService.uploadVideo(mov, mov.getOriginalFilename(), mov.getContentType());
+            photos.add(albumService.addPhoto(albumId, user, fid, url, null, liveVideoUrl));
         }
         if (!photos.isEmpty()) {
             pointsService.rewardPhotoUpload(user.getId(), fid, photos.size());
@@ -126,7 +142,7 @@ public class PhotoController {
             }
         }
         String desc = (dto.getDescription() == null || dto.getDescription().isBlank()) ? "AI 生图" : dto.getDescription();
-        Photo photo = albumService.addPhoto(albumId, user, fid, savedUrl, desc);
+        Photo photo = albumService.addPhoto(albumId, user, fid, savedUrl, desc, null);
         publicController.invalidateHomeCache(fid);
         return Result.success(List.of(photo));
     }

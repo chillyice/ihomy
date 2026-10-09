@@ -385,6 +385,7 @@ export default {
     download: '下载照片',
     linkCopied: '分享链接已复制',
     copyFailed: '复制失败，请手动复制',
+    live: '播放实况照片',
   },
   member: {
     title: '家庭成员',

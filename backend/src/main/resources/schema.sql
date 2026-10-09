@@ -511,6 +511,7 @@ CREATE TABLE `content_photo` (
   `visibility` VARCHAR(20) NOT NULL DEFAULT 'FAMILY' COMMENT '可见范围：PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开',
   `source_path` VARCHAR(500) DEFAULT NULL COMMENT '来源存储路径（一键同步去重用,系统上传为空）',
   `source_fs_id` BIGINT      DEFAULT NULL COMMENT '远程文件fs_id(百度网盘,免列目录直达dlink)',
+  `live_video_url` VARCHAR(255) DEFAULT NULL COMMENT '实况照片关联短视频URL(苹果 Live Photo,MOV;普通照片为空)',
   `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
   `deleted`    TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
   `deleted_at` DATETIME     DEFAULT NULL COMMENT '逻辑删除时间(回收站,7天后物理清理)',

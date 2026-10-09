@@ -209,6 +209,7 @@ public class RecycleService {
     private void purgePhoto(Photo p) {
         photoMapper.deletePhysicalById(p.getId());
         fileService.deleteByUrl(p.getUrl());
+        fileService.deleteByUrl(p.getLiveVideoUrl());
         thumbnailService.evictByUrl(p.getUrl());
     }
 
@@ -217,6 +218,7 @@ public class RecycleService {
         List<Photo> photos = photoMapper.selectByAlbumIdsAny(ids);
         for (Photo p : photos) {
             fileService.deleteByUrl(p.getUrl());
+            fileService.deleteByUrl(p.getLiveVideoUrl());
             thumbnailService.evictByUrl(p.getUrl());
         }
         List<Album> all = albumMapper.selectAllByFamily(familyId);

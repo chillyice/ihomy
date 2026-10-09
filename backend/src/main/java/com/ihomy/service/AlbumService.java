@@ -192,6 +192,7 @@ public class AlbumService {
             Map<String, Object> m = new HashMap<>();
             m.put("id", p.getId());
             m.put("url", signedUrlService.resolve(p.getUrl()));
+            m.put("liveVideoUrl", p.getLiveVideoUrl());
             m.put("description", p.getDescription());
             m.put("takenAt", p.getTakenAt());
             m.put("location", p.getLocation());
@@ -245,7 +246,7 @@ public class AlbumService {
 
     /** 添加照片:可见性随相册类型(public→PUBLIC,private→FAMILY);首张自动成为相册封面 */
     @Transactional
-    public Photo addPhoto(Long albumId, SysUser user, Long currentFamilyId, String url, String description) {
+    public Photo addPhoto(Long albumId, SysUser user, Long currentFamilyId, String url, String description, String liveVideoUrl) {
         Album a = albumMapper.selectById(albumId);
         if (a == null) throw new BizException(ResultCode.NOT_FOUND);
         if (!a.getFamilyId().equals(currentFamilyId)) throw new BizException(ResultCode.FORBIDDEN);
@@ -254,6 +255,7 @@ public class AlbumService {
         p.setAlbumId(albumId);
         p.setUrl(url);
         p.setDescription(description);
+        p.setLiveVideoUrl(liveVideoUrl);
         p.setAuthorId(user.getId());
         p.setFamilyId(a.getFamilyId());
         p.setVisibility("public".equals(a.getType()) ? DictConst.VIS_PUBLIC : DictConst.VIS_FAMILY);
