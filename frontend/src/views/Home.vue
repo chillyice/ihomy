@@ -307,6 +307,22 @@
             <router-link to="/book" class="card-more">{{ $t('home.dashboard.viewDetail') }}</router-link>
           </template>
 
+          <!-- 每日一图 / 每日知识 -->
+          <template v-else-if="w.id === 'daily'">
+            <div class="card-head">
+              {{ dailyImageOn ? $t('daily.image') : $t('daily.knowledge')
+              }}<button v-if="dailyKnowledgeOn" class="daily-next" :title="$t('daily.next')" @click.stop="reloadDaily()">↻</button>
+            </div>
+            <div class="card-scroll daily-scroll">
+              <div v-if="dailyImage" class="daily-pic">
+                <img :src="dailyImage.url" :alt="dailyImage.copyright || ''" loading="lazy" />
+                <span v-if="dailyImage.copyright" class="daily-cap">{{ dailyImage.copyright }}</span>
+              </div>
+              <div v-if="dailyKnowledge" class="daily-know">{{ dailyKnowledge }}</div>
+              <div v-if="!dailyImage && !dailyKnowledge" class="empty-hint">{{ dailyEmptyHint }}</div>
+            </div>
+          </template>
+
           <!-- 拍立得 -->
           <template v-else-if="w.id === 'album'">
             <div class="album-container" :style="{ '--polaroid-w': polaroidW(w) + 'px' }">
@@ -359,6 +375,9 @@
       </div>
     </template>
 
+    <!-- 右下角加号:添加「每日一图/每日知识」卡片(已在首页时不显示) -->
+    <button v-if="!hasDaily" class="daily-add-fab" :title="$t('daily.add')" @click="addDaily">+</button>
+
     <!-- 拖拽幽灵(从侧边栏拖出组件时) -->
     <div v-if="ghostActive" class="drag-ghost" :class="{ 'ghost-grown': ghostGrown }" :style="{ left: ghostX + 'px', top: ghostY + 'px' }">
       <span class="ghost-label">{{ ghostLabel }}</span>
@@ -374,6 +393,7 @@ import { useAppStore } from '@/stores/app'
 import { useI18n } from 'vue-i18n'
 import { publicApi, taskApi, pointsApi, reminderApi, bookApi, wishApi, itemApi, kitchenApi } from '@/api'
 import { useWeatherBg } from '@/composables/useWeatherBg'
+import { useDaily } from '@/composables/useDaily'
 import { gsap } from 'gsap'
 import { ElMessage } from 'element-plus'
 import { Search, Microphone } from '@element-plus/icons-vue'
@@ -724,6 +744,7 @@ const WIDGET_DEFAULT_SIZE = {
   wish: { w: 2, h: 2 },
   finance: { w: 2, h: 2 },
   task: { w: 3, h: 3 },
+  daily: { w: 2, h: 3 },
 }
 
 // 四档(排版方案 §二/§三):档位由等效栅格面积推导——画布比例 w/h × 列/行数 = 等效格宽/格高,
@@ -812,6 +833,34 @@ const resetLayout = () => {
   saveLayout()
   ElMessage.success(t('warm.layoutReset'))
 }
+
+// ========== 每日一图 / 每日知识(公开卡片,右下角加号加入;偏好读设置页 ihomy-daily) ==========
+const {
+  image: dailyImage,
+  knowledge: dailyKnowledge,
+  imageOn: dailyImageOn,
+  knowledgeOn: dailyKnowledgeOn,
+  load: loadDaily,
+  reload: reloadDaily,
+} = useDaily()
+const dailyEmptyHint = computed(() => (dailyImageOn || dailyKnowledgeOn ? t('daily.loading') : t('daily.off')))
+const hasDaily = computed(() => widgets.value.some((w) => w.id === 'daily'))
+const addDaily = () => {
+  if (hasDaily.value) return
+  const size = WIDGET_DEFAULT_SIZE.daily
+  const wf = size.w / COLS
+  const hf = size.h / ROWS
+  widgets.value.push(makeWidget({ id: 'daily', x: 1 - wf, y: 1 - hf, w: wf, h: hf }))
+  saveLayout()
+  ElMessage.success(t('warm.addedToast', { label: widgetLabel('daily') }))
+}
+watch(
+  hasDaily,
+  (on) => {
+    if (on) loadDaily()
+  },
+  { immediate: true },
+)
 
 const removeWidget = (w) => {
   widgets.value = widgets.value.filter((x) => x.uid !== w.uid)
@@ -1081,6 +1130,7 @@ const WIDGET_LABEL_KEYS = {
   wish: 'home.dashboard.wishlist',
   finance: 'home.dashboard.finance',
   album: 'home.dashboard.album',
+  daily: 'daily.image',
 }
 const widgetLabel = (type) => (WIDGET_LABEL_KEYS[type] ? t(WIDGET_LABEL_KEYS[type]) : type)
 const ghostActive = ref(false)
@@ -2499,6 +2549,98 @@ html.dark .voice-btn:hover {
   background: rgba(var(--color-brand-rgb), 0.22);
 }
 
+/* 每日一图 / 每日知识 + 右下角加号 */
+.dash-card.daily .card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.daily-next {
+  all: unset;
+  margin-left: auto;
+  cursor: pointer;
+  font-size: 13px;
+  opacity: 0.45;
+  transition:
+    opacity 0.2s,
+    color 0.2s;
+}
+.daily-next:hover {
+  opacity: 1;
+  color: var(--color-brand);
+}
+.daily-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.daily-pic {
+  position: relative;
+  flex: 1;
+  min-height: 60px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(var(--color-card-rgb), 0.4);
+}
+.daily-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.daily-cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 6px 9px;
+  font-size: 10.5px;
+  color: #fff;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.55));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.daily-know {
+  flex-shrink: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #776e62;
+}
+html.dark .daily-know {
+  color: #9a9088;
+}
+.daily-add-fab {
+  position: fixed;
+  right: 24px;
+  bottom: 88px;
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.72);
+  color: #3a2e22;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 80;
+  box-shadow: 0 8px 28px rgba(58, 46, 34, 0.16);
+  transition:
+    transform 0.15s,
+    box-shadow 0.15s;
+}
+.daily-add-fab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(58, 46, 34, 0.22);
+}
+html.dark .daily-add-fab {
+  background: rgba(var(--color-card-rgb), 0.72);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #e8dcc8;
+}
+
 /* Transition */
 .fade-enter-active,
 .fade-leave-active {
@@ -2510,7 +2652,8 @@ html.dark .voice-btn:hover {
 }
 
 @media (max-width: 960px) {
-  .dash-card {
+  .dash-card,
+  .daily-add-fab {
     display: none;
   }
   .home-page::before {

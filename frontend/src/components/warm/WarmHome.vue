@@ -43,6 +43,7 @@
             'gc-card-link': isLinkCard(w),
             'gc-card-preview': w.kind === 'preview',
             'gc-card-dragging': reorderPreview && reorderPreview.id === w.id,
+            'gc-daily-card': w.id === 'daily',
           },
         ]"
         :style="cardStyle(w)"
@@ -345,6 +346,22 @@
           <div v-else class="gc-empty">{{ $t('warm.noReminder') }}</div>
         </template>
 
+        <!-- 每日一图 / 每日知识(偏好走设置页 ihomy-daily;换一条 = 重新拉取) -->
+        <template v-else-if="w.id === 'daily'">
+          <h3 class="gc-card-h3">
+            {{ dailyImageOn ? $t('daily.image') : $t('daily.knowledge')
+            }}<button v-if="dailyKnowledgeOn" class="gc-more" :title="$t('daily.next')" @click.stop="!editMode && reloadDaily()">↻</button>
+          </h3>
+          <div class="gc-daily">
+            <div v-if="dailyImage" class="gc-daily-pic">
+              <img :src="dailyImage.url" :alt="dailyImage.copyright || ''" loading="lazy" />
+              <span v-if="dailyImage.copyright" class="gc-daily-cap">{{ dailyImage.copyright }}</span>
+            </div>
+            <div v-if="dailyKnowledge" class="gc-daily-know">{{ dailyKnowledge }}</div>
+            <div v-if="!dailyImage && !dailyKnowledge" class="gc-empty">{{ dailyEmptyHint }}</div>
+          </div>
+        </template>
+
         <!-- 快捷入口(无专属内容的模块拖入后生成) -->
         <template v-else-if="w.kind === 'link'">
           <h3 class="gc-card-h3">{{ w.label }}</h3>
@@ -391,6 +408,7 @@ import { useWarmWidgetDrag } from '@/utils/widgetDragData'
 import { addedCodes } from '@/utils/warmHomeShared'
 import { publicApi, bookApi, itemApi, taskApi, wishApi, reminderApi, aiApi } from '@/api'
 import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
+import { useDaily } from '@/composables/useDaily'
 import { feedSummary as feedSummaryOf } from '@/utils/feed'
 import { pickDefaultFloor } from '@/utils/floorPlanGeom'
 import { dictText } from '@/utils/dict'
@@ -400,6 +418,17 @@ const { t } = useI18n()
 const appStore = useAppStore()
 const userStore = useUserStore()
 const sunLight = inject(SUN_LIGHT_KEY)
+
+// 每日一图 / 每日知识(公开接口,游客也可看;偏好读设置页 localStorage)
+const {
+  image: dailyImage,
+  knowledge: dailyKnowledge,
+  imageOn: dailyImageOn,
+  knowledgeOn: dailyKnowledgeOn,
+  load: loadDaily,
+  reload: reloadDaily,
+} = useDaily()
+const dailyEmptyHint = computed(() => (dailyImageOn || dailyKnowledgeOn ? t('daily.loading') : t('daily.off')))
 
 defineProps({ weatherBg: { type: String, default: '' } })
 
@@ -420,6 +449,7 @@ const WIDGETS = [
   { id: 'task', labelKey: 'warm.widget.task', icon: '🎯', span: 4, chip: 5 },
   { id: 'wish', labelKey: 'warm.widget.wish', icon: '⭐', span: 4, chip: 3 },
   { id: 'reminder', labelKey: 'warm.widget.reminder', icon: '🔔', span: 4, chip: 1 },
+  { id: 'daily', labelKey: 'warm.widget.daily', icon: '🌅', span: 4, chip: 2 },
 ]
 const WIDGET_BY_ID = Object.fromEntries(WIDGETS.map((w) => [w.id, w]))
 const widgetLabel = (base) => t(base.labelKey)
@@ -463,8 +493,8 @@ const MODULE_META = {
 
 // 布局键:富组件用其 id(如 feed),快捷入口用 'link:<code>'(如 link:diary);每项携带 span(列宽)+ row(行高),可调整
 const defaultSpan = (id) => WIDGET_BY_ID[id]?.span || 4
-// 行高基准:天气 8 列 × 4 行为基准,家人动态同高 4 行,其余 2 行
-const defaultRow = (id) => (id === 'weather' || id === 'feed' ? 4 : 2)
+// 行高基准:天气 8 列 × 4 行为基准,家人动态同高 4 行,每日内容 3 行(图+知识),其余 2 行
+const defaultRow = (id) => (id === 'weather' || id === 'feed' ? 4 : id === 'daily' ? 3 : 2)
 const resolveWidget = (entry) => {
   const id = entry?.id
   if (!id) return null
@@ -547,6 +577,14 @@ watch(
     addedCodes.value = computeAddedCodes()
   },
   { deep: true, immediate: true },
+)
+// 每日内容卡片出现后才拉数据(公开接口:游客也能看)
+watch(
+  () => layout.value.some((e) => e.id === 'daily'),
+  (on) => {
+    if (on) loadDaily()
+  },
+  { immediate: true },
 )
 
 // ========== 布局动画(FLIP:先量后放,统一驱动「变大缩小 / 邻居移动 / 回弹」) ==========
@@ -1902,6 +1940,53 @@ html.theme-warm.dark .gc-home {
 .gc-link-body:hover .gc-link-arrow {
   transform: translateX(3px);
   color: var(--color-brand);
+}
+
+/* 每日一图 / 每日知识 */
+.gc-daily-card {
+  display: flex;
+  flex-direction: column;
+}
+.gc-daily {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gc-daily-pic {
+  position: relative;
+  flex: 1;
+  min-height: 72px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--color-line);
+}
+.gc-daily-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.gc-daily-cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 6px 9px;
+  font-size: 10.5px;
+  color: #fff;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.55));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gc-daily-know {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  max-height: 4.5em;
+  overflow: hidden;
 }
 
 /* 天气活窗 */

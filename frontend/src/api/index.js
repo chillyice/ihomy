@@ -14,6 +14,12 @@ export const publicApi = {
   searchWeatherLocations: (keyword) => request.get('/public/weather/locations', { params: { keyword } }),
 }
 
+// 每日内容:必应每日一图(后端代理)+ 每日知识(公开接口,游客可用)
+export const dailyApi = {
+  image: () => request.get('/public/daily-image'),
+  knowledge: (types) => request.get('/public/daily-knowledge', { params: { types } }),
+}
+
 // 认证相关:图形验证码
 export const authApi = {
   captcha: () => request.get('/auth/captcha'),

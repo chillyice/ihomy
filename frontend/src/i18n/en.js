@@ -2108,6 +2108,14 @@ export default {
     typeComment: 'Comment',
     typeExpiry: 'Expiry Alert',
   },
+  daily: {
+    image: 'Daily image',
+    knowledge: 'Daily knowledge',
+    next: 'Next',
+    loading: 'Loading…',
+    off: 'Enable daily content in Settings',
+    add: 'Add daily content card',
+  },
   warm: {
     backHome: 'Back home',
     backPrev: 'Back',
@@ -2135,6 +2143,7 @@ export default {
       task: 'Tasks',
       wish: 'Wishlist',
       reminder: 'Reminders',
+      daily: 'Daily image',
     },
     module: {
       blog: 'Blog',

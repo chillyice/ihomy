@@ -2100,6 +2100,14 @@ export default {
     typeComment: '评论',
     typeExpiry: '食材预警',
   },
+  daily: {
+    image: '每日一图',
+    knowledge: '每日知识',
+    next: '换一条',
+    loading: '加载中…',
+    off: '去设置开启每日内容',
+    add: '添加每日内容卡片',
+  },
   warm: {
     backHome: '返回首页',
     backPrev: '返回上一页',
@@ -2127,6 +2135,7 @@ export default {
       task: '悬赏任务',
       wish: '愿望单',
       reminder: '今日提醒',
+      daily: '每日一图',
     },
     module: {
       blog: '博客',
