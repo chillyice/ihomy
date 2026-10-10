@@ -25,3 +25,22 @@ describe('buildNavItems 虚拟入口', () => {
     expect(system.items.map((i) => i.code)).toEqual(['settings', 'help'])
   })
 })
+
+// 天气页不入 sys_home_module:桌面走侧栏/首页卡片,移动端无入口 = 页面存在却到不了(V10.26 修)
+describe('buildNavItems 天气入口', () => {
+  it('无 DB 行也有「天气」,且落在「生活」组', () => {
+    const groups = buildNavGroups([])
+    const life = groups.find((g) => g.category === 'life')
+    expect(life.items.map((i) => i.code)).toContain('weather')
+    expect(buildNavItems([]).find((i) => i.code === 'weather').path).toBe('/weather')
+  })
+
+  it('不破「工具箱殿后」的排序口径(工具箱仍在生活组末位)', () => {
+    const life = buildNavGroups([
+      { code: 'vault', title: '保险箱', path: '/vault', category: 'life', sortOrder: 14, enabled: 1 },
+      { code: 'chat', title: '聊天室', path: '/chat', category: 'life', sortOrder: 16, enabled: 1 },
+      { code: 'tools', title: '工具箱', path: '/tools', category: 'life', sortOrder: 17, enabled: 1 },
+    ]).find((g) => g.category === 'life')
+    expect(life.items.map((i) => i.code)).toEqual(['vault', 'weather', 'chat', 'tools'])
+  })
+})

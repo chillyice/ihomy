@@ -80,7 +80,7 @@ import { useI18n } from 'vue-i18n'
 const filename = 'kada.exe'
 const downloadUrl = `/files/kada/${filename}`
 const version = '0.1.0'
-const fileSize = '9.7 MB'
+const fileSize = '13.4 MB'
 
 const { t } = useI18n()
 

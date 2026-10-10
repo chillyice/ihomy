@@ -41,50 +41,17 @@ import MobileMePage from '@/components/MobileMePage.vue'
 import BackToTop from '@/components/BackToTop.vue'
 import InstallPrompt from '@/components/InstallPrompt.vue'
 import MusicPlayer from '@/components/MusicPlayer.vue'
+import { isMobileHomePath, mobileHeaderTitleKey } from '@/utils/mobileNav'
 
 const route = useRoute()
 const { t } = useI18n()
 const activeTab = ref('home')
 
-const isHomeRoute = computed(() => route.path === '/')
+// 首页判据与页头标题键都在 utils/mobileNav.js(纯函数,带单测);路由把 '/' 重定向到 '/home',两者都要认
+const isHomeRoute = computed(() => isMobileHomePath(route.path))
 
-// 页头标题:走 i18n(切语言即时跟着变),键为空即不显示标题
-const PAGE_TITLES = {
-  '/blog': 'blog.title',
-  '/diary': 'diary.title',
-  '/album': 'album.title',
-  '/anniversary': 'anniversary.title',
-  '/cinema': 'cinema.title',
-  '/music': 'music.title',
-  '/member': 'member.title',
-  '/points': 'points.title',
-  '/task': 'task.title',
-  '/reminder': 'reminder.title',
-  '/plan': 'plan.title',
-  '/wish': 'wish.title',
-  '/book': 'book.title',
-  '/chat': 'chat.title',
-  '/tree': 'tree.title',
-  '/item': 'mobile.title.item',
-  '/kitchen': 'kitchen.title',
-  '/library': 'library.title',
-  '/settings': 'settings.title',
-  '/ops': 'mobile.title.ops',
-  '/vault': 'vault.title',
-  '/login': 'mobile.title.login',
-}
 const pageTitle = computed(() => {
-  const p = route.path
-  const edit = p.includes('/edit/')
-  if (p.startsWith('/blog/')) return t(edit ? 'mobile.title.blogEdit' : 'mobile.title.blogDetail')
-  if (p.startsWith('/diary')) return t(edit ? 'mobile.title.diaryWrite' : 'diary.title')
-  if (p.startsWith('/album/')) return t('mobile.title.albumDetail')
-  if (p.startsWith('/library/')) return t(edit ? 'mobile.title.bookEdit' : 'mobile.title.bookDetail')
-  if (p.startsWith('/kitchen/recipe/')) return t(edit ? 'mobile.title.recipeEdit' : 'mobile.title.recipeDetail')
-  if (p.startsWith('/kitchen/ingredients')) return t('mobile.title.ingredients')
-  if (p.startsWith('/cinema/')) return t('mobile.title.cinemaDetail')
-  if (p.startsWith('/tools/loan')) return t('mobile.title.loan')
-  const key = PAGE_TITLES[p]
+  const key = mobileHeaderTitleKey(route.path)
   return key ? t(key) : ''
 })
 

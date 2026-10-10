@@ -91,6 +91,7 @@ export const ICON_MAP = {
   settings: Setting,
   ops: Monitor,
   tools: Tools,
+  weather: Sunny,
   plant: Sunny,
   games: Aim,
   vault: Lock,
@@ -124,6 +125,9 @@ export function buildNavItems(modules, { hasOps = false } = {}) {
   list.push({ code: 'settings', title: '设置', path: '/settings', category: 'system', sortOrder: 90 })
   // 帮助:与设置/运维同为不入 sys_home_module 的虚拟入口(标题同样写死,nav 现状即如此)
   list.push({ code: 'help', title: '帮助', path: '/help', category: 'system', sortOrder: 92 })
+  // 天气:同样不入 sys_home_module。此前桌面靠侧栏迷你天气/首页天气卡片进入,移动端无任何入口,
+  // 手机上等于「有页面但到不了」。sortOrder 15 落在 vault(14) 与 chat(16) 之间,不破「工具箱殿后」。
+  list.push({ code: 'weather', title: '天气', path: '/weather', category: 'life', sortOrder: 15 })
   if (hasOps) list.push({ code: 'ops', title: '运维管理', path: '/ops', category: 'system', sortOrder: 95 })
   return list.sort((a, b) => a.sortOrder - b.sortOrder)
 }
