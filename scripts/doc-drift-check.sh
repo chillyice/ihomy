@@ -75,9 +75,12 @@ for prefix in sys report family content; do
   [[ "$decl" == "$actual" ]] && pass "AGENTS ${prefix}_ 前缀 $decl 张" \
     || fail "AGENTS 写 ${prefix}_ $decl 张, 实际 $actual 张"
 done
-game_decl="$(grep -m1 -oE 'game_info\` [0-9]+' "$AGENTS" | grep -oE '[0-9]+' || true)"
-if [[ -z "$game_decl" ]]; then game_decl="$(grep -m1 -oE 'game_info[^0-9]{0,4}[0-9]+' "$AGENTS" | grep -oE '[0-9]+' || true)"; fi
-[[ "$game_decl" == "1" ]] && pass "AGENTS game_info 1 张" || fail "AGENTS 写 game_info $game_decl 张, 实际 1 张"
+# 游戏域(game_):V10.27 起成为正式顶层类别(家圃时光 garden + 导入的 game_info),
+# 原先 game_info 是「未加 family_ 前缀的遗留」,现在按前缀统一计数。
+game_decl="$(grep -m1 -oE '`game_` [0-9]+' "$AGENTS" | grep -oE '[0-9]+' || true)"
+game_actual="$(grep -oE '^CREATE TABLE `[^`]+`' "$SCHEMA" | sed 's/.*`\(.*\)`/\1/' | grep -cE '^game_' || true)"
+[[ "$game_decl" == "$game_actual" ]] && pass "AGENTS game_ 前缀 $game_decl 张" \
+  || fail "AGENTS 写 game_ $game_decl 张, 实际 $game_actual 张"
 
 # ------------------------------------------------------- 3. 实体 ↔ 表
 echo "[3] 实体 @TableName ↔ schema.sql 建表"
