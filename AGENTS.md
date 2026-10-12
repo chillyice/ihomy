@@ -71,7 +71,7 @@
 - **生产 MySQL 密码策略**(轮换踩坑):`validate_password` MEDIUM,密码必须含特殊字符(避开 `' " \ $ |`,建议 `!@%^&*-_+=.`),否则 `ALTER USER` 报 1819;开发 Docker MySQL 无此组件,同一密码 dev 能过 prod 被拒。详见踩坑速查 §2.7。
 - **81 张表**,前缀分类:`sys_` 25(系统/账号/权限/配置/存储)、`report_` 4(报表/日志)、`family_` 30(家庭事务)、`content_` 21(内容数据)、`game_` 1(游戏域,现仅家庭小游戏 `game_info`)。**各表用途与完整清单见 `docs/需求设计说明书.md` §6.2**。
   - **命名规则**:家庭事务业务表一律 `family_` 前缀;内容数据 `content_` 前缀;账号/权限/配置/存储保留 `sys_`;**报表/日志表一律 `report_` 前缀**;**游戏域一律 `game_` 前缀,格式 `game_<game_code>_<module>_<entity>`**(游戏是顶层类别,不是 family 的子集)。新增表必须遵守。前缀取最顶层祖先类别;上下级关系体现在表名(如 `sys_user_role`)。
-  - **游戏域细则**(家圃时光 V2 实现时生效):`game_code` 取游戏英文小写下划线简称;**模块层只在「≥3 张表 / 独立聚合根 / 有独立子域」时才建**,否则直接 `game_<code>_<entity>`;例外仅 `game_info`(存量游戏文件清单)。注册表统一 `game_info`,**小游戏页只读注册表,加游戏 = 插一行不改组件**。细则见设计稿 §16.1–16.2。
+  - **游戏域细则**(家圃时光已独立立项,2026-10-12):家圃时光 V2 整体迁至独立仓 `home_garden_moments`(GitHub: chillyice/home_garden_moments;库 `games`,表前缀 `garden_` 两段式),设计稿随之迁出,本仓仅剩集成事项(`game_info` 注册表与游戏库入口,见其设计稿 §16.2)。**ihomy 内游戏域表**仍按 `game_<game_code>_<entity>` 命名:`game_code` 取游戏英文小写下划线简称;**模块层只在「≥3 张表 / 独立聚合根 / 有独立子域」时才建**,否则直接 `game_<code>_<entity>`;例外仅 `game_info`(存量游戏文件清单)。注册表统一 `game_info`,**小游戏页只读注册表,加游戏 = 插一行不改组件**。独立仓设计稿:`ihomy_games\home_garden_moments\docs\设计稿\植物养殖游戏设计.md`。
 - **结构变更双文件**(强制):同时更新 `schema.sql`(全量)与 `migrations.sql`(增量、**幂等**),并按 CI 同路径做空库全量导入实测——`migrations` 跑通 ≠ `schema.sql` 可用。详见踩坑速查 §7.4。
 - **引用开源软件必须对接自动升级(强制)**:新增任何 npm/Maven 直接依赖或独立开源服务,**必须同时在 `sys_oss_component` 台账登记一条**(component_type=NPM/MAVEN/SERVICE + package_ref + current_version + license + repo_url + managed_by),否则不会被版本跟踪覆盖;**`current_version` 记实际锁定版本**(package-lock.json / 解析后的 Maven 依赖),不写声明区间下限(devDependencies 也登)。**升级闸门**:NPM/MAVEN 交 Renovate(`managed_by=RENOVATE`),台账「AI 评估」(`OSS_UPGRADE_EVAL` 功能码)判断影响后勾选「生成升级 PR」;SERVICE 走 `managed_by=INTERNAL` 按 `deploy_type` 出方案,**当前版本可按 `probe_type` 自动探测**(探不到保留人工值)。漏洞列 `vuln_count/vuln_severity` 仅预留(CVE 扫描已决策不做)。入口 `/ops/oss`;台账字段、探测方式与 AI 评估细则见 需求 §4.6.10 与踩坑速查。
 - **枚举不再用数字**:状态/类型字段一律大写英文单词(`PUBLISHED/DRAFT/PUBLIC/FAMILY/ACTIVE...`),含义存字典表 `sys_dict_item`,Java 常量集中于 `common/DictConst.java`,前端映射 `utils/dict.js`。**不要写回 0/1/2 判断**。
@@ -168,7 +168,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 内容 | 博客 / 日记 / 相册照片(含瀑布内嵌、实况照片) / 放映厅(媒体引擎+本地库) / 愿望单 / 书架 | Blog / Diary / Album+Photo / Video / Media / Wish / Library 各 Controller |
 | 互动 | 点赞 / 评论 / 通知 / 聊天室 / 家庭公告 | Like / Comment / Notification / Chat / Announcement 各 Controller + ChatWebSocketHandler |
 | 生活 | 纪念日 / 提醒 / 计划 / 任务 / 记账(含贷款) / 家谱 / 签到积分 / 背景音乐 / 保险箱 | Anniversary / Reminder / Plan / Task / Points / Music / Vault 各 Controller |
-| 游戏 | 花园共养植物(V1,**V2 家庭农场规划中见需求 §9.1**) / 小游戏库(SWF/GBA) / 宠物连连看 | FamilyPlant / GameInfo 各 Controller + FlashPlayer.vue + GbaPlayer.vue + PetLinkLink.vue |
+| 游戏 | 花园共养植物(V1;**V2 家圃时光已独立立项迁出,见需求 §9.1**) / 小游戏库(SWF/GBA) / 宠物连连看 | FamilyPlant / GameInfo 各 Controller + FlashPlayer.vue + GbaPlayer.vue + PetLinkLink.vue |
 | 基础 | 文件上传 / 存储管理 / 首页聚合 / 运维(含异常聚合预警) / 开源组件台账 / 每日内容 / 操作日志 / 系统参数 / 回收站 | File / Storage / Home+Public / Ops+Oss(OpsAlert) / Daily / Log / Recycle 各 Controller |
 | 光影 | 太阳位置 / 日月晨昏 / 体积光 / 台灯 / 天气 / 首页仪表盘 | SolarUtil+SunService(`/public/sun-info`) + windowLight.js + SunLightLayer.vue |
 | 物品 | 物品定位 + 户型图 + AI 语义 | ItemController / ItemAiService+AiService(见需求 §4.8.1) |
