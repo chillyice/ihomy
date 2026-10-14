@@ -7,8 +7,10 @@
         <span class="section-label">{{ $t('tools.mindmap.title') }}</span>
       </div>
       <div class="tb-right">
-        <el-button :icon="DeleteFilled" @click="openTrash">{{ $t('tools.mindmap.trashBtn') }}</el-button>
-        <el-button type="primary" :icon="Plus" @click="openCreateDialog">{{ $t('tools.mindmap.new') }}</el-button>
+        <el-button v-if="userStore.isLoggedIn" :icon="DeleteFilled" @click="openTrash">{{ $t('tools.mindmap.trashBtn') }}</el-button>
+        <el-button v-if="userStore.isLoggedIn" type="primary" :icon="Plus" @click="openCreateDialog">{{
+          $t('tools.mindmap.new')
+        }}</el-button>
       </div>
     </PageToolbar>
 
@@ -24,7 +26,7 @@
           </div>
         </div>
       </div>
-      <el-empty v-else :description="$t('tools.mindmap.noData')" />
+      <el-empty v-else :description="userStore.isGuest ? $t('tools.mindmap.guestEmpty') : $t('tools.mindmap.noData')" />
     </div>
 
     <!-- 新建脑图:选模板 + 标题 -->
@@ -94,6 +96,8 @@ const loading = ref(false)
 const list = ref([])
 
 const load = async () => {
+  // 脑图是家庭私有内容(后端接口需登录):游客不打注定 401 的请求,直接走登录引导空态
+  if (!userStore.isLoggedIn) return
   loading.value = true
   try {
     list.value = await mindmapApi.list()

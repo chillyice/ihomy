@@ -14,7 +14,7 @@
     </PageToolbar>
 
     <div v-loading="loading" class="tree-body">
-      <el-empty v-if="!loading && !roots.length" :description="$t('tree.emptyHint')" />
+      <el-empty v-if="!loading && !roots.length" :description="userStore.isGuest ? $t('tree.guestEmpty') : $t('tree.emptyHint')" />
       <div v-else class="generation-list">
         <div v-for="gen in generations" :key="gen" class="generation-row">
           <div class="gen-label">{{ $t('tree.gen', { n: gen + 1 }) }}</div>
@@ -235,6 +235,8 @@ const openEditor = (m) => {
 }
 
 const load = async () => {
+  // 家谱是家庭隐私内容(后端全部接口仅登录成员可用):游客不打注定 401 的请求,直接空态
+  if (!userStore.isLoggedIn) return
   loading.value = true
   try {
     members.value = await treeApi.list()

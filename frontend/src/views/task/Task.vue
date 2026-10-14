@@ -5,7 +5,7 @@
 
     <PageToolbar>
       <div class="tb-right">
-        <el-button type="primary" @click="openEditor()">{{ $t('task.publish') }}</el-button>
+        <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ $t('task.publish') }}</el-button>
       </div>
     </PageToolbar>
 
@@ -36,7 +36,7 @@
           </div>
         </div>
       </div>
-      <el-empty v-else :description="$t('task.noData')" />
+      <el-empty v-else :description="userStore.isGuest ? $t('task.guestEmpty') : $t('task.noData')" />
     </div>
 
     <!-- 发布任务弹窗 -->
@@ -161,6 +161,8 @@ const onPublish = async () => {
 }
 
 const loadTasks = async () => {
+  // 任务悬赏是私有内容:游客不打注定 401 的请求,直接空态
+  if (!userStore.isLoggedIn) return
   loading.value = true
   try {
     tasks.value = await taskApi.list()

@@ -1141,6 +1141,7 @@ INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`,
 ('PDF.js', 'NPM', 'pdfjs-dist', '6.3.289', 'Apache-2.0', 'https://github.com/mozilla/pdf.js', 'PDF 查看器/户型图底图', 'FULL'),
 ('simple-mind-map', 'NPM', 'simple-mind-map', '0.14.0', 'MIT', 'https://github.com/wanglin2/mind-map', '工具箱脑图设计', 'FULL'),
 ('Marked', 'NPM', 'marked', '18.0.9', 'MIT', 'https://github.com/markedjs/marked', 'Markdown 渲染', 'FULL'),
+('DOMPurify', 'NPM', 'dompurify', '3.4.17', 'Apache-2.0', 'https://github.com/cure53/DOMPurify', '博客正文 Markdown 渲染消毒(防存储型 XSS)', 'FULL'),
 ('QWeather Icons', 'NPM', 'qweather-icons', '1.8.0', 'MIT', 'https://github.com/qwd/Icons', '天气图标字体', 'FULL'),
 ('Ruffle (Flash 播放器)', 'NPM', '@ruffle-rs/ruffle', '0.6.0', 'MIT/Apache-2.0', 'https://github.com/ruffle-rs/ruffle', '放映厅/小游戏 Flash 播放', 'FULL'),
 ('EmulatorJS (GBA 模拟器)', 'NPM', '@emulatorjs/emulatorjs', '4.2.3', 'GPL-3.0', 'https://github.com/EmulatorJS/EmulatorJS', '小游戏 GBA/FC 等复古游戏模拟', 'FULL'),
@@ -1953,5 +1954,265 @@ SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA 
 SET @sql := IF(@has = 0, 'ALTER TABLE `content_photo` ADD COLUMN `live_video_url` VARCHAR(255) DEFAULT NULL COMMENT ''实况照片关联短视频URL(苹果 Live Photo,MOV;普通照片为空)'' AFTER `source_fs_id`', 'SELECT 1');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- ------------------------------------------------------------
+-- 2026-10-13 未登录访问演示家庭效果补满(游客首页 / 相册 / 动态流)
+--   背景:未登录访客默认落到 1 号家庭(FamilyMapper.selectDefault 取 is_default=1,且它 is_public=1),
+--   游客首页只显示「家人动态 / 天气 / 纪念日 / 相册」;相册取 PhotoMapper.selectLatestPublicByFamily
+--   (需相册 type='public' 且照片 visibility='PUBLIC'),动态流取 ActivityFeedService 的 publicOnly 分支。
+--   原先演示家庭一张照片都没有、公开博客仅 2 篇、纪念日卡片因 stats 空而整块隐藏,游客页近乎空白。
+--   ① 修种子缺陷:演示账号角色绑定因 schema.sql 里 `WHERE u.is_fake = 1` 与插入值 `is_fake = 0` 不一致
+--      而从未建立 —— demo_owner/member/child 登录会被 AuthService 兜底成 GUEST。
+--   ② 补内容:公开相册 2 个 + 照片 8 张、公开博客 4 篇、公开日记 3 条、公开愿望 4 条。
+--   ③ 演示照片是前端静态目录 /demo/ 下的矢量风景(scripts/gen-demo-photos.py 生成),随 frontend/dist
+--      一起部署;URL 不走 /files/ 故无需在 FileAccessMapper 登记反查。
+--   幂等:逐条 NOT EXISTS 守卫(相册按 name、照片按 url、博客按 title、日记按 content、愿望按 title),重复执行无副作用。
+-- ------------------------------------------------------------
+SET @demo_fid := (SELECT `id` FROM `sys_family_info` WHERE `is_demo` = 1 AND `deleted` = 0 ORDER BY `id` LIMIT 1);
+
+-- ① 补演示账号角色绑定(OWNER/MEMBER/CHILD)
+INSERT INTO `sys_user_role` (`user_id`, `role_id`, `family_id`)
+SELECT u.`id`, r.`id`, u.`family_id`
+FROM `sys_user` u
+JOIN `sys_role` r ON r.`role_code` = CASE u.`username`
+  WHEN 'demo_owner' THEN 'OWNER' WHEN 'demo_member' THEN 'MEMBER' ELSE 'CHILD' END
+WHERE u.`email` IN ('demo@ihomy.local', 'demo2@ihomy.local', 'demo3@ihomy.local')
+  AND NOT EXISTS (
+    SELECT 1 FROM `sys_user_role` ur
+    WHERE ur.`user_id` = u.`id` AND ur.`family_id` = u.`family_id`
+  );
+
+-- ② 公开相册
+INSERT INTO `content_photo_album` (`name`, `type`, `family_id`, `created_by`)
+SELECT '四季风景', 'public', @demo_fid, u.`id`
+FROM `sys_user` u
+WHERE u.`username` = 'demo_owner' AND @demo_fid IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM `content_photo_album` a
+    WHERE a.`family_id` = @demo_fid AND a.`name` = '四季风景' AND a.`deleted` = 0
+  );
+
+INSERT INTO `content_photo_album` (`name`, `type`, `family_id`, `created_by`)
+SELECT '周末出游', 'public', @demo_fid, u.`id`
+FROM `sys_user` u
+WHERE u.`username` = 'demo_member' AND @demo_fid IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM `content_photo_album` a
+    WHERE a.`family_id` = @demo_fid AND a.`name` = '周末出游' AND a.`deleted` = 0
+  );
+
+-- 演示相册给固定 share_token（与 schema.sql 同值）：空库安装的相册才有分享链接，
+-- 这里刷成同值让「全新安装」与「迁移」两条路径的库状态一致（幂等：同值 UPDATE 无副作用）
+UPDATE `content_photo_album` SET `share_token` = 'd3m0seasons2026v'
+ WHERE `family_id` = @demo_fid AND `name` = '四季风景' AND `type` = 'public' AND `deleted` = 0;
+UPDATE `content_photo_album` SET `share_token` = 'd3m0weekend2026v'
+ WHERE `family_id` = @demo_fid AND `name` = '周末出游' AND `type` = 'public' AND `deleted` = 0;
+
+-- ③ 公开照片(URL 为去重键;created_at 取执行时刻,首页拍立得按 created_at 取「近 7 天」那批)
+INSERT INTO `content_photo` (`album_id`, `url`, `description`, `taken_at`, `location`, `author_id`, `family_id`, `visibility`)
+SELECT a.`id`, d.`url`, d.`descr`, DATE_SUB(NOW(), INTERVAL d.`days` DAY), d.`loc`, u.`id`, @demo_fid, 'PUBLIC'
+FROM (
+            SELECT '四季风景' AS album, '/demo/sunrise-mountain.svg' AS url, '清晨的山顶，云海翻涌' AS descr, 2 AS days, '泰山' AS loc, 'demo_owner' AS uploader
+  UNION ALL SELECT '四季风景', '/demo/autumn-park.svg',  '公园里的银杏黄了',        3, '城市公园', 'demo_member'
+  UNION ALL SELECT '四季风景', '/demo/sakura.svg',       '春天的樱花开了',          4, '武大',     'demo_member'
+  UNION ALL SELECT '四季风景', '/demo/snow-village.svg', '下雪后的村子，安静得像画',  5, '姥姥家',   'demo_owner'
+  UNION ALL SELECT '周末出游', '/demo/seaside-dusk.svg', '海边的黄昏，风很温柔',      1, '青岛',     'demo_member'
+  UNION ALL SELECT '周末出游', '/demo/forest-path.svg',  '林间小径，适合慢慢走',      1, '森林公园', 'demo_owner'
+  UNION ALL SELECT '周末出游', '/demo/starry-lake.svg',  '湖边看星星，银河很亮',      6, '郊外营地', 'demo_child'
+  UNION ALL SELECT '周末出游', '/demo/city-night.svg',   '城市夜景，万家灯火',        6, '市中心',   'demo_owner'
+) d
+JOIN `content_photo_album` a ON a.`family_id` = @demo_fid AND a.`name` = d.`album` AND a.`deleted` = 0
+JOIN `sys_user` u ON u.`username` = d.`uploader`
+WHERE @demo_fid IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM `content_photo` p
+    WHERE p.`family_id` = @demo_fid AND p.`url` = d.`url` AND p.`deleted` = 0
+  );
+
+-- ④ 公开博客
+INSERT INTO `content_blog` (`title`, `content`, `author_id`, `family_id`, `status`, `visibility`, `view_count`, `category`)
+SELECT d.`title`, d.`content`, u.`id`, @demo_fid, 'PUBLISHED', 'PUBLIC', d.`views`, d.`category`
+FROM (
+            SELECT '秋日登山记' AS title,
+                   '秋高气爽，约上山友一起去爬泰山。\n\n从红门出发，一路石阶，走到中天门已经中午。山里的树叶黄了一半，风一吹哗啦啦地落。\n\n- 出发：早上 6 点\n- 登顶：中午 12 点半\n- 教训：带的水不够喝，下次至少背 3 升\n\n山顶的云海真的值得爬这一趟。' AS content,
+                   26 AS views, '旅行游记' AS category, 'demo_owner' AS author
+  UNION ALL SELECT '番茄牛腩：一锅炖出的周末味道',
+                   '周末在家炖了一锅番茄牛腩，记录下来下次照着做。\n\n**材料**：牛腩 800g、番茄 4 个、洋葱 1 个、姜片、番茄膏一小勺。\n\n**步骤**：\n1. 牛腩冷水下锅焯水，撇沫捞出；\n2. 少油炒香洋葱姜片，下番茄炒出沙，加番茄膏；\n3. 下牛腩翻匀，加热水没过，小火炖 90 分钟；\n4. 出锅前收汁，撒葱花。\n\n小宝说比饭店的好吃。',
+                   19, '美食记录', 'demo_member'
+  UNION ALL SELECT '阳台改造：给孩子一块小花园',
+                   '一直想在阳台上给小宝弄块能自己种点东西的地方，这个周末终于动手了。\n\n- 买了两组长条花箱 + 营养土\n- 种了薄荷、小番茄、向日葵\n- 做了一个浇水排班表，贴在冰箱上\n\n每天放学第一件事就是去看看有没有发芽。',
+                   14, '生活随笔', 'demo_member'
+  UNION ALL SELECT '读《小王子》：每个大人都曾是孩子',
+                   '重读《小王子》，和第一次看的感觉完全不一样。\n\n> 重要的东西用眼睛是看不见的。\n\n小时候觉得是童话，现在觉得是写给大人的提醒：别把好奇心弄丢了。读完了，也念给小宝听了一章。',
+                   9, '读书笔记', 'demo_owner'
+) d
+JOIN `sys_user` u ON u.`username` = d.`author`
+WHERE @demo_fid IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM `content_blog` b
+    WHERE b.`family_id` = @demo_fid AND b.`title` = d.`title` AND b.`deleted` = 0
+  );
+
+-- ⑤ 公开日记
+INSERT INTO `content_diary` (`content`, `mood`, `weather`, `author_id`, `family_id`, `visibility`)
+SELECT d.`content`, d.`mood`, d.`weather`, u.`id`, @demo_fid, 'PUBLIC'
+FROM (
+            SELECT '秋天真的来了，早晚开始凉，出门要加件外套。下班路上闻到了桂花香。' AS content, '平静' AS mood, '晴' AS weather, 'demo_owner' AS author
+  UNION ALL SELECT '把今年出去玩的照片整理进了相册，一张张翻过去，好像又重新走了一遍。', '开心', '多云', 'demo_member'
+  UNION ALL SELECT '今天美术课画了大海，老师说我画的海是金色的，因为灯塔的光照上去啦。', '自豪', '晴', 'demo_child'
+) d
+JOIN `sys_user` u ON u.`username` = d.`author`
+WHERE @demo_fid IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM `content_diary` y
+    WHERE y.`family_id` = @demo_fid AND y.`content` = d.`content` AND y.`deleted` = 0
+  );
+
+-- ⑥ 公开愿望
+INSERT INTO `content_wish` (`title`, `reason`, `category`, `status`, `requester_id`, `family_id`, `visibility`)
+SELECT d.`title`, d.`reason`, d.`category`, d.`status`, u.`id`, @demo_fid, 'PUBLIC'
+FROM (
+            SELECT '全家一起去看一次海' AS title, '想带小宝在沙滩上堆一次城堡' AS reason, '旅行' AS category, 'PENDING' AS status, 'demo_child' AS requester
+  UNION ALL SELECT '学会做提拉米苏', '生日的时候可以自己做蛋糕', '美食', 'PENDING', 'demo_owner'
+  UNION ALL SELECT '换一台更大的烤箱', '现在的烤箱放不下整只鸡', '生活', 'PENDING', 'demo_member'
+  UNION ALL SELECT '去北方看一次雪', '长这么大还没见过真的下雪', '旅行', 'ACHIEVED', 'demo_child'
+) d
+JOIN `sys_user` u ON u.`username` = d.`requester`
+WHERE @demo_fid IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM `content_wish` w
+    WHERE w.`family_id` = @demo_fid AND w.`title` = d.`title`
+  );
 
 
+
+
+-- 2026-10-14 演示家庭内容补满(续):家庭公告 + 厨房菜谱
+--   游客可读的两处此前是空的 —— /announcement/list 已是公开接口但演示家庭 0 条公告;
+--   /kitchen/menu 是公开接口、但未登录时 familyId=null,RecipeService.menu 直接返回空分组。
+--   本段补内容,厨房侧另由 RecipeController 游客解析演示家庭(见后端同批改动)。
+--   幂等:公告按 (family_id,title) 守卫,菜谱按 (family_id,name) 守卫,重复执行无副作用。
+SET @demo_fid := (SELECT `id` FROM `sys_family_info` WHERE `is_demo` = 1 AND `deleted` = 0 ORDER BY `id` LIMIT 1);
+SET @demo_owner  := (SELECT `id` FROM `sys_user` WHERE `username` = 'demo_owner');
+SET @demo_member := (SELECT `id` FROM `sys_user` WHERE `username` = 'demo_member');
+SET @demo_child  := (SELECT `id` FROM `sys_user` WHERE `username` = 'demo_child');
+
+INSERT INTO `family_announcement` (`title`, `image_url`, `sort_order`, `enabled`, `created_by`, `family_id`)
+SELECT d.`title`, d.`img`, d.`sort`, 1, u.`id`, @demo_fid
+FROM (
+            SELECT '周末全家去秋游' AS title, '/demo/autumn-park.svg' AS img, 1 AS sort, 'demo_owner' AS owner
+  UNION ALL SELECT '欢迎来到 ihomy 演示家庭', '/demo/sunrise-mountain.svg', 2, 'demo_owner'
+  UNION ALL SELECT '本月读书会：《小王子》', '/demo/starry-lake.svg', 3, 'demo_member'
+) d
+JOIN `sys_user` u ON u.`username` = d.`owner`
+WHERE @demo_fid IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM `family_announcement` a
+    WHERE a.`family_id` = @demo_fid AND a.`title` = d.`title` AND a.`deleted` = 0
+  );
+
+INSERT INTO `family_recipe` (`name`, `cover_image`, `cuisine`, `category`, `flavor`, `description`, `ingredients`, `equipment`, `steps`, `author_id`, `family_id`)
+SELECT d.`name`, d.`cover`, d.`cuisine`, d.`category`, d.`flavor`, d.`descr`, d.`ing`, d.`equip`, d.`steps`, u.`id`, @demo_fid
+FROM (
+            SELECT '番茄炒蛋' AS name, '/demo/dish-tomato-egg.svg' AS cover, 'OTHER' AS cuisine, 'HOT' AS category, 'SAVORY' AS flavor,
+                   '酸甜开胃的家常快手菜，十分钟上桌。' AS descr,
+                   '[{"name":"鸡蛋","quantity":"3","unit":"个"},{"name":"番茄","quantity":"2","unit":"个"},{"name":"食盐","quantity":"适量","unit":""},{"name":"白糖","quantity":"1","unit":"小勺"}]' AS ing,
+                   '[{"name":"炒锅"}]' AS equip,
+                   '[{"content":"鸡蛋打散加一小撮盐；番茄去蒂切滚刀块。"},{"content":"热锅倒油，倒入蛋液，边缘凝固后翻散盛出。"},{"content":"锅内留底油，下番茄炒出汁，加白糖和盐。"},{"content":"倒回鸡蛋翻炒均匀，撒葱花出锅。"}]' AS steps,
+                   'demo_member' AS author
+  UNION ALL SELECT '红烧肉', '/demo/dish-braised-pork.svg', 'OTHER', 'HARD', 'SAVORY', '小火慢炖，肥而不腻，配米饭一绝。',
+                   '[{"name":"五花肉","quantity":"800","unit":"克"},{"name":"冰糖","quantity":"30","unit":"克"},{"name":"生抽","quantity":"2","unit":"勺"},{"name":"老抽","quantity":"1","unit":"勺"},{"name":"姜片","quantity":"4","unit":"片"},{"name":"八角","quantity":"2","unit":"个"}]',
+                   '[{"name":"砂锅"}]',
+                   '[{"content":"五花肉切麻将块，冷水下锅焯水，撇去浮沫捞出。"},{"content":"锅中少油下冰糖，小火炒出糖色，下肉块翻匀上色。"},{"content":"加姜片、八角、生抽老抽，加热水没过肉。"},{"content":"小火炖 60 分钟，最后大火收汁。"}]',
+                   'demo_owner'
+  UNION ALL SELECT '凉拌黄瓜', '/demo/dish-cucumber.svg', 'OTHER', 'COLD', 'LIGHT', '清脆爽口，夏天餐桌的常客。',
+                   '[{"name":"黄瓜","quantity":"2","unit":"根"},{"name":"大蒜","quantity":"3","unit":"瓣"},{"name":"香醋","quantity":"2","unit":"勺"},{"name":"生抽","quantity":"1","unit":"勺"},{"name":"香油","quantity":"半","unit":"勺"}]',
+                   '[{"name":"拌菜盆"}]',
+                   '[{"content":"黄瓜洗净，用刀背拍裂后切段；大蒜切末。"},{"content":"加盐抓匀，静置 5 分钟杀出水分，倒掉多余的水。"},{"content":"加入醋、生抽、香油和蒜末拌匀，冷藏 10 分钟更爽脆。"}]',
+                   'demo_member'
+  UNION ALL SELECT '葱油拌面', '/demo/dish-noodles.svg', 'OTHER', 'STAPLE', 'SAVORY', '一勺葱油，一碗好面。',
+                   '[{"name":"面条","quantity":"200","unit":"克"},{"name":"小葱","quantity":"6","unit":"根"},{"name":"生抽","quantity":"2","unit":"勺"},{"name":"老抽","quantity":"半","unit":"勺"},{"name":"白糖","quantity":"1","unit":"小勺"}]',
+                   '[{"name":"煮锅"}]',
+                   '[{"content":"小葱切段，葱白葱绿分开。"},{"content":"冷油下葱白，小火慢炸至微黄，再下葱绿炸香，捞出葱段留油。"},{"content":"葱油中加生抽、老抽、白糖，小火煮开关火。"},{"content":"面条煮熟过一遍凉水，淋上葱油酱汁拌匀。"}]',
+                   'demo_owner'
+  UNION ALL SELECT '皮蛋瘦肉粥', '/demo/dish-congee.svg', 'YUE', 'PORRIDGE', 'SAVORY', '广式早餐的经典，米粒开花才够绵。',
+                   '[{"name":"大米","quantity":"1","unit":"杯"},{"name":"皮蛋","quantity":"1","unit":"个"},{"name":"猪里脊","quantity":"100","unit":"克"},{"name":"姜丝","quantity":"少许","unit":""},{"name":"食盐","quantity":"适量","unit":""}]',
+                   '[{"name":"砂锅"}]',
+                   '[{"content":"大米洗净，加少许油和盐拌匀，浸泡 30 分钟。"},{"content":"里脊切丝用少许盐抓匀；皮蛋切小块。"},{"content":"锅中加足量水烧开，下米转小火熬 40 分钟至米粒开花。"},{"content":"下肉丝、皮蛋和姜丝再煮 5 分钟，加盐调味，滴几滴香油。"}]',
+                   'demo_member'
+  UNION ALL SELECT '芒果班戟', '/demo/dish-mango-crepe.svg', 'OTHER', 'DESSERT', 'SWEET_SOUR', '薄皮裹着奶油和芒果，一勺挖下去很满足。',
+                   '[{"name":"低筋面粉","quantity":"60","unit":"克"},{"name":"牛奶","quantity":"150","unit":"毫升"},{"name":"鸡蛋","quantity":"1","unit":"个"},{"name":"芒果","quantity":"1","unit":"个"},{"name":"淡奶油","quantity":"100","unit":"克"},{"name":"白糖","quantity":"20","unit":"克"}]',
+                   '[{"name":"平底锅"}]',
+                   '[{"content":"面粉、牛奶、鸡蛋混合过筛，静置 20 分钟。"},{"content":"平底锅小火摊成薄饼皮，晾凉备用。"},{"content":"淡奶油加糖打发至硬挺；芒果切条。"},{"content":"饼皮上放奶油和芒果条，四边折起包成方块，冷藏后食用。"}]',
+                   'demo_child'
+) d
+JOIN `sys_user` u ON u.`username` = d.`author`
+WHERE @demo_fid IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM `family_recipe` r
+    WHERE r.`family_id` = @demo_fid AND r.`name` = d.`name` AND r.`deleted` = 0
+  );
+
+-- ------------------------------------------------------------
+-- 2026-10-14 演示家庭内容补满(续二):书架
+--   书架在 GET 白名单里(/library/list),服务层对游客只回 visibility='PUBLIC' 的书,
+--   但演示家庭一本书都没有 → 游客点「书架」只见「暂无公开图书」。
+--   本段补 2 个分类 + 4 本公开电子书;书与封面为 scripts/gen-demo-books.py 的产物,
+--   file_url / cover_url 指向前端静态目录 /demo/books/(随 dist 部署,不走 /files/ 无需登记反查)。
+--   幂等:分类按 (family_id,name) 守卫,图书按 (family_id,file_url) 守卫,
+--         关联按 (book_id,category_id) 守卫,重复执行无副作用。
+-- ------------------------------------------------------------
+SET @demo_fid := (SELECT `id` FROM `sys_family_info` WHERE `is_demo` = 1 AND `deleted` = 0 ORDER BY `id` LIMIT 1);
+SET @demo_owner  := (SELECT `id` FROM `sys_user` WHERE `username` = 'demo_owner');
+SET @demo_member := (SELECT `id` FROM `sys_user` WHERE `username` = 'demo_member');
+SET @demo_child  := (SELECT `id` FROM `sys_user` WHERE `username` = 'demo_child');
+
+INSERT INTO `content_book_category` (`name`, `parent_id`, `family_id`, `sort_order`)
+SELECT d.`name`, 0, @demo_fid, d.`sort` FROM (
+            SELECT '家庭藏书' AS name, 1 AS sort
+  UNION ALL SELECT '给孩子的书', 2
+) d
+WHERE @demo_fid IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM `content_book_category` c
+    WHERE c.`family_id` = @demo_fid AND c.`name` = d.`name` AND c.`deleted` = 0
+  );
+
+INSERT INTO `content_book` (`title`, `author`, `description`, `cover_url`, `file_url`, `file_format`, `file_size`, `category`, `tags`, `status`, `visibility`, `uploader_id`, `family_id`, `view_count`)
+SELECT d.`title`, d.`author`, d.`descr`, d.`cover`, d.`url`, d.`fmt`, d.`bytes`, d.`cat`, d.`tags`, 'PUBLISHED', 'PUBLIC', u.`id`, @demo_fid, d.`views`
+FROM (
+            SELECT '家常食记' AS title, '演示家庭 · 厨房' AS author, '三顿家常饭的随手记录：番茄炒蛋、红烧肉、皮蛋瘦肉粥。' AS descr,
+                   '/demo/books/cover-home-kitchen.svg' AS cover, '/demo/books/home-kitchen.epub' AS url, 'EPUB' AS fmt, 4184 AS bytes,
+                   '家庭藏书' AS cat, '美食,家常,记录' AS tags, 12 AS views, 'demo_member' AS uploader
+  UNION ALL SELECT '周末去哪儿', '演示家庭 · 生活', '三次短途出游的随笔：海边的黄昏、林间的小路、湖边看星星。',
+                   '/demo/books/cover-weekend-escape.svg', '/demo/books/weekend-escape.epub', 'EPUB', 3951,
+                   '家庭藏书', '出游,随笔', 9, 'demo_owner'
+  UNION ALL SELECT '给小宝的睡前故事', '演示家庭 · 儿童', '两个讲给孩子的短故事：小熊与月亮、会发光的小石头。',
+                   '/demo/books/cover-bedtime-stories.svg', '/demo/books/bedtime-stories.txt', 'TXT', 830,
+                   '给孩子的书', '睡前,故事', 7, 'demo_child'
+  UNION ALL SELECT '四季风景 · 摄影手记', '演示家庭 · 相册', '跟着相册里的四季走一遍：春樱、夏湖、秋叶、冬雪。',
+                   '/demo/books/cover-seasons-notes.svg', '/demo/books/seasons-notes.txt', 'TXT', 882,
+                   '家庭藏书', '摄影,四季', 5, 'demo_owner'
+) d
+JOIN `sys_user` u ON u.`username` = d.`uploader`
+WHERE @demo_fid IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM `content_book` b
+    WHERE b.`family_id` = @demo_fid AND b.`file_url` = d.`url` AND b.`deleted` = 0
+  );
+
+SET @cat_family := (SELECT `id` FROM `content_book_category` WHERE `family_id` = @demo_fid AND `name` = '家庭藏书' AND `deleted` = 0 LIMIT 1);
+SET @cat_kids   := (SELECT `id` FROM `content_book_category` WHERE `family_id` = @demo_fid AND `name` = '给孩子的书' AND `deleted` = 0 LIMIT 1);
+
+INSERT INTO `content_book_category_rel` (`book_id`, `category_id`)
+SELECT b.`id`, d.`cat_id` FROM (
+            SELECT '/demo/books/home-kitchen.epub' AS url, @cat_family AS cat_id
+  UNION ALL SELECT '/demo/books/weekend-escape.epub', @cat_family
+  UNION ALL SELECT '/demo/books/seasons-notes.txt',   @cat_family
+  UNION ALL SELECT '/demo/books/bedtime-stories.txt', @cat_kids
+) d
+JOIN `content_book` b ON b.`file_url` = d.`url` AND b.`family_id` = @demo_fid AND b.`deleted` = 0
+WHERE d.`cat_id` IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM `content_book_category_rel` r
+    WHERE r.`book_id` = b.`id` AND r.`category_id` = d.`cat_id`
+  );

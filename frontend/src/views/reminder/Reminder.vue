@@ -5,7 +5,7 @@
 
     <PageToolbar>
       <div class="tb-right">
-        <el-button type="primary" @click="openEditor()">{{ $t('reminder.add') }}</el-button>
+        <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ $t('reminder.add') }}</el-button>
       </div>
     </PageToolbar>
 
@@ -34,7 +34,7 @@
           </div>
         </div>
       </div>
-      <el-empty v-else :description="$t('reminder.noData')" />
+      <el-empty v-else :description="userStore.isGuest ? $t('reminder.guestEmpty') : $t('reminder.noData')" />
     </div>
 
     <el-dialog
@@ -80,10 +80,12 @@ import { useI18n } from 'vue-i18n'
 import { Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { reminderApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 
 const { t } = useI18n()
+const userStore = useUserStore()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -95,6 +97,8 @@ const repeatKey = { ONCE: 'once', DAILY: 'daily', WEEKLY: 'weekly', MONTHLY: 'mo
 const repeatText = (x) => t('reminder.' + (repeatKey[x] || 'once'))
 
 const load = async () => {
+  // 家庭提醒是私有内容:游客不打注定 401 的请求,直接空态
+  if (!userStore.isLoggedIn) return
   loading.value = true
   try {
     list.value = await reminderApi.list()

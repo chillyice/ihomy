@@ -208,7 +208,9 @@ public class MusicController {
     @Operation(summary = "获取当前背景音乐歌单+曲目")
     @GetMapping("/background")
     public Result<Map<String, Object>> getBackground() {
-        LoginUser user = requireLogin();
+        // 该接口在 GET 白名单里(游客可访问),故未登录返回空结果而不是 401 —— 与其余公开接口口径一致
+        LoginUser user = securityHelper.current();
+        if (user == null || user.getFamilyId() == null) return Result.success(new HashMap<>());
         ContentMusicPlaylist p = musicService.getBackgroundPlaylist(user.getFamilyId());
         Map<String, Object> result = new HashMap<>();
         if (p != null) {

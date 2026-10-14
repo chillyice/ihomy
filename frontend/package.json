@@ -18,6 +18,7 @@
     "@emulatorjs/emulatorjs": "^4.2.3",
     "@ruffle-rs/ruffle": "^0.6.0",
     "axios": "^1.7.2",
+    "dompurify": "^3.4.17",
     "element-plus": "^2.7.3",
     "epubjs": "^0.3.93",
     "gsap": "^3.15.0",

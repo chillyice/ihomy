@@ -96,8 +96,8 @@ import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Star, Delete } from '@element-plus/icons-vue'
-import { marked } from 'marked'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import { renderMarkdown } from '@/utils/markdown'
 import { formatDateTime as formatTime, formatDate } from '@/utils/datetime'
 
 const { t } = useI18n()
@@ -118,27 +118,8 @@ const activeHeading = ref('')
 // 标签字符串按逗号拆分
 const tagList = computed(() => (blog.value?.tags ? String(blog.value.tags).split(',').filter(Boolean) : []))
 
-// Markdown 渲染:用 marked.lexer + walkTokens 把 h1 降级为 h2(避免与博客标题的 h1 重复),
-// 同时给每个标题加 id 用于目录跳转
-marked.use({
-  renderer: {
-    heading({ text, depth }) {
-      // h1 降级为 h2,避免与页面标题重复;最大 depth=4
-      const level = Math.min(depth + (depth === 1 ? 1 : 0), 4)
-      const id =
-        'h-' +
-        text
-          .replace(/[^\w\u4e00-\u9fa5]+/g, '-')
-          .replace(/^-|-$/g, '')
-          .toLowerCase()
-          .slice(0, 50)
-      return `<h${level} id="${id}">${text}</h${level}>`
-    },
-  },
-})
-
-// Markdown 渲染为 HTML
-const renderedContent = computed(() => (blog.value?.content ? marked.parse(blog.value.content) : ''))
+// 正文渲染:Markdown 解析与 HTML 消毒统一在 utils/markdown.js,此处只取结果
+const renderedContent = computed(() => renderMarkdown(blog.value?.content))
 
 // 从渲染后的 DOM 提取标题列表(用于目录导航)
 const extractToc = () => {

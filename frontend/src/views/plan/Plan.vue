@@ -5,7 +5,7 @@
 
     <PageToolbar>
       <div class="tb-right">
-        <el-button type="primary" @click="openPlanEditor()">{{ $t('plan.newPlan') }}</el-button>
+        <el-button v-if="userStore.isLoggedIn" type="primary" @click="openPlanEditor()">{{ $t('plan.newPlan') }}</el-button>
       </div>
     </PageToolbar>
 
@@ -67,7 +67,7 @@
           </div>
         </div>
       </div>
-      <el-empty v-else :description="$t('plan.noData')" />
+      <el-empty v-else :description="userStore.isGuest ? $t('plan.guestEmpty') : $t('plan.noData')" />
     </div>
 
     <el-dialog v-model="editor.visible" append-to-body :title="editor.form.id ? $t('plan.editPlan') : $t('plan.newPlan')" width="440px">
@@ -97,10 +97,12 @@ import { useI18n } from 'vue-i18n'
 import { Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { planApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 
 const { t } = useI18n()
+const userStore = useUserStore()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -108,6 +110,8 @@ const plans = ref([])
 const editor = reactive({ visible: false, form: {} })
 
 const load = async () => {
+  // 家庭计划是要登录才有数据的私有内容:游客不打注定 401 的请求,直接空态
+  if (!userStore.isLoggedIn) return
   loading.value = true
   try {
     plans.value = await planApi.list()

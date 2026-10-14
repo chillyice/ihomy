@@ -12,7 +12,7 @@
       </div>
       <div v-if="tab === 'book'" class="tb-right">
         <el-date-picker v-model="month" type="month" value-format="YYYY-MM" @change="load" style="width: 140px" />
-        <el-button type="primary" @click="openEditor()">{{ $t('book.add') }}</el-button>
+        <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ $t('book.add') }}</el-button>
       </div>
     </PageToolbar>
 
@@ -60,7 +60,7 @@
                 </el-tooltip>
               </div>
             </div>
-            <el-empty v-if="!records.length" :description="$t('book.noRecords')" />
+            <el-empty v-if="!records.length" :description="userStore.isGuest ? $t('book.guestEmpty') : $t('book.noRecords')" />
           </div>
         </div>
 
@@ -128,6 +128,7 @@ import { Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { bookApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 
@@ -138,6 +139,7 @@ const LoanRecords = defineAsyncComponent(() => import('@/views/tools/LoanRecords
 const CATEGORIES = ['餐饮', '交通', '购物', '家居', '水电燃气', '医疗', '教育', '娱乐', '工资', '红包', '其他']
 
 const { t } = useI18n()
+const userStore = useUserStore()
 const tab = ref('book')
 const loading = ref(false)
 const saving = ref(false)
@@ -152,6 +154,8 @@ const catText = (r) => (r.type === 'INCOME' ? t('book.type.INCOME') : r.type ===
 const typeCls = (r) => ({ EXPENSE: 't0', INCOME: 't1', TRANSFER: 't2' })[r.type] || 't0'
 
 const load = async () => {
+  // 家庭账本是私有内容:游客不打注定 401 的请求,直接空态
+  if (!userStore.isLoggedIn) return
   loading.value = true
   try {
     const data = await bookApi.list(month.value)

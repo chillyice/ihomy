@@ -5,7 +5,7 @@
 
     <PageToolbar>
       <div class="tb-right">
-        <el-button type="primary" @click="openEditor()">{{ $t('wish.add') }}</el-button>
+        <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ $t('wish.add') }}</el-button>
       </div>
     </PageToolbar>
 
@@ -36,7 +36,7 @@
             <span v-if="w.status === 'ACHIEVED' && w.achievedAt">{{ $t('wish.achievedAt', { date: w.achievedAt.slice(0, 10) }) }}</span>
             <span v-else>{{ w.createdAt.slice(0, 10) }}</span>
           </div>
-          <div class="wish-actions">
+          <div v-if="userStore.isLoggedIn" class="wish-actions">
             <el-button v-if="w.status === 'PENDING'" size="small" type="success" plain @click="onSetStatus(w, 'ACHIEVED')">{{
               $t('wish.achieved')
             }}</el-button>
@@ -100,11 +100,13 @@ import { useI18n } from 'vue-i18n'
 import { Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { wishApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 import { dictText } from '@/utils/dict'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 
 const { t } = useI18n()
+const userStore = useUserStore()
 
 const CATEGORIES = ['生日礼物', '家庭用品', '旅行', '数码设备', '美食', '其他']
 

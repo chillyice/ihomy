@@ -27,12 +27,15 @@ public class AnniversaryController {
 
     private final AnniversaryService anniversaryService;
     private final SecurityHelper securityHelper;
+    private final PublicController publicController;
 
-    @Operation(summary = "纪念日列表")
+    @Operation(summary = "纪念日列表(支持 ?hid= / ?home_id= 指定公开家庭)")
     @GetMapping("/list")
-    public Result<List<Map<String, Object>>> list() {
-        SysUser user = securityHelper.currentUser();
-        Long familyId = user == null ? null : user.getFamilyId();
+    public Result<List<Map<String, Object>>> list(@RequestParam(name = "hid", required = false) String hid,
+                                                 @RequestParam(name = "home_id", required = false) Long homeId) {
+        // 访客(未登录)按公开家庭取数 —— 与公告同一入口(publicController.resolveVisibleFamilyId)。
+        // 此前游客分支 familyId=null 直接返回空列表,于是首页纪念日卡片有内容、纪念日页却「暂无纪念日」。
+        Long familyId = publicController.resolveVisibleFamilyId(hid, homeId);
         return Result.success(anniversaryService.list(familyId));
     }
 
@@ -41,7 +44,9 @@ public class AnniversaryController {
     @PostMapping
     public Result<Anniversary> create(@RequestBody AnniversaryDTO dto) {
         SysUser user = securityHelper.currentUser();
-        return Result.success(anniversaryService.create(user.getId(), user.getFamilyId(), dto));
+        Anniversary created = anniversaryService.create(user.getId(), user.getFamilyId(), dto);
+        publicController.invalidateHomeCache(user.getFamilyId());
+        return Result.success(created);
     }
 
     @Operation(summary = "更新纪念日")
@@ -49,7 +54,9 @@ public class AnniversaryController {
     @PutMapping("/{id}")
     public Result<Anniversary> update(@PathVariable Long id, @RequestBody AnniversaryDTO dto) {
         SysUser user = securityHelper.currentUser();
-        return Result.success(anniversaryService.update(id, user.getFamilyId(), dto));
+        Anniversary updated = anniversaryService.update(id, user.getFamilyId(), dto);
+        publicController.invalidateHomeCache(user.getFamilyId());
+        return Result.success(updated);
     }
 
     @Operation(summary = "删除纪念日")
@@ -58,6 +65,7 @@ public class AnniversaryController {
     public Result<Void> delete(@PathVariable Long id) {
         SysUser user = securityHelper.currentUser();
         anniversaryService.delete(id, user.getFamilyId());
+        publicController.invalidateHomeCache(user.getFamilyId());
         return Result.success();
     }
 }

@@ -25,7 +25,7 @@
           <el-button v-if="userStore.isLoggedIn && tab !== 'playlist' && filteredTracks.length" @click="enterSelect">{{
             $t('music.select')
           }}</el-button>
-          <el-button v-if="tab === 'playlist'" @click="openPlaylistDialog">{{ $t('music.newPlaylist') }}</el-button>
+          <el-button v-if="tab === 'playlist' && userStore.isLoggedIn" @click="openPlaylistDialog">{{ $t('music.newPlaylist') }}</el-button>
           <el-button v-if="userStore.isOwner && hasMapped" :loading="refreshing" @click="onRefreshMap">{{
             $t('music.refreshMap')
           }}</el-button>
@@ -120,8 +120,16 @@
                 </el-dropdown>
               </div>
             </div>
-            <el-empty v-else :description="tracks.length ? $t('music.noMatch') : $t('music.emptyTracks')">
-              <el-upload v-if="!tracks.length" :show-file-list="false" :http-request="uploadSingle" accept="audio/*">
+            <el-empty
+              v-else
+              :description="tracks.length ? $t('music.noMatch') : userStore.isGuest ? $t('music.guestEmpty') : $t('music.emptyTracks')"
+            >
+              <el-upload
+                v-if="!tracks.length && userStore.isLoggedIn"
+                :show-file-list="false"
+                :http-request="uploadSingle"
+                accept="audio/*"
+              >
                 <el-button type="primary">{{ $t('music.uploadBtn') }}</el-button>
               </el-upload>
             </el-empty>
@@ -181,7 +189,7 @@
                 </div>
               </div>
             </div>
-            <el-empty v-else :description="$t('music.emptyAlbums')" />
+            <el-empty v-else :description="userStore.isGuest ? $t('music.guestEmpty') : $t('music.emptyAlbums')" />
           </div>
         </el-tab-pane>
 
@@ -229,8 +237,8 @@
                 <circle cx="20" cy="24" r="3" fill="#c9b8a0" />
                 <path d="M28 22h18M28 30h16M28 38h12" stroke="#c9b8a0" stroke-width="2" stroke-linecap="round" />
               </svg>
-              <div class="pl-empty-text">{{ $t('music.emptyPlaylists') }}</div>
-              <el-button @click="openPlaylistDialog">{{ $t('music.newPlaylist') }}</el-button>
+              <div class="pl-empty-text">{{ userStore.isGuest ? $t('music.guestEmpty') : $t('music.emptyPlaylists') }}</div>
+              <el-button v-if="userStore.isLoggedIn" @click="openPlaylistDialog">{{ $t('music.newPlaylist') }}</el-button>
             </div>
           </div>
         </el-tab-pane>
@@ -503,6 +511,8 @@ const albums = computed(() => {
 })
 
 const load = async () => {
+  // 家庭音乐库是私有内容(接口需登录):游客不打注定 401 的请求,直接空态
+  if (!userStore.isLoggedIn) return
   loading.value = true
   try {
     tracks.value = await musicApi.list()
@@ -511,6 +521,7 @@ const load = async () => {
   }
 }
 const loadPlaylists = async () => {
+  if (!userStore.isLoggedIn) return
   playlistLoading.value = true
   try {
     playlists.value = await musicApi.playlistList()

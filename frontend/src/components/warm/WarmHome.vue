@@ -695,8 +695,15 @@ const onDragStart = (e, w) => {
 // ========== 侧栏拖入预览(4 列 × 2 行幽灵占位,作为真实网格项参与推挤) ==========
 const { code: dragCode, label: dragLabel, onMove, onDrop: onWidgetDrop, setOverGrid } = useWarmWidgetDrag()
 const dropPreview = ref(null) // { code, label, icon, index }
+// 需登录态的组件:数据全来自需要登录的接口(记账/寻物/悬赏/提醒),未登录访客拉不到,
+// 渲染出来只会是「本月还没有记账」「去登记户型图与物品」这类空态,反而显得演示内容残缺,故对游客隐藏。
+// 愿望单不在此列——它已对游客开放(见 onMounted 的 wishApi.list 与后端 /wish/list 游客分支)。
+// 口径与光尘首页 Home.vue 的 visibleWidgets 游客守卫一致。游客不可编辑(canEdit=isOwner),
+// 隐藏只影响渲染,不会让编辑态的下标错位。
+const GUEST_HIDDEN_WIDGETS = ['finance', 'item', 'task', 'reminder']
 const displayWidgets = computed(() => {
-  const list = [...widgets.value]
+  const hideForGuest = !userStore.isLoggedIn
+  const list = hideForGuest ? widgets.value.filter((w) => !GUEST_HIDDEN_WIDGETS.includes(w.id)) : [...widgets.value]
   const rp = reorderPreview.value
   const dp = dropPreview.value
   if (rp) {
@@ -1205,7 +1212,8 @@ onMounted(async () => {
     loggedIn ? bookApi.summary().catch(() => null) : Promise.resolve(null),
     loggedIn ? itemApi.list({}).catch(() => []) : Promise.resolve([]),
     loggedIn ? taskApi.list().catch(() => []) : Promise.resolve([]),
-    loggedIn ? wishApi.list().catch(() => []) : Promise.resolve([]),
+    // 愿望列表对游客开放(后端返回演示家庭的公开愿望),故不受登录态限制
+    wishApi.list().catch(() => []),
     loggedIn ? reminderApi.list().catch(() => []) : Promise.resolve([]),
     loggedIn ? itemApi.houses().catch(() => []) : Promise.resolve([]),
   ])

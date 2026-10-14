@@ -5,8 +5,10 @@ import com.ihomy.common.BizException;
 import com.ihomy.common.Result;
 import com.ihomy.common.ResultCode;
 import com.ihomy.dto.RecipeDTO;
+import com.ihomy.entity.Family;
 import com.ihomy.entity.Recipe;
 import com.ihomy.entity.SysUser;
+import com.ihomy.mapper.FamilyMapper;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.RecipeService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,6 +21,7 @@ import java.util.Map;
 
 /**
  * 厨房菜谱接口:菜单页(按类别分组 + 今日推荐)/ 菜谱详情 / CRUD。
+ * 菜谱列表与详情对游客开放:未登录时按演示家庭取数(与相册一致,见 AlbumController)。
  */
 @Tag(name = "厨房")
 @RestController
@@ -28,21 +31,26 @@ public class RecipeController {
 
     private final RecipeService recipeService;
     private final SecurityHelper securityHelper;
+    private final FamilyMapper familyMapper;
+
+    /** 当前家庭;未登录(游客)落到默认演示家庭 */
+    private Long resolveFamilyId() {
+        SysUser user = securityHelper.currentUser();
+        if (user != null) return user.getFamilyId();
+        Family f = familyMapper.selectDefault();
+        return f == null ? null : f.getId();
+    }
 
     @Operation(summary = "菜单页(按类别分组 + 今日推荐)")
     @GetMapping("/menu")
     public Result<Map<String, Object>> menu() {
-        SysUser user = securityHelper.currentUser();
-        Long familyId = user == null ? null : user.getFamilyId();
-        return Result.success(recipeService.menu(familyId));
+        return Result.success(recipeService.menu(resolveFamilyId()));
     }
 
     @Operation(summary = "菜谱详情")
     @GetMapping("/recipe/{id}")
     public Result<Map<String, Object>> detail(@PathVariable Long id) {
-        SysUser user = securityHelper.currentUser();
-        Long familyId = user == null ? null : user.getFamilyId();
-        return Result.success(recipeService.detail(id, familyId));
+        return Result.success(recipeService.detail(id, resolveFamilyId()));
     }
 
     @Operation(summary = "新增菜谱")

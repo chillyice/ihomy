@@ -62,6 +62,8 @@ public class SecurityConfig {
                         "/album/**",
                         "/anniversary/list",
                         "/announcement/list",
+                        // 愿望单列表游客可读(服务层匿名只返回演示家庭的 PUBLIC 愿望;写接口仍需登录)
+                        "/wish/list",
                         "/video/list", "/video/*",
                         "/photo/cascade",
                         "/comment/list",

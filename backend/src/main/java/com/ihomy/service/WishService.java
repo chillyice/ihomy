@@ -30,10 +30,23 @@ public class WishService {
 
     /** 家庭愿望列表(带提出人昵称),待实现优先 */
     public List<Map<String, Object>> list(Long familyId) {
-        List<Wish> wishes = wishMapper.selectList(new LambdaQueryWrapper<Wish>()
+        return toMaps(wishMapper.selectList(new LambdaQueryWrapper<Wish>()
                 .eq(Wish::getFamilyId, familyId)
                 .orderByAsc(Wish::getStatus)
-                .orderByDesc(Wish::getCreatedAt));
+                .orderByDesc(Wish::getCreatedAt)));
+    }
+
+    /** 公开愿望列表(游客可读):只取 visibility=PUBLIC 的愿望,口径与动态流 publicOnly 分支一致 */
+    public List<Map<String, Object>> listPublic(Long familyId) {
+        return toMaps(wishMapper.selectList(new LambdaQueryWrapper<Wish>()
+                .eq(Wish::getFamilyId, familyId)
+                .eq(Wish::getVisibility, DictConst.VIS_PUBLIC)
+                .orderByAsc(Wish::getStatus)
+                .orderByDesc(Wish::getCreatedAt)));
+    }
+
+    /** 愿望实体 → 视图对象(附提出人昵称) */
+    private List<Map<String, Object>> toMaps(List<Wish> wishes) {
         if (wishes.isEmpty()) return List.of();
         Map<Long, String> names = sysUserMapper.selectBatchIds(
                         wishes.stream().map(Wish::getRequesterId).collect(Collectors.toList())).stream()

@@ -7,6 +7,7 @@ import com.ihomy.common.Result;
 import com.ihomy.common.ResultCode;
 import com.ihomy.dto.LibraryDTO;
 import com.ihomy.entity.*;
+import com.ihomy.mapper.FamilyMapper;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.FileService;
 import com.ihomy.service.LibraryService;
@@ -33,6 +34,7 @@ public class LibraryController {
     private final LibraryService libraryService;
     private final FileService fileService;
     private final SecurityHelper securityHelper;
+    private final FamilyMapper familyMapper;
 
     @Operation(summary = "图书分页列表")
     @GetMapping("/list")
@@ -88,8 +90,15 @@ public class LibraryController {
     @GetMapping("/categories")
     public Result<List<BookCategory>> categories() {
         SysUser user = securityHelper.currentUser();
-        Long familyId = user == null ? 1L : user.getFamilyId();
-        return Result.success(libraryService.categoryTree(familyId));
+        Long familyId;
+        if (user != null) {
+            familyId = user.getFamilyId();
+        } else {
+            // 游客:按演示家庭给分类树(与 /library/list 的公开图书口径一致),别写死家庭 id
+            Family demo = familyMapper.selectDefault();
+            familyId = demo == null ? null : demo.getId();
+        }
+        return Result.success(familyId == null ? List.of() : libraryService.categoryTree(familyId));
     }
 
     @Operation(summary = "新增分类")

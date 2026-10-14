@@ -35,10 +35,10 @@
 
   <!-- 户型图主视图 -->
   <div v-if="!listMode" class="fp-main">
-    <!-- 空态 -->
-    <div v-a11y-click v-if="!houses.length" class="fp-empty" @click="openHouse()">
-      <div class="fp-empty-plus">+</div>
-      <div class="fp-empty-text">{{ $t('item.emptyFloorPlan') }}</div>
+    <!-- 空态(游客:只提示登录,不给「+ 新建」入口,免得点进一个存不下的表单) -->
+    <div v-a11y-click v-if="!houses.length" class="fp-empty" @click="userStore.isLoggedIn && openHouse()">
+      <div v-if="userStore.isLoggedIn" class="fp-empty-plus">+</div>
+      <div class="fp-empty-text">{{ userStore.isGuest ? $t('item.guestEmpty') : $t('item.emptyFloorPlan') }}</div>
     </div>
 
     <template v-else>
@@ -497,6 +497,7 @@ import { useI18n } from 'vue-i18n'
 import { furnitureIcon } from '@/utils/furnitureIcon'
 import { splitPoly, mergePolys, pointInPoly, polyBBox, samePt, pickDefaultFloor } from '@/utils/floorPlanGeom'
 import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
+import { useUserStore } from '@/stores/user'
 import FloorPlanCanvas from '../FloorPlanCanvas.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import AiRegisterDialog from '../dialogs/AiRegisterDialog.vue'
@@ -516,6 +517,7 @@ const props = defineProps({
 const listMode = defineModel('listMode', { default: false })
 
 const { t } = useI18n()
+const userStore = useUserStore()
 const itemTypes = ['KITCHENWARE', 'INGREDIENT', 'DAILY', 'CLOTHES', 'TOOL', 'OTHER']
 const furnitureTypes = ['衣柜', '床', '冰箱', '书桌', '沙发', '茶几', '柜子', '餐桌', '书架', '其他']
 // 预设家具(画布 px,默认 100px/m):拖入画布自动关联房间、按类型序号命名
@@ -676,6 +678,8 @@ const onSaveImageTransform = async (img) => {
 
 // ---- 数据加载 ----
 const loadHouses = async () => {
+  // 物品定位是私有内容:游客不打注定 401 的请求,直接走空态
+  if (!userStore.isLoggedIn) return
   houses.value = await itemApi.houses()
   if (!currentHouseId.value && houses.value.length) {
     currentHouseId.value = houses.value[0].id

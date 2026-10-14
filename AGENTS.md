@@ -18,9 +18,9 @@
 
 > **⚠ 工具链硬性规定(必须遵守;症状/真因/取证见 `docs/踩坑速查.md` §1)**:
 > - 工作目录:`C:\Users\chill\OneDrive\WorkStation\Projects\ihomy`;每次读写前逐字核对路径,读不到文件先怀疑拼写。
-> - **含中文的源码/配置/SQL/文档一律走 Read/Write/Edit 工具**,禁止 PowerShell `Get-Content`/`Set-Content`/`WriteAllText`(PS 5.1 默认 GBK 破坏 UTF-8 中文;`WriteAllText` 带 BOM 让 javac 报非法字符)。PowerShell 只用于 npm/mvn 构建与 HTTP 冒烟。
+> - **含中文的源码/配置/SQL/文档一律走 Read/Write/Edit 工具**,禁止 PowerShell `Get-Content`/`Set-Content`/`WriteAllText`(成因见 §1.1)。PowerShell 只用于 npm/mvn 构建与 HTTP 冒烟。
 > - **脚本化改写文档会把 CRLF 换成 LF**:本仓 `core.autocrlf=true`,一律 `open(p,'rb')` 读 + `split(b'\r\n')` + `b'\r\n'.join()` 写;小改用 Edit。复核 `\n` 数减 `\r\n` 数 = 0。
-> - **PowerShell 5.1 两坑**:原生命令的点号参数必须带引号(`'-h127.0.0.1'`,不加会被拆成主机 `127`);传给原生命令的参数里嵌双引号会被吃掉(用无引号模板 `{{.Config.Labels}}`)。**含中文的 .ps1 必须带 UTF-8 BOM**(无 BOM 按 GBK 解析直接语法错误;Write 工具默认无 BOM,新建后要补)。
+> - **PowerShell 5.1 两坑**:原生命令的点号参数必须带引号(`'-h127.0.0.1'`,不加会被拆成主机 `127`);传给原生命令的参数里嵌双引号会被吃掉(用无引号模板 `{{.Config.Labels}}`)。**含中文的 .ps1 必须带 UTF-8 BOM**(Write 工具默认无 BOM,新建后要补;成因见 §1.3)。
 > - **Git Bash 调 Windows 原生命令**:容器内路径参数一律加 `MSYS_NO_PATHCONV=1`(否则 `/tmp/x.sql` 被转成 Windows 路径,`docker cp`/`source` 静默失效报 `error: 2`)。
 > - **打包 zip 用 Windows 自带 bsdtar**:`tar -a -c -f out.zip dir`;别用 `Compress-Archive`(条目用反斜杠分隔,非 Windows 解压工具会当成文件名)。
 > - **写 MySQL 中文**:Write 写 UTF-8 无 BOM 的 SQL → `MSYS_NO_PATHCONV=1 docker cp` 进容器 → `docker exec ihomy-mysql mysql --default-character-set=utf8mb4 ihomy -e "source /tmp/x.sql"`;禁 PowerShell 管道喂 mysql。终端显示 `?` 是终端编码问题,不代表落库乱码。
@@ -68,7 +68,7 @@
 
 - **root 仅用于初始化**:`mysql -uroot -p < schema.sql`(建库/建表/建账号/初始数据),执行一次;本地开发 `.\scripts\start-db.ps1`(Docker 首启自动导入)。schema.sql 为开发安全版(仅本机 Docker 凭证)。
 - **业务运行用 `ihomy` 账号**:仅授予 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`(最小权限,无 DDL),application.yml 连接用 `ihomy`,**不要用 root 跑业务**;账号同时建 `localhost` 与 `%` 两个 host。
-- **生产 MySQL 密码策略**(轮换踩坑):`validate_password` MEDIUM,密码必须含特殊字符(避开 `' " \ $ |`,建议 `!@%^&*-_+=.`),否则 `ALTER USER` 报 1819;开发 Docker MySQL 无此组件,同一密码 dev 能过 prod 被拒。详见踩坑速查 §2.7。
+- **生产 MySQL 密码策略**(轮换踩坑):`validate_password` MEDIUM,密码必须含特殊字符(避开 `' " \ $ |`,建议 `!@%^&*-_+=.`)。详见踩坑速查 §2.7。
 - **81 张表**,前缀分类:`sys_` 25(系统/账号/权限/配置/存储)、`report_` 4(报表/日志)、`family_` 30(家庭事务)、`content_` 21(内容数据)、`game_` 1(游戏域,现仅家庭小游戏 `game_info`)。**各表用途与完整清单见 `docs/需求设计说明书.md` §6.2**。
   - **命名规则**:家庭事务业务表一律 `family_` 前缀;内容数据 `content_` 前缀;账号/权限/配置/存储保留 `sys_`;**报表/日志表一律 `report_` 前缀**;**游戏域一律 `game_` 前缀,格式 `game_<game_code>_<module>_<entity>`**(游戏是顶层类别,不是 family 的子集)。新增表必须遵守。前缀取最顶层祖先类别;上下级关系体现在表名(如 `sys_user_role`)。
   - **游戏域细则**(家圃时光已独立立项,2026-10-12):家圃时光 V2 整体迁至独立仓 `home_garden_moments`(GitHub: chillyice/home_garden_moments;库 `games`,表前缀 `garden_` 两段式),设计稿随之迁出,本仓仅剩集成事项(`game_info` 注册表与游戏库入口,见其设计稿 §16.2)。**ihomy 内游戏域表**仍按 `game_<game_code>_<entity>` 命名:`game_code` 取游戏英文小写下划线简称;**模块层只在「≥3 张表 / 独立聚合根 / 有独立子域」时才建**,否则直接 `game_<code>_<entity>`;例外仅 `game_info`(存量游戏文件清单)。注册表统一 `game_info`,**小游戏页只读注册表,加游戏 = 插一行不改组件**。独立仓设计稿:`ihomy_games\home_garden_moments\docs\设计稿\植物养殖游戏设计.md`。
@@ -101,7 +101,7 @@ backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
     logback-spring.xml  # 三类日志分流(access/server/thirdparty,六要素 pattern,按天滚动)
     external.yml.template  # 外挂配置模板(唯一开发生产差异机制)
     mapper/*.xml        # 每个 Mapper 一个同名 XML
-    schema.sql          # 建库+建账号+建表(80 张)+种子(开发安全版;与 migrations.sql 必须同步;本地由 start-db.ps1 自动导入)
+    schema.sql          # 建库+建账号+建表(81 张)+种子(开发安全版;与 migrations.sql 必须同步;本地由 start-db.ps1 自动导入)
   mvnw / mvnw.cmd       # Maven Wrapper
 frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
   src/
@@ -147,13 +147,14 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 ## 统一响应与鉴权
 
 - 响应 `{code: 0, message: "success", data: ...}`;code != 0 = 失败。
-- 登录:access token(2h)+ refresh(7d,Redis 黑名单登出失效)。普通 refresh **每次使用即轮换拉黑**(60s 宽限内重复提交返回同一份新令牌,防多标签互踢;JWT 带 `jti`),登出把 access 与本次会话 refresh 一并吊销;壁纸走独立 `type=WALLPAPER` 令牌(`POST /auth/wallpaper-token` 签发,不轮换不拉黑)——**改回「所有 refresh 一律轮换拉黑」前必读踩坑速查 §6**。请求头 `Authorization: Bearer <token>`,axios 自动续期;仅连续 7 天不访问才需重新登录。**后端 `authenticationEntryPoint` 必须返回真实 HTTP 401 状态码**(JSON 体照写),否则前端续期永不执行、用户每 2h 被登出(成因与 `refreshPromise` 重放见踩坑速查 §2.4)。
+- 登录:access token(2h)+ refresh(7d,Redis 黑名单登出失效)。普通 refresh **每次使用即轮换拉黑**(60s 宽限内重复提交返回同一份新令牌,防多标签互踢;JWT 带 `jti`),登出把 access 与本次会话 refresh 一并吊销;壁纸走独立 `type=WALLPAPER` 令牌(`POST /auth/wallpaper-token` 签发,不轮换不拉黑)——**改回「所有 refresh 一律轮换拉黑」前必读踩坑速查 §6**。请求头 `Authorization: Bearer <token>`,axios 自动续期;仅连续 7 天不访问才需重新登录。**后端 `authenticationEntryPoint` 必须返回真实 HTTP 401 状态码**(JSON 体照写;成因与 `refreshPromise` 重放见踩坑速查 §2.4)。
 - 接口前缀 `/api`;Knife4j 文档 `http://localhost:8080/api/doc.html`。
 - **权限模型**:`buildTokens` 返回 `permissions` 数组 + `isOps` 标志;前端 `userStore.hasPerm(code)`/`isOps`/`isPureOps`。OWNER 恒真,其余查 `SysRoleMapper.selectAuthCodesByUserAndFamily`。
-- **OPS 隔离**:`OpsAccessFilter` 只放行 OPS 到 `/api/ops/**`+`/api/auth/**`,其余 403;非 OPS 访问 `/api/ops/**` 一律 403;支持复合角色(OWNER+OPS)。**⚠ 判 OPS 只认系统级绑定**(`sys_user_role.family_id IS NULL` + 5 分钟缓存):前端一律 `userStore.isOps`,**禁止 `hasPerm('ops:view')`**;OPS 绑定必须带一条 `family_id=NULL` 的系统级行,否则 `isOps` 恒 false、运维页按「家长」渲染(见踩坑速查 §2.5)。
+- **OPS 隔离**:`OpsAccessFilter` 只放行 OPS 到 `/api/ops/**`+`/api/auth/**`,其余 403;非 OPS 访问 `/api/ops/**` 一律 403;支持复合角色(OWNER+OPS)。**⚠ 判 OPS 只认系统级绑定**(`sys_user_role.family_id IS NULL` + 5 分钟缓存):前端一律 `userStore.isOps`,**禁止 `hasPerm('ops:view')`**;OPS 绑定必须带一条 `family_id=NULL` 的系统级行(否则 `isOps` 恒 false,见踩坑速查 §2.5)。
 - 点赞/评论/通知严格同家庭:`validateTarget` 校验内容 family_id 与用户一致,跨家庭返回 NOT_FOUND。
-- **令牌过期预检(强制,V10.19)**:`api/request.js` 发请求前用 `utils/jwt.js` 的 `isTokenExpired` 读 exp,已过期且刷新令牌仍有效就先续期再发——permitAll 接口(`/api/public/**`)对过期令牌静默按未登录处理并返回 200,只靠 401 续期会让它们永远拿不到登录态(天气/日出日落退回 IP 定位、首页聚合成游客视图,见踩坑速查 §3.20);`/auth/*` 自身跳过预检防递归。
+- **令牌过期预检(强制,V10.19)**:`api/request.js` 发请求前用 `utils/jwt.js` 的 `isTokenExpired` 读 exp,已过期且刷新令牌仍有效就先续期再发——只靠 401 续期会让 permitAll 接口(`/api/public/**`)永远拿不到登录态(成因与取证见踩坑速查 §3.20);`/auth/*` 自身跳过预检防递归。
 - 匿名(permitAll)接口按登录态返回空数据,不许 NPE(见踩坑速查 §2.6)。
+- **未登录看到的 = 演示家庭的内容(V10.28)**:不带 `hid`/`home_id` 时家庭定位走 `selectDefault`(`is_default=1`)且该家庭 `is_public=1`,故**游客视图(首页/相册/动态流)就是 1 号演示家庭**;游客 `photos` 只取公开相册的 PUBLIC 照片、`stats` 与成员视图同源。演示家庭内容必须保持饱满(V10.30 起另有演示电子书 `public/demo/books/`,生成器 `scripts/gen-demo-books.py`),纪念日写接口要 `invalidateHomeCache`(维护清单与坑见踩坑速查 §7.9)。
 - **防爆破 + 首登改密(V10.1)**:`/auth/login|captcha|register` 按 IP 限流、登录失败按「账号+IP」Redis 计数(超限 429);种子账号 admin/ops 带 `must_change_password=1`,其令牌带 `pwdChange` claim 时只放行改密与登出(前端 `ChangePasswordDialog` 强制弹窗),且**不签发刷新令牌**;CORS 走白名单 `app.cors-allowed-origins`(基线仅生产域名,开发端 `localhost:5173` 由本机 external.yml 覆盖);SQL 日志(`logging.level.mybatis.sql`)默认 warn。
 
 ## 功能模块清单(索引)
@@ -195,24 +196,24 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 8. **多家庭**:`sys_user_role.family_id` 区分;当前家庭存 Redis;`default_family_id` 用户设置的默认家庭。**`family_id=NULL` 表示系统级**(OPS 绑定等),别用占位值填充。
 9. **N+1 禁令**(强制):列表接口禁止在 for 循环里 `selectById` 取关联字段(authorName/uploaderName 等)。**先收集 userIds,用 `selectBatchIds` 批量查,内存 Map 回填**;参考 `ActivityFeedService.getFeed` / `CommentService.list` 的 `batchUsers()` 写法。已批量化的清单见 变更归档 V10.2。
 10. **缓存规范**(强制):键 `ihomy:{domain}:{id}`;短 TTL(用户/权限/公开首页 5min);**变更点必须显式 invalidate(矩阵见踩坑速查 §9)**;不变数据走内存缓存(全局预热 + 双检锁兜底,按 familyId 分桶,**不引 Caffeine**);敏感数据不缓存(成员视图 `/public/home`)。
-11. **UPDATE 不先 select**(强制):回写冗余字段用 `LambdaUpdateWrapper.eq(...).set(...).update(null)`,不要 `selectById` 再 `updateById`;**计数类字段用 `setSql("like_count = like_count + delta")` 原子增量,禁止「先 COUNT 再 SET」**(踩坑速查 §8.3),参考 `ContentLikeService.adjustCount`。**依赖 `updated_at` 的表更新必须用 `LambdaUpdateWrapper` 只 SET 业务字段并重查**(MP `updateById` 会回写旧 `updated_at`、抑制 `ON UPDATE CURRENT_TIMESTAMP`,见踩坑速查 §2.2);**把字段清成 null 必须 `LambdaUpdateWrapper.set(col, null)`**(实体 `setXxx(null)` + `updateById` 整体跳过 null、字段清不掉,见踩坑速查 §2.3)。
+11. **UPDATE 不先 select**(强制):回写冗余字段用 `LambdaUpdateWrapper.eq(...).set(...).update(null)`,不要 `selectById` 再 `updateById`;**计数类字段用 `setSql("like_count = like_count + delta")` 原子增量,禁止「先 COUNT 再 SET」**(踩坑速查 §8.3),参考 `ContentLikeService.adjustCount`。**依赖 `updated_at` 的表更新必须用 `LambdaUpdateWrapper` 只 SET 业务字段并重查**(见踩坑速查 §2.2);**把字段清成 null 必须 `LambdaUpdateWrapper.set(col, null)`**(实体 `setXxx(null)` + `updateById` 整体跳过 null、字段清不掉,见踩坑速查 §2.3)。
 12. **文件上传流式**(强制):大文件(>1MB)禁止 `file.getBytes()` 全量入堆(生产 `-Xmx384m` 传 200MB 即 OOM),**必须用 `MultipartFile` 重载 + `transferTo` + `Files.copy` 兜底**;FileService 已提供 4 个流式重载,Controller 传 `MultipartFile` 不调 `getBytes()`。
 13. **JVM/连接池配置**(基线):`spring.threads.virtual.enabled: true`(JDK21 虚拟线程);HikariCP `maximum-pool-size: 20` + `minimum-idle: 5` + `connection-timeout: 3000`。
-14. **日志规范**(强制,细则见 `docs/设计想法/日志/`):三类文件 access(接口,`AccessLogFilter` 自动)/server(流程+SQL+ERROR)/thirdparty(三方,`ThirdPartyHttp` 封装),按天滚动留 7 天;六要素 时间/级别/线程/[tid]/位置/内容,tid 贯穿 HTTP/WS/@Async/线程池(配 TaskDecorator);三方调用一律走 `ThirdPartyHttp.get()`(自定义方法 `.request()`);**报错必须带堆栈** `log.error("xx, p={}", p, e)`(禁 printStackTrace);级别 ERROR=人工/WARN=可恢复/INFO=关键/DEBUG=细节;**所有写接口必须 @OperationLog**(module 大写/operationType 标准词/description 中文;token 刷新、已读等高频噪音端点除外);新敏感字段进 `AccessLogFilter.SENSITIVE_JSON` 打码清单;运维「详细日志」`GET /ops/logs/trace?tid=` 按 tid 扫三类文件;**同类异常聚合预警(V10.15)**:`LogAlertAppender` 挂在 root + ACCESS + thirdparty 三处 logger(后两者 `additivity=false`,不挂就收不到),同类判定=级别+logger+异常类型+首个应用栈帧,阈值/级别/排除项走 `app.log-alert.*`,详见需求 §4.6.4。
+14. **日志规范**(强制,细则见 `docs/设计想法/日志/`):三类文件 access(接口,`AccessLogFilter` 自动)/server(流程+SQL+ERROR)/thirdparty(三方,`ThirdPartyHttp` 封装),按天滚动留 7 天;六要素 时间/级别/线程/[tid]/位置/内容,tid 贯穿 HTTP/WS/@Async/线程池(配 TaskDecorator);三方调用一律走 `ThirdPartyHttp.get()`(自定义方法 `.request()`);**报错必须带堆栈** `log.error("xx, p={}", p, e)`(禁 printStackTrace);级别 ERROR=人工/WARN=可恢复/INFO=关键/DEBUG=细节;**所有写接口必须 @OperationLog**(module 大写/operationType 标准词/description 中文;token 刷新、已读等高频噪音端点除外);新敏感字段进 `AccessLogFilter.SENSITIVE_JSON` 打码清单;运维「详细日志」`GET /ops/logs/trace?tid=` 按 tid 扫三类文件;**同类异常聚合预警(V10.15)**:`LogAlertAppender` 必须挂在 root + ACCESS + thirdparty 三处 logger(后两者 `additivity=false`),同类判定=级别+logger+异常类型+首个应用栈帧,阈值/级别/排除项走 `app.log-alert.*`,详见需求 §4.6.4。
 
 ### 前端规范
 
 1. **API 分组**:`api/index.js` 按模块导出 `xxxApi` 对象;统一走 `api/request.js`(axios+JWT+401 自动刷新)。
 2. **状态管理**:Pinia;`stores/user.js`(登录+权限)、`stores/app.js`(首页聚合)。
 3. **路由守卫**:`meta.public` 无需登录;`meta.ops` 需 `ops:view`;纯 OPS 账号只能访问 `/ops`。
-   - **`meta.standalone`(独立产品页)**:挂「另一款产品的独立页」时加 `meta.standalone`——`App.vue` 走独立分支只渲染 `<router-view>`,**不套** ihomy 外壳(光影层/侧栏/页脚/播放器/回顶);`onMounted` 见 standalone 直接 return(跳过 `appStore.init()`/`ensureUserInfo()`);**外壳必须等 `router.isReady()` 后再渲染**;**续期失败不许顶到登录页**(401 统一走 `redirectToLogin()`,standalone 时直接返回)。已用:咔哒 `/kada`、壁纸屏 `/wallpaper`。成因见踩坑速查 §3.8。
+   - **`meta.standalone`(独立产品页)**:挂「另一款产品的独立页」时加 `meta.standalone`——`App.vue` 走独立分支只渲染 `<router-view>`,**不套** ihomy 外壳(光影层/侧栏/页脚/播放器/回顶);`onMounted` 见 standalone 直接 return(跳过 `appStore.init()`/`ensureUserInfo()`);**外壳必须等 `router.isReady()` 后再渲染**;**续期失败不许顶到登录页**(401 统一走 `redirectToLogin()`,standalone 时直接返回)。**自带配色的独立页要连文档根元素一起接管**(挂载/卸载增删 `html` 上的页标记类,`:global(html.<页类>:root)` 给出底色与 `color-scheme`)。已用:咔哒 `/kada`(根类 `kada-page`,深浅随浏览器偏好)、壁纸屏 `/wallpaper`(跟随 ihomy 主题,无需接管)。成因见踩坑速查 §3.8。
 4. **样式**:CSS 变量(`main.css`)+ 深色模式 `html.dark` 覆写;**不显式声明 serif 字体**,继承 body sans-serif;要能被类覆写的内联样式走 CSS 变量(踩坑速查 §3.4)。
 5. **图标**:Element Plus `el-icon`(线性图标);**Setting/Monitor 图标用内联 SVG 替代**(复杂 path 在 100% 缩放触发子像素光栅化开销)。
 6. **动画**:GSAP 入场;`transform: translateZ(0)` 隔离合成层;`contain: layout style` 隔离布局;避免 `background-attachment: fixed`(性能杀手)。
 7. **毛玻璃**:`backdrop-filter: blur(24px) saturate(1.1)`;子元素 hover 用 `transform` 而非 `box-shadow`(避免触发 backdrop-filter 重算);**长开页/持续动画页别用 backdrop-filter**(踩坑速查 §3.10)。
 8. **可拖拽面板**:`useDragResize` 组合式函数;位置/大小持久化 localStorage;**事件监听器按需挂载**(`onDragStart`/`onResizeStart` 时挂 `mousemove`/`mouseup`,`onMouseUp` 时移除,不要 `onMounted` 常驻——参考 `AvatarCropper.vue`)。
 9. **光影层全局化**:`SunLightLayer` + `AppSidebar` + `SiteFooter` 在 `App.vue` 全局挂载;`useSunLight` provide/inject 共享状态。
-10. **i18n**:所有用户可见文本用 `$t('key')`;中英双语(键结构必须 zh-CN/en 对齐);`utils/dict.js` 枚举映射。外壳文案命名空间:`warm.*`(暖居)/`sidebar.*`(侧栏)/`home.dashboard.*`(光尘首页)/`feed.*`(动态流)。**CI 有硬编码中文守门** `i18n/hardcoded-cjk.spec.js`(扫 `<template>` 文本/静态属性 + `ElMessage(Box/Notification)` 字面量;有意保留项进其 `ALLOW`);`<script>` 内枚举数据/`console.*` 不在扫描内。
+10. **i18n**:所有用户可见文本用 `$t('key')`;中英双语(键结构必须 zh-CN/en 对齐);`utils/dict.js` 枚举映射。外壳文案命名空间:`warm.*`(暖居)/`sidebar.*`(侧栏)/`home.dashboard.*`(光尘首页)/`feed.*`(动态流)。**文案里的字面量 `{`/`}`/`@` 必须转义**(`{'{名字}'}`/`{'@'}`)——漏了在生产构建下 `$t()` 直接抛错、打断整页渲染(dev 只打日志,所以本地看不出);守门 `i18n/message-format.spec.js` 逐条编译两份文案。**CI 有硬编码中文守门** `i18n/hardcoded-cjk.spec.js`(扫 `<template>` 文本/静态属性 + `ElMessage(Box/Notification)` 字面量;有意保留项进其 `ALLOW`);`<script>` 内枚举数据/`console.*` 不在扫描内。
 11. **共享逻辑抽 utils(禁止三份实现)**:动态流类型标签/摘要/相对时间走 `utils/feed.js`(`feedTypeLabel`/`feedSummary`/`formatFeedTime`),默认楼层走 `floorPlanGeom.pickDefaultFloor`,枚举文案走 `dictText(t,...)`;新增重复逻辑先找现成 util。
 12. **可点击非按钮元素**:用全局指令 `v-a11y-click`(自动补 `role=button`/`tabindex=0` + Enter/Space 触发 click),不要逐处手写三行键盘处理;`<img>` 必须带 `alt`(装饰图 `alt=""`)。
 13. **打包分块**(强制):`vite.config.js` 必须配 `build.rollupOptions.output.manualChunks` 拆分大 vendor(当前 `element-plus`/`gsap`/`vue-i18n`/`epubjs`/`pdfjs`/`simple-mind-map` 六块)。**public/ 下静态资源不得与 npm 包重复**。
@@ -224,8 +225,9 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 19. **全局 UI 样式统一**(强制):所有 EP 组件(el-dialog/ElMessageBox/ElMessage/popper/button/tag/badge/input)配色/圆角/尺寸/z-index 一律由 main.css 全局覆写,**禁止组件 scoped 重复定义**;完整值见 `docs/UI设计提示词.md` §11a/§3/§18a。**命令式 API(ElMessage/ElMessageBox/ElNotification/ElLoading)样式已在 main.js 显式引入**——新增命令式调用须确认样式已引入,否则裸 DOM 渲染不可见(踩坑速查 §3.15)。
 20. **按钮/标签/角标/圆角统一**(强制,main.css 全局覆写,禁止 scoped):按钮四类(主/次/幽灵/危险,浅深色**不同色值不共用**)、el-tag 半透明磨砂、el-badge 半透明黑、el-icon `stroke-width:2px`、圆角(button 12/input 10/card+dialog 14);完整色值见 `docs/UI设计提示词.md` §18a。
 21. **页面统一规范**(强制):根容器 `class="page"`(禁 scoped 覆写 max-width/margin/padding);页面级 H1/H2 移除,分区标题 `.section-label`;工具栏 `class="page-toolbar card"`(`.tb-left` 筛选 size=small、`.tb-right` 按钮 gap 8px);多选交互 `.pick-badge` 对勾圆标+卡片描边(**禁左上 checkbox 角标**);详见 `docs/UI设计提示词.md` §11b。
-22. **位图资产压缩入库**(强制):装饰性位图压缩后放 `frontend/src/assets/` 并 ESM 导入(构建出内容哈希名,配 nginx `expires 7d; immutable`),**不放 `public/`**(无哈希换图不刷新);宽度按实际渲染 2 倍封顶,带噪点先 3×3 中值滤波再压,输出渐进式 JPEG。参照相册封面 2560×1920 1.37MB→800×600 112KB。
+22. **位图资产压缩入库**(强制):装饰性位图压缩后放 `frontend/src/assets/` 并 ESM 导入(构建出内容哈希名,配 nginx `expires 7d; immutable`),**不放 `public/`**(无哈希换图不刷新);宽度按实际渲染 2 倍封顶,带噪点先 3×3 中值滤波再压,输出渐进式 JPEG。参照相册封面 2560×1920 1.37MB→800×600 112KB。**例外:URL 存在 DB 里的演示素材走 `frontend/public/`**(DB 引用需要稳定路径,用不了 ESM 哈希名),如演示照片 `frontend/public/demo/*.svg`(生成器 `scripts/gen-demo-photos.py`)。
 23. **提示说明不写实现**(强制,后端同守):所有用户可见的提示/说明/占位符/空状态/tooltip(i18n 值与硬编码文案)、后端报错文案(`BizException` 消息)与接口文档摘要(`@Operation`——`/doc.html` 公开可见),只讲「用户能做什么/发生了什么」,**不写实现方式、内部逻辑、实体信息**(库名表名字段名、配置键/环境变量、机制参数与内部枚举码当解释、内部节律如「每 30 分钟检查一次」、三方响应字段名);密钥类只说「保存后不再显示,请自行留底」。机制细节归代码注释与日志,不进提示。**给 LLM 的提示词例外**:输出 JSON 字段名/枚举码是解析契约必须保留,但描述性语句同样不用库表/内部词汇。
+24. **富文本渲染必须消毒**(强制):用户/管理员可写内容要渲染成 HTML,一律经 `utils/markdown.js` 的 `renderMarkdown()`(marked 解析 + DOMPurify 消毒)再绑 `v-html`;**禁止把 `marked.parse` 等渲染结果直接交给 `v-html`**(marked 默认透传原始 HTML,等于任意脚本可执行),`marked` 只允许在该文件里导入。守门测试 `src/utils/htmlSink.spec.js` 会拦下新增的裸 `v-html` 与 `.vue/.js` 里的非空 `innerHTML/outerHTML`;成因见 `docs/踩坑速查.md` §3.24。
 
 ### 性能规范(强制规则)
 
@@ -237,9 +239,9 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 ## 验证基线(每版更新,当前值)
 
 - 后端:`cd backend; .\mvnw.cmd -B clean package` → BUILD SUCCESS(`Tests run: 56`,纯逻辑不起 Spring 上下文);只求编译加 `-DskipTests`。**clean 被运行中后端锁 jar 时改跑 `-B test`**。
-- 前端测试:`cd frontend; npx vitest run` → 56 passed(jwt/loan/password/feed/nav/mobileNav + i18n 中英键对齐 + 引用键存在性 + 模板/消息硬编码中文守门;CI 构建前执行)。同一步跑 `npm run lint` → **0 error / 0 warning**(V10.21 起存量 warning 清零,不拦构建)。另跑 `npm run format:check`(`prettier --check "src/**/*.{js,vue,css}"`)→ 全通过(V10.23 起接 CI)。
+- 前端测试:`cd frontend; npx vitest run` → 62 passed(jwt/loan/password/feed/nav/mobileNav + i18n 中英键对齐 + 引用键存在性 + **文案可编译** + 模板/消息硬编码中文守门 + **HTML 注入面守门** `utils/htmlSink.spec.js`;CI 构建前执行)。同一步跑 `npm run lint` → **0 error / 0 warning**(V10.21 起存量 warning 清零,不拦构建)。另跑 `npm run format:check`(`prettier --check "src/**/*.{js,vue,css}"`)→ 全通过(V10.23 起接 CI)。
 - 文档/代码一致性闸门:`bash scripts/doc-drift-check.sh` → 全部 [OK](CI 最先跑;表数/实体↔建表/mapper 注解/@Tag/权限码种子/模块↔路由)。
-- 前端构建:`cd frontend; npm run build` → 入口 chunk **403.65KB/gzip 163.30KB**(V10.26 实测;功能页/pdfjs/epubjs/hls.js 均为独立异步 chunk;历史数字见 docs/变更归档.md)
+- 前端构建:`cd frontend; npm run build` → 入口 chunk **409.52KB/gzip 166.50KB**(V10.30 实测;功能页/pdfjs/epubjs/hls.js 均为独立异步 chunk;演示照片/演示电子书走 `public/demo/` 不进口 chunk;历史数字见 docs/变更归档.md)
   - **⚠ 口径:vite 报的是「字符数」不是「字节数」**(实测 318.71KB 字符 = 343,667 字节)——**别拿 `ls -la` 字节数跟基线比**;比特字节就 `wc -c` 对 `wc -c`。
 - 界面/交互验证:harness 别放 `target/`;持续动画页面用页面内 `evaluate` 量几何、派发 `el.click()`,别用截图或真实点击(必超时,见踩坑速查 §6)。
 - 接口测试:同级独立项目(不在本仓库)`cd ..\autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed;CI 每次推送自动构建前后端+起库导 schema+后端启动+登录冒烟。
@@ -275,7 +277,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 - **备份与恢复(V10.18)**:`scripts/prod-backup.sh`(mysqldump 单事务 + `gzip -t` 校验 + uploads `rsync -a` **只增不删** + 数据库转储留 14 天 + 写 `.last-success`)由 systemd timer **每日 03:00** 触发(`config/systemd/ihomy-backup.{service,timer}`,`Persistent=true` 停机补跑);恢复/演练用 `scripts/prod-restore.sh <dump> <目标库>`(目标库必须显式给;恢复生产库前自动快照)。**误删兜底两层**:内容误删走 `/recycle` 回收站(7 天),回收站超期与整库/整机故障才靠备份。安装与演练记录见 `docs/部署指导-Linux.md`「附:数据备份」。
 - **Docker 安装源**:Ubuntu 用阿里云镜像源(`mirrors.cloud.aliyuncs.com/docker-ce`),固定版本 29.7.0;**Redis 镜像** `docker pull redis`;**Git 克隆**用 SSH 地址(ihomy 用户先生成 ed25519 key 加到 GitHub)。
 - **⚠ 三条部署必查(重装/新服务器)**:① nginx `mime.types` 必须有 `.mjs` 映射;② 站点 conf 必须带 gzip 四行;③ 媒体引擎**播放地址必须与站点同为 HTTPS**(39 项接口断言查不出,浏览器按混合内容拦掉视频请求)。细节与取证见踩坑速查 §7.1/§7.3/§5 与 `docs/部署指导-Linux.md` §12.2。
-- **⚠ 部署新前端后老客户端仍跑旧 bundle**(PWA Service Worker 预缓存):访问新路由会被旧 bundle 的兜底路由重定向到 `/home`,看着像「新路由没发布」;**冒烟前先 unregister SW + 清 caches**,用户侧 Ctrl+Shift+R。辨认方法与取证见踩坑速查 §7.2。
+- **⚠ 部署新前端后老客户端仍跑旧 bundle**(PWA Service Worker 预缓存):**冒烟前先 unregister SW + 清 caches**,用户侧 Ctrl+Shift+R。症状/辨认方法/取证见踩坑速查 §7.2。
 - 详细步骤在 `docs/部署指导-Linux.md`(入库脱敏版;本地 `Linux部署指导.md` 只留凭证台账)。
 
 ## 规划事项(未实现)

@@ -3,8 +3,8 @@
   <div class="page">
     <Breadcrumb :items="[{ label: $t('points.title') }]" />
 
-    <!-- 签到卡 -->
-    <div class="checkin-card card">
+    <!-- 签到卡(需登录:积分与签到都是「我」的数据) -->
+    <div v-if="userStore.isLoggedIn" class="checkin-card card">
       <div class="checkin-info">
         <div class="checkin-balance">
           <b>{{ stats.balance ?? 0 }}</b
@@ -48,7 +48,7 @@
           <div v-else-if="loadError" style="padding: 20px 0; text-align: center; color: var(--color-text-secondary)">
             {{ $t('common.loadFailed') }} <el-button text size="small" @click="loadProducts">{{ $t('common.retry') }}</el-button>
           </div>
-          <el-empty v-else :description="$t('points.noProducts')" />
+          <el-empty v-else :description="userStore.isGuest ? $t('points.guestEmpty') : $t('points.noProducts')" />
         </div>
       </el-tab-pane>
 
@@ -76,7 +76,7 @@
               </template>
             </el-table-column>
           </el-table>
-          <el-empty v-else :description="$t('points.noOrders')" />
+          <el-empty v-else :description="userStore.isGuest ? $t('points.guestEmpty') : $t('points.noOrders')" />
         </div>
       </el-tab-pane>
     </el-tabs>
@@ -154,10 +154,13 @@ const editor = reactive({ visible: false, form: {} })
 const soldOut = (p) => p.enabled !== 1 || p.stock === 0 || (p.perLimit > 0 && p.redeemedCount >= p.perLimit)
 
 const loadStats = async () => {
+  // 积分/签到期数据都是私有内容:游客不打注定 401 的请求
+  if (!userStore.isLoggedIn) return
   stats.value = await pointsApi.stats()
 }
 
 const loadProducts = async () => {
+  if (!userStore.isLoggedIn) return
   loading.value = true
   loadError.value = false
   try {
@@ -170,6 +173,7 @@ const loadProducts = async () => {
 }
 
 const loadOrders = async () => {
+  if (!userStore.isLoggedIn) return
   loadingOrders.value = true
   try {
     orders.value = userStore.isOwner ? await pointsApi.familyOrders() : await pointsApi.myOrders()

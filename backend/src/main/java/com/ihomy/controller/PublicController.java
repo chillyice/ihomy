@@ -43,7 +43,7 @@ import java.util.Map;
  * 非成员仅能读到公开内容,私有家庭一律 NOT_FOUND。
  *
  * 性能:/public/home 每访客最多 7 次 DB(family+modules+photos+stats×3+currentUser),
- * 整包按 familyId 缓存到 Redis 5min,模块/相册/家庭设置变更时主动失效。
+ * 整包按 familyId 缓存到 Redis 5min,模块/相册/家庭设置/纪念日变更时主动失效。
  * 缓存 key 形式:ihomy:home:pub:{familyId}(只缓存非成员视图,成员视图数据更敏感不缓存)
  */
 @Slf4j
@@ -173,11 +173,12 @@ public class PublicController {
 
         if (member) {
             data.put("photos", resolvePhotoUrls(photoMapper.selectLatestByFamily(familyId, 20)));
-            data.put("stats", homeStatsService.getStats(familyId));
         } else {
             data.put("photos", resolvePhotoUrls(photoMapper.selectLatestPublicByFamily(familyId, 20)));
-            data.put("stats", new HashMap<String, Object>());
         }
+        // 统计(成员数 + 近期纪念日)与成员视图同源:非成员分支只可能落在 is_public=1 的公开家庭
+        // (上面已校验),成员数与倒计时本就是公开家庭对外展示的一部分,返回它首页卡片对访客才不空
+        data.put("stats", homeStatsService.getStats(familyId));
         return data;
     }
 

@@ -521,11 +521,10 @@ const loadBookSummary = async () => {
   }
 }
 const loadWishes = async () => {
-  if (userStore.isLoggedIn) {
-    try {
-      wishes.value = await wishApi.list()
-    } catch (e) {}
-  }
+  // 愿望列表对游客开放(后端返回演示家庭的公开愿望),故不限定登录态
+  try {
+    wishes.value = await wishApi.list()
+  } catch (e) {}
 }
 const searchItems = async () => {
   const kw = itemKeyword.value.trim()
@@ -569,12 +568,11 @@ const clearItemSearch = () => {
   aiSearching.value = false
 }
 const loadTodayRecipes = async () => {
-  if (userStore.isLoggedIn) {
-    try {
-      const data = await kitchenApi.menu()
-      todayRecipes.value = data?.todayRecommend || []
-    } catch (e) {}
-  }
+  // 菜谱对游客开放(后端未登录时按演示家庭取数),故不限定登录态
+  try {
+    const data = await kitchenApi.menu()
+    todayRecipes.value = data?.todayRecommend || []
+  } catch (e) {}
 }
 const doCheckin = async () => {
   try {
@@ -822,8 +820,12 @@ const widgets = ref((loadLayout() || DEFAULT_LAYOUT).map(makeWidget))
 
 const visibleWidgets = computed(() =>
   widgets.value.filter((w) => {
-    if (['today', 'task', 'recipe', 'search', 'wish', 'finance'].includes(w.id)) return userStore.isLoggedIn
+    if (['today', 'task', 'search', 'finance'].includes(w.id)) return userStore.isLoggedIn
     if (w.id === 'anni') return anniversaries.value.length > 0
+    // 愿望单对游客开放(后端返回演示家庭的公开愿望);无数据时不展示,避免留一张空卡
+    if (w.id === 'wish') return wishes.value.length > 0
+    // 今日推荐同样对游客开放(后端未登录时按演示家庭取数);无菜谱时不展示
+    if (w.id === 'recipe') return todayRecipes.value.length > 0
     return true
   }),
 )

@@ -232,7 +232,7 @@
           <div v-else-if="loadError" style="padding: 20px 0; text-align: center; color: var(--color-text-secondary)">
             {{ $t('common.loadFailed') }} <el-button text size="small" @click="load">{{ $t('common.retry') }}</el-button>
           </div>
-          <el-empty v-else :description="userStore.isGuest ? $t('cinema.noData') : $t('cinema.emptyHint')" />
+          <el-empty v-else :description="userStore.isGuest ? $t('cinema.loginRequired') : $t('cinema.emptyHint')" />
         </div>
       </el-tab-pane>
 
@@ -264,7 +264,7 @@
               </div>
             </div>
           </div>
-          <el-empty v-else :description="userStore.isGuest ? $t('cinema.wishEmpty') : $t('cinema.wishEmptyHint')" />
+          <el-empty v-else :description="userStore.isGuest ? $t('cinema.loginRequired') : $t('cinema.wishEmptyHint')" />
         </div>
       </el-tab-pane>
     </el-tabs>
