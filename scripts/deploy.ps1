@@ -269,6 +269,12 @@ if (-not $FrontendOnly) {
   if ($LASTEXITCODE -ne 0) { Die '上传 jar 失败' }
   Write-Ok 'jar 上传完成'
 
+  # 上传仓库根 VERSION:后端 HealthController 读 WorkingDirectory(/opt/ihomy/backend)的 ../VERSION,
+  # 即 $RemoteRoot/VERSION。不传则 /ops/health 与运维页「服务器状态」的版本号恒为 unknown。
+  & scp -P $Port (Join-Path $Root 'VERSION') "${User}@${Server}:$RemoteRoot/VERSION"
+  if ($LASTEXITCODE -ne 0) { Die '上传 VERSION 失败' }
+  Write-Ok 'VERSION 上传完成'
+
   Write-Step '部署后端:替换 jar + 重启'
   # jar 内嵌的 application.yml 为共同基线(端口/URL/mybatis/jwt/logging)
   # 测试/生产差异配置由外挂文件 external.yml 覆盖(IHOMY_CONFIG_PATH 指向)

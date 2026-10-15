@@ -32,6 +32,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
      * 接口文档沿用历史入口 /doc.html → springdoc 原生页 /swagger-ui/index.html。
      * 不能把 springdoc.swagger-ui.path 直接设成 /doc.html:那样页面里 ./swagger-ui.css
      * 会解析到 /api/swagger-ui.css(不在安全白名单),匿名访客拿到的是空白页。
+     * 注:Location 会是绝对地址且 scheme 取反代后的 http(Spring 7 恒输出绝对 URL),
+     * 浏览器侧由 HSTS 升级到 https,实测可达;不必为此开 forward-headers-strategy。
      */
     @Override
     public void addViewControllers(ViewControllerRegistry registry) {
