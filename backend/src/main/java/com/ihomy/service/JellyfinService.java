@@ -2,8 +2,9 @@ package com.ihomy.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.DictConst;
 import com.ihomy.common.HttpUrlUtil;
@@ -1123,7 +1124,7 @@ public class JellyfinService {
     private byte[] jsonBytes(Object body) {
         try {
             return mapper.writeValueAsBytes(body);
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("JSON 序列化失败", e);
         }
     }
@@ -1132,7 +1133,7 @@ public class JellyfinService {
         if (body == null || body.isBlank()) return mapper.createObjectNode();
         try {
             return mapper.readTree(body);
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             log.warn("媒体引擎响应解析失败, reason={}, body={}", e.getMessage(), safeBody(body));
             throw new BizException(ResultCode.INTERNAL_ERROR, "媒体服务器返回内容不正确");
         }

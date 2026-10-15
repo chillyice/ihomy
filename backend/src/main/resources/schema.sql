@@ -1997,7 +1997,7 @@ CREATE TABLE `sys_oss_component` (
   KEY `idx_type_status` (`component_type`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='开源组件台账(登记+版本检测+当前版本探测+升级提示)';
 
--- 种子:52 项 = 前端 NPM 直接依赖 29 + 后端 Maven 显式依赖 18 + 独立服务 5(Nextcloud / Jellyfin / Home Assistant + MySQL / Redis)
+-- 种子:53 项 = 前端 NPM 直接依赖 29 + 后端 Maven 显式依赖 19 + 独立服务 5(Nextcloud / Jellyfin / Home Assistant + MySQL / Redis)
 -- 版本为实际锁定版本(与 package-lock.json / 解析后的 Maven 依赖一致),不是 package.json/pom.xml 里的声明区间下限
 INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`) VALUES
 ('Vue', 'NPM', 'vue', '3.5.40', 'MIT', 'https://github.com/vuejs/core', '前端框架', 'FULL'),
@@ -2029,24 +2029,25 @@ INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `curre
 ('eslint-plugin-vue', 'NPM', 'eslint-plugin-vue', '10.11.1', 'MIT', 'https://github.com/vuejs/eslint-plugin-vue', 'Vue 单文件组件 lint 规则', 'FULL'),
 ('globals', 'NPM', 'globals', '15.15.0', 'MIT', 'https://github.com/sindresorhus/globals', 'ESLint 环境全局变量定义(浏览器/Node)', 'FULL'),
 ('Prettier', 'NPM', 'prettier', '3.9.9', 'MIT', 'https://github.com/prettier/prettier', '代码格式化(配置落地,未做全仓重排)', 'FULL'),
-('Spring Boot', 'MAVEN', 'org.springframework.boot:spring-boot-starter-parent', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端框架', 'FULL'),
-('Spring Boot Web', 'MAVEN', 'org.springframework.boot:spring-boot-starter-web', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Web/REST(MVC)', 'FULL'),
-('Spring Boot Security', 'MAVEN', 'org.springframework.boot:spring-boot-starter-security', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '认证授权(过滤链)', 'FULL'),
-('Spring Boot Validation', 'MAVEN', 'org.springframework.boot:spring-boot-starter-validation', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '参数校验', 'FULL'),
-('Spring Boot Data Redis', 'MAVEN', 'org.springframework.boot:spring-boot-starter-data-redis', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Redis(缓存/令牌/验证码)', 'FULL'),
-('Spring Boot AOP', 'MAVEN', 'org.springframework.boot:spring-boot-starter-aop', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '切面(权限/操作日志)', 'FULL'),
-('Spring Boot WebSocket', 'MAVEN', 'org.springframework.boot:spring-boot-starter-websocket', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '聊天室 WebSocket', 'FULL'),
-('Spring Boot Mail', 'MAVEN', 'org.springframework.boot:spring-boot-starter-mail', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '密码找回邮件(SMTP)', 'FULL'),
-('MyBatis-Plus', 'MAVEN', 'com.baomidou:mybatis-plus-spring-boot3-starter', '3.5.5', 'Apache-2.0', 'https://github.com/baomidou/mybatis-plus', 'ORM', 'FULL'),
-('MySQL Connector/J', 'MAVEN', 'com.mysql:mysql-connector-j', '8.3.0', 'GPL-2.0', 'https://github.com/mysql/mysql-connector-j', 'MySQL 驱动', 'FULL'),
+('Spring Boot', 'MAVEN', 'org.springframework.boot:spring-boot-starter-parent', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端框架', 'FULL'),
+('Spring Boot Web', 'MAVEN', 'org.springframework.boot:spring-boot-starter-webmvc', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Web/REST(MVC)', 'FULL'),
+('Spring Boot Security', 'MAVEN', 'org.springframework.boot:spring-boot-starter-security', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '认证授权(过滤链)', 'FULL'),
+('Spring Boot Validation', 'MAVEN', 'org.springframework.boot:spring-boot-starter-validation', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '参数校验', 'FULL'),
+('Spring Boot Data Redis', 'MAVEN', 'org.springframework.boot:spring-boot-starter-data-redis', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Redis(缓存/令牌/验证码)', 'FULL'),
+('Spring Boot AOP', 'MAVEN', 'org.springframework.boot:spring-boot-starter-aspectj', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '切面(权限/操作日志)', 'FULL'),
+('Spring Boot WebSocket', 'MAVEN', 'org.springframework.boot:spring-boot-starter-websocket', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '聊天室 WebSocket', 'FULL'),
+('Spring Boot Mail', 'MAVEN', 'org.springframework.boot:spring-boot-starter-mail', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '密码找回邮件(SMTP)', 'FULL'),
+('MyBatis-Plus', 'MAVEN', 'com.baomidou:mybatis-plus-spring-boot4-starter', '3.5.17', 'Apache-2.0', 'https://github.com/baomidou/mybatis-plus', 'ORM', 'FULL'),
+('MyBatis-Plus JSQLParser', 'MAVEN', 'com.baomidou:mybatis-plus-jsqlparser', '3.5.17', 'Apache-2.0', 'https://github.com/baomidou/mybatis-plus', '分页插件(3.5.9 起拆为独立模块)', 'FULL'),
+('MySQL Connector/J', 'MAVEN', 'com.mysql:mysql-connector-j', '9.7.0', 'GPL-2.0', 'https://github.com/mysql/mysql-connector-j', 'MySQL 驱动', 'FULL'),
 ('Hutool', 'MAVEN', 'cn.hutool:hutool-all', '5.8.27', 'MulanPSL-2.0', 'https://github.com/dromara/hutool', '工具库(农历/文本等)', 'FULL'),
 ('JJWT', 'MAVEN', 'io.jsonwebtoken:jjwt-api', '0.12.5', 'Apache-2.0', 'https://github.com/jwtk/jjwt', 'JWT 双 token', 'FULL'),
 ('JJWT Impl', 'MAVEN', 'io.jsonwebtoken:jjwt-impl', '0.12.5', 'Apache-2.0', 'https://github.com/jwtk/jjwt', 'JWT 实现(runtime)', 'FULL'),
 ('JJWT Jackson', 'MAVEN', 'io.jsonwebtoken:jjwt-jackson', '0.12.5', 'Apache-2.0', 'https://github.com/jwtk/jjwt', 'JWT JSON 序列化(runtime)', 'FULL'),
-('Knife4j', 'MAVEN', 'com.github.xiaoymin:knife4j-openapi3-jakarta-spring-boot-starter', '4.5.0', 'Apache-2.0', 'https://github.com/xiaoymin/knife4j', '接口文档', 'FULL'),
-('Lombok', 'MAVEN', 'org.projectlombok:lombok', '1.18.32', 'MIT', 'https://github.com/projectlombok/lombok', '编译期样板代码生成', 'FULL'),
+('SpringDoc OpenAPI', 'MAVEN', 'org.springdoc:springdoc-openapi-starter-webmvc-ui', '3.1.1', 'Apache-2.0', 'https://github.com/springdoc/springdoc-openapi', '接口文档', 'FULL'),
+('Lombok', 'MAVEN', 'org.projectlombok:lombok', '1.18.46', 'MIT', 'https://github.com/projectlombok/lombok', '编译期样板代码生成', 'FULL'),
 ('mp3agic', 'MAVEN', 'com.mpatric:mp3agic', '0.9.1', 'MIT', 'https://github.com/mpatric/mp3agic', '音乐元数据解析', 'FULL'),
-('Spring Boot Test', 'MAVEN', 'org.springframework.boot:spring-boot-starter-test', '3.5.16', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端单元测试(JUnit5/AssertJ)', 'FULL'),
+('Spring Boot Test', 'MAVEN', 'org.springframework.boot:spring-boot-starter-test', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端单元测试(JUnit5/AssertJ)', 'FULL'),
 ('Nextcloud', 'SERVICE', 'nextcloud/server', NULL, 'AGPL-3.0', 'https://github.com/nextcloud/server', 'WebDAV/Nextcloud 存储后端', 'PARTIAL'),
 ('Jellyfin', 'SERVICE', 'jellyfin/jellyfin', '10.9.11', 'GPL-2.0', 'https://github.com/jellyfin/jellyfin', '放映厅媒体引擎(刮削/转码/字幕轨/TV 客户端;API 集成,界面自建)', 'PARTIAL'),
 ('Home Assistant', 'SERVICE', 'home-assistant/core', NULL, 'Apache-2.0', 'https://github.com/home-assistant/core', '智能家居中控(实体状态采集/设备控制;API 集成,界面自建)', 'PARTIAL'),

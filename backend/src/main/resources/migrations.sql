@@ -2216,3 +2216,46 @@ WHERE d.`cat_id` IS NOT NULL
     SELECT 1 FROM `content_book_category_rel` r
     WHERE r.`book_id` = b.`id` AND r.`category_id` = d.`cat_id`
   );
+
+-- ------------------------------------------------------------
+-- V10.32 Spring Boot 4.x 升级(2026-10-15)
+--   parent 3.5.16 → 4.1.1;starter 改名:web→webmvc、aop→aspectj;
+--   MyBatis-Plus 3.5.5(spring-boot3-starter)→ 3.5.17(spring-boot4-starter),
+--     并新增 mybatis-plus-jsqlparser(分页插件自 3.5.9 起拆为独立模块);
+--   Knife4j 4.5.0(上游至今无 Boot4 starter)→ springdoc-openapi 3.1.1;
+--   Jackson 2 → 3(非直接依赖,由 starter/springdoc 传递,不单独登记);
+--   台账顺带记录 Boot BOM 带来的版本漂移:mysql-connector-j 8.3.0 → 9.7.0、lombok 1.18.32 → 1.18.46。
+--
+--   ⚠ 坐标变更一律「先删旧坐标 + 再 INSERT IGNORE 新坐标」,不要用 UPDATE 改 package_ref:
+--     本文件上方的历史种子(行 1149/1152/1580/1584)仍按旧坐标 INSERT IGNORE,每次执行都会把
+--     改名让出的旧坐标重新插回来——改坐标会撞唯一键 uk_type_ref,删旧坐标则对重放天然免疫。
+-- ------------------------------------------------------------
+DELETE FROM `sys_oss_component` WHERE `component_type` = 'MAVEN' AND `package_ref` IN (
+  'org.springframework.boot:spring-boot-starter-web',
+  'org.springframework.boot:spring-boot-starter-aop',
+  'com.baomidou:mybatis-plus-spring-boot3-starter',
+  'com.github.xiaoymin:knife4j-openapi3-jakarta-spring-boot-starter'
+);
+
+INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`) VALUES
+('Spring Boot Web', 'MAVEN', 'org.springframework.boot:spring-boot-starter-webmvc', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Web/REST(MVC)', 'FULL'),
+('Spring Boot AOP', 'MAVEN', 'org.springframework.boot:spring-boot-starter-aspectj', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '切面(权限/操作日志)', 'FULL'),
+('MyBatis-Plus', 'MAVEN', 'com.baomidou:mybatis-plus-spring-boot4-starter', '3.5.17', 'Apache-2.0', 'https://github.com/baomidou/mybatis-plus', 'ORM', 'FULL'),
+('MyBatis-Plus JSQLParser', 'MAVEN', 'com.baomidou:mybatis-plus-jsqlparser', '3.5.17', 'Apache-2.0', 'https://github.com/baomidou/mybatis-plus', '分页插件(3.5.9 起拆为独立模块)', 'FULL'),
+('SpringDoc OpenAPI', 'MAVEN', 'org.springdoc:springdoc-openapi-starter-webmvc-ui', '3.1.1', 'Apache-2.0', 'https://github.com/springdoc/springdoc-openapi', '接口文档', 'FULL');
+UPDATE `sys_oss_component` SET `managed_by` = 'RENOVATE'
+ WHERE `component_type` = 'MAVEN' AND `package_ref` IN (
+   'org.springframework.boot:spring-boot-starter-webmvc',
+   'org.springframework.boot:spring-boot-starter-aspectj',
+   'com.baomidou:mybatis-plus-spring-boot4-starter',
+   'com.baomidou:mybatis-plus-jsqlparser',
+   'org.springdoc:springdoc-openapi-starter-webmvc-ui');
+
+-- Spring Boot 家族版本(含坐标未变的 parent/security/validation/data-redis/websocket/mail/test)3.5.16 → 4.1.1
+UPDATE `sys_oss_component` SET `current_version` = '4.1.1'
+ WHERE `component_type` = 'MAVEN' AND `package_ref` LIKE 'org.springframework.boot:%';
+
+-- Boot 4 BOM 决定的版本漂移(台账记实际锁定版本)
+UPDATE `sys_oss_component` SET `current_version` = '9.7.0'   WHERE `component_type` = 'MAVEN' AND `package_ref` = 'com.mysql:mysql-connector-j';
+UPDATE `sys_oss_component` SET `current_version` = '1.18.46' WHERE `component_type` = 'MAVEN' AND `package_ref` = 'org.projectlombok:lombok';
+

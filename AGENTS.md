@@ -31,7 +31,7 @@
 
 - **应用名**:ihomy(家庭共用软件)。家庭内部内容共享平台,PC 浏览器 / 安卓 / iOS(均 PWA)。
 - **核心功能**:登录注册、博客、日记、相册、纪念日、留言板、放映厅、聊天室、积分商城、任务悬赏、提醒、计划、愿望单、记账、家谱、书架、工具箱、运维等;首页模块化可扩展(新增功能只需插一条 `sys_home_module` 记录)。
-- **技术栈**:前端 Vue3 + Vite + ElementPlus + PWA(`ihomy-frontend`);后端 Spring Boot 3 + MyBatis-Plus + MySQL 8 + Redis(双 token JWT + 验证码 + WebSocket),包 `com.ihomy`,主类 `IhomyApplication`,`ihomy-backend`。
+- **技术栈**:前端 Vue3 + Vite + ElementPlus + PWA(`ihomy-frontend`);后端 Spring Boot 4 + MyBatis-Plus + MySQL 8 + Redis(双 token JWT + 验证码 + WebSocket),包 `com.ihomy`,主类 `IhomyApplication`,`ihomy-backend`。
 
 ## 工作目录
 
@@ -83,11 +83,11 @@
 ## 代码结构
 
 ```
-backend/ (Spring Boot 3, JDK 21, 包 com.ihomy)
+backend/ (Spring Boot 4, JDK 21, 包 com.ihomy)
   src/main/java/com/ihomy/
     IhomyApplication.java   # 主类 @MapperScan("com.ihomy.mapper")
     common/      # Result/ResultCode/BizException/GlobalExceptionHandler/DictConst/SolarUtil/AesUtil/ThirdPartyHttp 等
-    config/      # SecurityConfig/CorsConfig/MybatisPlusConfig/Knife4jConfig/WebMvcConfig/WebSocketConfig/SqlStatementLog/ExternalConfigLoader/AsyncConfig
+    config/      # SecurityConfig/CorsConfig/MybatisPlusConfig/OpenApiConfig/WebMvcConfig/WebSocketConfig/SqlStatementLog/ExternalConfigLoader/AsyncConfig
     security/    # JwtUtils/JwtAuthenticationFilter/LoginUser/SecurityHelper/OpsAccessFilter
     annotation/ aspect/ filter/  # @RequirePermission/@OperationLog + 两个 Aspect;TraceIdFilter/AccessLogFilter/请求响应 Wrapper
     entity/      # 74 个实体类(81 张表里 7 张关联/字典表无实体)
@@ -148,7 +148,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 - 响应 `{code: 0, message: "success", data: ...}`;code != 0 = 失败。
 - 登录:access token(2h)+ refresh(7d,Redis 黑名单登出失效)。普通 refresh **每次使用即轮换拉黑**(60s 宽限内重复提交返回同一份新令牌,防多标签互踢;JWT 带 `jti`),登出把 access 与本次会话 refresh 一并吊销;壁纸走独立 `type=WALLPAPER` 令牌(`POST /auth/wallpaper-token` 签发,不轮换不拉黑)——**改回「所有 refresh 一律轮换拉黑」前必读踩坑速查 §6**。请求头 `Authorization: Bearer <token>`,axios 自动续期;仅连续 7 天不访问才需重新登录。**后端 `authenticationEntryPoint` 必须返回真实 HTTP 401 状态码**(JSON 体照写;成因与 `refreshPromise` 重放见踩坑速查 §2.4)。
-- 接口前缀 `/api`;Knife4j 文档 `http://localhost:8080/api/doc.html`。
+- 接口前缀 `/api`;SpringDoc 文档 `http://localhost:8080/api/doc.html`(302 → `/swagger-ui/index.html`)。
 - **权限模型**:`buildTokens` 返回 `permissions` 数组 + `isOps` 标志;前端 `userStore.hasPerm(code)`/`isOps`/`isPureOps`。OWNER 恒真,其余查 `SysRoleMapper.selectAuthCodesByUserAndFamily`。
 - **OPS 隔离**:`OpsAccessFilter` 只放行 OPS 到 `/api/ops/**`+`/api/auth/**`,其余 403;非 OPS 访问 `/api/ops/**` 一律 403;支持复合角色(OWNER+OPS)。**⚠ 判 OPS 只认系统级绑定**(`sys_user_role.family_id IS NULL` + 5 分钟缓存):前端一律 `userStore.isOps`,**禁止 `hasPerm('ops:view')`**;OPS 绑定必须带一条 `family_id=NULL` 的系统级行(否则 `isOps` 恒 false,见踩坑速查 §2.5)。
 - 点赞/评论/通知严格同家庭:`validateTarget` 校验内容 family_id 与用户一致,跨家庭返回 NOT_FOUND。
@@ -283,7 +283,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 ## 规划事项(未实现)
 
 > **本章只做指引,不记内容**——**未实现规划的唯一去处是 `docs/需求设计说明书.md` §9**:产品级规划见 §9.1,代码级待办见 §9.2(全量审计)/ §9.3(新增代码复审)/ §9.5(2026-10-05 全量复检),各表**只列仍未做的条目**;启动任何规划项前先读该章对应小节,不要凭本文件或记忆开工。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
-> **当前概览(截至 V10.26,要点一律见 §9)**:§9.2/§9.3 已无剩余(末条 C 组 P3「超大单文件拆分 + 全仓 Prettier 重排」已于 V10.23 完成,替代 harness 的验证口径见 §9.2 C 组);§9.5 全量复检条目已收口,剩 Boot 4.x 阻塞登记。**§9.1 P2「移动端适配补齐」已于 V10.26 整行收口移出**(三 Tab 首页不可达与页头标题缺项已修;桌面组件对等**决策不做**、7 个页面级断点经真机复测为伪问题)。剩余产品级 = 放映厅 Emby 实测/多家庭共用/清晰度多音轨、HA 侧硬件与户型图联动(不在本仓)、保险箱主密码(待定夺);§9.4 方向性(场景主题/阴影方案)已全部决策不做。
+> **当前概览(截至 V10.32,要点一律见 §9)**:§9.2/§9.3 已无剩余(末条 C 组 P3「超大单文件拆分 + 全仓 Prettier 重排」已于 V10.23 完成,替代 harness 的验证口径见 §9.2 C 组);**§9.5 全量复检条目已全部清空**——末条 D 组「Spring Boot 4.x 升级(阻塞登记)」已于 V10.32 落地(3.5.16→4.1.1,卡点以 Knife4j→SpringDoc 换栈解掉)。**§9.1 P2「移动端适配补齐」已于 V10.26 整行收口移出**(三 Tab 首页不可达与页头标题缺项已修;桌面组件对等**决策不做**、7 个页面级断点经真机复测为伪问题)。剩余产品级 = 放映厅 Emby 实测/多家庭共用/清晰度多音轨、HA 侧硬件与户型图联动(不在本仓)、保险箱主密码(待定夺);§9.4 方向性(场景主题/阴影方案)已全部决策不做。
 
 ## 文档清单
 

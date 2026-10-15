@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.5.16</version>
+        <version>4.1.1</version>
         <relativePath/>
     </parent>
 
@@ -20,16 +20,18 @@
 
     <properties>
         <java.version>21</java.version>
-        <mybatis-plus.version>3.5.5</mybatis-plus.version>
+        <!-- Boot4 对应的 MyBatis-Plus starter(b3 starter 在 Boot4 下不可用),最低 3.5.13 -->
+        <mybatis-plus.version>3.5.17</mybatis-plus.version>
         <jjwt.version>0.12.5</jjwt.version>
         <hutool.version>5.8.27</hutool.version>
-        <knife4j.version>4.5.0</knife4j.version>
+        <springdoc.version>3.1.1</springdoc.version>
     </properties>
 
     <dependencies>
+        <!-- Boot4 起 web starter 更名为 webmvc(aop 更名为 aspectj),旧名仍在但已弃用 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -45,7 +47,7 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-aop</artifactId>
+            <artifactId>spring-boot-starter-aspectj</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -59,7 +61,13 @@
 
         <dependency>
             <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+            <artifactId>mybatis-plus-spring-boot4-starter</artifactId>
+            <version>${mybatis-plus.version}</version>
+        </dependency>
+        <!-- 分页插件自 3.5.9 起拆出为独立模块,mybatis-plus-extension 不再内置 -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-jsqlparser</artifactId>
             <version>${mybatis-plus.version}</version>
         </dependency>
         <dependency>
@@ -79,6 +87,9 @@
             <version>${jjwt.version}</version>
             <scope>runtime</scope>
         </dependency>
+        <!-- JWT 的 JSON 序列化实现:jjwt 只提供 Jackson2/Gson 两套,无 Jackson3 适配。
+             本仓业务代码已全量迁 Jackson3,这里保留 jjwt-jackson 仅供 jjwt 内部使用
+             (Jackson2 仍由 Boot BOM 托管版本,与应用侧序列化链路互不相干) -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
             <artifactId>jjwt-jackson</artifactId>
@@ -92,10 +103,12 @@
             <version>${hutool.version}</version>
         </dependency>
 
+        <!-- 接口文档(V10.32):上游 Knife4j 4.5.0 无 Boot4 starter,改用其上游 springdoc-openapi 3.x;
+             文档路径用 springdoc.swagger-ui.path 保持 /api/doc.html 不变 -->
         <dependency>
-            <groupId>com.github.xiaoymin</groupId>
-            <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
-            <version>${knife4j.version}</version>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
         </dependency>
 
         <dependency>

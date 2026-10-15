@@ -32,7 +32,7 @@
 | 端 | 技术 |
 |----|------|
 | 前端 | Vue 3 + Vite + Element Plus + Pinia + vue-i18n + GSAP + PWA |
-| 后端 | Spring Boot 3（JDK 21 虚拟线程）+ MyBatis-Plus + JWT 双 token |
+| 后端 | Spring Boot 4（JDK 21 虚拟线程）+ MyBatis-Plus + JWT 双 token |
 | 数据 | MySQL 8 + Redis（缓存 / 验证码 / 令牌黑名单） |
 | 通信 | REST + WebSocket（聊天室） |
 

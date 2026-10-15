@@ -1,7 +1,7 @@
 package com.ihomy.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.Result;
 import com.ihomy.common.ResultCode;

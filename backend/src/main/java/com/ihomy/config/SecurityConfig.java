@@ -2,7 +2,7 @@ package com.ihomy.config;
 
 import com.ihomy.common.Result;
 import com.ihomy.common.ResultCode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.ihomy.security.JwtAuthenticationFilter;
 import com.ihomy.security.OpsAccessFilter;
 import com.ihomy.service.FileAccessService;

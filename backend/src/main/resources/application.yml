@@ -48,6 +48,12 @@ mybatis-plus:
       logic-delete-value: 1
       logic-not-delete-value: 0
 
+# 接口文档(springdoc-openapi):入口沿用历史 /doc.html(WebMvcConfig 里 302 到原生页),
+# 不要设 springdoc.swagger-ui.path=/doc.html —— 那会让页面相对资源解析到 /api/* 被安全白名单拦成 401
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+
 # JWT 配置
 # 密钥不入仓库:必须由外挂文件 external.yml 提供(缺失时后端启动即失败,防误用默认密钥)
 jwt:

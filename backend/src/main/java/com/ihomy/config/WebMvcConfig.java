@@ -3,6 +3,7 @@ package com.ihomy.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
+import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.nio.file.Paths;
@@ -25,5 +26,15 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         String location = Paths.get(uploadDir).toAbsolutePath().toUri().toString();
         registry.addResourceHandler(urlPrefix + "/**").addResourceLocations(location);
+    }
+
+    /**
+     * 接口文档沿用历史入口 /doc.html → springdoc 原生页 /swagger-ui/index.html。
+     * 不能把 springdoc.swagger-ui.path 直接设成 /doc.html:那样页面里 ./swagger-ui.css
+     * 会解析到 /api/swagger-ui.css(不在安全白名单),匿名访客拿到的是空白页。
+     */
+    @Override
+    public void addViewControllers(ViewControllerRegistry registry) {
+        registry.addRedirectViewController("/doc.html", "/swagger-ui/index.html");
     }
 }

@@ -1,6 +1,6 @@
 package com.ihomy.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.ihomy.entity.SysUser;
 import com.ihomy.mapper.SysRoleMapper;
 import com.ihomy.mapper.SysUserMapper;
