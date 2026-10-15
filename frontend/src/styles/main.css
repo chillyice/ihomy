@@ -988,6 +988,26 @@ html.dark .el-overlay-dialog .el-dialog {
   background: var(--color-card) !important;
 }
 
+/* 内容栏左边界(弹窗限宽用):光尘固定侧栏 220px;暖居 studio 外框 20 留白 + 230 侧栏 + 1 边框。
+   没有侧栏(纯 OPS、沉浸页、移动端)时保持 0。 */
+html:has(.app-sidebar) {
+  --shell-nav-w: 220px;
+}
+html:has(.gc-side) {
+  --shell-nav-w: 251px;
+}
+
+/* 升级方案弹窗(AI 评估结果):上面 width:fit-content 会让长文按 max-content 把弹窗撑到近整屏,
+   弹窗在内容栏内渲染,超出的部分会被左侧导航盖住(光尘侧栏 z-index 高于内容区)/内容栏渐隐遮罩裁掉(暖居)。
+   这里沿用组件声明的 640px 作上限,窗口偏窄时再按内容栏收窄,长文按阅读宽度换行;正文超高改为弹窗内滚动。 */
+.el-overlay-dialog .el-dialog.oss-plan-dialog {
+  max-width: clamp(320px, calc(100vw - 2 * var(--shell-nav-w, 0px) - 32px), 640px) !important;
+}
+.el-overlay-dialog .el-dialog.oss-plan-dialog .el-dialog__body {
+  max-height: calc(86vh - 132px);
+  overflow: auto;
+}
+
 /* 标题区:无装饰线,中等字重,紧凑 padding */
 .el-dialog__header {
   padding: 18px 20px 8px !important;

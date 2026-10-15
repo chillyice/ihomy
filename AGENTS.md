@@ -222,7 +222,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 16. **并行请求**(强制):多个独立的 `await xxxApi.foo()` 必须改 `Promise.all([a, b, c])` 并行(参考 `Home.vue loadAll` + `stores/app.js init`)。串行只在真有依赖时用。
 17. **computed 纯函数**(强制):`computed` 内禁止 `Math.random()`/`Date.now()`/副作用,否则每次访问重算且视觉跳动。需要随机/一次性计算用 `ref` + `watch(source, immediate)` 生成(参考 `Home.vue polaroidLayout`)。
 18. **路由懒加载**:页面路由全部 `() => import('./views/...')`,不写同步 import。
-19. **全局 UI 样式统一**(强制):所有 EP 组件(el-dialog/ElMessageBox/ElMessage/popper/button/tag/badge/input)配色/圆角/尺寸/z-index 一律由 main.css 全局覆写,**禁止组件 scoped 重复定义**;完整值见 `docs/UI设计提示词.md` §11a/§3/§18a。**命令式 API(ElMessage/ElMessageBox/ElNotification/ElLoading)样式已在 main.js 显式引入**——新增命令式调用须确认样式已引入,否则裸 DOM 渲染不可见(踩坑速查 §3.15)。
+19. **全局 UI 样式统一**(强制):所有 EP 组件(el-dialog/ElMessageBox/ElMessage/popper/button/tag/badge/input)配色/圆角/尺寸/z-index 一律由 main.css 全局覆写,**禁止组件 scoped 重复定义**;完整值见 `docs/UI设计提示词.md` §11a/§3/§18a。**命令式 API(ElMessage/ElMessageBox/ElNotification/ElLoading)样式已在 main.js 显式引入**——新增命令式调用须确认样式已引入,否则裸 DOM 渲染不可见(踩坑速查 §3.15)。**弹窗宽度不可依赖全局 `width:fit-content`**——长文本弹窗会被撑到近整屏,进而被左侧导航盖住/内容栏遮罩裁掉;长文弹窗须按 `docs/UI设计提示词.md` §18a「弹窗宽度上限与内容栏对齐」限宽收高,必要时加 `append-to-body`(成因见踩坑速查 §3.25)。
 20. **按钮/标签/角标/圆角统一**(强制,main.css 全局覆写,禁止 scoped):按钮四类(主/次/幽灵/危险,浅深色**不同色值不共用**)、el-tag 半透明磨砂、el-badge 半透明黑、el-icon `stroke-width:2px`、圆角(button 12/input 10/card+dialog 14);完整色值见 `docs/UI设计提示词.md` §18a。
 21. **页面统一规范**(强制):根容器 `class="page"`(禁 scoped 覆写 max-width/margin/padding);页面级 H1/H2 移除,分区标题 `.section-label`;工具栏 `class="page-toolbar card"`(`.tb-left` 筛选 size=small、`.tb-right` 按钮 gap 8px);多选交互 `.pick-badge` 对勾圆标+卡片描边(**禁左上 checkbox 角标**);详见 `docs/UI设计提示词.md` §11b。
 22. **位图资产压缩入库**(强制):装饰性位图压缩后放 `frontend/src/assets/` 并 ESM 导入(构建出内容哈希名,配 nginx `expires 7d; immutable`),**不放 `public/`**(无哈希换图不刷新);宽度按实际渲染 2 倍封顶,带噪点先 3×3 中值滤波再压,输出渐进式 JPEG。参照相册封面 2560×1920 1.37MB→800×600 112KB。**例外:URL 存在 DB 里的演示素材走 `frontend/public/`**(DB 引用需要稳定路径,用不了 ESM 哈希名),如演示照片 `frontend/public/demo/*.svg`(生成器 `scripts/gen-demo-photos.py`)。
@@ -283,7 +283,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 ## 规划事项(未实现)
 
 > **本章只做指引,不记内容**——**未实现规划的唯一去处是 `docs/需求设计说明书.md` §9**:产品级规划见 §9.1,代码级待办见 §9.2(全量审计)/ §9.3(新增代码复审)/ §9.5(2026-10-05 全量复检),各表**只列仍未做的条目**;启动任何规划项前先读该章对应小节,不要凭本文件或记忆开工。实现新功能前先 `grep schema.sql + router/` 对照模块种子。
-> **当前概览(截至 V10.33,要点一律见 §9)**:§9.2/§9.3 已无剩余(末条 C 组 P3「超大单文件拆分 + 全仓 Prettier 重排」已于 V10.23 完成,替代 harness 的验证口径见 §9.2 C 组);**§9.5 全量复检条目已全部清空**——末条 D 组「Spring Boot 4.x 升级(阻塞登记)」已于 V10.32 落地(3.5.16→4.1.1,卡点以 Knife4j→SpringDoc 换栈解掉)。**§9.1 P2「移动端适配补齐」已于 V10.26 整行收口移出**(三 Tab 首页不可达与页头标题缺项已修;桌面组件对等**决策不做**、7 个页面级断点经真机复测为伪问题)。剩余产品级 = 放映厅 Emby 实测/多家庭共用/清晰度多音轨、HA 侧硬件与户型图联动(不在本仓)、保险箱主密码(待定夺);§9.4 方向性(场景主题/阴影方案)已全部决策不做。
+> **当前概览(截至 V10.34,要点一律见 §9)**:§9.2/§9.3/§9.5 三张表均已无剩余条目(收口详情见各表下方索引行)。剩余产品级 = 放映厅 Emby 实测/多家庭共用/清晰度多音轨、HA 侧硬件与户型图联动(不在本仓)、保险箱主密码(待定夺);§9.1 与 §9.4 的已收口项与「已决策不做」项见该章索引行。
 
 ## 文档清单
 

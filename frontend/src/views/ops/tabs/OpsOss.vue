@@ -114,7 +114,8 @@
     </el-table-column>
   </el-table>
 
-  <el-dialog v-model="ossPlanVisible" :title="$t('ops.oss.plan')" width="640px">
+  <!-- append-to-body:AI 评估结果较长,弹窗挂在 body 上才不会被内容栏的渐隐遮罩/左侧导航裁掉或盖住(见 main.css .oss-plan-dialog) -->
+  <el-dialog v-model="ossPlanVisible" class="oss-plan-dialog" append-to-body :title="$t('ops.oss.plan')" width="640px">
     <div v-if="ossPlan">
       <div class="oss-plan-head">
         <b>{{ ossPlan.name }}</b>
