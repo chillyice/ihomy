@@ -330,6 +330,8 @@ color: #3A2E22;
 
 **工具栏结构**(`.page-toolbar card`,全局 padding `10px 16px !important`):
 
+- **工具栏内页面标题**(`.page-toolbar .section-label`,全局 `margin: 0`):`.section-label` 自带的 16px 下边距是给正文分区标题用的,放进工具栏会把标题顶得比右侧按钮高;全局清零后由 `.tb-left` 的 `align-items: center` 与按钮/控件垂直同中线(与工具箱标题栏口径一致)。正文卡片里的 `.section-label` 仍保留下边距。
+
 - `.tb-left` 搜索/筛选:组件统一 `size="small"`(24px 高,三页已对齐);搜索框 200px 带放大镜 SVG prefix + 来源筛选 150px + 类型/题材筛选 120-140px;筛选为**前端过滤**(家庭数据量小,全量拉取后 computed 过滤)。
 - `.tb-right` 操作按钮(默认 32px 高,自适应宽度):
   - 常规态从左到右:多选 → 次级动作(想看/刷新映射,owner+有映射时显示) → 从设备同步(owner) → 主操作(新建/上传,`type="primary"`)。

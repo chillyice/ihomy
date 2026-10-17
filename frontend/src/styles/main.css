@@ -527,6 +527,11 @@ a {
   flex-wrap: wrap;
   gap: 12px;
 }
+/* 工具栏里的分区标题兼作页面标题:.section-label 自带的 16px 下边距是给正文分区用的,
+   放进工具栏会把文字顶得比右侧按钮高;统一清零,与按钮/控件垂直居中对齐(与工具箱标题栏一致) */
+.page-toolbar .section-label {
+  margin: 0;
+}
 .page-toolbar .tb-left {
   display: flex;
   gap: 10px;
