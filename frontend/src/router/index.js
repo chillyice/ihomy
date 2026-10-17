@@ -112,6 +112,20 @@ const routes = [
     component: () => import('@/views/tools/JsonFormatter.vue'),
     meta: { public: true },
   },
+  // 字符编码转换:Unicode / HTML 实体 / URL / Base64 / UTF-8 字节互转,内容只在本机处理
+  {
+    path: '/tools/codec',
+    name: 'TextCodec',
+    component: () => import('@/views/tools/TextCodec.vue'),
+    meta: { public: true },
+  },
+  // 进制转换:2–36 进制整数/小数互转,大整数精确,纯前端
+  {
+    path: '/tools/base',
+    name: 'BaseConverter',
+    component: () => import('@/views/tools/BaseConverter.vue'),
+    meta: { public: true },
+  },
   // 贷款计算器:纯前端试算(等额本息/等额本金、商业/公积金/组合贷、提前还款对比),不依赖后端
   { path: '/tools/loan', name: 'LoanCalculator', component: () => import('@/views/tools/LoanCalculator.vue'), meta: { public: true } },
   // Flash 播放器(Ruffle):本地加载 .swf 怀旧小游戏
