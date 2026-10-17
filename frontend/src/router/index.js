@@ -133,6 +133,13 @@ const routes = [
     component: () => import('@/views/tools/PacketParser.vue'),
     meta: { public: true },
   },
+  // 子网掩码计算:IPv4 网络地址/广播地址/可用主机范围,纯前端
+  {
+    path: '/tools/subnet',
+    name: 'SubnetCalculator',
+    component: () => import('@/views/tools/SubnetCalculator.vue'),
+    meta: { public: true },
+  },
   // 贷款计算器:纯前端试算(等额本息/等额本金、商业/公积金/组合贷、提前还款对比),不依赖后端
   { path: '/tools/loan', name: 'LoanCalculator', component: () => import('@/views/tools/LoanCalculator.vue'), meta: { public: true } },
   // Flash 播放器(Ruffle):本地加载 .swf 怀旧小游戏

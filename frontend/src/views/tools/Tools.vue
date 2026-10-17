@@ -92,6 +92,7 @@ import {
   Rank,
   Check,
   Connection,
+  Share,
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -172,6 +173,15 @@ const DEFAULT_TOOLS = [
     icon: Connection,
     titleKey: 'tools.packet.title',
     descKey: 'tools.packet.desc',
+    category: 'dev',
+    tagKey: 'tools.tags.local',
+  },
+  {
+    id: 'subnet',
+    path: '/tools/subnet',
+    icon: Share,
+    titleKey: 'tools.subnet.title',
+    descKey: 'tools.subnet.desc',
     category: 'dev',
     tagKey: 'tools.tags.local',
   },
