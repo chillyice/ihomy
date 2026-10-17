@@ -2254,6 +2254,25 @@ export default {
       hint: '拖动卡片调整顺序',
       moveHint: '拖动卡片，或用方向键调整顺序',
     },
+    group: {
+      hint: '按分类展示',
+      toggleHint: '点击切换「平铺 / 按分类」',
+    },
+    categories: {
+      design: '设计与实验',
+      document: '文档处理',
+      dev: '开发调试',
+      life: '生活计算',
+      fun: '怀旧娱乐',
+    },
+    tags: {
+      shared: '家庭共享',
+      ai: 'AI',
+      threeD: '3D',
+      local: '本地处理',
+      offline: '纯前端',
+      localPlay: '本地播放',
+    },
     lightLab: {
       title: '光影实验台',
       desc: '3D 真实阴影：太阳模拟 / 移动光源',

@@ -2267,6 +2267,25 @@ export default {
       hint: 'Drag cards to reorder',
       moveHint: 'Drag a card, or focus it and use the arrow keys',
     },
+    group: {
+      hint: 'Grouped by category',
+      toggleHint: 'Click to switch between flat and grouped view',
+    },
+    categories: {
+      design: 'Design & Lab',
+      document: 'Documents',
+      dev: 'Developer',
+      life: 'Everyday',
+      fun: 'Retro & Fun',
+    },
+    tags: {
+      shared: 'Shared',
+      ai: 'AI',
+      threeD: '3D',
+      local: 'Local',
+      offline: 'Offline',
+      localPlay: 'Local play',
+    },
     lightLab: {
       title: 'Light Lab',
       desc: '3D real-time shadows: sun sim / move light',
