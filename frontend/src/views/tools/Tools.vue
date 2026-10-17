@@ -91,6 +91,7 @@ import {
   Sort,
   Rank,
   Check,
+  Connection,
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -162,6 +163,15 @@ const DEFAULT_TOOLS = [
     icon: Operation,
     titleKey: 'tools.base.title',
     descKey: 'tools.base.desc',
+    category: 'dev',
+    tagKey: 'tools.tags.local',
+  },
+  {
+    id: 'packet',
+    path: '/tools/packet',
+    icon: Connection,
+    titleKey: 'tools.packet.title',
+    descKey: 'tools.packet.desc',
     category: 'dev',
     tagKey: 'tools.tags.local',
   },
