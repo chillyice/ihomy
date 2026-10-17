@@ -105,6 +105,13 @@ const routes = [
   },
   // PDF 转换:PDF↔图片、PDF 提取文字,全部在本机浏览器完成(不上传服务器)
   { path: '/tools/pdf', name: 'PdfConverter', component: () => import('@/views/tools/PdfConverter.vue'), meta: { public: true } },
+  // JSON 格式化:纯前端格式化/压缩/键名排序,内容只在本机处理
+  {
+    path: '/tools/json',
+    name: 'JsonFormatter',
+    component: () => import('@/views/tools/JsonFormatter.vue'),
+    meta: { public: true },
+  },
   // 贷款计算器:纯前端试算(等额本息/等额本金、商业/公积金/组合贷、提前还款对比),不依赖后端
   { path: '/tools/loan', name: 'LoanCalculator', component: () => import('@/views/tools/LoanCalculator.vue'), meta: { public: true } },
   // Flash 播放器(Ruffle):本地加载 .swf 怀旧小游戏

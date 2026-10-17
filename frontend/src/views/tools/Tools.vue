@@ -64,7 +64,7 @@ import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { Tools, ArrowRight, MagicStick, Sunny, VideoPlay, Coin, Document, Sort, Rank, Check } from '@element-plus/icons-vue'
+import { Tools, ArrowRight, MagicStick, Sunny, VideoPlay, Coin, Document, DataLine, Sort, Rank, Check } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import { loadToolOrder, mergeToolOrder, moveToolBy, moveToolTo, saveToolOrder } from '@/utils/toolOrder'
@@ -84,6 +84,7 @@ const DEFAULT_TOOLS = [
   },
   { id: 'light-lab', path: '/tools/light-lab', icon: Sunny, titleKey: 'tools.lightLab.title', descKey: 'tools.lightLab.desc' },
   { id: 'pdf', path: '/tools/pdf', icon: Document, titleKey: 'tools.pdf.title', descKey: 'tools.pdf.desc' },
+  { id: 'json', path: '/tools/json', icon: DataLine, titleKey: 'tools.json.title', descKey: 'tools.json.desc' },
   { id: 'flash', path: '/tools/flash', icon: VideoPlay, titleKey: 'tools.flash.title', descKey: 'tools.flash.desc' },
   { id: 'loan', path: '/tools/loan', icon: Coin, titleKey: 'tools.loan.title', descKey: 'tools.loan.desc' },
   { id: 'gba', path: '/tools/gba', icon: VideoPlay, titleKey: 'tools.gba.title', descKey: 'tools.gba.desc' },
