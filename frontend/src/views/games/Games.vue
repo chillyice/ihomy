@@ -69,7 +69,7 @@
     </div>
 
     <!-- 导入对话框 -->
-    <el-dialog v-model="importVisible" :title="$t('games.import')" width="440px" destroy-on-close>
+    <el-dialog v-model="importVisible" append-to-body :title="$t('games.import')" width="440px" destroy-on-close>
       <el-form label-position="top">
         <el-form-item :label="$t('games.file')">
           <input ref="fileInput" type="file" accept=".swf,.gba" class="game-file-input" @change="onFilePicked" />
@@ -88,7 +88,7 @@
     </el-dialog>
 
     <!-- 编辑对话框 -->
-    <el-dialog v-model="editVisible" :title="$t('games.edit')" width="440px" destroy-on-close>
+    <el-dialog v-model="editVisible" append-to-body :title="$t('games.edit')" width="440px" destroy-on-close>
       <el-form label-position="top">
         <el-form-item :label="$t('games.name')">
           <el-input v-model="editForm.name" maxlength="100" />

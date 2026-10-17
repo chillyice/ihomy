@@ -30,7 +30,7 @@
     </div>
 
     <!-- 新建脑图:选模板 + 标题 -->
-    <el-dialog v-model="createVisible" :title="$t('tools.mindmap.new')" width="560px">
+    <el-dialog v-model="createVisible" append-to-body :title="$t('tools.mindmap.new')" width="560px">
       <div class="mm-tpl-label">{{ $t('tools.mindmap.tpl.pick') }}</div>
       <div class="mm-tpl-grid">
         <div
@@ -55,7 +55,7 @@
       </template>
     </el-dialog>
     <!-- 回收站 -->
-    <el-dialog v-model="trashVisible" :title="$t('tools.mindmap.trashBtn')" width="520px">
+    <el-dialog v-model="trashVisible" append-to-body :title="$t('tools.mindmap.trashBtn')" width="520px">
       <div v-if="trashList.length" class="mm-trash-list">
         <div v-for="m in trashList" :key="m.id" class="mm-trash-item">
           <div class="mm-trash-info">

@@ -170,7 +170,7 @@
     </div>
   </el-dialog>
 
-  <el-dialog v-model="ossEditVisible" :title="ossEditForm.id ? $t('ops.oss.edit') : $t('ops.oss.add')" width="520px">
+  <el-dialog v-model="ossEditVisible" append-to-body :title="ossEditForm.id ? $t('ops.oss.edit') : $t('ops.oss.add')" width="520px">
     <el-form :model="ossEditForm" label-width="100px">
       <el-form-item :label="$t('ops.oss.name')"><el-input v-model="ossEditForm.name" /></el-form-item>
       <el-form-item :label="$t('ops.oss.componentType')">
