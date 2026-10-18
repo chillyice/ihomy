@@ -18,7 +18,7 @@ Release 同步到 `/opt/ihomy/uploads/kada/updates/`，客户端从
 依赖：`curl`、`python3`（Ubuntu 自带）。先确认 `/opt/ihomy/uploads/kada/` 归 `ihomy` 所有。
 
 ```bash
-cd scripts/ihomy-mirror
+cd scripts/kada-mirror
 sudo ./install.sh
 ```
 
