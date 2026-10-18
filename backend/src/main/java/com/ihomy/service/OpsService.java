@@ -27,11 +27,15 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -76,6 +80,8 @@ public class OpsService {
     private static final int MAX_ENTRY_MSG = 16384;
     /** 返回条数上限 */
     private static final int MAX_ENTRIES = 3000;
+    /** 访问明细返回上限(时间序=最近 N 条 / 耗时序=最慢 N 条) */
+    private static final int MAX_DETAIL = 200;
 
     /** 各资源统计:可按开始/结束日期(含)、用户 ID、家庭 ID 过滤;缺省为全量 */
     public Map<String, Long> stats(LocalDate startDate, LocalDate endDate, Long userId, Long familyId) {
@@ -280,8 +286,8 @@ public class OpsService {
         }
 
         long total = 0, failed = 0, slow = 0, costSum = 0;
-        java.util.Set<String> users = new java.util.HashSet<>();
-        java.util.Set<String> ips = new java.util.HashSet<>();
+        Map<String, long[]> users = new LinkedHashMap<>(); // key=user#id -> [count, failed]
+        Map<String, long[]> ips = new LinkedHashMap<>();
         long[] hourTotal = new long[24];
         long[] hourFailed = new long[24];
         Map<String, long[]> paths = new LinkedHashMap<>(); // key=METHOD path -> [count, failed, costSum]
@@ -311,12 +317,14 @@ public class OpsService {
 
                     total++;
                     costSum += cost;
-                    users.add(m.group(3));
-                    ips.add(m.group(4));
+                    users.computeIfAbsent(m.group(3), k -> new long[2])[0]++;
+                    ips.computeIfAbsent(m.group(4), k -> new long[2])[0]++;
                     hourTotal[hour]++;
                     if (isFailed) {
                         failed++;
                         hourFailed[hour]++;
+                        users.get(m.group(3))[1]++;
+                        ips.get(m.group(4))[1]++;
                     }
                     // 慢请求口径:耗时 > 3000ms 计一次(与慢请求列表/概览的 slow 字段同一阈值)
                     if (cost > 3000) {
@@ -367,6 +375,132 @@ public class OpsService {
         result.put("avgCostMs", total == 0 ? 0 : costSum / total);
         result.put("hours", hours);
         result.put("topPaths", top);
+        result.put("userList", aggList(users)); // 卡片下钻:点击「独立用户/独立 IP」看明细
+        result.put("ipList", aggList(ips));
+        return result;
+    }
+
+    /** 用户/IP 聚合 Map 转列表(按请求数降序):[{key, count, failed}] */
+    private List<Map<String, Object>> aggList(Map<String, long[]> agg) {
+        return agg.entrySet().stream()
+                .sorted((a, b) -> Long.compare(b.getValue()[0], a.getValue()[0]))
+                .map(e -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("key", e.getKey());
+                    m.put("count", e.getValue()[0]);
+                    m.put("failed", e.getValue()[1]);
+                    return m;
+                })
+                .toList();
+    }
+
+    /**
+     * 访问明细(访问统计下钻):与 trafficStats 同一批 access 文件、同一日期范围口径,
+     * 按小时/接口/用户/IP/类型(失败/慢)过滤,返回原始条目(tid 可跳详细日志)。
+     * 内存有界:时间序保最近 MAX_DETAIL 条(返回时倒序),sort=cost 保最慢 MAX_DETAIL 条。
+     */
+    public Map<String, Object> trafficEntries(LocalDate startDate, LocalDate endDate, Integer hour,
+                                              String path, String user, String ip, String type, String sort) {
+        LocalDate today = LocalDate.now();
+        LocalDate start = startDate == null ? today : startDate;
+        LocalDate end = endDate == null ? start : endDate;
+        if (end.isBefore(start)) {
+            LocalDate t = start;
+            start = end;
+            end = t;
+        }
+        if (start.isBefore(today.minusDays(13))) {
+            start = today.minusDays(13);
+        }
+
+        boolean byCost = "cost".equals(sort);
+        Deque<Map<String, Object>> recent = new ArrayDeque<>();
+        PriorityQueue<Map<String, Object>> slowest = new PriorityQueue<>(Comparator.comparingLong(e -> (Long) e.get("costMs")));
+        long matched = 0;
+
+        for (LocalDate d = start; !d.isAfter(end); d = d.plusDays(1)) {
+            String suffix = d.equals(today) ? "" : "." + d.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            Path file = Path.of(logRoot, "access", "ihomy-access" + suffix + ".log");
+            if (!Files.exists(file)) {
+                continue;
+            }
+            try (BufferedReader br = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    Matcher header = LOG_HEADER.matcher(line);
+                    if (!header.matches()) {
+                        continue;
+                    }
+                    Matcher m = ACCESS_LINE.matcher(header.group(6));
+                    if (!m.matches()) {
+                        continue;
+                    }
+                    int hourOfLine = Integer.parseInt(header.group(1).substring(11, 13));
+                    if (hour != null && hour != hourOfLine) {
+                        continue;
+                    }
+                    String pathKey = m.group(1) + " " + m.group(2).split("\\?")[0];
+                    if (path != null && !path.isBlank() && !path.equals(pathKey)) {
+                        continue;
+                    }
+                    if (user != null && !user.isBlank() && !user.equals(m.group(3))) {
+                        continue;
+                    }
+                    if (ip != null && !ip.isBlank() && !ip.equals(m.group(4))) {
+                        continue;
+                    }
+                    int status = Integer.parseInt(m.group(5));
+                    Integer bizCode = "-".equals(m.group(6)) ? null : Integer.valueOf(m.group(6));
+                    long cost = Long.parseLong(m.group(7));
+                    boolean failed = status >= 400 || (bizCode != null && bizCode != 0);
+                    if ("failed".equals(type) && !failed) {
+                        continue;
+                    }
+                    if ("slow".equals(type) && cost <= 3000) {
+                        continue;
+                    }
+
+                    Map<String, Object> e = new LinkedHashMap<>();
+                    e.put("time", header.group(1));
+                    e.put("tid", header.group(3));
+                    e.put("method", m.group(1));
+                    e.put("uri", m.group(2));
+                    e.put("user", m.group(3));
+                    e.put("ip", m.group(4));
+                    e.put("status", status);
+                    e.put("code", m.group(6));
+                    e.put("costMs", cost);
+                    e.put("failed", failed);
+                    matched++;
+                    if (byCost) {
+                        slowest.offer(e);
+                        if (slowest.size() > MAX_DETAIL) {
+                            slowest.poll();
+                        }
+                    } else {
+                        if (recent.size() >= MAX_DETAIL) {
+                            recent.pollFirst();
+                        }
+                        recent.addLast(e);
+                    }
+                }
+            } catch (Exception ignored) {
+                // 单文件读取失败跳过(占用/损坏),统计其余文件
+            }
+        }
+
+        List<Map<String, Object>> entries = new ArrayList<>(byCost ? slowest : recent);
+        if (byCost) {
+            entries.sort(Comparator.comparingLong((Map<String, Object> e) -> (Long) e.get("costMs")).reversed());
+        } else {
+            Collections.reverse(entries); // 文件按时间追加,取反后最新在前
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("startDate", start.toString());
+        result.put("endDate", end.toString());
+        result.put("count", matched);
+        result.put("truncated", matched > MAX_DETAIL);
+        result.put("entries", entries);
         return result;
     }
 

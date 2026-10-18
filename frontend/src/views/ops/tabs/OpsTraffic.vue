@@ -7,7 +7,13 @@
   </div>
   <div v-loading="trafficLoading">
     <div v-if="traffic" class="stats-grid traffic-grid">
-      <div v-for="c in trafficCards" :key="c.key" class="stat-card card">
+      <div
+        v-for="c in trafficCards"
+        :key="c.key"
+        class="stat-card card stat-clickable"
+        :title="$t('ops.clickDetail')"
+        @click="openCard(c.key)"
+      >
         <div class="stat-name">{{ c.name }}</div>
         <div class="stat-num">{{ traffic[c.key] ?? 0 }}</div>
       </div>
@@ -65,6 +71,7 @@
           <rect
             v-for="(h, i) in traffic.hours"
             :key="'thv' + i"
+            class="tb-col-hit"
             :x="padL + i * barStep"
             :y="padT"
             :width="barStep"
@@ -72,6 +79,7 @@
             fill="transparent"
             @mouseenter="tHoverIdx = i"
             @mouseleave="tHoverIdx = -1"
+            @click="openHour(i)"
           />
         </svg>
         <div class="chart-legend">
@@ -91,7 +99,7 @@
         </div>
       </div>
       <h4 class="ops-section-title" style="margin-top: 20px">{{ $t('ops.topPaths') }}</h4>
-      <el-table :data="traffic.topPaths" size="small" stripe>
+      <el-table :data="traffic.topPaths" size="small" stripe class="path-table" @row-click="openPath">
         <el-table-column prop="path" :label="$t('ops.path')" min-width="280">
           <template #default="{ row }"
             ><span class="mono">{{ row.path }}</span></template
@@ -103,6 +111,57 @@
       </el-table>
     </template>
   </div>
+
+  <!-- 下钻明细:卡片/柱状图/接口行点击 → 该口径下的原始访问记录(TID 可跳详细日志) -->
+  <el-dialog v-model="detail.visible" :title="detail.title" class="dialog-xl" append-to-body>
+    <div v-loading="detail.loading" class="traffic-detail">
+      <el-button v-if="detail.back" text size="small" class="detail-back" @click="detail.back()">← {{ $t('ops.detailBack') }}</el-button>
+      <el-alert
+        v-if="detail.mode === 'entries' && detail.truncated"
+        type="warning"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 10px"
+        :title="$t('ops.detailTruncated', { n: detail.count })"
+      />
+      <el-table v-if="detail.mode === 'rows'" :data="detail.rows" size="small" stripe border class="path-table" @row-click="drillRow">
+        <el-table-column prop="key" :label="detail.kind === 'user' ? $t('ops.detailUser') : 'IP'" min-width="220">
+          <template #default="{ row }"
+            ><span class="mono">{{ row.key }}</span></template
+          >
+        </el-table-column>
+        <el-table-column prop="count" :label="$t('ops.reqCount')" width="120" />
+        <el-table-column prop="failed" :label="$t('ops.trafficFailed')" width="120" />
+      </el-table>
+      <el-table v-else :data="detail.entries" size="small" stripe border max-height="440">
+        <el-table-column prop="time" :label="$t('ops.detailTime')" width="160">
+          <template #default="{ row }"
+            ><span class="mono">{{ row.time }}</span></template
+          >
+        </el-table-column>
+        <el-table-column :label="$t('ops.path')" min-width="220" show-overflow-tooltip>
+          <template #default="{ row }"
+            ><span class="mono">{{ row.method }} {{ row.uri }}</span></template
+          >
+        </el-table-column>
+        <el-table-column prop="user" :label="$t('ops.detailUser')" width="110" show-overflow-tooltip />
+        <el-table-column prop="ip" label="IP" width="125" />
+        <el-table-column :label="$t('ops.detailStatus')" width="90">
+          <template #default="{ row }">
+            <span :class="{ 'detail-failed': row.failed }">{{
+              row.code === '-' || row.code === '0' ? row.status : row.status + '/' + row.code
+            }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="costMs" :label="$t('ops.costTime')" width="100" />
+        <el-table-column label="TID" width="152">
+          <template #default="{ row }">
+            <span v-a11y-click class="tid-link mono" :title="$t('ops.tidJump')" @click="jumpToTrace(row)">{{ row.tid }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+  </el-dialog>
 </template>
 
 <script setup>
@@ -112,6 +171,8 @@ import { opsApi } from '@/api'
 import { chartH, chartW, padB, padL, padR, padT } from '../opsChart'
 
 const { t } = useI18n()
+
+const emit = defineEmits(['navigate-trace'])
 
 const traffic = ref(null)
 const trafficLoading = ref(false)
@@ -159,6 +220,75 @@ const loadTraffic = async () => {
   }
 }
 
+// —— 下钻明细:卡片/柱状图/接口行点击 → 拉取对应原始访问记录 ——
+const detail = reactive({
+  visible: false,
+  loading: false,
+  mode: 'entries', // entries=访问记录表;rows=用户/IP 明细列表
+  kind: '', // rows 模式下的类型:user / ip
+  title: '',
+  entries: [],
+  rows: [],
+  count: 0,
+  truncated: false,
+  back: null, // rows → entries 下钻后的返回回调
+})
+
+/** 按当前筛选日期 + 附加条件(hour/path/user/ip/type/sort)拉访问明细 */
+const openEntries = async (filters, title, back = null) => {
+  Object.assign(detail, { visible: true, loading: true, mode: 'entries', title, back, entries: [], count: 0, truncated: false })
+  try {
+    const res = await opsApi.trafficEntries({
+      startDate: trafficFilter.startDate || null,
+      endDate: trafficFilter.endDate || null,
+      ...filters,
+    })
+    detail.entries = res.entries
+    detail.count = res.count
+    detail.truncated = res.truncated
+  } finally {
+    detail.loading = false
+  }
+}
+
+/** 独立用户/独立 IP 卡片:直接展示聚合列表(点行继续下钻到该用户/IP 的记录) */
+const openRows = (kind) => {
+  Object.assign(detail, {
+    visible: true,
+    loading: false,
+    mode: 'rows',
+    kind,
+    title: kind === 'user' ? t('ops.trafficUsers') : t('ops.trafficIps'),
+    rows: (kind === 'user' ? traffic.value?.userList : traffic.value?.ipList) || [],
+    back: null,
+    count: 0,
+    truncated: false,
+  })
+}
+
+const openCard = (key) => {
+  if (key === 'users') return openRows('user')
+  if (key === 'ips') return openRows('ip')
+  if (key === 'total') return openEntries({}, t('ops.trafficTotal'))
+  if (key === 'failed') return openEntries({ type: 'failed' }, t('ops.trafficFailed'))
+  if (key === 'slow') return openEntries({ type: 'slow' }, t('ops.trafficSlow'))
+  if (key === 'avgCostMs') return openEntries({ type: 'slow', sort: 'cost' }, t('ops.detailCost'))
+}
+
+const drillRow = (row) => {
+  openEntries(detail.kind === 'user' ? { user: row.key } : { ip: row.key }, `${detail.title} · ${row.key}`, () => openRows(detail.kind))
+}
+
+const openHour = (hour) => openEntries({ hour }, t('ops.detailHour', { hour }))
+
+const openPath = (row) => openEntries({ path: row.path }, `${t('ops.detailPath')} · ${row.path}`)
+
+/** 明细行 TID → 跳详细日志(复用操作日志的导航机制) */
+const jumpToTrace = (row) => {
+  detail.visible = false
+  emit('navigate-trace', { tid: row.tid, date: (row.time || '').slice(0, 10) })
+}
+
 onMounted(loadTraffic)
 </script>
 
@@ -178,6 +308,12 @@ onMounted(loadTraffic)
 .stat-card {
   padding: 14px 16px;
   text-align: center;
+}
+.stat-clickable {
+  cursor: pointer;
+}
+.stat-clickable:hover {
+  transform: translateY(-2px);
 }
 .stat-name {
   color: #999;
@@ -235,6 +371,31 @@ onMounted(loadTraffic)
 .tb-hover-col {
   fill: rgba(184, 140, 110, 0.12);
   pointer-events: none;
+}
+.tb-col-hit {
+  cursor: pointer;
+}
+/* 接口行 / 用户-IP 行可点击下钻 */
+.path-table :deep(.el-table__row) {
+  cursor: pointer;
+}
+.traffic-detail {
+  min-height: 80px;
+}
+.detail-back {
+  margin-bottom: 8px;
+}
+.detail-failed {
+  color: #b04a3a;
+  font-weight: 600;
+}
+.tid-link {
+  color: var(--color-brand);
+  cursor: pointer;
+  font-size: 12px;
+}
+.tid-link:hover {
+  text-decoration: underline;
 }
 .chart-legend {
   display: flex;

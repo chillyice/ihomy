@@ -96,6 +96,21 @@ public class OpsController {
         return Result.success(opsService.trafficStats(startDate, endDate));
     }
 
+    @Operation(summary = "访问明细下钻(按小时/接口/用户/IP/类型过滤;sort=cost 取最慢)")
+    @RequirePermission("ops:view")
+    @GetMapping("/traffic/entries")
+    public Result<Map<String, Object>> trafficEntries(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) Integer hour,
+            @RequestParam(required = false) String path,
+            @RequestParam(required = false) String user,
+            @RequestParam(required = false) String ip,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String sort) {
+        return Result.success(opsService.trafficEntries(startDate, endDate, hour, path, user, ip, type, sort));
+    }
+
     @Operation(summary = "详细日志:按 tid 检索 access/server/thirdparty 三类日志文件(缺省查当天,可按来源/级别过滤)")
     @RequirePermission("ops:view")
     @GetMapping("/logs/trace")

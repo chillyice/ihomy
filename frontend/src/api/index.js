@@ -369,6 +369,7 @@ export const opsApi = {
   logs: (params) => request.get('/ops/logs', { params }),
   logOptions: () => request.get('/ops/logs/options'),
   trafficStats: (params) => request.get('/ops/traffic/stats', { params }),
+  trafficEntries: (params) => request.get('/ops/traffic/entries', { params }),
   traceLogs: (params) => request.get('/ops/logs/trace', { params }),
   // 同类异常聚合预警(日志里同一类问题在窗口内反复出现时汇总成一条)
   alerts: (params) => request.get('/ops/alerts', { params }),

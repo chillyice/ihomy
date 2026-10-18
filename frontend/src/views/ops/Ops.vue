@@ -14,7 +14,7 @@
       </el-tab-pane>
 
       <el-tab-pane v-if="showSystemTabs" :label="$t('ops.traffic')" name="traffic" lazy>
-        <OpsTraffic />
+        <OpsTraffic @navigate-trace="navigateTrace" />
       </el-tab-pane>
 
       <el-tab-pane v-if="showSystemTabs" :label="$t('ops.logs')" name="logs" lazy>
