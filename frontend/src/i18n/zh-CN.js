@@ -3425,6 +3425,23 @@ export default {
     sensitiveAdvice: '敏感人群',
     indices: '生活指数',
     minutely: '分钟降水',
+    // 分区标签与渐进展开:现在(实况+预警)→ 未来(逐小时/10 天)→ 空气与天空(空气/晨昏/生活指数)
+    zone: { now: '现在', next: '未来', env: '空气与天空' },
+    // 晨昏地图:色带阶段 + 面板读数(天文值来自 /public/sun-info 的 subsolar/current)
+    map: {
+      title: '日月与晨昏',
+      hint: '点击地图上的地点，查看那里此刻的晨昏',
+      stage: { day: '白天', civil: '民用晨昏', nautical: '航海晨昏', astronomical: '天文晨昏', night: '夜间' },
+      altitude: '太阳高度',
+      azimuth: '方位',
+      nextStage: '下一阶段',
+      nowAt: '此刻',
+      todayAt: '当地今日',
+      todayCurve: '今日太阳高度',
+      afterHm: '{h} 小时 {m} 分后',
+      afterM: '{m} 分后',
+    },
+    airDetail: { expand: '展开空气质量详情', collapse: '收起空气质量详情' },
     empty: '天气数据暂不可用(未配置凭证或服务异常)',
     w0: '周日',
     w1: '周一',

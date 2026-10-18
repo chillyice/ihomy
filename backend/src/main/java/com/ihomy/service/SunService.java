@@ -52,11 +52,17 @@ public class SunService {
             data.put("city", familyLocation[2]);
         }
 
+        // 当前太阳位置与直射点:供前端「晨昏地图」画地球晨昏线(纯天文计算,变化快故不缓存)
+        Instant now = Instant.now();
+        data.put("generatedAt", now.toString());
+        data.put("subsolar", SolarUtil.subsolarPoint(now));
+        data.put("current", SolarUtil.sunPosition(lat, lng, now));
+
         // 日月与晨昏时刻(纯天文计算,不经任何天气 API):日出日落/太阳正午子夜 + 民用航海天文三档晨昏 + 月出月落/月中天月下中天
         data.putAll(SolarUtil.astroTimes(lat, lng, today, tz));
 
         // 月相:当前时刻的相位/8 档代码/照明比例(含向后兼容的 moonPhase 0~1 数值)
-        data.putAll(SolarUtil.moonPhaseInfo(Instant.now()));
+        data.putAll(SolarUtil.moonPhaseInfo(now));
 
         // 每日月相列表:逐日取当地正午为代表时刻,避免跨午夜跳档
         List<Map<String, Object>> moonDays = new ArrayList<>(MOON_DAYS);

@@ -109,7 +109,7 @@ frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
     stores/       # user.js(登录+权限) / app.js(首页聚合) / theme.js(主题两轴矩阵)
     router/       # 登录守卫 + scrollBehavior;61 条路由(57 条懒加载,另 4 条 redirect)
     i18n/ theme/  # vue-i18n 中英;主题两轴矩阵(暖居/光尘 × 晨/暮)
-    utils/        # dict.js / doodle.js(涂鸦引擎) / useDragResize.js / password.js / loan.js 等纯函数与组合逻辑
+    utils/        # dict.js / doodle.js(涂鸦引擎) / useDragResize.js / password.js / loan.js / terminator.js(晨昏线几何) 等纯函数与组合逻辑
     composables/  # useDevice.js(设备检测) / useWeatherBg.js(天气 AI 生图氛围底图)
     components/   # AppSidebar/Breadcrumb/AvatarCropper/MediaPlayer/Mobile*(移动端)/warm/(暖居外壳)等
     layouts/MobileLayout.vue  # 移动端壳
@@ -171,7 +171,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 生活 | 纪念日 / 提醒 / 计划 / 任务 / 记账(含贷款) / 家谱 / 签到积分 / 背景音乐 / 保险箱 | Anniversary / Reminder / Plan / Task / Points / Music / Vault 各 Controller |
 | 游戏 | 花园共养植物(V1;**V2 家圃时光已独立立项迁出,见需求 §9.1**) / 小游戏库(SWF/GBA) / 宠物连连看 | FamilyPlant / GameInfo 各 Controller + FlashPlayer.vue + GbaPlayer.vue + PetLinkLink.vue |
 | 基础 | 文件上传 / 存储管理 / 首页聚合 / 运维(含异常聚合预警) / 开源组件台账 / 每日内容 / 操作日志 / 系统参数 / 回收站 | File / Storage / Home+Public / Ops+Oss(OpsAlert) / Daily / Log / Recycle 各 Controller |
-| 光影 | 太阳位置 / 日月晨昏 / 体积光 / 台灯 / 天气 / 首页仪表盘 | SolarUtil+SunService(`/public/sun-info`) + windowLight.js + SunLightLayer.vue |
+| 光影 | 太阳位置 / **日月晨昏(含晨昏地图)** / 体积光 / 台灯 / 天气 / 首页仪表盘 | SolarUtil+SunService(`/public/sun-info`) + windowLight.js + SunLightLayer.vue + views/weather/TerminatorMap.vue。**天文计算唯一来源是后端 `SolarUtil`(随 sun-info 下发直射点/当前位置),前端 `utils/terminator.js` 只做球面几何渲染、禁再移植 NOAA/Meeus**;`/public/sun-info` 只缓存 slots,直射点/当前位置每次实时算 |
 | 物品 | 物品定位 + 户型图 + AI 语义 | ItemController / ItemAiService+AiService(见需求 §4.8.1) |
 | AI | 图片生成/语音识别 + AI 测试台 + 家庭级 AI 配置 + 调用统计 | AiService / FamilyAiConfigService / AiController + AiStatsService(`/ops/ai/**`) |
 | 厨房 | 菜单/菜谱/食材 | RecipeController / RecipeService |
@@ -238,10 +238,10 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 
 ## 验证基线(每版更新,当前值)
 
-- 后端:`cd backend; .\mvnw.cmd -B clean package` → BUILD SUCCESS(`Tests run: 56`,纯逻辑不起 Spring 上下文);只求编译加 `-DskipTests`。**clean 被运行中后端锁 jar 时改跑 `-B test`**。
-- 前端测试:`cd frontend; npx vitest run` → 170 passed(jwt/loan/password/feed/nav/mobileNav/toolOrder/pdfTools/jsonTools/textCodec/baseConvert/packetParse/subnet + i18n 中英键对齐 + 引用键存在性 + **文案可编译** + 模板/消息硬编码中文守门 + **HTML 注入面守门** `utils/htmlSink.spec.js`;CI 构建前执行)。同一步跑 `npm run lint` → **0 error / 0 warning**(V10.21 起存量 warning 清零,不拦构建)。另跑 `npm run format:check`(`prettier --check "src/**/*.{js,vue,css}"`)→ 全通过(V10.23 起接 CI)。
+- 后端:`cd backend; .\mvnw.cmd -B clean package` → BUILD SUCCESS(`Tests run: 60`,纯逻辑不起 Spring 上下文);只求编译加 `-DskipTests`。**clean 被运行中后端锁 jar 时改跑 `-B test`**。
+- 前端测试:`cd frontend; npx vitest run` → 184 passed(jwt/loan/password/feed/nav/mobileNav/toolOrder/pdfTools/jsonTools/textCodec/baseConvert/packetParse/subnet/**terminator** + i18n 中英键对齐 + 引用键存在性 + **文案可编译** + 模板/消息硬编码中文守门 + **HTML 注入面守门** `utils/htmlSink.spec.js`;CI 构建前执行)。同一步跑 `npm run lint` → **0 error / 0 warning**(V10.21 起存量 warning 清零,不拦构建)。另跑 `npm run format:check`(`prettier --check "src/**/*.{js,vue,css}"`)→ 全通过(V10.23 起接 CI);一次性生成的超长单行资产(`assets/world-land-path.js`)已进 `.prettierignore`。
 - 文档/代码一致性闸门:`bash scripts/doc-drift-check.sh` → 全部 [OK](CI 最先跑;表数/实体↔建表/mapper 注解/@Tag/权限码种子/模块↔路由)。
-- 前端构建:`cd frontend; npm run build` → 入口 chunk **430.13KB/gzip 175.96KB**(V10.42 实测;功能页/pdfjs/epubjs/hls.js 均为独立异步 chunk,PDF 工具仅进 `pdfjs` 异步块,JSON/字符编码/进制转换/报文解析/子网掩码工具均为独立异步块;演示照片/演示电子书走 `public/demo/` 不进口 chunk;历史数字见 docs/变更归档.md)
+- 前端构建:`cd frontend; npm run build` → 入口 chunk **431.05KB/gzip 176.37KB**(V10.44 实测,较 V10.42 +0.9KB 来自新增 i18n 键;功能页/pdfjs/epubjs/hls.js 均为独立异步 chunk,PDF 工具仅进 `pdfjs` 异步块,JSON/字符编码/进制转换/报文解析/子网掩码工具均为独立异步块,**天气页的世界轮廓 32KB 只进 `Weather` 异步块**;演示照片/演示电子书走 `public/demo/` 不进口 chunk;历史数字见 docs/变更归档.md)
   - **⚠ 口径:vite 报的是「字符数」不是「字节数」**(实测 318.71KB 字符 = 343,667 字节)——**别拿 `ls -la` 字节数跟基线比**;比特字节就 `wc -c` 对 `wc -c`。
 - 界面/交互验证:harness 别放 `target/`;持续动画页面用页面内 `evaluate` 量几何、派发 `el.click()`,别用截图或真实点击(必超时,见踩坑速查 §6)。
 - 接口测试:同级独立项目(不在本仓库)`cd ..\autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed;CI 每次推送自动构建前后端+起库导 schema+后端启动+登录冒烟。

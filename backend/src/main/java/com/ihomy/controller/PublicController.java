@@ -70,7 +70,7 @@ public class PublicController {
     private final StringRedisTemplate redis;
     private final ObjectMapper mapper;
 
-    @Operation(summary = "太阳信息(IP 定位日出日落 + 96 时隙太阳位置,可选 date=YYYY-MM-DD 模拟任意日期)")
+    @Operation(summary = "太阳信息(日出日落 + 三档晨昏 + 月相 + 当前太阳位置与直射点,可指定日期查看任意一天)")
     @GetMapping("/sun-info")
     public Result<Map<String, Object>> sunInfo(HttpServletRequest request,
             @RequestParam(value = "date", required = false) String date) {

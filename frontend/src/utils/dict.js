@@ -53,3 +53,9 @@ export const MOON_PHASE_ICON = {
   'waning-crescent': '🌘',
 }
 export const moonIcon = (code) => MOON_PHASE_ICON[code] || '🌙'
+/** 月相名称(走 i18n weatherPage.moon.<code>,缺键回退空串) */
+export const moonPhaseText = (t, code) => {
+  const key = 'weatherPage.moon.' + code
+  const msg = t(key)
+  return msg === key ? '' : msg
+}

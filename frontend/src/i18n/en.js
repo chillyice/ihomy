@@ -3468,6 +3468,23 @@ export default {
     sensitiveAdvice: 'Sensitive groups',
     indices: 'Life Indices',
     minutely: 'Minutely Precipitation',
+    // Section labels & progressive disclosure: Now (current + warnings) → Next (hourly / 10-day) → Air & Sky (air / terminator map / life indices)
+    zone: { now: 'Now', next: 'Next', env: 'Air & Sky' },
+    // Terminator map: twilight bands + panel readings (astronomy from /public/sun-info subsolar/current)
+    map: {
+      title: 'Sun, Moon & Twilight',
+      hint: 'Click a place on the map to see its twilight right now',
+      stage: { day: 'Day', civil: 'Civil', nautical: 'Nautical', astronomical: 'Astronomical', night: 'Night' },
+      altitude: 'Sun altitude',
+      azimuth: 'Azimuth',
+      nextStage: 'Next stage',
+      nowAt: 'Now',
+      todayAt: 'Today here',
+      todayCurve: "Today's sun altitude",
+      afterHm: 'in {h}h {m}m',
+      afterM: 'in {m}m',
+    },
+    airDetail: { expand: 'Show air quality details', collapse: 'Hide air quality details' },
     empty: 'Weather data unavailable (no credential or service error)',
     w0: 'Sun',
     w1: 'Mon',

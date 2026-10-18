@@ -53,4 +53,54 @@ class SolarUtilTest {
         assertThat((String) m.get("moonPhaseCode")).isNotBlank();
         assertThat(((Number) m.get("moonAge")).doubleValue()).isBetween(0.0, 29.6);
     }
+
+    // ---- 直射点与太阳位置(晨昏地图的数据源) ----
+
+    /** 直射点纬度 = 赤纬:春分/秋分落在赤道,夏至落在北回归线 */
+    @Test
+    void subsolarLatitudeFollowsDeclination() {
+        assertThat(subsolarLat("2026-03-20T12:00:00Z")).isCloseTo(0.0, within(1.0));
+        assertThat(subsolarLat("2026-09-23T12:00:00Z")).isCloseTo(0.0, within(1.0));
+        assertThat(subsolarLat("2026-06-21T12:00:00Z")).isCloseTo(23.4, within(1.0));
+        assertThat(subsolarLat("2026-12-21T12:00:00Z")).isCloseTo(-23.4, within(1.0));
+    }
+
+    /** 直射经度 = (720 − UTC分钟 − 均时差)/4;UTC 12:00 时均时差最多约 16 分钟 → 约 4° */
+    @Test
+    void subsolarLongitudeNearPrimeMeridianAtUtcNoon() {
+        assertThat(SolarUtil.subsolarPoint(Instant.parse("2026-03-20T12:00:00Z")).get("lng").doubleValue())
+                .isCloseTo(0.0, within(4.5));
+        assertThat(SolarUtil.subsolarPoint(Instant.parse("2026-06-21T12:00:00Z")).get("lng").doubleValue())
+                .isCloseTo(0.0, within(4.5));
+    }
+
+    /** 直射点处太阳在天顶(90°);其对跖点(镜像纬度 + 经度反相)在地平线下最低(−90°) */
+    @Test
+    void sunPositionIsZenithAtSubsolarPoint() {
+        Instant t = Instant.parse("2026-10-18T04:00:00Z");
+        Map<String, Double> ss = SolarUtil.subsolarPoint(t);
+        assertThat(SolarUtil.sunPosition(ss.get("lat"), ss.get("lng"), t).get("altitude"))
+                .isCloseTo(90.0, within(0.5));
+        double antiLng = ss.get("lng") >= 0 ? ss.get("lng") - 180 : ss.get("lng") + 180;
+        assertThat(SolarUtil.sunPosition(-ss.get("lat"), antiLng, t).get("altitude"))
+                .isCloseTo(-90.0, within(0.5));
+    }
+
+    /** 同一时刻同一纬度,经度每差 15° 高度角约差 15°(日落方向) */
+    @Test
+    void sunPositionBeijingNoonIsUpAndAzimuthSouth() {
+        Instant t = Instant.parse("2026-06-21T04:00:00Z"); // 北京时间正午
+        Map<String, Double> p = SolarUtil.sunPosition(39.9, 116.4, t);
+        double alt = p.get("altitude");
+        assertThat(alt).isGreaterThan(70.0).isLessThan(90.0);
+        assertThat(p.get("azimuth")).isBetween(150.0, 210.0); // 正南
+    }
+
+    private static double subsolarLat(String iso) {
+        return SolarUtil.subsolarPoint(Instant.parse(iso)).get("lat").doubleValue();
+    }
+
+    private static org.assertj.core.data.Offset<Double> within(double v) {
+        return org.assertj.core.data.Offset.offset(v);
+    }
 }

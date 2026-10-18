@@ -584,14 +584,26 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 
 ## 22. 天气详情页(/weather,public)
 
-- **页面容器**:`.page`(max-width 1100px 居中)+ Breadcrumb 顶部;`.weather-page-body` flex column gap 14px。
-- **顶部实况卡**(.wt-hero):城市+日期(次要色 14px)→ 大图标(56px 和风图标 qi-xxx)+ 大温度(56px/700 tabular-nums,° 28px 半透明)+ 今日高低温(右侧上下排列,暖橙 `#c07a4a`/冷蓝 `#6a8ab0`)+ 天气文字;下方 9 项指标网格(`.wt-metrics` auto-fill minmax(150px,1fr),移动端 2 列):体感/湿度/风向/风速/降水/气压/能见度/云量/露点,每项 `--color-card-2` 圆角卡片(12px 次要色标签+15px/600 数值)。
-- **气象预警卡**:section-label「气象预警」;每条预警左 3px 级别色边条(白 `#9a9a9a`/蓝 `#4a90d9`/黄 `#d4a13f`/橙 `#e0862f`/红 `#d94a3f`,未知橙)+ 背景 `--color-card-2` 圆角;标题行=类型+级别(级别色加粗)+发送单位(senderName 12px 次要色)+起止时间;正文 13px;防御指南(instruction)独立块 12px 次要色底 `rgba(184,140,110,0.08)` 圆角 white-space pre-line。
-- **24 小时预报卡**:section-label 右侧 `view-toggle`/`vt-btn` 双按钮(折线/卡片,localStorage 记忆,默认折线)。卡片模式=横向滚动 `.wt-hourly`(每卡片 min-width 76px:时间/图标/温度/文字/降水概率/风力)。折线模式=SVG 720×230 等比缩放(width:100% height:auto),Catmull-Rom 平滑曲线,描边用温度渐变(冷蓝→暖橙 linearGradient 3 停靠点),下方同渐变 0.10 透明填充;最高/最低点标注(暖橙/冷蓝 11px/700);底部每 3h 时间标签(10px 次要色);hover 透明热区列 → 虚线竖线 + 圆点(暖棕 `#b88c6e` 白描边)+ HTML tooltip(时间/天气图标+温度+文字/降水概率/风力,暖米卡片圆角 10px 阴影,`translate(-50%,-120%)` 定位,边缘 clamp 8%-92%)。
-- **10 天预报表格**(el-table size=small stripe):日期/白天天气/夜间天气(和风图标 18px)/温度区间(渐变横条)/紫外线/风力/日出日落。**温度横条**(`.wt-trange` flex):左侧最低温(冷蓝)+ 中间轨道(8px 高圆角,`rgba(58,46,34,0.10)` 底,深色 `rgba(232,220,200,0.12)`)+ 右侧最高温(暖橙);轨道内每天渐变段(`tempColor()` 7 段色阶:-20°冷蓝 `#4A6FD4`→42°暖红 `#D84A3A`,整体 min-max 范围定位 left/width 百分比,`linear-gradient(90deg, 低温色, 高温色)`)+ 均值指示点(5px 圆点)。
-- **空气卡**:AQI 大数值(34px/700)+ 等级(15px/600)+ 首要污染物(12px 次要色);6 污染物标签行(PM2.5/PM10/NO₂/SO₂/O₃/CO,`--color-card-2` 圆角小标签);健康建议块(一般人群/敏感人群,绿底 `rgba(107,155,107,0.08)` 圆角,标签加粗)。
-- **生活指数**:grid auto-fill minmax(240px,1fr),每项 `--color-card-2` 圆角(名称+暖棕等级+文字说明)。
-- **分钟降水**:summary 摘要句 13px。
+- **信息层级三级 + 分区标签**:页面按「**现在** → **未来** → **空气与天空**」三个分区组织,每个分区前一条 `.wt-zone-label`(12px/letter-spacing .5px/`--color-text-tertiary`);组内 gap 10px、组间 14px(合计约 24px)。**L1** = 实况 hero;**L2** = 逐小时、10 天(标准 `.card`,section-label 15px/600);**L3** = 空气、晨昏、生活指数(页内 `.wt-card-quiet`:去阴影与 hover 位移、padding 16px 20px、section-label 收成 12.5px 次要色、内层块靠 `--color-card-2` 分层——**只在本页 scoped 覆写,不动全局 `.card`**)。
+- **顶部实况卡**(.wt-hero):`.wt-hero-top` flex,左侧 `.wt-now`(flex:1,min-width:0)放城市+日期(次要色 14px)→ 大图标(56px 和风图标 qi-xxx)+ 大温度(56px/700 tabular-nums,° 28px 半透明)+ 今日高低温(上下排列,暖橙 `#c07a4a`/冷蓝 `#6a8ab0`)+ 天气文字;`.wt-metrics` 在下方通栏(auto-fill minmax(150px,1fr),移动端 2 列):体感/湿度/风向/风速/降水/气压/能见度/云量/露点,每项 `--color-card-2` 圆角 10px(12px 次要色标签+15px/600 数值)。**预警列不挤压指标网格**。
+- **气象预警(实况右侧,`row-reverse` 右起排列)**:`.wt-warnings` = `flex: 0 1 46%` + `flex-direction: row-reverse`(第一条即最右) + `gap:10px` + `overflow-x:auto`;chip `flex: 0 0 280px`,`border-left: 3px solid <级别色>`,底色 = 级别色 + `14`(8 位 hex 透明度),圆角 10px、内距 10px 12px。内容=标题(类型+级别,级别色 13px/700)+ 起止时间(11px 次要色)+ 正文 12px/1.6 截 3 行(`-webkit-line-clamp`)。**≤900px**:`.wt-hero-top` 改 column,`.wt-warnings` 改 `flex-direction: row`(回正常从左到右),chip `flex: 0 0 78vw`。点击 chip 开详情弹窗(`append-to-body` + `width:min(640px,92vw)`,见 §18a)。
+- **逐小时卡**:section-label 右侧两组控件——`24 小时/72 小时` 分段器(`.view-toggle` + `.vt-btn.wt-vt-text`,宽度 auto、padding 0 10px、12px)+ 折线/卡片两个**图标按钮**(`.vt-btn` 内联 SVG 折线/四宫格,15px,带 `title` 与 `aria-label`);**激活类名是 `active` 不是 `on`**(全局 `.vt-btn.active`)。卡片模式=横向滚动 `.wt-hourly`(每卡 min-width 76px)。折线模式=SVG 720×230(width:100% height:auto),Catmull-Rom 平滑曲线 + 温度渐变描边 + 0.10 透明填充;最高/最低点标注;底部每 3h 时间标签;hover 虚线竖线 + 圆点 + HTML tooltip(边缘 clamp 8%-92%)。**分钟降水摘要条**并入本卡顶部(12px/次要色/`--color-card-2` 底/圆角 8px/padding 8px 12px/margin-bottom 10px)。
+- **10 天预报(近细远粗,拆两张表)**:前 3 天 7 列细表 + 后 7 天 3 列精简表(日期/白天天气/温度区间),两张都 `size="small" stripe`、间距 8px(`.wt-daily-rest`),视觉上像一张表。**温度横条**(`.wt-trange` flex):左侧最低温(冷蓝)+ 中间轨道(8px 高圆角,`rgba(58,46,34,0.10)` 底,深色 `rgba(232,220,200,0.12)`)+ 右侧最高温(暖橙);轨道内每天渐变段(`tempColor()` 7 段色阶:-20°冷蓝 `#4A6FD4`→42°暖红 `#D84A3A`,整体 min-max 范围定位 left/width 百分比)+ 均值指示点(5px 圆点)。
+- **空气卡(L3,默认收起)**:常驻 AQI 大数值(34px/700)+ 等级(15px/600)+ 首要污染物(12px 次要色)+ PM2.5 标签 + 健康建议首行;右上 `.wt-more`(12px 次要色,文字 + `▾` 箭头 `.open` 时 `rotate(180deg)`)。展开区=其余 5 污染物标签(PM10/NO₂/SO₂/O₃/CO,`--color-card-2` 圆角小标签)+ 敏感人群建议 + 24h AQI 走势折线 + 未来 3 天 AQI 列表(左侧级别色条 + 类别胶囊 `级别色+'22'` + 首要污染物);健康建议块绿底 `rgba(107,155,107,0.08)` 圆角。
+- **晨昏地图卡(`.wt-map-card`,L3)**:`.wt-map-grid` = `grid-template-columns: minmax(0,640px) 1fr; gap:18px`(**≤900px 单列**,地图在上、面板在下)。地图 `.wt-map-wrap` 圆角 12px + `1px solid var(--color-border)`,内含 Canvas(`width:100%`,比例固定 720/288,`cursor:crosshair`)+ 叠在百分比位置的原生 `<button>` 城市点(14px 圆点,`--color-brand` 实心 + 2px `--color-card` 描边 + 外圈 1.5px 同色 50% 透明,`:focus-visible` 有 outline)。绘制顺序=**海洋底色 `--color-card-2` → 晨昏色带 → 陆地填充 `--color-card` → 陆地描边 `--color-border` 0.5px → 30° 经纬网 `--color-text-tertiary` 35% → 赤道与本初子午线 60% → 城市点 `--color-brand`**。
+  - **晨昏色带色值(五档,白天完全透明)**:
+
+    | 阶段 | 暖居 warm | 光尘 guangchen |
+    |---|---|---|
+    | 民用 | `rgba(120,105,85,.10)` | `rgba(90,110,150,.10)` |
+    | 航海 | `rgba(100,90,75,.20)` | `rgba(65,85,130,.20)` |
+    | 天文 | `rgba(80,72,62,.32)` | `rgba(40,55,100,.32)` |
+    | 夜间 | `rgba(60,54,48,.48)` | `rgba(20,30,60,.48)` |
+
+    深色模式 alpha 统一抬一档(`.14/.26/.40/.58`),避免夜间色带与卡片底色糊成一片。同一套色值也用于面板「今日太阳高度曲线」的背景阈值带。
+  - **图例**:地图下方一行 `.wt-map-legend`(11px 次要色),每项 12×8px 色块(带 `--color-border` 细描边)+ 阶段名,顺序=白天/民用/航海/天文/夜间;再下一行 `.wt-map-hint`(11px tertiary)提示可点击。
+  - **面板**(.wt-map-panel,gap 10px):阶段徽标(圆角 8px,`级别色+'22'` 底 + 同色字,白天 `#c9a227`/民用 `#e0862f`/航海 `#4a90d9`/天文 `#3a5f9e`/夜间 `#7a6b5a`)+ 「此刻 · <城市名或坐标>」→ 太阳高度/方位两块 `.wtm-fig`(`--color-card-2` 圆角 10px)→「当地今日」小标 → 下一阶段(事件名+时刻+相对时长 `em`)→ 3×3 时刻网格(`.wtm-time`,日出/正午/日落三格用 `rgba(var(--color-brand-rgb),0.1)` 底加重)→ 今日高度曲线 SVG(圆角 8px,阈值线 tertiary 0.5px 50%,「现在」虚线竖线)→ 月亮块(`--color-card-2` 圆角 10px,emoji 28px + 相名 + 月出月落/照明度 + 右侧 5 天月相条)。
+- **生活指数(紧凑网格,L3)**:grid `auto-fill minmax(260px,1fr)`,每格 `<button>` + `--color-card-2` 圆角 10px(hover 转 `--color-bg-2`),名称 + 暖棕等级 + 正文 12px/1.6 截 3 行;点击开全文弹窗(`append-to-body` + `width:min(560px,92vw)`,弹窗内 `line-clamp` 解除)。
 - 复用光影层 detail 缓存(useSunLight.weatherDetail),失败静默;未登录/游客可看(public),无数据显示 el-empty。
 
 ## 23. 移动端布局(MobileLayout,≤768px)

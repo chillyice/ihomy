@@ -48,6 +48,53 @@ public class SolarUtil {
         return slots;
     }
 
+    // ================= 太阳当前位置与直射点(供「晨昏地图」画地球晨昏线) =================
+
+    /**
+     * 太阳直射点(度):纬度 = 赤纬;经度由 UTC 时刻与均时差反解(直射经线所在经度)。
+     * 前端据此按「高度角 = f(纬度, 与直射经度的经差)」逐像素渲染晨昏带,故是天文计算的**唯一来源**,
+     * 前端只做几何渲染,不再移植 NOAA/Meeus 公式。
+     */
+    public static Map<String, Double> subsolarPoint(Instant instant) {
+        double T = julianCentury(julianDay(instant));
+        double utcMinutes = utcMinutes(instant);
+        double lng = norm180((720 - utcMinutes - eqOfTime(T)) / 4.0);
+        return Map.of("lat", round1(sunDeclination(T)), "lng", round1(lng));
+    }
+
+    /**
+     * 指定地点/时刻的太阳高度角与方位角(度,保留 1 位小数)。
+     * 方位角沿用 {@link #sunAltAz} 约定:正北 0°、顺时针。与 buildSlots/astroTimes 同一套公式。
+     */
+    public static Map<String, Double> sunPosition(double lat, double lng, Instant instant) {
+        double[] altAz = sunAltAz(lat, lng, instant);
+        Map<String, Double> m = new LinkedHashMap<>();
+        m.put("altitude", round1(altAz[0]));
+        m.put("azimuth", round1(altAz[1]));
+        return m;
+    }
+
+    /** 太阳高度角(度),不舍入(时刻求解需亚分钟精度) */
+    private static double[] sunAltAz(double lat, double lng, Instant instant) {
+        double T = julianCentury(julianDay(instant));
+        double ha = (utcMinutes(instant) - (720 - 4 * lng - eqOfTime(T))) / 4.0;
+        return sunAltAz(lat, sunDeclination(T), norm180(ha));
+    }
+
+    private static double utcMinutes(Instant instant) {
+        ZonedDateTime utc = instant.atZone(ZoneOffset.UTC);
+        return utc.getHour() * 60.0 + utc.getMinute() + utc.getSecond() / 60.0;
+    }
+
+    private static double round1(double v) {
+        return Math.round(v * 10) / 10.0;
+    }
+
+    private static double norm180(double deg) {
+        double v = ((deg % 360) + 360) % 360;
+        return v > 180 ? v - 360 : v;
+    }
+
     // ================= 日月时刻:晨昏三档 + 月出月落月相(纯天文计算,不依赖天气 API) =================
 
     /** 太阳地平线阈值:-0.833° = 日出日落(含大气折射 34′+ 太阳视半径 16′);-6/-12/-18° = 民用/航海/天文晨昏 */
@@ -172,16 +219,7 @@ public class SolarUtil {
 
     /** 太阳高度角(度)。与 buildSlots 同一套 NOAA 公式,只是按任意时刻求值 */
     private static double sunAltitudeAt(double lat, double lng, Instant instant) {
-        double jd = julianDay(instant);
-        double T = julianCentury(jd);
-        double dec = sunDeclination(T);
-        double eot = eqOfTime(T);
-        ZonedDateTime utc = instant.atZone(ZoneOffset.UTC);
-        double utcMin = utc.getHour() * 60.0 + utc.getMinute() + utc.getSecond() / 60.0;
-        double ha = (utcMin - (720 - 4 * lng - eot)) / 4.0;
-        while (ha > 180) ha -= 360;
-        while (ha < -180) ha += 360;
-        return sunAltAz(lat, dec, ha)[0];
+        return sunAltAz(lat, lng, instant)[0];
     }
 
     /** 月球高度角(度):Meeus 47 月球黄道坐标 → 赤道坐标 → 真时角(LST−α) */

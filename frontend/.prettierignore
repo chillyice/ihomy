@@ -3,3 +3,5 @@ coverage
 public
 node_modules
 package-lock.json
+# 一次性脚本生成的地图轮廓(单行超长 path 字符串,格式化无意义且下次生成又会失配)
+src/assets/world-land-path.js
