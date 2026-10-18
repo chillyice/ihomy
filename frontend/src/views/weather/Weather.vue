@@ -1062,8 +1062,9 @@ onMounted(load)
   max-width: none;
 }
 .wc-xlabel {
-  font-size: 10px;
-  fill: var(--color-text-secondary);
+  /* 10px 次要色在暖色纸底上几乎看不清,轴标签是读数不是装饰,提到正文色并放大一号 */
+  font-size: 11px;
+  fill: var(--color-text);
   text-anchor: middle;
   font-variant-numeric: tabular-nums;
 }

@@ -144,13 +144,14 @@ const TWILIGHT_KEYS = [
 
 // 阶段徽标配色:白天琥珀 → 民用橙 → 航海蓝 → 天文深蓝 → 夜间灰(两套主题底色下都可读)
 const STAGE_COLOR = { day: '#c9a227', civil: '#e0862f', nautical: '#4a90d9', astronomical: '#3a5f9e', night: '#7a6b5a' }
-// 晨昏色带:两套主题各一组(暖居偏暖褐、光尘偏冷蓝),alpha 递增 = 夜色加深;深色模式再抬一档
+// 晨昏色带:每档各自一个色相 + 一级 alpha 台阶(只拉 alpha 的话四档糊在一起看不出层次;
+// 暖居从暖褐过渡到冷蓝,光尘整组偏冷)。深色模式再抬一档。
 const BANDS = {
-  warm: { civil: '120,105,85', nautical: '100,90,75', astronomical: '80,72,62', night: '60,54,48' },
-  guangchen: { civil: '90,110,150', nautical: '65,85,130', astronomical: '40,55,100', night: '20,30,60' },
+  warm: { civil: '124,108,88', nautical: '86,98,126', astronomical: '56,66,96', night: '28,32,48' },
+  guangchen: { civil: '96,116,154', nautical: '64,88,134', astronomical: '40,60,104', night: '16,26,52' },
 }
-const ALPHA = { civil: 0.1, nautical: 0.2, astronomical: 0.32, night: 0.48 }
-const ALPHA_DARK = { civil: 0.14, nautical: 0.26, astronomical: 0.4, night: 0.58 }
+const ALPHA = { civil: 0.12, nautical: 0.3, astronomical: 0.48, night: 0.66 }
+const ALPHA_DARK = { civil: 0.18, nautical: 0.38, astronomical: 0.56, night: 0.74 }
 
 const canvasEl = ref(null)
 const panelEl = ref(null)
@@ -297,17 +298,21 @@ function draw() {
     const ctx = cv.getContext('2d')
     ctx.setTransform(cssW / MAP_W, 0, 0, cssH / MAP_H, 0, 0)
 
-    // 海洋底色 → 晨昏色带 → 陆地 → 陆地描边 → 经纬网 → 赤道/本初子午线 → 城市点
+    // 海洋底色 → 陆地填充 → 晨昏色带 → 海岸线 → 经纬网 → 赤道/本初子午线 → 城市点
+    // 色带必须画在**陆地填充之后**:半透明色带要同时压暗海与陆,否则夜半球大陆仍是亮色,
+    // 晨昏线在大片陆地上根本看不出来。海岸线则画在色带**之上**——夜间色带压到最暗时海陆亮度
+    // 会收敛到几乎一样,靠描边把大陆轮廓捞回来。
     ctx.fillStyle = cssVar('--color-card-2', '#e8dec8')
     ctx.fillRect(0, 0, MAP_W, MAP_H)
-    paintBands(ctx, ss)
-
     if (!landPath) landPath = new Path2D(WORLD_LAND_PATH)
     ctx.fillStyle = cssVar('--color-card', '#faf6ec')
     ctx.fill(landPath)
-    ctx.strokeStyle = cssVar('--color-border', 'rgba(0,0,0,.12)')
-    ctx.lineWidth = 0.5
+    paintBands(ctx, ss)
+    ctx.strokeStyle = cssVar('--color-text-tertiary', '#b5a98c')
+    ctx.globalAlpha = 0.85
+    ctx.lineWidth = 0.6
     ctx.stroke(landPath)
+    ctx.globalAlpha = 1
 
     ctx.strokeStyle = cssVar('--color-text-tertiary', '#b5a98c')
     ctx.lineWidth = 0.4
@@ -411,11 +416,12 @@ watch(
 .wt-map-card {
   padding: 16px 20px;
 }
+/* 单列:地图在上、信息面板在下。两栏并排时右栏太窄(9 时刻 3 列 + 月相 5 天挤在一起读不清),
+   面板转成整宽通栏后时刻网格与月相条都能横着铺开 */
 .wt-map-grid {
   display: grid;
-  grid-template-columns: minmax(0, 640px) 1fr;
-  gap: 18px;
-  align-items: start;
+  grid-template-columns: 1fr;
+  gap: 14px;
 }
 .wt-map-grid.is-degraded {
   grid-template-columns: 1fr;
@@ -468,10 +474,11 @@ watch(
   gap: 4px;
 }
 .wt-map-lg i {
-  width: 12px;
-  height: 8px;
+  width: 16px;
+  height: 11px;
   border-radius: 2px;
   border: 1px solid var(--color-border);
+  flex: none;
 }
 .wt-map-hint {
   margin-top: 6px;
@@ -611,24 +618,27 @@ watch(
   color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
 }
+/* 5 天月相条:横向铺开一整行(面板已转通栏,不再挤在右栏),空间够就一行排完 */
 .wtm-moon-days {
   margin-left: auto;
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
-  font-size: 11px;
+  justify-content: flex-end;
+  font-size: 12px;
   color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
 }
+.wtm-moon-days span {
+  white-space: nowrap;
+}
 @media (max-width: 900px) {
-  .wt-map-grid {
-    grid-template-columns: 1fr;
-  }
   .wtm-times {
     grid-template-columns: repeat(2, 1fr);
   }
   .wtm-moon-days {
     margin-left: 0;
+    justify-content: flex-start;
   }
 }
 </style>
