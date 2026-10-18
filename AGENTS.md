@@ -177,7 +177,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 厨房 | 菜单/菜谱/食材 | RecipeController / RecipeService |
 | 物联 | 智能家居中控(HA 接入) | IotController / HomeAssistantService + IotSyncService + views/iot/Iot.vue |
 | 工具 | 工具箱聚合页(卡片可手动排序) / 脑图设计 / AI 测试台 / 3D 光影实验台 / PDF 转换 / JSON 格式化 / 字符编码转换 / 进制转换 / 报文解析 / 子网掩码计算 / 贷款计算器+贷款记录 / Flash·GBA 播放器 | MindMapController / MindMapService(见需求 §4.12) |
-| 系统 | i18n / 主题(暖居/光尘 × 晨/暮) / 字典 / 帮助页 / 独立产品页(咔哒/壁纸) | i18n/ + theme/ + stores/theme.js + utils/dict.js + views/Help.vue + Kada.vue + Wallpaper.vue |
+| 系统 | i18n / 主题(暖居/光尘 × 晨/暮) / 字典 / 帮助页 / 独立产品页(咔哒/壁纸) | i18n/ + theme/ + stores/theme.js + utils/dict.js + views/Help.vue + Kada.vue + Wallpaper.vue;咔哒更新镜像在 `scripts/kada-mirror/`(见需求 §4.14) |
 | 移动端 | 设备自适应 | useDevice.js + MobileLayout.vue + Mobile* 组件;三 Tab 判据与页头标题表在 `utils/mobileNav.js`(带单测);**导航条目唯一数据源 `utils/navModules.js`——不入 `sys_home_module` 的页面(设置/帮助/运维/**天气**)须在 `buildNavItems` 补虚拟入口,否则移动端「更多」里没有(V10.26)**;移动首页只做动态流(桌面仪表盘组件对等已决策不做) |
 
 **关键坑速查**:已外移到 **`docs/踩坑速查.md`**,动手前按关键词 grep 该文件。
