@@ -87,6 +87,7 @@
       </el-input>
       <div v-loading="searchLoading" class="search-result">
         <div v-for="f in searchResult" :key="f.id" class="search-item">
+          <el-avatar :size="40" :src="f.coverImage || undefined">{{ (f.name || 'F').charAt(0) }}</el-avatar>
           <div class="search-item-info">
             <div class="search-item-name">
               {{ f.name }}

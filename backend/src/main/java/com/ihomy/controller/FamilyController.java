@@ -18,6 +18,7 @@ import com.ihomy.service.BlogService;
 import com.ihomy.service.MultiFamilyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.*;
@@ -45,11 +46,12 @@ public class FamilyController {
     private final StringRedisTemplate redisTemplate;
     private final BlogService blogService;
     private final com.ihomy.service.ParameterService parameterService;
+    private final PublicController publicController;
 
     @Operation(summary = "创建新家庭(当前用户绑定 OWNER)")
     @OperationLog(module = "FAMILY", operationType = "CREATE", description = "创建新家庭", saveArgs = false)
     @PostMapping
-    public Result<Family> create(@RequestBody FamilyDTO dto) {
+    public Result<Family> create(@Valid @RequestBody FamilyDTO dto) {
         SysUser user = securityHelper.currentUser();
         if (user == null) throw new BizException(ResultCode.UNAUTHORIZED);
         if (dto.getName() == null || dto.getName().isBlank()) throw new BizException(ResultCode.BAD_REQUEST);
@@ -152,7 +154,7 @@ public class FamilyController {
     @RequirePermission("family:manage")
     @OperationLog(module = "FAMILY", operationType = "CONFIG", description = "更新家庭设置", saveArgs = false)
     @PutMapping
-    public Result<Family> update(@RequestBody FamilyDTO dto) {
+    public Result<Family> update(@Valid @RequestBody FamilyDTO dto) {
         SysUser user = securityHelper.currentUser();
         Family f = familyMapper.selectById(user.getFamilyId());
         if (f == null) throw new BizException(ResultCode.NOT_FOUND);
@@ -164,6 +166,8 @@ public class FamilyController {
         if (dto.getIsPublic() != null) f.setIsPublic(dto.getIsPublic());
         if (dto.getMusicUrl() != null) f.setMusicUrl(dto.getMusicUrl());
         if (dto.getMusicTitle() != null) f.setMusicTitle(dto.getMusicTitle());
+        // 常规字段落库:updateById 写回实体非空字段(updatedAt 已被 @TableField(updateStrategy=NEVER) 跳过)
+        familyMapper.updateById(f);
         // 天气位置偏好:显式 SET NULL(清空)或值(设置),绕过 MyBatis-Plus 默认忽略 null
         com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Family> w = new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<>();
         w.eq(Family::getId, f.getId())
@@ -174,6 +178,8 @@ public class FamilyController {
         f.setWeatherLat(dto.getWeatherLat());
         f.setWeatherLng(dto.getWeatherLng());
         f.setWeatherCity(dto.getWeatherCity());
+        // 家庭信息公开可见(简介/封面等):失效访客首页整包缓存,避免最长 5 分钟残留旧信息
+        publicController.invalidateHomeCache(f.getId());
         return Result.success(f);
     }
 }

@@ -344,6 +344,7 @@ public class AuthService {
             Map<String, Object> m = new HashMap<>();
             m.put("familyId", f.getId());
             m.put("name", f.getName());
+            m.put("coverImage", f.getCoverImage());
             m.put("isDemo", f.getIsDemo());
             m.put("role", roleMap.get(f.getId()));
             m.put("isPrimary", user.getFamilyId() != null && user.getFamilyId().equals(f.getId()));

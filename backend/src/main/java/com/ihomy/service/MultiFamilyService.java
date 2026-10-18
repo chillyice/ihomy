@@ -99,6 +99,7 @@ public class MultiFamilyService {
             Map<String, Object> m = new HashMap<>();
             m.put("id", f.getId());
             m.put("name", f.getName());
+            m.put("coverImage", f.getCoverImage());
             m.put("coverText", f.getCoverText());
             m.put("coverSubtitle", f.getCoverSubtitle());
             m.put("description", f.getDescription());

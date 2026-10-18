@@ -432,6 +432,12 @@ watch(
   align-items: center;
   gap: 14px;
   cursor: pointer;
+  min-width: 0;
+  /* 家庭名/简介过长时连品牌区一起截断,不挤走右侧返回键与晨暮开关 */
+  max-width: min(520px, 46vw);
+}
+.gc-brand > div {
+  min-width: 0;
 }
 .gc-logo {
   width: 44px;
@@ -444,6 +450,7 @@ watch(
   font-weight: 700;
   font-size: 20px;
   box-shadow: var(--shadow);
+  flex-shrink: 0;
 }
 .gc-title {
   font-size: 18px;
@@ -451,11 +458,17 @@ watch(
   font-weight: 650;
   letter-spacing: 0.3px;
   color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .gc-sub {
   margin: 2px 0 0;
   font-size: 12.5px;
   color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .gc-ctl {
   display: flex;

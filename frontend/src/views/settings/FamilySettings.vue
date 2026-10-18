@@ -4,10 +4,10 @@
     <div class="section-label">{{ $t('settings.family') }}</div>
     <el-form :model="family" label-position="top">
       <el-form-item :label="$t('settings.familyName')">
-        <el-input v-model="family.name" />
+        <el-input v-model="family.name" maxlength="50" />
       </el-form-item>
       <el-form-item :label="$t('settings.description')">
-        <el-input v-model="family.description" type="textarea" :rows="2" />
+        <el-input v-model="family.description" type="textarea" :rows="2" maxlength="200" show-word-limit />
       </el-form-item>
       <el-form-item :label="$t('settings.cover')">
         <div class="upload-row">
@@ -17,12 +17,7 @@
           <img v-if="family.coverImage" :src="family.coverImage" class="cover-preview" :alt="$t('settings.cover')" />
           <el-button v-if="family.coverImage" link type="danger" @click="family.coverImage = ''">{{ $t('common.remove') }}</el-button>
         </div>
-      </el-form-item>
-      <el-form-item :label="$t('settings.coverText')">
-        <el-input v-model="family.coverText" />
-      </el-form-item>
-      <el-form-item :label="$t('settings.coverSubtitle')">
-        <el-input v-model="family.coverSubtitle" />
+        <div class="share-tip">{{ $t('settings.coverTip') }}</div>
       </el-form-item>
       <el-form-item :label="$t('settings.visitorPublic')">
         <el-switch v-model="family.isPublic" :active-value="1" :inactive-value="0" />
@@ -50,6 +45,7 @@
     <div class="section-label">{{ $t('nav.switchFamily') }}</div>
     <div v-if="families.length" class="family-switch-list">
       <div v-for="f in families" :key="f.familyId" class="family-switch-item">
+        <el-avatar :size="28" :src="f.coverImage || undefined">{{ (f.name || 'i').charAt(0) }}</el-avatar>
         <span class="family-switch-name">{{ f.name }}</span>
         <el-tag v-if="f.isCurrent" size="small" type="success">{{ $t('settings.currentFamily') }}</el-tag>
         <el-button v-else size="small" type="primary" plain @click="switchFamily(f.familyId)">{{ $t('settings.switchTo') }}</el-button>
@@ -95,17 +91,17 @@ import { useI18n } from 'vue-i18n'
 import { familyApi, fileApi, authApi } from '@/api'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { useAppStore } from '@/stores/app'
 import BgmSettings from './BgmSettings.vue'
 
 const { t } = useI18n()
 const userStore = useUserStore()
+const appStore = useAppStore()
 
 const family = reactive({
   name: '',
   description: '',
   coverImage: '',
-  coverText: '',
-  coverSubtitle: '',
   isPublic: 1,
   musicUrl: '',
   musicTitle: '',
@@ -123,7 +119,9 @@ const shareUrl = computed(() => {
 const saveFamily = async () => {
   familySaving.value = true
   try {
-    await familyApi.update({ ...family })
+    const updated = await familyApi.update({ ...family })
+    // 顶栏/侧栏展示的家庭名与简介来自 appStore,保存后当场同步,不必等刷新
+    if (appStore.family && updated) Object.assign(appStore.family, updated)
     ElMessage.success(t('settings.familySaved'))
   } finally {
     familySaving.value = false
@@ -203,8 +201,6 @@ onMounted(async () => {
       name: f.name || '',
       description: f.description || '',
       coverImage: f.coverImage || '',
-      coverText: f.coverText || '',
-      coverSubtitle: f.coverSubtitle || '',
       isPublic: f.isPublic ?? 1,
       musicUrl: f.musicUrl || '',
       musicTitle: f.musicTitle || '',
