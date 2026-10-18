@@ -163,8 +163,8 @@ import { useI18n } from 'vue-i18n'
 // macOS(universal dmg) 本机无 Mac 打不出来,仍指向 GitHub Releases 同 tag 产物
 // (由 Kada 仓 .github/workflows/release.yml 的 macos job 出,同时也供应用内自动更新)。
 // ⚠ 换版本时同步三处:version 常量、Windows 裸包体积 fileSize、Kada 仓该 tag 的 Release 已发布。
-const version = '0.1.0'
-const fileSize = '13.8 MB'
+const version = '1.1.0'
+const fileSize = '14.0 MB'
 const repoUrl = 'https://github.com/chillyice/Kada'
 const releasesUrl = `${repoUrl}/releases`
 const assetUrl = (name) => `${repoUrl}/releases/download/v${version}/${name}`
