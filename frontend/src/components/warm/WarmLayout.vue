@@ -57,6 +57,25 @@
                 <div class="gc-user-name">{{ userStore.isLoggedIn ? userInfo?.nickname || $t('warm.me') : $t('home.loginRegister') }}</div>
                 <div class="gc-user-fam">{{ familyName || 'ihomy' }}</div>
               </div>
+              <!-- 迷你天气(与光尘侧栏同款):图标 + 当前温度;有预警时显示最高级别颜色的三角叹号,悬浮看全部预警;点击进天气页 -->
+              <el-tooltip v-if="sidebarWeather" placement="top-end" :disabled="!sidebarWarnings.length" popper-class="mini-weather-popper">
+                <template #content>
+                  <div v-for="w in sidebarWarnings" :key="w.id" class="gc-mw-warn-row">
+                    <span class="gc-mw-warn-dot" :style="{ background: warnLevelColor(w.level) }"></span>
+                    <span
+                      >{{ w.typeName }} {{ w.level }}{{ $t('sidebar.warning') }} {{ (w.startTime || '').slice(5, 16) }} ~
+                      {{ (w.endTime || '').slice(5, 16) }}</span
+                    >
+                  </div>
+                </template>
+                <span class="gc-mini-weather" v-a11y-click :title="sidebarWeather.city" @click.stop="navigate('/weather')">
+                  <i :class="'qi-' + sidebarWeather.iconCode" class="gc-mw-icon"></i>
+                  <span class="gc-mw-temp">{{ sidebarWeather.temp }}°</span>
+                  <span v-if="topWarningBadge" class="gc-mw-warn" :style="{ color: warnLevelColor(topWarningBadge.level) }">
+                    <el-icon><WarningFilled /></el-icon>
+                  </span>
+                </span>
+              </el-tooltip>
             </div>
             <nav class="gc-nav">
               <div v-for="g in navGroups" :key="g.category" class="gc-nav-group">
@@ -136,6 +155,8 @@ import WarmHome from '@/components/warm/WarmHome.vue'
 import { useWarmWidgetDrag } from '@/utils/widgetDragData'
 import { addedCodes } from '@/utils/warmHomeShared'
 import { buildNavItems, groupNavItems, isActive } from '@/utils/navModules'
+import { warnLevelColor, topWarning } from '@/utils/dict'
+import { WarningFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
@@ -155,6 +176,11 @@ const familyInitial = computed(() => (familyName.value || 'ihomy').charAt(0))
 // 当前登录用户信息(侧栏顶部 .user 位置:头像 + 昵称 + 所在家庭)
 const userInfo = computed(() => userStore.userInfo)
 const userInitial = computed(() => (userInfo.value?.nickname || t('warm.me')).charAt(0))
+
+// 侧栏迷你天气(与光尘侧栏同款):简版天气 + 预警徽标
+const sidebarWeather = computed(() => sunLight?.weather?.value || null)
+const sidebarWarnings = computed(() => sunLight?.weatherDetail?.value?.warning || [])
+const topWarningBadge = computed(() => topWarning(sidebarWarnings.value))
 
 // 天气→AI 生图的全屏氛围背景(「活窗」放大到整屏,最底层)
 const { weatherBg, load: loadWeatherBg } = useWeatherBg()
@@ -676,6 +702,7 @@ watch(
   font-weight: 700;
 }
 .gc-user-meta {
+  flex: 1;
   min-width: 0;
 }
 .gc-user-name {
@@ -692,6 +719,54 @@ watch(
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* 迷你天气(与光尘侧栏同款):图标 + 温度 + 预警徽标,点击进天气详情页 */
+.gc-mini-weather {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.gc-mini-weather:hover {
+  background: var(--color-line);
+}
+.gc-mw-icon {
+  font-size: 16px;
+  line-height: 1;
+  color: var(--color-text);
+}
+.gc-mw-temp {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+.gc-mw-warn {
+  display: inline-flex;
+  align-items: center;
+}
+.gc-mw-warn .el-icon {
+  font-size: 14px;
+}
+:global(.mini-weather-popper) {
+  max-width: 320px;
+}
+.gc-mw-warn-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.gc-mw-warn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
 }
 
 /* 侧栏分组:组头可折叠,默认只展开内容组 */
