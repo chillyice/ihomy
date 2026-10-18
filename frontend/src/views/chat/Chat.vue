@@ -190,6 +190,15 @@ onBeforeUnmount(cleanup)
 .msg-avatar {
   flex-shrink: 0;
 }
+.msg-body {
+  max-width: 78%;
+  min-width: 0;
+}
+.msg-row.mine .msg-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
 .msg-meta {
   font-size: 12px;
   color: #999;
@@ -206,7 +215,7 @@ onBeforeUnmount(cleanup)
   line-height: 1.5;
   word-break: break-word;
   display: inline-block;
-  max-width: 70%;
+  max-width: 100%;
 }
 .msg-row.mine .msg-bubble {
   background: #e8f3ff;
@@ -249,7 +258,6 @@ onBeforeUnmount(cleanup)
     font-size: 11px;
   }
   .msg-bubble {
-    max-width: 75%;
     font-size: 14px;
     padding: 8px 10px;
   }
