@@ -412,6 +412,7 @@ import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useWarmWidgetDrag } from '@/utils/widgetDragData'
+import { pickInsertIndex } from '@/utils/dragInsert'
 import { addedCodes } from '@/utils/warmHomeShared'
 import { publicApi, bookApi, itemApi, taskApi, wishApi, reminderApi, aiApi } from '@/api'
 import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
@@ -776,22 +777,18 @@ const previewMeta = (code) => {
   const meta = MODULE_META[code]
   return meta ? { label: t(meta.titleKey), icon: meta.icon } : null
 }
-// 由鼠标坐标推导插入下标(网格自动流,按视觉顺序逐项判断)
+// 由鼠标坐标推导插入下标(网格自动流):取指针命中/最近的卡片矩形,交给 pickInsertIndex 判定前后
+// (原地按视觉顺序逐张试探会因同行卡片高度不一而把右侧卡上方误判到最前)
 const insertionIndexAt = (x, y) => {
   const grid = gridEl.value
   if (!grid) return layout.value.length
-  const cards = Array.from(grid.querySelectorAll('.gc-card')).filter((c) => {
-    const wid = c.dataset.wid
-    return wid && !wid.startsWith('__') && wid !== dragId.value // 排除占位幽灵与正在拖拽的源卡片
-  })
-  for (let i = 0; i < cards.length; i++) {
-    const r = cards[i].getBoundingClientRect()
-    const cx = r.left + r.width / 2
-    const cy = r.top + r.height / 2
-    if (y < cy) return i
-    if (y >= r.top && y < r.bottom && x < cx) return i
-  }
-  return cards.length
+  const rects = Array.from(grid.querySelectorAll('.gc-card'))
+    .filter((c) => {
+      const wid = c.dataset.wid
+      return wid && !wid.startsWith('__') && wid !== dragId.value // 排除占位幽灵与正在拖拽的源卡片
+    })
+    .map((c) => c.getBoundingClientRect())
+  return pickInsertIndex(rects, x, y)
 }
 const insertWidgetAt = (code, idx) => {
   const id = MODULE_TO_WIDGET[code] || `link:${code}`
