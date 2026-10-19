@@ -2268,3 +2268,12 @@ INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`,
 UPDATE `sys_oss_component` SET `managed_by` = 'RENOVATE'
  WHERE `component_type` = 'NPM' AND `package_ref` = 'js-yaml';
 
+-- ------------------------------------------------------------
+-- V10.60 工具箱文件工具引入 fflate(2026-10-20)
+--   NPM 直接依赖登记台账(uk_type_ref 幂等),NPM 行统一置 RENOVATE。
+-- ------------------------------------------------------------
+INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`) VALUES
+('fflate', 'NPM', 'fflate', '0.8.2', 'MIT', 'https://github.com/101arrowz/fflate', '工具箱 ZIP 打包与解压', 'FULL');
+UPDATE `sys_oss_component` SET `managed_by` = 'RENOVATE'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'fflate';
+

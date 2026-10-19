@@ -98,6 +98,9 @@ import {
   Timer,
   Search,
   EditPen,
+  Monitor,
+  Picture,
+  FolderOpened,
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -123,6 +126,9 @@ const ICONS = {
   Timer,
   Search,
   EditPen,
+  Monitor,
+  Picture,
+  FolderOpened,
   VideoPlay,
   Coin,
 }

@@ -175,6 +175,27 @@ const routes = [
     component: () => import('@/views/tools/TextTool.vue'),
     meta: { public: true },
   },
+  // 运维命令速查:静态手册(复制在本地完成,不请求后端)
+  {
+    path: '/tools/ops',
+    name: 'OpsTool',
+    component: () => import('@/views/tools/OpsTool.vue'),
+    meta: { public: true },
+  },
+  // 图片工具:压缩 / ICO 打包 / EXIF 查看,纯前端 Canvas
+  {
+    path: '/tools/image',
+    name: 'ImageTool',
+    component: () => import('@/views/tools/ImageTool.vue'),
+    meta: { public: true },
+  },
+  // 文件工具:类型识别 / ZIP 打包 / ZIP 解压,本地处理
+  {
+    path: '/tools/file',
+    name: 'FileTool',
+    component: () => import('@/views/tools/FileTool.vue'),
+    meta: { public: true },
+  },
   // 贷款计算器:纯前端试算(等额本息/等额本金、商业/公积金/组合贷、提前还款对比),不依赖后端
   { path: '/tools/loan', name: 'LoanCalculator', component: () => import('@/views/tools/LoanCalculator.vue'), meta: { public: true } },
   // Flash 播放器(Ruffle):本地加载 .swf 怀旧小游戏

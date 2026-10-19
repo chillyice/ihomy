@@ -1,15 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  JSON_MAX_DEPTH,
-  csvToJson,
-  formatJson,
-  jsonToCsv,
-  jsonToXml,
-  toJava,
-  toSqlInsert,
-  toTypeScript,
-  tokenizeJson,
-} from './jsonTools'
+import { JSON_MAX_DEPTH, csvToJson, formatJson, jsonToCsv, jsonToXml, toJava, toSqlInsert, toTypeScript, tokenizeJson } from './jsonTools'
 
 const ok = (text, options) => {
   const r = formatJson(text, options)

@@ -1,0 +1,510 @@
+// 运维命令速查的静态数据:按域分组,标题与说明中英双语(页面按当前语言取)。
+// 只做「可搜索 + 可复制」的手册,不连后端;危险命令标 dangerous,复制前由页面二次确认。
+
+export const OPS_DOMAINS = [
+  {
+    id: 'systemd',
+    title: { zh: 'systemd 服务', en: 'systemd services' },
+    commands: [
+      {
+        id: 'status',
+        title: { zh: '查看服务状态', en: 'Service status' },
+        command: 'systemctl status {service}',
+        note: { zh: '看是否 active、最近日志与主进程 PID。', en: 'Shows active state, recent logs and the main PID.' },
+      },
+      {
+        id: 'restart',
+        title: { zh: '重启服务', en: 'Restart service' },
+        command: 'sudo systemctl restart {service}',
+        note: { zh: '改完配置后重启;失败先看 journalctl。', en: 'Use after config changes; check journalctl if it fails.' },
+      },
+      {
+        id: 'daemon-reload',
+        title: { zh: '重载 unit 文件', en: 'Reload unit files' },
+        command: 'sudo systemctl daemon-reload',
+        note: { zh: '改了 /etc/systemd/system/*.service 之后必须执行。', en: 'Required after editing /etc/systemd/system/*.service.' },
+      },
+      {
+        id: 'enable-now',
+        title: { zh: '开机自启并立即启动', en: 'Enable at boot and start now' },
+        command: 'sudo systemctl enable --now {service}',
+        note: { zh: '等价于 enable + start。', en: 'Equivalent to enable plus start.' },
+      },
+      {
+        id: 'disable',
+        title: { zh: '取消开机自启', en: 'Disable at boot' },
+        command: 'sudo systemctl disable {service}',
+        note: { zh: '只取消自启,不会停止当前进程。', en: 'Only removes the boot link; the running process keeps running.' },
+        dangerous: true,
+      },
+      {
+        id: 'journalctl',
+        title: { zh: '跟踪服务日志', en: 'Follow service logs' },
+        command: 'journalctl -u {service} -f --no-pager',
+        note: { zh: '从最新开始滚动;去掉 -f 看历史。', en: 'Streams from now; drop -f to read history.' },
+      },
+      {
+        id: 'since-boot',
+        title: { zh: '本次启动后的错误', en: 'Errors since boot' },
+        command: 'journalctl -p err -b --no-pager',
+        note: { zh: '只筛 error 级别,排查重启原因。', en: 'Error level only, useful after a reboot.' },
+      },
+    ],
+  },
+  {
+    id: 'docker',
+    title: { zh: 'Docker / Compose', en: 'Docker / Compose' },
+    commands: [
+      {
+        id: 'ps',
+        title: { zh: '容器列表', en: 'List containers' },
+        command: 'docker ps -a',
+        note: { zh: '含已退出容器与端口映射。', en: 'Includes stopped containers and port mappings.' },
+      },
+      {
+        id: 'logs',
+        title: { zh: '容器日志', en: 'Container logs' },
+        command: 'docker logs -f --tail 200 {container}',
+        note: { zh: '跟 200 行历史;排查启动失败最常用。', en: 'Follows the last 200 lines; the first stop for boot failures.' },
+      },
+      {
+        id: 'exec',
+        title: { zh: '进入容器', en: 'Shell into a container' },
+        command: 'docker exec -it {container} sh',
+        note: { zh: '没有 bash 时用 sh。', en: 'Use sh when bash is missing.' },
+      },
+      {
+        id: 'compose-up',
+        title: { zh: 'Compose 启动', en: 'Compose up' },
+        command: 'docker compose up -d',
+        note: { zh: '后台启动;改了镜像或配置加 --build。', en: 'Detached start; add --build after image or config changes.' },
+      },
+      {
+        id: 'compose-logs',
+        title: { zh: 'Compose 日志', en: 'Compose logs' },
+        command: 'docker compose logs -f --tail 200 {service}',
+        note: { zh: '按服务名过滤,省略服务名看全部。', en: 'Filter by service; omit it to see everything.' },
+      },
+      {
+        id: 'prune',
+        title: { zh: '清理未使用资源', en: 'Prune unused resources' },
+        command: 'docker system prune -a',
+        note: {
+          zh: '会删除未使用的镜像、网络与构建缓存,不影响运行中容器。',
+          en: 'Removes unused images, networks and build cache; running containers are kept.',
+        },
+        dangerous: true,
+      },
+    ],
+  },
+  {
+    id: 'nginx',
+    title: { zh: 'Nginx', en: 'Nginx' },
+    commands: [
+      {
+        id: 'test',
+        title: { zh: '检查配置', en: 'Test configuration' },
+        command: 'sudo nginx -t',
+        note: { zh: '改完 conf 必须先过这一关再 reload。', en: 'Always run before reload after editing conf files.' },
+      },
+      {
+        id: 'reload',
+        title: { zh: '平滑重载', en: 'Graceful reload' },
+        command: 'sudo systemctl reload nginx',
+        note: { zh: '不中断现有连接;配置有误时不会生效。', en: 'Keeps existing connections; a bad config will not take effect.' },
+      },
+      {
+        id: 'logs',
+        title: { zh: '访问日志', en: 'Access log' },
+        command: 'sudo tail -f /var/log/nginx/access.log',
+        note: { zh: '看状态码与耗时定位慢请求。', en: 'Watch status codes and timings to find slow requests.' },
+      },
+      {
+        id: 'error-log',
+        title: { zh: '错误日志', en: 'Error log' },
+        command: 'sudo tail -f /var/log/nginx/error.log',
+        note: { zh: '502/504 优先看这里。', en: 'First stop for 502/504.' },
+      },
+    ],
+  },
+  {
+    id: 'ssh',
+    title: { zh: 'SSH / 传输', en: 'SSH / transfer' },
+    commands: [
+      {
+        id: 'login',
+        title: { zh: '登录服务器', en: 'Log in' },
+        command: 'ssh -p {port} {user}@{host}',
+        note: { zh: '非默认端口必须写 -p。', en: 'Always pass -p for a non-default port.' },
+      },
+      {
+        id: 'keygen',
+        title: { zh: '生成密钥', en: 'Generate a key' },
+        command: 'ssh-keygen -t ed25519 -C "{comment}"',
+        note: { zh: 'ed25519 足够且更快;私钥不要外传。', en: 'ed25519 is fast and modern; never share the private key.' },
+      },
+      {
+        id: 'copy-key',
+        title: { zh: '上传公钥', en: 'Upload public key' },
+        command: 'ssh-copy-id -p {port} {user}@{host}',
+        note: { zh: '写进远端 ~/.ssh/authorized_keys。', en: 'Appends to the remote ~/.ssh/authorized_keys.' },
+      },
+      {
+        id: 'scp',
+        title: { zh: '上传文件', en: 'Upload a file' },
+        command: 'scp -P {port} ./file {user}@{host}:/tmp/',
+        note: { zh: 'scp 的端口参数是大写 P。', en: 'scp uses capital -P for the port.' },
+      },
+      {
+        id: 'rsync',
+        title: { zh: '增量同步目录', en: 'Sync a directory' },
+        command: 'rsync -avz -e "ssh -p {port}" ./dist/ {user}@{host}:/var/www/',
+        note: {
+          zh: '末尾斜杠表示同步目录内容;--delete 会删远端多余文件,慎用。',
+          en: 'A trailing slash syncs contents; --delete removes remote extras.',
+        },
+        dangerous: true,
+      },
+    ],
+  },
+  {
+    id: 'archive',
+    title: { zh: '压缩与归档', en: 'Archives' },
+    commands: [
+      {
+        id: 'tar-gz',
+        title: { zh: '打包并压缩', en: 'Create a tar.gz' },
+        command: 'tar -czf {name}.tar.gz {dir}',
+        note: { zh: 'c 创建、z gzip、f 文件名。', en: 'c create, z gzip, f filename.' },
+      },
+      {
+        id: 'untar',
+        title: { zh: '解压 tar.gz', en: 'Extract a tar.gz' },
+        command: 'tar -xzf {name}.tar.gz -C {target}',
+        note: { zh: '-C 指定目标目录。', en: '-C sets the target directory.' },
+      },
+      {
+        id: 'zip',
+        title: { zh: '压缩为 zip', en: 'Create a zip' },
+        command: 'zip -r {name}.zip {dir}',
+        note: { zh: '-r 递归;Windows 解压工具兼容性最好。', en: '-r recurses; the friendliest format for Windows.' },
+      },
+      {
+        id: 'unzip',
+        title: { zh: '解压 zip', en: 'Extract a zip' },
+        command: 'unzip {name}.zip -d {target}',
+        note: { zh: '-d 指定目录。', en: '-d sets the destination.' },
+      },
+      {
+        id: 'rsync-backup',
+        title: { zh: '只增备份目录', en: 'Incremental backup' },
+        command: 'rsync -a --partial {src}/ {dst}/',
+        note: { zh: '不加 --delete 时只新增/覆盖,适合备份。', en: 'Without --delete it only adds/overwrites, which suits backups.' },
+      },
+    ],
+  },
+  {
+    id: 'search',
+    title: { zh: '查找与文本处理', en: 'Search and text' },
+    commands: [
+      {
+        id: 'grep',
+        title: { zh: '递归搜索内容', en: 'Recursive content search' },
+        command: 'grep -rn --include="{glob}" "{pattern}" {dir}',
+        note: { zh: 'n 显示行号,r 递归。', en: 'n shows line numbers, r recurses.' },
+      },
+      {
+        id: 'find',
+        title: { zh: '按名称找文件', en: 'Find files by name' },
+        command: 'find {dir} -name "{pattern}" -type f',
+        note: { zh: '-type f 只找文件。', en: '-type f restricts to files.' },
+      },
+      {
+        id: 'sed',
+        title: { zh: '就地替换文本', en: 'In-place replace' },
+        command: "sed -i 's/{old}/{new}/g' {file}",
+        note: { zh: '先 cp 备份或去掉 -i 预演。', en: 'Back up first or drop -i to preview.' },
+        dangerous: true,
+      },
+      {
+        id: 'awk',
+        title: { zh: '按列取字段', en: 'Pick columns' },
+        command: "awk '{print $1, $3}' {file}",
+        note: { zh: '默认按空白分列。', en: 'Splits on whitespace by default.' },
+      },
+      {
+        id: 'xargs',
+        title: { zh: '批量删除匹配文件', en: 'Delete matching files' },
+        command: 'find {dir} -name "{pattern}" -print0 | xargs -0 rm -f',
+        note: { zh: '先去掉 xargs 部分核对文件列表。', en: 'Run the find part first to review the list.' },
+        dangerous: true,
+      },
+    ],
+  },
+  {
+    id: 'process',
+    title: { zh: '进程与磁盘', en: 'Processes and disks' },
+    commands: [
+      {
+        id: 'ps-top',
+        title: { zh: '按 CPU 排序', en: 'Top processes by CPU' },
+        command: 'ps aux --sort=-%cpu | head -n 15',
+        note: { zh: '内存换成 -%mem。', en: 'Use -%mem for memory.' },
+      },
+      {
+        id: 'ss',
+        title: { zh: '监听端口', en: 'Listening ports' },
+        command: 'ss -lntp',
+        note: { zh: 't TCP、l 监听、n 数字端口、p 进程。', en: 't TCP, l listening, n numeric, p process.' },
+      },
+      {
+        id: 'du',
+        title: { zh: '目录占用排行', en: 'Largest directories' },
+        command: 'du -sh {dir}/* | sort -rh | head -n 15',
+        note: { zh: '定位磁盘被谁占满。', en: 'Find what filled the disk.' },
+      },
+      {
+        id: 'df',
+        title: { zh: '磁盘剩余', en: 'Disk usage' },
+        command: 'df -h',
+        note: { zh: '看 Use% 与挂载点。', en: 'Watch Use% per mount point.' },
+      },
+      {
+        id: 'kill',
+        title: { zh: '查找并结束进程', en: 'Find and kill' },
+        command: 'pgrep -af {pattern} && pkill -f {pattern}',
+        note: { zh: '先 pgrep 确认目标,再 pkill。', en: 'Confirm with pgrep before pkill.' },
+        dangerous: true,
+      },
+    ],
+  },
+  {
+    id: 'db',
+    title: { zh: 'MySQL / Redis', en: 'MySQL / Redis' },
+    commands: [
+      {
+        id: 'mysql-shell',
+        title: { zh: '进入 MySQL', en: 'MySQL shell' },
+        command: 'mysql -h 127.0.0.1 -P 3306 -u {user} -p {database}',
+        note: { zh: '密码交互输入,不要写在命令历史里。', en: 'Type the password interactively; keep it out of shell history.' },
+      },
+      {
+        id: 'mysql-dump',
+        title: { zh: '导出单库', en: 'Dump one database' },
+        command: 'mysqldump --single-transaction --routines -u {user} -p {database} > {file}.sql',
+        note: { zh: '--single-transaction 保证 InnoDB 一致性快照。', en: '--single-transaction gives a consistent InnoDB snapshot.' },
+      },
+      {
+        id: 'mysql-restore',
+        title: { zh: '导入 SQL', en: 'Restore from SQL' },
+        command: 'mysql -u {user} -p {database} < {file}.sql',
+        note: { zh: '大文件用 source 或客户端工具。', en: 'For huge files prefer source or a client tool.' },
+      },
+      {
+        id: 'redis-cli',
+        title: { zh: 'Redis 连接', en: 'Redis shell' },
+        command: 'redis-cli -h 127.0.0.1 -p 6379 -a {password}',
+        note: {
+          zh: '密码会进 shell 历史;生产可用 --askpass 或环境变量。',
+          en: 'The password lands in history; use --askpass or env vars in production.',
+        },
+        dangerous: true,
+      },
+      {
+        id: 'redis-bigkeys',
+        title: { zh: '查看大 key', en: 'Find big keys' },
+        command: 'redis-cli --bigkeys',
+        note: { zh: '扫描会占用一些 CPU,低峰执行。', en: 'The scan costs some CPU; run off-peak.' },
+      },
+      {
+        id: 'drop-table',
+        title: { zh: '删除表', en: 'Drop a table' },
+        command: 'DROP TABLE {table};',
+        note: { zh: '不可恢复;确认备份后再执行。', en: 'Irreversible; verify the backup first.' },
+        dangerous: true,
+      },
+    ],
+  },
+  {
+    id: 'network',
+    title: { zh: '网络与证书', en: 'Network and TLS' },
+    commands: [
+      {
+        id: 'curl',
+        title: { zh: '带状态与耗时请求', en: 'Request with status and timing' },
+        command: 'curl -sS -o /dev/null -w "%{http_code} %{time_total}s\\n" {url}',
+        note: { zh: '只看状态码与总耗时。', en: 'Shows status code and total time only.' },
+      },
+      {
+        id: 'curl-headers',
+        title: { zh: '查看响应头', en: 'Show response headers' },
+        command: 'curl -sSI {url}',
+        note: { zh: '排查缓存、CORS、重定向链。', en: 'Check caching, CORS and redirects.' },
+      },
+      {
+        id: 'dig',
+        title: { zh: 'DNS 查询', en: 'DNS lookup' },
+        command: 'dig +short {domain} A',
+        note: { zh: '换 AAAA / MX / TXT 查其他记录。', en: 'Use AAAA / MX / TXT for other records.' },
+      },
+      {
+        id: 'certbot',
+        title: { zh: '申请/续期证书', en: 'Issue or renew certificates' },
+        command: 'sudo certbot renew --dry-run',
+        note: { zh: '先 dry-run 验证续期链路。', en: 'Dry-run first to verify the renewal chain.' },
+      },
+      {
+        id: 'openssl',
+        title: { zh: '查看证书到期', en: 'Certificate expiry' },
+        command: 'openssl s_client -connect {host}:443 -servername {host} </dev/null 2>/dev/null | openssl x509 -noout -dates',
+        note: { zh: '看 notBefore / notAfter。', en: 'Shows notBefore / notAfter.' },
+      },
+      {
+        id: 'ufw',
+        title: { zh: '防火墙放行端口', en: 'Allow a port' },
+        command: 'sudo ufw allow {port}/tcp',
+        note: { zh: '改完用 ufw status numbered 核对。', en: 'Verify with ufw status numbered.' },
+      },
+      {
+        id: 'iptables-flush',
+        title: { zh: '清空 iptables 规则', en: 'Flush iptables' },
+        command: 'sudo iptables -F',
+        note: {
+          zh: '会连同 SSH 放行一起清掉,远程执行可能立刻断线。',
+          en: 'Also drops the SSH allow rule; a remote session may die instantly.',
+        },
+        dangerous: true,
+      },
+    ],
+  },
+  {
+    id: 'git',
+    title: { zh: 'Git', en: 'Git' },
+    commands: [
+      {
+        id: 'log',
+        title: { zh: '简洁提交历史', en: 'Compact history' },
+        command: 'git log --oneline --graph -20',
+        note: { zh: '看分支合并关系。', en: 'Shows branch and merge structure.' },
+      },
+      {
+        id: 'undo-commit',
+        title: { zh: '撤销最后一次提交', en: 'Undo the last commit' },
+        command: 'git reset --soft HEAD~1',
+        note: { zh: '保留改动在工作区。', en: 'Keeps the changes staged.' },
+      },
+      {
+        id: 'discard',
+        title: { zh: '丢弃本地改动', en: 'Discard local changes' },
+        command: 'git restore {file}',
+        note: { zh: '未提交的改动会丢。', en: 'Uncommitted changes are lost.' },
+        dangerous: true,
+      },
+      {
+        id: 'hard-reset',
+        title: { zh: '硬重置到某提交', en: 'Hard reset' },
+        command: 'git reset --hard {commit}',
+        note: { zh: '工作区与暂存区一并回退,不可恢复。', en: 'Resets the worktree and index; not recoverable.' },
+        dangerous: true,
+      },
+      {
+        id: 'stash',
+        title: { zh: '临时收存改动', en: 'Stash changes' },
+        command: 'git stash push -m "{message}" -- {file}',
+        note: { zh: '多会话共用工作区时只收存自己的文件。', en: 'In a shared worktree, path-limit the stash to your files.' },
+      },
+      {
+        id: 'force-push',
+        title: { zh: '强制推送', en: 'Force push' },
+        command: 'git push --force-with-lease origin {branch}',
+        note: {
+          zh: '仅限自己的分支;--force-with-lease 比 --force 安全。',
+          en: 'Own branches only; --force-with-lease is safer than --force.',
+        },
+        dangerous: true,
+      },
+    ],
+  },
+]
+
+export const OPS_REFERENCES = [
+  {
+    id: 'http',
+    title: { zh: 'HTTP 状态码', en: 'HTTP status codes' },
+    columns: [
+      { zh: '码', en: 'Code' },
+      { zh: '含义', en: 'Meaning' },
+    ],
+    rows: [
+      ['200', 'OK / 成功'],
+      ['201', 'Created / 已创建'],
+      ['204', 'No Content / 无内容'],
+      ['301', 'Moved Permanently / 永久重定向'],
+      ['302', 'Found / 临时重定向'],
+      ['304', 'Not Modified / 命中缓存'],
+      ['400', 'Bad Request / 请求不合法'],
+      ['401', 'Unauthorized / 未登录或令牌失效'],
+      ['403', 'Forbidden / 无权限'],
+      ['404', 'Not Found / 不存在'],
+      ['405', 'Method Not Allowed / 方法不允许'],
+      ['409', 'Conflict / 冲突'],
+      ['413', 'Payload Too Large / 请求体过大'],
+      ['429', 'Too Many Requests / 限流'],
+      ['500', 'Internal Server Error / 服务器错误'],
+      ['502', 'Bad Gateway / 网关上游异常'],
+      ['503', 'Service Unavailable / 服务不可用'],
+      ['504', 'Gateway Timeout / 上游超时'],
+    ],
+  },
+  {
+    id: 'ports',
+    title: { zh: '常用端口', en: 'Common ports' },
+    columns: [
+      { zh: '端口', en: 'Port' },
+      { zh: '用途', en: 'Purpose' },
+    ],
+    rows: [
+      ['22 / 19068', 'SSH(本仓生产改 19068)'],
+      ['80 / 443', 'HTTP / HTTPS'],
+      ['3306 / 6306', 'MySQL(本仓开发 6306)'],
+      ['6379', 'Redis(只绑回环)'],
+      ['8080', 'Spring Boot 后端'],
+      ['5173', 'Vite 开发服务器'],
+      ['8096', 'Jellyfin 媒体引擎'],
+    ],
+  },
+  {
+    id: 'mime',
+    title: { zh: '常见 MIME', en: 'Common MIME types' },
+    columns: [
+      { zh: '扩展名', en: 'Extension' },
+      { zh: 'MIME', en: 'MIME' },
+    ],
+    rows: [
+      ['.mjs', 'text/javascript'],
+      ['.json', 'application/json'],
+      ['.html', 'text/html'],
+      ['.css', 'text/css'],
+      ['.svg', 'image/svg+xml'],
+      ['.webp', 'image/webp'],
+      ['.woff2', 'font/woff2'],
+      ['.pdf', 'application/pdf'],
+      ['.zip', 'application/zip'],
+      ['.wasm', 'application/wasm'],
+    ],
+  },
+  {
+    id: 'nginx-snippets',
+    title: { zh: 'Nginx 片段', en: 'Nginx snippets' },
+    columns: null,
+    rows: [
+      [
+        'gzip on; gzip_types text/css application/javascript application/json image/svg+xml; gzip_min_length 1024;',
+        'gzip(必须四行:on/types/min_length/vary)',
+      ],
+      ['location ^~ /assets/ { expires 7d; add_header Cache-Control "public, immutable"; }', '哈希静态资源长缓存'],
+      ['location ~* ^/(?!api/|files/).*\\.(js|css|woff2)$ { expires 7d; }', '正则 location 的负向断言必须排除 /api/ 与 /files/'],
+      ['location /api/ { proxy_pass http://127.0.0.1:8080; proxy_set_header Host $host; }', '反代后端(不可 alias 直出)'],
+    ],
+  },
+]

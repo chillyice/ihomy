@@ -1,6 +1,6 @@
 {
   "source": "ihomy",
-  "version": "V10.59",
+  "version": "V10.60",
   "registry": "frontend/src/tools/registry.js",
   "tools": [
     {
@@ -548,6 +548,130 @@
       "bitPouch": {
         "status": "new",
         "note": "bit_pouch 暂无文本清洗/对比插件"
+      }
+    },
+    {
+      "id": "ops",
+      "bitPouchId": null,
+      "path": "/tools/ops",
+      "name": {
+        "zh": "运维命令速查",
+        "en": "Ops Command Reference"
+      },
+      "description": {
+        "zh": "常用命令与参考表，一键复制",
+        "en": "Common commands and cheat sheets, one-click copy"
+      },
+      "category": "dev",
+      "bitPouchCategory": null,
+      "bitPouchIcon": null,
+      "keywords": [
+        "ops",
+        "shell",
+        "nginx",
+        "docker",
+        "systemd",
+        "mysql",
+        "ssh",
+        "运维",
+        "命令",
+        "速查"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web",
+        "desktop",
+        "mobile"
+      ],
+      "offline": true,
+      "order": 126,
+      "kernel": null,
+      "bitPouch": {
+        "status": "new",
+        "note": "bit_pouch 暂无命令速查插件"
+      }
+    },
+    {
+      "id": "image",
+      "bitPouchId": null,
+      "path": "/tools/image",
+      "name": {
+        "zh": "图片工具",
+        "en": "Image Tools"
+      },
+      "description": {
+        "zh": "压缩 / ICO 图标 / EXIF 查看",
+        "en": "Compress / ICO icons / EXIF viewer"
+      },
+      "category": "document",
+      "bitPouchCategory": "inspect",
+      "bitPouchIcon": "image",
+      "keywords": [
+        "image",
+        "compress",
+        "resize",
+        "favicon",
+        "ico",
+        "exif",
+        "图片",
+        "压缩",
+        "图标"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web",
+        "desktop",
+        "mobile"
+      ],
+      "offline": true,
+      "order": 127,
+      "kernel": "imageTool",
+      "bitPouch": {
+        "status": "new",
+        "note": "bit_pouch 暂无图片压缩/ICO/EXIF 插件(内核可直接复用)"
+      }
+    },
+    {
+      "id": "file",
+      "bitPouchId": null,
+      "path": "/tools/file",
+      "name": {
+        "zh": "文件工具",
+        "en": "File Tools"
+      },
+      "description": {
+        "zh": "类型识别 / ZIP 打包与解压",
+        "en": "Type detection / ZIP pack and unpack"
+      },
+      "category": "document",
+      "bitPouchCategory": "inspect",
+      "bitPouchIcon": "file",
+      "keywords": [
+        "file",
+        "magic",
+        "mime",
+        "zip",
+        "unzip",
+        "archive",
+        "文件",
+        "类型",
+        "压缩包"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web",
+        "desktop",
+        "mobile"
+      ],
+      "offline": true,
+      "order": 128,
+      "kernel": "fileTool",
+      "bitPouch": {
+        "status": "new",
+        "note": "bit_pouch 暂无文件识别/ZIP 插件"
       }
     },
     {
