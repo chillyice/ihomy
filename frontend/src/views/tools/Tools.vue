@@ -93,127 +93,37 @@ import {
   Check,
   Connection,
   Share,
+  Key,
+  Opportunity,
+  Timer,
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
+import { TOOL_IDS, TOOL_REGISTRY } from '@/tools/registry'
 import { loadToolOrder, mergeToolOrder, moveToolBy, moveToolTo, saveToolOrder } from '@/utils/toolOrder'
 
 const { t } = useI18n()
 const router = useRouter()
 
-// 卡片清单:新增工具只在这里加一行(默认排最后,已排过序的用户会自动追加到末尾)
-// category 决定「按分类展示」时的分组,tagKey 是卡片名旁的小标签
-const DEFAULT_TOOLS = [
-  {
-    id: 'mindmap',
-    path: '/tools/mindmap',
-    icon: Tools,
-    titleKey: 'tools.mindmap.title',
-    descKey: 'tools.mindmap.desc',
-    category: 'design',
-    tagKey: 'tools.tags.shared',
-  },
-  {
-    id: 'ai-playground',
-    path: '/tools/ai-playground',
-    icon: MagicStick,
-    titleKey: 'tools.aiPlayground.title',
-    descKey: 'tools.aiPlayground.desc',
-    category: 'dev',
-    tagKey: 'tools.tags.ai',
-  },
-  {
-    id: 'light-lab',
-    path: '/tools/light-lab',
-    icon: Sunny,
-    titleKey: 'tools.lightLab.title',
-    descKey: 'tools.lightLab.desc',
-    category: 'design',
-    tagKey: 'tools.tags.threeD',
-  },
-  {
-    id: 'pdf',
-    path: '/tools/pdf',
-    icon: Document,
-    titleKey: 'tools.pdf.title',
-    descKey: 'tools.pdf.desc',
-    category: 'document',
-    tagKey: 'tools.tags.local',
-  },
-  {
-    id: 'json',
-    path: '/tools/json',
-    icon: DataLine,
-    titleKey: 'tools.json.title',
-    descKey: 'tools.json.desc',
-    category: 'dev',
-    tagKey: 'tools.tags.local',
-  },
-  {
-    id: 'codec',
-    path: '/tools/codec',
-    icon: Switch,
-    titleKey: 'tools.codec.title',
-    descKey: 'tools.codec.desc',
-    category: 'dev',
-    tagKey: 'tools.tags.local',
-  },
-  {
-    id: 'base',
-    path: '/tools/base',
-    icon: Operation,
-    titleKey: 'tools.base.title',
-    descKey: 'tools.base.desc',
-    category: 'dev',
-    tagKey: 'tools.tags.local',
-  },
-  {
-    id: 'packet',
-    path: '/tools/packet',
-    icon: Connection,
-    titleKey: 'tools.packet.title',
-    descKey: 'tools.packet.desc',
-    category: 'dev',
-    tagKey: 'tools.tags.local',
-  },
-  {
-    id: 'subnet',
-    path: '/tools/subnet',
-    icon: Share,
-    titleKey: 'tools.subnet.title',
-    descKey: 'tools.subnet.desc',
-    category: 'dev',
-    tagKey: 'tools.tags.local',
-  },
-  {
-    id: 'flash',
-    path: '/tools/flash',
-    icon: VideoPlay,
-    titleKey: 'tools.flash.title',
-    descKey: 'tools.flash.desc',
-    category: 'fun',
-    tagKey: 'tools.tags.localPlay',
-  },
-  {
-    id: 'loan',
-    path: '/tools/loan',
-    icon: Coin,
-    titleKey: 'tools.loan.title',
-    descKey: 'tools.loan.desc',
-    category: 'life',
-    tagKey: 'tools.tags.offline',
-  },
-  {
-    id: 'gba',
-    path: '/tools/gba',
-    icon: VideoPlay,
-    titleKey: 'tools.gba.title',
-    descKey: 'tools.gba.desc',
-    category: 'fun',
-    tagKey: 'tools.tags.localPlay',
-  },
-]
-const defaultIds = DEFAULT_TOOLS.map((tool) => tool.id)
+// 卡片清单的元数据唯一来源在 src/tools/registry.js(同一份清单也供 bit_pouch 导出)
+const ICONS = {
+  Tools,
+  MagicStick,
+  Sunny,
+  Document,
+  DataLine,
+  Switch,
+  Operation,
+  Connection,
+  Share,
+  Key,
+  Opportunity,
+  Timer,
+  VideoPlay,
+  Coin,
+}
+const DEFAULT_TOOLS = TOOL_REGISTRY.map((tool) => ({ ...tool, icon: ICONS[tool.icon] || Tools }))
+const defaultIds = TOOL_IDS
 
 // 分类顺序固定(不跟随用户排序):分组视图只决定「怎么排」,不改变每组内部的用户顺序
 const CATEGORIES = [

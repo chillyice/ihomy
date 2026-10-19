@@ -140,6 +140,27 @@ const routes = [
     component: () => import('@/views/tools/SubnetCalculator.vue'),
     meta: { public: true },
   },
+  // 哈希与校验:MD5/SHA/CRC32/HMAC,文本与文件摘要,纯前端
+  {
+    path: '/tools/hash',
+    name: 'HashTool',
+    component: () => import('@/views/tools/HashTool.vue'),
+    meta: { public: true },
+  },
+  // 随机生成器:密码/UUID/ULID/NanoID/随机字节/抽签分组,纯前端
+  {
+    path: '/tools/generator',
+    name: 'GeneratorTool',
+    component: () => import('@/views/tools/GeneratorTool.vue'),
+    meta: { public: true },
+  },
+  // 时间工具箱:时间戳/时区/日期差/日期加减/Cron,纯前端
+  {
+    path: '/tools/time',
+    name: 'TimeTool',
+    component: () => import('@/views/tools/TimeTool.vue'),
+    meta: { public: true },
+  },
   // 贷款计算器:纯前端试算(等额本息/等额本金、商业/公积金/组合贷、提前还款对比),不依赖后端
   { path: '/tools/loan', name: 'LoanCalculator', component: () => import('@/views/tools/LoanCalculator.vue'), meta: { public: true } },
   // Flash 播放器(Ruffle):本地加载 .swf 怀旧小游戏

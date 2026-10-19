@@ -1,0 +1,563 @@
+{
+  "source": "ihomy",
+  "version": "V10.58",
+  "registry": "frontend/src/tools/registry.js",
+  "tools": [
+    {
+      "id": "mindmap",
+      "path": "/tools/mindmap",
+      "name": {
+        "zh": "脑图设计",
+        "en": "Mind Map"
+      },
+      "description": {
+        "zh": "与家人共同创作思维导图",
+        "en": "Create mind maps together with your family"
+      },
+      "category": "design",
+      "bitPouchCategory": null,
+      "bitPouchIcon": null,
+      "keywords": [
+        "mindmap",
+        "mind map",
+        "思维导图",
+        "脑图",
+        "导图"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web",
+        "desktop",
+        "mobile"
+      ],
+      "offline": true,
+      "order": 10,
+      "kernel": null,
+      "bitPouch": {
+        "status": "new",
+        "note": "bit_pouch 暂无脑图插件"
+      }
+    },
+    {
+      "id": "ai-playground",
+      "path": "/tools/ai-playground",
+      "name": {
+        "zh": "AI 测试台",
+        "en": "AI Playground"
+      },
+      "description": {
+        "zh": "对话 / 图片 / 语音模型输入输出调试",
+        "en": "Debug chat / image / speech model input & output"
+      },
+      "category": "dev",
+      "bitPouchCategory": null,
+      "bitPouchIcon": null,
+      "keywords": [
+        "ai",
+        "llm",
+        "prompt",
+        "model",
+        "对话",
+        "模型调试"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web"
+      ],
+      "offline": false,
+      "order": 20,
+      "kernel": null,
+      "bitPouch": {
+        "status": "out-of-scope",
+        "note": "依赖 ihomy 家庭级 AI 配置,不适合离线工具袋"
+      }
+    },
+    {
+      "id": "light-lab",
+      "path": "/tools/light-lab",
+      "name": {
+        "zh": "光影实验台",
+        "en": "Light Lab"
+      },
+      "description": {
+        "zh": "3D 真实阴影：太阳模拟 / 移动光源",
+        "en": "3D real-time shadows: sun sim / move light"
+      },
+      "category": "design",
+      "bitPouchCategory": null,
+      "bitPouchIcon": null,
+      "keywords": [
+        "3d",
+        "light",
+        "shadow",
+        "sun",
+        "光影",
+        "阴影"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web"
+      ],
+      "offline": true,
+      "order": 30,
+      "kernel": null,
+      "bitPouch": {
+        "status": "out-of-scope",
+        "note": "Three.js 体积较大,暂不进入 bit_pouch"
+      }
+    },
+    {
+      "id": "pdf",
+      "path": "/tools/pdf",
+      "name": {
+        "zh": "PDF 转换",
+        "en": "PDF Converter"
+      },
+      "description": {
+        "zh": "PDF 转图片 / 图片合成 PDF / 提取文字",
+        "en": "PDF to images / images to PDF / extract text"
+      },
+      "category": "document",
+      "bitPouchCategory": null,
+      "bitPouchIcon": null,
+      "keywords": [
+        "pdf",
+        "image",
+        "text",
+        "convert",
+        "转换",
+        "提取文字"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web",
+        "desktop",
+        "mobile"
+      ],
+      "offline": true,
+      "order": 40,
+      "kernel": null,
+      "bitPouch": {
+        "status": "new",
+        "note": "bit_pouch 暂无 PDF 插件"
+      }
+    },
+    {
+      "id": "json",
+      "path": "/tools/json",
+      "name": {
+        "zh": "JSON 格式化",
+        "en": "JSON Formatter"
+      },
+      "description": {
+        "zh": "格式化 / 压缩 / 键名排序，内容只在本机处理",
+        "en": "Pretty-print / minify / sort keys — processed locally"
+      },
+      "category": "dev",
+      "bitPouchCategory": null,
+      "bitPouchIcon": null,
+      "keywords": [
+        "json",
+        "format",
+        "minify",
+        "sort keys",
+        "格式化",
+        "压缩"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web",
+        "desktop",
+        "mobile"
+      ],
+      "offline": true,
+      "order": 50,
+      "kernel": null,
+      "bitPouch": {
+        "status": "existing",
+        "note": "bit_pouch 已有 json 插件"
+      }
+    },
+    {
+      "id": "codec",
+      "path": "/tools/codec",
+      "name": {
+        "zh": "字符编码转换",
+        "en": "Text Codec"
+      },
+      "description": {
+        "zh": "Unicode / ASCII 码位 / HTML 实体 / URL / Base64 互转",
+        "en": "Unicode / ASCII code points / HTML entities / URL / Base64"
+      },
+      "category": "dev",
+      "bitPouchCategory": null,
+      "bitPouchIcon": null,
+      "keywords": [
+        "codec",
+        "unicode",
+        "base64",
+        "url",
+        "html entity",
+        "编码",
+        "转义"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web",
+        "desktop",
+        "mobile"
+      ],
+      "offline": true,
+      "order": 60,
+      "kernel": null,
+      "bitPouch": {
+        "status": "existing",
+        "note": "bit_pouch 已有 codec 插件"
+      }
+    },
+    {
+      "id": "base",
+      "path": "/tools/base",
+      "name": {
+        "zh": "进制转换",
+        "en": "Base Converter"
+      },
+      "description": {
+        "zh": "2–36 进制互转，大整数精确计算",
+        "en": "Convert between bases 2–36, exact for large integers"
+      },
+      "category": "dev",
+      "bitPouchCategory": null,
+      "bitPouchIcon": null,
+      "keywords": [
+        "base",
+        "radix",
+        "binary",
+        "hex",
+        "进制",
+        "二进制",
+        "十六进制"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web",
+        "desktop",
+        "mobile"
+      ],
+      "offline": true,
+      "order": 70,
+      "kernel": null,
+      "bitPouch": {
+        "status": "existing",
+        "note": "bit_pouch 已有 base 插件"
+      }
+    },
+    {
+      "id": "packet",
+      "path": "/tools/packet",
+      "name": {
+        "zh": "报文解析",
+        "en": "Packet Parser"
+      },
+      "description": {
+        "zh": "十六进制报文拆字段 / 逐字节查看 / 校验值参考",
+        "en": "Split hex messages into fields, bytes and checksum references"
+      },
+      "category": "dev",
+      "bitPouchCategory": null,
+      "bitPouchIcon": null,
+      "keywords": [
+        "packet",
+        "hex",
+        "protocol",
+        "报文",
+        "十六进制",
+        "校验"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web",
+        "desktop",
+        "mobile"
+      ],
+      "offline": true,
+      "order": 80,
+      "kernel": null,
+      "bitPouch": {
+        "status": "existing",
+        "note": "bit_pouch 已有 packet 插件"
+      }
+    },
+    {
+      "id": "subnet",
+      "path": "/tools/subnet",
+      "name": {
+        "zh": "子网掩码计算",
+        "en": "Subnet Calculator"
+      },
+      "description": {
+        "zh": "IPv4 网络地址 / 广播地址 / 可用主机范围与掩码换算",
+        "en": "IPv4 network / broadcast / usable host range and mask conversion"
+      },
+      "category": "dev",
+      "bitPouchCategory": null,
+      "bitPouchIcon": null,
+      "keywords": [
+        "subnet",
+        "cidr",
+        "netmask",
+        "ip",
+        "子网",
+        "掩码",
+        "网段"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web",
+        "desktop",
+        "mobile"
+      ],
+      "offline": true,
+      "order": 90,
+      "kernel": null,
+      "bitPouch": {
+        "status": "existing",
+        "note": "bit_pouch 已有 subnet 插件"
+      }
+    },
+    {
+      "id": "hash",
+      "path": "/tools/hash",
+      "name": {
+        "zh": "哈希与校验",
+        "en": "Hash & Checksum"
+      },
+      "description": {
+        "zh": "MD5 / SHA / CRC32 / HMAC，文本与文件摘要，全程本地",
+        "en": "MD5 / SHA / CRC32 / HMAC for text and files, all local"
+      },
+      "category": "dev",
+      "bitPouchCategory": "inspect",
+      "bitPouchIcon": "hash",
+      "keywords": [
+        "hash",
+        "md5",
+        "sha1",
+        "sha256",
+        "sha384",
+        "sha512",
+        "crc32",
+        "hmac",
+        "checksum",
+        "摘要",
+        "校验"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web",
+        "desktop",
+        "mobile"
+      ],
+      "offline": true,
+      "order": 100,
+      "kernel": "hashTool",
+      "bitPouch": {
+        "status": "partial",
+        "note": "bit_pouch 已有 hash 插件(仅 SHA 系与 MD5);本次新增 CRC32 / HMAC / 文件摘要 / 期望值比对"
+      }
+    },
+    {
+      "id": "generator",
+      "path": "/tools/generator",
+      "name": {
+        "zh": "随机生成器",
+        "en": "Random Generator"
+      },
+      "description": {
+        "zh": "密码 / UUID / ULID / 随机字节 / 抽签分组，本地生成",
+        "en": "Passwords / UUID / ULID / random bytes / draw & group, generated locally"
+      },
+      "category": "dev",
+      "bitPouchCategory": "convert",
+      "bitPouchIcon": "key",
+      "keywords": [
+        "password",
+        "random",
+        "uuid",
+        "ulid",
+        "nanoid",
+        "passphrase",
+        "密码",
+        "随机",
+        "抽签"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web",
+        "desktop",
+        "mobile"
+      ],
+      "offline": true,
+      "order": 110,
+      "kernel": "generatorTool",
+      "bitPouch": {
+        "status": "partial",
+        "note": "bit_pouch 仅有 uuid 插件;本次补齐密码/随机串/随机字节/抽签分组"
+      }
+    },
+    {
+      "id": "time",
+      "path": "/tools/time",
+      "name": {
+        "zh": "时间工具箱",
+        "en": "Time Toolbox"
+      },
+      "description": {
+        "zh": "时间戳 / 时区 / 日期差 / Cron，本地换算",
+        "en": "Timestamp / time zone / date difference / Cron, all local"
+      },
+      "category": "dev",
+      "bitPouchCategory": "convert",
+      "bitPouchIcon": "clock",
+      "keywords": [
+        "timestamp",
+        "timezone",
+        "cron",
+        "date",
+        "时间戳",
+        "时区",
+        "日期差",
+        "表达式"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web",
+        "desktop",
+        "mobile"
+      ],
+      "offline": true,
+      "order": 120,
+      "kernel": "timeTool",
+      "bitPouch": {
+        "status": "partial",
+        "note": "bit_pouch 已有 timestamp 插件(仅单向转换);本次新增时区/日期差/Cron"
+      }
+    },
+    {
+      "id": "flash",
+      "path": "/tools/flash",
+      "name": {
+        "zh": "Flash 播放器",
+        "en": "Flash Player"
+      },
+      "description": {
+        "zh": "本地加载 .swf 怀旧小游戏（Ruffle 模拟器）",
+        "en": "Play local .swf retro games (Ruffle emulator)"
+      },
+      "category": "fun",
+      "bitPouchCategory": null,
+      "bitPouchIcon": null,
+      "keywords": [
+        "flash",
+        "swf",
+        "ruffle",
+        "小游戏"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web"
+      ],
+      "offline": true,
+      "order": 130,
+      "kernel": null,
+      "bitPouch": {
+        "status": "out-of-scope",
+        "note": "怀旧播放器不属于开发者工具"
+      }
+    },
+    {
+      "id": "loan",
+      "path": "/tools/loan",
+      "name": {
+        "zh": "贷款计算器",
+        "en": "Loan Calculator"
+      },
+      "description": {
+        "zh": "房贷试算 / 组合贷 / 提前还款对比 / 利率反推",
+        "en": "Mortgage quotes / combined loans / early repayment comparison / rate finder"
+      },
+      "category": "life",
+      "bitPouchCategory": null,
+      "bitPouchIcon": null,
+      "keywords": [
+        "loan",
+        "mortgage",
+        "interest",
+        "贷款",
+        "房贷",
+        "利率"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web",
+        "desktop",
+        "mobile"
+      ],
+      "offline": true,
+      "order": 140,
+      "kernel": null,
+      "bitPouch": {
+        "status": "new",
+        "note": "bit_pouch 暂无贷款计算器"
+      }
+    },
+    {
+      "id": "gba",
+      "path": "/tools/gba",
+      "name": {
+        "zh": "GBA 播放器",
+        "en": "GBA Player"
+      },
+      "description": {
+        "zh": "本地加载 .gba / .gbc / .gb 复古游戏（EmulatorJS）",
+        "en": "Play local .gba / .gbc / .gb retro games (EmulatorJS)"
+      },
+      "category": "fun",
+      "bitPouchCategory": null,
+      "bitPouchIcon": null,
+      "keywords": [
+        "gba",
+        "gbc",
+        "emu",
+        "emulator",
+        "小游戏"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web"
+      ],
+      "offline": true,
+      "order": 150,
+      "kernel": null,
+      "bitPouch": {
+        "status": "out-of-scope",
+        "note": "怀旧播放器不属于开发者工具"
+      }
+    }
+  ]
+}

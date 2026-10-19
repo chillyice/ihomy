@@ -176,7 +176,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | AI | 图片生成/语音识别 + AI 测试台 + 家庭级 AI 配置 + 调用统计 | AiService / FamilyAiConfigService / AiController + AiStatsService(`/ops/ai/**`) |
 | 厨房 | 菜单/菜谱/食材 | RecipeController / RecipeService |
 | 物联 | 智能家居中控(HA 接入) | IotController / HomeAssistantService + IotSyncService + views/iot/Iot.vue |
-| 工具 | 工具箱聚合页(卡片可手动排序) / 脑图设计 / AI 测试台 / 3D 光影实验台 / PDF 转换 / JSON 格式化 / 字符编码转换 / 进制转换 / 报文解析 / 子网掩码计算 / 贷款计算器+贷款记录 / Flash·GBA 播放器 | MindMapController / MindMapService(见需求 §4.12) |
+| 工具 | 工具箱聚合页(卡片可手动排序;元数据单一来源 `frontend/src/tools/registry.js`) / 脑图设计 / AI 测试台 / 3D 光影实验台 / PDF 转换 / JSON 格式化 / 字符编码转换 / 进制转换 / 报文解析 / 子网掩码计算 / 哈希与校验 / 随机生成器 / 时间工具箱 / 贷款计算器+贷款记录 / Flash·GBA 播放器 | MindMapController / MindMapService(见需求 §4.12);纯前端工具核心在 `utils/tools/`,bit_pouch 导出见 `scripts/export-tools.mjs` 与需求 §4.12.14 |
 | 系统 | i18n / 主题(暖居/光尘 × 晨/暮) / 字典 / 帮助页 / 独立产品页(咔哒 / bit_pouch / 壁纸) | i18n/ + theme/ + stores/theme.js + utils/dict.js + views/Help.vue + Kada.vue + BitPouch.vue + Wallpaper.vue;咔哒更新镜像在 `scripts/kada-mirror/`(见需求 §4.14);bit_pouch 发布镜像在 bit_pouch 仓 `scripts/ihomy-mirror/`(见需求 §4.14.1) |
 | 移动端 | 设备自适应 | useDevice.js + MobileLayout.vue + Mobile* 组件;三 Tab 判据与页头标题表在 `utils/mobileNav.js`(带单测);**导航条目唯一数据源 `utils/navModules.js`——不入 `sys_home_module` 的页面(设置/帮助/运维/**天气**)须在 `buildNavItems` 补虚拟入口,否则移动端「更多」里没有(V10.26)**;移动首页只做动态流(桌面仪表盘组件对等已决策不做) |
 
@@ -239,9 +239,10 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 ## 验证基线(每版更新,当前值)
 
 - 后端:`cd backend; .\mvnw.cmd -B clean package` → BUILD SUCCESS(`Tests run: 63`,纯逻辑不起 Spring 上下文);只求编译加 `-DskipTests`。**clean 被运行中后端锁 jar 时改跑 `-B test`**。
-- 前端测试:`cd frontend; npx vitest run` → 189 passed(jwt/loan/password/feed/nav/mobileNav/toolOrder/pdfTools/jsonTools/textCodec/baseConvert/packetParse/subnet/**terminator**/**dragInsert** + i18n 中英键对齐 + 引用键存在性 + **文案可编译** + 模板/消息硬编码中文守门 + **HTML 注入面守门** `utils/htmlSink.spec.js`;CI 构建前执行)。同一步跑 `npm run lint` → **0 error / 0 warning**(V10.21 起存量 warning 清零,不拦构建)。另跑 `npm run format:check`(`prettier --check "src/**/*.{js,vue,css}"`)→ 全通过(V10.23 起接 CI);一次性生成的超长单行资产(`assets/world-land-path.js`)已进 `.prettierignore`。
+- 前端测试:`cd frontend; npx vitest run` → 250 passed(jwt/loan/password/feed/nav/mobileNav/toolOrder/pdfTools/jsonTools/textCodec/baseConvert/packetParse/subnet/**terminator**/**dragInsert**/**tools/hashTool**/**tools/generatorTool**/**tools/timeTool** + i18n 中英键对齐 + 引用键存在性 + **文案可编译** + 模板/消息硬编码中文守门 + **HTML 注入面守门** `utils/htmlSink.spec.js`;CI 构建前执行)。同一步跑 `npm run lint` → **0 error / 0 warning**(V10.21 起存量 warning 清零,不拦构建)。另跑 `npm run format:check`(`prettier --check "src/**/*.{js,vue,css}"`)→ 全通过(V10.23 起接 CI);一次性生成的超长单行资产(`assets/world-land-path.js`)已进 `.prettierignore`。**Windows 工作树 CRLF 下 `main.css` 可能被 prettier 误报,以 CI(LF)为准**。
+- 工具箱导出:`cd frontend; npm run tools:export` → 生成 `public/tools/manifest.json` 与 `tools-export/`;`npm run tools:export:check` 校验生成物无漂移(源码改动后必须重跑)。
 - 文档/代码一致性闸门:`bash scripts/doc-drift-check.sh` → 全部 [OK](CI 最先跑;表数/实体↔建表/mapper 注解/@Tag/权限码种子/模块↔路由)。
-- 前端构建:`cd frontend; npm run build` → 入口 chunk **433.45KB/gzip 177.37KB**(V10.55 实测,较 V10.54 +0.13KB 为暖居拖拽落位测量改 `offset`(恢复邻居推挤动画):WarmHome 经 App→WarmLayout 静态引入故进入口 chunk;功能页/pdfjs/epubjs/hls.js 均为独立异步 chunk,PDF 工具仅进 `pdfjs` 异步块,JSON/字符编码/进制转换/报文解析/子网掩码工具均为独立异步块,**天气页的世界轮廓 32KB 只进 `Weather` 异步块**;演示照片/演示电子书走 `public/demo/` 不进口 chunk;历史数字见 docs/变更归档.md)
+- 前端构建:`cd frontend; npm run build` → 入口 chunk **449.33KB/gzip 184.14KB**(V10.58 实测,较 V10.57 441.11KB/180.70KB 增 +8.22KB/+3.44KB,来自工具箱 registry 与新工具中英文案;`HashTool`/`GeneratorTool`/`TimeTool` 均为独立异步 chunk,不进入口;功能页/pdfjs/epubjs/hls.js 均为独立异步 chunk,PDF 工具仅进 `pdfjs` 异步块,JSON/字符编码/进制转换/报文解析/子网掩码工具均为独立异步块,**天气页的世界轮廓 32KB 只进 `Weather` 异步块**;演示照片/演示电子书走 `public/demo/` 不进口 chunk;历史数字见 docs/变更归档.md)
   - **⚠ 口径:vite 报的是「字符数」不是「字节数」**(实测 318.71KB 字符 = 343,667 字节)——**别拿 `ls -la` 字节数跟基线比**;比特字节就 `wc -c` 对 `wc -c`。
 - 界面/交互验证:harness 别放 `target/`;持续动画页面用页面内 `evaluate` 量几何、派发 `el.click()`,别用截图或真实点击(必超时,见踩坑速查 §6)。
 - 接口测试:同级独立项目(不在本仓库)`cd ..\autotest_framework; .venv\Scripts\python.exe -m pytest -m api` → 37 passed;CI 每次推送自动构建前后端+起库导 schema+后端启动+登录冒烟。

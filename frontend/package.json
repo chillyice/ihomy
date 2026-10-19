@@ -10,6 +10,8 @@
     "test": "vitest run",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "tools:export": "node ../scripts/export-tools.mjs",
+    "tools:export:check": "node ../scripts/export-tools.mjs --check",
     "format": "prettier --write \"src/**/*.{js,vue,css}\"",
     "format:check": "prettier --check \"src/**/*.{js,vue,css}\""
   },

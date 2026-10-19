@@ -1,149 +1,205 @@
 <!-- bit_pouch 发布页 —— 独立产品页,托管在 ihomy 域名 https://ihomy.top/bit-pouch。
-     配色与控件走 bit_pouch 自己的像素麻袋品牌(深色为默认,浅色跟随浏览器偏好),
+     视觉走 bit_pouch 自己的「工具手册 / 终端工作台」方向:方格纸底纹、等宽字标号、
+     非对称 Hero + 终端演示、构建产物清单表、编号规格清单;不用居中主视觉与圆角卡片网格。
      页内自包含、不随 ihomy 的暖居/光尘主题变化;路由 meta.standalone 让 App.vue 不套
      ihomy 外壳、直接全屏渲染,也不初始化家庭数据。 -->
 <template>
   <div class="bp">
     <div class="bpwrap">
-      <!-- 顶栏:品牌 + GitHub 入口 -->
+      <!-- 顶栏:品牌 + 分区索引 + GitHub 入口 -->
       <header class="bptop">
         <div class="bpbrand">
-          <div class="bpmark" aria-hidden="true" v-html="pouchMark"></div>
-          <span class="bpbrand-cn">{{ $t('bitPouch.brand') }}</span>
-          <span class="bpbrand-en">bit_pouch</span>
+          <span class="bpmark" aria-hidden="true" v-html="pouchMark"></span>
+          <span class="bpbrand-name">bit_pouch</span>
+          <span class="bpver">v{{ version }}</span>
         </div>
+        <nav class="bpnav" :aria-label="$t('bitPouch.navAria')">
+          <a href="#download"><b>01</b>{{ $t('bitPouch.secDownload') }}</a>
+          <a href="#features"><b>02</b>{{ $t('bitPouch.secFeatures') }}</a>
+          <a href="#notes"><b>03</b>{{ $t('bitPouch.notesLabel') }}</a>
+        </nav>
         <a class="bpgh" :href="repoUrl" target="_blank" rel="noopener noreferrer" :aria-label="$t('bitPouch.ghAria')">
           <span class="bpgh-ic" aria-hidden="true" v-html="ghIcon"></span>
-          GitHub
+          <span class="bpgh-label">GitHub</span>
         </a>
       </header>
 
-      <!-- 主视觉 -->
-      <section class="bpheroc">
-        <div class="bpheromark" aria-hidden="true" v-html="pouchMark"></div>
-        <h1 class="bptitle">{{ $t('bitPouch.brand') }}<span class="bptitle-en">bit_pouch</span></h1>
-        <p class="bptag">{{ $t('bitPouch.tag') }}</p>
-        <p class="bpsub">{{ $t('bitPouch.sub') }}</p>
+      <!-- 主视觉:左文案,右终端 -->
+      <section id="top" class="bpher">
+        <div class="bpher-copy">
+          <p class="bpeyebrow"><span class="bpeyebrow-dot" aria-hidden="true"></span>{{ $t('bitPouch.eyebrow') }}</p>
+          <h1 class="bptitle">bit_pouch<span class="bptitle-caret" aria-hidden="true"></span></h1>
+          <p class="bpclaim">{{ $t('bitPouch.tag') }}</p>
+          <p class="bpsub">{{ $t('bitPouch.sub') }}</p>
 
-        <!-- 一次命令打开一个工具:命令面板 → 打开插件 → 输入即算 → 复制结果 -->
-        <div class="bpflow">
-          <span class="bpflow-cap">{{ $t('bitPouch.flowCaption') }}</span>
-          <span class="bpflow-row">
-            <span class="bpflow-bolt" aria-hidden="true">⚡</span>
-            <span class="bpflow-keys" aria-hidden="true"><kbd>Ctrl</kbd><kbd>K</kbd></span>
-            <span class="bpflow-arrow" aria-hidden="true">→</span>
-            <span v-for="(s, i) in flowSteps" :key="s.key" class="bpflow-step">
-              <i class="bpflow-dot" :class="s.cls" aria-hidden="true"></i>{{ $t(s.key) }}
-              <span v-if="i < flowSteps.length - 1" class="bpflow-arrow" aria-hidden="true">→</span>
-            </span>
-            <span class="bpflow-done" aria-hidden="true">✓</span>
-          </span>
+          <div class="bpcta">
+            <a class="bpbtn bpbtn-primary" :href="downloadUrl(primaryAsset)" download>
+              <span class="bpbtn-ic" aria-hidden="true" v-html="dlIcon"></span>
+              {{ $t('bitPouch.ctaDownload') }}
+            </a>
+            <a class="bpbtn bpbtn-ghost" href="#download">{{ $t('bitPouch.ctaPlatforms') }}</a>
+          </div>
+
+          <dl class="bpkv">
+            <div>
+              <dt>{{ $t('bitPouch.kvVersion') }}</dt>
+              <dd>v{{ version }}</dd>
+            </div>
+            <div>
+              <dt>{{ $t('bitPouch.kvRuntime') }}</dt>
+              <dd>main / worker</dd>
+            </div>
+            <div>
+              <dt>{{ $t('bitPouch.kvNetwork') }}</dt>
+              <dd>0 uploads</dd>
+            </div>
+          </dl>
         </div>
 
-        <div class="bpcta">
-          <a class="bpbtn bpbtn-primary" :href="downloadUrl(primaryAsset)" download>
-            <span class="bpbtn-ic" aria-hidden="true" v-html="dlIcon"></span>
-            {{ $t('bitPouch.ctaDownload') }}
-          </a>
-          <a class="bpbtn bpbtn-ghost" href="#bitpouch-download">
-            {{ $t('bitPouch.ctaPlatforms') }}
-          </a>
-        </div>
-
-        <div class="bpmeta">
-          <span class="bpchip">v{{ version }}</span>
-          <span class="bpchip">{{ $t('bitPouch.chipPlatforms') }}</span>
-          <span class="bpchip">{{ $t('bitPouch.chipTools') }}</span>
-          <span class="bpchip">{{ $t('bitPouch.license') }}</span>
-        </div>
-      </section>
-
-      <!-- 能力速览 -->
-      <section class="bpstats">
-        <div v-for="s in stats" :key="s.labelKey" class="bpstat">
-          <div class="bpstat-n">{{ s.num }}</div>
-          <div class="bpstat-l">{{ $t(s.labelKey) }}</div>
-        </div>
-      </section>
-
-      <!-- 下载 -->
-      <section id="bitpouch-download" class="bpsec">
-        <div class="bplabel">{{ $t('bitPouch.secDownload') }}</div>
-        <p class="bpsec-hint">{{ $t('bitPouch.dlHint') }}</p>
-
-        <div class="bpplat">
-          <article v-for="p in platforms" :key="p.key" class="bpplat-card">
-            <div class="bpplat-head">
-              <span class="bpplat-ic" aria-hidden="true" v-html="p.icon"></span>
-              <div class="bpplat-titles">
-                <h3 class="bpplat-name">{{ $t(p.nameKey) }}</h3>
-                <p class="bpplat-arch">{{ $t(p.archKey) }}</p>
+        <div class="bpher-visual">
+          <div class="bppatch" aria-hidden="true" v-html="pouchMark"></div>
+          <div class="bpterm" aria-hidden="true">
+            <div class="bpterm-bar">
+              <span class="bpterm-dots"><i></i><i></i><i></i></span>
+              <span class="bpterm-title">bit_pouch — shell</span>
+            </div>
+            <div class="bpterm-body">
+              <div class="bpterm-line"><span class="t-prompt">$</span> bit_pouch</div>
+              <div class="bpterm-line t-comment"># open a tool by name</div>
+              <div class="bpterm-line"><span class="t-prompt">&gt;</span> json.format</div>
+              <div class="bpterm-line"><span class="t-ok">✓</span> plugin loaded <span class="t-dim">· worker</span></div>
+              <div class="bpterm-line"><span class="t-prompt">&gt;</span> {"id":1,"tags":["a","b"]}</div>
+              <div class="bpterm-line t-out">{</div>
+              <div class="bpterm-line t-out">"id": 1,</div>
+              <div class="bpterm-line t-out">"tags": ["a", "b"]</div>
+              <div class="bpterm-line t-out">}</div>
+              <div class="bpterm-line">
+                <span class="t-ok">✓</span> 0.8 ms <span class="t-dim">· 0 B uploaded</span><span class="bpterm-caret"></span>
               </div>
             </div>
-            <ul class="bpplat-dls">
-              <li v-for="d in p.downloads" :key="d.labelKey">
-                <a
-                  class="bpdl"
-                  :class="{ 'bpdl-primary': d.primary }"
-                  :href="downloadUrl(d.asset)"
-                  :download="d.asset ? '' : undefined"
-                  :target="d.asset ? undefined : '_blank'"
-                  :rel="d.asset ? undefined : 'noopener noreferrer'"
-                >
-                  <span class="bpdl-ic" aria-hidden="true" v-html="d.icon || dlIcon"></span>
-                  <span class="bpdl-label">{{ $t(d.labelKey) }}</span>
-                  <span class="bpdl-meta">{{ d.meta }}</span>
-                </a>
-              </li>
-            </ul>
-          </article>
-        </div>
-
-        <p class="bprelease">
-          {{ $t('bitPouch.releaseHint') }}
-          <a :href="releasesUrl" target="_blank" rel="noopener noreferrer"> GitHub Releases </a>
-        </p>
-      </section>
-
-      <!-- 功能 -->
-      <section class="bpsec">
-        <div class="bplabel">{{ $t('bitPouch.secFeatures') }}</div>
-        <p class="bpsec-hint">{{ $t('bitPouch.featHint') }}</p>
-
-        <div v-for="g in featureGroups" :key="g.labelKey" class="bpgroup">
-          <div class="bpgroup-label">{{ $t(g.labelKey) }}</div>
-          <div class="bpgrid">
-            <div v-for="f in g.items" :key="f.titleKey" class="bpcard">
-              <div class="bpcard-ic" aria-hidden="true" v-html="f.icon"></div>
-              <h3 class="bpcard-t">{{ $t(f.titleKey) }}</h3>
-              <p class="bpcard-d">{{ $t(f.descKey) }}</p>
+            <div class="bpterm-foot">
+              <span>11 TOOLS</span>
+              <span>LOCAL-FIRST</span>
+              <span class="t-ok">NO CLOUD</span>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- 首次运行与更新 -->
-      <section class="bpsec">
-        <div class="bplabel">{{ $t('bitPouch.notesLabel') }}</div>
-        <div class="bpnotes">
-          <div v-for="n in notes" :key="n.titleKey" class="bpnote">
-            <div class="bpnote-t">{{ $t(n.titleKey) }}</div>
-            <p class="bpnote-b">{{ $t(n.bodyKey) }}</p>
+      <!-- 能力速览:一条横向指标带,不做卡片 -->
+      <section class="bpstrip">
+        <div v-for="s in stats" :key="s.labelKey" class="bpstat">
+          <span class="bpstat-n">{{ s.num }}</span>
+          <span class="bpstat-l">{{ $t(s.labelKey) }}</span>
+        </div>
+      </section>
+
+      <!-- 下载:构建产物清单表 -->
+      <section id="download" class="bpsec">
+        <div class="bpsec-index" aria-hidden="true">01</div>
+        <div class="bpsec-body">
+          <header class="bpsec-head">
+            <h2 class="bpsec-title">{{ $t('bitPouch.secDownload') }}</h2>
+            <p class="bpsec-hint">{{ $t('bitPouch.dlHint') }}</p>
+          </header>
+
+          <div class="bptable">
+            <div class="bptable-head" aria-hidden="true">
+              <span>{{ $t('bitPouch.colTarget') }}</span>
+              <span>{{ $t('bitPouch.colBuild') }}</span>
+              <span>{{ $t('bitPouch.colGet') }}</span>
+            </div>
+
+            <div v-for="p in platforms" :key="p.key" class="bprow">
+              <div class="bprow-os">
+                <span class="bprow-ic" aria-hidden="true" v-html="p.icon"></span>
+                <span class="bprow-meta">
+                  <span class="bprow-name">{{ $t(p.nameKey) }}</span>
+                  <span class="bprow-arch">{{ $t(p.archKey) }}</span>
+                </span>
+              </div>
+              <div class="bprow-build" aria-hidden="true">
+                <span v-for="d in p.downloads" :key="d.asset" class="bpfile">{{ d.asset }}</span>
+              </div>
+              <div class="bprow-get">
+                <a
+                  v-for="d in p.downloads"
+                  :key="d.labelKey"
+                  class="bpdl"
+                  :class="{ 'is-primary': d.primary }"
+                  :href="downloadUrl(d.asset)"
+                  download
+                >
+                  <span class="bpdl-ic" aria-hidden="true" v-html="d.icon || dlIcon"></span>
+                  <span class="bpdl-label">{{ $t(d.labelKey) }}</span>
+                  <span class="bpdl-meta">{{ d.meta }}</span>
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <p class="bprelease">
+            {{ $t('bitPouch.releaseHint') }}
+            <a :href="releasesUrl" target="_blank" rel="noopener noreferrer">GitHub Releases ↗</a>
+          </p>
+        </div>
+      </section>
+
+      <!-- 功能:编号规格清单 -->
+      <section id="features" class="bpsec">
+        <div class="bpsec-index" aria-hidden="true">02</div>
+        <div class="bpsec-body">
+          <header class="bpsec-head">
+            <h2 class="bpsec-title">{{ $t('bitPouch.secFeatures') }}</h2>
+            <p class="bpsec-hint">{{ $t('bitPouch.featHint') }}</p>
+          </header>
+
+          <div class="bpspec">
+            <div v-for="g in featureGroups" :key="g.labelKey" class="bpspec-group">
+              <div class="bpspec-head">
+                <span>{{ g.num }}</span
+                >{{ $t(g.labelKey) }}
+              </div>
+              <div class="bpspec-items">
+                <div v-for="f in g.items" :key="f.titleKey" class="bpspec-item">
+                  <span class="bpspec-num">{{ f.num }}</span>
+                  <h3 class="bpspec-t">{{ $t(f.titleKey) }}</h3>
+                  <p class="bpspec-d">{{ $t(f.descKey) }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 首次运行与更新:readme 式说明 -->
+      <section id="notes" class="bpsec">
+        <div class="bpsec-index" aria-hidden="true">03</div>
+        <div class="bpsec-body">
+          <header class="bpsec-head">
+            <h2 class="bpsec-title">{{ $t('bitPouch.notesLabel') }}</h2>
+          </header>
+
+          <div class="bpnotes">
+            <div v-for="n in notes" :key="n.titleKey" class="bpnote">
+              <span class="bpnote-mark" aria-hidden="true">!</span>
+              <div>
+                <h3 class="bpnote-t">{{ $t(n.titleKey) }}</h3>
+                <p class="bpnote-b">{{ $t(n.bodyKey) }}</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       <!-- 页脚 -->
       <footer class="bpfoot">
-        <span>{{ $t('bitPouch.footer', { version }) }}</span>
-        <span class="bpsep" aria-hidden="true">·</span>
-        <span>{{ $t('bitPouch.license') }}</span>
-        <span class="bpsep" aria-hidden="true">·</span>
-        <a :href="repoUrl" target="_blank" rel="noopener noreferrer">
-          {{ $t('bitPouch.sourceCode') }}
-        </a>
-        <span class="bpsep" aria-hidden="true">·</span>
-        <span>{{ $t('bitPouch.hostedBy') }}</span>
+        <span>{{ $t('bitPouch.footer', { version }) }} · {{ $t('bitPouch.license') }}</span>
+        <span class="bpfoot-links">
+          <a :href="repoUrl" target="_blank" rel="noopener noreferrer">{{ $t('bitPouch.sourceCode') }}</a>
+          <span class="bpfoot-sep" aria-hidden="true">/</span>
+          <span>{{ $t('bitPouch.hostedBy') }}</span>
+        </span>
       </footer>
     </div>
   </div>
@@ -164,7 +220,7 @@ const repoUrl = 'https://github.com/chillyice/bit_pouch'
 const releasesUrl = `${repoUrl}/releases`
 const fileUrl = (name) => `/files/bit_pouch/${name}`
 
-// 主 CTA:Windows 安装版(与下载区第一项一致)
+// 主 CTA:Windows 安装版(与下载表第一行一致)
 const primaryAsset = `bit_pouch_${version}_x64-setup.exe`
 const downloadUrl = (asset) => fileUrl(asset)
 
@@ -261,13 +317,6 @@ const webIcon =
 const zipIcon =
   '<svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M9 5v3M15 5v3M9 11v3M15 11v3M9 17v2M15 17v2"/><path d="M12 8v2"/></svg>'
 
-const flowSteps = [
-  { key: 'bitPouch.flowSearch', cls: 'st-search' },
-  { key: 'bitPouch.flowOpen', cls: 'st-open' },
-  { key: 'bitPouch.flowCalc', cls: 'st-calc' },
-  { key: 'bitPouch.flowCopy', cls: 'st-copy' },
-]
-
 const stats = [
   { num: '11', labelKey: 'bitPouch.statTools' },
   { num: '2', labelKey: 'bitPouch.statRuntimes' },
@@ -353,93 +402,46 @@ const platforms = [
   },
 ]
 
+// 规格清单的编号:分组 01/02/03,条目 01–14 连续,方便对照与引用。
+let specNo = 0
 const featureGroups = [
   {
     labelKey: 'bitPouch.grpTools',
     items: [
-      {
-        titleKey: 'bitPouch.f1Title',
-        descKey: 'bitPouch.f1Desc',
-        icon: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/></svg>',
-      },
-      {
-        titleKey: 'bitPouch.f2Title',
-        descKey: 'bitPouch.f2Desc',
-        icon: '<svg viewBox="0 0 24 24"><path d="M12 3v18M5 8l7-5 7 5M5 16l7 5 7-5"/></svg>',
-      },
-      {
-        titleKey: 'bitPouch.f3Title',
-        descKey: 'bitPouch.f3Desc',
-        icon: '<svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h13"/><circle cx="19" cy="17" r="2"/></svg>',
-      },
-      {
-        titleKey: 'bitPouch.f4Title',
-        descKey: 'bitPouch.f4Desc',
-        icon: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 9h4M7 13h8M7 16h5"/><path d="M16 9h2"/></svg>',
-      },
-      {
-        titleKey: 'bitPouch.f5Title',
-        descKey: 'bitPouch.f5Desc',
-        icon: '<svg viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>',
-      },
+      { titleKey: 'bitPouch.f1Title', descKey: 'bitPouch.f1Desc' },
+      { titleKey: 'bitPouch.f2Title', descKey: 'bitPouch.f2Desc' },
+      { titleKey: 'bitPouch.f3Title', descKey: 'bitPouch.f3Desc' },
+      { titleKey: 'bitPouch.f4Title', descKey: 'bitPouch.f4Desc' },
+      { titleKey: 'bitPouch.f5Title', descKey: 'bitPouch.f5Desc' },
     ],
   },
   {
     labelKey: 'bitPouch.grpCore',
     items: [
-      {
-        titleKey: 'bitPouch.f6Title',
-        descKey: 'bitPouch.f6Desc',
-        icon: '<svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M8 12h8M8 15h5"/></svg>',
-      },
-      {
-        titleKey: 'bitPouch.f7Title',
-        descKey: 'bitPouch.f7Desc',
-        icon: '<svg viewBox="0 0 24 24"><path d="M12 3 4 7v5c0 5 3.5 8 8 9 4.5-1 8-4 8-9V7z"/><path d="m9 12 2 2 4-4"/></svg>',
-      },
-      {
-        titleKey: 'bitPouch.f8Title',
-        descKey: 'bitPouch.f8Desc',
-        icon: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></svg>',
-      },
-      {
-        titleKey: 'bitPouch.f9Title',
-        descKey: 'bitPouch.f9Desc',
-        icon: '<svg viewBox="0 0 24 24"><path d="M12 4v9"/><circle cx="12" cy="17" r="4"/><path d="M7 7l2 2M17 7l-2 2"/></svg>',
-      },
-      {
-        titleKey: 'bitPouch.f10Title',
-        descKey: 'bitPouch.f10Desc',
-        icon: '<svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/><circle cx="17" cy="16" r="1.5"/></svg>',
-      },
+      { titleKey: 'bitPouch.f6Title', descKey: 'bitPouch.f6Desc' },
+      { titleKey: 'bitPouch.f7Title', descKey: 'bitPouch.f7Desc' },
+      { titleKey: 'bitPouch.f8Title', descKey: 'bitPouch.f8Desc' },
+      { titleKey: 'bitPouch.f9Title', descKey: 'bitPouch.f9Desc' },
+      { titleKey: 'bitPouch.f10Title', descKey: 'bitPouch.f10Desc' },
     ],
   },
   {
     labelKey: 'bitPouch.grpCross',
     items: [
-      {
-        titleKey: 'bitPouch.f11Title',
-        descKey: 'bitPouch.f11Desc',
-        icon: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="12" height="9" rx="1.5"/><rect x="9" y="11" width="12" height="9" rx="1.5"/><path d="M7 8h4M13 15h4"/></svg>',
-      },
-      {
-        titleKey: 'bitPouch.f12Title',
-        descKey: 'bitPouch.f12Desc',
-        icon: '<svg viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6z"/><path d="M9 12h6M12 9v6"/></svg>',
-      },
-      {
-        titleKey: 'bitPouch.f13Title',
-        descKey: 'bitPouch.f13Desc',
-        icon: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg>',
-      },
-      {
-        titleKey: 'bitPouch.f14Title',
-        descKey: 'bitPouch.f14Desc',
-        icon: '<svg viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 20h14"/></svg>',
-      },
+      { titleKey: 'bitPouch.f11Title', descKey: 'bitPouch.f11Desc' },
+      { titleKey: 'bitPouch.f12Title', descKey: 'bitPouch.f12Desc' },
+      { titleKey: 'bitPouch.f13Title', descKey: 'bitPouch.f13Desc' },
+      { titleKey: 'bitPouch.f14Title', descKey: 'bitPouch.f14Desc' },
     ],
   },
-]
+].map((group, gi) => ({
+  ...group,
+  num: String(gi + 1).padStart(2, '0'),
+  items: group.items.map((item) => {
+    specNo += 1
+    return { ...item, num: String(specNo).padStart(2, '0') }
+  }),
+}))
 
 const notes = [
   { titleKey: 'bitPouch.noteWinTitle', bodyKey: 'bitPouch.noteWinBody' },
@@ -463,126 +465,131 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* 页面自包含:默认深色(bit_pouch 品牌像素麻袋 + 荧光绿),
-   浅色由浏览器/系统的 prefers-color-scheme 触发——两套只换令牌,
-   版式与组件规则共用下面这一份(故别在别处写死颜色,新增颜色一律走变量)。 */
+/* 页面自包含:墨绿底 + 荧光绿 + 麻布棕,方格纸底纹、细线分隔、等宽标号。
+   浅色由浏览器/系统的 prefers-color-scheme 触发——两套只换令牌,版式共用;
+   新增颜色一律走变量,终端面板始终保持深色,作为这页的视觉锚点。 */
 .bp {
-  --bg: #0a0d0b;
-  --panel: #111512;
-  --line: #263128;
+  --bg: #070a07;
+  --panel: #0c110c;
+  --line: #253126;
   --line-soft: rgba(184, 255, 61, 0.07);
-  --text: #e7efe3;
+  --grid: rgba(184, 255, 61, 0.045);
+  --text: #e6efdf;
   --muted: #8b9a8d;
+  --dim: #7d8c78;
   --accent: #b8ff3d;
   --accent-ink: #0a0d0b;
-  --accent-dim: #2c3a1e;
-  --key-bg: #1a221b;
-  --key-line: #344531;
+  --accent-soft: rgba(184, 255, 61, 0.07);
   --tan: #d9b98a;
-  /* 页面自用衍生量:图标底/提示卡底是 accent 的淡色,主按钮与投影随主题走。 */
-  --plate: rgba(184, 255, 61, 0.11);
-  --accent-soft: rgba(184, 255, 61, 0.05);
-  --accent-soft-line: rgba(184, 255, 61, 0.18);
-  --hover-line: rgba(184, 255, 61, 0.42);
-  --shadow-card: 0 2px 10px rgba(0, 0, 0, 0.35);
-  --shadow-lift: 0 14px 30px rgba(0, 0, 0, 0.5);
-  --cta-bg: #b8ff3d;
-  --cta-ink: #0a0d0b;
-  --cta-shadow: 0 8px 22px rgba(184, 255, 61, 0.18);
-  --cta-shadow-hi: 0 12px 30px rgba(184, 255, 61, 0.26);
-  --halo:
-    radial-gradient(880px 420px at 50% -8%, rgba(184, 255, 61, 0.09), transparent 62%),
-    radial-gradient(680px 380px at 94% 3%, rgba(94, 234, 212, 0.06), transparent 60%), var(--bg);
-  /* 流程节点色:工具 / 打开 / 计算 / 复制 */
-  --t-search: #b8ff3d;
-  --t-open: #5eead4;
-  --t-calc: #facc15;
-  --t-copy: #e8a87c;
-  --mono: Consolas, 'Cascadia Mono', monospace;
+  --term-bg: #050805;
+  --term-line: #1f2c1c;
+  --term-text: #c9d8bf;
+  --term-dim: #6b7f66;
+  --term-shadow: rgba(184, 255, 61, 0.08);
+  --mono: 'Cascadia Code', Consolas, 'Courier New', monospace;
+  --sans: 'Microsoft YaHei UI', 'Segoe UI', system-ui, sans-serif;
+  --pad: 28px;
 
   color-scheme: dark;
   min-height: 100vh;
   color: var(--text);
-  font:
-    14px/1.6 'Microsoft YaHei UI',
-    'Segoe UI',
-    system-ui,
-    sans-serif;
-  background: var(--halo);
+  font: 14px/1.65 var(--sans);
+  background: var(--bg);
 }
 
-/* 浅色主题:跟随浏览器/系统偏好。强调色改深绿保证文字对比度,
-   主按钮用深绿底白字;像素麻袋本身仍用自己的固定色。 */
+/* 方格纸底纹:只在页面上半部显现,向下淡出,避免整页噪点。 */
+.bp::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, var(--grid) 1px, transparent 1px), linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+  background-size: 40px 40px;
+  -webkit-mask-image: radial-gradient(ellipse 140% 100% at 50% 0%, #000 0%, transparent 74%);
+  mask-image: radial-gradient(ellipse 140% 100% at 50% 0%, #000 0%, transparent 74%);
+}
+
+/* 浅色:纸感暖白,强调色改深绿保证对比度;终端仍走深色令牌。 */
 @media (prefers-color-scheme: light) {
   .bp {
-    --bg: #f4f4ed;
-    --panel: #ffffff;
-    --line: #d9ddcf;
-    --line-soft: rgba(23, 27, 20, 0.08);
-    --text: #171b14;
-    --muted: #5f6b5c;
+    --bg: #f2f1e7;
+    --panel: #fbfaf2;
+    --line: #ccd0bd;
+    --line-soft: rgba(30, 40, 20, 0.1);
+    --grid: rgba(35, 50, 20, 0.06);
+    --text: #161a12;
+    --muted: #5f6b58;
+    --dim: #64705d;
     --accent: #3f6b00;
     --accent-ink: #ffffff;
-    --accent-dim: #dfe8c8;
-    --key-bg: #eef0e6;
-    --key-line: #c9cfbd;
-    --plate: rgba(63, 107, 0, 0.1);
-    --accent-soft: rgba(63, 107, 0, 0.05);
-    --accent-soft-line: rgba(63, 107, 0, 0.18);
-    --hover-line: rgba(63, 107, 0, 0.4);
-    --shadow-card: 0 2px 10px rgba(23, 27, 20, 0.05);
-    --shadow-lift: 0 14px 28px rgba(23, 27, 20, 0.1);
-    --cta-bg: #3f6b00;
-    --cta-ink: #ffffff;
-    --cta-shadow: 0 8px 20px rgba(63, 107, 0, 0.24);
-    --cta-shadow-hi: 0 12px 26px rgba(63, 107, 0, 0.3);
-    --halo:
-      radial-gradient(880px 420px at 50% -8%, rgba(63, 107, 0, 0.08), transparent 62%),
-      radial-gradient(680px 380px at 94% 3%, rgba(32, 150, 130, 0.05), transparent 60%), var(--bg);
-    --t-search: #3f6b00;
-    --t-open: #0f766e;
-    --t-calc: #a16207;
-    --t-copy: #9a5b32;
+    --accent-soft: rgba(63, 107, 0, 0.07);
+    --tan: #8a6434;
+    --term-shadow: rgba(63, 107, 0, 0.15);
 
     color-scheme: light;
   }
 }
-/* 独立页整屏渲染时,根元素也是页面的一部分:ihomy 外壳默认暖居·暮,html 上带着深色底与
-   深色滚动条,浅色浏览器下会在页面上顶出一条深色边。底色取上面两套 --bg 的同值
-   (令牌声明在 .bp 上,html 取不到)。 */
+
+/* 独立页整屏渲染时,根元素也是页面的一部分:ihomy 外壳默认暖居·暮,html 上带着深色底,
+   浅色浏览器下会在页面上顶出一条深色边。底色取上面两套 --bg 的同值。 */
 :global(html.bitpouch-page:root) {
   color-scheme: dark;
-  background: #0a0d0b;
+  background: #070a07;
+  scroll-behavior: smooth;
 }
 @media (prefers-color-scheme: light) {
   :global(html.bitpouch-page:root) {
     color-scheme: light;
-    background: #f4f4ed;
+    background: #f2f1e7;
   }
 }
+@media (prefers-reduced-motion: reduce) {
+  :global(html.bitpouch-page:root) {
+    scroll-behavior: auto;
+  }
+}
+
+.bp ::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
 .bpwrap {
-  max-width: 1060px;
+  position: relative;
+  z-index: 1;
+  max-width: 1140px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 var(--pad);
+}
+
+.bp a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 /* ---------- 顶栏 ---------- */
 .bptop {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 24px 0 4px;
+  gap: 24px;
+  height: 66px;
+  margin: 0 calc(-1 * var(--pad));
+  padding: 0 var(--pad);
+  border-bottom: 1px solid var(--line);
 }
 .bpbrand {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
 }
 .bpmark {
-  width: 34px;
-  height: 34px;
-  border-radius: 9px;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 4px;
   overflow: hidden;
   box-shadow: 0 0 0 1px var(--line);
 }
@@ -591,43 +598,74 @@ onBeforeUnmount(() => {
   height: 100%;
   display: block;
 }
-.bpbrand-cn {
-  font-size: 18px;
+.bpbrand-name {
+  font-family: var(--mono);
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: -0.02em;
 }
-.bpbrand-en {
-  font-size: 12px;
-  font-weight: 600;
+.bpver {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 10.5px;
   color: var(--muted);
-  letter-spacing: 0.1em;
+}
+.bpnav {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin-left: auto;
+}
+.bpnav a {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 8px 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.16s ease;
+}
+.bpnav b {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  color: var(--dim);
+  transition: color 0.16s ease;
+}
+.bpnav a:hover {
+  color: var(--text);
+}
+.bpnav a:hover b {
+  color: var(--accent);
 }
 .bpgh {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  height: 32px;
-  padding: 0 12px;
-  border-radius: 8px;
-  background: var(--panel);
+  height: 30px;
+  padding: 0 10px;
   border: 1px solid var(--line);
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 11.5px;
   color: var(--muted);
-  font-size: 12.5px;
-  font-weight: 600;
   text-decoration: none;
   transition:
     color 0.16s ease,
-    border-color 0.16s ease,
-    transform 0.16s ease;
+    border-color 0.16s ease;
 }
 .bpgh:hover {
-  color: var(--text);
-  border-color: var(--muted);
-  transform: translateY(-1px);
+  color: var(--accent);
+  border-color: var(--accent);
 }
 .bpgh-ic {
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
   display: block;
 }
 .bpgh-ic :deep(svg) {
@@ -637,169 +675,94 @@ onBeforeUnmount(() => {
 }
 
 /* ---------- 主视觉 ---------- */
-.bpheroc {
-  text-align: center;
-  padding: 52px 0 44px;
-}
-.bpheromark {
-  width: 96px;
-  height: 96px;
-  margin: 0 auto 24px;
-  border-radius: 20px;
-  overflow: hidden;
-  box-shadow:
-    0 0 0 1px var(--line),
-    0 18px 40px rgba(0, 0, 0, 0.45),
-    0 0 48px rgba(184, 255, 61, 0.12);
-}
-.bpheromark :deep(svg) {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-.bptitle {
-  font-size: 50px;
-  font-weight: 800;
-  letter-spacing: 0.01em;
-  line-height: 1.1;
-  margin: 0 0 10px;
-}
-.bptitle-en {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--muted);
-  letter-spacing: 0.04em;
-  margin-left: 12px;
-  vertical-align: 4px;
-}
-.bptag {
-  font-size: 19px;
-  font-weight: 600;
-  color: var(--accent);
-  margin: 0 0 8px;
-}
-.bpsub {
-  font-size: 15px;
-  color: var(--muted);
-  margin: 0 auto;
-  max-width: 660px;
-}
-
-/* 工具链示意 */
-.bpflow {
-  display: inline-flex;
-  flex-direction: column;
+.bpher {
+  display: grid;
+  grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
+  gap: clamp(36px, 5vw, 72px);
   align-items: center;
-  gap: 7px;
-  margin-top: 26px;
-  padding: 12px 20px 13px;
-  border-radius: 14px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-card);
+  padding: clamp(56px, 7vw, 92px) 0 clamp(44px, 6vw, 72px);
 }
-.bpflow-cap {
-  font-size: 11.5px;
-  color: var(--muted);
-  letter-spacing: 0.04em;
-}
-.bpflow-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-.bpflow-bolt {
-  color: var(--accent);
-  font-size: 13px;
-}
-.bpflow-keys {
-  display: inline-flex;
-  gap: 3px;
-}
-.bpflow-keys kbd {
-  font-family: var(--mono);
-  font-size: 11.5px;
-  line-height: 1.45;
-  padding: 1px 6px;
-  color: var(--text);
-  background: var(--key-bg);
-  border: 1px solid var(--key-line);
-  border-bottom-width: 2px;
-  border-radius: 5px;
-}
-.bpflow-arrow {
-  color: var(--muted);
-  opacity: 0.65;
-  font-size: 12px;
-}
-.bpflow-step {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12.5px;
-  color: var(--muted);
-}
-.bpflow-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  border: 2px solid var(--muted);
-  box-sizing: content-box;
-}
-.bpflow-dot.st-search {
-  border-color: var(--t-search);
-}
-.bpflow-dot.st-open {
-  border-color: var(--t-open);
-}
-.bpflow-dot.st-calc {
-  border-color: var(--t-calc);
-}
-.bpflow-dot.st-copy {
-  border-color: var(--t-copy);
-}
-.bpflow-done {
-  color: var(--t-search);
-  font-size: 12.5px;
-}
-
-/* CTA */
-.bpcta {
+.bpeyebrow {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin-top: 30px;
+  gap: 9px;
+  margin: 0 0 18px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.bpeyebrow-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.bptitle {
+  display: flex;
+  align-items: baseline;
+  margin: 0;
+  font-family: var(--mono);
+  font-size: clamp(46px, 6.6vw, 84px);
+  font-weight: 700;
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+}
+.bptitle-caret {
+  width: 0.34em;
+  height: 0.68em;
+  margin-left: 0.06em;
+  flex: none;
+  background: var(--accent);
+  animation: bpblink 1.2s steps(1) infinite;
+}
+.bpclaim {
+  margin: 18px 0 0;
+  font-size: clamp(19px, 2.2vw, 25px);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.bpsub {
+  max-width: 520px;
+  margin: 10px 0 0;
+  font-size: 14.5px;
+  line-height: 1.75;
+  color: var(--muted);
+}
+.bpcta {
+  display: flex;
   flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
 }
 .bpbtn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 9px;
   height: 46px;
-  padding: 0 24px;
-  border-radius: 10px;
-  font-size: 15px;
+  padding: 0 20px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 12.5px;
   font-weight: 700;
-  font-family: inherit;
+  letter-spacing: 0.02em;
   text-decoration: none;
-  cursor: pointer;
   transition:
     transform 0.16s ease,
-    box-shadow 0.16s ease,
     filter 0.16s ease,
-    border-color 0.16s ease;
+    border-color 0.16s ease,
+    color 0.16s ease;
 }
-.bpbtn-ic,
-.bpdl-ic {
-  width: 17px;
-  height: 17px;
+.bpbtn-ic {
+  width: 16px;
+  height: 16px;
   display: block;
 }
-.bpbtn-ic :deep(svg),
-.bpdl-ic :deep(svg) {
+.bpbtn-ic :deep(svg) {
   width: 100%;
   height: 100%;
   fill: none;
@@ -809,315 +772,518 @@ onBeforeUnmount(() => {
   stroke-linejoin: round;
 }
 .bpbtn-primary {
-  background: var(--cta-bg);
-  border: 1px solid var(--cta-bg);
-  color: var(--cta-ink);
-  box-shadow: var(--cta-shadow);
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px);
 }
 .bpbtn-primary:hover {
-  transform: translateY(-2px);
-  filter: brightness(1.05);
-  box-shadow: var(--cta-shadow-hi);
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
+.bpbtn-primary:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--text);
 }
 .bpbtn-ghost {
-  background: var(--panel);
-  border: 1px solid var(--line);
+  background: transparent;
   color: var(--text);
 }
 .bpbtn-ghost:hover {
-  transform: translateY(-2px);
-  border-color: var(--muted);
-  box-shadow: var(--shadow-lift);
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  color: var(--accent);
 }
-
-.bpmeta {
+.bpkv {
   display: flex;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 18px;
   flex-wrap: wrap;
+  max-width: 520px;
+  margin: 32px 0 0;
+  border-top: 1px solid var(--line);
 }
-.bpchip {
-  font-size: 12.5px;
-  color: var(--muted);
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: var(--panel);
-  border: 1px solid var(--line);
+.bpkv > div {
+  flex: 1 1 120px;
+  padding: 12px 18px 0 0;
+}
+.bpkv dt {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.15em;
+  color: var(--dim);
+}
+.bpkv dd {
+  margin: 3px 0 0;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text);
 }
 
-/* ---------- 能力速览 ---------- */
-.bpstats {
+/* 终端演示:页面视觉锚点,深色不随主题反转 */
+.bpher-visual {
+  position: relative;
+  min-width: 0;
+}
+.bppatch {
+  position: absolute;
+  top: -22px;
+  right: -14px;
+  z-index: 2;
+  width: 62px;
+  height: 62px;
+  border-radius: 8px;
+  overflow: hidden;
+  transform: rotate(5deg);
+  box-shadow:
+    0 0 0 1px var(--line),
+    0 10px 24px rgba(0, 0, 0, 0.32);
+}
+.bppatch :deep(svg) {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.bpterm {
+  position: relative;
+  background: var(--term-bg);
+  border: 1px solid var(--term-line);
+  box-shadow:
+    10px 10px 0 var(--term-shadow),
+    0 30px 60px rgba(0, 0, 0, 0.35);
+}
+.bpterm::before,
+.bpterm::after {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--accent);
+  pointer-events: none;
+}
+.bpterm::before {
+  top: -1px;
+  left: -1px;
+  border-right: 0;
+  border-bottom: 0;
+}
+.bpterm::after {
+  right: -1px;
+  bottom: -1px;
+  border-top: 0;
+  border-left: 0;
+}
+.bpterm-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 38px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--term-line);
+}
+.bpterm-dots {
+  display: flex;
+  gap: 5px;
+}
+.bpterm-dots i {
+  width: 7px;
+  height: 7px;
+  background: #2b3a26;
+}
+.bpterm-dots i:first-child {
+  background: var(--accent);
+  opacity: 0.8;
+}
+.bpterm-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--term-dim);
+}
+.bpterm-body {
+  padding: 18px 20px 16px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.9;
+  color: var(--term-text);
+  overflow-x: auto;
+}
+.bpterm-line {
+  white-space: pre;
+}
+.t-prompt,
+.t-ok {
+  color: var(--accent);
+}
+.t-dim,
+.t-comment {
+  color: var(--term-dim);
+}
+.t-out {
+  color: var(--tan);
+}
+.bpterm-caret {
+  display: inline-block;
+  width: 7px;
+  height: 13px;
+  margin-left: 7px;
+  vertical-align: -2px;
+  background: var(--accent);
+  animation: bpblink 1.1s steps(1) infinite;
+}
+.bpterm-foot {
+  display: flex;
+  gap: 16px;
+  padding: 10px 20px;
+  border-top: 1px solid var(--term-line);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  color: var(--term-dim);
+}
+.bpterm-foot span:last-child {
+  margin-left: auto;
+  color: var(--accent);
+}
+
+/* ---------- 指标带 ---------- */
+.bpstrip {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  padding-bottom: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 .bpstat {
-  padding: 16px 14px;
-  border-radius: 12px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  text-align: center;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 18px 20px;
+}
+.bpstat + .bpstat {
+  border-left: 1px solid var(--line);
 }
 .bpstat-n {
   font-family: var(--mono);
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
   color: var(--accent);
-  line-height: 1.2;
 }
 .bpstat-l {
-  font-size: 12.5px;
+  font-size: 11.5px;
   color: var(--muted);
 }
 
-/* ---------- 分区 ---------- */
+/* ---------- 分区骨架:左侧编号,右侧内容 ---------- */
 .bpsec {
-  padding: 38px 0 0;
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 8px 28px;
+  padding-top: clamp(56px, 7vw, 84px);
 }
-.bplabel {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--muted);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+.bpsec-index {
+  padding-top: 9px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--accent);
+}
+.bpsec-index::after {
+  content: '';
+  display: block;
+  width: 24px;
+  height: 1px;
+  margin-top: 12px;
+  background: var(--line);
+}
+.bpsec-head {
+  margin-bottom: 22px;
+}
+.bpsec-title {
+  margin: 0;
+  font-size: clamp(24px, 3vw, 30px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 .bpsec-hint {
-  font-size: 14px;
+  max-width: 720px;
+  margin: 8px 0 0;
+  font-size: 13.5px;
   color: var(--muted);
-  margin: 4px 0 16px;
 }
 
-/* 下载 */
-.bpplat {
+/* ---------- 下载:构建产物清单表 ---------- */
+.bptable {
+  border-top: 1px solid var(--line);
+}
+.bptable-head {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(228px, 1fr));
-  gap: 14px;
+  grid-template-columns: 1.05fr 1.2fr 1fr;
+  gap: 18px;
+  padding: 9px 0;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  color: var(--dim);
 }
-.bpplat-card {
-  display: flex;
-  flex-direction: column;
-  padding: 20px 18px 18px;
-  border-radius: 16px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-card);
-  transition:
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    transform 0.18s ease;
+.bprow {
+  display: grid;
+  grid-template-columns: 1.05fr 1.2fr 1fr;
+  gap: 18px;
+  align-items: center;
+  margin: 0 -10px;
+  padding: 18px 10px;
+  border-top: 1px solid var(--line-soft);
+  transition: background 0.16s ease;
 }
-.bpplat-card:hover {
-  border-color: var(--hover-line);
-  box-shadow: var(--shadow-lift);
-  transform: translateY(-2px);
+.bprow:hover {
+  background: var(--accent-soft);
 }
-.bpplat-head {
+.bprow-os {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 12px;
+  min-width: 0;
 }
-.bpplat-ic {
-  width: 38px;
-  height: 38px;
-  flex: none;
-  border-radius: 10px;
-  background: var(--plate);
+.bprow-ic {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--panel);
 }
-.bpplat-ic :deep(svg) {
-  width: 20px;
-  height: 20px;
+.bprow-ic :deep(svg) {
+  width: 18px;
+  height: 18px;
   fill: none;
   stroke: var(--accent);
-  stroke-width: 1.7;
+  stroke-width: 1.6;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.bpplat-titles {
+.bprow-meta {
   min-width: 0;
 }
-.bpplat-name {
-  font-size: 16px;
+.bprow-name {
+  display: block;
+  font-size: 14.5px;
   font-weight: 700;
-  margin: 0;
 }
-.bpplat-arch {
-  font-size: 12px;
+.bprow-arch {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--mono);
+  font-size: 10.5px;
   color: var(--muted);
-  margin: 1px 0 0;
 }
-.bpplat-dls {
-  list-style: none;
-  margin: 16px 0 0;
-  padding: 0;
+.bprow-build {
   display: flex;
   flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.bpfile {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.bprow-get {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 .bpdl {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 9px;
-  padding: 10px 13px;
-  border-radius: 10px;
-  background: var(--bg);
+  gap: 7px;
+  height: 34px;
+  padding: 0 11px;
   border: 1px solid var(--line);
+  border-radius: 2px;
+  background: transparent;
   color: var(--text);
-  font-size: 13.5px;
-  font-weight: 600;
-  text-decoration: none;
-  transition:
-    border-color 0.16s ease,
-    background 0.16s ease,
-    color 0.16s ease;
-}
-.bpdl:hover {
-  border-color: var(--muted);
-}
-.bpdl-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.bpdl-meta {
-  margin-left: auto;
-  flex: none;
   font-family: var(--mono);
   font-size: 11.5px;
-  font-weight: 400;
-  color: var(--muted);
-}
-.bpdl-primary {
-  background: var(--cta-bg);
-  border-color: var(--cta-bg);
-  color: var(--cta-ink);
-}
-.bpdl-primary .bpdl-meta {
-  color: var(--cta-ink);
-  opacity: 0.72;
-}
-.bpdl-primary:hover {
-  filter: brightness(1.06);
-  border-color: var(--cta-bg);
-}
-.bprelease {
-  margin: 14px 0 0;
-  font-size: 13px;
-  color: var(--muted);
-}
-.bprelease a {
-  color: var(--accent);
   font-weight: 600;
   text-decoration: none;
-  border-bottom: 1px solid var(--accent-dim);
-}
-.bprelease a:hover {
-  border-bottom-color: var(--accent);
-}
-
-/* 功能 */
-.bpgroup + .bpgroup {
-  margin-top: 22px;
-}
-.bpgroup-label {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--accent);
-  margin-bottom: 10px;
-}
-.bpgrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));
-  gap: 12px;
-}
-.bpcard {
-  padding: 18px 18px 16px;
-  border-radius: 14px;
-  background: var(--panel);
-  border: 1px solid var(--line);
   transition:
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    transform 0.18s ease;
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    filter 0.16s ease;
 }
-.bpcard:hover {
-  border-color: var(--hover-line);
-  box-shadow: var(--shadow-lift);
-  transform: translateY(-2px);
+.bpdl:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  color: var(--accent);
 }
-.bpcard-ic {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: var(--plate);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 12px;
+.bpdl-ic {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  display: block;
 }
-.bpcard-ic :deep(svg) {
-  width: 19px;
-  height: 19px;
+.bpdl-ic :deep(svg) {
+  width: 100%;
+  height: 100%;
   fill: none;
-  stroke: var(--accent);
-  stroke-width: 1.7;
+  stroke: currentColor;
+  stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.bpcard-t {
-  font-size: 15px;
-  font-weight: 700;
-  margin: 0 0 6px;
+.bpdl-meta {
+  font-size: 9.5px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  color: var(--dim);
 }
-.bpcard-d {
-  font-size: 12.8px;
-  line-height: 1.7;
+.bpdl.is-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.bpdl.is-primary .bpdl-meta {
+  color: var(--accent-ink);
+  opacity: 0.65;
+}
+.bpdl.is-primary:hover {
+  color: var(--accent-ink);
+  filter: brightness(1.06);
+}
+.bprelease {
+  margin: 16px 0 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--dim);
+}
+.bprelease a {
   color: var(--muted);
-  margin: 0;
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+}
+.bprelease a:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
 }
 
-/* 首次运行与更新 */
+/* ---------- 功能:编号规格清单 ---------- */
+.bpspec {
+  border-top: 1px solid var(--line);
+}
+.bpspec-group {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 10px 28px;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--line);
+}
+.bpspec-head {
+  padding-top: 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--tan);
+}
+.bpspec-head span {
+  margin-right: 9px;
+  color: var(--dim);
+}
+.bpspec-items {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 32px;
+}
+.bpspec-item {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: start;
+  padding: 13px 0;
+  border-top: 1px solid var(--line-soft);
+}
+.bpspec-item:nth-child(-n + 2) {
+  padding-top: 0;
+  border-top: 0;
+}
+.bpspec-num {
+  padding-top: 3px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--accent);
+}
+.bpspec-t {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+.bpspec-d {
+  grid-column: 2;
+  margin: 4px 0 0;
+  font-size: 12.3px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+/* ---------- 首次运行与更新 ---------- */
 .bpnotes {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 0 40px;
+  border-top: 1px solid var(--line);
 }
 .bpnote {
-  padding: 16px 18px;
-  border-radius: 14px;
-  background: var(--accent-soft);
-  border: 1px solid var(--accent-soft-line);
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 10px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.bpnote-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border: 1px solid var(--tan);
+  color: var(--tan);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1;
 }
 .bpnote-t {
-  font-size: 13.5px;
+  margin: 0 0 4px;
+  font-size: 13px;
   font-weight: 700;
-  color: var(--accent);
-  margin-bottom: 6px;
 }
 .bpnote-b {
   margin: 0;
-  font-size: 12.8px;
+  font-size: 12.3px;
   line-height: 1.7;
   color: var(--muted);
 }
 
-/* 页脚 */
+/* ---------- 页脚 ---------- */
 .bpfoot {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 40px;
-  padding: 22px 0 40px;
-  border-top: 1px solid var(--line-soft);
-  font-size: 12.5px;
-  color: var(--muted);
+  gap: 10px 20px;
+  margin-top: clamp(56px, 7vw, 84px);
+  padding: 20px 0 40px;
+  border-top: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--dim);
+}
+.bpfoot-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
 }
 .bpfoot a {
   color: var(--muted);
@@ -1126,42 +1292,159 @@ onBeforeUnmount(() => {
 .bpfoot a:hover {
   color: var(--accent);
 }
-.bpsep {
-  opacity: 0.6;
+.bpfoot-sep {
+  opacity: 0.4;
 }
 
-@media (max-width: 900px) {
-  .bpplat {
-    grid-template-columns: 1fr 1fr;
+@keyframes bpblink {
+  0%,
+  54% {
+    opacity: 1;
+  }
+  55%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bp *,
+  .bp *::before,
+  .bp *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 980px) {
+  .bpher {
+    grid-template-columns: 1fr;
+    gap: 52px;
+    padding-top: 56px;
+  }
+  .bpher-visual {
+    width: 100%;
+    max-width: 660px;
+    margin: 0 auto;
+  }
+  .bpsec {
+    grid-template-columns: 56px minmax(0, 1fr);
+    gap: 8px 20px;
+  }
+  .bpspec-group {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .bpspec-head {
+    padding-top: 0;
+  }
+}
+@media (max-width: 820px) {
+  .bpnav {
+    display: none;
+  }
+  .bpgh {
+    margin-left: auto;
   }
 }
 @media (max-width: 720px) {
-  .bpheroc {
-    padding: 40px 0 34px;
-  }
-  .bptitle {
-    font-size: 38px;
-  }
-  .bptitle-en {
-    font-size: 17px;
-    vertical-align: 3px;
-  }
-  .bpstats {
+  .bpstrip {
     grid-template-columns: 1fr 1fr;
+  }
+  .bpstat:nth-child(odd) {
+    border-left: 0;
+  }
+  .bpstat:nth-child(n + 3) {
+    border-top: 1px solid var(--line);
+  }
+  .bpspec-items {
+    grid-template-columns: 1fr;
+  }
+  .bpspec-item:nth-child(-n + 2) {
+    padding-top: 13px;
+    border-top: 1px solid var(--line-soft);
+  }
+  .bpspec-item:first-child {
+    padding-top: 0;
+    border-top: 0;
   }
   .bpnotes {
     grid-template-columns: 1fr;
   }
+  .bptable-head {
+    display: none;
+  }
+  .bprow {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 18px 10px;
+  }
+  .bprow-build {
+    display: none;
+  }
 }
 @media (max-width: 560px) {
-  .bpplat {
-    grid-template-columns: 1fr;
+  .bp {
+    --pad: 18px;
   }
-  .bpgrid {
-    grid-template-columns: 1fr;
+  .bptop {
+    height: 58px;
+    gap: 14px;
   }
-  .bpflow-row {
+  .bpbrand-name {
+    font-size: 14px;
+  }
+  .bpver {
+    display: none;
+  }
+  .bpgh {
+    width: 32px;
+    padding: 0;
+    justify-content: center;
+  }
+  .bpgh-label {
+    display: none;
+  }
+  .bpsec {
+    grid-template-columns: 1fr;
     gap: 6px;
+  }
+  .bpsec-index {
+    padding-top: 0;
+  }
+  .bpsec-index::after {
+    display: none;
+  }
+  .bpterm-body {
+    padding: 14px 14px 12px;
+    font-size: 11px;
+    line-height: 1.85;
+  }
+  .bpterm-foot {
+    gap: 10px;
+    padding: 10px 14px;
+    letter-spacing: 0.08em;
+  }
+  .bppatch {
+    top: -16px;
+    right: 4px;
+    width: 48px;
+    height: 48px;
+  }
+  .bpcta .bpbtn {
+    width: 100%;
+  }
+  .bpkv {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .bpkv > div {
+    padding: 10px 0;
+    border-bottom: 1px dotted var(--line-soft);
+  }
+  .bpkv > div:last-child {
+    border-bottom: 0;
   }
 }
 </style>
