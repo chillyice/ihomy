@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 const SRC = join(fileURLToPath(new URL('.', import.meta.url)), '..')
 
 // 有意保留的裸 v-html:值来自本地静态常量(装饰性图标 SVG),不含用户数据。
-const ALLOW_FILES = ['views/Kada.vue', 'views/tools/MindMapEditor.vue']
+const ALLOW_FILES = ['views/Kada.vue', 'views/BitPouch.vue', 'views/tools/MindMapEditor.vue']
 
 // 消毒入口:标记导入 + 实际调用(只导入不调用不算)
 const SANITIZER_IMPORT = /from\s+['"]@\/utils\/markdown['"]/

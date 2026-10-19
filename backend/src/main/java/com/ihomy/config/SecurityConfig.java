@@ -49,8 +49,9 @@ public class SecurityConfig {
                 // 认证/公开接口/接口文档无需登录;ws 握手自校验 JWT
                 .requestMatchers("/auth/**", "/public/**", "/ws/**",
                         "/doc.html", "/webjars/**", "/v3/api-docs/**", "/swagger-ui/**").permitAll()
-                // 咔哒安装包目录刻意公开(登录页/咔哒页免登录直接下载)
+                // 咔哒 / bit_pouch 安装包目录刻意公开(登录页/发布页免登录直接下载)
                 .requestMatchers("/files/kada/**").permitAll()
+                .requestMatchers("/files/bit_pouch/**").permitAll()
                 // 上传文件目录:登录态(Bearer 或 ihomy_at cookie)放行,游客只放行 PUBLIC 内容
                 .requestMatchers("/files/**").access((authentication, context) ->
                         new AuthorizationDecision(fileAccessService.allowed(context.getRequest())))

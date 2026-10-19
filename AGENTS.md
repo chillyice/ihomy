@@ -177,7 +177,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 厨房 | 菜单/菜谱/食材 | RecipeController / RecipeService |
 | 物联 | 智能家居中控(HA 接入) | IotController / HomeAssistantService + IotSyncService + views/iot/Iot.vue |
 | 工具 | 工具箱聚合页(卡片可手动排序) / 脑图设计 / AI 测试台 / 3D 光影实验台 / PDF 转换 / JSON 格式化 / 字符编码转换 / 进制转换 / 报文解析 / 子网掩码计算 / 贷款计算器+贷款记录 / Flash·GBA 播放器 | MindMapController / MindMapService(见需求 §4.12) |
-| 系统 | i18n / 主题(暖居/光尘 × 晨/暮) / 字典 / 帮助页 / 独立产品页(咔哒/壁纸) | i18n/ + theme/ + stores/theme.js + utils/dict.js + views/Help.vue + Kada.vue + Wallpaper.vue;咔哒更新镜像在 `scripts/kada-mirror/`(见需求 §4.14) |
+| 系统 | i18n / 主题(暖居/光尘 × 晨/暮) / 字典 / 帮助页 / 独立产品页(咔哒 / bit_pouch / 壁纸) | i18n/ + theme/ + stores/theme.js + utils/dict.js + views/Help.vue + Kada.vue + BitPouch.vue + Wallpaper.vue;咔哒更新镜像在 `scripts/kada-mirror/`(见需求 §4.14);bit_pouch 发布镜像在 bit_pouch 仓 `scripts/ihomy-mirror/`(见需求 §4.14.1) |
 | 移动端 | 设备自适应 | useDevice.js + MobileLayout.vue + Mobile* 组件;三 Tab 判据与页头标题表在 `utils/mobileNav.js`(带单测);**导航条目唯一数据源 `utils/navModules.js`——不入 `sys_home_module` 的页面(设置/帮助/运维/**天气**)须在 `buildNavItems` 补虚拟入口,否则移动端「更多」里没有(V10.26)**;移动首页只做动态流(桌面仪表盘组件对等已决策不做) |
 
 **关键坑速查**:已外移到 **`docs/踩坑速查.md`**,动手前按关键词 grep 该文件。
@@ -206,7 +206,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 1. **API 分组**:`api/index.js` 按模块导出 `xxxApi` 对象;统一走 `api/request.js`(axios+JWT+401 自动刷新)。
 2. **状态管理**:Pinia;`stores/user.js`(登录+权限)、`stores/app.js`(首页聚合)。
 3. **路由守卫**:`meta.public` 无需登录;`meta.ops` 需 `ops:view`;纯 OPS 账号只能访问 `/ops`。
-   - **`meta.standalone`(独立产品页)**:挂「另一款产品的独立页」时加 `meta.standalone`——`App.vue` 走独立分支只渲染 `<router-view>`,**不套** ihomy 外壳(光影层/侧栏/页脚/播放器/回顶);`onMounted` 见 standalone 直接 return(跳过 `appStore.init()`/`ensureUserInfo()`);**外壳必须等 `router.isReady()` 后再渲染**;**续期失败不许顶到登录页**(401 统一走 `redirectToLogin()`,standalone 时直接返回)。**自带配色的独立页要连文档根元素一起接管**(挂载/卸载增删 `html` 上的页标记类,`:global(html.<页类>:root)` 给出底色与 `color-scheme`)。已用:咔哒 `/kada`(根类 `kada-page`,深浅随浏览器偏好)、壁纸屏 `/wallpaper`(跟随 ihomy 主题,无需接管)。成因见踩坑速查 §3.8。
+   - **`meta.standalone`(独立产品页)**:挂「另一款产品的独立页」时加 `meta.standalone`——`App.vue` 走独立分支只渲染 `<router-view>`,**不套** ihomy 外壳(光影层/侧栏/页脚/播放器/回顶);`onMounted` 见 standalone 直接 return(跳过 `appStore.init()`/`ensureUserInfo()`);**外壳必须等 `router.isReady()` 后再渲染**;**续期失败不许顶到登录页**(401 统一走 `redirectToLogin()`,standalone 时直接返回)。**自带配色的独立页要连文档根元素一起接管**(挂载/卸载增删 `html` 上的页标记类,`:global(html.<页类>:root)` 给出底色与 `color-scheme`)。已用:咔哒 `/kada`(根类 `kada-page`,浅色默认、深色随浏览器偏好)、bit_pouch `/bit-pouch`(根类 `bitpouch-page`,深色默认、浅色随浏览器偏好)、壁纸屏 `/wallpaper`(跟随 ihomy 主题,无需接管)。成因见踩坑速查 §3.8。
 4. **样式**:CSS 变量(`main.css`)+ 深色模式 `html.dark` 覆写;**不显式声明 serif 字体**,继承 body sans-serif;要能被类覆写的内联样式走 CSS 变量(踩坑速查 §3.4)。
 5. **图标**:Element Plus `el-icon`(线性图标);**Setting/Monitor 图标用内联 SVG 替代**(复杂 path 在 100% 缩放触发子像素光栅化开销)。
 6. **动画**:GSAP 入场;`transform: translateZ(0)` 隔离合成层;`contain: layout style` 隔离布局;避免 `background-attachment: fixed`(性能杀手)。

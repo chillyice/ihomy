@@ -52,7 +52,7 @@ request.interceptors.request.use(async (config) => {
   return config
 })
 
-// 独立产品页(meta.standalone:/wallpaper、/kada)不套 ihomy 外壳、也没有登录页可跳 ——
+// 独立产品页(meta.standalone:/wallpaper、/kada、/bit-pouch)不套 ihomy 外壳、也没有登录页可跳 ——
 // 续期失败就地保持未登录,不要把整页顶到 /login(壁纸场景尤其糟:墙上会变成 ihomy 登录页)
 const redirectToLogin = (query) => {
   if (router.currentRoute.value.meta?.standalone) return

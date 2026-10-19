@@ -69,7 +69,7 @@ const PREFIX_TITLE_RULES = [
   { prefix: '/games/play', key: () => 'games.title' },
 ]
 
-// 路由路径 → 页头标题 i18n 键;无匹配(独立产品页 /wallpaper、/kada 与未适配页)返回空串,页头只显示返回按钮
+// 路由路径 → 页头标题 i18n 键;无匹配(独立产品页 /wallpaper、/kada、/bit-pouch 与未适配页)返回空串,页头只显示返回按钮
 export function mobileHeaderTitleKey(path) {
   if (!path) return ''
   const hit = PREFIX_TITLE_RULES.find((rule) => path.startsWith(rule.prefix))
