@@ -2213,7 +2213,6 @@ export default {
     noReminder: '今日无待办',
     linkOpen: '打开{label}',
     dropHere: '松手放置',
-    moveHere: '移到此处',
     addWidget: '添加组件',
     newWidget: '新组件',
     alreadyAdded: '该组件已在首页',

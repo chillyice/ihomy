@@ -24,7 +24,7 @@
       <div v-if="editMode" class="gc-edit-hint">{{ $t('warm.editHint') }}</div>
     </Transition>
 
-    <div class="gc-grid" ref="gridEl" @dragover="onReorderDragOver" @drop="onReorderDrop">
+    <div class="gc-grid" ref="gridEl" @dragover="onReorderDragOver" @drop="onReorderDrop" @dragend="onDragEnd">
       <div
         v-a11y-click
         v-for="w in displayWidgets"
@@ -729,6 +729,11 @@ const onDragStart = (e, w) => {
   reorderPreview.value = null
   dragId.value = w.id
   e.dataTransfer.effectAllowed = 'move'
+  // 用透明画布替换浏览器默认的拖拽快照:否则光标下会再跟一张卡片,与网格里的占位叠成「两个相同组件」
+  const blank = document.createElement('canvas')
+  blank.width = 1
+  blank.height = 1
+  e.dataTransfer.setDragImage(blank, 0, 0)
 }
 
 // ========== 侧栏拖入预览(4 列 × 2 行幽灵占位,作为真实网格项参与推挤) ==========
@@ -746,16 +751,13 @@ const displayWidgets = computed(() => {
   const rp = reorderPreview.value
   const dp = dropPreview.value
   if (rp) {
-    // 卡片重排:源卡片保留原位(降透明度表示"被拿起"),在目标下标插入同尺寸占位
-    list.splice(Math.max(0, Math.min(rp.index, list.length)), 0, {
-      id: '__reorder__',
-      kind: 'preview',
-      label: rp.label,
-      icon: rp.icon,
-      span: rp.span,
-      row: rp.row,
-      hint: t('warm.moveHere'),
-    })
+    // 卡片重排:实时移动——把源卡片(降透明度)直接挪到落点,只保留这一个占位,不再额外插入幽灵卡。
+    // rp.index 是「移除源卡后」的下标,故先移出源卡再按该下标插回
+    const from = list.findIndex((w) => w.id === rp.id)
+    if (from >= 0) {
+      const [src] = list.splice(from, 1)
+      list.splice(Math.max(0, Math.min(rp.index, list.length)), 0, src)
+    }
   } else if (dp) {
     list.splice(Math.max(0, Math.min(dp.index, list.length)), 0, {
       id: '__preview__',
@@ -847,7 +849,7 @@ onWidgetDrop((c) => {
   if (dropPreview.value) insertWidgetAt(c, dropPreview.value.index)
 })
 
-// 卡片重排预览:拖拽中在目标下标插入同尺寸占位(复用 insertIndex 计算 + FLIP 推挤)
+// 卡片重排:拖拽中实时把源卡移到目标下标(展示为唯一占位),复用 insertionIndexAt + FLIP 推挤
 const onReorderDragOver = (e) => {
   e.preventDefault()
   if (!dragId.value) return
@@ -856,15 +858,7 @@ const onReorderDragOver = (e) => {
   const cur = reorderPreview.value
   if (!cur || cur.index !== idx) {
     const prev = captureRects()
-    const dragged = widgets.value.find((w) => w.id === dragId.value)
-    reorderPreview.value = {
-      id: dragId.value,
-      index: idx,
-      label: dragged?.label || '',
-      icon: dragged?.icon || '✨',
-      span: dragged?.span || 4,
-      row: dragged?.row || 2,
-    }
+    reorderPreview.value = { id: dragId.value, index: idx }
     nextTick(() => flipLayout(prev))
   }
 }
@@ -1540,9 +1534,9 @@ html.theme-warm.dark .gc-home {
 .gc-overflow {
   overflow: hidden;
 }
-/* 卡片重排中被"拿起"的源卡片:保留原位降透明度,目标下标另有同尺寸占位 */
+/* 卡片重排中「被拿起」的源卡片:实时移动到落点并降透明度,作为唯一占位(不再另插幽灵卡) */
 .gc-card-dragging {
-  opacity: 0.35;
+  opacity: 0.4;
 }
 /* 拖入预览占位(4 列 × 2 行幽灵卡片,作为真实网格项参与推挤) */
 .gc-card-preview {

@@ -2221,7 +2221,6 @@ export default {
     noReminder: 'Nothing due today',
     linkOpen: 'Open {label}',
     dropHere: 'Drop here',
-    moveHere: 'Move here',
     addWidget: 'Add widget',
     newWidget: 'New widget',
     alreadyAdded: 'This widget is already on your home',
