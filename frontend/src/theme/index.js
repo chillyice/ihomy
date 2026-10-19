@@ -78,11 +78,10 @@ function cloneOldTheme(root) {
   overlay.className = 'theme-sweep-old'
 
   const app = document.getElementById('app')
-  if (app) {
-    const clone = app.cloneNode(true)
+  const clone = app ? app.cloneNode(true) : null
+  if (clone) {
     clone.removeAttribute('id')
     overlay.appendChild(clone)
-    copyScroll(app, clone)
   }
 
   // 冻结旧主题 CSS 变量:把 html 当前所有 --* 计算值内联到幕布,后代 var() 不再跟随 html 类切换
@@ -96,6 +95,7 @@ function cloneOldTheme(root) {
   overlay.style.background = oldBg
 
   document.body.appendChild(overlay)
+  if (app && clone) copyScroll(app, clone)
   return overlay
 }
 
@@ -129,6 +129,7 @@ function beginModeSweep(root, prevDusk) {
   overlay.style.webkitMask = `${grad} no-repeat center / 100% 100%`
   overlay.style.mask = `${grad} no-repeat center / 100% 100%`
   overlay.style.setProperty('--sweep-p', '-10%')
+  void overlay.offsetWidth // 提交起点值(--sweep-p 初值为 -150%,幕布已布局时须强制一次重排,否则过渡从 -150% 起跑)
 
   // 扫光期间禁 html/body/#app 的 1s 颜色过渡(否则与幕布交叉淡入打架)
   root.classList.add('theme-sweeping')
@@ -154,7 +155,13 @@ function beginModeSweep(root, prevDusk) {
       cleanup()
       return
     }
-    overlay.addEventListener('transitionend', cleanup, { once: true })
+    // 只认幕布自身的 --sweep-p 过渡结束(transitionend 会从后代冒泡,别让首次气泡提前清掉幕布)
+    const onEnd = (e) => {
+      if (e.target !== overlay || e.propertyName !== '--sweep-p') return
+      overlay.removeEventListener('transitionend', onEnd)
+      cleanup()
+    }
+    overlay.addEventListener('transitionend', onEnd)
     setTimeout(cleanup, travelMs + 300) // 兜底清理(过渡异常/被中断时)
   }
 }
