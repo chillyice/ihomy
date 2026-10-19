@@ -619,9 +619,6 @@ const FLIP_EASE = 'cubic-bezier(.34, 1.56, .64, 1)'
 const flipLayout = (prev) => {
   const grid = gridEl.value
   if (!grid) return
-  // 拖拽中的 FLIP 会改卡片 transform,而落位判定量的是 getBoundingClientRect(含 transform),
-  // 量到动画中间态就会连着算错下标、预览来回跳;拖拽期间直接按最终布局呈现
-  if (dragId.value || dragCode.value) return
   const moves = []
   grid.querySelectorAll('.gc-card').forEach((c) => {
     const id = c.dataset.wid
@@ -792,16 +789,21 @@ const previewMeta = (code) => {
   return meta ? { label: t(meta.titleKey), icon: meta.icon } : null
 }
 // 由鼠标坐标推导插入下标:取指针真正命中的卡片(间隙/源卡自身保持当前下标,见 utils/dragInsert.js)
+// 卡片矩形用 offsetLeft/offsetTop 换算(布局位置),不能用 getBoundingClientRect——
+// 邻居推挤的 FLIP 动画在跑,rect 会带 transform 的中间态,下标会连着算错、预览来回跳
 const insertionIndexAt = (x, y, current, sourceId) => {
   const grid = gridEl.value
   if (!grid) return current ?? 0
+  const g = grid.getBoundingClientRect()
+  const originX = g.left - grid.offsetLeft
+  const originY = g.top - grid.offsetTop
   const boxes = Array.from(grid.querySelectorAll('.gc-card'))
     .filter((c) => c.dataset.wid)
     .map((c) => {
-      const r = c.getBoundingClientRect()
-      return { id: c.dataset.wid, left: r.left, top: r.top, right: r.right, bottom: r.bottom }
+      const left = originX + c.offsetLeft
+      const top = originY + c.offsetTop
+      return { id: c.dataset.wid, left, top, right: left + c.offsetWidth, bottom: top + c.offsetHeight }
     })
-  const g = grid.getBoundingClientRect()
   return pickInsertIndex(
     boxes,
     layout.value.filter((e) => e.id !== sourceId),
@@ -840,6 +842,7 @@ const updateDragPreview = (nx, ny) => {
     const idx = insertionIndexAt(nx, ny, dropPreview.value?.index, '__preview__')
     const cur = dropPreview.value
     if (!cur || cur.code !== dragCode.value || cur.index !== idx) {
+      const prev = captureRects()
       const meta = previewMeta(dragCode.value)
       dropPreview.value = {
         code: dragCode.value,
@@ -847,10 +850,15 @@ const updateDragPreview = (nx, ny) => {
         icon: meta?.icon || '✨',
         index: idx,
       }
+      nextTick(() => flipLayout(prev))
     }
   } else {
     setOverGrid(false)
-    if (dropPreview.value) dropPreview.value = null
+    if (dropPreview.value) {
+      const prev = captureRects()
+      dropPreview.value = null
+      nextTick(() => flipLayout(prev))
+    }
   }
 }
 onMove((nx, ny) => updateDragPreview(nx, ny))
@@ -866,7 +874,9 @@ const onReorderDragOver = (e) => {
   const idx = insertionIndexAt(e.clientX, e.clientY, reorderPreview.value?.index, dragId.value)
   const cur = reorderPreview.value
   if (!cur || cur.index !== idx) {
+    const prev = captureRects()
     reorderPreview.value = { id: dragId.value, index: idx }
+    nextTick(() => flipLayout(prev))
   }
 }
 const onReorderDrop = (e) => {
