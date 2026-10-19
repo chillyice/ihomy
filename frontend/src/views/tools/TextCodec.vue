@@ -8,12 +8,16 @@
         <el-radio-group v-model="mode" size="small">
           <el-radio-button value="encode">{{ $t('tools.codec.modeEncode') }}</el-radio-button>
           <el-radio-button value="decode">{{ $t('tools.codec.modeDecode') }}</el-radio-button>
+          <el-radio-button value="repair">{{ $t('tools.codec.modeRepair') }}</el-radio-button>
         </el-radio-group>
       </div>
       <div class="tb-right">
         <el-button size="small" @click="loadSample">{{ $t('tools.codec.sample') }}</el-button>
         <el-button size="small" :disabled="!input" @click="clearAll">{{ $t('tools.codec.clear') }}</el-button>
-        <el-button v-if="mode === 'encode'" size="small" :disabled="!input" @click="copyAll">
+        <el-button v-if="mode === 'repair'" size="small" type="primary" :disabled="!input" :loading="repairing" @click="doRepair">
+          {{ $t('tools.codec.repair.run') }}
+        </el-button>
+        <el-button v-else-if="mode === 'encode'" size="small" :disabled="!input" @click="copyAll">
           {{ $t('tools.codec.copyAll') }}
         </el-button>
         <el-button v-else size="small" :disabled="!decoded.text" @click="copy(decoded.text)">
@@ -25,7 +29,15 @@
     <div class="codec-grid">
       <div class="card codec-pane">
         <div class="codec-pane-head">
-          <span class="section-label">{{ mode === 'encode' ? $t('tools.codec.original') : $t('tools.codec.encoded') }}</span>
+          <span class="section-label">
+            {{
+              mode === 'encode'
+                ? $t('tools.codec.original')
+                : mode === 'decode'
+                  ? $t('tools.codec.encoded')
+                  : $t('tools.codec.repair.input')
+            }}
+          </span>
           <span class="codec-meta">{{ $t('tools.codec.charCount', { n: charCount }) }}</span>
         </div>
 
@@ -42,14 +54,29 @@
           spellcheck="false"
           autocomplete="off"
           autocapitalize="off"
-          :placeholder="mode === 'encode' ? $t('tools.codec.inputPlaceholder') : $t('tools.codec.decodePlaceholder')"
+          :placeholder="
+            mode === 'encode'
+              ? $t('tools.codec.inputPlaceholder')
+              : mode === 'decode'
+                ? $t('tools.codec.decodePlaceholder')
+                : $t('tools.codec.repair.placeholder')
+          "
         ></textarea>
         <div class="codec-hint">{{ $t('tools.codec.privacy') }}</div>
+        <div v-if="mode === 'repair'" class="codec-hint">{{ $t('tools.codec.repair.hint') }}</div>
       </div>
 
       <div class="card codec-pane">
         <div class="codec-pane-head">
-          <span class="section-label">{{ mode === 'encode' ? $t('tools.codec.results') : $t('tools.codec.decoded') }}</span>
+          <span class="section-label">
+            {{
+              mode === 'encode'
+                ? $t('tools.codec.results')
+                : mode === 'decode'
+                  ? $t('tools.codec.decoded')
+                  : $t('tools.codec.repair.result')
+            }}
+          </span>
         </div>
 
         <div v-if="mode === 'encode'" class="codec-results">
@@ -61,6 +88,17 @@
               </el-button>
             </div>
             <code class="codec-value">{{ row.value || '—' }}</code>
+          </div>
+        </div>
+
+        <div v-else-if="mode === 'repair'" class="codec-results">
+          <div v-if="!repairResults.length" class="codec-area codec-empty">{{ $t('tools.codec.repair.empty') }}</div>
+          <div v-for="(row, index) in repairResults" :key="index" class="codec-row">
+            <div class="codec-row-head">
+              <span class="codec-label">{{ row.label }}</span>
+              <el-button size="small" text @click="useRepair(row.text)">{{ $t('tools.codec.repair.apply') }}</el-button>
+            </div>
+            <code class="codec-value">{{ row.text }}</code>
           </div>
         </div>
 
@@ -124,12 +162,14 @@ import {
   CODEC_FORMATS,
   decodeText,
   describeChars,
+  repairMojibake,
   toBase64,
   toHtmlEntities,
   toUnicodeEscapes,
   toUrlEncoded,
   toUtf8Hex,
 } from '@/utils/textCodec'
+import { toFullWidth, toHalfWidth } from '@/utils/tools/textTool'
 
 const { t } = useI18n()
 
@@ -145,8 +185,10 @@ const saved = (() => {
 })()
 
 const input = ref('')
-const mode = ref(saved.mode === 'decode' ? 'decode' : 'encode')
+const mode = ref(['decode', 'repair'].includes(saved.mode) ? saved.mode : 'encode')
 const decodeFormat = ref(FORMATS.includes(saved.decodeFormat) ? saved.decodeFormat : 'unicode')
+const repairResults = ref([])
+const repairing = ref(false)
 
 const savePrefs = () => {
   try {
@@ -168,12 +210,32 @@ const encodeRows = computed(() => {
     { key: 'url', value: text ? toUrlEncoded(text) : '' },
     { key: 'base64', value: text ? toBase64(text) : '' },
     { key: 'hex', value: text ? toUtf8Hex(text) : '' },
+    { key: 'half', value: text ? toHalfWidth(text) : '' },
+    { key: 'full', value: text ? toFullWidth(text) : '' },
   ]
 })
 
 const decoded = computed(() => (input.value ? decodeText(decodeFormat.value, input.value) : { ok: true, text: '' }))
 
 const charTable = computed(() => (input.value ? describeChars(input.value) : { items: [], total: 0, truncated: false }))
+
+// 反查编码表要枚举双字节组合,放到按钮后执行,并让出一帧先渲染 loading
+const doRepair = async () => {
+  if (!input.value) return
+  repairing.value = true
+  repairResults.value = []
+  await new Promise((resolve) => setTimeout(resolve, 30))
+  try {
+    repairResults.value = repairMojibake(input.value)
+  } finally {
+    repairing.value = false
+  }
+}
+
+const useRepair = (text) => {
+  input.value = text
+  repairResults.value = []
+}
 
 const copy = async (value) => {
   if (!value) return

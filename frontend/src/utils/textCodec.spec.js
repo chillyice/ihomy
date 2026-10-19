@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   CODEC_FORMATS,
+  buildReverseMap,
   decodeText,
   describeChars,
   fromBase64,
@@ -8,6 +9,7 @@ import {
   fromUnicodeEscapes,
   fromUrlEncoded,
   fromUtf8Hex,
+  repairMojibake,
   toBase64,
   toHtmlEntities,
   toUnicodeEscapes,
@@ -136,5 +138,29 @@ describe('describeChars', () => {
     expect(items).toHaveLength(3)
     expect(total).toBe(6)
     expect(truncated).toBe(true)
+  })
+})
+
+describe('乱码修复', () => {
+  it('Windows-1252 被当成 UTF-8 显示后可还原', () => {
+    const garbled = 'ä½\u00a0å¥½'
+    const [best] = repairMojibake(garbled)
+    expect(best.text).toBe('你好')
+    expect(best.label).toContain('Windows-1252')
+  })
+
+  it('GBK 显示乱码可还原', () => {
+    const results = repairMojibake('浣犲ソ')
+    expect(results.some((item) => item.text === '你好')).toBe(true)
+  })
+
+  it('正常文本不会给出离谱的候选', () => {
+    const results = repairMojibake('hello world')
+    expect(results.every((item) => item.text !== 'hello world')).toBe(true)
+  })
+
+  it('反查表可复用', () => {
+    const map = buildReverseMap('gbk')
+    expect(map.get('浣')).toEqual([0xe4, 0xbd])
   })
 })

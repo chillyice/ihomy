@@ -161,6 +161,20 @@ const routes = [
     component: () => import('@/views/tools/TimeTool.vue'),
     meta: { public: true },
   },
+  // 正则测试:实时匹配/捕获组/替换预览,匹配在 Worker 中限时执行
+  {
+    path: '/tools/regex',
+    name: 'RegexTool',
+    component: () => import('@/views/tools/RegexTool.vue'),
+    meta: { public: true },
+  },
+  // 文本清洗与对比:清洗/命名转换/Markdown 表格/文本 diff,纯前端
+  {
+    path: '/tools/text',
+    name: 'TextTool',
+    component: () => import('@/views/tools/TextTool.vue'),
+    meta: { public: true },
+  },
   // 贷款计算器:纯前端试算(等额本息/等额本金、商业/公积金/组合贷、提前还款对比),不依赖后端
   { path: '/tools/loan', name: 'LoanCalculator', component: () => import('@/views/tools/LoanCalculator.vue'), meta: { public: true } },
   // Flash 播放器(Ruffle):本地加载 .swf 怀旧小游戏

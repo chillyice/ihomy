@@ -191,3 +191,115 @@ export function describeChars(text, limit = 500) {
   }
   return { items, total, truncated: total > items.length }
 }
+
+// ---------------------------------------------------------------
+// 乱码修复:把「按 A 编码的字节被当成 B 编码显示」的文本还原。
+// 浏览器只能按编码解码、不能编码旧编码,因此先用 TextDecoder 反查单/双字节表建「字符 → 字节」映射,
+// 再用目标编码重新解码;候选固定为 GBK / Big5 / Shift_JIS / Windows-1252,按可读性排序。
+// ---------------------------------------------------------------
+
+const ENCODING_LABELS = {
+  gbk: 'GBK',
+  gb18030: 'GB18030',
+  big5: 'Big5',
+  shift_jis: 'Shift_JIS',
+  'windows-1252': 'Windows-1252',
+  'utf-8': 'UTF-8',
+}
+
+const REPAIR_SOURCES = ['gbk', 'big5', 'shift_jis', 'windows-1252']
+const REPAIR_TARGETS = ['utf-8', 'gb18030', 'big5', 'shift_jis', 'windows-1252']
+const reverseMaps = new Map()
+
+/** 反查编码表:字符 → 原始字节(只收录能解出单个字符的字节序列) */
+export function buildReverseMap(encoding) {
+  if (reverseMaps.has(encoding)) return reverseMaps.get(encoding)
+  const map = new Map()
+  let decoder
+  try {
+    decoder = new TextDecoder(encoding)
+  } catch {
+    reverseMaps.set(encoding, map)
+    return map
+  }
+  const record = (bytes) => {
+    const char = decoder.decode(Uint8Array.from(bytes))
+    if (char.length === 1 && char !== '\ufffd' && !map.has(char)) map.set(char, bytes)
+  }
+  for (let byte = 0x20; byte <= 0xff; byte += 1) record([byte])
+  for (let lead = 0x81; lead <= 0xfe; lead += 1) {
+    for (let trail = 0x40; trail <= 0xfe; trail += 1) {
+      if (trail >= 0x7f && trail <= 0x80) continue
+      record([lead, trail])
+    }
+  }
+  reverseMaps.set(encoding, map)
+  return map
+}
+
+function encodeWith(text, encoding) {
+  if (encoding === 'windows-1252') {
+    const bytes = []
+    for (const ch of text) {
+      const cp = ch.codePointAt(0)
+      if (cp > 0xff) return null
+      bytes.push(cp)
+    }
+    return Uint8Array.from(bytes)
+  }
+  const map = buildReverseMap(encoding)
+  const bytes = []
+  for (const ch of text) {
+    const pair = map.get(ch)
+    if (!pair) return null
+    bytes.push(...pair)
+  }
+  return Uint8Array.from(bytes)
+}
+
+function readability(text) {
+  let bad = 0
+  let printable = 0
+  let cjk = 0
+  for (const ch of text) {
+    const cp = ch.codePointAt(0)
+    if (cp === 0xfffd) {
+      bad += 1
+      continue
+    }
+    if (cp >= 0x20 && cp !== 0x7f) printable += 1
+    if (cp >= 0x3000 && cp <= 0x9fff) cjk += 1
+  }
+  const total = Math.max(1, Array.from(text).length)
+  return (printable / total) * 100 + (cjk / total) * 30 - (bad / total) * 200
+}
+
+/** 尝试修复乱码;返回按可信度降序的候选 [{source, target, label, text, score}] */
+export function repairMojibake(text, { sources = REPAIR_SOURCES } = {}) {
+  const input = String(text ?? '')
+  const results = []
+  const seen = new Set()
+  for (const source of sources) {
+    const bytes = encodeWith(input, source)
+    if (!bytes) continue
+    for (const target of REPAIR_TARGETS) {
+      if (target === source) continue
+      let decoded
+      try {
+        decoded = new TextDecoder(target).decode(bytes)
+      } catch {
+        continue
+      }
+      if (decoded === input || decoded.includes('\ufffd') || seen.has(decoded)) continue
+      seen.add(decoded)
+      results.push({
+        source,
+        target,
+        label: `${ENCODING_LABELS[source] || source} → ${ENCODING_LABELS[target] || target}`,
+        text: decoded,
+        score: Math.round(readability(decoded) * 10) / 10,
+      })
+    }
+  }
+  return results.sort((a, b) => b.score - a.score).slice(0, 6)
+}

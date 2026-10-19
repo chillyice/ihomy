@@ -83,6 +83,76 @@
       </div>
       <div class="subnet-hint">{{ $t('tools.subnet.binaryHint') }}</div>
     </div>
+
+    <div class="subnet-tools">
+      <div class="card subnet-tool">
+        <div class="subnet-pane-head">
+          <span class="section-label">{{ $t('tools.subnet.tools.ipv4Int') }}</span>
+        </div>
+        <div class="subnet-tool-row">
+          <el-input v-model="ipv4Input" size="small" spellcheck="false" :placeholder="$t('tools.subnet.tools.ipv4Placeholder')" />
+          <span class="subnet-arrow">↔</span>
+          <el-input v-model="intInput" size="small" spellcheck="false" :placeholder="$t('tools.subnet.tools.intPlaceholder')" />
+        </div>
+        <div class="subnet-tool-row">
+          <el-button size="small" @click="runIpv4ToInt">{{ $t('tools.subnet.tools.toInt') }}</el-button>
+          <el-button size="small" @click="runIntToIpv4">{{ $t('tools.subnet.tools.toIp') }}</el-button>
+        </div>
+        <div v-if="decimalError" class="subnet-alert">{{ decimalError }}</div>
+      </div>
+
+      <div class="card subnet-tool">
+        <div class="subnet-pane-head">
+          <span class="section-label">{{ $t('tools.subnet.tools.ipv6') }}</span>
+        </div>
+        <el-input v-model="ipv6Input" size="small" spellcheck="false" :placeholder="$t('tools.subnet.tools.ipv6Placeholder')" />
+        <div v-if="ipv6Result.error" class="subnet-alert">{{ ipv6Result.error }}</div>
+        <div v-else-if="ipv6Result.ok" class="subnet-tool-out">
+          <div class="subnet-tool-line">
+            <span>{{ $t('tools.subnet.tools.compressed') }}</span
+            ><code>{{ ipv6Result.compressed }}</code>
+          </div>
+          <div class="subnet-tool-line">
+            <span>{{ $t('tools.subnet.tools.expanded') }}</span
+            ><code>{{ ipv6Result.expanded }}</code>
+          </div>
+          <div class="subnet-tool-line">
+            <span>{{ $t('tools.subnet.tools.version') }}</span
+            ><code>{{ ipv6Result.version }}</code>
+          </div>
+        </div>
+      </div>
+
+      <div class="card subnet-tool">
+        <div class="subnet-pane-head">
+          <span class="section-label">{{ $t('tools.subnet.tools.cidr') }}</span>
+        </div>
+        <div class="subnet-tool-row">
+          <el-input v-model="cidrInput" size="small" spellcheck="false" :placeholder="$t('tools.subnet.tools.cidrPlaceholder')" />
+          <el-input v-model="cidrAddress" size="small" spellcheck="false" :placeholder="$t('tools.subnet.tools.addressPlaceholder')" />
+        </div>
+        <div v-if="cidrResult.error" class="subnet-alert">{{ cidrResult.error }}</div>
+        <div v-else-if="cidrResult.ok" class="subnet-tool-out">
+          <span :class="cidrResult.contains ? 'subnet-yes' : 'subnet-no'">
+            {{ cidrResult.contains ? $t('tools.subnet.tools.contains') : $t('tools.subnet.tools.notContains') }}
+          </span>
+        </div>
+      </div>
+
+      <div class="card subnet-tool">
+        <div class="subnet-pane-head">
+          <span class="section-label">{{ $t('tools.subnet.tools.mac') }}</span>
+        </div>
+        <el-input v-model="macInput" size="small" spellcheck="false" :placeholder="$t('tools.subnet.tools.macPlaceholder')" />
+        <div v-if="macResult.error" class="subnet-alert">{{ macResult.error }}</div>
+        <div v-else-if="macResult.ok" class="subnet-tool-out">
+          <div v-for="row in macRows" :key="row.key" class="subnet-tool-line">
+            <span>{{ $t(`tools.subnet.tools.macFormats.${row.key}`) }}</span>
+            <code>{{ row.value }}</code>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -92,7 +162,20 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
-import { SubnetError, binaryWithPrefix, ipToString, parseIpv4, parseMask, subnetInfo } from '@/utils/subnet'
+import {
+  SubnetError,
+  binaryWithPrefix,
+  cidrContains,
+  expandIpv6,
+  intToIpv4,
+  ipToString,
+  ipv4ToInt,
+  normalizeMac,
+  parseIpv4,
+  parseIpv6,
+  parseMask,
+  subnetInfo,
+} from '@/utils/subnet'
 
 const { t } = useI18n()
 
@@ -189,6 +272,72 @@ const clearAll = () => {
   ip.value = ''
   mask.value = ''
 }
+
+// ---------- 附属工具:整数互转 / IPv6 / CIDR 包含 / MAC ----------
+const ipv4Input = ref('')
+const intInput = ref('')
+const decimalError = ref('')
+const ipv6Input = ref('')
+const cidrInput = ref('')
+const cidrAddress = ref('')
+const macInput = ref('')
+
+const runIpv4ToInt = () => {
+  decimalError.value = ''
+  try {
+    intInput.value = String(ipv4ToInt(ipv4Input.value))
+  } catch {
+    decimalError.value = t('tools.subnet.errors.ipInvalid')
+  }
+}
+
+const runIntToIpv4 = () => {
+  decimalError.value = ''
+  try {
+    ipv4Input.value = intToIpv4(Number(intInput.value.trim()))
+  } catch {
+    decimalError.value = t('tools.subnet.tools.intInvalid')
+  }
+}
+
+const ipv6Result = computed(() => {
+  if (!ipv6Input.value.trim()) return {}
+  try {
+    const parsed = parseIpv6(ipv6Input.value)
+    return { ok: true, compressed: parsed.text, expanded: expandIpv6(ipv6Input.value), version: 'IPv6' }
+  } catch {
+    return { error: t('tools.subnet.tools.ipv6Invalid') }
+  }
+})
+
+const cidrResult = computed(() => {
+  if (!cidrInput.value.trim() || !cidrAddress.value.trim()) return {}
+  try {
+    return { ok: true, contains: cidrContains(cidrInput.value, cidrAddress.value) }
+  } catch (e) {
+    return { error: e instanceof SubnetError ? t(`tools.subnet.tools.errors.${e.code}`) : t('tools.subnet.tools.cidrInvalid') }
+  }
+})
+
+const macResult = computed(() => {
+  if (!macInput.value.trim()) return {}
+  try {
+    return { ok: true, mac: normalizeMac(macInput.value) }
+  } catch {
+    return { error: t('tools.subnet.tools.macInvalid') }
+  }
+})
+
+const macRows = computed(() => {
+  if (!macResult.value.ok) return []
+  const mac = macResult.value.mac
+  return [
+    { key: 'colon', value: mac.colon },
+    { key: 'dash', value: mac.dash },
+    { key: 'dot', value: mac.dot },
+    { key: 'plain', value: mac.upper },
+  ]
+})
 </script>
 
 <style scoped>
@@ -330,6 +479,54 @@ html.dark .subnet-type {
 }
 .subnet-bits code {
   letter-spacing: 0.02em;
+}
+.subnet-tools {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+.subnet-tool {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.subnet-tool-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.subnet-arrow {
+  color: var(--color-text-secondary);
+}
+.subnet-tool-out {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.subnet-tool-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.subnet-tool-line code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Courier New', monospace;
+  font-size: 12.5px;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+.subnet-yes {
+  color: #2e9a5a;
+  font-size: 13px;
+}
+.subnet-no {
+  color: var(--color-accent);
+  font-size: 13px;
 }
 @media (max-width: 900px) {
   .subnet-grid {

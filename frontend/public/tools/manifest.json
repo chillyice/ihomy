@@ -1,6 +1,6 @@
 {
   "source": "ihomy",
-  "version": "V10.58",
+  "version": "V10.59",
   "registry": "frontend/src/tools/registry.js",
   "tools": [
     {
@@ -465,6 +465,89 @@
       "bitPouch": {
         "status": "existing",
         "note": "bit_pouch timestamp 插件已合并时区/日期差/Cron"
+      }
+    },
+    {
+      "id": "regex",
+      "bitPouchId": null,
+      "path": "/tools/regex",
+      "name": {
+        "zh": "正则测试",
+        "en": "Regex Tester"
+      },
+      "description": {
+        "zh": "实时匹配 / 捕获组 / 替换预览，病态表达式自动超时中断",
+        "en": "Live matches / capture groups / replacement preview, with runaway patterns interrupted"
+      },
+      "category": "dev",
+      "bitPouchCategory": "inspect",
+      "bitPouchIcon": "regex",
+      "keywords": [
+        "regex",
+        "regexp",
+        "match",
+        "replace",
+        "capture",
+        "正则",
+        "匹配",
+        "替换"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web",
+        "desktop",
+        "mobile"
+      ],
+      "offline": true,
+      "order": 122,
+      "kernel": "regexTool",
+      "bitPouch": {
+        "status": "existing",
+        "note": "bit_pouch 已有 regex 插件，能力对齐后按 version 合并"
+      }
+    },
+    {
+      "id": "text",
+      "bitPouchId": null,
+      "path": "/tools/text",
+      "name": {
+        "zh": "文本清洗与对比",
+        "en": "Text Cleanup & Diff"
+      },
+      "description": {
+        "zh": "清洗 / 命名转换 / Markdown 表格 / 文本 diff",
+        "en": "Cleanup / case conversion / Markdown tables / line diff"
+      },
+      "category": "dev",
+      "bitPouchCategory": "convert",
+      "bitPouchIcon": "text",
+      "keywords": [
+        "text",
+        "clean",
+        "case",
+        "snake",
+        "camel",
+        "markdown",
+        "table",
+        "diff",
+        "文本",
+        "清洗",
+        "对比"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web",
+        "desktop",
+        "mobile"
+      ],
+      "offline": true,
+      "order": 124,
+      "kernel": "textTool",
+      "bitPouch": {
+        "status": "new",
+        "note": "bit_pouch 暂无文本清洗/对比插件"
       }
     },
     {

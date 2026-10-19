@@ -5,29 +5,77 @@
 
     <PageToolbar>
       <div class="tb-left">
-        <span class="section-label">{{ $t('tools.json.indent') }}</span>
-        <el-radio-group v-model="indent" size="small">
-          <el-radio-button value="  ">{{ $t('tools.json.indent2') }}</el-radio-button>
-          <el-radio-button value="    ">{{ $t('tools.json.indent4') }}</el-radio-button>
-          <el-radio-button :value="'\t'">{{ $t('tools.json.indentTab') }}</el-radio-button>
+        <el-radio-group v-model="tab" size="small">
+          <el-radio-button value="format">{{ $t('tools.json.tabFormat') }}</el-radio-button>
+          <el-radio-button value="convert">{{ $t('tools.json.tabConvert') }}</el-radio-button>
+          <el-radio-button value="codegen">{{ $t('tools.json.tabCodegen') }}</el-radio-button>
         </el-radio-group>
-        <el-checkbox v-model="sortKeys" size="small">{{ $t('tools.json.sortKeys') }}</el-checkbox>
+        <template v-if="tab === 'format'">
+          <span class="section-label">{{ $t('tools.json.indent') }}</span>
+          <el-radio-group v-model="indent" size="small">
+            <el-radio-button value="  ">{{ $t('tools.json.indent2') }}</el-radio-button>
+            <el-radio-button value="    ">{{ $t('tools.json.indent4') }}</el-radio-button>
+            <el-radio-button :value="'\t'">{{ $t('tools.json.indentTab') }}</el-radio-button>
+          </el-radio-group>
+          <el-checkbox v-model="sortKeys" size="small">{{ $t('tools.json.sortKeys') }}</el-checkbox>
+        </template>
+        <template v-else-if="tab === 'convert'">
+          <el-select v-model="convertTo" size="small" style="width: 170px">
+            <el-option value="yaml" :label="$t('tools.json.convert.yaml')" />
+            <el-option value="fromYaml" :label="$t('tools.json.convert.fromYaml')" />
+            <el-option value="csv" :label="$t('tools.json.convert.csv')" />
+            <el-option value="fromCsv" :label="$t('tools.json.convert.fromCsv')" />
+            <el-option value="xml" :label="$t('tools.json.convert.xml')" />
+            <el-option value="fromXml" :label="$t('tools.json.convert.fromXml')" />
+          </el-select>
+        </template>
+        <template v-else>
+          <el-select v-model="codeTarget" size="small" style="width: 150px">
+            <el-option value="ts" :label="$t('tools.json.codegen.ts')" />
+            <el-option value="java" :label="$t('tools.json.codegen.java')" />
+            <el-option value="sql" :label="$t('tools.json.codegen.sql')" />
+          </el-select>
+          <el-input
+            v-if="codeTarget === 'java'"
+            v-model="javaClass"
+            size="small"
+            style="width: 130px"
+            :placeholder="$t('tools.json.codegen.className')"
+          />
+          <el-input
+            v-if="codeTarget === 'sql'"
+            v-model="sqlTable"
+            size="small"
+            style="width: 130px"
+            :placeholder="$t('tools.json.codegen.tableName')"
+          />
+        </template>
       </div>
       <div class="tb-right">
-        <el-button size="small" @click="loadSample">{{ $t('tools.json.sample') }}</el-button>
-        <el-button size="small" :disabled="!input && !output" @click="clearAll">{{ $t('tools.json.clear') }}</el-button>
-        <el-button size="small" :disabled="!output" @click="copyOutput">{{ $t('tools.json.copy') }}</el-button>
-        <el-button size="small" :disabled="!input.trim()" @click="runFormat(true)">{{ $t('tools.json.minify') }}</el-button>
-        <el-button size="small" type="primary" :icon="MagicStick" :disabled="!input.trim()" @click="runFormat(false)">
-          {{ $t('tools.json.format') }}
-        </el-button>
+        <template v-if="tab === 'format'">
+          <el-button size="small" @click="loadSample">{{ $t('tools.json.sample') }}</el-button>
+          <el-button size="small" :disabled="!input && !output" @click="clearAll">{{ $t('tools.json.clear') }}</el-button>
+          <el-button size="small" :disabled="!output" @click="copyOutput">{{ $t('tools.json.copy') }}</el-button>
+          <el-button size="small" :disabled="!input.trim()" @click="runFormat(true)">{{ $t('tools.json.minify') }}</el-button>
+          <el-button size="small" type="primary" :icon="MagicStick" :disabled="!input.trim()" @click="runFormat(false)">
+            {{ $t('tools.json.format') }}
+          </el-button>
+        </template>
+        <template v-else>
+          <el-button size="small" @click="loadSample">{{ $t('tools.json.sample') }}</el-button>
+          <el-button size="small" :disabled="!input && !output" @click="clearAll">{{ $t('tools.json.clear') }}</el-button>
+          <el-button size="small" :disabled="!output" @click="copyOutput">{{ $t('tools.json.copy') }}</el-button>
+          <el-button size="small" type="primary" :disabled="!input.trim()" :loading="converting" @click="runConvert">
+            {{ tab === 'codegen' ? $t('tools.json.codegen.generate') : $t('tools.json.convert.run') }}
+          </el-button>
+        </template>
       </div>
     </PageToolbar>
 
     <div class="json-grid">
       <div class="card json-pane">
         <div class="json-pane-head">
-          <span class="section-label">{{ $t('tools.json.input') }}</span>
+          <span class="section-label">{{ inputLabel }}</span>
           <span class="json-count">{{ $t('tools.json.inputCount', { n: input.length }) }}</span>
         </div>
         <textarea
@@ -37,7 +85,7 @@
           spellcheck="false"
           autocomplete="off"
           autocapitalize="off"
-          :placeholder="$t('tools.json.inputPlaceholder')"
+          :placeholder="inputPlaceholder"
           @keydown="onKeydown"
         ></textarea>
       </div>
@@ -48,8 +96,9 @@
           <span v-if="output && !error" class="json-count">{{ statsText }}</span>
         </div>
 
+        <pre v-if="tab !== 'format' && convertError" class="json-area json-error"><code>{{ convertError }}</code></pre>
         <pre
-          v-if="error"
+          v-else-if="error"
           class="json-area json-error"
         ><code><span class="json-error-title">{{ errorText }}</span><span v-if="error.lineText" class="json-error-line">{{ errorLineText }}</span></code></pre>
         <pre
@@ -69,7 +118,18 @@ import { ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
-import { JSON_MAX_DEPTH, formatJson, tokenizeJson } from '@/utils/jsonTools'
+import {
+  JSON_MAX_DEPTH,
+  csvToJson,
+  formatJson,
+  jsonToCsv,
+  jsonToXml,
+  toJava,
+  toSqlInsert,
+  toTypeScript,
+  tokenizeJson,
+  xmlToJson,
+} from '@/utils/jsonTools'
 
 const { t } = useI18n()
 
@@ -93,6 +153,34 @@ const minified = ref(false)
 const indent = ref(INDENTS.includes(savedPrefs.indent) ? savedPrefs.indent : '  ')
 const sortKeys = ref(Boolean(savedPrefs.sortKeys))
 
+const tab = ref('format')
+const convertTo = ref('yaml')
+const codeTarget = ref('ts')
+const javaClass = ref('Root')
+const sqlTable = ref('data')
+const converting = ref(false)
+const convertError = ref('')
+
+const inputLabel = computed(() => {
+  if (tab.value === 'codegen') return t('tools.json.input')
+  if (tab.value === 'convert')
+    return ['fromYaml', 'fromCsv', 'fromXml'].includes(convertTo.value) ? t('tools.json.convert.source') : t('tools.json.input')
+  return t('tools.json.input')
+})
+
+const inputPlaceholder = computed(() => {
+  if (tab.value === 'convert' && ['fromYaml', 'fromCsv', 'fromXml'].includes(convertTo.value))
+    return t('tools.json.convert.sourcePlaceholder')
+  return t('tools.json.inputPlaceholder')
+})
+
+watch(tab, () => {
+  output.value = ''
+  error.value = null
+  convertError.value = ''
+  stats.value = null
+})
+
 watch([indent, sortKeys], () => {
   try {
     localStorage.setItem(PREF_KEY, JSON.stringify({ indent: indent.value, sortKeys: sortKeys.value }))
@@ -105,6 +193,7 @@ watch([indent, sortKeys], () => {
 // 超过这个长度不再逐 token 上色,避免几万个 span 拖慢渲染
 const HIGHLIGHT_LIMIT = 200_000
 const tokens = computed(() => {
+  if (tab.value !== 'format') return null
   if (!output.value || output.value.length > HIGHLIGHT_LIMIT) return null
   return tokenizeJson(output.value)
 })
@@ -164,6 +253,44 @@ const runFormat = (minifyMode = false) => {
     return
   }
   applyFormat(minifyMode)
+}
+
+// 数据转换与代码生成:YAML 依赖 js-yaml,只在真正转换时动态加载,不进入首屏
+const runConvert = async () => {
+  if (!input.value.trim()) {
+    ElMessage.warning(t('tools.json.empty'))
+    return
+  }
+  convertError.value = ''
+  stats.value = null
+  converting.value = true
+  try {
+    let text
+    if (tab.value === 'codegen') {
+      if (codeTarget.value === 'ts') text = toTypeScript(input.value)
+      else if (codeTarget.value === 'java') text = toJava(input.value, { className: javaClass.value || 'Root' })
+      else text = toSqlInsert(input.value, { table: sqlTable.value || 'data' })
+    } else if (convertTo.value === 'yaml' || convertTo.value === 'fromYaml') {
+      const yaml = await import('js-yaml')
+      if (convertTo.value === 'yaml') text = yaml.dump(JSON.parse(input.value), { noRefs: true, lineWidth: 100 })
+      else text = JSON.stringify(yaml.load(input.value), null, 2)
+    } else if (convertTo.value === 'csv') {
+      text = jsonToCsv(input.value)
+    } else if (convertTo.value === 'fromCsv') {
+      text = csvToJson(input.value)
+    } else if (convertTo.value === 'xml') {
+      text = jsonToXml(input.value)
+    } else {
+      text = xmlToJson(input.value)
+    }
+    output.value = text
+    error.value = null
+  } catch (e) {
+    output.value = ''
+    convertError.value = e?.message && e.message !== e.code ? e.message : t(`tools.json.convertErrors.${e?.code || 'invalid'}`)
+  } finally {
+    converting.value = false
+  }
 }
 
 const clearAll = () => {

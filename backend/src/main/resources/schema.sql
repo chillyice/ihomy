@@ -1997,7 +1997,7 @@ CREATE TABLE `sys_oss_component` (
   KEY `idx_type_status` (`component_type`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='开源组件台账(登记+版本检测+当前版本探测+升级提示)';
 
--- 种子:53 项 = 前端 NPM 直接依赖 29 + 后端 Maven 显式依赖 19 + 独立服务 5(Nextcloud / Jellyfin / Home Assistant + MySQL / Redis)
+-- 种子:54 项 = 前端 NPM 直接依赖 30 + 后端 Maven 显式依赖 19 + 独立服务 5(Nextcloud / Jellyfin / Home Assistant + MySQL / Redis)
 -- 版本为实际锁定版本(与 package-lock.json / 解析后的 Maven 依赖一致),不是 package.json/pom.xml 里的声明区间下限
 INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`) VALUES
 ('Vue', 'NPM', 'vue', '3.5.40', 'MIT', 'https://github.com/vuejs/core', '前端框架', 'FULL'),
@@ -2029,6 +2029,7 @@ INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `curre
 ('eslint-plugin-vue', 'NPM', 'eslint-plugin-vue', '10.11.1', 'MIT', 'https://github.com/vuejs/eslint-plugin-vue', 'Vue 单文件组件 lint 规则', 'FULL'),
 ('globals', 'NPM', 'globals', '15.15.0', 'MIT', 'https://github.com/sindresorhus/globals', 'ESLint 环境全局变量定义(浏览器/Node)', 'FULL'),
 ('Prettier', 'NPM', 'prettier', '3.9.9', 'MIT', 'https://github.com/prettier/prettier', '代码格式化(配置落地,未做全仓重排)', 'FULL'),
+('js-yaml', 'NPM', 'js-yaml', '4.3.2', 'MIT', 'https://github.com/nodeca/js-yaml', '工具箱 JSON ↔ YAML 转换', 'FULL'),
 ('Spring Boot', 'MAVEN', 'org.springframework.boot:spring-boot-starter-parent', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端框架', 'FULL'),
 ('Spring Boot Web', 'MAVEN', 'org.springframework.boot:spring-boot-starter-webmvc', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Web/REST(MVC)', 'FULL'),
 ('Spring Boot Security', 'MAVEN', 'org.springframework.boot:spring-boot-starter-security', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '认证授权(过滤链)', 'FULL'),

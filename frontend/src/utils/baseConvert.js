@@ -130,3 +130,147 @@ export function convertAll(raw, fromBase, bases = COMMON_BASES, options) {
   const targets = [...new Set(bases)].filter((b) => Number.isInteger(b) && b >= BASE_MIN && b <= BASE_MAX)
   return { ok: true, results: targets.map((base) => ({ base, ...formatParsed(parsed, base, options) })) }
 }
+
+// ---------------------------------------------------------------
+// IEEE 754 浮点(单/双精度)与十六进制互转、按位运算
+// ---------------------------------------------------------------
+
+const hexByte = (byte) => byte.toString(16).padStart(2, '0').toUpperCase()
+
+/** 浮点数 → 按大端顺序的十六进制字节串 */
+export function floatToHex(value, { double = false } = {}) {
+  const buffer = new ArrayBuffer(double ? 8 : 4)
+  const view = new DataView(buffer)
+  if (double) view.setFloat64(0, Number(value))
+  else view.setFloat32(0, Number(value))
+  return Array.from(new Uint8Array(buffer), hexByte).join('')
+}
+
+/** 十六进制字节串 → 浮点数;字节数必须与精度一致 */
+export function hexToFloat(hex, { double = false } = {}) {
+  const cleaned = String(hex ?? '')
+    .replace(/[\s,]/g, '')
+    .replace(/^0x/i, '')
+  const expected = double ? 16 : 8
+  if (!new RegExp(`^[0-9a-fA-F]{${expected}}$`).test(cleaned)) throw new BaseConvertError('invalidFloatHex', { expected })
+  const bytes = new Uint8Array(expected / 2)
+  for (let i = 0; i < bytes.length; i += 1) bytes[i] = parseInt(cleaned.slice(i * 2, i * 2 + 2), 16)
+  const view = new DataView(bytes.buffer)
+  const value = double ? view.getFloat64(0) : view.getFloat32(0)
+  return { value, hex: cleaned.toUpperCase() }
+}
+
+/** 拆解浮点位:符号 / 指数 / 尾数,NaN 与无穷单独标注 */
+export function describeFloat(hex, { double = false } = {}) {
+  const bits = double ? 64n : 32n
+  const exponentBits = double ? 11n : 8n
+  const mantissaBits = double ? 52n : 23n
+  const cleaned = String(hex ?? '')
+    .replace(/[\s,]/g, '')
+    .replace(/^0x/i, '')
+  if (!new RegExp(`^[0-9a-fA-F]{${double ? 16 : 8}}$`).test(cleaned))
+    throw new BaseConvertError('invalidFloatHex', { expected: double ? 16 : 8 })
+
+  const raw = BigInt(`0x${cleaned}`)
+  const sign = (raw >> (bits - 1n)) & 1n
+  const exponent = (raw >> mantissaBits) & ((1n << exponentBits) - 1n)
+  const mantissa = raw & ((1n << mantissaBits) - 1n)
+  const bias = (1n << (exponentBits - 1n)) - 1n
+  const maxExponent = (1n << exponentBits) - 1n
+
+  let kind = 'normal'
+  if (exponent === maxExponent) kind = mantissa === 0n ? 'infinity' : 'nan'
+  else if (exponent === 0n) kind = mantissa === 0n ? 'zero' : 'subnormal'
+
+  const { value } = hexToFloat(cleaned, { double })
+  const fraction = kind === 'normal' ? 1 + Number(mantissa) / 2 ** Number(mantissaBits) : Number(mantissa) / 2 ** Number(mantissaBits)
+  const realExponent = Number(exponent) - Number(bias)
+
+  return {
+    hex: cleaned.toUpperCase(),
+    value,
+    kind,
+    sign: Number(sign),
+    signLabel: sign === 1n ? '-' : '+',
+    exponent: Number(exponent),
+    exponentBias: Number(bias),
+    realExponent,
+    mantissa: mantissa
+      .toString(16)
+      .toUpperCase()
+      .padStart(Number(mantissaBits) / 4, '0'),
+    fraction,
+    binary: raw.toString(2).padStart(Number(bits), '0'),
+  }
+}
+
+export const BITWISE_OPS = ['AND', 'OR', 'XOR', 'NOT', 'SHL', 'SHR']
+export const BITWISE_WIDTHS = [8, 16, 32, 64]
+
+function parseBits(text, base, width) {
+  assertBase(base)
+  const input = String(text ?? '')
+    .trim()
+    .replace(/[\s_]/g, '')
+  if (!input) throw new BaseConvertError('empty')
+  const negative = input.startsWith('-')
+  const digits = (negative ? input.slice(1) : input).toLowerCase()
+  if (!digits) throw new BaseConvertError('invalidNumber')
+  let value = 0n
+  const bigBase = BigInt(base)
+  for (const ch of digits) {
+    const digit = digitValue(ch)
+    if (digit < 0 || digit >= base) throw new BaseConvertError('invalidDigit', { char: ch, base })
+    value = value * bigBase + BigInt(digit)
+  }
+  const mask = (1n << BigInt(width)) - 1n
+  return (negative ? -value : value) & mask
+}
+
+/**
+ * 按位运算;结果同时给出无符号值、二进制与十六进制。
+ * ops: AND / OR / XOR / NOT / SHL / SHR(逻辑右移,无符号)
+ */
+export function bitwiseCalc(leftText, rightText, op, { base = 10, width = 32 } = {}) {
+  if (!BITWISE_WIDTHS.includes(width)) throw new BaseConvertError('invalidWidth')
+  if (!BITWISE_OPS.includes(op)) throw new BaseConvertError('invalidOp')
+  const mask = (1n << BigInt(width)) - 1n
+  const left = parseBits(leftText, base, width)
+  const right = op === 'NOT' ? 0n : parseBits(rightText || '0', base, width)
+  let result
+  switch (op) {
+    case 'AND':
+      result = left & right
+      break
+    case 'OR':
+      result = left | right
+      break
+    case 'XOR':
+      result = left ^ right
+      break
+    case 'NOT':
+      result = ~left & mask
+      break
+    case 'SHL':
+      result = (left << right) & mask
+      break
+    case 'SHR':
+      result = (left >> right) & mask
+      break
+    default:
+      throw new BaseConvertError('invalidOp')
+  }
+  const signBit = 1n << BigInt(width - 1)
+  const signed = result & signBit ? result - (1n << BigInt(width)) : result
+  return {
+    unsigned: result.toString(),
+    signed: signed.toString(),
+    binary: result.toString(2).padStart(width, '0'),
+    hex: result
+      .toString(16)
+      .toUpperCase()
+      .padStart(width / 4, '0'),
+    octal: result.toString(8),
+    width,
+  }
+}

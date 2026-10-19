@@ -96,6 +96,8 @@ import {
   Key,
   Opportunity,
   Timer,
+  Search,
+  EditPen,
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -119,6 +121,8 @@ const ICONS = {
   Key,
   Opportunity,
   Timer,
+  Search,
+  EditPen,
   VideoPlay,
   Coin,
 }

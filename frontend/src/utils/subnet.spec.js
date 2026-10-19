@@ -2,11 +2,18 @@ import { describe, it, expect } from 'vitest'
 import {
   SubnetError,
   binaryWithPrefix,
+  cidrContains,
   classifyIp,
+  expandIpv6,
+  intToIpv4,
   ipToBinary,
   ipToString,
+  ipv4ToInt,
+  ipv6ToString,
   maskToPrefix,
+  normalizeMac,
   parseIpv4,
+  parseIpv6,
   parseMask,
   prefixToMask,
   subnetInfo,
@@ -132,5 +139,66 @@ describe('二进制对照', () => {
     expect(binaryWithPrefix(ip('192.168.1.10'), 8)).toBe('11000000.|10101000.00000001.00001010')
     expect(binaryWithPrefix(ip('192.168.1.10'), 20)).toBe('11000000.10101000.0000|0001.00001010')
     expect(binaryWithPrefix(ip('192.168.1.10'), 0)).toBe('|11000000.10101000.00000001.00001010')
+  })
+})
+
+describe('IPv4 整数互转', () => {
+  it('双向转换', () => {
+    expect(ipv4ToInt('8.8.8.8')).toBe(0x08080808)
+    expect(intToIpv4(0x08080808)).toBe('8.8.8.8')
+    expect(() => intToIpv4(2 ** 32)).toThrow(SubnetError)
+  })
+})
+
+describe('IPv6', () => {
+  it('解析压缩写法并还原', () => {
+    expect(parseIpv6('2001:db8::1').text).toBe('2001:db8::1')
+    expect(expandIpv6('2001:db8::1')).toBe('2001:0db8:0000:0000:0000:0000:0000:0001')
+    expect(parseIpv6('::1').text).toBe('::1')
+    expect(parseIpv6('::').text).toBe('::')
+  })
+
+  it('内嵌 IPv4 写法', () => {
+    expect(parseIpv6('::ffff:192.168.1.1').text).toBe('::ffff:c0a8:101')
+  })
+
+  it('最长零段压缩', () => {
+    expect(ipv6ToString(0n)).toBe('::')
+    expect(ipv6ToString(1n)).toBe('::1')
+  })
+
+  it('非法写法报错', () => {
+    expect(() => parseIpv6('1::2::3')).toThrow(SubnetError)
+    expect(() => parseIpv6('12345::1')).toThrow(SubnetError)
+  })
+})
+
+describe('CIDR 包含判断', () => {
+  it('IPv4 网段', () => {
+    expect(cidrContains('192.168.1.0/24', '192.168.1.200')).toBe(true)
+    expect(cidrContains('192.168.1.0/24', '192.168.2.1')).toBe(false)
+    expect(cidrContains('10.0.0.0/8', '10.255.0.1')).toBe(true)
+  })
+
+  it('IPv6 网段', () => {
+    expect(cidrContains('2001:db8::/32', '2001:db8::1')).toBe(true)
+    expect(cidrContains('2001:db8::/32', '2001:db9::1')).toBe(false)
+  })
+
+  it('版本不一致报错', () => {
+    expect(() => cidrContains('10.0.0.0/8', '2001:db8::1')).toThrow(SubnetError)
+  })
+})
+
+describe('MAC 规范化', () => {
+  it('四种写法互转', () => {
+    const mac = normalizeMac('AA-BB-CC-DD-EE-FF')
+    expect(mac.colon).toBe('aa:bb:cc:dd:ee:ff')
+    expect(mac.dot).toBe('aabb.ccdd.eeff')
+    expect(mac.upper).toBe('AABBCCDDEEFF')
+  })
+
+  it('非法输入报错', () => {
+    expect(() => normalizeMac('aa:bb:cc')).toThrow(SubnetError)
   })
 })

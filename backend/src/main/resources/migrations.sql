@@ -2259,3 +2259,12 @@ UPDATE `sys_oss_component` SET `current_version` = '4.1.1'
 UPDATE `sys_oss_component` SET `current_version` = '9.7.0'   WHERE `component_type` = 'MAVEN' AND `package_ref` = 'com.mysql:mysql-connector-j';
 UPDATE `sys_oss_component` SET `current_version` = '1.18.46' WHERE `component_type` = 'MAVEN' AND `package_ref` = 'org.projectlombok:lombok';
 
+-- ------------------------------------------------------------
+-- V10.59 工具箱 JSON ↔ YAML 转换引入 js-yaml(2026-10-20)
+--   NPM 直接依赖登记台账(uk_type_ref 幂等),NPM 行统一置 RENOVATE。
+-- ------------------------------------------------------------
+INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`) VALUES
+('js-yaml', 'NPM', 'js-yaml', '4.3.2', 'MIT', 'https://github.com/nodeca/js-yaml', '工具箱 JSON ↔ YAML 转换', 'FULL');
+UPDATE `sys_oss_component` SET `managed_by` = 'RENOVATE'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'js-yaml';
+

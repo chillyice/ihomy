@@ -1,5 +1,16 @@
 import { describe, it, expect } from 'vitest'
-import { COMMON_BASES, MAX_FRACTION_DIGITS, convert, convertAll, parseValue, toBaseString } from './baseConvert'
+import {
+  COMMON_BASES,
+  MAX_FRACTION_DIGITS,
+  bitwiseCalc,
+  convert,
+  convertAll,
+  describeFloat,
+  floatToHex,
+  hexToFloat,
+  parseValue,
+  toBaseString,
+} from './baseConvert'
 
 const text = (raw, from, to, options) => convert(raw, from, to, options).text
 
@@ -113,5 +124,57 @@ describe('convertAll', () => {
   it('toBaseString 支持 BigInt 与零', () => {
     expect(toBaseString(0n, 16)).toBe('0')
     expect(toBaseString(255n, 16)).toBe('FF')
+  })
+})
+
+describe('IEEE 754', () => {
+  it('单精度往返', () => {
+    expect(floatToHex(1)).toBe('3F800000')
+    expect(floatToHex(-2.5)).toBe('C0200000')
+    expect(hexToFloat('3F800000').value).toBe(1)
+    expect(floatToHex(hexToFloat('C0200000').value)).toBe('C0200000')
+  })
+
+  it('双精度往返', () => {
+    expect(floatToHex(1, { double: true })).toBe('3FF0000000000000')
+    expect(hexToFloat('3FF0000000000000', { double: true }).value).toBe(1)
+  })
+
+  it('拆解符号/指数/尾数', () => {
+    const info = describeFloat('3F800000')
+    expect(info.kind).toBe('normal')
+    expect(info.sign).toBe(0)
+    expect(info.realExponent).toBe(0)
+    expect(info.fraction).toBe(1)
+  })
+
+  it('NaN 与无穷', () => {
+    expect(describeFloat('7F800000').kind).toBe('infinity')
+    expect(describeFloat('7FC00000').kind).toBe('nan')
+  })
+
+  it('十六进制长度不符报错', () => {
+    expect(() => hexToFloat('3F80')).toThrow('invalidFloatHex')
+  })
+})
+
+describe('按位运算', () => {
+  it('AND / OR / XOR / NOT', () => {
+    expect(bitwiseCalc('12', '10', 'AND').unsigned).toBe('8')
+    expect(bitwiseCalc('12', '10', 'OR').unsigned).toBe('14')
+    expect(bitwiseCalc('12', '10', 'XOR').unsigned).toBe('6')
+    expect(bitwiseCalc('0', '0', 'NOT', { width: 8 }).unsigned).toBe('255')
+  })
+
+  it('移位与有符号显示', () => {
+    expect(bitwiseCalc('1', '4', 'SHL', { width: 8 }).binary).toBe('00010000')
+    expect(bitwiseCalc('255', '0', 'SHR', { width: 8 }).unsigned).toBe('255')
+    const signed = bitwiseCalc('255', '255', 'AND', { width: 8 })
+    expect(signed.signed).toBe('-1')
+  })
+
+  it('非法宽度与运算报错', () => {
+    expect(() => bitwiseCalc('1', '1', 'AND', { width: 12 })).toThrow('invalidWidth')
+    expect(() => bitwiseCalc('1', '1', 'NOPE')).toThrow('invalidOp')
   })
 })

@@ -61,6 +61,103 @@
         </div>
       </div>
     </div>
+
+    <div class="base-tools">
+      <div class="card base-tool">
+        <div class="base-pane-head">
+          <span class="section-label">{{ $t('tools.base.float.title') }}</span>
+          <el-radio-group v-model="floatSize" size="small">
+            <el-radio-button value="single">{{ $t('tools.base.float.single') }}</el-radio-button>
+            <el-radio-button value="double">{{ $t('tools.base.float.double') }}</el-radio-button>
+          </el-radio-group>
+        </div>
+        <div class="base-tool-row">
+          <el-input v-model="floatInput" size="small" spellcheck="false" :placeholder="$t('tools.base.float.valuePlaceholder')" />
+          <el-button size="small" @click="runFloatToHex">{{ $t('tools.base.float.toHex') }}</el-button>
+        </div>
+        <div class="base-tool-row">
+          <el-input v-model="floatHex" size="small" spellcheck="false" :placeholder="$t('tools.base.float.hexPlaceholder')" />
+          <el-button size="small" @click="runHexToFloat">{{ $t('tools.base.float.toValue') }}</el-button>
+        </div>
+        <div v-if="floatError" class="base-error">{{ floatError }}</div>
+        <div v-else-if="floatInfo" class="base-tool-out">
+          <div class="base-tool-line">
+            <span>{{ $t('tools.base.float.value') }}</span
+            ><code>{{ floatInfo.value }}</code>
+          </div>
+          <div class="base-tool-line">
+            <span>{{ $t('tools.base.float.kind') }}</span
+            ><code>{{ $t(`tools.base.float.kinds.${floatInfo.kind}`) }}</code>
+          </div>
+          <div class="base-tool-line">
+            <span>{{ $t('tools.base.float.sign') }}</span
+            ><code>{{ floatInfo.signLabel }}</code>
+          </div>
+          <div class="base-tool-line">
+            <span>{{ $t('tools.base.float.exponent') }}</span
+            ><code>{{ floatInfo.exponent }} ({{ $t('tools.base.float.real', { n: floatInfo.realExponent }) }})</code>
+          </div>
+          <div class="base-tool-line">
+            <span>{{ $t('tools.base.float.mantissa') }}</span
+            ><code>0x{{ floatInfo.mantissa }}</code>
+          </div>
+          <div class="base-tool-line">
+            <span>{{ $t('tools.base.float.hex') }}</span
+            ><code>{{ floatInfo.hex }}</code>
+          </div>
+          <div class="base-tool-line">
+            <span>{{ $t('tools.base.float.binary') }}</span
+            ><code class="base-binary">{{ floatInfo.binary }}</code>
+          </div>
+        </div>
+      </div>
+
+      <div class="card base-tool">
+        <div class="base-pane-head">
+          <span class="section-label">{{ $t('tools.base.bitwise.title') }}</span>
+        </div>
+        <div class="base-tool-row">
+          <el-input v-model="bitLeft" size="small" spellcheck="false" :placeholder="$t('tools.base.bitwise.left')" />
+          <el-select v-model="bitOp" size="small" style="width: 96px">
+            <el-option v-for="op in BITWISE_OPS" :key="op" :value="op" :label="op" />
+          </el-select>
+          <el-input
+            v-model="bitRight"
+            size="small"
+            spellcheck="false"
+            :disabled="bitOp === 'NOT'"
+            :placeholder="bitOp === 'SHL' || bitOp === 'SHR' ? $t('tools.base.bitwise.shift') : $t('tools.base.bitwise.right')"
+          />
+        </div>
+        <div class="base-tool-row">
+          <el-select v-model="bitBase" size="small" style="width: 108px">
+            <el-option v-for="base in [2, 8, 10, 16]" :key="base" :value="base" :label="$t('tools.base.baseLabel', { n: base })" />
+          </el-select>
+          <el-select v-model="bitWidth" size="small" style="width: 108px">
+            <el-option v-for="width in BITWISE_WIDTHS" :key="width" :value="width" :label="$t('tools.base.bitwise.width', { n: width })" />
+          </el-select>
+          <el-button size="small" type="primary" @click="runBitwise">{{ $t('tools.base.bitwise.run') }}</el-button>
+        </div>
+        <div v-if="bitError" class="base-error">{{ bitError }}</div>
+        <div v-else-if="bitResult" class="base-tool-out">
+          <div class="base-tool-line">
+            <span>{{ $t('tools.base.bitwise.unsigned') }}</span
+            ><code>{{ bitResult.unsigned }}</code>
+          </div>
+          <div class="base-tool-line">
+            <span>{{ $t('tools.base.bitwise.signed') }}</span
+            ><code>{{ bitResult.signed }}</code>
+          </div>
+          <div class="base-tool-line">
+            <span>HEX</span><code>{{ bitResult.hex }}</code>
+          </div>
+          <div class="base-tool-line">
+            <span>{{ $t('tools.base.bitwise.binary') }}</span
+            ><code class="base-binary">{{ bitResult.binary }}</code>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -70,7 +167,18 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
-import { BASE_MAX, BASE_MIN, COMMON_BASES, convertAll } from '@/utils/baseConvert'
+import {
+  BASE_MAX,
+  BASE_MIN,
+  BITWISE_OPS,
+  BITWISE_WIDTHS,
+  COMMON_BASES,
+  bitwiseCalc,
+  convertAll,
+  describeFloat,
+  floatToHex,
+  hexToFloat,
+} from '@/utils/baseConvert'
 
 const { t } = useI18n()
 
@@ -151,6 +259,59 @@ const loadSample = () => {
   const next = SAMPLES.find((sample) => sample.value !== input.value) || SAMPLES[0]
   input.value = next.value
   fromBase.value = next.base
+}
+
+// ---------- IEEE 754 与位运算 ----------
+const floatSize = ref('single')
+const floatInput = ref('')
+const floatHex = ref('')
+const floatInfo = ref(null)
+const floatError = ref('')
+
+const runFloatToHex = () => {
+  floatError.value = ''
+  try {
+    const hex = floatToHex(Number(floatInput.value), { double: floatSize.value === 'double' })
+    floatHex.value = hex
+    floatInfo.value = describeFloat(hex, { double: floatSize.value === 'double' })
+  } catch {
+    floatInfo.value = null
+    floatError.value = t('tools.base.float.invalidValue')
+  }
+}
+
+const runHexToFloat = () => {
+  floatError.value = ''
+  try {
+    const parsed = hexToFloat(floatHex.value, { double: floatSize.value === 'double' })
+    floatInput.value = String(parsed.value)
+    floatInfo.value = describeFloat(parsed.hex, { double: floatSize.value === 'double' })
+  } catch {
+    floatInfo.value = null
+    floatError.value = t('tools.base.float.invalidHex', { bytes: floatSize.value === 'double' ? 8 : 4 })
+  }
+}
+
+const bitLeft = ref('')
+const bitRight = ref('')
+const bitOp = ref('AND')
+const bitBase = ref(16)
+const bitWidth = ref(32)
+const bitResult = ref(null)
+const bitError = ref('')
+
+const runBitwise = () => {
+  bitError.value = ''
+  bitResult.value = null
+  try {
+    bitResult.value = bitwiseCalc(bitLeft.value || '0', bitRight.value || '0', bitOp.value, {
+      base: bitBase.value,
+      width: bitWidth.value,
+    })
+  } catch (e) {
+    const code = e?.code || 'invalidNumber'
+    bitError.value = t(`tools.base.bitwise.errors.${code}`, { char: e?.char ?? '', base: bitBase.value })
+  }
 }
 </script>
 
@@ -276,6 +437,47 @@ const loadSample = () => {
   font-size: 13px;
   line-height: 1.6;
   color: var(--color-text);
+}
+.base-tools {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.base-tool {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.base-tool-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.base-tool-out {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.base-tool-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.base-tool-line code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Courier New', monospace;
+  font-size: 12.5px;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+.base-binary {
+  word-break: break-all;
 }
 @media (max-width: 900px) {
   .base-grid {

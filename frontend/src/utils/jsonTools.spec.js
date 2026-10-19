@@ -1,5 +1,15 @@
 import { describe, it, expect } from 'vitest'
-import { JSON_MAX_DEPTH, formatJson, tokenizeJson } from './jsonTools'
+import {
+  JSON_MAX_DEPTH,
+  csvToJson,
+  formatJson,
+  jsonToCsv,
+  jsonToXml,
+  toJava,
+  toSqlInsert,
+  toTypeScript,
+  tokenizeJson,
+} from './jsonTools'
 
 const ok = (text, options) => {
   const r = formatJson(text, options)
@@ -99,5 +109,62 @@ describe('tokenizeJson', () => {
         .map((t) => t.text)
         .join(''),
     ).toBe(text)
+  })
+})
+
+describe('数据转换', () => {
+  it('嵌套对象拍平成 CSV', () => {
+    const csv = jsonToCsv('{"a":{"b":1},"list":[1,2],"name":"x,y"}')
+    expect(csv.split('\n')[0]).toBe('a.b,list.0,list.1,name')
+    expect(csv).toContain('"x,y"')
+  })
+
+  it('CSV 还原成 JSON 并推断类型', () => {
+    const json = JSON.parse(csvToJson('name,age\n阿岚,30'))
+    expect(json).toEqual([{ name: '阿岚', age: 30 }])
+  })
+
+  it('CSV 点路径还原嵌套', () => {
+    const json = JSON.parse(csvToJson('user.name,user.age\n小满,8'))
+    expect(json[0].user.name).toBe('小满')
+  })
+
+  it('JSON 生成 XML', () => {
+    const xml = jsonToXml('{"user":{"name":"阿岚","tags":["a","b"]}}')
+    expect(xml).toContain('<name>阿岚</name>')
+    expect((xml.match(/<tags>/g) || []).length).toBe(2)
+    expect(xml).toContain('<root>')
+  })
+
+  it('非法 JSON 抛可识别错误', () => {
+    expect(() => jsonToCsv('{')).toThrow('invalidJson')
+  })
+})
+
+describe('代码生成', () => {
+  const source = '{"id":1,"name":"a","vip":true,"tags":["x"],"profile":{"city":"hz"},"list":[{"k":1}]}'
+
+  it('TypeScript 接口含嵌套命名', () => {
+    const code = toTypeScript(source)
+    expect(code).toContain('export interface Root')
+    expect(code).toContain('id: number')
+    expect(code).toContain('tags: string[]')
+    expect(code).toContain('profile: Profile')
+    expect(code).toContain('list: ListItem[]')
+  })
+
+  it('Java POJO 生成字段与内部类', () => {
+    const code = toJava(source, { className: 'Demo' })
+    expect(code).toContain('public class Demo')
+    expect(code).toContain('private String name;')
+    expect(code).toContain('public static class Profile')
+    expect(code).toContain('private List<String> tags;')
+  })
+
+  it('SQL INSERT 支持数组与转义', () => {
+    const sql = toSqlInsert('[{"id":1,"name":"O\'Neil"},{"id":2,"name":null}]', { table: 'demo' })
+    expect(sql).toContain('INSERT INTO demo (id, name)')
+    expect(sql).toContain("'O''Neil'")
+    expect(sql).toContain('(2, NULL)')
   })
 })
