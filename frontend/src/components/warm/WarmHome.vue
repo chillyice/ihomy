@@ -473,8 +473,10 @@ const MODULE_TO_WIDGET = {
   task: 'task',
   wish: 'wish',
   reminder: 'reminder',
+  weather: 'weather',
 }
-// 全部模块的入口元信息(标题/路径/图标),快捷入口卡片据此渲染
+// 全部模块的入口元信息(标题/路径/图标),快捷入口卡片据此渲染。
+// 必须覆盖侧栏全部可拖入 code(NAV_PATHS 全集),否则 resolveWidget 返回 null → 拖入后无法落位
 const MODULE_META = {
   blog: { titleKey: 'warm.module.blog', path: '/blog', icon: '📝' },
   diary: { titleKey: 'warm.module.diary', path: '/diary', icon: '📖' },
@@ -496,6 +498,13 @@ const MODULE_META = {
   member: { titleKey: 'warm.module.member', path: '/member', icon: '👨‍👩‍👧' },
   storage: { titleKey: 'warm.module.storage', path: '/storage/files', icon: '🗂' },
   plant: { titleKey: 'warm.module.plant', path: '/plant', icon: '🌱' },
+  chat: { titleKey: 'warm.module.chat', path: '/chat', icon: '💬' },
+  games: { titleKey: 'warm.module.games', path: '/games', icon: '🎮' },
+  vault: { titleKey: 'warm.module.vault', path: '/vault', icon: '🔐' },
+  iot: { titleKey: 'warm.module.iot', path: '/iot', icon: '🏠' },
+  help: { titleKey: 'warm.module.help', path: '/help', icon: '❓' },
+  announcement: { titleKey: 'warm.module.announcement', path: '/announcement', icon: '📢' },
+  recycle: { titleKey: 'warm.module.recycle', path: '/recycle', icon: '🗑' },
 }
 
 // 布局键:富组件用其 id(如 feed),快捷入口用 'link:<code>'(如 link:diary);每项携带 span(列宽)+ row(行高),可调整
