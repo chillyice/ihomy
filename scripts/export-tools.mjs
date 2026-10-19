@@ -62,6 +62,7 @@ const exportManifest = {
   registry: 'frontend/src/tools/registry.js',
   tools: TOOL_REGISTRY.map((tool) => ({
     id: tool.id,
+    bitPouchId: tool.bitPouchId || null,
     path: tool.path,
     name: { zh: resolveMessage(zh, tool.titleKey), en: resolveMessage(en, tool.titleKey) },
     description: { zh: resolveMessage(zh, tool.descKey), en: resolveMessage(en, tool.descKey) },
@@ -92,7 +93,7 @@ const manifestTs = (tool) => {
   return `import type { ToolManifest } from '@/core/types'
 
 export default {
-  id: ${JSON.stringify(tool.id)},
+  id: ${JSON.stringify(tool.bitPouchId || tool.id)},
   name: { zh: ${JSON.stringify(nameZh)}, en: ${JSON.stringify(nameEn)} },
   description: {
     zh: ${JSON.stringify(descZh)},
@@ -110,8 +111,7 @@ export default {
 `
 }
 
-const runTs = `// @ts-nocheck
-import { run as coreRun } from './core'
+const runTs = `import { run as coreRun } from './core'
 
 export const run = coreRun
 `
@@ -197,7 +197,8 @@ if (target) {
   let copied = 0
   let skipped = 0
   for (const tool of kernelTools) {
-    const destination = join(target, tool.id)
+    const targetId = tool.bitPouchId || tool.id
+    const destination = join(target, targetId)
     if (existsSync(destination) && !force) {
       console.log(`  skip:     ${destination} (already exists; use --force to overwrite)`)
       skipped += 1

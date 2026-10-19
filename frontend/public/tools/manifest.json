@@ -5,6 +5,7 @@
   "tools": [
     {
       "id": "mindmap",
+      "bitPouchId": null,
       "path": "/tools/mindmap",
       "name": {
         "zh": "脑图设计",
@@ -41,6 +42,7 @@
     },
     {
       "id": "ai-playground",
+      "bitPouchId": null,
       "path": "/tools/ai-playground",
       "name": {
         "zh": "AI 测试台",
@@ -76,6 +78,7 @@
     },
     {
       "id": "light-lab",
+      "bitPouchId": null,
       "path": "/tools/light-lab",
       "name": {
         "zh": "光影实验台",
@@ -111,6 +114,7 @@
     },
     {
       "id": "pdf",
+      "bitPouchId": null,
       "path": "/tools/pdf",
       "name": {
         "zh": "PDF 转换",
@@ -148,6 +152,7 @@
     },
     {
       "id": "json",
+      "bitPouchId": null,
       "path": "/tools/json",
       "name": {
         "zh": "JSON 格式化",
@@ -185,6 +190,7 @@
     },
     {
       "id": "codec",
+      "bitPouchId": null,
       "path": "/tools/codec",
       "name": {
         "zh": "字符编码转换",
@@ -223,6 +229,7 @@
     },
     {
       "id": "base",
+      "bitPouchId": null,
       "path": "/tools/base",
       "name": {
         "zh": "进制转换",
@@ -261,6 +268,7 @@
     },
     {
       "id": "packet",
+      "bitPouchId": null,
       "path": "/tools/packet",
       "name": {
         "zh": "报文解析",
@@ -298,6 +306,7 @@
     },
     {
       "id": "subnet",
+      "bitPouchId": null,
       "path": "/tools/subnet",
       "name": {
         "zh": "子网掩码计算",
@@ -336,6 +345,7 @@
     },
     {
       "id": "hash",
+      "bitPouchId": null,
       "path": "/tools/hash",
       "name": {
         "zh": "哈希与校验",
@@ -372,12 +382,13 @@
       "order": 100,
       "kernel": "hashTool",
       "bitPouch": {
-        "status": "partial",
-        "note": "bit_pouch 已有 hash 插件(仅 SHA 系与 MD5);本次新增 CRC32 / HMAC / 文件摘要 / 期望值比对"
+        "status": "existing",
+        "note": "bit_pouch hash 插件已合并 CRC32 / HMAC / 文件摘要 / 期望值比对"
       }
     },
     {
       "id": "generator",
+      "bitPouchId": null,
       "path": "/tools/generator",
       "name": {
         "zh": "随机生成器",
@@ -412,12 +423,13 @@
       "order": 110,
       "kernel": "generatorTool",
       "bitPouch": {
-        "status": "partial",
-        "note": "bit_pouch 仅有 uuid 插件;本次补齐密码/随机串/随机字节/抽签分组"
+        "status": "existing",
+        "note": "bit_pouch 新增 generator 插件(密码/随机串/随机字节/抽签分组)"
       }
     },
     {
       "id": "time",
+      "bitPouchId": "timestamp",
       "path": "/tools/time",
       "name": {
         "zh": "时间工具箱",
@@ -451,12 +463,13 @@
       "order": 120,
       "kernel": "timeTool",
       "bitPouch": {
-        "status": "partial",
-        "note": "bit_pouch 已有 timestamp 插件(仅单向转换);本次新增时区/日期差/Cron"
+        "status": "existing",
+        "note": "bit_pouch timestamp 插件已合并时区/日期差/Cron"
       }
     },
     {
       "id": "flash",
+      "bitPouchId": null,
       "path": "/tools/flash",
       "name": {
         "zh": "Flash 播放器",
@@ -490,6 +503,7 @@
     },
     {
       "id": "loan",
+      "bitPouchId": null,
       "path": "/tools/loan",
       "name": {
         "zh": "贷款计算器",
@@ -527,6 +541,7 @@
     },
     {
       "id": "gba",
+      "bitPouchId": null,
       "path": "/tools/gba",
       "name": {
         "zh": "GBA 播放器",

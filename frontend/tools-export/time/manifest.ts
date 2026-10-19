@@ -1,7 +1,7 @@
 import type { ToolManifest } from '@/core/types'
 
 export default {
-  id: "time",
+  id: "timestamp",
   name: { zh: "时间工具箱", en: "Time Toolbox" },
   description: {
     zh: "时间戳 / 时区 / 日期差 / Cron，本地换算",

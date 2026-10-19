@@ -174,7 +174,7 @@ export const TOOL_REGISTRY = [
     kernel: 'hashTool',
     bitPouchCategory: 'inspect',
     bitPouchIcon: 'hash',
-    bitPouch: { status: 'partial', note: 'bit_pouch 已有 hash 插件(仅 SHA 系与 MD5);本次新增 CRC32 / HMAC / 文件摘要 / 期望值比对' },
+    bitPouch: { status: 'existing', note: 'bit_pouch hash 插件已合并 CRC32 / HMAC / 文件摘要 / 期望值比对' },
   },
   {
     id: 'generator',
@@ -193,7 +193,7 @@ export const TOOL_REGISTRY = [
     kernel: 'generatorTool',
     bitPouchCategory: 'convert',
     bitPouchIcon: 'key',
-    bitPouch: { status: 'partial', note: 'bit_pouch 仅有 uuid 插件;本次补齐密码/随机串/随机字节/抽签分组' },
+    bitPouch: { status: 'existing', note: 'bit_pouch 新增 generator 插件(密码/随机串/随机字节/抽签分组)' },
   },
   {
     id: 'time',
@@ -212,7 +212,8 @@ export const TOOL_REGISTRY = [
     kernel: 'timeTool',
     bitPouchCategory: 'convert',
     bitPouchIcon: 'clock',
-    bitPouch: { status: 'partial', note: 'bit_pouch 已有 timestamp 插件(仅单向转换);本次新增时区/日期差/Cron' },
+    bitPouchId: 'timestamp',
+    bitPouch: { status: 'existing', note: 'bit_pouch timestamp 插件已合并时区/日期差/Cron' },
   },
   {
     id: 'flash',
