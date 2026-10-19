@@ -651,7 +651,6 @@ const flipLayout = (prev) => {
 const applyLayout = (entries) => {
   const prev = captureRects()
   layout.value = entries.filter((e) => resolveWidget(e))
-  saveLayout()
   nextTick(() => flipLayout(prev))
 }
 const addWidget = (id) => {
@@ -667,7 +666,6 @@ const removeWidget = (w) => {
 }
 const resetLayout = () => {
   layout.value = DEFAULT_LAYOUT.map((e) => ({ ...e }))
-  saveLayout()
   ElMessage.success(t('warm.layoutReset'))
 }
 
@@ -676,6 +674,10 @@ const editMode = computed(() => appStore.homeEditMode)
 const canEdit = computed(() => userStore.isOwner)
 const startEdit = () => appStore.toggleHomeEditMode()
 const finishEdit = () => appStore.toggleHomeEditMode()
+// 编辑期间的增删/拖拽/缩放/恢复默认都只改内存,退出编辑(点「完成」或经侧栏再次点编辑)时才落库
+watch(editMode, (on) => {
+  if (!on) saveLayout()
+})
 
 // 卡片点击:仅整卡可跳转的组件(weather/anni/finance);photos 点击翻牌、feed/task/wish/reminder/item 由内部行/按钮跳转
 const LINK_IDS = ['weather', 'anni', 'finance']
@@ -948,7 +950,7 @@ const onResizeUp = () => {
   resizeState.value = null
   window.removeEventListener('mousemove', onResizeMove)
   window.removeEventListener('mouseup', onResizeUp)
-  saveLayout() // 松手才提交最终布局(拖回原位则等于原布局,无副作用)
+  // 松手仅结束拖拽,不落库;退出编辑(点「完成」或再次点编辑)时统一提交
 }
 onBeforeUnmount(() => {
   window.removeEventListener('mousemove', onResizeMove)
