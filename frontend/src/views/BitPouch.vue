@@ -78,7 +78,7 @@
               </div>
             </div>
             <div class="bpterm-foot">
-              <span>11 TOOLS</span>
+              <span>12 TOOLS</span>
               <span>LOCAL-FIRST</span>
               <span class="t-ok">NO CLOUD</span>
             </div>
@@ -215,7 +215,7 @@ import { useI18n } from 'vue-i18n'
 // /opt/ihomy/uploads/bit_pouch/,nginx /files/ 反代托管;页面统一走 ihomy 直链,
 // GitHub Releases 作为备用入口。换版本时同步 version 常量,并确认该 tag 已发布
 // (默认建 draft,不发布则镜像与下载链接都取不到)。
-const version = '0.2.0'
+const version = '0.3.0'
 const repoUrl = 'https://github.com/chillyice/bit_pouch'
 const releasesUrl = `${repoUrl}/releases`
 const fileUrl = (name) => `/files/bit_pouch/${name}`
@@ -318,7 +318,7 @@ const zipIcon =
   '<svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M9 5v3M15 5v3M9 11v3M15 11v3M9 17v2M15 17v2"/><path d="M12 8v2"/></svg>'
 
 const stats = [
-  { num: '11', labelKey: 'bitPouch.statTools' },
+  { num: '12', labelKey: 'bitPouch.statTools' },
   { num: '2', labelKey: 'bitPouch.statRuntimes' },
   { num: '0', labelKey: 'bitPouch.statCloud' },
   { num: '4', labelKey: 'bitPouch.statTargets' },
