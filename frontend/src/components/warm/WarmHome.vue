@@ -37,6 +37,7 @@
           {
             'gc-weather': w.id === 'weather',
             'gc-overflow': w.id === 'weather',
+            'gc-card-tile': compact(w),
             'gc-item-card': w.id === 'item',
             'gc-photos': w.id === 'photos',
             'gc-card-edit': editMode,
@@ -60,8 +61,14 @@
           <div class="gc-resize" :title="$t('warm.resizeWidget')" @mousedown.stop.prevent="onResizeStart($event, w)" @click.stop></div>
         </template>
 
+        <!-- 紧凑图标档:1 列纯图标(一行一列),2 列图标 + 最简名称(一行两列) -->
+        <div v-if="compact(w)" class="gc-tile">
+          <span class="gc-tile-icon">{{ w.icon }}</span>
+          <span v-if="w.span >= 2" class="gc-tile-label">{{ w.label }}</span>
+        </div>
+
         <!-- 天气活窗(暖居签名) -->
-        <template v-if="w.id === 'weather'">
+        <template v-else-if="w.id === 'weather'">
           <h3 class="gc-card-h3">
             <span>{{ $t('warm.weatherWindow', { city: weatherCity }) }}</span>
           </h3>
@@ -664,8 +671,28 @@ const finishEdit = () => appStore.toggleHomeEditMode()
 // 卡片点击:仅整卡可跳转的组件(weather/anni/finance);photos 点击翻牌、feed/task/wish/reminder/item 由内部行/按钮跳转
 const LINK_IDS = ['weather', 'anni', 'finance']
 const isLinkCard = (w) => LINK_IDS.includes(w.id)
+// 紧凑图标档:缩到 1 列(一行一列)/2 列(一行两列)时只渲染图标;2 列再带上名称(最简信息)。
+// span<=2 一律走图标档,避免窄列里塞进完整内容而挤爆
+const compact = (w) => w.span <= 2
+// 图标档点击直达:富组件按其所属模块路径,快捷入口用自身 path(daily 无独立页,不跳转)
+const TILE_PATH = {
+  weather: '/weather',
+  feed: '/blog',
+  photos: '/album',
+  anni: '/anniversary',
+  finance: '/book',
+  item: '/item',
+  task: '/task',
+  wish: '/wish',
+  reminder: '/reminder',
+}
 const onCardClick = (w) => {
   if (editMode.value) return
+  if (compact(w)) {
+    const path = w.kind === 'link' ? w.path : TILE_PATH[w.id]
+    if (path) router.push(path)
+    return
+  }
   const dest = { weather: '/weather', anni: '/anniversary', finance: '/book' }[w.id]
   if (dest) router.push(dest)
 }
@@ -677,9 +704,10 @@ const resizing = ref(false)
 const resizeState = ref(null)
 const ROW_H = 80
 const GAP = 16
-// 可吸附的列宽档(4/6/8/12)与行高档(2/3/4/6),与 .gc-c*/.gc-r* 样式类一一对应
-const ALLOWED_SPANS = [4, 6, 8, 12]
-const ALLOWED_ROWS = [2, 3, 4, 6]
+// 可吸附的列宽档(1/2/4/6/8/12)与行高档(1/2/3/4/6),与 .gc-c*/.gc-r* 样式类一一对应;
+// 1 列 = 一行一列、2 列 = 一行两列的紧凑图标档(见 compact())
+const ALLOWED_SPANS = [1, 2, 4, 6, 8, 12]
+const ALLOWED_ROWS = [1, 2, 3, 4, 6]
 
 const onDragStart = (e, w) => {
   if (resizing.value) {
@@ -1371,6 +1399,15 @@ html.theme-warm.dark .gc-home {
 .gc-c4 {
   grid-column: span 4;
 }
+.gc-c2 {
+  grid-column: span 2;
+}
+.gc-c1 {
+  grid-column: span 1;
+}
+.gc-r1 {
+  grid-row: span 1;
+}
 .gc-r2 {
   grid-row: span 2;
 }
@@ -1382,6 +1419,33 @@ html.theme-warm.dark .gc-home {
 }
 .gc-r6 {
   grid-row: span 6;
+}
+
+/* 紧凑图标档(1/2 列):收起内边距,只留图标 + 最简名称 */
+.gc-card-tile {
+  padding: 8px;
+}
+.gc-tile {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+}
+.gc-tile-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+.gc-tile-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 /* 卡片 = 家具块 */
@@ -2307,17 +2371,23 @@ html.dark .gc-glass::after {
   .gc-grid {
     grid-auto-rows: auto;
   }
+  .gc-c1,
+  .gc-c2,
   .gc-c4,
   .gc-c6,
   .gc-c8,
   .gc-c12 {
     grid-column: span 12;
   }
+  .gc-r1,
   .gc-r2,
   .gc-r3,
   .gc-r4,
   .gc-r6 {
     grid-row: auto;
+  }
+  .gc-card-tile {
+    min-height: 72px;
   }
 }
 </style>
