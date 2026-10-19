@@ -1,6 +1,6 @@
 {
   "source": "ihomy",
-  "version": "V10.60",
+  "version": "V10.61",
   "registry": "frontend/src/tools/registry.js",
   "tools": [
     {
@@ -672,6 +672,134 @@
       "bitPouch": {
         "status": "new",
         "note": "bit_pouch 暂无文件识别/ZIP 插件"
+      }
+    },
+    {
+      "id": "jwt",
+      "bitPouchId": null,
+      "path": "/tools/jwt",
+      "name": {
+        "zh": "JWT 与密钥",
+        "en": "JWT & Keys"
+      },
+      "description": {
+        "zh": "解码 / 验签 / 密钥对 / AES 加解密",
+        "en": "Decode / verify / key pairs / AES"
+      },
+      "category": "dev",
+      "bitPouchCategory": "inspect",
+      "bitPouchIcon": "jwt",
+      "keywords": [
+        "jwt",
+        "token",
+        "hmac",
+        "rsa",
+        "ecdsa",
+        "pem",
+        "jwk",
+        "aes",
+        "令牌",
+        "验签",
+        "密钥"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web",
+        "desktop",
+        "mobile"
+      ],
+      "offline": true,
+      "order": 129,
+      "kernel": "jwtTool",
+      "bitPouch": {
+        "status": "partial",
+        "note": "bit_pouch 已有 jwt 插件(仅解码),密钥/验签/加解密待合并"
+      }
+    },
+    {
+      "id": "color",
+      "bitPouchId": null,
+      "path": "/tools/color",
+      "name": {
+        "zh": "颜色与前端设计",
+        "en": "Color & UI Design"
+      },
+      "description": {
+        "zh": "格式互转 / 对比度 / 配色 / CSS",
+        "en": "Conversions / contrast / palettes / CSS"
+      },
+      "category": "design",
+      "bitPouchCategory": null,
+      "bitPouchIcon": null,
+      "keywords": [
+        "color",
+        "hex",
+        "rgb",
+        "hsl",
+        "lab",
+        "contrast",
+        "wcag",
+        "gradient",
+        "颜色",
+        "对比度",
+        "配色"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web",
+        "desktop",
+        "mobile"
+      ],
+      "offline": true,
+      "order": 132,
+      "kernel": "colorTool",
+      "bitPouch": {
+        "status": "new",
+        "note": "bit_pouch 暂无颜色插件"
+      }
+    },
+    {
+      "id": "unit",
+      "bitPouchId": null,
+      "path": "/tools/unit",
+      "name": {
+        "zh": "单位换算",
+        "en": "Unit Converter"
+      },
+      "description": {
+        "zh": "长度 / 重量 / 温度 / 数据量等",
+        "en": "Length / weight / temperature / data and more"
+      },
+      "category": "life",
+      "bitPouchCategory": null,
+      "bitPouchIcon": null,
+      "keywords": [
+        "unit",
+        "length",
+        "weight",
+        "temperature",
+        "convert",
+        "单位",
+        "换算",
+        "长度",
+        "重量",
+        "温度"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web",
+        "desktop",
+        "mobile"
+      ],
+      "offline": true,
+      "order": 134,
+      "kernel": "unitTool",
+      "bitPouch": {
+        "status": "new",
+        "note": "bit_pouch 暂无单位换算插件"
       }
     },
     {

@@ -196,6 +196,27 @@ const routes = [
     component: () => import('@/views/tools/FileTool.vue'),
     meta: { public: true },
   },
+  // JWT 与密钥:解码/验签/密钥对/加解密,全部本机 Web Crypto
+  {
+    path: '/tools/jwt',
+    name: 'JwtTool',
+    component: () => import('@/views/tools/JwtTool.vue'),
+    meta: { public: true },
+  },
+  // 颜色与前端设计:格式互转/WCAG 对比度/配色/CSS 片段
+  {
+    path: '/tools/color',
+    name: 'ColorTool',
+    component: () => import('@/views/tools/ColorTool.vue'),
+    meta: { public: true },
+  },
+  // 单位换算:长度/面积/体积/重量/温度/速度/压力/数据量/时间
+  {
+    path: '/tools/unit',
+    name: 'UnitTool',
+    component: () => import('@/views/tools/UnitTool.vue'),
+    meta: { public: true },
+  },
   // 贷款计算器:纯前端试算(等额本息/等额本金、商业/公积金/组合贷、提前还款对比),不依赖后端
   { path: '/tools/loan', name: 'LoanCalculator', component: () => import('@/views/tools/LoanCalculator.vue'), meta: { public: true } },
   // Flash 播放器(Ruffle):本地加载 .swf 怀旧小游戏

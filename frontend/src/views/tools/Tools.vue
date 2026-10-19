@@ -101,6 +101,9 @@ import {
   Monitor,
   Picture,
   FolderOpened,
+  Lock,
+  Brush,
+  ScaleToOriginal,
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -129,6 +132,9 @@ const ICONS = {
   Monitor,
   Picture,
   FolderOpened,
+  Lock,
+  Brush,
+  ScaleToOriginal,
   VideoPlay,
   Coin,
 }
