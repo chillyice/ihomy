@@ -412,6 +412,7 @@ import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useWarmWidgetDrag } from '@/utils/widgetDragData'
+import { pickInsertIndex } from '@/utils/dragInsert'
 import { addedCodes } from '@/utils/warmHomeShared'
 import { publicApi, bookApi, itemApi, taskApi, wishApi, reminderApi, aiApi } from '@/api'
 import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
@@ -618,6 +619,9 @@ const FLIP_EASE = 'cubic-bezier(.34, 1.56, .64, 1)'
 const flipLayout = (prev) => {
   const grid = gridEl.value
   if (!grid) return
+  // 拖拽中的 FLIP 会改卡片 transform,而落位判定量的是 getBoundingClientRect(含 transform),
+  // 量到动画中间态就会连着算错下标、预览来回跳;拖拽期间直接按最终布局呈现
+  if (dragId.value || dragCode.value) return
   const moves = []
   grid.querySelectorAll('.gc-card').forEach((c) => {
     const id = c.dataset.wid
@@ -726,7 +730,14 @@ const onDragStart = (e, w) => {
     return
   } // 调整大小时取消卡片原生拖拽
   dropPreview.value = null
-  reorderPreview.value = null
+  // 起初下标即原位(移除源卡后插回原位),指针压在自己身上时保持不变,避免第一帧就跳位
+  reorderPreview.value = {
+    id: w.id,
+    index: Math.max(
+      0,
+      widgets.value.findIndex((x) => x.id === w.id),
+    ),
+  }
   dragId.value = w.id
   e.dataTransfer.effectAllowed = 'move'
   // 用透明画布替换浏览器默认的拖拽快照:否则光标下会再跟一张卡片,与网格里的占位叠成「两个相同组件」
@@ -780,22 +791,26 @@ const previewMeta = (code) => {
   const meta = MODULE_META[code]
   return meta ? { label: t(meta.titleKey), icon: meta.icon } : null
 }
-// 由鼠标坐标推导插入下标(网格自动流,按视觉顺序逐项判断)
-const insertionIndexAt = (x, y) => {
+// 由鼠标坐标推导插入下标:取指针真正命中的卡片(间隙/源卡自身保持当前下标,见 utils/dragInsert.js)
+const insertionIndexAt = (x, y, current, sourceId) => {
   const grid = gridEl.value
-  if (!grid) return layout.value.length
-  const cards = Array.from(grid.querySelectorAll('.gc-card')).filter((c) => {
-    const wid = c.dataset.wid
-    return wid && !wid.startsWith('__') && wid !== dragId.value // 排除占位幽灵与正在拖拽的源卡片
-  })
-  for (let i = 0; i < cards.length; i++) {
-    const r = cards[i].getBoundingClientRect()
-    const cx = r.left + r.width / 2
-    const cy = r.top + r.height / 2
-    if (y < cy) return i
-    if (y >= r.top && y < r.bottom && x < cx) return i
-  }
-  return cards.length
+  if (!grid) return current ?? 0
+  const boxes = Array.from(grid.querySelectorAll('.gc-card'))
+    .filter((c) => c.dataset.wid)
+    .map((c) => {
+      const r = c.getBoundingClientRect()
+      return { id: c.dataset.wid, left: r.left, top: r.top, right: r.right, bottom: r.bottom }
+    })
+  const g = grid.getBoundingClientRect()
+  return pickInsertIndex(
+    boxes,
+    layout.value.filter((e) => e.id !== sourceId),
+    x,
+    y,
+    current,
+    sourceId,
+    { top: g.top, bottom: g.bottom },
+  )
 }
 const insertWidgetAt = (code, idx) => {
   const id = MODULE_TO_WIDGET[code] || `link:${code}`
@@ -822,10 +837,9 @@ const updateDragPreview = (nx, ny) => {
   const inside = !!(r && nx >= r.left && nx <= r.right && ny >= r.top && ny <= r.bottom)
   if (inside) {
     setOverGrid(true)
-    const idx = insertionIndexAt(nx, ny)
+    const idx = insertionIndexAt(nx, ny, dropPreview.value?.index, '__preview__')
     const cur = dropPreview.value
     if (!cur || cur.code !== dragCode.value || cur.index !== idx) {
-      const prev = captureRects()
       const meta = previewMeta(dragCode.value)
       dropPreview.value = {
         code: dragCode.value,
@@ -833,15 +847,10 @@ const updateDragPreview = (nx, ny) => {
         icon: meta?.icon || '✨',
         index: idx,
       }
-      nextTick(() => flipLayout(prev))
     }
   } else {
     setOverGrid(false)
-    if (dropPreview.value) {
-      const prev = captureRects()
-      dropPreview.value = null
-      nextTick(() => flipLayout(prev))
-    }
+    if (dropPreview.value) dropPreview.value = null
   }
 }
 onMove((nx, ny) => updateDragPreview(nx, ny))
@@ -854,12 +863,10 @@ const onReorderDragOver = (e) => {
   e.preventDefault()
   if (!dragId.value) return
   e.dataTransfer.dropEffect = 'move'
-  const idx = insertionIndexAt(e.clientX, e.clientY)
+  const idx = insertionIndexAt(e.clientX, e.clientY, reorderPreview.value?.index, dragId.value)
   const cur = reorderPreview.value
   if (!cur || cur.index !== idx) {
-    const prev = captureRects()
     reorderPreview.value = { id: dragId.value, index: idx }
-    nextTick(() => flipLayout(prev))
   }
 }
 const onReorderDrop = (e) => {
