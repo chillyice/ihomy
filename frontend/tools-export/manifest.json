@@ -803,6 +803,45 @@
       }
     },
     {
+      "id": "markdown",
+      "bitPouchId": null,
+      "path": "/tools/markdown",
+      "name": {
+        "zh": "Markdown 阅读器",
+        "en": "Markdown Reader"
+      },
+      "description": {
+        "zh": "本地阅读 .md 文件，支持标题 / 代码块 / 列表 / 链接等语法",
+        "en": "Read .md files locally, supports headings / code blocks / lists / links and more"
+      },
+      "category": "document",
+      "bitPouchCategory": null,
+      "bitPouchIcon": null,
+      "keywords": [
+        "markdown",
+        "md",
+        "reader",
+        "markdown",
+        "文档",
+        "阅读",
+        "md 文件"
+      ],
+      "version": "1.0.0",
+      "runtime": "main",
+      "platforms": [
+        "web",
+        "desktop",
+        "mobile"
+      ],
+      "offline": true,
+      "order": 136,
+      "kernel": null,
+      "bitPouch": {
+        "status": "new",
+        "note": "bit_pouch 暂无 Markdown 阅读器插件"
+      }
+    },
+    {
       "id": "flash",
       "bitPouchId": null,
       "path": "/tools/flash",

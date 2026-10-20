@@ -27,6 +27,26 @@
           <span class="group-count">{{ item.count }}</span>
         </div>
         <div
+          v-else-if="item.type === 'entry'"
+          v-a11y-click
+          class="tool-card card tool-entry"
+          :class="{ 'is-sorting': sorting }"
+          :aria-disabled="sorting ? 'true' : undefined"
+          @click="openEntry(item.entry)"
+        >
+          <div class="tool-icon">
+            <el-icon :size="30"><component :is="item.entry.icon" /></el-icon>
+          </div>
+          <div class="tool-name">
+            <span>{{ $t(item.entry.titleKey) }}</span>
+            <span class="tool-tag">{{ $t(item.entry.tagKey) }}</span>
+          </div>
+          <div class="tool-desc">{{ $t(item.entry.descKey) }}</div>
+          <span class="tool-enter"
+            >{{ $t('tools.enter') }}<el-icon><ArrowRight /></el-icon
+          ></span>
+        </div>
+        <div
           v-else
           v-a11y-click
           class="tool-card card"
@@ -76,70 +96,43 @@ import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import {
-  Tools,
-  ArrowRight,
-  ArrowDown,
-  MagicStick,
-  Sunny,
-  VideoPlay,
-  Coin,
-  Document,
-  DataLine,
-  Switch,
-  Operation,
-  Sort,
-  Rank,
-  Check,
-  Connection,
-  Share,
-  Key,
-  Opportunity,
-  Timer,
-  Search,
-  EditPen,
-  Monitor,
-  Picture,
-  FolderOpened,
-  Lock,
-  Brush,
-  ScaleToOriginal,
-} from '@element-plus/icons-vue'
+import { ArrowRight, ArrowDown, MagicStick, Sort, Rank, Check, Box, Pointer } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import { TOOL_IDS, TOOL_REGISTRY } from '@/tools/registry'
-import { loadToolOrder, mergeToolOrder, moveToolBy, moveToolTo, saveToolOrder } from '@/utils/toolOrder'
+import { iconFor } from '@/tools/icons'
+import { loadToolOrder, mergeToolOrder, moveToolTo, saveToolOrder } from '@/utils/toolOrder'
 
 const { t } = useI18n()
 const router = useRouter()
 
 // 卡片清单的元数据唯一来源在 src/tools/registry.js(同一份清单也供 bit_pouch 导出)
-const ICONS = {
-  Tools,
-  MagicStick,
-  Sunny,
-  Document,
-  DataLine,
-  Switch,
-  Operation,
-  Connection,
-  Share,
-  Key,
-  Opportunity,
-  Timer,
-  Search,
-  EditPen,
-  Monitor,
-  Picture,
-  FolderOpened,
-  Lock,
-  Brush,
-  ScaleToOriginal,
-  VideoPlay,
-  Coin,
-}
-const DEFAULT_TOOLS = TOOL_REGISTRY.map((tool) => ({ ...tool, icon: ICONS[tool.icon] || Tools }))
+// 比特口袋收录的开发者工具整体汇入「比特口袋 · 在线工具」页,这里不再单列;
+// AI 测试台虽同属 dev 分类,但 bitPouch.status=out-of-scope,仍留在工具箱里。
+const belongsToBitPouch = (tool) => tool.category === 'dev' && tool.bitPouch?.status !== 'out-of-scope'
+const DEFAULT_TOOLS = TOOL_REGISTRY.map((tool) => ({ ...tool, icon: iconFor(tool.icon) }))
 const defaultIds = TOOL_IDS
+
+// 工具箱末尾的固定入口:不参与排序,也不写入 toolOrder。
+const ENTRIES = [
+  {
+    key: 'bit-pouch',
+    path: '/tools/bit-pouch',
+    icon: Box,
+    titleKey: 'tools.entries.bitPouch.title',
+    descKey: 'tools.entries.bitPouch.desc',
+    tagKey: 'tools.entries.bitPouch.tag',
+  },
+  {
+    key: 'kada',
+    path: '/kada',
+    icon: Pointer,
+    titleKey: 'tools.entries.kada.title',
+    descKey: 'tools.entries.kada.desc',
+    tagKey: 'tools.entries.kada.tag',
+  },
+]
+const ENTRY_ITEMS = ENTRIES.map((entry) => ({ type: 'entry', key: `entry-${entry.key}`, entry }))
 
 // 分类顺序固定(不跟随用户排序):分组视图只决定「怎么排」,不改变每组内部的用户顺序
 const CATEGORIES = [
@@ -153,7 +146,10 @@ const CATEGORIES = [
 const order = ref(loadToolOrder(defaultIds))
 const tools = computed(() => {
   const byId = new Map(DEFAULT_TOOLS.map((tool) => [tool.id, tool]))
-  return order.value.map((id) => byId.get(id)).filter(Boolean)
+  return order.value
+    .map((id) => byId.get(id))
+    .filter(Boolean)
+    .filter((tool) => !belongsToBitPouch(tool))
 })
 const persist = () => saveToolOrder(order.value)
 
@@ -169,7 +165,7 @@ const grouped = ref(
   })(),
 )
 const gridItems = computed(() => {
-  if (!grouped.value) return tools.value.map((tool) => ({ type: 'card', key: tool.id, tool }))
+  if (!grouped.value) return [...tools.value.map((tool) => ({ type: 'card', key: tool.id, tool })), ...ENTRY_ITEMS]
   const items = []
   for (const cat of CATEGORIES) {
     const group = tools.value.filter((tool) => tool.category === cat.key)
@@ -177,6 +173,7 @@ const gridItems = computed(() => {
     items.push({ type: 'heading', key: `cat-${cat.key}`, labelKey: cat.labelKey, count: group.length })
     for (const tool of group) items.push({ type: 'card', key: tool.id, tool })
   }
+  items.push(...ENTRY_ITEMS)
   return items
 })
 
@@ -208,6 +205,9 @@ const resetOrder = () => {
 }
 const openTool = (tool) => {
   if (!sorting.value) router.push(tool.path)
+}
+const openEntry = (entry) => {
+  if (!sorting.value) router.push(entry.path)
 }
 
 // 拖拽排序:只认卡片右上角的把手,pointer 事件同时覆盖鼠标与触屏
@@ -247,12 +247,17 @@ const onGripDown = (event, id) => {
   window.addEventListener('pointercancel', upHandler)
 }
 
-// 键盘:把手聚焦后按方向键移动,不依赖拖拽也能完成排序
+// 键盘:把手聚焦后按方向键移动,不依赖拖拽也能完成排序。
+// 移动以「当前可见卡片」为准,避免一次按键只跨过被隐藏的开发者工具而不产生视觉变化。
 const onGripKeydown = (event, id) => {
   const delta = event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowDown' || event.key === 'ArrowRight' ? 1 : 0
   if (!delta) return
   event.preventDefault()
-  const next = moveToolBy(order.value, id, delta)
+  const visible = tools.value.map((tool) => tool.id)
+  const from = visible.indexOf(id)
+  const to = Math.max(0, Math.min(visible.length - 1, from + delta))
+  if (from < 0 || to === from) return
+  const next = moveToolTo(order.value, id, visible[to])
   if (next === order.value) return
   order.value = next
   persist()

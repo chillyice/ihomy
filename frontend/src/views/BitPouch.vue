@@ -14,9 +14,10 @@
           <span class="bpver">v{{ version }}</span>
         </div>
         <nav class="bpnav" :aria-label="$t('bitPouch.navAria')">
-          <a href="#download"><b>01</b>{{ $t('bitPouch.secDownload') }}</a>
-          <a href="#features"><b>02</b>{{ $t('bitPouch.secFeatures') }}</a>
-          <a href="#notes"><b>03</b>{{ $t('bitPouch.notesLabel') }}</a>
+          <router-link to="/tools/bit-pouch"><b>01</b>{{ $t('bitPouch.secOnline') }}</router-link>
+          <a href="#download"><b>02</b>{{ $t('bitPouch.secDownload') }}</a>
+          <a href="#features"><b>03</b>{{ $t('bitPouch.secFeatures') }}</a>
+          <a href="#notes"><b>04</b>{{ $t('bitPouch.notesLabel') }}</a>
         </nav>
         <a class="bpgh" :href="repoUrl" target="_blank" rel="noopener noreferrer" :aria-label="$t('bitPouch.ghAria')">
           <span class="bpgh-ic" aria-hidden="true" v-html="ghIcon"></span>
@@ -37,6 +38,10 @@
               <span class="bpbtn-ic" aria-hidden="true" v-html="dlIcon"></span>
               {{ $t('bitPouch.ctaDownload') }}
             </a>
+            <router-link class="bpbtn bpbtn-ghost bpbtn-online" to="/tools/bit-pouch">
+              <span class="bpbtn-ic" aria-hidden="true" v-html="webIcon"></span>
+              {{ $t('bitPouch.ctaOnline') }}
+            </router-link>
             <a class="bpbtn bpbtn-ghost" href="#download">{{ $t('bitPouch.ctaPlatforms') }}</a>
           </div>
 
@@ -793,6 +798,15 @@ onBeforeUnmount(() => {
   transform: translateY(-1px);
   border-color: var(--accent);
   color: var(--accent);
+}
+/* 在线使用:与下载并列但用强调色描边,让「不装也能用」一眼可见 */
+.bpbtn-online {
+  border-color: rgba(184, 255, 61, 0.4);
+  color: var(--accent);
+}
+.bpbtn-online:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 .bpkv {
   display: flex;

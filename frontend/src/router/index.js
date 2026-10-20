@@ -217,6 +217,10 @@ const routes = [
     component: () => import('@/views/tools/UnitTool.vue'),
     meta: { public: true },
   },
+  // Markdown 阅读器:本地阅读 .md 文件，支持标题 / 代码块 / 列表 / 链接等语法
+  { path: '/tools/markdown', name: 'MarkdownReader', component: () => import('@/views/tools/MarkdownReader.vue'), meta: { public: true } },
+  // 比特口袋 · 在线工具:工具箱里所有开发者工具的统一入口(发布页与工具箱都跳这里)
+  { path: '/tools/bit-pouch', name: 'BitPouchOnline', component: () => import('@/views/tools/BitPouchOnline.vue'), meta: { public: true } },
   // 贷款计算器:纯前端试算(等额本息/等额本金、商业/公积金/组合贷、提前还款对比),不依赖后端
   { path: '/tools/loan', name: 'LoanCalculator', component: () => import('@/views/tools/LoanCalculator.vue'), meta: { public: true } },
   // Flash 播放器(Ruffle):本地加载 .swf 怀旧小游戏

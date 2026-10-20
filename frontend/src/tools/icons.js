@@ -1,0 +1,53 @@
+// 工具箱与比特口袋在线页共用的图标映射:registry.js 是纯数据(只存图标名),这里把名字换成组件。
+import {
+  Tools,
+  MagicStick,
+  Sunny,
+  Document,
+  DataLine,
+  Switch,
+  Operation,
+  Connection,
+  Share,
+  Key,
+  Opportunity,
+  Timer,
+  Search,
+  EditPen,
+  Monitor,
+  Picture,
+  FolderOpened,
+  Lock,
+  Brush,
+  ScaleToOriginal,
+  VideoPlay,
+  Coin,
+} from '@element-plus/icons-vue'
+
+export const TOOL_ICONS = {
+  Tools,
+  MagicStick,
+  Sunny,
+  Document,
+  DataLine,
+  Switch,
+  Operation,
+  Connection,
+  Share,
+  Key,
+  Opportunity,
+  Timer,
+  Search,
+  EditPen,
+  Monitor,
+  Picture,
+  FolderOpened,
+  Lock,
+  Brush,
+  ScaleToOriginal,
+  VideoPlay,
+  Coin,
+}
+
+/** 把 registry 里的图标名解析成组件,未知名字回落到通用图标。 */
+export const iconFor = (name) => TOOL_ICONS[name] || Tools

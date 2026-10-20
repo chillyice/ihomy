@@ -2300,6 +2300,18 @@ export default {
       offline: 'Offline',
       localPlay: 'Local play',
     },
+    entries: {
+      bitPouch: {
+        title: 'bit_pouch · Online tools',
+        desc: '12 developer tools, right in the browser',
+        tag: 'Online tools',
+      },
+      kada: {
+        title: 'Kada',
+        desc: 'Cross-platform hotkey tool — downloads and updates',
+        tag: 'Standalone app',
+      },
+    },
     lightLab: {
       title: 'Light Lab',
       desc: '3D real-time shadows: sun sim / move light',
@@ -3845,6 +3857,25 @@ export default {
         k: 'Kelvin',
       },
     },
+    markdown: {
+      title: 'Markdown Reader',
+      desc: 'Read .md files locally, supports headings / code blocks / lists / links and more',
+      openFile: 'Open File',
+      clear: 'Clear',
+      copyHtml: 'Copy HTML',
+      cleared: 'Cleared',
+      fileLoaded: 'File loaded successfully',
+      loadFailed: 'Failed to load file',
+      copied: 'Copied',
+      copyFailed: 'Copy failed. Select it manually.',
+      emptyState: 'No content',
+      hint: 'Click "Open File" to select a .md or .txt file, or paste Markdown text',
+      fileName: 'File name',
+      fileTooLarge: 'File too large, maximum 10MB',
+      readFailed: 'Failed to read file',
+      emptyContent: 'Content is empty',
+      invalidFormat: 'Unrecognized file format, please select .md, .markdown, or .txt',
+    },
   },
   library: {
     title: 'Library',
@@ -4371,6 +4402,7 @@ export default {
     sub: 'Local-first · plugin-based · one core for desktop and mobile — 12 engineering tools, compute as you type, data never leaves your device',
     ghAria: 'View bit_pouch source code and all releases on GitHub',
     ctaDownload: 'Download for Windows',
+    ctaOnline: 'Use tools online',
     ctaPlatforms: 'See other platforms',
     chipPlatforms: 'Windows / Linux / macOS / Web',
     chipTools: '12 tools',
@@ -4388,6 +4420,7 @@ export default {
     statRuntimes: 'runtimes',
     statCloud: 'cloud uploads',
     statTargets: 'shared targets',
+    secOnline: 'Use online',
     secDownload: 'Download',
     colTarget: 'Target',
     colBuild: 'Build',
@@ -4461,6 +4494,17 @@ export default {
     noteUpdateTitle: 'Updates',
     noteUpdateBody:
       'This version has no auto-update: download the new package and install over the old one; local preferences and favourites are kept.',
+  },
+  bitPouchOnline: {
+    title: 'bit_pouch · Online tools',
+    count: '{n} tools',
+    intro:
+      '12 developer tools, ready to use and running locally in your browser. The same set is also available offline in the bit_pouch desktop app.',
+    privacy: 'Input and results never leave your device and are never uploaded.',
+    backToTools: 'Back to toolbox',
+    getDesktop: 'Get desktop app',
+    desktopHint: 'Need full offline use or very large files?',
+    desktopLink: 'See the bit_pouch desktop app',
   },
   lightTest: {
     title: 'Light test',
