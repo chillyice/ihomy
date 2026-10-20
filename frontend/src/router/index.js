@@ -219,8 +219,8 @@ const routes = [
   },
   // Markdown 阅读器:本地阅读 .md 文件，支持标题 / 代码块 / 列表 / 链接等语法
   { path: '/tools/markdown', name: 'MarkdownReader', component: () => import('@/views/tools/MarkdownReader.vue'), meta: { public: true } },
-  // 比特口袋 · 在线工具:工具箱里所有开发者工具的统一入口(发布页与工具箱都跳这里)
-  { path: '/tools/bit-pouch', name: 'BitPouchOnline', component: () => import('@/views/tools/BitPouchOnline.vue'), meta: { public: true } },
+  // 旧的比特口袋在线工具页:工具已搬进 bit_pouch 自己的页面(/bit-pouch/tools),旧链接保持可用
+  { path: '/tools/bit-pouch', redirect: '/bit-pouch/tools' },
   // 贷款计算器:纯前端试算(等额本息/等额本金、商业/公积金/组合贷、提前还款对比),不依赖后端
   { path: '/tools/loan', name: 'LoanCalculator', component: () => import('@/views/tools/LoanCalculator.vue'), meta: { public: true } },
   // Flash 播放器(Ruffle):本地加载 .swf 怀旧小游戏
@@ -238,6 +238,19 @@ const routes = [
   { path: '/ops', name: 'Ops', component: () => import('@/views/ops/Ops.vue'), meta: { ops: true } },
   // 咔哒软件首页:独立下载页(托管在 ihomy 域名下),standalone 不套 ihomy 外壳
   { path: '/kada', name: 'Kada', component: () => import('@/views/Kada.vue'), meta: { public: true, standalone: true } },
+  // bit_pouch 在线工具:属于 bit_pouch 自己的页面,standalone 不套 ihomy 外壳;目录 + 单工具两条路由
+  {
+    path: '/bit-pouch/tools',
+    name: 'BitPouchTools',
+    component: () => import('@/views/bitpouch/BitPouchTools.vue'),
+    meta: { public: true, standalone: true },
+  },
+  {
+    path: '/bit-pouch/tools/:id',
+    name: 'BitPouchTool',
+    component: () => import('@/views/bitpouch/BitPouchTool.vue'),
+    meta: { public: true, standalone: true },
+  },
   // bit_pouch 发布页:独立下载页,品牌写法带下划线(与产品名一致),两种写法都可达
   {
     path: '/bit-pouch',

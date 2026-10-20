@@ -700,6 +700,14 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
    - **响应式**:≤980px Hero 单列、终端 `width:100%`(限宽 660px)并居中;≤820px 顶栏分区索引隐藏;≤720px 指标带 2×2、下载表隐藏文件名列并逐行堆叠、规格清单与说明改单列;≤560px 间距 18px、版本 chip 与 GitHub 文字隐藏(保留 `aria-label`)、贴纸 48px、主 CTA 通栏。320–1440px 实测零横向溢出。
    - **交互与可访问性**:终端/清单行 hover 只换底色或边线(不用 `backdrop-filter`);闪烁光标与过渡在 `prefers-reduced-motion` 下关闭;顶栏与页脚链接保留 `focus-visible` 描边,主 CTA 的切角不裁掉内描边焦点态。外链一律 `target="_blank" rel="noopener noreferrer"`,同源直链带 `download`。**下载地址全部是 `/files/bit_pouch/<版本化文件名>`**(Windows 安装版/免安装 zip、Linux deb/AppImage、macOS dmg、Web/PWA 静态包),由 bit_pouch 仓 `scripts/ihomy-mirror/` 每日从 GitHub 最新已发布 Release 同步;换版本只改 `BitPouch.vue` 顶部 `version` 常量,并确认 Release 已 Publish。
 
+55. **bit_pouch 在线工具工作台**(`/bit-pouch/tools` 与 `/bit-pouch/tools/:id`;与发布页同为 `meta.standalone`,不套 ihomy 外壳、不引 Element Plus,全原生控件):
+   - **一份样式表**:发布页版式与工作台控件同住 `frontend/src/styles/bit-pouch.css`,由 `BitPouch.vue` 与 `BpShell.vue` 各自 `<style src>` 引入。令牌、方格纸底纹、`.bpwrap` 限宽、`html.bitpouch-page:root` 底色都在这里;改配色只动这一处。工作台控件统一 `bpc-` 前缀,发布页版式仍是 `bp-` 前缀。
+   - **版式**:目录页 `.bpc-head`(编号眉标 + 标题 + 说明 + 右侧「本地计算」标签)→ 搜索行 → `.bpc-index` 编号清单(**细线网格,不用卡片**:上/左边框在容器上,每项右/下边框,1px `--line`,0 圆角,无阴影)。工具页 `.bpc-crumb`(← 全部工具)→ `.bpc-head`(`01 / 12` 编号 + 工具名 + 一句说明)→ 面板。面板双栏 `.bpc-grid`(1fr / 1fr,`-wide` 为 .85fr / 1.15fr;≤900px 单列;需要多块结果时用 `.bpc-stack`)。
+   - **控件**:`.bpc-input` / `.bpc-select` / `.bpc-textarea` 用 `--bg` 底 + 1px `--line` + 2px 圆角 + 13px 等宽,聚焦换 `--accent` 边线并加 1px 内环;文本域默认 190px,`-short` 96px、`-tall` 280px,`resize: vertical`。按钮 `.bpc-btn` 是等宽大写 11.5px + 字距 `.08em` 的描边块,主按钮 `--accent` 实底反白,危险按钮用 `--danger`,悬停只换边线/文字色;小号 `-sm` 用于行内复制。开关组 `.bpc-chip`(选中 `is-on` = accent 边线 + `--accent-soft` 底),多选用小方点 `.bpc-chip-dot` 标示。
+   - **结果区**:`.bpc-out` 是始终深色的终端块(`--term-*`),等宽 12.5px、`white-space: pre-wrap`、最大高 460/560px 内部滚动;键值结果用 `.bpc-row`(左侧 11px 大写 muted 标签 + 右侧等宽值),强调值 `is-accent`、错误值 `is-error`;表格 `.bpc-table` 表头 sticky + 11px 大写 muted,行 hover 走 `--accent-soft`,diff 增/删分别 `is-add` / `is-del`。错误 `.bpc-err`(`--danger`)、说明 `.bpc-hint`(`--dim`)、统计 `.bpc-meta` 三者分工固定。
+   - **复制反馈**:`BpcCopy.vue` 自己管状态(复制 → 已复制 → 1.5s 复位;失败显示「复制失败」),不弹全局 toast;危险命令(运维面板)第一次点击只进入 4s 的「确认复制」态,再点才写剪贴板。
+   - **文案**:工作台外壳走 `bitPouch.tools.*`,各工具字段直接复用 `tools.<id>.*`(不复制第二套说法),中英键必须对齐;模板里不得出现硬编码中文(仍受 `i18n/hardcoded-cjk.spec.js` 守门)。配色只读 `.bp` 自己的令牌,继续**不读** `--color-*`,也不跟随暖居/光尘与晨暮。
+
 ## 25. 前端体验与规范补充(i18n 命名空间 / 无障碍 / 列表错误态 / 共享纯逻辑,V10.3)
 
 1. **外壳文案的 i18n 命名空间**:外壳与首页文案按命名空间落键,新增用户可见文案必须进对应命名空间并 **zh-CN / en 同步**(键数须对齐,当前 2739=2739)。四组:`warm.*`(暖居外壳:问候、编辑态、组件与模块标签、空态、提示)、`sidebar.*`(侧栏:展开收起、台灯三态、光影开关、语言、消息、编辑首页、相对时间)、`home.dashboard.*`(光尘首页仪表盘卡片标题/空态/天气指标/日期风力/寻物/愿望/收支/添加组件)、`feed.type|summary|time`(动态流类型标签、摘要模板、相对时间)。**暖居模块入口标签自持 key(`warm.module.*`)**,不复用后端 `sys_home_module.title`(后端标题不随前端语言切换)。

@@ -2303,7 +2303,7 @@ export default {
     entries: {
       bitPouch: {
         title: 'bit_pouch · Online tools',
-        desc: '12 developer tools, right in the browser',
+        desc: '12 developer tools, inside the bit_pouch page',
         tag: 'Online tools',
       },
       kada: {
@@ -4494,17 +4494,31 @@ export default {
     noteUpdateTitle: 'Updates',
     noteUpdateBody:
       'This version has no auto-update: download the new package and install over the old one; local preferences and favourites are kept.',
-  },
-  bitPouchOnline: {
-    title: 'bit_pouch · Online tools',
-    count: '{n} tools',
-    intro:
-      '12 developer tools, ready to use and running locally in your browser. The same set is also available offline in the bit_pouch desktop app.',
-    privacy: 'Input and results never leave your device and are never uploaded.',
-    backToTools: 'Back to toolbox',
-    getDesktop: 'Get desktop app',
-    desktopHint: 'Need full offline use or very large files?',
-    desktopLink: 'See the bit_pouch desktop app',
+    tools: {
+      docTitle: 'bit_pouch · Online tools',
+      title: 'Online tools',
+      kicker: '12 TOOLS / LOCAL-FIRST / NO CLOUD',
+      intro: 'Twelve developer tools that run inside bit_pouch. Inputs and results stay on this device; nothing is uploaded.',
+      localOnly: 'Local only · no upload',
+      search: 'Filter',
+      searchPlaceholder: 'Search by name or keyword',
+      count: '{n} tools',
+      open: 'Open',
+      noMatch: 'No matching tools',
+      desktopHint: 'Need large files or full offline use?',
+      desktopLink: 'Download the desktop app',
+      backToHome: 'Back to bit_pouch',
+      backToTools: 'All tools',
+      notFound: 'No such tool',
+      notFoundHint: 'The tool number may have changed. Check the directory for the current set.',
+      copy: 'Copy',
+      copied: 'Copied',
+      copyFailed: 'Copy failed, select manually',
+      format: 'Output format',
+      groups: 'Groups',
+      timezone: 'Time zone',
+      localZone: 'Local time zone',
+    },
   },
   lightTest: {
     title: 'Light test',

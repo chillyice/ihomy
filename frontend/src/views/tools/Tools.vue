@@ -107,9 +107,8 @@ const { t } = useI18n()
 const router = useRouter()
 
 // 卡片清单的元数据唯一来源在 src/tools/registry.js(同一份清单也供 bit_pouch 导出)
-// 比特口袋收录的开发者工具整体汇入「比特口袋 · 在线工具」页,这里不再单列;
-// AI 测试台虽同属 dev 分类,但 bitPouch.status=out-of-scope,仍留在工具箱里。
-const belongsToBitPouch = (tool) => tool.category === 'dev' && tool.bitPouch?.status !== 'out-of-scope'
+// 开发者工具在聚合页与比特口袋在线工具(/bit-pouch/tools)各有一份,两处并存是刻意为之:
+// 家里用工具箱顺手,开发者去比特口袋用带自己视觉的那一套。
 const DEFAULT_TOOLS = TOOL_REGISTRY.map((tool) => ({ ...tool, icon: iconFor(tool.icon) }))
 const defaultIds = TOOL_IDS
 
@@ -117,7 +116,7 @@ const defaultIds = TOOL_IDS
 const ENTRIES = [
   {
     key: 'bit-pouch',
-    path: '/tools/bit-pouch',
+    path: '/bit-pouch/tools',
     icon: Box,
     titleKey: 'tools.entries.bitPouch.title',
     descKey: 'tools.entries.bitPouch.desc',
@@ -146,10 +145,7 @@ const CATEGORIES = [
 const order = ref(loadToolOrder(defaultIds))
 const tools = computed(() => {
   const byId = new Map(DEFAULT_TOOLS.map((tool) => [tool.id, tool]))
-  return order.value
-    .map((id) => byId.get(id))
-    .filter(Boolean)
-    .filter((tool) => !belongsToBitPouch(tool))
+  return order.value.map((id) => byId.get(id)).filter(Boolean)
 })
 const persist = () => saveToolOrder(order.value)
 
@@ -248,7 +244,7 @@ const onGripDown = (event, id) => {
 }
 
 // 键盘:把手聚焦后按方向键移动,不依赖拖拽也能完成排序。
-// 移动以「当前可见卡片」为准,避免一次按键只跨过被隐藏的开发者工具而不产生视觉变化。
+// 移动以「当前可见卡片」为准(与拖拽同一套顺序),避免按一次方向键看不出变化。
 const onGripKeydown = (event, id) => {
   const delta = event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowDown' || event.key === 'ArrowRight' ? 1 : 0
   if (!delta) return
