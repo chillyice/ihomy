@@ -2290,7 +2290,7 @@ export default {
     entries: {
       bitPouch: {
         title: '比特口袋 · 在线工具',
-        desc: '12 个开发者工具，在比特口袋页面里直接用',
+        desc: '18 个工具：开发调试、配色、PDF、图片、文件、阅读器、单位换算',
         tag: '在线工具',
       },
       kada: {
@@ -3735,6 +3735,7 @@ export default {
       title: '单位换算',
       desc: '长度 / 重量 / 温度 / 数据量等',
       privacy: '换算只在本机完成',
+      category: '类别',
       input: '数值',
       valuePlaceholder: '输入数字',
       from: '从',
@@ -4336,7 +4337,7 @@ export default {
   bitPouch: {
     brand: 'bit_pouch',
     navAria: '页面分区导航',
-    eyebrow: '口袋工具袋 · 12 个工具 · 本地优先',
+    eyebrow: '口袋工具袋 · 18 个工具 · 本地优先',
     kvVersion: '版本',
     kvRuntime: '执行',
     kvNetwork: '网络',
@@ -4347,7 +4348,7 @@ export default {
     ctaOnline: '在线使用工具',
     ctaPlatforms: '查看其他平台',
     chipPlatforms: 'Windows / Linux / macOS / Web',
-    chipTools: '12 个工具',
+    chipTools: '18 个工具',
     license: '许可证待定',
     footer: 'bit_pouch v{version}',
     sourceCode: '源代码',
@@ -4428,8 +4429,9 @@ export default {
     tools: {
       docTitle: 'bit_pouch · 在线工具',
       title: '在线工具',
-      kicker: '12 TOOLS / LOCAL-FIRST / NO CLOUD',
-      intro: '12 个开发者工具，在 bit_pouch 的页面里直接用；输入与结果都留在本机，不上传服务器。',
+      kicker: '18 TOOLS / LOCAL-FIRST / NO CLOUD',
+      intro:
+        '18 个工具，在 bit_pouch 的页面里直接用：开发者工具、配色、图片与文件、PDF、Markdown 阅读器、单位换算；输入与结果都留在本机，不上传服务器。',
       localOnly: '本地计算 · 不上传',
       search: '筛选',
       searchPlaceholder: '搜索工具名称或关键词',

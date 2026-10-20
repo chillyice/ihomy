@@ -1,6 +1,6 @@
 {
   "source": "ihomy",
-  "version": "V10.61",
+  "version": "V10.63",
   "registry": "frontend/src/tools/registry.js",
   "tools": [
     {
@@ -146,8 +146,8 @@
       "order": 40,
       "kernel": null,
       "bitPouch": {
-        "status": "new",
-        "note": "bit_pouch 暂无 PDF 插件"
+        "status": "existing",
+        "note": "bit_pouch 已有 pdf 插件"
       }
     },
     {
@@ -629,8 +629,8 @@
       "order": 127,
       "kernel": "imageTool",
       "bitPouch": {
-        "status": "new",
-        "note": "bit_pouch 暂无图片压缩/ICO/EXIF 插件(内核可直接复用)"
+        "status": "existing",
+        "note": "bit_pouch 已有 image 插件"
       }
     },
     {
@@ -670,8 +670,8 @@
       "order": 128,
       "kernel": "fileTool",
       "bitPouch": {
-        "status": "new",
-        "note": "bit_pouch 暂无文件识别/ZIP 插件"
+        "status": "existing",
+        "note": "bit_pouch 已有 file 插件"
       }
     },
     {
@@ -756,8 +756,8 @@
       "order": 132,
       "kernel": "colorTool",
       "bitPouch": {
-        "status": "new",
-        "note": "bit_pouch 暂无颜色插件"
+        "status": "existing",
+        "note": "bit_pouch 已有 color 插件"
       }
     },
     {
@@ -798,8 +798,8 @@
       "order": 134,
       "kernel": "unitTool",
       "bitPouch": {
-        "status": "new",
-        "note": "bit_pouch 暂无单位换算插件"
+        "status": "existing",
+        "note": "bit_pouch 已有 unit 插件"
       }
     },
     {

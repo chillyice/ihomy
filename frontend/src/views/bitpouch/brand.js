@@ -1,89 +1,9 @@
-// 比特口袋的品牌图形:32×32 像素麻袋字标与界面图标。
+// 比特口袋的品牌图形:绿底圆角方块 + 深色 b_ 像素字标(与 bit_pouch 仓的 favicon / 应用图标同一形状)。
 // 静态常量,由发布页与在线工具页共用;放这里避免两份拷贝走样。
 
 export const pouchMark = `<svg viewBox="0 0 32 32" shape-rendering="crispEdges">
-<rect width="32" height="32" rx="7" fill="#0a0d0b"/>
-<rect x="13" y="6" width="4" height="4" fill="#b8ff3d" opacity=".14"/>
-<rect x="17" y="4" width="3" height="3" fill="#5eead4" opacity=".16"/>
-<rect x="11" y="3" width="3" height="3" fill="#5eead4" opacity=".16"/>
-<rect x="15" y="1" width="3" height="3" fill="#facc15" opacity=".16"/>
-<rect x="20" y="7" width="3" height="3" fill="#b8ff3d" opacity=".16"/>
-<rect x="10" y="10" width="2" height="1" fill="#b08e5f"/>
-<rect x="12" y="9" width="1" height="1" fill="#b08e5f"/>
-<rect x="13" y="10" width="1" height="1" fill="#b08e5f"/>
-<rect x="15" y="9" width="1" height="1" fill="#b08e5f"/>
-<rect x="16" y="10" width="1" height="1" fill="#b08e5f"/>
-<rect x="18" y="9" width="1" height="1" fill="#b08e5f"/>
-<rect x="19" y="10" width="1" height="1" fill="#b08e5f"/>
-<rect x="20" y="10" width="2" height="1" fill="#b08e5f"/>
-<rect x="14" y="10" width="1" height="1" fill="#4a3820"/>
-<rect x="17" y="10" width="1" height="1" fill="#4a3820"/>
-<rect x="12" y="11" width="9" height="1" fill="#4a3820"/>
-<rect x="11" y="12" width="11" height="1" fill="#4a3820"/>
-<rect x="14" y="12" width="3" height="1" fill="#b8ff3d"/>
-<rect x="10" y="13" width="13" height="1" fill="#d9b98a"/>
-<rect x="10" y="13" width="1" height="1" fill="#efd3a6"/>
-<rect x="22" y="13" width="1" height="1" fill="#efd3a6"/>
-<rect x="9" y="13" width="1" height="1" fill="#6b4f2a"/>
-<rect x="23" y="13" width="1" height="1" fill="#6b4f2a"/>
-<rect x="10" y="14" width="13" height="1" fill="#6b4f2a"/>
-<rect x="12" y="14" width="1" height="1" fill="#b8ff3d"/>
-<rect x="11" y="15" width="1" height="1" fill="#6b4f2a"/>
-<rect x="23" y="15" width="1" height="2" fill="#6b4f2a"/>
-<rect x="10" y="15" width="13" height="1" fill="#d9b98a"/>
-<rect x="9" y="16" width="15" height="1" fill="#d9b98a"/>
-<rect x="8" y="17" width="16" height="1" fill="#d9b98a"/>
-<rect x="7" y="18" width="17" height="1" fill="#d9b98a"/>
-<rect x="7" y="19" width="18" height="1" fill="#d9b98a"/>
-<rect x="6" y="20" width="18" height="1" fill="#d9b98a"/>
-<rect x="7" y="21" width="17" height="1" fill="#d9b98a"/>
-<rect x="8" y="22" width="16" height="1" fill="#d9b98a"/>
-<rect x="8" y="23" width="15" height="1" fill="#d9b98a"/>
-<rect x="9" y="24" width="14" height="1" fill="#d9b98a"/>
-<rect x="10" y="25" width="13" height="1" fill="#d9b98a"/>
-<rect x="11" y="26" width="11" height="1" fill="#d9b98a"/>
-<rect x="12" y="27" width="10" height="1" fill="#d9b98a"/>
-<rect x="14" y="28" width="5" height="1" fill="#d9b98a"/>
-<rect x="12" y="15" width="9" height="1" fill="#b08e5f"/>
-<rect x="23" y="16" width="1" height="3" fill="#b08e5f"/>
-<rect x="24" y="19" width="1" height="1" fill="#b08e5f"/>
-<rect x="23" y="20" width="1" height="3" fill="#b08e5f"/>
-<rect x="22" y="23" width="1" height="3" fill="#b08e5f"/>
-<rect x="11" y="26" width="11" height="1" fill="#b08e5f"/>
-<rect x="12" y="27" width="10" height="1" fill="#a37f52"/>
-<rect x="14" y="28" width="5" height="1" fill="#a37f52"/>
-<rect x="9" y="16" width="1" height="1" fill="#efd3a6"/>
-<rect x="8" y="17" width="1" height="1" fill="#efd3a6"/>
-<rect x="7" y="18" width="1" height="1" fill="#efd3a6"/>
-<rect x="7" y="19" width="1" height="1" fill="#c4a373"/>
-<rect x="6" y="20" width="1" height="1" fill="#efd3a6"/>
-<rect x="7" y="21" width="1" height="1" fill="#c4a373"/>
-<rect x="8" y="22" width="1" height="1" fill="#efd3a6"/>
-<rect x="13" y="16" width="1" height="1" fill="#b08e5f"/>
-<rect x="12" y="17" width="1" height="1" fill="#c4a373"/>
-<rect x="11" y="18" width="1" height="1" fill="#b08e5f"/>
-<rect x="10" y="19" width="1" height="1" fill="#c4a373"/>
-<rect x="10" y="20" width="1" height="1" fill="#b08e5f"/>
-<rect x="11" y="21" width="1" height="1" fill="#c4a373"/>
-<rect x="18" y="16" width="1" height="1" fill="#b08e5f"/>
-<rect x="19" y="17" width="1" height="1" fill="#c4a373"/>
-<rect x="19" y="18" width="1" height="1" fill="#b08e5f"/>
-<rect x="20" y="19" width="1" height="1" fill="#c4a373"/>
-<rect x="19" y="20" width="1" height="1" fill="#b08e5f"/>
-<rect x="19" y="21" width="1" height="1" fill="#c4a373"/>
-<rect x="15" y="17" width="1" height="1" fill="#b08e5f"/>
-<rect x="14" y="18" width="1" height="1" fill="#c4a373"/>
-<rect x="14" y="19" width="1" height="1" fill="#b08e5f"/>
-<rect x="15" y="20" width="1" height="1" fill="#c4a373"/>
-<rect x="15" y="21" width="1" height="1" fill="#b08e5f"/>
-<rect x="14" y="7" width="2" height="2" fill="#b8ff3d"/>
-<rect x="17" y="5" width="1" height="1" fill="#5eead4"/>
-<rect x="12" y="4" width="1" height="1" fill="#5eead4"/>
-<rect x="15" y="2" width="1" height="1" fill="#facc15"/>
-<rect x="20" y="8" width="1" height="1" fill="#b8ff3d"/>
-<rect x="10" y="7" width="1" height="1" fill="#facc15" opacity=".8"/>
-<rect x="19" y="2" width="1" height="1" fill="#5eead4" opacity=".7"/>
-<rect x="16" y="6" width="1" height="1" fill="#b8ff3d" opacity=".65"/>
+<rect width="32" height="32" rx="7" fill="#b8ff3d"/>
+<path d="M5 9H7V13H15V21H5Z M7 14H13V20H7Z M16 21H26V22H16Z" fill="#142000" fill-rule="evenodd"/>
 </svg>`
 
 export const ghIcon =

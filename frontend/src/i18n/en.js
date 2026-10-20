@@ -2303,7 +2303,7 @@ export default {
     entries: {
       bitPouch: {
         title: 'bit_pouch · Online tools',
-        desc: '12 developer tools, inside the bit_pouch page',
+        desc: '18 tools: dev utilities, colour, PDF, images, files, reader, units',
         tag: 'Online tools',
       },
       kada: {
@@ -3763,6 +3763,7 @@ export default {
       title: 'Unit Converter',
       desc: 'Length / weight / temperature / data and more',
       privacy: 'Conversion runs locally',
+      category: 'Category',
       input: 'Value',
       valuePlaceholder: 'Enter a number',
       from: 'From',
@@ -4394,7 +4395,7 @@ export default {
   bitPouch: {
     brand: 'bit_pouch',
     navAria: 'Page sections',
-    eyebrow: 'Pocket toolbox · 12 tools · local-first',
+    eyebrow: 'Pocket toolbox · 18 tools · local-first',
     kvVersion: 'Version',
     kvRuntime: 'Runtime',
     kvNetwork: 'Network',
@@ -4405,7 +4406,7 @@ export default {
     ctaOnline: 'Use tools online',
     ctaPlatforms: 'See other platforms',
     chipPlatforms: 'Windows / Linux / macOS / Web',
-    chipTools: '12 tools',
+    chipTools: '18 tools',
     license: 'License TBD',
     footer: 'bit_pouch v{version}',
     sourceCode: 'Source code',
@@ -4497,8 +4498,9 @@ export default {
     tools: {
       docTitle: 'bit_pouch · Online tools',
       title: 'Online tools',
-      kicker: '12 TOOLS / LOCAL-FIRST / NO CLOUD',
-      intro: 'Twelve developer tools that run inside bit_pouch. Inputs and results stay on this device; nothing is uploaded.',
+      kicker: '18 TOOLS / LOCAL-FIRST / NO CLOUD',
+      intro:
+        'Eighteen tools that run inside bit_pouch: developer utilities, colour, images and files, PDF, the Markdown reader and unit conversion. Inputs and results stay on this device; nothing is uploaded.',
       localOnly: 'Local only · no upload',
       search: 'Filter',
       searchPlaceholder: 'Search by name or keyword',

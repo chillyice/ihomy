@@ -634,11 +634,12 @@ html.bitpouch-page:root {
   width: 30px;
   height: 30px;
   flex: none;
-  border-radius: 4px;
+  /* 圆角由品牌图形自己画(32 视框 rx=7 → 30px 下约 6.5px),这里只裁边不另设圆角 */
+  border-radius: 7px;
   overflow: hidden;
   box-shadow: 0 0 0 1px var(--line);
 }
-.bpmark (svg) {
+.bpmark svg {
   width: 100%;
   height: 100%;
   display: block;
@@ -717,7 +718,7 @@ html.bitpouch-page:root {
   height: 14px;
   display: block;
 }
-.bpgh-ic (svg) {
+.bpgh-ic svg {
   width: 100%;
   height: 100%;
   display: block;
@@ -811,7 +812,7 @@ html.bitpouch-page:root {
   height: 16px;
   display: block;
 }
-.bpbtn-ic (svg) {
+.bpbtn-ic svg {
   width: 100%;
   height: 100%;
   fill: none;
@@ -888,14 +889,15 @@ html.bitpouch-page:root {
   z-index: 2;
   width: 62px;
   height: 62px;
-  border-radius: 8px;
+  /* 与品牌图形自身的圆角对齐(32 视框 rx=7 → 62px 下约 13.5px) */
+  border-radius: 14px;
   overflow: hidden;
   transform: rotate(5deg);
   box-shadow:
     0 0 0 1px var(--line),
     0 10px 24px rgba(0, 0, 0, 0.32);
 }
-.bppatch (svg) {
+.bppatch svg {
   width: 100%;
   height: 100%;
   display: block;
@@ -1112,7 +1114,7 @@ html.bitpouch-page:root {
   border-radius: 2px;
   background: var(--panel);
 }
-.bprow-ic (svg) {
+.bprow-ic svg {
   width: 18px;
   height: 18px;
   fill: none;
@@ -1184,7 +1186,7 @@ html.bitpouch-page:root {
   flex: none;
   display: block;
 }
-.bpdl-ic (svg) {
+.bpdl-ic svg {
   width: 100%;
   height: 100%;
   fill: none;
@@ -1489,6 +1491,7 @@ html.bitpouch-page:root {
     right: 4px;
     width: 48px;
     height: 48px;
+    border-radius: 11px;
   }
   .bpcta .bpbtn {
     width: 100%;

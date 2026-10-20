@@ -9,7 +9,7 @@
 
       <template v-if="tool">
         <section class="bpc-head">
-          <span class="bpc-head-no">{{ tool.no }} / 12</span>
+          <span class="bpc-head-no">{{ tool.no }} / {{ total }}</span>
           <div class="bpc-head-body">
             <h1 class="bpc-head-title">{{ $t(tool.titleKey) }}</h1>
             <p class="bpc-head-desc">{{ $t(tool.descKey) }}</p>
@@ -40,7 +40,7 @@ import { computed, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import BpShell from './BpShell.vue'
-import { findBitPouchTool } from '@/tools/bitPouchTools'
+import { BIT_POUCH_TOOLS, findBitPouchTool } from '@/tools/bitPouchTools'
 
 // 每个面板独立成 chunk:打开哪个工具才加载哪份代码,目录页不背全部工具的体积。
 const PANELS = {
@@ -56,11 +56,19 @@ const PANELS = {
   text: defineAsyncComponent(() => import('./panels/TextPanel.vue')),
   ops: defineAsyncComponent(() => import('./panels/OpsPanel.vue')),
   jwt: defineAsyncComponent(() => import('./panels/JwtPanel.vue')),
+  // 13 起:与 ihomy 工具箱共用的设计与文档工具(同一套内核,独立界面)
+  color: defineAsyncComponent(() => import('./panels/ColorPanel.vue')),
+  unit: defineAsyncComponent(() => import('./panels/UnitPanel.vue')),
+  image: defineAsyncComponent(() => import('./panels/ImagePanel.vue')),
+  file: defineAsyncComponent(() => import('./panels/FilePanel.vue')),
+  pdf: defineAsyncComponent(() => import('./panels/PdfPanel.vue')),
+  markdown: defineAsyncComponent(() => import('./panels/MarkdownPanel.vue')),
 }
 
 const route = useRoute()
 const { t } = useI18n()
 
+const total = BIT_POUCH_TOOLS.length
 const tool = computed(() => findBitPouchTool(String(route.params.id || '')))
 const panel = computed(() => (tool.value ? PANELS[tool.value.id] || null : null))
 const docTitle = computed(() => (tool.value ? `bit_pouch · ${t(tool.value.titleKey)}` : ''))

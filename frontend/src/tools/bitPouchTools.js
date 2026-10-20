@@ -1,4 +1,5 @@
-// bit_pouch 在线工具目录:序号与桌面版插件的排列一致(01–12)。
+// bit_pouch 在线工具目录:01–12 与桌面版插件的排列一致,13 起是与 ihomy 工具箱共用的
+// 设计与文档类工具(颜色/单位换算/图片/文件/PDF/Markdown 阅读器) —— 同一套内核,两处入口。
 // 名称与描述沿用工具箱的 tools.<id>.* 文案,同一工具不维护第二套说法;
 // 面板组件在 views/bitpouch/panels/ 下,由工具页按 id 异步加载。
 export const BIT_POUCH_TOOLS = [
@@ -85,6 +86,48 @@ export const BIT_POUCH_TOOLS = [
     titleKey: 'tools.jwt.title',
     descKey: 'tools.jwt.desc',
     keywords: ['jwt', 'token', 'hmac', 'rsa', 'jws', '令牌', '验签'],
+  },
+  {
+    id: 'color',
+    no: '13',
+    titleKey: 'tools.color.title',
+    descKey: 'tools.color.desc',
+    keywords: ['color', 'hex', 'rgb', 'hsl', 'lab', 'contrast', 'wcag', 'gradient', '颜色', '对比度', '配色'],
+  },
+  {
+    id: 'unit',
+    no: '14',
+    titleKey: 'tools.unit.title',
+    descKey: 'tools.unit.desc',
+    keywords: ['unit', 'length', 'weight', 'temperature', 'convert', '单位', '换算', '长度', '重量', '温度'],
+  },
+  {
+    id: 'image',
+    no: '15',
+    titleKey: 'tools.image.title',
+    descKey: 'tools.image.desc',
+    keywords: ['image', 'compress', 'resize', 'favicon', 'ico', 'exif', '图片', '压缩', '图标'],
+  },
+  {
+    id: 'file',
+    no: '16',
+    titleKey: 'tools.file.title',
+    descKey: 'tools.file.desc',
+    keywords: ['file', 'magic', 'mime', 'zip', 'unzip', 'archive', '文件', '类型', '压缩包'],
+  },
+  {
+    id: 'pdf',
+    no: '17',
+    titleKey: 'tools.pdf.title',
+    descKey: 'tools.pdf.desc',
+    keywords: ['pdf', 'image', 'text', 'convert', '转换', '提取文字'],
+  },
+  {
+    id: 'markdown',
+    no: '18',
+    titleKey: 'tools.markdown.title',
+    descKey: 'tools.markdown.desc',
+    keywords: ['markdown', 'md', 'reader', 'document', '文档', '阅读', 'md 文件'],
   },
 ]
 

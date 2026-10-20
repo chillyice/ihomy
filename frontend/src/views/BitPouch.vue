@@ -83,7 +83,7 @@
               </div>
             </div>
             <div class="bpterm-foot">
-              <span>12 TOOLS</span>
+              <span>{{ toolsCount }} TOOLS</span>
               <span>LOCAL-FIRST</span>
               <span class="t-ok">NO CLOUD</span>
             </div>
@@ -214,6 +214,7 @@
 import { onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { BIT_POUCH_REPO, BIT_POUCH_VERSION, pouchMark, ghIcon, dlIcon, webIcon, zipIcon } from './bitpouch/brand'
+import { BIT_POUCH_TOOLS } from '@/tools/bitPouchTools'
 
 // ---- 分发渠道 ----
 // 安装包由 bit_pouch 仓的 .github/workflows/release.yml 构建,发版后由服务器上的
@@ -231,11 +232,12 @@ const primaryAsset = `bit_pouch_${version}_x64-setup.exe`
 const downloadUrl = (asset) => fileUrl(asset)
 
 const stats = [
-  { num: '12', labelKey: 'bitPouch.statTools' },
+  { num: String(BIT_POUCH_TOOLS.length), labelKey: 'bitPouch.statTools' },
   { num: '2', labelKey: 'bitPouch.statRuntimes' },
   { num: '0', labelKey: 'bitPouch.statCloud' },
   { num: '4', labelKey: 'bitPouch.statTargets' },
 ]
+const toolsCount = BIT_POUCH_TOOLS.length
 
 const platformIcons = {
   win: '<svg viewBox="0 0 24 24"><path d="M4 5.6 10.6 4.7v6.8H4zM13.4 4.3 20 3.4v8.1h-6.6zM4 12.5h6.6v6.8L4 18.4zM13.4 12.5H20v8.1l-6.6-.9z"/></svg>',

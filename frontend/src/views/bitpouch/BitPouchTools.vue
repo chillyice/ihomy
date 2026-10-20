@@ -1,5 +1,6 @@
-<!-- bit_pouch 在线工具目录:12 个开发者工具的入口,页面本身就是 bit_pouch 的一部分,
-     不套 ihomy 家庭外壳(路由 meta.standalone)。工具按编号清单排列,不用卡片网格。 -->
+<!-- bit_pouch 在线工具目录:18 个工具的入口(01–12 开发者工具 + 13–18 设计与文档工具),
+     页面本身就是 bit_pouch 的一部分,不套 ihomy 家庭外壳(路由 meta.standalone)。
+     工具按编号清单排列,不用卡片网格。 -->
 <template>
   <BpShell>
     <main class="bpc">

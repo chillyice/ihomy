@@ -96,28 +96,30 @@ import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { ArrowRight, ArrowDown, MagicStick, Sort, Rank, Check, Box, Pointer } from '@element-plus/icons-vue'
+import { ArrowRight, ArrowDown, MagicStick, Sort, Rank, Check } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
-import { TOOL_IDS, TOOL_REGISTRY } from '@/tools/registry'
+import BitPouchMark from '@/components/BitPouchMark.vue'
+import KadaMark from '@/components/KadaMark.vue'
+import { TOOLBOX_IDS, TOOLBOX_TOOLS } from '@/tools/registry'
 import { iconFor } from '@/tools/icons'
 import { loadToolOrder, mergeToolOrder, moveToolTo, saveToolOrder } from '@/utils/toolOrder'
 
 const { t } = useI18n()
 const router = useRouter()
 
-// 卡片清单的元数据唯一来源在 src/tools/registry.js(同一份清单也供 bit_pouch 导出)
-// 开发者工具在聚合页与比特口袋在线工具(/bit-pouch/tools)各有一份,两处并存是刻意为之:
-// 家里用工具箱顺手,开发者去比特口袋用带自己视觉的那一套。
-const DEFAULT_TOOLS = TOOL_REGISTRY.map((tool) => ({ ...tool, icon: iconFor(tool.icon) }))
-const defaultIds = TOOL_IDS
+// 卡片清单的元数据唯一来源在 src/tools/registry.js(同一份清单也供 bit_pouch 导出)。
+// 开发者工具只在比特口袋在线工具(/bit-pouch/tools)里维护:registry 里带 toolbox:false 的不出卡片,
+// 旧 /tools/<id> 路由重定向到对应面板,避免两份界面各改一遍。
+const DEFAULT_TOOLS = TOOLBOX_TOOLS.map((tool) => ({ ...tool, icon: iconFor(tool.icon) }))
+const defaultIds = TOOLBOX_IDS
 
-// 工具箱末尾的固定入口:不参与排序,也不写入 toolOrder。
+// 工具箱末尾的固定入口:不参与排序,也不写入 toolOrder。图标用两款产品自己的标志。
 const ENTRIES = [
   {
     key: 'bit-pouch',
     path: '/bit-pouch/tools',
-    icon: Box,
+    icon: BitPouchMark,
     titleKey: 'tools.entries.bitPouch.title',
     descKey: 'tools.entries.bitPouch.desc',
     tagKey: 'tools.entries.bitPouch.tag',
@@ -125,7 +127,7 @@ const ENTRIES = [
   {
     key: 'kada',
     path: '/kada',
-    icon: Pointer,
+    icon: KadaMark,
     titleKey: 'tools.entries.kada.title',
     descKey: 'tools.entries.kada.desc',
     tagKey: 'tools.entries.kada.tag',

@@ -105,83 +105,20 @@ const routes = [
   },
   // PDF 转换:PDF↔图片、PDF 提取文字,全部在本机浏览器完成(不上传服务器)
   { path: '/tools/pdf', name: 'PdfConverter', component: () => import('@/views/tools/PdfConverter.vue'), meta: { public: true } },
-  // JSON 格式化:纯前端格式化/压缩/键名排序,内容只在本机处理
-  {
-    path: '/tools/json',
-    name: 'JsonFormatter',
-    component: () => import('@/views/tools/JsonFormatter.vue'),
-    meta: { public: true },
-  },
-  // 字符编码转换:Unicode / HTML 实体 / URL / Base64 / UTF-8 字节互转,内容只在本机处理
-  {
-    path: '/tools/codec',
-    name: 'TextCodec',
-    component: () => import('@/views/tools/TextCodec.vue'),
-    meta: { public: true },
-  },
-  // 进制转换:2–36 进制整数/小数互转,大整数精确,纯前端
-  {
-    path: '/tools/base',
-    name: 'BaseConverter',
-    component: () => import('@/views/tools/BaseConverter.vue'),
-    meta: { public: true },
-  },
-  // 报文解析:十六进制报文拆字段/逐字节查看/校验值参考,纯前端
-  {
-    path: '/tools/packet',
-    name: 'PacketParser',
-    component: () => import('@/views/tools/PacketParser.vue'),
-    meta: { public: true },
-  },
-  // 子网掩码计算:IPv4 网络地址/广播地址/可用主机范围,纯前端
-  {
-    path: '/tools/subnet',
-    name: 'SubnetCalculator',
-    component: () => import('@/views/tools/SubnetCalculator.vue'),
-    meta: { public: true },
-  },
-  // 哈希与校验:MD5/SHA/CRC32/HMAC,文本与文件摘要,纯前端
-  {
-    path: '/tools/hash',
-    name: 'HashTool',
-    component: () => import('@/views/tools/HashTool.vue'),
-    meta: { public: true },
-  },
-  // 随机生成器:密码/UUID/ULID/NanoID/随机字节/抽签分组,纯前端
-  {
-    path: '/tools/generator',
-    name: 'GeneratorTool',
-    component: () => import('@/views/tools/GeneratorTool.vue'),
-    meta: { public: true },
-  },
-  // 时间工具箱:时间戳/时区/日期差/日期加减/Cron,纯前端
-  {
-    path: '/tools/time',
-    name: 'TimeTool',
-    component: () => import('@/views/tools/TimeTool.vue'),
-    meta: { public: true },
-  },
-  // 正则测试:实时匹配/捕获组/替换预览,匹配在 Worker 中限时执行
-  {
-    path: '/tools/regex',
-    name: 'RegexTool',
-    component: () => import('@/views/tools/RegexTool.vue'),
-    meta: { public: true },
-  },
-  // 文本清洗与对比:清洗/命名转换/Markdown 表格/文本 diff,纯前端
-  {
-    path: '/tools/text',
-    name: 'TextTool',
-    component: () => import('@/views/tools/TextTool.vue'),
-    meta: { public: true },
-  },
-  // 运维命令速查:静态手册(复制在本地完成,不请求后端)
-  {
-    path: '/tools/ops',
-    name: 'OpsTool',
-    component: () => import('@/views/tools/OpsTool.vue'),
-    meta: { public: true },
-  },
+  // 开发者工具(JSON/编码/进制/报文/子网/哈希/随机/时间/正则/文本/运维/JWT)只在比特口袋在线工具
+  // (/bit-pouch/tools)里维护;ihomy 的旧地址保留重定向,老书签与外部链接照常可用。
+  { path: '/tools/json', redirect: '/bit-pouch/tools/json' },
+  { path: '/tools/codec', redirect: '/bit-pouch/tools/codec' },
+  { path: '/tools/base', redirect: '/bit-pouch/tools/base' },
+  { path: '/tools/packet', redirect: '/bit-pouch/tools/packet' },
+  { path: '/tools/subnet', redirect: '/bit-pouch/tools/subnet' },
+  { path: '/tools/hash', redirect: '/bit-pouch/tools/hash' },
+  { path: '/tools/generator', redirect: '/bit-pouch/tools/generator' },
+  { path: '/tools/time', redirect: '/bit-pouch/tools/time' },
+  { path: '/tools/regex', redirect: '/bit-pouch/tools/regex' },
+  { path: '/tools/text', redirect: '/bit-pouch/tools/text' },
+  { path: '/tools/ops', redirect: '/bit-pouch/tools/ops' },
+  { path: '/tools/jwt', redirect: '/bit-pouch/tools/jwt' },
   // 图片工具:压缩 / ICO 打包 / EXIF 查看,纯前端 Canvas
   {
     path: '/tools/image',
@@ -194,13 +131,6 @@ const routes = [
     path: '/tools/file',
     name: 'FileTool',
     component: () => import('@/views/tools/FileTool.vue'),
-    meta: { public: true },
-  },
-  // JWT 与密钥:解码/验签/密钥对/加解密,全部本机 Web Crypto
-  {
-    path: '/tools/jwt',
-    name: 'JwtTool',
-    component: () => import('@/views/tools/JwtTool.vue'),
     meta: { public: true },
   },
   // 颜色与前端设计:格式互转/WCAG 对比度/配色/CSS 片段

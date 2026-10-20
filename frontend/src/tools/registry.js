@@ -2,6 +2,7 @@
 // 只放纯数据(不 import 组件/运行时),Node 侧 scripts/export-tools.mjs 直接导入本文件。
 // icon 为 Element Plus 图标名,Tools.vue 负责映射成组件。
 // bitPouch 记录该工具在 bit_pouch 仓的现状,用于导出「新功能列表」时区分新增/有更新/已存在。
+// toolbox:false = 只在比特口袋在线工具里维护,ihomy 工具箱不再出卡片(旧 /tools/<id> 路由重定向过去)。
 
 export const TOOL_REGISTRY = [
   {
@@ -70,7 +71,7 @@ export const TOOL_REGISTRY = [
     offline: true,
     order: 40,
     kernel: null,
-    bitPouch: { status: 'new', note: 'bit_pouch 暂无 PDF 插件' },
+    bitPouch: { status: 'existing', note: 'bit_pouch 已有 pdf 插件' },
   },
   {
     id: 'json',
@@ -87,6 +88,7 @@ export const TOOL_REGISTRY = [
     offline: true,
     order: 50,
     kernel: null,
+    toolbox: false,
     bitPouch: { status: 'existing', note: 'bit_pouch 已有 json 插件' },
   },
   {
@@ -104,6 +106,7 @@ export const TOOL_REGISTRY = [
     offline: true,
     order: 60,
     kernel: null,
+    toolbox: false,
     bitPouch: { status: 'existing', note: 'bit_pouch 已有 codec 插件' },
   },
   {
@@ -121,6 +124,7 @@ export const TOOL_REGISTRY = [
     offline: true,
     order: 70,
     kernel: null,
+    toolbox: false,
     bitPouch: { status: 'existing', note: 'bit_pouch 已有 base 插件' },
   },
   {
@@ -138,6 +142,7 @@ export const TOOL_REGISTRY = [
     offline: true,
     order: 80,
     kernel: null,
+    toolbox: false,
     bitPouch: { status: 'existing', note: 'bit_pouch 已有 packet 插件' },
   },
   {
@@ -155,6 +160,7 @@ export const TOOL_REGISTRY = [
     offline: true,
     order: 90,
     kernel: null,
+    toolbox: false,
     bitPouch: { status: 'existing', note: 'bit_pouch 已有 subnet 插件' },
   },
   {
@@ -174,6 +180,7 @@ export const TOOL_REGISTRY = [
     kernel: 'hashTool',
     bitPouchCategory: 'inspect',
     bitPouchIcon: 'hash',
+    toolbox: false,
     bitPouch: { status: 'existing', note: 'bit_pouch hash 插件已合并 CRC32 / HMAC / 文件摘要 / 期望值比对' },
   },
   {
@@ -193,6 +200,7 @@ export const TOOL_REGISTRY = [
     kernel: 'generatorTool',
     bitPouchCategory: 'convert',
     bitPouchIcon: 'key',
+    toolbox: false,
     bitPouch: { status: 'existing', note: 'bit_pouch 新增 generator 插件(密码/随机串/随机字节/抽签分组)' },
   },
   {
@@ -213,6 +221,7 @@ export const TOOL_REGISTRY = [
     bitPouchCategory: 'convert',
     bitPouchIcon: 'clock',
     bitPouchId: 'timestamp',
+    toolbox: false,
     bitPouch: { status: 'existing', note: 'bit_pouch timestamp 插件已合并时区/日期差/Cron' },
   },
   {
@@ -232,6 +241,7 @@ export const TOOL_REGISTRY = [
     kernel: 'regexTool',
     bitPouchCategory: 'inspect',
     bitPouchIcon: 'regex',
+    toolbox: false,
     bitPouch: { status: 'existing', note: 'bit_pouch 已有 regex 插件，能力对齐后按 version 合并' },
   },
   {
@@ -251,6 +261,7 @@ export const TOOL_REGISTRY = [
     kernel: 'textTool',
     bitPouchCategory: 'convert',
     bitPouchIcon: 'text',
+    toolbox: false,
     bitPouch: { status: 'new', note: 'bit_pouch 暂无文本清洗/对比插件' },
   },
   {
@@ -268,6 +279,7 @@ export const TOOL_REGISTRY = [
     offline: true,
     order: 126,
     kernel: null,
+    toolbox: false,
     bitPouch: { status: 'new', note: 'bit_pouch 暂无命令速查插件' },
   },
   {
@@ -287,7 +299,7 @@ export const TOOL_REGISTRY = [
     kernel: 'imageTool',
     bitPouchCategory: 'inspect',
     bitPouchIcon: 'image',
-    bitPouch: { status: 'new', note: 'bit_pouch 暂无图片压缩/ICO/EXIF 插件(内核可直接复用)' },
+    bitPouch: { status: 'existing', note: 'bit_pouch 已有 image 插件' },
   },
   {
     id: 'file',
@@ -306,7 +318,7 @@ export const TOOL_REGISTRY = [
     kernel: 'fileTool',
     bitPouchCategory: 'inspect',
     bitPouchIcon: 'file',
-    bitPouch: { status: 'new', note: 'bit_pouch 暂无文件识别/ZIP 插件' },
+    bitPouch: { status: 'existing', note: 'bit_pouch 已有 file 插件' },
   },
   {
     id: 'jwt',
@@ -325,6 +337,7 @@ export const TOOL_REGISTRY = [
     kernel: 'jwtTool',
     bitPouchCategory: 'inspect',
     bitPouchIcon: 'jwt',
+    toolbox: false,
     bitPouch: { status: 'partial', note: 'bit_pouch 已有 jwt 插件(仅解码),密钥/验签/加解密待合并' },
   },
   {
@@ -342,7 +355,7 @@ export const TOOL_REGISTRY = [
     offline: true,
     order: 132,
     kernel: 'colorTool',
-    bitPouch: { status: 'new', note: 'bit_pouch 暂无颜色插件' },
+    bitPouch: { status: 'existing', note: 'bit_pouch 已有 color 插件' },
   },
   {
     id: 'unit',
@@ -359,7 +372,7 @@ export const TOOL_REGISTRY = [
     offline: true,
     order: 134,
     kernel: 'unitTool',
-    bitPouch: { status: 'new', note: 'bit_pouch 暂无单位换算插件' },
+    bitPouch: { status: 'existing', note: 'bit_pouch 已有 unit 插件' },
   },
   {
     id: 'markdown',
@@ -432,3 +445,7 @@ export const TOOL_REGISTRY = [
 ]
 
 export const TOOL_IDS = TOOL_REGISTRY.map((tool) => tool.id)
+
+// ihomy 工具箱实际展示的卡片:开发者工具已迁到比特口袋在线工具,不再在这里出卡片。
+export const TOOLBOX_TOOLS = TOOL_REGISTRY.filter((tool) => tool.toolbox !== false)
+export const TOOLBOX_IDS = TOOLBOX_TOOLS.map((tool) => tool.id)
