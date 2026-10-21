@@ -41,3 +41,65 @@ export const moonLitPath = (phase, r = 50) => {
   const n = Math.round(minor * 100) / 100
   return `M 0 ${-r} A ${r} ${r} 0 0 ${outerSweep} 0 ${r} A ${n} ${r} 0 0 ${terminatorSweep} 0 ${-r} Z`
 }
+
+// 天空按太阳高度角分档:深夜 → 晨昏 → 日出/日落 → 金光 → 白昼。
+// 文字色不在档位里插值——底色跨过中间灰时两套都会糊,改为按底色亮度二选一。
+const SKY_STOPS = [
+  { alt: -14, bg: [10, 17, 29], a: [34, 56, 92, 0.5], b: [58, 40, 76, 0.42] },
+  { alt: -4, bg: [42, 32, 51], a: [96, 58, 74, 0.46], b: [58, 56, 104, 0.44] },
+  { alt: 0, bg: [122, 63, 52], a: [214, 108, 62, 0.46], b: [120, 78, 108, 0.4] },
+  { alt: 5, bg: [201, 138, 92], a: [233, 160, 90, 0.5], b: [176, 146, 152, 0.36] },
+  { alt: 12, bg: [238, 214, 180], a: [233, 186, 128, 0.52], b: [152, 176, 200, 0.4] },
+  { alt: 24, bg: [246, 242, 234], a: [233, 190, 132, 0.55], b: [142, 174, 204, 0.42] },
+]
+const UI_ON_DARK = [
+  '#f1ece4',
+  'rgba(241, 236, 228, 0.58)',
+  'rgba(241, 236, 228, 0.18)',
+  'rgba(241, 236, 228, 0.3)',
+  '#e0a06a',
+  'rgba(241, 236, 228, 0.12)',
+  'rgba(241, 236, 228, 0.26)',
+]
+const UI_ON_LIGHT = [
+  '#201d19',
+  'rgba(32, 29, 25, 0.62)',
+  'rgba(32, 29, 25, 0.14)',
+  'rgba(32, 29, 25, 0.26)',
+  '#b96a3d',
+  'rgba(32, 29, 25, 0.16)',
+  'rgba(32, 29, 25, 0.22)',
+]
+
+const mix = (p, q, t) => Math.round(p + (q - p) * t)
+const rgba = (c) => `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${c[3]})`
+
+/** 太阳高度角(度)→ 页面天空配色(直接绑成 CSS 变量) */
+export const skyStyle = (altitude) => {
+  const alt = altitude == null || !Number.isFinite(Number(altitude)) ? 24 : Number(altitude)
+  let i = 0
+  while (i < SKY_STOPS.length - 2 && alt > SKY_STOPS[i + 1].alt) i += 1
+  const p = SKY_STOPS[i]
+  const q = SKY_STOPS[i + 1]
+  const t = Math.min(1, Math.max(0, (alt - p.alt) / (q.alt - p.alt)))
+  const bg = p.bg.map((v, k) => mix(v, q.bg[k], t))
+  const a = p.a.map((v, k) => mix(v, q.a[k], t))
+  const b = p.b.map((v, k) => mix(v, q.b[k], t))
+  // 相对亮度(sRGB → 线性),决定文字用深色还是浅色;阈值取两套对比度相等处附近
+  const lin = (v) => (v / 255 <= 0.04045 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4)
+  const lum = 0.2126 * lin(bg[0]) + 0.7152 * lin(bg[1]) + 0.0722 * lin(bg[2])
+  const [ink, muted, line, string, accent, moonDark, moonLine] = lum > 0.19 ? UI_ON_LIGHT : UI_ON_DARK
+  return {
+    '--cy-bg': `rgb(${bg[0]}, ${bg[1]}, ${bg[2]})`,
+    '--cy-spot-a': rgba(a),
+    '--cy-spot-b': rgba(b),
+    '--cy-ink': ink,
+    '--cy-muted': muted,
+    '--cy-line': line,
+    '--cy-string': string,
+    '--cy-accent': accent,
+    '--cy-moon-dark': moonDark,
+    '--cy-moon-line': moonLine,
+    'color-scheme': lum > 0.19 ? 'light' : 'dark',
+  }
+}

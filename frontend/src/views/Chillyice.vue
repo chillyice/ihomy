@@ -85,9 +85,9 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { moonLitPath, projectBody } from '@/utils/celestialStage'
+import { moonLitPath, projectBody, skyStyle } from '@/utils/celestialStage'
 import { moonPhaseText } from '@/utils/dict'
 
 // 固定济南:这页讲的是「从这里看天空」,不跟随访客 IP 或家庭设置
@@ -130,6 +130,13 @@ const moonLabel = computed(() =>
   moonPhaseName.value === t('chillyice.moon') ? moonPhaseName.value : `${t('chillyice.moon')} · ${moonPhaseName.value}`,
 )
 const puppetStyle = (p) => ({ left: p.x + '%', height: p.y + '%', '--orb-scale': p.scale })
+
+// 天空随太阳高度角变色:变量挂在 html 上,body 与 .cy 一起继承
+const sky = computed(() => skyStyle(astro.sun?.altitude))
+const SKY_KEYS = Object.keys(skyStyle(24))
+watchEffect(() => {
+  for (const [k, v] of Object.entries(sky.value)) document.documentElement.style.setProperty(k, v)
+})
 
 const load = async () => {
   controller?.abort()
@@ -184,11 +191,12 @@ onBeforeUnmount(() => {
   controller?.abort()
   document.title = 'ihomy'
   document.documentElement.classList.remove('chillyice-page')
+  for (const k of SKY_KEYS) document.documentElement.style.removeProperty(k)
 })
 </script>
 
 <style scoped>
-/* 自带一套浅/深配色,跟随浏览器偏好,不随 ihomy 的暖居/光尘主题变化 */
+/* 底色/文字/光晕由太阳高度角实时驱动(见 skyStyle),以下只是首帧兜底;日/月盘配色跟随浏览器深浅偏好 */
 :global(html.chillyice-page) {
   --cy-bg: #f6f2ea;
   --cy-ink: #201d19;
@@ -207,28 +215,18 @@ onBeforeUnmount(() => {
   --cy-moon-glow: rgba(196, 184, 160, 0.4);
   background: var(--cy-bg);
   color-scheme: light;
+  transition: background-color 1.2s ease;
 }
 :global(html.chillyice-page body) {
   background: var(--cy-bg);
 }
 @media (prefers-color-scheme: dark) {
   :global(html.chillyice-page) {
-    --cy-bg: #121315;
-    --cy-ink: #f1ece4;
-    --cy-muted: rgba(241, 236, 228, 0.58);
-    --cy-line: rgba(241, 236, 228, 0.18);
-    --cy-string: rgba(241, 236, 228, 0.3);
-    --cy-accent: #e0a06a;
-    --cy-spot-a: rgba(120, 86, 52, 0.42);
-    --cy-spot-b: rgba(58, 84, 112, 0.4);
     --cy-sun-core: #ffeab4;
     --cy-sun-edge: #d98a3c;
     --cy-sun-glow: rgba(224, 160, 106, 0.38);
     --cy-moon-lit: #f4ecda;
-    --cy-moon-dark: rgba(241, 236, 228, 0.12);
-    --cy-moon-line: rgba(241, 236, 228, 0.26);
     --cy-moon-glow: rgba(176, 188, 210, 0.32);
-    color-scheme: dark;
   }
 }
 
@@ -238,6 +236,9 @@ onBeforeUnmount(() => {
   min-height: 100dvh;
   display: grid;
   grid-template-rows: auto minmax(180px, 1fr) auto auto;
+  transition:
+    background-color 1.2s ease,
+    color 1.2s ease;
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
   padding: 22px clamp(20px, 5vw, 48px) 18px;
@@ -331,9 +332,13 @@ onBeforeUnmount(() => {
   transform: none;
 }
 @media (prefers-reduced-motion: reduce) {
+  :global(html.chillyice-page) {
+    transition: none;
+  }
   .cy-puppet,
   .cy-puppet.is-ready,
-  .cy-disc {
+  .cy-disc,
+  .cy {
     transition: none;
   }
 }

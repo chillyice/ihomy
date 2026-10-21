@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { moonLitPath, projectBody } from './celestialStage'
+import { moonLitPath, projectBody, skyStyle } from './celestialStage'
 
 describe('projectBody', () => {
   it('hides bodies at or below the horizon', () => {
@@ -54,5 +54,39 @@ describe('moonLitPath', () => {
   it('wraps negative and out-of-range phases', () => {
     expect(moonLitPath(-0.75, 50)).toBe(moonLitPath(0.25, 50))
     expect(moonLitPath(1.25, 50)).toBe(moonLitPath(0.25, 50))
+  })
+})
+
+const lum = (rgb) => {
+  const [r, g, b] = rgb
+    .match(/\d+/g)
+    .slice(0, 3)
+    .map((v) => Number(v) / 255)
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+describe('skyStyle', () => {
+  it('darkens the page at night and switches text to light', () => {
+    const night = skyStyle(-20)
+    expect(night['--cy-bg']).toBe('rgb(10, 17, 29)')
+    expect(night['--cy-ink']).toBe('#f1ece4')
+    expect(night['color-scheme']).toBe('dark')
+  })
+
+  it('returns the paper palette at noon with dark text', () => {
+    const noon = skyStyle(60)
+    expect(noon['--cy-bg']).toBe('rgb(246, 242, 234)')
+    expect(noon['--cy-ink']).toBe('#201d19')
+    expect(noon['color-scheme']).toBe('light')
+  })
+
+  it('brightens monotonically from night to day', () => {
+    const steps = [-30, -8, -1, 6, 20].map((a) => lum(skyStyle(a)['--cy-bg']))
+    expect(steps).toEqual([...steps].sort((a, b) => a - b))
+  })
+
+  it('falls back to the day palette when altitude is missing', () => {
+    expect(skyStyle(null)['--cy-bg']).toBe('rgb(246, 242, 234)')
+    expect(skyStyle(undefined)['--cy-bg']).toBe('rgb(246, 242, 234)')
   })
 })
