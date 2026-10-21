@@ -17,6 +17,6 @@ export const zipIcon =
 // 对外版本、工具数与仓库地址:发布页与在线工具页共用,换版本只改这里。
 export const BIT_POUCH_VERSION = '0.4.0'
 // 与 bit_pouch 仓 `npm run check:plugins` 的内置插件数保持一致；
-// 在线工具目录另有自己的 BIT_POUCH_TOOLS 清单（18 个），两者不要混用。
-export const BIT_POUCH_DESKTOP_TOOL_COUNT = 20
+// 在线工具目录另有自己的 BIT_POUCH_TOOLS 清单（24 个），两者不要混用。
+export const BIT_POUCH_DESKTOP_TOOL_COUNT = 24
 export const BIT_POUCH_REPO = 'https://github.com/chillyice/bit_pouch'

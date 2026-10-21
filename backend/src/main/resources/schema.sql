@@ -2031,6 +2031,8 @@ INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `curre
 ('Prettier', 'NPM', 'prettier', '3.9.9', 'MIT', 'https://github.com/prettier/prettier', '代码格式化(配置落地,未做全仓重排)', 'FULL'),
 ('js-yaml', 'NPM', 'js-yaml', '4.3.2', 'MIT', 'https://github.com/nodeca/js-yaml', '工具箱 JSON ↔ YAML 转换', 'FULL'),
 ('fflate', 'NPM', 'fflate', '0.8.2', 'MIT', 'https://github.com/101arrowz/fflate', '工具箱 ZIP 打包与解压', 'FULL'),
+('yaml', 'NPM', 'yaml', '2.9.1', 'ISC', 'https://github.com/eemeli/yaml', '比特口袋数据格式转换 YAML 解析', 'FULL'),
+('smol-toml', 'NPM', 'smol-toml', '1.9.1', 'BSD-3-Clause', 'https://github.com/squirrelchat/smol-toml', '比特口袋数据格式转换 TOML 解析', 'FULL'),
 ('Spring Boot', 'MAVEN', 'org.springframework.boot:spring-boot-starter-parent', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端框架', 'FULL'),
 ('Spring Boot Web', 'MAVEN', 'org.springframework.boot:spring-boot-starter-webmvc', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Web/REST(MVC)', 'FULL'),
 ('Spring Boot Security', 'MAVEN', 'org.springframework.boot:spring-boot-starter-security', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '认证授权(过滤链)', 'FULL'),

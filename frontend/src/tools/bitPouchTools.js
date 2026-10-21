@@ -1,14 +1,14 @@
-// bit_pouch 在线工具目录:01–12 与桌面版插件的排列一致,13 起是与 ihomy 工具箱共用的
-// 设计与文档类工具(颜色/单位换算/图片/文件/PDF/Markdown 阅读器) —— 同一套内核,两处入口。
-// 名称与描述沿用工具箱的 tools.<id>.* 文案,同一工具不维护第二套说法;
+// bit_pouch 在线工具目录:与 bit_pouch 仓 `src/plugins/` 的内置工具一一对应,
+// id 必须与插件目录名一致,数量以 `npm run check:plugins` 为准(当前 24 个)。
+// 同一能力不在在线页拆成多个入口:JSON / XML / HTML 统一走 format,时间戳统一走 timestamp。
 // 面板组件在 views/bitpouch/panels/ 下,由工具页按 id 异步加载。
 export const BIT_POUCH_TOOLS = [
   {
-    id: 'json',
+    id: 'format',
     no: '01',
-    titleKey: 'tools.json.title',
-    descKey: 'tools.json.desc',
-    keywords: ['json', 'format', 'minify', 'sort', '格式化', '压缩'],
+    titleKey: 'tools.format.title',
+    descKey: 'tools.format.desc',
+    keywords: ['json', 'xml', 'html', 'svg', 'format', 'minify', 'sort', '格式化', '压缩', '校验'],
   },
   {
     id: 'codec',
@@ -53,7 +53,7 @@ export const BIT_POUCH_TOOLS = [
     keywords: ['password', 'random', 'uuid', 'ulid', 'nanoid', '密码', '随机'],
   },
   {
-    id: 'time',
+    id: 'timestamp',
     no: '08',
     titleKey: 'tools.time.title',
     descKey: 'tools.time.desc',
@@ -123,11 +123,53 @@ export const BIT_POUCH_TOOLS = [
     keywords: ['pdf', 'image', 'text', 'convert', '转换', '提取文字'],
   },
   {
-    id: 'markdown',
+    id: 'url',
     no: '18',
-    titleKey: 'tools.markdown.title',
-    descKey: 'tools.markdown.desc',
-    keywords: ['markdown', 'md', 'reader', 'document', '文档', '阅读', 'md 文件'],
+    titleKey: 'tools.url.title',
+    descKey: 'tools.url.desc',
+    keywords: ['url', 'uri', 'query', 'params', 'search', '链接', '参数', '解析'],
+  },
+  {
+    id: 'uuid',
+    no: '19',
+    titleKey: 'tools.uuid.title',
+    descKey: 'tools.uuid.desc',
+    keywords: ['uuid', 'guid', 'v4', 'random', 'id', '标识', '唯一', '生成'],
+  },
+  {
+    id: 'data-format',
+    no: '20',
+    titleKey: 'tools.data-format.title',
+    descKey: 'tools.data-format.desc',
+    keywords: ['yaml', 'toml', 'ini', 'env', 'properties', 'json', 'convert', '配置', '转换'],
+  },
+  {
+    id: 'http-message',
+    no: '21',
+    titleKey: 'tools.http-message.title',
+    descKey: 'tools.http-message.desc',
+    keywords: ['http', 'request', 'response', 'header', 'cookie', 'chunked', '报文', '请求', '响应'],
+  },
+  {
+    id: 'curl-convert',
+    no: '22',
+    titleKey: 'tools.curl-convert.title',
+    descKey: 'tools.curl-convert.desc',
+    keywords: ['curl', 'fetch', 'axios', 'python', 'go', 'powershell', 'http', '请求', '转换'],
+  },
+  {
+    id: 'ip-range',
+    no: '23',
+    titleKey: 'tools.ip-range.title',
+    descKey: 'tools.ip-range.desc',
+    keywords: ['ip', 'cidr', 'subnet', 'range', 'ipv4', 'ipv6', '网段', '合并', '排除'],
+  },
+  {
+    id: 'mqtt-topic',
+    no: '24',
+    titleKey: 'tools.mqtt-topic.title',
+    descKey: 'tools.mqtt-topic.desc',
+    keywords: ['mqtt', 'topic', 'filter', 'wildcard', 'share', '主题', '通配', '订阅'],
   },
 ]
 

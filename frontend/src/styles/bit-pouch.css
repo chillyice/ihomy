@@ -113,17 +113,17 @@ html.bitpouch-page:root {
 .bpc {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 26px 0 48px;
+  gap: 26px;
+  padding: 30px 0 56px;
 }
 
 /* 工具页头:编号 + 名称 + 一句说明 */
 .bpc-head {
   display: flex;
   align-items: flex-start;
-  gap: 14px;
+  gap: 16px;
   flex-wrap: wrap;
-  padding-bottom: 14px;
+  padding-bottom: 16px;
   border-bottom: 1px solid var(--line);
 }
 .bpc-head-no {
@@ -143,18 +143,11 @@ html.bitpouch-page:root {
   letter-spacing: 0.01em;
 }
 .bpc-head-desc {
-  margin: 6px 0 0;
+  margin: 7px 0 0;
   max-width: 68ch;
   color: var(--muted);
-  font-size: 12.5px;
-  line-height: 1.7;
-}
-.bpc-head-meta {
-  flex-shrink: 0;
-  align-self: center;
-  display: flex;
-  gap: 8px;
-  align-items: center;
+  font-size: 13px;
+  line-height: 1.75;
 }
 
 /* 双栏工作区:左侧输入/选项,右侧结果 */
@@ -543,7 +536,7 @@ html.bitpouch-page:root {
 /* 目录页:编号清单(不用卡片网格) */
 .bpc-index {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 0;
   border-top: 1px solid var(--line);
   border-left: 1px solid var(--line);
@@ -551,8 +544,8 @@ html.bitpouch-page:root {
 .bpc-index-item {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 16px 16px 18px;
+  gap: 9px;
+  padding: 22px 24px 24px;
   border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   background: var(--panel);
@@ -571,28 +564,21 @@ html.bitpouch-page:root {
   letter-spacing: 0.16em;
 }
 .bpc-index-name {
-  font: 600 15px/1.35 var(--mono);
+  font: 600 16px/1.35 var(--mono);
 }
 .bpc-index-desc {
   color: var(--muted);
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: 12.5px;
+  line-height: 1.7;
 }
 .bpc-crumb {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding-top: 18px;
+  padding-top: 12px;
   color: var(--dim);
   font: 11px/1.6 var(--mono);
   letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.bpc-index-foot {
-  margin-top: 4px;
-  color: var(--dim);
-  font: 10.5px/1 var(--mono);
-  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 @media (max-width: 640px) {
@@ -600,10 +586,13 @@ html.bitpouch-page:root {
     --pad: 18px;
   }
   .bpc {
-    padding: 18px 0 32px;
+    padding: 20px 0 36px;
   }
   .bpc-head-title {
     font-size: 19px;
+  }
+  .bpc-index {
+    grid-template-columns: 1fr;
   }
 }
 

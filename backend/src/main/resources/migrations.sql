@@ -2277,3 +2277,13 @@ INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`,
 UPDATE `sys_oss_component` SET `managed_by` = 'RENOVATE'
  WHERE `component_type` = 'NPM' AND `package_ref` = 'fflate';
 
+-- ------------------------------------------------------------
+-- V10.69 比特口袋在线工具数据格式转换引入 yaml / smol-toml(2026-10-22)
+--   两者都只按需动态加载;NPM 直接依赖登记台账,NPM 行统一置 RENOVATE。
+-- ------------------------------------------------------------
+INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`) VALUES
+('yaml', 'NPM', 'yaml', '2.9.1', 'ISC', 'https://github.com/eemeli/yaml', '比特口袋数据格式转换 YAML 解析', 'FULL'),
+('smol-toml', 'NPM', 'smol-toml', '1.9.1', 'BSD-3-Clause', 'https://github.com/squirrelchat/smol-toml', '比特口袋数据格式转换 TOML 解析', 'FULL');
+UPDATE `sys_oss_component` SET `managed_by` = 'RENOVATE'
+ WHERE `component_type` = 'NPM' AND `package_ref` IN ('yaml', 'smol-toml');
+

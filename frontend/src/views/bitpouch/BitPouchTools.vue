@@ -1,23 +1,19 @@
-<!-- bit_pouch 在线工具目录:18 个工具的入口(01–12 开发者工具 + 13–18 设计与文档工具),
+<!-- bit_pouch 在线工具目录:24 个工具的入口,与 bit_pouch 打包的内置工具一一对应
+     (01 格式化、02–17 既有工具、18 URL、19 UUID、20–24 格式与协议工具),
      页面本身就是 bit_pouch 的一部分,不套 ihomy 家庭外壳(路由 meta.standalone)。
      工具按编号清单排列,不用卡片网格。 -->
 <template>
   <BpShell>
     <main class="bpc">
       <section class="bpc-head">
-        <span class="bpc-head-no">{{ $t('bitPouch.tools.kicker') }}</span>
         <div class="bpc-head-body">
           <h1 class="bpc-head-title">{{ $t('bitPouch.tools.title') }}</h1>
           <p class="bpc-head-desc">{{ $t('bitPouch.tools.intro') }}</p>
-        </div>
-        <div class="bpc-head-meta">
-          <span class="bpc-tag is-accent">{{ $t('bitPouch.tools.localOnly') }}</span>
         </div>
       </section>
 
       <div class="bpc-inline">
         <div class="bpc-field">
-          <label class="bpc-label" for="bp-tool-search">{{ $t('bitPouch.tools.search') }}</label>
           <input
             id="bp-tool-search"
             v-model="keyword"
@@ -25,6 +21,7 @@
             type="search"
             autocomplete="off"
             spellcheck="false"
+            :aria-label="$t('bitPouch.tools.search')"
             :placeholder="$t('bitPouch.tools.searchPlaceholder')"
           />
         </div>
@@ -36,7 +33,6 @@
           <span class="bpc-index-no">{{ tool.no }}</span>
           <span class="bpc-index-name">{{ $t(tool.titleKey) }}</span>
           <span class="bpc-index-desc">{{ $t(tool.descKey) }}</span>
-          <span class="bpc-index-foot">{{ $t('bitPouch.tools.open') }} →</span>
         </router-link>
       </div>
 

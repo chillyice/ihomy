@@ -175,6 +175,11 @@ const routes = [
     component: () => import('@/views/bitpouch/BitPouchTools.vue'),
     meta: { public: true, standalone: true },
   },
+  // 在线目录与 bit_pouch 打包工具对齐后的旧链接:合并 / 改名的工具保持可达
+  { path: '/bit-pouch/tools/json', redirect: '/bit-pouch/tools/format' },
+  { path: '/bit-pouch/tools/markup', redirect: '/bit-pouch/tools/format' },
+  { path: '/bit-pouch/tools/time', redirect: '/bit-pouch/tools/timestamp' },
+  { path: '/bit-pouch/tools/markdown', redirect: '/bit-pouch/tools' },
   {
     path: '/bit-pouch/tools/:id',
     name: 'BitPouchTool',

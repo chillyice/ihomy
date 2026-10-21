@@ -14,9 +14,6 @@
             <h1 class="bpc-head-title">{{ $t(tool.titleKey) }}</h1>
             <p class="bpc-head-desc">{{ $t(tool.descKey) }}</p>
           </div>
-          <div class="bpc-head-meta">
-            <span class="bpc-tag">{{ $t('bitPouch.tools.localOnly') }}</span>
-          </div>
         </section>
 
         <component :is="panel" v-if="panel" :key="tool.id" />
@@ -44,14 +41,14 @@ import { BIT_POUCH_TOOLS, findBitPouchTool } from '@/tools/bitPouchTools'
 
 // 每个面板独立成 chunk:打开哪个工具才加载哪份代码,目录页不背全部工具的体积。
 const PANELS = {
-  json: defineAsyncComponent(() => import('./panels/JsonPanel.vue')),
+  format: defineAsyncComponent(() => import('./panels/FormatPanel.vue')),
   codec: defineAsyncComponent(() => import('./panels/CodecPanel.vue')),
   base: defineAsyncComponent(() => import('./panels/BasePanel.vue')),
   packet: defineAsyncComponent(() => import('./panels/PacketPanel.vue')),
   subnet: defineAsyncComponent(() => import('./panels/SubnetPanel.vue')),
   hash: defineAsyncComponent(() => import('./panels/HashPanel.vue')),
   generator: defineAsyncComponent(() => import('./panels/GeneratorPanel.vue')),
-  time: defineAsyncComponent(() => import('./panels/TimePanel.vue')),
+  timestamp: defineAsyncComponent(() => import('./panels/TimePanel.vue')),
   regex: defineAsyncComponent(() => import('./panels/RegexPanel.vue')),
   text: defineAsyncComponent(() => import('./panels/TextPanel.vue')),
   ops: defineAsyncComponent(() => import('./panels/OpsPanel.vue')),
@@ -62,7 +59,14 @@ const PANELS = {
   image: defineAsyncComponent(() => import('./panels/ImagePanel.vue')),
   file: defineAsyncComponent(() => import('./panels/FilePanel.vue')),
   pdf: defineAsyncComponent(() => import('./panels/PdfPanel.vue')),
-  markdown: defineAsyncComponent(() => import('./panels/MarkdownPanel.vue')),
+  url: defineAsyncComponent(() => import('./panels/UrlPanel.vue')),
+  uuid: defineAsyncComponent(() => import('./panels/UuidPanel.vue')),
+  // 20 起:V0.5 格式与协议工具
+  'data-format': defineAsyncComponent(() => import('./panels/DataFormatPanel.vue')),
+  'http-message': defineAsyncComponent(() => import('./panels/HttpMessagePanel.vue')),
+  'curl-convert': defineAsyncComponent(() => import('./panels/CurlConvertPanel.vue')),
+  'ip-range': defineAsyncComponent(() => import('./panels/IpRangePanel.vue')),
+  'mqtt-topic': defineAsyncComponent(() => import('./panels/MqttTopicPanel.vue')),
 }
 
 const route = useRoute()
