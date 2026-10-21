@@ -11,15 +11,17 @@ const D2R = Math.PI / 180
 export const projectBody = (altitude, azimuth) => {
   const alt = Number(altitude)
   const az = Number(azimuth)
-  if (!Number.isFinite(alt) || !Number.isFinite(az) || alt <= 0) {
+  if (!Number.isFinite(alt) || !Number.isFinite(az)) {
     return { visible: false, x: 50, y: 100, depth: 0, scale: 1 }
   }
-  const a = alt * D2R
+  // 未升起/已落下仍按方位角停在东/西边缘的地平线上,避免从舞台中央滑入滑出
+  const visible = alt > 0
+  const a = (visible ? alt : 0) * D2R
   const depth = -Math.cos(a) * Math.cos(az * D2R) // 正南(板前)为正
   return {
-    visible: true,
+    visible,
     x: 50 - Math.cos(a) * Math.sin(az * D2R) * 44,
-    y: 100 - Math.sin(a) * 100,
+    y: visible ? 100 - Math.sin(alt * D2R) * 100 : 100,
     depth,
     scale: 1 + depth * 0.06,
   }

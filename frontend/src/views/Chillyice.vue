@@ -17,7 +17,7 @@
       <div class="cy-baton" aria-hidden="true"></div>
       <div class="cy-horizon" aria-hidden="true"></div>
 
-      <div class="cy-puppet" :class="{ 'is-off': !sun.visible, 'is-low': sun.y > 78 }" :style="puppetStyle(sun)">
+      <div class="cy-puppet" :class="{ 'is-off': !sun.visible, 'is-ready': ready, 'is-low': sun.y > 78 }" :style="puppetStyle(sun)">
         <span class="cy-string" aria-hidden="true"></span>
         <span class="cy-anchor">
           <span class="cy-disc cy-disc--sun" role="img" :aria-label="$t('chillyice.sunAria', { alt: Math.round(sunAlt) })"></span>
@@ -25,7 +25,7 @@
         </span>
       </div>
 
-      <div class="cy-puppet" :class="{ 'is-off': !moon.visible, 'is-low': moon.y > 78 }" :style="puppetStyle(moon)">
+      <div class="cy-puppet" :class="{ 'is-off': !moon.visible, 'is-ready': ready, 'is-low': moon.y > 78 }" :style="puppetStyle(moon)">
         <span class="cy-string" aria-hidden="true"></span>
         <span class="cy-anchor">
           <span
@@ -102,6 +102,7 @@ const { t } = useI18n()
 const astro = reactive({ sun: null, moon: null, moonPhase: 0, moonPhaseCode: '' })
 const scrub = ref(null)
 const nowMin = ref(0)
+const ready = ref(false)
 let timer = 0
 let scrubTimer = 0
 let controller = null
@@ -144,6 +145,10 @@ const load = async () => {
     if (body?.code === 0 && body.data) {
       Object.assign(astro, body.data)
       if (scrub.value === null) nowMin.value = jinanParts().min
+      if (!ready.value) {
+        // 等首帧按真实位置落位后再开过渡,避免从舞台中央滑进来
+        requestAnimationFrame(() => requestAnimationFrame(() => (ready.value = true)))
+      }
     }
   } catch (err) {
     if (err.name !== 'AbortError') console.warn('[chillyice] astro unavailable', err)
@@ -308,6 +313,8 @@ onBeforeUnmount(() => {
   top: 0;
   width: 0;
   opacity: 1;
+}
+.cy-puppet.is-ready {
   transition:
     left 1.6s ease,
     height 1.6s ease,
@@ -325,6 +332,7 @@ onBeforeUnmount(() => {
 }
 @media (prefers-reduced-motion: reduce) {
   .cy-puppet,
+  .cy-puppet.is-ready,
   .cy-disc {
     transition: none;
   }

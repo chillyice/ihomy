@@ -8,6 +8,12 @@ describe('projectBody', () => {
     expect(projectBody(null, 180).visible).toBe(false)
   })
 
+  it('keeps a hidden body at its own side of the horizon', () => {
+    expect(projectBody(-5, 90).x).toBeLessThan(10)
+    expect(projectBody(-5, 270).x).toBeGreaterThan(90)
+    expect(projectBody(-5, 90).y).toBe(100)
+  })
+
   it('puts the zenith at the top and the horizon at the bottom', () => {
     expect(projectBody(90, 180).y).toBeCloseTo(0, 5)
     expect(projectBody(30, 180).y).toBeCloseTo(50, 5)
