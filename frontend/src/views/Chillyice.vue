@@ -1,21 +1,60 @@
 <!-- chillyice 个人主页 —— 独立页(https://ihomy.top/chillyice),全公开、不套 ihomy 外壳。
-     内容尚未定稿,先给出可访问的占位页;个人首页设计落地时只替换本组件,
-     路由与 meta.public / meta.standalone 无需再动。 -->
+     舞台上的太阳与月亮按济南此刻的真实高度角/方位角悬挂:高度角决定吊线长短,方位角决定左右,
+     落到地平线以下就不出现。天文数据来自后端 SolarUtil(单一来源),本页只做几何投影与渲染。 -->
 <template>
   <main class="cy">
     <div class="cy-glow" aria-hidden="true"></div>
 
-    <section class="cy-stage">
+    <header class="cy-head">
       <p class="cy-kicker">
         <span class="cy-dot" aria-hidden="true"></span>
         {{ $t('chillyice.kicker') }}
       </p>
+      <p class="cy-place">{{ $t('chillyice.place') }}</p>
+    </header>
 
+    <section class="cy-stage">
+      <div class="cy-baton" aria-hidden="true"></div>
+      <div class="cy-horizon" aria-hidden="true"></div>
+
+      <div class="cy-puppet" :class="{ 'is-off': !sun.visible, 'is-low': sun.y > 78 }" :style="puppetStyle(sun)">
+        <span class="cy-string" aria-hidden="true"></span>
+        <span class="cy-anchor">
+          <span class="cy-disc cy-disc--sun" role="img" :aria-label="$t('chillyice.sunAria', { alt: Math.round(sunAlt) })"></span>
+          <span class="cy-label">{{ $t('chillyice.sun') }}</span>
+        </span>
+      </div>
+
+      <div class="cy-puppet" :class="{ 'is-off': !moon.visible }" :style="puppetStyle(moon)">
+        <span class="cy-string" aria-hidden="true"></span>
+        <span class="cy-anchor">
+          <span
+            class="cy-disc cy-disc--moon"
+            role="img"
+            :aria-label="$t('chillyice.moonAria', { alt: Math.round(moonAlt), phase: moonPhaseName })"
+          >
+            <svg viewBox="-50 -50 100 100" aria-hidden="true">
+              <circle class="cy-moon-dark" r="50" />
+              <path class="cy-moon-lit" :d="moonPath" />
+              <circle class="cy-moon-ring" r="49.5" />
+            </svg>
+          </span>
+          <span class="cy-label">{{ moonLabel }}</span>
+        </span>
+      </div>
+
+      <p v-if="!sun.visible && !moon.visible" class="cy-empty">{{ $t('chillyice.empty') }}</p>
+    </section>
+
+    <section class="cy-copy">
       <h1 class="cy-name">chillyice</h1>
-
       <p class="cy-role">{{ $t('chillyice.role') }}</p>
       <p class="cy-note">{{ $t('chillyice.note') }}</p>
-
+      <p class="cy-meta">
+        <span>{{ $t('chillyice.coords') }}</span>
+        <span v-if="sun.visible">{{ $t('chillyice.sunAltitude', { deg: Math.round(sunAlt) }) }}</span>
+        <span v-if="moon.visible">{{ $t('chillyice.moonAltitude', { deg: Math.round(moonAlt) }) }}</span>
+      </p>
       <nav class="cy-links" :aria-label="$t('chillyice.linksAria')">
         <router-link class="cy-link cy-link--primary" to="/home">{{ $t('chillyice.backHome') }}</router-link>
         <a class="cy-link" :href="githubUrl" target="_blank" rel="noopener noreferrer">{{ $t('chillyice.github') }}</a>
@@ -27,20 +66,60 @@
 </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { moonLitPath, projectBody } from '@/utils/celestialStage'
+import { moonPhaseText } from '@/utils/dict'
+
+// 固定济南:这页讲的是「从这里看天空」,不跟随访客 IP 或家庭设置
+const JINAN = { lat: 36.6512, lng: 117.1201 }
+const POLL_MS = 60_000
 
 const githubUrl = 'https://github.com/chillyice'
 const year = new Date().getFullYear()
 const { t } = useI18n()
 
+const astro = reactive({ sun: null, moon: null, moonPhase: 0, moonPhaseCode: '' })
+let timer = 0
+let controller = null
+
+const sun = computed(() => projectBody(astro.sun?.altitude, astro.sun?.azimuth))
+const moon = computed(() => projectBody(astro.moon?.altitude, astro.moon?.azimuth))
+const sunAlt = computed(() => astro.sun?.altitude ?? 0)
+const moonAlt = computed(() => astro.moon?.altitude ?? 0)
+const moonPath = computed(() => moonLitPath(astro.moonPhase, 50))
+const moonPhaseName = computed(() => moonPhaseText(t, astro.moonPhaseCode) || t('chillyice.moon'))
+const moonLabel = computed(() =>
+  moonPhaseName.value === t('chillyice.moon') ? moonPhaseName.value : `${t('chillyice.moon')} · ${moonPhaseName.value}`,
+)
+const puppetStyle = (p) => ({ left: p.x + '%', height: p.y + '%', '--orb-scale': p.scale })
+
+const load = async () => {
+  controller?.abort()
+  controller = new AbortController()
+  try {
+    const res = await fetch(`/api/public/astro?lat=${JINAN.lat}&lng=${JINAN.lng}`, {
+      signal: controller.signal,
+      headers: { Accept: 'application/json' },
+    })
+    const body = await res.json()
+    if (body?.code === 0 && body.data) Object.assign(astro, body.data)
+  } catch (err) {
+    if (err.name !== 'AbortError') console.warn('[chillyice] astro unavailable', err)
+  }
+}
+
 onMounted(() => {
   document.title = t('chillyice.docTitle')
   // 独立页整屏渲染,根元素一起接管配色(滚动条/橡皮筋区);卸载时移除,规则不外漏到 ihomy 其他页面
   document.documentElement.classList.add('chillyice-page')
+  load()
+  timer = window.setInterval(load, POLL_MS)
 })
 
 onBeforeUnmount(() => {
+  window.clearInterval(timer)
+  controller?.abort()
   document.title = 'ihomy'
   document.documentElement.classList.remove('chillyice-page')
 })
@@ -53,9 +132,17 @@ onBeforeUnmount(() => {
   --cy-ink: #201d19;
   --cy-muted: rgba(32, 29, 25, 0.62);
   --cy-line: rgba(32, 29, 25, 0.14);
+  --cy-string: rgba(32, 29, 25, 0.26);
   --cy-accent: #b96a3d;
   --cy-spot-a: rgba(233, 190, 132, 0.55);
   --cy-spot-b: rgba(142, 174, 204, 0.42);
+  --cy-sun-core: #fff6d8;
+  --cy-sun-edge: #e5a04a;
+  --cy-sun-glow: rgba(233, 170, 90, 0.45);
+  --cy-moon-lit: #fdf7ea;
+  --cy-moon-dark: rgba(32, 29, 25, 0.16);
+  --cy-moon-line: rgba(32, 29, 25, 0.22);
+  --cy-moon-glow: rgba(196, 184, 160, 0.4);
   background: var(--cy-bg);
   color-scheme: light;
 }
@@ -68,9 +155,17 @@ onBeforeUnmount(() => {
     --cy-ink: #f1ece4;
     --cy-muted: rgba(241, 236, 228, 0.58);
     --cy-line: rgba(241, 236, 228, 0.18);
+    --cy-string: rgba(241, 236, 228, 0.3);
     --cy-accent: #e0a06a;
     --cy-spot-a: rgba(120, 86, 52, 0.42);
     --cy-spot-b: rgba(58, 84, 112, 0.4);
+    --cy-sun-core: #ffeab4;
+    --cy-sun-edge: #d98a3c;
+    --cy-sun-glow: rgba(224, 160, 106, 0.38);
+    --cy-moon-lit: #f4ecda;
+    --cy-moon-dark: rgba(241, 236, 228, 0.12);
+    --cy-moon-line: rgba(241, 236, 228, 0.26);
+    --cy-moon-glow: rgba(176, 188, 210, 0.32);
     color-scheme: dark;
   }
 }
@@ -79,11 +174,11 @@ onBeforeUnmount(() => {
   position: relative;
   min-height: 100vh;
   min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px 24px 72px;
+  display: grid;
+  grid-template-rows: auto minmax(180px, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  padding: 22px clamp(20px, 5vw, 48px) 18px;
   overflow: hidden;
   background: var(--cy-bg);
   color: var(--cy-ink);
@@ -100,20 +195,22 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-.cy-stage {
+.cy-head {
   position: relative;
   z-index: 1;
-  max-width: 640px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
-
-.cy-kicker {
+.cy-kicker,
+.cy-place {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin: 0 0 28px;
+  margin: 0;
   font-size: 11px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--cy-muted);
 }
@@ -124,36 +221,188 @@ onBeforeUnmount(() => {
   background: var(--cy-accent);
 }
 
+/* ── 舞台:顶线是木架,底线是地平线,中间只放日月 ── */
+.cy-stage {
+  position: relative;
+  z-index: 1;
+  min-height: 0;
+  margin: 6px 0 14px;
+}
+.cy-baton {
+  position: absolute;
+  top: 0;
+  left: 4%;
+  right: 4%;
+  height: 1px;
+  background: var(--cy-line);
+}
+.cy-horizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--cy-line);
+}
+
+.cy-puppet {
+  --orb-size: clamp(36px, 8vw, 88px);
+  position: absolute;
+  top: 0;
+  width: 0;
+  opacity: 1;
+  transition:
+    left 1.6s ease,
+    height 1.6s ease,
+    opacity 0.6s ease;
+}
+.cy-puppet.is-off {
+  opacity: 0;
+  pointer-events: none;
+}
+.cy-puppet.is-low .cy-label {
+  top: auto;
+  bottom: calc(var(--orb-size) / 2 + 16px);
+  left: 12px;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cy-puppet,
+  .cy-disc {
+    transition: none;
+  }
+}
+.cy-string {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--cy-string);
+}
+.cy-string::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--cy-accent);
+  transform: translateX(-50%);
+}
+.cy-anchor {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 0;
+  height: 0;
+}
+
+.cy-disc {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  display: block;
+  width: var(--orb-size);
+  aspect-ratio: 1;
+  transform: translate(-50%, 50%) scale(var(--orb-scale, 1));
+  transition: transform 1.6s ease;
+}
+.cy-disc--sun {
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, var(--cy-sun-core) 0 26%, var(--cy-sun-edge) 100%);
+  box-shadow:
+    0 0 28px var(--cy-sun-glow),
+    0 0 72px var(--cy-sun-glow);
+}
+.cy-disc--moon {
+  filter: drop-shadow(0 0 14px var(--cy-moon-glow));
+}
+.cy-disc--moon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.cy-moon-dark {
+  fill: var(--cy-moon-dark);
+}
+.cy-moon-lit {
+  fill: var(--cy-moon-lit);
+}
+.cy-moon-ring {
+  fill: none;
+  stroke: var(--cy-moon-line);
+  stroke-width: 1;
+}
+
+.cy-label {
+  position: absolute;
+  left: 0;
+  top: calc(var(--orb-size) / 2 + 10px);
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--cy-muted);
+}
+
+.cy-empty {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  max-width: 26em;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--cy-muted);
+}
+
+/* ── 台前:名字与说明 ── */
+.cy-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 680px;
+}
 .cy-name {
   margin: 0;
-  font-size: clamp(48px, 11vw, 104px);
+  font-size: clamp(40px, 7.4vw, 76px);
   font-weight: 600;
-  line-height: 0.95;
+  line-height: 0.96;
   letter-spacing: -0.045em;
 }
-
 .cy-role {
-  margin: 22px 0 0;
-  font-size: clamp(15px, 2vw, 18px);
+  margin: 12px 0 0;
+  font-size: clamp(14px, 1.7vw, 17px);
   letter-spacing: 0.02em;
 }
-
 .cy-note {
-  max-width: 34em;
-  margin: 14px auto 0;
-  font-size: 14px;
+  max-width: 38em;
+  margin: 10px 0 0;
+  font-size: 13.5px;
   line-height: 1.85;
   color: var(--cy-muted);
+}
+.cy-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 12px 0 0;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--cy-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .cy-links {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: 12px;
-  margin-top: 36px;
+  margin-top: 18px;
 }
-
 .cy-link {
   display: inline-flex;
   align-items: center;
@@ -190,9 +439,24 @@ onBeforeUnmount(() => {
 .cy-foot {
   position: relative;
   z-index: 1;
-  margin-top: 56px;
+  margin-top: 18px;
   font-size: 11px;
   letter-spacing: 0.12em;
   color: var(--cy-muted);
+}
+
+@media (max-width: 520px) {
+  .cy {
+    padding: 18px 18px 14px;
+  }
+  .cy-stage {
+    margin-bottom: 18px;
+  }
+  .cy-copy {
+    max-width: none;
+  }
+  .cy-note {
+    font-size: 13px;
+  }
 }
 </style>

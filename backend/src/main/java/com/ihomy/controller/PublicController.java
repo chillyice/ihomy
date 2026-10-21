@@ -5,6 +5,7 @@ import tools.jackson.databind.ObjectMapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.Result;
 import com.ihomy.common.ResultCode;
+import com.ihomy.common.SolarUtil;
 import com.ihomy.entity.Family;
 import com.ihomy.entity.HomeModule;
 import com.ihomy.entity.SysUser;
@@ -81,6 +82,21 @@ public class PublicController {
             try { ld = LocalDate.parse(date); } catch (Exception ignored) {}
         }
         return Result.success(sunService.getSunInfo(ip, ld, resolveFamilyLocation()));
+    }
+
+    @Operation(summary = "此刻太阳与月亮的高度角、方位角与月相(按给定坐标,未给坐标取济南)")
+    @GetMapping("/astro")
+    public Result<Map<String, Object>> astro(
+            @RequestParam(value = "lat", required = false) Double lat,
+            @RequestParam(value = "lng", required = false) Double lng) {
+        return Result.success(SolarUtil.astroNow(coord(lat, 36.6512, 90), coord(lng, 117.1201, 180),
+                java.time.Instant.now()));
+    }
+
+    /** 坐标兜底与越界收敛:非数字/缺失用默认值,越界夹到合法范围 */
+    private static double coord(Double v, double fallback, double bound) {
+        if (v == null || !Double.isFinite(v)) return fallback;
+        return Math.max(-bound, Math.min(bound, v));
     }
 
     @Operation(summary = "天气(IP 定位或家庭偏好位置,和风天气 API,Key 未配返回 null)")

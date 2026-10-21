@@ -37,7 +37,7 @@ public class SolarUtil {
             // 归一化到 -180~180(凌晨时角 >180 需转负,否则方位角反着)
             while (ha > 180) ha -= 360;
             while (ha < -180) ha += 360;
-            double[] altAz = sunAltAz(lat, dec, ha);
+            double[] altAz = altAzFromEquatorial(lat, dec, ha);
             slots.add(Map.of(
                     "slot", i,
                     "time", String.format("%02d:%02d", t.getHour(), t.getMinute()),
@@ -64,7 +64,7 @@ public class SolarUtil {
 
     /**
      * 指定地点/时刻的太阳高度角与方位角(度,保留 1 位小数)。
-     * 方位角沿用 {@link #sunAltAz} 约定:正北 0°、顺时针。与 buildSlots/astroTimes 同一套公式。
+     * 方位角沿用 {@link #altAzFromEquatorial} 约定:正北 0°、顺时针。与 buildSlots/astroTimes 同一套公式。
      */
     public static Map<String, Double> sunPosition(double lat, double lng, Instant instant) {
         double[] altAz = sunAltAz(lat, lng, instant);
@@ -74,11 +74,36 @@ public class SolarUtil {
         return m;
     }
 
+    /**
+     * 指定时刻的月球高度角与方位角(度,保留 1 位小数)。与太阳位置同一套地平坐标换算,
+     * 只是月亮要先经 Meeus 47 的月球黄道坐标 → 赤道坐标 → 真时角。
+     */
+    public static Map<String, Double> moonPosition(double lat, double lng, Instant instant) {
+        double[] altAz = moonAltAz(lat, lng, instant);
+        Map<String, Double> m = new LinkedHashMap<>();
+        m.put("altitude", round1(altAz[0]));
+        m.put("azimuth", round1(altAz[1]));
+        return m;
+    }
+
+    /**
+     * 此刻日月位置 + 月相,供个人主页的「日月吊偶」舞台按单一坐标渲染:
+     * sun/moon 各含 altitude/azimuth(度),另附 moonPhase/moonPhaseCode/moonIllumination/moonAge。
+     */
+    public static Map<String, Object> astroNow(double lat, double lng, Instant instant) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("now", instant.toString());
+        m.put("sun", sunPosition(lat, lng, instant));
+        m.put("moon", moonPosition(lat, lng, instant));
+        m.putAll(moonPhaseInfo(instant));
+        return m;
+    }
+
     /** 太阳高度角(度),不舍入(时刻求解需亚分钟精度) */
     private static double[] sunAltAz(double lat, double lng, Instant instant) {
         double T = julianCentury(julianDay(instant));
         double ha = (utcMinutes(instant) - (720 - 4 * lng - eqOfTime(T))) / 4.0;
-        return sunAltAz(lat, sunDeclination(T), norm180(ha));
+        return altAzFromEquatorial(lat, sunDeclination(T), norm180(ha));
     }
 
     private static double utcMinutes(Instant instant) {
@@ -222,17 +247,20 @@ public class SolarUtil {
         return sunAltAz(lat, lng, instant)[0];
     }
 
-    /** 月球高度角(度):Meeus 47 月球黄道坐标 → 赤道坐标 → 真时角(LST−α) */
+    /** 月球高度角(度)。moonAltAz 的首项,月出月落求解要未舍入值 */
     private static double moonAltitudeAt(double lat, double lng, Instant instant) {
+        return moonAltAz(lat, lng, instant)[0];
+    }
+
+    /** 月球高度角+方位角(度):Meeus 47 月球黄道坐标 → 赤道坐标 → 真时角(LST−α) → 地平坐标 */
+    private static double[] moonAltAz(double lat, double lng, Instant instant) {
         double jd = julianDay(instant);
         double T = julianCentury(jd);
         double[] lb = moonEclipticLatLon(T);
         double[] ad = eclipticToEquatorial(lb[0], lb[1], obliquityCorrection(T));
         double ha = gmstDeg(jd, T) + lng - ad[0];
         ha = ((ha % 360) + 540) % 360 - 180;
-        double latR = lat * RAD, decR = ad[1] * RAD, haR = ha * RAD;
-        double sinAlt = Math.sin(latR) * Math.sin(decR) + Math.cos(latR) * Math.cos(decR) * Math.cos(haR);
-        return Math.asin(Math.max(-1, Math.min(1, sinAlt))) * DEG;
+        return altAzFromEquatorial(lat, ad[1], ha);
     }
 
     /** 月球黄道坐标(λ,β,度)。Meeus 表 47.A/47.B 主项(取到 3.5e-3 度量级,月出月落时刻误差 < 10 秒) */
@@ -415,8 +443,8 @@ public class SolarUtil {
         return Math.toDegrees(Etime) * 4.0; // minutes
     }
 
-    /** 太阳高度角 + 方位角 (degrees),用 atan2 避免象限歧义 */
-    private static double[] sunAltAz(double lat, double dec, double haDeg) {
+    /** 赤道坐标(赤纬 + 时角)→ 地平坐标(高度角, 方位角),太阳与月亮共用;方位角正北 0°、顺时针 */
+    private static double[] altAzFromEquatorial(double lat, double dec, double haDeg) {
         double latR = lat * RAD, decR = dec * RAD, haR = haDeg * RAD;
         double sinAlt = Math.sin(latR) * Math.sin(decR) + Math.cos(latR) * Math.cos(decR) * Math.cos(haR);
         sinAlt = Math.max(-1, Math.min(1, sinAlt));

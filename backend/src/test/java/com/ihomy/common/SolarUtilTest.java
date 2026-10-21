@@ -96,6 +96,20 @@ class SolarUtilTest {
         assertThat(p.get("azimuth")).isBetween(150.0, 210.0); // 正南
     }
 
+    // ---- 个人主页舞台:月球位置与日月快照 ----
+
+    @Test
+    void moonPositionAndAstroNowAreFinite() {
+        Instant t = Instant.parse("2026-10-21T12:00:00Z");
+        Map<String, Double> moon = SolarUtil.moonPosition(36.6512, 117.1201, t);
+        assertThat(moon.get("altitude")).isBetween(-90.0, 90.0);
+        assertThat(moon.get("azimuth")).isBetween(0.0, 360.0);
+
+        Map<String, Object> now = SolarUtil.astroNow(36.6512, 117.1201, t);
+        assertThat(now).containsKeys("now", "sun", "moon", "moonPhase", "moonPhaseCode");
+        assertThat(((Map<?, ?>) now.get("moon")).get("altitude")).isEqualTo(moon.get("altitude"));
+    }
+
     private static double subsolarLat(String iso) {
         return SolarUtil.subsolarPoint(Instant.parse(iso)).get("lat").doubleValue();
     }
