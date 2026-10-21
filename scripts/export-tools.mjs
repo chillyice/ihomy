@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * 工具箱导出:把 frontend/src/tools/registry.js 与对应纯函数核心导出成
- *   1) 新功能列表:frontend/public/tools/manifest.json(线上 https://ihomy.top/tools/manifest.json)
+ *   1) 新功能列表:frontend/public/toolbox-data/manifest.json(线上 https://ihomy.top/toolbox-data/manifest.json)
+ *      别放回 public/tools/:构建后是 dist/tools/ 真目录,与 SPA 路由 /tools 同名,nginx 会 403
  *   2) bit_pouch 插件代码:frontend/tools-export/<id>/{manifest.ts,core.ts,run.ts,run.spec.js}
  *
  * 用法:
@@ -22,7 +23,7 @@ const root = resolve(scriptDir, '..')
 const frontend = join(root, 'frontend')
 const toolsSrc = join(frontend, 'src', 'utils', 'tools')
 const exportDir = join(frontend, 'tools-export')
-const publicDir = join(frontend, 'public', 'tools')
+const publicDir = join(frontend, 'public', 'toolbox-data')
 
 const args = process.argv.slice(2)
 const flag = (name) => args.includes(name)
@@ -165,7 +166,7 @@ if (checkOnly) {
     if (actual !== content) drift.push(path)
   }
   // 已删除工具的残留目录也算漂移
-  for (const folder of ['public/tools', 'tools-export']) {
+  for (const folder of ['public/toolbox-data', 'tools-export']) {
     const dir = join(frontend, folder)
     if (!existsSync(dir)) continue
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -188,7 +189,7 @@ writeAll(publicDir, new Map([...files].filter(([path]) => path.startsWith(public
 writeAll(exportDir, new Map([...files].filter(([path]) => path.startsWith(exportDir))))
 
 console.log(`Exported ${exportManifest.tools.length} tool(s) from ihomy ${version}.`)
-console.log(`  manifest: frontend/public/tools/manifest.json`)
+console.log(`  manifest: frontend/public/toolbox-data/manifest.json`)
 for (const tool of kernelTools) {
   console.log(`  code:     frontend/tools-export/${tool.id}/ (${tool.bitPouch?.status || 'new'})`)
 }

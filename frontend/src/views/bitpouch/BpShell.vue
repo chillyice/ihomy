@@ -23,6 +23,9 @@ import { useI18n } from 'vue-i18n'
 import { onBeforeRouteLeave } from 'vue-router'
 import BpTop from './BpTop.vue'
 import { BIT_POUCH_VERSION } from './brand'
+// 顶栏/终端/表格等版式与发布页共用一份,必须由外壳自己引入:原先只写在发布页的 <style src> 里,
+// 从工具箱或直接打开 /bit-pouch/tools 时那份 CSS chunk 根本没加载,页面就成了无样式的裸文档。
+import '@/styles/bit-pouch.css'
 
 const props = defineProps({
   // 浏览器标签页标题;工具页传具体工具名,目录页用默认的「在线工具」。
