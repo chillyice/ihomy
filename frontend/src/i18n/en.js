@@ -4301,6 +4301,15 @@ export default {
       body: 'Say it in the chat room, or tell whoever looks after ihomy. The same goes for anything on the page that feels awkward.',
     },
   },
+  chillyice: {
+    docTitle: 'chillyice · Personal site',
+    kicker: 'Personal site',
+    role: 'Code, small tools, and everyday notes',
+    note: 'This page is still being prepared. Writing, projects and day-to-day notes will live here.',
+    linksAria: 'Site links',
+    backHome: 'Back to ihomy',
+    github: 'GitHub',
+  },
   kada: {
     brand: 'Kada',
     tag: 'A light, cross-platform hotkey tool',

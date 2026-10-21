@@ -191,6 +191,8 @@ const routes = [
   },
   // 壁纸页:家庭私有只读氛围屏(桌面壁纸/常开副屏用),登录后只展示照片/光影/天气;standalone 不套外壳
   { path: '/wallpaper', name: 'Wallpaper', component: () => import('@/views/Wallpaper.vue'), meta: { public: true, standalone: true } },
+  // chillyice 个人主页:ihomy 域名下的独立页(ihomy.top/chillyice),全公开、登录与否都可访问
+  { path: '/chillyice', name: 'Chillyice', component: () => import('@/views/Chillyice.vue'), meta: { public: true, standalone: true } },
   // 使用帮助:给家人看的纯文案页,不需要登录
   { path: '/help', name: 'Help', component: () => import('@/views/Help.vue'), meta: { public: true } },
   // 兜底:未匹配的路由重定向回首页

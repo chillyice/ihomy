@@ -708,6 +708,11 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
    - **复制反馈**:`BpcCopy.vue` 自己管状态(复制 → 已复制 → 1.5s 复位;失败显示「复制失败」),不弹全局 toast;危险命令(运维面板)第一次点击只进入 4s 的「确认复制」态,再点才写剪贴板。
    - **文案**:工作台外壳走 `bitPouch.tools.*`,各工具字段直接复用 `tools.<id>.*`(不复制第二套说法),中英键必须对齐;模板里不得出现硬编码中文(仍受 `i18n/hardcoded-cjk.spec.js` 守门)。配色只读 `.bp` 自己的令牌,继续**不读** `--color-*`,也不跟随暖居/光尘与晨暮。
 
+56. **chillyice 个人主页**(`/chillyice`,全公开;`meta.standalone` 同咔哒/比特口袋页,不套 ihomy 外壳、不引 Element Plus,当前为占位版):
+   - **配色自包含、浅色为默认**:页面根 `.cy` 声明两套令牌,不读 `--color-*`,也不跟随暖居/光尘与晨暮。**浅色**:`--cy-bg #f6f2ea` / `--cy-ink #201d19` / `--cy-muted rgba(32,29,25,.62)` / `--cy-line rgba(32,29,25,.14)` / `--cy-accent #b96a3d` / 光晕 `rgba(233,190,132,.55)` + `rgba(142,174,204,.42)`;**深色(`prefers-color-scheme: dark`)**:`--cy-bg #121315` / `--cy-ink #f1ece4` / `--cy-muted rgba(241,236,228,.58)` / `--cy-line rgba(241,236,228,.18)` / `--cy-accent #e0a06a` / 光晕 `rgba(120,86,52,.42)` + `rgba(58,84,112,.4)`。**根元素也归本页管**:挂载给 `html` 加 `chillyice-page` 类(卸载摘除),`:global(html.chillyice-page)` 给出底色、`color-scheme` 与 body 底色。
+   - **版式**:整屏居中单栏(最大宽 640px,`min-height: 100dvh`)——小字眉标(圆点 + 「个人主页」)→ `clamp(48px, 11vw, 104px)`、字距 `-0.045em` 的 `chillyice` 字标 → 一行定位语 → 说明文字(`--cy-muted`,行高 1.85)→ 两个 40px 胶囊链接(主链接实底反色,次链接描边,hover 只换边线与配色)→ 页脚年份。背景是两层静态径向渐变 `.cy-glow`(`pointer-events: none`),不做持续动画,也不用 `backdrop-filter`。
+   - **文案与状态**:全量走 i18n `chillyice.*`,中英键对齐;页面标题由 `chillyice.docTitle` 注入,卸载时恢复 `ihomy`;不调后端,未登录与登录态渲染一致。
+
 ## 25. 前端体验与规范补充(i18n 命名空间 / 无障碍 / 列表错误态 / 共享纯逻辑,V10.3)
 
 1. **外壳文案的 i18n 命名空间**:外壳与首页文案按命名空间落键,新增用户可见文案必须进对应命名空间并 **zh-CN / en 同步**(键数须对齐,当前 2739=2739)。四组:`warm.*`(暖居外壳:问候、编辑态、组件与模块标签、空态、提示)、`sidebar.*`(侧栏:展开收起、台灯三态、光影开关、语言、消息、编辑首页、相对时间)、`home.dashboard.*`(光尘首页仪表盘卡片标题/空态/天气指标/日期风力/寻物/愿望/收支/添加组件)、`feed.type|summary|time`(动态流类型标签、摘要模板、相对时间)。**暖居模块入口标签自持 key(`warm.module.*`)**,不复用后端 `sys_home_module.title`(后端标题不随前端语言切换)。

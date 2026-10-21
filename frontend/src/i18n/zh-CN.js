@@ -4256,6 +4256,15 @@ export default {
       body: '在聊天室里说一声,或者告诉家里管这套系统的运维管理员。页面哪里别扭也一样,说就行。',
     },
   },
+  chillyice: {
+    docTitle: 'chillyice · 个人主页',
+    kicker: '个人主页',
+    role: '写代码 · 做小工具 · 记录生活',
+    note: '这一页还在准备中。之后会放上我的文章、项目与日常记录。',
+    linksAria: '站点链接',
+    backHome: '回到 ihomy',
+    github: 'GitHub',
+  },
   kada: {
     brand: '咔哒',
     tag: '轻快跨平台快捷键工具',

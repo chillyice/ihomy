@@ -132,6 +132,15 @@ watch(
     appStore.init()
   },
 )
+
+// 直接落在独立页(如 /chillyice、/kada)后点站内链接回来:上面的 onMounted 已因 standalone 提前返回,
+// 这里补一次初始化;init 自带 loaded/loading 守卫,从站内页进出独立页时不会重复拉取。
+watch(standalone, (isStandalone) => {
+  if (isStandalone) return
+  if (userStore.mustChangePassword) return
+  appStore.init()
+  userStore.ensureUserInfo()
+})
 </script>
 
 <style>

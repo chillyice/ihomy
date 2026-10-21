@@ -107,7 +107,7 @@ frontend/ (Vue3 + Vite + PWA + Element Plus + Pinia)
   src/
     api/          # request.js(axios+JWT+401 自动刷新) + index.js(41 个 Api 对象)
     stores/       # user.js(登录+权限) / app.js(首页聚合) / theme.js(主题两轴矩阵)
-    router/       # 登录守卫 + scrollBehavior;61 条路由(57 条懒加载,另 4 条 redirect)
+    router/       # 登录守卫 + scrollBehavior;84 条路由(67 条懒加载,另 17 条 redirect)
     i18n/ theme/  # vue-i18n 中英;主题两轴矩阵(暖居/光尘 × 晨/暮)
     utils/        # dict.js / doodle.js(涂鸦引擎) / useDragResize.js / password.js / loan.js / terminator.js(晨昏线几何) 等纯函数与组合逻辑
     composables/  # useDevice.js(设备检测) / useWeatherBg.js(天气 AI 生图氛围底图)
@@ -177,7 +177,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 | 厨房 | 菜单/菜谱/食材 | RecipeController / RecipeService |
 | 物联 | 智能家居中控(HA 接入) | IotController / HomeAssistantService + IotSyncService + views/iot/Iot.vue |
 | 工具 | 工具箱聚合页 12 张卡(可手动排序;元数据单一来源 `frontend/src/tools/registry.js`) / 脑图设计 / AI 测试台 / 3D 光影实验台 / PDF 转换 / Markdown 阅读器(本地 .md) / 图片工具(压缩·ICO·EXIF) / 文件工具(类型识别·ZIP 打包解压) / 颜色与前端设计(对比度·配色·CSS) / 单位换算 / 贷款计算器+贷款记录 / Flash·GBA 播放器 / 固定入口:比特口袋在线工具(/bit-pouch/tools,带 `b_` 独立标志)+ 咔哒(/kada,键帽 K 标志)。**12 个开发者工具(JSON/编码/进制/报文/子网/哈希/随机/时间/正则/文本/运维/JWT)只在比特口袋在线工具里维护界面**(`/bit-pouch/tools/<id>`;ihomy 旧 `/tools/<id>` 重定向过去,registry 条目标 `toolbox:false`);颜色/单位/图片/文件/PDF/阅读器则是 ihomy 与比特口袋**两处各一套入口、共用内核** | MindMapController / MindMapService(见需求 §4.12);纯前端工具核心在 `utils/tools/` 与 `utils/`,导出见 `scripts/export-tools.mjs` 与需求 §4.12.22 |
-| 系统 | i18n / 主题(暖居/光尘 × 晨/暮) / 字典 / 帮助页 / 独立产品页(咔哒 / bit_pouch / 壁纸) | i18n/ + theme/ + stores/theme.js + utils/dict.js + views/Help.vue + Kada.vue + BitPouch.vue + Wallpaper.vue;咔哒更新镜像在 `scripts/kada-mirror/`(见需求 §4.14);bit_pouch 发布镜像在 bit_pouch 仓 `scripts/ihomy-mirror/`(见需求 §4.14.1) |
+| 系统 | i18n / 主题(暖居/光尘 × 晨/暮) / 字典 / 帮助页 / 独立产品页(咔哒 / bit_pouch / 壁纸 / chillyice 个人主页) | i18n/ + theme/ + stores/theme.js + utils/dict.js + views/Help.vue + Kada.vue + BitPouch.vue + Wallpaper.vue + Chillyice.vue;咔哒更新镜像在 `scripts/kada-mirror/`(见需求 §4.14);bit_pouch 发布镜像在 bit_pouch 仓 `scripts/ihomy-mirror/`(见需求 §4.14.1);个人主页 `/chillyice` 全公开独立页(见需求 §4.14.2) |
 | 移动端 | 设备自适应 | useDevice.js + MobileLayout.vue + Mobile* 组件;三 Tab 判据与页头标题表在 `utils/mobileNav.js`(带单测);**导航条目唯一数据源 `utils/navModules.js`——不入 `sys_home_module` 的页面(设置/帮助/运维/**天气**)须在 `buildNavItems` 补虚拟入口,否则移动端「更多」里没有(V10.26)**;移动首页只做动态流(桌面仪表盘组件对等已决策不做) |
 
 **关键坑速查**:已外移到 **`docs/踩坑速查.md`**,动手前按关键词 grep 该文件。
@@ -206,7 +206,7 @@ npm run build      # 生产构建,产物 dist/,含 PWA service worker
 1. **API 分组**:`api/index.js` 按模块导出 `xxxApi` 对象;统一走 `api/request.js`(axios+JWT+401 自动刷新)。
 2. **状态管理**:Pinia;`stores/user.js`(登录+权限)、`stores/app.js`(首页聚合)。
 3. **路由守卫**:`meta.public` 无需登录;`meta.ops` 需 `ops:view`;纯 OPS 账号只能访问 `/ops`。
-   - **`meta.standalone`(独立产品页)**:挂「另一款产品的独立页」时加 `meta.standalone`——`App.vue` 走独立分支只渲染 `<router-view>`,**不套** ihomy 外壳(光影层/侧栏/页脚/播放器/回顶);`onMounted` 见 standalone 直接 return(跳过 `appStore.init()`/`ensureUserInfo()`);**外壳必须等 `router.isReady()` 后再渲染**;**续期失败不许顶到登录页**(401 统一走 `redirectToLogin()`,standalone 时直接返回)。**自带配色的独立页要连文档根元素一起接管**(挂载/卸载增删 `html` 上的页标记类,`:global(html.<页类>:root)` 给出底色与 `color-scheme`)。已用:咔哒 `/kada`(根类 `kada-page`,浅色默认、深色随浏览器偏好)、bit_pouch `/bit-pouch` 与 `/bit-pouch/tools`(`bitpouch-page`,深色默认、浅色随浏览器偏好)、壁纸屏 `/wallpaper`(跟随 ihomy 主题,无需接管)。成因见踩坑速查 §3.8。
+   - **`meta.standalone`(独立产品页)**:挂「另一款产品的独立页」时加 `meta.standalone`——`App.vue` 走独立分支只渲染 `<router-view>`,**不套** ihomy 外壳(光影层/侧栏/页脚/播放器/回顶);`onMounted` 见 standalone 直接 return(跳过 `appStore.init()`/`ensureUserInfo()`);**外壳必须等 `router.isReady()` 后再渲染**;**续期失败不许顶到登录页**(401 统一走 `redirectToLogin()`,standalone 时直接返回)。**自带配色的独立页要连文档根元素一起接管**(挂载/卸载增删 `html` 上的页标记类,`:global(html.<页类>:root)` 给出底色与 `color-scheme`)。已用:咔哒 `/kada`(根类 `kada-page`,浅色默认、深色随浏览器偏好)、bit_pouch `/bit-pouch` 与 `/bit-pouch/tools`(`bitpouch-page`,深色默认、浅色随浏览器偏好)、壁纸屏 `/wallpaper`(跟随 ihomy 主题,无需接管)、个人主页 `/chillyice`(`chillyice-page`,浅色默认、深色随浏览器偏好)。**从独立页回站内页必须补初始化**:`onMounted` 因 standalone 提前返回且只跑一次,`App.vue` 监听 standalone 变 false 时补 `appStore.init()`/`ensureUserInfo()`(init 幂等),否则首页模块与家庭名全空(踩坑速查 §3.32)。成因见踩坑速查 §3.8。
 4. **样式**:CSS 变量(`main.css`)+ 深色模式 `html.dark` 覆写;**不显式声明 serif 字体**,继承 body sans-serif;要能被类覆写的内联样式走 CSS 变量(踩坑速查 §3.4)。
 5. **图标**:Element Plus `el-icon`(线性图标);**Setting/Monitor 图标用内联 SVG 替代**(复杂 path 在 100% 缩放触发子像素光栅化开销)。
 6. **动画**:GSAP 入场;`transform: translateZ(0)` 隔离合成层;`contain: layout style` 隔离布局;避免 `background-attachment: fixed`(性能杀手)。
