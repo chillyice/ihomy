@@ -13,6 +13,8 @@
 #   5. 每个 *Controller.java 必须带 @Tag(文档生成按它出章,缺了会静默丢章)
 #   6. @RequirePermission("code") 的 code 必须在 schema.sql 的 sys_auth 种子里
 #   7. 启用的首页模块种子(path, enabled=1)必须有对应前端路由
+#   8. 文档引用的 backend/ frontend/ 路径必须存在(改名/移动后不准留悬空指引)
+#   9. 生成物无漂移(docs/代码地图.md、docs/归档索引.md)+ AGENTS.md ≤45KB
 #
 # 用法:bash scripts/doc-drift-check.sh     # 退出码非 0 即有漂移
 set -uo pipefail
@@ -143,6 +145,43 @@ while read -r path enabled; do
 done < <(awk '/INSERT INTO `sys_home_module`/{f=1} f{print} f&&/;[[:space:]]*$/{f=0}' "$SCHEMA" \
   | sed -nE "s/^\(\s*'[^']*'\s*,\s*'[^']*'\s*,\s*'[^']*'\s*,\s*'([^']+)'\s*,.*,[[:space:]]*([01])[[:space:]]*\)[,;]?[[:space:]]*$/\1 \2/p")
 [[ -z "$MOD_MISSING" ]] && pass "启用模块的 path 都有对应路由" || fail "模块种子有 path 但路由缺失: $MOD_MISSING"
+
+# ------------------------------------------------------- 8. 文档路径存在性
+echo "[8] 文档引用的源码路径必须存在"
+MISSING_PATH="$(
+  for doc in AGENTS.md docs/README.md docs/需求设计说明书.md docs/架构设计.md docs/代码地图.md; do
+    [[ -f "$doc" ]] || continue
+    grep -oE '(backend|frontend)/[^ 　,;:、()<>{}*|`]+|(docs|test|scripts)/[^ 　,;:、()<>{}*|`]+\.(md|py|sh|ps1|mjs|js|json|sql)' "$doc" | sed 's/[.,;:、)]*$//' | sort -u \
+      | while IFS= read -r p; do
+          case "$p" in
+            frontend/dist*|frontend/.env*|backend/target*) continue ;;  # 构建产物/本地凭证,不入库
+            scripts/verify-release.mjs) continue ;;                     # 属 bit_pouch 独立仓,本仓没有
+          esac
+          [[ -e "$p" ]] || echo "        $doc: $p"
+        done
+  done
+)"
+[[ -z "$MISSING_PATH" ]] && pass "文档里的 backend/ frontend/ 路径都存在" \
+  || { fail "以下路径已不存在(改名/移动后未同步文档):"; printf '%s\n' "$MISSING_PATH"; }
+
+# ------------------------------------------------------- 9. 生成物与体积
+echo "[9] 生成物无漂移 + AGENTS.md 体积"
+if bash scripts/gen-code-map.sh --check >/dev/null 2>&1; then
+  pass "docs/代码地图.md 与代码一致"
+else
+  fail "docs/代码地图.md 已漂移,重跑 bash scripts/gen-code-map.sh"
+fi
+if bash scripts/doc-index.sh --check >/dev/null 2>&1; then
+  pass "docs/归档索引.md 与归档一致"
+else
+  fail "docs/归档索引.md 已漂移,重跑 bash scripts/doc-index.sh"
+fi
+AG_BYTES="$(wc -c < "$AGENTS" | tr -d ' ')"
+if [[ "$AG_BYTES" -le 45000 ]]; then
+  pass "AGENTS.md $AG_BYTES 字节(≤45KB)"
+else
+  fail "AGENTS.md $AG_BYTES 字节超 45KB,把成因/机制细节挪到 docs/踩坑速查.md"
+fi
 
 echo
 if [[ "$FAIL" -eq 0 ]]; then
