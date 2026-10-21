@@ -84,13 +84,17 @@ public class PublicController {
         return Result.success(sunService.getSunInfo(ip, ld, resolveFamilyLocation()));
     }
 
-    @Operation(summary = "此刻太阳与月亮的高度角、方位角与月相(按给定坐标,未给坐标取济南)")
+    @Operation(summary = "太阳与月亮的高度角、方位角与月相(按给定坐标与时刻,未给坐标取济南、未给时刻取此刻)")
     @GetMapping("/astro")
     public Result<Map<String, Object>> astro(
             @RequestParam(value = "lat", required = false) Double lat,
-            @RequestParam(value = "lng", required = false) Double lng) {
-        return Result.success(SolarUtil.astroNow(coord(lat, 36.6512, 90), coord(lng, 117.1201, 180),
-                java.time.Instant.now()));
+            @RequestParam(value = "lng", required = false) Double lng,
+            @RequestParam(value = "at", required = false) String at) {
+        java.time.Instant instant = java.time.Instant.now();
+        if (at != null && !at.isBlank()) {
+            try { instant = java.time.OffsetDateTime.parse(at).toInstant(); } catch (Exception ignored) {}
+        }
+        return Result.success(SolarUtil.astroNow(coord(lat, 36.6512, 90), coord(lng, 117.1201, 180), instant));
     }
 
     /** 坐标兜底与越界收敛:非数字/缺失用默认值,越界夹到合法范围 */

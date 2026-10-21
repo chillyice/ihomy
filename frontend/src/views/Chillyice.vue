@@ -25,7 +25,7 @@
         </span>
       </div>
 
-      <div class="cy-puppet" :class="{ 'is-off': !moon.visible }" :style="puppetStyle(moon)">
+      <div class="cy-puppet" :class="{ 'is-off': !moon.visible, 'is-low': moon.y > 78 }" :style="puppetStyle(moon)">
         <span class="cy-string" aria-hidden="true"></span>
         <span class="cy-anchor">
           <span
@@ -55,6 +55,25 @@
         <span v-if="sun.visible">{{ $t('chillyice.sunAltitude', { deg: Math.round(sunAlt) }) }}</span>
         <span v-if="moon.visible">{{ $t('chillyice.moonAltitude', { deg: Math.round(moonAlt) }) }}</span>
       </p>
+      <div class="cy-scrub">
+        <label class="cy-scrub-field">
+          <span>{{ $t('chillyice.timeLabel') }}</span>
+          <input
+            class="cy-scrub-range"
+            type="range"
+            min="0"
+            max="1439"
+            step="1"
+            :value="scrub ?? nowMin"
+            :aria-valuetext="scrubText"
+            @input="onScrub"
+          />
+          <span class="cy-scrub-time">{{ scrubText }}</span>
+        </label>
+        <button v-if="scrub !== null" type="button" class="cy-scrub-reset" @click="resetTime">
+          {{ $t('chillyice.now') }}
+        </button>
+      </div>
       <nav class="cy-links" :aria-label="$t('chillyice.linksAria')">
         <router-link class="cy-link cy-link--primary" to="/home">{{ $t('chillyice.backHome') }}</router-link>
         <a class="cy-link" :href="githubUrl" target="_blank" rel="noopener noreferrer">{{ $t('chillyice.github') }}</a>
@@ -66,13 +85,14 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { moonLitPath, projectBody } from '@/utils/celestialStage'
 import { moonPhaseText } from '@/utils/dict'
 
 // 固定济南:这页讲的是「从这里看天空」,不跟随访客 IP 或家庭设置
 const JINAN = { lat: 36.6512, lng: 117.1201 }
+const JINAN_OFFSET_MS = 8 * 3_600_000
 const POLL_MS = 60_000
 
 const githubUrl = 'https://github.com/chillyice'
@@ -80,8 +100,24 @@ const year = new Date().getFullYear()
 const { t } = useI18n()
 
 const astro = reactive({ sun: null, moon: null, moonPhase: 0, moonPhaseCode: '' })
+const scrub = ref(null)
+const nowMin = ref(0)
 let timer = 0
+let scrubTimer = 0
 let controller = null
+
+// 济南墙钟(UTC+8 无夏令时),用于时间手柄与回显
+const jinanParts = () => {
+  const d = new Date(Date.now() + JINAN_OFFSET_MS)
+  return { y: d.getUTCFullYear(), m: d.getUTCMonth(), d: d.getUTCDate(), min: d.getUTCHours() * 60 + d.getUTCMinutes() }
+}
+const instantAt = (min) => {
+  const p = jinanParts()
+  return new Date(Date.UTC(p.y, p.m, p.d, Math.floor(min / 60), min % 60) - JINAN_OFFSET_MS).toISOString()
+}
+const clockText = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`
+const scrubText = computed(() => clockText(scrub.value ?? nowMin.value))
+nowMin.value = jinanParts().min
 
 const sun = computed(() => projectBody(astro.sun?.altitude, astro.sun?.azimuth))
 const moon = computed(() => projectBody(astro.moon?.altitude, astro.moon?.azimuth))
@@ -98,15 +134,33 @@ const load = async () => {
   controller?.abort()
   controller = new AbortController()
   try {
-    const res = await fetch(`/api/public/astro?lat=${JINAN.lat}&lng=${JINAN.lng}`, {
+    const q = new URLSearchParams({ lat: JINAN.lat, lng: JINAN.lng })
+    if (scrub.value !== null) q.set('at', instantAt(scrub.value))
+    const res = await fetch(`/api/public/astro?${q}`, {
       signal: controller.signal,
       headers: { Accept: 'application/json' },
     })
     const body = await res.json()
-    if (body?.code === 0 && body.data) Object.assign(astro, body.data)
+    if (body?.code === 0 && body.data) {
+      Object.assign(astro, body.data)
+      if (scrub.value === null) nowMin.value = jinanParts().min
+    }
   } catch (err) {
     if (err.name !== 'AbortError') console.warn('[chillyice] astro unavailable', err)
   }
+}
+
+const onScrub = (e) => {
+  scrub.value = Number(e.target.value)
+  window.clearTimeout(scrubTimer)
+  scrubTimer = window.setTimeout(load, 250)
+}
+
+const resetTime = () => {
+  window.clearTimeout(scrubTimer)
+  scrub.value = null
+  nowMin.value = jinanParts().min
+  load()
 }
 
 onMounted(() => {
@@ -114,11 +168,14 @@ onMounted(() => {
   // 独立页整屏渲染,根元素一起接管配色(滚动条/橡皮筋区);卸载时移除,规则不外漏到 ihomy 其他页面
   document.documentElement.classList.add('chillyice-page')
   load()
-  timer = window.setInterval(load, POLL_MS)
+  timer = window.setInterval(() => {
+    if (scrub.value === null) load()
+  }, POLL_MS)
 })
 
 onBeforeUnmount(() => {
   window.clearInterval(timer)
+  window.clearTimeout(scrubTimer)
   controller?.abort()
   document.title = 'ihomy'
   document.documentElement.classList.remove('chillyice-page')
@@ -395,6 +452,67 @@ onBeforeUnmount(() => {
   letter-spacing: 0.06em;
   color: var(--cy-muted);
   font-variant-numeric: tabular-nums;
+}
+
+.cy-scrub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-top: 14px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--cy-muted);
+}
+.cy-scrub-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.cy-scrub-range {
+  appearance: none;
+  -webkit-appearance: none;
+  width: min(200px, 46vw);
+  height: 2px;
+  margin: 0;
+  border-radius: 2px;
+  background: var(--cy-line);
+  cursor: pointer;
+}
+.cy-scrub-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--cy-accent);
+}
+.cy-scrub-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--cy-accent);
+}
+.cy-scrub-range:focus-visible {
+  outline: 2px solid var(--cy-accent);
+  outline-offset: 6px;
+}
+.cy-scrub-time {
+  min-width: 4.2em;
+  color: var(--cy-ink);
+  font-variant-numeric: tabular-nums;
+}
+.cy-scrub-reset {
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  background: none;
+  color: var(--cy-accent);
+  font: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
 }
 
 .cy-links {

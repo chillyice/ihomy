@@ -4269,6 +4269,8 @@ export default {
     moon: '月亮',
     empty: '此刻,太阳和月亮都落在地平线以下。',
     coords: '北纬 36.65° · 东经 117.12°',
+    timeLabel: '时间 · 济南',
+    now: '回到此刻',
     sunAltitude: '太阳 {deg}°',
     moonAltitude: '月亮 {deg}°',
     sunAria: '太阳,高度角 {alt} 度',

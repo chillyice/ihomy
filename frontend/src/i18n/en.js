@@ -4314,6 +4314,8 @@ export default {
     moon: 'Moon',
     empty: 'Right now both the sun and the moon are below the horizon.',
     coords: '36.65°N · 117.12°E',
+    timeLabel: 'Time · Jinan',
+    now: 'Now',
     sunAltitude: 'Sun {deg}°',
     moonAltitude: 'Moon {deg}°',
     sunAria: 'Sun, altitude {alt} degrees',
