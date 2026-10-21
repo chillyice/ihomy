@@ -28,6 +28,27 @@ export const projectBody = (altitude, azimuth) => {
 }
 
 /**
+ * 全天轨迹 → 若干条 SVG path(视口 0~100):
+ * 只连接地平线以上的采样点,落到地平线下就断开,日月各回各的弧。
+ * 输入是后端 astroDay 的 [{ t, alt, az }];非法点直接跳过。
+ */
+export const projectTrack = (points) => {
+  const paths = []
+  let d = ''
+  for (const point of Array.isArray(points) ? points : []) {
+    const p = projectBody(point?.alt, point?.az)
+    if (!p.visible) {
+      if (d) paths.push(d)
+      d = ''
+      continue
+    }
+    d += `${d ? ' L' : 'M'}${p.x.toFixed(2)} ${p.y.toFixed(2)}`
+  }
+  if (d) paths.push(d)
+  return paths
+}
+
+/**
  * 月相亮部路径(以圆盘中心为原点,SVG viewBox 用 -r..r):
  * phase 0=新月、0.25=上弦(右半亮)、0.5=满月、0.75=下弦(左半亮)。
  * 亮部 = 外缘半圆 + 明暗界线(半椭圆),半椭圆短轴 = r·|cos(2π·phase)|,

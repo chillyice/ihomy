@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { moonLitPath, projectBody, skyStyle } from './celestialStage'
+import { moonLitPath, projectBody, projectTrack, skyStyle } from './celestialStage'
 
 describe('projectBody', () => {
   it('hides bodies at or below the horizon', () => {
@@ -54,6 +54,36 @@ describe('moonLitPath', () => {
   it('wraps negative and out-of-range phases', () => {
     expect(moonLitPath(-0.75, 50)).toBe(moonLitPath(0.25, 50))
     expect(moonLitPath(1.25, 50)).toBe(moonLitPath(0.25, 50))
+  })
+})
+
+describe('projectTrack', () => {
+  const point = (t, alt, az) => ({ t, alt, az })
+
+  it('connects the above-horizon samples into one path', () => {
+    const paths = projectTrack([point(0, 10, 90), point(10, 30, 120), point(20, 50, 180)])
+    expect(paths).toHaveLength(1)
+    expect(paths[0].startsWith('M')).toBe(true)
+    expect(paths[0].match(/L/g)).toHaveLength(2)
+  })
+
+  it('splits the path when the body dips below the horizon', () => {
+    const paths = projectTrack([point(0, -5, 90), point(10, 20, 120), point(20, -2, 240), point(30, 15, 270)])
+    expect(paths).toHaveLength(2)
+  })
+
+  it('returns nothing for empty or malformed input', () => {
+    expect(projectTrack([])).toEqual([])
+    expect(projectTrack(null)).toEqual([])
+    expect(projectTrack([point(0, null, 90)])).toEqual([])
+  })
+
+  it('keeps every coordinate inside the 0-100 stage', () => {
+    const d = projectTrack([point(0, 1, 90), point(10, 90, 180), point(20, 5, 270)])[0]
+    for (const n of d.match(/-?\d+(\.\d+)?/g).map(Number)) {
+      expect(n).toBeGreaterThanOrEqual(0)
+      expect(n).toBeLessThanOrEqual(100)
+    }
   })
 })
 

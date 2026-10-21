@@ -17,6 +17,11 @@
       <div class="cy-baton" aria-hidden="true"></div>
       <div class="cy-horizon" aria-hidden="true"></div>
 
+      <svg class="cy-orbit" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <path v-for="(d, i) in sunPaths" :key="`sun-${i}`" :d="d" class="cy-arc cy-arc--sun" vector-effect="non-scaling-stroke" />
+        <path v-for="(d, i) in moonPaths" :key="`moon-${i}`" :d="d" class="cy-arc cy-arc--moon" vector-effect="non-scaling-stroke" />
+      </svg>
+
       <div class="cy-puppet" :class="{ 'is-off': !sun.visible, 'is-ready': ready, 'is-low': sun.y > 78 }" :style="puppetStyle(sun)">
         <span class="cy-string" aria-hidden="true"></span>
         <span class="cy-anchor">
@@ -52,6 +57,8 @@
       <p class="cy-note">{{ $t('chillyice.note') }}</p>
       <p class="cy-meta">
         <span>{{ $t('chillyice.coords') }}</span>
+        <span v-if="sunWindow">{{ sunWindow }}</span>
+        <span v-if="moonWindow">{{ moonWindow }}</span>
         <span v-if="sun.visible">{{ $t('chillyice.sunAltitude', { deg: Math.round(sunAlt) }) }}</span>
         <span v-if="moon.visible">{{ $t('chillyice.moonAltitude', { deg: Math.round(moonAlt) }) }}</span>
       </p>
@@ -87,7 +94,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { moonLitPath, projectBody, skyStyle } from '@/utils/celestialStage'
+import { moonLitPath, projectBody, projectTrack, skyStyle } from '@/utils/celestialStage'
 import { moonPhaseText } from '@/utils/dict'
 
 // 固定济南:这页讲的是「从这里看天空」,不跟随访客 IP 或家庭设置
@@ -100,12 +107,15 @@ const year = new Date().getFullYear()
 const { t } = useI18n()
 
 const astro = reactive({ sun: null, moon: null, moonPhase: 0, moonPhaseCode: '' })
+const day = reactive({ sun: [], moon: [], times: {} })
 const scrub = ref(null)
 const nowMin = ref(0)
 const ready = ref(false)
 let timer = 0
 let scrubTimer = 0
 let controller = null
+let dayController = null
+let dayDate = ''
 
 // 济南墙钟(UTC+8 无夏令时),用于时间手柄与回显
 const jinanParts = () => {
@@ -120,6 +130,12 @@ const clockText = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${S
 const scrubText = computed(() => clockText(scrub.value ?? nowMin.value))
 nowMin.value = jinanParts().min
 
+// 济南当地日历日(YYYY-MM-DD),用来判断跨零点后要不要重取当天轨迹
+const jinanDate = () => {
+  const p = jinanParts()
+  return `${p.y}-${String(p.m + 1).padStart(2, '0')}-${String(p.d).padStart(2, '0')}`
+}
+
 const sun = computed(() => projectBody(astro.sun?.altitude, astro.sun?.azimuth))
 const moon = computed(() => projectBody(astro.moon?.altitude, astro.moon?.azimuth))
 const sunAlt = computed(() => astro.sun?.altitude ?? 0)
@@ -130,6 +146,19 @@ const moonLabel = computed(() =>
   moonPhaseName.value === t('chillyice.moon') ? moonPhaseName.value : `${t('chillyice.moon')} · ${moonPhaseName.value}`,
 )
 const puppetStyle = (p) => ({ left: p.x + '%', height: p.y + '%', '--orb-scale': p.scale })
+
+// 全天轨迹:后端按 10 分钟采样,本页只把点投到舞台坐标并连成弧线
+const sunPaths = computed(() => projectTrack(day.sun))
+const moonPaths = computed(() => projectTrack(day.moon))
+const windowText = (key, rise, set) => (rise && set ? t(key, { rise, set }) : '')
+const sunWindow = computed(() => windowText('chillyice.sunWindow', day.times.sunrise, day.times.sunset))
+// 月亮一天里可能先落再升:按时间先后显示,避免读成同一轮
+const moonWindow = computed(() => {
+  const rise = day.times.moonrise
+  const set = day.times.moonset
+  if (!rise || !set) return ''
+  return rise <= set ? t('chillyice.moonWindow', { rise, set }) : t('chillyice.moonWindowReverse', { rise, set })
+})
 
 // 天空随太阳高度角变色:变量挂在 html 上,body 与 .cy 一起继承
 const sky = computed(() => skyStyle(astro.sun?.altitude))
@@ -152,6 +181,7 @@ const load = async () => {
     if (body?.code === 0 && body.data) {
       Object.assign(astro, body.data)
       if (scrub.value === null) nowMin.value = jinanParts().min
+      if (dayDate !== jinanDate()) loadDay()
       if (!ready.value) {
         // 等首帧按真实位置落位后再开过渡,避免从舞台中央滑进来
         requestAnimationFrame(() => requestAnimationFrame(() => (ready.value = true)))
@@ -159,6 +189,28 @@ const load = async () => {
     }
   } catch (err) {
     if (err.name !== 'AbortError') console.warn('[chillyice] astro unavailable', err)
+  }
+}
+
+// 当天轨迹一天取一次;跨零点由 load() 的日期比较触发重取
+const loadDay = async () => {
+  dayController?.abort()
+  dayController = new AbortController()
+  try {
+    const q = new URLSearchParams({ lat: JINAN.lat, lng: JINAN.lng })
+    const res = await fetch(`/api/public/astro/day?${q}`, {
+      signal: dayController.signal,
+      headers: { Accept: 'application/json' },
+    })
+    const body = await res.json()
+    if (body?.code === 0 && body.data) {
+      day.sun = Array.isArray(body.data.sun) ? body.data.sun : []
+      day.moon = Array.isArray(body.data.moon) ? body.data.moon : []
+      day.times = body.data.times || {}
+      dayDate = body.data.date || jinanDate()
+    }
+  } catch (err) {
+    if (err.name !== 'AbortError') console.warn('[chillyice] astro track unavailable', err)
   }
 }
 
@@ -180,6 +232,7 @@ onMounted(() => {
   // 独立页整屏渲染,根元素一起接管配色(滚动条/橡皮筋区);卸载时移除,规则不外漏到 ihomy 其他页面
   document.documentElement.classList.add('chillyice-page')
   load()
+  loadDay()
   timer = window.setInterval(() => {
     if (scrub.value === null) load()
   }, POLL_MS)
@@ -189,6 +242,7 @@ onBeforeUnmount(() => {
   window.clearInterval(timer)
   window.clearTimeout(scrubTimer)
   controller?.abort()
+  dayController?.abort()
   document.title = 'ihomy'
   document.documentElement.classList.remove('chillyice-page')
   for (const k of SKY_KEYS) document.documentElement.style.removeProperty(k)
@@ -306,6 +360,29 @@ onBeforeUnmount(() => {
   bottom: 0;
   height: 1px;
   background: var(--cy-line);
+}
+
+/* 全天轨迹:日月各一条虚线弧,只画地平线以上的段 */
+.cy-orbit {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.cy-arc {
+  fill: none;
+  stroke-width: 1;
+  stroke-dasharray: 4 6;
+  opacity: 0.38;
+}
+.cy-arc--sun {
+  stroke: var(--cy-accent);
+}
+.cy-arc--moon {
+  stroke: var(--cy-string);
 }
 
 .cy-puppet {

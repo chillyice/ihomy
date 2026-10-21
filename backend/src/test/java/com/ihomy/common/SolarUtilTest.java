@@ -110,6 +110,25 @@ class SolarUtilTest {
         assertThat(((Map<?, ?>) now.get("moon")).get("altitude")).isEqualTo(moon.get("altitude"));
     }
 
+    @Test
+    void astroDayTrackCoversWholeDayAtRequestedStep() {
+        Map<String, Object> day = SolarUtil.astroDay(36.6512, 117.1201, LocalDate.of(2026, 10, 22), SH, 10);
+        assertThat(day).containsKeys("date", "times", "sun", "moon");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sun = (List<Map<String, Object>>) day.get("sun");
+        assertThat(sun).hasSize(144);
+        assertThat(sun.get(0).get("t")).isEqualTo(0);
+        assertThat(sun.get(143).get("t")).isEqualTo(1430);
+        for (Map<String, Object> p : sun) {
+            assertThat(((Number) p.get("alt")).doubleValue()).isBetween(-90.0, 90.0);
+            assertThat(((Number) p.get("az")).doubleValue()).isBetween(0.0, 360.0);
+        }
+        // 正午太阳应明显高于午夜
+        double noon = ((Number) sun.get(72).get("alt")).doubleValue();
+        double midnight = ((Number) sun.get(0).get("alt")).doubleValue();
+        assertThat(noon).isGreaterThan(midnight + 20);
+    }
+
     private static double subsolarLat(String iso) {
         return SolarUtil.subsolarPoint(Instant.parse(iso)).get("lat").doubleValue();
     }

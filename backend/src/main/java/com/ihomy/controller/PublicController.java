@@ -34,6 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -95,6 +96,22 @@ public class PublicController {
             try { instant = java.time.OffsetDateTime.parse(at).toInstant(); } catch (Exception ignored) {}
         }
         return Result.success(SolarUtil.astroNow(coord(lat, 36.6512, 90), coord(lng, 117.1201, 180), instant));
+    }
+
+    @Operation(summary = "某日日月运行轨迹与升落时刻(个人主页舞台画全天弧线;默认济南与上海时区,采样步长 5~30 分钟)")
+    @GetMapping("/astro/day")
+    public Result<Map<String, Object>> astroDay(
+            @RequestParam(value = "lat", required = false) Double lat,
+            @RequestParam(value = "lng", required = false) Double lng,
+            @RequestParam(value = "date", required = false) String date,
+            @RequestParam(value = "step", required = false) Integer step) {
+        ZoneId zone = ZoneId.of("Asia/Shanghai");
+        LocalDate ld = LocalDate.now(zone);
+        if (date != null && !date.isBlank()) {
+            try { ld = LocalDate.parse(date); } catch (Exception ignored) {}
+        }
+        return Result.success(SolarUtil.astroDay(coord(lat, 36.6512, 90), coord(lng, 117.1201, 180),
+                ld, zone, step == null ? 10 : step));
     }
 
     /** 坐标兜底与越界收敛:非数字/缺失用默认值,越界夹到合法范围 */
