@@ -1,6 +1,6 @@
 {
   "source": "ihomy",
-  "version": "V10.65",
+  "version": "V10.66",
   "registry": "frontend/src/tools/registry.js",
   "tools": [
     {
