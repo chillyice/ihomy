@@ -29,7 +29,7 @@ export const BIT_POUCH_TOOLS = [
     no: '04',
     titleKey: 'tools.packet.title',
     descKey: 'tools.packet.desc',
-    keywords: ['packet', 'hex', 'checksum', '报文', '校验', '拆包'],
+    keywords: ['packet', 'hex', 'ethernet', 'ipv4', 'ipv6', 'tcp', 'udp', 'dns', 'checksum', '报文', '抓包', '协议', '校验'],
   },
   {
     id: 'subnet',
