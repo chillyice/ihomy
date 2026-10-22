@@ -185,8 +185,8 @@ cd frontend; npm run lint; npx vitest run; npm run build
 ## 验证基线
 
 - 后端全绿:`.\mvnw.cmd -B clean package`(65 tests,纯逻辑不起 Spring)。
-- 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(431 passed)+ `npm run format:check`(已知 `styles/main.css` / `views/BitPouch.vue` 两处历史未格式化,不属新增改动)。
-- 构建:入口 chunk 基线 **489.22KB / gzip 201.30KB**(V10.70);**vite 报的是字符数不是字节数**,别拿 `ls -la` 比;历史数字见 变更归档。
+- 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(449 passed)+ `npm run format:check`(已知 `styles/main.css` / `views/BitPouch.vue` 两处历史未格式化,不属新增改动)。
+- 构建:入口 chunk 基线 **489.79KB / gzip 201.59KB**(V10.71);**vite 报的是字符数不是字节数**,别拿 `ls -la` 比;历史数字见 变更归档。
 - 一致性:`bash scripts/doc-drift-check.sh` 全 [OK];`gen-code-map.sh --check`、`doc-index.sh --check` 无漂移。
 - 接口测试在仓库外 `..\autotest_framework`(`pytest -m api`,37 passed)。
 

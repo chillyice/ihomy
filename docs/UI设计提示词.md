@@ -708,7 +708,7 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
    - **复制反馈**:`BpcCopy.vue` 自己管状态(复制 → 已复制 → 1.5s 复位;失败显示「复制失败」),不弹全局 toast;危险命令(运维面板)第一次点击只进入 4s 的「确认复制」态,再点才写剪贴板。
    - **文案**:工作台外壳走 `bitPouch.tools.*`,各工具字段直接复用 `tools.<id>.*`(不复制第二套说法),中英键必须对齐;模板里不得出现硬编码中文(仍受 `i18n/hardcoded-cjk.spec.js` 守门)。配色只读 `.bp` 自己的令牌,继续**不读** `--color-*`,也不跟随暖居/光尘与晨暮。
 
-56. **chillyice 个人主页**(`/chillyice`,全公开;`meta.standalone` 同咔哒/比特口袋页,不套 ihomy 外壳、不引 Element Plus):
+56. **chillyice 个人主页**(`/chillyice`,全公开;`meta.standalone` 同咔哒/比特口袋页,不套 ihomy 外壳、不引 Element Plus):入口在导航唯一数据源 `utils/navModules.js` 虚拟入口(system 组 sortOrder 94,帮助之后、运维之前)——暖居/光尘侧栏与移动端「更多」自动出现,标题 ASCII 不走 i18n:
    - **主视觉是「日月吊偶」**:顶部一条水平木架线,两根吊线各悬太阳/月亮,位置=济南此刻真实天象的正交投影——`x = cos(alt)·sin(az)`(东左西右)、`y = sin(alt)`(地平线在下、天顶在上);高度角 ≤0 不渲染,但**位置仍按方位角停在地平线两端**(东侧淡入、西侧淡出),升落只在原地起伏,**禁止从舞台中央滑入滑出**;首帧直接落位、不播过渡(过渡等首帧后由 `is-ready` 打开)。吊线长度随高度变化,天体圆盘挂在末端,圆盘下 10px 是名称(月亮附月相名);**高度角低于 12° 时名称翻到圆盘上方并右偏 12px**,避免压住地平线或吊线。正南/正北用 ±6% 缩放区分深度。太阳为径向渐变暖盘 + 两层柔光;月亮用 SVG 画明暗界线(半椭圆短轴 `r·|cos(2π·phase)|`,盈右亏左),暗部用低透明度墨色,不用背景色挖洞。舞台地平线与吊偶之间叠一层**全天轨迹**:日月各一条 1px 虚线(`stroke-dasharray: 4 6`、透明度 .38,太阳 `--cy-accent`、月亮 `--cy-string`),只连地平线以上的采样点,落到地平线下就断开成多段;`vector-effect: non-scaling-stroke` 保证纵向拉伸后线宽不变,`pointer-events: none`。
    - **天空配色随太阳走**:`--cy-bg` 与两层光晕 `--cy-spot-a/b` 按太阳高度角插值——≤-14° 深夜藏蓝 `rgb(10,17,29)` → -4° 暮紫 → 0° 暖赭 → 5° 金光 → 12° 米白 → ≥24° 纸白 `rgb(246,242,234)`;文字/线条/强调色与月亮暗面**不插值**,按底色相对亮度(线性,阈值 0.19)整组切深底浅字或浅底深字,避免中灰段两套都糊。变量写在 `html` 上(离开页面移除),底色与文字 1.2s 过渡、`prefers-reduced-motion` 关闭;`prefers-color-scheme` 块只保留日/月盘色。**浅色纸白为首屏兜底**,数值:`--cy-ink #201d19` / `--cy-muted rgba(32,29,25,.62)` / `--cy-line rgba(32,29,25,.14)` / `--cy-accent #b96a3d` / 日盘 `#fff6d8 → #e5a04a` / 月盘 `#fdf7ea`;深底浅字:`--cy-ink #f1ece4` / `--cy-muted rgba(241,236,228,.58)` / `--cy-line rgba(241,236,228,.18)` / `--cy-accent #e0a06a`。**根元素也归本页管**:挂载给 `html` 加 `chillyice-page` 类(卸载摘除),`:global(html.chillyice-page)` 给出底色、`color-scheme` 与 body 底色。
    - **版式**:整屏四行网格(`auto / minmax(180px,1fr) / auto / auto`,`min-height: 100dvh`,**显式 `grid-template-columns: minmax(0,1fr)`** 防隐式列按 max-content 撑宽、窄屏横向裁切)——页头(眉标 + 「济南 · 此刻」)→ 舞台(木架、地平线、日月吊偶;空状态 13px 居中)→ 台前(`clamp(40px,7.4vw,76px)`、字距 `-0.045em` 的 `chillyice`、定位语、说明、天文读数、两个 40px 胶囊链接)→ 页脚年份。背景两层静态径向渐变 `.cy-glow`(`pointer-events: none`),不做持续动画,不用 `backdrop-filter`;吊线只过渡 `left/height`(1.6s),圆盘缩放同步过渡;`prefers-reduced-motion` 下全部关闭。
@@ -752,7 +752,7 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 12. **首页栅格仪表盘**:12列×9行栅格,8个默认组件(feed/anni/weather/today/recipe/wish/album/finance);编辑模式可拖拽移动+缩放+增删组件(从侧边栏拖入);h=1 标题消失;点击置顶;照片溢出;布局持久化 localStorage。
 13. **今日面板**:积分余额+连续天数+签到按钮+今日待办提醒前 3 条(登录可见)。
 14. **首页功能组件区**(登录可见):栅格系统内 8 个组件(feed/anni/weather/today/recipe/wish/album/finance),编辑模式可拖拽缩放增删;移动端 ≤960px 隐藏显示提示。
-15. **备案号**:右下角 `right:16 bottom:8 z:70`,ICP+公安占位,磨砂玻璃小字。
+15. **备案号**:右下角 `right:16 bottom:8 z:70`,ICP+公安占位,磨砂玻璃小字;**暖居主题也显示**(V10.71,此前 `display:none`),`right` 改为 `calc(max(0px,(100vw-1180px)/2)+28px)` 贴合居中 1180px studio 框内右边距。
 16. **照片瀑布**(`/cascade`):落叶式飘落动画(包装元素分离 transform 防频闪),hover 暂停+scale 1.15,点击 `el-image-viewer`,每 2s 生成一张上限 50 张。
 17. **深色模式**:`html.dark .blob { opacity: 0.1 }` 色块压暗至 10%;`--color-primary` 深色覆写 `#E8DCC8`;手动切主题后取消日出日落自动切换(`autoMode=false`)+提示;深色模式配色体系详见 §18a。
 18. **创建新家庭**:`POST /family` 已登录用户创建新家庭组(绑定 OWNER+切换当前家庭);Settings 页入口。

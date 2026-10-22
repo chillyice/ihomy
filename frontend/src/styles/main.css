@@ -318,9 +318,9 @@ html.theme-warm .login-card {
   border-color: var(--color-border) !important;
 }
 
-/* 暖居是自包含 studio 框架,页脚不再需要(避免挤到视口下方);光照测试控制台保留——暖居下同样要做光影模拟 */
+/* 暖居 studio 框架居中不铺满视口(最大 1180px + 20px 内边距),页脚跟着框内右边距内收,别浮到框外的背景上 */
 html.theme-warm .site-footer {
-  display: none;
+  right: calc(max(0px, (100vw - 1180px) / 2) + 28px);
 }
 
 /* Element Plus 语义变量 → 暖居 token:让表格/输入框/下拉/弹窗/标签全部家具块化(晨暮自动) */
