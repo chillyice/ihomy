@@ -50,7 +50,6 @@ export const NAV_PATHS = {
   wish: '/wish',
   book: '/book',
   chat: '/chat',
-  chillyice: '/chillyice',
   tree: '/tree',
   item: '/item',
   kitchen: '/kitchen',
@@ -93,7 +92,6 @@ export const ICON_MAP = {
   ops: Monitor,
   tools: Tools,
   weather: Sunny,
-  chillyice: Sunny,
   plant: Sunny,
   games: Aim,
   vault: Lock,
@@ -130,8 +128,6 @@ export function buildNavItems(modules, { hasOps = false } = {}) {
   // 天气:同样不入 sys_home_module。此前桌面靠侧栏迷你天气/首页天气卡片进入,移动端无任何入口,
   // 手机上等于「有页面但到不了」。sortOrder 15 落在 vault(14) 与 chat(16) 之间,不破「工具箱殿后」。
   list.push({ code: 'weather', title: '天气', path: '/weather', category: 'life', sortOrder: 15 })
-  // chillyice 个人主页:独立页不入 sys_home_module,与设置/帮助同为虚拟入口,标题用页面自己的名字
-  list.push({ code: 'chillyice', title: 'chillyice', path: '/chillyice', category: 'system', sortOrder: 94 })
   if (hasOps) list.push({ code: 'ops', title: '运维管理', path: '/ops', category: 'system', sortOrder: 95 })
   return list.sort((a, b) => a.sortOrder - b.sortOrder)
 }
