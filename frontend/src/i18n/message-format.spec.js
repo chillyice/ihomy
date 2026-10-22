@@ -71,7 +71,8 @@ describe('i18n 文案可编译', () => {
       messages: { 'zh-CN': zhCN },
     })
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    expect(i18n.global.t('kada.f8Desc')).toContain('{变量名}')
+    // f11 是「命令输出进变量、用 {变量名} 引用」那条（原文案在 f8，重写发布页时随内容移动）。
+    expect(i18n.global.t('kada.f11Desc')).toContain('{变量名}')
     const logged = spy.mock.calls.map((c) => c.map(String).join(' '))
     spy.mockRestore()
     expect(logged.filter((t) => t.includes('compilation error'))).toEqual([])

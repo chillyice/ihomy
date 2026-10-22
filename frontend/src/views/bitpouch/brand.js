@@ -15,7 +15,7 @@ export const zipIcon =
   '<svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M9 5v3M15 5v3M9 11v3M15 11v3M9 17v2M15 17v2"/><path d="M12 8v2"/></svg>'
 
 // 对外版本、工具数与仓库地址:发布页与在线工具页共用,换版本只改这里。
-export const BIT_POUCH_VERSION = '0.4.0'
+export const BIT_POUCH_VERSION = '0.7.0'
 // 与 bit_pouch 仓 `npm run check:plugins` 的内置插件数保持一致；
 // 在线工具目录另有自己的 BIT_POUCH_TOOLS 清单（24 个），两者不要混用。
 export const BIT_POUCH_DESKTOP_TOOL_COUNT = 24

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { moonLitPath, projectBody, projectTrack, skyStyle } from './celestialStage'
+import { moonLitPath, projectBody, projectTrack, skyStyle, stageLight } from './celestialStage'
 
 describe('projectBody', () => {
   it('hides bodies at or below the horizon', () => {
@@ -54,6 +54,35 @@ describe('moonLitPath', () => {
   it('wraps negative and out-of-range phases', () => {
     expect(moonLitPath(-0.75, 50)).toBe(moonLitPath(0.25, 50))
     expect(moonLitPath(1.25, 50)).toBe(moonLitPath(0.25, 50))
+  })
+})
+
+describe('stageLight', () => {
+  const px = (v) => parseFloat(v)
+
+  it('throws shadows to the opposite side of the light', () => {
+    expect(px(stageLight(10, 90)['--cy-sh-x'])).toBeGreaterThan(0)
+    expect(px(stageLight(10, 270)['--cy-sh-x'])).toBeLessThan(0)
+  })
+
+  it('lengthens shadows as the sun drops', () => {
+    const high = Math.abs(px(stageLight(26, 120)['--cy-sh-x']))
+    const low = Math.abs(px(stageLight(4, 120)['--cy-sh-x']))
+    expect(low).toBeGreaterThan(high)
+  })
+
+  it('switches the scene to night below the horizon', () => {
+    const night = stageLight(-12, 270)
+    expect(night['--cy-night']).toBe('0.53')
+    expect(night['--cy-sh-a']).toBe('0.10')
+    expect(night['--cy-warm-a']).toBe('0.00')
+  })
+
+  it('keeps moonlight softer and cooler than sunlight', () => {
+    const sun = stageLight(40, 180)
+    const moon = stageLight(40, 180, { moon: true })
+    expect(Number(moon['--cy-sh-a'])).toBeLessThan(Number(sun['--cy-sh-a']))
+    expect(Number(moon['--cy-warm-a'])).toBeLessThan(Number(sun['--cy-warm-a']))
   })
 })
 

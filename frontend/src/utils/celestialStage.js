@@ -63,6 +63,34 @@ export const moonLitPath = (phase, r = 50) => {
   return `M 0 ${-r} A ${r} ${r} 0 0 ${outerSweep} 0 ${r} A ${n} ${r} 0 0 ${terminatorSweep} 0 ${-r} Z`
 }
 
+/**
+ * 光源(太阳,夜里换成月亮)→ 舞台光影变量(绑到 .cy-scene 的 CSS 变量):
+ * 投影方向与光源左右相反,太阳越低影子越长、越暖;高度角 ≤ 0 时不投影,只剩夜色。
+ * moon=true 时冷色补光、亮度减半 —— 月光照不出正午那种硬影子。
+ */
+export const stageLight = (altitude, azimuth, { moon = false } = {}) => {
+  const alt = Number(altitude)
+  const p = projectBody(altitude, azimuth)
+  const lit = Number.isFinite(alt) ? Math.max(0, Math.min(1, alt / 12)) : 0
+  const low = Number.isFinite(alt) ? Math.max(0, Math.min(1, 1 - alt / 32)) : 1
+  // strength 只管刚出地平线那几个度:太阳贴地时投影还没法从画面底部伸出来
+  const strength = Number.isFinite(alt) ? Math.max(0, Math.min(1, alt / 6)) : 0
+  const side = (p.x - 50) / 50
+  const reach = (moon ? 22 : 56) * (0.22 + 0.78 * low) * strength
+  // 封顶 0.62:再暗就看不出是画框里的夜景了
+  const night = 0.62 * Math.max(0, Math.min(1, -(Number.isFinite(alt) ? alt : 0) / 14))
+  return {
+    '--cy-sh-x': `${(-side * reach * 0.85).toFixed(1)}px`,
+    '--cy-sh-y': `${(3 + reach * 0.35).toFixed(1)}px`,
+    '--cy-sh-blur': `${(3 + low * 5).toFixed(1)}px`,
+    '--cy-sh-a': (0.1 + (moon ? 0.08 : 0.22) * lit).toFixed(2),
+    '--cy-light-x': `${p.x.toFixed(1)}%`,
+    '--cy-light-y': `${Math.max(0, Math.min(100, p.y)).toFixed(1)}%`,
+    '--cy-warm-a': (strength * (0.25 + 0.75 * low) * (moon ? 0.08 : 0.3)).toFixed(2),
+    '--cy-night': night.toFixed(2),
+  }
+}
+
 // 天空按太阳高度角分档:深夜 → 晨昏 → 日出/日落 → 金光 → 白昼。
 // 文字色不在档位里插值——底色跨过中间灰时两套都会糊,改为按底色亮度二选一。
 const SKY_STOPS = [
