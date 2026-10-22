@@ -172,7 +172,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 18. **全局 UI 样式统一(强制)**:EP 组件(dialog/message/popper/button/tag/badge/input)配色/圆角/尺寸/z-index 一律由 `main.css` 覆写,**禁止 scoped 重复定义**;命令式 API 样式已在 `main.js` 引入(新增调用先确认,否则裸 DOM 不可见);**弹窗不依赖全局 `width:fit-content`**,长文弹窗按 UI 提示词 §18a 限宽收高,必要时 `append-to-body`(踩坑速查 §3.15/§3.25)。
 19. **按钮/标签/角标/圆角**:主/次/幽灵/危险四类(浅深色不共用色值)、el-tag 半透明磨砂、el-badge 半透明黑、圆角 button 12 / input 10 / card+dialog 14;完整值见 UI 提示词 §18a。
 20. **页面规范(强制)**:根容器 `class="page"`(禁 scoped 覆写 max-width/margin/padding);页面级 H1/H2 移除,分区标题 `.section-label`;工具栏 `class="page-toolbar card"`(`.tb-left` size=small、`.tb-right` gap 8px);多选 `.pick-badge` 圆标+描边(**禁左上 checkbox**)。详见 UI 提示词 §11b。
-21. **位图资产(强制)**:装饰图放 `frontend/src/assets/` 并 ESM 导入(内容哈希,nginx 长缓存),**不放 `public/`**;宽度按渲染 2 倍封顶,噪点图先 3×3 中值滤波,输出渐进 JPEG。例外:URL 存 DB 的演示素材走 `frontend/public/`。**`public/` 目录名不得与 SPA 路由同名**(`public/tools/` → `dist/tools/` 让 `/tools` 403;导出放 `public/toolbox-data/`)。
+21. **位图资产(强制)**:装饰图放 `frontend/src/assets/` 并 ESM 导入(内容哈希,nginx 长缓存),**不放 `public/`**;宽度按渲染 2 倍封顶,噪点图先 3×3 中值滤波,输出渐进 JPEG。例外:URL 存 DB 的演示素材走 `frontend/public/`;咔哒发布页整屏截图按固定路径放 `frontend/public/kada-media/`(重截覆盖同名文件);像素字体子集化 woff2 放 `src/assets/fonts/`。chillyice 舞台位图由 `scripts/art/chillyice_paint.py` 生成,换 AI 出图只覆盖同名 webp。**`public/` 目录名不得与 SPA 路由同名**(`public/tools/` → `dist/tools/` 让 `/tools` 403;导出放 `public/toolbox-data/`)。
 22. **提示文案不写实现(强制,后端同守)**:用户可见文案、`BizException` 消息、`@Operation` 摘要(`/doc.html` 公开)**只讲用户能做什么/发生了什么**,不写库表字段/配置键/内部枚举码/内部节律。机制细节归注释与日志。
 23. **富文本必须消毒(强制)**:用户可写内容渲染 HTML 一律经 `utils/markdown.js` 的 `renderMarkdown()`(marked + DOMPurify)再 `v-html`;**禁止把 `marked.parse` 直接给 `v-html`**,`marked` 只允许在该文件导入;守门 `utils/htmlSink.spec.js`。
 
@@ -185,8 +185,8 @@ cd frontend; npm run lint; npx vitest run; npm run build
 ## 验证基线
 
 - 后端全绿:`.\mvnw.cmd -B clean package`(65 tests,纯逻辑不起 Spring)。
-- 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(447 passed)+ `npm run format:check`(已知 `styles/main.css` / `views/BitPouch.vue` 两处历史未格式化,不属新增改动)。
-- 构建:入口 chunk 基线 **489.66KB / gzip 201.58KB**(V10.72);**vite 报的是字符数不是字节数**,别拿 `ls -la` 比;历史数字见 变更归档。
+- 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(451 passed)+ `npm run format:check`(已知 `styles/main.css` / `views/BitPouch.vue` 两处历史未格式化,不属新增改动)。
+- 构建:入口 chunk 基线 **491.67KB / gzip 202.69KB**(V10.73);**vite 报的是字符数不是字节数**,别拿 `ls -la` 比;历史数字见 变更归档。
 - 一致性:`bash scripts/doc-drift-check.sh` 全 [OK];`gen-code-map.sh --check`、`doc-index.sh --check` 无漂移。
 - 接口测试在仓库外 `..\autotest_framework`(`pytest -m api`,37 passed)。
 
