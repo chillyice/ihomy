@@ -6,6 +6,13 @@
     <span class="traffic-hint">{{ $t('ops.trafficHint') }}</span>
   </div>
   <div v-loading="trafficLoading">
+    <h4 class="ops-section-title">{{ $t('ops.productTitle') }}</h4>
+    <div class="stats-grid product-grid">
+      <div v-for="c in productCards" :key="c.key" class="stat-card card">
+        <div class="stat-name">{{ c.name }}</div>
+        <div class="stat-num">{{ c.value }}</div>
+      </div>
+    </div>
     <div v-if="traffic" class="stats-grid traffic-grid">
       <div
         v-for="c in trafficCards"
@@ -177,6 +184,25 @@ const emit = defineEmits(['navigate-trace'])
 const traffic = ref(null)
 const trafficLoading = ref(false)
 const trafficFilter = reactive({ startDate: '', endDate: '' })
+const productStats = ref({})
+// 产品落地页(咔哒/比特口袋)访问与下载:访问=页面打点,下载=/files 直链安装包;与访问统计同源同日期范围
+const productCards = computed(() =>
+  [
+    { key: 'kada', nameKey: 'productKada' },
+    { key: 'bit_pouch', nameKey: 'productBitPouch' },
+  ].flatMap((p) => [
+    {
+      key: p.key + '-views',
+      name: `${t('ops.' + p.nameKey)} · ${t('ops.productViews')}`,
+      value: productStats.value[p.key]?.views ?? 0,
+    },
+    {
+      key: p.key + '-downloads',
+      name: `${t('ops.' + p.nameKey)} · ${t('ops.productDownloads')}`,
+      value: productStats.value[p.key]?.downloads ?? 0,
+    },
+  ]),
+)
 const trafficCards = [
   { key: 'total', name: t('ops.trafficTotal') },
   { key: 'failed', name: t('ops.trafficFailed') },
@@ -211,10 +237,13 @@ const tTooltipStyle = computed(() => {
 const loadTraffic = async () => {
   trafficLoading.value = true
   try {
-    traffic.value = await opsApi.trafficStats({
+    const params = {
       startDate: trafficFilter.startDate || null,
       endDate: trafficFilter.endDate || null,
-    })
+    }
+    const [res, products] = await Promise.all([opsApi.trafficStats(params), opsApi.productStats(params)])
+    traffic.value = res
+    productStats.value = Object.fromEntries((products.products || []).map((p) => [p.key, p]))
   } finally {
     trafficLoading.value = false
   }
@@ -427,6 +456,10 @@ onMounted(loadTraffic)
 .traffic-grid {
   grid-template-columns: repeat(6, 1fr);
 }
+.product-grid {
+  grid-template-columns: repeat(4, 1fr);
+  margin-bottom: 20px;
+}
 .traffic-hint {
   font-size: 12px;
   color: var(--color-text-secondary);
@@ -434,6 +467,9 @@ onMounted(loadTraffic)
 @media (max-width: 768px) {
   .traffic-grid {
     grid-template-columns: repeat(3, 1fr);
+  }
+  .product-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 </style>

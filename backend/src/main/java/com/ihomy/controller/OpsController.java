@@ -111,6 +111,15 @@ public class OpsController {
         return Result.success(opsService.trafficEntries(startDate, endDate, hour, path, user, ip, type, sort));
     }
 
+    @Operation(summary = "咔哒 / 比特口袋访问与下载统计(扫 access 日志,上限 14 天;下载仅计 ihomy 直链安装包)")
+    @RequirePermission("ops:view")
+    @GetMapping("/product/stats")
+    public Result<Map<String, Object>> productStats(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return Result.success(opsService.productStats(startDate, endDate));
+    }
+
     @Operation(summary = "详细日志:按 tid 检索 access/server/thirdparty 三类日志文件(缺省查当天,可按来源/级别过滤)")
     @RequirePermission("ops:view")
     @GetMapping("/logs/trace")

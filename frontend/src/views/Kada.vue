@@ -513,6 +513,8 @@ onMounted(() => {
   document.title = t('kada.docTitle')
   syncHtmlTheme()
   startLogoLoop()
+  // 访问打点:只在 access 日志留痕供运维统计,失败静默(离线/拦截都不影响页面)
+  fetch('/api/public/page-view?page=kada', { method: 'POST', keepalive: true }).catch(() => {})
 })
 
 onBeforeUnmount(() => {

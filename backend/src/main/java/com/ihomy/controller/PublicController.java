@@ -28,6 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -147,6 +148,16 @@ public class PublicController {
             }
         } catch (Exception ignored) {}
         return null;
+    }
+
+    /**
+     * 落地页访问打点(咔哒 / 比特口袋):只留一条 access 日志供运维统计,不落库、不返回数据。
+     * 用 POST 是为了避开 PWA 对 /api GET 的缓存(缓存命中就不再到后端,访问数会漏)。
+     */
+    @Operation(summary = "产品落地页访问打点(仅用于访问统计)")
+    @PostMapping("/page-view")
+    public Result<Void> pageView(@RequestParam String page) {
+        return Result.success();
     }
 
     @Operation(summary = "首页聚合（支持 ?hid= 混淆ID / ?home_id= 指定家庭）")

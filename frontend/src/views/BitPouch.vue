@@ -373,6 +373,8 @@ onMounted(() => {
   // 独立页整屏渲染,根元素也得跟着换色(滚动条/橡皮筋区,见样式里的 :global 段);
   // 类在挂载/卸载时增删,保证这份 chunk 的规则不会漏给 ihomy 其他页面。
   document.documentElement.classList.add('bitpouch-page')
+  // 访问打点:只在 access 日志留痕供运维统计,失败静默(离线/拦截都不影响页面)
+  fetch('/api/public/page-view?page=bit_pouch', { method: 'POST', keepalive: true }).catch(() => {})
 })
 onBeforeUnmount(() => {
   document.title = 'ihomy'
