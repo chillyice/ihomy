@@ -18,6 +18,7 @@ import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.ActivityFeedService;
 import com.ihomy.service.HomeStatsService;
 import com.ihomy.service.MultiFamilyService;
+import com.ihomy.service.ProductStatService;
 import com.ihomy.service.SunService;
 import com.ihomy.service.WeatherService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -26,6 +27,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -33,6 +37,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.net.URI;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -70,6 +75,7 @@ public class PublicController {
     private final MultiFamilyService multiFamilyService;
     private final WeatherService weatherService;
     private final SunService sunService;
+    private final ProductStatService productStatService;
     private final StringRedisTemplate redis;
     private final ObjectMapper mapper;
 
@@ -151,13 +157,32 @@ public class PublicController {
     }
 
     /**
-     * 落地页访问打点(咔哒 / 比特口袋):只留一条 access 日志供运维统计,不落库、不返回数据。
+     * 落地页访问打点(咔哒 / 比特口袋):落一条日统计(供运维页),不返回数据。
      * 用 POST 是为了避开 PWA 对 /api GET 的缓存(缓存命中就不再到后端,访问数会漏)。
      */
     @Operation(summary = "产品落地页访问打点(仅用于访问统计)")
     @PostMapping("/page-view")
     public Result<Void> pageView(@RequestParam String page) {
+        productStatService.recordView(page);
         return Result.success();
+    }
+
+    /**
+     * 产品安装包下载:先计数再 302 到 /files 直链,文件仍由 nginx 静态下发(不经过 JVM)。
+     * 前端下载链接统一走这里——nginx 直出的下载请求不进后端日志,按日志统计永远是 0。
+     */
+    @Operation(summary = "产品安装包下载(计数后跳转直链)")
+    @GetMapping("/product/download")
+    public ResponseEntity<Void> productDownload(@RequestParam("page") String page,
+                                                @RequestParam("file") String file) {
+        if (!ProductStatService.PRODUCTS.contains(page) || !ProductStatService.isInstaller(file)) {
+            throw new BizException(ResultCode.BAD_REQUEST);
+        }
+        productStatService.recordDownload(page);
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(URI.create("/files/" + page + "/" + file))
+                .cacheControl(CacheControl.noStore())
+                .build();
     }
 
     @Operation(summary = "首页聚合（支持 ?hid= 混淆ID / ?home_id= 指定家庭）")

@@ -372,7 +372,7 @@ exit
 # 用数据库 root 执行 schema.sql（建库、建表、创建应用账号 ihomy 并授权）
 mysql -uroot -p --default-character-set=utf8mb4 < /opt/ihomy/backend/src/main/resources/schema.sql
 ```
-该脚本由数据库 root 执行一次，会创建 `ihomy` 库、**81 张表**（`sys_` 系统与账号权限 / `report_` 报表日志 / `family_` 家庭事务 / `content_` 内容数据四前缀）、应用专用账号 `ihomy`（仅 DML 权限）、默认首页模块（含聊天室 `chat` 行）、管理员 `admin` 与运维账号 `ops`（初始密码为开发安全版，见下方警告）。
+该脚本由数据库 root 执行一次，会创建 `ihomy` 库、**82 张表**（`sys_` 系统与账号权限 / `report_` 报表日志 / `family_` 家庭事务 / `content_` 内容数据四前缀）、应用专用账号 `ihomy`（仅 DML 权限）、默认首页模块（含聊天室 `chat` 行）、管理员 `admin` 与运维账号 `ops`（初始密码为开发安全版，见下方警告）。
 
 > **⚠️ 生产必须改密（schema.sql 为开发安全版）**：入库版 schema.sql 内置的是本机 Docker 开发固定凭证（ihomy 账号开发密码 + admin/ops 开发专用 BCrypt 哈希，明文只在维护者本地文档）。生产部署后立即执行：
 > ```bash
@@ -382,7 +382,7 @@ mysql -uroot -p --default-character-set=utf8mb4 < /opt/ihomy/backend/src/main/re
 > - external.yml 的 `spring.datasource.password` 同步填同一新密码
 > - admin/ops 首次登录后立即在页面改密
 
-> 校验建表结果：`mysql -uroot -p ihomy -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='ihomy';"` 应为 **81**。
+> 校验建表结果：`mysql -uroot -p ihomy -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='ihomy';"` 应为 **82**。
 
 ### 3.5 构建后端（ihomy 用户）
 
@@ -829,7 +829,7 @@ powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1
 | 前端访问 | 浏览器 `https://你的域名` | 登录页 |
 | 登录 | 邮箱 + 密码 + 图形验证码 | 进入首页 |
 | 运维登录 | `ops` + 密码（初始密码为开发安全版，生产部署后已按 3.4 改密则用新密码） | 进入运维页 |
-| 数据库 | `mysql -uihomy -p ihomy -e "show tables;"` | 81 张表 |
+| 数据库 | `mysql -uihomy -p ihomy -e "show tables;"` | 82 张表 |
 | Redis | `docker exec ihomy-redis redis-cli -a '<Redis密码>' --no-auth-warning ping`(不带 `-a` 应报 `NOAUTH`) | PONG |
 | Redis 端口 | 从外网 `nc -vz <公网IP> 6379` | 拒绝连接(只绑回环) |
 | Nginx | `sudo nginx -t` | syntax ok |
@@ -1176,7 +1176,7 @@ journalctl -u ihomy-backup.service -n 50       # 查看本次结果
 ```bash
 # 演练:导入 ihomy_drill,核对表数与关键行数后删除
 sudo /opt/ihomy/scripts/prod-restore.sh /var/backups/ihomy/db/ihomy-2026-10-05_0300.sql.gz ihomy_drill
-mysql -uroot -N -B -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='ihomy_drill';"   # 应为 81
+mysql -uroot -N -B -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='ihomy_drill';"   # 应为 82
 mysql -uroot -e "DROP DATABASE ihomy_drill;"
 
 # 真恢复:目标库写 ihomy(脚本会先把当前库自动导出到 pre-restore-*.sql.gz 再覆盖)
@@ -1194,7 +1194,7 @@ DB 里的文件 URL(`/files/...`)与物理路径解耦,目录还原后即可访�
 
 | 日期 | 范围 | 结论 | 证据 |
 |------|------|------|------|
-| 2026-10-05 | 本机开发库(81 表/近 500KB 转储) | 通过:演练库表数 81、抽查 `sys_user`/`sys_auth`/`sys_role_auth`/`sys_home_module`/`content_blog`/`report_system`/`sys_parameter`/`family_item` 行数与源库一致,`admin` 账号值一致 | `test/reports/2026-10-05_V10.18_回归_测试报告.md` |
+| 2026-10-05 | 本机开发库(表数 81/近 500KB 转储) | 通过:演练库表数 81(当时口径)、抽查 `sys_user`/`sys_auth`/`sys_role_auth`/`sys_home_module`/`content_blog`/`report_system`/`sys_parameter`/`family_item` 行数与源库一致,`admin` 账号值一致 | `test/reports/2026-10-05_V10.18_回归_测试报告.md` |
 
 > **建议**:每次改动脚本或更换服务器后重跑一次演练,并把结论追加到上表。
 

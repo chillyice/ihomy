@@ -224,7 +224,8 @@ import { BIT_POUCH_DESKTOP_TOOL_COUNT, BIT_POUCH_REPO, BIT_POUCH_VERSION, pouchM
 const version = BIT_POUCH_VERSION
 const repoUrl = BIT_POUCH_REPO
 const releasesUrl = `${repoUrl}/releases`
-const fileUrl = (name) => `/files/bit_pouch/${name}`
+// 直链前多一跳后端:计数后 302 到 /files/bit_pouch/(文件仍由 nginx 静态下发),下载数才统计得到
+const fileUrl = (name) => `/api/public/product/download?page=bit_pouch&file=${encodeURIComponent(name)}`
 
 // 主 CTA:Windows 安装版(与下载表第一行一致)
 const primaryAsset = `bit_pouch_${version}_x64-setup.exe`

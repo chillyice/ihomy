@@ -2287,3 +2287,20 @@ INSERT IGNORE INTO `sys_oss_component` (`name`, `component_type`, `package_ref`,
 UPDATE `sys_oss_component` SET `managed_by` = 'RENOVATE'
  WHERE `component_type` = 'NPM' AND `package_ref` IN ('yaml', 'smol-toml');
 
+
+-- ------------------------------------------------------------
+-- V10.75 产品访问与下载日统计(2026-10-27)
+--   运维页「咔哒 / 比特口袋」统计改读本表(原口径扫 access 日志:
+--   nginx /files 静态直出,下载请求不进后端日志,下载数恒为 0)。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `report_product_stat` (
+  `id`           BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `stat_date`    DATE        NOT NULL COMMENT '统计日期',
+  `product_code` VARCHAR(32) NOT NULL COMMENT '产品键:kada/bit_pouch',
+  `views`        BIGINT      NOT NULL DEFAULT 0 COMMENT '落地页访问次数',
+  `downloads`    BIGINT      NOT NULL DEFAULT 0 COMMENT '安装包下载次数',
+  `created_at`   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_date_product` (`stat_date`, `product_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='产品访问与下载日统计';

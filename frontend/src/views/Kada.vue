@@ -243,8 +243,9 @@ const fileSize = '14.0 MB'
 const repoUrl = 'https://github.com/chillyice/Kada'
 const releasesUrl = `${repoUrl}/releases`
 const assetUrl = (name) => `${repoUrl}/releases/download/v${version}/${name}`
-const exeUrl = '/files/kada/kada.exe'
-const fileUrl = (name) => `/files/kada/${name}`
+// 直链前多一跳后端:计数后 302 到 /files/kada/(文件仍由 nginx 静态下发),下载数才统计得到
+const exeUrl = `/api/public/product/download?page=kada&file=kada.exe`
+const fileUrl = (name) => `/api/public/product/download?page=kada&file=${encodeURIComponent(name)}`
 
 const { t } = useI18n()
 const rootEl = ref(null)

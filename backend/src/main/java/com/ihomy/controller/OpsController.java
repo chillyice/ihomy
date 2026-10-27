@@ -8,6 +8,7 @@ import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.AiStatsService;
 import com.ihomy.service.OpsService;
 import com.ihomy.service.ParameterService;
+import com.ihomy.service.ProductStatService;
 import com.ihomy.service.WeatherService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,6 +37,7 @@ import java.util.Map;
 public class OpsController {
 
     private final OpsService opsService;
+    private final ProductStatService productStatService;
     private final WeatherService weatherService;
     private final AiStatsService aiStatsService;
     private final ParameterService parameterService;
@@ -111,13 +113,12 @@ public class OpsController {
         return Result.success(opsService.trafficEntries(startDate, endDate, hour, path, user, ip, type, sort));
     }
 
-    @Operation(summary = "咔哒 / 比特口袋访问与下载统计(扫 access 日志,上限 14 天;下载仅计 ihomy 直链安装包)")
+    @Operation(summary = "咔哒 / 比特口袋访问与下载统计(默认全部历史,可按日/周/月/年查看)")
     @RequirePermission("ops:view")
     @GetMapping("/product/stats")
     public Result<Map<String, Object>> productStats(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        return Result.success(opsService.productStats(startDate, endDate));
+            @RequestParam(required = false, defaultValue = "all") String range) {
+        return Result.success(productStatService.stats(range));
     }
 
     @Operation(summary = "详细日志:按 tid 检索 access/server/thirdparty 三类日志文件(缺省查当天,可按来源/级别过滤)")

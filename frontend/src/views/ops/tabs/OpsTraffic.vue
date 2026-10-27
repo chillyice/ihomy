@@ -6,13 +6,6 @@
     <span class="traffic-hint">{{ $t('ops.trafficHint') }}</span>
   </div>
   <div v-loading="trafficLoading">
-    <h4 class="ops-section-title">{{ $t('ops.productTitle') }}</h4>
-    <div class="stats-grid product-grid">
-      <div v-for="c in productCards" :key="c.key" class="stat-card card">
-        <div class="stat-name">{{ c.name }}</div>
-        <div class="stat-num">{{ c.value }}</div>
-      </div>
-    </div>
     <div v-if="traffic" class="stats-grid traffic-grid">
       <div
         v-for="c in trafficCards"
@@ -119,6 +112,35 @@
     </template>
   </div>
 
+  <!-- 产品统计(咔哒 / 比特口袋):独立区域,默认全部历史,可按日/周/月/年查看 -->
+  <div v-loading="productLoading" class="product-section">
+    <h4 class="ops-section-title">{{ $t('ops.productTitle') }}</h4>
+    <div class="filter-row product-filter">
+      <el-radio-group v-model="productRange" size="small" @change="loadProducts">
+        <el-radio-button v-for="r in productRanges" :key="r.value" :value="r.value">{{ $t(r.labelKey) }}</el-radio-button>
+      </el-radio-group>
+      <span class="traffic-hint">{{ productRangeHint }}</span>
+    </div>
+    <div class="stats-grid product-grid">
+      <div v-for="c in productCards" :key="c.key" class="stat-card card">
+        <div class="stat-name">{{ c.name }}</div>
+        <div class="stat-num">{{ c.value }}</div>
+      </div>
+    </div>
+    <el-table v-if="productBuckets.length" :data="productBuckets" size="small" stripe border class="path-table product-table">
+      <el-table-column prop="period" :label="$t('ops.productPeriod')" width="150" />
+      <el-table-column v-for="p in productDefs" :key="p.key" :label="$t('ops.' + p.nameKey)" align="center">
+        <el-table-column :label="$t('ops.productViews')" width="110" align="center">
+          <template #default="{ row }">{{ row.items[p.key]?.views ?? 0 }}</template>
+        </el-table-column>
+        <el-table-column :label="$t('ops.productDownloads')" width="110" align="center">
+          <template #default="{ row }">{{ row.items[p.key]?.downloads ?? 0 }}</template>
+        </el-table-column>
+      </el-table-column>
+    </el-table>
+    <el-empty v-else :description="$t('ops.traceEmpty')" :image-size="40" />
+  </div>
+
   <!-- 下钻明细:卡片/柱状图/接口行点击 → 该口径下的原始访问记录(TID 可跳详细日志) -->
   <el-dialog v-model="detail.visible" :title="detail.title" class="dialog-xl" append-to-body>
     <div v-loading="detail.loading" class="traffic-detail">
@@ -184,25 +206,44 @@ const emit = defineEmits(['navigate-trace'])
 const traffic = ref(null)
 const trafficLoading = ref(false)
 const trafficFilter = reactive({ startDate: '', endDate: '' })
-const productStats = ref({})
-// 产品落地页(咔哒/比特口袋)访问与下载:访问=页面打点,下载=/files 直链安装包;与访问统计同源同日期范围
+const productStats = ref(null)
+const productLoading = ref(false)
+const productRange = ref('all')
+const productRanges = [
+  { value: 'all', labelKey: 'ops.productRangeAll' },
+  { value: 'day', labelKey: 'ops.productRangeDay' },
+  { value: 'week', labelKey: 'ops.productRangeWeek' },
+  { value: 'month', labelKey: 'ops.productRangeMonth' },
+  { value: 'year', labelKey: 'ops.productRangeYear' },
+]
+const productDefs = [
+  { key: 'kada', nameKey: 'productKada' },
+  { key: 'bit_pouch', nameKey: 'productBitPouch' },
+]
+// 产品统计(咔哒/比特口袋):访问=落地页打点,下载=安装包下载接口;独立于访问统计的日期筛选
 const productCards = computed(() =>
-  [
-    { key: 'kada', nameKey: 'productKada' },
-    { key: 'bit_pouch', nameKey: 'productBitPouch' },
-  ].flatMap((p) => [
-    {
-      key: p.key + '-views',
-      name: `${t('ops.' + p.nameKey)} · ${t('ops.productViews')}`,
-      value: productStats.value[p.key]?.views ?? 0,
-    },
-    {
-      key: p.key + '-downloads',
-      name: `${t('ops.' + p.nameKey)} · ${t('ops.productDownloads')}`,
-      value: productStats.value[p.key]?.downloads ?? 0,
-    },
-  ]),
+  productDefs.flatMap((p) => {
+    const stat = productStats.value?.products?.find((x) => x.key === p.key)
+    return [
+      {
+        key: p.key + '-views',
+        name: `${t('ops.' + p.nameKey)} · ${t('ops.productViews')}`,
+        value: stat?.views ?? 0,
+      },
+      {
+        key: p.key + '-downloads',
+        name: `${t('ops.' + p.nameKey)} · ${t('ops.productDownloads')}`,
+        value: stat?.downloads ?? 0,
+      },
+    ]
+  }),
 )
+const productBuckets = computed(() => productStats.value?.buckets || [])
+const productRangeHint = computed(() => {
+  const d = productStats.value
+  if (!d) return ''
+  return d.startDate ? `${d.startDate} ~ ${d.endDate}` : d.endDate
+})
 const trafficCards = [
   { key: 'total', name: t('ops.trafficTotal') },
   { key: 'failed', name: t('ops.trafficFailed') },
@@ -241,11 +282,19 @@ const loadTraffic = async () => {
       startDate: trafficFilter.startDate || null,
       endDate: trafficFilter.endDate || null,
     }
-    const [res, products] = await Promise.all([opsApi.trafficStats(params), opsApi.productStats(params)])
-    traffic.value = res
-    productStats.value = Object.fromEntries((products.products || []).map((p) => [p.key, p]))
+    traffic.value = await opsApi.trafficStats(params)
   } finally {
     trafficLoading.value = false
+  }
+}
+
+/** 产品统计(咔哒/比特口袋):按 全部/日/周/月/年 拉区间合计与分桶 */
+const loadProducts = async () => {
+  productLoading.value = true
+  try {
+    productStats.value = await opsApi.productStats({ range: productRange.value })
+  } finally {
+    productLoading.value = false
   }
 }
 
@@ -318,7 +367,10 @@ const jumpToTrace = (row) => {
   emit('navigate-trace', { tid: row.tid, date: (row.time || '').slice(0, 10) })
 }
 
-onMounted(loadTraffic)
+onMounted(() => {
+  loadTraffic()
+  loadProducts()
+})
 </script>
 
 <style scoped>
@@ -458,7 +510,15 @@ onMounted(loadTraffic)
 }
 .product-grid {
   grid-template-columns: repeat(4, 1fr);
-  margin-bottom: 20px;
+  margin-bottom: 12px;
+}
+.product-section {
+  margin-top: 24px;
+  padding-top: 4px;
+  border-top: 1px solid var(--color-border);
+}
+.product-filter {
+  margin-bottom: 12px;
 }
 .traffic-hint {
   font-size: 12px;

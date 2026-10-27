@@ -1627,6 +1627,24 @@ CREATE TABLE `report_alert` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统报表表(同类异常聚合预警)';
 
 -- ------------------------------------------------------------
+-- 48d. report_product_stat 产品访问与下载日统计(V10.75):每个产品每天一行
+--      views=落地页打点次数,downloads=安装包下载计数接口命中次数
+--      与访问日志解耦:nginx /files 静态直出,下载请求不进后端日志,日志口径统计不到
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `report_product_stat`;
+CREATE TABLE `report_product_stat` (
+  `id`           BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `stat_date`    DATE        NOT NULL COMMENT '统计日期',
+  `product_code` VARCHAR(32) NOT NULL COMMENT '产品键:kada/bit_pouch',
+  `views`        BIGINT      NOT NULL DEFAULT 0 COMMENT '落地页访问次数',
+  `downloads`    BIGINT      NOT NULL DEFAULT 0 COMMENT '安装包下载次数',
+  `created_at`   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_date_product` (`stat_date`, `product_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='产品访问与下载日统计';
+
+-- ------------------------------------------------------------
 -- 49. 系统参数表(V5.6续):name/value 键值对,存 AES 加密盐值等
 --     盐值首次启动自动生成(16 字节 Base64),用于解密外挂文件中的 ENC(...) 密文
 -- ------------------------------------------------------------

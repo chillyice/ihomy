@@ -101,27 +101,6 @@ class OpsServiceTest {
     }
 
     @Test
-    void productStatsCountsPageViewsAndInstallerDownloads() throws IOException {
-        writeTodayLog(tempDir, List.of(
-                // 咔哒:1 次访问 + 2 次安装包下载
-                line(T + "09:00:00.123", "tid0000000000bb01", "POST /api/public/page-view?page=kada user=anonymous ip=10.0.0.1 status=200 code=0 cost=5ms req=- resp=-"),
-                line(T + "09:01:00.123", "tid0000000000bb02", "GET /api/files/kada/kada.exe user=anonymous ip=10.0.0.1 status=206 code=- cost=900ms req=- resp=-"),
-                // 更新清单轮询不算下载
-                line(T + "09:02:00.123", "tid0000000000bb03", "GET /api/files/kada/updates/latest.json user=anonymous ip=10.0.0.2 status=200 code=- cost=5ms req=- resp=-"),
-                line(T + "09:03:00.123", "tid0000000000bb04", "GET /api/files/kada/updates/Kada_1.1.0_amd64.AppImage user=anonymous ip=10.0.0.2 status=200 code=- cost=12000ms req=- resp=-"),
-                // 比特口袋:1 次访问 + 1 次下载;404 的包不算
-                line(T + "09:04:00.123", "tid0000000000bb05", "POST /api/public/page-view?page=bit_pouch user=anonymous ip=10.0.0.3 status=200 code=0 cost=5ms req=- resp=-"),
-                line(T + "09:05:00.123", "tid0000000000bb06", "GET /api/files/bit_pouch/bit_pouch_1.1.0_x64-setup.exe user=anonymous ip=10.0.0.3 status=200 code=- cost=900ms req=- resp=-"),
-                line(T + "09:06:00.123", "tid0000000000bb07", "GET /api/files/bit_pouch/bit_pouch_1.1.0_web.zip user=anonymous ip=10.0.0.3 status=404 code=- cost=5ms req=- resp=-")));
-
-        List<Map<String, Object>> products = (List<Map<String, Object>>) serviceWithLogDir(tempDir)
-                .productStats(null, null).get("products");
-        assertThat(products).hasSize(2);
-        assertThat(products.get(0)).containsEntry("key", "kada").containsEntry("views", 1L).containsEntry("downloads", 2L);
-        assertThat(products.get(1)).containsEntry("key", "bit_pouch").containsEntry("views", 1L).containsEntry("downloads", 1L);
-    }
-
-    @Test
     void entriesKeepsNewest200AndFlagsTruncation() throws IOException {
         List<String> lines = new java.util.ArrayList<>();
         for (int i = 0; i < 250; i++) {

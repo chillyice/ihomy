@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.ProductStatMapper">
+
+    <!-- 原子累加:唯一键 uk_date_product 命中则自增,计数并发安全(不做「先查再改」) -->
+    <insert id="increment">
+        INSERT INTO report_product_stat (stat_date, product_code, views, downloads)
+        VALUES (CURDATE(), #{product}, #{views}, #{downloads})
+        ON DUPLICATE KEY UPDATE
+            views = views + VALUES(views),
+            downloads = downloads + VALUES(downloads)
+    </insert>
+
+    <!-- 时间桶聚合:fmt 为 %Y-%m-%d(按天)或 %Y-%m(按月),由 Service 决定 -->
+    <select id="selectBuckets" resultType="java.util.HashMap">
+        SELECT DATE_FORMAT(stat_date, #{fmt}) AS period, product_code AS productCode,
+               SUM(views) AS views, SUM(downloads) AS downloads
+        FROM report_product_stat
+        WHERE stat_date &lt;= #{end}
+        <if test="start != null">
+            AND stat_date &gt;= #{start}
+        </if>
+        GROUP BY period, product_code
+        ORDER BY period
+    </select>
+
+    <select id="selectMinDate" resultType="java.time.LocalDate">
+        SELECT MIN(stat_date) FROM report_product_stat
+    </select>
+
+</mapper>

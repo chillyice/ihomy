@@ -73,7 +73,7 @@ Nginx 静态根指向 `frontend/dist`,构建即生效。
 
 - **root 仅初始化**:`mysql -uroot -p < schema.sql`(建库/建表/建账号/种子),只执行一次;本地 `.\scripts\start-db.ps1`(Docker 首启自动导入)。**业务运行用 `ihomy` 账号**(仅 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`,无 DDL),建 `localhost` 与 `%` 两个 host。
 - 生产 MySQL `validate_password` MEDIUM:密码须含特殊字符(避开 `' " \ $ |`,建议 `!@%^&*-_+=.`),改密顺序见 踩坑速查 §2.7。
-- **81 张表**,前缀:`sys_` 25(系统/账号/权限/配置/存储)、`report_` 4(报表/日志)、`family_` 30(家庭事务)、`content_` 21(内容数据)、`game_` 1(games 域)。完整清单见 需求 §6.2。
+- **82 张表**,前缀:`sys_` 25(系统/账号/权限/配置/存储)、`report_` 5(报表/日志)、`family_` 30(家庭事务)、`content_` 21(内容数据)、`game_` 1(games 域)。完整清单见 需求 §6.2。
   - 命名:家庭事务 `family_`;内容 `content_`;账号/权限/配置/存储 `sys_`;报表/日志 `report_`;
   - 游戏域顶层前缀 `game_`,格式 `game_<code>_<module>_<entity>`(模块层仅当 ≥3 张表/独立聚合根时才建);注册表 `game_info`,小游戏页只读注册表,**加游戏=插一行不改组件**。家圃时光 V2 已迁独立仓 `home_garden_moments`,本仓只留集成(`game_info` + 游戏库入口)。
 - **结构变更双文件**:同时改 `schema.sql`(全量)与 `migrations.sql`(增量、**幂等**),并按 CI 同路径做空库全量导入实测(`migrations` 跑通 ≠ `schema.sql` 可用,踩坑速查 §7.4)。
@@ -135,6 +135,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 - **工具箱**:元数据唯一来源 `frontend/src/tools/registry.js`;12 个开发者工具(JSON/编码/进制/报文/子网/哈希/随机/时间/正则/文本/运维/JWT)只在 `/bit-pouch/tools/<id>` 维护界面,ihomy 旧 `/tools/<id>` 重定向,registry 标 `toolbox:false`;颜色/单位/图片/文件/PDF 两处入口共用内核。比特口袋在线目录(`tools/bitPouchTools.js`)共 24 项,与 bit_pouch `src/plugins/` 一一对应,另有 URL/UUID/数据格式/HTTP 报文/cURL/IP 段/MQTT 主题 7 项只在线页维护。
 - **天文**:后端 `SolarUtil` 是唯一计算来源(随 `/public/sun-info` 下发),前端 `utils/terminator.js` 只做球面几何渲染,**禁止再移植 NOAA/Meeus**;`/public/sun-info` 只缓存 slots,直射点每次实时算。
 - **独立产品页**:挂 `/kada`、`/bit-pouch`、`/wallpaper`、`/chillyice` 这类页必须加 `meta.standalone`(不套外壳、跳过 `appStore.init()`、401 不顶登录页、自带配色要接管 `html` 根类);**从独立页回站内页要补初始化**(`App.vue` 监听 standalone 变 false 时补 `appStore.init()`/`ensureUserInfo()`),否则首页与家庭名全空(踩坑速查 §3.32/§3.8)。
+- **产品访问/下载统计**:咔哒与比特口袋的访问/下载落 `report_product_stat` 日表(落地页打点 + 安装包下载链接统一走 `GET /public/product/download` 计数后 302 到 `/files`),**禁止按 access 日志统计下载**——nginx `/files/` 静态直出,下载请求不进后端日志(踩坑速查 §7.11)。
 
 ## 后端规范
 
@@ -185,9 +186,9 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 ## 验证基线
 
-- 后端全绿:`.\mvnw.cmd -B clean package`(65 tests,纯逻辑不起 Spring)。
+- 后端全绿:`.\mvnw.cmd -B clean package`(68 tests,纯逻辑不起 Spring)。
 - 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(451 passed)+ `npm run format:check`(已知 `styles/main.css` / `views/BitPouch.vue` 两处历史未格式化,不属新增改动)。
-- 构建:入口 chunk 基线 **491.67KB / gzip 202.69KB**(V10.73);**vite 报的是字符数不是字节数**,别拿 `ls -la` 比;历史数字见 变更归档。
+- 构建:入口 chunk 基线 **492.22KB / gzip 202.89KB**(V10.75);**vite 报的是字符数不是字节数**,别拿 `ls -la` 比;历史数字见 变更归档。
 - 一致性:`bash scripts/doc-drift-check.sh` 全 [OK];`gen-code-map.sh --check`、`doc-index.sh --check` 无漂移。
 - 接口测试在仓库外 `..\autotest_framework`(`pytest -m api`,37 passed)。
 
