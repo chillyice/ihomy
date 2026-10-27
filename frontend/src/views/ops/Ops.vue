@@ -35,6 +35,10 @@
         <OpsAlerts :summary="alertSummary" :active="tab === 'alerts'" @navigate-trace="navigateTrace" @refresh-summary="loadAlertSummary" />
       </el-tab-pane>
 
+      <el-tab-pane v-if="showSystemTabs" :label="$t('ops.kada.title')" name="kada" lazy>
+        <OpsKada :active="tab === 'kada'" />
+      </el-tab-pane>
+
       <el-tab-pane :label="$t('ops.ai')" name="ai" lazy>
         <OpsAi />
       </el-tab-pane>
@@ -62,6 +66,7 @@ import OpsTraffic from './tabs/OpsTraffic.vue'
 import OpsLogs from './tabs/OpsLogs.vue'
 import OpsTrace from './tabs/OpsTrace.vue'
 import OpsAlerts from './tabs/OpsAlerts.vue'
+import OpsKada from './tabs/OpsKada.vue'
 import OpsAi from './tabs/OpsAi.vue'
 import OpsWeather from './tabs/OpsWeather.vue'
 import OpsOss from './tabs/OpsOss.vue'
@@ -105,6 +110,7 @@ onMounted(() => {
   }
   if (route.query.tab === 'traffic') tab.value = 'traffic'
   if (route.query.tab === 'alerts') tab.value = 'alerts'
+  if (route.query.tab === 'kada') tab.value = 'kada'
   loadAlertSummary()
 })
 </script>

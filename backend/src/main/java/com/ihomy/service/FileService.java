@@ -11,6 +11,8 @@ import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -131,6 +133,47 @@ public class FileService {
             }
         } catch (IOException e) {
             log.warn("删除文件失败(忽略): {}", url);
+        }
+    }
+
+    /**
+     * 咔哒社区卡带:人工审核通过后写到 {uploadDir}/kada/snippets/community/{id}.json。
+     * 文件名由服务端生成(数字 id / 固定 index.json),不接受用户传路径;原子写替换。
+     */
+    public String saveKadaSnippet(long id, String json) {
+        return saveKadaCommunityFile(id + ".json", json);
+    }
+
+    /** 社区卡带索引(与官方 index.json 分开,镜像每天覆盖官方索引不会动它)。 */
+    public String saveKadaCommunityIndex(String json) {
+        return saveKadaCommunityFile("index.json", json);
+    }
+
+    /** 下架时删掉卡带文件(索引由审核服务重建);不存在忽略。 */
+    public void deleteKadaSnippet(long id) {
+        try {
+            Files.deleteIfExists(Paths.get(uploadDir, "kada", "snippets", "community", id + ".json"));
+        } catch (IOException e) {
+            log.warn("删除社区卡带文件失败(忽略): id={}", id);
+        }
+    }
+
+    private String saveKadaCommunityFile(String fileName, String json) {
+        try {
+            Path dir = Paths.get(uploadDir, "kada", "snippets", "community");
+            Files.createDirectories(dir);
+            Path tmp = dir.resolve(fileName + ".tmp");
+            Path target = dir.resolve(fileName);
+            Files.writeString(tmp, json, StandardCharsets.UTF_8);
+            try {
+                Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+            return urlPrefix.replaceAll("/+$", "") + "/kada/snippets/community/" + fileName;
+        } catch (IOException e) {
+            log.error("写入社区卡带文件失败: {}", fileName, e);
+            throw new RuntimeException("卡带文件写入失败");
         }
     }
 

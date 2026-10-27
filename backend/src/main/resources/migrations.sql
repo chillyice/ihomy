@@ -2304,3 +2304,33 @@ CREATE TABLE IF NOT EXISTS `report_product_stat` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_date_product` (`stat_date`, `product_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='产品访问与下载日统计';
+
+-- ------------------------------------------------------------
+-- V10.76 咔哒卡带社区发布与人工审核(2026-10-27)
+--   提交内容先落库等审核；通过后写 /files/kada/snippets/community/ 并重建索引。
+--   只加表，不改既有数据；content_json 是规范化后的子集 Config。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `sys_kada_snippet` (
+  `id`                BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `name`              VARCHAR(60)   NOT NULL COMMENT '卡带名称',
+  `description`       VARCHAR(500)  NOT NULL DEFAULT '' COMMENT '一句话说明',
+  `author`            VARCHAR(40)   NOT NULL DEFAULT '匿名' COMMENT '发布者昵称',
+  `tags`              VARCHAR(500)  NOT NULL DEFAULT '[]' COMMENT '标签 JSON 数组',
+  `content_json`      MEDIUMTEXT    NOT NULL COMMENT '规范化后的卡带 JSON',
+  `content_sha256`    CHAR(64)      NOT NULL COMMENT '内容 SHA-256(去重)',
+  `danger_level`      TINYINT       NOT NULL DEFAULT 0 COMMENT '机器判定危险等级:0安全/1低/2中/3高',
+  `findings_json`     VARCHAR(2000) NOT NULL DEFAULT '[]' COMMENT '机器审核发现 JSON 数组',
+  `legal_flags_json`  VARCHAR(1000) NOT NULL DEFAULT '[]' COMMENT '法务关键词命中 JSON 数组',
+  `status`            VARCHAR(16)   NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/APPROVED/REJECTED',
+  `submitter_ip`      VARCHAR(64)   NOT NULL DEFAULT '' COMMENT '提交 IP(限流与追溯)',
+  `reviewer_id`       BIGINT        DEFAULT NULL COMMENT '审核人 ID',
+  `review_note`       VARCHAR(500)  DEFAULT NULL COMMENT '审核备注',
+  `reviewed_at`       DATETIME      DEFAULT NULL COMMENT '审核时间',
+  `published_url`     VARCHAR(500)  DEFAULT NULL COMMENT '上架后的卡带地址',
+  `created_at`        DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '提交时间',
+  `updated_at`        DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_status_created` (`status`, `created_at`),
+  KEY `idx_sha` (`content_sha256`),
+  KEY `idx_ip_created` (`submitter_ip`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='咔哒卡带社区发布与人工审核';

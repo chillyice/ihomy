@@ -73,7 +73,7 @@ Nginx 静态根指向 `frontend/dist`,构建即生效。
 
 - **root 仅初始化**:`mysql -uroot -p < schema.sql`(建库/建表/建账号/种子),只执行一次;本地 `.\scripts\start-db.ps1`(Docker 首启自动导入)。**业务运行用 `ihomy` 账号**(仅 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`,无 DDL),建 `localhost` 与 `%` 两个 host。
 - 生产 MySQL `validate_password` MEDIUM:密码须含特殊字符(避开 `' " \ $ |`,建议 `!@%^&*-_+=.`),改密顺序见 踩坑速查 §2.7。
-- **82 张表**,前缀:`sys_` 25(系统/账号/权限/配置/存储)、`report_` 5(报表/日志)、`family_` 30(家庭事务)、`content_` 21(内容数据)、`game_` 1(games 域)。完整清单见 需求 §6.2。
+- **83 张表**,前缀:`sys_` 26(系统/账号/权限/配置/存储)、`report_` 5(报表/日志)、`family_` 30(家庭事务)、`content_` 21(内容数据)、`game_` 1(games 域)。完整清单见 需求 §6.2。
   - 命名:家庭事务 `family_`;内容 `content_`;账号/权限/配置/存储 `sys_`;报表/日志 `report_`;
   - 游戏域顶层前缀 `game_`,格式 `game_<code>_<module>_<entity>`(模块层仅当 ≥3 张表/独立聚合根时才建);注册表 `game_info`,小游戏页只读注册表,**加游戏=插一行不改组件**。家圃时光 V2 已迁独立仓 `home_garden_moments`,本仓只留集成(`game_info` + 游戏库入口)。
 - **结构变更双文件**:同时改 `schema.sql`(全量)与 `migrations.sql`(增量、**幂等**),并按 CI 同路径做空库全量导入实测(`migrations` 跑通 ≠ `schema.sql` 可用,踩坑速查 §7.4)。
