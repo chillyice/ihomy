@@ -96,6 +96,9 @@ if (-not $FrontendOnly) {
 
   if ($Build) {
     Write-Host '    [Build] 编译打包...'
+    # OneDrive 会给 target 盖 ReadOnly+ReparsePoint，mvn clean 的普通删除会失败（踩坑速查 §1.14）
+    & (Join-Path $PSScriptRoot 'clean-build-target.ps1') -Path (Join-Path $Backend 'target')
+    if ($LASTEXITCODE -ne 0) { Die '清理 backend\target 失败' }
     # mvnw.cmd 在「当前目录」找 .mvn/wrapper（仓库根没有 .mvn，wrapper 在 backend 下），
     # 故必须切到 backend 再调，否则报「找不到 maven-wrapper.properties / 主类 MavenWrapperMain」
     Push-Location -LiteralPath $Backend

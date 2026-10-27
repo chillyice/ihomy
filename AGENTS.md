@@ -38,7 +38,7 @@
 > - 打包 zip 用 `tar -a -c -f out.zip dir`(别用 `Compress-Archive`)。
 > - 写 MySQL 中文:Write 出 UTF-8 无 BOM 的 SQL → `MSYS_NO_PATHCONV=1 docker cp` 进容器 → `docker exec ihomy-mysql mysql --default-character-set=utf8mb4 ihomy -e "source /tmp/x.sql"`。
 > - **`mvnw.cmd` 必须在 `backend` 目录内调用**;后端单实例运行 `C:\Program Files\Java\jdk-21\bin\java.exe -jar target\ihomy-backend.jar`(双实例分流 8080 会偶发 401/404/500);jar 锁按 PID 结束(含 IntelliJ 的是 IDEA 本体,不能杀;**禁 `taskkill /IM java.exe`**)。
-> - **OneDrive 工作树 `mvn clean` 删不掉 `backend/target`**(目录带 ReadOnly+ReparsePoint,非进程占用):先 `Remove-Item -LiteralPath backend\target -Recurse -Force` 再构建(踩坑速查 §1.14)。
+> - **OneDrive 工作树 `mvn clean` 删不掉 `backend/target`**(目录带 ReadOnly+ReparsePoint,非进程占用):三个构建脚本已在 `mvnw clean` 前自动调 `scripts/clean-build-target.ps1`(清只读→强删→rd 兜底→改名);IDE/手工构建卡住时按咔哒 `Alt+Shift+I` 或直接跑该脚本(踩坑速查 §1.14)。
 > - 内存缓存(如 `HomeModuleService`)**直改 DB 不生效**,须重启后端或走 evict 接口(踩坑速查 §2.1)。
 
 ## 项目概述

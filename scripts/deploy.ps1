@@ -117,6 +117,9 @@ if (-not $FrontendOnly) {
     if ($javaProcs) {
       Write-Warn '检测到本地 java 进程运行中,若 mvnw clean 失败请先 Stop-Process -Name java -Force'
     }
+    # OneDrive 会给 target 盖 ReadOnly+ReparsePoint,mvn clean 的普通删除会失败(踩坑速查 §1.14)
+    & (Join-Path $PSScriptRoot 'clean-build-target.ps1') -Path (Join-Path $Backend 'target')
+    if ($LASTEXITCODE -ne 0) { Die '清理 backend\target 失败,部署中止' }
     # mvnw.cmd 在当前目录找 .mvn/wrapper,必须先切到 backend 目录
     Push-Location -LiteralPath $Backend
     try {
