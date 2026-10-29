@@ -15,7 +15,8 @@ const routes = [
   { path: '/diary', name: 'DiaryList', component: () => import('@/views/diary/DiaryList.vue'), meta: { public: true } },
   { path: '/diary/book/:authorId', name: 'DiaryBook', component: () => import('@/views/diary/DiaryBook.vue'), meta: { public: true } },
   { path: '/diary/edit/:id?', name: 'DiaryEdit', component: () => import('@/views/diary/DiaryEdit.vue'), meta: { requiresAuth: true } },
-  { path: '/anniversary', name: 'Anniversary', component: () => import('@/views/Anniversary.vue'), meta: { public: true } },
+  // 提醒/纪念日已并入「家庭计划」页签,旧书签与导航统一跳过去
+  { path: '/anniversary', redirect: { path: '/plan', query: { tab: 'anniversary' } } },
   { path: '/announcement', name: 'Announcement', component: () => import('@/views/Announcement.vue'), meta: { public: true } },
   // 回收站:照片/相册/视频/图书的逻辑删内容恢复与彻底删除,家庭内部数据须登录
   { path: '/recycle', name: 'Recycle', component: () => import('@/views/Recycle.vue'), meta: { requiresAuth: true } },
@@ -28,7 +29,7 @@ const routes = [
   { path: '/member', name: 'Member', component: () => import('@/views/Member.vue'), meta: { requiresAuth: true } },
   { path: '/points', name: 'Points', component: () => import('@/views/points/Points.vue'), meta: { public: true } },
   { path: '/task', name: 'Task', component: () => import('@/views/task/Task.vue'), meta: { public: true } },
-  { path: '/reminder', name: 'Reminder', component: () => import('@/views/reminder/Reminder.vue'), meta: { public: true } },
+  { path: '/reminder', redirect: { path: '/plan', query: { tab: 'today' } } },
   { path: '/plan', name: 'Plan', component: () => import('@/views/plan/Plan.vue'), meta: { public: true } },
   { path: '/plant', redirect: '/tools/plant' },
   { path: '/wish', name: 'Wish', component: () => import('@/views/wish/Wish.vue'), meta: { public: true } },

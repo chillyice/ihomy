@@ -2514,3 +2514,15 @@ SET @sql := IF(@has = 0,
 PREPARE add_reminder_plan_idx_stmt FROM @sql;
 EXECUTE add_reminder_plan_idx_stmt;
 DEALLOCATE PREPARE add_reminder_plan_idx_stmt;
+
+-- ------------------------------------------------------------
+-- V10.88 家庭日程整合 阶段B:入口收口(2026-10-30)
+--   「今日提醒」「纪念日」并入 /plan 三页签,首页模块行置 enabled=0;
+--   保留行与 NAV_PATHS 映射,旧路由 /reminder、/anniversary 走前端 redirect。
+--   重复执行安全:UPDATE 自带 enabled <> 0 守卫;只改全局模块行。
+-- ------------------------------------------------------------
+UPDATE `sys_home_module` SET `enabled` = 0
+WHERE `family_id` IS NULL
+  AND `code` IN ('reminder', 'anniversary')
+  AND `enabled` <> 0;
+

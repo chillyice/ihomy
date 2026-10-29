@@ -260,9 +260,10 @@ export const reminderApi = {
   toggleDone: (id) => request.post(`/reminder/${id}/toggle-done`),
 }
 
-// 家庭计划(计划+子任务,进度自动联动)
+// 家庭计划(计划+子任务,进度自动联动;today=今日计划+今日提醒)
 export const planApi = {
   list: () => request.get('/plan/list'),
+  today: () => request.get('/plan/today'),
   create: (data) => request.post('/plan', data),
   update: (id, data) => request.put(`/plan/${id}`, data),
   remove: (id) => request.delete(`/plan/${id}`),

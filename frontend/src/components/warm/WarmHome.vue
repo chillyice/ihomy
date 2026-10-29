@@ -339,20 +339,20 @@
           <div v-else class="gc-empty">{{ $t('warm.noWish') }}</div>
         </template>
 
-        <!-- 今日提醒 -->
+        <!-- 今日:今天的计划 + 今天的提醒(与家庭计划页同源) -->
         <template v-else-if="w.id === 'reminder'">
           <h3 class="gc-card-h3">{{ $t('warm.widget.reminder') }}</h3>
           <div v-if="reminders.length" class="gc-list">
             <div
               v-for="r in reminders.slice(0, nReminder(w))"
-              :key="r.id"
+              :key="r.key"
               class="gc-row"
               v-a11y-click
-              @click="!editMode && $router.push('/reminder')"
+              @click="!editMode && $router.push('/plan?tab=today')"
             >
-              <span class="gc-ic">🔔</span>
+              <span class="gc-ic">{{ r.kind === 'plan' ? '📋' : '🔔' }}</span>
               <span class="gc-val">{{ r.title }}</span>
-              <span class="gc-muted">{{ (r.remindTime || '').slice(0, 5) }}</span>
+              <span class="gc-muted">{{ r.time || (r.overdueDays ? $t('plan.today.overdue', { n: r.overdueDays }) : '') }}</span>
             </div>
           </div>
           <div v-else class="gc-empty">{{ $t('warm.noReminder') }}</div>
@@ -419,9 +419,10 @@ import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useWarmWidgetDrag } from '@/utils/widgetDragData'
 import { pickInsertIndex } from '@/utils/dragInsert'
 import { addedCodes } from '@/utils/warmHomeShared'
-import { publicApi, bookApi, financeApi, itemApi, taskApi, wishApi, reminderApi, aiApi } from '@/api'
+import { publicApi, bookApi, financeApi, itemApi, taskApi, wishApi, planApi, aiApi } from '@/api'
 import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
 import { useDaily } from '@/composables/useDaily'
+import { buildAgenda } from '@/utils/agenda'
 import { feedSummary as feedSummaryOf } from '@/utils/feed'
 import { pickDefaultFloor } from '@/utils/floorPlanGeom'
 import { summarizePortfolio } from '@/utils/finance'
@@ -493,10 +494,10 @@ const MODULE_META = {
   library: { titleKey: 'warm.module.library', path: '/library', icon: '📚' },
   item: { titleKey: 'warm.module.item', path: '/item', icon: '📦' },
   kitchen: { titleKey: 'warm.module.kitchen', path: '/kitchen', icon: '🍳' },
-  anniversary: { titleKey: 'warm.module.anniversary', path: '/anniversary', icon: '🎂' },
+  anniversary: { titleKey: 'warm.module.anniversary', path: '/plan?tab=anniversary', icon: '🎂' },
   points: { titleKey: 'warm.module.points', path: '/points', icon: '🏆' },
   task: { titleKey: 'warm.module.task', path: '/task', icon: '🎯' },
-  reminder: { titleKey: 'warm.module.reminder', path: '/reminder', icon: '🔔' },
+  reminder: { titleKey: 'warm.module.reminder', path: '/plan?tab=today', icon: '🔔' },
   plan: { titleKey: 'warm.module.plan', path: '/plan', icon: '📋' },
   wish: { titleKey: 'warm.module.wish', path: '/wish', icon: '⭐' },
   book: { titleKey: 'warm.module.book', path: '/book', icon: '💰' },
@@ -697,12 +698,12 @@ const TILE_PATH = {
   weather: '/weather',
   feed: '/blog',
   photos: '/album',
-  anni: '/anniversary',
+  anni: '/plan?tab=anniversary',
   finance: '/book',
   item: '/item',
   task: '/task',
   wish: '/wish',
-  reminder: '/reminder',
+  reminder: '/plan?tab=today',
 }
 const onCardClick = (w) => {
   if (editMode.value) return
@@ -711,7 +712,7 @@ const onCardClick = (w) => {
     if (path) router.push(path)
     return
   }
-  const dest = { weather: '/weather', anni: '/anniversary', finance: '/book' }[w.id]
+  const dest = { weather: '/weather', anni: '/plan?tab=anniversary', finance: '/book' }[w.id]
   if (dest) router.push(dest)
 }
 
@@ -1278,7 +1279,7 @@ onMounted(async () => {
     loggedIn ? taskApi.list().catch(() => []) : Promise.resolve([]),
     // 愿望列表对游客开放(后端返回演示家庭的公开愿望),故不受登录态限制
     wishApi.list().catch(() => []),
-    loggedIn ? reminderApi.list().catch(() => []) : Promise.resolve([]),
+    loggedIn ? planApi.today().catch(() => null) : Promise.resolve(null),
     loggedIn ? itemApi.houses().catch(() => []) : Promise.resolve([]),
   ])
   feeds.value = feed || []
@@ -1287,7 +1288,7 @@ onMounted(async () => {
   items.value = (it || []).slice(0, 8)
   tasks.value = (Array.isArray(task) ? task : task?.records || []).filter((t) => t.status !== 'CANCELLED')
   wishes.value = Array.isArray(wish) ? wish : []
-  reminders.value = (Array.isArray(rem) ? rem : []).filter((r) => r.done !== 1)
+  reminders.value = buildAgenda(rem)
   const h = Array.isArray(houses) ? houses : []
   if (h.length) await loadItemFloorPlan(h[0])
   startPhotoTimer()

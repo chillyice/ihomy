@@ -841,12 +841,13 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 -- 生活组:厨房恒为组内第 1 位;组内相对序生效,与 content 组数值交错无影响。
 -- 家庭组(V10.85):物品定位/家庭公告/智能家居/工具箱 从生活组拆出,侧栏固定排在生活之后;
 -- 组内相对序 item < announcement(15) < iot(16) < tools(17)。照片瀑布已并入相册,不再单列为模块。
+-- reminder/anniversary(V10.88):入口并入「家庭计划」三页签,置 enabled=0 保留行与路由映射兜底旧链接。
 INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`) VALUES
 ('item',      '物品定位', 'icon-item',      '/item',   'family', 'left',  4, 1),
 ('kitchen',   '厨房',     'icon-kitchen',   '/kitchen','life', 'left',  5, 1),
-('reminder',  '今日提醒', 'icon-reminder',  '/reminder','life','left',  6, 1),
+('reminder',  '今日提醒', 'icon-reminder',  '/reminder','life','left',  6, 0),
 ('plan',      '家庭计划', 'icon-plan',      '/plan',   'life', 'left',  7, 1),
-('anniversary','纪念日',  'icon-anniversary','/anniversary','life','left', 8, 1),
+('anniversary','纪念日',  'icon-anniversary','/anniversary','life','left', 8, 0),
 ('book',      '记账本',   'icon-book',      '/book',   'life', 'left',  9, 1),
 ('wish',      '愿望单',   'icon-wish',      '/wish',   'life', 'left', 10, 1),
 ('task',      '任务悬赏', 'icon-task',      '/task',   'life', 'left', 11, 1),

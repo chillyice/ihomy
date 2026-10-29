@@ -92,13 +92,16 @@
                   <div v-if="!reminders.length" class="empty-hint">{{ $t('home.dashboard.noReminder') }}</div>
                   <div
                     v-for="r in reminders.slice(0, nReminder(w))"
-                    :key="r.id"
+                    :key="r.key"
                     class="today-reminder"
                     v-a11y-click
-                    @click="!editMode && $router.push('/reminder')"
+                    @click="!editMode && $router.push('/plan?tab=today')"
                   >
-                    <span class="tr-dot"></span><span class="tr-title">{{ r.title }}</span
-                    ><span class="tr-time">{{ (r.remindTime || '').slice(0, 5) }}</span>
+                    <span class="tr-dot" :class="r.kind"></span>
+                    <span class="tr-title">{{ r.title }}</span>
+                    <span v-if="r.overdueDays" class="tr-overdue">{{ $t('plan.today.overdue', { n: r.overdueDays }) }}</span>
+                    <span class="tr-kind" :class="r.kind">{{ r.kind === 'plan' ? $t('plan.tagPlan') : $t('plan.tagReminder') }}</span>
+                    <span class="tr-time">{{ r.time }}</span>
                   </div>
                 </div>
               </template>
@@ -160,7 +163,7 @@
                 :key="i"
                 class="anni-row"
                 v-a11y-click
-                @click="!editMode && $router.push('/anniversary')"
+                @click="!editMode && $router.push('/plan?tab=anniversary')"
               >
                 <div class="anni-info">
                   <div class="anni-name">{{ a.label }}</div>
@@ -397,9 +400,10 @@ import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
 import { useI18n } from 'vue-i18n'
-import { publicApi, taskApi, pointsApi, reminderApi, bookApi, financeApi, wishApi, itemApi, kitchenApi } from '@/api'
+import { publicApi, taskApi, pointsApi, planApi, bookApi, financeApi, wishApi, itemApi, kitchenApi } from '@/api'
 import { useWeatherBg } from '@/composables/useWeatherBg'
 import { useDaily } from '@/composables/useDaily'
+import { buildAgenda } from '@/utils/agenda'
 import { gsap } from 'gsap'
 import { ElMessage } from 'element-plus'
 import { Search, Microphone } from '@element-plus/icons-vue'
@@ -520,10 +524,10 @@ const loadPoints = async () => {
   }
 }
 const loadReminders = async () => {
+  // 今日卡 = 今天的计划 + 今天的提醒(与家庭计划页同源,口径由后端 /plan/today 决定)
   if (userStore.isLoggedIn) {
     try {
-      const r = await reminderApi.list()
-      reminders.value = (Array.isArray(r) ? r : []).filter((x) => x.done !== 1)
+      reminders.value = buildAgenda(await planApi.today())
     } catch (e) {}
   }
 }
@@ -1662,6 +1666,34 @@ html.dark .today-reminder:hover {
   border-radius: 50%;
   background: #c9a876;
   flex-shrink: 0;
+}
+.tr-dot.plan {
+  background: var(--color-primary);
+}
+.tr-kind {
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+  background: rgba(58, 46, 34, 0.06);
+  flex-shrink: 0;
+}
+.tr-kind.plan {
+  color: var(--color-primary);
+  background: rgba(46, 116, 181, 0.1);
+}
+.tr-overdue {
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 6px;
+  color: var(--color-danger, #c45656);
+  background: rgba(196, 86, 86, 0.1);
+  flex-shrink: 0;
+}
+html.dark .tr-kind {
+  background: rgba(255, 255, 255, 0.08);
 }
 .tr-title {
   flex: 1;
