@@ -162,7 +162,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 5. **图标**:Element Plus `el-icon`;Setting/Monitor 用内联 SVG(复杂 path 在 100% 缩放下光栅化卡)。`stroke-width:2px`。
 6. **动画**:GSAP 入场;`transform: translateZ(0)` 隔离合成层;`contain: layout style`;避免 `background-attachment: fixed`。
 7. **毛玻璃**:`backdrop-filter: blur(24px) saturate(1.1)`;hover 用 `transform` 不用 `box-shadow`;**长开页/持续动画页别用**(踩坑速查 §3.10)。
-8. **可拖拽面板**:`useDragResize`;位置尺寸持久化 localStorage;**事件监听按需挂载**(拖拽开始挂 `mousemove`/`mouseup`,结束移除,别 `onMounted` 常驻)。
+8. **可拖拽面板**:`useDragResize`;位置尺寸持久化 localStorage;**事件监听按需挂载**(拖拽开始挂 `mousemove`/`mouseup`,结束移除,别 `onMounted` 常驻)。**指针捕获只在真正拖动时做**:`setPointerCapture` 会把 pointerup 与 click 一起改派给捕获元素,`pointerdown` 就捕获会让容器内所有卡片/按钮点不动(踩坑速查 §3.35)。
 9. **光影层全局化**:`SunLightLayer` + `AppSidebar` + `SiteFooter` 在 `App.vue` 挂载,`useSunLight` provide/inject。
 10. **i18n**:所有可见文本 `$t('key')`,中英键结构对齐;**文案里字面量 `{`/`}`/`@` 必须转义**(`{'{名字}'}`),否则生产构建 `$t()` 抛错打断整页(dev 只打日志);守门 `i18n/message-format.spec.js` + 硬编码中文守门 `hardcoded-cjk.spec.js`(有意保留项进其 `ALLOW`)。
 11. **共享逻辑抽 utils(禁三份实现)**:动态流类型/摘要/相对时间走 `utils/feed.js`;默认楼层 `floorPlanGeom.pickDefaultFloor`;枚举文案 `dictText(t,...)`;金额「元⇄分」走 `utils/money.js`、年月日换算走 `utils/date.js`(贷款/理财/记账本共用,`loan.js` 只再导出);新重复逻辑先找现成 util。

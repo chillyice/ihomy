@@ -180,19 +180,36 @@ const onWheel = (event) => {
   zoomAt(Math.exp(-event.deltaY * 0.0015), point.x, point.y)
 }
 
+const capture = (pointerId) => {
+  try {
+    viewport.value?.setPointerCapture(pointerId)
+  } catch {
+    // 合成事件或已释放的指针不支持捕获,不致命
+  }
+}
+
 const onPointerDown = (event) => {
   if (event.pointerType === 'mouse' && event.button !== 0) return
   const vp = viewport.value
   if (!vp) return
   pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
-  try {
-    vp.setPointerCapture(event.pointerId)
-  } catch {
-    // 合成事件或已释放的指针不支持捕获,不致命
+  if (pointers.size === 1) {
+    // 按下时先不捕获指针:捕获会把 pointerup 与 click 一并重定向到画板,
+    // 卡片和右上角铅笔就都点不动了。真正拖动(超过阈值)时再捕获。
+    start = {
+      x: event.clientX,
+      y: event.clientY,
+      offsetX: offsetX.value,
+      offsetY: offsetY.value,
+      moved: false,
+    }
+    return
   }
-  dragging.value = true
-  if (pointers.size === 1) start = { x: event.clientX, y: event.clientY }
   if (pointers.size === 2) {
+    // 双指捏合全程依赖指针事件,直接捕获两根手指
+    for (const id of pointers.keys()) capture(id)
+    start = null
+    dragging.value = true
     const [a, b] = [...pointers.values()]
     const mid = viewportPoint((a.x + b.x) / 2, (a.y + b.y) / 2)
     pinch = {
@@ -208,8 +225,6 @@ const onPointerDown = (event) => {
 const onPointerMove = (event) => {
   const prev = pointers.get(event.pointerId)
   if (!prev) return
-  const dx = event.clientX - prev.x
-  const dy = event.clientY - prev.y
   pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
 
   if (pinch && pointers.size >= 2) {
@@ -225,13 +240,18 @@ const onPointerMove = (event) => {
     return
   }
 
-  offsetX.value += dx
-  offsetY.value += dy
-  userAdjusted = true
-  if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > DRAG_THRESHOLD) {
+  if (!start) return
+  if (!start.moved) {
+    if (Math.hypot(event.clientX - start.x, event.clientY - start.y) <= DRAG_THRESHOLD) return
+    start.moved = true
     // 拖动过就别再当成点击,避免松手时误选成员
+    dragging.value = true
     suppressClickUntil = Date.now() + 400
+    capture(event.pointerId)
   }
+  offsetX.value = start.offsetX + (event.clientX - start.x)
+  offsetY.value = start.offsetY + (event.clientY - start.y)
+  userAdjusted = true
 }
 
 const onPointerUp = (event) => {
@@ -245,6 +265,13 @@ const onPointerUp = (event) => {
   if (!pointers.size) {
     dragging.value = false
     start = null
+    return
+  }
+  // 双指抬起一根手指:用剩下那根续接拖动,避免画板卡住不动
+  if (pointers.size === 1) {
+    const [id, point] = [...pointers.entries()][0]
+    start = { x: point.x, y: point.y, offsetX: offsetX.value, offsetY: offsetY.value, moved: true }
+    capture(id)
   }
 }
 
