@@ -24,6 +24,8 @@ public class Reminder {
     private LocalTime remindTime;
     private String repeatType;
     private Integer done;
+    /** 关联计划ID:非空=由家庭计划托管,提醒侧只允许勾完成 */
+    private Long planId;
     private Long createdBy;
     private LocalDateTime createdAt;
 }

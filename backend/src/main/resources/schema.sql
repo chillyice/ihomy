@@ -1093,6 +1093,7 @@ CREATE TABLE `family_task` (
 -- ------------------------------------------------------------
 -- 33. 提醒事项表（V3.4 今日提醒:站内通知触发,repeat_type 支持一次性/每日/每周/每月）
 --     remind_date 语义:一次性=触发当天;每周=基准星期;每月=基准日号
+--     plan_id 非空 = 由家庭计划托管(单向:计划→提醒,提醒侧不改计划状态)
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `family_reminder`;
 CREATE TABLE `family_reminder` (
@@ -1104,11 +1105,13 @@ CREATE TABLE `family_reminder` (
   `remind_time` TIME          NOT NULL COMMENT '触发时刻（每日重复的时刻）',
   `repeat_type` VARCHAR(20)   NOT NULL DEFAULT 'ONCE' COMMENT 'ONCE一次性/DAILY每日/WEEKLY每周/MONTHLY每月',
   `done`        TINYINT       NOT NULL DEFAULT 0 COMMENT '0未完成 1已完成',
+  `plan_id`     BIGINT        DEFAULT NULL COMMENT '关联计划ID(family_plan.id;NULL=独立提醒)',
   `created_by`  BIGINT        NOT NULL COMMENT '创建人ID',
   `created_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   PRIMARY KEY (`id`),
   KEY `idx_family` (`family_id`, `done`, `remind_time`),
-  KEY `idx_date` (`remind_date`)
+  KEY `idx_date` (`remind_date`),
+  KEY `idx_plan` (`plan_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='提醒事项表';
 
 -- ------------------------------------------------------------

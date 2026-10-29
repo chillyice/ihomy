@@ -318,6 +318,7 @@ const onNotifyClick = async (n) => {
   else if (n.contentType === 'diary') router.push('/diary')
   else if (n.contentType === 'photo' && n.contentId) router.push('/album')
   else if (n.contentType === 'item') router.push('/kitchen/ingredients')
+  else if (n.contentType === 'reminder') router.push('/plan?tab=today')
 }
 const notifyType = (type) =>
   type === 'reply'
@@ -326,7 +327,9 @@ const notifyType = (type) =>
       ? t('notify.typeSystem')
       : type === 'item_expiry'
         ? t('notify.typeExpiry')
-        : t('notify.typeComment')
+        : type === 'reminder'
+          ? t('notify.typeReminder')
+          : t('notify.typeComment')
 const notifyTime = (d) => formatRelativeTime(t, d)
 
 // 用户下拉

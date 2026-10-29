@@ -2396,6 +2396,7 @@ export default {
     typeSystem: 'System',
     typeComment: 'Comment',
     typeExpiry: 'Expiry Alert',
+    typeReminder: 'Reminder',
   },
   daily: {
     image: 'Daily image',

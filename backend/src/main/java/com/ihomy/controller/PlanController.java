@@ -39,6 +39,12 @@ public class PlanController {
         return Result.success(planService.list(current().getFamilyId()));
     }
 
+    @Operation(summary = "今日视图:今天到期/逾期的计划 + 今天应触发的提醒")
+    @GetMapping("/today")
+    public Result<Map<String, Object>> today() {
+        return Result.success(planService.today(current().getFamilyId()));
+    }
+
     @Operation(summary = "创建计划")
     @OperationLog(module = "PLAN", operationType = "CREATE", description = "创建家庭计划")
     @PostMapping

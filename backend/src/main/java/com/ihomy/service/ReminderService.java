@@ -3,6 +3,7 @@ package com.ihomy.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.DictConst;
+import com.ihomy.common.RepeatSchedule;
 import com.ihomy.common.ResultCode;
 import com.ihomy.dto.ReminderDTO;
 import com.ihomy.entity.Notification;
@@ -11,11 +12,11 @@ import com.ihomy.mapper.NotificationMapper;
 import com.ihomy.mapper.ReminderMapper;
 import com.ihomy.mapper.SysUserMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
@@ -24,10 +25,15 @@ import java.util.Map;
  * 提醒事项业务:增删改查 + 定时触发(每分钟检查一次,到点给全家庭发站内通知)。
  * 重复规则:每日=每天提醒;每周=remind_date 的星期;每月=remind_date 的日号。
  * 同一天同一提醒只通知一次(以当日已存在该提醒的通知为准)。
+ * 关联计划的提醒(plan_id 非空)由家庭计划托管,提醒侧只允许勾完成。
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ReminderService {
+
+    /** 计划托管的提醒在提醒侧不允许改内容/时间/删除 */
+    private static final String PLAN_MANAGED = "该提醒由家庭计划管理，请到家庭计划中修改";
 
     private final ReminderMapper reminderMapper;
     private final NotificationMapper notificationMapper;
@@ -65,6 +71,7 @@ public class ReminderService {
 
     public void update(Long id, Long familyId, ReminderDTO dto) {
         Reminder r = require(id, familyId);
+        if (r.getPlanId() != null) throw new BizException(ResultCode.BAD_REQUEST, PLAN_MANAGED);
         if (dto.getTitle() != null) r.setTitle(dto.getTitle());
         if (dto.getContent() != null) r.setContent(dto.getContent());
         if (dto.getRemindDate() != null) r.setRemindDate(dto.getRemindDate());
@@ -74,7 +81,9 @@ public class ReminderService {
     }
 
     public void delete(Long id, Long familyId) {
-        reminderMapper.deleteById(require(id, familyId).getId());
+        Reminder r = require(id, familyId);
+        if (r.getPlanId() != null) throw new BizException(ResultCode.BAD_REQUEST, PLAN_MANAGED);
+        reminderMapper.deleteById(id);
     }
 
     /** 完成/取消完成勾选 */
@@ -96,7 +105,7 @@ public class ReminderService {
         for (Reminder r : due) {
             try {
                 // 今日是否应触发(一次性/每日/每周/每月)
-                if (!dueToday(r)) continue;
+                if (!RepeatSchedule.dueToday(r.getRepeatType(), r.getRemindDate(), LocalDate.now())) continue;
                 // 到点(预留 5 分钟触发窗口)
                 if (r.getRemindTime().isAfter(now.plusMinutes(5))) continue;
                 // 当日已通知则跳过(重复类提醒一天一次)
@@ -108,19 +117,9 @@ public class ReminderService {
                 }
             } catch (Exception e) {
                 // 单条提醒处理失败不影响其他提醒
+                log.error("reminder notify failed, reminderId={}", r.getId(), e);
             }
         }
-    }
-
-    /** 判断某提醒今天是否应触发:一次性看日期,重复类按星期/日号 */
-    private boolean dueToday(Reminder r) {
-        LocalDate today = LocalDate.now();
-        return switch (r.getRepeatType() == null ? DictConst.REPEAT_ONCE : r.getRepeatType()) {
-            case DictConst.REPEAT_DAILY -> true;
-            case DictConst.REPEAT_WEEKLY -> r.getRemindDate().getDayOfWeek() == today.getDayOfWeek();
-            case DictConst.REPEAT_MONTHLY -> r.getRemindDate().getDayOfMonth() == today.getDayOfMonth();
-            default -> r.getRemindDate().equals(today);              // 一次性
-        };
     }
 
     /** 当日是否已为某位成员发过该提醒通知(家庭为单位查重) */

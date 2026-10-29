@@ -2489,3 +2489,28 @@ UPDATE `sys_home_module` SET `category` = 'family'
 WHERE `family_id` IS NULL
   AND `code` IN ('item', 'announcement', 'iot', 'tools')
   AND `category` <> 'family';
+
+-- ------------------------------------------------------------
+-- V10.86 家庭日程整合 阶段A:提醒关联计划(2026-10-29)
+--   family_reminder 加 plan_id:非空=由家庭计划托管(单向 计划→提醒),计划侧单事务维护。
+--   MySQL 8 无 ADD COLUMN IF NOT EXISTS,information_schema 守卫幂等;索引同守卫。
+-- ------------------------------------------------------------
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_reminder'
+               AND COLUMN_NAME = 'plan_id');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `family_reminder` ADD COLUMN `plan_id` BIGINT DEFAULT NULL COMMENT ''关联计划ID(family_plan.id;NULL=独立提醒)'' AFTER `done`',
+  'SELECT 1');
+PREPARE add_reminder_plan_stmt FROM @sql;
+EXECUTE add_reminder_plan_stmt;
+DEALLOCATE PREPARE add_reminder_plan_stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_reminder'
+               AND INDEX_NAME = 'idx_plan');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `family_reminder` ADD KEY `idx_plan` (`plan_id`)',
+  'SELECT 1');
+PREPARE add_reminder_plan_idx_stmt FROM @sql;
+EXECUTE add_reminder_plan_idx_stmt;
+DEALLOCATE PREPARE add_reminder_plan_idx_stmt;

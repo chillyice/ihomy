@@ -2387,6 +2387,7 @@ export default {
     typeSystem: '系统',
     typeComment: '评论',
     typeExpiry: '食材预警',
+    typeReminder: '提醒',
   },
   daily: {
     image: '每日一图',

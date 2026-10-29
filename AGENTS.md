@@ -137,6 +137,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 - **天文**:后端 `SolarUtil` 是唯一计算来源(随 `/public/sun-info` 下发),前端 `utils/terminator.js` 只做球面几何渲染,**禁止再移植 NOAA/Meeus**;`/public/sun-info` 只缓存 slots,直射点每次实时算。
 - **独立产品页**:挂 `/kada`、`/bit-pouch`、`/wallpaper`、`/chillyice` 这类页必须加 `meta.standalone`(不套外壳、跳过 `appStore.init()`、401 不顶登录页、自带配色要接管 `html` 根类);**从独立页回站内页要补初始化**(`App.vue` 监听 standalone 变 false 时补 `appStore.init()`/`ensureUserInfo()`),否则首页与家庭名全空(踩坑速查 §3.32/§3.8)。
 - **产品访问/下载统计**:咔哒与比特口袋的访问/下载落 `report_product_stat` 日表(落地页打点 + 安装包下载链接统一走 `GET /public/product/download` 计数后 302 到 `/files`),**禁止按 access 日志统计下载**——nginx `/files/` 静态直出,下载请求不进后端日志(踩坑速查 §7.11)。
+- **计划提醒单向托管**:计划的「提醒时间」只存 `family_reminder`(由 `plan_id` 关联),`family_plan` 不加时间列;写操作全走 `FamilyPlanService` 单事务,计划→提醒单向同步(计划完成连带完成提醒,提醒勾完成不改计划);重复判定与「今日」聚合共用 `RepeatSchedule.dueToday`,前端不算。
 
 ## 后端规范
 
