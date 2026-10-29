@@ -850,7 +850,7 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('wish',      '愿望单',   'icon-wish',      '/wish',   'life', 'left', 10, 1),
 ('task',      '任务悬赏', 'icon-task',      '/task',   'life', 'left', 11, 1),
 ('points',    '积分商城', 'icon-points',    '/points', 'life', 'left', 12, 1),
-('tree',      '家谱',     'icon-tree',      '/tree',   'life', 'left', 13, 1),
+('tree',      '家谱',     'icon-tree',      '/tree',   'life', 'left', 13, 0),
 ('vault',     '保险箱',   'icon-vault',     '/vault',  'life', 'left', 14, 1),
 ('chat',      '聊天室',   'icon-chat',      '/chat',   'life', 'left', 16, 1),
 ('tools',     '工具箱',   'icon-tools',     '/tools',  'life', 'left', 17, 1),
@@ -1456,6 +1456,7 @@ CREATE TABLE `family_tree` (
   `updated_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   KEY `idx_family` (`family_id`),
+  KEY `idx_family_deleted_id` (`family_id`, `deleted`, `id`),
   KEY `idx_user` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家谱成员表';
 

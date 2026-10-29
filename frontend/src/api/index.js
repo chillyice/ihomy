@@ -414,6 +414,7 @@ export const treeApi = {
   create: (data) => request.post('/tree', data),
   update: (id, data) => request.put(`/tree/${id}`, data),
   remove: (id) => request.delete(`/tree/${id}`),
+  importMembers: (userIds) => request.post('/tree/import-members', { userIds }),
 }
 
 // 聊天室(历史/未读/已读游标;实时走 WebSocket)

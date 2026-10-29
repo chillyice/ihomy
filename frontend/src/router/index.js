@@ -37,7 +37,8 @@ const routes = [
   { path: '/iot', name: 'Iot', component: () => import('@/views/iot/Iot.vue'), meta: { requiresAuth: true } },
   // 家庭保险箱(密码管理器):家庭共享的账号密码保管箱,须登录
   { path: '/vault', name: 'Vault', component: () => import('@/views/vault/Vault.vue'), meta: { requiresAuth: true } },
-  { path: '/tree', name: 'Tree', component: () => import('@/views/tree/Tree.vue'), meta: { public: true } },
+  // 家谱已并入「家庭成员」页,旧书签/导航统一跳到图谱标签
+  { path: '/tree', redirect: { path: '/member', query: { tab: 'tree' } } },
   { path: '/weather', name: 'Weather', component: () => import('@/views/weather/Weather.vue'), meta: { public: true } },
   // 照片瀑布已并入相册(相册页内视图):保留旧链接/书签,重定向到相册并自动打开瀑布
   { path: '/cascade', redirect: { path: '/album', query: { cascade: '1' } } },

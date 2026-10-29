@@ -1,70 +1,63 @@
-<!-- 家谱页:按世代纵向排布的家谱树,夫妻并排,孩子挂在父辈下方;
-     家庭成员可新增/编辑/删除成员,删除时后端自动清理引用 -->
+<!-- 家谱面板(已并入「家庭成员」页):关系图谱 + 成员编辑 + 从家庭成员导入。
+     点击卡片选中两人 → 计算中华传统称谓;图谱不显示"第 N 代",关系线按夫妻/亲子/补充关系区分。 -->
 <template>
-  <div class="page">
-    <Breadcrumb :items="[{ label: $t('tree.title') }]" />
-
-    <PageToolbar>
-      <div class="tb-left">
-        <span class="tree-tip">{{ $t('tree.tip') }}</span>
-      </div>
-      <div class="tb-right">
-        <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ $t('tree.add') }}</el-button>
-      </div>
-    </PageToolbar>
-
-    <div v-loading="loading" class="tree-body">
-      <el-empty v-if="!loading && !roots.length" :description="userStore.isGuest ? $t('tree.guestEmpty') : $t('tree.emptyHint')" />
-      <div v-else class="generation-list">
-        <div v-for="gen in generations" :key="gen" class="generation-row">
-          <div class="gen-label">{{ $t('tree.gen', { n: gen + 1 }) }}</div>
-          <div class="gen-cards">
-            <div v-for="unit in unitsByGen(gen)" :key="unitKey(unit)" class="family-unit">
-              <div class="couple">
-                <div
-                  v-a11y-click
-                  v-for="m in unit"
-                  :key="m.id"
-                  class="member-card"
-                  :class="{ ghost: !m }"
-                  @click="userStore.isLoggedIn && openEditor(m)"
-                >
-                  <div class="member-photo">
-                    <img v-if="m.photo" :src="m.photo" :alt="m.name" />
-                    <span v-else class="photo-fallback">{{ genderIcon(m.gender) }}</span>
-                  </div>
-                  <div class="member-name">{{ m.name }}</div>
-                  <div v-if="m.birthDate" class="member-birth">{{ m.birthDate }}</div>
-                  <div v-if="m.userName" class="member-account" :title="$t('tree.account')">
-                    <el-icon><UserFilled /></el-icon>{{ m.userName }}
-                  </div>
-                </div>
-                <span v-if="unit[0] && unit[1]" class="couple-mark">💞</span>
-              </div>
-              <div v-if="childrenOf(unit).length" class="children">
-                <div class="children-line"></div>
-                <div class="children-cards">
-                  <div v-for="c in childrenOf(unit)" :key="c.id" class="child-node">
-                    <div v-a11y-click class="member-card mini" @click="userStore.isLoggedIn && openEditor(c)">
-                      <div class="member-photo">
-                        <img v-if="c.photo" :src="c.photo" :alt="c.name" />
-                        <span v-else class="photo-fallback">{{ genderIcon(c.gender) }}</span>
-                      </div>
-                      <div class="member-name">{{ c.name }}</div>
-                      <div v-if="c.userName" class="member-account" :title="$t('tree.account')">
-                        <el-icon><UserFilled /></el-icon>{{ c.userName }}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+  <div class="tree-panel">
+    <div class="tree-head">
+      <div class="tree-head-text">
+        <div class="tree-tip">{{ $t('tree.tip') }}</div>
+        <div v-if="graphStats.orphanLinks" class="tree-warn">
+          {{ $t('tree.orphanWarning', { n: graphStats.orphanLinks }) }}
         </div>
+      </div>
+      <div class="tree-head-actions">
+        <el-button v-if="unlinkedAccounts.length" plain @click="openImport">{{ $t('tree.importFromMembers') }}</el-button>
+        <el-button type="primary" @click="openEditor()">{{ $t('tree.add') }}</el-button>
       </div>
     </div>
 
-    <!-- 成员编辑对话框:新增/编辑共用;配偶/父亲/母亲从本家庭已有成员中选择 -->
+    <div class="tree-legend">
+      <span class="legend-item"><i class="legend-line spouse"></i>{{ $t('tree.legendSpouse') }}</span>
+      <span class="legend-item"><i class="legend-line parent"></i>{{ $t('tree.legendParent') }}</span>
+      <span class="legend-item"><i class="legend-line extra"></i>{{ $t('tree.legendExtra') }}</span>
+      <span class="legend-tip">{{ $t('tree.legendHint') }}</span>
+    </div>
+
+    <div v-loading="loading" class="tree-graph-wrap">
+      <FamilyTreeGraph :members="members" v-model:selected="selectedIds" @edit="openEditor" />
+    </div>
+
+    <div class="kin-card" :class="{ active: selectedIds.length === 2 }">
+      <template v-if="selectedIds.length === 0">
+        <span class="kin-empty">{{ $t('tree.selectTwoHint') }}</span>
+      </template>
+      <template v-else-if="selectedIds.length === 1">
+        <span class="kin-empty">{{ $t('tree.selectedHint', { name: nameOf(selectedIds[0]) }) }}</span>
+      </template>
+      <template v-else>
+        <div class="kin-row">
+          <div class="kin-person">{{ nameOf(selectedIds[0]) }}</div>
+          <div class="kin-arrow">→</div>
+          <div class="kin-person">{{ nameOf(selectedIds[1]) }}</div>
+          <el-tag size="small" :type="relationTagType(mutual.aToB.type)" effect="plain">
+            {{ relationTypeLabel(mutual.aToB.type) }}
+          </el-tag>
+        </div>
+        <div class="kin-terms">
+          <div class="kin-term">
+            <span class="kin-term-label">{{ $t('tree.calls', { a: nameOf(selectedIds[0]), b: nameOf(selectedIds[1]) }) }}</span>
+            <strong>{{ termLabel(mutual.aToB.code) }}</strong>
+          </div>
+          <div class="kin-term">
+            <span class="kin-term-label">{{ $t('tree.calls', { a: nameOf(selectedIds[1]), b: nameOf(selectedIds[0]) }) }}</span>
+            <strong>{{ termLabel(mutual.bToA.code) }}</strong>
+          </div>
+        </div>
+        <div v-if="mutual.aToB.code === 'none'" class="kin-note">{{ $t('tree.noRelationHint') }}</div>
+        <el-button class="kin-clear" link size="small" @click="selectedIds = []">{{ $t('tree.clearSelection') }}</el-button>
+      </template>
+    </div>
+
+    <!-- 成员编辑:新增/编辑共用;配偶/父亲/母亲从本家庭已有成员中选择 -->
     <el-dialog v-model="dialog" append-to-body :title="form.id ? $t('tree.edit') : $t('tree.add')" width="480px">
       <el-form :model="form" label-width="90px">
         <el-form-item :label="$t('tree.name')">
@@ -90,7 +83,14 @@
           </div>
         </el-form-item>
         <el-form-item :label="$t('tree.account')">
-          <el-select v-model="form.userId" clearable filterable style="width: 100%" :placeholder="$t('tree.accountPlaceholder')">
+          <el-select
+            v-model="form.userId"
+            clearable
+            filterable
+            style="width: 100%"
+            :placeholder="$t('tree.accountPlaceholder')"
+            @change="onAccountChange"
+          >
             <el-option v-for="u in linkableAccounts" :key="u.id" :label="u.nickname || u.username" :value="u.id" />
           </el-select>
         </el-form-item>
@@ -119,68 +119,56 @@
         <el-button type="primary" :loading="saving" @click="save">{{ $t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- 从家庭成员导入:把未进入家谱的账号一键建成家谱人物,避免两份名单各录一遍 -->
+    <el-dialog v-model="importVisible" append-to-body :title="$t('tree.importTitle')" width="440px">
+      <div class="import-hint">{{ $t('tree.importHint') }}</div>
+      <el-checkbox v-if="unlinkedAccounts.length" v-model="importAll" class="import-all">{{ $t('tree.importAll') }}</el-checkbox>
+      <div class="import-list">
+        <el-checkbox-group v-model="importIds">
+          <el-checkbox v-for="u in unlinkedAccounts" :key="u.id" :value="u.id" class="import-item">
+            <el-avatar :size="26" :src="u.avatar || undefined">{{ (u.nickname || u.username || 'U').charAt(0) }}</el-avatar>
+            <span>{{ u.nickname || u.username }}</span>
+          </el-checkbox>
+        </el-checkbox-group>
+        <el-empty v-if="!unlinkedAccounts.length" :description="$t('tree.allLinked')" :image-size="70" />
+      </div>
+      <template #footer>
+        <el-button @click="importVisible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="importing" :disabled="!importIds.length" @click="doImport">{{
+          $t('common.confirm')
+        }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-// 家谱树:数据来自 /tree/list(全部成员+关系姓名);世代按 generation 分组,
-// 每组把人按"夫妻单元"聚合(配偶并排),孩子通过 fatherId/motherId 归属到父辈单元
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { treeApi, fileApi, memberApi } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { UserFilled } from '@element-plus/icons-vue'
-import Breadcrumb from '@/components/Breadcrumb.vue'
-import PageToolbar from '@/components/PageToolbar.vue'
+import { computeMutualKinship } from '@/utils/kinship'
+import { kinshipLabel } from '@/utils/kinshipTerms'
+import { buildFamilyGraph } from '@/utils/familyGraph'
+import FamilyTreeGraph from '@/components/family/FamilyTreeGraph.vue'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const userStore = useUserStore()
 
 const loading = ref(false)
 const members = ref([])
-// 家庭成员账号(用于把家谱人物与账号对上)
 const accounts = ref([])
+const selectedIds = ref([])
 const dialog = ref(false)
 const saving = ref(false)
+const importVisible = ref(false)
+const importing = ref(false)
+const importIds = ref([])
 
-// 按世代排序分组(升序:祖先在前)
-const generations = computed(() => {
-  const gs = [...new Set(members.value.map((m) => m.generation ?? 0))].sort((a, b) => a - b)
-  return gs
-})
+const graphStats = computed(() => buildFamilyGraph(members.value).stats)
 
-const roots = computed(() => members.value.filter((m) => !m.fatherId && !m.motherId))
-
-// 某世代的"夫妻单元":把同代中互为配偶的人合并到一个单元(至多两人)
-const unitsByGen = (gen) => {
-  const inGen = members.value.filter((m) => (m.generation ?? 0) === gen)
-  const units = []
-  const used = new Set()
-  for (const m of inGen) {
-    if (used.has(m.id)) continue
-    const spouse = inGen.find((s) => s.id === m.spouseId)
-    const unit = [m]
-    if (spouse) {
-      unit.push(spouse)
-      used.add(spouse.id)
-    }
-    used.add(m.id)
-    units.push(unit)
-  }
-  return units
-}
-
-// 某夫妻单元的孩子:有 fatherId 或 motherId 指向单元内任一成员,且不在更早世代(防重复计数按自身世代呈现)
-const childrenOf = (unit) => {
-  const ids = new Set(unit.map((m) => m.id))
-  return members.value.filter((m) => (m.fatherId && ids.has(m.fatherId)) || (m.motherId && ids.has(m.motherId)))
-}
-
-const unitKey = (unit) => unit.map((m) => m.id).join('-')
-const genderIcon = (g) => (g === 1 ? '👨' : g === 2 ? '👩' : '🧑')
-
-// 编辑表单:排除本人后作为 父亲/母亲/配偶 候选项
 const form = reactive({
   id: null,
   name: '',
@@ -193,30 +181,55 @@ const form = reactive({
   motherId: null,
   note: '',
 })
+
 const otherMembers = computed(() => members.value.filter((m) => m.id !== form.id))
-// 可关联账号:已被其他家谱人物占用的账号不再重复出现(一个账号对应一位家人)
+
+// 一个账号只对应一位家谱人物;编辑自己时保留当前账号
+const linkedUserIds = computed(() => new Set(members.value.map((m) => m.userId).filter(Boolean)))
 const linkableAccounts = computed(() => {
-  const taken = new Set()
-  for (const m of members.value) {
-    if (m.userId && m.id !== form.id) taken.add(m.userId)
-  }
+  const taken = new Set(linkedUserIds.value)
+  if (form.userId) taken.delete(form.userId)
   return accounts.value.filter((u) => !taken.has(u.id))
 })
+const unlinkedAccounts = computed(() => accounts.value.filter((u) => !linkedUserIds.value.has(u.id)))
+
+const mutual = computed(() => {
+  if (selectedIds.value.length !== 2) return { aToB: { code: null, type: 'none' }, bToA: { code: null, type: 'none' } }
+  return computeMutualKinship(members.value, selectedIds.value[0], selectedIds.value[1])
+})
+
+const nameOf = (id) => members.value.find((m) => m.id === id)?.name || ''
+const termLabel = (code) => kinshipLabel(code, locale.value === 'en' ? 'en' : 'zh-CN')
+const relationTypeLabel = (type) =>
+  ({ blood: t('tree.relationBlood'), affinity: t('tree.relationAffinity'), spouse: t('tree.relationSpouse') })[type] ||
+  t('tree.relationNone')
+const relationTagType = (type) => (type === 'blood' ? 'success' : type === 'affinity' || type === 'spouse' ? 'warning' : 'info')
+
+const importAll = computed({
+  get: () => unlinkedAccounts.value.length > 0 && importIds.value.length === unlinkedAccounts.value.length,
+  set: (checked) => {
+    importIds.value = checked ? unlinkedAccounts.value.map((u) => u.id) : []
+  },
+})
+
+const resetForm = () => {
+  Object.assign(form, {
+    id: null,
+    name: '',
+    gender: 0,
+    birthDate: null,
+    photo: '',
+    userId: null,
+    spouseId: null,
+    fatherId: null,
+    motherId: null,
+    note: '',
+  })
+}
 
 const openEditor = (m) => {
   if (!m) {
-    Object.assign(form, {
-      id: null,
-      name: '',
-      gender: 0,
-      birthDate: null,
-      photo: '',
-      userId: null,
-      spouseId: null,
-      fatherId: null,
-      motherId: null,
-      note: '',
-    })
+    resetForm()
   } else {
     Object.assign(form, {
       id: m.id,
@@ -234,8 +247,18 @@ const openEditor = (m) => {
   dialog.value = true
 }
 
+// 选家庭成员账号时,空着的姓名/照片/性别/生日自动带出,减少重复录入
+const onAccountChange = (userId) => {
+  if (!userId) return
+  const u = accounts.value.find((item) => item.id === userId)
+  if (!u) return
+  if (!form.name.trim()) form.name = u.nickname || u.username || ''
+  if (!form.photo) form.photo = u.avatar || ''
+  if (!form.gender && u.gender) form.gender = u.gender
+  if (!form.birthDate && u.birthday) form.birthDate = String(u.birthday).slice(0, 10)
+}
+
 const load = async () => {
-  // 家谱是家庭隐私内容(后端全部接口仅登录成员可用):游客不打注定 401 的请求,直接空态
   if (!userStore.isLoggedIn) return
   loading.value = true
   try {
@@ -245,7 +268,6 @@ const load = async () => {
   }
 }
 
-// 家庭成员账号列表:仅登录可用(游客不请求,避免无谓 401)
 const loadAccounts = async () => {
   if (!userStore.isLoggedIn) return
   try {
@@ -289,6 +311,7 @@ const remove = async (id) => {
   await treeApi.remove(id)
   ElMessage.success(t('tree.deleted'))
   dialog.value = false
+  selectedIds.value = selectedIds.value.filter((x) => x !== id)
   await load()
 }
 
@@ -301,6 +324,24 @@ const uploadPhoto = async (options) => {
   }
 }
 
+const openImport = () => {
+  importIds.value = []
+  importVisible.value = true
+}
+
+const doImport = async () => {
+  if (!importIds.value.length) return
+  importing.value = true
+  try {
+    const data = await treeApi.importMembers(importIds.value)
+    ElMessage.success(t('tree.imported', { n: data?.count ?? importIds.value.length }))
+    importVisible.value = false
+    await load()
+  } finally {
+    importing.value = false
+  }
+}
+
 onMounted(() => {
   load()
   loadAccounts()
@@ -308,149 +349,142 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.tree-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tree-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
 .tree-tip {
   color: var(--color-text-2);
   font-size: 12px;
+  line-height: 1.6;
 }
-.generation-list {
-  display: flex;
-  flex-direction: column;
-  gap: 26px;
-}
-.generation-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-}
-.gen-label {
-  flex-shrink: 0;
-  width: 64px;
-  padding-top: 12px;
-  text-align: center;
-  border-radius: 8px;
-  background: linear-gradient(120deg, var(--color-primary), var(--color-accent));
-  color: #fff;
+.tree-warn {
+  margin-top: 4px;
+  color: #d98b2b;
   font-size: 12px;
-  font-weight: 600;
 }
-.gen-cards {
+.tree-head-actions {
+  flex: none;
+  display: flex;
+  gap: 8px;
+}
+.tree-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 26px;
-  align-items: flex-start;
-}
-.family-unit {
-  display: flex;
-  flex-direction: column;
   align-items: center;
+  gap: 16px;
+  color: var(--color-text-2);
+  font-size: 12px;
 }
-.couple {
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend-line {
+  display: inline-block;
+  width: 26px;
+  height: 0;
+  border-top: 2px solid var(--color-primary);
+}
+.legend-line.spouse {
+  border-top: 3px dotted #e85d75;
+}
+.legend-line.extra {
+  border-top: 2px dashed var(--color-accent, #c9807a);
+}
+.legend-tip {
+  opacity: 0.75;
+}
+.tree-graph-wrap {
+  min-height: 220px;
+}
+.kin-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+  background: var(--color-card);
+  color: var(--color-text-2);
+  font-size: 13px;
+}
+.kin-card.active {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+}
+.kin-empty {
+  color: var(--color-text-2);
+}
+.kin-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding-bottom: 8px;
 }
-.couple-mark {
-  color: #e85d75;
-  font-size: 16px;
-}
-.member-card {
-  width: 96px;
-  padding: 10px 8px;
-  border-radius: 12px;
-  background: var(--color-card);
-  border: 1px solid var(--color-border);
-  text-align: center;
-  cursor: pointer;
-  transition:
-    transform 0.15s,
-    box-shadow 0.15s;
-}
-.member-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
-}
-.member-card.mini {
-  width: 78px;
-}
-.ghost {
-  opacity: 0.35;
-  cursor: default;
-}
-.member-photo {
-  width: 56px;
-  height: 56px;
-  margin: 0 auto 6px;
-  border-radius: 50%;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #eef2f7;
-}
-.member-card.mini .member-photo {
-  width: 44px;
-  height: 44px;
-}
-.member-photo img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.photo-fallback {
-  font-size: 26px;
-}
-.member-card.mini .photo-fallback {
-  font-size: 20px;
-}
-.member-name {
-  font-size: 13px;
-  font-weight: 600;
+.kin-person {
   color: var(--color-text);
+  font-weight: 600;
 }
-.member-birth {
-  font-size: 11px;
+.kin-arrow {
   color: var(--color-text-2);
-  margin-top: 2px;
 }
-/* 关联账号徽标:小而不抢眼,仅提示此人与某账号对应 */
-.member-account {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  max-width: 100%;
-  margin-top: 3px;
-  font-size: 10px;
-  line-height: 1.3;
-  color: var(--color-accent, var(--color-brand));
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.member-account :deep(.el-icon) {
-  font-size: 11px;
-  flex: none;
-}
-.children {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.children-line {
-  width: 2px;
-  height: 12px;
-  background: var(--color-border-strong, #c5cfd9);
-}
-.children-cards {
+.kin-terms {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  justify-content: center;
+  gap: 8px 22px;
 }
-.child-node {
+.kin-term {
   display: flex;
-  flex-direction: column;
   align-items: center;
+  gap: 8px;
+}
+.kin-term-label {
+  color: var(--color-text-2);
+  font-size: 12px;
+}
+.kin-term strong {
+  color: var(--color-primary);
+  font-size: 18px;
+  letter-spacing: 1px;
+}
+.kin-note {
+  color: #d98b2b;
+  font-size: 12px;
+}
+.kin-clear {
+  margin-left: auto;
+}
+.import-hint {
+  color: var(--color-text-2);
+  font-size: 12px;
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+.import-all {
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+.import-list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+.import-item {
+  display: flex;
+  width: 100%;
+  margin: 0 0 6px;
+}
+.import-item :deep(.el-checkbox__label) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 .upload-row {
   display: flex;
@@ -465,14 +499,19 @@ onMounted(() => {
   object-fit: cover;
   border: 1px solid var(--color-border);
 }
-
 @media (max-width: 768px) {
-  .tree-container {
-    overflow-x: auto;
-    padding: 8px 0;
+  .tree-head {
+    flex-direction: column;
   }
-  .member-card {
-    min-width: 120px;
+  .tree-head-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .kin-card {
+    flex-wrap: wrap;
+  }
+  .kin-clear {
+    margin-left: 0;
   }
   .upload-row {
     flex-direction: column;

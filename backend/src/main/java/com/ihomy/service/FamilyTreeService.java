@@ -39,8 +39,18 @@ public class FamilyTreeService {
     public List<Map<String, Object>> list(Long familyId) {
         List<FamilyTreeMember> all = treeMapper.selectList(new LambdaQueryWrapper<FamilyTreeMember>()
                 .eq(FamilyTreeMember::getFamilyId, familyId)
-                .orderByAsc(FamilyTreeMember::getGeneration)
                 .orderByAsc(FamilyTreeMember::getId));
+        // 历史数据可能只在一侧写了 spouse_id:按反向引用补齐,保证前端夫妻单元能合并
+        Map<Long, Long> reverseSpouse = new HashMap<>();
+        for (FamilyTreeMember m : all) {
+            if (m.getSpouseId() != null) reverseSpouse.put(m.getSpouseId(), m.getId());
+        }
+        for (FamilyTreeMember m : all) {
+            if (m.getSpouseId() == null) {
+                Long other = reverseSpouse.get(m.getId());
+                if (other != null && !other.equals(m.getId())) m.setSpouseId(other);
+            }
+        }
         Map<Long, String> names = all.stream()
                 .collect(Collectors.toMap(FamilyTreeMember::getId, FamilyTreeMember::getName, (a, b) -> a));
         Map<Long, SysUser> userMap = batchUsers(all);
@@ -81,7 +91,9 @@ public class FamilyTreeService {
     /** 新增成员:世代按父母辈分+1自动推导;配偶双向绑定 */
     @Transactional
     public FamilyTreeMember create(Long familyId, TreeMemberDTO dto) {
+        if (dto.getName() == null || dto.getName().isBlank()) throw new BizException(ResultCode.BAD_REQUEST);
         validateUser(familyId, dto.getUserId());
+        validateParents(familyId, null, dto.getFatherId(), dto.getMotherId());
         FamilyTreeMember m = new FamilyTreeMember();
         m.setFamilyId(familyId);
         apply(m, dto);
@@ -96,6 +108,10 @@ public class FamilyTreeService {
     public void update(Long id, Long familyId, TreeMemberDTO dto) {
         FamilyTreeMember m = require(id, familyId);
         validateUser(familyId, dto.getUserId());
+        if (id.equals(dto.getFatherId()) || id.equals(dto.getMotherId()) || id.equals(dto.getSpouseId())) {
+            throw new BizException(ResultCode.BAD_REQUEST);
+        }
+        validateParents(familyId, id, dto.getFatherId(), dto.getMotherId());
         // 配偶被更换或解除时,先解除旧配偶的指向
         Long oldSpouse = m.getSpouseId();
         if (oldSpouse != null && !Objects.equals(oldSpouse, dto.getSpouseId())) {
@@ -154,6 +170,67 @@ public class FamilyTreeService {
         if (u == null || familyId == null || !familyId.equals(u.getFamilyId())) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
+    }
+
+    /** 父/母必须是本家庭成员,且不能把本人的后代设成父母(防环)。 */
+    private void validateParents(Long familyId, Long selfId, Long fatherId, Long motherId) {
+        if (fatherId != null) validateParent(familyId, selfId, fatherId);
+        if (motherId != null) validateParent(familyId, selfId, motherId);
+    }
+
+    private void validateParent(Long familyId, Long selfId, Long parentId) {
+        FamilyTreeMember p = treeMapper.selectById(parentId);
+        if (p == null || familyId == null || !familyId.equals(p.getFamilyId())) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
+        if (selfId != null && hasAncestor(parentId, selfId, familyId, new HashSet<>())) {
+            throw new BizException(ResultCode.BAD_REQUEST);
+        }
+    }
+
+    /** parent 链上是否能走回 target(是则表示 target 是 parent 的祖先,再挂父子会成环)。 */
+    private boolean hasAncestor(Long startId, Long targetId, Long familyId, Set<Long> seen) {
+        if (startId == null) return false;
+        if (startId.equals(targetId)) return true;
+        if (!seen.add(startId)) return false;
+        FamilyTreeMember m = treeMapper.selectById(startId);
+        if (m == null || !m.getFamilyId().equals(familyId)) return false;
+        return hasAncestor(m.getFatherId(), targetId, familyId, seen)
+                || hasAncestor(m.getMotherId(), targetId, familyId, seen);
+    }
+
+    /**
+     * 把家庭成员账号批量建成家谱人物:已关联账号自动跳过;
+     * userIds 为空时导入全部未关联成员。返回实际新增数量。
+     */
+    @Transactional
+    public int importMembers(Long familyId, List<Long> userIds) {
+        if (familyId == null) throw new BizException(ResultCode.UNAUTHORIZED);
+        Set<Long> wanted = (userIds == null || userIds.isEmpty()) ? null : new HashSet<>(userIds);
+        Set<Long> linked = new HashSet<>();
+        for (FamilyTreeMember m : treeMapper.selectList(new LambdaQueryWrapper<FamilyTreeMember>()
+                .eq(FamilyTreeMember::getFamilyId, familyId))) {
+            if (m.getUserId() != null) linked.add(m.getUserId());
+        }
+        List<SysUser> users = sysUserMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getFamilyId, familyId)
+                .orderByAsc(SysUser::getId));
+        int count = 0;
+        for (SysUser u : users) {
+            if (linked.contains(u.getId())) continue;
+            if (wanted != null && !wanted.contains(u.getId())) continue;
+            FamilyTreeMember m = new FamilyTreeMember();
+            m.setFamilyId(familyId);
+            m.setName(UserNames.of(u));
+            m.setGender(u.getGender() == null ? 0 : u.getGender());
+            m.setBirthDate(u.getBirthday());
+            m.setPhoto(u.getAvatar());
+            m.setUserId(u.getId());
+            m.setGeneration(0);
+            treeMapper.insert(m);
+            count++;
+        }
+        return count;
     }
 
     /** 世代 = 父/母中较大 generation + 1;无父母则为 0(新祖先) */

@@ -7,7 +7,7 @@
     </select>
 
     <select id="selectMembersByFamily" resultType="map">
-        SELECT u.id, u.username, u.nickname, u.avatar, r.role_code AS roleCode,
+        SELECT u.id, u.username, u.nickname, u.avatar, u.gender, u.birthday, r.role_code AS roleCode,
                l.label AS label, l.color AS labelColor
         FROM sys_user u
         JOIN sys_user_role ur ON ur.user_id = u.id

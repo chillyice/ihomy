@@ -3,81 +3,94 @@
   <div class="page">
     <Breadcrumb :items="[{ label: t('member.title') }]" />
 
-    <PageToolbar>
+    <PageToolbar v-if="activeTab === 'members'">
       <div class="tb-right">
         <el-button type="primary" plain @click="openSearch">{{ t('member.joinFamily') }}</el-button>
       </div>
     </PageToolbar>
 
-    <div v-if="userStore.isOwner" class="card invite-card">
-      <div class="invite-title">{{ t('member.inviteNew') }}</div>
-      <div class="invite-row">
-        <el-select v-model="inviteRole" style="width: 140px">
-          <el-option :label="t('member.member')" value="MEMBER" />
-          <el-option :label="t('member.child')" value="CHILD" />
-        </el-select>
-        <el-button type="primary" @click="genInvite">{{ t('member.invite') }}</el-button>
-      </div>
-      <div v-if="inviteCodes.length" class="invite-list">
-        <div v-for="c in inviteCodes" :key="c.id" class="invite-code">
-          <code>{{ c.code }}</code>
-          <span class="invite-uses">{{ t('member.usesCount', { used: c.usedCount, max: c.maxUses }) }}</span>
-          <span class="invite-expire">{{ t('member.expireAt', { time: formatDate(c.expiresAt) }) }}</span>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="userStore.isOwner && applies.length" class="card invite-card">
-      <div class="invite-title">{{ t('member.applyList') }}（{{ applies.length }}）</div>
-      <div class="apply-row" v-for="a in applies" :key="a.id">
-        <el-avatar :size="36">{{ (a.applicantName || 'U').charAt(0) }}</el-avatar>
-        <div class="apply-info">
-          <div class="apply-name">{{ a.applicantName }}</div>
-          <div v-if="a.message" class="apply-msg">{{ a.message }}</div>
-          <div class="apply-time">{{ formatDate(a.createdAt) }}</div>
-        </div>
-        <div class="apply-actions">
-          <el-button size="small" type="success" @click="handleApply(a, 'approve')">{{ t('member.approve') }}</el-button>
-          <el-button size="small" type="danger" plain @click="handleApply(a, 'reject')">{{ t('member.reject') }}</el-button>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="loadError" style="padding: 20px 0; text-align: center; color: var(--color-text-secondary)">
-      {{ t('common.loadFailed') }} <el-button text size="small" @click="load">{{ t('common.retry') }}</el-button>
-    </div>
-
-    <div v-loading="loading" class="member-list">
-      <div v-for="m in members" :key="m.id" class="member-row card">
-        <el-avatar :size="40" :src="m.avatar">{{ (m.nickname || m.username || 'U').charAt(0) }}</el-avatar>
-        <div class="member-info">
-          <div class="member-name">
-            {{ m.nickname || m.username }}
-            <el-tag v-if="m.label" :color="m.labelColor || '#C9807A'" size="small" effect="dark" style="color: #fff; border: none">{{
-              m.label
-            }}</el-tag>
+    <el-tabs v-model="activeTab" class="member-tabs">
+      <el-tab-pane :label="t('member.tabMembers')" name="members">
+        <div v-if="userStore.isOwner" class="card invite-card">
+          <div class="invite-title">{{ t('member.inviteNew') }}</div>
+          <div class="invite-row">
+            <el-select v-model="inviteRole" style="width: 140px">
+              <el-option :label="t('member.member')" value="MEMBER" />
+              <el-option :label="t('member.child')" value="CHILD" />
+            </el-select>
+            <el-button type="primary" @click="genInvite">{{ t('member.invite') }}</el-button>
           </div>
-          <div class="member-un">@{{ m.username }}</div>
+          <div v-if="inviteCodes.length" class="invite-list">
+            <div v-for="c in inviteCodes" :key="c.id" class="invite-code">
+              <code>{{ c.code }}</code>
+              <span class="invite-uses">{{ t('member.usesCount', { used: c.usedCount, max: c.maxUses }) }}</span>
+              <span class="invite-expire">{{ t('member.expireAt', { time: formatDate(c.expiresAt) }) }}</span>
+            </div>
+          </div>
         </div>
-        <div class="member-right">
-          <el-select
-            v-if="userStore.isOwner && m.id !== userStore.userInfo?.id"
-            :model-value="m.roleCode"
-            size="small"
-            style="width: 100px"
-            @change="(v) => changeRole(m, v)"
-          >
-            <el-option :label="t('member.owner')" value="OWNER" />
-            <el-option :label="t('member.member')" value="MEMBER" />
-            <el-option :label="t('member.child')" value="CHILD" />
-          </el-select>
-          <el-tag v-else size="small">{{ roleName(m.roleCode) }}</el-tag>
-          <el-button v-if="userStore.isOwner && m.id !== userStore.userInfo?.id" size="small" type="danger" text @click="removeMember(m)">{{
-            t('member.remove')
-          }}</el-button>
+
+        <div v-if="userStore.isOwner && applies.length" class="card invite-card">
+          <div class="invite-title">{{ t('member.applyList') }}（{{ applies.length }}）</div>
+          <div class="apply-row" v-for="a in applies" :key="a.id">
+            <el-avatar :size="36">{{ (a.applicantName || 'U').charAt(0) }}</el-avatar>
+            <div class="apply-info">
+              <div class="apply-name">{{ a.applicantName }}</div>
+              <div v-if="a.message" class="apply-msg">{{ a.message }}</div>
+              <div class="apply-time">{{ formatDate(a.createdAt) }}</div>
+            </div>
+            <div class="apply-actions">
+              <el-button size="small" type="success" @click="handleApply(a, 'approve')">{{ t('member.approve') }}</el-button>
+              <el-button size="small" type="danger" plain @click="handleApply(a, 'reject')">{{ t('member.reject') }}</el-button>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+
+        <div v-if="loadError" style="padding: 20px 0; text-align: center; color: var(--color-text-secondary)">
+          {{ t('common.loadFailed') }} <el-button text size="small" @click="load">{{ t('common.retry') }}</el-button>
+        </div>
+
+        <div v-loading="loading" class="member-list">
+          <div v-for="m in members" :key="m.id" class="member-row card">
+            <el-avatar :size="40" :src="m.avatar">{{ (m.nickname || m.username || 'U').charAt(0) }}</el-avatar>
+            <div class="member-info">
+              <div class="member-name">
+                {{ m.nickname || m.username }}
+                <el-tag v-if="m.label" :color="m.labelColor || '#C9807A'" size="small" effect="dark" style="color: #fff; border: none">{{
+                  m.label
+                }}</el-tag>
+              </div>
+              <div class="member-un">@{{ m.username }}</div>
+            </div>
+            <div class="member-right">
+              <el-select
+                v-if="userStore.isOwner && m.id !== userStore.userInfo?.id"
+                :model-value="m.roleCode"
+                size="small"
+                style="width: 100px"
+                @change="(v) => changeRole(m, v)"
+              >
+                <el-option :label="t('member.owner')" value="OWNER" />
+                <el-option :label="t('member.member')" value="MEMBER" />
+                <el-option :label="t('member.child')" value="CHILD" />
+              </el-select>
+              <el-tag v-else size="small">{{ roleName(m.roleCode) }}</el-tag>
+              <el-button
+                v-if="userStore.isOwner && m.id !== userStore.userInfo?.id"
+                size="small"
+                type="danger"
+                text
+                @click="removeMember(m)"
+                >{{ t('member.remove') }}</el-button
+              >
+            </div>
+          </div>
+        </div>
+      </el-tab-pane>
+
+      <el-tab-pane :label="t('member.tabTree')" name="tree">
+        <Tree v-if="activeTab === 'tree'" />
+      </el-tab-pane>
+    </el-tabs>
 
     <el-dialog v-model="searchVisible" append-to-body :title="t('member.joinFamily')" width="440px">
       <el-input v-model="keyword" :placeholder="t('member.searchPlaceholder')" clearable @keyup.enter="doSearch">
@@ -107,17 +120,38 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { memberApi, familyApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
+import Tree from '@/views/tree/Tree.vue'
 import { useI18n } from 'vue-i18n'
 import { formatDateTime as formatDate } from '@/utils/datetime'
 
 const { t } = useI18n()
 const userStore = useUserStore()
+const route = useRoute()
+const router = useRouter()
+// 家谱已并入本页:?tab=tree 直接打开图谱,旧 /tree 路由也跳到这里
+const activeTab = ref(route.query.tab === 'tree' ? 'tree' : 'members')
+watch(
+  () => route.query.tab,
+  (tab) => {
+    const next = tab === 'tree' ? 'tree' : 'members'
+    if (next !== activeTab.value) activeTab.value = next
+  },
+)
+watch(activeTab, (tab) => {
+  const next = tab === 'tree' ? 'tree' : undefined
+  if (next === route.query.tab) return
+  const query = { ...route.query }
+  if (next) query.tab = next
+  else delete query.tab
+  router.replace({ query })
+})
 const members = ref([])
 const loading = ref(false)
 const loadError = ref(false)

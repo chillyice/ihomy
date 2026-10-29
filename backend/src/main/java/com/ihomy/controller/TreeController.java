@@ -2,6 +2,7 @@ package com.ihomy.controller;
 
 import com.ihomy.annotation.OperationLog;
 import com.ihomy.common.Result;
+import com.ihomy.dto.TreeImportDTO;
 import com.ihomy.dto.TreeMemberDTO;
 import com.ihomy.entity.FamilyTreeMember;
 import com.ihomy.security.LoginUser;
@@ -38,14 +39,14 @@ public class TreeController {
         return Result.success(treeService.list(familyId()));
     }
 
-    @Operation(summary = "新增家谱成员(世代自动推导)")
+    @Operation(summary = "新增家谱成员")
     @OperationLog(module = "TREE", operationType = "CREATE", description = "新增家谱成员", saveArgs = false)
     @PostMapping
     public Result<FamilyTreeMember> create(@RequestBody TreeMemberDTO dto) {
         return Result.success(treeService.create(familyId(), dto));
     }
 
-    @Operation(summary = "编辑家谱成员(改父母自动重算世代)")
+    @Operation(summary = "编辑家谱成员")
     @OperationLog(module = "TREE", operationType = "UPDATE", description = "编辑家谱成员", saveArgs = false)
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @RequestBody TreeMemberDTO dto) {
@@ -59,5 +60,13 @@ public class TreeController {
     public Result<Void> delete(@PathVariable Long id) {
         treeService.delete(id, familyId());
         return Result.success();
+    }
+
+    @Operation(summary = "从家庭成员导入家谱")
+    @OperationLog(module = "TREE", operationType = "IMPORT", description = "导入家庭成员到家谱", saveArgs = false)
+    @PostMapping("/import-members")
+    public Result<Map<String, Object>> importMembers(@RequestBody(required = false) TreeImportDTO dto) {
+        int count = treeService.importMembers(familyId(), dto == null ? null : dto.getUserIds());
+        return Result.success(Map.of("count", count));
     }
 }
