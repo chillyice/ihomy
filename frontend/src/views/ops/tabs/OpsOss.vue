@@ -121,6 +121,7 @@
         <b>{{ ossPlan.name }}</b>
         <span class="mono">{{ ossPlan.currentVersion }} → {{ ossPlan.latestVersion }}</span>
       </div>
+      <div class="oss-plan-sub">{{ $t('ops.oss.stepsTitle') }}</div>
       <ol class="oss-plan-steps">
         <li v-for="(s, i) in ossPlan.steps" :key="i">{{ s }}</li>
       </ol>
@@ -136,6 +137,7 @@
           <el-tag v-if="ossAssess" size="small" :type="ossAssess.feasible ? 'success' : 'danger'">
             {{ ossAssess.feasible ? $t('ops.oss.feasibleYes') : $t('ops.oss.feasibleNo') }}
           </el-tag>
+          <el-tag v-if="ossAssessStale" size="small" type="warning">{{ $t('ops.oss.assessStale', { v: ossAssess.latestVersion }) }}</el-tag>
         </div>
         <div v-if="ossAssess" class="oss-assess-body">
           <p class="oss-assess-summary">{{ ossAssess.summary }}</p>
@@ -167,6 +169,9 @@
         <el-button size="small" @click="copyOssPlan">{{ ossCopied ? $t('ops.oss.copied') : $t('ops.oss.copy') }}</el-button>
         <el-button v-if="ossPlan.repoUrl" size="small" @click="openRepo(ossPlan.repoUrl)">{{ $t('ops.oss.viewChange') }}</el-button>
       </div>
+      <p v-if="ossPlanComponent && ossPlanComponent.managedBy === 'RENOVATE'" class="oss-plan-hint">
+        {{ $t('ops.oss.manualHint') }}
+      </p>
     </div>
   </el-dialog>
 
@@ -327,9 +332,11 @@ const filteredOssRows = computed(() => {
 
 const openOssPlan = async (row) => {
   try {
-    ossPlan.value = await opsApi.ossUpgradePlan(row.id)
+    const plan = await opsApi.ossUpgradePlan(row.id)
+    ossPlan.value = plan
     ossPlanComponent.value = row
-    ossAssess.value = null
+    // 方案里带回上次 AI 评估,重开弹窗不必再烧一次 token
+    ossAssess.value = plan?.lastAssess || null
     ossCopied.value = false
     ossPlanVisible.value = true
   } catch (e) {
@@ -338,6 +345,9 @@ const openOssPlan = async (row) => {
 }
 
 const ossAssessRiskTag = (level) => (level === 'HIGH' ? 'danger' : level === 'MEDIUM' ? 'warning' : 'success')
+
+// 库里存的是上次评估的目标版本:和当前最新版不一致就提示重新评估
+const ossAssessStale = computed(() => !!ossAssess.value?.latestVersion && ossAssess.value.latestVersion !== ossPlan.value?.latestVersion)
 
 // 当前版本自动探测:探到就回写当前版本,没探到后端会把原因写进 probeMessage,原样提示给运维
 const probeOss = async (row) => {
@@ -361,6 +371,8 @@ const assessOss = async (row) => {
   ossAssessing.value = true
   try {
     ossAssess.value = await opsApi.ossAssess(row.id)
+    // 同步进方案对象,复制出来的步骤里要带上这次的建议
+    if (ossPlan.value) ossPlan.value.lastAssess = ossAssess.value
   } catch (e) {
     /* 错误由 request.js 统一 toast */
   } finally {
@@ -375,9 +387,31 @@ const requestOssUpgrade = async (row) => {
   await loadOss()
 }
 
+// 复制成一份能直接照着做的清单:版本行 + 执行步骤 + 上次 AI 评估结论与迁移步骤
+const buildOssPlanText = () => {
+  const plan = ossPlan.value
+  if (!plan) return ''
+  const lines = [`${plan.name} ${plan.currentVersion || '—'} → ${plan.latestVersion}`, '', t('ops.oss.stepsTitle')]
+  ;(plan.steps || []).forEach((s, i) => lines.push(`${i + 1}. ${s}`))
+  const ai = ossAssess.value
+  if (ai) {
+    lines.push('', `${t('ops.oss.aiAssess')}(${t('ops.oss.risk')} ${ai.riskLevel || '—'})`)
+    if (ai.summary) lines.push(ai.summary)
+    if (ai.breakingChanges?.length) {
+      lines.push(t('ops.oss.breakingChanges'))
+      ai.breakingChanges.forEach((b, i) => lines.push(`${i + 1}. ${b}`))
+    }
+    if (ai.migrationSteps?.length) {
+      lines.push(t('ops.oss.migrationSteps'))
+      ai.migrationSteps.forEach((m, i) => lines.push(`${i + 1}. ${m}`))
+    }
+  }
+  return lines.join('\n')
+}
+
 const copyOssPlan = async () => {
   if (!ossPlan.value) return
-  const text = ossPlan.value.steps.join('\n')
+  const text = buildOssPlanText()
   try {
     if (navigator.clipboard && window.isSecureContext) {
       await navigator.clipboard.writeText(text)
@@ -513,6 +547,17 @@ onMounted(loadOss)
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
+}
+.oss-plan-sub {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--color-text-secondary);
+}
+.oss-plan-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
 }
 .oss-plan-steps {
   margin: 0;

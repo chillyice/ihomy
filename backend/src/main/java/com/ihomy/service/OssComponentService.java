@@ -2,11 +2,13 @@ package com.ihomy.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.ihomy.common.AiConst;
 import com.ihomy.common.BizException;
 import com.ihomy.common.DictConst;
+import com.ihomy.common.OssUpgradeGuide;
 import com.ihomy.common.OssVersionUtil;
 import com.ihomy.common.ResultCode;
 import com.ihomy.common.ThirdPartyHttp;
@@ -121,7 +123,7 @@ public class OssComponentService {
         }
     }
 
-    /** 生成升级方案(按组件类型确定性输出命令步骤,无 AI) */
+    /** 生成升级方案(按组件类型确定性输出可执行步骤,无 AI;同时回带上次 AI 评估供弹窗直接展示) */
     public Map<String, Object> buildUpgradePlan(Long id) {
         OssComponent c = mapper.selectById(id);
         if (c == null) {
@@ -138,36 +140,25 @@ public class OssComponentService {
         plan.put("latestVersion", c.getLatestVersion());
         plan.put("updateType", c.getUpdateType());
         plan.put("repoUrl", c.getRepoUrl());
-
-        List<String> steps = new ArrayList<>();
-        String type = c.getComponentType() == null ? "" : c.getComponentType();
-        switch (type) {
-            case DictConst.OSS_TYPE_NPM, DictConst.OSS_TYPE_MAVEN -> {
-                steps.add("该组件由 Renovate 管理:先「AI 评估」判断升级影响,评估可行后再「生成升级 PR」");
-                steps.add("Renovate 将生成 " + c.getName() + " 从 " + c.getCurrentVersion() + " → " + c.getLatestVersion() + " 的升级 PR,CI 构建通过后人工 review 合并");
-            }
-            case DictConst.OSS_TYPE_SERVICE -> {
-                String deploy = c.getDeployType() == null ? "" : c.getDeployType();
-                if (DictConst.OSS_DEPLOY_CONTAINER.equals(deploy)) {
-                    steps.add("该服务以容器部署:修改 compose/运行命令中的镜像 tag 为 " + c.getLatestVersion() + ",按现有部署流程重启");
-                } else if (DictConst.OSS_DEPLOY_SYSTEMD.equals(deploy)) {
-                    steps.add("该服务以 systemd 部署:按官方文档更新到 " + c.getLatestVersion() + " 后重启对应服务");
-                } else {
-                    steps.add("该组件为独立部署服务,升级在其自身管理界面/服务器完成(参考官方文档)");
-                }
-                if (hasProbe(c)) {
-                    steps.add("该组件已开启当前版本自动探测:升级完成后点「探测当前版本」即可读回真实版本,无需手工确认");
-                } else {
-                    steps.add("升级完成后回到本页,点击「确认已升级」把当前版本更新为 " + c.getLatestVersion());
-                }
-            }
-            default -> steps.add("未知组件类型,请参考官方文档手动升级");
-        }
-        if (DictConst.OSS_UPDATE_MAJOR.equals(c.getUpdateType())) {
-            steps.add("⚠ 大版本升级,可能含破坏性变更,升级前先查看变更日志并备份");
-        }
-        plan.put("steps", steps);
+        plan.put("steps", OssUpgradeGuide.steps(c.getComponentType(), c.getPackageRef(),
+                c.getLatestVersion(), c.getDeployType(), hasProbe(c), c.getUpdateType()));
+        plan.put("lastAssess", readAssess(c.getAssessJson()));
+        plan.put("assessedAt", c.getAssessedAt());
         return plan;
+    }
+
+    /** 读上次 AI 评估结果(JSON 解析失败或未评估返回 null,不阻断方案生成) */
+    private Map<String, Object> readAssess(String assessJson) {
+        if (assessJson == null || assessJson.isBlank()) {
+            return null;
+        }
+        try {
+            return json.readValue(assessJson, new TypeReference<Map<String, Object>>() {
+            });
+        } catch (Exception e) {
+            log.warn("parse oss assess json failed", e);
+            return null;
+        }
     }
 
     /** AI 升级评估:拉 release notes + 台账字段,LLM 出风险分级/迁移点/可行性,并回写台账 */
@@ -242,7 +233,7 @@ public class OssComponentService {
         String repo = githubRepo();
         if (!approveRenovateDashboard(repo, c)) {
             throw new BizException(ResultCode.INTERNAL_ERROR,
-                    "触发 Renovate 失败:未在 Dependency Dashboard 找到对应条目,请确认 Renovate 已运行过");
+                    "未找到待办的自动升级任务:请确认该仓库已接入自动升级,或直接按「升级方案」里的步骤手工升级");
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("component", c.getName());

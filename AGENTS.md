@@ -82,7 +82,7 @@ Nginx 静态根指向 `frontend/dist`,构建即生效。
 - 角色 OWNER/MEMBER/CHILD/GUEST + OPS(运维不属家庭,绑定须含 `family_id=NULL` 系统级行);同一用户在不同家庭可不同角色。
 - **新增 `@RequirePermission` 接口前**:auth_code 必须进 `sys_auth` + `sys_role_auth` 种子(OWNER 豁免、MEMBER 显式授权);注解**只写方法上**,类级不生效(踩坑速查 §2.14)。
 - **索引规范(强制)**:列表查询的 WHERE+ORDER BY 必须落在同一复合索引内,等值字段在前、范围/排序在后,`deleted` 进索引;混向排序给索引列加 `DESC`;新增表/接口先 `EXPLAIN`(踩坑速查 §8.4)。
-- **引用开源依赖必须登记** `sys_oss_component`(NPM/MAVEN 交 Renovate;SERVICE 走内部升级方案);`current_version` 记锁定版本,不写区间下限。细则见 需求 §4.6.10。
+- **引用开源依赖必须登记** `sys_oss_component`(NPM/MAVEN 交 Renovate;SERVICE 走内部升级方案);`current_version` 记锁定版本,不写区间下限。**升级两条通道**:台账「升级方案」给可执行手工步骤(NPM 装包+验证 / MAVEN 改 pom+`mvnw` / SERVICE 按部署方式),自动开 PR 只是可选路径——仓库没装 Renovate 时该通道恒失败,别当 bug 修(踩坑速查 §7.14)。细则见 需求 §4.6.10。
 - **记账账户余额不落库**:`balance = 期初 + 收入 − 支出 − 转出 + 转入`,前后端同一口径(前端 `utils/bookLedger.js` 可复算对账);`family_book_record` 三个账户列可空 = 历史未归属,只提示不迁移;总账 `byMonth` 只含有记录的月份、前端补 12 槽(踩坑速查 §8.5,功能口径见 需求 §4.5.5)。**预算同理只存额度**(`family_book_budget`,一个分类一条),当月已花/超支实时汇总;净资产 = 账户资金 + 理财持仓本金 − 贷款剩余本金(贷款走 `utils/loan.js` 唯一计算源)。
 
 ## 代码结构
@@ -188,9 +188,9 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 ## 验证基线
 
-- 后端全绿:`.\mvnw.cmd -B clean package`(140 tests,纯逻辑不起 Spring)。
-- 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(559 passed)+ `npm run format:check`(全树遗留未格式化:`views/BitPouch.vue`、`utils/packetDecode.js`+`.spec.js`、`views/bitpouch/panels/PacketPanel.vue`、`views/Chillyice.vue`、`views/ops/tabs/OpsKada.vue`;**本次改动的文件必须 `prettier --write` 后通过**)。
-- 构建:入口 chunk 基线 **515.20KB / gzip 212.70KB**(V10.89);**vite 报的是字符数不是字节数**,别拿 `ls -la` 比;历史数字见 变更归档。
+- 后端全绿:`.\mvnw.cmd -B clean package`(173 tests,纯逻辑不起 Spring)。
+- 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(571 passed)+ `npm run format:check`(全树遗留未格式化:`views/BitPouch.vue`、`utils/packetDecode.js`+`.spec.js`、`views/bitpouch/panels/PacketPanel.vue`、`views/Chillyice.vue`、`views/ops/tabs/OpsKada.vue`;**本次改动的文件必须 `prettier --write` 后通过**)。
+- 构建:入口 chunk 基线 **515.50KB / gzip 212.86KB**(V10.90);**vite 报的是字符数不是字节数**,别拿 `ls -la` 比;历史数字见 变更归档。
 - 一致性:`bash scripts/doc-drift-check.sh` 全 [OK];`gen-code-map.sh --check`、`doc-index.sh --check` 无漂移。
 - 接口测试在仓库外 `..\autotest_framework`(`pytest -m api`,37 passed)。
 
