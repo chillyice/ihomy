@@ -776,14 +776,14 @@ html.dark .doodle-mark {
   z-index: 4;
 }
 
-/* 心情/天气弹窗:z-index 61(高于导航栏60,低于光影层65+) */
+/* 心情/天气弹窗:取全局遮罩档,与 EP 弹窗同一层级语义(页内渲染,实际仍受内容栏层叠限制) */
 .picker-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 61;
+  z-index: var(--z-overlay);
 }
 .picker-pop {
   background: rgba(255, 253, 248, 0.85);

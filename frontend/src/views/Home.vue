@@ -2282,7 +2282,7 @@ html.dark .music-title {
 /* 拖拽幽灵 */
 .drag-ghost {
   position: fixed;
-  z-index: 200;
+  z-index: var(--z-immersive);
   width: 80px;
   height: 60px;
   margin-left: -40px;

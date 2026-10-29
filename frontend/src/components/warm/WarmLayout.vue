@@ -659,7 +659,7 @@ watch(
 /* 拖拽幽灵:导航胶囊形态,进入网格时放大并渐隐(交给 WarmHome 网格占位呈现 4×2 卡片) */
 .gc-drag-ghost {
   position: fixed;
-  z-index: 2000;
+  z-index: var(--z-immersive);
   pointer-events: none;
   transform: translate(14px, 12px);
   transform-origin: top left;

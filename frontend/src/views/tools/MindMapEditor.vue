@@ -1491,7 +1491,7 @@ onBeforeUnmount(() => {
 /* 右键菜单(fixed 定位到视口) */
 .mm-ctx-menu {
   position: fixed;
-  z-index: 2600;
+  z-index: var(--z-popup);
   width: 200px;
   padding: 6px;
   max-height: calc(100vh - 16px);
@@ -1572,7 +1572,7 @@ onBeforeUnmount(() => {
 /* 备注气泡 */
 .mm-note-bubble {
   position: fixed;
-  z-index: 2600;
+  z-index: var(--z-popup);
   width: 320px;
   padding: 10px 12px;
 }
@@ -1588,7 +1588,7 @@ onBeforeUnmount(() => {
 /* 富文本格式工具栏 */
 .mm-rt-bar {
   position: fixed;
-  z-index: 2600;
+  z-index: var(--z-popup);
   display: flex;
   align-items: center;
   gap: 4px;

@@ -383,7 +383,7 @@ onMounted(() => {
   top: 0;
   bottom: 0;
   width: 220px;
-  z-index: 60;
+  z-index: var(--z-nav);
   background: rgba(255, 255, 255, 0.35);
   backdrop-filter: blur(24px) saturate(1.1);
   -webkit-backdrop-filter: blur(24px) saturate(1.1);

@@ -40,7 +40,7 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll, { capture: 
   font-size: 20px;
   cursor: pointer;
   box-shadow: var(--shadow);
-  z-index: 200;
+  z-index: var(--z-action);
   transition:
     transform 0.15s,
     background 0.15s;

@@ -24,7 +24,7 @@ const appVersion = __APP_VERSION__
   position: fixed;
   right: 16px;
   bottom: 8px;
-  z-index: 70;
+  z-index: var(--z-footer);
   display: flex;
   align-items: center;
   gap: 6px;

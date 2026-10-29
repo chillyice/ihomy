@@ -364,11 +364,12 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* z-index 201:Teleport 到 body,高于导航栏(60)和光影层(65-100) */
+/* 层级取统一标尺:压在光影层(65-100)之上、EP 弹窗遮罩(200)之下 ——
+   查看器里触发的确认框/设置弹窗才能盖在照片之上 */
 .photo-viewer {
   position: fixed;
   inset: 0;
-  z-index: 201;
+  z-index: var(--z-immersive);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -378,15 +379,9 @@ onBeforeUnmount(() => {
 .pv-backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(8, 6, 4, 0.88);
+  background: var(--overlay-scrim-strong);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-}
-html.dark .pv-backdrop {
-  background: rgba(4, 8, 16, 0.9);
-}
-html.theme-warm.dark .pv-backdrop {
-  background: rgba(24, 18, 12, 0.9);
 }
 
 /* 照片舞台 */

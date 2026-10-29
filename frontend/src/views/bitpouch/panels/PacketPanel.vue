@@ -484,7 +484,7 @@ const checksumRows = computed(() => {
 }
 .bpk-tip {
   position: fixed;
-  z-index: 120;
+  z-index: var(--z-action);
   max-width: 300px;
   padding: 9px 11px;
   border: 1px solid var(--line);

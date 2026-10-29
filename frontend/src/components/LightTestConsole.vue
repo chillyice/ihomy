@@ -180,7 +180,7 @@ const onDateChange = () => {
 <style scoped>
 .light-test-console {
   position: fixed;
-  z-index: 80;
+  z-index: var(--z-action);
   background: rgba(20, 28, 45, 0.72);
   backdrop-filter: blur(20px) saturate(1.3);
   -webkit-backdrop-filter: blur(20px) saturate(1.3);

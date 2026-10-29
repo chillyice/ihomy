@@ -786,7 +786,7 @@ watch(txtPage, () => applyTxtStyle())
 .reader-overlay {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: var(--z-immersive);
   background: #fff;
   color: #333;
   display: flex;
@@ -1174,7 +1174,7 @@ watch(txtPage, () => applyTxtStyle())
   position: fixed;
   top: 16px;
   right: 16px;
-  z-index: 210;
+  z-index: calc(var(--z-immersive) + 5);
   width: 40px;
   height: 40px;
   border: none;

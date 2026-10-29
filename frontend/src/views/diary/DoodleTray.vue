@@ -457,7 +457,7 @@ html.dark .swatch {
     bottom: 0;
     top: auto;
     border-radius: 14px 14px 0 0;
-    z-index: 55;
+    z-index: var(--z-action);
     max-height: 48vh;
     display: flex;
     flex-direction: column;

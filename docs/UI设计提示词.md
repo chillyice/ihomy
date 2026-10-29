@@ -772,6 +772,29 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 12. **理财弹窗**:编辑 640px(两列:名称+类型、机构+账户、本金+年化、计息方式+期限+基准天数、起息日+到期日、风险+备注;≤768px 收单列),底部实时试算条为虚线描边 12px 圆角块,并排展示预期利息 / 到期本息 / 折合年化;赎回 520px(顶部本金与已计提摘要条,到账金额改动时实际收益联动,「转回本金」「收益入账」默认勾选,无账户或已入账时该行换成提示/标签),均 `append-to-body`。
 13. **首页「本月收支」卡的理财持仓行**(`Home.vue` / `WarmHome.vue`,V10.80):在本月收支三项下方多一条整行可点的浅底条(圆角 8、`rgba(160,140,110,.08)` hover 加浓),左侧「理财持仓」10px 次要色标签 + 本金合计 14px/700 `tabular-nums`,右侧「N 笔持有中」11px 次要色、`margin-left:auto`;点击直达 `/book?tab=finance`;**没有持仓时整行不渲染**(不占位、不显示 ¥0),与「查看明细 →」同卡共存不互相挤压。
 
+## 29. 层级标尺与遮罩(全站统一,V10.87)
+
+1. **唯一来源**:层级只在 `frontend/src/styles/main.css` 的 `:root` 里定义,组件一律取 token、不写裸数字;守门 `src/styles/zLayers.spec.js`(组件内出现 ≥100 的裸 `z-index` 即失败,豁免名单只有 main.css 本体、`SunLightLayer` 的装饰刻度、独立页 `Kada` 的页内特效)。
+
+| 层 | token | 值 | 归谁 |
+|---|---|---|---|
+| 内容 | `--z-content` | 10 | `.app-main`(整页内容的层叠上限,页内再高的数字也出不去) |
+| 页内吸顶 | `--z-sticky` | 30 | 页签头、页内工具栏、图表 tooltip |
+| 常驻外壳 | `--z-nav` / `--z-footer` | 60 / 70 | 侧栏、移动端页头与底栏 / 站点页脚 |
+| 常驻浮层 | `--z-float` | 62 | 音乐播放器 |
+| 装饰光影 | `--z-deco` 起 | 65–100 | `SunLightLayer`(亮斑/窗影/反射/暗角/浮尘/雨雪/雷电/台灯),全部 `pointer-events:none` |
+| 浮起操作 | `--z-action` | 120 | 回顶、安装提示、移动端手绘托盘、页内固定提示 |
+| 自建沉浸层 | `--z-immersive` | 150 | 照片查看器、电子书阅读器、相册光箱、拖拽幽灵 |
+| 弹窗遮罩 | `--z-overlay` | 200 | `el-dialog` / `el-drawer` 的 `.el-overlay` |
+| 确认框 | `--z-messagebox` | 210 | `ElMessageBox`(常由弹窗内部触发,必须高于弹窗) |
+| 浮层弹层 | `--z-popup` | 240 | 所有 `.el-popper`(下拉/日期/级联/悬浮卡/tooltip) |
+| 轻提示 | `--z-toast` | 260 | `ElMessage` / `ElNotification` |
+| 瞬时特效 | `--z-topmost` | 999999 | 主题切换扫光幕布 |
+
+2. **遮罩**:`--overlay-scrim`(光尘晨 `rgba(38,29,21,.42)` / 光尘暮 `.58` / 暖居晨 `.34` / 暖居暮 `.62`)+ `backdrop-filter: blur(var(--overlay-blur))`(4px);全屏媒体用强档 `--overlay-scrim-strong`,由它自带的那层做 8–16px 虚化。**暖居与 `html.no-glass` 会全局禁 `backdrop-filter`**,所以蒙层色值必须自身可读,不能靠虚化区分层次。
+3. **弹窗本体**:圆角 14、边框 `--color-border`、阴影 `--dialog-shadow`(光尘/暖居晨为暖褐投影,暗色加深),`width: fit-content` + `max-width: calc(100vw - 32px)`;`margin-top` 读内联 `--el-dialog-margin-top`(`top="5vh"` 的媒体/预览弹窗贴顶),未声明时回 14vh;未使用 `dialog-sm/md/lg/xl` 的弹窗正文 `max-height: calc(78vh - 120px)` + 弹窗内滚动。
+4. **验收**:打开任意弹窗 → 页脚、回顶、光影层一起被压暗;弹窗内点删除 → 确认框在弹窗之上;弹窗内开下拉 → 下拉在弹窗之上;相册打开照片查看器后再触发确认框 → 确认框在查看器之上;暖居与无玻璃态下蒙层仍清晰可辨。
+
 ## 验收标准
 
 1. 打开页面,背景米白渐变 + 5 个色块缓慢飘移,右下角拍立得堆/闭合相册,左右毛玻璃面板从两侧滑入。

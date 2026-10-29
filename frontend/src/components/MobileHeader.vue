@@ -45,7 +45,7 @@ const goHome = () => router.push('/')
   backdrop-filter: blur(20px) saturate(1.1);
   -webkit-backdrop-filter: blur(20px) saturate(1.1);
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-  z-index: 60;
+  z-index: var(--z-nav);
 }
 html.dark .mobile-header {
   background: rgba(var(--color-card-rgb), 0.92);

@@ -175,7 +175,7 @@ onBeforeUnmount(clearTimers)
 .pc-overlay {
   position: fixed;
   inset: 0;
-  z-index: 2000;
+  z-index: var(--z-immersive);
   overflow: hidden;
   background: var(--color-bg);
 }

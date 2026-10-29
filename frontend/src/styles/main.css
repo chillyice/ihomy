@@ -13,6 +13,26 @@
   --shadow: 0 4px 12px rgba(58, 46, 34, 0.08), 0 1px 3px rgba(58, 46, 34, 0.06);
   --shadow-hover: 0 8px 24px rgba(58, 46, 34, 0.14), 0 2px 6px rgba(58, 46, 34, 0.08);
   --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -1px 0 rgba(58, 46, 34, 0.04);
+  /* 层级标尺(全局唯一来源):内容 → 常驻外壳 → 装饰光影 → 浮起操作 → 自建沉浸层 → EP 弹窗/弹层。
+     组件内不要再写裸数字:光影层固定占 65–100(pointer-events:none),所有功能浮层取下列档位。 */
+  --z-content: 10;
+  --z-sticky: 30;
+  --z-nav: 60; /* 侧栏 / 移动端页头 / 移动端底栏 */
+  --z-float: 62; /* 音乐播放器等常驻功能层(压在侧栏之上) */
+  --z-deco: 65; /* 光影层起点(65–100 为装饰层) */
+  --z-footer: 70; /* 站点页脚 */
+  --z-action: 120; /* 回顶 / 安装提示 / 移动端抽屉:高于内容与光影,低于弹窗 */
+  --z-immersive: 150; /* 自建全屏浮层:照片查看器 / 阅读器 / 相册光箱 / 拖拽幽灵 */
+  --z-overlay: 200; /* EP 弹窗 / 抽屉遮罩 */
+  --z-messagebox: 210; /* 确认框:常由弹窗内部触发,需盖住弹窗 */
+  --z-popup: 240; /* EP popper:下拉 / 日期 / 悬浮卡 / tooltip */
+  --z-toast: 260; /* ElMessage / ElNotification */
+  --z-topmost: 999999; /* 瞬时全屏特效(主题扫光) */
+  /* 遮罩:暖褐蒙层而非纯黑,配一档轻虚化;no-glass / 暖居退化为纯色蒙层仍可读 */
+  --overlay-scrim: rgba(38, 29, 21, 0.42);
+  --overlay-scrim-strong: rgba(10, 8, 5, 0.8);
+  --overlay-blur: 4px;
+  --dialog-shadow: 0 24px 60px -18px rgba(38, 29, 21, 0.34), 0 4px 14px rgba(38, 29, 21, 0.08);
   /* 品牌主色(主题×晨暮 都会覆写):按钮/侧栏/Tag 的高影响面统一走此 token */
   --color-brand: #b88c6e;
   --color-brand-hover: #a87c5e;
@@ -94,6 +114,9 @@ html.dark {
   --shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
   --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
   --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  --overlay-scrim: rgba(4, 8, 16, 0.58);
+  --overlay-scrim-strong: rgba(2, 5, 10, 0.88);
+  --dialog-shadow: 0 24px 60px -18px rgba(0, 0, 0, 0.6), 0 4px 14px rgba(0, 0, 0, 0.35);
   --color-brand: #d4b298;
   --color-brand-hover: #e0c2aa;
   --color-brand-text: #2a2018;
@@ -128,6 +151,8 @@ html.theme-warm {
   --shadow: 0 10px 28px rgba(122, 90, 60, 0.14), 0 2px 6px rgba(122, 90, 60, 0.08);
   --shadow-hover: 0 16px 44px rgba(122, 90, 60, 0.22), 0 3px 8px rgba(122, 90, 60, 0.1);
   --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -1px 0 rgba(122, 90, 60, 0.05);
+  --overlay-scrim: rgba(58, 46, 34, 0.34);
+  --dialog-shadow: 0 20px 50px -18px rgba(58, 46, 34, 0.3), 0 3px 10px rgba(58, 46, 34, 0.08);
   --color-brand: #8a6a4e;
   --color-brand-hover: #7a5b40;
   --color-brand-text: #fbf3e4;
@@ -162,6 +187,9 @@ html.theme-warm.dark {
   --shadow: 0 12px 32px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.35);
   --shadow-hover: 0 18px 48px rgba(0, 0, 0, 0.55), 0 3px 10px rgba(0, 0, 0, 0.4);
   --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.05), inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+  --overlay-scrim: rgba(12, 8, 5, 0.62);
+  --overlay-scrim-strong: rgba(6, 4, 2, 0.9);
+  --dialog-shadow: 0 24px 60px -18px rgba(0, 0, 0, 0.7), 0 4px 14px rgba(0, 0, 0, 0.4);
   --color-brand: #c9a16e;
   --color-brand-hover: #d8b47e;
   --color-brand-text: #33241a;
@@ -422,7 +450,7 @@ body,
 .theme-sweep-old {
   position: fixed;
   inset: 0;
-  z-index: 999999;
+  z-index: var(--z-topmost);
   pointer-events: none;
   overflow: hidden;
   will-change: mask-position;
@@ -904,7 +932,7 @@ html.dark .el-button.is-loading {
   font-weight: 500 !important;
   min-width: auto !important;
   max-width: 320px !important;
-  z-index: 63 !important;
+  z-index: var(--z-toast) !important;
 }
 .el-message--success {
   background: rgba(243, 238, 230, 0.95) !important;
@@ -958,6 +986,7 @@ html.dark .el-message--error {
 
 /* === ElNotification 弹出框增强 === */
 .el-notification {
+  z-index: var(--z-toast) !important;
   border-radius: 14px !important;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18) !important;
   backdrop-filter: blur(20px) saturate(1.4);
@@ -967,24 +996,28 @@ html.dark .el-message--error {
 
 /* === 全局弹窗统一样式 — 浅米暖色 / 磨砂 / 紧凑 / 弱阴影 === */
 
-/* 遮罩:低透明度 + 轻磨砂 */
+/* 遮罩:暖褐蒙层 + 一档轻虚化,弹窗与抽屉共用;z 必须高于光影层(65–100)与页脚(70),
+   否则光尘/暗角/反射会画在弹窗之上、页脚浮在蒙层之上不被压暗 */
 .el-overlay {
-  z-index: 63 !important;
-  background: rgba(0, 0, 0, 0.2) !important;
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  z-index: var(--z-overlay) !important;
+  background: var(--overlay-scrim) !important;
+  backdrop-filter: blur(var(--overlay-blur));
+  -webkit-backdrop-filter: blur(var(--overlay-blur));
 }
 
 /* el-dialog 弹窗本体 */
 .el-overlay-dialog .el-dialog {
   border-radius: 14px !important;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07) !important;
+  box-shadow: var(--dialog-shadow) !important;
   border: 1px solid var(--color-border) !important;
   background: #fcf8f0 !important;
   backdrop-filter: blur(12px) saturate(1.1);
   -webkit-backdrop-filter: blur(12px) saturate(1.1);
   overflow: hidden;
-  margin-top: 14vh !important;
+  /* 尊重组件 top 属性(EP 把 top 写成元素内联的 --el-dialog-margin-top,内联优先级高于本行);
+     未声明 top 的弹窗回到本项目的 14vh 基线,而不是 EP 默认的 15vh */
+  --el-dialog-margin-top: 14vh;
+  margin-top: var(--el-dialog-margin-top, 14vh) !important;
   width: fit-content !important;
   max-width: calc(100vw - 32px) !important;
   padding: 0 !important;
@@ -1002,15 +1035,21 @@ html:has(.gc-side) {
   --shell-nav-w: 251px;
 }
 
-/* 升级方案弹窗(AI 评估结果):上面 width:fit-content 会让长文按 max-content 把弹窗撑到近整屏,
-   弹窗在内容栏内渲染,超出的部分会被左侧导航盖住(光尘侧栏 z-index 高于内容区)/内容栏渐隐遮罩裁掉(暖居)。
-   这里沿用组件声明的 640px 作上限,窗口偏窄时再按内容栏收窄,长文按阅读宽度换行;正文超高改为弹窗内滚动。 */
+/* 升级方案弹窗(AI 评估结果):width:fit-content 会让长文按 max-content 把弹窗撑到近整屏,
+   长文按阅读宽度换行更易读;窗口偏窄时再按内容栏收窄,正文超高改为弹窗内滚动。 */
 .el-overlay-dialog .el-dialog.oss-plan-dialog {
   max-width: clamp(320px, calc(100vw - 2 * var(--shell-nav-w, 0px) - 32px), 640px) !important;
 }
 .el-overlay-dialog .el-dialog.oss-plan-dialog .el-dialog__body {
   max-height: calc(86vh - 132px);
   overflow: auto;
+}
+
+/* 未声明 dialog-sm/md/lg/xl 的弹窗兜底:正文超高时在弹窗内滚动,不再顶出视口。
+   只限制正文高度,标题与底部按钮常驻可见。 */
+.el-overlay-dialog .el-dialog > .el-dialog__body {
+  max-height: calc(78vh - 120px) !important;
+  overflow-y: auto !important;
 }
 
 /* 标题区:无装饰线,中等字重,紧凑 padding */
@@ -1163,10 +1202,12 @@ html.dark .el-dialog .el-input__inner::placeholder {
 }
 
 /* === ElMessageBox 弹框 — 同风格 === */
+/* 确认框常由弹窗内部(如弹窗里点删除)触发,层级要高于弹窗遮罩,否则被弹窗盖住 */
 .el-overlay.is-message-box {
-  background: rgba(0, 0, 0, 0.2) !important;
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  z-index: var(--z-messagebox) !important;
+  background: var(--overlay-scrim) !important;
+  backdrop-filter: blur(var(--overlay-blur));
+  -webkit-backdrop-filter: blur(var(--overlay-blur));
   display: flex !important;
   align-items: flex-start !important;
   justify-content: center !important;
@@ -1174,7 +1215,7 @@ html.dark .el-dialog .el-input__inner::placeholder {
 }
 .el-overlay.is-message-box .el-message-box {
   border-radius: 14px !important;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.07) !important;
+  box-shadow: var(--dialog-shadow) !important;
   border: 1px solid var(--color-border) !important;
   background: #fcf8f0 !important;
   backdrop-filter: blur(12px) saturate(1.1);
@@ -1389,10 +1430,10 @@ html.dark .el-message-box__btns .el-button:not(.el-button--primary):hover {
 }
 
 /* ========== 全局下拉菜单(teleported, scoped 不生效) ========== */
-.el-dropdown__popper.el-popper,
-.el-popper.is-light,
-.el-select__popper.el-popper {
-  z-index: 64 !important;
+/* 所有 popper(下拉/日期/级联/悬浮卡/tooltip)统一一档:高于弹窗遮罩(200)、低于 toast(260)。
+   EP 自带的动态递增 z 在 !important 下失效,统一档位后弹窗内开下拉、遮罩上开提示都可预期。 */
+.el-popper {
+  z-index: var(--z-popup) !important;
 }
 .el-dropdown__popper.el-popper {
   border-radius: 12px !important;
