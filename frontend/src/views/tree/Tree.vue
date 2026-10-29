@@ -18,7 +18,6 @@
     <div class="tree-legend">
       <span class="legend-item"><i class="legend-line spouse"></i>{{ $t('tree.legendSpouse') }}</span>
       <span class="legend-item"><i class="legend-line parent"></i>{{ $t('tree.legendParent') }}</span>
-      <span class="legend-item"><i class="legend-line extra"></i>{{ $t('tree.legendExtra') }}</span>
       <span class="legend-tip">{{ $t('tree.legendHint') }}</span>
     </div>
 
@@ -395,10 +394,7 @@ onMounted(() => {
   border-top: 2px solid var(--color-primary);
 }
 .legend-line.spouse {
-  border-top: 3px dotted #e85d75;
-}
-.legend-line.extra {
-  border-top: 2px dashed var(--color-accent, #c9807a);
+  border-top: 3px solid #e85d75;
 }
 .legend-tip {
   opacity: 0.75;

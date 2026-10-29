@@ -1,16 +1,23 @@
-// 家谱关系图:把扁平成员(父/母/配偶)归一化为夫妻单元,再按「父母在上、子女在下」排布。
-// 关键点:布局完全不依赖 family_tree.generation —— 历史数据世代填错、夫妻世代不一致时,
-// 也不会被拆到不同行;配偶双向补齐,只有一侧写了 spouse_id 也能连上。
+// 家谱关系图:把扁平成员(父/母/配偶)归一化为夫妻单元,再按「世代分层」排布——
+// 同一代的单元排在同一行,父母恒在上方、子女恒在下方。
+// 三条关键约束:
+// 1) 布局完全不依赖 family_tree.generation —— 历史数据世代填错、夫妻世代不一致也不会被拆到不同行;
+// 2) 一个单元可以同时挂在两组父母下(男方父母 / 女方父母),两组都画实线;
+//    「姻亲父母」不单独成树,而是紧贴本家父母右侧、占同一行的槽位,到子女就是相邻行的短竖线;
+// 3) 连线只走「行间空隙」与「卡片正上方/正下方」,所以不会压到人物卡片。
 // 输出纯数据(节点坐标/边路径),由组件负责渲染,便于单测。
 
 const DEFAULT_OPTIONS = {
   cardWidth: 108,
   cardHeight: 104,
   spouseGap: 16,
-  siblingGap: 30,
-  levelGap: 92,
-  rootGap: 68,
-  padding: 28,
+  siblingGap: 28,
+  levelGap: 96,
+  rootGap: 64,
+  padding: 32,
+  busOffset: 20,
+  busLaneGap: 9,
+  busLanes: 4,
 }
 
 /** 关系归一化:只保留真实存在的人;配偶按双向处理;统计指向缺失成员的关联。 */
@@ -103,58 +110,155 @@ function buildUnits(normalized) {
   return { units, unitOfPerson }
 }
 
-/** 每个夫妻单元挂到哪个父单元:优先男方父系,其次母系;其余父/母关系画成补充虚线。 */
-function attachParents(normalized, units, unitOfPerson) {
-  const parentUnitOf = new Map()
-  const parentRefs = new Map()
-
+/**
+ * 每个单元的父单元分组:一个单元最多两组(男方父母 / 女方父母)。
+ * byMember 记录「本单元里哪位成员」通过这条关系挂上去,用于把线连到具体那张卡片。
+ */
+function collectParentGroups(normalized, units, unitOfPerson) {
+  const groupsOf = new Map()
   for (const unit of units.values()) {
-    const groups = new Map()
+    const perUnit = new Map()
     for (const memberId of unit.memberIds) {
       for (const p of normalized.parentsOf.get(memberId) || []) {
         const parentUnitId = unitOfPerson.get(p.id)
         if (!parentUnitId || parentUnitId === unit.id) continue
-        if (!groups.has(parentUnitId)) groups.set(parentUnitId, new Map())
-        const byMember = groups.get(parentUnitId)
+        if (!perUnit.has(parentUnitId)) perUnit.set(parentUnitId, new Map())
+        const byMember = perUnit.get(parentUnitId)
         if (!byMember.has(memberId)) byMember.set(memberId, new Set())
         byMember.get(memberId).add(p.id)
       }
     }
-    if (!groups.size) continue
-
-    // 第一组(男方父系优先)作为主挂点,其余作为补充关系
-    const primaryParent = groups.keys().next().value
-    parentUnitOf.set(unit.id, primaryParent)
-    parentRefs.set(unit.id, groups)
+    if (perUnit.size) groupsOf.set(unit.id, perUnit)
   }
+  return groupsOf
+}
 
-  // 脏数据成环时断开:把环上第一个单元的挂点清空,让它成为根
-  const state = new Map()
-  for (const unitId of units.keys()) {
-    if (state.get(unitId) === 2) continue
-    const path = []
-    const onPath = new Set()
-    let cur = unitId
-    while (cur && state.get(cur) !== 2) {
-      if (onPath.has(cur)) {
-        parentUnitOf.set(cur, null)
-        break
+/** DFS 标记回边:脏数据成环时丢掉成环的那条关系,后续世代分层才有拓扑序。 */
+function dropBackEdges(unitList, childUnitsOf) {
+  const color = new Map(unitList.map((u) => [u.id, 0]))
+  const dropped = new Set()
+  for (const root of unitList) {
+    if (color.get(root.id)) continue
+    const stack = [[root.id, 0]]
+    color.set(root.id, 1)
+    while (stack.length) {
+      const top = stack[stack.length - 1]
+      const kids = childUnitsOf.get(top[0]) || []
+      if (top[1] >= kids.length) {
+        color.set(top[0], 2)
+        stack.pop()
+        continue
       }
-      onPath.add(cur)
-      path.push(cur)
-      cur = parentUnitOf.get(cur)
+      const kid = kids[top[1]]
+      top[1] += 1
+      const state = color.get(kid)
+      if (state === 1) {
+        dropped.add(`${kid}>${top[0]}`)
+      } else if (!state) {
+        color.set(kid, 1)
+        stack.push([kid, 0])
+      }
     }
-    for (const id of path) state.set(id, 2)
+  }
+  return dropped
+}
+
+/**
+ * 姻亲单元:只有这一个子女、自己又没有父母,且不是该子女的主血亲挂点。
+ * 它应当紧贴子女的本家父母排在同一个行,而不是被当成独立根系摆到画布另一端。
+ */
+function makeSatelliteTest(childUnitsOf, parentUnitsOf, primaryParentOf) {
+  return (id) => {
+    const kids = childUnitsOf.get(id) || []
+    if (kids.length !== 1 || (parentUnitsOf.get(id) || []).length) return false
+    const primaryParentOfKid = primaryParentOf.get(kids[0])
+    return primaryParentOfKid !== undefined && primaryParentOfKid !== id
+  }
+}
+
+/**
+ * 递归铺排:以「主血亲树」为准 —— 父母居中于子女块,子女按录入序从左到右。
+ * 姻亲单元不再单独成树,而是占用宿主单元那一行的右侧槽位,
+ * 于是「男方父母 / 女方父母」并排出现在子女正上方,连线都是相邻行的短竖线。
+ * 世代(行号)直接取主血亲树的深度,不再依赖 family_tree.generation。
+ */
+function layoutForest(unitList, parentUnitsOf, primaryChildrenOf, satellitesOf, units, unitWidth, opts) {
+  const slotWidthOf = (id) =>
+    unitWidth(units.get(id)) +
+    (primaryChildrenOf.get(id) || []).reduce(
+      (sum, c) => sum + satellitesOf(c).reduce((s, sat) => s + unitWidth(units.get(sat)) + opts.siblingGap, 0),
+      0,
+    )
+
+  const measureOf = new Map()
+  const measure = (id, stack = new Set()) => {
+    if (measureOf.has(id)) return measureOf.get(id)
+    if (stack.has(id)) return { width: unitWidth(units.get(id)), height: opts.cardHeight }
+    stack.add(id)
+    const kids = primaryChildrenOf.get(id) || []
+    const infos = kids.map((c) => measure(c, stack))
+    const kidsWidth = infos.reduce((sum, info) => sum + info.width, 0) + Math.max(0, kids.length - 1) * opts.siblingGap
+    const info = {
+      width: Math.max(slotWidthOf(id), kidsWidth),
+      height: opts.cardHeight + (kids.length ? opts.levelGap + Math.max(...infos.map((i) => i.height)) : 0),
+    }
+    stack.delete(id)
+    measureOf.set(id, info)
+    return info
   }
 
-  const childUnits = new Map()
-  for (const [unitId, parentId] of parentUnitOf) {
-    if (!parentId) continue
-    if (!childUnits.has(parentId)) childUnits.set(parentId, [])
-    childUnits.get(parentId).push(unitId)
+  const pos = new Map()
+  const place = (id, left, top, level) => {
+    if (pos.has(id)) return
+    const info = measure(id)
+    const own = unitWidth(units.get(id))
+    const kids = primaryChildrenOf.get(id) || []
+    const infos = kids.map((c) => measure(c))
+    const kidsWidth = infos.reduce((sum, info2) => sum + info2.width, 0) + Math.max(0, kids.length - 1) * opts.siblingGap
+    const slotLeft = left + (info.width - slotWidthOf(id)) / 2
+    pos.set(id, { x: slotLeft, y: top, level })
+
+    // 姻亲块:紧跟宿主,占同一行右侧
+    let satCursor = slotLeft + own + opts.siblingGap
+    for (const c of kids) {
+      for (const sat of satellitesOf(c)) {
+        if (pos.has(sat)) continue
+        pos.set(sat, { x: satCursor, y: top, level })
+        satCursor += unitWidth(units.get(sat)) + opts.siblingGap
+      }
+    }
+
+    let cursor = left + (info.width - kidsWidth) / 2
+    kids.forEach((c, index) => {
+      place(c, cursor, top + opts.cardHeight + opts.levelGap, level + 1)
+      cursor += infos[index].width + opts.siblingGap
+    })
   }
 
-  return { parentUnitOf, parentRefs, childUnits }
+  const satelliteIds = new Set()
+  for (const unit of unitList) for (const sat of satellitesOf(unit.id)) satelliteIds.add(sat)
+  const roots = unitList.filter((u) => !(parentUnitsOf.get(u.id) || []).length && !satelliteIds.has(u.id))
+
+  let cursor = opts.padding
+  let maxHeight = opts.cardHeight
+  for (const root of roots) {
+    const info = measure(root.id)
+    place(root.id, cursor, opts.padding, 0)
+    cursor += info.width + opts.rootGap
+    maxHeight = Math.max(maxHeight, info.height)
+  }
+  // 脏数据里可能留下没挂上任何树的单元(如姻亲的宿主本身缺失),兜底各自成根
+  for (const unit of unitList) {
+    if (pos.has(unit.id)) continue
+    const info = measure(unit.id)
+    place(unit.id, cursor, opts.padding, 0)
+    cursor += info.width + opts.rootGap
+    maxHeight = Math.max(maxHeight, info.height)
+  }
+
+  const width = Math.max(opts.padding * 2, cursor - opts.rootGap + opts.padding)
+  const height = maxHeight + opts.padding * 2
+  return { pos, width, height }
 }
 
 const fmt = (n) => Math.round(n * 10) / 10
@@ -163,7 +267,7 @@ const fmt = (n) => Math.round(n * 10) / 10
 function polylinePath(pts, radius = 8) {
   if (!pts || pts.length < 2) return ''
   let d = `M${fmt(pts[0][0])},${fmt(pts[0][1])}`
-  for (let i = 1; i < pts.length; i++) {
+  for (let i = 1; i < pts.length; i += 1) {
     const prev = pts[i - 1]
     const cur = pts[i]
     const next = pts[i + 1]
@@ -187,93 +291,16 @@ function polylinePath(pts, radius = 8) {
 
 /** 直上直下的三折线点串(起点→总线→终点)。 */
 function orthPoints(x1, y1, x2, y2, busY) {
-  if (Math.abs(x1 - x2) < 0.5) return [[x1, y1], [x2, y2]]
-  return [[x1, y1], [x1, busY], [x2, busY], [x2, y2]]
-}
-
-/** 线段与轴对齐矩形是否相交(矩形外扩 pad 像素,贴边也视为相交)。 */
-function segIntersectsRect(x1, y1, x2, y2, rect, pad = 1.5) {
-  const xmin = rect.x - pad
-  const xmax = rect.x + rect.w + pad
-  const ymin = rect.y - pad
-  const ymax = rect.y + rect.h + pad
-  const dx = x2 - x1
-  const dy = y2 - y1
-  const p = [-dx, dx, -dy, dy]
-  const q = [x1 - xmin, xmax - x1, y1 - ymin, ymax - y1]
-  let tmin = 0
-  let tmax = 1
-  for (let i = 0; i < 4; i++) {
-    if (Math.abs(p[i]) < 1e-9) {
-      if (q[i] < 0) return false
-    } else {
-      const t = q[i] / p[i]
-      if (p[i] < 0) {
-        if (t > tmax) return false
-        if (t > tmin) tmin = t
-      } else {
-        if (t < tmin) return false
-        if (t < tmax) tmax = t
-      }
-    }
-  }
-  return true
-}
-
-/** 折线是否穿过任一节点卡片(端点所在单元除外)。 */
-function polylineHitsNodes(pts, nodeRects, excludeUnitIds) {
-  for (let i = 1; i < pts.length; i++) {
-    for (const r of nodeRects) {
-      if (excludeUnitIds.has(r.unitId)) continue
-      if (segIntersectsRect(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], r)) return true
-    }
-  }
-  return false
-}
-
-/**
- * 补充关系(非主亲子)走线:先试短正交线,不穿节点就直接用;
- * 穿节点时沿画布左右留白贴边走,垂直段始终落在卡片区之外,保证不压人物卡片。
- */
-function routeExtraEdge({ fromX, fromY, toX, toY, parentUnitId, childUnitId, nodes, opts, width }) {
-  const nodeRects = [...nodes.values()].map((n) => ({ x: n.x, y: n.y, w: n.width, h: n.height, unitId: n.unitId }))
-  const exclude = new Set([parentUnitId, childUnitId])
-  const vGap = Math.min(18, opts.levelGap * 0.24)
-
-  if (fromY < toY) {
-    const busY = fromY + Math.min(26, opts.levelGap * 0.3)
-    const direct = orthPoints(fromX, fromY, toX, toY, busY)
-    if (!polylineHitsNodes(direct, nodeRects, exclude)) return direct
-  }
-
-  const side = (fromX + toX) / 2 < width / 2 ? 'left' : 'right'
-  const rx = side === 'left' ? opts.padding * 0.5 : width - opts.padding * 0.5
-  if (fromY < toY) {
+  if (Math.abs(x1 - x2) < 0.5)
     return [
-      [fromX, fromY],
-      [fromX, fromY + vGap],
-      [rx, fromY + vGap],
-      [rx, toY - vGap],
-      [toX, toY - vGap],
-      [toX, toY],
+      [x1, y1],
+      [x2, y2],
     ]
-  }
-  if (fromY > toY) {
-    return [
-      [fromX, fromY],
-      [fromX, fromY - vGap],
-      [rx, fromY - vGap],
-      [rx, toY + vGap],
-      [toX, toY + vGap],
-      [toX, toY],
-    ]
-  }
-  const lane = fromY + vGap
   return [
-    [fromX, fromY],
-    [fromX, lane],
-    [toX, lane],
-    [toX, toY],
+    [x1, y1],
+    [x1, busY],
+    [x2, busY],
+    [x2, y2],
   ]
 }
 
@@ -297,83 +324,78 @@ export function buildFamilyGraph(members, options = {}) {
       nodes: new Map(),
       units: [],
       edges: [],
-      stats: { people: 0, units: 0, orphanLinks: normalized.orphanLinks },
+      stats: { people: 0, units: 0, spousePairs: 0, parentLinks: 0, orphanLinks: normalized.orphanLinks },
     }
   }
 
   const unitWidth = (unit) => unit.memberIds.length * opts.cardWidth + Math.max(0, unit.memberIds.length - 1) * opts.spouseGap
-  const { parentUnitOf, parentRefs, childUnits } = attachParents(normalized, units, unitOfPerson)
+  const groupsOf = collectParentGroups(normalized, units, unitOfPerson)
 
-  const measure = new Map()
-  const measureUnit = (unitId, stack = new Set()) => {
-    if (measure.has(unitId)) return measure.get(unitId)
-    if (stack.has(unitId)) return { width: unitWidth(units.get(unitId)), height: opts.cardHeight }
-    stack.add(unitId)
-    const unit = units.get(unitId)
-    const kids = childUnits.get(unitId) || []
-    const kidInfos = kids.map((id) => measureUnit(id, stack))
-    const kidsWidth = kidInfos.reduce((sum, info) => sum + info.width, 0) + Math.max(0, kids.length - 1) * opts.siblingGap
-    const kidsHeight = kidInfos.length ? Math.max(...kidInfos.map((i) => i.height)) + opts.levelGap : 0
-    const info = {
-      width: Math.max(unitWidth(unit), kidsWidth),
-      height: opts.cardHeight + kidsHeight,
+  // 父 → 子 的邻接表(去重),先断环再分层
+  const childUnitsOf = new Map()
+  for (const [childUnitId, perUnit] of groupsOf) {
+    for (const parentUnitId of perUnit.keys()) {
+      if (!childUnitsOf.has(parentUnitId)) childUnitsOf.set(parentUnitId, [])
+      childUnitsOf.get(parentUnitId).push(childUnitId)
     }
-    measure.set(unitId, info)
-    stack.delete(unitId)
-    return info
+  }
+  const dropped = dropBackEdges(unitList, childUnitsOf)
+  for (const [parentUnitId, kids] of childUnitsOf) {
+    childUnitsOf.set(
+      parentUnitId,
+      kids.filter((kid) => !dropped.has(`${parentUnitId}>${kid}`)),
+    )
+  }
+  const parentUnitsOf = new Map()
+  for (const [parentUnitId, kids] of childUnitsOf) {
+    for (const kid of kids) {
+      if (!parentUnitsOf.has(kid)) parentUnitsOf.set(kid, [])
+      parentUnitsOf.get(kid).push(parentUnitId)
+    }
   }
 
+  // 主血亲挂点:每个单元的第一组父母(本人一侧,即男方父母)。铺排以这棵树为骨架。
+  const primaryParentOf = new Map()
+  for (const [childUnitId, perUnit] of groupsOf) {
+    const usable = [...perUnit.keys()].filter((parentUnitId) => !dropped.has(`${parentUnitId}>${childUnitId}`))
+    if (usable.length) primaryParentOf.set(childUnitId, usable[0])
+  }
+  const primaryChildrenOf = new Map()
+  for (const [kid, parentUnitId] of primaryParentOf) {
+    if (!primaryChildrenOf.has(parentUnitId)) primaryChildrenOf.set(parentUnitId, [])
+    primaryChildrenOf.get(parentUnitId).push(kid)
+  }
+  const isSatellite = makeSatelliteTest(childUnitsOf, parentUnitsOf, primaryParentOf)
+  const satellitesOf = (id) => (parentUnitsOf.get(id) || []).filter(isSatellite)
+  const { pos, width, height } = layoutForest(unitList, parentUnitsOf, primaryChildrenOf, satellitesOf, units, unitWidth, opts)
+
+  // 落坐标:单元 → 卡片
   const nodes = new Map()
   const placed = []
-  const placeUnit = (unitId, left, top, depth) => {
-    const unit = units.get(unitId)
-    const info = measureUnit(unitId)
-    const width = unitWidth(unit)
-    const unitLeft = left + (info.width - width) / 2
-    unit.x = unitLeft
-    unit.y = top
-    unit.depth = depth
-    unit.width = width
-    unit.order = placed.length
+  for (const unit of unitList) {
+    const spot = pos.get(unit.id)
+    if (!spot) continue
+    const unitW = unitWidth(unit)
+    unit.x = spot.x
+    unit.y = spot.y
+    unit.width = unitW
+    unit.depth = spot.level
+    unit.level = spot.level
     placed.push(unit)
-
     unit.memberIds.forEach((memberId, index) => {
-      const x = unit.memberIds.length >= 2 ? unitLeft + index * (opts.cardWidth + opts.spouseGap) : unitLeft + (width - opts.cardWidth) / 2
+      const x = spot.x + index * (opts.cardWidth + opts.spouseGap)
       nodes.set(memberId, {
         id: memberId,
         x,
-        y: top,
+        y: spot.y,
         cx: x + opts.cardWidth / 2,
-        cy: top + opts.cardHeight / 2,
+        cy: spot.y + opts.cardHeight / 2,
         width: opts.cardWidth,
         height: opts.cardHeight,
-        unitId,
+        unitId: unit.id,
       })
     })
-
-    const kids = childUnits.get(unitId) || []
-    if (!kids.length) return
-    const kidInfos = kids.map((id) => measureUnit(id))
-    const kidsWidth = kidInfos.reduce((sum, i) => sum + i.width, 0) + Math.max(0, kids.length - 1) * opts.siblingGap
-    let cursor = left + (info.width - kidsWidth) / 2
-    const kidTop = top + opts.cardHeight + opts.levelGap
-    kids.forEach((id, index) => {
-      placeUnit(id, cursor, kidTop, depth + 1)
-      cursor += kidInfos[index].width + opts.siblingGap
-    })
   }
-
-  const roots = unitList.filter((unit) => !parentUnitOf.get(unit.id))
-  const rootInfos = roots.map((unit) => measureUnit(unit.id))
-  const rootsWidth = rootInfos.reduce((sum, info) => sum + info.width, 0) + Math.max(0, roots.length - 1) * opts.rootGap
-  let cursor = opts.padding
-  roots.forEach((unit, index) => {
-    placeUnit(unit.id, cursor, opts.padding, 0)
-    cursor += rootInfos[index].width + opts.rootGap
-  })
-
-  const width = rootsWidth + opts.padding * 2
-  const height = Math.max(...rootInfos.map((info) => info.height), opts.cardHeight) + opts.padding * 2
 
   const edges = []
   // 夫妻线:相邻卡片画一条横线;脏数据出现三人及以上同单元时,远距离夫妻画弧线
@@ -386,9 +408,9 @@ export function buildFamilyGraph(members, options = {}) {
         const leftNode = nodes.get(id)
         const rightNode = nodes.get(other)
         const adjacent = j === i + 1
-        const y1 = leftNode.y + leftNode.height / 2
         const x1 = leftNode.x + leftNode.width
         const x2 = rightNode.x
+        const y1 = leftNode.y + leftNode.height / 2
         const edge = {
           key: `s-${unit.id}-${id}-${other}`,
           type: 'spouse',
@@ -411,88 +433,79 @@ export function buildFamilyGraph(members, options = {}) {
     })
   }
 
-  // 亲子线:主挂点实线,同一父单元的子女共用一条总线(整齐的树形主干);
-  // 补充关系(第二个父/母在不同单元)画成虚线,并走避障路径保证不穿过人物卡片。
+  // 亲子线:从「夫妻横线中点」(单人取卡片下沿)垂到本行下方的总线,再横到子女卡片正上方落下。
+  // 同层并列的父母单元分配不同总线高度,避免两条总线重叠。
+  const rowBottomOf = (level) => opts.padding + level * (opts.cardHeight + opts.levelGap) + opts.cardHeight
+  const junctionOf = (unit) => {
+    if (unit.memberIds.length >= 2) {
+      const first = nodes.get(unit.memberIds[0])
+      const second = nodes.get(unit.memberIds[1])
+      return { x: (first.x + first.width + second.x) / 2, y: first.y + first.height / 2 }
+    }
+    const only = nodes.get(unit.memberIds[0])
+    return { x: only.cx, y: only.y + only.height }
+  }
+
   const busYOf = new Map()
-  for (const [parentUnitId, kids] of childUnits) {
+  const laneCount = new Map()
+  for (const unit of placed) {
+    const kids = childUnitsOf.get(unit.id) || []
     if (!kids.length) continue
-    const parentUnit = units.get(parentUnitId)
-    busYOf.set(parentUnitId, parentUnit.y + opts.cardHeight + Math.min(40, opts.levelGap * 0.45))
+    const lane = (laneCount.get(unit.level) || 0) % opts.busLanes
+    laneCount.set(unit.level, (laneCount.get(unit.level) || 0) + 1)
+    busYOf.set(unit.id, rowBottomOf(unit.level) + opts.busOffset + lane * opts.busLaneGap)
+  }
+
+  const laneX = (x1, x2) => ((x1 + x2) / 2 < width / 2 ? opts.padding * 0.45 : width - opts.padding * 0.45)
+  const spanPoints = (jx, jy, cx, childTop, busY) => {
+    const sideX = laneX(jx, cx)
+    const enterY = childTop - Math.min(20, opts.levelGap * 0.24)
+    return [
+      [jx, jy],
+      [jx, busY],
+      [sideX, busY],
+      [sideX, enterY],
+      [cx, enterY],
+      [cx, childTop],
+    ]
   }
 
   for (const unit of placed) {
-    const groups = parentRefs.get(unit.id)
-    if (!groups) continue
-    for (const [parentUnitId, byMember] of groups) {
+    const perUnit = groupsOf.get(unit.id)
+    if (!perUnit) continue
+    const isPrimaryGroup = new Map()
+    let first = true
+    for (const parentUnitId of perUnit.keys()) {
+      isPrimaryGroup.set(parentUnitId, first && !dropped.has(`${parentUnitId}>${unit.id}`))
+      first = false
+    }
+    for (const [parentUnitId, byMember] of perUnit) {
+      if (dropped.has(`${parentUnitId}>${unit.id}`)) continue
       const parentUnit = units.get(parentUnitId)
       if (!parentUnit) continue
-      const isPrimary = parentUnitOf.get(unit.id) === parentUnitId
+      const junction = junctionOf(parentUnit)
+      const busY = busYOf.get(parentUnitId)
       for (const [memberId, parentIds] of byMember) {
         const child = nodes.get(memberId)
         if (!child) continue
-        const parentNodes = [...parentIds].map((id) => nodes.get(id)).filter(Boolean)
-        if (!parentNodes.length) continue
-        const both = parentNodes.length >= 2
-        const parentCx = both ? parentUnit.x + parentUnit.width / 2 : parentNodes[0].cx
-        const base = {
+        const adjacent = unit.level === parentUnit.level + 1
+        const pts = adjacent
+          ? orthPoints(junction.x, junction.y, child.cx, child.y, busY)
+          : spanPoints(junction.x, junction.y, child.cx, child.y, busY)
+        edges.push({
           key: `p-${unit.id}-${memberId}-${parentUnitId}`,
           type: 'parent',
-          primary: isPrimary,
+          primary: isPrimaryGroup.get(parentUnitId),
           fromUnitId: parentUnitId,
           toUnitId: unit.id,
           memberId,
           parentIds: [...parentIds],
-        }
-        if (isPrimary) {
-          const fromX = parentCx
-          const fromY = parentUnit.y + opts.cardHeight
-          const busY = busYOf.get(parentUnitId)
-          edges.push({
-            ...base,
-            x1: fromX,
-            y1: fromY,
-            x2: child.cx,
-            y2: child.y,
-            path: polylinePath(orthPoints(fromX, fromY, child.cx, child.y, busY)),
-          })
-        } else {
-          const parentTop = parentUnit.y
-          const parentBottom = parentUnit.y + opts.cardHeight
-          const childTop = child.y
-          const childBottom = child.y + opts.cardHeight
-          let fromX
-          let fromY
-          let toX
-          let toY
-          if (parentBottom <= childTop) {
-            fromX = parentCx
-            fromY = parentBottom
-            toX = child.cx
-            toY = childTop
-          } else if (parentTop >= childBottom) {
-            fromX = parentCx
-            fromY = parentTop
-            toX = child.cx
-            toY = childBottom
-          } else {
-            fromX = parentCx
-            fromY = parentBottom
-            toX = child.cx
-            toY = childBottom
-          }
-          const pts = routeExtraEdge({
-            fromX,
-            fromY,
-            toX,
-            toY,
-            parentUnitId,
-            childUnitId: unit.id,
-            nodes,
-            opts,
-            width,
-          })
-          edges.push({ ...base, x1: fromX, y1: fromY, x2: toX, y2: toY, path: polylinePath(pts) })
-        }
+          x1: junction.x,
+          y1: junction.y,
+          x2: child.cx,
+          y2: child.y,
+          path: polylinePath(pts),
+        })
       }
     }
   }
