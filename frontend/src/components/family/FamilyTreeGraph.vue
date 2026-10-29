@@ -160,13 +160,12 @@ const birthYear = (m) => (m.birthDate ? String(m.birthDate).slice(0, 4) : '')
 .edge-extra .ftg-line {
   stroke: var(--color-accent, #c9807a);
   stroke-width: 1.6;
-  stroke-dasharray: 5 5;
-  opacity: 0.75;
+  stroke-dasharray: 6 5;
+  opacity: 0.7;
 }
 .edge-spouse .ftg-line {
   stroke: #e85d75;
-  stroke-width: 3;
-  stroke-dasharray: 1 5;
+  stroke-width: 2.5;
 }
 .ftg-heart {
   fill: #e85d75;

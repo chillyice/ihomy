@@ -157,18 +157,124 @@ function attachParents(normalized, units, unitOfPerson) {
   return { parentUnitOf, parentRefs, childUnits }
 }
 
-function orthPath(x1, y1, x2, y2, busY, radius = 9) {
-  if (Math.abs(x1 - x2) < 0.5) return `M${x1},${y1} L${x2},${y2}`
-  const dir = x2 > x1 ? 1 : -1
-  const r = Math.min(radius, Math.abs(x2 - x1) / 2)
+const fmt = (n) => Math.round(n * 10) / 10
+
+/** 把折线点串成 SVG path,转角用二次贝塞尔圆角,避免生硬的直角。 */
+function polylinePath(pts, radius = 8) {
+  if (!pts || pts.length < 2) return ''
+  let d = `M${fmt(pts[0][0])},${fmt(pts[0][1])}`
+  for (let i = 1; i < pts.length; i++) {
+    const prev = pts[i - 1]
+    const cur = pts[i]
+    const next = pts[i + 1]
+    const segLen = Math.hypot(cur[0] - prev[0], cur[1] - prev[1])
+    if (!next || segLen < 1e-6) {
+      d += `L${fmt(cur[0])},${fmt(cur[1])}`
+      continue
+    }
+    const nLen = Math.hypot(next[0] - cur[0], next[1] - cur[1])
+    const r = Math.min(radius, segLen / 2, nLen / 2)
+    const ux = (cur[0] - prev[0]) / segLen
+    const uy = (cur[1] - prev[1]) / segLen
+    const vx = (next[0] - cur[0]) / nLen
+    const vy = (next[1] - cur[1]) / nLen
+    const before = [cur[0] - ux * r, cur[1] - uy * r]
+    const after = [cur[0] + vx * r, cur[1] + vy * r]
+    d += `L${fmt(before[0])},${fmt(before[1])} Q${fmt(cur[0])},${fmt(cur[1])} ${fmt(after[0])},${fmt(after[1])}`
+  }
+  return d
+}
+
+/** 直上直下的三折线点串(起点→总线→终点)。 */
+function orthPoints(x1, y1, x2, y2, busY) {
+  if (Math.abs(x1 - x2) < 0.5) return [[x1, y1], [x2, y2]]
+  return [[x1, y1], [x1, busY], [x2, busY], [x2, y2]]
+}
+
+/** 线段与轴对齐矩形是否相交(矩形外扩 pad 像素,贴边也视为相交)。 */
+function segIntersectsRect(x1, y1, x2, y2, rect, pad = 1.5) {
+  const xmin = rect.x - pad
+  const xmax = rect.x + rect.w + pad
+  const ymin = rect.y - pad
+  const ymax = rect.y + rect.h + pad
+  const dx = x2 - x1
+  const dy = y2 - y1
+  const p = [-dx, dx, -dy, dy]
+  const q = [x1 - xmin, xmax - x1, y1 - ymin, ymax - y1]
+  let tmin = 0
+  let tmax = 1
+  for (let i = 0; i < 4; i++) {
+    if (Math.abs(p[i]) < 1e-9) {
+      if (q[i] < 0) return false
+    } else {
+      const t = q[i] / p[i]
+      if (p[i] < 0) {
+        if (t > tmax) return false
+        if (t > tmin) tmin = t
+      } else {
+        if (t < tmin) return false
+        if (t < tmax) tmax = t
+      }
+    }
+  }
+  return true
+}
+
+/** 折线是否穿过任一节点卡片(端点所在单元除外)。 */
+function polylineHitsNodes(pts, nodeRects, excludeUnitIds) {
+  for (let i = 1; i < pts.length; i++) {
+    for (const r of nodeRects) {
+      if (excludeUnitIds.has(r.unitId)) continue
+      if (segIntersectsRect(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], r)) return true
+    }
+  }
+  return false
+}
+
+/**
+ * 补充关系(非主亲子)走线:先试短正交线,不穿节点就直接用;
+ * 穿节点时沿画布左右留白贴边走,垂直段始终落在卡片区之外,保证不压人物卡片。
+ */
+function routeExtraEdge({ fromX, fromY, toX, toY, parentUnitId, childUnitId, nodes, opts, width }) {
+  const nodeRects = [...nodes.values()].map((n) => ({ x: n.x, y: n.y, w: n.width, h: n.height, unitId: n.unitId }))
+  const exclude = new Set([parentUnitId, childUnitId])
+  const vGap = Math.min(18, opts.levelGap * 0.24)
+
+  if (fromY < toY) {
+    const busY = fromY + Math.min(26, opts.levelGap * 0.3)
+    const direct = orthPoints(fromX, fromY, toX, toY, busY)
+    if (!polylineHitsNodes(direct, nodeRects, exclude)) return direct
+  }
+
+  const side = (fromX + toX) / 2 < width / 2 ? 'left' : 'right'
+  const rx = side === 'left' ? opts.padding * 0.5 : width - opts.padding * 0.5
+  if (fromY < toY) {
+    return [
+      [fromX, fromY],
+      [fromX, fromY + vGap],
+      [rx, fromY + vGap],
+      [rx, toY - vGap],
+      [toX, toY - vGap],
+      [toX, toY],
+    ]
+  }
+  if (fromY > toY) {
+    return [
+      [fromX, fromY],
+      [fromX, fromY - vGap],
+      [rx, fromY - vGap],
+      [rx, toY + vGap],
+      [toX, toY + vGap],
+      [toX, toY],
+    ]
+  }
+  const lane = fromY + vGap
   return [
-    `M${x1},${y1}`,
-    `L${x1},${busY - r}`,
-    `Q${x1},${busY} ${x1 + dir * r},${busY}`,
-    `L${x2 - dir * r},${busY}`,
-    `Q${x2},${busY} ${x2},${busY + r}`,
-    `L${x2},${y2}`,
-  ].join(' ')
+    [fromX, fromY],
+    [fromX, lane],
+    [toX, lane],
+    [toX, toY],
+  ]
 }
 
 /**
@@ -305,7 +411,15 @@ export function buildFamilyGraph(members, options = {}) {
     })
   }
 
-  // 亲子线:每个孩子到其父/母所在单元;主挂点实线,其余虚线补充
+  // 亲子线:主挂点实线,同一父单元的子女共用一条总线(整齐的树形主干);
+  // 补充关系(第二个父/母在不同单元)画成虚线,并走避障路径保证不穿过人物卡片。
+  const busYOf = new Map()
+  for (const [parentUnitId, kids] of childUnits) {
+    if (!kids.length) continue
+    const parentUnit = units.get(parentUnitId)
+    busYOf.set(parentUnitId, parentUnit.y + opts.cardHeight + Math.min(40, opts.levelGap * 0.45))
+  }
+
   for (const unit of placed) {
     const groups = parentRefs.get(unit.id)
     if (!groups) continue
@@ -319,10 +433,8 @@ export function buildFamilyGraph(members, options = {}) {
         const parentNodes = [...parentIds].map((id) => nodes.get(id)).filter(Boolean)
         if (!parentNodes.length) continue
         const both = parentNodes.length >= 2
-        const fromX = both ? parentUnit.x + parentUnit.width / 2 : parentNodes[0].cx
-        const fromY = parentUnit.y + opts.cardHeight
-        const busY = fromY + 20 + ((parentUnit.order || 0) % 6) * 5
-        edges.push({
+        const parentCx = both ? parentUnit.x + parentUnit.width / 2 : parentNodes[0].cx
+        const base = {
           key: `p-${unit.id}-${memberId}-${parentUnitId}`,
           type: 'parent',
           primary: isPrimary,
@@ -330,12 +442,57 @@ export function buildFamilyGraph(members, options = {}) {
           toUnitId: unit.id,
           memberId,
           parentIds: [...parentIds],
-          x1: fromX,
-          y1: fromY,
-          x2: child.cx,
-          y2: child.y,
-          path: orthPath(fromX, fromY, child.cx, child.y, busY),
-        })
+        }
+        if (isPrimary) {
+          const fromX = parentCx
+          const fromY = parentUnit.y + opts.cardHeight
+          const busY = busYOf.get(parentUnitId)
+          edges.push({
+            ...base,
+            x1: fromX,
+            y1: fromY,
+            x2: child.cx,
+            y2: child.y,
+            path: polylinePath(orthPoints(fromX, fromY, child.cx, child.y, busY)),
+          })
+        } else {
+          const parentTop = parentUnit.y
+          const parentBottom = parentUnit.y + opts.cardHeight
+          const childTop = child.y
+          const childBottom = child.y + opts.cardHeight
+          let fromX
+          let fromY
+          let toX
+          let toY
+          if (parentBottom <= childTop) {
+            fromX = parentCx
+            fromY = parentBottom
+            toX = child.cx
+            toY = childTop
+          } else if (parentTop >= childBottom) {
+            fromX = parentCx
+            fromY = parentTop
+            toX = child.cx
+            toY = childBottom
+          } else {
+            fromX = parentCx
+            fromY = parentBottom
+            toX = child.cx
+            toY = childBottom
+          }
+          const pts = routeExtraEdge({
+            fromX,
+            fromY,
+            toX,
+            toY,
+            parentUnitId,
+            childUnitId: unit.id,
+            nodes,
+            opts,
+            width,
+          })
+          edges.push({ ...base, x1: fromX, y1: fromY, x2: toX, y2: toY, path: polylinePath(pts) })
+        }
       }
     }
   }
