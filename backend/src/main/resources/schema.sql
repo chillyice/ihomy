@@ -858,6 +858,7 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('member', '家庭成员', 'icon-member', '/member', 'social',  'right',  1, 1),
 ('storage','文件浏览','icon-storage','/storage/files','system',  'left',  16, 1);
 -- 停用行说明:`plant`(花园)入口在「小游戏」页(Games.vue → /tools/plant),首页/侧栏不重复占位;
+-- `tree`(家谱)已并入「家庭成员」页的图谱标签,停用独立入口(旧 /tree 仍重定向到 /member?tab=tree);
 -- `NAV_PATHS` 已映射 plant,启用即回导航。原 `cover`(家庭封面 /cover)停用行已删除——无路由、
 -- 无 NAV_PATHS 映射,任何状态下都到不了,属死种子(2026-10-05 治理轮)。
 
@@ -1224,7 +1225,8 @@ CREATE TABLE `content_wish` (
 
 -- ------------------------------------------------------------
 -- 37. 记账明细表（V3.5 家庭共享账本:支出/收入/转账,月度统计）
---     ponytail: 家庭即一个账本,暂不建 sys_book_account 多账户表,需要多账户时再加
+--     V10.78 起支持多账户：account_id 记收支账户,from/to_account_id 记转账方向,
+--     账户实体见文件末尾「68. 家庭记账账户」;旧记录三列为 NULL = 未归属账户
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `family_book_record`;
 CREATE TABLE `family_book_record` (
@@ -1236,6 +1238,9 @@ CREATE TABLE `family_book_record` (
   `remark`      VARCHAR(200)    DEFAULT NULL COMMENT '备注',
   `record_date` DATE            NOT NULL COMMENT '记账日期',
   `created_by`  BIGINT          NOT NULL COMMENT '记录人ID',
+  `account_id`  BIGINT          DEFAULT NULL COMMENT '账户ID(EXPENSE=付款账户/INCOME=收款账户;V10.78)',
+  `from_account_id` BIGINT      DEFAULT NULL COMMENT '转出账户(TRANSFER;可空=转到账户外,如买入理财/取现;V10.78)',
+  `to_account_id`   BIGINT      DEFAULT NULL COMMENT '转入账户(TRANSFER;可空=账户外转入,如赎回/存现;V10.78)',
   `created_at`  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   PRIMARY KEY (`id`),
   KEY `idx_family_date` (`family_id`, `record_date`)
@@ -1415,7 +1420,14 @@ INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
 ('loan_prepay_strategy', 'REDUCE',  '减少月供（期限不变）'),
 -- 放映厅媒体引擎字典(V9.106)
 ('media_server_type', 'JELLYFIN', 'Jellyfin'),
-('media_server_type', 'EMBY',     'Emby');
+('media_server_type', 'EMBY',     'Emby'),
+-- 记账账户类型字典(V10.78)
+('book_account_type', 'CASH',   '现金'),
+('book_account_type', 'BANK',   '银行卡'),
+('book_account_type', 'ALIPAY', '支付宝'),
+('book_account_type', 'WECHAT', '微信'),
+('book_account_type', 'CREDIT', '信用卡'),
+('book_account_type', 'OTHER',  '其他');
 -- ------------------------------------------------------------
 -- 41. 身份标签表(V3.9): 成员在家庭内的身份标签(如"爸爸""妈妈"),每家庭一套
 --     预设 爸爸/妈妈;其余(如"大宝")为自定义。user_id+family_id 唯一。
@@ -2473,3 +2485,29 @@ SELECT b.`id`, d.`cat_id` FROM (
   UNION ALL SELECT '/demo/books/bedtime-stories.txt', @cat_kids
 ) d
 JOIN `content_book` b ON b.`file_url` = d.`url` AND b.`family_id` = @fid AND b.`deleted` = 0;
+
+-- ------------------------------------------------------------
+-- 68. 家庭记账账户（V10.78）
+--     现金/银行卡/支付宝/微信/信用卡等，一个家庭多本账户。
+--     余额不落库，按「期初 + 收入 − 支出 − 转出 + 转入」实时算（前后端同一口径，
+--     前端 utils/bookLedger.js 有单测）。历史记账记录 account_id 为 NULL = 未归属账户，
+--     不迁移、不重算，只提示。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_book_account`;
+CREATE TABLE `family_book_account` (
+  `id`              BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`       BIGINT        NOT NULL COMMENT '所属家庭ID',
+  `name`            VARCHAR(50)   NOT NULL COMMENT '账户名称(如 招行工资卡/支付宝/现金)',
+  `account_type`    VARCHAR(20)   NOT NULL DEFAULT 'BANK' COMMENT '类型: CASH现金/BANK银行卡/ALIPAY支付宝/WECHAT微信/CREDIT信用卡/OTHER其他',
+  `institution`     VARCHAR(60)   DEFAULT NULL COMMENT '开户行/平台(选填)',
+  `card_tail`       VARCHAR(10)   DEFAULT NULL COMMENT '卡号后四位(只存尾号,选填)',
+  `initial_balance` DECIMAL(14,2) NOT NULL DEFAULT 0 COMMENT '期初余额(元,启用该账户时的余额,信用卡可为负)',
+  `sort_order`      INT           NOT NULL DEFAULT 0 COMMENT '排序(小的在前)',
+  `note`            VARCHAR(200)  DEFAULT NULL COMMENT '备注',
+  `created_by`      BIGINT        NOT NULL COMMENT '创建人ID',
+  `deleted`         TINYINT       NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0正常/1已删除',
+  `created_at`      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family` (`family_id`, `deleted`, `sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭记账账户(现金/银行卡/支付平台)';

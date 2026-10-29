@@ -1,326 +1,70 @@
-<!-- 记账本页:家庭共享账本(月切换/收支统计卡/分类支出排行/明细列表)+ 贷款记录(复用工具箱的贷款记录组件) -->
+<!-- 记账本页:三页签外壳(记账本/总账/贷款记录),月份与页签在此持有,供总账点月钻取回记账本 -->
 <template>
   <div class="page">
     <Breadcrumb :items="[{ label: $t('book.title') }]" />
 
     <PageToolbar>
       <div class="tb-left">
-        <el-radio-group v-model="tab" size="small">
-          <el-radio-button value="book">{{ $t('book.tabBook') }}</el-radio-button>
-          <el-radio-button value="loan">{{ $t('book.tabLoan') }}</el-radio-button>
-        </el-radio-group>
-      </div>
-      <div v-if="tab === 'book'" class="tb-right">
-        <el-date-picker v-model="month" type="month" value-format="YYYY-MM" @change="load" style="width: 140px" />
-        <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ $t('book.add') }}</el-button>
+        <!-- 页签在窄屏横向滚动(不换行;V10.79 加「理财」后也挤不下) -->
+        <div class="book-tabs">
+          <el-radio-group v-model="tab" size="small">
+            <el-radio-button value="book">{{ $t('book.tabBook') }}</el-radio-button>
+            <el-radio-button value="ledger">{{ $t('book.tabLedger') }}</el-radio-button>
+            <el-radio-button value="loan">{{ $t('book.tabLoan') }}</el-radio-button>
+          </el-radio-group>
+        </div>
       </div>
     </PageToolbar>
 
-    <template v-if="tab === 'book'">
-      <!-- 统计卡 -->
-      <div class="stats-row">
-        <div class="stat-card card income">
-          <div class="stat-label">{{ $t('book.income') }}</div>
-          <div class="stat-value">+{{ stats.income?.toFixed(2) ?? '0.00' }}</div>
-        </div>
-        <div class="stat-card card expense">
-          <div class="stat-label">{{ $t('book.expense') }}</div>
-          <div class="stat-value">-{{ stats.expense?.toFixed(2) ?? '0.00' }}</div>
-        </div>
-        <div class="stat-card card">
-          <div class="stat-label">{{ $t('book.balance') }}</div>
-          <div class="stat-value">{{ stats.balance?.toFixed(2) ?? '0.00' }}</div>
-        </div>
-      </div>
+    <!-- 记账本页签:明细/统计/账户都在 BookDaily 里,月份走 v-model 双向同步 -->
+    <BookDaily v-if="tab === 'book'" v-model:month="month" />
 
-      <div class="content">
-        <!-- 明细列表 -->
-        <div class="records card">
-          <h3>{{ $t('book.records') }}</h3>
-          <div v-loading="loading">
-            <div v-for="r in records" :key="r.id" class="record-row">
-              <div class="record-main">
-                <span class="record-cat" :class="typeCls(r)">{{ catText(r) }}</span>
-                <div class="record-info">
-                  <div class="record-remark">{{ r.remark || r.category }}</div>
-                  <div class="record-meta">{{ r.recordDate }} · {{ r.creatorName }}</div>
-                </div>
-              </div>
-              <div class="record-amount" :class="typeCls(r)">{{ (r.type === 'EXPENSE' ? '-' : '+') + r.amount }}</div>
-              <div class="record-actions">
-                <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
-                  <el-button size="small" text @click="openEditor(r)"
-                    ><el-icon><Edit /></el-icon
-                  ></el-button>
-                </el-tooltip>
-                <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
-                  <el-button size="small" text type="danger" @click="onDel(r)"
-                    ><el-icon><Delete /></el-icon
-                  ></el-button>
-                </el-tooltip>
-              </div>
-            </div>
-            <el-empty v-if="!records.length" :description="userStore.isGuest ? $t('book.guestEmpty') : $t('book.noRecords')" />
-          </div>
-        </div>
-
-        <!-- 分类排行 -->
-        <div class="cats card">
-          <h3>{{ $t('book.expenseCategories') }}</h3>
-          <div v-for="c in stats.categoryStats || []" :key="c.category" class="cat-row">
-            <span class="cat-name">{{ c.category }}</span>
-            <span class="cat-total">{{ c.total.toFixed(2) }}</span>
-          </div>
-          <div v-if="!stats.categoryStats?.length" class="cat-empty">{{ $t('common.empty') }}</div>
-        </div>
-      </div>
-    </template>
+    <!-- 总账页签:总账组件异步引入,点某月由它 emit 回来钻取到记账本 -->
+    <BookLedger v-else-if="tab === 'ledger'" @pick-month="onPickMonth" />
 
     <!-- 贷款记录:与工具箱/贷款计算器同一组件同一份数据(家庭共享) -->
     <LoanRecords v-else />
-
-    <el-dialog v-model="editor.visible" append-to-body :title="editor.form.id ? $t('book.editRecord') : $t('book.add')" width="420px">
-      <el-form :model="editor.form" label-position="top">
-        <el-form-item :label="$t('book.typeLabel')">
-          <el-radio-group v-model="editor.form.type">
-            <el-radio value="EXPENSE">{{ $t('book.type.EXPENSE') }}</el-radio>
-            <el-radio value="INCOME">{{ $t('book.type.INCOME') }}</el-radio>
-            <el-radio value="TRANSFER">{{ $t('book.type.TRANSFER') }}</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <div class="form-row">
-          <el-form-item :label="$t('book.amount')" style="flex: 1">
-            <el-input-number v-model="editor.form.amount" :min="0.01" :precision="2" :step="10" style="width: 100%" />
-          </el-form-item>
-          <el-form-item :label="$t('book.date')" style="flex: 1">
-            <el-date-picker v-model="editor.form.recordDate" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
-          </el-form-item>
-        </div>
-        <el-form-item :label="$t('book.category')">
-          <el-select
-            v-model="editor.form.category"
-            filterable
-            allow-create
-            default-first-option
-            :placeholder="$t('book.categoryPlaceholder')"
-            style="width: 100%"
-          >
-            <el-option v-for="c in CATEGORIES" :key="c" :label="c" :value="c" />
-          </el-select>
-        </el-form-item>
-        <el-form-item :label="$t('book.remark')">
-          <el-input v-model="editor.form.remark" :placeholder="$t('book.remarkPlaceholder')" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="editor.visible = false">{{ $t('common.cancel') }}</el-button>
-        <el-button type="primary" :loading="saving" @click="onSave">{{ $t('common.save') }}</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup>
-// 记账本:月度明细+收支统计;改删仅记录人/家长(后端校验),前端按条件隐藏按钮
-import { defineAsyncComponent, onMounted, reactive, ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { Edit, Delete } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+// 记账本外壳:页签切换 + 月份状态;各页签自己管数据与工具栏右侧操作
+import { defineAsyncComponent, ref } from 'vue'
 
-import { bookApi } from '@/api'
-import { useUserStore } from '@/stores/user'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
+import BookDaily from '@/views/book/BookDaily.vue'
 
 // 贷款记录与工具箱/贷款计算器是同一组件同一份家庭数据;异步加载,首屏(记账本)不为它买单
 const LoanRecords = defineAsyncComponent(() => import('@/views/tools/LoanRecords.vue'))
+// 总账只在切到该页签时加载,记账本用户的首次进入不为它买单
+const BookLedger = defineAsyncComponent(() => import('@/views/book/BookLedger.vue'))
 
-// ponytail: 分类为用户自选/自定义数据(入库存储),不做翻译
-const CATEGORIES = ['餐饮', '交通', '购物', '家居', '水电燃气', '医疗', '教育', '娱乐', '工资', '红包', '其他']
-
-const { t } = useI18n()
-const userStore = useUserStore()
 const tab = ref('book')
-const loading = ref(false)
-const saving = ref(false)
 const month = ref(new Date().toISOString().slice(0, 7))
-const records = ref([])
-const stats = ref({})
-const editor = reactive({ visible: false, form: {} })
 
-const catText = (r) => (r.type === 'INCOME' ? t('book.type.INCOME') : r.type === 'TRANSFER' ? t('book.type.TRANSFER') : r.category)
-
-// 后端返回英文单词(type: EXPENSE/INCOME/TRANSFER),表单直接沿用字典词提交
-const typeCls = (r) => ({ EXPENSE: 't0', INCOME: 't1', TRANSFER: 't2' })[r.type] || 't0'
-
-const load = async () => {
-  // 家庭账本是私有内容:游客不打注定 401 的请求,直接空态
-  if (!userStore.isLoggedIn) return
-  loading.value = true
-  try {
-    const data = await bookApi.list(month.value)
-    records.value = data.records
-    stats.value = data.stats
-  } finally {
-    loading.value = false
-  }
+// 总账页签点某月 → 回到记账本并定位该月
+const onPickMonth = (m) => {
+  month.value = m
+  tab.value = 'book'
 }
-
-const openEditor = (r) => {
-  editor.visible = true
-  editor.form = r
-    ? { id: r.id, type: r.type, amount: Number(r.amount), category: r.category, remark: r.remark || '', recordDate: r.recordDate }
-    : { id: null, type: 'EXPENSE', amount: 0, category: '其他', remark: '', recordDate: new Date().toISOString().slice(0, 10) }
-}
-
-const onSave = async () => {
-  if (!editor.form.amount || editor.form.amount <= 0) return ElMessage.warning(t('book.fillAmount'))
-  saving.value = true
-  try {
-    const { id, ...data } = editor.form
-    if (id) await bookApi.update(id, data)
-    else await bookApi.create(data)
-    ElMessage.success(t('common.saveSuccess'))
-    editor.visible = false
-    await load()
-  } finally {
-    saving.value = false
-  }
-}
-
-const onDel = async (r) => {
-  await ElMessageBox.confirm(t('book.deleteMessage', { amount: r.amount }), t('common.deleteConfirm'), {
-    type: 'warning',
-    closeOnClickModal: true,
-  })
-  await bookApi.remove(r.id)
-  ElMessage.success(t('common.deleted'))
-  await load()
-}
-
-onMounted(load)
 </script>
 
 <style scoped>
-/* 统计卡三列;明细行:分类/备注/金额着色;支出分类排行 */
-.stats-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
-  margin-bottom: 16px;
-}
-.stat-card {
-  padding: 14px 18px;
-}
-.stat-label {
-  color: #999;
-  font-size: 12px;
-}
-.stat-value {
-  font-size: 22px;
-  font-weight: 700;
-  margin-top: 6px;
-}
-.stat-card.income .stat-value {
-  color: #67c23a;
-}
-.stat-card.expense .stat-value {
-  color: #f56c6c;
-}
-.content {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 14px;
-}
-.records,
-.cats {
-  padding: 16px 18px;
-}
-.records h3,
-.cats h3 {
-  margin: 0 0 12px;
-  font-size: 15px;
-}
-.record-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px dashed #f0f0f0;
-}
-.record-main {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 1;
+/* 页签横向滚动(窄屏/多页签时不换行、不撑破工具栏);EP 自身的配色圆角仍走全局 main.css */
+.book-tabs {
+  max-width: 100%;
   min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
-.record-cat {
-  font-size: 12px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: #f5f7fa;
-  color: #666;
-  white-space: nowrap;
+.book-tabs::-webkit-scrollbar {
+  display: none;
 }
-.record-cat.t1 {
-  background: #f0f9eb;
-  color: #67c23a;
+.book-tabs :deep(.el-radio-group) {
+  flex-wrap: nowrap;
 }
-.record-cat.t2 {
-  background: #fdf6ec;
-  color: #e6a23c;
-}
-.record-remark {
-  font-size: 14px;
-}
-.record-meta {
-  font-size: 12px;
-  color: #999;
-}
-.record-amount {
-  font-weight: 600;
-  white-space: nowrap;
-}
-.record-amount.t0 {
-  color: #f56c6c;
-}
-.record-amount.t1 {
-  color: #67c23a;
-}
-.record-actions :deep(.el-button) {
-  padding: 5px 6px;
-}
-.record-actions :deep(.el-button + .el-button) {
-  margin-left: 4px;
-}
-.cat-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 0;
-  border-bottom: 1px dashed #f0f0f0;
-  font-size: 13px;
-}
-.cat-total {
-  color: #f56c6c;
-  font-weight: 600;
-}
-.cat-empty {
-  color: #999;
-  font-size: 12px;
-}
-.form-row {
-  display: flex;
-  gap: 12px;
-}
-
-@media (max-width: 768px) {
-  .form-row {
-    flex-direction: column;
-    gap: 0;
-  }
-  .summary-cards {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
+.book-tabs :deep(.el-radio-button) {
+  flex-shrink: 0;
 }
 </style>

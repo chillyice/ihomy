@@ -45,6 +45,12 @@ public class BookController {
         return Result.success(bookService.summary(user == null ? null : user.getFamilyId()));
     }
 
+    @Operation(summary = "总账汇总(累计收支、年度月度、分类与成员)")
+    @GetMapping("/ledger")
+    public Result<Map<String, Object>> ledger(@RequestParam(required = false) Integer year) {
+        return Result.success(bookService.ledger(current().getFamilyId(), year));
+    }
+
     @Operation(summary = "记一笔(支出/收入/转账)")
     @OperationLog(module = "BOOK", operationType = "CREATE", description = "记账", saveArgs = false)
     @PostMapping

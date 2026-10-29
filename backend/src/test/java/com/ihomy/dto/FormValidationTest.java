@@ -128,4 +128,57 @@ class FormValidationTest {
         dto.setRate(new BigDecimal("3.1"));
         return dto;
     }
+
+    @Test
+    void bookAccountFieldsBoundedByColumnWidth() {
+        BookAccountDTO atCeiling = new BookAccountDTO();
+        atCeiling.setName(repeat("卡", 50));
+        atCeiling.setInstitution(repeat("行", 60));
+        atCeiling.setCardTail(repeat("8", 10));
+        atCeiling.setNote(repeat("备", 200));
+        atCeiling.setInitialBalance(new BigDecimal("999999999999.99"));
+        assertThat(invalidFields(atCeiling)).isEmpty();
+
+        BookAccountDTO over = new BookAccountDTO();
+        over.setName(repeat("卡", 51));
+        over.setInstitution(repeat("行", 61));
+        over.setCardTail(repeat("8", 11));
+        over.setNote(repeat("备", 201));
+        over.setInitialBalance(new BigDecimal("1000000000000"));
+        assertThat(invalidFields(over)).containsExactlyInAnyOrder(
+                "name", "institution", "cardTail", "note", "initialBalance");
+
+        BookAccountDTO tooManyDecimals = new BookAccountDTO();
+        tooManyDecimals.setName("零钱");
+        tooManyDecimals.setInitialBalance(new BigDecimal("1.234"));
+        assertThat(invalidFields(tooManyDecimals)).contains("initialBalance");
+    }
+
+    @Test
+    void bookAccountNameRequiredAndTypeEnumerated() {
+        BookAccountDTO blankName = new BookAccountDTO();
+        blankName.setName("  ");
+        assertThat(invalidFields(blankName)).contains("name");
+
+        // 空值/空串交给 Service 归一成银行卡,不在校验层拦截
+        BookAccountDTO emptyType = new BookAccountDTO();
+        emptyType.setName("现金");
+        emptyType.setAccountType("");
+        assertThat(invalidFields(emptyType)).isEmpty();
+        assertThat(invalidFields(new BookAccountDTO())).doesNotContain("accountType");
+
+        for (String ok : List.of("CASH", "BANK", "ALIPAY", "WECHAT", "CREDIT", "OTHER", "bank")) {
+            BookAccountDTO dto = new BookAccountDTO();
+            dto.setName("卡");
+            dto.setAccountType(ok);
+            assertThat(invalidFields(dto)).as(ok).isEmpty();
+        }
+
+        for (String bad : List.of("0", "1", "现金", "CASHX", "BANK_CARD")) {
+            BookAccountDTO dto = new BookAccountDTO();
+            dto.setName("卡");
+            dto.setAccountType(bad);
+            assertThat(invalidFields(dto)).as(bad).containsExactly("accountType");
+        }
+    }
 }

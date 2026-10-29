@@ -1,0 +1,125 @@
+/* 记账本三个页签(Daily/Ledger/Finance)共享的排版块:只放布局与文字层级。
+   EP 组件的配色/圆角/尺寸由全局 styles/main.css 覆写,这里不重复定义,避免 scoped 与全局打架。 */
+
+/* KPI / 统计卡:3 列,移动端 2 列;收入绿、支出红沿用页签既有配色 */
+.book-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.book-kpi {
+  padding: 14px 18px;
+  min-width: 0;
+}
+.book-kpi-label {
+  color: var(--color-text-secondary, #999);
+  font-size: 12px;
+}
+.book-kpi-value {
+  font-size: 22px;
+  font-weight: 700;
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.book-kpi-value.is-income {
+  color: #67c23a;
+}
+.book-kpi-value.is-expense {
+  color: #f56c6c;
+}
+/* 总账 4 张 KPI(累计收入/支出/结余/笔数):4 列,窄屏收成 2×2 */
+.book-kpi-grid.cols-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+/* KPI 副标(跨度、转账笔数):小字次要色,跟在主数值下面 */
+.book-kpi-sub {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--color-text-tertiary, #b5a98c);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+/* 账户余额条:横向可滑动的账户 chip + 右侧未归属提示与「管理账户」 */
+.book-balance-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.book-balance-strip .bs-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding-bottom: 2px;
+}
+.book-balance-strip .bs-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.book-balance-strip .bs-chip-name {
+  font-size: 12px;
+  color: var(--color-text-secondary, #999);
+}
+.book-balance-strip .bs-chip-amount {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.book-balance-strip .bs-chip-amount.is-negative {
+  color: #f56c6c;
+}
+.book-balance-strip .bs-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.book-balance-strip .bs-hint {
+  font-size: 12px;
+  color: var(--color-text-secondary, #999);
+  white-space: nowrap;
+}
+
+/* 空态/占位小字 */
+.book-empty {
+  color: var(--color-text-secondary, #999);
+  font-size: 12px;
+  padding: 12px 0;
+  text-align: center;
+}
+
+/* 颜色一律走主题变量(--color-text-secondary / --color-border 已按深浅色两套定义),不单独覆写 html.dark */
+
+@media (max-width: 768px) {
+  .book-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .book-kpi-grid.cols-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .book-kpi-value {
+    font-size: 18px;
+  }
+  .book-balance-strip {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .book-balance-strip .bs-chips {
+    width: 100%;
+  }
+}

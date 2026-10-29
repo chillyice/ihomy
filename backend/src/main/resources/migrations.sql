@@ -2334,3 +2334,92 @@ CREATE TABLE IF NOT EXISTS `sys_kada_snippet` (
   KEY `idx_sha` (`content_sha256`),
   KEY `idx_ip_created` (`submitter_ip`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='咔哒卡带社区发布与人工审核';
+
+-- ------------------------------------------------------------
+-- V10.78 记账多账户（2026-10-29）
+--   新增家庭记账账户表 + 记账明细挂账户；DDL 与 schema.sql 第 68 节逐字一致。
+--   历史记录 account_id 为空 = 未归属账户，不迁移、不重算，只提示。
+--   重复执行安全：建表 IF NOT EXISTS，加列走 information_schema 判定，字典 INSERT IGNORE。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `family_book_account` (
+  `id`              BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`       BIGINT        NOT NULL COMMENT '所属家庭ID',
+  `name`            VARCHAR(50)   NOT NULL COMMENT '账户名称(如 招行工资卡/支付宝/现金)',
+  `account_type`    VARCHAR(20)   NOT NULL DEFAULT 'BANK' COMMENT '类型: CASH现金/BANK银行卡/ALIPAY支付宝/WECHAT微信/CREDIT信用卡/OTHER其他',
+  `institution`     VARCHAR(60)   DEFAULT NULL COMMENT '开户行/平台(选填)',
+  `card_tail`       VARCHAR(10)   DEFAULT NULL COMMENT '卡号后四位(只存尾号,选填)',
+  `initial_balance` DECIMAL(14,2) NOT NULL DEFAULT 0 COMMENT '期初余额(元,启用该账户时的余额,信用卡可为负)',
+  `sort_order`      INT           NOT NULL DEFAULT 0 COMMENT '排序(小的在前)',
+  `note`            VARCHAR(200)  DEFAULT NULL COMMENT '备注',
+  `created_by`      BIGINT        NOT NULL COMMENT '创建人ID',
+  `deleted`         TINYINT       NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0正常/1已删除',
+  `created_at`      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family` (`family_id`, `deleted`, `sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭记账账户(现金/银行卡/支付平台)';
+
+-- 记账明细挂账户：三列各自判定，避免「只加了其中一两列」的库被整体跳过
+SET @add_book_record_account := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `family_book_record` ADD COLUMN `account_id` BIGINT DEFAULT NULL COMMENT ''账户ID(EXPENSE=付款账户/INCOME=收款账户;V10.78)'' AFTER `created_by`',
+    'SELECT ''skip: family_book_record.account_id already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_book_record' AND COLUMN_NAME = 'account_id'
+);
+PREPARE add_book_record_account_stmt FROM @add_book_record_account;
+EXECUTE add_book_record_account_stmt;
+DEALLOCATE PREPARE add_book_record_account_stmt;
+
+SET @add_book_record_from_account := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `family_book_record` ADD COLUMN `from_account_id` BIGINT DEFAULT NULL COMMENT ''转出账户(TRANSFER;可空=转到账户外,如买入理财/取现;V10.78)'' AFTER `account_id`',
+    'SELECT ''skip: family_book_record.from_account_id already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_book_record' AND COLUMN_NAME = 'from_account_id'
+);
+PREPARE add_book_record_from_account_stmt FROM @add_book_record_from_account;
+EXECUTE add_book_record_from_account_stmt;
+DEALLOCATE PREPARE add_book_record_from_account_stmt;
+
+SET @add_book_record_to_account := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `family_book_record` ADD COLUMN `to_account_id` BIGINT DEFAULT NULL COMMENT ''转入账户(TRANSFER;可空=账户外转入,如赎回/存现;V10.78)'' AFTER `from_account_id`',
+    'SELECT ''skip: family_book_record.to_account_id already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_book_record' AND COLUMN_NAME = 'to_account_id'
+);
+PREPARE add_book_record_to_account_stmt FROM @add_book_record_to_account;
+EXECUTE add_book_record_to_account_stmt;
+DEALLOCATE PREPARE add_book_record_to_account_stmt;
+
+INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('book_account_type', 'CASH',   '现金'),
+('book_account_type', 'BANK',   '银行卡'),
+('book_account_type', 'ALIPAY', '支付宝'),
+('book_account_type', 'WECHAT', '微信'),
+('book_account_type', 'CREDIT', '信用卡'),
+('book_account_type', 'OTHER',  '其他');
+
+-- ------------------------------------------------------------
+-- V10.79 家谱并入家庭成员(2026-10-29)
+--   ① 家谱入口并入「家庭成员」页,停用独立 home 模块(旧 /tree 路由仍跳转)
+--   ② 历史数据配偶关系可能只写一侧,按反向引用补齐,保证图谱能连上
+--   ③ 家谱列表按 family_id 查询,补复合索引(等值 + 主键排序)
+--   全部幂等,可重复执行。
+-- ------------------------------------------------------------
+UPDATE `sys_home_module` SET `enabled` = 0 WHERE `code` = 'tree' AND `family_id` IS NULL;
+
+UPDATE `family_tree` t
+JOIN `family_tree` s ON s.`spouse_id` = t.`id` AND s.`family_id` = t.`family_id` AND s.`deleted` = 0
+SET t.`spouse_id` = s.`id`
+WHERE t.`spouse_id` IS NULL AND t.`deleted` = 0;
+
+SET @has_tree_family_idx := (SELECT COUNT(*) FROM information_schema.STATISTICS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_tree' AND INDEX_NAME = 'idx_family_deleted_id');
+SET @add_tree_family_idx := IF(@has_tree_family_idx = 0,
+  'ALTER TABLE `family_tree` ADD KEY `idx_family_deleted_id` (`family_id`, `deleted`, `id`)',
+  'SELECT 1');
+PREPARE add_tree_family_idx_stmt FROM @add_tree_family_idx;
+EXECUTE add_tree_family_idx_stmt;
+DEALLOCATE PREPARE add_tree_family_idx_stmt;

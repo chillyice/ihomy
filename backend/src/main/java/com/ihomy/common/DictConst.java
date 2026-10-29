@@ -91,6 +91,15 @@ public final class DictConst {
     public static final String BOOK_TRANSFER = "TRANSFER";
     private static final String BOOK_FALLBACK = BOOK_EXPENSE;
 
+    /** 记账账户类型 book_account_type（V10.78） */
+    public static final String BOOK_ACCOUNT_CASH = "CASH";
+    public static final String BOOK_ACCOUNT_BANK = "BANK";
+    public static final String BOOK_ACCOUNT_ALIPAY = "ALIPAY";
+    public static final String BOOK_ACCOUNT_WECHAT = "WECHAT";
+    public static final String BOOK_ACCOUNT_CREDIT = "CREDIT";
+    public static final String BOOK_ACCOUNT_OTHER = "OTHER";
+    private static final String BOOK_ACCOUNT_FALLBACK = BOOK_ACCOUNT_BANK;
+
     /** 操作日志结果 log_result */
     public static final String LOG_SUCCESS = "SUCCESS";
     public static final String LOG_FAILED = "FAILED";
@@ -302,6 +311,19 @@ public final class DictConst {
             case BOOK_INCOME, "1" -> BOOK_INCOME;
             case BOOK_TRANSFER, "2" -> BOOK_TRANSFER;
             default -> BOOK_EXPENSE;
+        };
+    }
+
+    /** 记账账户类型归一；未知值落 BANK，避免前端脏数据写入越界枚举 */
+    public static String bookAccountType(String v) {
+        if (v == null || v.isBlank()) return BOOK_ACCOUNT_FALLBACK;
+        return switch (v.trim().toUpperCase()) {
+            case BOOK_ACCOUNT_CASH -> BOOK_ACCOUNT_CASH;
+            case BOOK_ACCOUNT_ALIPAY -> BOOK_ACCOUNT_ALIPAY;
+            case BOOK_ACCOUNT_WECHAT -> BOOK_ACCOUNT_WECHAT;
+            case BOOK_ACCOUNT_CREDIT -> BOOK_ACCOUNT_CREDIT;
+            case BOOK_ACCOUNT_OTHER -> BOOK_ACCOUNT_OTHER;
+            default -> BOOK_ACCOUNT_BANK;
         };
     }
 }

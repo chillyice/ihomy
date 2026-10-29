@@ -350,6 +350,13 @@ export const bookApi = {
   create: (data) => request.post('/book', data),
   update: (id, data) => request.put(`/book/${id}`, data),
   remove: (id) => request.delete(`/book/${id}`),
+  // 总账聚合:year 空 = 全部时段,否则只看该年(期初承接此前累计)
+  ledger: (year) => request.get('/book/ledger', { params: { year } }),
+  // 账户(现金/银行卡/支付宝等):列表自带实时余额与记录数,记账弹窗与余额条共用
+  accounts: () => request.get('/book/accounts'),
+  createAccount: (data) => request.post('/book/accounts', data),
+  updateAccount: (id, data) => request.put(`/book/accounts/${id}`, data),
+  removeAccount: (id) => request.delete(`/book/accounts/${id}`),
 }
 
 // 家庭贷款记录(真实贷款登记 + 事件时间轴,还款流水由前端按事件重算)

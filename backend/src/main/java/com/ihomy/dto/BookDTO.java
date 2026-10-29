@@ -8,7 +8,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
- * 记账表单:type 0支出 1收入 2转账。
+ * 记账表单:type 取 EXPENSE 支出 / INCOME 收入 / TRANSFER 转账(由 DictConst.bookType 归一)。
+ * 账户三列:收支填 accountId,转账填 fromAccountId/toAccountId;均可空(空=账户外,不影响统计)。
  */
 @Data
 public class BookDTO {
@@ -20,4 +21,10 @@ public class BookDTO {
     @Size(max = 200, message = "备注最多 200 字")
     private String remark;
     private LocalDate recordDate;
+    /** 收支账户(支出=付款账户/收入=收款账户) */
+    private Long accountId;
+    /** 转账转出账户(可空=转出到账户外,如买入理财/取现) */
+    private Long fromAccountId;
+    /** 转账转入账户(可空=从账户外转入,如赎回/存现) */
+    private Long toAccountId;
 }

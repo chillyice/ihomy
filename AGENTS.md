@@ -73,7 +73,7 @@ Nginx 静态根指向 `frontend/dist`,构建即生效。
 
 - **root 仅初始化**:`mysql -uroot -p < schema.sql`(建库/建表/建账号/种子),只执行一次;本地 `.\scripts\start-db.ps1`(Docker 首启自动导入)。**业务运行用 `ihomy` 账号**(仅 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`,无 DDL),建 `localhost` 与 `%` 两个 host。
 - 生产 MySQL `validate_password` MEDIUM:密码须含特殊字符(避开 `' " \ $ |`,建议 `!@%^&*-_+=.`),改密顺序见 踩坑速查 §2.7。
-- **83 张表**,前缀:`sys_` 26(系统/账号/权限/配置/存储)、`report_` 5(报表/日志)、`family_` 30(家庭事务)、`content_` 21(内容数据)、`game_` 1(games 域)。完整清单见 需求 §6.2。
+- **84 张表**,前缀:`sys_` 26(系统/账号/权限/配置/存储)、`report_` 5(报表/日志)、`family_` 31(家庭事务)、`content_` 21(内容数据)、`game_` 1(games 域)。完整清单见 需求 §6.2。
   - 命名:家庭事务 `family_`;内容 `content_`;账号/权限/配置/存储 `sys_`;报表/日志 `report_`;
   - 游戏域顶层前缀 `game_`,格式 `game_<code>_<module>_<entity>`(模块层仅当 ≥3 张表/独立聚合根时才建);注册表 `game_info`,小游戏页只读注册表,**加游戏=插一行不改组件**。家圃时光 V2 已迁独立仓 `home_garden_moments`,本仓只留集成(`game_info` + 游戏库入口)。
 - **结构变更双文件**:同时改 `schema.sql`(全量)与 `migrations.sql`(增量、**幂等**),并按 CI 同路径做空库全量导入实测(`migrations` 跑通 ≠ `schema.sql` 可用,踩坑速查 §7.4)。
@@ -83,6 +83,7 @@ Nginx 静态根指向 `frontend/dist`,构建即生效。
 - **新增 `@RequirePermission` 接口前**:auth_code 必须进 `sys_auth` + `sys_role_auth` 种子(OWNER 豁免、MEMBER 显式授权);注解**只写方法上**,类级不生效(踩坑速查 §2.14)。
 - **索引规范(强制)**:列表查询的 WHERE+ORDER BY 必须落在同一复合索引内,等值字段在前、范围/排序在后,`deleted` 进索引;混向排序给索引列加 `DESC`;新增表/接口先 `EXPLAIN`(踩坑速查 §8.4)。
 - **引用开源依赖必须登记** `sys_oss_component`(NPM/MAVEN 交 Renovate;SERVICE 走内部升级方案);`current_version` 记锁定版本,不写区间下限。细则见 需求 §4.6.10。
+- **记账账户余额不落库**:`balance = 期初 + 收入 − 支出 − 转出 + 转入`,前后端同一口径(前端 `utils/bookLedger.js` 可复算对账);`family_book_record` 三个账户列可空 = 历史未归属,只提示不迁移;总账 `byMonth` 只含有记录的月份、前端补 12 槽(踩坑速查 §8.5,功能口径见 需求 §4.5.5)。
 
 ## 代码结构
 
@@ -131,7 +132,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 ## 跨模块规则
 
-- **首页/导航**:`sys_home_module.sort_order` 决定三端顺序(现口径:物品定位/厨房第 1、2 位,工具箱殿后),改完重启后端;**移动端导航唯一数据源 `utils/navModules.js`**——不入模块表的页面(设置/帮助/运维/天气)须在 `buildNavItems` 补虚拟入口;移动首页只做动态流。
+- **首页/导航**:`sys_home_module.sort_order` 决定三端顺序(现口径:物品定位/厨房第 1、2 位,工具箱殿后),改完重启后端;**移动端导航唯一数据源 `utils/navModules.js`**——不入模块表的页面(设置/帮助/运维/天气)须在 `buildNavItems` 补虚拟入口;移动首页只做动态流。**家谱已并入「家庭成员」页**(`?tab=tree`,旧 `/tree` 重定向),`tree` 模块种子置 `enabled=0` 防止重复入口。
 - **工具箱**:元数据唯一来源 `frontend/src/tools/registry.js`;12 个开发者工具(JSON/编码/进制/报文/子网/哈希/随机/时间/正则/文本/运维/JWT)只在 `/bit-pouch/tools/<id>` 维护界面,ihomy 旧 `/tools/<id>` 重定向,registry 标 `toolbox:false`;颜色/单位/图片/文件/PDF 两处入口共用内核。比特口袋在线目录(`tools/bitPouchTools.js`)共 24 项,与 bit_pouch `src/plugins/` 一一对应,另有 URL/UUID/数据格式/HTTP 报文/cURL/IP 段/MQTT 主题 7 项只在线页维护。
 - **天文**:后端 `SolarUtil` 是唯一计算来源(随 `/public/sun-info` 下发),前端 `utils/terminator.js` 只做球面几何渲染,**禁止再移植 NOAA/Meeus**;`/public/sun-info` 只缓存 slots,直射点每次实时算。
 - **独立产品页**:挂 `/kada`、`/bit-pouch`、`/wallpaper`、`/chillyice` 这类页必须加 `meta.standalone`(不套外壳、跳过 `appStore.init()`、401 不顶登录页、自带配色要接管 `html` 根类);**从独立页回站内页要补初始化**(`App.vue` 监听 standalone 变 false 时补 `appStore.init()`/`ensureUserInfo()`),否则首页与家庭名全空(踩坑速查 §3.32/§3.8)。
