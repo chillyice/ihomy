@@ -2478,3 +2478,14 @@ INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUE
 ('finance_interest_mode', 'BY_MONTH', '按月折算'),
 ('finance_interest_mode', 'BY_DAY',   '按日折算'),
 ('finance_interest_mode', 'COMPOUND', '复利');
+
+-- ------------------------------------------------------------
+-- V10.85 导航新增「家庭」分类(2026-10-29)
+--   物品定位/家庭公告/智能家居/工具箱 从生活组拆到 family 组,前端 NAV_GROUP_ORDER
+--   固定 content → life → family → social → system;category 是纯展示字段,不动 sort_order。
+--   重复执行安全:UPDATE 自带 category <> 'family' 守卫;只改全局模块行。
+-- ------------------------------------------------------------
+UPDATE `sys_home_module` SET `category` = 'family'
+WHERE `family_id` IS NULL
+  AND `code` IN ('item', 'announcement', 'iot', 'tools')
+  AND `category` <> 'family';

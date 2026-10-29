@@ -35,12 +35,37 @@ describe('buildNavItems 天气入口', () => {
     expect(buildNavItems([]).find((i) => i.code === 'weather').path).toBe('/weather')
   })
 
-  it('不破「工具箱殿后」的排序口径(工具箱仍在生活组末位)', () => {
+  it('生活组内按 sortOrder 排,天气插在 vault 与 chat 之间', () => {
     const life = buildNavGroups([
       { code: 'vault', title: '保险箱', path: '/vault', category: 'life', sortOrder: 14, enabled: 1 },
       { code: 'chat', title: '聊天室', path: '/chat', category: 'life', sortOrder: 16, enabled: 1 },
-      { code: 'tools', title: '工具箱', path: '/tools', category: 'life', sortOrder: 17, enabled: 1 },
     ]).find((g) => g.category === 'life')
-    expect(life.items.map((i) => i.code)).toEqual(['vault', 'weather', 'chat', 'tools'])
+    expect(life.items.map((i) => i.code)).toEqual(['vault', 'weather', 'chat'])
+  })
+})
+
+// 「家庭」组(V10.85):物品定位/家庭公告/智能家居/工具箱 从生活组拆出,排在生活之后
+describe('buildNavGroups 家庭组', () => {
+  const modules = [
+    { code: 'item', title: '物品定位', path: '/item', category: 'family', sortOrder: 4, enabled: 1 },
+    { code: 'tools', title: '工具箱', path: '/tools', category: 'family', sortOrder: 17, enabled: 1 },
+    { code: 'iot', title: '智能家居', path: '/iot', category: 'family', sortOrder: 16, enabled: 1 },
+    { code: 'announcement', title: '家庭公告', path: '/announcement', category: 'family', sortOrder: 15, enabled: 1 },
+    { code: 'reminder', title: '今日提醒', path: '/reminder', category: 'life', sortOrder: 6, enabled: 1 },
+    { code: 'blog', title: '博客', path: '/blog', category: 'content', sortOrder: 1, enabled: 1 },
+    { code: 'member', title: '家庭成员', path: '/member', category: 'social', sortOrder: 1, enabled: 1 },
+  ]
+
+  it('家庭组固定排在生活之后、成员之前,组内按 sortOrder', () => {
+    const groups = buildNavGroups(modules)
+    expect(groups.map((g) => g.category)).toEqual(['content', 'life', 'family', 'social', 'system'])
+    const family = groups.find((g) => g.category === 'family')
+    expect(family.label).toBe('家庭')
+    expect(family.items.map((i) => i.code)).toEqual(['item', 'announcement', 'iot', 'tools'])
+  })
+
+  it('家庭组模块不会再出现在生活组', () => {
+    const life = buildNavGroups(modules).find((g) => g.category === 'life')
+    expect(life.items.map((i) => i.code)).toEqual(['reminder', 'weather'])
   })
 })

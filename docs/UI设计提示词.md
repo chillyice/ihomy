@@ -625,7 +625,7 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 
 - **MobileTabBar**:底部固定(fixed + safe-area-inset-bottom)三 Tab(首页/更多/我的)。
 - **MobileHomeFeed**(首页 Tab):顶部**文字式筛选 + 下划线选中**(无胶囊背景);动态流 8 类型(博客/日记/照片/视频/愿望/任务/菜谱/图书,9 Tab),复用 `homeApi.getFeed`(与桌面同一数据源,前端按 type 分流渲染,封面字段 `coverImage`)。
-- **MobileMoreGrid**(更多 Tab):按分类(内容/生活/成员/系统)4 列图标网格,复用 appStore.modules。
+- **MobileMoreGrid**(更多 Tab):按分类(内容/生活/家庭/成员/系统)4 列图标网格,复用 appStore.modules。
 - **MobileMePage**(我的 Tab):用户信息 + 家庭切换(展开列表)+ 主题/光影/语言开关 + 设置/成员/资料入口 + 退出。
 
 ### 子页面模式(其余路由)

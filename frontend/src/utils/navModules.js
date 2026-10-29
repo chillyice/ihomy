@@ -103,8 +103,10 @@ export const ICON_MAP = {
 export const iconComp = (code) => ICON_MAP[code] || Document
 
 // 分组顺序 + 中文名(相册 album 已并入 content,不单独成组)
-export const NAV_GROUP_ORDER = ['content', 'life', 'social', 'system']
-export const CATEGORY_LABELS = { content: '内容', life: '生活', social: '成员', system: '系统' }
+// family 组(V10.85):物品定位/家庭公告/智能家居/工具箱 从生活组拆出,固定排在生活之后;
+// 只在此处登记顺序与名称,三端(sidebar/暖居/移动端)自动同步
+export const NAV_GROUP_ORDER = ['content', 'life', 'family', 'social', 'system']
+export const CATEGORY_LABELS = { content: '内容', life: '生活', family: '家庭', social: '成员', system: '系统' }
 export const categoryLabel = (cat) => CATEGORY_LABELS[cat] || '功能'
 
 // album 归入 content;空分类兜底 life

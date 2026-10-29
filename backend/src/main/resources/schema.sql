@@ -838,10 +838,11 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('music',  '音乐',   'icon-music',  '/music',  'content', 'left', 6, 1),
 ('library','书架',     'icon-library','/library','content',  'left',  20, 1),
 ('games',  '小游戏', 'icon-games',   '/games',  'content',  'left',  21, 1);
--- 生活组:物品定位/厨房恒为第 1、2 位(V9.27 起),工具箱殿后(V10.11 重排);
--- 组内相对序生效,与 content 组数值交错无影响。照片瀑布已并入相册,不再单列为模块。
+-- 生活组:厨房恒为组内第 1 位;组内相对序生效,与 content 组数值交错无影响。
+-- 家庭组(V10.85):物品定位/家庭公告/智能家居/工具箱 从生活组拆出,侧栏固定排在生活之后;
+-- 组内相对序 item < announcement(15) < iot(16) < tools(17)。照片瀑布已并入相册,不再单列为模块。
 INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`) VALUES
-('item',      '物品定位', 'icon-item',      '/item',   'life', 'left',  4, 1),
+('item',      '物品定位', 'icon-item',      '/item',   'family', 'left',  4, 1),
 ('kitchen',   '厨房',     'icon-kitchen',   '/kitchen','life', 'left',  5, 1),
 ('reminder',  '今日提醒', 'icon-reminder',  '/reminder','life','left',  6, 1),
 ('plan',      '家庭计划', 'icon-plan',      '/plan',   'life', 'left',  7, 1),
@@ -853,7 +854,7 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('tree',      '家谱',     'icon-tree',      '/tree',   'life', 'left', 13, 0),
 ('vault',     '保险箱',   'icon-vault',     '/vault',  'life', 'left', 14, 1),
 ('chat',      '聊天室',   'icon-chat',      '/chat',   'life', 'left', 16, 1),
-('tools',     '工具箱',   'icon-tools',     '/tools',  'life', 'left', 17, 1),
+('tools',     '工具箱',   'icon-tools',     '/tools',  'family', 'left', 17, 1),
 ('plant',     '花园',     'icon-plant',     '/tools/plant',  'life', 'left', 40, 0),
 ('member', '家庭成员', 'icon-member', '/member', 'social',  'right',  1, 1),
 ('storage','文件浏览','icon-storage','/storage/files','system',  'left',  16, 1);
@@ -2342,14 +2343,14 @@ CREATE TABLE `family_announcement` (
   KEY `idx_family_sort` (`family_id`, `deleted`, `sort_order`, `id` DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭公告/广告位表(自建,图片+链接)';
 
--- 首页模块:智能家居中控入口(生活组,排工具箱前);sys_home_module 无唯一约束兜底,用 NOT EXISTS 防重
+-- 首页模块:智能家居中控入口(家庭组,排工具箱前);sys_home_module 无唯一约束兜底,用 NOT EXISTS 防重
 INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`)
-SELECT 'iot', '智能家居', 'icon-iot', '/iot', 'life', 'left', 16, 1
+SELECT 'iot', '智能家居', 'icon-iot', '/iot', 'family', 'left', 16, 1
 WHERE NOT EXISTS (SELECT 1 FROM `sys_home_module` WHERE `code` = 'iot' AND `family_id` IS NULL);
 
--- 首页模块:家庭公告入口(生活组)
+-- 首页模块:家庭公告入口(家庭组)
 INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`)
-SELECT 'announcement', '家庭公告', 'icon-announcement', '/announcement', 'life', 'left', 15, 1
+SELECT 'announcement', '家庭公告', 'icon-announcement', '/announcement', 'family', 'left', 15, 1
 WHERE NOT EXISTS (SELECT 1 FROM `sys_home_module` WHERE `code` = 'announcement' AND `family_id` IS NULL);
 
 -- 首页模块:回收站入口(系统组,排在设置之前)
