@@ -33,7 +33,8 @@
 
 <script setup>
 // 记账本外壳:页签切换 + 月份状态;各页签自己管数据与工具栏右侧操作
-import { defineAsyncComponent, ref } from 'vue'
+import { defineAsyncComponent, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -46,8 +47,20 @@ const BookLedger = defineAsyncComponent(() => import('@/views/book/BookLedger.vu
 // 理财同样按需加载(计算内核 + 4 个组件不进首页 chunk)
 const FinancePanel = defineAsyncComponent(() => import('@/views/book/finance/FinancePanel.vue'))
 
-const tab = ref('book')
+const TABS = ['book', 'ledger', 'loan', 'finance']
+const route = useRoute()
+// 支持外部直达某个页签(首页理财卡 → /book?tab=finance);非法值回落到记账本
+const tabFromQuery = () => (TABS.includes(route.query.tab) ? route.query.tab : 'book')
+const tab = ref(tabFromQuery())
 const month = ref(new Date().toISOString().slice(0, 7))
+
+// 同一路由内换 query(例如首页卡片再点一次)也要跟着切
+watch(
+  () => route.query.tab,
+  () => {
+    tab.value = tabFromQuery()
+  },
+)
 
 // 总账页签点某月 → 回到记账本并定位该月
 const onPickMonth = (m) => {

@@ -202,6 +202,11 @@
             <i class="out" :style="{ width: 100 - incomePct + '%' }"></i>
           </div>
           <div v-else class="gc-empty" style="padding: 8px 0">{{ $t('warm.noBook') }}</div>
+          <!-- 理财持仓:本金不计收支,单列一条,点了直达理财页签 -->
+          <button v-if="financeHolding.count" type="button" class="gc-fin-holding" @click.stop="$router.push('/book?tab=finance')">
+            <span class="gc-fin-holding-label">{{ $t('warm.financeHolding', { n: financeHolding.count }) }}</span>
+            <b>¥ {{ fmt(financeHolding.principal) }}</b>
+          </button>
         </template>
 
         <!-- 寻物(搜索 + 语音 + 户型图预览 / 列表) -->
@@ -414,11 +419,12 @@ import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useWarmWidgetDrag } from '@/utils/widgetDragData'
 import { pickInsertIndex } from '@/utils/dragInsert'
 import { addedCodes } from '@/utils/warmHomeShared'
-import { publicApi, bookApi, itemApi, taskApi, wishApi, reminderApi, aiApi } from '@/api'
+import { publicApi, bookApi, financeApi, itemApi, taskApi, wishApi, reminderApi, aiApi } from '@/api'
 import { useVoiceRecorder } from '@/composables/useVoiceRecorder'
 import { useDaily } from '@/composables/useDaily'
 import { feedSummary as feedSummaryOf } from '@/utils/feed'
 import { pickDefaultFloor } from '@/utils/floorPlanGeom'
+import { summarizePortfolio } from '@/utils/finance'
 import { dictText } from '@/utils/dict'
 
 const router = useRouter()
@@ -998,6 +1004,12 @@ const balance = computed(() => bookSummary.value?.balance ?? 0)
 // 收支比例条
 const financeTotal = computed(() => (Number(bookSummary.value?.income) || 0) + (Number(bookSummary.value?.expense) || 0))
 const incomePct = computed(() => (financeTotal.value > 0 ? ((Number(bookSummary.value?.income) || 0) / financeTotal.value) * 100 : 0))
+// 理财持仓(本金 / 持有笔数):本金不进收支,故单独一条展示
+const financeList = ref([])
+const financeHolding = computed(() => {
+  const s = summarizePortfolio(financeList.value)
+  return { principal: s.holdingPrincipal, count: s.holdingCount }
+})
 
 // ========== 照片卡牌堆(点击翻动 + 5s 自动轮播 + hover 摆正放大/暂停) ==========
 const photoIndex = ref(0)
@@ -1257,9 +1269,11 @@ onMounted(async () => {
   // 未登录(公开首页)只拉公开动态流:其余卡片数据都要登录态,直接跳过,
   // 别打一批注定 401 的请求(与 Home.vue 的 loadXxx 登录态守卫一致)
   const loggedIn = userStore.isLoggedIn
-  const [feed, book, it, task, wish, rem, houses] = await Promise.all([
+  const [feed, book, fin, it, task, wish, rem, houses] = await Promise.all([
     publicApi.getFeed(20).catch(() => []),
     loggedIn ? bookApi.summary().catch(() => null) : Promise.resolve(null),
+    // 理财持仓:与收支卡同卡展示,失败不影响收支
+    loggedIn ? financeApi.list().catch(() => []) : Promise.resolve([]),
     loggedIn ? itemApi.list({}).catch(() => []) : Promise.resolve([]),
     loggedIn ? taskApi.list().catch(() => []) : Promise.resolve([]),
     // 愿望列表对游客开放(后端返回演示家庭的公开愿望),故不受登录态限制
@@ -1269,6 +1283,7 @@ onMounted(async () => {
   ])
   feeds.value = feed || []
   if (book) bookSummary.value = book
+  financeList.value = Array.isArray(fin) ? fin : []
   items.value = (it || []).slice(0, 8)
   tasks.value = (Array.isArray(task) ? task : task?.records || []).filter((t) => t.status !== 'CANCELLED')
   wishes.value = Array.isArray(wish) ? wish : []
@@ -2329,6 +2344,35 @@ html.dark .gc-glass::after {
 }
 .gc-fin.out {
   color: var(--color-accent);
+}
+/* 理财持仓(本月收支卡底部一条,可点进理财页签) */
+.gc-fin-holding {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(160, 140, 110, 0.1);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.gc-fin-holding:hover {
+  background: rgba(160, 140, 110, 0.18);
+}
+.gc-fin-holding b {
+  font-variant-numeric: tabular-nums;
+}
+.gc-fin-holding-label {
+  opacity: 0.55;
 }
 
 /* 列表 */

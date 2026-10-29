@@ -36,12 +36,14 @@
 
     <template v-else>
       <div class="fc-progress">
-        <div class="fc-bar"><div class="fc-bar-inner" :style="{ width: `${progress}%` }"></div></div>
+        <!-- 活期没有期限,进度条没有意义(0% 看着像坏了),只留已持有天数 -->
+        <div v-if="!openEnded" class="fc-bar"><div class="fc-bar-inner" :style="{ width: `${progress}%` }"></div></div>
         <div class="fc-progress-text">{{ daysText }}</div>
       </div>
 
       <div class="fc-rows">
-        <div class="fc-row">
+        <!-- 活期(没有到期日)没有「到期预期」可言,换成当前本息;基金等浮动收益仍是「浮动收益」 -->
+        <div v-if="!openEnded" class="fc-row">
           <span class="fc-key">{{ $t('book.finance.expectInterest') }}</span>
           <span class="fc-val">{{ expectedText }}</span>
         </div>
@@ -50,13 +52,13 @@
           <span class="fc-val">{{ accruedText }}</span>
         </div>
         <div class="fc-row">
-          <span class="fc-key">{{ $t('book.finance.maturity') }}</span>
-          <span class="fc-val">{{ maturityText }}</span>
+          <span class="fc-key">{{ openEnded ? $t('book.finance.currentAmount') : $t('book.finance.maturity') }}</span>
+          <span class="fc-val">{{ openEnded ? currentText : maturityText }}</span>
         </div>
       </div>
 
       <div class="fc-due" :class="{ 'is-overdue': overdue }">
-        <span v-if="!endDate">{{ $t('book.finance.holdDaysOnly', { n: held }) }}</span>
+        <span v-if="!endDate">{{ hasRate ? $t('book.finance.openEndedHint') : $t('book.finance.noMaturityHint') }}</span>
         <span v-else>{{ $t('book.finance.maturityDate', { date: endDate }) }} · {{ remainText }}</span>
       </div>
     </template>
@@ -87,7 +89,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import { formatYuan } from '@/utils/money'
+import { formatYuan, round2 } from '@/utils/money'
 import {
   accruedInterest,
   actualInterest,
@@ -128,10 +130,13 @@ const daysText = computed(() =>
     : t('book.finance.holdDaysOnly', { n: held.value }),
 )
 
-const rateText = computed(() => {
+const hasRate = computed(() => {
   const rate = props.product.annualRate
-  if (rate === null || rate === undefined || rate === '') return t('book.finance.floating')
-  return `${Number(rate)}%`
+  return rate !== null && rate !== undefined && rate !== ''
+})
+const rateText = computed(() => {
+  if (!hasRate.value) return t('book.finance.floating')
+  return `${Number(props.product.annualRate)}%`
 })
 
 const expectedText = computed(() => {
@@ -145,6 +150,15 @@ const accruedText = computed(() => {
 const maturityText = computed(() => {
   const value = maturityAmount(props.product)
   return value === null ? t('book.finance.floating') : `¥${formatYuan(value)}`
+})
+
+// 活期:没有到期日,只能算「本金 + 已计提」的当前本息
+const openEnded = computed(() => !endDate.value)
+const currentText = computed(() => {
+  const principal = Number(props.product.principal)
+  const accrued = accruedInterest(props.product)
+  if (!Number.isFinite(principal) || accrued === null) return t('book.finance.unbounded')
+  return `¥${formatYuan(round2(principal + accrued))}`
 })
 
 const interestValue = computed(() => {

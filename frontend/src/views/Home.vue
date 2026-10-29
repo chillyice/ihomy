@@ -285,7 +285,7 @@
             <router-link to="/wish" class="card-more">{{ $t('home.dashboard.viewAll') }}</router-link>
           </template>
 
-          <!-- 本月收支 -->
+          <!-- 本月收支 + 理财持仓(本金不计收支,单独一行,点了直达理财页签) -->
           <template v-else-if="w.id === 'finance'">
             <div class="card-head">{{ $t('home.dashboard.finance') }}</div>
             <div class="finance-body">
@@ -304,6 +304,12 @@
                 }}</span>
               </div>
             </div>
+            <!-- 没有持仓时整行不渲染,不占位、不显示 0 -->
+            <router-link v-if="financeHolding.count" to="/book?tab=finance" class="fin-holding">
+              <span class="fin-holding-label">{{ $t('home.dashboard.financeHolding') }}</span>
+              <span class="fin-holding-val">¥{{ formatYuan(financeHolding.principal, 0) }}</span>
+              <span class="fin-holding-count">{{ $t('home.dashboard.financeHoldingCount', { n: financeHolding.count }) }}</span>
+            </router-link>
             <router-link to="/book" class="card-more">{{ $t('home.dashboard.viewDetail') }}</router-link>
           </template>
 
@@ -391,7 +397,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
 import { useI18n } from 'vue-i18n'
-import { publicApi, taskApi, pointsApi, reminderApi, bookApi, wishApi, itemApi, kitchenApi } from '@/api'
+import { publicApi, taskApi, pointsApi, reminderApi, bookApi, financeApi, wishApi, itemApi, kitchenApi } from '@/api'
 import { useWeatherBg } from '@/composables/useWeatherBg'
 import { useDaily } from '@/composables/useDaily'
 import { gsap } from 'gsap'
@@ -403,6 +409,8 @@ import FloorPlanCanvas from '@/views/item/FloorPlanCanvas.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useWidgetDrag } from '@/utils/useWidgetDrag'
 import { feedTypeLabel as feedTypeLabelOf, feedSummary as feedSummaryOf } from '@/utils/feed'
+import { formatYuan } from '@/utils/money'
+import { summarizePortfolio } from '@/utils/finance'
 import { formatRelativeTime } from '@/utils/datetime'
 import { pickDefaultFloor } from '@/utils/floorPlanGeom'
 import { dictText } from '@/utils/dict'
@@ -490,6 +498,12 @@ const anniversaries = ref([])
 const pointsStats = ref({})
 const reminders = ref([])
 const bookSummary = ref(null)
+// 理财持仓概览(本金 / 持有笔数):与本月收支同卡展示,本金不进收支所以单独一行
+const financeList = ref([])
+const financeHolding = computed(() => {
+  const s = summarizePortfolio(financeList.value)
+  return { principal: s.holdingPrincipal, count: s.holdingCount }
+})
 const wishes = ref([])
 const itemKeyword = ref('')
 const searchResults = ref([])
@@ -515,9 +529,10 @@ const loadReminders = async () => {
 }
 const loadBookSummary = async () => {
   if (userStore.isLoggedIn) {
-    try {
-      bookSummary.value = await bookApi.summary()
-    } catch (e) {}
+    // 本月收支与理财持仓互不依赖,并行取;理财接口失败不影响收支卡
+    const [summary, list] = await Promise.all([bookApi.summary().catch(() => null), financeApi.list().catch(() => [])])
+    if (summary) bookSummary.value = summary
+    financeList.value = Array.isArray(list) ? list : []
   }
 }
 const loadWishes = async () => {
@@ -1985,6 +2000,39 @@ html.dark .recipe-name {
 }
 .fin-val.expense {
   color: #b06a58;
+}
+/* 理财持仓行:本月收支下面一条,小一号字,整行可点进理财页签 */
+.fin-holding {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 18px 4px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: rgba(160, 140, 110, 0.08);
+  color: inherit;
+  text-decoration: none;
+  font-size: 12px;
+  line-height: 1.4;
+  transition: background 0.2s;
+}
+.fin-holding:hover {
+  background: rgba(160, 140, 110, 0.16);
+}
+.fin-holding-label {
+  font-size: 10px;
+  opacity: 0.45;
+  color: #9a9088;
+}
+.fin-holding-val {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.fin-holding-count {
+  margin-left: auto;
+  opacity: 0.45;
+  font-variant-numeric: tabular-nums;
 }
 html.dark .fin-val.income {
   color: #7dba7d;
