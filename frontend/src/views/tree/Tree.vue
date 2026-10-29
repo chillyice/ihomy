@@ -43,12 +43,18 @@
         </div>
         <div class="kin-terms">
           <div class="kin-term">
-            <span class="kin-term-label">{{ $t('tree.calls', { a: nameOf(selectedIds[0]), b: nameOf(selectedIds[1]) }) }}</span>
-            <strong>{{ termLabel(mutual.aToB.code) }}</strong>
+            <div class="kin-term-main">
+              <span class="kin-term-label">{{ $t('tree.calls', { a: nameOf(selectedIds[0]), b: nameOf(selectedIds[1]) }) }}</span>
+              <strong>{{ termLabel(mutual.aToB.code) }}</strong>
+            </div>
+            <span v-if="pathLabel(mutual.aToB)" class="kin-path">{{ pathLabel(mutual.aToB) }}</span>
           </div>
           <div class="kin-term">
-            <span class="kin-term-label">{{ $t('tree.calls', { a: nameOf(selectedIds[1]), b: nameOf(selectedIds[0]) }) }}</span>
-            <strong>{{ termLabel(mutual.bToA.code) }}</strong>
+            <div class="kin-term-main">
+              <span class="kin-term-label">{{ $t('tree.calls', { a: nameOf(selectedIds[1]), b: nameOf(selectedIds[0]) }) }}</span>
+              <strong>{{ termLabel(mutual.bToA.code) }}</strong>
+            </div>
+            <span v-if="pathLabel(mutual.bToA)" class="kin-path">{{ pathLabel(mutual.bToA) }}</span>
           </div>
         </div>
         <div v-if="mutual.aToB.code === 'none'" class="kin-note">{{ $t('tree.noRelationHint') }}</div>
@@ -199,6 +205,13 @@ const mutual = computed(() => {
 
 const nameOf = (id) => members.value.find((m) => m.id === id)?.name || ''
 const termLabel = (code) => kinshipLabel(code, locale.value === 'en' ? 'en' : 'zh-CN')
+// 关系推导路径(如「妈妈的爸爸的弟弟」):称谓怎么来的看得见;一步直达的关系不重复显示
+const pathLabel = (r) => {
+  const chain = r?.chain || []
+  if (chain.length < 2) return ''
+  const parts = chain.map(termLabel)
+  return locale.value === 'en' ? parts.join("'s ") : parts.join('的')
+}
 const relationTypeLabel = (type) =>
   ({ blood: t('tree.relationBlood'), affinity: t('tree.relationAffinity'), spouse: t('tree.relationSpouse') })[type] ||
   t('tree.relationNone')
@@ -439,6 +452,11 @@ onMounted(() => {
 }
 .kin-term {
   display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.kin-term-main {
+  display: flex;
   align-items: center;
   gap: 8px;
 }
@@ -450,6 +468,11 @@ onMounted(() => {
   color: var(--color-primary);
   font-size: 18px;
   letter-spacing: 1px;
+}
+.kin-path {
+  color: var(--color-text-2);
+  font-size: 12px;
+  opacity: 0.8;
 }
 .kin-note {
   color: #d98b2b;
