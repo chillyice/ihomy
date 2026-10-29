@@ -73,7 +73,7 @@ Nginx 静态根指向 `frontend/dist`,构建即生效。
 
 - **root 仅初始化**:`mysql -uroot -p < schema.sql`(建库/建表/建账号/种子),只执行一次;本地 `.\scripts\start-db.ps1`(Docker 首启自动导入)。**业务运行用 `ihomy` 账号**(仅 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`,无 DDL),建 `localhost` 与 `%` 两个 host。
 - 生产 MySQL `validate_password` MEDIUM:密码须含特殊字符(避开 `' " \ $ |`,建议 `!@%^&*-_+=.`),改密顺序见 踩坑速查 §2.7。
-- **84 张表**,前缀:`sys_` 26(系统/账号/权限/配置/存储)、`report_` 5(报表/日志)、`family_` 31(家庭事务)、`content_` 21(内容数据)、`game_` 1(games 域)。完整清单见 需求 §6.2。
+- **85 张表**,前缀:`sys_` 26(系统/账号/权限/配置/存储)、`report_` 5(报表/日志)、`family_` 32(家庭事务)、`content_` 21(内容数据)、`game_` 1(games 域)。完整清单见 需求 §6.2。
   - 命名:家庭事务 `family_`;内容 `content_`;账号/权限/配置/存储 `sys_`;报表/日志 `report_`;
   - 游戏域顶层前缀 `game_`,格式 `game_<code>_<module>_<entity>`(模块层仅当 ≥3 张表/独立聚合根时才建);注册表 `game_info`,小游戏页只读注册表,**加游戏=插一行不改组件**。家圃时光 V2 已迁独立仓 `home_garden_moments`,本仓只留集成(`game_info` + 游戏库入口)。
 - **结构变更双文件**:同时改 `schema.sql`(全量)与 `migrations.sql`(增量、**幂等**),并按 CI 同路径做空库全量导入实测(`migrations` 跑通 ≠ `schema.sql` 可用,踩坑速查 §7.4)。
@@ -165,7 +165,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 8. **可拖拽面板**:`useDragResize`;位置尺寸持久化 localStorage;**事件监听按需挂载**(拖拽开始挂 `mousemove`/`mouseup`,结束移除,别 `onMounted` 常驻)。
 9. **光影层全局化**:`SunLightLayer` + `AppSidebar` + `SiteFooter` 在 `App.vue` 挂载,`useSunLight` provide/inject。
 10. **i18n**:所有可见文本 `$t('key')`,中英键结构对齐;**文案里字面量 `{`/`}`/`@` 必须转义**(`{'{名字}'}`),否则生产构建 `$t()` 抛错打断整页(dev 只打日志);守门 `i18n/message-format.spec.js` + 硬编码中文守门 `hardcoded-cjk.spec.js`(有意保留项进其 `ALLOW`)。
-11. **共享逻辑抽 utils(禁三份实现)**:动态流类型/摘要/相对时间走 `utils/feed.js`;默认楼层 `floorPlanGeom.pickDefaultFloor`;枚举文案 `dictText(t,...)`;新重复逻辑先找现成 util。
+11. **共享逻辑抽 utils(禁三份实现)**:动态流类型/摘要/相对时间走 `utils/feed.js`;默认楼层 `floorPlanGeom.pickDefaultFloor`;枚举文案 `dictText(t,...)`;金额「元⇄分」走 `utils/money.js`、年月日换算走 `utils/date.js`(贷款/理财/记账本共用,`loan.js` 只再导出);新重复逻辑先找现成 util。
 12. **可点击非按钮元素**:用 `v-a11y-click`(补 `role`/`tabindex` + Enter/Space),别手写三行;`<img>` 必须带 `alt`。
 13. **打包分块(强制)**:`vite.config.js` 必配 `manualChunks`(element-plus/gsap/vue-i18n/epubjs/pdfjs/simple-mind-map);`public/` 静态资源不得与 npm 包重复。
 14. **重型资源异步(强制)**:阻塞首屏的字体包/CSS 用 `import('...')`,别同步 import。

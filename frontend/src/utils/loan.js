@@ -18,7 +18,14 @@
  *   银行不因首期少几天利息就重算后续月供,故第 2 期起仍是原月供,差额落在「首期还本多一点 +
  *   末期金额略小」上。不填放款日即按整月口径,与纯试算结果完全一致。
  * - 贷款流水(loanLedger):按「放款 + 利率调整 + 提前还款」事件时间轴逐期重算,用于记录真实贷款走向。
+ *
+ * 金额与日期的底层实现已抽到 utils/money.js 与 utils/date.js(理财/记账本共用),
+ * 本文件 import 后再原样 re-export,历史调用方(含 loan.spec.js)行为不变。
  */
+import { daysBetween, parseDate } from './date'
+import { formatYuan, toCents, toYuan } from './money'
+
+export { daysBetween, formatYuan, toCents, toYuan }
 
 export const LOAN_TYPE = {
   COMMERCIAL: 'COMMERCIAL',
@@ -68,26 +75,6 @@ const MAX_PERIODS = 1200
 /** 反推利率的可接受上限:月利率 100%(名义年利率 1200%),超出按参数异常处理 */
 const MAX_SOLVE_MONTHLY_RATE = 1
 
-/** 元 → 分 */
-export function toCents(yuan) {
-  const n = Number(yuan)
-  return Number.isFinite(n) ? Math.round(n * 100) : 0
-}
-
-/** 分 → 元 */
-export function toYuan(cents) {
-  return Math.round(cents) / 100
-}
-
-/** 金额格式化(千分位 + 指定小数位),仅用于展示 */
-export function formatYuan(yuan, digits = 2) {
-  const n = Number(yuan)
-  return (Number.isFinite(n) ? n : 0).toLocaleString('zh-CN', {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  })
-}
-
 /** 年利率百分数 → 月利率 */
 function rateOf(ratePct) {
   return (Number(ratePct) || 0) / 1200
@@ -97,26 +84,6 @@ function rateOf(ratePct) {
 function normalizeDays(days) {
   const d = Math.round(Number(days) || 0)
   return d > 0 ? d : DEFAULT_FIRST_DAYS
-}
-
-/** 'YYYY-MM-DD' 或 Date → { y, m, d };解析失败返回 null */
-function parseDate(value) {
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? null : { y: value.getFullYear(), m: value.getMonth() + 1, d: value.getDate() }
-  }
-  const m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(String(value || ''))
-  return m ? { y: Number(m[1]), m: Number(m[2]), d: Number(m[3]) } : null
-}
-
-/**
- * 两个日期之间的天数(算头不算尾)—— 放款日 → 首期还款日的计息天数用它。
- * 只按年月日算,不受时区/时分秒影响。
- */
-export function daysBetween(from, to) {
-  const a = parseDate(from)
-  const b = parseDate(to)
-  if (!a || !b) return 0
-  return Math.round((Date.UTC(b.y, b.m - 1, b.d) - Date.UTC(a.y, a.m - 1, a.d)) / 86400000)
 }
 
 /** 第 n 期的还款年月('YYYY-MM',由首期还款日按月递推);参数不可解析返回空串 */

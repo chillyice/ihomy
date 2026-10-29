@@ -1,8 +1,8 @@
 // 记账本共享计算:账户类型文案、家庭资金合计、未归属笔数、总账补零/同比/占比/余额复算/CSV 行。
-// 金额一律先转「分」整数再累加(复用 loan.js 的 toCents/toYuan),避免浮点误差;
+// 金额一律先转「分」整数再累加(复用 utils/money.js 的 toCents/toYuan),避免浮点误差;
 // 余额口径与后端一致:balance = 期初 + 收入 − 支出 − 转出 + 转入(由后端算好下发,前端只做求和;
 // computeAccountBalances 按同一公式复算,专供对账与单测)。
-import { toCents, toYuan } from './loan'
+import { toCents, toYuan } from './money'
 
 /** 账户类型(与 sys_dict_item 的 book_account_type 一一对应,顺序即下拉顺序) */
 export const ACCOUNT_TYPES = ['CASH', 'BANK', 'ALIPAY', 'WECHAT', 'CREDIT', 'OTHER']

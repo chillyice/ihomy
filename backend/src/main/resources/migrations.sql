@@ -2423,3 +2423,58 @@ SET @add_tree_family_idx := IF(@has_tree_family_idx = 0,
 PREPARE add_tree_family_idx_stmt FROM @add_tree_family_idx;
 EXECUTE add_tree_family_idx_stmt;
 DEALLOCATE PREPARE add_tree_family_idx_stmt;
+
+-- ------------------------------------------------------------
+-- V10.80 理财储蓄(2026-10-29)
+--   新增家庭理财持仓表 + 理财相关字典;DDL 与 schema.sql 第 69 节逐字一致。
+--   本金不计支出,收益由用户赎回时勾选入账;*_record_id 指向记账明细防重复入账。
+--   重复执行安全:建表 IF NOT EXISTS，字典 INSERT IGNORE。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `family_finance_product` (
+  `id`                 BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`          BIGINT        NOT NULL COMMENT '所属家庭ID',
+  `name`               VARCHAR(100)  NOT NULL COMMENT '产品名称(如 招行3年期大额存单)',
+  `product_type`       VARCHAR(30)   NOT NULL DEFAULT 'DEPOSIT' COMMENT '类型: DEPOSIT定期存款/LARGE_DEPOSIT大额存单/BOND国债/BANK_WMP银行理财/FUND基金/INSURANCE保险理财/OTHER其他',
+  `institution`        VARCHAR(60)   DEFAULT NULL COMMENT '银行/平台',
+  `account_id`         BIGINT        DEFAULT NULL COMMENT '资金出自/回款账户(family_book_account.id,选填)',
+  `principal`          DECIMAL(14,2) NOT NULL COMMENT '本金(元)',
+  `annual_rate`        DECIMAL(6,4)  DEFAULT NULL COMMENT '年化利率%(空=浮动收益,如基金)',
+  `interest_mode`      VARCHAR(20)   NOT NULL DEFAULT 'BY_MONTH' COMMENT '计息: BY_MONTH按月折算/BY_DAY按日折算/COMPOUND复利',
+  `day_count`          SMALLINT      NOT NULL DEFAULT 365 COMMENT '计息基准天数(BY_DAY 用): 365/360',
+  `term_months`        INT           DEFAULT NULL COMMENT '期限(月,空=活期/不定期)',
+  `start_date`         DATE          NOT NULL COMMENT '起息日/买入日',
+  `end_date`           DATE          DEFAULT NULL COMMENT '到期日(空=按 term_months 推算/活期)',
+  `status`             VARCHAR(20)   NOT NULL DEFAULT 'HOLDING' COMMENT 'HOLDING持有中/MATURED已到期/REDEEMED已赎回/CANCELLED已作废',
+  `redeem_date`        DATE          DEFAULT NULL COMMENT '赎回/了结日期',
+  `redeem_amount`      DECIMAL(14,2) DEFAULT NULL COMMENT '赎回到账本息合计(元)',
+  `actual_interest`    DECIMAL(14,2) DEFAULT NULL COMMENT '已实现收益(元,可负=亏损)',
+  `interest_booked`    TINYINT       NOT NULL DEFAULT 0 COMMENT '收益是否已记入记账本: 0未记/1已记',
+  `invest_record_id`   BIGINT        DEFAULT NULL COMMENT '购买转出对应的记账明细ID(防重复)',
+  `redeem_record_id`   BIGINT        DEFAULT NULL COMMENT '赎回转入对应的记账明细ID(防重复)',
+  `interest_record_id` BIGINT        DEFAULT NULL COMMENT '收益收入对应的记账明细ID(防重复)',
+  `risk_level`         VARCHAR(10)   DEFAULT NULL COMMENT '风险等级 R1~R5(选填)',
+  `note`               VARCHAR(500)  DEFAULT NULL COMMENT '备注',
+  `created_by`         BIGINT        NOT NULL COMMENT '创建人ID',
+  `deleted`            TINYINT       NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0正常/1已删除',
+  `created_at`         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`         DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family_status` (`family_id`, `deleted`, `status`, `end_date`),
+  KEY `idx_family_created` (`family_id`, `deleted`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭理财持仓(存款/理财/基金/国债等)';
+
+INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('finance_type', 'DEPOSIT',       '定期存款'),
+('finance_type', 'LARGE_DEPOSIT', '大额存单'),
+('finance_type', 'BOND',          '国债'),
+('finance_type', 'BANK_WMP',      '银行理财'),
+('finance_type', 'FUND',          '基金'),
+('finance_type', 'INSURANCE',     '保险理财'),
+('finance_type', 'OTHER',         '其他'),
+('finance_status', 'HOLDING',  '持有中'),
+('finance_status', 'MATURED',  '已到期'),
+('finance_status', 'REDEEMED', '已赎回'),
+('finance_status', 'CANCELLED','已作废'),
+('finance_interest_mode', 'BY_MONTH', '按月折算'),
+('finance_interest_mode', 'BY_DAY',   '按日折算'),
+('finance_interest_mode', 'COMPOUND', '复利');

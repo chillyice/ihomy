@@ -359,6 +359,14 @@ export const bookApi = {
   removeAccount: (id) => request.delete(`/book/accounts/${id}`),
 }
 
+// 家庭理财(存款/理财/基金持仓):本金不计支出,收益在赎回时按勾选决定是否记一笔收入
+export const financeApi = {
+  list: () => request.get('/finance/list'),
+  create: (data) => request.post('/finance', data),
+  update: (id, data) => request.put(`/finance/${id}`, data),
+  remove: (id) => request.delete(`/finance/${id}`),
+}
+
 // 家庭贷款记录(真实贷款登记 + 事件时间轴,还款流水由前端按事件重算)
 export const loanApi = {
   list: () => request.get('/loan/list'),

@@ -181,4 +181,82 @@ class FormValidationTest {
             assertThat(invalidFields(dto)).as(bad).containsExactly("accountType");
         }
     }
+
+    @Test
+    void financeFieldsBoundedByColumnWidth() {
+        FinanceDTO atCeiling = new FinanceDTO();
+        atCeiling.setName(repeat("存", 100));
+        atCeiling.setInstitution(repeat("行", 60));
+        atCeiling.setRiskLevel(repeat("R", 10));
+        atCeiling.setNote(repeat("备", 500));
+        atCeiling.setPrincipal(new BigDecimal("999999999999.99"));
+        atCeiling.setAnnualRate(new BigDecimal("99.9999"));
+        atCeiling.setRedeemAmount(new BigDecimal("999999999999.99"));
+        atCeiling.setActualInterest(new BigDecimal("-999999999999.99"));
+        assertThat(invalidFields(atCeiling)).isEmpty();
+
+        FinanceDTO over = new FinanceDTO();
+        over.setName(repeat("存", 101));
+        over.setInstitution(repeat("行", 61));
+        over.setRiskLevel(repeat("R", 11));
+        over.setNote(repeat("备", 501));
+        over.setPrincipal(new BigDecimal("1000000000000"));
+        over.setAnnualRate(new BigDecimal("100"));
+        over.setRedeemAmount(new BigDecimal("1.234"));
+        over.setActualInterest(new BigDecimal("1000000000000"));
+        assertThat(invalidFields(over)).containsExactlyInAnyOrder(
+                "name", "institution", "riskLevel", "note", "principal", "annualRate", "redeemAmount", "actualInterest");
+    }
+
+    @Test
+    void financeNameRequiredAndEnumsEnumerated() {
+        FinanceDTO blankName = new FinanceDTO();
+        blankName.setName("  ");
+        assertThat(invalidFields(blankName)).contains("name");
+
+        // 空值/空串交给 Service 归一(定期存款 / 按月折算 / 持有中),不在校验层拦截
+        FinanceDTO emptyEnums = new FinanceDTO();
+        emptyEnums.setName("存单");
+        assertThat(invalidFields(emptyEnums)).isEmpty();
+        assertThat(invalidFields(new FinanceDTO())).doesNotContain("productType", "interestMode", "status");
+
+        for (String ok : List.of("DEPOSIT", "LARGE_DEPOSIT", "BOND", "BANK_WMP", "FUND", "INSURANCE", "OTHER", "fund")) {
+            FinanceDTO dto = new FinanceDTO();
+            dto.setName("存单");
+            dto.setProductType(ok);
+            assertThat(invalidFields(dto)).as(ok).isEmpty();
+        }
+        for (String bad : List.of("0", "1", "存款", "STOCK")) {
+            FinanceDTO dto = new FinanceDTO();
+            dto.setName("存单");
+            dto.setProductType(bad);
+            assertThat(invalidFields(dto)).as(bad).containsExactly("productType");
+        }
+
+        for (String ok : List.of("BY_MONTH", "BY_DAY", "COMPOUND", "by_day")) {
+            FinanceDTO dto = new FinanceDTO();
+            dto.setName("存单");
+            dto.setInterestMode(ok);
+            assertThat(invalidFields(dto)).as(ok).isEmpty();
+        }
+        for (String bad : List.of("MONTH", "SIMPLE", "0")) {
+            FinanceDTO dto = new FinanceDTO();
+            dto.setName("存单");
+            dto.setInterestMode(bad);
+            assertThat(invalidFields(dto)).as(bad).containsExactly("interestMode");
+        }
+
+        for (String ok : List.of("HOLDING", "MATURED", "REDEEMED", "CANCELLED", "redeemed")) {
+            FinanceDTO dto = new FinanceDTO();
+            dto.setName("存单");
+            dto.setStatus(ok);
+            assertThat(invalidFields(dto)).as(ok).isEmpty();
+        }
+        for (String bad : List.of("HOLD", "EARNED", "1")) {
+            FinanceDTO dto = new FinanceDTO();
+            dto.setName("存单");
+            dto.setStatus(bad);
+            assertThat(invalidFields(dto)).as(bad).containsExactly("status");
+        }
+    }
 }

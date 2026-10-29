@@ -1,16 +1,17 @@
-<!-- 记账本页:三页签外壳(记账本/总账/贷款记录),月份与页签在此持有,供总账点月钻取回记账本 -->
+<!-- 记账本页:四页签外壳(记账本/总账/贷款记录/理财),月份与页签在此持有,供总账点月钻取回记账本 -->
 <template>
   <div class="page">
     <Breadcrumb :items="[{ label: $t('book.title') }]" />
 
     <PageToolbar>
       <div class="tb-left">
-        <!-- 页签在窄屏横向滚动(不换行;V10.79 加「理财」后也挤不下) -->
+        <!-- 页签在窄屏横向滚动(不换行;V10.80 加「理财」后四页签也挤不下) -->
         <div class="book-tabs">
           <el-radio-group v-model="tab" size="small">
             <el-radio-button value="book">{{ $t('book.tabBook') }}</el-radio-button>
             <el-radio-button value="ledger">{{ $t('book.tabLedger') }}</el-radio-button>
             <el-radio-button value="loan">{{ $t('book.tabLoan') }}</el-radio-button>
+            <el-radio-button value="finance">{{ $t('book.tabFinance') }}</el-radio-button>
           </el-radio-group>
         </div>
       </div>
@@ -23,7 +24,10 @@
     <BookLedger v-else-if="tab === 'ledger'" @pick-month="onPickMonth" />
 
     <!-- 贷款记录:与工具箱/贷款计算器同一组件同一份数据(家庭共享) -->
-    <LoanRecords v-else />
+    <LoanRecords v-else-if="tab === 'loan'" />
+
+    <!-- 理财:持仓卡片 + 到期日历,本金不计支出、收益在赎回时按勾选入账 -->
+    <FinancePanel v-else />
   </div>
 </template>
 
@@ -39,6 +43,8 @@ import BookDaily from '@/views/book/BookDaily.vue'
 const LoanRecords = defineAsyncComponent(() => import('@/views/tools/LoanRecords.vue'))
 // 总账只在切到该页签时加载,记账本用户的首次进入不为它买单
 const BookLedger = defineAsyncComponent(() => import('@/views/book/BookLedger.vue'))
+// 理财同样按需加载(计算内核 + 4 个组件不进首页 chunk)
+const FinancePanel = defineAsyncComponent(() => import('@/views/book/finance/FinancePanel.vue'))
 
 const tab = ref('book')
 const month = ref(new Date().toISOString().slice(0, 7))

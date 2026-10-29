@@ -100,6 +100,29 @@ public final class DictConst {
     public static final String BOOK_ACCOUNT_OTHER = "OTHER";
     private static final String BOOK_ACCOUNT_FALLBACK = BOOK_ACCOUNT_BANK;
 
+    /** 理财类型 finance_type（V10.80） */
+    public static final String FINANCE_TYPE_DEPOSIT = "DEPOSIT";
+    public static final String FINANCE_TYPE_LARGE_DEPOSIT = "LARGE_DEPOSIT";
+    public static final String FINANCE_TYPE_BOND = "BOND";
+    public static final String FINANCE_TYPE_BANK_WMP = "BANK_WMP";
+    public static final String FINANCE_TYPE_FUND = "FUND";
+    public static final String FINANCE_TYPE_INSURANCE = "INSURANCE";
+    public static final String FINANCE_TYPE_OTHER = "OTHER";
+    private static final String FINANCE_TYPE_FALLBACK = FINANCE_TYPE_DEPOSIT;
+
+    /** 理财状态 finance_status（V10.80）；MATURED 由到期日派生，库内一般不主动写 */
+    public static final String FINANCE_HOLDING = "HOLDING";
+    public static final String FINANCE_MATURED = "MATURED";
+    public static final String FINANCE_REDEEMED = "REDEEMED";
+    public static final String FINANCE_CANCELLED = "CANCELLED";
+    private static final String FINANCE_STATUS_FALLBACK = FINANCE_HOLDING;
+
+    /** 理财计息方式 finance_interest_mode（V10.80） */
+    public static final String FINANCE_MODE_BY_MONTH = "BY_MONTH";
+    public static final String FINANCE_MODE_BY_DAY = "BY_DAY";
+    public static final String FINANCE_MODE_COMPOUND = "COMPOUND";
+    private static final String FINANCE_MODE_FALLBACK = FINANCE_MODE_BY_MONTH;
+
     /** 操作日志结果 log_result */
     public static final String LOG_SUCCESS = "SUCCESS";
     public static final String LOG_FAILED = "FAILED";
@@ -325,5 +348,45 @@ public final class DictConst {
             case BOOK_ACCOUNT_OTHER -> BOOK_ACCOUNT_OTHER;
             default -> BOOK_ACCOUNT_BANK;
         };
+    }
+
+    /** 理财类型归一：未知值落「定期存款」 */
+    public static String financeType(String v) {
+        if (v == null || v.isBlank()) return FINANCE_TYPE_FALLBACK;
+        return switch (v.trim().toUpperCase()) {
+            case FINANCE_TYPE_LARGE_DEPOSIT -> FINANCE_TYPE_LARGE_DEPOSIT;
+            case FINANCE_TYPE_BOND -> FINANCE_TYPE_BOND;
+            case FINANCE_TYPE_BANK_WMP -> FINANCE_TYPE_BANK_WMP;
+            case FINANCE_TYPE_FUND -> FINANCE_TYPE_FUND;
+            case FINANCE_TYPE_INSURANCE -> FINANCE_TYPE_INSURANCE;
+            case FINANCE_TYPE_OTHER -> FINANCE_TYPE_OTHER;
+            default -> FINANCE_TYPE_DEPOSIT;
+        };
+    }
+
+    /** 理财状态归一：未知值落「持有中」（到期与否以到期日派生，不靠库内状态） */
+    public static String financeStatus(String v) {
+        if (v == null || v.isBlank()) return FINANCE_STATUS_FALLBACK;
+        return switch (v.trim().toUpperCase()) {
+            case FINANCE_MATURED -> FINANCE_MATURED;
+            case FINANCE_REDEEMED -> FINANCE_REDEEMED;
+            case FINANCE_CANCELLED -> FINANCE_CANCELLED;
+            default -> FINANCE_HOLDING;
+        };
+    }
+
+    /** 理财计息方式归一：未知值落「按月折算」 */
+    public static String financeMode(String v) {
+        if (v == null || v.isBlank()) return FINANCE_MODE_FALLBACK;
+        return switch (v.trim().toUpperCase()) {
+            case FINANCE_MODE_BY_DAY -> FINANCE_MODE_BY_DAY;
+            case FINANCE_MODE_COMPOUND -> FINANCE_MODE_COMPOUND;
+            default -> FINANCE_MODE_BY_MONTH;
+        };
+    }
+
+    /** 计息基准天数：只认 360/365，其余按 365（与前端 utils/finance.js 同口径） */
+    public static int financeDayCount(Integer v) {
+        return v != null && v == 360 ? 360 : 365;
     }
 }
