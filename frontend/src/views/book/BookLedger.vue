@@ -166,6 +166,30 @@
           </div>
         </div>
 
+        <!-- 净资产:账户资金 + 理财持仓 − 贷款剩余本金(贷款口径走 utils/loan 的流水快照) -->
+        <div v-if="loanRemaining !== null" class="card lg-fund">
+          <div class="section-label">{{ $t('book.ledger.netWorth') }}</div>
+          <div class="lg-fund-grid">
+            <div class="lg-fund-item">
+              <div class="lg-fund-name">{{ $t('book.ledger.netAccounts') }}</div>
+              <div class="lg-fund-amount">¥{{ money(fundTotal) }}</div>
+            </div>
+            <div class="lg-fund-item">
+              <div class="lg-fund-name">{{ $t('book.ledger.netInvest') }}</div>
+              <div class="lg-fund-amount">¥{{ money(investPrincipal) }}</div>
+            </div>
+            <div class="lg-fund-item">
+              <div class="lg-fund-name">{{ $t('book.ledger.netDebt') }}</div>
+              <div class="lg-fund-amount" :class="{ 'is-negative': Number(loanRemaining) > 0 }">−¥{{ money(loanRemaining) }}</div>
+            </div>
+            <div class="lg-fund-item is-total">
+              <div class="lg-fund-name">{{ $t('book.ledger.netValue') }}</div>
+              <div class="lg-fund-amount">¥{{ money(netWorthValue) }}</div>
+            </div>
+          </div>
+          <div class="lg-note">{{ $t('book.ledger.netNote') }}</div>
+        </div>
+
         <!-- 资金分布:账户实时余额 + 家庭资金合计(含期初),与记账本余额条同源 -->
         <div class="card lg-fund">
           <div class="section-label">{{ $t('book.ledger.fund') }}</div>
@@ -197,10 +221,11 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ArrowRight } from '@element-plus/icons-vue'
 
-import { bookApi } from '@/api'
+import { bookApi, financeApi, loanApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { formatYuan } from '@/utils/loan'
-import { accountTypeLabel, fillMonths, ledgerCsvRows, ratio, sumBalances, yoy } from '@/utils/bookLedger'
+import { formatYuan, totalRemainingPrincipal } from '@/utils/loan'
+import { accountTypeLabel, fillMonths, ledgerCsvRows, netWorth, ratio, sumBalances, yoy } from '@/utils/bookLedger'
+import { summarizePortfolio } from '@/utils/finance'
 import { saveBlob } from '@/utils/tools/download'
 import PageToolbar from '@/components/PageToolbar.vue'
 import BookTrendChart from './BookTrendChart.vue'
@@ -223,6 +248,12 @@ const totals = computed(() => ledger.value?.totals || {})
 const hasRecords = computed(() => Number(totals.value.count || 0) > 0 || Number(totals.value.transferCount || 0) > 0)
 const unassigned = computed(() => Number(ledger.value?.unassigned?.count || 0))
 const fundTotal = computed(() => sumBalances(accounts.value))
+
+// 净资产三项:账户资金(随总账加载)+ 理财持仓本金 + 贷款剩余本金(逐笔流水快照)
+const investPrincipal = ref(0)
+// null = 未取到(无 loan:view 或请求失败)→ 整张卡不渲染,不给错误的净值
+const loanRemaining = ref(null)
+const netWorthValue = computed(() => netWorth(fundTotal.value, investPrincipal.value, loanRemaining.value || 0))
 
 const scopeChips = computed(() => [
   { value: 'ALL', label: t('book.ledger.scopeAll') },
@@ -329,11 +360,24 @@ const load = async () => {
   }
 }
 
+// 净资产口径:理财取「持仓中 + 已到期未赎回」的本金,贷款取逐笔剩余本金快照(utils/loan 唯一计算源)。
+// 贷款接口要 loan:view(访客角色没有);无权限或取数失败就不渲染这张卡,免得净值算错。
+const loadNetWorth = async () => {
+  if (!userStore.isLoggedIn) return
+  if (!userStore.isOwner && !userStore.hasPerm('loan:view')) return
+  try {
+    const [products, loans] = await Promise.all([financeApi.list(), loanApi.list()])
+    investPrincipal.value = Number(summarizePortfolio(products || []).holdingPrincipal) || 0
+    loanRemaining.value = totalRemainingPrincipal(loans || [])
+  } catch {
+    loanRemaining.value = null
+  }
+}
+
 const pickScope = (value) => {
   if (scope.value === value) return
   scope.value = value
 }
-
 const toggleYear = (year) => {
   expandedYear.value = expandedYear.value === year ? null : year
 }
@@ -369,7 +413,11 @@ const exportCsv = () => {
 }
 
 watch(scope, load)
-onMounted(load)
+onMounted(() => {
+  load()
+  // 净资产与总账范围无关,只在进入页签时取一次(账户资金随 load 更新)
+  loadNetWorth()
+})
 </script>
 
 <style scoped>

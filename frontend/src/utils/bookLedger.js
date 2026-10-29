@@ -7,6 +7,12 @@ import { toCents, toYuan } from './money'
 /** 账户类型(与 sys_dict_item 的 book_account_type 一一对应,顺序即下拉顺序) */
 export const ACCOUNT_TYPES = ['CASH', 'BANK', 'ALIPAY', 'WECHAT', 'CREDIT', 'OTHER']
 
+/**
+ * 记账分类的常用候选(只做下拉建议,不是枚举):明细与预算都允许自由输入,
+ * 两处共用同一份,避免一边能选到另一边没有的分类。
+ */
+export const BOOK_CATEGORIES = ['餐饮', '交通', '购物', '家居', '水电燃气', '医疗', '教育', '娱乐', '工资', '红包', '其他']
+
 /** 账户类型文案(走 i18n book.account.type.*;缺键回落原始枚举,不显示空白) */
 export function accountTypeLabel(type, t) {
   if (!type) return ''
@@ -19,6 +25,15 @@ export function accountTypeLabel(type, t) {
 export function sumBalances(accounts) {
   const totalCents = (accounts || []).reduce((sum, a) => sum + toCents(a?.balance), 0)
   return toYuan(totalCents)
+}
+
+/**
+ * 净资产(元)= 账户资金 + 理财持仓本金 − 贷款剩余本金。
+ * 三个口径分别来自 /book/accounts、理财持仓(不含已赎回)与贷款流水快照,这里只做求和;
+ * 用「分」整数累加,避免浮点误差。未记账的房产/车辆等不计入(总账页脚已注明)。
+ */
+export function netWorth(fundTotal, investPrincipal, loanRemaining) {
+  return toYuan(toCents(fundTotal) + toCents(investPrincipal) - toCents(loanRemaining))
 }
 
 /** 未归属笔数:三个账户列全空的记录(历史数据),转账只要填了一侧就算已归属 */

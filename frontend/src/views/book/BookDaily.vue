@@ -77,14 +77,19 @@
           </div>
         </div>
 
-        <!-- 分类排行 -->
-        <div class="cats card">
-          <div class="section-label">{{ $t('book.expenseCategories') }}</div>
-          <div v-for="c in stats.categoryStats || []" :key="c.category" class="cat-row">
-            <span class="cat-name">{{ c.category }}</span>
-            <span class="cat-total">{{ Number(c.total).toFixed(2) }}</span>
+        <!-- 预算与分类排行:预算卡在上,超支一眼可见 -->
+        <div class="side">
+          <BudgetPanel :data="budgetData" @saved="loadBudget" />
+
+          <!-- 分类排行 -->
+          <div class="cats card">
+            <div class="section-label">{{ $t('book.expenseCategories') }}</div>
+            <div v-for="c in stats.categoryStats || []" :key="c.category" class="cat-row">
+              <span class="cat-name">{{ c.category }}</span>
+              <span class="cat-total">{{ Number(c.total).toFixed(2) }}</span>
+            </div>
+            <div v-if="!stats.categoryStats?.length" class="book-empty">{{ $t('common.empty') }}</div>
           </div>
-          <div v-if="!stats.categoryStats?.length" class="book-empty">{{ $t('common.empty') }}</div>
         </div>
       </div>
     </template>
@@ -161,9 +166,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { bookApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { formatYuan } from '@/utils/loan'
-import { unassignedCount } from '@/utils/bookLedger'
+import { BOOK_CATEGORIES, unassignedCount } from '@/utils/bookLedger'
 import PageToolbar from '@/components/PageToolbar.vue'
 import AccountManagerDialog from './accounts/AccountManagerDialog.vue'
+import BudgetPanel from './budget/BudgetPanel.vue'
 import './bookPage.css'
 
 const props = defineProps({
@@ -172,8 +178,8 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:month'])
 
-// ponytail: 分类为用户自选/自定义数据(入库存储),不做翻译
-const CATEGORIES = ['餐饮', '交通', '购物', '家居', '水电燃气', '医疗', '教育', '娱乐', '工资', '红包', '其他']
+// ponytail: 分类为用户自选/自定义数据(入库存储),不做翻译;候选清单与预算弹窗共用一份
+const CATEGORIES = BOOK_CATEGORIES
 
 const { t } = useI18n()
 const userStore = useUserStore()
@@ -182,6 +188,7 @@ const saving = ref(false)
 const records = ref([])
 const stats = ref({})
 const accounts = ref([])
+const budgetData = ref(null)
 const accountMgrVisible = ref(false)
 const editor = reactive({ visible: false, form: {} })
 
@@ -215,14 +222,21 @@ const load = async () => {
   if (!userStore.isLoggedIn) return
   loading.value = true
   try {
-    // 明细与账户互不依赖,并行取
-    const [data, acc] = await Promise.all([bookApi.list(props.month), bookApi.accounts()])
+    // 明细、账户、预算三者互不依赖,并行取;预算与明细同月份,记一笔后一起重拉
+    const [data, acc, budget] = await Promise.all([bookApi.list(props.month), bookApi.accounts(), bookApi.budget(props.month)])
     records.value = data.records || []
     stats.value = data.stats || {}
     accounts.value = acc || []
+    budgetData.value = budget || null
   } finally {
     loading.value = false
   }
+}
+
+// 预算增删改后只刷预算卡,不重拉明细与账户
+const loadBudget = async () => {
+  if (!userStore.isLoggedIn) return
+  budgetData.value = (await bookApi.budget(props.month)) || null
 }
 
 // 账户增删改后只刷余额条,不重拉明细
@@ -314,6 +328,13 @@ onMounted(load)
 .records,
 .cats {
   padding: 16px 18px;
+  min-width: 0;
+}
+/* 右栏:预算卡 + 分类排行纵向排列,窄屏跟随主栏顺序落到明细下方 */
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   min-width: 0;
 }
 .record-row {

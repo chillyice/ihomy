@@ -2526,3 +2526,22 @@ WHERE `family_id` IS NULL
   AND `code` IN ('reminder', 'anniversary')
   AND `enabled` <> 0;
 
+-- ------------------------------------------------------------
+-- V10.89 记账预算（2026-10-30）
+--   新增家庭记账预算表（按支出分类的月度预算），DDL 与 schema.sql 第 70 节逐字一致。
+--   当月已花不落库，由明细实时汇总；同一家庭同一分类只允许一条有效预算，服务层校验。
+--   重复执行安全：建表 IF NOT EXISTS。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `family_book_budget` (
+  `id`         BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`  BIGINT        NOT NULL COMMENT '所属家庭ID',
+  `category`   VARCHAR(30)   NOT NULL COMMENT '支出分类(与记账分类同名)',
+  `amount`     DECIMAL(10,2) NOT NULL COMMENT '每月预算金额(元)',
+  `note`       VARCHAR(200)  DEFAULT NULL COMMENT '备注',
+  `created_by` BIGINT        NOT NULL COMMENT '创建人ID',
+  `deleted`    TINYINT       NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0正常/1已删除',
+  `created_at` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family` (`family_id`, `deleted`, `category`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭记账预算(按支出分类的月度预算)';

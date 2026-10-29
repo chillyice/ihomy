@@ -2573,3 +2573,24 @@ CREATE TABLE `family_finance_product` (
   KEY `idx_family_status` (`family_id`, `deleted`, `status`, `end_date`),
   KEY `idx_family_created` (`family_id`, `deleted`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭理财持仓(存款/理财/基金/国债等)';
+
+-- ------------------------------------------------------------
+-- 70. 家庭记账预算（V10.89）
+--     按支出分类设置月度预算，一个分类一条、家庭共享，金额每月复用同一份。
+--     当月已花从 family_book_record 实时汇总（不落库），剩余/超支由「预算 − 支出」派生。
+--     同一家庭同一分类只允许一条有效预算：逻辑删列存在，故不加唯一索引，由服务层校验。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_book_budget`;
+CREATE TABLE `family_book_budget` (
+  `id`         BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`  BIGINT        NOT NULL COMMENT '所属家庭ID',
+  `category`   VARCHAR(30)   NOT NULL COMMENT '支出分类(与记账分类同名)',
+  `amount`     DECIMAL(10,2) NOT NULL COMMENT '每月预算金额(元)',
+  `note`       VARCHAR(200)  DEFAULT NULL COMMENT '备注',
+  `created_by` BIGINT        NOT NULL COMMENT '创建人ID',
+  `deleted`    TINYINT       NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0正常/1已删除',
+  `created_at` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family` (`family_id`, `deleted`, `category`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭记账预算(按支出分类的月度预算)';

@@ -72,8 +72,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Lock } from '@element-plus/icons-vue'
 import { loanApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { loanLedger, ledgerSnapshot, mergeLedgers, daysBetween, periodsPaid, LOAN_EVENT } from '@/utils/loan'
-import { toNum, loanToPayload } from './loan/loanShared'
+import { loanLedger, ledgerSnapshot, mergeLedgers, loanEngineInput, periodsPaid, LOAN_EVENT } from '@/utils/loan'
+import { loanToPayload } from './loan/loanShared'
 import LoanList from './loan/LoanList.vue'
 import LoanProgress from './loan/LoanProgress.vue'
 import LoanTimeline from './loan/LoanTimeline.vue'
@@ -119,27 +119,10 @@ onBeforeUnmount(() => {
 
 const canManage = computed(() => userStore.isOwner || userStore.hasPerm('loan:manage'))
 
-/** 每笔贷款 → 引擎入参(首期天数由放款日与首期还款日推出) */
-const engineInput = (loan) => ({
-  amount: toNum(loan.amount),
-  months: Number(loan.months),
-  method: loan.method,
-  rate: toNum(loan.rate),
-  firstDays: daysBetween(loan.loanDate, loan.firstPayDate),
-  firstPayment: toNum(loan.firstPayment),
-  events: (loan.events || []).map((e) => ({
-    type: e.type,
-    effectivePeriod: Number(e.effectivePeriod),
-    rate: toNum(e.rate),
-    amount: toNum(e.amount),
-    strategy: e.strategy,
-  })),
-})
-
 /** 卡片/详情用的逐笔视图:流水 + 进度快照(列表量级小,直接全算) */
 const cardViews = computed(() =>
   loans.value.map((loan) => {
-    const ledger = loanLedger(engineInput(loan))
+    const ledger = loanLedger(loanEngineInput(loan))
     const paidPeriods = loan.firstPayDate ? periodsPaid(loan.firstPayDate, now.value) : 0
     const snapshot = ledgerSnapshot(ledger, paidPeriods)
     return { ...loan, ledger, snapshot, paidPeriods, valid: ledger.valid }

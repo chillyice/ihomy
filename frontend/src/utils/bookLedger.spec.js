@@ -8,6 +8,7 @@ import {
   ratio,
   computeAccountBalances,
   ledgerCsvRows,
+  netWorth,
   ACCOUNT_TYPES,
 } from './bookLedger'
 
@@ -269,5 +270,20 @@ describe('ledgerCsvRows', () => {
   it('空数据:不传表头 → 空数组;传表头 → 只有标题行', () => {
     expect(ledgerCsvRows([], ['期间'])).toEqual([['期间']])
     expect(ledgerCsvRows(null)).toEqual([])
+  })
+})
+
+describe('netWorth 净资产', () => {
+  it('账户资金 + 理财持仓 − 贷款剩余本金,按分累加', () => {
+    expect(netWorth(1000.1, 500.2, 200.3)).toBe(1300)
+  })
+
+  it('贷款大于资产时为负,信用卡负余额照样计入', () => {
+    expect(netWorth(-50.5, 0, 500)).toBe(-550.5)
+  })
+
+  it('缺失/非法金额按 0,不产生 NaN', () => {
+    expect(netWorth(null, undefined, 'x')).toBe(0)
+    expect(netWorth(0.1, 0.2, 0)).toBe(0.3)
   })
 })

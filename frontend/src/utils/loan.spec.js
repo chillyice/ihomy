@@ -4,6 +4,9 @@ import {
   prepaymentComparison,
   solveRate,
   loanLedger,
+  ledgerSnapshot,
+  loanEngineInput,
+  totalRemainingPrincipal,
   periodsPaid,
   periodDate,
   LOAN_TYPE,
@@ -116,5 +119,45 @@ describe('日期工具', () => {
   it('periodDate 超出当月天数时取月末', () => {
     expect(periodDate('2026-01-31', 2)).toBe('2026-02-28')
     expect(periodDate('2026-01-31', 13)).toBe('2027-01-31')
+  })
+})
+
+describe('totalRemainingPrincipal 净资产口径', () => {
+  const loan = {
+    amount: 120000,
+    months: 120,
+    method: REPAY_METHOD.EQUAL_INSTALLMENT,
+    rate: 3.6,
+    loanDate: '2025-12-01',
+    firstPayDate: '2026-01-01',
+  }
+
+  it('首期未到:剩余本金等于贷款本金', () => {
+    expect(totalRemainingPrincipal([loan], new Date(2025, 11, 1))).toBe(120000)
+  })
+
+  it('已还 1 期:剩余本金 = 本金 − 首期归还本金', () => {
+    const snap = ledgerSnapshot(loanLedger(loanEngineInput(loan)), 1)
+    expect(totalRemainingPrincipal([loan], new Date(2026, 0, 1))).toBeCloseTo(snap.balance, 2)
+    expect(totalRemainingPrincipal([loan], new Date(2026, 0, 1))).toBeLessThan(120000)
+  })
+
+  it('多笔贷款相加;空列表为 0', () => {
+    const a = totalRemainingPrincipal([loan], new Date(2026, 0, 1))
+    const b = totalRemainingPrincipal([{ ...loan, amount: 60000 }], new Date(2026, 0, 1))
+    expect(totalRemainingPrincipal([loan, { ...loan, amount: 60000 }], new Date(2026, 0, 1))).toBeCloseTo(a + b, 2)
+    expect(totalRemainingPrincipal([], new Date(2026, 0, 1))).toBe(0)
+    expect(totalRemainingPrincipal(null, new Date(2026, 0, 1))).toBe(0)
+  })
+
+  it('loanEngineInput 透传事件与首期天数', () => {
+    const input = loanEngineInput({
+      ...loan,
+      firstPayment: 1200,
+      events: [{ type: LOAN_EVENT.RATE_CHANGE, effectivePeriod: 13, rate: 4.2 }],
+    })
+    expect(input.firstDays).toBe(31)
+    expect(input.firstPayment).toBe(1200)
+    expect(input.events).toEqual([{ type: LOAN_EVENT.RATE_CHANGE, effectivePeriod: 13, rate: 4.2, amount: null, strategy: undefined }])
   })
 })

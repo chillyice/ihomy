@@ -73,7 +73,7 @@ Nginx 静态根指向 `frontend/dist`,构建即生效。
 
 - **root 仅初始化**:`mysql -uroot -p < schema.sql`(建库/建表/建账号/种子),只执行一次;本地 `.\scripts\start-db.ps1`(Docker 首启自动导入)。**业务运行用 `ihomy` 账号**(仅 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`,无 DDL),建 `localhost` 与 `%` 两个 host。
 - 生产 MySQL `validate_password` MEDIUM:密码须含特殊字符(避开 `' " \ $ |`,建议 `!@%^&*-_+=.`),改密顺序见 踩坑速查 §2.7。
-- **85 张表**,前缀:`sys_` 26(系统/账号/权限/配置/存储)、`report_` 5(报表/日志)、`family_` 32(家庭事务)、`content_` 21(内容数据)、`game_` 1(games 域)。完整清单见 需求 §6.2。
+- **86 张表**,前缀:`sys_` 26(系统/账号/权限/配置/存储)、`report_` 5(报表/日志)、`family_` 33(家庭事务)、`content_` 21(内容数据)、`game_` 1(games 域)。完整清单见 需求 §6.2。
   - 命名:家庭事务 `family_`;内容 `content_`;账号/权限/配置/存储 `sys_`;报表/日志 `report_`;
   - 游戏域顶层前缀 `game_`,格式 `game_<code>_<module>_<entity>`(模块层仅当 ≥3 张表/独立聚合根时才建);注册表 `game_info`,小游戏页只读注册表,**加游戏=插一行不改组件**。家圃时光 V2 已迁独立仓 `home_garden_moments`,本仓只留集成(`game_info` + 游戏库入口)。
 - **结构变更双文件**:同时改 `schema.sql`(全量)与 `migrations.sql`(增量、**幂等**),并按 CI 同路径做空库全量导入实测(`migrations` 跑通 ≠ `schema.sql` 可用,踩坑速查 §7.4)。
@@ -83,7 +83,7 @@ Nginx 静态根指向 `frontend/dist`,构建即生效。
 - **新增 `@RequirePermission` 接口前**:auth_code 必须进 `sys_auth` + `sys_role_auth` 种子(OWNER 豁免、MEMBER 显式授权);注解**只写方法上**,类级不生效(踩坑速查 §2.14)。
 - **索引规范(强制)**:列表查询的 WHERE+ORDER BY 必须落在同一复合索引内,等值字段在前、范围/排序在后,`deleted` 进索引;混向排序给索引列加 `DESC`;新增表/接口先 `EXPLAIN`(踩坑速查 §8.4)。
 - **引用开源依赖必须登记** `sys_oss_component`(NPM/MAVEN 交 Renovate;SERVICE 走内部升级方案);`current_version` 记锁定版本,不写区间下限。细则见 需求 §4.6.10。
-- **记账账户余额不落库**:`balance = 期初 + 收入 − 支出 − 转出 + 转入`,前后端同一口径(前端 `utils/bookLedger.js` 可复算对账);`family_book_record` 三个账户列可空 = 历史未归属,只提示不迁移;总账 `byMonth` 只含有记录的月份、前端补 12 槽(踩坑速查 §8.5,功能口径见 需求 §4.5.5)。
+- **记账账户余额不落库**:`balance = 期初 + 收入 − 支出 − 转出 + 转入`,前后端同一口径(前端 `utils/bookLedger.js` 可复算对账);`family_book_record` 三个账户列可空 = 历史未归属,只提示不迁移;总账 `byMonth` 只含有记录的月份、前端补 12 槽(踩坑速查 §8.5,功能口径见 需求 §4.5.5)。**预算同理只存额度**(`family_book_budget`,一个分类一条),当月已花/超支实时汇总;净资产 = 账户资金 + 理财持仓本金 − 贷款剩余本金(贷款走 `utils/loan.js` 唯一计算源)。
 
 ## 代码结构
 

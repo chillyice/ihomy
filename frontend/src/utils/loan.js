@@ -1125,6 +1125,43 @@ export function ledgerSnapshot(ledger, paidPeriods) {
 const round2 = (v) => Math.round(v * 100) / 100
 
 /**
+ * 贷款记录行 → 引擎入参(首期天数由放款日与首期还款日推出)。
+ * 贷款记录页与总账「净资产」共用同一份映射,避免两处各拼一套入参。
+ */
+export function loanEngineInput(loan) {
+  return {
+    amount: Number(loan?.amount ?? 0),
+    months: Number(loan?.months ?? 0),
+    method: loan?.method,
+    rate: Number(loan?.rate ?? 0),
+    firstDays: daysBetween(loan?.loanDate, loan?.firstPayDate),
+    firstPayment: loan?.firstPayment == null ? null : Number(loan.firstPayment),
+    events: (loan?.events || []).map((e) => ({
+      type: e.type,
+      effectivePeriod: Number(e.effectivePeriod),
+      rate: e.rate == null ? null : Number(e.rate),
+      amount: e.amount == null ? null : Number(e.amount),
+      strategy: e.strategy,
+    })),
+  }
+}
+
+/**
+ * 全部贷款的剩余本金合计(元):按首期还款日与今天推出已还期数,逐笔取流水快照后相加。
+ * 没填首期还款日按 0 期已还处理(剩余本金 = 贷款本金);结清的贷款快照为 0。供净资产口径使用。
+ */
+export function totalRemainingPrincipal(loans, today = new Date()) {
+  const list = Array.isArray(loans) ? loans : []
+  let totalCents = 0
+  for (const loan of list) {
+    if (!loan) continue
+    const paid = loan.firstPayDate ? periodsPaid(loan.firstPayDate, today) : 0
+    totalCents += toCents(ledgerSnapshot(loanLedger(loanEngineInput(loan)), paid).balance)
+  }
+  return toYuan(totalCents)
+}
+
+/**
  * 合并多笔贷款的流水为「合计视图」(纯函数):同期次逐项相加(月供/本金/利息/剩余本金),
  * 供贷款组(如商贷 + 公积金组合)看合计。全部结清才算组内结清,结清期次取最晚的一笔。
  * delta(利率浮动/提前还款省下)按笔可加,由调用方对各笔求和。

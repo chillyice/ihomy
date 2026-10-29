@@ -358,6 +358,11 @@ export const bookApi = {
   createAccount: (data) => request.post('/book/accounts', data),
   updateAccount: (id, data) => request.put(`/book/accounts/${id}`, data),
   removeAccount: (id) => request.delete(`/book/accounts/${id}`),
+  // 预算(按支出分类的月度预算):列表带所选月份的实际支出、剩余与超支
+  budget: (month) => request.get('/book/budget', { params: { month } }),
+  createBudget: (data) => request.post('/book/budget', data),
+  updateBudget: (id, data) => request.put(`/book/budget/${id}`, data),
+  removeBudget: (id) => request.delete(`/book/budget/${id}`),
 }
 
 // 家庭理财(存款/理财/基金持仓):本金不计支出,收益在赎回时按勾选决定是否记一笔收入
