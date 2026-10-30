@@ -7,6 +7,7 @@
         <span class="section-label">{{ $t('games.title') }}</span>
       </div>
       <div class="tb-right">
+        <el-button size="small" round @click="wishOpen = true">{{ $t('wish.gameWish') }}</el-button>
         <el-button type="primary" size="small" round @click="openImport">
           <el-icon><Plus /></el-icon>
           {{ $t('games.import') }}
@@ -102,17 +103,21 @@
         <el-button type="primary" size="small" :loading="saving" @click="submitEdit">{{ $t('games.save') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- 许愿想加的游戏:只有「想加什么游戏」这一个语义,不带来源记录ID -->
+    <AddToWishDialog v-model="wishOpen" :source="wishSource" :title-placeholder="$t('wish.gameTitlePlaceholder')" />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { computed, ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Sunny, VideoPlay, ArrowRight, MoreFilled, Grid } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
+import AddToWishDialog from '@/components/wish/AddToWishDialog.vue'
 import { gameApi } from '@/api'
 
 const router = useRouter()
@@ -120,6 +125,9 @@ const { t } = useI18n()
 
 const games = ref([])
 const loading = ref(false)
+
+const wishOpen = ref(false)
+const wishSource = computed(() => ({ type: 'GAME', title: t('wish.gameSourceTitle') }))
 
 const importVisible = ref(false)
 const importing = ref(false)

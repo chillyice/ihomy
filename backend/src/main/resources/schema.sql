@@ -1213,6 +1213,8 @@ CREATE TABLE `family_plan_task` (
 
 -- ------------------------------------------------------------
 -- 36. 愿望单表（V3.4 家庭共享愿望:提出/标记达成/放弃,全员可见）
+--     V10.92 起带来源三列:放映厅/纪念日/小游戏/家庭计划一键许愿,来源标题存快照
+--     source_id 为字符串(媒体引擎条目ID是 GUID,不能存 BIGINT)
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `content_wish`;
 CREATE TABLE `content_wish` (
@@ -1221,6 +1223,9 @@ CREATE TABLE `content_wish` (
   `title`        VARCHAR(100)  NOT NULL COMMENT '愿望标题',
   `reason`       VARCHAR(500)  DEFAULT NULL COMMENT '愿望理由/备注',
   `category`     VARCHAR(50)   DEFAULT NULL COMMENT '分类标签（逗号分隔）',
+  `source_type`  VARCHAR(20)   DEFAULT NULL COMMENT '来源: CINEMA放映厅/ANNIVERSARY纪念日/GAME小游戏/PLAN家庭计划(NUL=直接添加)',
+  `source_id`    VARCHAR(64)   DEFAULT NULL COMMENT '来源记录ID(字符串,兼容媒体引擎条目ID;可空)',
+  `source_title` VARCHAR(100)  DEFAULT NULL COMMENT '来源标题快照(来源被删也能显示)',
   `status`       VARCHAR(20)   NOT NULL DEFAULT 'PENDING' COMMENT '状态: PENDING待实现/ACHIEVED已实现/ABANDONED放弃',
   `requester_id` BIGINT        NOT NULL COMMENT '提出人ID',
   `visibility`   VARCHAR(20)   NOT NULL DEFAULT 'FAMILY' COMMENT '可见范围：PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开（默认家庭可见）',
@@ -1326,6 +1331,10 @@ INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
 ('wish_status', 'PENDING',  '待实现'),
 ('wish_status', 'ACHIEVED', '已实现'),
 ('wish_status', 'ABANDONED','已放弃'),
+('wish_source', 'CINEMA',      '放映厅'),
+('wish_source', 'ANNIVERSARY', '纪念日'),
+('wish_source', 'GAME',        '小游戏'),
+('wish_source', 'PLAN',        '家庭计划'),
 ('video_wish_status', 'PENDING', '待入库'),
 ('video_wish_status', 'IMPORTED','已入库'),
 ('plan_status', 'ACTIVE',   '进行中'),

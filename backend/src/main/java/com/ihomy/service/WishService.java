@@ -57,6 +57,9 @@ public class WishService {
             map.put("title", w.getTitle());
             map.put("reason", w.getReason());
             map.put("category", w.getCategory());
+            map.put("sourceType", w.getSourceType());
+            map.put("sourceId", w.getSourceId());
+            map.put("sourceTitle", w.getSourceTitle());
             map.put("status", w.getStatus());
             map.put("requesterName", names.getOrDefault(w.getRequesterId(), "未知成员"));
             map.put("achievedAt", w.getAchievedAt());
@@ -75,6 +78,9 @@ public class WishService {
         wish.setTitle(dto.getTitle());
         wish.setReason(dto.getReason());
         wish.setCategory(dto.getCategory());
+        wish.setSourceType(requireSourceType(dto.getSourceType()));
+        wish.setSourceId(blankToNull(dto.getSourceId()));
+        wish.setSourceTitle(blankToNull(dto.getSourceTitle()));
         wish.setStatus(DictConst.wishStatus(dto.getStatus()));
         wish.setRequesterId(userId);
         wish.setVisibility(DictConst.VIS_FAMILY);
@@ -90,6 +96,9 @@ public class WishService {
         if (dto.getReason() != null) wish.setReason(dto.getReason());
         if (dto.getCategory() != null) wish.setCategory(dto.getCategory());
         if (dto.getStatus() != null) wish.setStatus(DictConst.wishStatus(dto.getStatus()));
+        if (dto.getSourceType() != null) wish.setSourceType(requireSourceType(dto.getSourceType()));
+        if (dto.getSourceId() != null) wish.setSourceId(blankToNull(dto.getSourceId()));
+        if (dto.getSourceTitle() != null) wish.setSourceTitle(blankToNull(dto.getSourceTitle()));
         apply(wish);
         wishMapper.updateById(wish);
     }
@@ -105,6 +114,19 @@ public class WishService {
         } else {
             wish.setAchievedAt(null);
         }
+    }
+
+    /** 来源类型校验:空=直接添加;非空但不在字典内直接报错,不静默回退 */
+    private String requireSourceType(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        String source = DictConst.wishSource(raw);
+        if (source == null) throw new BizException(ResultCode.BAD_REQUEST, "愿望来源不正确");
+        return source;
+    }
+
+    private String blankToNull(String v) {
+        if (v == null || v.isBlank()) return null;
+        return v.trim();
     }
 
     private Wish require(Long id, Long familyId) {

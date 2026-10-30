@@ -27,6 +27,12 @@
             <span class="wish-title">{{ w.title }}</span>
             <el-tag :type="statusTag(w.status)" size="small">{{ statusText(w.status) }}</el-tag>
           </div>
+          <div v-if="w.sourceType" class="wish-source">
+            <el-tag v-a11y-click size="small" effect="plain" class="wish-source-tag" @click="goSource(w)">
+              {{ $t('wish.fromSource', { source: dictText(t, 'wishSource', w.sourceType) }) }}
+            </el-tag>
+            <span v-if="w.sourceTitle" class="wish-source-title">{{ w.sourceTitle }}</span>
+          </div>
           <div v-if="w.reason" class="wish-reason">{{ w.reason }}</div>
           <div v-if="w.category" class="wish-cats">
             <el-tag v-for="c in w.category.split(',')" :key="c" size="small" effect="plain">{{ c }}</el-tag>
@@ -96,19 +102,22 @@
 <script setup>
 // 愿望单:愿望卡片网格 + 状态 tab;标记实现/放弃走 PUT status
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { wishApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { dictText } from '@/utils/dict'
+import { WISH_CATEGORIES, wishSourceRoute } from '@/utils/wish'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 
 const { t } = useI18n()
+const router = useRouter()
 const userStore = useUserStore()
 
-const CATEGORIES = ['生日礼物', '家庭用品', '旅行', '数码设备', '美食', '其他']
+const CATEGORIES = WISH_CATEGORIES
 
 const loading = ref(false)
 const loadError = ref(false)
@@ -119,6 +128,12 @@ const editor = reactive({ visible: false, form: {}, cats: [] })
 
 const statusText = (s) => dictText(t, 'wishStatus', s)
 const statusTag = (s) => ({ PENDING: '', ACHIEVED: 'success', ABANDONED: 'info' })[s] || 'info'
+
+// 来源标签回跳:放映厅回该作品详情,其余回来源页;来源被删也保留标签(标题是快照)
+const goSource = (w) => {
+  const to = wishSourceRoute(w.sourceType, w.sourceId)
+  if (to) router.push(to)
+}
 
 const filtered = computed(() => {
   if (filter.value === 'all') return list.value
@@ -214,6 +229,19 @@ onMounted(load)
 .wish-reason {
   color: #666;
   font-size: 13px;
+}
+.wish-source {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.wish-source-tag {
+  cursor: pointer;
+}
+.wish-source-title {
+  font-size: 12px;
+  color: var(--color-text-secondary);
 }
 .wish-cats {
   display: flex;

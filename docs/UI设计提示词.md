@@ -458,6 +458,7 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 | info | `rgba(255,255,255,0.08)` | `rgba(232,220,200,0.6)`(浅米) |
 
 - 圆角 8px;半透明磨砂背景;禁止高饱和实色块。
+- **来源标签(愿望单 `source_type`)**:`effect="plain"` 的 el-tag + 右侧 12px 次要色快照标题,整枚可点击回来源(容器补 `v-a11y-click`);来源为空的老数据不渲染该行。
 
 ### 数量角标(el-badge)
 

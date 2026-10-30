@@ -2571,3 +2571,47 @@ SET @sql := IF(@has = 0,
 PREPARE add_anniv_time_stmt FROM @sql;
 EXECUTE add_anniv_time_stmt;
 DEALLOCATE PREPARE add_anniv_time_stmt;
+
+-- ------------------------------------------------------------
+-- V10.92 家庭日程整合 阶段D:愿望单来源对接(2026-10-30)
+--   content_wish 加 source_type/source_id/source_title 三列(均可空,空=直接添加)。
+--   source_id 用 VARCHAR(64):放映厅条目 ID 是媒体引擎的 GUID,不能存 BIGINT。
+--   source_title 存来源标题快照,来源被删后愿望卡仍可显示。
+--   字典组 wish_source 四个取值;重复执行安全:列走 information_schema 守卫,
+--   字典行走 INSERT IGNORE(uk_group_value 唯一)。
+-- ------------------------------------------------------------
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_wish'
+               AND COLUMN_NAME = 'source_type');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `content_wish` ADD COLUMN `source_type` VARCHAR(20) DEFAULT NULL COMMENT ''来源: CINEMA放映厅/ANNIVERSARY纪念日/GAME小游戏/PLAN家庭计划(NUL=直接添加)'' AFTER `category`',
+  'SELECT 1');
+PREPARE add_wish_source_type_stmt FROM @sql;
+EXECUTE add_wish_source_type_stmt;
+DEALLOCATE PREPARE add_wish_source_type_stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_wish'
+               AND COLUMN_NAME = 'source_id');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `content_wish` ADD COLUMN `source_id` VARCHAR(64) DEFAULT NULL COMMENT ''来源记录ID(字符串,兼容媒体引擎条目ID;可空)'' AFTER `source_type`',
+  'SELECT 1');
+PREPARE add_wish_source_id_stmt FROM @sql;
+EXECUTE add_wish_source_id_stmt;
+DEALLOCATE PREPARE add_wish_source_id_stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_wish'
+               AND COLUMN_NAME = 'source_title');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `content_wish` ADD COLUMN `source_title` VARCHAR(100) DEFAULT NULL COMMENT ''来源标题快照(来源被删也能显示)'' AFTER `source_id`',
+  'SELECT 1');
+PREPARE add_wish_source_title_stmt FROM @sql;
+EXECUTE add_wish_source_title_stmt;
+DEALLOCATE PREPARE add_wish_source_title_stmt;
+
+INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('wish_source', 'CINEMA',      '放映厅'),
+('wish_source', 'ANNIVERSARY', '纪念日'),
+('wish_source', 'GAME',        '小游戏'),
+('wish_source', 'PLAN',        '家庭计划');

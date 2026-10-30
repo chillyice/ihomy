@@ -28,6 +28,11 @@
           <span>{{ memberText(a) }}</span>
         </div>
         <div v-if="userStore.isLoggedIn" class="anni-actions">
+          <el-tooltip :content="t('wish.anniversaryWish')" placement="top" :show-after="300">
+            <el-button size="small" text @click="openWish(a)"
+              ><el-icon><Star /></el-icon
+            ></el-button>
+          </el-tooltip>
           <el-tooltip :content="t('common.edit')" placement="top" :show-after="300">
             <el-button size="small" text @click="openEditor(a)"
               ><el-icon><Edit /></el-icon
@@ -44,18 +49,22 @@
     <el-empty v-else :description="userStore.isGuest ? t('anniversary.guestEmpty') : t('anniversary.emptyHint')" />
 
     <AnniversaryDialog v-model="editorVisible" :item="editing" :members="members" @saved="load" />
+
+    <!-- 许个愿:预填来源为该纪念日,标题只给占位提示 -->
+    <AddToWishDialog v-model="wishOpen" :source="wishSource" :title-placeholder="wishTitlePlaceholder" />
   </div>
 </template>
 
 <script setup>
 // 纪念日列表:访客看演示家庭的公开数据(后端白名单),登录后可增删改
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { User, Edit, Delete, Bell } from '@element-plus/icons-vue'
+import { User, Edit, Delete, Bell, Star } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { anniversaryApi, memberApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import AnniversaryDialog from '../dialogs/AnniversaryDialog.vue'
+import AddToWishDialog from '@/components/wish/AddToWishDialog.vue'
 
 const { t } = useI18n()
 const userStore = useUserStore()
@@ -64,6 +73,13 @@ const members = ref([])
 const loading = ref(false)
 const editorVisible = ref(false)
 const editing = ref(null)
+
+const wishOpen = ref(false)
+const wishTarget = ref(null)
+const wishSource = computed(() => (wishTarget.value ? { type: 'ANNIVERSARY', id: wishTarget.value.id, title: wishTarget.value.name } : {}))
+const wishTitlePlaceholder = computed(() =>
+  wishTarget.value ? t('wish.anniversaryTitlePlaceholder', { name: wishTarget.value.name }) : '',
+)
 
 // 关联成员展示:多位用顿号连接,未关联即为家庭级纪念日
 const memberText = (a) =>
@@ -90,6 +106,11 @@ const loadMembers = async () => {
 const openEditor = (a = null) => {
   editing.value = a
   editorVisible.value = true
+}
+
+const openWish = (a) => {
+  wishTarget.value = a
+  wishOpen.value = true
 }
 
 const onDel = async (a) => {

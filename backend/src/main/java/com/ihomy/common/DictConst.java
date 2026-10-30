@@ -40,6 +40,12 @@ public final class DictConst {
     public static final String VWISH_IMPORTED = "IMPORTED";
     private static final String WISH_FALLBACK = WISH_PENDING;
 
+    /** 愿望来源 wish_source(V10.92):空=直接添加,非空=从放映厅/纪念日/小游戏/家庭计划许愿 */
+    public static final String WISH_SOURCE_CINEMA = "CINEMA";
+    public static final String WISH_SOURCE_ANNIVERSARY = "ANNIVERSARY";
+    public static final String WISH_SOURCE_GAME = "GAME";
+    public static final String WISH_SOURCE_PLAN = "PLAN";
+
     /** 放映厅媒体引擎类型 media_server_type */
     public static final String MEDIA_JELLYFIN = "JELLYFIN";
     public static final String MEDIA_EMBY = "EMBY";
@@ -306,6 +312,18 @@ public final class DictConst {
             case PLAN_DONE, "1" -> PLAN_DONE;
             case PLAN_CANCELLED, "2" -> PLAN_CANCELLED;
             default -> PLAN_ACTIVE;
+        };
+    }
+
+    /** 愿望来源入参规范化:空=直接添加返回 null;未知值也返回 null,由调用方判空后报错(不静默回退) */
+    public static String wishSource(String v) {
+        if (v == null || v.isBlank()) return null;
+        return switch (v.trim().toUpperCase()) {
+            case WISH_SOURCE_CINEMA -> WISH_SOURCE_CINEMA;
+            case WISH_SOURCE_ANNIVERSARY -> WISH_SOURCE_ANNIVERSARY;
+            case WISH_SOURCE_GAME -> WISH_SOURCE_GAME;
+            case WISH_SOURCE_PLAN -> WISH_SOURCE_PLAN;
+            default -> null;
         };
     }
 

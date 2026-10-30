@@ -54,6 +54,9 @@
               <el-button :loading="marking" @click="togglePlayed(primaryTarget(), !detail.played)">
                 {{ detail.played ? $t('cinema.markUnwatched') : $t('cinema.markWatched') }}
               </el-button>
+              <el-button v-if="userStore.isLoggedIn" @click="wishOpen = true">
+                <el-icon><Star /></el-icon>{{ $t('wish.wantToWatch') }}
+              </el-button>
             </div>
           </div>
         </div>
@@ -104,6 +107,14 @@
     </div>
 
     <MediaPlayer v-model="player.visible" :item="player.item" @played="reload" />
+
+    <!-- 加入愿望单:来源带媒体引擎条目ID(字符串)与片名快照 -->
+    <AddToWishDialog
+      v-model="wishOpen"
+      :source="{ type: 'CINEMA', id: itemId, title: detail?.name }"
+      :default-title="detail?.name || ''"
+      :default-category="WISH_SOURCE_DEFAULT_CATEGORY.CINEMA"
+    />
   </div>
 </template>
 
@@ -111,12 +122,14 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { VideoPlay } from '@element-plus/icons-vue'
+import { VideoPlay, Star } from '@element-plus/icons-vue'
 import { mediaApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import MediaPlayer from '@/components/MediaPlayer.vue'
+import AddToWishDialog from '@/components/wish/AddToWishDialog.vue'
+import { WISH_SOURCE_DEFAULT_CATEGORY } from '@/utils/wish'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -128,6 +141,7 @@ const loading = ref(false)
 const marking = ref(false)
 const season = ref(null)
 const player = ref({ visible: false, item: null })
+const wishOpen = ref(false)
 
 const itemId = computed(() => route.params.itemId)
 
