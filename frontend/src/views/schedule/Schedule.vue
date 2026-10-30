@@ -1,0 +1,493 @@
+<!-- 日程提醒页:近期条 + 月历 + 当日详情 + 待安排 + 日历/清单切换。
+     地址栏兼容:?date=YYYY-MM-DD 选中该日;?tab=today 选中今天;?tab=plan 清单(全部);
+     ?tab=anniversary 清单(纪念日);?tab=plan&focus=<planId> 清单定位高亮。 -->
+<template>
+  <div class="page">
+    <Breadcrumb :items="[{ label: $t('schedule.title') }]" />
+
+    <PageToolbar>
+      <div class="tb-left">
+        <el-radio-group v-model="view" size="small">
+          <el-radio-button value="calendar">{{ $t('schedule.view.calendar') }}</el-radio-button>
+          <el-radio-button value="list">{{ $t('schedule.view.list') }}</el-radio-button>
+        </el-radio-group>
+        <el-select v-if="view === 'list'" v-model="filter" size="small" class="filter-select" @change="onFilterChange">
+          <el-option v-for="f in TYPE_FILTERS" :key="f" :label="filterLabel(f)" :value="f" />
+        </el-select>
+      </div>
+      <div class="tb-right">
+        <el-button v-if="userStore.isLoggedIn" type="primary" @click="openCreate(selectedDate)">
+          {{ $t('schedule.dialog.create') }}
+        </el-button>
+      </div>
+    </PageToolbar>
+
+    <div v-loading="loading">
+      <ScheduleUpcoming v-if="view === 'calendar' && userStore.isLoggedIn" :items="upcoming" @pick="onPickUpcoming" />
+
+      <ScheduleCalendar
+        v-if="view === 'calendar'"
+        v-model:selected="selectedDate"
+        :grid="grid"
+        :calendar-days="calendarDays"
+        :events="eventsDays"
+        :year="cursor.year"
+        :month="cursor.month"
+        @change-month="changeMonth"
+      />
+
+      <ScheduleDayPanel
+        v-if="view === 'calendar'"
+        :date="selectedDate"
+        :items="dayItems"
+        :info="dayInfo"
+        :record-of="recordOf"
+        @add="openCreate"
+        @open="openDetail"
+        @edit="openEdit"
+        @delete="onDelete"
+        @toggle="onToggle"
+        @toggle-task="onToggleTask"
+      />
+
+      <template v-else>
+        <!-- 清单与月历共用同一份区间数据,所以翻月放在清单头上,否则进清单后无法换月 -->
+        <div class="list-month card">
+          <el-button size="small" text :aria-label="$t('schedule.prevMonth')" @click="changeMonth(-1)">
+            <el-icon><ArrowLeft /></el-icon>
+          </el-button>
+          <span class="list-month-title">{{ $t('schedule.monthTitle', { year: cursor.year, month: cursor.month }) }}</span>
+          <el-button size="small" text :aria-label="$t('schedule.nextMonth')" @click="changeMonth(1)">
+            <el-icon><ArrowRight /></el-icon>
+          </el-button>
+        </div>
+        <ScheduleList
+          :groups="listGroups"
+          :focus="focusId"
+          :record-of="recordOf"
+          :can-edit="userStore.isLoggedIn"
+          @open="openDetail"
+          @edit="openEdit"
+          @delete="onDelete"
+          @toggle="onToggle"
+          @toggle-task="onToggleTask"
+        />
+      </template>
+
+      <ScheduleUndated
+        v-if="userStore.isLoggedIn && undated.length"
+        :items="undated"
+        @arrange="openPlanEditor"
+        @edit="openPlanEditor"
+        @delete="onDeleteUndated"
+      />
+    </div>
+
+    <ScheduleDialog v-model="editorVisible" :item="editing" :default-date="defaultDate" :members="members" @saved="onSaved" />
+    <ScheduleDetail
+      v-model="detailVisible"
+      :kind="detailKind"
+      :record="detailRecord"
+      @edit="onDetailEdit"
+      @delete="onDelete"
+      @saved="onSaved"
+    />
+  </div>
+</template>
+
+<script setup>
+// 数据分三路:月历基础数据(公共)+ 区间聚合(游客可读)+ 家庭明细(登录后,用于编辑与子任务)
+// 切月只重拉前两路,家庭明细与近期提醒只在挂载/保存后刷新
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
+import { anniversaryApi, memberApi, planApi, publicApi, reminderApi, scheduleApi } from '@/api'
+import { useUserStore } from '@/stores/user'
+import { buildMonthGrid, isDateString, monthKey, monthRange, shiftMonth, todayString } from '@/utils/scheduleCalendar'
+import { buildList, sortEvents } from '@/utils/scheduleList'
+import { TYPE_FILTERS } from '@/utils/scheduleType'
+import Breadcrumb from '@/components/Breadcrumb.vue'
+import PageToolbar from '@/components/PageToolbar.vue'
+import ScheduleCalendar from './ScheduleCalendar.vue'
+import ScheduleUpcoming from './ScheduleUpcoming.vue'
+import ScheduleDayPanel from './ScheduleDayPanel.vue'
+import ScheduleList from './ScheduleList.vue'
+import ScheduleUndated from './ScheduleUndated.vue'
+import ScheduleDialog from './dialogs/ScheduleDialog.vue'
+import ScheduleDetail from './dialogs/ScheduleDetail.vue'
+
+const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
+const userStore = useUserStore()
+
+const today = todayString()
+const view = ref('calendar')
+const filter = ref('ALL')
+const selectedDate = ref(today)
+const cursor = reactive({ year: Number(today.slice(0, 4)), month: Number(today.slice(5, 7)) })
+const focusId = ref(null)
+
+const calendarDays = ref({})
+const eventsDays = ref({})
+const undated = ref([])
+const upcoming = ref([])
+const anniversaries = ref([])
+const plans = ref([])
+const reminders = ref([])
+const members = ref([])
+const loading = ref(false)
+
+const editorVisible = ref(false)
+const editing = ref(null)
+const defaultDate = ref('')
+const detailVisible = ref(false)
+const detailRef = ref(null)
+
+const grid = computed(() => buildMonthGrid(cursor.year, cursor.month))
+const dayItems = computed(() => sortEvents(eventsDays.value[selectedDate.value] || []))
+const dayInfo = computed(() => calendarDays.value[selectedDate.value] || null)
+const listGroups = computed(() => buildList(eventsDays.value, filter.value))
+const detailKind = computed(() => detailRef.value?.kind || 'PLAN')
+const detailRecord = computed(() => {
+  if (!detailRef.value) return null
+  const pool = detailRef.value.kind === 'ANNIVERSARY' ? anniversaries.value : plans.value
+  return pool.find((x) => x.id === detailRef.value.id) || null
+})
+
+const filterLabel = (f) => t('schedule.filter.' + (f === 'ALL' ? 'all' : f))
+
+// 事件 → 完整记录:纪念日看提前提醒,计划看子任务,提醒看重复与时刻
+const recordOf = (it) => {
+  if (it.kind === 'ANNIVERSARY') return anniversaries.value.find((a) => a.id === it.id) || null
+  if (it.kind === 'REMINDER' || it.kind === 'TASK') return reminders.value.find((r) => r.id === it.id) || null
+  if (it.kind === 'PLAN') return plans.value.find((p) => p.id === it.id) || null
+  if (it.kind === 'PLAN_TASK') return plans.value.find((p) => p.id === it.planId) || null
+  return null
+}
+
+// 月历基础数据 + 区间聚合:两次请求并行;切月只重拉这两个。
+// pending 与 seq 只做两件事:同一月份的并发重复请求直接跳过、旧月份的慢响应丢弃,
+// 否则快速连点翻月会被先发后到的响应覆盖成上个月。
+let monthSeq = 0
+let pendingKey = ''
+const loadMonth = async () => {
+  const key = monthKey(cursor.year, cursor.month)
+  if (pendingKey === key) return
+  pendingKey = key
+  const seq = ++monthSeq
+  loading.value = true
+  try {
+    const { from, to } = monthRange(cursor.year, cursor.month)
+    const [cal, ev] = await Promise.all([publicApi.calendar(key), scheduleApi.events(from, to)])
+    if (seq !== monthSeq) return
+    calendarDays.value = Object.fromEntries((cal?.days || []).map((d) => [d.date, d]))
+    eventsDays.value = ev?.days || {}
+    undated.value = userStore.isLoggedIn && Array.isArray(ev?.undated) ? ev.undated : []
+  } catch (e) {
+    // 失败保留上一份数据,错误提示由 request 拦截器统一给出
+  } finally {
+    if (seq === monthSeq) {
+      loading.value = false
+      pendingKey = ''
+    }
+  }
+}
+
+// 近期提醒单拉一份:勾完成后它要跟着掉下去,不必为刷新顶部条重拉五个列表
+const loadUpcoming = async () => {
+  if (!userStore.isLoggedIn) return
+  upcoming.value = await scheduleApi.upcoming(7).catch(() => [])
+}
+
+// 家庭明细:纪念日对游客也公开(只读);其余四类登录后才请求,游客不发注定 401 的请求
+const loadLists = async () => {
+  const loggedIn = userStore.isLoggedIn
+  const [anni, mem, pl, rem, up] = await Promise.all([
+    anniversaryApi.list().catch(() => []),
+    loggedIn ? memberApi.list().catch(() => []) : Promise.resolve([]),
+    loggedIn ? planApi.list().catch(() => []) : Promise.resolve([]),
+    loggedIn ? reminderApi.list().catch(() => []) : Promise.resolve([]),
+    loggedIn ? scheduleApi.upcoming(7).catch(() => []) : Promise.resolve([]),
+  ])
+  anniversaries.value = Array.isArray(anni) ? anni : []
+  members.value = Array.isArray(mem) ? mem : []
+  plans.value = Array.isArray(pl) ? pl : []
+  reminders.value = Array.isArray(rem) ? rem : []
+  upcoming.value = Array.isArray(up) ? up : []
+}
+
+const reloadAll = async () => {
+  await Promise.all([loadMonth(), loadLists()])
+  if (view.value === 'list') await scrollToFocus()
+}
+
+// ---- 地址栏:旧链接兼容 + 当前状态回写 ----
+const applyQuery = () => {
+  const q = route.query
+  const qd = typeof q.date === 'string' ? q.date : ''
+  if (isDateString(qd)) {
+    view.value = 'calendar'
+    selectedDate.value = qd
+    cursor.year = Number(qd.slice(0, 4))
+    cursor.month = Number(qd.slice(5, 7))
+    return
+  }
+  if (q.tab === 'today') {
+    view.value = 'calendar'
+    selectedDate.value = today
+    cursor.year = Number(today.slice(0, 4))
+    cursor.month = Number(today.slice(5, 7))
+    return
+  }
+  if (q.tab === 'anniversary') {
+    view.value = 'list'
+    filter.value = 'ANNIVERSARY'
+    focusId.value = null
+    return
+  }
+  if (q.tab === 'plan') {
+    view.value = 'list'
+    filter.value = typeof q.type === 'string' && TYPE_FILTERS.includes(q.type) ? q.type : 'ALL'
+    focusId.value = q.focus != null ? String(q.focus) : null
+    return
+  }
+  view.value = 'calendar'
+  selectedDate.value = today
+  cursor.year = Number(today.slice(0, 4))
+  cursor.month = Number(today.slice(5, 7))
+}
+
+const syncQuery = () => {
+  let query
+  if (view.value === 'calendar') query = { date: selectedDate.value }
+  else if (filter.value === 'ANNIVERSARY') query = { tab: 'anniversary' }
+  else
+    query = {
+      tab: 'plan',
+      ...(filter.value !== 'ALL' ? { type: filter.value } : {}),
+      ...(focusId.value ? { focus: focusId.value } : {}),
+    }
+  const same = ['date', 'tab', 'type', 'focus'].every((k) => String(route.query[k] ?? '') === String(query[k] ?? ''))
+  if (!same) router.replace({ path: '/plan', query })
+}
+
+// ---- 交互 ----
+const changeMonth = (delta) => {
+  const next = shiftMonth(cursor.year, cursor.month, delta)
+  cursor.year = next.year
+  cursor.month = next.month
+  // 选中日不在新月份里时落到 1 号,避免详情停在上个月的某天
+  const sel = selectedDate.value
+  if (Number(sel.slice(0, 4)) !== next.year || Number(sel.slice(5, 7)) !== next.month) {
+    selectedDate.value = `${monthKey(next.year, next.month)}-01`
+  }
+}
+
+const onPickUpcoming = (it) => {
+  view.value = 'calendar'
+  selectedDate.value = it.date
+  cursor.year = Number(it.date.slice(0, 4))
+  cursor.month = Number(it.date.slice(5, 7))
+  nextTick(() => document.getElementById('schedule-day')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+}
+
+const onFilterChange = () => {
+  focusId.value = null
+}
+
+const openCreate = (date) => {
+  editing.value = null
+  defaultDate.value = date && isDateString(date) ? date : selectedDate.value
+  editorVisible.value = true
+}
+
+const openEdit = (it) => {
+  const record = recordOf(it)
+  if (!record) return ElMessage.warning(t('schedule.detail.noData'))
+  editing.value = { kind: it.kind, record }
+  editorVisible.value = true
+}
+
+// 无日期计划:与编辑同一个弹窗,选日期即完成「安排日期」。
+// 待安排列表来自聚合接口的精简项(没有说明/子任务),必须回查完整计划再填表,
+// 否则保存会把说明清空;回查不到时宁可提示也不拿精简项硬填。
+const openPlanEditor = (p) => {
+  const record = plans.value.find((x) => x.id === p.id)
+  if (!record) return ElMessage.warning(t('schedule.detail.noData'))
+  editing.value = { kind: 'PLAN', record }
+  editorVisible.value = true
+}
+
+const openDetail = (it) => {
+  if (it.kind === 'REMINDER' || it.kind === 'TASK') return openEdit(it)
+  if (it.kind === 'PLAN_TASK') detailRef.value = { kind: 'PLAN', id: it.planId }
+  else detailRef.value = { kind: it.kind, id: it.id }
+  detailVisible.value = true
+}
+
+const onDetailEdit = ({ kind, record }) => {
+  detailVisible.value = false
+  editing.value = { kind, record }
+  editorVisible.value = true
+}
+
+const onToggle = async (it) => {
+  // 循环提醒按当日勾选;一次性提醒忽略日期
+  await reminderApi.toggleDone(it.id, it.kind === 'TASK' ? it.date : undefined)
+  await Promise.all([loadMonth(), loadUpcoming()])
+}
+
+const onToggleTask = async (it) => {
+  await planApi.updateTask(it.id, { done: it.done ? 0 : 1 })
+  await reloadAll()
+}
+
+// 删除有两条入口:日程行给的是 events 项({kind,id}),详情弹窗给的是 {kind,record},两种都要吃
+const onDelete = async (payload) => {
+  const record = payload.record || recordOf(payload)
+  const id = record?.id ?? payload.id
+  if (!id) return
+  const title = payload.kind === 'ANNIVERSARY' ? record?.name : record?.title
+  await ElMessageBox.confirm(t('schedule.dialog.deleteMessage', { title: title || '' }), t('common.deleteConfirm'), {
+    type: 'warning',
+    closeOnClickModal: true,
+  })
+  if (payload.kind === 'ANNIVERSARY') await anniversaryApi.remove(id)
+  else if (payload.kind === 'REMINDER' || payload.kind === 'TASK') await reminderApi.remove(id)
+  else if (payload.kind === 'PLAN') await planApi.remove(id)
+  else return
+  ElMessage.success(t('common.deleted'))
+  detailVisible.value = false
+  await reloadAll()
+}
+
+const onDeleteUndated = async (p) => {
+  await ElMessageBox.confirm(t('schedule.dialog.deleteMessage', { title: p.title }), t('common.deleteConfirm'), {
+    type: 'warning',
+    closeOnClickModal: true,
+  })
+  await planApi.remove(p.id)
+  ElMessage.success(t('common.deleted'))
+  await reloadAll()
+}
+
+const onSaved = async (payload) => {
+  // 新建了无日期计划或把计划改了日期时,待安排与月历都要跟着刷新
+  detailVisible.value = false
+  await reloadAll()
+  if (payload?.kind === 'ITEM' || payload?.kind === 'PLAN') focusId.value = null
+}
+
+// 清单数据分批到、外壳挂载后还会把内容区滚回顶部、路由切换期布局仍在变高变矮:
+// 单次滚动(含 scrollIntoView)会被后到的重排覆盖,实测 2.5s 后还会被推离目标位置。
+// 做法:4 秒窗口内每 250ms 按「内容坐标绝对值」校正一次(幂等,已就位就跳过),
+// 布局稳定后自然停在同一位置;离开页面立即停表。
+let focusTimer = null
+const scrollToFocus = () => {
+  // 返回 true 表示已经就位(不需要再动),连续 3 次就位就停表
+  const scroll = () => {
+    if (!focusId.value || view.value !== 'list') return true
+    const node = document.getElementById('schedule-row-PLAN-' + focusId.value)
+    if (!node) return false
+    const centered = (viewportHeight, nodeHeight) => (viewportHeight - nodeHeight) / 2
+    // 以节点真正所在的滚动容器为准:暖居主题主区是 .gc-main,光尘走 window。
+    // 挂载早期页面还可能不在外壳里,closest 为 null 时按 window 处理,后续 tick 再校正。
+    const box = node.closest('.gc-main')
+    if (box && box.scrollHeight > box.clientHeight + 10) {
+      const nodeTop = node.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop
+      const max = box.scrollHeight - box.clientHeight
+      const target = Math.max(0, Math.min(max, nodeTop - centered(box.clientHeight, node.offsetHeight)))
+      if (Math.abs(box.scrollTop - target) > 4) {
+        box.scrollTo({ top: target, behavior: 'instant' })
+        return false
+      }
+      return true
+    }
+    const nodeTop = node.getBoundingClientRect().top + window.scrollY
+    const target = Math.max(0, nodeTop - centered(window.innerHeight, node.offsetHeight))
+    if (Math.abs(window.scrollY - target) > 4) {
+      window.scrollTo({ top: target, behavior: 'instant' })
+      return false
+    }
+    return true
+  }
+  let okStreak = 0
+  let ticks = 0
+  const stop = () => {
+    if (focusTimer) clearInterval(focusTimer)
+    focusTimer = null
+  }
+  const tick = () => {
+    okStreak = scroll() ? okStreak + 1 : 0
+    if (++ticks >= 24 || okStreak >= 3) stop()
+  }
+  scroll()
+  if (focusTimer) clearInterval(focusTimer)
+  focusTimer = setInterval(tick, 250)
+}
+
+watch(() => [cursor.year, cursor.month], loadMonth)
+// 选中日落到别的月份(点「今天」、点补格日期、点近期条)时跟着换月,
+// 否则详情显示的日子不在当前网格里,看不到它在月历上的圆点
+watch(selectedDate, (d) => {
+  if (!isDateString(d)) return
+  const y = Number(d.slice(0, 4))
+  const m = Number(d.slice(5, 7))
+  if (y !== cursor.year || m !== cursor.month) {
+    cursor.year = y
+    cursor.month = m
+  }
+})
+watch([view, filter, selectedDate, focusId], syncQuery)
+watch(
+  () => route.fullPath,
+  () => applyQuery(),
+)
+watch(
+  [() => view.value, () => listGroups.value],
+  () => {
+    if (view.value === 'list') scrollToFocus()
+  },
+  { flush: 'post' },
+)
+
+onMounted(async () => {
+  applyQuery()
+  await reloadAll()
+  scrollToFocus()
+})
+
+onBeforeUnmount(() => {
+  if (focusTimer) clearInterval(focusTimer)
+  focusTimer = null
+})
+</script>
+
+<style scoped>
+.filter-select {
+  width: 132px;
+}
+.list-month {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+}
+.list-month-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  min-width: 120px;
+  text-align: center;
+}
+@media (max-width: 480px) {
+  .list-month-title {
+    min-width: 0;
+  }
+}
+</style>

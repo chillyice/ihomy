@@ -204,6 +204,7 @@ import { ElMessage } from 'element-plus'
 import { Sunny, Moon, Bell, Fold, Expand, ArrowRight, Check, WarningFilled } from '@element-plus/icons-vue'
 import { iconComp, buildNavGroups, isActive } from '@/utils/navModules'
 import { formatRelativeTime } from '@/utils/datetime'
+import { todayString } from '@/utils/scheduleCalendar'
 
 import { applyLocale } from '@/i18n'
 import { useThemeStore } from '@/stores/theme'
@@ -318,8 +319,11 @@ const onNotifyClick = async (n) => {
   else if (n.contentType === 'diary') router.push('/diary')
   else if (n.contentType === 'photo' && n.contentId) router.push('/album')
   else if (n.contentType === 'item') router.push('/kitchen/ingredients')
-  else if (n.contentType === 'reminder') router.push('/plan?tab=today')
-  else if (n.contentType === 'anniversary') router.push('/plan?tab=anniversary')
+  // 提醒/纪念日通知统一落到日程提醒页并选中触发当天(通知无独立触发日字段,取创建日期兜底)
+  else if (n.contentType === 'reminder' || n.contentType === 'anniversary') {
+    const day = n.createdAt ? String(n.createdAt).slice(0, 10) : todayString()
+    router.push({ path: '/plan', query: { date: day } })
+  }
 }
 const notifyType = (type) =>
   type === 'reply'

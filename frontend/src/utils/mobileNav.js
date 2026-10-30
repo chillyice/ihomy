@@ -23,7 +23,7 @@ const PAGE_TITLE_KEYS = {
   '/points': 'points.title',
   '/task': 'task.title',
   '/reminder': 'reminder.title',
-  '/plan': 'plan.title',
+  '/plan': 'schedule.title',
   '/wish': 'wish.title',
   '/book': 'book.title',
   '/chat': 'chat.title',

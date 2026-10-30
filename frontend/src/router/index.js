@@ -30,7 +30,7 @@ const routes = [
   { path: '/points', name: 'Points', component: () => import('@/views/points/Points.vue'), meta: { public: true } },
   { path: '/task', name: 'Task', component: () => import('@/views/task/Task.vue'), meta: { public: true } },
   { path: '/reminder', redirect: { path: '/plan', query: { tab: 'today' } } },
-  { path: '/plan', name: 'Plan', component: () => import('@/views/plan/Plan.vue'), meta: { public: true } },
+  { path: '/plan', name: 'Plan', component: () => import('@/views/schedule/Schedule.vue'), meta: { public: true } },
   { path: '/plant', redirect: '/tools/plant' },
   { path: '/wish', name: 'Wish', component: () => import('@/views/wish/Wish.vue'), meta: { public: true } },
   { path: '/book', name: 'Book', component: () => import('@/views/book/Book.vue'), meta: { public: true } },

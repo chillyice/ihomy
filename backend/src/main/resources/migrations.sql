@@ -2754,3 +2754,14 @@ CREATE TABLE IF NOT EXISTS `family_reminder_check` (
 
 INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
 ('reminder_repeat', 'YEARLY', '每年');
+
+-- ------------------------------------------------------------
+-- V10.96 日程提醒 阶段C:入口文案(2026-10-30)
+--   「家庭计划」改「日程提醒」(月历 + 当日详情 + 清单);path 仍 /plan,code 不变。
+--   改完需重启后端(HomeModuleService 是内存缓存,直接改库不生效)。
+--   重复执行安全:UPDATE 自带 title 守卫;只改全局模块行。
+-- ------------------------------------------------------------
+UPDATE `sys_home_module` SET `title` = '日程提醒'
+WHERE `family_id` IS NULL
+  AND `code` = 'plan'
+  AND `title` <> '日程提醒';

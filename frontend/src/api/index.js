@@ -12,6 +12,8 @@ export const publicApi = {
   getWeatherDetail: () => request.get('/public/weather/detail'),
   getSunInfo: (date) => request.get('/public/sun-info', { params: date ? { date } : {} }),
   searchWeatherLocations: (keyword) => request.get('/public/weather/locations', { params: { keyword } }),
+  // 月历基础数据(农历/节气/传统节日/法定节假日与调休):month=YYYY-MM,缺省当月;免登录
+  calendar: (month) => request.get('/public/calendar', { params: month ? { month } : {} }),
 }
 
 // 每日内容:必应每日一图(后端代理)+ 每日知识(公开接口,游客可用)
@@ -251,13 +253,14 @@ export const taskApi = {
   cancel: (id) => request.post(`/task/${id}/cancel`),
 }
 
-// 提醒事项(一次性/每日/每周/每月,定时站内通知全家庭)
+// 提醒事项(一次性/每日/每周/每月/每年,定时站内通知全家庭)
 export const reminderApi = {
   list: () => request.get('/reminder/list'),
   create: (data) => request.post('/reminder', data),
   update: (id, data) => request.put(`/reminder/${id}`, data),
   remove: (id) => request.delete(`/reminder/${id}`),
-  toggleDone: (id) => request.post(`/reminder/${id}/toggle-done`),
+  // date 可选:循环提醒按该日勾选完成(缺省今天);一次性提醒忽略该参数
+  toggleDone: (id, date) => request.post(`/reminder/${id}/toggle-done`, null, { params: date ? { date } : {} }),
 }
 
 // 家庭计划(计划+子任务,进度自动联动;today=今日计划+今日提醒)
@@ -270,6 +273,13 @@ export const planApi = {
   addTask: (id, data) => request.post(`/plan/${id}/task`, data),
   updateTask: (id, data) => request.put(`/plan/task/${id}`, data),
   removeTask: (id) => request.delete(`/plan/task/${id}`),
+}
+
+// 日程聚合(只读):月历与近期提醒共用。写操作仍走提醒/计划/纪念日各自接口。
+// 游客可读 events(只返回演示家庭纪念日),upcoming 游客为空列表。
+export const scheduleApi = {
+  events: (from, to) => request.get('/schedule/events', { params: { from, to } }),
+  upcoming: (days = 7) => request.get('/schedule/upcoming', { params: { days } }),
 }
 
 // 植物养殖(全家共养一棵,实时养成;营养/天气/积分/成长日志)
