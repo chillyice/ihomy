@@ -628,6 +628,8 @@ export default {
       remindTime: 'Remind at',
       noTime: 'Optional — you and the family get a notification at this time',
       timeNeedsDate: 'Pick a target date first to set a reminder time',
+      eventToday: '{name} is today',
+      eventInDays: '{n} days until {name}',
     },
   },
   plant: {
@@ -853,6 +855,11 @@ export default {
     nameRequired: 'Please enter the anniversary name',
     saved: 'Saved',
     deleteConfirm: 'Delete "{name}"?',
+    remindLabel: 'Advance reminder',
+    remindDaysLabel: 'Days before',
+    remindDaysOption: '{n} days before',
+    remindTimeLabel: 'Remind at',
+    remindBadge: 'Reminds {n} days ahead',
   },
   announcement: {
     title: 'Family announcements',
@@ -2451,6 +2458,7 @@ export default {
     typeComment: 'Comment',
     typeExpiry: 'Expiry Alert',
     typeReminder: 'Reminder',
+    typeAnniversary: 'Anniversary',
   },
   daily: {
     image: 'Daily image',

@@ -2545,3 +2545,29 @@ CREATE TABLE IF NOT EXISTS `family_book_budget` (
   PRIMARY KEY (`id`),
   KEY `idx_family` (`family_id`, `deleted`, `category`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭记账预算(按支出分类的月度预算)';
+
+-- ------------------------------------------------------------
+-- V10.91 家庭日程整合 阶段C:纪念日提前提醒(2026-10-30)
+--   family_anniversary 加 remind_days_before(0/NULL=不提醒,1-30)与 remind_time(空=08:00)。
+--   到点由 AnniversaryReminderService 定时扫描给全家发站内通知;倒计时口径不变。
+--   重复执行安全:information_schema 守卫,列已存在则跳过。
+-- ------------------------------------------------------------
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_anniversary'
+               AND COLUMN_NAME = 'remind_days_before');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `family_anniversary` ADD COLUMN `remind_days_before` SMALLINT DEFAULT NULL COMMENT ''提前几天提醒（0或NULL=不提醒,1-30）'' AFTER `recurring`',
+  'SELECT 1');
+PREPARE add_anniv_days_stmt FROM @sql;
+EXECUTE add_anniv_days_stmt;
+DEALLOCATE PREPARE add_anniv_days_stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_anniversary'
+               AND COLUMN_NAME = 'remind_time');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `family_anniversary` ADD COLUMN `remind_time` TIME DEFAULT NULL COMMENT ''提醒时刻（空=默认08:00）'' AFTER `remind_days_before`',
+  'SELECT 1');
+PREPARE add_anniv_time_stmt FROM @sql;
+EXECUTE add_anniv_time_stmt;
+DEALLOCATE PREPARE add_anniv_time_stmt;

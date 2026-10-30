@@ -630,6 +630,8 @@ export default {
       remindTime: '提醒时间',
       noTime: '提醒时间（选填，填了会到点通知）',
       timeNeedsDate: '设置提醒时间需要先选择目标日期',
+      eventToday: '今天就是{name}',
+      eventInDays: '距{name}还有{n}天',
     },
   },
   plant: {
@@ -855,6 +857,11 @@ export default {
     nameRequired: '请输入纪念日名称',
     saved: '保存成功',
     deleteConfirm: '确认删除「{name}」？',
+    remindLabel: '提前提醒',
+    remindDaysLabel: '提前天数',
+    remindDaysOption: '提前 {n} 天',
+    remindTimeLabel: '提醒时间',
+    remindBadge: '提前 {n} 天提醒',
   },
   announcement: {
     title: '家庭公告',
@@ -2441,6 +2448,7 @@ export default {
     typeComment: '评论',
     typeExpiry: '食材预警',
     typeReminder: '提醒',
+    typeAnniversary: '纪念日',
   },
   daily: {
     image: '每日一图',

@@ -42,10 +42,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class FamilyPlanService {
 
+    /** 今日页签「重要日期」最多提示条数 */
+    private static final int TODAY_EVENT_LIMIT = 3;
+
     private final FamilyPlanMapper planMapper;
     private final FamilyPlanTaskMapper taskMapper;
     private final ReminderMapper reminderMapper;
     private final SysUserMapper sysUserMapper;
+    private final HomeStatsService homeStatsService;
 
     /** 家庭计划列表(含子任务、指派昵称、进度、提醒时间) */
     public List<Map<String, Object>> list(Long familyId) {
@@ -86,8 +90,8 @@ public class FamilyPlanService {
     }
 
     /**
-     * 今日视图:今天到期与已逾期的进行中计划 + 今天应触发的未完成提醒。
-     * 计划按提醒时刻(空排后)、目标日、id 升序;提醒按时刻升序。
+     * 今日视图:今天到期与已逾期的进行中计划 + 今天应触发的未完成提醒 + 最近的重要日期。
+     * 计划按提醒时刻(空排后)、目标日、id 升序;提醒按时刻升序;重要日期只是提示,不生成待办。
      */
     public Map<String, Object> today(Long familyId) {
         LocalDate today = LocalDate.now();
@@ -144,6 +148,7 @@ public class FamilyPlanService {
         Map<String, Object> result = new HashMap<>();
         result.put("plans", planRows);
         result.put("reminders", reminderRows);
+        result.put("events", homeStatsService.upcomingEvents(familyId, TODAY_EVENT_LIMIT));
         return result;
     }
 

@@ -2,6 +2,7 @@ package com.ihomy.service;
 
 import cn.hutool.core.date.ChineseDate;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ihomy.common.AnniversaryDate;
 import com.ihomy.common.DictConst;
 import com.ihomy.entity.Anniversary;
 import com.ihomy.entity.FamilyAnniversaryMember;
@@ -12,7 +13,6 @@ import com.ihomy.mapper.SysUserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -111,14 +111,27 @@ public class HomeStatsService {
         return sysUserMapper.selectCount(qw);
     }
 
+    /** 本家庭未来最近的纪念日(最多 limit 条):首页统计与今日页签共用这一份口径 */
+    public List<Map<String, Object>> upcomingEvents(Long familyId, int limit) {
+        if (familyId == null) return new ArrayList<>();
+        List<Anniversary> all = anniversaryMapper.selectList(new LambdaQueryWrapper<Anniversary>()
+                .eq(Anniversary::getFamilyId, familyId));
+        return upcomingEvents(all, linkedAnniversaryIds(all), limit);
+    }
+
     /** 计算每年重复纪念日的下一次日期与剩余天数,关联成员记为生日类型 */
     private List<Map<String, Object>> upcomingEvents(List<Anniversary> anniversaries, Set<Long> linkedIds) {
+        return upcomingEvents(anniversaries, linkedIds, EVENT_LIMIT);
+    }
+
+    private List<Map<String, Object>> upcomingEvents(List<Anniversary> anniversaries, Set<Long> linkedIds, int limit) {
         List<Map<String, Object>> events = new ArrayList<>();
         if (anniversaries == null || anniversaries.isEmpty()) return events;
         LocalDate today = LocalDate.now();
         for (Anniversary a : anniversaries) {
             if (!DictConst.RECUR_YEARLY.equals(a.getRecurring())) continue;
-            LocalDate next = nextOccurrence(a, today);
+            LocalDate next = AnniversaryDate.nextOccurrence(a.getCalendar(), a.getMonth(), a.getDay(),
+                    a.getIsLeap(), today);
             if (next == null) continue;
             Map<String, Object> e = new HashMap<>();
             e.put("type", linkedIds.contains(a.getId()) ? "birthday" : "anniversary");
@@ -130,47 +143,6 @@ public class HomeStatsService {
         }
 
         events.sort(Comparator.comparingInt(e -> (int) e.get("days")));
-        return events.size() > EVENT_LIMIT ? events.subList(0, EVENT_LIMIT) : events;
-    }
-
-    /** 按历法分支计算下一次日期:阳历直算,农历走转换 */
-    private LocalDate nextOccurrence(Anniversary a, LocalDate today) {
-        if ("lunar".equalsIgnoreCase(a.getCalendar())) {
-            return nextLunar(a, today);
-        }
-        return nextSolar(a, today);
-    }
-
-    /** 阳历日期:今年已过则顺延到下一年 */
-    private LocalDate nextSolar(Anniversary a, LocalDate today) {
-        if (a.getMonth() == null || a.getDay() == null) return null;
-        LocalDate candidate;
-        try {
-            candidate = LocalDate.of(today.getYear(), a.getMonth(), a.getDay());
-        } catch (DateTimeException ex) {
-            return null;
-        }
-        if (candidate.isBefore(today)) {
-            candidate = candidate.plusYears(1);
-        }
-        return candidate;
-    }
-
-    /** 农历日期:今年与明年各尝试一次,取首个不早于今天的公历日期;闰月无此年则跳过 */
-    private LocalDate nextLunar(Anniversary a, LocalDate today) {
-        if (a.getMonth() == null || a.getDay() == null) return null;
-        boolean leap = a.getIsLeap() != null && a.getIsLeap() == 1;
-        for (int lunarYear = today.getYear(); lunarYear <= today.getYear() + 1; lunarYear++) {
-            try {
-                ChineseDate cd = new ChineseDate(lunarYear, a.getMonth(), a.getDay(), leap);
-                LocalDate solar = LocalDate.of(cd.getGregorianYear(), cd.getGregorianMonth() + 1, cd.getGregorianDay());
-                if (!solar.isBefore(today)) {
-                    return solar;
-                }
-            } catch (Exception ex) {
-                // 该农历年无此闰月或日期非法,尝试下一年
-            }
-        }
-        return null;
+        return events.size() > limit ? new ArrayList<>(events.subList(0, limit)) : events;
     }
 }

@@ -4,6 +4,11 @@
     <el-empty v-if="!userStore.isLoggedIn" :description="$t('plan.today.guestEmpty')" />
 
     <template v-else>
+      <div v-if="events.length" class="event-strip card" v-a11y-click @click="openAnniversary">
+        <el-icon class="ev-icon"><Calendar /></el-icon>
+        <span v-for="(e, i) in events" :key="'e' + i" class="ev-item">{{ eventText(e) }}</span>
+      </div>
+
       <div class="section-label">{{ $t('plan.today.planSection') }}</div>
       <div v-if="plans.length" class="today-list">
         <div v-for="p in plans" :key="'p' + p.id" class="today-row card" v-a11y-click @click="openPlan(p.id)">
@@ -69,7 +74,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Edit, Delete } from '@element-plus/icons-vue'
+import { Edit, Delete, Calendar } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { planApi, reminderApi } from '@/api'
 import { timeOf } from '@/utils/agenda'
@@ -83,6 +88,7 @@ const userStore = useUserStore()
 const loading = ref(false)
 const plans = ref([])
 const reminders = ref([])
+const events = ref([])
 const allReminders = ref([])
 const editorVisible = ref(false)
 const editing = ref(null)
@@ -90,6 +96,10 @@ const editing = ref(null)
 // 后端返回英文枚举,表单用同一批词;未知值按一次性展示
 const repeatKey = { ONCE: 'once', DAILY: 'daily', WEEKLY: 'weekly', MONTHLY: 'monthly' }
 const repeatText = (x) => t('reminder.' + (repeatKey[x] || 'once'))
+
+// 重要日期提示行:当天显示「今天」,其余显示剩余天数;不生成待办
+const eventText = (e) =>
+  e.days === 0 ? t('plan.today.eventToday', { name: e.label }) : t('plan.today.eventInDays', { name: e.label, n: e.days })
 
 const load = async () => {
   // 今日视图与提醒都是私有内容:游客不打注定 401 的请求
@@ -99,6 +109,7 @@ const load = async () => {
     const [today, all] = await Promise.all([planApi.today(), reminderApi.list().catch(() => [])])
     plans.value = Array.isArray(today?.plans) ? today.plans : []
     reminders.value = Array.isArray(today?.reminders) ? today.reminders : []
+    events.value = Array.isArray(today?.events) ? today.events : []
     allReminders.value = Array.isArray(all) ? all : []
   } finally {
     loading.value = false
@@ -106,6 +117,7 @@ const load = async () => {
 }
 
 const openPlan = (id) => router.push({ path: '/plan', query: { tab: 'plan', focus: id } })
+const openAnniversary = () => router.push({ path: '/plan', query: { tab: 'anniversary' } })
 
 const openEditor = (r) => {
   editing.value = r
@@ -197,6 +209,24 @@ onMounted(load)
   color: var(--color-text-secondary);
   font-size: 13px;
   padding: 8px 2px 12px;
+}
+/* 重要日期提示条:一行放不下就换行,整体可点进纪念日页签 */
+.event-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.event-strip .ev-icon {
+  color: var(--color-primary);
+}
+.event-strip .ev-item {
+  color: var(--color-text);
 }
 
 @media (max-width: 768px) {

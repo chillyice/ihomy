@@ -42,6 +42,19 @@
       <el-form-item :label="t('anniversary.recurring')">
         <el-switch v-model="form.recurring" :active-value="1" :inactive-value="0" />
       </el-form-item>
+      <el-form-item :label="t('anniversary.remindLabel')">
+        <el-switch v-model="form.remindEnabled" />
+      </el-form-item>
+      <div v-if="form.remindEnabled" class="form-row">
+        <el-form-item :label="t('anniversary.remindDaysLabel')">
+          <el-select v-model="form.remindDaysBefore" style="width: 100%">
+            <el-option v-for="d in 30" :key="d" :label="t('anniversary.remindDaysOption', { n: d })" :value="d" />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="t('anniversary.remindTimeLabel')">
+          <el-time-select v-model="form.remindTime" start="06:00" step="00:15" end="23:00" style="width: 100%" />
+        </el-form-item>
+      </div>
     </el-form>
     <template #footer>
       <el-button @click="visible = false">{{ t('common.cancel') }}</el-button>
@@ -70,7 +83,20 @@ const visible = computed({
   set: (v) => emit('update:modelValue', v),
 })
 
-const blank = () => ({ id: null, name: '', calendar: 'solar', month: 1, day: 1, isLeap: 0, memberIds: [], recurring: 1 })
+const blank = () => ({
+  id: null,
+  name: '',
+  calendar: 'solar',
+  month: 1,
+  day: 1,
+  isLeap: 0,
+  memberIds: [],
+  recurring: 1,
+  remindEnabled: false,
+  remindDaysBefore: 3,
+  remindTime: '08:00',
+})
+
 const form = reactive(blank())
 
 watch(
@@ -90,6 +116,10 @@ watch(
             isLeap: a.isLeap,
             memberIds: Array.isArray(a.memberIds) ? [...a.memberIds] : [],
             recurring: a.recurring === 'ONCE' ? 0 : 1,
+            remindEnabled: (a.remindDaysBefore || 0) > 0,
+            remindDaysBefore: (a.remindDaysBefore || 0) > 0 ? a.remindDaysBefore : 3,
+            // 后端时刻带秒(LocalTime),时间选择器只认 HH:mm
+            remindTime: a.remindTime ? String(a.remindTime).slice(0, 5) : '08:00',
           }
         : blank(),
     )
@@ -98,8 +128,20 @@ watch(
 
 const onSave = async () => {
   if (!form.name) return ElMessage.warning(t('anniversary.nameRequired'))
-  if (form.id) await anniversaryApi.update(form.id, form)
-  else await anniversaryApi.create(form)
+  // 关闭提醒时两列提交空值,后端据此关闭调度
+  const payload = {
+    name: form.name,
+    calendar: form.calendar,
+    month: form.month,
+    day: form.day,
+    isLeap: form.isLeap,
+    memberIds: form.memberIds,
+    recurring: form.recurring,
+    remindDaysBefore: form.remindEnabled ? form.remindDaysBefore : 0,
+    remindTime: form.remindEnabled ? form.remindTime : null,
+  }
+  if (form.id) await anniversaryApi.update(form.id, payload)
+  else await anniversaryApi.create(payload)
   ElMessage.success(t('anniversary.saved'))
   visible.value = false
   emit('saved')

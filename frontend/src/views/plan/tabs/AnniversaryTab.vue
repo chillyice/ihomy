@@ -19,6 +19,10 @@
           }}
         </div>
         <div class="anni-name">{{ a.name }}</div>
+        <div v-if="a.remindDaysBefore > 0" class="anni-remind">
+          <el-icon><Bell /></el-icon>
+          <span>{{ t('anniversary.remindBadge', { n: a.remindDaysBefore }) }}</span>
+        </div>
         <div class="anni-owner">
           <el-icon><User /></el-icon>
           <span>{{ memberText(a) }}</span>
@@ -47,7 +51,7 @@
 // 纪念日列表:访客看演示家庭的公开数据(后端白名单),登录后可增删改
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { User, Edit, Delete } from '@element-plus/icons-vue'
+import { User, Edit, Delete, Bell } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { anniversaryApi, memberApi } from '@/api'
 import { useUserStore } from '@/stores/user'
@@ -153,6 +157,13 @@ defineExpose({ openEditor })
   gap: 4px;
   font-size: 13px;
   color: var(--color-text-secondary);
+}
+.anni-remind {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-primary);
 }
 .anni-actions {
   margin-top: 4px;

@@ -48,8 +48,9 @@ class FamilyPlanServiceTest {
     private final FamilyPlanTaskMapper taskMapper = mock(FamilyPlanTaskMapper.class);
     private final ReminderMapper reminderMapper = mock(ReminderMapper.class);
     private final SysUserMapper userMapper = mock(SysUserMapper.class);
+    private final HomeStatsService homeStatsService = mock(HomeStatsService.class);
     private final FamilyPlanService service =
-            new FamilyPlanService(planMapper, taskMapper, reminderMapper, userMapper);
+            new FamilyPlanService(planMapper, taskMapper, reminderMapper, userMapper, homeStatsService);
 
     /** 单测没有 MyBatis-Plus 启动扫描,手动注册实体信息,否则 LambdaWrapper 的列名解析会报错 */
     @BeforeAll
@@ -323,6 +324,7 @@ class FamilyPlanServiceTest {
         member.setId(USER);
         member.setNickname("妈妈");
         when(userMapper.selectBatchIds(any())).thenReturn(List.of(member));
+        when(homeStatsService.upcomingEvents(FAMILY, 3)).thenReturn(List.of());
 
         Map<String, Object> result = service.today(FAMILY);
 
@@ -347,6 +349,8 @@ class FamilyPlanServiceTest {
         assertThat(reminders.get(1).get("id")).isEqualTo(30L);
         assertThat(reminders.get(1).get("fromPlan")).isEqualTo(true);
         assertThat(reminders.get(0).get("fromPlan")).isEqualTo(false);
+        // 重要日期只做提示,与首页倒计时同源(本用例没有纪念日)
+        assertThat((List<?>) result.get("events")).isEmpty();
     }
 
     @Test

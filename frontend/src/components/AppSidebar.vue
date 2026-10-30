@@ -319,6 +319,7 @@ const onNotifyClick = async (n) => {
   else if (n.contentType === 'photo' && n.contentId) router.push('/album')
   else if (n.contentType === 'item') router.push('/kitchen/ingredients')
   else if (n.contentType === 'reminder') router.push('/plan?tab=today')
+  else if (n.contentType === 'anniversary') router.push('/plan?tab=anniversary')
 }
 const notifyType = (type) =>
   type === 'reply'
@@ -329,7 +330,9 @@ const notifyType = (type) =>
         ? t('notify.typeExpiry')
         : type === 'reminder'
           ? t('notify.typeReminder')
-          : t('notify.typeComment')
+          : type === 'anniversary'
+            ? t('notify.typeAnniversary')
+            : t('notify.typeComment')
 const notifyTime = (d) => formatRelativeTime(t, d)
 
 // 用户下拉

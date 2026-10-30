@@ -275,6 +275,8 @@ CREATE TABLE `family_anniversary` (
   `is_leap`     TINYINT      NOT NULL DEFAULT 0 COMMENT '农历是否闰月: 0非闰 1闰',
   `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
   `recurring`   VARCHAR(20)  NOT NULL DEFAULT 'YEARLY' COMMENT 'ONCE一次性/YEARLY每年',
+  `remind_days_before` SMALLINT DEFAULT NULL COMMENT '提前几天提醒（0或NULL=不提醒,1-30）',
+  `remind_time` TIME         DEFAULT NULL COMMENT '提醒时刻（空=默认08:00）',
   `created_by`  BIGINT       DEFAULT NULL COMMENT '创建人ID',
   `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',

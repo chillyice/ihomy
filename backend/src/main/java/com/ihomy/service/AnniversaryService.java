@@ -68,6 +68,8 @@ public class AnniversaryService {
             m.put("day", a.getDay());
             m.put("isLeap", a.getIsLeap());
             m.put("recurring", a.getRecurring());
+            m.put("remindDaysBefore", a.getRemindDaysBefore());
+            m.put("remindTime", a.getRemindTime());
             List<Long> ids = memberIdsByAnniv.getOrDefault(a.getId(), List.of());
             m.put("memberIds", ids);
             List<String> names = new ArrayList<>(ids.size());
@@ -129,7 +131,7 @@ public class AnniversaryService {
         anniversaryMapper.deleteById(id);
     }
 
-    /** DTO 字段落库,isLeap/recurring 缺省补默认值 */
+    /** DTO 字段落库,isLeap/recurring 缺省补默认值;提醒天数为 0/空表示关闭,两列一并置空 */
     private void apply(Anniversary a, AnniversaryDTO dto) {
         a.setName(dto.getName());
         a.setCalendar(dto.getCalendar());
@@ -137,6 +139,13 @@ public class AnniversaryService {
         a.setDay(dto.getDay());
         a.setIsLeap(dto.getIsLeap() == null ? 0 : dto.getIsLeap());
         a.setRecurring(DictConst.annRecurring(dto.getRecurring()));
+        Integer remindDays = dto.getRemindDaysBefore();
+        if (remindDays != null && (remindDays < 0 || remindDays > 30)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "提前提醒天数请填 1-30 天");
+        }
+        boolean remind = remindDays != null && remindDays > 0;
+        a.setRemindDaysBefore(remind ? remindDays : null);
+        a.setRemindTime(remind ? dto.getRemindTime() : null);
     }
 
     /** 关联成员去重、去空(保序),返回不可变前的可写列表 */

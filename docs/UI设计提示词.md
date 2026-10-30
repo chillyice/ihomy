@@ -350,6 +350,8 @@ color: #3A2E22;
 
 **游戏/播放页顶栏变体(`.game-topbar`,V9.72)**:宠物连连看/Flash 播放器顶部「返回+全屏」不适用 §11b 多选工具栏,改用 `PageToolbar root-class="game-topbar" :holder-margin="0" always`,右侧 `.game-top-actions`(`margin-left:auto;flex gap:8px`)放圆角小按钮(返回 ArrowLeft + 全屏 FullScreen);容器样式定义在 `PageToolbar.vue`、`.game-top-actions` 与暖居 `.gc-pin .game-topbar` 胞吐适配定义在 `main.css`,与物品定位 `.fp-topbar` 同构;全屏目标为 `.game-card`(非 `.page`)。
 
+**今日页签重要日期条(V10.91)**:今日页签顶部一条 `.event-strip.card`(padding 10/14、`margin-bottom:14px`),左侧 `Calendar` 图标走 `--color-primary`,右侧 1–3 条「距<名称>还有 N 天 / 今天就是<名称>」(13px,条目 `--color-text`、整体 `--color-text-secondary`,`flex-wrap` 自然换行),整条可点(`v-a11y-click`)跳纪念日页签;无纪念日整条不渲染。纪念日卡片在名称下补一行 `.anni-remind`(12px `--color-primary` + `Bell` 图标,「提前 N 天提醒」),仅开启提醒时出现。
+
 ## 11c. 音乐页(Music)
 
 - **结构**:Breadcrumb + 标准工具栏(11b 规范)+ 三 Tab(全部曲目/按专辑/歌单);Tab 项 15px/40px 高,active `#5c4c3d` + 下划线 `#c4a884` 2px `opacity:0.7`,无 nav 底边线;切 Tab 自动退出多选。
