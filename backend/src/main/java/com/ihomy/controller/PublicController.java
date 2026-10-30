@@ -16,6 +16,7 @@ import com.ihomy.mapper.PhotoMapper;
 import com.ihomy.mapper.WeatherLocationMapper;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.ActivityFeedService;
+import com.ihomy.service.CalendarService;
 import com.ihomy.service.HomeStatsService;
 import com.ihomy.service.MultiFamilyService;
 import com.ihomy.service.ProductStatService;
@@ -76,6 +77,7 @@ public class PublicController {
     private final WeatherService weatherService;
     private final SunService sunService;
     private final ProductStatService productStatService;
+    private final CalendarService calendarService;
     private final StringRedisTemplate redis;
     private final ObjectMapper mapper;
 
@@ -125,6 +127,13 @@ public class PublicController {
     private static double coord(Double v, double fallback, double bound) {
         if (v == null || !Double.isFinite(v)) return fallback;
         return Math.max(-bound, Math.min(bound, v));
+    }
+
+    @Operation(summary = "日历基础数据(某月农历/节气/传统节日/法定节假日与调休,免登录;month 缺省为当月)")
+    @GetMapping("/calendar")
+    public Result<Map<String, Object>> calendar(
+            @RequestParam(value = "month", required = false) String month) {
+        return Result.success(calendarService.month(month));
     }
 
     @Operation(summary = "天气(IP 定位或家庭偏好位置,和风天气 API,Key 未配返回 null)")

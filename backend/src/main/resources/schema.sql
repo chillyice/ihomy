@@ -842,7 +842,8 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('games',  '小游戏', 'icon-games',   '/games',  'content',  'left',  21, 1);
 -- 生活组:厨房恒为组内第 1 位;组内相对序生效,与 content 组数值交错无影响。
 -- 家庭组(V10.85):物品定位/家庭公告/智能家居/工具箱 从生活组拆出,侧栏固定排在生活之后;
--- 组内相对序 item < announcement(15) < iot(16) < tools(17)。照片瀑布已并入相册,不再单列为模块。
+-- 组内相对序 member(3) < item(4) < announcement(15) < iot(16) < tools(17)。照片瀑布已并入相册,不再单列为模块。
+-- member(V10.93):从 social 组并入家庭组并排在首位,「成员」分组随之消失。
 -- reminder/anniversary(V10.88):入口并入「家庭计划」三页签,置 enabled=0 保留行与路由映射兜底旧链接。
 INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`) VALUES
 ('item',      '物品定位', 'icon-item',      '/item',   'family', 'left',  4, 1),
@@ -859,7 +860,7 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('chat',      '聊天室',   'icon-chat',      '/chat',   'life', 'left', 16, 1),
 ('tools',     '工具箱',   'icon-tools',     '/tools',  'family', 'left', 17, 1),
 ('plant',     '花园',     'icon-plant',     '/tools/plant',  'life', 'left', 40, 0),
-('member', '家庭成员', 'icon-member', '/member', 'social',  'right',  1, 1),
+('member', '家庭成员', 'icon-member', '/member', 'family',  'right',  3, 1),
 ('storage','文件浏览','icon-storage','/storage/files','system',  'left',  16, 1);
 -- 停用行说明:`plant`(花园)入口在「小游戏」页(Games.vue → /tools/plant),首页/侧栏不重复占位;
 -- `tree`(家谱)已并入「家庭成员」页的图谱标签,停用独立入口(旧 /tree 仍重定向到 /member?tab=tree);
@@ -2605,3 +2606,68 @@ CREATE TABLE `family_book_budget` (
   PRIMARY KEY (`id`),
   KEY `idx_family` (`family_id`, `deleted`, `category`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭记账预算(按支出分类的月度预算)';
+
+-- ------------------------------------------------------------
+-- 71. 法定节假日与调休（V10.93 日程提醒重构阶段A）
+--     全局数据(不区分家庭):一行一天,type=HOLIDAY 放假 / WORKDAY 补班。
+--     按年维护:每年国办发布次年通知后补下一年的行;缺年份时日历照常显示
+--     农历/节日/节气,只是没有「休/班」角标(优雅降级,不报错)。
+--     2026 数据以国办通知为准(gov.cn/zhengce/zhengceku/202511/content_7047091.htm)。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_holiday`;
+CREATE TABLE `sys_holiday` (
+  `id`           BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `year`         SMALLINT    NOT NULL COMMENT '年份',
+  `holiday_date` DATE        NOT NULL COMMENT '日期',
+  `name`         VARCHAR(50) NOT NULL COMMENT '名称(如 国庆节、春节补班)',
+  `type`         VARCHAR(20) NOT NULL COMMENT 'HOLIDAY 放假 / WORKDAY 补班',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_date` (`holiday_date`),
+  KEY `idx_year` (`year`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='法定节假日与调休(全局,按年维护)';
+
+INSERT INTO `sys_holiday` (`year`, `holiday_date`, `name`, `type`) VALUES
+('2026', '2026-01-01', '元旦', 'HOLIDAY'),
+('2026', '2026-01-02', '元旦', 'HOLIDAY'),
+('2026', '2026-01-03', '元旦', 'HOLIDAY'),
+('2026', '2026-01-04', '元旦', 'WORKDAY'),
+('2026', '2026-02-14', '春节', 'WORKDAY'),
+('2026', '2026-02-15', '春节', 'HOLIDAY'),
+('2026', '2026-02-16', '春节', 'HOLIDAY'),
+('2026', '2026-02-17', '春节', 'HOLIDAY'),
+('2026', '2026-02-18', '春节', 'HOLIDAY'),
+('2026', '2026-02-19', '春节', 'HOLIDAY'),
+('2026', '2026-02-20', '春节', 'HOLIDAY'),
+('2026', '2026-02-21', '春节', 'HOLIDAY'),
+('2026', '2026-02-22', '春节', 'HOLIDAY'),
+('2026', '2026-02-23', '春节', 'HOLIDAY'),
+('2026', '2026-02-28', '春节', 'WORKDAY'),
+('2026', '2026-04-04', '清明节', 'HOLIDAY'),
+('2026', '2026-04-05', '清明节', 'HOLIDAY'),
+('2026', '2026-04-06', '清明节', 'HOLIDAY'),
+('2026', '2026-05-01', '劳动节', 'HOLIDAY'),
+('2026', '2026-05-02', '劳动节', 'HOLIDAY'),
+('2026', '2026-05-03', '劳动节', 'HOLIDAY'),
+('2026', '2026-05-04', '劳动节', 'HOLIDAY'),
+('2026', '2026-05-05', '劳动节', 'HOLIDAY'),
+('2026', '2026-05-09', '劳动节', 'WORKDAY'),
+('2026', '2026-06-19', '端午节', 'HOLIDAY'),
+('2026', '2026-06-20', '端午节', 'HOLIDAY'),
+('2026', '2026-06-21', '端午节', 'HOLIDAY'),
+('2026', '2026-09-20', '国庆节', 'WORKDAY'),
+('2026', '2026-09-25', '中秋节', 'HOLIDAY'),
+('2026', '2026-09-26', '中秋节', 'HOLIDAY'),
+('2026', '2026-09-27', '中秋节', 'HOLIDAY'),
+('2026', '2026-10-01', '国庆节', 'HOLIDAY'),
+('2026', '2026-10-02', '国庆节', 'HOLIDAY'),
+('2026', '2026-10-03', '国庆节', 'HOLIDAY'),
+('2026', '2026-10-04', '国庆节', 'HOLIDAY'),
+('2026', '2026-10-05', '国庆节', 'HOLIDAY'),
+('2026', '2026-10-06', '国庆节', 'HOLIDAY'),
+('2026', '2026-10-07', '国庆节', 'HOLIDAY'),
+('2026', '2026-10-10', '国庆节', 'WORKDAY');
+
+-- 日历用的字典组:休/班角标文案
+INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('holiday_type', 'HOLIDAY', '放假'),
+('holiday_type', 'WORKDAY', '补班');

@@ -51,6 +51,10 @@ public final class DictConst {
     public static final String MEDIA_EMBY = "EMBY";
     private static final String MEDIA_FALLBACK = MEDIA_JELLYFIN;
 
+    /** 法定节假日/调休类型 holiday_type(V10.93):sys_holiday.type */
+    public static final String HOLIDAY_TYPE_HOLIDAY = "HOLIDAY";
+    public static final String HOLIDAY_TYPE_WORKDAY = "WORKDAY";
+
     /** 家庭计划状态 plan_status */
     public static final String PLAN_ACTIVE = "ACTIVE";
     public static final String PLAN_DONE = "DONE";

@@ -2615,3 +2615,79 @@ INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUE
 ('wish_source', 'ANNIVERSARY', '纪念日'),
 ('wish_source', 'GAME',        '小游戏'),
 ('wish_source', 'PLAN',        '家庭计划');
+
+-- ------------------------------------------------------------
+-- V10.93 成员分组调整(2026-10-30)
+--   「家庭成员」从 social 组并入 family 组并排在组内首位(member 3 < item 4),
+--   「成员」分组随 NAV_GROUP_ORDER 去掉 social 而消失。
+--   幂等:只有仍停在旧分组时才更新,重复执行无副作用。改完须重启后端(模块内存缓存)。
+-- ------------------------------------------------------------
+UPDATE `sys_home_module` SET `category`='family', `sort_order`=3
+ WHERE `code`='member' AND `family_id` IS NULL
+   AND (`category` <> 'family' OR `sort_order` <> 3);
+
+-- ------------------------------------------------------------
+-- V10.93 日程提醒重构 阶段A:日历基础数据(2026-10-30)
+--   新增 sys_holiday(法定节假日与调休,全局按年维护)+ 2026 全年种子;
+--   农历/节气/传统节日由 Hutool 现算,不落库,缺年份时日历只少「休/班」角标。
+--   重复执行安全:建表 IF NOT EXISTS;种子 INSERT ... ON DUPLICATE KEY UPDATE。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `sys_holiday` (
+  `id`           BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `year`         SMALLINT    NOT NULL COMMENT '年份',
+  `holiday_date` DATE        NOT NULL COMMENT '日期',
+  `name`         VARCHAR(50) NOT NULL COMMENT '名称(如 国庆节、春节补班)',
+  `type`         VARCHAR(20) NOT NULL COMMENT 'HOLIDAY 放假 / WORKDAY 补班',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_date` (`holiday_date`),
+  KEY `idx_year` (`year`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='法定节假日与调休(全局,按年维护)';
+
+INSERT INTO `sys_holiday` (`year`, `holiday_date`, `name`, `type`) VALUES
+('2026', '2026-01-01', '元旦', 'HOLIDAY'),
+('2026', '2026-01-02', '元旦', 'HOLIDAY'),
+('2026', '2026-01-03', '元旦', 'HOLIDAY'),
+('2026', '2026-01-04', '元旦', 'WORKDAY'),
+('2026', '2026-02-14', '春节', 'WORKDAY'),
+('2026', '2026-02-15', '春节', 'HOLIDAY'),
+('2026', '2026-02-16', '春节', 'HOLIDAY'),
+('2026', '2026-02-17', '春节', 'HOLIDAY'),
+('2026', '2026-02-18', '春节', 'HOLIDAY'),
+('2026', '2026-02-19', '春节', 'HOLIDAY'),
+('2026', '2026-02-20', '春节', 'HOLIDAY'),
+('2026', '2026-02-21', '春节', 'HOLIDAY'),
+('2026', '2026-02-22', '春节', 'HOLIDAY'),
+('2026', '2026-02-23', '春节', 'HOLIDAY'),
+('2026', '2026-02-28', '春节', 'WORKDAY'),
+('2026', '2026-04-04', '清明节', 'HOLIDAY'),
+('2026', '2026-04-05', '清明节', 'HOLIDAY'),
+('2026', '2026-04-06', '清明节', 'HOLIDAY'),
+('2026', '2026-05-01', '劳动节', 'HOLIDAY'),
+('2026', '2026-05-02', '劳动节', 'HOLIDAY'),
+('2026', '2026-05-03', '劳动节', 'HOLIDAY'),
+('2026', '2026-05-04', '劳动节', 'HOLIDAY'),
+('2026', '2026-05-05', '劳动节', 'HOLIDAY'),
+('2026', '2026-05-09', '劳动节', 'WORKDAY'),
+('2026', '2026-06-19', '端午节', 'HOLIDAY'),
+('2026', '2026-06-20', '端午节', 'HOLIDAY'),
+('2026', '2026-06-21', '端午节', 'HOLIDAY'),
+('2026', '2026-09-20', '国庆节', 'WORKDAY'),
+('2026', '2026-09-25', '中秋节', 'HOLIDAY'),
+('2026', '2026-09-26', '中秋节', 'HOLIDAY'),
+('2026', '2026-09-27', '中秋节', 'HOLIDAY'),
+('2026', '2026-10-01', '国庆节', 'HOLIDAY'),
+('2026', '2026-10-02', '国庆节', 'HOLIDAY'),
+('2026', '2026-10-03', '国庆节', 'HOLIDAY'),
+('2026', '2026-10-04', '国庆节', 'HOLIDAY'),
+('2026', '2026-10-05', '国庆节', 'HOLIDAY'),
+('2026', '2026-10-06', '国庆节', 'HOLIDAY'),
+('2026', '2026-10-07', '国庆节', 'HOLIDAY'),
+('2026', '2026-10-10', '国庆节', 'WORKDAY')
+ON DUPLICATE KEY UPDATE
+  `year` = VALUES(`year`),
+  `name` = VALUES(`name`),
+  `type` = VALUES(`type`);
+
+INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('holiday_type', 'HOLIDAY', '放假'),
+('holiday_type', 'WORKDAY', '补班');
