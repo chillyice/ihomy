@@ -4,7 +4,16 @@
     <PageToolbar v-if="userStore.isLoggedIn" :card="false">
       <div class="tb-right">
         <el-date-picker v-model="monthModel" type="month" value-format="YYYY-MM" style="width: 140px" />
-        <el-button type="primary" @click="openEditor()">{{ $t('book.add') }}</el-button>
+        <!-- 记一笔为主操作;导入 CSV 与周期账目收进下拉,窄屏工具栏不会横向溢出 -->
+        <el-dropdown split-button type="primary" trigger="click" @click="openEditor()" @command="onToolCommand">
+          {{ $t('book.add') }}
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="import">{{ $t('book.import.entry') }}</el-dropdown-item>
+              <el-dropdown-item command="recurring">{{ $t('book.recurring.entry') }}</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
     </PageToolbar>
 
@@ -153,6 +162,10 @@
 
     <!-- 账户管理:改完账户回来刷新余额条(明细里的账户名不随账户改名回填,下次加载生效) -->
     <AccountManagerDialog v-model:visible="accountMgrVisible" @saved="loadAccounts" />
+
+    <!-- CSV 导入 / 周期账目:导入或自动生成都会新增流水,关窗后重拉本月明细与账户 -->
+    <ImportDialog v-model:visible="importVisible" @saved="load" />
+    <RecurringManagerDialog v-model:visible="recurringVisible" @saved="load" />
   </div>
 </template>
 
@@ -170,6 +183,8 @@ import { BOOK_CATEGORIES, unassignedCount } from '@/utils/bookLedger'
 import PageToolbar from '@/components/PageToolbar.vue'
 import AccountManagerDialog from './accounts/AccountManagerDialog.vue'
 import BudgetPanel from './budget/BudgetPanel.vue'
+import ImportDialog from './import/ImportDialog.vue'
+import RecurringManagerDialog from './recurring/RecurringManagerDialog.vue'
 import './bookPage.css'
 
 const props = defineProps({
@@ -190,7 +205,15 @@ const stats = ref({})
 const accounts = ref([])
 const budgetData = ref(null)
 const accountMgrVisible = ref(false)
+const importVisible = ref(false)
+const recurringVisible = ref(false)
 const editor = reactive({ visible: false, form: {} })
+
+// 工具栏下拉:导入 / 周期账目(主按钮仍是「记一笔」)
+const onToolCommand = (cmd) => {
+  if (cmd === 'import') importVisible.value = true
+  else if (cmd === 'recurring') recurringVisible.value = true
+}
 
 const monthModel = computed({
   get: () => props.month,

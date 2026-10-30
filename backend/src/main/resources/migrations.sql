@@ -2765,3 +2765,32 @@ UPDATE `sys_home_module` SET `title` = '日程提醒'
 WHERE `family_id` IS NULL
   AND `code` = 'plan'
   AND `title` <> '日程提醒';
+
+-- ------------------------------------------------------------
+-- V10.98 记账本进阶:周期账目模板(2026-10-30)
+--   family_book_recurring:按周期自动生成普通记账流水(房租/工资/定投等)。
+--   生成的记录就是 family_book_record 普通行,不改明细结构;模板只记「生成到哪天」
+--   (last_generated_date),每日定时任务按它条件更新抢占,重复跑不会重复插入。
+--   重复执行安全:CREATE TABLE IF NOT EXISTS。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `family_book_recurring` (
+  `id`                  BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`           BIGINT        NOT NULL COMMENT '所属家庭ID',
+  `type`                VARCHAR(20)   NOT NULL DEFAULT 'EXPENSE' COMMENT '类型: EXPENSE支出/INCOME收入',
+  `amount`              DECIMAL(10,2) NOT NULL COMMENT '每次金额(元)',
+  `category`            VARCHAR(30)   NOT NULL DEFAULT '其他' COMMENT '分类(与记账明细同名)',
+  `account_id`          BIGINT        DEFAULT NULL COMMENT '账户ID(可空=不挂账户)',
+  `remark`              VARCHAR(200)  DEFAULT NULL COMMENT '备注',
+  `period_type`         VARCHAR(20)   NOT NULL DEFAULT 'MONTHLY' COMMENT '周期: DAILY每日/WEEKLY每周/MONTHLY每月/YEARLY每年',
+  `start_date`          DATE          NOT NULL COMMENT '起始日期(同时是周期锚点:每周看星期、每月看日号、每年看月日)',
+  `end_date`            DATE          DEFAULT NULL COMMENT '结束日期(含当天,可空=长期有效)',
+  `enabled`             TINYINT       NOT NULL DEFAULT 1 COMMENT '是否启用: 1启用/0暂停',
+  `last_generated_date` DATE          DEFAULT NULL COMMENT '已生成到哪一天(空=从未生成)',
+  `created_by`          BIGINT        NOT NULL COMMENT '创建人ID',
+  `deleted`             TINYINT       NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0正常/1已删除',
+  `created_at`          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_scan` (`enabled`, `deleted`, `last_generated_date`),
+  KEY `idx_family` (`family_id`, `deleted`, `start_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭记账周期模板(自动生成固定收支)';

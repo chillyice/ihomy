@@ -73,7 +73,7 @@ Nginx 静态根指向 `frontend/dist`,构建即生效。
 
 - **root 仅初始化**:`mysql -uroot -p < schema.sql`(建库/建表/建账号/种子),只执行一次;本地 `.\scripts\start-db.ps1`(Docker 首启自动导入)。**业务运行用 `ihomy` 账号**(仅 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`,无 DDL),建 `localhost` 与 `%` 两个 host。
 - 生产 MySQL `validate_password` MEDIUM:密码须含特殊字符(避开 `' " \ $ |`,建议 `!@%^&*-_+=.`),改密顺序见 踩坑速查 §2.7。
-- **88 张表**,前缀:`sys_` 27(系统/账号/权限/配置/存储)、`report_` 5(报表/日志)、`family_` 34(家庭事务)、`content_` 21(内容数据)、`game_` 1(games 域)。完整清单见 需求 §6.2。
+- **89 张表**,前缀:`sys_` 27(系统/账号/权限/配置/存储)、`report_` 5(报表/日志)、`family_` 35(家庭事务)、`content_` 21(内容数据)、`game_` 1(games 域)。完整清单见 需求 §6.2。
   - 命名:家庭事务 `family_`;内容 `content_`;账号/权限/配置/存储 `sys_`;报表/日志 `report_`;
   - 游戏域顶层前缀 `game_`,格式 `game_<code>_<module>_<entity>`(模块层仅当 ≥3 张表/独立聚合根时才建);注册表 `game_info`,小游戏页只读注册表,**加游戏=插一行不改组件**。家圃时光 V2 已迁独立仓 `home_garden_moments`,本仓只留集成(`game_info` + 游戏库入口)。
 - **结构变更双文件**:同时改 `schema.sql`(全量)与 `migrations.sql`(增量、**幂等**),并按 CI 同路径做空库全量导入实测(`migrations` 跑通 ≠ `schema.sql` 可用,踩坑速查 §7.4)。
@@ -83,7 +83,7 @@ Nginx 静态根指向 `frontend/dist`,构建即生效。
 - **新增 `@RequirePermission` 接口前**:auth_code 必须进 `sys_auth` + `sys_role_auth` 种子(OWNER 豁免、MEMBER 显式授权);注解**只写方法上**,类级不生效(踩坑速查 §2.14)。
 - **索引规范(强制)**:列表查询的 WHERE+ORDER BY 必须落在同一复合索引内,等值字段在前、范围/排序在后,`deleted` 进索引;混向排序给索引列加 `DESC`;新增表/接口先 `EXPLAIN`(踩坑速查 §8.4)。
 - **引用开源依赖必须登记** `sys_oss_component`(NPM/MAVEN 交 Renovate;SERVICE 走内部升级方案);`current_version` 记锁定版本,不写区间下限。**升级两条通道**:台账「升级方案」给可执行手工步骤(NPM 装包+验证 / MAVEN 改 pom+`mvnw` / SERVICE 按部署方式),自动开 PR 只是可选路径——仓库没装 Renovate 时该通道恒失败,别当 bug 修(踩坑速查 §7.14)。细则见 需求 §4.6.10。
-- **记账账户余额不落库**:`balance = 期初 + 收入 − 支出 − 转出 + 转入`,前后端同一口径(前端 `utils/bookLedger.js` 可复算对账);`family_book_record` 三个账户列可空 = 历史未归属,只提示不迁移;总账 `byMonth` 只含有记录的月份、前端补 12 槽(踩坑速查 §8.5,功能口径见 需求 §4.5.5)。**预算同理只存额度**(`family_book_budget`,一个分类一条),当月已花/超支实时汇总;净资产 = 账户资金 + 理财持仓本金 − 贷款剩余本金(贷款走 `utils/loan.js` 唯一计算源)。
+- **记账账户余额不落库**:`balance = 期初 + 收入 − 支出 − 转出 + 转入`,前后端同一口径(前端 `utils/bookLedger.js` 可复算对账);`family_book_record` 三个账户列可空 = 历史未归属,只提示不迁移;总账 `byMonth` 只含有记录的月份、前端补 12 槽(踩坑速查 §8.5,功能口径见 需求 §4.5.5)。**预算同理只存额度**(`family_book_budget`,一个分类一条),当月已花/超支实时汇总;净资产 = 账户资金 + 理财持仓本金 − 贷款剩余本金(贷款走 `utils/loan.js` 唯一计算源,首页资产卡与总账页共用 `utils/bookLedger.netWorth`)。**周期账目(`family_book_recurring`)到点生成的是普通 `family_book_record`**,统计/总账/预算对比全部沿用既有口径,不改明细结构;日期推算唯一来源 `common/BookRecurringSchedule`(月度短月取月末、每年 2/29 平年取 2/28、停机补跑≤90 天),生成靠 `last_generated_date` 条件更新抢占 + 同事务插入保证幂等(踩坑速查 §8.6)。银行流水 CSV 导入同样落普通流水(流式解析、2MB/2000 行上限、逐行报错)。
 
 ## 代码结构
 
@@ -191,9 +191,9 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 ## 验证基线
 
-- 后端全绿:`.\mvnw.cmd -B clean package`(233 tests,纯逻辑不起 Spring)。
-- 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(587 passed)+ `npm run format:check`(全树遗留未格式化:`views/BitPouch.vue`、`utils/packetDecode.js`+`.spec.js`、`views/bitpouch/panels/PacketPanel.vue`、`views/Chillyice.vue`、`views/ops/tabs/OpsKada.vue`;**本次改动的文件必须 `prettier --write` 后通过**)。
-- 构建:入口 chunk 基线 **518.25KB / gzip 213.93KB**(V10.95 收尾);**vite 报的是字符数不是字节数**,别拿 `ls -la` 比;历史数字见 变更归档。
+- 后端全绿:`.\mvnw.cmd -B clean package`(281 tests,纯逻辑不起 Spring)。
+- 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(652 passed)+ `npm run format:check`(全树遗留未格式化:`views/BitPouch.vue`、`utils/packetDecode.js`+`.spec.js`、`views/bitpouch/panels/PacketPanel.vue`、`views/Chillyice.vue`、`views/ops/tabs/OpsKada.vue`;**本次改动的文件必须 `prettier --write` 后通过**)。
+- 构建:入口 chunk 基线 **531.25KB / gzip 219.10KB**(V10.98 收尾);**vite 报的是字符数不是字节数**,别拿 `ls -la` 比;历史数字见 变更归档。
 - 一致性:`bash scripts/doc-drift-check.sh` 全 [OK];`gen-code-map.sh --check`、`doc-index.sh --check` 无漂移。
 - 接口测试在仓库外 `..\autotest_framework`(`pytest -m api`,37 passed)。
 
@@ -231,7 +231,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 ## 文档与服务
 
-- 索引:`docs/README.md`(每份文档一句话 + 阅读顺序);`docs/架构设计.md`(请求怎么走/关键机制);`docs/代码地图.md`(代码定位);`docs/归档索引.md`(历史反查);`test/cases/功能测试用例.md`(475 条)。
+- 索引:`docs/README.md`(每份文档一句话 + 阅读顺序);`docs/架构设计.md`(请求怎么走/关键机制);`docs/代码地图.md`(代码定位);`docs/归档索引.md`(历史反查);`test/cases/功能测试用例.md`(489 条)。
 - `scripts/`:setup / start-all / restart-all / start-db / doc-drift-check / gen-code-map / doc-index / prod-backup / prod-restore / db_diff / ci-jellyfin-setup / docs-gen / soft-copyright(软著 PDF 生成)。
 - 本机环境:JDK 21、Node 20、MySQL 8、python-docx;Maven 用 Wrapper(或 temp 3.9.9);Redis 未装时用 Docker/Memurai。
 - **代码事实以 `backend/src/main/java` + `resources/schema.sql` 为准**;文档与代码冲突时先改文档再改代码,或先读 `docs/踩坑速查.md` 确认不是已知取舍。

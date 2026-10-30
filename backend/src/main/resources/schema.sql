@@ -2694,3 +2694,35 @@ INSERT INTO `sys_holiday` (`year`, `holiday_date`, `name`, `type`) VALUES
 INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
 ('holiday_type', 'HOLIDAY', '放假'),
 ('holiday_type', 'WORKDAY', '补班');
+
+-- ------------------------------------------------------------
+-- 72. 家庭记账周期模板（V10.98 记账本进阶）
+--     按周期（每日/每周/每月/每年）自动生成普通记账流水：房租、工资、定投等固定收支。
+--     生成出来的就是 family_book_record 里的普通记录，统计/总账/预算对比全部沿用既有口径，
+--     不改记账明细结构；模板本身只管「什么时候再生成一笔」。
+--     last_generated_date = 已生成到哪一天（判定幂等的唯一依据，生成前用条件更新抢占）；
+--     首次生成从 start_date 起算，停机补跑最多回溯 90 天；月度 31 号在短月取月末，
+--     每年 2/29 在平年取 2/28（与贷款期次同一口径思路，纯函数见 common/BookRecurringSchedule）。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_book_recurring`;
+CREATE TABLE `family_book_recurring` (
+  `id`                  BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`           BIGINT        NOT NULL COMMENT '所属家庭ID',
+  `type`                VARCHAR(20)   NOT NULL DEFAULT 'EXPENSE' COMMENT '类型: EXPENSE支出/INCOME收入',
+  `amount`              DECIMAL(10,2) NOT NULL COMMENT '每次金额(元)',
+  `category`            VARCHAR(30)   NOT NULL DEFAULT '其他' COMMENT '分类(与记账明细同名)',
+  `account_id`          BIGINT        DEFAULT NULL COMMENT '账户ID(可空=不挂账户)',
+  `remark`              VARCHAR(200)  DEFAULT NULL COMMENT '备注',
+  `period_type`         VARCHAR(20)   NOT NULL DEFAULT 'MONTHLY' COMMENT '周期: DAILY每日/WEEKLY每周/MONTHLY每月/YEARLY每年',
+  `start_date`          DATE          NOT NULL COMMENT '起始日期(同时是周期锚点:每周看星期、每月看日号、每年看月日)',
+  `end_date`            DATE          DEFAULT NULL COMMENT '结束日期(含当天,可空=长期有效)',
+  `enabled`             TINYINT       NOT NULL DEFAULT 1 COMMENT '是否启用: 1启用/0暂停',
+  `last_generated_date` DATE          DEFAULT NULL COMMENT '已生成到哪一天(空=从未生成)',
+  `created_by`          BIGINT        NOT NULL COMMENT '创建人ID',
+  `deleted`             TINYINT       NOT NULL DEFAULT 0 COMMENT '逻辑删除: 0正常/1已删除',
+  `created_at`          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`          DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_scan` (`enabled`, `deleted`, `last_generated_date`),
+  KEY `idx_family` (`family_id`, `deleted`, `start_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭记账周期模板(自动生成固定收支)';

@@ -373,6 +373,20 @@ export const bookApi = {
   createBudget: (data) => request.post('/book/budget', data),
   updateBudget: (id, data) => request.put(`/book/budget/${id}`, data),
   removeBudget: (id) => request.delete(`/book/budget/${id}`),
+  // 周期模板(房租/工资等固定收支):到点自动生成普通流水,可暂停/恢复,重复触发不会重复生成
+  recurring: () => request.get('/book/recurring'),
+  createRecurring: (data) => request.post('/book/recurring', data),
+  updateRecurring: (id, data) => request.put(`/book/recurring/${id}`, data),
+  removeRecurring: (id) => request.delete(`/book/recurring/${id}`),
+  setRecurringEnabled: (id, enabled) => request.put(`/book/recurring/${id}/enabled`, null, { params: { enabled } }),
+  runRecurring: () => request.post('/book/recurring/run'),
+  // 银行流水 CSV 导入:列号从 0 起,-1 表示不映射(日期/金额必填),服务端会再解析一遍并逐行校验
+  importCsv: (file, mapping) => {
+    const form = new FormData()
+    form.append('file', file)
+    Object.entries(mapping).forEach(([key, value]) => form.append(key, String(value)))
+    return request.post('/book/import', form, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 0 })
+  },
 }
 
 // 家庭理财(存款/理财/基金持仓):本金不计支出,收益在赎回时按勾选决定是否记一笔收入

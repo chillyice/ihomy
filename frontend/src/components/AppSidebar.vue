@@ -17,6 +17,18 @@
 
     <!-- 导航列表 -->
     <nav class="sidebar-nav">
+      <!-- 编辑态:没有对应导航项的组件(资产卡)从这里拖入首页 -->
+      <div v-if="appStore.homeEditMode" class="nav-group">
+        <div v-if="!collapsed" class="group-label">{{ $t('home.dashboard.widgetLibrary') }}</div>
+        <div v-for="w in EXTRA_WIDGETS" :key="w.type" class="nav-item-wrap">
+          <div class="nav-item widget-src" :title="extraLabel(w)" v-a11y-click @mousedown="startWidgetDrag(w.type, $event)">
+            <span class="nav-icon"
+              ><el-icon><component :is="w.icon" /></el-icon
+            ></span>
+            <span v-if="!collapsed" class="nav-text">{{ extraLabel(w) }}</span>
+          </div>
+        </div>
+      </div>
       <div v-for="g in groupedModules" :key="g.category" class="nav-group">
         <div v-if="!collapsed && g.items.length" class="group-label">{{ g.label }}</div>
         <div v-for="m in g.items" :key="m.code" class="nav-item-wrap">
@@ -201,7 +213,7 @@ import { useUserStore } from '@/stores/user'
 import { useWidgetDrag } from '@/utils/useWidgetDrag'
 import { notificationApi, authApi, opsApi } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Sunny, Moon, Bell, Fold, Expand, ArrowRight, Check, WarningFilled } from '@element-plus/icons-vue'
+import { Sunny, Moon, Bell, Fold, Expand, ArrowRight, Check, WarningFilled, Wallet } from '@element-plus/icons-vue'
 import { iconComp, buildNavGroups, isActive } from '@/utils/navModules'
 import { formatRelativeTime } from '@/utils/datetime'
 import { todayString } from '@/utils/scheduleCalendar'
@@ -231,6 +243,10 @@ const WIDGET_MAP = {
   album: 'album',
 }
 const widgetType = (code) => WIDGET_MAP[code] || null
+
+// 没有对应导航项的首页组件(资产卡):编辑态在侧栏顶部给一个可拖入的组件库入口
+const EXTRA_WIDGETS = [{ type: 'asset', labelKey: 'home.dashboard.asset', icon: Wallet }]
+const extraLabel = (w) => t(w.labelKey)
 
 // 注入全局光影状态(与 SunLightLayer 共享同一实例);导航栏只用台灯开关,其余设置在 Settings 页
 const sunLight = inject(SUN_LIGHT_KEY)

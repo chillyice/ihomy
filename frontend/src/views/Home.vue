@@ -288,6 +288,33 @@
             <router-link to="/wish" class="card-more">{{ $t('home.dashboard.viewAll') }}</router-link>
           </template>
 
+          <!-- 资产:净资产 = 账户资金 + 理财持仓本金 − 贷款剩余本金(口径走 utils/bookLedger.netWorth) -->
+          <template v-else-if="w.id === 'asset'">
+            <div class="card-head">{{ $t('home.dashboard.asset') }}</div>
+            <div class="asset-body">
+              <div class="asset-net">
+                <span class="asset-net-label">{{ $t('home.dashboard.assetNet') }}</span>
+                <span class="asset-net-val" :title="$t('home.dashboard.assetNote')">¥{{ formatYuan(assetCard.net) }}</span>
+              </div>
+              <div v-if="tierOf(w) !== 'S'" class="asset-breakdown">
+                <div class="asset-row">
+                  <span>{{ $t('home.dashboard.assetFund') }}</span
+                  ><span>¥{{ formatYuan(assetCard.fund) }}</span>
+                </div>
+                <div class="asset-row">
+                  <span>{{ $t('home.dashboard.assetInvest') }}</span
+                  ><span>¥{{ formatYuan(assetCard.invest) }}</span>
+                </div>
+                <div class="asset-row" :class="{ 'is-muted': assetCard.debtMissing }">
+                  <span>{{ $t('home.dashboard.assetDebt') }}</span>
+                  <span>{{ assetCard.debtMissing ? '—' : `−¥${formatYuan(assetCard.debt)}` }}</span>
+                </div>
+              </div>
+              <div v-if="assetCard.debtMissing" class="asset-note">{{ $t('home.dashboard.assetNoLoan') }}</div>
+            </div>
+            <router-link to="/book?tab=ledger" class="card-more">{{ $t('home.dashboard.assetDetail') }}</router-link>
+          </template>
+
           <!-- 本月收支 + 理财持仓(本金不计收支,单独一行,点了直达理财页签) -->
           <template v-else-if="w.id === 'finance'">
             <div class="card-head">{{ $t('home.dashboard.finance') }}</div>
@@ -400,7 +427,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
 import { useI18n } from 'vue-i18n'
-import { publicApi, taskApi, pointsApi, planApi, bookApi, financeApi, wishApi, itemApi, kitchenApi } from '@/api'
+import { publicApi, taskApi, pointsApi, planApi, bookApi, financeApi, loanApi, wishApi, itemApi, kitchenApi } from '@/api'
 import { useWeatherBg } from '@/composables/useWeatherBg'
 import { useDaily } from '@/composables/useDaily'
 import { buildAgenda } from '@/utils/agenda'
@@ -415,6 +442,7 @@ import { useWidgetDrag } from '@/utils/useWidgetDrag'
 import { feedTypeLabel as feedTypeLabelOf, feedSummary as feedSummaryOf } from '@/utils/feed'
 import { formatYuan } from '@/utils/money'
 import { summarizePortfolio } from '@/utils/finance'
+import { resolveAssetCard } from '@/utils/assetCard'
 import { formatRelativeTime } from '@/utils/datetime'
 import { pickDefaultFloor } from '@/utils/floorPlanGeom'
 import { dictText } from '@/utils/dict'
@@ -508,6 +536,28 @@ const financeHolding = computed(() => {
   const s = summarizePortfolio(financeList.value)
   return { principal: s.holdingPrincipal, count: s.holdingCount }
 })
+// 资产卡:账户资金 + 理财持仓本金 − 贷款剩余本金(三项分别来自记账账户/理财/贷款接口)。
+// 无 loan:view 或取数失败时贷款按 0 处理并在卡片注明缺口,不能把缺省当真实净资产展示。
+const assetAccounts = ref([])
+const assetLoans = ref(null)
+const canViewLoan = computed(() => userStore.isOwner || userStore.hasPerm('loan:view'))
+const assetCard = computed(() =>
+  resolveAssetCard({
+    accounts: assetAccounts.value,
+    products: financeList.value,
+    loans: assetLoans.value,
+    canViewLoan: canViewLoan.value,
+  }),
+)
+const loadAssets = async () => {
+  if (!userStore.isLoggedIn) return
+  const [accounts, loans] = await Promise.all([
+    bookApi.accounts().catch(() => []),
+    canViewLoan.value ? loanApi.list().catch(() => null) : Promise.resolve(null),
+  ])
+  assetAccounts.value = Array.isArray(accounts) ? accounts : []
+  assetLoans.value = Array.isArray(loans) ? loans : null
+}
 const wishes = ref([])
 const itemKeyword = ref('')
 const searchResults = ref([])
@@ -744,6 +794,8 @@ const DEFAULT_LAYOUT = [
   { id: 'recipe', col: 8, row: 3, w: 2, h: 2 },
   { id: 'wish', col: 10, row: 3, w: 2, h: 2 },
   { id: 'finance', col: 8, row: 5, w: 2, h: 2 },
+  // 资产卡:只进默认布局(新用户/恢复默认),已有用户的 localStorage 布局不强插
+  { id: 'asset', col: 10, row: 5, w: 2, h: 2 },
 ].map((g) => ({ id: g.id, x: g.col / COLS, y: g.row / ROWS, w: g.w / COLS, h: g.h / ROWS }))
 
 // 布局键加版本号:v3 起组件改为自由布局(x/y/w/h 画布比例),旧 v1/v2 栅格布局语义不兼容,直接丢弃
@@ -760,6 +812,7 @@ const WIDGET_DEFAULT_SIZE = {
   recipe: { w: 2, h: 2 },
   wish: { w: 2, h: 2 },
   finance: { w: 2, h: 2 },
+  asset: { w: 2, h: 2 },
   task: { w: 3, h: 3 },
   daily: { w: 2, h: 3 },
 }
@@ -839,7 +892,7 @@ const widgets = ref((loadLayout() || DEFAULT_LAYOUT).map(makeWidget))
 
 const visibleWidgets = computed(() =>
   widgets.value.filter((w) => {
-    if (['today', 'task', 'search', 'finance'].includes(w.id)) return userStore.isLoggedIn
+    if (['today', 'task', 'search', 'finance', 'asset'].includes(w.id)) return userStore.isLoggedIn
     if (w.id === 'anni') return anniversaries.value.length > 0
     // 愿望单对游客开放(后端返回演示家庭的公开愿望);无数据时不展示,避免留一张空卡
     if (w.id === 'wish') return wishes.value.length > 0
@@ -854,6 +907,16 @@ const resetLayout = () => {
   saveLayout()
   ElMessage.success(t('warm.layoutReset'))
 }
+
+// 资产卡在布局里且已登录时才取数(拖入/恢复默认/登录完成都会触发);游客不发请求,卡片本身也不渲染
+const hasAsset = computed(() => widgets.value.some((w) => w.id === 'asset'))
+watch(
+  [hasAsset, () => userStore.isLoggedIn],
+  ([on, loggedIn]) => {
+    if (on && loggedIn) loadAssets()
+  },
+  { immediate: true },
+)
 
 // ========== 每日一图 / 每日知识(公开卡片,右下角加号加入;偏好读设置页 ihomy-daily) ==========
 const {
@@ -1150,6 +1213,7 @@ const WIDGET_LABEL_KEYS = {
   search: 'home.dashboard.searchItems',
   wish: 'home.dashboard.wishlist',
   finance: 'home.dashboard.finance',
+  asset: 'home.dashboard.asset',
   album: 'home.dashboard.album',
   daily: 'daily.image',
 }
@@ -2011,6 +2075,52 @@ html.dark .recipe-name {
   display: flex;
   gap: 20px;
   padding: 4px 18px 8px;
+}
+/* 资产卡:净资产一行大字 + 三行拆分(小档只留净资产,避免挤) */
+.asset-body {
+  padding: 4px 18px 8px;
+  min-height: 0;
+  overflow: hidden;
+}
+.asset-net {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.asset-net-label {
+  font-size: 10px;
+  opacity: 0.4;
+  color: #9a9088;
+}
+.asset-net-val {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+.asset-breakdown {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.asset-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-text-secondary, #999);
+  font-variant-numeric: tabular-nums;
+}
+.asset-row.is-muted {
+  opacity: 0.6;
+}
+.asset-note {
+  margin-top: 6px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: #b5a98c;
 }
 .fin-item {
   display: flex;
