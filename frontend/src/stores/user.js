@@ -14,6 +14,24 @@ export const useUserStore = defineStore('user', {
     isLoggedIn: (state) => !!state.token,
     // 当前家庭角色是否为家长(OWNER 权限豁免的依据)
     isOwner: (state) => state.userInfo?.role === 'OWNER',
+    // 记账本档位(登录/续期时由后端下发 NONE/READ/WRITE/MANAGE):
+    // 老缓存没有该字段时按角色兜底——家长可管理、其他成员可记账(与后端默认口径一致)
+    bookLevel: (state) => {
+      if (!state.token) return 'NONE'
+      return state.userInfo?.bookLevel || (state.userInfo?.role === 'OWNER' ? 'MANAGE' : 'WRITE')
+    },
+    // 能否查看账本/总账/理财与首页收支卡、资产卡
+    canReadBook() {
+      return ['READ', 'WRITE', 'MANAGE'].includes(this.bookLevel)
+    },
+    // 能否记账(记一笔/导入/周期生成);改删他人另看 canManageBook
+    canWriteBook() {
+      return ['WRITE', 'MANAGE'].includes(this.bookLevel)
+    },
+    // 能否改删他人账目与账户/预算/周期/理财配置
+    canManageBook() {
+      return this.bookLevel === 'MANAGE'
+    },
     // 是否为运维管理员(V3.8:仅能访问 /ops 运维页;与家庭角色正交,可同时是某家庭 OWNER + 系统级 OPS)
     isOps: (state) => !!state.userInfo?.isOps,
     // 是否为纯 OPS 账号(只有 OPS 角色,没有家庭角色,不显示侧边栏)
@@ -74,6 +92,12 @@ export const useUserStore = defineStore('user', {
       this.userInfo = data.user
       localStorage.setItem('userInfo', JSON.stringify(data.user))
       return data
+    },
+    // 同步账本档位(账本页每次进入都向 /book/permission 取一次最新值,家长改档后无需重新登录)
+    setBookLevel(level) {
+      if (!this.userInfo || !level) return
+      this.userInfo = { ...this.userInfo, bookLevel: level }
+      localStorage.setItem('userInfo', JSON.stringify(this.userInfo))
     },
     setToken(token, refreshToken) {
       this.token = token

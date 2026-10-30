@@ -1563,6 +1563,27 @@ export default {
       portfolioEmpty: '还没有持仓',
       unbounded: '—',
     },
+    // 账本权限(家长按成员配置可见与读写档位)
+    perm: {
+      entry: '账本权限',
+      title: '账本权限',
+      hint: '默认家庭成员都能记账；家长可以按成员单独设置，家长本人始终可管理。',
+      ownerTag: '家长',
+      empty: '还没有其他家庭成员',
+      noAccess: '家长还没有向你开放家庭账本，需要查看请联系家长',
+      levels: {
+        NONE: '不可见',
+        READ: '只读',
+        WRITE: '可记账',
+        MANAGE: '可管理',
+      },
+      levelDesc: {
+        NONE: '看不到账本与首页收支卡',
+        READ: '可以查看，不能记账或修改',
+        WRITE: '可以记账，改删仅限自己记的',
+        MANAGE: '可以改删他人账目与全部设置',
+      },
+    },
   },
   settings: {
     title: '设置',

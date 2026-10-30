@@ -180,10 +180,10 @@ public class BookService {
         return r;
     }
 
-    /** 改账:仅记录人本人或家长可改,且须同一家庭;账户按「最终类型 + 覆盖后的账户列」整体校验 */
-    public void update(Long id, Long familyId, Long userId, boolean isOwner, BookDTO dto) {
+    /** 改账:仅记录人本人或可管理账本者(家长/被授予可管理档位)可改,且须同一家庭;账户按「最终类型 + 覆盖后的账户列」整体校验 */
+    public void update(Long id, Long familyId, Long userId, boolean canManage, BookDTO dto) {
         BookRecord r = require(id, familyId);
-        if (!r.getCreatedBy().equals(userId) && !isOwner) {
+        if (!r.getCreatedBy().equals(userId) && !canManage) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
         String type = dto.getType() != null ? DictConst.bookType(dto.getType()) : r.getType();
@@ -212,10 +212,10 @@ public class BookService {
                 .set(BookRecord::getToAccountId, refs.toAccountId()));
     }
 
-    /** 删除账目:仅记录人本人或家长 */
-    public void delete(Long id, Long familyId, Long userId, boolean isOwner) {
+    /** 删除账目:仅记录人本人或可管理账本者 */
+    public void delete(Long id, Long familyId, Long userId, boolean canManage) {
         BookRecord r = require(id, familyId);
-        if (!r.getCreatedBy().equals(userId) && !isOwner) {
+        if (!r.getCreatedBy().equals(userId) && !canManage) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
         bookMapper.deleteById(id);

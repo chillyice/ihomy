@@ -102,10 +102,10 @@ public class BookRecurringService {
         return r;
     }
 
-    /** 编辑模板:仅创建人本人或家长;改动周期锚点后从新锚点续算(已生成日保留) */
-    public void update(Long id, Long familyId, Long userId, boolean isOwner, BookRecurringDTO dto) {
+    /** 编辑模板:仅创建人本人或可管理账本者;改动周期锚点后从新锚点续算(已生成日保留) */
+    public void update(Long id, Long familyId, Long userId, boolean canManage, BookRecurringDTO dto) {
         BookRecurring r = require(id, familyId);
-        if (!r.getCreatedBy().equals(userId) && !isOwner) {
+        if (!r.getCreatedBy().equals(userId) && !canManage) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
         applyForm(r, familyId, dto, false);
@@ -121,9 +121,9 @@ public class BookRecurringService {
     }
 
     /** 暂停 / 恢复:恢复时不补暂停期间的期次(已生成日推到昨天,今天起继续) */
-    public void setEnabled(Long id, Long familyId, Long userId, boolean isOwner, Integer enabled) {
+    public void setEnabled(Long id, Long familyId, Long userId, boolean canManage, Integer enabled) {
         BookRecurring r = require(id, familyId);
-        if (!r.getCreatedBy().equals(userId) && !isOwner) {
+        if (!r.getCreatedBy().equals(userId) && !canManage) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
         int value = normalizeEnabled(enabled);
@@ -140,10 +140,10 @@ public class BookRecurringService {
         recurringMapper.update(null, w);
     }
 
-    /** 删除模板:仅创建人本人或家长;已生成的流水保留(它们就是普通流水) */
-    public void delete(Long id, Long familyId, Long userId, boolean isOwner) {
+    /** 删除模板:仅创建人本人或可管理账本者;已生成的流水保留(它们就是普通流水) */
+    public void delete(Long id, Long familyId, Long userId, boolean canManage) {
         BookRecurring r = require(id, familyId);
-        if (!r.getCreatedBy().equals(userId) && !isOwner) {
+        if (!r.getCreatedBy().equals(userId) && !canManage) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
         recurringMapper.deleteById(id);

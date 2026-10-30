@@ -4,8 +4,15 @@
     <PageToolbar v-if="userStore.isLoggedIn" :card="false">
       <div class="tb-right">
         <el-date-picker v-model="monthModel" type="month" value-format="YYYY-MM" style="width: 140px" />
-        <!-- 记一笔为主操作;导入 CSV 与周期账目收进下拉,窄屏工具栏不会横向溢出 -->
-        <el-dropdown split-button type="primary" trigger="click" @click="openEditor()" @command="onToolCommand">
+        <!-- 记一笔为主操作;导入 CSV 与周期账目收进下拉,窄屏工具栏不会横向溢出(只读档位不显示) -->
+        <el-dropdown
+          v-if="userStore.canWriteBook"
+          split-button
+          type="primary"
+          trigger="click"
+          @click="openEditor()"
+          @command="onToolCommand"
+        >
           {{ $t('book.add') }}
           <template #dropdown>
             <el-dropdown-menu>
@@ -32,7 +39,9 @@
         </div>
         <div class="bs-actions">
           <span class="bs-hint">{{ $t('book.account.unassignedCount', { n: unassigned }) }}</span>
-          <el-button size="small" @click="accountMgrVisible = true">{{ $t('book.account.manage') }}</el-button>
+          <el-button v-if="userStore.canWriteBook" size="small" @click="accountMgrVisible = true">{{
+            $t('book.account.manage')
+          }}</el-button>
         </div>
       </div>
 
@@ -69,7 +78,7 @@
                 </div>
               </div>
               <div class="record-amount" :class="typeCls(r)">{{ amountText(r) }}</div>
-              <div class="record-actions">
+              <div v-if="canEditRow(r)" class="record-actions">
                 <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
                   <el-button size="small" text @click="openEditor(r)"
                     ><el-icon><Edit /></el-icon
@@ -88,7 +97,7 @@
 
         <!-- 预算与分类排行:预算卡在上,超支一眼可见 -->
         <div class="side">
-          <BudgetPanel :data="budgetData" @saved="loadBudget" />
+          <BudgetPanel :data="budgetData" :readonly="!userStore.canWriteBook" @saved="loadBudget" />
 
           <!-- 分类排行 -->
           <div class="cats card">
@@ -222,6 +231,9 @@ const monthModel = computed({
 
 const unassigned = computed(() => unassignedCount(records.value))
 const money = (v) => Number(v ?? 0).toFixed(2)
+
+// 行内改删:可写档位下,本人记的或可管理账本者才能改;只读档位整列隐藏(后端仍逐条校验)
+const canEditRow = (r) => userStore.canWriteBook && (userStore.canManageBook || r.createdBy === userStore.userInfo?.id)
 
 const catText = (r) => (r.type === 'INCOME' ? t('book.type.INCOME') : r.type === 'TRANSFER' ? t('book.type.TRANSFER') : r.category)
 

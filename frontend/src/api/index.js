@@ -380,6 +380,9 @@ export const bookApi = {
   removeRecurring: (id) => request.delete(`/book/recurring/${id}`),
   setRecurringEnabled: (id, enabled) => request.put(`/book/recurring/${id}/enabled`, null, { params: { enabled } }),
   runRecurring: () => request.post('/book/recurring/run'),
+  // 账本权限:本人档位(家长另带各成员档位),家长可按人设置 NONE/READ/WRITE/MANAGE
+  permission: () => request.get('/book/permission'),
+  setPermission: (userId, level) => request.put(`/book/permission/${userId}`, { level }),
   // 银行流水 CSV 导入:列号从 0 起,-1 表示不映射(日期/金额必填),服务端会再解析一遍并逐行校验
   importCsv: (file, mapping) => {
     const form = new FormData()

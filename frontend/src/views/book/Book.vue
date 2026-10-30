@@ -15,30 +15,44 @@
           </el-radio-group>
         </div>
       </div>
+      <!-- 账本权限:家长按成员配置可见与读写档位(家长本人恒可管理) -->
+      <div v-if="userStore.isOwner" class="tb-right">
+        <el-button size="small" @click="permVisible = true">{{ $t('book.perm.entry') }}</el-button>
+      </div>
     </PageToolbar>
 
-    <!-- 记账本页签:明细/统计/账户都在 BookDaily 里,月份走 v-model 双向同步 -->
-    <BookDaily v-if="tab === 'book'" v-model:month="month" />
+    <!-- 家长把账本对该成员设为「不可见」时,整页只给提示,不发注定 403 的请求 -->
+    <el-empty v-if="userStore.isLoggedIn && !userStore.canReadBook" :description="$t('book.perm.noAccess')" />
 
-    <!-- 总账页签:总账组件异步引入,点某月由它 emit 回来钻取到记账本 -->
-    <BookLedger v-else-if="tab === 'ledger'" @pick-month="onPickMonth" />
+    <template v-else>
+      <!-- 记账本页签:明细/统计/账户都在 BookDaily 里,月份走 v-model 双向同步 -->
+      <BookDaily v-if="tab === 'book'" v-model:month="month" />
 
-    <!-- 贷款记录:与工具箱/贷款计算器同一组件同一份数据(家庭共享) -->
-    <LoanRecords v-else-if="tab === 'loan'" />
+      <!-- 总账页签:总账组件异步引入,点某月由它 emit 回来钻取到记账本 -->
+      <BookLedger v-else-if="tab === 'ledger'" @pick-month="onPickMonth" />
 
-    <!-- 理财:持仓卡片 + 到期日历,本金不计支出、收益在赎回时按勾选入账 -->
-    <FinancePanel v-else />
+      <!-- 贷款记录:与工具箱/贷款计算器同一组件同一份数据(家庭共享) -->
+      <LoanRecords v-else-if="tab === 'loan'" />
+
+      <!-- 理财:持仓卡片 + 到期日历,本金不计支出、收益在赎回时按勾选入账 -->
+      <FinancePanel v-else />
+    </template>
+
+    <BookPermissionDialog v-model:visible="permVisible" @saved="syncLevel" />
   </div>
 </template>
 
 <script setup>
 // 记账本外壳:页签切换 + 月份状态;各页签自己管数据与工具栏右侧操作
-import { defineAsyncComponent, ref, watch } from 'vue'
+import { defineAsyncComponent, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
+import { bookApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import BookDaily from '@/views/book/BookDaily.vue'
+import BookPermissionDialog from '@/views/book/permission/BookPermissionDialog.vue'
 
 // 贷款记录与工具箱/贷款计算器是同一组件同一份家庭数据;异步加载,首屏(记账本)不为它买单
 const LoanRecords = defineAsyncComponent(() => import('@/views/tools/LoanRecords.vue'))
@@ -49,10 +63,12 @@ const FinancePanel = defineAsyncComponent(() => import('@/views/book/finance/Fin
 
 const TABS = ['book', 'ledger', 'loan', 'finance']
 const route = useRoute()
+const userStore = useUserStore()
 // 支持外部直达某个页签(首页理财卡 → /book?tab=finance);非法值回落到记账本
 const tabFromQuery = () => (TABS.includes(route.query.tab) ? route.query.tab : 'book')
 const tab = ref(tabFromQuery())
 const month = ref(new Date().toISOString().slice(0, 7))
+const permVisible = ref(false)
 
 // 同一路由内换 query(例如首页卡片再点一次)也要跟着切
 watch(
@@ -67,6 +83,20 @@ const onPickMonth = (m) => {
   month.value = m
   tab.value = 'book'
 }
+
+// 进页面取一次最新档位:家长改档后立即生效,不必等令牌续期
+const syncLevel = async () => {
+  if (!userStore.isLoggedIn) return
+  const data = await bookApi.permission().catch(() => null)
+  if (data?.level) userStore.setBookLevel(data.level)
+}
+
+onMounted(syncLevel)
+// 切换家庭后档位随家庭变化,重新取一次
+watch(
+  () => userStore.userInfo?.familyId,
+  () => syncLevel(),
+)
 </script>
 
 <style scoped>

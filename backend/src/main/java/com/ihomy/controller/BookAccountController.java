@@ -7,6 +7,7 @@ import com.ihomy.entity.BookAccount;
 import com.ihomy.security.LoginUser;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.BookAccountService;
+import com.ihomy.service.BookPermissionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -25,7 +26,7 @@ import java.util.Map;
 
 /**
  * 记账账户接口:现金/银行卡/支付宝等账户的增删改查与实时余额。
- * 账户为家庭共享数据,改删限创建人本人或家长;家庭隔离由 Service 兜底(跨家庭一律当不存在)。
+ * 账户为家庭共享数据,可见/可写按成员账本档位校验;改删限创建人本人或可管理账本者。
  */
 @Tag(name = "记账账户")
 @RestController
@@ -34,6 +35,7 @@ import java.util.Map;
 public class BookAccountController {
 
     private final BookAccountService bookAccountService;
+    private final BookPermissionService bookPermissionService;
     private final SecurityHelper securityHelper;
 
     private LoginUser current() {
@@ -43,7 +45,9 @@ public class BookAccountController {
     @Operation(summary = "账户列表与实时余额")
     @GetMapping
     public Result<List<Map<String, Object>>> list() {
-        return Result.success(bookAccountService.list(current().getFamilyId()));
+        LoginUser user = current();
+        bookPermissionService.requireRead(user);
+        return Result.success(bookAccountService.list(user.getFamilyId()));
     }
 
     @Operation(summary = "新增账户")
@@ -51,24 +55,27 @@ public class BookAccountController {
     @PostMapping
     public Result<BookAccount> create(@Valid @RequestBody BookAccountDTO dto) {
         LoginUser user = current();
+        bookPermissionService.requireWrite(user);
         return Result.success(bookAccountService.create(user.getUserId(), user.getFamilyId(), dto));
     }
 
-    @Operation(summary = "修改账户(本人或家长)")
+    @Operation(summary = "修改账户(本人或可管理账本者)")
     @OperationLog(module = "BOOK", operationType = "UPDATE", description = "修改记账账户")
     @PutMapping("/{id}")
     public Result<Void> update(@PathVariable Long id, @Valid @RequestBody BookAccountDTO dto) {
         LoginUser user = current();
-        bookAccountService.update(id, user.getFamilyId(), user.getUserId(), securityHelper.isOwner(), dto);
+        String level = bookPermissionService.requireWrite(user);
+        bookAccountService.update(id, user.getFamilyId(), user.getUserId(), bookPermissionService.canManage(level), dto);
         return Result.success();
     }
 
-    @Operation(summary = "删除账户(本人或家长;账户下还有记录时不能删)")
+    @Operation(summary = "删除账户(本人或可管理账本者;账户下还有记录时不能删)")
     @OperationLog(module = "BOOK", operationType = "DELETE", description = "删除记账账户")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         LoginUser user = current();
-        bookAccountService.delete(id, user.getFamilyId(), user.getUserId(), securityHelper.isOwner());
+        String level = bookPermissionService.requireWrite(user);
+        bookAccountService.delete(id, user.getFamilyId(), user.getUserId(), bookPermissionService.canManage(level));
         return Result.success();
     }
 }

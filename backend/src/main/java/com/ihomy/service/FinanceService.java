@@ -124,11 +124,11 @@ public class FinanceService {
         return p;
     }
 
-    /** 编辑持仓:仅创建人本人或家长可改;按需追加赎回/收益入账,已记过的拒绝重复 */
+    /** 编辑持仓:仅创建人本人或可管理账本者可改;按需追加赎回/收益入账,已记过的拒绝重复 */
     @Transactional
-    public void update(Long id, Long familyId, Long userId, boolean isOwner, FinanceDTO dto) {
+    public void update(Long id, Long familyId, Long userId, boolean canManage, FinanceDTO dto) {
         FamilyFinanceProduct p = require(id, familyId);
-        if (!p.getCreatedBy().equals(userId) && !isOwner) {
+        if (!p.getCreatedBy().equals(userId) && !canManage) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
         applyForm(p, familyId, dto);
@@ -170,10 +170,10 @@ public class FinanceService {
         persist(p);
     }
 
-    /** 删除持仓:仅创建人本人或家长;逻辑删(已记过账的明细保留,不做连带回滚) */
-    public void delete(Long id, Long familyId, Long userId, boolean isOwner) {
+    /** 删除持仓:仅创建人本人或可管理账本者;逻辑删(已记过账的明细保留,不做连带回滚) */
+    public void delete(Long id, Long familyId, Long userId, boolean canManage) {
         FamilyFinanceProduct p = require(id, familyId);
-        if (!p.getCreatedBy().equals(userId) && !isOwner) {
+        if (!p.getCreatedBy().equals(userId) && !canManage) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
         productMapper.deleteById(id);

@@ -90,10 +90,10 @@ public class BookAccountService {
         return account;
     }
 
-    /** 编辑账户:仅创建人本人或家长可改,只覆盖提交了的字段 */
-    public void update(Long id, Long familyId, Long userId, boolean isOwner, BookAccountDTO dto) {
+    /** 编辑账户:仅创建人本人或可管理账本者可改,只覆盖提交了的字段 */
+    public void update(Long id, Long familyId, Long userId, boolean canManage, BookAccountDTO dto) {
         BookAccount account = require(id, familyId);
-        if (!account.getCreatedBy().equals(userId) && !isOwner) {
+        if (!account.getCreatedBy().equals(userId) && !canManage) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
         BookAccount patch = new BookAccount();
@@ -133,9 +133,9 @@ public class BookAccountService {
     }
 
     /** 删除账户:有记账记录引用时拒绝,不静默把记录置空 */
-    public void delete(Long id, Long familyId, Long userId, boolean isOwner) {
+    public void delete(Long id, Long familyId, Long userId, boolean canManage) {
         BookAccount account = require(id, familyId);
-        if (!account.getCreatedBy().equals(userId) && !isOwner) {
+        if (!account.getCreatedBy().equals(userId) && !canManage) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
         Long refs = bookMapper.selectCount(new LambdaQueryWrapper<BookRecord>()

@@ -54,6 +54,7 @@ public class AuthService {
     private final CaptchaService captchaService;
     private final AuthGuardService authGuard;
     private final BlogService blogService;
+    private final BookPermissionService bookPermissionService;
 
     private static final String BLACKLIST_PREFIX = "jwt:blacklist:";
     private static final String CUR_FAMILY_PREFIX = "user:curfamily:";
@@ -479,6 +480,8 @@ public class AuthService {
             perms.remove("ops:view");
         }
         u.put("permissions", perms);
+        // 记账本档位:前端据此隐藏账本入口/写操作与首页收支卡(服务端仍逐接口校验,改档立即生效)
+        u.put("bookLevel", bookPermissionService.levelOf(familyId, user.getId(), roleCode));
         data.put("user", u);
         // 附带当前家庭分享链接所需的混淆 token(注册/切换后前端可直接生成分享链接)
         if (familyId != null) {

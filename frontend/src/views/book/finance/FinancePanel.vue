@@ -16,7 +16,9 @@
         </button>
       </div>
       <div class="tb-right">
-        <el-button size="small" type="primary" @click="openEditor(null)">{{ $t('book.finance.add') }}</el-button>
+        <el-button v-if="userStore.canWriteBook" size="small" type="primary" @click="openEditor(null)">{{
+          $t('book.finance.add')
+        }}</el-button>
       </div>
     </PageToolbar>
 
@@ -55,12 +57,20 @@
       <FinanceCalendar v-if="rows.length" :list="rows" />
 
       <el-empty v-if="!rows.length" :description="$t('book.finance.empty')">
-        <el-button type="primary" @click="openEditor(null)">{{ $t('book.finance.add') }}</el-button>
+        <el-button v-if="userStore.canWriteBook" type="primary" @click="openEditor(null)">{{ $t('book.finance.add') }}</el-button>
       </el-empty>
       <el-empty v-else-if="!visibleRows.length" :description="$t('book.finance.filterEmpty')" />
 
       <div v-else class="fn-grid">
-        <FinanceCard v-for="p in visibleRows" :key="p.id" :product="p" @edit="openEditor" @redeem="openRedeem" @remove="onRemove" />
+        <FinanceCard
+          v-for="p in visibleRows"
+          :key="p.id"
+          :product="p"
+          :can-edit="canEditRow(p)"
+          @edit="openEditor"
+          @redeem="openRedeem"
+          @remove="onRemove"
+        />
       </div>
     </div>
 
@@ -128,6 +138,9 @@ const visibleRows = computed(() => {
 })
 
 const money = (v) => formatYuan(v)
+
+// 持仓改删:可写档位下,自己记的或可管理账本者才显示操作;只读档位一律隐藏
+const canEditRow = (p) => userStore.canWriteBook && (userStore.canManageBook || p.createdBy === userStore.userInfo?.id)
 
 const load = async () => {
   if (!userStore.isLoggedIn) return

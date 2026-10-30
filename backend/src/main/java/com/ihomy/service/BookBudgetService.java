@@ -69,10 +69,10 @@ public class BookBudgetService {
         return budget;
     }
 
-    /** 编辑预算:仅创建人本人或家长可改;分类改到别的已存在分类时拒绝 */
-    public void update(Long id, Long familyId, Long userId, boolean isOwner, BookBudgetDTO dto) {
+    /** 编辑预算:仅创建人本人或可管理账本者可改;分类改到别的已存在分类时拒绝 */
+    public void update(Long id, Long familyId, Long userId, boolean canManage, BookBudgetDTO dto) {
         BookBudget budget = require(id, familyId);
-        if (!budget.getCreatedBy().equals(userId) && !isOwner) {
+        if (!budget.getCreatedBy().equals(userId) && !canManage) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
         String category = requireCategory(dto.getCategory());
@@ -87,10 +87,10 @@ public class BookBudgetService {
         budgetMapper.updateById(patch);
     }
 
-    /** 删除预算:仅创建人本人或家长;预算只是额度,不牵连已有明细 */
-    public void delete(Long id, Long familyId, Long userId, boolean isOwner) {
+    /** 删除预算:仅创建人本人或可管理账本者;预算只是额度,不牵连已有明细 */
+    public void delete(Long id, Long familyId, Long userId, boolean canManage) {
         BookBudget budget = require(id, familyId);
-        if (!budget.getCreatedBy().equals(userId) && !isOwner) {
+        if (!budget.getCreatedBy().equals(userId) && !canManage) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
         budgetMapper.deleteById(id);

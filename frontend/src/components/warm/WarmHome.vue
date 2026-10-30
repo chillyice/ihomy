@@ -762,7 +762,11 @@ const dropPreview = ref(null) // { code, label, icon, index }
 const GUEST_HIDDEN_WIDGETS = ['finance', 'item', 'task', 'reminder']
 const displayWidgets = computed(() => {
   const hideForGuest = !userStore.isLoggedIn
-  const list = hideForGuest ? widgets.value.filter((w) => !GUEST_HIDDEN_WIDGETS.includes(w.id)) : [...widgets.value]
+  // 账本不可读(家长设为 NONE)的成员连收支卡一起隐藏,与光尘首页口径一致
+  const hideFinance = hideForGuest || !userStore.canReadBook
+  const list = hideFinance
+    ? widgets.value.filter((w) => w.id !== 'finance' && !(hideForGuest && GUEST_HIDDEN_WIDGETS.includes(w.id)))
+    : [...widgets.value]
   const rp = reorderPreview.value
   const dp = dropPreview.value
   if (rp) {
@@ -1270,11 +1274,13 @@ onMounted(async () => {
   // 未登录(公开首页)只拉公开动态流:其余卡片数据都要登录态,直接跳过,
   // 别打一批注定 401 的请求(与 Home.vue 的 loadXxx 登录态守卫一致)
   const loggedIn = userStore.isLoggedIn
+  // 记账/理财数据只对账本可读的成员取(家长可把某成员设为不可见)
+  const canReadBook = loggedIn && userStore.canReadBook
   const [feed, book, fin, it, task, wish, rem, houses] = await Promise.all([
     publicApi.getFeed(20).catch(() => []),
-    loggedIn ? bookApi.summary().catch(() => null) : Promise.resolve(null),
+    canReadBook ? bookApi.summary().catch(() => null) : Promise.resolve(null),
     // 理财持仓:与收支卡同卡展示,失败不影响收支
-    loggedIn ? financeApi.list().catch(() => []) : Promise.resolve([]),
+    canReadBook ? financeApi.list().catch(() => []) : Promise.resolve([]),
     loggedIn ? itemApi.list({}).catch(() => []) : Promise.resolve([]),
     loggedIn ? taskApi.list().catch(() => []) : Promise.resolve([]),
     // 愿望列表对游客开放(后端返回演示家庭的公开愿望),故不受登录态限制

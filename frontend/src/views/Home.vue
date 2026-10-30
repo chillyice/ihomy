@@ -550,7 +550,8 @@ const assetCard = computed(() =>
   }),
 )
 const loadAssets = async () => {
-  if (!userStore.isLoggedIn) return
+  // 账本不可读(档位 NONE)时不打注定 403 的账户接口
+  if (!userStore.isLoggedIn || !userStore.canReadBook) return
   const [accounts, loans] = await Promise.all([
     bookApi.accounts().catch(() => []),
     canViewLoan.value ? loanApi.list().catch(() => null) : Promise.resolve(null),
@@ -582,7 +583,8 @@ const loadReminders = async () => {
   }
 }
 const loadBookSummary = async () => {
-  if (userStore.isLoggedIn) {
+  // 收支/理财卡只对账本可读的成员取数(后端 /book/summary 对 NONE 也给空摘要,前端先省掉两个请求)
+  if (userStore.isLoggedIn && userStore.canReadBook) {
     // 本月收支与理财持仓互不依赖,并行取;理财接口失败不影响收支卡
     const [summary, list] = await Promise.all([bookApi.summary().catch(() => null), financeApi.list().catch(() => [])])
     if (summary) bookSummary.value = summary
@@ -892,7 +894,9 @@ const widgets = ref((loadLayout() || DEFAULT_LAYOUT).map(makeWidget))
 
 const visibleWidgets = computed(() =>
   widgets.value.filter((w) => {
-    if (['today', 'task', 'search', 'finance', 'asset'].includes(w.id)) return userStore.isLoggedIn
+    if (['today', 'task', 'search'].includes(w.id)) return userStore.isLoggedIn
+    // 收支/资产卡跟账本可见性同口径:被家长设为「不可见」的成员连卡都不渲染
+    if (['finance', 'asset'].includes(w.id)) return userStore.isLoggedIn && userStore.canReadBook
     if (w.id === 'anni') return anniversaries.value.length > 0
     // 愿望单对游客开放(后端返回演示家庭的公开愿望);无数据时不展示,避免留一张空卡
     if (w.id === 'wish') return wishes.value.length > 0
@@ -908,12 +912,12 @@ const resetLayout = () => {
   ElMessage.success(t('warm.layoutReset'))
 }
 
-// 资产卡在布局里且已登录时才取数(拖入/恢复默认/登录完成都会触发);游客不发请求,卡片本身也不渲染
+// 资产卡在布局里、已登录且账本可读时才取数(拖入/恢复默认/登录完成都会触发);游客不发请求,卡片本身也不渲染
 const hasAsset = computed(() => widgets.value.some((w) => w.id === 'asset'))
 watch(
-  [hasAsset, () => userStore.isLoggedIn],
-  ([on, loggedIn]) => {
-    if (on && loggedIn) loadAssets()
+  [hasAsset, () => userStore.isLoggedIn, () => userStore.canReadBook],
+  ([on, loggedIn, readable]) => {
+    if (on && loggedIn && readable) loadAssets()
   },
   { immediate: true },
 )

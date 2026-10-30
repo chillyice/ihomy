@@ -1573,6 +1573,27 @@ export default {
       portfolioEmpty: 'No holdings yet',
       unbounded: '—',
     },
+    // Ledger access: the household owner sets each member's visibility and read/write level
+    perm: {
+      entry: 'Ledger access',
+      title: 'Ledger access',
+      hint: 'By default every family member can record entries. The owner can set each member individually; the owner always keeps full access.',
+      ownerTag: 'Owner',
+      empty: 'No other family members yet',
+      noAccess: 'The ledger has not been shared with you. Ask the household owner for access.',
+      levels: {
+        NONE: 'No access',
+        READ: 'View only',
+        WRITE: 'Can record',
+        MANAGE: 'Can manage',
+      },
+      levelDesc: {
+        NONE: 'The ledger and home finance card are hidden',
+        READ: 'Can view but not add or change entries',
+        WRITE: 'Can add entries; can only change or delete their own',
+        MANAGE: 'Can change or delete anyone’s entries and all settings',
+      },
+    },
   },
   settings: {
     title: 'Settings',

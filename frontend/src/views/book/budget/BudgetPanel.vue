@@ -3,7 +3,7 @@
   <div class="card budget-panel">
     <div class="budget-head">
       <span class="section-label">{{ $t('book.budget.title') }}</span>
-      <el-button size="small" text @click="mgrVisible = true">{{ $t('book.budget.manage') }}</el-button>
+      <el-button v-if="!readonly" size="small" text @click="mgrVisible = true">{{ $t('book.budget.manage') }}</el-button>
     </div>
 
     <div v-if="overCount > 0" class="budget-alert">
@@ -56,6 +56,8 @@ import BudgetManagerDialog from './BudgetManagerDialog.vue'
 const props = defineProps({
   // 后端 /book/budget 的返回:{ items, total, overCount, unbudgeted }
   data: { type: Object, default: null },
+  // 只读档位:隐藏「管理预算」入口(后端也会拒绝写接口)
+  readonly: { type: Boolean, default: false },
 })
 const emit = defineEmits(['saved'])
 

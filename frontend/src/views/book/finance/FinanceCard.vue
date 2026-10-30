@@ -73,7 +73,7 @@
           {{ $t('book.finance.redeemReturned') }}
         </el-tag>
       </div>
-      <div class="fc-actions">
+      <div v-if="canEdit" class="fc-actions">
         <el-button v-if="canRedeem" size="small" type="primary" plain @click="emit('redeem', product)">
           {{ $t('book.finance.redeem') }}
         </el-button>
@@ -106,6 +106,8 @@ import {
 
 const props = defineProps({
   product: { type: Object, required: true },
+  // 只读档位或不是自己记的持仓:隐藏赎回/编辑/删除(后端仍逐条校验)
+  canEdit: { type: Boolean, default: true },
 })
 const emit = defineEmits(['edit', 'redeem', 'remove'])
 

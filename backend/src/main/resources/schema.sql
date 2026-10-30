@@ -2726,3 +2726,29 @@ CREATE TABLE `family_book_recurring` (
   KEY `idx_scan` (`enabled`, `deleted`, `last_generated_date`),
   KEY `idx_family` (`family_id`, `deleted`, `start_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭记账周期模板(自动生成固定收支)';
+
+-- ------------------------------------------------------------
+-- 73. 家庭记账本权限（V10.99 账本细粒度可见性）
+--     家长（OWNER）按成员设置整本账本的可见与读写档位；没有配置行的成员按默认「可记账」，
+--     维持历史口径「家庭成员都能读写账本」；家长本人恒为可管理，不能被降级。
+--     档位：NONE 不可见 / READ 只读 / WRITE 可记账（改删仅限自己记的）/ MANAGE 可管理。
+--     一行一个成员，按 (family_id, user_id) 唯一；改档立即生效（服务端不做缓存）。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_book_permission`;
+CREATE TABLE `family_book_permission` (
+  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`  BIGINT      NOT NULL COMMENT '所属家庭ID',
+  `user_id`    BIGINT      NOT NULL COMMENT '成员用户ID',
+  `perm_level` VARCHAR(20) NOT NULL DEFAULT 'WRITE' COMMENT '账本档位: NONE不可见/READ只读/WRITE可记账/MANAGE可管理',
+  `created_by` BIGINT      DEFAULT NULL COMMENT '配置人ID(家长)',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_family_user` (`family_id`, `user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭记账本权限(家长按成员配置账本档位)';
+
+INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('book_perm_level', 'NONE',   '不可见'),
+('book_perm_level', 'READ',   '只读'),
+('book_perm_level', 'WRITE',  '可记账'),
+('book_perm_level', 'MANAGE', '可管理');

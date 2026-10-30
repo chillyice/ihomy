@@ -116,6 +116,13 @@ public final class DictConst {
     public static final String BOOK_ACCOUNT_OTHER = "OTHER";
     private static final String BOOK_ACCOUNT_FALLBACK = BOOK_ACCOUNT_BANK;
 
+    /** 记账本权限等级 book_perm_level（V10.99）：按用户配置整本账本的可见与读写档位 */
+    public static final String BOOK_PERM_NONE = "NONE";
+    public static final String BOOK_PERM_READ = "READ";
+    public static final String BOOK_PERM_WRITE = "WRITE";
+    public static final String BOOK_PERM_MANAGE = "MANAGE";
+    private static final String BOOK_PERM_FALLBACK = BOOK_PERM_WRITE;
+
     /** 理财类型 finance_type（V10.80） */
     public static final String FINANCE_TYPE_DEPOSIT = "DEPOSIT";
     public static final String FINANCE_TYPE_LARGE_DEPOSIT = "LARGE_DEPOSIT";
@@ -381,6 +388,25 @@ public final class DictConst {
             case BOOK_ACCOUNT_CREDIT -> BOOK_ACCOUNT_CREDIT;
             case BOOK_ACCOUNT_OTHER -> BOOK_ACCOUNT_OTHER;
             default -> BOOK_ACCOUNT_BANK;
+        };
+    }
+
+    /** 记账本权限等级归一：unknown/空落「可记账」(维持历史「家庭成员都能读写」的默认口径) */
+    public static String bookPermLevel(String v) {
+        if (v == null || v.isBlank()) return BOOK_PERM_FALLBACK;
+        return switch (v.trim().toUpperCase()) {
+            case BOOK_PERM_NONE, "0" -> BOOK_PERM_NONE;
+            case BOOK_PERM_READ, "1" -> BOOK_PERM_READ;
+            case BOOK_PERM_MANAGE, "3" -> BOOK_PERM_MANAGE;
+            default -> BOOK_PERM_WRITE;
+        };
+    }
+
+    /** 记账本权限是否合法档位(配置入口用:脏值直接拒绝,不静默归一) */
+    public static boolean isBookPermLevel(String v) {
+        return v != null && switch (v.trim().toUpperCase()) {
+            case BOOK_PERM_NONE, BOOK_PERM_READ, BOOK_PERM_WRITE, BOOK_PERM_MANAGE -> true;
+            default -> false;
         };
     }
 

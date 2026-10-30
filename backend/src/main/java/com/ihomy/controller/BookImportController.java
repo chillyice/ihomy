@@ -5,6 +5,7 @@ import com.ihomy.common.Result;
 import com.ihomy.security.LoginUser;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.BookImportService;
+import com.ihomy.service.BookPermissionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ import java.util.Map;
 public class BookImportController {
 
     private final BookImportService bookImportService;
+    private final BookPermissionService bookPermissionService;
     private final SecurityHelper securityHelper;
 
     @Operation(summary = "导入银行流水 CSV(≤2MB、≤2000 行;返回成功/失败条数与前 20 条错误)")
@@ -43,6 +45,8 @@ public class BookImportController {
             @RequestParam(defaultValue = "-1") int remarkCol,
             @RequestParam(defaultValue = "1") int headerRows) {
         LoginUser user = securityHelper.current();
+        // 导入会新增流水:只读档位直接拒绝
+        bookPermissionService.requireWrite(user);
         BookImportService.CsvMapping mapping = new BookImportService.CsvMapping(
                 dateCol, typeCol, amountCol, categoryCol, accountCol, remarkCol, headerRows);
         return Result.success(bookImportService.importCsv(user.getUserId(), user.getFamilyId(), file, mapping));
