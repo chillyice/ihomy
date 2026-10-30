@@ -1095,9 +1095,10 @@ CREATE TABLE `family_task` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='悬赏任务表';
 
 -- ------------------------------------------------------------
--- 33. 提醒事项表（V3.4 今日提醒:站内通知触发,repeat_type 支持一次性/每日/每周/每月）
---     remind_date 语义:一次性=触发当天;每周=基准星期;每月=基准日号
+-- 33. 提醒事项表（V3.4 今日提醒:站内通知触发,repeat_type 支持一次性/每日/每周/每月/每年）
+--     remind_date 语义:一次性=触发当天;每周=基准星期;每月=基准日号;每年=锚定公历日(展示/排序用)
 --     plan_id 非空 = 由家庭计划托管(单向:计划→提醒,提醒侧不改计划状态)
+--     V10.95 循环提醒扩展:YEARLY + 阳历/农历 + 闰月,日历口径只在 common/RepeatSchedule 一处
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `family_reminder`;
 CREATE TABLE `family_reminder` (
@@ -1105,10 +1106,14 @@ CREATE TABLE `family_reminder` (
   `family_id`   BIGINT        NOT NULL COMMENT '所属家庭ID',
   `title`       VARCHAR(100)  NOT NULL COMMENT '提醒标题',
   `content`     VARCHAR(500)  DEFAULT NULL COMMENT '提醒内容',
-  `remind_date` DATE          NOT NULL COMMENT '基准日期(一次性=当天/每周=星期基准/每月=日号基准)',
+  `remind_date` DATE          NOT NULL COMMENT '基准日期(一次性=当天/每周=星期基准/每月=日号基准/每年=锚定公历日)',
   `remind_time` TIME          NOT NULL COMMENT '触发时刻（每日重复的时刻）',
-  `repeat_type` VARCHAR(20)   NOT NULL DEFAULT 'ONCE' COMMENT 'ONCE一次性/DAILY每日/WEEKLY每周/MONTHLY每月',
-  `done`        TINYINT       NOT NULL DEFAULT 0 COMMENT '0未完成 1已完成',
+  `repeat_type` VARCHAR(20)   NOT NULL DEFAULT 'ONCE' COMMENT 'ONCE一次性/DAILY每日/WEEKLY每周/MONTHLY每月/YEARLY每年',
+  `calendar`    VARCHAR(20)   NOT NULL DEFAULT 'solar' COMMENT '历法: solar阳历/lunar农历（仅每年重复时有意义）',
+  `lunar_month` TINYINT       DEFAULT NULL COMMENT '农历月(1-12,农历每年时必填)',
+  `lunar_day`   TINYINT       DEFAULT NULL COMMENT '农历日(1-30,农历每年时必填)',
+  `is_leap`     TINYINT       NOT NULL DEFAULT 0 COMMENT '农历是否闰月: 0否/1是（当年无该闰月则不触发）',
+  `done`        TINYINT       NOT NULL DEFAULT 0 COMMENT '0未完成 1已完成(每年/每日等循环提醒恒为0,按日完成记录见 family_reminder_check)',
   `plan_id`     BIGINT        DEFAULT NULL COMMENT '关联计划ID(family_plan.id;NULL=独立提醒)',
   `created_by`  BIGINT        NOT NULL COMMENT '创建人ID',
   `created_at`  DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -1117,6 +1122,23 @@ CREATE TABLE `family_reminder` (
   KEY `idx_date` (`remind_date`),
   KEY `idx_plan` (`plan_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='提醒事项表';
+
+-- ------------------------------------------------------------
+-- 33a. 循环提醒按日完成记录表（V10.95 日程提醒:每日任务/每年提醒「今天完成了吗」）
+--      一次性提醒仍用 family_reminder.done;循环提醒按 (提醒, 日期) 记一条,取消完成即删行
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_reminder_check`;
+CREATE TABLE `family_reminder_check` (
+  `id`          BIGINT   NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `reminder_id` BIGINT   NOT NULL COMMENT '提醒ID(family_reminder.id)',
+  `family_id`   BIGINT   NOT NULL COMMENT '所属家庭ID(冗余隔离)',
+  `check_date`  DATE     NOT NULL COMMENT '完成日期',
+  `done_by`     BIGINT   DEFAULT NULL COMMENT '完成人ID',
+  `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_reminder_date` (`reminder_id`, `check_date`),
+  KEY `idx_family_date` (`family_id`, `check_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='循环提醒按日完成记录';
 
 -- ------------------------------------------------------------
 -- 33b. 家庭共养植物表（V9.67 小游戏模块:全家共养一棵,实时养成）
@@ -1358,6 +1380,7 @@ INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
 ('reminder_repeat', 'DAILY',  '每日'),
 ('reminder_repeat', 'WEEKLY', '每周'),
 ('reminder_repeat', 'MONTHLY','每月'),
+('reminder_repeat', 'YEARLY', '每年'),
 ('ann_recurring', 'ONCE',   '一次性'),
 ('ann_recurring', 'YEARLY', '每年'),
 ('book_type', 'EXPENSE',  '支出'),

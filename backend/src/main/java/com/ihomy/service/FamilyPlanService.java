@@ -11,9 +11,11 @@ import com.ihomy.dto.PlanTaskDTO;
 import com.ihomy.entity.FamilyPlan;
 import com.ihomy.entity.PlanTask;
 import com.ihomy.entity.Reminder;
+import com.ihomy.entity.ReminderCheck;
 import com.ihomy.entity.SysUser;
 import com.ihomy.mapper.FamilyPlanMapper;
 import com.ihomy.mapper.FamilyPlanTaskMapper;
+import com.ihomy.mapper.ReminderCheckMapper;
 import com.ihomy.mapper.ReminderMapper;
 import com.ihomy.mapper.SysUserMapper;
 import lombok.RequiredArgsConstructor;
@@ -27,10 +29,12 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -48,6 +52,7 @@ public class FamilyPlanService {
     private final FamilyPlanMapper planMapper;
     private final FamilyPlanTaskMapper taskMapper;
     private final ReminderMapper reminderMapper;
+    private final ReminderCheckMapper reminderCheckMapper;
     private final SysUserMapper sysUserMapper;
     private final HomeStatsService homeStatsService;
 
@@ -127,11 +132,15 @@ public class FamilyPlanService {
                 .thenComparing(m -> (LocalDate) m.get("targetDate"))
                 .thenComparing(m -> (Long) m.get("id")));
 
+        Set<Long> checkedToday = checkedReminderIds(familyId, today);
         List<Map<String, Object>> reminderRows = reminderMapper.selectList(new LambdaQueryWrapper<Reminder>()
                         .eq(Reminder::getFamilyId, familyId)
                         .eq(Reminder::getDone, 0))
                 .stream()
-                .filter(r -> RepeatSchedule.dueToday(r.getRepeatType(), r.getRemindDate(), today))
+                // 循环提醒勾了当天完成即从今日列表消失(与老的一次性口径一致)
+                .filter(r -> !checkedToday.contains(r.getId()))
+                .filter(r -> RepeatSchedule.dueToday(r.getRepeatType(), r.getRemindDate(), today,
+                        r.getCalendar(), r.getLunarMonth(), r.getLunarDay(), r.getIsLeap()))
                 .sorted(Comparator.comparing(Reminder::getRemindTime).thenComparing(Reminder::getId))
                 .map(r -> {
                     Map<String, Object> m = new HashMap<>();
@@ -307,6 +316,17 @@ public class FamilyPlanService {
         reminderMapper.update(null, new LambdaUpdateWrapper<Reminder>()
                 .eq(Reminder::getPlanId, planId)
                 .set(Reminder::getDone, 1));
+    }
+
+    /** 当天已勾完成的循环提醒 id(一次查询) */
+    private Set<Long> checkedReminderIds(Long familyId, LocalDate day) {
+        Set<Long> ids = new HashSet<>();
+        for (ReminderCheck c : reminderCheckMapper.selectList(new LambdaQueryWrapper<ReminderCheck>()
+                .eq(ReminderCheck::getFamilyId, familyId)
+                .eq(ReminderCheck::getCheckDate, day))) {
+            ids.add(c.getReminderId());
+        }
+        return ids;
     }
 
     /** 批量取计划关联的提醒时刻(一次查询,禁止逐条) */

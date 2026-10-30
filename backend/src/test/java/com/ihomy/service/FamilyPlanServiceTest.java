@@ -9,9 +9,11 @@ import com.ihomy.dto.PlanDTO;
 import com.ihomy.entity.FamilyPlan;
 import com.ihomy.entity.PlanTask;
 import com.ihomy.entity.Reminder;
+import com.ihomy.entity.ReminderCheck;
 import com.ihomy.entity.SysUser;
 import com.ihomy.mapper.FamilyPlanMapper;
 import com.ihomy.mapper.FamilyPlanTaskMapper;
+import com.ihomy.mapper.ReminderCheckMapper;
 import com.ihomy.mapper.ReminderMapper;
 import com.ihomy.mapper.SysUserMapper;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -47,10 +49,11 @@ class FamilyPlanServiceTest {
     private final FamilyPlanMapper planMapper = mock(FamilyPlanMapper.class);
     private final FamilyPlanTaskMapper taskMapper = mock(FamilyPlanTaskMapper.class);
     private final ReminderMapper reminderMapper = mock(ReminderMapper.class);
+    private final ReminderCheckMapper reminderCheckMapper = mock(ReminderCheckMapper.class);
     private final SysUserMapper userMapper = mock(SysUserMapper.class);
     private final HomeStatsService homeStatsService = mock(HomeStatsService.class);
-    private final FamilyPlanService service =
-            new FamilyPlanService(planMapper, taskMapper, reminderMapper, userMapper, homeStatsService);
+    private final FamilyPlanService service = new FamilyPlanService(
+            planMapper, taskMapper, reminderMapper, reminderCheckMapper, userMapper, homeStatsService);
 
     /** 单测没有 MyBatis-Plus 启动扫描,手动注册实体信息,否则 LambdaWrapper 的列名解析会报错 */
     @BeforeAll
@@ -59,6 +62,7 @@ class FamilyPlanServiceTest {
         TableInfoHelper.initTableInfo(assistant, FamilyPlan.class);
         TableInfoHelper.initTableInfo(assistant, PlanTask.class);
         TableInfoHelper.initTableInfo(assistant, Reminder.class);
+        TableInfoHelper.initTableInfo(assistant, ReminderCheck.class);
     }
 
     private PlanDTO dto(String title, LocalDate targetDate, String remindTime) {

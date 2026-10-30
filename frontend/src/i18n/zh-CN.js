@@ -4621,7 +4621,7 @@ export default {
     videoWishStatus: { PENDING: '待入库', IMPORTED: '已入库' },
     orderStatus: { PENDING: '待核销', REDEEMED: '已核销' },
     bookType: { EXPENSE: '支出', INCOME: '收入', TRANSFER: '转账' },
-    repeatType: { ONCE: '一次性', DAILY: '每日', WEEKLY: '每周', MONTHLY: '每月' },
+    repeatType: { ONCE: '一次性', DAILY: '每日', WEEKLY: '每周', MONTHLY: '每月', YEARLY: '每年' },
     annRecurring: { ONCE: '单次', YEARLY: '每年' },
     item_type: { KITCHENWARE: '厨具', INGREDIENT: '食材', DAILY: '日化', CLOTHES: '衣物', TOOL: '工具', OTHER: '其他' },
     book_format: { EPUB: 'EPUB', PDF: 'PDF', TXT: 'TXT', MOBI: 'MOBI' },

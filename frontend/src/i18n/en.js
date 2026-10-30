@@ -4668,7 +4668,7 @@ export default {
     videoWishStatus: { PENDING: 'Pending', IMPORTED: 'Imported' },
     orderStatus: { PENDING: 'Pending', REDEEMED: 'Fulfilled' },
     bookType: { EXPENSE: 'Expense', INCOME: 'Income', TRANSFER: 'Transfer' },
-    repeatType: { ONCE: 'Once', DAILY: 'Daily', WEEKLY: 'Weekly', MONTHLY: 'Monthly' },
+    repeatType: { ONCE: 'Once', DAILY: 'Daily', WEEKLY: 'Weekly', MONTHLY: 'Monthly', YEARLY: 'Yearly' },
     annRecurring: { ONCE: 'One-time', YEARLY: 'Yearly' },
     item_type: { KITCHENWARE: 'Kitchenware', INGREDIENT: 'Ingredient', DAILY: 'Daily', CLOTHES: 'Clothes', TOOL: 'Tool', OTHER: 'Other' },
     book_format: { EPUB: 'EPUB', PDF: 'PDF', TXT: 'TXT', MOBI: 'MOBI' },

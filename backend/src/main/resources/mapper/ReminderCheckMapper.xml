@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.ReminderCheckMapper">
+
+    <!--
+      循环提醒按日完成记录:表无逻辑删列,删除即物理删,故走自定义 XML(MP 常规删除不适用)。
+      提醒被删除时连带清理,避免留下孤儿完成记录。
+    -->
+    <delete id="deleteByReminderId">
+        DELETE FROM `family_reminder_check` WHERE `reminder_id` = #{reminderId}
+    </delete>
+
+    <delete id="deleteByReminderIds">
+        DELETE FROM `family_reminder_check`
+        WHERE `reminder_id` IN
+        <foreach collection="reminderIds" item="rid" open="(" separator="," close=")">
+            #{rid}
+        </foreach>
+    </delete>
+
+</mapper>

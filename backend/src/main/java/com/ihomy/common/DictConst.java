@@ -88,7 +88,13 @@ public final class DictConst {
     public static final String REPEAT_DAILY = "DAILY";
     public static final String REPEAT_WEEKLY = "WEEKLY";
     public static final String REPEAT_MONTHLY = "MONTHLY";
+    public static final String REPEAT_YEARLY = "YEARLY";
     private static final String REPEAT_FALLBACK = REPEAT_ONCE;
+
+    /** 提醒历法 calendar(V10.95):仅每年重复时有意义 */
+    public static final String CALENDAR_SOLAR = "solar";
+    public static final String CALENDAR_LUNAR = "lunar";
+    private static final String CALENDAR_FALLBACK = CALENDAR_SOLAR;
 
     /** 纪念日周期 ann_recurring */
     public static final String RECUR_ONCE = "ONCE";
@@ -346,8 +352,14 @@ public final class DictConst {
             case REPEAT_DAILY, "1" -> REPEAT_DAILY;
             case REPEAT_WEEKLY, "2" -> REPEAT_WEEKLY;
             case REPEAT_MONTHLY, "3" -> REPEAT_MONTHLY;
+            case REPEAT_YEARLY -> REPEAT_YEARLY;
             default -> REPEAT_ONCE;
         };
+    }
+
+    /** 提醒历法归一:只认 lunar,其余(含空)按阳历 */
+    public static String calendar(String v) {
+        return v != null && CALENDAR_LUNAR.equalsIgnoreCase(v.trim()) ? CALENDAR_LUNAR : CALENDAR_FALLBACK;
     }
 
     public static String bookType(String v) {

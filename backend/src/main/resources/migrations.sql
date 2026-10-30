@@ -2691,3 +2691,66 @@ ON DUPLICATE KEY UPDATE
 INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
 ('holiday_type', 'HOLIDAY', '放假'),
 ('holiday_type', 'WORKDAY', '补班');
+
+-- ------------------------------------------------------------
+-- V10.95 日程提醒重构 阶段B:循环提醒扩展 + 按日完成(2026-10-30)
+--   ① family_reminder 加 4 列:calendar(阳历/农历)、lunar_month、lunar_day、is_leap;
+--      每年重复按阳历月日或农历月日判定(阳历 2/29 只在闰年触发,农历闰月在无该闰月年份跳过);
+--   ② 新表 family_reminder_check:循环提醒按 (提醒, 日期) 记完成,一次性提醒仍用 done 列;
+--   ③ 字典 reminder_repeat 增 YEARLY。
+--   重复执行安全:列走 information_schema 守卫,建表 IF NOT EXISTS,字典 INSERT IGNORE。
+-- ------------------------------------------------------------
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_reminder'
+               AND COLUMN_NAME = 'calendar');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `family_reminder` ADD COLUMN `calendar` VARCHAR(20) NOT NULL DEFAULT ''solar'' COMMENT ''历法: solar阳历/lunar农历（仅每年重复时有意义）'' AFTER `repeat_type`',
+  'SELECT 1');
+PREPARE add_reminder_calendar_stmt FROM @sql;
+EXECUTE add_reminder_calendar_stmt;
+DEALLOCATE PREPARE add_reminder_calendar_stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_reminder'
+               AND COLUMN_NAME = 'lunar_month');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `family_reminder` ADD COLUMN `lunar_month` TINYINT DEFAULT NULL COMMENT ''农历月(1-12,农历每年时必填)'' AFTER `calendar`',
+  'SELECT 1');
+PREPARE add_reminder_lunar_month_stmt FROM @sql;
+EXECUTE add_reminder_lunar_month_stmt;
+DEALLOCATE PREPARE add_reminder_lunar_month_stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_reminder'
+               AND COLUMN_NAME = 'lunar_day');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `family_reminder` ADD COLUMN `lunar_day` TINYINT DEFAULT NULL COMMENT ''农历日(1-30,农历每年时必填)'' AFTER `lunar_month`',
+  'SELECT 1');
+PREPARE add_reminder_lunar_day_stmt FROM @sql;
+EXECUTE add_reminder_lunar_day_stmt;
+DEALLOCATE PREPARE add_reminder_lunar_day_stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_reminder'
+               AND COLUMN_NAME = 'is_leap');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `family_reminder` ADD COLUMN `is_leap` TINYINT NOT NULL DEFAULT 0 COMMENT ''农历是否闰月: 0否/1是（当年无该闰月则不触发）'' AFTER `lunar_day`',
+  'SELECT 1');
+PREPARE add_reminder_is_leap_stmt FROM @sql;
+EXECUTE add_reminder_is_leap_stmt;
+DEALLOCATE PREPARE add_reminder_is_leap_stmt;
+
+CREATE TABLE IF NOT EXISTS `family_reminder_check` (
+  `id`          BIGINT   NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `reminder_id` BIGINT   NOT NULL COMMENT '提醒ID(family_reminder.id)',
+  `family_id`   BIGINT   NOT NULL COMMENT '所属家庭ID(冗余隔离)',
+  `check_date`  DATE     NOT NULL COMMENT '完成日期',
+  `done_by`     BIGINT   DEFAULT NULL COMMENT '完成人ID',
+  `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_reminder_date` (`reminder_id`, `check_date`),
+  KEY `idx_family_date` (`family_id`, `check_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='循环提醒按日完成记录';
+
+INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('reminder_repeat', 'YEARLY', '每年');

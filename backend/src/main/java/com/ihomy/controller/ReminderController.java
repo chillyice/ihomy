@@ -1,7 +1,9 @@
 package com.ihomy.controller;
 
 import com.ihomy.annotation.OperationLog;
+import com.ihomy.common.BizException;
 import com.ihomy.common.Result;
+import com.ihomy.common.ResultCode;
 import com.ihomy.dto.ReminderDTO;
 import com.ihomy.entity.Reminder;
 import com.ihomy.security.LoginUser;
@@ -12,6 +14,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -60,11 +63,23 @@ public class ReminderController {
         return Result.success();
     }
 
-    @Operation(summary = "完成/取消完成")
+    @Operation(summary = "完成/取消完成(循环提醒可按?date=YYYY-MM-DD指定日期,缺省今天)")
     @OperationLog(module = "REMINDER", operationType = "UPDATE", description = "提醒完成切换")
     @PostMapping("/{id}/toggle-done")
-    public Result<Void> toggleDone(@PathVariable Long id) {
-        reminderService.toggleDone(id, current().getFamilyId());
+    public Result<Void> toggleDone(@PathVariable Long id,
+                                   @RequestParam(name = "date", required = false) String date) {
+        LoginUser user = current();
+        reminderService.toggleDone(id, user.getFamilyId(), user.getUserId(), parseDate(date));
         return Result.success();
+    }
+
+    /** 可选的完成日期:空=今天(交给服务层取今天),格式不对按参数错误 */
+    private LocalDate parseDate(String date) {
+        if (date == null || date.isBlank()) return null;
+        try {
+            return LocalDate.parse(date.trim());
+        } catch (Exception e) {
+            throw new BizException(ResultCode.BAD_REQUEST, "日期格式不正确，请使用 YYYY-MM-DD");
+        }
     }
 }
