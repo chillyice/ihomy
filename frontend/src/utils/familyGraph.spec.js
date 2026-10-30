@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildFamilyGraph, normalizeFamily } from './familyGraph'
+import { buildFamilyGraph, canvasPoint, nearestNode, normalizeFamily, relationPayload, shortestRelationEdgeKeys } from './familyGraph'
 
 // 生产 family 2 的真实家谱快照(20 人):含姻亲父母、兄弟、跨房祖辈
 const FAMILY = [
@@ -240,5 +240,126 @@ describe('buildFamilyGraph', () => {
     expect(spanEdge.path.split(/[MLQ]/).length).toBeGreaterThan(4)
     expect(edgeCrossings(graph)).toEqual([])
     expect(overlaps(graph)).toEqual([])
+  })
+})
+
+describe('画板交互纯函数', () => {
+  it('canvasPoint 把视口坐标换算成画板坐标(与 translate+scale 互逆)', () => {
+    const rect = { left: 100, top: 50 }
+    expect(canvasPoint(300, 250, rect, 40, 20, 2)).toEqual({ x: 80, y: 90 })
+    expect(canvasPoint(100, 50, rect, 0, 0, 1)).toEqual({ x: 0, y: 0 })
+  })
+
+  it('nearestNode 卡片内/外扩阈值内命中,远处返回 null', () => {
+    const nodes = new Map([[7, { id: 7, x: 0, y: 0, width: 100, height: 80, cx: 50, cy: 40 }]])
+    expect(nearestNode(nodes, 50, 40, 4)).toBe(7)
+    expect(nearestNode(nodes, 118, 40, 24)).toBe(7) // 卡片右侧 18px,在 24px 阈值内
+    expect(nearestNode(nodes, 200, 40, 24)).toBe(null)
+    expect(nearestNode(new Map(), 0, 0, 24)).toBe(null)
+  })
+
+  it('relationPayload 四类关系与性别未知', () => {
+    const members = [
+      { id: 1, gender: 1 },
+      { id: 2, gender: 2 },
+      { id: 3, gender: 0 },
+    ]
+    expect(relationPayload(1, 2, 'FATHER', members)).toEqual({ fromId: 1, toId: 2, kind: 'FATHER' })
+    expect(relationPayload(1, 2, 'MOTHER', members)).toEqual({ fromId: 1, toId: 2, kind: 'MOTHER' })
+    expect(relationPayload(1, 2, 'SPOUSE', members)).toEqual({ fromId: 1, toId: 2, kind: 'SPOUSE' })
+    // 「1 是 2 的子女」→ 2 是父亲(性别男),方向反过来
+    expect(relationPayload(1, 2, 'CHILD', members)).toEqual({ fromId: 2, toId: 1, kind: 'MOTHER' })
+    expect(relationPayload(2, 1, 'CHILD', members)).toEqual({ fromId: 1, toId: 2, kind: 'FATHER' })
+    expect(relationPayload(1, 3, 'CHILD', members)).toEqual({ needGenderOf: 3 })
+    expect(relationPayload(1, 1, 'SPOUSE', members)).toBe(null)
+    expect(relationPayload(1, 2, 'UNCLE', members)).toBe(null)
+  })
+})
+
+describe('shortestRelationEdgeKeys 两人之间的最近连线', () => {
+  const members = [
+    { id: 1, name: '祖父', gender: 1, spouseId: 2 },
+    { id: 2, name: '祖母', gender: 2, spouseId: 1 },
+    { id: 3, name: '父', gender: 1, fatherId: 1, motherId: 2, spouseId: 4 },
+    { id: 4, name: '母', gender: 2, spouseId: 3, fatherId: 6, motherId: 7 },
+    { id: 5, name: '子', gender: 1, fatherId: 3, motherId: 4 },
+    { id: 6, name: '外祖父', gender: 1, spouseId: 7 },
+    { id: 7, name: '外祖母', gender: 2, spouseId: 6 },
+    { id: 8, name: '外孙女', gender: 2, fatherId: 3, motherId: 4 },
+    { id: 9, name: '路人', gender: 1 },
+  ]
+  const graph = buildFamilyGraph(members)
+  const edgeKeysOf = (r) => [...r.edgeKeys].sort()
+
+  it('父子一跳:只加深那一条亲子线', () => {
+    const r = shortestRelationEdgeKeys(graph, 3, 5)
+    expect(r.distance).toBe(1)
+    expect(r.edgeKeys.size).toBe(1)
+    expect(r.nodeIds).toEqual(new Set([3, 5]))
+    expect(graph.edges.some((e) => e.key === [...r.edgeKeys][0])).toBe(true)
+  })
+
+  it('祖孙两跳:两段亲子线都加深,中间节点在路径里', () => {
+    const r = shortestRelationEdgeKeys(graph, 1, 5)
+    expect(r.distance).toBe(2)
+    expect(r.nodeIds).toEqual(new Set([1, 3, 5]))
+    expect(r.edgeKeys.size).toBe(2)
+  })
+
+  it('夫妻一跳:得到夫妻线 key(用于连同 ♥ 一起加深)', () => {
+    const r = shortestRelationEdgeKeys(graph, 1, 2)
+    expect(r.distance).toBe(1)
+    const edge = graph.edges.find((e) => e.key === [...r.edgeKeys][0])
+    expect(edge.type).toBe('spouse')
+  })
+
+  it('亲家两跳:夫妻线 + 女方亲子线', () => {
+    const r = shortestRelationEdgeKeys(graph, 6, 3)
+    expect(r.distance).toBe(2)
+    expect(r.nodeIds).toEqual(new Set([6, 4, 3]))
+    expect(r.edgeKeys.size).toBe(2)
+  })
+
+  it('并列最短路径全部加深(不任选一条)', () => {
+    // 甲乙是兄弟,丙的父亲是甲、母亲是乙 → 祖父丁到丙有两条 2 跳路径
+    const g = buildFamilyGraph([
+      { id: 1, name: '祖父', gender: 1 },
+      { id: 2, name: '甲', gender: 1, fatherId: 1 },
+      { id: 3, name: '乙', gender: 2, fatherId: 1 },
+      { id: 4, name: '丙', gender: 1, fatherId: 2, motherId: 3 },
+    ])
+    const r = shortestRelationEdgeKeys(g, 1, 4)
+    expect(r.distance).toBe(2)
+    // 两条 2 跳路径 = 4 条边(1→2→4 与 1→3→4),全部加深
+    expect(r.edgeKeys.size).toBe(4)
+    expect(edgeKeysOf(r)).toHaveLength(4)
+    expect([...r.nodeIds].sort()).toEqual([1, 2, 3, 4])
+  })
+
+  it('无通路/同一人/不存在成员:不算距离、不亮线、不报错', () => {
+    expect(shortestRelationEdgeKeys(graph, 1, 9)).toEqual({ distance: -1, edgeKeys: new Set(), nodeIds: new Set() })
+    expect(shortestRelationEdgeKeys(graph, 1, 1).distance).toBe(-1)
+    expect(shortestRelationEdgeKeys(graph, 1, 999).distance).toBe(-1)
+    expect(shortestRelationEdgeKeys(null, 1, 2).distance).toBe(-1)
+  })
+
+  it('父母缺一侧(单亲)也能算出路径,不崩', () => {
+    const g = buildFamilyGraph([
+      { id: 1, name: '单亲父', gender: 1 },
+      { id: 2, name: '孩子', gender: 1, fatherId: 1 },
+      { id: 3, name: '孙', gender: 1, fatherId: 2 },
+    ])
+    const r = shortestRelationEdgeKeys(g, 1, 3)
+    expect(r.distance).toBe(2)
+    expect([...r.nodeIds].sort()).toEqual([1, 2, 3])
+  })
+
+  it('数据成环时 BFS 不死循环', () => {
+    const g = buildFamilyGraph([
+      { id: 1, gender: 1, fatherId: 2 },
+      { id: 2, gender: 1, fatherId: 1 },
+    ])
+    const r = shortestRelationEdgeKeys(g, 1, 2)
+    expect(r.distance).toBe(1)
   })
 })

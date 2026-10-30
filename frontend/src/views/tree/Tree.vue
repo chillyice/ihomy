@@ -1,5 +1,5 @@
 <!-- 家谱面板(已并入「家庭成员」页):关系图谱 + 成员编辑 + 从家庭成员导入。
-     点击卡片选中两人 → 计算中华传统称谓;图谱不显示"第 N 代",关系线按夫妻/亲子/补充关系区分。 -->
+     点击卡片选中两人 → 计算称谓;图谱不显示"第 N 代",关系线按夫妻/亲子/补充关系区分。 -->
 <template>
   <div class="tree-panel">
     <div class="tree-head">
@@ -22,7 +22,16 @@
     </div>
 
     <div v-loading="loading" class="tree-graph-wrap">
-      <FamilyTreeGraph :members="members" v-model:selected="selectedIds" @edit="openEditor" />
+      <FamilyTreeGraph
+        :members="members"
+        v-model:selected="selectedIds"
+        :connect-from="connectFrom"
+        @edit="openEditor"
+        @node-context="openNodeMenu"
+        @canvas-context="openCanvasMenu"
+        @canvas-click="exitConnect"
+        @link-request="openRelation"
+      />
     </div>
 
     <div class="kin-card" :class="{ active: selectedIds.length === 2 }">
@@ -61,6 +70,34 @@
         <el-button class="kin-clear" link size="small" @click="selectedIds = []">{{ $t('tree.clearSelection') }}</el-button>
       </template>
     </div>
+
+    <!-- 右键/长按菜单:画布空白处=新增成员,节点上=编辑/连接/解除/删除 -->
+    <FamilyTreeContextMenu :menu="contextMenu" @close="contextMenu = null" @select="onMenuSelect" />
+
+    <!-- 关系选择:拖拽连线或「连接到…」后弹出,A 是 B 的什么(子女按 B 的性别展开) -->
+    <el-dialog v-model="relDialog" append-to-body :title="$t('tree.relationTitle')" width="420px">
+      <div class="rel-head">{{ $t('tree.relationWho', { a: relFromName, b: relToName }) }}</div>
+      <el-radio-group v-model="relOption" class="rel-options">
+        <el-radio value="FATHER">{{ $t('tree.relationFather', { a: relFromName, b: relToName }) }}</el-radio>
+        <el-radio value="MOTHER">{{ $t('tree.relationMother', { a: relFromName, b: relToName }) }}</el-radio>
+        <el-radio value="SPOUSE">{{ $t('tree.relationSpousePair', { a: relFromName, b: relToName }) }}</el-radio>
+        <el-radio value="CHILD">{{ $t('tree.relationChild', { a: relFromName, b: relToName }) }}</el-radio>
+      </el-radio-group>
+      <div v-if="needGenderPick" class="rel-gender">
+        <span class="rel-gender-label">{{ $t('tree.genderNeeded', { name: relToName }) }}</span>
+        <el-radio-group v-model="relGender">
+          <el-radio :value="1">{{ $t('tree.male') }}</el-radio>
+          <el-radio :value="2">{{ $t('tree.female') }}</el-radio>
+        </el-radio-group>
+      </div>
+      <template #footer>
+        <el-button class="rel-swap" @click="swapDirection">{{ $t('tree.swapDirection') }}</el-button>
+        <el-button @click="relDialog = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="relSaving" :disabled="needGenderPick && !relGender" @click="submitRelation">
+          {{ $t('common.confirm') }}
+        </el-button>
+      </template>
+    </el-dialog>
 
     <!-- 成员编辑:新增/编辑共用;配偶/父亲/母亲从本家庭已有成员中选择 -->
     <el-dialog v-model="dialog" append-to-body :title="form.id ? $t('tree.edit') : $t('tree.add')" width="480px">
@@ -156,8 +193,9 @@ import { treeApi, fileApi, memberApi } from '@/api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { computeMutualKinship } from '@/utils/kinship'
 import { kinshipLabel } from '@/utils/kinshipTerms'
-import { buildFamilyGraph } from '@/utils/familyGraph'
+import { buildFamilyGraph, relationPayload } from '@/utils/familyGraph'
 import FamilyTreeGraph from '@/components/family/FamilyTreeGraph.vue'
+import FamilyTreeContextMenu from '@/components/family/FamilyTreeContextMenu.vue'
 
 const { t, locale } = useI18n()
 const userStore = useUserStore()
@@ -171,6 +209,13 @@ const saving = ref(false)
 const importVisible = ref(false)
 const importing = ref(false)
 const importIds = ref([])
+
+// 画板右键菜单 / 点选连线 / 关系选择弹窗
+const contextMenu = ref(null)
+const connectFrom = ref(null)
+const relDialog = ref(false)
+const relSaving = ref(false)
+const rel = reactive({ fromId: null, toId: null, option: 'FATHER', gender: 0 })
 
 const graphStats = computed(() => buildFamilyGraph(members.value).stats)
 
@@ -333,6 +378,162 @@ const uploadPhoto = async (options) => {
     form.photo = data.url
   } catch {
     ElMessage.error(t('tree.uploadFailed'))
+  }
+}
+
+// ---------- 画板右键菜单 / 拖拽连线 / 关系解绑 ----------
+const relFromName = computed(() => nameOf(rel.fromId))
+const relToName = computed(() => nameOf(rel.toId))
+// 「A 是 B 的子女」时 B 的性别决定落库到 father_id 还是 mother_id;性别未知就先让用户选
+const needGenderPick = computed(
+  () => relDialog.value && rel.option === 'CHILD' && ![1, 2].includes(members.value.find((m) => m.id === rel.toId)?.gender),
+)
+
+const openNodeMenu = ({ member, x, y }) => {
+  connectFrom.value = null
+  const children = []
+  if (member.fatherId) {
+    children.push({
+      key: 'unlink',
+      kind: 'FATHER',
+      fromId: member.fatherId,
+      toId: member.id,
+      label: `${t('tree.father')} · ${nameOf(member.fatherId)}`,
+    })
+  }
+  if (member.motherId) {
+    children.push({
+      key: 'unlink',
+      kind: 'MOTHER',
+      fromId: member.motherId,
+      toId: member.id,
+      label: `${t('tree.mother')} · ${nameOf(member.motherId)}`,
+    })
+  }
+  if (member.spouseId) {
+    children.push({
+      key: 'unlink',
+      kind: 'SPOUSE',
+      fromId: member.id,
+      toId: member.spouseId,
+      label: `${t('tree.spouse')} · ${nameOf(member.spouseId)}`,
+    })
+  }
+  const items = [
+    { key: 'edit', label: t('tree.menuEdit'), member },
+    { key: 'connect', label: t('tree.menuConnect'), member },
+  ]
+  if (children.length) items.push({ key: 'unlinkGroup', label: t('tree.menuUnlink'), children })
+  items.push({ key: 'delete', label: t('tree.menuDelete'), danger: true, member })
+  contextMenu.value = { x, y, items }
+}
+
+const openCanvasMenu = ({ x, y }) => {
+  connectFrom.value = null
+  contextMenu.value = { x, y, items: [{ key: 'add', label: t('tree.menuAddMember') }] }
+}
+
+const onMenuSelect = (item) => {
+  contextMenu.value = null
+  switch (item.key) {
+    case 'add':
+      openEditor()
+      break
+    case 'edit':
+      openEditor(item.member)
+      break
+    case 'connect':
+      connectFrom.value = item.member.id
+      break
+    case 'unlink':
+      unlinkRelation(item)
+      break
+    case 'delete':
+      remove(item.member.id)
+      break
+    default:
+      break
+  }
+}
+
+const exitConnect = () => {
+  if (connectFrom.value != null) connectFrom.value = null
+}
+
+// 拖拽手柄 / 「连接到…」点选完成后进入关系选择,默认选项按现有关系猜一个
+const openRelation = ({ fromId, toId }) => {
+  connectFrom.value = null
+  if (fromId == null || toId == null || fromId === toId) return
+  const target = members.value.find((m) => m.id === toId)
+  const source = members.value.find((m) => m.id === fromId)
+  let option = 'FATHER'
+  if (target?.fatherId === fromId) option = 'FATHER'
+  else if (target?.motherId === fromId) option = 'MOTHER'
+  else if (source?.spouseId === toId || target?.spouseId === fromId) option = 'SPOUSE'
+  Object.assign(rel, { fromId, toId, option, gender: 0 })
+  relDialog.value = true
+}
+
+const swapDirection = () => {
+  const { fromId, toId } = rel
+  rel.fromId = toId
+  rel.toId = fromId
+  rel.gender = 0
+}
+
+const unlinkRelation = async (item) => {
+  try {
+    await ElMessageBox.confirm(t('tree.unlinkConfirm', { label: item.label }), t('common.tip'), { type: 'warning' })
+  } catch {
+    return
+  }
+  await treeApi.unlink({ fromId: item.fromId, toId: item.toId, kind: item.kind })
+  ElMessage.success(t('tree.linkRemoved'))
+  await load()
+}
+
+// 目标已有父亲/母亲时先确认再覆盖(另一侧不动)
+const confirmReplaceParent = async (payload) => {
+  if (payload.kind !== 'FATHER' && payload.kind !== 'MOTHER') return true
+  const child = members.value.find((m) => m.id === payload.toId)
+  if (!child) return true
+  const currentId = payload.kind === 'FATHER' ? child.fatherId : child.motherId
+  if (!currentId || currentId === payload.fromId) return true
+  try {
+    await ElMessageBox.confirm(
+      t('tree.replaceParentConfirm', {
+        name: child.name,
+        role: payload.kind === 'FATHER' ? t('tree.father') : t('tree.mother'),
+        current: nameOf(currentId),
+        next: nameOf(payload.fromId),
+      }),
+      t('common.tip'),
+      { type: 'warning' },
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
+const submitRelation = async () => {
+  let payload
+  if (rel.option === 'CHILD' && needGenderPick.value) {
+    // 目标性别未知:由用户指定「B 是父亲还是母亲」,方向随之反过来
+    payload = { fromId: rel.toId, toId: rel.fromId, kind: rel.gender === 2 ? 'MOTHER' : 'FATHER' }
+  } else {
+    payload = relationPayload(rel.fromId, rel.toId, rel.option, members.value)
+  }
+  if (!payload || payload.needGenderOf) return
+  if (!(await confirmReplaceParent(payload))) return
+  relSaving.value = true
+  try {
+    await treeApi.link(payload)
+    ElMessage.success(t('tree.linkSaved'))
+    relDialog.value = false
+    await load()
+  } finally {
+    relSaving.value = false
   }
 }
 
@@ -510,6 +711,37 @@ onMounted(() => {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+.rel-head {
+  margin-bottom: 10px;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+.rel-options {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.rel-options :deep(.el-radio) {
+  margin-right: 0;
+}
+.rel-gender {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  font-size: 12px;
+}
+.rel-gender-label {
+  color: var(--color-text-2);
+}
+.rel-swap {
+  float: left;
 }
 .photo-preview {
   width: 64px;

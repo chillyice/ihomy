@@ -44,7 +44,8 @@ describe('buildNavItems 天气入口', () => {
   })
 })
 
-// 「家庭」组(V10.85):物品定位/家庭公告/智能家居/工具箱 从生活组拆出,排在生活之后
+// 「家庭」组(V10.85):物品定位/家庭公告/智能家居/工具箱 从生活组拆出,排在生活之后;
+// 成员(V10.93)从 social 组并入并排组内首位,「成员」分组不再出现
 describe('buildNavGroups 家庭组', () => {
   const modules = [
     { code: 'item', title: '物品定位', path: '/item', category: 'family', sortOrder: 4, enabled: 1 },
@@ -53,19 +54,25 @@ describe('buildNavGroups 家庭组', () => {
     { code: 'announcement', title: '家庭公告', path: '/announcement', category: 'family', sortOrder: 15, enabled: 1 },
     { code: 'reminder', title: '今日提醒', path: '/reminder', category: 'life', sortOrder: 6, enabled: 1 },
     { code: 'blog', title: '博客', path: '/blog', category: 'content', sortOrder: 1, enabled: 1 },
-    { code: 'member', title: '家庭成员', path: '/member', category: 'social', sortOrder: 1, enabled: 1 },
+    { code: 'member', title: '家庭成员', path: '/member', category: 'family', sortOrder: 3, enabled: 1 },
   ]
 
-  it('家庭组固定排在生活之后、成员之前,组内按 sortOrder', () => {
+  it('家庭组固定排在生活之后,组内按 sortOrder 且成员排首位', () => {
     const groups = buildNavGroups(modules)
-    expect(groups.map((g) => g.category)).toEqual(['content', 'life', 'family', 'social', 'system'])
+    expect(groups.map((g) => g.category)).toEqual(['content', 'life', 'family', 'system'])
     const family = groups.find((g) => g.category === 'family')
     expect(family.label).toBe('家庭')
-    expect(family.items.map((i) => i.code)).toEqual(['item', 'announcement', 'iot', 'tools'])
+    expect(family.items.map((i) => i.code)).toEqual(['member', 'item', 'announcement', 'iot', 'tools'])
   })
 
   it('家庭组模块不会再出现在生活组', () => {
     const life = buildNavGroups(modules).find((g) => g.category === 'life')
     expect(life.items.map((i) => i.code)).toEqual(['reminder', 'weather'])
+  })
+
+  it('仍停在旧 social 分类的自定义模块归入家庭组,不会整组消失', () => {
+    const groups = buildNavGroups([{ code: 'member', title: '家庭成员', path: '/member', category: 'social', sortOrder: 1, enabled: 1 }])
+    expect(groups.map((g) => g.category)).toEqual(['life', 'family', 'system'])
+    expect(groups.find((g) => g.category === 'family').items.map((i) => i.code)).toEqual(['member'])
   })
 })

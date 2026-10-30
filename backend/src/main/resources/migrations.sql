@@ -2617,7 +2617,7 @@ INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUE
 ('wish_source', 'PLAN',        '家庭计划');
 
 -- ------------------------------------------------------------
--- V10.93 成员分组调整(2026-10-30)
+-- V10.94 成员分组调整(2026-10-30)
 --   「家庭成员」从 social 组并入 family 组并排在组内首位(member 3 < item 4),
 --   「成员」分组随 NAV_GROUP_ORDER 去掉 social 而消失。
 --   幂等:只有仍停在旧分组时才更新,重复执行无副作用。改完须重启后端(模块内存缓存)。

@@ -843,7 +843,7 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 -- 生活组:厨房恒为组内第 1 位;组内相对序生效,与 content 组数值交错无影响。
 -- 家庭组(V10.85):物品定位/家庭公告/智能家居/工具箱 从生活组拆出,侧栏固定排在生活之后;
 -- 组内相对序 member(3) < item(4) < announcement(15) < iot(16) < tools(17)。照片瀑布已并入相册,不再单列为模块。
--- member(V10.93):从 social 组并入家庭组并排在首位,「成员」分组随之消失。
+-- member(V10.94):从 social 组并入家庭组并排在首位,「成员」分组随之消失。
 -- reminder/anniversary(V10.88):入口并入「家庭计划」三页签,置 enabled=0 保留行与路由映射兜底旧链接。
 INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`) VALUES
 ('item',      '物品定位', 'icon-item',      '/item',   'family', 'left',  4, 1),

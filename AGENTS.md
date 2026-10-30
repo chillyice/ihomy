@@ -132,7 +132,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 ## 跨模块规则
 
-- **首页/导航**:分组顺序固定 `content → life → family → social → system`(内容/生活/家庭/成员/系统),`family` 组 = 物品定位/家庭公告/智能家居/工具箱;`sys_home_module.sort_order` 决定组内顺序,改完重启后端;**移动端导航唯一数据源 `utils/navModules.js`**——不入模块表的页面(设置/帮助/运维/天气)须在 `buildNavItems` 补虚拟入口;新增 category 必须同时登记 `NAV_GROUP_ORDER`,否则该组模块在导航里整组消失。移动首页只做动态流。**家谱已并入「家庭成员」页**(`?tab=tree`,旧 `/tree` 重定向),`tree` 模块种子置 `enabled=0` 防止重复入口。**提醒/纪念日已并入「家庭计划」页**(`/plan?tab=today|plan|anniversary`,旧 `/reminder`、`/anniversary` 重定向),两模块种子置 `enabled=0`;今日页签 = 今日计划 + 今日提醒 + 最近纪念日提示行,首页/暖居「今日」卡与它同源(`/plan/today` + `utils/agenda.js`)。**纪念日的下一次日期只由 `common/AnniversaryDate` 算**(首页倒计时/今日提示行/提前提醒共用),前端与别处禁止重算;提前提醒走 `AnniversaryReminderService`(站内通知,不生成待办)。**愿望来源三列**(`content_wish.source_type/source_id/source_title`)由放映厅作品详情/纪念日卡片/小游戏页三个入口写入,共用 `components/wish/AddToWishDialog.vue`,分类与回跳口径在 `utils/wish.js`;`source_id` 是**字符串**(媒体引擎条目ID 是 GUID),`source_title` 只存快照。
+- **首页/导航**:分组顺序固定 `content → life → family → system`(内容/生活/家庭/系统),`family` 组 = 家庭成员/物品定位/家庭公告/智能家居/工具箱(成员 `sort_order=3` 居首,原「成员」social 组已取消);`sys_home_module.sort_order` 决定组内顺序,改完重启后端;**移动端导航唯一数据源 `utils/navModules.js`**——不入模块表的页面(设置/帮助/运维/天气)须在 `buildNavItems` 补虚拟入口;新增 category 必须同时登记 `NAV_GROUP_ORDER`,否则该组模块在导航里整组消失。移动首页只做动态流。**家谱已并入「家庭成员」页**(`?tab=tree`,旧 `/tree` 重定向),`tree` 模块种子置 `enabled=0` 防止重复入口。**提醒/纪念日已并入「家庭计划」页**(`/plan?tab=today|plan|anniversary`,旧 `/reminder`、`/anniversary` 重定向),两模块种子置 `enabled=0`;今日页签 = 今日计划 + 今日提醒 + 最近纪念日提示行,首页/暖居「今日」卡与它同源(`/plan/today` + `utils/agenda.js`)。**纪念日的下一次日期只由 `common/AnniversaryDate` 算**(首页倒计时/今日提示行/提前提醒共用),前端与别处禁止重算;提前提醒走 `AnniversaryReminderService`(站内通知,不生成待办)。**愿望来源三列**(`content_wish.source_type/source_id/source_title`)由放映厅作品详情/纪念日卡片/小游戏页三个入口写入,共用 `components/wish/AddToWishDialog.vue`,分类与回跳口径在 `utils/wish.js`;`source_id` 是**字符串**(媒体引擎条目ID 是 GUID),`source_title` 只存快照。
 - **工具箱**:元数据唯一来源 `frontend/src/tools/registry.js`;12 个开发者工具(JSON/编码/进制/报文/子网/哈希/随机/时间/正则/文本/运维/JWT)只在 `/bit-pouch/tools/<id>` 维护界面,ihomy 旧 `/tools/<id>` 重定向,registry 标 `toolbox:false`;颜色/单位/图片/文件/PDF 两处入口共用内核。比特口袋在线目录(`tools/bitPouchTools.js`)共 24 项,与 bit_pouch `src/plugins/` 一一对应,另有 URL/UUID/数据格式/HTTP 报文/cURL/IP 段/MQTT 主题 7 项只在线页维护。
 - **天文**:后端 `SolarUtil` 是唯一计算来源(随 `/public/sun-info` 下发),前端 `utils/terminator.js` 只做球面几何渲染,**禁止再移植 NOAA/Meeus**;`/public/sun-info` 只缓存 slots,直射点每次实时算。
 - **独立产品页**:挂 `/kada`、`/bit-pouch`、`/wallpaper`、`/chillyice` 这类页必须加 `meta.standalone`(不套外壳、跳过 `appStore.init()`、401 不顶登录页、自带配色要接管 `html` 根类);**从独立页回站内页要补初始化**(`App.vue` 监听 standalone 变 false 时补 `appStore.init()`/`ensureUserInfo()`),否则首页与家庭名全空(踩坑速查 §3.32/§3.8)。
@@ -188,9 +188,9 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 ## 验证基线
 
-- 后端全绿:`.\mvnw.cmd -B clean package`(182 tests,纯逻辑不起 Spring)。
-- 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(574 passed)+ `npm run format:check`(全树遗留未格式化:`views/BitPouch.vue`、`utils/packetDecode.js`+`.spec.js`、`views/bitpouch/panels/PacketPanel.vue`、`views/Chillyice.vue`、`views/ops/tabs/OpsKada.vue`;**本次改动的文件必须 `prettier --write` 后通过**)。
-- 构建:入口 chunk 基线 **516.89KB / gzip 213.39KB**(V10.92);**vite 报的是字符数不是字节数**,别拿 `ls -la` 比;历史数字见 变更归档。
+- 后端全绿:`.\mvnw.cmd -B clean package`(203 tests,纯逻辑不起 Spring)。
+- 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(586 passed)+ `npm run format:check`(全树遗留未格式化:`views/BitPouch.vue`、`utils/packetDecode.js`+`.spec.js`、`views/bitpouch/panels/PacketPanel.vue`、`views/Chillyice.vue`、`views/ops/tabs/OpsKada.vue`;**本次改动的文件必须 `prettier --write` 后通过**)。
+- 构建:入口 chunk 基线 **518.22KB / gzip 213.91KB**(V10.94);**vite 报的是字符数不是字节数**,别拿 `ls -la` 比;历史数字见 变更归档。
 - 一致性:`bash scripts/doc-drift-check.sh` 全 [OK];`gen-code-map.sh --check`、`doc-index.sh --check` 无漂移。
 - 接口测试在仓库外 `..\autotest_framework`(`pytest -m api`,37 passed)。
 

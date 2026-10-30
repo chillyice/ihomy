@@ -436,6 +436,9 @@ export const treeApi = {
   update: (id, data) => request.put(`/tree/${id}`, data),
   remove: (id) => request.delete(`/tree/${id}`),
   importMembers: (userIds) => request.post('/tree/import-members', { userIds }),
+  // 只改一条关系,不动成员的其他资料(fromId 是 toId 的 kind: FATHER/MOTHER/SPOUSE)
+  link: (data) => request.post('/tree/relation', data),
+  unlink: (params) => request.delete('/tree/relation', { params }),
 }
 
 // 聊天室(历史/未读/已读游标;实时走 WebSocket)

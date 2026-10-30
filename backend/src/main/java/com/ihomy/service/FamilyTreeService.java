@@ -151,6 +151,83 @@ public class FamilyTreeService {
         treeMapper.deleteById(id);
     }
 
+    /**
+     * 建立一条关系:fromId 是 toId 的 kind(FATHER/MOTHER/SPOUSE)。
+     * 只写关系列,不动成员的姓名/性别/生日/照片/备注等资料——全量编辑接口做不到这一点。
+     */
+    @Transactional
+    public void link(Long familyId, Long fromId, Long toId, String kind) {
+        if (fromId == null || toId == null || fromId.equals(toId)) throw new BizException(ResultCode.BAD_REQUEST);
+        FamilyTreeMember from = require(fromId, familyId);
+        FamilyTreeMember to = require(toId, familyId);
+        switch (kind == null ? "" : kind) {
+            case "FATHER" -> linkParent(familyId, from, to, true);
+            case "MOTHER" -> linkParent(familyId, from, to, false);
+            case "SPOUSE" -> linkSpousePair(familyId, from, to);
+            default -> throw new BizException(ResultCode.BAD_REQUEST);
+        }
+    }
+
+    /** 解除一条关系:配偶双向解绑;父亲/母亲只清子女该侧,且仅在确实指向该成员时才清 */
+    @Transactional
+    public void unlink(Long familyId, Long fromId, Long toId, String kind) {
+        if (fromId == null || toId == null || fromId.equals(toId)) throw new BizException(ResultCode.BAD_REQUEST);
+        FamilyTreeMember from = require(fromId, familyId);
+        FamilyTreeMember to = require(toId, familyId);
+        switch (kind == null ? "" : kind) {
+            case "FATHER" -> unlinkParent(from, to, true);
+            case "MOTHER" -> unlinkParent(from, to, false);
+            case "SPOUSE" -> unlinkSpousePair(from, to);
+            default -> throw new BizException(ResultCode.BAD_REQUEST);
+        }
+    }
+
+    /** 把 parent 挂到 child 的父/母列:只 set 该侧列;parent 是 child 的后代时拒绝(成环)。 */
+    private void linkParent(Long familyId, FamilyTreeMember parent, FamilyTreeMember child, boolean father) {
+        if (hasAncestor(parent.getId(), child.getId(), familyId, new HashSet<>())) {
+            throw new BizException(ResultCode.BAD_REQUEST);
+        }
+        LambdaUpdateWrapper<FamilyTreeMember> uw = new LambdaUpdateWrapper<FamilyTreeMember>()
+                .eq(FamilyTreeMember::getId, child.getId());
+        if (father) uw.set(FamilyTreeMember::getFatherId, parent.getId());
+        else uw.set(FamilyTreeMember::getMotherId, parent.getId());
+        treeMapper.update(null, uw);
+    }
+
+    private void unlinkParent(FamilyTreeMember parent, FamilyTreeMember child, boolean father) {
+        LambdaUpdateWrapper<FamilyTreeMember> uw = new LambdaUpdateWrapper<FamilyTreeMember>()
+                .eq(FamilyTreeMember::getId, child.getId());
+        if (father) uw.eq(FamilyTreeMember::getFatherId, parent.getId()).set(FamilyTreeMember::getFatherId, null);
+        else uw.eq(FamilyTreeMember::getMotherId, parent.getId()).set(FamilyTreeMember::getMotherId, null);
+        treeMapper.update(null, uw);
+    }
+
+    /** 配偶双向绑定:双方原有配偶先解绑另一侧,再互相指向(一人一位配偶,与编辑页行为一致)。 */
+    private void linkSpousePair(Long familyId, FamilyTreeMember a, FamilyTreeMember b) {
+        if (!Objects.equals(a.getSpouseId(), b.getId())) unlinkSpouse(a.getSpouseId(), familyId);
+        if (!Objects.equals(b.getSpouseId(), a.getId())) unlinkSpouse(b.getSpouseId(), familyId);
+        treeMapper.update(null, new LambdaUpdateWrapper<FamilyTreeMember>()
+                .eq(FamilyTreeMember::getId, a.getId())
+                .set(FamilyTreeMember::getSpouseId, b.getId()));
+        treeMapper.update(null, new LambdaUpdateWrapper<FamilyTreeMember>()
+                .eq(FamilyTreeMember::getId, b.getId())
+                .set(FamilyTreeMember::getSpouseId, a.getId()));
+    }
+
+    /** 解除配偶:只清确实指向对方的那一侧(历史单侧数据只清一侧,不误伤第三方)。 */
+    private void unlinkSpousePair(FamilyTreeMember a, FamilyTreeMember b) {
+        if (Objects.equals(a.getSpouseId(), b.getId())) {
+            treeMapper.update(null, new LambdaUpdateWrapper<FamilyTreeMember>()
+                    .eq(FamilyTreeMember::getId, a.getId())
+                    .set(FamilyTreeMember::getSpouseId, null));
+        }
+        if (Objects.equals(b.getSpouseId(), a.getId())) {
+            treeMapper.update(null, new LambdaUpdateWrapper<FamilyTreeMember>()
+                    .eq(FamilyTreeMember::getId, b.getId())
+                    .set(FamilyTreeMember::getSpouseId, null));
+        }
+    }
+
     private void apply(FamilyTreeMember m, TreeMemberDTO dto) {
         if (dto.getName() != null && !dto.getName().isBlank()) m.setName(dto.getName());
         if (dto.getGender() != null) m.setGender(dto.getGender());

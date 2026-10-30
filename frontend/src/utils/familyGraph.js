@@ -324,6 +324,7 @@ export function buildFamilyGraph(members, options = {}) {
       nodes: new Map(),
       units: [],
       edges: [],
+      normalized,
       stats: { people: 0, units: 0, spousePairs: 0, parentLinks: 0, orphanLinks: normalized.orphanLinks },
     }
   }
@@ -517,6 +518,7 @@ export function buildFamilyGraph(members, options = {}) {
     nodes,
     units: placed,
     edges,
+    normalized,
     stats: {
       people: normalized.byId.size,
       units: placed.length,
@@ -525,4 +527,142 @@ export function buildFamilyGraph(members, options = {}) {
       parentLinks: edges.filter((e) => e.type === 'parent').length,
     },
   }
+}
+
+// ---------------------------------------------------------------------------
+// 画板交互的纯函数:命中测试、坐标换算、关系载荷、最短关系路径。
+// 组件只负责事件与渲染,判断逻辑都在这里,便于单测。
+// ---------------------------------------------------------------------------
+
+/** 画布坐标:视口内客户端坐标 → 画板内坐标(与 translate+scale 变换互逆)。 */
+export function canvasPoint(clientX, clientY, rect, offsetX, offsetY, scale) {
+  const s = scale || 1
+  return { x: (clientX - rect.left - offsetX) / s, y: (clientY - rect.top - offsetY) / s }
+}
+
+/** 命中的节点:点在卡片外扩 threshold 范围内即算命中,多个候选取离中心最近的。 */
+export function nearestNode(nodes, canvasX, canvasY, threshold = 24) {
+  let bestId = null
+  let bestDistance = Infinity
+  for (const node of nodes instanceof Map ? nodes.values() : nodes || []) {
+    const left = node.x ?? node.cx - (node.width || 0) / 2
+    const top = node.y ?? node.cy - (node.height || 0) / 2
+    const right = left + (node.width || 0)
+    const bottom = top + (node.height || 0)
+    const dx = Math.max(left - canvasX, 0, canvasX - right)
+    const dy = Math.max(top - canvasY, 0, canvasY - bottom)
+    if (Math.hypot(dx, dy) > threshold) continue
+    const distance = Math.hypot((left + right) / 2 - canvasX, (top + bottom) / 2 - canvasY)
+    if (distance < bestDistance) {
+      bestDistance = distance
+      bestId = node.id
+    }
+  }
+  return bestId
+}
+
+/**
+ * 关系选择 → 接口载荷。option 是「from 是 to 的什么」:
+ * FATHER/MOTHER/SPOUSE 直接给 kind;CHILD 表示「from 是 to 的子女」,
+ * 需要按 to 的性别把方向反过来(性别未知时返回 needGenderOf 让用户先选)。
+ */
+export function relationPayload(fromId, toId, option, members) {
+  if (fromId == null || toId == null || fromId === toId) return null
+  switch (option) {
+    case 'FATHER':
+    case 'MOTHER':
+    case 'SPOUSE':
+      return { fromId, toId, kind: option }
+    case 'CHILD': {
+      const target = (members || []).find((m) => m.id === toId)
+      if (target?.gender === 1) return { fromId: toId, toId: fromId, kind: 'FATHER' }
+      if (target?.gender === 2) return { fromId: toId, toId: fromId, kind: 'MOTHER' }
+      return { needGenderOf: toId }
+    }
+    default:
+      return null
+  }
+}
+
+const relationPairKey = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`)
+
+/** 关系跳 → 图上连线 key 的索引:夫妻按成员对,亲子按「父母-子女」逐对。 */
+function buildHopIndex(edges) {
+  const index = new Map()
+  const add = (a, b, key) => {
+    const k = relationPairKey(a, b)
+    if (!index.has(k)) index.set(k, new Set())
+    index.get(k).add(key)
+  }
+  for (const edge of edges || []) {
+    if (edge.type === 'spouse' && edge.memberIds?.length >= 2) {
+      add(edge.memberIds[0], edge.memberIds[1], edge.key)
+    } else if (edge.type === 'parent' && edge.memberId != null) {
+      for (const pid of edge.parentIds || []) add(pid, edge.memberId, edge.key)
+    }
+  }
+  return index
+}
+
+/** 归一化关系 → 无向邻接表(夫妻 + 亲子),只含真实存在的人。 */
+export function relationAdjacency(normalized) {
+  const adjacency = new Map()
+  const ensure = (id) => {
+    if (!adjacency.has(id)) adjacency.set(id, new Set())
+    return adjacency.get(id)
+  }
+  for (const id of normalized?.byId?.keys() || []) ensure(id)
+  const link = (a, b) => {
+    if (!normalized.byId.has(a) || !normalized.byId.has(b) || a === b) return
+    ensure(a).add(b)
+    ensure(b).add(a)
+  }
+  for (const [id, spouses] of normalized?.spouseOf || []) for (const sid of spouses) link(id, sid)
+  for (const [child, parents] of normalized?.parentsOf || []) for (const p of parents) link(p.id, child)
+  return adjacency
+}
+
+/**
+ * 两人之间的「最近连线」= 关系跳数最少(BFS,不是屏幕距离),多解全取。
+ * 返回路径上的边 key 与节点 id;无通路时 distance=-1 且集合为空。
+ */
+export function shortestRelationEdgeKeys(graph, fromId, toId) {
+  const empty = { distance: -1, edgeKeys: new Set(), nodeIds: new Set() }
+  if (!graph || fromId == null || toId == null || fromId === toId) return empty
+  const normalized = graph.normalized
+  if (!normalized?.byId?.has(fromId) || !normalized.byId.has(toId)) return empty
+
+  const adjacency = relationAdjacency(normalized)
+  const bfs = (start) => {
+    const dist = new Map([[start, 0]])
+    const queue = [start]
+    for (let head = 0; head < queue.length; head += 1) {
+      const cur = queue[head]
+      for (const next of adjacency.get(cur) || []) {
+        if (dist.has(next)) continue
+        dist.set(next, dist.get(cur) + 1)
+        queue.push(next)
+      }
+    }
+    return dist
+  }
+
+  const dFrom = bfs(fromId)
+  const distance = dFrom.get(toId)
+  if (distance == null) return empty
+  const dTo = bfs(toId)
+
+  const hopIndex = buildHopIndex(graph.edges)
+  const edgeKeys = new Set()
+  const nodeIds = new Set()
+  for (const [id, d] of dFrom) {
+    if (d + (dTo.get(id) ?? Infinity) === distance) nodeIds.add(id)
+  }
+  for (const [a, d] of dFrom) {
+    for (const b of adjacency.get(a) || []) {
+      if (d + 1 + (dTo.get(b) ?? Infinity) !== distance) continue
+      for (const key of hopIndex.get(relationPairKey(a, b)) || []) edgeKeys.add(key)
+    }
+  }
+  return { distance, edgeKeys, nodeIds }
 }

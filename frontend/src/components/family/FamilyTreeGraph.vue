@@ -1,6 +1,7 @@
 <!-- 家谱关系图:SVG 画关系线 + 绝对定位卡片,画布支持拖动平移与缩放。
      点击卡片选中(最多两人),由父组件计算称谓;右上角小铅笔进入编辑。
-     关系线:实线=亲子(父母与子女),红色横线=夫妻;悬停高亮同一关系组。 -->
+     关系线:实线=亲子(父母与子女),红色横线=夫妻;悬停高亮同一关系组。
+     交互增强:右键/长按出菜单,卡片右侧手柄拖出虚线连接另一位成员,选中两人时按关系跳数高亮最近连线。 -->
 <template>
   <div class="ftg-shell">
     <div class="ftg-bar">
@@ -16,18 +17,20 @@
         </el-button>
       </el-button-group>
       <span class="ftg-zoom">{{ zoomLabel }}</span>
-      <span class="ftg-hint">{{ $t('tree.panHint') }}</span>
+      <span class="ftg-hint">{{ connectFrom != null ? $t('tree.connectHint') : $t('tree.panHint') }}</span>
     </div>
 
     <div
       ref="viewport"
       class="ftg-viewport"
-      :class="{ dragging }"
+      :class="{ dragging, connecting: connectFrom != null }"
       @wheel.prevent="onWheel"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
       @pointerup="onPointerUp"
       @pointercancel="onPointerUp"
+      @contextmenu.prevent="onCanvasContext"
+      @click="onViewportClick"
     >
       <div v-if="!members.length" class="ftg-empty">
         <el-empty :description="$t('tree.emptyHint')" :image-size="90" />
@@ -41,23 +44,48 @@
             </g>
           </svg>
 
+          <svg v-if="linkDraft" class="ftg-draft" :width="graph.width" :height="graph.height" aria-hidden="true">
+            <line :x1="linkDraft.x1" :y1="linkDraft.y1" :x2="linkDraft.x2" :y2="linkDraft.y2" class="ftg-draft-line" />
+          </svg>
+
           <div
             v-for="entry in nodeEntries"
             :key="entry.id"
             v-a11y-click
             class="ftg-node"
-            :class="[`g${entry.member.gender || 0}`, { selected: selected.includes(entry.id), dim: isDim(entry.id) }]"
+            :class="[
+              `g${entry.member.gender || 0}`,
+              {
+                selected: selected.includes(entry.id),
+                dim: isDim(entry.id),
+                'path-node': isPathNode(entry.id),
+                'link-target': linkTargetId === entry.id,
+                'connect-source': connectFrom === entry.id,
+              },
+            ]"
             :style="{ left: `${entry.pos.x}px`, top: `${entry.pos.y}px`, width: `${entry.pos.width}px`, height: `${entry.pos.height}px` }"
             role="button"
             :tabindex="0"
             :aria-pressed="selected.includes(entry.id)"
             :aria-label="`${entry.member.name} ${$t('tree.selectHint')}`"
             @click="toggle(entry.id)"
+            @pointerdown="onNodePointerDown(entry, $event)"
+            @contextmenu.prevent.stop="onNodeContext(entry, $event)"
             @mouseenter="hoverId = entry.id"
             @mouseleave="hoverId = null"
           >
             <button class="ftg-edit" type="button" :title="$t('tree.edit')" @click.stop="$emit('edit', entry.member)">
               <el-icon><EditPen /></el-icon>
+            </button>
+            <button
+              class="ftg-link"
+              type="button"
+              :title="$t('tree.connectHandle')"
+              :aria-label="$t('tree.connectHandle')"
+              @pointerdown.stop="onHandleDown(entry, $event)"
+              @click.stop
+            >
+              <el-icon><Connection /></el-icon>
             </button>
             <div class="ftg-photo">
               <img v-if="entry.member.photo" :src="entry.member.photo" :alt="entry.member.name" draggable="false" />
@@ -77,18 +105,21 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { EditPen, FullScreen, UserFilled, ZoomIn, ZoomOut } from '@element-plus/icons-vue'
-import { buildFamilyGraph } from '@/utils/familyGraph'
+import { Connection, EditPen, FullScreen, UserFilled, ZoomIn, ZoomOut } from '@element-plus/icons-vue'
+import { buildFamilyGraph, canvasPoint, nearestNode, shortestRelationEdgeKeys } from '@/utils/familyGraph'
 
 const props = defineProps({
   members: { type: Array, default: () => [] },
   selected: { type: Array, default: () => [] },
+  /** 非空 = 处于「连接到…」点选态:此时点另一位成员直接发起连线请求 */
+  connectFrom: { type: Number, default: null },
 })
-const emit = defineEmits(['update:selected', 'edit'])
+const emit = defineEmits(['update:selected', 'edit', 'node-context', 'canvas-context', 'canvas-click', 'link-request'])
 
 const MIN_SCALE = 0.2
 const MAX_SCALE = 2.5
 const DRAG_THRESHOLD = 4
+const LONG_PRESS_MS = 500
 
 const hoverId = ref(null)
 const graph = computed(() => buildFamilyGraph(props.members))
@@ -114,6 +145,97 @@ let pinch = null
 let suppressClickUntil = 0
 let userAdjusted = false
 let resizeObserver = null
+
+// ---------- 连线拖拽 / 右键 / 长按 ----------
+const linking = ref(null)
+const linkTargetId = ref(null)
+let pressTimer = null
+let pressStart = null
+let pressEvent = null
+
+const linkDraft = computed(() => {
+  const draft = linking.value
+  if (!draft?.active) return null
+  const node = graph.value.nodes.get(draft.fromId)
+  if (!node) return null
+  return { x1: node.x + node.width, y1: node.y + node.height / 2, x2: draft.x, y2: draft.y }
+})
+
+const clearPress = () => {
+  if (pressTimer) clearTimeout(pressTimer)
+  pressTimer = null
+  pressStart = null
+  pressEvent = null
+}
+
+// 触屏长按等价于右键:移动超过 4px 即取消,抬手后短时间内不当作点击
+const startPress = (event, payload) => {
+  clearPress()
+  pressStart = { x: event.clientX, y: event.clientY }
+  pressEvent = payload
+  pressTimer = setTimeout(() => {
+    pressTimer = null
+    const data = pressEvent
+    pressStart = null
+    pressEvent = null
+    if (!data) return
+    suppressClickUntil = Date.now() + 400
+    emit(data.type, data.data)
+  }, LONG_PRESS_MS)
+}
+
+const onNodePointerDown = (entry, event) => {
+  if (event.pointerType !== 'touch') return
+  startPress(event, { type: 'node-context', data: { member: entry.member, x: event.clientX, y: event.clientY } })
+}
+
+const onNodeContext = (entry, event) => {
+  clearPress()
+  suppressClickUntil = Date.now() + 400
+  emit('node-context', { member: entry.member, x: event.clientX, y: event.clientY })
+}
+
+const onCanvasContext = (event) => {
+  if (event.target.closest?.('.ftg-node')) return
+  clearPress()
+  suppressClickUntil = Date.now() + 400
+  emit('canvas-context', { x: event.clientX, y: event.clientY })
+}
+
+const onViewportClick = (event) => {
+  if (Date.now() < suppressClickUntil) return
+  if (event.target.closest?.('.ftg-node')) return
+  emit('canvas-click', { x: event.clientX, y: event.clientY })
+}
+
+// 手柄按下只记起点,不捕获指针:等真正拖动(超过 4px)才捕获并进入连线态
+const onHandleDown = (entry, event) => {
+  if (event.pointerType === 'mouse' && event.button !== 0) return
+  clearPress()
+  linking.value = { fromId: entry.id, startX: event.clientX, startY: event.clientY, x: 0, y: 0, active: false }
+}
+
+const canvasPointOf = (clientX, clientY) => {
+  const vp = viewport.value
+  if (!vp) return { x: 0, y: 0 }
+  return canvasPoint(clientX, clientY, vp.getBoundingClientRect(), offsetX.value, offsetY.value, scale.value)
+}
+
+const finishLink = (clientX, clientY, pointerId) => {
+  const draft = linking.value
+  linking.value = null
+  linkTargetId.value = null
+  try {
+    viewport.value?.releasePointerCapture(pointerId)
+  } catch {
+    // 未捕获时无需释放
+  }
+  if (!draft?.active) return
+  suppressClickUntil = Date.now() + 400
+  const point = canvasPointOf(clientX, clientY)
+  const target = nearestNode(graph.value.nodes, point.x, point.y, 16)
+  if (target != null && target !== draft.fromId) emit('link-request', { fromId: draft.fromId, toId: target })
+}
 
 const stageStyle = computed(() => ({
   transform: `translate3d(${offsetX.value}px, ${offsetY.value}px, 0) scale(${scale.value})`,
@@ -203,6 +325,10 @@ const onPointerDown = (event) => {
       offsetY: offsetY.value,
       moved: false,
     }
+    // 触屏在空白处按住 = 画布右键菜单(节点上的长按由节点自己发起)
+    if (event.pointerType === 'touch' && !event.target.closest?.('.ftg-node')) {
+      startPress(event, { type: 'canvas-context', data: { x: event.clientX, y: event.clientY } })
+    }
     return
   }
   if (pointers.size === 2) {
@@ -223,9 +349,33 @@ const onPointerDown = (event) => {
 }
 
 const onPointerMove = (event) => {
+  // 连线拖拽优先:手柄按下时没有进 pointers,单独一条路径处理
+  if (linking.value) {
+    const draft = linking.value
+    const dx = event.clientX - draft.startX
+    const dy = event.clientY - draft.startY
+    if (!draft.active) {
+      if (Math.hypot(dx, dy) <= DRAG_THRESHOLD) return
+      draft.active = true
+      // 超过阈值才捕获,避免吞掉卡片点击
+      capture(event.pointerId)
+    }
+    const point = canvasPointOf(event.clientX, event.clientY)
+    draft.x = point.x
+    draft.y = point.y
+    const target = nearestNode(graph.value.nodes, point.x, point.y, 16)
+    linkTargetId.value = target != null && target !== draft.fromId ? target : null
+    return
+  }
+
   const prev = pointers.get(event.pointerId)
   if (!prev) return
   pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+
+  // 长按期间移动超过阈值 = 用户在拖画布,取消长按
+  if (pressStart && Math.hypot(event.clientX - pressStart.x, event.clientY - pressStart.y) > DRAG_THRESHOLD) {
+    clearPress()
+  }
 
   if (pinch && pointers.size >= 2) {
     const [a, b] = [...pointers.values()]
@@ -255,6 +405,12 @@ const onPointerMove = (event) => {
 }
 
 const onPointerUp = (event) => {
+  if (linking.value) {
+    pointers.delete(event.pointerId)
+    finishLink(event.clientX, event.clientY, event.pointerId)
+    return
+  }
+  clearPress()
   pointers.delete(event.pointerId)
   try {
     viewport.value?.releasePointerCapture(event.pointerId)
@@ -292,6 +448,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   clearTimeout(fitTimer)
+  clearPress()
   resizeObserver?.disconnect()
   resizeObserver = null
   window.removeEventListener('resize', onWindowResize)
@@ -303,8 +460,16 @@ watch(
   () => nextTick(fitSoon),
 )
 
-// 当前聚焦的单元:悬停优先,其次已选中的两人
+// 选中恰好两人时,按关系跳数(BFS)找最近的连线;不是屏幕几何距离
+const path = computed(() => {
+  if (props.selected.length !== 2) return null
+  const result = shortestRelationEdgeKeys(graph.value, props.selected[0], props.selected[1])
+  return result.distance > 0 ? result : null
+})
+
+// 当前聚焦的单元:有路径时以路径为准(悬停不再改深浅),否则悬停优先,其次已选中的人
 const focusUnits = computed(() => {
+  if (path.value) return new Set()
   const units = new Set()
   const ids = hoverId.value != null ? [hoverId.value] : props.selected
   for (const id of ids) {
@@ -320,13 +485,22 @@ const edgeTouchesFocus = (edge) => {
   return focusUnits.value.has(edge.fromUnitId) || focusUnits.value.has(edge.toUnitId)
 }
 
-const edgeClass = (edge) => ({
-  'edge-spouse': edge.type === 'spouse',
-  'edge-parent': edge.type === 'parent',
-  dim: !edgeTouchesFocus(edge),
-})
+const edgeClass = (edge) => {
+  const base = {
+    'edge-spouse': edge.type === 'spouse',
+    'edge-parent': edge.type === 'parent',
+  }
+  if (path.value) {
+    const onPath = path.value.edgeKeys.has(edge.key)
+    return { ...base, 'edge-path': onPath, dim: !onPath }
+  }
+  return { ...base, dim: !edgeTouchesFocus(edge) }
+}
+
+const isPathNode = (id) => !!path.value && path.value.nodeIds.has(id)
 
 const isDim = (id) => {
+  if (path.value) return !path.value.nodeIds.has(id) && !props.selected.includes(id)
   if (!focusUnits.value.size) return false
   const unitId = graph.value.nodes.get(id)?.unitId
   return !focusUnits.value.has(unitId)
@@ -334,6 +508,11 @@ const isDim = (id) => {
 
 const toggle = (id) => {
   if (Date.now() < suppressClickUntil) return
+  // 「连接到…」点选态:点另一位成员直接发起连线
+  if (props.connectFrom != null) {
+    if (id !== props.connectFrom) emit('link-request', { fromId: props.connectFrom, toId: id })
+    return
+  }
   const next = props.selected.includes(id) ? props.selected.filter((x) => x !== id) : [...props.selected, id].slice(-2)
   emit('update:selected', next)
 }
@@ -436,6 +615,30 @@ const birthYear = (m) => (m.birthDate ? String(m.birthDate).slice(0, 4) : '')
 .ftg-edges g:not(.dim) .ftg-line {
   stroke-width: 2.6;
 }
+/* 选中两人的最近关系路径:线加粗 + 主色微光,夫妻 ♥ 同步放大;非路径边由 dim 弱化 */
+.ftg-edges g.edge-path .ftg-line {
+  stroke-width: 3.6;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--color-primary) 55%, transparent));
+}
+.ftg-edges g.edge-path.edge-spouse .ftg-line {
+  filter: drop-shadow(0 0 5px rgb(232 93 117 / 55%));
+}
+.ftg-edges g.edge-path .ftg-heart {
+  font-size: 15px;
+  font-weight: 700;
+}
+.ftg-draft {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+.ftg-draft-line {
+  stroke: var(--color-primary);
+  stroke-width: 2;
+  stroke-dasharray: 6 5;
+  opacity: 0.9;
+}
 .ftg-node {
   position: absolute;
   display: flex;
@@ -465,6 +668,55 @@ const birthYear = (m) => (m.birthDate ? String(m.birthDate).slice(0, 4) : '')
   box-shadow:
     0 0 0 2px color-mix(in srgb, var(--color-primary) 35%, transparent),
     0 8px 18px rgb(0 0 0 / 10%);
+}
+/* 路径经过的节点加描边高亮(两端点另有 selected 样式) */
+.ftg-node.path-node:not(.selected) {
+  border-color: color-mix(in srgb, var(--color-primary) 60%, var(--color-border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 28%, transparent);
+}
+/* 连线拖拽的候选落点 */
+.ftg-node.link-target {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 45%, transparent);
+}
+.ftg-node.connect-source {
+  border-style: dashed;
+}
+.ftg-viewport.connecting {
+  cursor: crosshair;
+}
+.ftg-link {
+  position: absolute;
+  top: 50%;
+  right: -11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-card);
+  color: var(--color-text-secondary);
+  transform: translateY(-50%);
+  cursor: crosshair;
+  opacity: 0.35;
+  transition: opacity 0.15s;
+  touch-action: none;
+}
+.ftg-node:hover .ftg-link,
+.ftg-node.selected .ftg-link,
+.ftg-node.link-target .ftg-link {
+  opacity: 1;
+  color: var(--color-primary);
+}
+@media (hover: none) {
+  .ftg-link {
+    width: 28px;
+    height: 28px;
+    opacity: 0.85;
+  }
 }
 .ftg-node.g1 {
   border-top: 3px solid #5b8def;

@@ -4,12 +4,14 @@ import com.ihomy.annotation.OperationLog;
 import com.ihomy.common.Result;
 import com.ihomy.dto.TreeImportDTO;
 import com.ihomy.dto.TreeMemberDTO;
+import com.ihomy.dto.TreeRelationDTO;
 import com.ihomy.entity.FamilyTreeMember;
 import com.ihomy.security.LoginUser;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.FamilyTreeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -68,5 +70,21 @@ public class TreeController {
     public Result<Map<String, Object>> importMembers(@RequestBody(required = false) TreeImportDTO dto) {
         int count = treeService.importMembers(familyId(), dto == null ? null : dto.getUserIds());
         return Result.success(Map.of("count", count));
+    }
+
+    @Operation(summary = "建立家谱成员关系(只改关系,不动其他资料)")
+    @OperationLog(module = "TREE", operationType = "UPDATE", description = "建立家谱成员关系", saveArgs = false)
+    @PostMapping("/relation")
+    public Result<Void> link(@RequestBody @Valid TreeRelationDTO dto) {
+        treeService.link(familyId(), dto.getFromId(), dto.getToId(), dto.getKind());
+        return Result.success();
+    }
+
+    @Operation(summary = "解除家谱成员关系")
+    @OperationLog(module = "TREE", operationType = "DELETE", description = "解除家谱成员关系", saveArgs = false)
+    @DeleteMapping("/relation")
+    public Result<Void> unlink(@RequestParam Long fromId, @RequestParam Long toId, @RequestParam String kind) {
+        treeService.unlink(familyId(), fromId, toId, kind);
+        return Result.success();
     }
 }

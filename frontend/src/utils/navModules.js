@@ -104,13 +104,14 @@ export const iconComp = (code) => ICON_MAP[code] || Document
 
 // 分组顺序 + 中文名(相册 album 已并入 content,不单独成组)
 // family 组(V10.85):物品定位/家庭公告/智能家居/工具箱 从生活组拆出,固定排在生活之后;
+// member(V10.93)并入 family 组成为组内第一位,「成员(social)」分组随之取消。
 // 只在此处登记顺序与名称,三端(sidebar/暖居/移动端)自动同步
-export const NAV_GROUP_ORDER = ['content', 'life', 'family', 'social', 'system']
-export const CATEGORY_LABELS = { content: '内容', life: '生活', family: '家庭', social: '成员', system: '系统' }
+export const NAV_GROUP_ORDER = ['content', 'life', 'family', 'system']
+export const CATEGORY_LABELS = { content: '内容', life: '生活', family: '家庭', system: '系统' }
 export const categoryLabel = (cat) => CATEGORY_LABELS[cat] || '功能'
 
-// album 归入 content;空分类兜底 life
-const normalizeCategory = (cat) => (cat === 'album' ? 'content' : cat || 'life')
+// album 归入 content;历史 social(成员组)归入 family,避免自定义模块仍停在旧分类时整组消失;空分类兜底 life
+const normalizeCategory = (cat) => (cat === 'album' ? 'content' : cat === 'social' ? 'family' : cat || 'life')
 
 // 原始模块 → 扁平导航项:过滤无路径映射/停用模块,追加「设置」+「运维管理」虚拟入口,按 sortOrder 升序。
 // hasOps:是否展示运维管理(拥有 ops:view 权限)。
