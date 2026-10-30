@@ -26,6 +26,9 @@ export default [
     rules: {
       // 页面组件按路由命名(Home/Login/Vault...),不强制多词名
       'vue/multi-word-component-names': 'off',
+      // 模板引用了脚本没定义的绑定 = 静默失效(如 v-model="x" 而 x 不存在:选择永远不生效、
+      // 也不报错),按 error 拦。V10.94 家谱关系弹窗就是这类缺陷(选配偶却落库父亲)。
+      'vue/no-undef-properties': 'error',
       // 未使用变量是打磨项而非缺陷:提示但不拦构建
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' }],
       'no-empty': ['error', { allowEmptyCatch: true }],

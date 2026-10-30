@@ -216,6 +216,7 @@ const album = ref({})
 const photos = ref([])
 const children = ref([])
 const refreshing = ref(false)
+const loading = ref(false)
 const descEditor = reactive({ visible: false, value: '', currentId: null })
 const viewer = reactive({ visible: false, index: 0 })
 
@@ -242,19 +243,24 @@ const shareBase = computed(() => (album.value.shareToken ? `${location.origin}/a
 
 // 拉取相册详情与照片列表:分享模式走令牌接口(游客可访问),普通模式走详情接口
 const load = async () => {
-  const data = shareToken ? await albumApi.shared(shareToken) : await albumApi.detail(albumId)
-  album.value = data.album || {}
-  photos.value = data.photos || []
-  children.value = data.children || []
-  parents.value = data.parents || []
-  // 分享链接带 ?p= 混淆照片ID时,定位到该照片并打开播放页
-  const p = route.query.p
-  if (p) {
-    const idx = photos.value.findIndex((x) => shareId(x.id) === String(p))
-    if (idx >= 0) {
-      viewer.index = idx
-      viewer.visible = true
+  loading.value = true
+  try {
+    const data = shareToken ? await albumApi.shared(shareToken) : await albumApi.detail(albumId)
+    album.value = data.album || {}
+    photos.value = data.photos || []
+    children.value = data.children || []
+    parents.value = data.parents || []
+    // 分享链接带 ?p= 混淆照片ID时,定位到该照片并打开播放页
+    const p = route.query.p
+    if (p) {
+      const idx = photos.value.findIndex((x) => shareId(x.id) === String(p))
+      if (idx >= 0) {
+        viewer.index = idx
+        viewer.visible = true
+      }
     }
+  } finally {
+    loading.value = false
   }
 }
 

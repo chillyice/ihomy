@@ -60,4 +60,22 @@ describe('全局层级标尺守门', () => {
     }
     expect(offenders, `组件内裸层级过大(请改用 main.css 的 --z-* token):\n${offenders.join('\n')}`).toEqual([])
   })
+
+  it('组件引用的 --z-* token 必须在 main.css 里真实存在(拼错等于层级失效)', () => {
+    const css = readFileSync(join(SRC, 'styles/main.css'), 'utf8')
+    const defined = new Set([...css.matchAll(/(--z-[a-z-]+)\s*:/g)].map((m) => m[1]))
+    const offenders = []
+    for (const file of walk(SRC, ['.vue', '.css'])) {
+      const path = rel(file)
+      if (path === 'styles/main.css') continue
+      readFileSync(file, 'utf8')
+        .split(/\r?\n/)
+        .forEach((line, i) => {
+          for (const m of line.matchAll(/var\(\s*(--z-[a-z-]+)/g)) {
+            if (!defined.has(m[1])) offenders.push(`${path}:${i + 1}: ${m[1]}`)
+          }
+        })
+    }
+    expect(offenders, `引用了不存在的层级 token(检查拼写,可用值见 main.css):\n${offenders.join('\n')}`).toEqual([])
+  })
 })

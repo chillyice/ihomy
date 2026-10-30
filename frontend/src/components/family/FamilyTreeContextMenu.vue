@@ -1,5 +1,5 @@
 <!-- 家谱画板的右键/长按菜单:自建浮层(不走 el-dropdown,避免与画布拖拽抢指针)。
-     append-to-body 由 teleport 实现,防止被画板 overflow:hidden 裁切;层级用 --z-popper。 -->
+     append-to-body 由 teleport 实现,防止被画板 overflow:hidden 裁切;层级用 --z-popup(popper 档)。 -->
 <template>
   <teleport to="body">
     <div v-if="menu" class="ftm-layer" @pointerdown.self="$emit('close')" @contextmenu.prevent>
@@ -73,7 +73,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .ftm-layer {
   position: fixed;
   inset: 0;
-  z-index: var(--z-popper);
+  z-index: var(--z-popup);
 }
 .ftm-menu {
   position: fixed;

@@ -77,7 +77,7 @@
     <!-- 关系选择:拖拽连线或「连接到…」后弹出,A 是 B 的什么(子女按 B 的性别展开) -->
     <el-dialog v-model="relDialog" append-to-body :title="$t('tree.relationTitle')" width="420px">
       <div class="rel-head">{{ $t('tree.relationWho', { a: relFromName, b: relToName }) }}</div>
-      <el-radio-group v-model="relOption" class="rel-options">
+      <el-radio-group v-model="rel.option" class="rel-options">
         <el-radio value="FATHER">{{ $t('tree.relationFather', { a: relFromName, b: relToName }) }}</el-radio>
         <el-radio value="MOTHER">{{ $t('tree.relationMother', { a: relFromName, b: relToName }) }}</el-radio>
         <el-radio value="SPOUSE">{{ $t('tree.relationSpousePair', { a: relFromName, b: relToName }) }}</el-radio>
@@ -85,7 +85,7 @@
       </el-radio-group>
       <div v-if="needGenderPick" class="rel-gender">
         <span class="rel-gender-label">{{ $t('tree.genderNeeded', { name: relToName }) }}</span>
-        <el-radio-group v-model="relGender">
+        <el-radio-group v-model="rel.gender">
           <el-radio :value="1">{{ $t('tree.male') }}</el-radio>
           <el-radio :value="2">{{ $t('tree.female') }}</el-radio>
         </el-radio-group>
@@ -93,7 +93,7 @@
       <template #footer>
         <el-button class="rel-swap" @click="swapDirection">{{ $t('tree.swapDirection') }}</el-button>
         <el-button @click="relDialog = false">{{ $t('common.cancel') }}</el-button>
-        <el-button type="primary" :loading="relSaving" :disabled="needGenderPick && !relGender" @click="submitRelation">
+        <el-button type="primary" :loading="relSaving" :disabled="needGenderPick && !rel.gender" @click="submitRelation">
           {{ $t('common.confirm') }}
         </el-button>
       </template>
