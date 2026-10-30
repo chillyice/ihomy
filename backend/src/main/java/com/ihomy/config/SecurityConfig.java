@@ -62,8 +62,8 @@ public class SecurityConfig {
                         "/diary/list",
                         "/album/**",
                         "/anniversary/list",
-                        // 日程聚合游客可读(服务层匿名只返回演示家庭的纪念日,其余 kind 为空)
-                        "/schedule/events",
+                        // 日程聚合游客可读(服务层匿名只返回演示家庭的纪念日,其余 kind 为空;近期提醒游客为空列表)
+                        "/schedule/events", "/schedule/upcoming",
                         "/announcement/list",
                         // 愿望单列表游客可读(服务层匿名只返回演示家庭的 PUBLIC 愿望;写接口仍需登录)
                         "/wish/list",
