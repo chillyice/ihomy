@@ -140,7 +140,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 - **产品访问/下载统计**:咔哒与比特口袋的访问/下载落 `report_product_stat` 日表(落地页打点 + 安装包下载链接统一走 `GET /public/product/download` 计数后 302 到 `/files`),**禁止按 access 日志统计下载**——nginx `/files/` 静态直出,下载请求不进后端日志(踩坑速查 §7.11)。
 - **计划提醒单向托管**:计划的「提醒时间」只存 `family_reminder`(由 `plan_id` 关联),`family_plan` 不加时间列;写操作全走 `FamilyPlanService` 单事务,计划→提醒单向同步(计划完成连带完成提醒,提醒勾完成不改计划);重复判定与「今日」聚合共用 `RepeatSchedule.dueToday`,前端不算。
 - **提醒按日完成**:一次性提醒用 `family_reminder.done`;循环(每日/每周/每月/每年)按 (提醒, 日期) 落 `family_reminder_check`,取消完成即删行,系列不终止;每年重复可选阳历/农历(闰月严格匹配)。`toggle-done?date=` 带日期即按该日切换,删除提醒连带清完成行(自定义 XML)。判定唯一来源 `RepeatSchedule.dueToday`(重载带 `calendar/lunarMonth/lunarDay/isLeap`),到点通知对循环看当日完成行、并保留「当日已通知」兜底防 5 分钟重复推送(踩坑速查 §2.20)。
-- **日程聚合只读**:`GET /schedule/events?from=&to=`(≤62 天)与 `/schedule/upcoming?days=` 把纪念日/提醒/计划/子任务摊平成按日列表与待安排计划;写侧仍走各自接口。纪念日展开只用 `AnniversaryDate`;计划托管的提醒不单独成项(PLAN 项已带提醒时刻);游客口径只返回演示家庭纪念日(`SecurityConfig` GET 白名单)。
+- **日程聚合只读**:`GET /schedule/events?from=&to=`(≤62 天)与 `/schedule/upcoming?days=` 把纪念日/提醒/计划/子任务摊平成按日列表与待安排计划;写侧仍走各自接口。纪念日展开只用 `AnniversaryDate`;计划托管的提醒不单独成项(PLAN 项已带提醒时刻);**贷款还款日/理财到期/食材到期是只读来源**:每类一个 `service/schedule/ScheduleSourceProvider` 实现(`@Order` 注入列表遍历,新增来源只加实现、聚合主逻辑不堆 if-else),事项带 `source`/`readOnly`/`link`,日程页只展示与跳转、改数据回原页面;贷款需 `loan:view`、食材到期复用 `ItemExpiryService.expiryDate`(禁第二套算法);来源开关只在前端 `localStorage`(`ihomy:schedule:sources:v1`,默认全开,关掉不发请求);游客口径只返回演示家庭纪念日(`SecurityConfig` GET 白名单),只读来源对匿名一律不返回。
 
 ## 后端规范
 
@@ -231,7 +231,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 ## 文档与服务
 
-- 索引:`docs/README.md`(每份文档一句话 + 阅读顺序);`docs/架构设计.md`(请求怎么走/关键机制);`docs/代码地图.md`(代码定位);`docs/归档索引.md`(历史反查);`test/cases/功能测试用例.md`(463 条)。
+- 索引:`docs/README.md`(每份文档一句话 + 阅读顺序);`docs/架构设计.md`(请求怎么走/关键机制);`docs/代码地图.md`(代码定位);`docs/归档索引.md`(历史反查);`test/cases/功能测试用例.md`(475 条)。
 - `scripts/`:setup / start-all / restart-all / start-db / doc-drift-check / gen-code-map / doc-index / prod-backup / prod-restore / db_diff / ci-jellyfin-setup / docs-gen / soft-copyright(软著 PDF 生成)。
 - 本机环境:JDK 21、Node 20、MySQL 8、python-docx;Maven 用 Wrapper(或 temp 3.9.9);Redis 未装时用 Docker/Memurai。
 - **代码事实以 `backend/src/main/java` + `resources/schema.sql` 为准**;文档与代码冲突时先改文档再改代码,或先读 `docs/踩坑速查.md` 确认不是已知取舍。

@@ -683,6 +683,14 @@ export default {
     listEmpty: '这段时间还没有日程',
     type: { PLAN: '计划', ITEM: '事项', REMINDER: '提醒', TASK: '每日任务', ANNIVERSARY: '纪念日' },
     filter: { all: '全部', ANNIVERSARY: '纪念日', REMINDER: '提醒', TASK: '每日任务', ITEM: '事项', PLAN: '计划' },
+    sources: '显示来源',
+    source: {
+      PLAN_TASK: '计划子任务',
+      LOAN: '贷款还款',
+      FINANCE: '理财到期',
+      ITEM_EXPIRY: '食材到期',
+      loanPeriod: '第 {n} 期',
+    },
     dialog: {
       create: '新增日程',
       edit: '编辑日程',

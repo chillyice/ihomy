@@ -16,6 +16,25 @@
         </el-select>
       </div>
       <div class="tb-right">
+        <el-popover v-if="userStore.isLoggedIn" placement="bottom-end" trigger="click" :width="200">
+          <template #reference>
+            <el-button size="small" plain :aria-label="$t('schedule.sources')">
+              <el-icon><Filter /></el-icon>
+            </el-button>
+          </template>
+          <div class="source-panel">
+            <div class="section-label">{{ $t('schedule.sources') }}</div>
+            <el-checkbox
+              v-for="s in SOURCE_OPTIONS"
+              :key="s"
+              class="source-item"
+              :model-value="sourcePrefs[s]"
+              @change="setSource(s, $event)"
+            >
+              {{ $t('schedule.source.' + s) }}
+            </el-checkbox>
+          </div>
+        </el-popover>
         <el-button v-if="userStore.isLoggedIn" type="primary" @click="openCreate(selectedDate)">
           {{ $t('schedule.dialog.create') }}
         </el-button>
@@ -23,14 +42,14 @@
     </PageToolbar>
 
     <div v-loading="loading">
-      <ScheduleUpcoming v-if="view === 'calendar' && userStore.isLoggedIn" :items="upcoming" @pick="onPickUpcoming" />
+      <ScheduleUpcoming v-if="view === 'calendar' && userStore.isLoggedIn" :items="visibleUpcoming" @pick="onPickUpcoming" />
 
       <ScheduleCalendar
         v-if="view === 'calendar'"
         v-model:selected="selectedDate"
         :grid="grid"
         :calendar-days="calendarDays"
-        :events="eventsDays"
+        :events="visibleEventsDays"
         :year="cursor.year"
         :month="cursor.month"
         @change-month="changeMonth"
@@ -102,12 +121,20 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } 
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, Filter } from '@element-plus/icons-vue'
 import { anniversaryApi, memberApi, planApi, publicApi, reminderApi, scheduleApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { buildMonthGrid, isDateString, monthKey, monthRange, shiftMonth, todayString } from '@/utils/scheduleCalendar'
 import { buildList, sortEvents } from '@/utils/scheduleList'
 import { TYPE_FILTERS } from '@/utils/scheduleType'
+import {
+  SOURCE_OPTIONS,
+  filterEventDays,
+  filterSourceItems,
+  isReadOnlySource,
+  loadSourcePrefs,
+  saveSourcePrefs,
+} from '@/utils/scheduleSource'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import ScheduleCalendar from './ScheduleCalendar.vue'
@@ -134,6 +161,7 @@ const calendarDays = ref({})
 const eventsDays = ref({})
 const undated = ref([])
 const upcoming = ref([])
+const sourcePrefs = ref(loadSourcePrefs())
 const anniversaries = ref([])
 const plans = ref([])
 const reminders = ref([])
@@ -147,9 +175,12 @@ const detailVisible = ref(false)
 const detailRef = ref(null)
 
 const grid = computed(() => buildMonthGrid(cursor.year, cursor.month))
-const dayItems = computed(() => sortEvents(eventsDays.value[selectedDate.value] || []))
+// 来源开关只影响前端展示:后端仍返回全量,关掉某来源后当月圆点、当日列表、清单与近期条一起消失
+const visibleEventsDays = computed(() => filterEventDays(eventsDays.value, sourcePrefs.value))
+const visibleUpcoming = computed(() => filterSourceItems(upcoming.value, sourcePrefs.value))
+const dayItems = computed(() => sortEvents(visibleEventsDays.value[selectedDate.value] || []))
 const dayInfo = computed(() => calendarDays.value[selectedDate.value] || null)
-const listGroups = computed(() => buildList(eventsDays.value, filter.value))
+const listGroups = computed(() => buildList(visibleEventsDays.value, filter.value))
 const detailKind = computed(() => detailRef.value?.kind || 'PLAN')
 const detailRecord = computed(() => {
   if (!detailRef.value) return null
@@ -322,10 +353,21 @@ const openPlanEditor = (p) => {
 }
 
 const openDetail = (it) => {
+  // 只读来源(贷款/理财/食材)不在日程页展开详情,直接跳原页面修改
+  if (isReadOnlySource(it)) {
+    if (it.link) router.push(it.link)
+    return
+  }
   if (it.kind === 'REMINDER' || it.kind === 'TASK') return openEdit(it)
   if (it.kind === 'PLAN_TASK') detailRef.value = { kind: 'PLAN', id: it.planId }
   else detailRef.value = { kind: it.kind, id: it.id }
   detailVisible.value = true
+}
+
+// 来源开关:只存本机偏好,不发请求、不改后端返回
+const setSource = (source, on) => {
+  sourcePrefs.value = { ...sourcePrefs.value, [source]: !!on }
+  saveSourcePrefs(sourcePrefs.value)
 }
 
 const onDetailEdit = ({ kind, record }) => {
@@ -469,6 +511,17 @@ onBeforeUnmount(() => {
 <style scoped>
 .filter-select {
   width: 132px;
+}
+.source-panel {
+  display: flex;
+  flex-direction: column;
+}
+.source-panel .section-label {
+  margin: 0 0 4px;
+}
+.source-item {
+  height: 28px;
+  margin-right: 0;
 }
 .list-month {
   display: flex;

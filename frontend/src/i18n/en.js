@@ -688,6 +688,14 @@ export default {
       ITEM: 'Items',
       PLAN: 'Plans',
     },
+    sources: 'Show sources',
+    source: {
+      PLAN_TASK: 'Plan subtasks',
+      LOAN: 'Loan payments',
+      FINANCE: 'Maturities',
+      ITEM_EXPIRY: 'Food expiry',
+      loanPeriod: 'Payment {n}',
+    },
     dialog: {
       create: 'New event',
       edit: 'Edit event',

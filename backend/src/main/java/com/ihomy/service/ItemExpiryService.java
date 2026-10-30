@@ -70,11 +70,27 @@ public class ItemExpiryService {
         }
     }
 
+    /**
+     * 到期时刻(入库时间 + 保质期):通知分级与日程聚合共用这一处口径,别处不得另算。
+     * 无入库时间/无保质期时返回 null。
+     */
+    public LocalDateTime expiryAt(Item it) {
+        Duration total = totalDuration(it);
+        if (total == null || total.isZero() || total.isNegative()) return null;
+        return it.getStoredAt().plus(total);
+    }
+
+    /** 到期日(日粒度,供日程聚合落格);无保质期信息返回 null */
+    public LocalDate expiryDate(Item it) {
+        LocalDateTime at = expiryAt(it);
+        return at == null ? null : at.toLocalDate();
+    }
+
     /** 三档预警级别:RED 已过期;YELLOW 总时长≤3天 或 剩余≤10%;GREEN 健康 */
     private String warnLevel(Item it) {
         Duration total = totalDuration(it);
         if (total == null || total.isZero() || total.isNegative()) return "GREEN";
-        LocalDateTime expiry = it.getStoredAt().plus(total);
+        LocalDateTime expiry = expiryAt(it);
         if (LocalDateTime.now().isAfter(expiry)) return "RED";
         long totalMs = total.toMillis();
         if (totalMs <= 3L * 24 * 60 * 60 * 1000) return "YELLOW";

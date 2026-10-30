@@ -3,8 +3,17 @@
 
 import { matchFilter, typeOfKind } from './scheduleType'
 
-/** 同一时刻的顺序:纪念日 → 提醒 → 每日任务 → 事项 → 计划子任务 */
-export const KIND_RANK = { ANNIVERSARY: 0, REMINDER: 1, TASK: 2, PLAN: 3, PLAN_TASK: 4 }
+/** 同一时刻的顺序:纪念日 → 提醒 → 每日任务 → 事项 → 计划子任务 → 贷款 → 理财 → 食材(与后端口径一致) */
+export const KIND_RANK = {
+  ANNIVERSARY: 0,
+  REMINDER: 1,
+  TASK: 2,
+  PLAN: 3,
+  PLAN_TASK: 4,
+  LOAN: 5,
+  FINANCE: 6,
+  ITEM_EXPIRY: 7,
+}
 
 const rankOf = (kind) => KIND_RANK[kind] ?? 9
 

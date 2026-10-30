@@ -12,6 +12,7 @@ import com.ihomy.mapper.FamilyPlanMapper;
 import com.ihomy.mapper.FamilyPlanTaskMapper;
 import com.ihomy.mapper.ReminderCheckMapper;
 import com.ihomy.mapper.ReminderMapper;
+import com.ihomy.service.schedule.ScheduleSourceProvider;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -26,7 +27,11 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -43,8 +48,9 @@ class ScheduleServiceTest {
     private final FamilyPlanMapper planMapper = mock(FamilyPlanMapper.class);
     private final FamilyPlanTaskMapper planTaskMapper = mock(FamilyPlanTaskMapper.class);
     private final AnniversaryService anniversaryService = mock(AnniversaryService.class);
+    private final ScheduleSourceProvider sourceProvider = mock(ScheduleSourceProvider.class);
     private final ScheduleService service = new ScheduleService(
-            reminderMapper, checkMapper, planMapper, planTaskMapper, anniversaryService);
+            reminderMapper, checkMapper, planMapper, planTaskMapper, anniversaryService, List.of(sourceProvider));
 
     /** 单测没有 MyBatis-Plus 启动扫描,手动注册实体信息,否则 LambdaWrapper 的列名解析会报错 */
     @BeforeAll
@@ -288,5 +294,56 @@ class ScheduleServiceTest {
     @Test
     void upcomingForGuestIsEmpty() {
         assertThat(service.upcoming(null, 7)).isEmpty();
+    }
+
+    // ---------------------------------------------------------------- 只读来源
+
+    @Test
+    void readOnlySourceItemsAreMergedIntoThatDay() {
+        when(anniversaryService.list(FAMILY)).thenReturn(List.of());
+        when(planMapper.selectList(any())).thenReturn(List.of(), List.of());
+        when(reminderMapper.selectList(any())).thenReturn(List.of());
+        when(sourceProvider.available(FAMILY)).thenReturn(true);
+        doAnswer(inv -> {
+            List<Map<String, Object>> items = inv.getArgument(3);
+            items.add(ScheduleSourceProvider.readOnlyItem(
+                    "LOAN", 7L, "建行房贷", LocalDate.of(2026, 10, 30), "/book?tab=loan"));
+            return null;
+        }).when(sourceProvider).append(eq(FAMILY), any(), any(), any());
+
+        Map<String, Object> result = service.events(FAMILY,
+                LocalDate.of(2026, 10, 30), LocalDate.of(2026, 10, 30), false);
+
+        List<Map<String, Object>> items = day(result, "2026-10-30");
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0)).containsEntry("kind", "LOAN")
+                .containsEntry("source", "LOAN")
+                .containsEntry("readOnly", true)
+                .containsEntry("link", "/book?tab=loan")
+                .containsEntry("title", "建行房贷")
+                .containsEntry("time", null);
+    }
+
+    @Test
+    void unavailableSourceIsSkippedEntirely() {
+        when(anniversaryService.list(FAMILY)).thenReturn(List.of());
+        when(planMapper.selectList(any())).thenReturn(List.of(), List.of());
+        when(reminderMapper.selectList(any())).thenReturn(List.of());
+        when(sourceProvider.available(FAMILY)).thenReturn(false);
+
+        Map<String, Object> result = service.events(FAMILY,
+                LocalDate.of(2026, 10, 30), LocalDate.of(2026, 10, 30), false);
+
+        assertThat(day(result, "2026-10-30")).isEmpty();
+        verify(sourceProvider, never()).append(any(), any(), any(), any());
+    }
+
+    @Test
+    void guestNeverTouchesReadOnlySources() {
+        when(anniversaryService.list(FAMILY)).thenReturn(List.of(anniversary(1, "solar", 10, 30, 0)));
+
+        service.events(FAMILY, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), true);
+
+        verifyNoInteractions(sourceProvider);
     }
 }

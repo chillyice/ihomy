@@ -14,6 +14,7 @@ import com.ihomy.mapper.FamilyPlanMapper;
 import com.ihomy.mapper.FamilyPlanTaskMapper;
 import com.ihomy.mapper.ReminderCheckMapper;
 import com.ihomy.mapper.ReminderMapper;
+import com.ihomy.service.schedule.ScheduleSourceProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -36,6 +37,8 @@ import java.util.Set;
  * 写侧仍落各自既有表与接口,本服务只读;日期算法不另写一套:
  * 提醒与每日任务逐日判定走 {@link RepeatSchedule},纪念日展开走 {@link AnniversaryDate},
  * 计划按 target_date、子任务按 due_date 取区间。
+ * 贷款还款日/理财到期/食材到期等「别处已存在」的数据走 {@link ScheduleSourceProvider} 实现列表汇总,
+ * 新增来源只加实现类,不在本服务里堆 if-else。
  * 游客口径(anniversaryOnly=true)只返回纪念日,其余为空,且不发需要登录的查询。
  */
 @Service
@@ -57,6 +60,8 @@ public class ScheduleService {
     private final FamilyPlanMapper planMapper;
     private final FamilyPlanTaskMapper planTaskMapper;
     private final AnniversaryService anniversaryService;
+    /** 只读来源实现列表(贷款/理财/食材),顺序由各实现的 @Order 决定 */
+    private final List<ScheduleSourceProvider> sourceProviders;
 
     /**
      * 区间日程聚合。
@@ -125,7 +130,19 @@ public class ScheduleService {
         if (anniversaryOnly) return items;
         appendReminders(familyId, from, to, items);
         appendPlans(familyId, from, to, items);
+        appendReadOnlySources(familyId, from, to, items);
         return items;
+    }
+
+    /**
+     * 只读来源(贷款还款日/理财到期/食材到期):遍历实现列表逐个摊平。
+     * 新增来源只加一个 ScheduleSourceProvider 实现,聚合主逻辑不动;不可用(无权限/未登录)时整段跳过。
+     */
+    private void appendReadOnlySources(Long familyId, LocalDate from, LocalDate to, List<Map<String, Object>> items) {
+        for (ScheduleSourceProvider provider : sourceProviders) {
+            if (!provider.available(familyId)) continue;
+            provider.append(familyId, from, to, items);
+        }
     }
 
     /** 纪念日:按 AnniversaryDate 展开到区间内的每年发生日(阳历/农历同一套口径) */
@@ -272,7 +289,7 @@ public class ScheduleService {
         return keys;
     }
 
-    /** 当日排序:有时刻的按时刻升序在前;全天事项依次为纪念日 / 计划 / 子任务,同组按 id */
+    /** 当日排序:有时刻的按时刻升序在前;全天事项依次为纪念日 / 计划 / 子任务 / 只读来源,同组按 id */
     private static void sortDay(List<Map<String, Object>> items) {
         items.sort(Comparator
                 .comparing((Map<String, Object> m) -> (String) m.get("time"), Comparator.nullsLast(Comparator.naturalOrder()))
@@ -285,7 +302,10 @@ public class ScheduleService {
             case "ANNIVERSARY" -> 0;
             case "PLAN" -> 1;
             case "PLAN_TASK" -> 2;
-            default -> 3;
+            case "LOAN" -> 3;
+            case "FINANCE" -> 4;
+            case "ITEM_EXPIRY" -> 5;
+            default -> 6;
         };
     }
 

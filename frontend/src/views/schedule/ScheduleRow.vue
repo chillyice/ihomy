@@ -1,8 +1,9 @@
-<!-- 日程单行:类型徽标 + 时刻 + 标题 + 提醒/循环提示 + 完成控件 + 编辑/删除。
-     月历的当日详情与清单模式共用,避免两处各写一份行渲染。 -->
+<!-- 日程单行:类型/来源徽标 + 时刻 + 标题 + 提醒/循环提示 + 完成控件 + 编辑/删除。
+     月历的当日详情与清单模式共用,避免两处各写一份行渲染。
+     贷款还款/理财到期/食材到期是只读来源:只显示来源徽标与提示,可点击跳原页面,无勾选/编辑/删除。 -->
 <template>
-  <div class="sched-row" :class="{ done: done }" v-a11y-click @click="$emit('open', item)">
-    <span class="sched-badge" :class="type.toLowerCase()">{{ $t('schedule.type.' + type) }}</span>
+  <div class="sched-row" :class="{ done: done, 'read-only': readOnly }" v-a11y-click @click="$emit('open', item)">
+    <span class="sched-badge" :class="badgeClass">{{ badgeText }}</span>
     <span class="sched-time">{{ item.time || $t('schedule.allDay') }}</span>
     <span class="sched-title">{{ item.title }}</span>
     <span v-if="hint" class="sched-hint">{{ hint }}</span>
@@ -24,11 +25,13 @@
 </template>
 
 <script setup>
-// 完成控件只给「提醒 / 每日任务 / 计划子任务」;纪念日、事项、计划走详情或跳原页
+// 完成控件只给「提醒 / 每日任务 / 计划子任务」;纪念日、事项、计划走详情或跳原页;
+// 只读来源(贷款/理财/食材)没有完成语义,一律不给勾选与改删。
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Edit, Delete } from '@element-plus/icons-vue'
 import { typeOfKind } from '@/utils/scheduleType'
+import { isReadOnlySource, sourceOf } from '@/utils/scheduleSource'
 
 const props = defineProps({
   /** /schedule/events 的一项 */
@@ -42,13 +45,19 @@ const emit = defineEmits(['open', 'edit', 'delete', 'toggle', 'toggle-task'])
 const { t } = useI18n()
 
 const type = computed(() => typeOfKind(props.item.kind))
+const readOnly = computed(() => isReadOnlySource(props.item))
+const badgeText = computed(() => (readOnly.value ? t('schedule.source.' + sourceOf(props.item)) : t('schedule.type.' + type.value)))
+const badgeClass = computed(() => (readOnly.value ? sourceOf(props.item).toLowerCase() : type.value.toLowerCase()))
 
 const REPEAT_KEY = { DAILY: 'repeatDaily', WEEKLY: 'repeatWeekly', MONTHLY: 'repeatMonthly', YEARLY: 'repeatYearly' }
 
-// 提示优先级:纪念日提前提醒 > 循环周期(当天时刻已在左侧显示)
+// 提示优先级:纪念日提前提醒 > 贷款期次 > 循环周期(当天时刻已在左侧显示)
 const hint = computed(() => {
   if (props.item.kind === 'ANNIVERSARY' && props.record?.remindDaysBefore > 0) {
     return t('schedule.remindAdvance', { n: props.record.remindDaysBefore })
+  }
+  if (readOnly.value && props.item.kind === 'LOAN' && props.item.period) {
+    return t('schedule.source.loanPeriod', { n: props.item.period })
   }
   const key = REPEAT_KEY[props.item.repeat]
   return key ? t('schedule.dialog.' + key) : ''
@@ -67,9 +76,9 @@ const doneTag = computed(() => {
   return props.item.kind === 'TASK' && props.item.doneToday ? t('schedule.doneToday') : t('schedule.done')
 })
 
-const checkable = computed(() => props.canEdit && ['REMINDER', 'TASK', 'PLAN_TASK'].includes(props.item.kind))
-const editable = computed(() => props.canEdit && ['REMINDER', 'TASK', 'ANNIVERSARY', 'PLAN'].includes(props.item.kind))
-const deletable = computed(() => props.canEdit && props.item.kind !== 'PLAN_TASK')
+const checkable = computed(() => props.canEdit && !readOnly.value && ['REMINDER', 'TASK', 'PLAN_TASK'].includes(props.item.kind))
+const editable = computed(() => props.canEdit && !readOnly.value && ['REMINDER', 'TASK', 'ANNIVERSARY', 'PLAN'].includes(props.item.kind))
+const deletable = computed(() => props.canEdit && !readOnly.value && props.item.kind !== 'PLAN_TASK')
 
 const onCheck = () => {
   if (props.item.kind === 'PLAN_TASK') emit('toggle-task', props.item)
@@ -91,6 +100,10 @@ const onCheck = () => {
 }
 .sched-row.done {
   opacity: 0.6;
+}
+/* 只读来源(贷款/理财/食材):虚线边提示「这里只看看,改要去原页面」,配色沿用主题不另起色板 */
+.sched-row.read-only {
+  border-style: dashed;
 }
 .sched-row.done .sched-title {
   text-decoration: line-through;
@@ -116,6 +129,18 @@ const onCheck = () => {
 .sched-badge.plan {
   background: rgba(31, 58, 95, 0.08);
   color: var(--color-text-secondary);
+}
+.sched-badge.loan {
+  background: rgba(31, 107, 74, 0.14);
+  color: #2c7a58;
+}
+.sched-badge.finance {
+  background: rgba(108, 76, 158, 0.14);
+  color: #6b4c9e;
+}
+.sched-badge.item_expiry {
+  background: rgba(122, 138, 40, 0.16);
+  color: #6d7c1f;
 }
 .sched-time {
   flex-shrink: 0;
