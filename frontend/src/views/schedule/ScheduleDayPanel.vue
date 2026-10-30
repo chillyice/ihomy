@@ -25,6 +25,7 @@
         :item="it"
         :record="recordOf(it)"
         :can-edit="isLoggedIn"
+        :show-type="false"
         @open="$emit('open', $event)"
         @toggle="$emit('toggle', $event)"
         @toggle-task="$emit('toggle-task', $event)"

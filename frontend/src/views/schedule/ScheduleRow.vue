@@ -1,9 +1,10 @@
 <!-- 日程单行:类型/来源徽标 + 时刻 + 标题 + 提醒/循环提示 + 完成控件 + 编辑/删除。
      月历的当日详情与清单模式共用,避免两处各写一份行渲染。
-     贷款还款/理财到期/食材到期是只读来源:只显示来源徽标与提示,可点击跳原页面,无勾选/编辑/删除。 -->
+     贷款还款/理财到期/食材到期是只读来源:只显示来源徽标与提示,可点击跳原页面,无勾选/编辑/删除。
+     showType=false 时不显示类别徽标(只读来源徽标仍保留,那是条目本身属性),当日详情用。 -->
 <template>
   <div class="sched-row" :class="{ done: done, 'read-only': readOnly }" v-a11y-click @click="$emit('open', item)">
-    <span class="sched-badge" :class="badgeClass">{{ badgeText }}</span>
+    <span v-if="showType || readOnly" class="sched-badge" :class="badgeClass">{{ badgeText }}</span>
     <span class="sched-time">{{ item.time || $t('schedule.allDay') }}</span>
     <span class="sched-title">{{ item.title }}</span>
     <span v-if="hint" class="sched-hint">{{ hint }}</span>
@@ -40,6 +41,8 @@ const props = defineProps({
   record: { type: Object, default: null },
   /** 游客不显示编辑/删除 */
   canEdit: { type: Boolean, default: true },
+  /** 是否显示类别徽标(纪念日/提醒…);当日详情关掉,只读来源徽标不受影响 */
+  showType: { type: Boolean, default: true },
 })
 const emit = defineEmits(['open', 'edit', 'delete', 'toggle', 'toggle-task'])
 const { t } = useI18n()
