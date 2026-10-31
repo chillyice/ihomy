@@ -139,6 +139,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 - **独立产品页**:挂 `/kada`、`/bit-pouch`、`/wallpaper`、`/chillyice` 这类页必须加 `meta.standalone`(不套外壳、跳过 `appStore.init()`、401 不顶登录页、自带配色要接管 `html` 根类);**从独立页回站内页要补初始化**(`App.vue` 监听 standalone 变 false 时补 `appStore.init()`/`ensureUserInfo()`),否则首页与家庭名全空(踩坑速查 §3.32/§3.8)。
 - **产品访问/下载统计**:咔哒与比特口袋的访问/下载落 `report_product_stat` 日表(落地页打点 + 安装包下载链接统一走 `GET /public/product/download` 计数后 302 到 `/files`),**禁止按 access 日志统计下载**——nginx `/files/` 静态直出,下载请求不进后端日志(踩坑速查 §7.11)。
 - **计划提醒单向托管**:计划的「提醒时间」只存 `family_reminder`(由 `plan_id` 关联),`family_plan` 不加时间列;写操作全走 `FamilyPlanService` 单事务,计划→提醒单向同步(计划完成连带完成提醒,提醒勾完成不改计划);重复判定与「今日」聚合共用 `RepeatSchedule.dueToday`,前端不算。
+- **GBA 存档**:唯一存放位置是游戏目录的 `saves/`(`uploads/games/{游戏名}/saves/`,文件名统一过 `common/GameSaveName` 白名单),播放器启动取该目录最新一份、运行中 30s 回写;浏览器 IndexedDB 只作断网兜底。**禁止把存档另存 DB 或按成员分档**(机制与同步时序见 踩坑速查 §3.48)。
 - **提醒按日完成**:一次性提醒用 `family_reminder.done`;循环(每日/每周/每月/每年)按 (提醒, 日期) 落 `family_reminder_check`,取消完成即删行,系列不终止;每年重复可选阳历/农历(闰月严格匹配)。`toggle-done?date=` 带日期即按该日切换,删除提醒连带清完成行(自定义 XML)。判定唯一来源 `RepeatSchedule.dueToday`(重载带 `calendar/lunarMonth/lunarDay/isLeap`),到点通知对循环看当日完成行、并保留「当日已通知」兜底防 5 分钟重复推送(踩坑速查 §2.20)。
 - **记账本权限**:整本账本按成员配置档位(`family_book_permission`,NONE 不可见 / READ 只读 / WRITE 可记账 / MANAGE 可管理),**无配置行 = WRITE**(维持历史「家庭成员都能读写」口径),家长(OWNER)恒 MANAGE 且只有家长能改档;**不走 `@RequirePermission` 权限码**,Controller 用 `BookPermissionService.requireRead/requireWrite` 守门、改删他人看 `canManage`;`/auth` 返回的 `userInfo` 带 `bookLevel`,前端一律读 `userStore.canReadBook/canWriteBook/canManageBook`;档位**不缓存**(改档立即生效),`/book/summary` 对被设 NONE 的成员按游客返回空摘要。台账口径见 需求 §4.5.5。
 - **日程聚合只读**:`GET /schedule/events?from=&to=`(≤62 天)与 `/schedule/upcoming?days=` 把纪念日/提醒/计划/子任务摊平成按日列表与待安排计划;写侧仍走各自接口。纪念日展开只用 `AnniversaryDate`;计划托管的提醒不单独成项(PLAN 项已带提醒时刻);**贷款还款日/理财到期/食材到期是只读来源**:每类一个 `service/schedule/ScheduleSourceProvider` 实现(`@Order` 注入列表遍历,新增来源只加实现、聚合主逻辑不堆 if-else),事项带 `source`/`readOnly`/`link`,日程页只展示与跳转、改数据回原页面;贷款需 `loan:view`、食材到期复用 `ItemExpiryService.expiryDate`(禁第二套算法);来源开关只在前端 `localStorage`(`ihomy:schedule:sources:v1`,默认全开,关掉不发请求);游客口径只返回演示家庭纪念日(`SecurityConfig` GET 白名单),只读来源对匿名一律不返回。
@@ -192,9 +193,9 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 ## 验证基线
 
-- 后端全绿:`.\mvnw.cmd -B clean package`(284 tests,纯逻辑不起 Spring)。
+- 后端全绿:`.\mvnw.cmd -B clean package`(289 tests,纯逻辑不起 Spring)。
 - 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(657 passed)+ `npm run format:check`(全树遗留未格式化:`views/BitPouch.vue`、`utils/packetDecode.js`+`.spec.js`、`views/bitpouch/panels/PacketPanel.vue`、`views/Chillyice.vue`、`views/ops/tabs/OpsKada.vue`;**本次改动的文件必须 `prettier --write` 后通过**)。
-- 构建:入口 chunk 基线 **532.94KB / gzip 219.78KB**(V11.1 收尾);**vite 报的是字符数不是字节数**,别拿 `ls -la` 比;历史数字见 变更归档。
+- 构建:入口 chunk 基线 **534.07KB / gzip 220.19KB**(V11.2 收尾);**vite 报的是字符数不是字节数**,别拿 `ls -la` 比;历史数字见 变更归档。
 - 一致性:`bash scripts/doc-drift-check.sh` 全 [OK];`gen-code-map.sh --check`、`doc-index.sh --check` 无漂移。
 - 接口测试在仓库外 `..\autotest_framework`(`pytest -m api`,37 passed)。
 

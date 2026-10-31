@@ -189,21 +189,23 @@ class ScheduleServiceTest {
     void remindersExpandPerDayWithCheckedState() {
         when(anniversaryService.list(FAMILY)).thenReturn(List.of());
         when(planMapper.selectList(any())).thenReturn(List.of());
-        Reminder once = reminder(1L, DictConst.REPEAT_ONCE, LocalDate.of(2026, 10, 30), LocalTime.of(9, 0), 0);
-        Reminder onceDone = reminder(2L, DictConst.REPEAT_ONCE, LocalDate.of(2026, 10, 30), LocalTime.of(10, 0), 1);
-        Reminder daily = reminder(3L, DictConst.REPEAT_DAILY, LocalDate.of(2026, 10, 1), LocalTime.of(7, 30), 0);
-        Reminder planManaged = reminder(4L, DictConst.REPEAT_ONCE, LocalDate.of(2026, 10, 30), LocalTime.of(11, 0), 0);
+        // doneToday 只对「今天」这一列置 true(服务端拿 LocalDate.now() 比),日期必须跟着当前日走,不能写死
+        LocalDate today = LocalDate.now();
+        LocalDate yesterday = today.minusDays(1);
+        Reminder once = reminder(1L, DictConst.REPEAT_ONCE, today, LocalTime.of(9, 0), 0);
+        Reminder onceDone = reminder(2L, DictConst.REPEAT_ONCE, today, LocalTime.of(10, 0), 1);
+        Reminder daily = reminder(3L, DictConst.REPEAT_DAILY, today.minusMonths(2), LocalTime.of(7, 30), 0);
+        Reminder planManaged = reminder(4L, DictConst.REPEAT_ONCE, today, LocalTime.of(11, 0), 0);
         planManaged.setPlanId(9L);
         when(reminderMapper.selectList(any())).thenReturn(List.of(once, onceDone, daily, planManaged));
         ReminderCheck checked = new ReminderCheck();
         checked.setReminderId(3L);
-        checked.setCheckDate(LocalDate.of(2026, 10, 30));
+        checked.setCheckDate(today);
         when(checkMapper.selectList(any())).thenReturn(List.of(checked));
 
-        Map<String, Object> result = service.events(FAMILY,
-                LocalDate.of(2026, 10, 29), LocalDate.of(2026, 10, 30), false);
+        Map<String, Object> result = service.events(FAMILY, yesterday, today, false);
 
-        List<Map<String, Object>> first = day(result, "2026-10-30");
+        List<Map<String, Object>> first = day(result, today.toString());
         // 一次性未完成 + 每日任务;已完成的一次性与计划托管的提醒不出现
         assertThat(first).extracting(m -> m.get("kind"))
                 .containsExactlyInAnyOrder("REMINDER", "TASK");
@@ -213,7 +215,7 @@ class ScheduleServiceTest {
                 .containsEntry("done", true)
                 .containsEntry("doneToday", true);
         // 前一天每天任务未勾选
-        Map<String, Object> previous = day(result, "2026-10-29").stream()
+        Map<String, Object> previous = day(result, yesterday.toString()).stream()
                 .filter(m -> "TASK".equals(m.get("kind"))).findFirst().orElseThrow();
         assertThat(previous).containsEntry("done", false);
     }

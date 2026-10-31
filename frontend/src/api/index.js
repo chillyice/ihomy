@@ -292,7 +292,7 @@ export const plantApi = {
   harvest: (species, message) => request.post('/plant/harvest', { species, message }),
 }
 
-// 小游戏(家庭游戏库:导入 .swf,列表/详情/改名/改描述/删除;H5 通关奖励)
+// 小游戏(家庭游戏库:导入 .swf,列表/详情/改名/改描述/删除;H5 通关奖励;GBA 存档)
 export const gameApi = {
   list: () => request.get('/game'),
   get: (id) => request.get(`/game/${id}`),
@@ -300,6 +300,15 @@ export const gameApi = {
   update: (id, data) => request.put(`/game/${id}`, data),
   remove: (id) => request.delete(`/game/${id}`),
   petLinkReward: () => request.post('/game/petlink/reward'),
+  // GBA 存档落在游戏目录的 saves/ 下,列表按最后修改时间倒序
+  listSaves: (id) => request.get(`/game/${id}/saves`),
+  downloadSave: (id, name) => request.get(`/game/${id}/saves/${encodeURIComponent(name)}`, { responseType: 'arraybuffer' }),
+  uploadSave: (id, blob, name) => {
+    const form = new FormData()
+    form.append('file', blob, name)
+    return request.post(`/game/${id}/saves`, form)
+  },
+  deleteSave: (id, name) => request.delete(`/game/${id}/saves/${encodeURIComponent(name)}`),
 }
 
 // 愿望单(家庭共享愿望,分类/达成/放弃)

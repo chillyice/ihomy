@@ -4,9 +4,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.GameConst;
+import com.ihomy.common.GameSaveName;
 import com.ihomy.common.ResultCode;
 import com.ihomy.common.PointsRuleConst;
 import com.ihomy.dto.GameInfoDTO;
+import com.ihomy.dto.GameSaveDTO;
 import com.ihomy.entity.GameInfo;
 import com.ihomy.mapper.GameInfoMapper;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +16,9 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -24,6 +29,7 @@ import java.util.Map;
 /**
  * 家庭小游戏业务:导入 .swf(存 games/{游戏名}/)与 .gba、列表/详情/改名/改描述/删除,家庭隔离。
  * 仅支持 SWF/GBA 两种导入类型(.gbc/.gb 仅前端本地模式播放,不入库)。改名不移动物理文件夹(文件夹名在导入时固定)。
+ * GBA 存档落在游戏目录下的 saves/(模拟器自动同步),删游戏连带清存档。
  */
 @Service
 @RequiredArgsConstructor
@@ -86,8 +92,55 @@ public class GameInfoService {
 
     public void delete(Long familyId, Long id) {
         GameInfo g = require(familyId, id);
-        fileService.deleteByUrl(g.getFileUrl());
+        fileService.deleteGameFiles(g.getFileUrl());
         gameMapper.deleteById(id);
+    }
+
+    /** GBA 存档列表:游戏目录 saves/ 下的文件,按最后修改时间倒序 */
+    public List<GameSaveDTO> listSaves(Long familyId, Long id) {
+        GameInfo g = requireGba(familyId, id);
+        Path dir = fileService.gameDirectory(g.getFileUrl());
+        if (dir == null) return List.of();
+        return fileService.listGameSaves(dir).stream().map(GameInfoService::toSaveDto).toList();
+    }
+
+    /** 上传/覆盖存档:文件名取客户端(模拟器)的存档名,消毒 + 扩展名白名单后落到 saves/ */
+    public GameSaveDTO uploadSave(Long familyId, Long id, MultipartFile file) {
+        GameInfo g = requireGba(familyId, id);
+        if (file == null || file.isEmpty()) {
+            throw new BizException(ResultCode.BAD_REQUEST, "存档文件为空");
+        }
+        if (file.getSize() > GameSaveName.MAX_BYTES) {
+            throw new BizException(ResultCode.BAD_REQUEST, "存档文件过大(上限 4MB)");
+        }
+        String name = GameSaveName.sanitize(file.getOriginalFilename());
+        if (!GameSaveName.allowed(name)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "只支持 .srm / .sav / .state 存档文件");
+        }
+        Path dir = fileService.gameDirectory(g.getFileUrl());
+        if (dir == null) throw new BizException(ResultCode.NOT_FOUND);
+        return toSaveDto(fileService.writeGameSave(dir, name, file));
+    }
+
+    /** 存档文件路径(下载用),不存在 404 */
+    public Path saveFile(Long familyId, Long id, String name) {
+        GameInfo g = requireGba(familyId, id);
+        String safe = GameSaveName.sanitize(name);
+        if (!GameSaveName.allowed(safe)) throw new BizException(ResultCode.NOT_FOUND);
+        Path dir = fileService.gameDirectory(g.getFileUrl());
+        if (dir == null) throw new BizException(ResultCode.NOT_FOUND);
+        Path file = dir.resolve("saves").resolve(safe);
+        if (!Files.isRegularFile(file)) throw new BizException(ResultCode.NOT_FOUND);
+        return file;
+    }
+
+    /** 删除存档文件,不存在 404 */
+    public void deleteSave(Long familyId, Long id, String name) {
+        GameInfo g = requireGba(familyId, id);
+        Path dir = fileService.gameDirectory(g.getFileUrl());
+        if (dir == null || !fileService.deleteGameSave(dir, name)) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
     }
 
     /**
@@ -142,6 +195,27 @@ public class GameInfoService {
             throw new BizException(ResultCode.NOT_FOUND);
         }
         return g;
+    }
+
+    /** 存档只属于 GBA 游戏(SWF 是小游戏文件,没有模拟器存档) */
+    private GameInfo requireGba(Long familyId, Long id) {
+        GameInfo g = require(familyId, id);
+        if (!GameConst.TYPE_GBA.equals(g.getType())) {
+            throw new BizException(ResultCode.BAD_REQUEST, "只有 GBA 游戏有存档");
+        }
+        return g;
+    }
+
+    private static GameSaveDTO toSaveDto(Path file) {
+        long size = 0;
+        long updatedAt = 0;
+        try {
+            size = Files.size(file);
+            updatedAt = Files.getLastModifiedTime(file).toMillis();
+        } catch (IOException ignored) {
+            // 文件刚被删/不可读时按 0 返回,前端仍能显示文件名
+        }
+        return new GameSaveDTO(file.getFileName().toString(), size, updatedAt);
     }
 
     private String normalizeName(String name) {

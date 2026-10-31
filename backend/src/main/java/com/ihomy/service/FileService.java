@@ -1,6 +1,7 @@
 package com.ihomy.service;
 
 import com.ihomy.common.BizException;
+import com.ihomy.common.GameSaveName;
 import com.ihomy.common.ResultCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +20,9 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Stream;
 import javax.imageio.ImageIO;
 
 /**
@@ -112,6 +116,113 @@ public class FileService {
     /** 小游戏上传(流式):存 games/{游戏名}/ 平铺 */
     public String uploadGame(MultipartFile file, String gameName) {
         return saveTo(file, file.getOriginalFilename(), "games", gameName, null);
+    }
+
+    /**
+     * 小游戏目录:{uploadDir}/games/{游戏名},由游戏文件 URL 反推。
+     * URL 不在 /files/games/<一层目录>/ 下(外链、历史数据)时返回 null。
+     */
+    public Path gameDirectory(String gameFileUrl) {
+        if (gameFileUrl == null) return null;
+        String prefix = urlPrefix.replaceAll("/+$", "");
+        if (!gameFileUrl.startsWith(prefix + "/games/")) return null;
+        Path root = Paths.get(uploadDir).toAbsolutePath().normalize();
+        Path gamesRoot = root.resolve("games");
+        String rel = gameFileUrl.substring(prefix.length()).replace('\\', '/').replaceFirst("^/+", "");
+        Path dir = root.resolve(rel).normalize().getParent();
+        if (dir == null || dir.equals(gamesRoot) || !dir.startsWith(gamesRoot)) return null;
+        return dir;
+    }
+
+    /** 游戏存档目录 {游戏目录}/saves,不存在时创建 */
+    public Path gameSaveDir(Path gameDir) {
+        Path dir = gameDir.resolve("saves");
+        try {
+            Files.createDirectories(dir);
+            return dir;
+        } catch (IOException e) {
+            log.error("存档目录创建失败", e);
+            throw new RuntimeException("存档目录创建失败");
+        }
+    }
+
+    /** 列出存档文件(扩展名白名单内),按最后修改时间倒序;目录不存在返回空列表 */
+    public List<Path> listGameSaves(Path gameDir) {
+        Path dir = gameDir.resolve("saves");
+        if (!Files.isDirectory(dir)) return List.of();
+        try (Stream<Path> files = Files.list(dir)) {
+            return files.filter(Files::isRegularFile)
+                    .filter(p -> GameSaveName.allowed(p.getFileName().toString()))
+                    .sorted(Comparator.comparingLong(this::lastModifiedSafe).reversed())
+                    .toList();
+        } catch (IOException e) {
+            log.warn("读取存档目录失败(忽略): {}", dir);
+            return List.of();
+        }
+    }
+
+    /** 写入存档(同名覆盖,流式);返回落盘路径。文件名必须已过 GameSaveName 校验 */
+    public Path writeGameSave(Path gameDir, String name, MultipartFile file) {
+        String safe = GameSaveName.sanitize(name);
+        if (safe == null || !GameSaveName.allowed(safe)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "存档文件名不合法");
+        }
+        Path target = gameSaveDir(gameDir).resolve(safe);
+        try {
+            try {
+                file.transferTo(target.toFile());
+            } catch (Exception fallback) {
+                try (InputStream in = file.getInputStream()) {
+                    Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+            log.info("存档已保存: {}", target);
+            return target;
+        } catch (IOException e) {
+            log.error("存档写入失败: {}", target, e);
+            throw new RuntimeException("存档写入失败");
+        }
+    }
+
+    /** 删除存档;文件名不合法或文件不存在返回 false */
+    public boolean deleteGameSave(Path gameDir, String name) {
+        String safe = GameSaveName.sanitize(name);
+        if (safe == null || !GameSaveName.allowed(safe)) return false;
+        try {
+            return Files.deleteIfExists(gameDir.resolve("saves").resolve(safe));
+        } catch (IOException e) {
+            log.warn("删除存档失败(忽略): {}", name);
+            return false;
+        }
+    }
+
+    /** 删除整个游戏(ROM + saves/ + 游戏目录):删游戏时存档一并清理 */
+    public void deleteGameFiles(String gameFileUrl) {
+        Path dir = gameDirectory(gameFileUrl);
+        deleteByUrl(gameFileUrl);
+        if (dir == null) return;
+        try {
+            Path saves = dir.resolve("saves");
+            if (Files.isDirectory(saves)) {
+                try (Stream<Path> files = Files.list(saves)) {
+                    for (Path p : files.toList()) Files.deleteIfExists(p);
+                }
+                Files.deleteIfExists(saves);
+            }
+            try (Stream<Path> files = Files.list(dir)) {
+                if (files.findAny().isEmpty()) Files.deleteIfExists(dir);
+            }
+        } catch (IOException e) {
+            log.warn("清理游戏目录失败(忽略): {}", dir);
+        }
+    }
+
+    private long lastModifiedSafe(Path path) {
+        try {
+            return Files.getLastModifiedTime(path).toMillis();
+        } catch (IOException e) {
+            return 0L;
+        }
     }
 
     /** 按 URL 删除已上传文件:仅处理本站 URL(外链/空直接忽略),文件不存在容忍,失败仅告警 */
