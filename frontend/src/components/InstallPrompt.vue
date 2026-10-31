@@ -15,6 +15,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { isIOS } from '@/utils/platform'
 
 const DISMISS_KEY = 'ihomy-install-dismissed'
 const visible = ref(false)
@@ -23,8 +24,6 @@ let deferredPrompt = null
 
 // 已安装(PWA standalone 模式)或用户关闭过 → 不再弹
 const alreadyInstalled = () => window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true
-
-const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes('Mac') && 'ontouchend' in document)
 
 // Android/Chrome:捕获安装事件并显示引导(iOS 不触发,只在 4s 后兜底显示 iOS 提示)
 const show = () => {

@@ -62,6 +62,7 @@ import { ElMessage } from 'element-plus'
 import { FullScreen, ArrowLeft } from '@element-plus/icons-vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import { loadRuffle } from '@/utils/ruffle'
+import { isIOS } from '@/utils/platform'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 
 const props = defineProps({
@@ -110,6 +111,15 @@ const destroyPlayer = () => {
   revokeObjectUrl()
 }
 
+/** iPadOS/Safari 禁止在全屏网页里键入:Flash 文本框获得焦点时 Ruffle 会聚焦它自己的隐藏输入
+ *  (#virtual-keyboard),系统随即弹「不允许在全屏显示的网站键入」,手写笔连续点击会反复弹。
+ *  全屏期间禁用该输入、退出全屏恢复;键盘事件走 window keydown,硬件键盘不受影响。 */
+const syncVirtualKeyboardGuard = () => {
+  const kb = player?.shadowRoot?.getElementById('virtual-keyboard')
+  if (!kb) return
+  kb.disabled = isIOS() && !!document.fullscreenElement
+}
+
 /** 创建 Ruffle 播放器并调用 loadFn 加载(loadFn 接收 player api) */
 const mountAndLoad = async (loadFn) => {
   loading.value = true
@@ -124,6 +134,8 @@ const mountAndLoad = async (loadFn) => {
     player = p
     await nextTick()
     container.value.appendChild(p)
+    // 播放器创建完成时可能已在全屏态(先点全屏再加载),补一次守卫
+    syncVirtualKeyboardGuard()
     const api = typeof p.ruffle === 'function' ? p.ruffle() : p
     await loadFn(api)
   } catch (e) {
@@ -181,6 +193,7 @@ const toggleFullscreen = () => {
 }
 const onFullscreenChange = () => {
   isFullscreen.value = !!document.fullscreenElement
+  syncVirtualKeyboardGuard()
 }
 
 onMounted(() => {
