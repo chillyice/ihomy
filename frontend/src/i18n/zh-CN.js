@@ -958,7 +958,7 @@ export default {
     saves: '存档',
     savesTitle: '云端存档',
     savesEmpty: '还没有存档，游戏中会自动保存',
-    savesHint: '存档保存在这个游戏目录的 saves 文件夹，换设备也能接着玩',
+    savesHint: '存档按成员分开保存，每人读到自己的进度，换设备也能接着玩',
     saveLoad: '载入',
     saveDelete: '删除',
     saveDeleteConfirm: '确定删除存档「{name}」？删除后无法恢复',

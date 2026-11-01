@@ -134,9 +134,9 @@ public class FileService {
         return dir;
     }
 
-    /** 游戏存档目录 {游戏目录}/saves,不存在时创建 */
-    public Path gameSaveDir(Path gameDir) {
-        Path dir = gameDir.resolve("saves");
+    /** 成员存档目录 {游戏目录}/saves/u{成员id},不存在时创建;每个成员只读写自己的目录 */
+    public Path gameSaveDir(Path gameDir, Long userId) {
+        Path dir = gameSaveRoot(gameDir).resolve("u" + userId);
         try {
             Files.createDirectories(dir);
             return dir;
@@ -146,9 +146,48 @@ public class FileService {
         }
     }
 
-    /** 列出存档文件(扩展名白名单内),按最后修改时间倒序;目录不存在返回空列表 */
-    public List<Path> listGameSaves(Path gameDir) {
-        Path dir = gameDir.resolve("saves");
+    /** 存档总目录 {游戏目录}/saves(建目录/清理用,业务读写一律走成员子目录) */
+    private Path gameSaveRoot(Path gameDir) {
+        return gameDir.resolve("saves");
+    }
+
+    /**
+     * 归置 V11.2 的共享存档:旧实现把存档直接放在 saves/ 根下(全家共用一份),
+     * 现在按成员隔离。首次访问时把根下文件搬进游戏导入者的成员目录,同名文件不覆盖。
+     * 只处理普通文件(成员子目录不会被误搬);幂等,搬空后无操作。
+     */
+    public void migrateLegacyGameSaves(Path gameDir, Long ownerUserId) {
+        Path root = gameSaveRoot(gameDir);
+        if (ownerUserId == null || !Files.isDirectory(root)) return;
+        List<Path> legacy;
+        try (Stream<Path> files = Files.list(root)) {
+            legacy = files.filter(Files::isRegularFile)
+                    .filter(p -> GameSaveName.allowed(p.getFileName().toString()))
+                    .toList();
+        } catch (IOException e) {
+            log.warn("读取历史存档失败(忽略): {}", root);
+            return;
+        }
+        if (legacy.isEmpty()) return;
+        Path targetDir = gameSaveDir(gameDir, ownerUserId);
+        for (Path p : legacy) {
+            Path target = targetDir.resolve(p.getFileName().toString());
+            try {
+                if (Files.exists(target)) {
+                    Files.deleteIfExists(p);
+                } else {
+                    Files.move(p, target);
+                }
+                log.info("历史存档已归属到成员目录: {}", target);
+            } catch (IOException e) {
+                log.warn("历史存档迁移失败(忽略): {}", p);
+            }
+        }
+    }
+
+    /** 列出某成员的存档文件(扩展名白名单内),按最后修改时间倒序;目录不存在返回空列表 */
+    public List<Path> listGameSaves(Path gameDir, Long userId) {
+        Path dir = gameSaveRoot(gameDir).resolve("u" + userId);
         if (!Files.isDirectory(dir)) return List.of();
         try (Stream<Path> files = Files.list(dir)) {
             return files.filter(Files::isRegularFile)
@@ -161,13 +200,21 @@ public class FileService {
         }
     }
 
+    /** 某成员的存档文件路径(下载用),文件名不合法或文件不存在返回 null */
+    public Path findGameSave(Path gameDir, Long userId, String name) {
+        String safe = GameSaveName.sanitize(name);
+        if (safe == null || !GameSaveName.allowed(safe)) return null;
+        Path file = gameSaveRoot(gameDir).resolve("u" + userId).resolve(safe);
+        return Files.isRegularFile(file) ? file : null;
+    }
+
     /** 写入存档(同名覆盖,流式);返回落盘路径。文件名必须已过 GameSaveName 校验 */
-    public Path writeGameSave(Path gameDir, String name, MultipartFile file) {
+    public Path writeGameSave(Path gameDir, Long userId, String name, MultipartFile file) {
         String safe = GameSaveName.sanitize(name);
         if (safe == null || !GameSaveName.allowed(safe)) {
             throw new BizException(ResultCode.BAD_REQUEST, "存档文件名不合法");
         }
-        Path target = gameSaveDir(gameDir).resolve(safe);
+        Path target = gameSaveDir(gameDir, userId).resolve(safe);
         try {
             try {
                 file.transferTo(target.toFile());
@@ -184,30 +231,35 @@ public class FileService {
         }
     }
 
-    /** 删除存档;文件名不合法或文件不存在返回 false */
-    public boolean deleteGameSave(Path gameDir, String name) {
+    /** 删除某成员的存档;文件名不合法或文件不存在返回 false */
+    public boolean deleteGameSave(Path gameDir, Long userId, String name) {
         String safe = GameSaveName.sanitize(name);
         if (safe == null || !GameSaveName.allowed(safe)) return false;
         try {
-            return Files.deleteIfExists(gameDir.resolve("saves").resolve(safe));
+            return Files.deleteIfExists(gameSaveRoot(gameDir).resolve("u" + userId).resolve(safe));
         } catch (IOException e) {
             log.warn("删除存档失败(忽略): {}", name);
             return false;
         }
     }
 
-    /** 删除整个游戏(ROM + saves/ + 游戏目录):删游戏时存档一并清理 */
+    /** 删除整个游戏(ROM + saves/ 下所有成员存档 + 游戏目录):删游戏时存档一并清理 */
     public void deleteGameFiles(String gameFileUrl) {
         Path dir = gameDirectory(gameFileUrl);
         deleteByUrl(gameFileUrl);
         if (dir == null) return;
         try {
-            Path saves = dir.resolve("saves");
+            Path saves = gameSaveRoot(dir);
             if (Files.isDirectory(saves)) {
-                try (Stream<Path> files = Files.list(saves)) {
-                    for (Path p : files.toList()) Files.deleteIfExists(p);
+                try (Stream<Path> walk = Files.walk(saves)) {
+                    walk.sorted(Comparator.reverseOrder()).forEach(p -> {
+                        try {
+                            Files.deleteIfExists(p);
+                        } catch (IOException ignored) {
+                            // 单个文件删不掉不影响后续
+                        }
+                    });
                 }
-                Files.deleteIfExists(saves);
             }
             try (Stream<Path> files = Files.list(dir)) {
                 if (files.findAny().isEmpty()) Files.deleteIfExists(dir);

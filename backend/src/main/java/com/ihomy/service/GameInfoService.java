@@ -96,16 +96,17 @@ public class GameInfoService {
         gameMapper.deleteById(id);
     }
 
-    /** GBA 存档列表:游戏目录 saves/ 下的文件,按最后修改时间倒序 */
-    public List<GameSaveDTO> listSaves(Long familyId, Long id) {
+    /** GBA 存档列表:只列当前成员自己的存档,按最后修改时间倒序 */
+    public List<GameSaveDTO> listSaves(Long familyId, Long userId, Long id) {
         GameInfo g = requireGba(familyId, id);
         Path dir = fileService.gameDirectory(g.getFileUrl());
         if (dir == null) return List.of();
-        return fileService.listGameSaves(dir).stream().map(GameInfoService::toSaveDto).toList();
+        fileService.migrateLegacyGameSaves(dir, g.getUserId());
+        return fileService.listGameSaves(dir, userId).stream().map(GameInfoService::toSaveDto).toList();
     }
 
-    /** 上传/覆盖存档:文件名取客户端(模拟器)的存档名,消毒 + 扩展名白名单后落到 saves/ */
-    public GameSaveDTO uploadSave(Long familyId, Long id, MultipartFile file) {
+    /** 上传/覆盖存档:文件名取客户端(模拟器)的存档名,消毒 + 扩展名白名单后落到当前成员的 saves/u{id}/ */
+    public GameSaveDTO uploadSave(Long familyId, Long userId, Long id, MultipartFile file) {
         GameInfo g = requireGba(familyId, id);
         if (file == null || file.isEmpty()) {
             throw new BizException(ResultCode.BAD_REQUEST, "存档文件为空");
@@ -119,26 +120,28 @@ public class GameInfoService {
         }
         Path dir = fileService.gameDirectory(g.getFileUrl());
         if (dir == null) throw new BizException(ResultCode.NOT_FOUND);
-        return toSaveDto(fileService.writeGameSave(dir, name, file));
+        fileService.migrateLegacyGameSaves(dir, g.getUserId());
+        return toSaveDto(fileService.writeGameSave(dir, userId, name, file));
     }
 
-    /** 存档文件路径(下载用),不存在 404 */
-    public Path saveFile(Long familyId, Long id, String name) {
+    /** 当前成员的存档文件路径(下载用),不存在 404 */
+    public Path saveFile(Long familyId, Long userId, Long id, String name) {
         GameInfo g = requireGba(familyId, id);
-        String safe = GameSaveName.sanitize(name);
-        if (!GameSaveName.allowed(safe)) throw new BizException(ResultCode.NOT_FOUND);
         Path dir = fileService.gameDirectory(g.getFileUrl());
         if (dir == null) throw new BizException(ResultCode.NOT_FOUND);
-        Path file = dir.resolve("saves").resolve(safe);
-        if (!Files.isRegularFile(file)) throw new BizException(ResultCode.NOT_FOUND);
+        fileService.migrateLegacyGameSaves(dir, g.getUserId());
+        Path file = fileService.findGameSave(dir, userId, name);
+        if (file == null) throw new BizException(ResultCode.NOT_FOUND);
         return file;
     }
 
-    /** 删除存档文件,不存在 404 */
-    public void deleteSave(Long familyId, Long id, String name) {
+    /** 删除当前成员的存档文件,不存在 404 */
+    public void deleteSave(Long familyId, Long userId, Long id, String name) {
         GameInfo g = requireGba(familyId, id);
         Path dir = fileService.gameDirectory(g.getFileUrl());
-        if (dir == null || !fileService.deleteGameSave(dir, name)) {
+        if (dir == null) throw new BizException(ResultCode.NOT_FOUND);
+        fileService.migrateLegacyGameSaves(dir, g.getUserId());
+        if (!fileService.deleteGameSave(dir, userId, name)) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
     }

@@ -964,7 +964,7 @@ export default {
     saves: 'Saves',
     savesTitle: 'Cloud saves',
     savesEmpty: 'No saves yet — progress is saved automatically during play',
-    savesHint: 'Saves live in the saves folder under this game directory, so progress follows you across devices',
+    savesHint: 'Saves are kept per member — everyone continues their own progress, on any device',
     saveLoad: 'Load',
     saveDelete: 'Delete',
     saveDeleteConfirm: 'Delete save "{name}"? This cannot be undone',

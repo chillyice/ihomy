@@ -85,13 +85,15 @@ public class GameInfoController {
     @Operation(summary = "GBA 存档列表")
     @GetMapping("/{id}/saves")
     public Result<List<GameSaveDTO>> saves(@PathVariable Long id) {
-        return Result.success(gameService.listSaves(current().getFamilyId(), id));
+        LoginUser user = current();
+        return Result.success(gameService.listSaves(user.getFamilyId(), user.getUserId(), id));
     }
 
     @Operation(summary = "下载 GBA 存档")
     @GetMapping("/{id}/saves/{name}")
     public ResponseEntity<Resource> downloadSave(@PathVariable Long id, @PathVariable String name) {
-        Path file = gameService.saveFile(current().getFamilyId(), id, name);
+        LoginUser user = current();
+        Path file = gameService.saveFile(user.getFamilyId(), user.getUserId(), id, name);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
         String encoded = URLEncoder.encode(file.getFileName().toString(), StandardCharsets.UTF_8).replace("+", "%20");
@@ -108,14 +110,16 @@ public class GameInfoController {
     @Operation(summary = "上传/覆盖 GBA 存档")
     @PostMapping("/{id}/saves")
     public Result<GameSaveDTO> uploadSave(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
-        return Result.success(gameService.uploadSave(current().getFamilyId(), id, file));
+        LoginUser user = current();
+        return Result.success(gameService.uploadSave(user.getFamilyId(), user.getUserId(), id, file));
     }
 
     @Operation(summary = "删除 GBA 存档")
     @OperationLog(module = "GAME", operationType = "DELETE", description = "删除游戏存档")
     @DeleteMapping("/{id}/saves/{name}")
     public Result<Void> deleteSave(@PathVariable Long id, @PathVariable String name) {
-        gameService.deleteSave(current().getFamilyId(), id, name);
+        LoginUser user = current();
+        gameService.deleteSave(user.getFamilyId(), user.getUserId(), id, name);
         return Result.success();
     }
 

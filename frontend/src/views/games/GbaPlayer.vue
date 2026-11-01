@@ -84,6 +84,7 @@ import PageToolbar from '@/components/PageToolbar.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { formatDateTime } from '@/utils/datetime'
 import { gameApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 
 const props = defineProps({
   src: { type: String, default: '' },
@@ -95,6 +96,7 @@ const props = defineProps({
 
 const router = useRouter()
 const { t } = useI18n()
+const userStore = useUserStore()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 const container = ref(null)
 const stage = ref(null)
@@ -111,8 +113,10 @@ const isFullscreen = ref(false)
 let objectUrl = null
 let loadFallbackTimer = null
 
-// —— 云端存档:导入的 GBA 游戏把存档放在「游戏目录/saves」,播放时自动取最新那份、每 30s 回写 ——
-// 本地 IndexedDB(EJS 自己的 /data/saves)仍保留作断网兜底;下次同步用 hash 判断本机是否有未上传进度。
+// —— 云端存档:服务端是唯一事实来源,按成员隔离 ——
+// 启动前先取服务端最新存档,趁存档库挂载完、ROM 还没加载时(EJS 的 saveDatabaseLoaded)写进模拟器,
+// 核心加载 ROM 读 SRAM 时就已经是新档——换设备/清站点数据后的第一次打开也能接着上次的进度。
+// 运行中每 30s、切后台、离开页面前把当前存档回写到服务端;本地 IndexedDB 只作断网兜底。
 const SYNC_INTERVAL = 30000
 const cloudSave = computed(() => props.gameId !== null && props.gameId !== '')
 const saves = ref([])
@@ -122,8 +126,11 @@ let syncTimer = null
 let emulatorStarted = false
 let lastPushedHash = 0
 let syncWarned = false
+let pendingServerSave = null // 启动前取到的服务端最新电池存档 { name, bytes }
+let serverSeedUsed = false // 本次启动是否用服务端存档预置过
+let ejsInstance = null
 
-const syncHashKey = () => `ihomy:gba:savehash:${props.gameId}`
+const syncHashKey = () => `ihomy:gba:savehash:${props.gameId}:${userStore.userInfo?.id ?? 'anon'}`
 
 // FNV-1a:只用来判断存档是否变化,不要求密码学强度
 const hashBytes = (bytes) => {
@@ -136,17 +143,6 @@ const hashBytes = (bytes) => {
 }
 
 const gameManager = () => window.EJS_emulator?.gameManager || null
-
-// 只读本机已有存档(save=false 不触发核心落盘)
-const readLocalSave = () => {
-  const manager = gameManager()
-  if (!manager || !emulatorStarted) return null
-  try {
-    return manager.getSaveFile(false) || null
-  } catch (e) {
-    return null
-  }
-}
 
 // 先让核心落盘再读当前存档
 const currentSaveBytes = () => {
@@ -168,15 +164,15 @@ const saveFileName = () => {
   }
 }
 
-const pushSave = async (bytes) => {
+const pushSave = async (bytes, name) => {
   if (!cloudSave.value) return
   const data = bytes || currentSaveBytes()
   if (!data || !data.length) return
   const hash = hashBytes(data)
   if (hash === lastPushedHash) return
-  const name = saveFileName()
+  const fileName = name || saveFileName()
   try {
-    await gameApi.uploadSave(props.gameId, new Blob([new Uint8Array(data)]), name)
+    await gameApi.uploadSave(props.gameId, new Blob([new Uint8Array(data)]), fileName)
     lastPushedHash = hash
     localStorage.setItem(syncHashKey(), String(hash))
   } catch (e) {
@@ -187,36 +183,105 @@ const pushSave = async (bytes) => {
   }
 }
 
-// 启动时:本机有没同步成功的进度就先回传(本地优先),否则取服务端最新存档灌进模拟器
-const restoreSave = async () => {
+// 启动前把服务端最新电池存档拿到手(与模拟器生命周期无关,失败则退回本机/空档)
+const prefetchServerSave = async () => {
+  pendingServerSave = null
   if (!cloudSave.value) return
-  let list = []
   try {
-    list = await gameApi.listSaves(props.gameId)
-  } catch (e) {
-    return
-  }
-  // 后端已按最后修改时间倒序,取第一份电池存档
-  const serverSave = list.find((s) => /\.(srm|sav)$/i.test(s.name))
-  const local = readLocalSave()
-  const lastSynced = Number(localStorage.getItem(syncHashKey()) || 0)
-  if (local && local.length && hashBytes(local) !== lastSynced) {
-    await pushSave(local)
-    return
-  }
-  if (!serverSave) return
-  try {
-    const buffer = await gameApi.downloadSave(props.gameId, serverSave.name)
-    const manager = gameManager()
-    if (!manager) return
+    const list = await gameApi.listSaves(props.gameId)
+    const latest = list.find((s) => /\.(srm|sav)$/i.test(s.name))
+    if (!latest) return
+    const buffer = await gameApi.downloadSave(props.gameId, latest.name)
     const bytes = new Uint8Array(buffer)
-    manager.writeFile(manager.getSaveFilePath(), bytes)
-    manager.loadSaveFiles()
-    lastPushedHash = hashBytes(bytes)
-    localStorage.setItem(syncHashKey(), String(lastPushedHash))
+    if (bytes.length) pendingServerSave = { name: latest.name, bytes }
   } catch (e) {
-    ElMessage.warning(t('gba.saveRestoreFailed'))
+    pendingServerSave = null
   }
+}
+
+// ROM 文件名去扩展名 = 核心电池存档的基名;核心在 ROM 加载前拿不到 getSaveFilePath,只能按同一规则推导
+const guessSavePath = () => {
+  const raw = props.src.split('/').pop() || ''
+  const base = raw.split('?')[0].split('#')[0]
+  let name = base
+  try {
+    name = decodeURIComponent(base)
+  } catch (e) {
+    /* 保持原样 */
+  }
+  return `/data/saves/mGBA/${name.replace(/\.[^.]+$/, '')}.srm`
+}
+
+// 存档库挂载完(EJS 在挂载 IDBFS 后、加载 ROM 前触发):此刻写进 FS 的存档会被核心读进 SRAM
+const seedSaveOnMount = async () => {
+  if (!cloudSave.value) return
+  const manager = gameManager()
+  if (!manager) return
+  const path = guessSavePath()
+  let local = null
+  try {
+    if (manager.FS.analyzePath(path).exists) local = manager.FS.readFile(path)
+  } catch (e) {
+    local = null
+  }
+  const recorded = Number(localStorage.getItem(syncHashKey()) || 0)
+  const localHash = local && local.length ? hashBytes(local) : 0
+  const serverBytes = pendingServerSave?.bytes || null
+
+  if (localHash && recorded && localHash !== recorded) {
+    // 本机有这台浏览器自己没传完的进度:先回传,核心继续用本机这份(不被服务端旧档回滚)
+    await pushSave(local, path.split('/').pop())
+    return
+  }
+  if (serverBytes) {
+    // 服务端为准:盖写本地(首次打开/换设备/本机就是上次同步的那份),核心启动时即读到
+    try {
+      manager.writeFile(path, serverBytes)
+      lastPushedHash = hashBytes(serverBytes)
+      localStorage.setItem(syncHashKey(), String(lastPushedHash))
+      serverSeedUsed = true
+    } catch (e) {
+      /* 预置失败时由 start 后的补写兜底 */
+    }
+    return
+  }
+  if (localHash) {
+    // 服务端还没有存档:把本机这份(可能来自旧版本共享档时期)交上去
+    await pushSave(local, path.split('/').pop())
+  }
+}
+
+// start 后校验预置是否落在核心实际路径上(路径推导有出入时补一次,晚于 SRAM 初读但好过没有)
+const reconcileAfterStart = () => {
+  if (!serverSeedUsed || !pendingServerSave?.bytes) return
+  const manager = gameManager()
+  if (!manager) return
+  try {
+    const path = manager.getSaveFilePath()
+    if (!path) return
+    const exists = manager.FS.analyzePath(path).exists
+    const current = exists ? manager.FS.readFile(path) : null
+    if (!current || hashBytes(current) !== hashBytes(pendingServerSave.bytes)) {
+      manager.writeFile(path, pendingServerSave.bytes)
+      manager.loadSaveFiles()
+    }
+  } catch (e) {
+    /* 忽略:下次 30s 周期会以当前进度为准 */
+  }
+}
+
+// 拦截 EJS_emulator 的赋值:loader.js 创建实例的瞬间挂上 saveDatabaseLoaded 监听,
+// 保证监听先于核心下载/ROM 加载(事后补挂会错过事件,存档就赶不上核心读 SRAM)
+const installEmulatorInterceptor = () => {
+  ejsInstance = null
+  Object.defineProperty(window, 'EJS_emulator', {
+    configurable: true,
+    get: () => ejsInstance,
+    set: (v) => {
+      ejsInstance = v
+      if (v && typeof v.on === 'function') v.on('saveDatabaseLoaded', seedSaveOnMount)
+    },
+  })
 }
 
 const startSync = () => {
@@ -224,7 +289,6 @@ const startSync = () => {
   emulatorStarted = true
   syncWarned = false
   lastPushedHash = Number(localStorage.getItem(syncHashKey()) || 0)
-  restoreSave()
   syncTimer = setInterval(() => pushSave(), SYNC_INTERVAL)
 }
 
@@ -234,6 +298,8 @@ const stopSync = () => {
     syncTimer = null
   }
   emulatorStarted = false
+  serverSeedUsed = false
+  pendingServerSave = null
 }
 
 // 离开页面前补推一次:字节要同步取(teardown 会清掉 window.EJS_emulator)
@@ -282,6 +348,18 @@ const removeSave = async (save) => {
   }
   try {
     await gameApi.deleteSave(props.gameId, save.name)
+    // 删掉的是当前正在用的那份时,把本机副本与同步标记一并清掉,避免下次启动被断网兜底悄悄救回来
+    if (save.name === saveFileName()) {
+      const manager = gameManager()
+      try {
+        const path = manager?.getSaveFilePath()
+        if (path && manager.FS.analyzePath(path).exists) manager.FS.unlink(path)
+      } catch (e) {
+        /* 模拟器没在运行就无需清理本机 */
+      }
+    }
+    localStorage.removeItem(syncHashKey())
+    lastPushedHash = 0
     ElMessage.success(t('gba.saveDeleted'))
     await loadSaveList()
   } catch (e) {
@@ -306,6 +384,7 @@ const teardownEmulator = () => {
   }
   if (container.value) container.value.innerHTML = ''
   delete window.EJS_emulator
+  ejsInstance = null
   delete window.EJS_ready
   delete window.EJS_onGameStart
 }
@@ -342,8 +421,14 @@ const loadRom = async (romUrl) => {
     // 游戏跑起来后核心的 /data/saves 才挂载好,这时才接管存档同步
     window.EJS_onGameStart = () => {
       onEmulatorReady()
+      reconcileAfterStart()
       startSync()
     }
+
+    // 云端存档:先取好服务端最新档,再装实例拦截器,最后注入 loader——顺序不能倒,
+    // 拦截器要在 loader.js 给 window.EJS_emulator 赋值的瞬间挂上 saveDatabaseLoaded 监听
+    await prefetchServerSave()
+    installEmulatorInterceptor()
 
     // 只注入一次 loader.js(其内部读取全局配置并启动模拟器)
     const s = document.createElement('script')
