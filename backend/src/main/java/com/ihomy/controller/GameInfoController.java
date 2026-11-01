@@ -126,4 +126,20 @@ public class GameInfoController {
         LoginUser user = current();
         return Result.success(gameService.petLinkReward(user.getUserId(), user.getFamilyId()));
     }
+
+    @Operation(summary = "H5 小游戏完成奖励")
+    @OperationLog(module = "GAME", operationType = "UPDATE", description = "数独完成奖励")
+    @PostMapping("/sudoku/reward")
+    public Result<Map<String, Object>> sudokuReward() {
+        LoginUser user = current();
+        return Result.success(gameService.sudokuReward(user.getUserId(), user.getFamilyId()));
+    }
+
+    @Operation(summary = "H5 小游戏达成奖励")
+    @OperationLog(module = "GAME", operationType = "UPDATE", description = "2048 达成奖励")
+    @PostMapping("/2048/reward")
+    public Result<Map<String, Object>> game2048Reward() {
+        LoginUser user = current();
+        return Result.success(gameService.game2048Reward(user.getUserId(), user.getFamilyId()));
+    }
 }

@@ -348,7 +348,7 @@ color: #3A2E22;
 
 **页签组变体(`.tb-left` 放 `el-radio-group`,`size="small"`,V9.99 起 / V9.105 二例)**:页面内部有多个平级视图时,视图切换用 `el-radio-group` 放 `.tb-left`(按钮型 `el-radio-button`,与 `.tb-left` 筛选组件同 `size="small"` 保持 24px 高),该视图专属的操作与筛选整组放 `.tb-right` 并用 `v-if` 跟随当前页签隐藏(切走时不给无关操作留位置)。**页签不写进 URL**(刷新回默认页签,避免与「从侧栏进入」的期望冲突),除非该页签本身需要可分享(如运维页 `?tab=trace&tid=`,见 §20)。已用:`/tools/loan`(贷款试算/提前还款/反推利率/贷款记录)、`/book`(记账本/贷款记录)、`/plan`(今日/计划/纪念日,`?tab=` 可分享且旧 `/reminder`、`/anniversary` 直达跳对应页签;游客只读纪念日、今日/计划给登录邀请)。
 
-**游戏/播放页顶栏变体(`.game-topbar`,V9.72)**:宠物连连看/Flash 播放器顶部「返回+全屏」不适用 §11b 多选工具栏,改用 `PageToolbar root-class="game-topbar" :holder-margin="0" always`,右侧 `.game-top-actions`(`margin-left:auto;flex gap:8px`)放圆角小按钮(返回 ArrowLeft + 全屏 FullScreen);容器样式定义在 `PageToolbar.vue`、`.game-top-actions` 与暖居 `.gc-pin .game-topbar` 胞吐适配定义在 `main.css`,与物品定位 `.fp-topbar` 同构;全屏目标为 `.game-card`(非 `.page`)。
+**游戏/播放页顶栏变体(`.game-topbar`,V9.72)**:宠物连连看/Flash/数独/2048 顶部「返回+全屏」不适用 §11b 多选工具栏,改用 `PageToolbar root-class="game-topbar" :holder-margin="0" always`,右侧 `.game-top-actions`(`margin-left:auto;flex gap:8px`)放圆角小按钮(返回 ArrowLeft + 全屏 FullScreen);容器样式定义在 `PageToolbar.vue`、`.game-top-actions` 与暖居 `.gc-pin .game-topbar` 胞吐适配定义在 `main.css`,与物品定位 `.fp-topbar` 同构;全屏目标是页面自己的棋盘/游戏卡容器(`.game-card` / `.sd-card` / `.bf-card`,非 `.page`),全屏后棋盘按 `min(78vh, 86vw)` 收窄、工具区允许纵向滚动。
 
 **今日页签重要日期条(V10.91)**:今日页签顶部一条 `.event-strip.card`(padding 10/14、`margin-bottom:14px`),左侧 `Calendar` 图标走 `--color-primary`,右侧 1–3 条「距<名称>还有 N 天 / 今天就是<名称>」(13px,条目 `--color-text`、整体 `--color-text-secondary`,`flex-wrap` 自然换行),整条可点(`v-a11y-click`)跳纪念日页签;无纪念日整条不渲染。纪念日卡片在名称下补一行 `.anni-remind`(12px `--color-primary` + `Bell` 图标,「提前 N 天提醒」),仅开启提醒时出现。
 

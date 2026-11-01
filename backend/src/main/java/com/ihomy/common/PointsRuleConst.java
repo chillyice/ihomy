@@ -21,6 +21,8 @@ public final class PointsRuleConst {
     public static final String VIDEO = "video";
     public static final String TASK = "task";
     public static final String GAME_PETLINK = "game_petlink";
+    public static final String GAME_SUDOKU = "game_sudoku";
+    public static final String GAME_2048 = "game_2048";
     public static final String PLANT_WATER = "plant_water";
     public static final String PLANT_SUN = "plant_sun";
     public static final String PLANT_HARVEST = "plant_harvest";
@@ -47,6 +49,8 @@ public final class PointsRuleConst {
             new Feature(VIDEO, GROUP_CONTENT, 15, true),
             new Feature(TASK, GROUP_TASK, 0, false),
             new Feature(GAME_PETLINK, GROUP_GAME, 10, true),
+            new Feature(GAME_SUDOKU, GROUP_GAME, 10, true),
+            new Feature(GAME_2048, GROUP_GAME, 10, true),
             new Feature(PLANT_WATER, GROUP_GARDEN, 2, true),
             new Feature(PLANT_SUN, GROUP_GARDEN, 2, true),
             new Feature(PLANT_HARVEST, GROUP_GARDEN, 30, true));

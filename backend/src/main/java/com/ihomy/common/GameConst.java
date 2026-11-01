@@ -27,4 +27,7 @@ public final class GameConst {
 
     /** H5 小游戏通关奖励每日上限(防刷:宠物连连看等前端上报分数的游戏按天限次) */
     public static final int PETLINK_DAILY_LIMIT = 5;
+
+    /** 数独/2048 等 H5 小游戏的每日奖励次数上限,口径与连连看一致 */
+    public static final int H5_GAME_DAILY_LIMIT = 5;
 }

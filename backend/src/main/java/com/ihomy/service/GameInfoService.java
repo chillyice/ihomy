@@ -144,20 +144,42 @@ public class GameInfoService {
     }
 
     /**
-     * H5 小游戏通关奖励(宠物连连看):每局固定加分,按天限次防刷。
+     * H5 小游戏通关奖励:每局固定加分,按天限次防刷。
      * 计数器走 Redis(原子自增 + 次日零时过期),Redis 不可用时降级为直接奖励,不阻塞游戏体验。
      * ponytail: 低并发家庭场景,INCR 后校验存在极小并发窗口,每日上限为软性约束而非硬安全边界。
      */
     public Map<String, Object> petLinkReward(Long userId, Long familyId) {
+        return h5GameReward(userId, familyId, PointsRuleConst.GAME_PETLINK, "petlink",
+                GameConst.PETLINK_DAILY_LIMIT, "宠物连连看通关");
+    }
+
+    /**
+     * 数独完成奖励(每日限次口径与连连看一致)。
+     */
+    public Map<String, Object> sudokuReward(Long userId, Long familyId) {
+        return h5GameReward(userId, familyId, PointsRuleConst.GAME_SUDOKU, "sudoku",
+                GameConst.H5_GAME_DAILY_LIMIT, "数独完成");
+    }
+
+    /**
+     * 2048 达成奖励(首次合并出 2048 时前端上报,每日限次防刷)。
+     */
+    public Map<String, Object> game2048Reward(Long userId, Long familyId) {
+        return h5GameReward(userId, familyId, PointsRuleConst.GAME_2048, "2048",
+                GameConst.H5_GAME_DAILY_LIMIT, "2048 达成");
+    }
+
+    private Map<String, Object> h5GameReward(Long userId, Long familyId, String featureCode,
+                                             String counterKey, int dailyLimit, String remark) {
         Map<String, Object> map = new HashMap<>();
-        if (!pointsService.ruleEnabled(familyId, PointsRuleConst.GAME_PETLINK)) {
+        if (!pointsService.ruleEnabled(familyId, featureCode)) {
             map.put("awarded", 0);
             map.put("balance", pointsService.balance(userId));
             map.put("remainingToday", 0);
             return map;
         }
         LocalDate today = LocalDate.now();
-        String key = "ihomy:game:petlink:" + userId + ":" + today;
+        String key = "ihomy:game:" + counterKey + ":" + userId + ":" + today;
         long count;
         try {
             count = redis.opsForValue().increment(key);
@@ -167,17 +189,17 @@ public class GameInfoService {
         } catch (Exception e) {
             count = 1;
         }
-        if (count > GameConst.PETLINK_DAILY_LIMIT) {
+        if (count > dailyLimit) {
             map.put("awarded", 0);
             map.put("balance", pointsService.balance(userId));
             map.put("remainingToday", 0);
             return map;
         }
-        int awarded = pointsService.rulePoints(familyId, PointsRuleConst.GAME_PETLINK);
-        pointsService.addRecord(userId, familyId, "REWARD", awarded, "宠物连连看通关");
+        int awarded = pointsService.rulePoints(familyId, featureCode);
+        pointsService.addRecord(userId, familyId, "REWARD", awarded, remark);
         map.put("awarded", awarded);
         map.put("balance", pointsService.balance(userId));
-        map.put("remainingToday", (int) Math.max(0, GameConst.PETLINK_DAILY_LIMIT - count));
+        map.put("remainingToday", (int) Math.max(0, dailyLimit - count));
         return map;
     }
 

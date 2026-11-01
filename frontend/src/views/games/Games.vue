@@ -40,6 +40,30 @@
         ></span>
       </div>
 
+      <!-- 数独固定入口(H5 原生小游戏,通关发积分) -->
+      <div v-a11y-click class="tool-card card" @click="$router.push('/games/sudoku')">
+        <div class="tool-icon">
+          <el-icon :size="30"><Cpu /></el-icon>
+        </div>
+        <div class="tool-name">{{ $t('games.sudoku.title') }}</div>
+        <div class="tool-desc">{{ $t('games.sudoku.desc') }}</div>
+        <span class="tool-enter"
+          >{{ $t('games.enter') }}<el-icon><ArrowRight /></el-icon
+        ></span>
+      </div>
+
+      <!-- 2048 固定入口(H5 原生小游戏,达成 2048 发积分) -->
+      <div v-a11y-click class="tool-card card" @click="$router.push('/games/2048')">
+        <div class="tool-icon">
+          <el-icon :size="30"><Histogram /></el-icon>
+        </div>
+        <div class="tool-name">{{ $t('games.g2048.title') }}</div>
+        <div class="tool-desc">{{ $t('games.g2048.desc') }}</div>
+        <span class="tool-enter"
+          >{{ $t('games.enter') }}<el-icon><ArrowRight /></el-icon
+        ></span>
+      </div>
+
       <!-- 导入的小游戏 -->
       <div v-a11y-click v-for="g in games" :key="g.id" class="tool-card card" @click="play(g)">
         <div class="tool-icon">
@@ -114,7 +138,7 @@ import { computed, ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Sunny, VideoPlay, ArrowRight, MoreFilled, Grid } from '@element-plus/icons-vue'
+import { Plus, Sunny, VideoPlay, ArrowRight, MoreFilled, Grid, Cpu, Histogram } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import AddToWishDialog from '@/components/wish/AddToWishDialog.vue'

@@ -300,6 +300,8 @@ export const gameApi = {
   update: (id, data) => request.put(`/game/${id}`, data),
   remove: (id) => request.delete(`/game/${id}`),
   petLinkReward: () => request.post('/game/petlink/reward'),
+  sudokuReward: () => request.post('/game/sudoku/reward'),
+  game2048Reward: () => request.post('/game/2048/reward'),
   // GBA 存档落在游戏目录的 saves/ 下,列表按最后修改时间倒序
   listSaves: (id) => request.get(`/game/${id}/saves`),
   downloadSave: (id, name) => request.get(`/game/${id}/saves/${encodeURIComponent(name)}`, { responseType: 'arraybuffer' }),

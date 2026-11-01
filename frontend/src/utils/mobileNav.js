@@ -77,6 +77,8 @@ const PREFIX_TITLE_RULES = [
   { prefix: '/tools/gba', key: () => 'tools.gba.title' },
   { prefix: '/tools/plant', key: () => 'plant.title' },
   { prefix: '/games/petlink', key: () => 'games.petlink.title' },
+  { prefix: '/games/sudoku', key: () => 'games.sudoku.title' },
+  { prefix: '/games/2048', key: () => 'games.g2048.title' },
   { prefix: '/games/play', key: () => 'games.title' },
 ]
 

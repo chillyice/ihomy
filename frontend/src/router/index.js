@@ -166,6 +166,10 @@ const routes = [
   { path: '/games/play/:id', name: 'GamePlayer', component: () => import('@/views/games/GamePlayer.vue'), meta: { requiresAuth: true } },
   // 宠物连连看 H5(自 Flash 移植的原生小游戏,通关发积分),需登录
   { path: '/games/petlink', name: 'PetLinkLink', component: () => import('@/views/games/PetLinkLink.vue'), meta: { requiresAuth: true } },
+  // 数独 H5(唯一解生成、笔记/提示/撤销,通关发积分),需登录
+  { path: '/games/sudoku', name: 'Sudoku', component: () => import('@/views/games/Sudoku.vue'), meta: { requiresAuth: true } },
+  // 2048 H5(方向键/滑动合并数字,达成 2048 发积分),需登录
+  { path: '/games/2048', name: 'Game2048', component: () => import('@/views/games/Game2048.vue'), meta: { requiresAuth: true } },
   // 运维管理页:仅 OPS 角色可访问
   { path: '/ops', name: 'Ops', component: () => import('@/views/ops/Ops.vue'), meta: { ops: true } },
   // 咔哒软件首页:独立下载页(托管在 ihomy 域名下),standalone 不套 ihomy 外壳
