@@ -195,7 +195,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 - 后端全绿:`.\mvnw.cmd -B clean package`(289 tests,纯逻辑不起 Spring)。
 - 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(657 passed)+ `npm run format:check`(全树遗留未格式化:`views/BitPouch.vue`、`utils/packetDecode.js`+`.spec.js`、`views/bitpouch/panels/PacketPanel.vue`、`views/Chillyice.vue`、`views/ops/tabs/OpsKada.vue`;**本次改动的文件必须 `prettier --write` 后通过**)。
-- 构建:入口 chunk 基线 **534.07KB / gzip 220.19KB**(V11.2 收尾);**vite 报的是字符数不是字节数**,别拿 `ls -la` 比;历史数字见 变更归档。
+- 构建:入口 chunk 基线 **534.07KB / gzip 220.19KB**(V11.2 收尾);**体积口径一律以 vite 构建输出打印的数字为准**(自测 utf8 字节/utf16 字符都对不上,`ls -la` 也不可比);历史数字见 变更归档。
 - 一致性:`bash scripts/doc-drift-check.sh` 全 [OK];`gen-code-map.sh --check`、`doc-index.sh --check` 无漂移。
 - 接口测试在仓库外 `..\autotest_framework`(`pytest -m api`,37 passed)。
 
