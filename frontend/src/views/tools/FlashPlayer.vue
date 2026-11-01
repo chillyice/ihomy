@@ -61,7 +61,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { FullScreen, ArrowLeft } from '@element-plus/icons-vue'
 import PageToolbar from '@/components/PageToolbar.vue'
-import { loadRuffle } from '@/utils/ruffle'
+import { loadRuffle, ruffleLoadOptions } from '@/utils/ruffle'
 import { isIOS } from '@/utils/platform'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 
@@ -157,13 +157,13 @@ const playFile = async (file) => {
   revokeObjectUrl()
   const url = URL.createObjectURL(file)
   objectUrl = url
-  await mountAndLoad((api) => api.load(url))
+  await mountAndLoad((api) => api.load(ruffleLoadOptions(url)))
 }
 
 const loadUrl = (url) => {
   revokeObjectUrl()
   fileName.value = props.title || url.split('/').pop() || ''
-  mountAndLoad((api) => api.load(url))
+  mountAndLoad((api) => api.load(ruffleLoadOptions(url)))
 }
 
 const onPick = (e) => {
