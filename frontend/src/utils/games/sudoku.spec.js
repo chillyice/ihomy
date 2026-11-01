@@ -2,14 +2,17 @@ import { describe, it, expect } from 'vitest'
 import {
   CELLS,
   DIFFICULTIES,
+  cageIndexOf,
   clearPeerNotes,
   countSolutions,
   digitCounts,
+  extraGroupsFor,
   findConflicts,
   generatePuzzle,
   generateSolution,
   isSolved,
   isValidBoard,
+  isValidCages,
   notesOf,
   pickHintIndex,
 } from './sudoku'
@@ -133,5 +136,69 @@ describe('数独判定', () => {
     expect(isValidBoard(new Array(80).fill(0))).toBe(false)
     expect(isValidBoard([...emptyBoard().slice(1), 'x'])).toBe(false)
     expect(isValidBoard([...emptyBoard().slice(1), 10])).toBe(false)
+  })
+})
+
+describe('数独变体(对角线/杀手)', () => {
+  it('对角线终盘两条对角线都是 1~9,题目唯一解', () => {
+    const { puzzle, solution } = generatePuzzle('MEDIUM', seeded(21), { variant: 'DIAGONAL' })
+    const mainDiag = Array.from({ length: 9 }, (_, i) => i * 9 + i)
+    const antiDiag = Array.from({ length: 9 }, (_, i) => i * 9 + (8 - i))
+    for (const diag of [mainDiag, antiDiag]) {
+      expect(new Set(diag.map((i) => solution[i])).size).toBe(9)
+    }
+    expect(countSolutions(puzzle, 2, { extraGroups: extraGroupsFor('DIAGONAL') })).toBe(1)
+    expect(generatePuzzle('EASY', seeded(1)).variant).toBe('CLASSIC')
+  })
+
+  it('对角线冲突检测:标准模式不冲突,附加对角线组后冲突', () => {
+    const board = emptyBoard()
+    board[0] = 5 // 主对角线起点
+    board[40] = 5 // 中心(同对角线,不同行/列/宫)
+    expect(findConflicts(board).size).toBe(0)
+    const conflicts = findConflicts(board, extraGroupsFor('DIAGONAL'))
+    expect(conflicts.has(0)).toBe(true)
+    expect(conflicts.has(40)).toBe(true)
+  })
+
+  it('杀手题:全空盘,笼覆盖全盘、笼和与终盘一致且唯一解', () => {
+    const { puzzle, solution, cages, blanks } = generatePuzzle('EASY', seeded(13), { variant: 'KILLER' })
+    expect(blanks).toBe(CELLS)
+    expect(puzzle.every((v) => v === 0)).toBe(true)
+    expect(isValidCages(cages)).toBe(true)
+    for (const cage of cages) {
+      expect(cage.cells.reduce((acc, i) => acc + solution[i], 0)).toBe(cage.sum)
+      // 笼内数字互不重复(终盘口径)
+      expect(new Set(cage.cells.map((i) => solution[i])).size).toBe(cage.cells.length)
+    }
+    expect(countSolutions(puzzle, 2, { cages })).toBe(1)
+  })
+
+  it('杀手判定:填满无冲突但笼和不对不算完成', () => {
+    const full = generateSolution(seeded(3))
+    expect(isSolved(full, { cages: [{ cells: [0, 1], sum: full[0] + full[1] }] })).toBe(true)
+    expect(isSolved(full, { cages: [{ cells: [0, 1], sum: full[0] + full[1] + 1 }] })).toBe(false)
+  })
+
+  it('笼工具:cageIndexOf 映射与 isValidCages 挡脏数据', () => {
+    const idx = cageIndexOf([
+      { cells: [4, 5], sum: 9 },
+      { cells: [6], sum: 2 },
+    ])
+    expect(idx[4]).toBe(0)
+    expect(idx[5]).toBe(0)
+    expect(idx[6]).toBe(1)
+    expect(idx[7]).toBe(-1)
+
+    expect(isValidCages([])).toBe(false)
+    expect(isValidCages([{ cells: [0, 1], sum: 5 }])).toBe(false) // 未覆盖全盘
+    expect(
+      isValidCages([
+        { cells: [0, 0], sum: 3 },
+        { cells: [1], sum: 2 },
+        ...Array.from({ length: 79 }, (_, k) => ({ cells: [k + 2], sum: 1 })),
+      ]),
+    ).toBe(false) // 重叠
+    expect(isValidCages([{ cells: [0, 1], sum: 0 }, ...Array.from({ length: 79 }, (_, k) => ({ cells: [k + 2], sum: 1 }))])).toBe(false) // sum 越界
   })
 })

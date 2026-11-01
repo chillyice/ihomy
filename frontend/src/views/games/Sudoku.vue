@@ -14,10 +14,13 @@
       </div>
     </PageToolbar>
 
-    <div ref="gameCardEl" class="sd-card">
+    <div ref="gameCardEl" v-loading="generating" class="sd-card">
       <div class="sd-head">
         <div class="sd-title">{{ $t('games.sudoku.title') }}</div>
         <div class="sd-head-right">
+          <el-select v-model="variant" size="small" class="sd-variant" @change="changeVariant">
+            <el-option v-for="key in VARIANT_KEYS" :key="key" :value="key" :label="$t('games.sudoku.variant.' + key)" />
+          </el-select>
           <el-select v-model="difficulty" size="small" class="sd-difficulty" @change="startNew">
             <el-option v-for="key in DIFFICULTY_KEYS" :key="key" :value="key" :label="$t('games.sudoku.difficulty.' + key)" />
           </el-select>
@@ -40,7 +43,7 @@
         </span>
       </div>
 
-      <div class="sd-board" :class="{ 'is-frozen': won }">
+      <div class="sd-board" :class="{ 'is-frozen': won, 'is-quick': quickFill && activeNumber > 0 }">
         <button
           v-for="(value, index) in board"
           :key="index"
@@ -50,6 +53,13 @@
           :aria-label="cellLabel(index, value)"
           @click="select(index)"
         >
+          <template v-if="variant === 'KILLER'">
+            <i v-if="cageEdge(index, 't')" class="sd-cage sd-cage-t" aria-hidden="true"></i>
+            <i v-if="cageEdge(index, 'b')" class="sd-cage sd-cage-b" aria-hidden="true"></i>
+            <i v-if="cageEdge(index, 'l')" class="sd-cage sd-cage-l" aria-hidden="true"></i>
+            <i v-if="cageEdge(index, 'r')" class="sd-cage sd-cage-r" aria-hidden="true"></i>
+            <b v-if="cageHeadSum(index) !== ''" class="sd-cage-sum">{{ cageHeadSum(index) }}</b>
+          </template>
           <span v-if="value" class="sd-value">{{ value }}</span>
           <span v-else-if="notes[index]" class="sd-notes">
             <span v-for="n in notesList(index)" :key="n" class="sd-note">{{ n }}</span>
@@ -60,6 +70,9 @@
       <div class="sd-tools">
         <button type="button" class="sd-tool" :class="{ active: notesMode }" @click="notesMode = !notesMode">
           {{ $t('games.sudoku.notes') }}
+        </button>
+        <button type="button" class="sd-tool" :class="{ active: quickFill }" @click="toggleQuickFill">
+          {{ $t('games.sudoku.quickFill') }}
         </button>
         <button type="button" class="sd-tool" @click="erase">{{ $t('games.sudoku.erase') }}</button>
         <button type="button" class="sd-tool" :disabled="!history.length" @click="undo">
@@ -75,9 +88,9 @@
           :key="n"
           type="button"
           class="sd-num"
-          :class="{ done: remaining[n] <= 0 }"
+          :class="{ done: remaining[n] <= 0, active: quickFill && activeNumber === n }"
           :disabled="remaining[n] <= 0"
-          @click="input(n)"
+          @click="pickNumber(n)"
         >
           <b>{{ n }}</b>
           <span class="sd-num-left">{{ remaining[n] > 0 ? remaining[n] : '' }}</span>
@@ -102,8 +115,9 @@
 </template>
 
 <script setup>
-// 数独:纯前端 H5 小游戏。生成器在 utils/games/sudoku.js(挖空时逐步校验唯一解),
-// 本页只做棋盘渲染、笔记/提示/撤销/计时与进度存档;通关按后端积分规则发奖励。
+// 数独:纯前端 H5 小游戏。生成器在 utils/games/sudoku.js(挖空时逐步校验唯一解;
+// 变体含标准/对角线/杀手,杀手为全空盘 + 笼划分),本页只做棋盘渲染、笔记/提示/撤销/
+// 计时与进度存档;快填模式先选数字再点格子直填;通关按后端积分规则发奖励。
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -114,12 +128,16 @@ import PageToolbar from '@/components/PageToolbar.vue'
 import {
   CELLS,
   DIFFICULTY_KEYS,
+  VARIANT_KEYS,
+  cageIndexOf,
   clearPeerNotes,
   digitCounts,
+  extraGroupsFor,
   findConflicts,
   generatePuzzle,
   isSolved,
   isValidBoard,
+  isValidCages,
   notesOf,
   pickHintIndex,
 } from '@/utils/games/sudoku'
@@ -129,18 +147,24 @@ const router = useRouter()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 
 const STORAGE_KEY = 'ihomy:games:sudoku:v1'
+const QUICK_FILL_KEY = 'ihomy:games:sudoku:quickfill:v1'
 const MAX_HISTORY = 120
 
 const gameCardEl = ref(null)
 const isFullscreen = ref(false)
 
+const variant = ref('CLASSIC')
 const difficulty = ref('MEDIUM')
 const puzzle = ref(new Array(CELLS).fill(0))
 const solution = ref(new Array(CELLS).fill(0))
+const cages = ref(null)
 const board = ref(new Array(CELLS).fill(0))
 const notes = ref(new Array(CELLS).fill(0))
 const selected = ref(-1)
 const notesMode = ref(false)
+const quickFill = ref(false)
+const activeNumber = ref(0)
+const generating = ref(false)
 const history = ref([])
 const hintsUsed = ref(0)
 const elapsed = ref(0)
@@ -148,7 +172,19 @@ const won = ref(false)
 const rewardMsg = ref('')
 const hintFlash = ref(-1)
 
-const conflicts = computed(() => findConflicts(board.value))
+// 冲突分组:对角线加两条对角线;杀手笼内不重复,把各笼也当分组参与冲突检测
+const conflictGroups = computed(() => {
+  if (variant.value === 'DIAGONAL') return extraGroupsFor('DIAGONAL')
+  if (variant.value === 'KILLER' && cages.value) return cages.value.map((cage) => cage.cells)
+  return null
+})
+const solvedNow = () =>
+  isSolved(board.value, {
+    extraGroups: conflictGroups.value || undefined,
+    cages: variant.value === 'KILLER' ? cages.value : undefined,
+  })
+
+const conflicts = computed(() => findConflicts(board.value, conflictGroups.value))
 const conflictCount = computed(() => conflicts.value.size)
 const blanksLeft = computed(() => board.value.reduce((n, v) => n + (v ? 0 : 1), 0))
 const counts = computed(() => digitCounts(board.value))
@@ -183,6 +219,7 @@ const cellClass = (index) => {
     given: isGiven(index),
     'edge-r': col % 3 === 2 && col !== 8,
     'edge-b': row % 3 === 2 && row !== 8,
+    diag: variant.value === 'DIAGONAL' && (row === col || row + col === 8),
     selected: index === selected.value,
     peer:
       selected.value >= 0 &&
@@ -192,6 +229,28 @@ const cellClass = (index) => {
     conflict: conflicts.value.has(index),
     hint: hintFlash.value === index,
   }
+}
+
+// ---------- 杀手笼渲染(虚线边框 + 笼和标注,标在笼内最左上格) ----------
+const cageIdx = computed(() => (variant.value === 'KILLER' && cages.value ? cageIndexOf(cages.value) : null))
+const cageEdge = (index, side) => {
+  const idx = cageIdx.value
+  if (!idx) return false
+  const g = idx[index]
+  const row = Math.floor(index / 9)
+  const col = index % 9
+  if (side === 't') return row > 0 && idx[index - 9] !== g
+  if (side === 'b') return row < 8 && idx[index + 9] !== g
+  if (side === 'l') return col > 0 && idx[index - 1] !== g
+  return col < 8 && idx[index + 1] !== g
+}
+const cageHeadSum = (index) => {
+  const list = cages.value
+  const idx = cageIdx.value
+  if (!list || !idx) return ''
+  const g = idx[index]
+  if (g < 0 || list[g].cells[0] !== index) return ''
+  return list[g].sum
 }
 
 // ---------- 计时 ----------
@@ -218,12 +277,14 @@ const saveState = () => {
       STORAGE_KEY,
       JSON.stringify({
         difficulty: difficulty.value,
+        variant: variant.value,
         puzzle: puzzle.value,
         solution: solution.value,
         board: board.value,
         notes: notes.value,
         elapsed: elapsed.value,
         hintsUsed: hintsUsed.value,
+        cages: cages.value,
       }),
     )
   } catch (e) {
@@ -241,7 +302,10 @@ const loadState = () => {
   try {
     const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null')
     if (!raw) return null
+    // 旧版存档没有 variant 字段,一律按标准数独处理
+    const savedVariant = VARIANT_KEYS.includes(raw.variant) ? raw.variant : 'CLASSIC'
     if (!DIFFICULTY_KEYS.includes(raw.difficulty)) return null
+    if (savedVariant === 'KILLER' && !isValidCages(raw.cages)) return null
     if (!isValidBoard(raw.puzzle) || !isValidBoard(raw.board) || !isValidBoard(raw.solution, { allowZero: false })) {
       return null
     }
@@ -251,7 +315,7 @@ const loadState = () => {
     for (let i = 0; i < CELLS; i++) {
       if (raw.puzzle[i] && raw.board[i] !== raw.puzzle[i]) return null
     }
-    return raw
+    return { ...raw, variant: savedVariant }
   } catch (e) {
     return null
   }
@@ -266,14 +330,23 @@ const scheduleSave = () => {
   }, 800)
 }
 // ---------- 游戏流程 ----------
-const startNew = () => {
-  const { puzzle: nextPuzzle, solution: nextSolution } = generatePuzzle(difficulty.value)
-  puzzle.value = nextPuzzle
-  solution.value = nextSolution
-  board.value = nextPuzzle.slice()
+let generateSeq = 0
+const startNew = async () => {
+  const seq = ++generateSeq
+  generating.value = true
+  // 先让 loading 遮罩画出来再算题:杀手数独生成要几百毫秒,直接同步算会卡死一拍
+  await nextTick()
+  const res = generatePuzzle(difficulty.value, Math.random, { variant: variant.value })
+  if (seq !== generateSeq) return
+  variant.value = res.variant
+  puzzle.value = res.puzzle
+  solution.value = res.solution
+  cages.value = res.cages
+  board.value = res.puzzle.slice()
   notes.value = new Array(CELLS).fill(0)
   selected.value = -1
   notesMode.value = false
+  activeNumber.value = 0
   history.value = []
   hintsUsed.value = 0
   elapsed.value = 0
@@ -281,12 +354,45 @@ const startNew = () => {
   rewardMsg.value = ''
   hintFlash.value = -1
   clearState()
+  generating.value = false
   startTimer()
 }
 
+// 切变体:先清掉旧盘面的存档再开新局,避免旧盘面被写进新变体的档里
+const changeVariant = () => {
+  cages.value = null
+  clearState()
+  startNew()
+}
+
 const select = (index) => {
-  if (won.value) return
+  if (won.value || generating.value) return
   selected.value = index
+  // 快填模式:先点数字再点格子,空格直接落数(笔记模式下记候选);已有数字只做选中
+  if (quickFill.value && activeNumber.value > 0 && !isGiven(index) && !board.value[index]) {
+    input(activeNumber.value)
+  }
+}
+
+// 快填开关:开启后数字盘只负责选中数字,不再直接落子
+const toggleQuickFill = () => {
+  quickFill.value = !quickFill.value
+  activeNumber.value = 0
+  try {
+    localStorage.setItem(QUICK_FILL_KEY, quickFill.value ? '1' : '0')
+  } catch (e) {
+    // 忽略
+  }
+}
+
+// 数字盘:快填模式选中数字(再点同数字取消),常规模式直接落子
+const pickNumber = (n) => {
+  if (won.value || generating.value) return
+  if (quickFill.value) {
+    activeNumber.value = activeNumber.value === n ? 0 : n
+    return
+  }
+  input(n)
 }
 
 const snapshot = () => {
@@ -296,7 +402,7 @@ const snapshot = () => {
 
 const input = (n) => {
   const index = selected.value
-  if (won.value || index < 0 || isGiven(index)) return
+  if (won.value || generating.value || index < 0 || isGiven(index)) return
   if (notesMode.value) {
     if (board.value[index]) return
     snapshot()
@@ -311,7 +417,7 @@ const input = (n) => {
   board.value[index] = n
   notes.value[index] = 0
   clearPeerNotes(notes.value, index, n)
-  if (isSolved(board.value)) finish()
+  if (solvedNow()) finish()
 }
 
 const erase = () => {
@@ -331,7 +437,7 @@ const undo = () => {
 }
 
 const useHint = () => {
-  if (won.value) return
+  if (won.value || generating.value) return
   let index = selected.value
   if (index < 0 || board.value[index]) index = pickHintIndex(board.value)
   if (index < 0) return
@@ -345,7 +451,7 @@ const useHint = () => {
   setTimeout(() => {
     if (hintFlash.value === index) hintFlash.value = -1
   }, 900)
-  if (isSolved(board.value)) finish()
+  if (solvedNow()) finish()
 }
 
 const finish = () => {
@@ -375,9 +481,15 @@ const ARROW_DELTA = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -9, ArrowDown: 9 }
 const onKeydown = (event) => {
   const tag = event.target?.tagName
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-  if (won.value) return
+  if (won.value || generating.value) return
   if (/^[1-9]$/.test(event.key)) {
-    input(Number(event.key))
+    const n = Number(event.key)
+    if (quickFill.value) {
+      // 快填模式下键盘也只选数字,配合点击格子落子
+      activeNumber.value = activeNumber.value === n ? 0 : n
+    } else {
+      input(n)
+    }
     event.preventDefault()
     return
   }
@@ -421,11 +533,19 @@ onMounted(() => {
   document.addEventListener('fullscreenchange', onFullscreenChange)
   sunLight?.suspendEffects()
 
+  try {
+    quickFill.value = localStorage.getItem(QUICK_FILL_KEY) === '1'
+  } catch (e) {
+    quickFill.value = false
+  }
+
   const saved = loadState()
   if (saved) {
+    variant.value = saved.variant
     difficulty.value = saved.difficulty
     puzzle.value = saved.puzzle
     solution.value = saved.solution
+    cages.value = saved.variant === 'KILLER' ? saved.cages : null
     board.value = saved.board
     notes.value = saved.notes
     elapsed.value = Number.isInteger(saved.elapsed) ? saved.elapsed : 0
@@ -466,6 +586,8 @@ onBeforeUnmount(() => {
   --sd-same: rgba(184, 140, 110, 0.2);
   --sd-conflict: rgba(214, 76, 76, 0.22);
   --sd-hint: rgba(96, 176, 120, 0.3);
+  --sd-diag: rgba(184, 140, 110, 0.07);
+  --sd-cage: rgba(184, 140, 110, 0.6);
 }
 .sd-card:fullscreen {
   width: 100vw;
@@ -482,6 +604,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   width: 100%;
   gap: 12px;
+  flex-wrap: wrap;
 }
 .sd-title {
   font-size: 20px;
@@ -491,10 +614,13 @@ onBeforeUnmount(() => {
 .sd-head-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+}
+.sd-variant {
+  width: 88px;
 }
 .sd-difficulty {
-  width: 118px;
+  width: 104px;
 }
 .sd-timer {
   font-variant-numeric: tabular-nums;
@@ -577,6 +703,10 @@ onBeforeUnmount(() => {
   color: var(--sd-given);
   font-weight: 700;
 }
+/* 对角线数独:两条对角线淡着色(优先级低于选中/冲突态) */
+.sd-cell.diag {
+  background: var(--sd-diag);
+}
 .sd-cell.peer {
   background: var(--sd-peer);
 }
@@ -596,6 +726,51 @@ onBeforeUnmount(() => {
 }
 .sd-value {
   line-height: 1;
+}
+
+/* 杀手笼:虚线框在格边内侧描出笼界,笼和标注压在笼内最左上格的角上 */
+.sd-board.is-quick .sd-cell {
+  cursor: crosshair;
+}
+.sd-cage {
+  position: absolute;
+  pointer-events: none;
+}
+.sd-cage-t {
+  top: 0;
+  left: 0;
+  right: 0;
+  border-top: 2px dashed var(--sd-cage);
+}
+.sd-cage-b {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-bottom: 2px dashed var(--sd-cage);
+}
+.sd-cage-l {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-left: 2px dashed var(--sd-cage);
+}
+.sd-cage-r {
+  top: 0;
+  bottom: 0;
+  right: 0;
+  border-right: 2px dashed var(--sd-cage);
+}
+.sd-cage-sum {
+  position: absolute;
+  top: 0;
+  left: 2px;
+  padding: 0 3px;
+  border-radius: 0 0 4px 0;
+  background: var(--sd-cell-bg);
+  font-size: clamp(7px, 1.7vw, 10px);
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--color-text-secondary, #8a8a8a);
 }
 
 .sd-notes {
@@ -739,6 +914,8 @@ html.dark .sd-card {
   --sd-same: rgba(184, 140, 110, 0.28);
   --sd-conflict: rgba(214, 76, 76, 0.32);
   --sd-hint: rgba(96, 176, 120, 0.34);
+  --sd-diag: rgba(184, 140, 110, 0.13);
+  --sd-cage: rgba(184, 140, 110, 0.7);
 }
 html.dark .sd-cell.conflict {
   color: #ff9a9a;

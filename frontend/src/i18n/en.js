@@ -914,7 +914,12 @@ export default {
     },
     sudoku: {
       title: 'Sudoku',
-      desc: 'Unique-solution puzzles with notes / hints / undo',
+      desc: 'Classic / diagonal / killer with notes / hints / undo',
+      variant: {
+        CLASSIC: 'Classic',
+        DIAGONAL: 'Diagonal',
+        KILLER: 'Killer',
+      },
       difficulty: {
         EASY: 'Easy',
         MEDIUM: 'Medium',
@@ -925,6 +930,7 @@ export default {
       conflicts: 'Conflicts',
       hints: 'Hints',
       notes: 'Notes',
+      quickFill: 'Quick fill',
       erase: 'Erase',
       undo: 'Undo',
       hint: 'Hint',
@@ -932,7 +938,7 @@ export default {
       win: 'Solved!',
       winMeta: 'Time {time} · Hints {hints}',
       playAgain: 'Play again',
-      tip: 'Pick a cell, then use the keyboard or the pad below; turn on Notes to pencil in candidates (shortcut: N)',
+      tip: 'Pick a cell, then use the keyboard or the pad below; turn on Quick fill to select a digit first and tap cells to place it; diagonal mode also needs 1-9 on both diagonals, killer cages hold non-repeating digits summing to the label',
       cellFilled: 'Row {row}, column {col}, number {value}',
       cellEmpty: 'Row {row}, column {col}, empty',
     },

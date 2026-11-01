@@ -1,8 +1,10 @@
 // 2048 纯逻辑:方块用 { id, value, row, col } 表示(id 稳定,页面靠它做滑动/合并动画)。
 // 移动 = 每行/每列向一个方向紧凑 + 相邻同值合并一次;所有判定都在这里,组件只渲染与收键盘/手势。
+// 棋盘边长参数化(4~8 列模式):各函数带 size 参数,缺省 4,旧调用与旧存档校验不受影响。
 
 export const SIZE = 4
 export const CELLS = SIZE * SIZE
+export const BOARD_SIZES = [4, 5, 6, 7, 8]
 export const WIN_VALUE = 2048
 
 /** 新方块进场的数字分布:2 占九成、4 占一成 */
@@ -21,9 +23,9 @@ export function tilesFromGrid(grid) {
   return tiles
 }
 
-/** 方块数组 → 4×4 数字矩阵 */
-export function gridOf(tiles) {
-  const grid = Array.from({ length: SIZE }, () => new Array(SIZE).fill(0))
+/** 方块数组 → 数字矩阵(size×size,测试/调试用) */
+export function gridOf(tiles, size = SIZE) {
+  const grid = Array.from({ length: size }, () => new Array(size).fill(0))
   for (const t of tiles) grid[t.row][t.col] = t.value
   return grid
 }
@@ -32,7 +34,7 @@ export function gridOf(tiles) {
  * 朝一个方向移动一次。
  * 返回 { tiles, gained, moved, mergedIds }:新方块数组(未落新方块)、本步得分、是否发生位移或合并、本次合并出的方块 id。
  */
-export function move(tiles, direction) {
+export function move(tiles, direction, size = SIZE) {
   const horizontal = direction === 'left' || direction === 'right'
   const ascending = direction === 'left' || direction === 'up'
   const lineAxis = horizontal ? 'row' : 'col'
@@ -67,7 +69,7 @@ export function move(tiles, direction) {
       }
     }
     slots.forEach((slot, position) => {
-      const index = ascending ? position : SIZE - 1 - position
+      const index = ascending ? position : size - 1 - position
       const tile = { id: slot.id, value: slot.value, merged: slot.merged }
       tile[lineAxis] = key
       tile[travelAxis] = index
@@ -80,25 +82,25 @@ export function move(tiles, direction) {
 }
 
 /** 在随机空格落一个新方块;盘面已满返回 null */
-export function spawnTile(tiles, random = Math.random) {
-  const occupied = new Set(tiles.map((t) => t.row * SIZE + t.col))
+export function spawnTile(tiles, random = Math.random, size = SIZE) {
+  const occupied = new Set(tiles.map((t) => t.row * size + t.col))
   const empty = []
-  for (let i = 0; i < CELLS; i++) if (!occupied.has(i)) empty.push(i)
+  for (let i = 0; i < size * size; i++) if (!occupied.has(i)) empty.push(i)
   if (!empty.length) return null
   const cell = empty[Math.min(empty.length - 1, Math.floor(random() * empty.length))]
   return {
     id: nextId(tiles),
     value: random() < TWO_RATE ? 2 : 4,
-    row: (cell / SIZE) | 0,
-    col: cell % SIZE,
+    row: (cell / size) | 0,
+    col: cell % size,
   }
 }
 
 /** 开局:两个随机新方块 */
-export function createGame(random = Math.random) {
+export function createGame(random = Math.random, size = SIZE) {
   const tiles = []
-  tiles.push(spawnTile(tiles, random))
-  tiles.push(spawnTile(tiles, random))
+  tiles.push(spawnTile(tiles, random, size))
+  tiles.push(spawnTile(tiles, random, size))
   return tiles
 }
 
@@ -108,23 +110,23 @@ export function hasWon(tiles) {
 }
 
 /** 满盘且四邻无同值 = 无路可走 */
-export function isGameOver(tiles) {
-  if (tiles.length < CELLS) return false
-  const grid = gridOf(tiles)
-  for (let r = 0; r < SIZE; r++) {
-    for (let c = 0; c < SIZE; c++) {
+export function isGameOver(tiles, size = SIZE) {
+  if (tiles.length < size * size) return false
+  const grid = gridOf(tiles, size)
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
       const v = grid[r][c]
       if (!v) return false
-      if (c + 1 < SIZE && v === grid[r][c + 1]) return false
-      if (r + 1 < SIZE && v === grid[r + 1][c]) return false
+      if (c + 1 < size && v === grid[r][c + 1]) return false
+      if (r + 1 < size && v === grid[r + 1][c]) return false
     }
   }
   return true
 }
 
 /** 读档校验:方块字段合法且不重叠、不越界 */
-export function isValidTiles(tiles) {
-  if (!Array.isArray(tiles) || tiles.length > CELLS) return false
+export function isValidTiles(tiles, size = SIZE) {
+  if (!Array.isArray(tiles) || tiles.length > size * size) return false
   const seen = new Set()
   const ids = new Set()
   for (const t of tiles) {
@@ -134,8 +136,8 @@ export function isValidTiles(tiles) {
     const isPowerOfTwo = (t.value & (t.value - 1)) === 0
     if (!isPowerOfTwo) return false
     if (!Number.isInteger(t.row) || !Number.isInteger(t.col)) return false
-    if (t.row < 0 || t.row >= SIZE || t.col < 0 || t.col >= SIZE) return false
-    const cell = t.row * SIZE + t.col
+    if (t.row < 0 || t.row >= size || t.col < 0 || t.col >= size) return false
+    const cell = t.row * size + t.col
     if (seen.has(cell)) return false
     seen.add(cell)
   }

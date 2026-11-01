@@ -376,11 +376,23 @@ const onVisibilityChange = () => {
 const pick = () => fileInput.value?.click()
 
 // 清理旧模拟器(只清 DOM + 释放全局引用;objectUrl 由调用方在合适时机释放,否则会提前失效)
+// EmulatorJS 没有 destroy API:只清 DOM 不停核心,核心的模拟主循环与音频回调会继续跑——
+// 返回上级页面后游戏声音仍在放、CPU 照跑。先暂停(等价暂停按钮)再拆 DOM。
 const teardownEmulator = () => {
   stopSync()
   if (loadFallbackTimer) {
     clearTimeout(loadFallbackTimer)
     loadFallbackTimer = null
+  }
+  try {
+    ejsInstance?.pause?.()
+  } catch (e) {
+    /* 模拟器未启动/已损坏时忽略 */
+  }
+  try {
+    ejsInstance?.gameManager?.toggleMainLoop?.(0)
+  } catch (e) {
+    /* pause 已停则无操作;paused 标志错乱时这里兜底 */
   }
   if (container.value) container.value.innerHTML = ''
   delete window.EJS_emulator

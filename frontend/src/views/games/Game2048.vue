@@ -29,13 +29,16 @@
       </div>
 
       <div class="bf-actions">
+        <el-select v-model="size" size="small" class="bf-size-select" @change="switchSize">
+          <el-option v-for="s in BOARD_SIZES" :key="s" :value="s" :label="s + '×' + s" />
+        </el-select>
         <el-button size="small" round @click="startNew">{{ $t('games.g2048.newGame') }}</el-button>
         <el-button size="small" round :disabled="!history.length" @click="undo">{{ $t('games.g2048.undo') }}</el-button>
       </div>
 
-      <div class="bf-board" @touchstart="onTouchStart" @touchend="onTouchEnd">
-        <div class="bf-playfield">
-          <div v-for="i in 16" :key="i" class="bf-slot"></div>
+      <div class="bf-board" :class="'bf-size-' + size" @touchstart="onTouchStart" @touchend="onTouchEnd">
+        <div class="bf-playfield" :style="playfieldStyle">
+          <div v-for="i in size * size" :key="i" class="bf-slot"></div>
           <div
             v-for="tile in tiles"
             :key="tile.id"
@@ -75,6 +78,7 @@
 <script setup>
 // 2048:经典数字合并小游戏。移动/合并/落子/胜负全在 utils/games/game2048.js(纯函数,单测覆盖),
 // 本页负责方块定位与动画、键盘/滑动输入、最高分与本局进度存档;达成 2048 按积分规则发奖励。
+// 列宽模式 4~8 各自独立存档与最高分;4 列沿用旧键,老玩家的进度与最高分不丢。
 import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -82,19 +86,18 @@ import { ArrowLeft, FullScreen } from '@element-plus/icons-vue'
 import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import PageToolbar from '@/components/PageToolbar.vue'
-import { createGame, hasWon, isGameOver, isValidTiles, move, spawnTile } from '@/utils/games/game2048'
+import { BOARD_SIZES, createGame, hasWon, isGameOver, isValidTiles, move, spawnTile } from '@/utils/games/game2048'
 
 const { t } = useI18n()
 const router = useRouter()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 
-const BEST_KEY = 'ihomy:games:2048:best:v1'
-const STATE_KEY = 'ihomy:games:2048:state:v1'
 const MAX_HISTORY = 20
 
 const gameCardEl = ref(null)
 const isFullscreen = ref(false)
 
+const size = ref(4)
 const tiles = ref([])
 const score = ref(0)
 const best = ref(0)
@@ -105,10 +108,20 @@ const history = ref([])
 const newIds = ref(new Set())
 const mergedIds = ref(new Set())
 
-const gameOver = computed(() => isGameOver(tiles.value))
+const gameOver = computed(() => isGameOver(tiles.value, size.value))
+
+// 4 列沿用旧键,其余列宽各用独立键
+const bestKey = () => (size.value === 4 ? 'ihomy:games:2048:best:v1' : `ihomy:games:2048:best:${size.value}:v1`)
+const stateKey = () => (size.value === 4 ? 'ihomy:games:2048:state:v1' : `ihomy:games:2048:state:${size.value}:v1`)
+
+const playfieldStyle = computed(() => ({
+  gridTemplateColumns: `repeat(${size.value}, 1fr)`,
+  gridTemplateRows: `repeat(${size.value}, 1fr)`,
+}))
 
 const tileStyle = (tile) => {
-  const cell = 'calc((100% - 3 * var(--bf-gap)) / 4)'
+  const n = size.value
+  const cell = `calc((100% - ${n - 1} * var(--bf-gap)) / ${n})`
   // translate 的百分比按方块自身尺寸解析:每格步长 = 方块宽 + 间距
   const offset = (i) => `calc(${i} * (100% + var(--bf-gap)))`
   return {
@@ -129,7 +142,7 @@ const flash = (target, ids) => {
 // ---------- 存档 ----------
 const loadBest = () => {
   try {
-    const n = Number(localStorage.getItem(BEST_KEY))
+    const n = Number(localStorage.getItem(bestKey()))
     best.value = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
   } catch (e) {
     best.value = 0
@@ -137,29 +150,29 @@ const loadBest = () => {
 }
 const saveBest = () => {
   try {
-    localStorage.setItem(BEST_KEY, String(best.value))
+    localStorage.setItem(bestKey(), String(best.value))
   } catch (e) {
     // 隐私模式忽略
   }
 }
 const saveState = () => {
   try {
-    localStorage.setItem(STATE_KEY, JSON.stringify({ tiles: tiles.value, score: score.value, achieved: achieved.value }))
+    localStorage.setItem(stateKey(), JSON.stringify({ tiles: tiles.value, score: score.value, achieved: achieved.value }))
   } catch (e) {
     // 忽略
   }
 }
 const clearState = () => {
   try {
-    localStorage.removeItem(STATE_KEY)
+    localStorage.removeItem(stateKey())
   } catch (e) {
     // 忽略
   }
 }
 const loadState = () => {
   try {
-    const raw = JSON.parse(localStorage.getItem(STATE_KEY) || 'null')
-    if (!raw || !isValidTiles(raw.tiles) || !raw.tiles.length) return null
+    const raw = JSON.parse(localStorage.getItem(stateKey()) || 'null')
+    if (!raw || !isValidTiles(raw.tiles, size.value) || !raw.tiles.length) return null
     if (!Number.isInteger(raw.score) || raw.score < 0) return null
     return raw
   } catch (e) {
@@ -169,7 +182,7 @@ const loadState = () => {
 
 // ---------- 游戏流程 ----------
 const startNew = () => {
-  tiles.value = createGame()
+  tiles.value = createGame(Math.random, size.value)
   score.value = 0
   achieved.value = false
   won.value = false
@@ -180,13 +193,32 @@ const startNew = () => {
   clearState()
 }
 
+// 切换列宽 = 切到另一份独立存档:当前局面已随每次移动落盘,这里装载新尺寸的档(没有就开新局)
+const switchSize = () => {
+  loadBest()
+  history.value = []
+  newIds.value = new Set()
+  mergedIds.value = new Set()
+  won.value = false
+  rewardMsg.value = ''
+  const saved = loadState()
+  if (saved) {
+    tiles.value = saved.tiles
+    score.value = saved.score
+    achieved.value = !!saved.achieved
+    if (hasWon(saved.tiles)) achieved.value = true
+  } else {
+    startNew()
+  }
+}
+
 const keepPlaying = () => {
   won.value = false
 }
 
 const tryMove = (direction) => {
   if (won.value || gameOver.value) return
-  const res = move(tiles.value, direction)
+  const res = move(tiles.value, direction, size.value)
   if (!res.moved) return
 
   history.value.push({
@@ -200,7 +232,7 @@ const tryMove = (direction) => {
   score.value += res.gained
   flash(mergedIds, res.mergedIds)
 
-  const spawned = spawnTile(tiles.value)
+  const spawned = spawnTile(tiles.value, Math.random, size.value)
   if (spawned) {
     tiles.value = [...tiles.value, spawned]
     flash(newIds, [spawned.id])
@@ -215,7 +247,7 @@ const tryMove = (direction) => {
     best.value = score.value
     saveBest()
   }
-  if (isGameOver(tiles.value)) clearState()
+  if (isGameOver(tiles.value, size.value)) clearState()
   else saveState()
 }
 
@@ -383,6 +415,10 @@ onBeforeUnmount(() => {
   width: min(100%, 480px);
   justify-content: flex-end;
 }
+.bf-size-select {
+  width: 88px;
+  margin-right: auto;
+}
 
 .bf-board {
   width: min(100%, 480px);
@@ -428,6 +464,31 @@ onBeforeUnmount(() => {
 }
 .bf-tile.len-long {
   font-size: clamp(15px, 4.4vw, 28px);
+}
+/* 大棋盘字号随列宽递减,8 列下四位数字也不出格 */
+.bf-size-5 .bf-tile {
+  font-size: clamp(17px, 5vw, 31px);
+}
+.bf-size-5 .bf-tile.len-long {
+  font-size: clamp(13px, 3.8vw, 24px);
+}
+.bf-size-6 .bf-tile {
+  font-size: clamp(14px, 4.2vw, 26px);
+}
+.bf-size-6 .bf-tile.len-long {
+  font-size: clamp(11px, 3vw, 19px);
+}
+.bf-size-7 .bf-tile {
+  font-size: clamp(12px, 3.6vw, 22px);
+}
+.bf-size-7 .bf-tile.len-long {
+  font-size: clamp(10px, 2.6vw, 16px);
+}
+.bf-size-8 .bf-tile {
+  font-size: clamp(10px, 3.2vw, 19px);
+}
+.bf-size-8 .bf-tile.len-long {
+  font-size: clamp(8px, 2.4vw, 14px);
 }
 .bf-tile.new {
   animation: bf-pop 0.16s ease;

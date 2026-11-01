@@ -171,3 +171,45 @@ describe('2048 落子与胜负', () => {
     expect(isValidTiles(new Array(CELLS + 1).fill({ id: 1, value: 2, row: 0, col: 0 }))).toBe(false)
   })
 })
+
+describe('2048 列宽模式(5~8)', () => {
+  const emptyGrid = (n) => Array.from({ length: n }, () => new Array(n).fill(0))
+  const checkerboard = (n) => Array.from({ length: n }, (_, r) => Array.from({ length: n }, (_, c) => ((r + c) % 2 ? 4 : 2)))
+
+  it('5×5 上移动按对应边长紧凑与合并', () => {
+    const row = tilesFromGrid([[2, 2, 2, 2, 0], ...emptyGrid(5).slice(1)])
+    expect(gridOf(move(row, 'left', 5).tiles, 5)[0]).toEqual([4, 4, 0, 0, 0])
+    const rightRow = tilesFromGrid([[2, 0, 0, 0, 2], ...emptyGrid(5).slice(1)])
+    expect(gridOf(move(rightRow, 'right', 5).tiles, 5)[0]).toEqual([0, 0, 0, 0, 4])
+    const column = tilesFromGrid(emptyGrid(5).map((rowArr, r) => rowArr.map((_, c) => (c === 0 && r < 3 ? 2 : 0))))
+    expect(
+      gridOf(move(column, 'up', 5).tiles, 5)
+        .map((r) => r[0])
+        .join(''),
+    ).toBe('42000')
+  })
+
+  it('大棋盘落子只落空格且不越界', () => {
+    const tiles = createGame(() => 0, 8)
+    expect(tiles).toHaveLength(2)
+    expect(isValidTiles(tiles, 8)).toBe(true)
+    const spawned = spawnTile(tiles, () => 0, 8)
+    expect(isValidTiles([...tiles, spawned], 8)).toBe(true)
+  })
+
+  it('大棋盘满盘且无可合并才算结束,有空格就不算', () => {
+    const full8 = checkerboard(8)
+    expect(isGameOver(tilesFromGrid(full8), 8)).toBe(true)
+    expect(spawnTile(tilesFromGrid(full8), () => 0, 8)).toBeNull()
+    const withHole = checkerboard(6)
+    withHole[5][5] = 0
+    expect(isGameOver(tilesFromGrid(withHole), 6)).toBe(false)
+  })
+
+  it('读档校验按列宽判越界', () => {
+    expect(isValidTiles([{ id: 1, value: 2, row: 4, col: 0 }], 5)).toBe(true)
+    expect(isValidTiles([{ id: 1, value: 2, row: 4, col: 0 }], 4)).toBe(false)
+    expect(isValidTiles([{ id: 1, value: 2, row: 0, col: 7 }], 8)).toBe(true)
+    expect(isValidTiles(new Array(26).fill({ id: 1, value: 2, row: 0, col: 0 }), 5)).toBe(false)
+  })
+})

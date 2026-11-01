@@ -908,7 +908,12 @@ export default {
     },
     sudoku: {
       title: '数独',
-      desc: '唯一解题目，笔记 / 提示 / 撤销',
+      desc: '标准 / 对角线 / 杀手，笔记 / 提示 / 撤销',
+      variant: {
+        CLASSIC: '标准',
+        DIAGONAL: '对角线',
+        KILLER: '杀手',
+      },
       difficulty: {
         EASY: '简单',
         MEDIUM: '中等',
@@ -919,6 +924,7 @@ export default {
       conflicts: '冲突',
       hints: '提示次数',
       notes: '笔记',
+      quickFill: '快填',
       erase: '擦除',
       undo: '撤销',
       hint: '提示',
@@ -926,7 +932,7 @@ export default {
       win: '完成！',
       winMeta: '用时 {time} · 提示 {hints} 次',
       playAgain: '再玩一局',
-      tip: '点格子后用数字键或下方数字盘填入；开启「笔记」可记录候选数（快捷键 N）',
+      tip: '点格子后用数字键或下方数字盘填入；开启「快填」可先点数字再点格子直填；对角线模式两条对角线也要 1~9，杀手模式各笼内数字不重复、和等于标注',
       cellFilled: '第 {row} 行第 {col} 列，数字 {value}',
       cellEmpty: '第 {row} 行第 {col} 列，空格',
     },
