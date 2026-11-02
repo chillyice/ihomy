@@ -23,6 +23,10 @@ public final class PointsRuleConst {
     public static final String GAME_PETLINK = "game_petlink";
     public static final String GAME_SUDOKU = "game_sudoku";
     public static final String GAME_2048 = "game_2048";
+    public static final String GAME_MINESWEEPER = "game_minesweeper";
+    public static final String GAME_SOLITAIRE = "game_solitaire";
+    public static final String GAME_TETRIS = "game_tetris";
+    public static final String GAME_SNAKE = "game_snake";
     public static final String PLANT_WATER = "plant_water";
     public static final String PLANT_SUN = "plant_sun";
     public static final String PLANT_HARVEST = "plant_harvest";
@@ -51,6 +55,10 @@ public final class PointsRuleConst {
             new Feature(GAME_PETLINK, GROUP_GAME, 10, true),
             new Feature(GAME_SUDOKU, GROUP_GAME, 10, true),
             new Feature(GAME_2048, GROUP_GAME, 10, true),
+            new Feature(GAME_MINESWEEPER, GROUP_GAME, 10, true),
+            new Feature(GAME_SOLITAIRE, GROUP_GAME, 10, true),
+            new Feature(GAME_TETRIS, GROUP_GAME, 10, true),
+            new Feature(GAME_SNAKE, GROUP_GAME, 10, true),
             new Feature(PLANT_WATER, GROUP_GARDEN, 2, true),
             new Feature(PLANT_SUN, GROUP_GARDEN, 2, true),
             new Feature(PLANT_HARVEST, GROUP_GARDEN, 30, true));

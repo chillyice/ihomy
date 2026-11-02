@@ -257,6 +257,38 @@ public class GameInfoService {
                 GameConst.H5_GAME_DAILY_LIMIT, "2048 达成");
     }
 
+    /**
+     * 扫雷通关奖励(每日限次口径与其他 H5 小游戏一致)。
+     */
+    public Map<String, Object> minesweeperReward(Long userId, Long familyId) {
+        return h5GameReward(userId, familyId, PointsRuleConst.GAME_MINESWEEPER, "minesweeper",
+                GameConst.H5_GAME_DAILY_LIMIT, "扫雷通关");
+    }
+
+    /**
+     * 纸牌接龙完成奖励(每日限次口径与其他 H5 小游戏一致)。
+     */
+    public Map<String, Object> solitaireReward(Long userId, Long familyId) {
+        return h5GameReward(userId, familyId, PointsRuleConst.GAME_SOLITAIRE, "solitaire",
+                GameConst.H5_GAME_DAILY_LIMIT, "纸牌接龙完成");
+    }
+
+    /**
+     * 俄罗斯方块消行达标奖励(单局消除满 10 行时前端上报,每日限次防刷)。
+     */
+    public Map<String, Object> tetrisReward(Long userId, Long familyId) {
+        return h5GameReward(userId, familyId, PointsRuleConst.GAME_TETRIS, "tetris",
+                GameConst.H5_GAME_DAILY_LIMIT, "俄罗斯方块消行");
+    }
+
+    /**
+     * 贪吃蛇得分达标奖励(单局吃到 10 个食物时前端上报,每日限次防刷)。
+     */
+    public Map<String, Object> snakeReward(Long userId, Long familyId) {
+        return h5GameReward(userId, familyId, PointsRuleConst.GAME_SNAKE, "snake",
+                GameConst.H5_GAME_DAILY_LIMIT, "贪吃蛇得分");
+    }
+
     private Map<String, Object> h5GameReward(Long userId, Long familyId, String featureCode,
                                              String counterKey, int dailyLimit, String remark) {
         Map<String, Object> map = new HashMap<>();

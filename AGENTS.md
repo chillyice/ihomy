@@ -140,7 +140,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 - **产品访问/下载统计**:咔哒与比特口袋的访问/下载落 `report_product_stat` 日表(落地页打点 + 安装包下载链接统一走 `GET /public/product/download` 计数后 302 到 `/files`),**禁止按 access 日志统计下载**——nginx `/files/` 静态直出,下载请求不进后端日志(踩坑速查 §7.11)。
 - **计划提醒单向托管**:计划的「提醒时间」只存 `family_reminder`(由 `plan_id` 关联),`family_plan` 不加时间列;写操作全走 `FamilyPlanService` 单事务,计划→提醒单向同步(计划完成连带完成提醒,提醒勾完成不改计划);重复判定与「今日」聚合共用 `RepeatSchedule.dueToday`,前端不算。
 - **GBA 存档**:唯一事实来源是服务端游戏目录的 `saves/u{成员id}/`(`uploads/games/{游戏名}/saves/`,文件名统一过 `common/GameSaveName` 白名单),**按成员隔离**,各人只读写并只看到自己的档;V11.2 的共享档(`saves/` 根下)首次访问自动迁入游戏导入者目录。播放器在 ROM 加载前(EJS `saveDatabaseLoaded`)把服务端最新一份预置进模拟器——start 后再写就赶不上核心读 SRAM;运行中 30s/切后台/离开页面前回写;浏览器 IndexedDB 实测不持久化,没有本机兜底。**离开页面/重开 ROM 必须先 `pause()`+`toggleMainLoop(0)` 再拆 DOM**(EmulatorJS 无 destroy,只清 DOM 主循环与音频照跑,踩坑速查 §3.52)。**禁止把存档另存 DB**(机制与取档时序见 踩坑速查 §3.48)。
-- **小游戏进度与触摸守卫**:需续玩的 H5 小游戏把进度写 `localStorage`(数独 `ihomy:games:sudoku:v1`、2048 `state:v1`/`state:{size}:v1`、连连看 `ihomy:games:petlink:v1`),结构校验与恢复判定放 `utils/games/*` 纯函数并带 spec;游戏根容器统一 `class="game-surface"` 禁双击放大/长按选字(卡内表单除外),细则 UI 提示词 §31。
+- **小游戏进度与触摸守卫**:需续玩的 H5 小游戏把进度写 `localStorage`(数独 `ihomy:games:sudoku:v1`、2048 `state:v1`/`state:{size}:v1`、连连看 `ihomy:games:petlink:v1`、扫雷 `ihomy:games:minesweeper:state:v1`、纸牌接龙 `ihomy:games:solitaire:state:v1`、俄罗斯方块 `ihomy:games:tetris:state:v1`、贪吃蛇 `ihomy:games:snake:state:v1`;最高分/最快时间用同前缀 `best`),结构校验与恢复判定放 `utils/games/*` 纯函数并带 spec;游戏根容器统一 `class="game-surface"` 禁双击放大/长按选字(卡内表单除外),细则 UI 提示词 §31。**七个 H5 小游戏(连连看/数独/2048/扫雷/纸牌接龙/俄罗斯方块/贪吃蛇)的通关/达标奖励统一走 `POST /game/{code}/reward`**(积分规则功能码 `game_*`,Redis 每日限 5 次),新增游戏照抄 `GameInfoService.h5GameReward` 一套口径。
 - **提醒按日完成**:一次性提醒用 `family_reminder.done`;循环(每日/每周/每月/每年)按 (提醒, 日期) 落 `family_reminder_check`,取消完成即删行,系列不终止;每年重复可选阳历/农历(闰月严格匹配)。`toggle-done?date=` 带日期即按该日切换,删除提醒连带清完成行(自定义 XML)。判定唯一来源 `RepeatSchedule.dueToday`(重载带 `calendar/lunarMonth/lunarDay/isLeap`),到点通知对循环看当日完成行、并保留「当日已通知」兜底防 5 分钟重复推送(踩坑速查 §2.20)。
 - **记账本权限**:整本账本按成员配置档位(`family_book_permission`,NONE 不可见 / READ 只读 / WRITE 可记账 / MANAGE 可管理),**无配置行 = WRITE**(维持历史「家庭成员都能读写」口径),家长(OWNER)恒 MANAGE 且只有家长能改档;**不走 `@RequirePermission` 权限码**,Controller 用 `BookPermissionService.requireRead/requireWrite` 守门、改删他人看 `canManage`;`/auth` 返回的 `userInfo` 带 `bookLevel`,前端一律读 `userStore.canReadBook/canWriteBook/canManageBook`;档位**不缓存**(改档立即生效),`/book/summary` 对被设 NONE 的成员按游客返回空摘要。台账口径见 需求 §4.5.5。
 - **日程聚合只读**:`GET /schedule/events?from=&to=`(≤62 天)与 `/schedule/upcoming?days=` 把纪念日/提醒/计划/子任务摊平成按日列表与待安排计划;写侧仍走各自接口。纪念日展开只用 `AnniversaryDate`;计划托管的提醒不单独成项(PLAN 项已带提醒时刻);**贷款还款日/理财到期/食材到期是只读来源**:每类一个 `service/schedule/ScheduleSourceProvider` 实现(`@Order` 注入列表遍历,新增来源只加实现、聚合主逻辑不堆 if-else),事项带 `source`/`readOnly`/`link`,日程页只展示与跳转、改数据回原页面;贷款需 `loan:view`、食材到期复用 `ItemExpiryService.expiryDate`(禁第二套算法);来源开关只在前端 `localStorage`(`ihomy:schedule:sources:v1`,默认全开,关掉不发请求);游客口径只返回演示家庭纪念日(`SecurityConfig` GET 白名单),只读来源对匿名一律不返回。
@@ -195,8 +195,8 @@ cd frontend; npm run lint; npx vitest run; npm run build
 ## 验证基线
 
 - 后端全绿:`.\mvnw.cmd -B clean package`(312 tests,纯逻辑不起 Spring)。
-- 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(716 passed)+ `npm run format:check`(全树遗留未格式化:`views/BitPouch.vue`、`utils/packetDecode.js`+`.spec.js`、`views/bitpouch/panels/PacketPanel.vue`、`views/Chillyice.vue`、`views/ops/tabs/OpsKada.vue`;**本次改动的文件必须 `prettier --write` 后通过**)。
-- 构建:首屏初始 JS 基线 **1619.42KB / gzip 556.46KB**(V11.18 起,Vite 8/Rolldown 分块口径:入口本身是 0.04KB facade,首屏 43 个初始 assets 合计;最大单块 element-plus 612.10KB / 188.51KB)。V11.16 的 1625.99 / 557.59 是 Vue 生态大版本升级前的同口径值;V11.15 及以前的「单入口 553.40 / 227.20」是 Vite 5 单块口径,与分块后不可直接比;**体积口径一律以 vite 构建输出打印的数字为准**(它按 minified 代码的 UTF-16 长度计数,与磁盘 UTF-8 字节数对不上,`ls -la` 也不可比);历史数字见 变更归档。
+- 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(767 passed)+ `npm run format:check`(全树遗留未格式化:`views/BitPouch.vue`、`utils/packetDecode.js`+`.spec.js`、`views/bitpouch/panels/PacketPanel.vue`、`views/Chillyice.vue`、`views/ops/tabs/OpsKada.vue`;**本次改动的文件必须 `prettier --write` 后通过**)。
+- 构建:首屏初始 JS 基线 **1665.88KB / gzip 575.81KB**(V11.20 起,47 个初始 assets 合计;最大单块 element-plus 612.10KB / 188.52KB)。V11.18 记的 1619.42/556.46 是 43 assets 口径——差值是 4 个支撑 chunk(AiPlayground/PageToolbar/Breadcrumb/useSunLight 等)的 modulepreload 计入与否,新游戏页均为懒加载 chunk 不在首屏;V11.16 的 1625.99 / 557.59 是 Vue 生态大版本升级前的同口径值;V11.15 及以前的「单入口 553.40 / 227.20」是 Vite 5 单块口径,与分块后不可直接比;**体积口径一律以 vite 构建输出打印的数字为准**(它按 minified 代码的 UTF-16 长度计数,与磁盘 UTF-8 字节数对不上,`ls -la` 也不可比);历史数字见 变更归档。
 - 一致性:`bash scripts/doc-drift-check.sh` 全 [OK];`gen-code-map.sh --check`、`doc-index.sh --check` 无漂移。
 - 接口测试在仓库外 `..\autotest_framework`(`pytest -m api`,37 passed)。
 
@@ -234,7 +234,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 ## 文档与服务
 
-- 索引:`docs/README.md`(每份文档一句话 + 阅读顺序);`docs/架构设计.md`(请求怎么走/关键机制);`docs/代码地图.md`(代码定位);`docs/归档索引.md`(历史反查);`test/cases/功能测试用例.md`(489 条)。
+- 索引:`docs/README.md`(每份文档一句话 + 阅读顺序);`docs/架构设计.md`(请求怎么走/关键机制);`docs/代码地图.md`(代码定位);`docs/归档索引.md`(历史反查);`test/cases/功能测试用例.md`(497 条)。
 - `scripts/`:setup / start-all / restart-all / start-db / doc-drift-check / gen-code-map / doc-index / prod-backup / prod-restore / db_diff / ci-jellyfin-setup / docs-gen / soft-copyright(软著 PDF 生成)。
 - 本机环境:JDK 21、Node 24 LTS(最低 22.12)、MySQL 8、python-docx;Maven 用 Wrapper(或 temp 3.9.9);Redis 未装时用 Docker/Memurai。
 - **代码事实以 `backend/src/main/java` + `resources/schema.sql` 为准**;文档与代码冲突时先改文档再改代码,或先读 `docs/踩坑速查.md` 确认不是已知取舍。

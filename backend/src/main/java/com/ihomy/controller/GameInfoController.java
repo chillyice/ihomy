@@ -196,4 +196,36 @@ public class GameInfoController {
         LoginUser user = current();
         return Result.success(gameService.game2048Reward(user.getUserId(), user.getFamilyId()));
     }
+
+    @Operation(summary = "H5 小游戏通关奖励")
+    @OperationLog(module = "GAME", operationType = "UPDATE", description = "扫雷通关奖励")
+    @PostMapping("/minesweeper/reward")
+    public Result<Map<String, Object>> minesweeperReward() {
+        LoginUser user = current();
+        return Result.success(gameService.minesweeperReward(user.getUserId(), user.getFamilyId()));
+    }
+
+    @Operation(summary = "H5 小游戏完成奖励")
+    @OperationLog(module = "GAME", operationType = "UPDATE", description = "纸牌接龙完成奖励")
+    @PostMapping("/solitaire/reward")
+    public Result<Map<String, Object>> solitaireReward() {
+        LoginUser user = current();
+        return Result.success(gameService.solitaireReward(user.getUserId(), user.getFamilyId()));
+    }
+
+    @Operation(summary = "H5 小游戏达标奖励")
+    @OperationLog(module = "GAME", operationType = "UPDATE", description = "俄罗斯方块消行奖励")
+    @PostMapping("/tetris/reward")
+    public Result<Map<String, Object>> tetrisReward() {
+        LoginUser user = current();
+        return Result.success(gameService.tetrisReward(user.getUserId(), user.getFamilyId()));
+    }
+
+    @Operation(summary = "H5 小游戏达标奖励")
+    @OperationLog(module = "GAME", operationType = "UPDATE", description = "贪吃蛇得分奖励")
+    @PostMapping("/snake/reward")
+    public Result<Map<String, Object>> snakeReward() {
+        LoginUser user = current();
+        return Result.success(gameService.snakeReward(user.getUserId(), user.getFamilyId()));
+    }
 }

@@ -236,6 +236,10 @@ import {
   Key,
   MagicStick,
   Collection,
+  Aim,
+  Tickets,
+  Box,
+  Cherry,
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -274,6 +278,24 @@ const builtinGames = [
   },
   { key: 'sudoku', titleKey: 'games.sudoku.title', descKey: 'games.sudoku.desc', icon: Cpu, path: '/games/sudoku', category: 'PUZZLE' },
   { key: 'g2048', titleKey: 'games.g2048.title', descKey: 'games.g2048.desc', icon: Histogram, path: '/games/2048', category: 'PUZZLE' },
+  {
+    key: 'minesweeper',
+    titleKey: 'games.minesweeper.title',
+    descKey: 'games.minesweeper.desc',
+    icon: Aim,
+    path: '/games/minesweeper',
+    category: 'PUZZLE',
+  },
+  {
+    key: 'solitaire',
+    titleKey: 'games.solitaire.title',
+    descKey: 'games.solitaire.desc',
+    icon: Tickets,
+    path: '/games/solitaire',
+    category: 'CASUAL',
+  },
+  { key: 'tetris', titleKey: 'games.tetris.title', descKey: 'games.tetris.desc', icon: Box, path: '/games/tetris', category: 'ARCADE' },
+  { key: 'snake', titleKey: 'games.snake.title', descKey: 'games.snake.desc', icon: Cherry, path: '/games/snake', category: 'ARCADE' },
 ]
 
 const categoryText = (category) => dictText(t, 'game_category', normalizeGameCategory(category))

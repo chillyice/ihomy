@@ -170,6 +170,19 @@ const routes = [
   { path: '/games/sudoku', name: 'Sudoku', component: () => import('@/views/games/Sudoku.vue'), meta: { requiresAuth: true } },
   // 2048 H5(方向键/滑动合并数字,达成 2048 发积分),需登录
   { path: '/games/2048', name: 'Game2048', component: () => import('@/views/games/Game2048.vue'), meta: { requiresAuth: true } },
+  // 扫雷 H5(首点安全/插旗/和弦,通关发积分),需登录
+  {
+    path: '/games/minesweeper',
+    name: 'Minesweeper',
+    component: () => import('@/views/games/Minesweeper.vue'),
+    meta: { requiresAuth: true },
+  },
+  // 纸牌接龙 H5(Klondike 规则,通关发积分),需登录
+  { path: '/games/solitaire', name: 'Solitaire', component: () => import('@/views/games/Solitaire.vue'), meta: { requiresAuth: true } },
+  // 俄罗斯方块 H5(7-bag/暂存/硬降,消行达标发积分),需登录
+  { path: '/games/tetris', name: 'Tetris', component: () => import('@/views/games/Tetris.vue'), meta: { requiresAuth: true } },
+  // 贪吃蛇 H5(键盘/滑动/方向键,得分达标发积分),需登录
+  { path: '/games/snake', name: 'Snake', component: () => import('@/views/games/Snake.vue'), meta: { requiresAuth: true } },
   // 运维管理页:仅 OPS 角色可访问
   { path: '/ops', name: 'Ops', component: () => import('@/views/ops/Ops.vue'), meta: { ops: true } },
   // 咔哒软件首页:独立下载页(托管在 ihomy 域名下),standalone 不套 ihomy 外壳
