@@ -177,8 +177,10 @@ const routes = [
     component: () => import('@/views/games/Minesweeper.vue'),
     meta: { requiresAuth: true },
   },
-  // 纸牌接龙 H5(Klondike 规则,通关发积分),需登录
-  { path: '/games/solitaire', name: 'Solitaire', component: () => import('@/views/games/Solitaire.vue'), meta: { requiresAuth: true } },
+  // 纸牌统一入口:接龙与蜘蛛纸牌共用一个页面(顶部切换玩法),通关发积分
+  { path: '/games/cards', name: 'Cards', component: () => import('@/views/games/Cards.vue'), meta: { requiresAuth: true } },
+  { path: '/games/solitaire', redirect: '/games/cards?mode=klondike' },
+  { path: '/games/spider', redirect: '/games/cards?mode=spider' },
   // 俄罗斯方块 H5(7-bag/暂存/硬降,消行达标发积分),需登录
   { path: '/games/tetris', name: 'Tetris', component: () => import('@/views/games/Tetris.vue'), meta: { requiresAuth: true } },
   // 贪吃蛇 H5(键盘/滑动/方向键,得分达标发积分),需登录

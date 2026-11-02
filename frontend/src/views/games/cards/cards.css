@@ -1,0 +1,354 @@
+/* 纸牌类游戏(Klondike 接龙 / 蜘蛛纸牌)共用的牌桌皮肤与固定一屏布局。
+ * 牌宽由组件按可用宽高算好后写进 --sol-card-w;叠牌步进由行内 margin-top 控制,
+ * 所以这里只负责视觉,不再写死 aspect-ratio 与固定负边距。 */
+
+.sol-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 10px 12px 12px;
+  border-radius: 14px;
+  background: var(--color-surface, #fff);
+  color: var(--color-text-primary, #2b2b2b);
+  box-sizing: border-box;
+}
+
+.sol-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+.sol-title {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+.sol-stats {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.sol-stat {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.05);
+  white-space: nowrap;
+}
+.sol-stat-label {
+  font-size: 10px;
+  color: var(--color-text-secondary, #8a8a8a);
+  letter-spacing: 1px;
+}
+.sol-stat-value {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.sol-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+}
+.sol-draw {
+  width: 104px;
+  margin-right: auto;
+}
+
+.sol-felt {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  padding: 10px;
+  border-radius: 12px;
+  background: radial-gradient(120% 140% at 50% 0%, #2f7a58 0%, #1f5c41 55%, #174a34 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  overflow-x: auto;
+  overflow-y: hidden;
+  box-sizing: border-box;
+}
+.sol-row {
+  display: grid;
+  grid-template-columns: repeat(var(--sol-cols, 7), var(--sol-card-w, 80px));
+  justify-content: safe center;
+  align-items: start;
+  gap: var(--sol-gap, 6px);
+  width: 100%;
+}
+.sol-top {
+  margin-bottom: 10px;
+}
+.sol-tableau {
+  align-content: start;
+}
+.sol-slot {
+  min-width: 0;
+}
+.sol-pile {
+  min-width: 0;
+  cursor: pointer;
+}
+
+.sol-cardface,
+.sol-empty,
+.sol-stock {
+  position: relative;
+  width: 100%;
+  height: calc(var(--sol-card-w, 80px) * 1.4);
+  border-radius: clamp(3px, calc(var(--sol-card-w, 80px) * 0.05), 7px);
+  box-sizing: border-box;
+}
+.sol-cardface {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #fdfcf8;
+  color: #2a2a2a;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  font-weight: 700;
+  touch-action: manipulation;
+}
+.sol-cardface.red {
+  color: #c0392b;
+}
+.sol-cardface.back {
+  background: repeating-linear-gradient(45deg, #2c5f9e 0 6px, #244f85 6px 12px), #244f85;
+  box-shadow:
+    inset 0 0 0 3px #f2f2f2,
+    0 2px 6px rgba(0, 0, 0, 0.28);
+}
+.sol-cardface.selected {
+  outline: 2px solid #ffd166;
+  outline-offset: -2px;
+  box-shadow:
+    0 0 0 2px rgba(255, 209, 102, 0.5),
+    0 4px 10px rgba(0, 0, 0, 0.32);
+}
+.sol-corner {
+  position: absolute;
+  top: 4%;
+  left: 7%;
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 1px;
+  line-height: 1;
+  font-size: clamp(7px, calc(var(--sol-card-w, 80px) * 0.15), 15px);
+}
+.sol-corner i {
+  font-style: normal;
+  font-size: 0.9em;
+}
+.sol-center {
+  font-size: clamp(12px, calc(var(--sol-card-w, 80px) * 0.34), 34px);
+  opacity: 0.9;
+  line-height: 1;
+}
+.sol-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.45);
+  font-size: clamp(12px, calc(var(--sol-card-w, 80px) * 0.3), 28px);
+}
+.sol-found {
+  cursor: pointer;
+}
+.sol-stock {
+  cursor: pointer;
+  background: repeating-linear-gradient(45deg, #2c5f9e 0 6px, #244f85 6px 12px), #244f85;
+  box-shadow:
+    inset 0 0 0 3px #f2f2f2,
+    0 2px 6px rgba(0, 0, 0, 0.28);
+}
+.sol-stock-count {
+  position: absolute;
+  right: 5%;
+  bottom: 4%;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: clamp(8px, calc(var(--sol-card-w, 80px) * 0.13), 12px);
+  font-weight: 700;
+}
+.sol-recycle {
+  cursor: pointer;
+  border-style: solid;
+}
+.sol-spacer {
+  pointer-events: none;
+}
+.sol-tip {
+  flex: 0 0 auto;
+  width: 100%;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-secondary, #8a8a8a);
+  text-align: center;
+}
+
+/* 蜘蛛纸牌顶部:已完成组数 + 牌堆 */
+.sp-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  height: 44px;
+  margin-bottom: 10px;
+  padding: 0 2px;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 13px;
+}
+.sp-completed {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.sp-completed b {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.sp-stock-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sp-stock {
+  width: 30px;
+  height: 42px;
+  border-radius: 5px;
+  box-shadow:
+    inset 0 0 0 2px #f2f2f2,
+    0 2px 6px rgba(0, 0, 0, 0.28);
+}
+.sp-stock:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+.sp-stock-count {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+.sp-stock-empty {
+  width: 30px;
+  height: 42px;
+  border-radius: 5px;
+  border: 2px dashed rgba(255, 255, 255, 0.22);
+  box-sizing: border-box;
+}
+.sp-deal-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.sol-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: rgba(250, 248, 239, 0.72);
+  backdrop-filter: blur(2px);
+  z-index: 5;
+}
+.sol-overlay-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 36px;
+  border-radius: 16px;
+  background: var(--color-surface, #fff);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  text-align: center;
+}
+.sol-overlay-icon {
+  font-size: 36px;
+}
+.sol-overlay-title {
+  font-size: 19px;
+  font-weight: 700;
+}
+.sol-overlay-meta {
+  font-size: 13px;
+  color: var(--color-text-secondary, #8a8a8a);
+}
+.sol-overlay-reward {
+  font-size: 14px;
+  font-weight: 700;
+  color: #e0933a;
+}
+
+html.dark .sol-stat {
+  background: rgba(255, 255, 255, 0.08);
+}
+html.dark .sol-cardface {
+  background: #f3f1ea;
+}
+html.dark .sol-cardface.back {
+  background: repeating-linear-gradient(45deg, #24405f 0 6px, #1b3149 6px 12px), #1b3149;
+}
+html.dark .sol-overlay {
+  background: rgba(20, 20, 20, 0.72);
+}
+
+@media (max-width: 560px) {
+  .sol-card {
+    padding: 8px 8px 10px;
+  }
+  .sol-title {
+    font-size: 17px;
+  }
+  .sol-stat {
+    padding: 2px 6px;
+  }
+  .sol-felt {
+    padding: 6px;
+  }
+  .sol-row {
+    gap: 4px;
+  }
+}
+/* 视口矮(含手机横屏):把说明文字收掉,把高度全留给牌桌 */
+@media (max-height: 760px) {
+  .sol-tip {
+    display: none;
+  }
+}
+@media (max-height: 620px) {
+  .sol-title {
+    font-size: 16px;
+  }
+  .sol-head {
+    gap: 6px;
+  }
+}

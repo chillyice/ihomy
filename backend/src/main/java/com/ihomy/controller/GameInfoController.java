@@ -213,6 +213,14 @@ public class GameInfoController {
         return Result.success(gameService.solitaireReward(user.getUserId(), user.getFamilyId()));
     }
 
+    @Operation(summary = "H5 小游戏完成奖励")
+    @OperationLog(module = "GAME", operationType = "UPDATE", description = "蜘蛛纸牌完成奖励")
+    @PostMapping("/spider/reward")
+    public Result<Map<String, Object>> spiderReward() {
+        LoginUser user = current();
+        return Result.success(gameService.spiderReward(user.getUserId(), user.getFamilyId()));
+    }
+
     @Operation(summary = "H5 小游戏达标奖励")
     @OperationLog(module = "GAME", operationType = "UPDATE", description = "俄罗斯方块消行奖励")
     @PostMapping("/tetris/reward")
