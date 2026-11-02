@@ -940,11 +940,23 @@ export default {
     },
     sudoku: {
       title: '数独',
-      desc: '标准 / 对角线 / 杀手，笔记 / 提示 / 撤销',
+      desc: '标准 / 对角线 / 窗口 / 不规则 / 不等式 / 奇偶 / 杀手，笔记 / 提示 / 撤销',
       variant: {
         CLASSIC: '标准',
         DIAGONAL: '对角线',
+        WINDOW: '窗口',
+        JIGSAW: '不规则',
+        GREATER: '不等式',
+        ODD_EVEN: '奇偶',
         KILLER: '杀手',
+      },
+      variantTip: {
+        DIAGONAL: '两条大对角线也要 1~9 不重复',
+        WINDOW: '四个额外 3×3 窗口内也要 1~9 不重复',
+        JIGSAW: '九个粗线异形区内也要 1~9 不重复（不再看九宫）',
+        GREATER: '相邻格之间的符号开口朝向较大的数字',
+        ODD_EVEN: '底色格只能填奇数，右上角带点的格只能填偶数',
+        KILLER: '各笼内数字不重复，且和等于笼左上角的标注',
       },
       difficulty: {
         EASY: '简单',

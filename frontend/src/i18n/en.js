@@ -946,11 +946,23 @@ export default {
     },
     sudoku: {
       title: 'Sudoku',
-      desc: 'Classic / diagonal / killer with notes / hints / undo',
+      desc: 'Classic / diagonal / window / jigsaw / inequality / odd-even / killer with notes / hints / undo',
       variant: {
         CLASSIC: 'Classic',
         DIAGONAL: 'Diagonal',
+        WINDOW: 'Window',
+        JIGSAW: 'Jigsaw',
+        GREATER: 'Inequality',
+        ODD_EVEN: 'Odd/even',
         KILLER: 'Killer',
+      },
+      variantTip: {
+        DIAGONAL: 'Both long diagonals must also hold 1-9 without repeats',
+        WINDOW: 'Each of the four extra 3×3 windows must also hold 1-9',
+        JIGSAW: 'The nine bold-outlined regions replace the 3×3 boxes and must hold 1-9',
+        GREATER: 'Signs between neighbouring cells open towards the larger digit',
+        ODD_EVEN: 'Shaded cells take odd digits; cells with a corner dot take even digits',
+        KILLER: 'Each cage holds no repeats and its digits sum to the label',
       },
       difficulty: {
         EASY: 'Easy',
