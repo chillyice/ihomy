@@ -159,7 +159,7 @@
 
       <div style="margin-top: 14px">
         <el-button
-          v-if="ossPlanComponent && ossPlanComponent.managedBy === 'RENOVATE' && isOssUpdatable(ossPlanComponent)"
+          v-if="ossAutoUpgrade?.available"
           size="small"
           type="success"
           :disabled="!ossAssess || !ossAssess.feasible"
@@ -170,7 +170,7 @@
         <el-button v-if="ossPlan.repoUrl" size="small" @click="openRepo(ossPlan.repoUrl)">{{ $t('ops.oss.viewChange') }}</el-button>
       </div>
       <p v-if="ossPlanComponent && ossPlanComponent.managedBy === 'RENOVATE'" class="oss-plan-hint">
-        {{ $t('ops.oss.manualHint') }}
+        {{ ossAutoUpgrade?.available ? $t('ops.oss.manualHint') : $t('ops.oss.autoUnavailable') }}
       </p>
     </div>
   </el-dialog>
@@ -257,6 +257,7 @@ const ossUpdatable = ref(0)
 
 const ossPlanVisible = ref(false)
 const ossPlan = ref(null)
+const ossAutoUpgrade = ref(null)
 const ossCopied = ref(false)
 
 const ossEditVisible = ref(false)
@@ -335,6 +336,8 @@ const openOssPlan = async (row) => {
     const plan = await opsApi.ossUpgradePlan(row.id)
     ossPlan.value = plan
     ossPlanComponent.value = row
+    // 自动升级通道是否可用由后端探一次仓库的 Dependency Dashboard 决定(见 OssComponentService)
+    ossAutoUpgrade.value = plan?.autoUpgrade || null
     // 方案里带回上次 AI 评估,重开弹窗不必再烧一次 token
     ossAssess.value = plan?.lastAssess || null
     ossCopied.value = false

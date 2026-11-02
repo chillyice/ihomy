@@ -61,14 +61,23 @@ public class OssComponentService {
     private final ObjectMapper json = new ObjectMapper();
 
     private static final int TIMEOUT_MS = 5000;
+    /** 自动升级通道探测超时:比常规请求短,避免打开升级方案时被 GitHub 拖住 */
+    private static final int PROBE_TIMEOUT_MS = 2500;
+    /** 「仓库是否已接入 Renovate」结果缓存 5 分钟:同一仓库的台账共用,不必每次开弹窗都打 GitHub */
+    private static final long DASHBOARD_CACHE_MS = 5 * 60 * 1000L;
     private static final int CHECK_POOL = 8;
     /** 触发 Renovate 的 GitHub 仓库(owner/repo),可被 sys_parameter oss.github.repo 覆盖 */
     private static final String DEFAULT_GITHUB_REPO = "chillyice/ihomy";
     private final AtomicBoolean checking = new AtomicBoolean(false);
+    /** Dependency Dashboard 探测缓存(含 null 结果:仓库没装 Renovate 时也缓存,别反复超时等待) */
+    private volatile String dashboardRepo;
+    private volatile Dashboard dashboardCache;
+    private volatile long dashboardCheckedAt;
 
     /** 台账列表:可升级项排前(MAJOR > MINOR > PATCH),其余按名称 */
     public List<OssComponent> list() {
         List<OssComponent> all = mapper.selectList(null);
+        all.forEach(this::normalizeUpdateType);
         all.sort((a, b) -> {
             int ra = updatableRank(a);
             int rb = updatableRank(b);
@@ -85,6 +94,7 @@ public class OssComponentService {
     /** 汇总:总数 / 可升级数 / 最近检测时间(供导航角标) */
     public Map<String, Object> summary() {
         List<OssComponent> all = mapper.selectList(null);
+        all.forEach(this::normalizeUpdateType);
         long updatable = all.stream().filter(this::isUpdatable).count();
         LocalDateTime last = all.stream()
                 .map(OssComponent::getLastCheckedAt)
@@ -132,6 +142,10 @@ public class OssComponentService {
         if (c.getLatestVersion() == null || c.getLatestVersion().isBlank()) {
             throw new BizException(ResultCode.BAD_REQUEST, "尚未检测到最新版本,请先执行检查");
         }
+        normalizeUpdateType(c);
+        if (!isUpdatable(c)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "当前已是最新版本,无需升级");
+        }
         Map<String, Object> plan = new LinkedHashMap<>();
         plan.put("id", c.getId());
         plan.put("name", c.getName());
@@ -142,9 +156,84 @@ public class OssComponentService {
         plan.put("repoUrl", c.getRepoUrl());
         plan.put("steps", OssUpgradeGuide.steps(c.getComponentType(), c.getPackageRef(),
                 c.getLatestVersion(), c.getDeployType(), hasProbe(c), c.getUpdateType()));
+        plan.put("autoUpgrade", autoUpgradeInfo(c));
         plan.put("lastAssess", readAssess(c.getAssessJson()));
         plan.put("assessedAt", c.getAssessedAt());
         return plan;
+    }
+
+    /**
+     * 自动升级通道是否可用:仓库已接入 Renovate(Dependency Dashboard 里还有这个组件未勾选的条目)才显示「生成升级 PR」。
+     * 仓库没接入时前端只给手工升级路径,不再让用户点了才吃一条 500。
+     */
+    private Map<String, Object> autoUpgradeInfo(OssComponent c) {
+        boolean managed = DictConst.OSS_MANAGED_RENOVATE.equals(c.getManagedBy());
+        String repo = githubRepo();
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("managed", managed);
+        m.put("repo", repo);
+        m.put("available", managed && isUpdatable(c) && dashboardHasPending(dashboardFor(repo), c));
+        return m;
+    }
+
+    /** 该组件的自动升级项是否还在 Dashboard 里等着勾选 */
+    private boolean dashboardHasPending(Dashboard d, OssComponent c) {
+        if (d == null || d.body() == null) {
+            return false;
+        }
+        String match = componentDashboardToken(c);
+        if (match.isBlank()) {
+            return false;
+        }
+        for (String line : d.body().split("\n", -1)) {
+            if (line.contains(match) && line.contains("[ ]")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 取仓库的 Dependency Dashboard(按仓库缓存 5 分钟,含「没有」这个结论) */
+    private Dashboard dashboardFor(String repo) {
+        long now = System.currentTimeMillis();
+        if (repo.equals(dashboardRepo) && now - dashboardCheckedAt < DASHBOARD_CACHE_MS) {
+            return dashboardCache;
+        }
+        Dashboard d = fetchDashboard(repo);
+        dashboardCache = d;
+        dashboardRepo = repo;
+        dashboardCheckedAt = now;
+        return d;
+    }
+
+    /** 去 issue 列表里找标题为 Dependency Dashboard 的那条;仓库没装 Renovate 或接口失败返回 null */
+    private Dashboard fetchDashboard(String repo) {
+        try {
+            Map<String, String> headers = null;
+            String token = githubToken();
+            if (token != null) {
+                headers = Map.of("Authorization", "Bearer " + token);
+            }
+            ThirdPartyHttp.Resp list = ThirdPartyHttp.get("github",
+                    "https://api.github.com/repos/" + repo + "/issues?state=open&per_page=100",
+                    headers, PROBE_TIMEOUT_MS);
+            if (!list.ok()) {
+                return null;
+            }
+            for (JsonNode issue : json.readTree(list.body())) {
+                if ("Dependency Dashboard".equals(issue.path("title").asText())) {
+                    return new Dashboard(issue.path("number").asLong(), issue.path("body").asText(""));
+                }
+            }
+            return null;
+        } catch (Exception e) {
+            log.warn("fetch renovate dashboard failed, repo={}", repo, e);
+            return null;
+        }
+    }
+
+    /** Dependency Dashboard:issue 号 + 正文(勾选项所在) */
+    private record Dashboard(Long number, String body) {
     }
 
     /** 读上次 AI 评估结果(JSON 解析失败或未评估返回 null,不阻断方案生成) */
@@ -231,9 +320,10 @@ public class OssComponentService {
             throw new BizException(ResultCode.BAD_REQUEST, "请先 AI 评估且评估结论为可行,再生成升级 PR");
         }
         String repo = githubRepo();
-        if (!approveRenovateDashboard(repo, c)) {
-            throw new BizException(ResultCode.INTERNAL_ERROR,
-                    "未找到待办的自动升级任务:请确认该仓库已接入自动升级,或直接按「升级方案」里的步骤手工升级");
+        // 先探一次再动手:仓库没接入 Renovate / 该组件的条目不在 Dashboard 里时,给可执行的人工路径而不是 500
+        if (!dashboardHasPending(dashboardFor(repo), c) || !approveRenovateDashboard(repo, c)) {
+            throw new BizException(ResultCode.BAD_REQUEST,
+                    "该仓库暂无待办的自动升级任务:请按「升级方案」里的步骤手工升级,或在仓库接入 Renovate 后再试");
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("component", c.getName());
@@ -298,6 +388,9 @@ public class OssComponentService {
         }
         if (c.getLatestVersion() == null || c.getLatestVersion().isBlank()) {
             throw new BizException(ResultCode.BAD_REQUEST, "尚未检测到最新版本");
+        }
+        if (!isNewer(c.getLatestVersion(), c.getCurrentVersion())) {
+            throw new BizException(ResultCode.BAD_REQUEST, "最新版不高于当前版本,无需确认升级");
         }
         mapper.update(null, new LambdaUpdateWrapper<OssComponent>()
                 .eq(OssComponent::getId, id)
@@ -445,32 +538,14 @@ public class OssComponentService {
     /** 在 Dependency Dashboard issue 里勾选该组件对应项,触发 Renovate 下一轮开 PR(尽力而为,格式随 Renovate 版本变化) */
     private boolean approveRenovateDashboard(String repo, OssComponent c) {
         try {
-            Map<String, String> headers = null;
-            String token = githubToken();
-            if (token != null) {
-                headers = Map.of("Authorization", "Bearer " + token);
-            }
-            ThirdPartyHttp.Resp list = ThirdPartyHttp.get("github",
-                    "https://api.github.com/repos/" + repo + "/issues?state=open&per_page=100", headers, TIMEOUT_MS);
-            if (!list.ok()) {
-                return false;
-            }
-            Long issueNo = null;
-            String body = null;
-            for (JsonNode issue : json.readTree(list.body())) {
-                if ("Dependency Dashboard".equals(issue.path("title").asText())) {
-                    issueNo = issue.path("number").asLong();
-                    body = issue.path("body").asText("");
-                    break;
-                }
-            }
-            if (issueNo == null || body == null) {
+            Dashboard d = dashboardFor(repo);
+            if (d == null || d.body() == null) {
                 return false;
             }
             String match = componentDashboardToken(c);
             StringBuilder sb = new StringBuilder();
             boolean changed = false;
-            for (String line : body.split("\n", -1)) {
+            for (String line : d.body().split("\n", -1)) {
                 if (!changed && line.contains(match) && line.contains("[ ]")) {
                     sb.append(line.replaceFirst("\\[ \\]", "[x]")).append('\n');
                     changed = true;
@@ -482,14 +557,17 @@ public class OssComponentService {
                 return false;
             }
             Map<String, String> patchHeaders = new LinkedHashMap<>();
-            if (headers != null) {
-                patchHeaders.putAll(headers);
+            String token = githubToken();
+            if (token != null) {
+                patchHeaders.put("Authorization", "Bearer " + token);
             }
             patchHeaders.put("Content-Type", "application/json");
             Map<String, Object> patch = Map.of("body", sb.toString());
             ThirdPartyHttp.Resp resp = ThirdPartyHttp.request("github", "PATCH",
-                    "https://api.github.com/repos/" + repo + "/issues/" + issueNo,
+                    "https://api.github.com/repos/" + repo + "/issues/" + d.number(),
                     patchHeaders, json.writeValueAsBytes(patch), TIMEOUT_MS);
+            // Dashboard 正文已变:清掉缓存,下一次探测重新拉
+            dashboardCheckedAt = 0;
             return resp.ok();
         } catch (Exception e) {
             log.warn("approve renovate dashboard failed, name={}", c.getName(), e);
@@ -510,7 +588,28 @@ public class OssComponentService {
     private boolean isUpdatable(OssComponent c) {
         return DictConst.OSS_ACTIVE.equals(c.getStatus())
                 && c.getUpdateType() != null
-                && !DictConst.OSS_UPDATE_NONE.equals(c.getUpdateType());
+                && !DictConst.OSS_UPDATE_NONE.equals(c.getUpdateType())
+                && isNewer(c.getLatestVersion(), c.getCurrentVersion());
+    }
+
+    /**
+     * 列表/汇总统一按「当前版本 vs 最新版」重新判型:历史检测结果可能把低于当前版的版本标成可升级
+     * (台账显示与操作入口共用这一份结论,不只看库里存的 update_type)。
+     */
+    private void normalizeUpdateType(OssComponent c) {
+        if (c.getLatestVersion() != null && !c.getLatestVersion().isBlank()) {
+            c.setUpdateType(OssVersionUtil.updateType(c.getCurrentVersion(), c.getLatestVersion()));
+        }
+    }
+
+    /**
+     * 只有 latest 严格高于 current 才算升级项:台账里可能残留「最新版低于当前版」的历史检测结果
+     * (Maven Central 的 latestVersion 是最后发布而非最高版),否则「确认已升级」会把版本降回去。
+     * 版本不可比较(如 SHA / 日期型标签)时沿用已存的 updateType 结论。
+     */
+    private boolean isNewer(String latest, String current) {
+        Integer cmp = OssVersionUtil.compare(latest, current);
+        return cmp == null || cmp > 0;
     }
 
     private int updatableRank(OssComponent c) {

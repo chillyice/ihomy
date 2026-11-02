@@ -2336,6 +2336,8 @@ export default {
       migrationSteps: '迁移/验证步骤',
       stepsTitle: '执行步骤',
       manualHint: '自动升级不可用时,按上面的步骤手工执行即可;复制按钮会连同 AI 建议一起拷出',
+      autoUnavailable:
+        '该仓库还没有可触发的自动升级任务(未接入 Renovate 或该项已处理完),按上面的步骤手工升级即可;复制按钮会连同 AI 建议一起拷出',
       assessStale: '该评估针对 {v},请重新评估',
       genPr: '生成升级 PR',
       genPrDone: '已标记升级,待 Renovate 生成 PR',

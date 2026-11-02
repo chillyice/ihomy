@@ -2349,6 +2349,8 @@ export default {
       migrationSteps: 'Migration steps',
       stepsTitle: 'Steps',
       manualHint: 'If automated upgrades are unavailable, just follow the steps above; Copy includes the AI advice too',
+      autoUnavailable:
+        'This repository has no pending automated upgrade to trigger (Renovate is not connected, or the item is already handled); follow the steps above to upgrade manually. Copy includes the AI advice too',
       assessStale: 'This assessment targets {v}; please re-assess',
       genPr: 'Create PR',
       genPrDone: 'Marked; Renovate will open a PR',

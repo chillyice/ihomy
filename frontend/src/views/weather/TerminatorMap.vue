@@ -72,9 +72,21 @@
               <rect x="0" :y="b.y" :width="CURVE_W" :height="CURVE_H - b.y" :fill="bandColor(b.key)" />
               <line x1="0" :y1="b.y" :x2="CURVE_W" :y2="b.y" class="wtm-curve-th" />
             </template>
+            <line x1="0" :y1="curve.horizonY" :x2="CURVE_W" :y2="curve.horizonY" class="wtm-curve-horizon" />
             <path :d="curve.area" :fill="curve.stroke" opacity="0.12" />
             <path :d="curve.line" fill="none" :stroke="curve.stroke" stroke-width="1.8" stroke-linejoin="round" />
-            <line :x1="curve.nowX" y1="0" :x2="curve.nowX" :y2="CURVE_H" class="wtm-curve-now" />
+            <!-- 此刻太阳:落在高度曲线上,代替原来的竖直虚线;地平线以下转暗 -->
+            <g
+              class="wtm-curve-sun"
+              :class="{ 'is-below': curve.sunBelow }"
+              :transform="`translate(${curve.nowX.toFixed(1)} ${curve.nowY.toFixed(1)})`"
+            >
+              <circle class="wtm-sun-glow" r="13" />
+              <g class="wtm-sun-rays">
+                <line v-for="(r, i) in SUN_RAYS" :key="i" :x1="r.x1" :y1="r.y1" :x2="r.x2" :y2="r.y2" />
+              </g>
+              <circle class="wtm-sun-core" r="5.2" />
+            </g>
           </svg>
         </div>
 
@@ -221,17 +233,38 @@ const CURVE_W = 720,
   CURVE_H = 90,
   CURVE_LO = -30,
   CURVE_HI = 90
+// 太阳图标:8 条射线(8.6 → 12.6),上下留 16 的余量,正午最高点也不会被 viewBox 裁掉
+const SUN_RAYS = Array.from({ length: 8 }, (_, i) => {
+  const a = (i * Math.PI) / 4
+  return {
+    x1: +(Math.cos(a) * 8.6).toFixed(2),
+    y1: +(Math.sin(a) * 8.6).toFixed(2),
+    x2: +(Math.cos(a) * 12.6).toFixed(2),
+    y2: +(Math.sin(a) * 12.6).toFixed(2),
+  }
+})
+// 当前时刻与地图一起每分钟刷新(computed 内不直接读 Date.now)
+const nowMin = ref(nowLocalMinutes())
 const curve = computed(() => {
   const list = props.astro?.slots || []
   if (list.length < 2) return null
-  const yOf = (a) => CURVE_H - 6 - ((Math.max(CURVE_LO, Math.min(CURVE_HI, a)) - CURVE_LO) / (CURVE_HI - CURVE_LO)) * (CURVE_H - 12)
+  // 上下各留 16 的余量:太阳图标(射线到 15)在正午最高点与半夜最低点都不会被 viewBox 裁掉
+  const yOf = (a) => CURVE_H - 16 - ((Math.max(CURVE_LO, Math.min(CURVE_HI, a)) - CURVE_LO) / (CURVE_HI - CURVE_LO)) * (CURVE_H - 32)
   const pts = list.map((s, i) => ({ x: (i / (list.length - 1)) * CURVE_W, y: yOf(s.altitude) }))
   const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join('')
+  // 太阳标记:按「今日已过分钟」在曲线索引上线性插值(与 288 × 5 分钟时隙一一对应)
+  const t = Math.min(1, Math.max(0, nowMin.value / 1440)) * (list.length - 1)
+  const i0 = Math.min(list.length - 1, Math.floor(t))
+  const i1 = Math.min(list.length - 1, i0 + 1)
+  const alt = Number(list[i0].altitude) + (Number(list[i1].altitude) - Number(list[i0].altitude)) * (t - i0)
   return {
     line,
     area: `${line}L${CURVE_W} ${CURVE_H}L0 ${CURVE_H}Z`,
     bands: [-6, -12, -18].map((v, i) => ({ key: ['civil', 'nautical', 'astronomical'][i], y: yOf(v) })),
-    nowX: (nowLocalMinutes() / 1440) * CURVE_W,
+    horizonY: yOf(0),
+    nowX: (t / (list.length - 1)) * CURVE_W,
+    nowY: yOf(alt),
+    sunBelow: alt < -0.833,
     stroke: cssVar('--color-brand', '#b88c6e'),
   }
 })
@@ -381,11 +414,13 @@ onMounted(() => {
   const ts = props.generatedAt ? Date.parse(props.generatedAt) : NaN
   baseTs.value = Number.isNaN(ts) ? Date.now() : ts
   elapsed.value = Math.max(0, (Date.now() - baseTs.value) / 60000)
+  nowMin.value = nowLocalMinutes()
   ro = new ResizeObserver(() => draw())
   if (canvasEl.value) ro.observe(canvasEl.value)
   timer = setInterval(() => {
     if (document.hidden) return
     elapsed.value = Math.max(0, (Date.now() - baseTs.value) / 60000)
+    nowMin.value = nowLocalMinutes()
     draw()
   }, 60000)
 })
@@ -582,11 +617,30 @@ watch(
   stroke-width: 0.5;
   opacity: 0.5;
 }
-.wtm-curve-now {
-  stroke: var(--color-text);
+/* 0° 地平线:比晨昏分档线略重,用来区分太阳在地平线上/下 */
+.wtm-curve-horizon {
+  stroke: var(--color-text-tertiary);
   stroke-width: 1;
-  stroke-dasharray: 3 3;
-  opacity: 0.7;
+  stroke-dasharray: 6 4;
+  opacity: 0.55;
+}
+.wtm-curve-sun .wtm-sun-core {
+  fill: var(--color-brand);
+  stroke: var(--color-card);
+  stroke-width: 1.5;
+}
+.wtm-curve-sun .wtm-sun-glow {
+  fill: var(--color-brand);
+  opacity: 0.16;
+}
+.wtm-curve-sun .wtm-sun-rays line {
+  stroke: var(--color-brand);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+/* 夜间(太阳在地平线以下)整体压暗,仍保留位置提示 */
+.wtm-curve-sun.is-below {
+  opacity: 0.45;
 }
 .wtm-moon {
   display: flex;
