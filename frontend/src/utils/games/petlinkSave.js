@@ -9,8 +9,9 @@ export const PETLINK_CELLS = PETLINK_ROWS * PETLINK_COLS
 export const PETLINK_MAX_LEVEL = 9
 export const PETLINK_LEVEL_TIME = 150
 
-/** 每关用到的宠物种类数:第 1 关 30、第 2 关 35、第 3 关起 40 */
-export const typeCountOf = (level) => (level === 1 ? 30 : level === 2 ? 35 : 40)
+// 关卡规则(宠物种类数)由棋盘内核唯一定义,这里只再导出,避免两份口径
+import { typeCountOf } from './petlinkBoard'
+export { typeCountOf }
 
 /** 收成存档对象(棋盘逐格浅拷贝,避免后续原位移动改动已写出的对象) */
 export function serializePetLinkState({ board, score, level, shufflesLeft, timeLeft, paused }) {

@@ -102,6 +102,42 @@
           </el-button>
         </div>
 
+        <!-- 调试版(地址加 ?debug=1):跳关、自动消除、误消/奇数张体检;不读写玩家存档 -->
+        <div v-if="debugMode" class="debug-panel">
+          <div class="debug-row">
+            <span class="debug-tag">{{ $t('games.petlink.debug.title') }}</span>
+            <el-select v-model="debugJumpLevel" size="small" class="debug-level-select">
+              <el-option v-for="n in MAX_LEVEL" :key="n" :label="$t('games.petlink.levelNames.' + n)" :value="n" />
+            </el-select>
+            <el-button size="small" @click="debugJump(debugJumpLevel)">{{ $t('games.petlink.debug.jump') }}</el-button>
+            <el-button size="small" :type="autoRunning ? 'danger' : 'primary'" @click="toggleAutoPlay">
+              {{ autoRunning ? $t('games.petlink.debug.stop') : $t('games.petlink.debug.auto') }}
+            </el-button>
+            <el-button size="small" @click="runSelfTest">{{ $t('games.petlink.debug.selfTest') }}</el-button>
+            <el-button size="small" @click="debugLog = []">{{ $t('games.petlink.debug.clearLog') }}</el-button>
+          </div>
+          <div class="debug-row debug-stats">
+            <span
+              >{{ $t('games.petlink.debug.tiles') }} <b>{{ debugTiles }}</b></span
+            >
+            <span
+              >{{ $t('games.petlink.debug.removed') }} <b>{{ debugRemoved }}</b></span
+            >
+            <span :class="{ 'debug-bad': debugOdd.length }"
+              >{{ $t('games.petlink.debug.oddTypes') }} <b>{{ debugOdd.length }}</b></span
+            >
+            <span :class="{ 'debug-bad': debugIssueCount }"
+              >{{ $t('games.petlink.debug.issues') }} <b>{{ debugIssueCount }}</b></span
+            >
+            <span v-if="debugOdd.length" class="debug-bad">{{ debugOddText }}</span>
+          </div>
+          <div v-if="debugSelfText" class="debug-row debug-self">{{ debugSelfText }}</div>
+          <div class="debug-hint">{{ $t('games.petlink.debug.hint') }}</div>
+          <div class="debug-log">
+            <div v-for="(line, i) in debugLog" :key="i" class="debug-line" :class="{ 'debug-bad': line.bad }">{{ line.text }}</div>
+          </div>
+        </div>
+
         <!-- 胜负弹层 -->
         <div v-if="won || lost" class="overlay">
           <div class="overlay-card">
@@ -126,7 +162,7 @@
 // 支持全屏,进入时关闭全局光影特效(与图片/视频/看书一致)。
 // 进度按关卡存档(棋盘/分数/重排数/剩余时间),下次进来可从封面继续或新开一局。
 import { ref, computed, onBeforeUnmount, onMounted, nextTick, inject, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { FullScreen, ArrowLeft } from '@element-plus/icons-vue'
@@ -139,20 +175,31 @@ import {
   PETLINK_STORAGE_KEY,
   parsePetLinkState,
   serializePetLinkState,
-  typeCountOf,
 } from '@/utils/games/petlinkSave'
+import {
+  PETLINK_COLS,
+  PETLINK_ROWS,
+  createPetLinkBoard,
+  findPetLinkPair,
+  findPetLinkPath,
+  petLinkOddTypes,
+  removePetLinkPair,
+  shufflePetLinkBoard,
+  simulatePetLinkLevel,
+} from '@/utils/games/petlinkBoard'
 import clickUrl from '@/assets/games/petlink/sounds/15.wav'
 import matchUrl from '@/assets/games/petlink/sounds/294.mp3'
 import winUrl from '@/assets/games/petlink/sounds/301.mp3'
 
 const { t, locale } = useI18n()
 const router = useRouter()
+const route = useRoute()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 
 // 原版棋盘:16×12 格(含一圈 1 格外圈用于绕外圈连线),内圈 14×10 为可玩区;
 // 格子 44×40 间距(卡牌 42×40、左右间隙 2px、上下无间隙)。
-const ROWS = 10
-const COLS = 14
+const ROWS = PETLINK_ROWS
+const COLS = PETLINK_COLS
 const CELL_W = 42
 const CELL_H = 40
 const GAP_X = 2
@@ -190,6 +237,22 @@ const linePoints = ref('')
 const rewardMsg = ref('')
 // 封面读到的可续存档(点「继续游戏」才真正装载)
 const savedState = ref(null)
+
+// ---------- 调试版(地址加 ?debug=1) ----------
+// 只做核对:跳关、自动消除、每次消除后校验「是否恰好这两张」与「剩余是否成对」。
+// 调试态不写也不清玩家存档,退出清掉参数即回到正常版。
+const DEBUG_SHUFFLES = 120
+const debugMode = computed(() => String(route.query.debug) === '1')
+const debugJumpLevel = ref(1)
+const debugFast = ref(false)
+const autoRunning = ref(false)
+const debugLog = ref([])
+const debugIssueCount = ref(0)
+const debugRemoved = ref(0)
+const debugSelfText = ref('')
+const debugTiles = computed(() => board.value.filter(Boolean).length)
+const debugOdd = computed(() => petLinkOddTypes(board.value))
+const debugOddText = computed(() => debugOdd.value.map((d) => `#${d.type}×${d.count}`).join(' '))
 
 const boardW = COLS * CELL_W + (COLS - 1) * GAP_X
 const boardH = ROWS * CELL_H + (ROWS - 1) * GAP_Y
@@ -273,6 +336,7 @@ function playWin() {
 // ---------- 进度存档 ----------
 // 只在对局进行中写档;通关/失败/重新开始即清档,封面按存档显示「继续游戏」。
 const saveState = () => {
+  if (debugMode.value) return
   if (screen.value !== 'game' || won.value || lost.value) return
   if (!board.value.length || board.value.every((tile) => tile === null)) return
   try {
@@ -295,6 +359,7 @@ const saveState = () => {
 }
 
 const clearState = () => {
+  if (debugMode.value) return
   try {
     localStorage.removeItem(PETLINK_STORAGE_KEY)
   } catch (e) {
@@ -351,109 +416,15 @@ const applySavedState = (saved) => {
 
 // ---------- 关卡 ----------
 
+// 发牌走棋盘内核;tileSeq 只负责跨关连续编号,保证 FLIP 动画的牌身份稳定
 function buildBoard(lv) {
-  const typeCount = typeCountOf(lv)
-  const arr = []
-  for (let i = 1; i <= typeCount; i++) arr.push(i)
-  for (let i = typeCount + 1; i <= 70; i++) arr.push(Math.floor(Math.random() * typeCount) + 1)
-  const pairs = [...arr, ...arr]
-  for (let k = pairs.length - 1; k > 0; k--) {
-    const m = Math.floor(Math.random() * (k + 1))
-    ;[pairs[k], pairs[m]] = [pairs[m], pairs[k]]
-  }
-  return pairs.map((type) => ({ id: ++tileSeq, type }))
+  const { board: next, maxId } = createPetLinkBoard(lv, tileSeq)
+  tileSeq = maxId
+  return next
 }
 
-// ---------- 连线算法(移植原 findlu:最多两拐 + 可绕外圈) ----------
-
-function get(r, c) {
-  if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return 0
-  const t = board.value[r * COLS + c]
-  return t ? t.type : 0
-}
-function walkable(r, c) {
-  return get(r, c) === 0
-}
-function horizClear(r, c1, c2) {
-  const lo = Math.min(c1, c2),
-    hi = Math.max(c1, c2)
-  for (let c = lo + 1; c < hi; c++) if (get(r, c) !== 0) return false
-  return true
-}
-function vertClear(c, r1, r2) {
-  const lo = Math.min(r1, r2),
-    hi = Math.max(r1, r2)
-  for (let r = lo + 1; r < hi; r++) if (get(r, c) !== 0) return false
-  return true
-}
-function findPath(r1, c1, r2, c2) {
-  if (r1 === r2 && c1 === c2) return null
-  const a = get(r1, c1),
-    b = get(r2, c2)
-  if (a === 0 || b === 0 || a !== b) return null
-  if (r1 === r2 && horizClear(r1, c1, c2))
-    return [
-      [r1, c1],
-      [r2, c2],
-    ]
-  if (c1 === c2 && vertClear(c1, r1, r2))
-    return [
-      [r1, c1],
-      [r2, c2],
-    ]
-  if (walkable(r1, c2) && horizClear(r1, c1, c2) && vertClear(c2, r1, r2))
-    return [
-      [r1, c1],
-      [r1, c2],
-      [r2, c2],
-    ]
-  if (walkable(r2, c1) && vertClear(c1, r1, r2) && horizClear(r2, c1, c2))
-    return [
-      [r1, c1],
-      [r2, c1],
-      [r2, c2],
-    ]
-  for (let c = -1; c <= COLS; c++) {
-    if (c === c1 || c === c2) continue
-    if (walkable(r1, c) && walkable(r2, c) && horizClear(r1, c1, c) && horizClear(r2, c2, c) && vertClear(c, r1, r2)) {
-      return [
-        [r1, c1],
-        [r1, c],
-        [r2, c],
-        [r2, c2],
-      ]
-    }
-  }
-  for (let r = -1; r <= ROWS; r++) {
-    if (r === r1 || r === r2) continue
-    if (walkable(r, c1) && walkable(r, c2) && vertClear(c1, r1, r) && vertClear(c2, r2, r) && horizClear(r, c1, c2)) {
-      return [
-        [r1, c1],
-        [r, c1],
-        [r, c2],
-        [r2, c2],
-      ]
-    }
-  }
-  return null
-}
-function findAnyPair() {
-  const groups = {}
-  board.value.forEach((t, i) => {
-    if (t) (groups[t.type] ||= []).push(i)
-  })
-  for (const v in groups) {
-    const arr = groups[v]
-    for (let a = 0; a < arr.length; a++) {
-      for (let b = a + 1; b < arr.length; b++) {
-        const i = arr[a],
-          j = arr[b]
-        if (findPath(Math.floor(i / COLS), i % COLS, Math.floor(j / COLS), j % COLS)) return [i, j]
-      }
-    }
-  }
-  return null
-}
+// 连线判定与「找任意一对」由内核提供(最多两拐 + 可绕外圈,见 utils/games/petlinkBoard.js)
+const findAnyPair = () => findPetLinkPair(board.value)
 
 // ---------- 交互 ----------
 
@@ -476,7 +447,7 @@ function onClick(i) {
     playClick()
     return
   }
-  const path = findPath(Math.floor(s / COLS), s % COLS, Math.floor(i / COLS), i % COLS)
+  const path = findPetLinkPath(board.value, Math.floor(s / COLS), s % COLS, Math.floor(i / COLS), i % COLS)
   selected.value = -1
   if (path) match(s, i, path)
   else playClick()
@@ -485,19 +456,24 @@ function onClick(i) {
 async function match(a, b, path) {
   animating.value = true
   playMatch()
+  const lineMs = debugFast.value ? 0 : MATCH_LINE_MS
+  const flipMs = debugFast.value ? 0 : MATCH_FLIP_MS
+  const removedTiles = debugMode.value ? [board.value[a], board.value[b]] : null
+  const beforeIds = debugMode.value ? new Set(board.value.filter(Boolean).map((t) => t.id)) : null
   linePoints.value = path.map(([r, c]) => `${centerX(c)},${centerY(r)}`).join(' ')
-  await sleep(MATCH_LINE_MS)
+  await sleep(lineMs)
   linePoints.value = ''
 
   // FLIP:先记录各牌当前屏幕位置,再应用消除/牌位移动,最后从旧位置滑到新位置
   const before = snapshotPositions()
-  applyGravity(a, b)
+  removePetLinkPair(board.value, level.value, a, b)
+  if (debugMode.value) auditRemoval(removedTiles, beforeIds, a, b)
   score.value += 10
   // 消除补充倒计时:每消除一对 +3 秒(原件 thetimer 回退 36 帧)
   timeLeft.value = Math.min(LEVEL_TIME, timeLeft.value + TIME_BONUS)
   await nextTick()
-  flipAnimate(before, MATCH_FLIP_MS)
-  await sleep(MATCH_FLIP_MS)
+  flipAnimate(before, flipMs)
+  await sleep(flipMs)
   animating.value = false
 
   if (board.value.every((v) => v === null)) {
@@ -533,157 +509,132 @@ function doShuffle() {
 }
 
 function applyShuffle() {
-  const remaining = board.value.filter((v) => v !== null)
-  for (let k = remaining.length - 1; k > 0; k--) {
-    const m = Math.floor(Math.random() * (k + 1))
-    ;[remaining[k], remaining[m]] = [remaining[m], remaining[k]]
-  }
-  let p = 0
-  board.value = board.value.map((v) => (v !== null ? remaining[p++] : null))
+  shufflePetLinkBoard(board.value)
   shufflesLeft.value -= 1
   selected.value = -1
   hinted.value = []
 }
 
-// ---------- 消除后牌位移动(复刻原版 the_pass_nm 分支) ----------
-// 第 1~2 关仅消除;第 3~9 关消除后按关卡名做不同的牌位聚拢:
-// 3 上下分离(上半上移/下半下移)、4 左右分离(左半左移/右半右移)、5 向左看齐(整行左移)、
-// 6 地心引力(整列下移)、7 飘向天空(整列上移)、8 向右看齐(整行右移)、9 中央集中(向中心聚拢)。
+// ---------- 消除后牌位移动 ----------
+// 第 3~9 关的聚拢规则(上下分离/左右分离/向左看齐/地心引力/飘向天空/向右看齐/中央集中)
+// 统一在 utils/games/petlinkBoard.js 的 removePetLinkPair 实现,页面不再重复一份。
 
-function applyGravity(a, b) {
-  const lv = level.value
-  if (lv <= 2) {
-    board.value[a] = null
-    board.value[b] = null
+// ---------- 调试版动作 ----------
+
+function pushDebugLog(text, bad = false) {
+  debugLog.value = [...debugLog.value.slice(-11), { text, bad }]
+}
+
+// 每次消除后核对:消失的必须恰好是这两张牌;剩余各型必须成对(奇数张必然卡死)
+function auditRemoval(tiles, beforeIds, a, b) {
+  const alive = new Set(board.value.filter(Boolean).map((t) => t.id))
+  const lost = [...beforeIds].filter((id) => !alive.has(id))
+  const extra = lost.filter((id) => !tiles.some((t) => t && t.id === id))
+  const r1 = Math.floor(a / COLS)
+  const c1 = a % COLS
+  const r2 = Math.floor(b / COLS)
+  const c2 = b % COLS
+  const type = tiles[0] ? tiles[0].type : 0
+  let bad = false
+  debugRemoved.value += 1
+  if (lost.length !== 2 || extra.length) {
+    bad = true
+    debugIssueCount.value += 1
+    pushDebugLog(t('games.petlink.debug.extraRemoved', { level: level.value, r1, c1, r2, c2, n: Math.max(0, lost.length - 2) }), true)
+    console.warn('[petlink] 消除张数不符', { level: level.value, a, b, tiles, lost })
+  }
+  if (debugOdd.value.length) {
+    bad = true
+    debugIssueCount.value += 1
+    pushDebugLog(t('games.petlink.debug.oddLeft', { list: debugOddText.value }), true)
+    console.warn('[petlink] 盘面出现奇数张', debugOdd.value)
+  }
+  pushDebugLog(`L${level.value} (${r1},${c1})-(${r2},${c2}) #${type} ${bad ? '✗' : '✓'}`)
+}
+
+// 跳到指定关卡的调试盘面:重排给足,免得「无牌可消」提前终止
+function debugJump(lv) {
+  stopAutoPlay()
+  const next = Math.min(MAX_LEVEL, Math.max(1, Number(lv) || 1))
+  level.value = next
+  board.value = buildBoard(next)
+  shufflesLeft.value = DEBUG_SHUFFLES
+  timeLeft.value = LEVEL_TIME
+  selected.value = -1
+  hinted.value = []
+  animating.value = false
+  won.value = false
+  lost.value = false
+  linePoints.value = ''
+  rewardMsg.value = ''
+  debugJumpLevel.value = next
+  debugLog.value = []
+  debugIssueCount.value = 0
+  debugRemoved.value = 0
+  debugSelfText.value = ''
+  startTicker()
+  pushDebugLog(t('games.petlink.debug.jumpTo', { n: next }))
+}
+
+function stopAutoPlay() {
+  autoRunning.value = false
+}
+
+// 自动把当前关卡消到底:连续跑 5/8 关最容易复现「横向连消多消一张」
+async function toggleAutoPlay() {
+  if (autoRunning.value) {
+    stopAutoPlay()
     return
   }
-  const ra = Math.floor(a / COLS),
-    ca = a % COLS
-  const rb = Math.floor(b / COLS),
-    cb = b % COLS
-  let t1 = { r: ra, c: ca },
-    t2 = { r: rb, c: cb }
-
-  if (lv === 3) {
-    // 上下分离:同列且同半区时,上半区行大者先(上移)、下半区行小者先(下移)
-    if (ca === cb) {
-      if (ra <= 4 && rb <= 4 && ra < rb) [t1, t2] = [t2, t1]
-      if (ra >= 5 && rb >= 5 && rb < ra) [t1, t2] = [t2, t1]
+  if (frozen.value) return
+  autoRunning.value = true
+  debugFast.value = true
+  const startLevel = level.value
+  let steps = 0
+  try {
+    while (autoRunning.value && steps < 400) {
+      const pair = findPetLinkPair(board.value)
+      if (!pair) break
+      const [a, b] = pair
+      const path = findPetLinkPath(board.value, Math.floor(a / COLS), a % COLS, Math.floor(b / COLS), b % COLS)
+      if (!path) break
+      await match(a, b, path)
+      steps += 1
+      if (won.value || lost.value || level.value !== startLevel) break
     }
-    shiftVertHalf(t1.r, t1.c)
-    shiftVertHalf(t2.r, t2.c)
-  } else if (lv === 4) {
-    // 左右分离:同行且同半区时,左半区列大者先(左移)、右半区列小者先(右移)
-    if (ra === rb) {
-      if (ca <= 6 && cb <= 6 && ca < cb) [t1, t2] = [t2, t1]
-      if (ca >= 7 && cb >= 7 && cb < ca) [t1, t2] = [t2, t1]
+    if (!findPetLinkPair(board.value) && debugTiles.value > 0) {
+      pushDebugLog(t('games.petlink.debug.stuck', { n: debugTiles.value }))
     }
-    shiftHorizHalf(t1.r, t1.c)
-    shiftHorizHalf(t2.r, t2.c)
-  } else if (lv === 5) {
-    // 向左看齐:同行时右者先
-    if (cb < ca) [t1, t2] = [t2, t1]
-    shiftRowLeft(t1.r, t1.c)
-    shiftRowLeft(t2.r, t2.c)
-  } else if (lv === 6) {
-    // 地心引力(整列下移):同列时上者先
-    if (rb < ra) [t1, t2] = [t2, t1]
-    shiftColDown(t1.r, t1.c)
-    shiftColDown(t2.r, t2.c)
-  } else if (lv === 7) {
-    // 飘向天空(整列上移):同列时下者先
-    if (ra < rb) [t1, t2] = [t2, t1]
-    shiftColUp(t1.r, t1.c)
-    shiftColUp(t2.r, t2.c)
-  } else if (lv === 8) {
-    // 向右看齐:同行时左者先
-    if (ca < cb) [t1, t2] = [t2, t1]
-    shiftRowRight(t1.r, t1.c)
-    shiftRowRight(t2.r, t2.c)
-  } else if (lv === 9) {
-    board.value[a] = null
-    board.value[b] = null
-    toCenter()
+  } finally {
+    debugFast.value = false
+    autoRunning.value = false
   }
 }
 
-function shiftVertHalf(r, c) {
-  if (r <= 4) {
-    // 上半区向上
-    for (let rr = r; rr < 4; rr++) board.value[rr * COLS + c] = board.value[(rr + 1) * COLS + c]
-    board.value[4 * COLS + c] = null
-  } else {
-    // 下半区向下
-    for (let rr = r; rr > 5; rr--) board.value[rr * COLS + c] = board.value[(rr - 1) * COLS + c]
-    board.value[5 * COLS + c] = null
+// 内核自检:1~9 关各跑若干局,统计「误消/吃错型」
+function runSelfTest() {
+  const games = 10
+  let steps = 0
+  const issues = []
+  for (let lv = 1; lv <= MAX_LEVEL; lv++) {
+    const r = simulatePetLinkLevel(lv, games)
+    steps += r.steps
+    issues.push(...r.issues)
+  }
+  debugSelfText.value = t('games.petlink.debug.selfTestDone', { games, levels: MAX_LEVEL, steps, issues: issues.length })
+  debugIssueCount.value += issues.length
+  debugLog.value = []
+  pushDebugLog(debugSelfText.value, issues.length > 0)
+  for (const it of issues.slice(0, 5)) {
+    pushDebugLog(t('games.petlink.debug.selfTestIssue', { level: it.level, kind: it.kind, step: it.step }), true)
   }
 }
-function shiftHorizHalf(r, c) {
-  if (c <= 6) {
-    // 左半区向左
-    for (let cc = c; cc < 6; cc++) board.value[r * COLS + cc] = board.value[r * COLS + cc + 1]
-    board.value[r * COLS + 6] = null
-  } else {
-    // 右半区向右
-    for (let cc = c; cc > 7; cc--) board.value[r * COLS + cc] = board.value[r * COLS + cc - 1]
-    board.value[r * COLS + 7] = null
-  }
-}
-function shiftRowLeft(r, c) {
-  for (let cc = c; cc < 13; cc++) board.value[r * COLS + cc] = board.value[r * COLS + cc + 1]
-  board.value[r * COLS + 13] = null
-}
-function shiftRowRight(r, c) {
-  for (let cc = c; cc > 0; cc--) board.value[r * COLS + cc] = board.value[r * COLS + cc - 1]
-  board.value[r * COLS + 0] = null
-}
-function shiftColDown(r, c) {
-  for (let rr = r; rr > 0; rr--) board.value[rr * COLS + c] = board.value[(rr - 1) * COLS + c]
-  board.value[0 * COLS + c] = null
-}
-function shiftColUp(r, c) {
-  for (let rr = r; rr < 9; rr++) board.value[rr * COLS + c] = board.value[(rr + 1) * COLS + c]
-  board.value[9 * COLS + c] = null
-}
-function toCenter() {
-  let moved
-  do {
-    moved = false
-    for (let i = 0; i < ROWS * COLS; i++) {
-      if (board.value[i] !== null) continue
-      const r = Math.floor(i / COLS),
-        c = i % COLS
-      if (r > 0 && r < ROWS - 1) {
-        // 排除首末行
-        if (r < 5 && board.value[i - COLS] !== null) {
-          // 上半区:上方牌下移
-          board.value[i] = board.value[i - COLS]
-          board.value[i - COLS] = null
-          moved = true
-        } else if (r >= 5 && board.value[i + COLS] !== null) {
-          // 下半区:下方牌上移
-          board.value[i] = board.value[i + COLS]
-          board.value[i + COLS] = null
-          moved = true
-        }
-      }
-      if (board.value[i] !== null) continue
-      if (c > 0 && c < COLS - 1) {
-        // 排除首末列
-        if (c < 7 && board.value[i - 1] !== null) {
-          // 左半区:左方牌右移
-          board.value[i] = board.value[i - 1]
-          board.value[i - 1] = null
-          moved = true
-        } else if (c >= 7 && board.value[i + 1] !== null) {
-          // 右半区:右方牌左移
-          board.value[i] = board.value[i + 1]
-          board.value[i + 1] = null
-          moved = true
-        }
-      }
-    }
-  } while (moved)
+
+// 带 ?level=N 进入时直接落到该关,便于复现第 5/8 关
+function applyDebugStart() {
+  if (!debugMode.value) return
+  const q = Number(route.query.level)
+  debugJump(Number.isInteger(q) && q >= 1 && q <= MAX_LEVEL ? q : level.value)
 }
 
 // ---------- 关卡推进 ----------
@@ -783,6 +734,7 @@ function continueGame() {
   } else {
     restart()
   }
+  applyDebugStart()
 }
 
 // 封面「新游戏」:丢掉旧档,从第 1 关开始
@@ -790,6 +742,7 @@ function startFresh() {
   screen.value = 'game'
   savedState.value = null
   restart()
+  applyDebugStart()
 }
 
 function restart() {
@@ -1248,6 +1201,62 @@ function onKeydown(e) {
   display: flex;
   gap: 8px;
   margin-top: 12px;
+}
+
+/* 调试版面板(?debug=1) */
+.debug-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 720px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px dashed rgba(0, 204, 255, 0.45);
+  border-radius: 10px;
+  background: rgba(0, 204, 255, 0.06);
+  font-size: 12px;
+  color: #b8c4d8;
+}
+.debug-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.debug-tag {
+  color: #00ccff;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+.debug-level-select {
+  width: 104px;
+}
+.debug-stats {
+  gap: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.debug-stats b {
+  color: #ffcc66;
+}
+.debug-bad {
+  color: #ff5a5a;
+  font-weight: 700;
+}
+.debug-self {
+  color: #66ffcc;
+}
+.debug-hint {
+  color: #667;
+}
+.debug-log {
+  max-height: 132px;
+  overflow: auto;
+  font-family: ui-monospace, Consolas, monospace;
+  line-height: 1.5;
+}
+.debug-line {
+  white-space: pre-wrap;
 }
 
 /* 胜负弹层 */
