@@ -82,7 +82,7 @@ Nginx 静态根指向 `frontend/dist`,构建即生效。
 - 角色 OWNER/MEMBER/CHILD/GUEST + OPS(运维不属家庭,绑定须含 `family_id=NULL` 系统级行);同一用户在不同家庭可不同角色。
 - **新增 `@RequirePermission` 接口前**:auth_code 必须进 `sys_auth` + `sys_role_auth` 种子(OWNER 豁免、MEMBER 显式授权);注解**只写方法上**,类级不生效(踩坑速查 §2.14)。
 - **索引规范(强制)**:列表查询的 WHERE+ORDER BY 必须落在同一复合索引内,等值字段在前、范围/排序在后,`deleted` 进索引;混向排序给索引列加 `DESC`;新增表/接口先 `EXPLAIN`(踩坑速查 §8.4)。
-- **引用开源依赖必须登记** `sys_oss_component`(NPM/MAVEN 交 Renovate;SERVICE 走内部升级方案);`current_version` 记锁定版本,不写区间下限。**升级两条通道**:台账「升级方案」给可执行手工步骤(NPM 装包+验证 / MAVEN 改 pom+`mvnw` / SERVICE 按部署方式),自动开 PR 只是可选路径——仓库没装 Renovate 时该通道恒失败,别当 bug 修(踩坑速查 §7.14);前端只在 `upgrade-plan.autoUpgrade.available` 为真时显示「生成升级 PR」。**可升级判定必须 latest 严格高于 current**(列表/汇总按两版重算),防止历史检测残留把低版本当升级项、确认后反而降版。细则见 需求 §4.6.10。
+- **引用开源依赖必须登记** `sys_oss_component`(NPM/MAVEN 交 Renovate;SERVICE 走内部升级方案);`current_version` 记锁定版本,不写区间下限。**升级两条通道**:台账「升级方案」给可执行手工步骤(NPM 装包+验证 / MAVEN 改 pom+`mvnw` / SERVICE 按部署方式),自动开 PR 只是可选路径——仓库没装 Renovate 时该通道恒失败,别当 bug 修(踩坑速查 §7.14);前端只在 `upgrade-plan.autoUpgrade.available` 为真时显示「生成升级 PR」。**可升级判定必须 latest 严格高于 current**(列表/汇总按两版重算),防止历史检测残留把低版本当升级项、确认后反而降版。**Maven 最新版只认 repo1.maven.org 的 `maven-metadata.xml`**(`<release>` 优先,预发布才回退版本列表),NPM `latest` 与 SERVICE GitHub tag 一律过滤预发布(-RC/-M/SNAPSHOT/-fix 及不同版本轨道标签);MySQL 服务与 Connector/J 只跟 8.4 LTS、台账置 IGNORED(踩坑速查 §7.16)。细则见 需求 §4.6.10。
 - **记账账户余额不落库**:`balance = 期初 + 收入 − 支出 − 转出 + 转入`,前后端同一口径(前端 `utils/bookLedger.js` 可复算对账);`family_book_record` 三个账户列可空 = 历史未归属,只提示不迁移;总账 `byMonth` 只含有记录的月份、前端补 12 槽(踩坑速查 §8.5,功能口径见 需求 §4.5.5)。**预算同理只存额度**(`family_book_budget`,一个分类一条),当月已花/超支实时汇总;净资产 = 账户资金 + 理财持仓本金 − 贷款剩余本金(贷款走 `utils/loan.js` 唯一计算源,首页资产卡与总账页共用 `utils/bookLedger.netWorth`)。**周期账目(`family_book_recurring`)到点生成的是普通 `family_book_record`**,统计/总账/预算对比全部沿用既有口径,不改明细结构;日期推算唯一来源 `common/BookRecurringSchedule`(月度短月取月末、每年 2/29 平年取 2/28、停机补跑≤90 天),生成靠 `last_generated_date` 条件更新抢占 + 同事务插入保证幂等(踩坑速查 §8.6)。银行流水 CSV 导入同样落普通流水(流式解析、2MB/2000 行上限、逐行报错)。
 
 ## 代码结构
@@ -194,7 +194,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 ## 验证基线
 
-- 后端全绿:`.\mvnw.cmd -B clean package`(307 tests,纯逻辑不起 Spring)。
+- 后端全绿:`.\mvnw.cmd -B clean package`(312 tests,纯逻辑不起 Spring)。
 - 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(702 passed)+ `npm run format:check`(全树遗留未格式化:`views/BitPouch.vue`、`utils/packetDecode.js`+`.spec.js`、`views/bitpouch/panels/PacketPanel.vue`、`views/Chillyice.vue`、`views/ops/tabs/OpsKada.vue`;**本次改动的文件必须 `prettier --write` 后通过**)。
 - 构建:入口 chunk 基线 **540.19KB / gzip 223.17KB**(V11.11 收尾);**体积口径一律以 vite 构建输出打印的数字为准**(自测 utf8 字节/utf16 字符都对不上,`ls -la` 也不可比);历史数字见 变更归档。
 - 一致性:`bash scripts/doc-drift-check.sh` 全 [OK];`gen-code-map.sh --check`、`doc-index.sh --check` 无漂移。
