@@ -280,7 +280,7 @@ export function tokenizeJson(text) {
 
 // ---------------------------------------------------------------
 // 数据转换:JSON ↔ CSV / XML,以及 JSON → TypeScript / Java / SQL 代码生成。
-// 转换类函数失败抛带 code 的 JsonConvertError,YAML 由页面按需动态加载 js-yaml。
+// 转换类函数失败抛带 code 的 JsonConvertError,YAML/TOML 由数据格式工具按需动态加载 yaml/smol-toml。
 // ---------------------------------------------------------------
 
 export class JsonConvertError extends Error {
