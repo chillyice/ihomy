@@ -195,8 +195,8 @@ cd frontend; npm run lint; npx vitest run; npm run build
 ## 验证基线
 
 - 后端全绿:`.\mvnw.cmd -B clean package`(312 tests,纯逻辑不起 Spring)。
-- 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(702 passed)+ `npm run format:check`(全树遗留未格式化:`views/BitPouch.vue`、`utils/packetDecode.js`+`.spec.js`、`views/bitpouch/panels/PacketPanel.vue`、`views/Chillyice.vue`、`views/ops/tabs/OpsKada.vue`;**本次改动的文件必须 `prettier --write` 后通过**)。
-- 构建:入口 chunk 基线 **540.19KB / gzip 223.17KB**(V11.11 收尾);**体积口径一律以 vite 构建输出打印的数字为准**(自测 utf8 字节/utf16 字符都对不上,`ls -la` 也不可比);历史数字见 变更归档。
+- 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(716 passed)+ `npm run format:check`(全树遗留未格式化:`views/BitPouch.vue`、`utils/packetDecode.js`+`.spec.js`、`views/bitpouch/panels/PacketPanel.vue`、`views/Chillyice.vue`、`views/ops/tabs/OpsKada.vue`;**本次改动的文件必须 `prettier --write` 后通过**)。
+- 构建:入口 chunk 基线 **553.40KB / gzip 227.20KB**(V11.15 收尾);**体积口径一律以 vite 构建输出打印的数字为准**(它按 minified 代码的 UTF-16 长度计数,与磁盘 UTF-8 字节数对不上,`ls -la` 也不可比);历史数字见 变更归档。
 - 一致性:`bash scripts/doc-drift-check.sh` 全 [OK];`gen-code-map.sh --check`、`doc-index.sh --check` 无漂移。
 - 接口测试在仓库外 `..\autotest_framework`(`pytest -m api`,37 passed)。
 
@@ -224,7 +224,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 - SSH 统一 **19068**(禁 22),所有 ssh/scp 带 `-p 19068`;配 fail2ban 与自动安全更新。
 - 备份:`scripts/prod-backup.sh`(mysqldump 单事务 + gzip 校验 + uploads 只增不删,留 14 天)由 systemd timer 每日 03:00 跑;恢复 `scripts/prod-restore.sh <dump> <目标库>`(必须显式给库,恢复前自动快照)。
 - **重装/新服务器四条必查**:① nginx `mime.types` 有 `.mjs`;② 站点 conf 有 gzip 四行;③ 静态缓存 location 负向断言排除 `/api/`、`/files/`(否则接口文档 404);④ 媒体引擎播放地址与站点同为 HTTPS(接口断言查不出)。细节 踩坑速查 §7.1/§7.3/§7.10。
-- **部署新前端后老客户端仍跑旧 bundle(PWA 预缓存)**:冒烟前先 unregister SW + 清 caches;用户侧 Ctrl+Shift+R(踩坑速查 §7.2)。
+- **部署新前端后老客户端仍跑旧 bundle(PWA 预缓存)**:冒烟前先 unregister SW + 清 caches;用户侧 Ctrl+Shift+R(踩坑速查 §7.2)。`public/` 下不带内容哈希的运行时(如 `/ruffle/ruffle.js`)被 nginx 强缓存 7 天,换版本必须带 `?v=` 破缓存(踩坑速查 §3.55)。
 - 详细步骤 `docs/部署指导-Linux.md` / `docs/部署指导-Windows.md`。
 
 ## 归档与规划
