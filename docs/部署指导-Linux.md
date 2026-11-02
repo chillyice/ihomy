@@ -82,7 +82,7 @@ node -v && npm -v
 npm config set registry https://registry.npmmirror.com
 ```
 
-### 2.4 安装 MySQL 8.4.10（本机部署）
+### 2.4 安装 MySQL 8.4 LTS（本机部署，当前补丁 8.4.13）
 
 > 求稳方案：MySQL 本机部署，不走 Docker。调优配置直接放 `/etc/mysql/conf.d/`，无需挂载。
 
@@ -110,6 +110,37 @@ sudo cp /opt/ihomy/config/mysql/my.cnf /etc/mysql/conf.d/ihomy.cnf
 sudo systemctl restart mysql     # CentOS: mysqld
 ```
 > `my.cnf` 关键项：`port=6306`、`performance_schema=OFF`（省 80-100MB）、`max_connections=30`、`innodb_buffer_pool_size=128M`。详见第十一节。
+
+#### 2.4.1 MySQL 8.4 LTS 补丁升级运行手册（8.4.11 → 8.4.13）
+
+> 只走 **8.4 LTS 补丁线**，不装 9.x、也不跟 `mysql-cluster-26.x` 创新版。8.4 补丁线内 MySQL **不支持降级**，回滚只能靠升级前的备份。
+
+```bash
+# 0) 核对现状（台账可能滞后：2026-10-27 实测生产为 8.4.11，台账当时记 8.4.10）
+mysql --version
+mysql -uroot -e "SELECT VERSION();"        # root 走 socket 免密
+apt-cache policy mysql-server               # 确认候选版本是 8.4.x
+
+# 1) 备份并确认成功标记（脚本未部署时见下方说明）
+sudo /opt/ihomy/scripts/prod-backup.sh
+cat /var/backups/ihomy/.last-success
+
+# 2) 停后端，避免升级窗口内连接失败刷错误日志
+sudo systemctl stop ihomy-backend
+
+# 3) 升级（只升级现有包，不装新包）
+sudo apt-get update
+sudo apt-get install -y --only-upgrade mysql-server
+mysql --version
+
+# 4) 起后端并冒烟
+sudo systemctl start ihomy-backend
+curl -s https://ihomy.top/api/public/health          # 期望 status=UP
+```
+
+- **备份脚本尚未部署到生产**（2026-10-27 核查：`/opt/ihomy/scripts` 没有 `prod-backup.sh`、也没有 `ihomy-backup.timer`）。先把仓库 `scripts/prod-backup.sh` 上传到 `/opt/ihomy/scripts/` 再执行；临时替代可手工 `mysqldump --single-transaction --routines --triggers --events ihomy | gzip` 到 `/opt/ihomy/backups/` 并 `gzip -t` 校验。
+- 升级完成后**不需要改 schema、不需要跑 `migrations.sql`**；只把台账该行 `current_version` 改成 `8.4.13`（保持 `status=IGNORED`，仍只跟 8.4 LTS）。
+- 回滚：apt 没有旧补丁包可退回，只能 `scripts/prod-restore.sh <dump> <目标库>` 恢复备份（该脚本同样需要先上传）。**`.last-success` 没更新前不要开始升级。**
 
 ### 2.5 安装 Docker Engine（用于运行 Redis 容器）
 
@@ -163,9 +194,9 @@ docker ps
 
 > 求稳方案：Redis 用 Docker 运行，轻量且便于升级。Docker 已在 2.5 节安装。
 
-**拉取 Redis 镜像：**
+**拉取 Redis 镜像（固定补丁版本，不用 `latest`）：**
 ```bash
-docker pull redis
+docker pull redis:8.10.3
 ```
 
 **启动 Redis 容器：**
@@ -174,9 +205,9 @@ docker pull redis
 docker run -d --name ihomy-redis \
   -p 127.0.0.1:6379:6379 \
   --restart unless-stopped \
-  redis redis-server --requirepass '<Redis密码>'
+  redis:8.10.3 redis-server --requirepass '<Redis密码>'
 ```
-> 默认拉取 `redis:latest`。如需固定版本，用 `docker pull redis:7-alpine` 并在 `docker run` 时用 `redis:7-alpine`。
+> **镜像 tag 固定到补丁版**（当前 `8.10.3`，与 `docker-compose.yml` 开发侧一致）；用 `latest` 会在下次重建时隐式跨版本。`--requirepass` 必须写在镜像名之后，否则会被 `docker run` 当成自己的参数。
 > **只绑 `127.0.0.1`**：Redis 只给本机后端用，公网/局域网一律不给；Docker 能绕过 ufw，绑定回环才是真门闩（V10.6）。`--requirepass` 与 external.yml 的 `spring.data.redis.password` 必须同值。
 
 验证：
@@ -192,7 +223,7 @@ docker stop ihomy-redis      # 停止
 docker start ihomy-redis     # 启动
 docker restart ihomy-redis   # 重启
 docker logs ihomy-redis      # 查看日志
-docker pull redis && docker rm -f ihomy-redis && docker run -d --name ihomy-redis -p 127.0.0.1:6379:6379 --restart unless-stopped redis redis-server --requirepass '<Redis密码>'   # 升级
+docker pull redis:8.10.3 && docker rm -f ihomy-redis && docker run -d --name ihomy-redis -p 127.0.0.1:6379:6379 --restart unless-stopped redis:8.10.3 redis-server --requirepass '<Redis密码>'   # 升级（流程见 §2.6.2）
 ```
 > ⚠️ 重建容器会**清空全部 Redis 数据**（无持久化卷）：刷新令牌黑名单、验证码、登录限流计数、当前家庭选择。顺序永远是「先改 external.yml → 停后端 → 重建 Redis → 起后端 → 冒烟」，详见 §2.6.1。
 
@@ -215,7 +246,7 @@ docker stop ihomy-redis && docker rm ihomy-redis        # 5) 重建（旧容器�
 docker run -d --name ihomy-redis \
   -p 127.0.0.1:6379:6379 \
   --restart unless-stopped \
-  redis redis-server --requirepass '<Redis密码>'
+  redis:8.10.3 redis-server --requirepass '<Redis密码>'
 
 sudo systemctl start ihomy-backend  # 6) 起后端（配置启动早期即加载新密码）
 
@@ -229,6 +260,39 @@ sudo systemctl is-active ihomy-backend                                       # a
 **副作用（可接受，但要知道）**：Redis 无持久化，重建即清空——此前已吊销的刷新令牌会重新有效（最长 7 天，仅当令牌本身已泄露才有影响）、验证码/登录限流计数/当前家庭选择丢失（用户下次自选家庭即可）。家庭场景风险低，窗口期内正常访问不受影响（访问令牌是无状态 JWT，2 小时内照常有效）。
 
 **改密后手工命令都要带 `-a`**：`docker exec ihomy-redis redis-cli -a '<Redis密码>' --no-auth-warning ...`（或先 `export REDISCLI_AUTH='<Redis密码>'`）。`--requirepass` 写在 `docker run` 参数里，`docker inspect` 可见，故密码只放台账与 external.yml，不写进任何入库文件。
+
+#### 2.6.2 Redis 补丁升级运行手册（8.8.1 → 8.10.3）
+
+> 只升补丁/小版本、**不改密码**时 `external.yml` 不用动；但重建容器会**清空全部 Redis 数据**（无持久化卷）：刷新令牌黑名单、验证码、登录限流计数、当前家庭选择全部丢失，**全员需要重新登录一次**（访问令牌是无状态 JWT，2 小时内仍有效）。
+
+```bash
+# 0) 记录现状
+docker inspect -f '{{.Config.Image}}' ihomy-redis
+docker exec ihomy-redis redis-cli -a '<Redis密码>' --no-auth-warning INFO server | grep redis_version
+
+# 1) 先拉新镜像，缩短停服窗口
+docker pull redis:8.10.3
+
+# 2) 停后端，避免重建期间缓存读写报错
+sudo systemctl stop ihomy-backend
+
+# 3) 重建容器（密码与 external.yml 同值；--requirepass 必须在镜像名之后）
+docker stop ihomy-redis && docker rm ihomy-redis
+docker run -d --name ihomy-redis \
+  -p 127.0.0.1:6379:6379 \
+  --restart unless-stopped \
+  redis:8.10.3 redis-server --requirepass '<Redis密码>'
+
+# 4) 验版本与鉴权，再起后端
+docker exec ihomy-redis redis-cli -a '<Redis密码>' --no-auth-warning INFO server | grep redis_version
+docker exec ihomy-redis redis-cli ping          # NOAUTH:密码生效
+sudo systemctl start ihomy-backend
+curl -s https://ihomy.top/api/public/health     # 期望 status=UP
+```
+
+- **冒烟**：`/api/public/health` = UP；登录页验证码能出图并登录成功；连续请求触发限流计数正常、无 `WRONGPASS`/`NOAUTH`（看 `/opt/ihomy/logs/access/` 与 `server/`）。
+- **回滚**：用旧 tag（`redis:8.8.1`）按原参数重建即可；数据本来就是缓存，无需恢复。
+- 换版本与换密码不要混在一次操作里；换密码仍按 §2.6.1 的硬顺序。
 
 ### 2.7 安装 Nginx
 

@@ -33,8 +33,8 @@ services:
       start_period: 60s
 
   redis:
-    # 固定大版本(不再 latest):避免隐式跨大版本升级;开发实跑 8.8.1(见台账 sys_oss_component)
-    image: redis:8
+    # 固定补丁版本(不再浮动):与生产 ihomy-redis 对齐 8.10.3(P5 核实的最新稳定版,见台账 sys_oss_component)
+    image: redis:8.10.3
     container_name: ihomy-redis
     ports:
       # 只绑本机回环:开发机/CI 的局域网不暴露 Redis(V10.6 加固)
