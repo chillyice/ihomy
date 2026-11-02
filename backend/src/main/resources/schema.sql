@@ -2139,7 +2139,7 @@ CREATE TABLE `sys_oss_component` (
   KEY `idx_type_status` (`component_type`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='开源组件台账(登记+版本检测+当前版本探测+升级提示)';
 
--- 种子:55 项 = 前端 NPM 直接依赖 31 + 后端 Maven 显式依赖 19 + 独立服务 5(Nextcloud / Jellyfin / Home Assistant + MySQL / Redis)
+-- 种子:57 项 = 前端 NPM 直接依赖 33 + 后端 Maven 显式依赖 19 + 独立服务 5(Nextcloud / Jellyfin / Home Assistant + MySQL / Redis)
 -- 版本为实际锁定版本(与 package-lock.json / 解析后的 Maven 依赖一致),不是 package.json/pom.xml 里的声明区间下限
 INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`) VALUES
 ('Vue', 'NPM', 'vue', '3.5.40', 'MIT', 'https://github.com/vuejs/core', '前端框架', 'FULL'),
@@ -2175,29 +2175,29 @@ INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `curre
 ('fflate', 'NPM', 'fflate', '0.8.2', 'MIT', 'https://github.com/101arrowz/fflate', '工具箱 ZIP 打包与解压', 'FULL'),
 ('yaml', 'NPM', 'yaml', '2.9.1', 'ISC', 'https://github.com/eemeli/yaml', '比特口袋数据格式转换 YAML 解析', 'FULL'),
 ('smol-toml', 'NPM', 'smol-toml', '1.9.1', 'BSD-3-Clause', 'https://github.com/squirrelchat/smol-toml', '比特口袋数据格式转换 TOML 解析', 'FULL'),
-('Spring Boot', 'MAVEN', 'org.springframework.boot:spring-boot-starter-parent', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端框架', 'FULL'),
-('Spring Boot Web', 'MAVEN', 'org.springframework.boot:spring-boot-starter-webmvc', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Web/REST(MVC)', 'FULL'),
-('Spring Boot Security', 'MAVEN', 'org.springframework.boot:spring-boot-starter-security', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '认证授权(过滤链)', 'FULL'),
-('Spring Boot Validation', 'MAVEN', 'org.springframework.boot:spring-boot-starter-validation', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '参数校验', 'FULL'),
-('Spring Boot Data Redis', 'MAVEN', 'org.springframework.boot:spring-boot-starter-data-redis', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Redis(缓存/令牌/验证码)', 'FULL'),
-('Spring Boot AOP', 'MAVEN', 'org.springframework.boot:spring-boot-starter-aspectj', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '切面(权限/操作日志)', 'FULL'),
-('Spring Boot WebSocket', 'MAVEN', 'org.springframework.boot:spring-boot-starter-websocket', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '聊天室 WebSocket', 'FULL'),
-('Spring Boot Mail', 'MAVEN', 'org.springframework.boot:spring-boot-starter-mail', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '密码找回邮件(SMTP)', 'FULL'),
-('MyBatis-Plus', 'MAVEN', 'com.baomidou:mybatis-plus-spring-boot4-starter', '3.5.17', 'Apache-2.0', 'https://github.com/baomidou/mybatis-plus', 'ORM', 'FULL'),
-('MyBatis-Plus JSQLParser', 'MAVEN', 'com.baomidou:mybatis-plus-jsqlparser', '3.5.17', 'Apache-2.0', 'https://github.com/baomidou/mybatis-plus', '分页插件(3.5.9 起拆为独立模块)', 'FULL'),
-('MySQL Connector/J', 'MAVEN', 'com.mysql:mysql-connector-j', '9.7.0', 'GPL-2.0', 'https://github.com/mysql/mysql-connector-j', 'MySQL 驱动', 'FULL'),
-('Hutool', 'MAVEN', 'cn.hutool:hutool-all', '5.8.27', 'MulanPSL-2.0', 'https://github.com/dromara/hutool', '工具库(农历/文本等)', 'FULL'),
-('JJWT', 'MAVEN', 'io.jsonwebtoken:jjwt-api', '0.12.5', 'Apache-2.0', 'https://github.com/jwtk/jjwt', 'JWT 双 token', 'FULL'),
-('JJWT Impl', 'MAVEN', 'io.jsonwebtoken:jjwt-impl', '0.12.5', 'Apache-2.0', 'https://github.com/jwtk/jjwt', 'JWT 实现(runtime)', 'FULL'),
-('JJWT Jackson', 'MAVEN', 'io.jsonwebtoken:jjwt-jackson', '0.12.5', 'Apache-2.0', 'https://github.com/jwtk/jjwt', 'JWT JSON 序列化(runtime)', 'FULL'),
-('SpringDoc OpenAPI', 'MAVEN', 'org.springdoc:springdoc-openapi-starter-webmvc-ui', '3.1.1', 'Apache-2.0', 'https://github.com/springdoc/springdoc-openapi', '接口文档', 'FULL'),
-('Lombok', 'MAVEN', 'org.projectlombok:lombok', '1.18.46', 'MIT', 'https://github.com/projectlombok/lombok', '编译期样板代码生成', 'FULL'),
+('Spring Boot', 'MAVEN', 'org.springframework.boot:spring-boot-starter-parent', '4.1.2', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端框架', 'FULL'),
+('Spring Boot Web', 'MAVEN', 'org.springframework.boot:spring-boot-starter-webmvc', '4.1.2', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Web/REST(MVC)', 'FULL'),
+('Spring Boot Security', 'MAVEN', 'org.springframework.boot:spring-boot-starter-security', '4.1.2', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '认证授权(过滤链)', 'FULL'),
+('Spring Boot Validation', 'MAVEN', 'org.springframework.boot:spring-boot-starter-validation', '4.1.2', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '参数校验', 'FULL'),
+('Spring Boot Data Redis', 'MAVEN', 'org.springframework.boot:spring-boot-starter-data-redis', '4.1.2', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', 'Redis(缓存/令牌/验证码)', 'FULL'),
+('Spring Boot AOP', 'MAVEN', 'org.springframework.boot:spring-boot-starter-aspectj', '4.1.2', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '切面(权限/操作日志)', 'FULL'),
+('Spring Boot WebSocket', 'MAVEN', 'org.springframework.boot:spring-boot-starter-websocket', '4.1.2', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '聊天室 WebSocket', 'FULL'),
+('Spring Boot Mail', 'MAVEN', 'org.springframework.boot:spring-boot-starter-mail', '4.1.2', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '密码找回邮件(SMTP)', 'FULL'),
+('MyBatis-Plus', 'MAVEN', 'com.baomidou:mybatis-plus-spring-boot4-starter', '3.5.18', 'Apache-2.0', 'https://github.com/baomidou/mybatis-plus', 'ORM', 'FULL'),
+('MyBatis-Plus JSQLParser', 'MAVEN', 'com.baomidou:mybatis-plus-jsqlparser', '3.5.18', 'Apache-2.0', 'https://github.com/baomidou/mybatis-plus', '分页插件(3.5.9 起拆为独立模块)', 'FULL'),
+('MySQL Connector/J', 'MAVEN', 'com.mysql:mysql-connector-j', '9.7.0', 'GPL-2.0', 'https://github.com/mysql/mysql-connector-j', 'MySQL 驱动(跟踪 8.4 LTS,不跟 26.x 日历版本线)', 'FULL'),
+('Hutool', 'MAVEN', 'cn.hutool:hutool-all', '5.8.48', 'MulanPSL-2.0', 'https://github.com/dromara/hutool', '工具库(农历/文本等)', 'FULL'),
+('JJWT', 'MAVEN', 'io.jsonwebtoken:jjwt-api', '0.12.7', 'Apache-2.0', 'https://github.com/jwtk/jjwt', 'JWT 双 token', 'FULL'),
+('JJWT Impl', 'MAVEN', 'io.jsonwebtoken:jjwt-impl', '0.12.7', 'Apache-2.0', 'https://github.com/jwtk/jjwt', 'JWT 实现(runtime)', 'FULL'),
+('JJWT Jackson', 'MAVEN', 'io.jsonwebtoken:jjwt-jackson', '0.12.7', 'Apache-2.0', 'https://github.com/jwtk/jjwt', 'JWT JSON 序列化(runtime)', 'FULL'),
+('SpringDoc OpenAPI', 'MAVEN', 'org.springdoc:springdoc-openapi-starter-webmvc-ui', '3.2.0', 'Apache-2.0', 'https://github.com/springdoc/springdoc-openapi', '接口文档', 'FULL'),
+('Lombok', 'MAVEN', 'org.projectlombok:lombok', '1.18.48', 'MIT', 'https://github.com/projectlombok/lombok', '编译期样板代码生成(Boot 4.1.2 BOM 托管)', 'FULL'),
 ('mp3agic', 'MAVEN', 'com.mpatric:mp3agic', '0.9.1', 'MIT', 'https://github.com/mpatric/mp3agic', '音乐元数据解析', 'FULL'),
-('Spring Boot Test', 'MAVEN', 'org.springframework.boot:spring-boot-starter-test', '4.1.1', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端单元测试(JUnit5/AssertJ)', 'FULL'),
+('Spring Boot Test', 'MAVEN', 'org.springframework.boot:spring-boot-starter-test', '4.1.2', 'Apache-2.0', 'https://github.com/spring-projects/spring-boot', '后端单元测试(JUnit5/AssertJ)', 'FULL'),
 ('Nextcloud', 'SERVICE', 'nextcloud/server', NULL, 'AGPL-3.0', 'https://github.com/nextcloud/server', 'WebDAV/Nextcloud 存储后端', 'PARTIAL'),
 ('Jellyfin', 'SERVICE', 'jellyfin/jellyfin', '10.9.11', 'GPL-2.0', 'https://github.com/jellyfin/jellyfin', '放映厅媒体引擎(刮削/转码/字幕轨/TV 客户端;API 集成,界面自建)', 'PARTIAL'),
 ('Home Assistant', 'SERVICE', 'home-assistant/core', NULL, 'Apache-2.0', 'https://github.com/home-assistant/core', '智能家居中控(实体状态采集/设备控制;API 集成,界面自建)', 'PARTIAL'),
-('MySQL', 'SERVICE', 'mysql/mysql-server', '8.4.10', 'GPL-2.0', 'https://github.com/mysql/mysql-server', '关系型数据库(业务数据持久化,端口 6306)', 'FULL'),
+('MySQL', 'SERVICE', 'mysql/mysql-server', '8.4.10', 'GPL-2.0', 'https://github.com/mysql/mysql-server', '关系型数据库(业务数据持久化,端口 6306);跟踪 8.4 LTS,不跟 26.x 创新版', 'FULL'),
 ('Redis', 'SERVICE', 'redis/redis', '8.8.1', 'AGPL-3.0', 'https://github.com/redis/redis', '缓存/令牌/验证码/限流(内存数据存储,只绑回环)', 'FULL');
 
 -- NPM/MAVEN 直接依赖交由 Renovate 检测 + 生成 PR,SERVICE 独立服务由台账内部维护(默认 INTERNAL)
@@ -2431,6 +2431,13 @@ UPDATE `sys_oss_component` SET `probe_type` = 'HA_CONFIG'        WHERE `componen
 -- 基础设施服务部署方式:MySQL 生产为本机部署,Redis 走 Docker(见 docs/部署指导-Linux.md)
 UPDATE `sys_oss_component` SET `deploy_type` = 'SYSTEMD'   WHERE `component_type` = 'SERVICE' AND `package_ref` = 'mysql/mysql-server';
 UPDATE `sys_oss_component` SET `deploy_type` = 'CONTAINER' WHERE `component_type` = 'SERVICE' AND `package_ref` = 'redis/redis';
+
+-- 版本轨道降噪:MySQL 服务与 Connector/J 只跟随 8.4 LTS 补丁线,
+-- 不跟 GitHub 的 mysql-cluster-26.x 创新版与 Connector 26.x 日历版本线,置 IGNORED 防误报升级项
+UPDATE `sys_oss_component` SET `status` = 'IGNORED'
+ WHERE `component_type` = 'SERVICE' AND `package_ref` = 'mysql/mysql-server';
+UPDATE `sys_oss_component` SET `status` = 'IGNORED'
+ WHERE `component_type` = 'MAVEN' AND `package_ref` = 'com.mysql:mysql-connector-j';
 
 -- ------------------------------------------------------------
 -- 66. 演示家庭内容补满（V10.28）

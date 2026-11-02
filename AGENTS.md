@@ -236,5 +236,5 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 - 索引:`docs/README.md`(每份文档一句话 + 阅读顺序);`docs/架构设计.md`(请求怎么走/关键机制);`docs/代码地图.md`(代码定位);`docs/归档索引.md`(历史反查);`test/cases/功能测试用例.md`(489 条)。
 - `scripts/`:setup / start-all / restart-all / start-db / doc-drift-check / gen-code-map / doc-index / prod-backup / prod-restore / db_diff / ci-jellyfin-setup / docs-gen / soft-copyright(软著 PDF 生成)。
-- 本机环境:JDK 21、Node 20、MySQL 8、python-docx;Maven 用 Wrapper(或 temp 3.9.9);Redis 未装时用 Docker/Memurai。
+- 本机环境:JDK 21、Node 24 LTS(最低 22.12)、MySQL 8、python-docx;Maven 用 Wrapper(或 temp 3.9.9);Redis 未装时用 Docker/Memurai。
 - **代码事实以 `backend/src/main/java` + `resources/schema.sql` 为准**;文档与代码冲突时先改文档再改代码,或先读 `docs/踩坑速查.md` 确认不是已知取舍。

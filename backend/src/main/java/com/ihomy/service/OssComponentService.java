@@ -23,12 +23,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilderFactory;
+
+import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
+
 import java.io.IOException;
+import java.io.StringReader;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
-import java.net.URLEncoder;
 import java.net.UnknownHostException;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -61,6 +67,8 @@ public class OssComponentService {
     private final ObjectMapper json = new ObjectMapper();
 
     private static final int TIMEOUT_MS = 5000;
+    /** Maven Central 官方仓库根:按 group(点换路径)/artifact 取 maven-metadata.xml */
+    private static final String MAVEN_METADATA_BASE = "https://repo1.maven.org/maven2/";
     /** 自动升级通道探测超时:比常规请求短,避免打开升级方案时被 GitHub 拖住 */
     private static final int PROBE_TIMEOUT_MS = 2500;
     /** 「仓库是否已接入 Renovate」结果缓存 5 分钟:同一仓库的台账共用,不必每次开弹窗都打 GitHub */
@@ -651,9 +659,14 @@ public class OssComponentService {
     private String fetchLatest(OssComponent c) throws IOException {
         String type = c.getComponentType() == null ? "" : c.getComponentType();
         if (DictConst.OSS_TYPE_NPM.equals(type)) {
-            JsonNode n = json.readTree(ThirdPartyHttp.get("npm",
-                    "https://registry.npmjs.org/" + c.getPackageRef() + "/latest", null, TIMEOUT_MS).body());
-            return n.path("version").asText(null);
+            ThirdPartyHttp.Resp r = ThirdPartyHttp.get("npm",
+                    "https://registry.npmjs.org/" + c.getPackageRef() + "/latest", null, TIMEOUT_MS);
+            if (!r.ok() || r.body() == null || r.body().isBlank()) {
+                return null;
+            }
+            String latest = json.readTree(r.body()).path("version").asText(null);
+            // dist-tag latest 可能指向 -fix/-rc 发行:不作为升级目标,保留上次检测结果
+            return OssVersionUtil.isPrerelease(latest) ? null : latest;
         }
         if (DictConst.OSS_TYPE_MAVEN.equals(type)) {
             return fetchMavenLatest(c.getPackageRef());
@@ -664,20 +677,57 @@ public class OssComponentService {
         return null;
     }
 
+    /**
+     * Maven Central 官方元数据(repo1.maven.org):search.maven.org 的 solr 索引陈旧,会漏报新版本。
+     * 选版先看 &lt;release&gt;(避开 3.5.18 与 3.5.18.1 的歧义),它是预发布时回退版本列表取最高稳定版。
+     */
     private String fetchMavenLatest(String ref) throws IOException {
         String[] ga = ref.split(":", 2);
         if (ga.length < 2) {
             return null;
         }
-        String q = "g:\"" + ga[0] + "\" AND a:\"" + ga[1] + "\"";
-        String url = "https://search.maven.org/solrsearch/select?q="
-                + URLEncoder.encode(q, StandardCharsets.UTF_8) + "&rows=1&wt=json";
-        JsonNode n = json.readTree(ThirdPartyHttp.get("maven", url, null, TIMEOUT_MS).body());
-        JsonNode docs = n.path("response").path("docs");
-        if (docs.isArray() && docs.size() > 0) {
-            return docs.get(0).path("latestVersion").asText(null);
+        String url = MAVEN_METADATA_BASE + ga[0].replace('.', '/') + "/" + ga[1] + "/maven-metadata.xml";
+        ThirdPartyHttp.Resp r = ThirdPartyHttp.get("maven", url, null, TIMEOUT_MS);
+        if (!r.ok() || r.body() == null || r.body().isBlank()) {
+            return null;
         }
-        return null;
+        try {
+            Document doc = parseMavenMetadata(r.body());
+            String release = firstText(doc, "release");
+            if (release != null && !OssVersionUtil.isPrerelease(release) && !OssVersionUtil.parse(release).isEmpty()) {
+                return release;
+            }
+            return OssVersionUtil.pickLatestStable(allTexts(doc, "version"));
+        } catch (Exception e) {
+            log.warn("parse maven metadata failed, ref={}", ref, e);
+            return null;
+        }
+    }
+
+    /** 解析 maven-metadata.xml:关闭 DTD 与外部实体,只读本地 XML 文本 */
+    private Document parseMavenMetadata(String xml) throws Exception {
+        DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
+        f.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        f.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        f.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        f.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        f.setXIncludeAware(false);
+        f.setExpandEntityReferences(false);
+        return f.newDocumentBuilder().parse(new InputSource(new StringReader(xml)));
+    }
+
+    private String firstText(Document doc, String tag) {
+        NodeList nodes = doc.getElementsByTagName(tag);
+        return nodes.getLength() == 0 ? null : nodes.item(0).getTextContent().trim();
+    }
+
+    private List<String> allTexts(Document doc, String tag) {
+        NodeList nodes = doc.getElementsByTagName(tag);
+        List<String> out = new ArrayList<>(nodes.getLength());
+        for (int i = 0; i < nodes.getLength(); i++) {
+            out.add(nodes.item(i).getTextContent().trim());
+        }
+        return out;
     }
 
     private String fetchGithubLatest(String repo) throws IOException {
@@ -690,17 +740,19 @@ public class OssComponentService {
                 "https://api.github.com/repos/" + repo + "/releases/latest", headers, TIMEOUT_MS);
         if (r.ok()) {
             String tag = json.readTree(r.body()).path("tag_name").asText(null);
-            if (tag != null && !tag.isBlank()) {
+            if (tag != null && !tag.isBlank() && !OssVersionUtil.isPrerelease(tag)) {
                 return tag;
             }
         }
-        // 403 限流 / 404(无 latest release):回退 tags 列表第一条
+        // 403 限流 / 404(无 latest release)/ latest 是预发布:回退 tags 列表取最高稳定版
         ThirdPartyHttp.Resp t = ThirdPartyHttp.get("github",
                 "https://api.github.com/repos/" + repo + "/tags", headers, TIMEOUT_MS);
         if (t.ok()) {
             JsonNode arr = json.readTree(t.body());
-            if (arr.isArray() && arr.size() > 0) {
-                return arr.get(0).path("name").asText(null);
+            if (arr.isArray()) {
+                List<String> names = new ArrayList<>(arr.size());
+                arr.forEach(n -> names.add(n.path("name").asText("")));
+                return OssVersionUtil.pickLatestStable(names);
             }
         }
         return null;

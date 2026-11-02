@@ -2897,3 +2897,35 @@ SET @add_game_series := (
 PREPARE add_game_series_stmt FROM @add_game_series;
 EXECUTE add_game_series_stmt;
 DEALLOCATE PREPARE add_game_series_stmt;
+
+-- ------------------------------------------------------------
+-- 开源组件升级 P0:台账版本轨道降噪 + 后端补丁版本(2026-11-02)
+--   MySQL 服务与 Connector/J 只跟踪 8.4 LTS 补丁线,不跟 26.x 创新版/日历版本线,
+--   置 IGNORED 免得 GitHub latest 每次都被当成可升级项;后端补丁同步记实际锁定版本。
+--   重复执行安全:全部为幂等 UPDATE。
+-- ------------------------------------------------------------
+UPDATE `sys_oss_component` SET `status` = 'IGNORED',
+       `purpose` = '关系型数据库(业务数据持久化,端口 6306);跟踪 8.4 LTS,不跟 26.x 创新版'
+ WHERE `component_type` = 'SERVICE' AND `package_ref` = 'mysql/mysql-server';
+UPDATE `sys_oss_component` SET `status` = 'IGNORED',
+       `purpose` = 'MySQL 驱动(跟踪 8.4 LTS,不跟 26.x 日历版本线)'
+ WHERE `component_type` = 'MAVEN' AND `package_ref` = 'com.mysql:mysql-connector-j';
+
+UPDATE `sys_oss_component` SET `current_version` = '4.1.2'
+ WHERE `component_type` = 'MAVEN' AND `package_ref` LIKE 'org.springframework.boot:%';
+UPDATE `sys_oss_component` SET `current_version` = '3.5.18'
+ WHERE `component_type` = 'MAVEN' AND `package_ref` IN (
+   'com.baomidou:mybatis-plus-spring-boot4-starter',
+   'com.baomidou:mybatis-plus-jsqlparser');
+UPDATE `sys_oss_component` SET `current_version` = '0.12.7'
+ WHERE `component_type` = 'MAVEN' AND `package_ref` IN (
+   'io.jsonwebtoken:jjwt-api',
+   'io.jsonwebtoken:jjwt-impl',
+   'io.jsonwebtoken:jjwt-jackson');
+UPDATE `sys_oss_component` SET `current_version` = '5.8.48'
+ WHERE `component_type` = 'MAVEN' AND `package_ref` = 'cn.hutool:hutool-all';
+UPDATE `sys_oss_component` SET `current_version` = '3.2.0'
+ WHERE `component_type` = 'MAVEN' AND `package_ref` = 'org.springdoc:springdoc-openapi-starter-webmvc-ui';
+UPDATE `sys_oss_component` SET `current_version` = '1.18.48',
+       `purpose` = '编译期样板代码生成(Boot 4.1.2 BOM 托管)'
+ WHERE `component_type` = 'MAVEN' AND `package_ref` = 'org.projectlombok:lombok';

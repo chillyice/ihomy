@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
     "dev": "node scripts/copy-ruffle.mjs && node scripts/copy-emulatorjs.mjs && vite",
     "build": "node scripts/copy-ruffle.mjs && node scripts/copy-emulatorjs.mjs && vite build",
