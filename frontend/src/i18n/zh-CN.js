@@ -1018,6 +1018,7 @@ export default {
     saveDeleted: '存档已删除',
     saveRestoreFailed: '读取云端存档失败，本次从本机进度开始',
     saveSyncFailed: '存档同步失败，进度暂存在本机',
+    dpad: '方向键',
   },
   points: {
     title: '积分商城',

@@ -61,8 +61,106 @@
           <el-button v-if="!src" size="small" round @click="pick">{{ $t('gba.reselect') }}</el-button>
           <el-button v-if="!src" size="small" round text type="danger" @click="close">{{ $t('gba.close') }}</el-button>
         </div>
-        <div ref="stage" class="gba-stage">
-          <div ref="container" :id="playerId" class="gba-stage-inner"></div>
+        <div ref="consoleEl" class="gba-console" :class="{ 'gba-console--pad': padLayout }" :style="{ '--gba-aspect': screenAspect }">
+          <!-- 竖屏触屏:手柄拆到屏幕上方(肩键)与下方(方向键/AB/Start·Select),像一个真正的掌机 -->
+          <div v-if="padLayout" class="gba-pad-row gba-pad-row--top">
+            <button
+              type="button"
+              class="gba-pad-shoulder"
+              :class="{ down: padDown.l }"
+              @pointerdown.prevent="padButtonDown('l', $event)"
+              @pointerup.prevent="padButtonUp('l')"
+              @pointercancel.prevent="padButtonUp('l')"
+              @lostpointercapture="padButtonUp('l')"
+            >
+              L
+            </button>
+            <button
+              type="button"
+              class="gba-pad-shoulder"
+              :class="{ down: padDown.r }"
+              @pointerdown.prevent="padButtonDown('r', $event)"
+              @pointerup.prevent="padButtonUp('r')"
+              @pointercancel.prevent="padButtonUp('r')"
+              @lostpointercapture="padButtonUp('r')"
+            >
+              R
+            </button>
+          </div>
+
+          <div ref="stage" class="gba-stage">
+            <div ref="container" :id="playerId" class="gba-stage-inner" :class="{ 'gba-stage-inner--pad': padLayout }"></div>
+          </div>
+
+          <div v-if="padLayout" class="gba-pad-row gba-pad-row--bottom">
+            <div
+              ref="dpadEl"
+              class="gba-dpad"
+              role="group"
+              :aria-label="$t('gba.dpad')"
+              @pointerdown.prevent="onDpadDown"
+              @pointermove.prevent="onDpadMove"
+              @pointerup.prevent="onDpadEnd"
+              @pointercancel.prevent="onDpadEnd"
+              @lostpointercapture="onDpadEnd"
+            >
+              <i class="gba-dpad-dir up" :class="{ 'is-on': dpadDown.up }"></i>
+              <i class="gba-dpad-dir down" :class="{ 'is-on': dpadDown.down }"></i>
+              <i class="gba-dpad-dir left" :class="{ 'is-on': dpadDown.left }"></i>
+              <i class="gba-dpad-dir right" :class="{ 'is-on': dpadDown.right }"></i>
+              <span class="gba-dpad-hub"></span>
+            </div>
+
+            <div class="gba-pad-sys">
+              <button
+                type="button"
+                class="gba-pad-sysbtn"
+                :class="{ down: padDown.select }"
+                @pointerdown.prevent="padButtonDown('select', $event)"
+                @pointerup.prevent="padButtonUp('select')"
+                @pointercancel.prevent="padButtonUp('select')"
+                @lostpointercapture="padButtonUp('select')"
+              >
+                SELECT
+              </button>
+              <button
+                type="button"
+                class="gba-pad-sysbtn"
+                :class="{ down: padDown.start }"
+                @pointerdown.prevent="padButtonDown('start', $event)"
+                @pointerup.prevent="padButtonUp('start')"
+                @pointercancel.prevent="padButtonUp('start')"
+                @lostpointercapture="padButtonUp('start')"
+              >
+                START
+              </button>
+            </div>
+
+            <div class="gba-pad-ab">
+              <button
+                type="button"
+                class="gba-pad-round is-b"
+                :class="{ down: padDown.b }"
+                @pointerdown.prevent="padButtonDown('b', $event)"
+                @pointerup.prevent="padButtonUp('b')"
+                @pointercancel.prevent="padButtonUp('b')"
+                @lostpointercapture="padButtonUp('b')"
+              >
+                B
+              </button>
+              <button
+                type="button"
+                class="gba-pad-round is-a"
+                :class="{ down: padDown.a }"
+                @pointerdown.prevent="padButtonDown('a', $event)"
+                @pointerup.prevent="padButtonUp('a')"
+                @pointercancel.prevent="padButtonUp('a')"
+                @lostpointercapture="padButtonUp('a')"
+              >
+                A
+              </button>
+            </div>
+          </div>
         </div>
       </template>
 
@@ -75,7 +173,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, nextTick, inject } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, nextTick, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -100,6 +198,7 @@ const userStore = useUserStore()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 const container = ref(null)
 const stage = ref(null)
+const consoleEl = ref(null)
 // EmulatorJS 的 setElements() 用 document.querySelector(element) 定位容器,要求传 CSS 选择器字符串(官方约定 EJS_player='#game'),
 // 不能传 DOM 元素(否则抛 "[object HTMLDivElement] is not a valid selector" 导致模拟器永不初始化)。故给容器分配稳定 id。
 const playerId = 'gba-stage-inner'
@@ -112,6 +211,111 @@ const isFullscreen = ref(false)
 
 let objectUrl = null
 let loadFallbackTimer = null
+
+// —— 竖屏机身布局:触屏 + 竖屏时隐藏 EmulatorJS 自带的悬浮手柄,改用屏幕上下两排实体感按键 ——
+// 按键值(RetroArch 手柄编号,mGBA 与 EJS 的 GBA 预设一致):B=0 / Select=2 / Start=3 / 上下左右=4~7 / A=8 / L=10 / R=11
+const PAD_INPUT = { up: 4, down: 5, left: 6, right: 7, select: 2, start: 3, a: 8, b: 0, l: 10, r: 11 }
+const PAD_DIRS = ['up', 'down', 'left', 'right']
+
+const gameStarted = ref(false)
+const screenAspect = ref('3 / 2')
+const padDown = reactive({ a: false, b: false, l: false, r: false, start: false, select: false })
+const dpadDown = reactive({ up: false, down: false, left: false, right: false })
+const dpadEl = ref(null)
+let dpadPointerId = null
+
+// 是否用「掌机机身」布局:触屏且竖屏。桌面/横屏保持 EJS 原有悬浮手柄,不改变既有操作习惯。
+const isTouch = ref(false)
+const isPortrait = ref(false)
+const padLayout = computed(() => isTouch.value && isPortrait.value)
+
+const refreshViewport = () => {
+  isTouch.value = (navigator.maxTouchPoints || 0) > 0 || !!window.matchMedia?.('(any-pointer: coarse)').matches
+  isPortrait.value = window.innerHeight >= window.innerWidth
+}
+
+// 核心就绪前(加载中/起始按钮阶段)不送输入,避免把按键缓存进模拟器
+const sendPad = (value, down) => {
+  const manager = gameManager()
+  if (!gameStarted.value || !manager) return
+  try {
+    manager.simulateInput(0, value, down ? 1 : 0)
+  } catch (e) {
+    /* 核心正在重启/已销毁时忽略 */
+  }
+}
+
+const padButtonDown = (id, e) => {
+  if (padDown[id]) return
+  padDown[id] = true
+  try {
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+  } catch (err) {
+    /* 老浏览器不支持指针捕获时靠 pointerup 兜底 */
+  }
+  sendPad(PAD_INPUT[id], true)
+}
+
+const padButtonUp = (id) => {
+  if (!padDown[id]) return
+  padDown[id] = false
+  sendPad(PAD_INPUT[id], false)
+}
+
+const dpadApply = (next) => {
+  for (const dir of PAD_DIRS) {
+    if (next[dir] === dpadDown[dir]) continue
+    dpadDown[dir] = next[dir]
+    sendPad(PAD_INPUT[dir], next[dir])
+  }
+}
+
+// 以圆盘中心算方向,两轴各自过阈值 → 天然支持斜向;阈值按盘面尺寸换算,小屏也不误触
+const dpadFromEvent = (e, rect) => {
+  const dx = e.clientX - (rect.left + rect.width / 2)
+  const dy = e.clientY - (rect.top + rect.height / 2)
+  const dead = Math.max(6, rect.width * 0.16)
+  return { up: dy < -dead, down: dy > dead, left: dx < -dead, right: dx > dead }
+}
+
+const onDpadDown = (e) => {
+  if (dpadPointerId !== null) return
+  dpadPointerId = e.pointerId
+  try {
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+  } catch (err) {
+    /* 同上 */
+  }
+  dpadApply(dpadFromEvent(e, e.currentTarget.getBoundingClientRect()))
+}
+
+const onDpadMove = (e) => {
+  if (e.pointerId !== dpadPointerId) return
+  dpadApply(dpadFromEvent(e, e.currentTarget.getBoundingClientRect()))
+}
+
+const onDpadEnd = (e) => {
+  if (dpadPointerId !== null && e.pointerId !== dpadPointerId) return
+  dpadPointerId = null
+  dpadApply({ up: false, down: false, left: false, right: false })
+}
+
+// 切后台/转屏/拆模拟器时把按住的键全部松开,否则会卡住一个方向
+const releaseAllPad = () => {
+  for (const id of Object.keys(padDown)) {
+    if (padDown[id]) padButtonUp(id)
+  }
+  dpadPointerId = null
+  dpadApply({ up: false, down: false, left: false, right: false })
+}
+
+// 画面比例跟核心实际缓冲一致(GB/GBC 是 10:9,GBA 是 3:2),避免机身布局里被拉伸
+const syncScreenAspect = () => {
+  const canvas = ejsInstance?.canvas
+  if (canvas?.width && canvas?.height) screenAspect.value = `${canvas.width} / ${canvas.height}`
+}
+
+watch(padLayout, () => releaseAllPad())
 
 // —— 云端存档:服务端是唯一事实来源,按成员隔离 ——
 // 启动前先取服务端最新存档,趁存档库挂载完、ROM 还没加载时(EJS 的 saveDatabaseLoaded)写进模拟器,
@@ -370,7 +574,10 @@ const removeSave = async (save) => {
 const sizeText = (bytes) => (bytes >= 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${bytes || 0} B`)
 
 const onVisibilityChange = () => {
-  if (document.hidden) flushSave()
+  if (document.hidden) {
+    releaseAllPad()
+    flushSave()
+  }
 }
 
 const pick = () => fileInput.value?.click()
@@ -380,6 +587,8 @@ const pick = () => fileInput.value?.click()
 // 返回上级页面后游戏声音仍在放、CPU 照跑。先暂停(等价暂停按钮)再拆 DOM。
 const teardownEmulator = () => {
   stopSync()
+  releaseAllPad()
+  gameStarted.value = false
   if (loadFallbackTimer) {
     clearTimeout(loadFallbackTimer)
     loadFallbackTimer = null
@@ -415,6 +624,10 @@ const loadRom = async (romUrl) => {
   try {
     flushSave()
     teardownEmulator()
+    // 机身布局要在注入 loader.js 前定好:竖屏时关掉 EJS 菜单里的全屏(全屏只覆盖画面,会丢手柄),改由工具栏全屏整台机身
+    refreshViewport()
+    if (padLayout.value) window.EJS_Buttons = { fullscreen: { visible: false } }
+    else delete window.EJS_Buttons
     // fileName/src 变更后 v-else 分支(含 container ref)可能尚未渲染,等下一拍确保 DOM 就位
     await nextTick()
 
@@ -434,6 +647,8 @@ const loadRom = async (romUrl) => {
     window.EJS_onGameStart = () => {
       onEmulatorReady()
       reconcileAfterStart()
+      syncScreenAspect()
+      gameStarted.value = true
       startSync()
     }
 
@@ -492,9 +707,11 @@ const close = () => {
 }
 
 const toggleFullscreen = () => {
-  if (!stage.value) return
+  // 全屏整台机身(而不是单画面),竖屏机身布局进全屏后手柄仍在
+  const target = consoleEl.value || stage.value
+  if (!target) return
   if (!document.fullscreenElement) {
-    stage.value.requestFullscreen?.()
+    target.requestFullscreen?.()
   } else {
     document.exitFullscreen?.()
   }
@@ -506,6 +723,9 @@ const onFullscreenChange = () => {
 onMounted(() => {
   document.addEventListener('fullscreenchange', onFullscreenChange)
   document.addEventListener('visibilitychange', onVisibilityChange)
+  window.addEventListener('resize', refreshViewport)
+  window.addEventListener('orientationchange', refreshViewport)
+  refreshViewport()
   sunLight?.suspendEffects()
   if (props.src) {
     fileName.value = props.title || props.src.split('/').pop() || ''
@@ -515,6 +735,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('fullscreenchange', onFullscreenChange)
   document.removeEventListener('visibilitychange', onVisibilityChange)
+  window.removeEventListener('resize', refreshViewport)
+  window.removeEventListener('orientationchange', refreshViewport)
   // 先取一次当前存档快照再拆模拟器,路由内跳转时请求能照常完成
   flushSave()
   teardownEmulator()
@@ -528,6 +750,7 @@ onBeforeUnmount(() => {
   delete window.EJS_gameUrl
   delete window.EJS_pathtodata
   delete window.EJS_gameID
+  delete window.EJS_Buttons
   sunLight?.restoreEffects()
 })
 </script>
@@ -593,10 +816,234 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
 }
+/* 画布按核心缓冲比例等比落在黑框里,不被容器拉伸(竖屏机身布局与桌面固定高度都受益) */
+.gba-stage-inner :deep(canvas) {
+  object-fit: contain;
+}
+/* 机身布局下关掉 EJS 自带的悬浮手柄,避免与本页按键重复 */
+.gba-stage-inner--pad :deep(.ejs_virtualGamepad_parent) {
+  display: none !important;
+}
 .gba-stage:fullscreen {
   width: 100vw;
   height: 100vh;
   border-radius: 0;
+}
+
+/* ===== 掌机机身布局(触屏 + 竖屏):肩键在画面上方,方向键/AB/Start·Select 在下方 ===== */
+.gba-console {
+  display: flex;
+  flex-direction: column;
+}
+.gba-console--pad {
+  --pad-size: clamp(92px, 27vw, 124px);
+  --pad-face: rgba(255, 255, 255, 0.12);
+  --pad-face-down: rgba(255, 255, 255, 0.4);
+  --pad-line: rgba(255, 255, 255, 0.24);
+  gap: 12px;
+  padding: 12px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #2a2e38 0%, #15171c 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 10px 26px rgba(0, 0, 0, 0.22);
+}
+.gba-console--pad .gba-stage {
+  width: 100%;
+  height: auto;
+  aspect-ratio: var(--gba-aspect, 3 / 2);
+  border-radius: 8px;
+}
+.gba-console:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  justify-content: center;
+  gap: 16px;
+  padding: 12px;
+  border-radius: 0;
+  background: #0b0c10;
+}
+.gba-console:fullscreen .gba-stage {
+  height: 100%;
+}
+.gba-console--pad:fullscreen .gba-stage {
+  height: auto;
+}
+.gba-pad-row {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+/* 下方三栏:方向键 | Start·Select | AB。两侧按可用宽度等比缩放,窄屏也不会横向溢出 */
+.gba-pad-row--bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+.gba-pad-shoulder {
+  width: min(34%, 132px);
+  height: 34px;
+  border: 1px solid var(--pad-line);
+  border-radius: 10px;
+  background: var(--pad-face);
+  color: rgba(255, 255, 255, 0.9);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  touch-action: none;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    transform 0.12s ease;
+}
+.gba-pad-shoulder.down {
+  background: var(--pad-face-down);
+  transform: translateY(1px);
+}
+.gba-dpad {
+  position: relative;
+  justify-self: start;
+  width: 100%;
+  max-width: var(--pad-size);
+  aspect-ratio: 1;
+  touch-action: none;
+}
+.gba-dpad::before,
+.gba-dpad::after {
+  content: '';
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid var(--pad-line);
+  border-radius: 10px;
+  background: var(--pad-face);
+}
+.gba-dpad::before {
+  left: 33%;
+  top: 0;
+  width: 34%;
+  height: 100%;
+}
+.gba-dpad::after {
+  top: 33%;
+  left: 0;
+  width: 100%;
+  height: 34%;
+}
+.gba-dpad-hub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 20%;
+  height: 20%;
+  margin: -10% 0 0 -10%;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.28);
+}
+.gba-dpad-dir {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 7px solid transparent;
+  opacity: 0.45;
+  transition: opacity 0.1s ease;
+}
+.gba-dpad-dir.up {
+  left: 50%;
+  top: 8%;
+  margin-left: -7px;
+  border-top-width: 0;
+  border-bottom-color: #fff;
+}
+.gba-dpad-dir.down {
+  left: 50%;
+  bottom: 8%;
+  margin-left: -7px;
+  border-bottom-width: 0;
+  border-top-color: #fff;
+}
+.gba-dpad-dir.left {
+  top: 50%;
+  left: 8%;
+  margin-top: -7px;
+  border-left-width: 0;
+  border-right-color: #fff;
+}
+.gba-dpad-dir.right {
+  top: 50%;
+  right: 8%;
+  margin-top: -7px;
+  border-right-width: 0;
+  border-left-color: #fff;
+}
+.gba-dpad-dir.is-on {
+  opacity: 1;
+}
+.gba-pad-sys {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.gba-pad-sysbtn {
+  width: clamp(58px, 18vw, 76px);
+  height: 28px;
+  border: 1px solid var(--pad-line);
+  border-radius: 14px;
+  background: var(--pad-face);
+  color: rgba(255, 255, 255, 0.88);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  transform: rotate(-12deg);
+  touch-action: none;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+.gba-pad-sysbtn.down {
+  background: var(--pad-face-down);
+}
+.gba-pad-ab {
+  position: relative;
+  justify-self: end;
+  width: 100%;
+  max-width: var(--pad-size);
+  aspect-ratio: 1;
+}
+.gba-pad-round {
+  position: absolute;
+  width: 46%;
+  height: 46%;
+  border: 1px solid var(--pad-line);
+  border-radius: 50%;
+  background: var(--pad-face);
+  color: rgba(255, 255, 255, 0.92);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  touch-action: none;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    transform 0.12s ease;
+}
+.gba-pad-round.is-b {
+  left: 0;
+  bottom: 4%;
+}
+.gba-pad-round.is-a {
+  right: 4%;
+  top: 0;
+}
+.gba-pad-round.down {
+  background: var(--pad-face-down);
+  transform: scale(0.96);
 }
 .gba-status {
   margin-top: 14px;
@@ -649,8 +1096,15 @@ onBeforeUnmount(() => {
   color: var(--color-text-secondary, #888);
 }
 @media (max-width: 768px) {
+  .gba-card {
+    padding: 12px;
+  }
   .gba-stage {
     height: 320px;
+  }
+  /* 机身布局由画面比例决定高度(压过后面的固定高度) */
+  .gba-console--pad .gba-stage {
+    height: auto;
   }
 }
 </style>

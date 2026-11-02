@@ -1024,6 +1024,7 @@ export default {
     saveDeleted: 'Save deleted',
     saveRestoreFailed: 'Could not read the cloud save; starting from this device’s progress',
     saveSyncFailed: 'Save sync failed — progress is kept on this device',
+    dpad: 'D-pad',
   },
   points: {
     title: 'Points Mall',
