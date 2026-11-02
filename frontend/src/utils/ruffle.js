@@ -18,7 +18,9 @@ export function loadRuffle() {
   if (!rufflePromise) {
     rufflePromise = new Promise((resolve, reject) => {
       const s = document.createElement('script')
-      s.src = '/ruffle/ruffle.js'
+      // ruffle.js 文件名不带内容哈希且 nginx 给 7 天强缓存,而它内部引用的 wasm 文件名带哈希。
+      // 升级 Ruffle 后旧脚本会去请求新构建已删掉的旧 wasm 而报错,故用版本号破缓存。
+      s.src = `/ruffle/ruffle.js?v=${__APP_VERSION__}`
       s.onload = resolve
       s.onerror = () => reject(new Error('Ruffle runtime load failed'))
       document.head.appendChild(s)
