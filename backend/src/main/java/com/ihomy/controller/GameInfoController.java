@@ -70,9 +70,11 @@ public class GameInfoController {
     public Result<GameInfo> importGame(@RequestParam("file") MultipartFile file,
                                        @RequestParam("name") String name,
                                        @RequestParam(value = "description", required = false) String description,
-                                       @RequestParam(value = "category", required = false) String category) {
+                                       @RequestParam(value = "category", required = false) String category,
+                                       @RequestParam(value = "series", required = false) String series) {
         LoginUser user = current();
-        return Result.success(gameService.importGame(user.getUserId(), user.getFamilyId(), file, name, description, category));
+        return Result.success(gameService.importGame(user.getUserId(), user.getFamilyId(), file, name, description,
+                category, series));
     }
 
     @Operation(summary = "添加网页游戏")
@@ -88,6 +90,14 @@ public class GameInfoController {
     @PutMapping("/{id}")
     public Result<GameInfo> update(@PathVariable Long id, @Valid @RequestBody GameInfoDTO dto) {
         return Result.success(gameService.update(current().getFamilyId(), id, dto));
+    }
+
+    @Operation(summary = "自动归类游戏系列")
+    @OperationLog(module = "GAME", operationType = "UPDATE", description = "自动归类游戏系列")
+    @PostMapping("/auto-series")
+    public Result<Map<String, Object>> autoSeries() {
+        int updated = gameService.autoSeries(current().getFamilyId());
+        return Result.success(Map.of("updated", updated));
     }
 
     @Operation(summary = "删除游戏")

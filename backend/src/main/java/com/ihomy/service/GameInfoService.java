@@ -7,6 +7,7 @@ import com.ihomy.common.GameCategory;
 import com.ihomy.common.GameConst;
 import com.ihomy.common.GameLinkUrl;
 import com.ihomy.common.GameSaveName;
+import com.ihomy.common.GameSeries;
 import com.ihomy.common.ResultCode;
 import com.ihomy.common.PointsRuleConst;
 import com.ihomy.dto.GameInfoDTO;
@@ -36,6 +37,7 @@ import java.util.stream.Collectors;
 /**
  * 家庭小游戏业务:导入 .swf(存 games/{游戏名}/)与 .gba、添加外部网页游戏(LINK)、列表/详情/改名/改描述/删除,家庭隔离。
  * 仅支持 SWF/GBA 两种文件导入类型(.gbc/.gb 仅前端本地模式播放,不入库);LINK 类型只存外链,点卡片新标签页打开。
+ * 分类(category)是固定枚举,系列(series)是自由文本:手动优先,留空时按名称自动归类,并可批量归类存量未归类的游戏。
  * 改名不移动物理文件夹(文件夹名在导入时固定)。GBA 存档落在游戏目录下的 saves/(模拟器自动同步),
  * 删游戏连带清存档;LINK 游戏无文件,删除不动磁盘。
  */
@@ -73,7 +75,7 @@ public class GameInfoService {
     }
 
     public GameInfo importGame(Long userId, Long familyId, MultipartFile file, String name, String description,
-                               String category) {
+                               String category, String series) {
         String cleanName = normalizeName(name);
         if (file == null || file.isEmpty()) {
             throw new BizException(ResultCode.BAD_REQUEST, "请选择要导入的游戏文件");
@@ -96,6 +98,7 @@ public class GameInfoService {
         g.setDescription(normalizeDescription(description));
         g.setType(type);
         g.setCategory(GameCategory.normalize(category));
+        g.setSeries(resolveSeries(series, cleanName));
         g.setFileUrl(url);
         g.setStatus(GameConst.STATUS_ACTIVE);
         gameMapper.insert(g);
@@ -113,6 +116,7 @@ public class GameInfoService {
         g.setDescription(normalizeDescription(dto.getDescription()));
         g.setType(GameConst.TYPE_LINK);
         g.setCategory(GameCategory.normalize(dto.getCategory()));
+        g.setSeries(resolveSeries(dto.getSeries(), cleanName));
         g.setLinkUrl(linkUrl);
         g.setStatus(GameConst.STATUS_ACTIVE);
         gameMapper.insert(g);
@@ -132,6 +136,8 @@ public class GameInfoService {
         if (dto != null && dto.getCategory() != null && !dto.getCategory().isBlank()) {
             updater.set(GameInfo::getCategory, GameCategory.normalize(dto.getCategory()));
         }
+        // 系列按提交值落库:空串表示手动清空归类,不回落到自动猜测
+        updater.set(GameInfo::getSeries, GameSeries.normalize(dto == null ? null : dto.getSeries()));
         // LINK 游戏可改网址;文件型游戏忽略该字段
         if (GameConst.TYPE_LINK.equals(game.getType()) && dto != null && dto.getLinkUrl() != null
                 && !dto.getLinkUrl().isBlank()) {
@@ -147,6 +153,32 @@ public class GameInfoService {
             fileService.deleteGameFiles(g.getFileUrl());
         }
         gameMapper.deleteById(id);
+    }
+
+    /**
+     * 批量自动归类:只处理当前家庭里还没有系列的游戏,按名称猜系列;已有值(手动或先前自动)一律不动。
+     * ponytail: 家庭游戏量小(通常几十个),逐条条件更新换取「不覆盖并发手动值」的原子性,不做批量 CASE WHEN。
+     */
+    public int autoSeries(Long familyId) {
+        List<GameInfo> pending = gameMapper.selectList(new LambdaQueryWrapper<GameInfo>()
+                .eq(GameInfo::getFamilyId, familyId)
+                .and(w -> w.isNull(GameInfo::getSeries).or().eq(GameInfo::getSeries, "")));
+        int updated = 0;
+        for (GameInfo g : pending) {
+            String guess = GameSeries.guess(g.getName());
+            if (guess == null) {
+                continue;
+            }
+            int rows = gameMapper.update(null, new LambdaUpdateWrapper<GameInfo>()
+                    .eq(GameInfo::getId, g.getId())
+                    .eq(GameInfo::getFamilyId, familyId)
+                    .and(w -> w.isNull(GameInfo::getSeries).or().eq(GameInfo::getSeries, ""))
+                    .set(GameInfo::getSeries, guess));
+            if (rows > 0) {
+                updated++;
+            }
+        }
+        return updated;
     }
 
     /** GBA 存档列表:只列当前成员自己的存档,按最后修改时间倒序 */
@@ -311,5 +343,11 @@ public class GameInfoService {
         }
         String d = description.trim();
         return d.length() > GameConst.DESC_MAX_LENGTH ? d.substring(0, GameConst.DESC_MAX_LENGTH) : d;
+    }
+
+    /** 手动系列优先;留空时按名称自动归类(猜不出则保持未归类) */
+    private String resolveSeries(String manual, String name) {
+        String clean = GameSeries.normalize(manual);
+        return clean != null ? clean : GameSeries.guess(name);
     }
 }

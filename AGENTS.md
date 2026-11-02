@@ -75,7 +75,7 @@ Nginx 静态根指向 `frontend/dist`,构建即生效。
 - 生产 MySQL `validate_password` MEDIUM:密码须含特殊字符(避开 `' " \ $ |`,建议 `!@%^&*-_+=.`),改密顺序见 踩坑速查 §2.7。
 - **91 张表**,前缀:`sys_` 27(系统/账号/权限/配置/存储)、`report_` 5(报表/日志)、`family_` 36(家庭事务)、`content_` 21(内容数据)、`game_` 2(games 域)。完整清单见 需求 §6.2。
   - 命名:家庭事务 `family_`;内容 `content_`;账号/权限/配置/存储 `sys_`;报表/日志 `report_`;
-  - 游戏域顶层前缀 `game_`,格式 `game_<code>_<module>_<entity>`(模块层仅当 ≥3 张表/独立聚合根时才建);`game_info`=家庭小游戏表(家庭隔离,type=SWF/GBA/LINK,LINK 只存 `link_url` 外链、点卡片新标签页打开;category 分类归一唯一来源 `common/GameCategory`),`game_site_account`=游戏站点账号(**密码只存 AES-GCM 密文**,仅本人读写、删除即物理删,siteUsername/sitePassword 进 `AccessLogFilter.SENSITIVE_JSON`,外链校验唯一来源 `common/GameLinkUrl`)。家圃时光 V2 已迁独立仓 `home_garden_moments`,本仓只留集成(`game_info` + 游戏库入口)。
+  - 游戏域顶层前缀 `game_`,格式 `game_<code>_<module>_<entity>`(模块层仅当 ≥3 张表/独立聚合根时才建);`game_info`=家庭小游戏表(家庭隔离,type=SWF/GBA/LINK,LINK 只存 `link_url` 外链、点卡片新标签页打开;category 分类归一唯一来源 `common/GameCategory`,series 系列自动归类唯一来源 `common/GameSeries`(只补未归类、手动值优先)),`game_site_account`=游戏站点账号(**密码只存 AES-GCM 密文**,仅本人读写、删除即物理删,siteUsername/sitePassword 进 `AccessLogFilter.SENSITIVE_JSON`,外链校验唯一来源 `common/GameLinkUrl`)。家圃时光 V2 已迁独立仓 `home_garden_moments`,本仓只留集成(`game_info` + 游戏库入口)。
 - **结构变更双文件**:同时改 `schema.sql`(全量)与 `migrations.sql`(增量、**幂等**),并按 CI 同路径做空库全量导入实测(`migrations` 跑通 ≠ `schema.sql` 可用,踩坑速查 §7.4)。
 - **枚举不用数字**:状态/类型一律大写英文(`PUBLISHED/PUBLIC/ACTIVE...`),含义在 `sys_dict_item`,Java 常量在 `common/DictConst.java`,前端映射 `utils/dict.js`;**禁止写回 0/1/2 判断**。
 - `content_blog/diary/photo/video/wish` 的 `visibility` 为 `VARCHAR(20) DEFAULT 'FAMILY'`(PRIVATE/FAMILY/PUBLIC),与 live DB 已对齐。
@@ -193,9 +193,9 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 ## 验证基线
 
-- 后端全绿:`.\mvnw.cmd -B clean package`(303 tests,纯逻辑不起 Spring)。
-- 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(693 passed)+ `npm run format:check`(全树遗留未格式化:`views/BitPouch.vue`、`utils/packetDecode.js`+`.spec.js`、`views/bitpouch/panels/PacketPanel.vue`、`views/Chillyice.vue`、`views/ops/tabs/OpsKada.vue`;**本次改动的文件必须 `prettier --write` 后通过**)。
-- 构建:入口 chunk 基线 **538.54KB / gzip 222.31KB**(V11.8 收尾);**体积口径一律以 vite 构建输出打印的数字为准**(自测 utf8 字节/utf16 字符都对不上,`ls -la` 也不可比);历史数字见 变更归档。
+- 后端全绿:`.\mvnw.cmd -B clean package`(307 tests,纯逻辑不起 Spring)。
+- 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(696 passed)+ `npm run format:check`(全树遗留未格式化:`views/BitPouch.vue`、`utils/packetDecode.js`+`.spec.js`、`views/bitpouch/panels/PacketPanel.vue`、`views/Chillyice.vue`、`views/ops/tabs/OpsKada.vue`;**本次改动的文件必须 `prettier --write` 后通过**)。
+- 构建:入口 chunk 基线 **539.06KB / gzip 222.54KB**(V11.9 收尾);**体积口径一律以 vite 构建输出打印的数字为准**(自测 utf8 字节/utf16 字符都对不上,`ls -la` 也不可比);历史数字见 变更归档。
 - 一致性:`bash scripts/doc-drift-check.sh` 全 [OK];`gen-code-map.sh --check`、`doc-index.sh --check` 无漂移。
 - 接口测试在仓库外 `..\autotest_framework`(`pytest -m api`,37 passed)。
 

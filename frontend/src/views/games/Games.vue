@@ -5,8 +5,23 @@
     <PageToolbar>
       <div class="tb-left">
         <span class="section-label">{{ $t('games.title') }}</span>
+        <el-select
+          v-if="seriesOptions.length"
+          v-model="activeSeries"
+          size="small"
+          clearable
+          class="game-series-filter"
+          :placeholder="$t('games.allSeries')"
+        >
+          <el-option v-if="unsortedCount" :label="$t('games.unsortedSeries')" :value="UNSERIES" />
+          <el-option v-for="s in seriesOptions" :key="s" :label="s" :value="s" />
+        </el-select>
       </div>
       <div class="tb-right">
+        <el-button v-if="unsortedCount" size="small" round :loading="autoSeriesLoading" @click="autoClassify">
+          <el-icon><MagicStick /></el-icon>
+          {{ $t('games.autoSeries') }}
+        </el-button>
         <el-button size="small" round @click="wishOpen = true">{{ $t('wish.gameWish') }}</el-button>
         <el-button type="primary" size="small" round @click="openImport">
           <el-icon><Plus /></el-icon>
@@ -62,6 +77,9 @@
         <div class="tool-meta">
           <div class="tool-meta-left">
             <div class="tool-type-tag cat-tag">{{ categoryText(g.category) }}</div>
+            <div v-if="g.series" class="tool-type-tag series-tag" :title="$t('games.seriesLabel')">
+              <el-icon><Collection /></el-icon>{{ g.series }}
+            </div>
             <div class="tool-type-tag">{{ typeText(g) }}</div>
             <el-tooltip v-if="g.hasAccount" :content="$t('games.account.savedFlag')" placement="top">
               <el-icon class="tool-account-flag"><Key /></el-icon>
@@ -85,7 +103,10 @@
         </div>
       </div>
 
-      <div v-if="!loading && games.length === 0" class="tool-empty">{{ $t('games.empty') }}</div>
+      <div v-if="!loading && games.length === 0 && !activeSeries && activeCategory === 'ALL'" class="tool-empty">
+        {{ $t('games.empty') }}
+      </div>
+      <div v-else-if="!loading && visibleTotal === 0" class="tool-empty">{{ $t('games.emptyFiltered') }}</div>
     </div>
 
     <!-- 导入对话框(游戏文件 / 网页游戏两种方式) -->
@@ -107,6 +128,19 @@
         <el-form-item :label="$t('games.categoryLabel')">
           <el-select v-model="importForm.category" style="width: 100%">
             <el-option v-for="c in GAME_CATEGORIES" :key="c" :label="categoryText(c)" :value="c" />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="$t('games.seriesLabel')">
+          <el-select
+            v-model="importForm.series"
+            filterable
+            allow-create
+            clearable
+            default-first-option
+            style="width: 100%"
+            :placeholder="$t('games.seriesPlaceholder')"
+          >
+            <el-option v-for="s in seriesOptions" :key="s" :label="s" :value="s" />
           </el-select>
         </el-form-item>
         <el-form-item :label="$t('games.desc')">
@@ -131,6 +165,19 @@
         <el-form-item :label="$t('games.categoryLabel')">
           <el-select v-model="editForm.category" style="width: 100%">
             <el-option v-for="c in GAME_CATEGORIES" :key="c" :label="categoryText(c)" :value="c" />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="$t('games.seriesLabel')">
+          <el-select
+            v-model="editForm.series"
+            filterable
+            allow-create
+            clearable
+            default-first-option
+            style="width: 100%"
+            :placeholder="$t('games.seriesPlaceholder')"
+          >
+            <el-option v-for="s in seriesOptions" :key="s" :label="s" :value="s" />
           </el-select>
         </el-form-item>
         <el-form-item :label="$t('games.desc')">
@@ -172,17 +219,31 @@
 </template>
 
 <script setup>
-import { computed, ref, reactive, onMounted } from 'vue'
+import { computed, ref, reactive, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Sunny, VideoPlay, ArrowRight, MoreFilled, Grid, Cpu, Histogram, Link, Key } from '@element-plus/icons-vue'
+import {
+  Plus,
+  Sunny,
+  VideoPlay,
+  ArrowRight,
+  MoreFilled,
+  Grid,
+  Cpu,
+  Histogram,
+  Link,
+  Key,
+  MagicStick,
+  Collection,
+} from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import AddToWishDialog from '@/components/wish/AddToWishDialog.vue'
 import { gameApi } from '@/api'
 import { dictText } from '@/utils/dict'
 import { GAME_CATEGORIES, countGameCategories, inGameCategory, normalizeGameCategory } from '@/utils/games/gameCategory'
+import { UNSERIES, inGameSeries, normalizeGameSeries, seriesOptionsOf } from '@/utils/games/gameSeries'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -190,6 +251,8 @@ const { t } = useI18n()
 const games = ref([])
 const loading = ref(false)
 const activeCategory = ref('ALL')
+const activeSeries = ref('')
+const autoSeriesLoading = ref(false)
 
 /** 站内固定入口也按同一套分类参与筛选;图标直接引用组件 */
 const builtinGames = [
@@ -215,19 +278,37 @@ const builtinGames = [
 
 const categoryText = (category) => dictText(t, 'game_category', normalizeGameCategory(category))
 
-const categoryCounts = computed(() => countGameCategories([...builtinGames, ...games.value]))
+const seriesOptions = computed(() => seriesOptionsOf(games.value))
+const unsortedCount = computed(() => games.value.filter((g) => !normalizeGameSeries(g.series)).length)
+
+/** 分类计数跟随当前系列筛选(系列为空时含固定入口),避免出现「计数有、点进去空白」的组合 */
+const categoryPool = computed(() =>
+  activeSeries.value ? games.value.filter((g) => inGameSeries(g, activeSeries.value)) : [...builtinGames, ...games.value],
+)
+const categoryCounts = computed(() => countGameCategories(categoryPool.value))
 
 /** 筛选条只显示有游戏的分类(含固定入口),避免一排空分类 */
 const categoryChips = computed(() => {
-  const chips = [{ value: 'ALL', label: t('games.allGames'), count: builtinGames.length + games.value.length }]
+  const chips = [{ value: 'ALL', label: t('games.allGames'), count: categoryPool.value.length }]
   for (const c of GAME_CATEGORIES) {
     if (categoryCounts.value[c] > 0) chips.push({ value: c, label: categoryText(c), count: categoryCounts.value[c] })
   }
   return chips
 })
 
-const visibleBuiltins = computed(() => builtinGames.filter((b) => inGameCategory(b, activeCategory.value)))
-const visibleGames = computed(() => games.value.filter((g) => inGameCategory(g, activeCategory.value)))
+/** 选了系列时只看系列内的导入游戏(固定入口不属于任何系列) */
+const visibleBuiltins = computed(() => (activeSeries.value ? [] : builtinGames.filter((b) => inGameCategory(b, activeCategory.value))))
+const visibleGames = computed(() =>
+  games.value.filter((g) => inGameCategory(g, activeCategory.value) && inGameSeries(g, activeSeries.value)),
+)
+const visibleTotal = computed(() => visibleBuiltins.value.length + visibleGames.value.length)
+
+// 切换系列后,原分类在新范围内可能没有游戏,回落到「全部」分类
+watch(activeSeries, () => {
+  if (activeCategory.value !== 'ALL' && !categoryCounts.value[activeCategory.value]) {
+    activeCategory.value = 'ALL'
+  }
+})
 
 const wishOpen = ref(false)
 const wishSource = computed(() => ({ type: 'GAME', title: t('wish.gameSourceTitle') }))
@@ -235,12 +316,12 @@ const wishSource = computed(() => ({ type: 'GAME', title: t('wish.gameSourceTitl
 const importVisible = ref(false)
 const importing = ref(false)
 const importMode = ref('file')
-const importForm = reactive({ file: null, url: '', name: '', description: '', category: 'OTHER' })
+const importForm = reactive({ file: null, url: '', name: '', description: '', category: 'OTHER', series: '' })
 
 const editVisible = ref(false)
 const saving = ref(false)
 const editGameType = ref('')
-const editForm = reactive({ id: null, name: '', description: '', linkUrl: '', category: 'OTHER' })
+const editForm = reactive({ id: null, name: '', description: '', linkUrl: '', category: 'OTHER', series: '' })
 
 const accountVisible = ref(false)
 const accountSaving = ref(false)
@@ -253,12 +334,31 @@ const load = async () => {
   try {
     const list = (await gameApi.list()) || []
     games.value = list.map((g) => ({ ...g, category: normalizeGameCategory(g.category) }))
-    // 选中的分类被删空时回到「全部」,避免停留在空白的筛选结果
+    // 选中的分类/系列被删空时回到「全部」,避免停留在空白的筛选结果
     if (activeCategory.value !== 'ALL' && !categoryCounts.value[activeCategory.value]) {
       activeCategory.value = 'ALL'
     }
+    if (activeSeries.value && activeSeries.value !== UNSERIES && !seriesOptions.value.includes(activeSeries.value)) {
+      activeSeries.value = ''
+    }
+    if (activeSeries.value === UNSERIES && !unsortedCount.value) {
+      activeSeries.value = ''
+    }
   } finally {
     loading.value = false
+  }
+}
+
+/** 自动归类:只处理还没有系列的游戏,已有(手动或先前自动)的系列不会被覆盖 */
+const autoClassify = async () => {
+  autoSeriesLoading.value = true
+  try {
+    const res = await gameApi.autoSeries()
+    const n = res?.updated || 0
+    ElMessage.success(n ? t('games.autoSeriesDone', { n }) : t('games.autoSeriesNone'))
+    await load()
+  } finally {
+    autoSeriesLoading.value = false
   }
 }
 
@@ -279,6 +379,7 @@ const openImport = () => {
   importForm.name = ''
   importForm.description = ''
   importForm.category = 'OTHER'
+  importForm.series = ''
   importVisible.value = true
 }
 
@@ -317,6 +418,7 @@ const submitImport = async () => {
         url,
         description: importForm.description.trim(),
         category: importForm.category,
+        series: normalizeGameSeries(importForm.series),
       })
       ElMessage.success(t('games.linkImported'))
       importVisible.value = false
@@ -341,6 +443,7 @@ const submitImport = async () => {
     fd.append('name', importForm.name.trim())
     fd.append('description', importForm.description.trim())
     fd.append('category', importForm.category)
+    fd.append('series', normalizeGameSeries(importForm.series))
     await gameApi.import(fd)
     ElMessage.success(t('games.imported'))
     importVisible.value = false
@@ -357,6 +460,7 @@ const openEdit = (g) => {
   editForm.description = g.description || ''
   editForm.linkUrl = g.linkUrl || ''
   editForm.category = normalizeGameCategory(g.category)
+  editForm.series = normalizeGameSeries(g.series)
   editVisible.value = true
 }
 
@@ -371,6 +475,7 @@ const submitEdit = async () => {
       name: editForm.name.trim(),
       description: editForm.description.trim(),
       category: editForm.category,
+      series: normalizeGameSeries(editForm.series),
     }
     if (editGameType.value === 'LINK') data.linkUrl = editForm.linkUrl.trim()
     await gameApi.update(editForm.id, data)
@@ -491,6 +596,9 @@ onMounted(load)
   font-size: 11px;
   opacity: 0.75;
 }
+.game-series-filter {
+  width: 150px;
+}
 .tool-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -539,6 +647,8 @@ onMounted(load)
   align-items: center;
   gap: 6px;
   min-width: 0;
+  flex-wrap: wrap;
+  row-gap: 4px;
 }
 .tool-account-flag {
   color: var(--color-accent, var(--color-brand));
@@ -555,6 +665,18 @@ onMounted(load)
 .tool-type-tag.cat-tag {
   background: rgba(var(--color-brand-rgb), 0.14);
   color: var(--color-accent);
+}
+.tool-type-tag.series-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 100%;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .tool-enter {
   display: inline-flex;

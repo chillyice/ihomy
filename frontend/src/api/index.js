@@ -300,6 +300,8 @@ export const gameApi = {
   addLink: (data) => request.post('/game/link', data),
   update: (id, data) => request.put(`/game/${id}`, data),
   remove: (id) => request.delete(`/game/${id}`),
+  // 自动归类:只给还没有系列的游戏按名称猜系列,不覆盖手动值
+  autoSeries: () => request.post('/game/auto-series'),
   // 站点账号:成员为网页游戏保存的外部站点登录信息,只读写本人自己的
   getAccount: (id) => request.get(`/game/${id}/account`),
   saveAccount: (id, data) => request.put(`/game/${id}/account`, data),

@@ -15,6 +15,9 @@ public class GameInfoDTO {
     @Size(max = 20, message = "游戏分类无效")
     private String category;
 
+    @Size(max = 50, message = "游戏系列不能超过 50 字")
+    private String series;
+
     @Size(max = 500, message = "网址不能超过 500 字")
     private String linkUrl;
 }

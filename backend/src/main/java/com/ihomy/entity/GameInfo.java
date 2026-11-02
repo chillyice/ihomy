@@ -25,6 +25,8 @@ public class GameInfo {
     private String type;
     /** 分类(ACTION/PUZZLE/.../OTHER),见 common/GameCategory */
     private String category;
+    /** 游戏系列(手动填写或按名称自动归类),见 common/GameSeries */
+    private String series;
     private String fileUrl;
     /** 外部网页游戏地址(仅 LINK 类型有值) */
     private String linkUrl;

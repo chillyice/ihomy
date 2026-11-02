@@ -20,4 +20,7 @@ public class GameLinkDTO {
 
     @Size(max = 20, message = "游戏分类无效")
     private String category;
+
+    @Size(max = 50, message = "游戏系列不能超过 50 字")
+    private String series;
 }

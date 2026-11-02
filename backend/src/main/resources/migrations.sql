@@ -2880,3 +2880,20 @@ INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUE
 ('game_category', 'STRATEGY',   '策略'),
 ('game_category', 'ARCADE',     '街机'),
 ('game_category', 'OTHER',      '其他');
+
+-- ------------------------------------------------------------
+-- V11.9 小游戏系列(2026-11-02)
+--   game_info 加 series:同一作品的不同版本归入一个系列(如「宝可梦」),可手动填写,
+--   也可在导入/新增时按名称自动归类,或对存量未归类的游戏批量自动归类。
+--   重复执行安全:information_schema 条件加列。
+-- ------------------------------------------------------------
+SET @add_game_series := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `game_info` ADD COLUMN `series` VARCHAR(50) DEFAULT NULL COMMENT ''游戏系列(手动填写或按名称自动归类,如「宝可梦」)'' AFTER `category`',
+    'SELECT ''skip: game_info.series already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'game_info' AND COLUMN_NAME = 'series'
+);
+PREPARE add_game_series_stmt FROM @add_game_series;
+EXECUTE add_game_series_stmt;
+DEALLOCATE PREPARE add_game_series_stmt;
