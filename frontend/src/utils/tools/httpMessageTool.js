@@ -481,7 +481,7 @@ function buildMessage(text, options) {
     startLine = `${version} ${status}${reason ? ` ${reason}` : ''}`
   }
   const headers = readBuildHeaders(input.headers)
-  let body = ''
+  let body
   if (typeof input.body === 'string') body = input.body
   else if (input.body === void 0 || input.body === null) body = ''
   else if (typeof input.body === 'object') body = JSON.stringify(input.body)

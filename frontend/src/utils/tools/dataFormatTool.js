@@ -390,7 +390,7 @@ function parseEnvText(text, warn) {
     const key = line.slice(0, separator).trim()
     if (!key) throw new DataError('syntaxError', raw, { line: index + 1, column: 1, lineText: raw })
     let rest = line.slice(separator + 1).trim()
-    let value = ''
+    let value
     if (rest.startsWith('"') || rest.startsWith("'")) {
       const quote = rest[0]
       let closed = false
@@ -406,7 +406,6 @@ function parseEnvText(text, warn) {
         }
         if (char === quote) {
           closed = true
-          rest = rest.slice(cursor + 1)
           break
         }
         body += char

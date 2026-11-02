@@ -669,7 +669,7 @@ const exchangeToken = async (tk) => {
 const bootstrapToken = async () => {
   const m = /(?:^|[#&])token=([^&]+)/.exec(window.location.hash || '')
   if (!m) return
-  let tk = ''
+  let tk
   try {
     tk = decodeURIComponent(m[1])
   } catch (e) {

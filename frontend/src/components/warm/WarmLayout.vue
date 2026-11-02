@@ -347,8 +347,7 @@ watch(pinned, async (val) => {
   const first = toolbar.getBoundingClientRect()
   await nextTick()
   const last = toolbar.getBoundingClientRect()
-  let dx = 0,
-    dy = 0
+  let dx, dy
   if (val) {
     // 正向:钳制起始位置到内容窗口顶部(避免滚动过快时从屏幕外滑入)
     const mainTop = mainEl.value?.getBoundingClientRect().top ?? last.top

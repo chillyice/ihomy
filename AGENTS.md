@@ -174,7 +174,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 10. **i18n**:所有可见文本 `$t('key')`,中英键结构对齐;**文案里字面量 `{`/`}`/`@` 必须转义**(`{'{名字}'}`),否则生产构建 `$t()` 抛错打断整页(dev 只打日志);守门 `i18n/message-format.spec.js` + 硬编码中文守门 `hardcoded-cjk.spec.js`(有意保留项进其 `ALLOW`)。
 11. **共享逻辑抽 utils(禁三份实现)**:动态流类型/摘要/相对时间走 `utils/feed.js`;默认楼层 `floorPlanGeom.pickDefaultFloor`;枚举文案 `dictText(t,...)`;金额「元⇄分」走 `utils/money.js`、年月日换算走 `utils/date.js`(贷款/理财/记账本共用,`loan.js` 只再导出);新重复逻辑先找现成 util。
 12. **可点击非按钮元素**:用 `v-a11y-click`(补 `role`/`tabindex` + Enter/Space),别手写三行;`<img>` 必须带 `alt`。
-13. **打包分块(强制)**:`vite.config.js` 必配 `manualChunks`(element-plus/gsap/vue-i18n/epubjs/pdfjs/simple-mind-map);`public/` 静态资源不得与 npm 包重复。
+13. **打包分块(强制)**:`vite.config.js` 用 Rolldown 的 `build.rolldownOptions.output.codeSplitting.groups`(name + test)拆 element-plus/gsap/vue-i18n/epubjs/pdfjs/simple-mind-map/three;**`includeDependenciesRecursively:false` 必须配 `output.strictExecutionOrder:true`**(否则 app 内部 chunk 与入口形成循环引用,运行时抛 `_ is not a function`,见踩坑速查 §1.16);`public/` 静态资源不得与 npm 包重复。
 14. **重型资源异步(强制)**:阻塞首屏的字体包/CSS 用 `import('...')`,别同步 import。
 15. **动画优先级(强制)**:持续型动画 CSS `@keyframes` > GSAP 直接操作 DOM ref > rAF + 响应式 ref;**禁止 rAF 每帧写 Vue ref**。
 16. **并行请求(强制)**:独立请求改 `Promise.all([...])`,串行只在真有依赖时。
@@ -196,7 +196,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 - 后端全绿:`.\mvnw.cmd -B clean package`(312 tests,纯逻辑不起 Spring)。
 - 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(716 passed)+ `npm run format:check`(全树遗留未格式化:`views/BitPouch.vue`、`utils/packetDecode.js`+`.spec.js`、`views/bitpouch/panels/PacketPanel.vue`、`views/Chillyice.vue`、`views/ops/tabs/OpsKada.vue`;**本次改动的文件必须 `prettier --write` 后通过**)。
-- 构建:入口 chunk 基线 **553.40KB / gzip 227.20KB**(V11.15 收尾);**体积口径一律以 vite 构建输出打印的数字为准**(它按 minified 代码的 UTF-16 长度计数,与磁盘 UTF-8 字节数对不上,`ls -la` 也不可比);历史数字见 变更归档。
+- 构建:首屏初始 JS 基线 **1625.99KB / gzip 557.59KB**(V11.16 起,Vite 8/Rolldown 分块口径:入口本身是 0.04KB facade,首屏 47 个 assets 合计;最大单块 element-plus 612.12KB / 188.90KB)。V11.15 及以前的「单入口 553.40 / 227.20」是 Vite 5 单块口径,与分块后不可直接比;**体积口径一律以 vite 构建输出打印的数字为准**(它按 minified 代码的 UTF-16 长度计数,与磁盘 UTF-8 字节数对不上,`ls -la` 也不可比);历史数字见 变更归档。
 - 一致性:`bash scripts/doc-drift-check.sh` 全 [OK];`gen-code-map.sh --check`、`doc-index.sh --check` 无漂移。
 - 接口测试在仓库外 `..\autotest_framework`(`pytest -m api`,37 passed)。
 

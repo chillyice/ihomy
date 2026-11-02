@@ -42,7 +42,7 @@ function parseIpv4(text, line) {
   return { value, family: 'ipv4', bits: 32 }
 }
 function parseIpv6Groups(text, original, line) {
-  let left = []
+  let left
   let right = []
   if (text.includes('::')) {
     const halves = text.split('::')

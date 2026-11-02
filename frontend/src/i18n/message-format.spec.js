@@ -21,8 +21,12 @@ const flatten = (o, out = []) => {
 
 // 漏转义时两条分支的失败信号不同,两条都跑:dev 分支只记日志(先静音,失败信息由断言给),
 // production 分支直接抛错。
+// 消息语法里只有 { } @ | 会被 vue-i18n 当作记号,不含它们的文案只能是纯文本、编译不可能失败;
+// 先按此过滤,把 5000+ 条文案压到数百条(Vitest 5 下逐条编译全部文案会超过默认 5s 超时)。
+const MESSAGE_SYNTAX = /[{}@|]/
+
 function compileAll(messages) {
-  const strings = flatten(messages)
+  const strings = flatten(messages).filter((s) => MESSAGE_SYNTAX.test(s))
   const i18n = createI18n({
     legacy: false,
     locale: 'probe',

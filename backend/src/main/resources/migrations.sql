@@ -2959,3 +2959,27 @@ UPDATE `sys_oss_component` SET `current_version` = '3.9.10'
  WHERE `component_type` = 'NPM' AND `package_ref` = 'prettier';
 UPDATE `sys_oss_component` SET `current_version` = '10.12.0'
  WHERE `component_type` = 'NPM' AND `package_ref` = 'eslint-plugin-vue';
+-- ------------------------------------------------------------
+-- 开源组件升级 P3:前端工程链 Vite 8(2026-11-02)
+--   9 个包同批安装(Vite 8 换 Rolldown 内核 + plugin-vue 6 + vite-plugin-pwa 2 +
+--   Vitest 5 + unplugin 两件 + ESLint 10 三件),记 package-lock.json 实际锁定版本。
+--   Vue Router / Pinia / vue-i18n 属 P4,此处不动。重复执行安全:全部为幂等 UPDATE。
+-- ------------------------------------------------------------
+UPDATE `sys_oss_component` SET `current_version` = '8.3.5'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'vite';
+UPDATE `sys_oss_component` SET `current_version` = '6.0.10'
+ WHERE `component_type` = 'NPM' AND `package_ref` = '@vitejs/plugin-vue';
+UPDATE `sys_oss_component` SET `current_version` = '2.0.0'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'vite-plugin-pwa';
+UPDATE `sys_oss_component` SET `current_version` = '5.0.5'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'vitest';
+UPDATE `sys_oss_component` SET `current_version` = '21.1.0'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'unplugin-auto-import';
+UPDATE `sys_oss_component` SET `current_version` = '32.1.0'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'unplugin-vue-components';
+UPDATE `sys_oss_component` SET `current_version` = '10.14.0'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'eslint';
+UPDATE `sys_oss_component` SET `current_version` = '10.0.1'
+ WHERE `component_type` = 'NPM' AND `package_ref` = '@eslint/js';
+UPDATE `sys_oss_component` SET `current_version` = '17.14.0'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'globals';
