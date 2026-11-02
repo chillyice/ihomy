@@ -823,6 +823,12 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 8. **空态与游客**:空日「这一天还没有安排」+ 添加按钮;清单空态居中卡;游客在日程区看到「登录后即可查看和安排家庭日程」+「去登录」,**该日的纪念日只读行照常显示**(不带勾选/编辑/删除);游客不渲染来源开关(匿名只有纪念日,无只读来源),关掉某来源后只影响本机展示、不改变后端返回。
 9. **禁项**:不写裸 `z-index`(取 `--z-*`);不引农历/日历库(农历/节气/节日/休班全部来自 `/public/calendar`);不在组件内重复定义 EP 弹窗/按钮样式;完成控件用 `el-checkbox`,不自绘。
 
+## 31. 小游戏触摸守卫与进度延续(V11.12)
+
+1. **触摸守卫(强制)**:数独/2048/宠物连连看/Flash/GBA 与花园页的根容器统一加 `.game-surface`(`main.css`):`touch-action: manipulation` 禁双击放大(保留点击与拖动),`user-select: none` + `-webkit-touch-callout: none` 禁长按选字与长按菜单,`-webkit-tap-highlight-color: transparent` 去点击高亮;游戏卡另加 `@contextmenu.prevent @dblclick.prevent`。卡内 `input/textarea` 用 `.game-surface :is(input,textarea)` 恢复 `touch-action: manipulation`、`user-select: text` 与长按,表单可正常编辑。2048 棋盘保留 `touch-action: none`(滑动操作需要,优先级高于 `.game-surface`)。
+2. **进度延续**:需要续玩的 H5 小游戏把进度写 `localStorage`——数独 `ihomy:games:sudoku:v1`、2048 `ihomy:games:2048:state:v1`(4 列)/ `ihomy:games:2048:state:{size}:v1`(5–8 列)、宠物连连看 `ihomy:games:petlink:v1`;连连看封面有存档时主按钮改「继续游戏」、下方给「新游戏」,存档含棋盘/得分/关卡/重排数/剩余时间/暂停态,通关/失败/重新开始即清档,恢复时校验棋盘结构与成对性(坏档当没存档)。存档结构校验放 `utils/games/petlinkSave.js` 纯函数并带 spec。
+3. **数独长按直填**:格内笔记恰有一个候选数字时,长按 500ms 把该候选落为正式数字(可撤销、不计提示次数);多候选/已填/给定格不响应。长按用 pointer 事件,鼠标按住同样有效。
+
 ## 验收标准
 
 1. 打开页面,背景米白渐变 + 5 个色块缓慢飘移,右下角拍立得堆/闭合相册,左右毛玻璃面板从两侧滑入。

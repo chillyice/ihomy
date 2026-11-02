@@ -14,7 +14,7 @@
       </div>
     </PageToolbar>
 
-    <div ref="gameCardEl" v-loading="generating" class="sd-card">
+    <div ref="gameCardEl" v-loading="generating" class="sd-card game-surface" @contextmenu.prevent @dblclick.prevent>
       <div class="sd-head">
         <div class="sd-title">{{ $t('games.sudoku.title') }}</div>
         <div class="sd-head-right">
@@ -52,6 +52,10 @@
           :class="cellClass(index)"
           :aria-label="cellLabel(index, value)"
           @click="select(index)"
+          @pointerdown="onCellPressStart(index, $event)"
+          @pointerup="onCellPressEnd"
+          @pointerleave="onCellPressEnd"
+          @pointercancel="onCellPressEnd"
         >
           <template v-if="variant === 'KILLER'">
             <i v-if="cageEdge(index, 't')" class="sd-cage sd-cage-t" aria-hidden="true"></i>
@@ -164,6 +168,7 @@ const sunLight = inject(SUN_LIGHT_KEY, null)
 const STORAGE_KEY = 'ihomy:games:sudoku:v1'
 const QUICK_FILL_KEY = 'ihomy:games:sudoku:quickfill:v1'
 const MAX_HISTORY = 120
+const LONG_PRESS_MS = 500
 
 const gameCardEl = ref(null)
 const isFullscreen = ref(false)
@@ -534,6 +539,50 @@ const erase = () => {
   notes.value[index] = 0
 }
 
+const flashCell = (index) => {
+  hintFlash.value = index
+  setTimeout(() => {
+    if (hintFlash.value === index) hintFlash.value = -1
+  }, 900)
+}
+
+// 长按只有一个候选的格子:把该笔记直接转成正式数字(可撤销,不计提示次数)
+const promoteSingleNote = (index) => {
+  if (won.value || generating.value || index < 0) return false
+  if (isGiven(index) || board.value[index]) return false
+  const candidates = notesOf(notes.value[index])
+  if (candidates.length !== 1) return false
+  const n = candidates[0]
+  snapshot()
+  board.value[index] = n
+  notes.value[index] = 0
+  clearPeerNotes(notes.value, index, n)
+  selected.value = index
+  flashCell(index)
+  if (solvedNow()) finish()
+  return true
+}
+
+let pressTimer = null
+const cancelCellPress = () => {
+  if (pressTimer) {
+    clearTimeout(pressTimer)
+    pressTimer = null
+  }
+}
+
+const onCellPressStart = (index, event) => {
+  // 只认主键/触摸,避免右键长按也触发
+  if (event.pointerType === 'mouse' && event.button !== 0) return
+  cancelCellPress()
+  pressTimer = setTimeout(() => {
+    pressTimer = null
+    promoteSingleNote(index)
+  }, LONG_PRESS_MS)
+}
+
+const onCellPressEnd = () => cancelCellPress()
+
 const undo = () => {
   if (won.value || !history.value.length) return
   const last = history.value.pop()
@@ -552,10 +601,7 @@ const useHint = () => {
   clearPeerNotes(notes.value, index, solution.value[index])
   hintsUsed.value += 1
   selected.value = index
-  hintFlash.value = index
-  setTimeout(() => {
-    if (hintFlash.value === index) hintFlash.value = -1
-  }, 900)
+  flashCell(index)
   if (solvedNow()) finish()
 }
 
@@ -666,6 +712,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   stopTimer()
+  cancelCellPress()
   if (saveTimer) clearTimeout(saveTimer)
   saveState()
   document.removeEventListener('keydown', onKeydown)

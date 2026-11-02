@@ -295,6 +295,24 @@ html.theme-warm .gc-pin .fp-topbar {
   gap: 8px;
   align-items: center;
 }
+/* 小游戏公共触摸守卫:禁双击放大、长按选字与长按菜单(各游戏根容器加 class="game-surface") */
+.game-surface {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.game-surface img {
+  -webkit-user-drag: none;
+}
+/* 游戏里的表单(如 GBA 设置、花园寄语)恢复正常的选字/长按/右键能力 */
+.game-surface :is(input, textarea) {
+  touch-action: manipulation;
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
 html.theme-warm .gc-pin .game-topbar {
   display: flex;
   align-items: center;

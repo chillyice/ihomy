@@ -14,7 +14,7 @@
       </div>
     </PageToolbar>
 
-    <div class="gba-card card">
+    <div class="gba-card card game-surface" @contextmenu.prevent @dblclick.prevent>
       <div
         v-a11y-click
         v-if="!fileName && !src"

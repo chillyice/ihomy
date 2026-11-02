@@ -1,6 +1,6 @@
 <!-- 植物养殖小游戏:全家共养一棵,实时养成;营养/天气/积分/家庭交互/成长日志。 -->
 <template>
-  <div class="page">
+  <div class="page game-surface">
     <Breadcrumb :items="[{ label: $t('tools.title') }, { label: $t('plant.title') }]" />
 
     <!-- 已种植:植物 + 天气/营养 + 成长进度 + 照料按钮 -->

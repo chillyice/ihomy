@@ -14,16 +14,19 @@
       </div>
     </PageToolbar>
 
-    <div ref="gameCardEl" class="game-card">
-      <!-- 封面(复刻原版标题屏):多色标题 + ihomy 版后缀 + 开始 + 版权) -->
+    <div ref="gameCardEl" class="game-card game-surface" @contextmenu.prevent @dblclick.prevent>
+      <!-- 封面(复刻原版标题屏):多色标题 + ihomy 版后缀 + 开始/继续 + 版权) -->
       <div v-if="screen === 'cover'" class="cover">
         <h1 class="cover-title">
           <span class="ct-pet">宠</span><span class="ct-pet">物</span><span class="ct-lian">连</span><span class="ct-lian">连</span
           ><span class="ct-kan">看</span>
           <span class="ct-ihomy">-ihomy版</span>
         </h1>
-        <button class="start-btn" type="button" @click="startGame">
-          {{ $t('games.petlink.start') }}
+        <button class="start-btn" type="button" @click="continueGame">
+          {{ savedState ? $t('games.petlink.resume') : $t('games.petlink.start') }}
+        </button>
+        <button v-if="savedState" class="cover-new-btn" type="button" @click="startFresh">
+          {{ $t('games.petlink.newGame') }}
         </button>
         <div class="cover-credits">{{ $t('games.petlink.credits') }}</div>
         <div class="cover-hint">{{ $t('games.petlink.coverHint') }}</div>
@@ -121,7 +124,8 @@
 // 过关时间奖励 = 剩余秒数×4、重排(第 1~9 关 6/7/8/9/11/13/15/17/19 次)、
 // 蓝色连线动画 + 点击/消除/胜利音效(无背景音乐,可静音);通关按后端发积分。
 // 支持全屏,进入时关闭全局光影特效(与图片/视频/看书一致)。
-import { ref, computed, onBeforeUnmount, onMounted, nextTick, inject } from 'vue'
+// 进度按关卡存档(棋盘/分数/重排数/剩余时间),下次进来可从封面继续或新开一局。
+import { ref, computed, onBeforeUnmount, onMounted, nextTick, inject, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
@@ -129,6 +133,14 @@ import { FullScreen, ArrowLeft } from '@element-plus/icons-vue'
 import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import PageToolbar from '@/components/PageToolbar.vue'
+import {
+  PETLINK_LEVEL_TIME,
+  PETLINK_MAX_LEVEL,
+  PETLINK_STORAGE_KEY,
+  parsePetLinkState,
+  serializePetLinkState,
+  typeCountOf,
+} from '@/utils/games/petlinkSave'
 import clickUrl from '@/assets/games/petlink/sounds/15.wav'
 import matchUrl from '@/assets/games/petlink/sounds/294.mp3'
 import winUrl from '@/assets/games/petlink/sounds/301.mp3'
@@ -146,8 +158,8 @@ const CELL_H = 40
 const GAP_X = 2
 const GAP_Y = 0
 const PAD = 44 // 外圈占位(供连线 SVG 绕外圈绘制)
-const MAX_LEVEL = 9
-const LEVEL_TIME = 150 // 秒,与原件 1800 帧 @12fps 一致
+const LEVEL_TIME = PETLINK_LEVEL_TIME
+const MAX_LEVEL = PETLINK_MAX_LEVEL
 const TIME_BONUS = 3 // 每消除一对补充 3 秒(原件 36 帧)
 const BASE_SHUFFLE = 6
 const MATCH_LINE_MS = 150 // 消除连线展示时长(原 280,贴近原版 12fps 连线瞬时节奏)
@@ -176,6 +188,8 @@ const won = ref(false)
 const lost = ref(false)
 const linePoints = ref('')
 const rewardMsg = ref('')
+// 封面读到的可续存档(点「继续游戏」才真正装载)
+const savedState = ref(null)
 
 const boardW = COLS * CELL_W + (COLS - 1) * GAP_X
 const boardH = ROWS * CELL_H + (ROWS - 1) * GAP_Y
@@ -256,11 +270,86 @@ function playWin() {
   } catch (e) {}
 }
 
-// ---------- 关卡 ----------
-
-function typeCountOf(lv) {
-  return lv === 1 ? 30 : lv === 2 ? 35 : 40
+// ---------- 进度存档 ----------
+// 只在对局进行中写档;通关/失败/重新开始即清档,封面按存档显示「继续游戏」。
+const saveState = () => {
+  if (screen.value !== 'game' || won.value || lost.value) return
+  if (!board.value.length || board.value.every((tile) => tile === null)) return
+  try {
+    localStorage.setItem(
+      PETLINK_STORAGE_KEY,
+      JSON.stringify(
+        serializePetLinkState({
+          board: board.value,
+          score: score.value,
+          level: level.value,
+          shufflesLeft: shufflesLeft.value,
+          timeLeft: timeLeft.value,
+          paused: paused.value,
+        }),
+      ),
+    )
+  } catch (e) {
+    // 隐私模式/配额满时放弃存档,不影响游戏
+  }
 }
+
+const clearState = () => {
+  try {
+    localStorage.removeItem(PETLINK_STORAGE_KEY)
+  } catch (e) {
+    // 忽略
+  }
+}
+
+const loadSavedState = () => {
+  try {
+    return parsePetLinkState(JSON.parse(localStorage.getItem(PETLINK_STORAGE_KEY) || 'null'))
+  } catch (e) {
+    return null
+  }
+}
+
+let saveTimer = null
+const scheduleSave = () => {
+  if (saveTimer) return
+  saveTimer = setTimeout(() => {
+    saveTimer = null
+    saveState()
+  }, 800)
+}
+
+// 恢复出来的盘面若已无解(极少见),先按剩余重排次数自救;救不回来直接判负
+const ensurePlayable = () => {
+  while (!findAnyPair() && shufflesLeft.value > 0) applyShuffle()
+  if (!findAnyPair()) {
+    lost.value = true
+    stopTicker()
+    clearState()
+    return false
+  }
+  return true
+}
+
+const applySavedState = (saved) => {
+  tileSeq = saved.maxId
+  board.value = saved.board
+  score.value = saved.score
+  level.value = saved.level
+  shufflesLeft.value = saved.shufflesLeft
+  timeLeft.value = saved.timeLeft
+  paused.value = saved.paused
+  selected.value = -1
+  hinted.value = []
+  animating.value = false
+  won.value = false
+  lost.value = false
+  linePoints.value = ''
+  rewardMsg.value = ''
+  if (ensurePlayable()) startTicker()
+}
+
+// ---------- 关卡 ----------
 
 function buildBoard(lv) {
   const typeCount = typeCountOf(lv)
@@ -422,6 +511,7 @@ async function match(a, b, path) {
   if (board.value.some((v) => v !== null) && !findAnyPair()) {
     lost.value = true
     stopTicker()
+    clearState()
   }
 }
 
@@ -608,6 +698,7 @@ async function levelComplete() {
 
   if (level.value >= MAX_LEVEL) {
     won.value = true
+    clearState()
     await grantReward()
     return
   }
@@ -619,6 +710,7 @@ async function levelComplete() {
   selected.value = -1
   hinted.value = []
   startTicker()
+  saveState()
 }
 
 async function grantReward() {
@@ -644,6 +736,7 @@ function startTicker() {
       timeLeft.value = 0
       lost.value = true
       stopTicker()
+      clearState()
     }
   }, 1000)
 }
@@ -681,12 +774,26 @@ function updateBoardScale() {
   boardScale.value = scale
 }
 
-function startGame() {
+// 封面主按钮:有存档就接着上次的盘面,没有就开新局
+function continueGame() {
   screen.value = 'game'
+  if (savedState.value) {
+    applySavedState(savedState.value)
+    savedState.value = null
+  } else {
+    restart()
+  }
+}
+
+// 封面「新游戏」:丢掉旧档,从第 1 关开始
+function startFresh() {
+  screen.value = 'game'
+  savedState.value = null
   restart()
 }
 
 function restart() {
+  clearState()
   level.value = 1
   score.value = 0
   shufflesLeft.value = BASE_SHUFFLE
@@ -701,6 +808,7 @@ function restart() {
   rewardMsg.value = ''
   board.value = buildBoard(level.value)
   startTicker()
+  saveState()
 }
 
 function centerX(c) {
@@ -749,22 +857,36 @@ function flipAnimate(before, ms = 200) {
   })
 }
 
+// 棋面/分数/关卡/重排/暂停变化即落盘;计时每秒变化走防抖,避免每秒写 localStorage
+watch([board, score, level, shufflesLeft, paused], saveState, { deep: true })
+watch(timeLeft, scheduleSave)
+
+const onVisibilityChange = () => {
+  if (document.hidden) saveState()
+}
+
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
   window.addEventListener('resize', updateBoardScale)
   document.addEventListener('fullscreenchange', onFullscreenChange)
+  document.addEventListener('visibilitychange', onVisibilityChange)
   // 进入游戏即关闭全局光影特效(与图片/视频/看书一致),离开时恢复
   sunLight?.suspendEffects()
+  // 封面先读出可续存档,由「继续游戏」决定是否装载
+  savedState.value = loadSavedState()
   nextTick(() => updateBoardScale())
   resizeObserver = new ResizeObserver(() => updateBoardScale())
   if (boardScrollRef.value) resizeObserver.observe(boardScrollRef.value)
 })
 onBeforeUnmount(() => {
+  if (saveTimer) clearTimeout(saveTimer)
+  saveState()
   stopTicker()
   clearTimeout(hintTimer)
   window.removeEventListener('keydown', onKeydown)
   window.removeEventListener('resize', updateBoardScale)
   document.removeEventListener('fullscreenchange', onFullscreenChange)
+  document.removeEventListener('visibilitychange', onVisibilityChange)
   if (resizeObserver) {
     resizeObserver.disconnect()
     resizeObserver = null
@@ -871,6 +993,23 @@ function onKeydown(e) {
   box-shadow:
     0 3px 0 #c2273d,
     0 6px 14px rgba(255, 90, 120, 0.4);
+}
+.cover-new-btn {
+  padding: 8px 26px;
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  border-radius: 999px;
+  background: transparent;
+  color: #aebbd0;
+  font-size: 14px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+.cover-new-btn:hover {
+  color: #fff;
+  border-color: #fff;
 }
 .cover-credits {
   font-size: 12px;

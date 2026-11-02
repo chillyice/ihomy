@@ -13,7 +13,7 @@
       </div>
     </PageToolbar>
 
-    <div ref="gameCardEl" class="bf-card">
+    <div ref="gameCardEl" class="bf-card game-surface" @contextmenu.prevent @dblclick.prevent>
       <div class="bf-head">
         <div class="bf-title">2048</div>
         <div class="bf-scores">

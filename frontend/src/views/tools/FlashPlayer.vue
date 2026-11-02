@@ -15,7 +15,7 @@
       </div>
     </PageToolbar>
 
-    <div class="flash-card card">
+    <div class="flash-card card game-surface" @contextmenu.prevent @dblclick.prevent>
       <!-- 本地模式:拖拽/点击选择 .swf -->
       <div
         v-a11y-click
