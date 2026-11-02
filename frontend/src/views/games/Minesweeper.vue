@@ -51,12 +51,12 @@
             class="ms-cell"
             :class="[cellClass(cell, i)]"
             :aria-label="cellLabel(cell, i)"
-            @pointerdown="onPointerDown(i)"
+            @pointerdown="onPointerDown(i, $event)"
             @pointerup="onPointerUp"
             @pointerleave="onPointerUp"
             @pointercancel="onPointerUp"
             @click="onCellClick(i)"
-            @contextmenu.stop.prevent="flagAt(i)"
+            @contextmenu.stop.prevent="onCellContextmenu(i, $event)"
           >
             <span v-if="cell.revealed && cell.mine">💣</span>
             <span v-else-if="cell.revealed && cell.adjacent">{{ cell.adjacent }}</span>
@@ -230,24 +230,48 @@ const afterAction = (next) => {
   }
 }
 
-// 长按 420ms 插旗;随后的 click 被吞掉,避免又翻开一格
+// 长按 420ms 插旗。触摸/手写笔长按成立时系统还会补发 contextmenu,若不拦截会再切一次旗,
+// 表现为「旗子出现后立刻消失」;所以同一次按下只能有一方插旗(计时器或 contextmenu)。
+const LONG_PRESS_MS = 420
 let pressTimer = null
 let suppressClick = false
-const onPointerDown = (index) => {
+let gestureFlagged = false
+let lastPointerType = 'mouse'
+
+const flagByLongPress = (index) => {
+  suppressClick = true
+  gestureFlagged = true
   onPointerUp()
+  flagAt(index)
+}
+
+const onPointerDown = (index, event) => {
+  const pointerType = event?.pointerType || 'mouse'
+  lastPointerType = pointerType
+  // 鼠标右键/笔杆键交给 contextmenu,不参与长按计时
+  if (pointerType === 'mouse' && event?.button !== 0) return
+  onPointerUp()
+  suppressClick = false
+  gestureFlagged = false
   pressTimer = setTimeout(() => {
     pressTimer = null
-    suppressClick = true
-    flagAt(index)
-    setTimeout(() => {
-      suppressClick = false
-    }, 700)
-  }, 420)
+    flagByLongPress(index)
+  }, LONG_PRESS_MS)
 }
 const onPointerUp = () => {
   if (!pressTimer) return
   clearTimeout(pressTimer)
   pressTimer = null
+}
+const onCellContextmenu = (index, event) => {
+  const pointerType = event?.pointerType || lastPointerType
+  if (pointerType === 'mouse') {
+    flagAt(index)
+    return
+  }
+  // 触摸/手写笔:长按事件本身即长按成立 —— 计时器已被 pointercancel 清掉时由这里补插旗,
+  // 已插过旗则忽略,任意事件先后顺序都只切一次
+  if (!gestureFlagged) flagByLongPress(index)
 }
 
 const onCellClick = (index) => {

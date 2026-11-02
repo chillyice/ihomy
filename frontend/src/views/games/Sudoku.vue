@@ -795,7 +795,7 @@ onBeforeUnmount(() => {
   --sd-cage: rgba(184, 140, 110, 0.6);
   --sd-region: rgba(184, 140, 110, 0.06);
   --sd-window: rgba(64, 150, 170, 0.55);
-  --sd-odd: rgba(184, 140, 110, 0.13);
+  --sd-odd: rgba(184, 140, 110, 0.26);
 }
 .sd-card:fullscreen {
   width: 100vw;
@@ -933,11 +933,11 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 3px;
   right: 3px;
-  width: 4px;
-  height: 4px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: var(--sd-user);
-  opacity: 0.5;
+  opacity: 0.7;
   pointer-events: none;
 }
 .sd-cell.peer {
@@ -1212,7 +1212,7 @@ html.dark .sd-card {
   --sd-cage: rgba(184, 140, 110, 0.7);
   --sd-region: rgba(184, 140, 110, 0.1);
   --sd-window: rgba(96, 190, 210, 0.6);
-  --sd-odd: rgba(184, 140, 110, 0.2);
+  --sd-odd: rgba(184, 140, 110, 0.36);
 }
 html.dark .sd-cell.conflict {
   color: #ff9a9a;
