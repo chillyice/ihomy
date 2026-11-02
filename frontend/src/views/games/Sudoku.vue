@@ -100,7 +100,7 @@
           :key="n"
           type="button"
           class="sd-num"
-          :class="{ done: remaining[n] <= 0, active: quickFill && activeNumber === n }"
+          :class="{ done: remaining[n] <= 0, active: quickFill ? activeNumber === n : focusDigit === n }"
           :disabled="remaining[n] <= 0"
           @click="pickNumber(n)"
         >
@@ -144,6 +144,7 @@ import {
   CELLS,
   DIFFICULTY_KEYS,
   VARIANT_KEYS,
+  buildPeers,
   cageIndexOf,
   clearPeerNotes,
   digitCounts,
@@ -187,6 +188,9 @@ const selected = ref(-1)
 const notesMode = ref(false)
 const quickFill = ref(false)
 const activeNumber = ref(0)
+// 焦点数字(数字盘选中或点中的棋盘数字)与「影响范围」高亮口径
+const focusDigit = ref(0)
+const focusWide = ref(false)
 const generating = ref(false)
 const history = ref([])
 const hintsUsed = ref(0)
@@ -247,10 +251,20 @@ const timeText = computed(() => {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 })
 
-const selectedValue = computed(() => (selected.value >= 0 ? board.value[selected.value] : 0))
-const selectedRow = computed(() => (selected.value >= 0 ? Math.floor(selected.value / 9) : -1))
-const selectedCol = computed(() => (selected.value >= 0 ? selected.value % 9 : -1))
-const selectedUnit = computed(() => (selected.value >= 0 ? unitAt(selected.value) : -1))
+// 约束邻居与高亮:笔记清理、数字影响范围共用同一份邻居口径(不规则区替代九宫、附加组计入)
+const peersAll = computed(() => buildPeers(currentConstraints.value))
+const selectedPeerSet = computed(() => (selected.value >= 0 ? new Set(peersAll.value[selected.value]) : null))
+// 数字盘口径:该数字所有落点 + 它们的影响范围;点棋盘数字只高亮那一个格子的邻居
+const digitPeerSet = computed(() => {
+  if (!focusWide.value || !focusDigit.value) return null
+  const value = focusDigit.value
+  const set = new Set()
+  for (let i = 0; i < CELLS; i++) {
+    if (board.value[i] !== value) continue
+    for (const peer of peersAll.value[i]) set.add(peer)
+  }
+  return set
+})
 
 const isGiven = (index) => puzzle.value[index] !== 0
 const notesList = (index) => notesOf(notes.value[index])
@@ -264,17 +278,17 @@ const cellClass = (index) => {
   const col = index % 9
   const unit = unitAt(index)
   const mark = parity.value ? parity.value[index] : 0
+  const wide = digitPeerSet.value
   return {
     given: isGiven(index),
     'edge-r': col < 8 && unitAt(index + 1) !== unit,
     'edge-b': row < 8 && unitAt(index + 9) !== unit,
     diag: variant.value === 'DIAGONAL' && (row === col || row + col === 8),
     selected: index === selected.value,
-    peer:
-      selected.value >= 0 &&
-      index !== selected.value &&
-      (row === selectedRow.value || col === selectedCol.value || unit === selectedUnit.value),
-    same: selectedValue.value > 0 && board.value[index] === selectedValue.value && index !== selected.value,
+    peer: wide
+      ? wide.has(index) && board.value[index] !== focusDigit.value
+      : selectedPeerSet.value !== null && index !== selected.value && selectedPeerSet.value.has(index),
+    same: focusDigit.value > 0 && board.value[index] === focusDigit.value && index !== selected.value,
     conflict: conflicts.value.has(index),
     hint: hintFlash.value === index,
     'parity-odd': mark === 1,
@@ -454,6 +468,9 @@ const startNew = async () => {
   selected.value = -1
   notesMode.value = false
   activeNumber.value = 0
+  focusDigit.value = 0
+  focusWide.value = false
+  skipClick = false
   history.value = []
   hintsUsed.value = 0
   elapsed.value = 0
@@ -477,17 +494,30 @@ const changeVariant = () => {
 
 const select = (index) => {
   if (won.value || generating.value) return
-  selected.value = index
-  // 快填模式:先点数字再点格子,空格直接落数(笔记模式下记候选);已有数字只做选中
-  if (quickFill.value && activeNumber.value > 0 && !isGiven(index) && !board.value[index]) {
-    input(activeNumber.value)
+  // 长按直填会紧随一次 click,别让这次点击再落一遍数字
+  if (skipClick) {
+    skipClick = false
+    return
   }
+  selected.value = index
+  // 快填模式:先点数字再点格子,已有数字可覆盖(给定格不可改);同数字再点不擦除
+  if (quickFill.value && activeNumber.value > 0 && !isGiven(index)) {
+    focusDigit.value = activeNumber.value
+    focusWide.value = true
+    if (board.value[index] !== activeNumber.value) input(activeNumber.value)
+    return
+  }
+  // 点棋盘上的数字:高亮该数字的落点与这一格的影响范围(与点下方数字盘同效)
+  focusDigit.value = board.value[index] || 0
+  focusWide.value = false
 }
 
 // 快填开关:开启后数字盘只负责选中数字,不再直接落子
 const toggleQuickFill = () => {
   quickFill.value = !quickFill.value
   activeNumber.value = 0
+  focusDigit.value = 0
+  focusWide.value = false
   try {
     localStorage.setItem(QUICK_FILL_KEY, quickFill.value ? '1' : '0')
   } catch (e) {
@@ -495,13 +525,17 @@ const toggleQuickFill = () => {
   }
 }
 
-// 数字盘:快填模式选中数字(再点同数字取消),常规模式直接落子
+// 数字盘:快填模式选中数字(再点同数字取消),常规模式直接落子;两种模式都高亮该数字的影响范围
 const pickNumber = (n) => {
   if (won.value || generating.value) return
   if (quickFill.value) {
     activeNumber.value = activeNumber.value === n ? 0 : n
+    focusDigit.value = activeNumber.value
+    focusWide.value = activeNumber.value > 0
     return
   }
+  focusDigit.value = n
+  focusWide.value = true
   input(n)
 }
 
@@ -509,6 +543,9 @@ const snapshot = () => {
   history.value.push({ board: board.value.slice(), notes: notes.value.slice() })
   if (history.value.length > MAX_HISTORY) history.value.shift()
 }
+
+// 落数后按当前变体口径清邻居笔记(不规则区替代九宫,对角线/窗口/杀手笼一并计入)
+const clearNotesAround = (index, value) => clearPeerNotes(notes.value, index, value, currentConstraints.value)
 
 const input = (n) => {
   const index = selected.value
@@ -526,7 +563,7 @@ const input = (n) => {
   }
   board.value[index] = n
   notes.value[index] = 0
-  clearPeerNotes(notes.value, index, n)
+  clearNotesAround(index, n)
   if (solvedNow()) finish()
 }
 
@@ -537,6 +574,9 @@ const erase = () => {
   snapshot()
   board.value[index] = 0
   notes.value[index] = 0
+  // 快填时保持已选数字的影响范围,否则清掉高亮
+  focusDigit.value = quickFill.value ? activeNumber.value : 0
+  focusWide.value = quickFill.value && activeNumber.value > 0
 }
 
 const flashCell = (index) => {
@@ -556,14 +596,17 @@ const promoteSingleNote = (index) => {
   snapshot()
   board.value[index] = n
   notes.value[index] = 0
-  clearPeerNotes(notes.value, index, n)
+  clearNotesAround(index, n)
   selected.value = index
+  focusDigit.value = n
+  focusWide.value = false
   flashCell(index)
   if (solvedNow()) finish()
   return true
 }
 
 let pressTimer = null
+let skipClick = false
 const cancelCellPress = () => {
   if (pressTimer) {
     clearTimeout(pressTimer)
@@ -577,7 +620,8 @@ const onCellPressStart = (index, event) => {
   cancelCellPress()
   pressTimer = setTimeout(() => {
     pressTimer = null
-    promoteSingleNote(index)
+    // 长按直填后浏览器还会补一次 click,标掉它免得快填模式再覆盖一次
+    if (promoteSingleNote(index)) skipClick = true
   }, LONG_PRESS_MS)
 }
 
@@ -598,9 +642,11 @@ const useHint = () => {
   snapshot()
   board.value[index] = solution.value[index]
   notes.value[index] = 0
-  clearPeerNotes(notes.value, index, solution.value[index])
+  clearNotesAround(index, solution.value[index])
   hintsUsed.value += 1
   selected.value = index
+  focusDigit.value = solution.value[index]
+  focusWide.value = false
   flashCell(index)
   if (solvedNow()) finish()
 }
@@ -638,7 +684,11 @@ const onKeydown = (event) => {
     if (quickFill.value) {
       // 快填模式下键盘也只选数字,配合点击格子落子
       activeNumber.value = activeNumber.value === n ? 0 : n
+      focusDigit.value = activeNumber.value
+      focusWide.value = activeNumber.value > 0
     } else {
+      focusDigit.value = n
+      focusWide.value = true
       input(n)
     }
     event.preventDefault()
@@ -1083,6 +1133,13 @@ onBeforeUnmount(() => {
 }
 .sd-num:hover:not(:disabled) {
   background: var(--sd-peer);
+}
+/* 当前焦点数字(点数字盘或棋盘上的该数字):与棋盘「同数字」高亮同色 */
+.sd-num.active {
+  background: var(--sd-same);
+  border-color: var(--sd-user);
+  color: var(--sd-user);
+  font-weight: 700;
 }
 .sd-num.done {
   opacity: 0.32;

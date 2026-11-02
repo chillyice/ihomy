@@ -134,6 +134,27 @@ const PEERS = (() => {
   return peers.map((s) => [...s])
 })()
 
+/**
+ * 每格的约束邻居:同行/同列/同单元;regions 提供时用异形区替代九宫(不规则数独),
+ * extraGroups 追加附加约束组(对角线/窗口/杀手笼)。都不传时复用标准九宫常量。
+ */
+export function buildPeers({ regions = null, extraGroups = null } = {}) {
+  const regionGroups = regions && regions.length ? regions : null
+  const extra = extraGroups && extraGroups.length ? extraGroups : null
+  if (!regionGroups && !extra) return PEERS
+  const peers = Array.from({ length: CELLS }, () => new Set())
+  const link = (group) => {
+    for (const a of group) {
+      for (const b of group) if (a !== b) peers[a].add(b)
+    }
+  }
+  for (const group of rowGroups) link(group)
+  for (const group of colGroups) link(group)
+  for (const group of regionGroups || BOX_GROUPS) link(group)
+  if (extra) for (const group of extra) link(group)
+  return peers.map((set) => [...set])
+}
+
 /** 单元组(宫/不规则区)→ 每格所属组索引;模块级常量用 WeakMap 缓存 */
 const unitIndexCache = new WeakMap()
 function unitIndexOf(regions) {
@@ -807,11 +828,15 @@ export function digitCounts(board) {
   return counts
 }
 
-/** 落一个数字时清掉邻居格里的同数字笔记,返回是否改动 */
-export function clearPeerNotes(notes, index, value) {
+/**
+ * 落一个数字时清掉邻居格里的同数字笔记,返回是否改动。
+ * opts.regions 用异形区替代九宫(不规则数独);opts.extraGroups 追加附加约束组(对角线/窗口/杀手笼)。
+ */
+export function clearPeerNotes(notes, index, value, opts = null) {
   const bit = 1 << (value - 1)
+  const peers = opts && (opts.regions || opts.extraGroups) ? buildPeers(opts)[index] : PEERS[index]
   let changed = false
-  for (const peer of PEERS[index]) {
+  for (const peer of peers) {
     if (notes[peer] & bit) {
       notes[peer] &= ~bit
       changed = true

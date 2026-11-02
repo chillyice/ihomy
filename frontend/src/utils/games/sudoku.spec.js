@@ -128,6 +128,27 @@ describe('数独判定', () => {
     expect(clearPeerNotes(notes, 0, 5)).toBe(false)
   })
 
+  it('不规则数独:笔记按异形区清理,不再按九宫', () => {
+    // 每行一个区:0 号格的邻居只剩同行/同列,标准九宫里的 10 号格不再是邻居
+    const regions = Array.from({ length: 9 }, (_, r) => Array.from({ length: 9 }, (_, c) => r * 9 + c))
+    const notes = new Array(CELLS).fill(0)
+    notes[1] = 1 << 4 // 同行
+    notes[9] = 1 << 4 // 同列
+    notes[10] = 1 << 4 // 同标准九宫但不同异形区,也不同行列
+    expect(clearPeerNotes(notes, 0, 5, { regions })).toBe(true)
+    expect(notesOf(notes[1])).toEqual([])
+    expect(notesOf(notes[9])).toEqual([])
+    expect(notesOf(notes[10])).toEqual([5])
+  })
+
+  it('附加约束组(对角线)也计入笔记清理范围', () => {
+    const notes = new Array(CELLS).fill(0)
+    notes[40] = 1 << 4 // 与 0 同主对角线,不同行列宫
+    expect(clearPeerNotes(notes, 0, 5)).toBe(false)
+    expect(clearPeerNotes(notes, 0, 5, { extraGroups: extraGroupsFor('DIAGONAL') })).toBe(true)
+    expect(notesOf(notes[40])).toEqual([])
+  })
+
   it('提示只挑空格', () => {
     const board = emptyBoard()
     for (let i = 0; i < CELLS - 1; i++) board[i] = 1

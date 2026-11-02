@@ -982,7 +982,7 @@ export default {
       win: 'Solved!',
       winMeta: 'Time {time} · Hints {hints}',
       playAgain: 'Play again',
-      tip: 'Pick a cell, then use the keyboard or the pad below; turn on Quick fill to select a digit first and tap cells to place it; long-press a cell with a single note to place that digit; diagonal mode also needs 1-9 on both diagonals, killer cages hold non-repeating digits summing to the label',
+      tip: 'Pick a cell, then use the keyboard or the pad below; tap a pad digit or a digit on the board to highlight its placements and range; turn on Quick fill to select a digit first and tap cells to place it (existing digits can be overwritten); long-press a cell with a single note to place that digit; diagonal mode also needs 1-9 on both diagonals, killer cages hold non-repeating digits summing to the label',
       cellFilled: 'Row {row}, column {col}, number {value}',
       cellEmpty: 'Row {row}, column {col}, empty',
     },
