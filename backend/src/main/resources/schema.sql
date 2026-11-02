@@ -2143,9 +2143,9 @@ CREATE TABLE `sys_oss_component` (
 -- 版本为实际锁定版本(与 package-lock.json / 解析后的 Maven 依赖一致),不是 package.json/pom.xml 里的声明区间下限
 INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `current_version`, `license`, `repo_url`, `purpose`, `integration_status`) VALUES
 ('Vue', 'NPM', 'vue', '3.5.44', 'MIT', 'https://github.com/vuejs/core', '前端框架', 'FULL'),
-('Vue Router', 'NPM', 'vue-router', '4.6.4', 'MIT', 'https://github.com/vuejs/router', '前端路由', 'FULL'),
-('Pinia', 'NPM', 'pinia', '2.3.1', 'MIT', 'https://github.com/vuejs/pinia', '状态管理', 'FULL'),
-('Vue I18n', 'NPM', 'vue-i18n', '9.14.4', 'MIT', 'https://github.com/intlify/vue-i18n', '中英双语', 'FULL'),
+('Vue Router', 'NPM', 'vue-router', '5.4.0', 'MIT', 'https://github.com/vuejs/router', '前端路由', 'FULL'),
+('Pinia', 'NPM', 'pinia', '4.1.0', 'MIT', 'https://github.com/vuejs/pinia', '状态管理', 'FULL'),
+('Vue I18n', 'NPM', 'vue-i18n', '11.4.17', 'MIT', 'https://github.com/intlify/vue-i18n', '中英双语', 'FULL'),
 ('Element Plus', 'NPM', 'element-plus', '2.14.7', 'MIT', 'https://github.com/element-plus/element-plus', 'UI 组件库', 'FULL'),
 ('Element Plus Icons', 'NPM', '@element-plus/icons-vue', '2.3.2', 'MIT', 'https://github.com/element-plus/element-plus-icons', '图标', 'FULL'),
 ('Axios', 'NPM', 'axios', '1.21.0', 'MIT', 'https://github.com/axios/axios', 'HTTP 客户端', 'FULL'),

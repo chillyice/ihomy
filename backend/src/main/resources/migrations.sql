@@ -2983,3 +2983,16 @@ UPDATE `sys_oss_component` SET `current_version` = '10.0.1'
  WHERE `component_type` = 'NPM' AND `package_ref` = '@eslint/js';
 UPDATE `sys_oss_component` SET `current_version` = '17.14.0'
  WHERE `component_type` = 'NPM' AND `package_ref` = 'globals';
+
+-- ------------------------------------------------------------
+-- 开源组件升级 P4:Vue 生态大版本(2026-11-02)
+--   3 个包同批安装(避免 peer 半新半旧),记 package-lock.json 实际锁定版本:
+--   vue-router 4→5 / pinia 2→4 / vue-i18n 9→11;Vue 本体已在 P2 到 3.5.44。
+--   重复执行安全:全部为幂等 UPDATE。
+-- ------------------------------------------------------------
+UPDATE `sys_oss_component` SET `current_version` = '5.4.0'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'vue-router';
+UPDATE `sys_oss_component` SET `current_version` = '4.1.0'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'pinia';
+UPDATE `sys_oss_component` SET `current_version` = '11.4.17'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'vue-i18n';
