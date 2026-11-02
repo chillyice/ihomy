@@ -828,6 +828,8 @@ export default {
   },
   games: {
     title: '小游戏',
+    allGames: '全部',
+    categoryLabel: '分类',
     import: '导入',
     enter: '进入',
     play: '播放',
@@ -4942,6 +4944,17 @@ export default {
     loan_event_type: { RATE_CHANGE: '利率调整', PREPAY: '提前还款' },
     loan_prepay_strategy: { SHORTEN: '缩短年限', REDUCE: '减少月供' },
     media_server_type: { JELLYFIN: 'Jellyfin', EMBY: 'Emby' },
+    game_category: {
+      ACTION: '动作',
+      PUZZLE: '益智',
+      CASUAL: '休闲',
+      SIMULATION: '模拟养成',
+      ADVENTURE: '冒险',
+      RPG: '角色扮演',
+      STRATEGY: '策略',
+      ARCADE: '街机',
+      OTHER: '其他',
+    },
   },
   weatherPage: {
     title: '天气',

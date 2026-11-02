@@ -2852,3 +2852,31 @@ CREATE TABLE IF NOT EXISTS `game_site_account` (
   UNIQUE KEY `uk_game_user` (`game_id`, `user_id`),
   KEY `idx_user` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='游戏站点账号(外部网页游戏登录信息,密码加密存储)';
+
+-- ------------------------------------------------------------
+-- V11.8 小游戏分类(2026-11-02)
+--   game_info 加 category(ACTION/PUZZLE/CASUAL/SIMULATION/ADVENTURE/RPG/STRATEGY/ARCADE/OTHER),
+--   页面按分类筛选;已存在的游戏统一落 OTHER,不猜分类。
+--   重复执行安全:information_schema 条件加列 / INSERT IGNORE。
+-- ------------------------------------------------------------
+SET @add_game_category := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `game_info` ADD COLUMN `category` VARCHAR(20) NOT NULL DEFAULT ''OTHER'' COMMENT ''分类:ACTION动作/PUZZLE益智/CASUAL休闲/SIMULATION模拟养成/ADVENTURE冒险/RPG角色扮演/STRATEGY策略/ARCADE街机/OTHER其他'' AFTER `type`',
+    'SELECT ''skip: game_info.category already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'game_info' AND COLUMN_NAME = 'category'
+);
+PREPARE add_game_category_stmt FROM @add_game_category;
+EXECUTE add_game_category_stmt;
+DEALLOCATE PREPARE add_game_category_stmt;
+
+INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('game_category', 'ACTION',     '动作'),
+('game_category', 'PUZZLE',     '益智'),
+('game_category', 'CASUAL',     '休闲'),
+('game_category', 'SIMULATION', '模拟养成'),
+('game_category', 'ADVENTURE',  '冒险'),
+('game_category', 'RPG',        '角色扮演'),
+('game_category', 'STRATEGY',   '策略'),
+('game_category', 'ARCADE',     '街机'),
+('game_category', 'OTHER',      '其他');

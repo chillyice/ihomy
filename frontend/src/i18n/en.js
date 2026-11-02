@@ -834,6 +834,8 @@ export default {
   },
   games: {
     title: 'Games',
+    allGames: 'All',
+    categoryLabel: 'Category',
     import: 'Import',
     enter: 'Enter',
     play: 'Play',
@@ -4998,6 +5000,17 @@ export default {
     loan_event_type: { RATE_CHANGE: 'Rate change', PREPAY: 'Prepayment' },
     loan_prepay_strategy: { SHORTEN: 'Shorten term', REDUCE: 'Reduce payment' },
     media_server_type: { JELLYFIN: 'Jellyfin', EMBY: 'Emby' },
+    game_category: {
+      ACTION: 'Action',
+      PUZZLE: 'Puzzle',
+      CASUAL: 'Casual',
+      SIMULATION: 'Simulation',
+      ADVENTURE: 'Adventure',
+      RPG: 'RPG',
+      STRATEGY: 'Strategy',
+      ARCADE: 'Arcade',
+      OTHER: 'Other',
+    },
   },
   weatherPage: {
     title: 'Weather',

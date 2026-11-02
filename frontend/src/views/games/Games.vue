@@ -15,57 +15,42 @@
       </div>
     </PageToolbar>
 
+    <!-- 分类筛选:只列出当前有游戏的分类,带数量;「全部」恒在第一 -->
+    <div v-if="categoryChips.length > 1" class="game-cats">
+      <button
+        v-for="c in categoryChips"
+        :key="c.value"
+        type="button"
+        class="game-cat"
+        :class="{ active: activeCategory === c.value }"
+        :aria-pressed="activeCategory === c.value"
+        @click="activeCategory = c.value"
+      >
+        {{ c.label }}
+        <span class="game-cat-count">{{ c.count }}</span>
+      </button>
+    </div>
+
     <div v-loading="loading" class="tool-grid">
-      <!-- 花园固定入口(植物养殖改名而来) -->
-      <div v-a11y-click class="tool-card card" @click="$router.push('/tools/plant')">
+      <!-- 固定入口(花园/连连看/数独/2048)同样参与分类筛选 -->
+      <div v-a11y-click v-for="b in visibleBuiltins" :key="b.key" class="tool-card card" @click="$router.push(b.path)">
         <div class="tool-icon">
-          <el-icon :size="30"><Sunny /></el-icon>
+          <el-icon :size="30"><component :is="b.icon" /></el-icon>
         </div>
-        <div class="tool-name">{{ $t('games.garden.title') }}</div>
-        <div class="tool-desc">{{ $t('games.garden.desc') }}</div>
-        <span class="tool-enter"
-          >{{ $t('games.enter') }}<el-icon><ArrowRight /></el-icon
-        ></span>
-      </div>
-
-      <!-- 宠物连连看固定入口(H5 原生小游戏,通关发积分) -->
-      <div v-a11y-click class="tool-card card" @click="$router.push('/games/petlink')">
-        <div class="tool-icon">
-          <el-icon :size="30"><Grid /></el-icon>
+        <div class="tool-name">{{ $t(b.titleKey) }}</div>
+        <div class="tool-desc">{{ $t(b.descKey) }}</div>
+        <div class="tool-meta">
+          <div class="tool-meta-left">
+            <div class="tool-type-tag cat-tag">{{ categoryText(b.category) }}</div>
+          </div>
+          <span class="tool-enter"
+            >{{ $t('games.enter') }}<el-icon><ArrowRight /></el-icon
+          ></span>
         </div>
-        <div class="tool-name">{{ $t('games.petlink.title') }}</div>
-        <div class="tool-desc">{{ $t('games.petlink.desc') }}</div>
-        <span class="tool-enter"
-          >{{ $t('games.enter') }}<el-icon><ArrowRight /></el-icon
-        ></span>
-      </div>
-
-      <!-- 数独固定入口(H5 原生小游戏,通关发积分) -->
-      <div v-a11y-click class="tool-card card" @click="$router.push('/games/sudoku')">
-        <div class="tool-icon">
-          <el-icon :size="30"><Cpu /></el-icon>
-        </div>
-        <div class="tool-name">{{ $t('games.sudoku.title') }}</div>
-        <div class="tool-desc">{{ $t('games.sudoku.desc') }}</div>
-        <span class="tool-enter"
-          >{{ $t('games.enter') }}<el-icon><ArrowRight /></el-icon
-        ></span>
-      </div>
-
-      <!-- 2048 固定入口(H5 原生小游戏,达成 2048 发积分) -->
-      <div v-a11y-click class="tool-card card" @click="$router.push('/games/2048')">
-        <div class="tool-icon">
-          <el-icon :size="30"><Histogram /></el-icon>
-        </div>
-        <div class="tool-name">{{ $t('games.g2048.title') }}</div>
-        <div class="tool-desc">{{ $t('games.g2048.desc') }}</div>
-        <span class="tool-enter"
-          >{{ $t('games.enter') }}<el-icon><ArrowRight /></el-icon
-        ></span>
       </div>
 
       <!-- 导入的小游戏(LINK 为外部网页游戏,点卡片新标签页打开) -->
-      <div v-a11y-click v-for="g in games" :key="g.id" class="tool-card card" @click="play(g)">
+      <div v-a11y-click v-for="g in visibleGames" :key="g.id" class="tool-card card" @click="play(g)">
         <div class="tool-icon">
           <el-icon :size="30">
             <Link v-if="g.type === 'LINK'" />
@@ -76,6 +61,7 @@
         <div class="tool-desc">{{ g.description || $t('games.noDesc') }}</div>
         <div class="tool-meta">
           <div class="tool-meta-left">
+            <div class="tool-type-tag cat-tag">{{ categoryText(g.category) }}</div>
             <div class="tool-type-tag">{{ typeText(g) }}</div>
             <el-tooltip v-if="g.hasAccount" :content="$t('games.account.savedFlag')" placement="top">
               <el-icon class="tool-account-flag"><Key /></el-icon>
@@ -118,6 +104,11 @@
         <el-form-item :label="$t('games.name')">
           <el-input v-model="importForm.name" maxlength="100" :placeholder="$t('games.namePlaceholder')" />
         </el-form-item>
+        <el-form-item :label="$t('games.categoryLabel')">
+          <el-select v-model="importForm.category" style="width: 100%">
+            <el-option v-for="c in GAME_CATEGORIES" :key="c" :label="categoryText(c)" :value="c" />
+          </el-select>
+        </el-form-item>
         <el-form-item :label="$t('games.desc')">
           <el-input v-model="importForm.description" type="textarea" :rows="2" maxlength="500" :placeholder="$t('games.descPlaceholder')" />
         </el-form-item>
@@ -136,6 +127,11 @@
         </el-form-item>
         <el-form-item :label="$t('games.name')">
           <el-input v-model="editForm.name" maxlength="100" />
+        </el-form-item>
+        <el-form-item :label="$t('games.categoryLabel')">
+          <el-select v-model="editForm.category" style="width: 100%">
+            <el-option v-for="c in GAME_CATEGORIES" :key="c" :label="categoryText(c)" :value="c" />
+          </el-select>
         </el-form-item>
         <el-form-item :label="$t('games.desc')">
           <el-input v-model="editForm.description" type="textarea" :rows="2" maxlength="500" :placeholder="$t('games.descPlaceholder')" />
@@ -185,12 +181,53 @@ import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import AddToWishDialog from '@/components/wish/AddToWishDialog.vue'
 import { gameApi } from '@/api'
+import { dictText } from '@/utils/dict'
+import { GAME_CATEGORIES, countGameCategories, inGameCategory, normalizeGameCategory } from '@/utils/games/gameCategory'
 
 const router = useRouter()
 const { t } = useI18n()
 
 const games = ref([])
 const loading = ref(false)
+const activeCategory = ref('ALL')
+
+/** 站内固定入口也按同一套分类参与筛选;图标直接引用组件 */
+const builtinGames = [
+  {
+    key: 'garden',
+    titleKey: 'games.garden.title',
+    descKey: 'games.garden.desc',
+    icon: Sunny,
+    path: '/tools/plant',
+    category: 'SIMULATION',
+  },
+  {
+    key: 'petlink',
+    titleKey: 'games.petlink.title',
+    descKey: 'games.petlink.desc',
+    icon: Grid,
+    path: '/games/petlink',
+    category: 'PUZZLE',
+  },
+  { key: 'sudoku', titleKey: 'games.sudoku.title', descKey: 'games.sudoku.desc', icon: Cpu, path: '/games/sudoku', category: 'PUZZLE' },
+  { key: 'g2048', titleKey: 'games.g2048.title', descKey: 'games.g2048.desc', icon: Histogram, path: '/games/2048', category: 'PUZZLE' },
+]
+
+const categoryText = (category) => dictText(t, 'game_category', normalizeGameCategory(category))
+
+const categoryCounts = computed(() => countGameCategories([...builtinGames, ...games.value]))
+
+/** 筛选条只显示有游戏的分类(含固定入口),避免一排空分类 */
+const categoryChips = computed(() => {
+  const chips = [{ value: 'ALL', label: t('games.allGames'), count: builtinGames.length + games.value.length }]
+  for (const c of GAME_CATEGORIES) {
+    if (categoryCounts.value[c] > 0) chips.push({ value: c, label: categoryText(c), count: categoryCounts.value[c] })
+  }
+  return chips
+})
+
+const visibleBuiltins = computed(() => builtinGames.filter((b) => inGameCategory(b, activeCategory.value)))
+const visibleGames = computed(() => games.value.filter((g) => inGameCategory(g, activeCategory.value)))
 
 const wishOpen = ref(false)
 const wishSource = computed(() => ({ type: 'GAME', title: t('wish.gameSourceTitle') }))
@@ -198,12 +235,12 @@ const wishSource = computed(() => ({ type: 'GAME', title: t('wish.gameSourceTitl
 const importVisible = ref(false)
 const importing = ref(false)
 const importMode = ref('file')
-const importForm = reactive({ file: null, url: '', name: '', description: '' })
+const importForm = reactive({ file: null, url: '', name: '', description: '', category: 'OTHER' })
 
 const editVisible = ref(false)
 const saving = ref(false)
 const editGameType = ref('')
-const editForm = reactive({ id: null, name: '', description: '', linkUrl: '' })
+const editForm = reactive({ id: null, name: '', description: '', linkUrl: '', category: 'OTHER' })
 
 const accountVisible = ref(false)
 const accountSaving = ref(false)
@@ -214,7 +251,12 @@ const accountForm = reactive({ siteUsername: '', sitePassword: '', remark: '' })
 const load = async () => {
   loading.value = true
   try {
-    games.value = (await gameApi.list()) || []
+    const list = (await gameApi.list()) || []
+    games.value = list.map((g) => ({ ...g, category: normalizeGameCategory(g.category) }))
+    // 选中的分类被删空时回到「全部」,避免停留在空白的筛选结果
+    if (activeCategory.value !== 'ALL' && !categoryCounts.value[activeCategory.value]) {
+      activeCategory.value = 'ALL'
+    }
   } finally {
     loading.value = false
   }
@@ -236,6 +278,7 @@ const openImport = () => {
   importForm.url = ''
   importForm.name = ''
   importForm.description = ''
+  importForm.category = 'OTHER'
   importVisible.value = true
 }
 
@@ -269,7 +312,12 @@ const submitImport = async () => {
     }
     importing.value = true
     try {
-      await gameApi.addLink({ name: importForm.name.trim(), url, description: importForm.description.trim() })
+      await gameApi.addLink({
+        name: importForm.name.trim(),
+        url,
+        description: importForm.description.trim(),
+        category: importForm.category,
+      })
       ElMessage.success(t('games.linkImported'))
       importVisible.value = false
       load()
@@ -292,6 +340,7 @@ const submitImport = async () => {
     fd.append('file', importForm.file)
     fd.append('name', importForm.name.trim())
     fd.append('description', importForm.description.trim())
+    fd.append('category', importForm.category)
     await gameApi.import(fd)
     ElMessage.success(t('games.imported'))
     importVisible.value = false
@@ -307,6 +356,7 @@ const openEdit = (g) => {
   editForm.name = g.name
   editForm.description = g.description || ''
   editForm.linkUrl = g.linkUrl || ''
+  editForm.category = normalizeGameCategory(g.category)
   editVisible.value = true
 }
 
@@ -317,7 +367,11 @@ const submitEdit = async () => {
   }
   saving.value = true
   try {
-    const data = { name: editForm.name.trim(), description: editForm.description.trim() }
+    const data = {
+      name: editForm.name.trim(),
+      description: editForm.description.trim(),
+      category: editForm.category,
+    }
     if (editGameType.value === 'LINK') data.linkUrl = editForm.linkUrl.trim()
     await gameApi.update(editForm.id, data)
     ElMessage.success(t('games.saved'))
@@ -401,6 +455,42 @@ onMounted(load)
 </script>
 
 <style scoped>
+.game-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.game-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition:
+    color 0.16s ease,
+    border-color 0.16s ease,
+    background-color 0.16s ease;
+}
+.game-cat:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+.game-cat.active {
+  color: var(--color-brand-text);
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+}
+.game-cat-count {
+  font-size: 11px;
+  opacity: 0.75;
+}
 .tool-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -461,6 +551,10 @@ onMounted(load)
   background: rgba(0, 0, 0, 0.06);
   color: var(--color-text-secondary, #999);
   font-weight: 500;
+}
+.tool-type-tag.cat-tag {
+  background: rgba(var(--color-brand-rgb), 0.14);
+  color: var(--color-accent);
 }
 .tool-enter {
   display: inline-flex;

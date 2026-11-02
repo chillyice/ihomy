@@ -69,9 +69,10 @@ public class GameInfoController {
     @PostMapping("/import")
     public Result<GameInfo> importGame(@RequestParam("file") MultipartFile file,
                                        @RequestParam("name") String name,
-                                       @RequestParam(value = "description", required = false) String description) {
+                                       @RequestParam(value = "description", required = false) String description,
+                                       @RequestParam(value = "category", required = false) String category) {
         LoginUser user = current();
-        return Result.success(gameService.importGame(user.getUserId(), user.getFamilyId(), file, name, description));
+        return Result.success(gameService.importGame(user.getUserId(), user.getFamilyId(), file, name, description, category));
     }
 
     @Operation(summary = "添加网页游戏")

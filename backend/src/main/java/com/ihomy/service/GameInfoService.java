@@ -3,6 +3,7 @@ package com.ihomy.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ihomy.common.BizException;
+import com.ihomy.common.GameCategory;
 import com.ihomy.common.GameConst;
 import com.ihomy.common.GameLinkUrl;
 import com.ihomy.common.GameSaveName;
@@ -71,7 +72,8 @@ public class GameInfoService {
         return require(familyId, id);
     }
 
-    public GameInfo importGame(Long userId, Long familyId, MultipartFile file, String name, String description) {
+    public GameInfo importGame(Long userId, Long familyId, MultipartFile file, String name, String description,
+                               String category) {
         String cleanName = normalizeName(name);
         if (file == null || file.isEmpty()) {
             throw new BizException(ResultCode.BAD_REQUEST, "请选择要导入的游戏文件");
@@ -93,6 +95,7 @@ public class GameInfoService {
         g.setName(cleanName);
         g.setDescription(normalizeDescription(description));
         g.setType(type);
+        g.setCategory(GameCategory.normalize(category));
         g.setFileUrl(url);
         g.setStatus(GameConst.STATUS_ACTIVE);
         gameMapper.insert(g);
@@ -109,6 +112,7 @@ public class GameInfoService {
         g.setName(cleanName);
         g.setDescription(normalizeDescription(dto.getDescription()));
         g.setType(GameConst.TYPE_LINK);
+        g.setCategory(GameCategory.normalize(dto.getCategory()));
         g.setLinkUrl(linkUrl);
         g.setStatus(GameConst.STATUS_ACTIVE);
         gameMapper.insert(g);
@@ -124,6 +128,10 @@ public class GameInfoService {
                 .eq(GameInfo::getFamilyId, familyId)
                 .set(GameInfo::getName, cleanName)
                 .set(GameInfo::getDescription, cleanDesc);
+        // 分类未提供(旧调用方)时保持原值;提供了就归一后写入
+        if (dto != null && dto.getCategory() != null && !dto.getCategory().isBlank()) {
+            updater.set(GameInfo::getCategory, GameCategory.normalize(dto.getCategory()));
+        }
         // LINK 游戏可改网址;文件型游戏忽略该字段
         if (GameConst.TYPE_LINK.equals(game.getType()) && dto != null && dto.getLinkUrl() != null
                 && !dto.getLinkUrl().isBlank()) {

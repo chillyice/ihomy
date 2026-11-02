@@ -1191,6 +1191,7 @@ CREATE TABLE `game_info` (
   `name`        VARCHAR(100) NOT NULL COMMENT '游戏名',
   `description` VARCHAR(500) DEFAULT NULL COMMENT '描述',
   `type`        VARCHAR(20)  NOT NULL DEFAULT 'SWF' COMMENT '类型:SWF/GBA/LINK(外部网页)',
+  `category`    VARCHAR(20)  NOT NULL DEFAULT 'OTHER' COMMENT '分类:ACTION动作/PUZZLE益智/CASUAL休闲/SIMULATION模拟养成/ADVENTURE冒险/RPG角色扮演/STRATEGY策略/ARCADE街机/OTHER其他',
   `file_url`    VARCHAR(500) DEFAULT NULL COMMENT '文件URL(/files/games/...,LINK 类型为空)',
   `link_url`    VARCHAR(500) DEFAULT NULL COMMENT '外部网页游戏地址(仅 LINK 类型,http/https)',
   `status`      VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE' COMMENT '状态:ACTIVE启用/DISABLED禁用',
@@ -2773,3 +2774,15 @@ INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
 ('book_perm_level', 'READ',   '只读'),
 ('book_perm_level', 'WRITE',  '可记账'),
 ('book_perm_level', 'MANAGE', '可管理');
+
+-- 小游戏分类(game_info.category):页面按分类筛选,未知值统一落 OTHER
+INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('game_category', 'ACTION',     '动作'),
+('game_category', 'PUZZLE',     '益智'),
+('game_category', 'CASUAL',     '休闲'),
+('game_category', 'SIMULATION', '模拟养成'),
+('game_category', 'ADVENTURE',  '冒险'),
+('game_category', 'RPG',        '角色扮演'),
+('game_category', 'STRATEGY',   '策略'),
+('game_category', 'ARCADE',     '街机'),
+('game_category', 'OTHER',      '其他');

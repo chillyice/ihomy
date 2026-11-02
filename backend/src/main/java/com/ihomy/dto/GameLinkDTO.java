@@ -17,4 +17,7 @@ public class GameLinkDTO {
 
     @Size(max = 500, message = "描述不能超过 500 字")
     private String description;
+
+    @Size(max = 20, message = "游戏分类无效")
+    private String category;
 }
