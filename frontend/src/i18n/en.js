@@ -1046,7 +1046,12 @@ export default {
     },
     cards: {
       title: 'Cards',
-      desc: 'Klondike and Spider in one entry',
+      desc: 'Klondike and Spider — pick a game, then deal',
+      lobby: 'Game lobby',
+      pick: 'Pick a game and take a seat',
+      recent: 'Recent',
+      bestScore: 'Best {n}',
+      noBest: 'No record yet',
     },
     solitaire: {
       title: 'Solitaire',

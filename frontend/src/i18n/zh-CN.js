@@ -1040,7 +1040,12 @@ export default {
     },
     cards: {
       title: '纸牌',
-      desc: '纸牌接龙与蜘蛛纸牌，一个入口两种玩法',
+      desc: '纸牌接龙与蜘蛛纸牌，先选玩法再开局',
+      lobby: '玩法大厅',
+      pick: '选择一种玩法，进入牌桌',
+      recent: '最近在玩',
+      bestScore: '最高 {n} 分',
+      noBest: '暂无纪录',
     },
     solitaire: {
       title: '纸牌接龙',
