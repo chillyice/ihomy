@@ -4,13 +4,17 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ihomy.common.BizException;
 import com.ihomy.common.GameConst;
+import com.ihomy.common.GameLinkUrl;
 import com.ihomy.common.GameSaveName;
 import com.ihomy.common.ResultCode;
 import com.ihomy.common.PointsRuleConst;
 import com.ihomy.dto.GameInfoDTO;
+import com.ihomy.dto.GameLinkDTO;
 import com.ihomy.dto.GameSaveDTO;
 import com.ihomy.entity.GameInfo;
+import com.ihomy.entity.GameSiteAccount;
 import com.ihomy.mapper.GameInfoMapper;
+import com.ihomy.mapper.GameSiteAccountMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -25,25 +29,42 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * 家庭小游戏业务:导入 .swf(存 games/{游戏名}/)与 .gba、列表/详情/改名/改描述/删除,家庭隔离。
- * 仅支持 SWF/GBA 两种导入类型(.gbc/.gb 仅前端本地模式播放,不入库)。改名不移动物理文件夹(文件夹名在导入时固定)。
- * GBA 存档落在游戏目录下的 saves/(模拟器自动同步),删游戏连带清存档。
+ * 家庭小游戏业务:导入 .swf(存 games/{游戏名}/)与 .gba、添加外部网页游戏(LINK)、列表/详情/改名/改描述/删除,家庭隔离。
+ * 仅支持 SWF/GBA 两种文件导入类型(.gbc/.gb 仅前端本地模式播放,不入库);LINK 类型只存外链,点卡片新标签页打开。
+ * 改名不移动物理文件夹(文件夹名在导入时固定)。GBA 存档落在游戏目录下的 saves/(模拟器自动同步),
+ * 删游戏连带清存档;LINK 游戏无文件,删除不动磁盘。
  */
 @Service
 @RequiredArgsConstructor
 public class GameInfoService {
 
     private final GameInfoMapper gameMapper;
+    private final GameSiteAccountMapper siteAccountMapper;
     private final FileService fileService;
     private final StringRedisTemplate redis;
     private final PointsService pointsService;
 
-    public List<GameInfo> list(Long familyId) {
-        return gameMapper.selectList(new LambdaQueryWrapper<GameInfo>()
+    public List<GameInfo> list(Long familyId, Long userId) {
+        List<GameInfo> games = gameMapper.selectList(new LambdaQueryWrapper<GameInfo>()
                 .eq(GameInfo::getFamilyId, familyId)
                 .orderByDesc(GameInfo::getCreatedAt));
+        if (!games.isEmpty() && userId != null) {
+            markHasAccount(games, userId);
+        }
+        return games;
+    }
+
+    /** 一次批量查询当前成员保存过站点账号的游戏,回填 hasAccount(避免卡片逐个查) */
+    private void markHasAccount(List<GameInfo> games, Long userId) {
+        Set<Long> withAccount = siteAccountMapper.selectList(new LambdaQueryWrapper<GameSiteAccount>()
+                        .select(GameSiteAccount::getGameId)
+                        .eq(GameSiteAccount::getUserId, userId))
+                .stream().map(GameSiteAccount::getGameId).collect(Collectors.toSet());
+        games.forEach(g -> g.setHasAccount(withAccount.contains(g.getId())));
     }
 
     public GameInfo get(Long familyId, Long id) {
@@ -78,21 +99,45 @@ public class GameInfoService {
         return require(familyId, g.getId());
     }
 
+    /** 添加外部网页游戏(LINK):只存网址,点开新标签页跳转 */
+    public GameInfo importLink(Long userId, Long familyId, GameLinkDTO dto) {
+        String cleanName = normalizeName(dto.getName());
+        String linkUrl = GameLinkUrl.normalize(dto.getUrl());
+        GameInfo g = new GameInfo();
+        g.setFamilyId(familyId);
+        g.setUserId(userId);
+        g.setName(cleanName);
+        g.setDescription(normalizeDescription(dto.getDescription()));
+        g.setType(GameConst.TYPE_LINK);
+        g.setLinkUrl(linkUrl);
+        g.setStatus(GameConst.STATUS_ACTIVE);
+        gameMapper.insert(g);
+        return require(familyId, g.getId());
+    }
+
     public GameInfo update(Long familyId, Long id, GameInfoDTO dto) {
-        require(familyId, id);
+        GameInfo game = require(familyId, id);
         String cleanName = normalizeName(dto == null ? null : dto.getName());
         String cleanDesc = normalizeDescription(dto == null ? null : dto.getDescription());
-        gameMapper.update(null, new LambdaUpdateWrapper<GameInfo>()
+        LambdaUpdateWrapper<GameInfo> updater = new LambdaUpdateWrapper<GameInfo>()
                 .eq(GameInfo::getId, id)
                 .eq(GameInfo::getFamilyId, familyId)
                 .set(GameInfo::getName, cleanName)
-                .set(GameInfo::getDescription, cleanDesc));
+                .set(GameInfo::getDescription, cleanDesc);
+        // LINK 游戏可改网址;文件型游戏忽略该字段
+        if (GameConst.TYPE_LINK.equals(game.getType()) && dto != null && dto.getLinkUrl() != null
+                && !dto.getLinkUrl().isBlank()) {
+            updater.set(GameInfo::getLinkUrl, GameLinkUrl.normalize(dto.getLinkUrl()));
+        }
+        gameMapper.update(null, updater);
         return require(familyId, id);
     }
 
     public void delete(Long familyId, Long id) {
         GameInfo g = require(familyId, id);
-        fileService.deleteGameFiles(g.getFileUrl());
+        if (!GameConst.TYPE_LINK.equals(g.getType())) {
+            fileService.deleteGameFiles(g.getFileUrl());
+        }
         gameMapper.deleteById(id);
     }
 
@@ -212,7 +257,8 @@ public class GameInfoService {
         return Duration.between(now, now.toLocalDate().plusDays(1).atStartOfDay()).getSeconds();
     }
 
-    private GameInfo require(Long familyId, Long id) {
+    /** 家庭隔离取游戏:不属于当前家庭一律 NOT_FOUND(站点账号等服务复用) */
+    public GameInfo require(Long familyId, Long id) {
         GameInfo g = gameMapper.selectOne(new LambdaQueryWrapper<GameInfo>()
                 .eq(GameInfo::getFamilyId, familyId)
                 .eq(GameInfo::getId, id));

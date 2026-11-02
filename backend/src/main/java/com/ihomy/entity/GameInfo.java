@@ -11,7 +11,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 家庭小游戏实体(game_info):导入的 swf 小游戏,家庭隔离,可改名/改描述/删除。
+ * 家庭小游戏实体(game_info):导入的 swf/gba 小游戏与外部网页游戏(LINK),家庭隔离,可改名/改描述/删除。
  */
 @Data
 @TableName("game_info")
@@ -24,10 +24,15 @@ public class GameInfo {
     private String description;
     private String type;
     private String fileUrl;
+    /** 外部网页游戏地址(仅 LINK 类型有值) */
+    private String linkUrl;
     private String status;
     @TableLogic
     private Integer deleted;
     private LocalDateTime createdAt;
     @TableField(updateStrategy = FieldStrategy.NEVER)
     private LocalDateTime updatedAt;
+    /** 当前成员是否已保存该游戏的站点账号(列表查询内存回填,非表字段) */
+    @TableField(exist = false)
+    private Boolean hasAccount;
 }

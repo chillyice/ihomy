@@ -39,7 +39,8 @@ public class AccessLogFilter extends OncePerRequestFilter {
 
     /** JSON 入参/响应敏感字段打码(值替换为 ***) */
     private static final Pattern SENSITIVE_JSON =
-            Pattern.compile("(?i)(\"(?:password|passwd|oldPassword|newPassword|token|accessToken|access_token"
+            Pattern.compile("(?i)(\"(?:password|passwd|oldPassword|newPassword|sitePassword|site_password"
+                    + "|siteUsername|site_username|token|accessToken|access_token"
                     + "|refreshToken|refresh_token|secret|secretKey|privateKey|publicKey|apiKey|api_key"
                     + "|appKey|signKey|probeToken|captcha|captchaCode"
                     + "|plaintext|ciphertext|authorization)"

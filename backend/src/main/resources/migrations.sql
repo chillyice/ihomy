@@ -2819,3 +2819,36 @@ INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUE
 ('book_perm_level', 'READ',   '只读'),
 ('book_perm_level', 'WRITE',  '可记账'),
 ('book_perm_level', 'MANAGE', '可管理');
+
+-- ------------------------------------------------------------
+-- V11.7 小游戏:外部网页游戏(LINK)+ 站点账号(2026-11-02)
+--   game_info 加 link_url(LINK 类型存外部网址),file_url 放开可空(LINK 无文件);
+--   game_site_account 一人一游戏一行,密码只存 AES-GCM 密文(ENC(Base64)),删除即物理删。
+--   重复执行安全:information_schema 条件加列 / MODIFY 幂等 / CREATE TABLE IF NOT EXISTS。
+-- ------------------------------------------------------------
+SET @add_game_link := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `game_info` ADD COLUMN `link_url` VARCHAR(500) DEFAULT NULL COMMENT ''外部网页游戏地址(仅 LINK 类型,http/https)'' AFTER `file_url`',
+    'SELECT ''skip: game_info.link_url already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'game_info' AND COLUMN_NAME = 'link_url'
+);
+PREPARE add_game_link_stmt FROM @add_game_link;
+EXECUTE add_game_link_stmt;
+DEALLOCATE PREPARE add_game_link_stmt;
+
+ALTER TABLE `game_info` MODIFY COLUMN `file_url` VARCHAR(500) NULL COMMENT '文件URL(/files/games/...,LINK 类型为空)';
+
+CREATE TABLE IF NOT EXISTS `game_site_account` (
+  `id`            BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `game_id`       BIGINT       NOT NULL COMMENT '游戏ID(game_info.id)',
+  `user_id`       BIGINT       NOT NULL COMMENT '所属成员ID(只存自己的账号)',
+  `site_username` VARCHAR(100) DEFAULT NULL COMMENT '站点用户名',
+  `site_password` VARCHAR(500) DEFAULT NULL COMMENT '站点密码(AES-GCM 密文 ENC(Base64))',
+  `remark`        VARCHAR(200) DEFAULT NULL COMMENT '备注',
+  `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_game_user` (`game_id`, `user_id`),
+  KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='游戏站点账号(外部网页游戏登录信息,密码加密存储)';

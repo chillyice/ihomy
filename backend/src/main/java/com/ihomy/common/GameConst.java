@@ -2,7 +2,7 @@ package com.ihomy.common;
 
 /**
  * 小游戏常量:类型/状态/长度上限。
- * 支持 SWF(Flash 播放器)与 GBA(GBA 模拟器)两种导入类型。
+ * 支持 SWF(Flash 播放器)、GBA(GBA 模拟器)与 LINK(外部网页跳转)三种类型。
  */
 public final class GameConst {
 
@@ -12,6 +12,7 @@ public final class GameConst {
     /** 游戏类型 type */
     public static final String TYPE_SWF = "SWF";
     public static final String TYPE_GBA = "GBA";
+    public static final String TYPE_LINK = "LINK";
 
     /** 状态 status */
     public static final String STATUS_ACTIVE = "ACTIVE";

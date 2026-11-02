@@ -1190,8 +1190,9 @@ CREATE TABLE `game_info` (
   `user_id`     BIGINT       NOT NULL COMMENT '导入人ID',
   `name`        VARCHAR(100) NOT NULL COMMENT '游戏名',
   `description` VARCHAR(500) DEFAULT NULL COMMENT '描述',
-  `type`        VARCHAR(20)  NOT NULL DEFAULT 'SWF' COMMENT '类型:SWF/GBA(预留)',
-  `file_url`    VARCHAR(500) NOT NULL COMMENT '文件URL(/files/games/...)',
+  `type`        VARCHAR(20)  NOT NULL DEFAULT 'SWF' COMMENT '类型:SWF/GBA/LINK(外部网页)',
+  `file_url`    VARCHAR(500) DEFAULT NULL COMMENT '文件URL(/files/games/...,LINK 类型为空)',
+  `link_url`    VARCHAR(500) DEFAULT NULL COMMENT '外部网页游戏地址(仅 LINK 类型,http/https)',
   `status`      VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE' COMMENT '状态:ACTIVE启用/DISABLED禁用',
   `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
   `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -1199,6 +1200,26 @@ CREATE TABLE `game_info` (
   PRIMARY KEY (`id`),
   KEY `idx_family_created` (`family_id`, `deleted`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭小游戏表';
+
+-- ------------------------------------------------------------
+-- 33b. 游戏站点账号表(V11.7:外部网页游戏的登录信息,成员各自保存)
+--      密码只存 AES-GCM 密文(ENC(Base64),盐值 sys_parameter.aes-salt);
+--      一人一游戏一行(唯一键),删除即物理删(密文不留库)。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `game_site_account`;
+CREATE TABLE `game_site_account` (
+  `id`            BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `game_id`       BIGINT       NOT NULL COMMENT '游戏ID(game_info.id)',
+  `user_id`       BIGINT       NOT NULL COMMENT '所属成员ID(只存自己的账号)',
+  `site_username` VARCHAR(100) DEFAULT NULL COMMENT '站点用户名',
+  `site_password` VARCHAR(500) DEFAULT NULL COMMENT '站点密码(AES-GCM 密文 ENC(Base64))',
+  `remark`        VARCHAR(200) DEFAULT NULL COMMENT '备注',
+  `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_game_user` (`game_id`, `user_id`),
+  KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='游戏站点账号(外部网页游戏登录信息,密码加密存储)';
 
 -- ------------------------------------------------------------
 -- 34. 家庭计划表（V3.4 中长期目标:全家计划含子任务清单）
