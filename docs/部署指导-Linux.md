@@ -114,6 +114,7 @@ sudo systemctl restart mysql     # CentOS: mysqld
 #### 2.4.1 MySQL 8.4 LTS 补丁升级运行手册（8.4.11 → 8.4.13）
 
 > 只走 **8.4 LTS 补丁线**，不装 9.x、也不跟 `mysql-cluster-26.x` 创新版。8.4 补丁线内 MySQL **不支持降级**，回滚只能靠升级前的备份。
+> **2026-11-02 实测**：生产 MySQL 来自 Ubuntu 26.04 发行版源（`8.4.11-0ubuntu0.26.04.1`），`apt-get update` 后 `mysql-server` 的 Candidate 仍是 8.4.11——上游 8.4.13 尚未进 `resolute-updates`，**此环境下第 3 步是空操作**。要升到 8.4.13 只能接入 MySQL 官方 APT 源，属于更换包来源，需单独评审；未接入前如实记录实际版本即可。
 
 ```bash
 # 0) 核对现状（台账可能滞后：2026-10-27 实测生产为 8.4.11，台账当时记 8.4.10）
@@ -261,9 +262,14 @@ sudo systemctl is-active ihomy-backend                                       # a
 
 **改密后手工命令都要带 `-a`**：`docker exec ihomy-redis redis-cli -a '<Redis密码>' --no-auth-warning ...`（或先 `export REDISCLI_AUTH='<Redis密码>'`）。`--requirepass` 写在 `docker run` 参数里，`docker inspect` 可见，故密码只放台账与 external.yml，不写进任何入库文件。
 
-#### 2.6.2 Redis 补丁升级运行手册（8.8.1 → 8.10.3）
+#### 2.6.2 Redis 补丁升级运行手册（6.2.6 → 8.10.3）
 
 > 只升补丁/小版本、**不改密码**时 `external.yml` 不用动；但重建容器会**清空全部 Redis 数据**（无持久化卷）：刷新令牌黑名单、验证码、登录限流计数、当前家庭选择全部丢失，**全员需要重新登录一次**（访问令牌是无状态 JWT，2 小时内仍有效）。
+> **镜像来源**：生产 `daemon.json` 配的是阿里云个人加速器，实测没有 `redis:8.x` 的 tag（`docker pull redis:8.10.3` 返回 not found），直连 Docker Hub 又超时。先拉镜像源再打回原名：
+> ```bash
+> docker pull docker.m.daocloud.io/library/redis:8.10.3
+> docker tag docker.m.daocloud.io/library/redis:8.10.3 redis:8.10.3
+> ```
 
 ```bash
 # 0) 记录现状

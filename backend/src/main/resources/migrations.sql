@@ -2996,3 +2996,15 @@ UPDATE `sys_oss_component` SET `current_version` = '4.1.0'
  WHERE `component_type` = 'NPM' AND `package_ref` = 'pinia';
 UPDATE `sys_oss_component` SET `current_version` = '11.4.17'
  WHERE `component_type` = 'NPM' AND `package_ref` = 'vue-i18n';
+
+-- ------------------------------------------------------------
+-- 开源组件升级 P5:独立服务(2026-11-02)
+--   Redis 6.2.6 → 8.10.3(生产实际是 6.2.6:容器沿用了 4 年前的 redis:latest 镜像,
+--   台账原记 8.8.1 未探测,已按实跑版本更正);MySQL 8.4.10 → 8.4.11
+--   (Ubuntu 26.04 源内最新补丁:8.4.13 未进发行版源,不为此新增第三方 APT 源)。
+--   重复执行安全:全部为幂等 UPDATE。
+-- ------------------------------------------------------------
+UPDATE `sys_oss_component` SET `current_version` = '8.10.3'
+ WHERE `component_type` = 'SERVICE' AND `package_ref` = 'redis/redis';
+UPDATE `sys_oss_component` SET `current_version` = '8.4.11'
+ WHERE `component_type` = 'SERVICE' AND `package_ref` = 'mysql/mysql-server';

@@ -220,9 +220,9 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 - MySQL 本机(~180MB)+ Redis 用 Docker。后端以 `ihomy` 用户跑 systemd,MySQL 用 `mysql`,Nginx 用 `www-data`;除装包/建用户/systemd/`/etc/`/防火墙/certbot/导 schema 外不用 root。
 - JVM:`-Xmx384m -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC -Xss512k`;MySQL `performance_schema=OFF`,端口 6306。
-- **Redis 只绑回环 + 强密码**:`-p 127.0.0.1:6379:6379` + `--requirepass`(写在**镜像名之后**),密码同值进 external.yml;**改密顺序**:external.yml → 停后端 → 重建容器 → 起后端 → 冒烟。
+- **Redis 只绑回环 + 强密码**:`-p 127.0.0.1:6379:6379` + `--requirepass`(写在**镜像名之后**),密码同值进 external.yml;镜像固定 tag(当前 `redis:8.10.3`),Docker Hub/阿里云加速器缺新 tag 时经 daocloud 镜像源拉取后 `docker tag` 回原名;**改密顺序**:external.yml → 停后端 → 重建容器 → 起后端 → 冒烟(踩坑速查 §7.17)。
 - SSH 统一 **19068**(禁 22),所有 ssh/scp 带 `-p 19068`;配 fail2ban 与自动安全更新。
-- 备份:`scripts/prod-backup.sh`(mysqldump 单事务 + gzip 校验 + uploads 只增不删,留 14 天)由 systemd timer 每日 03:00 跑;恢复 `scripts/prod-restore.sh <dump> <目标库>`(必须显式给库,恢复前自动快照)。
+- 备份:`scripts/prod-backup.sh`(mysqldump 单事务 + gzip 校验 + uploads 只增不删,留 14 天)由 systemd timer 每日 03:00 跑;恢复 `scripts/prod-restore.sh <dump> <目标库>`(必须显式给库,恢复前自动快照)。**生产 2026-11-02 尚未安装 timer**(只上传了脚本并手工跑过一次),需装 `config/systemd/ihomy-backup.{service,timer}` 后才成立。
 - **重装/新服务器四条必查**:① nginx `mime.types` 有 `.mjs`;② 站点 conf 有 gzip 四行;③ 静态缓存 location 负向断言排除 `/api/`、`/files/`(否则接口文档 404);④ 媒体引擎播放地址与站点同为 HTTPS(接口断言查不出)。细节 踩坑速查 §7.1/§7.3/§7.10。
 - **部署新前端后老客户端仍跑旧 bundle(PWA 预缓存)**:冒烟前先 unregister SW + 清 caches;用户侧 Ctrl+Shift+R(踩坑速查 §7.2)。`public/` 下不带内容哈希的运行时(如 `/ruffle/ruffle.js`)被 nginx 强缓存 7 天,换版本必须带 `?v=` 破缓存(踩坑速查 §3.55)。
 - 详细步骤 `docs/部署指导-Linux.md` / `docs/部署指导-Windows.md`。

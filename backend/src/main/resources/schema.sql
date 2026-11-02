@@ -2197,8 +2197,8 @@ INSERT INTO `sys_oss_component` (`name`, `component_type`, `package_ref`, `curre
 ('Nextcloud', 'SERVICE', 'nextcloud/server', NULL, 'AGPL-3.0', 'https://github.com/nextcloud/server', 'WebDAV/Nextcloud 存储后端', 'PARTIAL'),
 ('Jellyfin', 'SERVICE', 'jellyfin/jellyfin', '10.9.11', 'GPL-2.0', 'https://github.com/jellyfin/jellyfin', '放映厅媒体引擎(刮削/转码/字幕轨/TV 客户端;API 集成,界面自建)', 'PARTIAL'),
 ('Home Assistant', 'SERVICE', 'home-assistant/core', NULL, 'Apache-2.0', 'https://github.com/home-assistant/core', '智能家居中控(实体状态采集/设备控制;API 集成,界面自建)', 'PARTIAL'),
-('MySQL', 'SERVICE', 'mysql/mysql-server', '8.4.10', 'GPL-2.0', 'https://github.com/mysql/mysql-server', '关系型数据库(业务数据持久化,端口 6306);跟踪 8.4 LTS,不跟 26.x 创新版', 'FULL'),
-('Redis', 'SERVICE', 'redis/redis', '8.8.1', 'AGPL-3.0', 'https://github.com/redis/redis', '缓存/令牌/验证码/限流(内存数据存储,只绑回环)', 'FULL');
+('MySQL', 'SERVICE', 'mysql/mysql-server', '8.4.11', 'GPL-2.0', 'https://github.com/mysql/mysql-server', '关系型数据库(业务数据持久化,端口 6306);跟踪 8.4 LTS,不跟 26.x 创新版', 'FULL'),
+('Redis', 'SERVICE', 'redis/redis', '8.10.3', 'AGPL-3.0', 'https://github.com/redis/redis', '缓存/令牌/验证码/限流(内存数据存储,只绑回环)', 'FULL');
 
 -- NPM/MAVEN 直接依赖交由 Renovate 检测 + 生成 PR,SERVICE 独立服务由台账内部维护(默认 INTERNAL)
 
