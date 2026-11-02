@@ -2929,3 +2929,33 @@ UPDATE `sys_oss_component` SET `current_version` = '3.2.0'
 UPDATE `sys_oss_component` SET `current_version` = '1.18.48',
        `purpose` = '编译期样板代码生成(Boot 4.1.2 BOM 托管)'
  WHERE `component_type` = 'MAVEN' AND `package_ref` = 'org.projectlombok:lombok';
+
+-- ------------------------------------------------------------
+-- 开源组件升级 P2:前端运行时补丁/小版本(2026-11-02)
+--   记 package-lock.json 实际锁定版本(--save-exact);simple-mind-map 的 latest 是
+--   预发布 0.14.0-fix.3,不写回台账,保持 0.14.0。重复执行安全:全部为幂等 UPDATE。
+-- ------------------------------------------------------------
+UPDATE `sys_oss_component` SET `current_version` = '3.5.44'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'vue';
+UPDATE `sys_oss_component` SET `current_version` = '2.14.7'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'element-plus';
+UPDATE `sys_oss_component` SET `current_version` = '1.21.0'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'axios';
+UPDATE `sys_oss_component` SET `current_version` = '18.1.2'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'marked';
+UPDATE `sys_oss_component` SET `current_version` = '1.7.4'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'hls.js';
+UPDATE `sys_oss_component` SET `current_version` = '6.5.438'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'pdfjs-dist';
+UPDATE `sys_oss_component` SET `current_version` = '0.187.0'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'three';
+UPDATE `sys_oss_component` SET `current_version` = '0.8.3'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'fflate';
+UPDATE `sys_oss_component` SET `current_version` = '5.5.0'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'js-yaml';
+UPDATE `sys_oss_component` SET `current_version` = '0.7.1'
+ WHERE `component_type` = 'NPM' AND `package_ref` = '@ruffle-rs/ruffle';
+UPDATE `sys_oss_component` SET `current_version` = '3.9.10'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'prettier';
+UPDATE `sys_oss_component` SET `current_version` = '10.12.0'
+ WHERE `component_type` = 'NPM' AND `package_ref` = 'eslint-plugin-vue';
