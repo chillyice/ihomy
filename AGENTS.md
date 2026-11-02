@@ -196,7 +196,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 - 后端全绿:`.\mvnw.cmd -B clean package`(312 tests,纯逻辑不起 Spring)。
 - 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(716 passed)+ `npm run format:check`(全树遗留未格式化:`views/BitPouch.vue`、`utils/packetDecode.js`+`.spec.js`、`views/bitpouch/panels/PacketPanel.vue`、`views/Chillyice.vue`、`views/ops/tabs/OpsKada.vue`;**本次改动的文件必须 `prettier --write` 后通过**)。
-- 构建:首屏初始 JS 基线 **1625.99KB / gzip 557.59KB**(V11.16 起,Vite 8/Rolldown 分块口径:入口本身是 0.04KB facade,首屏 47 个 assets 合计;最大单块 element-plus 612.12KB / 188.90KB)。V11.15 及以前的「单入口 553.40 / 227.20」是 Vite 5 单块口径,与分块后不可直接比;**体积口径一律以 vite 构建输出打印的数字为准**(它按 minified 代码的 UTF-16 长度计数,与磁盘 UTF-8 字节数对不上,`ls -la` 也不可比);历史数字见 变更归档。
+- 构建:首屏初始 JS 基线 **1619.42KB / gzip 556.46KB**(V11.18 起,Vite 8/Rolldown 分块口径:入口本身是 0.04KB facade,首屏 43 个初始 assets 合计;最大单块 element-plus 612.10KB / 188.51KB)。V11.16 的 1625.99 / 557.59 是 Vue 生态大版本升级前的同口径值;V11.15 及以前的「单入口 553.40 / 227.20」是 Vite 5 单块口径,与分块后不可直接比;**体积口径一律以 vite 构建输出打印的数字为准**(它按 minified 代码的 UTF-16 长度计数,与磁盘 UTF-8 字节数对不上,`ls -la` 也不可比);历史数字见 变更归档。
 - 一致性:`bash scripts/doc-drift-check.sh` 全 [OK];`gen-code-map.sh --check`、`doc-index.sh --check` 无漂移。
 - 接口测试在仓库外 `..\autotest_framework`(`pytest -m api`,37 passed)。
 
