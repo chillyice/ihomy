@@ -21,7 +21,7 @@
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",
     "@emulatorjs/emulatorjs": "^4.2.3",
-    "@ruffle-rs/ruffle": "^0.6.0",
+    "@ruffle-rs/ruffle": "0.7.1",
     "axios": "1.21.0",
     "dompurify": "^3.4.17",
     "element-plus": "2.14.7",
