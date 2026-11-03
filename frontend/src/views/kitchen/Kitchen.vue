@@ -263,7 +263,7 @@ onMounted(loadMenu)
   }
 }
 
-:global(html.dark) .menu-info {
+html.dark .menu-info {
   background: rgba(40, 44, 52, 0.85);
 }
 </style>

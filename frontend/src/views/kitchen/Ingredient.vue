@@ -710,11 +710,11 @@ onMounted(() => {
   padding: 0 6px 10px;
 }
 
-:global(html.dark) .ingredient-bar {
+html.dark .ingredient-bar {
   background: rgba(40, 44, 52, 0.6);
   border-color: rgba(255, 255, 255, 0.08);
 }
-:global(html.dark) .bar-image-overlay {
+html.dark .bar-image-overlay {
   background: linear-gradient(to right, transparent 0%, transparent 40%, rgba(40, 44, 52, 0.9) 100%);
 }
 

@@ -764,7 +764,8 @@ watch(
 .gc-mw-warn .el-icon {
   font-size: 14px;
 }
-:global(.mini-weather-popper) {
+/* 弹层挂在 body 下,本文件是非 scoped 样式块,直接写类名即可(别包 :global) */
+.mini-weather-popper {
   max-width: 320px;
 }
 .gc-mw-warn-row {

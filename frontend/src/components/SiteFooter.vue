@@ -55,7 +55,7 @@ const appVersion = __APP_VERSION__
   letter-spacing: 0.2px;
   cursor: default;
 }
-:global(html.dark) .site-footer {
+html.dark .site-footer {
   color: rgba(232, 220, 200, 0.55);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }

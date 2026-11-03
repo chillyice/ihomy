@@ -342,9 +342,9 @@ onMounted(load)
   }
 }
 
-:global(html.dark) .ingredient-item,
-:global(html.dark) .equipment-item,
-:global(html.dark) .step-body {
+html.dark .ingredient-item,
+html.dark .equipment-item,
+html.dark .step-body {
   background: rgba(40, 44, 52, 0.6);
   border-color: rgba(255, 255, 255, 0.08);
 }

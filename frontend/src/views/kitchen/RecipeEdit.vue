@@ -340,7 +340,7 @@ onMounted(load)
   }
 }
 
-:global(html.dark) .form-section {
+html.dark .form-section {
   background: rgba(40, 44, 52, 0.6);
   border-color: rgba(255, 255, 255, 0.08);
 }
