@@ -76,7 +76,7 @@ const lunarText = computed(() => {
 })
 
 // 节日、节气、休班各占一行,行首属性由这里决定;节日与法定节假日同名(如春节)时只留一行,
-// 休班(调休补班)不与节日重名、单独成行。
+// 休班(调休补班)不与节日重名、单独成行;非节气日 term 为空串,空名称行整行跳过。
 const calendarRows = computed(() => {
   const info = props.info
   if (!info) return []
@@ -84,8 +84,8 @@ const calendarRows = computed(() => {
   const seen = new Set()
   const push = (key, label, title, cls) => {
     const name = title || ''
-    if (name && seen.has(name)) return
-    if (name) seen.add(name)
+    if (!name || seen.has(name)) return
+    seen.add(name)
     rows.push({ key, label, title: name, cls })
   }
   ;(info.festivals || []).forEach((name, i) => push('festival-' + i, t('schedule.dayKind.festival'), name, 'festival'))
