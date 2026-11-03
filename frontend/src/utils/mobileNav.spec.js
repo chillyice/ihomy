@@ -33,6 +33,7 @@ describe('mobileHeaderTitleKey', () => {
       '/games',
       '/games/petlink',
       '/games/play/12',
+      '/games/web/12',
       '/help',
       '/reset-password',
     ]

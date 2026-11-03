@@ -36,7 +36,4 @@ public class GameInfo {
     private LocalDateTime createdAt;
     @TableField(updateStrategy = FieldStrategy.NEVER)
     private LocalDateTime updatedAt;
-    /** 当前成员是否已保存该游戏的站点账号(列表查询内存回填,非表字段) */
-    @TableField(exist = false)
-    private Boolean hasAccount;
 }

@@ -164,6 +164,8 @@ const routes = [
   // 小游戏:家庭游戏库(花园 + 导入的 swf 游戏),需登录
   { path: '/games', name: 'Games', component: () => import('@/views/games/Games.vue'), meta: { requiresAuth: true } },
   { path: '/games/play/:id', name: 'GamePlayer', component: () => import('@/views/games/GamePlayer.vue'), meta: { requiresAuth: true } },
+  // 网页游戏:站内 iframe 直接打开外部游戏页(LINK 类型),不再新标签页跳走
+  { path: '/games/web/:id', name: 'WebGame', component: () => import('@/views/games/WebGame.vue'), meta: { requiresAuth: true } },
   // 宠物连连看 H5(自 Flash 移植的原生小游戏,通关发积分),需登录
   { path: '/games/petlink', name: 'PetLinkLink', component: () => import('@/views/games/PetLinkLink.vue'), meta: { requiresAuth: true } },
   // 数独 H5(唯一解生成、笔记/提示/撤销,通关发积分),需登录

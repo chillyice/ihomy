@@ -292,7 +292,8 @@ export const plantApi = {
   harvest: (species, message) => request.post('/plant/harvest', { species, message }),
 }
 
-// 小游戏(家庭游戏库:导入 .swf/.gba、添加网页游戏 LINK,列表/详情/改名/改描述/删除;H5 通关奖励;GBA 存档;站点账号)
+// 小游戏(家庭游戏库:导入 .swf/.gba、添加网页游戏 LINK,列表/详情/改名/改描述/删除;H5 通关奖励;GBA 存档)
+// 网页游戏的站点登录信息统一存家庭保险箱,vaultApi 里维护
 export const gameApi = {
   list: () => request.get('/game'),
   get: (id) => request.get(`/game/${id}`),
@@ -302,10 +303,6 @@ export const gameApi = {
   remove: (id) => request.delete(`/game/${id}`),
   // 自动归类:只给还没有系列的游戏按名称猜系列,不覆盖手动值
   autoSeries: () => request.post('/game/auto-series'),
-  // 站点账号:成员为网页游戏保存的外部站点登录信息,只读写本人自己的
-  getAccount: (id) => request.get(`/game/${id}/account`),
-  saveAccount: (id, data) => request.put(`/game/${id}/account`, data),
-  deleteAccount: (id) => request.delete(`/game/${id}/account`),
   petLinkReward: () => request.post('/game/petlink/reward'),
   sudokuReward: () => request.post('/game/sudoku/reward'),
   game2048Reward: () => request.post('/game/2048/reward'),

@@ -1204,26 +1204,6 @@ CREATE TABLE `game_info` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭小游戏表';
 
 -- ------------------------------------------------------------
--- 33b. 游戏站点账号表(V11.7:外部网页游戏的登录信息,成员各自保存)
---      密码只存 AES-GCM 密文(ENC(Base64),盐值 sys_parameter.aes-salt);
---      一人一游戏一行(唯一键),删除即物理删(密文不留库)。
--- ------------------------------------------------------------
-DROP TABLE IF EXISTS `game_site_account`;
-CREATE TABLE `game_site_account` (
-  `id`            BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `game_id`       BIGINT       NOT NULL COMMENT '游戏ID(game_info.id)',
-  `user_id`       BIGINT       NOT NULL COMMENT '所属成员ID(只存自己的账号)',
-  `site_username` VARCHAR(100) DEFAULT NULL COMMENT '站点用户名',
-  `site_password` VARCHAR(500) DEFAULT NULL COMMENT '站点密码(AES-GCM 密文 ENC(Base64))',
-  `remark`        VARCHAR(200) DEFAULT NULL COMMENT '备注',
-  `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_game_user` (`game_id`, `user_id`),
-  KEY `idx_user` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='游戏站点账号(外部网页游戏登录信息,密码加密存储)';
-
--- ------------------------------------------------------------
 -- 34. 家庭计划表（V3.4 中长期目标:全家计划含子任务清单）
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `family_plan`;

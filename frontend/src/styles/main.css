@@ -541,6 +541,10 @@ a {
   margin: 0 auto;
   padding: 16px;
 }
+/* 网页游戏页(V11.32):iframe 外壳吃满可用宽度,不受 1100px 内容宽限制 */
+.page.web-game-page {
+  max-width: none;
+}
 
 /* ========== 页面通用:标题栏 + 面包屑 ========== */
 .page-header {

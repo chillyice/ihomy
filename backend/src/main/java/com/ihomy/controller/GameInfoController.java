@@ -5,13 +5,10 @@ import com.ihomy.common.Result;
 import com.ihomy.dto.GameInfoDTO;
 import com.ihomy.dto.GameLinkDTO;
 import com.ihomy.dto.GameSaveDTO;
-import com.ihomy.dto.GameSiteAccountDTO;
-import com.ihomy.dto.GameSiteAccountVO;
 import com.ihomy.entity.GameInfo;
 import com.ihomy.security.LoginUser;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.GameInfoService;
-import com.ihomy.service.GameSiteAccountService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -34,8 +31,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 小游戏接口:导入 .swf(存 games/{游戏名}/)、添加外部网页游戏(LINK)、列表/详情/改名/改描述/删除、站点账号。
- * 家庭隔离,登录即可(与植物/脑图一致)。
+ * 小游戏接口:导入 .swf(存 games/{游戏名}/)、添加外部网页游戏(LINK)、列表/详情/改名/改描述/删除。
+ * 家庭隔离,登录即可(与植物/脑图一致)。网页游戏的站点登录信息统一存家庭保险箱(/vault)。
  */
 @Tag(name = "小游戏")
 @RestController
@@ -44,7 +41,6 @@ import java.util.Map;
 public class GameInfoController {
 
     private final GameInfoService gameService;
-    private final GameSiteAccountService siteAccountService;
     private final SecurityHelper securityHelper;
 
     private LoginUser current() {
@@ -55,7 +51,7 @@ public class GameInfoController {
     @GetMapping
     public Result<List<GameInfo>> list() {
         LoginUser user = current();
-        return Result.success(gameService.list(user.getFamilyId(), user.getUserId()));
+        return Result.success(gameService.list(user.getFamilyId()));
     }
 
     @Operation(summary = "游戏详情")
@@ -105,30 +101,6 @@ public class GameInfoController {
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         gameService.delete(current().getFamilyId(), id);
-        return Result.success();
-    }
-
-    @Operation(summary = "查看游戏站点账号")
-    @GetMapping("/{id}/account")
-    public Result<GameSiteAccountVO> getAccount(@PathVariable Long id) {
-        LoginUser user = current();
-        return Result.success(siteAccountService.get(user.getFamilyId(), user.getUserId(), id));
-    }
-
-    @Operation(summary = "保存游戏站点账号")
-    @OperationLog(module = "GAME", operationType = "UPDATE", description = "保存游戏站点账号", saveArgs = false)
-    @PutMapping("/{id}/account")
-    public Result<GameSiteAccountVO> saveAccount(@PathVariable Long id, @Valid @RequestBody GameSiteAccountDTO dto) {
-        LoginUser user = current();
-        return Result.success(siteAccountService.save(user.getFamilyId(), user.getUserId(), id, dto));
-    }
-
-    @Operation(summary = "删除游戏站点账号")
-    @OperationLog(module = "GAME", operationType = "DELETE", description = "删除游戏站点账号")
-    @DeleteMapping("/{id}/account")
-    public Result<Void> deleteAccount(@PathVariable Long id) {
-        LoginUser user = current();
-        siteAccountService.delete(user.getFamilyId(), user.getUserId(), id);
         return Result.success();
     }
 

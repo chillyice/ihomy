@@ -210,6 +210,7 @@
 // 复制后 10 秒自动清剪贴板,揭示 30 秒自动隐藏。
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import { Search, View, Hide, DocumentCopy, Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { vaultApi } from '@/api'
@@ -220,6 +221,8 @@ import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
 const userStore = useUserStore()
 
 const CATEGORIES = ['SITE', 'APP', 'BANK', 'SOCIAL', 'DEVICE', 'WIFI', 'OTHER']
@@ -442,7 +445,22 @@ const onDelete = async (item) => {
   await load()
 }
 
-onMounted(load)
+// 从网页游戏页带参进入(/vault?create=1&name=..&url=..&category=SITE):直接弹新建并预填,
+// 打开后清掉 query,刷新页面不会反复弹窗
+const openFromQuery = () => {
+  if (route.query.create !== '1' || !canManage.value) return
+  const q = route.query
+  openEditor()
+  if (typeof q.name === 'string') editor.form.name = q.name
+  if (typeof q.url === 'string') editor.form.url = q.url
+  if (typeof q.category === 'string' && CATEGORIES.includes(q.category)) editor.form.category = q.category
+  router.replace({ path: '/vault' })
+}
+
+onMounted(async () => {
+  await load()
+  openFromQuery()
+})
 // 离开页面:清掉全部定时器;剪贴板里还留着的密码立刻尽力清空(读不到就交给 10 秒兜底计时器之前的手动刷新)
 onBeforeUnmount(() => {
   revealTimers.forEach((timer) => clearTimeout(timer))

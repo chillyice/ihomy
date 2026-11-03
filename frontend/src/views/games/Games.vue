@@ -64,7 +64,7 @@
         </div>
       </div>
 
-      <!-- 导入的小游戏(LINK 为外部网页游戏,点卡片新标签页打开) -->
+      <!-- 导入的小游戏(LINK 为外部网页游戏,点卡片进站内 /games/web/{id} 用 iframe 打开) -->
       <div v-a11y-click v-for="g in visibleGames" :key="g.id" class="tool-card card" @click="play(g)">
         <div class="tool-icon">
           <el-icon :size="30">
@@ -81,9 +81,6 @@
               <el-icon><Collection /></el-icon>{{ g.series }}
             </div>
             <div class="tool-type-tag">{{ typeText(g) }}</div>
-            <el-tooltip v-if="g.hasAccount" :content="$t('games.account.savedFlag')" placement="top">
-              <el-icon class="tool-account-flag"><Key /></el-icon>
-            </el-tooltip>
           </div>
           <span class="tool-enter">
             {{ g.type === 'LINK' ? $t('games.open') : $t('games.play') }}<el-icon><ArrowRight /></el-icon
@@ -95,7 +92,7 @@
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item command="edit">{{ $t('games.edit') }}</el-dropdown-item>
-                <el-dropdown-item v-if="g.type === 'LINK'" command="account">{{ $t('games.account.title') }}</el-dropdown-item>
+                <el-dropdown-item v-if="g.type === 'LINK' && canVault" command="vault">{{ $t('games.vaultEntry') }}</el-dropdown-item>
                 <el-dropdown-item command="delete" divided>{{ $t('games.delete') }}</el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -190,29 +187,6 @@
       </template>
     </el-dialog>
 
-    <!-- 站点账号对话框:记住外部游戏网站的登录信息,只存自己名下 -->
-    <el-dialog v-model="accountVisible" append-to-body :title="$t('games.account.title')" width="440px" destroy-on-close>
-      <p class="account-hint">{{ $t('games.account.hint') }}</p>
-      <el-form label-position="top" @submit.prevent>
-        <el-form-item :label="$t('games.account.username')">
-          <el-input v-model="accountForm.siteUsername" maxlength="100" autocomplete="off" />
-        </el-form-item>
-        <el-form-item :label="$t('games.account.password')">
-          <el-input v-model="accountForm.sitePassword" type="password" show-password maxlength="200" autocomplete="new-password" />
-        </el-form-item>
-        <el-form-item :label="$t('games.account.remark')">
-          <el-input v-model="accountForm.remark" maxlength="200" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button v-if="accountExists" size="small" type="danger" plain @click="removeAccount">
-          {{ $t('games.account.deleteBtn') }}
-        </el-button>
-        <el-button size="small" @click="accountVisible = false">{{ $t('games.cancel') }}</el-button>
-        <el-button type="primary" size="small" :loading="accountSaving" @click="submitAccount">{{ $t('games.save') }}</el-button>
-      </template>
-    </el-dialog>
-
     <!-- 许愿想加的游戏:只有「想加什么游戏」这一个语义,不带来源记录ID -->
     <AddToWishDialog v-model="wishOpen" :source="wishSource" :title-placeholder="$t('wish.gameTitlePlaceholder')" />
   </div>
@@ -233,7 +207,6 @@ import {
   Cpu,
   Histogram,
   Link,
-  Key,
   MagicStick,
   Collection,
   Aim,
@@ -246,11 +219,16 @@ import PageToolbar from '@/components/PageToolbar.vue'
 import AddToWishDialog from '@/components/wish/AddToWishDialog.vue'
 import { gameApi } from '@/api'
 import { dictText } from '@/utils/dict'
+import { useUserStore } from '@/stores/user'
 import { GAME_CATEGORIES, countGameCategories, inGameCategory, normalizeGameCategory } from '@/utils/games/gameCategory'
 import { UNSERIES, inGameSeries, normalizeGameSeries, seriesOptionsOf } from '@/utils/games/gameSeries'
 
 const router = useRouter()
 const { t } = useI18n()
+const userStore = useUserStore()
+
+/** 保险箱写权限(新增条目要 vault:manage);没有权限就不显示「存入保险箱」,避免点了白跑 */
+const canVault = computed(() => userStore.isOwner || userStore.hasPerm('vault:manage'))
 
 const games = ref([])
 const loading = ref(false)
@@ -345,12 +323,6 @@ const saving = ref(false)
 const editGameType = ref('')
 const editForm = reactive({ id: null, name: '', description: '', linkUrl: '', category: 'OTHER', series: '' })
 
-const accountVisible = ref(false)
-const accountSaving = ref(false)
-const accountExists = ref(false)
-const accountGame = ref(null)
-const accountForm = reactive({ siteUsername: '', sitePassword: '', remark: '' })
-
 const load = async () => {
   loading.value = true
   try {
@@ -387,11 +359,8 @@ const autoClassify = async () => {
 const typeText = (g) => (g.type === 'LINK' ? t('games.typeLink') : g.type)
 
 const play = (g) => {
-  if (g.type === 'LINK') {
-    window.open(g.linkUrl, '_blank', 'noopener,noreferrer')
-    return
-  }
-  router.push(`/games/play/${g.id}`)
+  // 网页游戏在站内嵌入打开(不跳走、不丢 ihomy 外壳);文件类游戏走播放器页
+  router.push(g.type === 'LINK' ? `/games/web/${g.id}` : `/games/play/${g.id}`)
 }
 
 const openImport = () => {
@@ -509,56 +478,12 @@ const submitEdit = async () => {
   }
 }
 
-const openAccount = async (g) => {
-  accountGame.value = g
-  accountForm.siteUsername = ''
-  accountForm.sitePassword = ''
-  accountForm.remark = ''
-  accountExists.value = false
-  accountVisible.value = true
-  try {
-    const acc = await gameApi.getAccount(g.id)
-    if (acc && acc.updatedAt) {
-      accountExists.value = true
-      accountForm.siteUsername = acc.siteUsername || ''
-      accountForm.sitePassword = acc.sitePassword || ''
-      accountForm.remark = acc.remark || ''
-    }
-  } catch (e) {
-    // 取不到已有账号(首次使用/读取失败)按空表单处理,保存时后端会给出具体错误
-  }
-}
-
-const submitAccount = async () => {
-  if (!accountForm.siteUsername.trim() && !accountForm.sitePassword.trim()) {
-    ElMessage.warning(t('games.account.needAny'))
-    return
-  }
-  accountSaving.value = true
-  try {
-    await gameApi.saveAccount(accountGame.value.id, {
-      siteUsername: accountForm.siteUsername.trim(),
-      sitePassword: accountForm.sitePassword.trim(),
-      remark: accountForm.remark.trim(),
-    })
-    ElMessage.success(t('games.account.saved'))
-    accountVisible.value = false
-    load()
-  } finally {
-    accountSaving.value = false
-  }
-}
-
-const removeAccount = async () => {
-  try {
-    await ElMessageBox.confirm(t('games.account.deleteConfirm'), t('games.account.deleteBtn'), { type: 'warning' })
-  } catch (e) {
-    return
-  }
-  await gameApi.deleteAccount(accountGame.value.id)
-  ElMessage.success(t('games.account.deleted'))
-  accountVisible.value = false
-  load()
+/** 网页游戏的站点登录信息统一存家庭保险箱:带上游戏名与网址打开新建弹窗 */
+const openVault = (g) => {
+  router.push({
+    path: '/vault',
+    query: { create: '1', name: g.name, url: g.linkUrl, category: 'SITE' },
+  })
 }
 
 const removeGame = async (g) => {
@@ -574,7 +499,7 @@ const removeGame = async (g) => {
 
 const onGameAction = (cmd, g) => {
   if (cmd === 'edit') openEdit(g)
-  else if (cmd === 'account') openAccount(g)
+  else if (cmd === 'vault') openVault(g)
   else if (cmd === 'delete') removeGame(g)
 }
 
@@ -672,10 +597,6 @@ onMounted(load)
   flex-wrap: wrap;
   row-gap: 4px;
 }
-.tool-account-flag {
-  color: var(--color-accent, var(--color-brand));
-  font-size: 14px;
-}
 .tool-type-tag {
   font-size: 11px;
   padding: 2px 6px;
@@ -733,11 +654,5 @@ onMounted(load)
 }
 .import-mode {
   margin-bottom: 16px;
-}
-.account-hint {
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--color-text-secondary, #8a8a8a);
-  margin: 0 0 14px;
 }
 </style>

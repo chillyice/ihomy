@@ -80,6 +80,7 @@ const PREFIX_TITLE_RULES = [
   { prefix: '/games/sudoku', key: () => 'games.sudoku.title' },
   { prefix: '/games/2048', key: () => 'games.g2048.title' },
   { prefix: '/games/play', key: () => 'games.title' },
+  { prefix: '/games/web', key: () => 'games.title' },
 ]
 
 // 路由路径 → 页头标题 i18n 键;无匹配(独立产品页 /wallpaper、/kada、/bit-pouch 与未适配页)返回空串,页头只显示返回按钮

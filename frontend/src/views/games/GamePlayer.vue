@@ -16,10 +16,9 @@ const game = ref(null)
 
 onMounted(async () => {
   game.value = await gameApi.get(route.params.id)
-  // 网页游戏没有播放器:新标签页打开外链后回游戏库
-  if (game.value?.type === 'LINK' && game.value?.linkUrl) {
-    window.open(game.value.linkUrl, '_blank', 'noopener,noreferrer')
-    router.replace('/games')
+  // 网页游戏没有播放器:交给站内 iframe 页(旧链接/收藏夹照常可用)
+  if (game.value?.type === 'LINK') {
+    router.replace(`/games/web/${game.value.id}`)
   }
 })
 </script>

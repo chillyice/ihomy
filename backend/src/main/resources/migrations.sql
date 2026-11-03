@@ -3008,3 +3008,30 @@ UPDATE `sys_oss_component` SET `current_version` = '8.10.3'
  WHERE `component_type` = 'SERVICE' AND `package_ref` = 'redis/redis';
 UPDATE `sys_oss_component` SET `current_version` = '8.4.11'
  WHERE `component_type` = 'SERVICE' AND `package_ref` = 'mysql/mysql-server';
+
+-- ------------------------------------------------------------
+-- V11.32 网页游戏:站点账号并入家庭保险箱(2026-11-03)
+--   旧 game_site_account 的账号密码已是 AES-GCM 密文(盐值同为 sys_parameter.aes-salt),
+--   原样搬进 family_vault_item(分类 SITE、保留本人可见),随后删除旧表。
+--   重复执行安全:旧表不存在时整段跳过,迁移 SQL 只在 information_schema 判定存在时执行。
+-- ------------------------------------------------------------
+SET @has_game_site_account := (
+  SELECT COUNT(*) FROM information_schema.TABLES
+   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'game_site_account'
+);
+SET @migrate_game_site_account := IF(@has_game_site_account > 0,
+  'INSERT INTO `family_vault_item` (`family_id`, `name`, `category`, `username`, `password_enc`, `url`, `note`, `owner_id`, `visibility`, `deleted`, `created_at`, `updated_at`)
+   SELECT g.`family_id`, g.`name`, ''SITE'', a.`site_username`, a.`site_password`, g.`link_url`, a.`remark`, a.`user_id`, ''PRIVATE'', 0, a.`created_at`, a.`updated_at`
+     FROM `game_site_account` a
+     JOIN `game_info` g ON g.`id` = a.`game_id`
+    WHERE g.`link_url` IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM `family_vault_item` v
+         WHERE v.`owner_id` = a.`user_id` AND v.`family_id` = g.`family_id`
+           AND v.`url` = g.`link_url` AND v.`deleted` = 0)',
+  'SELECT ''skip: game_site_account already migrated'' AS msg');
+PREPARE migrate_game_site_account_stmt FROM @migrate_game_site_account;
+EXECUTE migrate_game_site_account_stmt;
+DEALLOCATE PREPARE migrate_game_site_account_stmt;
+
+DROP TABLE IF EXISTS `game_site_account`;
