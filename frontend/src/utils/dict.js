@@ -41,6 +41,23 @@ export const AQI_LEVEL_COLOR = {
 }
 export const aqiColor = (level) => AQI_LEVEL_COLOR[Number(level)] || '#c9a227'
 
+// 生活指数类别(和风 category 文案)→ 「舒适 ↔ 不适宜」四档:
+// good 牛油果绿 / fair 橄榄金 / poor 陶土橙 / bad 主题红(色值由页面 CSS 变量给,这里只分档)。
+// 用精确匹配而非包含:和风文案里「较不宜」含「不宜」、「很不舒适」含「舒适」,子串判定会串档;
+// 化妆/空调/太阳镜(保湿/防晒/开启/需要…)不是舒适度量表,返回空串 → 保持品牌色。
+export const INDEX_CAT_TONE = {
+  good: ['适宜', '较适宜', '舒适', '较舒适', '不易发', '少发', '最弱', '弱', '优', '良', '良好'],
+  fair: ['一般', '中等', '中', '较冷', '较热'],
+  poor: ['较不宜', '较不适宜', '较不舒适', '较易发', '较差', '热', '冷'],
+  bad: ['不宜', '不适宜', '很不舒适', '极易发', '易发', '很差', '差', '强', '很强', '炎热', '寒冷'],
+}
+export const indexCatTone = (category) => {
+  const c = (category || '').trim()
+  if (!c) return ''
+  for (const [tone, list] of Object.entries(INDEX_CAT_TONE)) if (list.includes(c)) return tone
+  return ''
+}
+
 // 月相(和风 v1 astro.moonPhase 代码)→ emoji 图标;名称走 i18n weatherPage.moon.<code>
 export const MOON_PHASE_ICON = {
   'new-moon': '🌑',

@@ -424,7 +424,7 @@
             <button v-for="(ix, i) in detail.indices" :key="i" class="wt-index" type="button" @click="openIndex(ix)">
               <span class="wi-head">
                 <span class="wi-name">{{ ix.name }}</span
-                ><span class="wi-cat">{{ ix.category }}</span>
+                ><span class="wi-cat" :class="indexCatTone(ix.category)">{{ ix.category }}</span>
               </span>
               <span class="wi-text">{{ ix.text }}</span>
             </button>
@@ -455,7 +455,7 @@
     <!-- 生活指数全文 -->
     <el-dialog v-model="indexDialog" :title="activeIndex?.name" append-to-body width="min(560px, 92vw)">
       <div v-if="activeIndex" class="wt-index-dialog">
-        <div class="wi-cat">{{ activeIndex.category }}</div>
+        <div class="wi-cat" :class="indexCatTone(activeIndex.category)">{{ activeIndex.category }}</div>
         <div class="wi-text">{{ activeIndex.text }}</div>
       </div>
     </el-dialog>
@@ -467,7 +467,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, inject, watch } fr
 import { useI18n } from 'vue-i18n'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import TerminatorMap from '@/views/weather/TerminatorMap.vue'
-import { aqiColor, warnLevelColor, WARN_LEVEL_ORDER } from '@/utils/dict'
+import { aqiColor, warnLevelColor, WARN_LEVEL_ORDER, indexCatTone } from '@/utils/dict'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { publicApi } from '@/api'
 
@@ -1430,6 +1430,20 @@ onMounted(load)
   color: var(--color-brand);
   font-weight: 600;
 }
+/* 类别按「舒适 ↔ 不适宜」四档着色:牛油果绿 → 橄榄金 → 陶土橙 → 主题红;
+   化妆/空调/太阳镜等非舒适度量表保持上面的品牌色(不挂档位类) */
+.wi-cat.good {
+  color: var(--color-green, #7c8b6c);
+}
+.wi-cat.fair {
+  color: #9a8f55;
+}
+.wi-cat.poor {
+  color: #b06a45;
+}
+.wi-cat.bad {
+  color: var(--color-accent, #a8483a);
+}
 .wi-text {
   font-size: 12px;
   line-height: 1.6;
@@ -1451,14 +1465,21 @@ onMounted(load)
   display: block;
   overflow: visible;
 }
-/* 深色模式横条轨道 */
-:global(html.dark) .wt-tbar-track {
+/* 深色模式横条轨道(别写 :global(html.dark)——本版 scoped 编译会丢掉后代选择器) */
+html.dark .wt-tbar-track {
   background: rgba(232, 220, 200, 0.12);
 }
-:global(html.dark) .wt-tbar-dot {
+html.dark .wt-tbar-dot {
   background: rgba(232, 220, 200, 0.55);
 }
-:global(html.dark) .wc-hover-dot {
+/* 深色下中间两档提亮,避免与深底糊在一起 */
+html.dark .wi-cat.fair {
+  color: #b3a866;
+}
+html.dark .wi-cat.poor {
+  color: #c98363;
+}
+html.dark .wc-hover-dot {
   stroke: var(--color-card);
 }
 @media (max-width: 900px) {
