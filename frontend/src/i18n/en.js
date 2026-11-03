@@ -5174,6 +5174,7 @@ export default {
     wind: 'Wind',
     windSpeed: 'Wind speed',
     precip: 'Precipitation',
+    pop: 'Rain chance',
     pressure: 'Pressure',
     vis: 'Visibility',
     cloud: 'Cloud',
@@ -5188,10 +5189,7 @@ export default {
     chartView: 'Chart',
     cardsView: 'Cards',
     daily: '10-Day Forecast',
-    date: 'Date',
-    dayWeather: 'Day',
     nightWeather: 'Night',
-    tempRange: 'Temp',
     uv: 'UV',
     sunSunset: 'Sunrise / Sunset',
     // Sun, moon & twilight (V9.92): pure astronomy from /public/sun-info (SolarUtil, NOAA/Meeus), no weather API needed

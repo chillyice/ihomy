@@ -220,63 +220,69 @@
           </div>
         </div>
 
-        <!-- 10 天预报:前 3 天 7 列细列,后 7 天 3 列精简列(近细远粗) -->
+        <!-- 10 天预报:统一「日期 / 白天天气 / 温度」三列,点某天在行下展开当天详情 -->
         <div v-if="detail?.daily?.length" class="card">
           <div class="section-label">{{ $t('weatherPage.daily') }}</div>
-          <el-table v-if="dailyMain.length" :data="dailyMain" size="small" stripe>
-            <el-table-column :label="$t('weatherPage.date')" width="110">
-              <template #default="{ row }">{{ fmtDate(row.fxDate) }}</template>
-            </el-table-column>
-            <el-table-column :label="$t('weatherPage.dayWeather')" min-width="140">
-              <template #default="{ row }"> <i :class="'qi-' + row.iconDay" class="wt-td-icon"></i> {{ row.textDay }} </template>
-            </el-table-column>
-            <el-table-column :label="$t('weatherPage.nightWeather')" min-width="140">
-              <template #default="{ row }"> <i :class="'qi-' + row.iconNight" class="wt-td-icon"></i> {{ row.textNight }} </template>
-            </el-table-column>
-            <el-table-column :label="$t('weatherPage.tempRange')" min-width="220">
-              <template #default="{ row }">
-                <div class="wt-trange">
+          <div class="wt-daily">
+            <template v-for="row in detail.daily" :key="row.fxDate">
+              <div
+                class="wt-day-row"
+                :class="{ open: openDate === row.fxDate }"
+                :aria-expanded="openDate === row.fxDate"
+                @click="toggleDay(row.fxDate)"
+                v-a11y-click
+              >
+                <span class="wt-day-date">{{ fmtDate(row.fxDate) }}</span>
+                <span class="wt-day-weather">
+                  <i :class="'qi-' + row.iconDay" class="wt-td-icon"></i>
+                  {{ row.textDay }}
+                </span>
+                <span class="wt-trange">
                   <span class="wt-lo">{{ row.tempMin }}°</span>
-                  <div class="wt-tbar-track">
-                    <div class="wt-tbar-fill" :style="tbarStyle(row)"></div>
-                    <div class="wt-tbar-dot" :style="{ left: tbarDotLeft(row) }"></div>
-                  </div>
+                  <span class="wt-tbar-track">
+                    <span class="wt-tbar-fill" :style="tbarStyle(row)"></span>
+                    <span class="wt-tbar-dot" :style="{ left: tbarDotLeft(row) }"></span>
+                  </span>
                   <span class="wt-hi">{{ row.tempMax }}°</span>
+                </span>
+                <span class="wt-day-arrow" aria-hidden="true">▾</span>
+              </div>
+              <!-- 展开区:当天完整状况(夜间、降水、湿度、风、紫外线、日出日落) -->
+              <dl v-if="openDate === row.fxDate" class="wt-day-detail">
+                <div class="wt-dd-item">
+                  <dt>{{ $t('weatherPage.nightWeather') }}</dt>
+                  <dd>
+                    <i :class="'qi-' + row.iconNight" class="wt-td-icon"></i>
+                    {{ row.textNight }}
+                  </dd>
                 </div>
-              </template>
-            </el-table-column>
-            <el-table-column :label="$t('weatherPage.uv')" width="70">
-              <template #default="{ row }">{{ row.uvIndex }}</template>
-            </el-table-column>
-            <el-table-column :label="$t('weatherPage.wind')" width="120">
-              <template #default="{ row }">{{ row.windDirDay }} {{ row.windScaleDay }}{{ $t('weatherPage.level') }}</template>
-            </el-table-column>
-            <el-table-column :label="$t('weatherPage.sunSunset')" width="150">
-              <template #default="{ row }">
-                ☀ {{ (row.sunrise || '').slice(11, 16) }} / 🌙 {{ (row.sunset || '').slice(11, 16) }}
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-table v-if="dailyRest.length" :data="dailyRest" size="small" stripe class="wt-daily-rest">
-            <el-table-column :label="$t('weatherPage.date')" width="110">
-              <template #default="{ row }">{{ fmtDate(row.fxDate) }}</template>
-            </el-table-column>
-            <el-table-column :label="$t('weatherPage.dayWeather')" min-width="140">
-              <template #default="{ row }"> <i :class="'qi-' + row.iconDay" class="wt-td-icon"></i> {{ row.textDay }} </template>
-            </el-table-column>
-            <el-table-column :label="$t('weatherPage.tempRange')" min-width="220">
-              <template #default="{ row }">
-                <div class="wt-trange">
-                  <span class="wt-lo">{{ row.tempMin }}°</span>
-                  <div class="wt-tbar-track">
-                    <div class="wt-tbar-fill" :style="tbarStyle(row)"></div>
-                    <div class="wt-tbar-dot" :style="{ left: tbarDotLeft(row) }"></div>
-                  </div>
-                  <span class="wt-hi">{{ row.tempMax }}°</span>
+                <div class="wt-dd-item">
+                  <dt>{{ $t('weatherPage.pop') }}</dt>
+                  <dd>{{ row.pop }}%</dd>
                 </div>
-              </template>
-            </el-table-column>
-          </el-table>
+                <div class="wt-dd-item">
+                  <dt>{{ $t('weatherPage.precip') }}</dt>
+                  <dd>{{ row.precip ?? 0 }} mm</dd>
+                </div>
+                <div class="wt-dd-item">
+                  <dt>{{ $t('weatherPage.humidity') }}</dt>
+                  <dd>{{ row.humidity }}%</dd>
+                </div>
+                <div class="wt-dd-item">
+                  <dt>{{ $t('weatherPage.wind') }}</dt>
+                  <dd>{{ row.windDirDay }} {{ row.windScaleDay }}{{ $t('weatherPage.level') }}</dd>
+                </div>
+                <div class="wt-dd-item">
+                  <dt>{{ $t('weatherPage.uv') }}</dt>
+                  <dd>{{ row.uvIndex }}</dd>
+                </div>
+                <div class="wt-dd-item">
+                  <dt>{{ $t('weatherPage.sunSunset') }}</dt>
+                  <dd>☀ {{ (row.sunrise || '').slice(11, 16) }} / 🌙 {{ (row.sunset || '').slice(11, 16) }}</dd>
+                </div>
+              </dl>
+            </template>
+          </div>
         </div>
       </div>
 
@@ -748,9 +754,11 @@ const tbarDotLeft = (row) => {
   return ((avg - r.min) / r.range) * 100 + '%'
 }
 
-// 近细远粗:前 3 天 7 列细列,后 7 天 3 列精简列(拆两张表,EP 列是全局的没法按行隐藏)
-const dailyMain = computed(() => (detail.value?.daily || []).slice(0, 3))
-const dailyRest = computed(() => (detail.value?.daily || []).slice(3))
+// 10 天预报:统一行只放日期 / 白天天气 / 温度,点行展开当天详情(同一时间只展开一天)
+const openDate = ref('')
+const toggleDay = (date) => {
+  openDate.value = openDate.value === date ? '' : date
+}
 
 const load = async () => {
   if (sunLight?.weatherDetail?.value) detail.value = sunLight.weatherDetail.value
@@ -1138,30 +1146,117 @@ onMounted(load)
   font-weight: 600;
   fill: var(--color-text-secondary);
 }
-/* ── N 天温度横条 ── */
-.wt-daily-rest {
-  margin-top: 8px;
+/* ── 10 天预报:统一三列(日期 / 白天天气 / 温度)+ 点行展开当天详情 ── */
+.wt-daily {
+  display: flex;
+  flex-direction: column;
 }
+.wt-day-row {
+  display: grid;
+  grid-template-columns: 88px minmax(90px, 1fr) minmax(150px, 1.4fr) 14px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background-color 0.18s;
+}
+.wt-day-row:hover,
+.wt-day-row.open {
+  background: var(--color-card-2);
+}
+.wt-day-row:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 1px;
+}
+.wt-day-date {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.wt-day-weather {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wt-day-arrow {
+  font-size: 11px;
+  line-height: 1;
+  text-align: center;
+  color: var(--color-text-secondary);
+  transition: transform 0.18s;
+}
+.wt-day-row.open .wt-day-arrow {
+  transform: rotate(180deg);
+}
+.wt-day-detail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px 16px;
+  margin: 2px 10px 10px;
+  padding: 12px 14px;
+  background: var(--color-card-2);
+  border-radius: 10px;
+}
+.wt-dd-item {
+  min-width: 0;
+}
+.wt-dd-item dt {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  margin-bottom: 2px;
+}
+.wt-dd-item dd {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.wt-day-detail .wt-td-icon {
+  font-size: 15px;
+}
+@media (max-width: 640px) {
+  .wt-day-row {
+    grid-template-columns: 72px minmax(80px, 1fr) minmax(120px, 1.2fr) 12px;
+    gap: 8px;
+    padding: 8px 4px;
+  }
+  .wt-day-detail {
+    margin: 2px 0 10px;
+  }
+}
+/* ── N 天温度横条 ── */
 .wt-trange {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 .wt-tbar-track {
+  display: block;
   flex: 1;
   height: 8px;
   background: rgba(58, 46, 34, 0.1);
   border-radius: 4px;
   position: relative;
-  min-width: 90px;
+  min-width: 60px;
 }
 .wt-tbar-fill {
+  display: block;
   position: absolute;
   top: 0;
   height: 100%;
   border-radius: 4px;
 }
 .wt-tbar-dot {
+  display: block;
   position: absolute;
   top: 50%;
   width: 5px;

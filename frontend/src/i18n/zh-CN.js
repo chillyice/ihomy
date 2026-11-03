@@ -5118,6 +5118,7 @@ export default {
     wind: '风向风力',
     windSpeed: '风速',
     precip: '降水量',
+    pop: '降水概率',
     pressure: '气压',
     vis: '能见度',
     cloud: '云量',
@@ -5132,10 +5133,7 @@ export default {
     chartView: '折线',
     cardsView: '卡片',
     daily: '10 天预报',
-    date: '日期',
-    dayWeather: '白天天气',
     nightWeather: '夜间天气',
-    tempRange: '温度',
     uv: '紫外线',
     sunSunset: '日出 / 日落',
     // 日月与晨昏(V9.92):纯天文计算,取自 /public/sun-info(SolarUtil 的 NOAA/Meeus 实现),不依赖天气 API
