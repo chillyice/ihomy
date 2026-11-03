@@ -15,28 +15,37 @@
       </div>
     </div>
 
-    <!-- 动态流 -->
+    <!-- 动态流:切换筛选项时整组淡出再淡入,避免列表内容硬切 -->
     <div class="feed-list" v-loading="loading">
-      <template v-if="filteredFeeds.length">
-        <div v-for="(f, i) in filteredFeeds" :key="i" class="feed-card" v-a11y-click @click="goFeed(f)">
-          <div class="feed-card-head">
-            <el-avatar :size="32" :src="f.authorAvatar">{{ (f.authorName || 'U').charAt(0) }}</el-avatar>
-            <span class="feed-author">{{ f.authorName || $t('feed.authorFallback') }}</span>
-            <span class="feed-type-tag">{{ feedTypeLabel(f.type) }}</span>
-            <span class="feed-time">{{ formatTime(f.createdAt) }}</span>
-          </div>
-          <div class="feed-card-body">
-            <div v-if="feedCover(f)" class="feed-cover">
-              <img :src="feedCover(f)" :alt="feedSummary(f)" loading="lazy" />
+      <Transition name="feed-swap" mode="out-in">
+        <div v-if="filteredFeeds.length" :key="activeFilter" class="feed-list-inner">
+          <div
+            v-for="(f, i) in filteredFeeds"
+            :key="f.type + '-' + (f.id ?? i)"
+            class="feed-card anim-rise"
+            :style="{ '--i': Math.min(i, 12) }"
+            v-a11y-click
+            @click="goFeed(f)"
+          >
+            <div class="feed-card-head">
+              <el-avatar :size="32" :src="f.authorAvatar">{{ (f.authorName || 'U').charAt(0) }}</el-avatar>
+              <span class="feed-author">{{ f.authorName || $t('feed.authorFallback') }}</span>
+              <span class="feed-type-tag">{{ feedTypeLabel(f.type) }}</span>
+              <span class="feed-time">{{ formatTime(f.createdAt) }}</span>
             </div>
-            <div class="feed-text">
-              <div v-if="f.type === 'blog'" class="feed-title">{{ f.title }}</div>
-              <div class="feed-summary">{{ feedSummary(f) }}</div>
+            <div class="feed-card-body">
+              <div v-if="feedCover(f)" class="feed-cover">
+                <img :src="feedCover(f)" :alt="feedSummary(f)" loading="lazy" />
+              </div>
+              <div class="feed-text">
+                <div v-if="f.type === 'blog'" class="feed-title">{{ f.title }}</div>
+                <div class="feed-summary">{{ feedSummary(f) }}</div>
+              </div>
             </div>
           </div>
         </div>
-      </template>
-      <div v-else-if="!loading" class="feed-empty">{{ $t('common.empty') }}</div>
+        <div v-else-if="!loading" key="empty" class="feed-empty">{{ $t('common.empty') }}</div>
+      </Transition>
     </div>
   </div>
 </template>
@@ -136,8 +145,13 @@ html.dark .filter-bar {
   background: transparent;
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.2s;
+  transition:
+    color 0.2s,
+    transform 0.16s var(--ease-soft);
   -webkit-tap-highlight-color: transparent;
+}
+.filter-chip:active {
+  transform: scale(0.95);
 }
 html.dark .filter-chip {
   color: #9aa0a8;
@@ -174,6 +188,23 @@ html.dark .filter-chip::after {
   padding: 12px 16px 80px;
 }
 
+/* 筛选切换:整组先淡出再淡入,不做逐卡删除/插入,避免列表抖动 */
+.feed-swap-enter-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.24s var(--ease-soft);
+}
+.feed-swap-leave-active {
+  transition: opacity 0.14s ease;
+}
+.feed-swap-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.feed-swap-leave-to {
+  opacity: 0;
+}
+
 .feed-card {
   background: rgba(255, 255, 255, 0.6);
   border-radius: 14px;
@@ -181,11 +212,14 @@ html.dark .filter-chip::after {
   margin-bottom: 12px;
   border: 1px solid rgba(0, 0, 0, 0.04);
   cursor: pointer;
-  transition: transform 0.15s;
+  transition:
+    transform 0.18s var(--ease-soft),
+    box-shadow 0.18s ease;
   -webkit-tap-highlight-color: transparent;
 }
 .feed-card:active {
   transform: scale(0.98);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
 }
 html.dark .feed-card {
   background: rgba(255, 255, 255, 0.06);

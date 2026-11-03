@@ -13,6 +13,12 @@
   --shadow: 0 4px 12px rgba(58, 46, 34, 0.08), 0 1px 3px rgba(58, 46, 34, 0.06);
   --shadow-hover: 0 8px 24px rgba(58, 46, 34, 0.14), 0 2px 6px rgba(58, 46, 34, 0.08);
   --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 -1px 0 rgba(58, 46, 34, 0.04);
+  /* 动效基线:进入用「快出慢入」的软着陆曲线,回弹只给需要「落下」反馈的组件 */
+  --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast: 0.16s;
+  --dur-base: 0.24s;
+  --dur-slow: 0.36s;
   /* 层级标尺(全局唯一来源):内容 → 常驻外壳 → 装饰光影 → 浮起操作 → 自建沉浸层 → EP 弹窗/弹层。
      组件内不要再写裸数字:光影层固定占 65–100(pointer-events:none),所有功能浮层取下列档位。 */
   --z-content: 10;
@@ -453,6 +459,8 @@ html.dark .msg-icon:hover {
 /* 深浅主题切换:1s 颜色过渡(只作用于容器级,避免拖慢 hover) */
 html {
   transition: background-color 1s ease;
+  /* 关掉浏览器横向 overscroll 的「前进/后退」手势:移动端三 Tab 左右滑动要靠它不被抢走 */
+  overscroll-behavior-x: none;
 }
 body,
 #app {
@@ -1786,6 +1794,129 @@ html.dark .el-badge__content {
 }
 .el-card {
   border-radius: 14px !important;
+}
+
+/* ========== 动效基线:页面/列表/浮层共用曲线 ========== */
+/* 移动端三 Tab 切换:轻位移 + 淡入淡出(KeepAlive 保状态,不重新拉数据) */
+.mobile-tab-enter-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.26s var(--ease-soft);
+}
+.mobile-tab-leave-active {
+  transition:
+    opacity 0.14s ease,
+    transform 0.18s ease;
+}
+.mobile-tab-enter-from {
+  opacity: 0;
+  transform: translateY(10px) scale(0.995);
+}
+.mobile-tab-leave-to {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.995);
+}
+
+/* 左右滑动切 Tab:新页从手势方向推入,旧页朝反方向让位(与手指方向一致) */
+.mobile-tab-next-enter-active,
+.mobile-tab-prev-enter-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.26s var(--ease-soft);
+}
+.mobile-tab-next-leave-active,
+.mobile-tab-prev-leave-active {
+  transition:
+    opacity 0.14s ease,
+    transform 0.2s ease;
+}
+.mobile-tab-next-enter-from {
+  opacity: 0;
+  transform: translateX(30px);
+}
+.mobile-tab-next-leave-to {
+  opacity: 0;
+  transform: translateX(-22px);
+}
+.mobile-tab-prev-enter-from {
+  opacity: 0;
+  transform: translateX(-30px);
+}
+.mobile-tab-prev-leave-to {
+  opacity: 0;
+  transform: translateX(22px);
+}
+
+/* 移动端子页:从下方轻推进入,返回时向上淡出 */
+.mobile-page-enter-active {
+  transition:
+    opacity 0.22s ease,
+    transform 0.3s var(--ease-soft);
+}
+.mobile-page-leave-active {
+  transition:
+    opacity 0.14s ease,
+    transform 0.2s ease;
+}
+.mobile-page-enter-from {
+  opacity: 0;
+  transform: translateY(12px);
+}
+.mobile-page-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+/* 游戏结算/暂停浮层:遮罩淡入 + 结果卡回弹落下(各游戏统一加 game-overlay / game-overlay-card 类) */
+.game-overlay-enter-active,
+.game-overlay-leave-active {
+  transition: opacity 0.22s ease;
+}
+.game-overlay-enter-from,
+.game-overlay-leave-to {
+  opacity: 0;
+}
+.game-overlay-enter-active .game-overlay-card,
+.game-overlay-leave-active .game-overlay-card {
+  transition:
+    transform 0.28s var(--ease-spring),
+    opacity 0.2s ease;
+}
+.game-overlay-enter-from .game-overlay-card {
+  opacity: 0;
+  transform: translateY(8px) scale(0.92);
+}
+.game-overlay-leave-to .game-overlay-card {
+  opacity: 0;
+  transform: translateY(4px) scale(0.97);
+}
+
+/* 列表逐条进场:模板里给 --i(序号)即可,超过 12 条不再继续加延迟 */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.anim-rise {
+  animation: rise-in 0.34s var(--ease-soft) backwards;
+  animation-delay: calc(min(var(--i, 0), 12) * 20ms);
+}
+
+/* 减少动态:系统开启「减少动态效果」时关掉装饰性位移与循环动画,保留一次性状态反馈 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 .el-dialog {
   border-radius: 14px !important;

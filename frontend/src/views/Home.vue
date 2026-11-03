@@ -19,13 +19,14 @@
         class="dash-card"
         :class="[w.id, { 'edit-active': editMode, dragging: w._dragging, 'h-1': tinyCard(w) }]"
         :style="cardStyle(w)"
+        :data-widget-uid="w.uid"
         @mouseenter="onCardEnter(w)"
         @mouseleave="onCardLeave"
         @click="bringToFront(w)"
       >
-        <div class="drag-bar" @mousedown="onDragStart($event, w)"><span class="grip"></span></div>
+        <div class="drag-bar" @pointerdown="onDragStart($event, w)"><span class="grip"></span></div>
         <button v-if="editMode" class="del-btn" @click.stop="removeWidget(w)">✕</button>
-        <div class="resize-corner" @mousedown.stop="onResizeStart($event, w)"></div>
+        <div class="resize-corner" @pointerdown.stop="onResizeStart($event, w)"></div>
 
         <div class="card-inner">
           <!-- 家人动态 -->
@@ -1147,35 +1148,46 @@ const loadFloorPlanPreview = async () => {
 // ========== 拖拽 + 缩放(自由布局,正常模式即可直接调整) ==========
 let zCounter = 20
 let dragState = null
+// 指针事件可能一帧内来多次:合并到下一帧统一写一次坐标,避免高频触发 Vue 更新与布局抖动
+let dragRaf = 0
+let pendingPointer = null
 
 const bringToFront = (w) => {
   zCounter = Math.min(zCounter + 1, 59)
   w._z = zCounter
 }
 
+// 统一用 Pointer Events:鼠标、触屏、触控笔同一套逻辑(平板/触屏笔记本也能拖拽与缩放)
 const onDragStart = (e, w) => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return
   if (e.target.classList.contains('resize-corner') || e.target.classList.contains('del-btn')) return
   w._dragging = true
   zCounter = Math.min(zCounter + 1, 59)
   w._z = zCounter
-  dragState = { w, startX: e.clientX, startY: e.clientY, startXf: w.x, startYf: w.y }
+  dragState = { w, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, startXf: w.x, startYf: w.y }
   e.preventDefault()
-  window.addEventListener('mousemove', onMouseMove)
-  window.addEventListener('mouseup', onMouseUp)
+  window.addEventListener('pointermove', onPointerMove)
+  window.addEventListener('pointerup', onPointerUp)
+  window.addEventListener('pointercancel', onPointerUp)
 }
 
 const onResizeStart = (e, w) => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return
   w._dragging = true
   zCounter = Math.min(zCounter + 1, 59)
   w._z = zCounter
-  dragState = { w, startX: e.clientX, startY: e.clientY, startW: w.w, startH: w.h, isResize: true }
+  dragState = { w, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, startW: w.w, startH: w.h, isResize: true }
   e.preventDefault()
-  window.addEventListener('mousemove', onMouseMove)
-  window.addEventListener('mouseup', onMouseUp)
+  window.addEventListener('pointermove', onPointerMove)
+  window.addEventListener('pointerup', onPointerUp)
+  window.addEventListener('pointercancel', onPointerUp)
 }
 
-const onMouseMove = (e) => {
-  if (!dragState) return
+const applyDragFrame = () => {
+  dragRaf = 0
+  if (!dragState || !pendingPointer) return
+  const e = pendingPointer
+  pendingPointer = null
   const { w } = dragState
   // 像素位移折算成画布比例位移;自由布局不做栅格吸附
   const dx = (e.clientX - dragState.startX) / canvasW.value
@@ -1191,19 +1203,36 @@ const onMouseMove = (e) => {
   }
 }
 
-const onMouseUp = () => {
+const onPointerMove = (e) => {
+  if (!dragState || e.pointerId !== dragState.pointerId) return
+  pendingPointer = e
+  if (!dragRaf) dragRaf = requestAnimationFrame(applyDragFrame)
+}
+
+const onPointerUp = (e) => {
+  if (dragState && e.pointerId !== undefined && e.pointerId !== dragState.pointerId) return
+  if (dragRaf) {
+    cancelAnimationFrame(dragRaf)
+    dragRaf = 0
+  }
+  // 松手前最后一帧可能还没画,先补上最终位置再提交
+  if (dragState && pendingPointer) applyDragFrame()
   if (dragState) {
     dragState.w._dragging = false
     saveLayout()
   }
   dragState = null
-  window.removeEventListener('mousemove', onMouseMove)
-  window.removeEventListener('mouseup', onMouseUp)
+  pendingPointer = null
+  window.removeEventListener('pointermove', onPointerMove)
+  window.removeEventListener('pointerup', onPointerUp)
+  window.removeEventListener('pointercancel', onPointerUp)
 }
 
 onUnmounted(() => {
-  window.removeEventListener('mousemove', onMouseMove)
-  window.removeEventListener('mouseup', onMouseUp)
+  if (dragRaf) cancelAnimationFrame(dragRaf)
+  window.removeEventListener('pointermove', onPointerMove)
+  window.removeEventListener('pointerup', onPointerUp)
+  window.removeEventListener('pointercancel', onPointerUp)
 })
 
 // ========== 从侧边栏拖入组件 ==========
@@ -1257,8 +1286,14 @@ onDrop((type, x, y) => {
   const hf = size.h / ROWS
   const wx = Math.max(0, Math.min(1 - wf, (x - MARGIN.left) / canvasW.value))
   const wy = Math.max(0, Math.min(1 - hf, (y - MARGIN.top) / canvasH.value))
-  widgets.value.push(makeWidget({ id: type, x: wx, y: wy, w: wf, h: hf }))
+  const widget = makeWidget({ id: type, x: wx, y: wy, w: wf, h: hf })
+  widgets.value.push(widget)
   saveLayout()
+  // 从侧栏拖入的组件轻轻「落下」,而不是凭空出现
+  nextTick(() => {
+    const el = root.value?.querySelector(`[data-widget-uid="${widget.uid}"]`)
+    if (el) gsap.from(el, { scale: 0.92, autoAlpha: 0, duration: 0.36, ease: 'back.out(1.5)' })
+  })
   ElMessage.success(t('warm.addedToast', { label: widgetLabel(type) }))
 })
 
@@ -1340,7 +1375,9 @@ html.dark .edit-toolbar {
     inset 0 1px 0 rgba(255, 255, 255, 0.6);
   color: #3a2e22;
   overflow: hidden;
-  transition: box-shadow 0.25s ease;
+  transition:
+    box-shadow 0.25s ease,
+    scale 0.2s var(--ease-spring);
   contain: layout style;
 }
 .dash-card:not(.edit-active):hover {
@@ -1355,11 +1392,21 @@ html.dark .edit-toolbar {
     top 0.15s cubic-bezier(0.4, 0, 0.2, 1),
     width 0.15s cubic-bezier(0.4, 0, 0.2, 1),
     height 0.15s cubic-bezier(0.4, 0, 0.2, 1),
-    box-shadow 0.25s ease;
+    box-shadow 0.25s ease,
+    scale 0.2s var(--ease-spring);
 }
 .dash-card.dragging {
-  opacity: 0.9;
-  transition: none;
+  opacity: 0.94;
+  cursor: grabbing;
+  scale: 1.012;
+  box-shadow:
+    0 20px 48px rgba(58, 46, 34, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  transition:
+    box-shadow 0.2s ease,
+    scale 0.18s ease;
+  /* 拖拽期间才提示合成层,松手即撤,避免常驻占用显存 */
+  will-change: left, top, width, height;
 }
 html.dark .dash-card {
   background: rgba(var(--color-card-rgb), 0.5);
@@ -1525,6 +1572,28 @@ html.dark .widget-empty {
 .dash-card:hover .resize-corner,
 .dash-card.edit-active .resize-corner {
   opacity: 1;
+}
+/* 触屏:编辑态拖拽条与缩放手柄都要够大、且手柄上不触发页面滚动,否则手指一按就被浏览器当成滚动抢走 */
+.dash-card.edit-active .drag-bar,
+.resize-corner {
+  touch-action: none;
+}
+@media (pointer: coarse) {
+  .dash-card.edit-active .drag-bar {
+    height: 26px;
+  }
+  .dash-card.edit-active .grip {
+    width: 44px;
+    height: 4px;
+  }
+  .resize-corner {
+    width: 36px;
+    height: 36px;
+  }
+  .del-btn {
+    width: 28px;
+    height: 28px;
+  }
 }
 
 /* 家人动态 */

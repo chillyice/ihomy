@@ -67,19 +67,21 @@
 
       <div class="ms-tip">{{ $t('games.minesweeper.tip') }}</div>
 
-      <div v-if="isFinished" class="ms-overlay">
-        <div class="ms-overlay-card">
-          <div class="ms-overlay-icon">{{ isWin ? '🎉' : '💥' }}</div>
-          <div class="ms-overlay-title">
-            {{ isWin ? $t('games.minesweeper.win') : $t('games.minesweeper.lose') }}
+      <Transition name="game-overlay">
+        <div v-if="isFinished" class="ms-overlay game-overlay">
+          <div class="ms-overlay-card game-overlay-card">
+            <div class="ms-overlay-icon">{{ isWin ? '🎉' : '💥' }}</div>
+            <div class="ms-overlay-title">
+              {{ isWin ? $t('games.minesweeper.win') : $t('games.minesweeper.lose') }}
+            </div>
+            <div class="ms-overlay-meta">{{ $t('games.minesweeper.winMeta', { time: formatClock(elapsed) }) }}</div>
+            <div v-if="isWin && rewardMsg" class="ms-overlay-reward">{{ rewardMsg }}</div>
+            <el-button type="primary" size="small" round @click="startNew(level)">
+              {{ $t('games.minesweeper.newGame') }}
+            </el-button>
           </div>
-          <div class="ms-overlay-meta">{{ $t('games.minesweeper.winMeta', { time: formatClock(elapsed) }) }}</div>
-          <div v-if="isWin && rewardMsg" class="ms-overlay-reward">{{ rewardMsg }}</div>
-          <el-button type="primary" size="small" round @click="startNew(level)">
-            {{ $t('games.minesweeper.newGame') }}
-          </el-button>
         </div>
-      </div>
+      </Transition>
     </div>
   </div>
 </template>
@@ -456,17 +458,42 @@ onBeforeUnmount(() => {
   font-variant-numeric: tabular-nums;
   cursor: pointer;
   line-height: 1;
+  transition: filter 0.15s ease;
 }
 .ms-cell:hover:not(.open) {
   filter: brightness(1.06);
 }
+/* 翻开/插旗只在该格子状态变化时播一次,连锁展开也会逐格弹一下 */
 .ms-cell.open {
   background: var(--color-surface, #fff);
   box-shadow: inset 0 0 0 1px var(--color-border, #e3ded6);
   cursor: default;
+  animation: ms-open 0.16s var(--ease-soft);
 }
 .ms-cell.flag {
   color: #c0392b;
+  animation: ms-flag 0.22s var(--ease-spring);
+}
+@keyframes ms-open {
+  from {
+    opacity: 0.45;
+    transform: scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes ms-flag {
+  0% {
+    transform: scale(0.6);
+  }
+  70% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 .ms-cell.boom {
   background: #f2b7ad;

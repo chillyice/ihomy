@@ -200,7 +200,7 @@ html.fp-edit-focus .app-main.with-sidebar {
 /* 全局页面切换过渡(默认):淡入淡出,无 transform 避免 fixed 定位偏移 */
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.5s ease;
+  transition: opacity 0.34s ease;
 }
 .fade-enter-from,
 .fade-leave-to {

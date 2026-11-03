@@ -57,8 +57,8 @@
         <!-- 编辑手柄 -->
         <template v-if="editMode && w.kind !== 'preview'">
           <button class="gc-del" :title="$t('warm.removeWidget')" @click.stop="removeWidget(w)">✕</button>
-          <div class="gc-grip" :title="$t('warm.dragSort')">⋮⋮</div>
-          <div class="gc-resize" :title="$t('warm.resizeWidget')" @mousedown.stop.prevent="onResizeStart($event, w)" @click.stop></div>
+          <div class="gc-grip" :title="$t('warm.dragSort')" @pointerdown.stop.prevent="onGripPointerDown($event, w)">⋮⋮</div>
+          <div class="gc-resize" :title="$t('warm.resizeWidget')" @pointerdown.stop.prevent="onResizeStart($event, w)" @click.stop></div>
         </template>
 
         <!-- 紧凑图标档:1 列纯图标(一行一列),2 列图标 + 最简名称(一行两列) -->
@@ -909,9 +909,69 @@ const onDragEnd = () => {
   reorderPreview.value = null
 }
 
+// 触屏排序:原生 HTML5 DnD 在手机上不触发,编辑态改从「⋮⋮ 手柄」按住拖动;
+// 复用鼠标拖拽的实时占位 / FLIP 推挤,松手才落一次布局。
+let gripDrag = null
+
+const onGripPointerDown = (e, w) => {
+  if (!editMode.value || (e.pointerType === 'mouse' && e.button !== 0)) return
+  gripDrag = { id: w.id, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, active: false }
+  window.addEventListener('pointermove', onGripPointerMove)
+  window.addEventListener('pointerup', onGripPointerUp)
+  window.addEventListener('pointercancel', onGripPointerUp)
+}
+
+const onGripPointerMove = (e) => {
+  if (!gripDrag || e.pointerId !== gripDrag.pointerId) return
+  if (!gripDrag.active) {
+    // 先走 8px 阈值,避免把「点一下手柄」误判成拖拽
+    if (Math.hypot(e.clientX - gripDrag.startX, e.clientY - gripDrag.startY) < 8) return
+    gripDrag.active = true
+    dragId.value = gripDrag.id
+    reorderPreview.value = {
+      id: gripDrag.id,
+      index: Math.max(
+        0,
+        layout.value.findIndex((x) => x.id === gripDrag.id),
+      ),
+    }
+  }
+  const idx = insertionIndexAt(e.clientX, e.clientY, reorderPreview.value?.index, gripDrag.id)
+  if (reorderPreview.value?.index !== idx) {
+    const prev = captureRects()
+    reorderPreview.value = { id: gripDrag.id, index: idx }
+    nextTick(() => flipLayout(prev))
+  }
+}
+
+const detachGripDrag = () => {
+  window.removeEventListener('pointermove', onGripPointerMove)
+  window.removeEventListener('pointerup', onGripPointerUp)
+  window.removeEventListener('pointercancel', onGripPointerUp)
+}
+
+const onGripPointerUp = (e) => {
+  if (!gripDrag || (e.pointerId !== undefined && e.pointerId !== gripDrag.pointerId)) return
+  const { id, active } = gripDrag
+  gripDrag = null
+  detachGripDrag()
+  if (!active) return
+  const k = reorderPreview.value?.index
+  dragId.value = null
+  reorderPreview.value = null
+  if (k == null) return
+  const dragged = layout.value.find((x) => x.id === id)
+  if (!dragged) return
+  const others = layout.value.filter((x) => x.id !== id)
+  others.splice(Math.max(0, Math.min(k, others.length)), 0, dragged)
+  applyLayout(others)
+}
+
 // 调整大小:按下右下角手柄拖拽,把卡片列宽吸附 4/6/8/12、行高吸附 2/3/4/6;
 // 拖动中实时改 span/row,邻居经 CSS 栅格自动重排(实时预览),松手才 saveLayout 提交,拖回原位等于还原
+// 缩放同样改用 Pointer Events:触屏/触控笔与鼠标共用,手柄加 touch-action:none 防止被页面滚动抢走
 const onResizeStart = (e, w) => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return
   const card = e.currentTarget.closest('.gc-card')
   if (!card) return
   const grid = card.parentElement
@@ -919,6 +979,7 @@ const onResizeStart = (e, w) => {
   const colW = (gridW - 11 * GAP) / 12
   resizeState.value = {
     id: w.id,
+    pointerId: e.pointerId,
     startX: e.clientX,
     startY: e.clientY,
     startWidth: card.getBoundingClientRect().width,
@@ -928,12 +989,13 @@ const onResizeStart = (e, w) => {
     currentRow: w.row,
   }
   resizing.value = true
-  window.addEventListener('mousemove', onResizeMove)
-  window.addEventListener('mouseup', onResizeUp)
+  window.addEventListener('pointermove', onResizeMove)
+  window.addEventListener('pointerup', onResizeUp)
+  window.addEventListener('pointercancel', onResizeUp)
 }
 const onResizeMove = (e) => {
   const s = resizeState.value
-  if (!s) return
+  if (!s || e.pointerId !== s.pointerId) return
   const targetW = s.startWidth + (e.clientX - s.startX)
   const targetH = s.startHeight + (e.clientY - s.startY)
   let bestSpan = s.currentSpan
@@ -967,16 +1029,20 @@ const onResizeMove = (e) => {
     nextTick(() => flipLayout(prev)) // 吸附档变化时动画过渡(放大缩小 + 邻居让位 + 回弹)
   }
 }
-const onResizeUp = () => {
+const onResizeUp = (e) => {
+  if (resizeState.value && e.pointerId !== undefined && e.pointerId !== resizeState.value.pointerId) return
   resizing.value = false
   resizeState.value = null
-  window.removeEventListener('mousemove', onResizeMove)
-  window.removeEventListener('mouseup', onResizeUp)
+  window.removeEventListener('pointermove', onResizeMove)
+  window.removeEventListener('pointerup', onResizeUp)
+  window.removeEventListener('pointercancel', onResizeUp)
   // 松手仅结束拖拽,不落库;退出编辑(点「完成」或再次点编辑)时统一提交
 }
 onBeforeUnmount(() => {
-  window.removeEventListener('mousemove', onResizeMove)
-  window.removeEventListener('mouseup', onResizeUp)
+  detachGripDrag()
+  window.removeEventListener('pointermove', onResizeMove)
+  window.removeEventListener('pointerup', onResizeUp)
+  window.removeEventListener('pointercancel', onResizeUp)
 })
 
 // ========== 内容丰富度(分两维,面积相关) ==========
@@ -1656,6 +1722,31 @@ html.theme-warm.dark .gc-home {
   width: 20px;
   height: 20px;
   cursor: nwse-resize;
+}
+/* 触屏编辑:手柄吃指针、不触发页面滚动;命中区放大到手指能稳稳按住 */
+.gc-grip,
+.gc-resize {
+  touch-action: none;
+}
+@media (pointer: coarse) {
+  .gc-grip {
+    top: 6px;
+    right: 46px;
+    width: 34px;
+    height: 34px;
+    font-size: 15px;
+  }
+  .gc-resize {
+    width: 38px;
+    height: 38px;
+  }
+  .gc-del {
+    top: 6px;
+    right: 6px;
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
 }
 .gc-resize::after {
   content: '';

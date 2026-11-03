@@ -109,7 +109,7 @@
                       'widget-none': canDragNav && !m.draggable,
                     }"
                     @click="onNavClick(m)"
-                    @mousedown="onNavMousedown(m, $event)"
+                    @pointerdown="onNavMousedown(m, $event)"
                   >
                     <span class="gc-dot"></span>{{ m.title }}
                     <span v-if="canDragNav && m.draggable && m.added" class="gc-added-badge">{{ $t('warm.addedBadge') }}</span>
@@ -607,6 +607,7 @@ watch(
 /* 编辑模式三态:待拖入(可拖入且未添加)/ 已拖入冲突(已添加)/ 不可拖入(settings·ops) */
 .gc-nav-item.widget-src {
   cursor: grab;
+  touch-action: none;
   background: rgba(var(--color-brand-rgb), 0.1);
   border: 1px dashed rgba(var(--color-brand-rgb), 0.45);
   transition:

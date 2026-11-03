@@ -56,17 +56,21 @@ html.dark .mobile-header {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
   cursor: pointer;
   color: var(--color-text-primary, #333);
   -webkit-tap-highlight-color: transparent;
   font-size: 18px;
+  transition:
+    background 0.18s ease,
+    transform 0.18s var(--ease-spring);
 }
 .back-btn:active,
 .home-btn:active {
   background: rgba(0, 0, 0, 0.06);
+  transform: scale(0.9);
 }
 html.dark .back-btn,
 html.dark .home-btn {

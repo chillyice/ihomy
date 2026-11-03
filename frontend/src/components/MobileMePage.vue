@@ -230,6 +230,7 @@ html.dark .me-section {
   cursor: pointer;
   border-bottom: 1px solid rgba(0, 0, 0, 0.03);
   -webkit-tap-highlight-color: transparent;
+  transition: background 0.18s ease;
 }
 html.dark .me-row {
   border-bottom-color: rgba(255, 255, 255, 0.04);
@@ -248,6 +249,10 @@ html.dark .me-row:active {
   font-size: 18px;
   width: 24px;
   text-align: center;
+  transition: transform 0.18s var(--ease-spring);
+}
+.me-row:active .me-row-icon {
+  transform: scale(0.88);
 }
 .me-row-text {
   flex: 1;

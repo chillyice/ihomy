@@ -17,7 +17,7 @@
 
     <div v-loading="loading">
       <div v-if="filtered.length" class="task-list">
-        <div v-for="t in filtered" :key="t.id" class="task-card card">
+        <div v-for="(t, i) in filtered" :key="t.id" class="task-card card anim-rise" :style="{ '--i': i }">
           <div class="task-head">
             <span class="task-title">{{ t.title }}</span>
             <el-tag :type="tagType(t.status)" size="small">{{ statusText(t.status) }}</el-tag>

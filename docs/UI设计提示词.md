@@ -244,6 +244,7 @@
   - 从侧边栏拖出到内容区,ghost 由 `scale(0.3)` 弹性增长到 `scale(1)`(cubic-bezier 0.34,1.56,0.64,1),尺寸 80×60→200×150;drop 按 WIDGET_DEFAULT_SIZE 创建组件。
   - 侧边栏右边界气泡融合效果(`::after` radial-gradient pulse)。
   - 卡片可拖拽移动(drag-bar 顶部手柄)+ 缩放(resize-corner 右下角);**V9.63 起正常模式也可直接拖拽/缩放**(手柄 hover 浮现),不做栅格吸附,像素位移折算画布比例位移。
+  - **触屏编辑(V11.35)**:拖拽条/缩放角用 Pointer Events,手柄 `touch-action:none`;`@media (pointer: coarse)` 下缩放角 36px、拖拽条 26px、删除按钮 28px;指针位移 rAF 合帧写入。
   - 编辑模式禁用内部交互(`.card-inner { pointer-events: none }`),仅移动+缩放+删除。
   - 编辑工具栏 hover 隐藏(`opacity:0; translateY(-10px); pointer-events:none`)。
 - **h=1 时标题行消失(V9.63 改 tinyCard)**:`w.h*canvasH<120px` 时 `.card-head` opacity→0 + max-height→0 + padding→0(0.3s ease 动效)。
@@ -415,6 +416,14 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 ```
 **光柱层不入场**,直接显示当前太阳状态(避免光从无到有的突兀)。
 
+## 15b. 全局动效令牌与列表入场(V11.35)
+
+- **曲线/时长令牌**:`main.css :root` 定义 `--ease-soft: cubic-bezier(.22,1,.36,1)`(快出慢入)、`--ease-spring: cubic-bezier(.34,1.56,.64,1)`(回弹)与 `--dur-fast/base/slow`(0.16/0.24/0.36s);新动效优先引用变量,不写裸 cubic-bezier。
+- **列表逐条进场**:容器项加 `class="anim-rise"` + 内联 `--i`(序号),动画 `rise-in` 0.34s、延迟 `min(--i, 12) × 20ms`;用于移动端动态流/更多网格、任务与愿望列表等。筛选切换的整组替换用 `feed-swap`(淡出 0.14s → 淡入 0.2s),不做逐卡增删动画。
+- **浮层**:小游戏结算/暂停统一 `game-overlay`(遮罩淡入 0.22s,卡片 `--ease-spring` 回弹落位);数独填数 `sd-pop`、聊天新消息 `msg` 同属轻量过渡。
+- **移动端切页**:`mobile-tab`(底栏点选,纵向轻位移)、`mobile-tab-next/prev`(横滑,按手势方向推入/让位)、`mobile-page`(子页面从下轻推入)。
+- **无障碍/性能**:全局 `@media (prefers-reduced-motion: reduce)` 把动画/过渡压到 0.01ms 并关 `scroll-behavior`;高频拖拽用 `requestAnimationFrame` 合帧,禁止每帧写响应式状态。
+
 ## 16. 响应式
 
 | 断点 | 变化 |
@@ -508,7 +517,7 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 - **晨暮切换扫光(V9.62)**:暖居内晨↔暮切换不再整体 1s 渐变,改「从一侧柔和扫向另一侧」——暗色(晨→暮)沿垂直于光束方向扫过,上午~正午向右上、下午向左上、正午纯水平向右、夜晚默认水平,暮→晨反向;实现为克隆旧主题整页 DOM 为幕布 `.theme-sweep-old` + 方向性柔和 `mask` 蒙版划动(边界两侧真实晨/暮渲染,交界 ±8% 渐变条,`@property --sweep-p` 过渡 **1700ms**),划动期间 `html.theme-sweeping` 禁容器级颜色过渡;克隆内 `.theme-sweep-old :is(...){color:var(--color-text)!important}` 防 `html.dark` 硬编码浅色字泄漏。
 - **晨暮分段滑块(V9.63)**:晨/暮分段开关改「滑块 thumb」——`.gc-seg-thumb` 绝对定位盖在选中按钮下,`segMode` 本地 ref 跟随选中态;扫光结束后才更新滑块位置(`waitSweepEnd`),首次定位关过渡、ResizeObserver 跟随语言切换按钮宽度变化;选中文案 `--color-card`、thumb `--color-brand`、hover `--color-brand-hover`。
 - **天气背景待机浮现(V9.63)**:鼠标停在「背景板」静止 ≥3s 后天气 AI 底图 `.gc-weatherbg.revealed` 浮到最前(z-index 30、opacity 1,`pointer-events:none` 不挡交互),移动鼠标即恢复原状。
-- **暖居首页组件化(V9.63;V9.66 组件默认展示优化)**:`WarmHome` 硬编码卡片改组件注册表——9 富组件(weather/feed/photos/anni/finance/item/task/wish/reminder)+ 27 模块入口(未映射富组件的模块落为「快捷入口」卡片);OWNER 编辑模式(复用 `appStore.homeEditMode`)可增删/拖拽排序/右下角调大小(列宽 1/2/4/6/8/12、行高 1/2/3/4/6)/托盘添加,布局持久化 `ihomy:guangchen:home:v3`(V9.66 升版);拖动重排时**源卡实时移动到落点作唯一占位**(降透明度)且抑制浏览器拖拽快照,避免出现两张相同卡片;落位按**指针命中的卡片**判定(左/右半区决定前后,压源卡自身或卡片间隙时保持当前落点,越出网格边界收口到首尾),邻居推挤动画照常播放(落位测量取布局位置,不受动画中间态影响);内容丰富度按「行数 row + 列宽 span」两维推导(`vTier`/`hTier` → S/M/L/XL);**列宽 ≤2 走紧凑图标档**(1 列=纯图标、2 列=图标+最简名称,点击直达);侧栏模块编辑态可拖入首页。V9.66 组件默认展示(照片卡牌堆/寻物户型图/收支比例条/色相锚点)见 §18d。
+- **暖居首页组件化(V9.63;V9.66 组件默认展示优化)**:`WarmHome` 硬编码卡片改组件注册表——9 富组件(weather/feed/photos/anni/finance/item/task/wish/reminder)+ 27 模块入口(未映射富组件的模块落为「快捷入口」卡片);OWNER 编辑模式(复用 `appStore.homeEditMode`)可增删/拖拽排序/右下角调大小(列宽 1/2/4/6/8/12、行高 1/2/3/4/6)/托盘添加,布局持久化 `ihomy:guangchen:home:v3`(V9.66 升版);拖动重排时**源卡实时移动到落点作唯一占位**(降透明度)且抑制浏览器拖拽快照,避免出现两张相同卡片;落位按**指针命中的卡片**判定(左/右半区决定前后,压源卡自身或卡片间隙时保持当前落点,越出网格边界收口到首尾),邻居推挤动画照常播放(落位测量取布局位置,不受动画中间态影响);内容丰富度按「行数 row + 列宽 span」两维推导(`vTier`/`hTier` → S/M/L/XL);**列宽 ≤2 走紧凑图标档**(1 列=纯图标、2 列=图标+最简名称,点击直达);侧栏模块编辑态可拖入首页。**触屏编辑(V11.35)**:卡片多一个 `⋮⋮` 排序手柄(Pointer Events,触屏拖它排序),缩放角 `touch-action:none`,触屏下缩放角 38px、`⋮⋮` 34px、删除 32px。V9.66 组件默认展示(照片卡牌堆/寻物户型图/收支比例条/色相锚点)见 §18d。
 
 ## 18d. 暖居首页组件默认展示规格(V9.66)
 
@@ -635,7 +644,10 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 
 ### 首页三 Tab 模式(`/` 路由)
 
-- **MobileTabBar**:底部固定(fixed + safe-area-inset-bottom)三 Tab(首页/更多/我的)。
+- **MobileTabBar**:底部固定(fixed + safe-area-inset-bottom)三 Tab(首页/更多/我的);顶部 3px 指示条随当前 Tab 平移(`translateX(index*100%)`,0.32s `--ease-soft`)。
+- **左右滑动切换(V11.35)**:内容区单指横滑(≥48px、≤650ms、横向大于纵向 1.2 倍)切 Tab;起手在横向滚动容器/输入框/弹窗内不接管,纵向滚动不 `preventDefault`;`html { overscroll-behavior-x:none }` 防浏览器前进后退;每个 Tab 记忆 `scrollY`,切回恢复;过渡 `mobile-tab-next/prev` 按手势方向推入/让位。
+- **触摸目标**:页头返回/首页按钮 44px;首页组件编辑手柄 ≥36px;底部 Tab 高度 56px 与 `MobileLayout` 的 `padding-bottom` 是跨文件契约,改一处必须同步另一处。
+- **悬浮音乐播放器**:黑胶区是拖拽手柄(Pointer Events),松手存 `ihomy:music:pos`;移动端最低 `bottom:72px`(不压 56px 底栏),展开/旋转/换屏后自动夹回视口;拖动超过 6px 视为拖拽,350ms 内屏蔽补发的 click。
 - **MobileHomeFeed**(首页 Tab):顶部**文字式筛选 + 下划线选中**(无胶囊背景);动态流 8 类型(博客/日记/照片/视频/愿望/任务/菜谱/图书,9 Tab),复用 `homeApi.getFeed`(与桌面同一数据源,前端按 type 分流渲染,封面字段 `coverImage`)。
 - **MobileMoreGrid**(更多 Tab):按分类(内容/生活/家庭/成员/系统)4 列图标网格,复用 appStore.modules。
 - **MobileMePage**(我的 Tab):用户信息 + 家庭切换(展开列表)+ 主题/光影/语言开关 + 设置/成员/资料入口 + 退出。
@@ -837,6 +849,7 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 7. **连连看调试版面板(V11.23,仅 `?debug=1`)**:坐在游戏卡底部操作栏之下,宽 100% / 最大 720px,1px 虚线青色描边 `rgba(0,204,255,.45)` + 6% 青底、圆角 10、12px 字;第一行「调试面板」青色标签 + 关卡下拉(104px)+ 跳关/自动消除(运行中切 danger 显示「停止」)/自检 1-9 关/清空日志;第二行等宽数字统计「剩余牌 / 已消对数 / 奇数型 / 异常」,非零用 `#ff5a5a` 加粗;自检结果行青绿色,日志区等宽字体、最高 132px 滚动,异常行整行红色。面板只在带 `?debug=1` 时渲染,正常入口不可见,不占正常布局。
 8. **纸牌统一入口与固定一屏(V11.24/V11.25)**:两级纵深——玩法大厅 `/games/cards` 居中放标题 + 副标题 + 玩法卡网格(每卡:圆角图标块/名称(带「最近在玩」小胶囊,跟随 `ihomy:games:cards:mode:v1`)/简介/最高分行/「进入」箭头,hover 上浮),点卡进入 `/games/cards/klondike|spider`;牌桌顶栏返回键文案变「玩法大厅」。牌桌页 `.cards-page` 在暖居下 `height:100%` 直接吃满主区净高(CSS 链,不数值测量),光尘下按视口实测锁高,`.cards-stage` flex 占满剩余高度。牌宽与叠牌步进由 `utils/games/cardLayout.js` 反推:`fitCardWidth` 按列数/间距/顶部占用算牌宽(上限 132、蜘蛛 96、蜘蛛窄屏下限 44),`pileSteps` 按「每张露出的可见高度占牌宽」给步进(正面 0.42 / 背面 0.22 / 最小 0.12),渲染 `marginTop = -(1.4 − step)×100%`(百分比负边距按牌宽算);长列自动压紧自身间距,页面高度永不被牌列顶开。窄屏蜘蛛十列放不下时保持 44px 牌宽、呢面盘 `overflow-x:auto` 横向滚动;视口矮(≤760px)自动隐藏底部说明文字。全屏目标是 `.cards-stage`(整块牌桌),统计小盒改横排(label+数值同行)省高度。
 9. **网页游戏页 `/games/web/{id}`(V11.32)**:顶栏 `PageToolbar(root-class="game-topbar")` = 返回键 + 游戏名(`.wg-title`,单行省略)+ 右侧动作组 `.game-top-actions`(刷新 / 浏览器打开 / 存入保险箱 / 页面全屏 / 全屏);窄屏 ≤768px 只留图标,文案藏进 `title`+`aria-label`。主区 `.wg-stage.card.game-surface` 高度 `calc(100dvh - 170px)`(窄屏 `-140px`,最小 400px)、`overflow:hidden`、深底 `#1b1b1b`,内嵌 iframe 无边框、白底 `#f4f4f4` 吃满容器;**不放任何外站内容进 ihomy 主题变量**,只做外壳。加载中盖一层 `.wg-cover`(居中转圈 + 「加载中」),失败文案换成「打开失败 + 浏览器打开」按钮。页面全屏 `.wg-stage.is-page-full` = `position: fixed; inset: 0; z-index: var(--z-immersive)`,盖住侧栏/页脚/顶栏但**不触发浏览器 F11**,右上角 12px 处给悬浮圆形关闭按钮(Esc 只在父文档有焦点时兜底,焦点在 iframe 里收不到);全屏按钮走浏览器 Fullscreen API,被拒绝(如 iOS)时保持窗口态。外壳 `.page.web-game-page` 由 `main.css` 放开 `max-width: none`,不吃 1100px 内容宽;游戏库卡片的「打开」与旧 `/games/play/{id}` 都收敛到这个页面。
+10. **结算/暂停浮层与落子动效(V11.35)**:八款 H5 小游戏与纸牌接龙的结算/暂停遮罩统一走 `<Transition name="game-overlay">`——遮罩 0.22s 淡入,结果卡 `translateY(8px) scale(.92)` 起、`--ease-spring` 0.28s 落位;扫雷翻开格 `ms-open` 0.16s、插旗 `ms-flag` 0.22s 回弹,数独填数 `sd-pop` 缩放弹入,俄罗斯方块格子颜色 0.1s 过渡,纸牌牌面 hover 上浮 2px(仅 `hover:hover`)。全部在 `prefers-reduced-motion` 下停用位移。
 
 ## 32. 家庭保险箱查看密码二次校验弹窗(V11.34)
 

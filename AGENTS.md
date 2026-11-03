@@ -156,7 +156,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 5. **图标**:Element Plus `el-icon`;Setting/Monitor 用内联 SVG(复杂 path 在 100% 缩放下光栅化卡)。`stroke-width:2px`。
 6. **动画**:GSAP 入场;`transform: translateZ(0)` 隔离合成层;`contain: layout style`;避免 `background-attachment: fixed`。
 7. **毛玻璃**:`backdrop-filter: blur(24px) saturate(1.1)`;hover 用 `transform` 不用 `box-shadow`;**长开页/持续动画页别用**(踩坑速查 §3.10)。
-8. **可拖拽面板**:`useDragResize`;位置尺寸持久化 localStorage;**事件监听按需挂载**;**指针捕获只在真正拖动时做**(`pointerdown` 就 `setPointerCapture` 会让容器内所有卡片/按钮点不动,踩坑速查 §3.35)。
+8. **可拖拽面板**:`useDragResize`;位置尺寸持久化 localStorage;**事件监听按需挂载**;**指针捕获只在真正拖动时做**(`pointerdown` 就 `setPointerCapture` 会让容器内所有卡片/按钮点不动,踩坑速查 §3.35);拖拽/缩放手柄统一 Pointer Events + `touch-action:none`(触屏才不会被页面滚动抢走,踩坑速查 §3.61)。
 9. **光影层全局化**:`SunLightLayer` + `AppSidebar` + `SiteFooter` 在 `App.vue` 挂载,`useSunLight` provide/inject。
 10. **i18n**:所有可见文本 `$t('key')`,中英键结构对齐;文案里字面量 `{`/`}`/`@` 必须转义,否则生产构建 `$t()` 抛错打断整页;守门 `i18n/message-format.spec.js` + 硬编码中文守门 `hardcoded-cjk.spec.js`(有意保留项进其 `ALLOW`)。
 11. **共享逻辑抽 utils(禁三份实现)**:动态流走 `utils/feed.js`;枚举文案 `dictText(t,...)`;金额「元⇄分」`utils/money.js`、年月日换算 `utils/date.js`(`loan.js` 只再导出);新重复逻辑先找现成 util。
@@ -172,6 +172,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 21. **位图资产(强制)**:装饰图放 `frontend/src/assets/` 并 ESM 导入,**不放 `public/`**;宽度按渲染 2 倍封顶。例外:URL 存 DB 的演示素材走 `frontend/public/`;咔哒截图放 `public/kada-media/`;chillyice 舞台位图由 `scripts/art/chillyice_paint.py` 生成。**`public/` 目录名不得与 SPA 路由同名**(否则该路由 403),工具导出放 `public/toolbox-data/`。
 22. **提示文案不写实现(强制,后端同守)**:用户可见文案、`BizException` 消息、`@Operation` 摘要(`/doc.html` 公开)**只讲用户能做什么/发生了什么**,不写库表字段/配置键/内部枚举码/内部节律。机制细节归注释与日志。
 23. **富文本必须消毒(强制)**:用户可写内容渲染 HTML 一律经 `utils/markdown.js` 的 `renderMarkdown()`(marked + DOMPurify)再 `v-html`;**禁止把 `marked.parse` 直接给 `v-html`**,`marked` 只允许在该文件导入;守门 `utils/htmlSink.spec.js`。
+24. **移动端横滑手势**:只做意图识别、不 `preventDefault`;**起手在横向滚动容器(overflowX auto/scroll)、输入框或弹窗内不接管**;`html { overscroll-behavior-x:none }` 防浏览器前进/后退抢手势;切 Tab 前记住各 Tab 的 `scrollY`(踩坑速查 §3.61)。
 
 ## 验证基线
 

@@ -56,21 +56,23 @@
 
       <div class="bf-tip">{{ $t('games.g2048.tip') }}</div>
 
-      <div v-if="won || gameOver" class="bf-overlay">
-        <div class="bf-overlay-card">
-          <div class="bf-overlay-icon">{{ won ? '🏆' : '💤' }}</div>
-          <div class="bf-overlay-title">
-            {{ won ? $t('games.g2048.win') : $t('games.g2048.lose') }}
-          </div>
-          <div class="bf-overlay-meta">{{ $t('games.g2048.meta', { score }) }}</div>
-          <div v-if="won && rewardMsg" class="bf-overlay-reward">{{ rewardMsg }}</div>
-          <div class="bf-overlay-actions">
-            <el-button v-if="won" type="primary" size="small" round @click="keepPlaying">{{ $t('games.g2048.continue') }}</el-button>
-            <el-button v-if="won" size="small" round @click="startNew">{{ $t('games.g2048.playAgain') }}</el-button>
-            <el-button v-else type="primary" size="small" round @click="startNew">{{ $t('games.g2048.playAgain') }}</el-button>
+      <Transition name="game-overlay">
+        <div v-if="won || gameOver" class="bf-overlay game-overlay">
+          <div class="bf-overlay-card game-overlay-card">
+            <div class="bf-overlay-icon">{{ won ? '🏆' : '💤' }}</div>
+            <div class="bf-overlay-title">
+              {{ won ? $t('games.g2048.win') : $t('games.g2048.lose') }}
+            </div>
+            <div class="bf-overlay-meta">{{ $t('games.g2048.meta', { score }) }}</div>
+            <div v-if="won && rewardMsg" class="bf-overlay-reward">{{ rewardMsg }}</div>
+            <div class="bf-overlay-actions">
+              <el-button v-if="won" type="primary" size="small" round @click="keepPlaying">{{ $t('games.g2048.continue') }}</el-button>
+              <el-button v-if="won" size="small" round @click="startNew">{{ $t('games.g2048.playAgain') }}</el-button>
+              <el-button v-else type="primary" size="small" round @click="startNew">{{ $t('games.g2048.playAgain') }}</el-button>
+            </div>
           </div>
         </div>
-      </div>
+      </Transition>
     </div>
   </div>
 </template>

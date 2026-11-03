@@ -2,13 +2,13 @@
 <template>
   <div
     v-if="playlist.length"
+    ref="playerEl"
     class="music-player"
     :class="{ expanded }"
     :style="{ left: pos.x + 'px', bottom: pos.bottom + 'px' }"
-    @mousedown="onDragStart"
   >
-    <!-- 黑胶可视化 + 展开切换 -->
-    <div v-a11y-click class="player-left" @click.stop="expanded = !expanded">
+    <!-- 黑胶可视化 + 展开切换:整个黑胶区就是拖拽手柄,鼠标与触屏都从这里拖 -->
+    <div v-a11y-click class="player-left" @pointerdown="onDragStart" @click.stop="onVinylClick">
       <div class="vinyl" :class="{ playing }">
         <div class="vinyl-disc">
           <div class="vinyl-groove"></div>
@@ -83,9 +83,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { musicApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { useDevice } from '@/composables/useDevice'
 import { useI18n } from 'vue-i18n'
 import { CaretLeft, CaretRight, VideoPlay, VideoPause, List } from '@element-plus/icons-vue'
 
@@ -101,50 +102,102 @@ const currentTime = ref(0)
 const duration = ref(0)
 const buffered = ref(0)
 
-// 拖拽位置(bottom 定位,左下角不动)
+// 拖拽位置(bottom 定位,左下角不动);移动端默认抬到 56px 底栏之上,避免压住 Tab 点击区
+const { isMobile } = useDevice()
+const playerEl = ref(null)
+const MOBILE_MIN_BOTTOM = 72
 const DEFAULT_POS = { x: 240, bottom: 24 }
 const pos = ref({ ...DEFAULT_POS })
 try {
   const saved = JSON.parse(localStorage.getItem('ihomy:music:pos') || 'null')
-  if (saved && saved.x !== undefined) pos.value = saved
+  if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.bottom)) pos.value = saved
 } catch (e) {}
 
-const onDragStart = (e) => {
-  const tag = e.target.tagName
-  if (tag === 'BUTTON' || tag === 'AUDIO' || tag === 'INPUT' || tag === 'svg' || tag === 'path') return
-  const startX = e.clientX - pos.value.x
-  const startBottom = window.innerHeight - e.clientY - pos.value.bottom
-  let moved = false
-  const onMove = (ev) => {
-    const dx = ev.clientX - startX - pos.value.x
-    const dy = window.innerHeight - ev.clientY - startBottom - pos.value.bottom
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) moved = true
-    let x = ev.clientX - startX
-    let bottom = window.innerHeight - ev.clientY - startBottom
-    x = Math.max(8, Math.min(window.innerWidth - 80, x))
-    bottom = Math.max(8, Math.min(window.innerHeight - 80, bottom))
-    pos.value = { x, bottom }
+let drag = null
+let suppressClickUntil = 0
+let expandClampTimer = 0
+
+// 位置永远留在视口内:换屏/旋转/展开成宽面板后都不会跑到屏幕外
+const clampPos = () => {
+  const el = playerEl.value
+  if (!el) return
+  const minBottom = isMobile.value ? MOBILE_MIN_BOTTOM : 8
+  const maxX = Math.max(8, window.innerWidth - el.offsetWidth - 8)
+  const maxBottom = Math.max(minBottom, window.innerHeight - el.offsetHeight - 8)
+  pos.value = {
+    x: Math.min(Math.max(8, pos.value.x), maxX),
+    bottom: Math.min(Math.max(minBottom, pos.value.bottom), maxBottom),
   }
-  const onUp = (ev) => {
-    document.removeEventListener('mousemove', onMove)
-    document.removeEventListener('mouseup', onUp)
-    if (moved) {
-      // 拖拽结束后浏览器还会补发一次 click(会被播放器当成点击 → 松手即切歌/展开):
-      // 在捕获阶段吞掉紧随其后的这一次 click,用完自摘(不留常驻监听)
-      ev.stopPropagation()
-      ev.preventDefault()
-      const blocker = (e) => {
-        e.stopPropagation()
-        e.preventDefault()
-        document.removeEventListener('click', blocker, true)
-      }
-      document.addEventListener('click', blocker, true)
-      localStorage.setItem('ihomy:music:pos', JSON.stringify(pos.value))
-    }
-  }
-  document.addEventListener('mousemove', onMove)
-  document.addEventListener('mouseup', onUp)
 }
+
+const detachDrag = () => {
+  window.removeEventListener('pointermove', onDragMove)
+  window.removeEventListener('pointerup', onDragUp)
+  window.removeEventListener('pointercancel', onDragUp)
+}
+
+const onDragStart = (e) => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return
+  const rect = playerEl.value?.getBoundingClientRect()
+  if (!rect) return
+  drag = {
+    pointerId: e.pointerId,
+    startX: e.clientX,
+    startY: e.clientY,
+    left: rect.left,
+    bottom: window.innerHeight - rect.bottom,
+    width: rect.width,
+    height: rect.height,
+    moved: false,
+  }
+  // 只在真按下手柄时挂监听,松手即摘;触屏移动量小于 6px 仍按点击处理(展开/收起)
+  window.addEventListener('pointermove', onDragMove)
+  window.addEventListener('pointerup', onDragUp)
+  window.addEventListener('pointercancel', onDragUp)
+}
+
+const onDragMove = (e) => {
+  if (!drag || e.pointerId !== drag.pointerId) return
+  const dx = e.clientX - drag.startX
+  const dy = e.clientY - drag.startY
+  if (!drag.moved && Math.hypot(dx, dy) < 6) return
+  drag.moved = true
+  const minBottom = isMobile.value ? MOBILE_MIN_BOTTOM : 8
+  pos.value = {
+    x: Math.min(Math.max(8, drag.left + dx), Math.max(8, window.innerWidth - drag.width - 8)),
+    bottom: Math.min(Math.max(minBottom, drag.bottom - dy), Math.max(minBottom, window.innerHeight - drag.height - 8)),
+  }
+}
+
+const onDragUp = (e) => {
+  if (!drag || e.pointerId !== drag.pointerId) return
+  const moved = drag.moved
+  drag = null
+  detachDrag()
+  if (!moved) return
+  // 拖动结束浏览器会补发一次 click,短暂屏蔽,避免松手就展开/收起
+  suppressClickUntil = Date.now() + 350
+  clampPos()
+  try {
+    localStorage.setItem('ihomy:music:pos', JSON.stringify(pos.value))
+  } catch (e) {
+    /* 无痕环境存不了就仅本次会话生效 */
+  }
+}
+
+const onVinylClick = () => {
+  if (Date.now() < suppressClickUntil) return
+  expanded.value = !expanded.value
+}
+
+// 展开后播放器会变宽:动画结束再夹一次,保证右边缘不出屏;收起时同理
+watch(expanded, () => {
+  clearTimeout(expandClampTimer)
+  nextTick(() => {
+    requestAnimationFrame(clampPos)
+    expandClampTimer = setTimeout(clampPos, 380)
+  })
+})
 
 const currentTrack = computed(() => playlist.value[trackIdx.value] || {})
 const playedPct = computed(() => (duration.value ? (currentTime.value / duration.value) * 100 : 0))
@@ -276,8 +329,23 @@ const formatTime = (s) => {
 watch(() => userStore.isLoggedIn, loadBackgroundPlaylist)
 watch(() => userStore.userInfo?.familyId, loadBackgroundPlaylist)
 watch(() => userStore.bgMusicVersion, loadBackgroundPlaylist)
+// 有歌单后播放器才渲染,渲染出来再校正一次位置(旧存档/小屏可能已越界)
+watch(
+  () => playlist.value.length,
+  (n) => {
+    if (n) nextTick(() => requestAnimationFrame(clampPos))
+  },
+)
 
-onMounted(loadBackgroundPlaylist)
+onMounted(() => {
+  loadBackgroundPlaylist()
+  window.addEventListener('resize', clampPos)
+})
+onBeforeUnmount(() => {
+  clearTimeout(expandClampTimer)
+  detachDrag()
+  window.removeEventListener('resize', clampPos)
+})
 </script>
 
 <style scoped>
@@ -298,13 +366,9 @@ onMounted(loadBackgroundPlaylist)
     inset 0 1px 0 rgba(255, 255, 255, 0.6),
     inset 0 -1px 0 rgba(58, 46, 34, 0.04);
   overflow: hidden;
-  cursor: grab;
   user-select: none;
   contain: layout style;
   transform: translateZ(0);
-}
-.music-player:active {
-  cursor: grabbing;
 }
 html.dark .music-player {
   background: rgba(var(--color-card-rgb), 0.65);
@@ -319,6 +383,9 @@ html.dark .music-player {
   padding: 12px;
   cursor: grab;
   flex-shrink: 0;
+  /* 手柄上接管指针:触屏拖动时页面不跟着滚;body 区仍保留原生滚动与点击 */
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
 }
 .player-left:active {
   cursor: grabbing;

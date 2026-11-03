@@ -126,6 +126,15 @@
   cursor: pointer;
   font-weight: 700;
   touch-action: manipulation;
+  transition:
+    transform 0.16s var(--ease-soft),
+    box-shadow 0.16s ease;
+}
+@media (hover: hover) {
+  .sol-cardface:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 14px rgba(0, 0, 0, 0.34);
+  }
 }
 .sol-cardface.red {
   color: #c0392b;
@@ -142,6 +151,7 @@
   box-shadow:
     0 0 0 2px rgba(255, 209, 102, 0.5),
     0 4px 10px rgba(0, 0, 0, 0.32);
+  transform: translateY(-2px);
 }
 .sol-corner {
   position: absolute;

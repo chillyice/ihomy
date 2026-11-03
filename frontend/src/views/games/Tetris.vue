@@ -90,22 +90,24 @@
 
       <div class="tt-tip">{{ $t('games.tetris.tip') }}</div>
 
-      <div v-if="paused || game.status === 'OVER'" class="tt-overlay">
-        <div class="tt-overlay-card">
-          <div class="tt-overlay-icon">{{ game.status === 'OVER' ? '💤' : '⏸' }}</div>
-          <div class="tt-overlay-title">
-            {{ game.status === 'OVER' ? $t('games.tetris.over') : $t('games.tetris.paused') }}
+      <Transition name="game-overlay">
+        <div v-if="paused || game.status === 'OVER'" class="tt-overlay game-overlay">
+          <div class="tt-overlay-card game-overlay-card">
+            <div class="tt-overlay-icon">{{ game.status === 'OVER' ? '💤' : '⏸' }}</div>
+            <div class="tt-overlay-title">
+              {{ game.status === 'OVER' ? $t('games.tetris.over') : $t('games.tetris.paused') }}
+            </div>
+            <div class="tt-overlay-meta">
+              {{ $t('games.tetris.meta', { score: game.score, lines: game.lines }) }}
+            </div>
+            <div v-if="game.status === 'OVER' && rewardMsg" class="tt-overlay-reward">{{ rewardMsg }}</div>
+            <el-button v-if="paused && game.status === 'PLAYING'" type="primary" size="small" round @click="togglePause">
+              {{ $t('games.tetris.resume') }}
+            </el-button>
+            <el-button v-else type="primary" size="small" round @click="startNew">{{ $t('games.tetris.newGame') }}</el-button>
           </div>
-          <div class="tt-overlay-meta">
-            {{ $t('games.tetris.meta', { score: game.score, lines: game.lines }) }}
-          </div>
-          <div v-if="game.status === 'OVER' && rewardMsg" class="tt-overlay-reward">{{ rewardMsg }}</div>
-          <el-button v-if="paused && game.status === 'PLAYING'" type="primary" size="small" round @click="togglePause">
-            {{ $t('games.tetris.resume') }}
-          </el-button>
-          <el-button v-else type="primary" size="small" round @click="startNew">{{ $t('games.tetris.newGame') }}</el-button>
         </div>
-      </div>
+      </Transition>
     </div>
   </div>
 </template>
@@ -475,10 +477,13 @@ onBeforeUnmount(() => {
 .tt-cell {
   border-radius: 2px;
   background: rgba(255, 255, 255, 0.045);
+  /* 方块左移/下落/消行时,颜色用极短过渡接上,避免整块生硬跳变 */
+  transition: background-color 0.1s ease;
 }
 .tt-cell.ghost {
   opacity: 0.34;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+  transition: opacity 0.12s ease;
 }
 
 .tt-side {
@@ -511,6 +516,7 @@ onBeforeUnmount(() => {
 .tt-mini-cell {
   border-radius: 1px;
   background: transparent;
+  transition: background-color 0.12s ease;
 }
 
 .tt-pad {

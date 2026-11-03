@@ -21,7 +21,7 @@
       <div v-if="appStore.homeEditMode" class="nav-group">
         <div v-if="!collapsed" class="group-label">{{ $t('home.dashboard.widgetLibrary') }}</div>
         <div v-for="w in EXTRA_WIDGETS" :key="w.type" class="nav-item-wrap">
-          <div class="nav-item widget-src" :title="extraLabel(w)" v-a11y-click @mousedown="startWidgetDrag(w.type, $event)">
+          <div class="nav-item widget-src" :title="extraLabel(w)" v-a11y-click @pointerdown="startWidgetDrag(w.type, $event)">
             <span class="nav-icon"
               ><el-icon><component :is="w.icon" /></el-icon
             ></span>
@@ -38,7 +38,7 @@
             :title="m.title"
             v-a11y-click
             @click="appStore.homeEditMode ? null : navigate(m.path)"
-            @mousedown="appStore.homeEditMode && widgetType(m.code) && startWidgetDrag(widgetType(m.code), $event)"
+            @pointerdown="appStore.homeEditMode && widgetType(m.code) && startWidgetDrag(widgetType(m.code), $event)"
           >
             <span class="nav-icon">
               <svg v-if="m.code === 'settings'" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
@@ -712,6 +712,7 @@ html.dark .edit-mode-btn.active {
 }
 .nav-item.widget-src {
   cursor: grab;
+  touch-action: none;
 }
 .nav-item.widget-src:active {
   cursor: grabbing;

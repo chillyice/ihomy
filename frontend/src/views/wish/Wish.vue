@@ -18,9 +18,10 @@
     <div v-loading="loading">
       <div v-if="filtered.length" class="wish-grid">
         <div
-          v-for="w in filtered"
+          v-for="(w, i) in filtered"
           :key="w.id"
-          class="wish-card card"
+          class="wish-card card anim-rise"
+          :style="{ '--i': i }"
           :class="'st' + (w.status === 'ACHIEVED' ? 1 : w.status === 'ABANDONED' ? 2 : 0)"
         >
           <div class="wish-top">

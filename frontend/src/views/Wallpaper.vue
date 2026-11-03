@@ -525,6 +525,9 @@ const widgetPos = reactive(
 )
 const dragId = ref('')
 let dragCtx = null
+// pointermove 一帧可能触发多次:合并到下一帧写一次位置,壁纸页长时间开着也不掉帧
+let dragRaf = 0
+let pendingMove = null
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi))
 
 const saveWidgetPos = () => {
@@ -532,6 +535,18 @@ const saveWidgetPos = () => {
     localStorage.setItem(WIDGET_POS_KEY, JSON.stringify(widgetPos))
   } catch (e) {
     /* 无痕环境存不了就仅本次会话生效 */
+  }
+}
+
+const applyWidgetMove = () => {
+  dragRaf = 0
+  if (!dragCtx || !pendingMove) return
+  const e = pendingMove
+  pendingMove = null
+  const { id, dx, dy, w, h } = dragCtx
+  widgetPos[id] = {
+    x: clamp(e.clientX - dx, 0, window.innerWidth - w),
+    y: clamp(e.clientY - dy, 0, window.innerHeight - h),
   }
 }
 
@@ -549,14 +564,18 @@ const onWidgetDown = (id, e) => {
 }
 const onWidgetMove = (e) => {
   if (!dragCtx) return
-  const { id, dx, dy, w, h } = dragCtx
-  widgetPos[id] = {
-    x: clamp(e.clientX - dx, 0, window.innerWidth - w),
-    y: clamp(e.clientY - dy, 0, window.innerHeight - h),
-  }
+  pendingMove = e
+  if (!dragRaf) dragRaf = requestAnimationFrame(applyWidgetMove)
 }
 const onWidgetUp = () => {
+  if (dragRaf) {
+    cancelAnimationFrame(dragRaf)
+    dragRaf = 0
+  }
+  // 松手前最后一段位移还没上屏时,补到最终位置
+  if (dragCtx && pendingMove) applyWidgetMove()
   dragCtx = null
+  pendingMove = null
   dragId.value = ''
   window.removeEventListener('pointermove', onWidgetMove)
   window.removeEventListener('pointerup', onWidgetUp)
@@ -734,6 +753,7 @@ onBeforeUnmount(() => {
   clearTimeout(uiHideTimer)
   stopSlide()
   // 若卸载时还挂着拖拽监听(极端时序),一并摘掉
+  if (dragRaf) cancelAnimationFrame(dragRaf)
   window.removeEventListener('pointermove', onWidgetMove)
   window.removeEventListener('pointerup', onWidgetUp)
 })
@@ -848,10 +868,15 @@ onBeforeUnmount(() => {
   user-select: none;
   -webkit-user-drag: none;
   touch-action: none;
+  transition:
+    scale 0.2s var(--ease-spring),
+    box-shadow 0.2s ease;
 }
 .wp-widget.dragging {
   cursor: grabbing;
   box-shadow: 0 22px 56px rgba(0, 0, 0, 0.26);
+  scale: 1.02;
+  will-change: left, top;
 }
 /* 拖过一次位置固化为 left/top px(内联),清掉默认定位的 right/bottom/transform */
 .wp-widget.placed {

@@ -11,13 +11,15 @@
       <!-- 消息区(自动滚动到底部) -->
       <div ref="msgBox" class="msg-list" v-loading="loading">
         <el-empty v-if="!loading && !messages.length" :description="$t('chat.noData')" :image-size="70" />
-        <div v-for="m in messages" :key="m.id" class="msg-row" :class="{ mine: m.senderId === myId }">
-          <el-avatar :size="30" class="msg-avatar">{{ m.senderName?.charAt(0) }}</el-avatar>
-          <div class="msg-body">
-            <div class="msg-meta">{{ m.senderName }} · {{ fmtTime(m.createdAt) }}</div>
-            <div class="msg-bubble">{{ m.content }}</div>
+        <TransitionGroup name="msg" tag="div">
+          <div v-for="m in messages" :key="m.id" class="msg-row" :class="{ mine: m.senderId === myId }">
+            <el-avatar :size="30" class="msg-avatar">{{ m.senderName?.charAt(0) }}</el-avatar>
+            <div class="msg-body">
+              <div class="msg-meta">{{ m.senderName }} · {{ fmtTime(m.createdAt) }}</div>
+              <div class="msg-bubble">{{ m.content }}</div>
+            </div>
           </div>
-        </div>
+        </TransitionGroup>
       </div>
 
       <!-- 输入区 -->
@@ -186,6 +188,26 @@ onBeforeUnmount(cleanup)
 }
 .msg-row.mine {
   flex-direction: row-reverse;
+}
+
+/* 新消息从底部轻轻抬起;历史一次性加载时不播,只影响后续追加 */
+.msg-enter-active {
+  transition:
+    opacity 0.22s ease,
+    transform 0.26s var(--ease-soft);
+}
+.msg-leave-active {
+  transition: opacity 0.16s ease;
+}
+.msg-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.msg-leave-to {
+  opacity: 0;
+}
+.msg-move {
+  transition: transform 0.24s var(--ease-soft);
 }
 .msg-avatar {
   flex-shrink: 0;

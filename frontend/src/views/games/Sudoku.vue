@@ -72,10 +72,12 @@
           </template>
           <span v-if="ineqMark(index, 'r')" class="sd-ineq sd-ineq-r" aria-hidden="true">{{ ineqMark(index, 'r') }}</span>
           <span v-if="ineqMark(index, 'b')" class="sd-ineq sd-ineq-b" aria-hidden="true">{{ ineqMark(index, 'b') }}</span>
-          <span v-if="value" class="sd-value">{{ value }}</span>
-          <span v-else-if="notes[index]" class="sd-notes">
-            <span v-for="n in notesList(index)" :key="n" class="sd-note">{{ n }}</span>
-          </span>
+          <Transition name="sd-pop" mode="out-in">
+            <span v-if="value" :key="'v' + value" class="sd-value">{{ value }}</span>
+            <span v-else-if="notes[index]" :key="'n' + index" class="sd-notes">
+              <span v-for="n in notesList(index)" :key="n" class="sd-note">{{ n }}</span>
+            </span>
+          </Transition>
         </button>
       </div>
 
@@ -116,15 +118,17 @@
         {{ $t('games.sudoku.variantTip.' + variant) }}
       </div>
 
-      <div v-if="won" class="sd-overlay">
-        <div class="sd-overlay-card">
-          <div class="sd-overlay-icon">🎉</div>
-          <div class="sd-overlay-title">{{ $t('games.sudoku.win') }}</div>
-          <div class="sd-overlay-meta">{{ $t('games.sudoku.winMeta', { time: timeText, hints: hintsUsed }) }}</div>
-          <div v-if="rewardMsg" class="sd-overlay-reward">{{ rewardMsg }}</div>
-          <el-button type="primary" size="small" round @click="startNew">{{ $t('games.sudoku.playAgain') }}</el-button>
+      <Transition name="game-overlay">
+        <div v-if="won" class="sd-overlay game-overlay">
+          <div class="sd-overlay-card game-overlay-card">
+            <div class="sd-overlay-icon">🎉</div>
+            <div class="sd-overlay-title">{{ $t('games.sudoku.win') }}</div>
+            <div class="sd-overlay-meta">{{ $t('games.sudoku.winMeta', { time: timeText, hints: hintsUsed }) }}</div>
+            <div v-if="rewardMsg" class="sd-overlay-reward">{{ rewardMsg }}</div>
+            <el-button type="primary" size="small" round @click="startNew">{{ $t('games.sudoku.playAgain') }}</el-button>
+          </div>
         </div>
-      </div>
+      </Transition>
     </div>
   </div>
 </template>
@@ -895,8 +899,13 @@ onBeforeUnmount(() => {
   font-weight: 600;
   cursor: pointer;
   overflow: hidden;
-  transition: background-color 0.12s ease;
+  transition:
+    background-color 0.12s ease,
+    transform 0.1s ease;
   -webkit-tap-highlight-color: transparent;
+}
+.sd-cell:active {
+  transform: scale(0.97);
 }
 .sd-cell.edge-r {
   border-right-width: 2px;
@@ -959,6 +968,22 @@ onBeforeUnmount(() => {
 }
 .sd-value {
   line-height: 1;
+}
+/* 填数/改数/擦除:新数字轻轻弹出,旧数字先淡出,不再硬切 */
+.sd-pop-enter-active {
+  transition:
+    opacity 0.12s ease,
+    transform 0.18s var(--ease-spring);
+}
+.sd-pop-leave-active {
+  transition: opacity 0.08s ease;
+}
+.sd-pop-enter-from {
+  opacity: 0;
+  transform: scale(0.55);
+}
+.sd-pop-leave-to {
+  opacity: 0;
 }
 
 /* 不等式数独:比较符号贴在右/下边中点,∧∨ 表示上下两格的大小方向 */

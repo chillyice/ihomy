@@ -1,9 +1,16 @@
 <template>
   <div class="mobile-more">
-    <div class="more-section" v-for="g in groups" :key="g.category">
+    <div class="more-section" v-for="(g, gi) in groups" :key="g.category">
       <div class="more-section-title">{{ g.label }}</div>
       <div class="more-grid">
-        <div v-a11y-click v-for="m in g.items" :key="m.code" class="more-item" @click="navigate(m.path)">
+        <div
+          v-a11y-click
+          v-for="(m, mi) in g.items"
+          :key="m.code"
+          class="more-item anim-rise"
+          :style="{ '--i': Math.min(gi * 8 + mi, 12) }"
+          @click="navigate(m.path)"
+        >
           <span class="more-icon">
             <svg v-if="m.code === 'settings'" viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
               <path
@@ -70,9 +77,11 @@ html.dark .more-section-title {
   gap: 6px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  transition: transform 0.18s var(--ease-soft);
 }
 .more-item:active {
-  opacity: 0.6;
+  opacity: 0.72;
+  transform: scale(0.94);
 }
 
 .more-icon {
@@ -85,6 +94,12 @@ html.dark .more-section-title {
   background: rgba(184, 140, 110, 0.08);
   color: var(--color-primary, var(--color-brand));
   font-size: 24px;
+  transition:
+    transform 0.2s var(--ease-spring),
+    background 0.2s ease;
+}
+.more-item:active .more-icon {
+  transform: scale(0.92);
 }
 html.dark .more-icon {
   background: rgba(var(--color-brand-rgb), 0.12);

@@ -95,15 +95,17 @@
 
     <div class="sol-tip">{{ $t('games.solitaire.tip') }}</div>
 
-    <div v-if="isWon" class="sol-overlay">
-      <div class="sol-overlay-card">
-        <div class="sol-overlay-icon">🏆</div>
-        <div class="sol-overlay-title">{{ $t('games.solitaire.win') }}</div>
-        <div class="sol-overlay-meta">{{ $t('games.solitaire.winMeta', { score: game.score, moves: game.moves }) }}</div>
-        <div v-if="rewardMsg" class="sol-overlay-reward">{{ rewardMsg }}</div>
-        <el-button type="primary" size="small" round @click="startNew">{{ $t('games.solitaire.newGame') }}</el-button>
+    <Transition name="game-overlay">
+      <div v-if="isWon" class="sol-overlay game-overlay">
+        <div class="sol-overlay-card game-overlay-card">
+          <div class="sol-overlay-icon">🏆</div>
+          <div class="sol-overlay-title">{{ $t('games.solitaire.win') }}</div>
+          <div class="sol-overlay-meta">{{ $t('games.solitaire.winMeta', { score: game.score, moves: game.moves }) }}</div>
+          <div v-if="rewardMsg" class="sol-overlay-reward">{{ rewardMsg }}</div>
+          <el-button type="primary" size="small" round @click="startNew">{{ $t('games.solitaire.newGame') }}</el-button>
+        </div>
       </div>
-    </div>
+    </Transition>
   </div>
 </template>
 

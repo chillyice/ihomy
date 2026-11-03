@@ -52,20 +52,24 @@
 
       <div class="sn-tip">{{ $t('games.snake.tip') }}</div>
 
-      <div v-if="paused || game.status !== 'PLAYING'" class="sn-overlay">
-        <div class="sn-overlay-card">
-          <div class="sn-overlay-icon">{{ game.status === 'WON' ? '🏆' : game.status === 'LOST' ? '💥' : '⏸' }}</div>
-          <div class="sn-overlay-title">
-            {{ game.status === 'WON' ? $t('games.snake.win') : game.status === 'LOST' ? $t('games.snake.lose') : $t('games.snake.paused') }}
+      <Transition name="game-overlay">
+        <div v-if="paused || game.status !== 'PLAYING'" class="sn-overlay game-overlay">
+          <div class="sn-overlay-card game-overlay-card">
+            <div class="sn-overlay-icon">{{ game.status === 'WON' ? '🏆' : game.status === 'LOST' ? '💥' : '⏸' }}</div>
+            <div class="sn-overlay-title">
+              {{
+                game.status === 'WON' ? $t('games.snake.win') : game.status === 'LOST' ? $t('games.snake.lose') : $t('games.snake.paused')
+              }}
+            </div>
+            <div class="sn-overlay-meta">{{ $t('games.snake.meta', { score: game.score }) }}</div>
+            <div v-if="game.status !== 'PLAYING' && rewardMsg" class="sn-overlay-reward">{{ rewardMsg }}</div>
+            <el-button v-if="paused && game.status === 'PLAYING'" type="primary" size="small" round @click="togglePause">
+              {{ $t('games.snake.resume') }}
+            </el-button>
+            <el-button v-else type="primary" size="small" round @click="startNew">{{ $t('games.snake.newGame') }}</el-button>
           </div>
-          <div class="sn-overlay-meta">{{ $t('games.snake.meta', { score: game.score }) }}</div>
-          <div v-if="game.status !== 'PLAYING' && rewardMsg" class="sn-overlay-reward">{{ rewardMsg }}</div>
-          <el-button v-if="paused && game.status === 'PLAYING'" type="primary" size="small" round @click="togglePause">
-            {{ $t('games.snake.resume') }}
-          </el-button>
-          <el-button v-else type="primary" size="small" round @click="startNew">{{ $t('games.snake.newGame') }}</el-button>
         </div>
-      </div>
+      </Transition>
     </div>
   </div>
 </template>
@@ -433,9 +437,12 @@ onBeforeUnmount(() => {
   color: var(--color-text-primary, #2b2b2b);
   font-size: 15px;
   cursor: pointer;
+  transition:
+    background 0.15s ease,
+    transform 0.1s ease;
 }
 .sn-key:active {
-  transform: translateY(1px);
+  transform: translateY(1px) scale(0.96);
   background: rgba(0, 0, 0, 0.06);
 }
 .sn-up {

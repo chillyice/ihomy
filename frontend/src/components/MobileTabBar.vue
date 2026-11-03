@@ -1,5 +1,7 @@
 <template>
   <div class="mobile-tabbar">
+    <!-- 滑动指示条:跟着当前 Tab 平移,让切换有连续方向感 -->
+    <span class="tab-indicator" :style="{ transform: `translateX(${activeIndex * 100}%)` }" aria-hidden="true" />
     <div v-a11y-click class="tab-item" :class="{ active: modelValue === 'home' }" @click="$emit('update:modelValue', 'home')">
       <el-icon><HomeFilled /></el-icon>
       <span>{{ $t('mobile.home') }}</span>
@@ -16,9 +18,12 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { HomeFilled, Grid, User } from '@element-plus/icons-vue'
-defineProps({ modelValue: String })
+
+const props = defineProps({ modelValue: String })
 defineEmits(['update:modelValue'])
+const activeIndex = computed(() => ({ home: 0, more: 1, me: 2 })[props.modelValue] ?? 0)
 </script>
 
 <style scoped>
@@ -37,6 +42,25 @@ defineEmits(['update:modelValue'])
   -webkit-backdrop-filter: blur(20px) saturate(1.1);
   border-top: 1px solid rgba(0, 0, 0, 0.06);
   z-index: var(--z-nav);
+}
+/* 顶部 3px 指示条跟着 Tab 滑动;本身不吃指针事件 */
+.tab-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 33.3333%;
+  height: 3px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  transition: transform 0.32s var(--ease-soft);
+}
+.tab-indicator::after {
+  content: '';
+  width: 28px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--color-brand);
 }
 html.dark .mobile-tabbar {
   background: rgba(var(--color-card-rgb), 0.92);
@@ -57,6 +81,15 @@ html.dark .mobile-tabbar {
 }
 .tab-item .el-icon {
   font-size: 22px;
+  transition:
+    transform 0.28s var(--ease-spring),
+    color 0.2s ease;
+}
+.tab-item.active .el-icon {
+  transform: translateY(-2px) scale(1.1);
+}
+.tab-item:active .el-icon {
+  transform: scale(0.9);
 }
 .tab-item.active {
   color: var(--color-primary, var(--color-brand));

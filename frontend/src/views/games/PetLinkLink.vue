@@ -81,9 +81,11 @@
                 <polyline v-if="linePoints" :points="linePoints" class="line" />
               </svg>
 
-              <div v-if="paused" class="pause-mask">
-                <div class="pause-label">{{ $t('games.petlink.paused') }}</div>
-              </div>
+              <Transition name="game-overlay">
+                <div v-if="paused" class="pause-mask game-overlay">
+                  <div class="pause-label game-overlay-card">{{ $t('games.petlink.paused') }}</div>
+                </div>
+              </Transition>
             </div>
           </div>
         </div>
@@ -139,15 +141,17 @@
         </div>
 
         <!-- 胜负弹层 -->
-        <div v-if="won || lost" class="overlay">
-          <div class="overlay-card">
-            <div class="overlay-icon">{{ won ? '🎉' : '😿' }}</div>
-            <div class="overlay-title">{{ won ? $t('games.petlink.win') : $t('games.petlink.lose') }}</div>
-            <div class="overlay-score">{{ $t('games.petlink.score') }} {{ score }}</div>
-            <div v-if="won && rewardMsg" class="overlay-reward">{{ rewardMsg }}</div>
-            <el-button type="primary" size="small" round @click="restart">{{ $t('games.petlink.playAgain') }}</el-button>
+        <Transition name="game-overlay">
+          <div v-if="won || lost" class="overlay game-overlay">
+            <div class="overlay-card game-overlay-card">
+              <div class="overlay-icon">{{ won ? '🎉' : '😿' }}</div>
+              <div class="overlay-title">{{ won ? $t('games.petlink.win') : $t('games.petlink.lose') }}</div>
+              <div class="overlay-score">{{ $t('games.petlink.score') }} {{ score }}</div>
+              <div v-if="won && rewardMsg" class="overlay-reward">{{ rewardMsg }}</div>
+              <el-button type="primary" size="small" round @click="restart">{{ $t('games.petlink.playAgain') }}</el-button>
+            </div>
           </div>
-        </div>
+        </Transition>
       </template>
     </div>
   </div>
