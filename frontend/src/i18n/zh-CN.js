@@ -677,7 +677,6 @@ export default {
     lunarPrefix: '农历',
     leap: '闰',
     dayEmpty: '这一天还没有安排',
-    addToDay: '添加到这一天',
     dayKind: { festival: '节日', term: '节气', holiday: '节日', workday: '上班' },
     holidayRest: '休',
     holidayWork: '班',

@@ -159,13 +159,19 @@
             <div class="wt-chart-inner" :style="{ width: chartW + 'px' }">
               <svg v-if="chartData" :viewBox="`0 0 ${chartW} ${CHART_H}`" class="wt-chart">
                 <defs>
-                  <linearGradient id="wtLineGrad" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" :stop-color="tempColor(chartData.tMin + 1)" />
+                  <!-- 上下渐变:高处(高温)暖色、低处(低温)冷色,颜色随高度而非时间变化 -->
+                  <linearGradient id="wtLineGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" :stop-color="tempColor(chartData.tMax - 1)" />
                     <stop offset="50%" :stop-color="tempColor((chartData.tMin + chartData.tMax) / 2)" />
-                    <stop offset="100%" :stop-color="tempColor(chartData.tMax - 1)" />
+                    <stop offset="100%" :stop-color="tempColor(chartData.tMin + 1)" />
+                  </linearGradient>
+                  <!-- 面积填充同向,顶部暖色微透、底部淡出 -->
+                  <linearGradient id="wtAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" :stop-color="tempColor(chartData.tMax - 1)" stop-opacity="0.16" />
+                    <stop offset="100%" :stop-color="tempColor(chartData.tMin + 1)" stop-opacity="0.03" />
                   </linearGradient>
                 </defs>
-                <path :d="areaPath" fill="url(#wtLineGrad)" opacity="0.10" />
+                <path :d="areaPath" fill="url(#wtAreaGrad)" />
                 <path
                   :d="linePath"
                   fill="none"

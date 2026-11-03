@@ -676,7 +676,6 @@ export default {
     lunarPrefix: 'Lunar',
     leap: 'Leap ',
     dayEmpty: 'Nothing planned for this day',
-    addToDay: 'Add to this day',
     dayKind: { festival: 'Festival', term: 'Solar term', holiday: 'Holiday', workday: 'Workday' },
     holidayRest: 'Off',
     holidayWork: 'Work',

@@ -61,7 +61,6 @@
         :items="dayItems"
         :info="dayInfo"
         :record-of="recordOf"
-        @add="openCreate"
         @open="openDetail"
         @edit="openEdit"
         @delete="onDelete"

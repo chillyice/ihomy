@@ -6,9 +6,6 @@
         <span class="day-date">{{ titleText }}</span>
         <span v-if="lunarText" class="day-lunar">{{ lunarText }}</span>
       </div>
-      <el-button v-if="isLoggedIn" size="small" type="primary" plain @click="$emit('add', date)">
-        {{ $t('schedule.addToDay') }}
-      </el-button>
     </header>
 
     <!-- 游客:纪念日与「访客可读」的既有口径保持一致照常展示(只读),其余日程换成登录引导 -->
@@ -57,7 +54,7 @@ const props = defineProps({
   info: { type: Object, default: null },
   recordOf: { type: Function, required: true },
 })
-defineEmits(['add', 'open', 'edit', 'delete', 'toggle', 'toggle-task'])
+defineEmits(['open', 'edit', 'delete', 'toggle', 'toggle-task'])
 
 const { t } = useI18n()
 const router = useRouter()
