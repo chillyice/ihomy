@@ -298,7 +298,7 @@ color: #3A2E22;
 
 ### 弹窗尺寸规则(`main.css` 全局,按业务场景)
 
-> **宽度语义(V11.26 起)**:全局 `.el-dialog` 宽度 = `var(--el-dialog-width, 50%)`,**组件声明的 `width` prop 全局生效**(EP 把它写进元素内联 `--el-dialog-width`)。各功能弹窗按业务声明宽度(简短确认 360–420 / 简单表单 440–520 / 复杂表单 560–640 / 表格管理 620–820 / 详情媒体 800–900 或 `min(…, 92vw)`);**新弹窗必须声明 `width` 或用下面四档 class**,未声明的按 EP 默认 50% 渲染。宽度兜底 `max-width: calc(100vw - 32px)`。
+> **宽度语义(V11.27 起)**:全局 `.el-dialog` 宽度 = `var(--el-dialog-width, 50%)`,**组件声明的 `width` prop 全局生效**(EP 把它写进元素内联 `--el-dialog-width`)。各功能弹窗按业务声明宽度(简短确认 360–420 / 简单表单 440–520 / 复杂表单 560–640 / 表格管理 620–820 / 详情媒体 800–900 或 `min(…, 92vw)`);**新弹窗必须声明 `width` 或用下面四档 class**,未声明的按 EP 默认 50% 渲染。宽度兜底 `max-width: calc(100vw - 32px)`。
 
 | class | 场景 | 宽度 | max-height | 滚动 |
 |-------|------|------|------------|------|
@@ -488,7 +488,7 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 
 ### 弹窗宽度上限与内容栏对齐
 
-- **宽度语义(V11.26 起)**:全局 `.el-dialog` 宽度 = `var(--el-dialog-width, 50%)`,组件声明的 `width` prop **全局生效**(EP 把它写进元素内联 `--el-dialog-width`);历史上这里曾是 `width: fit-content`,会把所有 `width` prop 压死、长文按 max-content 撑到近整屏(成因与取证见 `docs/踩坑速查.md` §3.25)。因此:
+- **宽度语义(V11.27 起)**:全局 `.el-dialog` 宽度 = `var(--el-dialog-width, 50%)`,组件声明的 `width` prop **全局生效**(EP 把它写进元素内联 `--el-dialog-width`);历史上这里曾是 `width: fit-content`,会把所有 `width` prop 压死、长文按 max-content 撑到近整屏(成因与取证见 `docs/踩坑速查.md` §3.25)。因此:
   - **正文可能很长(AI 生成结果、日志、说明段落)的弹窗必须显式声明 `width` 上限**(全量 83 个弹窗均已声明宽度或档位 class),正文超高由全局兜底在弹窗内滚动;
   - 内容栏感知的收窄仅保留给 `oss-plan-dialog`(升级方案):`max-width: clamp(320px, calc(100vw - 2 * var(--shell-nav-w, 0px) - 32px), 640px)`;`--shell-nav-w` = 内容栏左边界(光尘侧栏 220px;暖居 studio 外框 20 留白 + 230 侧栏 + 1 边框 = 251px,由 `html:has(.app-sidebar)` / `html:has(.gc-side)` 注入,无侧栏为 0)。
 - **要跳出内容栏**就给该弹窗加 `append-to-body`:在内容栏内渲染时,弹窗会被固定侧栏(`z-index: 60` > `.app-main` 的 `z-index: 10`)压在下面,或在暖居被 `.gc-main` 的渐隐 mask 裁掉;挂到 body 后遮罩在根级高于侧栏(`--z-overlay` 200),mask 也不再套住它。成因与取证见 `docs/踩坑速查.md` §3.25。
