@@ -15,6 +15,8 @@ export const SUN_LIGHT_KEY = Symbol('sunLight')
 export function useSunLight() {
   const themeStore = useThemeStore()
   const sunInfo = ref(null)
+  // 共享 sun-info 的取数时刻(ms):判断「页面长开几小时后」这份数据还能不能直接复用
+  const sunInfoAt = ref(0)
   const slotIdx = ref(currentSlotIndex())
   const sunScene = ref({
     source: { x: '50%', y: '-15%' },
@@ -399,25 +401,37 @@ export function useSunLight() {
 
   const loadSunInfo = async () => {
     try {
-      const data = await request.get('/public/sun-info')
-      if (data) {
-        sunInfo.value = data
-        slotIdx.value = currentSlotIndex()
-        sunScene.value = getSunScene(data, slotIdx.value)
-        themeStore.applyAuto(sunScene.value.isNight)
-      }
+      applySunInfo(await request.get('/public/sun-info'))
     } catch (e) {}
   }
 
   const loadSunInfoForDate = async (dateStr) => {
     try {
-      const data = await request.get('/public/sun-info', { params: { date: dateStr } })
-      if (data) {
-        sunInfo.value = data
-        sunScene.value = getSunScene(data, slotIdx.value)
-        themeStore.applyAuto(sunScene.value.isNight)
-      }
+      // 光照测试台按日期取:沿用当前时隙(测试台会自己步进),不重置 slotIdx
+      applySunInfo(await request.get('/public/sun-info', { params: { date: dateStr } }), { resetSlot: false })
     } catch (e) {}
+  }
+
+  // 把一份 /public/sun-info 落到全局:记录取数时刻(供天气页判断共享数据是否还能复用,
+  // 用本地时钟算时长,避免前后端时钟差)并同步光影场景与晨暮主题
+  const applySunInfo = (data, { resetSlot = true } = {}) => {
+    if (!data) return
+    sunInfo.value = data
+    sunInfoAt.value = Date.now()
+    if (resetSlot) slotIdx.value = currentSlotIndex()
+    sunScene.value = getSunScene(data, slotIdx.value)
+    themeStore.applyAuto(sunScene.value.isNight)
+  }
+
+  // 共享 sun-info 距取数的时长(ms);从未取到返回 Infinity
+  const sunInfoAge = () => (sunInfoAt.value ? Date.now() - sunInfoAt.value : Infinity)
+
+  // 长开兜底:日出日落/时隙表/月相与天气数据同频,每 30 分钟换一次;
+  // 跨零点后时隙表也随之换成新一天(光照测试台按别的日期看数据时不动它)
+  const SUN_INFO_TTL = 30 * 60 * 1000
+  const refreshSunInfoIfStale = () => {
+    if (!sunInfo.value || lightTestMode.value) return
+    if (sunInfoAge() > SUN_INFO_TTL) loadSunInfo()
   }
 
   // 拉取真实天气并同步到光影系统(非光照测试模式)
@@ -449,6 +463,18 @@ export function useSunLight() {
     } catch (e) {}
   }
 
+  const onVisibilityChange = () => {
+    if (document.hidden || !sunInfo.value || lightTestMode.value) return
+    // 后台期间定时器会被浏览器节流:回到前台先把时隙对齐到现在,再按需补取天文数据
+    const idx = currentSlotIndex()
+    if (idx !== slotIdx.value) {
+      slotIdx.value = idx
+      refreshScene()
+      themeStore.applyAuto(sunScene.value.isNight)
+    }
+    refreshSunInfoIfStale()
+  }
+
   onMounted(() => {
     loadSunInfo()
     loadWeather()
@@ -456,6 +482,7 @@ export function useSunLight() {
     // 空闲检测:注册用户活动事件(mousemove 节流),启动超时定时器
     IDLE_EVENTS.forEach((e) => window.addEventListener(e, resetIdle, { passive: true }))
     IDLE_EVENTS_THROTTLED.forEach((e) => window.addEventListener(e, resetIdle, { passive: true }))
+    document.addEventListener('visibilitychange', onVisibilityChange)
     resetIdle()
     // 每 5 分钟更新时隙
     slotTimer = setInterval(() => {
@@ -466,6 +493,8 @@ export function useSunLight() {
           refreshScene()
           themeStore.applyAuto(sunScene.value.isNight)
         }
+        // 长开/跨零点:时隙表与日出日落到点换新(光照测试台按日期看数据时不覆盖)
+        refreshSunInfoIfStale()
       }
     }, 300000)
     // 每 10 秒微调光柱明暗(天气系数由 computed 实时应用,这里只调基础值)
@@ -497,6 +526,7 @@ export function useSunLight() {
     if (testTimer) clearInterval(testTimer)
     IDLE_EVENTS.forEach((e) => window.removeEventListener(e, resetIdle))
     IDLE_EVENTS_THROTTLED.forEach((e) => window.removeEventListener(e, resetIdle))
+    document.removeEventListener('visibilitychange', onVisibilityChange)
     if (idleTimer) clearTimeout(idleTimer)
   })
 
@@ -554,6 +584,9 @@ export function useSunLight() {
 
   return {
     sunInfo,
+    sunInfoAt,
+    sunInfoAge,
+    applySunInfo,
     slotIdx,
     sunScene,
     weather,

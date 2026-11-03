@@ -220,11 +220,14 @@ const fmtMD = (s) => {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || '')
   return m ? `${Number(m[2])}/${Number(m[3])}` : ''
 }
-const nextEvent = computed(() => nextTwilightEvent(props.astro, nowLocalMinutes()))
+// 当前时刻(本地分钟):地图、今日高度曲线与「下一阶段」共用,每分钟与回到前台时刷新
+// (computed 内不直接读 Date.now / new Date,否则长开后不会重算)
+const nowMin = ref(nowLocalMinutes())
+const nextEvent = computed(() => nextTwilightEvent(props.astro, nowMin.value))
 const nextInText = computed(() => {
   const e = nextEvent.value
   if (!e) return ''
-  const d = e.minutes - nowLocalMinutes()
+  const d = e.minutes - nowMin.value
   return d >= 60 ? t('weatherPage.map.afterHm', { h: Math.floor(d / 60), m: d % 60 }) : t('weatherPage.map.afterM', { m: d })
 })
 
@@ -244,7 +247,6 @@ const SUN_RAYS = Array.from({ length: 8 }, (_, i) => {
   }
 })
 // 当前时刻与地图一起每分钟刷新(computed 内不直接读 Date.now)
-const nowMin = ref(nowLocalMinutes())
 const curve = computed(() => {
   const list = props.astro?.slots || []
   if (list.length < 2) return null
@@ -408,27 +410,52 @@ function scrollPanelIntoView() {
   }
 }
 
-onMounted(() => {
-  focus.value = cityFocus.value ? { ...cityFocus.value } : null
-  // 后端给了 generatedAt 才算得准已过分钟数;没有就按当前时刻起算(误差最多几小时)
+// 后端给了 generatedAt 才把「已过分钟数」算准;没有就按当前时刻起算(误差最多几小时)
+const rebase = () => {
   const ts = props.generatedAt ? Date.parse(props.generatedAt) : NaN
   baseTs.value = Number.isNaN(ts) ? Date.now() : ts
   elapsed.value = Math.max(0, (Date.now() - baseTs.value) / 60000)
+}
+// 时钟与直射点一起推进:地图重画 + 曲线上「此刻太阳」与「下一阶段」的分钟数一起更新
+const syncClock = () => {
+  elapsed.value = Math.max(0, (Date.now() - baseTs.value) / 60000)
   nowMin.value = nowLocalMinutes()
+  draw()
+}
+const onVisible = () => {
+  // 后台时定时器被节流:回到前台立刻把晨昏线与时刻对齐到现在
+  if (!document.hidden) syncClock()
+}
+
+onMounted(() => {
+  focus.value = cityFocus.value ? { ...cityFocus.value } : null
+  rebase()
+  syncClock()
   ro = new ResizeObserver(() => draw())
   if (canvasEl.value) ro.observe(canvasEl.value)
+  document.addEventListener('visibilitychange', onVisible)
   timer = setInterval(() => {
     if (document.hidden) return
-    elapsed.value = Math.max(0, (Date.now() - baseTs.value) / 60000)
-    nowMin.value = nowLocalMinutes()
-    draw()
+    syncClock()
   }, 60000)
 })
 
 onBeforeUnmount(() => {
   clearInterval(timer)
+  document.removeEventListener('visibilitychange', onVisible)
   ro?.disconnect()
 })
+
+// 父级定时换新 sun-info(页面长开每 30 分钟一次)后,基准时刻也要跟着换,
+// 否则会用「旧基准 + 新增已过分钟」把晨昏线推到错误经度
+watch(
+  () => [props.generatedAt, props.subsolar],
+  () => {
+    if (!props.subsolar) return
+    rebase()
+    syncClock()
+  },
+)
 
 // canvas 是 v-if 的产物,subsolar 到位后它才挂上 → 挂上时补一次绘制与观察
 watch(

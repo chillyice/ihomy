@@ -94,10 +94,14 @@ export function nowLocalMinutes(date = new Date()) {
   return date.getHours() * 60 + date.getMinutes()
 }
 
-/** 直射点漂移:赤纬按天变(可忽略),经度 +0.25°/min,归一化到 [-180,180] */
+/**
+ * 直射点漂移:赤纬按天变(可忽略),经度随 UT 向西 0.25°/min,归一化到 [-180,180]。
+ * 符号别写反:后端 SolarUtil.subsolarPoint 的 lng = (720 - utcMinutes - eot) / 4,
+ * 时间前进 → 直射经度递减(0.25°/min),这里是「从取数时刻往后推」,故为负号。
+ */
 export function driftSubsolar(subsolar, elapsedMinutes) {
   if (!subsolar) return null
-  const lng = normLng(subsolar.lng + 0.25 * elapsedMinutes)
+  const lng = normLng(subsolar.lng - 0.25 * elapsedMinutes)
   return { lat: subsolar.lat, lng }
 }
 

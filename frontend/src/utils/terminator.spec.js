@@ -138,12 +138,22 @@ describe('当日下一个晨昏事件', () => {
 })
 
 describe('直射点漂移', () => {
-  it('经度按 0.25°/min 前进并归一化', () => {
-    expect(driftSubsolar({ lat: 10, lng: 0 }, 60).lng).toBeCloseTo(15, 6)
+  it('经度随 UT 向西 0.25°/min 并归一化', () => {
+    expect(driftSubsolar({ lat: 10, lng: 0 }, 60).lng).toBeCloseTo(-15, 6)
     expect(driftSubsolar({ lat: 10, lng: 0 }, 60).lat).toBe(10)
-    expect(driftSubsolar({ lat: 10, lng: 170 }, 60).lng).toBeCloseTo(-175, 6)
-    expect(driftSubsolar({ lat: 10, lng: -170 }, 60).lng).toBeCloseTo(-155, 6)
+    expect(driftSubsolar({ lat: 10, lng: 170 }, 60).lng).toBeCloseTo(155, 6)
+    expect(driftSubsolar({ lat: 10, lng: -170 }, 60).lng).toBeCloseTo(175, 6)
+    expect(driftSubsolar({ lat: 10, lng: 0 }, 240).lng).toBeCloseTo(-60, 6)
     expect(driftSubsolar(null, 60)).toBeNull()
+  })
+
+  // 与后端 SolarUtil.subsolarPoint 的 lng = (720 - utcMinutes - eot) / 4 同向:
+  // 时间每过 1 小时,直射经度西移 15°(滞后取数时刻的经度不能反过来往东跑)
+  it('一小时西移 15°,方向与后端公式一致', () => {
+    const start = { lat: 0, lng: 60 }
+    expect(driftSubsolar(start, 60).lng).toBeCloseTo(45, 6)
+    expect(driftSubsolar(start, 120).lng).toBeCloseTo(30, 6)
+    expect(driftSubsolar(start, 1440).lng).toBeCloseTo(60, 6)
   })
 })
 

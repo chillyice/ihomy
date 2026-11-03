@@ -492,9 +492,12 @@ const fmtToday = () => {
 }
 const todayLabel = ref(fmtToday())
 const todayTimer = setInterval(() => {
-  todayLabel.value = fmtToday()
+  const next = fmtToday()
+  if (next === todayLabel.value) return
+  // 跨零点:今天是新的一天,实况/10 天预报/日月时刻整体换新
+  todayLabel.value = next
+  load(true)
 }, 60000)
-onBeforeUnmount(() => clearInterval(todayTimer))
 const nf = (key) => detail.value?.nowFull?.[key] ?? '—'
 const fmtHour = (s) => (s || '').slice(11, 16)
 const fmtDate = (s) => {
@@ -680,9 +683,24 @@ const tooltipStyle = computed(() => {
 // ── 日月天文(纯天文计算:取自 /public/sun-info,后端 SolarUtil 用 NOAA/Meeus 算法算,不依赖天气 API;
 //    故天气凭证未配置时晨昏地图照常显示。渲染交给 <TerminatorMap>) ──
 const astro = ref(null)
-const astroLoading = ref(false)
-// 晨昏地图依赖后端新增的 subsolar 直射点;老后端/应用启动时取的旧数据没有该字段 → 当日则重取一次
-const astroStale = () => !!astro.value && astro.value.date === todayLabel.value && !astro.value.subsolar && !astroLoading.value
+// 复用共享 sun-info 的上限:光影层那份只在应用启动时取一次,页面长开几小时后不能当「此刻」用;
+// 晨昏地图的直射点虽会按取数时刻自漂,但日出日落/月相/「当地今日」时刻仍以服务器算的当日为准。
+const ASTRO_REUSE_MS = 10 * 60 * 1000
+const astroAt = ref(0) // 当前 astro 的数据时刻(本地时钟;0 = 没有可用数据)
+// 最近一次完整取数的时刻(本地时钟):页面从后台回来时据此决定要不要立刻补一次
+const lastLoadAt = ref(0)
+const astroAge = () => (astroAt.value ? Date.now() - astroAt.value : Infinity)
+const applyAstro = (data, ageMs = 0) => {
+  astro.value = data
+  astroAt.value = Date.now() - Math.max(0, ageMs)
+}
+// 共享实例只在「今天 + 足够新」时拿来省一次请求;否则视为不可用,由 load() 自己重取
+const reuseSharedAstro = () => {
+  const shared = sunLight?.sunInfo?.value
+  if (!shared || shared.date !== todayLabel.value || !shared.subsolar) return
+  const age = sunLight?.sunInfoAge?.() ?? Infinity
+  if (age <= ASTRO_REUSE_MS) applyAstro(shared, age)
+}
 // ── 空气质量 24 小时走势(和风 airquality/v1/hourly) ──
 const AIR_W = 720,
   AIR_H = 150,
@@ -760,33 +778,49 @@ const toggleDay = (date) => {
   openDate.value = openDate.value === date ? '' : date
 }
 
-const load = async () => {
+const load = async (background = false) => {
+  // 光影层同一份 sun-info 可省一次请求,但只在「今天 + 足够新」时复用;长开几小时后必须自己重取
+  if (astroAge() > ASTRO_REUSE_MS) reuseSharedAstro()
   if (sunLight?.weatherDetail?.value) detail.value = sunLight.weatherDetail.value
-  // 光影层应用启动时已取过当日 sun-info(同一份数据),先拿来立即渲染省一次请求;
-  // 但光线测试台可能按别的日期取过,日期不符就自己再取一次,免得卡片显示的是另一天的日月时刻
-  const shared = sunLight?.sunInfo?.value
-  if (shared?.date === todayLabel.value) astro.value = shared
-  loading.value = true
+  if (!background) loading.value = true
+  const needSun = astroAge() > ASTRO_REUSE_MS
   // 天气详情与日月天文并行:后者纯天文计算(不依赖天气凭证),故天气凭证未配/接口失败也不影响晨昏区块
   const [data, sun] = await Promise.all([
     publicApi.getWeatherDetail().catch(() => null),
-    astroStale() || astro.value ? Promise.resolve(null) : publicApi.getSunInfo().catch(() => null),
+    needSun ? publicApi.getSunInfo().catch(() => null) : Promise.resolve(null),
   ])
   if (data) {
     detail.value = data
     if (sunLight?.weatherDetail) sunLight.weatherDetail.value = data
   }
-  if (sun) astro.value = sun
-  loading.value = false
-  // 共享的那份缺 subsolar(后端未升级/启动时取于旧版本)→ 补一次取当日完整数据
-  if (astroStale()) {
-    astroLoading.value = true
-    const fresh = await publicApi.getSunInfo().catch(() => null)
-    astroLoading.value = false
-    if (fresh) astro.value = fresh
+  if (sun) {
+    applyAstro(sun, 0)
+    // 顺手把共享实例换新(光影层/设置页的日出日落跟着更新);光照测试台按别的日期看数据时不覆盖
+    if (!sunLight?.lightTestMode?.value) sunLight?.applySunInfo?.(sun)
   }
+  lastLoadAt.value = Date.now()
+  if (!background) loading.value = false
 }
-onMounted(load)
+// 页面长开:实况/预报与日月晨昏定时换新(后端天气缓存 30 分钟,与之同频;后台刷新不闪全局 loading)
+let refreshTimer = null
+const onVisible = () => {
+  if (!document.hidden && Date.now() - lastLoadAt.value > 30 * 60 * 1000) load(true)
+}
+onMounted(() => {
+  load()
+  document.addEventListener('visibilitychange', onVisible)
+  refreshTimer = setInterval(
+    () => {
+      if (!document.hidden) load(true)
+    },
+    30 * 60 * 1000,
+  )
+})
+onBeforeUnmount(() => {
+  clearInterval(refreshTimer)
+  clearInterval(todayTimer)
+  document.removeEventListener('visibilitychange', onVisible)
+})
 </script>
 
 <style scoped>
