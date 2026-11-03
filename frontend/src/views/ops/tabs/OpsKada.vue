@@ -103,6 +103,7 @@
     v-model="detailVisible"
     :title="$t('ops.kada.detailTitle')"
     width="min(880px, 92vw)"
+    append-to-body
     destroy-on-close
   >
     <template v-if="detail.item">

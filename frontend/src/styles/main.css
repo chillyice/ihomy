@@ -1036,7 +1036,10 @@ html.dark .el-message--error {
      未声明 top 的弹窗回到本项目的 14vh 基线,而不是 EP 默认的 15vh */
   --el-dialog-margin-top: 14vh;
   margin-top: var(--el-dialog-margin-top, 14vh) !important;
-  width: fit-content !important;
+  /* 尊重组件 width 属性(EP 把它写进元素内联的 --el-dialog-width):各功能弹窗按业务声明宽度渲染。
+     未声明的弹窗回 EP 默认 50%;四档 dialog-sm/md/lg/xl 由下方档位规则接管。
+     这里曾是 width: fit-content——它把所有 width prop 压死、长文按 max-content 撑到近整屏(踩坑速查 §3.25) */
+  width: var(--el-dialog-width, 50%) !important;
   max-width: calc(100vw - 32px) !important;
   padding: 0 !important;
 }
@@ -1063,10 +1066,10 @@ html:has(.gc-side) {
   overflow: auto;
 }
 
-/* 未声明 dialog-sm/md/lg/xl 的弹窗兜底:正文超高时在弹窗内滚动,不再顶出视口。
-   只限制正文高度,标题与底部按钮常驻可见。 */
+/* 未声明 dialog-sm/md/lg/xl 的弹窗兜底:正文 = 视口高 − 弹窗顶距(随组件 top 走) − 头尾约 120px,
+   超高时在弹窗内滚动,标题与底部按钮常驻可见,弹窗整体不出视口。 */
 .el-overlay-dialog .el-dialog > .el-dialog__body {
-  max-height: calc(78vh - 120px) !important;
+  max-height: calc(100vh - var(--el-dialog-margin-top, 14vh) - 120px) !important;
   overflow-y: auto !important;
 }
 
@@ -1508,6 +1511,8 @@ html.dark .el-dropdown-menu .el-dropdown-menu__item:not(.is-disabled):hover {
 }
 
 /* ========== 全局弹窗尺寸规则(按业务场景) ========== */
+/* 弹窗最大高度统一取「档位设计值」与「视口可用高度(100vh − 顶距 − EP 默认底距 50px)」的较小者,
+   矮窗口下自动收缩,正文内滚。 */
 /* 1.简短确认类:420px */
 .el-overlay-dialog .el-dialog.dialog-sm {
   width: 420px !important;
@@ -1515,7 +1520,7 @@ html.dark .el-dropdown-menu .el-dropdown-menu__item:not(.is-disabled):hover {
 /* 2.选择器/简单表单:520px, max-height:520px */
 .el-overlay-dialog .el-dialog.dialog-md {
   width: 520px !important;
-  max-height: 520px !important;
+  max-height: min(520px, calc(100vh - var(--el-dialog-margin-top, 14vh) - 50px)) !important;
   display: flex !important;
   flex-direction: column !important;
 }
@@ -1527,7 +1532,7 @@ html.dark .el-dropdown-menu .el-dropdown-menu__item:not(.is-disabled):hover {
 /* 3.复杂多字段表单:640px, max-height:640px */
 .el-overlay-dialog .el-dialog.dialog-lg {
   width: 640px !important;
-  max-height: 640px !important;
+  max-height: min(640px, calc(100vh - var(--el-dialog-margin-top, 14vh) - 50px)) !important;
   display: flex !important;
   flex-direction: column !important;
 }
@@ -1540,7 +1545,7 @@ html.dark .el-dropdown-menu .el-dropdown-menu__item:not(.is-disabled):hover {
 .el-overlay-dialog .el-dialog.dialog-xl {
   width: 82vw !important;
   max-width: 900px !important;
-  max-height: 85vh !important;
+  max-height: min(85vh, calc(100vh - var(--el-dialog-margin-top, 14vh) - 50px)) !important;
   display: flex !important;
   flex-direction: column !important;
 }

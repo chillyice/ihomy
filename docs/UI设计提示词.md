@@ -298,13 +298,16 @@ color: #3A2E22;
 
 ### 弹窗尺寸规则(`main.css` 全局,按业务场景)
 
+> **宽度语义(V11.26 起)**:全局 `.el-dialog` 宽度 = `var(--el-dialog-width, 50%)`,**组件声明的 `width` prop 全局生效**(EP 把它写进元素内联 `--el-dialog-width`)。各功能弹窗按业务声明宽度(简短确认 360–420 / 简单表单 440–520 / 复杂表单 560–640 / 表格管理 620–820 / 详情媒体 800–900 或 `min(…, 92vw)`);**新弹窗必须声明 `width` 或用下面四档 class**,未声明的按 EP 默认 50% 渲染。宽度兜底 `max-width: calc(100vw - 32px)`。
+
 | class | 场景 | 宽度 | max-height | 滚动 |
 |-------|------|------|------------|------|
 | `dialog-sm` | 简短确认/单行输入 | 420px | 自适应 | 无 |
-| `dialog-md` | 选择器/简单表单 | 520px | 520px | body 内部滚动 |
-| `dialog-lg` | 复杂多字段表单 | 640px | 640px | body 内部滚动 |
-| `dialog-xl` | 详情/媒体预览 | 82vw(max 900px) | 85vh | body 内部滚动 |
+| `dialog-md` | 选择器/简单表单 | 520px | min(520px, 视口高−顶距−50px) | body 内部滚动 |
+| `dialog-lg` | 复杂多字段表单 | 640px | min(640px, 视口高−顶距−50px) | body 内部滚动 |
+| `dialog-xl` | 详情/媒体预览 | 82vw(max 900px) | min(85vh, 视口高−顶距−50px) | body 内部滚动 |
 
+- 未用四档的弹窗,正文兜底 `max-height: calc(100vh - var(--el-dialog-margin-top, 14vh) - 120px) + overflow-y:auto`(顶距随组件 `top` 走),正文超高即弹窗内滚、标题与底部按钮常驻,弹窗整体不出视口。
 - 容器 `flex-direction:column`;body `flex:1 + overflow-y:auto`;容器本身不滚动。
 - 圆角 14px;磨砂背景 `#fcf8f0` + `blur(12px)`;ESC + 点击遮罩关闭。
 - 关闭按钮 X 显示(28×28px,圆角 8px,hover 浅米底色)。
@@ -485,10 +488,10 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 
 ### 弹窗宽度上限与内容栏对齐
 
-- 全局 `.el-dialog` 是 `width: fit-content`(贴合内容,`width` prop 实际不生效),**长文本弹窗会被 max-content 撑到近整屏**;凡正文可能很长(AI 生成结果、日志、说明段落)的弹窗必须显式给上限,并让正文自己滚动:
-  - `max-width: clamp(320px, calc(100vw - 2 * var(--shell-nav-w, 0px) - 32px), 640px)`;`--shell-nav-w` = 内容栏左边界(光尘侧栏 220px;暖居 studio 外框 20 留白 + 230 侧栏 + 1 边框 = 251px,由 `html:has(.app-sidebar)` / `html:has(.gc-side)` 注入,无侧栏为 0)。
-  - `.el-dialog__body { max-height: calc(86vh - 132px); overflow: auto }`(弹窗顶边固定 14vh、头尾约 98px,故留 132px;高度不收的弹窗在暖居会被内容栏渐隐遮罩裁掉)。
-- **要跳出内容栏**就给该弹窗加 `append-to-body`:在内容栏内渲染时,弹窗会被固定侧栏(`z-index: 60` > `.app-main` 的 `z-index: 10`)压在下面,或在暖居被 `.gc-main` 的渐隐 mask 裁掉;挂到 body 后遮罩的 `z-index: 63` 在根级高于侧栏,mask 也不再套住它。成因与取证见 `docs/踩坑速查.md` §3.25。
+- **宽度语义(V11.26 起)**:全局 `.el-dialog` 宽度 = `var(--el-dialog-width, 50%)`,组件声明的 `width` prop **全局生效**(EP 把它写进元素内联 `--el-dialog-width`);历史上这里曾是 `width: fit-content`,会把所有 `width` prop 压死、长文按 max-content 撑到近整屏(成因与取证见 `docs/踩坑速查.md` §3.25)。因此:
+  - **正文可能很长(AI 生成结果、日志、说明段落)的弹窗必须显式声明 `width` 上限**(全量 83 个弹窗均已声明宽度或档位 class),正文超高由全局兜底在弹窗内滚动;
+  - 内容栏感知的收窄仅保留给 `oss-plan-dialog`(升级方案):`max-width: clamp(320px, calc(100vw - 2 * var(--shell-nav-w, 0px) - 32px), 640px)`;`--shell-nav-w` = 内容栏左边界(光尘侧栏 220px;暖居 studio 外框 20 留白 + 230 侧栏 + 1 边框 = 251px,由 `html:has(.app-sidebar)` / `html:has(.gc-side)` 注入,无侧栏为 0)。
+- **要跳出内容栏**就给该弹窗加 `append-to-body`:在内容栏内渲染时,弹窗会被固定侧栏(`z-index: 60` > `.app-main` 的 `z-index: 10`)压在下面,或在暖居被 `.gc-main` 的渐隐 mask 裁掉;挂到 body 后遮罩在根级高于侧栏(`--z-overlay` 200),mask 也不再套住它。成因与取证见 `docs/踩坑速查.md` §3.25。
 
 ## 18b. 暖居(Warm Dwelling)主题(暖木/陶土/鼠尾草绿/奶油,V9.60;V9.64 随主题对调改名)
 
