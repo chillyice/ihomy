@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * 认证防爆破:Redis 计数限流。
  * - 登录失败:账号(邮箱)与来源 IP 双计数,窗口内累加,达到上限即拒绝并持续续期;登录成功清零。
+ * - 保险箱查看密码的登录密码校验失败:按账号与 IP 独立计数(不拖累登录封禁),成功清零。
  * - 通用按 IP 限流:验证码/注册等公开接口防无限刷。
  * 计数器 TTL 固定窗口(失败即续期,被封者无法靠等待窗口内重置计数绕过)。
  */
@@ -28,8 +29,14 @@ public class AuthGuardService {
     /** 失败窗口/封禁时长(分钟) */
     private static final long FAIL_TTL_MINUTES = 15;
 
+    /** 保险箱二次校验失败上限:按账号 5 次、按 IP 20 次,独立计数不拖累登录封禁 */
+    private static final int MAX_FAIL_PER_VAULT_ACCOUNT = 5;
+    private static final int MAX_FAIL_PER_VAULT_IP = 20;
+
     private static final String FAIL_USER = "auth:fail:user:";
     private static final String FAIL_IP = "auth:fail:ip:";
+    private static final String FAIL_VAULT_USER = "auth:fail:vault:user:";
+    private static final String FAIL_VAULT_IP = "auth:fail:vault:ip:";
     private static final String RATE = "auth:rate:";
 
     /** 登录前检查:账号或来源 IP 是否已因失败过多被封禁 */
@@ -50,6 +57,26 @@ public class AuthGuardService {
     public void clearLoginFail(String ip, String email) {
         redisTemplate.delete(FAIL_USER + norm(email));
         redisTemplate.delete(FAIL_IP + norm(ip));
+    }
+
+    /** 保险箱查看密码前检查:该账号或来源 IP 是否已因登录密码校验失败被封禁 */
+    public void checkVaultUnlockBlocked(Long userId, String ip) {
+        if (failCount(FAIL_VAULT_USER + userId) >= MAX_FAIL_PER_VAULT_ACCOUNT
+                || failCount(FAIL_VAULT_IP + norm(ip)) >= MAX_FAIL_PER_VAULT_IP) {
+            throw new BizException(ResultCode.TOO_MANY_REQUESTS, "密码验证失败次数过多,请稍后再试");
+        }
+    }
+
+    /** 记录一次保险箱查看密码的登录密码校验失败 */
+    public void recordVaultUnlockFail(Long userId, String ip) {
+        bump(FAIL_VAULT_USER + userId, TimeUnit.MINUTES.toSeconds(FAIL_TTL_MINUTES));
+        bump(FAIL_VAULT_IP + norm(ip), TimeUnit.MINUTES.toSeconds(FAIL_TTL_MINUTES));
+    }
+
+    /** 保险箱密码校验成功:清零该账号与来源 IP 的失败计数 */
+    public void clearVaultUnlockFail(Long userId, String ip) {
+        redisTemplate.delete(FAIL_VAULT_USER + userId);
+        redisTemplate.delete(FAIL_VAULT_IP + norm(ip));
     }
 
     /** 按 IP 限流:窗口内计数超过 max 即拒绝(固定窗口) */

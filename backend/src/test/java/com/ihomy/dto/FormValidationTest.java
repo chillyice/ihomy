@@ -76,6 +76,24 @@ class FormValidationTest {
     }
 
     @Test
+    void vaultRevealPasswordRequiredAndBounded() {
+        VaultRevealDTO ok = new VaultRevealDTO();
+        ok.setPassword(repeat("p", 128));
+        assertThat(invalidFields(ok)).isEmpty();
+
+        VaultRevealDTO blank = new VaultRevealDTO();
+        blank.setPassword("  ");
+        assertThat(invalidFields(blank)).contains("password");
+
+        VaultRevealDTO missing = new VaultRevealDTO();
+        assertThat(invalidFields(missing)).contains("password");
+
+        VaultRevealDTO over = new VaultRevealDTO();
+        over.setPassword(repeat("p", 129));
+        assertThat(invalidFields(over)).contains("password");
+    }
+
+    @Test
     void loanAmountPrecisionMatchesDecimal14_2Column() {
         FamilyLoanDTO atCeiling = baseLoan();
         atCeiling.setAmount(new BigDecimal("999999999999.99"));

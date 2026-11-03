@@ -12,6 +12,7 @@ import com.ihomy.mapper.SysUserMapper;
 import com.ihomy.mapper.VaultItemMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -24,8 +25,9 @@ import java.util.stream.Collectors;
  * 家庭保险箱业务:账号密码条目的增删改查。
  *
  * 密码以 AES-GCM 密文存储({@link ParameterService#encrypt},盐值 sys_parameter.aes-salt),
- * 列表与详情只回固定掩码,明文仅在 {@link #revealPassword} 由后端解密返回
- * (调用方接口带 @OperationLog,每次揭示落一条操作日志)。
+ * 列表与详情只回固定掩码,明文仅在 {@link #revealPassword} 由后端解密返回。
+ * 揭示前必须再次校验当前账号的登录密码(BCrypt),连续失败按账号/IP 限流;
+ * 调用方接口带 @OperationLog,每次揭示(含失败)都落一条操作日志。
  * 可见范围:PRIVATE 仅创建人本人可见(严格仅自己,家庭家长也不可见)/ FAMILY 家庭可见。
  */
 @Slf4j
@@ -36,6 +38,8 @@ public class VaultService {
     private final VaultItemMapper vaultItemMapper;
     private final SysUserMapper sysUserMapper;
     private final ParameterService parameterService;
+    private final PasswordEncoder passwordEncoder;
+    private final AuthGuardService authGuardService;
 
     /** 固定掩码:与真实长度无关,避免从列表泄露密码位数 */
     private static final String MASK = "••••••••";
@@ -145,10 +149,22 @@ public class VaultService {
     }
 
     /**
-     * 揭示密码明文:仅此路径解密返回,调用方接口必须带 @OperationLog 留痕。
+     * 揭示密码明文:先校验当前账号的登录密码(二次校验),仅此路径解密返回。
+     * 调用方接口必须带 @OperationLog 留痕(成功与失败都记录,且不保存入参)。
      * 未设置密码返回空串(前端按空处理)。
      */
-    public String revealPassword(Long id, Long familyId, Long userId) {
+    public String revealPassword(Long id, Long familyId, Long userId, String accountPassword, String ip) {
+        authGuardService.checkVaultUnlockBlocked(userId, ip);
+        SysUser user = sysUserMapper.selectById(userId);
+        if (user == null || user.getPassword() == null || accountPassword == null
+                || !passwordEncoder.matches(accountPassword, user.getPassword())) {
+            authGuardService.recordVaultUnlockFail(userId, ip);
+            // 只记录人/条目/来源,绝不记录密码本身
+            log.warn("保险箱密码二次校验失败: userId={}, itemId={}, ip={}", userId, id, ip);
+            throw new BizException(ResultCode.PASSWORD_ERROR, "登录密码错误,请重新输入");
+        }
+        authGuardService.clearVaultUnlockFail(userId, ip);
+
         VaultItem item = require(id, familyId, userId);
         if (!hasPassword(item)) return "";
         return parameterService.decrypt(item.getPasswordEnc());

@@ -838,6 +838,12 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 8. **纸牌统一入口与固定一屏(V11.24/V11.25)**:两级纵深——玩法大厅 `/games/cards` 居中放标题 + 副标题 + 玩法卡网格(每卡:圆角图标块/名称(带「最近在玩」小胶囊,跟随 `ihomy:games:cards:mode:v1`)/简介/最高分行/「进入」箭头,hover 上浮),点卡进入 `/games/cards/klondike|spider`;牌桌顶栏返回键文案变「玩法大厅」。牌桌页 `.cards-page` 在暖居下 `height:100%` 直接吃满主区净高(CSS 链,不数值测量),光尘下按视口实测锁高,`.cards-stage` flex 占满剩余高度。牌宽与叠牌步进由 `utils/games/cardLayout.js` 反推:`fitCardWidth` 按列数/间距/顶部占用算牌宽(上限 132、蜘蛛 96、蜘蛛窄屏下限 44),`pileSteps` 按「每张露出的可见高度占牌宽」给步进(正面 0.42 / 背面 0.22 / 最小 0.12),渲染 `marginTop = -(1.4 − step)×100%`(百分比负边距按牌宽算);长列自动压紧自身间距,页面高度永不被牌列顶开。窄屏蜘蛛十列放不下时保持 44px 牌宽、呢面盘 `overflow-x:auto` 横向滚动;视口矮(≤760px)自动隐藏底部说明文字。全屏目标是 `.cards-stage`(整块牌桌),统计小盒改横排(label+数值同行)省高度。
 9. **网页游戏页 `/games/web/{id}`(V11.32)**:顶栏 `PageToolbar(root-class="game-topbar")` = 返回键 + 游戏名(`.wg-title`,单行省略)+ 右侧动作组 `.game-top-actions`(刷新 / 浏览器打开 / 存入保险箱 / 页面全屏 / 全屏);窄屏 ≤768px 只留图标,文案藏进 `title`+`aria-label`。主区 `.wg-stage.card.game-surface` 高度 `calc(100dvh - 170px)`(窄屏 `-140px`,最小 400px)、`overflow:hidden`、深底 `#1b1b1b`,内嵌 iframe 无边框、白底 `#f4f4f4` 吃满容器;**不放任何外站内容进 ihomy 主题变量**,只做外壳。加载中盖一层 `.wg-cover`(居中转圈 + 「加载中」),失败文案换成「打开失败 + 浏览器打开」按钮。页面全屏 `.wg-stage.is-page-full` = `position: fixed; inset: 0; z-index: var(--z-immersive)`,盖住侧栏/页脚/顶栏但**不触发浏览器 F11**,右上角 12px 处给悬浮圆形关闭按钮(Esc 只在父文档有焦点时兜底,焦点在 iframe 里收不到);全屏按钮走浏览器 Fullscreen API,被拒绝(如 iOS)时保持窗口态。外壳 `.page.web-game-page` 由 `main.css` 放开 `max-width: none`,不吃 1100px 内容宽;游戏库卡片的「打开」与旧 `/games/play/{id}` 都收敛到这个页面。
 
+## 32. 家庭保险箱查看密码二次校验弹窗(V11.34)
+
+1. **入口与可见性**:保险箱卡片直接展示名称/账号/登录地址/标签/备注,密码保持 `••••••••` 掩码;点眼睛或复制密码才弹「验证登录密码」(`dialog-sm`,420px),弹窗打开即聚焦密码框,Enter 提交。
+2. **弹窗内容**:副标题写明「查看或复制『条目名』的密码」;单个 `el-input type="password" show-password`(`autocomplete="current-password"`,上限 128);错误行用 `--el-color-danger` 12px 显示「登录密码错误 / 失败次数过多」,失败保留弹窗并清空输入;取消不发请求。
+3. **结果**:验证通过后,查看仍 30 秒自动隐藏、复制仍 10 秒后清剪贴板;已在卡片上揭示的明文点复制不再二次验证。
+
 ## 验收标准
 
 1. 打开页面,背景米白渐变 + 5 个色块缓慢飘移,右下角拍立得堆/闭合相册,左右毛玻璃面板从两侧滑入。

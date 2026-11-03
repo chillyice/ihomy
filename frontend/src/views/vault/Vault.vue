@@ -1,4 +1,4 @@
-<!-- 家庭保险箱:家庭共用的账号密码条目(列表只显示掩码,查看/复制密码走单独接口并留痕) -->
+<!-- 家庭保险箱:家庭共用的账号密码条目(内容直接可见,查看/复制密码需再次输入登录密码并留痕) -->
 <template>
   <div class="page">
     <Breadcrumb :items="[{ label: $t('vault.title') }]" />
@@ -202,11 +202,42 @@
         <el-button type="primary" :loading="saving" @click="onSave">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- 查看/复制密码前二次校验:条目内容可直接浏览,密码需重新输入当前账号的登录密码 -->
+    <el-dialog
+      v-model="unlock.visible"
+      append-to-body
+      class="dialog-sm"
+      :title="$t('vault.unlockTitle')"
+      @opened="focusUnlockInput"
+      @closed="resetUnlock"
+    >
+      <div class="vault-unlock">
+        <p class="vault-unlock-hint">{{ $t('vault.unlockHint', { name: unlock.item?.name || '' }) }}</p>
+        <el-input
+          ref="unlockInput"
+          v-model="unlock.password"
+          type="password"
+          show-password
+          autocomplete="current-password"
+          maxlength="128"
+          :placeholder="$t('vault.unlockPlaceholder')"
+          @keyup.enter="submitUnlock"
+        />
+        <div v-if="unlock.error" class="vault-unlock-error">{{ unlock.error }}</div>
+      </div>
+      <template #footer>
+        <el-button @click="unlock.visible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="unlock.loading" :disabled="!unlock.password" @click="submitUnlock">
+          {{ unlock.action === 'copy' ? $t('vault.unlockCopy') : $t('vault.unlockReveal') }}
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-// 保险箱页:条目卡片墙 + 搜索/分类筛选;密码默认掩码,揭示/复制都走 /vault/{id}/password 留痕,
+// 保险箱页:条目卡片墙 + 搜索/分类筛选;内容直接可见,查看/复制密码需再次输入登录密码,
 // 复制后 10 秒自动清剪贴板,揭示 30 秒自动隐藏。
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -243,6 +274,9 @@ const keyword = ref('')
 const category = ref('')
 const revealed = reactive({})
 const editor = reactive({ visible: false, form: {}, tags: [] })
+/** 密码二次校验弹窗:action = reveal(显示在卡片上)/ copy(直接复制) */
+const unlock = reactive({ visible: false, password: '', loading: false, error: '', item: null, action: 'reveal' })
+const unlockInput = ref(null)
 const generator = reactive({
   visible: false,
   preview: '',
@@ -253,6 +287,7 @@ const canManage = computed(() => userStore.isOwner || userStore.hasPerm('vault:m
 const catText = (c) => dictText(t, 'vault_category', c)
 const tagList = (item) => (item.tags ? item.tags.split(',').filter(Boolean) : [])
 
+// 密码不参与搜索:列表接口从不返回明文,这里只匹配名称/账号/地址/标签/备注
 const filtered = computed(() => {
   const kw = keyword.value.trim().toLowerCase()
   return list.value.filter((i) => {
@@ -294,9 +329,9 @@ const copyText = async (text) => {
   return ok
 }
 
-/** 取密码明文(唯一入口,后端每次返回都落一条操作日志) */
-const fetchPlain = async (id) => {
-  const res = await vaultApi.password(id)
+/** 取密码明文(唯一入口):先校验当前账号的登录密码,后端每次返回都落一条操作日志 */
+const fetchPlain = async (id, password) => {
+  const res = await vaultApi.password(id, password)
   return res?.password ?? ''
 }
 
@@ -333,9 +368,8 @@ const copyUsername = async (item) => {
   }
 }
 
-const copyPassword = async (item) => {
+const copyPlain = async (item, plain) => {
   try {
-    const plain = await fetchPlain(item.id)
     if (!plain) return ElMessage.warning(t('vault.noPassword'))
     await copyText(plain)
     scheduleClear(`pw-${item.id}`, plain)
@@ -345,21 +379,70 @@ const copyPassword = async (item) => {
   }
 }
 
-/* ---------- 密码揭示:明文只短暂留在页面上,超时自动隐藏 ---------- */
+const copyPassword = async (item) => {
+  // 已在卡片上揭示过的明文直接复用,不再要求重复验证
+  if (revealed[item.id] !== undefined) return copyPlain(item, revealed[item.id])
+  openUnlock(item, 'copy')
+}
+
+/* ---------- 密码二次校验 + 揭示:明文只短暂留在页面上,超时自动隐藏 ---------- */
 const revealTimers = new Map()
 
-const toggleReveal = async (item) => {
-  if (revealed[item.id] !== undefined) return hideReveal(item.id)
+const openUnlock = (item, action) => {
+  unlock.item = item
+  unlock.action = action
+  unlock.password = ''
+  unlock.error = ''
+  unlock.visible = true
+}
+
+const focusUnlockInput = () => unlockInput.value?.focus()
+
+const resetUnlock = () => {
+  unlock.password = ''
+  unlock.error = ''
+  unlock.loading = false
+  unlock.item = null
+}
+
+const submitUnlock = async () => {
+  if (!unlock.password || !unlock.item) return
+  const { item, action } = unlock
+  unlock.loading = true
+  unlock.error = ''
   try {
-    revealed[item.id] = await fetchPlain(item.id)
-    clearTimeout(revealTimers.get(item.id))
-    revealTimers.set(
-      item.id,
-      setTimeout(() => hideReveal(item.id), REVEAL_HIDE_MS),
-    )
+    const plain = await fetchPlain(item.id, unlock.password)
+    unlock.visible = false
+    unlock.password = ''
+    if (action === 'copy') await copyPlain(item, plain)
+    else showReveal(item, plain)
   } catch (e) {
-    ElMessage.error(t('vault.revealFailed'))
+    // 错误提示由 request 拦截器统一弹出,这里只在弹窗内补充原因并保留弹窗重试
+    if (e?.code === 1003) {
+      unlock.error = t('vault.unlockWrong')
+      unlock.password = ''
+    } else if (e?.code === 429) {
+      unlock.error = t('vault.unlockTooMany')
+    } else {
+      unlock.error = e?.message || t('vault.revealFailed')
+    }
+  } finally {
+    unlock.loading = false
   }
+}
+
+const showReveal = (item, plain) => {
+  revealed[item.id] = plain
+  clearTimeout(revealTimers.get(item.id))
+  revealTimers.set(
+    item.id,
+    setTimeout(() => hideReveal(item.id), REVEAL_HIDE_MS),
+  )
+}
+
+const toggleReveal = (item) => {
+  if (revealed[item.id] !== undefined) return hideReveal(item.id)
+  openUnlock(item, 'reveal')
 }
 
 const hideReveal = (id) => {
@@ -598,6 +681,23 @@ onBeforeUnmount(() => {
 .vault-empty-hint {
   color: #999;
   font-size: 13px;
+}
+
+/* 查看密码前的二次校验弹窗 */
+.vault-unlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.vault-unlock-hint {
+  margin: 0;
+  color: #777;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.vault-unlock-error {
+  color: var(--el-color-danger);
+  font-size: 12px;
 }
 
 /* 编辑弹窗:密码行 + 生成器 + 强度条 */

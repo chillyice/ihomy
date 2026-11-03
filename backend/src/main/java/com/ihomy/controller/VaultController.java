@@ -2,13 +2,16 @@ package com.ihomy.controller;
 
 import com.ihomy.annotation.OperationLog;
 import com.ihomy.annotation.RequirePermission;
+import com.ihomy.common.Ips;
 import com.ihomy.common.Result;
 import com.ihomy.dto.VaultItemDTO;
+import com.ihomy.dto.VaultRevealDTO;
 import com.ihomy.security.LoginUser;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.VaultService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -19,8 +22,8 @@ import java.util.Map;
 /**
  * 家庭保险箱接口:账号密码条目的增删改查 + 密码揭示。
  *
- * 安全约定:列表只回掩码;明文仅 /vault/{id}/password 返回,该接口写操作日志留痕;
- * 新增/编辑接口的入参含明文密码,故 @OperationLog(saveArgs = false) 不入参留库。
+ * 安全约定:列表只回掩码;明文仅 POST /vault/{id}/password 在再次校验当前账号登录密码后返回,
+ * 该接口写操作日志留痕;新增/编辑/揭示接口的入参含明文密码,故 @OperationLog(saveArgs = false) 不入参留库。
  */
 @Tag(name = "家庭保险箱")
 @RestController
@@ -68,14 +71,17 @@ public class VaultController {
         return Result.success();
     }
 
-    @Operation(summary = "查看条目密码(明文,操作留痕)")
+    @Operation(summary = "查看条目密码(需再次输入当前账号的登录密码,明文,操作留痕)")
     @RequirePermission("vault:view")
     @OperationLog(module = "VAULT", operationType = "QUERY", description = "查看保险箱密码",
-            saveArgs = true, saveResult = false)
-    @GetMapping("/{id}/password")
-    public Result<Map<String, String>> password(@PathVariable Long id) {
+            saveArgs = false, saveResult = false)
+    @PostMapping("/{id}/password")
+    public Result<Map<String, String>> password(@PathVariable Long id,
+                                                @Valid @RequestBody VaultRevealDTO dto,
+                                                HttpServletRequest request) {
         LoginUser user = securityHelper.current();
-        String plain = vaultService.revealPassword(id, user.getFamilyId(), user.getUserId());
+        String plain = vaultService.revealPassword(id, user.getFamilyId(), user.getUserId(),
+                dto.getPassword(), Ips.realIp(request));
         return Result.success(Map.of("password", plain));
     }
 }

@@ -330,13 +330,13 @@ export const wishApi = {
   remove: (id) => request.delete(`/wish/${id}`),
 }
 
-// 家庭保险箱(账号密码保管箱):列表只回掩码,密码明文单独走 password 接口
+// 家庭保险箱(账号密码保管箱):列表只回掩码,查看明文需再次输入当前账号的登录密码
 export const vaultApi = {
   list: () => request.get('/vault/list'),
   create: (data) => request.post('/vault', data),
   update: (id, data) => request.put(`/vault/${id}`, data),
   remove: (id) => request.delete(`/vault/${id}`),
-  password: (id) => request.get(`/vault/${id}/password`),
+  password: (id, password) => request.post(`/vault/${id}/password`, { password }),
 }
 
 // 音乐曲库 + 歌单管理
