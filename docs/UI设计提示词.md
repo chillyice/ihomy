@@ -152,15 +152,17 @@
 
 `position: fixed; inset: 0; mix-blend-mode: multiply; pointer-events: none`。模拟阳光照耀强度,在内容之上、阴影之下。multiply 让白色=透明(日间无影响)、黑色=压暗(夜间)、彩色=染色(日出日落)。
 
-### 颜色生命周期(由 dayProgress 驱动)
-| 阶段 | dayProgress | 颜色 | 不透明度 |
-|------|-------------|------|----------|
-| 夜间 | <0 或 >1 | 黑 rgba(0,0,0,1) | 0.7 |
-| 凌晨 | 0~0.1 | 黑→黄 lerp | 0.7→0.4 |
-| 清晨 | 0.1~0.3 | 黄→白 lerp | 0.4→0.1 |
+### 颜色生命周期(由 dayProgress 驱动;太阳未出地平线时与阴影同色)
+| 阶段 | 触发条件 | 颜色 | 不透明度 |
+|------|----------|------|----------|
+| 夜间 / 地平线下 | 高度角≤0 | 阴影同色 `rgba(8,12,28,1)` | 0.7 |
+| 凌晨 | dayProgress 0~0.1 | 环境暗色→黄 lerp | 0.7 |
+| 清晨 | 0.1~0.3 | 黄→白 lerp | 0.7→0.1 |
 | 日间 | 0.3~0.7 | 白(逐渐透明) | 0.1→0 |
-| 傍晚 | 0.7~0.9 | 白→橙 lerp | 0→0.5 |
-| 日落 | 0.9~1.0 | 橙→红 lerp | 0.5→0.7 |
+| 傍晚 | 0.7~0.9 | 白→橙 lerp | 0→0.7 |
+| 日落 | 0.9~1.0 | 橙→环境暗色 lerp | 0.7 |
+
+> 亮斑的「白天/黑夜」只认太阳高度角 `alt`(不是时钟):`alt≤0` 时亮斑颜色直接取 `shadowColor`,与阴影完全同色;`alt>0` 后才按 dayProgress 转暖。天气压 0 只作用于 `alt>0` 的直射亮斑,地平线下的环境暗色不受天气影响。
 
 ## 5. 反光层(reflection-layer,z-index 42)
 
@@ -172,10 +174,11 @@
 
 ## 6. 窗户阴影(z-index 68)
 
-**现行实现(V10.23 口径)**:单个 `.window-shadow` 层(fixed 全屏,`mix-blend-mode: multiply`,整层 `opacity: var(--shadow-alpha)`,台灯 mask 统一挖洞),内含 6 条 `filter: blur(16px)` 的 bar(颜色 `--shadow-color`:夜间 `rgb(8,12,28)`、其余 `rgb(0,0,0)`)+ 1 条固定不移动、随天气显隐的天气覆盖阴影。
+**现行实现(V10.23 口径)**:单个 `.window-shadow` 层(fixed 全屏,`mix-blend-mode: multiply`,整层 `opacity: var(--shadow-alpha)`,台灯 mask 统一挖洞),内含 6 条 `filter: blur(16px)` 的 bar(颜色 `--shadow-color` 由太阳高度角计算:地平线及以下为环境暗色 `rgb(8,12,28)`,升到 15° 后过渡为日间纯黑)+ 1 条固定不移动、随天气显隐的天气覆盖阴影。
 
 ### 强度与深度(关键)
-- 阴影强度 `shadowIntensity`:`isNight ? 0.7 : 0.7 - sin(π·dayProgress) × 0.4`(夜间 0.7 最深 → 正午 0.3 最浅)。
+- 阴影强度 `shadowIntensity`:`alt≤0` 时取全天最大值 0.7(太阳未出地平线,阴影最重),`alt>0` 时 `0.7 - sin(π·dayProgress) × 0.4`(正午 0.3 最浅)。
+- 阴影颜色 `shadowColor = lerp(rgb(8,12,28), rgb(0,0,0), clamp(alt/15, 0, 1))`:高度角 0° 时与亮斑同为环境暗色,随太阳升高逐渐转中性黑;地平线及以下整段保持同一暗色。
 - 层不透明度 `--shadow-alpha = min(1, shadowIntensity × shadowDepth / 70)`;`shadowDepth` = **个性化设置「阴影深度」滑块 0~100(V10.23 起可手动调)**,默认 70 即乘数 1(与旧版观感一致),深度 0 时整层不渲染;上限 clamp 1 防与暗角/天气阴影叠成全黑。
 - 台灯 mask(`--lamp-mask`)仍整层挖洞,不随深度变化。
 
@@ -433,8 +436,8 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 ## 17. 数据流
 
 - 页面 mount 时并发请求 `/public/sun-info` + `/public/weather` + `/public/home` + `/public/feed`。
-- sun-info 返回 288 时隙(每 5 分钟一个),前端 `currentSlotIndex(sunInfo)` 按当前时间取 5 分钟时隙索引,`getSunScene(sunInfo, slotIndex)` 返回 `{source, rotation, palette, rays, shadowVRotation, shadowHTop, shadowIntensity, shadowColor, brightSpotColor, brightSpotOpacity, reflectionOpacity, altitude, azimuth, isNight, dayProgress, windowAngle, hasDirectLight}`。
-- 旋转由方位角驱动(`az - 180`),窗角≤0(无直射光)时 hold 在端点;光柱/辉光/反光在无直射光时全透明;亮斑夜间黑色压暗。
+- sun-info 返回 288 时隙(每 5 分钟一个),前端 `currentSlotIndex(sunInfo)` 按当前时间取 5 分钟时隙索引,`getSunScene(sunInfo, slotIndex)` 返回 `{source, rotation, palette, rays, shadowVRotation, shadowHTop, shadowIntensity, shadowColor, brightSpotColor, brightSpotOpacity, reflectionOpacity, altitude, azimuth, isNight, sunUp, dayProgress, windowAngle, hasDirectLight}`。
+- 旋转由方位角驱动(`az - 180`),窗角≤0(无直射光)时 hold 在端点;光柱/辉光/反光在无直射光时全透明;亮斑在太阳未出地平线(`sunUp=false`)时直接取阴影颜色压暗,`sunUp=true` 后按 dayProgress 转暖,且晴天才显示直射亮斑。
 - 每 5 分钟更新一次时隙。
 - 拍立得堆按近 7 天照片筛选(展示 7 张随机),点击 `PhotoViewer` 播放全部近 7 天照片。
 

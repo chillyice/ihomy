@@ -49,8 +49,15 @@ export function getSunScene(sunInfo, slotIndex) {
 
   // 窗角:太阳直射窗户的角度(90°=正对窗户,0°=平行窗户无直射)
   const windowAngle = 90 - Math.abs(az - 180)
-  // 是否有直射光:白天 + 窗角>0 + 太阳在地平线上
-  const hasDirectLight = !isNight && windowAngle > 0 && alt > 0
+  // 太阳是否已跃出地平线:光影明暗只认高度角,不认时钟——
+  // 时隙 5 分钟一档,按时钟判断会在真实日出前提前「天亮」,导致亮斑与阴影色不同
+  const sunUp = alt > 0
+  // 是否有直射光:白天 + 太阳在地平线上 + 窗角>0
+  const hasDirectLight = !isNight && sunUp && windowAngle > 0
+  // 太阳未出地平线时,亮斑与阴影共用这一环境暗色(夜间深蓝黑)
+  const AMBIENT_DARK = [8, 12, 28]
+  // 高度角 0°→15° 的日光线:0=刚触地平线(亮斑与阴影同色),1=天光已足(阴影转纯黑)
+  const sunLift = Math.min(1, Math.max(0, alt) / 15)
 
   // 旋转:基于方位角驱动,az=90°开始(-90°)→ az=180°正中(0°)→ az=270°结束(+90°)
   // 窗角≤0(az<90 或 az>270)时 hold 在对应端点,无直射光不旋转
@@ -71,20 +78,22 @@ export function getSunScene(sunInfo, slotIndex) {
   // 顶框随太阳高度移动:太阳越高顶框越下移(窗口视觉变窄),范围 ±8vh
   const frameTopOffset = isNight ? 0 : -(Math.max(0, alt) - 45) * 0.18
 
-  // 阴影强度:夜间 0.7,正午 0.3,日出日落 0.7(不超过 70%)
-  const shadowIntensity = isNight ? 0.7 : 0.7 - Math.sin(dayProgress * Math.PI) * 0.4
-  // 阴影颜色:夜间深蓝黑,日间纯黑
-  const shadowColor = isNight ? 'rgb(8,12,28)' : 'rgb(0,0,0)'
+  // 阴影强度:太阳在地平线及以下(高度角 ≤0)时一天中最重(0.7),越往正午越浅(0.3)
+  const shadowIntensity = sunUp ? 0.7 - Math.sin(dayProgress * Math.PI) * 0.4 : 0.7
+  // 阴影颜色:与亮斑从同一环境暗色起步(高度角 0° 时两者完全同色),
+  // 随高度角升到 15° 逐渐过渡为日间纯黑
+  const shadowColor = lerpColor(AMBIENT_DARK, [0, 0, 0], sunLift)
 
   // 亮斑颜色与不透明度:夜黑→凌晨黄→清晨白→日间透明→傍晚橙→日落红→深夜黑
   let brightSpotColor, brightSpotOpacity
-  if (isNight) {
-    brightSpotColor = 'rgb(8,12,28)'
+  if (!sunUp) {
+    // 太阳未出地平线:亮斑直接复用阴影颜色(此刻阴影最深,是一天中最重的)
+    brightSpotColor = shadowColor
     brightSpotOpacity = 0.7
   } else if (dayProgress < 0.1) {
-    // 凌晨:深蓝黑→黄
+    // 凌晨:环境暗色→黄(起点与阴影同色,随太阳升高才转暖)
     const t = dayProgress / 0.1
-    brightSpotColor = lerpColor([8, 12, 28], [255, 200, 80], t)
+    brightSpotColor = lerpColor(AMBIENT_DARK, [255, 200, 80], t)
     brightSpotOpacity = 0.7
   } else if (dayProgress < 0.3) {
     // 清晨:黄→白,不透明度 0.7→0.1
@@ -102,9 +111,9 @@ export function getSunScene(sunInfo, slotIndex) {
     brightSpotColor = lerpColor([255, 250, 230], [255, 140, 50], t)
     brightSpotOpacity = t * 0.7
   } else {
-    // 日落:橙→深蓝黑,不透明度 0.7
+    // 日落:橙→环境暗色,不透明度 0.7(落到地平线时与阴影同色)
     const t = (dayProgress - 0.9) / 0.1
-    brightSpotColor = lerpColor([255, 140, 50], [8, 12, 28], t)
+    brightSpotColor = lerpColor([255, 140, 50], AMBIENT_DARK, t)
     brightSpotOpacity = 0.7
   }
 
@@ -182,6 +191,7 @@ export function getSunScene(sunInfo, slotIndex) {
     altitude: alt,
     azimuth: az,
     isNight,
+    sunUp,
     dayProgress,
     windowAngle,
     hasDirectLight,

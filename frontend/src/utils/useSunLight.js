@@ -37,6 +37,7 @@ export function useSunLight() {
     dayProgress: 0,
     windowAngle: 0,
     hasDirectLight: false,
+    sunUp: false,
   })
 
   const _saved = JSON.parse(localStorage.getItem('ihomy:effects') || 'null') || {}
@@ -374,11 +375,11 @@ export function useSunLight() {
   }))
 
   // 高光亮斑:白天下任何非晴天气(雨/雪/云/雷/阴/雾)一律压成 0——云层遮住太阳就不该有直射亮点;
-  // 夜间直接用后端的 brightSpotOpacity(月光/夜景点),不受天气压制
+  // 太阳未出地平线时亮斑是「与阴影同色的环境暗色」,不受天气压制
   const brightSpotStyle = computed(() => ({
     background: sunScene.value.brightSpotColor || 'transparent',
     opacity: shadowEnabled.value
-      ? sunScene.value.isNight
+      ? !sunScene.value.sunUp
         ? (sunScene.value.brightSpotOpacity ?? 0)
         : ['rain', 'snow', 'cloud', 'thunder', 'overcast', 'fog'].includes(weatherMode.value)
           ? 0
