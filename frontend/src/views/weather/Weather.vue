@@ -235,7 +235,7 @@
                 <span class="wt-day-date">{{ fmtDate(row.fxDate) }}</span>
                 <span class="wt-day-weather">
                   <i :class="'qi-' + row.iconDay" class="wt-td-icon"></i>
-                  {{ row.textDay }}
+                  <span class="wt-day-weather-text">{{ row.textDay }}</span>
                 </span>
                 <span class="wt-trange">
                   <span class="wt-lo">{{ row.tempMin }}°</span>
@@ -1237,8 +1237,15 @@ onBeforeUnmount(() => {
 .wt-day-weather {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   font-size: 13px;
+  min-width: 0;
+}
+.wt-day-weather .wt-td-icon {
+  flex: 0 0 auto;
+}
+.wt-day-weather-text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
