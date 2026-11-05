@@ -154,8 +154,8 @@
               </div>
             </template>
           </div>
-          <!-- 折线图模式(72 小时点数多,固定点位宽度后横向滚动) -->
-          <div v-else class="wt-chart-scroll" @mouseleave="hoverIdx = -1">
+          <!-- 折线图模式(24h 铺满容器;72h 点数多,固定点位宽度后横向滚动) -->
+          <div v-else ref="chartScrollEl" class="wt-chart-scroll" @mouseleave="hoverIdx = -1">
             <div class="wt-chart-inner" :style="{ width: chartW + 'px' }">
               <svg v-if="chartData" :viewBox="`0 0 ${chartW} ${CHART_H}`" class="wt-chart">
                 <defs>
@@ -592,15 +592,38 @@ const tempColor = (t) => {
   return `rgb(${l[1]},${l[2]},${l[3]})`
 }
 
-// ── 折线图几何(宽度随点数变化:72h 点位固定 46px 后横向滚动) ──
+// ── 折线图几何(24h 铺满容器,与左边界对称;72h 点位固定 46px 后横向滚动) ──
 const CHART_W = 720,
   CHART_H = 230,
   PT = 34,
   PB = 40,
   PL = 14,
-  PR = 14
+  PR = 14,
+  HOUR_MIN_W = 320 // 容器窄到这个程度才退化出横向滚动条
 const hoverIdx = ref(-1)
-const chartW = computed(() => (effRange.value === '72h' ? Math.max(CHART_W, hourPoints.value.length * 46) : CHART_W))
+// 容器内容宽度(ResizeObserver 实测):24h 用实测值铺满,避免右侧留白
+const chartBoxW = ref(0)
+const chartScrollEl = ref(null)
+let chartRO = null
+function observeChartBox() {
+  chartRO?.disconnect()
+  chartRO = null
+  const el = chartScrollEl.value
+  if (!el) return
+  chartBoxW.value = el.clientWidth || 0
+  if (typeof ResizeObserver === 'undefined') return
+  chartRO = new ResizeObserver((entries) => {
+    const w = entries[0]?.contentRect?.width
+    if (w > 0) chartBoxW.value = w
+  })
+  chartRO.observe(el)
+}
+watch(chartScrollEl, observeChartBox, { flush: 'post' })
+const chartW = computed(() => {
+  const box = chartBoxW.value || CHART_W
+  if (effRange.value === '72h') return Math.max(box, hourPoints.value.length * 46)
+  return Math.max(box, HOUR_MIN_W)
+})
 
 const chartData = computed(() => {
   const hs = hourPoints.value
@@ -819,6 +842,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   clearInterval(refreshTimer)
   clearInterval(todayTimer)
+  chartRO?.disconnect()
+  chartRO = null
   document.removeEventListener('visibilitychange', onVisible)
 })
 </script>
