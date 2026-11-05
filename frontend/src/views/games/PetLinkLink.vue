@@ -1300,4 +1300,12 @@ function onKeydown(e) {
   color: #f0a04b;
   font-weight: 700;
 }
+/* 深色档:结算弹卡随表面色转深(与其余游戏同口径),分数文字走次要色 */
+html.dark .overlay-card {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+html.dark .overlay-score {
+  color: var(--color-text-secondary);
+}
 </style>

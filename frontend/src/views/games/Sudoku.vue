@@ -1242,6 +1242,9 @@ html.dark .sd-card {
 html.dark .sd-cell.conflict {
   color: #ff9a9a;
 }
+html.dark .sd-stat.warn b {
+  color: #ff9a9a;
+}
 
 @media (max-width: 560px) {
   .sd-card {

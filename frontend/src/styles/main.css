@@ -8,6 +8,10 @@
   --color-card-rgb: 250, 246, 236;
   --color-text: #3a2e22;
   --color-text-secondary: #7a6b5a;
+  /* 主文字色语义别名:与 --color-text 同值,组件按语义引用(深色由 html.dark 覆写) */
+  --color-text-primary: var(--color-text);
+  /* 表面色(游戏卡/浮层卡等"抬起的面"):浅色纯白,深色随卡片色 */
+  --color-surface: #fff;
   --color-border: rgba(58, 46, 34, 0.12);
   --radius: 10px;
   --shadow: 0 4px 12px rgba(58, 46, 34, 0.08), 0 1px 3px rgba(58, 46, 34, 0.06);
@@ -117,6 +121,8 @@ html.dark {
   --color-text: #e8dcc8;
   --color-text-secondary: #b0a898;
   --color-border: rgba(232, 220, 200, 0.1);
+  /* 表面色随卡片色(游戏卡/浮层卡):深色绝不能再落回纯白,否则浅色字压白底 */
+  --color-surface: var(--color-card);
   --shadow: 0 4px 12px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
   --shadow-hover: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
   --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 rgba(0, 0, 0, 0.2);

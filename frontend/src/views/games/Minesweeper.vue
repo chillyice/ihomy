@@ -579,6 +579,35 @@ html.dark .ms-cell:not(.open) {
 html.dark .ms-cell.open {
   background: rgba(255, 255, 255, 0.06);
 }
+/* 踩中雷的格子:浅色档靠粉底区分,深色档改半透明暗红 */
+html.dark .ms-cell.boom {
+  background: rgba(201, 116, 116, 0.38);
+}
+/* 翻开格底色随卡片转深,数字配色整体提亮(浅色档在深底上读不清) */
+html.dark .ms-cell.n1 {
+  color: #6ea8ff;
+}
+html.dark .ms-cell.n2 {
+  color: #7dba7d;
+}
+html.dark .ms-cell.n3 {
+  color: #f2857a;
+}
+html.dark .ms-cell.n4 {
+  color: #b6a3f5;
+}
+html.dark .ms-cell.n5 {
+  color: #e59a6b;
+}
+html.dark .ms-cell.n6 {
+  color: #63c5d8;
+}
+html.dark .ms-cell.n7 {
+  color: #d5dbe3;
+}
+html.dark .ms-cell.n8 {
+  color: #9aa5b4;
+}
 html.dark .ms-overlay {
   background: rgba(20, 20, 20, 0.72);
 }

@@ -449,6 +449,11 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 
 > 深色模式与浅色模式使用**完全不同的色值**,禁止直接复用浅色色值。整体设计语言:柔和低饱和暖棕主题,磨砂毛玻璃质感。
 
+### 表面色与文字语义别名(`main.css` 全局令牌)
+
+- `--color-text-primary`:与 `--color-text` 同值的**语义别名**,组件按「主文字色」语义引用,深色由 `html.dark` 覆写;不要在组件里再写死一个主文字色。
+- `--color-surface`:「抬起的面」(游戏卡、结算/暂停浮层卡)——浅色 `#fff`,深色 `var(--color-card)`。**深色绝不能落回纯白**,否则浅色字压白底读不出来;游戏卡与浮层卡一律引用它,不各写各的白色。
+
 ### 按钮(el-button,`main.css` 全局覆写)
 
 | 按钮类型 | 深色模式背景 | 深色模式文字 | hover 背景 |
@@ -850,6 +855,7 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 8. **纸牌统一入口与固定一屏(V11.24/V11.25)**:两级纵深——玩法大厅 `/games/cards` 居中放标题 + 副标题 + 玩法卡网格(每卡:圆角图标块/名称(带「最近在玩」小胶囊,跟随 `ihomy:games:cards:mode:v1`)/简介/最高分行/「进入」箭头,hover 上浮),点卡进入 `/games/cards/klondike|spider`;牌桌顶栏返回键文案变「玩法大厅」。牌桌页 `.cards-page` 在暖居下 `height:100%` 直接吃满主区净高(CSS 链,不数值测量),光尘下按视口实测锁高,`.cards-stage` flex 占满剩余高度。牌宽与叠牌步进由 `utils/games/cardLayout.js` 反推:`fitCardWidth` 按列数/间距/顶部占用算牌宽(上限 132、蜘蛛 96、蜘蛛窄屏下限 44),`pileSteps` 按「每张露出的可见高度占牌宽」给步进(正面 0.42 / 背面 0.22 / 最小 0.12),渲染 `marginTop = -(1.4 − step)×100%`(百分比负边距按牌宽算);长列自动压紧自身间距,页面高度永不被牌列顶开。窄屏蜘蛛十列放不下时保持 44px 牌宽、呢面盘 `overflow-x:auto` 横向滚动;视口矮(≤760px)自动隐藏底部说明文字。全屏目标是 `.cards-stage`(整块牌桌),统计小盒改横排(label+数值同行)省高度。
 9. **网页游戏页 `/games/web/{id}`(V11.32)**:顶栏 `PageToolbar(root-class="game-topbar")` = 返回键 + 游戏名(`.wg-title`,单行省略)+ 右侧动作组 `.game-top-actions`(刷新 / 浏览器打开 / 存入保险箱 / 页面全屏 / 全屏);窄屏 ≤768px 只留图标,文案藏进 `title`+`aria-label`。主区 `.wg-stage.card.game-surface` 高度 `calc(100dvh - 170px)`(窄屏 `-140px`,最小 400px)、`overflow:hidden`、深底 `#1b1b1b`,内嵌 iframe 无边框、白底 `#f4f4f4` 吃满容器;**不放任何外站内容进 ihomy 主题变量**,只做外壳。加载中盖一层 `.wg-cover`(居中转圈 + 「加载中」),失败文案换成「打开失败 + 浏览器打开」按钮。页面全屏 `.wg-stage.is-page-full` = `position: fixed; inset: 0; z-index: var(--z-immersive)`,盖住侧栏/页脚/顶栏但**不触发浏览器 F11**,右上角 12px 处给悬浮圆形关闭按钮(Esc 只在父文档有焦点时兜底,焦点在 iframe 里收不到);全屏按钮走浏览器 Fullscreen API,被拒绝(如 iOS)时保持窗口态。外壳 `.page.web-game-page` 由 `main.css` 放开 `max-width: none`,不吃 1100px 内容宽;游戏库卡片的「打开」与旧 `/games/play/{id}` 都收敛到这个页面。
 10. **结算/暂停浮层与落子动效(V11.35)**:八款 H5 小游戏与纸牌接龙的结算/暂停遮罩统一走 `<Transition name="game-overlay">`——遮罩 0.22s 淡入,结果卡 `translateY(8px) scale(.92)` 起、`--ease-spring` 0.28s 落位;扫雷翻开格 `ms-open` 0.16s、插旗 `ms-flag` 0.22s 回弹,数独填数 `sd-pop` 缩放弹入,俄罗斯方块格子颜色 0.1s 过渡,纸牌牌面 hover 上浮 2px(仅 `hover:hover`)。全部在 `prefers-reduced-motion` 下停用位移。
+11. **小游戏深色档配色收口(V11.39)**:游戏卡与结算浮层卡的底/主文字统一走 `--color-surface` / `--color-text-primary`(见 §18a),不再各写白色。扫雷:踩中雷格 `html.dark .ms-cell.boom` 半透明暗红 `rgba(201,116,116,.38)`,翻开格数字 1–8 在深底整体提亮为 `#6ea8ff / #7dba7d / #f2857a / #b6a3f5 / #e59a6b / #63c5d8 / #d5dbe3 / #9aa5b4`(浅色档原配色在深底上读不清);连连看结算卡 `.overlay-card` 深色走 `--color-surface` + `--color-text-primary`、分数走 `--color-text-secondary`;数独 `.sd-stat.warn b` 深色 `#ff9a9a`。新增深色可读性问题先套这两个令牌,别在 scoped 里写死白底。
 
 ## 32. 家庭保险箱查看密码二次校验弹窗(V11.34)
 

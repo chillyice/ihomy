@@ -235,15 +235,16 @@ const refreshViewport = () => {
 }
 
 // 核心就绪前(加载中/起始按钮阶段)不送输入,避免把按键缓存进模拟器
-const sendPad = (value, down) => {
+const sendPadRaw = (value, raw) => {
   const manager = gameManager()
   if (!gameStarted.value || !manager) return
   try {
-    manager.simulateInput(0, value, down ? 1 : 0)
+    manager.simulateInput(0, value, raw)
   } catch (e) {
     /* 核心正在重启/已销毁时忽略 */
   }
 }
+const sendPad = (value, down) => sendPadRaw(value, down ? 1 : 0)
 
 const padButtonDown = (id, e) => {
   if (padDown[id]) return
@@ -307,6 +308,53 @@ const releaseAllPad = () => {
   }
   dpadPointerId = null
   dpadApply({ up: false, down: false, left: false, right: false })
+}
+
+// —— 键盘兜底(外接键盘方向键失灵) ——
+// EmulatorJS 只把 keydown/keyup 挂在模拟器容器上,且 keyChange 在「设置菜单/模拟器弹窗开着」
+// 时直接 return:焦点一旦跑到容器外(点工具栏、存档浮层、页面空白),或模拟器内部状态把按键
+// 吃掉,方向键就整体失灵——点画面也救不回来,只有刷新页面才恢复。
+// 这里在 document 上兜底:按 EJS 自己的键位表把按键直送核心;只在「EJS 收不到」或
+// 「EJS 收到了也会忽略」时补送,正常路径不重复(重复会把快速存档这类动作键按两次)。
+const ejsKeyWouldIgnore = () => {
+  const emu = window.EJS_emulator
+  if (!emu) return true
+  try {
+    if (emu.settingsMenu && emu.settingsMenu.style.display !== 'none') return true
+    if (typeof emu.isPopupOpen === 'function' && emu.isPopupOpen()) return true
+    if (typeof emu.getSettingValue === 'function' && emu.getSettingValue('keyboardInput') === 'enabled') return true
+  } catch (e) {
+    return false /* 模拟器半初始化:交给 EJS 自己处理 */
+  }
+  return false
+}
+
+// 键位表与 keyChange 同源:controls[0][按键序号].value === keyCode
+const ejsKeyCodeIndex = (keyCode) => {
+  const controls = window.EJS_emulator?.controls?.[0]
+  if (!controls) return undefined
+  for (const k of Object.keys(controls)) {
+    if (controls[k]?.value === keyCode) return Number(k)
+  }
+  return undefined
+}
+
+// 与 keyChange 对齐:16~23 是模拟轴,按下送满量程
+const EJS_ANALOG_KEYS = [16, 17, 18, 19, 20, 21, 22, 23]
+
+const onDocumentKey = (e) => {
+  if (!gameStarted.value || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
+  const el = container.value
+  if (!el) return
+  const target = e.target
+  // 焦点在输入层(本页没有输入框,存档浮层等 Element Plus 层也不接管)时保持原行为
+  if (target instanceof Element && target.closest('input, textarea, select, [contenteditable="true"], .el-popper, .el-overlay')) return
+  const reached = el.contains(target)
+  if (reached && !ejsKeyWouldIgnore()) return // EJS 正常收到并会处理,不重复送
+  const idx = ejsKeyCodeIndex(e.keyCode)
+  if (idx === undefined) return // 没绑到游戏按键的键放行(不 preventDefault)
+  e.preventDefault() // 已映射的游戏键不让页面跟着滚动
+  sendPadRaw(idx, e.type === 'keyup' ? 0 : EJS_ANALOG_KEYS.includes(idx) ? 0x7fff : 1)
 }
 
 // 画面比例跟核心实际缓冲一致(GB/GBC 是 10:9,GBA 是 3:2),避免机身布局里被拉伸
@@ -723,6 +771,8 @@ const onFullscreenChange = () => {
 onMounted(() => {
   document.addEventListener('fullscreenchange', onFullscreenChange)
   document.addEventListener('visibilitychange', onVisibilityChange)
+  document.addEventListener('keydown', onDocumentKey)
+  document.addEventListener('keyup', onDocumentKey)
   window.addEventListener('resize', refreshViewport)
   window.addEventListener('orientationchange', refreshViewport)
   refreshViewport()
@@ -735,6 +785,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   document.removeEventListener('fullscreenchange', onFullscreenChange)
   document.removeEventListener('visibilitychange', onVisibilityChange)
+  document.removeEventListener('keydown', onDocumentKey)
+  document.removeEventListener('keyup', onDocumentKey)
   window.removeEventListener('resize', refreshViewport)
   window.removeEventListener('orientationchange', refreshViewport)
   // 先取一次当前存档快照再拆模拟器,路由内跳转时请求能照常完成
