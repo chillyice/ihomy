@@ -108,12 +108,20 @@ const yearlyRows = computed(() => {
   return out
 })
 
+// 只有「换了贷款对象」才回到第 1 页:父组件每分钟刷新「今天」会重算并重建 view 对象,
+// 按对象身份监听会让正在翻看的明细页被反复顶回首页。
 watch(
-  () => props.view,
+  () => props.view && props.view.id,
   () => {
     page.value = 1
   },
 )
+
+// 行数减少或每页条数变化时把页码夹到有效范围,避免停在空白页(不直接归 1)
+watch([monthRows, pageSize], () => {
+  const max = Math.max(1, Math.ceil(monthRows.value.length / pageSize.value))
+  if (page.value > max) page.value = max
+})
 </script>
 
 <style scoped>

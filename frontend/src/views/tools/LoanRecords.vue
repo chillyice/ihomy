@@ -104,8 +104,11 @@ const selectedKey = ref('') // 'g:<组名>' 看合计,或 '<贷款id>' 看单笔
 
 // 已还期数/还款进度依赖「今天」;定时 + 回到页面可见时刷新 now,跨还款日自动重算
 const now = ref(new Date())
+const dayKey = (d) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
 const tickNow = () => {
-  now.value = new Date()
+  // 进度只跟「哪一天」有关:跨天才换新 Date,别每分钟重建整页视图(会打断翻页、滚动与拖拽)
+  const t = new Date()
+  if (dayKey(t) !== dayKey(now.value)) now.value = t
 }
 const nowTimer = setInterval(tickNow, 60000)
 const onVisibility = () => {
