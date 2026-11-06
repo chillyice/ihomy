@@ -11,7 +11,10 @@
       <el-table-column :label="$t('tools.loan.rec.segPayment')" min-width="118" align="right">
         <template #default="{ row }">
           <div>{{ money(row.payment) }}</div>
-          <span v-if="row.firstPayment !== row.payment" class="lc-sub">{{
+          <span v-if="row.transitionPayment" class="lc-sub">{{
+            $t('tools.loan.rec.segTransitionLine', { v: money(row.transitionPayment) })
+          }}</span>
+          <span v-else-if="row.firstPayment !== row.payment" class="lc-sub">{{
             $t('tools.loan.rec.segFirstLine', { v: money(row.firstPayment) })
           }}</span>
         </template>

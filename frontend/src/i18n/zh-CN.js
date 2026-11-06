@@ -4056,6 +4056,7 @@ export default {
         segPeriods: '第 {a}~{b} 期',
         segPayment: '月供',
         segFirstLine: '首期 {v}',
+        segTransitionLine: '调息当期 {v}',
         segInterest: '利息小计',
         compareTitle: '与「从未调整」对比',
         compareHint: '同一笔贷款若利率一直不变、不提前还款的利息',

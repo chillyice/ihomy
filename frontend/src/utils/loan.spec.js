@@ -125,6 +125,49 @@ describe('loanLedger 贷款流水', () => {
   })
 })
 
+describe('调息分段计息(按生产账单复核)', () => {
+  // 兴业商贷真实数据:248 万 / 360 期 / 3.1%,放款 2025-02-17、首期还款 2025-03-05 实收 7600.23(16 天利息),
+  // 2026-01-01 调息到 3.0%(第 10 期之后生效)
+  const loan = {
+    amount: 2480000,
+    months: 360,
+    method: REPAY_METHOD.EQUAL_INSTALLMENT,
+    rate: 3.1,
+    loanDate: '2025-02-17',
+    firstPayDate: '2025-03-05',
+    firstPayment: 7600.23,
+    events: [{ type: LOAN_EVENT.RATE_CHANGE, effectivePeriod: 10, triggerDate: '2026-01-01', rate: 3.0 }],
+  }
+  const led = loanLedger(loanEngineInput(loan))
+
+  it('调息当期(2026-01-05)按新旧利率分段计息:4 天新利率、26 天旧利率', () => {
+    const row = led.rows[10]
+    expect(row.period).toBe(11)
+    expect(row.interest).toBeCloseTo(6270.25, 2)
+    // 本金沿用调整前的月供计划(10590.01 − 6297.33),不因调息当期就变
+    expect(row.principal).toBeCloseTo(4292.68, 2)
+    expect(row.payment).toBeCloseTo(10562.93, 2)
+  })
+
+  it('第 12 期起才按新利率、剩余 349 期重算月供', () => {
+    expect(led.rows[11].payment).toBeCloseTo(10459.16, 2)
+    expect(led.rows[15].payment).toBeCloseTo(10459.16, 2)
+    expect(led.rows[11].rate).toBe(3)
+  })
+
+  it('利率分段表把调息当期单列,常规月供仍取新月供', () => {
+    const seg = led.segments.find((s) => s.fromPeriod === 11)
+    expect(seg.payment).toBeCloseTo(10459.16, 2)
+    expect(seg.transitionPayment).toBeCloseTo(10562.93, 2)
+  })
+
+  it('调息前的期次不受影响', () => {
+    expect(led.rows[0].payment).toBeCloseTo(7600.23, 2)
+    expect(led.rows[1].payment).toBeCloseTo(10590.01, 2)
+    expect(led.rows[9].payment).toBeCloseTo(10590.01, 2)
+  })
+})
+
 describe('日期工具', () => {
   it('periodsPaid 首期还款日当天即算已还 1 期', () => {
     expect(periodsPaid('2026-01-31', '2026-01-31')).toBe(1)
@@ -170,12 +213,21 @@ describe('totalRemainingPrincipal 净资产口径', () => {
     const input = loanEngineInput({
       ...loan,
       firstPayment: 1200,
-      events: [{ type: LOAN_EVENT.RATE_CHANGE, effectivePeriod: 13, rate: 4.2 }],
+      events: [{ type: LOAN_EVENT.RATE_CHANGE, effectivePeriod: 13, rate: 4.2, triggerDate: '2027-01-01' }],
     })
     expect(input.firstDays).toBe(31)
     expect(input.firstPayment).toBe(1200)
+    expect(input.firstPayDate).toBe('2026-01-01')
     expect(input.events).toEqual([
-      { type: LOAN_EVENT.RATE_CHANGE, effectivePeriod: 13, rate: 4.2, amount: null, strategy: undefined, accountId: null },
+      {
+        type: LOAN_EVENT.RATE_CHANGE,
+        effectivePeriod: 13,
+        triggerDate: '2027-01-01',
+        rate: 4.2,
+        amount: null,
+        strategy: undefined,
+        accountId: null,
+      },
     ])
   })
 })

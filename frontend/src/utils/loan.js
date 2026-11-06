@@ -17,6 +17,9 @@
  *   (日利率 = 年利率 ÷ 360,与「月利率 × 天数 ÷ 30」等价),首期还款额默认为标准月供、可按账单覆盖。
  *   银行不因首期少几天利息就重算后续月供,故第 2 期起仍是原月供,差额落在「首期还本多一点 +
  *   末期金额略小」上。不填放款日即按整月口径,与纯试算结果完全一致。
+ * - 调息落在某一期中间:该期按「旧利率天数 + 新利率天数」分段计息,本金仍沿用调整前的月供计划
+ *   (所以该期还款额与常规月供不同,例:2026-01-01 调息、1 月 5 日还款 → 该期 4 天按新利率、26 天按旧利率),
+ *   **下一期起**才按「剩余本金 + 剩余期数 + 新利率」重算月供 —— 与银行账单口径一致。
  * - 贷款流水(loanLedger):按「放款 + 利率调整 + 提前还款」事件时间轴逐期重算,用于记录真实贷款走向。
  *
  * 金额与日期的底层实现已抽到 utils/money.js 与 utils/date.js(理财/记账本共用),
@@ -789,7 +792,8 @@ function normalizeLedgerEvents(events, months) {
     if (type === LOAN_EVENT.RATE_CHANGE) {
       const ratePct = Number(raw.rate)
       if (!Number.isFinite(ratePct) || ratePct < 0 || ratePct > 100) return { error: 'BAD_EVENT_VALUE' }
-      list.push({ type, period, ratePct })
+      // 调息日(可选)用于「按天分段计息」:落在某期还款区间内时该期新旧利率各记一段
+      list.push({ type, period, ratePct, triggerDate: raw.triggerDate || null })
     } else if (type === LOAN_EVENT.PREPAY) {
       const amountC = toCents(raw.amount)
       if (amountC <= 0) return { error: 'BAD_EVENT_VALUE' }
@@ -864,11 +868,29 @@ function ledgerToScheduleC(run) {
 }
 
 /**
+ * 调息日落在某期还款区间内时,该期按新利率计息的天数(一个月按 30 天算,与利息口径一致)。
+ * 例:调息日 2026-01-01、该期还款日 2026-01-05 → 4 天按新利率、26 天按旧利率。
+ * 返回 30 表示整期都按新利率(调息日不晚于上期还款日);返回 0 表示调息日还没到该期,
+ * 或事件没填调息日(老数据)→ 都退化成「整期按新利率」。
+ */
+function rateChangeDaysInPeriod(firstPayDate, period, triggerDate) {
+  if (!firstPayDate || !triggerDate) return 0
+  const due = periodDate(firstPayDate, period)
+  if (!due) return 0
+  return Math.max(0, Math.min(DEFAULT_FIRST_DAYS, daysBetween(triggerDate, due)))
+}
+
+/**
  * 逐期滚动出流水(内部,分单位)。
  * 第 1 期利息按首期天数计;其后沿用既有口径(利息 = 剩余本金 × 月利率取整到分、月供固定、末期结清)。
  * 事件在第 N 期还款之后生效:利率调整 → 第 N+1 期起按新利率;提前还款 → 第 N 期后减少剩余本金。
+ *
+ * 调息日(triggerDate)落在第 N+1 期的还款区间内时,银行是**按天分段计息**:该期利息 =
+ * 旧利率天数 + 新利率天数,月供里的本金部分沿用调整前的计划,所以该期还款额与常规月供不同;
+ * **下一期起**才按「剩余本金 + 剩余期数 + 新利率」重算月供。没填调息日的老数据保持旧口径
+ * (整期按新利率、当期重算),避免历史流水跳变。
  */
-function runLedgerC({ amountC, months, method, rate0, firstDays, firstPaymentC, events }) {
+function runLedgerC({ amountC, months, method, rate0, firstDays, firstPaymentC, firstPayDate, events }) {
   const byPeriod = new Map()
   for (const e of events) {
     if (!byPeriod.has(e.period)) byPeriod.set(e.period, [])
@@ -883,16 +905,30 @@ function runLedgerC({ amountC, months, method, rate0, firstDays, firstPaymentC, 
   let perPrincipal = method === REPAY_METHOD.EQUAL_PRINCIPAL ? Math.max(1, Math.round(amountC / months)) : 0
   let prepaidTotal = 0
   let settledAt = 0
+  /** 过渡期的月供重算延到下一期(本期本金沿用调整前的计划) */
+  let pendingRecalc = false
 
   for (let k = 1; k <= planEnd && k <= MAX_PERIODS && remain > 0; k++) {
     // 1) 上一期还款之后生效的事件
     const flags = []
-    let recalc = false
+    let recalc = pendingRecalc
+    pendingRecalc = false
+    /** 本期是否为「调息过渡期」:{ fromRate, days },days 天按新利率、其余按旧利率 */
+    let transition = null
     let shorten = false
     for (const e of byPeriod.get(k - 1) || []) {
       if (e.type === LOAN_EVENT.RATE_CHANGE) {
-        rate = e.ratePct
-        recalc = true
+        const days = rateChangeDaysInPeriod(firstPayDate, k, e.triggerDate)
+        if (days > 0 && days < DEFAULT_FIRST_DAYS) {
+          // 调息日落在本期还款区间内:本期按天分段计息,本金沿用调整前的计划,下一期起重算月供
+          transition = { fromRate: rate, days }
+          rate = e.ratePct
+          pendingRecalc = true
+        } else {
+          // 整期按新利率:当期重算月供
+          rate = e.ratePct
+          recalc = true
+        }
         flags.push({ type: e.type, rate: e.ratePct })
       } else {
         const cut = Math.min(e.amountC, remain)
@@ -927,8 +963,13 @@ function runLedgerC({ amountC, months, method, rate0, firstDays, firstPaymentC, 
       else payment = annuityPaymentC(remain, rate, left)
     }
 
-    // 4) 本期利息:第 1 期按实际天数(不足/超过整月),其后按整月
-    const interest = k === 1 ? firstPeriodInterestC(remain, rate, firstDays) : Math.round(remain * rateOf(rate))
+    // 4) 本期利息:第 1 期按实际天数(不足/超过整月);调息过渡期按新旧利率分段;其余按整月
+    let interest
+    if (k === 1) interest = firstPeriodInterestC(remain, rate, firstDays)
+    else if (transition) {
+      const pctDays = transition.fromRate * (DEFAULT_FIRST_DAYS - transition.days) + rate * transition.days
+      interest = Math.round((remain * pctDays) / 36000)
+    } else interest = Math.round(remain * rateOf(rate))
     let pay
     let principal
     if (method === REPAY_METHOD.EQUAL_PRINCIPAL) {
@@ -936,10 +977,17 @@ function runLedgerC({ amountC, months, method, rate0, firstDays, firstPaymentC, 
       // 账单上的首期还款额优先:首期本金按实收金额倒推
       if (k === 1 && firstPaymentC > 0) principal = firstPaymentC - interest
       pay = principal + interest
-    } else {
+    } else if (k === 1) {
       // 第 1 期:首期本金按整月口径不变、利息按实际天数 → 首期还款额自然与后续不同(天数 30 时即标准月供);
       // 账单上有准确金额时优先用它,首期本金随之倒推。
-      pay = k === 1 ? (firstPaymentC > 0 ? firstPaymentC : payment - Math.round(remain * rateOf(rate)) + interest) : payment
+      pay = firstPaymentC > 0 ? firstPaymentC : payment - Math.round(remain * rateOf(rate)) + interest
+      principal = pay - interest
+    } else if (transition) {
+      // 调息过渡期:本金部分沿用调整前的月供计划(月供 − 旧利率利息),只把利息换成按天分段后的金额
+      principal = payment - Math.round(remain * rateOf(transition.fromRate))
+      pay = principal + interest
+    } else {
+      pay = payment
       principal = pay - interest
     }
     if (principal <= 0) break // 还款额不足以覆盖利息:参数异常,不再往下滚
@@ -956,6 +1004,7 @@ function runLedgerC({ amountC, months, method, rate0, firstDays, firstPaymentC, 
       interest,
       balance: remain,
       days: k === 1 ? normalizeDays(firstDays) : 0,
+      transition: Boolean(transition),
       events: flags,
     })
   }
@@ -970,6 +1019,9 @@ function runLedgerC({ amountC, months, method, rate0, firstDays, firstPaymentC, 
  *   利率调整 → 第 N+1 期起按新利率计息;提前还款 → 第 N 期后减少剩余本金(金额 ≥ 剩余本金即结清)。
  *   第 1 期的利率由贷款的初始年利率决定,同一件事不在两处表达,故事件生效期次不能填 0。
  *
+ * 利率调整带调息日(triggerDate)时按天分段:调息日落在第 N+1 期的还款区间内 → 该期新旧利率各记一段、
+ * 月供本金不变,**第 N+2 期起**才按新利率重算月供;调息日不在区间内(或没填)则整期按新利率、当期重算。
+ *
  * 首期(与后续不同):放款日到首个还款日不足/超过整月时,填 firstDays 即按实际天数计首期利息。
  *   首期本金按整月口径不变、利息换成实际天数,故首期还款额与后续月供不同(天数 30 时正好等于标准月供);
  *   firstPayment 可按账单覆盖(不填就用这个参考口径)。第 2 期起仍按标准月供继续,末期结清。
@@ -982,9 +1034,10 @@ function runLedgerC({ amountC, months, method, rate0, firstDays, firstPaymentC, 
  * @param {number} input.months          原定还款期数
  * @param {string} input.method          REPAY_METHOD.*
  * @param {number} input.rate            初始年利率(%)
+ * @param {string} [input.firstPayDate]  首期还款日(调息分段计息靠它推算每期还款日;不填则整期按新利率)
  * @param {number} [input.firstDays]     首期计息天数(放款日 → 首期还款日;不填按 30 天整月)
  * @param {number} [input.firstPayment]  首期还款额(元;不填按标准月供)
- * @param {Array}  [input.events]        事件:[{type, effectivePeriod, rate|amount, strategy}]
+ * @param {Array}  [input.events]        事件:[{type, effectivePeriod, triggerDate, rate|amount, strategy}]
  * @returns {{valid:boolean,error:string,method:string,months:number,firstDays:number,rows:Array,
  *   segments:Array,summary:object,settled:boolean,settledAt:number,baseline:object,delta:object}}
  */
@@ -1023,7 +1076,17 @@ export function loanLedger(input) {
     return invalid('FIRST_PAYMENT_TOO_LOW')
   }
 
-  const run = (events) => runLedgerC({ amountC, months, method, rate0, firstDays, firstPaymentC, events })
+  const run = (events) =>
+    runLedgerC({
+      amountC,
+      months,
+      method,
+      rate0,
+      firstDays,
+      firstPaymentC,
+      firstPayDate: input && input.firstPayDate,
+      events,
+    })
   // 换账户事件不影响计息(只决定哪一期记到哪个账户),从计息事件里剔除
   const financial = parsed.events.filter((e) => e.type !== LOAN_EVENT.ACCOUNT_CHANGE)
   const main = run(financial)
@@ -1040,13 +1103,15 @@ export function loanLedger(input) {
     interest: toYuan(r.interest),
     balance: toYuan(r.balance),
     days: r.days,
+    transition: Boolean(r.transition),
     events: r.events,
     rateChanged: r.events.some((e) => e.type === LOAN_EVENT.RATE_CHANGE),
     prepaid: r.events.some((e) => e.type === LOAN_EVENT.PREPAY),
   }))
 
   // 每段(同一利率)汇总:利率调整后的月供变化在流水里分段呈现;末期取整差额不另立一段。
-  // 「月供」取段内首个常规期(首期按实际天数计息的金额单独存 firstPayment,页面以小字标注)。
+  // 「月供」取段内首个常规期:首期(按实际天数计息)与调息当期(按新旧利率分段)都不是常规月供,
+  // 分别放在 firstPayment / transitionPayment 里,页面上以小字标注。
   const segments = []
   for (const r of rows) {
     const cur = segments[segments.length - 1]
@@ -1057,12 +1122,14 @@ export function loanLedger(input) {
       cur.lastPayment = r.payment
       if (!cur.regularPayment && r.period > cur.fromPeriod) cur.regularPayment = r.payment
     } else {
+      const irregular = (r.period === 1 && r.days) || r.transition
       segments.push({
         fromPeriod: r.period,
         toPeriod: r.period,
         rate: r.rate,
-        payment: r.period === 1 && r.days ? 0 : r.payment,
+        payment: irregular ? 0 : r.payment,
         firstPayment: r.payment,
+        transitionPayment: r.transition ? r.payment : 0,
         lastPayment: r.payment,
         interest: r.interest,
         principal: r.principal,
@@ -1168,11 +1235,14 @@ export function loanEngineInput(loan) {
     months: Number(loan?.months ?? 0),
     method: loan?.method,
     rate: Number(loan?.rate ?? 0),
+    loanDate: loan?.loanDate || null,
+    firstPayDate: loan?.firstPayDate || null,
     firstDays: daysBetween(loan?.loanDate, loan?.firstPayDate),
     firstPayment: loan?.firstPayment == null ? null : Number(loan.firstPayment),
     events: (loan?.events || []).map((e) => ({
       type: e.type,
       effectivePeriod: Number(e.effectivePeriod),
+      triggerDate: e.triggerDate || null,
       rate: e.rate == null ? null : Number(e.rate),
       amount: e.amount == null ? null : Number(e.amount),
       strategy: e.strategy,

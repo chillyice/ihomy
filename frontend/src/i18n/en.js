@@ -4091,6 +4091,7 @@ export default {
         segPeriods: 'Periods {a}–{b}',
         segPayment: 'Payment',
         segFirstLine: 'First: {v}',
+        segTransitionLine: 'Rate-change month: {v}',
         segInterest: 'Interest',
         compareTitle: 'Versus “never changed”',
         compareHint: 'Interest of the same loan if the rate never changed and nothing was prepaid',
