@@ -1536,6 +1536,11 @@ export default {
       unassigned: '未归属',
       unassignedCount: '未归属 {n} 笔',
       transferNeedOne: '转账请至少选择转出或转入账户',
+      filterHint: '只看「{name}」的账目',
+      filterOnly: '只看「{name}」· {n} 笔',
+      filterScope: '统计卡与预算仍是本月全部',
+      filterEmpty: '这个账户本月还没有账目',
+      filterClear: '清除筛选',
     },
     budget: {
       title: '本月预算',

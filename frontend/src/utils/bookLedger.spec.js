@@ -3,6 +3,7 @@ import {
   accountTypeLabel,
   sumBalances,
   unassignedCount,
+  accountRecords,
   fillMonths,
   yoy,
   ratio,
@@ -84,6 +85,31 @@ describe('unassignedCount', () => {
       { type: 'TRANSFER', fromAccountId: null, toAccountId: null },
     ]
     expect(unassignedCount(records)).toBe(1)
+  })
+})
+
+describe('accountRecords 按账户筛账目', () => {
+  const records = [
+    { id: 1, type: 'EXPENSE', accountId: 1 },
+    { id: 2, type: 'INCOME', accountId: 2 },
+    { id: 3, type: 'TRANSFER', fromAccountId: 1, toAccountId: 2 },
+    { id: 4, type: 'TRANSFER', fromAccountId: null, toAccountId: 1 },
+    { id: 5, type: 'EXPENSE', accountId: null },
+  ]
+
+  it('accountId 为空/非法时原样返回', () => {
+    expect(accountRecords(records, null)).toBe(records)
+    expect(accountRecords(records, '')).toBe(records)
+    expect(accountRecords(undefined, 1)).toEqual([])
+  })
+
+  it('收支按 accountId 命中,转账任一侧命中都算', () => {
+    expect(accountRecords(records, 1).map((r) => r.id)).toEqual([1, 3, 4])
+    expect(accountRecords(records, 2).map((r) => r.id)).toEqual([2, 3])
+  })
+
+  it('id 是数字字符串时同样命中(后端字段类型不一致也不漏)', () => {
+    expect(accountRecords(records, '1').map((r) => r.id)).toEqual([1, 3, 4])
   })
 })
 

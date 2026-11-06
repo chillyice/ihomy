@@ -1543,6 +1543,11 @@ export default {
       unassigned: 'Unassigned',
       unassignedCount: '{n} unassigned',
       transferNeedOne: 'Pick at least a from-account or a to-account for a transfer',
+      filterHint: 'Show only entries of "{name}"',
+      filterOnly: 'Only "{name}" · {n} entries',
+      filterScope: 'Totals and budgets still cover the whole month',
+      filterEmpty: 'No entries for this account this month',
+      filterClear: 'Clear filter',
     },
     budget: {
       title: 'Monthly budget',

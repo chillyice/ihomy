@@ -70,6 +70,26 @@
   border-radius: 10px;
   white-space: nowrap;
   flex-shrink: 0;
+  /* 点一下只看这个账户的账目(再点取消):只过渡描边与底色,不动尺寸避免整条抖动 */
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease-soft),
+    background-color var(--dur-fast) var(--ease-soft);
+}
+.book-balance-strip .bs-chip:hover {
+  border-color: var(--color-brand);
+}
+.book-balance-strip .bs-chip:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+/* 选中态:品牌色描边 + 淡底,与「已筛选」的明细标题呼应 */
+.book-balance-strip .bs-chip.is-active {
+  border-color: var(--color-brand);
+  background: rgba(var(--color-brand-rgb), 0.12);
+}
+.book-balance-strip .bs-chip.is-active .bs-chip-name {
+  color: var(--color-text-primary);
 }
 .book-balance-strip .bs-chip-name {
   font-size: 12px;

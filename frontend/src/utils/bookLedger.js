@@ -42,6 +42,20 @@ export function unassignedCount(records) {
 }
 
 /**
+ * 按账户筛账目(记账本点账户 chip 只看该账户的账目)。
+ * 支出/收入看 `accountId`;转账没有单一账户,转出或转入任一侧命中都算「与这个账户有关」。
+ * accountId 为空/非法时原样返回,不做筛选。比较前统一转数字,兼容后端返回字符串 id 的场景。
+ */
+export function accountRecords(records, accountId) {
+  const list = records || []
+  const id = Number(accountId)
+  if (accountId == null || accountId === '' || !Number.isFinite(id)) return list
+  return list.filter((r) =>
+    r?.type === 'TRANSFER' ? Number(r.fromAccountId) === id || Number(r.toAccountId) === id : Number(r?.accountId) === id,
+  )
+}
+
+/**
  * 12 槽补零:把某年 `byMonth`(后端只含有记录的月份)铺成 1~12 月,期初/期末逐槽滚动。
  * 年初期初取该年首条记录的 `opening`(后端已按全时段滚动算好,等于该年之前累计结余);
  * 该年没有记录时为 0。返回项按月份升序,金额单位元、保留 2 位。

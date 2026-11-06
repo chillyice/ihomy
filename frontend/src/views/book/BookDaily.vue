@@ -20,7 +20,15 @@
       <!-- 账户余额条 -->
       <div class="book-balance-strip card">
         <div class="bs-chips">
-          <div v-for="a in accounts" :key="a.id" class="bs-chip">
+          <div
+            v-for="a in accounts"
+            :key="a.id"
+            v-a11y-click
+            class="bs-chip"
+            :class="{ 'is-active': activeAccountId === a.id }"
+            :title="$t('book.account.filterHint', { name: a.name })"
+            @click="toggleAccountFilter(a.id)"
+          >
             <span class="bs-chip-name">{{ a.name }}</span>
             <span class="bs-chip-amount" :class="{ 'is-negative': Number(a.balance) < 0 }">¥{{ formatYuan(a.balance) }}</span>
           </div>
@@ -51,11 +59,18 @@
       </div>
 
       <div class="content">
-        <!-- 明细列表 -->
+        <!-- 明细列表:点账户余额条上的账户只看该账户的账目(统计卡与预算仍是本月全部) -->
         <div class="records card">
-          <div class="section-label">{{ $t('book.records') }}</div>
+          <div class="records-head">
+            <div class="section-label">{{ $t('book.records') }}</div>
+            <div v-if="activeAccount" class="records-filter">
+              <span class="rf-text">{{ $t('book.account.filterOnly', { name: activeAccount.name, n: filteredRecords.length }) }}</span>
+              <span class="rf-hint">{{ $t('book.account.filterScope') }}</span>
+              <el-button size="small" text @click="clearAccountFilter">{{ $t('book.account.filterClear') }}</el-button>
+            </div>
+          </div>
           <div v-loading="loading">
-            <div v-for="r in records" :key="r.id" class="record-row">
+            <div v-for="r in filteredRecords" :key="r.id" class="record-row">
               <div class="record-main">
                 <span class="record-cat" :class="typeCls(r)">{{ catText(r) }}</span>
                 <div class="record-info">
@@ -80,7 +95,7 @@
                 </el-tooltip>
               </div>
             </div>
-            <el-empty v-if="!records.length" :description="$t('book.noRecords')" />
+            <el-empty v-if="!filteredRecords.length" :description="activeAccount ? $t('book.account.filterEmpty') : $t('book.noRecords')" />
           </div>
         </div>
 
@@ -177,7 +192,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { bookApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { formatYuan } from '@/utils/loan'
-import { BOOK_CATEGORIES, unassignedCount } from '@/utils/bookLedger'
+import { BOOK_CATEGORIES, accountRecords, unassignedCount } from '@/utils/bookLedger'
 import PageToolbar from '@/components/PageToolbar.vue'
 import AccountManagerDialog from './accounts/AccountManagerDialog.vue'
 import BudgetPanel from './budget/BudgetPanel.vue'
@@ -206,6 +221,25 @@ const accountMgrVisible = ref(false)
 const importVisible = ref(false)
 const recurringVisible = ref(false)
 const editor = reactive({ visible: false, form: {} })
+
+// 账户筛选:点余额条上的账户只看它的账目,再点一次取消;切月保留(对比同一账户的跨月流水很方便)
+const activeAccountId = ref(null)
+const activeAccount = computed(() => accounts.value.find((a) => a.id === activeAccountId.value) || null)
+const filteredRecords = computed(() => accountRecords(records.value, activeAccountId.value))
+
+const toggleAccountFilter = (id) => {
+  activeAccountId.value = activeAccountId.value === id ? null : id
+}
+const clearAccountFilter = () => {
+  activeAccountId.value = null
+}
+
+// 账户被删或换了家庭后列表里没有它:自动清除筛选,否则会卡在「空明细 + 找不到账户」的死角
+watch(accounts, (list) => {
+  if (activeAccountId.value != null && !(list || []).some((a) => a.id === activeAccountId.value)) {
+    activeAccountId.value = null
+  }
+})
 
 const monthModel = computed({
   get: () => props.month,
@@ -358,6 +392,36 @@ onMounted(load)
   padding: 16px 18px;
   min-width: 0;
 }
+/* 明细标题行:左边「明细」,筛选生效时右边挂筛选说明与清除入口 */
+.records-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.records-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.rf-text {
+  font-size: 12px;
+  color: var(--color-text-primary);
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: rgba(var(--color-brand-rgb), 0.12);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 口径提示:统计卡/预算/分类排行不受账户筛选影响,免得以为数字算错了 */
+.rf-hint {
+  font-size: 11px;
+  color: var(--color-text-tertiary, #b5a98c);
+  white-space: nowrap;
+}
 /* 右栏:预算卡 + 分类排行纵向排列,窄屏跟随主栏顺序落到明细下方 */
 .side {
   display: flex;
@@ -465,6 +529,10 @@ onMounted(load)
   .form-row {
     flex-direction: column;
     gap: 0;
+  }
+  /* 窄屏只留「只看 X · N 笔」与清除按钮,口径提示隐藏,免得标题行换行占太多高度 */
+  .rf-hint {
+    display: none;
   }
 }
 </style>
