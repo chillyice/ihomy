@@ -22,6 +22,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +50,10 @@ public class WeatherService {
 
     @Value("${app.weather-private-key:}")
     private String privateKeyPem;
+
+    /** 天气调用日志保留天数(默认 7):第三方响应正文体积大,过期即清,避免 report_weather 长期堆积。 */
+    @Value("${app.weather-log-retention-days:7}")
+    private int weatherLogRetentionDays;
 
     private final StringRedisTemplate redis;
     private final WeatherCredentialMapper credentialMapper;
@@ -352,6 +357,21 @@ public class WeatherService {
             } catch (Exception e) {
                 log.warn("[pushWeatherAlerts] family={} failed: {}", f.getId(), e.getMessage());
             }
+        }
+    }
+
+    /**
+     * 天气调用日志保留策略:每天 04:10 清掉超过保留天数的记录。
+     * 只动 report_weather(纯诊断日志),不碰任何家庭/业务数据;清理量小,单条 DELETE 即可。
+     */
+    @Scheduled(cron = "0 10 4 * * *")
+    public void purgeWeatherLogs() {
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(weatherLogRetentionDays);
+        int deleted = weatherLogMapper.delete(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WeatherLog>()
+                        .lt(WeatherLog::getCreatedAt, cutoff));
+        if (deleted > 0) {
+            log.info("[purgeWeatherLogs] 已清理 {} 条 {} 天前的天气调用日志", deleted, weatherLogRetentionDays);
         }
     }
 

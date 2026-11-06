@@ -145,7 +145,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 9. **UPDATE 不先 select(强制)**:回写冗余字段用 `LambdaUpdateWrapper.eq(...).set(...).update(null)`;**计数用 `setSql("x = x + delta")` 原子增量,禁止「先 COUNT 再 SET」**;清空字段必须 `.set(col, null)`(踩坑速查 §8.3/§2.2/§2.3)。
 10. **文件上传流式(强制)**:禁 `file.getBytes()` 全量入堆(生产 `-Xmx384m`),用 `MultipartFile` 重载 + `transferTo`(+`Files.copy` 兜底),Controller 传 `MultipartFile`。
 11. **JVM/池**:虚拟线程开启;HikariCP `maximum-pool-size:20` / `minimum-idle:5` / `connection-timeout:3000`。
-12. **日志(强制,细则见 `docs/设计想法/日志/`)**:access/server/thirdparty 三类文件,按天滚动留 7 天;六要素含 `[tid]`,tid 贯穿 HTTP/WS/@Async;三方调用一律走 `ThirdPartyHttp`;**报错必须带堆栈** `log.error("xx, p={}", p, e)`(禁 printStackTrace);级别 ERROR=人工/WARN=可恢复/INFO=关键/DEBUG=细节;新敏感字段进 `AccessLogFilter.SENSITIVE_JSON`;**同类异常聚合预警** `LogAlertAppender` 须挂 root + ACCESS + thirdparty,配置 `app.log-alert.*`,详见 需求 §4.6.4。
+12. **日志(强制,细则见 `docs/设计想法/日志/`)**:access/server/thirdparty 三类文件,按天滚动留 7 天;六要素含 `[tid]`,tid 贯穿 HTTP/WS/@Async;三方调用一律走 `ThirdPartyHttp`;**报错必须带堆栈** `log.error("xx, p={}", p, e)`(禁 printStackTrace);级别 ERROR=人工/WARN=可恢复/INFO=关键/DEBUG=细节;新敏感字段进 `AccessLogFilter.SENSITIVE_JSON`;**同类异常聚合预警** `LogAlertAppender` 须挂 root + ACCESS + thirdparty,配置 `app.log-alert.*`,详见 需求 §4.6.4;**天气调用日志 `report_weather` 保留 7 天**(`app.weather-log-retention-days`),每天 04:10 清理,只动诊断日志表。
 
 ## 前端规范
 
@@ -158,7 +158,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 7. **毛玻璃**:`backdrop-filter: blur(24px) saturate(1.1)`;hover 用 `transform` 不用 `box-shadow`;**长开页/持续动画页别用**(踩坑速查 §3.10)。
 8. **可拖拽面板**:`useDragResize`;位置尺寸持久化 localStorage;**事件监听按需挂载**;**指针捕获只在真正拖动时做**(`pointerdown` 就 `setPointerCapture` 会让容器内所有卡片/按钮点不动,踩坑速查 §3.35);拖拽/缩放手柄统一 Pointer Events + `touch-action:none`(触屏才不会被页面滚动抢走,踩坑速查 §3.61)。
 9. **光影层全局化**:`SunLightLayer` + `AppSidebar` + `SiteFooter` 在 `App.vue` 挂载,`useSunLight` provide/inject。
-10. **i18n**:所有可见文本 `$t('key')`,中英键结构对齐;文案里字面量 `{`/`}`/`@` 必须转义,否则生产构建 `$t()` 抛错打断整页;守门 `i18n/message-format.spec.js` + 硬编码中文守门 `hardcoded-cjk.spec.js`(有意保留项进其 `ALLOW`)。
+10. **i18n**:所有可见文本 `$t('key')`,中英键结构对齐;中文随首屏、英文 `en` 走独立懒加载 chunk(`ensureLocale` 先加载再切,首屏 en 在 mount 前等);文案里字面量 `{`/`}`/`@` 必须转义,否则生产构建 `$t()` 抛错打断整页;守门 `i18n/message-format.spec.js` + 硬编码中文守门 `hardcoded-cjk.spec.js`(有意保留项进其 `ALLOW`)。
 11. **共享逻辑抽 utils(禁三份实现)**:动态流走 `utils/feed.js`;枚举文案 `dictText(t,...)`;金额「元⇄分」`utils/money.js`、年月日换算 `utils/date.js`(`loan.js` 只再导出);新重复逻辑先找现成 util。
 12. **可点击非按钮元素**:用 `v-a11y-click`(补 `role`/`tabindex` + Enter/Space),别手写三行;`<img>` 必须带 `alt`。
 13. **打包分块(强制)**:`vite.config.js` 用 Rolldown 的 `codeSplitting.groups` 拆 element-plus/gsap/vue-i18n/epubjs/pdfjs/simple-mind-map/three;`includeDependenciesRecursively:false` 必须配 `output.strictExecutionOrder:true`(否则循环引用,运行时抛 `_ is not a function`,踩坑速查 §1.16);`public/` 静态资源不得与 npm 包重复。
@@ -178,7 +178,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 - 后端全绿:`.\mvnw.cmd -B clean package`(312 tests,纯逻辑不起 Spring)。
 - 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(804 passed)+ `npm run format:check`(全树仍有历史遗留未格式化文件,口径见 踩坑速查 §1.13;**本次改动的文件必须 `prettier --write` 后通过**)。
-- 构建:首屏初始 JS 基线 **1670.54KB / gzip 571.85KB**(42 chunk);体积口径以 vite 构建输出为准,历史数字见 变更归档。
+- 构建:首屏初始 JS 基线 **1465.51KB / gzip 501.03KB**(42 chunk,英文包 `en` 为懒加载 chunk);体积口径以 vite 构建输出为准,历史数字见 变更归档。
 - 一致性:`bash scripts/doc-drift-check.sh` 全 [OK];`gen-code-map.sh --check`、`doc-index.sh --check` 无漂移。
 - 接口测试在仓库外 `..\autotest_framework`(`pytest -m api`,37 passed)。
 
@@ -204,7 +204,8 @@ cd frontend; npm run lint; npx vitest run; npm run build
 - JVM:`-Xmx384m -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC -Xss512k`;MySQL `performance_schema=OFF`,端口 6306。
 - **Redis 只绑回环 + 强密码**:`-p 127.0.0.1:6379:6379` + `--requirepass`(写在**镜像名之后**);镜像固定 tag(当前 `redis:8.10.3`),加速器缺新 tag 时经 daocloud 拉取后 `docker tag` 回原名;**改密顺序**:external.yml → 停后端 → 重建容器 → 起后端 → 冒烟(踩坑速查 §7.17)。
 - SSH 统一 **19068**(禁 22),ssh/scp 都带 `-p 19068`;配 fail2ban 与自动安全更新。
-- 备份:`scripts/prod-backup.sh`(mysqldump 单事务 + gzip 校验 + uploads 只增不删,留 14 天)由 systemd timer 每日 03:00 跑;恢复 `scripts/prod-restore.sh <dump> <目标库>`。**生产 2026-11-02 尚未安装 timer**,需装 `config/systemd/ihomy-backup.{service,timer}` 后才成立。
+- 备份:`scripts/prod-backup.sh`(mysqldump 单事务 + gzip 校验 + uploads 只增不删,留 14 天)由 systemd timer 每日 03:00 跑(生产已安装 `ihomy-backup.timer` 并验证);恢复 `scripts/prod-restore.sh <dump> <目标库>`。
+- **生产只留构建产物**:`/opt/ihomy` 部署后仅保留 `backend/target/ihomy-backend.jar`、`frontend/dist`、`config/external.yml`(+`mysql/my.cnf`)、`uploads/`、`backups/`、`logs/`、`VERSION`、`scripts/prod-backup.sh`/`prod-restore.sh`;源码/docs/.git 不在服务器,构建与上传一律走本地 `scripts/deploy.ps1`。部署成功后脚本会删除 `dist.bak`/`jar.bak`。
 - **重装/新服务器四条必查**(nginx `mime.types` 有 `.mjs`、站点 conf 有 gzip、静态缓存排除 `/api/`+`/files/`、媒体播放地址同为 HTTPS):见 踩坑速查 §7.1/§7.3/§7.10。
 - **部署新前端后老客户端仍跑旧 bundle(PWA 预缓存)**:冒烟前先 unregister SW + 清 caches;不带内容哈希的运行时换版本必须带 `?v=` 破缓存(踩坑速查 §7.2/§3.55)。
 - 详细步骤 `docs/部署指导-Linux.md` / `docs/部署指导-Windows.md`。
@@ -212,6 +213,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 ## 归档与规划
 
 - 每次可交付迭代:更新 `VERSION` → 追加 `docs/变更归档.md` `#####` 小节 → 就地改写 需求 §4/§6/§7/§9 → 跑 `gen-code-map.sh` + `doc-index.sh` → `doc-drift-check.sh` 全绿 → commit。流程细节走 `/archive` 技能。
+- `docs/变更归档.md` 的 **V10 之前条目已压缩为「标题 + 一句话摘要」**(2026-11-06),细节查 git 历史;V10 起仍按完整条目追加。
 - **未实现规划的唯一去处是 需求 §9**(§9.1 产品级 / §9.2-§9.5 代码级待办);本章不记内容,启动任何规划项前先读对应小节。开工新功能前先 `grep schema.sql + router/` 对照模块种子。
 
 ## 文档与服务

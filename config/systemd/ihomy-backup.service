@@ -9,7 +9,7 @@
 #   journalctl -u ihomy-backup.service -n 50        # 查看本次结果
 [Unit]
 Description=ihomy 每日备份(MySQL 转储 + uploads 同步)
-Documentation=file:/opt/ihomy/docs/部署指导-Linux.md
+Documentation=https://ihomy.top
 
 [Service]
 Type=oneshot

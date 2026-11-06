@@ -143,7 +143,15 @@ if (-not $BackendOnly) {
       & npm install --prefix $Frontend --no-audit --no-fund
       if ($LASTEXITCODE -ne 0) { Die '前端依赖安装失败' }
     }
-    & npm run build --prefix $Frontend
+    # PowerShell 5.1 下 native 命令往 stderr 写一行(如 rolldown 的无害 warning)就会被
+    # $ErrorActionPreference='Stop' 当成终止错误,所以这一段临时放宽并显式看退出码
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+      & npm run build --prefix $Frontend 2>&1 | ForEach-Object { Write-Host $_ }
+    } finally {
+      $ErrorActionPreference = $prevEap
+    }
     if ($LASTEXITCODE -ne 0) { Die '前端构建失败' }
   }
 
@@ -391,6 +399,14 @@ if (-not $healthOk) {
   & ssh @sshOpts "$User@$Server" 'tail -n 40 /var/log/ihomy/backend.log 2>/dev/null; echo "----- /var/log/ihomy/backend.err.log (tail 20) -----"; tail -n 20 /var/log/ihomy/backend.err.log 2>/dev/null'
   Die 'API 健康检查未通过(见上方日志)'
 }
+
+# 健康检查通过后清理本次回滚备份:生产只保留一份构建产物,避免 dist.bak/jar.bak 长期堆积
+$cleanupScript = @"
+rm -rf $RemoteRoot/frontend/dist.bak
+rm -f $RemoteRoot/backend/target/ihomy-backend.jar.bak
+echo CLEANED
+"@
+$null = Invoke-RemoteBash $cleanupScript
 
 Write-Host ""
 Write-Host "==> 部署完成: https://$Server" -ForegroundColor Cyan

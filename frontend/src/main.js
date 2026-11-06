@@ -3,7 +3,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
-import i18n from './i18n'
+import i18n, { ensureLocale } from './i18n'
 import 'element-plus/theme-chalk/dark/css-vars.css'
 import './styles/main.css'
 // 命令式 API(ElMessage/ElMessageBox/ElNotification/ElLoading)不经过模板按需加载,
@@ -25,4 +25,13 @@ app.use(createPinia())
 app.use(router)
 app.use(i18n)
 app.directive('a11y-click', a11yClick)
-app.mount('#app')
+
+// 英文文案是懒加载 chunk:首屏语言为英文时先补齐再挂载,避免闪一下中文/键名
+const mount = () => app.mount('#app')
+if (i18n.global.locale.value === 'en') {
+  ensureLocale('en')
+    .catch(() => {})
+    .then(mount)
+} else {
+  mount()
+}
