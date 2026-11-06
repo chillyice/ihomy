@@ -1145,7 +1145,7 @@ const saveNow = async (force = false) => {
         // 取消=放弃本地改动,加载家人版本
         try {
           const fresh = await mindmapApi.get(id)
-          applyRemoteData(fresh)
+          await applyRemoteData(fresh)
           saveState.value = 'saved'
           ElMessage.success(t('tools.mindmap.conflictLoaded'))
         } catch (e2) {
@@ -1249,7 +1249,7 @@ const restoreSnapshot = async (s) => {
   const restored = await mindmapApi.snapshotRestore(id, s.id)
   lastSnapAt = Date.now()
   title.value = restored.title
-  applyRemoteData(restored)
+  await applyRemoteData(restored)
   ElMessage.success(t('tools.mindmap.rollbackDone'))
   history.list = await mindmapApi.snapshotList(id)
 }
@@ -1265,15 +1265,25 @@ const formatSnapTime = (s) => (s ? String(s).slice(0, 16).replace('T', ' ') : '-
 let remoteUpdatedAt = ''
 let syncTimer = null
 
-const applyRemoteData = (record) => {
+const applyRemoteData = async (record, { preserveView = true } = {}) => {
   if (!mm || !record?.data) return
+  // 拍视口快照:setLayout 会隐式 view.reset(),setData 重排也会挪内容;渲染完成后按快照还原
+  let viewData = null
+  if (preserveView) {
+    try {
+      viewData = mm.view.getTransformData()
+    } catch (e) {
+      viewData = null
+    }
+  }
   try {
     const parsed = JSON.parse(record.data)
     if (!parsed?.root) return
     if (record.title) title.value = record.title
+    // 只在真的换了布局时才调 setLayout:库内部会直接把缩放/平移归零(只浏览也会被跳视口)
     if (parsed.layout && layoutOptions.some((o) => o.value === parsed.layout)) {
+      if (parsed.layout !== mm.getLayout()) mm.setLayout(parsed.layout)
       layout.value = parsed.layout
-      mm.setLayout(parsed.layout)
     }
     if (parsed.theme?.template && themeOptions.some((o) => o.value === parsed.theme.template)) {
       themeTemplate.value = parsed.theme.template
@@ -1281,6 +1291,15 @@ const applyRemoteData = (record) => {
     }
     if (parsed.theme) userThemeConfig = deepClone(parsed.theme.config || {})
     mm.setData(parsed.root)
+    // 必须等重排完成再还原,否则会按旧尺寸被夹取
+    await waitRender()
+    if (viewData) {
+      try {
+        mm.view.setTransformData(viewData)
+      } catch (e) {
+        /* 库版本差异:退回默认视口,不阻断数据更新 */
+      }
+    }
     applyCanvasTheme()
     remoteUpdatedAt = record.updatedAt || ''
   } catch (e) {
@@ -1298,7 +1317,7 @@ const pollRemote = async () => {
       if (!remoteUpdatedAt) {
         remoteUpdatedAt = record.updatedAt
       } else {
-        applyRemoteData(record)
+        await applyRemoteData(record)
         ElMessage.info(t('tools.mindmap.remoteUpdated'))
       }
     }
