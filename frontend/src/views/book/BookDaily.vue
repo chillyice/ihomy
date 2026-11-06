@@ -4,23 +4,12 @@
     <PageToolbar v-if="userStore.isLoggedIn" :card="false">
       <div class="tb-right">
         <el-date-picker v-model="monthModel" type="month" value-format="YYYY-MM" style="width: 140px" />
-        <!-- 记一笔为主操作;导入 CSV 与周期账目收进下拉,窄屏工具栏不会横向溢出(只读档位不显示) -->
-        <el-dropdown
-          v-if="userStore.canWriteBook"
-          split-button
-          type="primary"
-          trigger="click"
-          @click="openEditor()"
-          @command="onToolCommand"
-        >
-          {{ $t('book.add') }}
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="import">{{ $t('book.import.entry') }}</el-dropdown-item>
-              <el-dropdown-item command="recurring">{{ $t('book.recurring.entry') }}</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+        <!-- 三个入口并排:记一笔(主)、周期账目、导入 CSV;只读档位不显示 -->
+        <div v-if="userStore.canWriteBook" class="tb-actions">
+          <el-button type="primary" @click="openEditor()">{{ $t('book.add') }}</el-button>
+          <el-button @click="recurringVisible = true">{{ $t('book.recurring.entry') }}</el-button>
+          <el-button @click="importVisible = true">{{ $t('book.import.entry') }}</el-button>
+        </div>
       </div>
     </PageToolbar>
 
@@ -218,12 +207,6 @@ const importVisible = ref(false)
 const recurringVisible = ref(false)
 const editor = reactive({ visible: false, form: {} })
 
-// 工具栏下拉:导入 / 周期账目(主按钮仍是「记一笔」)
-const onToolCommand = (cmd) => {
-  if (cmd === 'import') importVisible.value = true
-  else if (cmd === 'recurring') recurringVisible.value = true
-}
-
 const monthModel = computed({
   get: () => props.month,
   set: (v) => emit('update:month', v),
@@ -355,6 +338,16 @@ onMounted(load)
 
 <style scoped>
 /* 只放本页布局;统计卡/余额条/空态样式在 bookPage.css,EP 组件样式走全局 main.css */
+/* 工具栏三个入口并排;窄屏放不下就换行,不把月份选择器挤出去 */
+.tb-right {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.tb-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 .content {
   display: grid;
   grid-template-columns: 2fr 1fr;

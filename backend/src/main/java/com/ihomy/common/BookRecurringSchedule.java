@@ -17,8 +17,9 @@ import java.util.List;
  * </ul>
  *
  * 生成范围 = (已生成日, 今天] ∩ [起始日, 结束日];已生成日为空表示从未生成,从起始日起算。
- * 停机补跑最多回溯 {@link #MAX_BACKFILL_DAYS} 天:更早的期次不再补插,但已生成日仍推进到最后
- * 一期,避免以后每次都重复命中同一段历史。
+ * 定时任务补跑最多回溯 {@link #MAX_BACKFILL_DAYS} 天:更早的期次不再补插,但已生成日仍推进到最后
+ * 一期,避免以后每次都重复命中同一段历史;用户主动建模板/立即生成传 {@link #FULL_HISTORY},
+ * 从起始日一次性补齐,不设回溯窗口。
  */
 public final class BookRecurringSchedule {
 
@@ -27,8 +28,11 @@ public final class BookRecurringSchedule {
     public static final String PERIOD_MONTHLY = "MONTHLY";
     public static final String PERIOD_YEARLY = "YEARLY";
 
-    /** 停机补跑上限:最多补 90 天内的期次(含今天) */
+    /** 停机补跑上限:定时任务最多补 90 天内的期次(含今天) */
     public static final int MAX_BACKFILL_DAYS = 90;
+
+    /** 用户主动补账(新建模板 / 手动立即生成)不设回溯窗口,从起始日补齐 */
+    public static final int FULL_HISTORY = 0;
 
     /** 单次推算的安全上限,防止异常数据把定时任务拖死 */
     private static final int SAFETY_LIMIT = 10_000;
@@ -69,6 +73,16 @@ public final class BookRecurringSchedule {
      */
     public static Occurrences due(String period, LocalDate startDate, LocalDate endDate,
                                   LocalDate lastGeneratedDate, LocalDate today) {
+        return due(period, startDate, endDate, lastGeneratedDate, today, MAX_BACKFILL_DAYS);
+    }
+
+    /**
+     * 同 {@link #due(String, LocalDate, LocalDate, LocalDate, LocalDate)},可指定回溯窗口。
+     *
+     * @param backfillDays 只插入最近 N 天内的期次;{@link #FULL_HISTORY}(0)表示不设窗口,从起始日补齐
+     */
+    public static Occurrences due(String period, LocalDate startDate, LocalDate endDate,
+                                  LocalDate lastGeneratedDate, LocalDate today, int backfillDays) {
         if (startDate == null || today == null) return Occurrences.EMPTY;
 
         LocalDate end = endDate == null ? today : (endDate.isBefore(today) ? endDate : today);
@@ -84,13 +98,13 @@ public final class BookRecurringSchedule {
         LocalDate cursor = firstOnOrAfter(p, startDate, from);
         if (cursor == null || cursor.isAfter(end)) return Occurrences.EMPTY;
 
-        LocalDate windowStart = today.minusDays(MAX_BACKFILL_DAYS - 1L);
+        LocalDate windowStart = backfillDays <= FULL_HISTORY ? null : today.minusDays(backfillDays - 1L);
         List<LocalDate> all = new ArrayList<>();
         List<LocalDate> capped = new ArrayList<>();
         int guard = 0;
         while (cursor != null && !cursor.isAfter(end) && guard++ < SAFETY_LIMIT) {
             all.add(cursor);
-            if (!cursor.isBefore(windowStart)) capped.add(cursor);
+            if (windowStart == null || !cursor.isBefore(windowStart)) capped.add(cursor);
             cursor = next(p, startDate, cursor);
         }
         if (all.isEmpty()) return Occurrences.EMPTY;

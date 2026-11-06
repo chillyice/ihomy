@@ -1596,8 +1596,9 @@ export default {
       endBeforeStart: 'End date cannot be earlier than start date',
       run: 'Generate now',
       runDone: '{n} new entries',
+      createdWithHistory: 'Saved — {n} past entries were added from the start date',
       deleteMessage: 'Delete the "{category}" template? Generated entries stay in the ledger.',
-      note: 'A normal ledger entry is created automatically on schedule; it can be edited or deleted like any other entry.',
+      note: 'Due entries are filled in from the start date on save; afterwards a normal ledger entry is created automatically on schedule and can be edited or deleted like any other entry.',
     },
     import: {
       entry: 'Import CSV',

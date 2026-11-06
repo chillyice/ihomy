@@ -208,9 +208,10 @@ const onSave = async () => {
   }
   saving.value = true
   try {
-    if (f.id) await bookApi.updateRecurring(f.id, data)
-    else await bookApi.createRecurring(data)
-    ElMessage.success(t('common.saveSuccess'))
+    // 新建保存后后端会按起始日补历史期次;从未生成过的旧模板在编辑保存时也会回补,提示补了几笔
+    const res = f.id ? await bookApi.updateRecurring(f.id, data) : await bookApi.createRecurring(data)
+    const n = Number(f.id ? res : res?.generated) || 0
+    ElMessage.success(n > 0 ? t('book.recurring.createdWithHistory', { n }) : t('common.saveSuccess'))
     editor.visible = false
     await load()
     emit('saved')

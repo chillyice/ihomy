@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionOperations;
 
 import java.math.BigDecimal;
@@ -37,8 +38,9 @@ import java.util.stream.Collectors;
  *
  * 生成是幂等的:先以「已生成日」做条件更新抢占(WHERE last_generated_date = 旧值),
  * 抢到才插入流水,同一天重复跑(定时任务 + 手动触发 + 多实例)不会重复插入。
- * 日期推算唯一来源 common/BookRecurringSchedule(月度短月取月末、每年 2/29 平年取 2/28、
- * 停机补跑最多回溯 90 天)。模板为家庭共享数据,改删限创建人本人或家长。
+ * 日期推算唯一来源 common/BookRecurringSchedule(月度短月取月末、每年 2/29 平年取 2/28);
+ * 用户主动补账(新建模板 / 立即生成)从起始日补齐全部历史期次,定时任务补跑最多回溯 90 天。
+ * 模板为家庭共享数据,改删限创建人本人或家长。
  */
 @Slf4j
 @Service
@@ -91,19 +93,35 @@ public class BookRecurringService {
         return out;
     }
 
-    /** 新建模板:只允许收支两种类型;账户必须是本家庭未删除账户;分类空按「其他」 */
-    public BookRecurring create(Long userId, Long familyId, BookRecurringDTO dto) {
+    /**
+     * 新建模板:只允许收支两种类型;账户必须是本家庭未删除账户;分类空按「其他」。
+     * 保存后立即从起始日把已到期期次补成流水(用户主动补账,不套定时任务的 90 天窗口),
+     * 否则起始日早于今天的模板要等到次日的定时任务才会有账目。
+     *
+     * @return id 与本次补记的流水笔数
+     */
+    @Transactional
+    public Map<String, Object> create(Long userId, Long familyId, BookRecurringDTO dto) {
         BookRecurring r = new BookRecurring();
         r.setFamilyId(familyId);
         r.setCreatedBy(userId);
         applyForm(r, familyId, dto, true);
         r.setEnabled(1);
         recurringMapper.insert(r);
-        return r;
+        int generated = generateOne(r, LocalDate.now(), BookRecurringSchedule.FULL_HISTORY);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", r.getId());
+        out.put("generated", generated);
+        return out;
     }
 
-    /** 编辑模板:仅创建人本人或可管理账本者;改动周期锚点后从新锚点续算(已生成日保留) */
-    public void update(Long id, Long familyId, Long userId, boolean canManage, BookRecurringDTO dto) {
+    /**
+     * 编辑模板:仅创建人本人或可管理账本者;改动周期锚点后从新锚点续算(已生成日保留)。
+     * 从未生成过任何期次的模板(旧版本遗留 / 起始日在未来)在保存时补齐历史,回到正常节奏。
+     *
+     * @return 本次补记的流水笔数(通常 0)
+     */
+    public int update(Long id, Long familyId, Long userId, boolean canManage, BookRecurringDTO dto) {
         BookRecurring r = require(id, familyId);
         if (!r.getCreatedBy().equals(userId) && !canManage) {
             throw new BizException(ResultCode.FORBIDDEN);
@@ -118,6 +136,11 @@ public class BookRecurringService {
                 .eq(BookRecurring::getId, id)
                 .set(BookRecurring::getEndDate, r.getEndDate())
                 .set(BookRecurring::getAccountId, r.getAccountId()));
+        // 只有「从未生成过」才回补:已生成中的模板改金额只影响后续期次,不拿新金额重写历史
+        if (r.getEnabled() != null && r.getEnabled() == 1 && r.getLastGeneratedDate() == null) {
+            return generateOne(r, LocalDate.now(), BookRecurringSchedule.FULL_HISTORY);
+        }
+        return 0;
     }
 
     /** 暂停 / 恢复:恢复时不补暂停期间的期次(已生成日推到昨天,今天起继续) */
@@ -149,7 +172,10 @@ public class BookRecurringService {
         recurringMapper.deleteById(id);
     }
 
-    /** 手动为单个家庭补生成一次(与定时任务同一实现,幂等),返回本次新增条数 */
+    /**
+     * 手动为单个家庭补生成一次(与定时任务同一实现,幂等),返回本次新增条数。
+     * 用户主动触发,按模板起始日补齐全部历史期次,不套定时任务的 90 天窗口。
+     */
     public int generateForFamily(Long familyId) {
         List<BookRecurring> rows = recurringMapper.selectList(new LambdaQueryWrapper<BookRecurring>()
                 .eq(BookRecurring::getFamilyId, familyId)
@@ -157,7 +183,7 @@ public class BookRecurringService {
         LocalDate today = LocalDate.now();
         int total = 0;
         for (BookRecurring r : rows) {
-            total += generateOne(r, today);
+            total += generateOne(r, today, BookRecurringSchedule.FULL_HISTORY);
         }
         return total;
     }
@@ -171,7 +197,8 @@ public class BookRecurringService {
         int total = 0;
         for (BookRecurring r : rows) {
             try {
-                total += generateOne(r, today);
+                // 定时补跑只补最近 90 天:停机太久不把陈年旧账一次性灌进来
+                total += generateOne(r, today, BookRecurringSchedule.MAX_BACKFILL_DAYS);
             } catch (Exception e) {
                 log.error("周期账目生成失败, id={}", r.getId(), e);
             }
@@ -186,9 +213,9 @@ public class BookRecurringService {
      *
      * 条件更新命中 0 行说明已被另一次执行抢走(或已暂停/删除),直接跳过。
      */
-    private int generateOne(BookRecurring r, LocalDate today) {
+    private int generateOne(BookRecurring r, LocalDate today, int backfillDays) {
         BookRecurringSchedule.Occurrences occ = BookRecurringSchedule.due(
-                r.getPeriod(), r.getStartDate(), r.getEndDate(), r.getLastGeneratedDate(), today);
+                r.getPeriod(), r.getStartDate(), r.getEndDate(), r.getLastGeneratedDate(), today, backfillDays);
         if (occ.isEmpty()) return 0;
 
         Integer generated = txOps.execute(status -> claimAndInsert(r, occ));

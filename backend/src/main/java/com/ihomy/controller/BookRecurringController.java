@@ -3,7 +3,6 @@ package com.ihomy.controller;
 import com.ihomy.annotation.OperationLog;
 import com.ihomy.common.Result;
 import com.ihomy.dto.BookRecurringDTO;
-import com.ihomy.entity.BookRecurring;
 import com.ihomy.security.LoginUser;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.BookPermissionService;
@@ -43,23 +42,23 @@ public class BookRecurringController {
         return Result.success(recurringService.list(user.getFamilyId()));
     }
 
-    @Operation(summary = "新增周期模板")
+    @Operation(summary = "新增周期模板(保存后按起始日补齐历史期次)")
     @OperationLog(module = "BOOK", operationType = "CREATE", description = "新增周期账目")
     @PostMapping
-    public Result<BookRecurring> create(@Valid @RequestBody BookRecurringDTO dto) {
+    public Result<Map<String, Object>> create(@Valid @RequestBody BookRecurringDTO dto) {
         LoginUser user = current();
         bookPermissionService.requireWrite(user);
         return Result.success(recurringService.create(user.getUserId(), user.getFamilyId(), dto));
     }
 
-    @Operation(summary = "修改周期模板(本人或可管理账本者)")
+    @Operation(summary = "修改周期模板(本人或可管理账本者;从未生成过的模板保存时补齐历史)")
     @OperationLog(module = "BOOK", operationType = "UPDATE", description = "修改周期账目")
     @PutMapping("/{id}")
-    public Result<Void> update(@PathVariable Long id, @Valid @RequestBody BookRecurringDTO dto) {
+    public Result<Integer> update(@PathVariable Long id, @Valid @RequestBody BookRecurringDTO dto) {
         LoginUser user = current();
         String level = bookPermissionService.requireWrite(user);
-        recurringService.update(id, user.getFamilyId(), user.getUserId(), bookPermissionService.canManage(level), dto);
-        return Result.success();
+        return Result.success(recurringService.update(id, user.getFamilyId(), user.getUserId(),
+                bookPermissionService.canManage(level), dto));
     }
 
     @Operation(summary = "暂停或恢复周期模板(本人或可管理账本者)")

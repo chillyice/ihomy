@@ -1589,8 +1589,9 @@ export default {
       endBeforeStart: '结束日期不能早于起始日期',
       run: '立即生成',
       runDone: '本次新增 {n} 条流水',
+      createdWithHistory: '已保存，并按起始日补记 {n} 笔历史账目',
       deleteMessage: '确定删除「{category}」的周期模板吗？已生成的流水会保留。',
-      note: '到点自动生成一笔普通流水；生成的流水可以像手记的一样修改或删除。',
+      note: '保存后会按起始日期把已到期的期次补齐；之后到点自动生成普通流水，生成的流水可以像手记的一样修改或删除。',
     },
     import: {
       entry: '导入 CSV',

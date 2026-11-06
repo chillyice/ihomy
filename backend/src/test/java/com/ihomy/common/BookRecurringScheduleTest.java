@@ -3,6 +3,7 @@ package com.ihomy.common;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -82,6 +83,18 @@ class BookRecurringScheduleTest {
         assertThat(occ.dates().get(0)).isEqualTo(TODAY.minusDays(BookRecurringSchedule.MAX_BACKFILL_DAYS - 1L));
         assertThat(occ.dates().get(occ.dates().size() - 1)).isEqualTo(TODAY);
         // 已生成日推进到今天,避免下次又落回同一段历史
+        assertThat(occ.lastGeneratedDate()).isEqualTo(TODAY);
+    }
+
+    @Test
+    void userTriggeredBackfillIgnoresThe90DayWindow() {
+        // 用户主动建模板/立即生成:从起始日补齐,不受定时补跑的 90 天窗口限制
+        LocalDate start = LocalDate.of(2025, 1, 1);
+        BookRecurringSchedule.Occurrences occ = BookRecurringSchedule.due(
+                BookRecurringSchedule.PERIOD_DAILY, start, null, null, TODAY, BookRecurringSchedule.FULL_HISTORY);
+
+        assertThat(occ.dates()).hasSize((int) (ChronoUnit.DAYS.between(start, TODAY) + 1));
+        assertThat(occ.dates().get(0)).isEqualTo(start);
         assertThat(occ.lastGeneratedDate()).isEqualTo(TODAY);
     }
 

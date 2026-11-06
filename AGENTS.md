@@ -76,7 +76,7 @@ ihomy:家庭内部内容共享平台(PC / 安卓 / iOS,均 PWA),功能域见 需
 - **新增 `@RequirePermission` 接口前**:auth_code 必须进 `sys_auth` + `sys_role_auth` 种子(OWNER 豁免、MEMBER 显式授权);注解**只写方法上**,类级不生效(踩坑速查 §2.14)。
 - **索引规范(强制)**:列表查询的 WHERE+ORDER BY 必须落在同一复合索引内,等值字段在前、范围/排序在后,`deleted` 进索引;混向排序给索引列加 `DESC`;新增表/接口先 `EXPLAIN`;`ORDER BY RAND()` 只用于小数据集(≤1000 行,加 `ponytail:` 注释)。已踩坑清单与「不建议改」见 踩坑速查 §8。
 - **引用开源依赖必须登记** `sys_oss_component`;升级两条通道(台账「升级方案」手工步骤 / 可选自动开 PR),**可升级判定必须 latest 严格高于 current**,预发布一律过滤,Maven 最新版只认 repo1 的 `maven-metadata.xml`,MySQL 服务与 Connector/J 只跟 8.4 LTS。细则见 需求 §4.6.10、踩坑速查 §7.14/§7.16。
-- **记账余额不落库**:`balance = 期初 + 收入 − 支出 − 转出 + 转入`,前后端同一口径(`utils/bookLedger.js` 可复算对账);账户列可空=历史未归属,只提示不迁移;预算只存额度,净资产 = 账户资金 + 理财持仓本金 − 贷款剩余本金(`utils/loan.js` 唯一计算源)。**周期账目与 CSV 导入都落普通 `family_book_record`**,日期推算唯一来源 `common/BookRecurringSchedule`(短月取月末、2/29 平年取 2/28、补跑≤90 天),`last_generated_date` 条件更新抢占 + 同事务插入保证幂等。口径见 需求 §4.5.5,机制见 踩坑速查 §8.5/§8.6。
+- **记账余额不落库**:`balance = 期初 + 收入 − 支出 − 转出 + 转入`,前后端同一口径(`utils/bookLedger.js` 可复算对账);账户列可空=历史未归属,只提示不迁移;预算只存额度,净资产 = 账户资金 + 理财持仓本金 − 贷款剩余本金(`utils/loan.js` 唯一计算源)。**周期账目与 CSV 导入都落普通 `family_book_record`**,日期推算唯一来源 `common/BookRecurringSchedule`(短月取月末、2/29 平年取 2/28;新建/立即生成按起始日补齐历史,定时补跑≤90 天),`last_generated_date` 条件更新抢占 + 同事务插入保证幂等。口径见 需求 §4.5.5,机制见 踩坑速查 §8.5/§8.6。
 
 ## 代码结构
 
@@ -177,9 +177,9 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 ## 验证基线
 
-- 后端全绿:`.\mvnw.cmd -B clean package`(319 tests,纯逻辑不起 Spring)。
+- 后端全绿:`.\mvnw.cmd -B clean package`(323 tests,纯逻辑不起 Spring)。
 - 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(815 passed)+ `npm run format:check`(全树仍有历史遗留未格式化文件,口径见 踩坑速查 §1.13;**本次改动的文件必须 `prettier --write` 后通过**)。
-- 构建:首屏初始 JS 基线 **1466.33KB / gzip 500.75KB**(42 chunk,英文包 `en` 为懒加载 chunk);体积口径以 vite 构建输出为准,历史数字见 变更归档。
+- 构建:首屏初始 JS 基线 **1466.46KB / gzip 500.81KB**(42 chunk,英文包 `en` 为懒加载 chunk);体积口径以 vite 构建输出为准,历史数字见 变更归档。
 - 一致性:`bash scripts/doc-drift-check.sh` 全 [OK];`gen-code-map.sh --check`、`doc-index.sh --check` 无漂移。
 - 接口测试在仓库外 `..\autotest_framework`(`pytest -m api`,37 passed)。
 

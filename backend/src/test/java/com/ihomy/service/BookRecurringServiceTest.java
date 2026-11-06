@@ -120,6 +120,59 @@ class BookRecurringServiceTest {
     }
 
     @Test
+    void createBackfillsHistoryFromStartDate() {
+        // 起始日两个月前 → 保存时就应生成 3 笔(而不是等次日的定时任务)
+        BookRecurringDTO dto = new BookRecurringDTO();
+        dto.setType(DictConst.BOOK_EXPENSE);
+        dto.setAmount(new BigDecimal("3000"));
+        dto.setCategory("家居");
+        dto.setRemark("房租");
+        dto.setPeriod("MONTHLY");
+        dto.setStartDate(LocalDate.now().minusMonths(2));
+        when(recurringMapper.update(isNull(), any())).thenReturn(1);
+
+        var created = service.create(USER, FAMILY, dto);
+
+        assertThat(created.get("generated")).isEqualTo(3);
+        verify(bookMapper, times(3)).insert(any(BookRecord.class));
+    }
+
+    @Test
+    void manualRunBackfillsFullHistoryNotJust90Days() {
+        // 立即生成本来是用户主动补账:5 个月前的月度模板应补 6 笔,不再被 90 天窗口截成 3 笔
+        BookRecurring row = dailyTemplate();
+        row.setPeriod("MONTHLY");
+        row.setStartDate(LocalDate.now().minusMonths(5));
+        when(recurringMapper.selectList(any(Wrapper.class))).thenReturn(List.of(row));
+        when(recurringMapper.update(isNull(), any())).thenReturn(1);
+
+        int generated = service.generateForFamily(FAMILY);
+
+        assertThat(generated).isEqualTo(6);
+        verify(bookMapper, times(6)).insert(any(BookRecord.class));
+    }
+
+    @Test
+    void editingNeverGeneratedTemplateBackfillsHistory() {
+        // 旧模板从未生成过(lastGeneratedDate 为空):编辑保存时补历史;已生成过的模板只影响后续
+        BookRecurring row = dailyTemplate();
+        row.setPeriod("MONTHLY");
+        row.setStartDate(LocalDate.now().minusMonths(2));
+        when(recurringMapper.selectById(11L)).thenReturn(row);
+        when(recurringMapper.update(isNull(), any())).thenReturn(1);
+
+        BookRecurringDTO dto = new BookRecurringDTO();
+        dto.setAmount(new BigDecimal("3200"));
+        int generated = service.update(11L, FAMILY, USER, true, dto);
+
+        assertThat(generated).isEqualTo(3);
+        verify(bookMapper, times(3)).insert(any(BookRecord.class));
+
+        row.setLastGeneratedDate(LocalDate.now().minusMonths(1));
+        assertThat(service.update(11L, FAMILY, USER, true, dto)).isZero();
+    }
+
+    @Test
     void pausedTemplateIsNotScanned() {
         // selectList 已按 enabled=1 过滤;返回空表示无启用模板
         when(recurringMapper.selectList(any(Wrapper.class))).thenReturn(List.of());
