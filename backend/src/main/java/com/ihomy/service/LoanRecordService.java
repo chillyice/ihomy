@@ -131,6 +131,7 @@ public class LoanRecordService {
         loan.setFamilyId(familyId);
         loan.setCreatedBy(userId);
         applyForm(loan, dto);
+        foldInitialAccountChange(familyId, loan, dto);
         familyLoanMapper.insert(loan);
         insertEvents(loan.getId(), familyId, dto);
         return loan.getId();
@@ -141,6 +142,7 @@ public class LoanRecordService {
     public void update(Long id, Long familyId, FamilyLoanDTO dto) {
         FamilyLoan loan = require(id, familyId);
         applyForm(loan, dto);
+        foldInitialAccountChange(familyId, loan, dto);
         // 只 SET 业务字段,避免 updateById 回写旧 updated_at 抑制 ON UPDATE CURRENT_TIMESTAMP
         LambdaUpdateWrapper<FamilyLoan> uw = new LambdaUpdateWrapper<FamilyLoan>()
                 .eq(FamilyLoan::getId, id)
@@ -354,6 +356,32 @@ public class LoanRecordService {
         loan.setAccountId(dto.getAccountId());
         loan.setGroupName(blankToNull(dto.getGroupName()));
         loan.setNote(blankToNull(dto.getNote()));
+    }
+
+    /**
+     * 没有初始还款账户时,「第 1 期还款之后换账户」实际就是首次绑定:第 1 期还款前根本还没有账户,
+     * 不存在「第 1 期后」这个变更点。用户按「绑定账户的日期」填事件时最常落到第 1 期(日期早于
+     * 首期还款日会被推成第 1 期),若原样保存,第 1 期会因为「该期无账户」永远不自动记账。
+     * 因此把这**一条**事件并成初始账户(第 1 期起生效)并去掉它;已有初始账户时不动 —— 那才是
+     * 真正的「第 1 期还款之后换账户」(第 2 期起改扣新账户)。
+     */
+    private void foldInitialAccountChange(Long familyId, FamilyLoan loan, FamilyLoanDTO dto) {
+        if (loan.getAccountId() != null || dto.getEvents() == null || dto.getEvents().isEmpty()) return;
+        List<FamilyLoanDTO.EventDTO> kept = new ArrayList<>();
+        boolean folded = false;
+        for (FamilyLoanDTO.EventDTO e : dto.getEvents()) {
+            if (e == null) continue;
+            boolean accountChange = e.getType() != null && "ACCOUNT_CHANGE".equalsIgnoreCase(e.getType().trim());
+            if (!folded && accountChange && e.getAccountId() != null
+                    && e.getEffectivePeriod() != null && e.getEffectivePeriod() == 1) {
+                requireAccounts(familyId, List.of(e.getAccountId()));
+                loan.setAccountId(e.getAccountId());
+                folded = true;
+                continue;
+            }
+            kept.add(e);
+        }
+        if (folded) dto.setEvents(kept);
     }
 
     /** 事件时间轴整体写入(调用前已物理清空) */

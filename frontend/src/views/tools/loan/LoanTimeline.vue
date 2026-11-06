@@ -5,7 +5,9 @@
       <div v-if="canManage && !view.isGroup" class="lc-head-actions">
         <el-button size="small" @click="emit('add-rate')">{{ $t('tools.loan.rec.addRateChange') }}</el-button>
         <el-button size="small" @click="emit('add-prepay')">{{ $t('tools.loan.rec.addPrepay') }}</el-button>
-        <el-button v-if="hasAccounts" size="small" @click="emit('add-account')">{{ $t('tools.loan.rec.accountChangeEntry') }}</el-button>
+        <el-button v-if="hasAccounts" size="small" @click="emit('add-account')">{{
+          view.accountId ? $t('tools.loan.rec.accountChangeEntry') : $t('tools.loan.rec.accountBindEntry')
+        }}</el-button>
       </div>
     </div>
     <div v-if="view.events.length" class="lr-timeline">

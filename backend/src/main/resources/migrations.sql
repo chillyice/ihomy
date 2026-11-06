@@ -3087,3 +3087,25 @@ CREATE TABLE IF NOT EXISTS `family_loan_repay` (
 
 INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
 ('loan_event_type', 'ACCOUNT_CHANGE', '还款账户变更');
+
+-- ------------------------------------------------------------
+-- V11.46 贷款首次绑定还款账户(2026-11-06)
+--   未绑定初始账户时,「第 1 期还款之后换账户」实际是首次绑定:并成初始账户(第 1 期起生效),
+--   否则第 1 期永远没有账户、不会自动记账(用户按「绑定账户的日期」填事件时最容易踩)。
+--   已有初始账户时不动 —— 那才是真正的换账户(第 N+1 期起)。
+--   重复执行安全:UPDATE 带 account_id IS NULL 守卫;DELETE 只删与新初始账户同额、无备注的冗余事件。
+-- ------------------------------------------------------------
+UPDATE `family_loan` l
+  JOIN `family_loan_event` e ON e.`loan_id` = l.`id`
+   SET l.`account_id` = e.`account_id`
+ WHERE l.`account_id` IS NULL
+   AND e.`type` = 'ACCOUNT_CHANGE'
+   AND e.`effective_period` = 1
+   AND e.`account_id` IS NOT NULL;
+
+DELETE e FROM `family_loan_event` e
+  JOIN `family_loan` l ON l.`id` = e.`loan_id`
+ WHERE e.`type` = 'ACCOUNT_CHANGE'
+   AND e.`effective_period` = 1
+   AND e.`note` IS NULL
+   AND e.`account_id` = l.`account_id`;

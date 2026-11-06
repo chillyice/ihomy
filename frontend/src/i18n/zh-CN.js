@@ -4071,6 +4071,10 @@ export default {
         accountLabel: '还款账户',
         accountNone: '不绑定账户（不自动记账）',
         accountBindHint: '绑定后，已到期期次会自动补记成该账户的支出；中途换账户请在下方事件时间轴点「换账户」',
+        accountBindEntry: '绑定还款账户',
+        accountBindTitle: '绑定还款账户',
+        accountBindInitialHint:
+          '这笔贷款还没有还款账户：生效期次填 1 表示从第 1 期起生效（保存后即成为初始还款账户）；填更高期次表示第 N 期还款后再改扣新账户。',
         accountChangeEntry: '换账户',
         accountChangeLine: '还款账户改为 {name}',
         accountChangeOffLine: '从此不再自动记账',

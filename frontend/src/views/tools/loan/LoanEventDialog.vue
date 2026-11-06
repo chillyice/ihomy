@@ -31,13 +31,15 @@
       >
       <el-input-number v-model="eventDlg.rate" :min="0" :max="36" :step="0.05" :precision="4" :controls="false" style="width: 100%" />
     </div>
-    <!-- 换还款账户:留空 = 从此不再自动记账(已记的流水不回改) -->
+    <!-- 换还款账户:留空 = 从此不再自动记账(换账户后既有账目会跟着迁到新账户) -->
     <div v-else-if="eventDlg.type === LOAN_EVENT.ACCOUNT_CHANGE" class="lc-field">
       <label>{{ $t('tools.loan.rec.accountLabel') }}</label>
       <el-select v-model="eventDlg.accountId" clearable style="width: 100%" :placeholder="$t('tools.loan.rec.accountUnbound')">
         <el-option v-for="a in accounts" :key="a.id" :value="a.id" :label="a.name" />
       </el-select>
-      <span class="lc-hint">{{ $t('tools.loan.rec.accountChangeHint') }}</span>
+      <span class="lc-hint">{{
+        bindingInitial ? $t('tools.loan.rec.accountBindInitialHint') : $t('tools.loan.rec.accountChangeHint')
+      }}</span>
     </div>
     <template v-else>
       <div class="lc-field">
@@ -100,6 +102,7 @@ const eventDlg = reactive({
 
 /** 三种事件的标题(沿用原按钮文案,编辑/新建一致) */
 const dialogTitle = computed(() => {
+  if (bindingInitial.value) return t('tools.loan.rec.accountBindTitle')
   if (eventDlg.type === LOAN_EVENT.ACCOUNT_CHANGE) return t('tools.loan.rec.accountChangeEntry')
   return eventDlg.type === LOAN_EVENT.RATE_CHANGE ? t('tools.loan.rec.addRateChange') : t('tools.loan.rec.addPrepay')
 })
@@ -111,6 +114,11 @@ const periodHint = computed(() =>
 
 /** 事件作用的目标贷款(组视图下事件归属它所属的那笔) */
 const targetView = ref(null)
+
+/** 没绑定初始账户时的「换账户」其实是首次绑定:文案与说明改成「绑定还款账户」 */
+const bindingInitial = computed(
+  () => eventDlg.type === LOAN_EVENT.ACCOUNT_CHANGE && !!targetView.value && !targetView.value.accountId && !eventDlg.editingId,
+)
 
 const eventDlgMax = computed(() => (targetView.value ? Number(targetView.value.months) : 1200))
 const eventTarget = () => targetView.value
@@ -186,7 +194,7 @@ const onSaveEvent = async () => {
     rate: eventDlg.type === LOAN_EVENT.RATE_CHANGE ? Number(eventDlg.rate) : null,
     amount: eventDlg.type === LOAN_EVENT.PREPAY ? Number(eventDlg.amount) : null,
     strategy: eventDlg.type === LOAN_EVENT.PREPAY ? eventDlg.strategy : null,
-    // 换账户留空 = 从此不再自动记账(已记的流水不回改)
+    // 换账户留空 = 从此不再自动记账(换账户后既有账目由 /repay/sync 迁到新账户)
     accountId: eventDlg.type === LOAN_EVENT.ACCOUNT_CHANGE ? (eventDlg.accountId ?? null) : null,
     note: eventDlg.note || null,
   }

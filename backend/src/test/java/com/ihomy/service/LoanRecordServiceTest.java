@@ -20,6 +20,7 @@ import com.ihomy.mapper.SysUserMapper;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -104,6 +105,37 @@ class LoanRecordServiceTest {
         assertThatThrownBy(() -> service.create(1L, 1L, dto("4.9", rateChange("100"))))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("99.9999");
+    }
+
+    /* ==================== 首次绑定还款账户 ==================== */
+
+    private FamilyLoanDTO.EventDTO accountChange(int period, Long accountId) {
+        FamilyLoanDTO.EventDTO e = new FamilyLoanDTO.EventDTO();
+        e.setType("ACCOUNT_CHANGE");
+        e.setEffectivePeriod(period);
+        e.setAccountId(accountId);
+        return e;
+    }
+
+    @Test
+    void accountChangeAtFirstPeriodBecomesInitialAccount() {
+        // 未绑定初始账户时,「第 1 期后换账户」实际是首次绑定:并成初始账户,第 1 期才扣得到
+        when(accountMapper.selectBatchIds(any())).thenReturn(List.of(accountOf(7L)));
+        service.create(1L, 1L, dto("4.9", accountChange(1, 7L)));
+
+        ArgumentCaptor<FamilyLoan> captor = ArgumentCaptor.forClass(FamilyLoan.class);
+        verify(loanMapper).insert(captor.capture());
+        assertThat(captor.getValue().getAccountId()).isEqualTo(7L);
+        verify(eventMapper, never()).insert(any(FamilyLoanEvent.class));
+    }
+
+    @Test
+    void accountChangeAfterFirstPeriodStaysAnEvent() {
+        // 已有初始账户时的第 1 期后换账户 / 更高期次换账户:仍是普通事件(第 N+1 期起)
+        when(accountMapper.selectBatchIds(any())).thenReturn(List.of(accountOf(7L)));
+        service.create(1L, 1L, dto("4.9", accountChange(12, 7L)));
+
+        verify(eventMapper).insert(any(FamilyLoanEvent.class));
     }
 
     /* ==================== 还款记账同步 ==================== */

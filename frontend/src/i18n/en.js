@@ -4107,6 +4107,10 @@ export default {
         accountNone: 'No account (no automatic entries)',
         accountBindHint:
           'Once bound, due installments are added as expenses of this account; to switch mid-way, use “Switch account” on the event timeline below',
+        accountBindEntry: 'Bind repayment account',
+        accountBindTitle: 'Bind repayment account',
+        accountBindInitialHint:
+          'This loan has no repayment account yet: set the period to 1 to start from payment 1 (saved as the initial repayment account); a higher period switches to the new account after that payment.',
         accountChangeEntry: 'Switch account',
         accountChangeLine: 'Repayment account changed to {name}',
         accountChangeOffLine: 'Stop automatic entries from here',
