@@ -426,6 +426,8 @@ export const loanApi = {
   create: (data) => request.post('/loan', data),
   update: (id, data) => request.put(`/loan/${id}`, data),
   remove: (id) => request.delete(`/loan/${id}`),
+  // 已到期期次补记成记账本支出(按 (贷款, 期次) 幂等,重复调用不会重复记账)
+  syncRepay: (items) => request.post('/loan/repay/sync', { items }),
 }
 
 // 运维管理(仅 OPS 角色)

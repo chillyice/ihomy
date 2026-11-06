@@ -4034,7 +4034,7 @@ export default {
         firstDaysValue: '{n} days',
         timelineTitle: 'Events',
         timelineEmpty:
-          'No rate changes or prepayments yet — the schedule runs on the original terms; use the buttons above or drag an event onto the pipeline',
+          'No rate changes, prepayments or account switches yet — the schedule runs on the original terms; use the buttons above or drag an event onto the pipeline',
         rateChangeLine: 'Rate changed to {v}%',
         prepayLine: 'Prepaid {v} CNY',
         timelineAtLine: 'After payment {n}',
@@ -4102,6 +4102,19 @@ export default {
         formAmount: 'Principal',
         formYears: 'Term',
         formRate: 'Initial annual rate',
+        accountLabel: 'Repayment account',
+        accountNone: 'No account (no automatic entries)',
+        accountBindHint:
+          'Once bound, due installments are added as expenses of this account; to switch mid-way, use “Switch account” on the event timeline below',
+        accountChangeEntry: 'Switch account',
+        accountChangeLine: 'Repayment account changed to {name}',
+        accountChangeOffLine: 'Stop automatic entries from here',
+        accountChangeAt: 'After payment {n} (from payment {n1})',
+        accountChangeHint: 'Switching only affects installments that fall due later; entries already in the ledger are not rewritten',
+        accountEventHint:
+          'Takes effect after payment N: from payment N+1 the installment goes to the new account; leave the account empty to stop automatic entries',
+        bookedCount: '{n} installments booked',
+        accountUnbound: 'No account bound',
         formLoanDate: 'Drawn on (optional)',
         formFirstPayDate: 'First payment date (optional)',
         formFirstPayment: 'First payment',
@@ -5155,7 +5168,7 @@ export default {
     vault_category: { SITE: 'Website', APP: 'App', BANK: 'Bank card', SOCIAL: 'Social', DEVICE: 'Device', WIFI: 'Wi-Fi', OTHER: 'Other' },
     loan_channel: { COMMERCIAL: 'Commercial', FUND: 'Housing fund', OTHER: 'Other' },
     loan_method: { EQUAL_INSTALLMENT: 'Equal installment', EQUAL_PRINCIPAL: 'Equal principal' },
-    loan_event_type: { RATE_CHANGE: 'Rate change', PREPAY: 'Prepayment' },
+    loan_event_type: { RATE_CHANGE: 'Rate change', PREPAY: 'Prepayment', ACCOUNT_CHANGE: 'Account change' },
     loan_prepay_strategy: { SHORTEN: 'Shorten term', REDUCE: 'Reduce payment' },
     media_server_type: { JELLYFIN: 'Jellyfin', EMBY: 'Emby' },
     game_category: {

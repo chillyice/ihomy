@@ -24,7 +24,7 @@
     <!-- 家长把账本对该成员设为「不可见」时,整页只给提示,不发注定 403 的请求 -->
     <el-empty v-if="userStore.isLoggedIn && !userStore.canReadBook" :description="$t('book.perm.noAccess')" />
 
-    <template v-else>
+    <template v-else-if="ready">
       <!-- 记账本页签:明细/统计/账户都在 BookDaily 里,月份走 v-model 双向同步 -->
       <BookDaily v-if="tab === 'book'" v-model:month="month" />
 
@@ -49,6 +49,7 @@ import { useRoute } from 'vue-router'
 
 import { bookApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { syncLoanRepaysFromServer } from '@/composables/useLoanRepays'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import BookDaily from '@/views/book/BookDaily.vue'
@@ -69,6 +70,8 @@ const tabFromQuery = () => (TABS.includes(route.query.tab) ? route.query.tab : '
 const tab = ref(tabFromQuery())
 const month = ref(new Date().toISOString().slice(0, 7))
 const permVisible = ref(false)
+// 先补记贷款月供、取最新档位,再让各页签取数:首屏的余额/收入支出就包含到期月供
+const ready = ref(false)
 
 // 同一路由内换 query(例如首页卡片再点一次)也要跟着切
 watch(
@@ -91,7 +94,19 @@ const syncLevel = async () => {
   if (data?.level) userStore.setBookLevel(data.level)
 }
 
-onMounted(syncLevel)
+// 贷款绑定还款账户后,已到期月供由前端按流水补记(后端幂等);只读档位不写
+const syncDueRepays = async () => {
+  if (!userStore.isLoggedIn || !userStore.canWriteBook) return
+  await syncLoanRepaysFromServer().catch(() => 0)
+}
+
+const boot = async () => {
+  await syncLevel()
+  await syncDueRepays()
+  ready.value = true
+}
+
+onMounted(boot)
 // 切换家庭后档位随家庭变化,重新取一次
 watch(
   () => userStore.userInfo?.familyId,

@@ -46,6 +46,9 @@ public class FamilyLoanEvent {
     /** 提前还款处理: SHORTEN 缩短年限(月供不变) / REDUCE 减少月供(期限不变) */
     private String strategy;
 
+    /** 变更后的还款账户ID(ACCOUNT_CHANGE 时有效;空 = 从该期起停止自动记账) */
+    private Long accountId;
+
     /** 备注 */
     private String note;
 

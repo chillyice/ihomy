@@ -57,10 +57,11 @@ export const LOAN_CHANNEL = {
   OTHER: 'OTHER',
 }
 
-/** 贷款流水的事件类型:利率调整 / 提前还款(提前结清 = 金额≥剩余本金的提前还款) */
+/** 贷款流水的事件类型:利率调整 / 提前还款(提前结清 = 金额≥剩余本金的提前还款) / 换还款账户 */
 export const LOAN_EVENT = {
   RATE_CHANGE: 'RATE_CHANGE',
   PREPAY: 'PREPAY',
+  ACCOUNT_CHANGE: 'ACCOUNT_CHANGE',
 }
 
 /** 首期计息天数:未填或非法时按整月 30 天 */
@@ -777,7 +778,7 @@ function periodsToPayoffC(balanceC, ratePct, stepC, method) {
   return n
 }
 
-/** 事件归一 + 校验:按生效期次排序(同期先利率调整、后提前还款),错误返回错误码 */
+/** 事件归一 + 校验:按生效期次排序(同期先利率调整、再换账户、后提前还款),错误返回错误码 */
 function normalizeLedgerEvents(events, months) {
   const list = []
   for (const raw of Array.isArray(events) ? events : []) {
@@ -798,14 +799,45 @@ function normalizeLedgerEvents(events, months) {
         amountC,
         strategy: raw.strategy === PREPAY_STRATEGY.REDUCE ? PREPAY_STRATEGY.REDUCE : PREPAY_STRATEGY.SHORTEN,
       })
+    } else if (type === LOAN_EVENT.ACCOUNT_CHANGE) {
+      // 换账户不参与计息:只带账户ID(空 = 从该期起不再自动记账)
+      const accountId = raw.accountId == null || raw.accountId === '' ? null : Number(raw.accountId)
+      if (accountId != null && !Number.isFinite(accountId)) return { error: 'BAD_EVENT_VALUE' }
+      list.push({ type, period, accountId })
     } else {
       return { error: 'BAD_EVENT_VALUE' }
     }
   }
-  // 同一期两者都有时:利率先生效(第 N+1 期起),提前还款再按新利率推算结清期次
+  // 同一期多个事件时:利率先生效(第 N+1 期起),换账户随后,提前还款再按新利率推算结清期次
   // 比较器必须自洽(同型事件返回 0):V8 排序对「a<b 且 b<a」的输入顺序未定义,后端已按 (期次,id) 定序,这里靠稳定排序原样保留
-  list.sort((a, b) => a.period - b.period || (a.type === LOAN_EVENT.RATE_CHANGE ? 0 : 1) - (b.type === LOAN_EVENT.RATE_CHANGE ? 0 : 1))
+  const rank = (type) => (type === LOAN_EVENT.RATE_CHANGE ? 0 : type === LOAN_EVENT.ACCOUNT_CHANGE ? 1 : 2)
+  list.sort((a, b) => a.period - b.period || rank(a.type) - rank(b.type))
   return { events: list, error: '' }
+}
+
+/**
+ * 第 N 期由哪个账户扣款(还款账户时间轴,纯函数)。
+ * 初始账户(loan.accountId)从第 1 期起生效;ACCOUNT_CHANGE 事件与其他事件同一口径
+ * 「第 P 期还款之后生效」,即第 P+1 期起改用新账户。返回 null = 该期不自动记账。
+ */
+export function loanAccountOfPeriod(loan, period) {
+  const n = Math.round(Number(period) || 0)
+  if (n < 1) return null
+  let accountId = loan && loan.accountId != null && loan.accountId !== '' ? Number(loan.accountId) : null
+  if (accountId != null && !Number.isFinite(accountId)) accountId = null
+  const changes = ((loan && loan.events) || [])
+    .filter((e) => e && e.type === LOAN_EVENT.ACCOUNT_CHANGE)
+    .map((e) => ({
+      period: Math.round(Number(e.effectivePeriod) || 0),
+      accountId: e.accountId == null || e.accountId === '' ? null : Number(e.accountId),
+    }))
+    .filter((e) => e.period >= 1)
+    .sort((a, b) => a.period - b.period)
+  for (const c of changes) {
+    if (c.period >= n) break
+    accountId = Number.isFinite(c.accountId) ? c.accountId : null
+  }
+  return accountId
 }
 
 /** 流水(分)→ 与 calculateLoan 同构的计划汇总(元),便于反推页复用同一张明细表 */
@@ -992,10 +1024,12 @@ export function loanLedger(input) {
   }
 
   const run = (events) => runLedgerC({ amountC, months, method, rate0, firstDays, firstPaymentC, events })
-  const main = run(parsed.events)
+  // 换账户事件不影响计息(只决定哪一期记到哪个账户),从计息事件里剔除
+  const financial = parsed.events.filter((e) => e.type !== LOAN_EVENT.ACCOUNT_CHANGE)
+  const main = run(financial)
   if (!main.rows.length) return invalid('PAYMENT_TOO_LOW')
   // 基准对照:① 全程不调整、不提前还款 ② 只调利率、不提前还款
-  const rateOnly = run(parsed.events.filter((e) => e.type === LOAN_EVENT.RATE_CHANGE))
+  const rateOnly = run(financial.filter((e) => e.type === LOAN_EVENT.RATE_CHANGE))
   const base = run([])
 
   const rows = main.rows.map((r) => ({
@@ -1142,6 +1176,7 @@ export function loanEngineInput(loan) {
       rate: e.rate == null ? null : Number(e.rate),
       amount: e.amount == null ? null : Number(e.amount),
       strategy: e.strategy,
+      accountId: e.accountId == null ? null : Number(e.accountId),
     })),
   }
 }

@@ -1459,6 +1459,7 @@ INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
 ('loan_method', 'EQUAL_PRINCIPAL',   '等额本金'),
 ('loan_event_type', 'RATE_CHANGE', '利率调整'),
 ('loan_event_type', 'PREPAY',      '提前还款'),
+('loan_event_type', 'ACCOUNT_CHANGE', '还款账户变更'),
 ('loan_prepay_strategy', 'SHORTEN', '缩短年限（月供不变）'),
 ('loan_prepay_strategy', 'REDUCE',  '减少月供（期限不变）'),
 -- 放映厅媒体引擎字典(V9.106)
@@ -2211,6 +2212,8 @@ CREATE TABLE `family_vault_item` (
 -- 61. family_loan 家庭贷款记录(V9.101):登记真实贷款,还款流水由前端按事件时间轴重算
 --     金额单位为元;rate 为年利率百分数(3.1 = 3.1%)。组合贷按渠道拆成多条记录。
 --     loan_date/first_pay_date 填写后首期按实际天数计息;first_payment 可按账单覆盖首期还款额。
+--     V11.43 加 account_id:绑定还款账户后,每期到期还款额自动记到该账户(记账本支出),
+--     中途换账户走 family_loan_event 的 ACCOUNT_CHANGE 事件。
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `family_loan`;
 CREATE TABLE `family_loan` (
@@ -2225,6 +2228,7 @@ CREATE TABLE `family_loan` (
   `first_pay_date` DATE           DEFAULT NULL COMMENT '首期还款日(可空;期次换算真实年月与推算已还期数)',
   `first_payment`  DECIMAL(14, 2) DEFAULT NULL COMMENT '首期还款额(元,可空;空=按整月口径推算)',
   `rate`           DECIMAL(6, 4)  NOT NULL COMMENT '初始年利率(%)',
+  `account_id`     BIGINT         DEFAULT NULL COMMENT '还款账户ID(family_book_account.id;空=不自动记账)',
   `group_name`     VARCHAR(100)   DEFAULT NULL COMMENT '贷款组名称(选填;同组贷款合并展示合计,如商贷+公积金同填「组合贷」)',
   `note`           VARCHAR(500)   DEFAULT NULL COMMENT '备注',
   `created_by`     BIGINT         NOT NULL COMMENT '创建人ID',
@@ -2238,6 +2242,8 @@ CREATE TABLE `family_loan` (
 -- ------------------------------------------------------------
 -- 62. family_loan_event 贷款事件时间轴(V9.101):利率调整/提前还款,编辑时整体重写(物理删,无逻辑删列)
 --     事件在第 N 期还款之后生效:利率调整 → 第 N+1 期起按新利率;提前还款 → 第 N 期后减少剩余本金。
+--     V11.43 加 ACCOUNT_CHANGE(换还款账户)与 account_id:同样「第 N 期还款之后生效」,第 N+1 期起
+--     月供记到新账户;account_id 为空 = 从此不再自动记账。初始还款账户在 family_loan.account_id(第 1 期起)。
 --     子表不带 family_id(家庭隔离由主记录保证)。
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS `family_loan_event`;
@@ -2246,10 +2252,11 @@ CREATE TABLE `family_loan_event` (
   `loan_id`          BIGINT         NOT NULL COMMENT '所属贷款ID(family_loan.id)',
   `effective_period` INT            NOT NULL COMMENT '生效期次:在第N期还款之后生效',
   `trigger_date`     DATE           DEFAULT NULL COMMENT '事件触发日(选填;与生效期次互为表述,重新拖拽时据它确认日期)',
-  `type`             VARCHAR(20)    NOT NULL COMMENT '事件类型: RATE_CHANGE利率调整/PREPAY提前还款',
+  `type`             VARCHAR(20)    NOT NULL COMMENT '事件类型: RATE_CHANGE利率调整/PREPAY提前还款/ACCOUNT_CHANGE换还款账户',
   `rate`             DECIMAL(6, 4)  DEFAULT NULL COMMENT '调整后的年利率(%)(RATE_CHANGE时有效)',
   `amount`           DECIMAL(14, 2) DEFAULT NULL COMMENT '提前还款金额(元)(PREPAY时有效)',
   `strategy`         VARCHAR(20)    DEFAULT NULL COMMENT '提前还款处理: SHORTEN缩短年限/REDUCE减少月供',
+  `account_id`       BIGINT         DEFAULT NULL COMMENT '变更后的还款账户ID(ACCOUNT_CHANGE时有效;空=从此不自动记账)',
   `note`             VARCHAR(500)   DEFAULT NULL COMMENT '备注',
   `created_at`       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   PRIMARY KEY (`id`),
@@ -2774,3 +2781,29 @@ INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
 ('game_category', 'STRATEGY',   '策略'),
 ('game_category', 'ARCADE',     '街机'),
 ('game_category', 'OTHER',      '其他');
+
+-- ------------------------------------------------------------
+-- 74. family_loan_repay 贷款还款记账台账(V11.43 贷款绑定账户)
+--     一行 = 「某笔贷款的某一期已记进记账本的支出」,(loan_id, period) 唯一,用于幂等:
+--     前端按流水算出已到期期次后调 /loan/repay/sync,后端只补插缺的期次,重复调用不会再记账。
+--     amount/principal/interest 是记账当时的快照(贷款改参数或换账户都不回改历史);
+--     record_id 指向生成的 family_book_record,仅作追溯(用户删掉那条流水后该期仍算已记,不再自动生成)。
+--     不带 deleted 列:台账是系统凭证,只随贷款删除保留(不提供单独删除入口)。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_loan_repay`;
+CREATE TABLE `family_loan_repay` (
+  `id`         BIGINT         NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`  BIGINT         NOT NULL COMMENT '所属家庭ID',
+  `loan_id`    BIGINT         NOT NULL COMMENT '所属贷款ID(family_loan.id)',
+  `period`     INT            NOT NULL COMMENT '第 N 期(1 起,与流水期次一致)',
+  `due_date`   DATE           NOT NULL COMMENT '本期还款日(按期次从首期还款日递推)',
+  `amount`     DECIMAL(12, 2) NOT NULL COMMENT '本期还款额(元,记账当时快照)',
+  `principal`  DECIMAL(12, 2) DEFAULT NULL COMMENT '本期本金(元)',
+  `interest`   DECIMAL(12, 2) DEFAULT NULL COMMENT '本期利息(元)',
+  `account_id` BIGINT         NOT NULL COMMENT '扣款账户ID(family_book_account.id)',
+  `record_id`  BIGINT         DEFAULT NULL COMMENT '生成的记账流水ID(family_book_record.id;仅作追溯)',
+  `created_at` DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_loan_period` (`loan_id`, `period`),
+  KEY `idx_family_account` (`family_id`, `account_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='贷款还款记账台账(按期次幂等生成记账支出)';

@@ -56,19 +56,30 @@
         <span>{{ $t('tools.loan.rec.formFirstPayment') }}</span
         ><b>{{ money(view.firstPayment) }}</b>
       </div>
+      <div v-if="!view.isGroup">
+        <span>{{ $t('tools.loan.rec.accountLabel') }}</span
+        ><b>{{ view.accountName || $t('tools.loan.rec.accountUnbound') }}</b>
+      </div>
+      <div v-if="!view.isGroup && bookedCount > 0">
+        <span>{{ $t('tools.loan.rec.bookedCount', { n: bookedCount }) }}</span>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { formatYuan } from '@/utils/loan'
 
-defineProps({
+const props = defineProps({
   view: { type: Object, required: true },
   canManage: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['edit', 'delete'])
+
+/** 已自动记进记账本的期数(后端按期次幂等补记,这里只做展示) */
+const bookedCount = computed(() => (props.view.bookedPeriods || []).length)
 
 const money = (v, digits = 2) => formatYuan(v, digits)
 const rate = (v) => (Number(v) || 0).toFixed(4)

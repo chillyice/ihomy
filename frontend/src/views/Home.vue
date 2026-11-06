@@ -431,6 +431,7 @@ import { useI18n } from 'vue-i18n'
 import { publicApi, taskApi, pointsApi, planApi, bookApi, financeApi, loanApi, wishApi, itemApi, kitchenApi } from '@/api'
 import { useWeatherBg } from '@/composables/useWeatherBg'
 import { useDaily } from '@/composables/useDaily'
+import { syncLoanRepays } from '@/composables/useLoanRepays'
 import { buildAgenda } from '@/utils/agenda'
 import { gsap } from 'gsap'
 import { ElMessage } from 'element-plus'
@@ -559,6 +560,16 @@ const loadAssets = async () => {
   ])
   assetAccounts.value = Array.isArray(accounts) ? accounts : []
   assetLoans.value = Array.isArray(loans) ? loans : null
+  // 有贷款的成员打开首页时顺手补记到期月供(幂等;只读档位不写,失败不影响资产卡)
+  if (Array.isArray(loans) && loans.length && userStore.canWriteBook) {
+    const created = await syncLoanRepays(loans).catch(() => 0)
+    if (created > 0) {
+      // 账户余额与本月收支都变了:重取账户与摘要,资产卡/收支卡即刻反映月供
+      const [fresh] = await Promise.all([bookApi.accounts().catch(() => null)])
+      if (Array.isArray(fresh)) assetAccounts.value = fresh
+      loadBookSummary()
+    }
+  }
 }
 const wishes = ref([])
 const itemKeyword = ref('')

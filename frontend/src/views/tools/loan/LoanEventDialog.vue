@@ -1,10 +1,5 @@
 <template>
-  <el-dialog
-    v-model="eventDlg.visible"
-    :title="eventDlg.type === LOAN_EVENT.RATE_CHANGE ? $t('tools.loan.rec.addRateChange') : $t('tools.loan.rec.addPrepay')"
-    width="420px"
-    append-to-body
-  >
+  <el-dialog v-model="eventDlg.visible" :title="dialogTitle" width="420px" append-to-body>
     <div class="lc-field">
       <label>{{ $t('tools.loan.rec.triggerDateLabel') }}</label>
       <el-date-picker
@@ -28,13 +23,21 @@
         style="width: 100%"
         @change="onPeriodManualChange"
       />
-      <span class="lc-hint">{{ $t('tools.loan.rec.eventPeriodHint') }}</span>
+      <span class="lc-hint">{{ periodHint }}</span>
     </div>
     <div v-if="eventDlg.type === LOAN_EVENT.RATE_CHANGE" class="lc-field">
       <label
         >{{ $t('tools.loan.rec.newRateLabel') }}<span class="lc-unit">{{ $t('tools.loan.percentUnit') }}</span></label
       >
       <el-input-number v-model="eventDlg.rate" :min="0" :max="36" :step="0.05" :precision="4" :controls="false" style="width: 100%" />
+    </div>
+    <!-- 换还款账户:留空 = 从此不再自动记账(已记的流水不回改) -->
+    <div v-else-if="eventDlg.type === LOAN_EVENT.ACCOUNT_CHANGE" class="lc-field">
+      <label>{{ $t('tools.loan.rec.accountLabel') }}</label>
+      <el-select v-model="eventDlg.accountId" clearable style="width: 100%" :placeholder="$t('tools.loan.rec.accountUnbound')">
+        <el-option v-for="a in accounts" :key="a.id" :value="a.id" :label="a.name" />
+      </el-select>
+      <span class="lc-hint">{{ $t('tools.loan.rec.accountChangeHint') }}</span>
     </div>
     <template v-else>
       <div class="lc-field">
@@ -68,8 +71,13 @@ import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { loanApi } from '@/api'
-import { periodDate, periodsPaid, LOAN_EVENT } from '@/utils/loan'
+import { loanAccountOfPeriod, periodDate, periodsPaid, LOAN_EVENT } from '@/utils/loan'
 import { toNum, loanToPayload } from './loanShared'
+
+defineProps({
+  /** 可绑定的记账账户(无账本权限时为空数组,换账户入口自然没有可选账户) */
+  accounts: { type: Array, default: () => [] },
+})
 
 const emit = defineEmits(['saved'])
 
@@ -86,8 +94,20 @@ const eventDlg = reactive({
   rate: 3.1,
   amount: 100000,
   strategy: 'SHORTEN',
+  accountId: null,
   note: '',
 })
+
+/** 三种事件的标题(沿用原按钮文案,编辑/新建一致) */
+const dialogTitle = computed(() => {
+  if (eventDlg.type === LOAN_EVENT.ACCOUNT_CHANGE) return t('tools.loan.rec.accountChangeEntry')
+  return eventDlg.type === LOAN_EVENT.RATE_CHANGE ? t('tools.loan.rec.addRateChange') : t('tools.loan.rec.addPrepay')
+})
+
+/** 生效期次说明:换账户不参与计息,文案与利率/提前还款分开 */
+const periodHint = computed(() =>
+  eventDlg.type === LOAN_EVENT.ACCOUNT_CHANGE ? t('tools.loan.rec.accountEventHint') : t('tools.loan.rec.eventPeriodHint'),
+)
 
 /** 事件作用的目标贷款(组视图下事件归属它所属的那笔) */
 const targetView = ref(null)
@@ -122,6 +142,8 @@ const open = (type, ev, loanView, presetPeriod) => {
   eventDlg.rate = ev ? toNum(ev.rate) : toNum(target.rate)
   eventDlg.amount = ev ? toNum(ev.amount) : 100000
   eventDlg.strategy = ev ? ev.strategy || 'SHORTEN' : 'SHORTEN'
+  // 换账户:编辑回显自己选的账户;新建默认填「该期当前扣款账户」,用户只需改要换去的那个
+  eventDlg.accountId = type !== LOAN_EVENT.ACCOUNT_CHANGE ? null : ev ? (ev.accountId ?? null) : loanAccountOfPeriod(target, period)
   eventDlg.note = ev ? ev.note || '' : ''
   eventDlg.visible = true
 }
@@ -164,6 +186,8 @@ const onSaveEvent = async () => {
     rate: eventDlg.type === LOAN_EVENT.RATE_CHANGE ? Number(eventDlg.rate) : null,
     amount: eventDlg.type === LOAN_EVENT.PREPAY ? Number(eventDlg.amount) : null,
     strategy: eventDlg.type === LOAN_EVENT.PREPAY ? eventDlg.strategy : null,
+    // 换账户留空 = 从此不再自动记账(已记的流水不回改)
+    accountId: eventDlg.type === LOAN_EVENT.ACCOUNT_CHANGE ? (eventDlg.accountId ?? null) : null,
     note: eventDlg.note || null,
   }
   const events = (loan.events || [])

@@ -68,7 +68,7 @@ ihomy:家庭内部内容共享平台(PC / 安卓 / iOS,均 PWA),功能域见 需
 
 - **root 仅初始化**:`mysql -uroot -p < schema.sql`(建库/建表/建账号/种子),只执行一次;本地 `.\scripts\start-db.ps1`(Docker 首启自动导入)。**业务运行用 `ihomy` 账号**(仅 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`,无 DDL),建 `localhost` 与 `%` 两个 host。
 - 生产 MySQL `validate_password` MEDIUM:密码须含特殊字符(避开 `' " \ $ |`,建议 `!@%^&*-_+=.`),改密顺序见 踩坑速查 §2.7。
-- **90 张表**,前缀:`sys_` 27(系统/账号/权限/配置/存储)、`report_` 5(报表/日志)、`family_` 36(家庭事务)、`content_` 21(内容数据)、`game_` 1(games 域);完整清单见 需求 §6.2。游戏域顶层前缀 `game_`(格式 `game_<code>_<module>_<entity>`);`game_info` 遗留未带 `family_` 前缀,类型/分类/系列口径见 需求 §4.13。
+- **91 张表**,前缀:`sys_` 27(系统/账号/权限/配置/存储)、`report_` 5(报表/日志)、`family_` 37(家庭事务)、`content_` 21(内容数据)、`game_` 1(games 域);完整清单见 需求 §6.2。游戏域顶层前缀 `game_`(格式 `game_<code>_<module>_<entity>`);`game_info` 遗留未带 `family_` 前缀,类型/分类/系列口径见 需求 §4.13。
 - **结构变更双文件**:同时改 `schema.sql`(全量)与 `migrations.sql`(增量、**幂等**),并按 CI 同路径做空库全量导入实测(`migrations` 跑通 ≠ `schema.sql` 可用,踩坑速查 §7.4)。
 - **枚举不用数字**:状态/类型一律大写英文(`PUBLISHED/PUBLIC/ACTIVE...`),含义在 `sys_dict_item`,Java 常量在 `common/DictConst.java`,前端映射 `utils/dict.js`;**禁止写回 0/1/2 判断**。
 - `content_blog/diary/photo/video/wish/book` 的 `visibility` 为 `VARCHAR(20) DEFAULT 'FAMILY'`(PRIVATE/FAMILY/PUBLIC);`family_vault_item` 只有 PRIVATE/FAMILY 两档。清单见 需求 §6.4。
@@ -130,6 +130,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 - **小游戏与网页游戏**:进度写 `localStorage`(`ihomy:games:*`),结构校验/恢复判定在 `utils/games/*` 纯函数(带 spec),连连看棋盘与纸牌尺寸内核 `petlinkBoard.js`/`cardLayout.js`;根容器统一 `class="game-surface"` 触摸守卫,长按类操作(扫雷插旗)必须用 gesture 标记吞 click(踩坑速查 §3.57);**八个 H5 小游戏奖励统一 `POST /game/{code}/reward`**(Redis 每日 5 次);**纸牌两级入口** `/games/cards` → 牌桌 `/games/cards/klondike|spider`;**网页游戏(LINK)一律走站内 `/games/web/{id}` iframe**,站点账号已并入家庭保险箱(`game_site_account` 已删,跨域见 踩坑速查 §3.60)。键清单/玩法/全屏口径见 需求 §4.13.2、UI 提示词 §31,连连看坑见 踩坑速查 §3.58。
 - **提醒按日完成**:一次性用 `family_reminder.done`;循环按 (提醒, 日期) 落 `family_reminder_check`,取消即删行;`toggle-done?date=` 带日期按该日切换,删除连带清完成行。判定唯一来源 `RepeatSchedule.dueToday`(每年可选阳历/农历,闰月严格匹配),到点通知对循环看当日完成行(踩坑速查 §2.20)。
 - **记账本权限**:整本账本按成员档位(`family_book_permission`:NONE/READ/WRITE/MANAGE,**无行=WRITE**),OWNER 恒 MANAGE 且只有家长能改档;**不走 `@RequirePermission`**,Controller 用 `BookPermissionService.requireRead/requireWrite` 守门;`userInfo.bookLevel` → `userStore.canReadBook/canWriteBook/canManageBook`;档位不缓存。口径见 需求 §4.5.5。
+- **贷款月供自动记账**:贷款 `account_id` = 初始还款账户(第 1 期起),中途换账户走 `ACCOUNT_CHANGE` 事件(第 N 期后生效,留空=停记),**换账户不生成转账流水**;到期期次由前端按流水口径算(`utils/loanRepay.js`)调 `POST /loan/repay/sync`,后端按 `(loan_id, period)` 唯一幂等补插支出到 `family_book_record`,台账 `family_loan_repay` 保证不重复;**月供金额唯一计算源仍是 `utils/loan.js`**,后端不复算;已记期次不回改。触发点:贷款记录页/记账本进页(先补记再取数)/首页资产卡/保存贷款或事件。细则见 需求 §4.12.4。
 - **日程聚合只读**:`GET /schedule/events?from=&to=`(≤62 天)与 `/schedule/upcoming?days=` 摊平纪念日/提醒/计划/子任务与只读来源,写侧仍走各自接口。**贷款还款日/理财到期/食材到期**各是一个 `service/schedule/ScheduleSourceProvider` 实现(新增来源只加实现),事项带 `source`/`readOnly`/`link`;来源开关只在前端 `localStorage`。游客只返回演示家庭纪念日。细则见 需求 §4.3.6。
 
 ## 后端规范
@@ -176,9 +177,9 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 ## 验证基线
 
-- 后端全绿:`.\mvnw.cmd -B clean package`(312 tests,纯逻辑不起 Spring)。
-- 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(804 passed)+ `npm run format:check`(全树仍有历史遗留未格式化文件,口径见 踩坑速查 §1.13;**本次改动的文件必须 `prettier --write` 后通过**)。
-- 构建:首屏初始 JS 基线 **1465.51KB / gzip 501.03KB**(42 chunk,英文包 `en` 为懒加载 chunk);体积口径以 vite 构建输出为准,历史数字见 变更归档。
+- 后端全绿:`.\mvnw.cmd -B clean package`(319 tests,纯逻辑不起 Spring)。
+- 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(815 passed)+ `npm run format:check`(全树仍有历史遗留未格式化文件,口径见 踩坑速查 §1.13;**本次改动的文件必须 `prettier --write` 后通过**)。
+- 构建:首屏初始 JS 基线 **1466.33KB / gzip 500.75KB**(42 chunk,英文包 `en` 为懒加载 chunk);体积口径以 vite 构建输出为准,历史数字见 变更归档。
 - 一致性:`bash scripts/doc-drift-check.sh` 全 [OK];`gen-code-map.sh --check`、`doc-index.sh --check` 无漂移。
 - 接口测试在仓库外 `..\autotest_framework`(`pytest -m api`,37 passed)。
 

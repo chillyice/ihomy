@@ -35,6 +35,7 @@
         >
           <div class="lr-item-top">
             <span class="lr-item-name">{{ row.view.name }}</span>
+            <span v-if="row.view.accountName" class="lr-badge lr-badge-account">{{ row.view.accountName }}</span>
             <span v-if="row.view.snapshot.settled" class="lr-badge">{{ $t('tools.loan.rec.settledBadge') }}</span>
             <el-tag v-else size="small" type="info" effect="plain" class="lr-tag">{{
               dictText(t, 'loan_channel', row.view.channel)
@@ -146,6 +147,14 @@ const rate = (v) => (Number(v) || 0).toFixed(4)
 }
 .lr-badge-group {
   color: var(--color-accent, #a8483a);
+}
+/* 还款账户:与渠道标签区分,弱化为次要信息,过长省略 */
+.lr-badge-account {
+  color: var(--color-text-secondary, #7a6b5a);
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .lr-item-sub {
   display: flex;

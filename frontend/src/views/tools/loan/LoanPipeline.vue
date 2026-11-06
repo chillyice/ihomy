@@ -146,6 +146,8 @@ const pipeNodes = computed(() => {
   const rows = c.ledger.rows
   const evByPeriod = {}
   for (const e of c.events || []) {
+    // 换账户不影响月供/本金,不上流水线(在事件时间轴上管理)
+    if (e.type === LOAN_EVENT.ACCOUNT_CHANGE) continue
     if (!evByPeriod[e.effectivePeriod]) evByPeriod[e.effectivePeriod] = []
     evByPeriod[e.effectivePeriod].push(e)
   }
@@ -180,7 +182,9 @@ const pipeNodes = computed(() => {
     for (const e of evByPeriod[k] || []) out.push({ kind: 'event', period: k, event: e })
     out.push({ kind: 'paid', period: k, row: rows[k - 1] })
   }
-  const future = (c.events || []).filter((e) => e.effectivePeriod > paid).sort((a, b) => b.effectivePeriod - a.effectivePeriod)
+  const future = (c.events || [])
+    .filter((e) => e.effectivePeriod > paid && e.type !== LOAN_EVENT.ACCOUNT_CHANGE)
+    .sort((a, b) => b.effectivePeriod - a.effectivePeriod)
   for (const e of future) out.unshift({ kind: 'future', period: e.effectivePeriod, event: e })
   let prevYm = ''
   for (const n of out) {

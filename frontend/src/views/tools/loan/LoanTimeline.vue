@@ -5,6 +5,7 @@
       <div v-if="canManage && !view.isGroup" class="lc-head-actions">
         <el-button size="small" @click="emit('add-rate')">{{ $t('tools.loan.rec.addRateChange') }}</el-button>
         <el-button size="small" @click="emit('add-prepay')">{{ $t('tools.loan.rec.addPrepay') }}</el-button>
+        <el-button v-if="hasAccounts" size="small" @click="emit('add-account')">{{ $t('tools.loan.rec.accountChangeEntry') }}</el-button>
       </div>
     </div>
     <div v-if="view.events.length" class="lr-timeline">
@@ -19,24 +20,12 @@
         <span class="lr-event-dot" />
         <div class="lr-event-body">
           <div class="lr-event-head">
-            <span class="lr-event-title">
-              {{
-                ev.type === LOAN_EVENT.RATE_CHANGE
-                  ? $t('tools.loan.rec.rateChangeLine', { v: rate(ev.rate) })
-                  : $t('tools.loan.rec.prepayLine', { v: money(ev.amount) })
-              }}
-            </span>
+            <span class="lr-event-title">{{ eventTitle(ev) }}</span>
             <el-tag v-if="view.isGroup" size="small" effect="plain" class="lr-tag">{{ ev.loanName }}</el-tag>
-            <el-tag size="small" effect="plain" class="lr-tag">
-              {{
-                ev.type === LOAN_EVENT.PREPAY
-                  ? $t('dict.loan_prepay_strategy.' + (ev.strategy || 'SHORTEN'))
-                  : $t('dict.loan_event_type.RATE_CHANGE')
-              }}
-            </el-tag>
+            <el-tag size="small" effect="plain" class="lr-tag">{{ eventTag(ev) }}</el-tag>
           </div>
           <div class="lr-event-sub">
-            {{ $t('tools.loan.rec.timelineAtLine', { n: ev.effectivePeriod })
+            {{ eventAtLine(ev)
             }}<template v-if="periodMonth(view, ev.effectivePeriod)">{{
               $t('tools.loan.rec.timelineAtMonth', { m: periodMonth(view, ev.effectivePeriod) })
             }}</template>
@@ -51,19 +40,44 @@
 </template>
 
 <script setup>
+import { useI18n } from 'vue-i18n'
 import { Close } from '@element-plus/icons-vue'
 import { formatYuan, periodYearMonth, LOAN_EVENT } from '@/utils/loan'
 
 defineProps({
   view: { type: Object, required: true },
   canManage: { type: Boolean, default: false },
+  /** 有可绑账户才显示「换账户」入口 */
+  hasAccounts: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['add-rate', 'add-prepay', 'event-click', 'event-delete'])
+const emit = defineEmits(['add-rate', 'add-prepay', 'add-account', 'event-click', 'event-delete'])
+
+const { t } = useI18n()
 
 const money = (v, digits = 2) => formatYuan(v, digits)
 const rate = (v) => (Number(v) || 0).toFixed(4)
 const periodMonth = (view, period) => periodYearMonth(view && view.firstPayDate, period)
+
+/** 事件标题:利率/金额/换到哪个账户(账户已删除时按解绑文案兜底) */
+const eventTitle = (ev) => {
+  if (ev.type === LOAN_EVENT.ACCOUNT_CHANGE) {
+    return ev.accountId ? t('tools.loan.rec.accountChangeLine', { name: ev.accountName || '—' }) : t('tools.loan.rec.accountChangeOffLine')
+  }
+  return ev.type === LOAN_EVENT.RATE_CHANGE
+    ? t('tools.loan.rec.rateChangeLine', { v: rate(ev.rate) })
+    : t('tools.loan.rec.prepayLine', { v: money(ev.amount) })
+}
+
+/** 事件类型标签:提前还款带处理方式,其余取字典文案 */
+const eventTag = (ev) =>
+  ev.type === LOAN_EVENT.PREPAY ? t('dict.loan_prepay_strategy.' + (ev.strategy || 'SHORTEN')) : t('dict.loan_event_type.' + ev.type)
+
+/** 生效时间说明:换账户强调「从下一期起」 */
+const eventAtLine = (ev) =>
+  ev.type === LOAN_EVENT.ACCOUNT_CHANGE
+    ? t('tools.loan.rec.accountChangeAt', { n: ev.effectivePeriod, n1: Number(ev.effectivePeriod) + 1 })
+    : t('tools.loan.rec.timelineAtLine', { n: ev.effectivePeriod })
 </script>
 
 <style scoped>
@@ -130,6 +144,9 @@ const periodMonth = (view, period) => periodYearMonth(view && view.firstPayDate,
 }
 .lr-event-rate_change .lr-event-dot {
   background: var(--lr-pink);
+}
+.lr-event-account_change .lr-event-dot {
+  background: var(--lr-sage);
 }
 .lr-event-body {
   flex: 1;

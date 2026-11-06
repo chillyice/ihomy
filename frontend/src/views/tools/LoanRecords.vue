@@ -33,8 +33,10 @@
             <LoanTimeline
               :view="current"
               :can-manage="canManage"
+              :has-accounts="accounts.length > 0"
               @add-rate="openEvent(LOAN_EVENT.RATE_CHANGE)"
               @add-prepay="openEvent(LOAN_EVENT.PREPAY)"
+              @add-account="openEvent(LOAN_EVENT.ACCOUNT_CHANGE)"
               @event-click="onEventClick"
               @event-delete="onEventDelete"
             />
@@ -60,8 +62,8 @@
       <LoanDetailTable v-if="current && current.ledger.rows.length" :view="current" />
     </template>
 
-    <LoanEditorDialog ref="editorRef" :group-names="groupNames" @saved="onEditorSaved" />
-    <LoanEventDialog ref="eventRef" @saved="load" />
+    <LoanEditorDialog ref="editorRef" :group-names="groupNames" :accounts="accounts" @saved="onEditorSaved" />
+    <LoanEventDialog ref="eventRef" :accounts="accounts" @saved="reload" />
   </div>
 </template>
 
@@ -70,10 +72,11 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Lock } from '@element-plus/icons-vue'
-import { loanApi } from '@/api'
+import { loanApi, bookApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { loanLedger, ledgerSnapshot, mergeLedgers, loanEngineInput, periodsPaid, LOAN_EVENT } from '@/utils/loan'
 import { useDayTick } from '@/composables/useDayTick'
+import { syncLoanRepays } from '@/composables/useLoanRepays'
 import { loanToPayload } from './loan/loanShared'
 import LoanList from './loan/LoanList.vue'
 import LoanProgress from './loan/LoanProgress.vue'
@@ -101,6 +104,7 @@ const LEDGER_ERROR_KEYS = {
 const loading = ref(false)
 const loadError = ref(false)
 const loans = ref([])
+const accounts = ref([]) // 可绑定的记账账户(无账本读权限时为空,编辑器不显示账户栏)
 const selectedKey = ref('') // 'g:<组名>' 看合计,或 '<贷款id>' 看单笔
 
 // 已还期数/还款进度依赖「今天」;公用 tick 只在跨天时换新 Date,跨还款日自动重算
@@ -220,11 +224,22 @@ const ledgerError = computed(() => {
   return bad ? t('tools.loan.rec.' + (LEDGER_ERROR_KEYS[bad.ledger.error] || 'errBadEventValue')) : ''
 })
 
-const load = async () => {
+/**
+ * 取贷款列表与可绑定账户。
+ * @param {{ sync?: boolean }} [opts] sync=true 时顺带把「已到期 + 该期有还款账户」的期次补记进记账本
+ *   (后端按 (贷款, 期次) 幂等);补记出新流水后重取一次列表刷新已记账期次,不再重复同步。
+ */
+const load = async ({ sync = true } = {}) => {
   loading.value = true
   loadError.value = false
   try {
-    loans.value = await loanApi.list()
+    // 贷款列表与账户互不依赖,并行取;账本不可读时不打注定 403 的账户接口
+    const [list, acc] = await Promise.all([
+      loanApi.list(),
+      userStore.canReadBook ? bookApi.accounts().catch(() => []) : Promise.resolve([]),
+    ])
+    loans.value = Array.isArray(list) ? list : []
+    accounts.value = Array.isArray(acc) ? acc : []
     const keys = new Set(listRows.value.map((r) => (r.type === 'group' ? r.view.id : String(r.view.id))))
     if (!keys.has(selectedKey.value)) selectedKey.value = firstListKey()
   } catch (e) {
@@ -232,7 +247,14 @@ const load = async () => {
   } finally {
     loading.value = false
   }
+  // 自动记账 = 写家庭账本:只读档位不补记(后端同口径拒绝),失败也不影响贷款页展示
+  if (sync && userStore.canReadBook && userStore.canWriteBook) {
+    const created = await syncLoanRepays(loans.value, now.value).catch(() => 0)
+    if (created > 0) await load({ sync: false })
+  }
 }
+
+const reload = () => load()
 
 watch(
   () => userStore.isLoggedIn,

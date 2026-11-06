@@ -37,6 +37,8 @@ public class FamilyLoanDTO {
     private BigDecimal firstPayment;
     /** 初始年利率(%) */
     private BigDecimal rate;
+    /** 还款账户ID(空 = 不自动记账;中途换账户走 ACCOUNT_CHANGE 事件) */
+    private Long accountId;
     /** 贷款组名称(选填;同组贷款合并展示合计) */
     @Size(max = 100, message = "贷款组名称过长")
     private String groupName;
@@ -62,6 +64,8 @@ public class FamilyLoanDTO {
         private BigDecimal amount;
         /** 提前还款处理: SHORTEN/REDUCE */
         private String strategy;
+        /** 变更后的还款账户ID(ACCOUNT_CHANGE;空 = 从此停止自动记账) */
+        private Long accountId;
         @Size(max = 500, message = "备注过长")
         private String note;
     }

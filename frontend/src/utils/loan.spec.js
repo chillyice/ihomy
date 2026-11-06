@@ -6,6 +6,7 @@ import {
   loanLedger,
   ledgerSnapshot,
   loanEngineInput,
+  loanAccountOfPeriod,
   totalRemainingPrincipal,
   periodsPaid,
   periodDate,
@@ -107,6 +108,21 @@ describe('loanLedger 贷款流水', () => {
     expect(led.rows[11].rate).toBe(3.6)
     expect(led.rows[12].rate).toBe(4.2)
   })
+
+  it('换账户事件不参与计息:月供与不绑账户一致,且不会被判为非法事件', () => {
+    const base = { amount: 1000000, months: 360, method: REPAY_METHOD.EQUAL_INSTALLMENT, rate: 3.6 }
+    const plain = loanLedger(base)
+    const withAccount = loanLedger({
+      ...base,
+      events: [
+        { type: LOAN_EVENT.ACCOUNT_CHANGE, effectivePeriod: 5, accountId: 9 },
+        { type: LOAN_EVENT.ACCOUNT_CHANGE, effectivePeriod: 18, accountId: null },
+      ],
+    })
+    expect(withAccount.valid).toBe(true)
+    expect(withAccount.rows.map((r) => r.payment)).toEqual(plain.rows.map((r) => r.payment))
+    expect(withAccount.summary.totalInterest).toBe(plain.summary.totalInterest)
+  })
 })
 
 describe('日期工具', () => {
@@ -158,6 +174,50 @@ describe('totalRemainingPrincipal 净资产口径', () => {
     })
     expect(input.firstDays).toBe(31)
     expect(input.firstPayment).toBe(1200)
-    expect(input.events).toEqual([{ type: LOAN_EVENT.RATE_CHANGE, effectivePeriod: 13, rate: 4.2, amount: null, strategy: undefined }])
+    expect(input.events).toEqual([
+      { type: LOAN_EVENT.RATE_CHANGE, effectivePeriod: 13, rate: 4.2, amount: null, strategy: undefined, accountId: null },
+    ])
+  })
+})
+
+describe('loanAccountOfPeriod 还款账户时间轴', () => {
+  const loan = {
+    accountId: 7,
+    events: [
+      { type: LOAN_EVENT.ACCOUNT_CHANGE, effectivePeriod: 5, accountId: 9 },
+      { type: LOAN_EVENT.RATE_CHANGE, effectivePeriod: 3, rate: 4.2 },
+    ],
+  }
+
+  it('初始账户从第 1 期起生效,换账户事件「第 N 期后」生效', () => {
+    expect(loanAccountOfPeriod(loan, 1)).toBe(7)
+    expect(loanAccountOfPeriod(loan, 5)).toBe(7)
+    // 第 5 期还款后换成 9 → 第 6 期起扣 9
+    expect(loanAccountOfPeriod(loan, 6)).toBe(9)
+    expect(loanAccountOfPeriod(loan, 360)).toBe(9)
+  })
+
+  it('未绑定账户 = 该期不自动记账;中途解绑留空后不再记账', () => {
+    expect(loanAccountOfPeriod({ events: [] }, 1)).toBeNull()
+    const unbound = {
+      accountId: 7,
+      events: [{ type: LOAN_EVENT.ACCOUNT_CHANGE, effectivePeriod: 10, accountId: null }],
+    }
+    expect(loanAccountOfPeriod(unbound, 10)).toBe(7)
+    expect(loanAccountOfPeriod(unbound, 11)).toBeNull()
+  })
+
+  it('期次非法返回 null;事件顺序不影响结果', () => {
+    expect(loanAccountOfPeriod(loan, 0)).toBeNull()
+    const reversed = {
+      accountId: 7,
+      events: [
+        { type: LOAN_EVENT.ACCOUNT_CHANGE, effectivePeriod: 20, accountId: 11 },
+        { type: LOAN_EVENT.ACCOUNT_CHANGE, effectivePeriod: 8, accountId: 9 },
+      ],
+    }
+    expect(loanAccountOfPeriod(reversed, 7)).toBe(7)
+    expect(loanAccountOfPeriod(reversed, 9)).toBe(9)
+    expect(loanAccountOfPeriod(reversed, 21)).toBe(11)
   })
 })

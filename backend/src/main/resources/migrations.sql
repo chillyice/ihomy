@@ -3035,3 +3035,55 @@ EXECUTE migrate_game_site_account_stmt;
 DEALLOCATE PREPARE migrate_game_site_account_stmt;
 
 DROP TABLE IF EXISTS `game_site_account`;
+
+-- ------------------------------------------------------------
+-- V11.43 贷款绑定还款账户(2026-11-06)
+--   family_loan.account_id  = 初始还款账户(第 1 期起),空 = 不自动记账;
+--   family_loan_event.account_id = ACCOUNT_CHANGE 事件生效后(第 N 期还款之后,即第 N+1 期起)的还款账户,空=从此停止自动记账;
+--   family_loan_repay = 已记进记账本的期次台账,(loan_id, period) 唯一,保证重复同步不重复记账。
+--   重复执行安全:information_schema 条件加列 / CREATE TABLE IF NOT EXISTS / INSERT IGNORE。
+-- ------------------------------------------------------------
+SET @add_loan_account := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `family_loan` ADD COLUMN `account_id` BIGINT DEFAULT NULL COMMENT ''还款账户ID(family_book_account.id;空=不自动记账)'' AFTER `rate`',
+    'SELECT ''skip: family_loan.account_id already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_loan' AND COLUMN_NAME = 'account_id'
+);
+PREPARE add_loan_account_stmt FROM @add_loan_account;
+EXECUTE add_loan_account_stmt;
+DEALLOCATE PREPARE add_loan_account_stmt;
+
+SET @add_loan_event_account := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `family_loan_event` ADD COLUMN `account_id` BIGINT DEFAULT NULL COMMENT ''变更后的还款账户ID(ACCOUNT_CHANGE时有效;空=从此不自动记账)'' AFTER `strategy`',
+    'SELECT ''skip: family_loan_event.account_id already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_loan_event' AND COLUMN_NAME = 'account_id'
+);
+PREPARE add_loan_event_account_stmt FROM @add_loan_event_account;
+EXECUTE add_loan_event_account_stmt;
+DEALLOCATE PREPARE add_loan_event_account_stmt;
+
+ALTER TABLE `family_loan_event`
+  MODIFY COLUMN `type` VARCHAR(20) NOT NULL COMMENT '事件类型: RATE_CHANGE利率调整/PREPAY提前还款/ACCOUNT_CHANGE换还款账户';
+
+CREATE TABLE IF NOT EXISTS `family_loan_repay` (
+  `id`         BIGINT         NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`  BIGINT         NOT NULL COMMENT '所属家庭ID',
+  `loan_id`    BIGINT         NOT NULL COMMENT '所属贷款ID(family_loan.id)',
+  `period`     INT            NOT NULL COMMENT '第 N 期(1 起,与流水期次一致)',
+  `due_date`   DATE           NOT NULL COMMENT '本期还款日(按期次从首期还款日递推)',
+  `amount`     DECIMAL(12, 2) NOT NULL COMMENT '本期还款额(元,记账当时快照)',
+  `principal`  DECIMAL(12, 2) DEFAULT NULL COMMENT '本期本金(元)',
+  `interest`   DECIMAL(12, 2) DEFAULT NULL COMMENT '本期利息(元)',
+  `account_id` BIGINT         NOT NULL COMMENT '扣款账户ID(family_book_account.id)',
+  `record_id`  BIGINT         DEFAULT NULL COMMENT '生成的记账流水ID(family_book_record.id;仅作追溯)',
+  `created_at` DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_loan_period` (`loan_id`, `period`),
+  KEY `idx_family_account` (`family_id`, `account_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='贷款还款记账台账(按期次幂等生成记账支出)';
+
+INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('loan_event_type', 'ACCOUNT_CHANGE', '还款账户变更');

@@ -54,6 +54,14 @@
       >
       <el-input-number v-model="editor.form.rate" :min="0" :max="36" :step="0.05" :precision="4" :controls="false" style="width: 100%" />
     </div>
+    <!-- 还款账户:绑定后到期月供自动记进记账本;中途换账户走事件时间轴的 ACCOUNT_CHANGE -->
+    <div v-if="showAccount" class="lc-field">
+      <label>{{ $t('tools.loan.rec.accountLabel') }}</label>
+      <el-select v-model="editor.form.accountId" clearable style="width: 100%" :placeholder="$t('tools.loan.rec.accountNone')">
+        <el-option v-for="a in accounts" :key="a.id" :value="a.id" :label="a.name" />
+      </el-select>
+      <span class="lc-hint">{{ $t('tools.loan.rec.accountBindHint') }}</span>
+    </div>
     <div class="lc-field">
       <label>{{ $t('tools.loan.rec.groupName') }}</label>
       <el-input v-model="editor.form.groupName" maxlength="50" :placeholder="$t('tools.loan.rec.groupNamePlaceholder')" />
@@ -105,8 +113,9 @@ import { loanApi } from '@/api'
 import { firstPaymentPreview, daysBetween, formatYuan, REPAY_METHOD } from '@/utils/loan'
 import { toNum } from './loanShared'
 
-defineProps({
+const props = defineProps({
   groupNames: { type: Array, default: () => [] },
+  accounts: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['saved'])
@@ -120,6 +129,9 @@ const editor = reactive({
   saving: false,
   form: {},
 })
+
+/** 没有可绑账户(无账本权限或还没建账户)时不显示这一栏 */
+const showAccount = computed(() => (editor.form.accountId != null && editor.form.accountId !== '') || props.accounts.length > 0)
 
 /** 编辑器预览:填了放款日 + 首期还款日即回显首期天数与参考还款额 */
 const editorPreviewDays = computed(() => {
@@ -149,6 +161,7 @@ const open = (loan) => {
         amountWan: toNum(loan.amount) / 10000,
         years: Math.max(1, Math.round(Number(loan.months) / 12)),
         rate: toNum(loan.rate),
+        accountId: loan.accountId ?? null,
         groupName: loan.groupName || '',
         loanDate: loan.loanDate || null,
         firstPayDate: loan.firstPayDate || null,
@@ -164,6 +177,7 @@ const open = (loan) => {
         amountWan: 100,
         years: 30,
         rate: 3.1,
+        accountId: null,
         groupName: '',
         loanDate: null,
         firstPayDate: null,
@@ -192,6 +206,7 @@ const onSaveLoan = async () => {
       firstPayDate: f.firstPayDate || null,
       firstPayment: Number(f.firstPayment) > 0 ? Number(f.firstPayment) : null,
       rate: Number(f.rate) || 0,
+      accountId: f.accountId ?? null,
       groupName: (f.groupName || '').trim() || null,
       note: f.note || null,
       events: (f.events || []).map((e) => ({
@@ -201,6 +216,8 @@ const onSaveLoan = async () => {
         rate: toNum(e.rate),
         amount: toNum(e.amount),
         strategy: e.strategy || null,
+        // 换账户事件带账户ID,漏带等于把事件改成「从此不再自动记账」
+        accountId: toNum(e.accountId),
         note: e.note || null,
       })),
     }

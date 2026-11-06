@@ -54,6 +54,9 @@ public class FamilyLoan {
     /** 初始年利率(%) */
     private BigDecimal rate;
 
+    /** 还款账户ID(family_book_account.id;空 = 不自动记账)。中途换账户走 ACCOUNT_CHANGE 事件 */
+    private Long accountId;
+
     /** 贷款组名称(选填;同组贷款合并展示合计,如商贷+公积金同填「组合贷」) */
     private String groupName;
 
