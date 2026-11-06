@@ -787,7 +787,7 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 
 ## 28. 记账本 · 总账 / 贷款 / 理财(`/book`,V10.78;理财页签 V10.80;预算与净资产 V10.89;周期/导入/资产卡 V10.98;账本权限 V10.99)
 
-1. **页签与工具栏**:四页签「记账本 / 总账 / 贷款记录 / 理财」用 `el-radio-group size="small"`,外层 `.book-tabs` 限宽 `max-width:100%` + `overflow-x:auto` + 组内 `nowrap`(窄屏页签挤不下时横向滚动,不换行、不撑破工具栏);页面用 `PageToolbar :card="false"`,右侧操作由各页签自带(记账本=月份 + 记一笔,总账=范围 chips + 导出 CSV,理财=状态 chips + 记一笔理财);不写页面级 H1/H2。支持 `?tab=book|ledger|loan|finance` 直达指定页签(首页卡片跳转用),非法值回落记账本。
+1. **页签与工具栏**:四页签「记账本 / 总账 / 贷款记录 / 理财」用 `el-radio-group size="small"`,外层 `.book-tabs` 限宽 `max-width:100%` + `overflow-x:auto` + 组内 `nowrap`(窄屏页签挤不下时横向滚动,不换行、不撑破工具栏);页面用 `PageToolbar :card="false"`,右侧操作由各页签自带(记账本=月份 + 并排的「记一笔 / 周期账目 / 导入 CSV」三个按钮(V11.44 起不再收进下拉,窄屏换行),总账=范围 chips + 导出 CSV,理财=状态 chips + 记一笔理财);不写页面级 H1/H2。支持 `?tab=book|ledger|loan|finance` 直达指定页签(首页卡片跳转用),非法值回落记账本。
 2. **账户余额条**(`.book-balance-strip card`,记账本页签):横向 chip = 账户名(12px 次要色)+ 余额(13px/600 `tabular-nums`,负余额红),右侧「未归属 N 笔」+「管理账户」;≤768px 改纵向,chips 仍可横向滑动。
 3. **KPI 卡**(`bookPage.css`):记账本 3 列(本月收入绿 / 本月支出红 / 结余),总账 `.cols-4` 4 列(累计收入 / 累计支出 / 累计结余 / 收支笔数);数值 22px/700 `tabular-nums`,副标 `.book-kpi-sub` 11px 次要色放跨度与「另有 N 笔转账不计入结余」;≤768px 一律 2×2。
 4. **月度总账表**(`.lt-table`):期间列左对齐、其余右对齐;年行 600 加粗、左侧箭头展开转 90°(同时只展开一年),展开后是该年 12 个月(空月补零);月行次要色、hover 底色、点击切回记账本并定位该月;窄屏放进 `.lt-scroll`(min-width 440px)容器内横向滚动,**不允许页面整体横向溢出**。

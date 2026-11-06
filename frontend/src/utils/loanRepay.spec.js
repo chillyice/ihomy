@@ -34,9 +34,23 @@ describe('loanRepayItems 待补记期次', () => {
     }
   })
 
-  it('已记过的期次不再提交(重复同步不会重复记账)', () => {
+  it('已记过的期次照样提交(后端据此纠正换账户后的归属,不会重复记账)', () => {
     const items = loanRepayItems([{ ...baseLoan, bookedPeriods: [1, 2] }], new Date(2026, 2, 1))
-    expect(items.map((x) => x.period)).toEqual([3])
+    expect(items.map((x) => x.period)).toEqual([1, 2, 3])
+  })
+
+  it('换账户后已记过的期次也带上新账户(历史账目跟着迁)', () => {
+    const loan = {
+      ...baseLoan,
+      bookedPeriods: [1, 2, 3],
+      events: [{ type: LOAN_EVENT.ACCOUNT_CHANGE, effectivePeriod: 2, accountId: 9 }],
+    }
+    const items = loanRepayItems([loan], new Date(2026, 2, 1))
+    expect(items.map((x) => [x.period, x.accountId])).toEqual([
+      [1, 7],
+      [2, 7],
+      [3, 9],
+    ])
   })
 
   it('首期还款日还没到 / 没填首期还款日 → 不产生待补记', () => {

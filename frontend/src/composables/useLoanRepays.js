@@ -10,19 +10,24 @@ import { loanRepayItems } from '@/utils/loanRepay'
 /** 单批期次上限:后端 @Size(max=600),这里留足余量,30 年房贷一笔也只需两批 */
 const CHUNK = 200
 
-/** 提交待补记期次,返回本次新生成的记账笔数 */
+/**
+ * 提交待同步期次。
+ * @returns {Promise<{created:number, moved:number}>} created=新生成的记账笔数,moved=换账户后迁到新账户的笔数
+ */
 export async function syncLoanRepays(loans, today = new Date()) {
   const items = loanRepayItems(loans, today)
-  if (!items.length) return 0
+  if (!items.length) return { created: 0, moved: 0 }
   let created = 0
+  let moved = 0
   for (let i = 0; i < items.length; i += CHUNK) {
-    const n = await loanApi.syncRepay(items.slice(i, i + CHUNK))
-    created += Number(n) || 0
+    const res = await loanApi.syncRepay(items.slice(i, i + CHUNK))
+    created += Number(res?.created) || 0
+    moved += Number(res?.moved) || 0
   }
-  return created
+  return { created, moved }
 }
 
-/** 自己取贷款列表再补记(记账本页/贷款记录页用),返回新生成的记账笔数 */
+/** 自己取贷款列表再同步(记账本页/贷款记录页用),返回新生成/迁移的笔数 */
 export async function syncLoanRepaysFromServer(today = new Date()) {
   const loans = await loanApi.list()
   return syncLoanRepays(Array.isArray(loans) ? loans : [], today)

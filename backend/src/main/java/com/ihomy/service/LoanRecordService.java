@@ -170,16 +170,22 @@ public class LoanRecordService {
     }
 
     /**
-     * 贷款还款记账同步:前端按流水算出「已到期 + 该期有还款账户」的期次,这里按 (loan_id, period) 幂等补插。
+     * 贷款还款记账同步:前端按流水给出「已到期 + 该期有还款账户」的期次(含已记账的),
+     * 这里按 (loan_id, period) 幂等补插,并把换账户后的既有账目迁到新账户。
      *
-     * 已记过的期次一律跳过(含用户在记账本删掉流水的情况:台账还在,不再重复生成);
-     * 金额与还款日沿用前端流水快照,贷款改参数或换账户都不回改历史记账。
-     * @return 本次新生成的记账流水笔数
+     * 已记过的期次不重复生成(含用户在记账本删掉流水的情况:台账还在,不再重复生成),金额与还款日
+     * 沿用首次记账的快照;只有「本期该扣哪个账户」按前端最新时间轴纠正——换账户事件落在中间某一期时,
+     * 已生成的后半段账目也随之改挂新账户(用户手改过该笔流水的账户则保留用户的选择)。
+     *
+     * @return created=本次新生成的记账笔数,moved=迁移到新账户的已记账笔数
      */
     @Transactional
-    public int syncRepays(Long familyId, LoanRepaySyncDTO dto) {
+    public Map<String, Object> syncRepays(Long familyId, LoanRepaySyncDTO dto) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("created", 0);
+        out.put("moved", 0);
         List<LoanRepaySyncDTO.Item> items = dto == null ? null : dto.getItems();
-        if (items == null || items.isEmpty()) return 0;
+        if (items == null || items.isEmpty()) return out;
 
         List<Long> loanIds = items.stream().map(LoanRepaySyncDTO.Item::getLoanId).distinct().collect(Collectors.toList());
         Map<Long, FamilyLoan> loans = familyLoanMapper.selectBatchIds(loanIds).stream()
@@ -201,13 +207,16 @@ public class LoanRecordService {
         // 每笔贷款配置过的账户集合(初始账户 + 换账户事件),只用于校验,不做期次归属推断
         Map<Long, Set<Long>> allowedAccounts = allowedAccountsByLoan(loans);
 
-        Set<String> booked = familyLoanRepayMapper.selectList(new LambdaQueryWrapper<FamilyLoanRepay>()
+        Map<String, FamilyLoanRepay> booked = familyLoanRepayMapper.selectList(new LambdaQueryWrapper<FamilyLoanRepay>()
                         .eq(FamilyLoanRepay::getFamilyId, familyId)
                         .in(FamilyLoanRepay::getLoanId, loanIds))
-                .stream().map(r -> key(r.getLoanId(), r.getPeriod())).collect(Collectors.toCollection(HashSet::new));
+                .stream().collect(Collectors.toMap(r -> key(r.getLoanId(), r.getPeriod()), r -> r, (a, b) -> a));
 
         LocalDate today = LocalDate.now();
         int created = 0;
+        // 已记账但「本期该扣的账户」变了的期次:台账改账户,生成的流水也一起迁(账户切换后历史跟着走)
+        List<FamilyLoanRepay> moved = new ArrayList<>();
+        Map<Long, Long> oldAccountOfRepay = new HashMap<>();
         for (LoanRepaySyncDTO.Item item : items) {
             if (item == null || item.getLoanId() == null || item.getAccountId() == null) continue;
             FamilyLoan loan = loans.get(item.getLoanId());
@@ -225,7 +234,19 @@ public class LoanRecordService {
             if (!allowed.contains(item.getAccountId())) {
                 throw new BizException(ResultCode.BAD_REQUEST, "所选账户不是这笔贷款的还款账户");
             }
-            if (!booked.add(key(loan.getId(), period))) continue; // 已记过这一期
+            FamilyLoanRepay existing = booked.get(key(loan.getId(), period));
+            if (existing != null) {
+                // 金额/日期保持首次记账快照,只纠正账户归属
+                if (!Objects.equals(existing.getAccountId(), item.getAccountId())) {
+                    oldAccountOfRepay.put(existing.getId(), existing.getAccountId());
+                    familyLoanRepayMapper.update(null, new LambdaUpdateWrapper<FamilyLoanRepay>()
+                            .eq(FamilyLoanRepay::getId, existing.getId())
+                            .set(FamilyLoanRepay::getAccountId, item.getAccountId()));
+                    existing.setAccountId(item.getAccountId());
+                    moved.add(existing);
+                }
+                continue;
+            }
 
             // 先占住 (贷款, 期次) 唯一键再写记账流水:两个标签页/手机同时同步时,
             // 抢输的一方在这里被唯一键挡下(此时流水还没写,不会留下重复支出)
@@ -244,6 +265,7 @@ public class LoanRecordService {
                 log.debug("该期已被并发同步记账,跳过,loanId={},period={}", loan.getId(), period);
                 continue;
             }
+            booked.put(key(loan.getId(), period), repay); // 同批重复项不再插入第二次
 
             BookRecord record = new BookRecord();
             record.setFamilyId(familyId);
@@ -264,7 +286,26 @@ public class LoanRecordService {
             }
             created++;
         }
-        return created;
+
+        if (!moved.isEmpty()) {
+            // 只有「流水账户仍是当初自动记账写的那一个」才跟着迁;用户手改过账户的流水保留用户选择
+            List<Long> recordIds = moved.stream().map(FamilyLoanRepay::getRecordId)
+                    .filter(Objects::nonNull).distinct().collect(Collectors.toList());
+            Map<Long, BookRecord> records = recordIds.isEmpty() ? Map.of()
+                    : bookRecordMapper.selectBatchIds(recordIds).stream()
+                            .collect(Collectors.toMap(BookRecord::getId, r -> r, (a, b) -> a));
+            for (FamilyLoanRepay repay : moved) {
+                BookRecord record = repay.getRecordId() == null ? null : records.get(repay.getRecordId());
+                if (record == null || !Objects.equals(record.getFamilyId(), familyId)) continue;
+                if (!Objects.equals(record.getAccountId(), oldAccountOfRepay.get(repay.getId()))) continue;
+                bookRecordMapper.update(null, new LambdaUpdateWrapper<BookRecord>()
+                        .eq(BookRecord::getId, record.getId())
+                        .set(BookRecord::getAccountId, repay.getAccountId()));
+            }
+        }
+        out.put("created", created);
+        out.put("moved", moved.size());
+        return out;
     }
 
     private FamilyLoan require(Long id, Long familyId) {

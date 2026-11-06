@@ -4111,10 +4111,12 @@ export default {
         accountChangeLine: 'Repayment account changed to {name}',
         accountChangeOffLine: 'Stop automatic entries from here',
         accountChangeAt: 'After payment {n} (from payment {n1})',
-        accountChangeHint: 'Switching only affects installments that fall due later; entries already in the ledger are not rewritten',
+        accountChangeHint:
+          'After switching, installments from payment N+1 are charged to the new account, and installments already booked in the ledger are moved there too (entries whose account you edited by hand are kept as-is)',
         accountEventHint:
           'Takes effect after payment N: from payment N+1 the installment goes to the new account; leave the account empty to stop automatic entries',
         bookedCount: '{n} installments booked',
+        movedAccounts: '{n} booked entries moved to the new repayment account',
         accountUnbound: 'No account bound',
         formLoanDate: 'Drawn on (optional)',
         formFirstPayDate: 'First payment date (optional)',

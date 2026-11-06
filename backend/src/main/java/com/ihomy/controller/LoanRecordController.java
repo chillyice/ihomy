@@ -69,11 +69,11 @@ public class LoanRecordController {
         return Result.success();
     }
 
-    /** 系统对账口径的补偿接口(页面加载时按流水补记到期月供),高频且幂等,不记操作日志 */
-    @Operation(summary = "同步贷款还款记账(补记已到期期次)")
+    /** 系统对账口径的补偿接口(页面加载时按流水补记到期月供、纠正换账户后的账目归属),高频且幂等,不记操作日志 */
+    @Operation(summary = "同步贷款还款记账(补记已到期期次;换账户后把已记账目迁到新账户)")
     @RequirePermission("loan:view")
     @PostMapping("/repay/sync")
-    public Result<Integer> syncRepays(@Valid @RequestBody LoanRepaySyncDTO dto) {
+    public Result<Map<String, Object>> syncRepays(@Valid @RequestBody LoanRepaySyncDTO dto) {
         LoginUser user = securityHelper.current();
         // 自动记账 = 写家庭账本,只读档位不生成(避免只读成员把账本改出窟窿)
         bookPermissionService.requireWrite(user);

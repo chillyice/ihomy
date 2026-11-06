@@ -249,7 +249,9 @@ const load = async ({ sync = true } = {}) => {
   }
   // 自动记账 = 写家庭账本:只读档位不补记(后端同口径拒绝),失败也不影响贷款页展示
   if (sync && userStore.canReadBook && userStore.canWriteBook) {
-    const created = await syncLoanRepays(loans.value, now.value).catch(() => 0)
+    const { created, moved } = await syncLoanRepays(loans.value, now.value).catch(() => ({ created: 0, moved: 0 }))
+    // 换过还款账户:后端已把这段时间的既有账目迁到新账户,提示一下免得以为没生效
+    if (moved > 0) ElMessage.success(t('tools.loan.rec.movedAccounts', { n: moved }))
     if (created > 0) await load({ sync: false })
   }
 }
