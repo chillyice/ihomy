@@ -23,6 +23,7 @@ import { useI18n } from 'vue-i18n'
 
 import { formatYuan } from '@/utils/money'
 import { upcomingMaturities } from '@/utils/finance'
+import { useDayTick } from '@/composables/useDayTick'
 
 const props = defineProps({
   list: { type: Array, default: () => [] },
@@ -30,7 +31,10 @@ const props = defineProps({
 
 const { t } = useI18n()
 
-const items = computed(() => upcomingMaturities(props.list, new Date(), 90))
+// 90 天窗口与「剩余天数」都以「今天」为基准:用跨天 tick 而不是 computed 里的 new Date(),
+// 否则页面长开跨零点后窗口不会重算(computed 只追踪响应式依赖)
+const { now } = useDayTick()
+const items = computed(() => upcomingMaturities(props.list, now.value, 90))
 
 // 7 天内到期高亮;已过期(理论上窗口内不含负数)仍按警示色兜底
 const itemCls = (it) => ({ 'is-soon': !it.overdue && it.daysLeft <= 7, 'is-overdue': it.overdue })

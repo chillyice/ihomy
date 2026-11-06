@@ -66,13 +66,14 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Lock } from '@element-plus/icons-vue'
 import { loanApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { loanLedger, ledgerSnapshot, mergeLedgers, loanEngineInput, periodsPaid, LOAN_EVENT } from '@/utils/loan'
+import { useDayTick } from '@/composables/useDayTick'
 import { loanToPayload } from './loan/loanShared'
 import LoanList from './loan/LoanList.vue'
 import LoanProgress from './loan/LoanProgress.vue'
@@ -102,23 +103,8 @@ const loadError = ref(false)
 const loans = ref([])
 const selectedKey = ref('') // 'g:<组名>' 看合计,或 '<贷款id>' 看单笔
 
-// 已还期数/还款进度依赖「今天」;定时 + 回到页面可见时刷新 now,跨还款日自动重算
-const now = ref(new Date())
-const dayKey = (d) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
-const tickNow = () => {
-  // 进度只跟「哪一天」有关:跨天才换新 Date,别每分钟重建整页视图(会打断翻页、滚动与拖拽)
-  const t = new Date()
-  if (dayKey(t) !== dayKey(now.value)) now.value = t
-}
-const nowTimer = setInterval(tickNow, 60000)
-const onVisibility = () => {
-  if (!document.hidden) tickNow()
-}
-document.addEventListener('visibilitychange', onVisibility)
-onBeforeUnmount(() => {
-  clearInterval(nowTimer)
-  document.removeEventListener('visibilitychange', onVisibility)
-})
+// 已还期数/还款进度依赖「今天」;公用 tick 只在跨天时换新 Date,跨还款日自动重算
+const { now } = useDayTick()
 
 const canManage = computed(() => userStore.isOwner || userStore.hasPerm('loan:manage'))
 
