@@ -281,7 +281,10 @@ const applyQuery = () => {
   if (q.tab === 'plan') {
     view.value = 'list'
     filter.value = typeof q.type === 'string' && TYPE_FILTERS.includes(q.type) ? q.type : 'ALL'
-    focusId.value = q.focus != null ? String(q.focus) : null
+    const nextFocus = q.focus != null ? String(q.focus) : null
+    // 换了一条深链才重新允许抢定位;同一条深链被用户打断后保持不动
+    if (nextFocus !== focusId.value) focusAborted = false
+    focusId.value = nextFocus
     return
   }
   view.value = 'calendar'
@@ -426,8 +429,50 @@ const onSaved = async (payload) => {
 // 单次滚动(含 scrollIntoView)会被后到的重排覆盖,实测 2.5s 后还会被推离目标位置。
 // 做法:4 秒窗口内每 250ms 按「内容坐标绝对值」校正一次(幂等,已就位就跳过),
 // 布局稳定后自然停在同一位置;离开页面立即停表。
+// 用户主动滚动(wheel / touchmove / 翻页键)视为「我不要你定位了」,立刻停表且本次深链不再抢。
 let focusTimer = null
+let focusAborted = false
+let focusEvtTarget = null
+const FOCUS_KEYS = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '])
+
+const onFocusInterrupt = (e) => {
+  // 不用 scroll 事件判断:自己的校正也会触发 scroll,会立刻自我中断
+  if (e.type === 'keydown' && !FOCUS_KEYS.has(e.key)) return
+  focusAborted = true
+  stopFocusScroll()
+}
+
+const unbindFocusInterrupt = () => {
+  if (!focusEvtTarget) return
+  focusEvtTarget.removeEventListener('wheel', onFocusInterrupt)
+  focusEvtTarget.removeEventListener('touchmove', onFocusInterrupt)
+  focusEvtTarget.removeEventListener('keydown', onFocusInterrupt)
+  focusEvtTarget = null
+}
+
+const stopFocusScroll = () => {
+  if (focusTimer) clearInterval(focusTimer)
+  focusTimer = null
+  unbindFocusInterrupt()
+}
+
+// 监听挂在实际滚动容器上(暖居 .gc-main / 光尘 window);容器第一 tick 之后才稳定,允许换绑
+const bindFocusInterrupt = () => {
+  if (!focusId.value) return
+  const node = document.getElementById('schedule-row-PLAN-' + focusId.value)
+  const box = node?.closest('.gc-main')
+  const target = box && box.scrollHeight > box.clientHeight + 10 ? box : window
+  if (target === focusEvtTarget) return
+  unbindFocusInterrupt()
+  focusEvtTarget = target
+  target.addEventListener('wheel', onFocusInterrupt, { passive: true })
+  target.addEventListener('touchmove', onFocusInterrupt, { passive: true })
+  target.addEventListener('keydown', onFocusInterrupt)
+}
+
 const scrollToFocus = () => {
+  // 本次深链已被用户打断:后续数据变化重新起表也不许抢
+  if (focusAborted) return
   // 返回 true 表示已经就位(不需要再动),连续 3 次就位就停表
   const scroll = () => {
     if (!focusId.value || view.value !== 'list') return true
@@ -457,16 +502,14 @@ const scrollToFocus = () => {
   }
   let okStreak = 0
   let ticks = 0
-  const stop = () => {
-    if (focusTimer) clearInterval(focusTimer)
-    focusTimer = null
-  }
   const tick = () => {
+    bindFocusInterrupt()
     okStreak = scroll() ? okStreak + 1 : 0
-    if (++ticks >= 24 || okStreak >= 3) stop()
+    if (++ticks >= 24 || okStreak >= 3) stopFocusScroll()
   }
+  stopFocusScroll()
   scroll()
-  if (focusTimer) clearInterval(focusTimer)
+  bindFocusInterrupt()
   focusTimer = setInterval(tick, 250)
 }
 
@@ -488,7 +531,7 @@ watch(
   () => applyQuery(),
 )
 watch(
-  [() => view.value, () => listGroups.value],
+  [() => view.value, () => listGroups.value, () => focusId.value],
   () => {
     if (view.value === 'list') scrollToFocus()
   },
@@ -502,8 +545,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  if (focusTimer) clearInterval(focusTimer)
-  focusTimer = null
+  stopFocusScroll()
 })
 </script>
 
