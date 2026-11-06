@@ -1464,6 +1464,7 @@ export default {
     send: '发送',
     noData: '还没有消息，说点什么吧',
     onlineHint: '在线成员实时接收',
+    newMessages: '新消息 · {n}',
     connected: '已连接',
     connecting: '连接中...',
     reconnecting: '连接断开，正在重连',

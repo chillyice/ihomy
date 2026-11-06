@@ -1471,6 +1471,7 @@ export default {
     send: 'Send',
     noData: 'No messages yet, say something',
     onlineHint: 'Online members receive in real time',
+    newMessages: '{n} new messages',
     connected: 'Connected',
     connecting: 'Connecting...',
     reconnecting: 'Disconnected, reconnecting...',

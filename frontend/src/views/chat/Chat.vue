@@ -8,8 +8,8 @@
         {{ $t('chat.roomTitle') }} <span class="online-hint">{{ $t('chat.onlineHint') }}</span>
       </div>
 
-      <!-- 消息区(自动滚动到底部) -->
-      <div ref="msgBox" class="msg-list" v-loading="loading">
+      <!-- 消息区(贴近底部才自动滚动,翻历史时改出「新消息」浮标) -->
+      <div ref="msgBox" class="msg-list" v-loading="loading" @scroll="onMsgScroll">
         <el-empty v-if="!loading && !messages.length" :description="$t('chat.noData')" :image-size="70" />
         <TransitionGroup name="msg" tag="div">
           <div v-for="m in messages" :key="m.id" class="msg-row" :class="{ mine: m.senderId === myId }">
@@ -21,6 +21,11 @@
           </div>
         </TransitionGroup>
       </div>
+
+      <!-- 翻历史时的新消息浮标:点一下回到底部 -->
+      <button v-if="unreadNew > 0" type="button" class="msg-jump" @click="scrollBottom({ clearUnread: true })">
+        {{ $t('chat.newMessages', { n: unreadNew }) }}
+      </button>
 
       <!-- 输入区 -->
       <div class="msg-input">
@@ -59,6 +64,10 @@ const connected = ref(false)
 const connectedError = ref(false)
 const connecting = ref(false)
 const msgBox = ref(null)
+// 距底多少像素内算「贴着底部」:在这个范围内收消息才自动滚
+const NEAR_BOTTOM_PX = 80
+// 用户在翻历史时累计的新消息条数,点浮标或自己滚回底部即清零
+const unreadNew = ref(0)
 let ws = null
 let heartbeatTimer = null
 let reconnectTimer = null
@@ -106,8 +115,8 @@ const connect = () => {
       return
     }
     if (pkt.type === 'message') {
-      pushMsg(pkt.data)
-      // 自己发的也回显(服务端广播全房间),这里统一推进已读
+      // 自己发的消息永远回到底部(服务端广播全房间,这里统一推进已读)
+      pushMsg(pkt.data, { force: pkt.data.senderId === myId.value })
       chatApi.read(pkt.data.id).catch(() => {})
     }
   }
@@ -116,17 +125,32 @@ const connect = () => {
   }, 25000)
 }
 
-/** 追加消息(仅保留最近 200 条,过长截断) */
-const pushMsg = (m) => {
-  messages.value.push(m)
-  if (messages.value.length > 200) messages.value.splice(0, messages.value.length - 200)
-  scrollBottom()
+/** 是否贴着底部(必须在插入新消息之前判断:插入后高度已变) */
+const isNearBottom = () => {
+  const el = msgBox.value
+  if (!el) return true
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_PX
 }
 
-const scrollBottom = () => {
+/** 追加消息(仅保留最近 200 条,过长截断);force=true 时无论在哪都回到底部 */
+const pushMsg = (m, { force = false } = {}) => {
+  const wasNear = isNearBottom()
+  messages.value.push(m)
+  if (messages.value.length > 200) messages.value.splice(0, messages.value.length - 200)
+  if (force || wasNear) scrollBottom({ clearUnread: true })
+  else unreadNew.value += 1
+}
+
+const scrollBottom = ({ clearUnread = false } = {}) => {
+  if (clearUnread) unreadNew.value = 0
   requestAnimationFrame(() => {
     if (msgBox.value) msgBox.value.scrollTop = msgBox.value.scrollHeight
   })
+}
+
+/** 自己滚回底部时浮标自然消失;回调只做一次布尔判断,不需要节流 */
+const onMsgScroll = () => {
+  if (unreadNew.value > 0 && isNearBottom()) unreadNew.value = 0
 }
 
 const send = () => {
@@ -143,7 +167,8 @@ const loadHistory = async () => {
     const un = await chatApi.unread()
     const msgs = await chatApi.history()
     messages.value = msgs
-    scrollBottom()
+    // 首次进入定位最新
+    scrollBottom({ clearUnread: true })
     await chatApi.read(un.lastMsgId)
   } finally {
     loading.value = false
@@ -159,6 +184,7 @@ onBeforeUnmount(cleanup)
 
 <style scoped>
 .chat-box {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: calc(100vh - 220px);
@@ -247,6 +273,27 @@ onBeforeUnmount(cleanup)
   display: flex;
   gap: 10px;
   margin-top: 12px;
+}
+/* 翻历史时的新消息浮标:浮在输入区上方居中 */
+.msg-jump {
+  position: absolute;
+  left: 50%;
+  bottom: 72px;
+  transform: translateX(-50%);
+  z-index: var(--z-action);
+  padding: 5px 14px;
+  border: none;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: pointer;
+  color: var(--color-brand-text);
+  background: rgba(var(--color-brand-rgb), 0.92);
+  box-shadow: var(--shadow);
+  transition: transform var(--dur-fast) var(--ease-soft);
+}
+.msg-jump:hover {
+  transform: translateX(-50%) translateY(-1px);
 }
 .conn-hint {
   margin-top: 8px;
