@@ -83,28 +83,33 @@ class BookRecurringServiceTest {
         return r;
     }
 
+    private BookRecord recordOn(LocalDate date) {
+        BookRecord r = new BookRecord();
+        r.setFamilyId(FAMILY);
+        r.setType(DictConst.BOOK_EXPENSE);
+        r.setAmount(new BigDecimal("3000.00"));
+        r.setCategory("家居");
+        r.setRecordDate(date);
+        return r;
+    }
+
     @Test
-    void rerunOnSameDayDoesNotInsertTwice() {
+    void manualRunSkipsPeriodsAlreadyRecorded() {
         BookRecurring row = dailyTemplate();
         when(recurringMapper.selectList(any(Wrapper.class))).thenReturn(List.of(row));
-        // 第一次抢到「已生成日」并插入;第二次条件更新命中 0 行(另一执行已推进/已生成)
-        when(recurringMapper.update(isNull(), any())).thenReturn(1, 0);
+        // 今天已有同类型同分类的一笔(上次生成过 / 用户手记过):这一期算已记过,不再插入
+        when(bookMapper.selectList(any(Wrapper.class))).thenReturn(List.of(recordOn(LocalDate.now())));
 
-        int first = service.generateForFamily(FAMILY);
-        int second = service.generateForFamily(FAMILY);
-
-        assertThat(first).isEqualTo(1);
-        assertThat(second).isZero();
-        verify(bookMapper, times(1)).insert(any(BookRecord.class));
+        assertThat(service.backfillForFamily(FAMILY)).isZero();
+        verify(bookMapper, never()).insert(any(BookRecord.class));
     }
 
     @Test
     void generatedRecordCopiesTemplateAndUsesOccurrenceDate() {
         BookRecurring row = dailyTemplate();
         when(recurringMapper.selectList(any(Wrapper.class))).thenReturn(List.of(row));
-        when(recurringMapper.update(isNull(), any())).thenReturn(1);
 
-        service.generateForFamily(FAMILY);
+        service.backfillForFamily(FAMILY);
 
         ArgumentCaptor<BookRecord> captor = ArgumentCaptor.forClass(BookRecord.class);
         verify(bookMapper).insert(captor.capture());
@@ -139,17 +144,31 @@ class BookRecurringServiceTest {
 
     @Test
     void manualRunBackfillsFullHistoryNotJust90Days() {
-        // 立即生成本来是用户主动补账:5 个月前的月度模板应补 6 笔,不再被 90 天窗口截成 3 笔
+        // 立即生成本来就不套定时任务的 90 天窗口:5 个月前的月度模板应补 6 笔
         BookRecurring row = dailyTemplate();
         row.setPeriod("MONTHLY");
         row.setStartDate(LocalDate.now().minusMonths(5));
         when(recurringMapper.selectList(any(Wrapper.class))).thenReturn(List.of(row));
-        when(recurringMapper.update(isNull(), any())).thenReturn(1);
 
-        int generated = service.generateForFamily(FAMILY);
+        int generated = service.backfillForFamily(FAMILY);
 
         assertThat(generated).isEqualTo(6);
         verify(bookMapper, times(6)).insert(any(BookRecord.class));
+    }
+
+    @Test
+    void manualRunIgnoresLastGeneratedDateAndFillsHistory() {
+        // 「已生成日」已经很近(旧版本推进过),但起始日更早:历史缺口仍要补出来
+        BookRecurring row = dailyTemplate();
+        row.setPeriod("MONTHLY");
+        row.setStartDate(LocalDate.now().minusMonths(5));
+        row.setLastGeneratedDate(LocalDate.now().minusMonths(1)); // 只差最近 1 期的话,以前只补 1 笔
+        when(recurringMapper.selectList(any(Wrapper.class))).thenReturn(List.of(row));
+
+        assertThat(service.backfillForFamily(FAMILY)).isEqualTo(6);
+        verify(bookMapper, times(6)).insert(any(BookRecord.class));
+        // 补完把已生成日推到最后一期,定时任务接着往后生成
+        assertThat(row.getLastGeneratedDate()).isAfterOrEqualTo(LocalDate.now().withDayOfMonth(1));
     }
 
     @Test
@@ -177,8 +196,38 @@ class BookRecurringServiceTest {
         // selectList 已按 enabled=1 过滤;返回空表示无启用模板
         when(recurringMapper.selectList(any(Wrapper.class))).thenReturn(List.of());
 
-        assertThat(service.generateForFamily(FAMILY)).isZero();
+        assertThat(service.backfillForFamily(FAMILY)).isZero();
         verify(bookMapper, never()).insert(any(BookRecord.class));
+    }
+
+    @Test
+    void manualRunKeepsHandEditedAmountAsAlreadyRecorded() {
+        // 用户核对账单后手改了金额:分类仍对得上,视为这一期已记过,不再插一笔(避免重复记账)
+        BookRecurring row = dailyTemplate();
+        when(recurringMapper.selectList(any(Wrapper.class))).thenReturn(List.of(row));
+        BookRecord edited = recordOn(LocalDate.now());
+        edited.setAmount(new BigDecimal("2800.00"));
+        when(bookMapper.selectList(any(Wrapper.class))).thenReturn(List.of(edited));
+
+        assertThat(service.backfillForFamily(FAMILY)).isZero();
+        verify(bookMapper, never()).insert(any(BookRecord.class));
+    }
+
+    @Test
+    void coveredCheckTrustsAmountOnlyTogetherWithAccount() {
+        // 只比金额会把「同一天恰好花了同样的钱」的别的支出当成这一期,金额必须与账户一起比
+        BookRecurring row = dailyTemplate();
+        when(recurringMapper.selectList(any(Wrapper.class))).thenReturn(List.of(row));
+
+        service.backfillForFamily(FAMILY);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Wrapper<BookRecord>> captor = ArgumentCaptor.forClass(Wrapper.class);
+        verify(bookMapper).selectList(captor.capture());
+        assertThat(captor.getValue().getSqlSegment())
+                .contains("category")
+                .contains("amount")
+                .contains("account_id");
     }
 
     @Test

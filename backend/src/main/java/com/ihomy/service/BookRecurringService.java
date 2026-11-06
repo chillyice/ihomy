@@ -36,10 +36,11 @@ import java.util.stream.Collectors;
 /**
  * 记账周期模板业务:维护固定收支模板,并按天把到期期次生成为普通记账流水。
  *
- * 生成是幂等的:先以「已生成日」做条件更新抢占(WHERE last_generated_date = 旧值),
- * 抢到才插入流水,同一天重复跑(定时任务 + 手动触发 + 多实例)不会重复插入。
+ * 生成是幂等的:定时任务先以「已生成日」做条件更新抢占(WHERE last_generated_date = 旧值),
+ * 抢到才插入流水,同一天重复跑(定时任务 + 多实例)不会重复插入。
  * 日期推算唯一来源 common/BookRecurringSchedule(月度短月取月末、每年 2/29 平年取 2/28);
- * 用户主动补账(新建模板 / 立即生成)从起始日补齐全部历史期次,定时任务补跑最多回溯 90 天。
+ * 用户主动补账(新建模板 / 立即生成账目)从起始日补齐全部历史期次,定时任务补跑最多回溯 90 天。
+ * 「立即生成账目」不看已生成日、按「同日同类账目」跳过已记过的期次,所以历史缺口也能补出来。
  * 模板为家庭共享数据,改删限创建人本人或家长。
  */
 @Slf4j
@@ -96,7 +97,7 @@ public class BookRecurringService {
     /**
      * 新建模板:只允许收支两种类型;账户必须是本家庭未删除账户;分类空按「其他」。
      * 保存后立即从起始日把已到期期次补成流水(用户主动补账,不套定时任务的 90 天窗口),
-     * 否则起始日早于今天的模板要等到次日的定时任务才会有账目。
+     * 否则起始日早于今天的模板要等到次日的定时任务才会有账目;同一天已有同类账目则跳过。
      *
      * @return id 与本次补记的流水笔数
      */
@@ -108,7 +109,7 @@ public class BookRecurringService {
         applyForm(r, familyId, dto, true);
         r.setEnabled(1);
         recurringMapper.insert(r);
-        int generated = generateOne(r, LocalDate.now(), BookRecurringSchedule.FULL_HISTORY);
+        int generated = backfillOne(r, LocalDate.now());
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", r.getId());
         out.put("generated", generated);
@@ -138,7 +139,7 @@ public class BookRecurringService {
                 .set(BookRecurring::getAccountId, r.getAccountId()));
         // 只有「从未生成过」才回补:已生成中的模板改金额只影响后续期次,不拿新金额重写历史
         if (r.getEnabled() != null && r.getEnabled() == 1 && r.getLastGeneratedDate() == null) {
-            return generateOne(r, LocalDate.now(), BookRecurringSchedule.FULL_HISTORY);
+            return backfillOne(r, LocalDate.now());
         }
         return 0;
     }
@@ -173,17 +174,31 @@ public class BookRecurringService {
     }
 
     /**
-     * 手动为单个家庭补生成一次(与定时任务同一实现,幂等),返回本次新增条数。
-     * 用户主动触发,按模板起始日补齐全部历史期次,不套定时任务的 90 天窗口。
+     * 手动「立即生成账目」:把本家庭**每个启用模板**从起始日到今天的期次全部补齐。
+     *
+     * 与每日定时任务的区别是**不看「已生成日」**——旧版本跳过的历史期次、暂停期间漏掉的、
+     * 或者改过起始日之后新增出来的历史期次,都能一次补出来(定时任务只补最近 90 天,
+     * 且「已生成日」一旦推进就再也不会回头看)。
+     *
+     * 幂等靠「同日已有同类账目」判定:同一天、同类型,且分类与模板一致,或金额与账户都与模板一致,
+     * 就认为这一期已经记过,不重复插入。所以重复点、补过之后又点,都不会产生重复流水;
+     * 用户手改过金额的也认得出来,而「同一天恰好花了同样的钱」不会把别的支出当成这一期。
+     *
+     * @return 本次新生成的记账笔数
      */
-    public int generateForFamily(Long familyId) {
+    public int backfillForFamily(Long familyId) {
         List<BookRecurring> rows = recurringMapper.selectList(new LambdaQueryWrapper<BookRecurring>()
                 .eq(BookRecurring::getFamilyId, familyId)
                 .eq(BookRecurring::getEnabled, 1));
         LocalDate today = LocalDate.now();
         int total = 0;
         for (BookRecurring r : rows) {
-            total += generateOne(r, today, BookRecurringSchedule.FULL_HISTORY);
+            try {
+                total += backfillOne(r, today);
+            } catch (Exception e) {
+                // 单个模板出错不影响其他模板:补账是用户主动操作,别的模板该补的照样补
+                log.error("周期账目补齐失败, id={}", r.getId(), e);
+            }
         }
         return total;
     }
@@ -237,18 +252,74 @@ public class BookRecurringService {
         if (recurringMapper.update(null, claim) == 0) return 0;
 
         for (LocalDate date : occ.dates()) {
-            BookRecord record = new BookRecord();
-            record.setFamilyId(r.getFamilyId());
-            record.setType(r.getType());
-            record.setAmount(r.getAmount());
-            record.setCategory(r.getCategory());
-            record.setRemark(r.getRemark());
-            record.setRecordDate(date);
-            record.setCreatedBy(r.getCreatedBy());
-            record.setAccountId(r.getAccountId());
-            bookMapper.insert(record);
+            insertRecord(r, date);
         }
         return occ.dates().size();
+    }
+
+    /** 单个模板补齐历史(见 {@link #backfillForFamily}):整段推算 + 跳过已记过的期次 */
+    private int backfillOne(BookRecurring r, LocalDate today) {
+        // 已生成日传 null = 从起始日整段推算,不受「已生成到哪天」限制
+        BookRecurringSchedule.Occurrences occ = BookRecurringSchedule.due(
+                r.getPeriod(), r.getStartDate(), r.getEndDate(), null, today, BookRecurringSchedule.FULL_HISTORY);
+        if (occ.isEmpty()) return 0;
+        Integer generated = txOps.execute(status -> backfillInsert(r, occ));
+        return generated == null ? 0 : generated;
+    }
+
+    /** 同一事务内:先锁模板行(同模板串行),再按「同日同类」跳过已存在的期次,只补缺的 */
+    private int backfillInsert(BookRecurring r, BookRecurringSchedule.Occurrences occ) {
+        // 锁住模板行:两个人同时点「立即生成账目」时,后到的那个等前一个提交后再查已存在的账目
+        recurringMapper.selectOne(new LambdaQueryWrapper<BookRecurring>()
+                .eq(BookRecurring::getId, r.getId())
+                .last("FOR UPDATE"));
+
+        List<LocalDate> dates = occ.dates();
+        LocalDate first = dates.get(0);
+        LocalDate last = dates.get(dates.size() - 1);
+        // 已记过的期次:同类型 + (同分类 或 同金额且同账户)。用户手改过金额也认得出来,
+        // 又不会「同一天恰好花了同样的钱」把别的支出当成这一期
+        LambdaQueryWrapper<BookRecord> coveredQuery = new LambdaQueryWrapper<BookRecord>()
+                .eq(BookRecord::getFamilyId, r.getFamilyId())
+                .eq(BookRecord::getType, r.getType())
+                .between(BookRecord::getRecordDate, first, last)
+                .and(w -> w.eq(BookRecord::getCategory, r.getCategory()).or(same -> {
+                    same.eq(BookRecord::getAmount, r.getAmount());
+                    if (r.getAccountId() == null) same.isNull(BookRecord::getAccountId);
+                    else same.eq(BookRecord::getAccountId, r.getAccountId());
+                }));
+        Set<LocalDate> covered = bookMapper.selectList(coveredQuery)
+                .stream().map(BookRecord::getRecordDate).collect(Collectors.toSet());
+
+        int created = 0;
+        for (LocalDate date : dates) {
+            if (covered.contains(date)) continue;
+            insertRecord(r, date);
+            created++;
+        }
+        // 已生成日推进到最后一次期次:补完之后定时任务接着往后生成,不会再回头重算这段
+        LocalDate current = r.getLastGeneratedDate();
+        if (current == null || current.isBefore(last)) {
+            recurringMapper.update(null, new LambdaUpdateWrapper<BookRecurring>()
+                    .eq(BookRecurring::getId, r.getId())
+                    .set(BookRecurring::getLastGeneratedDate, last));
+            r.setLastGeneratedDate(last);
+        }
+        return created;
+    }
+
+    /** 按模板字段生成一笔普通流水(定时补跑与手动补齐共用) */
+    private void insertRecord(BookRecurring r, LocalDate date) {
+        BookRecord record = new BookRecord();
+        record.setFamilyId(r.getFamilyId());
+        record.setType(r.getType());
+        record.setAmount(r.getAmount());
+        record.setCategory(r.getCategory());
+        record.setRemark(r.getRemark());
+        record.setRecordDate(date);
+        record.setCreatedBy(r.getCreatedBy());
+        record.setAccountId(r.getAccountId());
+        bookMapper.insert(record);
     }
 
     /** 下次生成日(暂停/已过期返回 null):取「已生成日与昨天的较晚者」之后的第一个周期日 */

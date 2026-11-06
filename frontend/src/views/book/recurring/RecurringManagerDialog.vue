@@ -30,6 +30,8 @@
         <el-table-column :label="$t('book.recurring.nextDate')" width="110">
           <template #default="{ row }">
             <span v-if="row.enabled && row.nextDate">{{ row.nextDate }}</span>
+            <!-- 启用但算不出下次 = 已过结束日;别再显示「已暂停」让人以为模板没生效 -->
+            <span v-else-if="row.enabled" class="rc-muted">{{ $t('book.recurring.finished') }}</span>
             <span v-else class="rc-muted">{{ $t('book.recurring.paused') }}</span>
           </template>
         </el-table-column>
@@ -117,7 +119,7 @@
 </template>
 
 <script setup>
-// 周期模板管理:列表 + 新增/编辑 + 暂停恢复 + 删除 + 立即生成(与服务端每日任务同一逻辑,幂等)
+// 周期模板管理:列表 + 新增/编辑 + 暂停恢复 + 删除 + 立即生成账目(按模板从起始日补齐缺的期次,已记过的不重复)
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -242,6 +244,11 @@ const onDel = async (row) => {
 }
 
 const onRun = async () => {
+  try {
+    await ElMessageBox.confirm(t('book.recurring.runConfirm'), t('book.recurring.runConfirmTitle'), { type: 'info' })
+  } catch {
+    return
+  }
   running.value = true
   try {
     const data = await bookApi.runRecurring()

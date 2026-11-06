@@ -81,13 +81,13 @@ public class BookRecurringController {
         return Result.success();
     }
 
-    @Operation(summary = "立即生成本家庭的到期流水(与每日定时任务同一逻辑,重复执行不会重复生成)")
-    @OperationLog(module = "BOOK", operationType = "CREATE", description = "生成周期账目")
+    @Operation(summary = "立即生成账目(按模板从起始日补齐到今天缺的期次,已有的不重复生成)")
+    @OperationLog(module = "BOOK", operationType = "CREATE", description = "补齐周期账目")
     @PostMapping("/run")
     public Result<Map<String, Object>> run() {
         LoginUser user = current();
         bookPermissionService.requireWrite(user);
-        int generated = recurringService.generateForFamily(user.getFamilyId());
+        int generated = recurringService.backfillForFamily(user.getFamilyId());
         return Result.success(Map.of("generated", generated));
     }
 }
