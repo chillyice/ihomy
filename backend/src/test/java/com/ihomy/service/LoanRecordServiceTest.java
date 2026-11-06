@@ -239,6 +239,9 @@ class LoanRecordServiceTest {
         r.setId(id);
         r.setFamilyId(1L);
         r.setAccountId(accountId);
+        // 与台账快照一致(自动生成且未被手改):金额/日期/账户都对得上
+        r.setAmount(new BigDecimal("5307.26"));
+        r.setRecordDate(LocalDate.now().minusMonths(1));
         return r;
     }
 
@@ -263,7 +266,7 @@ class LoanRecordServiceTest {
 
         Map<String, Object> res = service.syncRepays(1L, syncDtoOfPeriod(4, 9L));
 
-        // 换账户后这一期归新账户:台账与记账流水一起迁,金额/日期不动
+        // 换账户后这一期归新账户:台账与记账流水一起迁
         assertThat(res.get("created")).isEqualTo(0);
         assertThat(res.get("moved")).isEqualTo(1);
         assertThat(booked.getAccountId()).isEqualTo(9L);
@@ -285,9 +288,48 @@ class LoanRecordServiceTest {
         verify(recordMapper, never()).update(any(), any());
     }
 
+    /* ==================== 贷款信息改动后重算历史账目 ==================== */
+
+    @Test
+    void syncRecomputesBookedAmountAfterLoanChanged() {
+        stubAccountSwitch();
+        FamilyLoanRepay booked = bookedRepay(4, 7L); // 上次记账按旧利率 5307.26
+        when(repayMapper.selectList(any())).thenReturn(List.of(booked));
+        when(recordMapper.selectBatchIds(any())).thenReturn(List.of(recordOf(104L, 7L)));
+
+        // 补录了 1 月 1 日的利率调整后,这一期应改为新利率算出的金额
+        Map<String, Object> res = service.syncRepays(1L, syncDtoOfPeriod(4, 7L, "5100.00"));
+
+        assertThat(res.get("created")).isEqualTo(0);
+        assertThat(res.get("adjusted")).isEqualTo(1);
+        assertThat(booked.getAmount()).isEqualByComparingTo("5100.00");
+        verify(repayMapper).update(isNull(), any()); // 台账快照跟着新计划走
+        verify(recordMapper).update(isNull(), any()); // 自动生成的流水一起改金额
+    }
+
+    @Test
+    void syncKeepsUserEditedRecordAmount() {
+        stubAccountSwitch();
+        FamilyLoanRepay booked = bookedRepay(4, 7L);
+        when(repayMapper.selectList(any())).thenReturn(List.of(booked));
+        BookRecord edited = recordOf(104L, 7L);
+        edited.setAmount(new BigDecimal("5288.88")); // 用户核对账单后手改过金额
+        when(recordMapper.selectBatchIds(any())).thenReturn(List.of(edited));
+
+        Map<String, Object> res = service.syncRepays(1L, syncDtoOfPeriod(4, 7L, "5100.00"));
+
+        assertThat(res.get("adjusted")).isEqualTo(0);
+        verify(recordMapper, never()).update(any(), any());
+    }
+
     /** 指定期次与账户的同步表单(换账户场景要落在被迁移的那一期上) */
     private LoanRepaySyncDTO syncDtoOfPeriod(int period, Long accountId) {
-        LoanRepaySyncDTO d = syncDto(accountId, LocalDate.now().minusDays(1), "5307.26");
+        return syncDtoOfPeriod(period, accountId, "5307.26");
+    }
+
+    /** 指定期次、账户与金额(贷款信息改动后重算历史账目用) */
+    private LoanRepaySyncDTO syncDtoOfPeriod(int period, Long accountId, String amount) {
+        LoanRepaySyncDTO d = syncDto(accountId, LocalDate.now().minusDays(1), amount);
         d.getItems().get(0).setPeriod(period);
         return d;
     }

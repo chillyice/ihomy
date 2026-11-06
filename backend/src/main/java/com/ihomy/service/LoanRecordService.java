@@ -175,17 +175,21 @@ public class LoanRecordService {
      * 贷款还款记账同步:前端按流水给出「已到期 + 该期有还款账户」的期次(含已记账的),
      * 这里按 (loan_id, period) 幂等补插,并把换账户后的既有账目迁到新账户。
      *
-     * 已记过的期次不重复生成(含用户在记账本删掉流水的情况:台账还在,不再重复生成),金额与还款日
-     * 沿用首次记账的快照;只有「本期该扣哪个账户」按前端最新时间轴纠正——换账户事件落在中间某一期时,
-     * 已生成的后半段账目也随之改挂新账户(用户手改过该笔流水的账户则保留用户的选择)。
+     * 已记过的期次不重复生成(含用户在记账本删掉流水的情况:台账还在,不再重复生成),但**金额/还款日/
+     * 账户都会按最新贷款信息校正**——改了利率、期限、首期还款日,或补录了利率调整/提前还款后,已记进
+     * 记账本的历史月供也要跟着变,否则贷款页的流水表与记账本里的支出对不上(月供金额唯一计算源仍是
+     * 前端 `utils/loan.js`,这里只落库不重算)。
+     * 两条保护:①用户在记账本手动改过该笔流水(金额/日期/账户任一与台账快照不一致)时整条保留用户选择;
+     * ②`(贷款, 期次)` 唯一键保证同一期不会重复生成。
      *
-     * @return created=本次新生成的记账笔数,moved=迁移到新账户的已记账笔数
+     * @return created=本次新生成的记账笔数,moved=改挂新账户的已记账笔数,adjusted=按最新计划重算金额/日期的流水笔数
      */
     @Transactional
     public Map<String, Object> syncRepays(Long familyId, LoanRepaySyncDTO dto) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("created", 0);
         out.put("moved", 0);
+        out.put("adjusted", 0);
         List<LoanRepaySyncDTO.Item> items = dto == null ? null : dto.getItems();
         if (items == null || items.isEmpty()) return out;
 
@@ -214,11 +218,19 @@ public class LoanRecordService {
                         .in(FamilyLoanRepay::getLoanId, loanIds))
                 .stream().collect(Collectors.toMap(r -> key(r.getLoanId(), r.getPeriod()), r -> r, (a, b) -> a));
 
+        // 已记账期次对应的记账流水一次取回(改账户/改金额都要回写它,禁止逐条 selectById)
+        List<Long> bookedRecordIds = booked.values().stream().map(FamilyLoanRepay::getRecordId)
+                .filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        Map<Long, BookRecord> records = bookedRecordIds.isEmpty() ? Map.of()
+                : bookRecordMapper.selectBatchIds(bookedRecordIds).stream()
+                        .filter(r -> Objects.equals(r.getFamilyId(), familyId))
+                        .collect(Collectors.toMap(BookRecord::getId, r -> r, (a, b) -> a));
+
         LocalDate today = LocalDate.now();
         int created = 0;
-        // 已记账但「本期该扣的账户」变了的期次:台账改账户,生成的流水也一起迁(账户切换后历史跟着走)
-        List<FamilyLoanRepay> moved = new ArrayList<>();
-        Map<Long, Long> oldAccountOfRepay = new HashMap<>();
+        // 已记账期次:改挂新账户的笔数(含换账户)、按最新计划重算金额/日期的流水笔数
+        int moved = 0;
+        int adjusted = 0;
         for (LoanRepaySyncDTO.Item item : items) {
             if (item == null || item.getLoanId() == null || item.getAccountId() == null) continue;
             FamilyLoan loan = loans.get(item.getLoanId());
@@ -238,15 +250,48 @@ public class LoanRecordService {
             }
             FamilyLoanRepay existing = booked.get(key(loan.getId(), period));
             if (existing != null) {
-                // 金额/日期保持首次记账快照,只纠正账户归属
-                if (!Objects.equals(existing.getAccountId(), item.getAccountId())) {
-                    oldAccountOfRepay.put(existing.getId(), existing.getAccountId());
+                boolean accountChanged = !Objects.equals(existing.getAccountId(), item.getAccountId());
+                // 贷款信息被改过(利率/期限/首期还款日/事件):已记账的金额、还款日也要跟着最新流水走
+                boolean planChanged = !sameAmount(existing.getAmount(), item.getAmount())
+                        || !sameAmount(existing.getPrincipal(), item.getPrincipal())
+                        || !sameAmount(existing.getInterest(), item.getInterest())
+                        || !Objects.equals(existing.getDueDate(), item.getDueDate());
+                if (accountChanged || planChanged) {
                     familyLoanRepayMapper.update(null, new LambdaUpdateWrapper<FamilyLoanRepay>()
                             .eq(FamilyLoanRepay::getId, existing.getId())
-                            .set(FamilyLoanRepay::getAccountId, item.getAccountId()));
-                    existing.setAccountId(item.getAccountId());
-                    moved.add(existing);
+                            .set(FamilyLoanRepay::getAccountId, item.getAccountId())
+                            .set(FamilyLoanRepay::getAmount, item.getAmount())
+                            .set(FamilyLoanRepay::getPrincipal, item.getPrincipal())
+                            .set(FamilyLoanRepay::getInterest, item.getInterest())
+                            .set(FamilyLoanRepay::getDueDate, item.getDueDate()));
                 }
+                BookRecord record = existing.getRecordId() == null ? null : records.get(existing.getRecordId());
+                if (record != null) {
+                    // 未被手改 = 流水上的金额/日期/账户仍与台账快照一致;任一项被改过就整条保留用户的选择
+                    boolean untouched = sameAmount(record.getAmount(), existing.getAmount())
+                            && Objects.equals(record.getRecordDate(), existing.getDueDate())
+                            && Objects.equals(record.getAccountId(), existing.getAccountId());
+                    String remark = loan.getName() + " · 第 " + period + " 期";
+                    if (untouched && (accountChanged || planChanged || !Objects.equals(record.getRemark(), remark))) {
+                        LambdaUpdateWrapper<BookRecord> rw = new LambdaUpdateWrapper<BookRecord>()
+                                .eq(BookRecord::getId, record.getId())
+                                .set(BookRecord::getAccountId, item.getAccountId())
+                                .set(BookRecord::getRemark, remark);
+                        if (planChanged) {
+                            rw.set(BookRecord::getAmount, item.getAmount())
+                                    .set(BookRecord::getRecordDate, item.getDueDate());
+                        }
+                        bookRecordMapper.update(null, rw);
+                        if (planChanged) adjusted++;
+                    }
+                }
+                if (accountChanged) moved++;
+                // 台账跟着最新计划走,作为下一轮比较的基准
+                existing.setAccountId(item.getAccountId());
+                existing.setAmount(item.getAmount());
+                existing.setPrincipal(item.getPrincipal());
+                existing.setInterest(item.getInterest());
+                existing.setDueDate(item.getDueDate());
                 continue;
             }
 
@@ -289,24 +334,9 @@ public class LoanRecordService {
             created++;
         }
 
-        if (!moved.isEmpty()) {
-            // 只有「流水账户仍是当初自动记账写的那一个」才跟着迁;用户手改过账户的流水保留用户选择
-            List<Long> recordIds = moved.stream().map(FamilyLoanRepay::getRecordId)
-                    .filter(Objects::nonNull).distinct().collect(Collectors.toList());
-            Map<Long, BookRecord> records = recordIds.isEmpty() ? Map.of()
-                    : bookRecordMapper.selectBatchIds(recordIds).stream()
-                            .collect(Collectors.toMap(BookRecord::getId, r -> r, (a, b) -> a));
-            for (FamilyLoanRepay repay : moved) {
-                BookRecord record = repay.getRecordId() == null ? null : records.get(repay.getRecordId());
-                if (record == null || !Objects.equals(record.getFamilyId(), familyId)) continue;
-                if (!Objects.equals(record.getAccountId(), oldAccountOfRepay.get(repay.getId()))) continue;
-                bookRecordMapper.update(null, new LambdaUpdateWrapper<BookRecord>()
-                        .eq(BookRecord::getId, record.getId())
-                        .set(BookRecord::getAccountId, repay.getAccountId()));
-            }
-        }
         out.put("created", created);
-        out.put("moved", moved.size());
+        out.put("moved", moved);
+        out.put("adjusted", adjusted);
         return out;
     }
 
@@ -496,6 +526,12 @@ public class LoanRecordService {
 
     private static String key(Long loanId, Integer period) {
         return loanId + ":" + period;
+    }
+
+    /** 金额按数值比较:台账快照 2481.34 与前端入参 2481.3400 视为相同 */
+    private static boolean sameAmount(BigDecimal a, BigDecimal b) {
+        if (a == null || b == null) return a == null && b == null;
+        return a.compareTo(b) == 0;
     }
 
     private String normalize(String value, Set<String> allowed, String fallback) {

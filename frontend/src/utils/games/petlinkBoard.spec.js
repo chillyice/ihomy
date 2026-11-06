@@ -139,7 +139,7 @@ describe('simulatePetLinkLevel 全关卡自动对局', () => {
       expect(report.issues, `第 ${level} 关自检异常:${JSON.stringify(report.issues.slice(0, 3))}`).toEqual([])
       expect(report.steps).toBeGreaterThan(0)
     }
-  })
+  }, 30000) // 7 关 × 40 局全量模拟是纯 CPU 重活:并行跑全量测试时默认 5s 会被机器负载挤爆(误报超时)
 
   it('第 1~2 关(无牌位移动)同样成立', () => {
     for (const level of [1, 2]) {

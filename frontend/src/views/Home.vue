@@ -562,8 +562,8 @@ const loadAssets = async () => {
   assetLoans.value = Array.isArray(loans) ? loans : null
   // 有贷款的成员打开首页时顺手补记到期月供(幂等;只读档位不写,失败不影响资产卡)
   if (Array.isArray(loans) && loans.length && userStore.canWriteBook) {
-    const { created, moved } = await syncLoanRepays(loans).catch(() => ({ created: 0, moved: 0 }))
-    if (created > 0 || moved > 0) {
+    const { created, moved, adjusted } = await syncLoanRepays(loans).catch(() => ({ created: 0, moved: 0, adjusted: 0 }))
+    if (created > 0 || moved > 0 || adjusted > 0) {
       // 账户余额与本月收支都变了:重取账户与摘要,资产卡/收支卡即刻反映月供
       const [fresh] = await Promise.all([bookApi.accounts().catch(() => null)])
       if (Array.isArray(fresh)) assetAccounts.value = fresh

@@ -4121,6 +4121,7 @@ export default {
           'Takes effect after payment N: from payment N+1 the installment goes to the new account; leave the account empty to stop automatic entries',
         bookedCount: '{n} installments booked',
         movedAccounts: '{n} booked entries moved to the new repayment account',
+        adjustedEntries: '{n} booked entries updated to the latest loan plan',
         accountUnbound: 'No account bound',
         formLoanDate: 'Drawn on (optional)',
         formFirstPayDate: 'First payment date (optional)',

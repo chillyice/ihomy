@@ -4083,6 +4083,7 @@ export default {
         accountEventHint: '第 N 期还款之后生效：从第 N+1 期起月供记到新账户；账户留空表示不再自动记账',
         bookedCount: '已自动记账 {n} 期',
         movedAccounts: '已按新的还款账户调整 {n} 期账目',
+        adjustedEntries: '已按最新贷款信息调整 {n} 期账目',
         accountUnbound: '未绑定账户',
         formLoanDate: '放款日（选填）',
         formFirstPayDate: '首期还款日（选填）',

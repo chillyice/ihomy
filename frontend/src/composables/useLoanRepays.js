@@ -12,22 +12,25 @@ const CHUNK = 200
 
 /**
  * 提交待同步期次。
- * @returns {Promise<{created:number, moved:number}>} created=新生成的记账笔数,moved=换账户后迁到新账户的笔数
+ * @returns {Promise<{created:number, moved:number, adjusted:number}>} created=新生成的记账笔数,
+ *   moved=换账户后迁到新账户的笔数,adjusted=按最新贷款信息重算金额/日期的已记账笔数
  */
 export async function syncLoanRepays(loans, today = new Date()) {
   const items = loanRepayItems(loans, today)
-  if (!items.length) return { created: 0, moved: 0 }
+  if (!items.length) return { created: 0, moved: 0, adjusted: 0 }
   let created = 0
   let moved = 0
+  let adjusted = 0
   for (let i = 0; i < items.length; i += CHUNK) {
     const res = await loanApi.syncRepay(items.slice(i, i + CHUNK))
     created += Number(res?.created) || 0
     moved += Number(res?.moved) || 0
+    adjusted += Number(res?.adjusted) || 0
   }
-  return { created, moved }
+  return { created, moved, adjusted }
 }
 
-/** 自己取贷款列表再同步(记账本页/贷款记录页用),返回新生成/迁移的笔数 */
+/** 自己取贷款列表再同步(记账本页/贷款记录页用),返回新生成/迁移/重算的笔数 */
 export async function syncLoanRepaysFromServer(today = new Date()) {
   const loans = await loanApi.list()
   return syncLoanRepays(Array.isArray(loans) ? loans : [], today)

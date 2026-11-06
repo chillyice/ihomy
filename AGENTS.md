@@ -130,7 +130,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 - **小游戏与网页游戏**:进度写 `localStorage`(`ihomy:games:*`),结构校验/恢复判定在 `utils/games/*` 纯函数(带 spec),连连看棋盘与纸牌尺寸内核 `petlinkBoard.js`/`cardLayout.js`;根容器统一 `class="game-surface"` 触摸守卫,长按类操作(扫雷插旗)必须用 gesture 标记吞 click(踩坑速查 §3.57);**八个 H5 小游戏奖励统一 `POST /game/{code}/reward`**(Redis 每日 5 次);**纸牌两级入口** `/games/cards` → 牌桌 `/games/cards/klondike|spider`;**网页游戏(LINK)一律走站内 `/games/web/{id}` iframe**,站点账号已并入家庭保险箱(`game_site_account` 已删,跨域见 踩坑速查 §3.60)。键清单/玩法/全屏口径见 需求 §4.13.2、UI 提示词 §31,连连看坑见 踩坑速查 §3.58。
 - **提醒按日完成**:一次性用 `family_reminder.done`;循环按 (提醒, 日期) 落 `family_reminder_check`,取消即删行;`toggle-done?date=` 带日期按该日切换,删除连带清完成行。判定唯一来源 `RepeatSchedule.dueToday`(每年可选阳历/农历,闰月严格匹配),到点通知对循环看当日完成行(踩坑速查 §2.20)。
 - **记账本权限**:整本账本按成员档位(`family_book_permission`:NONE/READ/WRITE/MANAGE,**无行=WRITE**),OWNER 恒 MANAGE 且只有家长能改档;**不走 `@RequirePermission`**,Controller 用 `BookPermissionService.requireRead/requireWrite` 守门;`userInfo.bookLevel` → `userStore.canReadBook/canWriteBook/canManageBook`;档位不缓存。口径见 需求 §4.5.5。
-- **贷款月供自动记账**:贷款 `account_id` = 初始还款账户(第 1 期起),中途换账户走 `ACCOUNT_CHANGE` 事件(第 N 期后生效,留空=停记),**换账户不生成转账流水**;**没有初始账户时「第 1 期后换账户」按首次绑定处理**(后端 `foldInitialAccountChange` 并成 `family_loan.account_id`,事件不落库,否则第 1 期永远无账户可扣);到期期次由前端按流水口径算(`utils/loanRepay.js`)**含已记账期次**一起调 `POST /loan/repay/sync`,后端按 `(loan_id, period)` 唯一幂等补插支出到 `family_book_record`,台账 `family_loan_repay` 保证不重复;换账户后**已记账期次按最新时间轴改挂新账户**(台账与流水同步迁移,金额/日期仍是首次记账快照;用户手改过该笔流水的账户则保留);**月供金额唯一计算源仍是 `utils/loan.js`**,后端不复算。触发点:贷款记录页/记账本进页(先补记再取数)/首页资产卡/保存贷款或事件。细则见 需求 §4.12.4。
+- **贷款月供自动记账**:贷款 `account_id` = 初始还款账户(第 1 期起),中途换账户走 `ACCOUNT_CHANGE` 事件(第 N 期后生效,留空=停记),**换账户不生成转账流水**;**没有初始账户时「第 1 期后换账户」按首次绑定处理**(后端 `foldInitialAccountChange` 并成 `family_loan.account_id`,事件不落库,否则第 1 期永远无账户可扣);到期期次由前端按流水口径算(`utils/loanRepay.js`)**含已记账期次**一起调 `POST /loan/repay/sync`,后端按 `(loan_id, period)` 唯一幂等补插支出到 `family_book_record`,台账 `family_loan_repay` 保证不重复;**换账户或改贷款信息(利率/期限/首期还款日/事件)后,已记账期次的账户/金额/还款日按最新流水校正**(台账与流水同步更新,返回 `{created,moved,adjusted}`;用户手改过该笔流水则整条保留);**调息日早于某期还款日 → 该期整期按新利率计息**,晚于则下期起,不按天拆分;**月供金额唯一计算源仍是 `utils/loan.js`**,后端不复算。触发点:贷款记录页/记账本进页(先补记再取数)/首页资产卡/保存贷款或事件。细则见 需求 §4.12.4。
 - **日程聚合只读**:`GET /schedule/events?from=&to=`(≤62 天)与 `/schedule/upcoming?days=` 摊平纪念日/提醒/计划/子任务与只读来源,写侧仍走各自接口。**贷款还款日/理财到期/食材到期**各是一个 `service/schedule/ScheduleSourceProvider` 实现(新增来源只加实现),事项带 `source`/`readOnly`/`link`;来源开关只在前端 `localStorage`。游客只返回演示家庭纪念日。细则见 需求 §4.3.6。
 
 ## 后端规范
@@ -177,9 +177,9 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 ## 验证基线
 
-- 后端全绿:`.\mvnw.cmd -B clean package`(327 tests,纯逻辑不起 Spring)。
+- 后端全绿:`.\mvnw.cmd -B clean package`(329 tests,纯逻辑不起 Spring)。
 - 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(816 passed)+ `npm run format:check`(全树仍有历史遗留未格式化文件,口径见 踩坑速查 §1.13;**本次改动的文件必须 `prettier --write` 后通过**)。
-- 构建:首屏初始 JS 基线 **1466.88KB / gzip 500.95KB**(42 chunk,英文包 `en` 为懒加载 chunk);体积口径以 vite 构建输出为准,历史数字见 变更归档。
+- 构建:首屏初始 JS 基线 **1466.94KB / gzip 500.98KB**(42 chunk,英文包 `en` 为懒加载 chunk);体积口径以 vite 构建输出为准,历史数字见 变更归档。
 - 一致性:`bash scripts/doc-drift-check.sh` 全 [OK];`gen-code-map.sh --check`、`doc-index.sh --check` 无漂移。
 - 接口测试在仓库外 `..\autotest_framework`(`pytest -m api`,37 passed)。
 
