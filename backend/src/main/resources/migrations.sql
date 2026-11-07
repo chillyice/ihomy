@@ -3109,3 +3109,32 @@ DELETE e FROM `family_loan_event` e
    AND e.`effective_period` = 1
    AND e.`note` IS NULL
    AND e.`account_id` = l.`account_id`;
+
+-- ------------------------------------------------------------
+-- V11.55 聊天消息富内容化(2026-11-07)
+--   family_chat_message 增加 msg_type(消息类型)与 payload(结构化 JSON 负载):
+--   TEXT 为存量默认值零迁移;非 TEXT 类型(IMAGE/LINK/CARD/GAME_INVITE/CALL)的
+--   展示数据存 payload(≤4KB),content 保留文本摘要(卡片标题/链接地址)。
+--   重复执行安全:information_schema 条件加列,列存在即跳过。
+-- ------------------------------------------------------------
+SET @add_chat_msg_type := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `family_chat_message` ADD COLUMN `msg_type` VARCHAR(20) NOT NULL DEFAULT ''TEXT'' COMMENT ''消息类型: TEXT/IMAGE/LINK/CARD/GAME_INVITE/CALL'' AFTER `content`',
+    'SELECT ''skip: family_chat_message.msg_type already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_chat_message' AND COLUMN_NAME = 'msg_type'
+);
+PREPARE add_chat_msg_type_stmt FROM @add_chat_msg_type;
+EXECUTE add_chat_msg_type_stmt;
+DEALLOCATE PREPARE add_chat_msg_type_stmt;
+
+SET @add_chat_payload := (
+  SELECT IF(COUNT(*) = 0,
+    'ALTER TABLE `family_chat_message` ADD COLUMN `payload` TEXT NULL COMMENT ''结构化负载(JSON,≤4KB,按 msg_type 定义;TEXT 为 NULL)'' AFTER `msg_type`',
+    'SELECT ''skip: family_chat_message.payload already exists'' AS msg')
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_chat_message' AND COLUMN_NAME = 'payload'
+);
+PREPARE add_chat_payload_stmt FROM @add_chat_payload;
+EXECUTE add_chat_payload_stmt;
+DEALLOCATE PREPARE add_chat_payload_stmt;

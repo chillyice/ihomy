@@ -1,8 +1,7 @@
 package com.ihomy.websocket;
 
 import tools.jackson.databind.ObjectMapper;
-import com.ihomy.entity.ChatMessage;
-import com.ihomy.mapper.ChatMessageMapper;
+import com.ihomy.service.ChatService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -16,8 +15,11 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 聊天室 WebSocket 处理器:
- * 按 family_id 分房间,收到文本即落库并向同房间所有在线会话广播。
+ * 聊天室 WebSocket 处理器(协议 v2):
+ * - 上行统一 {"type","data"}:ping(心跳,回 pong)/ message(聊天消息);未知 type 回 error 不断连。
+ * - 下行 envelope:{"type":"message|pong|error","data":{…}};聊天消息视图与 REST 历史同构(含 senderName/msgType/payload)。
+ * - 按 familyId 分房间广播;另有 userId→sessions 索引供定向投递(通话/对战信令,P3/P4 启用),
+ *   目标不在线不排队补发,由上层走离线落库逻辑。
  * 低并发家庭场景内存房间表足够,不引入 Redis 广播。
  */
 @Slf4j
@@ -25,11 +27,14 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 public class ChatWebSocketHandler extends TextWebSocketHandler {
 
-    private final ChatMessageMapper messageMapper;
+    private final ChatService chatService;
     private final ObjectMapper objectMapper;
 
     /** 房间表:familyId -> 在线会话集合(会话自带 userId/familyId 属性) */
     private final Map<Long, Set<WebSocketSession>> rooms = new ConcurrentHashMap<>();
+
+    /** 定向投递索引:userId -> 在线会话集合(同人多标签各一条) */
+    private final Map<Long, Set<WebSocketSession>> userSessions = new ConcurrentHashMap<>();
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
@@ -39,7 +44,11 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             return;
         }
         rooms.computeIfAbsent(familyId, k -> ConcurrentHashMap.newKeySet()).add(session);
-        log.info("聊天连接建立 family={} sessions={}", familyId, rooms.get(familyId).size());
+        Long userId = userIdOf(session);
+        if (userId != null) {
+            userSessions.computeIfAbsent(userId, k -> ConcurrentHashMap.newKeySet()).add(session);
+        }
+        log.info("聊天连接建立 family={} sessions={} user={}", familyId, rooms.get(familyId).size(), userId);
     }
 
     @Override
@@ -57,66 +66,119 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                     "WS /ws/chat user={}#{} family={} bytes={} content={}",
                     session.getAttributes().get("username"), userId, familyId,
                     message.getPayloadLength(), abbreviate(message.getPayload()));
-            // 消息负载形如 {"content":"..."}:落库后广播给同房间全部在线会话
-            Map<?, ?> payload = objectMapper.readValue(message.getPayload(), Map.class);
-            String content = payload.get("content") == null ? "" : payload.get("content").toString();
-            if (content.isBlank() || content.length() > 2000) {
-                session.close(CloseStatus.POLICY_VIOLATION);
-                return;
+            Map<?, ?> pkt = objectMapper.readValue(message.getPayload(), Map.class);
+            String type = str(pkt.get("type"));
+            Map<?, ?> data = pkt.get("data") instanceof Map<?, ?> d ? d : Map.of();
+            switch (type) {
+                case "ping" -> reply(session, Map.of("type", "pong"));
+                case "message" -> onChatMessage(session, familyId, userId, data);
+                default -> replyError(session, "BAD_TYPE");
             }
-            ChatMessage m = new ChatMessage();
-            m.setFamilyId(familyId);
-            m.setSenderId(userId);
-            m.setContent(content);
-            messageMapper.insert(m);
-
-            Map<String, Object> out = toJson(m, userId);
-            Set<WebSocketSession> room = rooms.get(familyId);
-            if (room != null) {
-                TextMessage broadcast = new TextMessage(objectMapper.writeValueAsString(out));
-                for (WebSocketSession s : room) {
-                    if (s.isOpen()) {
-                        s.sendMessage(broadcast);
-                    }
-                }
-            }
+        } catch (Exception e) {
+            // 载荷不是合法 JSON 等协议错误:回 error envelope,不断连(心跳错配曾在这里关连接)
+            log.warn("WS 载荷处理失败 user={} bytes={}", userId, message.getPayloadLength(), e);
+            replyError(session, "BAD_FORMAT");
         } finally {
             org.slf4j.MDC.remove(com.ihomy.filter.TraceIdFilter.TRACE_ID);
         }
     }
 
-    /** WS 消息内容截断(access 日志防刷屏,完整内容在 family_chat_message 表) */
-    private String abbreviate(String payload) {
-        return payload != null && payload.length() > 200 ? payload.substring(0, 200) + "...(truncated)" : payload;
+    /** 聊天消息:校验+落库+广播(校验失败回 error envelope,连接保留) */
+    private void onChatMessage(WebSocketSession session, Long familyId, Long userId, Map<?, ?> data) {
+        try {
+            String payload = data.get("payload") == null ? null
+                    : data.get("payload") instanceof String s ? s : objectMapper.writeValueAsString(data.get("payload"));
+            Map<String, Object> view = chatService.sendMessage(familyId, userId, str(data.get("msgType")),
+                    str(data.get("content")), payload);
+            broadcast(familyId, envelope("message", view));
+        } catch (IllegalArgumentException e) {
+            replyError(session, e.getMessage());
+        }
     }
 
-    @Override
-    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        Long familyId = familyOf(session);
-        if (familyId == null) {
+    /** 广播给同房间全部在线会话 */
+    private void broadcast(Long familyId, Map<String, Object> envelope) {
+        Set<WebSocketSession> room = rooms.get(familyId);
+        if (room == null) {
             return;
         }
-        Set<WebSocketSession> room = rooms.get(familyId);
-        if (room != null) {
-            room.remove(session);
-            if (room.isEmpty()) {
-                rooms.remove(familyId);
+        TextMessage msg = new TextMessage(toJson(envelope));
+        for (WebSocketSession s : room) {
+            if (s.isOpen()) {
+                sendQuietly(s, msg);
             }
         }
     }
 
-    /** 返回给客户端的消息结构(带发送人) */
-    private Map<String, Object> toJson(ChatMessage m, Long senderId) {
-        Map<String, Object> data = new java.util.LinkedHashMap<>();
-        data.put("id", m.getId());
-        data.put("familyId", m.getFamilyId());
-        data.put("senderId", senderId);
-        data.put("content", m.getContent());
-        data.put("createdAt", m.getCreatedAt());
-        Map<String, Object> envelope = new java.util.LinkedHashMap<>();
-        envelope.put("type", "message");
-        envelope.put("data", data);
-        return envelope;
+    /** 单会话投递:IO 失败只记日志不中断循环(广播/定向共用,死会话由容器异步关闭回调摘除) */
+    private void sendQuietly(WebSocketSession s, TextMessage msg) {
+        try {
+            s.sendMessage(msg);
+        } catch (Exception e) {
+            log.warn("WS 投递失败 session={}", s.getId(), e);
+        }
+    }
+
+    /**
+     * 定向投递:按 userId 找全部在线会话(P3 通话/P4 对战信令用),返回送达的会话数。
+     * 返回 0 表示目标不在线 —— 上层据此走离线逻辑(如落 CALL MISSED 消息),不排队补发。
+     */
+    public int sendToUser(Long userId, String type, Map<String, Object> data) {
+        Set<WebSocketSession> sessions = userSessions.get(userId);
+        if (sessions == null || sessions.isEmpty()) {
+            return 0;
+        }
+        TextMessage msg = new TextMessage(toJson(envelope(type, data)));
+        int sent = 0;
+        for (WebSocketSession s : sessions) {
+            if (s.isOpen()) {
+                sendQuietly(s, msg);
+                sent++;
+            }
+        }
+        return sent;
+    }
+
+    @Override
+    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
+        removeFrom(rooms.get(familyOf(session)), session);
+        removeFrom(userSessions.get(userIdOf(session)), session);
+    }
+
+    /** 从房间/定向索引摘除会话;集合允许留空不删键 —— 删键会与 computeIfAbsent 竞争,可能把并发中的新会话整组孤儿化(空集合内存可忽略) */
+    private void removeFrom(Set<WebSocketSession> set, WebSocketSession session) {
+        if (set != null) {
+            set.remove(session);
+        }
+    }
+
+    private Map<String, Object> envelope(String type, Map<String, Object> data) {
+        Map<String, Object> e = new java.util.LinkedHashMap<>();
+        e.put("type", type);
+        e.put("data", data);
+        return e;
+    }
+
+    private void reply(WebSocketSession session, Map<String, Object> envelope) {
+        try {
+            session.sendMessage(new TextMessage(toJson(envelope)));
+        } catch (Exception e) {
+            log.warn("WS 回包失败", e);
+        }
+    }
+
+    /** 协议错误下行:{"type":"error","data":{"reason":"…"}};reason 为协议错误码,不写实现细节 */
+    private void replyError(WebSocketSession session, String reason) {
+        reply(session, envelope("error", Map.of("reason", reason == null ? "BAD_FORMAT" : reason)));
+    }
+
+    private String toJson(Map<String, Object> envelope) {
+        return objectMapper.writeValueAsString(envelope);
+    }
+
+    /** WS 消息内容截断(access 日志防刷屏,完整内容在 family_chat_message 表) */
+    private String abbreviate(String payload) {
+        return payload != null && payload.length() > 200 ? payload.substring(0, 200) + "...(truncated)" : payload;
     }
 
     private Long familyOf(WebSocketSession s) {
@@ -127,6 +189,10 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private Long userIdOf(WebSocketSession s) {
         Object v = s.getAttributes().get("userId");
         return v instanceof Number n ? n.longValue() : null;
+    }
+
+    private String str(Object v) {
+        return v == null ? null : v.toString();
     }
 
     private void closeSilently(WebSocketSession s) {

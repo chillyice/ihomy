@@ -1,4 +1,4 @@
-<!-- 聊天室页(V3.3):家庭房间实时聊天。WS 连接 /ws/chat?token=,
+<!-- 聊天室页(V3.3):家庭房间实时聊天。WS 连接由 stores/chat.js 全局单例持有,
      连接后拉一次历史消息;发送即落库并广播到同房间全部在线成员 -->
 <template>
   <div class="page chat-page">
@@ -47,98 +47,46 @@
 </template>
 
 <script setup>
-// 聊天室:原生 WebSocket(浏览器内置),无第三方库;
+// 聊天室:连接/心跳/重连在 stores/chat.js(全局单连接,页面只做展示与滚动);
 // token 追加在 URL 查询参数(浏览器 WS API 无法自定义 Authorization 头)
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { chatApi } from '@/api'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useUserStore } from '@/stores/user'
+import { useChatStore } from '@/stores/chat'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 
 const userStore = useUserStore()
+const chatStore = useChatStore()
 const myId = computed(() => userStore.userInfo?.id)
 
-const messages = ref([])
+const messages = computed(() => chatStore.messages)
 const draft = ref('')
 const loading = ref(false)
-const connected = ref(false)
-const connectedError = ref(false)
-const connecting = ref(false)
+const connected = computed(() => chatStore.socketStatus === 'open')
+const connecting = computed(() => chatStore.socketStatus === 'connecting')
 const msgBox = ref(null)
 // 距底多少像素内算「贴着底部」:在这个范围内收消息才自动滚
 const NEAR_BOTTOM_PX = 80
 // 用户在翻历史时累计的新消息条数,点浮标或自己滚回底部即清零
 const unreadNew = ref(0)
-let ws = null
-let heartbeatTimer = null
-let reconnectTimer = null
 
 const fmtTime = (t) => (t ? String(t).replace('T', ' ').slice(5, 16) : '')
 
-// 组件卸载时关闭连接与心跳,避免泄漏
-const cleanup = () => {
-  if (heartbeatTimer) clearInterval(heartbeatTimer)
-  if (reconnectTimer) clearTimeout(reconnectTimer)
-  if (ws) {
-    ws.onclose = null
-    ws.close()
-  }
-}
-
-const connect = () => {
-  cleanup() // 先断开旧的,再建立新连接
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-  // @vite 开发代理不转发 WS,直连 8080 端口即可(Vite HTTP 代理不支持 WS 时后端同源)
-  const base = import.meta.env.DEV ? `ws://localhost:8080` : `${proto}://${location.host}`
-  ws = new WebSocket(`${base}/api/ws/chat?token=${userStore.token}`)
-  connecting.value = true
-  ws.onopen = () => {
-    connected.value = true
-    connectedError.value = false
-    connecting.value = false
-  }
-  ws.onclose = () => {
-    connected.value = false
-    connecting.value = false
-    // 断开后 3 秒自动重连(服务端停机重启或网络波动恢复)
-    reconnectTimer = setTimeout(() => {
-      if (userStore.isLoggedIn) connect()
-    }, 3000)
-  }
-  ws.onerror = () => {
-    connectedError.value = true
-  }
-  ws.onmessage = (evt) => {
-    let pkt
-    try {
-      pkt = JSON.parse(evt.data)
-    } catch {
-      return
-    }
-    if (pkt.type === 'message') {
-      // 自己发的消息永远回到底部(服务端广播全房间,这里统一推进已读)
-      pushMsg(pkt.data, { force: pkt.data.senderId === myId.value })
-      chatApi.read(pkt.data.id).catch(() => {})
-    }
-  }
-  heartbeatTimer = setInterval(() => {
-    if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'ping' }))
-  }, 25000)
-}
+// WS 新消息到达(含自己发的):贴底/自己发的回底部,否则累计浮标计数。
+// 消息本体已由 store 进缓存,这里只处理滚动。
+watch(
+  () => chatStore.lastIncoming,
+  (m) => {
+    if (!m) return
+    if (m.senderId === myId.value || isNearBottom()) scrollBottom({ clearUnread: true })
+    else unreadNew.value += 1
+  },
+)
 
 /** 是否贴着底部(必须在插入新消息之前判断:插入后高度已变) */
 const isNearBottom = () => {
   const el = msgBox.value
   if (!el) return true
   return el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_PX
-}
-
-/** 追加消息(仅保留最近 200 条,过长截断);force=true 时无论在哪都回到底部 */
-const pushMsg = (m, { force = false } = {}) => {
-  const wasNear = isNearBottom()
-  messages.value.push(m)
-  if (messages.value.length > 200) messages.value.splice(0, messages.value.length - 200)
-  if (force || wasNear) scrollBottom({ clearUnread: true })
-  else unreadNew.value += 1
 }
 
 const scrollBottom = ({ clearUnread = false } = {}) => {
@@ -154,32 +102,31 @@ const onMsgScroll = () => {
 }
 
 const send = () => {
-  const text = draft.value.trim()
-  if (!text || !ws || ws.readyState !== 1) return
-  ws.send(JSON.stringify({ content: text }))
-  draft.value = ''
+  if (!connected.value) return
+  if (chatStore.sendText(draft.value)) draft.value = ''
 }
 
 const loadHistory = async () => {
   loading.value = true
   try {
     // 初始化:标记已读到当前游标,让未读归零
-    const un = await chatApi.unread()
-    const msgs = await chatApi.history()
-    messages.value = msgs
+    await chatStore.loadHistory()
     // 首次进入定位最新
     scrollBottom({ clearUnread: true })
-    await chatApi.read(un.lastMsgId)
   } finally {
     loading.value = false
   }
 }
 
 onMounted(async () => {
+  // 连接是全局单例:页面只声明自己在看与补建连接,离开不断开(浮窗/未读在别的页面继续收)
+  chatStore.viewing = true
   await loadHistory()
-  if (userStore.isLoggedIn) connect()
+  chatStore.ensureConnected()
 })
-onBeforeUnmount(cleanup)
+onBeforeUnmount(() => {
+  chatStore.viewing = false
+})
 </script>
 
 <style scoped>

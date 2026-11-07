@@ -1303,7 +1303,9 @@ CREATE TABLE `family_chat_message` (
   `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
   `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID(房间)',
   `sender_id`   BIGINT       NOT NULL COMMENT '发送人ID',
-  `content`     VARCHAR(2000) NOT NULL COMMENT '消息内容',
+  `content`     VARCHAR(2000) NOT NULL COMMENT '消息内容(文本正文/卡片标题等快照摘要)',
+  `msg_type`    VARCHAR(20)  NOT NULL DEFAULT 'TEXT' COMMENT '消息类型: TEXT/IMAGE/LINK/CARD/GAME_INVITE/CALL',
+  `payload`     TEXT         NULL COMMENT '结构化负载(JSON,≤4KB,按 msg_type 定义;TEXT 为 NULL)',
   `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发送时间',
   PRIMARY KEY (`id`),
   KEY `idx_family` (`family_id`, `id`)

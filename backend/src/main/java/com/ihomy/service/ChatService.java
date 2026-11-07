@@ -83,6 +83,51 @@ public class ChatService {
         }
     }
 
+    /** payload 长度上限:发送侧与 WS 侧同一口径,超限拒绝 */
+    private static final int PAYLOAD_MAX_BYTES = 4096;
+
+    /**
+     * 发送一条消息(WS 实时链路):校验类型与负载 → 落库 → 返回统一视图。
+     * msgType 空 = TEXT;非法类型/负载抛 IllegalArgumentException,文案为协议错误码
+     * (WS 层转 error envelope,不走 BizException:GlobalExceptionHandler 不覆盖 WS 线程)。
+     */
+    public Map<String, Object> sendMessage(Long familyId, Long senderId, String msgType, String content, String payload) {
+        String type = msgType == null || msgType.isBlank() ? com.ihomy.common.ChatMsgType.TEXT : msgType;
+        if (!com.ihomy.common.ChatMsgType.isKnown(type)) {
+            throw new IllegalArgumentException("BAD_TYPE");
+        }
+        if (content == null || content.isBlank() || content.length() > 2000) {
+            throw new IllegalArgumentException("BAD_CONTENT");
+        }
+        if (com.ihomy.common.ChatMsgType.TEXT.equals(type)) {
+            // 文本消息不带结构化负载
+            if (payload != null && !payload.isBlank()) {
+                throw new IllegalArgumentException("BAD_PAYLOAD");
+            }
+        } else {
+            // 非文本类型 P0 暂未放开(P1 起按类型逐一启用 payload 校验)
+            throw new IllegalArgumentException("TYPE_NOT_SUPPORTED");
+        }
+        if (payload != null && payload.length() > PAYLOAD_MAX_BYTES) {
+            throw new IllegalArgumentException("BAD_PAYLOAD");
+        }
+        ChatMessage m = new ChatMessage();
+        m.setFamilyId(familyId);
+        m.setSenderId(senderId);
+        m.setContent(content);
+        m.setMsgType(type);
+        m.setPayload(payload);
+        // 应用侧写入发送时间:insert 后实体直接可广播(依赖 DB DEFAULT 回填的话实体里恒为 null)
+        m.setCreatedAt(java.time.LocalDateTime.now());
+        messageMapper.insert(m);
+        return view(m);
+    }
+
+    /** 单条消息的统一视图(WS 广播与 REST 历史同构,带发送人昵称) */
+    public Map<String, Object> view(ChatMessage m) {
+        return toView(m, fuzzyNames(List.of(m)));
+    }
+
     private long lastMsgId(Long familyId) {
         ChatMessage last = messageMapper.selectOne(new LambdaQueryWrapper<ChatMessage>()
                 .eq(ChatMessage::getFamilyId, familyId)
@@ -107,6 +152,8 @@ public class ChatService {
         v.put("senderId", m.getSenderId());
         v.put("senderName", names.getOrDefault(m.getSenderId(), "未知成员"));
         v.put("content", m.getContent());
+        v.put("msgType", m.getMsgType());
+        v.put("payload", m.getPayload());
         v.put("createdAt", m.getCreatedAt());
         return v;
     }
