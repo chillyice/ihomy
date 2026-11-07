@@ -72,7 +72,7 @@
                   <i :class="'qi-' + sidebarWeather.iconCode" class="gc-mw-icon"></i>
                   <span class="gc-mw-temp">{{ sidebarWeather.temp }}°</span>
                   <span v-if="topWarningBadge" class="gc-mw-warn" :style="{ color: warnLevelColor(topWarningBadge.level) }">
-                    <el-icon><WarningFilled /></el-icon>
+                    <WarnTriangle />
                   </span>
                 </span>
               </el-tooltip>
@@ -155,8 +155,9 @@ import WarmHome from '@/components/warm/WarmHome.vue'
 import { useWarmWidgetDrag } from '@/utils/widgetDragData'
 import { addedCodes } from '@/utils/warmHomeShared'
 import { buildNavItems, groupNavItems, isActive } from '@/utils/navModules'
+import { nextScrolled } from '@/utils/warmToolbar'
 import { warnLevelColor, topWarning } from '@/utils/dict'
-import { WarningFilled } from '@element-plus/icons-vue'
+import WarnTriangle from '@/components/WarnTriangle.vue'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
@@ -262,23 +263,66 @@ const mainEl = ref(null)
 const scrolled = ref(false)
 const pinned = ref(false) // toolbar 是否在顶栏(反向延迟回来,配合 holder 渐显让内容平滑下移)
 const threshold = ref(36)
+// 胞吐一次会从内容流里拿掉的高度(工具栏 + 下边距):页面总高同步少这么多。
+// 记账本这类「外壳工具栏 + 页签工具栏」双层页面一次会拿掉两份,临界页高下尤其明显。
+// 胞吐期间工具栏在顶栏里量不到,只能沿用缓存值;所以进页/换页/改窗口尺寸 + 越过阈值那一刻都现量。
+let pinLossPx = 0
+const readPinLoss = () =>
+  [...(mainEl.value?.querySelectorAll('.page-toolbar') ?? [])].reduce(
+    (sum, el) => sum + el.offsetHeight + (parseFloat(getComputedStyle(el).marginBottom) || 0),
+    0,
+  )
 const measureThreshold = () => {
-  const toolbar = mainEl.value?.querySelector('.page-toolbar')
-  if (toolbar && mainEl.value) {
-    threshold.value = toolbar.getBoundingClientRect().top - mainEl.value.getBoundingClientRect().top
-  }
+  const main = mainEl.value
+  if (!main) return
+  const toolbar = main.querySelector('.page-toolbar')
+  if (!toolbar) return // 本页没有工具栏,或工具栏正胞吐在顶栏里:沿用上次量值
+  threshold.value = toolbar.getBoundingClientRect().top - main.getBoundingClientRect().top
+  const loss = readPinLoss()
+  if (loss > 0) pinLossPx = loss
 }
 const onMainScroll = () => {
-  scrolled.value = (mainEl.value?.scrollTop ?? 0) > threshold.value - 4
+  const el = mainEl.value
+  if (!el) return
+  // 还没滚到阈值线(且未胞吐):不可能切换状态,先省掉这次布局读取
+  if (!scrolled.value && el.scrollTop <= threshold.value - 4) return
+  // 未胞吐时现量:工具栏可能晚于进页渲染(外壳工具栏先出、页签工具栏后出),缓存会少算;
+  // 已胞吐时工具栏在顶栏里量不到,沿用缓存值
+  if (!scrolled.value) {
+    const loss = readPinLoss()
+    if (loss > 0) pinLossPx = loss
+  }
+  const next = nextScrolled({
+    scrolled: scrolled.value,
+    scrollTop: el.scrollTop,
+    scrollHeight: el.scrollHeight,
+    clientHeight: el.clientHeight,
+    threshold: threshold.value,
+    loss: pinLossPx,
+  })
+  if (next !== scrolled.value) scrolled.value = next
+}
+const reMeasure = () => {
+  measureThreshold()
+  onMainScroll()
 }
 onMounted(() => {
-  measureThreshold()
+  reMeasure()
   mainEl.value?.addEventListener('scroll', onMainScroll, { passive: true })
+  window.addEventListener('resize', reMeasure, { passive: true })
 })
-onBeforeUnmount(() => mainEl.value?.removeEventListener('scroll', onMainScroll))
+onBeforeUnmount(() => {
+  mainEl.value?.removeEventListener('scroll', onMainScroll)
+  window.removeEventListener('resize', reMeasure)
+})
 watch(
   () => route.fullPath,
-  () => nextTick(measureThreshold),
+  () =>
+    nextTick(() => {
+      // 换页后内容高度变了(scrollTop 被夹回顶部)但可能没有 scroll 事件,主动复核一次
+      pinLossPx = 0
+      reMeasure()
+    }),
 )
 
 // 晨暮分段开关滑块:选中态(高亮 + thumb)跟随 themeStore.mode,与主题切换同步立即更新
@@ -761,8 +805,6 @@ watch(
 .gc-mw-warn {
   display: inline-flex;
   align-items: center;
-}
-.gc-mw-warn .el-icon {
   font-size: 14px;
 }
 /* 弹层挂在 body 下,本文件是非 scoped 样式块,直接写类名即可(别包 :global) */

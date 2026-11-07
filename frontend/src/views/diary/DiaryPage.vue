@@ -33,7 +33,7 @@
               ></el-button>
             </el-tooltip>
           </template>
-          <el-tooltip v-if="shareable" :content="$t('chat.share.toChat')" placement="top" :show-after="300">
+          <el-tooltip v-if="shareable && loggedIn" :content="$t('chat.share.toChat')" placement="top" :show-after="300">
             <el-button size="small" text @click.stop="$emit('action', 'chat-share')"
               ><el-icon><ChatDotRound /></el-icon
             ></el-button>
@@ -72,6 +72,7 @@ import { Edit, Delete } from '@element-plus/icons-vue'
 import { PAGE_H, moodLabel, weatherLabel } from '@/utils/diary'
 import { parseDoodle, doodleExtentY, renderStrokes, setupCanvas, clearCanvas } from '@/utils/doodle'
 import { ChatDotRound } from '@element-plus/icons-vue'
+import { useUserStore } from '@/stores/user'
 
 const props = defineProps({
   page: { type: Object, required: true },
@@ -81,6 +82,9 @@ const props = defineProps({
   shareable: { type: Boolean, default: false }, // 是否显示「分享到聊天室」(日记本页 true,编辑预览 false)
 })
 defineEmits(['action'])
+
+const userStore = useUserStore()
+const loggedIn = computed(() => userStore.isLoggedIn)
 
 const sideClass = computed(() => `sheet-${props.side}`)
 

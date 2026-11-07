@@ -23,21 +23,45 @@
                 <span class="wt-text">{{ detail?.now?.text || '' }}</span>
               </div>
             </div>
-            <div v-if="sortedWarnings.length" ref="warnRowEl" class="wt-warnings">
+            <div v-if="sortedWarnings.length" class="wt-warnings">
+              <!-- 仅一条预警:直接给完整信息 -->
               <button
-                v-for="w in sortedWarnings"
-                :key="w.id"
+                v-if="sortedWarnings.length === 1"
                 class="wt-warn-chip"
                 type="button"
-                :style="{ borderLeftColor: warnLevelColor(w.level), background: warnTint(w.level) }"
-                @click="openWarning(w)"
+                :style="{ borderLeftColor: warnLevelColor(sortedWarnings[0].level), background: warnTint(sortedWarnings[0].level) }"
+                @click="openWarning(sortedWarnings[0])"
               >
-                <span class="wt-warn-title" :style="{ color: warnLevelColor(w.level) }">
-                  {{ w.typeName }} {{ w.level }}{{ $t('weatherPage.warningSuffix') }}
+                <WarnSignal
+                  compact
+                  :level="sortedWarnings[0].level"
+                  :type-name="sortedWarnings[0].typeName"
+                  :code="sortedWarnings[0].code"
+                />
+                <span class="wt-warn-chip-body">
+                  <span class="wt-warn-title" :style="{ color: warnLevelColor(sortedWarnings[0].level) }">
+                    {{ sortedWarnings[0].typeName }} {{ sortedWarnings[0].level }}{{ $t('weatherPage.warningSuffix') }}
+                  </span>
+                  <span class="wt-warn-time">
+                    {{ fmtDateTime(sortedWarnings[0].startTime) }} ~ {{ fmtDateTime(sortedWarnings[0].endTime) }}
+                  </span>
+                  <span class="wt-warn-text">{{ sortedWarnings[0].text }}</span>
                 </span>
-                <span class="wt-warn-time">{{ fmtDateTime(w.startTime) }} ~ {{ fmtDateTime(w.endTime) }}</span>
-                <span class="wt-warn-text">{{ w.text }}</span>
               </button>
+              <!-- 多条预警:只留预警信号图标(类型图形 + 级别色),点击看详情,互相不遮挡 -->
+              <template v-else>
+                <button
+                  v-for="w in sortedWarnings"
+                  :key="w.id"
+                  class="wt-warn-icon"
+                  type="button"
+                  :title="warnTitle(w)"
+                  :aria-label="`${warnTitle(w)} · ${$t('weatherPage.warningShowDetail')}`"
+                  @click="openWarning(w)"
+                >
+                  <WarnSignal :level="w.level" :type-name="w.typeName" :code="w.code" />
+                </button>
+              </template>
             </div>
           </div>
           <div class="wt-metrics">
@@ -220,68 +244,82 @@
           </div>
         </div>
 
-        <!-- 10 天预报:统一「日期 / 白天天气 / 温度」三列,点某天在行下展开当天详情 -->
+        <!-- 10 天预报:单列全宽;每行统一「日期 / 白天天气 / 温度」,点行展开当天详情 -->
         <div v-if="detail?.daily?.length" class="card">
           <div class="section-label">{{ $t('weatherPage.daily') }}</div>
           <div class="wt-daily">
-            <template v-for="row in detail.daily" :key="row.fxDate">
-              <div
-                class="wt-day-row"
-                :class="{ open: openDate === row.fxDate }"
-                :aria-expanded="openDate === row.fxDate"
-                @click="toggleDay(row.fxDate)"
-                v-a11y-click
-              >
-                <span class="wt-day-date">{{ fmtDate(row.fxDate) }}</span>
-                <span class="wt-day-weather">
-                  <i :class="'qi-' + row.iconDay" class="wt-td-icon"></i>
-                  <span class="wt-day-weather-text">{{ row.textDay }}</span>
-                </span>
-                <span class="wt-trange">
-                  <span class="wt-lo">{{ row.tempMin }}°</span>
-                  <span class="wt-tbar-track">
-                    <span class="wt-tbar-fill" :style="tbarStyle(row)"></span>
-                    <span class="wt-tbar-dot" :style="{ left: tbarDotLeft(row) }"></span>
+            <div v-for="(col, ci) in dailyColumns" :key="ci" class="wt-day-col">
+              <div v-for="row in col" :key="row.fxDate" class="wt-day-item">
+                <div
+                  class="wt-day-row"
+                  :class="{ open: openDate === row.fxDate }"
+                  :aria-expanded="openDate === row.fxDate"
+                  @click="toggleDay(row.fxDate)"
+                  v-a11y-click
+                >
+                  <span class="wt-day-date">
+                    <span class="wt-day-md">{{ fmtMD(row.fxDate) }}</span>
+                    <span class="wt-day-wd">{{ fmtWeekday(row.fxDate) }}</span>
                   </span>
-                  <span class="wt-hi">{{ row.tempMax }}°</span>
-                </span>
-                <span class="wt-day-arrow" aria-hidden="true">▾</span>
+                  <span class="wt-day-weather">
+                    <i :class="'qi-' + row.iconDay" class="wt-td-icon"></i>
+                    <span class="wt-day-weather-text">{{ row.textDay }}</span>
+                  </span>
+                  <span class="wt-trange">
+                    <span class="wt-lo">{{ row.tempMin }}°</span>
+                    <span class="wt-tbar-track">
+                      <span class="wt-tbar-fill" :style="tbarStyle(row)"></span>
+                      <span class="wt-tbar-dot" :style="{ left: tbarDotLeft(row) }"></span>
+                    </span>
+                    <span class="wt-hi">{{ row.tempMax }}°</span>
+                  </span>
+                  <svg class="wt-day-chev" viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
+                    <path
+                      d="M9 6l6 6-6 6"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </div>
+                <!-- 展开区:当天完整状况(夜间、降水、湿度、风、紫外线、日出日落) -->
+                <dl v-if="openDate === row.fxDate" class="wt-day-detail">
+                  <div class="wt-dd-item">
+                    <dt>{{ $t('weatherPage.nightWeather') }}</dt>
+                    <dd>
+                      <i :class="'qi-' + row.iconNight" class="wt-td-icon"></i>
+                      {{ row.textNight }}
+                    </dd>
+                  </div>
+                  <div class="wt-dd-item">
+                    <dt>{{ $t('weatherPage.pop') }}</dt>
+                    <dd>{{ row.pop }}%</dd>
+                  </div>
+                  <div class="wt-dd-item">
+                    <dt>{{ $t('weatherPage.precip') }}</dt>
+                    <dd>{{ row.precip ?? 0 }} mm</dd>
+                  </div>
+                  <div class="wt-dd-item">
+                    <dt>{{ $t('weatherPage.humidity') }}</dt>
+                    <dd>{{ row.humidity }}%</dd>
+                  </div>
+                  <div class="wt-dd-item">
+                    <dt>{{ $t('weatherPage.wind') }}</dt>
+                    <dd>{{ row.windDirDay }} {{ row.windScaleDay }}{{ $t('weatherPage.level') }}</dd>
+                  </div>
+                  <div class="wt-dd-item">
+                    <dt>{{ $t('weatherPage.uv') }}</dt>
+                    <dd>{{ row.uvIndex }}</dd>
+                  </div>
+                  <div class="wt-dd-item">
+                    <dt>{{ $t('weatherPage.sunSunset') }}</dt>
+                    <dd>☀ {{ (row.sunrise || '').slice(11, 16) }} / 🌙 {{ (row.sunset || '').slice(11, 16) }}</dd>
+                  </div>
+                </dl>
               </div>
-              <!-- 展开区:当天完整状况(夜间、降水、湿度、风、紫外线、日出日落) -->
-              <dl v-if="openDate === row.fxDate" class="wt-day-detail">
-                <div class="wt-dd-item">
-                  <dt>{{ $t('weatherPage.nightWeather') }}</dt>
-                  <dd>
-                    <i :class="'qi-' + row.iconNight" class="wt-td-icon"></i>
-                    {{ row.textNight }}
-                  </dd>
-                </div>
-                <div class="wt-dd-item">
-                  <dt>{{ $t('weatherPage.pop') }}</dt>
-                  <dd>{{ row.pop }}%</dd>
-                </div>
-                <div class="wt-dd-item">
-                  <dt>{{ $t('weatherPage.precip') }}</dt>
-                  <dd>{{ row.precip ?? 0 }} mm</dd>
-                </div>
-                <div class="wt-dd-item">
-                  <dt>{{ $t('weatherPage.humidity') }}</dt>
-                  <dd>{{ row.humidity }}%</dd>
-                </div>
-                <div class="wt-dd-item">
-                  <dt>{{ $t('weatherPage.wind') }}</dt>
-                  <dd>{{ row.windDirDay }} {{ row.windScaleDay }}{{ $t('weatherPage.level') }}</dd>
-                </div>
-                <div class="wt-dd-item">
-                  <dt>{{ $t('weatherPage.uv') }}</dt>
-                  <dd>{{ row.uvIndex }}</dd>
-                </div>
-                <div class="wt-dd-item">
-                  <dt>{{ $t('weatherPage.sunSunset') }}</dt>
-                  <dd>☀ {{ (row.sunrise || '').slice(11, 16) }} / 🌙 {{ (row.sunset || '').slice(11, 16) }}</dd>
-                </div>
-              </dl>
-            </template>
+            </div>
           </div>
         </div>
       </div>
@@ -439,11 +477,14 @@
     <el-dialog v-model="warnDialog" :title="activeWarn?.typeName" append-to-body width="min(640px, 92vw)">
       <div v-if="activeWarn" class="wt-warn-dialog">
         <div class="wt-warn-head">
-          <span class="wt-warn-title" :style="{ color: warnLevelColor(activeWarn.level) }">
-            {{ activeWarn.level }}{{ $t('weatherPage.warningSuffix') }}
-          </span>
-          <span v-if="activeWarn.senderName" class="wt-warn-sender">{{ activeWarn.senderName }}</span>
-          <span class="wt-warn-time">{{ fmtDateTime(activeWarn.startTime) }} ~ {{ fmtDateTime(activeWarn.endTime) }}</span>
+          <WarnSignal compact :level="activeWarn.level" :type-name="activeWarn.typeName" :code="activeWarn.code" />
+          <div class="wt-warn-head-meta">
+            <span class="wt-warn-title" :style="{ color: warnLevelColor(activeWarn.level) }">
+              {{ activeWarn.typeName }} {{ activeWarn.level }}{{ $t('weatherPage.warningSuffix') }}
+            </span>
+            <span class="wt-warn-time">{{ fmtDateTime(activeWarn.startTime) }} ~ {{ fmtDateTime(activeWarn.endTime) }}</span>
+            <span v-if="activeWarn.senderName" class="wt-warn-sender">{{ activeWarn.senderName }}</span>
+          </div>
         </div>
         <div class="wt-warn-text">{{ activeWarn.text }}</div>
         <div v-if="activeWarn.instruction" class="wt-warn-instruction">
@@ -463,9 +504,10 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, inject, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, inject, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import WarnSignal from '@/components/WarnSignal.vue'
 import TerminatorMap from '@/views/weather/TerminatorMap.vue'
 import { aqiColor, warnLevelColor, WARN_LEVEL_ORDER, indexCatTone } from '@/utils/dict'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
@@ -500,9 +542,9 @@ const todayTimer = setInterval(() => {
 }, 60000)
 const nf = (key) => detail.value?.nowFull?.[key] ?? '—'
 const fmtHour = (s) => (s || '').slice(11, 16)
-const fmtDate = (s) => {
-  if (!s) return ''
-  const d = new Date(s)
+const fmtWeekday = (s) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || '')
+  if (!m) return ''
   const weekdays = [
     t('weatherPage.w0'),
     t('weatherPage.w1'),
@@ -512,7 +554,8 @@ const fmtDate = (s) => {
     t('weatherPage.w5'),
     t('weatherPage.w6'),
   ]
-  return `${d.getMonth() + 1}/${d.getDate()} ${weekdays[d.getDay()]}`
+  // 按本地日期构造,避免 date-only 串被当成 UTC 解析后跨时区偏一天
+  return weekdays[new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getDay()] || ''
 }
 const fmtDateTime = (s) => (s || '').replace('T', ' ').slice(5, 16)
 // "2026-09-25" / ISO 串 → "9/25"(按字符串取,避免 new Date 在非 +08:00 环境偏移一天)
@@ -521,23 +564,14 @@ const fmtMD = (s) => {
   return m ? `${Number(m[2])}/${Number(m[3])}` : ''
 }
 
-// ── 气象预警(实况右侧,右起排列 + 详情弹窗) ──
-const warnRowEl = ref(null)
+// ── 气象预警(实况右侧;单条直接展示,多条只留图标 + 详情弹窗) ──
 const warnDialog = ref(false)
 const activeWarn = ref(null)
+const warnTitle = (w) => `${w.typeName} ${w.level}${t('weatherPage.warningSuffix')}`
 const openWarning = (w) => {
   activeWarn.value = w
   warnDialog.value = true
 }
-// row-reverse 下初始滚动位置各浏览器不一致:按第一条(最右)chip 的实际位置纠正
-function scrollWarnRow() {
-  const el = warnRowEl.value
-  const first = el?.firstElementChild
-  if (!el || !first || el.scrollWidth <= el.clientWidth) return
-  el.scrollLeft += first.getBoundingClientRect().right - el.getBoundingClientRect().right
-}
-watch(sortedWarnings, () => nextTick(scrollWarnRow))
-onMounted(() => nextTick(scrollWarnRow))
 
 // ── 生活指数(紧凑网格 + 全文弹窗) ──
 const indexDialog = ref(false)
@@ -769,6 +803,12 @@ const airTooltipStyle = computed(() => {
   }
 })
 
+// ── 10 天预报单列:整段顺序排,展开详情后下方日期整体下移 ──
+const dailyColumns = computed(() => {
+  const d = detail.value?.daily || []
+  return d.length ? [d] : []
+})
+
 // ── N 天温度区间渐变横条 ──
 const dailyRange = computed(() => {
   const d = detail.value?.daily || []
@@ -964,18 +1004,19 @@ onBeforeUnmount(() => {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
-/* 预警列:右起排列,最严重在最右;溢出时横向滚动并初始停在最右 */
+/* 预警区:单条给完整卡片;多条只排图标(按级别着色),点击看详情 */
 .wt-warnings {
-  flex: 0 1 46%;
+  flex: 0 1 auto;
   display: flex;
-  flex-direction: row-reverse;
-  justify-content: flex-start;
-  gap: 10px;
-  overflow-x: auto;
-  padding-bottom: 2px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 100%;
 }
 .wt-warn-chip {
-  flex: 0 0 280px;
+  flex: 0 1 340px;
+  max-width: 100%;
   border: 0;
   border-left: 3px solid;
   border-radius: 10px;
@@ -983,11 +1024,36 @@ onBeforeUnmount(() => {
   text-align: left;
   cursor: pointer;
   display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+.wt-warn-chip-body {
+  display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
 }
 .wt-warn-chip:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+.wt-warn-icon {
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  display: inline-flex;
+  cursor: pointer;
+  transition:
+    transform 0.16s,
+    filter 0.16s;
+}
+.wt-warn-icon:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.06) saturate(1.06);
+}
+.wt-warn-icon:focus-visible {
   outline: 2px solid var(--color-brand);
   outline-offset: 2px;
 }
@@ -1015,9 +1081,14 @@ onBeforeUnmount(() => {
 }
 .wt-warn-head {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.wt-warn-head-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
 }
 .wt-warn-sender {
   font-size: 12px;
@@ -1205,17 +1276,29 @@ onBeforeUnmount(() => {
   font-weight: 600;
   fill: var(--color-text-secondary);
 }
-/* ── 10 天预报:统一三列(日期 / 白天天气 / 温度)+ 点行展开当天详情 ── */
+/* ── 10 天预报单列全宽;
+     每行统一「日期 / 白天天气 / 温度」,点行展开当天详情 ── */
 .wt-daily {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+.wt-day-col {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+}
+.wt-day-item {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 .wt-day-row {
   display: grid;
-  grid-template-columns: 88px minmax(90px, 1fr) minmax(150px, 1.4fr) 14px;
+  grid-template-columns: 74px minmax(0, 1fr) 144px 14px;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
+  gap: 8px;
+  min-height: 34px;
+  padding: 4px 8px;
   border-radius: 10px;
   cursor: pointer;
   transition: background-color 0.18s;
@@ -1229,15 +1312,25 @@ onBeforeUnmount(() => {
   outline-offset: 1px;
 }
 .wt-day-date {
-  font-size: 13px;
-  color: var(--color-text-secondary);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+.wt-day-md {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.wt-day-wd {
+  font-size: 11.5px;
+  color: var(--color-text-secondary);
 }
 .wt-day-weather {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 6px;
   font-size: 13px;
   min-width: 0;
@@ -1251,21 +1344,20 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.wt-day-arrow {
-  font-size: 11px;
-  line-height: 1;
-  text-align: center;
+.wt-day-chev {
+  flex: none;
   color: var(--color-text-secondary);
+  transform: rotate(90deg);
   transition: transform 0.18s;
 }
-.wt-day-row.open .wt-day-arrow {
-  transform: rotate(180deg);
+.wt-day-row.open .wt-day-chev {
+  transform: rotate(-90deg);
 }
 .wt-day-detail {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 10px 16px;
-  margin: 2px 10px 10px;
+  margin: 0 8px 8px;
   padding: 12px 14px;
   background: var(--color-card-2);
   border-radius: 10px;
@@ -1289,30 +1381,36 @@ onBeforeUnmount(() => {
 .wt-day-detail .wt-td-icon {
   font-size: 15px;
 }
-@media (max-width: 640px) {
-  .wt-day-row {
-    grid-template-columns: 72px minmax(80px, 1fr) minmax(120px, 1.2fr) 12px;
-    gap: 8px;
-    padding: 8px 4px;
-  }
-  .wt-day-detail {
-    margin: 2px 0 10px;
-  }
-}
 /* ── N 天温度横条 ── */
 .wt-trange {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+.wt-trange .wt-lo {
+  min-width: 27px;
+  text-align: right;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.wt-trange .wt-hi {
+  min-width: 27px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
 }
 .wt-tbar-track {
   display: block;
   flex: 1;
+  max-width: 280px;
   height: 8px;
   background: rgba(58, 46, 34, 0.1);
   border-radius: 4px;
   position: relative;
-  min-width: 60px;
+  min-width: 46px;
 }
 .wt-tbar-fill {
   display: block;
@@ -1333,6 +1431,41 @@ onBeforeUnmount(() => {
 }
 .wt-td-icon {
   font-size: 18px;
+}
+/* 10 天预报窄屏:单列 + 收紧列宽,温度横条仍保留 */
+@media (max-width: 640px) {
+  .wt-day-row {
+    grid-template-columns: 70px minmax(0, 1fr) 128px 12px;
+    gap: 6px;
+    padding: 4px 4px;
+  }
+  .wt-day-md {
+    font-size: 12.5px;
+  }
+  .wt-trange .wt-lo,
+  .wt-trange .wt-hi {
+    min-width: 22px;
+    font-size: 12.5px;
+  }
+  .wt-trange {
+    gap: 4px;
+  }
+  .wt-trange .wt-tbar-track {
+    min-width: 34px;
+  }
+  .wt-day-detail {
+    margin: 0 0 8px;
+  }
+}
+/* 超窄屏(≤400px):温度横条退化为纯数字,避免把行撑破 */
+@media (max-width: 400px) {
+  .wt-day-row {
+    grid-template-columns: 64px minmax(0, 1fr) 74px 10px;
+    gap: 5px;
+  }
+  .wt-trange .wt-tbar-track {
+    display: none;
+  }
 }
 /* ── 空气质量 ── */
 .wt-air {
@@ -1554,11 +1687,10 @@ html.dark .wc-hover-dot {
   }
   .wt-warnings {
     width: 100%;
-    flex: none;
-    flex-direction: row;
+    justify-content: flex-start;
   }
   .wt-warn-chip {
-    flex: 0 0 78vw;
+    flex: 1 1 100%;
   }
 }
 @media (max-width: 768px) {

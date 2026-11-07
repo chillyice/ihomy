@@ -198,7 +198,7 @@
             <i :class="'qi-' + sidebarWeather.iconCode" class="mw-icon"></i>
             <span v-if="!collapsed" class="mw-temp">{{ sidebarWeather.temp }}°</span>
             <span v-if="topWarningBadge" class="mw-warn-badge" :style="{ color: warnLevelColor(topWarningBadge.level) }">
-              <el-icon><WarningFilled /></el-icon>
+              <WarnTriangle />
             </span>
           </span>
         </el-tooltip>
@@ -217,7 +217,8 @@ import { useChatStore } from '@/stores/chat'
 import { useWidgetDrag } from '@/utils/useWidgetDrag'
 import { notificationApi, authApi, opsApi } from '@/api'
 import { ElMessage } from 'element-plus'
-import { Sunny, Moon, Bell, Fold, Expand, ArrowRight, Check, WarningFilled, Wallet } from '@element-plus/icons-vue'
+import { Sunny, Moon, Bell, Fold, Expand, ArrowRight, Check, Wallet } from '@element-plus/icons-vue'
+import WarnTriangle from '@/components/WarnTriangle.vue'
 import { iconComp, buildNavGroups, isActive } from '@/utils/navModules'
 import { formatRelativeTime } from '@/utils/datetime'
 import { todayString } from '@/utils/scheduleCalendar'
@@ -633,8 +634,6 @@ html.dark .foot-btn:hover {
 .mw-warn-badge {
   display: inline-flex;
   align-items: center;
-}
-.mw-warn-badge :deep(.el-icon) {
   font-size: 14px;
 }
 :global(.mini-weather-popper) {

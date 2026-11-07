@@ -17,6 +17,14 @@ export const warnLevelColor = (level) =>
     橙色: '#e0862f',
     红色: '#d94a3f',
   })[level] || '#e0862f'
+/** 预警类型 → 和风图标库编号:国内预警类型码 1001-1089 与图标编号同号,
+ *  国际预警 2001-2084 同样有对应图标;缺码或未知类型回退通用预警图标 9999(三角叹号)。 */
+export const warnIconCode = (w) => {
+  const code = String(typeof w === 'object' && w ? (w.code ?? '') : (w ?? '')).trim()
+  return /^(10\d{2}|20\d{2})$/.test(code) ? code : '9999'
+}
+/** 预警信号底色上的字色:黄色 / 白色底太浅,用深色字保证可读;其余用白字。 */
+export const warnInkColor = (level) => (level === '黄色' || level === '白色' ? '#3a2e22' : '#ffffff')
 /** 取预警列表里级别最高的一条(颜色用)。
  *  未知级别经 indexOf 得 -1,按最低级别对待:只有全部未知时才会返回列表首个元素。 */
 export const topWarning = (warnings) => {
