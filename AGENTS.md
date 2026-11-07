@@ -1,11 +1,11 @@
 # AGENTS.md — ihomy 项目规则
 
-> 跨会话自动加载。本文件**只放结论级规定 + 索引**,目标 **≤30KB**(硬上限 45KB:超了注入会被截断,尾部先丢)。详细内容各归其位,别写回本文件:
+> 跨会话自动加载。本文件**只放结论级规定 + 索引**,目标 **≤30KB**(硬上限 45KB:超了注入会被截断,尾部先丢)。详细内容各归其位,别写回本文件(**收尾两级**:平时修改只追加当日文档到 `docs/daily/`,下表去处在明确说「归档」时才全量梳理;代码地图例外,始终自动生成):
 
 | 内容类型 | 去处 |
 |---------|------|
 | 功能现状(模块能力/表结构/接口/规划) | `docs/需求设计说明书.md`(§4 功能 / §6 数据库 / §7 接口 / §9 规划;**就地改写=当前事实**,不写时间/版本叙事) |
-| 实现记录(逐次改动/设计决策/live DB 迁移 SQL) | `docs/变更归档.md` 末尾追加 `#####` 小节;索引由脚本生成到 `docs/归档索引.md` |
+| 实现记录(逐次改动/设计决策/live DB 迁移 SQL) | 平时写当日 `docs/daily/` 变更文档;全量归档时合并为 `docs/变更归档.md` 末尾 `#####` 小节(索引 `docs/归档索引.md`) |
 | 踩坑成因、机制解释、维护清单、缓存失效矩阵 | `docs/踩坑速查.md`(本文件只留一句结论或 `§x` 指针) |
 | UI/交互/视觉细则 | `docs/UI设计提示词.md` |
 | 代码路径索引(功能 ↔ 文件) | `docs/代码地图.md`(**自动生成,勿手改**:`bash scripts/gen-code-map.sh`) |
@@ -21,11 +21,11 @@
 | 加/调首页模块 | `sys_home_module` 种子 → `HomeModuleService`(改完重启)→ 移动端入口 |
 | 加工具 | `tools/registry.js` → `utils/tools/` 内核 → `npm run tools:export` |
 | 查历史 / 排线上问题 | `docs/归档索引.md` 反查 → 变更归档;线上按 踩坑速查 → 日志 tid:`GET /api/ops/logs/trace?tid=` |
-| 收尾归档 | `.agents/skills/archive/SKILL.md`:写文档 → 跑生成器 → drift check → commit |
+| 收尾归档 | `.agents/skills/archive/SKILL.md`:轻量收尾=追加 `docs/daily/` 当日文档 → 代码地图 → commit;明确说「归档」才全量梳理四文档 |
 
 ## 硬性禁令(违反即返工)
 
-> **Git**:非人工指令禁止 `git commit`/`git add -A`/`git add .`/`git push`;`git add` 只能指定具体文件。**例外(已授权)**:归档流程写完全部文档后自动 commit;`git push` 仍需指示。
+> **Git**:非人工指令禁止 `git commit`/`git add -A`/`git add .`/`git push`;`git add` 只能指定具体文件。**例外(已授权)**:收尾流程(每日变更文档/全量归档)写完后自动 commit;`git push` 仍需指示。
 > **敏感数据**:**生产**密码/密钥/token 一律不进仓库(生产 DB 密码与 JWT 密钥走服务器 `external.yml`,模板 `backend/src/main/resources/external.yml.template`);凭证台账在本地 `Linux部署指导.md` §〇,开发账号在本地 `docs/新人上手指南.md`(均 .gitignore);前端演示凭证走 `frontend/.env.development.local`(**`.env.local` 会内联进生产 bundle,禁用**)。`schema.sql` 是开发安全版,生产须 `ALTER USER` 改强密码。
 > **多会话并行**:禁用 `git stash`(会把其他会话未提交的 i18n/router 改动一起回滚);他人 stash 不 pop,只读 (`git show "stash@{0}:<path>"`);不并行跑 `npm run build`(争 `public/emulatorjs`、`dist/`)。**动手前先 `git status`**:工作区有他人未提交改动时,不要整文件重写共享文件。
 > **工具链**:
@@ -214,7 +214,9 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 ## 归档与规划
 
-- 每次可交付迭代:更新 `VERSION` → 追加 `docs/变更归档.md` `#####` 小节 → 就地改写 需求 §4/§6/§7/§9 → 跑 `gen-code-map.sh` + `doc-index.sh` → `doc-drift-check.sh` 全绿 → commit。流程细节走 `/archive` 技能。
+- **收尾分两级**(流程细节走 `/archive` 技能):
+  - **轻量收尾(每次可交付迭代后自动)**:更新 `VERSION` → 追加当日 `docs/daily/` 变更文档(变更/决策/接口表路由变化/live SQL/踩坑/UI 细则/验证,一次一小节)→ `gen-code-map.sh` → `doc-drift-check.sh` 全绿(表数/路径漂移只做最小修补)→ commit。**不主动读改** 需求说明书/AGENTS/踩坑速查/UI 提示词/变更归档——把上下文让给真正需要读取的内容。
+  - **全量归档(仅用户明确说「归档」)**:把 `docs/daily/` 未处理文档按内容类型分流进四文档 + 踩坑速查 → `doc-index.sh` 重建索引 → drift check 全绿 → commit;处理完的移入 `docs/daily/archived/`。
 - `docs/变更归档.md` 的 **V10 之前条目已压缩为「标题 + 一句话摘要」**(2026-11-06),细节查 git 历史;V10 起仍按完整条目追加。
 - **未实现规划的唯一去处是 需求 §9**(§9.1 产品级 / §9.2-§9.5 代码级待办);本章不记内容,启动任何规划项前先读对应小节。开工新功能前先 `grep schema.sql + router/` 对照模块种子。
 
