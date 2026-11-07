@@ -10,6 +10,9 @@
   --color-text-secondary: #7a6b5a;
   /* 主文字色语义别名:与 --color-text 同值,组件按语义引用(深色由 html.dark 覆写) */
   --color-text-primary: var(--color-text);
+  /* 收支语义色:记账本等金额展示统一引用,禁止再散落 #67c23a / #f56c6c 硬编码 */
+  --color-income: #67c23a;
+  --color-expense: #f56c6c;
   /* 表面色(游戏卡/浮层卡等"抬起的面"):浅色纯白,深色随卡片色 */
   --color-surface: #fff;
   --color-border: rgba(58, 46, 34, 0.12);
@@ -120,6 +123,9 @@ html.dark {
   --color-card-rgb: 30, 42, 72;
   --color-text: #e8dcc8;
   --color-text-secondary: #b0a898;
+  /* 深色底上提亮一档,保证收支数字的对比度 */
+  --color-income: #86d162;
+  --color-expense: #f78989;
   --color-border: rgba(232, 220, 200, 0.1);
   /* 表面色随卡片色(游戏卡/浮层卡):深色绝不能再落回纯白,否则浅色字压白底 */
   --color-surface: var(--color-card);
@@ -291,6 +297,13 @@ html.theme-warm .gc-pin .page-toolbar .tb-left,
 html.theme-warm .gc-pin .page-toolbar .tb-right {
   gap: 6px;
 }
+/* 暖居胞吐后的工具栏默认 nowrap(避免顶栏高度随内容跳动),但窄屏下 nowrap 会让单槽工具栏
+   顶出容器被裁掉:768 以下放开换行,与内容页同一套「内容收敛 + 内部换行」策略 */
+@media (max-width: 768px) {
+  html.theme-warm .gc-pin .page-toolbar {
+    flex-wrap: wrap;
+  }
+}
 
 /* 物品定位页:顶栏胞吐进顶栏后容器样式(.fp-topbar 的 scoped 样式不匹配 Teleport 后元素) + 画板铺满 gc-main + 边缘渐变融入背景 */
 html.theme-warm .gc-pin .fp-topbar {
@@ -428,6 +441,22 @@ html.theme-warm {
   --el-disabled-bg-color: var(--color-card-2);
   --el-disabled-text-color: var(--color-text-tertiary);
   --el-disabled-border-color: var(--color-line);
+}
+
+/* 表格斑马纹 / 行悬停必须是实色底
+ * Element Plus 给固定列(sticky)用 background:inherit 上底,而斑马纹与悬停行的底色取自
+ * --el-fill-color-lighter / --el-fill-color-light;暖居把这两档映射成半透明的 --color-line,
+ * 于是偶数行横向滚动时,下层单元格的文字会从固定列(操作列)透上来。
+ * 表格范围内改用「半透明线色叠加在卡片色上」算出的等效实色(晨暮各一套)。 */
+html.theme-warm .el-table {
+  --el-fill-color-lighter: #f0e5d5; /* 斑马纹:rgba(138,106,78,.1) over #fbf3e4 */
+  --el-fill-color-light: #ebe0cf; /* 行悬停:rgba(138,106,78,.14) over #fbf3e4 */
+  --el-table-row-hover-bg-color: #ebe0cf;
+}
+html.theme-warm.dark .el-table {
+  --el-fill-color-lighter: #453324; /* 斑马纹:rgba(201,161,110,.12) over #33241a */
+  --el-fill-color-light: #4b3827; /* 行悬停:rgba(201,161,110,.16) over #33241a */
+  --el-table-row-hover-bg-color: #4b3827;
 }
 
 /* 深色模式:硬编码深色字体覆写为浅色 */
@@ -634,6 +663,14 @@ a {
   gap: 8px;
   align-items: center;
   flex-shrink: 0;
+  /* 单槽工具栏(只给 .tb-right)也要靠右:space-between 只有一个子元素时会落在 flex-start,
+     margin-left:auto 把剩余空间全吃掉,双槽时仍由 space-between 收尾,无副作用 */
+  margin-left: auto;
+  /* 窄屏把宽度收敛回容器,由内部 flex-wrap 换行,不再顶出 .page 被静默裁掉 */
+  min-width: 0;
+  max-width: 100%;
+  justify-content: flex-end;
+  flex-wrap: wrap;
 }
 
 /* ========== 工具栏按钮(全局) ========== */
@@ -942,6 +979,14 @@ html.dark .el-button--danger.is-link {
 html.dark .el-button--danger.is-text:hover,
 html.dark .el-button--danger.is-link:hover {
   background: rgba(201, 116, 116, 0.12) !important;
+}
+
+/* 表格操作列:全站放图标按钮(配 el-tooltip 出文字),这里统一紧凑内边距与间距 */
+.el-table .el-button.is-text {
+  padding: 5px 6px;
+}
+.el-table .el-button.is-text + .el-button.is-text {
+  margin-left: 4px;
 }
 
 /* 禁用/loading 态:统一置灰,去掉上浮 */

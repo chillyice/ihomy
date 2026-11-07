@@ -12,10 +12,18 @@
         <template #default="{ row }">¥{{ money(row.amount) }}</template>
       </el-table-column>
       <el-table-column prop="note" :label="$t('book.budget.note')" min-width="140" show-overflow-tooltip />
-      <el-table-column :label="$t('common.actions')" width="96" fixed="right">
+      <el-table-column :label="$t('common.actions')" width="84" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" text @click="openEditor(row)">{{ $t('common.edit') }}</el-button>
-          <el-button size="small" text type="danger" @click="onDel(row)">{{ $t('common.delete') }}</el-button>
+          <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
+            <el-button size="small" text @click="openEditor(row)"
+              ><el-icon><Edit /></el-icon
+            ></el-button>
+          </el-tooltip>
+          <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+            <el-button size="small" text type="danger" @click="onDel(row)"
+              ><el-icon><Delete /></el-icon
+            ></el-button>
+          </el-tooltip>
         </template>
       </el-table-column>
     </el-table>
@@ -68,8 +76,10 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Edit, Delete } from '@element-plus/icons-vue'
 
 import { bookApi } from '@/api'
+import { formatYuan } from '@/utils/money'
 import { BOOK_CATEGORIES } from '@/utils/bookLedger'
 
 const props = defineProps({
@@ -88,7 +98,7 @@ const dialogVisible = computed({
   set: (v) => emit('update:visible', v),
 })
 
-const money = (v) => Number(v ?? 0).toFixed(2)
+const money = (v) => formatYuan(v)
 
 const load = async () => {
   loading.value = true

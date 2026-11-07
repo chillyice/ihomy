@@ -12,13 +12,7 @@
       <el-option :value="2" :label="$t('ops.kada.level2')" />
       <el-option :value="3" :label="$t('ops.kada.level3')" />
     </el-select>
-    <el-input
-      v-model="q"
-      clearable
-      :placeholder="$t('ops.kada.search')"
-      style="width: 220px"
-      @keyup.enter="load(1)"
-    />
+    <el-input v-model="q" clearable :placeholder="$t('ops.kada.search')" style="width: 220px" @keyup.enter="load(1)" />
     <el-button type="primary" @click="load(1)">{{ $t('ops.kada.query') }}</el-button>
   </div>
 
@@ -41,13 +35,7 @@
     </div>
   </div>
 
-  <el-alert
-    v-if="!loading && !page.records.length"
-    type="info"
-    :closable="false"
-    show-icon
-    :title="$t('ops.kada.empty')"
-  />
+  <el-alert v-if="!loading && !page.records.length" type="info" :closable="false" show-icon :title="$t('ops.kada.empty')" />
   <el-table v-else v-loading="loading" :data="page.records" border stripe>
     <el-table-column prop="createdAt" :label="$t('ops.kada.created')" width="165" />
     <el-table-column :label="$t('ops.kada.name')" min-width="200" show-overflow-tooltip>
@@ -77,12 +65,18 @@
         </el-tag>
       </template>
     </el-table-column>
-    <el-table-column label="" width="150" fixed="right">
+    <el-table-column :label="$t('common.actions')" width="100" fixed="right">
       <template #default="{ row }">
-        <el-button size="small" @click="openDetail(row.id)">{{ $t('ops.kada.view') }}</el-button>
-        <el-button v-if="row.publishedUrl" size="small" link @click="openPublished(row.publishedUrl)">
-          {{ $t('ops.kada.open') }}
-        </el-button>
+        <el-tooltip :content="$t('ops.kada.view')" placement="top" :show-after="300">
+          <el-button size="small" text @click="openDetail(row.id)"
+            ><el-icon><View /></el-icon
+          ></el-button>
+        </el-tooltip>
+        <el-tooltip v-if="row.publishedUrl" :content="$t('ops.kada.open')" placement="top" :show-after="300">
+          <el-button size="small" text @click="openPublished(row.publishedUrl)"
+            ><el-icon><Link /></el-icon
+          ></el-button>
+        </el-tooltip>
       </template>
     </el-table-column>
   </el-table>
@@ -99,13 +93,7 @@
     @size-change="load(1)"
   />
 
-  <el-dialog
-    v-model="detailVisible"
-    :title="$t('ops.kada.detailTitle')"
-    width="min(880px, 92vw)"
-    append-to-body
-    destroy-on-close
-  >
+  <el-dialog v-model="detailVisible" :title="$t('ops.kada.detailTitle')" width="min(880px, 92vw)" append-to-body destroy-on-close>
     <template v-if="detail.item">
       <div class="kada-meta">
         <span class="kada-detail-name">{{ detail.item.name }}</span>
@@ -145,32 +133,15 @@
       <div class="kada-section-title">{{ $t('ops.kada.content') }}</div>
       <pre class="kada-content">{{ detail.content }}</pre>
 
-      <el-input
-        v-model="note"
-        type="textarea"
-        :rows="2"
-        maxlength="500"
-        show-word-limit
-        :placeholder="$t('ops.kada.notePlaceholder')"
-      />
-      <p v-if="detail.item.reviewNote" class="kada-meta-text">
-        {{ $t('ops.kada.reviewNote') }}：{{ detail.item.reviewNote }}
-      </p>
+      <el-input v-model="note" type="textarea" :rows="2" maxlength="500" show-word-limit :placeholder="$t('ops.kada.notePlaceholder')" />
+      <p v-if="detail.item.reviewNote" class="kada-meta-text">{{ $t('ops.kada.reviewNote') }}：{{ detail.item.reviewNote }}</p>
     </template>
     <template #footer>
       <el-button @click="detailVisible = false">{{ $t('ops.kada.cancel') }}</el-button>
-      <el-button
-        v-if="detail.item && detail.item.status !== 'REJECTED'"
-        type="danger"
-        @click="reject"
-      >
+      <el-button v-if="detail.item && detail.item.status !== 'REJECTED'" type="danger" @click="reject">
         {{ detail.item.status === 'APPROVED' ? $t('ops.kada.takedown') : $t('ops.kada.reject') }}
       </el-button>
-      <el-button
-        v-if="detail.item && detail.item.status !== 'APPROVED'"
-        type="primary"
-        @click="approve"
-      >
+      <el-button v-if="detail.item && detail.item.status !== 'APPROVED'" type="primary" @click="approve">
         {{ $t('ops.kada.approve') }}
       </el-button>
     </template>
@@ -181,6 +152,7 @@
 import { onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { View, Link } from '@element-plus/icons-vue'
 import { opsApi } from '@/api'
 
 const props = defineProps({
@@ -217,11 +189,7 @@ const parseList = (raw) => {
 const levelTagType = (lv) => ['success', 'info', 'warning', 'danger'][lv] || 'info'
 const statusTagType = (s) => (s === 'APPROVED' ? 'success' : s === 'REJECTED' ? 'info' : 'warning')
 const statusKey = (s) =>
-  s === 'APPROVED'
-    ? 'ops.kada.statusApproved'
-    : s === 'REJECTED'
-      ? 'ops.kada.statusRejected'
-      : 'ops.kada.statusPending'
+  s === 'APPROVED' ? 'ops.kada.statusApproved' : s === 'REJECTED' ? 'ops.kada.statusRejected' : 'ops.kada.statusPending'
 
 const loadSummary = async () => {
   try {
@@ -266,11 +234,7 @@ const openPublished = (url) => {
 const approve = async () => {
   if (!detail.item) return
   try {
-    await ElMessageBox.confirm(
-      t('ops.kada.approveConfirm', { name: detail.item.name }),
-      t('ops.kada.approve'),
-      { type: 'warning' },
-    )
+    await ElMessageBox.confirm(t('ops.kada.approveConfirm', { name: detail.item.name }), t('ops.kada.approve'), { type: 'warning' })
   } catch {
     return
   }

@@ -68,11 +68,13 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column v-if="userStore.isOwner" :label="$t('common.actions')" width="100">
+            <el-table-column v-if="userStore.isOwner" :label="$t('common.actions')" width="80">
               <template #default="{ row }">
-                <el-button v-if="row.status === 'PENDING'" size="small" type="success" plain @click="onTaken(row)">{{
-                  $t('points.taken')
-                }}</el-button>
+                <el-tooltip v-if="row.status === 'PENDING'" :content="$t('points.taken')" placement="top" :show-after="300">
+                  <el-button size="small" text type="success" @click="onTaken(row)"
+                    ><el-icon><CircleCheck /></el-icon
+                  ></el-button>
+                </el-tooltip>
               </template>
             </el-table-column>
           </el-table>
@@ -128,7 +130,7 @@
 // 积分商城:签到、家庭商品兑换;家长可上架/编辑/下架商品并核销兑换
 import { onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Edit } from '@element-plus/icons-vue'
+import { Edit, CircleCheck } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { pointsApi } from '@/api'

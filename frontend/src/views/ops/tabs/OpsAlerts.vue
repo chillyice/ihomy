@@ -54,9 +54,13 @@
         <span v-a11y-click v-if="row.sampleTraceId" class="tid-link mono" :title="$t('ops.tidJump')" @click="jumpAlertTrace(row)">TID</span>
       </template>
     </el-table-column>
-    <el-table-column label="" width="120" fixed="right">
+    <el-table-column :label="$t('common.actions')" width="80" fixed="right">
       <template #default="{ row }">
-        <el-button v-if="row.status === 'OPEN'" size="small" @click="ackAlert(row)">{{ $t('ops.alertAck') }}</el-button>
+        <el-tooltip v-if="row.status === 'OPEN'" :content="$t('ops.alertAck')" placement="top" :show-after="300">
+          <el-button size="small" text @click="ackAlert(row)"
+            ><el-icon><Check /></el-icon
+          ></el-button>
+        </el-tooltip>
       </template>
     </el-table-column>
   </el-table>
@@ -78,6 +82,7 @@ import { onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { opsApi } from '@/api'
 import { ElMessage } from 'element-plus'
+import { Check } from '@element-plus/icons-vue'
 
 const emit = defineEmits(['navigate-trace', 'refresh-summary'])
 

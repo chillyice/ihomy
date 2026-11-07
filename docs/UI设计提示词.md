@@ -543,6 +543,13 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 - **暖居配色补充(V9.65)**:陶土粉(`--blob-1`)/鼠尾草绿(`--blob-3`)在暖居主体里原先极少(五色漂移色块被 `html.theme-warm .bg-blobs{display:none}` 关闭)——补充点:①studio 外壳叠极淡双色径向渐变底衬(右上陶土 + 左下鼠尾草绿,`rgba(...,.12)`);②天气窗左下角鼠尾草绿光斑(`rgba(var(--blob-3),.22)`,对角平衡右上陶土光斑);③快捷入口图标 `.gc-link-icon` 鼠尾草绿底 `rgba(var(--blob-3),.16)`、列表图标 `.gc-ic` 陶土粉底 `rgba(var(--blob-1),.14)`。
 - **晨暮分段开关同步(V9.65)**:顶栏 `.gc-seg` 滑块/高亮跟随 `themeStore.mode` 立即同步(去 `waitSweepEnd` 延迟)。
 
+## 18e. 表格(el-table)规范(V11.53)
+
+- **操作列只放图标按钮**:所有表格的「操作 / 动作」列不再用文字按钮,统一 `el-tooltip(:content=文案, show-after=300)` 包一枚 `el-button size="small" text` + `el-icon`,文案仍走 `$t()`;危险动作给 `type="danger"`、主/成功动作给 `type="primary|success"`,图标按语义选(编辑 `Edit`、删除 `Delete`、查看 `View`、下载 `Download`、重命名 `EditPen`、浏览 `FolderOpened`、设为默认 `Star`、确认 `Check`/`CircleCheck`、暂停/恢复 `VideoPause`/`VideoPlay`、忽略/恢复 `Hide`/`RefreshLeft`、生成方案 `Document`、探测 `Search`、打开 `Link`、已取 `CircleCheck`)。
+- **列宽按图标数收**:每个图标按钮约 28px,列宽 = 图标数 × 28 + 间距 + 单元格内边距(2 个 ≈ 84、3 个 ≈ 120、6 个 ≈ 220);固定列不再预留文字宽度。表格内图标按钮的紧凑内边距(`5px 6px`、相邻 `4px`)由 `main.css` 全局提供,页面不要再写 `:deep(.el-table .el-button…)`。
+- **行底色必须实色**:`stripe` 斑马纹与行悬停底色不许用半透明色(如 `--color-line`),否则 `fixed` 固定列(sticky)会把下层的单元格内容透上来;暖居两套实色由 `main.css` 的 `html.theme-warm[.dark] .el-table` 统一给出(成因与取证见 `docs/踩坑速查.md` §3.69)。新增表格直接写 `stripe` 即可,不要自己覆写 `--el-fill-color-lighter/light`。
+- **带 `fixed="right"` 的操作列必须有表头**:统一 `:label="$t('common.actions')"`(历史上 OPS 两处写的是空 label,已统一)。
+
 ## 19. 性能规范(已踩坑)
 
 - **100% 缩放卡顿根因**:Element Plus `Setting`/`Monitor` 图标 SVG path 过于复杂,hover 时子像素光栅化开销大 → 用内联 SVG 替代(详见博客 id=18)。

@@ -23,17 +23,23 @@
             <span v-else class="path-hidden">—</span>
           </template>
         </el-table-column>
-        <el-table-column :label="$t('common.actions')" :width="isMobile ? 140 : 280" :fixed="isMobile ? false : 'right'">
+        <el-table-column :label="$t('common.actions')" :width="isMobile ? 140 : 150" :fixed="isMobile ? false : 'right'">
           <template #default="{ row }">
-            <el-button v-if="row.id !== 0" size="small" @click="goBrowse(row)">{{ $t('storage.browse') }}</el-button>
-            <el-button
+            <el-tooltip v-if="row.id !== 0" :content="$t('storage.browse')" placement="top" :show-after="300">
+              <el-button size="small" text @click="goBrowse(row)"
+                ><el-icon><FolderOpened /></el-icon
+              ></el-button>
+            </el-tooltip>
+            <el-tooltip
               v-if="row.id !== 0 && row.id !== defaultDeviceId && userStore.isOwner"
-              size="small"
-              text
-              type="success"
-              @click="setDefaultDevice(row)"
-              >{{ $t('storage.setDefault') }}</el-button
+              :content="$t('storage.setDefault')"
+              placement="top"
+              :show-after="300"
             >
+              <el-button size="small" text type="success" @click="setDefaultDevice(row)"
+                ><el-icon><Star /></el-icon
+              ></el-button>
+            </el-tooltip>
             <el-tooltip v-if="row.id !== 0 && userStore.isOwner" :content="$t('common.edit')" placement="top" :show-after="300">
               <el-button size="small" text @click="openDevice(row)"
                 ><el-icon><Edit /></el-icon
@@ -158,7 +164,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
-import { Edit, Delete } from '@element-plus/icons-vue'
+import { Edit, Delete, FolderOpened, Star } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useDevice } from '@/composables/useDevice'
@@ -414,13 +420,6 @@ onMounted(() => {
 .path-hidden {
   color: var(--el-text-color-secondary);
   opacity: 0.5;
-}
-/* 设备表内编辑/删除图标按钮:紧凑间距(排除「设为默认」等文本按钮) */
-:deep(.el-table .el-button.is-text:not(.el-button--success)) {
-  padding: 5px 6px;
-}
-:deep(.el-table .el-button.is-text:not(.el-button--success) + .el-button.is-text:not(.el-button--success)) {
-  margin-left: 4px;
 }
 
 @media (max-width: 768px) {

@@ -92,24 +92,38 @@
         <span v-else class="oss-none">—</span>
       </template>
     </el-table-column>
-    <el-table-column :label="$t('ops.oss.actions')" width="300">
+    <el-table-column :label="$t('ops.oss.actions')" width="220">
       <template #default="{ row }">
-        <el-button v-if="row.probeType" link type="primary" size="small" :loading="probingOssId === row.id" @click="probeOss(row)">{{
-          $t('ops.oss.probe')
-        }}</el-button>
-        <el-button v-if="isOssUpdatable(row)" link type="primary" size="small" @click="openOssPlan(row)">{{
-          $t('ops.oss.genPlan')
-        }}</el-button>
-        <el-button v-if="isOssUpdatable(row)" link type="success" size="small" @click="confirmOss(row)">{{
-          $t('ops.oss.confirm')
-        }}</el-button>
-        <el-button v-if="isOssUpdatable(row)" link type="warning" size="small" @click="ignoreOss(row, true)">{{
-          $t('ops.oss.ignore')
-        }}</el-button>
-        <el-button v-else-if="row.status === 'IGNORED'" link size="small" @click="ignoreOss(row, false)">{{
-          $t('ops.oss.unignore')
-        }}</el-button>
-        <el-button link size="small" @click="openOssEdit(row)">{{ $t('common.edit') }}</el-button>
+        <el-tooltip v-if="row.probeType" :content="$t('ops.oss.probe')" placement="top" :show-after="300">
+          <el-button size="small" text type="primary" :loading="probingOssId === row.id" @click="probeOss(row)"
+            ><el-icon><Search /></el-icon
+          ></el-button>
+        </el-tooltip>
+        <el-tooltip v-if="isOssUpdatable(row)" :content="$t('ops.oss.genPlan')" placement="top" :show-after="300">
+          <el-button size="small" text type="primary" @click="openOssPlan(row)"
+            ><el-icon><Document /></el-icon
+          ></el-button>
+        </el-tooltip>
+        <el-tooltip v-if="isOssUpdatable(row)" :content="$t('ops.oss.confirm')" placement="top" :show-after="300">
+          <el-button size="small" text type="success" @click="confirmOss(row)"
+            ><el-icon><CircleCheck /></el-icon
+          ></el-button>
+        </el-tooltip>
+        <el-tooltip v-if="isOssUpdatable(row)" :content="$t('ops.oss.ignore')" placement="top" :show-after="300">
+          <el-button size="small" text type="warning" @click="ignoreOss(row, true)"
+            ><el-icon><Hide /></el-icon
+          ></el-button>
+        </el-tooltip>
+        <el-tooltip v-else-if="row.status === 'IGNORED'" :content="$t('ops.oss.unignore')" placement="top" :show-after="300">
+          <el-button size="small" text @click="ignoreOss(row, false)"
+            ><el-icon><RefreshLeft /></el-icon
+          ></el-button>
+        </el-tooltip>
+        <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
+          <el-button size="small" text @click="openOssEdit(row)"
+            ><el-icon><Edit /></el-icon
+          ></el-button>
+        </el-tooltip>
       </template>
     </el-table-column>
   </el-table>
@@ -243,6 +257,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { opsApi } from '@/api'
 import { ElMessage } from 'element-plus'
+import { Search, Document, CircleCheck, Hide, RefreshLeft, Edit } from '@element-plus/icons-vue'
 import { formatDateTime } from '@/utils/datetime'
 
 const { t } = useI18n()

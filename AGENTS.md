@@ -169,7 +169,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 16. **并行请求(强制)**:独立请求改 `Promise.all([...])`,串行只在真有依赖时。
 17. **computed 纯函数(强制)**:内部禁止 `Math.random()`/`Date.now()`/副作用;随机或一次性计算用 `ref` + `watch(source, immediate)`。
 18. **全局 UI 样式统一(强制)**:EP 组件配色/圆角/尺寸/z-index 一律由 `main.css` 覆写,禁 scoped 重复定义;层级只用 `main.css` 的 `--z-*` 标尺(组件内禁写 ≥100 裸 z-index,守门 `styles/zLayers.spec.js`),遮罩统一 `--overlay-scrim`+`--overlay-blur`;**新弹窗必须声明宽度或用 `dialog-sm/md/lg/xl` 档位**。细则 UI 提示词 §29,坑见 踩坑速查 §3.15/§3.25/§3.36。
-19. **按钮/标签/角标/圆角**:主/次/幽灵/危险四类(浅深色不共用色值)、el-tag 半透明磨砂、el-badge 半透明黑、圆角 button 12 / input 10 / card+dialog 14;完整值见 UI 提示词 §18a。
+19. **按钮/标签/角标/圆角**:主/次/幽灵/危险四类(浅深色不共用色值)、el-tag 半透明磨砂、el-badge 半透明黑、圆角 button 12 / input 10 / card+dialog 14;完整值见 UI 提示词 §18a。**表格操作列只用图标按钮**(`el-tooltip` + `el-button text` + `el-icon`,不再放文字);**表格行底色必须实色**(斑马纹/悬停底色不许用半透明色,否则 `fixed` 固定列会透出下层单元格),细则 UI 提示词 §18e、坑见 踩坑速查 §3.69。
 20. **页面规范(强制)**:根容器 `class="page"`(禁 scoped 覆写 max-width/margin/padding);页面级 H1/H2 移除,分区标题 `.section-label`;工具栏 `class="page-toolbar card"`;多选 `.pick-badge` 圆标+描边(**禁左上 checkbox**)。详见 UI 提示词 §11b。
 21. **位图资产(强制)**:装饰图放 `frontend/src/assets/` 并 ESM 导入,**不放 `public/`**;宽度按渲染 2 倍封顶。例外:URL 存 DB 的演示素材走 `frontend/public/`;咔哒截图放 `public/kada-media/`;chillyice 舞台位图由 `scripts/art/chillyice_paint.py` 生成。**`public/` 目录名不得与 SPA 路由同名**(否则该路由 403),工具导出放 `public/toolbox-data/`。
 22. **提示文案不写实现(强制,后端同守)**:用户可见文案、`BizException` 消息、`@Operation` 摘要(`/doc.html` 公开)**只讲用户能做什么/发生了什么**,不写库表字段/配置键/内部枚举码/内部节律。机制细节归注释与日志。

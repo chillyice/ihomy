@@ -35,13 +35,23 @@
             <span v-else class="rc-muted">{{ $t('book.recurring.paused') }}</span>
           </template>
         </el-table-column>
-        <el-table-column :label="$t('common.actions')" width="170" fixed="right">
+        <el-table-column :label="$t('common.actions')" width="120" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" text @click="openEditor(row)">{{ $t('common.edit') }}</el-button>
-            <el-button size="small" text @click="onToggle(row)">{{
-              row.enabled ? $t('book.recurring.pause') : $t('book.recurring.resume')
-            }}</el-button>
-            <el-button size="small" text type="danger" @click="onDel(row)">{{ $t('common.delete') }}</el-button>
+            <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
+              <el-button size="small" text @click="openEditor(row)"
+                ><el-icon><Edit /></el-icon
+              ></el-button>
+            </el-tooltip>
+            <el-tooltip :content="row.enabled ? $t('book.recurring.pause') : $t('book.recurring.resume')" placement="top" :show-after="300">
+              <el-button size="small" text @click="onToggle(row)"
+                ><el-icon><VideoPause v-if="row.enabled" /><VideoPlay v-else /></el-icon
+              ></el-button>
+            </el-tooltip>
+            <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+              <el-button size="small" text type="danger" @click="onDel(row)"
+                ><el-icon><Delete /></el-icon
+              ></el-button>
+            </el-tooltip>
           </template>
         </el-table-column>
       </el-table>
@@ -123,8 +133,10 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Edit, Delete, VideoPlay, VideoPause } from '@element-plus/icons-vue'
 
 import { bookApi } from '@/api'
+import { formatYuan } from '@/utils/money'
 import { BOOK_CATEGORIES } from '@/utils/bookLedger'
 
 const props = defineProps({
@@ -148,7 +160,7 @@ const dialogVisible = computed({
   set: (v) => emit('update:visible', v),
 })
 
-const money = (v) => Number(v ?? 0).toFixed(2)
+const money = (v) => formatYuan(v)
 const periodLabel = (p) => t(`book.recurring.period.${p}`)
 const rangeText = (row) => (row.endDate ? `${row.startDate} ~ ${row.endDate}` : `${row.startDate}${t('book.recurring.ongoing')}`)
 
@@ -295,11 +307,11 @@ watch(
   color: var(--color-text-secondary, #999);
 }
 .is-income {
-  color: #67c23a;
+  color: var(--color-income);
   font-weight: 600;
 }
 .is-expense {
-  color: #f56c6c;
+  color: var(--color-expense);
   font-weight: 600;
 }
 .form-row {

@@ -74,12 +74,24 @@
           <el-table-column v-if="!isMobile" :label="$t('storage.modified')" width="160">
             <template #default="{ row }">{{ formatTime(row.modified) }}</template>
           </el-table-column>
-          <el-table-column :label="$t('common.actions')" :width="isMobile ? 140 : 220">
+          <el-table-column :label="$t('common.actions')" :width="isMobile ? 120 : 140">
             <template #default="{ row }">
               <template v-if="!selectMode">
-                <el-button v-if="isPreviewable(row.name)" size="small" @click="preview(row)">{{ $t('storage.preview') }}</el-button>
-                <el-button size="small" text @click="download(row)">{{ $t('storage.download') }}</el-button>
-                <el-button v-if="canManage" size="small" text @click="renameEntry(row)">{{ $t('storage.rename') }}</el-button>
+                <el-tooltip v-if="isPreviewable(row.name)" :content="$t('storage.preview')" placement="top" :show-after="300">
+                  <el-button size="small" text @click="preview(row)"
+                    ><el-icon><View /></el-icon
+                  ></el-button>
+                </el-tooltip>
+                <el-tooltip :content="$t('storage.download')" placement="top" :show-after="300">
+                  <el-button size="small" text @click="download(row)"
+                    ><el-icon><Download /></el-icon
+                  ></el-button>
+                </el-tooltip>
+                <el-tooltip v-if="canManage" :content="$t('storage.rename')" placement="top" :show-after="300">
+                  <el-button size="small" text @click="renameEntry(row)"
+                    ><el-icon><EditPen /></el-icon
+                  ></el-button>
+                </el-tooltip>
               </template>
             </template>
           </el-table-column>
@@ -102,6 +114,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { View, Download, EditPen } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
