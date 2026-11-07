@@ -179,9 +179,9 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 ## 验证基线
 
-- 后端全绿:`.\mvnw.cmd -B clean package`(332 tests,纯逻辑不起 Spring)。
-- 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(819 passed)+ `npm run format:check`(全树仍有历史遗留未格式化文件,口径见 踩坑速查 §1.13;**本次改动的文件必须 `prettier --write` 后通过**)。
-- 构建:首屏初始 JS 基线 **1467.50KB / gzip 501.19KB**(42 chunk,英文包 `en` 为懒加载 chunk);体积口径以 vite 构建输出为准,历史数字见 变更归档。
+- 后端全绿:`.\mvnw.cmd -B clean package`(337 tests,纯逻辑不起 Spring)。
+- 前端:`npm run lint`(0 error 0 warning)+ `npx vitest run`(883 passed)+ `npm run format:check`(全树仍有历史遗留未格式化文件,口径见 踩坑速查 §1.13;**本次改动的文件必须 `prettier --write` 后通过**)。
+- 构建:首屏初始 JS 基线 **1489.83KB / gzip 508.56KB**(42 chunk,英文包 `en` 为懒加载 chunk);体积口径以 vite 构建输出为准,历史数字见 变更归档。
 - 一致性:`bash scripts/doc-drift-check.sh` 全 [OK];`gen-code-map.sh --check`、`doc-index.sh --check` 无漂移。
 - 接口测试在仓库外 `..\autotest_framework`(`pytest -m api`,37 passed)。
 
