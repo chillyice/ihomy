@@ -300,12 +300,39 @@ html.theme-warm .gc-pin .fp-topbar {
   padding: 8px 12px !important;
   flex-wrap: nowrap;
 }
-/* 小游戏页顶栏(返回+全屏):容器 + 右对齐工具按钮(全局,供 PetLinkLink/FlashPlayer 共用) */
+/* 小游戏页顶栏(返回+全屏+宽屏):容器 + 右对齐工具按钮(全局,供 PetLinkLink/FlashPlayer 共用) */
 .game-top-actions {
   margin-left: auto;
   display: flex;
   gap: 8px;
   align-items: center;
+}
+/* 小游戏页一屏布局:页面高度由 useGameView 按内容区实测写入,内容超高时等比缩小,
+   页面自身不再出现纵向滚动(内容不够高时保持原尺寸) */
+.page.game-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+/* 宽屏模式:隐藏侧栏、放开内容宽度上限;不触发浏览器全屏,顶栏与返回键仍然可用 */
+html.game-wide .gc-side {
+  display: none;
+}
+html.game-wide .gc-app {
+  grid-template-columns: 1fr;
+}
+html.game-wide .gc-wrap {
+  max-width: none;
+}
+html.game-wide .app-sidebar {
+  display: none;
+}
+html.game-wide .app-main.with-sidebar {
+  margin-left: 0;
+}
+html.game-wide .page.game-page {
+  max-width: none;
 }
 /* 小游戏公共触摸守卫:禁双击放大、长按选字与长按菜单(各游戏根容器加 class="game-surface") */
 .game-surface {

@@ -874,6 +874,8 @@ export default {
     back: 'Back',
     fullscreen: 'Fullscreen',
     exitFullscreen: 'Exit fullscreen',
+    wide: 'Wide',
+    exitWide: 'Exit wide',
     rewarded: 'Reward +{n} points',
     rewardCapped: "Today's game reward limit reached",
     rewardFailed: 'Failed to grant points',

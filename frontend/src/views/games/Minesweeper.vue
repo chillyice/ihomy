@@ -1,16 +1,13 @@
 <template>
-  <div class="page">
+  <div ref="pageEl" class="page game-page">
     <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <div class="game-top-actions">
-        <el-button size="small" round @click="router.push('/games')">
-          <el-icon><ArrowLeft /></el-icon>
-          {{ $t('games.back') }}
-        </el-button>
-        <el-button size="small" round @click="toggleFullscreen">
-          <el-icon><FullScreen /></el-icon>
-          {{ isFullscreen ? $t('games.exitFullscreen') : $t('games.fullscreen') }}
-        </el-button>
-      </div>
+      <GameTopActions
+        :is-fullscreen="isFullscreen"
+        :wide="isWide"
+        @back="router.push('/games')"
+        @fullscreen="toggleFullscreen"
+        @wide="toggleWide"
+      />
     </PageToolbar>
 
     <div ref="gameCardEl" class="ms-card card game-surface" @contextmenu.prevent @dblclick.prevent>
@@ -33,7 +30,7 @@
       </div>
 
       <div class="ms-actions">
-        <el-select :model-value="level" size="small" class="ms-level" @change="startNew">
+        <el-select :model-value="level" size="small" class="ms-level" :teleported="!isFullscreen" @change="startNew">
           <el-option v-for="key in LEVEL_KEYS" :key="key" :value="key" :label="$t('games.minesweeper.level.' + key)" />
         </el-select>
         <el-button size="small" round :type="flagMode ? 'primary' : 'default'" @click="flagMode = !flagMode">
@@ -92,9 +89,10 @@
 import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ArrowLeft, FullScreen } from '@element-plus/icons-vue'
 import PageToolbar from '@/components/PageToolbar.vue'
+import GameTopActions from '@/components/games/GameTopActions.vue'
 import { gameApi } from '@/api'
+import { useGameView } from '@/composables/useGameView'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { formatClock } from '@/utils/games/gameClock'
 import { LEVEL_KEYS, STATUS, chord, createBoard, isValidBoard, remainingMines, revealCell, toggleFlag } from '@/utils/games/minesweeper'
@@ -106,8 +104,9 @@ const router = useRouter()
 const { t } = useI18n()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 
+const pageEl = ref(null)
 const gameCardEl = ref(null)
-const isFullscreen = ref(false)
+const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({ page: pageEl, stage: gameCardEl })
 const level = ref('EASY')
 const board = ref(createBoard('EASY'))
 const elapsed = ref(0)
@@ -315,21 +314,7 @@ const cellLabel = (cell, index) => {
   return t('games.minesweeper.cell', { row, col, state })
 }
 
-// ---------- 全屏 ----------
-const toggleFullscreen = async () => {
-  try {
-    if (document.fullscreenElement) await document.exitFullscreen?.()
-    else await gameCardEl.value?.requestFullscreen?.()
-  } catch (e) {
-    // 浏览器拒绝(iOS)时保持窗口态
-  }
-}
-const onFullscreenChange = () => {
-  isFullscreen.value = !!document.fullscreenElement
-}
-
 onMounted(() => {
-  document.addEventListener('fullscreenchange', onFullscreenChange)
   sunLight?.suspendEffects()
   loadBest()
   if (!loadState()) startNew(level.value)
@@ -339,7 +324,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   stopTimer()
   if (!isFinished.value) saveState()
-  document.removeEventListener('fullscreenchange', onFullscreenChange)
   sunLight?.restoreEffects()
 })
 </script>

@@ -1,16 +1,16 @@
 <template>
-  <div class="page cards-page">
+  <div ref="pageEl" class="page cards-page game-page">
     <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <div class="cards-actions">
-        <el-button size="small" round @click="router.push(backTarget)">
-          <el-icon><ArrowLeft /></el-icon>
-          {{ $t(backLabelKey) }}
-        </el-button>
-        <el-button v-if="currentGame" size="small" round @click="toggleFullscreen">
-          <el-icon><FullScreen /></el-icon>
-          {{ isFullscreen ? $t('games.exitFullscreen') : $t('games.fullscreen') }}
-        </el-button>
-      </div>
+      <GameTopActions
+        :back-label="$t(backLabelKey)"
+        :show-fullscreen="!!currentGame"
+        :show-wide="!!currentGame"
+        :is-fullscreen="isFullscreen"
+        :wide="isWide"
+        @back="router.push(backTarget)"
+        @fullscreen="toggleFullscreen"
+        @wide="toggleWide"
+      />
     </PageToolbar>
 
     <!-- 玩法大厅:点击「纸牌」入口先到这里,选一种玩法再进牌桌,给游戏留出软件式的使用纵深 -->
@@ -58,10 +58,12 @@
 // 纸牌统一入口:先玩法大厅(/games/cards)后牌桌(/games/cards/klondike|spider)两级结构。
 // 页面高度锁在一屏内(暖居按主区高度 100% 的 CSS 链),牌桌组件再用 cardLayout 把牌宽与
 // 叠牌步进收进这个高度;大厅展示各玩法最高分与最近在玩标记。
-import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, ArrowRight, Connection, FullScreen, Tickets } from '@element-plus/icons-vue'
+import { ArrowRight, Connection, Tickets } from '@element-plus/icons-vue'
 import PageToolbar from '@/components/PageToolbar.vue'
+import GameTopActions from '@/components/games/GameTopActions.vue'
+import { useGameView } from '@/composables/useGameView'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import KlondikeBoard from './cards/KlondikeBoard.vue'
 import SpiderBoard from './cards/SpiderBoard.vue'
@@ -95,9 +97,12 @@ const route = useRoute()
 const router = useRouter()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 
+const pageEl = ref(null)
 const stageEl = ref(null)
 const stageH = ref(0)
-const isFullscreen = ref(false)
+// 牌桌高度由页面自己按一屏算(fit:false),这里只用全屏 / 宽屏状态
+const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({ page: pageEl, stage: stageEl, fit: false })
+provide('gameFullscreen', isFullscreen)
 const recent = ref('')
 // 暖居主区(.gc-main)有确定高度,直接用 CSS 撑满,不依赖首帧测量
 const fillByLayout = ref(false)
@@ -163,22 +168,21 @@ const observeLayout = () => {
   resizeObserver.observe(scroller || document.documentElement)
 }
 
-// ---------- 全屏 ----------
-const toggleFullscreen = async () => {
-  try {
-    if (document.fullscreenElement) await document.exitFullscreen?.()
-    else await stageEl.value?.requestFullscreen?.()
-  } catch (e) {
-    // 浏览器拒绝(iOS)时保持窗口态
-  }
-}
+// ---------- 全屏 / 宽屏后的牌桌重算 ----------
 const onFullscreenChange = () => {
-  isFullscreen.value = !!document.fullscreenElement
   nextTick(() => {
     measure()
     window.dispatchEvent(new Event('resize'))
   })
 }
+
+// 宽屏会隐藏侧栏、放开内容宽度,窗口本身不变,不会触发 resize,这里主动通知牌桌重新反推牌宽
+watch(isWide, () => {
+  nextTick(() => {
+    measure()
+    window.dispatchEvent(new Event('resize'))
+  })
+})
 
 const onResize = () => measure()
 

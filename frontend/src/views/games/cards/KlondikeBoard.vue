@@ -23,7 +23,7 @@
     </div>
 
     <div class="sol-actions">
-      <el-select v-model="drawCount" size="small" class="sol-draw">
+      <el-select v-model="drawCount" size="small" class="sol-draw" :teleported="!gameFullscreen">
         <el-option :value="1" :label="$t('games.solitaire.draw1')" />
         <el-option :value="3" :label="$t('games.solitaire.draw3')" />
       </el-select>
@@ -113,7 +113,7 @@
 // 纸牌接龙(Klondike):发牌/翻牌/叠牌规则/自动收牌全在 utils/games/solitaire.js(纯函数,单测覆盖)。
 // 本组件负责点选移动、双击自动收纳、撤销快照、计时与最高分;牌宽与叠牌步进来自 utils/games/cardLayout.js,
 // 让牌桌固定在一屏内,叠牌比原先更紧。
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { gameApi } from '@/api'
 import { formatClock } from '@/utils/games/gameClock'
@@ -128,6 +128,8 @@ const DOUBLE_TAP_MS = 320
 const COLUMNS = 7
 
 const { t } = useI18n()
+// 牌桌全屏时下拉要留在全屏元素内部(挂 body 会被全屏层遮住)
+const gameFullscreen = inject('gameFullscreen', ref(false))
 
 const feltEl = ref(null)
 const feltSize = ref({ w: 0, h: 0 })

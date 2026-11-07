@@ -1,16 +1,13 @@
 <template>
-  <div class="page">
+  <div ref="pageEl" class="page game-page">
     <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <div class="game-top-actions">
-        <el-button size="small" round @click="router.push('/games')">
-          <el-icon><ArrowLeft /></el-icon>
-          {{ $t('games.back') }}
-        </el-button>
-        <el-button size="small" round @click="toggleFullscreen">
-          <el-icon><FullScreen /></el-icon>
-          {{ isFullscreen ? $t('games.exitFullscreen') : $t('games.fullscreen') }}
-        </el-button>
-      </div>
+      <GameTopActions
+        :is-fullscreen="isFullscreen"
+        :wide="isWide"
+        @back="router.push('/games')"
+        @fullscreen="toggleFullscreen"
+        @wide="toggleWide"
+      />
     </PageToolbar>
 
     <div ref="gameCardEl" class="bf-card game-surface" @contextmenu.prevent @dblclick.prevent>
@@ -29,7 +26,7 @@
       </div>
 
       <div class="bf-actions">
-        <el-select v-model="size" size="small" class="bf-size-select" @change="switchSize">
+        <el-select v-model="size" size="small" class="bf-size-select" :teleported="!isFullscreen" @change="switchSize">
           <el-option v-for="s in BOARD_SIZES" :key="s" :value="s" :label="s + '×' + s" />
         </el-select>
         <el-button size="small" round @click="startNew">{{ $t('games.g2048.newGame') }}</el-button>
@@ -84,10 +81,11 @@
 import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ArrowLeft, FullScreen } from '@element-plus/icons-vue'
 import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import PageToolbar from '@/components/PageToolbar.vue'
+import GameTopActions from '@/components/games/GameTopActions.vue'
+import { useGameView } from '@/composables/useGameView'
 import { BOARD_SIZES, createGame, hasWon, isGameOver, isValidTiles, move, spawnTile } from '@/utils/games/game2048'
 
 const { t } = useI18n()
@@ -96,8 +94,9 @@ const sunLight = inject(SUN_LIGHT_KEY, null)
 
 const MAX_HISTORY = 20
 
+const pageEl = ref(null)
 const gameCardEl = ref(null)
-const isFullscreen = ref(false)
+const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({ page: pageEl, stage: gameCardEl })
 
 const size = ref(4)
 const tiles = ref([])
@@ -316,22 +315,8 @@ const onTouchEnd = (event) => {
   tryMove(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up')
 }
 
-// ---------- 全屏 ----------
-const toggleFullscreen = async () => {
-  try {
-    if (document.fullscreenElement) await document.exitFullscreen?.()
-    else await gameCardEl.value?.requestFullscreen?.()
-  } catch (e) {
-    // 浏览器拒绝(如 iOS)时保持窗口态
-  }
-}
-const onFullscreenChange = () => {
-  isFullscreen.value = !!document.fullscreenElement
-}
-
 onMounted(() => {
   document.addEventListener('keydown', onKeydown)
-  document.addEventListener('fullscreenchange', onFullscreenChange)
   sunLight?.suspendEffects()
   loadBest()
 
@@ -349,7 +334,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (!gameOver.value) saveState()
   document.removeEventListener('keydown', onKeydown)
-  document.removeEventListener('fullscreenchange', onFullscreenChange)
   sunLight?.restoreEffects()
 })
 </script>

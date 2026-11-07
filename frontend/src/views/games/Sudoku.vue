@@ -1,27 +1,24 @@
 <template>
-  <div class="page">
-    <!-- 顶栏:返回 + 全屏(与连连看/物品定位同构) -->
+  <div ref="pageEl" class="page game-page">
+    <!-- 顶栏:返回 + 全屏 + 宽屏(与连连看/物品定位同构) -->
     <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <div class="game-top-actions">
-        <el-button size="small" round @click="router.push('/games')">
-          <el-icon><ArrowLeft /></el-icon>
-          {{ $t('games.back') }}
-        </el-button>
-        <el-button size="small" round @click="toggleFullscreen">
-          <el-icon><FullScreen /></el-icon>
-          {{ isFullscreen ? $t('games.exitFullscreen') : $t('games.fullscreen') }}
-        </el-button>
-      </div>
+      <GameTopActions
+        :is-fullscreen="isFullscreen"
+        :wide="isWide"
+        @back="router.push('/games')"
+        @fullscreen="toggleFullscreen"
+        @wide="toggleWide"
+      />
     </PageToolbar>
 
     <div ref="gameCardEl" v-loading="generating" class="sd-card game-surface" @contextmenu.prevent @dblclick.prevent>
       <div class="sd-head">
         <div class="sd-title">{{ $t('games.sudoku.title') }}</div>
         <div class="sd-head-right">
-          <el-select v-model="variant" size="small" class="sd-variant" @change="changeVariant">
+          <el-select v-model="variant" size="small" class="sd-variant" :teleported="!isFullscreen" @change="changeVariant">
             <el-option v-for="key in VARIANT_KEYS" :key="key" :value="key" :label="$t('games.sudoku.variant.' + key)" />
           </el-select>
-          <el-select v-model="difficulty" size="small" class="sd-difficulty" @change="startNew">
+          <el-select v-model="difficulty" size="small" class="sd-difficulty" :teleported="!isFullscreen" @change="startNew">
             <el-option v-for="key in DIFFICULTY_KEYS" :key="key" :value="key" :label="$t('games.sudoku.difficulty.' + key)" />
           </el-select>
           <span class="sd-timer">{{ timeText }}</span>
@@ -140,10 +137,11 @@
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ArrowLeft, FullScreen } from '@element-plus/icons-vue'
 import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import PageToolbar from '@/components/PageToolbar.vue'
+import GameTopActions from '@/components/games/GameTopActions.vue'
+import { useGameView } from '@/composables/useGameView'
 import {
   CELLS,
   DIFFICULTY_KEYS,
@@ -175,8 +173,9 @@ const QUICK_FILL_KEY = 'ihomy:games:sudoku:quickfill:v1'
 const MAX_HISTORY = 120
 const LONG_PRESS_MS = 500
 
+const pageEl = ref(null)
 const gameCardEl = ref(null)
-const isFullscreen = ref(false)
+const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({ page: pageEl, stage: gameCardEl })
 
 const variant = ref('CLASSIC')
 const difficulty = ref('MEDIUM')
@@ -716,26 +715,12 @@ const onKeydown = (event) => {
   }
 }
 
-// ---------- 全屏 ----------
-const toggleFullscreen = async () => {
-  try {
-    if (document.fullscreenElement) await document.exitFullscreen?.()
-    else await gameCardEl.value?.requestFullscreen?.()
-  } catch (e) {
-    // 浏览器拒绝(如 iOS)时保持窗口态
-  }
-}
-const onFullscreenChange = () => {
-  isFullscreen.value = !!document.fullscreenElement
-}
-
 // 棋面/笔记改动立即落盘(撤销后立刻刷新也不会回退),计时每秒变化走防抖,避免每秒写 localStorage
 watch([board, notes, difficulty, hintsUsed], saveState, { deep: true })
 watch(elapsed, scheduleSave)
 
 onMounted(() => {
   document.addEventListener('keydown', onKeydown)
-  document.addEventListener('fullscreenchange', onFullscreenChange)
   sunLight?.suspendEffects()
 
   try {
@@ -770,7 +755,6 @@ onBeforeUnmount(() => {
   if (saveTimer) clearTimeout(saveTimer)
   saveState()
   document.removeEventListener('keydown', onKeydown)
-  document.removeEventListener('fullscreenchange', onFullscreenChange)
   sunLight?.restoreEffects()
 })
 </script>

@@ -1,16 +1,13 @@
 <template>
-  <div class="page">
+  <div ref="pageEl" class="page game-page">
     <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <div class="game-top-actions">
-        <el-button size="small" round @click="router.push('/games')">
-          <el-icon><ArrowLeft /></el-icon>
-          {{ $t('games.back') }}
-        </el-button>
-        <el-button size="small" round @click="toggleFullscreen">
-          <el-icon><FullScreen /></el-icon>
-          {{ isFullscreen ? $t('games.exitFullscreen') : $t('games.fullscreen') }}
-        </el-button>
-      </div>
+      <GameTopActions
+        :is-fullscreen="isFullscreen"
+        :wide="isWide"
+        @back="router.push('/games')"
+        @fullscreen="toggleFullscreen"
+        @wide="toggleWide"
+      />
     </PageToolbar>
 
     <div ref="gameCardEl" class="tt-card card game-surface" @contextmenu.prevent @dblclick.prevent>
@@ -118,10 +115,12 @@
 import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ArrowDownBold, ArrowLeft, ArrowLeftBold, ArrowRightBold, FullScreen, RefreshRight } from '@element-plus/icons-vue'
+import { ArrowDownBold, ArrowLeftBold, ArrowRightBold, RefreshRight } from '@element-plus/icons-vue'
 import PageToolbar from '@/components/PageToolbar.vue'
+import GameTopActions from '@/components/games/GameTopActions.vue'
 import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import { useGameView } from '@/composables/useGameView'
 import {
   SHAPES,
   STATUS,
@@ -145,8 +144,9 @@ const router = useRouter()
 const { t } = useI18n()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 
+const pageEl = ref(null)
 const gameCardEl = ref(null)
-const isFullscreen = ref(false)
+const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({ page: pageEl, stage: gameCardEl })
 const game = ref(createGame())
 const paused = ref(false)
 const best = ref(0)
@@ -345,18 +345,7 @@ const onKeydown = (event) => {
   }
 }
 
-// ---------- 全屏与可见性 ----------
-const toggleFullscreen = async () => {
-  try {
-    if (document.fullscreenElement) await document.exitFullscreen?.()
-    else await gameCardEl.value?.requestFullscreen?.()
-  } catch (e) {
-    // 浏览器拒绝(iOS)时保持窗口态
-  }
-}
-const onFullscreenChange = () => {
-  isFullscreen.value = !!document.fullscreenElement
-}
+// ---------- 可见性 ----------
 const onVisibility = () => {
   if (document.hidden) stopTimer()
   else schedule()
@@ -364,7 +353,6 @@ const onVisibility = () => {
 
 onMounted(() => {
   document.addEventListener('keydown', onKeydown)
-  document.addEventListener('fullscreenchange', onFullscreenChange)
   document.addEventListener('visibilitychange', onVisibility)
   sunLight?.suspendEffects()
   loadBest()
@@ -382,7 +370,6 @@ onBeforeUnmount(() => {
   stopTimer()
   if (game.value.status === STATUS.PLAYING) saveState()
   document.removeEventListener('keydown', onKeydown)
-  document.removeEventListener('fullscreenchange', onFullscreenChange)
   document.removeEventListener('visibilitychange', onVisibility)
   sunLight?.restoreEffects()
 })

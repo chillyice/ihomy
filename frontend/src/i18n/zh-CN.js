@@ -868,6 +868,8 @@ export default {
     back: '返回',
     fullscreen: '全屏',
     exitFullscreen: '退出全屏',
+    wide: '宽屏',
+    exitWide: '退出宽屏',
     rewarded: '奖励 +{n} 积分',
     rewardCapped: '今日游戏奖励已领完',
     rewardFailed: '积分奖励发放失败',

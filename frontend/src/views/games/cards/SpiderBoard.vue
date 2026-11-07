@@ -23,7 +23,7 @@
     </div>
 
     <div class="sol-actions">
-      <el-select v-model="difficulty" size="small" class="sol-draw">
+      <el-select v-model="difficulty" size="small" class="sol-draw" :teleported="!gameFullscreen">
         <el-option v-for="d in DIFFICULTIES" :key="d" :value="d" :label="difficultyLabel(d)" />
       </el-select>
       <el-button size="small" round :disabled="!history.length" @click="undo">{{ $t('games.spider.undo') }}</el-button>
@@ -95,7 +95,7 @@
 // 蜘蛛纸牌:规则/发牌/叠牌/自动收组全在 utils/games/spider.js(纯函数,单测覆盖)。
 // 本组件只做点选移动、双击自动移动、撤销快照、计时与最高分;牌宽与叠牌步进来自 cardLayout.js。
 // 难度 1/2/4 色分别记录最高分与存档,通关按积分规则发奖励(后端 POST /game/spider/reward)。
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { gameApi } from '@/api'
 import { formatClock } from '@/utils/games/gameClock'
@@ -122,6 +122,8 @@ const SUIT_SYMBOL = { S: '♠', H: '♥', D: '♦', C: '♣' }
 const DOUBLE_TAP_MS = 320
 
 const { t } = useI18n()
+// 牌桌全屏时下拉要留在全屏元素内部(挂 body 会被全屏层遮住)
+const gameFullscreen = inject('gameFullscreen', ref(false))
 
 const feltEl = ref(null)
 const feltSize = ref({ w: 0, h: 0 })

@@ -1,17 +1,16 @@
 <template>
-  <div class="page">
-    <!-- 顶栏:返回 + 全屏(工具按钮统一进顶栏,与物品定位一致) -->
+  <div ref="pageEl" class="page game-page">
+    <!-- 顶栏:返回 + 全屏 + 宽屏(工具按钮统一进顶栏,与物品定位一致) -->
     <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <div class="game-top-actions">
-        <el-button size="small" round @click="router.push('/games')">
-          <el-icon><ArrowLeft /></el-icon>
-          {{ $t('games.back') }}
-        </el-button>
-        <el-button size="small" round @click="toggleFullscreen">
-          <el-icon><FullScreen /></el-icon>
-          {{ isFullscreen ? $t('games.petlink.exitFullscreen') : $t('games.petlink.fullscreen') }}
-        </el-button>
-      </div>
+      <GameTopActions
+        :is-fullscreen="isFullscreen"
+        :wide="isWide"
+        :fullscreen-label="$t('games.petlink.fullscreen')"
+        :exit-label="$t('games.petlink.exitFullscreen')"
+        @back="router.push('/games')"
+        @fullscreen="toggleFullscreen"
+        @wide="toggleWide"
+      />
     </PageToolbar>
 
     <div ref="gameCardEl" class="game-card game-surface" @contextmenu.prevent @dblclick.prevent>
@@ -108,7 +107,7 @@
         <div v-if="debugMode" class="debug-panel">
           <div class="debug-row">
             <span class="debug-tag">{{ $t('games.petlink.debug.title') }}</span>
-            <el-select v-model="debugJumpLevel" size="small" class="debug-level-select">
+            <el-select v-model="debugJumpLevel" size="small" class="debug-level-select" :teleported="!isFullscreen">
               <el-option v-for="n in MAX_LEVEL" :key="n" :label="$t('games.petlink.levelNames.' + n)" :value="n" />
             </el-select>
             <el-button size="small" @click="debugJump(debugJumpLevel)">{{ $t('games.petlink.debug.jump') }}</el-button>
@@ -169,10 +168,11 @@ import { ref, computed, onBeforeUnmount, onMounted, nextTick, inject, watch } fr
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { FullScreen, ArrowLeft } from '@element-plus/icons-vue'
 import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import PageToolbar from '@/components/PageToolbar.vue'
+import GameTopActions from '@/components/games/GameTopActions.vue'
+import { useGameView } from '@/composables/useGameView'
 import {
   PETLINK_LEVEL_TIME,
   PETLINK_MAX_LEVEL,
@@ -288,18 +288,11 @@ let ticker = null
 let hintTimer = null
 let resizeObserver = null
 
-// 全屏(原生 Fullscreen API,对 .game-card 全屏)
+// 全屏 / 宽屏 / 一屏适配;全屏目标仍是 .game-card
+const pageEl = ref(null)
 const gameCardEl = ref(null)
-const isFullscreen = ref(false)
-function toggleFullscreen() {
-  if (!document.fullscreenElement) {
-    gameCardEl.value?.requestFullscreen?.()
-  } else {
-    document.exitFullscreen?.()
-  }
-}
+const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({ page: pageEl, stage: gameCardEl })
 function onFullscreenChange() {
-  isFullscreen.value = !!document.fullscreenElement
   // 全屏/退出后可用宽高变化,重新计算缩放(退出恢复 1.6 上限)
   nextTick(() => updateBoardScale())
 }

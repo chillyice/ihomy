@@ -2,7 +2,7 @@
      触控守卫沿用 .game-surface(禁双击放大/长按选字/长按菜单);全屏=浏览器全屏 API,
      页面全屏=站内沉浸浮层(不按 F11);站点登录信息统一存家庭保险箱 -->
 <template>
-  <div class="page web-game-page">
+  <div ref="pageEl" class="page web-game-page game-page">
     <PageToolbar root-class="game-topbar" :holder-margin="0" always>
       <el-button size="small" round @click="router.push('/games')">
         <el-icon><ArrowLeft /></el-icon>
@@ -91,19 +91,22 @@ import PageToolbar from '@/components/PageToolbar.vue'
 import { gameApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import { useGameView } from '@/composables/useGameView'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 
+const pageEl = ref(null)
 const game = ref(null)
 const stageEl = ref(null)
 const frameKey = ref(0)
 const frameLoaded = ref(false)
 const loadError = ref(false)
-const isFullscreen = ref(false)
 const pageFull = ref(false)
+// iframe 本身不缩放(缩了字会糊),页面按内容区锁高、iframe 用 flex 撑满
+const { isFullscreen, toggleFullscreen } = useGameView({ page: pageEl, stage: stageEl, scale: false })
 
 /** 保险箱写权限(新增条目要 vault:manage);没有权限就不显示入口,避免点了才报错 */
 const canVault = computed(() => userStore.isOwner || userStore.hasPerm('vault:manage'))
@@ -129,19 +132,6 @@ const openVault = () => {
 
 const togglePageFull = () => {
   pageFull.value = !pageFull.value
-}
-
-const toggleFullscreen = async () => {
-  try {
-    if (document.fullscreenElement) await document.exitFullscreen?.()
-    else await stageEl.value?.requestFullscreen?.()
-  } catch (e) {
-    // 浏览器拒绝(如 iOS)时保持窗口态
-  }
-}
-
-const onFullscreenChange = () => {
-  isFullscreen.value = !!document.fullscreenElement
 }
 
 const onKeydown = (event) => {
@@ -175,14 +165,12 @@ watch(
 )
 
 onMounted(() => {
-  document.addEventListener('fullscreenchange', onFullscreenChange)
   document.addEventListener('keydown', onKeydown)
   sunLight?.suspendEffects()
   loadGame(route.params.id)
 })
 
 onBeforeUnmount(() => {
-  document.removeEventListener('fullscreenchange', onFullscreenChange)
   document.removeEventListener('keydown', onKeydown)
   if (document.fullscreenElement) document.exitFullscreen?.()
   sunLight?.restoreEffects?.()
@@ -200,8 +188,9 @@ onBeforeUnmount(() => {
 }
 .wg-stage {
   position: relative;
-  height: calc(100dvh - 170px);
-  min-height: 400px;
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 320px;
   padding: 0;
   overflow: hidden;
   background: #1b1b1b;
@@ -264,9 +253,6 @@ onBeforeUnmount(() => {
 @media (max-width: 768px) {
   .wg-btn-label {
     display: none;
-  }
-  .wg-stage {
-    height: calc(100dvh - 140px);
   }
 }
 </style>
