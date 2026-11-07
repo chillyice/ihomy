@@ -93,6 +93,11 @@ app:
   log-retention-days: 7
   # 天气调用日志(report_weather)保留天数:每天 04:10 清理,响应正文体积大,过期即删
   weather-log-retention-days: 7
+  # WebRTC 通话 ICE 服务器(1:1 语音视频,聊天室 P3):
+  # 分号分隔多条,单条格式 url[|username|credential];STUN 基线开箱即用,
+  # TURN(自建 coturn)生产经 external.yml 覆盖——凭证不入 git,见 external.yml.template
+  webrtc:
+    ice-servers: "stun:stun.l.google.com:19302"
   # 同类异常聚合预警(运维页「异常预警」):同类问题在窗口内达到阈值时汇总成一条并提醒 OPS。
   # 采集端是 logback 的 LogAlertAppender(见 logback-spring.xml),计数在内存,落库/发信走后台单线程。
   log-alert:

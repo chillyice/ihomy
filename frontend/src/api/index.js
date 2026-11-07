@@ -496,6 +496,7 @@ export const chatApi = {
   unread: () => request.get('/chat/unread'),
   read: (msgId) => request.post('/chat/read', { msgId }),
   unfurl: (url) => request.post('/chat/unfurl', { url }),
+  iceServers: () => request.get('/chat/ice-servers'),
 }
 
 // 存储管理(家庭级设备 + 文件浏览 + 目录映射同步)

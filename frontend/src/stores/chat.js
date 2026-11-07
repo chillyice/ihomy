@@ -7,6 +7,7 @@ import { chatApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { createChatSocket, SOCKET_STATUS } from '@/composables/useChatSocket'
 import { serializePayload } from '@/utils/chatMsg'
+import { useCallStore } from '@/stores/call'
 
 let socket = null
 let wired = false
@@ -56,6 +57,7 @@ export const useChatStore = defineStore('chat', {
         if (socket === s) this.socketStatus = SOCKET_STATUS.CLOSED
       })
       s.on('message', (data) => this.onIncoming(data))
+      s.on('call-signal', (data) => useCallStore().onSignal(data))
       return s
     },
 
@@ -158,6 +160,11 @@ export const useChatStore = defineStore('chat', {
       this.hydrated = true
       this.unread = 0
       if (un?.lastMsgId) chatApi.read(un.lastMsgId).catch(() => {})
+    },
+
+    /** 通话/对战等协议信令上行(结构化 {type,data},由调用方组好) */
+    sendSignal(data) {
+      return socket ? socket.send(data) : false
     },
 
     /** 登出/清场:断开连接并清空全部会话数据(防串号) */

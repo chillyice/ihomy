@@ -44,6 +44,8 @@
     <ChangePasswordDialog />
     <!-- 全局聊天浮窗(懒加载,内部自守卫:登录且非独立页) -->
     <ChatFloat />
+    <!-- 1:1 通话覆盖层(懒加载,内部自守卫登录态) -->
+    <CallOverlay />
   </el-config-provider>
 </template>
 
@@ -68,6 +70,7 @@ import SiteFooter from '@/components/SiteFooter.vue'
 import LightTestConsole from '@/components/LightTestConsole.vue'
 import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue'
 const ChatFloat = defineAsyncComponent(() => import('@/components/chat/ChatFloat.vue'))
+const CallOverlay = defineAsyncComponent(() => import('@/components/chat/CallOverlay.vue'))
 import MobileLayout from '@/layouts/MobileLayout.vue'
 
 const { isMobile } = useDevice()

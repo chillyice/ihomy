@@ -1483,7 +1483,6 @@ export default {
       objects: 'Share from ihomy',
       link: 'Web link',
       game: 'Game invite',
-      callSoon: 'Calling is coming soon',
       tooLarge: 'Picture must be under 20MB',
       sendImageFailed: 'Failed to send the picture, please retry',
       sendFailed: 'Failed to send, the connection may be down',
@@ -1492,6 +1491,8 @@ export default {
       fetchPreview: 'Fetch preview',
       previewUnavailable: 'No preview available, a plain link will be sent',
       gameTitle: 'Invite to play',
+      callTitle: 'Start a call',
+      call: 'Call',
     },
     picker: {
       title: 'Share ihomy content',
@@ -1529,6 +1530,21 @@ export default {
         cancelled: 'Call cancelled',
       },
       unavailable: '[Content unavailable]',
+    },
+    call: {
+      member: 'Member',
+      noMember: 'No other members in the family yet',
+      startFailed: 'Cannot start the call, please check the connection',
+      audio: 'Voice call',
+      video: 'Video call',
+      accept: 'Answer',
+      reject: 'Decline',
+      ringing: 'Waiting for an answer…',
+      connecting: 'Connecting…',
+      incoming: {
+        audio: 'invites you to a voice call',
+        video: 'invites you to a video call',
+      },
     },
     share: {
       toChat: 'Share to chat',

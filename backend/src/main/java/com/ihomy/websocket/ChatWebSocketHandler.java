@@ -72,6 +72,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             switch (type) {
                 case "ping" -> reply(session, Map.of("type", "pong"));
                 case "message" -> onChatMessage(session, familyId, userId, data);
+                case "call-signal" -> onCallSignal(session, familyId, userId, data);
                 default -> replyError(session, "BAD_TYPE");
             }
         } catch (Exception e) {
@@ -94,6 +95,49 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         } catch (IllegalArgumentException e) {
             replyError(session, e.getMessage());
         }
+    }
+
+    /** 通话信令事件集:end 由服务端代落 CALL 记录,其余按 to 定向转发(不排队补发,离线由主叫超时逻辑兜底) */
+    private static final java.util.Set<String> CALL_EVENTS =
+            java.util.Set.of("invite", "accept", "reject", "busy", "offer", "answer", "ice");
+
+    private void onCallSignal(WebSocketSession session, Long familyId, Long userId, Map<?, ?> data) {
+        String event = str(data.get("event"));
+        Long to = data.get("to") instanceof Number n ? n.longValue() : null;
+        String callId = str(data.get("callId"));
+        if (event == null || to == null || callId == null || callId.isBlank() || callId.length() > 64) {
+            replyError(session, "BAD_SIGNAL");
+            return;
+        }
+        // 家庭隔离:定向目标必须与发送人同家庭(跨家庭一律拒绝)
+        if (!chatService.sameFamily(userId, to)) {
+            replyError(session, "BAD_SIGNAL");
+            return;
+        }
+        if (CALL_EVENTS.contains(event)) {
+            Map<String, Object> out = new java.util.LinkedHashMap<>();
+            data.forEach((k, v) -> out.put(String.valueOf(k), v));
+            out.put("from", userId);
+            sendToUser(to, "call-signal", out);
+            return;
+        }
+        if ("end".equals(event)) {
+            // 通话结束:服务端统一落 CALL 记录并广播(挂断/拒绝/超时/取消/忙线都收敛到这里)
+            String media = "VIDEO".equals(str(data.get("media"))) ? "VIDEO" : "AUDIO";
+            String result = switch (str(data.get("reason"))) {
+                case "completed" -> "ANSWERED";
+                case "rejected" -> "REJECTED";
+                case "timeout" -> "MISSED";
+                default -> "CANCELLED";
+            };
+            Integer duration = data.get("duration") instanceof Number n ? n.intValue() : 0;
+            Map<String, Object> view = chatService.writeCallRecord(familyId, userId, media, result, duration, callId);
+            if (view != null) {
+                broadcast(familyId, envelope("message", view));
+            }
+            return;
+        }
+        replyError(session, "BAD_SIGNAL");
     }
 
     /** 广播给同房间全部在线会话 */

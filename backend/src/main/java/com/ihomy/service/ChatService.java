@@ -18,7 +18,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 聊天室业务:历史消息分页(含发送人昵称)、未读数、已读游标、消息发送(分类型负载校验)。
+ * 聊天室业务:历史消息分页(含发送人昵称)、未读数、已读游标、消息发送(分类型负载校验)、通话记录落库。
  */
 @Slf4j
 @Service
@@ -29,6 +29,7 @@ public class ChatService {
     private final ChatReadMapper readMapper;
     private final SysUserMapper sysUserMapper;
     private final tools.jackson.databind.ObjectMapper objectMapper;
+    private final org.springframework.data.redis.core.StringRedisTemplate stringRedisTemplate;
 
     /** 站内对象卡可引用的对象类型(P1 口径,与前端 utils/chatMsg.js 一致) */
     private static final java.util.Set<String> CARD_OBJ_TYPES =
@@ -215,9 +216,54 @@ public class ChatService {
         return v == null ? null : v.toString();
     }
 
+    /** 通话信令的家庭隔离:双方必须同家庭(OPS/无家庭用户不参与通话) */
+    public boolean sameFamily(Long userId, Long targetUserId) {
+        if (userId == null || targetUserId == null || userId.equals(targetUserId)) {
+            return false;
+        }
+        SysUser a = sysUserMapper.selectById(userId);
+        SysUser b = sysUserMapper.selectById(targetUserId);
+        return a != null && b != null && a.getFamilyId() != null && a.getFamilyId().equals(b.getFamilyId());
+    }
+
     /** 单条消息的统一视图(WS 广播与 REST 历史同构,带发送人昵称) */
     public Map<String, Object> view(ChatMessage m) {
         return toView(m, fuzzyNames(List.of(m)));
+    }
+
+    /**
+     * 通话结束落 CALL 记录(聊天流内一张卡,不另建表;计划 §4.1):
+     * 同一 callId 只落一条(Redis SETNX 48h 兜底防信令重发重复落卡)。
+     * result 由通话事件映射:completed→ANSWERED / rejected→REJECTED / timeout→MISSED / 其余→CANCELLED。
+     */
+    public Map<String, Object> writeCallRecord(Long familyId, Long callerId, String media, String result,
+                                               Integer durationSec, String callId) {
+        try {
+            Boolean first = stringRedisTemplate.opsForValue()
+                    .setIfAbsent("ihomy:chat:call:" + callId, "1", java.time.Duration.ofHours(48));
+            if (!Boolean.TRUE.equals(first)) {
+                return null;
+            }
+        } catch (Exception e) {
+            log.warn("通话记录防重检查失败,按首次处理 callId={}", callId, e);
+        }
+        ChatMessage m = new ChatMessage();
+        m.setFamilyId(familyId);
+        m.setSenderId(callerId);
+        m.setContent("");
+        m.setMsgType(com.ihomy.common.ChatMsgType.CALL);
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("media", media);
+        payload.put("result", result);
+        payload.put("duration", durationSec == null || durationSec < 0 ? 0 : durationSec);
+        try {
+            m.setPayload(objectMapper.writeValueAsString(payload));
+        } catch (Exception e) {
+            m.setPayload(null);
+        }
+        m.setCreatedAt(java.time.LocalDateTime.now());
+        messageMapper.insert(m);
+        return view(m);
     }
 
     private long lastMsgId(Long familyId) {

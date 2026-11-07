@@ -1476,7 +1476,6 @@ export default {
       objects: '分享站内内容',
       link: '站外链接',
       game: '游戏邀请',
-      callSoon: '通话即将开放',
       tooLarge: '图片不能超过 20MB',
       sendImageFailed: '图片发送失败，请重试',
       sendFailed: '发送失败，连接可能已断开',
@@ -1485,6 +1484,8 @@ export default {
       fetchPreview: '获取预览',
       previewUnavailable: '拿不到预览，将发送纯链接',
       gameTitle: '邀请一起玩',
+      callTitle: '发起通话',
+      call: '通话',
     },
     picker: {
       title: '分享站内内容',
@@ -1522,6 +1523,21 @@ export default {
         cancelled: '已取消',
       },
       unavailable: '[内容无法显示]',
+    },
+    call: {
+      member: '成员',
+      noMember: '家里还没有其他成员',
+      startFailed: '无法发起通话，请检查连接',
+      audio: '语音通话',
+      video: '视频通话',
+      accept: '接听',
+      reject: '拒绝',
+      ringing: '等待接听…',
+      connecting: '正在接通…',
+      incoming: {
+        audio: '邀请你语音通话',
+        video: '邀请你视频通话',
+      },
     },
     share: {
       toChat: '分享到聊天室',

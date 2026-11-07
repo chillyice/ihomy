@@ -59,5 +59,10 @@ app:
   # 同类异常聚合预警(可选覆盖,基线见 application.yml):
   #   enabled/levels/window-seconds/threshold/cooldown-seconds/max-fingerprints/exclude-loggers/retention-days/mail-enabled
   #   收件人取系统级 OPS 角色的邮箱;未配 spring.mail.host 时不发信,只在运维页「异常预警」展示
+  # WebRTC 通话 TURN 中继(自建 coturn,Docker ~30MB,与 nginx 同机;拍板 #1):
+  # 不配置(整段保持注释)时只有 STUN——同网/打洞成功可通话,对称 NAT 跨网可能不通。
+  # 多条分号分隔,单条 url|username|credential;turn 地址用服务器公网域名,3478(UDP/TCP)与 5349(TLS)按需
+  # webrtc:
+  #   ice-servers: "stun:stun.l.google.com:19302;turn:turn.example.com:3478?transport=udp|ihomy|CHANGE_ME_TURN_PASSWORD"
   # log-alert:
   #   threshold: 10

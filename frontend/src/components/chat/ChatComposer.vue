@@ -22,8 +22,8 @@
           <el-icon><Trophy /></el-icon>
         </el-button>
       </el-tooltip>
-      <el-tooltip :content="$t('chat.composer.callSoon')" placement="top">
-        <el-button text circle disabled>
+      <el-tooltip :content="$t('chat.composer.call')" placement="top">
+        <el-button text circle :disabled="!connected" @click="openCall">
           <el-icon><Phone /></el-icon>
         </el-button>
       </el-tooltip>
@@ -79,6 +79,29 @@
         </button>
       </div>
     </el-dialog>
+
+    <!-- 通话:选家庭成员 + 音/视频 -->
+    <el-dialog v-model="callVisible" :title="$t('chat.composer.callTitle')" width="dialog-sm" append-to-body>
+      <div v-loading="callLoading" class="call-members">
+        <el-empty v-if="!callLoading && !members.length" :description="$t('chat.call.noMember')" :image-size="60" />
+        <div v-for="m in members" :key="m.id" class="call-member-row">
+          <el-avatar :size="34">{{ (m.nickname || m.username || 'U').charAt(0) }}</el-avatar>
+          <span class="call-member-name">{{ m.nickname || m.username }}</span>
+          <span class="call-member-actions">
+            <el-tooltip :content="$t('chat.call.audio')" placement="top">
+              <el-button circle size="small" @click="startCall(m, 'AUDIO')">
+                <el-icon><Phone /></el-icon>
+              </el-button>
+            </el-tooltip>
+            <el-tooltip :content="$t('chat.call.video')" placement="top">
+              <el-button circle size="small" @click="startCall(m, 'VIDEO')">
+                <el-icon><VideoCamera /></el-icon>
+              </el-button>
+            </el-tooltip>
+          </span>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -87,10 +110,12 @@
 // 卡片/游戏/链接的负载构造在 utils/chatMsg(与后端同口径校验)
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { CircleClose, FolderOpened, Link, Paperclip, Phone, Picture, Trophy } from '@element-plus/icons-vue'
+import { CircleClose, FolderOpened, Link, Paperclip, Phone, Picture, Trophy, VideoCamera } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
-import { chatApi, fileApi } from '@/api'
+import { chatApi, fileApi, memberApi } from '@/api'
 import { useChatStore } from '@/stores/chat'
+import { useCallStore } from '@/stores/call'
+import { useUserStore } from '@/stores/user'
 import { H5_GAMES, buildCardPayload, buildGameInvitePayload, buildLinkPayload } from '@/utils/chatMsg'
 import ChatObjectPicker from '@/components/chat/ChatObjectPicker.vue'
 
@@ -110,6 +135,10 @@ const linkUrl = ref('')
 const linkLoading = ref(false)
 const linkPreview = ref(null)
 const gameVisible = ref(false)
+const callVisible = ref(false)
+const callLoading = ref(false)
+const members = ref([])
+const callStore = useCallStore()
 
 const connected = computed(() => chatStore.socketStatus === 'open')
 const linkUrlOk = computed(() => /^https?:\/\//.test(linkUrl.value.trim()) && linkUrl.value.trim().length <= 2000)
@@ -221,6 +250,26 @@ const sendLink = () => {
   }
 }
 
+const openCall = async () => {
+  callVisible.value = true
+  if (members.value.length) return
+  callLoading.value = true
+  try {
+    const list = await memberApi.list()
+    members.value = (list || []).filter((m) => m.id !== useUserStore().userInfo?.id)
+  } catch {
+    members.value = []
+  } finally {
+    callLoading.value = false
+  }
+}
+
+const startCall = async (m, media) => {
+  const ok = await callStore.start({ id: m.id, name: m.nickname || m.username }, media)
+  if (ok) callVisible.value = false
+  else ElMessage.warning(t('chat.call.startFailed'))
+}
+
 const pickGame = (g) => {
   const payload = buildGameInvitePayload(g.code)
   if (!payload) return
@@ -289,6 +338,33 @@ const pickGame = (g) => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+.call-members {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 120px;
+}
+.call-member-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+.call-member-row:hover {
+  background: var(--color-bg-muted, rgba(128, 128, 128, 0.08));
+}
+.call-member-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.call-member-actions {
+  display: flex;
+  gap: 6px;
 }
 .game-grid {
   display: grid;
