@@ -4,6 +4,10 @@ import {
   sumBalances,
   unassignedCount,
   accountRecords,
+  UNASSIGNED_ID,
+  groupRecordsByDate,
+  pctText,
+  pctWidth,
   fillMonths,
   yoy,
   ratio,
@@ -110,6 +114,78 @@ describe('accountRecords 按账户筛账目', () => {
 
   it('id 是数字字符串时同样命中(后端字段类型不一致也不漏)', () => {
     expect(accountRecords(records, '1').map((r) => r.id)).toEqual([1, 3, 4])
+  })
+
+  it('UNASSIGNED_ID 只看三个账户列全空的记录,与 unassignedCount 同口径', () => {
+    expect(accountRecords(records, UNASSIGNED_ID).map((r) => r.id)).toEqual([5])
+    expect(accountRecords(records, UNASSIGNED_ID)).toHaveLength(unassignedCount(records))
+  })
+
+  it('UNASSIGNED_ID 不是合法账户 id,不能命中任何真实账户', () => {
+    expect(accountRecords(records, '__UNASSIGNED_X__').map((r) => r.id)).toEqual([1, 2, 3, 4, 5])
+  })
+})
+
+describe('groupRecordsByDate 明细按日分组', () => {
+  it('空入参返回空数组,空记录跳过', () => {
+    expect(groupRecordsByDate([])).toEqual([])
+    expect(groupRecordsByDate(null)).toEqual([])
+    expect(groupRecordsByDate([null, undefined])).toEqual([])
+  })
+
+  it('跨日按日期倒序,同日保持传入顺序(新记的在前)', () => {
+    const rows = [
+      { id: 1, recordDate: '2026-11-07', type: 'EXPENSE', amount: 32 },
+      { id: 2, recordDate: '2026-11-07', type: 'EXPENSE', amount: 54 },
+      { id: 3, recordDate: '2026-11-06', type: 'INCOME', amount: 100 },
+    ]
+    const groups = groupRecordsByDate(rows)
+    expect(groups.map((g) => g.date)).toEqual(['2026-11-07', '2026-11-06'])
+    expect(groups[0].items.map((r) => r.id)).toEqual([1, 2])
+  })
+
+  it('当日小计按分累加:收入/支出分开,转账只计笔数', () => {
+    const rows = [
+      { recordDate: '2026-11-07', type: 'EXPENSE', amount: 0.1 },
+      { recordDate: '2026-11-07', type: 'EXPENSE', amount: 0.2 },
+      { recordDate: '2026-11-07', type: 'INCOME', amount: 86.5 },
+      { recordDate: '2026-11-07', type: 'TRANSFER', amount: 500 },
+      { recordDate: '2026-11-07', type: 'TRANSFER', amount: 300 },
+    ]
+    const [g] = groupRecordsByDate(rows)
+    expect(g.income).toBe(86.5)
+    expect(g.expense).toBeCloseTo(0.3, 10)
+    expect(g.transferCount).toBe(2)
+    expect(g.items).toHaveLength(5)
+  })
+
+  it('未知类型按支出侧计(与展示层 typeCls 的兜底一致)', () => {
+    const [g] = groupRecordsByDate([{ recordDate: '2026-11-07', type: 'WEIRD', amount: 5 }])
+    expect(g.expense).toBe(5)
+    expect(g.income).toBe(0)
+    expect(g.transferCount).toBe(0)
+  })
+
+  it('recordDate 缺失/异形时截前 10 位归一组,不炸', () => {
+    const groups = groupRecordsByDate([
+      { recordDate: '2026-11-07 12:00:00', type: 'EXPENSE', amount: 1 },
+      { recordDate: '', type: 'EXPENSE', amount: 2 },
+    ])
+    expect(groups.map((g) => g.date)).toEqual(['2026-11-07', ''])
+  })
+})
+
+describe('pctText / pctWidth 占比展示', () => {
+  it('占比保留 1 位小数;非法输入按 0', () => {
+    expect(pctText(0.125)).toBe('12.5%')
+    expect(pctText(0)).toBe('0.0%')
+    expect(pctText(null)).toBe('0.0%')
+  })
+
+  it('条宽封顶 100% 不为负(超支只画满格)', () => {
+    expect(pctWidth(1.25)).toBe('100%')
+    expect(pctWidth(-0.5)).toBe('0%')
+    expect(pctWidth(0.5)).toBe('50%')
   })
 })
 

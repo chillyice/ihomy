@@ -190,6 +190,10 @@
   .book-kpi-grid.cols-4 {
     grid-template-columns: repeat(2, 1fr);
   }
+  /* 结余卡带预算副标跨两列,避免 3 卡在 2 列网格里留一张孤卡(仅记账本用) */
+  .book-kpi-wide {
+    grid-column: span 2;
+  }
   .book-kpi-value {
     font-size: 18px;
   }

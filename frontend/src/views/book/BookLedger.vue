@@ -126,27 +126,27 @@
               <div v-if="!yoyRows.length" class="book-empty">{{ $t('book.ledger.yoyEmpty') }}</div>
             </div>
 
-            <!-- 支出 / 收入构成:金额 + 占比 + 占比条 -->
+            <!-- 支出 / 收入构成:金额 + 占比 + 占比条(构成行与记账本分类排行共用 book-cat 一套类) -->
             <div class="card lg-panel">
               <div class="section-label">{{ $t('book.ledger.expenseComposition') }}</div>
-              <div v-for="c in expenseCats" :key="c.category" class="lg-cat">
-                <div class="lg-cat-head">
-                  <span class="lg-cat-name">{{ c.category }}</span>
-                  <span class="lg-cat-amount">{{ money(c.total) }} · {{ pctText(c.share) }}</span>
+              <div v-for="c in expenseCats" :key="c.category" class="book-cat">
+                <div class="book-cat-head">
+                  <span class="book-cat-name">{{ c.category }}</span>
+                  <span class="book-cat-amount">{{ money(c.total) }} · {{ pctText(c.share) }}</span>
                 </div>
-                <div class="lg-bar"><div class="lg-bar-fill is-expense" :style="{ width: pctWidth(c.share) }"></div></div>
+                <div class="book-cat-bar"><div class="book-cat-bar-fill is-expense" :style="{ width: pctWidth(c.share) }"></div></div>
               </div>
               <div v-if="!expenseCats.length" class="book-empty">{{ $t('book.ledger.compositionEmpty') }}</div>
             </div>
 
             <div class="card lg-panel">
               <div class="section-label">{{ $t('book.ledger.incomeComposition') }}</div>
-              <div v-for="c in incomeCats" :key="c.category" class="lg-cat">
-                <div class="lg-cat-head">
-                  <span class="lg-cat-name">{{ c.category }}</span>
-                  <span class="lg-cat-amount">{{ money(c.total) }} · {{ pctText(c.share) }}</span>
+              <div v-for="c in incomeCats" :key="c.category" class="book-cat">
+                <div class="book-cat-head">
+                  <span class="book-cat-name">{{ c.category }}</span>
+                  <span class="book-cat-amount">{{ money(c.total) }} · {{ pctText(c.share) }}</span>
                 </div>
-                <div class="lg-bar"><div class="lg-bar-fill is-income" :style="{ width: pctWidth(c.share) }"></div></div>
+                <div class="book-cat-bar"><div class="book-cat-bar-fill is-income" :style="{ width: pctWidth(c.share) }"></div></div>
               </div>
               <div v-if="!incomeCats.length" class="book-empty">{{ $t('book.ledger.compositionEmpty') }}</div>
             </div>
@@ -226,7 +226,7 @@ import { useUserStore } from '@/stores/user'
 import { formatYuan } from '@/utils/money'
 import { totalRemainingPrincipal } from '@/utils/loan'
 import { bindHorizontalWheel } from '@/utils/horizontalWheel'
-import { accountTypeLabel, fillMonths, ledgerCsvRows, netWorth, ratio, sumBalances, yoy } from '@/utils/bookLedger'
+import { accountTypeLabel, fillMonths, ledgerCsvRows, netWorth, pctText, pctWidth, ratio, sumBalances, yoy } from '@/utils/bookLedger'
 import { summarizePortfolio } from '@/utils/finance'
 import { saveBlob } from '@/utils/tools/download'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -344,8 +344,6 @@ const incomeCats = computed(() => withShare(ledger.value?.incomeByCategory))
 const members = computed(() => ledger.value?.byMember || [])
 
 const money = (v) => formatYuan(v)
-const pctText = (v) => `${((Number(v) || 0) * 100).toFixed(1)}%`
-const pctWidth = (v) => `${Math.min(100, Math.max(0, (Number(v) || 0) * 100))}%`
 const yoyText = (v) => (v == null ? t('book.ledger.yoyNoBase') : `${v > 0 ? '+' : ''}${(v * 100).toFixed(1)}%`)
 
 // 收入涨是好事、支出涨是坏事:只影响颜色,不改变数值
@@ -573,45 +571,7 @@ onMounted(() => {
   color: var(--color-text-secondary, #999);
 }
 
-/* 分类构成 */
-.lg-cat {
-  padding: 7px 0;
-}
-.lg-cat-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 13px;
-}
-.lg-cat-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.lg-cat-amount {
-  color: var(--color-text-secondary, #999);
-  font-size: 12px;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-.lg-bar {
-  height: 4px;
-  margin-top: 5px;
-  border-radius: 2px;
-  background: var(--color-card-2);
-  overflow: hidden;
-}
-.lg-bar-fill {
-  height: 100%;
-  border-radius: 2px;
-}
-.lg-bar-fill.is-income {
-  background: var(--color-income);
-}
-.lg-bar-fill.is-expense {
-  background: var(--color-expense);
-}
+/* 分类构成:构成行与记账本分类排行共用 bookPage.css 的 .book-cat 一套(名称/金额·占比/比例条) */
 
 /* 成员收支 */
 .lg-member {

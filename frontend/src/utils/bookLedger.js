@@ -42,17 +42,61 @@ export function unassignedCount(records) {
 }
 
 /**
+ * 「未归属」筛选哨兵:余额条点「未归属 N 笔」只看三个账户列全空的记录,
+ * 与 unassignedCount 同一口径。不是真实账户 id,账户删除后的自动清筛选要放行它。
+ */
+export const UNASSIGNED_ID = '__UNASSIGNED__'
+
+/**
  * 按账户筛账目(记账本点账户 chip 只看该账户的账目)。
- * 支出/收入看 `accountId`;转账没有单一账户,转出或转入任一侧命中都算「与这个账户有关」。
+ * 支出/收入看 `accountId`;转账没有单一账户,转出或转入任一侧命中都算「与这个账户有关」;
+ * 传 UNASSIGNED_ID 时只看未归属记录。
  * accountId 为空/非法时原样返回,不做筛选。比较前统一转数字,兼容后端返回字符串 id 的场景。
  */
 export function accountRecords(records, accountId) {
   const list = records || []
+  if (accountId === UNASSIGNED_ID) return list.filter((r) => !r?.accountId && !r?.fromAccountId && !r?.toAccountId)
   const id = Number(accountId)
   if (accountId == null || accountId === '' || !Number.isFinite(id)) return list
   return list.filter((r) =>
     r?.type === 'TRANSFER' ? Number(r.fromAccountId) === id || Number(r.toAccountId) === id : Number(r?.accountId) === id,
   )
+}
+
+/**
+ * 明细按日分组(记账本明细列表):跨日按日期倒序(新的日期在上),同日内保持传入顺序
+ * (后端返回顺序即「新记的在前」)。收支小计不含转账(与统计卡口径一致),转账单独给笔数。
+ * 金额单位元,以「分」累加避免浮点误差;weekday 不在组里算,展示层用 g.date 配 weekdayKey 自转文案。
+ */
+export function groupRecordsByDate(records) {
+  const groups = new Map()
+  for (const r of records || []) {
+    if (!r) continue
+    const date = String(r.recordDate || '').slice(0, 10)
+    let g = groups.get(date)
+    if (!g) {
+      g = { date, income: 0, expense: 0, transferCount: 0, items: [] }
+      groups.set(date, g)
+    }
+    const type = String(r.type || '').toUpperCase()
+    if (type === 'TRANSFER') g.transferCount++
+    else if (type === 'INCOME') g.income += toCents(r.amount)
+    else g.expense += toCents(r.amount)
+    g.items.push(r)
+  }
+  return [...groups.values()]
+    .map((g) => ({ ...g, income: toYuan(g.income), expense: toYuan(g.expense) }))
+    .sort((a, b) => b.date.localeCompare(a.date))
+}
+
+/** 占比展示文本(0.125 → '12.5%'):记账本分类排行与总账构成卡共用同一口径 */
+export function pctText(v) {
+  return `${((Number(v) || 0) * 100).toFixed(1)}%`
+}
+
+/** 占比进度条宽度,封顶 100%、不为负(超支只画满格不外溢) */
+export function pctWidth(v) {
+  return `${Math.min(100, Math.max(0, (Number(v) || 0) * 100))}%`
 }
 
 /**
