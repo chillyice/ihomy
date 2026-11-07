@@ -53,6 +53,20 @@ MODULE = {
     "IotController": ("智能家居中控", "家庭生活"),
     "VaultController": ("家庭保险箱", "家庭生活"),
     "LoanRecordController": ("家庭贷款记录", "家庭生活"),
+    "FinanceController": ("理财储蓄", "家庭生活"),
+    "BookAccountController": ("记账本账户", "家庭生活"),
+    "BookBudgetController": ("记账本预算", "家庭生活"),
+    "BookRecurringController": ("记账本周期账目", "家庭生活"),
+    "BookImportController": ("记账本导入", "家庭生活"),
+    "BookPermissionController": ("记账本权限", "家庭生活"),
+    "ScheduleController": ("日程聚合", "家庭生活"),
+    "AnnouncementController": ("家庭公告", "家庭生活"),
+    "RecycleController": ("回收站", "家庭生活"),
+    "GameMatchController": ("游戏对战", "游戏与工具"),
+    "HealthController": ("健康检查", "基础设施"),
+    "KadaSnippetPublicController": ("咔哒卡带发布", "独立产品"),
+    "OpsAlertController": ("异常预警", "运维"),
+    "OpsKadaSnippetController": ("咔哒卡带审核", "运维"),
 }
 
 ANN_BLOCK = re.compile(

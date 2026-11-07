@@ -149,7 +149,7 @@ def parse_sql(text):
 
 
 def domain_of(name):
-    for p in ("sys_", "report_", "family_", "content_"):
+    for p in ("sys_", "report_", "family_", "content_", "game_"):
         if name.startswith(p):
             return p
     return "other"
@@ -160,6 +160,7 @@ DOMAIN_LABEL = {
     "report_": "报表与日志类",
     "family_": "家庭事务类",
     "content_": "内容数据类",
+    "game_": "游戏域",
     "other": "其他",
 }
 
