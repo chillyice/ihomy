@@ -68,7 +68,7 @@ ihomy:家庭内部内容共享平台(PC / 安卓 / iOS,均 PWA),功能域见 需
 
 - **root 仅初始化**:`mysql -uroot -p < schema.sql`(建库/建表/建账号/种子),只执行一次;本地 `.\scripts\start-db.ps1`(Docker 首启自动导入)。**业务运行用 `ihomy` 账号**(仅 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`,无 DDL),建 `localhost` 与 `%` 两个 host。
 - 生产 MySQL `validate_password` MEDIUM:密码须含特殊字符(避开 `' " \ $ |`,建议 `!@%^&*-_+=.`),改密顺序见 踩坑速查 §2.7。
-- **91 张表**,前缀:`sys_` 27(系统/账号/权限/配置/存储)、`report_` 5(报表/日志)、`family_` 37(家庭事务)、`content_` 21(内容数据)、`game_` 1(games 域);完整清单见 需求 §6.2。游戏域顶层前缀 `game_`(格式 `game_<code>_<module>_<entity>`);`game_info` 遗留未带 `family_` 前缀,类型/分类/系列口径见 需求 §4.13。
+- **92 张表**,前缀:`sys_` 27(系统/账号/权限/配置/存储)、`report_` 5(报表/日志)、`family_` 38(家庭事务)、`content_` 21(内容数据)、`game_` 1(games 域);完整清单见 需求 §6.2。游戏域顶层前缀 `game_`(格式 `game_<code>_<module>_<entity>`);`game_info` 遗留未带 `family_` 前缀,类型/分类/系列口径见 需求 §4.13。
 - **结构变更双文件**:同时改 `schema.sql`(全量)与 `migrations.sql`(增量、**幂等**),并按 CI 同路径做空库全量导入实测(`migrations` 跑通 ≠ `schema.sql` 可用,踩坑速查 §7.4)。
 - **枚举不用数字**:状态/类型一律大写英文(`PUBLISHED/PUBLIC/ACTIVE...`),含义在 `sys_dict_item`,Java 常量在 `common/DictConst.java`,前端映射 `utils/dict.js`;**禁止写回 0/1/2 判断**。
 - `content_blog/diary/photo/video/wish/book` 的 `visibility` 为 `VARCHAR(20) DEFAULT 'FAMILY'`(PRIVATE/FAMILY/PUBLIC);`family_vault_item` 只有 PRIVATE/FAMILY 两档。清单见 需求 §6.4。
@@ -133,6 +133,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 - **记账本账户筛选**:点余额条账户 chip **只在客户端过滤本月明细**(`utils/bookLedger.accountRecords`:收支按 `accountId`,转账转出/转入任一侧命中;空 id 原样返回),**不新增请求**;统计卡/预算/分类排行仍按本月全部口径(面板固定提示);再点同一 chip 或「清除筛选」取消,切月保留,账户被删自动清除。
 - **贷款月供自动记账**:贷款 `account_id` = 初始还款账户(第 1 期起),中途换账户走 `ACCOUNT_CHANGE` 事件(第 N 期后生效,留空=停记),**换账户不生成转账流水**;**没有初始账户时「第 1 期后换账户」按首次绑定处理**(后端 `foldInitialAccountChange` 并成 `family_loan.account_id`,事件不落库,否则第 1 期永远无账户可扣);到期期次由前端按流水口径算(`utils/loanRepay.js`)**含已记账期次**一起调 `POST /loan/repay/sync`,后端按 `(loan_id, period)` 唯一幂等补插支出到 `family_book_record`,台账 `family_loan_repay` 保证不重复;**换账户或改贷款信息(利率/期限/首期还款日/事件)后,已记账期次的账户/金额/还款日按最新流水校正**(台账与流水同步更新,返回 `{created,moved,adjusted}`;用户手改过该笔流水则整条保留);**调息落在某期还款区间内 → 该期按天分段计息**(旧利率天数 + 新利率天数,本金沿用调整前的月供计划,该期还款额因此与常规月供不同),**下一期起**才按剩余本金 + 剩余期数 + 新利率重算月供;调息日不晚于上期还款日则整期新利率、当期重算,事件没填调息日也按此老口径;**月供金额唯一计算源仍是 `utils/loan.js`**,后端不复算。触发点:贷款记录页/记账本进页(先补记再取数)/首页资产卡/保存贷款或事件。细则见 需求 §4.12.4。
 - **日程聚合只读**:`GET /schedule/events?from=&to=`(≤62 天)与 `/schedule/upcoming?days=` 摊平纪念日/提醒/计划/子任务与只读来源,写侧仍走各自接口。**贷款还款日/理财到期/食材到期**各是一个 `service/schedule/ScheduleSourceProvider` 实现(新增来源只加实现),事项带 `source`/`readOnly`/`link`;来源开关只在前端 `localStorage`。游客只返回演示家庭纪念日。细则见 需求 §4.3.6。
+- **聊天室与浮窗**:WS 协议 v2(上行 `{type,data}`,ping/pong 心跳、error envelope 不断连);消息六类 TEXT/IMAGE/LINK/CARD/GAME_INVITE/CALL(常量 `common/ChatMsgType`,payload JSON ≤4KB 双端同口径校验,渲染禁 v-html);连接由 `stores/chat.js` 全局单持有(退避重连 3→60s,token 换代重建,登出清场);卡片/浮窗/通话组件在 `components/chat/*`,复用入口 `ChatPanel`;浮窗位置键 `ihomy:chat:float:v1` 已登记 LightSettings 清理清单;通话与对战信令走 WS 定向(`call-signal`/`game-signal`),家庭隔离在服务端校验;通话结束由服务端单点落 CALL 卡(Redis 按 callId 幂等)。对战见 需求 §4.13.2,协议细节 踩坑速查 §11。
 
 ## 后端规范
 
