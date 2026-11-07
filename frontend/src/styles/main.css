@@ -8,11 +8,16 @@
   --color-card-rgb: 250, 246, 236;
   --color-text: #3a2e22;
   --color-text-secondary: #7a6b5a;
+  /* 三级文字(侧栏分组名/占位说明):须在晨色卡片与浅色渐变上都 ≥3:1 */
+  --color-text-tertiary: #8a7a64;
+  /* 成功/连接状态(与收支绿区分:那是金额语义色,亮度更低) */
+  --color-green: #6f8060;
   /* 主文字色语义别名:与 --color-text 同值,组件按语义引用(深色由 html.dark 覆写) */
   --color-text-primary: var(--color-text);
-  /* 收支语义色:记账本等金额展示统一引用,禁止再散落 #67c23a / #f56c6c 硬编码 */
-  --color-income: #67c23a;
-  --color-expense: #f56c6c;
+  /* 收支语义色:记账本等金额展示统一引用,禁止再散落 #67c23a / #f56c6c 硬编码。
+   * 晨色卡片上要用作正文字号,压到 ≥4.5:1(原 EP 绿/红只有 2.04 / 2.63) */
+  --color-income: #4a7538;
+  --color-expense: #b5433b;
   /* 危险动作与失败态(删除/失败数/错误提示)/提示态:语义独立于收支色,由主题×晨暮覆写 */
   --color-danger: #c45656;
   --color-warning: #9c6f1a;
@@ -50,10 +55,10 @@
   --overlay-blur: 4px;
   --dialog-shadow: 0 24px 60px -18px rgba(38, 29, 21, 0.34), 0 4px 14px rgba(38, 29, 21, 0.08);
   /* 品牌主色(主题×晨暮 都会覆写):按钮/侧栏/Tag 的高影响面统一走此 token */
-  --color-brand: #b88c6e;
-  --color-brand-hover: #a87c5e;
+  --color-brand: #906244;
+  --color-brand-hover: #7d5238;
   --color-brand-text: #ffffff;
-  --color-brand-rgb: 184, 140, 110;
+  --color-brand-rgb: 144, 98, 68;
   /* 光影层 token(光尘晨):毛玻璃覆盖 / 浮尘 */
   --light-glass-bg: rgba(250, 246, 236, 0.25);
   --light-dust: rgba(255, 238, 185, 0.85);
@@ -66,9 +71,14 @@
   --blob-5: 192, 216, 168;
 }
 
-/* Element Plus 主色 → 品牌色(消除默认蓝 #409EFF;光尘/暖居通用,晨暮均覆盖) */
+/* Element Plus 主色/文字色 → 主题 token(消除默认蓝 #409EFF 与 #a8abb2 灰;光尘/暖居通用,晨暮均覆盖) */
 :root,
 html.dark {
+  --el-text-color-primary: var(--color-text);
+  --el-text-color-regular: var(--color-text);
+  --el-text-color-secondary: var(--color-text-secondary);
+  --el-text-color-placeholder: var(--color-text-tertiary);
+  --el-disabled-text-color: var(--color-text-tertiary);
   --el-color-primary: var(--color-brand);
   --el-color-primary-light-3: rgba(var(--color-brand-rgb), 0.72);
   --el-color-primary-light-5: rgba(var(--color-brand-rgb), 0.52);
@@ -119,6 +129,8 @@ html.theme-warm *::after {
 /* 暗色模式:夜色深蓝 */
 html.dark {
   --color-primary: #e8dcc8;
+  /* 强调/链接色:晨色是砖红,深色底上必须换成浅调,否则侧栏选中项与分类标签(2.1:1)读不出 */
+  --color-accent: #e0958a;
   --color-bg: #0f1a2e;
   --color-bg-2: #162238;
   --color-card: #1e2a48;
@@ -126,6 +138,8 @@ html.dark {
   --color-card-rgb: 30, 42, 72;
   --color-text: #e8dcc8;
   --color-text-secondary: #b0a898;
+  --color-text-tertiary: #9a8767;
+  --color-green: #8fa080;
   /* 深色底上提亮一档,保证收支数字的对比度 */
   --color-income: #86d162;
   --color-expense: #f78989;
@@ -158,7 +172,8 @@ html.dark {
 /* 晨 dawn:暖木米背景 + 羊皮卡片 + 深木主色 */
 html.theme-warm {
   --color-primary: #8a6a4e;
-  --color-accent: #c9807a;
+  /* 强调色要当链接/选中文字用,晨色羊皮底上必须压到 ≥3:1(原 #c9807a 只有 2.1~2.8) */
+  --color-accent: #a3564e;
   --color-danger: #b4544c;
   --color-warning: #96681a;
   --color-bg: #f1e7d6;
@@ -168,20 +183,20 @@ html.theme-warm {
   --color-card-rgb: 251, 243, 228;
   --color-green: #7c8b6c;
   --color-line: rgba(138, 106, 78, 0.1);
-  --color-text-tertiary: #b5a98c;
+  --color-text-tertiary: #8a7a64;
   --glow-warm: rgba(201, 128, 122, 0.55);
   --color-text: #4a3a2b;
-  --color-text-secondary: #8a7a64;
+  --color-text-secondary: #867660;
   --color-border: rgba(138, 106, 78, 0.14);
   --shadow: 0 10px 28px rgba(122, 90, 60, 0.14), 0 2px 6px rgba(122, 90, 60, 0.08);
   --shadow-hover: 0 16px 44px rgba(122, 90, 60, 0.22), 0 3px 8px rgba(122, 90, 60, 0.1);
   --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -1px 0 rgba(122, 90, 60, 0.05);
   --overlay-scrim: rgba(58, 46, 34, 0.34);
   --dialog-shadow: 0 20px 50px -18px rgba(58, 46, 34, 0.3), 0 3px 10px rgba(58, 46, 34, 0.08);
-  --color-brand: #8a6a4e;
+  --color-brand: #866448;
   --color-brand-hover: #7a5b40;
   --color-brand-text: #fbf3e4;
-  --color-brand-rgb: 138, 106, 78;
+  --color-brand-rgb: 134, 100, 72;
   /* 光影层 token(暖居晨):羊皮覆盖 + 暖白浮尘 */
   --light-glass-bg: rgba(251, 243, 228, 0.25);
   --light-dust: rgba(255, 239, 207, 0.85);
@@ -246,7 +261,7 @@ html.theme-warm .card:hover {
 html.theme-warm .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):not(.ghost-btn) {
   background: var(--color-line) !important;
   border-color: var(--color-line) !important;
-  color: var(--color-text-secondary) !important;
+  color: var(--color-text) !important;
 }
 html.theme-warm .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.is-text):not(.ghost-btn):hover {
   background: var(--color-card-2) !important;
@@ -757,7 +772,7 @@ html.dark .ghost-btn:hover {
 }
 html.dark .danger-btn {
   background: rgba(201, 116, 116, 0.15);
-  color: #c97474;
+  color: var(--color-danger);
 }
 html.dark .danger-btn:hover {
   background: rgba(201, 116, 116, 0.25);
@@ -963,7 +978,7 @@ html.dark .ghost-btn:disabled:hover {
 html.dark .el-button--danger {
   background: rgba(201, 116, 116, 0.15) !important;
   border-color: rgba(201, 116, 116, 0.15) !important;
-  color: #c97474 !important;
+  color: var(--color-danger) !important;
 }
 html.dark .el-button--danger:hover {
   background: rgba(201, 116, 116, 0.25) !important;
@@ -983,11 +998,33 @@ html.dark .el-button--danger:hover {
 html.dark .el-button--danger.is-text,
 html.dark .el-button--danger.is-link {
   background: transparent !important;
-  color: #c97474 !important;
+  color: var(--color-danger) !important;
 }
 html.dark .el-button--danger.is-text:hover,
 html.dark .el-button--danger.is-link:hover {
   background: rgba(201, 116, 116, 0.12) !important;
+}
+
+/* 头像占位:EP 默认灰底白字(#c0c4cc 上白字仅 1.75:1),统一改品牌底 + 对应的品牌文字色;
+ * 成员/家庭自带封面图时 img 覆盖背景,不受影响 */
+.el-avatar {
+  --el-avatar-bg-color: var(--color-brand);
+  --el-avatar-text-color: var(--color-brand-text);
+}
+
+/* 字数统计(EP 默认 #909399 在晨色卡片上只有 2.8:1) */
+.el-input__count-inner {
+  color: var(--color-text-tertiary) !important;
+  background: transparent !important;
+}
+
+/* 选中态单选/复选按钮:EP 默认白字压在 --el-color-primary(=品牌色)上,
+ * 暮色下品牌色是中调琥珀,白字只有 2.4:1,统一改用「品牌底上的文字色」 */
+.el-radio-button__original-radio:checked + .el-radio-button__inner,
+.el-radio-button.is-active .el-radio-button__inner,
+.el-checkbox-button__original:checked + .el-checkbox-button__inner,
+.el-checkbox-button.is-checked .el-checkbox-button__inner {
+  color: var(--color-brand-text) !important;
 }
 
 /* 表格操作列:全站放图标按钮(配 el-tooltip 出文字),这里统一紧凑内边距与间距 */
@@ -1813,7 +1850,7 @@ html.dark .el-tag.el-tag--warning {
 html.dark .el-tag.el-tag--danger {
   background: rgba(201, 116, 116, 0.15) !important;
   border-color: rgba(201, 116, 116, 0.2) !important;
-  color: #c97474 !important;
+  color: var(--color-danger) !important;
 }
 html.dark .el-tag.el-tag--info {
   background: rgba(255, 255, 255, 0.08) !important;

@@ -250,7 +250,7 @@ onMounted(load)
   gap: 6px;
 }
 .wish-meta {
-  color: #999;
+  color: var(--color-text-secondary);
   font-size: 12px;
   display: flex;
   justify-content: space-between;

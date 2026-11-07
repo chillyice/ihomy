@@ -204,10 +204,10 @@ onMounted(loadTasks)
   flex-wrap: wrap;
   gap: 16px;
   font-size: 12px;
-  color: #999;
+  color: var(--color-text-secondary);
 }
 .task-meta .reward {
-  color: #e6a23c;
+  color: var(--color-warning);
   font-weight: 600;
 }
 .task-actions {

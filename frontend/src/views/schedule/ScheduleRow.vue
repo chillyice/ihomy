@@ -121,7 +121,7 @@ const onCheck = () => {
 }
 .sched-badge.anniversary {
   background: rgba(230, 162, 60, 0.16);
-  color: #b8860b;
+  color: var(--color-warning);
 }
 .sched-badge.task {
   background: rgba(168, 72, 58, 0.12);

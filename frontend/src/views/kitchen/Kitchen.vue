@@ -233,7 +233,7 @@ onMounted(loadMenu)
 }
 .meta-flavor {
   background: var(--el-color-warning-light-9, #fdf6ec);
-  color: var(--el-color-warning, #e6a23c);
+  color: var(--color-warning);
 }
 .menu-author {
   font-size: 12px;

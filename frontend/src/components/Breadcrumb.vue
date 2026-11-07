@@ -81,7 +81,7 @@ const isWarm = computed(() => themeStore.theme === 'warm')
   font-size: 14px;
 }
 .sep {
-  color: #cdd5df;
+  color: var(--color-text-tertiary);
 }
 .crumb-current {
   color: var(--color-text);

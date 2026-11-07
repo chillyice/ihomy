@@ -1836,7 +1836,7 @@ html.theme-warm.dark .gc-home {
   color: #fff;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(6px);
   max-width: 72%;
   overflow: hidden;
@@ -1848,7 +1848,7 @@ html.theme-warm.dark .gc-home {
   color: #fff;
   padding: 3px 9px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(6px);
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;

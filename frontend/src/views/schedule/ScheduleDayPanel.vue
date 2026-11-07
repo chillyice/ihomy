@@ -168,7 +168,7 @@ const goLogin = () => router.push('/login')
 }
 .note-badge.festival {
   background: rgba(230, 162, 60, 0.16);
-  color: #b8860b;
+  color: var(--color-warning);
 }
 .note-badge.workday {
   background: rgba(31, 58, 95, 0.08);

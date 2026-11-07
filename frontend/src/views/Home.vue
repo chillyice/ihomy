@@ -1556,7 +1556,7 @@ html.dark .widget-empty {
   border: none;
   border-radius: 50%;
   background: rgba(201, 116, 116, 0.15);
-  color: #c97474;
+  color: var(--color-danger);
   font-size: 11px;
   cursor: pointer;
   z-index: 10;
@@ -2175,8 +2175,7 @@ html.dark .recipe-name {
 }
 .asset-net-label {
   font-size: 10px;
-  opacity: 0.4;
-  color: #9a9088;
+  color: var(--color-text-secondary);
 }
 .asset-net-val {
   font-size: 20px;
@@ -2215,8 +2214,7 @@ html.dark .recipe-name {
 }
 .fin-label {
   font-size: 10px;
-  opacity: 0.4;
-  color: #9a9088;
+  color: var(--color-text-secondary);
 }
 .fin-val {
   font-size: 18px;
@@ -2224,10 +2222,10 @@ html.dark .recipe-name {
   font-variant-numeric: tabular-nums;
 }
 .fin-val.income {
-  color: #6b9b6b;
+  color: var(--color-income);
 }
 .fin-val.expense {
-  color: #b06a58;
+  color: var(--color-expense);
 }
 /* 理财持仓行:本月收支下面一条,小一号字,整行可点进理财页签 */
 .fin-holding {
@@ -2249,8 +2247,7 @@ html.dark .recipe-name {
 }
 .fin-holding-label {
   font-size: 10px;
-  opacity: 0.45;
-  color: #9a9088;
+  color: var(--color-text-secondary);
 }
 .fin-holding-val {
   font-size: 14px;
@@ -2259,14 +2256,8 @@ html.dark .recipe-name {
 }
 .fin-holding-count {
   margin-left: auto;
-  opacity: 0.45;
+  color: var(--color-text-tertiary);
   font-variant-numeric: tabular-nums;
-}
-html.dark .fin-val.income {
-  color: #7dba7d;
-}
-html.dark .fin-val.expense {
-  color: #d9806a;
 }
 
 /* 音乐 */
@@ -2619,12 +2610,9 @@ html.dark .fp-wrap {
   align-items: center;
   justify-content: center;
   font-size: 11px;
-  color: #9a9088;
+  color: var(--color-text-secondary);
   padding: 0 12px;
   text-align: center;
-}
-html.dark .fp-no-plan {
-  color: rgba(232, 220, 200, 0.4);
 }
 /* 当前命中物品 */
 .fp-match-chip {
@@ -2806,7 +2794,7 @@ html.dark .fp-nav-count {
 }
 .voice-btn.on {
   background: rgba(201, 116, 116, 0.28);
-  color: #c97474;
+  color: var(--color-danger);
   animation: voicePulse 1s ease-in-out infinite;
 }
 @keyframes voicePulse {

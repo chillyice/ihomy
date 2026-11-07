@@ -882,7 +882,7 @@ html.dark .picker-cell.active {
 }
 html.dark .picker-clear {
   background: rgba(201, 116, 116, 0.08);
-  color: #c97474;
+  color: var(--color-danger);
 }
 
 @media (max-width: 768px) {

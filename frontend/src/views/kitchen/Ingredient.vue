@@ -626,7 +626,7 @@ onMounted(() => {
   background: rgba(245, 108, 108, 0.14);
 }
 .warn-badge.yellow {
-  color: var(--el-color-warning, #e6a23c);
+  color: var(--color-warning);
   background: rgba(230, 162, 60, 0.16);
 }
 .warn-badge.green {

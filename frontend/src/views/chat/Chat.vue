@@ -48,7 +48,7 @@ onBeforeUnmount(() => {
 }
 .online-hint {
   font-size: 12px;
-  color: #999;
+  color: var(--color-text-secondary);
   font-weight: 400;
   margin-left: 8px;
 }

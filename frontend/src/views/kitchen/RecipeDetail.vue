@@ -291,7 +291,7 @@ onMounted(load)
   height: 32px;
   border-radius: 50%;
   background: var(--el-color-primary, #409eff);
-  color: white;
+  color: var(--color-brand-text);
   display: flex;
   align-items: center;
   justify-content: center;

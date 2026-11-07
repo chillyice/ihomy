@@ -89,7 +89,7 @@ describe('主题配色守门', () => {
     expect(offenders, `引用了未定义的 CSS 变量(运行时会静默取 fallback 或继承父色):\n${offenders.join('\n')}`).toEqual([])
   })
 
-  it('main.css 四态都定义了 --color-danger / --color-warning', () => {
+  it('main.css 四态都定义了语义色 token(danger/warning/tertiary/green)', () => {
     const css = normalize(readFileSync(join(SRC, 'styles/main.css'), 'utf8'))
     const blocks = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({
       selectors: m[1].split(',').map((s) => s.trim().split(/\r?\n/).pop().trim()),
@@ -100,7 +100,7 @@ describe('主题配色守门', () => {
         .filter((b) => b.selectors.includes(selector))
         .map((b) => b.body)
         .join('\n')
-      for (const token of ['--color-danger', '--color-warning']) {
+      for (const token of ['--color-danger', '--color-warning', '--color-text-tertiary', '--color-green']) {
         expect(body.includes(`${token}:`), `${selector} 缺少 ${token}`).toBe(true)
       }
     }

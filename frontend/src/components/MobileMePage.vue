@@ -280,7 +280,7 @@ html.dark .me-row-text {
   color: #b04a3a;
 }
 html.dark .me-row.logout .me-row-text {
-  color: #c97474;
+  color: var(--color-danger);
 }
 
 .family-list {

@@ -670,7 +670,7 @@ onBeforeUnmount(() => unbindWheel?.())
 }
 .record-account.is-unassigned {
   background: transparent;
-  color: #bbb;
+  color: var(--color-text-tertiary);
 }
 .record-amount {
   font-weight: 600;
