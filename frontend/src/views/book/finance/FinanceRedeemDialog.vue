@@ -167,7 +167,7 @@ const onSave = async () => {
   font-variant-numeric: tabular-nums;
 }
 .fr-sum-val.is-income {
-  color: #67c23a;
+  color: var(--color-income);
 }
 .fr-row {
   display: flex;

@@ -1755,7 +1755,9 @@ html.dark .task-status-dot.s-4 {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 2px 0 10px;
+  /* 下边距走 margin 而不是 padding:padding 只加在盒子下沿会把子元素的中线拉离盒中线 */
+  padding: 2px 0 0;
+  margin-bottom: 10px;
 }
 .tp-item {
   display: flex;

@@ -50,7 +50,7 @@
 import { computed, ref } from 'vue'
 import { WarningFilled } from '@element-plus/icons-vue'
 
-import { formatYuan } from '@/utils/loan'
+import { formatYuan } from '@/utils/money'
 import BudgetManagerDialog from './BudgetManagerDialog.vue'
 
 const props = defineProps({
@@ -89,7 +89,7 @@ const width = (ratio) => `${Math.min(100, Math.max(0, (Number(ratio) || 0) * 100
   gap: 4px;
   margin-top: 6px;
   font-size: 12px;
-  color: #f56c6c;
+  color: var(--color-expense);
 }
 .budget-total {
   display: flex;
@@ -105,7 +105,7 @@ const width = (ratio) => `${Math.min(100, Math.max(0, (Number(ratio) || 0) * 100
   color: var(--color-text-secondary, #999);
 }
 .budget-total-nums.is-over {
-  color: #f56c6c;
+  color: var(--color-expense);
   font-weight: 600;
 }
 .budget-bar {
@@ -122,7 +122,7 @@ const width = (ratio) => `${Math.min(100, Math.max(0, (Number(ratio) || 0) * 100
   transition: width 0.3s;
 }
 .budget-bar-fill.is-over {
-  background: #f56c6c;
+  background: var(--color-expense);
 }
 .budget-item {
   padding: 8px 0;
@@ -146,7 +146,7 @@ const width = (ratio) => `${Math.min(100, Math.max(0, (Number(ratio) || 0) * 100
   white-space: nowrap;
 }
 .bi-nums.is-over {
-  color: #f56c6c;
+  color: var(--color-expense);
   font-weight: 600;
 }
 .bi-foot {
@@ -156,7 +156,7 @@ const width = (ratio) => `${Math.min(100, Math.max(0, (Number(ratio) || 0) * 100
   font-variant-numeric: tabular-nums;
 }
 .bi-foot.is-over {
-  color: #f56c6c;
+  color: var(--color-expense);
 }
 .budget-note {
   margin-top: 10px;

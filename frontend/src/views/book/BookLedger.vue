@@ -62,7 +62,7 @@
             <!-- 月度总账:年行点开是 12 个月,点某月切回记账本定位 -->
             <div class="card lg-panel">
               <div class="section-label">{{ $t('book.ledger.table') }}</div>
-              <div class="lt-scroll">
+              <div ref="scrollEl" class="lt-scroll">
                 <table class="lt-table">
                   <thead>
                     <tr>
@@ -217,13 +217,15 @@
 
 <script setup>
 // 总账页签:一次取总账聚合 + 账户余额(Promise.all);范围切换只重拉这两个接口
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ArrowRight } from '@element-plus/icons-vue'
 
 import { bookApi, financeApi, loanApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { formatYuan, totalRemainingPrincipal } from '@/utils/loan'
+import { formatYuan } from '@/utils/money'
+import { totalRemainingPrincipal } from '@/utils/loan'
+import { bindHorizontalWheel } from '@/utils/horizontalWheel'
 import { accountTypeLabel, fillMonths, ledgerCsvRows, netWorth, ratio, sumBalances, yoy } from '@/utils/bookLedger'
 import { summarizePortfolio } from '@/utils/finance'
 import { saveBlob } from '@/utils/tools/download'
@@ -243,6 +245,14 @@ const ledger = ref(null)
 const accounts = ref([])
 // 同时只展开一个年份,避免表格长到失控
 const expandedYear = ref(null)
+// 月度总账表的横向滚动容器(隐藏原生滚动条后靠滚轮/触屏横滑,见 utils/horizontalWheel)
+const scrollEl = ref(null)
+let unbindWheel = null
+watch(scrollEl, (el) => {
+  unbindWheel?.()
+  unbindWheel = el ? bindHorizontalWheel(el) : null
+})
+onBeforeUnmount(() => unbindWheel?.())
 
 const totals = computed(() => ledger.value?.totals || {})
 const hasRecords = computed(() => Number(totals.value.count || 0) > 0 || Number(totals.value.transferCount || 0) > 0)
@@ -464,10 +474,14 @@ onMounted(() => {
   font-weight: 600;
 }
 
-/* 月度总账表 */
+/* 月度总账表:横向滚动不占布局盒(原生滚动条会让表格行随内容多寡上下抖),靠滚轮/触屏横滑 */
 .lt-scroll {
   overflow-x: auto;
-  scrollbar-width: thin;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.lt-scroll::-webkit-scrollbar {
+  display: none;
 }
 .lt-table {
   width: 100%;
@@ -520,10 +534,10 @@ onMounted(() => {
   color: var(--color-text, #3a2e22);
 }
 .is-income {
-  color: #67c23a;
+  color: var(--color-income);
 }
 .is-expense {
-  color: #f56c6c;
+  color: var(--color-expense);
 }
 
 /* 年度同比 */
@@ -550,10 +564,10 @@ onMounted(() => {
   color: var(--color-text-secondary, #999);
 }
 .is-good {
-  color: #67c23a;
+  color: var(--color-income);
 }
 .is-bad {
-  color: #f56c6c;
+  color: var(--color-expense);
 }
 .is-flat {
   color: var(--color-text-secondary, #999);
@@ -593,10 +607,10 @@ onMounted(() => {
   border-radius: 2px;
 }
 .lg-bar-fill.is-income {
-  background: #67c23a;
+  background: var(--color-income);
 }
 .lg-bar-fill.is-expense {
-  background: #f56c6c;
+  background: var(--color-expense);
 }
 
 /* 成员收支 */
@@ -660,7 +674,7 @@ onMounted(() => {
   overflow-wrap: anywhere;
 }
 .lg-fund-amount.is-negative {
-  color: #f56c6c;
+  color: var(--color-expense);
 }
 .lg-note {
   margin-top: 10px;

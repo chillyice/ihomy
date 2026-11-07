@@ -250,11 +250,11 @@ const reset = () => {
   margin-bottom: 12px;
 }
 .is-ok {
-  color: #67c23a;
+  color: var(--color-income);
   font-weight: 600;
 }
 .is-bad {
-  color: #f56c6c;
+  color: var(--color-expense);
   font-weight: 600;
 }
 @media (max-width: 560px) {

@@ -20,7 +20,9 @@
     <el-tabs v-model="activeTab">
       <el-tab-pane :label="$t('points.title')" name="shop">
         <PageToolbar :card="false">
-          <el-button v-if="userStore.isOwner" type="primary" plain @click="openEditor()">{{ $t('points.publish') }}</el-button>
+          <div class="tb-right">
+            <el-button v-if="userStore.isOwner" type="primary" plain @click="openEditor()">{{ $t('points.publish') }}</el-button>
+          </div>
         </PageToolbar>
         <div v-loading="loading">
           <div v-if="products.length" class="product-grid">

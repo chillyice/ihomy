@@ -1,6 +1,8 @@
 <template>
   <PageToolbar :card="false">
-    <el-button type="primary" @click="$emit('add')">{{ $t('item.addHouse') }}</el-button>
+    <div class="tb-right">
+      <el-button type="primary" @click="$emit('add')">{{ $t('item.addHouse') }}</el-button>
+    </div>
   </PageToolbar>
   <el-table :data="houses" stripe>
     <el-table-column prop="name" :label="$t('item.houseName')" />

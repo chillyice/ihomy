@@ -117,9 +117,14 @@ watch(
 <style scoped>
 /* 页签横向滚动(窄屏/多页签时不换行、不撑破工具栏);EP 自身的配色圆角仍走全局 main.css */
 .book-tabs {
+  /* 元素型控件(el-radio-group 是 inline-flex)放进块级容器会按行盒基线排版,视觉上整体下偏 2–4px;
+     容器改 flex + 居中,让控件真正落在容器中线上 */
+  display: flex;
+  align-items: center;
   max-width: 100%;
   min-width: 0;
   overflow-x: auto;
+  overflow-y: hidden;
   scrollbar-width: none;
 }
 .book-tabs::-webkit-scrollbar {

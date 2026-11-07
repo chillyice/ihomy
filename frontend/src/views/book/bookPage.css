@@ -9,7 +9,9 @@
   margin-bottom: 16px;
 }
 .book-kpi {
-  padding: 14px 18px;
+  /* 记账本统一用「高密度卡」一档(16px 18px):一屏要放余额条 + 统计 + 46 行明细,
+     全局 .card 的 20px 会把页面拉得过长;全站只有这两档,禁再出现第三档(见 UI 提示词) */
+  padding: 16px 18px;
   min-width: 0;
 }
 .book-kpi-label {
@@ -24,22 +26,65 @@
   overflow-wrap: anywhere;
 }
 .book-kpi-value.is-income {
-  color: #67c23a;
+  color: var(--color-income);
 }
 .book-kpi-value.is-expense {
-  color: #f56c6c;
+  color: var(--color-expense);
 }
 /* 总账 4 张 KPI(累计收入/支出/结余/笔数):4 列,窄屏收成 2×2 */
 .book-kpi-grid.cols-4 {
   grid-template-columns: repeat(4, 1fr);
 }
-/* KPI 副标(跨度、转账笔数):小字次要色,跟在主数值下面 */
+/* KPI 副标(跨度、转账笔数、结余卡的预算余量):小字次要色,跟在主数值下面 */
 .book-kpi-sub {
   margin-top: 4px;
   font-size: 11px;
   color: var(--color-text-tertiary, #b5a98c);
   font-variant-numeric: tabular-nums;
   line-height: 1.5;
+}
+.book-kpi-sub.is-over {
+  color: var(--color-expense);
+}
+
+/* 分类构成行(记账本分类排行与总账构成卡共用):名称 + 金额·占比 + 4px 比例条,一眼看出大头 */
+.book-cat {
+  padding: 7px 0;
+}
+.book-cat-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+.book-cat-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.book-cat-amount {
+  color: var(--color-text-secondary, #999);
+  font-size: 12px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.book-cat-bar {
+  height: 4px;
+  margin-top: 5px;
+  border-radius: 2px;
+  background: var(--color-card-2);
+  overflow: hidden;
+}
+.book-cat-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+}
+.book-cat-bar-fill.is-income {
+  background: var(--color-income);
+}
+.book-cat-bar-fill.is-expense {
+  background: var(--color-expense);
 }
 
 /* 账户余额条:横向可滑动的账户 chip + 右侧未归属提示与「管理账户」 */
@@ -57,11 +102,24 @@
   gap: 8px;
   flex: 1;
   min-width: 0;
+  /* 横向滚动不能占布局盒:原生滚动条会出现 8–12px 高度,让整条在「账户多/少」时高度不同、
+     chip 中线偏移。这里隐藏原生滚动条,行高只由 chip 决定(padding 必须上下对称) */
   overflow-x: auto;
-  scrollbar-width: thin;
-  padding-bottom: 2px;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  /* 隐藏滚动条后靠边缘渐隐提示「右边还有」 */
+  mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 16px), transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 16px), transparent);
+}
+.book-balance-strip .bs-chips::-webkit-scrollbar {
+  display: none;
 }
 .book-balance-strip .bs-chip {
+  /* chip 用 <button type="button"> 语义化(键盘可达 + aria-pressed),先复位按钮默认外观 */
+  appearance: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
   display: inline-flex;
   align-items: baseline;
   gap: 6px;
@@ -101,7 +159,7 @@
   font-variant-numeric: tabular-nums;
 }
 .book-balance-strip .bs-chip-amount.is-negative {
-  color: #f56c6c;
+  color: var(--color-expense);
 }
 .book-balance-strip .bs-actions {
   display: flex;

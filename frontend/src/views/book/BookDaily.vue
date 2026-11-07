@@ -19,7 +19,7 @@
     <template v-else>
       <!-- 账户余额条 -->
       <div class="book-balance-strip card">
-        <div class="bs-chips">
+        <div ref="chipsEl" class="bs-chips">
           <div
             v-for="a in accounts"
             :key="a.id"
@@ -108,7 +108,7 @@
             <div class="section-label">{{ $t('book.expenseCategories') }}</div>
             <div v-for="c in stats.categoryStats || []" :key="c.category" class="cat-row">
               <span class="cat-name">{{ c.category }}</span>
-              <span class="cat-total">{{ Number(c.total).toFixed(2) }}</span>
+              <span class="cat-total">{{ formatYuan(c.total) }}</span>
             </div>
             <div v-if="!stats.categoryStats?.length" class="book-empty">{{ $t('common.empty') }}</div>
           </div>
@@ -184,14 +184,15 @@
 
 <script setup>
 // 记账本页签:月度明细 + 收支统计 + 账户余额;改删仅记录人/家长(后端校验),前端按条件隐藏按钮
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { bookApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { formatYuan } from '@/utils/loan'
+import { formatYuan } from '@/utils/money'
+import { bindHorizontalWheel } from '@/utils/horizontalWheel'
 import { BOOK_CATEGORIES, accountRecords, unassignedCount } from '@/utils/bookLedger'
 import PageToolbar from '@/components/PageToolbar.vue'
 import AccountManagerDialog from './accounts/AccountManagerDialog.vue'
@@ -221,6 +222,9 @@ const accountMgrVisible = ref(false)
 const importVisible = ref(false)
 const recurringVisible = ref(false)
 const editor = reactive({ visible: false, form: {} })
+// 余额条的横向滚动靠原生滑动(触屏)+ 滚轮映射(鼠标),不显示原生滚动条
+const chipsEl = ref(null)
+let unbindWheel = null
 
 // 账户筛选:点余额条上的账户只看它的账目,再点一次取消;切月保留(对比同一账户的跨月流水很方便)
 const activeAccountId = ref(null)
@@ -247,7 +251,8 @@ const monthModel = computed({
 })
 
 const unassigned = computed(() => unassignedCount(records.value))
-const money = (v) => Number(v ?? 0).toFixed(2)
+// 金额展示全站唯一口径:千分位 + 两位小数(与总账/预算/理财一致,不再用 toFixed)
+const money = (v) => formatYuan(v)
 
 // 行内改删:可写档位下,本人记的或可管理账本者才能改;只读档位整列隐藏(后端仍逐条校验)
 const canEditRow = (r) => userStore.canWriteBook && (userStore.canManageBook || r.createdBy === userStore.userInfo?.id)
@@ -258,7 +263,7 @@ const catText = (r) => (r.type === 'INCOME' ? t('book.type.INCOME') : r.type ===
 const typeCls = (r) => ({ EXPENSE: 't0', INCOME: 't1', TRANSFER: 't2' })[r.type] || 't0'
 
 // 转账不带正负号:它不改收支也不改结余
-const amountText = (r) => (r.type === 'EXPENSE' ? '-' : r.type === 'INCOME' ? '+' : '') + Number(r.amount).toFixed(2)
+const amountText = (r) => (r.type === 'EXPENSE' ? '-' : r.type === 'INCOME' ? '+' : '') + formatYuan(r.amount)
 
 // 行内账户标签:收支看 accountName,转账看「转出 → 转入」,空一侧说明钱进出账户之外
 const hasAccount = (r) => (r.type === 'TRANSFER' ? !!(r.fromAccountId || r.toAccountId) : !!r.accountId)
@@ -368,6 +373,12 @@ watch(
   () => load(),
 )
 onMounted(load)
+// 余额条只在登录态渲染:模板 ref 从 null 变为元素时再挂滚轮,游客不会空挂监听
+watch(chipsEl, (el) => {
+  unbindWheel?.()
+  unbindWheel = el ? bindHorizontalWheel(el) : null
+})
+onBeforeUnmount(() => unbindWheel?.())
 </script>
 
 <style scoped>
@@ -386,6 +397,8 @@ onMounted(load)
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: 14px;
+  /* 网格默认 stretch:明细很长时右栏被拉到同高,下方留一大片空白;两栏各自按内容高度排 */
+  align-items: start;
 }
 .records,
 .cats {
@@ -456,7 +469,7 @@ onMounted(load)
 }
 .record-cat.t1 {
   background: rgba(103, 194, 58, 0.12);
-  color: #67c23a;
+  color: var(--color-income);
 }
 .record-cat.t2 {
   background: rgba(230, 162, 60, 0.14);
@@ -492,10 +505,10 @@ onMounted(load)
   font-variant-numeric: tabular-nums;
 }
 .record-amount.t0 {
-  color: #f56c6c;
+  color: var(--color-expense);
 }
 .record-amount.t1 {
-  color: #67c23a;
+  color: var(--color-income);
 }
 .record-amount.t2 {
   color: #e6a23c;
@@ -514,7 +527,7 @@ onMounted(load)
   font-size: 13px;
 }
 .cat-total {
-  color: #f56c6c;
+  color: var(--color-expense);
   font-weight: 600;
 }
 .form-row {

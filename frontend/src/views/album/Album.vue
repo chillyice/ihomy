@@ -396,14 +396,17 @@ onMounted(() => {
   margin-top: 4px;
 }
 .album-actions {
-  padding: 6px 8px 10px;
-  text-align: right;
+  /* 按钮是 inline-flex,块级容器里会按基线排版(整体偏上 2px);改 flex + 居中,
+     padding 上下对称后中线才真正与容器一致 */
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 6px 8px;
+  margin-bottom: 2px;
 }
 .album-actions :deep(.el-button) {
   padding: 5px 6px;
-}
-.album-actions :deep(.el-button + .el-button) {
-  margin-left: 4px;
 }
 
 /* 暖居主题:画廊(暖木阴影 + 深木/陶土徽章 + 封面加高) */

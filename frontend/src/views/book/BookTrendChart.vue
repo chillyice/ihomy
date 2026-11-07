@@ -16,7 +16,7 @@
       </div>
     </div>
 
-    <div class="bt-scroll">
+    <div ref="scrollEl" class="bt-scroll">
       <div class="bt-cols">
         <div v-for="(bar, i) in bars" :key="bar.key" class="bt-col" @mouseenter="hover = i" @mouseleave="hover = -1">
           <div class="bt-bars">
@@ -34,9 +34,10 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
-import { formatYuan } from '@/utils/loan'
+import { formatYuan } from '@/utils/money'
+import { bindHorizontalWheel } from '@/utils/horizontalWheel'
 
 // rows: [{ key, label, income, expense }],金额单位元
 const props = defineProps({
@@ -44,6 +45,13 @@ const props = defineProps({
 })
 
 const hover = ref(-1)
+// 横向滚动容器:列多时滚轮映射成横滑(隐藏原生滚动条,见 utils/horizontalWheel)
+const scrollEl = ref(null)
+let unbindWheel = null
+onMounted(() => {
+  unbindWheel = bindHorizontalWheel(scrollEl.value)
+})
+onBeforeUnmount(() => unbindWheel?.())
 
 const max = computed(() => (props.rows || []).reduce((m, r) => Math.max(m, Number(r.income) || 0, Number(r.expense) || 0), 0))
 
@@ -98,10 +106,10 @@ const hoverBar = computed(() => (hover.value >= 0 ? bars.value[hover.value] : nu
   display: inline-block;
 }
 .bt-dot.is-income {
-  background: #67c23a;
+  background: var(--color-income);
 }
 .bt-dot.is-expense {
-  background: #f56c6c;
+  background: var(--color-expense);
   margin-left: 6px;
 }
 .bt-readout {
@@ -119,17 +127,23 @@ const hoverBar = computed(() => (hover.value >= 0 ? bars.value[hover.value] : nu
   font-weight: 600;
 }
 .bt-readout-item.is-income {
-  color: #67c23a;
+  color: var(--color-income);
 }
 .bt-readout-item.is-expense {
-  color: #f56c6c;
+  color: var(--color-expense);
 }
 
-/* 横向可滚动:列多(12 个月)时窄屏也能看全,列宽随容器拉伸 */
+/* 横向可滚动:列多(12 个月)时窄屏也能看全,列宽随容器拉伸;
+   隐藏原生滚动条(不占布局盒),靠边缘渐隐 + 滚轮映射提示与操作 */
 .bt-scroll {
   overflow-x: auto;
-  scrollbar-width: thin;
-  padding-bottom: 2px;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 16px), transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 16px), transparent);
+}
+.bt-scroll::-webkit-scrollbar {
+  display: none;
 }
 .bt-cols {
   display: flex;
@@ -162,10 +176,10 @@ const hoverBar = computed(() => (hover.value >= 0 ? bars.value[hover.value] : nu
   transition: height 0.25s ease;
 }
 .bt-bar.is-income {
-  background: #67c23a;
+  background: var(--color-income);
 }
 .bt-bar.is-expense {
-  background: #f56c6c;
+  background: var(--color-expense);
 }
 /* 悬停列整列提亮,指出读数对应哪一列 */
 .bt-col:hover .bt-bar {
