@@ -213,7 +213,7 @@ const copy = async (value) => {
   padding: 2px;
   border: 1px solid var(--color-border);
   border-radius: 8px;
-  background: var(--color-bg-soft);
+  background: var(--color-bg-2);
   cursor: pointer;
 }
 .color-swatch {
@@ -272,7 +272,7 @@ const copy = async (value) => {
   min-width: 0;
   padding: 5px 8px;
   border-radius: 6px;
-  background: var(--color-bg-soft);
+  background: var(--color-bg-2);
   font-family: 'Cascadia Code', Consolas, monospace;
   font-size: 12px;
   overflow: hidden;
@@ -318,7 +318,7 @@ const copy = async (value) => {
   margin: 0;
   padding: 10px 12px;
   border-radius: 8px;
-  background: var(--color-bg-soft);
+  background: var(--color-bg-2);
   font-family: 'Cascadia Code', Consolas, monospace;
   font-size: 12px;
   line-height: 1.6;

@@ -2206,7 +2206,7 @@ html.dark .recipe-name {
   margin-top: 6px;
   font-size: 10px;
   line-height: 1.5;
-  color: #b5a98c;
+  color: var(--color-text-secondary);
 }
 .fin-item {
   display: flex;

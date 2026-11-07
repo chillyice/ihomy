@@ -545,12 +545,12 @@ const birthYear = (m) => (m.birthDate ? String(m.birthDate).slice(0, 4) : '')
 }
 .ftg-zoom {
   min-width: 40px;
-  color: var(--color-text-2);
+  color: var(--color-text-secondary);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 .ftg-hint {
-  color: var(--color-text-2);
+  color: var(--color-text-secondary);
   font-size: 12px;
   opacity: 0.75;
 }
@@ -754,7 +754,7 @@ const birthYear = (m) => (m.birthDate ? String(m.birthDate).slice(0, 4) : '')
   justify-content: center;
   overflow: hidden;
   border-radius: 50%;
-  background: #eef2f7;
+  background: var(--color-card-2);
 }
 .ftg-photo img {
   width: 100%;

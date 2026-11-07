@@ -44,7 +44,8 @@
                   class="bpk-byte"
                   :class="{ 'is-on': isActive(line.offset + byteIndex) }"
                   @mouseenter="showTip(fieldAt(line.offset + byteIndex), $event)"
-                >{{ hexByte(byte) }}</span>
+                  >{{ hexByte(byte) }}</span
+                >
               </div>
               <div class="bpk-ascii">{{ line.ascii || ' ' }}</div>
             </div>
@@ -168,7 +169,10 @@
     </details>
 
     <div v-if="tip" class="bpk-tip" :style="{ left: `${tip.x}px`, top: `${tip.y}px` }">
-      <div class="bpk-tip-head"><strong>{{ tip.name }}</strong><span>{{ tip.value }}</span></div>
+      <div class="bpk-tip-head">
+        <strong>{{ tip.name }}</strong
+        ><span>{{ tip.value }}</span>
+      </div>
       <p>{{ tip.meaning }}</p>
     </div>
   </div>
@@ -180,15 +184,7 @@ import { useI18n } from 'vue-i18n'
 import BpcChips from '../BpcChips.vue'
 import BpcCopy from '../BpcCopy.vue'
 import { analyzePacket, parsePacketInput } from '@/utils/packetDecode'
-import {
-  PACKET_MAX_BYTES,
-  bigEndianValue,
-  checksumSet,
-  describeBytes,
-  hexOf,
-  parseFieldTemplate,
-  splitFields,
-} from '@/utils/packetParse'
+import { PACKET_MAX_BYTES, bigEndianValue, checksumSet, describeBytes, hexOf, parseFieldTemplate, splitFields } from '@/utils/packetParse'
 
 const { t, locale } = useI18n()
 
@@ -210,9 +206,7 @@ const modeOptions = computed(() => [
   { value: 'text', label: t('tools.packet.modeText') },
 ])
 
-const hint = computed(() =>
-  mode.value === 'text' ? t('tools.packet.textHint') : t('tools.packet.hexHint'),
-)
+const hint = computed(() => (mode.value === 'text' ? t('tools.packet.textHint') : t('tools.packet.hexHint')))
 
 const parsed = computed(() => {
   if (!input.value.trim()) return { ok: true, value: { bytes: new Uint8Array(0), lines: [], mode: 'hex' } }
@@ -376,7 +370,7 @@ const checksumRows = computed(() => {
   color: var(--text);
 }
 .bpk-text {
-  color: var(--text-dim);
+  color: var(--dim);
   font-family: var(--mono);
 }
 .bpk-byte {
@@ -392,7 +386,7 @@ const checksumRows = computed(() => {
 }
 .bpk-ascii {
   margin-top: 2px;
-  color: var(--text-faint);
+  color: var(--muted);
   white-space: pre-wrap;
   word-break: break-all;
 }
@@ -422,12 +416,12 @@ const checksumRows = computed(() => {
   font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--text-faint);
+  color: var(--muted);
 }
 .bpk-layer-note {
   margin-left: auto;
   font-size: 10px;
-  color: var(--text-faint);
+  color: var(--muted);
 }
 .bpk-field {
   display: grid;
@@ -445,7 +439,7 @@ const checksumRows = computed(() => {
   outline: none;
 }
 .bpk-fname {
-  color: var(--text-dim);
+  color: var(--dim);
   font-size: 11.5px;
 }
 .bpk-fval {
@@ -457,7 +451,7 @@ const checksumRows = computed(() => {
 .bpk-fpos {
   font-family: var(--mono);
   font-size: 9.5px;
-  color: var(--text-faint);
+  color: var(--muted);
   white-space: nowrap;
 }
 .bpk-fmean {
@@ -465,7 +459,7 @@ const checksumRows = computed(() => {
   margin: 2px 0 0;
   padding-top: 4px;
   border-top: 1px dashed var(--line);
-  color: var(--text-dim);
+  color: var(--dim);
   font-size: 11px;
   line-height: 1.55;
 }

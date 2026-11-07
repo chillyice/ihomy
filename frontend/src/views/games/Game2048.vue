@@ -411,7 +411,8 @@ onBeforeUnmount(() => {
   aspect-ratio: 1;
   padding: var(--bf-gap);
   border-radius: 10px;
-  background: #bbada0;
+  background: var(--color-card-2);
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.14);
   touch-action: none;
   user-select: none;
   contain: layout style;
@@ -430,7 +431,7 @@ onBeforeUnmount(() => {
 }
 .bf-slot {
   border-radius: 6px;
-  background: rgba(238, 228, 218, 0.35);
+  background: rgba(var(--color-card-rgb), 0.35);
 }
 .bf-tile {
   position: absolute;
@@ -444,7 +445,7 @@ onBeforeUnmount(() => {
   font-size: clamp(20px, 6vw, 38px);
   line-height: 1;
   color: #776e65;
-  background: #eee4da;
+  background: var(--color-surface);
   transition: transform 0.13s ease;
   will-change: transform;
 }

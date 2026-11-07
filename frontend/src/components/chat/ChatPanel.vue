@@ -36,10 +36,10 @@ const connecting = computed(() => chatStore.socketStatus === SOCKET_STATUS.CONNE
   font-size: 12px;
 }
 .conn-hint.ok {
-  color: #67c23a;
+  color: var(--el-color-success);
 }
 .conn-hint.bad {
-  color: #f56c6c;
+  color: var(--color-danger);
 }
 @media (max-width: 768px) {
   .conn-hint {

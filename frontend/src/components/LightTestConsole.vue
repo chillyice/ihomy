@@ -242,7 +242,7 @@ const onDateChange = () => {
   flex-wrap: wrap;
 }
 .lt-phase {
-  color: #c9a876;
+  color: var(--color-brand);
   font-weight: 600;
 }
 .lt-controls {
@@ -320,7 +320,7 @@ const onDateChange = () => {
 }
 .lt-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #c9a876, #a8483a);
+  background: linear-gradient(90deg, var(--color-brand), var(--color-accent));
   transition: width 0.2s;
 }
 </style>

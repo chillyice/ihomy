@@ -324,7 +324,7 @@ const pickGame = (g) => {
   margin-top: 10px;
   padding: 8px 10px;
   border-radius: 8px;
-  background: var(--color-bg-muted, rgba(128, 128, 128, 0.08));
+  background: var(--color-bg-2);
 }
 .link-mini-title {
   font-size: 13px;
@@ -353,7 +353,7 @@ const pickGame = (g) => {
   border-radius: 10px;
 }
 .call-member-row:hover {
-  background: var(--color-bg-muted, rgba(128, 128, 128, 0.08));
+  background: var(--color-bg-2);
 }
 .call-member-name {
   flex: 1;
@@ -377,7 +377,7 @@ const pickGame = (g) => {
   align-items: center;
   gap: 6px;
   padding: 14px 8px;
-  border: 1px solid var(--color-border-light, rgba(128, 128, 128, 0.15));
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   background: transparent;
   cursor: pointer;

@@ -574,7 +574,7 @@ onMounted(() => {
   gap: 16px;
 }
 .tree-tip {
-  color: var(--color-text-2);
+  color: var(--color-text-secondary);
   font-size: 12px;
   line-height: 1.6;
 }
@@ -593,7 +593,7 @@ onMounted(() => {
   flex-wrap: wrap;
   align-items: center;
   gap: 16px;
-  color: var(--color-text-2);
+  color: var(--color-text-secondary);
   font-size: 12px;
 }
 .legend-item {
@@ -624,7 +624,7 @@ onMounted(() => {
   border: 1px dashed var(--color-border);
   border-radius: 12px;
   background: var(--color-card);
-  color: var(--color-text-2);
+  color: var(--color-text-secondary);
   font-size: 13px;
 }
 .kin-card.active {
@@ -632,7 +632,7 @@ onMounted(() => {
   border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
 }
 .kin-empty {
-  color: var(--color-text-2);
+  color: var(--color-text-secondary);
 }
 .kin-row {
   display: flex;
@@ -644,7 +644,7 @@ onMounted(() => {
   font-weight: 600;
 }
 .kin-arrow {
-  color: var(--color-text-2);
+  color: var(--color-text-secondary);
 }
 .kin-terms {
   display: flex;
@@ -662,7 +662,7 @@ onMounted(() => {
   gap: 8px;
 }
 .kin-term-label {
-  color: var(--color-text-2);
+  color: var(--color-text-secondary);
   font-size: 12px;
 }
 .kin-term strong {
@@ -671,7 +671,7 @@ onMounted(() => {
   letter-spacing: 1px;
 }
 .kin-path {
-  color: var(--color-text-2);
+  color: var(--color-text-secondary);
   font-size: 12px;
   opacity: 0.8;
 }
@@ -683,7 +683,7 @@ onMounted(() => {
   margin-left: auto;
 }
 .import-hint {
-  color: var(--color-text-2);
+  color: var(--color-text-secondary);
   font-size: 12px;
   line-height: 1.6;
   margin-bottom: 10px;
@@ -738,7 +738,7 @@ onMounted(() => {
   font-size: 12px;
 }
 .rel-gender-label {
-  color: var(--color-text-2);
+  color: var(--color-text-secondary);
 }
 .rel-swap {
   float: left;

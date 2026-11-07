@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="reader-overlay" :class="{ dark: isDark, fullscreen: isFullscreen }">
+    <div class="reader-overlay" :class="{ fullscreen: isFullscreen }">
       <!-- Top Bar -->
       <div class="reader-bar">
         <div class="bar-left">
@@ -401,12 +401,19 @@ const initEpub = async () => {
 const applyEpubTheme = () => {
   if (!epubRendition) return
   const theme = isDark.value ? 'dark' : 'light'
+  // EPUB 在 iframe 内渲染,CSS 变量不继承:读当前主题的计算值,再注册成字面量
+  const cs = getComputedStyle(document.documentElement)
+  const readVar = (name, fallback) => (cs.getPropertyValue(name) || fallback).trim()
+  const background = readVar('--color-bg', '#fff')
+  const color = readVar('--color-text', '#333')
+  const link = readVar('--color-brand', '#b88c6e')
   epubRendition.themes.register('dark', {
-    body: { background: '#1a1a2e', color: '#E8DCC8' },
-    a: { color: '#d4b298' },
+    body: { background, color },
+    a: { color: link },
   })
   epubRendition.themes.register('light', {
-    body: { background: '#fff', color: '#333' },
+    body: { background, color },
+    a: { color: link },
   })
   epubRendition.themes.select(theme)
   epubRendition.themes.fontSize(`${fontSize.value}px`)
@@ -787,14 +794,10 @@ watch(txtPage, () => applyTxtStyle())
   position: fixed;
   inset: 0;
   z-index: var(--z-immersive);
-  background: #fff;
-  color: #333;
+  background: var(--color-bg);
+  color: var(--color-text);
   display: flex;
   flex-direction: column;
-}
-.reader-overlay.dark {
-  background: #1a1a2e;
-  color: #e8dcc8;
 }
 
 .reader-bar {
@@ -802,12 +805,9 @@ watch(txtPage, () => applyTxtStyle())
   justify-content: space-between;
   align-items: center;
   padding: 8px 16px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
   min-height: 48px;
-}
-.reader-overlay.dark .reader-bar {
-  border-bottom-color: rgba(255, 255, 255, 0.08);
 }
 .bar-left {
   display: flex;
@@ -842,10 +842,7 @@ watch(txtPage, () => applyTxtStyle())
   transition: background 0.2s;
 }
 .r-btn:hover {
-  background: rgba(0, 0, 0, 0.06);
-}
-.reader-overlay.dark .r-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(var(--color-brand-rgb), 0.1);
 }
 .r-btn.small {
   width: 26px;
@@ -853,15 +850,11 @@ watch(txtPage, () => applyTxtStyle())
 }
 .r-btn.primary {
   background: var(--color-brand);
-  color: #fff;
+  color: var(--color-brand-text);
   padding: 0 12px;
   width: auto;
   height: 34px;
   font-size: 13px;
-}
-.reader-overlay.dark .r-btn.primary {
-  background: var(--color-brand);
-  color: #2a2018;
 }
 
 .reader-main {
@@ -874,12 +867,9 @@ watch(txtPage, () => applyTxtStyle())
 .toc-drawer {
   width: 240px;
   flex-shrink: 0;
-  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  border-right: 1px solid var(--color-border);
   overflow-y: auto;
   padding: 10px;
-}
-.reader-overlay.dark .toc-drawer {
-  border-right-color: rgba(255, 255, 255, 0.08);
 }
 .drawer-head {
   font-size: 13px;
@@ -904,17 +894,10 @@ watch(txtPage, () => applyTxtStyle())
   align-items: center;
 }
 .toc-item:hover {
-  background: rgba(0, 0, 0, 0.04);
-}
-.reader-overlay.dark .toc-item:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(var(--color-brand-rgb), 0.08);
 }
 .toc-item.active {
   background: rgba(var(--color-brand-rgb), 0.12);
-  color: var(--color-brand);
-}
-.reader-overlay.dark .toc-item.active {
-  background: rgba(var(--color-brand-rgb), 0.15);
   color: var(--color-brand);
 }
 .toc-indent {
@@ -948,11 +931,8 @@ watch(txtPage, () => applyTxtStyle())
   height: 100%;
   overflow-y: auto;
   overflow-x: auto;
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--color-bg-2);
   -webkit-overflow-scrolling: touch;
-}
-.reader-overlay.dark .pdf-scroll {
-  background: rgba(0, 0, 0, 0.3);
 }
 .pdf-page-wrap {
   display: flex;
@@ -1015,7 +995,7 @@ watch(txtPage, () => applyTxtStyle())
   width: 40px;
   height: 60px;
   border: none;
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(var(--color-brand-rgb), 0.08);
   border-radius: 8px;
   cursor: pointer;
   display: flex;
@@ -1032,13 +1012,7 @@ watch(txtPage, () => applyTxtStyle())
 }
 .nav-arrow:hover {
   opacity: 1 !important;
-  background: rgba(0, 0, 0, 0.1);
-}
-.reader-overlay.dark .nav-arrow {
-  background: rgba(255, 255, 255, 0.05);
-}
-.reader-overlay.dark .nav-arrow:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(var(--color-brand-rgb), 0.18);
 }
 .nav-arrow.left {
   left: 8px;
@@ -1050,12 +1024,9 @@ watch(txtPage, () => applyTxtStyle())
 .side-drawer {
   width: 260px;
   flex-shrink: 0;
-  border-left: 1px solid rgba(0, 0, 0, 0.08);
+  border-left: 1px solid var(--color-border);
   overflow-y: auto;
   padding: 10px;
-}
-.reader-overlay.dark .side-drawer {
-  border-left-color: rgba(255, 255, 255, 0.08);
 }
 .drawer-content {
   display: flex;
@@ -1097,10 +1068,7 @@ watch(txtPage, () => applyTxtStyle())
   transition: background 0.2s;
 }
 .bm-item:hover {
-  background: rgba(0, 0, 0, 0.04);
-}
-.reader-overlay.dark .bm-item:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(var(--color-brand-rgb), 0.08);
 }
 .bm-label {
   overflow: hidden;
@@ -1122,7 +1090,7 @@ watch(txtPage, () => applyTxtStyle())
 }
 .bm-del:hover {
   opacity: 1;
-  color: #b04a3a;
+  color: var(--color-danger);
 }
 .meta-item {
   display: flex;
@@ -1205,11 +1173,11 @@ watch(txtPage, () => applyTxtStyle())
   }
   .toc-drawer {
     left: 0;
-    border-right: 1px solid rgba(0, 0, 0, 0.1);
+    border-right: 1px solid var(--color-border);
   }
   .side-drawer {
     right: 0;
-    border-left: 1px solid rgba(0, 0, 0, 0.1);
+    border-left: 1px solid var(--color-border);
   }
 }
 </style>

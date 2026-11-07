@@ -42,7 +42,7 @@ const payload = computed(() => parsePayload(props.msg.payload) || {})
 .img-card-fallback {
   padding: 18px 22px;
   border-radius: 10px;
-  background: var(--color-bg-muted, rgba(128, 128, 128, 0.1));
+  background: var(--color-bg-2);
   color: var(--color-text-secondary, #999);
   font-size: 13px;
   text-align: center;

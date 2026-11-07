@@ -604,7 +604,7 @@ onMounted(() => {
 .bar-name {
   font-size: 14px;
   font-weight: 600;
-  color: var(--text-primary, #303133);
+  color: var(--color-text);
 }
 .bar-name-row {
   display: flex;
@@ -645,18 +645,18 @@ onMounted(() => {
 }
 .qty-unit {
   font-size: 12px;
-  color: var(--text-secondary, #909399);
+  color: var(--color-text-secondary);
 }
 .qty-empty {
   font-size: 12px;
-  color: var(--text-placeholder, #c0c4cc);
+  color: var(--el-text-color-placeholder);
 }
 .bar-location {
   display: flex;
   align-items: center;
   gap: 4px;
   font-size: 11px;
-  color: var(--text-secondary, #909399);
+  color: var(--color-text-secondary);
 }
 
 .bar-actions {
@@ -691,7 +691,7 @@ onMounted(() => {
   align-items: baseline;
   gap: 4px;
   font-size: 13px;
-  color: var(--text-secondary, #909399);
+  color: var(--color-text-secondary);
   margin-bottom: 12px;
 }
 .take-total-num {

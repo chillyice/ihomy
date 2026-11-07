@@ -54,8 +54,8 @@ const go = () => {
   max-width: min(300px, 100%);
   padding: 10px 12px;
   border-radius: 10px;
-  background: var(--color-bg-muted, rgba(128, 128, 128, 0.08));
-  border: 1px solid var(--color-border-light, rgba(128, 128, 128, 0.18));
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border);
   cursor: pointer;
   transition: transform var(--dur-fast) var(--ease-soft);
 }

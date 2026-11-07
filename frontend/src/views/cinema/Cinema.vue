@@ -1002,24 +1002,6 @@ onMounted(() => {
   background: #b96058;
   box-shadow: 0 0 4px rgba(185, 96, 88, 0.9);
 }
-.pick-badge {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.85);
-  border: 2px solid rgba(184, 140, 110, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
-}
-.pick-badge.on {
-  background: var(--color-brand);
-  border-color: var(--color-brand);
-}
 .select-count {
   font-size: 13px;
   color: var(--color-text-secondary);

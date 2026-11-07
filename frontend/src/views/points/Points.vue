@@ -292,7 +292,7 @@ onMounted(async () => {
   margin: 8px 0 4px;
 }
 .product-points {
-  color: #e6a23c;
+  color: var(--color-warning);
   font-weight: 600;
 }
 .product-limit,

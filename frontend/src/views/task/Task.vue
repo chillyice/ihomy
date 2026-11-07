@@ -194,7 +194,7 @@ onMounted(loadTasks)
   font-size: 16px;
 }
 .task-desc {
-  color: #666;
+  color: var(--color-text-secondary);
   font-size: 13px;
   margin: 8px 0;
   white-space: pre-wrap;

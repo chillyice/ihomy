@@ -306,7 +306,7 @@ html.theme-warm .cards-page {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-accent-weak, rgba(184, 140, 110, 0.14));
+  background: rgba(var(--color-brand-rgb), 0.14);
   color: var(--color-accent, var(--color-brand));
 }
 .cards-lobby-name {

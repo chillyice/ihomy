@@ -1581,7 +1581,7 @@ onBeforeUnmount(() => {
 }
 .mm-icon-item.active {
   border-color: var(--color-primary, var(--color-brand));
-  background: var(--color-primary-light, rgba(184, 140, 110, 0.1));
+  background: rgba(var(--color-brand-rgb), 0.1);
 }
 .mm-icon-item :deep(svg) {
   width: 18px;
@@ -1660,7 +1660,7 @@ onBeforeUnmount(() => {
   background: var(--color-card-2, rgba(0, 0, 0, 0.04));
 }
 .mm-rt-btn.active {
-  background: var(--color-primary-light, rgba(184, 140, 110, 0.15));
+  background: rgba(var(--color-brand-rgb), 0.15);
   color: var(--color-primary, var(--color-brand));
 }
 .mm-rt-bg {

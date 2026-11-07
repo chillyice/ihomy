@@ -143,6 +143,19 @@ const onCheck = () => {
   background: rgba(122, 138, 40, 0.16);
   color: #6d7c1f;
 }
+/* 暮色:半透明底不变,只把固定深色文字提亮一档,保证深色卡片上可读 */
+html.dark .sched-badge.anniversary {
+  color: #e8c06a;
+}
+html.dark .sched-badge.loan {
+  color: #6fc79c;
+}
+html.dark .sched-badge.finance {
+  color: #b79ae0;
+}
+html.dark .sched-badge.item_expiry {
+  color: #b3c45c;
+}
 .sched-time {
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;

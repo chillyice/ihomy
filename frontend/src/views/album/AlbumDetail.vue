@@ -604,23 +604,6 @@ onMounted(load)
   outline: 3px solid var(--color-primary, var(--color-brand));
   outline-offset: -3px;
 }
-.pick-badge {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.85);
-  border: 2px solid rgba(184, 140, 110, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.pick-badge.on {
-  background: var(--color-brand);
-  border-color: var(--color-brand);
-}
 .live-badge {
   position: absolute;
   top: 8px;

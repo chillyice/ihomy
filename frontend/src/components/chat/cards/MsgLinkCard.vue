@@ -46,8 +46,8 @@ const host = computed(() => {
   max-width: min(320px, 100%);
   padding: 10px 12px;
   border-radius: 10px;
-  background: var(--color-bg-muted, rgba(128, 128, 128, 0.08));
-  border: 1px solid var(--color-border-light, rgba(128, 128, 128, 0.18));
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border);
   text-decoration: none;
   color: inherit;
   cursor: pointer;

@@ -149,7 +149,7 @@ watch(visible, (v) => {
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border: 1px solid var(--color-border-light, rgba(128, 128, 128, 0.15));
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   background: transparent;
   cursor: pointer;

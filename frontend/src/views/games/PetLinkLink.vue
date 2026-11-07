@@ -969,7 +969,7 @@ function onKeydown(e) {
 }
 .cover-hint {
   font-size: 12px;
-  color: #667;
+  color: var(--color-text-secondary);
   max-width: 420px;
   line-height: 1.6;
 }
@@ -1114,7 +1114,7 @@ function onKeydown(e) {
   justify-content: center;
   width: 42px;
   height: 40px;
-  background: #fff;
+  background: var(--color-surface);
   border: 1px solid #5283c6;
   border-radius: 3px;
   cursor: pointer;
@@ -1244,7 +1244,7 @@ function onKeydown(e) {
   color: #66ffcc;
 }
 .debug-hint {
-  color: #667;
+  color: var(--color-text-secondary);
 }
 .debug-log {
   max-height: 132px;

@@ -116,7 +116,7 @@ onMounted(loadMenu)
   font-size: 20px;
   font-weight: 600;
   margin: 32px 0 16px;
-  color: var(--text-primary, #303133);
+  color: var(--color-text);
 }
 
 .title-tag {
@@ -129,7 +129,7 @@ onMounted(loadMenu)
 
 .title-count {
   font-size: 14px;
-  color: var(--text-secondary, #909399);
+  color: var(--color-text-secondary);
   font-weight: normal;
 }
 
@@ -169,7 +169,7 @@ onMounted(loadMenu)
   font-size: 15px;
   font-weight: 500;
   text-align: center;
-  color: var(--text-primary, #303133);
+  color: var(--color-text);
 }
 
 .menu-grid {
@@ -213,7 +213,7 @@ onMounted(loadMenu)
   font-size: 15px;
   font-weight: 600;
   margin-bottom: 4px;
-  color: var(--text-primary, #303133);
+  color: var(--color-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -229,7 +229,7 @@ onMounted(loadMenu)
   padding: 1px 8px;
   border-radius: 8px;
   background: var(--el-fill-color, #f0f2f5);
-  color: var(--text-secondary, #606266);
+  color: var(--color-text-secondary);
 }
 .meta-flavor {
   background: var(--el-color-warning-light-9, #fdf6ec);
@@ -237,7 +237,7 @@ onMounted(loadMenu)
 }
 .menu-author {
   font-size: 12px;
-  color: var(--text-secondary, #909399);
+  color: var(--color-text-secondary);
 }
 
 @media (max-width: 1200px) {

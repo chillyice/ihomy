@@ -299,7 +299,7 @@ watch(mode, () => {
   margin: 0;
   padding: 10px 12px;
   border-radius: 8px;
-  background: var(--color-bg-soft);
+  background: var(--color-bg-2);
   font-family: 'Cascadia Code', Consolas, monospace;
   font-size: 12px;
   line-height: 1.7;
@@ -348,7 +348,7 @@ watch(mode, () => {
   font-size: 12.5px;
 }
 .file-list-row:nth-child(odd) {
-  background: var(--color-bg-soft);
+  background: var(--color-bg-2);
 }
 .file-list-name {
   flex: 1;

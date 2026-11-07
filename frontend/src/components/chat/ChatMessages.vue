@@ -140,14 +140,14 @@ onBeforeUnmount(() => {})
 }
 .msg-meta {
   font-size: 12px;
-  color: #999;
+  color: var(--color-text-secondary);
   margin-bottom: 4px;
 }
 .msg-row.mine .msg-meta {
   text-align: right;
 }
 .msg-bubble {
-  background: #f5f7fa;
+  background: var(--color-card-2);
   border-radius: 8px;
   padding: 8px 12px;
   font-size: 14px;
@@ -157,7 +157,7 @@ onBeforeUnmount(() => {})
   max-width: 100%;
 }
 .msg-row.mine .msg-bubble {
-  background: #e8f3ff;
+  background: rgba(var(--color-brand-rgb), 0.16);
   text-align: left;
 }
 /* 卡片消息去掉内边距,由卡片自带留白 */

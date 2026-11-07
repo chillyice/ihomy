@@ -646,7 +646,7 @@ onBeforeUnmount(() => unbindWheel?.())
 }
 .record-cat.t2 {
   background: rgba(230, 162, 60, 0.14);
-  color: #e6a23c;
+  color: var(--color-warning);
 }
 .record-remark {
   font-size: 14px;
@@ -684,7 +684,7 @@ onBeforeUnmount(() => unbindWheel?.())
   color: var(--color-income);
 }
 .record-amount.t2 {
-  color: #e6a23c;
+  color: var(--color-warning);
 }
 .record-actions {
   flex-shrink: 0;

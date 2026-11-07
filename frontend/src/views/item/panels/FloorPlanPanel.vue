@@ -1757,7 +1757,7 @@ defineExpose({
   flex-shrink: 0;
 }
 .fp-voice.recording {
-  color: #fff;
+  color: var(--color-brand-text);
   background: var(--color-danger, #e74c3c);
   border-color: var(--color-danger, #e74c3c);
   animation: fp-voice-pulse 1.2s ease-in-out infinite;
@@ -1790,7 +1790,7 @@ defineExpose({
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #5c4c3d;
+  color: var(--color-text);
 }
 .fp-empty-plus {
   width: 96px;
@@ -1806,7 +1806,7 @@ defineExpose({
 .fp-empty-text {
   margin-top: 16px;
   font-size: 15px;
-  color: #8a7a6a;
+  color: var(--color-text-secondary);
 }
 .fp-guide {
   position: absolute;
@@ -1824,23 +1824,23 @@ defineExpose({
 .fp-guide-title {
   font-size: 16px;
   font-weight: 600;
-  color: #5c4c3d;
+  color: var(--color-text);
 }
 .fp-guide-text {
   font-size: 13px;
-  color: #a89a8a;
+  color: var(--color-text-secondary);
 }
 .fp-sidebar {
   width: 220px;
   flex-shrink: 0;
-  border-right: 1px solid #eee5d8;
-  background: #faf5ec;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-card);
   display: flex;
   flex-direction: column;
 }
 .fp-side-tabs {
   display: flex;
-  border-bottom: 1px solid #eee5d8;
+  border-bottom: 1px solid var(--color-border);
 }
 .fp-side-tab {
   flex: 1;
@@ -1848,10 +1848,10 @@ defineExpose({
   padding: 10px 0;
   cursor: pointer;
   font-size: 13px;
-  color: #8a7a6a;
+  color: var(--color-text-secondary);
 }
 .fp-side-tab.on {
-  color: #5c4c3d;
+  color: var(--color-text);
   font-weight: 600;
   border-bottom: 2px solid var(--color-brand);
 }
@@ -1863,15 +1863,15 @@ defineExpose({
 .fp-tool-hint {
   font-size: 12px;
   line-height: 1.6;
-  color: #8a7a6a;
-  background: rgba(184, 140, 110, 0.09);
+  color: var(--color-text-secondary);
+  background: rgba(var(--color-brand-rgb), 0.09);
   border-radius: 8px;
   padding: 8px 10px;
   margin-bottom: 12px;
 }
 .fp-drag-hint {
   font-size: 11px;
-  color: #a89a8a;
+  color: var(--color-text-secondary);
   margin-bottom: 6px;
 }
 .fp-tool-btn {
@@ -1919,7 +1919,7 @@ defineExpose({
 .fp-ruler-caret svg {
   width: 7px;
   height: 6px;
-  fill: #fff;
+  fill: var(--color-brand-text);
 }
 .fp-ico {
   width: 20px;
@@ -1934,10 +1934,10 @@ defineExpose({
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.08em;
-  color: #a89a8a;
+  color: var(--color-text-secondary);
   margin: 14px 0 6px;
   padding-top: 8px;
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  border-top: 1px solid var(--color-border);
 }
 .fp-side-head:first-child {
   margin-top: 0;
@@ -1956,14 +1956,14 @@ defineExpose({
   align-items: center;
   gap: 4px;
   padding: 8px 2px 6px;
-  border: 1px dashed #d8c9b8;
+  border: 1px dashed var(--color-border);
   border-radius: 8px;
   cursor: grab;
-  background: #fffdf8;
+  background: var(--color-card-2);
 }
 .fp-preset:hover {
   border-color: var(--color-brand);
-  background: rgba(184, 140, 110, 0.08);
+  background: rgba(var(--color-brand-rgb), 0.08);
 }
 .fp-preset:active {
   cursor: grabbing;
@@ -1972,14 +1972,14 @@ defineExpose({
   width: 22px;
   height: 22px;
   fill: none;
-  stroke: #8a6f55;
+  stroke: var(--color-text-secondary);
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 .fp-preset-name {
   font-size: 11px;
-  color: #5c4c3d;
+  color: var(--color-text);
 }
 .fp-opacity-row {
   display: flex;
@@ -1989,7 +1989,7 @@ defineExpose({
 }
 .fp-opacity-label {
   font-size: 12px;
-  color: #a89a8a;
+  color: var(--color-text-secondary);
   white-space: nowrap;
 }
 .fp-opacity-row :deep(.el-slider) {
@@ -2001,7 +2001,7 @@ defineExpose({
   justify-content: space-between;
   gap: 6px;
   padding: 6px 0;
-  border-bottom: 1px dashed #eee5d8;
+  border-bottom: 1px dashed var(--color-border);
   min-height: 32px;
 }
 /* 家具类型图标(侧栏家具行名称前) */
@@ -2010,14 +2010,14 @@ defineExpose({
   height: 15px;
   flex-shrink: 0;
   fill: none;
-  stroke: #8a7a6a;
+  stroke: var(--color-text-secondary);
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 .fp-side-name {
   font-size: 13px;
-  color: #5c4c3d;
+  color: var(--color-text);
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -2038,7 +2038,7 @@ defineExpose({
 }
 .fp-side-furn {
   padding: 6px 0;
-  border-bottom: 1px dashed #eee5d8;
+  border-bottom: 1px dashed var(--color-border);
 }
 /* 已摆放家具条目之间不显示分隔线(家具库列表仍保留) */
 .fp-side-furn:not([draggable='true']) {
@@ -2060,18 +2060,18 @@ defineExpose({
   gap: 10px;
   margin-top: 4px;
   font-size: 11px;
-  color: #a89a8a;
+  color: var(--color-text-secondary);
 }
 .fp-side-room {
-  color: #8a7a6a;
+  color: var(--color-text-secondary);
   padding: 1px 8px;
   border-radius: 8px;
-  background: rgba(138, 111, 85, 0.09);
-  border: 1px solid rgba(138, 111, 85, 0.16);
+  background: rgba(var(--color-brand-rgb), 0.09);
+  border: 1px solid rgba(var(--color-brand-rgb), 0.16);
   white-space: nowrap;
 }
 .fp-side-note {
-  color: #a89a8a;
+  color: var(--color-text-secondary);
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -2093,7 +2093,7 @@ defineExpose({
   margin-left: 4px;
 }
 .fp-side-ok {
-  color: #7aa07a;
+  color: var(--el-color-success);
 }
 .fp-floors {
   position: absolute;
@@ -2111,8 +2111,8 @@ defineExpose({
   width: 36px;
   height: 36px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.92);
-  color: #5c4c3d;
+  background: rgba(var(--color-card-rgb), 0.92);
+  color: var(--color-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2126,16 +2126,16 @@ defineExpose({
     transform 0.15s;
 }
 .fp-floor:hover {
-  background: #fff;
+  background: rgba(var(--color-card-rgb), 1);
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
 }
 .fp-floor.on {
   background: var(--color-brand);
-  color: #fff;
+  color: var(--color-brand-text);
 }
 .fp-floor.on:hover {
-  background: #a87e60;
+  background: var(--color-brand-hover);
 }
 .fp-floor-arrow {
   width: 20px;
@@ -2143,7 +2143,7 @@ defineExpose({
   font-size: 11px;
   border-radius: 4px;
   background: rgba(var(--color-brand-rgb), 0.12);
-  color: #8a7a6a;
+  color: var(--color-text-secondary);
   box-shadow: none;
 }
 .fp-floor-arrows {
@@ -2158,14 +2158,14 @@ defineExpose({
 } /* 上下移纵向堆叠:两钮加间距与 36px 芯片等高 */
 .fp-floor-arrow:hover {
   background: rgba(var(--color-brand-rgb), 0.25);
-  color: #5c4c3d;
+  color: var(--color-text);
 }
 .fp-floor-del {
   font-size: 10px;
 }
 .fp-floor-del:hover {
   background: rgba(211, 88, 66, 0.16);
-  color: #c0503c;
+  color: var(--color-danger);
 }
 .fp-floor-row {
   display: flex;
@@ -2177,8 +2177,8 @@ defineExpose({
   height: 28px;
   border-radius: 8px;
   border: 1px solid var(--color-primary, var(--color-brand));
-  background: rgba(255, 255, 255, 0.95);
-  color: #5c4c3d;
+  background: rgba(var(--color-card-rgb), 0.95);
+  color: var(--color-text);
   text-align: center;
   font-size: 12px;
   font-weight: 600;
@@ -2191,8 +2191,8 @@ defineExpose({
   width: 36px;
   height: 36px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.92);
-  color: #5c4c3d;
+  background: rgba(var(--color-card-rgb), 0.92);
+  color: var(--color-text);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2205,7 +2205,7 @@ defineExpose({
   z-index: 5;
 }
 .fp-fit:hover {
-  background: #fff;
+  background: rgba(var(--color-card-rgb), 1);
   transform: translateY(-1px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.16);
 }
@@ -2225,7 +2225,7 @@ defineExpose({
   width: 260px;
   max-height: 50%;
   overflow-y: auto;
-  background: rgba(255, 253, 248, 0.96);
+  background: rgba(var(--color-card-rgb), 0.96);
   border-radius: 12px;
   box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12);
   padding: 10px;
@@ -2234,7 +2234,7 @@ defineExpose({
 .fp-results-title {
   font-size: 13px;
   font-weight: 600;
-  color: #5c4c3d;
+  color: var(--color-text);
   margin-bottom: 8px;
 }
 .fp-src-tag {
@@ -2243,9 +2243,9 @@ defineExpose({
   padding: 1px 8px;
   border-radius: 999px;
   margin-left: 6px;
-  background: rgba(0, 0, 0, 0.05);
-  color: #8a7a68;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(var(--color-brand-rgb), 0.08);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
 }
 .fp-src-tag.ai {
   background: rgba(120, 90, 40, 0.08);
@@ -2254,7 +2254,7 @@ defineExpose({
 }
 .fp-search-hint {
   font-size: 12px;
-  color: #8a7a68;
+  color: var(--color-text-secondary);
   padding: 4px 2px;
 }
 .fp-result {
@@ -2285,12 +2285,12 @@ defineExpose({
 .fp-result-name {
   display: block;
   font-size: 13px;
-  color: #3a2e22;
+  color: var(--color-text);
 }
 .fp-result-path {
   display: block;
   font-size: 11px;
-  color: #a89a8a;
+  color: var(--color-text-secondary);
   margin-top: 2px;
   overflow: hidden;
   text-overflow: ellipsis;

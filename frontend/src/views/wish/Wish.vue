@@ -228,7 +228,7 @@ onMounted(load)
   font-weight: 600;
 }
 .wish-reason {
-  color: #666;
+  color: var(--color-text-secondary);
   font-size: 13px;
 }
 .wish-source {

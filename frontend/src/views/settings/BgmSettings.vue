@@ -188,7 +188,7 @@ html.dark .share-tip {
   color: #9a9088;
 }
 .music-name {
-  color: var(--color-text-2);
+  color: var(--color-text-secondary);
   font-size: 13px;
 }
 .music-audio {

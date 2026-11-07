@@ -1142,7 +1142,7 @@ onBeforeUnmount(() => {
   text-align: center;
 }
 .gba-status.error {
-  color: #f56c6c;
+  color: var(--color-danger);
 }
 .hidden-input {
   display: none;

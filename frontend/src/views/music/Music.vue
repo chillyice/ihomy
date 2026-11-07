@@ -1179,7 +1179,7 @@ html.dark .card-more-btn .el-icon {
   border-radius: 0;
 }
 .pl-cover-placeholder {
-  background: linear-gradient(135deg, #ede5d8 0%, #e2d8c8 100%);
+  background: linear-gradient(135deg, var(--color-card-2) 0%, var(--color-bg-2) 100%);
 }
 .pl-cover-icon {
   width: 48px;
@@ -1449,22 +1449,6 @@ html.dark .add-album-cover.placeholder {
 .album-card.selected {
   outline: 2px solid var(--color-brand);
   outline-offset: -2px;
-}
-.pick-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: rgba(var(--color-brand-rgb), 0.25);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
-}
-.pick-badge.on {
-  background: var(--color-brand);
 }
 .select-count {
   font-size: 13px;

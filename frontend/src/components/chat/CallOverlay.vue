@@ -266,7 +266,7 @@ const stateText = computed(() => {
   border-radius: 12px;
   overflow: hidden;
   background: rgba(12, 14, 18, 0.92);
-  box-shadow: var(--shadow-lg, 0 8px 32px rgba(0, 0, 0, 0.3));
+  box-shadow: var(--shadow-hover);
   touch-action: none;
 }
 .call-mini-video {

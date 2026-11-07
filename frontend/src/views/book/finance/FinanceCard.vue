@@ -237,7 +237,7 @@ const money = (v) => (v === null || v === undefined ? t('book.finance.unbounded'
 }
 .fc-rate {
   font-size: 13px;
-  color: #e6a23c;
+  color: var(--color-warning);
   font-variant-numeric: tabular-nums;
 }
 .fc-progress {
@@ -292,7 +292,7 @@ const money = (v) => (v === null || v === undefined ? t('book.finance.unbounded'
   color: var(--color-text-secondary, #999);
 }
 .fc-due.is-overdue {
-  color: #e6a23c;
+  color: var(--color-warning);
 }
 .fc-foot {
   margin-top: auto;

@@ -200,7 +200,7 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   border: 0;
-  background: #f4f4f4;
+  background: var(--color-bg-2);
   touch-action: manipulation;
 }
 .wg-stage:fullscreen {

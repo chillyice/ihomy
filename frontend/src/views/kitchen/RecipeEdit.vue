@@ -256,7 +256,7 @@ onMounted(load)
   font-size: 18px;
   font-weight: 600;
   margin: 0;
-  color: var(--text-primary, #303133);
+  color: var(--color-text);
 }
 
 .form-row-3 {
@@ -305,7 +305,7 @@ onMounted(load)
 }
 .media-label {
   font-size: 12px;
-  color: var(--text-secondary, #909399);
+  color: var(--color-text-secondary);
   margin-bottom: 4px;
 }
 

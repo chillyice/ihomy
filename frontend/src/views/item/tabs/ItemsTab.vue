@@ -99,24 +99,6 @@ const keyword = defineModel('keyword', { default: '' })
   color: var(--color-text-secondary, #909399);
   margin-right: 8px;
 }
-.pick-badge {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.85);
-  border: 2px solid rgba(184, 140, 110, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
-}
-.pick-badge.on {
-  background: var(--color-brand);
-  border-color: var(--color-brand);
-}
 .item-main {
   display: flex;
   align-items: center;
@@ -135,7 +117,7 @@ const keyword = defineModel('keyword', { default: '' })
   font-weight: 600;
 }
 .item-path {
-  color: #909399;
+  color: var(--color-text-secondary);
   font-size: 13px;
   margin-top: 4px;
 }

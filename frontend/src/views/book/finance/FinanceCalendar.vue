@@ -89,7 +89,7 @@ onBeforeUnmount(() => unbindWheel?.())
   min-width: 0;
 }
 .fn-cal-item.is-soon {
-  border-color: #e6a23c;
+  border-color: var(--color-warning);
 }
 .fn-cal-item.is-overdue {
   border-color: var(--color-expense);
@@ -123,7 +123,7 @@ onBeforeUnmount(() => unbindWheel?.())
   white-space: nowrap;
 }
 .fn-cal-item.is-soon .fn-cal-days {
-  color: #e6a23c;
+  color: var(--color-warning);
 }
 .fn-cal-item.is-overdue .fn-cal-days {
   color: var(--color-expense);

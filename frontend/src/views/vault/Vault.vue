@@ -652,7 +652,7 @@ onBeforeUnmount(() => {
 }
 .vc-note {
   font-size: 13px;
-  color: #666;
+  color: var(--color-text-secondary);
   white-space: pre-wrap;
   word-break: break-word;
 }

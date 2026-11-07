@@ -167,7 +167,7 @@ const copy = async (text) => {
   gap: 6px;
   padding: 14px 16px;
   border-radius: 10px;
-  background: var(--color-bg-soft);
+  background: var(--color-bg-2);
 }
 .unit-result-value {
   font-size: 18px;
@@ -198,7 +198,7 @@ const copy = async (text) => {
   font-size: 12.5px;
 }
 .unit-tr:nth-child(odd) {
-  background: var(--color-bg-soft);
+  background: var(--color-bg-2);
 }
 .unit-tr.is-current {
   box-shadow: inset 3px 0 0 var(--color-accent);

@@ -645,7 +645,7 @@ html.dark .playlist-item.active {
 }
 .pl-playing {
   font-size: 12px;
-  color: #a8483a;
+  color: var(--color-brand);
 }
 
 /* 滚动条 */

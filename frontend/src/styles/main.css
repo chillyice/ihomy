@@ -13,6 +13,9 @@
   /* 收支语义色:记账本等金额展示统一引用,禁止再散落 #67c23a / #f56c6c 硬编码 */
   --color-income: #67c23a;
   --color-expense: #f56c6c;
+  /* 危险动作与失败态(删除/失败数/错误提示)/提示态:语义独立于收支色,由主题×晨暮覆写 */
+  --color-danger: #c45656;
+  --color-warning: #9c6f1a;
   /* 表面色(游戏卡/浮层卡等"抬起的面"):浅色纯白,深色随卡片色 */
   --color-surface: #fff;
   --color-border: rgba(58, 46, 34, 0.12);
@@ -126,6 +129,8 @@ html.dark {
   /* 深色底上提亮一档,保证收支数字的对比度 */
   --color-income: #86d162;
   --color-expense: #f78989;
+  --color-danger: #f78989;
+  --color-warning: #e8c07a;
   --color-border: rgba(232, 220, 200, 0.1);
   /* 表面色随卡片色(游戏卡/浮层卡):深色绝不能再落回纯白,否则浅色字压白底 */
   --color-surface: var(--color-card);
@@ -154,6 +159,8 @@ html.dark {
 html.theme-warm {
   --color-primary: #8a6a4e;
   --color-accent: #c9807a;
+  --color-danger: #b4544c;
+  --color-warning: #96681a;
   --color-bg: #f1e7d6;
   --color-bg-2: #e4d5bf;
   --color-card: #fbf3e4;
@@ -190,6 +197,8 @@ html.theme-warm {
 html.theme-warm.dark {
   --color-primary: #efe0c8;
   --color-accent: #e19a8c;
+  --color-danger: #e8908a;
+  --color-warning: #e0b476;
   --color-bg: #241a12;
   --color-bg-2: #2e2217;
   --color-card: #33241a;
@@ -1998,4 +2007,40 @@ html.dark .el-badge__content {
 }
 .el-dialog {
   border-radius: 14px !important;
+}
+
+/* ===== 多选圆标(封面单选/多选):相册详情 / 影院 / 物品 / 音乐四处共用 =====
+   底随卡片色、描边走品牌色、选中态品牌底,深色下不会再是一颗白点;勾选图标只在选中时显示 */
+.pick-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--color-card-rgb), 0.85);
+  border: 2px solid rgba(var(--color-brand-rgb), 0.6);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.pick-badge.on {
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+}
+.pick-badge svg {
+  opacity: 0;
+  color: var(--color-brand-text);
+  transition: opacity 0.15s;
+}
+.pick-badge.on svg {
+  opacity: 1;
+}
+.pick-badge svg path {
+  stroke: currentColor;
 }

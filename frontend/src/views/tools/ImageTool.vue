@@ -394,7 +394,7 @@ watch(mode, () => {
   font-size: 12.5px;
 }
 .image-tr:nth-child(odd) {
-  background: var(--color-bg-soft);
+  background: var(--color-bg-2);
 }
 .image-tag-name {
   color: var(--color-text-secondary);

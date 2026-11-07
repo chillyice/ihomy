@@ -212,8 +212,8 @@ onBeforeUnmount(onThumbDragEnd)
   position: absolute;
   z-index: 6;
   width: 168px;
-  background: rgba(255, 253, 248, 0.96);
-  border: 1px solid rgba(184, 140, 110, 0.35);
+  background: rgba(var(--color-card-rgb), 0.96);
+  border: 1px solid rgba(var(--color-brand-rgb), 0.35);
   border-radius: 10px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
   user-select: none;
@@ -244,7 +244,7 @@ onBeforeUnmount(onThumbDragEnd)
 .fp-thumb-grip {
   width: 16px;
   height: 8px;
-  fill: #a89a8a;
+  fill: var(--color-text-secondary);
 }
 .fp-thumb-map {
   width: 100%;
@@ -267,13 +267,13 @@ onBeforeUnmount(onThumbDragEnd)
   stroke-width: 1;
 }
 .fp-thumb-viewport {
-  fill: rgba(176, 74, 58, 0.08);
-  stroke: #b04a3a;
+  fill: rgba(var(--color-brand-rgb), 0.08);
+  stroke: var(--color-brand);
   stroke-width: 2;
 }
 .fp-thumb-preview {
-  fill: rgba(176, 74, 58, 0.12);
-  stroke: #b04a3a;
+  fill: rgba(var(--color-brand-rgb), 0.12);
+  stroke: var(--color-brand);
   stroke-width: 1.5;
   stroke-dasharray: 4 3;
 }

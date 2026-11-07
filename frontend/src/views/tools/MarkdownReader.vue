@@ -109,7 +109,7 @@ const copyHtml = async () => {
   flex: 1;
   overflow-y: auto;
   padding: 16px;
-  background: var(--color-bg-soft);
+  background: var(--color-bg-2);
   border-radius: 12px;
   border: 1px solid var(--color-border);
 }
@@ -166,7 +166,7 @@ const copyHtml = async () => {
   margin: 0 2px;
   font-family: 'Cascadia Code', Consolas, monospace;
   font-size: 0.9em;
-  background: var(--color-bg-soft);
+  background: var(--color-bg-2);
   border-radius: 4px;
   color: var(--color-accent);
 }
@@ -175,7 +175,7 @@ const copyHtml = async () => {
   margin: 0.5em 0;
   padding: 12px;
   overflow-x: auto;
-  background: var(--color-bg-soft);
+  background: var(--color-bg-2);
   border-radius: 8px;
   border: 1px solid var(--color-border);
 }

@@ -79,7 +79,12 @@ const ball = useDragResize({
   h: BALL_SIZE,
   storageKey: FLOAT_POS_KEY,
 })
-const { pos: panelPos, size: panelSize, onDragStart, onResizeStart } = useDragResize({
+const {
+  pos: panelPos,
+  size: panelSize,
+  onDragStart,
+  onResizeStart,
+} = useDragResize({
   x: Math.max(16, window.innerWidth - PANEL_W - 24),
   y: 84,
   w: PANEL_W,
@@ -179,10 +184,10 @@ onMounted(() => {
   position: fixed;
   display: flex;
   flex-direction: column;
-  background: var(--color-bg-card, #fff);
-  border: 1px solid var(--color-border-light, rgba(128, 128, 128, 0.2));
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
   border-radius: 14px;
-  box-shadow: var(--shadow-lg, 0 8px 32px rgba(0, 0, 0, 0.16));
+  box-shadow: var(--shadow-hover);
   overflow: hidden;
 }
 .panel-head {
@@ -193,7 +198,7 @@ onMounted(() => {
   cursor: grab;
   user-select: none;
   touch-action: none; /* 拖拽把手 */
-  border-bottom: 1px solid var(--color-border-light, rgba(128, 128, 128, 0.15));
+  border-bottom: 1px solid var(--color-border);
 }
 .panel-head:active {
   cursor: grabbing;
@@ -236,7 +241,7 @@ onMounted(() => {
   height: 52vh;
   display: flex;
   flex-direction: column;
-  background: var(--color-bg-card, #fff);
+  background: var(--color-card);
   border-radius: 16px 16px 0 0;
   box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18);
   z-index: var(--z-float);

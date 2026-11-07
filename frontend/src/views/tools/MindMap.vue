@@ -316,7 +316,7 @@ onMounted(load)
 }
 .mm-tpl-card.active {
   border-color: var(--color-primary, var(--color-brand));
-  background: var(--color-primary-light, rgba(184, 140, 110, 0.08));
+  background: rgba(var(--color-brand-rgb), 0.08);
 }
 .mm-tpl-name {
   font-size: 13px;

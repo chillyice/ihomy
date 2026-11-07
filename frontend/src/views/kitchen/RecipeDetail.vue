@@ -185,7 +185,7 @@ onMounted(load)
   font-size: 28px;
   font-weight: 600;
   margin: 0 0 12px;
-  color: var(--text-primary, #303133);
+  color: var(--color-text);
 }
 .meta-row {
   display: flex;
@@ -195,15 +195,15 @@ onMounted(load)
 }
 .meta-item {
   font-size: 14px;
-  color: var(--text-primary, #606266);
+  color: var(--color-text-secondary);
 }
 .meta-label {
-  color: var(--text-secondary, #909399);
+  color: var(--color-text-secondary);
   margin-right: 4px;
 }
 .desc {
   font-size: 14px;
-  color: var(--text-regular, #606266);
+  color: var(--color-text-secondary);
   line-height: 1.6;
   margin: 0 0 12px;
 }
@@ -212,7 +212,7 @@ onMounted(load)
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: var(--text-secondary, #909399);
+  color: var(--color-text-secondary);
   margin-bottom: 12px;
 }
 .actions {
@@ -233,7 +233,7 @@ onMounted(load)
   font-size: 18px;
   font-weight: 600;
   margin: 0 0 14px;
-  color: var(--text-primary, #303133);
+  color: var(--color-text);
 }
 
 .ingredient-list {
@@ -252,11 +252,11 @@ onMounted(load)
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 .ing-name {
-  color: var(--text-primary, #303133);
+  color: var(--color-text);
   font-weight: 500;
 }
 .ing-qty {
-  color: var(--text-secondary, #909399);
+  color: var(--color-text-secondary);
 }
 
 .equipment-list {
@@ -310,7 +310,7 @@ onMounted(load)
   margin: 0 0 10px;
   font-size: 14px;
   line-height: 1.6;
-  color: var(--text-primary, #303133);
+  color: var(--color-text);
 }
 .step-media {
   max-width: 100%;
