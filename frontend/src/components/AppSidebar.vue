@@ -51,6 +51,9 @@
                   <path d="M3 4H21V16H3V4ZM5 6V14H19V6H5ZM2 18H22V20H2V18Z" />
                 </svg>
               </el-badge>
+              <el-badge v-else-if="m.code === 'chat'" :value="chatUnread" :hidden="!chatUnread" :max="99" class="nav-badge">
+                <el-icon><component :is="iconComp(m.code)" /></el-icon>
+              </el-badge>
               <el-icon v-else><component :is="iconComp(m.code)" /></el-icon>
             </span>
             <span v-if="!collapsed" class="nav-text">{{ m.title }}</span>
@@ -210,6 +213,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
+import { useChatStore } from '@/stores/chat'
 import { useWidgetDrag } from '@/utils/useWidgetDrag'
 import { notificationApi, authApi, opsApi } from '@/api'
 import { ElMessage } from 'element-plus'
@@ -226,6 +230,7 @@ import { warnLevelColor, topWarning } from '@/utils/dict'
 const router = useRouter()
 const route = useRoute()
 const appStore = useAppStore()
+const chatStore = useChatStore()
 const userStore = useUserStore()
 const { locale, t } = useI18n()
 const { startDrag: startWidgetDrag, dragging: widgetDragging, crossed: crossedEdge } = useWidgetDrag()
@@ -296,6 +301,8 @@ const onLang = () => {
 
 // 通知
 const unreadCount = ref(0)
+// 聊天未读:全局 WS 连接在 stores/chat.js,浮窗展开或进 /chat 时自动清零
+const chatUnread = computed(() => chatStore.unread)
 const notifications = ref([])
 const loadUnread = async () => {
   if (!userStore.isLoggedIn) return

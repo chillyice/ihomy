@@ -1525,7 +1525,7 @@ export default {
     },
     share: {
       toChat: '分享到聊天室',
-      pending: '已放入聊天草稿，去聊天室发送',
+      pending: '已放入聊天草稿',
       photoTitle: '照片',
       diaryTitle: '日记',
       privateBlocked: '私密内容不能分享到聊天室',

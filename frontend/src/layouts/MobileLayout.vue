@@ -38,11 +38,12 @@
     <BackToTop />
     <InstallPrompt />
     <MusicPlayer />
+    <ChatFloat />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import MobileTabBar from '@/components/MobileTabBar.vue'
@@ -53,6 +54,7 @@ import MobileMePage from '@/components/MobileMePage.vue'
 import BackToTop from '@/components/BackToTop.vue'
 import InstallPrompt from '@/components/InstallPrompt.vue'
 import MusicPlayer from '@/components/MusicPlayer.vue'
+const ChatFloat = defineAsyncComponent(() => import('@/components/chat/ChatFloat.vue'))
 import { isMobileHomePath, mobileHeaderTitleKey } from '@/utils/mobileNav'
 
 const route = useRoute()
@@ -87,6 +89,7 @@ const SWIPE_IGNORE_SELECTOR = [
   '.filter-bar',
   '.el-slider',
   '.el-carousel',
+  '.chat-float-sheet',
 ].join(', ')
 
 const startTabSwitch = (next, transition = 'mobile-tab') => {

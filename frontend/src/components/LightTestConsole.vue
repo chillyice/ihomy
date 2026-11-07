@@ -2,7 +2,7 @@
 <template>
   <div v-if="light?.lightTestMode?.value" class="light-test-console" :style="{ left: pos.x + 'px', top: pos.y + 'px' }">
     <div class="lt-header">
-      <span class="lt-title lt-drag" @mousedown="onDragStart" :title="$t('lightTest.drag')">≡ {{ $t('lightTest.title') }}</span>
+      <span class="lt-title lt-drag" @pointerdown="onDragStart" :title="$t('lightTest.drag')">≡ {{ $t('lightTest.title') }}</span>
       <input type="date" v-model="dateInput" @change="onDateChange" class="lt-date-input" :title="$t('lightTest.dateHint')" />
       <input type="time" v-model="timeInput" @change="onTimeChange" class="lt-time-input" />
       <button class="lt-btn lt-reset" @click="light.stopLightTest" :title="$t('lightTest.resetTitle')">⏹</button>
@@ -204,6 +204,7 @@ const onDateChange = () => {
   cursor: grab;
   user-select: none;
   white-space: nowrap;
+  touch-action: none; /* Pointer Events 拖拽把手:触屏不被页面滚动抢走 */
 }
 .lt-title:active {
   cursor: grabbing;

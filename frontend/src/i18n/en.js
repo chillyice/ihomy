@@ -1532,7 +1532,7 @@ export default {
     },
     share: {
       toChat: 'Share to chat',
-      pending: 'Added to chat draft, send it in the chat room',
+      pending: 'Added to chat draft',
       photoTitle: 'Photo',
       diaryTitle: 'Diary',
       privateBlocked: 'Private content cannot be shared to the chat room',

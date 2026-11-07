@@ -22,13 +22,19 @@ export const useChatStore = defineStore('chat', {
     unread: 0,
     /** 最近一条 WS 到达的消息(驱动页面滚动/浮标,历史加载不触发) */
     lastIncoming: null,
-    /** 聊天界面是否在前台(/chat 页或浮窗展开) */
-    viewing: false,
+    /** /chat 页是否在前台(与 floatOpen 任意一个为真即「在看」,新消息直接推进已读) */
+    chatPageActive: false,
+    /** 全局浮窗是否展开(ChatFloat 维护) */
+    floatOpen: false,
     /** 本次登录会话是否已拉过历史 */
     hydrated: false,
     /** 待发送的富内容卡片(分享注入/站内选择/游戏邀请的预填草稿,{msgType,content,payload} 已是可发送形态) */
     shareCard: null,
   }),
+  getters: {
+    /** 聊天界面是否在前台(/chat 页或浮窗展开) */
+    viewing: (s) => s.chatPageActive || s.floatOpen,
+  },
   actions: {
     /** 建连入口:已连接/连接中是幂等空转;登出态直接忽略 */
     ensureConnected() {
@@ -164,7 +170,8 @@ export const useChatStore = defineStore('chat', {
       this.messages = []
       this.unread = 0
       this.lastIncoming = null
-      this.viewing = false
+      this.chatPageActive = false
+      this.floatOpen = false
       this.hydrated = false
     },
   },

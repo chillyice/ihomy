@@ -42,11 +42,13 @@
     </template>
     <!-- 首登强制改密(种子账号):全局弹窗,由 store 标记驱动 -->
     <ChangePasswordDialog />
+    <!-- 全局聊天浮窗(懒加载,内部自守卫:登录且非独立页) -->
+    <ChatFloat />
   </el-config-provider>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, provide } from 'vue'
+import { ref, computed, watch, onMounted, provide, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
@@ -65,6 +67,7 @@ import MusicPlayer from '@/components/MusicPlayer.vue'
 import SiteFooter from '@/components/SiteFooter.vue'
 import LightTestConsole from '@/components/LightTestConsole.vue'
 import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue'
+const ChatFloat = defineAsyncComponent(() => import('@/components/chat/ChatFloat.vue'))
 import MobileLayout from '@/layouts/MobileLayout.vue'
 
 const { isMobile } = useDevice()

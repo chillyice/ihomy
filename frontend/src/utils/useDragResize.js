@@ -5,6 +5,8 @@ import { ref, onUnmounted } from 'vue'
 // storageKey 为空则不持久化;minY 限制最高位置(默认 0);anchorRight=true 时 pos.x 为离右边缘距离(拖动方向取反)
 // marginLeft 限制左侧边界(默认 0,沉浸式首页导航栏宽 220 时传 220)
 // zIndex:面板层级,拖拽/resize 时自动置顶(但不超过光影层 65),由模块级计数器管理
+// 事件:统一 Pointer Events(鼠标/触摸一把抓),把手容器加 touch-action:none 触屏才不会被页面滚动抢走;
+// 指针捕获只在真正拖动/缩放期间做(踩坑速查 §3.35:pointerdown 就捕获会让容器内所有卡片点不动)
 const PANEL_BASE_Z = 20
 const PANEL_TOP_MAX = 60 // 低于光影层 bright-spot(65)
 let zCounter = PANEL_BASE_Z
@@ -36,6 +38,7 @@ export function useDragResize(initial) {
     startY = 0,
     startPos = { x: 0, y: 0 },
     startSize = { w: 0, h: 0 }
+  let captureEl = null
 
   // 置顶:拖拽或 resize 时调用,提升 z-index(不超过光影层)
   const bringToFront = () => {
@@ -50,32 +53,8 @@ export function useDragResize(initial) {
     } catch (e) {}
   }
 
-  const onDragStart = (e) => {
-    if (e.target.classList.contains('resize-handle')) return
-    dragging.value = true
-    bringToFront()
-    startX = e.clientX
-    startY = e.clientY
-    startPos = { ...pos.value }
-    e.preventDefault()
-    // 拖拽开始才挂监听器,空闲无 listener(参考 AvatarCropper.vue 的写法)
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
-  }
-  const onResizeStart = (e) => {
-    resizing.value = true
-    bringToFront()
-    startX = e.clientX
-    startY = e.clientY
-    startPos = { ...pos.value }
-    startSize = { ...size.value }
-    e.preventDefault()
-    e.stopPropagation()
-    // resize 开始才挂监听器
-    window.addEventListener('mousemove', onMouseMove)
-    window.addEventListener('mouseup', onMouseUp)
-  }
-  const onMouseMove = (e) => {
+  /** 指针捕获期间移动/抬起都派发到捕获元素上,直接改 pos/size */
+  const onPointerMove = (e) => {
     const vw = window.innerWidth
     const vh = window.innerHeight
     if (dragging.value) {
@@ -85,7 +64,7 @@ export function useDragResize(initial) {
       const dy = e.clientY - startY
       let nx
       if (anchorRight) {
-        // right 模式:pos.x 是离右边缘距离,鼠标向左(dx<0)→ nx 增大(面板向左)
+        // right 模式:pos.x 是离右边缘距离,指针向左(dx<0)→ nx 增大(面板向左)
         // 左边界限制:面板左边 = vw - pos.x - w ≥ marginLeft → pos.x ≤ vw - marginLeft - w
         const maxX = Math.max(0, vw - marginLeft - w)
         nx = Math.max(0, Math.min(startPos.x - dx, maxX))
@@ -101,7 +80,7 @@ export function useDragResize(initial) {
       const dx = e.clientX - startX
       const dy = e.clientY - startY
       if (anchorRight) {
-        // right 模式 + 左下角把手:右边缘固定(pos.x 不变),鼠标向左(dx<0)→ 宽度增大(左边缘左移)
+        // right 模式 + 左下角把手:右边缘固定(pos.x 不变),指针向左(dx<0)→ 宽度增大(左边缘左移)
         // 左边缘 = vw - pos.x - startSize.w,新左边缘 = 左边缘 + dx,新宽度 = startSize.w - dx
         // 宽度范围:最小 200,最大 = vw - marginLeft - startPos.x(左边缘不越过 marginLeft)
         const maxW = Math.max(200, vw - marginLeft - startPos.x)
@@ -109,7 +88,7 @@ export function useDragResize(initial) {
         pos.value = { x: startPos.x, y: startPos.y }
         size.value = { w: newW, h: Math.min(Math.max(120, startSize.h + dy), Math.max(120, vh - startPos.y)) }
       } else {
-        // left 模式:左边固定,鼠标向右(dx>0)→ 宽度增大,右边右移,但不超过 vw
+        // left 模式:左边固定,指针向右(dx>0)→ 宽度增大,右边右移,但不超过 vw
         size.value = {
           w: Math.min(Math.max(200, startSize.w + dx), Math.max(200, vw - startPos.x)),
           h: Math.min(Math.max(120, startSize.h + dy), Math.max(120, vh - startPos.y)),
@@ -117,13 +96,59 @@ export function useDragResize(initial) {
       }
     }
   }
-  const onMouseUp = () => {
+
+  const stopListening = () => {
+    if (captureEl) {
+      captureEl.removeEventListener('pointermove', onPointerMove)
+      captureEl.removeEventListener('pointerup', onPointerUp)
+      captureEl.removeEventListener('pointercancel', onPointerUp)
+      try {
+        if (captureEl.hasPointerCapture?.(0)) captureEl.releasePointerCapture(0)
+      } catch (e) {}
+      captureEl = null
+    }
+  }
+
+  const onPointerUp = () => {
     if (dragging.value || resizing.value) save()
     dragging.value = false
     resizing.value = false
-    // 拖拽/resize 结束立即移除监听器
-    window.removeEventListener('mousemove', onMouseMove)
-    window.removeEventListener('mouseup', onMouseUp)
+    // 拖拽/缩放结束立即释放捕获并移除监听器
+    stopListening()
+  }
+
+  const beginPointer = (e) => {
+    captureEl = e.currentTarget
+    captureEl.addEventListener('pointermove', onPointerMove)
+    captureEl.addEventListener('pointerup', onPointerUp)
+    captureEl.addEventListener('pointercancel', onPointerUp)
+    try {
+      captureEl.setPointerCapture(e.pointerId)
+    } catch (e2) {}
+  }
+
+  const onDragStart = (e) => {
+    if (e.target.classList.contains('resize-handle')) return
+    dragging.value = true
+    bringToFront()
+    startX = e.clientX
+    startY = e.clientY
+    startPos = { ...pos.value }
+    e.preventDefault()
+    // 拖拽开始才捕获指针挂监听器,空闲无 listener(参考 AvatarCropper.vue 的写法)
+    beginPointer(e)
+  }
+  const onResizeStart = (e) => {
+    resizing.value = true
+    bringToFront()
+    startX = e.clientX
+    startY = e.clientY
+    startPos = { ...pos.value }
+    startSize = { ...size.value }
+    e.preventDefault()
+    e.stopPropagation()
+    // resize 开始才捕获指针挂监听器
+    beginPointer(e)
   }
   const reset = () => {
     pos.value = { x: initial.x ?? 0, y: initial.y ?? 0 }
@@ -134,11 +159,9 @@ export function useDragResize(initial) {
       } catch (e) {}
     }
   }
-  // 不再在 onMounted 常驻 mousemove/mouseup,改由 onDragStart/onResizeStart 时挂载
-  // onUnmounted 仅做兜底清理(避免异常退出路径漏移除)
+  // 监听器只在拖拽期间存在;onUnmounted 兜底清理(避免异常退出路径漏移除)
   onUnmounted(() => {
-    window.removeEventListener('mousemove', onMouseMove)
-    window.removeEventListener('mouseup', onMouseUp)
+    stopListening()
   })
   return { pos, size, zIndex, dragging, resizing, onDragStart, onResizeStart, reset }
 }

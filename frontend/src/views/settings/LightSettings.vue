@@ -132,8 +132,8 @@ const enterLightTest = () => {
 }
 
 // 恢复默认面板布局:清除 localStorage 中所有面板持久化记录,刷新页面生效。
-// 当前确实在写的键:ihomy:music:pos(MusicPlayer 拖拽位置);ihomy:panel:* 与 ihomy:vinyl:pos
-// 是历史键(现已无写入方),保留清理是为了清掉老浏览器里的残留。
+// 当前确实在写的键:ihomy:music:pos(MusicPlayer 拖拽位置)、ihomy:chat:float:v1(ChatFloat 悬浮球位置);
+// ihomy:panel:* 与 ihomy:vinyl:pos 是历史键(现已无写入方),保留清理是为了清掉老浏览器里的残留。
 // 注意:光尘首页仪表盘(ihomy:dashboard:layout:v3)与暖居首页(ihomy:guangchen:home:v)布局
 // 各有页面内自带的「恢复默认」按钮,不在这里覆盖——新增可拖拽面板时记得回来补键。
 const resetPanelLayout = () => {
@@ -148,6 +148,7 @@ const resetPanelLayout = () => {
       keys.forEach((k) => localStorage.removeItem(k))
       localStorage.removeItem('ihomy:vinyl:pos')
       localStorage.removeItem('ihomy:music:pos')
+      localStorage.removeItem('ihomy:chat:float:v1')
       ElMessage.success(t('settings.resetPanelDone'))
       setTimeout(() => location.reload(), 800)
     })

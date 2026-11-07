@@ -1,5 +1,5 @@
 <!-- 聊天室页(V3.3→V11.55):家庭房间实时聊天。WS 连接由 stores/chat.js 全局单例持有,
-     消息区/输入区抽成 ChatMessages/ChatComposer(全局浮窗 P2 共用) -->
+     消息区/输入区组装在 ChatPanel(与全局浮窗共用) -->
 <template>
   <div class="page chat-page">
     <Breadcrumb :items="[{ label: $t('chat.title') }]" />
@@ -8,38 +8,27 @@
         {{ $t('chat.roomTitle') }} <span class="online-hint">{{ $t('chat.onlineHint') }}</span>
       </div>
 
-      <ChatMessages />
-
-      <!-- 输入区 -->
-      <ChatComposer />
-      <div class="conn-hint" :class="connected ? 'ok' : 'bad'">
-        {{ connected ? $t('chat.connected') : connecting ? $t('chat.connecting') : $t('chat.reconnecting') }}
-      </div>
+      <ChatPanel />
     </div>
   </div>
 </template>
 
 <script setup>
 // 页面壳:声明在看状态、拉历史、补建连接;离开不断开(全局连接,浮窗/未读继续收)
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { onBeforeUnmount, onMounted } from 'vue'
 import { useChatStore } from '@/stores/chat'
-import { SOCKET_STATUS } from '@/composables/useChatSocket'
 import Breadcrumb from '@/components/Breadcrumb.vue'
-import ChatMessages from '@/components/chat/ChatMessages.vue'
-import ChatComposer from '@/components/chat/ChatComposer.vue'
+import ChatPanel from '@/components/chat/ChatPanel.vue'
 
 const chatStore = useChatStore()
 
-const connected = computed(() => chatStore.socketStatus === SOCKET_STATUS.OPEN)
-const connecting = computed(() => chatStore.socketStatus === SOCKET_STATUS.CONNECTING)
-
 onMounted(async () => {
-  chatStore.viewing = true
+  chatStore.chatPageActive = true
   await chatStore.loadHistory()
   chatStore.ensureConnected()
 })
 onBeforeUnmount(() => {
-  chatStore.viewing = false
+  chatStore.chatPageActive = false
 })
 </script>
 
@@ -63,16 +52,6 @@ onBeforeUnmount(() => {
   font-weight: 400;
   margin-left: 8px;
 }
-.conn-hint {
-  margin-top: 8px;
-  font-size: 12px;
-}
-.conn-hint.ok {
-  color: #67c23a;
-}
-.conn-hint.bad {
-  color: #f56c6c;
-}
 
 @media (max-width: 768px) {
   .chat-box {
@@ -86,10 +65,6 @@ onBeforeUnmount(() => {
   }
   .online-hint {
     display: none;
-  }
-  .conn-hint {
-    font-size: 11px;
-    margin-top: 6px;
   }
 }
 </style>
