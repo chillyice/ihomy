@@ -114,7 +114,7 @@
       </el-radio-group>
       <el-form label-position="top">
         <el-form-item v-if="importMode === 'file'" :label="$t('games.file')">
-          <input ref="fileInput" type="file" accept=".swf,.gba" class="game-file-input" @change="onFilePicked" />
+          <input ref="fileInput" type="file" :accept="importFileAccept" class="game-file-input" @change="onFilePicked" />
         </el-form-item>
         <el-form-item v-else :label="$t('games.url')">
           <el-input v-model="importForm.url" maxlength="500" :placeholder="$t('games.urlPlaceholder')" clearable />
@@ -221,11 +221,15 @@ import { gameApi } from '@/api'
 import { dictText } from '@/utils/dict'
 import { useUserStore } from '@/stores/user'
 import { GAME_CATEGORIES, countGameCategories, inGameCategory, normalizeGameCategory } from '@/utils/games/gameCategory'
+import { importAccept, typeForFile, typeLabel } from '@/utils/games/emulatorSystems'
 import { UNSERIES, inGameSeries, normalizeGameSeries, seriesOptionsOf } from '@/utils/games/gameSeries'
 
 const router = useRouter()
 const { t } = useI18n()
 const userStore = useUserStore()
+
+/** 导入文件选择器接受的格式:.swf + 全部模拟器 ROM(与后端 GameSystem 同口径) */
+const importFileAccept = importAccept()
 
 /** 保险箱写权限(新增条目要 vault:manage);没有权限就不显示「存入保险箱」,避免点了白跑 */
 const canVault = computed(() => userStore.isOwner || userStore.hasPerm('vault:manage'))
@@ -356,7 +360,7 @@ const autoClassify = async () => {
   }
 }
 
-const typeText = (g) => (g.type === 'LINK' ? t('games.typeLink') : g.type)
+const typeText = (g) => (g.type === 'LINK' ? t('games.typeLink') : typeLabel(g.type) || g.type)
 
 const play = (g) => {
   // 网页游戏在站内嵌入打开(不跳走、不丢 ihomy 外壳);文件类游戏走播放器页
@@ -382,7 +386,7 @@ const onFilePicked = (e) => {
   if (!f) return
   importForm.file = f
   if (!importForm.name.trim()) {
-    importForm.name = f.name.replace(/\.(swf|gba)$/i, '')
+    importForm.name = f.name.replace(/\.[^.]+$/, '')
   }
   e.target.value = ''
 }
@@ -421,6 +425,10 @@ const submitImport = async () => {
   }
   if (!importForm.file) {
     ElMessage.warning(t('games.needFile'))
+    return
+  }
+  if (!typeForFile(importForm.file.name) && !/\.swf$/i.test(importForm.file.name)) {
+    ElMessage.warning(t('games.invalidFile'))
     return
   }
   if (!importForm.name.trim()) {

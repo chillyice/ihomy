@@ -4,7 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** GBA 存档文件:游戏目录 saves/ 下的一个文件 */
+/** 游戏存档文件:游戏目录 saves/ 下的一个文件 */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

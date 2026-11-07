@@ -3,8 +3,8 @@ package com.ihomy.common;
 import java.util.Set;
 
 /**
- * GBA 存档文件名:消毒 + 扩展名白名单。
- * 存档落在游戏目录下的 saves/,文件名来自模拟器(ROM 基名 + .srm),也接受手工放进目录的文件,
+ * 模拟器存档文件名:消毒 + 扩展名白名单。
+ * 存档落在游戏目录下的 saves/,文件名来自模拟器(ROM 基名 + srm/sav),也接受手工放进目录的文件,
  * 因此列表/上传/下载/删除所有入口都要过这里,禁止拿原始文件名直接拼路径。
  */
 public final class GameSaveName {
@@ -15,8 +15,8 @@ public final class GameSaveName {
     /** 允许的存档扩展名:电池存档(srm/sav)、即时存档(state) */
     private static final Set<String> EXTENSIONS = Set.of("srm", "sav", "state");
 
-    /** 单份存档上限(GBA 电池存档最大 128KB,留足余量) */
-    public static final long MAX_BYTES = 4L * 1024 * 1024;
+    /** 单份存档上限(GBA 电池存档最大 128KB、NDS 最大 8MB,留足余量) */
+    public static final long MAX_BYTES = 16L * 1024 * 1024;
 
     /** 文件名长度上限 */
     public static final int MAX_LENGTH = 120;

@@ -104,14 +104,14 @@ public class GameInfoController {
         return Result.success();
     }
 
-    @Operation(summary = "GBA 存档列表")
+    @Operation(summary = "游戏存档列表")
     @GetMapping("/{id}/saves")
     public Result<List<GameSaveDTO>> saves(@PathVariable Long id) {
         LoginUser user = current();
         return Result.success(gameService.listSaves(user.getFamilyId(), user.getUserId(), id));
     }
 
-    @Operation(summary = "下载 GBA 存档")
+    @Operation(summary = "下载游戏存档")
     @GetMapping("/{id}/saves/{name}")
     public ResponseEntity<Resource> downloadSave(@PathVariable Long id, @PathVariable String name) {
         LoginUser user = current();
@@ -129,14 +129,14 @@ public class GameInfoController {
     }
 
     /** 自动存档每 30 秒一次,属高频端点,不记操作日志(避免日志被存档同步刷满) */
-    @Operation(summary = "上传/覆盖 GBA 存档")
+    @Operation(summary = "上传/覆盖游戏存档")
     @PostMapping("/{id}/saves")
     public Result<GameSaveDTO> uploadSave(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
         LoginUser user = current();
         return Result.success(gameService.uploadSave(user.getFamilyId(), user.getUserId(), id, file));
     }
 
-    @Operation(summary = "删除 GBA 存档")
+    @Operation(summary = "删除游戏存档")
     @OperationLog(module = "GAME", operationType = "DELETE", description = "删除游戏存档")
     @DeleteMapping("/{id}/saves/{name}")
     public Result<Void> deleteSave(@PathVariable Long id, @PathVariable String name) {

@@ -157,8 +157,8 @@ const routes = [
   { path: '/tools/loan', name: 'LoanCalculator', component: () => import('@/views/tools/LoanCalculator.vue'), meta: { public: true } },
   // Flash 播放器(Ruffle):本地加载 .swf 怀旧小游戏
   { path: '/tools/flash', name: 'FlashPlayer', component: () => import('@/views/tools/FlashPlayer.vue'), meta: { public: true } },
-  // GBA 播放器(EmulatorJS):本地加载 .gba/.gbc/.gb 复古游戏
-  { path: '/tools/gba', name: 'GbaPlayer', component: () => import('@/views/games/GbaPlayer.vue'), meta: { public: true } },
+  // 模拟器播放器(EmulatorJS):本地打开 GBA/GB/GBC/NES/SNES/MD·GG/街机/NDS 的 ROM;机种按扩展名自动判定
+  { path: '/tools/gba', name: 'EmulatorPlayer', component: () => import('@/views/games/EmulatorPlayer.vue'), meta: { public: true } },
   // 植物养殖小游戏:全家共养一棵,营养/天气/积分/成长日志(需登录,涉及积分与家庭交互)
   { path: '/tools/plant', name: 'Plant', component: () => import('@/views/plant/Plant.vue'), meta: { requiresAuth: true } },
   // 小游戏:家庭游戏库(花园 + 导入的 swf 游戏),需登录

@@ -8,6 +8,7 @@ import com.ihomy.common.GameConst;
 import com.ihomy.common.GameLinkUrl;
 import com.ihomy.common.GameSaveName;
 import com.ihomy.common.GameSeries;
+import com.ihomy.common.GameSystem;
 import com.ihomy.common.ResultCode;
 import com.ihomy.common.PointsRuleConst;
 import com.ihomy.dto.GameInfoDTO;
@@ -31,10 +32,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 家庭小游戏业务:导入 .swf(存 games/{游戏名}/)与 .gba、添加外部网页游戏(LINK)、列表/详情/改名/改描述/删除,家庭隔离。
- * 仅支持 SWF/GBA 两种文件导入类型(.gbc/.gb 仅前端本地模式播放,不入库);LINK 类型只存外链,由站内网页游戏页 iframe 打开。
+ * 家庭小游戏业务:导入 .swf(存 games/{游戏名}/)与模拟器 ROM(机种码见 GameSystem)、添加外部网页游戏(LINK)、列表/详情/改名/改描述/删除,家庭隔离。
+ * 文件型游戏按扩展名判定机种(GBA/GB/NES/SNES/SEGA/ARCADE/NDS),扩机种只加 GameSystem 映射与前端注册表;LINK 类型只存外链,由站内网页游戏页 iframe 打开。
  * 分类(category)是固定枚举,系列(series)是自由文本:手动优先,留空时按名称自动归类,并可批量归类存量未归类的游戏。
- * 改名不移动物理文件夹(文件夹名在导入时固定)。GBA 存档落在游戏目录下的 saves/(模拟器自动同步),
+ * 改名不移动物理文件夹(文件夹名在导入时固定)。有电池存档的机种把存档写进游戏目录下的 saves/(模拟器自动同步),
  * 删游戏连带清存档;LINK 游戏无文件,删除不动磁盘。
  */
 @Service
@@ -62,15 +63,10 @@ public class GameInfoService {
         if (file == null || file.isEmpty()) {
             throw new BizException(ResultCode.BAD_REQUEST, "请选择要导入的游戏文件");
         }
-        String original = file.getOriginalFilename();
-        String lower = original != null ? original.toLowerCase() : "";
-        String type;
-        if (lower.endsWith(GameConst.SWF_EXTENSION)) {
-            type = GameConst.TYPE_SWF;
-        } else if (lower.endsWith(GameConst.GBA_EXTENSION)) {
-            type = GameConst.TYPE_GBA;
-        } else {
-            throw new BizException(ResultCode.BAD_REQUEST, "仅支持导入 .swf 或 .gba 文件");
+        String type = GameSystem.typeForName(file.getOriginalFilename());
+        if (type == null) {
+            throw new BizException(ResultCode.BAD_REQUEST,
+                    "仅支持导入 .swf 或模拟器 ROM(" + GameSystem.importHint() + ")");
         }
         String url = fileService.uploadGame(file, cleanName);
         GameInfo g = new GameInfo();
@@ -163,9 +159,9 @@ public class GameInfoService {
         return updated;
     }
 
-    /** GBA 存档列表:只列当前成员自己的存档,按最后修改时间倒序 */
+    /** 游戏存档列表:只列当前成员自己的存档,按最后修改时间倒序 */
     public List<GameSaveDTO> listSaves(Long familyId, Long userId, Long id) {
-        GameInfo g = requireGba(familyId, id);
+        GameInfo g = requireSavable(familyId, id);
         Path dir = fileService.gameDirectory(g.getFileUrl());
         if (dir == null) return List.of();
         fileService.migrateLegacyGameSaves(dir, g.getUserId());
@@ -174,7 +170,7 @@ public class GameInfoService {
 
     /** 上传/覆盖存档:文件名取客户端(模拟器)的存档名,消毒 + 扩展名白名单后落到当前成员的 saves/u{id}/ */
     public GameSaveDTO uploadSave(Long familyId, Long userId, Long id, MultipartFile file) {
-        GameInfo g = requireGba(familyId, id);
+        GameInfo g = requireSavable(familyId, id);
         if (file == null || file.isEmpty()) {
             throw new BizException(ResultCode.BAD_REQUEST, "存档文件为空");
         }
@@ -193,7 +189,7 @@ public class GameInfoService {
 
     /** 当前成员的存档文件路径(下载用),不存在 404 */
     public Path saveFile(Long familyId, Long userId, Long id, String name) {
-        GameInfo g = requireGba(familyId, id);
+        GameInfo g = requireSavable(familyId, id);
         Path dir = fileService.gameDirectory(g.getFileUrl());
         if (dir == null) throw new BizException(ResultCode.NOT_FOUND);
         fileService.migrateLegacyGameSaves(dir, g.getUserId());
@@ -204,7 +200,7 @@ public class GameInfoService {
 
     /** 删除当前成员的存档文件,不存在 404 */
     public void deleteSave(Long familyId, Long userId, Long id, String name) {
-        GameInfo g = requireGba(familyId, id);
+        GameInfo g = requireSavable(familyId, id);
         Path dir = fileService.gameDirectory(g.getFileUrl());
         if (dir == null) throw new BizException(ResultCode.NOT_FOUND);
         fileService.migrateLegacyGameSaves(dir, g.getUserId());
@@ -330,11 +326,11 @@ public class GameInfoService {
         return g;
     }
 
-    /** 存档只属于 GBA 游戏(SWF 是小游戏文件,没有模拟器存档) */
-    private GameInfo requireGba(Long familyId, Long id) {
+    /** 存档只属于有电池存档的模拟器机种(街机无 SRAM,SWF/LINK 也不是模拟器) */
+    private GameInfo requireSavable(Long familyId, Long id) {
         GameInfo g = require(familyId, id);
-        if (!GameConst.TYPE_GBA.equals(g.getType())) {
-            throw new BizException(ResultCode.BAD_REQUEST, "只有 GBA 游戏有存档");
+        if (!GameSystem.hasSave(g.getType())) {
+            throw new BizException(ResultCode.BAD_REQUEST, "该游戏没有存档");
         }
         return g;
     }

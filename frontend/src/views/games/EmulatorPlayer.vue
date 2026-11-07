@@ -1,4 +1,5 @@
-<!-- GBA 播放器(EmulatorJS + mGBA 核心):本地加载 .gba(不托管/不分发)或按 src 加载已导入的游戏;支持全屏。 -->
+<!-- 模拟器播放器(EmulatorJS):按机种加载 GBA/GB/GBC/NES/SNES/MD·GG/街机/NDS 核心;
+     本地打开 ROM(不托管/不分发)或按 src 播放已导入的游戏;支持全屏与云端存档。 -->
 <template>
   <div class="page">
     <PageToolbar root-class="game-topbar" :holder-margin="0" always>
@@ -27,11 +28,12 @@
       >
         <div class="drop-icon">🎮</div>
         <div class="drop-title">{{ $t('gba.dropTitle') }}</div>
-        <div class="drop-sub">{{ $t('gba.dropSub') }}</div>
+        <div class="drop-sub">{{ $t('gba.dropSub', { systems: systemList }) }}</div>
       </div>
 
       <template v-else>
         <div class="gba-bar">
+          <span v-if="systemLabel" class="gba-sys">{{ systemLabel }}</span>
           <span class="gba-name">{{ fileName }}</span>
           <el-popover
             v-if="cloudSave"
@@ -63,7 +65,7 @@
         </div>
         <div ref="consoleEl" class="gba-console" :class="{ 'gba-console--pad': padLayout }" :style="{ '--gba-aspect': screenAspect }">
           <!-- 竖屏触屏:手柄拆到屏幕上方(肩键)与下方(方向键/AB/Start·Select),像一个真正的掌机 -->
-          <div v-if="padLayout" class="gba-pad-row gba-pad-row--top">
+          <div v-if="padLayout && showShoulder" class="gba-pad-row gba-pad-row--top">
             <button
               type="button"
               class="gba-pad-shoulder"
@@ -167,7 +169,7 @@
       <div v-if="loading" class="gba-status">{{ $t('gba.loading') }}</div>
       <div v-if="error" class="gba-status error">{{ error }}</div>
 
-      <input v-if="!src" ref="fileInput" type="file" accept=".gba,.gbc,.gb" class="hidden-input" @change="onPick" />
+      <input v-if="!src" ref="fileInput" type="file" :accept="romAccept" class="hidden-input" @change="onPick" />
     </div>
   </div>
 </template>
@@ -183,11 +185,14 @@ import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { formatDateTime } from '@/utils/datetime'
 import { gameApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { emulatorAccept, emulatorSystemsText, systemOf, typeForFile, typeLabel } from '@/utils/games/emulatorSystems'
 
 const props = defineProps({
   src: { type: String, default: '' },
   title: { type: String, default: '' },
   backTo: { type: String, default: '' },
+  // 已导入游戏的机种码(GBA/GB/NES/SNES/SEGA/ARCADE/NDS);工具箱本地模式按文件扩展名自动判定
+  system: { type: String, default: 'GBA' },
   // 已导入游戏的 id:带上它才启用「游戏目录 saves/」云端存档(工具箱本地模式没有游戏目录)
   gameId: { type: [Number, String], default: null },
 })
@@ -212,7 +217,16 @@ const isFullscreen = ref(false)
 let objectUrl = null
 let loadFallbackTimer = null
 
-// —— 竖屏机身布局:触屏 + 竖屏时隐藏 EmulatorJS 自带的悬浮手柄,改用屏幕上下两排实体感按键 ——
+// 本地打开时按扩展名判定的机种(已导入游戏直接用 props.system)
+const localSystem = ref('')
+const effectiveType = computed(() => (props.src ? props.system : localSystem.value) || 'GBA')
+const systemInfo = computed(() => systemOf(effectiveType.value) || systemOf('GBA'))
+const systemLabel = computed(() => typeLabel(effectiveType.value))
+const romAccept = emulatorAccept()
+const systemList = emulatorSystemsText()
+
+// —— 竖屏机身布局:触屏 + 竖屏 + 该机种键位能装进机身(见 emulatorSystems 的 pad)时,
+// 隐藏 EmulatorJS 自带的悬浮手柄,改用屏幕上下两排实体感按键 ——
 // 按键值(RetroArch 手柄编号,mGBA 与 EJS 的 GBA 预设一致):B=0 / Select=2 / Start=3 / 上下左右=4~7 / A=8 / L=10 / R=11
 const PAD_INPUT = { up: 4, down: 5, left: 6, right: 7, select: 2, start: 3, a: 8, b: 0, l: 10, r: 11 }
 const PAD_DIRS = ['up', 'down', 'left', 'right']
@@ -224,10 +238,12 @@ const dpadDown = reactive({ up: false, down: false, left: false, right: false })
 const dpadEl = ref(null)
 let dpadPointerId = null
 
-// 是否用「掌机机身」布局:触屏且竖屏。桌面/横屏保持 EJS 原有悬浮手柄,不改变既有操作习惯。
+// 是否用「掌机机身」布局:触屏 + 竖屏 + 该机种键位与机身一致(GB/NES 同 GBA 的 AB+Start/Select,SNES 起回退 EJS 悬浮手柄)。
 const isTouch = ref(false)
 const isPortrait = ref(false)
-const padLayout = computed(() => isTouch.value && isPortrait.value)
+const padLayout = computed(() => isTouch.value && isPortrait.value && !!systemInfo.value?.pad)
+// GBA 才有 L/R 肩键;GB 与 NES 的机身不画肩键
+const showShoulder = computed(() => effectiveType.value === 'GBA')
 
 const refreshViewport = () => {
   isTouch.value = (navigator.maxTouchPoints || 0) > 0 || !!window.matchMedia?.('(any-pointer: coarse)').matches
@@ -370,7 +386,7 @@ watch(padLayout, () => releaseAllPad())
 // 核心加载 ROM 读 SRAM 时就已经是新档——换设备/清站点数据后的第一次打开也能接着上次的进度。
 // 运行中每 30s、切后台、离开页面前把当前存档回写到服务端;本地 IndexedDB 只作断网兜底。
 const SYNC_INTERVAL = 30000
-const cloudSave = computed(() => props.gameId !== null && props.gameId !== '')
+const cloudSave = computed(() => props.gameId !== null && props.gameId !== '' && !!systemInfo.value?.saveExt)
 const saves = ref([])
 const savesLoading = ref(false)
 const savesOpen = ref(false)
@@ -439,9 +455,10 @@ const pushSave = async (bytes, name) => {
 const prefetchServerSave = async () => {
   pendingServerSave = null
   if (!cloudSave.value) return
+  const ext = systemInfo.value.saveExt
   try {
     const list = await gameApi.listSaves(props.gameId)
-    const latest = list.find((s) => /\.(srm|sav)$/i.test(s.name))
+    const latest = list.find((s) => s.name.toLowerCase().endsWith('.' + ext))
     if (!latest) return
     const buffer = await gameApi.downloadSave(props.gameId, latest.name)
     const bytes = new Uint8Array(buffer)
@@ -451,8 +468,15 @@ const prefetchServerSave = async () => {
   }
 }
 
-// ROM 文件名去扩展名 = 核心电池存档的基名;核心在 ROM 加载前拿不到 getSaveFilePath,只能按同一规则推导
+// ROM 文件名去扩展名 = 核心电池存档的基名;核心就绪前拿不到 getSaveFilePath 时按机种注册表推导
+// (saveDir 是核心在 FS 里的存档目录名,各核心不同:mGBA/Gambatte/FCEUmm/Snes9x/Genesis Plus GX/melonDS)
 const guessSavePath = () => {
+  try {
+    const actual = gameManager()?.getSaveFilePath?.()
+    if (actual && /^\/data\/saves\/[^/]+\/.+\.[a-z0-9]+$/i.test(actual)) return actual
+  } catch (e) {
+    /* 核心未初始化:退回推导路径 */
+  }
   const raw = props.src.split('/').pop() || ''
   const base = raw.split('?')[0].split('#')[0]
   let name = base
@@ -461,7 +485,8 @@ const guessSavePath = () => {
   } catch (e) {
     /* 保持原样 */
   }
-  return `/data/saves/mGBA/${name.replace(/\.[^.]+$/, '')}.srm`
+  const info = systemInfo.value
+  return `/data/saves/${info.saveDir}/${name.replace(/\.[^.]+$/, '')}.${info.saveExt}`
 }
 
 // 存档库挂载完(EJS 在挂载 IDBFS 后、加载 ROM 前触发):此刻写进 FS 的存档会被核心读进 SRAM
@@ -681,7 +706,7 @@ const loadRom = async (romUrl) => {
 
     // 设置 EmulatorJS 全局配置(必须在注入 loader.js 前就位;loader.js 读取后 new EmulatorJS 启动)
     window.EJS_player = '#' + playerId
-    window.EJS_core = 'gba'
+    window.EJS_core = systemInfo.value.core
     window.EJS_gameUrl = romUrl
     window.EJS_pathtodata = '/emulatorjs/data/'
     window.EJS_startOnLoaded = true
@@ -723,10 +748,12 @@ const loadRom = async (romUrl) => {
 
 const playFile = async (file) => {
   if (!file) return
-  if (!/\.(gba|gbc|gb)$/i.test(file.name)) {
+  const type = typeForFile(file.name)
+  if (!type) {
     ElMessage.warning(t('gba.invalidType'))
     return
   }
+  localSystem.value = type
   fileName.value = file.name
   if (objectUrl) URL.revokeObjectURL(objectUrl) // 释放上一个本地 ROM 的 blob URL
   objectUrl = URL.createObjectURL(file)
@@ -808,6 +835,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* 类名沿用历史 gba- 前缀:同一个播放器承载所有机种,不按机种另起前缀,新增样式请沿用 */
 .gba-card {
   padding: 24px;
 }
@@ -847,6 +875,16 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 12px;
   margin-bottom: 14px;
+}
+.gba-sys {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text-secondary, #888);
+  border: 1px solid rgba(0, 0, 0, 0.12);
 }
 .gba-name {
   flex: 1;

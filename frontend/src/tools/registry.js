@@ -433,7 +433,7 @@ export const TOOL_REGISTRY = [
     descKey: 'tools.gba.desc',
     category: 'fun',
     tagKey: 'tools.tags.localPlay',
-    keywords: ['gba', 'gbc', 'emu', 'emulator', '小游戏'],
+    keywords: ['gba', 'gb', 'gbc', 'nes', 'snes', 'sega', 'md', 'arcade', 'nds', 'emu', 'emulator', '模拟器', '小游戏'],
     version: '1.0.0',
     runtime: 'main',
     platforms: ['web'],

@@ -1,5 +1,12 @@
 <template>
-  <GbaPlayer v-if="game && game.type === 'GBA'" :src="game.fileUrl" :title="game.name" :game-id="game.id" back-to="/games" />
+  <EmulatorPlayer
+    v-if="game && isEmulatorType(game.type)"
+    :src="game.fileUrl"
+    :title="game.name"
+    :game-id="game.id"
+    :system="game.type"
+    back-to="/games"
+  />
   <FlashPlayer v-else-if="game && game.type !== 'LINK'" :src="game.fileUrl" :title="game.name" back-to="/games" />
 </template>
 
@@ -7,7 +14,8 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import FlashPlayer from '@/views/tools/FlashPlayer.vue'
-import GbaPlayer from '@/views/games/GbaPlayer.vue'
+import EmulatorPlayer from '@/views/games/EmulatorPlayer.vue'
+import { isEmulatorType } from '@/utils/games/emulatorSystems'
 import { gameApi } from '@/api'
 
 const route = useRoute()
