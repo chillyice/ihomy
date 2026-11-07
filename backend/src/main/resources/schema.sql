@@ -2809,3 +2809,31 @@ CREATE TABLE `family_loan_repay` (
   UNIQUE KEY `uk_loan_period` (`loan_id`, `period`),
   KEY `idx_family_account` (`family_id`, `account_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='贷款还款记账台账(按期次幂等生成记账支出)';
+
+-- ------------------------------------------------------------
+-- 75. family_game_match 家庭游戏对战(V11.55 聊天室增强 P4)
+--     同种子赛(ASYNC_SEED:2048,双方同一 seed 各自打完上报)与实时对战(REALTIME:贪吃蛇,
+--     WS game-signal 输入级同步);结算幂等:同一用户重复 finish 不覆盖首报成绩。
+--     胜者按双方已报成绩在第二人 finish 时判定;积分走 family_points_rule(game_match_win)。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_game_match`;
+CREATE TABLE `family_game_match` (
+  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`  BIGINT      NOT NULL COMMENT '所属家庭ID',
+  `game_code`  VARCHAR(32) NOT NULL COMMENT '游戏code(game_2048/game_snake,见 GameConst.H5_GAME_CODES)',
+  `mode`       VARCHAR(20) NOT NULL COMMENT '赛制: ASYNC_SEED同种子赛/REALTIME实时对战',
+  `seed`       BIGINT      NOT NULL DEFAULT 0 COMMENT '随机种子(ASYNC_SEED/REALTIME 共用,保证双端可重放)',
+  `host_id`    BIGINT      NOT NULL COMMENT '发起人ID',
+  `guest_id`   BIGINT      DEFAULT NULL COMMENT '对手ID(join 后填)',
+  `status`     VARCHAR(20) NOT NULL DEFAULT 'WAITING' COMMENT '状态: WAITING待加入/PLAYING进行中/FINISHED已结束/CANCELLED已取消',
+  `host_score` BIGINT      DEFAULT NULL COMMENT '发起人成绩(NULL=未上报)',
+  `guest_score` BIGINT     DEFAULT NULL COMMENT '对手成绩(NULL=未上报)',
+  `winner_id`  BIGINT      DEFAULT NULL COMMENT '胜者ID(平局为 NULL)',
+  `result_json` TEXT       DEFAULT NULL COMMENT '结算明细(JSON,预留)',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted`    TINYINT     NOT NULL DEFAULT 0 COMMENT '软删:0正常 1删除',
+  PRIMARY KEY (`id`),
+  KEY `idx_family_status` (`family_id`, `deleted`, `status`, `id`),
+  KEY `idx_guest` (`guest_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭游戏对战(同种子赛/实时对战)';

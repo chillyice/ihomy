@@ -28,6 +28,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     private final ChatService chatService;
+    private final com.ihomy.service.GameMatchService matchService;
     private final ObjectMapper objectMapper;
 
     /** 房间表:familyId -> 在线会话集合(会话自带 userId/familyId 属性) */
@@ -73,6 +74,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                 case "ping" -> reply(session, Map.of("type", "pong"));
                 case "message" -> onChatMessage(session, familyId, userId, data);
                 case "call-signal" -> onCallSignal(session, familyId, userId, data);
+                case "game-signal" -> onGameSignal(session, familyId, userId, data);
                 default -> replyError(session, "BAD_TYPE");
             }
         } catch (Exception e) {
@@ -140,6 +142,32 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         replyError(session, "BAD_SIGNAL");
     }
 
+    /**
+     * 对战信令(实时对战输入级同步):1v1 即「转发给对端」——按 matchId 找对局,
+     * 发给除发送者外的另一方(host/guest);不在线不补发,由双方本地确定性模拟兜底。
+     */
+    private void onGameSignal(WebSocketSession session, Long familyId, Long userId, Map<?, ?> data) {
+        Long matchId = data.get("matchId") instanceof Number n ? n.longValue() : null;
+        String event = str(data.get("event"));
+        if (matchId == null || event == null || event.isBlank()) {
+            replyError(session, "BAD_SIGNAL");
+            return;
+        }
+        com.ihomy.entity.GameMatch m = matchService.participantMatch(userId, familyId, matchId);
+        if (m == null) {
+            replyError(session, "BAD_SIGNAL");
+            return;
+        }
+        Long other = userId.equals(m.getHostId()) ? m.getGuestId() : m.getHostId();
+        if (other == null) {
+            return;
+        }
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        data.forEach((k, v) -> out.put(String.valueOf(k), v));
+        out.put("from", userId);
+        sendToUser(other, "game-signal", out);
+    }
+
     /** 广播给同房间全部在线会话 */
     private void broadcast(Long familyId, Map<String, Object> envelope) {
         Set<WebSocketSession> room = rooms.get(familyId);
@@ -152,6 +180,11 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                 sendQuietly(s, msg);
             }
         }
+    }
+
+    /** REST 侧(对战邀请卡/结果卡等)复用同一 envelope 推送同房间在线成员 */
+    public void broadcastMessage(Long familyId, Map<String, Object> view) {
+        broadcast(familyId, envelope("message", view));
     }
 
     /** 单会话投递:IO 失败只记日志不中断循环(广播/定向共用,死会话由容器异步关闭回调摘除) */

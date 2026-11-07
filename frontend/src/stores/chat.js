@@ -11,6 +11,8 @@ import { useCallStore } from '@/stores/call'
 
 let socket = null
 let wired = false
+/** game-signal 页面级订阅(SnakeMatch 对战页);socket 重建后由新连接重新分发 */
+let gameSignalListeners = []
 
 /** 本地保留的消息条数上限(更早的靠 /chat/history 翻页) */
 const KEEP_MESSAGES = 200
@@ -58,6 +60,9 @@ export const useChatStore = defineStore('chat', {
       })
       s.on('message', (data) => this.onIncoming(data))
       s.on('call-signal', (data) => useCallStore().onSignal(data))
+      s.on('game-signal', (data) => {
+        for (const fn of gameSignalListeners) fn(data)
+      })
       return s
     },
 
@@ -167,6 +172,14 @@ export const useChatStore = defineStore('chat', {
       return socket ? socket.send(data) : false
     },
 
+    /** 订阅 game-signal 下行(对战页),返回解绑函数 */
+    onGameSignal(fn) {
+      gameSignalListeners.push(fn)
+      return () => {
+        gameSignalListeners = gameSignalListeners.filter((f) => f !== fn)
+      }
+    },
+
     /** 登出/清场:断开连接并清空全部会话数据(防串号) */
     reset() {
       if (socket) {
@@ -180,6 +193,7 @@ export const useChatStore = defineStore('chat', {
       this.chatPageActive = false
       this.floatOpen = false
       this.hydrated = false
+      gameSignalListeners = []
     },
   },
 })

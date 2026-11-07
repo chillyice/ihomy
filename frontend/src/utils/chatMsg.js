@@ -10,7 +10,7 @@ export const MSG_TYPE = {
 }
 
 /** 站内对象卡可引用的对象类型 */
-export const CARD_OBJ_TYPES = ['ALBUM', 'PHOTO', 'VIDEO', 'BLOG', 'DIARY', 'BOOK', 'WISH']
+export const CARD_OBJ_TYPES = ['ALBUM', 'PHOTO', 'VIDEO', 'BLOG', 'DIARY', 'BOOK', 'WISH', 'MATCH']
 
 /** 八个 H5 小游戏:code 与后端 GameConst.H5_GAME_CODES 一致,route 为邀请卡跳转页 */
 export const H5_GAMES = [

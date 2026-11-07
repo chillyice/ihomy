@@ -187,6 +187,15 @@ const routes = [
   { path: '/games/tetris', name: 'Tetris', component: () => import('@/views/games/Tetris.vue'), meta: { requiresAuth: true } },
   // 贪吃蛇 H5(键盘/滑动/方向键,得分达标发积分),需登录
   { path: '/games/snake', name: 'Snake', component: () => import('@/views/games/Snake.vue'), meta: { requiresAuth: true } },
+  // 贪吃蛇 1v1 对战(实时,WS 输入同步)
+  {
+    path: '/games/snake/match/:id',
+    name: 'SnakeMatch',
+    component: () => import('@/views/games/SnakeMatch.vue'),
+    meta: { requiresAuth: true },
+  },
+  // 家庭对战详情(邀请卡/结果卡落点:查看比分/加入/开赛)
+  { path: '/games/match/:id', name: 'GameMatch', component: () => import('@/views/games/MatchDetail.vue'), meta: { requiresAuth: true } },
   // 运维管理页:仅 OPS 角色可访问
   { path: '/ops', name: 'Ops', component: () => import('@/views/ops/Ops.vue'), meta: { ops: true } },
   // 咔哒软件首页:独立下载页(托管在 ihomy 域名下),standalone 不套 ihomy 外壳

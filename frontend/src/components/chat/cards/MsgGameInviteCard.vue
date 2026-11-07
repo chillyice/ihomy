@@ -6,7 +6,10 @@
       <div class="invite-title">{{ gameName }}</div>
       <div class="invite-hint">{{ $t('chat.card.inviteHint', { name: msg.senderName || '' }) }}</div>
     </div>
-    <el-button v-if="game" type="primary" size="small" round @click="router.push(game.route)">
+    <el-button v-if="matchId" type="primary" size="small" round @click="router.push(`/games/match/${matchId}`)">
+      {{ $t('chat.card.openMatch') }}
+    </el-button>
+    <el-button v-else-if="game" type="primary" size="small" round @click="router.push(game.route)">
       {{ $t('chat.card.play') }}
     </el-button>
   </div>
@@ -28,6 +31,10 @@ const router = useRouter()
 const { t } = useI18n()
 const payload = computed(() => parsePayload(props.msg.payload) || {})
 const game = computed(() => gameByCode(payload.value.gameCode))
+const matchId = computed(() => {
+  const n = Number(payload.value.matchId)
+  return Number.isFinite(n) && n > 0 ? n : 0
+})
 const gameName = computed(() => {
   if (game.value) return t(game.value.nameKey)
   return props.msg.content || payload.value.gameCode || ''

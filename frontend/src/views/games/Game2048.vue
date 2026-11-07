@@ -12,7 +12,7 @@
 
     <div ref="gameCardEl" class="bf-card game-surface" @contextmenu.prevent @dblclick.prevent>
       <div class="bf-head">
-        <div class="bf-title">2048</div>
+        <div class="bf-title">2048{{ matchId ? ' · ' + $t('games.match.tag') : '' }}</div>
         <div class="bf-scores">
           <div class="bf-score-box">
             <span class="bf-score-label">{{ $t('games.g2048.score') }}</span>
@@ -26,11 +26,18 @@
       </div>
 
       <div class="bf-actions">
-        <el-select v-model="size" size="small" class="bf-size-select" :teleported="!isFullscreen" @change="switchSize">
+        <el-select v-if="!matchId" v-model="size" size="small" class="bf-size-select" :teleported="!isFullscreen" @change="switchSize">
           <el-option v-for="s in BOARD_SIZES" :key="s" :value="s" :label="s + '×' + s" />
         </el-select>
-        <el-button size="small" round @click="startNew">{{ $t('games.g2048.newGame') }}</el-button>
-        <el-button size="small" round :disabled="!history.length" @click="undo">{{ $t('games.g2048.undo') }}</el-button>
+        <el-button v-if="!matchId" size="small" round @click="startNew">{{ $t('games.g2048.newGame') }}</el-button>
+        <el-button v-if="!matchId" size="small" round :disabled="!history.length" @click="undo">{{ $t('games.g2048.undo') }}</el-button>
+      </div>
+
+      <!-- 对战横幅:同种子赛,对手信息与结算结果 -->
+      <div v-if="matchId" class="match-banner">
+        <span>{{ $t('games.match.vs', { opponent: opponentName }) }}</span>
+        <span class="match-state">{{ matchStateText }}</span>
+        <span v-if="matchResultText" class="match-result">{{ matchResultText }}</span>
       </div>
 
       <div class="bf-board" :class="'bf-size-' + size" @touchstart="onTouchStart" @touchend="onTouchEnd">
@@ -78,19 +85,73 @@
 // 2048:经典数字合并小游戏。移动/合并/落子/胜负全在 utils/games/game2048.js(纯函数,单测覆盖),
 // 本页负责方块定位与动画、键盘/滑动输入、最高分与本局进度存档;达成 2048 按积分规则发奖励。
 // 列宽模式 4~8 各自独立存档与最高分;4 列沿用旧键,老玩家的进度与最高分不丢。
-import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { gameApi } from '@/api'
+import { gameApi, matchApi } from '@/api'
+import { useUserStore } from '@/stores/user'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import PageToolbar from '@/components/PageToolbar.vue'
 import GameTopActions from '@/components/games/GameTopActions.vue'
 import { useGameView } from '@/composables/useGameView'
 import { BOARD_SIZES, createGame, hasWon, isGameOver, isValidTiles, move, spawnTile } from '@/utils/games/game2048'
+import { seededRng } from '@/utils/games/seededRng'
 
 const { t } = useI18n()
+const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const sunLight = inject(SUN_LIGHT_KEY, null)
+
+// ---------- 对战模式(?match=<id>):同种子赛,禁存档/撤销/列宽/奖励,终局自动上报 ----------
+const matchId = computed(() => Number(route.query.match) || 0)
+const matchInfo = ref(null)
+const matchRng = ref(null)
+const matchResult = ref(null)
+const matchReported = ref(false)
+
+const opponentName = computed(() => {
+  const m = matchInfo.value
+  if (!m) return '?'
+  return userStore.userInfo?.id === m.hostId ? m.guestName : m.hostName
+})
+const matchStateText = computed(() => {
+  const m = matchInfo.value
+  if (!m) return ''
+  const key = {
+    WAITING: 'waiting',
+    PLAYING: 'playing',
+    FINISHED: 'finished',
+    CANCELLED: 'cancelled',
+  }
+  return t(`games.match.status.${key[m.status] || 'playing'}`)
+})
+const matchResultText = computed(() => {
+  const m = matchResult.value?.match || (matchInfo.value?.status === 'FINISHED' ? matchInfo.value : null)
+  if (!m || m.status !== 'FINISHED') return ''
+  const mine = userStore.userInfo?.id === m.hostId ? m.hostScore : m.guestScore
+  const other = userStore.userInfo?.id === m.hostId ? m.guestScore : m.hostScore
+  const awarded = matchResult.value?.awarded || 0
+  const win =
+    m.winnerId == null ? t('games.match.draw') : m.winnerId === userStore.userInfo?.id ? t('games.match.youWin') : t('games.match.youLose')
+  return `${mine} : ${other} · ${win}${awarded > 0 ? ' · +' + awarded : ''}`
+})
+
+const reportMatchScore = async () => {
+  if (!matchId.value || matchReported.value) return
+  matchReported.value = true
+  try {
+    const res = await matchApi.finish(matchId.value, score.value)
+    matchResult.value = res
+    matchInfo.value = res.match
+  } catch {
+    matchResult.value = null
+  }
+}
+
+watch(gameOver, (over) => {
+  if (over && matchId.value) reportMatchScore()
+})
 
 const MAX_HISTORY = 20
 
@@ -157,6 +218,7 @@ const saveBest = () => {
   }
 }
 const saveState = () => {
+  if (matchId.value) return
   try {
     localStorage.setItem(stateKey(), JSON.stringify({ tiles: tiles.value, score: score.value, achieved: achieved.value }))
   } catch (e) {
@@ -164,6 +226,7 @@ const saveState = () => {
   }
 }
 const clearState = () => {
+  if (matchId.value) return
   try {
     localStorage.removeItem(stateKey())
   } catch (e) {
@@ -171,6 +234,7 @@ const clearState = () => {
   }
 }
 const loadState = () => {
+  if (matchId.value) return null
   try {
     const raw = JSON.parse(localStorage.getItem(stateKey()) || 'null')
     if (!raw || !isValidTiles(raw.tiles, size.value) || !raw.tiles.length) return null
@@ -183,7 +247,9 @@ const loadState = () => {
 
 // ---------- 游戏流程 ----------
 const startNew = () => {
-  tiles.value = createGame(Math.random, size.value)
+  // 对战模式:从对战 seed 重建随机序列(首只方块即由该链生成)
+  matchRng.value = matchId.value ? seededRng(matchInfo.value?.seed ?? 0) : null
+  tiles.value = createGame(matchRng.value ?? Math.random, size.value)
   score.value = 0
   achieved.value = false
   won.value = false
@@ -233,7 +299,7 @@ const tryMove = (direction) => {
   score.value += res.gained
   flash(mergedIds, res.mergedIds)
 
-  const spawned = spawnTile(tiles.value, Math.random, size.value)
+  const spawned = spawnTile(tiles.value, matchRng.value ?? Math.random, size.value)
   if (spawned) {
     tiles.value = [...tiles.value, spawned]
     flash(newIds, [spawned.id])
@@ -253,7 +319,7 @@ const tryMove = (direction) => {
 }
 
 const undo = () => {
-  if (won.value || !history.value.length) return
+  if (won.value || matchId.value || !history.value.length) return
   const last = history.value.pop()
   tiles.value = last.tiles
   score.value = last.score
@@ -262,6 +328,7 @@ const undo = () => {
 }
 
 const grantReward = async () => {
+  if (matchId.value) return
   try {
     const res = await gameApi.game2048Reward()
     rewardMsg.value =
@@ -315,10 +382,21 @@ const onTouchEnd = (event) => {
   tryMove(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up')
 }
 
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('keydown', onKeydown)
   sunLight?.suspendEffects()
   loadBest()
+
+  if (matchId.value) {
+    // 对战:拉详情(取 seed)后开同种子局;终局由 gameOver watch 自动上报
+    try {
+      matchInfo.value = await matchApi.get(matchId.value)
+    } catch {
+      matchInfo.value = null
+    }
+    startNew()
+    return
+  }
 
   const saved = loadState()
   if (saved) {
@@ -339,6 +417,26 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* 对战横幅 */
+.match-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  border: 1px dashed rgba(var(--color-brand-rgb), 0.4);
+  border-radius: 10px;
+  background: rgba(var(--color-brand-rgb), 0.06);
+  font-size: 13px;
+}
+.match-state {
+  color: var(--color-text-secondary, #888);
+}
+.match-result {
+  font-weight: 600;
+  color: var(--color-brand-text);
+}
 .bf-card {
   position: relative;
   display: flex;

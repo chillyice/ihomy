@@ -33,7 +33,7 @@ public class ChatService {
 
     /** 站内对象卡可引用的对象类型(P1 口径,与前端 utils/chatMsg.js 一致) */
     private static final java.util.Set<String> CARD_OBJ_TYPES =
-            java.util.Set.of("ALBUM", "PHOTO", "VIDEO", "BLOG", "DIARY", "BOOK", "WISH");
+            java.util.Set.of("ALBUM", "PHOTO", "VIDEO", "BLOG", "DIARY", "BOOK", "WISH", "MATCH");
 
     /** 取某家庭最近 limit 条消息(倒序取再翻正),附带发送人昵称 */
     public List<Map<String, Object>> history(Long familyId, Long beforeId, int limit) {

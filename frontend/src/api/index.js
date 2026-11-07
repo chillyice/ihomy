@@ -69,6 +69,16 @@ export const fileApi = {
   },
 }
 
+// 家庭游戏对战(同种子赛/实时对战;实时信令走 WS game-signal)
+export const matchApi = {
+  create: (data) => request.post('/game/match', data),
+  list: (params) => request.get('/game/match', { params }),
+  get: (id) => request.get(`/game/match/${id}`),
+  join: (id) => request.post(`/game/match/${id}/join`),
+  cancel: (id) => request.post(`/game/match/${id}/cancel`),
+  finish: (id, score) => request.post(`/game/match/${id}/finish`, { score }),
+}
+
 // 家庭成员、角色调整与邀请码(加入家庭统一走注册带邀请码或 /auth/join)
 export const memberApi = {
   list: () => request.get('/member/list'),
