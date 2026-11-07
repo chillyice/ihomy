@@ -73,6 +73,15 @@
                 />
               </svg>
             </button>
+            <!-- 分享到聊天室(登录可见;PRIVATE 照片拦截) -->
+            <button v-if="shareBase && userStore.isLoggedIn" class="pv-icon-btn" :title="t('chat.share.toChat')" @click="shareToChatRoom">
+              <svg viewBox="0 0 24 24" width="22" height="22">
+                <path
+                  d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H7v-2h11v2zm0-3H7V9h11v2zm0-3H7V6h11v2z"
+                  fill="currentColor"
+                />
+              </svg>
+            </button>
             <!-- 下载当前照片 -->
             <button class="pv-icon-btn" :title="t('photoViewer.download')" @click="download">
               <svg viewBox="0 0 24 24" width="22" height="22">
@@ -167,6 +176,8 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { shareId } from '@/utils/shareId'
+import { useUserStore } from '@/stores/user'
+import { shareToChat } from '@/utils/chatShare'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -177,6 +188,7 @@ const props = defineProps({
 const emit = defineEmits(['update:visible', 'close'])
 
 const { t } = useI18n()
+const userStore = useUserStore()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 
 const index = ref(0)
@@ -240,6 +252,24 @@ const copyShare = async () => {
   } catch {
     ElMessage.error(t('photoViewer.copyFailed'))
   }
+}
+
+// 分享到聊天室:PRIVATE 照片拦截(拍板 #4,不进家庭流),其余生成照片卡进草稿
+const shareToChatRoom = () => {
+  const p = current.value
+  if (!props.shareBase || !p?.id) return
+  if (p.visibility === 'PRIVATE') {
+    ElMessage.warning(t('chat.share.privateBlocked'))
+    return
+  }
+  shareToChat({
+    objType: 'PHOTO',
+    objId: p.id,
+    title: p.description || t('chat.share.photoTitle'),
+    sub: '',
+    url: `${props.shareBase}?p=${shareId(p.id)}`,
+    cover: p.url || '',
+  })
 }
 
 // 下载当前照片(同源静态文件,download 属性触发浏览器下载)

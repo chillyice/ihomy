@@ -31,10 +31,15 @@ import java.util.zip.GZIPInputStream;
  */
 public final class ThirdPartyHttp {
 
-    /** 响应:状态码 + 响应体字符串(非 2xx 也是错误流内容,便于排查) */
-    public record Resp(int status, String body) {
+    /** 响应:状态码 + 响应体字符串(非 2xx 也是错误流内容,便于排查);getCapped 附带重定向 Location 与 Content-Type */
+    public record Resp(int status, String body, String location, String contentType) {
         public boolean ok() {
             return status >= 200 && status < 300;
+        }
+
+        /** 兼容既有调用:无重定向/内容类型语义的响应 */
+        public Resp(int status, String body) {
+            this(status, body, null, null);
         }
     }
 
@@ -116,6 +121,55 @@ public final class ThirdPartyHttp {
     @FunctionalInterface
     public interface BodyWriter {
         void writeTo(OutputStream out) throws IOException;
+    }
+
+    /**
+     * 响应体封顶的 GET(不跟随重定向):超限截断到 maxBodyBytes,重定向由调用方逐跳校验后跟进
+     * (自动跟随会绕过调用方的 SSRF 逐跳检查)。用于抓取用户给的外部地址(如链接预览)。
+     * 重定向时返回该 3xx 响应,Location 头由调用方读 conn…改经 Resp.location() 提供。
+     */
+    public static Resp getCapped(String service, String url, Map<String, String> headers,
+                                 int timeoutMs, int maxBodyBytes) throws IOException {
+        var log = Loggers.thirdParty(service);
+        String maskedUrl = maskUrl(url);
+        long start = System.currentTimeMillis();
+        log.info(">>> GET {} headers={} capped={}B", maskedUrl, describeHeaders(headers), maxBodyBytes);
+        HttpURLConnection conn = null;
+        try {
+            URL u = URI.create(url).toURL();
+            conn = (HttpURLConnection) u.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(timeoutMs);
+            conn.setReadTimeout(timeoutMs);
+            conn.setInstanceFollowRedirects(false);
+            if (headers != null) {
+                headers.forEach(conn::setRequestProperty);
+            }
+            int status = conn.getResponseCode();
+            InputStream is = status >= 200 && status < 300 ? conn.getInputStream() : conn.getErrorStream();
+            String body = "";
+            if (is != null) {
+                if ("gzip".equalsIgnoreCase(conn.getContentEncoding())) {
+                    is = new GZIPInputStream(is);
+                }
+                // 只读 maxBodyBytes,超限即停,防止超大页把整包压进堆
+                byte[] buf = is.readNBytes(maxBodyBytes);
+                body = new String(buf, StandardCharsets.UTF_8);
+                is.close();
+            }
+            String location = status >= 300 && status < 400 ? conn.getHeaderField("Location") : null;
+            String contentType = conn.getContentType();
+            log.info("<<< GET {} status={} costMs={} bodyLen={}", maskedUrl, status,
+                    System.currentTimeMillis() - start, body.length());
+            return new Resp(status, body, location, contentType);
+        } catch (IOException e) {
+            log.error("!!! GET {} failed costMs={}", maskedUrl, System.currentTimeMillis() - start, e);
+            throw e;
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
     }
 
     /**

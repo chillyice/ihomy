@@ -146,6 +146,9 @@
             <div v-if="!batchMode" class="book-overlay">
               <button v-if="canReadOnline(b)" class="ovl-btn primary" @click.stop="openReader(b)">{{ $t('library.read') }}</button>
               <button class="ovl-btn" @click.stop="openDetail(b)">{{ $t('library.viewDetail') }}</button>
+              <button v-if="userStore.isLoggedIn && b.visibility !== 'PRIVATE'" class="ovl-btn" @click.stop="shareBookToChat(b)">
+                {{ $t('chat.share.toChat') }}
+              </button>
               <template v-if="userStore.isLoggedIn && canEdit(b)">
                 <button class="ovl-btn" @click.stop="moveCategory(b)">{{ $t('library.moveCategory') }}</button>
                 <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
@@ -284,11 +287,12 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Delete } from '@element-plus/icons-vue'
 import { libraryApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { shareToChat } from '@/utils/chatShare'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -297,6 +301,7 @@ import LibraryReader from './LibraryReader.vue'
 
 const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 const list = ref([])
 const loading = ref(false)
@@ -459,6 +464,19 @@ const openReader = (b) => {
   readerVisible.value = true
 }
 
+// 分享图书到聊天室:封面/作者快照,深链回书架并直接打开阅读器
+const shareBookToChat = (b) => {
+  if (!b?.id) return
+  shareToChat({
+    objType: 'BOOK',
+    objId: b.id,
+    title: b.title,
+    sub: b.author || '',
+    url: `/library?book=${b.id}`,
+    cover: b.coverUrl || '',
+  })
+}
+
 const onReadFromDetail = (book) => {
   detailVisible.value = false
   readerBook.value = book
@@ -540,9 +558,20 @@ const batchDeleteAction = async () => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   loadCategories()
-  load()
+  await load()
+  // 聊天图书卡深链:?book=<id> 直接打开阅读器(卡片点击落书架后无动作断裂);
+  // 直查详情,不受书架当前筛选影响
+  const bookId = Number(route.query.book)
+  if (bookId > 0) {
+    try {
+      const b = await libraryApi.detail(bookId)
+      if (b && b.visibility !== 'PRIVATE' && canReadOnline(b)) openReader(b)
+    } catch {
+      /* 书已删/无权限:落书架空态即可 */
+    }
+  }
 })
 </script>
 

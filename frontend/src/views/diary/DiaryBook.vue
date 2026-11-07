@@ -19,6 +19,7 @@
                 :no="pos * 2 + 1"
                 side="left"
                 :can-edit="canEdit(pages[pos * 2])"
+                shareable
                 @action="(a) => onAction(a, pages[pos * 2])"
               />
               <DiaryPage
@@ -26,6 +27,7 @@
                 :no="pos * 2 + 2"
                 side="right"
                 :can-edit="canEdit(pages[pos * 2 + 1])"
+                shareable
                 @action="(a) => onAction(a, pages[pos * 2 + 1])"
               />
             </template>
@@ -35,6 +37,7 @@
               :no="pos + 1"
               side="single"
               :can-edit="canEdit(pages[pos])"
+              shareable
               @action="(a) => onAction(a, pages[pos])"
             />
           </div>
@@ -119,6 +122,8 @@ import { diaryApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useDevice } from '@/composables/useDevice'
 import { LINES_PER_PAGE, PAGE_H, PAPER_W, measureDiaryLines } from '@/utils/diary'
+import { clipText } from '@/utils/chatMsg'
+import { shareToChat } from '@/utils/chatShare'
 import { parseDoodle, doodleExtentY } from '@/utils/doodle'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import DiaryPage from './DiaryPage.vue'
@@ -226,8 +231,25 @@ const jumpToEntry = (i) => {
   pos.value = isMobile.value ? idx : Math.floor(idx / 2)
 }
 
+// 分享当前日记页到聊天室:卡片段落快照,链接回作者日记本(单篇无独立路由)
+const shareDiaryToChat = (page) => {
+  if (!page?.e) return
+  shareToChat({
+    objType: 'DIARY',
+    objId: page.e.id,
+    title: clipText(page.e.content, 40) || t('chat.share.diaryTitle'),
+    sub: authorName.value,
+    url: `/diary/book/${route.params.authorId}`,
+    cover: '',
+  })
+}
+
 const onAction = async (action, page) => {
   if (!page || page.blank) return
+  if (action === 'chat-share') {
+    shareDiaryToChat(page)
+    return
+  }
   if (action === 'edit') {
     router.push(`/diary/edit/${page.e.id}`)
   } else if (action === 'delete') {

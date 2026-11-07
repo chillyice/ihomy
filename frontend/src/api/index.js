@@ -490,11 +490,12 @@ export const treeApi = {
   unlink: (params) => request.delete('/tree/relation', { params }),
 }
 
-// 聊天室(历史/未读/已读游标;实时走 WebSocket)
+// 聊天室(历史/未读/已读游标;实时走 WebSocket;unfurl 为站外链接预览)
 export const chatApi = {
   history: (params) => request.get('/chat/history', { params }),
   unread: () => request.get('/chat/unread'),
   read: (msgId) => request.post('/chat/read', { msgId }),
+  unfurl: (url) => request.post('/chat/unfurl', { url }),
 }
 
 // 存储管理(家庭级设备 + 文件浏览 + 目录映射同步)

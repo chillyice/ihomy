@@ -2,9 +2,11 @@ package com.ihomy.controller;
 
 import com.ihomy.common.Result;
 import com.ihomy.dto.ChatReadDTO;
+import com.ihomy.dto.ChatUnfurlDTO;
 import com.ihomy.security.LoginUser;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.ChatService;
+import com.ihomy.service.ChatUnfurlService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ import java.util.Map;
 public class ChatController {
 
     private final ChatService chatService;
+    private final ChatUnfurlService chatUnfurlService;
     private final SecurityHelper securityHelper;
 
     private LoginUser current() {
@@ -50,5 +53,16 @@ public class ChatController {
         LoginUser user = current();
         chatService.markRead(user.getUserId(), user.getFamilyId(), dto == null ? null : dto.getMsgId());
         return Result.success();
+    }
+
+    /**
+     * 站外链接预览(unfurl)。查询型 RPC 不落库,不加 @OperationLog(限流已防滥用);
+     * 抓取失败/内网地址等一律降级返回 preview=null,由前端发纯链接。
+     */
+    @Operation(summary = "站外链接预览")
+    @PostMapping("/unfurl")
+    public Result<Map<String, Object>> unfurl(@RequestBody @jakarta.validation.Valid ChatUnfurlDTO dto) {
+        LoginUser user = current();
+        return Result.success(chatUnfurlService.unfurl(user.getUserId(), dto == null ? null : dto.getUrl()));
     }
 }

@@ -25,6 +25,11 @@
               <el-tag v-else-if="detail.type === 'Series' && detail.unplayedCount" size="small" type="warning">
                 {{ $t('cinema.unplayedEpisodes', { n: detail.unplayedCount }) }}
               </el-tag>
+              <el-tooltip v-if="userStore.isLoggedIn" :content="$t('chat.share.toChat')" placement="top" :show-after="300">
+                <el-button text circle class="chat-share-btn" @click="shareToChatRoom">
+                  <el-icon><ChatDotRound /></el-icon>
+                </el-button>
+              </el-tooltip>
             </div>
             <div v-if="detail.originalTitle" class="original">{{ detail.originalTitle }}</div>
             <div class="facts">
@@ -122,7 +127,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { VideoPlay, Star } from '@element-plus/icons-vue'
+import { VideoPlay, Star, ChatDotRound } from '@element-plus/icons-vue'
 import { mediaApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
@@ -130,6 +135,7 @@ import Breadcrumb from '@/components/Breadcrumb.vue'
 import MediaPlayer from '@/components/MediaPlayer.vue'
 import AddToWishDialog from '@/components/wish/AddToWishDialog.vue'
 import { WISH_SOURCE_DEFAULT_CATEGORY } from '@/utils/wish'
+import { shareToChat } from '@/utils/chatShare'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -144,6 +150,20 @@ const player = ref({ visible: false, item: null })
 const wishOpen = ref(false)
 
 const itemId = computed(() => route.params.itemId)
+
+// 分享到聊天室:放映厅影片卡(标题/年份/海报快照,deep link 回本页)
+const shareToChatRoom = () => {
+  const d = detail.value
+  if (!d || !itemId.value) return
+  shareToChat({
+    objType: 'VIDEO',
+    objId: itemId.value,
+    title: d.name,
+    sub: d.year ? String(d.year) : '',
+    url: `/cinema/${itemId.value}`,
+    cover: d.imageUrl || '',
+  })
+}
 
 const currentEpisodes = computed(() => {
   const eps = detail.value?.episodes || []

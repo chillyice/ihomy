@@ -6,6 +6,7 @@ import { watch } from 'vue'
 import { chatApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { createChatSocket, SOCKET_STATUS } from '@/composables/useChatSocket'
+import { serializePayload } from '@/utils/chatMsg'
 
 let socket = null
 let wired = false
@@ -25,6 +26,8 @@ export const useChatStore = defineStore('chat', {
     viewing: false,
     /** 本次登录会话是否已拉过历史 */
     hydrated: false,
+    /** 待发送的富内容卡片(分享注入/站内选择/游戏邀请的预填草稿,{msgType,content,payload} 已是可发送形态) */
+    shareCard: null,
   }),
   actions: {
     /** 建连入口:已连接/连接中是幂等空转;登出态直接忽略 */
@@ -108,6 +111,38 @@ export const useChatStore = defineStore('chat', {
       const t = (text || '').trim()
       if (!t || t.length > 2000 || !socket) return false
       return socket.send({ type: 'message', data: { content: t } })
+    },
+
+    /**
+     * 发送富内容消息({msgType, content, payload});payload 传结构化对象,这里统一序列化。
+     * 返回 false 表示未发出(连接断开或负载非法),由调用方保留草稿提示重试。
+     */
+    sendContent({ msgType, content, payload }) {
+      if (!socket) return false
+      const data = { content: content == null ? '' : String(content), msgType: msgType || 'TEXT' }
+      if (payload) {
+        const s = serializePayload(payload)
+        if (!s) return false
+        data.payload = s
+      }
+      return socket.send({ type: 'message', data })
+    },
+
+    /**
+     * 分享注入点统一入口:各页面(照片/视频/日记/图书/放映厅)把要分享的对象卡放进草稿。
+     * P1(浮窗未上线):置草稿 + 提示去聊天室发送;/chat 进页自动预填。P2 起浮窗直接展开。
+     * card 形如 {objType, objId, title, sub, url, cover} 或 {msgType:'GAME_INVITE', ...}。
+     */
+    share(card) {
+      if (!card) return
+      this.shareCard = card
+    },
+
+    /** 聊天界面取走草稿(预填后清空,避免下次进页又冒出来) */
+    consumeShareCard() {
+      const c = this.shareCard
+      this.shareCard = null
+      return c
     },
 
     /** 进入聊天界面拉初始数据:未读游标 + 最新一页历史 */

@@ -20,15 +20,22 @@
             </div>
           </div>
         </div>
-        <div v-if="canEdit" class="head-actions">
-          <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
-            <el-button size="small" text @click.stop="$emit('action', 'edit')"
-              ><el-icon><Edit /></el-icon
-            ></el-button>
-          </el-tooltip>
-          <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
-            <el-button size="small" text type="danger" @click.stop="$emit('action', 'delete')"
-              ><el-icon><Delete /></el-icon
+        <div v-if="canEdit || shareable" class="head-actions">
+          <template v-if="canEdit">
+            <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
+              <el-button size="small" text @click.stop="$emit('action', 'edit')"
+                ><el-icon><Edit /></el-icon
+              ></el-button>
+            </el-tooltip>
+            <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+              <el-button size="small" text type="danger" @click.stop="$emit('action', 'delete')"
+                ><el-icon><Delete /></el-icon
+              ></el-button>
+            </el-tooltip>
+          </template>
+          <el-tooltip v-if="shareable" :content="$t('chat.share.toChat')" placement="top" :show-after="300">
+            <el-button size="small" text @click.stop="$emit('action', 'chat-share')"
+              ><el-icon><ChatDotRound /></el-icon
             ></el-button>
           </el-tooltip>
         </div>
@@ -64,12 +71,14 @@ import { computed, ref, watch, onMounted, nextTick } from 'vue'
 import { Edit, Delete } from '@element-plus/icons-vue'
 import { PAGE_H, moodLabel, weatherLabel } from '@/utils/diary'
 import { parseDoodle, doodleExtentY, renderStrokes, setupCanvas, clearCanvas } from '@/utils/doodle'
+import { ChatDotRound } from '@element-plus/icons-vue'
 
 const props = defineProps({
   page: { type: Object, required: true },
   no: { type: Number, default: 0 },
   side: { type: String, default: 'single' }, // left | right | single
   canEdit: { type: Boolean, default: false },
+  shareable: { type: Boolean, default: false }, // 是否显示「分享到聊天室」(日记本页 true,编辑预览 false)
 })
 defineEmits(['action'])
 

@@ -18,7 +18,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 聊天室业务:历史消息分页(含发送人昵称)、未读数、已读游标。
+ * 聊天室业务:历史消息分页(含发送人昵称)、未读数、已读游标、消息发送(分类型负载校验)。
  */
 @Slf4j
 @Service
@@ -28,6 +28,11 @@ public class ChatService {
     private final ChatMessageMapper messageMapper;
     private final ChatReadMapper readMapper;
     private final SysUserMapper sysUserMapper;
+    private final tools.jackson.databind.ObjectMapper objectMapper;
+
+    /** 站内对象卡可引用的对象类型(P1 口径,与前端 utils/chatMsg.js 一致) */
+    private static final java.util.Set<String> CARD_OBJ_TYPES =
+            java.util.Set.of("ALBUM", "PHOTO", "VIDEO", "BLOG", "DIARY", "BOOK", "WISH");
 
     /** 取某家庭最近 limit 条消息(倒序取再翻正),附带发送人昵称 */
     public List<Map<String, Object>> history(Long familyId, Long beforeId, int limit) {
@@ -93,34 +98,121 @@ public class ChatService {
      */
     public Map<String, Object> sendMessage(Long familyId, Long senderId, String msgType, String content, String payload) {
         String type = msgType == null || msgType.isBlank() ? com.ihomy.common.ChatMsgType.TEXT : msgType;
-        if (!com.ihomy.common.ChatMsgType.isKnown(type)) {
+        // CALL 只由通话流程(挂断/超时等)落库,用户不能直接发
+        if (!com.ihomy.common.ChatMsgType.isKnown(type) || com.ihomy.common.ChatMsgType.CALL.equals(type)) {
             throw new IllegalArgumentException("BAD_TYPE");
-        }
-        if (content == null || content.isBlank() || content.length() > 2000) {
-            throw new IllegalArgumentException("BAD_CONTENT");
-        }
-        if (com.ihomy.common.ChatMsgType.TEXT.equals(type)) {
-            // 文本消息不带结构化负载
-            if (payload != null && !payload.isBlank()) {
-                throw new IllegalArgumentException("BAD_PAYLOAD");
-            }
-        } else {
-            // 非文本类型 P0 暂未放开(P1 起按类型逐一启用 payload 校验)
-            throw new IllegalArgumentException("TYPE_NOT_SUPPORTED");
         }
         if (payload != null && payload.length() > PAYLOAD_MAX_BYTES) {
             throw new IllegalArgumentException("BAD_PAYLOAD");
         }
+        boolean text = com.ihomy.common.ChatMsgType.TEXT.equals(type);
+        if (text) {
+            // 文本消息:内容必填、不带结构化负载
+            if (content == null || content.isBlank() || content.length() > 2000) {
+                throw new IllegalArgumentException("BAD_CONTENT");
+            }
+            if (payload != null && !payload.isBlank()) {
+                throw new IllegalArgumentException("BAD_PAYLOAD");
+            }
+        } else {
+            validateRichPayload(type, content, payload);
+        }
         ChatMessage m = new ChatMessage();
         m.setFamilyId(familyId);
         m.setSenderId(senderId);
-        m.setContent(content);
+        m.setContent(content == null ? "" : content);
         m.setMsgType(type);
         m.setPayload(payload);
         // 应用侧写入发送时间:insert 后实体直接可广播(依赖 DB DEFAULT 回填的话实体里恒为 null)
         m.setCreatedAt(java.time.LocalDateTime.now());
         messageMapper.insert(m);
         return view(m);
+    }
+
+    /**
+     * 富内容消息的负载校验(P1 起按类型放开):
+     * payload 必须是 JSON 对象且字段符合该类型的 schema,违规一律 BAD_PAYLOAD。
+     * 各类型 schema(与前端 utils/chatMsg.js 同一口径):
+     * IMAGE  {url 必填 /files/ 开头, width?, height?};content=附言可空
+     * LINK   {title?, description?, image?, siteName?};content=URL 必填 http(s) 开头
+     * CARD   {objType 必填 ALBUM/PHOTO/VIDEO/BLOG/DIARY/BOOK/WISH, objId 数字, url 必填 / 开头, sub?, cover?};content=标题必填
+     * GAME_INVITE {gameCode 必填且属于 H5 小游戏全集};content=游戏名必填
+     */
+    private void validateRichPayload(String type, String content, String payload) {
+        boolean hasPayload = payload != null && !payload.isBlank();
+        Map<?, ?> p = Map.of();
+        if (hasPayload) {
+            try {
+                Object node = objectMapper.readValue(payload, Object.class);
+                if (!(node instanceof Map)) {
+                    throw new IllegalArgumentException("BAD_PAYLOAD");
+                }
+                p = (Map<?, ?>) node;
+            } catch (IllegalArgumentException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new IllegalArgumentException("BAD_PAYLOAD");
+            }
+        }
+        switch (type) {
+            case com.ihomy.common.ChatMsgType.IMAGE -> {
+                String url = strField(p.get("url"));
+                if (url == null || !url.startsWith("/files/") || url.length() > 1000) {
+                    throw new IllegalArgumentException("BAD_PAYLOAD");
+                }
+                if (p.get("width") != null && !(p.get("width") instanceof Number)) {
+                    throw new IllegalArgumentException("BAD_PAYLOAD");
+                }
+                if (p.get("height") != null && !(p.get("height") instanceof Number)) {
+                    throw new IllegalArgumentException("BAD_PAYLOAD");
+                }
+                if (content != null && content.length() > 2000) {
+                    throw new IllegalArgumentException("BAD_CONTENT");
+                }
+            }
+            case com.ihomy.common.ChatMsgType.LINK -> {
+                if (content == null || content.isBlank() || content.length() > 2000
+                        || !(content.startsWith("http://") || content.startsWith("https://"))) {
+                    throw new IllegalArgumentException("BAD_CONTENT");
+                }
+                if (hasPayload) {
+                    // 预览四字段全可缺(抓取失败就是纯链接),存在则限长
+                    if (overLen(strField(p.get("title")), 200) || overLen(strField(p.get("description")), 500)
+                            || overLen(strField(p.get("image")), 1000) || overLen(strField(p.get("siteName")), 100)) {
+                        throw new IllegalArgumentException("BAD_PAYLOAD");
+                    }
+                }
+            }
+            case com.ihomy.common.ChatMsgType.CARD -> {
+                String objType = strField(p.get("objType"));
+                String url = strField(p.get("url"));
+                // objId 放宽为数字或短字符串(放映厅条目是 Jellyfin 十六进制 id),只作展示/追溯,url 才是导航
+                boolean objIdOk = p.get("objId") instanceof Number n && n.longValue() >= 0
+                        || p.get("objId") instanceof String s && !s.isBlank() && s.length() <= 64;
+                if (objType == null || !CARD_OBJ_TYPES.contains(objType) || !objIdOk
+                        || url == null || !url.startsWith("/") || url.length() > 200
+                        || content == null || content.isBlank() || content.length() > 200
+                        || overLen(strField(p.get("sub")), 200) || overLen(strField(p.get("cover")), 1000)) {
+                    throw new IllegalArgumentException("BAD_PAYLOAD");
+                }
+            }
+            case com.ihomy.common.ChatMsgType.GAME_INVITE -> {
+                String gameCode = strField(p.get("gameCode"));
+                if (gameCode == null || !com.ihomy.common.GameConst.H5_GAME_CODES.contains(gameCode)
+                        || content == null || content.isBlank() || content.length() > 100) {
+                    throw new IllegalArgumentException("BAD_PAYLOAD");
+                }
+            }
+            default -> throw new IllegalArgumentException("BAD_TYPE");
+        }
+    }
+
+    private boolean overLen(String v, int max) {
+        return v != null && v.length() > max;
+    }
+
+    private String strField(Object v) {
+        return v == null ? null : v.toString();
     }
 
     /** 单条消息的统一视图(WS 广播与 REST 历史同构,带发送人昵称) */

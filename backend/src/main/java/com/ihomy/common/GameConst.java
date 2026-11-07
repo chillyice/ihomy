@@ -26,4 +26,10 @@ public final class GameConst {
 
     /** 数独/2048 等 H5 小游戏的每日奖励次数上限,口径与连连看一致 */
     public static final int H5_GAME_DAILY_LIMIT = 5;
+
+    /** H5 小游戏 code 全集(与 PointsRuleConst 的 game_* 一致):聊天游戏邀请卡校验用 */
+    public static final java.util.Set<String> H5_GAME_CODES = java.util.Set.of(
+            PointsRuleConst.GAME_PETLINK, PointsRuleConst.GAME_SUDOKU, PointsRuleConst.GAME_2048,
+            PointsRuleConst.GAME_MINESWEEPER, PointsRuleConst.GAME_SOLITAIRE, PointsRuleConst.GAME_SPIDER,
+            PointsRuleConst.GAME_TETRIS, PointsRuleConst.GAME_SNAKE);
 }
