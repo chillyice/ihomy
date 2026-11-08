@@ -37,26 +37,29 @@
 | bg-blobs(伪元素) | 1 | 5 个飘移色块(模糊大圆,fixed 不随滚动) |
 | glass-bg(玻璃背景) | 2 | 背景玻璃层 |
 | main-content(页面内容) | 10 | 主内容 + 首页拍立得堆/面板 |
-| draggable-panel(可拖拽面板) | 20→60 | 首页组件面板,置顶最高到 60(不超过光影层) |
+| draggable-panel(可拖拽面板) | 20→60 | 首页组件面板,置顶最高到 60(`useDragResize` 的 `PANEL_TOP_MAX`) |
 | AppSidebar(导航栏) | 60 | 左侧导航+底部主题/台灯/用户 |
 | MusicPlayer(音乐播放器) | 62 | 左下角黑胶唱片播放器(有背景歌单且曲目>0 时渲染) |
-| el-overlay/dialog/message-box | 63 | 弹窗遮罩(低于光影层,高于 AppSidebar) |
-| el-popper/dropdown/tooltip | 64 | 全局下拉菜单(teleported,高于弹窗,低于光影层) |
+| **背景光影(65–80,被弹窗遮罩压暗)** | | |
 | bright-spot(光源辉光) | 65 | 体积光源核心光晕 |
 | window-shadow(窗框阴影) | 68 | 上下分层窗框阴影 |
 | SiteFooter(备案号) | 70 | 右下角 ICP+公安备案 |
 | reflection(反光高光) | 72 | 内容反光 |
-| vignette(暗角) | 74 | 边缘压暗 |
-| dust(灰尘粒子) | 76 | 光路微粒 |
-| snow/rain(天气粒子) | 77 | 雪花/雨滴 |
-| light-layer(光影根) | 78 | 光影层根容器 |
-| lightning(闪电) | 79 | 雷电闪烁 |
-| LightTestConsole(光照测试台) | 80 | 全局固定面板 |
-| lamp-light(台灯) | 100 | 钟摆运动径向发光(夜间) |
-| BackToTop/InstallPrompt | 200 | 返回顶部/PWA 安装提示 |
-| PhotoViewer | 201 | 全屏照片播放器(Teleport to body) |
-| LibraryReader float-close | 210 | 电子书全屏模式浮动关闭按钮 |
-| ElMessage(Toast) | 3000 | 右上角提示消息(EP 内置,不覆写) |
+| light-layer(光影根) | 78 | 体积光(丁达尔射线) |
+| fog(雾霭) | 80 | 雾团慢漂移 |
+| BackToTop / InstallPrompt / LightTestConsole | 120 | 返回顶部、PWA 安装提示、光照测试台(`--z-action`) |
+| PhotoViewer / 阅读器 / 相册光箱 | 150 | 自建沉浸层(`--z-immersive`) |
+| el-overlay / el-dialog / el-drawer | 200 | 弹窗遮罩(`--z-overlay`) |
+| el-overlay.is-message-box | 210 | 确认框(`--z-messagebox`,高于弹窗) |
+| el-popper / dropdown / tooltip | 240 | 全局下拉/日期/悬浮卡(`--z-popup`) |
+| ElMessage / ElNotification | 260 | 轻提示(`--z-toast`) |
+| **氛围层(300 起,盖在所有 UI 之上)** | | |
+| vignette(暗角) | 300 | 边缘压暗(`--z-atmos`) |
+| dust(灰尘粒子) | 302 | 光路微粒 |
+| snow / rain(天气粒子) | 304 | 雪花/雨滴 |
+| lightning(闪电) | 306 | 雷电闪烁 |
+| lamp-light(台灯) | 308 | 钟摆运动径向发光(夜间) |
+| 主题扫光 | 999999 | 瞬时全屏特效(`--z-topmost`) |
 
 ## 1. 背景色块(bg-blobs)
 
@@ -834,18 +837,19 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 | 页内吸顶 | `--z-sticky` | 30 | 页签头、页内工具栏、图表 tooltip |
 | 常驻外壳 | `--z-nav` / `--z-footer` | 60 / 70 | 侧栏、移动端页头与底栏 / 站点页脚 |
 | 常驻浮层 | `--z-float` | 62 | 音乐播放器 |
-| 装饰光影 | `--z-deco` 起 | 65–100 | `SunLightLayer`(亮斑/窗影/反射/暗角/浮尘/雨雪/雷电/台灯),全部 `pointer-events:none` |
+| 背景光影 | `--z-deco` 起 | 65–80 | `SunLightLayer` 的亮斑/窗影/反射/体积光/雾霭(随弹窗遮罩一起被压暗) |
 | 浮起操作 | `--z-action` | 120 | 回顶、安装提示、移动端手绘托盘、页内固定提示 |
 | 自建沉浸层 | `--z-immersive` | 150 | 照片查看器、电子书阅读器、相册光箱、拖拽幽灵 |
 | 弹窗遮罩 | `--z-overlay` | 200 | `el-dialog` / `el-drawer` 的 `.el-overlay` |
 | 确认框 | `--z-messagebox` | 210 | `ElMessageBox`(常由弹窗内部触发,必须高于弹窗) |
 | 浮层弹层 | `--z-popup` | 240 | 所有 `.el-popper`(下拉/日期/级联/悬浮卡/tooltip) |
 | 轻提示 | `--z-toast` | 260 | `ElMessage` / `ElNotification` |
+| 氛围层 | `--z-atmos` 起 | 300–308 | 暗角 300 / 浮尘 302 / 雨雪 304 / 雷电 306 / 台灯 308(`SunLightLayer`,盖在弹窗与轻提示之上、全部 `pointer-events:none`) |
 | 瞬时特效 | `--z-topmost` | 999999 | 主题切换扫光幕布 |
 
 2. **遮罩**:`--overlay-scrim`(光尘晨 `rgba(38,29,21,.42)` / 光尘暮 `.58` / 暖居晨 `.34` / 暖居暮 `.62`)+ `backdrop-filter: blur(var(--overlay-blur))`(4px);全屏媒体用强档 `--overlay-scrim-strong`,由它自带的那层做 8–16px 虚化。**暖居与 `html.no-glass` 会全局禁 `backdrop-filter`**,所以蒙层色值必须自身可读,不能靠虚化区分层次。
 3. **弹窗本体**:圆角 14、边框 `--color-border`、阴影 `--dialog-shadow`(光尘/暖居晨为暖褐投影,暗色加深),`width: fit-content` + `max-width: calc(100vw - 32px)`;`margin-top` 读内联 `--el-dialog-margin-top`(`top="5vh"` 的媒体/预览弹窗贴顶),未声明时回 14vh;未使用 `dialog-sm/md/lg/xl` 的弹窗正文 `max-height: calc(78vh - 120px)` + 弹窗内滚动。
-4. **验收**:打开任意弹窗 → 页脚、回顶、光影层一起被压暗;弹窗内点删除 → 确认框在弹窗之上;弹窗内开下拉 → 下拉在弹窗之上;相册打开照片查看器后再触发确认框 → 确认框在查看器之上;暖居与无玻璃态下蒙层仍清晰可辨。
+4. **验收**:打开任意弹窗 → 页脚、回顶、侧栏、**背景光影(亮斑/窗影/反射/体积光/雾)一起被压暗**,而**暗角/浮尘/雨雪/台灯仍盖在弹窗之上**(光与天气落在纸面上,`pointer-events:none` 不挡操作);弹窗内点删除 → 确认框在弹窗之上;弹窗内开下拉 → 下拉在弹窗之上;相册打开照片查看器后再触发确认框 → 确认框在查看器之上;暖居与无玻璃态下蒙层仍清晰可辨。
 
 ## 30. 日程提醒页(月历 + 当日详情 + 清单,`/plan`,V10.97)
 
@@ -912,7 +916,7 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 18. **创建新家庭**:`POST /family` 已登录用户创建新家庭组(绑定 OWNER+切换当前家庭);Settings 页入口。
 19. **天气特效**:雪(❄ 字符 12-28px)/雨(线性雨滴)粒子,数量=降水等级×10;多云闪烁(GSAP 4-8s 随机补间);weather-shadow 雨雪常显/多云随 cloudFlicker/晴不显示;weatherMultiplier 衰减光强(晴 1.0/多云 0.55/雨 0.25/雪 0.4)。
 20. **和风字体图标**:`<i class="qi-{iconCode}">`,iconCode 来自和风 API now.icon;npm 包 qweather-icons。
-21. **z-index 层级**:光影层(65-100)为最高层(台灯 100 除外);弹窗遮罩 `el-overlay`+`ElMessage`=63(低于光影层 65,高于 AppSidebar 60);Popper/dropdown/select=64(高于弹窗,低于光影层);PhotoViewer=201;BackToTop/InstallPrompt=200;MusicPlayer=62;任何新增组件 z-index 不得超 100(台灯 100 除外),弹窗遮罩和 Popper 例外(63/64)。
+21. **z-index 层级**:统一取 `main.css` 的 `--z-*` 标尺(见 §29)。要点:背景光影 65–80(亮斑/窗影/反射/体积光/雾)会被弹窗遮罩(200)一起压暗;暗角/浮尘/雨雪/雷电/台灯属**氛围层**(`--z-atmos` 300–308),盖在弹窗与轻提示之上(刻意为之:光与天气落在弹窗纸面,`pointer-events:none` 不挡操作);Popper 240、确认框 210、轻提示 260;PhotoViewer/阅读器/相册光箱 150;BackToTop/InstallPrompt/LightTestConsole 120;MusicPlayer 62;组件内禁写裸 `z-index`(≥100 一律失败,守门 `styles/zLayers.spec.js`)。
 22. **书架页**(`/library`):与博客列表页设计风格统一。顶部工具栏(`.page-toolbar.card`:搜索→分类级联→排序→格式筛选→状态筛选→上传主按钮+批量操作);图书网格 `auto-fill minmax(150px, 1fr)`,卡片含封面(3:4 比例)+格式角标(右上半透明黑底白字)+书名(2 行截断)+作者+浏览数;卡片 hover 上浮 `translateY(-4px)`+阴影;下拉菜单(编辑/复制链接/删除)hover 显示;分类选择/筛选用 `el-cascader`(`checkStrictly + emitPath: false`,支持多级树、`filterable` 搜索)。
 23. **书架详情页**(`/library/:id`):flex 布局(封面 140px+元信息区);封面 3:4 带阴影;元信息含书名(24px/700)、作者、格式标签(暖棕半透明)、分类标签、文件大小、标签、浏览数;操作按钮区(在线阅读/下载/阅读状态切换);简介区(section-label 标题);在线阅读器全屏覆盖(z-index:200)含顶栏(书名+翻页控件+关闭)+内容区(PDF iframe / EPUB epub.js / TXT 分页);移动端封面+元信息改垂直居中布局。
 24. **书架编辑页**(`/library/edit/:id?`):与博客编辑页设计风格统一。`.card` + `el-form label-position="top"`;文件上传(`el-input` readonly + `el-upload` append 按钮);封面上传同;表单含书名/作者/文件/封面/简介/分类(`el-cascader` 多选+新建分类弹窗支持选父级)/标签/可见范围;底部 `.form-footer` 右对齐保存按钮。

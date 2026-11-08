@@ -1,5 +1,5 @@
 <!-- 全局光影层:体积光 + 窗框阴影 + 台灯 + 灰尘 + 背景色块 + 闪电 + 雾霭 -->
-<!-- z-index 分层:bg-blobs(1)→glass-bg(2)→内容(10)→AppSidebar(60)→bright-spot(65)→window-shadow(68)→reflection(72)→vignette(74)→dust(76)→snow/rain(77)→light-layer(78)→lightning(79)→fog(80)→lamp-light(100) -->
+<!-- z-index 分层:bg-blobs(1)→glass-bg(2)→内容(10)→AppSidebar(60)→bright-spot(65)→window-shadow(68)→reflection(72)→light-layer(78)→fog(80)=背景光影(被弹窗遮罩压暗);vignette(300)→dust(302)→snow/rain(304)→lightning(306)→lamp-light(308)=氛围层(--z-atmos 起,盖在弹窗/轻提示之上) -->
 <template>
   <div class="sun-light-layer" aria-hidden="true">
     <!-- 背景色块:5 个 blur 色块随机飘动(可开关) -->
@@ -395,11 +395,11 @@ html.dark .blob-5 {
   transform: translateZ(0);
 }
 
-/* 台灯光源:最顶层 */
+/* 台灯光源:氛围层最高(盖在弹窗之上,像灯照在纸面) */
 .lamp-light {
   position: fixed;
   border-radius: 50%;
-  z-index: 100;
+  z-index: calc(var(--z-atmos) + 8);
   pointer-events: none;
   filter: blur(20px);
 }
@@ -515,11 +515,11 @@ html.dark .blob-5 {
     background 3s ease;
 }
 
-/* 柔和暗角 */
+/* 柔和暗角:氛围层,盖在弹窗之上(压边走暗,弹窗居中不受影响) */
 .vignette {
   position: fixed;
   inset: 0;
-  z-index: 74;
+  z-index: var(--z-atmos);
   pointer-events: none;
   -webkit-mask-image: var(--lamp-mask, none);
   mask-image: var(--lamp-mask, none);
@@ -541,11 +541,11 @@ html.dark .blob-5 {
   transition: opacity 2s ease;
 }
 
-/* 灰尘粒子:screen 发光 */
+/* 灰尘粒子:screen 发光,氛围层 */
 .dust-layer {
   position: fixed;
   inset: 0;
-  z-index: 76;
+  z-index: calc(var(--z-atmos) + 2);
   pointer-events: none;
   overflow: hidden;
   mix-blend-mode: screen;
@@ -588,11 +588,11 @@ html.dark .blob-5 {
   }
 }
 
-/* 雪花层:从顶端飘到底端,六瓣雪花样式 */
+/* 雪花层:从顶端飘到底端,六瓣雪花样式(氛围层,雪落在弹窗上) */
 .snow-layer {
   position: fixed;
   inset: 0;
-  z-index: 77;
+  z-index: calc(var(--z-atmos) + 4);
   pointer-events: none;
   overflow: hidden;
   transform: translateZ(0);
@@ -623,11 +623,11 @@ html.dark .blob-5 {
   }
 }
 
-/* 雨滴层:快速下落 */
+/* 雨滴层:快速下落(氛围层,雨落在弹窗上) */
 .rain-layer {
   position: fixed;
   inset: 0;
-  z-index: 77;
+  z-index: calc(var(--z-atmos) + 4);
   pointer-events: none;
   overflow: hidden;
   transform: translateZ(0);
@@ -653,18 +653,18 @@ html.dark .blob-5 {
   }
 }
 
-/* 雷雨闪电:全屏瞬间增亮,screen 混合 */
+/* 雷雨闪电:全屏瞬间增亮,screen 混合(氛围层) */
 .lightning-flash {
   position: fixed;
   inset: 0;
-  z-index: 79;
+  z-index: calc(var(--z-atmos) + 6);
   pointer-events: none;
   mix-blend-mode: screen;
   background: rgba(255, 255, 255, 0.6);
   transform: translateZ(0);
 }
 
-/* 雾霭层(z 80,高于闪电):不规则雾团慢漂移,整层经 Vue Transition 淡入/消散(雾/阴转瞬效果) */
+/* 雾霭层(z 80,背景光影最高一处):不规则雾团慢漂移,整层经 Vue Transition 淡入/消散(雾/阴转瞬效果) */
 .fog-layer {
   position: fixed;
   inset: 0;
