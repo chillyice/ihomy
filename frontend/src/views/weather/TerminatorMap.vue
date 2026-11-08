@@ -331,7 +331,9 @@ function draw() {
     cv.height = Math.round(cssH * dpr)
     cv.style.height = cssH + 'px'
     const ctx = cv.getContext('2d')
-    ctx.setTransform(cssW / MAP_W, 0, 0, cssH / MAP_H, 0, 0)
+    // 缓冲区是 cssW*dpr × cssH*dpr,变换必须同样乘 dpr 把逻辑地图铺满整个缓冲区;
+    // 漏乘时 dpr=2 的平板会把地图画进左上 1/4 再被拉伸(表现为只占组件左上角)
+    ctx.setTransform((cssW * dpr) / MAP_W, 0, 0, (cssH * dpr) / MAP_H, 0, 0)
 
     // 海洋底色 → 陆地填充 → 晨昏色带 → 海岸线 → 经纬网 → 赤道/本初子午线 → 城市点
     // 色带必须画在**陆地填充之后**:半透明色带要同时压暗海与陆,否则夜半球大陆仍是亮色,

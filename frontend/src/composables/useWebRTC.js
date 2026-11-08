@@ -2,17 +2,46 @@
 // 纯函数式工厂,连接生命周期/状态机在 stores/call.js;本文件只管媒体与 SDP/ICE。
 // 环境硬前提:HTTPS(生产已具备)或 http://localhost(安全上下文);局域网 IP 不可用。
 
-/** 拉取本地媒体流;视频通话被拒绝(无摄像头/用户拒绝)时降级为音频 */
+/** getUserMedia 失败 → 稳定错误码:denied(权限被拒)/ notfound(无设备)/ busy(被占用)/ generic */
+function mapMediaError(e) {
+  const name = e?.name || ''
+  if (name === 'NotAllowedError' || name === 'SecurityError') return 'denied'
+  if (name === 'NotFoundError' || name === 'DevicesNotFoundError' || name === 'OverconstrainedError') return 'notfound'
+  if (name === 'NotReadableError' || name === 'TrackStartError') return 'busy'
+  return 'generic'
+}
+
+/** 错误码 → i18n 键(stores/call.js 与 ChatComposer 共用,键在 chat.call.err*) */
+export function mediaErrorKey(code) {
+  const cap = code ? code.charAt(0).toUpperCase() + code.slice(1) : 'Generic'
+  return `chat.call.err${cap}`
+}
+
+/**
+ * 拉取本地媒体流,返回 { stream, downgraded }。
+ * 视频通话拿不到摄像头时降级为纯音频并标记 downgraded(整通按语音走);
+ * 音频也拿不到或环境不支持(非安全上下文/过旧内核)时抛出带 code 的错误,由调用方按码提示。
+ */
 export async function getLocalStream(media) {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw Object.assign(new Error('media unsupported in this context'), { code: 'unsupported' })
+  }
   const wantVideo = media === 'VIDEO'
-  try {
-    return await navigator.mediaDevices.getUserMedia({ audio: true, video: wantVideo })
-  } catch (e) {
-    if (wantVideo) {
-      // 摄像头不可用降级语音(计划 §8:失败降级提示)
-      return await navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+  let firstError = null
+  if (wantVideo) {
+    try {
+      return { stream: await navigator.mediaDevices.getUserMedia({ audio: true, video: true }), downgraded: false }
+    } catch (e) {
+      firstError = e // 摄像头不可用降级语音(计划 §8:失败降级提示)
     }
-    throw e
+  }
+  try {
+    return { stream: await navigator.mediaDevices.getUserMedia({ audio: true, video: false }), downgraded: wantVideo }
+  } catch (e) {
+    const code = mapMediaError(e)
+    throw Object.assign(new Error(e?.message || 'getUserMedia failed'), {
+      code: code === 'generic' && firstError ? mapMediaError(firstError) : code,
+    })
   }
 }
 

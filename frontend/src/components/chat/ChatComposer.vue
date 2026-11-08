@@ -116,6 +116,7 @@ import { chatApi, fileApi, memberApi } from '@/api'
 import { useChatStore } from '@/stores/chat'
 import { useCallStore } from '@/stores/call'
 import { useUserStore } from '@/stores/user'
+import { mediaErrorKey } from '@/composables/useWebRTC'
 import { H5_GAMES, buildCardPayload, buildGameInvitePayload, buildLinkPayload } from '@/utils/chatMsg'
 import ChatObjectPicker from '@/components/chat/ChatObjectPicker.vue'
 
@@ -267,7 +268,7 @@ const openCall = async () => {
 const startCall = async (m, media) => {
   const ok = await callStore.start({ id: m.id, name: m.nickname || m.username }, media)
   if (ok) callVisible.value = false
-  else ElMessage.warning(t('chat.call.startFailed'))
+  else ElMessage.warning(callStore.failReason ? t(mediaErrorKey(callStore.failReason)) : t('chat.call.startFailed'))
 }
 
 const pickGame = (g) => {

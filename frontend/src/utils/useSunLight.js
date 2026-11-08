@@ -80,6 +80,28 @@ export function useSunLight() {
   const precipLevel = ref(0)
   let testTimer = null
 
+  // 转瞬天气效果(雾/阴):只在进入页面与切回前台时显示 3 秒,随后消散为正常页面;
+  // 雨/雪/雷粒子保持常驻但不再压暗页面(去阴影),晴/多云维持原有常驻表现
+  const TRANSIENT_MODES = ['fog', 'overcast']
+  const FOG_HOLD_MS = 3000
+  const fogVisible = ref(false)
+  let fogHoldTimer = null
+  const playTransient = () => {
+    if (fogHoldTimer) clearTimeout(fogHoldTimer)
+    fogVisible.value = true
+    fogHoldTimer = setTimeout(() => {
+      fogVisible.value = false
+      fogHoldTimer = null
+    }, FOG_HOLD_MS)
+  }
+  const stopTransient = () => {
+    if (fogHoldTimer) {
+      clearTimeout(fogHoldTimer)
+      fogHoldTimer = null
+    }
+    fogVisible.value = false
+  }
+
   // 多云模式:云遮阳光的随机闪烁系数(0~1),由 GSAP 缓慢补间
   const cloudFlicker = ref(1)
   let cloudTimer = null
@@ -88,6 +110,8 @@ export function useSunLight() {
   const setWeather = (mode, level = 0) => {
     weatherMode.value = mode
     precipLevel.value = level
+    if (TRANSIENT_MODES.includes(mode)) playTransient()
+    else stopTransient()
     startCloudFlicker(mode === 'cloud')
     startLightning(mode === 'thunder')
     refreshScene()
@@ -153,22 +177,19 @@ export function useSunLight() {
     sunScene.value = getSunScene(sunInfo.value, slotIdx.value)
   }
 
-  // 天气光照系数(实时响应 cloudFlicker):晴=1,雨雪=0,多云=cloudFlicker
+  // 天气光照系数(实时响应 cloudFlicker):雨雪雷=0(雨天无光柱),多云=cloudFlicker;
+  // 晴/雾/阴=1 —— 雾阴的观感由转瞬雾层承担,消散后即恢复正常页面
   const weatherLightMul = computed(() => {
     if (weatherMode.value === 'rain' || weatherMode.value === 'snow' || weatherMode.value === 'thunder') return 0
-    if (weatherMode.value === 'overcast') return 0.15
-    if (weatherMode.value === 'fog') return 0.08
     if (weatherMode.value === 'cloud') return cloudFlicker.value
     return 1
   })
 
-  // 天气覆盖阴影层:雨雪常显;多云随 cloudFlicker 平滑反向变化;晴天不显示
-  // 与光柱/光源/灰尘的 weatherLightMul 完全同步(同一 cloudFlicker 驱动)
+  // 天气覆盖阴影层:雨雪雷不再压暗(粒子常驻但页面明暗保持正常);多云随 cloudFlicker 平滑反向变化;
+  // 阴天只在转瞬窗口内压暗;晴天/雾不显示(雾的观感由雾层承担)
   const weatherShadowOpacity = computed(() => {
     if (!shadowEnabled.value) return 0
-    if (weatherMode.value === 'rain' || weatherMode.value === 'snow' || weatherMode.value === 'thunder') return 1
-    if (weatherMode.value === 'overcast') return 0.85
-    if (weatherMode.value === 'fog') return 0.6
+    if (weatherMode.value === 'overcast') return fogVisible.value ? 0.85 : 0
     if (weatherMode.value === 'cloud') return Math.max(0, 1 - cloudFlicker.value)
     return 0
   })
@@ -240,6 +261,7 @@ export function useSunLight() {
     lightTestMode.value = false
     weatherMode.value = 'clear'
     precipLevel.value = 0
+    stopTransient()
     startCloudFlicker(false)
     startLightning(false)
     if (testTimer) {
@@ -373,14 +395,15 @@ export function useSunLight() {
     background: `radial-gradient(circle, ${sunScene.value.palette.bloom} 0%, ${sunScene.value.palette.mid} 35%, transparent 70%)`,
   }))
 
-  // 高光亮斑:白天下任何非晴天气(雨/雪/云/雷/阴/雾)一律压成 0——云层遮住太阳就不该有直射亮点;
+  // 高光亮斑:白天雨/雪/云/雷一律压成 0——云层遮住太阳就不该有直射亮点;
+  // 雾/阴的亮斑跟随正常光照(转瞬效果消散后是正常页面);
   // 夜间直接用后端的 brightSpotOpacity(月光/夜景点),不受天气压制
   const brightSpotStyle = computed(() => ({
     background: sunScene.value.brightSpotColor || 'transparent',
     opacity: shadowEnabled.value
       ? sunScene.value.isNight
         ? (sunScene.value.brightSpotOpacity ?? 0)
-        : ['rain', 'snow', 'cloud', 'thunder', 'overcast', 'fog'].includes(weatherMode.value)
+        : ['rain', 'snow', 'cloud', 'thunder'].includes(weatherMode.value)
           ? 0
           : (sunScene.value.brightSpotOpacity ?? 0)
       : 0,
@@ -473,6 +496,8 @@ export function useSunLight() {
       themeStore.applyAuto(sunScene.value.isNight)
     }
     refreshSunInfoIfStale()
+    // 转瞬天气(雾/阴):每次回到前台都重播 3 秒再消散
+    if (TRANSIENT_MODES.includes(weatherMode.value) && weatherEffectEnabled.value) playTransient()
   }
 
   onMounted(() => {
@@ -519,6 +544,7 @@ export function useSunLight() {
     lampTween?.kill()
     if (cloudTimer) clearInterval(cloudTimer)
     cloudTween?.kill()
+    if (fogHoldTimer) clearTimeout(fogHoldTimer)
     if (lightningTimer) clearTimeout(lightningTimer)
     if (slotTimer) clearInterval(slotTimer)
     if (flickerTimer) clearInterval(flickerTimer)
@@ -630,6 +656,7 @@ export function useSunLight() {
     weatherMode,
     cloudFlicker,
     precipLevel,
+    fogVisible,
     setWeather,
     startLightTest,
     pauseLightTest,

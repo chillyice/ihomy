@@ -1,5 +1,5 @@
-<!-- 全局光影层:体积光 + 窗框阴影 + 台灯 + 灰尘 + 背景色块 + 闪电 -->
-<!-- z-index 分层:bg-blobs(1)→glass-bg(2)→内容(10)→AppSidebar(60)→bright-spot(65)→window-shadow(68)→reflection(72)→vignette(74)→dust(76)→snow/rain(77)→light-layer(78)→lightning(79)→lamp-light(100) -->
+<!-- 全局光影层:体积光 + 窗框阴影 + 台灯 + 灰尘 + 背景色块 + 闪电 + 雾霭 -->
+<!-- z-index 分层:bg-blobs(1)→glass-bg(2)→内容(10)→AppSidebar(60)→bright-spot(65)→window-shadow(68)→reflection(72)→vignette(74)→dust(76)→snow/rain(77)→light-layer(78)→lightning(79)→fog(80)→lamp-light(100) -->
 <template>
   <div class="sun-light-layer" aria-hidden="true">
     <!-- 背景色块:5 个 blur 色块随机飘动(可开关) -->
@@ -142,6 +142,13 @@
         }"
       ></div>
     </div>
+
+    <!-- 雾霭层:不规则雾团短暂笼罩(雾/阴天转瞬效果,3 秒后消散为正常页面) -->
+    <Transition name="fog">
+      <div v-if="weatherEffectEnabled && fogVisible" class="fog-layer">
+        <div v-for="b in FOG_BLOBS" :key="b.id" class="fog-blob" :style="fogBlobStyle(b)"></div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -165,6 +172,7 @@ const {
   weatherShadowOpacity,
   lightLayerOpacity,
   blobsEnabled,
+  weatherEffectEnabled,
   dustParticles,
   snowParticles,
   rainParticles,
@@ -174,7 +182,39 @@ const {
   brightSpotStyle,
   reflectionStyle,
   lightningFlash,
+  fogVisible,
 } = light || {}
+
+// 雾团静态配置:位置/尺寸/漂移各异拼出不规则雾,负 delay 让动画起始就在中途;
+// 用预模糊 radial-gradient 而非 filter:blur——带 filter 的层随动画会周期性重栅格化
+// (与 .bg-blobs 的 ponytail 注记同因),translate-only 漂移是纯合成器变换
+const FOG_TONES = [
+  'radial-gradient(ellipse at center, rgba(208, 215, 226, 0.6) 0%, rgba(208, 215, 226, 0.3) 40%, rgba(208, 215, 226, 0.1) 62%, transparent 78%)',
+  'radial-gradient(ellipse at center, rgba(224, 226, 231, 0.55) 0%, rgba(219, 222, 228, 0.26) 45%, rgba(219, 222, 228, 0.08) 64%, transparent 76%)',
+]
+const FOG_BLOBS = [
+  { id: 1, left: '-10%', top: '-15%', w: 65, o: 0.5, dx: '6vw', dy: '3vh', dur: 12, delay: -2, tone: 0 },
+  { id: 2, left: '55%', top: '-20%', w: 70, o: 0.45, dx: '-5vw', dy: '4vh', dur: 16, delay: -7, tone: 1 },
+  { id: 3, left: '10%', top: '30%', w: 80, o: 0.5, dx: '8vw', dy: '-3vh', dur: 18, delay: -4, tone: 1 },
+  { id: 4, left: '60%', top: '35%', w: 75, o: 0.55, dx: '-7vw', dy: '-4vh', dur: 14, delay: -9, tone: 0 },
+  { id: 5, left: '-15%', top: '55%', w: 70, o: 0.5, dx: '6vw', dy: '-5vh', dur: 15, delay: -5, tone: 0 },
+  { id: 6, left: '40%', top: '65%', w: 90, o: 0.45, dx: '-6vw', dy: '-3vh', dur: 19, delay: -11, tone: 1 },
+  { id: 7, left: '20%', top: '80%', w: 65, o: 0.5, dx: '5vw', dy: '-4vh', dur: 13, delay: -8, tone: 0 },
+  { id: 8, left: '75%', top: '70%', w: 60, o: 0.4, dx: '-8vw', dy: '-6vh', dur: 17, delay: -13, tone: 1 },
+  { id: 9, left: '30%', top: '5%', w: 55, o: 0.38, dx: '4vw', dy: '5vh', dur: 11, delay: -3, tone: 1 },
+]
+const fogBlobStyle = (b) => ({
+  left: b.left,
+  top: b.top,
+  width: b.w + 'vw',
+  height: Math.round(b.w * 0.62) + 'vw',
+  opacity: b.o,
+  background: FOG_TONES[b.tone],
+  animationDuration: b.dur + 's',
+  animationDelay: b.delay + 's',
+  '--dx': b.dx,
+  '--dy': b.dy,
+})
 </script>
 
 <style scoped>
@@ -622,6 +662,46 @@ html.dark .blob-5 {
   mix-blend-mode: screen;
   background: rgba(255, 255, 255, 0.6);
   transform: translateZ(0);
+}
+
+/* 雾霭层(z 80,高于闪电):不规则雾团慢漂移,整层经 Vue Transition 淡入/消散(雾/阴转瞬效果) */
+.fog-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  overflow: hidden;
+  pointer-events: none;
+  transform: translateZ(0);
+}
+.fog-blob {
+  position: absolute;
+  border-radius: 50%;
+  will-change: transform;
+  animation: fog-drift 14s ease-in-out infinite alternate;
+}
+@keyframes fog-drift {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(var(--dx, 6vw), var(--dy, 3vh)) scale(1.12);
+  }
+}
+/* 进入快速浮现,消散缓慢淡出并轻微上浮,像雾被风带走 */
+.fog-enter-active {
+  transition: opacity 0.4s ease;
+}
+.fog-leave-active {
+  transition:
+    opacity 1.4s ease,
+    transform 1.4s ease;
+}
+.fog-enter-from,
+.fog-leave-to {
+  opacity: 0;
+}
+.fog-leave-to {
+  transform: translateY(-2vh);
 }
 
 /* 台灯钟摆运动:CSS @keyframes 驱动,不经过 Vue 响应式 */

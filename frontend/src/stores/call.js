@@ -2,10 +2,12 @@
 // 信令全走 WS call-signal(stores/chat.js 的 socket,按 to 定向);媒体 P2P 直连不过服务器。
 // 通话结束由一方发 end 事件,服务端代落 CALL 记录卡(幂等);本 store 只管媒体与界面状态。
 import { defineStore } from 'pinia'
+import { ElMessage } from 'element-plus'
+import i18n from '@/i18n'
 import { chatApi } from '@/api'
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
-import { createPeer, getLocalStream, setAudioEnabled, setVideoEnabled, stopStream } from '@/composables/useWebRTC'
+import { createPeer, getLocalStream, mediaErrorKey, setAudioEnabled, setVideoEnabled, stopStream } from '@/composables/useWebRTC'
 
 const RING_TIMEOUT_MS = 30000
 
@@ -31,7 +33,7 @@ export const useCallStore = defineStore('call', {
     isVideo: (s) => s.media === 'VIDEO',
   },
   actions: {
-    /** 发起通话:拉媒体 → invite → 30s 无应答按超时结束 */
+    /** 发起通话:拉媒体 → invite → 30s 无应答按超时结束;媒体失败按码提示并记录 failReason */
     async start(peer, media) {
       if (this.inCall) return false
       const chat = useChatStore()
@@ -43,9 +45,16 @@ export const useCallStore = defineStore('call', {
       this.direction = 'out'
       this.status = 'ringing-out'
       try {
-        this.localStream = await getLocalStream(this.media)
-      } catch {
+        const { stream, downgraded } = await getLocalStream(this.media)
+        this.localStream = stream
+        if (downgraded) {
+          // 摄像头不可用:整通按语音走(invite 改带 AUDIO,对端界面同步),并明确告知发起人
+          this.media = 'AUDIO'
+          ElMessage.warning(i18n.global.t('chat.call.downgradedAudio'))
+        }
+      } catch (e) {
         this.reset()
+        this.failReason = e?.code || 'generic' // reset 会清空,这里补记供发起方按码提示
         return false
       }
       this.signal({ event: 'invite', to: peer.id, callId: this.callId, media: this.media, from: this.me().id, fromName: this.me().name })
@@ -86,6 +95,7 @@ export const useCallStore = defineStore('call', {
         this.signal({ event: 'busy', to: d.from, callId: d.callId })
         return
       }
+      this.failReason = ''
       this.callId = d.callId
       this.peerId = d.from
       this.peerName = d.fromName || ''
@@ -115,13 +125,16 @@ export const useCallStore = defineStore('call', {
       this.finishWith('busy')
     },
 
-    /** 被叫接听:拉媒体 → accept → 等 offer */
+    /** 被叫接听:拉媒体 → accept → 等 offer;拿不到媒体时明确报错并回绝,不再静默消失 */
     async accept() {
       if (this.status !== 'ringing-in') return
       this.status = 'connecting'
       try {
-        this.localStream = await getLocalStream(this.media)
-      } catch {
+        const { stream, downgraded } = await getLocalStream(this.media)
+        this.localStream = stream
+        if (downgraded) ElMessage.warning(i18n.global.t('chat.call.downgradedAudio'))
+      } catch (e) {
+        ElMessage.error(i18n.global.t(mediaErrorKey(e?.code)))
         this.signal({ event: 'reject', to: this.peerId, callId: this.callId })
         this.reset()
         return
