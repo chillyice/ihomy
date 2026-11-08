@@ -1277,7 +1277,8 @@ onBeforeUnmount(() => {
   fill: var(--color-text-secondary);
 }
 /* ── 10 天预报单列全宽;
-     每行统一「日期 / 白天天气 / 温度」,点行展开当天详情 ── */
+     每行统一「日期 / 白天天气 / 温度」,点行展开当天详情;
+     三块按 日期定宽 + 天气/温度等分 铺满,避免宽屏中间留大片空白 ── */
 .wt-daily {
   display: grid;
   grid-template-columns: 1fr;
@@ -1294,7 +1295,7 @@ onBeforeUnmount(() => {
 }
 .wt-day-row {
   display: grid;
-  grid-template-columns: 74px minmax(0, 1fr) 144px 14px;
+  grid-template-columns: 88px minmax(0, 1fr) minmax(240px, 1fr) 16px;
   align-items: center;
   gap: 8px;
   min-height: 34px;
@@ -1330,7 +1331,7 @@ onBeforeUnmount(() => {
 .wt-day-weather {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 6px;
   font-size: 13px;
   min-width: 0;
@@ -1405,7 +1406,6 @@ onBeforeUnmount(() => {
 .wt-tbar-track {
   display: block;
   flex: 1;
-  max-width: 280px;
   height: 8px;
   background: rgba(58, 46, 34, 0.1);
   border-radius: 4px;
@@ -1435,7 +1435,7 @@ onBeforeUnmount(() => {
 /* 10 天预报窄屏:单列 + 收紧列宽,温度横条仍保留 */
 @media (max-width: 640px) {
   .wt-day-row {
-    grid-template-columns: 70px minmax(0, 1fr) 128px 12px;
+    grid-template-columns: 68px minmax(0, 1fr) minmax(112px, 40%) 12px;
     gap: 6px;
     padding: 4px 4px;
   }
@@ -1460,7 +1460,7 @@ onBeforeUnmount(() => {
 /* 超窄屏(≤400px):温度横条退化为纯数字,避免把行撑破 */
 @media (max-width: 400px) {
   .wt-day-row {
-    grid-template-columns: 64px minmax(0, 1fr) 74px 10px;
+    grid-template-columns: 62px minmax(0, 1fr) 72px 10px;
     gap: 5px;
   }
   .wt-trange .wt-tbar-track {
