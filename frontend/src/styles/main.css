@@ -1297,6 +1297,15 @@ html.dark .el-dialog__headerbtn:hover {
   background: #eed0ca !important;
   border-color: #eed0ca !important;
 }
+html.dark .el-dialog__footer .el-button--danger {
+  background: rgba(201, 116, 116, 0.15) !important;
+  border-color: rgba(201, 116, 116, 0.15) !important;
+  color: var(--color-danger) !important;
+}
+html.dark .el-dialog__footer .el-button--danger:hover {
+  background: rgba(201, 116, 116, 0.25) !important;
+  border-color: rgba(201, 116, 116, 0.25) !important;
+}
 /* 禁用态(输入为空/loading):统一置灰 */
 .el-dialog__footer .el-button.is-disabled,
 .el-dialog__footer .el-button.is-loading {
@@ -1356,6 +1365,13 @@ html.dark .el-dialog .el-input__inner::placeholder {
 .el-dialog .el-textarea__inner::placeholder {
   color: #c4b8a8 !important;
   opacity: 0.7 !important;
+}
+html.dark .el-dialog .el-textarea__inner {
+  border-color: rgba(232, 220, 200, 0.12) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+html.dark .el-dialog .el-textarea__inner::placeholder {
+  color: rgba(232, 220, 200, 0.35) !important;
 }
 
 /* === ElMessageBox 弹框 — 同风格 === */
@@ -1493,6 +1509,13 @@ html.dark .el-message-box__btns .el-button:not(.el-button--primary):hover {
 .el-message-box__input .el-input__inner::placeholder {
   color: #c4b8a8 !important;
   opacity: 0.7 !important;
+}
+html.dark .el-message-box__input .el-input__wrapper {
+  box-shadow: 0 0 0 1px rgba(232, 220, 200, 0.12) inset !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+html.dark .el-message-box__input .el-input__inner::placeholder {
+  color: rgba(232, 220, 200, 0.35) !important;
 }
 
 /* 台灯钟摆运动:8s 周期 ease-in-out 近似 sin 波,scaleX 在峰值时收缩 0.8。

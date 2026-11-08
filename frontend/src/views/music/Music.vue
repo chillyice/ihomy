@@ -887,6 +887,10 @@ html.dark .cover-placeholder {
 html.dark .cover-placeholder span {
   color: rgba(232, 220, 200, 0.2);
 }
+html.dark .pl-detail-cover.placeholder {
+  background: rgba(232, 220, 200, 0.06);
+  color: rgba(232, 220, 200, 0.2);
+}
 .cover-img {
   width: 100%;
   height: 100%;
