@@ -10,7 +10,7 @@
 
 | 文件 | 内容 | 状态 |
 |---|---|---|
-| `功能/Android客户端-计划.md` | Android 端实施计划:Capacitor 套壳复用现有 Vue + 原生 Glance 桌面卡片 + AlarmManager 本地通知 + 分享/相机/指纹/快捷方式;**不自建推送、循环时间只由服务端算**。含 P0–P4 分期、`/schedule/occurrences` 与 `type=WIDGET` 令牌契约、表结构草案、风险与验收(2026-11-09 评估定稿) | **未开工** |
+| `功能/Android客户端-计划.md` | Android 端实施计划:Capacitor 套壳复用现有 Vue + 原生桌面卡片(RemoteViews)+ AlarmManager 本地通知 + 分享/相机/指纹/快捷方式;**不自建推送、循环时间只由服务端算**。含 P0–P4 分期、`/schedule/occurrences` 与 `type=WIDGET` 令牌契约、表结构草案、风险与验收 | **P0–P2 已落地(V11.74–V11.78)**;真机验收、发布链路(`/files/app/**` + `/app` 页 + `latest-version`)与 P3/P4 未做 |
 
 新计划建在 `功能/`、`运维/` 两个目录下，全部落地后连同本节行一起移入 `完成/`。
 

@@ -52,6 +52,8 @@ public class SecurityConfig {
                 // 咔哒 / bit_pouch 安装包目录刻意公开(登录页/发布页免登录直接下载)
                 .requestMatchers("/files/kada/**").permitAll()
                 .requestMatchers("/files/bit_pouch/**").permitAll()
+                // Android 安装包目录同样公开:站内 /app 下载页与 /public/app/latest 的直链必须免登录可用
+                .requestMatchers("/files/app/**").permitAll()
                 // 上传文件目录:登录态(Bearer 或 ihomy_at cookie)放行,游客只放行 PUBLIC 内容
                 .requestMatchers("/files/**").access((authentication, context) ->
                         new AuthorizationDecision(fileAccessService.allowed(context.getRequest())))
