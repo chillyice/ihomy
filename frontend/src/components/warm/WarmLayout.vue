@@ -2,7 +2,7 @@
 <!-- 光影(丁达尔体积光/窗影/尘/台灯)由全局 SunLightLayer 提供,此处只做布局 + 天气 AI 全屏底图 -->
 <template>
   <div class="gc-root" :class="{ scrolled: scrolled }">
-    <!-- 天气→AI 生图的全屏氛围底图层(最底,压在 SunLightLayer 之下);鼠标静止 3s 浮到最前 -->
+    <!-- 天气→AI 生图的全屏氛围底图层(最底,压在 SunLightLayer 之下);鼠标静止 1 分钟浮到最前 -->
     <div v-if="weatherBg" class="gc-weatherbg" :class="{ revealed: bgRevealed }" :style="{ backgroundImage: `url(${weatherBg})` }"></div>
 
     <div class="gc-wrap">
@@ -194,11 +194,13 @@ watch(
 )
 
 // 背景照片待机浮现:只有鼠标停在「背景板」上(天气照片实际可见的区域)且确有背景图时,
-// 静止超过 3s → 背景浮到最前;移动鼠标 → 恢复原始状态
+// 静止超过 1 分钟 → 背景浮到最前;移动鼠标 → 恢复原始状态
 const bgRevealed = ref(false)
-const BG_IDLE_MS = 3000
-// 命中判定:studio 外框内(含侧栏/主区/卡片/间隙)与顶栏内容、浮层都不是背景板
-const CONTENT_SELECTOR = '.gc-brand, .gc-seg, .gc-back, .el-overlay, .el-popper, .el-message'
+const BG_IDLE_MS = 60000
+// 命中判定:studio 外框内(含侧栏/主区/卡片/间隙)与顶栏内容、浮层都不是背景板。
+// 顶栏整条都算控件区(含胞吐进来的工具栏 .gc-pin):返回键、晨暮开关、工具栏按钮都贴在
+// 照片边上,漏掉任一处鼠标经过按钮时就会闪一下背景
+const CONTENT_SELECTOR = '.gc-topbar, .gc-pin, .el-overlay, .el-popper, .el-message'
 const isBackgroundArea = (x, y) => {
   const el = document.elementFromPoint(x, y)
   if (!el) return false
@@ -441,7 +443,7 @@ watch(
   pointer-events: none;
   transition: opacity 1.2s ease;
 }
-/* 待机浮现:鼠标静止 3s 后浮到最前(盖过内容层,pointer-events:none 不挡交互;移动鼠标即移除该类恢复) */
+/* 待机浮现:鼠标静止 1 分钟后浮到最前(盖过内容层,pointer-events:none 不挡交互;移动鼠标即移除该类恢复) */
 .gc-weatherbg.revealed {
   z-index: 30;
   opacity: 1;
