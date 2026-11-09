@@ -291,6 +291,8 @@ export const planApi = {
 export const scheduleApi = {
   events: (from, to) => request.get('/schedule/events', { params: { from, to } }),
   upcoming: (days = 7) => request.get('/schedule/upcoming', { params: { days } }),
+  // 闹钟/卡片数据源:循环事项每期一条,带 key/link/timeZone(原生壳提醒与桌面卡片用)
+  occurrences: (from, to) => request.get('/schedule/occurrences', { params: { from, to } }),
 }
 
 // 植物养殖(全家共养一棵,实时养成;营养/天气/积分/成长日志)

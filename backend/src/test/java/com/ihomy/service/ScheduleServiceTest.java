@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -347,5 +348,120 @@ class ScheduleServiceTest {
         service.events(FAMILY, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), true);
 
         verifyNoInteractions(sourceProvider);
+    }
+
+    // ---------------------------------------------------------------- 闹钟数据源(occurrences)
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> occurrenceItems(Map<String, Object> result) {
+        return (List<Map<String, Object>>) result.get("items");
+    }
+
+    @Test
+    void occurrencesExpandRecurringPerOccurrenceWithKeys() {
+        when(anniversaryService.list(FAMILY)).thenReturn(List.of());
+        when(planMapper.selectList(any())).thenReturn(List.of(), List.of());
+        LocalDate today = LocalDate.now();
+        // 每日任务:区间 3 天应出 3 条(upcoming 会去重成 1 条,这里不做合并——闹钟每期都要响)
+        when(reminderMapper.selectList(any()))
+                .thenReturn(List.of(reminder(5L, DictConst.REPEAT_DAILY, today.minusDays(1), LocalTime.of(7, 30), 0)));
+        when(checkMapper.selectList(any())).thenReturn(List.of());
+
+        Map<String, Object> result = service.occurrences(FAMILY, today, today.plusDays(2));
+
+        List<Map<String, Object>> items = occurrenceItems(result);
+        assertThat(items).hasSize(3);
+        assertThat(items).allSatisfy(m -> {
+            assertThat(m.get("kind")).isEqualTo("TASK");
+            assertThat(m.get("key")).isEqualTo("TASK:5:" + m.get("date"));
+            assertThat(m.get("link")).isEqualTo("/plan?date=" + m.get("date"));
+        });
+        assertThat(result).containsEntry("timeZone", ZoneId.systemDefault().getId())
+                .containsEntry("truncated", false);
+    }
+
+    @Test
+    void occurrencesDropDoneAndPlanTasksAndPlanManagedReminders() {
+        when(anniversaryService.list(FAMILY)).thenReturn(List.of());
+        when(planMapper.selectList(any())).thenReturn(List.of(), List.of());
+        LocalDate today = LocalDate.now();
+        Reminder onceDone = reminder(1L, DictConst.REPEAT_ONCE, today, LocalTime.of(9, 0), 1);
+        Reminder daily = reminder(2L, DictConst.REPEAT_DAILY, today.minusDays(1), LocalTime.of(7, 30), 0);
+        when(reminderMapper.selectList(any())).thenReturn(List.of(onceDone, daily));
+        ReminderCheck checked = new ReminderCheck();
+        checked.setReminderId(2L);
+        checked.setCheckDate(today);
+        when(checkMapper.selectList(any())).thenReturn(List.of(checked));
+        PlanTask sub = new PlanTask();
+        sub.setId(21L);
+        sub.setPlanId(1L);
+        sub.setTitle("买滤芯");
+        sub.setDueDate(today);
+        sub.setDone(0);
+        when(planTaskMapper.selectList(any())).thenReturn(List.of(sub));
+
+        Map<String, Object> result = service.occurrences(FAMILY, today, today);
+
+        // 已完成的一次性与当日已勾的每日任务、子任务都不进闹钟清单
+        assertThat(occurrenceItems(result)).isEmpty();
+    }
+
+    @Test
+    void occurrencesAnniversaryAndProviderLinkRules() {
+        when(anniversaryService.list(FAMILY)).thenReturn(List.of(anniversary(3, "solar", 10, 30, 0)));
+        when(planMapper.selectList(any())).thenReturn(List.of(), List.of());
+        when(reminderMapper.selectList(any())).thenReturn(List.of());
+        when(sourceProvider.available(FAMILY)).thenReturn(true);
+        doAnswer(inv -> {
+            List<Map<String, Object>> items = inv.getArgument(3);
+            items.add(ScheduleSourceProvider.readOnlyItem(
+                    "LOAN", 7L, "建行房贷", LocalDate.of(2026, 10, 30), "/book?tab=loan"));
+            return null;
+        }).when(sourceProvider).append(eq(FAMILY), any(), any(), any());
+
+        Map<String, Object> result = service.occurrences(FAMILY,
+                LocalDate.of(2026, 10, 30), LocalDate.of(2026, 10, 30));
+
+        List<Map<String, Object>> items = occurrenceItems(result);
+        Map<String, Object> anniv = items.stream()
+                .filter(m -> "ANNIVERSARY".equals(m.get("kind"))).findFirst().orElseThrow();
+        // 纪念日落纪念日列表;只读来源沿用 provider 的 link
+        assertThat(anniv).containsEntry("key", "ANNIVERSARY:3:2026-10-30")
+                .containsEntry("link", "/anniversary");
+        assertThat(items.stream().filter(m -> "LOAN".equals(m.get("kind"))).findFirst().orElseThrow())
+                .containsEntry("key", "LOAN:7:2026-10-30")
+                .containsEntry("link", "/book?tab=loan");
+    }
+
+    @Test
+    void occurrencesRange92DaysAllowed() {
+        LocalDate from = LocalDate.of(2026, 1, 1);
+        assertThatThrownBy(() -> service.occurrences(FAMILY, from, from.plusDays(92)))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("92");
+        assertThat(service.occurrences(FAMILY, from, from.plusDays(91))).containsKey("items");
+    }
+
+    @Test
+    void occurrencesTruncateAt500() {
+        when(anniversaryService.list(FAMILY)).thenReturn(List.of());
+        when(planMapper.selectList(any())).thenReturn(List.of(), List.of());
+        when(reminderMapper.selectList(any())).thenReturn(List.of());
+        when(sourceProvider.available(FAMILY)).thenReturn(true);
+        doAnswer(inv -> {
+            List<Map<String, Object>> items = inv.getArgument(3);
+            LocalDate base = LocalDate.of(2026, 1, 1);
+            for (long i = 0; i < 600; i++) {
+                items.add(ScheduleSourceProvider.readOnlyItem(
+                        "LOAN", i, "事项" + i, base.plusDays(i % 90), "/book?tab=loan"));
+            }
+            return null;
+        }).when(sourceProvider).append(eq(FAMILY), any(), any(), any());
+
+        Map<String, Object> result = service.occurrences(FAMILY,
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31));
+
+        assertThat(occurrenceItems(result)).hasSize(500);
+        assertThat(result).containsEntry("truncated", true);
     }
 }

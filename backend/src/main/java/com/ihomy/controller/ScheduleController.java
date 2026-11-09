@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -53,6 +55,27 @@ public class ScheduleController {
         SysUser user = securityHelper.currentUser();
         if (user == null) return Result.success(List.of());
         return Result.success(scheduleService.upcoming(user.getFamilyId(), days));
+    }
+
+    /**
+     * 闹钟注册与桌面卡片的唯一数据源:区间逐条摊平(循环事项每期一条),
+     * 每条带 key(幂等对账)/link(点击落点)/timeZone;游客返回空列表(提醒需登录才有意义)。
+     */
+    @Operation(summary = "闹钟/卡片数据源(区间逐条摊平,最多 92 天;游客返回空列表)")
+    @GetMapping("/occurrences")
+    public Result<Map<String, Object>> occurrences(@RequestParam(name = "from") String from,
+                                                   @RequestParam(name = "to") String to) {
+        LocalDate start = parseDate(from, "开始日期");
+        LocalDate end = parseDate(to, "结束日期");
+        SysUser user = securityHelper.currentUser();
+        if (user == null) {
+            Map<String, Object> empty = new LinkedHashMap<>();
+            empty.put("timeZone", ZoneId.systemDefault().getId());
+            empty.put("truncated", false);
+            empty.put("items", List.of());
+            return Result.success(empty);
+        }
+        return Result.success(scheduleService.occurrences(user.getFamilyId(), start, end));
     }
 
     private LocalDate parseDate(String raw, String label) {

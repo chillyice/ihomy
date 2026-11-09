@@ -13,6 +13,10 @@ export function bootNative() {
       import('./links').then((m) => m.installLinkHandler()),
       import('./network').then((m) => m.initNetworkStatus()),
       import('./credentials').then((m) => m.installCredentialShim()),
+      import('./deeplink').then((m) => m.initDeeplink()),
+      import('./reminders').then((m) => m.initReminders()),
+      // 更新检查放最后:等前面的能力就绪,且不阻塞其它初始化
+      import('./appUpdate').then((m) => m.checkAppUpdate()),
     ]).then((results) => {
       for (const r of results) {
         if (r.status === 'rejected') console.warn('[native] 初始化项失败', r.reason)

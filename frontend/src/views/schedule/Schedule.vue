@@ -123,6 +123,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, ArrowRight, Filter } from '@element-plus/icons-vue'
 import { anniversaryApi, memberApi, planApi, publicApi, reminderApi, scheduleApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { isNativeApp } from '@/utils/platform'
 import { buildMonthGrid, isDateString, monthKey, monthRange, shiftMonth, todayString } from '@/utils/scheduleCalendar'
 import { buildList, sortEvents } from '@/utils/scheduleList'
 import { TYPE_FILTERS } from '@/utils/scheduleType'
@@ -382,6 +383,10 @@ const onToggle = async (it) => {
   // 循环提醒按当日勾选;一次性提醒忽略日期
   await reminderApi.toggleDone(it.id, it.kind === 'TASK' ? it.date : undefined)
   await Promise.all([loadMonth(), loadUpcoming()])
+  // 原生壳内立即重排闹钟(勾完成的那期不再响);Web 端动态 import 直接跳过
+  if (isNativeApp()) {
+    import('@/native/reminders').then((m) => m.syncNotifications()).catch(() => {})
+  }
 }
 
 const onToggleTask = async (it) => {

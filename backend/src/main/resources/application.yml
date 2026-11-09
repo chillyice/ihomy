@@ -120,6 +120,13 @@ app:
     retention-days: 30
     # 配好邮件通道(spring.mail.host)时是否向 OPS 邮箱发提醒;未配置则只在运维页展示
     mail-enabled: true
+  # Android 客户端版本(/public/app/latest 返回,App 内更新检查用):
+  # 发布新版 APK 时与仓库根 VERSION 同步;version 留空 = 尚未发布,客户端不提示。
+  # 生产 external.yml 若覆盖本段,请保持与实际上传到 /files/app/ 的包名一致
+  android:
+    latest-version:
+    min-supported-version:
+    latest-notes:
 
 logging:
   file:

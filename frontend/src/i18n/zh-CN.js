@@ -619,6 +619,17 @@ export default {
     fillTitle: '请填写标题',
     deleteMessage: '确定删除提醒「{title}」吗？',
     noData: '还没有提醒，添加家庭提醒吧',
+    // 系统通知(P1 提醒闭环):通道名 / 动作按钮 / 文案
+    channelName: '日程提醒',
+    actionDone: '完成',
+    actionSnooze: '稍后 10 分钟',
+    lateNightTag: '（昨晚）',
+    notifBodyTimed: '{time} · 到点啦，点击查看或完成',
+    notifBodyAllDay: '今天的事项，点击查看',
+    permissionTitle: '提醒通知未开启',
+    permissionGuide:
+      '没有通知权限，到点不会响铃。请到系统「设置 → 应用 → ihomy → 通知」手动开启；国产手机建议同时在电池设置里允许后台运行。',
+    gotIt: '知道了',
   },
   plan: {
     title: '家庭计划',
@@ -5777,5 +5788,14 @@ export default {
     hint: '左键旋转 · 右键平移 · 滚轮缩放 · 拖动发光小球移动光源',
     cityJinan: '济南',
     cityCustom: '自定义',
+  },
+  appUpdate: {
+    blockedTitle: '需要更新',
+    blockedBody: '当前版本过低，已不再受支持，请更新到 {version} 后继续使用。',
+    availableTitle: '发现新版本',
+    availableBody: '新版本 {version} 已发布{notes}',
+    goUpdate: '去更新',
+    later: '下次再说',
+    laterToast: '已跳过本次更新提醒',
   },
 }

@@ -43,6 +43,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -80,6 +81,14 @@ public class PublicController {
     private final CalendarService calendarService;
     private final StringRedisTemplate redis;
     private final ObjectMapper mapper;
+
+    /** Android 客户端版本信息(app.android.*,发布新版时与仓库根 VERSION 同步;留空 = 尚未发布 Android 包) */
+    @org.springframework.beans.factory.annotation.Value("${app.android.latest-version:}")
+    private String androidLatestVersion;
+    @org.springframework.beans.factory.annotation.Value("${app.android.min-supported-version:}")
+    private String androidMinSupportedVersion;
+    @org.springframework.beans.factory.annotation.Value("${app.android.latest-notes:}")
+    private String androidLatestNotes;
 
     @Operation(summary = "太阳信息(日出日落 + 三档晨昏 + 月相 + 当前太阳位置与直射点,可指定日期查看任意一天)")
     @GetMapping("/sun-info")
@@ -192,6 +201,22 @@ public class PublicController {
                 .location(URI.create("/files/" + page + "/" + file))
                 .cacheControl(CacheControl.noStore())
                 .build();
+    }
+
+    /**
+     * Android 客户端更新检查:App 启动时比对安装包 versionName 与这里返回的版本。
+     * 免登录;版本留空表示尚未发布 Android 包,客户端不提示。url 为 /files 直链,客户端拼接服务端 origin 下载。
+     */
+    @Operation(summary = "Android 客户端最新版本与下载地址(免登录)")
+    @GetMapping("/app/latest")
+    public Result<Map<String, Object>> appLatest() {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("version", androidLatestVersion);
+        data.put("url", androidLatestVersion.isBlank() ? ""
+                : "/files/app/ihomy-" + androidLatestVersion + ".apk");
+        data.put("notes", androidLatestNotes);
+        data.put("minSupported", androidMinSupportedVersion);
+        return Result.success(data);
     }
 
     @Operation(summary = "首页聚合（支持 ?hid= 混淆ID / ?home_id= 指定家庭）")

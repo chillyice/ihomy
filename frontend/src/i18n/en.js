@@ -618,6 +618,17 @@ export default {
     fillTitle: 'Please enter a title',
     deleteMessage: 'Delete reminder "{title}"?',
     noData: 'No reminders yet, add a family reminder',
+    // System notifications (P1 reminder loop): channel / actions / copy
+    channelName: 'Schedule reminders',
+    actionDone: 'Done',
+    actionSnooze: 'Snooze 10 min',
+    lateNightTag: ' (last night)',
+    notifBodyTimed: '{time} · It is time, tap to view or complete',
+    notifBodyAllDay: 'Scheduled for today, tap to view',
+    permissionTitle: 'Reminder notifications are off',
+    permissionGuide:
+      'Without notification permission reminders will be silent. Enable them in system Settings → Apps → ihomy → Notifications; on Chinese ROMs also allow background running in battery settings.',
+    gotIt: 'Got it',
   },
   plan: {
     title: 'Family plans',
@@ -5867,5 +5878,14 @@ export default {
     hint: 'Drag to rotate · right-drag to pan · scroll to zoom · drag the glowing ball to move the light',
     cityJinan: 'Jinan',
     cityCustom: 'Custom',
+  },
+  appUpdate: {
+    blockedTitle: 'Update required',
+    blockedBody: 'This version is no longer supported. Please update to {version} to continue.',
+    availableTitle: 'New version available',
+    availableBody: 'Version {version} is available{notes}',
+    goUpdate: 'Update',
+    later: 'Later',
+    laterToast: 'Update reminder skipped',
   },
 }

@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -47,6 +48,10 @@ public class ScheduleService {
 
     /** 区间查询上限(含首尾),防止误传整年 */
     private static final int MAX_RANGE_DAYS = 62;
+    /** 闹钟/卡片数据源区间上限(含首尾):客户端按 30 天窗口拉,留跨窗口余量 */
+    private static final int MAX_OCCURRENCE_DAYS = 92;
+    /** occurrences 单次最多返回条数,超出截断并置 truncated(客户端提示「还有更多」) */
+    private static final int OCCURRENCE_LIMIT = 500;
     /** 近期提醒默认天数与上限 */
     private static final int DEFAULT_UPCOMING_DAYS = 7;
     private static final int MAX_UPCOMING_DAYS = 30;
@@ -119,6 +124,45 @@ public class ScheduleService {
             if (result.size() >= UPCOMING_LIMIT) break;
         }
         return result;
+    }
+
+    /**
+     * 闹钟注册与桌面卡片的数据源:区间内逐条摊平,循环事项每期一条(不做 upcoming 的同项去重)。
+     * 与 events/upcoming 的差异:
+     * <ul>
+     *   <li>区间最多 {@value #MAX_OCCURRENCE_DAYS} 天;</li>
+     *   <li>过滤已完成(done)与 PLAN_TASK(子任务只在当日详情出现);</li>
+     *   <li>每条补 {@code key}(= kind:id:date,客户端按它对账注册/取消闹钟)与
+     *       {@code link}(通知/卡片点击落点;只读来源沿用 provider 给的,其余按 kind 给日程页深链);</li>
+     * </ul>
+     * 响应带 timeZone(服务器 IANA 名,一期按墙上时间用,客户端不做换算)与 truncated(超 500 条截断)。
+     */
+    public Map<String, Object> occurrences(Long familyId, LocalDate from, LocalDate to) {
+        validateRange(from, to, MAX_OCCURRENCE_DAYS);
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (Map<String, Object> raw : collectOccurrences(familyId, from, to, false)) {
+            String kind = (String) raw.get("kind");
+            if ("PLAN_TASK".equals(kind)) continue;
+            if (Boolean.TRUE.equals(raw.get("done"))) continue;
+            String date = (String) raw.get("date");
+            Map<String, Object> item = new LinkedHashMap<>(raw);
+            item.put("key", kind + ":" + raw.get("id") + ":" + date);
+            Object link = raw.get("link");
+            item.put("link", link != null ? link
+                    : ("ANNIVERSARY".equals(kind) ? "/anniversary" : "/plan?date=" + date));
+            items.add(item);
+        }
+        items.sort(Comparator
+                .comparing((Map<String, Object> m) -> (String) m.get("date"))
+                .thenComparing(m -> (String) m.get("time"), Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(m -> (Long) m.get("id")));
+        boolean truncated = items.size() > OCCURRENCE_LIMIT;
+        if (truncated) items = new ArrayList<>(items.subList(0, OCCURRENCE_LIMIT));
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("timeZone", ZoneId.systemDefault().getId());
+        data.put("truncated", truncated);
+        data.put("items", items);
+        return data;
     }
 
     /** 摊平区间内的全部事项(每项带 date),游客口径只摊纪念日 */
@@ -321,16 +365,20 @@ public class ScheduleService {
         return value instanceof Number n ? n.intValue() : null;
     }
 
-    /** 区间必填、顺序合法、最多 62 天 */
-    private static void validateRange(LocalDate from, LocalDate to) {
+    /** 区间必填、顺序合法、最多 maxDays 天(月历 62、闹钟 92) */
+    private static void validateRange(LocalDate from, LocalDate to, int maxDays) {
         if (from == null || to == null) {
             throw new BizException(ResultCode.BAD_REQUEST, "请选择开始与结束日期");
         }
         if (to.isBefore(from)) {
             throw new BizException(ResultCode.BAD_REQUEST, "结束日期不能早于开始日期");
         }
-        if (ChronoUnit.DAYS.between(from, to) + 1 > MAX_RANGE_DAYS) {
-            throw new BizException(ResultCode.BAD_REQUEST, "查询范围最多 62 天");
+        if (ChronoUnit.DAYS.between(from, to) + 1 > maxDays) {
+            throw new BizException(ResultCode.BAD_REQUEST, "查询范围最多 " + maxDays + " 天");
         }
+    }
+
+    private static void validateRange(LocalDate from, LocalDate to) {
+        validateRange(from, to, MAX_RANGE_DAYS);
     }
 }

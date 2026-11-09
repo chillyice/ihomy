@@ -750,3 +750,11 @@ npx cap open android
 - **P0 第 10 条「发布」** — 原文含「APK 放服务器 + `/app` 下载页 + `GET /public/app/latest`」 / 本轮未做 / 需要部署窗口与生产 `uploads` 写权限,等套壳验收通过后再上;本轮只交付可侧载 APK。
 - **P0 §6.3 路由** — 原文「先保持 history 实测,404 再兜底」 / 采用 history 模式 + `capacitor.config.json` 显式 `server.html5mode: true` / Capacitor 的本地服务本来就把「无扩展名路径」回落 `index.html`,写明防误改;真机冷启动仍需按验收表实测。
 
+
+### P1 实施差异(2026-11-10,V11.77)
+
+- **P1 权限引导** — 原计划「权限引导页(通知/精确闹钟/电池白名单三项)」/ 实际:通知权限被拒时一次性引导弹窗(系统设置路径指引),精确闹钟未授权时降级 inexact 并打告警日志;/plan 设置页内的状态展示与电池白名单引导后移 P2 / 页面级 UI 优先级低于闭环本身,一次弹窗已满足「不静默失败」。
+- **P1 深链格式** — 原计划 `/reminder?date=YYYY-MM-DD` / 实际 `occurrences.link` 直接给 `/plan?date=`(路由表里 /reminder 重定向会丢 date 参数);通知点击与外部 appUrlOpen 统一走 `native/deeplink.js`。
+- **P1 WorkManager 每日兜底(§5-P1 第5条)→ 移至 P2** — 原生 Worker 要脱离 WebView 独立拉接口,需要一份不轮换的只读凭证;这正是 P2 `type=WIDGET` 令牌的设计用途,届时卡片数据层与每日兜底共用同一 Kotlin HTTP 栈,避免先写一版用完即弃的凭证 hack。
+- **P1 系统日历导出兜底(§5-P1 第6条)→ 移至 P2** — 需要 WRITE_CALENDAR 运行时权限 + CalendarProvider 写入插件;与卡片同一批原生工作一起做,统一出真机验收。
+- **P1 验收口径** — 锁屏响铃/权限弹窗/注册对账已在模拟器实测通过;通知点击深链与「完成」动作的完整 UI 路径、循环提醒连续 3 天、真机矩阵留待真机阶段(模拟器上插件桥在自动化并发下会变慢挂起,应用本身无恙——物理机上不存在 CDP 并发评估)。
