@@ -3,7 +3,8 @@
   "appName": "ihomy",
   "webDir": "dist",
   "android": {
-    "allowMixedContent": false
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
   },
   "server": {
     "androidScheme": "https",

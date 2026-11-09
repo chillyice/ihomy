@@ -75,8 +75,17 @@ export async function clearTokens() {
   try {
     await loadStore()
     if (storeApi) {
-      await storeApi.remove(TOKEN_KEY)
-      await storeApi.remove(REFRESH_KEY)
+      // 两个 remove 各自独立执行:串行 try 包裹时第一个抛错会吞掉第二个,
+      // 实测登出后 refreshToken 残留在 Keystore;allSettled + 回读校验保底清干净
+      const results = await Promise.allSettled([storeApi.remove(TOKEN_KEY), storeApi.remove(REFRESH_KEY)])
+      for (const r of results) {
+        if (r.status === 'rejected') console.warn('[native] 安全存储清理项失败', r.reason)
+      }
+      const leftovers = await Promise.allSettled([storeApi.get(TOKEN_KEY), storeApi.get(REFRESH_KEY)])
+      const stillThere = leftovers.some((r) => r.status === 'fulfilled' && r.value)
+      if (stillThere) {
+        await Promise.allSettled([storeApi.remove(TOKEN_KEY), storeApi.remove(REFRESH_KEY)])
+      }
     }
   } catch (e) {
     console.warn('[native] 安全存储清理失败', e)

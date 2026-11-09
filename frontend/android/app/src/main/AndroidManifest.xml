@@ -1,13 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- allowBackup=false:令牌密文在 EncryptedSharedPreferences,其密钥不参与备份,
+         换机恢复后解不开等于死数据;关闭云备份也避免密文随 adb backup 落地。
+         usesCleartextTraffic=false:接口与文件全部 https,壳内不需要明文流量。 -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:usesCleartextTraffic="true"
+        android:usesCleartextTraffic="false"
         android:theme="@style/AppTheme">
 
         <activity
