@@ -1,10 +1,54 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#1F3A5F" />
+    <script>
+      // 首帧配色预置:主题类由 JS 包在 main.js 里才应用,冷启动(尤其浏览器以本站为启动页)时
+      // 这段空窗会先用 CSS 默认浅色铺满整页,等包加载完再翻成暮色 —— 表现为「整页纯色 → 突然变色」。
+      // 这里在首帧前按本地存储把 html 类先摆好,口径与 src/theme/index.js 的 loadTheme() 一致。
+      ;(function () {
+        try {
+          var PALETTE = {
+            warm: { dawn: '#F1E7D6', dusk: '#241A12' },
+            guangchen: { dawn: '#EDE4D3', dusk: '#0F1A2E' },
+          }
+          var raw = localStorage.getItem('ihomy-theme')
+          var s = raw ? JSON.parse(raw) : null
+          if (s && !s.theme && !s.mode) s = { theme: 'warm', mode: s.dark ? 'dusk' : 'dawn', autoMode: s.autoMode }
+          if (!s) s = { theme: 'warm', mode: 'dawn', autoMode: true }
+          if (!PALETTE[s.theme]) s.theme = 'warm'
+          if (s.mode !== 'dawn' && s.mode !== 'dusk') s.mode = 'dawn'
+          if (s.autoMode) {
+            var w = JSON.parse(localStorage.getItem('ihomy:theme:sun-window') || 'null')
+            var d = new Date()
+            var pad = function (n) {
+              return n < 10 ? '0' + n : '' + n
+            }
+            var today = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
+            var mm = function (t) {
+              var m = /^(\d{1,2}):(\d{2})$/.exec(String(t || '').trim())
+              return m ? Number(m[1]) * 60 + Number(m[2]) : null
+            }
+            var rise = w && w.date === today ? mm(w.sunrise) : null
+            var set = w && w.date === today ? mm(w.sunset) : null
+            if (rise != null && set != null && set > rise) {
+              var now = d.getHours() * 60 + d.getMinutes()
+              s.mode = now >= rise && now < set ? 'dawn' : 'dusk'
+            }
+          }
+          var html = document.documentElement
+          html.classList.add('theme-' + s.theme)
+          if (s.mode === 'dusk') html.classList.add('dark')
+          var meta = document.querySelector('meta[name="theme-color"]')
+          if (meta) meta.setAttribute('content', PALETTE[s.theme][s.mode])
+        } catch (e) {
+          /* 存储不可用/内容损坏时交给 main.js 兜底 */
+        }
+      })()
+    </script>
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>ihomy</title>
