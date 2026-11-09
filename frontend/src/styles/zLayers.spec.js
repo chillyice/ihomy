@@ -79,4 +79,45 @@ describe('全局层级标尺守门', () => {
     }
     expect(offenders, `引用了不存在的层级 token(检查拼写,可用值见 main.css):\n${offenders.join('\n')}`).toEqual([])
   })
+
+  it('层级顺序不可倒置(光影 --z-deco/--z-atmos 必须永远在弹窗 --z-overlay 之上)', () => {
+    const css = readFileSync(join(SRC, 'styles/main.css'), 'utf8')
+    const valueOf = (token) => {
+      const m = css.match(new RegExp(`${token}\\s*:\\s*(\\d+)`))
+      return m ? Number(m[1]) : NaN
+    }
+    const problems = []
+    const chain = [
+      '--z-content',
+      '--z-sticky',
+      '--z-nav',
+      '--z-float',
+      '--z-footer',
+      '--z-action',
+      '--z-immersive',
+      '--z-overlay',
+      '--z-messagebox',
+      '--z-popup',
+      '--z-toast',
+      '--z-deco',
+      '--z-atmos',
+      '--z-topmost',
+    ]
+    for (const token of chain) {
+      if (!Number.isFinite(valueOf(token))) problems.push(`${token} 缺失或不是纯数字`)
+    }
+    for (let i = 1; i < chain.length; i++) {
+      const prev = valueOf(chain[i - 1])
+      const cur = valueOf(chain[i])
+      if (prev >= cur) problems.push(`${chain[i - 1]}(${prev}) 必须小于 ${chain[i]}(${cur})`)
+    }
+    // 铁律单独再断言一次:被改错时的报错要最直白
+    const overlay = valueOf('--z-overlay')
+    for (const light of ['--z-deco', '--z-atmos']) {
+      if (!(overlay < valueOf(light))) {
+        problems.push(`弹窗遮罩 ${overlay} 必须低于光影 ${light}(${valueOf(light)}):光影永远在弹窗之上`)
+      }
+    }
+    expect(problems, `层级标尺顺序被改错了(见 docs/踩坑速查.md §3.36):\n${problems.join('\n')}`).toEqual([])
+  })
 })
