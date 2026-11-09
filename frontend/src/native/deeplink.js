@@ -7,9 +7,21 @@ import router from '@/router'
 function navigate(raw) {
   if (!raw) return
   try {
-    // 通知/卡片给的是站内路径(如 /plan?date=2026-11-12);外部唤起可能是完整 URL
-    const u = new URL(raw, 'https://localhost')
-    const path = u.pathname + u.search + u.hash
+    // 卡片/外部唤起是 ihomy://plan?date=... 自定义 scheme——URL 解析器对非标准 scheme 的 host/path
+    // 切分不可靠(Chromium 会把 //plan 塞进 pathname),所以手动剥前缀;
+    // 通知与程序化跳转是站内路径(如 /plan?date=2026-11-12),直接用。
+    let s = String(raw)
+    let path
+    if (s.startsWith('ihomy://')) {
+      path = '/' + s.slice(8).replace(/^\/+/, '')
+    } else if (s.startsWith('ihomy:')) {
+      path = '/' + s.slice(6).replace(/^\/+/, '')
+    } else if (s.startsWith('/')) {
+      path = s
+    } else {
+      const u = new URL(s)
+      path = u.pathname + u.search + u.hash
+    }
     if (router.currentRoute.value.fullPath === path) return
     router.push(path).catch(() => {})
   } catch (e) {

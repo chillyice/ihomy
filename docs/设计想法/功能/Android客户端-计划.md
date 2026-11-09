@@ -758,3 +758,13 @@ npx cap open android
 - **P1 WorkManager 每日兜底(§5-P1 第5条)→ 移至 P2** — 原生 Worker 要脱离 WebView 独立拉接口,需要一份不轮换的只读凭证;这正是 P2 `type=WIDGET` 令牌的设计用途,届时卡片数据层与每日兜底共用同一 Kotlin HTTP 栈,避免先写一版用完即弃的凭证 hack。
 - **P1 系统日历导出兜底(§5-P1 第6条)→ 移至 P2** — 需要 WRITE_CALENDAR 运行时权限 + CalendarProvider 写入插件;与卡片同一批原生工作一起做,统一出真机验收。
 - **P1 验收口径** — 锁屏响铃/权限弹窗/注册对账已在模拟器实测通过;通知点击深链与「完成」动作的完整 UI 路径、循环提醒连续 3 天、真机矩阵留待真机阶段(模拟器上插件桥在自动化并发下会变慢挂起,应用本身无恙——物理机上不存在 CDP 并发评估)。
+
+### P2 实施差异(2026-11-10,V11.78)
+
+- **P2 Jetpack Glance → RemoteViews 直写(Java)** — 原计划 Glance / 实际三张卡用经典 RemoteViews 直写 / Glance 需要引入 Kotlin + Compose 双工具链,而 Glance 的编译产物本来就是 RemoteViews;三张静态布局卡直写更稳、零新增依赖(仅 WorkManager),产物一致。
+- **P2 卡片「勾选=后台完成」→ v1 只读** — 原计划今日提醒卡可勾选 / 实际 v1 点击进 App 完成 / §7.2 的最小权限(WIDGET 只读、写接口 401)与卡片写回完成状态冲突;不给卡片写权限是安全取舍,勾选功能留待后续版本(短效完成令牌或专用动作端点)。
+- **P2 今日概览内容精简** — 原计划「日期+农历、天气、最近 3 条、未读数」/ 实际 v1「日期+最近 3 条日程」/ 客户端禁算农历(§10);天气需要定位参数与令牌覆盖,未读需要额外接口,均为增量,后补不破架构。
+- **P2 深链格式** — 卡片点击 `ihomy://plan?date=...` 自定义 scheme;`deeplink.js` 对其手动剥前缀(Chromium 的 URL 解析器把 `//plan` 塞进 pathname,不可靠,实测冷启动丢路径后修复)。launch intent 由 manifest 的 VIEW intent-filter 承接,`@capacitor/app` 的 appUrlOpen → deeplink.js 统一路由。
+- **P2 registerPlugin 时序** — 自定义 Capacitor 插件必须在 `MainActivity` 的 `super.onCreate` **之前** `registerPlugin`(桥在 super 里构建,晚了 JS 侧报 plugin not implemented)。
+- **P2 通知「每日 WorkManager 兜底」口径修订** — 卡片 Worker(30 分钟)只刷卡片数据;提醒闹钟的注册重排仍靠 JS 同步(App 启动/回前台/完成后)+ 插件内置的开机重排。若真机长期未开 App 出现漏响,再做原生侧重排(需要 WIDGET 令牌覆盖 occurrences 读权限——已具备)。
+- **P2 验收口径** — 机制链路全部实测(启动器枚举 3 张卡、令牌→Worker→缓存、occurrences 数据正确含服务端 days、深链冷启动落 /plan?date、无崩溃);卡片摆放与视觉效果是真机 30 秒手动步骤,真机阶段补截图进 docs/daily/。

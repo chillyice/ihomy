@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 深色模式卡片配色 -->
+    <color name="widget_surface">#F0222226</color>
+    <color name="widget_text_primary">#ECEDEF</color>
+    <color name="widget_text_secondary">#9CA3AF</color>
+    <color name="widget_accent">#7CA5F5</color>
+</resources>

@@ -15,6 +15,7 @@ export function bootNative() {
       import('./credentials').then((m) => m.installCredentialShim()),
       import('./deeplink').then((m) => m.initDeeplink()),
       import('./reminders').then((m) => m.initReminders()),
+      import('./widgets').then((m) => m.installWidgetBridge()),
       // 更新检查放最后:等前面的能力就绪,且不阻塞其它初始化
       import('./appUpdate').then((m) => m.checkAppUpdate()),
     ]).then((results) => {

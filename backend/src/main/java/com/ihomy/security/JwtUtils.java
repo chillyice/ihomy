@@ -29,6 +29,10 @@ public class JwtUtils {
     @Value("${jwt.refresh-token-expire}")
     private long refreshExpire;
 
+    /** 桌面卡片令牌有效期(秒),默认 30 天 */
+    @Value("${jwt.widget-token-expire:2592000}")
+    private long widgetExpire;
+
     private SecretKey key;
 
     /** 由配置的 secret 派生 HMAC 密钥(缺失时启动即失败,密钥只允许来自 external.yml 外挂配置) */
@@ -56,6 +60,15 @@ public class JwtUtils {
      */
     public String generateWallpaperToken(Long userId, String username) {
         return build(userId, username, null, null, refreshExpire, "WALLPAPER", false);
+    }
+
+    /**
+     * 签发桌面卡片令牌(type=WIDGET):卡片数据由原生 WorkManager 拉取,不经 WebView、无法复用会话令牌;
+     * 默认 30 天,不轮换拉黑(卡片可能与 App 各持一份、各自滑动续期)。角色与家庭随令牌携带(签发时快照)。
+     * 过滤器对 WIDGET 令牌做最小权限白名单:仅放行只读日程/天气/公开接口,写接口一律 401。
+     */
+    public String generateWidgetToken(Long userId, String username, String role, Long familyId) {
+        return build(userId, username, role, familyId, widgetExpire, "WIDGET", false);
     }
 
     /** 组装 JWT:type 区分 ACCESS/REFRESH,角色与家庭 ID 仅在访问令牌中携带;pwdChange=首登强制改密标记 */

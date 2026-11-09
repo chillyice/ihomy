@@ -46,7 +46,30 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String token = header.substring(7);
             try {
                 Claims claims = jwtUtils.parse(token);
-                if ("ACCESS".equals(claims.get("type", String.class))) {
+                if ("WIDGET".equals(claims.get("type", String.class))) {
+                    // 桌面卡片令牌:最小权限白名单——仅放行只读日程/天气/纪念日/公开接口,写接口一律 401。
+                    // 宁可白名单不要黑名单(§7.2);禁用账号按库校验,签发时的角色/家庭快照随令牌走。
+                    if (!widgetAllowed(request)) {
+                        denyWidget(response);
+                        return;
+                    }
+                    Long userId = Long.valueOf(claims.getSubject());
+                    var u = sysUserMapper.selectById(userId);
+                    if (u == null || com.ihomy.common.DictConst.USER_DISABLED.equals(u.getStatus())) {
+                        chain.doFilter(request, response);
+                        return;
+                    }
+                    String role = claims.get("role", String.class);
+                    Long familyId = claims.get("familyId", Long.class);
+                    if (familyId == null) familyId = u.getFamilyId();
+                    LoginUser loginUser = new LoginUser(userId, u.getUsername(), role, familyId);
+                    var auth = new UsernamePasswordAuthenticationToken(
+                            loginUser, null, List.of(new SimpleGrantedAuthority("ROLE_" + role)));
+                    auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(auth);
+                    request.setAttribute("ihomy.userId", userId);
+                    request.setAttribute("ihomy.username", u.getUsername());
+                } else if ("ACCESS".equals(claims.get("type", String.class))) {
                     Long userId = Long.valueOf(claims.getSubject());
                     String username = claims.get("username", String.class);
                     String role = claims.get("role", String.class);
@@ -90,6 +113,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private boolean passwordChangeAllowed(HttpServletRequest request) {
         String path = request.getServletPath();
         return "/profile/password".equals(path) || "/auth/logout".equals(path);
+    }
+
+    /** 卡片令牌白名单:仅 GET,只读日程/天气/纪念日/提醒列表/公开接口;不包含 /files(卡片不该拿到文件读权) */
+    private boolean widgetAllowed(HttpServletRequest request) {
+        if (!"GET".equalsIgnoreCase(request.getMethod())) return false;
+        String path = request.getServletPath();
+        return path.startsWith("/schedule/") || path.startsWith("/weather/") || path.startsWith("/public/")
+                || path.startsWith("/anniversary/") || "/reminder".equals(path) || "/reminder/list".equals(path);
+    }
+
+    /** 卡片令牌访问白名单外接口:直接 401,不走通用异常链 */
+    private void denyWidget(HttpServletResponse response) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        response.getWriter().write(objectMapper.writeValueAsString(Result.fail(ResultCode.UNAUTHORIZED)));
     }
 
     private void denyPasswordChangeRequired(HttpServletResponse response) throws IOException {

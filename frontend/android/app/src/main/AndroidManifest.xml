@@ -26,7 +26,52 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- 桌面卡片深链:ihomy://plan?date=... / ihomy://anniversary 等,进入壳内由 deeplink.js 统一路由 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="ihomy" />
+            </intent-filter>
+
         </activity>
+
+        <!-- 桌面卡片 ×3:今日概览 / 今日提醒 / 纪念日倒计时(RemoteViews 直写,数据见 widget/ 目录) -->
+        <receiver
+            android:name=".widget.TodayWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_today_desc">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_today" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.ReminderWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_reminder_desc">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_reminder" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.CountdownWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_countdown_desc">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_countdown" />
+        </receiver>
 
         <provider
             android:name="androidx.core.content.FileProvider"

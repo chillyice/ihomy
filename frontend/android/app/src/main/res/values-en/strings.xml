@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <!-- Widget strings in English (device locale en); app name stays "ihomy" -->
+    <string name="widget_sign_in">Open ihomy to sign in</string>
+    <string name="widget_loading">Loading…</string>
+    <string name="widget_no_reminders">No reminders today</string>
+    <string name="widget_no_anniversary">No anniversary yet</string>
+    <string name="widget_today_desc">Today and recent schedule</string>
+    <string name="widget_reminder_desc">Today\'s reminder times</string>
+    <string name="widget_countdown_desc">Next anniversary countdown</string>
+</resources>

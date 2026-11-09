@@ -239,10 +239,16 @@ public class AuthService {
         return Map.of("refreshToken", jwtUtils.generateWallpaperToken(user.getId(), user.getUsername()));
     }
 
+    /** 签发桌面卡片令牌(供 Android 卡片 WorkManager 使用,之后由 /auth/refresh 滑动续期);角色与家庭是签发时快照 */
+    public Map<String, String> widgetToken(SysUser user) {
+        return Map.of("refreshToken",
+                jwtUtils.generateWidgetToken(user.getId(), user.getUsername(), roleOf(user), familyOf(user)));
+    }
+
     /**
      * 刷新令牌:校验 refresh token 未过期/未拉黑后重签 access token。
      * 普通刷新令牌每次使用后即拉黑(轮换,单次有效,被盗令牌无法在登出后继续续期);
-     * 壁纸令牌(WALLPAPER)不轮换拉黑,允许浏览器会话与多个壁纸实例各持一份、各自滑动续期。
+     * 壁纸(WALLPAPER)与桌面卡片(WIDGET)令牌不轮换拉黑,允许浏览器会话与多个介质各持一份、各自滑动续期。
      */
     public Map<String, Object> refresh(String refreshToken) {
         if (!jwtUtils.isValid(refreshToken)) {
@@ -251,7 +257,8 @@ public class AuthService {
         var claims = jwtUtils.parse(refreshToken);
         String type = claims.get("type", String.class);
         boolean wallpaper = "WALLPAPER".equals(type);
-        if (!"REFRESH".equals(type) && !wallpaper) {
+        boolean widget = "WIDGET".equals(type);
+        if (!"REFRESH".equals(type) && !wallpaper && !widget) {
             throw new BizException(ResultCode.UNAUTHORIZED);
         }
         String black = redisTemplate.opsForValue().get(BLACKLIST_PREFIX + refreshToken);
@@ -274,6 +281,10 @@ public class AuthService {
         if (wallpaper) {
             return buildTokens(user, roleCode, familyId,
                     jwtUtils.generateWallpaperToken(user.getId(), user.getUsername()));
+        }
+        if (widget) {
+            return buildTokens(user, roleCode, familyId,
+                    jwtUtils.generateWidgetToken(user.getId(), user.getUsername(), roleCode, familyId));
         }
         Map<String, Object> out = buildTokens(user, roleCode, familyId);
         blacklist(refreshToken, "rot:" + System.currentTimeMillis() + ":" + out.get("refreshToken"));

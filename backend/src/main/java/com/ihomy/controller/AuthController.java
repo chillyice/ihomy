@@ -123,6 +123,19 @@ public class AuthController {
         return Result.success(data);
     }
 
+    /**
+     * 获取桌面卡片令牌(Android 卡片 WorkManager 专用):原生侧存本地,凭它只读拉日程/天气。
+     * 与壁纸令牌不同:不给 cookie(卡片走 Bearer,不该拿到 /files 读权),登出不吊销(§7.2)。
+     */
+    @Operation(summary = "获取桌面卡片令牌(Android 卡片专用)")
+    @OperationLog(module = "AUTH", operationType = "CREATE", description = "获取桌面卡片令牌", saveArgs = false)
+    @PostMapping("/widget-token")
+    public Result<Map<String, String>> widgetToken() {
+        SysUser user = securityHelper.currentUser();
+        if (user == null) throw new BizException(ResultCode.UNAUTHORIZED);
+        return Result.success(authService.widgetToken(user));
+    }
+
     /** 登录/注册/刷新后把访问令牌放进 cookie:图片等静态资源请求带不了 Authorization 头,登录态靠它读 /files */
     private void attachAccessToken(HttpServletRequest request, HttpServletResponse response, Map<String, Object> data) {
         Object token = data == null ? null : data.get("accessToken");

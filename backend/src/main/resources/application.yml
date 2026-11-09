@@ -62,6 +62,8 @@ jwt:
   access-token-expire: 7200
   # 刷新令牌有效期（秒）- 7天
   refresh-token-expire: 604800
+  # 桌面卡片令牌有效期（秒）- 30天;不轮换,白名单只读(§计划 7.2)
+  widget-token-expire: 2592000
 
 # 文件上传存储
 # 注意:upload-dir 必须与 nginx /files/ 的 alias 指向同一目录,用绝对路径避免随启动目录漂移

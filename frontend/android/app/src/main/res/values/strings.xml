@@ -4,4 +4,13 @@
     <string name="title_activity_main">ihomy</string>
     <string name="package_name">top.ihomy.app</string>
     <string name="custom_url_scheme">top.ihomy.app</string>
+
+    <!-- 桌面卡片(默认中文;英文覆盖见 values-en) -->
+    <string name="widget_sign_in">打开 ihomy 登录后查看</string>
+    <string name="widget_loading">正在加载…</string>
+    <string name="widget_no_reminders">今天没有提醒</string>
+    <string name="widget_no_anniversary">暂无纪念日</string>
+    <string name="widget_today_desc">今天日期与最近日程</string>
+    <string name="widget_reminder_desc">今日提醒时刻清单</string>
+    <string name="widget_countdown_desc">下一个纪念日倒计时</string>
 </resources>
