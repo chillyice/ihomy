@@ -396,6 +396,7 @@ color: #3A2E22;
 - 3 态开关:lampMode=auto(夜间自动)/on(常开)/off(关),按钮图标🌑/💡/⬛循环切换。
 - `lampStrength`:auto=`sunScene.lampOpacity`、on=1、off=0。
 - 开关时机:`lampOpacity=(isNight||dayProgress≥0.9||dayProgress≤0.1)?1:0`。
+- **天气补光(V11.66)**:雾/阴进入 3 秒(`LAMP_AUTO_ON_MS`)后 `lampAutoOn=true`,auto 模式下 `lampStrength` 直接取 1;只作用于 auto(`on` 已亮、`off` 必须尊重用户),空闲关灯优先于天气开灯;雨/雪/雷不联动台灯。
 - 色温可调:lampTemp 0-100 滑块,warm rgba(255,180,100)→cool rgba(220,230,255)。
 - 亮度可调:lampBrightness 0-100 滑块,控制 mask 透明区域比例。
 - 钟摆运动:CSS `@keyframes lampSwing` 驱动(8 秒周期),不经过 Vue 响应式。横向 ±1.5vw,两侧 scaleX 0.97/1.03。
@@ -408,11 +409,12 @@ color: #3A2E22;
 - `codeToPrecipLevel(code)` 1-6 级。
 - `snowParticles`(❄ 字符 12-28px)/`rainParticles`(线性雨滴)computed 数组,数量=降水等级×10。
 - `cloudFlicker` GSAP 每 4-8s 随机补间 0.1-1,模拟云彩遮阳。
-- `weatherShadowOpacity`:雨雪=1,多云=`1-cloudFlicker`,晴=0。
+- `weatherShadowOpacity`:多云=`1-cloudFlicker`,阴=`0.85`(常驻),晴/雨/雪/雷/雾=0——**雨雪雷粒子常驻但不压暗页面**。
+- **雾/阴(V11.63 → V11.66 定稿)**:昏暗常驻 + 3 秒自动开灯补光(见 §13)。`.fog-layer`(z=`--z-deco`+8,当前 278):9 个静态配置不规则雾团,预模糊 `radial-gradient`(**禁 `filter:blur`**,与 `.bg-blobs` 同一周期性重栅格化坑)+ translate-only CSS 漂移;进入 0.4s、转晴离场 1.4s(Vue Transition)。`weatherLightMul` 雾/阴=0.15、阴天压暗常驻;`brightSpotStyle` 压 0 列表包含雾/阴(昏暗天无直射亮斑)。
 - `.shadow-bar.weather-shadow` 在 window-shadow 内,继承同色同 blur。
 - `weatherMultiplier`(晴 1.0/多云 0.55/雨 0.25/雪 0.4)实时驱动 rayStyles/lightLayerOpacity/reflectionStyle。
 - 雪花/雨滴 CSS keyframes + `translateZ(0)` 合成层隔离。
-- bright-spot:雨雪时 opacity=0 隐藏。
+- bright-spot:雨雪时 opacity=0 隐藏;雾/阴同(无直射亮斑)。
 
 ## 15. GSAP 入场动画
 
@@ -508,6 +510,9 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 ### 弹窗深色模式
 
 - 弹窗背景 `#1E2A48`;次级按钮 `rgba(255,255,255,0.12)`;placeholder `rgba(232,220,200,0.35)`。
+- **弹窗内文本域 / 消息框输入框**(V11.62):`background: rgba(255,255,255,0.04)` + 边框 `rgba(232,220,200,0.12)` + placeholder `rgba(232,220,200,0.35)`(与既有 input wrapper 深色口径一致),否则深色下仍是白底浅字。
+- **页脚危险按钮**(V11.62):深色底 `rgba(201,116,116,0.15)` + 字 `var(--color-danger)`(对齐全局 `html.dark .el-button--danger`),浅粉底在深色弹窗里刺眼。
+- **成对维护**:`main.css` 的 EP 覆写浅色/深色各一块,新增浅色规则时紧跟同名 `html.dark` 块(坑见 `docs/踩坑速查.md` §3.74)。
 
 ### 弹窗宽度上限与内容栏对齐
 
@@ -640,7 +645,7 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 - **顶部实况卡**(.wt-hero):`.wt-hero-top` flex,左侧 `.wt-now`(flex:1,min-width:0)放城市+日期(次要色 14px)→ 大图标(56px 和风图标 qi-xxx)+ 大温度(56px/700 tabular-nums,° 28px 半透明)+ 今日高低温(上下排列,暖橙 `#c07a4a`/冷蓝 `#6a8ab0`)+ 天气文字;`.wt-metrics` 在下方通栏(auto-fill minmax(150px,1fr),移动端 2 列):体感/湿度/风向/风速/降水/气压/能见度/云量/露点,每项 `--color-card-2` 圆角 10px(12px 次要色标签+15px/600 数值)。**预警列不挤压指标网格**。
 - **气象预警(实况右侧,信号化)**:`.wt-warnings` = `flex: 0 1 auto` + `flex-wrap: wrap` + `justify-content: flex-end` + `gap: 8px` + `max-width: 100%`,**不做横向滚动、不用 `row-reverse`**。预警信号 `WarnSignal` = 级别色实心方块 + 和风类型图形(`qi-<code>`,缺码/未知回落 `9999`)+ 类型名,`flex: none`,58px 见方(`compact` 46px);黄 / 白两级底太浅,字色用 `#3a2e22`,其余用白字。**仅一条**:`.wt-warn-chip`(`flex: 0 1 340px`、圆角 10px、内距 10px 12px、左侧 3px 级别色条、底色=级别色 + `14`)里放信号 + 标题(类型+级别,级别色 13px/700)+ 起止时间(11px 次要色)+ 正文 12px/1.6 截 3 行。**≥2 条**:只排 `.wt-warn-icon`(信号本身,`padding:0`/`border:0`/`background:none`,hover `translateY(-2px)`),`title` 与 `aria-label` 带「类型 级别」+「查看预警详情」。**≤900px**:`.wt-hero-top` 改 column,`.wt-warnings` 改 `justify-content: flex-start`,单条 chip `flex: 1 1 100%`。点击开详情弹窗(`append-to-body` + `width:min(640px,92vw)`,见 §18a),弹窗头 = `compact` 信号 + 标题/起止时间/发布单位三行。
 - **逐小时卡**:section-label 右侧两组控件——`24 小时/72 小时` 分段器(`.view-toggle` + `.vt-btn.wt-vt-text`,宽度 auto、padding 0 10px、12px)+ 折线/卡片两个**图标按钮**(`.vt-btn` 内联 SVG 折线/四宫格,15px,带 `title` 与 `aria-label`);**激活类名是 `active` 不是 `on`**(全局 `.vt-btn.active`)。卡片模式=横向滚动 `.wt-hourly`(每卡 min-width 76px)。折线模式=SVG **宽度跟随容器**(24h 铺满内容宽、左右边界对称;72h 点位固定 46px 宽后横向滚动;容器内容宽 <320px 才出横向滚动条)×230 高,Catmull-Rom 平滑曲线 + **上下温度渐变**(描边与面积填充同向:`y1=0 → y2=1`,高处=高温=暖色、低处=低温=冷色,颜色跟高度不跟时间;面积顶部暖色 0.16 微透、底部淡出到 0.03);最高/最低点标注;底部每 3h 时间标签(**`.wc-xlabel` 用 `--color-text` 正文色 11px——次要色 10px 在暖色纸底上几乎看不清,轴标签是读数不是装饰**);hover 虚线竖线 + 圆点 + HTML tooltip(边缘 clamp 8%-92%)。**分钟降水摘要条**并入本卡顶部(12px/次要色/`--color-card-2` 底/圆角 8px/padding 8px 12px/margin-bottom 10px)。
-- **10 天预报(单列全宽 + 点行展开)**:**单列**——`.wt-daily { display: grid; grid-template-columns: 1fr }`,一天一行,不按远近拆表、也不再拆多列;行网格 `74px minmax(0,1fr) 144px 14px`。日期拆两级内联(`.wt-day-md` 月/日 13px·600 正文色 + `.wt-day-wd` 周几 11.5px 次要色)、白天天气**左对齐**(图标+文字,超出省略号截断、图标不裁切)、温度组靠右、末尾内联 SVG chevron(默认 `rotate(90deg)`,行 `.open` 时 `rotate(-90deg)`)。点行在行下展开当天详情(同一时间只展开一天,再点收起;`v-a11y-click` + `aria-expanded`),展开区 `.wt-day-detail` 为 `auto-fit minmax(140px,1fr)` 网格(`--color-card-2` 底、圆角 10px、`margin: 0 8px 8px`):夜间天气(图标+文字)、降水概率、降水量、湿度、风向风力、紫外线、日出/日落。**温度横条**(`.wt-trange` 右对齐 flex):最低温(次要色 13px,`min-width:27px` 右对齐)+ 轨道(8px 高圆角,`rgba(58,46,34,0.10)` 底,`min-width:46px` / `max-width:280px`)+ 最高温(13px/600,`min-width:27px` 左对齐);轨道内每天渐变段(`tempColor()` 7 段色阶:-20°冷蓝 `#4A6FD4`→42°暖红 `#D84A3A`,整体 min-max 定位 left/width 百分比)+ 均值指示点(5px 圆点)。**≤640px**:行网格 `70px / 1fr / 128px / 12px`、间距 6px;≤400px 轨道 `display:none`,只留两端数字。
+- **10 天预报(单列全宽 + 点行展开)**:**单列**——`.wt-daily { display: grid; grid-template-columns: 1fr }`,一天一行,不按远近拆表、也不再拆多列;行网格 `88px minmax(0,1fr) minmax(240px,1fr) 16px`(日期定宽、白天天气与温度区等分铺满)。日期拆两级内联(`.wt-day-md` 月/日 13px·600 正文色 + `.wt-day-wd` 周几 11.5px 次要色)、白天天气**水平居中**(图标+文字,超出省略号截断、图标不裁切)、温度组靠右、末尾内联 SVG chevron(默认 `rotate(90deg)`,行 `.open` 时 `rotate(-90deg)`)。点行在行下展开当天详情(同一时间只展开一天,再点收起;`v-a11y-click` + `aria-expanded`),展开区 `.wt-day-detail` 为 `auto-fit minmax(140px,1fr)` 网格(`--color-card-2` 底、圆角 10px、`margin: 0 8px 8px`):夜间天气(图标+文字)、降水概率、降水量、湿度、风向风力、紫外线、日出/日落。**温度横条**(`.wt-trange` 右对齐 flex):最低温(次要色 13px,`min-width:27px` 右对齐)+ 轨道(8px 高圆角,`rgba(58,46,34,0.10)` 底,`min-width:46px`、**不设 max-width**,随列宽伸展)+ 最高温(13px/600,`min-width:27px` 左对齐);轨道内每天渐变段(`tempColor()` 7 段色阶:-20°冷蓝 `#4A6FD4`→42°暖红 `#D84A3A`,整体 min-max 定位 left/width 百分比)+ 均值指示点(5px 圆点)。**≤640px**:行网格 `68px / minmax(0,1fr) / minmax(112px,40%) / 12px`、间距 6px;≤400px 行网格 `62px / minmax(0,1fr) / 72px / 10px`、轨道 `display:none`,只留两端数字。
 - **空气卡(L3,默认收起)**:常驻 AQI 大数值(34px/700)+ 等级(15px/600)+ 首要污染物(12px 次要色)+ PM2.5 标签 + 健康建议首行;右上 `.wt-more`(12px 次要色,文字 + `▾` 箭头 `.open` 时 `rotate(180deg)`)。展开区=其余 5 污染物标签(PM10/NO₂/SO₂/O₃/CO,`--color-card-2` 圆角小标签)+ 敏感人群建议 + 24h AQI 走势折线 + 未来 3 天 AQI 列表(左侧级别色条 + 类别胶囊 `级别色+'22'` + 首要污染物);健康建议块绿底 `rgba(107,155,107,0.08)` 圆角。
 - **晨昏地图卡(`.wt-map-card`,L3)**:**单列**——`.wt-map-grid { grid-template-columns: 1fr; gap: 14px }`,地图在上、`.wt-map-panel` 通栏在下(两栏并排时右栏太窄,9 时刻 3 列与 5 天月相挤在一起读不清)。地图 `.wt-map-wrap` 圆角 12px + `1px solid var(--color-border)`,内含 Canvas(`width:100%`,比例固定 720/288,`cursor:crosshair`)+ 叠在百分比位置的原生 `<button>` 城市点(14px 圆点,`--color-brand` 实心 + 2px `--color-card` 描边 + 外圈 1.5px 同色 50% 透明,`:focus-visible` 有 outline)。
   - **绘制顺序(顺序本身是正确性要求,不是审美偏好)**:**海洋底色 `--color-card-2` → 陆地填充 `--color-card` → 晨昏色带 → 海岸线 → 30° 经纬网 → 赤道与本初子午线 → 城市点 `--color-brand`**。色带画在**陆地之后**,否则夜半球大陆仍是亮色、晨昏线在大片陆地上根本看不出来;海岸线画在色带**之上**(`--color-text-tertiary` 85% / 0.6px),因为夜间色带压到最暗时海陆亮度会收敛到几乎一样(暖居实测 `#676970` vs `#616164`),靠描边把大陆轮廓捞回来。
@@ -890,7 +895,7 @@ gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, eas
 1. **气泡与卡片**:文本气泡限宽 78%、贴同侧头像(§3.26 口径);卡片消息由 `components/chat/cards/*` 结构化渲染(图片/链接/对象/邀请/通话),**禁 v-html**;卡片底 `--color-bg-2` + `--color-border` 描边圆角 10,缩略图 46–72px 圆角 8;链接卡新窗口 `rel="noopener noreferrer"`、缩略图 `referrerpolicy="no-referrer"` + 失败隐藏;对象卡整卡可点跳站内路由。
 2. **输入工具条**:工具条在上(图片/站内/链接/游戏邀请/通话,小圆 text 按钮 + tooltip)、输入行在下;待发送卡片预览条(品牌虚线框)可移除;链接弹窗 `dialog-sm` 带可选预览;站内选择器 `dialog-lg` 五 tab(相册/视频/图书/日记/愿望,过滤 PRIVATE)。
 3. **全局浮窗**:收起悬浮球 48px(品牌底 + 未读角标),桌面位置记忆 `ihomy:chat:float:v1`;展开面板 360×520(最小 280×360)圆角 14,标题栏拖拽/左下角缩放把手;移动端半屏抽屉(52vh,顶部标题+关闭,进横滑手势排除清单),球位避开 56px 底栏;层级 `--z-float`,通话覆盖层 `--z-overlay`;沉浸页只显示收起球。
-4. **通话界面**:来电响铃卡(图标摆动动画 + 接听/拒绝);通话中全屏深底(`rgba(10,12,16,.94)`),视频大窗 cover、本地小窗 180px 右下;音频通话头像态;底部动作条(静音/关摄像头/最小化/挂断,52px 圆钮);最小化小窗 220px 可拖拽(标题条 Pointer 拖拽);计时走 elapsed ref。
+4. **通话界面**:来电响铃**整屏接管**(Teleport body + 显式 top/right/bottom/left 四边,不用 `inset`——safari14 构建目标下 iOS<16.4 会塌成顶部小条):大头像 + 双脉冲光环 + 底部接听/拒绝大圆钮(`env(safe-area-inset-bottom)` 适配);通话中全屏深底(`rgba(10,12,16,.94)`),视频大窗 cover、本地小窗 180px 右下;音频通话头像态;底部动作条(静音/关摄像头/最小化/挂断,52px 圆钮);最小化小窗 220px 可拖拽(标题条 Pointer 拖拽);计时走 elapsed ref。**媒体失败按错误码出文案**(权限拒绝/无设备/被占用/环境不支持各一句),不要笼统「请检查连接」;视频失败降级语音要提示已改用语音;被叫接听失败显式报错并回绝。
 5. **对战 UI**:对战横幅(品牌虚线框)显示对手/状态/结果;详情页比分卡左右对峙布局,胜者描边高亮;贪吃蛇对战页双蛇双色(host 品牌色/guest 橙),计分条置顶,起跑/等待/终局三态遮罩。
 
 
