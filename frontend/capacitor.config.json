@@ -1,0 +1,17 @@
+{
+  "appId": "top.ihomy.app",
+  "appName": "ihomy",
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https",
+    "html5mode": true
+  },
+  "plugins": {
+    "Keyboard": {
+      "resize": "native"
+    }
+  }
+}

@@ -213,7 +213,17 @@
 <script setup>
 import { onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { BIT_POUCH_DESKTOP_TOOL_COUNT, BIT_POUCH_REPO, BIT_POUCH_VERSION, pouchMark, ghIcon, dlIcon, webIcon, zipIcon } from './bitpouch/brand'
+import {
+  BIT_POUCH_DESKTOP_TOOL_COUNT,
+  BIT_POUCH_REPO,
+  BIT_POUCH_VERSION,
+  pouchMark,
+  ghIcon,
+  dlIcon,
+  webIcon,
+  zipIcon,
+} from './bitpouch/brand'
+import { serverUrl } from '@/utils/assetUrl'
 
 // ---- 分发渠道 ----
 // 安装包由 bit_pouch 仓的 .github/workflows/release.yml 构建,发版后由服务器上的
@@ -225,7 +235,7 @@ const version = BIT_POUCH_VERSION
 const repoUrl = BIT_POUCH_REPO
 const releasesUrl = `${repoUrl}/releases`
 // 直链前多一跳后端:计数后 302 到 /files/bit_pouch/(文件仍由 nginx 静态下发),下载数才统计得到
-const fileUrl = (name) => `/api/public/product/download?page=bit_pouch&file=${encodeURIComponent(name)}`
+const fileUrl = (name) => serverUrl(`/api/public/product/download?page=bit_pouch&file=${encodeURIComponent(name)}`)
 
 // 主 CTA:Windows 安装版(与下载表第一行一致)
 const primaryAsset = `bit_pouch_${version}_x64-setup.exe`
@@ -375,7 +385,7 @@ onMounted(() => {
   // 类在挂载/卸载时增删,保证这份 chunk 的规则不会漏给 ihomy 其他页面。
   document.documentElement.classList.add('bitpouch-page')
   // 访问打点:只在 access 日志留痕供运维统计,失败静默(离线/拦截都不影响页面)
-  fetch('/api/public/page-view?page=bit_pouch', { method: 'POST', keepalive: true }).catch(() => {})
+  fetch(serverUrl('/api/public/page-view?page=bit_pouch'), { method: 'POST', keepalive: true }).catch(() => {})
 })
 onBeforeUnmount(() => {
   document.title = 'ihomy'

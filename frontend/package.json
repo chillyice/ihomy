@@ -16,9 +16,22 @@
     "tools:export": "node ../scripts/export-tools.mjs",
     "tools:export:check": "node ../scripts/export-tools.mjs --check",
     "format": "prettier --write \"src/**/*.{js,vue,css}\"",
-    "format:check": "prettier --check \"src/**/*.{js,vue,css}\""
+    "format:check": "prettier --check \"src/**/*.{js,vue,css}\"",
+    "app:build": "node scripts/copy-ruffle.mjs && node scripts/copy-emulatorjs.mjs && vite build --mode app",
+    "app:sync": "npm run app:build && npx cap sync android",
+    "app:open": "npx cap open android"
   },
   "dependencies": {
+    "@aparajita/capacitor-secure-storage": "8.0.1",
+    "@capacitor/android": "8.6.0",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/browser": "8.0.5",
+    "@capacitor/core": "8.6.0",
+    "@capacitor/filesystem": "8.1.5",
+    "@capacitor/keyboard": "8.0.6",
+    "@capacitor/network": "8.0.1",
+    "@capacitor/share": "8.0.3",
+    "@capacitor/status-bar": "8.0.4",
     "@element-plus/icons-vue": "^2.3.1",
     "@emulatorjs/emulatorjs": "^4.2.3",
     "@ruffle-rs/ruffle": "0.7.1",
@@ -42,6 +55,7 @@
     "yaml": "^2.9.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "8.6.0",
     "@eslint/js": "10.0.1",
     "@vitejs/plugin-vue": "6.0.10",
     "eslint": "10.14.0",

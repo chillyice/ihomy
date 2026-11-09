@@ -19,6 +19,9 @@ public class AuthCookie {
 
     public static final String NAME = "ihomy_at";
 
+    /** Capacitor 客户端壳的固定页面 origin(WebView androidScheme=https + hostname=localhost) */
+    private static final String APP_ORIGIN = "https://localhost";
+
     @Value("${jwt.access-token-expire}")
     private long accessExpire;
 
@@ -49,10 +52,23 @@ public class AuthCookie {
     }
 
     private String build(String token, HttpServletRequest request) {
+        boolean secure = request.isSecure();
+        // Android 客户端壳内页面 origin 固定为 https://localhost(Capacitor androidScheme=https + hostname=localhost),
+        // 相对 ihomy.top 属跨站:默认 Lax 不会随 <img>/<video> 子资源发出,家庭私有照片/电子书会被判未登录。
+        // 仅对壳来源降为 SameSite=None(None 必须配 Secure);Web 端仍是 Lax,CSRF 面不变。
+        boolean appOrigin = isAppOrigin(request);
+        String sameSite = appOrigin ? "None" : "Lax";
         StringBuilder sb = new StringBuilder(NAME).append('=').append(token)
-                .append("; Path=/; HttpOnly; SameSite=Lax; Max-Age=").append(Math.max(accessExpire / 1000, 60));
+                .append("; Path=/; HttpOnly; SameSite=").append(sameSite)
+                .append("; Max-Age=").append(Math.max(accessExpire / 1000, 60));
         // 开发环境 http 下不加 Secure,否则浏览器直接丢弃 cookie、图片全 403
-        if (request.isSecure()) sb.append("; Secure");
+        // (SameSite=None 例外:规范要求必须带 Secure,壳只连 https 生产环境)
+        if (secure || appOrigin) sb.append("; Secure");
         return sb.toString();
+    }
+
+    /** 请求是否来自 Capacitor 客户端壳(跨站固定 origin) */
+    private boolean isAppOrigin(HttpServletRequest request) {
+        return APP_ORIGIN.equalsIgnoreCase(request.getHeader("Origin"));
     }
 }

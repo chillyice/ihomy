@@ -8,6 +8,7 @@ import { useUserStore } from '@/stores/user'
 import { createChatSocket, SOCKET_STATUS } from '@/composables/useChatSocket'
 import { serializePayload } from '@/utils/chatMsg'
 import { useCallStore } from '@/stores/call'
+import { rewriteAssetUrls } from '@/utils/assetUrl'
 
 let socket = null
 let wired = false
@@ -68,10 +69,14 @@ export const useChatStore = defineStore('chat', {
 
     buildUrl() {
       const userStore = useUserStore()
-      const proto = location.protocol === 'https:' ? 'wss' : 'ws'
+      const token = encodeURIComponent(userStore.token || '')
       // @vite 开发代理不转发 WS,直连 8080 端口(与原 Chat.vue 直连口径一致)
-      const base = import.meta.env.DEV ? 'ws://localhost:8080' : `${proto}://${location.host}`
-      return `${base}/api/ws/chat?token=${encodeURIComponent(userStore.token)}`
+      if (import.meta.env.DEV) return `ws://localhost:8080/api/ws/chat?token=${token}`
+      // 按 API 基址推导:套壳后页面 origin 是 https://localhost,用 location.host 会连到壳自己
+      const apiBase = import.meta.env.VITE_API_BASE || `${location.origin}/api`
+      const url = new URL(apiBase, location.href)
+      const proto = url.protocol === 'https:' ? 'wss:' : 'ws:'
+      return `${proto}//${url.host}${url.pathname.replace(/\/+$/, '')}/ws/chat?token=${token}`
     },
 
     /** 一次性接线:登出清场 + token 换代重连(WS 房间绑定握手时 familyId 快照,切换家庭必须重建) */
@@ -104,6 +109,8 @@ export const useChatStore = defineStore('chat', {
     /** WS 到达一条消息:进缓存、驱动 lastIncoming、按界面状态推进已读/未读 */
     onIncoming(data) {
       if (!data || data.id == null) return
+      // 壳内消息里的图片/封面是 /files/... 相对路径,补成服务端绝对地址(Web 端恒等)
+      data = rewriteAssetUrls(data)
       const userStore = useUserStore()
       const mine = data.senderId === userStore.userInfo?.id
       this.messages.push(data)

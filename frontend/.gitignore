@@ -6,4 +6,6 @@ dist-ssr
 .env
 .env.*
 !.env.example
+# App 构建专用基址(公开信息,非凭证):不入库会导致套壳包没有 API 地址
+!.env.app
 .vite

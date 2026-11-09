@@ -1,5 +1,6 @@
 // 各业务模块 API 汇总:统一走 request 实例,按模块导出供页面使用
 import request from '@/api/request'
+import { serverUrl } from '@/utils/assetUrl'
 
 // 公开接口:无需登录,支持 hid(混淆 token)优先、home_id 兜底指定家庭
 export const publicApi = {
@@ -517,7 +518,8 @@ export const storageApi = {
   removeDevice: (id) => request.delete(`/storage/device/${id}`),
   browse: (deviceId, path) => request.get('/storage/browse', { params: { deviceId, path } }),
   fileUrl: (deviceId, path, download) => {
-    const base = `/api/storage/file?deviceId=${deviceId}&path=${encodeURIComponent(path)}`
+    // 该地址直接给 <img>/window.open 用,不经过 axios 基址;壳内需补服务端 origin
+    const base = serverUrl(`/api/storage/file?deviceId=${deviceId}&path=${encodeURIComponent(path)}`)
     return download ? `${base}&download=true` : base
   },
   map: (data) => request.post('/storage/map', data),

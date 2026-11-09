@@ -1,12 +1,23 @@
-// 用户状态 store:token/refreshToken/userInfo 持久化到 localStorage,统一处理登录、续期、切换家庭与登出
+// 用户状态 store:统一处理登录、续期、切换家庭与登出。
+// 令牌存储:Web 用 localStorage;Capacitor 壳内用 Keystore(见 native/secureStore.js),
+// localStorage 只保留非敏感的 userInfo。
 import { defineStore } from 'pinia'
 import request from '@/api/request'
+import { isNativeApp } from '@/utils/platform'
+import { writeTokens, clearTokens } from '@/native/secureStore'
+
+// 壳内 Keystore 是异步的:main.js 在挂载前把令牌预读到这里,store 首次初始化即可拿到,
+// 避免首帧以游客态渲染(否则会先拉一批游客数据再突变登录态)
+let bootTokens = null
+export function setBootTokens(tokens) {
+  bootTokens = tokens
+}
 
 export const useUserStore = defineStore('user', {
   state: () => ({
-    // 初始化时从 localStorage 恢复登录态,保证刷新页面后保持登录
-    token: localStorage.getItem('token') || '',
-    refreshToken: localStorage.getItem('refreshToken') || '',
+    // 初始化时恢复登录态:壳内取启动预读值,Web 取 localStorage
+    token: (bootTokens ? bootTokens.token : localStorage.getItem('token')) || '',
+    refreshToken: (bootTokens ? bootTokens.refreshToken : localStorage.getItem('refreshToken')) || '',
     userInfo: JSON.parse(localStorage.getItem('userInfo') || 'null'),
     bgMusicVersion: 0,
   }),
@@ -57,7 +68,8 @@ export const useUserStore = defineStore('user', {
     },
     // 检查 userInfo 是否完整(含 permissions 字段),不完整则静默刷新一次
     async ensureUserInfo() {
-      if (this.token && this.userInfo && this.userInfo.permissions === undefined) {
+      // userInfo 缺失(如重装后只剩 Keystore 令牌)也要补一次,否则权限判断全空
+      if (this.token && (!this.userInfo || this.userInfo.permissions === undefined)) {
         try {
           await this.refresh()
         } catch (e) {
@@ -103,8 +115,13 @@ export const useUserStore = defineStore('user', {
       this.token = token
       // 首登强制改密时后端不签发刷新令牌(refreshToken 为 null),归一为空串避免存成 "null"
       this.refreshToken = refreshToken || ''
-      localStorage.setItem('token', token || '')
-      localStorage.setItem('refreshToken', refreshToken || '')
+      if (isNativeApp()) {
+        // 侧载包无商店保护:令牌只进 Keystore,localStorage 不落敏感值
+        writeTokens(this.token, this.refreshToken).catch(() => {})
+      } else {
+        localStorage.setItem('token', token || '')
+        localStorage.setItem('refreshToken', refreshToken || '')
+      }
     },
     bumpBgMusic() {
       this.bgMusicVersion++
@@ -118,6 +135,8 @@ export const useUserStore = defineStore('user', {
       localStorage.removeItem('token')
       localStorage.removeItem('refreshToken')
       localStorage.removeItem('userInfo')
+      // 壳内令牌在 Keystore,必须同步清掉,否则下次启动会把已登出的会话读回来
+      if (isNativeApp()) clearTokens().catch(() => {})
       // 清掉 Service Worker 缓存过的接口响应,避免登出后仍可离线读到上一账号的数据
       if (typeof caches !== 'undefined') caches.delete('api-cache').catch(() => {})
     },

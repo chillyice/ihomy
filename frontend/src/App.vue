@@ -116,6 +116,8 @@ watch(
 const elLocale = computed(() => (locale.value === 'en' ? en : zhCn))
 
 onMounted(async () => {
+  // 原生壳能力(返回键/状态栏/下载/外链/断网提示):懒加载,Web 端 bootNative 直接返回
+  import('@/native').then((m) => m.bootNative()).catch((e) => console.warn('[native] 初始化失败', e))
   // 等首次导航解析完再判定独立页,否则会把独立页当普通页初始化一次 ihomy 家庭数据
   await router.isReady()
   routeReady.value = true

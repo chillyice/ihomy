@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ihomy</string>
+    <string name="title_activity_main">ihomy</string>
+    <string name="package_name">top.ihomy.app</string>
+    <string name="custom_url_scheme">top.ihomy.app</string>
+</resources>

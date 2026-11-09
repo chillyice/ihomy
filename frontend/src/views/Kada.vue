@@ -232,6 +232,7 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { serverUrl } from '@/utils/assetUrl'
 
 // ---- 分发渠道 ----
 // Windows 绿色版 + 安装版(NSIS) 与 Linux(deb / AppImage) 都发 ihomy 直链
@@ -244,8 +245,8 @@ const repoUrl = 'https://github.com/chillyice/Kada'
 const releasesUrl = `${repoUrl}/releases`
 const assetUrl = (name) => `${repoUrl}/releases/download/v${version}/${name}`
 // 直链前多一跳后端:计数后 302 到 /files/kada/(文件仍由 nginx 静态下发),下载数才统计得到
-const exeUrl = `/api/public/product/download?page=kada&file=kada.exe`
-const fileUrl = (name) => `/api/public/product/download?page=kada&file=${encodeURIComponent(name)}`
+const exeUrl = serverUrl('/api/public/product/download?page=kada&file=kada.exe')
+const fileUrl = (name) => serverUrl(`/api/public/product/download?page=kada&file=${encodeURIComponent(name)}`)
 
 const { t } = useI18n()
 const rootEl = ref(null)
@@ -515,7 +516,7 @@ onMounted(() => {
   syncHtmlTheme()
   startLogoLoop()
   // 访问打点:只在 access 日志留痕供运维统计,失败静默(离线/拦截都不影响页面)
-  fetch('/api/public/page-view?page=kada', { method: 'POST', keepalive: true }).catch(() => {})
+  fetch(serverUrl('/api/public/page-view?page=kada'), { method: 'POST', keepalive: true }).catch(() => {})
 })
 
 onBeforeUnmount(() => {

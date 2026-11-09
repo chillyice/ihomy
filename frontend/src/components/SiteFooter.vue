@@ -16,7 +16,20 @@
 </template>
 
 <script setup>
-const appVersion = __APP_VERSION__
+import { onMounted, ref } from 'vue'
+
+// 版本号唯一事实来源是根 VERSION:Web 端由构建注入 __APP_VERSION__,
+// 原生壳内改读安装包 versionName(gradle 同样从 VERSION 生成),两者展示一致。
+const appVersion = ref(__APP_VERSION__)
+
+onMounted(() => {
+  import('@/native/version')
+    .then((m) => m.getAppVersion())
+    .then((v) => {
+      if (v) appVersion.value = v
+    })
+    .catch(() => {})
+})
 </script>
 
 <style scoped>

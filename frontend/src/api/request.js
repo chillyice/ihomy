@@ -5,9 +5,17 @@ import { isTokenExpired } from '@/utils/jwt'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
 import i18n from '@/i18n'
+import { rewriteAssetUrls } from '@/utils/assetUrl'
 
+// 基址:Web/开发走同源相对路径;Capacitor 壳内由 .env.app 注入服务端绝对地址
+// (壳内页面 origin 是 https://localhost,相对路径会打到壳自己)
 const request = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_BASE || '/api',
+  // 壳内页面 origin 是 https://localhost,接口在 https://ihomy.top 属跨源:
+  // 登录/刷新靠响应的 Set-Cookie 下发 ihomy_at(私有照片/电子书/视频按它鉴权),
+  // 跨源 XHR 默认不接收 Set-Cookie,不显式允许携带凭证会导致文件接口全部 403。
+  // Web 端是同源请求,该开关无副作用。
+  withCredentials: true,
   timeout: 15000,
 })
 
@@ -75,7 +83,9 @@ request.interceptors.response.use(
       return Promise.reject(res)
     }
     // 成功时直接返回 data 字段,调用方无需再取 res.data
-    return res.data !== undefined ? res.data : res
+    // 壳内把 /files/... 补成服务端绝对地址(Web 端此行是恒等返回)
+    if (res.data !== undefined) return rewriteAssetUrls(res.data)
+    return res
   },
   async (error) => {
     const status = error.response?.status

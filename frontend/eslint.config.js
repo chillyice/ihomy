@@ -7,7 +7,16 @@ import globals from 'globals'
 
 export default [
   {
-    ignores: ['dist/**', 'coverage/**', 'public/**', 'node_modules/**', '**/*.min.js'],
+    ignores: [
+      'dist/**',
+      'coverage/**',
+      'public/**',
+      'node_modules/**',
+      '**/*.min.js',
+      // Capacitor 原生工程:app/src/main/assets/public 是 cap sync 拷进来的构建产物
+      // (含 ruffle/emulatorjs 压缩包),不属于前端源码,必须排除
+      'android/**',
+    ],
   },
   js.configs.recommended,
   ...pluginVue.configs['flat/essential'],

@@ -21,20 +21,8 @@
         <div class="cy-air" aria-hidden="true"></div>
 
         <svg class="cy-orbit" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-          <path
-            v-for="(d, i) in sunPaths"
-            :key="`sun-${i}`"
-            :d="d"
-            class="cy-arc cy-arc--sun"
-            vector-effect="non-scaling-stroke"
-          />
-          <path
-            v-for="(d, i) in moonPaths"
-            :key="`moon-${i}`"
-            :d="d"
-            class="cy-arc cy-arc--moon"
-            vector-effect="non-scaling-stroke"
-          />
+          <path v-for="(d, i) in sunPaths" :key="`sun-${i}`" :d="d" class="cy-arc cy-arc--sun" vector-effect="non-scaling-stroke" />
+          <path v-for="(d, i) in moonPaths" :key="`moon-${i}`" :d="d" class="cy-arc cy-arc--moon" vector-effect="non-scaling-stroke" />
         </svg>
 
         <img class="cy-layer cy-far" :src="layerFar" alt="" />
@@ -44,11 +32,7 @@
           <div class="cy-puppet" :class="{ 'is-off': !sun.visible, 'is-ready': ready }" :style="puppetStyle(sun)">
             <span class="cy-string" aria-hidden="true"></span>
             <span class="cy-anchor">
-              <span
-                class="cy-disc cy-disc--sun"
-                role="img"
-                :aria-label="$t('chillyice.sunAria', { alt: Math.round(sunAlt) })"
-              >
+              <span class="cy-disc cy-disc--sun" role="img" :aria-label="$t('chillyice.sunAria', { alt: Math.round(sunAlt) })">
                 <img :src="discSun" alt="" />
               </span>
             </span>
@@ -144,6 +128,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref, watchEffect } from
 import { useI18n } from 'vue-i18n'
 import { moonLitPath, projectBody, projectTrack, skyStyle, stageLight } from '@/utils/celestialStage'
 import { moonPhaseText } from '@/utils/dict'
+import { serverUrl } from '@/utils/assetUrl'
 import animalBird from '@/assets/chillyice/animal-bird.webp'
 import animalDeer from '@/assets/chillyice/animal-deer.webp'
 import animalFox from '@/assets/chillyice/animal-fox.webp'
@@ -243,7 +228,7 @@ const load = async () => {
   try {
     const q = new URLSearchParams({ lat: JINAN.lat, lng: JINAN.lng })
     if (scrub.value !== null) q.set('at', instantAt(scrub.value))
-    const res = await fetch(`/api/public/astro?${q}`, {
+    const res = await fetch(serverUrl(`/api/public/astro?${q}`), {
       signal: controller.signal,
       headers: { Accept: 'application/json' },
     })
@@ -268,7 +253,7 @@ const loadDay = async () => {
   dayController = new AbortController()
   try {
     const q = new URLSearchParams({ lat: JINAN.lat, lng: JINAN.lng })
-    const res = await fetch(`/api/public/astro/day?${q}`, {
+    const res = await fetch(serverUrl(`/api/public/astro/day?${q}`), {
       signal: dayController.signal,
       headers: { Accept: 'application/json' },
     })
