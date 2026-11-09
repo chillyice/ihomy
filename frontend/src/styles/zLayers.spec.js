@@ -22,7 +22,7 @@ const REQUIRED_TOKENS = [
   '--z-topmost',
 ]
 
-// 有意保留的裸层级:main.css 是标尺本体;SunLightLayer 的 1–80 是背景光影自身刻度(氛围层走 --z-atmos);
+// 有意保留的裸层级:main.css 是标尺本体;SunLightLayer 的 1–2 是背景色块/玻璃底(光影刻度一律走 --z-deco/--z-atmos);
 // Kada 是独立页(无站点外壳),9989–9991 为该页 CRT 扫描线/暗角特效的页内层。
 const ALLOW_FILES = ['styles/main.css', 'components/SunLightLayer.vue', 'views/Kada.vue']
 

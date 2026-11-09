@@ -1,5 +1,5 @@
 <!-- 全局光影层:体积光 + 窗框阴影 + 台灯 + 灰尘 + 背景色块 + 闪电 + 雾霭 -->
-<!-- z-index 分层:bg-blobs(1)→glass-bg(2)→内容(10)→AppSidebar(60)→bright-spot(65)→window-shadow(68)→reflection(72)→light-layer(78)→fog(80)=背景光影(被弹窗遮罩压暗);vignette(300)→dust(302)→snow/rain(304)→lightning(306)→lamp-light(308)=氛围层(--z-atmos 起,盖在弹窗/轻提示之上) -->
+<!-- z-index 分层:bg-blobs(1)→glass-bg(2)→内容(10)→侧栏(60)→音乐(62)→页脚(70)→沉浸层(150)→弹窗(200–260)=UI 栈;bright-spot(270)→window-shadow(272)→reflection(274)→light-layer(276)→fog(278)=背景光影;vignette(300)→dust(302)→snow/rain(304)→lightning(306)→lamp-light(308)=氛围层。**两组光影都盖在弹窗之上**(用户口径:弹窗永远低于光影) -->
 <template>
   <div class="sun-light-layer" aria-hidden="true">
     <!-- 背景色块:5 个 blur 色块随机飘动(可开关) -->
@@ -221,7 +221,7 @@ const fogBlobStyle = (b) => ({
 .sun-light-layer {
   pointer-events: none;
   /* 不设 position/inset/z-index:子元素都是 fixed,各自在 root stacking context 中 */
-  /* 这样 z-index 35/48/100 等与页面内容(z=10)在同一 context 比较,和以前 Home.vue 一样 */
+  /* 这样 z-index 270/300 等与页面内容(z=10)、弹窗(z=200)在同一 context 比较,和以前 Home.vue 一样 */
 }
 
 /* 毛玻璃背景层:全屏固定,半透明米色,覆盖色块使其柔和(不用 backdrop-filter 避免与面板叠加) */
@@ -369,11 +369,11 @@ html.dark .blob-5 {
   }
 }
 
-/* 亮斑图层:multiply 染色,台灯 mask 挖洞 */
+/* 亮斑图层:multiply 染色,台灯 mask 挖洞(背景光影,盖在弹窗之上) */
 .bright-spot {
   position: fixed;
   inset: 0;
-  z-index: 65;
+  z-index: var(--z-deco);
   pointer-events: none;
   mix-blend-mode: multiply;
   -webkit-mask-image: var(--lamp-mask, none);
@@ -388,7 +388,7 @@ html.dark .blob-5 {
 .reflection-layer {
   position: fixed;
   inset: 0;
-  z-index: 72;
+  z-index: calc(var(--z-deco) + 4);
   pointer-events: none;
   mix-blend-mode: soft-light;
   transition: opacity 3s ease;
@@ -408,7 +408,7 @@ html.dark .blob-5 {
 .window-shadow {
   position: fixed;
   inset: 0;
-  z-index: 68;
+  z-index: calc(var(--z-deco) + 2);
   pointer-events: none;
   mix-blend-mode: multiply;
   opacity: var(--shadow-alpha, 0.7);
@@ -471,11 +471,11 @@ html.dark .blob-5 {
   transition: top var(--bar-transition, 3s ease);
 }
 
-/* 体积光层:丁达尔效应,screen */
+/* 体积光层:丁达尔效应,screen(背景光影,盖在弹窗之上) */
 .light-layer {
   position: fixed;
   inset: 0;
-  z-index: 78;
+  z-index: calc(var(--z-deco) + 6);
   pointer-events: none;
   mix-blend-mode: screen;
   overflow: hidden;
@@ -664,11 +664,11 @@ html.dark .blob-5 {
   transform: translateZ(0);
 }
 
-/* 雾霭层(z 80,背景光影最高一处):不规则雾团慢漂移,整层经 Vue Transition 淡入/消散(雾/阴转瞬效果) */
+/* 雾霭层(背景光影最高一处):不规则雾团慢漂移,整层经 Vue Transition 淡入/消散(雾/阴转瞬效果) */
 .fog-layer {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: calc(var(--z-deco) + 8);
   overflow: hidden;
   pointer-events: none;
   transform: translateZ(0);

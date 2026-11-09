@@ -4,11 +4,11 @@ import { ref, onUnmounted } from 'vue'
 // 用法:const { pos, size, reset } = useDragResize({ x, y, w, h, storageKey, minY, anchorRight, marginLeft })
 // storageKey 为空则不持久化;minY 限制最高位置(默认 0);anchorRight=true 时 pos.x 为离右边缘距离(拖动方向取反)
 // marginLeft 限制左侧边界(默认 0,沉浸式首页导航栏宽 220 时传 220)
-// zIndex:面板层级,拖拽/resize 时自动置顶(但不超过光影层 65),由模块级计数器管理
+// zIndex:面板层级,拖拽/resize 时自动置顶(但不超过侧栏 60),由模块级计数器管理
 // 事件:统一 Pointer Events(鼠标/触摸一把抓),把手容器加 touch-action:none 触屏才不会被页面滚动抢走;
 // 指针捕获只在真正拖动/缩放期间做(踩坑速查 §3.35:pointerdown 就捕获会让容器内所有卡片点不动)
 const PANEL_BASE_Z = 20
-const PANEL_TOP_MAX = 60 // 低于光影层 bright-spot(65)
+const PANEL_TOP_MAX = 60 // 低于侧栏(60)与全部光影(270+)
 let zCounter = PANEL_BASE_Z
 
 export function useDragResize(initial) {
