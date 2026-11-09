@@ -42,6 +42,12 @@
           var html = document.documentElement
           html.classList.add('theme-' + s.theme)
           if (s.mode === 'dusk') html.classList.add('dark')
+          // 冷启动保护窗口:首帧后 1.8s 内先不做大面积遮罩/混合合成,给 GPU 进程一点预热时间
+          // (浏览器以本站为启动页时,合成器常常还没就绪;期间一次性建多个全屏混合层会把窗口渲染成整片黑)
+          html.classList.add('booting')
+          setTimeout(function () {
+            html.classList.remove('booting')
+          }, 1800)
           var meta = document.querySelector('meta[name="theme-color"]')
           if (meta) meta.setAttribute('content', PALETTE[s.theme][s.mode])
         } catch (e) {

@@ -7,7 +7,7 @@
         <component :is="Component" :key="route.path" />
       </router-view>
       <template v-else-if="routeReady">
-        <SunLightLayer v-if="anyEffectEnabled && !immersive" />
+        <SunLightLayer v-if="anyEffectEnabled && !immersive && effectsReady" />
         <MobileLayout />
       </template>
     </template>
@@ -20,7 +20,7 @@
       </router-view>
       <template v-else-if="routeReady">
         <!-- 光影层:暖居/光尘共用同一套太阳驱动的丁达尔体积光+窗影+尘+台灯;沉浸式页面(如光影实验台)时隐藏 -->
-        <SunLightLayer v-if="anyEffectEnabled && !immersive" />
+        <SunLightLayer v-if="anyEffectEnabled && !immersive && effectsReady" />
         <!-- 暖居主题:独立外壳(顶栏 + studio 外框 + 侧栏),光影沿用 SunLightLayer -->
         <WarmLayout v-if="isWarm" />
         <template v-else>
@@ -85,6 +85,10 @@ const immersive = computed(() => !!route.meta.immersive)
 // 外壳(侧栏/播放器/暖居/首页)再被卸载——独立页(Kada/壁纸)因此会打出一批与它无关的 ihomy 接口
 // (含 OPS 权限 403 弹错、appStore 重复拉首页)。故外壳一律等解析完成后再渲染。
 const routeReady = ref(false)
+// 冷启动保护:光影层是 6~8 个全屏 fixed 层(mix-blend-mode / mask / blur),
+// 浏览器以本站为启动页时 GPU 进程可能还没就绪,首帧就建这么多重合成层容易把窗口渲染成整片黑。
+// 先让外壳画出来,再过 1.2s 才挂光影(与 index.html 的 html.booting 窗口同一思路)。
+const effectsReady = ref(false)
 // 独立站点页(咔哒软件首页等)：完全独立全屏，不套 ihomy 外壳/光影/侧栏/页脚
 const standalone = computed(() => routeReady.value && !!route.meta.standalone)
 const { locale } = useI18n()
@@ -119,6 +123,10 @@ onMounted(async () => {
   // 冷启动时网络可能还没就绪(浏览器随系统启动、把本站设为启动页):界面先画出来,请求却全部失败,
   // 页面会停在空数据/旧天气上。联网恢复后补拉一次,不必让用户手动刷新
   window.addEventListener('online', onOnline)
+  // 光影层延后挂载:先让首帧落地,别在合成器刚起来时一次建多个全屏混合层
+  setTimeout(() => {
+    effectsReady.value = true
+  }, 1200)
   // 等首次导航解析完再判定独立页,否则会把独立页当普通页初始化一次 ihomy 家庭数据
   await router.isReady()
   routeReady.value = true

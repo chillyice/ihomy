@@ -620,6 +620,14 @@ html {
   background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
 }
+
+/* 冷启动保护窗口(见 index.html 内联脚本):首帧后 1.8s 内不做大面积遮罩/混合合成。
+   暖居主区的滚动边缘渐变遮罩是整页尺寸的 mask,低端显卡 + 合成器刚起来时是高风险项;
+   窗口期过后再挂回,视觉上只是首屏那一下没有边缘渐隐 */
+html.booting .gc-main {
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+}
 body,
 #app {
   height: 100%;
