@@ -428,11 +428,9 @@ html.theme-warm .ops-tabs .el-tabs__header {
   top: 0;
 }
 
-/* 内容页:gc-main 滚动区上下边缘渐变(同物品定位页「边缘融入背景」),内容滚动不再硬切;物品定位页自带画板渐变,排除 */
-html.theme-warm .gc-main:not(:has(.fp-page)) {
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
-  mask-image: linear-gradient(to bottom, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
-}
+/* 内容页上下边缘渐隐:原方案是给 .gc-main 整片加 mask-image,
+   但整页尺寸的 mask 在「浏览器以本站为启动页 + GPU 进程刚起来」时会和光影层一起把窗口合成打挂
+   (V11.67~V11.72 冷启动整窗黑屏),这里直接不挂遮罩,内容在框内硬边滚动。 */
 
 /* 暖居不要五色漂移色块(光尘特征),背景回归暖木米 + 天气氛围 + 光柱 + 浮尘(视觉解析 §4) */
 html.theme-warm .bg-blobs {
@@ -621,13 +619,6 @@ html {
   -webkit-font-smoothing: antialiased;
 }
 
-/* 冷启动保护窗口(见 index.html 内联脚本):首帧后 1.8s 内不做大面积遮罩/混合合成。
-   暖居主区的滚动边缘渐变遮罩是整页尺寸的 mask,低端显卡 + 合成器刚起来时是高风险项;
-   窗口期过后再挂回,视觉上只是首屏那一下没有边缘渐隐 */
-html.booting .gc-main {
-  -webkit-mask-image: none !important;
-  mask-image: none !important;
-}
 body,
 #app {
   height: 100%;

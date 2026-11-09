@@ -85,9 +85,8 @@ const immersive = computed(() => !!route.meta.immersive)
 // 外壳(侧栏/播放器/暖居/首页)再被卸载——独立页(Kada/壁纸)因此会打出一批与它无关的 ihomy 接口
 // (含 OPS 权限 403 弹错、appStore 重复拉首页)。故外壳一律等解析完成后再渲染。
 const routeReady = ref(false)
-// 冷启动保护:光影层是 6~8 个全屏 fixed 层(mix-blend-mode / mask / blur),
-// 浏览器以本站为启动页时 GPU 进程可能还没就绪,首帧就建这么多重合成层容易把窗口渲染成整片黑。
-// 先让外壳画出来,再过 1.2s 才挂光影(与 index.html 的 html.booting 窗口同一思路)。
+// 冷启动保护:光影层是多张全屏 fixed 图层,浏览器以本站为启动页时 GPU 进程可能还没就绪,
+// 首帧就一次建这么多层容易把窗口渲染成整片黑(V11.70 起):先让外壳画出来,再过 1.2s 才挂光影。
 const effectsReady = ref(false)
 // 独立站点页(咔哒软件首页等)：完全独立全屏，不套 ihomy 外壳/光影/侧栏/页脚
 const standalone = computed(() => routeReady.value && !!route.meta.standalone)

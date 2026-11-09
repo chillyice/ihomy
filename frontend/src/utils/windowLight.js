@@ -158,8 +158,9 @@ export function getSunScene(sunInfo, slotIndex) {
   // 光源整体不透明度(控制 bloom 辉光):无直射光时 0,正弦过渡
   const lightOpacity = hasDirectLight ? Math.sin(dayProgress * Math.PI) : 0
 
-  // 反光层:内容组件被阳光照亮的轻微高光(soft-light,无直射光时 0)
-  const reflectionOpacity = hasDirectLight ? Math.sin(dayProgress * Math.PI) * 0.22 : 0
+  // 反光层:内容组件被阳光照亮的轻微高光(普通 alpha 叠加,无直射光时 0);
+  // 原 soft-light 已改为 alpha,系数按观感折半,避免亮度比原来更冲
+  const reflectionOpacity = hasDirectLight ? Math.sin(dayProgress * Math.PI) * 0.12 : 0
 
   // 台灯:太阳方位角>260°(日落西方)开灯,>100°且≤260°(白天)关灯
   const lampOpacity = az > 260 || az <= 100 || isNight ? 1 : 0

@@ -1,5 +1,8 @@
 <!-- 全局光影层:体积光 + 窗框阴影 + 台灯 + 灰尘 + 背景色块 + 闪电 + 雾霭 -->
 <!-- z-index 分层:bg-blobs(1)→glass-bg(2)→内容(10)→侧栏(60)→音乐(62)→页脚(70)→沉浸层(150)→弹窗(200–260)=UI 栈;bright-spot(270)→window-shadow(272)→reflection(274)→light-layer(276)→fog(278)=背景光影;vignette(300)→dust(302)→snow/rain(304)→lightning(306)→lamp-light(308)=氛围层。**两组光影都盖在弹窗之上**(用户口径:弹窗永远低于光影) -->
+<!-- ponytail: 本组件只用普通 alpha 叠加 + 渐变/mask,**不用 filter: blur() / mix-blend-mode**。
+     全屏混合层会让合成器为每层读一遍整屏背景、filter 要按元素外接盒分配离屏纹理(窗影条 1400px×337.5vh),
+     浏览器把本站当启动页冷启动时(GPU 进程刚起来)这套组合会把整窗渲染成黑屏(V11.67~V11.72 定位) -->
 <template>
   <div class="sun-light-layer" aria-hidden="true">
     <!-- 背景色块:5 个 blur 色块随机飘动(可开关) -->
@@ -231,7 +234,6 @@ const fogBlobStyle = (b) => ({
   z-index: 2;
   pointer-events: none;
   background: var(--light-glass-bg, rgba(250, 246, 236, 0.25));
-  transform: translateZ(0);
 }
 
 /* 背景色块:清新淡雅,随机飘动(fixed 固定不随页面滚动) */
@@ -369,30 +371,29 @@ html.dark .blob-5 {
   }
 }
 
-/* 亮斑图层:multiply 染色,台灯 mask 挖洞(背景光影,盖在弹窗之上) */
+/* 亮斑图层:纯色叠加,台灯 mask 挖洞(背景光影,盖在弹窗之上)
+   ponytail: 不用 mix-blend-mode —— 全屏混合层会强制合成器读取整屏背景,
+   冷启动(启动页 + GPU 刚起来)时是整窗黑屏的诱因。亮斑色本身是「暗色/浅色」,
+   普通 alpha 叠加与原 multiply 在米色底上几乎无差(纯黑/近黑时完全等价) */
 .bright-spot {
   position: fixed;
   inset: 0;
   z-index: var(--z-deco);
   pointer-events: none;
-  mix-blend-mode: multiply;
   -webkit-mask-image: var(--lamp-mask, none);
   mask-image: var(--lamp-mask, none);
   transition:
     background 3s ease,
     opacity 3s ease;
-  transform: translateZ(0);
 }
 
-/* 反光层:soft-light 高光 */
+/* 反光层:轻微高光(纯 alpha,不用 soft-light,避免全屏背景回读) */
 .reflection-layer {
   position: fixed;
   inset: 0;
   z-index: calc(var(--z-deco) + 4);
   pointer-events: none;
-  mix-blend-mode: soft-light;
   transition: opacity 3s ease;
-  transform: translateZ(0);
 }
 
 /* 台灯光源:氛围层最高(盖在弹窗之上,像灯照在纸面) */
@@ -405,19 +406,16 @@ html.dark .blob-5 {
   pointer-events: none;
 }
 
-/* 窗户阴影:6 条 bar,multiply,台灯 mask 挖洞 */
+/* 窗户阴影:6 条 bar,纯 alpha 叠加,台灯 mask 挖洞 */
 .window-shadow {
   position: fixed;
   inset: 0;
   z-index: calc(var(--z-deco) + 2);
   pointer-events: none;
-  mix-blend-mode: multiply;
   opacity: var(--shadow-alpha, 0.7);
   -webkit-mask-image: var(--lamp-mask, none);
   mask-image: var(--lamp-mask, none);
-  /* ponytail: 必须裁剪。multiply 要求整棵子树先画进一张离屏表面,
-     而 6 条 bar 是 1400px × 337.5vh 且带旋转,不裁剪时这张表面会按子元素外接盒分配(几十 MB),
-     冷启动 GPU 刚起来时直接分配失败 → 整窗黑屏。视口外的部分本来就不可见,裁掉零视觉损失 */
+  /* 裁剪:视口外的部分本来就不可见,裁掉可把这一层的绘制范围钉在视口内 */
   overflow: hidden;
 }
 .shadow-bar {
@@ -508,15 +506,13 @@ html.dark .blob-5 {
   transition: top var(--bar-transition, 3s ease);
 }
 
-/* 体积光层:丁达尔效应,screen(背景光影,盖在弹窗之上) */
+/* 体积光层:丁达尔效应,纯 alpha 叠加(背景光影,盖在弹窗之上) */
 .light-layer {
   position: fixed;
   inset: 0;
   z-index: calc(var(--z-deco) + 6);
   pointer-events: none;
-  mix-blend-mode: screen;
   overflow: hidden;
-  transform: translateZ(0);
 }
 .light-bloom {
   position: absolute;
@@ -578,7 +574,6 @@ html.dark .blob-5 {
     rgba(60, 38, 12, 0.08) 80%,
     rgba(45, 25, 8, 0.18) 100%
   );
-  transform: translateZ(0);
 }
 
 /* 天气覆盖阴影:与其他 shadow-bar 同色,固定全屏不移动,随天气显隐 */
@@ -589,15 +584,13 @@ html.dark .blob-5 {
   transition: opacity 2s ease;
 }
 
-/* 灰尘粒子:screen 发光,氛围层 */
+/* 灰尘粒子:明亮微粒,氛围层 */
 .dust-layer {
   position: fixed;
   inset: 0;
   z-index: calc(var(--z-atmos) + 2);
   pointer-events: none;
   overflow: hidden;
-  mix-blend-mode: screen;
-  transform: translateZ(0);
 }
 .dust {
   position: absolute;
@@ -643,7 +636,6 @@ html.dark .blob-5 {
   z-index: calc(var(--z-atmos) + 4);
   pointer-events: none;
   overflow: hidden;
-  transform: translateZ(0);
 }
 .snowflake {
   position: absolute;
@@ -678,7 +670,6 @@ html.dark .blob-5 {
   z-index: calc(var(--z-atmos) + 4);
   pointer-events: none;
   overflow: hidden;
-  transform: translateZ(0);
 }
 .raindrop {
   position: absolute;
@@ -701,15 +692,13 @@ html.dark .blob-5 {
   }
 }
 
-/* 雷雨闪电:全屏瞬间增亮,screen 混合(氛围层) */
+/* 雷雨闪电:全屏瞬间增亮(氛围层) */
 .lightning-flash {
   position: fixed;
   inset: 0;
   z-index: calc(var(--z-atmos) + 6);
   pointer-events: none;
-  mix-blend-mode: screen;
-  background: rgba(255, 255, 255, 0.6);
-  transform: translateZ(0);
+  background: rgba(255, 255, 255, 0.45);
 }
 
 /* 雾霭层(背景光影最高一处):不规则雾团慢漂移,整层经 Vue Transition 淡入/消散(雾/阴昏暗氛围,常驻) */
@@ -719,7 +708,6 @@ html.dark .blob-5 {
   z-index: calc(var(--z-deco) + 8);
   overflow: hidden;
   pointer-events: none;
-  transform: translateZ(0);
 }
 .fog-blob {
   position: absolute;
