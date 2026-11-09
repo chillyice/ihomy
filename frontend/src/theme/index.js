@@ -116,6 +116,11 @@ function copyScroll(orig, clone) {
 }
 
 function beginModeSweep(root, prevDusk) {
+  // 空壳/后台标签页不扫光:幕布是对当前 DOM 的克隆,没有内容可克隆时只会铺出一整片不透明色块。
+  // 启动瞬间 #app 还没渲染(外壳要等路由解析完)、或在后台标签里切档都会命中,此时直接切类即可
+  const app = document.getElementById('app')
+  if (document.hidden || !app || !app.firstElementChild) return null
+
   const toDusk = !prevDusk // true=晨→暮(暗色扫入),false=暮→晨(亮色扫入)
   const dir = sweepVector(_sun)
   const vx = toDusk ? dir.dx : -dir.dx // 扫光前进方向(新主题从该侧露出来)
@@ -166,7 +171,8 @@ function beginModeSweep(root, prevDusk) {
   }
 }
 
-export function applyTheme(state) {
+// sweep=false:不扫光直接切类,用于启动期按太阳状态校正档位(App.vue 外壳尚未渲染,扫光只会盖出整片色块)
+export function applyTheme(state, { sweep = true } = {}) {
   const t = { ...DEFAULT_THEME, ...state }
   const root = document.documentElement
   const nextDusk = t.mode === 'dusk'
@@ -175,7 +181,7 @@ export function applyTheme(state) {
   const withinWarm = _current && _current.theme === 'warm' && t.theme === 'warm'
 
   // 暖居内晨↔暮切换:切类前克隆旧主题整页为幕布,切类后蒙版扫光露出新主题
-  const finishSweep = isModeChange && withinWarm ? beginModeSweep(root, prevDusk) : null
+  const finishSweep = sweep && isModeChange && withinWarm ? beginModeSweep(root, prevDusk) : null
 
   root.classList.remove(...THEME_IDS.map((id) => 'theme-' + id))
   root.classList.add('theme-' + t.theme)

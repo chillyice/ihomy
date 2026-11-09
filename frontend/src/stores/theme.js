@@ -9,8 +9,8 @@ export const useThemeStore = defineStore('theme', {
     isDusk: (s) => s.mode === 'dusk',
   },
   actions: {
-    _apply() {
-      applyTheme({ theme: this.theme, mode: this.mode, autoMode: this.autoMode })
+    _apply({ sweep = true } = {}) {
+      applyTheme({ theme: this.theme, mode: this.mode, autoMode: this.autoMode }, { sweep })
     },
     setTheme(theme) {
       if (!THEMES[theme]) return
@@ -30,13 +30,14 @@ export const useThemeStore = defineStore('theme', {
       this.autoMode = autoMode
       this._apply()
     },
-    // 日出日落自动切晨暮:仅 autoMode 时生效,只切 mode 不切 theme
-    applyAuto(isNight) {
+    // 日出日落自动切晨暮:仅 autoMode 时生效,只切 mode 不切 theme。
+    // sweep=false 用于启动期校正本地档位(首屏还没渲染,扫光只会盖出整片色块)
+    applyAuto(isNight, { sweep = true } = {}) {
       if (!this.autoMode) return
       const mode = isNight ? 'dusk' : 'dawn'
       if (this.mode === mode) return
       this.mode = mode
-      this._apply()
+      this._apply({ sweep })
     },
   },
 })

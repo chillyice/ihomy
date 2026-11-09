@@ -442,13 +442,17 @@ export function useSunLight() {
 
   // 把一份 /public/sun-info 落到全局:记录取数时刻(供天气页判断共享数据是否还能复用,
   // 用本地时钟算时长,避免前后端时钟差)并同步光影场景与晨暮主题
+  // 启动后第一份数据按太阳状态校正本地档位属于「首屏校正」,不是用户正在看的昼夜切换:不扫光
+  // (App.vue 的外壳要等路由解析完才渲染,此时幕布只能克隆到空壳/半截 DOM,盖出一整片色块)
+  let bootCorrectionPending = true
   const applySunInfo = (data, { resetSlot = true } = {}) => {
     if (!data) return
     sunInfo.value = data
     sunInfoAt.value = Date.now()
     if (resetSlot) slotIdx.value = currentSlotIndex()
     sunScene.value = getSunScene(data, slotIdx.value)
-    themeStore.applyAuto(sunScene.value.isNight)
+    themeStore.applyAuto(sunScene.value.isNight, { sweep: !bootCorrectionPending })
+    bootCorrectionPending = false
   }
 
   // 共享 sun-info 距取数的时长(ms);从未取到返回 Infinity
