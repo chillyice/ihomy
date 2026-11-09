@@ -143,7 +143,7 @@
       ></div>
     </div>
 
-    <!-- 雾霭层:不规则雾团短暂笼罩(雾/阴天转瞬效果,3 秒后消散为正常页面) -->
+    <!-- 雾霭层:不规则雾团(雾/阴天昏暗氛围,常驻至天气转晴才消散;进入 3 秒后台灯自动开灯补光) -->
     <Transition name="fog">
       <div v-if="weatherEffectEnabled && fogVisible" class="fog-layer">
         <div v-for="b in FOG_BLOBS" :key="b.id" class="fog-blob" :style="fogBlobStyle(b)"></div>
@@ -664,7 +664,7 @@ html.dark .blob-5 {
   transform: translateZ(0);
 }
 
-/* 雾霭层(背景光影最高一处):不规则雾团慢漂移,整层经 Vue Transition 淡入/消散(雾/阴转瞬效果) */
+/* 雾霭层(背景光影最高一处):不规则雾团慢漂移,整层经 Vue Transition 淡入/消散(雾/阴昏暗氛围,常驻) */
 .fog-layer {
   position: fixed;
   inset: 0;
