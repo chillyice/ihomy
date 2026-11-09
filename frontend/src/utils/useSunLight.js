@@ -374,7 +374,7 @@ export function useSunLight() {
     }))
   })
 
-  // 体积光束样式(天气系数实时应用)
+  // 体积光束样式(天气系数实时应用);两侧柔边交给 .light-ray 的 mask 渐变,这里不再返回 inline filter
   const rayStyles = computed(() => {
     const s = sunScene.value
     const mul = weatherLightMul.value
@@ -382,7 +382,6 @@ export function useSunLight() {
       width: ray.width + 'px',
       transform: `translateX(${ray.offset}px) rotate(${s.rotation}deg)`,
       opacity: ray.opacity * mul,
-      filter: `blur(${ray.blur}px)`,
       background: `linear-gradient(to bottom, ${s.palette.core} 0%, ${s.palette.mid} 35%, transparent 75%)`,
     }))
   })
@@ -398,7 +397,8 @@ export function useSunLight() {
   const bloomStyle = computed(() => ({
     left: sunScene.value.source.x,
     top: sunScene.value.source.y,
-    background: `radial-gradient(circle, ${sunScene.value.palette.bloom} 0%, ${sunScene.value.palette.mid} 35%, transparent 70%)`,
+    // 不再依赖 .light-bloom 的 filter: blur(60px),把柔和收尾放进取色自身:外圈拉到 96% 才透明
+    background: `radial-gradient(circle, ${sunScene.value.palette.bloom} 0%, ${sunScene.value.palette.mid} 30%, transparent 96%)`,
   }))
 
   // 高光亮斑:白天下雨/雪/云/雷/阴/雾一律压成 0——云层遮住太阳就不该有直射亮点;

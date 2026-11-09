@@ -396,12 +396,13 @@ html.dark .blob-5 {
 }
 
 /* 台灯光源:氛围层最高(盖在弹窗之上,像灯照在纸面) */
+/* ponytail: 不再用 filter: blur(20px) —— 渐变本身已经柔和到 transparent 95%,
+   去滤波在视觉上无差别,却少一次全屏离屏纹理(冷启动黑屏的诱因之一) */
 .lamp-light {
   position: fixed;
   border-radius: 50%;
   z-index: calc(var(--z-atmos) + 8);
   pointer-events: none;
-  filter: blur(20px);
 }
 
 /* 窗户阴影:6 条 bar,multiply,台灯 mask 挖洞 */
@@ -414,11 +415,42 @@ html.dark .blob-5 {
   opacity: var(--shadow-alpha, 0.7);
   -webkit-mask-image: var(--lamp-mask, none);
   mask-image: var(--lamp-mask, none);
+  /* ponytail: 必须裁剪。multiply 要求整棵子树先画进一张离屏表面,
+     而 6 条 bar 是 1400px × 337.5vh 且带旋转,不裁剪时这张表面会按子元素外接盒分配(几十 MB),
+     冷启动 GPU 刚起来时直接分配失败 → 整窗黑屏。视口外的部分本来就不可见,裁掉零视觉损失 */
+  overflow: hidden;
 }
 .shadow-bar {
   position: absolute;
-  filter: blur(16px);
   background: var(--shadow-color, rgb(0, 0, 0));
+}
+/* ponytail: 软边改用渐变,不再给窗影条加 filter: blur(16px) ——
+   这些条是 1400px × 337.5vh 量级的元素,filter 会让 Chromium 为每条分配一张
+   超大离屏纹理(冷启动时 GPU 进程刚起来,最容易直接整窗黑屏);
+   渐变只沿「窄边」做 20px 左右的过渡,视觉与原模糊近似,栅格化成本几乎为零 */
+.shadow-v,
+.frame-v-left,
+.frame-v-right {
+  --bar-feather: 16%;
+  background: linear-gradient(
+    to right,
+    transparent 0,
+    var(--shadow-color, rgb(0, 0, 0)) var(--bar-feather),
+    var(--shadow-color, rgb(0, 0, 0)) calc(100% - var(--bar-feather)),
+    transparent 100%
+  );
+}
+.shadow-h,
+.frame-h-top,
+.frame-h-bottom {
+  --bar-feather: 14%;
+  background: linear-gradient(
+    to bottom,
+    transparent 0,
+    var(--shadow-color, rgb(0, 0, 0)) var(--bar-feather),
+    var(--shadow-color, rgb(0, 0, 0)) calc(100% - var(--bar-feather)),
+    transparent 100%
+  );
 }
 .shadow-v {
   top: -50vh;
@@ -431,6 +463,7 @@ html.dark .blob-5 {
   transform: rotate(var(--rot, 0deg));
 }
 .frame-v-left {
+  --bar-feather: 1.4%;
   top: -50vh;
   left: 50%;
   width: 1400px;
@@ -441,6 +474,7 @@ html.dark .blob-5 {
   transform: translateX(-55vw) rotate(var(--rot, 0deg));
 }
 .frame-v-right {
+  --bar-feather: 1.4%;
   top: -50vh;
   left: 50%;
   width: 1400px;
@@ -450,6 +484,7 @@ html.dark .blob-5 {
   transform: translateX(55vw) rotate(var(--rot, 0deg));
 }
 .shadow-h {
+  --bar-feather: 22%;
   left: -75%;
   right: -75%;
   height: 70px;
@@ -457,6 +492,7 @@ html.dark .blob-5 {
   transition: top var(--bar-transition, 3s ease);
 }
 .frame-h-top {
+  --bar-feather: 7%;
   left: -75%;
   right: -75%;
   height: 280px;
@@ -464,6 +500,7 @@ html.dark .blob-5 {
   transition: top var(--bar-transition, 3s ease);
 }
 .frame-h-bottom {
+  --bar-feather: 1.4%;
   left: -75%;
   right: -75%;
   height: 1400px;
@@ -488,7 +525,8 @@ html.dark .blob-5 {
   margin-left: -350px;
   margin-top: -350px;
   border-radius: 50%;
-  filter: blur(60px);
+  /* ponytail: 不再 filter: blur(60px);渐变停靠点放到 96% 做同样的柔和收尾,
+     省掉一张 700×700 的离屏模糊纹理(和 .shadow-bar 同一类冷启动风险) */
   transition:
     background 3s ease,
     left 3s ease,
@@ -508,9 +546,19 @@ html.dark .blob-5 {
   left: 50%;
   height: 200vh;
   transform-origin: top center;
+  /* ponytail: 光柱两侧的柔边改用 mask 渐变,替代原来的内联 filter: blur(30~80px)
+     —— 200vh 高的光柱做模糊同样是一张超长离屏纹理,冷启动时很危险 */
+  --ray-feather: 42%;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 var(--ray-feather),
+    #000 calc(100% - var(--ray-feather)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--ray-feather), #000 calc(100% - var(--ray-feather)), transparent 100%);
   transition:
     opacity 3s ease,
-    filter 3s ease,
     transform 3s ease,
     background 3s ease;
 }
@@ -533,7 +581,7 @@ html.dark .blob-5 {
   transform: translateZ(0);
 }
 
-/* 天气覆盖阴影:与其他 shadow-bar 同色同 blur,固定全屏不移动,随天气显隐 */
+/* 天气覆盖阴影:与其他 shadow-bar 同色,固定全屏不移动,随天气显隐 */
 .shadow-bar.weather-shadow {
   inset: 0;
   width: 100%;
