@@ -6,7 +6,7 @@ import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { gsap } from 'gsap'
 import { getSunScene, currentSlotIndex } from '@/utils/windowLight'
 import { useThemeStore } from '@/stores/theme'
-import { setSunContext } from '@/theme'
+import { setSunContext, rememberSunWindow } from '@/theme'
 import request from '@/api/request'
 
 // provide/inject key(确保 App.vue 与 SunLightLayer/AppSidebar 共享同一状态)
@@ -449,6 +449,8 @@ export function useSunLight() {
     if (!data) return
     sunInfo.value = data
     sunInfoAt.value = Date.now()
+    // 记住日出日落,供下次启动首屏直接算出正确档位(见 theme/index.js 的 modeFromSunWindow)
+    rememberSunWindow(data)
     if (resetSlot) slotIdx.value = currentSlotIndex()
     sunScene.value = getSunScene(data, slotIdx.value)
     themeStore.applyAuto(sunScene.value.isNight, { sweep: !bootCorrectionPending })
@@ -625,6 +627,7 @@ export function useSunLight() {
     weather,
     weatherDetail,
     loadWeather,
+    loadSunInfo,
     loadSunInfoForDate,
     lampMode,
     lampTemp,

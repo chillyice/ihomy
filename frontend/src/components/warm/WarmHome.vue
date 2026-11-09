@@ -1336,7 +1336,8 @@ const itemFloorPlanView = computed(() => {
   }
 })
 
-onMounted(async () => {
+// 首页卡片数据:冷启动网络还没就绪时请求会全部落空(catch 成空数组),联网恢复后重跑一次
+const refreshHome = async () => {
   // 未登录(公开首页)只拉公开动态流:其余卡片数据都要登录态,直接跳过,
   // 别打一批注定 401 的请求(与 Home.vue 的 loadXxx 登录态守卫一致)
   const loggedIn = userStore.isLoggedIn
@@ -1363,12 +1364,18 @@ onMounted(async () => {
   reminders.value = buildAgenda(rem)
   const h = Array.isArray(houses) ? houses : []
   if (h.length) await loadItemFloorPlan(h[0])
+}
+
+onMounted(async () => {
+  window.addEventListener('online', refreshHome)
+  await refreshHome()
   startPhotoTimer()
   clockTimer = setInterval(() => {
     now.value = new Date()
   }, 60000)
 })
 onBeforeUnmount(() => {
+  window.removeEventListener('online', refreshHome)
   stopPhotoTimer()
   clearInterval(clockTimer)
   if (itemVoiceRecording.value) itemVoiceStop()

@@ -32,17 +32,69 @@ function migrate(raw) {
   }
 }
 
+// —— 启动期晨暮预判 ——
+// 自动模式下本地存的 mode 是「上次应用时的档位」,隔一场(隔夜)再开就可能是错的:
+// 首屏先按旧档位铺一层整页深/浅色,等 sun-info 回来才校正,看起来就是「整页纯色 → 突然变色」。
+// 因此把最近一次 sun-info 的日出/日落缓存下来,启动时直接用当前时间算档位,首屏即是正确配色。
+const SUN_WINDOW_KEY = 'ihomy:theme:sun-window'
+
+// 由 useSunLight 每次拿到 sun-info 后写入(只留判定档位所需的三项,不缓存整个响应)
+export function rememberSunWindow(data) {
+  if (!data || !data.date || !data.sunrise || !data.sunset) return
+  try {
+    localStorage.setItem(SUN_WINDOW_KEY, JSON.stringify({ date: data.date, sunrise: data.sunrise, sunset: data.sunset }))
+  } catch {
+    // 隐私模式/配额异常时忽略:只是首屏配色的优化,不影响主题本身
+  }
+}
+
+function minutesOf(text) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(text || '').trim())
+  if (!m) return null
+  return Number(m[1]) * 60 + Number(m[2])
+}
+
+function todayLocal() {
+  const d = new Date()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
+}
+
+// 缓存只认「今天」的:日期对不上就不猜,交给 sun-info 回来后校正。
+// 日出日落是服务端家庭时区的墙上时间,与 windowLight.getSunScene 的判定口径一致(客户端与时区同时区)。
+function modeFromSunWindow() {
+  try {
+    const w = JSON.parse(localStorage.getItem(SUN_WINDOW_KEY) || 'null')
+    if (!w || w.date !== todayLocal()) return null
+    const rise = minutesOf(w.sunrise)
+    const set = minutesOf(w.sunset)
+    if (rise == null || set == null || set <= rise) return null
+    const d = new Date()
+    const now = d.getHours() * 60 + d.getMinutes()
+    return now >= rise && now < set ? 'dawn' : 'dusk'
+  } catch {
+    return null
+  }
+}
+
 export function loadTheme() {
+  let m
   try {
     const raw = localStorage.getItem(THEME_STORAGE_KEY)
-    if (!raw) return { ...DEFAULT_THEME }
-    const m = migrate(JSON.parse(raw))
-    if (!THEMES[m.theme]) m.theme = DEFAULT_THEME.theme
-    if (m.mode !== 'dawn' && m.mode !== 'dusk') m.mode = DEFAULT_THEME.mode
-    return { ...DEFAULT_THEME, ...m }
+    m = raw ? migrate(JSON.parse(raw)) : { ...DEFAULT_THEME }
   } catch {
-    return { ...DEFAULT_THEME }
+    m = { ...DEFAULT_THEME }
   }
+  if (!THEMES[m.theme]) m.theme = DEFAULT_THEME.theme
+  if (m.mode !== 'dawn' && m.mode !== 'dusk') m.mode = DEFAULT_THEME.mode
+  m = { ...DEFAULT_THEME, ...m }
+  // 自动模式:首屏档位按缓存的日出日落算,不拿隔夜的旧档位先铺一屏
+  if (m.autoMode) {
+    const derived = modeFromSunWindow()
+    if (derived) m.mode = derived
+  }
+  return m
 }
 
 // —— 晨暮切换扫光(暖居专属):克隆旧主题整页 DOM 为幕布,方向性柔和蒙版从一侧划到另一侧露出新主题 ——
@@ -55,6 +107,14 @@ export function setSunContext(ctx) {
 
 // 上次已应用状态(区分「首次加载」与「真实切换」,首次不扫光)
 let _current = null
+
+// 首帧跑过之前不扫光:浏览器把本站当启动页/预渲染时,页面可能还没开始出帧,
+// 此时若因可见性回调翻档,幕布会把还没画出来的页面盖成整片纯色(后台标签里有 rAF 不跑,激活时才补跑)
+let _sweepArmed = typeof requestAnimationFrame !== 'function'
+if (!_sweepArmed)
+  requestAnimationFrame(() => {
+    _sweepArmed = true
+  })
 
 // 计算「晨→暮」暗色扫过方向(单位向量,屏幕坐标 y 向下)
 // 规则:暗色沿「垂直于光束」的方向扫过,取「暮光从下往上蔓延」的一侧——
@@ -148,15 +208,25 @@ function beginModeSweep(root, prevDusk) {
       root.classList.remove('theme-sweeping')
     }
     const travelMs = 1700
+    // 兜底:窗被遮挡/预渲染时 rAF 可能一直不跑,幕布会停在起点把整页盖成不透明纯色(点击又能穿透),
+    // 400ms 内没真正开始过渡就直接撤掉幕布,退回「瞬间切类」
+    let started = false
+    const startGuard = setTimeout(() => {
+      if (!started) cleanup()
+    }, 400)
+    const disarmGuard = () => clearTimeout(startGuard)
     try {
       overlay.style.transition = `--sweep-p ${travelMs}ms cubic-bezier(.4,0,.2,1)`
       // 先提交起点,下一帧再切到终点触发过渡(--sweep-p 已用 @property 注册为可过渡)
       requestAnimationFrame(() =>
         requestAnimationFrame(() => {
+          started = true
+          disarmGuard()
           overlay.style.setProperty('--sweep-p', '110%')
         }),
       )
     } catch {
+      disarmGuard()
       cleanup()
       return
     }
@@ -181,7 +251,7 @@ export function applyTheme(state, { sweep = true } = {}) {
   const withinWarm = _current && _current.theme === 'warm' && t.theme === 'warm'
 
   // 暖居内晨↔暮切换:切类前克隆旧主题整页为幕布,切类后蒙版扫光露出新主题
-  const finishSweep = sweep && isModeChange && withinWarm ? beginModeSweep(root, prevDusk) : null
+  const finishSweep = sweep && _sweepArmed && isModeChange && withinWarm ? beginModeSweep(root, prevDusk) : null
 
   root.classList.remove(...THEME_IDS.map((id) => 'theme-' + id))
   root.classList.add('theme-' + t.theme)

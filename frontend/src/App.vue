@@ -1,6 +1,13 @@
 <!-- 根组件:移动端 → MobileLayout;桌面端 → 光影层 + 左侧导航 + 页面内容 -->
 <template>
   <el-config-provider :locale="elLocale">
+    <!-- 首屏幕布:外壳要等路由解析完才渲染,冷启动/浏览器以本站为启动页时,这段空窗只剩整页背景色。
+         用主题色静态幕布承接到首页聚合落地(最长 2s),避免「整页纯色 → 元素突然出现」的观感。
+         不用 <transition>:预渲染/窗口被遮挡时 rAF 可能不跑,离场过渡会卡在起点一直盖住页面 -->
+    <div v-if="!bootDone" class="boot-splash" aria-hidden="true">
+      <span class="boot-word">ihomy</span>
+      <span class="boot-dots"><i /><i /><i /></span>
+    </div>
     <!-- 移动端布局:特效开启时同样挂载光影层(全部 pointer-events:none 不挡触摸) -->
     <template v-if="isMobile">
       <router-view v-if="standalone" v-slot="{ Component, route }">
@@ -50,7 +57,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, provide, defineAsyncComponent } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, provide, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
@@ -85,6 +92,17 @@ const immersive = computed(() => !!route.meta.immersive)
 // 外壳(侧栏/播放器/暖居/首页)再被卸载——独立页(Kada/壁纸)因此会打出一批与它无关的 ihomy 接口
 // (含 OPS 权限 403 弹错、appStore 重复拉首页)。故外壳一律等解析完成后再渲染。
 const routeReady = ref(false)
+// 首屏幕布(见模板):路由就绪且首页聚合落地后淡出;任何情况都有 2s 上限,绝不让幕布卡住
+const bootDone = ref(false)
+let bootCapTimer = null
+const finishBoot = () => {
+  if (bootDone.value) return
+  bootDone.value = true
+  if (bootCapTimer) {
+    clearTimeout(bootCapTimer)
+    bootCapTimer = null
+  }
+}
 // 独立站点页(咔哒软件首页等)：完全独立全屏，不套 ihomy 外壳/光影/侧栏/页脚
 const standalone = computed(() => routeReady.value && !!route.meta.standalone)
 const { locale } = useI18n()
@@ -116,6 +134,10 @@ watch(
 const elLocale = computed(() => (locale.value === 'en' ? en : zhCn))
 
 onMounted(async () => {
+  // 冷启动时网络可能还没就绪(浏览器随系统启动、把本站设为启动页):界面先画出来,请求却全部失败,
+  // 页面会停在空数据/旧天气上。联网恢复后补拉一次,不必让用户手动刷新
+  window.addEventListener('online', onOnline)
+  bootCapTimer = setTimeout(finishBoot, 2000)
   // 等首次导航解析完再判定独立页,否则会把独立页当普通页初始化一次 ihomy 家庭数据
   await router.isReady()
   routeReady.value = true
@@ -126,6 +148,16 @@ onMounted(async () => {
   appStore.init()
   userStore.ensureUserInfo()
 })
+
+// 首屏幕布:外壳 + 首页聚合就绪就收起(独立页不等聚合);兜底见 onMounted 里的 2s 上限
+watch(
+  [routeReady, standalone, () => appStore.loaded],
+  () => {
+    if (!routeReady.value) return
+    if (standalone.value || appStore.loaded) finishBoot()
+  },
+  { immediate: true },
+)
 
 watch(
   () => userStore.isLoggedIn,
@@ -147,9 +179,72 @@ watch(standalone, (isStandalone) => {
   appStore.init()
   userStore.ensureUserInfo()
 })
+
+// 联网恢复:补拉首页聚合 + 太阳/天气(失败时 appStore 不会把 loaded 锁死,这里能重新拉起)
+const onOnline = () => {
+  if (standalone.value) return
+  appStore.init(true)
+  if (userStore.mustChangePassword) return
+  userStore.ensureUserInfo()
+  sunLight.loadSunInfo()
+  sunLight.loadWeather()
+}
+
+onBeforeUnmount(() => {
+  window.removeEventListener('online', onOnline)
+  if (bootCapTimer) clearTimeout(bootCapTimer)
+})
 </script>
 
 <style>
+/* 首屏幕布(见模板):主题色底 + 呼吸点,承接外壳渲染前的空窗;不拦点击 */
+.boot-splash {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-immersive);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  pointer-events: none;
+}
+.boot-word {
+  font-size: 20px;
+  letter-spacing: 0.18em;
+  opacity: 0.6;
+}
+.boot-dots {
+  display: flex;
+  gap: 6px;
+}
+.boot-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: bootDot 1.1s ease-in-out infinite;
+}
+.boot-dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.boot-dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes bootDot {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 0.7;
+    transform: translateY(-3px);
+  }
+}
+
 /* 主内容区:左侧导航占位,不设 z-index 避免创建 stacking context(光影层需与内容混合) */
 .app-main {
   min-height: 100vh;

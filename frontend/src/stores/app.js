@@ -34,7 +34,9 @@ export const useAppStore = defineStore('app', {
         }
         // 登录后私有模块覆盖公开模块列表
         if (dash?.modules) this.modules = dash.modules
-        this.loaded = true
+        // 两个接口都失败(冷启动网络还没就绪/离线)时保持「未加载」,网络恢复后由 online 事件重试,
+        // 否则 loaded 会锁住首页,一直停在空数据上直到手动刷新
+        this.loaded = !!(pub || dash)
       } finally {
         this.loading = false
       }

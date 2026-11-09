@@ -1308,7 +1308,8 @@ onDrop((type, x, y) => {
   ElMessage.success(t('warm.addedToast', { label: widgetLabel(type) }))
 })
 
-onMounted(() => {
+// 首页卡片数据:冷启动网络还没就绪时请求会全部落空,联网恢复后重跑一次
+const refreshHome = () => {
   loadAll()
   loadPoints()
   loadReminders()
@@ -1316,14 +1317,22 @@ onMounted(() => {
   loadWishes()
   loadTodayRecipes()
   loadItemHouses()
+}
+
+onMounted(() => {
+  refreshHome()
+  window.addEventListener('online', refreshHome)
   nextTick(() => {
     if (!root.value) return
     ctx = gsap.context(() => {
-      gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, ease: 'power2.out' })
+      // immediateRender:false:先把卡片按正常状态画出来,等真出帧再起动画。
+      // 浏览器以启动页/预渲染方式打开时首帧可能迟迟不来,autoAlpha:0 会一直停在起点,页面看起来像没渲染
+      gsap.from('.dash-card', { y: 16, autoAlpha: 0, duration: 0.4, stagger: 0.04, ease: 'power2.out', immediateRender: false })
     }, root.value)
   })
 })
 onBeforeUnmount(() => {
+  window.removeEventListener('online', refreshHome)
   ctx?.revert()
   gsap.killTweensOf('.dash-card')
 })
