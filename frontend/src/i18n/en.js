@@ -4165,6 +4165,8 @@ export default {
         interestRatioLine: '{v} of principal',
         paidPeriodsLabel: 'Paid / total',
         prepaidTotal: 'Prepaid in total',
+        prepayInterestTotal: 'Prepay interest',
+        prepayInterestTag: 'Incl. {d}-day prepay interest {v}',
         firstDaysLabel: 'First period',
         firstDaysValue: '{n} days',
         timelineTitle: 'Events',
@@ -4195,6 +4197,9 @@ export default {
         tipEvent: 'Event',
         tipAfterPayment: 'Payment after event',
         tipTriggerDate: 'Event date',
+        tipPrepayInterest: 'Prepay bridge interest',
+        prepayInterestValue: '{d} day(s) · {v}',
+        prepayExtraHint: 'Settling on this date adds {d} day(s) of interest: {v} CNY (from the last payment date)',
         tipProjected: 'This period has not arrived; amounts are projected',
         triggerDateLabel: 'Trigger date (optional)',
         triggerDateHint:

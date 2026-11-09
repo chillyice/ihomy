@@ -10,6 +10,9 @@
  * - 组合贷款:商贷与公积金各自独立计息,月供为两者之和(与银行「商贷月供 + 公积金月供」一致)。
  * - 提前还款只有「缩短年限(月供不变)」与「减少月供(期限不变)」两种银行常规处理方式;
  *   不含提前还款违约金、评估费、保险费等费用。
+ * - 提前还款带结清日期(triggerDate)时补收「过渡期利息」:上次还款日到实际还款日之间,
+ *   剩余本金按天计息(日利率 = 年利率 ÷ 360,与首期计息同口径),记在「第 N 期」那一行;
+ *   老数据没填日期则不计,行为与以前完全一致。
  * - 反推利率:已知「总额 + 期数 + 每期还款额」求利率。等额本息无解析解,靠「月供随利率单调递增」
  *   二分求根;等额本金首期月供 = 本金/期数 + 本金×月利率,直接解出。组合贷款两个利率无法由
  *   一个月供唯一确定,不支持反推。
@@ -763,6 +766,7 @@ const zeroLedgerSummary = () => ({
   totalInterest: 0,
   interestRatio: 0,
   prepaidTotal: 0,
+  prepayInterest: 0,
   currentRate: 0,
 })
 
@@ -802,6 +806,8 @@ function normalizeLedgerEvents(events, months) {
         period,
         amountC,
         strategy: raw.strategy === PREPAY_STRATEGY.REDUCE ? PREPAY_STRATEGY.REDUCE : PREPAY_STRATEGY.SHORTEN,
+        // 结清/还款日期:用来补收「上次还款日 → 实际还款日」的按天利息(老数据没填则不计)
+        triggerDate: raw.triggerDate || null,
       })
     } else if (type === LOAN_EVENT.ACCOUNT_CHANGE) {
       // 换账户不参与计息:只带账户ID(空 = 从该期起不再自动记账)
@@ -881,6 +887,18 @@ function rateChangeDaysInPeriod(firstPayDate, period, triggerDate) {
 }
 
 /**
+ * 提前还款过渡期利息(分):上次还款日 → 实际还款日的剩余本金按天计息。
+ * 日利率 = 年利率 ÷ 360(与首期计息同口径);没填日期、日期不晚于上次还款日都算 0 天,不收这笔钱。
+ * 天数封顶 30 天 —— 超过下一期还款日的日期应把事件放到后一期,「一期区间」最长只到下一期还款日前一天。
+ */
+function prepayDayInterestC(remainC, ratePct, fromDate, toDate) {
+  if (!fromDate || !toDate) return { days: 0, interestC: 0 }
+  const days = Math.max(0, Math.min(DEFAULT_FIRST_DAYS, daysBetween(fromDate, toDate)))
+  if (days <= 0) return { days: 0, interestC: 0 }
+  return { days, interestC: Math.round((remainC * (Number(ratePct) || 0) * days) / 36000) }
+}
+
+/**
  * 逐期滚动出流水(内部,分单位)。
  * 第 1 期利息按首期天数计;其后沿用既有口径(利息 = 剩余本金 × 月利率取整到分、月供固定、末期结清)。
  * 事件在第 N 期还款之后生效:利率调整 → 第 N+1 期起按新利率;提前还款 → 第 N 期后减少剩余本金。
@@ -889,6 +907,9 @@ function rateChangeDaysInPeriod(firstPayDate, period, triggerDate) {
  * 旧利率天数 + 新利率天数,月供里的本金部分沿用调整前的计划,所以该期还款额与常规月供不同;
  * **下一期起**才按「剩余本金 + 剩余期数 + 新利率」重算月供。没填调息日的老数据保持旧口径
  * (整期按新利率、当期重算),避免历史流水跳变。
+ *
+ * 提前还款带结清日期时同理按天计息:上次还款日 → 结清日的剩余本金 × 年利率 ÷ 360,记在「第 N 期」
+ * (该期利息与还款额都含这笔过渡期利息,本金不变);结清时它就是当天除剩余本金外还要多付的钱。
  */
 function runLedgerC({ amountC, months, method, rate0, firstDays, firstPaymentC, firstPayDate, events }) {
   const byPeriod = new Map()
@@ -916,6 +937,10 @@ function runLedgerC({ amountC, months, method, rate0, firstDays, firstPaymentC, 
     /** 本期是否为「调息过渡期」:{ fromRate, days },days 天按新利率、其余按旧利率 */
     let transition = null
     let shorten = false
+    /** 提前还款过渡期利息(分/天):「上次还款日 → 实际还款日」按天计息,记在上一条流水行上 */
+    let prepayExtraC = 0
+    let prepayExtraDays = 0
+    let accruedTo = periodDate(firstPayDate, k - 1)
     for (const e of byPeriod.get(k - 1) || []) {
       if (e.type === LOAN_EVENT.RATE_CHANGE) {
         const days = rateChangeDaysInPeriod(firstPayDate, k, e.triggerDate)
@@ -931,6 +956,14 @@ function runLedgerC({ amountC, months, method, rate0, firstDays, firstPaymentC, 
         }
         flags.push({ type: e.type, rate: e.ratePct })
       } else {
+        // 提前还款:先按「上次还款日(或同日上一笔还款日)→ 实际还款日」补收过渡期利息
+        // (基数是本笔还款前的剩余本金,日利率 = 年利率 ÷ 360),再扣减本金;金额 ≥ 剩余本金即结清
+        if (e.type === LOAN_EVENT.PREPAY) {
+          const extra = prepayDayInterestC(remain, rate, accruedTo, e.triggerDate)
+          prepayExtraC += extra.interestC
+          prepayExtraDays += extra.days
+          if (extra.days > 0) accruedTo = e.triggerDate
+        }
         const cut = Math.min(e.amountC, remain)
         remain -= cut
         prepaidTotal += cut
@@ -943,6 +976,13 @@ function runLedgerC({ amountC, months, method, rate0, firstDays, firstPaymentC, 
     // —— 提前还款/结清在流水里一眼可见,结清时最后一行余额就是 0
     if (flags.length && rows.length) {
       const prev = rows[rows.length - 1]
+      if (prepayExtraC > 0) {
+        // 过渡期利息计入本期利息与还款额(本金不变),结清时这笔就是当天要多付的钱
+        prev.interest += prepayExtraC
+        prev.payment += prepayExtraC
+        prev.prepayInterest += prepayExtraC
+        prev.prepayDays += prepayExtraDays
+      }
       prev.events = flags
       prev.balance = remain
     }
@@ -1005,6 +1045,8 @@ function runLedgerC({ amountC, months, method, rate0, firstDays, firstPaymentC, 
       balance: remain,
       days: k === 1 ? normalizeDays(firstDays) : 0,
       transition: Boolean(transition),
+      prepayInterest: 0,
+      prepayDays: 0,
       events: flags,
     })
   }
@@ -1017,6 +1059,8 @@ function runLedgerC({ amountC, months, method, rate0, firstDays, firstPaymentC, 
  *
  * 事件统一语义 —— **在第 N 期还款之后生效**(effectivePeriod = N,必须 ≥ 1):
  *   利率调整 → 第 N+1 期起按新利率计息;提前还款 → 第 N 期后减少剩余本金(金额 ≥ 剩余本金即结清)。
+ *   提前还款带结清日期(triggerDate)时,「上次还款日 → 结清日」之间的剩余本金按天计息(日利率 = 年利率 ÷ 360),
+ *   这笔过渡期利息一并记在第 N 期那一行(没填日期则不计,与老口径一致)。
  *   第 1 期的利率由贷款的初始年利率决定,同一件事不在两处表达,故事件生效期次不能填 0。
  *
  * 利率调整带调息日(triggerDate)时按天分段:调息日落在第 N+1 期的还款区间内 → 该期新旧利率各记一段、
@@ -1104,25 +1148,28 @@ export function loanLedger(input) {
     balance: toYuan(r.balance),
     days: r.days,
     transition: Boolean(r.transition),
+    // 提前还款过渡期按天补收的利息(上次还款日 → 实际还款日),已含在 interest/payment 里
+    prepayInterest: toYuan(r.prepayInterest),
+    prepayDays: r.prepayDays,
     events: r.events,
     rateChanged: r.events.some((e) => e.type === LOAN_EVENT.RATE_CHANGE),
     prepaid: r.events.some((e) => e.type === LOAN_EVENT.PREPAY),
   }))
 
   // 每段(同一利率)汇总:利率调整后的月供变化在流水里分段呈现;末期取整差额不另立一段。
-  // 「月供」取段内首个常规期:首期(按实际天数计息)与调息当期(按新旧利率分段)都不是常规月供,
-  // 分别放在 firstPayment / transitionPayment 里,页面上以小字标注。
+  // 「月供」取段内首个常规期:首期(按实际天数计息)、调息当期(按新旧利率分段)与
+  // 提前还款过渡期(多了一笔按天利息)都不是常规月供,分别放在 firstPayment / transitionPayment 里,页面上以小字标注。
   const segments = []
   for (const r of rows) {
     const cur = segments[segments.length - 1]
+    const irregular = (r.period === 1 && r.days) || r.transition || r.prepayInterest > 0
     if (cur && cur.rate === r.rate) {
       cur.toPeriod = r.period
       cur.interest = Math.round((cur.interest + r.interest) * 100) / 100
       cur.principal = Math.round((cur.principal + r.principal) * 100) / 100
       cur.lastPayment = r.payment
-      if (!cur.regularPayment && r.period > cur.fromPeriod) cur.regularPayment = r.payment
+      if (!cur.regularPayment && r.period > cur.fromPeriod && !irregular) cur.regularPayment = r.payment
     } else {
-      const irregular = (r.period === 1 && r.days) || r.transition
       segments.push({
         fromPeriod: r.period,
         toPeriod: r.period,
@@ -1169,6 +1216,7 @@ export function loanLedger(input) {
       totalInterest: toYuan(totalInterestC),
       interestRatio: totalPrincipalC > 0 ? totalInterestC / totalPrincipalC : 0,
       prepaidTotal: toYuan(main.prepaidTotal),
+      prepayInterest: toYuan(sumBy(main.rows, 'prepayInterest')),
       currentRate: main.rows[main.rows.length - 1].rate,
     },
     baseline: {
@@ -1321,6 +1369,7 @@ export function mergeLedgers(ledgers) {
       totalInterest,
       interestRatio: totalPrincipal > 0 ? totalInterest / totalPrincipal : 0,
       prepaidTotal: round2(list.reduce((s, l) => s + ((l.summary && l.summary.prepaidTotal) || 0), 0)),
+      prepayInterest: round2(list.reduce((s, l) => s + ((l.summary && l.summary.prepayInterest) || 0), 0)),
       currentRate: 0,
     },
     segments: [],

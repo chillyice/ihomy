@@ -10,6 +10,7 @@ import {
   totalRemainingPrincipal,
   periodsPaid,
   periodDate,
+  firstPeriodInterest,
   LOAN_TYPE,
   REPAY_METHOD,
   PREPAY_STRATEGY,
@@ -165,6 +166,84 @@ describe('调息分段计息(按生产账单复核)', () => {
     expect(led.rows[0].payment).toBeCloseTo(7600.23, 2)
     expect(led.rows[1].payment).toBeCloseTo(10590.01, 2)
     expect(led.rows[9].payment).toBeCloseTo(10590.01, 2)
+  })
+})
+
+describe('提前还款过渡期按日计息', () => {
+  // 90 万 / 3.0% / 360 期,放款 2025-12-05、首期还款日 2026-01-05(首期 31 天);
+  // 第 13 期还款日 2027-01-05,2027-01-06(还款日后一天)结清 → 1 天过渡期利息
+  const loan = {
+    amount: 900000,
+    months: 360,
+    method: REPAY_METHOD.EQUAL_INSTALLMENT,
+    rate: 3.0,
+    loanDate: '2025-12-05',
+    firstPayDate: '2026-01-05',
+  }
+  const base = loanLedger(loanEngineInput(loan))
+  // 过渡期利息基数 = 第 13 期还款后的剩余本金
+  const expectedDayInterest = Math.round((base.rows[12].balance * 100 * 3.0 * 1) / 36000) / 100
+
+  const ledgerWith = (event) => loanLedger(loanEngineInput({ ...loan, events: [event] }))
+
+  it('单日利息口径:90 万 × 3% ÷ 360 = 75 元', () => {
+    expect(firstPeriodInterest(900000, 3.0, 1)).toBeCloseTo(75, 2)
+  })
+
+  it('还款日后一天结清:结清期多收 1 天过渡期利息,余额归零', () => {
+    const led = ledgerWith({
+      type: LOAN_EVENT.PREPAY,
+      effectivePeriod: 13,
+      triggerDate: '2027-01-06',
+      amount: 900000,
+      strategy: PREPAY_STRATEGY.REDUCE,
+    })
+    expect(led.valid).toBe(true)
+    expect(led.settled).toBe(true)
+    const row = led.rows[12]
+    expect(row.period).toBe(13)
+    expect(row.prepayDays).toBe(1)
+    expect(row.prepayInterest).toBeCloseTo(expectedDayInterest, 2)
+    // 过渡期利息并入该期利息与还款额(本金不变),结清时这就是除剩余本金外要多付的钱
+    expect(row.interest).toBeCloseTo(base.rows[12].interest + expectedDayInterest, 2)
+    expect(row.payment).toBeCloseTo(row.principal + row.interest, 2)
+    expect(row.balance).toBe(0)
+    expect(led.summary.prepayInterest).toBeCloseTo(expectedDayInterest, 2)
+  })
+
+  it('结清日就是还款日:不收过渡期利息', () => {
+    const led = ledgerWith({
+      type: LOAN_EVENT.PREPAY,
+      effectivePeriod: 13,
+      triggerDate: '2027-01-05',
+      amount: 900000,
+      strategy: PREPAY_STRATEGY.REDUCE,
+    })
+    expect(led.rows[12].prepayDays).toBe(0)
+    expect(led.rows[12].prepayInterest).toBe(0)
+    expect(led.rows[12].interest).toBeCloseTo(base.rows[12].interest, 2)
+  })
+
+  it('没填结清日期的老数据:不补息,口径与以前一致', () => {
+    const led = ledgerWith({ type: LOAN_EVENT.PREPAY, effectivePeriod: 13, amount: 900000, strategy: PREPAY_STRATEGY.REDUCE })
+    expect(led.rows[12].prepayInterest).toBe(0)
+    expect(led.rows[12].interest).toBeCloseTo(base.rows[12].interest, 2)
+  })
+
+  it('部分提前还款同样按天补息,贷款继续按新月供还到结清', () => {
+    const led = ledgerWith({
+      type: LOAN_EVENT.PREPAY,
+      effectivePeriod: 13,
+      triggerDate: '2027-01-06',
+      amount: 100000,
+      strategy: PREPAY_STRATEGY.REDUCE,
+    })
+    expect(led.settledAt).toBe(360)
+    expect(led.rows).toHaveLength(360)
+    expect(led.rows[12].prepayDays).toBe(1)
+    expect(led.rows[12].prepayInterest).toBeCloseTo(expectedDayInterest, 2)
+    // 减少月供:第 14 期起月供比原来低
+    expect(led.rows[13].payment).toBeLessThan(base.rows[13].payment)
   })
 })
 

@@ -44,6 +44,10 @@
         <span>{{ $t('tools.loan.rec.prepaidTotal') }}</span
         ><b>{{ view.ledger.summary.prepaidTotal > 0 ? money(view.ledger.summary.prepaidTotal) : '—' }}</b>
       </div>
+      <div v-if="view.ledger.summary.prepayInterest > 0">
+        <span>{{ $t('tools.loan.rec.prepayInterestTotal') }}</span
+        ><b>{{ money(view.ledger.summary.prepayInterest) }}</b>
+      </div>
       <div v-for="m in view.groupLoans || []" :key="m.id">
         <span>{{ m.name }}</span
         ><b>{{ money(m.snapshot.balance) }}</b>

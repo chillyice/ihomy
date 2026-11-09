@@ -32,7 +32,12 @@
         <template #default="{ row }">{{ money(row.principal) }}</template>
       </el-table-column>
       <el-table-column :label="$t('tools.loan.colInterest')" min-width="110" align="right">
-        <template #default="{ row }">{{ money(row.interest) }}</template>
+        <template #default="{ row }">
+          {{ money(row.interest) }}
+          <span v-if="row.prepayInterest" class="lc-sub lr-mark">{{
+            $t('tools.loan.rec.prepayInterestTag', { d: row.prepayDays, v: money(row.prepayInterest) })
+          }}</span>
+        </template>
       </el-table-column>
       <el-table-column :label="$t('tools.loan.colBalance')" min-width="120" align="right">
         <template #default="{ row }">{{ money(row.balance) }}</template>

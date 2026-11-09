@@ -10,6 +10,9 @@
         @change="onTriggerDateChange"
       />
       <span class="lc-hint">{{ $t('tools.loan.rec.triggerDateHint') }}</span>
+      <span v-if="prepayExtra" class="lc-hint lr-prepay-extra">{{
+        $t('tools.loan.rec.prepayExtraHint', { d: prepayExtra.days, v: money(prepayExtra.amount) })
+      }}</span>
     </div>
     <div class="lc-field">
       <label>{{ $t('tools.loan.rec.eventPeriodLabel') }}</label>
@@ -73,7 +76,7 @@ import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { loanApi } from '@/api'
-import { loanAccountOfPeriod, periodDate, periodsPaid, LOAN_EVENT } from '@/utils/loan'
+import { loanAccountOfPeriod, formatYuan, loanEngineInput, loanLedger, periodDate, periodsPaid, LOAN_EVENT } from '@/utils/loan'
 import { toNum, loanToPayload } from './loanShared'
 
 defineProps({
@@ -122,6 +125,27 @@ const bindingInitial = computed(
 
 const eventDlgMax = computed(() => (targetView.value ? Number(targetView.value.months) : 1200))
 const eventTarget = () => targetView.value
+
+const money = (v, digits = 2) => formatYuan(v, digits)
+
+/**
+ * 提前还款「过渡期利息」预览:按当前填的日期/金额重跑一次流水,把「上次还款日 → 结清日」
+ * 按天补收的利息提前告诉用户 —— 口径与 utils/loan 完全一致,这里不另算一遍。
+ */
+const prepayExtra = computed(() => {
+  const target = targetView.value
+  if (eventDlg.type !== LOAN_EVENT.PREPAY || !target || !target.firstPayDate || !eventDlg.triggerDate) return null
+  const amount = Number(eventDlg.amount)
+  if (!(amount > 0)) return null
+  const period = Math.max(1, Math.min(Number(eventDlg.effectivePeriod) || 1, eventDlgMax.value))
+  const events = (target.events || [])
+    .filter((e) => (eventDlg.editingId ? e.id !== eventDlg.editingId : true))
+    .concat([{ type: LOAN_EVENT.PREPAY, effectivePeriod: period, triggerDate: eventDlg.triggerDate, amount, strategy: eventDlg.strategy }])
+  const led = loanLedger(loanEngineInput({ ...target, events }))
+  if (!led.valid) return null
+  const row = led.rows[period - 1]
+  return row && row.prepayInterest > 0 ? { days: row.prepayDays, amount: row.prepayInterest } : null
+})
 
 /**
  * 打开事件弹窗(新增或编辑)。
@@ -239,5 +263,8 @@ defineExpose({ open })
   font-size: 12px;
   line-height: 1.6;
   color: var(--color-text-secondary, #7a6b5a);
+}
+.lr-prepay-extra {
+  color: var(--color-accent, #a8483a);
 }
 </style>

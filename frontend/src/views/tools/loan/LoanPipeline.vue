@@ -165,6 +165,9 @@ const pipeNodes = computed(() => {
       payment: r.payment,
       principal: r.principal,
       interest: r.interest,
+      // 提前还款过渡期利息(已含在 interest 里):悬浮时单列一行,免得把按天补的利息当成整月利息
+      prepayInterest: r.prepayInterest || 0,
+      prepayDays: r.prepayDays || 0,
       balance: r.balance,
       // 组合贷的合计流水没有单一利率,取不到就不显示这一行
       rate: r.rate == null ? null : r.rate,
@@ -222,6 +225,14 @@ const tipRows = (node) => {
     { k: t('tools.loan.rec.tipPayment'), v: money(tp.payment) },
     { k: t('tools.loan.rec.tipPrincipal'), v: money(tp.principal) },
     { k: t('tools.loan.rec.tipInterest'), v: money(tp.interest) },
+    ...(tp.prepayInterest > 0
+      ? [
+          {
+            k: t('tools.loan.rec.tipPrepayInterest'),
+            v: t('tools.loan.rec.prepayInterestValue', { d: tp.prepayDays, v: money(tp.prepayInterest) }),
+          },
+        ]
+      : []),
     { k: t('tools.loan.rec.tipBalance'), v: money(tp.balance), emph: true },
     { k: t('tools.loan.rec.tipRemaining'), v: t('tools.loan.rec.tipPeriods', { n: tp.remaining }) },
   ]
