@@ -40,3 +40,31 @@ export function isAndroidApp() {
 export function getWebVersion() {
   return typeof __APP_VERSION__ === 'undefined' ? '' : __APP_VERSION__
 }
+
+/** Android 官方平板线:`resources` 的 smallestScreenWidthDp ≥ 600(WebView 里 1 CSS px ≈ 1dp) */
+export const TABLET_MIN_SHORT_SIDE = 600
+/** 窄窗口线:与 main.css 的移动端断点保持一致 */
+export const NARROW_MAX_WIDTH = 768
+
+/**
+ * 视口形态判定(纯函数,方便测试):手机 / 平板 / 窄窗口。
+ *
+ * - `tablet`:iPad(含 iPadOS 13+ 伪装 Mac 的情况)或 Android 且屏幕短边 ≥ 600dp;
+ * - `phone`:非平板的 iPhone / Android(短边过线的 Android 已归入平板);
+ * - `narrow`:窗口宽度 ≤ 768px(桌面浏览器拉窄、平板分屏都算);
+ * - `mobile`:**是否用移动端布局** = 手机 or 窄窗口 —— 平板按桌面端布局处理。
+ *
+ * 不用 UA 里的 `Mobile` 标记单独判平板:部分国产平板 UA 也带 Mobile;屏幕短边是系统口径。
+ */
+export function classifyViewport({ ua = '', maxTouchPoints = 0, screenWidth = 0, screenHeight = 0, innerWidth = 0 } = {}) {
+  const agent = String(ua || '')
+  const isIPhone = /iPhone|iPod/i.test(agent)
+  // iPhone 的 UA 也含「like Mac OS X」,必须先排除 iPhone/iPod 再按「Mac + 多点触摸」认 iPadOS
+  const isIPad = /iPad/i.test(agent) || (!isIPhone && /Mac/i.test(agent) && maxTouchPoints > 1)
+  const isAndroid = /Android/i.test(agent)
+  const shortSide = Math.min(screenWidth || innerWidth || 0, screenHeight || innerWidth || 0)
+  const tablet = isIPad || (isAndroid && shortSide >= TABLET_MIN_SHORT_SIDE)
+  const phone = !tablet && (isIPhone || isAndroid)
+  const narrow = (innerWidth || 0) <= NARROW_MAX_WIDTH
+  return { phone, tablet, narrow, mobile: phone || narrow }
+}
