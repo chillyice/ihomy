@@ -46,4 +46,11 @@
         <foreach item="id" collection="ids" open="(" separator="," close=")">#{id}</foreach>
     </update>
 
+    <!-- 自动备份相册按稳定标识找,不过滤 deleted:已进回收站的那只要恢复,不能再建第二个 -->
+    <select id="selectByBackupKeyAny" resultType="com.ihomy.entity.Album">
+        SELECT * FROM content_photo_album
+        WHERE family_id = #{familyId} AND backup_key = #{backupKey}
+        LIMIT 1
+    </select>
+
 </mapper>

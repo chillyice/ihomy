@@ -28,6 +28,8 @@ public class Photo {
     private String sourcePath;
     private Long sourceFsId;
     private String liveVideoUrl;
+    /** 内容 SHA-256(客户端计算,自动备份幂等用;NULL=未参与去重) */
+    private String checksum;
     private LocalDateTime createdAt;
     @TableLogic
     private Integer deleted;

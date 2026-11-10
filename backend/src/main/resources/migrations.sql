@@ -3165,3 +3165,48 @@ CREATE TABLE IF NOT EXISTS `family_game_match` (
   KEY `idx_family_status` (`family_id`, `deleted`, `status`, `id`),
   KEY `idx_guest` (`guest_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭游戏对战(同种子赛/实时对战)';
+
+-- ------------------------------------------------------------
+-- V11.88 B1:相册自动备份(2026-11-10,Android 能力扩展 P1)
+--   ① content_photo.checksum:客户端算好的 SHA-256,服务端只做唯一键去重(不读文件算哈希,
+--      2GB 生产机上全量读大图算哈希会打穿内存与 IO)。
+--   ② content_photo_album.backup_key:自动备份相册的稳定标识(android:<设备标识>),按标识
+--      找相册而不是按名字找——否则用户手建同名相册会被写进去。
+--   两处均只加列 + 唯一索引,表数不变(92);存量数据全 NULL(MySQL 唯一索引允许多个 NULL),
+--   不影响任何现有照片/相册,不必回填。重复执行安全:information_schema 守卫。
+-- ------------------------------------------------------------
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_photo' AND COLUMN_NAME = 'checksum');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `content_photo` ADD COLUMN `checksum` VARCHAR(64) DEFAULT NULL COMMENT ''内容 SHA-256(客户端计算,自动备份幂等用;NULL=未参与去重)'' AFTER `live_video_url`',
+  'SELECT 1');
+PREPARE add_photo_checksum_stmt FROM @sql;
+EXECUTE add_photo_checksum_stmt;
+DEALLOCATE PREPARE add_photo_checksum_stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_photo' AND INDEX_NAME = 'uk_family_checksum');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `content_photo` ADD UNIQUE KEY `uk_family_checksum` (`family_id`, `checksum`)',
+  'SELECT 1');
+PREPARE add_photo_checksum_uk_stmt FROM @sql;
+EXECUTE add_photo_checksum_uk_stmt;
+DEALLOCATE PREPARE add_photo_checksum_uk_stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_photo_album' AND COLUMN_NAME = 'backup_key');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `content_photo_album` ADD COLUMN `backup_key` VARCHAR(64) DEFAULT NULL COMMENT ''自动备份相册标识(android:<设备标识>;NULL=普通相册),同家庭唯一'' AFTER `source_path`',
+  'SELECT 1');
+PREPARE add_album_backup_key_stmt FROM @sql;
+EXECUTE add_album_backup_key_stmt;
+DEALLOCATE PREPARE add_album_backup_key_stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_photo_album' AND INDEX_NAME = 'uk_family_backup_key');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `content_photo_album` ADD UNIQUE KEY `uk_family_backup_key` (`family_id`, `backup_key`)',
+  'SELECT 1');
+PREPARE add_album_backup_key_uk_stmt FROM @sql;
+EXECUTE add_album_backup_key_uk_stmt;
+DEALLOCATE PREPARE add_album_backup_key_uk_stmt;

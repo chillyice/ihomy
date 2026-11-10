@@ -10,6 +10,7 @@ import top.ihomy.app.calendar.CalendarSyncPlugin;
 import top.ihomy.app.camera.CameraPlugin;
 import top.ihomy.app.diagnostics.CrashStore;
 import top.ihomy.app.diagnostics.DiagnosticsPlugin;
+import top.ihomy.app.photo.PhotoBackupPlugin;
 import top.ihomy.app.screen.ScreenPlugin;
 import top.ihomy.app.share.ShareInboxPlugin;
 import top.ihomy.app.share.ShareIntake;
@@ -41,6 +42,8 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(DiagnosticsPlugin.class);
         // 保险箱防截屏 / 看板常亮:按页面进出开关窗口 Flag,离开即清
         registerPlugin(ScreenPlugin.class);
+        // 相册自动备份:只读系统相册,把新照片交给前端上传到「手机备份」
+        registerPlugin(PhotoBackupPlugin.class);
         // 冷启动时先把分享意图接住,JS 起来后再取(getPending 只读,确认落地才清)
         ShareIntake.capture(getIntent());
         super.onCreate(savedInstanceState);

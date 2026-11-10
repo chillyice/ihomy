@@ -81,6 +81,24 @@ export async function verifyVault() {
 }
 
 /**
+ * 通用生物识别校验(看板模式退出等):标题/说明由调用方给。
+ * 返回 true=通过;取消/失败/本机不支持都返回 false。
+ */
+export async function verifyWithPrompt(title, subtitle = '') {
+  try {
+    const res = await IhomyBiometric.verify({
+      title,
+      subtitle,
+      cancel: i18n.global.t('common.cancel'),
+    })
+    return !!(res && res.ok)
+  } catch (e) {
+    console.warn('[biometric] 校验未通过', e)
+    return false
+  }
+}
+
+/**
  * 应用锁校验:返回 {ok, reason}。
  * reason=busy 表示保险箱自己的系统框在途——调用方应放行,不要把人踢回登录页。
  */

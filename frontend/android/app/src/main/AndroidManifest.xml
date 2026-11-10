@@ -150,4 +150,9 @@
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
     <!-- 应用内更新:允许 ihomy 调起系统安装器装自己下载好的新版本(仍需用户在系统设置里单独授权一次) -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- 相册自动备份:只读手机照片(Android 13+ 用细分权限,12 及以下仍走存储权限) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
 </manifest>

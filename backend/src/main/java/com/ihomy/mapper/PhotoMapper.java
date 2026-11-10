@@ -60,4 +60,10 @@ public interface PhotoMapper extends BaseMapper<Photo> {
 
     /** 取相册子树内全部照片(含已删),彻底删除时连文件一并清理 */
     List<Photo> selectByAlbumIdsAny(@Param("ids") List<Long> ids);
+
+    /**
+     * 按 (family_id, checksum) 查已有照片,**含回收站行**(@TableLogic 会自动加 deleted=0,故走 XML)。
+     * 自动备份幂等:命中即跳过上传;命中的是回收站里的行也照旧跳过——用户主动删掉的照片不该被备份任务复活。
+     */
+    Photo selectByChecksumAny(@Param("familyId") Long familyId, @Param("checksum") String checksum);
 }

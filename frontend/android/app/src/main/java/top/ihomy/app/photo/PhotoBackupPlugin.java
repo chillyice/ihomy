@@ -1,0 +1,522 @@
+package top.ihomy.app.photo;
+
+import android.Manifest;
+import android.content.ContentResolver;
+import android.content.ContentUris;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.database.Cursor;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.net.Uri;
+import android.os.BatteryManager;
+import android.os.Build;
+import android.provider.MediaStore;
+import android.util.Log;
+import android.webkit.MimeTypeMap;
+
+import com.getcapacitor.JSArray;
+import com.getcapacitor.JSObject;
+import com.getcapacitor.PermissionState;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.security.MessageDigest;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/**
+ * 相册自动备份桥(插件名 {@code IhomyPhotoBackup}):按系统相册增量列出手机照片、
+ * 复制到应用缓存并算出内容指纹,再由前端逐张上传到「手机备份」相册。
+ *
+ * <p>约定:
+ * <ul>
+ *   <li>只读系统相册,不申请写入/删除权限,也不改动用户原图;</li>
+ *   <li>指纹(SHA-256)在复制时顺带算好,前端上传后由服务端按指纹去重,重复的不会再存一份;</li>
+ *   <li>图片先落到应用缓存目录,前端用本地资源地址取回再上传,避免把整张原图 base64 塞进 WebView 内存;</li>
+ *   <li>分页按 (DATE_ADDED, _ID) 双键推进,同一秒内的多张照片也不会漏或重复。</li>
+ * </ul>
+ *
+ * <p>不做的事:不在后台自动跑(没有前台服务、没有 Worker),备份只在应用前台时由前端触发。
+ */
+@CapacitorPlugin(
+        name = "IhomyPhotoBackup",
+        permissions = {
+            @Permission(alias = "images", strings = { Manifest.permission.READ_MEDIA_IMAGES }),
+            @Permission(alias = "imagesLegacy", strings = { Manifest.permission.READ_EXTERNAL_STORAGE })
+        })
+public class PhotoBackupPlugin extends Plugin {
+
+    private static final String TAG = "IhomyPhotoBackup";
+    /** 单张上限:超过的多为 RAW/连拍原图,跳过并交给用户手动处理,不拖垮手机与上传链路 */
+    private static final long MAX_PHOTO_BYTES = 30L * 1024L * 1024L;
+    private static final String CACHE_DIR = "photo-backup";
+
+    private final ExecutorService io = Executors.newSingleThreadExecutor();
+
+    /** Android 13+ 读图片用细分权限,12 及以下仍是存储权限 */
+    private String imageAlias() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ? "images" : "imagesLegacy";
+    }
+
+    @PluginMethod
+    public void status(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("permission", getPermissionState(imageAlias()).toString());
+        ret.put("charging", isCharging());
+        ret.put("wifi", isWifi());
+        ret.put("metered", isMetered());
+        ret.put("cacheBytes", cacheBytes());
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void checkPermission(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("state", getPermissionState(imageAlias()).toString());
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void requestPermission(PluginCall call) {
+        if (getPermissionState(imageAlias()) == PermissionState.GRANTED) {
+            JSObject ret = new JSObject();
+            ret.put("state", PermissionState.GRANTED.toString());
+            call.resolve(ret);
+            return;
+        }
+        requestPermissionForAlias(imageAlias(), call, "permissionCallback");
+    }
+
+    @PermissionCallback
+    private void permissionCallback(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("state", getPermissionState(imageAlias()).toString());
+        call.resolve(ret);
+    }
+
+    /** 待备份张数(只数拍摄/添加时间不早于给定时刻的照片),用于界面显示「还有多少」 */
+    @PluginMethod
+    public void count(PluginCall call) {
+        if (getPermissionState(imageAlias()) != PermissionState.GRANTED) {
+            JSObject ret = new JSObject();
+            ret.put("total", 0);
+            ret.put("granted", false);
+            call.resolve(ret);
+            return;
+        }
+        long sinceMs = call.getLong("sinceMs", 0L);
+        io.execute(() -> {
+            try {
+                JSObject ret = new JSObject();
+                ret.put("total", countSince(sinceMs));
+                ret.put("granted", true);
+                call.resolve(ret);
+            } catch (Exception e) {
+                Log.w(TAG, "count failed", e);
+                call.reject("读取相册张数失败");
+            }
+        });
+    }
+
+    /**
+     * 增量列出一页照片(按添加时间升序)。
+     * {@code afterDateAdded}/{@code afterId} 是上一次的游标,首次传 0 从 {@code sinceMs} 起。
+     */
+    @PluginMethod
+    public void list(PluginCall call) {
+        if (getPermissionState(imageAlias()) != PermissionState.GRANTED) {
+            call.reject("permission");
+            return;
+        }
+        long sinceMs = call.getLong("sinceMs", 0L);
+        long afterDateAdded = call.getLong("afterDateAdded", 0L);
+        long afterId = call.getLong("afterId", 0L);
+        int limit = call.getInt("limit", 50);
+        if (limit <= 0 || limit > 200) limit = 50;
+        final int pageSize = limit;
+        io.execute(() -> {
+            try {
+                JSArray items = new JSArray();
+                boolean hasMore = queryPage(sinceMs, afterDateAdded, afterId, pageSize, items);
+                JSObject ret = new JSObject();
+                ret.put("items", items);
+                ret.put("hasMore", hasMore);
+                call.resolve(ret);
+            } catch (Exception e) {
+                Log.w(TAG, "list failed", e);
+                call.reject("读取相册失败");
+            }
+        });
+    }
+
+    /**
+     * 把一张照片复制进缓存并算内容指纹。返回的 path 供前端用本地资源地址取回;
+     * 超过体积上限的返回 {@code tooLarge=true}(不抛异常,便于前端继续下一张)。
+     */
+    @PluginMethod
+    public void prepare(PluginCall call) {
+        if (getPermissionState(imageAlias()) != PermissionState.GRANTED) {
+            call.reject("permission");
+            return;
+        }
+        Long mediaId = call.getLong("mediaId");
+        if (mediaId == null || mediaId <= 0) {
+            call.reject("mediaId required");
+            return;
+        }
+        long id = mediaId;
+        io.execute(() -> {
+            File dest = null;
+            try {
+                Uri uri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id);
+                Meta meta = readMeta(uri);
+                if (meta == null) {
+                    call.reject("照片已不在相册里");
+                    return;
+                }
+                JSObject ret = new JSObject();
+                ret.put("mediaId", id);
+                ret.put("name", meta.name);
+                ret.put("mime", meta.mime);
+                ret.put("takenAt", meta.takenAt);
+                if (meta.size > MAX_PHOTO_BYTES) {
+                    ret.put("tooLarge", true);
+                    ret.put("size", meta.size);
+                    call.resolve(ret);
+                    return;
+                }
+                File dir = new File(getContext().getCacheDir(), CACHE_DIR);
+                if (!dir.exists() && !dir.mkdirs()) {
+                    call.reject("无法创建缓存目录");
+                    return;
+                }
+                dest = new File(dir, id + "-" + System.currentTimeMillis() + extension(meta));
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                long copied = copy(uri, dest, digest);
+                if (copied <= 0) {
+                    //noinspection ResultOfMethodCallIgnored
+                    dest.delete();
+                    call.reject("读取照片失败");
+                    return;
+                }
+                ret.put("tooLarge", false);
+                ret.put("size", copied);
+                ret.put("checksum", hex(digest.digest()));
+                ret.put("path", dest.getAbsolutePath());
+                call.resolve(ret);
+            } catch (Exception e) {
+                if (dest != null) {
+                    //noinspection ResultOfMethodCallIgnored
+                    dest.delete();
+                }
+                Log.w(TAG, "prepare failed: " + id, e);
+                call.reject("准备上传失败");
+            }
+        });
+    }
+
+    /** 删掉单张缓存文件(上传完成或失败后调用);只允许删缓存目录里的东西 */
+    @PluginMethod
+    public void drop(PluginCall call) {
+        String path = call.getString("path");
+        if (path == null || path.isEmpty()) {
+            call.resolve();
+            return;
+        }
+        io.execute(() -> {
+            try {
+                File dir = new File(getContext().getCacheDir(), CACHE_DIR);
+                File file = new File(path);
+                String base = dir.getCanonicalPath() + File.separator;
+                if (file.getCanonicalPath().startsWith(base)) {
+                    //noinspection ResultOfMethodCallIgnored
+                    file.delete();
+                }
+                call.resolve();
+            } catch (Exception e) {
+                Log.w(TAG, "drop failed", e);
+                call.resolve();
+            }
+        });
+    }
+
+    /**
+     * 兜底读取缓存文件(base64):个别机型 WebView 取不到本地资源地址时用。
+     * 只允许读缓存目录里我们刚写的那一份,且上限 12MB。
+     */
+    @PluginMethod
+    public void readBase64(PluginCall call) {
+        String path = call.getString("path");
+        if (path == null || path.isEmpty()) {
+            call.reject("path required");
+            return;
+        }
+        io.execute(() -> {
+            try {
+                File dir = new File(getContext().getCacheDir(), CACHE_DIR);
+                File file = new File(path);
+                if (!file.getCanonicalPath().startsWith(dir.getCanonicalPath() + File.separator) || !file.isFile()) {
+                    call.reject("照片已失效,请重试");
+                    return;
+                }
+                long length = file.length();
+                if (length > 12L * 1024L * 1024L) {
+                    call.reject("单张照片过大");
+                    return;
+                }
+                byte[] bytes = new byte[(int) length];
+                try (InputStream in = new java.io.FileInputStream(file)) {
+                    int read = 0;
+                    while (read < bytes.length) {
+                        int n = in.read(bytes, read, bytes.length - read);
+                        if (n < 0) break;
+                        read += n;
+                    }
+                }
+                JSObject ret = new JSObject();
+                ret.put("data", android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP));
+                ret.put("size", bytes.length);
+                call.resolve(ret);
+            } catch (Exception e) {
+                Log.w(TAG, "readBase64 failed", e);
+                call.reject("读取照片失败");
+            }
+        });
+    }
+
+    /** 清空备份用的缓存图片(退出备份界面或备份结束时调用) */
+    @PluginMethod
+    public void cleanup(PluginCall call) {
+        io.execute(() -> {
+            int removed = 0;
+            File[] files = new File(getContext().getCacheDir(), CACHE_DIR).listFiles();
+            if (files != null) {
+                for (File f : files) {
+                    if (f.isFile() && f.delete()) removed++;
+                }
+            }
+            JSObject ret = new JSObject();
+            ret.put("removed", removed);
+            call.resolve(ret);
+        });
+    }
+
+    // ---- 相册读取 ----
+
+    private long countSince(long sinceMs) {
+        long sinceSec = Math.max(0L, sinceMs / 1000L);
+        Uri uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+        String[] projection = { MediaStore.Images.Media._ID };
+        String selection = MediaStore.Images.Media.DATE_ADDED + " >= ?";
+        String[] args = { String.valueOf(sinceSec) };
+        long total = 0L;
+        try (Cursor c = getContext().getContentResolver().query(uri, projection, selection, args, null)) {
+            if (c != null) total = c.getCount();
+        } catch (Exception e) {
+            Log.w(TAG, "countSince failed", e);
+        }
+        return total;
+    }
+
+    /** 返回是否还有下一页(读到 pageSize 条就认为可能有,前端再探一页即可) */
+    private boolean queryPage(long sinceMs, long afterDateAdded, long afterId, int pageSize, JSArray out) {
+        long sinceSec = Math.max(0L, sinceMs / 1000L);
+        long afterSec = Math.max(0L, afterDateAdded / 1000L);
+        Uri uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+        String[] projection = {
+            MediaStore.Images.Media._ID,
+            MediaStore.Images.Media.DISPLAY_NAME,
+            MediaStore.Images.Media.MIME_TYPE,
+            MediaStore.Images.Media.SIZE,
+            MediaStore.Images.Media.DATE_ADDED,
+            MediaStore.Images.Media.DATE_TAKEN
+        };
+        StringBuilder selection = new StringBuilder(MediaStore.Images.Media.DATE_ADDED + " >= ?");
+        java.util.List<String> args = new java.util.ArrayList<>();
+        args.add(String.valueOf(sinceSec));
+        if (afterDateAdded > 0) {
+            // 双键游标:同一秒里的多张照片按 _ID 继续往后,既不漏也不重
+            selection.append(" AND (").append(MediaStore.Images.Media.DATE_ADDED).append(" > ? OR (")
+                    .append(MediaStore.Images.Media.DATE_ADDED).append(" = ? AND ")
+                    .append(MediaStore.Images.Media._ID).append(" > ?))");
+            args.add(String.valueOf(afterSec));
+            args.add(String.valueOf(afterSec));
+            args.add(String.valueOf(afterId));
+        }
+        String order = MediaStore.Images.Media.DATE_ADDED + " ASC, " + MediaStore.Images.Media._ID + " ASC";
+        int read = 0;
+        try (Cursor c = getContext().getContentResolver()
+                .query(uri, projection, selection.toString(), args.toArray(new String[0]), order)) {
+            if (c == null) return false;
+            while (c.moveToNext() && read < pageSize) {
+                long id = c.getLong(0);
+                String name = c.getString(1);
+                String mime = c.getString(2);
+                long size = c.getLong(3);
+                long dateAdded = c.getLong(4) * 1000L;
+                long takenAt = 0L;
+                try {
+                    takenAt = c.getLong(5);
+                } catch (Exception ignored) {
+                    // 个别机型 DATE_TAKEN 为空:按「没有拍摄时间」处理
+                }
+                JSObject item = new JSObject();
+                item.put("mediaId", id);
+                item.put("name", name == null ? "" : name);
+                item.put("mime", mime == null ? "image/jpeg" : mime);
+                item.put("size", size);
+                item.put("dateAdded", dateAdded);
+                item.put("takenAt", takenAt);
+                out.put(item);
+                read++;
+            }
+            return read >= pageSize;
+        }
+    }
+
+    private static final class Meta {
+        String name;
+        String mime;
+        long size;
+        long takenAt;
+    }
+
+    private Meta readMeta(Uri uri) {
+        String[] projection = {
+            MediaStore.Images.Media.DISPLAY_NAME,
+            MediaStore.Images.Media.MIME_TYPE,
+            MediaStore.Images.Media.SIZE,
+            MediaStore.Images.Media.DATE_TAKEN
+        };
+        try (Cursor c = getContext().getContentResolver().query(uri, projection, null, null, null)) {
+            if (c == null || !c.moveToFirst()) return null;
+            Meta m = new Meta();
+            m.name = c.getString(0);
+            m.mime = c.getString(1);
+            m.size = c.getLong(2);
+            try {
+                m.takenAt = c.getLong(3);
+            } catch (Exception ignored) {
+                m.takenAt = 0L;
+            }
+            if (m.name == null || m.name.trim().isEmpty()) m.name = "photo";
+            if (m.mime == null || !m.mime.contains("/")) m.mime = guessMime(m.name);
+            return m;
+        } catch (Exception e) {
+            Log.w(TAG, "readMeta failed: " + uri, e);
+            return null;
+        }
+    }
+
+    private static String guessMime(String name) {
+        int dot = name.lastIndexOf('.');
+        if (dot >= 0) {
+            String ext = name.substring(dot + 1).toLowerCase();
+            String guess = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext);
+            if (guess != null) return guess;
+        }
+        return "image/jpeg";
+    }
+
+    private static String extension(Meta meta) {
+        int dot = meta.name.lastIndexOf('.');
+        if (dot >= 0 && meta.name.length() - dot <= 6) {
+            return meta.name.substring(dot).replaceAll("[^A-Za-z0-9.]", "");
+        }
+        String ext = MimeTypeMap.getSingleton().getExtensionFromMimeType(meta.mime);
+        return ext == null ? ".jpg" : "." + ext;
+    }
+
+    /** 流式复制并同步更新指纹;超过上限立刻放弃(返回 -1) */
+    private long copy(Uri uri, File dest, MessageDigest digest) throws Exception {
+        ContentResolver resolver = getContext().getContentResolver();
+        long total = 0L;
+        try (InputStream in = resolver.openInputStream(uri);
+             OutputStream out = new FileOutputStream(dest)) {
+            if (in == null) return 0L;
+            byte[] buf = new byte[64 * 1024];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                total += n;
+                if (total > MAX_PHOTO_BYTES) return -1L;
+                digest.update(buf, 0, n);
+                out.write(buf, 0, n);
+            }
+            out.flush();
+        }
+        return total;
+    }
+
+    private static String hex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder(bytes.length * 2);
+        for (byte b : bytes) {
+            sb.append(Character.forDigit((b >> 4) & 0xF, 16));
+            sb.append(Character.forDigit(b & 0xF, 16));
+        }
+        return sb.toString();
+    }
+
+    private long cacheBytes() {
+        File[] files = new File(getContext().getCacheDir(), CACHE_DIR).listFiles();
+        if (files == null) return 0L;
+        long total = 0L;
+        for (File f : files) total += f.length();
+        return total;
+    }
+
+    // ---- 设备状态(备份开关要按这些判断) ----
+
+    private boolean isCharging() {
+        try {
+            BatteryManager bm = (BatteryManager) getContext().getSystemService(Context.BATTERY_SERVICE);
+            if (bm != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                int status = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_STATUS);
+                if (status == BatteryManager.BATTERY_STATUS_CHARGING
+                        || status == BatteryManager.BATTERY_STATUS_FULL) {
+                    return true;
+                }
+            }
+            // 少数机型上面取到的状态不刷新:回退读一次电量广播
+            Intent battery = getContext().registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+            if (battery == null) return false;
+            int status = battery.getIntExtra(BatteryManager.EXTRA_STATUS, -1);
+            return status == BatteryManager.BATTERY_STATUS_CHARGING
+                    || status == BatteryManager.BATTERY_STATUS_FULL;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean isWifi() {
+        try {
+            ConnectivityManager cm = (ConnectivityManager) getContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+            if (cm == null) return false;
+            Network network = cm.getActiveNetwork();
+            if (network == null) return false;
+            NetworkCapabilities caps = cm.getNetworkCapabilities(network);
+            return caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean isMetered() {
+        try {
+            ConnectivityManager cm = (ConnectivityManager) getContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+            return cm != null && cm.isActiveNetworkMetered();
+        } catch (Exception e) {
+            return true;
+        }
+    }
+}

@@ -6,6 +6,7 @@ import com.ihomy.common.BizException;
 import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
 import com.ihomy.dto.AlbumDTO;
+import com.ihomy.dto.PhotoBackupResult;
 import com.ihomy.entity.Album;
 import com.ihomy.entity.Family;
 import com.ihomy.entity.Photo;
@@ -16,9 +17,15 @@ import com.ihomy.mapper.FamilyMapper;
 import com.ihomy.mapper.PhotoMapper;
 import com.ihomy.mapper.StorageDeviceMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -26,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -36,6 +44,11 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class AlbumService {
+
+    /** 备份相册标识:android:&lt;设备标识&gt;(与前端约定的稳定键,服务端只校验形状) */
+    private static final Pattern BACKUP_KEY = Pattern.compile("android:[A-Za-z0-9_-]{1,56}");
+    /** 客户端算的 SHA-256(小写十六进制) */
+    private static final Pattern CHECKSUM = Pattern.compile("[a-f0-9]{64}");
 
     private final AlbumMapper albumMapper;
     private final PhotoMapper photoMapper;
@@ -266,6 +279,97 @@ public class AlbumService {
             albumMapper.updateById(a);
         }
         return p;
+    }
+
+    /**
+     * 取或建「自动备份相册」:按 backupKey 找(含回收站),没有才用 name 建一个私有相册。
+     * 只加列不改表:backup_key 同家庭唯一,两端同时调用由唯一键兜住,回读已存在那条。
+     */
+    @Transactional
+    public Album backupAlbum(SysUser user, Long currentFamilyId, String backupKey, String name) {
+        String key = backupKey == null ? "" : backupKey.trim();
+        if (!BACKUP_KEY.matcher(key).matches()) throw new BizException(ResultCode.BAD_REQUEST);
+        String albumName = name == null ? "" : name.trim();
+        if (albumName.isEmpty() || albumName.length() > 100) throw new BizException(ResultCode.BAD_REQUEST);
+
+        Album found = albumMapper.selectByBackupKeyAny(currentFamilyId, key);
+        if (found != null) return restoreIfTrashed(found);
+
+        Album a = new Album();
+        a.setName(albumName);
+        // 私有相册:照片可见性落 FAMILY;备份照片不该因为相册被建成 public 而变成 PUBLIC
+        a.setType("private");
+        a.setShareToken(java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16));
+        a.setFamilyId(currentFamilyId);
+        a.setBackupKey(key);
+        a.setCreatedBy(user.getId());
+        try {
+            albumMapper.insert(a);
+            return a;
+        } catch (DuplicateKeyException e) {
+            Album existing = albumMapper.selectByBackupKeyAny(currentFamilyId, key);
+            if (existing == null) throw e;
+            return restoreIfTrashed(existing);
+        }
+    }
+
+    /** 备份相册被用户删进回收站:恢复它,而不是再建一个(唯一键也不允许同键两只) */
+    private Album restoreIfTrashed(Album a) {
+        if (a.getDeleted() != null && a.getDeleted() == 1) {
+            albumMapper.restoreByIds(List.of(a.getId()));
+            a.setDeleted(0);
+            a.setDeletedAt(null);
+        }
+        return a;
+    }
+
+    /**
+     * 自动备份单张照片:先按 (家庭, 内容哈希) 查重,命中直接跳过(含回收站里的行,不复活用户主动删掉的照片);
+     * 未命中才落盘入库,并发撞唯一键时删掉刚落盘的那份文件再回读跳过。
+     * 不记积分:自动备份是无人值守的批量行为,不该按张数刷积分。
+     */
+    @Transactional
+    public PhotoBackupResult addBackupPhoto(Long albumId, SysUser user, Long currentFamilyId,
+                                            MultipartFile file, String checksum, Long takenAt) throws IOException {
+        String sum = checksum == null ? "" : checksum.trim().toLowerCase();
+        if (!CHECKSUM.matcher(sum).matches()) throw new BizException(ResultCode.BAD_REQUEST);
+        Album a = albumMapper.selectById(albumId);
+        if (a == null) throw new BizException(ResultCode.NOT_FOUND);
+        if (!a.getFamilyId().equals(currentFamilyId)) throw new BizException(ResultCode.FORBIDDEN);
+
+        Photo dup = photoMapper.selectByChecksumAny(currentFamilyId, sum);
+        if (dup != null) return PhotoBackupResult.skipped(dup);
+
+        String url = fileService.upload(file, file.getOriginalFilename(), file.getContentType(),
+                albumId, a.getName());
+        Photo p = new Photo();
+        p.setAlbumId(albumId);
+        p.setUrl(url);
+        p.setAuthorId(user.getId());
+        p.setFamilyId(currentFamilyId);
+        p.setChecksum(sum);
+        p.setVisibility(DictConst.VIS_FAMILY);
+        if (takenAt != null && takenAt > 0) {
+            // 拍摄时刻(毫秒)来自手机相册,异常值只忽略这一张,不打断整批备份
+            try {
+                p.setTakenAt(LocalDateTime.ofInstant(Instant.ofEpochMilli(takenAt), ZoneId.systemDefault()));
+            } catch (RuntimeException ignore) {
+                // 越界时间戳:按「没有拍摄时间」处理
+            }
+        }
+        try {
+            photoMapper.insert(p);
+        } catch (DuplicateKeyException e) {
+            fileService.deleteByUrl(url); // 另一路已经入库,这份是多余文件
+            Photo existing = photoMapper.selectByChecksumAny(currentFamilyId, sum);
+            if (existing == null) throw e;
+            return PhotoBackupResult.skipped(existing);
+        }
+        if (a.getCoverPhotoUrl() == null || a.getCoverPhotoUrl().isBlank()) {
+            a.setCoverPhotoUrl(url);
+            albumMapper.updateById(a);
+        }
+        return PhotoBackupResult.created(p);
     }
 
     /** 修改照片备注:仅上传者或家长 */

@@ -3,6 +3,7 @@ package com.ihomy.controller;
 import com.ihomy.annotation.OperationLog;
 import com.ihomy.annotation.RequirePermission;
 import com.ihomy.common.Result;
+import com.ihomy.dto.AlbumBackupDTO;
 import com.ihomy.dto.AlbumDTO;
 import com.ihomy.entity.Album;
 import com.ihomy.entity.Family;
@@ -13,6 +14,7 @@ import com.ihomy.service.AlbumMapService;
 import com.ihomy.service.AlbumService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -67,6 +69,18 @@ public class AlbumController {
     @PostMapping
     public Result<Album> create(@RequestBody AlbumDTO dto) {
         return Result.success(albumService.create(securityHelper.currentUser(), securityHelper.current().getFamilyId(), dto));
+    }
+
+    /**
+     * 取或建「自动备份相册」:手机端每次备份前都会调一次,幂等。
+     * 按设备稳定标识找相册,不按相册名找——用户手建的同名相册不会被写进备份。
+     */
+    @Operation(summary = "取或建自动备份相册")
+    @OperationLog(module = "ALBUM", operationType = "CREATE", description = "启用相册自动备份")
+    @PostMapping("/backup")
+    public Result<Album> backup(@Valid @RequestBody AlbumBackupDTO dto) {
+        return Result.success(albumService.backupAlbum(securityHelper.currentUser(),
+                securityHelper.current().getFamilyId(), dto.getKey(), dto.getName()));
     }
 
     @Operation(summary = "更新相册")

@@ -100,4 +100,11 @@
         <foreach item="id" collection="ids" open="(" separator="," close=")">#{id}</foreach>
     </select>
 
+    <!-- 自动备份幂等查重:必须不过滤 deleted(用户删掉的照片不该被备份任务复活,但也不能重复上传) -->
+    <select id="selectByChecksumAny" resultType="com.ihomy.entity.Photo">
+        SELECT * FROM content_photo
+        WHERE family_id = #{familyId} AND checksum = #{checksum}
+        LIMIT 1
+    </select>
+
 </mapper>

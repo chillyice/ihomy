@@ -1,4 +1,5 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useGamepad } from './useGamepad'
 
 /**
  * 小游戏页面公共视图状态(全屏 / 宽屏 / 一屏适配)。
@@ -18,6 +19,8 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 export function useGameView({ page, stage, fit = true, scale = true } = {}) {
   const isFullscreen = ref(false)
   const isWide = ref(false)
+  // 手柄:统一在这里接(所有小游戏都走 useGameView),只派发键盘事件,不写逐帧状态
+  const { gamepadConnected, gamepadName } = useGamepad()
 
   let fitTimer = null
   let resizeObserver = null
@@ -155,5 +158,5 @@ export function useGameView({ page, stage, fit = true, scale = true } = {}) {
     if (pageNode) pageNode.style.height = ''
   })
 
-  return { isFullscreen, isWide, toggleFullscreen, toggleWide, refit: scheduleFit }
+  return { isFullscreen, isWide, toggleFullscreen, toggleWide, refit: scheduleFit, gamepadConnected, gamepadName }
 }

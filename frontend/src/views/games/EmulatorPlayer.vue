@@ -12,6 +12,9 @@
           <el-icon><FullScreen /></el-icon>
           {{ isFullscreen ? $t('gba.exitFullscreen') : $t('gba.fullscreen') }}
         </el-button>
+        <el-tag v-if="fileName || src" size="small" type="info" effect="plain">
+          {{ $t('games.gamepadEmulator') }}
+        </el-tag>
       </div>
     </PageToolbar>
 

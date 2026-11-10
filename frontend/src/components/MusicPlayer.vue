@@ -74,6 +74,8 @@
       ref="audioEl"
       :src="playSrc"
       @ended="next"
+      @play="onPlayState"
+      @pause="onPlayState"
       @timeupdate="onTimeUpdate"
       @loadedmetadata="onLoadedMeta"
       @progress="onProgress"
@@ -89,6 +91,7 @@ import { useUserStore } from '@/stores/user'
 import { useDevice } from '@/composables/useDevice'
 import { useI18n } from 'vue-i18n'
 import { CaretLeft, CaretRight, VideoPlay, VideoPause, List } from '@element-plus/icons-vue'
+import { bindMediaSession, clearMediaSession, syncPlaybackState, updatePosition } from '@/utils/mediaSession'
 
 const { t } = useI18n()
 const userStore = useUserStore()
@@ -307,16 +310,40 @@ const onTimeUpdate = () => {
     if (audioEl.value.buffered.length) {
       buffered.value = audioEl.value.buffered.end(audioEl.value.buffered.length - 1)
     }
+    updatePosition(audioEl.value)
   }
 }
 const onLoadedMeta = () => {
-  if (audioEl.value) duration.value = audioEl.value.duration || 0
+  if (audioEl.value) {
+    duration.value = audioEl.value.duration || 0
+    updatePosition(audioEl.value, true)
+  }
+}
+const onPlayState = () => {
+  if (!audioEl.value) return
+  playing.value = !audioEl.value.paused
+  syncPlaybackState(audioEl.value)
 }
 const onProgress = () => {
   if (audioEl.value && audioEl.value.buffered.length) {
     buffered.value = audioEl.value.buffered.end(audioEl.value.buffered.length - 1)
   }
 }
+
+// 锁屏 / 耳机键:曲目或播放地址一变就把系统媒体会话换成当前这首
+watch(
+  () => [playlist.value.length, currentTrack.value?.id, playSrc.value],
+  async () => {
+    if (!playlist.value.length || !playSrc.value) {
+      clearMediaSession('float')
+      return
+    }
+    await nextTick()
+    const ok = bindMediaSession(audioEl.value, currentTrack.value, { prev, next }, 'float')
+    if (ok) syncPlaybackState(audioEl.value)
+  },
+  { immediate: true },
+)
 
 const formatTime = (s) => {
   if (!s || isNaN(s)) return '0:00'
@@ -345,6 +372,7 @@ onBeforeUnmount(() => {
   clearTimeout(expandClampTimer)
   detachDrag()
   window.removeEventListener('resize', clampPos)
+  clearMediaSession('float')
 })
 </script>
 

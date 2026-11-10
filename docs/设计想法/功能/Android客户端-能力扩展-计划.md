@@ -461,3 +461,10 @@ Manifest 其他增量:新增 `reminder` Worker 的 WorkManager 初始化(默认�
 ## 实施差异
 
 > 落地过程中与本文不一致的地方记在这里(格式:`A?/B? — 原计划 / 实际 / 原因`)。
+
+- **B1 — 后台 Worker + SharedPreferences 游标 / 实际只在前台触发,游标存 localStorage**:后台备份的写接口不能放进 `type=WIDGET` 只读白名单,另开写令牌通道超出本批安全面;改为 App 启动/回前台/手动点击触发(10 分钟节流),D4 幂等口径不变。
+- **B1 — 按 `content_photo_album.source_device_id` 找备份相册 / 实际新增 `backup_key VARCHAR(64)` 字符串键**:`source_device_id` 的语义是「设备目录映射来源 ID」(存储映射域),混用会搅乱映射相册口径;`android:<设备标识>` 字符串键服务端只校验形状,建相册/找相册/恢复回收站共用一个键,`content_photo_album` 也加了列(原计划只写 `content_photo`)。
+- **B1 — 单张失败进重试队列 / 实际单张失败整轮停下,游标停在上一张成功处**:下次备份从游标继续,等价于重试队列但不维护额外数据结构;>30MB 的单张返回 `tooLarge` 跳过但游标照走,不会永远卡住。
+- **B2-L1 — 只接 `views/music/Music.vue` 播控处 / 实际全局 `MusicPlayer.vue` 优先接入,页内试听也接了一份**:锁屏场景大头是全局浮窗播放器;两个持有者按 owner 隔离,关闭试听弹窗只清自己的会话。
+- **B3 — 平板自动提示一次 / 实际只在设置页加「看板模式」按钮**:自动弹提示会打断正常手机使用;入口保持手动,未进 `navModules.js`。
+- **B5 — 模拟器在 `useGameView` 里做「已连接」提示 / 实际模拟器页(`EmulatorPlayer.vue`)完全不接适配器**,只显示「手柄由模拟器直接支持」静态说明——EmulatorJS 自带手柄支持,再派发键盘事件会双输入。

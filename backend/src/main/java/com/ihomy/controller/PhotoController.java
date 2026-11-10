@@ -5,6 +5,7 @@ import com.ihomy.common.HttpUrlUtil;
 import com.ihomy.common.LivePhotoUtil;
 import com.ihomy.common.Result;
 import com.ihomy.dto.PhotoDTO;
+import com.ihomy.dto.PhotoBackupResult;
 import com.ihomy.dto.PhotoFromUrlDTO;
 import com.ihomy.entity.Album;
 import com.ihomy.entity.Photo;
@@ -93,6 +94,25 @@ public class PhotoController {
             publicController.invalidateHomeCache(fid);
         }
         return Result.success(photos);
+    }
+
+    /**
+     * 自动备份上传:一张一请求,按内容哈希去重。
+     * 同一家庭里同一张图只存一份,重复上传返回 skipped=true 与已有照片(不重复占盘,也不刷积分)。
+     */
+    @Operation(summary = "备份上传单张照片（按内容去重）")
+    @OperationLog(module = "PHOTO", operationType = "CREATE", description = "自动备份照片", saveArgs = false)
+    @PostMapping("/album/{albumId}/photos/backup")
+    public Result<PhotoBackupResult> uploadBackup(@PathVariable Long albumId,
+                                                  @RequestParam("file") MultipartFile file,
+                                                  @RequestParam("checksum") String checksum,
+                                                  @RequestParam(value = "takenAt", required = false) Long takenAt)
+            throws IOException {
+        Long fid = securityHelper.current().getFamilyId();
+        PhotoBackupResult result = albumService.addBackupPhoto(albumId, securityHelper.currentUser(),
+                fid, file, checksum, takenAt);
+        if (!result.isSkipped()) publicController.invalidateHomeCache(fid);
+        return Result.success(result);
     }
 
     @Operation(summary = "更新照片备注")

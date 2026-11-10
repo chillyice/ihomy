@@ -122,6 +122,8 @@ export const albumApi = {
   update: (id, data) => request.put(`/album/${id}`, data),
   remove: (id) => request.delete(`/album/${id}`),
   refresh: (id) => request.post(`/album/${id}/refresh`),
+  /** 取或建「手机备份」相册:按设备标识找,重复调用返回同一只 */
+  backup: (data) => request.post('/album/backup', data),
   setCover: (id, file) => {
     const fd = new FormData()
     fd.append('file', file)
@@ -141,6 +143,17 @@ export const photoApi = {
   remove: (id) => request.delete(`/photo/${id}`),
   cascade: (limit = 60) => request.get('/photo/cascade', { params: { limit } }),
   saveFromUrl: (albumId, data) => request.post(`/album/${albumId}/photos/from-url`, data),
+  /** 自动备份单张照片:带内容哈希,服务端命中已存在的会返回 skipped=true */
+  backupUpload: (albumId, file, checksum, takenAt) => {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('checksum', checksum)
+    if (takenAt) form.append('takenAt', String(takenAt))
+    return request.post(`/album/${albumId}/photos/backup`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 0,
+    })
+  },
 }
 
 // 统一点赞

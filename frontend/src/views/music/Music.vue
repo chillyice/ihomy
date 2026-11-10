@@ -396,7 +396,18 @@
       <div v-if="player.track" class="player-wrap">
         <img v-if="player.track.coverUrl" :src="player.track.coverUrl" class="player-cover" alt="" />
         <div v-if="player.track.artist" class="player-artist">{{ player.track.artist }}</div>
-        <audio v-if="player.url" :src="player.url" controls autoplay class="player-audio" />
+        <audio
+          v-if="player.url"
+          ref="previewAudioEl"
+          :src="player.url"
+          controls
+          autoplay
+          class="player-audio"
+          @play="onPreviewPlayState"
+          @pause="onPreviewPlayState"
+          @timeupdate="onPreviewTimeUpdate"
+          @loadedmetadata="onPreviewMeta"
+        />
       </div>
     </el-dialog>
 
@@ -409,7 +420,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { musicApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useSyncStore } from '@/stores/sync'
@@ -419,6 +430,7 @@ import { useI18n } from 'vue-i18n'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import SyncDialog from '@/components/SyncDialog.vue'
+import { bindMediaSession, clearMediaSession, syncPlaybackState, updatePosition } from '@/utils/mediaSession'
 
 const { t: $t } = useI18n()
 const userStore = useUserStore()
@@ -558,6 +570,25 @@ const play = async (t) => {
   player.url = await resolvePlayUrl(t)
 }
 const playAlbum = (al) => play(al.tracks[0])
+
+// 页内试听也接系统媒体会话:锁屏能看到曲名并能暂停/拖动;关闭弹窗立刻清掉,
+// 避免锁屏还显示一首已经关掉的曲子(浮窗播放器的会话按 owner 隔离,不会被误清)。
+const previewAudioEl = ref(null)
+watch(
+  () => [player.visible, player.url, player.track?.id],
+  async () => {
+    if (!player.visible || !player.url) {
+      clearMediaSession('music-preview')
+      return
+    }
+    await nextTick()
+    bindMediaSession(previewAudioEl.value, player.track, {}, 'music-preview')
+  },
+  { immediate: true },
+)
+const onPreviewPlayState = () => syncPlaybackState(previewAudioEl.value)
+const onPreviewTimeUpdate = () => updatePosition(previewAudioEl.value)
+const onPreviewMeta = () => updatePosition(previewAudioEl.value, true)
 
 // 上传单曲
 const uploadSingle = async (options) => {
@@ -809,6 +840,10 @@ const delPlaylist = async (p) => {
 onMounted(() => {
   load()
   loadPlaylists()
+})
+onBeforeUnmount(() => {
+  // 离开音乐页时清掉试听会话;浮窗播放器若仍在放,它的会话会在下次 play/pause 时重新接管
+  clearMediaSession('music-preview')
 })
 </script>
 

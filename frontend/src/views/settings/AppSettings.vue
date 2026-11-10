@@ -65,12 +65,63 @@
         <div class="share-tip">{{ $t('appSettings.appLockDesc') }}</div>
       </el-form-item>
 
+      <el-form-item :label="$t('appSettings.kioskTitle')">
+        <div class="share-tip">{{ $t('appSettings.kioskDesc') }}</div>
+        <div class="cal-actions">
+          <el-button @click="router.push('/kiosk')">{{ $t('appSettings.kioskOpen') }}</el-button>
+        </div>
+      </el-form-item>
+
       <el-form-item :label="$t('appSettings.unreadNotifyTitle')">
         <div class="cal-head">
           <el-switch v-model="unreadNotify" @change="onUnreadNotifyChange" />
           <el-tag size="small" type="info">{{ $t('appSettings.unreadNotifyEvery') }}</el-tag>
         </div>
         <div class="share-tip">{{ $t('appSettings.unreadNotifyDesc') }}</div>
+      </el-form-item>
+
+      <el-form-item :label="$t('appSettings.photoBackupTitle')">
+        <div class="cal-head">
+          <el-switch v-model="backupOn" :disabled="backupBusy" @change="onBackupToggle" />
+          <el-tag size="small" :type="backupOn ? 'success' : 'info'">
+            {{ backupOn ? $t('appSettings.photoBackupOn') : $t('appSettings.photoBackupOff') }}
+          </el-tag>
+          <el-tag size="small" type="info">{{ $t('appSettings.photoBackupPending', { n: backupPending }) }}</el-tag>
+        </div>
+        <div class="share-tip">{{ $t('appSettings.photoBackupDesc') }}</div>
+        <div class="share-tip">{{ $t('appSettings.photoBackupPartialHint') }}</div>
+
+        <div class="cal-head bk-switches">
+          <span class="share-tip bk-switch">
+            <el-switch v-model="backupWifi" size="small" @change="onBackupWifiChange" />
+            {{ $t('appSettings.photoBackupWifi') }}
+          </span>
+          <span class="share-tip bk-switch">
+            <el-switch v-model="backupCharge" size="small" @change="onBackupChargeChange" />
+            {{ $t('appSettings.photoBackupCharge') }}
+          </span>
+        </div>
+        <div class="share-tip">{{ $t('appSettings.photoBackupSwitchHint') }}</div>
+
+        <div class="cal-last">
+          {{ $t('appSettings.photoBackupLast') }}: <b>{{ backupLastText }}</b>
+        </div>
+        <div v-if="pbState.running" class="cal-last">
+          {{ $t('appSettings.photoBackupRunning', { done: pbState.scanned }) }}
+        </div>
+
+        <div class="cal-actions">
+          <el-button type="primary" :loading="pbState.running" @click="onBackupNow">
+            {{ $t('appSettings.photoBackupNow') }}
+          </el-button>
+          <el-button :disabled="pbState.running || backupBusy" @click="onBackupFull">
+            {{ $t('appSettings.photoBackupFull') }}
+          </el-button>
+          <el-button v-if="pbState.running" @click="onBackupStop">
+            {{ $t('appSettings.photoBackupStop') }}
+          </el-button>
+          <el-button link :disabled="pbState.running" @click="loadPhotoBackup">{{ $t('appSettings.refresh') }}</el-button>
+        </div>
       </el-form-item>
 
       <el-form-item :label="$t('appSettings.diagnosticsTitle')">
@@ -104,11 +155,13 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getWebVersion } from '@/utils/platform'
 
 const { t } = useI18n()
+const router = useRouter()
 
 const status = ref({ granted: false, count: 0, last: null })
 const busy = ref(false)
@@ -125,6 +178,27 @@ const diagBusy = ref(false)
 const unreadNotify = ref(true)
 /** 应用锁(默认关;本机无生物识别时禁用) */
 const appLockOn = ref(false)
+
+// 相册自动备份:开关与进度都在 native/photoBackup 里,这里只做界面与回填
+const backupOn = ref(false)
+const backupWifi = ref(true)
+const backupCharge = ref(false)
+const backupPending = ref(0)
+const backupBusy = ref(false)
+const backupLast = ref({ at: 0, created: 0 })
+const pbState = ref({ running: false, scanned: 0, created: 0, skipped: 0, failed: 0, phase: 'idle' })
+
+const backupModule = () => import('@/native/photoBackup')
+
+const backupLastText = computed(() => {
+  const last = backupLast.value || pbState.value
+  const at = last && last.at ? last.at : 0
+  if (!at) return t('appSettings.photoBackupNever')
+  const d = new Date(at)
+  const pad = (n) => String(n).padStart(2, '0')
+  const time = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return t('appSettings.photoBackupLastValue', { time, n: last.created || 0 })
+})
 
 // 原生模块动态引入:Capacitor 运行时只在壳内用到,不进首屏包
 const native = () => import('@/native/calendarExport')
@@ -242,6 +316,95 @@ function onUnreadNotifyChange(v) {
   widgetNative().then((m) => m.setUnreadNotifyEnabled(!!v))
 }
 
+// 相册自动备份:所有状态都在原生模块里,这里只回填与触发
+async function loadPhotoBackup() {
+  try {
+    const m = await backupModule()
+    pbState.value = m.photoBackupState
+    backupOn.value = m.photoBackupEnabled()
+    backupWifi.value = m.wifiOnlyEnabled()
+    backupCharge.value = m.chargeOnlyEnabled()
+    backupLast.value = m.photoBackupLast()
+    backupPending.value = await m.photoBackupPending()
+  } catch (e) {
+    console.warn('[appSettings] 读取备份状态失败', e)
+  }
+}
+
+function onBackupToggle(v) {
+  backupModule().then((m) => {
+    m.setPhotoBackupEnabled(!!v)
+    backupOn.value = !!v
+    if (v) {
+      // 开启当场会尝试一次:成功后把待备份数刷掉
+      setTimeout(loadPhotoBackup, 1200)
+    }
+  })
+}
+
+function onBackupWifiChange(v) {
+  backupModule().then((m) => m.setWifiOnly(!!v))
+}
+
+function onBackupChargeChange(v) {
+  backupModule().then((m) => m.setChargeOnly(!!v))
+}
+
+function backupResultMessage(out) {
+  const o = out || {}
+  if (o.reason === 'permission')
+    ElMessageBox.alert(t('appSettings.photoBackupPermission'), t('appSettings.photoBackupTitle'), { type: 'warning' })
+  else if (o.reason === 'network') ElMessage.warning(t('appSettings.photoBackupNoNetwork'))
+  else if (o.reason === 'charging') ElMessage.warning(t('appSettings.photoBackupNoCharge'))
+  else if (o.reason === 'error') ElMessage.error(t('appSettings.photoBackupFailed', { created: pbState.value.created || 0 }))
+  else if (o.reason) return
+  else if (pbState.value.phase === 'stopped') ElMessage.info(t('appSettings.photoBackupStopped', { created: o.created || 0 }))
+  else ElMessage.success(t('appSettings.photoBackupDone', { created: o.created || 0, skipped: o.skipped || 0 }))
+}
+
+async function onBackupNow() {
+  backupBusy.value = true
+  try {
+    const m = await backupModule()
+    const out = await m.runPhotoBackup()
+    backupResultMessage(out)
+  } catch (e) {
+    console.warn('[appSettings] 备份失败', e)
+    ElMessage.error(t('appSettings.photoBackupFailed', { created: 0 }))
+  } finally {
+    backupBusy.value = false
+    await loadPhotoBackup()
+  }
+}
+
+async function onBackupFull() {
+  try {
+    await ElMessageBox.confirm(t('appSettings.photoBackupFullConfirm'), t('appSettings.photoBackupTitle'), {
+      type: 'warning',
+      confirmButtonText: t('appSettings.photoBackupFull'),
+      cancelButtonText: t('common.cancel'),
+    })
+  } catch (e) {
+    return
+  }
+  backupBusy.value = true
+  try {
+    const m = await backupModule()
+    const out = await m.runPhotoBackup({ full: true })
+    backupResultMessage(out)
+  } catch (e) {
+    console.warn('[appSettings] 全量备份失败', e)
+    ElMessage.error(t('appSettings.photoBackupFailed', { created: 0 }))
+  } finally {
+    backupBusy.value = false
+    await loadPhotoBackup()
+  }
+}
+
+function onBackupStop() {
+  backupModule().then((m) => m.stopPhotoBackup())
+}
+
 // 诊断信息:只读摘要;导出走系统分享,清空会删掉原生里的崩溃与错误文件
 const diagModule = () => import('@/native/diagnostics')
 
@@ -322,6 +485,7 @@ onMounted(async () => {
   loadVersion()
   loadDiagnostics()
   loadUnreadNotify()
+  loadPhotoBackup()
   await loadBiometric()
   await loadAppLock()
 })
@@ -351,6 +515,16 @@ html.dark .share-tip {
   gap: 10px;
   flex-wrap: wrap;
   margin-bottom: 6px;
+}
+.bk-switches {
+  margin-top: 10px;
+  gap: 18px;
+}
+.bk-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 0;
 }
 .cal-points {
   margin: 8px 0 0;

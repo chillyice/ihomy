@@ -27,6 +27,8 @@ public class Album {
     private Long parentId;
     private Long sourceDeviceId;
     private String sourcePath;
+    /** 自动备份相册标识(android:&lt;设备标识&gt;;NULL=普通相册),同家庭唯一 */
+    private String backupKey;
     private String syncStatus;
     private LocalDateTime lastSyncedAt;
     private Long createdBy;

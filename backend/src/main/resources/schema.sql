@@ -483,6 +483,7 @@ CREATE TABLE `content_photo_album` (
   `parent_id`      BIGINT       DEFAULT NULL COMMENT '父相册ID(层级相册,设备目录映射)',
   `source_device_id` BIGINT     DEFAULT NULL COMMENT '映射来源设备ID(非空=映射相册)',
   `source_path`    VARCHAR(500) DEFAULT NULL COMMENT '设备上的远程目录路径',
+  `backup_key`     VARCHAR(64)  DEFAULT NULL COMMENT '自动备份相册标识(android:<设备标识>;NULL=普通相册),同家庭唯一',
   `sync_status`    VARCHAR(20)  DEFAULT NULL COMMENT '映射状态:VALID可访问/OFFLINE设备离线/MISSING目录丢失',
   `last_synced_at` DATETIME     DEFAULT NULL COMMENT '最后同步刷新时间',
   `created_by`     BIGINT       NOT NULL COMMENT '创建用户ID',
@@ -493,7 +494,8 @@ CREATE TABLE `content_photo_album` (
   PRIMARY KEY (`id`),
   KEY `idx_family` (`family_id`),
   KEY `idx_family_parent` (`family_id`, `parent_id`, `deleted`),
-  UNIQUE KEY `uk_share_token` (`share_token`)
+  UNIQUE KEY `uk_share_token` (`share_token`),
+  UNIQUE KEY `uk_family_backup_key` (`family_id`, `backup_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='相册表';
 
 -- ------------------------------------------------------------
@@ -514,13 +516,15 @@ CREATE TABLE `content_photo` (
   `source_path` VARCHAR(500) DEFAULT NULL COMMENT '来源存储路径（一键同步去重用,系统上传为空）',
   `source_fs_id` BIGINT      DEFAULT NULL COMMENT '远程文件fs_id(百度网盘,免列目录直达dlink)',
   `live_video_url` VARCHAR(255) DEFAULT NULL COMMENT '实况照片关联短视频URL(苹果 Live Photo,MOV;普通照片为空)',
+  `checksum` VARCHAR(64) DEFAULT NULL COMMENT '内容 SHA-256(客户端计算,自动备份幂等用;NULL=未参与去重)',
   `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
   `deleted`    TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
   `deleted_at` DATETIME     DEFAULT NULL COMMENT '逻辑删除时间(回收站,7天后物理清理)',
   PRIMARY KEY (`id`),
   KEY `idx_album` (`album_id`),
   KEY `idx_author` (`author_id`),
-  KEY `idx_family_created` (`family_id`, `deleted`, `created_at`)
+  KEY `idx_family_created` (`family_id`, `deleted`, `created_at`),
+  UNIQUE KEY `uk_family_checksum` (`family_id`, `checksum`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='照片表';
 
 -- ------------------------------------------------------------

@@ -28,4 +28,10 @@ public interface AlbumMapper extends BaseMapper<Album> {
     int softDeleteByIds(@Param("ids") List<Long> ids);
 
     int restoreByIds(@Param("ids") List<Long> ids);
+
+    /**
+     * 按 (family_id, backup_key) 找「自动备份相册」,**含回收站行**——MP 逻辑删会自动加 deleted=0,
+     * 走 XML 才能把已删的那只捞回来恢复,而不是再建第二个同名相册。
+     */
+    Album selectByBackupKeyAny(@Param("familyId") Long familyId, @Param("backupKey") String backupKey);
 }
