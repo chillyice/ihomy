@@ -29,7 +29,17 @@ function navigate(raw) {
   }
 }
 
-export function initDeeplink() {
+export async function initDeeplink() {
   App.addListener('appUrlOpen', ({ url }) => navigate(url))
   document.addEventListener('ihomy-deeplink', (e) => navigate(e.detail))
+  // 冷启动:通知/卡片/快捷方式把 App 从进程未启动状态拉起时,启动意图不会触发 appUrlOpen
+  // (那是运行期事件),必须主动取一次 launchUrl,否则一律停在首页。
+  try {
+    const launched = await App.getLaunchUrl()
+    if (!launched?.url) return
+    await router.isReady()
+    navigate(launched.url)
+  } catch (e) {
+    console.warn('[deeplink] 启动链接读取失败', e)
+  }
 }
