@@ -8,6 +8,12 @@ import i18n from '@/i18n'
 import { scheduleApi, reminderApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 
+/** 通知通道 id。通道参数(声音/重要级)创建后不可改,想改只能换新 id 重新建一条——
+ * 故「补上提示音」= 换 id,见 initReminders。 */
+const CHANNEL_ID = 'reminders-v2'
+/** 通道提示音:res/raw/ihomy_notify.wav(插件按 raw 资源名解析,不认 'default') */
+const CHANNEL_SOUND = 'ihomy_notify'
+
 /** 注册窗口:今天 00:00 → +30 天(计划 §6.4.2) */
 const WINDOW_DAYS = 30
 /** 单次注册上限,超出按时间升序取前 200(§6.4.2) */
@@ -94,7 +100,7 @@ function toRequest(item, takenIds, exactAllowed) {
     title,
     body: buildBody(item),
     schedule: { at, allowWhileIdle: true, exact: exactAllowed },
-    channelId: 'reminders',
+    channelId: CHANNEL_ID,
     smallIcon: 'ic_notification',
     extra: { key, kind: item.kind, link: item.link || '/plan?date=' + item.date, date: item.date },
     // REMINDER/TASK 才有「完成」语义;其余 kind 点击进对应页
@@ -190,14 +196,15 @@ async function doSync() {
     if (k) localByKey.set(k, p)
   }
 
-  // 变更检测:触发时刻或标题变了才重排;同 key 同内容不折腾(避免每天重复 set 闹钟)
+  // 变更检测:触发时刻、标题或通道变了才重排;同 key 同内容不折腾(避免每天重复 set 闹钟)。
+  // 通道也进比对——升级到带提示音的通道后,旧通道上已排的闹钟必须重建才会响。
   const toSchedule = []
   const toCancel = []
   for (const [key, item] of remote) {
     const cur = localByKey.get(key)
     const { at } = fireDate(item.date, item.time)
     const curAt = cur && cur.schedule && cur.schedule.at ? new Date(cur.schedule.at).getTime() : null
-    if (cur && curAt === at.getTime()) {
+    if (cur && curAt === at.getTime() && cur.channelId === CHANNEL_ID) {
       localByKey.delete(key)
       continue
     }
@@ -248,7 +255,7 @@ async function onActionPerformed(notification, actionId) {
             title: notification.title,
             body: notification.body,
             schedule: { at, allowWhileIdle: true },
-            channelId: 'reminders',
+            channelId: CHANNEL_ID,
             smallIcon: 'ic_notification',
             extra,
             actionTypeId: extra.kind === 'REMINDER' || extra.kind === 'TASK' ? 'REMINDER_ACTIONS' : undefined,
@@ -281,13 +288,21 @@ function openLink(link) {
 /** 通知通道与动作注册 + 触发时机接线(App 启动 / 回到前台) */
 export async function initReminders() {
   try {
-    // 注意 API 名是 createChannel(registerChannel 不存在);importance ≥3 才有横幅与声音
+    // 注意 API 名是 createChannel(registerChannel 不存在);importance ≥3 才有横幅。
+    // 通道创建后参数被系统冻结(改代码不生效),所以「响铃」这项必须落在新 id 上并显式给 sound:
+    // 插件把 sound 解析成 android.resource://<包名>/raw/<名>(不认 'default'),不传就是静音通道。
     await LocalNotifications.createChannel({
-      id: 'reminders',
+      id: CHANNEL_ID,
       name: i18n.global.t('reminder.channelName'),
+      description: i18n.global.t('reminder.channelDesc'),
       importance: 4, // IMPORTANCE_HIGH:横幅 + 提示音
       visibility: 1, // PUBLIC:锁屏可见标题
+      sound: CHANNEL_SOUND,
+      vibration: true,
+      lights: true,
     })
+    // 旧的无声音通道(reminders)留着只会让用户看到两条同名通道,直接删掉
+    await LocalNotifications.deleteChannel({ id: 'reminders' }).catch(() => {})
   } catch (e) {
     console.warn('[reminders] 创建通知通道失败', e)
   }

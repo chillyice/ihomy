@@ -388,6 +388,8 @@ export default {
     noteTitle: '编辑照片备注',
     notePlaceholder: '写点什么吧',
     uploadSuccess: '上传成功',
+    takePhoto: '拍照上传',
+    captureFailed: '拍照上传没有成功，请再试一次',
     photoDeleteConfirm: '确认删除这张照片？',
     carousel: {
       noPhotos: '暂无公开照片',
@@ -600,6 +602,11 @@ export default {
     familyTag: '家庭可见',
     privateTag: '仅自己',
     count: '共 {n} 条',
+    // 指纹门(仅安卓客户端):进页先验一次身份,5 分钟内免二次
+    lockTitle: '解锁保险箱',
+    lockTip: '确认是你本人在使用这台设备',
+    lockButton: '验证指纹 / 人脸',
+    lockLeave: '先离开',
   },
   reminder: {
     title: '今日提醒',
@@ -622,6 +629,7 @@ export default {
     noData: '还没有提醒，添加家庭提醒吧',
     // 系统通知(P1 提醒闭环):通道名 / 动作按钮 / 文案
     channelName: '日程提醒',
+    channelDesc: '日程到点提醒，带提示音',
     actionDone: '完成',
     actionSnooze: '稍后 10 分钟',
     lateNightTag: '（昨晚）',
@@ -1640,6 +1648,14 @@ export default {
     remark: '备注',
     remarkPlaceholder: '如：周末买菜（可选）',
     fillAmount: '请填写金额',
+    // 语音记账(仅安卓客户端)
+    voice: {
+      entry: '说一句',
+      noMatch: '没听清，请再说一次',
+      noAmount: '没听出金额（说的是「{text}」），再说一次或手动填吧',
+      permission: '需要麦克风权限才能语音记账，请在系统设置里允许后重试',
+      failed: '语音识别没有成功，请再说一次',
+    },
     deleteMessage: '确定删除这笔 {amount} 元的账目吗？',
     account: {
       manage: '管理账户',
@@ -5586,6 +5602,11 @@ export default {
     kindFinance: '理财到期',
     calendarRepeating: '循环',
     calendarEventSource: '来自 ihomy',
+    // 保险箱指纹门
+    vaultLockTitle: '保险箱指纹解锁',
+    vaultLockDesc: '开启后，每次进入保险箱先验证指纹或人脸，验证后 5 分钟内不再重复。只挡本机上的顺手翻看，不改变密码本身的校验。',
+    vaultLockOn: '本机可用',
+    vaultLockNoHardware: '本机不可用',
   },
   shareInbox: {
     title: '分享到家庭',

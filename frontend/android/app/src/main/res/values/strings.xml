@@ -13,4 +13,18 @@
     <string name="widget_today_desc">今天日期与最近日程</string>
     <string name="widget_reminder_desc">今日提醒时刻清单</string>
     <string name="widget_countdown_desc">下一个纪念日倒计时</string>
+
+    <!-- 长按图标快捷方式(默认中文;英文覆盖见 values-en) -->
+    <string name="shortcut_schedule">今日日程</string>
+    <string name="shortcut_schedule_long">查看今天的提醒与计划</string>
+    <string name="shortcut_book">记账本</string>
+    <string name="shortcut_book_long">记录一笔家庭收支</string>
+    <string name="shortcut_chat">家庭聊天</string>
+    <string name="shortcut_chat_long">打开家庭聊天室</string>
+    <string name="shortcut_album">相册回忆</string>
+    <string name="shortcut_album_long">浏览家庭相册</string>
+
+    <!-- 下拉栏磁贴 -->
+    <string name="tile_book_label">记账本</string>
+    <string name="tile_plan_label">今日日程</string>
 </resources>

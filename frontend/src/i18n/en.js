@@ -387,6 +387,8 @@ export default {
     noteTitle: 'Edit photo note',
     notePlaceholder: 'Write something...',
     uploadSuccess: 'Uploaded',
+    takePhoto: 'Take photo',
+    captureFailed: 'The photo upload did not work. Please try again.',
     photoDeleteConfirm: 'Delete this photo?',
     carousel: {
       noPhotos: 'No public photos yet',
@@ -599,6 +601,11 @@ export default {
     familyTag: 'Shared',
     privateTag: 'Private',
     count: '{n} entries',
+    // Biometric gate (Android app only)
+    lockTitle: 'Unlock the vault',
+    lockTip: 'Confirm it is you using this device',
+    lockButton: 'Verify fingerprint / face',
+    lockLeave: 'Leave for now',
   },
   reminder: {
     title: 'Reminders',
@@ -621,6 +628,7 @@ export default {
     noData: 'No reminders yet, add a family reminder',
     // System notifications (P1 reminder loop): channel / actions / copy
     channelName: 'Schedule reminders',
+    channelDesc: 'Reminders that ring when they are due',
     actionDone: 'Done',
     actionSnooze: 'Snooze 10 min',
     lateNightTag: ' (last night)',
@@ -1647,6 +1655,14 @@ export default {
     remark: 'Remark',
     remarkPlaceholder: 'e.g. weekend groceries (optional)',
     fillAmount: 'Please enter an amount',
+    // Voice record (Android app only)
+    voice: {
+      entry: 'Speak',
+      noMatch: 'I did not catch that, please say it again',
+      noAmount: 'No amount in "{text}". Try again or fill it in manually.',
+      permission: 'Microphone permission is needed for voice entry. Allow it in system settings and try again.',
+      failed: 'Voice recognition did not work, please try again',
+    },
     deleteMessage: 'Delete this record of {amount} yuan?',
     account: {
       manage: 'Manage accounts',
@@ -5650,6 +5666,12 @@ export default {
     kindFinance: 'Investment maturity',
     calendarRepeating: 'Repeating',
     calendarEventSource: 'From ihomy',
+    // Vault biometric gate
+    vaultLockTitle: 'Fingerprint unlock for the vault',
+    vaultLockDesc:
+      'When on, opening the vault asks for your fingerprint or face first, then stays unlocked for 5 minutes. It only guards against someone browsing this device; password checks still happen on the server.',
+    vaultLockOn: 'Available on this device',
+    vaultLockNoHardware: 'Not available on this device',
   },
   shareInbox: {
     title: 'Share to family',

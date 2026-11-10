@@ -3,6 +3,7 @@
 import { registerPlugin } from '@capacitor/core'
 import router from '@/router'
 import { useUserStore } from '@/stores/user'
+import { fileFromBase64 } from '@/utils/file'
 
 const IhomyShare = registerPlugin('IhomyShare')
 /** 会话内缓存:登录跳转/刷新页面后仍能拿回同一份分享内容 */
@@ -51,10 +52,7 @@ export async function clearSharePayload() {
 /** 把原生复制到缓存目录的文件读成 File(上传接口要 FormData) */
 export async function readShareFile(file) {
   const res = await IhomyShare.readFile({ path: file.path })
-  const binary = atob(res.data)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-  return new File([bytes], file.name || 'share', { type: file.mime || 'application/octet-stream' })
+  return fileFromBase64(res.data, file.name || 'share', file.mime || 'application/octet-stream')
 }
 
 async function openShare({ broadcast = false } = {}) {

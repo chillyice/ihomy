@@ -60,6 +60,10 @@
           <el-button v-if="userStore.isLoggedIn && !shareToken && !isMapped" type="primary" @click="photoInput?.click()">{{
             t('album.uploadPhotos')
           }}</el-button>
+          <!-- 相机直传:只在安卓壳里出现(系统相机拍完直接进当前相册) -->
+          <el-button v-if="canCapture && userStore.isLoggedIn && !shareToken && !isMapped" :loading="capturing" @click="onCapture">
+            {{ t('album.takePhoto') }}
+          </el-button>
         </template>
       </div>
     </div>
@@ -204,6 +208,7 @@ import Breadcrumb from '@/components/Breadcrumb.vue'
 import PhotoViewer from '@/components/PhotoViewer.vue'
 import AlbumDefaultCover from '@/components/AlbumDefaultCover.vue'
 import { shareId } from '@/utils/shareId'
+import { isAndroidApp } from '@/utils/platform'
 import { formatRelativeTime, formatDateTime } from '@/utils/datetime'
 import { useSyncStore } from '@/stores/sync'
 
@@ -298,6 +303,38 @@ const onPhotosPicked = async (e) => {
   } finally {
     e.target.value = ''
     load()
+  }
+}
+
+// 相机直传:仅安卓壳可用(有无相机由原生桥回报,没有就不显示按钮)
+const canCapture = ref(false)
+const capturing = ref(false)
+if (isAndroidApp()) {
+  import('@/native/camera')
+    .then((m) => m.cameraAvailable())
+    .then((ok) => {
+      canCapture.value = !!ok
+    })
+    .catch(() => {})
+}
+
+const onCapture = async () => {
+  if (capturing.value) return
+  capturing.value = true
+  try {
+    const m = await import('@/native/camera')
+    const file = await m.capturePhoto()
+    await photoApi.upload(albumId, [file])
+    ElMessage.success(t('album.uploadSuccess'))
+    load()
+  } catch (e) {
+    // 用户点取消是正常操作,不弹错
+    if (e && e.code !== 'cancel') {
+      console.warn('[album] 拍照上传失败', e)
+      ElMessage.error(t('album.captureFailed'))
+    }
+  } finally {
+    capturing.value = false
   }
 }
 

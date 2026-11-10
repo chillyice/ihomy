@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 长按桌面图标弹出的快捷方式:静态声明,点击走 ihomy:// 深链(MainActivity 的 VIEW filter 承接,
+     deeplink.js 统一识别路由)。短标签按 Android 建议 ≤10 字,长标签补充说明。
+     属性名口径:shortcutId / shortcutShortLabel / shortcutLongLabel / enabled / icon。 -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_schedule"
+        android:shortcutId="schedule"
+        android:shortcutShortLabel="@string/shortcut_schedule"
+        android:shortcutLongLabel="@string/shortcut_schedule_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="ihomy://plan?tab=today"
+            android:targetClass="top.ihomy.app.MainActivity"
+            android:targetPackage="top.ihomy.app" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_book"
+        android:shortcutId="book"
+        android:shortcutShortLabel="@string/shortcut_book"
+        android:shortcutLongLabel="@string/shortcut_book_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="ihomy://book"
+            android:targetClass="top.ihomy.app.MainActivity"
+            android:targetPackage="top.ihomy.app" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_chat"
+        android:shortcutId="chat"
+        android:shortcutShortLabel="@string/shortcut_chat"
+        android:shortcutLongLabel="@string/shortcut_chat_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="ihomy://chat"
+            android:targetClass="top.ihomy.app.MainActivity"
+            android:targetPackage="top.ihomy.app" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_album"
+        android:shortcutId="album"
+        android:shortcutShortLabel="@string/shortcut_album"
+        android:shortcutLongLabel="@string/shortcut_album_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="ihomy://album"
+            android:targetClass="top.ihomy.app.MainActivity"
+            android:targetPackage="top.ihomy.app" />
+    </shortcut>
+
+</shortcuts>

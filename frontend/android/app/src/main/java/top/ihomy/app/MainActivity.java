@@ -5,9 +5,12 @@ import android.os.Bundle;
 import android.webkit.CookieManager;
 
 import com.getcapacitor.BridgeActivity;
+import top.ihomy.app.biometric.BiometricPlugin;
 import top.ihomy.app.calendar.CalendarSyncPlugin;
+import top.ihomy.app.camera.CameraPlugin;
 import top.ihomy.app.share.ShareInboxPlugin;
 import top.ihomy.app.share.ShareIntake;
+import top.ihomy.app.speech.SpeechPlugin;
 import top.ihomy.app.widget.WidgetBridgePlugin;
 
 public class MainActivity extends BridgeActivity {
@@ -20,6 +23,12 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(CalendarSyncPlugin.class);
         // 系统分享收件:微信/相册/浏览器 → 分享 → ihomy(落点由站内「分享到家庭」页决定)
         registerPlugin(ShareInboxPlugin.class);
+        // 保险箱进页前的本机指纹/人脸校验
+        registerPlugin(BiometricPlugin.class);
+        // 相机直传:拍照 → 站内相册/记账(用系统相机,不申请 CAMERA 权限)
+        registerPlugin(CameraPlugin.class);
+        // 语音记账:说一句话 → 识别文本 → 前端解析成金额与备注
+        registerPlugin(SpeechPlugin.class);
         // 冷启动时先把分享意图接住,JS 起来后再取(getPending 只读,确认落地才清)
         ShareIntake.capture(getIntent());
         super.onCreate(savedInstanceState);

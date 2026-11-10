@@ -1,107 +1,120 @@
 <!-- 家庭保险箱:家庭共用的账号密码条目(内容直接可见,查看/复制密码需再次输入登录密码并留痕) -->
 <template>
   <div class="page">
-    <Breadcrumb :items="[{ label: $t('vault.title') }]" />
-
-    <PageToolbar>
-      <div class="tb-left">
-        <el-input v-model="keyword" size="small" clearable class="vault-search" :placeholder="$t('vault.searchPlaceholder')">
-          <template #prefix
-            ><el-icon><Search /></el-icon
-          ></template>
-        </el-input>
-        <el-select v-model="category" size="small" class="vault-cat">
-          <el-option :label="$t('vault.allCategories')" value="" />
-          <el-option v-for="c in CATEGORIES" :key="c" :label="catText(c)" :value="c" />
-        </el-select>
+    <!-- 指纹门:开启后进页先验证身份(5 分钟内免二次),只是本地遮挡;密码明文仍由服务端校验 -->
+    <div v-if="locked" class="vault-lock card">
+      <div class="vl-icon">
+        <el-icon><Lock /></el-icon>
       </div>
-      <div class="tb-right">
-        <span v-if="filtered.length" class="vault-count">{{ $t('vault.count', { n: filtered.length }) }}</span>
-        <el-button v-if="canManage" type="primary" @click="openEditor()">{{ $t('vault.add') }}</el-button>
-      </div>
-    </PageToolbar>
+      <p class="vl-title">{{ $t('vault.lockTitle') }}</p>
+      <p class="vl-tip">{{ $t('vault.lockTip') }}</p>
+      <el-button type="primary" :loading="verifying" @click="unlockVaultNow">{{ $t('vault.lockButton') }}</el-button>
+      <el-button link @click="goBack">{{ $t('vault.lockLeave') }}</el-button>
+    </div>
 
-    <div v-loading="loading">
-      <div v-if="filtered.length" class="vault-grid">
-        <div v-for="item in filtered" :key="item.id" class="vault-card card">
-          <div class="vc-head">
-            <span class="vc-name" :title="item.name">{{ item.name }}</span>
-            <div class="vc-tags">
-              <el-tag size="small" effect="plain">{{ catText(item.category) }}</el-tag>
-              <el-tag v-if="item.visibility === 'PRIVATE'" size="small" type="warning" effect="plain">
-                {{ $t('vault.privateTag') }}
-              </el-tag>
+    <template v-else>
+      <Breadcrumb :items="[{ label: $t('vault.title') }]" />
+
+      <PageToolbar>
+        <div class="tb-left">
+          <el-input v-model="keyword" size="small" clearable class="vault-search" :placeholder="$t('vault.searchPlaceholder')">
+            <template #prefix
+              ><el-icon><Search /></el-icon
+            ></template>
+          </el-input>
+          <el-select v-model="category" size="small" class="vault-cat">
+            <el-option :label="$t('vault.allCategories')" value="" />
+            <el-option v-for="c in CATEGORIES" :key="c" :label="catText(c)" :value="c" />
+          </el-select>
+        </div>
+        <div class="tb-right">
+          <span v-if="filtered.length" class="vault-count">{{ $t('vault.count', { n: filtered.length }) }}</span>
+          <el-button v-if="canManage" type="primary" @click="openEditor()">{{ $t('vault.add') }}</el-button>
+        </div>
+      </PageToolbar>
+
+      <div v-loading="loading">
+        <div v-if="filtered.length" class="vault-grid">
+          <div v-for="item in filtered" :key="item.id" class="vault-card card">
+            <div class="vc-head">
+              <span class="vc-name" :title="item.name">{{ item.name }}</span>
+              <div class="vc-tags">
+                <el-tag size="small" effect="plain">{{ catText(item.category) }}</el-tag>
+                <el-tag v-if="item.visibility === 'PRIVATE'" size="small" type="warning" effect="plain">
+                  {{ $t('vault.privateTag') }}
+                </el-tag>
+              </div>
             </div>
-          </div>
 
-          <div class="vc-row">
-            <span class="vc-label">{{ $t('vault.username') }}</span>
-            <span v-if="item.username" class="vc-value" :title="item.username">{{ item.username }}</span>
-            <span v-else class="vc-empty">{{ $t('vault.noUsername') }}</span>
-            <span v-a11y-click v-if="item.username" class="vc-icon" :title="$t('vault.copyUsername')" @click="copyUsername(item)">
-              <el-icon><DocumentCopy /></el-icon>
-            </span>
-          </div>
-
-          <div class="vc-row">
-            <span class="vc-label">{{ $t('vault.password') }}</span>
-            <span v-if="revealed[item.id] !== undefined" class="vc-value vc-plain">{{ revealed[item.id] || '—' }}</span>
-            <span v-else-if="item.passwordMasked" class="vc-value vc-mask">{{ item.passwordMasked }}</span>
-            <span v-else class="vc-empty">{{ $t('vault.noPassword') }}</span>
-            <template v-if="item.passwordMasked">
-              <span
-                v-a11y-click
-                class="vc-icon"
-                :title="revealed[item.id] !== undefined ? $t('vault.hide') : $t('vault.reveal')"
-                @click="toggleReveal(item)"
-              >
-                <el-icon><View v-if="revealed[item.id] === undefined" /><Hide v-else /></el-icon>
-              </span>
-              <span v-a11y-click class="vc-icon" :title="$t('vault.copyPassword')" @click="copyPassword(item)">
+            <div class="vc-row">
+              <span class="vc-label">{{ $t('vault.username') }}</span>
+              <span v-if="item.username" class="vc-value" :title="item.username">{{ item.username }}</span>
+              <span v-else class="vc-empty">{{ $t('vault.noUsername') }}</span>
+              <span v-a11y-click v-if="item.username" class="vc-icon" :title="$t('vault.copyUsername')" @click="copyUsername(item)">
                 <el-icon><DocumentCopy /></el-icon>
               </span>
-            </template>
-          </div>
+            </div>
 
-          <div v-if="item.url" class="vc-row">
-            <span class="vc-label">{{ $t('vault.url') }}</span>
-            <a class="vc-link" :href="item.url" target="_blank" rel="noopener noreferrer" :title="item.url">{{ item.url }}</a>
-          </div>
+            <div class="vc-row">
+              <span class="vc-label">{{ $t('vault.password') }}</span>
+              <span v-if="revealed[item.id] !== undefined" class="vc-value vc-plain">{{ revealed[item.id] || '—' }}</span>
+              <span v-else-if="item.passwordMasked" class="vc-value vc-mask">{{ item.passwordMasked }}</span>
+              <span v-else class="vc-empty">{{ $t('vault.noPassword') }}</span>
+              <template v-if="item.passwordMasked">
+                <span
+                  v-a11y-click
+                  class="vc-icon"
+                  :title="revealed[item.id] !== undefined ? $t('vault.hide') : $t('vault.reveal')"
+                  @click="toggleReveal(item)"
+                >
+                  <el-icon><View v-if="revealed[item.id] === undefined" /><Hide v-else /></el-icon>
+                </span>
+                <span v-a11y-click class="vc-icon" :title="$t('vault.copyPassword')" @click="copyPassword(item)">
+                  <el-icon><DocumentCopy /></el-icon>
+                </span>
+              </template>
+            </div>
 
-          <div v-if="item.note" class="vc-note">{{ item.note }}</div>
+            <div v-if="item.url" class="vc-row">
+              <span class="vc-label">{{ $t('vault.url') }}</span>
+              <a class="vc-link" :href="item.url" target="_blank" rel="noopener noreferrer" :title="item.url">{{ item.url }}</a>
+            </div>
 
-          <div v-if="tagList(item).length" class="vc-chips">
-            <el-tag v-for="tg in tagList(item)" :key="tg" size="small" effect="plain" type="info">{{ tg }}</el-tag>
-          </div>
+            <div v-if="item.note" class="vc-note">{{ item.note }}</div>
 
-          <div class="vc-foot">
-            <span>{{ $t('vault.owner', { name: item.ownerName }) }}</span>
-            <span v-if="item.updatedAt">{{ item.updatedAt.slice(0, 10) }}</span>
-          </div>
+            <div v-if="tagList(item).length" class="vc-chips">
+              <el-tag v-for="tg in tagList(item)" :key="tg" size="small" effect="plain" type="info">{{ tg }}</el-tag>
+            </div>
 
-          <div v-if="canManage" class="vc-actions">
-            <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
-              <el-button size="small" text @click="openEditor(item)"
-                ><el-icon><Edit /></el-icon
-              ></el-button>
-            </el-tooltip>
-            <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
-              <el-button size="small" text type="danger" @click="onDelete(item)"
-                ><el-icon><Delete /></el-icon
-              ></el-button>
-            </el-tooltip>
+            <div class="vc-foot">
+              <span>{{ $t('vault.owner', { name: item.ownerName }) }}</span>
+              <span v-if="item.updatedAt">{{ item.updatedAt.slice(0, 10) }}</span>
+            </div>
+
+            <div v-if="canManage" class="vc-actions">
+              <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
+                <el-button size="small" text @click="openEditor(item)"
+                  ><el-icon><Edit /></el-icon
+                ></el-button>
+              </el-tooltip>
+              <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+                <el-button size="small" text type="danger" @click="onDelete(item)"
+                  ><el-icon><Delete /></el-icon
+                ></el-button>
+              </el-tooltip>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div v-else-if="loadError" style="padding: 20px 0; text-align: center; color: var(--color-text-secondary)">
-        {{ $t('common.loadFailed') }} <el-button text size="small" @click="load">{{ $t('common.retry') }}</el-button>
+        <div v-else-if="loadError" style="padding: 20px 0; text-align: center; color: var(--color-text-secondary)">
+          {{ $t('common.loadFailed') }} <el-button text size="small" @click="load">{{ $t('common.retry') }}</el-button>
+        </div>
+        <el-empty v-else-if="!loading && !list.length" :description="$t('vault.emptyTitle')">
+          <div class="vault-empty-hint">{{ $t('vault.emptyHint') }}</div>
+        </el-empty>
+        <el-empty v-else-if="!loading" :description="$t('vault.noMatch')" />
       </div>
-      <el-empty v-else-if="!loading && !list.length" :description="$t('vault.emptyTitle')">
-        <div class="vault-empty-hint">{{ $t('vault.emptyHint') }}</div>
-      </el-empty>
-      <el-empty v-else-if="!loading" :description="$t('vault.noMatch')" />
-    </div>
+    </template>
 
     <!-- 条目编辑:密码留空表示不改;生成器挂在密码输入框旁 -->
     <el-dialog v-model="editor.visible" append-to-body :title="editor.form.id ? $t('vault.edit') : $t('vault.add')" width="480px">
@@ -242,11 +255,12 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, View, Hide, DocumentCopy, Edit, Delete } from '@element-plus/icons-vue'
+import { Search, View, Hide, DocumentCopy, Edit, Delete, Lock } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { vaultApi } from '@/api'
 import { dictText } from '@/utils/dict'
 import { generatePassword, passwordStrength } from '@/utils/password'
+import { isAndroidApp } from '@/utils/platform'
 import { useUserStore } from '@/stores/user'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -540,12 +554,52 @@ const openFromQuery = () => {
   router.replace({ path: '/vault' })
 }
 
-onMounted(async () => {
+/* ---------- 指纹门(仅安卓壳,开关在「设置 → 安卓客户端」) ---------- */
+const locked = ref(false)
+const verifying = ref(false)
+
+/** 首次进页的加载:列表 + 深链预填 */
+const boot = async () => {
   await load()
   openFromQuery()
+}
+
+/** 指纹通过后才真正加载内容;失败留在锁屏,可重试 */
+const unlockVaultNow = async () => {
+  if (verifying.value) return
+  verifying.value = true
+  try {
+    const bio = await import('@/native/biometric')
+    const ok = await bio.verifyVault()
+    if (!ok) return
+    bio.markVaultUnlocked()
+    locked.value = false
+    await boot()
+  } finally {
+    verifying.value = false
+  }
+}
+
+const goBack = () => {
+  if (window.history.length > 1) router.back()
+  else router.push('/home')
+}
+
+onMounted(async () => {
+  // 指纹门:开了且不在免验窗口内,先挡住内容(列表也不拉,避免开口就泄露条目名)
+  if (isAndroidApp()) {
+    const bio = await import('@/native/biometric')
+    if (bio.vaultLockEnabled() && !bio.vaultLockFresh()) {
+      locked.value = true
+      unlockVaultNow()
+      return
+    }
+  }
+  await boot()
 })
 // 离开页面:清掉全部定时器;剪贴板里还留着的密码立刻尽力清空(读不到就交给 10 秒兜底计时器之前的手动刷新)
 onBeforeUnmount(() => {
+  if (locked.value) import('@/native/biometric').then((m) => m.cancelVerify())
   revealTimers.forEach((timer) => clearTimeout(timer))
   revealTimers.clear()
   clearTimers.forEach((entry) => {
@@ -793,5 +847,38 @@ onBeforeUnmount(() => {
     flex-wrap: wrap;
     gap: 0 12px;
   }
+}
+
+/* 指纹门:一片留白 + 居中图标与按钮,和内容页共用卡片底色 */
+.vault-lock {
+  max-width: 420px;
+  margin: 8vh auto 0;
+  padding: 32px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+.vl-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(var(--color-brand-rgb, 144, 98, 68) / 0.14);
+  color: var(--color-accent, #a8483a);
+  font-size: 26px;
+}
+.vl-title {
+  margin: 4px 0 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.vl-tip {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  color: var(--color-text-secondary, #8a8a8a);
 }
 </style>

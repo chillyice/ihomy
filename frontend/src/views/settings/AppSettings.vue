@@ -34,6 +34,16 @@
           <el-button link :disabled="busy" @click="load">{{ $t('appSettings.refresh') }}</el-button>
         </div>
       </el-form-item>
+
+      <el-form-item :label="$t('appSettings.vaultLockTitle')">
+        <div class="cal-head">
+          <el-switch v-model="vaultLock" :disabled="!bioAvailable" @change="onVaultLockChange" />
+          <el-tag size="small" :type="bioAvailable ? 'success' : 'info'">
+            {{ bioAvailable ? $t('appSettings.vaultLockOn') : $t('appSettings.vaultLockNoHardware') }}
+          </el-tag>
+        </div>
+        <div class="share-tip">{{ $t('appSettings.vaultLockDesc') }}</div>
+      </el-form-item>
     </el-form>
   </div>
 </template>
@@ -47,6 +57,9 @@ const { t } = useI18n()
 
 const status = ref({ granted: false, count: 0, last: null })
 const busy = ref(false)
+/** 保险箱指纹门:本机是否具备可用指纹/人脸 + 开关状态 */
+const bioAvailable = ref(false)
+const vaultLock = ref(false)
 
 // 原生模块动态引入:Capacitor 运行时只在壳内用到,不进首屏包
 const native = () => import('@/native/calendarExport')
@@ -110,7 +123,31 @@ async function onClear() {
   }
 }
 
-onMounted(load)
+// 指纹门开关:读写都在 native/biometric 里,这里只做界面与状态回填
+const bio = () => import('@/native/biometric')
+
+async function loadBiometric() {
+  try {
+    const m = await bio()
+    const st = await m.biometricStatus()
+    bioAvailable.value = !!(st && st.available)
+    vaultLock.value = bioAvailable.value && m.vaultLockEnabled()
+    // 本机指纹被移除/关闭(录入被删)时顺手关掉开关,否则下次进保险箱会被挡在锁屏且验不过
+    if (!bioAvailable.value && m.vaultLockEnabled()) m.setVaultLockEnabled(false)
+  } catch (e) {
+    bioAvailable.value = false
+    vaultLock.value = false
+  }
+}
+
+function onVaultLockChange(v) {
+  bio().then((m) => m.setVaultLockEnabled(!!v))
+}
+
+onMounted(() => {
+  load()
+  loadBiometric()
+})
 </script>
 
 <style scoped>

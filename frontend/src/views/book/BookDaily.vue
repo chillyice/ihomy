@@ -16,6 +16,8 @@
       <!-- 三个入口并排:记一笔(主)、周期账目、导入 CSV;只读档位不显示 -->
       <div v-if="userStore.canWriteBook" class="bc-right">
         <el-button type="primary" @click="openEditor()">{{ $t('book.add') }}</el-button>
+        <!-- 语音记账:只在有识别服务的安卓壳里出现,识别文本在前端解析成金额/备注 -->
+        <el-button v-if="voiceReady" :loading="voiceBusy" @click="onVoiceRecord">{{ $t('book.voice.entry') }}</el-button>
         <el-button @click="recurringVisible = true">{{ $t('book.recurring.entry') }}</el-button>
         <el-button @click="importVisible = true">{{ $t('book.import.entry') }}</el-button>
       </div>
@@ -237,6 +239,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { bookApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { formatYuan } from '@/utils/money'
+import { isAndroidApp } from '@/utils/platform'
+import { parseVoiceRecord } from '@/utils/voiceRecord'
 import { bindHorizontalWheel } from '@/utils/horizontalWheel'
 import { weekdayKey, shiftMonth as shiftCalendarMonth, todayString } from '@/utils/scheduleCalendar'
 import {
@@ -437,6 +441,60 @@ const openEditor = (r) => {
         toAccountId: null,
       }
 }
+
+// 语音记账(仅安卓壳):识别一句话 → 前端拆金额/备注 → 预填弹窗,用户确认后再存
+const voiceReady = ref(false)
+const voiceBusy = ref(false)
+if (isAndroidApp()) {
+  import('@/native/speech')
+    .then((m) => m.speechAvailable())
+    .then((ok) => {
+      voiceReady.value = !!ok
+    })
+    .catch(() => {})
+}
+
+const onVoiceRecord = async () => {
+  if (voiceBusy.value) return
+  voiceBusy.value = true
+  try {
+    const m = await import('@/native/speech')
+    const text = await m.recognizeOnce()
+    if (!text) {
+      ElMessage.warning(t('book.voice.noMatch'))
+      return
+    }
+    const parsed = parseVoiceRecord(text)
+    if (!parsed) {
+      ElMessage.warning(t('book.voice.noAmount', { text }))
+      return
+    }
+    openEditor()
+    editor.form.type = parsed.type
+    editor.form.amount = parsed.amount
+    editor.form.remark = parsed.note || text
+    if (CATEGORIES.includes(parsed.category)) editor.form.category = parsed.category
+  } catch (e) {
+    const code = e && e.code
+    if (code === 'cancel') return
+    if (code === 'permission') {
+      ElMessage.warning(t('book.voice.permission'))
+      return
+    }
+    if (code === 'no_match') {
+      ElMessage.warning(t('book.voice.noMatch'))
+      return
+    }
+    console.warn('[book] 语音记账失败', e)
+    ElMessage.error(t('book.voice.failed'))
+  } finally {
+    voiceBusy.value = false
+  }
+}
+
+onBeforeUnmount(() => {
+  if (voiceBusy.value) import('@/native/speech').then((m) => m.cancelRecognition()).catch(() => {})
+})
 
 const onSave = async () => {
   const f = editor.form

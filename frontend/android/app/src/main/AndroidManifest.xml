@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Android 11+ 包可见性:不声明就看不到系统语音识别服务(SpeechRecognizer 会误报不可用) -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+
     <!-- allowBackup=false:令牌密文在 EncryptedSharedPreferences,其密钥不参与备份,
          换机恢复后解不开等于死数据;关闭云备份也避免密文随 adb backup 落地。
          usesCleartextTraffic=false:接口与文件全部 https,壳内不需要明文流量。 -->
@@ -25,6 +32,11 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- 长按图标快捷方式:今日日程 / 记账本 / 家庭聊天 / 相册(静态声明,走 ihomy:// 深链) -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
 
             <!-- 桌面卡片深链:ihomy://plan?date=... / ihomy://anniversary 等,进入壳内由 deeplink.js 统一路由 -->
             <intent-filter>
@@ -101,11 +113,38 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!-- 下拉栏快速设置磁贴:记账本 / 今日日程(点一下直接进站内页面,无开关语义) -->
+        <service
+            android:name=".tile.BookTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_shortcut_book"
+            android:label="@string/tile_book_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".tile.PlanTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_shortcut_schedule"
+            android:label="@string/tile_plan_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
     </application>
 
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 保险箱进页前的本机指纹/人脸校验(系统 BiometricPrompt,不读生物特征数据) -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <!-- 语音记账:识别时说一句话(录音只交给系统识别服务,不落盘、不上传自家后端) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- 系统日历单向导出(兜底提醒):只写本机专属「ihomy」日历,授权在设置页里按需申请 -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />

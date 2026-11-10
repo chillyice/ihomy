@@ -1,6 +1,6 @@
 # Android 客户端实施计划(套壳 + 原生提醒 + 桌面卡片)
 
-> **状态**:**P0–P2 已落地并上线生产(V11.74–V11.80)**(含站内 `/app` 下载页与 APK 分发);剩真机验收、P3/P4 与补口项(明细见文末「实施差异」)
+> **状态**:**P0–P2 已落地并上线生产(V11.74–V11.80)**(含站内 `/app` 下载页与 APK 分发);**P3 除「通知快捷回复」外全部落地(V11.81–V11.82,待真机验收 + 发布)**;剩真机验收、P4 与补口项(明细见文末「实施差异」)
 > **本文是 Android 端实施的唯一口径**:目标、选型、分期、接口契约、表结构草案、验收标准、明确不做。
 > **索引**:`docs/需求设计说明书.md` §9.1(规划表行)、`docs/设计想法/README.md`(进行中计划)。
 > **动工前必读**:`AGENTS.md`(硬性禁令 / 后端规范 / 前端规范)、`docs/需求设计说明书.md` §2.3 运行环境、§4.3.6 日程提醒、§4.4.4 聊天室;`docs/踩坑速查.md` §2.4(401)、§6(令牌)、§7.2(PWA 缓存)。
@@ -310,15 +310,17 @@ Glance 渲染 RemoteViews(读 DataStore,不读网络)
 
 ### P3 高价值增量(2–3 周,按需挑)
 
+> 落地状态(V11.82):除「通知快捷回复」外全部实现(差异见文末「P3 实施差异」)。
+
 | 能力 | 说明 | 关键实现 |
 |---|---|---|
-| 分享到家庭 ⭐ | 微信/相册/浏览器 → 相册/日记/文件/愿望 | `ACTION_SEND` / `ACTION_SEND_MULTIPLE` + 自定义 Capacitor 插件 |
-| 保险箱指纹解锁 ⭐ | 进 `/vault` 前 BiometricPrompt,可配「5 分钟免验」 | `@aparajita/capacitor-biometric-auth` + 一个 Gate 组件 |
-| 相机直传 | 拍照进相册、拍单据进记账 | `@capacitor/camera` + 现有上传接口 |
-| 通知快捷回复 | 聊天通知直接回一句 | `RemoteInput` + 现有 WS/REST |
-| 桌面快捷方式 | 长按图标:新建提醒/记一笔/聊天/拍照 | `shortcuts.xml` + 深链 |
-| 快速设置磁贴 | 下拉栏一键「记一笔」/「加提醒」 | `TileService` |
-| 语音记账 | 说「买菜 35」直接落账 | 系统 `SpeechRecognizer`(可离线)+ 现有记账接口 |
+| 分享到家庭 ⭐ ✅ | 微信/相册/浏览器 → 相册/日记/文件/愿望 | `ACTION_SEND` / `ACTION_SEND_MULTIPLE` + 自定义 Capacitor 插件 |
+| 保险箱指纹解锁 ⭐ ✅ | 进 `/vault` 前 BiometricPrompt,可配「5 分钟免验」 | 自写 `IhomyBiometric`(系统 `BiometricPrompt`)+ Gate 组件 |
+| 相机直传 ✅ | 拍照进相册(拍照进记账待「附件」数据概念) | 自写 `IhomyCamera`(`ACTION_IMAGE_CAPTURE`+FileProvider)+ 现有上传接口 |
+| 通知快捷回复 ⏸ | 聊天通知直接回一句(需先有推送通道) | `RemoteInput` + 现有 WS/REST |
+| 桌面快捷方式 ✅ | 长按图标:今日日程/记账本/聊天/相册 | `shortcuts.xml` + 深链 |
+| 快速设置磁贴 ✅ | 下拉栏一键进「记账本」/「今日日程」 | `TileService` |
+| 语音记账 ✅ | 说「买菜 35」→ 预填记账弹窗 | 系统 `SpeechRecognizer` + 前端 `utils/voiceRecord.js` |
 
 ### P4 可选
 
@@ -776,4 +778,18 @@ npx cap open android
 - **下载入口拆成两条** — 页面上「下载安装包」走 `/public/product/download?page=app&file=...`(先计数再 302,保住下载统计);App 内更新检查直接用 `/public/app/latest` 里的 `/files/app/*` 直链 / 统计口径只覆盖落地页转化,App 自身更新不该再算一次下载。
 - **APK 体积 51.8 MB(54,288,580 字节)** — 计划风险表阈值 30 MB 已超,主因仍是 `public/emulatorjs`(≈30 MB)+ `public/ruffle`(≈28 MB)原样进 assets;Q4「进包 or 游戏资源按需下载」仍待拍板,不影响本轮发布。
 - **`min-supported-version` 与线上唯一包对齐** — 设为 V11.80(旧包已从服务器删除),只有一版可用时留低值会给出「能装但下不到」的死链。
+
+### P3 实施差异(2026-11-10,V11.82)
+
+- **P3 通知快捷回复 → 本轮不做** — 原计划 `RemoteInput` 直接回一句 / 未实现 / 一期明确不自建推送,聊天通知在后台没有载体(前台在聊天页不需要通知),`RemoteInput` 必须挂在通知上;等推送通道(自建 ntfy/UnifiedPush 或 FCM)落地后再做。
+- **P3 指纹解锁 → 自写框架插件** — 原计划 `@aparajita/capacitor-biometric-auth` / 实际 `biometric/BiometricPlugin.java` 直接用系统 `BiometricPrompt` + `BiometricManager`(插件名 `IhomyBiometric`) / 与「P0 令牌存储」同一条取舍:壳里少一个第三方依赖就少一处与 Capacitor 大版本绑定的风险,`available/verify/cancel` 三个方法已够用。
+- **P3 指纹解锁口径** — 原计划「进 `/vault` 前 BiometricPrompt,可配 5 分钟免验」 / 基本一致,补两条:**锁住时不拉条目列表**(避免开口就泄露条目名);`AppSettings` 每次进页回填开关,本机指纹被移除时自动关掉(否则会被永久挡在锁屏)。指纹只做本地遮挡,密码明文仍由服务端按登录密码校验。
+- **P3 相机直传 → 系统相机 + FileProvider** — 原计划 `@capacitor/camera` / 实际 `camera/CameraPlugin.java` 用 `ACTION_IMAGE_CAPTURE` 写 `<cache>/camera/` 再以 base64 回传(`readFile` 限定该目录且 ≤12MB,防任意文件读取) / 不引第三方包;**故意不声明 `CAMERA` 权限**——声明了系统就要求动态申请,由系统相机代拍则不需要。
+- **P3 相机落点** — 原计划「拍照进相册、拍单据进记账」 / v1 只做相册详情页「拍照上传」 / 记账单据要先有「附件」这个概念,`family_book_record` 没有附件列,属新需求而非壳能力,后补不破架构。
+- **P3 语音记账口径** — 原计划「说『买菜 35』直接落账」 / 实际「识别 → 前端解析 → **预填记账弹窗**,用户确认才落账」 / 识别看错直接落账会污染账本,预填只多一次确认。解析器 `utils/voiceRecord.js` 纯前端(金额/分类/备注),解析不到金额时明说「没听出金额」,**不猜**。
+- **P3 语音识别选型** — 原计划系统 `SpeechRecognizer` / 一致,但必须在 Manifest `<queries>` 里声明 `android.speech.RecognitionService` / Android 11+ 包可见性不声明会让 `isRecognitionAvailable()` 误报 false。
+- **P3 快捷方式 / 磁贴清单** — 原计划「新建提醒/记一笔/聊天/拍照」四快捷方式 + 「记一笔/加提醒」两磁贴 / 实际快捷方式**今日日程 / 记账本 / 家庭聊天 / 相册**,磁贴**记账本 / 今日日程** / 深链只能落到页面,「新建提醒」「拍照」这类动作型入口需要稳定的 query 约定,先把高频「看」的入口给全。
+- **P3 磁贴 API 分叉** — `startActivityAndCollapse(Intent)` 在 API 34 被废弃且行为受限:34+ 必须用 `PendingIntent` 版本,34 以下用已废弃 Intent 版并 `@SuppressWarnings("deprecation")`。
+- **通知提示音(计划外,B 缺陷修复)** — 真机反馈「通知无声」。根因:`@capacitor/local-notifications` 的 `createChannel` **不传 `sound` 就是静音通道**,且通道参数创建后被系统冻结(改代码不生效);插件把 `sound` 解析成 `android.resource://<包名>/raw/<名>`,**不认 `'default'`**。修法 = `res/raw/ihomy_notify.wav` + 新通道 id `reminders-v2` + 对账条件增加 `channelId` 比对(强制重建旧通道上已排的闹钟)。
+- **P3 验收口径** — 机制链路全部实测(通道 sound/vibration、四条快捷方式注册、两个磁贴被系统识别、冷启动无报错);**提示音实际响铃 / 磁贴添加 / 指纹 / 拍照 / 语音必须真机**(模拟器无指纹硬件、无识别服务)。
 
