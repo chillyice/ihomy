@@ -7,6 +7,7 @@ import { ElMessageBox } from 'element-plus'
 import i18n from '@/i18n'
 import { scheduleApi, reminderApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { reportReminderSync } from './widgets'
 
 /** 通知通道 id。通道参数(声音/重要级)创建后不可改,想改只能换新 id 重新建一条——
  * 故「补上提示音」= 换 id,见 initReminders。 */
@@ -126,7 +127,10 @@ export async function syncNotifications() {
   if (!userStore.isLoggedIn) return { registered: 0, cancelled: 0, reason: 'guest' }
   syncing = true
   try {
-    return await doSync()
+    const res = await doSync()
+    // 只有真正完成对账(没有 reason 的失败分支)才上报:后台兜底据此判断本地闹钟是否过期
+    if (!res || !res.reason) reportReminderSync()
+    return res
   } finally {
     syncing = false
   }

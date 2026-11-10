@@ -80,6 +80,24 @@ export async function verifyVault() {
   }
 }
 
+/**
+ * 应用锁校验:返回 {ok, reason}。
+ * reason=busy 表示保险箱自己的系统框在途——调用方应放行,不要把人踢回登录页。
+ */
+export async function verifyAppLock() {
+  const t = i18n.global.t
+  try {
+    const res = await IhomyBiometric.verify({
+      title: t('appLock.title'),
+      subtitle: t('appLock.tip'),
+      cancel: t('common.cancel'),
+    })
+    return { ok: !!(res && res.ok), reason: res && res.ok ? '' : 'failed' }
+  } catch (e) {
+    return { ok: false, reason: String((e && e.message) || 'failed') }
+  }
+}
+
 /** 页面离开时收起可能还开着的系统框 */
 export async function cancelVerify() {
   try {

@@ -5630,6 +5630,10 @@ export default {
       },
     ],
   },
+  appLock: {
+    title: 'ihomy is locked',
+    tip: 'Verify your fingerprint or face to continue',
+  },
   appSettings: {
     title: 'Android app',
     lead: 'These settings only appear in the phone app, not on the website.',
@@ -5672,6 +5676,26 @@ export default {
       'When on, opening the vault asks for your fingerprint or face first, then stays unlocked for 5 minutes. It only guards against someone browsing this device; password checks still happen on the server.',
     vaultLockOn: 'Available on this device',
     vaultLockNoHardware: 'Not available on this device',
+    appLockTitle: 'App lock',
+    appLockDesc:
+      'After 5 minutes away, the app asks for your fingerprint or face before it opens again. Cancelling returns to the sign-in page, where the password can still be used. The switch turns itself off if the fingerprint is removed from this device.',
+    // Background unread alert
+    unreadNotifyTitle: 'Background unread alert',
+    unreadNotifyEvery: 'About every 30 minutes',
+    unreadNotifyDesc:
+      'When someone sends a message or a new notice arrives, one combined alert appears on the lock screen. It checks about every 30 minutes and stays quiet from 23:00 to 06:00. Some phones limit background checks; opening the app still refreshes everything immediately.',
+    // Diagnostics (crashes and front-end errors stay on this device)
+    diagnosticsTitle: 'Diagnostics',
+    diagnosticsCrashes: '{n} crash file(s)',
+    diagnosticsErrors: '{n} front-end error(s)',
+    diagnosticsDesc:
+      'Crashes and page errors stay on this phone and are never uploaded. If something goes wrong, tap Export and send the record to the developer so the cause is easier to find.',
+    diagnosticsExport: 'Export diagnostics',
+    diagnosticsExportTitle: 'ihomy diagnostics',
+    diagnosticsClear: 'Clear',
+    diagnosticsClearConfirm: 'This cannot be undone. Delete the crash and error records saved on this phone?',
+    diagnosticsClearOk: 'Cleared {n} record(s)',
+    diagnosticsFail: 'That did not work. Please try again later.',
     // About / in-app update
     aboutTitle: 'Client version',
     currentVersion: 'Current version {version}',

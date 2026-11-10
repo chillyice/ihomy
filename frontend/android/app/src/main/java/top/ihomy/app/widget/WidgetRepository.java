@@ -41,6 +41,18 @@ public final class WidgetRepository {
         public String date;
         public String time;
         public long days = Long.MIN_VALUE;
+        /** 已完成/已取消的条目不再提醒 */
+        public boolean done = false;
+    }
+
+    /** 后台未读:通知数与聊天数(计划 §5.2) */
+    public static class Unread {
+        public long notification;
+        public long chat;
+
+        public long total() {
+            return notification + chat;
+        }
     }
 
     /** 拉取并解析;抛异常时调用方保持旧缓存不动 */
@@ -64,9 +76,27 @@ public final class WidgetRepository {
             o.date = it.optString("date", "");
             o.time = it.isNull("time") ? null : it.optString("time", null);
             o.days = it.isNull("days") ? Long.MIN_VALUE : it.optLong("days", Long.MIN_VALUE);
+            o.done = it.optBoolean("done", false);
             out.add(o);
         }
         return out;
+    }
+
+    /**
+     * 后台未读:两次只读 GET(计划 §5.2)。
+     * WIDGET 令牌只放行计数接口,读不到通知正文(后端白名单精确到路径)。
+     */
+    public static Unread fetchUnread(Context context) throws Exception {
+        String token = WidgetPrefs.token(context);
+        if (token == null || token.isEmpty()) throw new IllegalStateException("no widget token");
+        Unread unread = new Unread();
+        JSONObject notice = new JSONObject(get(apiBase() + "/notification/unread-count", token));
+        if (notice.optInt("code", -1) != 0) throw new IllegalStateException("bad notice code " + notice.optInt("code"));
+        unread.notification = notice.optLong("data", 0L);
+        JSONObject chat = new JSONObject(get(apiBase() + "/chat/unread", token));
+        if (chat.optInt("code", -1) != 0) throw new IllegalStateException("bad chat code " + chat.optInt("code"));
+        unread.chat = chat.optJSONObject("data") == null ? 0L : chat.optJSONObject("data").optLong("unread", 0L);
+        return unread;
     }
 
     /** 缓存结构:{"items":[...]}——原样存解析后的最小字段,渲染时不再依赖网络 */
@@ -81,6 +111,7 @@ public final class WidgetRepository {
                 it.put("date", o.date);
                 it.put("time", o.time == null ? JSONObject.NULL : o.time);
                 if (o.days != Long.MIN_VALUE) it.put("days", o.days);
+                it.put("done", o.done);
                 arr.put(it);
             }
             JSONObject wrap = new JSONObject();
@@ -106,6 +137,7 @@ public final class WidgetRepository {
                 o.date = it.optString("date", "");
                 o.time = it.isNull("time") ? null : it.optString("time", null);
                 o.days = it.isNull("days") ? Long.MIN_VALUE : it.optLong("days", Long.MIN_VALUE);
+                o.done = it.optBoolean("done", false);
                 out.add(o);
             }
         } catch (Exception e) {

@@ -20,6 +20,34 @@ export async function syncWidgetToken() {
   return 'pushed'
 }
 
+/** 提醒对账成功后上报时间:原生 StaleCheckWorker 据此判断「超过 7 天没校准」 */
+export async function reportReminderSync(ts = Date.now()) {
+  try {
+    await IhomyWidgets.setReminderSyncAt({ ts })
+  } catch (e) {
+    // 上报失败只影响后台兜底提示,不影响已排好的本地闹钟
+    console.warn('[widgets] 提醒同步时间上报失败', e)
+  }
+}
+
+/** 设置页:后台未读通知开关(原生 WidgetPrefs 是唯一事实源,Worker 直接读) */
+export async function getUnreadNotifyEnabled() {
+  try {
+    const res = await IhomyWidgets.getUnreadNotifyEnabled()
+    return !!(res && res.enabled)
+  } catch (e) {
+    return true
+  }
+}
+
+export async function setUnreadNotifyEnabled(enabled) {
+  try {
+    await IhomyWidgets.setUnreadNotifyEnabled({ enabled: !!enabled })
+  } catch (e) {
+    console.warn('[widgets] 保存未读通知开关失败', e)
+  }
+}
+
 /** 原生桥安装:登录态/家庭变化时防抖同步一次(与 chat.js 的换代重建同思路) */
 export async function installWidgetBridge() {
   const { watch } = await import('vue')

@@ -54,6 +54,50 @@
         </div>
         <div class="share-tip">{{ $t('appSettings.vaultLockDesc') }}</div>
       </el-form-item>
+
+      <el-form-item :label="$t('appSettings.appLockTitle')">
+        <div class="cal-head">
+          <el-switch v-model="appLockOn" :disabled="!bioAvailable" @change="onAppLockChange" />
+          <el-tag size="small" :type="bioAvailable ? 'success' : 'info'">
+            {{ bioAvailable ? $t('appSettings.vaultLockOn') : $t('appSettings.vaultLockNoHardware') }}
+          </el-tag>
+        </div>
+        <div class="share-tip">{{ $t('appSettings.appLockDesc') }}</div>
+      </el-form-item>
+
+      <el-form-item :label="$t('appSettings.unreadNotifyTitle')">
+        <div class="cal-head">
+          <el-switch v-model="unreadNotify" @change="onUnreadNotifyChange" />
+          <el-tag size="small" type="info">{{ $t('appSettings.unreadNotifyEvery') }}</el-tag>
+        </div>
+        <div class="share-tip">{{ $t('appSettings.unreadNotifyDesc') }}</div>
+      </el-form-item>
+
+      <el-form-item :label="$t('appSettings.diagnosticsTitle')">
+        <div class="cal-head">
+          <el-tag size="small" :type="diag.crashes ? 'warning' : 'info'">
+            {{ $t('appSettings.diagnosticsCrashes', { n: diag.crashes }) }}
+          </el-tag>
+          <el-tag size="small" :type="diag.errors ? 'warning' : 'info'">
+            {{ $t('appSettings.diagnosticsErrors', { n: diag.errors }) }}
+          </el-tag>
+        </div>
+        <div class="share-tip">{{ $t('appSettings.diagnosticsDesc') }}</div>
+        <div class="cal-actions">
+          <el-button
+            type="primary"
+            :loading="diagBusy"
+            :disabled="diagBusy || (!diag.crashes && !diag.errors)"
+            @click="onExportDiagnostics"
+          >
+            {{ $t('appSettings.diagnosticsExport') }}
+          </el-button>
+          <el-button :disabled="diagBusy || (!diag.crashes && !diag.errors)" @click="onClearDiagnostics">
+            {{ $t('appSettings.diagnosticsClear') }}
+          </el-button>
+          <el-button link :disabled="diagBusy" @click="loadDiagnostics">{{ $t('appSettings.refresh') }}</el-button>
+        </div>
+      </el-form-item>
     </el-form>
   </div>
 </template>
@@ -74,6 +118,13 @@ const checking = ref(false)
 /** 保险箱指纹门:本机是否具备可用指纹/人脸 + 开关状态 */
 const bioAvailable = ref(false)
 const vaultLock = ref(false)
+/** 诊断信息:崩溃份数 + 前端错误条数 */
+const diag = ref({ crashes: 0, errors: 0 })
+const diagBusy = ref(false)
+/** 后台未读提醒(默认开,事实源在原生 WidgetPrefs) */
+const unreadNotify = ref(true)
+/** 应用锁(默认关;本机无生物识别时禁用) */
+const appLockOn = ref(false)
 
 // 原生模块动态引入:Capacitor 运行时只在壳内用到,不进首屏包
 const native = () => import('@/native/calendarExport')
@@ -158,6 +209,89 @@ function onVaultLockChange(v) {
   bio().then((m) => m.setVaultLockEnabled(!!v))
 }
 
+// 应用锁:开关存 localStorage;本机无可用指纹/被移除时自动关闭,避免永久锁死
+const appLockModule = () => import('@/native/appLock')
+
+async function loadAppLock() {
+  try {
+    const m = await appLockModule()
+    appLockOn.value = bioAvailable.value && m.appLockEnabled()
+    if (!bioAvailable.value && m.appLockEnabled()) m.setAppLockEnabled(false)
+  } catch (e) {
+    appLockOn.value = false
+  }
+}
+
+function onAppLockChange(v) {
+  appLockModule().then((m) => m.setAppLockEnabled(!!v))
+}
+
+// 后台未读提醒:开关状态存在原生(Worker 直接读),这里只做界面回填
+const widgetNative = () => import('@/native/widgets')
+
+async function loadUnreadNotify() {
+  try {
+    const m = await widgetNative()
+    unreadNotify.value = await m.getUnreadNotifyEnabled()
+  } catch (e) {
+    unreadNotify.value = true
+  }
+}
+
+function onUnreadNotifyChange(v) {
+  widgetNative().then((m) => m.setUnreadNotifyEnabled(!!v))
+}
+
+// 诊断信息:只读摘要;导出走系统分享,清空会删掉原生里的崩溃与错误文件
+const diagModule = () => import('@/native/diagnostics')
+
+async function loadDiagnostics() {
+  try {
+    const m = await diagModule()
+    diag.value = await m.diagnosticsSummary()
+  } catch (e) {
+    diag.value = { crashes: 0, errors: 0 }
+  }
+}
+
+async function onExportDiagnostics() {
+  diagBusy.value = true
+  try {
+    const m = await diagModule()
+    await m.exportDiagnostics()
+  } catch (e) {
+    console.warn('[appSettings] 导出诊断信息失败', e)
+    ElMessage.error(t('appSettings.diagnosticsFail'))
+  } finally {
+    diagBusy.value = false
+    loadDiagnostics()
+  }
+}
+
+async function onClearDiagnostics() {
+  try {
+    await ElMessageBox.confirm(t('appSettings.diagnosticsClearConfirm'), t('appSettings.diagnosticsTitle'), {
+      type: 'warning',
+      confirmButtonText: t('appSettings.diagnosticsClear'),
+      cancelButtonText: t('common.cancel'),
+    })
+  } catch (e) {
+    return
+  }
+  diagBusy.value = true
+  try {
+    const m = await diagModule()
+    const removed = await m.clearDiagnostics()
+    ElMessage.success(t('appSettings.diagnosticsClearOk', { n: removed }))
+  } catch (e) {
+    console.warn('[appSettings] 清空诊断信息失败', e)
+    ElMessage.error(t('appSettings.diagnosticsFail'))
+  } finally {
+    diagBusy.value = false
+    loadDiagnostics()
+  }
+}
+
 /** 版本号以安装包为准(与更新检查同一来源),取不到就保留构建期版本 */
 async function loadVersion() {
   try {
@@ -183,10 +317,13 @@ async function onCheckUpdate() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   load()
-  loadBiometric()
   loadVersion()
+  loadDiagnostics()
+  loadUnreadNotify()
+  await loadBiometric()
+  await loadAppLock()
 })
 </script>
 

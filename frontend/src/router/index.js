@@ -44,6 +44,13 @@ const routes = [
   // 照片瀑布已并入相册(相册页内视图):保留旧链接/书签,重定向到相册并自动打开瀑布
   { path: '/cascade', redirect: { path: '/album', query: { cascade: '1' } } },
   { path: '/chat', name: 'Chat', component: () => import('@/views/chat/Chat.vue'), meta: { requiresAuth: true } },
+  // 通知中心:桌面侧栏气泡之外的整页入口,后台未读通知「打开通知」深链落点
+  {
+    path: '/notification',
+    name: 'Notification',
+    component: () => import('@/views/notification/Notification.vue'),
+    meta: { requiresAuth: true },
+  },
   { path: '/settings', name: 'Settings', component: () => import('@/views/Settings.vue'), meta: { requiresAuth: true } },
   // 百度网盘 OAuth 授权回调页(须与百度开放平台注册的「授权回调页地址」一致)
   {

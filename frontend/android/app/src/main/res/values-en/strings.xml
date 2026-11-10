@@ -22,4 +22,16 @@
     <!-- Quick settings tiles -->
     <string name="tile_book_label">Ledger</string>
     <string name="tile_plan_label">Schedule</string>
+
+    <!-- Background alerts (A1 schedule calibration / A2 unread) -->
+    <string name="notify_channel_reminders">Schedule reminders</string>
+    <string name="notify_channel_reminders_desc">On-time schedule alerts with sound</string>
+    <string name="notify_stale_title">Your schedule needs a check</string>
+    <string name="notify_stale_body">%1$d upcoming item(s). Tap to open ihomy and recalibrate reminders.</string>
+    <string name="notify_channel_updates">Family updates</string>
+    <string name="notify_channel_updates_desc">Checks chat and notice unread counts about every 30 minutes</string>
+    <string name="notify_unread_title">New messages at home</string>
+    <string name="notify_unread_body">Chat %1$d · Notices %2$d</string>
+    <string name="notify_action_chat">Open chat</string>
+    <string name="notify_action_notice">Open notices</string>
 </resources>

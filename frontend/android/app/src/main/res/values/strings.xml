@@ -27,4 +27,16 @@
     <!-- 下拉栏磁贴 -->
     <string name="tile_book_label">记账本</string>
     <string name="tile_plan_label">今日日程</string>
+
+    <!-- 后台提示(A1 日程校准 / A2 未读) -->
+    <string name="notify_channel_reminders">日程提醒</string>
+    <string name="notify_channel_reminders_desc">日程到点提醒，带提示音</string>
+    <string name="notify_stale_title">最近的日程等你确认</string>
+    <string name="notify_stale_body">有 %1$d 条日程，点一下打开 ihomy 校准提醒</string>
+    <string name="notify_channel_updates">家庭动态</string>
+    <string name="notify_channel_updates_desc">约每 30 分钟检查一次聊天与通知未读</string>
+    <string name="notify_unread_title">家里有新消息</string>
+    <string name="notify_unread_body">聊天 %1$d 条 · 通知 %2$d 条</string>
+    <string name="notify_action_chat">打开聊天</string>
+    <string name="notify_action_notice">打开通知</string>
 </resources>

@@ -5567,6 +5567,10 @@ export default {
       { q: '以后怎么更新？', a: '应用启动时会检查新版本并提示，直接覆盖安装即可，内容都保存在服务器上。' },
     ],
   },
+  appLock: {
+    title: 'ihomy 已锁定',
+    tip: '验证指纹或人脸继续',
+  },
   appSettings: {
     title: '安卓客户端',
     lead: '这些设置只在手机应用里出现，网页版看不到。',
@@ -5607,6 +5611,24 @@ export default {
     vaultLockDesc: '开启后，每次进入保险箱先验证指纹或人脸，验证后 5 分钟内不再重复。只挡本机上的顺手翻看，不改变密码本身的校验。',
     vaultLockOn: '本机可用',
     vaultLockNoHardware: '本机不可用',
+    appLockTitle: '应用锁',
+    appLockDesc: '离开应用 5 分钟后回来，先验证指纹或人脸。取消验证会回到登录页，还有密码可以进；本机指纹被移除时会自动关闭。',
+    // 后台未读提醒
+    unreadNotifyTitle: '后台未读提醒',
+    unreadNotifyEvery: '约每 30 分钟',
+    unreadNotifyDesc:
+      '有人发消息或有新通知时，锁屏会出现一条合并提示。大约每 30 分钟检查一次，23:00–06:00 不打扰；部分手机会限制后台检查，打开应用时仍会立即更新。',
+    // 诊断信息(崩溃与前端报错,只留本机)
+    diagnosticsTitle: '诊断信息',
+    diagnosticsCrashes: '崩溃 {n} 份',
+    diagnosticsErrors: '前端错误 {n} 条',
+    diagnosticsDesc: '应用崩溃和页面报错只保存在这台手机上，不会自动上传。遇到问题时点「导出」，把记录发给开发者，能更快定位原因。',
+    diagnosticsExport: '导出诊断信息',
+    diagnosticsExportTitle: 'ihomy 诊断信息',
+    diagnosticsClear: '清空',
+    diagnosticsClearConfirm: '清空后无法恢复，确定删除本机保存的崩溃与错误记录吗？',
+    diagnosticsClearOk: '已清空 {n} 份记录',
+    diagnosticsFail: '操作没有成功，请稍后再试',
     // 关于 / 应用内更新
     aboutTitle: '客户端版本',
     currentVersion: '当前版本 {version}',

@@ -586,8 +586,10 @@ const goBack = () => {
 }
 
 onMounted(async () => {
-  // 指纹门:开了且不在免验窗口内,先挡住内容(列表也不拉,避免开口就泄露条目名)
   if (isAndroidApp()) {
+    // 保险箱页内禁止截图/录屏与最近任务缩略图;离开页面立刻清除(全局开会把正常截图也封死)
+    import('@/native/screen').then((m) => m.setSecure(true))
+    // 指纹门:开了且不在免验窗口内,先挡住内容(列表也不拉,避免开口就泄露条目名)
     const bio = await import('@/native/biometric')
     if (bio.vaultLockEnabled() && !bio.vaultLockFresh()) {
       locked.value = true
@@ -599,6 +601,7 @@ onMounted(async () => {
 })
 // 离开页面:清掉全部定时器;剪贴板里还留着的密码立刻尽力清空(读不到就交给 10 秒兜底计时器之前的手动刷新)
 onBeforeUnmount(() => {
+  if (isAndroidApp()) import('@/native/screen').then((m) => m.setSecure(false))
   if (locked.value) import('@/native/biometric').then((m) => m.cancelVerify())
   revealTimers.forEach((timer) => clearTimeout(timer))
   revealTimers.clear()

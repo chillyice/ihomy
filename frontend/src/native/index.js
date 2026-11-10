@@ -13,8 +13,11 @@ export function bootNative() {
       import('./links').then((m) => m.installLinkHandler()),
       import('./network').then((m) => m.initNetworkStatus()),
       import('./credentials').then((m) => m.installCredentialShim()),
+      // 诊断采集尽早装:越早接管,启动期前端报错越不会漏
+      import('./diagnostics').then((m) => m.installDiagnostics()),
       import('./deeplink').then((m) => m.initDeeplink()),
       import('./reminders').then((m) => m.initReminders()),
+      import('./appLock').then((m) => m.installAppLock()),
       import('./widgets').then((m) => m.installWidgetBridge()),
       import('./shareInbox').then((m) => m.initShareInbox()),
       // 更新检查放最后:等前面的能力就绪,且不阻塞其它初始化

@@ -8,6 +8,9 @@ import com.getcapacitor.BridgeActivity;
 import top.ihomy.app.biometric.BiometricPlugin;
 import top.ihomy.app.calendar.CalendarSyncPlugin;
 import top.ihomy.app.camera.CameraPlugin;
+import top.ihomy.app.diagnostics.CrashStore;
+import top.ihomy.app.diagnostics.DiagnosticsPlugin;
+import top.ihomy.app.screen.ScreenPlugin;
 import top.ihomy.app.share.ShareInboxPlugin;
 import top.ihomy.app.share.ShareIntake;
 import top.ihomy.app.speech.SpeechPlugin;
@@ -17,6 +20,8 @@ import top.ihomy.app.widget.WidgetBridgePlugin;
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // 崩溃落盘必须是越早越好:先于 super.onCreate 装好,桥构建期的崩溃也能留下证据
+        CrashStore.install(getApplicationContext());
         // 桌面卡片桥:令牌下发 / 登出清理 / 改动后即时刷新(周期任务在插件 load 时注册)。
         // 必须在 super.onCreate 之前注册——桥在 super 里构建,晚了插件就不存在。
         registerPlugin(WidgetBridgePlugin.class);
@@ -32,6 +37,10 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(SpeechPlugin.class);
         // 应用内更新:前端下好安装包后,由原生把它交给系统安装器
         registerPlugin(UpdaterPlugin.class);
+        // 诊断:设置页查看/导出时读原生落盘的崩溃与前端错误
+        registerPlugin(DiagnosticsPlugin.class);
+        // 保险箱防截屏 / 看板常亮:按页面进出开关窗口 Flag,离开即清
+        registerPlugin(ScreenPlugin.class);
         // 冷启动时先把分享意图接住,JS 起来后再取(getPending 只读,确认落地才清)
         ShareIntake.capture(getIntent());
         super.onCreate(savedInstanceState);

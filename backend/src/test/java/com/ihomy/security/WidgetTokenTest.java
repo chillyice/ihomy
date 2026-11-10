@@ -106,6 +106,28 @@ class WidgetTokenTest {
     }
 
     @Test
+    void widgetTokenAllowedOnUnreadCountEndpoints() throws Exception {
+        String token = jwtUtils.generateWidgetToken(7L, "widgeter", "OWNER", 2L);
+        when(sysUserMapper.selectById(7L)).thenReturn(user(DictConst.USER_ACTIVE));
+
+        run(request("GET", "/notification/unread-count"), token);
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
+        SecurityContextHolder.clearContext();
+
+        run(request("GET", "/chat/unread"), token);
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
+        SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void widgetTokenRejectedOnNotificationBody() throws Exception {
+        String token = jwtUtils.generateWidgetToken(7L, "widgeter", "OWNER", 2L);
+        // 只放行计数,通知正文/聊天历史仍须 401(白名单必须精确到路径)
+        assertThat(run(request("GET", "/notification/list"), token).getStatus()).isEqualTo(401);
+        assertThat(run(request("GET", "/chat/history"), token).getStatus()).isEqualTo(401);
+    }
+
+    @Test
     void widgetTokenRejectedOnWrite() throws Exception {
         String token = jwtUtils.generateWidgetToken(7L, "widgeter", "OWNER", 2L);
         MockHttpServletResponse res = run(request("POST", "/plan"), token);
