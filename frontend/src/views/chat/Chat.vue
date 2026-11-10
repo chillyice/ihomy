@@ -22,10 +22,12 @@ import ChatPanel from '@/components/chat/ChatPanel.vue'
 
 const chatStore = useChatStore()
 
-onMounted(async () => {
+onMounted(() => {
   chatStore.chatPageActive = true
-  await chatStore.loadHistory()
+  // 建连与拉历史互不依赖:先建连,别让历史请求(含续期)拖住 WS;
+  // loadHistory 内部吞掉单路失败且会置 hydrated,失败也不会让消息区永久转圈
   chatStore.ensureConnected()
+  chatStore.loadHistory({ force: true })
 })
 onBeforeUnmount(() => {
   chatStore.chatPageActive = false

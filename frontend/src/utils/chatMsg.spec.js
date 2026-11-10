@@ -6,6 +6,7 @@ import {
   buildImagePayload,
   buildLinkPayload,
   isSiteInternal,
+  mergeMessages,
   parsePayload,
   serializePayload,
 } from './chatMsg'
@@ -92,5 +93,23 @@ describe('isSiteInternal / serializePayload', () => {
     circular.self = circular
     expect(serializePayload(circular)).toBeNull()
     expect(serializePayload(null)).toBeNull()
+  })
+})
+
+describe('mergeMessages', () => {
+  const m = (id) => ({ id, content: `c${id}` })
+
+  it('历史与本地的消息按 id 合并去重并升序(加载期间 WS 推来的新消息不丢)', () => {
+    const merged = mergeMessages([m(3)], [m(1), m(2), m(3)])
+    expect(merged.map((x) => x.id)).toEqual([1, 2, 3])
+  })
+  it('本地更早的消息保留在前面,只留最近 keep 条', () => {
+    const cached = [m(1), m(2), m(3)]
+    const merged = mergeMessages(cached, [m(4), m(5)], 2)
+    expect(merged.map((x) => x.id)).toEqual([4, 5])
+  })
+  it('空值与非法项安全跳过,不抛错', () => {
+    expect(mergeMessages(null, undefined)).toEqual([])
+    expect(mergeMessages([null, { id: null }], [m(1)]).map((x) => x.id)).toEqual([1])
   })
 })

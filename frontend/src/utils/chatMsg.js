@@ -104,6 +104,23 @@ export function buildGameInvitePayload(gameCode) {
   return { gameCode }
 }
 
+/**
+ * 历史消息与本地缓存合并:按 id 去重、升序排列,只留最近 keep 条。
+ * 拉历史期间 WS 可能已把新消息推进缓存,直接整体覆盖会把这些消息吞掉;
+ * 历史接口也可能只回最近一页,更早的缓存要保留在前面。
+ */
+export function mergeMessages(cached, incoming, keep = 200) {
+  const byId = new Map()
+  for (const m of cached || []) {
+    if (m && m.id != null) byId.set(m.id, m)
+  }
+  for (const m of incoming || []) {
+    if (m && m.id != null) byId.set(m.id, m)
+  }
+  const list = [...byId.values()].sort((a, b) => Number(a.id) - Number(b.id))
+  return list.length > keep ? list.slice(list.length - keep) : list
+}
+
 /** 序列化为待发送的负载字符串:超限或异常返回 null */
 export function serializePayload(obj) {
   if (!obj) return null

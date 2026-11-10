@@ -6,7 +6,7 @@ import { watch } from 'vue'
 import { chatApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { createChatSocket, SOCKET_STATUS } from '@/composables/useChatSocket'
-import { serializePayload } from '@/utils/chatMsg'
+import { serializePayload, mergeMessages } from '@/utils/chatMsg'
 import { useCallStore } from '@/stores/call'
 import { rewriteAssetUrls } from '@/utils/assetUrl'
 
@@ -14,6 +14,10 @@ let socket = null
 let wired = false
 /** game-signal 页面级订阅(SnakeMatch 对战页);socket 重建后由新连接重新分发 */
 let gameSignalListeners = []
+/** 历史加载中的共享 Promise(/chat 页与浮窗同时挂载时只发一次请求) */
+let historyPromise = null
+/** 登出/换号时递增:在途历史请求回来后按旧世代丢弃,避免把上个账号的消息写进清空后的缓存 */
+let historyGen = 0
 
 /** 本地保留的消息条数上限(更早的靠 /chat/history 翻页) */
 const KEEP_MESSAGES = 200
@@ -165,13 +169,31 @@ export const useChatStore = defineStore('chat', {
       return c
     },
 
-    /** 进入聊天界面拉初始数据:未读游标 + 最新一页历史 */
-    async loadHistory() {
-      const [un, msgs] = await Promise.all([chatApi.unread(), chatApi.history()])
-      this.messages = msgs || []
-      this.hydrated = true
-      this.unread = 0
-      if (un?.lastMsgId) chatApi.read(un.lastMsgId).catch(() => {})
+    /**
+     * 进入聊天界面拉初始数据:未读游标 + 最新一页历史。
+     * 浮窗与 /chat 页共用同一份缓存,谁先打开谁拉;hydrated 之后不再重复拉(force 用于 /chat 进页刷新)。
+     * 两条接口互不依赖:任一失败(断网/续期失败)都只丢一路数据,不能让消息区永久转圈。
+     */
+    async loadHistory({ force = false } = {}) {
+      if (historyPromise) return historyPromise
+      if (this.hydrated && !force) return
+      const gen = historyGen
+      historyPromise = (async () => {
+        const [un, msgs] = await Promise.allSettled([chatApi.unread(), chatApi.history()])
+        if (gen !== historyGen) return
+        if (msgs.status === 'fulfilled') {
+          // 与 WS 已推入的消息按 id 合并,避免覆盖掉加载期间到达的新消息
+          this.messages = mergeMessages(this.messages, msgs.value, KEEP_MESSAGES)
+        }
+        if (un.status === 'fulfilled' && un.value?.lastMsgId) {
+          chatApi.read(un.value.lastMsgId).catch(() => {})
+        }
+        this.hydrated = true
+        this.unread = 0
+      })().finally(() => {
+        historyPromise = null
+      })
+      return historyPromise
     },
 
     /** 通话/对战等协议信令上行(结构化 {type,data},由调用方组好) */
@@ -189,6 +211,8 @@ export const useChatStore = defineStore('chat', {
 
     /** 登出/清场:断开连接并清空全部会话数据(防串号) */
     reset() {
+      historyGen += 1
+      historyPromise = null
       if (socket) {
         socket.disconnect()
         socket = null

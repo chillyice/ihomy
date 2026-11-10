@@ -113,6 +113,9 @@ const onBallUp = (e) => {
 }
 
 const expand = () => {
+  // 浮窗与 /chat 页共用 stores/chat.js 的缓存:首次展开必须自己拉历史,
+  // 否则消息区只会保留「加载中」转圈,等 /chat 页那样拉过一次才停
+  chatStore.loadHistory()
   expanded.value = true
 }
 const collapse = () => {
