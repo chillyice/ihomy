@@ -156,6 +156,7 @@ import { useWarmWidgetDrag } from '@/utils/widgetDragData'
 import { addedCodes } from '@/utils/warmHomeShared'
 import { buildNavItems, groupNavItems, isActive } from '@/utils/navModules'
 import { nextScrolled } from '@/utils/warmToolbar'
+import { BG_IDLE_MS, isBackgroundPlate } from '@/utils/warmBgIdle'
 import { warnLevelColor, topWarning } from '@/utils/dict'
 import WarnTriangle from '@/components/WarnTriangle.vue'
 import { ElMessage } from 'element-plus'
@@ -194,20 +195,10 @@ watch(
 )
 
 // 背景照片待机浮现:只有鼠标停在「背景板」上(天气照片实际可见的区域)且确有背景图时,
-// 静止超过 1 分钟 → 背景浮到最前;移动鼠标 → 恢复原始状态
+// 静止超过 1 分钟 → 背景浮到最前;移动鼠标 → 恢复原始状态。
+// 命中判定(壳内/顶栏/胞吐工具栏/音乐播放器/聊天室浮窗等都不算背景板)见 utils/warmBgIdle.js
 const bgRevealed = ref(false)
-const BG_IDLE_MS = 60000
-// 命中判定:studio 外框内(含侧栏/主区/卡片/间隙)与顶栏内容、浮层都不是背景板。
-// 顶栏整条都算控件区(含胞吐进来的工具栏 .gc-pin):返回键、晨暮开关、工具栏按钮都贴在
-// 照片边上,漏掉任一处鼠标经过按钮时就会闪一下背景
-const CONTENT_SELECTOR = '.gc-topbar, .gc-pin, .el-overlay, .el-popper, .el-message'
-const isBackgroundArea = (x, y) => {
-  const el = document.elementFromPoint(x, y)
-  if (!el) return false
-  if (el.closest('.gc-studio')) return false // studio 外框盖住天气照片,内里一律不算背景
-  if (el.closest(CONTENT_SELECTOR)) return false // 顶栏内容/浮层不算背景
-  return true
-}
+const isBackgroundArea = (x, y) => isBackgroundPlate(document.elementFromPoint(x, y))
 let bgIdleTimer = null
 const resetBgIdle = (e) => {
   clearTimeout(bgIdleTimer)
