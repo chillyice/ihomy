@@ -93,6 +93,7 @@ export default {
     createdHint: 'Family created, please sign in',
     joinedHint: 'Joined family, please sign in',
     forgotPassword: 'Forgot password?',
+    androidApp: 'Get the Android app',
   },
   passwordReset: {
     forgotTitle: 'Reset password',
@@ -2478,9 +2479,10 @@ export default {
     detailHour: 'Requests at {hour}:00',
     detailPath: 'Endpoint details',
     detailCost: 'Slowest requests',
-    productTitle: 'Kada / Bit Pouch',
+    productTitle: 'Kada / Bit Pouch / Android app',
     productKada: 'Kada',
     productBitPouch: 'Bit Pouch',
+    productApp: 'Android app',
     productViews: 'Visits',
     productDownloads: 'Downloads',
     productRangeAll: 'All',
@@ -5559,6 +5561,57 @@ export default {
     moonAltitude: 'Moon {deg}°',
     sunAria: 'Sun, altitude {alt} degrees',
     moonAria: 'Moon, altitude {alt} degrees, {phase}',
+  },
+  androidApp: {
+    title: 'Android app',
+    name: 'ihomy for Android',
+    lead: 'Take the family with you: feed, ledger and chat on your phone, reminders that actually ring, plus three home-screen widgets.',
+    versionLabel: 'Version',
+    notPublished: 'Not released yet',
+    notPublishedHint: 'The installer is still being prepared. Please check back later.',
+    requirementLabel: 'Requires',
+    requirementValue: 'Android 10 or newer',
+    sizeLabel: 'Installer',
+    download: 'Download APK',
+    notesLabel: "What's new: ",
+    installTitle: 'How to install',
+    installSteps: [
+      'Tap the button above to download the APK.',
+      'Open the downloaded file and allow installing from this source when asked.',
+      'Launch the app and sign in with your family account.',
+      'Allow notifications on first launch so reminders can ring on time.',
+    ],
+    permissionTitle: 'Make reminders on time',
+    permissionNote:
+      'Phone makers limit background apps differently. Turning on the following keeps reminders from arriving late or not at all.',
+    permissions: [
+      'Notifications: allow ihomy to send notifications.',
+      "Alarms & reminders: allow exact alarms so the system can't delay them.",
+      'Battery: set ihomy to unrestricted so the system will not put it to sleep.',
+      'Autostart: allow ihomy to start automatically in phone-manager apps (some brands need this).',
+    ],
+    widgetTitle: 'Home-screen widgets',
+    widgetBody:
+      'Long-press an empty spot on your home screen, open Widgets, find ihomy and add up to three: today at a glance, today\u2019s reminders, and the next-anniversary countdown. They refresh as your family data changes.',
+    faqTitle: 'FAQ',
+    faq: [
+      {
+        q: 'Why not install it from an app store?',
+        a: 'The app is distributed as an APK and is not listed in app stores. Only download it from this page.',
+      },
+      {
+        q: 'A reminder did not ring. What now?',
+        a: 'Check that notifications and exact alarms are allowed, then set battery usage to unrestricted. If it still fails, open the app once so reminders are scheduled again.',
+      },
+      {
+        q: 'Do I need to sign in again on a new phone?',
+        a: 'Yes. Sign-in is stored on the device only, so sign in again on the new phone.',
+      },
+      {
+        q: 'How do updates work?',
+        a: 'The app checks for a new version on launch and prompts you. Install over the existing app; your content stays on the server.',
+      },
+    ],
   },
   kada: {
     brand: 'Kada',

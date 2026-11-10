@@ -232,6 +232,8 @@ const routes = [
   { path: '/chillyice', name: 'Chillyice', component: () => import('@/views/Chillyice.vue'), meta: { public: true, standalone: true } },
   // 使用帮助:给家人看的纯文案页,不需要登录
   { path: '/help', name: 'Help', component: () => import('@/views/Help.vue'), meta: { public: true } },
+  // 安卓客户端下载页:公开(装机前没有账号也能看),版本与安装包地址由后端下发
+  { path: '/app', name: 'AppDownload', component: () => import('@/views/AppDownload.vue'), meta: { public: true } },
   // 兜底:未匹配的路由重定向回首页
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]

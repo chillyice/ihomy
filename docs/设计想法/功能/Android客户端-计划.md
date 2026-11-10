@@ -1,6 +1,6 @@
 # Android 客户端实施计划(套壳 + 原生提醒 + 桌面卡片)
 
-> **状态**:**P0–P2 已落地(V11.74–V11.78)**;P1/P2 真机验收、发布链路、P3/P4 未做(进度明细见文末「实施差异」)
+> **状态**:**P0–P2 已落地并上线生产(V11.74–V11.80)**(含站内 `/app` 下载页与 APK 分发);剩真机验收、P3/P4 与补口项(明细见文末「实施差异」)
 > **本文是 Android 端实施的唯一口径**:目标、选型、分期、接口契约、表结构草案、验收标准、明确不做。
 > **索引**:`docs/需求设计说明书.md` §9.1(规划表行)、`docs/设计想法/README.md`(进行中计划)。
 > **动工前必读**:`AGENTS.md`(硬性禁令 / 后端规范 / 前端规范)、`docs/需求设计说明书.md` §2.3 运行环境、§4.3.6 日程提醒、§4.4.4 聊天室;`docs/踩坑速查.md` §2.4(401)、§6(令牌)、§7.2(PWA 缓存)。
@@ -768,3 +768,12 @@ npx cap open android
 - **P2 registerPlugin 时序** — 自定义 Capacitor 插件必须在 `MainActivity` 的 `super.onCreate` **之前** `registerPlugin`(桥在 super 里构建,晚了 JS 侧报 plugin not implemented)。
 - **P2 通知「每日 WorkManager 兜底」口径修订** — 卡片 Worker(30 分钟)只刷卡片数据;提醒闹钟的注册重排仍靠 JS 同步(App 启动/回前台/完成后)+ 插件内置的开机重排。若真机长期未开 App 出现漏响,再做原生侧重排(需要 WIDGET 令牌覆盖 occurrences 读权限——已具备)。
 - **P2 验收口径** — 机制链路全部实测(启动器枚举 3 张卡、令牌→Worker→缓存、occurrences 数据正确含服务端 days、深链冷启动落 /plan?date、无崩溃);卡片摆放与视觉效果是真机 30 秒手动步骤,真机阶段补截图进 docs/daily/。
+
+### 发布链路实施差异(2026-11-10,V11.80)
+
+- **P0 第 10 条「发布」→ 已落地(原「本轮未做」)** — `/public/app/latest` 早于 P1 交付;本轮补齐:站内 `/app` 下载页(公开路由)、`ProductStatService.PRODUCTS` 增加 `app`(计数下载 + 访问打点 + 运维页卡片)、线上 `external.yml` 的 `app.android.*` 三个键、APK 上架。
+- **APK 目录口径** — 计划写「服务器 `uploads/files/` 放 APK」/ 实际放 `{upload-dir}/app/`(`/opt/ihomy/uploads/app/ihomy-V11.80.apk`) / `/files/**` 被 `WebMvcConfig` 整体映射到上传根目录,前缀吃掉一层;放成 `uploads/files/app/` 直链 404(白名单与 302 都正常,极易误判)。同坑记入 踩坑速查 §12.2。
+- **下载入口拆成两条** — 页面上「下载安装包」走 `/public/product/download?page=app&file=...`(先计数再 302,保住下载统计);App 内更新检查直接用 `/public/app/latest` 里的 `/files/app/*` 直链 / 统计口径只覆盖落地页转化,App 自身更新不该再算一次下载。
+- **APK 体积 51.8 MB(54,288,580 字节)** — 计划风险表阈值 30 MB 已超,主因仍是 `public/emulatorjs`(≈30 MB)+ `public/ruffle`(≈28 MB)原样进 assets;Q4「进包 or 游戏资源按需下载」仍待拍板,不影响本轮发布。
+- **`min-supported-version` 与线上唯一包对齐** — 设为 V11.80(旧包已从服务器删除),只有一版可用时留低值会给出「能装但下不到」的死链。
+

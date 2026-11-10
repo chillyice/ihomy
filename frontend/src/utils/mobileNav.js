@@ -35,6 +35,7 @@ const PAGE_TITLE_KEYS = {
   '/ops': 'mobile.title.ops',
   '/vault': 'vault.title',
   '/login': 'mobile.title.login',
+  '/app': 'androidApp.title',
   '/recycle': 'recycle.title',
   '/iot': 'iot.title',
   '/weather': 'weatherPage.title',

@@ -32,8 +32,8 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class ProductStatService {
 
-    /** 产品键 = 落地页打点 ?page= 值 = /files 下的分发目录名 */
-    public static final List<String> PRODUCTS = List.of("kada", "bit_pouch");
+    /** 产品键 = 落地页打点 ?page= 值 = /files 下的分发目录名(app = ihomy 安卓客户端) */
+    public static final List<String> PRODUCTS = List.of("kada", "bit_pouch", "app");
 
     /** 安装包后缀:只认这些才算下载,排除 latest.json/.sig 等更新清单轮询 */
     private static final List<String> INSTALLER_SUFFIXES =

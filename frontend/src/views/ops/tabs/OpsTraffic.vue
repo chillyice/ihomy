@@ -219,6 +219,7 @@ const productRanges = [
 const productDefs = [
   { key: 'kada', nameKey: 'productKada' },
   { key: 'bit_pouch', nameKey: 'productBitPouch' },
+  { key: 'app', nameKey: 'productApp' },
 ]
 // 产品统计(咔哒/比特口袋):访问=落地页打点,下载=安装包下载接口;独立于访问统计的日期筛选
 const productCards = computed(() =>

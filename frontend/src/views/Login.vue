@@ -56,6 +56,10 @@
         {{ $t('login.forgotPassword') }}
       </div>
 
+      <router-link v-if="!isRegister" class="app-download" to="/app">
+        {{ $t('login.androidApp') }}
+      </router-link>
+
       <div v-a11y-click class="toggle" @click="toggleMode">
         {{ isRegister ? $t('login.hasAccount') : $t('login.noAccount') }}
       </div>
@@ -276,6 +280,17 @@ html.dark .login-card {
   color: var(--color-text-secondary);
   font-size: 13px;
   cursor: pointer;
+}
+.app-download {
+  display: block;
+  text-align: center;
+  margin-top: 8px;
+  color: var(--color-text-secondary);
+  font-size: 12.5px;
+  text-decoration: none;
+}
+.app-download:hover {
+  color: var(--color-accent);
 }
 .toggle {
   text-align: center;
