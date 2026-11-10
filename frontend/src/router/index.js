@@ -234,6 +234,8 @@ const routes = [
   { path: '/help', name: 'Help', component: () => import('@/views/Help.vue'), meta: { public: true } },
   // 安卓客户端下载页:公开(装机前没有账号也能看),版本与安装包地址由后端下发
   { path: '/app', name: 'AppDownload', component: () => import('@/views/AppDownload.vue'), meta: { public: true } },
+  // 系统分享收件(壳内「分享 → ihomy」的落点页):需登录才能落到家庭内容
+  { path: '/share', name: 'ShareInbox', component: () => import('@/views/ShareInbox.vue'), meta: { requiresAuth: true } },
   // 兜底:未匹配的路由重定向回首页
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]

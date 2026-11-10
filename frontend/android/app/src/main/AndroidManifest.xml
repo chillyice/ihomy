@@ -34,6 +34,25 @@
                 <data android:scheme="ihomy" />
             </intent-filter>
 
+            <!-- 系统分享收件:微信/浏览器分享文字链接、相册分享图片(单张/多张)→ 站内「分享到家庭」 -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+
         </activity>
 
         <!-- 桌面卡片 ×3:今日概览 / 今日提醒 / 纪念日倒计时(RemoteViews 直写,数据见 widget/ 目录) -->
