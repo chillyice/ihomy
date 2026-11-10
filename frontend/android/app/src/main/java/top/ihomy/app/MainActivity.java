@@ -11,6 +11,7 @@ import top.ihomy.app.camera.CameraPlugin;
 import top.ihomy.app.share.ShareInboxPlugin;
 import top.ihomy.app.share.ShareIntake;
 import top.ihomy.app.speech.SpeechPlugin;
+import top.ihomy.app.updater.UpdaterPlugin;
 import top.ihomy.app.widget.WidgetBridgePlugin;
 
 public class MainActivity extends BridgeActivity {
@@ -29,6 +30,8 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(CameraPlugin.class);
         // 语音记账:说一句话 → 识别文本 → 前端解析成金额与备注
         registerPlugin(SpeechPlugin.class);
+        // 应用内更新:前端下好安装包后,由原生把它交给系统安装器
+        registerPlugin(UpdaterPlugin.class);
         // 冷启动时先把分享意图接住,JS 起来后再取(getPending 只读,确认落地才清)
         ShareIntake.capture(getIntent());
         super.onCreate(savedInstanceState);

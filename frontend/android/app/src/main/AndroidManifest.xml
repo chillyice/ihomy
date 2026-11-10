@@ -148,4 +148,6 @@
     <!-- 系统日历单向导出(兜底提醒):只写本机专属「ihomy」日历,授权在设置页里按需申请 -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+    <!-- 应用内更新:允许 ihomy 调起系统安装器装自己下载好的新版本(仍需用户在系统设置里单独授权一次) -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 </manifest>

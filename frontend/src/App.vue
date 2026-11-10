@@ -46,6 +46,8 @@
     <ChatFloat />
     <!-- 1:1 通话覆盖层(懒加载,内部自守卫登录态) -->
     <CallOverlay />
+    <!-- 应用内更新弹窗(仅原生壳):懒加载,Web 端永不加载 Capacitor 运行时 -->
+    <AppUpdateDialog v-if="isNative" />
   </el-config-provider>
 </template>
 
@@ -59,6 +61,7 @@ import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { useSunLight, SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import { isNativeApp } from '@/utils/platform'
 import { useDevice } from '@/composables/useDevice'
 import SunLightLayer from '@/components/SunLightLayer.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
@@ -72,6 +75,10 @@ import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue'
 const ChatFloat = defineAsyncComponent(() => import('@/components/chat/ChatFloat.vue'))
 const CallOverlay = defineAsyncComponent(() => import('@/components/chat/CallOverlay.vue'))
 import MobileLayout from '@/layouts/MobileLayout.vue'
+// 应用内更新弹窗:内部 import Capacitor 插件,必须懒加载且只在壳内渲染
+const AppUpdateDialog = defineAsyncComponent(() => import('@/components/AppUpdateDialog.vue'))
+// 壳内判定(静态读一次,不随运行期变化)
+const isNative = isNativeApp()
 
 const { isMobile } = useDevice()
 const appStore = useAppStore()

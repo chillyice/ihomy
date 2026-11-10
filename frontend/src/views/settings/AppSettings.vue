@@ -6,6 +6,16 @@
     <p class="share-tip app-lead">{{ $t('appSettings.lead') }}</p>
 
     <el-form label-position="top" class="settings-form">
+      <el-form-item :label="$t('appSettings.aboutTitle')">
+        <div class="ver-now">{{ $t('appSettings.currentVersion', { version: appVersion }) }}</div>
+        <div class="share-tip">{{ $t('appSettings.updateDesc') }}</div>
+        <div class="cal-actions">
+          <el-button type="primary" :loading="checking" @click="onCheckUpdate">
+            {{ $t('appUpdate.check') }}
+          </el-button>
+        </div>
+      </el-form-item>
+
       <el-form-item :label="$t('appSettings.calendarTitle')">
         <div class="cal-head">
           <el-tag size="small" :type="status.granted ? 'success' : 'info'">
@@ -52,11 +62,15 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { getWebVersion } from '@/utils/platform'
 
 const { t } = useI18n()
 
 const status = ref({ granted: false, count: 0, last: null })
 const busy = ref(false)
+/** 客户端版本:先给构建期版本号,进页后再取安装包 versionName 覆盖 */
+const appVersion = ref(getWebVersion())
+const checking = ref(false)
 /** 保险箱指纹门:本机是否具备可用指纹/人脸 + 开关状态 */
 const bioAvailable = ref(false)
 const vaultLock = ref(false)
@@ -144,9 +158,35 @@ function onVaultLockChange(v) {
   bio().then((m) => m.setVaultLockEnabled(!!v))
 }
 
+/** 版本号以安装包为准(与更新检查同一来源),取不到就保留构建期版本 */
+async function loadVersion() {
+  try {
+    const m = await import('@/native/version')
+    appVersion.value = await m.getAppVersion()
+  } catch (e) {
+    /* 保留构建期版本号 */
+  }
+}
+
+/** 手动检查更新:有新版本会弹出更新弹窗,已是最新/失败给一条轻提示 */
+async function onCheckUpdate() {
+  checking.value = true
+  try {
+    const m = await import('@/native/appUpdate')
+    await m.checkAppUpdate({ interactive: true })
+    await loadVersion()
+  } catch (e) {
+    console.warn('[appSettings] 检查更新失败', e)
+    ElMessage.warning(t('appUpdate.checkFailed'))
+  } finally {
+    checking.value = false
+  }
+}
+
 onMounted(() => {
   load()
   loadBiometric()
+  loadVersion()
 })
 </script>
 
@@ -163,6 +203,10 @@ html.dark .share-tip {
 }
 .app-lead {
   margin-bottom: 12px;
+}
+.ver-now {
+  font-size: 13.5px;
+  font-weight: 600;
 }
 .cal-head {
   display: flex;
