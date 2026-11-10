@@ -287,7 +287,7 @@ export function useSunLight() {
     if (lampMode.value === 'off') return 0
     if (lampMode.value === 'on') return 1
     // auto 模式:空闲超时关灯优先(人走灯灭),其后昏暗天气(雾/阴)3 秒自动开灯补光,
-    // 其余按昼夜场景(日间 lampOpacity=0)
+    // 其余按窗口阴影强度连续取灯光强度(白天 0 → 傍晚渐亮 → 夜间 1,阈值见 windowLight.lampFromShadow)
     if (isIdle.value) return 0
     if (lampAutoOn.value && weatherEffectEnabled.value) return 1
     return sunScene.value.lampOpacity ?? 0

@@ -15,6 +15,19 @@ function lerpColor(c1, c2, t) {
   return `rgba(${r},${g},${b},1)`
 }
 
+// 台灯自动开关阈值(以窗口阴影强度为口径:正午 0.3 → 日出日落 0.7 → 夜间 0.7):
+// 阴影强度 ≥ LAMP_SHADOW_ON 认为「暗到该开灯」,≤ LAMP_SHADOW_OFF 认为「亮到该关灯」。
+// 两阈值之间做 smoothstep 过渡(而非 0/1 跳变),傍晚渐亮、清晨渐灭,避免视觉突跳;
+// 纯函数、不带历史状态,光照测试台按任意时隙跳着看也能得到同一条曲线。
+export const LAMP_SHADOW_ON = 0.64
+export const LAMP_SHADOW_OFF = 0.54
+
+export function lampFromShadow(shadowIntensity) {
+  const span = LAMP_SHADOW_ON - LAMP_SHADOW_OFF
+  const t = Math.max(0, Math.min(1, ((shadowIntensity ?? 0) - LAMP_SHADOW_OFF) / span))
+  return t * t * (3 - 2 * t)
+}
+
 export function getSunScene(sunInfo, slotIndex) {
   const slots = sunInfo?.slots || []
   const idx = Math.max(0, Math.min(287, slotIndex || 0))
@@ -161,8 +174,8 @@ export function getSunScene(sunInfo, slotIndex) {
   // 反光层:内容组件被阳光照亮的轻微高光(soft-light,无直射光时 0)
   const reflectionOpacity = hasDirectLight ? Math.sin(dayProgress * Math.PI) * 0.22 : 0
 
-  // 台灯:太阳方位角>260°(日落西方)开灯,>100°且≤260°(白天)关灯
-  const lampOpacity = az > 260 || az <= 100 || isNight ? 1 : 0
+  // 台灯:由阴影强度驱动(见 lampFromShadow),不再按方位角一刀切
+  const lampOpacity = lampFromShadow(shadowIntensity)
 
   return {
     source: { x: sourceX + '%', y: '-15%' },
