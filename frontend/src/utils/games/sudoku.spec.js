@@ -21,9 +21,13 @@ import {
   isValidParity,
   isValidRegions,
   isValidThermos,
+  isValidArithPaths,
+  isValidPalindromePaths,
+  isValidSkyscrapers,
   notesOf,
   pickHintIndex,
   regionIndexOf,
+  visibilityCount,
 } from './sudoku'
 
 // 可复现的随机源:同一个种子生成同一道题,测试结果稳定
@@ -438,5 +442,130 @@ describe('数独变体(温度计/连续/罗马)', () => {
         [2, 3],
       ]),
     ).toBe(true)
+  })
+})
+
+describe('数独变体(摩天楼/等差/回文)', () => {
+  it('三种新变体都登记在 VARIANT_KEYS 里', () => {
+    for (const key of ['SKYSCRAPER', 'ARITHMETIC', 'PALINDROME']) expect(VARIANT_KEYS).toContain(key)
+  })
+
+  it('摩天楼:四边提示与终盘可见楼层数一致,题目唯一解', () => {
+    const { puzzle, solution, skyscrapers } = generatePuzzle('MEDIUM', seeded(91), { variant: 'SKYSCRAPER' })
+    expect(isValidSkyscrapers(skyscrapers)).toBe(true)
+    const sides = [
+      ['top', (k) => Array.from({ length: 9 }, (_, r) => r * 9 + k)],
+      ['bottom', (k) => Array.from({ length: 9 }, (_, r) => (8 - r) * 9 + k)],
+      ['left', (k) => Array.from({ length: 9 }, (_, c) => k * 9 + c)],
+      ['right', (k) => Array.from({ length: 9 }, (_, c) => k * 9 + (8 - c))],
+    ]
+    for (const [side, cellsOf] of sides) {
+      for (let k = 0; k < 9; k++) {
+        const clue = skyscrapers[side][k]
+        if (!clue) continue
+        expect(visibilityCount(cellsOf(k).map((cell) => solution[cell]))).toBe(clue)
+      }
+    }
+    expect(puzzle.some((v) => !v)).toBe(true)
+    expect(countSolutions(puzzle, 2, { skyscrapers })).toBe(1)
+    expect(isSolved(solution, { skyscrapers })).toBe(true)
+  })
+
+  it('摩天楼冲突:整行可见数与提示不符时整行标冲突', () => {
+    const board = emptyBoard()
+    for (let c = 0; c < 9; c++) board[c] = c + 1
+    const clue = {
+      top: new Array(9).fill(0),
+      bottom: new Array(9).fill(0),
+      left: new Array(9).fill(0),
+      right: new Array(9).fill(0),
+    }
+    clue.left[0] = 5
+    const conflicts = findConflicts(board, { skyscrapers: clue })
+    expect(conflicts.size).toBe(9)
+    clue.left[0] = 9 // 1~9 从左看正好能看到 9 层
+    expect(findConflicts(board, { skyscrapers: clue }).size).toBe(0)
+  })
+
+  it('等差:每条线段都是同一行/列的等差数列,题目唯一解', () => {
+    const { puzzle, solution, arith } = generatePuzzle('MEDIUM', seeded(92), { variant: 'ARITHMETIC' })
+    expect(isValidArithPaths(arith)).toBe(true)
+    expect(arith.length).toBeGreaterThan(0)
+    for (const path of arith) {
+      const values = path.map((cell) => solution[cell])
+      const step = values[1] - values[0]
+      expect(step).not.toBe(0)
+      for (let i = 2; i < values.length; i++) expect(values[i] - values[i - 1]).toBe(step)
+    }
+    expect(countSolutions(puzzle, 2, { arith })).toBe(1)
+    expect(isSolved(solution, { arith })).toBe(true)
+  })
+
+  it('等差冲突:已填线段不成等差时整条线标冲突', () => {
+    const board = emptyBoard()
+    board[0] = 1
+    board[1] = 2
+    board[2] = 4
+    const conflicts = findConflicts(board, { arith: [[0, 1, 2]] })
+    expect(conflicts.has(0)).toBe(true)
+    expect(conflicts.has(1)).toBe(true)
+    expect(conflicts.has(2)).toBe(true)
+
+    board[2] = 3 // 1,2,3 公差 1
+    expect(findConflicts(board, { arith: [[0, 1, 2]] }).size).toBe(0)
+  })
+
+  it('回文:每条线上对称格数字相同,题目唯一解', () => {
+    const { puzzle, solution, palindromes } = generatePuzzle('MEDIUM', seeded(93), { variant: 'PALINDROME' })
+    expect(isValidPalindromePaths(palindromes)).toBe(true)
+    expect(palindromes.length).toBeGreaterThan(0)
+    for (const path of palindromes) {
+      for (let i = 0, j = path.length - 1; i < j; i++, j--) expect(solution[path[i]]).toBe(solution[path[j]])
+    }
+    expect(countSolutions(puzzle, 2, { palindromes })).toBe(1)
+    expect(isSolved(solution, { palindromes })).toBe(true)
+  })
+
+  it('回文冲突:对称格不同号会被标冲突', () => {
+    const board = emptyBoard()
+    board[0] = 3
+    board[2] = 4
+    const conflicts = findConflicts(board, { palindromes: [[0, 1, 2]] })
+    expect(conflicts.has(0)).toBe(true)
+    expect(conflicts.has(2)).toBe(true)
+    expect(conflicts.has(1)).toBe(false)
+  })
+
+  it('线段结构校验挡脏数据', () => {
+    const blank = () => new Array(9).fill(0)
+    expect(isValidSkyscrapers(null)).toBe(false)
+    expect(isValidSkyscrapers({ top: blank(), bottom: blank(), left: blank(), right: blank() })).toBe(false) // 一条提示都没有
+    expect(isValidSkyscrapers({ top: new Array(8).fill(0), bottom: blank(), left: blank(), right: blank() })).toBe(false)
+    const clue = { top: blank(), bottom: blank(), left: blank(), right: blank() }
+    clue.left[0] = 4
+    clue.top[2] = 3
+    clue.right[8] = 2
+    clue.bottom[5] = 1
+    expect(isValidSkyscrapers(clue)).toBe(true)
+
+    expect(isValidArithPaths([[0, 1, 2]])).toBe(true)
+    expect(isValidArithPaths([[0, 9, 18]])).toBe(true)
+    expect(isValidArithPaths([[0, 1, 9]])).toBe(false) // 折线不是等差线
+    expect(isValidArithPaths([[0, 1]])).toBe(false)
+    expect(
+      isValidArithPaths([
+        [0, 1, 2],
+        [2, 3, 4],
+      ]),
+    ).toBe(false) // 重叠
+
+    expect(isValidPalindromePaths([[0, 1, 10]])).toBe(true) // 回文可以折线
+    expect(isValidPalindromePaths([[0, 1, 2]])).toBe(true)
+    expect(
+      isValidPalindromePaths([
+        [0, 1, 2],
+        [1, 2, 3],
+      ]),
+    ).toBe(false)
   })
 })

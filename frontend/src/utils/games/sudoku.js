@@ -4,7 +4,9 @@
 // JIGSAW 不规则(9 个连通异形区替代九宫) / GREATER 不等式(相邻格比较符号) /
 // ODD_EVEN 奇偶(标记格限定奇数或偶数) / KILLER 杀手(无给定数字,笼内不重复且和等于标注) /
 // ANTI_KNIGHT 反马步 / ANTI_KING 反王步(斜对角不同号) / THERMO 温度计(沿线严格递增) /
-// CONSECUTIVE 连续(标记相邻格相差 1) / XV 罗马(标记相邻格和为 5 或 10)。
+// CONSECUTIVE 连续(标记相邻格相差 1) / XV 罗马(标记相邻格和为 5 或 10) /
+// SKYSCRAPER 摩天楼(四边外围给出可见楼层数) / ARITHMETIC 等差(标记连续格成等差数列) /
+// PALINDROME 回文(标记线上的数字正反读一致)。
 // 组件只负责渲染与交互,所有判定都在这里,便于单测覆盖。
 
 export const SIZE = 9
@@ -47,6 +49,41 @@ const THERMO_COUNTS = {
 /** 单条温度计最多跨几格(太长会绕出难看的折线) */
 const THERMO_MAX_LEN = 6
 
+/** 摩天楼:难度 → 隐藏的外围提示数(提示越少越难;同一行/列最多藏一侧) */
+const SKYSCRAPER_HIDDEN = {
+  EASY: 0,
+  MEDIUM: 6,
+  HARD: 10,
+  EXPERT: 14,
+}
+
+/** 等差线:难度 → 线数(线多 = 线索多 = 越简单) */
+const ARITH_COUNTS = {
+  EASY: 16,
+  MEDIUM: 13,
+  HARD: 10,
+  EXPERT: 8,
+}
+
+/** 回文线:难度 → 线数(线多 = 线索多 = 越简单) */
+const PALINDROME_COUNTS = {
+  EASY: 16,
+  MEDIUM: 13,
+  HARD: 10,
+  EXPERT: 8,
+}
+
+/** 等差线 3~5 格(直线,同一行或同一列) */
+const ARITH_MIN_LEN = 3
+const ARITH_MAX_LEN = 5
+
+/** 回文线 3~5 格(可折线;偶数长度必然出现相邻同号,故只用奇数长度) */
+const PAL_MIN_LEN = 3
+const PAL_MAX_LEN = 5
+
+/** 摩天楼四条边(与线索对象字段同序) */
+const SKY_SIDES = ['top', 'bottom', 'left', 'right']
+
 const pickCageSize = (weights, random) => {
   const entries = Object.entries(weights)
   let roll = random() * entries.reduce((acc, [, w]) => acc + w, 0)
@@ -70,6 +107,9 @@ export const VARIANT_KEYS = [
   'THERMO',
   'CONSECUTIVE',
   'XV',
+  'SKYSCRAPER',
+  'ARITHMETIC',
+  'PALINDROME',
 ]
 
 /** 对角线数独的两条附加组(主对角线 + 反对角线) */
@@ -206,6 +246,69 @@ function edgeAdjacency(edges) {
 }
 
 const edgeAllows = (rel, value, neighbor) => (EDGE_MASKS[rel][neighbor] & (1 << (value - 1))) !== 0
+
+/** 序列线索(等差/回文) → 每格所属的线段及在线上的位置 [{ cells, pos }] */
+function sequenceAdjacency(paths) {
+  const adj = new Array(CELLS).fill(null)
+  for (const cells of paths) {
+    for (let pos = 0; pos < cells.length; pos++) {
+      const cell = cells[pos]
+      if (!adj[cell]) adj[cell] = []
+      adj[cell].push({ cells, pos })
+    }
+  }
+  return adj
+}
+
+/**
+ * 等差候选过滤:线段内任意两个已填格都能定出公差,
+ * 本格的值就被锁定;两个已填格推不出整数公差或不一致即判死。
+ */
+function arithCandidates(board, adj, cell, mask) {
+  const entries = adj[cell]
+  if (!entries) return mask
+  for (const { cells, pos } of entries) {
+    let refPos = -1
+    let refVal = 0
+    let step = null
+    for (let q = 0; q < cells.length; q++) {
+      if (q === pos) continue
+      const v = board[cells[q]]
+      if (!v) continue
+      if (refPos < 0) {
+        refPos = q
+        refVal = v
+        continue
+      }
+      const num = v - refVal
+      const den = q - refPos
+      if (num % den !== 0) return 0
+      const d = num / den
+      if (step === null) step = d
+      else if (step !== d) return 0
+    }
+    if (step !== null) {
+      const v = refVal + step * (pos - refPos)
+      if (v < 1 || v > SIZE) return 0
+      mask &= 1 << (v - 1)
+      if (!mask) return 0
+    }
+  }
+  return mask
+}
+
+/** 回文候选过滤:对称格已填时本格只能填同一个数字 */
+function palindromeCandidates(board, adj, cell, mask) {
+  const entries = adj[cell]
+  if (!entries) return mask
+  for (const { cells, pos } of entries) {
+    const mirror = board[cells[cells.length - 1 - pos]]
+    if (!mirror) continue
+    mask &= 1 << (mirror - 1)
+    if (!mask) return 0
+  }
+  return mask
+}
 
 const ALL = 0x1ff
 
@@ -409,7 +512,10 @@ function pickCell(board, rows, cols, units, unitOf, extras = null, membership = 
  * opts.cages:杀手笼 [{ cells, sum }];opts.inequalities:不等式对 [小, 大];
  * opts.parity:每格奇偶标记(0 无约束 / 1 奇数 / 2 偶数);
  * opts.edges:相邻边关系(连续/罗马数独的 144 条边);
- * opts.nodeBudget:搜索节点预算,超过即放弃并返回 -1(用于杀手生成时廉价淘汰近唯一盘)。
+ * opts.nodeBudget:搜索节点预算,超过即放弃并返回 -1(用于杀手生成时廉价淘汰近唯一盘);
+ * opts.skyscrapers:摩天楼四边线索 { top, bottom, left, right }(0 = 该侧无提示);
+ * opts.arith:等差线段 [[cell...]](线段内数字成等差数列);
+ * opts.palindromes:回文线段 [[cell...]](对称格数字相同)。
  * 返回 0 表示无解。
  */
 export function countSolutions(input, limit = 2, opts = {}) {
@@ -420,6 +526,9 @@ export function countSolutions(input, limit = 2, opts = {}) {
   const inequalities = opts.inequalities || null
   const parity = opts.parity || null
   const edges = opts.edges || null
+  const skyscrapers = opts.skyscrapers || null
+  const arith = opts.arith || null
+  const palindromes = opts.palindromes || null
   const budget = opts.nodeBudget ?? Infinity
   const masks = buildMasks(board, extraGroups, regions)
   if (!masks) return 0
@@ -455,6 +564,14 @@ export function countSolutions(input, limit = 2, opts = {}) {
       }
     }
   }
+
+  // 摩天楼/等差/回文的给定格先行校验(候选过滤只处理空格的落点)
+  const skyLines = skyscrapers ? skylineClues(skyscrapers) : null
+  if (skyLines && !skylineFeasible(board, skyLines)) return 0
+  const arithAdj = arith ? sequenceAdjacency(arith) : null
+  if (arith && arithViolationSet(board, arith).size) return 0
+  const palindromeAdj = palindromes ? sequenceAdjacency(palindromes) : null
+  if (palindromes && palindromeViolationSet(board, palindromes).size) return 0
 
   // 杀手笼状态:各笼剩余和 / 未填格数 / 笼内已用数字掩码;盘面已有笼内重复直接判无解
   let cageSum = null
@@ -546,6 +663,8 @@ export function countSolutions(input, limit = 2, opts = {}) {
       aborted = true
       return
     }
+    // 摩天楼:每条已部分填写的行/列都按可见楼层数剪枝
+    if (skyLines && !skylineFeasible(board, skyLines)) return
     // MRV 选格:候选掩码叠加附加组/笼/奇偶/比较约束
     let best = -1
     let bestMask = 0
@@ -564,6 +683,8 @@ export function countSolutions(input, limit = 2, opts = {}) {
       if (cageOf) mask = cageCandidates(i, mask)
       if (ineqAdj) mask = inequalityCandidates(i, mask)
       if (edgeAdj) mask = edgeCandidates(i, mask)
+      if (arithAdj) mask = arithCandidates(board, arithAdj, i, mask)
+      if (palindromeAdj) mask = palindromeCandidates(board, palindromeAdj, i, mask)
       if (!mask) return
       const n = popcount(mask)
       if (n < bestCount) {
@@ -708,6 +829,9 @@ export function generatePuzzle(difficulty = 'MEDIUM', random = Math.random, { va
   if (variant === 'GREATER') return generateGreater(difficulty, random)
   if (variant === 'THERMO') return generateThermo(difficulty, random)
   if (variant === 'CONSECUTIVE' || variant === 'XV') return generateEdgeVariant(difficulty, random, variant)
+  if (variant === 'SKYSCRAPER') return generateSkyscraper(difficulty, random)
+  if (variant === 'ARITHMETIC') return generateArithmetic(difficulty, random)
+  if (variant === 'PALINDROME') return generatePalindrome(difficulty, random)
   const extraGroups = extraGroupsFor(variant)
   const targetBlanks = DIFFICULTIES[difficulty] ?? DIFFICULTIES.MEDIUM
   const solution = generateSolution(random, extraGroups.length ? extraGroups : null)
@@ -958,6 +1082,341 @@ function generateThermo(difficulty, random) {
   }
 }
 
+// ---------- 摩天楼数独 ----------
+
+/**
+ * 从一端看过去的可见楼层数:只有比前面所有数字都大的才露得出来。
+ * 行/列两个方向共用同一口径,线索生成与判定都走这里。
+ */
+export function visibilityCount(values) {
+  let tallest = 0
+  let seen = 0
+  for (const v of values) {
+    if (v > tallest) {
+      tallest = v
+      seen += 1
+    }
+  }
+  return seen
+}
+
+/** 摩天楼线索 → 四边的逐条线(0 表示该侧不给提示,那条线不参与约束) */
+function skylineClues(skyscrapers) {
+  const lines = []
+  for (let k = 0; k < SIZE; k++) {
+    const col = colGroups[k]
+    const row = rowGroups[k]
+    if (skyscrapers.top?.[k]) lines.push({ cells: col, clue: skyscrapers.top[k] })
+    if (skyscrapers.bottom?.[k]) lines.push({ cells: col.slice().reverse(), clue: skyscrapers.bottom[k] })
+    if (skyscrapers.left?.[k]) lines.push({ cells: row, clue: skyscrapers.left[k] })
+    if (skyscrapers.right?.[k]) lines.push({ cells: row.slice().reverse(), clue: skyscrapers.right[k] })
+  }
+  return lines
+}
+
+/**
+ * 部分盘面的摩天楼剪枝:只数「从该端连续已填的前缀」,
+ * 前缀可见数不能超过提示,剩下的空格每格最多再露一层。
+ */
+function skylineFeasible(board, lines) {
+  for (const line of lines) {
+    const cells = line.cells
+    let tallest = 0
+    let seen = 0
+    let i = 0
+    while (i < cells.length && board[cells[i]]) {
+      const v = board[cells[i]]
+      if (v > tallest) {
+        tallest = v
+        seen += 1
+      }
+      i += 1
+    }
+    const rest = cells.length - i
+    if (seen > line.clue || seen + rest < line.clue) return false
+  }
+  return true
+}
+
+/** 按终盘算出四边可见数,再按难度随机隐藏若干条(同一行/列最多藏一侧) */
+function buildSkyscrapers(solution, random, difficulty) {
+  const clues = {
+    top: colGroups.map((cells) => visibilityCount(cells.map((cell) => solution[cell]))),
+    bottom: colGroups.map((cells) =>
+      visibilityCount(
+        cells
+          .slice()
+          .reverse()
+          .map((cell) => solution[cell]),
+      ),
+    ),
+    left: rowGroups.map((cells) => visibilityCount(cells.map((cell) => solution[cell]))),
+    right: rowGroups.map((cells) =>
+      visibilityCount(
+        cells
+          .slice()
+          .reverse()
+          .map((cell) => solution[cell]),
+      ),
+    ),
+  }
+  const hidden = SKYSCRAPER_HIDDEN[difficulty] ?? SKYSCRAPER_HIDDEN.MEDIUM
+  if (hidden <= 0) return clues
+  const slots = []
+  for (let k = 0; k < SIZE; k++) {
+    slots.push({ side: 'top', index: k, line: `col${k}` })
+    slots.push({ side: 'bottom', index: k, line: `col${k}` })
+    slots.push({ side: 'left', index: k, line: `row${k}` })
+    slots.push({ side: 'right', index: k, line: `row${k}` })
+  }
+  shuffle(slots, random)
+  const hiddenLines = new Set()
+  let done = 0
+  for (const slot of slots) {
+    if (done >= hidden) break
+    if (hiddenLines.has(slot.line)) continue
+    hiddenLines.add(slot.line)
+    clues[slot.side][slot.index] = 0
+    done += 1
+  }
+  return clues
+}
+
+function generateSkyscraper(difficulty, random) {
+  const solution = generateSolution(random)
+  const skyscrapers = buildSkyscrapers(solution, random, difficulty)
+  const targetBlanks = DIFFICULTIES[difficulty] ?? DIFFICULTIES.MEDIUM
+  const { puzzle, blanks } = digHoles(solution, targetBlanks, random, { skyscrapers })
+  return {
+    variant: 'SKYSCRAPER',
+    puzzle,
+    solution,
+    cages: null,
+    regions: null,
+    inequalities: null,
+    parity: null,
+    edges: null,
+    thermos: null,
+    skyscrapers,
+    arith: null,
+    palindromes: null,
+    blanks,
+    difficulty,
+  }
+}
+
+// ---------- 等差数独 ----------
+
+/** 等差数列判定:至少 3 项、公差非 0、相邻差恒等 */
+function isArithmeticSequence(values) {
+  if (values.length < 3) return false
+  const step = values[1] - values[0]
+  if (!step) return false
+  for (let i = 2; i < values.length; i++) if (values[i] - values[i - 1] !== step) return false
+  return true
+}
+
+/** 终盘上所有「同行/同列连续格刚好成等差」的线段(3~5 格),这是等差数独的候选线索 */
+function collectArithPaths(solution) {
+  const paths = []
+  const consider = (cells) => {
+    if (isArithmeticSequence(cells.map((cell) => solution[cell]))) paths.push(cells)
+  }
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      for (let len = ARITH_MIN_LEN; len <= ARITH_MAX_LEN; len++) {
+        if (c + len <= SIZE) consider(Array.from({ length: len }, (_, k) => r * SIZE + c + k))
+        if (r + len <= SIZE) consider(Array.from({ length: len }, (_, k) => (r + k) * SIZE + c))
+      }
+    }
+  }
+  return paths
+}
+
+/** 从候选线段里随机挑出互不重叠的若干条(长线优先,长短交替) */
+function pickNonOverlappingPaths(candidates, count, random) {
+  const groups = new Map()
+  for (const path of candidates) {
+    if (!groups.has(path.length)) groups.set(path.length, [])
+    groups.get(path.length).push(path)
+  }
+  const queues = [...groups.entries()].sort((a, b) => b[0] - a[0]).map(([, list]) => shuffle(list.slice(), random))
+  const picked = []
+  const used = new Set()
+  let guard = 0
+  while (picked.length < count && guard < 10000) {
+    guard += 1
+    let progressed = false
+    for (const queue of queues) {
+      if (picked.length >= count) break
+      while (queue.length) {
+        const path = queue.pop()
+        if (path.some((cell) => used.has(cell))) continue
+        for (const cell of path) used.add(cell)
+        picked.push(path)
+        progressed = true
+        break
+      }
+    }
+    if (!progressed) break
+  }
+  return picked
+}
+
+/** 已填格违反等差数列时返回涉及的格子(空盘或只有一个参照时视为未违反) */
+function arithViolationSet(board, paths) {
+  const bad = new Set()
+  for (const path of paths) {
+    let refPos = -1
+    let refVal = 0
+    let step = null
+    let broken = false
+    for (let pos = 0; pos < path.length; pos++) {
+      const v = board[path[pos]]
+      if (!v) continue
+      if (refPos < 0) {
+        refPos = pos
+        refVal = v
+        continue
+      }
+      const num = v - refVal
+      const den = pos - refPos
+      if (num % den !== 0) {
+        broken = true
+        break
+      }
+      const d = num / den
+      if (step === null) step = d
+      else if (step !== d) {
+        broken = true
+        break
+      }
+    }
+    if (broken) for (const cell of path) if (board[cell]) bad.add(cell)
+  }
+  return bad
+}
+
+function generateArithmetic(difficulty, random) {
+  const solution = generateSolution(random)
+  const arith = pickNonOverlappingPaths(collectArithPaths(solution), ARITH_COUNTS[difficulty] ?? ARITH_COUNTS.MEDIUM, random)
+  const targetBlanks = DIFFICULTIES[difficulty] ?? DIFFICULTIES.MEDIUM
+  const { puzzle, blanks } = digHoles(solution, targetBlanks, random, { arith })
+  return {
+    variant: 'ARITHMETIC',
+    puzzle,
+    solution,
+    cages: null,
+    regions: null,
+    inequalities: null,
+    parity: null,
+    edges: null,
+    thermos: null,
+    skyscrapers: null,
+    arith,
+    palindromes: null,
+    blanks,
+    difficulty,
+  }
+}
+
+// ---------- 回文数独 ----------
+
+/** 回文序列判定:正读反读一致 */
+function isPalindromeSequence(values) {
+  for (let i = 0, j = values.length - 1; i < j; i++, j--) if (values[i] !== values[j]) return false
+  return true
+}
+
+/** 同一段回文线正反走是两条路径,用字典序较小的字符串去重 */
+function palindromeKey(path) {
+  const forward = path.join(',')
+  const backward = path.slice().reverse().join(',')
+  return forward < backward ? forward : backward
+}
+
+/**
+ * 终盘上所有「已构成回文」的折线(3 格 / 5 格)。
+ * 偶数长度的回文线必然有一对相邻格同号(行列宫冲突),所以只用奇数长度。
+ */
+function collectPalindromePaths(solution) {
+  const seen = new Set()
+  const paths = []
+  const consider = (path) => {
+    if (!isPalindromeSequence(path.map((cell) => solution[cell]))) return
+    const key = palindromeKey(path)
+    if (seen.has(key)) return
+    seen.add(key)
+    paths.push(path)
+  }
+  // 3 格:中心格 + 两个相邻格
+  for (let center = 0; center < CELLS; center++) {
+    const nbs = neighborsOf(center)
+    for (const a of nbs) {
+      for (const c of nbs) if (a !== c) consider([a, center, c])
+    }
+  }
+  // 5 格:从任意起点做 4 步不重复游走
+  const walk = (path) => {
+    if (path.length === PAL_MAX_LEN) {
+      consider(path.slice())
+      return
+    }
+    const last = path[path.length - 1]
+    for (const nb of neighborsOf(last)) {
+      if (path.includes(nb)) continue
+      path.push(nb)
+      walk(path)
+      path.pop()
+    }
+  }
+  for (let start = 0; start < CELLS; start++) walk([start])
+  return paths
+}
+
+/** 已填格违反回文关系时返回涉及的格子 */
+function palindromeViolationSet(board, paths) {
+  const bad = new Set()
+  for (const path of paths) {
+    for (let i = 0, j = path.length - 1; i < j; i++, j--) {
+      const a = board[path[i]]
+      const b = board[path[j]]
+      if (a && b && a !== b) {
+        bad.add(path[i])
+        bad.add(path[j])
+      }
+    }
+  }
+  return bad
+}
+
+function generatePalindrome(difficulty, random) {
+  const solution = generateSolution(random)
+  const palindromes = pickNonOverlappingPaths(
+    collectPalindromePaths(solution),
+    PALINDROME_COUNTS[difficulty] ?? PALINDROME_COUNTS.MEDIUM,
+    random,
+  )
+  const targetBlanks = DIFFICULTIES[difficulty] ?? DIFFICULTIES.MEDIUM
+  const { puzzle, blanks } = digHoles(solution, targetBlanks, random, { palindromes })
+  return {
+    variant: 'PALINDROME',
+    puzzle,
+    solution,
+    cages: null,
+    regions: null,
+    inequalities: null,
+    parity: null,
+    edges: null,
+    thermos: null,
+    skyscrapers: null,
+    arith: null,
+    palindromes,
+    blanks,
+    difficulty,
+  }
+}
+
 /** 奇偶标记:随机挑若干格,按终盘标出该格是奇数还是偶数 */
 function generateParity(solution, random, difficulty) {
   const marks = Math.min(CELLS, PARITY_MARKS[difficulty] ?? 22)
@@ -1054,6 +1513,9 @@ export function findConflicts(board, opts = null) {
   const regions = Array.isArray(opts) ? null : opts?.regions || null
   const inequalities = Array.isArray(opts) ? null : opts?.inequalities || null
   const edges = Array.isArray(opts) ? null : opts?.edges || null
+  const skyscrapers = Array.isArray(opts) ? null : opts?.skyscrapers || null
+  const arith = Array.isArray(opts) ? null : opts?.arith || null
+  const palindromes = Array.isArray(opts) ? null : opts?.palindromes || null
   const conflicts = new Set()
   const check = (group) => {
     const byValue = new Map()
@@ -1089,6 +1551,16 @@ export function findConflicts(board, opts = null) {
       }
     }
   }
+  // 摩天楼:整条行/列填满但可见楼层数与线索不符时,整条线一起标冲突
+  if (skyscrapers) {
+    for (const line of skylineClues(skyscrapers)) {
+      if (!line.cells.every((cell) => board[cell])) continue
+      if (visibilityCount(line.cells.map((cell) => board[cell])) === line.clue) continue
+      for (const cell of line.cells) conflicts.add(cell)
+    }
+  }
+  if (arith) for (const cell of arithViolationSet(board, arith)) conflicts.add(cell)
+  if (palindromes) for (const cell of palindromeViolationSet(board, palindromes)) conflicts.add(cell)
   return conflicts
 }
 
@@ -1123,6 +1595,13 @@ export function isSolved(board, opts = {}) {
       if (p && board[i] % 2 !== (p === 1 ? 1 : 0)) return false
     }
   }
+  if (opts.skyscrapers) {
+    for (const line of skylineClues(opts.skyscrapers)) {
+      if (visibilityCount(line.cells.map((cell) => board[cell])) !== line.clue) return false
+    }
+  }
+  if (opts.arith && arithViolationSet(board, opts.arith).size) return false
+  if (opts.palindromes && palindromeViolationSet(board, opts.palindromes).size) return false
   return true
 }
 
@@ -1253,6 +1732,57 @@ export function isValidThermos(thermos) {
     }
   }
   return true
+}
+
+/** 摩天楼线索结构校验:四边各 9 个数(0 = 该侧无提示),至少给 4 条提示 */
+export function isValidSkyscrapers(skyscrapers) {
+  if (!skyscrapers || typeof skyscrapers !== 'object') return false
+  let clues = 0
+  for (const side of SKY_SIDES) {
+    const list = skyscrapers[side]
+    if (!Array.isArray(list) || list.length !== SIZE) return false
+    for (const v of list) {
+      if (!Number.isInteger(v) || v < 0 || v > SIZE) return false
+      if (v) clues += 1
+    }
+  }
+  return clues >= 4
+}
+
+/**
+ * 线段线索结构校验(等差/回文读档用):每条线长度在区间内、格位不越界不重叠、
+ * 相邻两格必须上下左右相接;等差线还要求是同一条直线。
+ */
+function isValidSequencePaths(paths, minLen, maxLen, straightOnly) {
+  if (!Array.isArray(paths) || !paths.length) return false
+  const used = new Set()
+  for (const path of paths) {
+    if (!Array.isArray(path) || path.length < minLen || path.length > maxLen) return false
+    for (let i = 0; i < path.length; i++) {
+      const cell = path[i]
+      if (!Number.isInteger(cell) || cell < 0 || cell >= CELLS || used.has(cell)) return false
+      used.add(cell)
+      if (i > 0 && !ADJACENT_KEYS.has(pairKey(path[i - 1], cell))) return false
+    }
+    if (!straightOnly) continue
+    const dr = Math.floor(path[1] / SIZE) - Math.floor(path[0] / SIZE)
+    const dc = (path[1] % SIZE) - (path[0] % SIZE)
+    for (let i = 2; i < path.length; i++) {
+      if (Math.floor(path[i] / SIZE) - Math.floor(path[i - 1] / SIZE) !== dr) return false
+      if ((path[i] % SIZE) - (path[i - 1] % SIZE) !== dc) return false
+    }
+  }
+  return true
+}
+
+/** 等差线结构校验:3~5 格、连续同一直线、互不重叠 */
+export function isValidArithPaths(paths) {
+  return isValidSequencePaths(paths, ARITH_MIN_LEN, ARITH_MAX_LEN, true)
+}
+
+/** 回文线结构校验:3~5 格、连续折线、互不重叠 */
+export function isValidPalindromePaths(paths) {
+  return isValidSequencePaths(paths, PAL_MIN_LEN, PAL_MAX_LEN, false)
 }
 
 /** 笼划分 → 每格所属笼索引(Int16Array,未归属为 -1);KILLER 渲染笼边框/求和标注用 */

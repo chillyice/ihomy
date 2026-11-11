@@ -40,51 +40,100 @@
         </span>
       </div>
 
-      <div class="sd-board" :class="{ 'is-frozen': won, 'is-quick': quickFill && activeNumber > 0 }">
-        <button
-          v-for="(value, index) in board"
-          :key="index"
-          type="button"
-          class="sd-cell"
-          :class="cellClass(index)"
-          :aria-label="cellLabel(index, value)"
-          @click="select(index)"
-          @pointerdown="onCellPressStart(index, $event)"
-          @pointerup="onCellPressEnd"
-          @pointerleave="onCellPressEnd"
-          @pointercancel="onCellPressEnd"
-        >
-          <template v-if="variant === 'KILLER'">
-            <i v-if="cageEdge(index, 't')" class="sd-cage sd-cage-t" aria-hidden="true"></i>
-            <i v-if="cageEdge(index, 'b')" class="sd-cage sd-cage-b" aria-hidden="true"></i>
-            <i v-if="cageEdge(index, 'l')" class="sd-cage sd-cage-l" aria-hidden="true"></i>
-            <i v-if="cageEdge(index, 'r')" class="sd-cage sd-cage-r" aria-hidden="true"></i>
-            <b v-if="cageHeadSum(index) !== ''" class="sd-cage-sum">{{ cageHeadSum(index) }}</b>
+      <div class="sd-frame" :class="{ 'with-clues': variant === 'SKYSCRAPER' }">
+        <template v-if="variant === 'SKYSCRAPER'">
+          <template v-for="(value, col) in skyTop" :key="'sky-t' + col">
+            <span v-if="value" class="sd-sky sd-sky-top" :style="{ gridColumnStart: String(col + 2), gridRowStart: '1' }">{{ value }}</span>
           </template>
-          <template v-if="variant === 'WINDOW'">
-            <i v-if="windowSide(index, 't')" class="sd-win sd-win-t" aria-hidden="true"></i>
-            <i v-if="windowSide(index, 'b')" class="sd-win sd-win-b" aria-hidden="true"></i>
-            <i v-if="windowSide(index, 'l')" class="sd-win sd-win-l" aria-hidden="true"></i>
-            <i v-if="windowSide(index, 'r')" class="sd-win sd-win-r" aria-hidden="true"></i>
+          <template v-for="(value, col) in skyBottom" :key="'sky-b' + col">
+            <span v-if="value" class="sd-sky sd-sky-bottom" :style="{ gridColumnStart: String(col + 2), gridRowStart: '11' }">{{
+              value
+            }}</span>
           </template>
-          <template v-if="variant === 'THERMO' && thermoInfo[index]">
-            <i v-if="thermoInfo[index].prev" class="sd-thermo-seg" :class="'sd-thermo-to-' + thermoInfo[index].prev" aria-hidden="true"></i>
-            <i v-if="thermoInfo[index].next" class="sd-thermo-seg" :class="'sd-thermo-to-' + thermoInfo[index].next" aria-hidden="true"></i>
-            <i v-if="thermoInfo[index].bulb" class="sd-thermo-bulb" aria-hidden="true"></i>
+          <template v-for="(value, row) in skyLeft" :key="'sky-l' + row">
+            <span v-if="value" class="sd-sky sd-sky-left" :style="{ gridColumnStart: '1', gridRowStart: String(row + 2) }">{{
+              value
+            }}</span>
           </template>
-          <span v-if="ineqMark(index, 'r')" class="sd-ineq sd-ineq-r" aria-hidden="true">{{ ineqMark(index, 'r') }}</span>
-          <span v-if="ineqMark(index, 'b')" class="sd-ineq sd-ineq-b" aria-hidden="true">{{ ineqMark(index, 'b') }}</span>
-          <span v-if="consecutiveMark(index, 'r')" class="sd-consec sd-consec-r" aria-hidden="true"></span>
-          <span v-if="consecutiveMark(index, 'b')" class="sd-consec sd-consec-b" aria-hidden="true"></span>
-          <span v-if="xvMark(index, 'r')" class="sd-xv sd-xv-r" aria-hidden="true">{{ xvMark(index, 'r') }}</span>
-          <span v-if="xvMark(index, 'b')" class="sd-xv sd-xv-b" aria-hidden="true">{{ xvMark(index, 'b') }}</span>
-          <Transition name="sd-pop" mode="out-in">
-            <span v-if="value" :key="'v' + value" class="sd-value">{{ value }}</span>
-            <span v-else-if="notes[index]" :key="'n' + index" class="sd-notes">
-              <span v-for="n in notesList(index)" :key="n" class="sd-note">{{ n }}</span>
-            </span>
-          </Transition>
-        </button>
+          <template v-for="(value, row) in skyRight" :key="'sky-r' + row">
+            <span v-if="value" class="sd-sky sd-sky-right" :style="{ gridColumnStart: '11', gridRowStart: String(row + 2) }">{{
+              value
+            }}</span>
+          </template>
+        </template>
+
+        <div class="sd-board" :class="{ 'is-frozen': won, 'is-quick': quickFill && activeNumber > 0 }">
+          <button
+            v-for="(value, index) in board"
+            :key="index"
+            type="button"
+            class="sd-cell"
+            :class="cellClass(index)"
+            :aria-label="cellLabel(index, value)"
+            @click="select(index)"
+            @pointerdown="onCellPressStart(index, $event)"
+            @pointerup="onCellPressEnd"
+            @pointerleave="onCellPressEnd"
+            @pointercancel="onCellPressEnd"
+          >
+            <template v-if="variant === 'KILLER'">
+              <i v-if="cageEdge(index, 't')" class="sd-cage sd-cage-t" aria-hidden="true"></i>
+              <i v-if="cageEdge(index, 'b')" class="sd-cage sd-cage-b" aria-hidden="true"></i>
+              <i v-if="cageEdge(index, 'l')" class="sd-cage sd-cage-l" aria-hidden="true"></i>
+              <i v-if="cageEdge(index, 'r')" class="sd-cage sd-cage-r" aria-hidden="true"></i>
+              <b v-if="cageHeadSum(index) !== ''" class="sd-cage-sum">{{ cageHeadSum(index) }}</b>
+            </template>
+            <template v-if="variant === 'WINDOW'">
+              <i v-if="windowSide(index, 't')" class="sd-win sd-win-t" aria-hidden="true"></i>
+              <i v-if="windowSide(index, 'b')" class="sd-win sd-win-b" aria-hidden="true"></i>
+              <i v-if="windowSide(index, 'l')" class="sd-win sd-win-l" aria-hidden="true"></i>
+              <i v-if="windowSide(index, 'r')" class="sd-win sd-win-r" aria-hidden="true"></i>
+            </template>
+            <template v-if="variant === 'THERMO' && thermoInfo[index]">
+              <i
+                v-if="thermoInfo[index].prev"
+                class="sd-thermo-seg"
+                :class="'sd-thermo-to-' + thermoInfo[index].prev"
+                aria-hidden="true"
+              ></i>
+              <i
+                v-if="thermoInfo[index].next"
+                class="sd-thermo-seg"
+                :class="'sd-thermo-to-' + thermoInfo[index].next"
+                aria-hidden="true"
+              ></i>
+              <i v-if="thermoInfo[index].bulb" class="sd-thermo-bulb" aria-hidden="true"></i>
+            </template>
+            <template v-if="variant === 'PALINDROME' && palInfo[index]">
+              <i
+                v-if="palInfo[index].prev"
+                class="sd-thermo-seg sd-pal-seg"
+                :class="'sd-thermo-to-' + palInfo[index].prev"
+                aria-hidden="true"
+              ></i>
+              <i
+                v-if="palInfo[index].next"
+                class="sd-thermo-seg sd-pal-seg"
+                :class="'sd-thermo-to-' + palInfo[index].next"
+                aria-hidden="true"
+              ></i>
+              <i v-if="palInfo[index].end" class="sd-pal-dot" aria-hidden="true"></i>
+            </template>
+            <i v-if="variant === 'ARITHMETIC' && arithInfo[index]" :class="arithCellClass(index)" aria-hidden="true"></i>
+            <span v-if="ineqMark(index, 'r')" class="sd-ineq sd-ineq-r" aria-hidden="true">{{ ineqMark(index, 'r') }}</span>
+            <span v-if="ineqMark(index, 'b')" class="sd-ineq sd-ineq-b" aria-hidden="true">{{ ineqMark(index, 'b') }}</span>
+            <span v-if="consecutiveMark(index, 'r')" class="sd-consec sd-consec-r" aria-hidden="true"></span>
+            <span v-if="consecutiveMark(index, 'b')" class="sd-consec sd-consec-b" aria-hidden="true"></span>
+            <span v-if="xvMark(index, 'r')" class="sd-xv sd-xv-r" aria-hidden="true">{{ xvMark(index, 'r') }}</span>
+            <span v-if="xvMark(index, 'b')" class="sd-xv sd-xv-b" aria-hidden="true">{{ xvMark(index, 'b') }}</span>
+            <Transition name="sd-pop" mode="out-in">
+              <span v-if="value" :key="'v' + value" class="sd-value">{{ value }}</span>
+              <span v-else-if="notes[index]" :key="'n' + index" class="sd-notes">
+                <span v-for="n in notesList(index)" :key="n" class="sd-note">{{ n }}</span>
+              </span>
+            </Transition>
+          </button>
+        </div>
       </div>
 
       <div class="sd-tools">
@@ -164,12 +213,15 @@ import {
   findConflicts,
   generatePuzzle,
   isSolved,
+  isValidArithPaths,
   isValidBoard,
   isValidCages,
   isValidEdges,
   isValidInequalities,
+  isValidPalindromePaths,
   isValidParity,
   isValidRegions,
+  isValidSkyscrapers,
   isValidThermos,
   notesOf,
   pickHintIndex,
@@ -199,6 +251,9 @@ const inequalities = ref(null)
 const parity = ref(null)
 const edges = ref(null)
 const thermos = ref(null)
+const skyscrapers = ref(null)
+const arith = ref(null)
+const palindromes = ref(null)
 const board = ref(new Array(CELLS).fill(0))
 const notes = ref(new Array(CELLS).fill(0))
 const selected = ref(-1)
@@ -227,6 +282,9 @@ const constraintsOf = (key, data) => {
     inequalities: key === 'GREATER' || key === 'THERMO' ? data.inequalities || undefined : undefined,
     parity: key === 'ODD_EVEN' ? data.parity || undefined : undefined,
     edges: key === 'CONSECUTIVE' || key === 'XV' ? data.edges || undefined : undefined,
+    skyscrapers: key === 'SKYSCRAPER' ? data.skyscrapers || undefined : undefined,
+    arith: key === 'ARITHMETIC' ? data.arith || undefined : undefined,
+    palindromes: key === 'PALINDROME' ? data.palindromes || undefined : undefined,
   }
 }
 const currentConstraints = computed(() =>
@@ -236,6 +294,9 @@ const currentConstraints = computed(() =>
     inequalities: inequalities.value,
     parity: parity.value,
     edges: edges.value,
+    skyscrapers: skyscrapers.value,
+    arith: arith.value,
+    palindromes: palindromes.value,
   }),
 )
 
@@ -257,6 +318,9 @@ const conflicts = computed(() => {
     regions: variant.value === 'JIGSAW' ? regions.value : null,
     inequalities: variant.value === 'GREATER' || variant.value === 'THERMO' ? inequalities.value : null,
     edges: variant.value === 'CONSECUTIVE' || variant.value === 'XV' ? edges.value : null,
+    skyscrapers: variant.value === 'SKYSCRAPER' ? skyscrapers.value : null,
+    arith: variant.value === 'ARITHMETIC' ? arith.value : null,
+    palindromes: variant.value === 'PALINDROME' ? palindromes.value : null,
   })
 })
 const conflictCount = computed(() => conflicts.value.size)
@@ -416,6 +480,47 @@ const thermoInfo = computed(() => {
   return info
 })
 
+// ---------- 回文数独:与温度计同一套「中心 → 邻格」半段线,两端画小圆点 ----------
+const palInfo = computed(() => {
+  const info = new Array(CELLS).fill(null)
+  if (variant.value !== 'PALINDROME' || !Array.isArray(palindromes.value)) return info
+  for (const path of palindromes.value) {
+    for (let i = 0; i < path.length; i++) {
+      const cell = path[i]
+      info[cell] = {
+        prev: i > 0 ? directionTo(cell, path[i - 1]) : '',
+        next: i < path.length - 1 ? directionTo(cell, path[i + 1]) : '',
+        end: i === 0 || i === path.length - 1,
+      }
+    }
+  }
+  return info
+})
+
+// ---------- 摩天楼数独:四边外围提示(0 = 该侧无提示) ----------
+const skyTop = computed(() => (variant.value === 'SKYSCRAPER' && skyscrapers.value ? skyscrapers.value.top : []))
+const skyBottom = computed(() => (variant.value === 'SKYSCRAPER' && skyscrapers.value ? skyscrapers.value.bottom : []))
+const skyLeft = computed(() => (variant.value === 'SKYSCRAPER' && skyscrapers.value ? skyscrapers.value.left : []))
+const skyRight = computed(() => (variant.value === 'SKYSCRAPER' && skyscrapers.value ? skyscrapers.value.right : []))
+
+// ---------- 等差数独:每条线段画成横/竖胶囊(端点封口 + 圆角) ----------
+const arithInfo = computed(() => {
+  const info = new Array(CELLS).fill(null)
+  if (variant.value !== 'ARITHMETIC' || !Array.isArray(arith.value)) return info
+  for (const path of arith.value) {
+    const horizontal = Math.floor(path[0] / 9) === Math.floor(path[1] / 9)
+    for (let i = 0; i < path.length; i++) {
+      info[path[i]] = { dir: horizontal ? 'h' : 'v', first: i === 0, last: i === path.length - 1 }
+    }
+  }
+  return info
+})
+const arithCellClass = (index) => {
+  const info = arithInfo.value[index]
+  if (!info) return ''
+  return ['sd-arith', info.dir === 'h' ? 'sd-arith-h' : 'sd-arith-v', info.first ? 'sd-arith-start' : '', info.last ? 'sd-arith-end' : '']
+}
+
 // ---------- 杀手笼渲染(虚线边框 + 笼和标注,标在笼内最左上格) ----------
 const cageIdx = computed(() => (variant.value === 'KILLER' && cages.value ? cageIndexOf(cages.value) : null))
 const cageEdge = (index, side) => {
@@ -475,6 +580,9 @@ const saveState = () => {
         parity: parity.value,
         edges: edges.value,
         thermos: thermos.value,
+        skyscrapers: skyscrapers.value,
+        arith: arith.value,
+        palindromes: palindromes.value,
       }),
     )
   } catch (e) {
@@ -501,6 +609,9 @@ const loadState = () => {
     if (savedVariant === 'ODD_EVEN' && !isValidParity(raw.parity)) return null
     if ((savedVariant === 'CONSECUTIVE' || savedVariant === 'XV') && !isValidEdges(raw.edges)) return null
     if (savedVariant === 'THERMO' && (!isValidThermos(raw.thermos) || !isValidInequalities(raw.inequalities))) return null
+    if (savedVariant === 'SKYSCRAPER' && !isValidSkyscrapers(raw.skyscrapers)) return null
+    if (savedVariant === 'ARITHMETIC' && !isValidArithPaths(raw.arith)) return null
+    if (savedVariant === 'PALINDROME' && !isValidPalindromePaths(raw.palindromes)) return null
     if (!isValidBoard(raw.puzzle) || !isValidBoard(raw.board) || !isValidBoard(raw.solution, { allowZero: false })) {
       return null
     }
@@ -545,6 +656,9 @@ const startNew = async () => {
   parity.value = res.parity
   edges.value = res.edges || null
   thermos.value = res.thermos || null
+  skyscrapers.value = res.skyscrapers || null
+  arith.value = res.arith || null
+  palindromes.value = res.palindromes || null
   board.value = res.puzzle.slice()
   notes.value = new Array(CELLS).fill(0)
   selected.value = -1
@@ -572,6 +686,9 @@ const changeVariant = () => {
   parity.value = null
   edges.value = null
   thermos.value = null
+  skyscrapers.value = null
+  arith.value = null
+  palindromes.value = null
   clearState()
   startNew()
 }
@@ -822,6 +939,9 @@ onMounted(() => {
     parity.value = saved.variant === 'ODD_EVEN' ? saved.parity : null
     edges.value = saved.variant === 'CONSECUTIVE' || saved.variant === 'XV' ? saved.edges : null
     thermos.value = saved.variant === 'THERMO' ? saved.thermos : null
+    skyscrapers.value = saved.variant === 'SKYSCRAPER' ? saved.skyscrapers : null
+    arith.value = saved.variant === 'ARITHMETIC' ? saved.arith : null
+    palindromes.value = saved.variant === 'PALINDROME' ? saved.palindromes : null
     board.value = saved.board
     notes.value = saved.notes
     elapsed.value = Number.isInteger(saved.elapsed) ? saved.elapsed : 0
@@ -870,6 +990,8 @@ onBeforeUnmount(() => {
   --sd-thermo: rgba(208, 118, 72, 0.6);
   --sd-consec: rgba(122, 96, 184, 0.7);
   --sd-xv: rgba(62, 138, 156, 0.9);
+  --sd-arith: rgba(52, 138, 112, 0.8);
+  --sd-pal: rgba(196, 86, 146, 0.7);
 }
 .sd-card:fullscreen {
   width: 100vw;
@@ -899,7 +1021,7 @@ onBeforeUnmount(() => {
   gap: 8px;
 }
 .sd-variant {
-  width: 124px;
+  width: 140px;
 }
 .sd-difficulty {
   width: 104px;
@@ -932,22 +1054,63 @@ onBeforeUnmount(() => {
   color: #d64c4c;
 }
 
+/* 棋盘外框:摩天楼要用四边留出提示轨道,其余变体只有中间 9×9 */
+.sd-frame {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  grid-template-rows: repeat(9, minmax(0, 1fr));
+  width: min(100%, 520px);
+  aspect-ratio: 1;
+}
+.sd-frame.with-clues {
+  --sd-clue-track: clamp(15px, 4.2vw, 24px);
+  grid-template-columns: var(--sd-clue-track) repeat(9, minmax(0, 1fr)) var(--sd-clue-track);
+  grid-template-rows: var(--sd-clue-track) repeat(9, minmax(0, 1fr)) var(--sd-clue-track);
+  width: min(100%, 556px);
+}
+.sd-card:fullscreen .sd-frame {
+  width: min(78vh, 86vw);
+}
+
 .sd-board {
+  grid-area: 1 / 1 / 10 / 10;
   display: grid;
   grid-template-columns: repeat(9, minmax(0, 1fr));
   /* 行也必须显式等分:自动行高会跟着格内数字/笔记的内容走,填数后整盘会跳尺寸 */
   grid-template-rows: repeat(9, minmax(0, 1fr));
-  width: min(100%, 520px);
-  aspect-ratio: 1;
+  width: 100%;
+  height: 100%;
   border: 2px solid var(--sd-line-strong);
   border-radius: 8px;
   overflow: hidden;
   background: var(--sd-cell-bg);
   contain: layout style;
 }
-.sd-card:fullscreen .sd-board {
-  width: min(78vh, 86vw);
+.sd-frame.with-clues .sd-board {
+  grid-area: 2 / 2 / 11 / 11;
 }
+
+/* 摩天楼四边外围提示数字 */
+.sd-sky {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(9px, 2.2vw, 13px);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--color-text-secondary, #8a8a8a);
+  user-select: none;
+}
+.sd-sky-top,
+.sd-sky-bottom {
+  padding: 0 1px;
+}
+.sd-sky-left,
+.sd-sky-right {
+  padding: 1px 0;
+}
+
 .sd-board.is-frozen {
   pointer-events: none;
 }
@@ -1170,6 +1333,73 @@ onBeforeUnmount(() => {
   border-radius: 50%;
   background: var(--sd-thermo);
   pointer-events: none;
+}
+
+/* 回文数独:复用温度计的「中心 → 邻格」半段线,换色并在两端补小圆点 */
+.sd-pal-seg {
+  background: var(--sd-pal);
+}
+.sd-pal-dot {
+  position: absolute;
+  z-index: 0;
+  top: 50%;
+  left: 50%;
+  width: 24%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--sd-pal);
+  pointer-events: none;
+}
+
+/* 等差数独:每条线段画成贴边界的胶囊框(中间格只画上下/左右两条边,端点封口并加圆角) */
+.sd-arith {
+  position: absolute;
+  z-index: 0;
+  border-style: solid;
+  border-width: 0;
+  border-color: var(--sd-arith);
+  pointer-events: none;
+}
+.sd-arith-h {
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  right: 0;
+  border-top-width: 2px;
+  border-bottom-width: 2px;
+}
+.sd-arith-v {
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  right: 2px;
+  border-left-width: 2px;
+  border-right-width: 2px;
+}
+.sd-arith-h.sd-arith-start {
+  left: 2px;
+  border-left-width: 2px;
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+.sd-arith-h.sd-arith-end {
+  right: 2px;
+  border-right-width: 2px;
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+.sd-arith-v.sd-arith-start {
+  top: 2px;
+  border-top-width: 2px;
+  border-top-left-radius: 6px;
+  border-top-right-radius: 6px;
+}
+.sd-arith-v.sd-arith-end {
+  bottom: 2px;
+  border-bottom-width: 2px;
+  border-bottom-left-radius: 6px;
+  border-bottom-right-radius: 6px;
 }
 
 /* 窗口数独:额外 3×3 窗用实线描边(与九宫粗线区分) */
@@ -1405,6 +1635,8 @@ html.dark .sd-card {
   --sd-thermo: rgba(232, 148, 100, 0.7);
   --sd-consec: rgba(160, 138, 224, 0.8);
   --sd-xv: rgba(112, 196, 214, 0.95);
+  --sd-arith: rgba(96, 196, 164, 0.9);
+  --sd-pal: rgba(228, 132, 184, 0.8);
 }
 html.dark .sd-cell.conflict {
   color: #ff9a9a;

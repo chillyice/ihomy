@@ -1059,7 +1059,7 @@ export default {
     },
     sudoku: {
       title: 'Sudoku',
-      desc: 'Classic / diagonal / window / jigsaw / inequality / odd-even / killer / anti-knight / anti-king / thermo / consecutive / XV with notes / hints / undo',
+      desc: 'Classic / diagonal / window / jigsaw / inequality / odd-even / killer / anti-knight / anti-king / thermo / consecutive / XV / skyscraper / arithmetic / palindrome with notes / hints / undo',
       variant: {
         CLASSIC: 'Classic',
         DIAGONAL: 'Diagonal',
@@ -1073,6 +1073,9 @@ export default {
         THERMO: 'Thermo',
         CONSECUTIVE: 'Consecutive',
         XV: 'XV',
+        SKYSCRAPER: 'Skyscraper',
+        ARITHMETIC: 'Arithmetic',
+        PALINDROME: 'Palindrome',
       },
       variantTip: {
         DIAGONAL: 'Both long diagonals must also hold 1-9 without repeats',
@@ -1086,6 +1089,10 @@ export default {
         THERMO: 'Digits strictly increase from the round bulb along each thermometer',
         CONSECUTIVE: 'Barred pairs differ by 1; neighbouring cells without a bar must not differ by 1',
         XV: 'V pairs sum to 5 and X pairs sum to 10; unmarked neighbours sum to neither 5 nor 10',
+        SKYSCRAPER:
+          'Clues outside the grid count the buildings visible from that side: taller ones hide shorter ones; a blank side is unconstrained',
+        ARITHMETIC: 'Each boxed run of consecutive cells is an arithmetic progression (non-zero step, either direction)',
+        PALINDROME: 'Digits along each line read the same both ways, mirrored about the centre cell',
       },
       difficulty: {
         EASY: 'Easy',

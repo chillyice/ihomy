@@ -1053,7 +1053,7 @@ export default {
     },
     sudoku: {
       title: '数独',
-      desc: '标准 / 对角线 / 窗口 / 不规则 / 不等式 / 奇偶 / 杀手 / 反马步 / 反王步 / 温度计 / 连续 / 罗马，笔记 / 提示 / 撤销',
+      desc: '标准 / 对角线 / 窗口 / 不规则 / 不等式 / 奇偶 / 杀手 / 反马步 / 反王步 / 温度计 / 连续 / 罗马 / 摩天楼 / 等差 / 回文，笔记 / 提示 / 撤销',
       variant: {
         CLASSIC: '标准',
         DIAGONAL: '对角线',
@@ -1067,6 +1067,9 @@ export default {
         THERMO: '温度计',
         CONSECUTIVE: '连续',
         XV: '罗马',
+        SKYSCRAPER: '摩天楼',
+        ARITHMETIC: '等差',
+        PALINDROME: '回文',
       },
       variantTip: {
         DIAGONAL: '两条大对角线也要 1~9 不重复',
@@ -1080,6 +1083,9 @@ export default {
         THERMO: '温度计圆头端的数字最小，沿线路严格递增',
         CONSECUTIVE: '带短棒的两格数字相差 1；没有短棒的相邻格不能相差 1',
         XV: '标 V 的两格之和为 5，标 X 的两格之和为 10；没标的相邻格两数之和既不是 5 也不是 10',
+        SKYSCRAPER: '棋盘外侧的数字是从该方向看过去能看到的楼层数：大数字会挡住后面的小数字，没标数字的一侧不限制',
+        ARITHMETIC: '带胶囊框的连续几格数字成等差数列（公差不为 0，正着读或倒着读都算）',
+        PALINDROME: '带线的格子沿线路正读反读一致，即以线正中那格为轴左右对称',
       },
       difficulty: {
         EASY: '简单',
