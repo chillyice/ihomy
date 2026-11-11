@@ -1,5 +1,8 @@
 package top.ihomy.app.widget;
 
+import android.content.Intent;
+import android.provider.Settings;
+
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -124,6 +127,20 @@ public class WidgetBridgePlugin extends Plugin {
     public void refreshWidgets(PluginCall call) {
         WidgetWorker.refreshNow(getContext());
         call.resolve();
+    }
+
+    /** 设置页「通知设置」:直达本 App 的系统通知页,4 条通道由系统列出(不重建通道) */
+    @PluginMethod
+    public void openNotificationSettings(PluginCall call) {
+        try {
+            Intent intent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, getContext().getPackageName())
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("open_failed", e);
+        }
     }
 
     /** App 冷启动:注册周期任务(KEEP 策略幂等),让卡片在 App 打开期间保持新鲜 */

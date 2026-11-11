@@ -21,6 +21,10 @@
             <span>{{ likeState.liked ? $t('blog.liked') : $t('blog.like') }}</span>
             <span v-if="likeState.likeCount">({{ likeState.likeCount }})</span>
           </el-button>
+          <el-button v-if="userStore.isLoggedIn" round @click="onShare">
+            <el-icon><Share /></el-icon>
+            <span>{{ $t('common.share') }}</span>
+          </el-button>
         </div>
       </div>
 
@@ -95,10 +99,11 @@ import { blogApi, likeApi, commentApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { Star, Delete } from '@element-plus/icons-vue'
+import { Star, Delete, Share } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import { renderMarkdown } from '@/utils/markdown'
 import { formatDateTime as formatTime, formatDate } from '@/utils/datetime'
+import { shareUrl, absoluteUrl } from '@/native/shareOut'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -209,6 +214,12 @@ const onLike = async () => {
   if (!userStore.isLoggedIn) return ElMessage.warning(t('blog.needLogin'))
   likeState.value = await likeApi.toggle({ contentType: 'blog', contentId: route.params.id })
   if (blog.value) blog.value.likeCount = likeState.value.likeCount
+}
+
+// 分享博客:链接回到当前详情页;壳内走系统面板,Web 不支持时复制链接
+const onShare = () => {
+  if (!blog.value) return
+  shareUrl(absoluteUrl(`/blog/${blog.value.id}`), blog.value.title || t('blog.detail'))
 }
 
 // 进入回复模式:记录被回复评论的 id 与作者,提交时作为 parentId/replyToUserId
@@ -496,6 +507,10 @@ onMounted(loadAll)
 }
 
 .like-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
   margin-top: 24px;
   padding-top: 16px;
   border-top: 1px solid rgba(31, 58, 95, 0.08);

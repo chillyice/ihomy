@@ -2112,3 +2112,60 @@ html.dark .el-badge__content {
 .pick-badge svg path {
   stroke: currentColor;
 }
+
+/* ===== 下拉刷新指示器(H4):只在白名单页顶部下拉时出现,位移由 usePullRefresh 直接写 style =====
+   overscroll-behavior-y:contain 只在挂载期间生效,避免浏览器原生下拉刷新与自绘指示器同时出现 */
+html.pull-refresh-host {
+  overscroll-behavior-y: contain;
+}
+.pull-refresh-indicator {
+  position: fixed;
+  left: 50%;
+  top: calc(env(safe-area-inset-top, 0px) + 54px);
+  z-index: var(--z-toast);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(var(--color-card-rgb), 0.94);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.12);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -16px);
+  transition: opacity 0.16s ease;
+  will-change: transform;
+}
+.pull-refresh-indicator.is-visible {
+  opacity: 1;
+}
+.pri-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(var(--color-brand-rgb), 0.2);
+  border-top-color: var(--color-brand);
+}
+.pull-refresh-indicator.is-ready .pri-spinner {
+  transform: rotate(180deg);
+  transition: transform 0.18s ease;
+}
+.pull-refresh-indicator.is-refreshing .pri-spinner {
+  animation: pri-spin 0.8s linear infinite;
+}
+.pri-text {
+  white-space: nowrap;
+}
+@keyframes pri-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (min-width: 769px) {
+  .pull-refresh-indicator {
+    top: 14px;
+  }
+}

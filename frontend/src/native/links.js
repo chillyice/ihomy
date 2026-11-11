@@ -7,6 +7,7 @@ import { ElMessage } from 'element-plus'
 import router from '@/router'
 import i18n from '@/i18n'
 import { useUserStore } from '@/stores/user'
+import { filenameFrom } from '@/utils/filename'
 
 /** 视为「要落到本地再交给系统打开」的扩展名(P0 只覆盖电子书/文档/音视频/压缩包) */
 const DOWNLOAD_EXT =
@@ -17,12 +18,6 @@ function isDownloadUrl(url) {
   if (DOWNLOAD_EXT.test(url.pathname)) return true
   const download = url.searchParams.get('download')
   return download === 'true' || download === '1'
-}
-
-function filenameFrom(url) {
-  const raw = decodeURIComponent(url.pathname.split('/').pop() || '')
-  const name = raw.replace(/[\\/:*?"<>|]/g, '_')
-  return name || 'ihomy-file'
 }
 
 /** 原生流式下载(可带 Authorization,不受 CORS 限制),再交给系统「打开方式」 */

@@ -1,4 +1,5 @@
 import { ref, onUnmounted } from 'vue'
+import { haptic } from '@/utils/haptics'
 
 // 可拖动+可调整大小的组合式函数,位置/大小持久化到 localStorage
 // 用法:const { pos, size, reset } = useDragResize({ x, y, w, h, storageKey, minY, anchorRight, marginLeft })
@@ -110,7 +111,10 @@ export function useDragResize(initial) {
   }
 
   const onPointerUp = () => {
-    if (dragging.value || resizing.value) save()
+    if (dragging.value || resizing.value) {
+      save()
+      haptic('tap')
+    }
     dragging.value = false
     resizing.value = false
     // 拖拽/缩放结束立即释放捕获并移除监听器

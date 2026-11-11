@@ -1,6 +1,6 @@
 <!-- 相册列表页:封面/类型/照片数卡片网格,登录后可新建,家长或创建者可管理 -->
 <template>
-  <div class="page">
+  <div ref="root" class="page">
     <Breadcrumb :items="[{ label: t('album.title') }]" />
 
     <PageToolbar>
@@ -130,6 +130,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { albumApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useSyncStore } from '@/stores/sync'
+import { usePullRefresh } from '@/composables/usePullRefresh'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { Edit, Delete } from '@element-plus/icons-vue'
@@ -144,6 +145,7 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const root = ref(null)
 const syncVisible = ref(false)
 const cascadeVisible = ref(false)
 const albums = ref([])
@@ -252,6 +254,15 @@ const onBatchDelete = async () => {
 // ---------- 后台同步完成时自动刷新列表 ----------
 const syncStore = useSyncStore()
 watch(syncStore.doneCount, () => load())
+
+// 下拉刷新:load 内部已把错误落到 loadError,这里转成 reject 让指示器统一提示
+usePullRefresh({
+  target: root,
+  onRefresh: async () => {
+    await load()
+    if (loadError.value) throw new Error('album load failed')
+  },
+})
 
 onMounted(() => {
   // 兼容旧链接 /cascade 重定向来的 /album?cascade=1:进页即打开照片瀑布,并清掉参数(刷新不再自动弹出)

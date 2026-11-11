@@ -64,6 +64,15 @@
                 {{ s.label }}
               </button>
             </div>
+            <!-- 分享原图(系统分享面板):能打开查看器就说明当前账号有读权限 -->
+            <button v-if="userStore.isLoggedIn && current.url" class="pv-icon-btn" :title="t('common.share')" @click="sharePhoto">
+              <svg viewBox="0 0 24 24" width="22" height="22">
+                <path
+                  d="M16 5l-1.42 1.42-1.59-1.59V16h-2V4.83L9.42 6.42 8 5l4-4 4 4zm4 5v11c0 1.1-.9 2-2 2H6c-1.1 0-2-.9-2-2V10c0-1.1.9-2 2-2h3v2H6v11h12V10h-3V8h3c1.1 0 2 .9 2 2z"
+                  fill="currentColor"
+                />
+              </svg>
+            </button>
             <!-- 分享链接(有相册分享基准时才显示) -->
             <button v-if="shareBase" class="pv-icon-btn" :title="t('photoViewer.share')" @click="copyShare">
               <svg viewBox="0 0 24 24" width="22" height="22">
@@ -178,6 +187,7 @@ import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { shareId } from '@/utils/shareId'
 import { useUserStore } from '@/stores/user'
 import { shareToChat } from '@/utils/chatShare'
+import { shareFiles } from '@/native/shareOut'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -252,6 +262,13 @@ const copyShare = async () => {
   } catch {
     ElMessage.error(t('photoViewer.copyFailed'))
   }
+}
+
+// 分享原图:交给系统分享面板(壳内先下载再分享,Web 走 navigator.share)
+const sharePhoto = () => {
+  const p = current.value
+  if (!p?.url) return
+  shareFiles([p.url], p.description || t('common.share'))
 }
 
 // 分享到聊天室:PRIVATE 照片拦截(拍板 #4,不进家庭流),其余生成照片卡进草稿

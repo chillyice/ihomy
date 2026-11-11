@@ -108,31 +108,49 @@
                   <span v-if="g.transferCount" class="dh-transfer">{{ $t('book.dayTransfers', { n: g.transferCount }) }}</span>
                 </span>
               </div>
-              <div v-for="(r, i) in g.items" :key="r.id" class="record-row" :class="{ 'is-last': i === g.items.length - 1 }">
-                <div class="record-main">
-                  <span class="record-cat" :class="typeCls(r)">{{ catText(r) }}</span>
-                  <div class="record-info">
-                    <div class="record-remark">{{ r.remark || r.category }}</div>
-                    <div class="record-meta">
-                      <span>{{ r.creatorName }}</span>
-                      <span class="record-account" :class="{ 'is-unassigned': !hasAccount(r) }">{{ accountText(r) }}</span>
+              <SwipeRow
+                v-for="(r, i) in g.items"
+                :key="r.id"
+                class="record-swipe"
+                :left-actions="rowLeftActions(r)"
+                :right-actions="rowRightActions(r)"
+                :menu-items="rowMenuItems(r)"
+                @action="(item) => onRowAction(item, r)"
+              >
+                <template #default="{ openMenu }">
+                  <div class="record-row" :class="{ 'is-last': i === g.items.length - 1 }">
+                    <div class="record-main">
+                      <span class="record-cat" :class="typeCls(r)">{{ catText(r) }}</span>
+                      <div class="record-info">
+                        <div class="record-remark">{{ r.remark || r.category }}</div>
+                        <div class="record-meta">
+                          <span>{{ r.creatorName }}</span>
+                          <span class="record-account" :class="{ 'is-unassigned': !hasAccount(r) }">{{ accountText(r) }}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="record-amount" :class="typeCls(r)">{{ amountText(r) }}</div>
+                    <div class="record-actions">
+                      <el-tooltip v-if="canEditRow(r)" :content="$t('common.edit')" placement="top" :show-after="300">
+                        <el-button size="small" text @click="openEditor(r)"
+                          ><el-icon><Edit /></el-icon
+                        ></el-button>
+                      </el-tooltip>
+                      <el-tooltip v-if="canEditRow(r)" :content="$t('common.delete')" placement="top" :show-after="300">
+                        <el-button size="small" text type="danger" @click="onDel(r)"
+                          ><el-icon><Delete /></el-icon
+                        ></el-button>
+                      </el-tooltip>
+                      <!-- 长按菜单的等价按钮(D4):只读档位也能复制摘要 -->
+                      <el-tooltip :content="$t('common.more')" placement="top" :show-after="300">
+                        <el-button size="small" text :aria-label="$t('common.more')" @click.stop="openMenu($event)"
+                          ><el-icon><MoreFilled /></el-icon
+                        ></el-button>
+                      </el-tooltip>
                     </div>
                   </div>
-                </div>
-                <div class="record-amount" :class="typeCls(r)">{{ amountText(r) }}</div>
-                <div v-if="canEditRow(r)" class="record-actions">
-                  <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
-                    <el-button size="small" text @click="openEditor(r)"
-                      ><el-icon><Edit /></el-icon
-                    ></el-button>
-                  </el-tooltip>
-                  <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
-                    <el-button size="small" text type="danger" @click="onDel(r)"
-                      ><el-icon><Delete /></el-icon
-                    ></el-button>
-                  </el-tooltip>
-                </div>
-              </div>
+                </template>
+              </SwipeRow>
             </template>
             <el-empty
               v-if="!filteredRecords.length"
@@ -233,14 +251,17 @@
 // 记账本页签:月度明细 + 收支统计 + 账户余额;改删仅记录人/家长(后端校验),前端按条件隐藏按钮
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ArrowLeft, ArrowRight, Delete, Edit } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, Delete, Edit, MoreFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { bookApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { formatYuan } from '@/utils/money'
 import { isAndroidApp } from '@/utils/platform'
+import { haptic } from '@/utils/haptics'
+import { copyText } from '@/native/shareOut'
 import { parseVoiceRecord } from '@/utils/voiceRecord'
+import SwipeRow from '@/components/ui/SwipeRow.vue'
 import { bindHorizontalWheel } from '@/utils/horizontalWheel'
 import { weekdayKey, shiftMonth as shiftCalendarMonth, todayString } from '@/utils/scheduleCalendar'
 import {
@@ -370,6 +391,34 @@ const budgetSubline = computed(() => {
 // 行内改删:可写档位下,本人记的或可管理账本者才能改;只读档位整列隐藏(后端仍逐条校验)
 const canEditRow = (r) => userStore.canWriteBook && (userStore.canManageBook || r.createdBy === userStore.userInfo?.id)
 
+// 账目行手势:右滑复制摘要(所有可读档位),左滑删除(仅可改行);长按菜单同源
+const rowLeftActions = () => [{ key: 'copy', label: t('common.copySummary'), type: 'success' }]
+const rowRightActions = (r) => (canEditRow(r) ? [{ key: 'delete', label: t('common.delete'), type: 'danger' }] : [])
+const rowMenuItems = (r) => {
+  const items = [{ key: 'copy', label: t('common.copySummary') }]
+  if (canEditRow(r)) {
+    items.push({ key: 'edit', label: t('common.edit') })
+    items.push({ key: 'delete', label: t('common.delete'), type: 'danger' })
+  }
+  return items
+}
+
+// 复制摘要 = 日期 · 分类 · 金额 · 备注 · 账户;全走既有展示口径,不另造一套格式
+const copyRecordSummary = async (r) => {
+  const parts = [r.recordDate, catText(r), amountText(r)]
+  if (r.remark) parts.push(r.remark)
+  if (hasAccount(r)) parts.push(accountText(r))
+  const ok = await copyText(parts.filter(Boolean).join(' · '))
+  if (ok) ElMessage.success(t('common.copied'))
+  else ElMessage.error(t('common.copyFailed'))
+}
+
+const onRowAction = (item, r) => {
+  if (item.key === 'copy') copyRecordSummary(r)
+  else if (item.key === 'edit') openEditor(r)
+  else if (item.key === 'delete') onDel(r)
+}
+
 const catText = (r) => (r.type === 'INCOME' ? t('book.type.INCOME') : r.type === 'TRANSFER' ? t('book.type.TRANSFER') : r.category)
 
 // 后端返回英文单词(type: EXPENSE/INCOME/TRANSFER),表单直接沿用字典词提交
@@ -498,8 +547,14 @@ onBeforeUnmount(() => {
 
 const onSave = async () => {
   const f = editor.form
-  if (!f.amount || f.amount <= 0) return ElMessage.warning(t('book.fillAmount'))
-  if (f.type === 'TRANSFER' && !f.fromAccountId && !f.toAccountId) return ElMessage.warning(t('book.account.transferNeedOne'))
+  if (!f.amount || f.amount <= 0) {
+    haptic('error')
+    return ElMessage.warning(t('book.fillAmount'))
+  }
+  if (f.type === 'TRANSFER' && !f.fromAccountId && !f.toAccountId) {
+    haptic('error')
+    return ElMessage.warning(t('book.account.transferNeedOne'))
+  }
   const isTransfer = f.type === 'TRANSFER'
   const data = {
     type: f.type,
@@ -515,6 +570,7 @@ const onSave = async () => {
   try {
     if (f.id) await bookApi.update(f.id, data)
     else await bookApi.create(data)
+    haptic('success')
     ElMessage.success(t('common.saveSuccess'))
     editor.visible = false
     // 记一笔会改账户余额,余额条与明细一起刷

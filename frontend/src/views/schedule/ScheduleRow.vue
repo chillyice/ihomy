@@ -3,26 +3,36 @@
      贷款还款/理财到期/食材到期是只读来源:只显示来源徽标与提示,可点击跳原页面,无勾选/编辑/删除。
      徽标始终显示,标明这一行自身属性(纪念日/提醒/贷款还款…)。 -->
 <template>
-  <div class="sched-row" :class="{ done: done, 'read-only': readOnly }" v-a11y-click @click="$emit('open', item)">
-    <span class="sched-badge" :class="badgeClass">{{ badgeText }}</span>
-    <span class="sched-time">{{ item.time || $t('schedule.allDay') }}</span>
-    <span class="sched-title">{{ item.title }}</span>
-    <span v-if="hint" class="sched-hint">{{ hint }}</span>
-    <span v-if="doneTag" class="sched-done">{{ doneTag }}</span>
-    <span class="sched-actions" @click.stop>
-      <el-checkbox v-if="checkable" :model-value="done" @change="onCheck" />
-      <el-tooltip v-if="editable" :content="$t('common.edit')" placement="top" :show-after="300">
-        <el-button size="small" text @click="$emit('edit', item)"
-          ><el-icon><Edit /></el-icon
-        ></el-button>
-      </el-tooltip>
-      <el-tooltip v-if="deletable" :content="$t('common.delete')" placement="top" :show-after="300">
-        <el-button size="small" text type="danger" @click="$emit('delete', item)"
-          ><el-icon><Delete /></el-icon
-        ></el-button>
-      </el-tooltip>
-    </span>
-  </div>
+  <SwipeRow class="sched-swipe" :left-actions="leftActions" :right-actions="rightActions" :menu-items="menuItems" @action="onAction">
+    <template #default="{ openMenu }">
+      <div class="sched-row" :class="{ done: done, 'read-only': readOnly }" v-a11y-click @click="$emit('open', item)">
+        <span class="sched-badge" :class="badgeClass">{{ badgeText }}</span>
+        <span class="sched-time">{{ item.time || $t('schedule.allDay') }}</span>
+        <span class="sched-title">{{ item.title }}</span>
+        <span v-if="hint" class="sched-hint">{{ hint }}</span>
+        <span v-if="doneTag" class="sched-done">{{ doneTag }}</span>
+        <span class="sched-actions" @click.stop>
+          <el-checkbox v-if="checkable" :model-value="done" @change="onCheck" />
+          <el-tooltip v-if="editable" :content="$t('common.edit')" placement="top" :show-after="300">
+            <el-button size="small" text @click="$emit('edit', item)"
+              ><el-icon><Edit /></el-icon
+            ></el-button>
+          </el-tooltip>
+          <el-tooltip v-if="deletable" :content="$t('common.delete')" placement="top" :show-after="300">
+            <el-button size="small" text type="danger" @click="$emit('delete', item)"
+              ><el-icon><Delete /></el-icon
+            ></el-button>
+          </el-tooltip>
+          <!-- 长按菜单的等价按钮(D4):没有可执行项时不显示,避免弹出空菜单 -->
+          <el-tooltip v-if="menuItems.length" :content="$t('common.more')" placement="top" :show-after="300">
+            <el-button size="small" text :aria-label="$t('common.more')" @click.stop="openMenu($event)"
+              ><el-icon><MoreFilled /></el-icon
+            ></el-button>
+          </el-tooltip>
+        </span>
+      </div>
+    </template>
+  </SwipeRow>
 </template>
 
 <script setup>
@@ -30,9 +40,11 @@
 // 只读来源(贷款/理财/食材)没有完成语义,一律不给勾选与改删。
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Edit, Delete } from '@element-plus/icons-vue'
+import { Edit, Delete, MoreFilled } from '@element-plus/icons-vue'
 import { typeOfKind } from '@/utils/scheduleType'
 import { isReadOnlySource, sourceOf } from '@/utils/scheduleSource'
+import { haptic } from '@/utils/haptics'
+import SwipeRow from '@/components/ui/SwipeRow.vue'
 
 const props = defineProps({
   /** /schedule/events 的一项 */
@@ -82,12 +94,34 @@ const editable = computed(() => props.canEdit && !readOnly.value && ['REMINDER',
 const deletable = computed(() => props.canEdit && !readOnly.value && props.item.kind !== 'PLAN_TASK')
 
 const onCheck = () => {
+  haptic('tap')
   if (props.item.kind === 'PLAN_TASK') emit('toggle-task', props.item)
   else emit('toggle', props.item)
+}
+
+// 长按菜单与左右滑动共用同一份动作清单;删除的二次确认由父页统一做。
+const toggleLabel = computed(() => (done.value ? t('schedule.actionUndone') : t('schedule.actionDone')))
+const leftActions = computed(() => (checkable.value ? [{ key: 'toggle', label: toggleLabel.value, type: 'success' }] : []))
+const rightActions = computed(() => (deletable.value ? [{ key: 'delete', label: t('common.delete'), type: 'danger' }] : []))
+const menuItems = computed(() => {
+  const items = []
+  if (checkable.value) items.push({ key: 'toggle', label: toggleLabel.value })
+  if (editable.value) items.push({ key: 'edit', label: t('common.edit') })
+  if (deletable.value) items.push({ key: 'delete', label: t('common.delete'), type: 'danger' })
+  return items
+})
+const onAction = (item) => {
+  if (item.key === 'toggle') onCheck()
+  else if (item.key === 'edit') emit('edit', props.item)
+  else if (item.key === 'delete') emit('delete', props.item)
 }
 </script>
 
 <style scoped>
+/* 手势外壳跟行同圆角:左滑露出的操作区被同一圈裁切,不会露出直角 */
+.sched-swipe {
+  border-radius: 10px;
+}
 .sched-row {
   display: flex;
   align-items: center;

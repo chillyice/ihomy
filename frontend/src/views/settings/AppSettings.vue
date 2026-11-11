@@ -65,6 +65,16 @@
         <div class="share-tip">{{ $t('appSettings.appLockDesc') }}</div>
       </el-form-item>
 
+      <el-form-item :label="$t('appSettings.hapticsTitle')">
+        <div class="cal-head">
+          <el-switch v-model="hapticsOn" @change="onHapticsChange" />
+          <el-tag size="small" :type="hapticsOn ? 'success' : 'info'">
+            {{ hapticsOn ? $t('appSettings.hapticsOn') : $t('appSettings.hapticsOff') }}
+          </el-tag>
+        </div>
+        <div class="share-tip">{{ $t('appSettings.hapticsDesc') }}</div>
+      </el-form-item>
+
       <el-form-item :label="$t('appSettings.kioskTitle')">
         <div class="share-tip">{{ $t('appSettings.kioskDesc') }}</div>
         <div class="cal-actions">
@@ -97,6 +107,16 @@
           </el-button>
         </div>
         <div class="share-tip">{{ $t('appSettings.dailyWeatherDesc') }}</div>
+      </el-form-item>
+
+      <el-form-item :label="$t('appSettings.notifySettingsTitle')">
+        <div class="cal-head">
+          <el-tag size="small" type="info">{{ $t('appSettings.notifySettingsChannels') }}</el-tag>
+        </div>
+        <div class="share-tip">{{ $t('appSettings.notifySettingsDesc') }}</div>
+        <div class="cal-actions">
+          <el-button @click="onOpenNotificationSettings">{{ $t('appSettings.notifySettingsOpen') }}</el-button>
+        </div>
       </el-form-item>
 
       <el-form-item :label="$t('appSettings.autoUpdateTitle')">
@@ -189,6 +209,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getWebVersion } from '@/utils/platform'
+import { haptic, hapticsEnabled, setHapticsEnabled } from '@/utils/haptics'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -211,6 +232,8 @@ const dailyWeather = ref(true)
 const dailyWeatherTime = ref('07:30')
 /** 应用锁(默认关;本机无生物识别时禁用) */
 const appLockOn = ref(false)
+/** 触觉反馈(默认开):只影响语义动作的轻震,跟随系统触感开关 */
+const hapticsOn = ref(hapticsEnabled())
 
 // 相册自动备份:开关与进度都在 native/photoBackup 里,这里只做界面与回填
 const backupOn = ref(false)
@@ -333,6 +356,12 @@ function onAppLockChange(v) {
   appLockModule().then((m) => m.setAppLockEnabled(!!v))
 }
 
+// 触觉反馈:开关只存本机;打开时立刻震一下,让用户知道手感是什么
+function onHapticsChange(v) {
+  setHapticsEnabled(!!v)
+  if (v) haptic('tap')
+}
+
 // 后台未读提醒:开关状态存在原生(Worker 直接读),这里只做界面回填
 const widgetNative = () => import('@/native/widgets')
 
@@ -420,6 +449,17 @@ async function onDailyWeatherChange(v) {
 function onDailyWeatherTimeChange(v) {
   if (!v) return
   widgetNative().then((m) => m.setDailyWeatherMinute(timeToMinute(v)))
+}
+
+// 系统通知设置:直达本 App 的通知页,4 条通道的开关交给系统管理(不重建通道)
+async function onOpenNotificationSettings() {
+  try {
+    const m = await widgetNative()
+    await m.openNotificationSettings()
+  } catch (e) {
+    console.warn('[appSettings] 打开系统通知设置失败', e)
+    ElMessage.error(t('appSettings.fail'))
+  }
 }
 
 async function onWeatherPreview() {

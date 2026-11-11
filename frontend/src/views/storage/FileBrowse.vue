@@ -82,6 +82,11 @@
                     ><el-icon><View /></el-icon
                   ></el-button>
                 </el-tooltip>
+                <el-tooltip v-if="userStore.isLoggedIn && !row.isDir" :content="$t('common.share')" placement="top" :show-after="300">
+                  <el-button size="small" text @click="shareFile(row)"
+                    ><el-icon><Share /></el-icon
+                  ></el-button>
+                </el-tooltip>
                 <el-tooltip :content="$t('storage.download')" placement="top" :show-after="300">
                   <el-button size="small" text @click="download(row)"
                     ><el-icon><Download /></el-icon
@@ -114,12 +119,13 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { View, Download, EditPen } from '@element-plus/icons-vue'
+import { View, Download, EditPen, Share } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useDevice } from '@/composables/useDevice'
 import { storageApi } from '@/api'
+import { shareFiles } from '@/native/shareOut'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 
@@ -259,6 +265,13 @@ function preview(row) {
 
 function download(row) {
   window.open(row.signedUrl ? `${row.signedUrl}&download=true` : storageApi.fileUrl(activeDeviceId.value, entryPath(row), true), '_blank')
+}
+
+// 分享文件:私有存储需要登录态,壳内下载时带 Bearer;Web 不支持文件分享时退回下载
+function shareFile(row) {
+  if (row.isDir) return
+  const url = row.signedUrl || storageApi.fileUrl(activeDeviceId.value, entryPath(row), false)
+  shareFiles([url], row.name)
 }
 
 function isPreviewable(name) {

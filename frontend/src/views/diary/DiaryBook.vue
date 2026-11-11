@@ -124,6 +124,7 @@ import { useDevice } from '@/composables/useDevice'
 import { LINES_PER_PAGE, PAGE_H, PAPER_W, measureDiaryLines } from '@/utils/diary'
 import { clipText } from '@/utils/chatMsg'
 import { shareToChat } from '@/utils/chatShare'
+import { shareText, absoluteUrl } from '@/native/shareOut'
 import { parseDoodle, doodleExtentY } from '@/utils/doodle'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import DiaryPage from './DiaryPage.vue'
@@ -231,6 +232,14 @@ const jumpToEntry = (i) => {
   pos.value = isMobile.value ? idx : Math.floor(idx / 2)
 }
 
+// 分享当前日记页:正文 + 回作者日记本的链接(单篇无独立路由);游客/无读权限不显示入口
+const shareDiary = (page) => {
+  if (!page?.e) return
+  const url = absoluteUrl(`/diary/book/${route.params.authorId}`)
+  const text = [page.e.createdAt ? String(page.e.createdAt).slice(0, 10) : '', page.e.content || '', url].filter(Boolean).join('\n')
+  shareText(text, clipText(page.e.content, 40) || t('diary.title'))
+}
+
 // 分享当前日记页到聊天室:卡片段落快照,链接回作者日记本(单篇无独立路由)
 const shareDiaryToChat = (page) => {
   if (!page?.e) return
@@ -246,6 +255,10 @@ const shareDiaryToChat = (page) => {
 
 const onAction = async (action, page) => {
   if (!page || page.blank) return
+  if (action === 'share') {
+    shareDiary(page)
+    return
+  }
   if (action === 'chat-share') {
     shareDiaryToChat(page)
     return

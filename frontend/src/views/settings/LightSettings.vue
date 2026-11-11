@@ -132,7 +132,9 @@ const enterLightTest = () => {
 }
 
 // 恢复默认面板布局:清除 localStorage 中所有面板持久化记录,刷新页面生效。
-// 当前确实在写的键:ihomy:music:pos(MusicPlayer 拖拽位置)、ihomy:chat:float:v1(ChatFloat 悬浮球位置);
+// 当前确实在写的键:ihomy:music:pos(MusicPlayer 拖拽位置)、ihomy:chat:float:v1(ChatFloat 悬浮球位置)、
+// ihomy:haptics:v1(触觉反馈总开关);ihomy:float:chat / ihomy:float:music(浮窗显隐开关)
+// 是功能偏好不是布局,这里不清,要重新打开去聊天室 / 音乐页。
 // ihomy:panel:* 与 ihomy:vinyl:pos 是历史键(现已无写入方),保留清理是为了清掉老浏览器里的残留。
 // 注意:光尘首页仪表盘(ihomy:dashboard:layout:v3)与暖居首页(ihomy:guangchen:home:v)布局
 // 各有页面内自带的「恢复默认」按钮,不在这里覆盖——新增可拖拽面板时记得回来补键。

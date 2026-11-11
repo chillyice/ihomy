@@ -1,4 +1,5 @@
 import { ref, readonly } from 'vue'
+import { haptic } from '@/utils/haptics'
 
 // 模块级单例,跨组件共享拖拽状态(AppSidebar 启动 → Home.vue 接收):
 // 拖拽状态与回调都挂在模块作用域,故 onDrop/onMove 是「后写覆盖」——同一时刻只应有一个消费者注册。
@@ -26,7 +27,10 @@ function onPointerMove(e) {
 function onPointerUp(e) {
   if (activePointerId !== null && e.pointerId !== undefined && e.pointerId !== activePointerId) return
   // crossed 为 false 时(在侧栏区域内松手)直接取消,不调用 dropCb
-  if (crossed.value && dropCb) dropCb(dragType.value, dragX.value, dragY.value)
+  if (crossed.value && dropCb) {
+    dropCb(dragType.value, dragX.value, dragY.value)
+    haptic('tap')
+  }
   dragging.value = false
   dragType.value = null
   crossed.value = false

@@ -175,6 +175,8 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 触觉反馈(normal 权限,不弹窗):勾选/长按/拖拽等语义动作的轻震 -->
+    <uses-permission android:name="android.permission.VIBRATE" />
     <!-- 保险箱进页前的本机指纹/人脸校验(系统 BiometricPrompt,不读生物特征数据) -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <!-- 语音记账 + 语音/视频通话:录音(RECORD_AUDIO 本机展示权限,同时供 WebView getUserMedia 用) -->

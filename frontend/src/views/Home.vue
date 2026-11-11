@@ -431,6 +431,7 @@ import { useI18n } from 'vue-i18n'
 import { publicApi, taskApi, pointsApi, planApi, bookApi, financeApi, loanApi, wishApi, itemApi, kitchenApi } from '@/api'
 import { useWeatherBg } from '@/composables/useWeatherBg'
 import { useDaily } from '@/composables/useDaily'
+import { usePullRefresh } from '@/composables/usePullRefresh'
 import { syncLoanRepays } from '@/composables/useLoanRepays'
 import { buildAgenda } from '@/utils/agenda'
 import { gsap } from 'gsap'
@@ -1306,6 +1307,14 @@ onDrop((type, x, y) => {
     if (el) gsap.from(el, { scale: 0.92, autoAlpha: 0, duration: 0.36, ease: 'back.out(1.5)' })
   })
   ElMessage.success(t('warm.addedToast', { label: widgetLabel(type) }))
+})
+
+// 下拉刷新只重拉首页各卡片数据;编辑模式下手势留给拖拽/缩放,不接管
+usePullRefresh({
+  target: root,
+  disabled: () => editMode.value,
+  onRefresh: () =>
+    Promise.all([loadAll(), loadPoints(), loadReminders(), loadBookSummary(), loadWishes(), loadTodayRecipes(), loadItemHouses()]),
 })
 
 onMounted(() => {

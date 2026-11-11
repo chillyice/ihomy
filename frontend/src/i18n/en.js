@@ -56,6 +56,24 @@ export default {
     selected: 'Selected',
     loadFailed: 'Failed to load',
     retry: 'Retry',
+    more: 'More',
+    copied: 'Copied',
+    copyFailed: 'Copy failed, please copy manually',
+    copySummary: 'Copy summary',
+    markRead: 'Mark as read',
+    share: 'Share',
+    shareFailed: 'Sharing did not finish, please try again later',
+    shareTooLarge: '"{name}" is over 30MB and cannot be shared right now',
+    sharePreparing: 'Preparing to share…',
+    shareDownloading: 'Preparing {n} file(s)…',
+    shareUnsupported: 'System sharing is unavailable here, so the file was downloaded instead',
+    pull: {
+      idle: 'Pull to refresh',
+      pulling: 'Pull to refresh',
+      ready: 'Release to refresh',
+      refreshing: 'Refreshing…',
+      failed: 'Refresh failed, please try again later',
+    },
   },
   login: {
     title: 'Sign in',
@@ -719,6 +737,8 @@ export default {
     remindAdvance: 'Remind {n} days ahead',
     doneToday: 'Done today',
     done: 'Done',
+    actionDone: 'Mark done',
+    actionUndone: 'Mark not done',
     listEmpty: 'No schedule in this period',
     type: { PLAN: 'Plan', ITEM: 'Item', REMINDER: 'Reminder', TASK: 'Recurring task', ANNIVERSARY: 'Anniversary' },
     filter: {
@@ -1602,8 +1622,10 @@ export default {
       noMember: 'No other members in the family yet',
       startFailed: 'Cannot start the call, please check the connection',
       errUnsupported: 'Camera/microphone is not supported here, use an up-to-date browser or the ihomy app',
-      errDenied: 'Camera/microphone permission was denied: allow it in the browser site settings, or in Settings → Apps → ihomy → Permissions, then retry',
-      errInsecure: 'This page is not a secure connection, so the browser blocks the camera/microphone. Open the https site instead (an http LAN-IP address will not work)',
+      errDenied:
+        'Camera/microphone permission was denied: allow it in the browser site settings, or in Settings → Apps → ihomy → Permissions, then retry',
+      errInsecure:
+        'This page is not a secure connection, so the browser blocks the camera/microphone. Open the https site instead (an http LAN-IP address will not work)',
       errNotFound: 'No camera or microphone found',
       errBusy: 'The camera or microphone is being used by another app',
       errGeneric: 'Could not access the camera/microphone, check your device and retry',
@@ -5686,6 +5708,12 @@ export default {
     appLockTitle: 'App lock',
     appLockDesc:
       'After 5 minutes away, the app asks for your fingerprint or face before it opens again. Cancelling returns to the sign-in page, where the password can still be used. The switch turns itself off if the fingerprint is removed from this device.',
+    // Haptics
+    hapticsTitle: 'Haptic feedback',
+    hapticsOn: 'On',
+    hapticsOff: 'Off',
+    hapticsDesc:
+      'A light tap when you check an item, long-press, drop something, save, or hit a validation error. It follows the system "Touch feedback" setting and stays silent in silent mode.',
     // Tablet kiosk / photo frame
     kioskTitle: 'Kiosk mode',
     kioskDesc:
@@ -5705,6 +5733,12 @@ export default {
     dailyWeatherPreviewOffline: 'No network right now — try again when you are back online.',
     dailyWeatherDesc:
       "One note every day at the time you pick, with today's weather and a single practical tip. It only shows in the notification shade and on the lock screen, with no banner and no sound. Weather comes from the family's saved city; tap the note for the full forecast.",
+    // System notification settings entry (four independent channels, never rebuilt)
+    notifySettingsTitle: 'Notification settings',
+    notifySettingsChannels: 'Reminders · Family updates · Daily weather · App updates',
+    notifySettingsOpen: 'Open system notification settings',
+    notifySettingsDesc:
+      'These four kinds of notices use separate channels, so you can turn off just one. The other three keep working as before.',
     // Idle auto-update
     autoUpdateTitle: 'Idle auto-update',
     autoUpdateSilent: 'Installs silently',

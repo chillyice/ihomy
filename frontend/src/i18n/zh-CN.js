@@ -59,6 +59,24 @@ export default {
     selected: '已选择',
     loadFailed: '加载失败',
     retry: '重试',
+    more: '更多',
+    copied: '已复制',
+    copyFailed: '复制失败，请手动复制',
+    copySummary: '复制摘要',
+    markRead: '标为已读',
+    share: '分享',
+    shareFailed: '分享没有完成，请稍后再试',
+    shareTooLarge: '「{name}」超过 30MB，暂时不能分享',
+    sharePreparing: '正在准备分享…',
+    shareDownloading: '正在准备 {n} 个文件…',
+    shareUnsupported: '当前环境不支持系统分享，已改为下载',
+    pull: {
+      idle: '下拉刷新',
+      pulling: '下拉刷新',
+      ready: '松手刷新',
+      refreshing: '正在刷新…',
+      failed: '刷新失败，请稍后再试',
+    },
   },
   login: {
     title: '登录',
@@ -720,6 +738,8 @@ export default {
     remindAdvance: '提前 {n} 天提醒',
     doneToday: '今日已完成',
     done: '已完成',
+    actionDone: '完成',
+    actionUndone: '取消完成',
     listEmpty: '这段时间还没有日程',
     type: { PLAN: '计划', ITEM: '事项', REMINDER: '提醒', TASK: '每日任务', ANNIVERSARY: '纪念日' },
     filter: { all: '全部', ANNIVERSARY: '纪念日', REMINDER: '提醒', TASK: '每日任务', ITEM: '事项', PLAN: '计划' },
@@ -1595,7 +1615,8 @@ export default {
       noMember: '家里还没有其他成员',
       startFailed: '无法发起通话，请检查连接',
       errUnsupported: '当前环境不支持摄像头/麦克风，请换用最新版浏览器或 ihomy App 再试',
-      errDenied: '摄像头/麦克风权限被拒绝：请在浏览器地址栏的站点设置里允许，或到手机「设置 → 应用 → ihomy → 权限」中打开摄像头与麦克风后重试',
+      errDenied:
+        '摄像头/麦克风权限被拒绝：请在浏览器地址栏的站点设置里允许，或到手机「设置 → 应用 → ihomy → 权限」中打开摄像头与麦克风后重试',
       errInsecure: '当前页面不是安全连接，浏览器已禁用摄像头/麦克风，请改用 https 正式地址打开（局域网 IP 的 http 地址不行）',
       errNotFound: '没有检测到可用的摄像头或麦克风',
       errBusy: '摄像头或麦克风正被其他应用占用',
@@ -5620,6 +5641,11 @@ export default {
     vaultLockNoHardware: '本机不可用',
     appLockTitle: '应用锁',
     appLockDesc: '离开应用 5 分钟后回来，先验证指纹或人脸。取消验证会回到登录页，还有密码可以进；本机指纹被移除时会自动关闭。',
+    // 触觉反馈
+    hapticsTitle: '触觉反馈',
+    hapticsOn: '已开启',
+    hapticsOff: '已关闭',
+    hapticsDesc: '勾选、长按、拖拽、保存成功和校验失败时轻轻震一下；跟随系统「触感反馈」设置，静音模式下不震。',
     // 平板看板 / 相框
     kioskTitle: '看板模式',
     kioskDesc: '把闲置的平板横过来当看板：大时钟、天气、未来几天的日程和家庭照片轮播，屏幕保持常亮。右下角按 3 秒可退出。',
@@ -5638,6 +5664,11 @@ export default {
     dailyWeatherPreviewOffline: '当前没有网络，等联网后再试',
     dailyWeatherDesc:
       '每天在设定时间推送一条当天天气和一句出行建议，只在通知中心和锁屏安静显示，不弹横幅也不响铃。天气用家庭设置的常用城市，点开可以看完整预报。',
+    // 系统通知设置入口(4 条独立通道,不重建)
+    notifySettingsTitle: '通知设置',
+    notifySettingsChannels: '提醒 · 家庭动态 · 每日天气 · 应用更新',
+    notifySettingsOpen: '打开系统通知设置',
+    notifySettingsDesc: '这四类通知各是一条独立通道，可以只关掉其中一类；关掉后不会再收到这一类通知，其它三类不受影响。',
     // 闲时自动更新
     autoUpdateTitle: '闲时自动更新',
     autoUpdateSilent: '可静默安装',

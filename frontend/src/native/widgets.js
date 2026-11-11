@@ -84,6 +84,11 @@ export async function previewDailyWeather() {
   return true
 }
 
+/** 设置页「通知设置」:直达本 App 的系统通知页(4 条通道由系统列出) */
+export async function openNotificationSettings() {
+  await IhomyWidgets.openNotificationSettings()
+}
+
 /** 原生桥安装:登录态/家庭变化时防抖同步一次(与 chat.js 的换代重建同思路) */
 export async function installWidgetBridge() {
   const { watch } = await import('vue')

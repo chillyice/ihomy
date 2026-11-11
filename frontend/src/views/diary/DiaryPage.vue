@@ -33,6 +33,11 @@
               ></el-button>
             </el-tooltip>
           </template>
+          <el-tooltip v-if="shareable && loggedIn" :content="$t('common.share')" placement="top" :show-after="300">
+            <el-button size="small" text @click.stop="$emit('action', 'share')"
+              ><el-icon><Share /></el-icon
+            ></el-button>
+          </el-tooltip>
           <el-tooltip v-if="shareable && loggedIn" :content="$t('chat.share.toChat')" placement="top" :show-after="300">
             <el-button size="small" text @click.stop="$emit('action', 'chat-share')"
               ><el-icon><ChatDotRound /></el-icon
@@ -68,7 +73,7 @@
 
 <script setup>
 import { computed, ref, watch, onMounted, nextTick } from 'vue'
-import { Edit, Delete } from '@element-plus/icons-vue'
+import { Edit, Delete, Share } from '@element-plus/icons-vue'
 import { PAGE_H, moodLabel, weatherLabel } from '@/utils/diary'
 import { parseDoodle, doodleExtentY, renderStrokes, setupCanvas, clearCanvas } from '@/utils/doodle'
 import { ChatDotRound } from '@element-plus/icons-vue'

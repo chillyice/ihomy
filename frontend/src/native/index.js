@@ -20,6 +20,8 @@ export function bootNative() {
       import('./appLock').then((m) => m.installAppLock()),
       import('./widgets').then((m) => m.installWidgetBridge()),
       import('./shareInbox').then((m) => m.initShareInbox()),
+      // 触觉反馈:先加载插件出口,首次勾选/长按不用等动态 import
+      import('./haptics'),
       // 相册自动备份:回前台/启动时按开关补传手机新照片
       import('./photoBackup').then((m) => m.installPhotoBackup()),
       // 更新检查放最后:等前面的能力就绪,且不阻塞其它初始化

@@ -1,5 +1,5 @@
 <template>
-  <div class="mobile-home">
+  <div ref="root" class="mobile-home">
     <!-- 顶部筛选栏 -->
     <div class="filter-bar">
       <div class="filter-scroll">
@@ -58,10 +58,12 @@ import { useUserStore } from '@/stores/user'
 import { publicApi, homeApi } from '@/api'
 import { feedTypeLabel as feedTypeLabelOf, feedSummary as feedSummaryOf } from '@/utils/feed'
 import { formatRelativeTime } from '@/utils/datetime'
+import { usePullRefresh } from '@/composables/usePullRefresh'
 
 const router = useRouter()
 const userStore = useUserStore()
 const { t } = useI18n()
+const root = ref(null)
 const feeds = ref([])
 const loading = ref(true)
 const activeFilter = ref('all')
@@ -93,16 +95,23 @@ const goFeed = (f) => {
   else if (FEED_ROUTES[f.type]) router.push(FEED_ROUTES[f.type])
 }
 
-onMounted(async () => {
+const load = async () => {
+  loading.value = true
   try {
     const fn = userStore.isLoggedIn ? homeApi.getFeed : publicApi.getFeed
     feeds.value = await fn(20)
   } catch (e) {
     feeds.value = []
+    throw e
   } finally {
     loading.value = false
   }
-})
+}
+
+// 手机首页是真正的「首页 Tab」:下拉刷新重拉动态流,失败由指示器统一提示
+usePullRefresh({ target: root, onRefresh: load })
+
+onMounted(() => load().catch(() => {}))
 </script>
 
 <style scoped>
