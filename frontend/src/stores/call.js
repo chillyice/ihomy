@@ -7,6 +7,7 @@ import i18n from '@/i18n'
 import { chatApi } from '@/api'
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
+import { isNativeApp } from '@/utils/platform'
 import {
   createPeer,
   getLocalStream,
@@ -60,6 +61,9 @@ export const useCallStore = defineStore('call', {
         this.failReason = envErr
         return false
       }
+      // 壳内先把系统麦克风/摄像头权限要到手:提示文案由 native/call.js 负责,
+      // 这里用 'permission'/'cancelled' 让调用方不要重复弹一遍
+      if (!(await this.ensurePermissions(media === 'VIDEO'))) return false
       this.callId = newCallId()
       this.peerId = peer.id
       this.peerName = peer.name || ''
@@ -107,6 +111,26 @@ export const useCallStore = defineStore('call', {
       return { id: u?.id, name: u?.nickname }
     },
 
+    /**
+     * 壳内通话权限前置(网页端直接放行):先把麦克风/摄像头要到手再拉流,
+     * 避免「正在接通」阶段被系统权限框打断。失败时写入约定的 failReason:
+     * 'cancelled' = 用户关掉说明框;'permission' = 原生侧已经提示过(调用方别重复弹)。
+     */
+    async ensurePermissions(video) {
+      if (!isNativeApp()) return true
+      try {
+        const { ensureCallPermissions } = await import('@/native/call')
+        const res = await ensureCallPermissions({ video })
+        if (res?.ok) return true
+        this.failReason = res?.reason === 'cancelled' ? 'cancelled' : 'permission'
+        return false
+      } catch (e) {
+        // 插件模块加载失败不拦通话:交给 getUserMedia 按真实原因报错
+        console.warn('[call] 权限前置模块加载失败', e)
+        return true
+      }
+    },
+
     signal(data) {
       useChatStore().sendSignal({ type: 'call-signal', data })
     },
@@ -151,6 +175,11 @@ export const useCallStore = defineStore('call', {
     async accept() {
       if (this.status !== 'ringing-in') return
       this.status = 'connecting'
+      if (!(await this.ensurePermissions(this.media === 'VIDEO'))) {
+        this.signal({ event: 'reject', to: this.peerId, callId: this.callId })
+        this.reset()
+        return
+      }
       try {
         const { stream, downgraded } = await getLocalStream(this.media)
         this.localStream = stream
@@ -207,15 +236,43 @@ export const useCallStore = defineStore('call', {
           if (this.status === 'connecting') {
             this.status = 'active'
             this.startedAt = Date.now()
+            this.watchMedia()
           }
         },
         onIceCandidate: (candidate) => {
           this.signal({ event: 'ice', to: this.peerId, callId: this.callId, candidate })
         },
         onStateChange: (state) => {
-          if (state === 'failed') this.hangup()
+          if (state === 'failed') {
+            // 不再静默挂断:告诉用户是「连不上对端」,而不是让通话无声消失
+            ElMessage.error(i18n.global.t('chat.call.connectionFailed'))
+            this.hangup()
+          }
         },
       })
+    },
+
+    /**
+     * 媒体看门狗:接通 6 秒后仍没有收到任何音频字节,说明 P2P 通道没真正建立
+     * (典型:双方都在运营商 NAT 后而服务端没配 TURN)。给一句可照做的提示,
+     * 不自动挂断——换网络后有时还能补通。
+     */
+    watchMedia() {
+      clearTimeout(this.mediaWatchTimer)
+      this.mediaWatchTimer = setTimeout(async () => {
+        const pc = this.pc
+        if (!pc || this.status !== 'active') return
+        try {
+          const stats = await pc.getStats()
+          let bytes = 0
+          stats.forEach((r) => {
+            if (r.type === 'inbound-rtp' && r.kind === 'audio') bytes += Number(r.bytesReceived) || 0
+          })
+          if (bytes <= 0) ElMessage.warning(i18n.global.t('chat.call.noMedia'))
+        } catch (e) {
+          /* getStats 不可用(旧内核)就不提示,不误报 */
+        }
+      }, 6000)
     },
 
     /** 主动挂断/取消:end 事件由服务端落 CALL 记录(结果按 reason 映射) */
@@ -238,6 +295,7 @@ export const useCallStore = defineStore('call', {
 
     teardown() {
       clearTimeout(this.ringTimer)
+      clearTimeout(this.mediaWatchTimer)
       stopStream(this.localStream)
       try {
         this.pc?.close()
@@ -258,6 +316,7 @@ export const useCallStore = defineStore('call', {
 
     reset() {
       clearTimeout(this.ringTimer)
+      clearTimeout(this.mediaWatchTimer)
       stopStream(this.localStream)
       try {
         this.pc?.close()

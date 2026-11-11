@@ -1,5 +1,6 @@
-import { ref, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { haptic } from '@/utils/haptics'
+import { clampFloatRect } from '@/utils/floatRect'
 
 // 可拖动+可调整大小的组合式函数,位置/大小持久化到 localStorage
 // 用法:const { pos, size, reset } = useDragResize({ x, y, w, h, storageKey, minY, anchorRight, marginLeft })
@@ -29,9 +30,30 @@ export function useDragResize(initial) {
       return null
     }
   }
+  // 视口尺寸:固定定位元素用布局视口(innerWidth/innerHeight),不用 visualViewport(键盘弹出时会把小窗推乱)
+  const viewportSize = () => ({ width: window.innerWidth || 0, height: window.innerHeight || 0 })
+  // 最小可用尺寸:面板允许缩到 200×120,浮球/小窗按自身尺寸(不会被放大)
+  const clampOptions = () => ({
+    minY,
+    marginLeft,
+    anchorRight,
+    minW: Math.min(200, initial.w ?? 200),
+    minH: Math.min(120, initial.h ?? 120),
+  })
   const saved = load()
-  const pos = ref({ x: saved?.x ?? initial.x ?? 0, y: saved?.y ?? initial.y ?? 0 })
-  const size = ref({ w: saved?.w ?? initial.w ?? 320, h: saved?.h ?? initial.h ?? 200 })
+  // 初始化就夹一次:上次在大屏存的位置,这次可能已经在屏幕外(窗口缩小/换设备/旋屏后)
+  const startRect = clampFloatRect(
+    {
+      x: saved?.x ?? initial.x ?? 0,
+      y: saved?.y ?? initial.y ?? 0,
+      w: saved?.w ?? initial.w ?? 320,
+      h: saved?.h ?? initial.h ?? 200,
+    },
+    viewportSize(),
+    clampOptions(),
+  )
+  const pos = ref({ x: startRect.x, y: startRect.y })
+  const size = ref({ w: startRect.w, h: startRect.h })
   const zIndex = ref(PANEL_BASE_Z)
   const dragging = ref(false)
   const resizing = ref(false)
@@ -53,6 +75,34 @@ export function useDragResize(initial) {
       localStorage.setItem(key, JSON.stringify({ x: pos.value.x, y: pos.value.y, w: size.value.w, h: size.value.h }))
     } catch (e) {}
   }
+
+  /**
+   * 屏幕变小后把当前位置/尺寸夹回视口内(窗口缩放、旋屏、地址栏收起、回前台都调用)。
+   * 拖拽/缩放进行中不动手:指针移动本身已经逐帧夹紧,避免两边抢着改同一个 ref。
+   */
+  const clampToViewport = () => {
+    if (dragging.value || resizing.value) return
+    const next = clampFloatRect({ x: pos.value.x, y: pos.value.y, w: size.value.w, h: size.value.h }, viewportSize(), clampOptions())
+    const changed = next.x !== pos.value.x || next.y !== pos.value.y || next.w !== size.value.w || next.h !== size.value.h
+    if (!changed) return
+    pos.value = { x: next.x, y: next.y }
+    size.value = { w: next.w, h: next.h }
+    save()
+  }
+
+  // 监听按需挂载:resize / 旋屏 / visualViewport(移动端键盘与地址栏) / 回前台,
+  // 只在挂载期间存在,卸载一并摘除。
+  const onViewportChange = () => clampToViewport()
+  const onVisibilityChange = () => {
+    if (document.visibilityState === 'visible') clampToViewport()
+  }
+  onMounted(() => {
+    window.addEventListener('resize', onViewportChange)
+    window.addEventListener('orientationchange', onViewportChange)
+    window.addEventListener('visibilitychange', onVisibilityChange)
+    window.visualViewport?.addEventListener('resize', onViewportChange)
+    clampToViewport()
+  })
 
   /** 指针捕获期间移动/抬起都派发到捕获元素上,直接改 pos/size */
   const onPointerMove = (e) => {
@@ -155,8 +205,13 @@ export function useDragResize(initial) {
     beginPointer(e)
   }
   const reset = () => {
-    pos.value = { x: initial.x ?? 0, y: initial.y ?? 0 }
-    size.value = { w: initial.w ?? 320, h: initial.h ?? 200 }
+    const rect = clampFloatRect(
+      { x: initial.x ?? 0, y: initial.y ?? 0, w: initial.w ?? 320, h: initial.h ?? 200 },
+      viewportSize(),
+      clampOptions(),
+    )
+    pos.value = { x: rect.x, y: rect.y }
+    size.value = { w: rect.w, h: rect.h }
     if (key) {
       try {
         localStorage.removeItem(key)
@@ -166,6 +221,10 @@ export function useDragResize(initial) {
   // 监听器只在拖拽期间存在;onUnmounted 兜底清理(避免异常退出路径漏移除)
   onUnmounted(() => {
     stopListening()
+    window.removeEventListener('resize', onViewportChange)
+    window.removeEventListener('orientationchange', onViewportChange)
+    window.removeEventListener('visibilitychange', onVisibilityChange)
+    window.visualViewport?.removeEventListener('resize', onViewportChange)
   })
   return { pos, size, zIndex, dragging, resizing, onDragStart, onResizeStart, reset }
 }

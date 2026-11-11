@@ -19,6 +19,8 @@ export function bootNative() {
       import('./reminders').then((m) => m.initReminders()),
       import('./appLock').then((m) => m.installAppLock()),
       import('./widgets').then((m) => m.installWidgetBridge()),
+      // 后台消息提醒:登录且开关打开时拉起前台服务(依赖上一条先下发 WIDGET 令牌)
+      import('./live').then((m) => m.installLiveService()),
       import('./shareInbox').then((m) => m.initShareInbox()),
       // 触觉反馈:先加载插件出口,首次勾选/长按不用等动态 import
       import('./haptics'),

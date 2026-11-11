@@ -267,8 +267,14 @@ const openCall = async () => {
 
 const startCall = async (m, media) => {
   const ok = await callStore.start({ id: m.id, name: m.nickname || m.username }, media)
-  if (ok) callVisible.value = false
-  else ElMessage.warning(callStore.failReason ? t(mediaErrorKey(callStore.failReason)) : t('chat.call.startFailed'))
+  if (ok) {
+    callVisible.value = false
+    return
+  }
+  // 权限说明/系统授权框已在 native/call.js 里处理过,不再叠一条失败提示
+  const reason = callStore.failReason
+  if (reason === 'cancelled' || reason === 'permission') return
+  ElMessage.warning(reason ? t(mediaErrorKey(reason)) : t('chat.call.startFailed'))
 }
 
 const pickGame = (g) => {

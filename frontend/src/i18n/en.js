@@ -1630,6 +1630,19 @@ export default {
       errNotFound: 'No camera or microphone found',
       errBusy: 'The camera or microphone is being used by another app',
       errGeneric: 'Could not access the camera/microphone, check your device and retry',
+      permTitle: 'Call permissions',
+      permContinue: 'Continue',
+      permIntroAudio: 'A voice call needs your microphone. The system permission prompt comes next — please choose Allow.',
+      permIntroVideo: 'A video call needs your microphone and camera. The system permission prompt comes next — please choose Allow.',
+      permDeniedAudio:
+        'No microphone permission, so the call cannot start: open Settings → Apps → ihomy → Permissions, allow the microphone, then retry',
+      permDeniedVideo:
+        'No microphone or camera permission, so the video call cannot start: open Settings → Apps → ihomy → Permissions, allow them, then retry',
+      permBlocked: 'Microphone/camera permission was permanently denied, so the system will not ask again. Open the app settings and enable it manually, then retry.',
+      openSettings: 'Open settings',
+      connectionFailed:
+        'The call could not connect: the two networks cannot reach each other. Switch networks (for example, use the same Wi-Fi) and retry',
+      noMedia: 'No audio has arrived yet: the current networks may not allow a direct connection. If it stays like this, hang up, switch networks and retry',
       downgradedAudio: 'Camera unavailable, switched to a voice call',
       audio: 'Voice call',
       video: 'Video call',
@@ -5723,10 +5736,10 @@ export default {
       'Turn an idle tablet into a family display: large clock, weather, the next few days and a slow slideshow of family photos, with the screen kept on. Press and hold the bottom-right corner for 3 seconds to exit.',
     kioskOpen: 'Open kiosk mode',
     // Background unread alert
-    unreadNotifyTitle: 'Background unread alert',
-    unreadNotifyEvery: 'About every 30 minutes',
+    unreadNotifyTitle: 'Background message alerts',
     unreadNotifyDesc:
-      'When someone sends a message or a new notice arrives, one combined alert appears on the lock screen. It checks about every 30 minutes and stays quiet from 23:00 to 06:00. Some phones limit background checks; opening the app still refreshes everything immediately.',
+      'When on, the app keeps running in the background and alerts you in the notification bar when a message or notice arrives (usually within 30 seconds). Android shows a permanent "ihomy is running in the background" notification. Turning it off stops the background checks; home-screen widgets still check about every 30 minutes as a fallback. Quiet from 23:00 to 06:00.',
+    unreadNotifyDenied: 'Notification permission is off, so background alerts will not appear. Allow ihomy to send notifications in system settings.',
     // Daily weather push
     dailyWeatherTitle: 'Daily weather',
     dailyWeatherTimePlaceholder: 'Time',

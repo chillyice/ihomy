@@ -10,7 +10,9 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import androidx.core.app.NotificationManagerCompat;
+import androidx.core.content.ContextCompat;
 
+import top.ihomy.app.live.LiveService;
 import top.ihomy.app.reminder.StaleCheckWorker;
 import top.ihomy.app.weather.DailyWeatherNotifier;
 import top.ihomy.app.weather.DailyWeatherWorker;
@@ -64,6 +66,36 @@ public class WidgetBridgePlugin extends Plugin {
     public void getUnreadNotifyEnabled(PluginCall call) {
         JSObject ret = new JSObject();
         ret.put("enabled", WidgetPrefs.unreadNotifyEnabled(getContext()));
+        call.resolve(ret);
+    }
+
+    /** 启动后台消息提醒(前台服务)。必须由前台 UI 调用:Android 12+ 禁止后台启动前台服务 */
+    @PluginMethod
+    public void startLive(PluginCall call) {
+        try {
+            Intent intent = new Intent(getContext(), LiveService.class).setAction(LiveService.ACTION_START);
+            ContextCompat.startForegroundService(getContext(), intent);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("start_failed", e);
+        }
+    }
+
+    /** 停止后台消息提醒(登出/关开关/系统不允许时) */
+    @PluginMethod
+    public void stopLive(PluginCall call) {
+        try {
+            getContext().stopService(new Intent(getContext(), LiveService.class));
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("stop_failed", e);
+        }
+    }
+
+    @PluginMethod
+    public void isLiveRunning(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("running", LiveService.isRunning());
         call.resolve(ret);
     }
 

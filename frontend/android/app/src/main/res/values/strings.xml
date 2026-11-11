@@ -41,6 +41,12 @@
     <string name="notify_action_chat">打开聊天</string>
     <string name="notify_action_notice">打开通知</string>
 
+    <!-- 后台消息提醒的前台服务常驻通知(低优先级、静音) -->
+    <string name="notify_channel_live">后台运行</string>
+    <string name="notify_channel_live_desc">保持 App 在后台运行，有新消息时提醒；常驻通知，不响铃</string>
+    <string name="notify_live_title">ihomy 正在后台运行</string>
+    <string name="notify_live_body">有新消息会在通知栏提醒；可在 App 设置里关闭</string>
+
     <!-- 每日天气(每天一条,只进通知中心与锁屏) -->
     <string name="notify_channel_weather">每日天气</string>
     <string name="notify_channel_weather_desc">每天一条当天天气与出行建议，安静显示，不响铃</string>

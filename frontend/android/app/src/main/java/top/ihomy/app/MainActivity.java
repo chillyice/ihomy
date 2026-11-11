@@ -7,10 +7,12 @@ import android.webkit.CookieManager;
 import com.getcapacitor.BridgeActivity;
 import top.ihomy.app.biometric.BiometricPlugin;
 import top.ihomy.app.calendar.CalendarSyncPlugin;
+import top.ihomy.app.call.CallPermissionPlugin;
 import top.ihomy.app.camera.CameraPlugin;
 import top.ihomy.app.diagnostics.CrashStore;
 import top.ihomy.app.diagnostics.DiagnosticsPlugin;
 import top.ihomy.app.haptics.HapticsPlugin;
+import top.ihomy.app.live.AppVisibility;
 import top.ihomy.app.photo.PhotoBackupPlugin;
 import top.ihomy.app.screen.ScreenPlugin;
 import top.ihomy.app.share.ShareInboxPlugin;
@@ -48,6 +50,8 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(PhotoBackupPlugin.class);
         // 触觉反馈:勾选/长按/拖拽/保存/校验失败的手感,只在系统允许时震
         registerPlugin(HapticsPlugin.class);
+        // 通话权限前置:发起/接听前主动申请麦克风(视频还要摄像头),拒绝后引导去系统设置
+        registerPlugin(CallPermissionPlugin.class);
         // 冷启动时先把分享意图接住,JS 起来后再取(getPending 只读,确认落地才清)
         ShareIntake.capture(getIntent());
         super.onCreate(savedInstanceState);
@@ -59,6 +63,23 @@ public class MainActivity extends BridgeActivity {
         if (bridge != null && bridge.getWebView() != null) {
             CookieManager.getInstance().setAcceptThirdPartyCookies(bridge.getWebView(), true);
         }
+    }
+
+    /**
+     * 前后台标记:前台服务据此决定「只更新未读基线」还是「真的发系统通知」。
+     * 用 onResume/onPause 而不是 onStart/onStop:弹系统权限框时 Activity 仍算前台,
+     * 不会把用户正在看的这次操作当成后台事件再提醒一遍。
+     */
+    @Override
+    public void onResume() {
+        super.onResume();
+        AppVisibility.setForeground(true);
+    }
+
+    @Override
+    public void onPause() {
+        AppVisibility.setForeground(false);
+        super.onPause();
     }
 
     /** 应用已在前台/后台时再次收到分享(singleTask):接住并通知 WebView 去取 */

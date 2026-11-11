@@ -468,3 +468,4 @@ Manifest 其他增量:新增 `reminder` Worker 的 WorkManager 初始化(默认�
 - **B2-L1 — 只接 `views/music/Music.vue` 播控处 / 实际全局 `MusicPlayer.vue` 优先接入,页内试听也接了一份**:锁屏场景大头是全局浮窗播放器;两个持有者按 owner 隔离,关闭试听弹窗只清自己的会话。
 - **B3 — 平板自动提示一次 / 实际只在设置页加「看板模式」按钮**:自动弹提示会打断正常手机使用;入口保持手动,未进 `navModules.js`。
 - **B5 — 模拟器在 `useGameView` 里做「已连接」提示 / 实际模拟器页(`EmulatorPlayer.vue`)完全不接适配器**,只显示「手柄由模拟器直接支持」静态说明——EmulatorJS 自带手柄支持,再派发键盘事件会双输入。
+- **A2 — D2「不做常驻保活/不申请前台服务」/ 2026-11-11 V11.98 改为常驻前台服务(30 秒轮询)**:用户明确要求「App 要能后台运行、有消息后台能收到」,30 分钟 WorkManager 满足不了;采用 `foregroundServiceType="remoteMessaging"` + 通知栏一条常驻低优先级通知(Android 硬要求),设置页开关关闭即停,WorkManager 保留为兜底。只读 `chat/unread` + `notification/unread-count`,不开写接口、不扩白名单。

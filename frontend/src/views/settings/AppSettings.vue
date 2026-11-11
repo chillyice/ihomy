@@ -85,7 +85,6 @@
       <el-form-item :label="$t('appSettings.unreadNotifyTitle')">
         <div class="cal-head">
           <el-switch v-model="unreadNotify" @change="onUnreadNotifyChange" />
-          <el-tag size="small" type="info">{{ $t('appSettings.unreadNotifyEvery') }}</el-tag>
         </div>
         <div class="share-tip">{{ $t('appSettings.unreadNotifyDesc') }}</div>
       </el-form-item>
@@ -394,8 +393,23 @@ async function loadUnreadNotify() {
   }
 }
 
-function onUnreadNotifyChange(v) {
-  widgetNative().then((m) => m.setUnreadNotifyEnabled(!!v))
+async function onUnreadNotifyChange(v) {
+  // 开关是前台服务与 WorkManager 兜底共用的唯一事实源:先落偏好,再同步服务
+  const m = await import('@/native/live')
+  await m.setBackgroundLiveEnabled(!!v)
+  if (!v) return
+  // 打开时顺手要一次通知权限:13+ 没这个权限前台服务仍在跑,但通知不会出现
+  try {
+    const { LocalNotifications } = await import('@capacitor/local-notifications')
+    const perm = await LocalNotifications.checkPermissions()
+    if (perm.display !== 'granted') {
+      const req = await LocalNotifications.requestPermissions()
+      if (req.display !== 'granted') ElMessage.warning(t('appSettings.unreadNotifyDenied'))
+    }
+  } catch (e) {
+    // 权限询问失败不改变开关本身,系统设置里仍可手动补
+    console.warn('[appSettings] 通知权限询问失败', e)
+  }
 }
 
 const DEFAULT_WEATHER_MINUTE = 7 * 60 + 30

@@ -148,6 +148,14 @@
             </intent-filter>
         </receiver>
 
+        <!-- 后台消息提醒:常驻前台服务,App 在后台/锁屏时每 30 秒对一次未读并提醒。
+             remoteMessaging 类型(Android 14+ 必须在 startForeground 时声明);
+             不用 stopWithTask:从最近任务划掉后仍继续提醒,直到设置里关闭或系统清理。 -->
+        <service
+            android:name=".live.LiveService"
+            android:exported="false"
+            android:foregroundServiceType="remoteMessaging" />
+
         <!-- 下拉栏快速设置磁贴:记账本 / 今日日程(点一下直接进站内页面,无开关语义) -->
         <service
             android:name=".tile.BookTileService"
@@ -175,6 +183,11 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 后台消息提醒:前台服务 + Android 14 的 remoteMessaging 类型 + 通知运行时权限(13+)。
+         通知权限在设置页打开「后台消息提醒」时用 LocalNotifications 主动申请。 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- 触觉反馈(normal 权限,不弹窗):勾选/长按/拖拽等语义动作的轻震 -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- 保险箱进页前的本机指纹/人脸校验(系统 BiometricPrompt,不读生物特征数据) -->

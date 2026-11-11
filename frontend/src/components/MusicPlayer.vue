@@ -388,15 +388,26 @@ watch(
   },
 )
 
+// 视口变化的统一回调:窗口缩放、旋屏、移动端地址栏/键盘收起都要重新夹一次
+const onViewportChange = () => clampPos()
+const onVisibilityChange = () => {
+  if (document.visibilityState === 'visible') clampPos()
+}
 onMounted(() => {
   loadBackgroundPlaylist()
-  window.addEventListener('resize', clampPos)
+  window.addEventListener('resize', onViewportChange)
+  window.addEventListener('orientationchange', onViewportChange)
+  window.addEventListener('visibilitychange', onVisibilityChange)
+  window.visualViewport?.addEventListener('resize', onViewportChange)
 })
 onBeforeUnmount(() => {
   clearTimeout(expandClampTimer)
   detachDrag()
   dockCancel()
-  window.removeEventListener('resize', clampPos)
+  window.removeEventListener('resize', onViewportChange)
+  window.removeEventListener('orientationchange', onViewportChange)
+  window.removeEventListener('visibilitychange', onVisibilityChange)
+  window.visualViewport?.removeEventListener('resize', onViewportChange)
   clearMediaSession('float')
 })
 </script>
