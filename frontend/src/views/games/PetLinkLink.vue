@@ -33,6 +33,17 @@
 
       <!-- 游戏 -->
       <template v-else>
+        <GameRoomBar
+          :room="play.room"
+          :is-host="play.isHost"
+          :score="score"
+          :reported="play.reported"
+          :ended="play.ended"
+          :result="play.spec?.result"
+          :my-id="play.myId"
+          @submit="submitRoomScore"
+          @leave="play.leave"
+        />
         <!-- 顶部信息栏(复刻原版 HUD):关卡+关卡名 / 重排 / 倒计时条 / 得分 -->
         <div class="game-hud">
           <div class="hud-level">
@@ -97,7 +108,7 @@
           <el-button size="small" :disabled="won || lost" @click="togglePause">
             {{ paused ? '▶' : '⏸' }} {{ $t('games.petlink.pause') }}
           </el-button>
-          <el-button size="small" @click="restart">↺ {{ $t('games.petlink.restart') }}</el-button>
+          <el-button size="small" @click="onRestartClick">↺ {{ $t('games.petlink.restart') }}</el-button>
           <el-button size="small" :title="$t('games.petlink.muteToggle')" @click="toggleMute">
             {{ muted ? '🔇' : '🔊' }} {{ muted ? $t('games.petlink.unmute') : $t('games.petlink.mute') }}
           </el-button>
@@ -147,7 +158,9 @@
               <div class="overlay-title">{{ won ? $t('games.petlink.win') : $t('games.petlink.lose') }}</div>
               <div class="overlay-score">{{ $t('games.petlink.score') }} {{ score }}</div>
               <div v-if="won && rewardMsg" class="overlay-reward">{{ rewardMsg }}</div>
-              <el-button type="primary" size="small" round @click="restart">{{ $t('games.petlink.playAgain') }}</el-button>
+              <el-button type="primary" size="small" round @click="onResultAction">
+                {{ play.active ? $t('games.room.backGames') : $t('games.petlink.playAgain') }}
+              </el-button>
             </div>
           </div>
         </Transition>
@@ -172,8 +185,12 @@ import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import PageToolbar from '@/components/PageToolbar.vue'
 import GameTopActions from '@/components/games/GameTopActions.vue'
+import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import { useGameView } from '@/composables/useGameView'
+import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
+import { seededRng } from '@/utils/games/seededRng'
 import {
+  PETLINK_CELLS,
   PETLINK_LEVEL_TIME,
   PETLINK_MAX_LEVEL,
   PETLINK_STORAGE_KEY,
@@ -242,6 +259,113 @@ const rewardMsg = ref('')
 // 封面读到的可续存档(点「继续游戏」才真正装载)
 const savedState = ref(null)
 
+// ---------- 「一起玩」房间(?room=<id>) ----------
+// PK:双端同 seed 独立跑,先通关者胜(交卷/终局上报);
+// COOP:房主权威,共享盘面由房主广播快照,其他成员只发操作意图,消除结果所有人都能看到。
+const play = useGameRoomPlay({ onSignal: onRoomSignal, onRoom: onRoomChange })
+const coopGuest = computed(() => play.active && play.coop && !play.isHost)
+
+let roomTimer = null
+// 合作模式:房主每重开一局本地推进一轮,换一副新牌面(同 seed + 同关卡原本会发出一样的牌,
+// 「再来一局」看起来像没反应)。访客只看房主快照,不参与计算。
+let coopRound = 0
+
+function snapshotRoomState() {
+  return {
+    board: board.value.map((t) => (t ? { id: t.id, type: t.type } : null)),
+    score: score.value,
+    level: level.value,
+    shufflesLeft: shufflesLeft.value,
+    timeLeft: timeLeft.value,
+    selected: selected.value,
+    won: won.value,
+    lost: lost.value,
+  }
+}
+
+function applyRoomState(state) {
+  if (!state || !Array.isArray(state.board) || state.board.length !== PETLINK_CELLS) return
+  let maxId = tileSeq
+  const nextBoard = state.board.map((t) => {
+    if (!t || !Number.isInteger(t.id) || !Number.isInteger(t.type)) return null
+    maxId = Math.max(maxId, t.id)
+    return { id: t.id, type: t.type }
+  })
+  tileSeq = maxId
+  board.value = nextBoard
+  score.value = Math.max(0, Number(state.score) || 0)
+  level.value = Math.min(MAX_LEVEL, Math.max(1, Number(state.level) || 1))
+  shufflesLeft.value = Math.max(0, Number(state.shufflesLeft) || 0)
+  timeLeft.value = Math.max(0, Number(state.timeLeft) || 0)
+  selected.value = Number.isInteger(state.selected) ? state.selected : -1
+  won.value = !!state.won
+  lost.value = !!state.lost
+  linePoints.value = ''
+  hinted.value = []
+  if (won.value || lost.value) stopTicker()
+}
+
+/** 房主广播共享盘面(80ms 合批,避免连点刷屏) */
+function broadcastRoomState(immediate = false) {
+  if (!play.active || !play.coop || !play.isHost) return
+  if (roomTimer) {
+    clearTimeout(roomTimer)
+    roomTimer = null
+  }
+  const emit = () => {
+    roomTimer = null
+    play.send('state', { state: snapshotRoomState() })
+  }
+  if (immediate) emit()
+  else roomTimer = setTimeout(emit, 80)
+}
+
+function onRoomSignal(data) {
+  if (!data) return
+  if (play.coop) {
+    if (data.event === 'state' && !play.isHost) {
+      applyRoomState(data.state)
+      return
+    }
+    if (data.event === 'sync' && play.isHost) {
+      broadcastRoomState(true)
+      return
+    }
+    if (data.event === 'op' && play.isHost) {
+      if (data.kind === 'click') {
+        const index = Number(data.index)
+        if (Number.isInteger(index) && index >= 0 && index < PETLINK_CELLS) onClick(index, true)
+      } else if (data.kind === 'shuffle') {
+        doShuffle()
+      } else if (data.kind === 'restart') {
+        restart()
+      }
+      return
+    }
+  }
+}
+
+function onRoomChange(next) {
+  if (!next) return
+  if (next.status === 'FINISHED' || next.status === 'CANCELLED') stopTicker()
+}
+
+const submitRoomScore = () => play.report(score.value)
+
+function onRestartClick() {
+  if (play.ended) return
+  if (coopGuest.value) {
+    play.send('op', { kind: 'restart' })
+    return
+  }
+  restart()
+}
+
+function onResultAction() {
+  if (play.active) play.leave()
+  else restart()
+}
+
 // ---------- 调试版(地址加 ?debug=1) ----------
 // 只做核对:跳关、自动消除、每次消除后校验「是否恰好这两张」与「剩余是否成对」。
 // 调试态不写也不清玩家存档,退出清掉参数即回到正常版。
@@ -269,7 +393,7 @@ const boardEl = ref(null)
 const boardScale = ref(1)
 const scaledW = computed(() => Math.round(svgW * boardScale.value))
 const scaledH = computed(() => Math.round(svgH * boardScale.value))
-const frozen = computed(() => animating.value || paused.value || won.value || lost.value)
+const frozen = computed(() => animating.value || paused.value || won.value || lost.value || play.ended)
 const levelName = computed(() => t(`games.petlink.levelNames.${level.value}`) || '')
 const CN_NUMS = ['一', '二', '三', '四', '五', '六', '七', '八', '九']
 // 原版关卡号用中文数字:第一关/第二关…(英文回退 Level N)
@@ -333,7 +457,7 @@ function playWin() {
 // ---------- 进度存档 ----------
 // 只在对局进行中写档;通关/失败/重新开始即清档,封面按存档显示「继续游戏」。
 const saveState = () => {
-  if (debugMode.value) return
+  if (debugMode.value || play.active) return
   if (screen.value !== 'game' || won.value || lost.value) return
   if (!board.value.length || board.value.every((tile) => tile === null)) return
   try {
@@ -356,7 +480,7 @@ const saveState = () => {
 }
 
 const clearState = () => {
-  if (debugMode.value) return
+  if (debugMode.value || play.active) return
   try {
     localStorage.removeItem(PETLINK_STORAGE_KEY)
   } catch (e) {
@@ -413,9 +537,12 @@ const applySavedState = (saved) => {
 
 // ---------- 关卡 ----------
 
-// 发牌走棋盘内核;tileSeq 只负责跨关连续编号,保证 FLIP 动画的牌身份稳定
+// 发牌走棋盘内核;tileSeq 只负责跨关连续编号,保证 FLIP 动画的牌身份稳定。
+// 房间模式下按 (seed, 关卡) 派生随机源,保证 PK 双端首发牌面一致。
 function buildBoard(lv) {
-  const { board: next, maxId } = createPetLinkBoard(lv, tileSeq)
+  const base = (Number(play.seed) ^ Math.imul(lv, 0x9e3779b1)) >>> 0
+  const rand = play.active ? seededRng(play.coop ? (base + coopRound * 7877) >>> 0 : base) : Math.random
+  const { board: next, maxId } = createPetLinkBoard(lv, tileSeq, rand)
   tileSeq = maxId
   return next
 }
@@ -425,7 +552,22 @@ const findAnyPair = () => findPetLinkPair(board.value)
 
 // ---------- 交互 ----------
 
-function onClick(i) {
+function onClick(i, remote = false) {
+  if (!remote && coopGuest.value) {
+    // 合作模式:非房主只上报意图,盘面由房主统一改动后再广播回来
+    if (frozen.value) return
+    hinted.value = []
+    if (selected.value === -1) {
+      selected.value = i
+      playClick()
+    } else if (selected.value === i) {
+      selected.value = -1
+    } else {
+      selected.value = i
+    }
+    play.send('op', { kind: 'click', index: i })
+    return
+  }
   if (frozen.value) return
   if (!board.value[i]) return
   hinted.value = []
@@ -501,12 +643,18 @@ function doHint() {
 
 function doShuffle() {
   if (frozen.value || shufflesLeft.value <= 0) return
+  if (coopGuest.value) {
+    play.send('op', { kind: 'shuffle' })
+    return
+  }
   applyShuffle()
   playClick()
 }
 
 function applyShuffle() {
-  shufflePetLinkBoard(board.value)
+  // 房间内按 (seed, 关卡, 剩余重排次数) 派生随机源:双方用同样次数重排时盘面依然一致
+  const rand = play.active ? seededRng((Number(play.seed) + level.value * 7919 + shufflesLeft.value * 104729) >>> 0) : Math.random
+  shufflePetLinkBoard(board.value, rand)
   shufflesLeft.value -= 1
   selected.value = -1
   hinted.value = []
@@ -647,6 +795,11 @@ async function levelComplete() {
   if (level.value >= MAX_LEVEL) {
     won.value = true
     clearState()
+    if (play.active) {
+      // 房间:PK 先完成制立即上报;COOP 只有房主上报团队完成
+      if (!play.coop || play.isHost) play.report(score.value)
+      return
+    }
     await grantReward()
     return
   }
@@ -662,6 +815,7 @@ async function levelComplete() {
 }
 
 async function grantReward() {
+  if (play.active) return
   try {
     const res = await gameApi.petLinkReward()
     rewardMsg.value =
@@ -677,6 +831,8 @@ async function grantReward() {
 
 function startTicker() {
   stopTicker()
+  // 合作模式只有房主计时,访客按房主快照显示倒计时
+  if (coopGuest.value) return
   ticker = setInterval(() => {
     if (paused.value || won.value || lost.value) return
     timeLeft.value -= 1
@@ -744,6 +900,7 @@ function startFresh() {
 
 function restart() {
   clearState()
+  if (play.coop && play.isHost) coopRound += 1
   level.value = 1
   score.value = 0
   shufflesLeft.value = BASE_SHUFFLE
@@ -810,26 +967,50 @@ function flipAnimate(before, ms = 200) {
 // 棋面/分数/关卡/重排/暂停变化即落盘;计时每秒变化走防抖,避免每秒写 localStorage
 watch([board, score, level, shufflesLeft, paused], saveState, { deep: true })
 watch(timeLeft, scheduleSave)
+// 合作模式:房主把共享盘面变化(含每秒倒计时)同步给其他成员
+watch(
+  [board, score, level, shufflesLeft, timeLeft, selected, won, lost],
+  () => {
+    if (play.active && play.coop && play.isHost) broadcastRoomState()
+  },
+  { deep: true },
+)
 
 const onVisibilityChange = () => {
   if (document.hidden) saveState()
 }
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('keydown', onKeydown)
   window.addEventListener('resize', updateBoardScale)
   document.addEventListener('fullscreenchange', onFullscreenChange)
   document.addEventListener('visibilitychange', onVisibilityChange)
   // 进入游戏即关闭全局光影特效(与图片/视频/看书一致),离开时恢复
   sunLight?.suspendEffects()
+  resizeObserver = new ResizeObserver(() => updateBoardScale())
+
+  if (play.active) {
+    // 房间:跳过封面直接进局。COOP 由房主发牌并广播快照,访客等房主同步。
+    screen.value = 'game'
+    await play.load()
+    if (coopGuest.value) play.requestSync()
+    else restart()
+    await nextTick()
+    updateBoardScale()
+    if (boardScrollRef.value) resizeObserver.observe(boardScrollRef.value)
+    return
+  }
+
   // 封面先读出可续存档,由「继续游戏」决定是否装载
   savedState.value = loadSavedState()
-  nextTick(() => updateBoardScale())
-  resizeObserver = new ResizeObserver(() => updateBoardScale())
-  if (boardScrollRef.value) resizeObserver.observe(boardScrollRef.value)
+  nextTick(() => {
+    updateBoardScale()
+    if (boardScrollRef.value) resizeObserver.observe(boardScrollRef.value)
+  })
 })
 onBeforeUnmount(() => {
   if (saveTimer) clearTimeout(saveTimer)
+  if (roomTimer) clearTimeout(roomTimer)
   saveState()
   stopTicker()
   clearTimeout(hintTimer)

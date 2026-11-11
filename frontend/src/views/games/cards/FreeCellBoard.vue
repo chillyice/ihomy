@@ -1,7 +1,7 @@
 <template>
   <div class="sol-card card game-surface" @contextmenu.prevent @dblclick.prevent>
     <div class="sol-head">
-      <div class="sol-title">{{ $t('games.freecell.title') }}</div>
+      <div class="sol-title">{{ $t('games.freecell.title') }}{{ play.active ? ' · ' + $t('games.room.together') : '' }}</div>
       <div class="sol-stats">
         <div class="sol-stat">
           <span class="sol-stat-label">{{ $t('games.freecell.moves') }}</span>
@@ -20,10 +20,24 @@
 
     <div class="sol-actions">
       <el-button size="small" round class="fc-hint" @click="showHint">{{ $t('games.freecell.hint') }}</el-button>
-      <el-button size="small" round :disabled="!history.length" @click="undo">{{ $t('games.freecell.undo') }}</el-button>
+      <el-button v-if="!play.active" size="small" round :disabled="!history.length" @click="undo">{{
+        $t('games.freecell.undo')
+      }}</el-button>
       <el-button size="small" round @click="autoFinishAll">{{ $t('games.freecell.autoFinish') }}</el-button>
       <el-button type="primary" size="small" round @click="startNew">{{ $t('games.freecell.newGame') }}</el-button>
     </div>
+
+    <GameRoomBar
+      :room="play.room"
+      :is-host="play.isHost"
+      :score="roomScore"
+      :reported="play.reported"
+      :ended="play.ended"
+      :result="play.spec?.result"
+      :my-id="play.myId"
+      @submit="submitRoomScore"
+      @leave="play.leave"
+    />
 
     <div ref="feltEl" class="sol-felt" :style="feltStyle">
       <div class="sol-row sol-top fc-top">
@@ -129,6 +143,10 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { gameApi } from '@/api'
 import PlayingCard from '@/components/games/PlayingCard.vue'
+import GameRoomBar from '@/components/games/GameRoomBar.vue'
+import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
+import { cardRoomScore } from '@/utils/gameRoom'
+import { seededRng } from '@/utils/games/seededRng'
 import { useCardDrag } from '@/composables/useCardDrag'
 import { formatClock } from '@/utils/games/gameClock'
 import { CARD_RATIO, fitCardWidth, pileSteps } from '@/utils/games/cardLayout'
@@ -158,6 +176,9 @@ const { t } = useI18n()
 
 const feltEl = ref(null)
 const feltSize = ref({ w: 0, h: 0 })
+const play = useGameRoomPlay()
+/** 房间模式的同种子发牌 */
+let rng = null
 const game = ref(deal())
 const elapsed = ref(0)
 const best = ref(0)
@@ -169,6 +190,8 @@ const hintNote = ref('')
 
 const isWon = computed(() => game.value.status === STATUS.WON)
 const isLost = computed(() => game.value.status === STATUS.LOST)
+/** 房间 PK 比为「分高者胜」:自由纸牌按步数/用时换算成越高越好的分数 */
+const roomScore = computed(() => cardRoomScore(game.value.moves, elapsed.value))
 const foundationTop = (suit) => {
   const pile = game.value.foundations[suit]
   return pile && pile.length ? pile[pile.length - 1] : null
@@ -267,6 +290,7 @@ const saveBest = () => {
   }
 }
 const saveState = () => {
+  if (play.active) return
   try {
     localStorage.setItem(STATE_KEY, JSON.stringify({ game: game.value, elapsed: elapsed.value }))
   } catch (e) {
@@ -274,6 +298,7 @@ const saveState = () => {
   }
 }
 const clearState = () => {
+  if (play.active) return
   try {
     localStorage.removeItem(STATE_KEY)
   } catch (e) {
@@ -281,6 +306,7 @@ const clearState = () => {
   }
 }
 const loadState = () => {
+  if (play.active) return false
   try {
     const raw = JSON.parse(localStorage.getItem(STATE_KEY) || 'null')
     if (!raw || !isValidState(raw.game) || !Number.isInteger(raw.elapsed) || raw.elapsed < 0) return false
@@ -320,7 +346,8 @@ const showHint = () => {
 const startNew = () => {
   stopTimer()
   clearHint()
-  game.value = deal()
+  rng = play.active ? seededRng(play.seed) : null
+  game.value = deal(rng || undefined)
   history.value = []
   selected.value = null
   elapsed.value = 0
@@ -331,6 +358,7 @@ const startNew = () => {
 }
 
 const grantReward = async () => {
+  if (play.active) return
   try {
     const res = await gameApi.freecellReward()
     rewardMsg.value =
@@ -349,6 +377,7 @@ const finishWin = () => {
     saveBest()
   }
   clearState()
+  if (play.active) play.report(roomScore.value)
   grantReward()
 }
 
@@ -357,7 +386,10 @@ const finishLose = () => {
   clearHint()
   clearState()
   selected.value = null
+  if (play.active) play.report(0)
 }
+
+const submitRoomScore = () => play.report(roomScore.value)
 
 const commit = (next) => {
   if (!next || next === game.value) return false
@@ -482,12 +514,15 @@ const onVisibility = () => {
 }
 const onResize = () => measureFelt()
 
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('visibilitychange', onVisibility)
   window.addEventListener('resize', onResize)
   observeFelt()
   loadBest()
-  if (!loadState()) startNew()
+  if (play.active) {
+    await play.load()
+    startNew()
+  } else if (!loadState()) startNew()
   else startTimer()
   measureFelt()
   setTimeout(measureFelt, 320)

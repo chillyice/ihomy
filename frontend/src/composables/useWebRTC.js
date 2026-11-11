@@ -42,10 +42,17 @@ export async function getLocalStream(media) {
   const wantVideo = media === 'VIDEO'
   let firstError = null
   if (wantVideo) {
-    try {
-      return { stream: await navigator.mediaDevices.getUserMedia({ audio: true, video: true }), downgraded: false }
-    } catch (e) {
-      firstError = e // 摄像头不可用降级语音(计划 §8:失败降级提示)
+    // 前置摄像头:部分 iPad/安卓机型不认 `video:true` 的默认设备,显式 facingMode 更稳
+    const attempts = [
+      { audio: true, video: { facingMode: 'user' } },
+      { audio: true, video: true },
+    ]
+    for (const constraints of attempts) {
+      try {
+        return { stream: await navigator.mediaDevices.getUserMedia(constraints), downgraded: false }
+      } catch (e) {
+        firstError = firstError || e // 摄像头不可用降级语音(计划 §8:失败降级提示)
+      }
     }
   }
   try {
@@ -68,9 +75,13 @@ export function createPeer({ iceServers, localStream, onRemoteStream, onIceCandi
   pc.onicecandidate = (e) => {
     if (e.candidate) onIceCandidate?.(e.candidate)
   }
+  // 自己攒一条远端流:iPad/Safari 的 ontrack 可能不带 streams[0],而且音视频分两次回调。
+  // 每次都把新轨道并入同一条流再回传,视频元素只需挂一次 srcObject。
+  const remote = new MediaStream()
   pc.ontrack = (e) => {
-    const stream = e.streams?.[0]
-    if (stream) onRemoteStream?.(stream)
+    if (!e.track) return
+    if (!remote.getTracks().includes(e.track)) remote.addTrack(e.track)
+    onRemoteStream?.(remote)
   }
   pc.onconnectionstatechange = () => onStateChange?.(pc.connectionState)
   return pc

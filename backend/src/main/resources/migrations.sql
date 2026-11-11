@@ -3232,3 +3232,47 @@ CREATE TABLE IF NOT EXISTS `family_file` (
   KEY `idx_family_deleted_created` (`family_id`, `deleted`, `created_at` DESC),
   KEY `idx_family_deleted_name` (`family_id`, `deleted`, `file_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭文件(通用文件列表,不进相册/图书馆)';
+
+-- ------------------------------------------------------------
+-- 「一起玩」房间(2026-11-11,V12.8)
+--   family_game_room + family_game_room_member:2~8 人 PK/合作房间。
+--   只新增两张表,按 family_id 隔离,软删;实时盘面状态不落库(房主经 WS 广播)。
+--   幂等:CREATE TABLE IF NOT EXISTS,重复执行安全。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `family_game_room` (
+  `id`           BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`    BIGINT      NOT NULL COMMENT '所属家庭ID',
+  `game_code`    VARCHAR(32) NOT NULL COMMENT '游戏code(见 GameConst.ROOM_GAMES)',
+  `mode`         VARCHAR(10) NOT NULL COMMENT '玩法: PK对抗/COOP合作',
+  `seed`         BIGINT      NOT NULL DEFAULT 0 COMMENT '随机种子(同盘/同题,保证各端可重放)',
+  `host_id`      BIGINT      NOT NULL COMMENT '房主ID',
+  `max_players`  INT         NOT NULL DEFAULT 4 COMMENT '人数上限(2~8)',
+  `status`       VARCHAR(20) NOT NULL DEFAULT 'WAITING' COMMENT '状态: WAITING待加入/PLAYING进行中/FINISHED已结束/CANCELLED已取消',
+  `winner_id`    BIGINT      DEFAULT NULL COMMENT '胜者ID(合作/平局为 NULL)',
+  `started_at`   DATETIME    DEFAULT NULL COMMENT '开赛时间',
+  `finished_at`  DATETIME    DEFAULT NULL COMMENT '结束时间',
+  `created_at`   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted`      TINYINT     NOT NULL DEFAULT 0 COMMENT '软删:0正常 1删除',
+  PRIMARY KEY (`id`),
+  KEY `idx_family_status` (`family_id`, `deleted`, `status`, `id`),
+  KEY `idx_host` (`host_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭游戏房间(一起玩:PK/合作)';
+
+CREATE TABLE IF NOT EXISTS `family_game_room_member` (
+  `id`          BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `room_id`     BIGINT      NOT NULL COMMENT '房间ID',
+  `family_id`   BIGINT      NOT NULL COMMENT '所属家庭ID(冗余,便于隔离校验)',
+  `user_id`     BIGINT      NOT NULL COMMENT '成员ID',
+  `role`        VARCHAR(10) NOT NULL DEFAULT 'PLAYER' COMMENT '角色: HOST房主/PLAYER成员',
+  `ready`       TINYINT     NOT NULL DEFAULT 0 COMMENT '是否已准备:0否 1是',
+  `score`       BIGINT      DEFAULT NULL COMMENT '成绩(NULL=未上报)',
+  `finished_at` DATETIME    DEFAULT NULL COMMENT '完成/上报时间(幂等:只在首次上报写入)',
+  `created_at`  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '加入时间',
+  `updated_at`  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted`     TINYINT     NOT NULL DEFAULT 0 COMMENT '软删:0正常 1已离开',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_room_user_deleted` (`room_id`, `user_id`, `deleted`),
+  KEY `idx_room` (`room_id`, `deleted`, `id`),
+  KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭游戏房间成员(准备/成绩/完成时间)';

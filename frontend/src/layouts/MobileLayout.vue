@@ -38,12 +38,11 @@
     <BackToTop />
     <InstallPrompt />
     <MusicPlayer v-if="floatsStore.music" />
-    <ChatFloat />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, defineAsyncComponent } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import MobileTabBar from '@/components/MobileTabBar.vue'
@@ -54,7 +53,6 @@ import MobileMePage from '@/components/MobileMePage.vue'
 import BackToTop from '@/components/BackToTop.vue'
 import InstallPrompt from '@/components/InstallPrompt.vue'
 import MusicPlayer from '@/components/MusicPlayer.vue'
-const ChatFloat = defineAsyncComponent(() => import('@/components/chat/ChatFloat.vue'))
 import { isMobileHomePath, mobileHeaderTitleKey } from '@/utils/mobileNav'
 import { useFloatsStore } from '@/stores/floats'
 

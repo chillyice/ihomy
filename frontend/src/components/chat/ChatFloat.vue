@@ -43,6 +43,18 @@
 
     <!-- 拖到底部删除区:桌面端拖球/拖面板时出现,松手即隐藏浮窗(可在聊天室重新开启) -->
     <FloatDeleteDock :active="dockActive" :over="dockOver" />
+
+    <!-- 新消息横幅:浮窗收起/未在看聊天时来消息,给一条看得见的提示(不只是声音/角标) -->
+    <Transition name="chat-toast">
+      <button v-if="notifyMsg" type="button" class="chat-toast" @click="openFromToast">
+        <span class="chat-toast-avatar">{{ notifyMsg.senderName?.charAt(0) }}</span>
+        <span class="chat-toast-body">
+          <b class="chat-toast-name">{{ notifyMsg.senderName }}</b>
+          <span class="chat-toast-text">{{ toastPreview }}</span>
+        </span>
+        <span class="chat-toast-open">{{ $t('chat.toastOpen') }}</span>
+      </button>
+    </Transition>
   </template>
 </template>
 
@@ -174,25 +186,63 @@ const removeFloat = () => {
   floatsStore.setChat(false)
   expanded.value = false
   ball.reset()
+  clearToast()
   ElMessage.info(t('chat.floatRemoved'))
 }
 
 const expand = () => {
   // 浮窗与 /chat 页共用 stores/chat.js 的缓存:首次展开必须自己拉历史,
   // 否则消息区只会保留「加载中」转圈,等 /chat 页那样拉过一次才停
-  chatStore.loadHistory()
+  chatStore.loadHistory({ force: true })
   expanded.value = true
+  clearToast()
 }
 const collapse = () => {
   expanded.value = false
 }
+
+// ---------- 新消息横幅 ----------
+// 浮窗收起或不在聊天界面时来消息,除了角标/系统提示音,再给一条 6 秒的可见横幅。
+const notifyMsg = ref(null)
+let notifyTimer = null
+const toastPreview = computed(() => {
+  const m = notifyMsg.value
+  if (!m) return ''
+  if (m.msgType && m.msgType !== 'TEXT') return t('chat.toastRich')
+  return String(m.content || '').slice(0, 60)
+})
+const clearToast = () => {
+  notifyMsg.value = null
+  if (notifyTimer) {
+    clearTimeout(notifyTimer)
+    notifyTimer = null
+  }
+}
+const openFromToast = () => {
+  clearToast()
+  expand()
+}
+watch(
+  () => chatStore.lastIncoming,
+  (m) => {
+    if (!m || !show.value) return
+    if (m.senderId === userStore.userInfo?.id) return
+    if (chatStore.viewing) return
+    notifyMsg.value = m
+    if (notifyTimer) clearTimeout(notifyTimer)
+    notifyTimer = setTimeout(clearToast, 6000)
+  },
+)
 
 // 展开=在看(推进已读),收起=交还未读计数;/chat 页经由 chatPageActive 与这里叠加
 watch(expanded, (v) => {
   chatStore.floatOpen = v
 })
 watch(show, (v) => {
-  if (!v) collapse()
+  if (!v) {
+    collapse()
+    clearToast()
+  }
 })
 
 // 登录后全局建连(浮窗挂载即代表外壳可用);登出收起
@@ -221,6 +271,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   detachTrack?.()
   dockCancel()
+  if (notifyTimer) clearTimeout(notifyTimer)
 })
 </script>
 
@@ -335,5 +386,79 @@ onBeforeUnmount(() => {
 .chat-float-sheet :deep(.chat-panel) {
   flex: 1;
   min-height: 0;
+}
+
+/* 新消息横幅:桌面右上、移动端顶部,不遮输入区;点一下直接展开浮窗 */
+.chat-toast {
+  position: fixed;
+  right: 18px;
+  top: 84px;
+  z-index: var(--z-float);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(360px, calc(100vw - 36px));
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-card);
+  box-shadow: var(--shadow-hover);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.chat-toast-avatar {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: var(--color-brand-text);
+  background: rgba(var(--color-brand-rgb), 0.9);
+}
+.chat-toast-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.chat-toast-name {
+  font-size: 13px;
+}
+.chat-toast-text {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat-toast-open {
+  flex: none;
+  font-size: 12px;
+  color: var(--color-accent);
+}
+.chat-toast-enter-active,
+.chat-toast-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+.chat-toast-enter-from,
+.chat-toast-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+@media (max-width: 768px) {
+  .chat-toast {
+    right: 12px;
+    left: 12px;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    max-width: none;
+  }
 }
 </style>

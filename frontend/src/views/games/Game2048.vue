@@ -12,7 +12,7 @@
 
     <div ref="gameCardEl" class="bf-card game-surface" @contextmenu.prevent @dblclick.prevent>
       <div class="bf-head">
-        <div class="bf-title">2048{{ matchId ? ' · ' + $t('games.match.tag') : '' }}</div>
+        <div class="bf-title">2048{{ matchId ? ' · ' + $t('games.match.tag') : play.active ? ' · ' + $t('games.room.together') : '' }}</div>
         <div class="bf-scores">
           <div class="bf-score-box">
             <span class="bf-score-label">{{ $t('games.g2048.score') }}</span>
@@ -25,12 +25,33 @@
         </div>
       </div>
 
+      <GameRoomBar
+        :room="play.room"
+        :is-host="play.isHost"
+        :score="score"
+        :reported="play.reported"
+        :ended="play.ended"
+        :result="play.spec?.result"
+        :my-id="play.myId"
+        @submit="submitRoomScore"
+        @leave="play.leave"
+      />
+
       <div class="bf-actions">
-        <el-select v-if="!matchId" v-model="size" size="small" class="bf-size-select" :teleported="!isFullscreen" @change="switchSize">
+        <el-select
+          v-if="!matchId && !play.active"
+          v-model="size"
+          size="small"
+          class="bf-size-select"
+          :teleported="!isFullscreen"
+          @change="switchSize"
+        >
           <el-option v-for="s in BOARD_SIZES" :key="s" :value="s" :label="s + '×' + s" />
         </el-select>
         <el-button v-if="!matchId" size="small" round @click="startNew">{{ $t('games.g2048.newGame') }}</el-button>
-        <el-button v-if="!matchId" size="small" round :disabled="!history.length" @click="undo">{{ $t('games.g2048.undo') }}</el-button>
+        <el-button v-if="!matchId && !play.active" size="small" round :disabled="!history.length" @click="undo">{{
+          $t('games.g2048.undo')
+        }}</el-button>
       </div>
 
       <!-- 对战横幅:同种子赛,对手信息与结算结果 -->
@@ -93,7 +114,9 @@ import { useUserStore } from '@/stores/user'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import PageToolbar from '@/components/PageToolbar.vue'
 import GameTopActions from '@/components/games/GameTopActions.vue'
+import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import { useGameView } from '@/composables/useGameView'
+import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { BOARD_SIZES, createGame, hasWon, isGameOver, isValidTiles, move, spawnTile } from '@/utils/games/game2048'
 import { seededRng } from '@/utils/games/seededRng'
 
@@ -102,6 +125,9 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const sunLight = inject(SUN_LIGHT_KEY, null)
+
+// ---------- 「一起玩」房间(?room=<id>):同 seed 各自跑,终局/交卷上报 ----------
+const play = useGameRoomPlay()
 
 // ---------- 对战模式(?match=<id>):同种子赛,禁存档/撤销/列宽/奖励,终局自动上报 ----------
 const matchId = computed(() => Number(route.query.match) || 0)
@@ -149,10 +175,6 @@ const reportMatchScore = async () => {
   }
 }
 
-watch(gameOver, (over) => {
-  if (over && matchId.value) reportMatchScore()
-})
-
 const MAX_HISTORY = 20
 
 const pageEl = ref(null)
@@ -171,6 +193,15 @@ const newIds = ref(new Set())
 const mergedIds = ref(new Set())
 
 const gameOver = computed(() => isGameOver(tiles.value, size.value))
+
+// 终局自动上报:旧 1v1 与「一起玩」都走这里(观测量在 gameOver 定义之后才注册,避免 TDZ)
+watch(gameOver, (over) => {
+  if (!over) return
+  if (matchId.value) reportMatchScore()
+  if (play.active) play.report(score.value)
+})
+
+const submitRoomScore = () => play.report(score.value)
 
 // 4 列沿用旧键,其余列宽各用独立键
 const bestKey = () => (size.value === 4 ? 'ihomy:games:2048:best:v1' : `ihomy:games:2048:best:${size.value}:v1`)
@@ -218,7 +249,7 @@ const saveBest = () => {
   }
 }
 const saveState = () => {
-  if (matchId.value) return
+  if (matchId.value || play.active) return
   try {
     localStorage.setItem(stateKey(), JSON.stringify({ tiles: tiles.value, score: score.value, achieved: achieved.value }))
   } catch (e) {
@@ -226,7 +257,7 @@ const saveState = () => {
   }
 }
 const clearState = () => {
-  if (matchId.value) return
+  if (matchId.value || play.active) return
   try {
     localStorage.removeItem(stateKey())
   } catch (e) {
@@ -234,7 +265,7 @@ const clearState = () => {
   }
 }
 const loadState = () => {
-  if (matchId.value) return null
+  if (matchId.value || play.active) return null
   try {
     const raw = JSON.parse(localStorage.getItem(stateKey()) || 'null')
     if (!raw || !isValidTiles(raw.tiles, size.value) || !raw.tiles.length) return null
@@ -247,8 +278,9 @@ const loadState = () => {
 
 // ---------- 游戏流程 ----------
 const startNew = () => {
-  // 对战模式:从对战 seed 重建随机序列(首只方块即由该链生成)
-  matchRng.value = matchId.value ? seededRng(matchInfo.value?.seed ?? 0) : null
+  // 对战/房间模式:从 seed 重建随机序列(首只方块即由该链生成)
+  const runSeed = matchId.value ? (matchInfo.value?.seed ?? 0) : play.active ? play.seed : 0
+  matchRng.value = runSeed ? seededRng(runSeed) : null
   tiles.value = createGame(matchRng.value ?? Math.random, size.value)
   score.value = 0
   achieved.value = false
@@ -319,7 +351,7 @@ const tryMove = (direction) => {
 }
 
 const undo = () => {
-  if (won.value || matchId.value || !history.value.length) return
+  if (won.value || matchId.value || play.active || !history.value.length) return
   const last = history.value.pop()
   tiles.value = last.tiles
   score.value = last.score
@@ -328,7 +360,7 @@ const undo = () => {
 }
 
 const grantReward = async () => {
-  if (matchId.value) return
+  if (matchId.value || play.active) return
   try {
     const res = await gameApi.game2048Reward()
     rewardMsg.value =
@@ -394,6 +426,13 @@ onMounted(async () => {
     } catch {
       matchInfo.value = null
     }
+    startNew()
+    return
+  }
+
+  if (play.active) {
+    // 房间:拉房间取 seed(等房间时间超过 seed 落地),再开同种子局
+    await play.load()
     startNew()
     return
   }

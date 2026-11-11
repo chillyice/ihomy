@@ -12,7 +12,7 @@
 
     <div ref="gameCardEl" class="tt-card card game-surface" @contextmenu.prevent @dblclick.prevent>
       <div class="tt-head">
-        <div class="tt-title">{{ $t('games.tetris.title') }}</div>
+        <div class="tt-title">{{ $t('games.tetris.title') }}{{ play.active ? ' · ' + $t('games.room.together') : '' }}</div>
         <div class="tt-stats">
           <div class="tt-stat">
             <span class="tt-stat-label">{{ $t('games.tetris.score') }}</span>
@@ -39,6 +39,18 @@
         </el-button>
         <el-button type="primary" size="small" round @click="startNew">{{ $t('games.tetris.newGame') }}</el-button>
       </div>
+
+      <GameRoomBar
+        :room="play.room"
+        :is-host="play.isHost"
+        :score="game.score"
+        :reported="play.reported"
+        :ended="play.ended"
+        :result="play.spec?.result"
+        :my-id="play.myId"
+        @submit="submitRoomScore"
+        @leave="play.leave"
+      />
 
       <div class="tt-stage">
         <div class="tt-board-wrap">
@@ -78,11 +90,11 @@
         <el-button class="tt-pad-btn" circle @click="act((s) => tryMove(s, 1, 0))">
           <el-icon><ArrowRightBold /></el-icon>
         </el-button>
-        <el-button class="tt-pad-btn" circle @click="act((s) => softDrop(s))">
+        <el-button class="tt-pad-btn" circle @click="act((s, r) => softDrop(s, r))">
           <el-icon><ArrowDownBold /></el-icon>
         </el-button>
-        <el-button class="tt-pad-btn tt-drop" @click="act((s) => hardDrop(s))">{{ $t('games.tetris.drop') }}</el-button>
-        <el-button class="tt-pad-btn" @click="act((s) => holdPiece(s))">{{ $t('games.tetris.hold') }}</el-button>
+        <el-button class="tt-pad-btn tt-drop" @click="act((s, r) => hardDrop(s, r))">{{ $t('games.tetris.drop') }}</el-button>
+        <el-button class="tt-pad-btn" @click="act((s, r) => holdPiece(s, r))">{{ $t('games.tetris.hold') }}</el-button>
       </div>
 
       <div class="tt-tip">{{ $t('games.tetris.tip') }}</div>
@@ -118,9 +130,12 @@ import { useI18n } from 'vue-i18n'
 import { ArrowDownBold, ArrowLeftBold, ArrowRightBold, RefreshRight } from '@element-plus/icons-vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import GameTopActions from '@/components/games/GameTopActions.vue'
+import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import { seededRng } from '@/utils/games/seededRng'
 import { useGameView } from '@/composables/useGameView'
+import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import {
   SHAPES,
   STATUS,
@@ -147,6 +162,9 @@ const sunLight = inject(SUN_LIGHT_KEY, null)
 const pageEl = ref(null)
 const gameCardEl = ref(null)
 const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({ page: pageEl, stage: gameCardEl })
+const play = useGameRoomPlay()
+/** 房间模式下的种子随机数:7-bag 序列两端一致 */
+let rng = null
 const game = ref(createGame())
 const paused = ref(false)
 const best = ref(0)
@@ -194,6 +212,7 @@ const saveBest = () => {
   }
 }
 const saveState = () => {
+  if (play.active) return
   try {
     localStorage.setItem(STATE_KEY, JSON.stringify({ game: game.value, paused: paused.value }))
   } catch (e) {
@@ -201,6 +220,7 @@ const saveState = () => {
   }
 }
 const clearState = () => {
+  if (play.active) return
   try {
     localStorage.removeItem(STATE_KEY)
   } catch (e) {
@@ -208,6 +228,7 @@ const clearState = () => {
   }
 }
 const loadState = () => {
+  if (play.active) return false
   try {
     const raw = JSON.parse(localStorage.getItem(STATE_KEY) || 'null')
     if (!raw || !isValidState(raw.game) || raw.game.status !== STATUS.PLAYING) return false
@@ -231,12 +252,13 @@ const schedule = () => {
   if (paused.value || game.value.status !== STATUS.PLAYING) return
   tickTimer = setTimeout(() => {
     tickTimer = null
-    apply(tick(game.value))
+    apply(tick(game.value, rng ?? Math.random))
     schedule()
   }, speedMs.value)
 }
 
 const grantReward = async () => {
+  if (play.active) return
   try {
     const res = await gameApi.tetrisReward()
     rewardMsg.value =
@@ -251,6 +273,7 @@ const grantReward = async () => {
 const finishGame = () => {
   stopTimer()
   clearState()
+  if (play.active) play.report(game.value.score)
   if (game.value.lines >= REWARD_LINES) grantReward()
 }
 
@@ -272,18 +295,21 @@ const apply = (next) => {
 
 const act = (fn) => {
   if (paused.value || game.value.status !== STATUS.PLAYING) return
-  apply(fn(game.value))
+  apply(fn(game.value, rng ?? Math.random))
   schedule()
 }
 
 const startNew = () => {
   stopTimer()
-  game.value = createGame()
+  rng = play.active ? seededRng(play.seed) : null
+  game.value = rng ? createGame(rng) : createGame()
   paused.value = false
   rewardMsg.value = ''
   clearState()
   schedule()
 }
+
+const submitRoomScore = () => play.report(game.value.score)
 
 const togglePause = () => {
   if (game.value.status !== STATUS.PLAYING) return
@@ -317,7 +343,7 @@ const onKeydown = (event) => {
     case 's':
     case 'S':
       event.preventDefault()
-      act((s) => softDrop(s))
+      act((s, r) => softDrop(s, r))
       break
     case 'ArrowUp':
     case 'w':
@@ -329,11 +355,11 @@ const onKeydown = (event) => {
       break
     case ' ':
       event.preventDefault()
-      act((s) => hardDrop(s))
+      act((s, r) => hardDrop(s, r))
       break
     case 'c':
     case 'C':
-      act((s) => holdPiece(s))
+      act((s, r) => holdPiece(s, r))
       break
     case 'p':
     case 'P':
@@ -351,11 +377,16 @@ const onVisibility = () => {
   else schedule()
 }
 
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('keydown', onKeydown)
   document.addEventListener('visibilitychange', onVisibility)
   sunLight?.suspendEffects()
   loadBest()
+  if (play.active) {
+    await play.load()
+    startNew()
+    return
+  }
   if (!loadState()) startNew()
   else if (game.value.score > best.value) {
     best.value = game.value.score

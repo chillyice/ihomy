@@ -29,6 +29,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     private final ChatService chatService;
     private final com.ihomy.service.GameMatchService matchService;
+    private final com.ihomy.service.GameRoomService roomService;
     private final ObjectMapper objectMapper;
 
     /** 房间表:familyId -> 在线会话集合(会话自带 userId/familyId 属性) */
@@ -57,6 +58,11 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         Long familyId = familyOf(session);
         Long userId = userIdOf(session);
         if (familyId == null || userId == null) {
+            return;
+        }
+        // 合作模式的盘面快照会到几 KB;超过 128KB 一律拒收,防止异常客户端打爆服务端内存
+        if (message.getPayloadLength() > 128 * 1024) {
+            replyError(session, "TOO_LARGE");
             return;
         }
         // 每条 WS 消息一个独立 tid:握手 tid 只代表建连,消息级操作单独成链路
@@ -124,6 +130,12 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             return;
         }
         if ("end".equals(event)) {
+            // 先转发给对端:以前只落 CALL 记录卡不转发,对方要等连接超时/自然收尾才发现已挂断,
+            // 表现为「一方挂断,另一方反应很慢」。转发与落卡互不依赖,对端离线时转发自然失败。
+            Map<String, Object> out = new java.util.LinkedHashMap<>();
+            data.forEach((k, v) -> out.put(String.valueOf(k), v));
+            out.put("from", userId);
+            sendToUser(to, "call-signal", out);
             // 通话结束:服务端统一落 CALL 记录并广播(挂断/拒绝/超时/取消/忙线都收敛到这里)
             String media = "VIDEO".equals(str(data.get("media"))) ? "VIDEO" : "AUDIO";
             String result = switch (str(data.get("reason"))) {
@@ -143,10 +155,24 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     }
 
     /**
-     * 对战信令(实时对战输入级同步):1v1 即「转发给对端」——按 matchId 找对局,
-     * 发给除发送者外的另一方(host/guest);不在线不补发,由双方本地确定性模拟兜底。
+     * 对战信令(实时对战输入级同步):
+     * - 旧 1v1(matchId):转发给对局中的另一方;
+     * - 新房间(roomId):转发给房间内除发送者外的全部成员(合作状态/操作/成绩进度)。
+     * 都不排队补发,由各端本地状态兜底。
      */
     private void onGameSignal(WebSocketSession session, Long familyId, Long userId, Map<?, ?> data) {
+        Long roomId = data.get("roomId") instanceof Number n ? n.longValue() : null;
+        if (roomId != null) {
+            if (!roomService.isMember(familyId, roomId, userId)) {
+                replyError(session, "BAD_SIGNAL");
+                return;
+            }
+            Map<String, Object> out = new java.util.LinkedHashMap<>();
+            data.forEach((k, v) -> out.put(String.valueOf(k), v));
+            out.put("from", userId);
+            sendToUsers(roomService.memberIds(familyId, roomId), "game-signal", out, userId);
+            return;
+        }
         Long matchId = data.get("matchId") instanceof Number n ? n.longValue() : null;
         String event = str(data.get("event"));
         if (matchId == null || event == null || event.isBlank()) {
@@ -211,6 +237,33 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             if (s.isOpen()) {
                 sendQuietly(s, msg);
                 sent++;
+            }
+        }
+        return sent;
+    }
+
+    /**
+     * 多目标定向投递(房间广播用):跳过指定用户与离线用户,返回成功送达的会话数。
+     */
+    public int sendToUsers(java.util.Collection<Long> userIds, String type, Map<String, Object> data, Long excludeUserId) {
+        if (userIds == null || userIds.isEmpty()) {
+            return 0;
+        }
+        TextMessage msg = new TextMessage(toJson(envelope(type, data)));
+        int sent = 0;
+        for (Long userId : userIds) {
+            if (userId == null || userId.equals(excludeUserId)) {
+                continue;
+            }
+            Set<WebSocketSession> sessions = userSessions.get(userId);
+            if (sessions == null) {
+                continue;
+            }
+            for (WebSocketSession s : sessions) {
+                if (s.isOpen()) {
+                    sendQuietly(s, msg);
+                    sent++;
+                }
             }
         }
         return sent;

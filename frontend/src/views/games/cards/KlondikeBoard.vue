@@ -1,7 +1,7 @@
 <template>
   <div class="sol-card card game-surface" @contextmenu.prevent @dblclick.prevent>
     <div class="sol-head">
-      <div class="sol-title">{{ $t('games.solitaire.title') }}</div>
+      <div class="sol-title">{{ $t('games.solitaire.title') }}{{ play.active ? ' · ' + $t('games.room.together') : '' }}</div>
       <div class="sol-stats">
         <div class="sol-stat">
           <span class="sol-stat-label">{{ $t('games.solitaire.score') }}</span>
@@ -23,15 +23,29 @@
     </div>
 
     <div class="sol-actions">
-      <el-select v-model="drawCount" size="small" class="sol-draw" :teleported="!gameFullscreen">
+      <el-select v-model="drawCount" size="small" class="sol-draw" :teleported="!gameFullscreen" :disabled="play.active">
         <el-option :value="1" :label="$t('games.solitaire.draw1')" />
         <el-option :value="3" :label="$t('games.solitaire.draw3')" />
       </el-select>
       <el-button size="small" round @click="showHint">{{ $t('games.solitaire.hint') }}</el-button>
-      <el-button size="small" round :disabled="!history.length" @click="undo">{{ $t('games.solitaire.undo') }}</el-button>
+      <el-button v-if="!play.active" size="small" round :disabled="!history.length" @click="undo">{{
+        $t('games.solitaire.undo')
+      }}</el-button>
       <el-button size="small" round @click="autoFinishAll">{{ $t('games.solitaire.autoFinish') }}</el-button>
       <el-button type="primary" size="small" round @click="startNew">{{ $t('games.solitaire.newGame') }}</el-button>
     </div>
+
+    <GameRoomBar
+      :room="play.room"
+      :is-host="play.isHost"
+      :score="game.score"
+      :reported="play.reported"
+      :ended="play.ended"
+      :result="play.spec?.result"
+      :my-id="play.myId"
+      @submit="submitRoomScore"
+      @leave="play.leave"
+    />
 
     <div ref="feltEl" class="sol-felt" :style="feltStyle">
       <div class="sol-row sol-top">
@@ -161,8 +175,11 @@ import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { gameApi } from '@/api'
 import PlayingCard from '@/components/games/PlayingCard.vue'
+import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import { useCardDrag } from '@/composables/useCardDrag'
+import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { formatClock } from '@/utils/games/gameClock'
+import { seededRng } from '@/utils/games/seededRng'
 import { CARD_RATIO, fitCardWidth, pileSteps } from '@/utils/games/cardLayout'
 import {
   STATUS,
@@ -193,6 +210,9 @@ const gameFullscreen = inject('gameFullscreen', ref(false))
 
 const feltEl = ref(null)
 const feltSize = ref({ w: 0, h: 0 })
+const play = useGameRoomPlay()
+/** 房间模式的同种子发牌:同一 seed + 同 drawCount 得到同一副牌 */
+let rng = null
 const game = ref(deal(1))
 const elapsed = ref(0)
 const best = ref(0)
@@ -300,6 +320,7 @@ const saveBest = () => {
   }
 }
 const saveState = () => {
+  if (play.active) return
   try {
     localStorage.setItem(STATE_KEY, JSON.stringify({ game: game.value, elapsed: elapsed.value }))
   } catch (e) {
@@ -307,6 +328,7 @@ const saveState = () => {
   }
 }
 const clearState = () => {
+  if (play.active) return
   try {
     localStorage.removeItem(STATE_KEY)
   } catch (e) {
@@ -314,6 +336,7 @@ const clearState = () => {
   }
 }
 const loadState = () => {
+  if (play.active) return false
   try {
     const raw = JSON.parse(localStorage.getItem(STATE_KEY) || 'null')
     if (!raw || !isValidState(raw.game) || !Number.isInteger(raw.elapsed) || raw.elapsed < 0) return false
@@ -354,7 +377,8 @@ const showHint = () => {
 const startNew = () => {
   stopTimer()
   clearHint()
-  game.value = deal(drawCount.value)
+  rng = play.active ? seededRng(play.seed) : null
+  game.value = deal(drawCount.value, rng || undefined)
   history.value = []
   selected.value = null
   elapsed.value = 0
@@ -365,6 +389,7 @@ const startNew = () => {
 }
 
 const grantReward = async () => {
+  if (play.active) return
   try {
     const res = await gameApi.solitaireReward()
     rewardMsg.value =
@@ -383,6 +408,7 @@ const finishWin = () => {
     saveBest()
   }
   clearState()
+  if (play.active) play.report(game.value.score)
   grantReward()
 }
 
@@ -392,7 +418,10 @@ const finishLose = () => {
   clearHint()
   clearState()
   selected.value = null
+  if (play.active) play.report(0)
 }
+
+const submitRoomScore = () => play.report(game.value.score)
 
 const commit = (next) => {
   if (!next || next === game.value) return false
@@ -535,12 +564,15 @@ watch(drawCount, (value) => {
   saveState()
 })
 
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('visibilitychange', onVisibility)
   window.addEventListener('resize', onResize)
   observeFelt()
   loadBest()
-  if (!loadState()) {
+  if (play.active) {
+    await play.load()
+    startNew()
+  } else if (!loadState()) {
     startNew()
   } else {
     if (game.value.score > best.value) {

@@ -1,12 +1,17 @@
-<!-- 游戏邀请卡:点「一起玩」直达对应游戏页;P4 升级为可加入的对局 -->
+<!-- 游戏邀请卡:房间邀请直达房间大厅,旧 1v1 邀请直达对战详情,普通邀请直达游戏页 -->
 <template>
   <div class="invite-card">
     <el-icon class="invite-icon" :size="22"><Trophy /></el-icon>
     <div class="invite-main">
       <div class="invite-title">{{ gameName }}</div>
-      <div class="invite-hint">{{ $t('chat.card.inviteHint', { name: msg.senderName || '' }) }}</div>
+      <div class="invite-hint">
+        {{ roomId ? $t('chat.card.roomHint', { name: msg.senderName || '' }) : $t('chat.card.inviteHint', { name: msg.senderName || '' }) }}
+      </div>
     </div>
-    <el-button v-if="matchId" type="primary" size="small" round @click="router.push(`/games/match/${matchId}`)">
+    <el-button v-if="roomId" type="primary" size="small" round @click="router.push(`/games/room/${roomId}`)">
+      {{ $t('chat.card.joinRoom') }}
+    </el-button>
+    <el-button v-else-if="matchId" type="primary" size="small" round @click="router.push(`/games/match/${matchId}`)">
       {{ $t('chat.card.openMatch') }}
     </el-button>
     <el-button v-else-if="game" type="primary" size="small" round @click="router.push(game.route)">
@@ -16,7 +21,7 @@
 </template>
 
 <script setup>
-// 游戏邀请(GAME_INVITE):payload {gameCode};content=游戏名快照
+// 游戏邀请(GAME_INVITE):payload {gameCode, roomId?, mode?, matchId?};content=游戏名快照
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Trophy } from '@element-plus/icons-vue'
@@ -31,6 +36,10 @@ const router = useRouter()
 const { t } = useI18n()
 const payload = computed(() => parsePayload(props.msg.payload) || {})
 const game = computed(() => gameByCode(payload.value.gameCode))
+const roomId = computed(() => {
+  const n = Number(payload.value.roomId)
+  return Number.isFinite(n) && n > 0 ? n : 0
+})
 const matchId = computed(() => {
   const n = Number(payload.value.matchId)
   return Number.isFinite(n) && n > 0 ? n : 0

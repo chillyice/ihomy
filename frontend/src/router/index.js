@@ -205,6 +205,8 @@ const routes = [
   },
   // 家庭对战详情(邀请卡/结果卡落点:查看比分/加入/开赛)
   { path: '/games/match/:id', name: 'GameMatch', component: () => import('@/views/games/MatchDetail.vue'), meta: { requiresAuth: true } },
+  // 「一起玩」房间大厅(2~8 人,PK/COOP):邀请卡落点,准备齐后自动进入游戏页
+  { path: '/games/room/:id', name: 'GameRoom', component: () => import('@/views/games/GameRoom.vue'), meta: { requiresAuth: true } },
   // 运维管理页:仅 OPS 角色可访问
   { path: '/ops', name: 'Ops', component: () => import('@/views/ops/Ops.vue'), meta: { ops: true } },
   // 咔哒软件首页:独立下载页(托管在 ihomy 域名下),standalone 不套 ihomy 外壳

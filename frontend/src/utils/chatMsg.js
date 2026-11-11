@@ -12,7 +12,7 @@ export const MSG_TYPE = {
 /** 站内对象卡可引用的对象类型 */
 export const CARD_OBJ_TYPES = ['ALBUM', 'PHOTO', 'VIDEO', 'BLOG', 'DIARY', 'BOOK', 'WISH', 'MATCH']
 
-/** 八个 H5 小游戏:code 与后端 GameConst.H5_GAME_CODES 一致,route 为邀请卡跳转页 */
+/** 九个 H5 小游戏:code 与后端 GameConst.H5_GAME_CODES 一致,route 为邀请卡跳转页 */
 export const H5_GAMES = [
   { code: 'game_2048', nameKey: 'games.g2048.title', route: '/games/2048' },
   { code: 'game_sudoku', nameKey: 'games.sudoku.title', route: '/games/sudoku' },
@@ -22,6 +22,7 @@ export const H5_GAMES = [
   { code: 'game_snake', nameKey: 'games.snake.title', route: '/games/snake' },
   { code: 'game_solitaire', nameKey: 'games.solitaire.title', route: '/games/cards/klondike' },
   { code: 'game_spider', nameKey: 'games.spider.title', route: '/games/cards/spider' },
+  { code: 'game_freecell', nameKey: 'games.freecell.title', route: '/games/cards/freecell' },
 ]
 
 export const H5_GAME_CODES = new Set(H5_GAMES.map((g) => g.code))
@@ -102,6 +103,16 @@ export function buildCardPayload({ objType, objId, url, sub, cover }) {
 export function buildGameInvitePayload(gameCode) {
   if (!H5_GAME_CODES.has(gameCode)) return null
   return { gameCode }
+}
+
+/** 「一起玩」房间邀请卡:在游戏邀请基础上带 roomId/mode,点卡片直接进房间大厅 */
+export function buildRoomInvitePayload(gameCode, roomId, mode) {
+  if (!H5_GAME_CODES.has(gameCode)) return null
+  const id = Number(roomId)
+  if (!Number.isFinite(id) || id <= 0) return null
+  const p = { gameCode, roomId: id }
+  if (mode) p.mode = String(mode).slice(0, 16)
+  return p
 }
 
 /**

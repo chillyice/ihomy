@@ -1,7 +1,7 @@
 <template>
   <div class="sol-card card game-surface" @contextmenu.prevent @dblclick.prevent>
     <div class="sol-head">
-      <div class="sol-title">{{ $t('games.spider.title') }}</div>
+      <div class="sol-title">{{ $t('games.spider.title') }}{{ play.active ? ' · ' + $t('games.room.together') : '' }}</div>
       <div class="sol-stats">
         <div class="sol-stat">
           <span class="sol-stat-label">{{ $t('games.spider.score') }}</span>
@@ -23,13 +23,25 @@
     </div>
 
     <div class="sol-actions">
-      <el-select v-model="difficulty" size="small" class="sol-draw" :teleported="!gameFullscreen">
+      <el-select v-model="difficulty" size="small" class="sol-draw" :teleported="!gameFullscreen" :disabled="play.active">
         <el-option v-for="d in DIFFICULTIES" :key="d" :value="d" :label="difficultyLabel(d)" />
       </el-select>
       <el-button size="small" round @click="showHint">{{ $t('games.spider.hint') }}</el-button>
-      <el-button size="small" round :disabled="!history.length" @click="undo">{{ $t('games.spider.undo') }}</el-button>
+      <el-button v-if="!play.active" size="small" round :disabled="!history.length" @click="undo">{{ $t('games.spider.undo') }}</el-button>
       <el-button type="primary" size="small" round @click="startNew">{{ $t('games.spider.newGame') }}</el-button>
     </div>
+
+    <GameRoomBar
+      :room="play.room"
+      :is-host="play.isHost"
+      :score="game.score"
+      :reported="play.reported"
+      :ended="play.ended"
+      :result="play.spec?.result"
+      :my-id="play.myId"
+      @submit="submitRoomScore"
+      @leave="play.leave"
+    />
 
     <div ref="feltEl" class="sol-felt" :style="feltStyle">
       <div class="sp-top">
@@ -116,8 +128,11 @@ import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { gameApi } from '@/api'
 import PlayingCard from '@/components/games/PlayingCard.vue'
+import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import { useCardDrag } from '@/composables/useCardDrag'
+import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { formatClock } from '@/utils/games/gameClock'
+import { seededRng } from '@/utils/games/seededRng'
 import { CARD_RATIO, fitCardWidth, pileSteps } from '@/utils/games/cardLayout'
 import {
   COLUMNS,
@@ -147,6 +162,9 @@ const gameFullscreen = inject('gameFullscreen', ref(false))
 
 const feltEl = ref(null)
 const feltSize = ref({ w: 0, h: 0 })
+const play = useGameRoomPlay()
+/** 房间模式的同种子发牌 */
+let rng = null
 const difficulty = ref(1)
 const game = ref(deal(1))
 const elapsed = ref(0)
@@ -249,6 +267,7 @@ const saveBest = () => {
   }
 }
 const saveState = () => {
+  if (play.active) return
   try {
     const payload = { game: game.value, elapsed: elapsed.value }
     localStorage.setItem(STATE_KEY, JSON.stringify(payload))
@@ -257,6 +276,7 @@ const saveState = () => {
   }
 }
 const clearState = () => {
+  if (play.active) return
   try {
     localStorage.removeItem(STATE_KEY)
   } catch (e) {
@@ -264,6 +284,7 @@ const clearState = () => {
   }
 }
 const loadState = () => {
+  if (play.active) return false
   try {
     const raw = JSON.parse(localStorage.getItem(STATE_KEY) || 'null')
     if (!raw || !isValidState(raw.game) || !Number.isInteger(raw.elapsed) || raw.elapsed < 0) return false
@@ -304,7 +325,8 @@ const showHint = () => {
 const startNew = () => {
   stopTimer()
   clearHint()
-  game.value = deal(difficulty.value)
+  rng = play.active ? seededRng(play.seed) : null
+  game.value = deal(difficulty.value, rng || undefined)
   history.value = []
   selected.value = null
   elapsed.value = 0
@@ -315,6 +337,7 @@ const startNew = () => {
 }
 
 const grantReward = async () => {
+  if (play.active) return
   try {
     const res = await gameApi.spiderReward()
     rewardMsg.value =
@@ -334,6 +357,7 @@ const finishWin = () => {
     saveBest()
   }
   clearState()
+  if (play.active) play.report(game.value.score)
   grantReward()
 }
 
@@ -342,7 +366,10 @@ const finishLose = () => {
   clearHint()
   clearState()
   selected.value = null
+  if (play.active) play.report(0)
 }
+
+const submitRoomScore = () => play.report(game.value.score)
 
 const commit = (next) => {
   if (!next || next === game.value) return false
@@ -449,12 +476,15 @@ watch(difficulty, (value) => {
   startNew()
 })
 
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('visibilitychange', onVisibility)
   window.addEventListener('resize', onResize)
   observeFelt()
   loadBest()
-  if (!loadState()) startNew()
+  if (play.active) {
+    await play.load()
+    startNew()
+  } else if (!loadState()) startNew()
   else startTimer()
   measureFelt()
   setTimeout(measureFelt, 320)

@@ -360,6 +360,19 @@ export const gameApi = {
   deleteSave: (id, name) => request.delete(`/game/${id}/saves/${encodeURIComponent(name)}`),
 }
 
+// 「一起玩」房间(2~8 人,PK/COOP):建房自动往聊天流发邀请卡,状态变化经 WS game-signal(event=room)推送
+export const roomApi = {
+  create: (data) => request.post('/game/room', data),
+  list: (status) => request.get('/game/room', { params: status ? { status } : {} }),
+  get: (id) => request.get(`/game/room/${id}`),
+  join: (id) => request.post(`/game/room/${id}/join`),
+  ready: (id, ready) => request.post(`/game/room/${id}/ready`, { ready }),
+  start: (id) => request.post(`/game/room/${id}/start`),
+  finish: (id, score) => request.post(`/game/room/${id}/finish`, { score }),
+  end: (id) => request.post(`/game/room/${id}/end`),
+  leave: (id) => request.post(`/game/room/${id}/leave`),
+}
+
 // 愿望单(家庭共享愿望,分类/达成/放弃)
 export const wishApi = {
   list: () => request.get('/wish/list'),

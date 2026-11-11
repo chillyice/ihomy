@@ -12,6 +12,17 @@
     </PageToolbar>
 
     <div ref="gameCardEl" v-loading="generating" class="sd-card game-surface" @contextmenu.prevent @dblclick.prevent>
+      <GameRoomBar
+        :room="play.room"
+        :is-host="play.isHost"
+        :score="elapsed"
+        :reported="play.reported"
+        :ended="play.ended"
+        :result="play.spec?.result"
+        :my-id="play.myId"
+        @submit="submitRoomScore"
+        @leave="play.leave"
+      />
       <div class="sd-head">
         <div class="sd-title">{{ $t('games.sudoku.title') }}</div>
         <div class="sd-head-right">
@@ -205,7 +216,10 @@ import { gameApi } from '@/api'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import PageToolbar from '@/components/PageToolbar.vue'
 import GameTopActions from '@/components/games/GameTopActions.vue'
+import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import { useGameView } from '@/composables/useGameView'
+import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
+import { seededRng } from '@/utils/games/seededRng'
 import {
   CELLS,
   DIFFICULTY_KEYS,
@@ -276,6 +290,101 @@ const elapsed = ref(0)
 const won = ref(false)
 const rewardMsg = ref('')
 const hintFlash = ref(-1)
+
+// ---------- 「一起玩」房间(数独只允许合作) ----------
+// 房主生成题面并权威落子;其他成员的操作(落子/擦除/提示/撤销/长按直填/换题)都发给房主执行,
+// 房主把整盘(题面/答案/笔记/线索/用时/提示次数)广播回来,所有人看到同一盘。
+const play = useGameRoomPlay({ onSignal: onRoomSignal, onRoom: onRoomChange })
+const coopGuest = computed(() => play.active && play.coop && !play.isHost)
+const submitRoomScore = () => play.report(elapsed.value)
+
+function snapshotRoomState() {
+  return {
+    variant: variant.value,
+    difficulty: difficulty.value,
+    puzzle: puzzle.value,
+    solution: solution.value,
+    board: board.value,
+    notes: notes.value,
+    cages: cages.value,
+    regions: regions.value,
+    inequalities: inequalities.value,
+    parity: parity.value,
+    edges: edges.value,
+    thermos: thermos.value,
+    skyscrapers: skyscrapers.value,
+    arith: arith.value,
+    palindromes: palindromes.value,
+    elapsed: elapsed.value,
+    hintsUsed: hintsUsed.value,
+    won: won.value,
+  }
+}
+
+function applyRoomState(state) {
+  if (!state || !Array.isArray(state.board) || state.board.length !== CELLS) return
+  variant.value = VARIANT_KEYS.includes(state.variant) ? state.variant : 'CLASSIC'
+  difficulty.value = DIFFICULTY_KEYS.includes(state.difficulty) ? state.difficulty : 'MEDIUM'
+  puzzle.value = state.puzzle
+  solution.value = state.solution
+  board.value = state.board
+  notes.value = Array.isArray(state.notes) && state.notes.length === CELLS ? state.notes : new Array(CELLS).fill(0)
+  cages.value = state.cages || null
+  regions.value = state.regions || null
+  inequalities.value = state.inequalities || null
+  parity.value = state.parity || null
+  edges.value = state.edges || null
+  thermos.value = state.thermos || null
+  skyscrapers.value = state.skyscrapers || null
+  arith.value = state.arith || null
+  palindromes.value = state.palindromes || null
+  elapsed.value = Math.max(0, Number(state.elapsed) || 0)
+  hintsUsed.value = Math.max(0, Number(state.hintsUsed) || 0)
+  won.value = !!state.won
+  history.value = []
+  if (won.value) stopTimer()
+}
+
+let roomTimer = null
+function broadcastRoomState(immediate = false) {
+  if (!play.active || !play.isHost) return
+  if (roomTimer) {
+    clearTimeout(roomTimer)
+    roomTimer = null
+  }
+  const emit = () => {
+    roomTimer = null
+    play.send('state', { state: snapshotRoomState() })
+  }
+  if (immediate) emit()
+  else roomTimer = setTimeout(emit, 80)
+}
+
+function onRoomSignal(data) {
+  if (!data) return
+  if (data.event === 'state' && coopGuest.value) {
+    applyRoomState(data.state)
+    return
+  }
+  if (data.event === 'sync' && play.isHost) {
+    broadcastRoomState(true)
+    return
+  }
+  if (data.event !== 'op' || !play.isHost) return
+  const index = Number(data.index)
+  const at = Number.isInteger(index) && index >= 0 && index < CELLS ? index : -1
+  if (data.kind === 'input' && Number.isInteger(Number(data.n))) applyInput(Number(data.n), at, !!data.notes)
+  else if (data.kind === 'erase') applyErase(at)
+  else if (data.kind === 'hint') applyHint(at)
+  else if (data.kind === 'undo') applyUndo()
+  else if (data.kind === 'promote') applyPromote(at)
+  else if (data.kind === 'newGame') startNewWith({ difficulty: data.difficulty, variant: data.variant })
+}
+
+function onRoomChange(next) {
+  if (!next) return
+  if (next.status === 'FINISHED' || next.status === 'CANCELLED') stopTimer()
+}
 
 /** 规则约束(生成/判定/存档校验共用同一份口径) */
 const constraintsOf = (key, data) => {
@@ -581,6 +690,8 @@ const stopTimer = () => {
 }
 const startTimer = () => {
   stopTimer()
+  // 合作模式以房主用时为准,访客跟随快照
+  if (coopGuest.value) return
   timer = setInterval(() => {
     if (won.value || document.visibilityState === 'hidden') return
     elapsed.value += 1
@@ -589,6 +700,7 @@ const startTimer = () => {
 
 // ---------- 存档 ----------
 const saveState = () => {
+  if (play.active) return
   if (won.value || !solution.value.length) return
   try {
     localStorage.setItem(
@@ -618,6 +730,7 @@ const saveState = () => {
   }
 }
 const clearState = () => {
+  if (play.active) return
   try {
     localStorage.removeItem(STORAGE_KEY)
   } catch (e) {
@@ -670,13 +783,24 @@ const scheduleSave = () => {
 }
 // ---------- 游戏流程 ----------
 let generateSeq = 0
+// 合作模式首局按房间 seed 生成(房主刷新重进仍是同一道题);之后每次换题本地推进一轮,
+// 否则同 seed + 同难度/变体永远生成一模一样的题,「换题」看起来像没反应。
+// 只在房主侧累加,访客始终以房主广播的题面为准。
+let roomRound = 0
 const startNew = async () => {
+  if (coopGuest.value) {
+    play.send('op', { kind: 'newGame', difficulty: difficulty.value, variant: variant.value })
+    return
+  }
   const seq = ++generateSeq
   generating.value = true
   // 先让 loading 遮罩画出来再算题:杀手数独生成要几百毫秒,直接同步算会卡死一拍
   await nextTick()
-  const res = generatePuzzle(difficulty.value, Math.random, { variant: variant.value })
+  // 房间内按 seed 生成题面:即使房主重启,同一 seed 也还是同一道题
+  const rand = play.active ? seededRng((Number(play.seed) || 1) + roomRound * 7919) : Math.random
+  const res = generatePuzzle(difficulty.value, rand, { variant: variant.value })
   if (seq !== generateSeq) return
+  if (play.active) roomRound += 1
   variant.value = res.variant
   puzzle.value = res.puzzle
   solution.value = res.solution
@@ -708,8 +832,19 @@ const startNew = async () => {
   startTimer()
 }
 
+// 房主按其他成员换题的请求重建题面(先套用对方选的难度/变体)
+const startNewWith = ({ difficulty: nextDifficulty, variant: nextVariant } = {}) => {
+  if (DIFFICULTY_KEYS.includes(nextDifficulty)) difficulty.value = nextDifficulty
+  if (VARIANT_KEYS.includes(nextVariant)) variant.value = nextVariant
+  return startNew()
+}
+
 // 切变体:先清掉旧盘面的存档与线索再开新局,避免旧盘面被写进新变体的档里
 const changeVariant = () => {
+  if (coopGuest.value) {
+    play.send('op', { kind: 'newGame', difficulty: difficulty.value, variant: variant.value })
+    return
+  }
   cages.value = null
   regions.value = null
   inequalities.value = null
@@ -778,10 +913,19 @@ const snapshot = () => {
 // 落数后按当前变体口径清邻居笔记(不规则区替代九宫,对角线/窗口/杀手笼一并计入)
 const clearNotesAround = (index, value) => clearPeerNotes(notes.value, index, value, currentConstraints.value)
 
-const input = (n) => {
-  const index = selected.value
+const input = (n, at = selected.value) => {
+  if (coopGuest.value) {
+    play.send('op', { kind: 'input', index: at, n, notes: notesMode.value })
+    return
+  }
+  applyInput(n, at, notesMode.value)
+}
+
+// 落子/记笔记的唯一实现(房主本地操作与远端请求都走这里)
+const applyInput = (n, at, asNotes) => {
+  const index = at
   if (won.value || generating.value || index < 0 || isGiven(index)) return
-  if (notesMode.value) {
+  if (asNotes) {
     if (board.value[index]) return
     snapshot()
     notes.value[index] ^= 1 << (n - 1)
@@ -799,7 +943,14 @@ const input = (n) => {
 }
 
 const erase = () => {
-  const index = selected.value
+  if (coopGuest.value) {
+    play.send('op', { kind: 'erase', index: selected.value })
+    return
+  }
+  applyErase(selected.value)
+}
+
+const applyErase = (index) => {
   if (won.value || index < 0 || isGiven(index)) return
   if (!board.value[index] && !notes.value[index]) return
   snapshot()
@@ -819,6 +970,14 @@ const flashCell = (index) => {
 
 // 长按只有一个候选的格子:把该笔记直接转成正式数字(可撤销,不计提示次数)
 const promoteSingleNote = (index) => {
+  if (coopGuest.value) {
+    play.send('op', { kind: 'promote', index })
+    return true
+  }
+  return applyPromote(index)
+}
+
+const applyPromote = (index) => {
   if (won.value || generating.value || index < 0) return false
   if (isGiven(index) || board.value[index]) return false
   const candidates = notesOf(notes.value[index])
@@ -859,6 +1018,15 @@ const onCellPressStart = (index, event) => {
 const onCellPressEnd = () => cancelCellPress()
 
 const undo = () => {
+  if (coopGuest.value) {
+    play.send('op', { kind: 'undo' })
+    return
+  }
+  if (won.value || !history.value.length) return
+  applyUndo()
+}
+
+const applyUndo = () => {
   if (won.value || !history.value.length) return
   const last = history.value.pop()
   board.value = last.board
@@ -867,7 +1035,16 @@ const undo = () => {
 
 const useHint = () => {
   if (won.value || generating.value) return
-  let index = selected.value
+  if (coopGuest.value) {
+    play.send('op', { kind: 'hint', index: selected.value })
+    return
+  }
+  applyHint(selected.value)
+}
+
+const applyHint = (at) => {
+  if (won.value || generating.value) return
+  let index = at
   if (index < 0 || board.value[index]) index = pickHintIndex(board.value)
   if (index < 0) return
   snapshot()
@@ -888,10 +1065,15 @@ const finish = () => {
   stopTimer()
   selected.value = -1
   clearState()
+  if (play.active) {
+    if (play.isHost) play.report(elapsed.value)
+    return
+  }
   grantReward()
 }
 
 const grantReward = async () => {
+  if (play.active) return
   try {
     const res = await gameApi.sudokuReward()
     rewardMsg.value =
@@ -946,8 +1128,16 @@ const onKeydown = (event) => {
 // 棋面/笔记改动立即落盘(撤销后立刻刷新也不会回退),计时每秒变化走防抖,避免每秒写 localStorage
 watch([board, notes, difficulty, hintsUsed], saveState, { deep: true })
 watch(elapsed, scheduleSave)
+// 合作模式:房主把整盘(题面/答案/笔记/线索/用时/提示)同步给其他成员
+watch(
+  [board, notes, elapsed, hintsUsed, won, variant, difficulty, puzzle],
+  () => {
+    if (play.active && play.isHost) broadcastRoomState()
+  },
+  { deep: true },
+)
 
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('keydown', onKeydown)
   sunLight?.suspendEffects()
 
@@ -955,6 +1145,14 @@ onMounted(() => {
     quickFill.value = localStorage.getItem(QUICK_FILL_KEY) === '1'
   } catch (e) {
     quickFill.value = false
+  }
+
+  if (play.active) {
+    // 房间:跳过本地存档,房主出题并广播,访客等房主同步
+    await play.load()
+    if (coopGuest.value) play.requestSync()
+    else startNew()
+    return
   }
 
   const saved = loadState()
@@ -986,6 +1184,7 @@ onBeforeUnmount(() => {
   stopTimer()
   cancelCellPress()
   if (saveTimer) clearTimeout(saveTimer)
+  if (roomTimer) clearTimeout(roomTimer)
   saveState()
   document.removeEventListener('keydown', onKeydown)
   sunLight?.restoreEffects()

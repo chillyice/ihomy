@@ -12,7 +12,7 @@
 
     <div ref="gameCardEl" class="sn-card card game-surface" @contextmenu.prevent @dblclick.prevent>
       <div class="sn-head">
-        <div class="sn-title">{{ $t('games.snake.title') }}</div>
+        <div class="sn-title">{{ $t('games.snake.title') }}{{ play.active ? ' · ' + $t('games.room.together') : '' }}</div>
         <div class="sn-stats">
           <div class="sn-stat">
             <span class="sn-stat-label">{{ $t('games.snake.score') }}</span>
@@ -35,6 +35,18 @@
         </el-button>
         <el-button type="primary" size="small" round @click="startNew">{{ $t('games.snake.newGame') }}</el-button>
       </div>
+
+      <GameRoomBar
+        :room="play.room"
+        :is-host="play.isHost"
+        :score="game.score"
+        :reported="play.reported"
+        :ended="play.ended"
+        :result="play.spec?.result"
+        :my-id="play.myId"
+        @submit="submitRoomScore"
+        @leave="play.leave"
+      />
 
       <div class="sn-board" :style="{ '--sn-cols': game.cols }" @touchstart="onTouchStart" @touchend="onTouchEnd">
         <div v-for="(cell, i) in viewCells" :key="i" class="sn-cell" :class="{ snake: cell.snake, head: cell.head, food: cell.food }"></div>
@@ -79,9 +91,12 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import PageToolbar from '@/components/PageToolbar.vue'
 import GameTopActions from '@/components/games/GameTopActions.vue'
+import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import { gameApi } from '@/api'
 import { useGameView } from '@/composables/useGameView'
+import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import { seededRng } from '@/utils/games/seededRng'
 import { STATUS, createGame, isValidState, step, stepInterval, turn } from '@/utils/games/snake'
 
 const BEST_KEY = 'ihomy:games:snake:best:v1'
@@ -95,6 +110,9 @@ const sunLight = inject(SUN_LIGHT_KEY, null)
 const pageEl = ref(null)
 const gameCardEl = ref(null)
 const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({ page: pageEl, stage: gameCardEl })
+const play = useGameRoomPlay()
+/** 房间模式下的种子随机数:两条蛇/食物序列由同一 seed 生成,各自跑各自的盘面 */
+let rng = null
 const game = ref(createGame())
 const paused = ref(false)
 const best = ref(0)
@@ -129,6 +147,7 @@ const saveBest = () => {
   }
 }
 const saveState = () => {
+  if (play.active) return
   try {
     localStorage.setItem(STATE_KEY, JSON.stringify({ game: game.value, paused: paused.value }))
   } catch (e) {
@@ -136,6 +155,7 @@ const saveState = () => {
   }
 }
 const clearState = () => {
+  if (play.active) return
   try {
     localStorage.removeItem(STATE_KEY)
   } catch (e) {
@@ -143,6 +163,7 @@ const clearState = () => {
   }
 }
 const loadState = () => {
+  if (play.active) return false
   try {
     const raw = JSON.parse(localStorage.getItem(STATE_KEY) || 'null')
     if (!raw || !isValidState(raw.game) || raw.game.status !== STATUS.PLAYING) return false
@@ -166,12 +187,13 @@ const schedule = () => {
   if (paused.value || game.value.status !== STATUS.PLAYING) return
   stepTimer = setTimeout(() => {
     stepTimer = null
-    apply(step(game.value))
+    apply(step(game.value, rng ?? Math.random))
     schedule()
   }, stepInterval(game.value.score))
 }
 
 const grantReward = async () => {
+  if (play.active) return
   try {
     const res = await gameApi.snakeReward()
     rewardMsg.value =
@@ -186,6 +208,7 @@ const grantReward = async () => {
 const finishGame = () => {
   stopTimer()
   clearState()
+  if (play.active) play.report(game.value.score)
   if (game.value.score >= REWARD_SCORE || game.value.status === STATUS.WON) grantReward()
 }
 
@@ -210,12 +233,15 @@ const apply = (next) => {
 
 const startNew = () => {
   stopTimer()
-  game.value = createGame()
+  rng = play.active ? seededRng(play.seed) : null
+  game.value = rng ? createGame(undefined, undefined, rng) : createGame()
   paused.value = false
   rewardMsg.value = ''
   clearState()
   schedule()
 }
+
+const submitRoomScore = () => play.report(game.value.score)
 
 const togglePause = () => {
   if (game.value.status !== STATUS.PLAYING) return
@@ -285,11 +311,16 @@ const onVisibility = () => {
   else schedule()
 }
 
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('keydown', onKeydown)
   document.addEventListener('visibilitychange', onVisibility)
   sunLight?.suspendEffects()
   loadBest()
+  if (play.active) {
+    await play.load()
+    startNew()
+    return
+  }
   if (!loadState()) startNew()
   else if (game.value.score > best.value) {
     best.value = game.value.score

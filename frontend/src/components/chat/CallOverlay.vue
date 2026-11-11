@@ -9,8 +9,9 @@
       <div v-if="call.status === 'active' && call.minimized" class="call-mini" :style="miniStyle">
         <video
           v-if="call.isVideo && call.remoteStream"
-          :src-object.prop="call.remoteStream"
+          ref="miniVideoEl"
           playsinline
+          webkit-playsinline
           autoplay
           class="call-mini-video"
         ></video>
@@ -63,8 +64,9 @@
         <template v-else>
           <video
             v-if="call.isVideo && call.remoteStream"
-            :src-object.prop="call.remoteStream"
+            ref="remoteVideoEl"
             playsinline
+            webkit-playsinline
             autoplay
             class="call-remote-video"
           ></video>
@@ -75,8 +77,9 @@
           </div>
           <video
             v-if="call.isVideo && call.localStream"
-            :src-object.prop="call.localStream"
+            ref="localVideoEl"
             playsinline
+            webkit-playsinline
             autoplay
             muted
             class="call-local-video"
@@ -105,7 +108,7 @@
 
 <script setup>
 // 覆盖层:接听/拒绝是 user gesture(满足 iOS 播放要求);视频元素带 playsinline
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Close, FullScreen, Microphone, Minus, Mute, Phone, SwitchButton, VideoCamera, VideoPause } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
@@ -130,6 +133,33 @@ const miniStyle = computed(() => ({
   zIndex: 'var(--z-float)',
 }))
 const onDragStart = (e) => mini.onDragStart(e)
+
+// ---------- 视频挂载 ----------
+// iPad/Safari 不认模板上的 srcObject 绑定,而且 v-if 切换会重建元素漏挂流:
+// 统一用 ref 显式赋值 srcObject 并 play(),元素/流/状态任一变化都重挂一次。
+const remoteVideoEl = ref(null)
+const localVideoEl = ref(null)
+const miniVideoEl = ref(null)
+
+const attach = (el, stream) => {
+  if (!el) return
+  if (el.srcObject !== (stream || null)) el.srcObject = stream || null
+  if (!stream) return
+  const p = el.play?.()
+  if (p && typeof p.catch === 'function') p.catch(() => {})
+}
+
+const syncVideos = () => {
+  attach(remoteVideoEl.value, call.remoteStream)
+  attach(localVideoEl.value, call.localStream)
+  attach(miniVideoEl.value, call.remoteStream)
+}
+
+watch(
+  () => [call.remoteStream, call.localStream, call.status, call.minimized, remoteVideoEl.value, localVideoEl.value, miniVideoEl.value],
+  () => nextTick(syncVideos),
+  { immediate: true },
+)
 
 const reject = () => {
   call.signal({ event: 'reject', to: call.peerId, callId: call.callId })

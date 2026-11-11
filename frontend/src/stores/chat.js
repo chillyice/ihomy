@@ -12,6 +12,8 @@ import { rewriteAssetUrls } from '@/utils/assetUrl'
 
 let socket = null
 let wired = false
+/** 本次登录是否已经建立过 WS(区分首连与重连:重连要补拉历史) */
+let wsEverOpened = false
 /** game-signal 页面级订阅(SnakeMatch 对战页);socket 重建后由新连接重新分发 */
 let gameSignalListeners = []
 /** 历史加载中的共享 Promise(/chat 页与浮窗同时挂载时只发一次请求) */
@@ -58,7 +60,12 @@ export const useChatStore = defineStore('chat', {
     createSocket() {
       const s = createChatSocket({ url: () => this.buildUrl() })
       s.on('open', () => {
+        const reconnected = wsEverOpened
+        wsEverOpened = true
         this.socketStatus = SOCKET_STATUS.OPEN
+        // 断线期间的消息不会补推:重连后强制补拉一页历史并回正未读数,
+        // 否则浮窗要等下一批新消息才「活过来」(用户表现为经常收不到消息)
+        if (reconnected && this.hydrated) this.resync()
       })
       s.on('close', () => {
         if (socket === s) this.socketStatus = SOCKET_STATUS.CLOSED
@@ -115,6 +122,8 @@ export const useChatStore = defineStore('chat', {
       if (!data || data.id == null) return
       // 壳内消息里的图片/封面是 /files/... 相对路径,补成服务端绝对地址(Web 端恒等)
       data = rewriteAssetUrls(data)
+      // 重连补拉与实时推送可能撞车:同一 id 只留一份
+      if (this.messages.some((m) => m.id === data.id)) return
       const userStore = useUserStore()
       const mine = data.senderId === userStore.userInfo?.id
       this.messages.push(data)
@@ -172,9 +181,10 @@ export const useChatStore = defineStore('chat', {
     /**
      * 进入聊天界面拉初始数据:未读游标 + 最新一页历史。
      * 浮窗与 /chat 页共用同一份缓存,谁先打开谁拉;hydrated 之后不再重复拉(force 用于 /chat 进页刷新)。
+     * markRead=false 时只并历史与回正未读数,不推进已读(断线补拉/浮窗收起时用)。
      * 两条接口互不依赖:任一失败(断网/续期失败)都只丢一路数据,不能让消息区永久转圈。
      */
-    async loadHistory({ force = false } = {}) {
+    async loadHistory({ force = false, markRead = true } = {}) {
       if (historyPromise) return historyPromise
       if (this.hydrated && !force) return
       const gen = historyGen
@@ -185,15 +195,24 @@ export const useChatStore = defineStore('chat', {
           // 与 WS 已推入的消息按 id 合并,避免覆盖掉加载期间到达的新消息
           this.messages = mergeMessages(this.messages, msgs.value, KEEP_MESSAGES)
         }
-        if (un.status === 'fulfilled' && un.value?.lastMsgId) {
-          chatApi.read(un.value.lastMsgId).catch(() => {})
+        if (un.status === 'fulfilled') {
+          if (markRead) {
+            if (un.value?.lastMsgId) chatApi.read(un.value.lastMsgId).catch(() => {})
+            this.unread = 0
+          } else {
+            this.unread = Math.max(0, Number(un.value?.unread) || 0)
+          }
         }
         this.hydrated = true
-        this.unread = 0
       })().finally(() => {
         historyPromise = null
       })
       return historyPromise
+    },
+
+    /** 断线重连后补拉:正在看就顺手推进已读,否则只回正角标 */
+    resync() {
+      return this.loadHistory({ force: true, markRead: this.viewing })
     },
 
     /** 通话/对战等协议信令上行(结构化 {type,data},由调用方组好) */
@@ -213,6 +232,7 @@ export const useChatStore = defineStore('chat', {
     reset() {
       historyGen += 1
       historyPromise = null
+      wsEverOpened = false
       if (socket) {
         socket.disconnect()
         socket = null

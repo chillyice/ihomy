@@ -46,6 +46,22 @@
       </button>
     </div>
 
+    <!-- 进行中的「一起玩」房间:点一下直接进大厅,不用翻邀请卡 -->
+    <div v-if="activeRooms.length" class="room-strip">
+      <button
+        v-for="r in activeRooms"
+        :key="r.id"
+        type="button"
+        class="room-chip"
+        :class="String(r.status).toLowerCase()"
+        @click="$router.push(`/games/room/${r.id}`)"
+      >
+        <span class="room-chip-name">{{ r.gameName }}</span>
+        <span class="room-chip-meta">{{ roomChipMeta(r) }}</span>
+        <el-icon><ArrowRight /></el-icon>
+      </button>
+    </div>
+
     <div v-loading="loading" class="tool-grid">
       <!-- 固定入口(花园/连连看/数独/2048)同样参与分类筛选 -->
       <div v-a11y-click v-for="b in visibleBuiltins" :key="b.key" class="tool-card card" @click="$router.push(b.path)">
@@ -58,6 +74,16 @@
           <div class="tool-meta-left">
             <div class="tool-type-tag cat-tag">{{ categoryText(b.category) }}</div>
           </div>
+          <button
+            v-if="b.roomCodes?.length"
+            type="button"
+            class="room-open"
+            :title="$t('games.room.together')"
+            :aria-label="$t('games.room.together')"
+            @click.stop="openRoomDialog(b)"
+          >
+            <el-icon :size="18"><Promotion /></el-icon>
+          </button>
           <span class="tool-enter"
             >{{ $t('games.enter') }}<el-icon><ArrowRight /></el-icon
           ></span>
@@ -187,6 +213,34 @@
       </template>
     </el-dialog>
 
+    <!-- 「一起玩」建房:一个人点一下就把房间开好,邀请卡自动发到聊天室 -->
+    <el-dialog v-model="roomDialog" append-to-body :title="$t('games.room.createTitle')" width="420px" destroy-on-close>
+      <el-form label-position="top">
+        <el-form-item v-if="roomOptions.length > 1" :label="$t('games.room.gameLabel')">
+          <el-select v-model="roomForm.gameCode" style="width: 100%" @change="onRoomGameChange">
+            <el-option v-for="o in roomOptions" :key="o.code" :label="$t(o.nameKey)" :value="o.code" />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="$t('games.room.modeLabel')">
+          <el-radio-group v-model="roomForm.mode">
+            <el-radio-button v-for="m in roomModesOf(roomForm.gameCode)" :key="m" :value="m">
+              {{ $t(m === 'COOP' ? 'games.room.modeCoop' : 'games.room.modePk') }}
+            </el-radio-button>
+          </el-radio-group>
+          <div class="room-dialog-hint">{{ $t(roomForm.mode === 'COOP' ? 'games.room.modeCoopHint' : 'games.room.modePkHint') }}</div>
+        </el-form-item>
+        <el-form-item :label="$t('games.room.playersLabel')">
+          <el-select v-model="roomForm.maxPlayers" style="width: 100%">
+            <el-option v-for="n in 7" :key="n + 1" :label="$t('games.room.playersOption', { n: n + 1 })" :value="n + 1" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button size="small" @click="roomDialog = false">{{ $t('games.cancel') }}</el-button>
+        <el-button type="primary" size="small" :loading="roomCreating" @click="submitRoom">{{ $t('games.room.create') }}</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 许愿想加的游戏:只有「想加什么游戏」这一个语义,不带来源记录ID -->
     <AddToWishDialog v-model="wishOpen" :source="wishSource" :title-placeholder="$t('wish.gameTitlePlaceholder')" />
   </div>
@@ -213,16 +267,18 @@ import {
   Tickets,
   Box,
   Cherry,
+  Promotion,
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import AddToWishDialog from '@/components/wish/AddToWishDialog.vue'
-import { gameApi } from '@/api'
+import { gameApi, roomApi } from '@/api'
 import { dictText } from '@/utils/dict'
 import { useUserStore } from '@/stores/user'
 import { GAME_CATEGORIES, countGameCategories, inGameCategory, normalizeGameCategory } from '@/utils/games/gameCategory'
 import { importAccept, typeForFile, typeLabel } from '@/utils/games/emulatorSystems'
 import { UNSERIES, inGameSeries, normalizeGameSeries, seriesOptionsOf } from '@/utils/games/gameSeries'
+import { defaultRoomMode, roomGame, roomModes } from '@/utils/gameRoom'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -257,9 +313,26 @@ const builtinGames = [
     icon: Grid,
     path: '/games/petlink',
     category: 'PUZZLE',
+    roomCodes: ['game_petlink'],
   },
-  { key: 'sudoku', titleKey: 'games.sudoku.title', descKey: 'games.sudoku.desc', icon: Cpu, path: '/games/sudoku', category: 'PUZZLE' },
-  { key: 'g2048', titleKey: 'games.g2048.title', descKey: 'games.g2048.desc', icon: Histogram, path: '/games/2048', category: 'PUZZLE' },
+  {
+    key: 'sudoku',
+    titleKey: 'games.sudoku.title',
+    descKey: 'games.sudoku.desc',
+    icon: Cpu,
+    path: '/games/sudoku',
+    category: 'PUZZLE',
+    roomCodes: ['game_sudoku'],
+  },
+  {
+    key: 'g2048',
+    titleKey: 'games.g2048.title',
+    descKey: 'games.g2048.desc',
+    icon: Histogram,
+    path: '/games/2048',
+    category: 'PUZZLE',
+    roomCodes: ['game_2048'],
+  },
   {
     key: 'minesweeper',
     titleKey: 'games.minesweeper.title',
@@ -267,6 +340,7 @@ const builtinGames = [
     icon: Aim,
     path: '/games/minesweeper',
     category: 'PUZZLE',
+    roomCodes: ['game_minesweeper'],
   },
   {
     key: 'cards',
@@ -275,9 +349,26 @@ const builtinGames = [
     icon: Tickets,
     path: '/games/cards',
     category: 'CASUAL',
+    roomCodes: ['game_solitaire', 'game_spider', 'game_freecell'],
   },
-  { key: 'tetris', titleKey: 'games.tetris.title', descKey: 'games.tetris.desc', icon: Box, path: '/games/tetris', category: 'ARCADE' },
-  { key: 'snake', titleKey: 'games.snake.title', descKey: 'games.snake.desc', icon: Cherry, path: '/games/snake', category: 'ARCADE' },
+  {
+    key: 'tetris',
+    titleKey: 'games.tetris.title',
+    descKey: 'games.tetris.desc',
+    icon: Box,
+    path: '/games/tetris',
+    category: 'ARCADE',
+    roomCodes: ['game_tetris'],
+  },
+  {
+    key: 'snake',
+    titleKey: 'games.snake.title',
+    descKey: 'games.snake.desc',
+    icon: Cherry,
+    path: '/games/snake',
+    category: 'ARCADE',
+    roomCodes: ['game_snake'],
+  },
 ]
 
 const categoryText = (category) => dictText(t, 'game_category', normalizeGameCategory(category))
@@ -316,6 +407,56 @@ watch(activeSeries, () => {
 
 const wishOpen = ref(false)
 const wishSource = computed(() => ({ type: 'GAME', title: t('wish.gameSourceTitle') }))
+
+// ---------- 「一起玩」房间 ----------
+const rooms = ref([])
+const activeRooms = computed(() => rooms.value.filter((r) => r.status === 'WAITING' || r.status === 'PLAYING').slice(0, 4))
+const roomDialog = ref(false)
+const roomCreating = ref(false)
+const roomCodePool = ref([])
+const roomForm = reactive({ gameCode: '', mode: 'PK', maxPlayers: 4 })
+const roomOptions = computed(() => roomCodePool.value.map((code) => roomGame(code)).filter(Boolean))
+const roomModesOf = (code) => roomModes(code)
+const roomChipMeta = (r) =>
+  `${t(r.mode === 'COOP' ? 'games.room.modeCoop' : 'games.room.modePk')} · ${r.members.length}/${r.maxPlayers}${r.status === 'PLAYING' ? ' · ' + t('games.room.playingTag') : ''}`
+
+const loadRooms = async () => {
+  try {
+    rooms.value = (await roomApi.list()) || []
+  } catch {
+    rooms.value = []
+  }
+}
+
+const openRoomDialog = (b) => {
+  roomCodePool.value = [...(b.roomCodes || [])]
+  if (!roomCodePool.value.length) return
+  roomForm.gameCode = roomCodePool.value[0]
+  roomForm.mode = defaultRoomMode(roomForm.gameCode)
+  roomForm.maxPlayers = 4
+  roomDialog.value = true
+}
+
+const onRoomGameChange = () => {
+  roomForm.mode = defaultRoomMode(roomForm.gameCode)
+}
+
+const submitRoom = async () => {
+  roomCreating.value = true
+  try {
+    const created = await roomApi.create({
+      gameCode: roomForm.gameCode,
+      mode: roomForm.mode,
+      maxPlayers: roomForm.maxPlayers,
+    })
+    roomDialog.value = false
+    router.push(`/games/room/${created.id}`)
+  } catch (e) {
+    ElMessage.warning(e?.response?.data?.message || t('games.room.createFailed'))
+  } finally {
+    roomCreating.value = false
+  }
+}
 
 const importVisible = ref(false)
 const importing = ref(false)
@@ -511,7 +652,10 @@ const onGameAction = (cmd, g) => {
   else if (cmd === 'delete') removeGame(g)
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  loadRooms()
+})
 </script>
 
 <style scoped>
@@ -662,5 +806,63 @@ onMounted(load)
 }
 .import-mode {
   margin-bottom: 16px;
+}
+.room-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.room-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--color-brand-rgb), 0.35);
+  background: rgba(var(--color-brand-rgb), 0.08);
+  color: var(--color-text);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    background-color 0.16s ease;
+}
+.room-chip:hover {
+  border-color: var(--color-accent);
+}
+.room-chip.playing {
+  border-color: rgba(103, 194, 58, 0.5);
+  background: rgba(103, 194, 58, 0.1);
+}
+.room-chip-name {
+  font-weight: 600;
+}
+.room-chip-meta {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+.room-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-right: 4px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(var(--color-brand-rgb), 0.12);
+  color: var(--color-accent);
+  cursor: pointer;
+  transition: background-color 0.16s ease;
+}
+.room-open:hover {
+  background: rgba(var(--color-brand-rgb), 0.22);
+}
+.room-dialog-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
 }
 </style>

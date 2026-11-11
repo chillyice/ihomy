@@ -11,6 +11,17 @@
     </PageToolbar>
 
     <div ref="gameCardEl" class="ms-card card game-surface" @contextmenu.prevent @dblclick.prevent>
+      <GameRoomBar
+        :room="play.room"
+        :is-host="play.isHost"
+        :score="elapsed"
+        :reported="play.reported"
+        :ended="play.ended"
+        :result="play.spec?.result"
+        :my-id="play.myId"
+        @submit="submitRoomScore"
+        @leave="play.leave"
+      />
       <div class="ms-head">
         <div class="ms-title">{{ $t('games.minesweeper.title') }}</div>
         <div class="ms-stats">
@@ -30,13 +41,13 @@
       </div>
 
       <div class="ms-actions">
-        <el-select :model-value="level" size="small" class="ms-level" :teleported="!isFullscreen" @change="startNew">
+        <el-select :model-value="level" size="small" class="ms-level" :teleported="!isFullscreen" @change="onLevelChange">
           <el-option v-for="key in LEVEL_KEYS" :key="key" :value="key" :label="$t('games.minesweeper.level.' + key)" />
         </el-select>
         <el-button size="small" round :type="flagMode ? 'primary' : 'default'" @click="flagMode = !flagMode">
           {{ flagMode ? $t('games.minesweeper.flagMode') : $t('games.minesweeper.revealMode') }}
         </el-button>
-        <el-button size="small" round @click="startNew(level)">{{ $t('games.minesweeper.newGame') }}</el-button>
+        <el-button size="small" round @click="onNewGameClick">{{ $t('games.minesweeper.newGame') }}</el-button>
       </div>
 
       <div class="ms-board-wrap">
@@ -73,7 +84,7 @@
             </div>
             <div class="ms-overlay-meta">{{ $t('games.minesweeper.winMeta', { time: formatClock(elapsed) }) }}</div>
             <div v-if="isWin && rewardMsg" class="ms-overlay-reward">{{ rewardMsg }}</div>
-            <el-button type="primary" size="small" round @click="startNew(level)">
+            <el-button type="primary" size="small" round @click="onNewGameClick">
               {{ $t('games.minesweeper.newGame') }}
             </el-button>
           </div>
@@ -91,11 +102,24 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import PageToolbar from '@/components/PageToolbar.vue'
 import GameTopActions from '@/components/games/GameTopActions.vue'
+import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import { gameApi } from '@/api'
 import { useGameView } from '@/composables/useGameView'
+import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { formatClock } from '@/utils/games/gameClock'
-import { LEVEL_KEYS, STATUS, chord, createBoard, isValidBoard, remainingMines, revealCell, toggleFlag } from '@/utils/games/minesweeper'
+import { seededRng } from '@/utils/games/seededRng'
+import {
+  LEVELS,
+  LEVEL_KEYS,
+  STATUS,
+  chord,
+  createBoard,
+  isValidBoard,
+  remainingMines,
+  revealCell,
+  toggleFlag,
+} from '@/utils/games/minesweeper'
 
 const BEST_KEY = 'ihomy:games:minesweeper:best:v1'
 const STATE_KEY = 'ihomy:games:minesweeper:state:v1'
@@ -114,6 +138,70 @@ const flagMode = ref(false)
 const rewardMsg = ref('')
 const bestTimes = ref({})
 
+// ---------- 「一起玩」房间(扫雷只允许合作) ----------
+// 房主权威:只有房主布雷/翻格/插旗,操作结果全量广播;其他成员点击只发意图,倒计时跟房主走。
+const play = useGameRoomPlay({ onSignal: onRoomSignal, onRoom: onRoomChange })
+const coopGuest = computed(() => play.active && play.coop && !play.isHost)
+const submitRoomScore = () => play.report(elapsed.value)
+
+const randFor = () => (play.active ? seededRng(Number(play.seed) || 1) : Math.random)
+
+function snapshotRoomState() {
+  return { board: board.value, elapsed: elapsed.value }
+}
+
+function applyRoomState(state) {
+  const next = state?.board
+  const shape = next && LEVELS[next.level]
+  if (!shape || !Array.isArray(next.cells) || next.cells.length !== shape.rows * shape.cols) return
+  board.value = next
+  level.value = next.level
+  elapsed.value = Math.max(0, Number(state.elapsed) || 0)
+  if (isFinished.value) stopTimer()
+}
+
+const broadcastRoomState = () => {
+  if (!play.active || !play.isHost) return
+  play.send('state', snapshotRoomState())
+}
+
+function onRoomSignal(data) {
+  if (!data) return
+  if (data.event === 'state' && coopGuest.value) {
+    applyRoomState(data.state)
+    return
+  }
+  if (data.event === 'clock' && coopGuest.value) {
+    elapsed.value = Math.max(0, Number(data.elapsed) || 0)
+    return
+  }
+  if (data.event === 'sync' && play.isHost) {
+    broadcastRoomState()
+    return
+  }
+  if (data.event === 'op' && play.isHost) {
+    if (data.kind === 'click') {
+      const index = Number(data.index)
+      if (!Number.isInteger(index) || !board.value.cells[index]) return
+      if (isFinished.value) return
+      const cell = board.value.cells[index]
+      let next
+      if (data.flag) next = toggleFlag(board.value, index)
+      else if (cell.revealed) next = chord(board.value, index)
+      else next = revealCell(board.value, index, randFor())
+      afterAction(next)
+    } else if (data.kind === 'newGame') {
+      startNew(data.level)
+    }
+    return
+  }
+}
+
+function onRoomChange(next) {
+  if (!next) return
+  if (next.status === 'FINISHED' || next.status === 'CANCELLED') stopTimer()
+}
+
 const isWin = computed(() => board.value.status === STATUS.WON)
 const isFinished = computed(() => board.value.status === STATUS.WON || board.value.status === STATUS.LOST)
 const bestText = computed(() => {
@@ -123,9 +211,15 @@ const bestText = computed(() => {
 
 let timer = null
 const startTimer = () => {
+  if (coopGuest.value) return
   if (timer) return
   timer = setInterval(() => {
     elapsed.value++
+    if (play.active && play.isHost) {
+      // 合作模式:倒计时以房主为准;盘面只在操作时广播,这里每 5 秒补一次全量快照兜底
+      if (elapsed.value % 5 === 0) broadcastRoomState()
+      else play.send('clock', { elapsed: elapsed.value })
+    }
     if (elapsed.value % 5 === 0) saveState()
   }, 1000)
 }
@@ -134,7 +228,14 @@ const stopTimer = () => {
   clearInterval(timer)
   timer = null
 }
-const syncTimer = () => (board.value.status === STATUS.PLAYING ? startTimer() : stopTimer())
+const syncTimer = () => {
+  if (coopGuest.value) {
+    stopTimer()
+    return
+  }
+  if (board.value.status === STATUS.PLAYING) startTimer()
+  else stopTimer()
+}
 
 // ---------- 存档 ----------
 const loadBest = () => {
@@ -157,6 +258,7 @@ const saveBest = () => {
   }
 }
 const saveState = () => {
+  if (play.active) return
   try {
     localStorage.setItem(STATE_KEY, JSON.stringify({ board: board.value, elapsed: elapsed.value }))
   } catch (e) {
@@ -164,6 +266,7 @@ const saveState = () => {
   }
 }
 const clearState = () => {
+  if (play.active) return
   try {
     localStorage.removeItem(STATE_KEY)
   } catch (e) {
@@ -193,9 +296,11 @@ const startNew = (nextLevel = level.value) => {
   rewardMsg.value = ''
   flagMode.value = false
   clearState()
+  if (play.active && play.isHost) broadcastRoomState()
 }
 
 const grantReward = async () => {
+  if (play.active) return
   try {
     const res = await gameApi.minesweeperReward()
     rewardMsg.value =
@@ -209,6 +314,10 @@ const grantReward = async () => {
 
 const finishWin = () => {
   stopTimer()
+  if (play.active) {
+    if (play.isHost) play.report(elapsed.value)
+    return
+  }
   const best = bestTimes.value[level.value]
   if (!Number.isInteger(best) || elapsed.value < best) {
     bestTimes.value = { ...bestTimes.value, [level.value]: elapsed.value }
@@ -221,6 +330,7 @@ const finishWin = () => {
 const afterAction = (next) => {
   if (!next || next === board.value) return
   board.value = next
+  if (play.active && play.isHost) broadcastRoomState()
   if (next.status === STATUS.WON) finishWin()
   else if (next.status === STATUS.LOST) {
     stopTimer()
@@ -283,17 +393,34 @@ const onCellClick = (index) => {
   if (isFinished.value) return
   const cell = board.value.cells[index]
   if (!cell) return
+  if (coopGuest.value) {
+    play.send('op', { kind: 'click', index, flag: flagMode.value })
+    return
+  }
   let next
   if (flagMode.value) next = toggleFlag(board.value, index)
   else if (cell.revealed) next = chord(board.value, index)
-  else next = revealCell(board.value, index)
+  else next = revealCell(board.value, index, randFor())
   afterAction(next)
 }
 
 const flagAt = (index) => {
   if (isFinished.value) return
+  if (coopGuest.value) {
+    play.send('op', { kind: 'click', index, flag: true })
+    return
+  }
   afterAction(toggleFlag(board.value, index))
 }
+
+const onLevelChange = (key) => {
+  if (coopGuest.value) {
+    play.send('op', { kind: 'newGame', level: key })
+    return
+  }
+  startNew(key)
+}
+const onNewGameClick = () => onLevelChange(level.value)
 
 const cellClass = (cell) => ({
   open: cell.revealed,
@@ -314,9 +441,15 @@ const cellLabel = (cell, index) => {
   return t('games.minesweeper.cell', { row, col, state })
 }
 
-onMounted(() => {
+onMounted(async () => {
   sunLight?.suspendEffects()
   loadBest()
+  if (play.active) {
+    await play.load()
+    if (coopGuest.value) play.requestSync()
+    else startNew(level.value)
+    return
+  }
   if (!loadState()) startNew(level.value)
   syncTimer()
 })
