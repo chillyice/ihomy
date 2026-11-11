@@ -31,9 +31,14 @@ export function nativePlatform() {
   return cap?.platform || 'web'
 }
 
-/** 是否 Android 壳(调用 Android 专有行为前先判;iOS 未实现) */
+/** 是否 Android 壳(仅用于「只有 Android 有对应物」的能力:APK 自更新、通知渠道、磁贴等) */
 export function isAndroidApp() {
   return isNativeApp() && nativePlatform() === 'android'
+}
+
+/** 是否 iOS 壳(原生壳内才为真) */
+export function isIOSApp() {
+  return isNativeApp() && nativePlatform() === 'ios'
 }
 
 /** Web 端版本号(构建时由 VERSION 注入);原生壳内请用 native/version.js 的 getAppVersion */

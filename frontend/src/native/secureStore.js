@@ -1,4 +1,4 @@
-// 令牌安全存储(仅原生壳):token / refreshToken 落 Android Keystore(EncryptedSharedPreferences),
+// 令牌安全存储(仅原生壳):token / refreshToken 落系统安全存储(Android Keystore / iOS Keychain),
 // localStorage 只放非敏感的 userInfo。插件按需 import,进不了首屏包。
 import { isNativeApp } from '@/utils/platform'
 

@@ -16,6 +16,9 @@ export default [
       // Capacitor 原生工程:app/src/main/assets/public 是 cap sync 拷进来的构建产物
       // (含 ruffle/emulatorjs 压缩包),不属于前端源码,必须排除
       'android/**',
+      // iOS 工程同理:App/App/public 是 cap sync 拷进来的 dist(压缩后的 chunk),
+      // Swift/plist/pbxproj 不在 ESLint 检查范围内
+      'ios/**',
     ],
   },
   js.configs.recommended,

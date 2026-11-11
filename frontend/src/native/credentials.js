@@ -1,4 +1,4 @@
-// 壳内页面 origin 是 https://localhost,而文件在 https://ihomy.top/files/**:
+// 壳内页面 origin 是 https://localhost(Android) 或 capacitor://localhost(iOS),而文件在服务器域名下:
 // fetch/XHR 默认不带跨站 cookie,私有图片/电子书/视频会被判未登录(403)。
 // 这里只对「本服务 /files/ 下的请求」补 credentials,业务接口仍走 axios 的 Bearer 头。
 import { SERVER_ORIGIN } from '@/utils/assetUrl'

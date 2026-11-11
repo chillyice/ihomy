@@ -1,10 +1,10 @@
 // 系统日历单向导出(仅原生壳):把服务端算好的提醒/纪念日/还款日写进本机「ihomy」日历。
-// 目的不是替代 App 内提醒,而是兜底——鸿蒙/国产系统杀后台时,系统日历的闹钟仍会响。
+// 目的不是替代 App 内提醒,而是兜底——系统杀后台时,系统日历的闹钟仍会响。
 // 日期时刻全部来自 /schedule/occurrences(客户端零历法),本模块只做形状转换与幂等调用。
 import { registerPlugin } from '@capacitor/core'
 import { scheduleApi } from '@/api'
 import { useUserStore } from '@/stores/user'
-import { isAndroidApp } from '@/utils/platform'
+import { isNativeApp } from '@/utils/platform'
 import i18n from '@/i18n'
 
 const IhomyCalendar = registerPlugin('IhomyCalendar')
@@ -164,7 +164,7 @@ function pad2(n) {
  * 返回 [{id,title,date,time,allDay}] 或 null(=未开启/未授权,调用方静默跳过)。
  */
 export async function readDeviceCalendar(from, to) {
-  if (!isAndroidApp() || !deviceCalendarEnabled()) return null
+  if (!isNativeApp() || !deviceCalendarEnabled()) return null
   const status = await calendarStatus().catch(() => null)
   if (!status || !status.granted) return null
   const res = await IhomyCalendar.readEvents({ from: from.getTime(), to: to.getTime() }).catch(() => null)

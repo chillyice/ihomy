@@ -2093,7 +2093,7 @@ export default {
       storage: '存储管理',
       media: '放映厅',
       weather: '天气',
-      client: '安卓客户端',
+      client: '手机客户端',
       display: '显示模式',
     },
     // 放映厅引擎(家庭媒体服务器):刮削/转码/电视端 App 由它负责,ihomy 只做界面与家庭层
@@ -5633,7 +5633,7 @@ export default {
     tip: '验证指纹或人脸继续',
   },
   appSettings: {
-    title: '安卓客户端',
+    title: '手机客户端',
     lead: '这些设置只在手机应用里出现，网页版看不到。',
     calendarTitle: '导出到系统日历',
     calendarGranted: '已授权',
@@ -5655,6 +5655,7 @@ export default {
     permissionTitle: '需要日历权限',
     permissionGuide:
       '请在系统设置里允许 ihomy 使用日历：设置 → 应用 → ihomy → 权限 → 日历（部分机型在「应用管理」里）。授权后再点一次导出即可。',
+    permissionGuideIos: '请在系统设置里允许 ihomy 访问日历：设置 → ihomy → 日历，选择「完整访问」后再点一次导出即可。',
     exportOk: '已写入 {n} 条到系统日历',
     exportTruncated: '日程太多，本次只导出了前 500 条，稍后可以再导一次',
     clearOk: '已清空 {n} 条',
@@ -5695,6 +5696,8 @@ export default {
     unreadNotifyTitle: '后台消息提醒',
     unreadNotifyDesc:
       '开启后 App 在后台保持运行，有人发消息或有新通知时在通知栏提醒（一般 30 秒内）。系统会显示一条常驻的「ihomy 正在后台运行」通知；关闭即停止后台检查，桌面卡片仍会约每 30 分钟兜底检查一次。23:00–06:00 不打扰。',
+    unreadNotifyDescIos:
+      '开启后由系统在合适的时机在后台检查一次消息与新通知：间隔由系统按省电情况决定，可能几十分钟也可能更久，因此重要提醒请同时打开「导出到系统日历」兜底。需要保持系统的「后台 App 刷新」开着。23:00–06:00 不打扰。',
     unreadNotifyDenied: '通知权限未开启，后台提醒不会显示：请到系统设置里允许 ihomy 发送通知。',
     // 每日天气推送
     dailyWeatherTitle: '每日天气',
@@ -5710,6 +5713,8 @@ export default {
     notifySettingsChannels: '提醒 · 家庭动态 · 每日天气 · 应用更新',
     notifySettingsOpen: '打开系统通知设置',
     notifySettingsDesc: '这四类通知各是一条独立通道，可以只关掉其中一类；关掉后不会再收到这一类通知，其它三类不受影响。',
+    notifySettingsChannelsIos: '提醒 · 家庭动态 · 每日天气',
+    notifySettingsDescIos: '提醒、家庭动态和每日天气三类通知可以分别开关，关掉一类不影响其它两类。',
     // 闲时自动更新
     autoUpdateTitle: '闲时自动更新',
     autoUpdateSilent: '可静默安装',
@@ -5758,6 +5763,7 @@ export default {
     aboutTitle: '客户端版本',
     currentVersion: '当前版本 {version}',
     updateDesc: '有新版本时可以直接在应用里下载并安装，不用去网页下载安装包。',
+    updateDescIos: '新版本通过 App Store 发布，打开 App Store 里的 ihomy 页面即可升级。',
   },
   shareInbox: {
     title: '分享到家庭',
@@ -6108,6 +6114,7 @@ export default {
     latest: '已经是最新版本',
     checkFailed: '检查更新失败，请稍后再试',
     check: '检查更新',
+    iosAppStore: 'iOS 版本请到 App Store 更新。',
   },
   // 平板看板 / 相框(全屏常亮页)
   kiosk: {

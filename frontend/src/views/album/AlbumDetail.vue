@@ -65,7 +65,7 @@
             @click="photoInput?.click()"
             >{{ t('album.uploadPhotos') }}</el-button
           >
-          <!-- 相机直传:只在安卓壳里出现(系统相机拍完直接进当前相册) -->
+          <!-- 相机直传:只在原生壳里出现(系统相机拍完直接进当前相册) -->
           <el-button v-if="canCapture && userStore.isLoggedIn && !currentShareToken && !isMapped" :loading="capturing" @click="onCapture">
             {{ t('album.takePhoto') }}
           </el-button>
@@ -224,7 +224,7 @@ import Breadcrumb from '@/components/Breadcrumb.vue'
 import PhotoViewer from '@/components/PhotoViewer.vue'
 import AlbumDefaultCover from '@/components/AlbumDefaultCover.vue'
 import { shareId } from '@/utils/shareId'
-import { isAndroidApp } from '@/utils/platform'
+import { isNativeApp } from '@/utils/platform'
 import { formatRelativeTime, formatDateTime } from '@/utils/datetime'
 import { useSyncStore } from '@/stores/sync'
 import { useDevice } from '@/composables/useDevice'
@@ -343,10 +343,10 @@ const onPhotosPicked = async (e) => {
   }
 }
 
-// 相机直传:仅安卓壳可用(有无相机由原生桥回报,没有就不显示按钮)
+// 相机直传:仅原生壳可用(有无相机由原生桥回报,没有就不显示按钮)
 const canCapture = ref(false)
 const capturing = ref(false)
-if (isAndroidApp()) {
+if (isNativeApp()) {
   import('@/native/camera')
     .then((m) => m.cameraAvailable())
     .then((ok) => {

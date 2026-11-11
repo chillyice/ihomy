@@ -9,7 +9,7 @@ import i18n from '@/i18n'
 
 const IhomyBiometric = registerPlugin('IhomyBiometric')
 
-/** 开关(默认关,由用户在「设置 → 安卓客户端」里打开) */
+/** 开关(默认关,由用户在「设置 → 手机客户端」里打开) */
 const ON_KEY = 'ihomy:vault:bio:on'
 /** 免验截止时间戳(毫秒) */
 const UNTIL_KEY = 'ihomy:vault:bio:until'

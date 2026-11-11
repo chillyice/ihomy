@@ -209,7 +209,7 @@ const routes = [
   { path: '/ops', name: 'Ops', component: () => import('@/views/ops/Ops.vue'), meta: { ops: true } },
   // 咔哒软件首页:独立下载页(托管在 ihomy 域名下),standalone 不套 ihomy 外壳
   { path: '/kada', name: 'Kada', component: () => import('@/views/Kada.vue'), meta: { public: true, standalone: true } },
-  // 平板看板/相框:独立全屏页,常亮显示时钟/日程/家庭照片(入口在安卓设置里)
+  // 平板看板/相框:独立全屏页,常亮显示时钟/日程/家庭照片(入口在手机客户端设置里)
   { path: '/kiosk', name: 'Kiosk', component: () => import('@/views/Kiosk.vue'), meta: { requiresAuth: true, standalone: true } },
   // bit_pouch 在线工具:属于 bit_pouch 自己的页面,standalone 不套 ihomy 外壳;目录 + 单工具两条路由
   {

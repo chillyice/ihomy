@@ -81,8 +81,9 @@ app:
   captcha-fixed-code:
   # 跨域白名单(逗号分隔):生产域名 + 开发前端地址;经 external.yml 按环境覆盖
   # https://localhost 是 Android 客户端壳的固定 origin(Capacitor androidScheme=https + hostname=localhost),
+  # capacitor://localhost 是 iOS 客户端壳的默认 origin;
   # 生产 external.yml 若覆盖了本项,必须一并追加,否则客户端登录/接口预检全部失败
-  cors-allowed-origins: https://ihomy.top,https://localhost
+  cors-allowed-origins: https://ihomy.top,https://localhost,capacitor://localhost
   weather-api-host:
   weather-project-id:
   weather-key-id:

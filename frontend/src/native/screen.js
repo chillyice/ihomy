@@ -1,12 +1,13 @@
-// 屏幕保护(仅安卓壳):保险箱防截屏、看板常亮。只做窗口 Flag,不改系统设置。
+// 屏幕保护(仅原生壳):保险箱防窥、看板常亮。
+// Android 用窗口 Flag 真正禁止截屏/录屏;iOS 系统不允许阻止截屏,只能切后台/录屏时盖一层遮罩。
 import { registerPlugin } from '@capacitor/core'
-import { isAndroidApp } from '@/utils/platform'
+import { isNativeApp } from '@/utils/platform'
 
 const IhomyScreen = registerPlugin('IhomyScreen')
 
-/** 保险箱页进出时开关 FLAG_SECURE;离开必须传 false,否则全站截图都会变黑 */
+/** 保险箱页进出时开关防窥;离开必须传 false */
 export async function setSecure(secure) {
-  if (!isAndroidApp()) return
+  if (!isNativeApp()) return
   try {
     await IhomyScreen.setSecure({ secure: !!secure })
   } catch (e) {
@@ -16,7 +17,7 @@ export async function setSecure(secure) {
 
 /** 看板/相框页常亮(本批未用,留给 B3) */
 export async function setKeepOn(keepOn) {
-  if (!isAndroidApp()) return
+  if (!isNativeApp()) return
   try {
     await IhomyScreen.setKeepOn({ keepOn: !!keepOn })
   } catch (e) {

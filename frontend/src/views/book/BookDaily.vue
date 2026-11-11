@@ -16,7 +16,7 @@
       <!-- 三个入口并排:记一笔(主)、周期账目、导入 CSV;只读档位不显示 -->
       <div v-if="userStore.canWriteBook" class="bc-right">
         <el-button type="primary" @click="openEditor()">{{ $t('book.add') }}</el-button>
-        <!-- 语音记账:只在有识别服务的安卓壳里出现,识别文本在前端解析成金额/备注 -->
+        <!-- 语音记账:只在有识别服务的原生壳里出现,识别文本在前端解析成金额/备注 -->
         <el-button v-if="voiceReady" :loading="voiceBusy" @click="onVoiceRecord">{{ $t('book.voice.entry') }}</el-button>
         <el-button @click="recurringVisible = true">{{ $t('book.recurring.entry') }}</el-button>
         <el-button @click="importVisible = true">{{ $t('book.import.entry') }}</el-button>
@@ -257,7 +257,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { bookApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { formatYuan } from '@/utils/money'
-import { isAndroidApp } from '@/utils/platform'
+import { isNativeApp } from '@/utils/platform'
 import { haptic } from '@/utils/haptics'
 import { copyText } from '@/native/shareOut'
 import { refreshWidgets } from '@/native/widgets'
@@ -494,14 +494,14 @@ const openEditor = (r) => {
       }
 }
 
-// 语音记账(仅安卓壳):识别一句话 → 前端拆金额/备注 → 预填弹窗,用户确认后再存
+// 语音记账(仅原生壳):识别一句话 → 前端拆金额/备注 → 预填弹窗,用户确认后再存
 const voiceReady = ref(false)
 const voiceBusy = ref(false)
 // 探一次能力即可:模板按钮与 ?voice=1 的一次性动作共用同一份结果(避免竞态时前者未就绪)
 let voiceProbe = null
 const probeVoice = () => {
   if (!voiceProbe) {
-    voiceProbe = isAndroidApp()
+    voiceProbe = isNativeApp()
       ? import('@/native/speech')
           .then((m) => m.speechAvailable())
           .then((ok) => {

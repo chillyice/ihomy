@@ -1,10 +1,10 @@
-// 后台消息提醒(仅 Android 壳):登录且开关打开时启动原生前台服务,
-// 登出/关开关时停掉。服务自己每 30 秒对一次未读(见 live/LiveService.java),
-// 这里只负责生命周期同步,不让 Web 侧关心实现。
+// 后台消息提醒(仅原生壳):登录且开关打开时启动后台检查,
+// 登出/关开关时停掉。Android 是前台服务每 30 秒对一次未读,
+// iOS 是系统调度的后台刷新;这里只负责生命周期同步,不让 Web 侧关心实现。
 import { App } from '@capacitor/app'
 import { registerPlugin } from '@capacitor/core'
 import { watch } from 'vue'
-import { isAndroidApp } from '@/utils/platform'
+import { isNativeApp } from '@/utils/platform'
 import { useUserStore } from '@/stores/user'
 import { getUnreadNotifyEnabled, setUnreadNotifyEnabled } from './widgets'
 
@@ -30,7 +30,7 @@ export async function setBackgroundLiveEnabled(enabled) {
 }
 
 export function installLiveService() {
-  if (installed || !isAndroidApp()) return
+  if (installed || !isNativeApp()) return
   installed = true
   const userStore = useUserStore()
   // 登录态恢复/退出、切家庭都会走这里;immediate 覆盖冷启动已登录的情况

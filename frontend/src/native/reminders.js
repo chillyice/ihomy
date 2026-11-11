@@ -7,6 +7,7 @@ import { ElMessageBox } from 'element-plus'
 import i18n from '@/i18n'
 import { scheduleApi, reminderApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { isIOSApp } from '@/utils/platform'
 import { reportReminderSync } from './widgets'
 
 /** 通知通道 id。通道参数(声音/重要级)创建后不可改,想改只能换新 id 重新建一条——
@@ -19,6 +20,8 @@ const CHANNEL_SOUND = 'ihomy_notify'
 const WINDOW_DAYS = 30
 /** 单次注册上限,超出按时间升序取前 200(§6.4.2) */
 const MAX_SCHEDULED = 200
+/** iOS 系统对单个 App 的待触发通知有 64 条上限,留几条给每日天气与未读提醒 */
+const IOS_MAX_SCHEDULED = 60
 /** 静默时段口径与服务端一致:23:00–06:00 的提醒不按点响(§6.4.5) */
 const QUIET_END_MINUTES = 6 * 60
 const QUIET_START_MINUTES = 23 * 60
@@ -177,10 +180,11 @@ async function doSync() {
   }
 
   // 已完成的 / 只读展示类不注册;先按 key 去重(理论不会重,接口同 key 只会出一条)
+  const limit = isIOSApp() ? IOS_MAX_SCHEDULED : MAX_SCHEDULED
   const remote = new Map()
   for (const it of items) {
     if (!it || it.done || !it.key) continue
-    if (remote.size >= MAX_SCHEDULED) break
+    if (remote.size >= limit) break
     if (isPast(it.date, it.time)) continue
     remote.set(it.key, it)
   }
@@ -202,13 +206,15 @@ async function doSync() {
 
   // 变更检测:触发时刻、标题或通道变了才重排;同 key 同内容不折腾(避免每天重复 set 闹钟)。
   // 通道也进比对——升级到带提示音的通道后,旧通道上已排的闹钟必须重建才会响。
+  // iOS 没有通知通道(pending 里拿不到 channelId),只比触发时刻。
+  const ios = isIOSApp()
   const toSchedule = []
   const toCancel = []
   for (const [key, item] of remote) {
     const cur = localByKey.get(key)
     const { at } = fireDate(item.date, item.time)
     const curAt = cur && cur.schedule && cur.schedule.at ? new Date(cur.schedule.at).getTime() : null
-    if (cur && curAt === at.getTime() && cur.channelId === CHANNEL_ID) {
+    if (cur && curAt === at.getTime() && (ios || cur.channelId === CHANNEL_ID)) {
       localByKey.delete(key)
       continue
     }

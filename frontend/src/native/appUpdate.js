@@ -1,4 +1,5 @@
 // App 内更新(仅原生壳):检查 → 应用内下载 → 交给系统安装器,全程不离开 ihomy。
+// iOS 走 App Store 更新:不走 APK 下载流程,手动检查只给一句引导。
 //
 // 口径:
 // - 启动时静默检查一次(见 native/index.js),设置页可手动查;
@@ -15,7 +16,7 @@ import { ElMessage } from 'element-plus'
 import i18n from '@/i18n'
 import request from '@/api/request'
 import { serverUrl } from '@/utils/assetUrl'
-import { isAndroidApp } from '@/utils/platform'
+import { isAndroidApp, isIOSApp } from '@/utils/platform'
 import { apkFileName, downloadPercent, updatePlan } from '@/utils/appUpdate'
 import { getAppVersion } from './version'
 import { canInstallApk, cleanupApks, installApk, openInstallSettings, queryApkDownload, startApkDownload } from './updater'
@@ -86,7 +87,12 @@ function hookResume() {
  * 检查更新。`interactive = true` 时无论结果都给反馈(设置页手动检查用),静默检查只在新版本时弹窗。
  */
 export async function checkAppUpdate({ interactive = false } = {}) {
-  // 只有 Android 壳能装 APK;iOS/Web 不打扰
+  // iOS 只能在 App Store 更新:不跑 APK 流程,手动检查给一句引导
+  if (isIOSApp()) {
+    if (interactive) ElMessage.info(t('appUpdate.iosAppStore'))
+    return
+  }
+  // 只有 Android 壳能装 APK;Web 不打扰
   if (!isAndroidApp()) {
     if (interactive) ElMessage.warning(t('appUpdate.checkFailed'))
     return

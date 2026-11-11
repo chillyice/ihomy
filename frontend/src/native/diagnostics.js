@@ -1,8 +1,8 @@
-// 诊断(仅安卓壳):前端错误先放内存环形缓冲,切后台时交给原生落盘;崩溃由原生侧自己写。
+// 诊断(仅原生壳):前端错误先放内存环形缓冲,切后台时交给原生落盘;崩溃由原生侧自己写。
 // 只本地留存,用户在设置页手动导出——不上传(计划 §5.3)。首屏不静态引入本模块。
 import { App } from '@capacitor/app'
 import { registerPlugin } from '@capacitor/core'
-import { isAndroidApp } from '@/utils/platform'
+import { isNativeApp } from '@/utils/platform'
 import i18n from '@/i18n'
 
 const IhomyDiagnostics = registerPlugin('IhomyDiagnostics')
@@ -48,7 +48,7 @@ export async function flushDiagnostics() {
 
 /** 安装采集:window.onerror / unhandledrejection / console.error */
 export function installDiagnostics() {
-  if (installed || !isAndroidApp()) return
+  if (installed || !isNativeApp()) return
   installed = true
   window.addEventListener('error', (e) => {
     const where = e.filename ? `${e.filename}:${e.lineno || 0}:${e.colno || 0}` : ''

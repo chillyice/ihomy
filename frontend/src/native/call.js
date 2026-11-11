@@ -1,10 +1,10 @@
-// 通话权限前置(仅 Android 壳):发起/接听前主动把麦克风(视频还要摄像头)要到手,
+// 通话权限前置(仅原生壳):发起/接听前主动把麦克风(视频还要摄像头)要到手,
 // 并在本机第一次使用时先解释一句「接下来会弹系统授权框」,避免用户把系统弹框当成故障。
 // 网页端直接放行,浏览器自己的站点权限流程不变。
 import { registerPlugin } from '@capacitor/core'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import i18n from '@/i18n'
-import { isAndroidApp } from '@/utils/platform'
+import { isNativeApp } from '@/utils/platform'
 
 const IhomyCall = registerPlugin('IhomyCall')
 
@@ -18,7 +18,7 @@ const t = (key) => i18n.global.t(key)
  * 调用方拿 ok=false 就不再拉流,避免 getUserMedia 第二次弹框。
  */
 export async function ensureCallPermissions({ video } = {}) {
-  if (!isAndroidApp()) return { ok: true, reason: '' }
+  if (!isNativeApp()) return { ok: true, reason: '' }
   const introKey = `${INTRO_KEY}:${video ? 'video' : 'audio'}`
   if (!localStorage.getItem(introKey)) {
     try {

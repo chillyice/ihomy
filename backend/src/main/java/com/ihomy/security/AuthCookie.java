@@ -19,8 +19,10 @@ public class AuthCookie {
 
     public static final String NAME = "ihomy_at";
 
-    /** Capacitor 客户端壳的固定页面 origin(WebView androidScheme=https + hostname=localhost) */
+    /** Capacitor 客户端壳的固定页面 origin(Android: androidScheme=https + hostname=localhost) */
     private static final String APP_ORIGIN = "https://localhost";
+    /** iOS 壳的页面 origin 固定为 capacitor://localhost(不覆写 iosScheme 时的默认值) */
+    private static final String IOS_APP_ORIGIN = "capacitor://localhost";
 
     @Value("${jwt.access-token-expire}")
     private long accessExpire;
@@ -67,8 +69,10 @@ public class AuthCookie {
         return sb.toString();
     }
 
-    /** 请求是否来自 Capacitor 客户端壳(跨站固定 origin) */
+    /** 请求是否来自 Capacitor 客户端壳(跨站固定 origin;Android / iOS 各一个) */
     private boolean isAppOrigin(HttpServletRequest request) {
-        return APP_ORIGIN.equalsIgnoreCase(request.getHeader("Origin"));
+        String origin = request.getHeader("Origin");
+        if (origin == null) return false;
+        return APP_ORIGIN.equalsIgnoreCase(origin) || IOS_APP_ORIGIN.equalsIgnoreCase(origin);
     }
 }

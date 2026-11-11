@@ -48,7 +48,7 @@
       </div>
     </PageToolbar>
 
-    <!-- 仅安卓壳 + 已登录 + 自动备份未开:提示条把「功能存在但藏在设置里」变成看得见 -->
+    <!-- 仅原生壳 + 已登录 + 自动备份未开:提示条把「功能存在但藏在设置里」变成看得见 -->
     <div v-if="showBackupBanner" class="backup-banner card">
       <div class="bb-text">
         <span class="bb-title">{{ t('album.backupEntryTitle') }}</span>
@@ -212,7 +212,7 @@ import AlbumDefaultCover from '@/components/AlbumDefaultCover.vue'
 import PhotoCascade from './PhotoCascade.vue'
 import AlbumDetail from './AlbumDetail.vue'
 import { formatDate } from '@/utils/datetime'
-import { isAndroidApp } from '@/utils/platform'
+import { isNativeApp } from '@/utils/platform'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -227,7 +227,7 @@ const loading = ref(false)
 const loadError = ref(false)
 const editor = reactive({ visible: false, form: { id: null, name: '', type: 'public' } })
 
-// 手机照片自动备份入口:只在安卓壳 + 已登录 + 开关关着时出现。
+// 手机照片自动备份入口:只在原生壳 + 已登录 + 开关关着时出现。
 // 只在挂载时读一次开关(同步读 localStorage,不碰原生扫描);从设置页回来会重新挂载,状态自然更新。
 const backupOff = ref(false)
 const showBackupBanner = computed(() => backupOff.value && userStore.isLoggedIn)
@@ -392,9 +392,9 @@ onMounted(() => {
   load()
 })
 
-/** 只在安卓壳里读一次备份开关(同步 localStorage,不触发原生扫描);Web 端完全不加载该模块 */
+/** 只在原生壳里读一次备份开关(同步 localStorage,不触发原生扫描);Web 端完全不加载该模块 */
 function detectBackupEntry() {
-  if (!isAndroidApp()) return
+  if (!isNativeApp()) return
   import('@/native/photoBackup')
     .then((m) => {
       backupOff.value = !m.photoBackupEnabled()

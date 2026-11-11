@@ -1,4 +1,4 @@
-// 相册自动备份(仅安卓壳):把手机里的新照片逐张传到「手机备份」相册。
+// 相册自动备份(仅原生壳):把手机里的新照片逐张传到「手机备份」相册。
 //
 // 口径:
 // - 只在前台跑:App 启动、回到前台、或用户在设置里点「立即备份」时触发;不做后台服务,
@@ -10,7 +10,7 @@
 import { Capacitor, registerPlugin } from '@capacitor/core'
 import { App } from '@capacitor/app'
 import { reactive, watch } from 'vue'
-import { isAndroidApp } from '@/utils/platform'
+import { isNativeApp } from '@/utils/platform'
 import { useUserStore } from '@/stores/user'
 import { albumApi, photoApi } from '@/api'
 import { fileFromBase64 } from '@/utils/file'
@@ -155,7 +155,7 @@ export function photoBackupLast() {
 }
 
 export async function photoBackupStatus() {
-  if (!isAndroidApp()) return null
+  if (!isNativeApp()) return null
   try {
     return await Plugin.status()
   } catch (e) {
@@ -197,7 +197,7 @@ export function runPhotoBackup(opts = {}) {
 
 async function doRun({ full = false } = {}) {
   const userStore = useUserStore()
-  if (!isAndroidApp() || !userStore.isLoggedIn) return { reason: 'idle' }
+  if (!isNativeApp() || !userStore.isLoggedIn) return { reason: 'idle' }
 
   stopRequested = false
   const st = photoBackupState
@@ -347,7 +347,7 @@ let lastAutoAt = 0
 
 /** App 启动时安装一次:回到前台且满足开关时自动补备份 */
 export function installPhotoBackup() {
-  if (installed || !isAndroidApp()) return
+  if (installed || !isNativeApp()) return
   installed = true
   const userStore = useUserStore()
   const trigger = () => {

@@ -1,4 +1,4 @@
-<!-- 安卓客户端设置(仅壳内可见):系统日历单向导出做提醒兜底。文案只讲用户能做什么。 -->
+<!-- 手机客户端设置(仅壳内可见):系统日历单向导出做提醒兜底。文案只讲用户能做什么。 -->
 <template>
   <div class="card settings-card">
     <div class="section-label">{{ $t('appSettings.title') }}</div>
@@ -8,8 +8,8 @@
     <el-form label-position="top" class="settings-form">
       <el-form-item :label="$t('appSettings.aboutTitle')">
         <div class="ver-now">{{ $t('appSettings.currentVersion', { version: appVersion }) }}</div>
-        <div class="share-tip">{{ $t('appSettings.updateDesc') }}</div>
-        <div class="cal-actions">
+        <div class="share-tip">{{ isIOS ? $t('appSettings.updateDescIos') : $t('appSettings.updateDesc') }}</div>
+        <div v-if="!isIOS" class="cal-actions">
           <el-button type="primary" :loading="checking" @click="onCheckUpdate">
             {{ $t('appUpdate.check') }}
           </el-button>
@@ -96,7 +96,7 @@
         <div class="cal-head">
           <el-switch v-model="unreadNotify" @change="onUnreadNotifyChange" />
         </div>
-        <div class="share-tip">{{ $t('appSettings.unreadNotifyDesc') }}</div>
+        <div class="share-tip">{{ isIOS ? $t('appSettings.unreadNotifyDescIos') : $t('appSettings.unreadNotifyDesc') }}</div>
       </el-form-item>
 
       <el-form-item :label="$t('appSettings.dailyWeatherTitle')">
@@ -120,15 +120,17 @@
 
       <el-form-item :label="$t('appSettings.notifySettingsTitle')">
         <div class="cal-head">
-          <el-tag size="small" type="info">{{ $t('appSettings.notifySettingsChannels') }}</el-tag>
+          <el-tag size="small" type="info">{{
+            isIOS ? $t('appSettings.notifySettingsChannelsIos') : $t('appSettings.notifySettingsChannels')
+          }}</el-tag>
         </div>
-        <div class="share-tip">{{ $t('appSettings.notifySettingsDesc') }}</div>
+        <div class="share-tip">{{ isIOS ? $t('appSettings.notifySettingsDescIos') : $t('appSettings.notifySettingsDesc') }}</div>
         <div class="cal-actions">
           <el-button @click="onOpenNotificationSettings">{{ $t('appSettings.notifySettingsOpen') }}</el-button>
         </div>
       </el-form-item>
 
-      <el-form-item :label="$t('appSettings.autoUpdateTitle')">
+      <el-form-item v-if="isAndroid" :label="$t('appSettings.autoUpdateTitle')">
         <div class="cal-head">
           <el-switch v-model="autoUpdate" @change="onAutoUpdateChange" />
           <el-tag v-if="autoUpdateDeviceOwner" size="small" type="success">
@@ -217,11 +219,14 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getWebVersion } from '@/utils/platform'
+import { getWebVersion, isAndroidApp, isIOSApp } from '@/utils/platform'
 import { haptic, hapticsEnabled, setHapticsEnabled } from '@/utils/haptics'
 
 const { t } = useI18n()
 const router = useRouter()
+/** 平台能力差异只在原生壳内出现:Android 有 APK 自更新,其余更新一律走 App Store */
+const isAndroid = isAndroidApp()
+const isIOS = isIOSApp()
 
 const status = ref({ granted: false, count: 0, last: null })
 const busy = ref(false)
@@ -256,6 +261,9 @@ const backupLast = ref({ at: 0, created: 0 })
 const pbState = ref({ running: false, scanned: 0, created: 0, skipped: 0, failed: 0, phase: 'idle' })
 
 const backupModule = () => import('@/native/photoBackup')
+
+/** 授权引导按平台给系统设置的路径(iOS 在「设置 → ihomy」里) */
+const permissionGuideText = computed(() => (isIOS ? t('appSettings.permissionGuideIos') : t('appSettings.permissionGuide')))
 
 const backupLastText = computed(() => {
   const last = backupLast.value || pbState.value
@@ -319,7 +327,7 @@ async function onExport() {
     await load()
   } catch (e) {
     if (String(e && e.message) === 'permission') {
-      ElMessageBox.alert(t('appSettings.permissionGuide'), t('appSettings.permissionTitle'), { type: 'warning' })
+      ElMessageBox.alert(permissionGuideText.value, t('appSettings.permissionTitle'), { type: 'warning' })
     } else if (String(e && e.message) === 'guest') {
       ElMessage.warning(t('appSettings.guestOnly'))
     } else {
@@ -340,7 +348,7 @@ async function onClear() {
     await load()
   } catch (e) {
     if (String(e && e.message) === 'permission') {
-      ElMessageBox.alert(t('appSettings.permissionGuide'), t('appSettings.permissionTitle'), { type: 'warning' })
+      ElMessageBox.alert(permissionGuideText.value, t('appSettings.permissionTitle'), { type: 'warning' })
     } else {
       console.warn('[appSettings] 清空日历失败', e)
       ElMessage.error(t('appSettings.fail'))

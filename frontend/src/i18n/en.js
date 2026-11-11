@@ -2239,7 +2239,7 @@ export default {
       storage: 'Storage',
       media: 'Cinema',
       weather: 'Weather',
-      client: 'Android app',
+      client: 'Phone app',
       display: 'Display mode',
     },
     // Cinema engine (home media server)
@@ -5702,7 +5702,7 @@ export default {
     tip: 'Verify your fingerprint or face to continue',
   },
   appSettings: {
-    title: 'Android app',
+    title: 'Phone app',
     lead: 'These settings only appear in the phone app, not on the website.',
     calendarTitle: 'Export to system calendar',
     calendarGranted: 'Allowed',
@@ -5725,6 +5725,8 @@ export default {
     permissionTitle: 'Calendar permission needed',
     permissionGuide:
       'Allow ihomy to use the calendar in system settings: Settings → Apps → ihomy → Permissions → Calendar (on some phones it sits under App management). Then tap export again.',
+    permissionGuideIos:
+      'Allow ihomy to access the calendar in system settings: Settings → ihomy → Calendars, choose Full Access, then tap export again.',
     exportOk: 'Added {n} entries to your calendar',
     exportTruncated: 'There were too many entries, so only the first 500 were exported. Export again later for the rest.',
     clearOk: 'Cleared {n} entries',
@@ -5769,6 +5771,8 @@ export default {
     unreadNotifyTitle: 'Background message alerts',
     unreadNotifyDesc:
       'When on, the app keeps running in the background and alerts you in the notification bar when a message or notice arrives (usually within 30 seconds). Android shows a permanent "ihomy is running in the background" notification. Turning it off stops the background checks; home-screen widgets still check about every 30 minutes as a fallback. Quiet from 23:00 to 06:00.',
+    unreadNotifyDescIos:
+      'When on, iOS runs a background check for messages and notices at times it chooses: the interval depends on power conditions and may be tens of minutes or longer, so keep "Export to system calendar" on as a fallback for important reminders. "Background App Refresh" must stay enabled in system settings. Quiet from 23:00 to 06:00.',
     unreadNotifyDenied:
       'Notification permission is off, so background alerts will not appear. Allow ihomy to send notifications in system settings.',
     // Daily weather push
@@ -5786,6 +5790,8 @@ export default {
     notifySettingsOpen: 'Open system notification settings',
     notifySettingsDesc:
       'These four kinds of notices use separate channels, so you can turn off just one. The other three keep working as before.',
+    notifySettingsChannelsIos: 'Reminders · Family updates · Daily weather',
+    notifySettingsDescIos: 'Reminders, family updates and daily weather can each be turned off on their own; the other two keep working.',
     // Idle auto-update
     autoUpdateTitle: 'Idle auto-update',
     autoUpdateSilent: 'Installs silently',
@@ -5836,6 +5842,7 @@ export default {
     aboutTitle: 'Client version',
     currentVersion: 'Current version {version}',
     updateDesc: 'When a new version is out you can download and install it right here, no need to fetch the installer from the web page.',
+    updateDescIos: 'New versions ship through the App Store. Open ihomy in the App Store to update.',
   },
   shareInbox: {
     title: 'Share to family',
@@ -6217,6 +6224,7 @@ export default {
     latest: 'You are on the latest version',
     checkFailed: 'Could not check for updates. Please try again later.',
     check: 'Check for updates',
+    iosAppStore: 'Please update the iOS app from the App Store.',
   },
   // Tablet kiosk / photo frame (always-on full screen page)
   kiosk: {

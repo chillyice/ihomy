@@ -19,6 +19,8 @@
     "format:check": "prettier --check \"src/**/*.{js,vue,css}\"",
     "app:build": "node scripts/copy-ruffle.mjs --app && node scripts/copy-emulatorjs.mjs --app && vite build --mode app",
     "app:sync": "npm run app:build && npx cap sync android",
+    "ios:sync": "npm run app:build && npx cap sync ios",
+    "ios:open": "npx cap open ios",
     "app:open": "npx cap open android"
   },
   "dependencies": {
@@ -28,6 +30,7 @@
     "@capacitor/browser": "8.0.5",
     "@capacitor/core": "8.6.0",
     "@capacitor/filesystem": "8.1.5",
+    "@capacitor/ios": "8.6.0",
     "@capacitor/keyboard": "8.0.6",
     "@capacitor/local-notifications": "^8.3.1",
     "@capacitor/network": "8.0.1",

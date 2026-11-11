@@ -1,6 +1,6 @@
 // 触觉反馈统一出口:全站只从这里取「震一下」,同类 80ms 内合并,总开关存本机。
 // 语义只有五类(与 HapticsPlugin 一一对应),禁止给滚动/hover/每次普通点击加震动。
-import { isAndroidApp } from '@/utils/platform'
+import { isNativeApp } from '@/utils/platform'
 
 export const HAPTICS_KEY = 'ihomy:haptics:v1'
 const THROTTLE_MS = 80
@@ -28,7 +28,7 @@ export function setHapticsEnabled(on) {
  * @param {'tap'|'select'|'success'|'warning'|'error'} kind
  */
 export function haptic(kind = 'tap') {
-  if (!KINDS.has(kind) || !hapticsEnabled() || !isAndroidApp()) return
+  if (!KINDS.has(kind) || !hapticsEnabled() || !isNativeApp()) return
   const now = Date.now()
   if (kind === lastKind && now - lastAt < THROTTLE_MS) return
   lastKind = kind

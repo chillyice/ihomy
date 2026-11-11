@@ -106,7 +106,7 @@ import SunLightLayer from '@/components/SunLightLayer.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useUserStore } from '@/stores/user'
 import { planApi, publicApi, reminderApi, scheduleApi } from '@/api'
-import { isAndroidApp } from '@/utils/platform'
+import { isNativeApp } from '@/utils/platform'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -269,7 +269,7 @@ const onExitUp = () => {
 }
 
 const confirmExit = async () => {
-  if (isAndroidApp()) {
+  if (isNativeApp()) {
     try {
       const bio = await biometricNative()
       const status = await bio.biometricStatus()

@@ -1,15 +1,15 @@
-// 应用锁(仅安卓壳):离开 App 超过 5 分钟再回来,先过一道系统指纹/人脸。
+// 应用锁(仅原生壳):离开 App 超过 5 分钟再回来,先过一道系统指纹/人脸。
 //
 // 口径:
 // - pausedAt 只放内存,不落 localStorage;进程被系统杀掉后重开不做二次校验(冷启动仍可直接进)。
 // - 本机没有可用生物识别、或指纹被系统移除时自动关掉开关,绝不把用户永久挡在门外。
 // - 取消/失败一律回登录页(还有密码可走),不留在当前页面。
 import { App } from '@capacitor/app'
-import { isAndroidApp } from '@/utils/platform'
+import { isNativeApp } from '@/utils/platform'
 import { useUserStore } from '@/stores/user'
 import router from '@/router'
 
-/** 开关(默认关,由用户在「设置 → 安卓客户端」里打开) */
+/** 开关(默认关,由用户在「设置 → 手机客户端」里打开) */
 const ON_KEY = 'ihomy:app:lock:on'
 /** 切后台多久后回前台需要再次验证 */
 export const APP_LOCK_AFTER_MS = 5 * 60 * 1000
@@ -37,7 +37,7 @@ export function setAppLockEnabled(on) {
 
 /** App 启动时安装一次;只在回前台时判断,不在页面里散落钩子 */
 export function installAppLock() {
-  if (installed || !isAndroidApp()) return
+  if (installed || !isNativeApp()) return
   installed = true
   App.addListener('appStateChange', ({ isActive }) => {
     if (!isActive) {

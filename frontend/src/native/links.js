@@ -53,13 +53,14 @@ function handleUrl(rawUrl, nameHint) {
   } catch {
     return
   }
-  if (url.protocol !== 'https:' && url.protocol !== 'http:') return
   const download = isDownloadUrl(url)
   if (url.origin === location.origin && !download) {
-    // 壳自带的站内页面:留在 WebView 里,跳系统浏览器会丢登录态
+    // 壳自带的站内页面:留在 WebView 里,跳系统浏览器会丢登录态。
+    // 必须先判同源再判协议——iOS 壳页面是 capacitor://,相对路径解析出来也是 capacitor:。
     router.push(url.pathname + url.search + url.hash).catch(() => {})
     return
   }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return
   if (download) {
     downloadAndOpen(url.href, nameHint)
     return
@@ -87,9 +88,10 @@ export function installLinkHandler() {
     } catch {
       return
     }
-    if (url.protocol !== 'https:' && url.protocol !== 'http:') return
+    const sameOrigin = url.origin === location.origin
+    if (!sameOrigin && url.protocol !== 'https:' && url.protocol !== 'http:') return
     const download = anchor.hasAttribute('download') || isDownloadUrl(url)
-    const leavesApp = url.origin !== location.origin
+    const leavesApp = !sameOrigin
     if (!download && !leavesApp && anchor.target !== '_blank') return
     e.preventDefault()
     handleUrl(url.href, anchor.getAttribute('download') || anchor.getAttribute('data-filename') || undefined)

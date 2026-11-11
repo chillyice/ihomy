@@ -180,7 +180,7 @@ watch(
   },
 )
 
-// ---- 画中画(仅安卓壳):播放中离开 App 自动缩进小窗,播完/暂停即关掉 ----
+// ---- 画中画(仅原生壳):播放中离开 App 自动缩进小窗,播完/暂停即关掉 ----
 const pipReady = ref(false)
 const pipNative = () => import('@/native/pip')
 const checkPip = async () => {

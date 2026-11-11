@@ -1,12 +1,12 @@
-// 触觉反馈原生出口(仅 Android 壳):统一语义 kind,插件不存在时静默 no-op。
+// 触觉反馈原生出口(仅原生壳):统一语义 kind,插件不存在时静默 no-op。
 // 由 utils/haptics.js 动态引入,Web 端不会加载 Capacitor 运行时。
 import { registerPlugin } from '@capacitor/core'
-import { isAndroidApp } from '@/utils/platform'
+import { isNativeApp } from '@/utils/platform'
 
 const IhomyHaptics = registerPlugin('IhomyHaptics')
 
 export async function play(kind = 'tap') {
-  if (!isAndroidApp()) return
+  if (!isNativeApp()) return
   try {
     await IhomyHaptics.play({ kind })
   } catch (e) {
