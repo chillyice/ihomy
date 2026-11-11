@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { classifyViewport, isIOSUA, TABLET_MIN_SHORT_SIDE, NARROW_MAX_WIDTH } from './platform'
+import { classifyViewport, isIOSUA, isWideViewport, TABLET_MIN_SHORT_SIDE, NARROW_MAX_WIDTH, WIDE_MIN_WIDTH } from './platform'
 
 describe('isIOSUA 平台识别', () => {
   it('iPhone / iPod 原生 UA', () => {
@@ -151,5 +151,46 @@ describe('classifyViewport 手机 / 平板 / 窄窗口判定', () => {
   it('缺参数(SSR / 老 WebView)不抛错', () => {
     expect(() => classifyViewport()).not.toThrow()
     expect(() => classifyViewport({})).not.toThrow()
+  })
+})
+
+describe('isWideViewport 宽屏判定', () => {
+  it('常量与 main.css 的宽屏段一致', () => {
+    expect(WIDE_MIN_WIDTH).toBe(900)
+  })
+
+  it('10 寸平板横屏(1024×768):宽屏', () => {
+    expect(isWideViewport({ innerWidth: 1024, screenWidth: 1024, screenHeight: 768 })).toBe(true)
+  })
+
+  it('手机横屏(873×393):宽度过线但短边不足,不算宽屏', () => {
+    expect(isWideViewport({ innerWidth: 873, screenWidth: 873, screenHeight: 393 })).toBe(false)
+  })
+
+  it('手机竖屏(393×873):宽度不足,不算宽屏', () => {
+    expect(isWideViewport({ innerWidth: 393, screenWidth: 393, screenHeight: 873 })).toBe(false)
+  })
+
+  it('900px 边界:刚好算宽屏;899px 回单栏', () => {
+    expect(isWideViewport({ innerWidth: 900, screenWidth: 1440, screenHeight: 900 })).toBe(true)
+    expect(isWideViewport({ innerWidth: 899, screenWidth: 1440, screenHeight: 900 })).toBe(false)
+  })
+
+  it('平板分屏压窄到 875px:自动退出宽屏(短边仍过线)', () => {
+    expect(isWideViewport({ innerWidth: 875, screenWidth: 1066, screenHeight: 666 })).toBe(false)
+  })
+
+  it('桌面 1440×900:宽屏', () => {
+    expect(isWideViewport({ innerWidth: 1440, screenWidth: 1920, screenHeight: 1080 })).toBe(true)
+  })
+
+  it('拿不到 screen 尺寸时按窗口宽补:窗口够宽仍算宽屏', () => {
+    expect(isWideViewport({ innerWidth: 1280 })).toBe(true)
+  })
+
+  it('缺参数(SSR / 老 WebView)不抛错,按非宽屏处理', () => {
+    expect(() => isWideViewport()).not.toThrow()
+    expect(isWideViewport()).toBe(false)
+    expect(isWideViewport({})).toBe(false)
   })
 })

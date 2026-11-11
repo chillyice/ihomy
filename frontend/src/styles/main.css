@@ -879,6 +879,24 @@ html.dark .section-label {
   }
 }
 
+/* ========== 大屏双栏(≥900px)==========
+   是否真的分栏由页面加 `.wide-cols` 决定(唯一判定来源 composables/useDevice 的 isWide:
+   还要求屏幕短边 ≥600dp,手机横屏宽度过线也不分栏);这里的 media query 只保证窄窗口一律单栏。
+   网格列宽属于页面自己的事(留页面 scoped),这里只统一「两列各自滚、不撑长页面」的列规则。 */
+@media (min-width: 900px) {
+  .wide-cols {
+    align-items: start;
+  }
+  .wide-cols > .wide-col {
+    min-width: 0;
+    min-height: 0;
+    /* 高度由页面实测头高后写到 --wide-col-max;拿不到时按内容自然高度,不硬造滚动 */
+    max-height: var(--wide-col-max, none);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
 /* === 全局按钮统一样式 — 4 类按钮 / 浅米暖调 / 大圆角 === */
 
 /* 基础:所有 el-button 圆角 + 无 border + 过渡 */

@@ -45,6 +45,8 @@ export function getWebVersion() {
 export const TABLET_MIN_SHORT_SIDE = 600
 /** 窄窗口线:与 main.css 的移动端断点保持一致 */
 export const NARROW_MAX_WIDTH = 768
+/** 宽屏线:与 main.css 的宽屏段 `@media (min-width: 900px)` 保持一致(≥900 才考虑双栏) */
+export const WIDE_MIN_WIDTH = 900
 
 /**
  * 视口形态判定(纯函数,方便测试):手机 / 平板 / 窄窗口。
@@ -67,4 +69,18 @@ export function classifyViewport({ ua = '', maxTouchPoints = 0, screenWidth = 0,
   const phone = !tablet && (isIPhone || isAndroid)
   const narrow = (innerWidth || 0) <= NARROW_MAX_WIDTH
   return { phone, tablet, narrow, mobile: phone || narrow }
+}
+
+/**
+ * 宽屏判定(纯函数):窗口宽 ≥900 且屏幕短边 ≥600dp。
+ *
+ * 两个条件都要满足:
+ * - 只看宽度会让「手机横屏」(如 873×393)也进双栏,短边一项把手机排除;
+ * - 平板分屏把窗口压窄到 <900 时第一项不成立,自动退回单栏。
+ *
+ * 与 `classifyViewport` 分开:那个函数的返回值被 8 处 `toEqual` 全量断言,不加字段改语义。
+ */
+export function isWideViewport({ innerWidth = 0, screenWidth = 0, screenHeight = 0 } = {}) {
+  const shortSide = Math.min(screenWidth || innerWidth || 0, screenHeight || innerWidth || 0)
+  return (innerWidth || 0) >= WIDE_MIN_WIDTH && shortSide >= TABLET_MIN_SHORT_SIDE
 }

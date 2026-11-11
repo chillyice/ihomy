@@ -44,29 +44,38 @@
     <div v-loading="loading">
       <ScheduleUpcoming v-if="view === 'calendar' && userStore.isLoggedIn" :items="visibleUpcoming" @pick="onPickUpcoming" />
 
-      <ScheduleCalendar
-        v-if="view === 'calendar'"
-        v-model:selected="selectedDate"
-        :grid="grid"
-        :calendar-days="calendarDays"
-        :events="visibleEventsDays"
-        :year="cursor.year"
-        :month="cursor.month"
-        @change-month="changeMonth"
-      />
-
-      <ScheduleDayPanel
-        v-if="view === 'calendar'"
-        :date="selectedDate"
-        :items="dayItems"
-        :info="dayInfo"
-        :record-of="recordOf"
-        @open="openDetail"
-        @edit="openEdit"
-        @delete="onDelete"
-        @toggle="onToggle"
-        @toggle-task="onToggleTask"
-      />
+      <!-- 宽屏双栏(≥900px 且屏幕短边 ≥600dp,判定唯一来源 useDevice.isWide):
+           左月历、右当日 + 待安排,两列各自滚,页面不再被当日列表撑长。
+           窄屏不加 `.wide-cols`,同一份 DOM 保持「月历 → 当日 → 待安排」的纵向顺序,
+           不用 CSS order 重排(读屏顺序会错)。 -->
+      <div v-if="view === 'calendar'" ref="wideEl" class="sched-wide" :class="{ 'wide-cols': viewWide }" :style="colStyle">
+        <div class="wide-col sched-col-cal">
+          <ScheduleCalendar
+            v-model:selected="selectedDate"
+            :grid="grid"
+            :calendar-days="calendarDays"
+            :events="visibleEventsDays"
+            :year="cursor.year"
+            :month="cursor.month"
+            @change-month="changeMonth"
+          />
+        </div>
+        <div class="wide-col sched-col-side">
+          <ScheduleDayPanel
+            :date="selectedDate"
+            :items="dayItems"
+            :info="dayInfo"
+            :record-of="recordOf"
+            @open="openDetail"
+            @edit="openEdit"
+            @delete="onDelete"
+            @toggle="onToggle"
+            @toggle-task="onToggleTask"
+          />
+          <!-- 宽屏把「待安排」收进右列底部(当日面板之后);窄屏同一位置,顺序与旧版一致 -->
+          <ScheduleUndated v-if="showUndated" :items="undated" @arrange="openPlanEditor" @edit="openPlanEditor" @delete="onDeleteUndated" />
+        </div>
+      </div>
 
       <template v-else>
         <!-- 清单与月历共用同一份区间数据,所以翻月放在清单头上,否则进清单后无法换月 -->
@@ -92,8 +101,9 @@
         />
       </template>
 
+      <!-- 清单视图的待安排仍在清单之后(清单不是双栏) -->
       <ScheduleUndated
-        v-if="userStore.isLoggedIn && undated.length"
+        v-if="view !== 'calendar' && showUndated"
         :items="undated"
         @arrange="openPlanEditor"
         @edit="openPlanEditor"
@@ -123,6 +133,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, ArrowRight, Filter } from '@element-plus/icons-vue'
 import { anniversaryApi, memberApi, planApi, publicApi, reminderApi, scheduleApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { useDevice } from '@/composables/useDevice'
 import { isNativeApp } from '@/utils/platform'
 import { buildMonthGrid, isDateString, monthKey, monthRange, shiftMonth, todayString } from '@/utils/scheduleCalendar'
 import { buildList, sortEvents } from '@/utils/scheduleList'
@@ -149,6 +160,9 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+// 宽屏判定只在这里取一次(页面/模板禁止自己读 window.innerWidth);
+// 别名 viewWide:useGameView 里同名的是「游戏宽屏开关」,语义无关
+const { isWide: viewWide } = useDevice()
 
 const today = todayString()
 const view = ref('calendar')
@@ -181,6 +195,32 @@ const visibleUpcoming = computed(() => filterSourceItems(upcoming.value, sourceP
 const dayItems = computed(() => sortEvents(visibleEventsDays.value[selectedDate.value] || []))
 const dayInfo = computed(() => calendarDays.value[selectedDate.value] || null)
 const listGroups = computed(() => buildList(visibleEventsDays.value, filter.value))
+// 待安排只对登录用户有意义(游客拿到的是空数组,也从未请求过)
+const showUndated = computed(() => userStore.isLoggedIn && undated.value.length > 0)
+
+// ---- 宽屏双栏:列内滚动净高 ----
+// 两列各自滚,所以先要知道「双栏顶边到可视区底边」还剩多高(头高含面包屑 / 工具栏 / 近期条,
+// 暖居与光尘的外壳头高还不一样),量出来的 px 写到 --wide-col-max 交给 main.css 的 .wide-col。
+// 这里只量高度,不做视口形态判定(宽度与短边判定一律在 useDevice)。
+const wideEl = ref(null)
+const colMaxH = ref(0)
+const colStyle = computed(() => (viewWide.value && colMaxH.value > 0 ? { '--wide-col-max': `${colMaxH.value}px` } : {}))
+
+const measureCols = () => {
+  if (!viewWide.value || view.value !== 'calendar') return
+  const el = wideEl.value
+  if (!el) return
+  // 暖居主区是 .gc-main 自己的滚动盒,光尘整页滚:两种都按各自滚动容器算净高
+  const box = el.closest('.gc-main')
+  const areaTop = box ? box.getBoundingClientRect().top : 0
+  const areaHeight = box ? box.clientHeight : window.innerHeight
+  const scrolled = box ? box.scrollTop : window.scrollY
+  const topInArea = el.getBoundingClientRect().top - areaTop + scrolled
+  // 下限 240:再矮就只剩标题栏,宁可让外壳稍微滚一点也不把月历压没
+  colMaxH.value = Math.max(240, Math.round(areaHeight - topInArea - 24))
+}
+
+const onViewportChange = () => nextTick(measureCols)
 const detailKind = computed(() => detailRef.value?.kind || 'PLAN')
 const detailRecord = computed(() => {
   if (!detailRef.value) return null
@@ -542,21 +582,46 @@ watch(
   },
   { flush: 'post' },
 )
+// 双栏净高会随这几件事变:进出宽屏、切回月历视图、近期条/待安排出现把顶边下推
+watch([viewWide, () => view.value], onViewportChange)
+watch([() => showUndated.value, () => visibleUpcoming.value.length, () => loading.value], onViewportChange)
 
 onMounted(async () => {
   applyQuery()
   await reloadAll()
   scrollToFocus()
+  window.addEventListener('resize', onViewportChange)
+  window.addEventListener('orientationchange', onViewportChange)
+  await nextTick()
+  measureCols()
 })
 
 onBeforeUnmount(() => {
   stopFocusScroll()
+  window.removeEventListener('resize', onViewportChange)
+  window.removeEventListener('orientationchange', onViewportChange)
 })
 </script>
 
 <style scoped>
 .filter-select {
   width: 132px;
+}
+/* 宽屏双栏(≥900px 且短边 ≥600):62/38 在 .page 的 1100px 内容宽内分,不改全局宽度。
+   列内滚动、不把页面撑高的通用规则在 main.css 的 .wide-col 段;窄屏没有 .wide-cols 类,
+   同一份 DOM 退回纵向堆叠,顺序与旧版一致。 */
+.wide-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38%;
+  gap: 16px;
+}
+.sched-col-cal,
+.sched-col-side {
+  min-width: 0;
+}
+/* 右列顶部与左列齐平:单栏时当日面板靠 12px 上边距与前一块分开,双栏里不需要 */
+.wide-cols .sched-col-side :deep(.day) {
+  margin-top: 0;
 }
 .source-panel {
   display: flex;
