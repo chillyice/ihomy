@@ -36,7 +36,8 @@
   --dur-base: 0.24s;
   --dur-slow: 0.36s;
   /* 层级标尺(全局唯一来源):内容 → 常驻外壳 → 浮起操作 → 自建沉浸层 → EP 弹窗/弹层 → 轻提示
-     → 背景光影(270–290)→ 氛围层(300–308)。组件内不要再写裸数字。
+     → 背景光影(270–290)→ 氛围层(300–308)。命令面板插在确认框与 EP popper 之间(--z-palette)。
+    组件内不要再写裸数字。
      **光影永远在弹窗之上**(全部 pointer-events:none,不挡操作):弹窗遮罩只压暗外壳与内容,
      太阳光斑/窗影/体积光/雾/浮尘/雨雪/台灯照旧落在弹窗纸面上。 */
   --z-content: 10;
@@ -49,6 +50,7 @@
   --z-immersive: 150; /* 自建全屏浮层:照片查看器 / 阅读器 / 相册光箱 / 拖拽幽灵 */
   --z-overlay: 200; /* EP 弹窗 / 抽屉遮罩:压住外壳与内容,但低于全部光影 */
   --z-messagebox: 210; /* 确认框:常由弹窗内部触发,需盖住弹窗 */
+  --z-palette: 215; /* 命令面板:盖住页面弹窗,但让 EP popper 与轻提示压在它上面 */
   --z-popup: 240; /* EP popper:下拉 / 日期 / 悬浮卡 / tooltip */
   --z-toast: 260; /* ElMessage / ElNotification */
   --z-deco: 270; /* 背景光影起点(270–290):光斑 / 窗影 / 反射 / 体积光 / 雾霭,盖在全部 UI 之上 */
@@ -2187,3 +2189,11 @@ html.pull-refresh-host {
     top: 14px;
   }
 }
+
+/* ===== 拖拽上传(T7):文件从系统拖进相册期间,整页光标换成「抓着」 =====
+   由 AlbumDetail 在 dragenter 时挂到 body、drop/dragleave 归零或窗口失焦时移除。 */
+body.dragging-files,
+body.dragging-files * {
+  cursor: grabbing !important;
+}
+

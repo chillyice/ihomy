@@ -48,6 +48,8 @@
     <CallOverlay />
     <!-- 应用内更新弹窗(仅原生壳):懒加载,Web 端永不加载 Capacitor 运行时 -->
     <AppUpdateDialog v-if="isNative" />
+    <!-- 命令面板(Ctrl/⌘+K):独立页与沉浸页不渲染,触屏由组件内 hasPointer 兜底 -->
+    <CommandPalette v-if="!standalone && !immersive" />
   </el-config-provider>
 </template>
 
@@ -64,6 +66,7 @@ import { useFloatsStore } from '@/stores/floats'
 import { useSunLight, SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { isNativeApp } from '@/utils/platform'
 import { useDevice } from '@/composables/useDevice'
+import { useHotkeys } from '@/composables/useHotkeys'
 import SunLightLayer from '@/components/SunLightLayer.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
 import WarmLayout from '@/components/warm/WarmLayout.vue'
@@ -75,6 +78,8 @@ import LightTestConsole from '@/components/LightTestConsole.vue'
 import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue'
 const ChatFloat = defineAsyncComponent(() => import('@/components/chat/ChatFloat.vue'))
 const CallOverlay = defineAsyncComponent(() => import('@/components/chat/CallOverlay.vue'))
+// 命令面板(Ctrl/⌘+K):懒加载,内部只对精细指针显示,独立页/沉浸页不挂载
+const CommandPalette = defineAsyncComponent(() => import('@/components/CommandPalette.vue'))
 import MobileLayout from '@/layouts/MobileLayout.vue'
 // 应用内更新弹窗:内部 import Capacitor 插件,必须懒加载且只在壳内渲染
 const AppUpdateDialog = defineAsyncComponent(() => import('@/components/AppUpdateDialog.vue'))
@@ -97,6 +102,8 @@ const immersive = computed(() => !!route.meta.immersive)
 const routeReady = ref(false)
 // 独立站点页(咔哒软件首页等)：完全独立全屏，不套 ihomy 外壳/光影/侧栏/页脚
 const standalone = computed(() => routeReady.value && !!route.meta.standalone)
+// 全局快捷键:模块级单例,只绑一次;面板状态由这里与 CommandPalette 共享
+const { closePalette } = useHotkeys()
 const { locale } = useI18n()
 
 // 暖居主题:桌面端 + 非纯 OPS 时启用独立外壳
@@ -158,6 +165,11 @@ watch(standalone, (isStandalone) => {
   if (userStore.mustChangePassword) return
   appStore.init()
   userStore.ensureUserInfo()
+})
+
+// 命令面板只在站内普通页可用:独立页 / 沉浸页即使收到 Ctrl/⌘+K 也不弹,离开时顺手关闭
+watch([standalone, immersive], ([isStandalone, isImmersive]) => {
+  if (isStandalone || isImmersive) closePalette()
 })
 </script>
 

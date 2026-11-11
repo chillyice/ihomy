@@ -6,7 +6,7 @@
     <PageToolbar>
       <template v-if="!selectMode">
         <div class="tb-left">
-          <el-input v-model="searchKeyword" :placeholder="$t('music.searchPlaceholder')" clearable size="small" style="width: 200px">
+          <el-input v-model="searchKeyword" :placeholder="$t('music.searchPlaceholder')" clearable size="small" style="width: 200px" data-search-input>
             <template #prefix>
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                 <circle cx="11" cy="11" r="8" />

@@ -2,7 +2,7 @@
      位移直接写内容层 style(useRowGestures),松手才提交展开状态;不 preventDefault,纵向滚动照常。
      行尾「更多」按钮通过 slot prop openMenu 打开同一份菜单(D4:手势必须有等价按钮)。 -->
 <template>
-  <div class="swipe-row" :class="{ 'is-open': open }">
+  <div class="swipe-row" :class="{ 'is-open': open }" @contextmenu="onRowContextmenu">
     <div class="swipe-actions swipe-actions-left" :style="{ width: actionWidth + 'px' }">
       <button
         v-for="a in leftActions"
@@ -41,6 +41,7 @@
 <script setup>
 import LongPressMenu from './LongPressMenu.vue'
 import { useRowGestures } from '@/composables/useRowGestures'
+import { useDevice } from '@/composables/useDevice'
 
 const props = defineProps({
   leftActions: { type: Array, default: () => [] },
@@ -50,12 +51,19 @@ const props = defineProps({
 })
 const emit = defineEmits(['action'])
 
-const { contentEl, open, menu, actionWidth, close, openMenuAt, onPointerDown, onClickCapture } = useRowGestures({
+const { contentEl, open, menu, actionWidth, close, openMenuAt, openContextMenu, onPointerDown, onClickCapture } = useRowGestures({
   hasLeft: () => props.leftActions.length > 0,
   hasRight: () => props.rightActions.length > 0,
   hasMenu: () => props.menuItems.length > 0,
   disabled: () => props.disabled,
 })
+const { hasPointer } = useDevice()
+
+// 右键与长按共用同一份菜单;触屏放行,避免 Android 长按补发的 contextmenu 再弹一层
+const onRowContextmenu = (e) => {
+  if (!hasPointer.value) return
+  openContextMenu(e)
+}
 
 /** 行尾「更多」按钮:以按钮位置为锚点打开菜单(长按则跟随手指) */
 const openMenu = (e) => {
@@ -120,5 +128,21 @@ const run = (item) => {
   background: var(--color-card);
   touch-action: pan-y;
   will-change: transform;
+}
+/* 悬停反馈只在精细指针下出现:触屏(Android 长按/点击后)不残留 :hover */
+@media (hover: hover) and (pointer: fine) {
+  .swipe-content::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background: rgba(var(--color-brand-rgb), 0.04);
+    opacity: 0;
+    transition: opacity var(--dur-fast) ease;
+  }
+  .swipe-content:hover::after {
+    opacity: 1;
+  }
 }
 </style>

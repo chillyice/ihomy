@@ -45,6 +45,8 @@ function apply() {
 
 function init() {
   if (initialized) return
+  // 单测(Node,无 DOM)环境只导入不初始化;浏览器/壳内照旧
+  if (typeof window === 'undefined') return
   initialized = true
   apply()
   const handler = () => apply()

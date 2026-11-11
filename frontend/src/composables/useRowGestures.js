@@ -3,6 +3,7 @@
 // 拖动位移直接写 DOM style,手势结束才提交 open 状态(规范 15:禁止 rAF 每帧写 Vue ref)。
 import { ref, onBeforeUnmount } from 'vue'
 import { haptic } from '@/utils/haptics'
+import { useDevice } from '@/composables/useDevice'
 
 export const LONG_PRESS_MS = 480
 export const MOVE_CANCEL_PX = 10
@@ -60,6 +61,7 @@ export function useRowGestures(options = {}) {
   const hasLeft = options.hasLeft || (() => (options.leftActions || []).length > 0)
   const hasRight = options.hasRight || (() => (options.rightActions || []).length > 0)
   const hasMenu = options.hasMenu || (() => true)
+  const { hasPointer } = useDevice()
 
   let press = null
   let longTimer = null
@@ -110,6 +112,17 @@ export function useRowGestures(options = {}) {
   const openMenuAt = (x = 0, y = 0) => {
     close()
     menu.value = { visible: true, x, y }
+  }
+
+  /**
+   * 鼠标右键入口:与长按共用同一份菜单(不另写右键项)。
+   * 触屏必须拦掉——Android 长按后会补发 contextmenu,不挡会同时弹两个菜单。
+   */
+  const openContextMenu = (e) => {
+    if (!e || !hasPointer.value) return
+    if (!hasMenu()) return
+    e.preventDefault()
+    openMenuAt(e.clientX, e.clientY)
   }
 
   const closeMenu = () => {
@@ -253,6 +266,7 @@ export function useRowGestures(options = {}) {
     close,
     closeMenu,
     openMenuAt,
+    openContextMenu,
     onPointerDown,
     onClickCapture,
   }

@@ -7,7 +7,7 @@
       <!-- 媒体库(家庭媒体服务器):按题材/地区/年代/类型前端过滤,数据量小 -->
       <template v-if="tab === 'media'">
         <div class="tb-left">
-          <el-input v-model="mediaKeyword" :placeholder="$t('cinema.searchPlaceholder')" clearable size="small" style="width: 180px">
+          <el-input v-model="mediaKeyword" :placeholder="$t('cinema.searchPlaceholder')" clearable size="small" style="width: 180px" data-search-input>
             <template #prefix>
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                 <circle cx="11" cy="11" r="8" />
@@ -50,7 +50,7 @@
       </template>
       <template v-else-if="!selectMode">
         <div class="tb-left">
-          <el-input v-model="searchKeyword" :placeholder="$t('cinema.searchPlaceholder')" clearable size="small" style="width: 200px">
+          <el-input v-model="searchKeyword" :placeholder="$t('cinema.searchPlaceholder')" clearable size="small" style="width: 200px" data-search-input>
             <template #prefix>
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                 <circle cx="11" cy="11" r="8" />

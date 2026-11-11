@@ -11,6 +11,7 @@
           clearable
           size="small"
           style="width: 180px"
+          data-search-input
           @keyup.enter="load"
           @clear="load"
         />

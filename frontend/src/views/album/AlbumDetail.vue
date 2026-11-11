@@ -58,9 +58,13 @@
           <el-button v-if="album.type === 'public' && album.shareToken" class="ghost-btn" @click="copyAlbumShare">{{
             t('album.share')
           }}</el-button>
-          <el-button v-if="userStore.isLoggedIn && !currentShareToken && !isMapped" type="primary" @click="photoInput?.click()">{{
-            t('album.uploadPhotos')
-          }}</el-button>
+          <el-button
+            v-if="userStore.isLoggedIn && !currentShareToken && !isMapped"
+            type="primary"
+            :loading="uploading"
+            @click="photoInput?.click()"
+            >{{ t('album.uploadPhotos') }}</el-button
+          >
           <!-- 相机直传:只在安卓壳里出现(系统相机拍完直接进当前相册) -->
           <el-button v-if="canCapture && userStore.isLoggedIn && !currentShareToken && !isMapped" :loading="capturing" @click="onCapture">
             {{ t('album.takePhoto') }}
@@ -150,7 +154,16 @@
       </div>
     </div>
 
-    <div v-loading="loading" class="album-body">
+    <div
+      v-loading="loading"
+      class="album-body"
+      :class="{ 'is-drop-target': dropActive }"
+      @dragenter="onDragEnter"
+      @dragover="onDragOver"
+      @dragleave="onDragLeave"
+      @drop="onDrop"
+    >
+      <div v-if="dropActive" class="drop-hint" aria-hidden="true">{{ t('album.dropHere') }}</div>
       <div v-if="photos.length" class="photo-wall">
         <div v-for="p in photos" :key="p.id" class="photo-card" :class="{ selected: selectMode && selectedIds.includes(p.id) }">
           <div v-a11y-click class="photo-wrap" @click="selectMode ? togglePick(p) : openViewer(p)">
@@ -200,7 +213,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { albumApi, photoApi } from '@/api'
 import { useUserStore } from '@/stores/user'
@@ -214,6 +227,7 @@ import { shareId } from '@/utils/shareId'
 import { isAndroidApp } from '@/utils/platform'
 import { formatRelativeTime, formatDateTime } from '@/utils/datetime'
 import { useSyncStore } from '@/stores/sync'
+import { useDevice } from '@/composables/useDevice'
 
 // 受控组件:宽屏右栏传 albumId / inline;直接访问 /album/:id 或分享链接时不传,回落路由参数
 const props = defineProps({
@@ -306,15 +320,26 @@ const onRefresh = async () => {
 
 // 批量上传照片(含实况照片:静态图 + 同名 MOV 一并提交,后端按同名配对)
 const photoInput = ref(null)
-const onPhotosPicked = async (e) => {
-  const files = Array.from(e.target.files || [])
-  if (!files.length) return
+const uploading = ref(false)
+// 文件选择与拖拽上传共用这一条上传路径:接口调用 / 成功提示 / 刷新都从这里收口
+const uploadFiles = async (files) => {
+  const list = Array.from(files || [])
+  if (!list.length || uploading.value) return
+  uploading.value = true
   try {
-    await photoApi.upload(currentAlbumId.value, files)
+    await photoApi.upload(currentAlbumId.value, list)
     ElMessage.success(t('album.uploadSuccess'))
   } finally {
-    e.target.value = ''
+    uploading.value = false
     load()
+  }
+}
+const onPhotosPicked = async (e) => {
+  const input = e.target
+  try {
+    await uploadFiles(input.files)
+  } finally {
+    input.value = ''
   }
 }
 
@@ -418,6 +443,59 @@ const setChildView = (v) => {
 
 // ---------- 子相册 + 照片多选删除(混合选择) ----------
 const selectMode = ref(false)
+
+// ---------- 拖拽上传(T7):鼠标把系统文件拖进照片墙,松手即上传 ----------
+const { hasPointer } = useDevice()
+const dropActive = ref(false)
+// 进入计数:照片卡等子元素间移动会连续触发 enter/leave,计数归零才算真正离开
+let dragDepth = 0
+// 登录、非公开分享、非映射只读、非多选、且有精细指针时才接
+const canDrop = computed(() => userStore.isLoggedIn && !currentShareToken.value && !isMapped.value && !selectMode.value && hasPointer.value)
+const isFileDrag = (e) => Array.from(e.dataTransfer?.types || []).includes('Files')
+const clearDrop = () => {
+  dragDepth = 0
+  dropActive.value = false
+  document.body.classList.remove('dragging-files')
+}
+const onDragEnter = (e) => {
+  if (!canDrop.value || !isFileDrag(e)) return
+  e.preventDefault()
+  dragDepth += 1
+  dropActive.value = true
+  document.body.classList.add('dragging-files')
+}
+const onDragOver = (e) => {
+  if (!isFileDrag(e)) return
+  // 任何情况下都要 preventDefault:否则松手时浏览器会直接打开拖入的文件
+  e.preventDefault()
+  if (!canDrop.value) {
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'none'
+    return
+  }
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+}
+const onDragLeave = () => {
+  dragDepth = Math.max(0, dragDepth - 1)
+  if (!dragDepth) clearDrop()
+}
+const onDrop = async (e) => {
+  e.preventDefault()
+  if (!canDrop.value) return
+  const files = Array.from(e.dataTransfer?.files || [])
+  clearDrop()
+  if (!files.length) {
+    // 部分 ROM 给的是 content:// URI,DataTransfer.files 可能为空:给提示而不是静默失败
+    ElMessage.warning(t('album.dropNoFile'))
+    return
+  }
+  const accepted = files.filter((f) => f.type?.startsWith('image/') || f.type?.startsWith('video/'))
+  if (!accepted.length) {
+    ElMessage.warning(t('album.dropWrongType'))
+    return
+  }
+  await uploadFiles(accepted)
+}
+
 const selectedIds = ref([]) // 选中照片 id
 const selectedChildIds = ref([]) // 选中子相册 id
 const batchDeleting = ref(false)
@@ -471,10 +549,19 @@ watch(currentAlbumId, () => {
   selectedIds.value = []
   selectedChildIds.value = []
   viewer.visible = false
+  clearDrop()
   load()
 })
 
-onMounted(load)
+onMounted(() => {
+  load()
+  // 拖拽中切窗/失焦时浏览器不再补 dragleave,兜底清掉高亮与光标
+  window.addEventListener('blur', clearDrop)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('blur', clearDrop)
+  clearDrop()
+})
 </script>
 
 <style scoped>
@@ -700,6 +787,32 @@ onMounted(load)
 }
 .album-body {
   margin-top: 20px;
+  position: relative;
+}
+/* 拖拽上传落点(只在鼠标拖文件进来时出现):虚线框 + 轻遮罩,不挡任何点击 */
+.album-body.is-drop-target::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  z-index: 2;
+  border: 2px dashed var(--color-brand);
+  border-radius: 14px;
+  background: rgba(var(--color-brand-rgb), 0.06);
+  pointer-events: none;
+}
+.drop-hint {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  z-index: 3;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--color-brand);
+  color: var(--color-brand-text);
+  font-size: 12.5px;
+  white-space: nowrap;
+  pointer-events: none;
 }
 .photo-wall {
   display: grid;
