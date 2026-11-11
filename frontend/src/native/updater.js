@@ -52,3 +52,24 @@ export async function cleanupApks(keep) {
     return 0
   }
 }
+
+/**
+ * 设置页:闲时自动更新开关 + 本机能不能真静默安装。
+ * 开关/排期/去重都在原生(WidgetPrefs + WorkManager),这里只读写。
+ */
+export async function getAutoUpdate() {
+  try {
+    const res = await IhomyUpdater.getAutoUpdate()
+    return { enabled: !!(res && res.enabled), deviceOwner: !!(res && res.deviceOwner) }
+  } catch (e) {
+    return { enabled: true, deviceOwner: false }
+  }
+}
+
+export async function setAutoUpdate(enabled) {
+  try {
+    await IhomyUpdater.setAutoUpdate({ enabled: !!enabled })
+  } catch (e) {
+    console.warn('[updater] 保存闲时自动更新开关失败', e)
+  }
+}

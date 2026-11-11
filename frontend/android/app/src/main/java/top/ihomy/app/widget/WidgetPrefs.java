@@ -30,6 +30,10 @@ public final class WidgetPrefs {
     public static final String KEY_LAST_WEATHER_DATE = "last_weather_date";
     /** 默认 07:30(与 DailyWeatherWorker.DEFAULT_MINUTE 同口径) */
     public static final int DEFAULT_DAILY_WEATHER_MINUTE = 7 * 60 + 30;
+    /** 闲时自动更新开关(默认开):设备空闲 + 非计费网络时静默下载新包 */
+    public static final String KEY_AUTO_UPDATE = "auto_update_enabled";
+    /** 「新版本已下载好」通知去重:记已提示过的版本,避免每个空闲窗口弹一次 */
+    public static final String KEY_AUTO_UPDATE_NOTIFIED = "auto_update_notified";
 
     private WidgetPrefs() {
     }
@@ -136,5 +140,21 @@ public final class WidgetPrefs {
 
     public static void setLastWeatherDate(Context context, String date) {
         prefs(context).edit().putString(KEY_LAST_WEATHER_DATE, date == null ? "" : date).apply();
+    }
+
+    public static boolean autoUpdateEnabled(Context context) {
+        return prefs(context).getBoolean(KEY_AUTO_UPDATE, true);
+    }
+
+    public static void setAutoUpdateEnabled(Context context, boolean enabled) {
+        prefs(context).edit().putBoolean(KEY_AUTO_UPDATE, enabled).apply();
+    }
+
+    public static String autoUpdateNotified(Context context) {
+        return prefs(context).getString(KEY_AUTO_UPDATE_NOTIFIED, "");
+    }
+
+    public static void setAutoUpdateNotified(Context context, String version) {
+        prefs(context).edit().putString(KEY_AUTO_UPDATE_NOTIFIED, version == null ? "" : version).apply();
     }
 }

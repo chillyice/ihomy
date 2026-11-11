@@ -66,4 +66,12 @@
     <string name="notify_weather_advice_uv">紫外线偏强，记得防晒</string>
     <string name="notify_weather_advice_windy">风有点大，注意防风</string>
     <string name="notify_weather_advice_nice">天气不错，适合出门走走</string>
+
+    <!-- 闲时自动更新(设备空闲 + Wi-Fi 时下包;设备所有者才真静默,否则一条通知) -->
+    <string name="update_channel_name">版本更新</string>
+    <string name="update_channel_desc">新版本在后台下好后提示安装，不响铃</string>
+    <string name="update_ready_title">新版本已下载好</string>
+    <string name="update_ready_text">%1$s 已在后台准备好，点一下完成安装</string>
+    <string name="device_admin_label">ihomy 更新助手</string>
+    <string name="device_admin_desc">允许 ihomy 在后台静默安装自己的新版本（仅用于应用更新）</string>
 </resources>

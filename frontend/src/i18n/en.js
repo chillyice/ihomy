@@ -5700,6 +5700,12 @@ export default {
     dailyWeatherPreviewOffline: 'No network right now — try again when you are back online.',
     dailyWeatherDesc:
       "One note every day at the time you pick, with today's weather and a single practical tip. It only shows in the notification shade and on the lock screen, with no banner and no sound. Weather comes from the family's saved city; tap the note for the full forecast.",
+    // Idle auto-update
+    autoUpdateTitle: 'Idle auto-update',
+    autoUpdateSilent: 'Installs silently',
+    autoUpdateNeedConfirm: 'One tap to install',
+    autoUpdateDesc:
+      'Downloads new versions while the phone is idle and on Wi-Fi, so it never gets in your way or uses mobile data. Whether it installs without confirmation depends on a system permission: unless this phone has made ihomy its device owner, you get one notification to tap.',
     // Diagnostics (crashes and front-end errors stay on this device)
     diagnosticsTitle: 'Diagnostics',
     diagnosticsCrashes: '{n} crash file(s)',

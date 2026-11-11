@@ -15,6 +15,7 @@ import top.ihomy.app.screen.ScreenPlugin;
 import top.ihomy.app.share.ShareInboxPlugin;
 import top.ihomy.app.share.ShareIntake;
 import top.ihomy.app.speech.SpeechPlugin;
+import top.ihomy.app.updater.AutoUpdateWorker;
 import top.ihomy.app.updater.UpdaterPlugin;
 import top.ihomy.app.widget.WidgetBridgePlugin;
 
@@ -47,6 +48,8 @@ public class MainActivity extends BridgeActivity {
         // 冷启动时先把分享意图接住,JS 起来后再取(getPending 只读,确认落地才清)
         ShareIntake.capture(getIntent());
         super.onCreate(savedInstanceState);
+        // 闲时自动更新:周期任务在这里兜一次(插件 load 也会调,幂等);开关关着就撤排期
+        AutoUpdateWorker.ensureScheduled(getApplicationContext());
         // 壳内页面 origin 固定为 https://localhost,而接口与文件都在 https://ihomy.top:
         // 家庭私有照片/电子书/视频靠 ihomy_at cookie(后端对壳来源下发 SameSite=None)鉴权,
         // 不显式允许三方 cookie 时这些子资源会一律 403。

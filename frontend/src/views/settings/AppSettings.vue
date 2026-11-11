@@ -99,6 +99,17 @@
         <div class="share-tip">{{ $t('appSettings.dailyWeatherDesc') }}</div>
       </el-form-item>
 
+      <el-form-item :label="$t('appSettings.autoUpdateTitle')">
+        <div class="cal-head">
+          <el-switch v-model="autoUpdate" @change="onAutoUpdateChange" />
+          <el-tag v-if="autoUpdateDeviceOwner" size="small" type="success">
+            {{ $t('appSettings.autoUpdateSilent') }}
+          </el-tag>
+          <el-tag v-else size="small" type="info">{{ $t('appSettings.autoUpdateNeedConfirm') }}</el-tag>
+        </div>
+        <div class="share-tip">{{ $t('appSettings.autoUpdateDesc') }}</div>
+      </el-form-item>
+
       <el-form-item :label="$t('appSettings.photoBackupTitle')">
         <div class="cal-head">
           <el-switch v-model="backupOn" :disabled="backupBusy" @change="onBackupToggle" />
@@ -324,6 +335,26 @@ function onAppLockChange(v) {
 
 // 后台未读提醒:开关状态存在原生(Worker 直接读),这里只做界面回填
 const widgetNative = () => import('@/native/widgets')
+
+/** 闲时自动更新(默认开):排期与去重都在原生;设备所有者才真静默,其余人下好给一条通知 */
+const autoUpdate = ref(true)
+const autoUpdateDeviceOwner = ref(false)
+const updaterNative = () => import('@/native/updater')
+
+async function loadAutoUpdate() {
+  try {
+    const m = await updaterNative()
+    const st = await m.getAutoUpdate()
+    autoUpdate.value = !!st.enabled
+    autoUpdateDeviceOwner.value = !!st.deviceOwner
+  } catch (e) {
+    autoUpdate.value = true
+  }
+}
+
+function onAutoUpdateChange(v) {
+  updaterNative().then((m) => m.setAutoUpdate(!!v))
+}
 
 async function loadUnreadNotify() {
   try {
@@ -574,6 +605,7 @@ onMounted(async () => {
   loadDiagnostics()
   loadUnreadNotify()
   loadDailyWeather()
+  loadAutoUpdate()
   loadPhotoBackup()
   await loadBiometric()
   await loadAppLock()

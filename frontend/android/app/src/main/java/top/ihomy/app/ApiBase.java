@@ -6,7 +6,8 @@ package top.ihomy.app;
  */
 public final class ApiBase {
 
-    public static final String URL = "https://ihomy.top/api";
+    public static final String ORIGIN = "https://ihomy.top";
+    public static final String URL = ORIGIN + "/api";
 
     private ApiBase() {
     }

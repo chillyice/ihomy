@@ -5633,6 +5633,12 @@ export default {
     dailyWeatherPreviewOffline: '当前没有网络，等联网后再试',
     dailyWeatherDesc:
       '每天在设定时间推送一条当天天气和一句出行建议，只在通知中心和锁屏安静显示，不弹横幅也不响铃。天气用家庭设置的常用城市，点开可以看完整预报。',
+    // 闲时自动更新
+    autoUpdateTitle: '闲时自动更新',
+    autoUpdateSilent: '可静默安装',
+    autoUpdateNeedConfirm: '下载好点一下确认',
+    autoUpdateDesc:
+      '手机空闲且连着 Wi-Fi 时自动把新版本下好，不占你使用手机的时间，也不走移动数据。下载完能不能免确认装上取决于系统权限：本机不是「设备所有者」时会留一条通知，点一下确认即可。',
     // 诊断信息(崩溃与前端报错,只留本机)
     diagnosticsTitle: '诊断信息',
     diagnosticsCrashes: '崩溃 {n} 份',

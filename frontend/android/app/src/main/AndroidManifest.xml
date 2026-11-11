@@ -123,6 +123,31 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
 
+        <!-- 应用内更新:系统下载器下完的包 → 设备所有者静默装 / 其余人一条「点此安装」通知 -->
+        <receiver
+            android:name=".updater.DownloadDoneReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
+                <action android:name="top.ihomy.app.action.INSTALL_RESULT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 设备所有者入口:用户用 adb 执行 dpm set-device-owner 后才生效(换成真静默安装) -->
+        <receiver
+            android:name=".updater.IhomyDeviceAdminReceiver"
+            android:exported="true"
+            android:label="@string/device_admin_label"
+            android:description="@string/device_admin_desc"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+
         <!-- 下拉栏快速设置磁贴:记账本 / 今日日程(点一下直接进站内页面,无开关语义) -->
         <service
             android:name=".tile.BookTileService"

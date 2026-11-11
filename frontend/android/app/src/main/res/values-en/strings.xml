@@ -61,4 +61,12 @@
     <string name="notify_weather_advice_uv">Strong UV, remember sunscreen</string>
     <string name="notify_weather_advice_windy">Quite windy, hold on to your hat</string>
     <string name="notify_weather_advice_nice">Nice weather, good day for a walk</string>
+
+    <!-- Idle auto-update: download on idle + Wi-Fi; silent only as device owner -->
+    <string name="update_channel_name">App updates</string>
+    <string name="update_channel_desc">Tells you when a new version is ready to install. No sound.</string>
+    <string name="update_ready_title">New version downloaded</string>
+    <string name="update_ready_text">%1$s is ready in the background — tap to install</string>
+    <string name="device_admin_label">ihomy update helper</string>
+    <string name="device_admin_desc">Lets ihomy install its own updates silently in the background</string>
 </resources>
