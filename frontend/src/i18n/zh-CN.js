@@ -1526,6 +1526,8 @@ export default {
   chat: {
     title: '聊天室',
     roomTitle: '家庭聊天室',
+    floatToggle: '聊天浮窗',
+    floatRemoved: '聊天浮窗已隐藏，可在聊天室重新开启',
     placeholder: '输入消息，回车发送',
     send: '发送',
     noData: '还没有消息，说点什么吧',
@@ -2742,6 +2744,8 @@ export default {
     uploaded: '音乐上传成功，请点击保存生效',
     // ===== 音乐页(V9.6 music 分支) =====
     pageTitle: '音乐',
+    floatToggle: '悬浮播放器',
+    floatRemoved: '悬浮播放器已隐藏，可在音乐页重新开启',
     allTracks: '全部曲目',
     byAlbum: '按专辑',
     byTrack: '按曲目',

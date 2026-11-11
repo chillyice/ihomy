@@ -22,6 +22,11 @@
           </el-select>
         </div>
         <div class="tb-right">
+          <!-- 悬浮播放器开关:关掉后右下角悬浮播放器不再显示;拖到底部删除条关的也是它 -->
+          <label v-if="userStore.isLoggedIn" class="float-toggle">
+            <span class="float-toggle-label">{{ $t('music.floatToggle') }}</span>
+            <el-switch v-model="musicFloatOn" size="small" />
+          </label>
           <el-button v-if="userStore.isLoggedIn && tab !== 'playlist' && filteredTracks.length" @click="enterSelect">{{
             $t('music.select')
           }}</el-button>
@@ -424,6 +429,7 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick } 
 import { musicApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useSyncStore } from '@/stores/sync'
+import { useFloatsStore } from '@/stores/floats'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MoreFilled, Delete } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
@@ -435,6 +441,13 @@ import { bindMediaSession, clearMediaSession, syncPlaybackState, updatePosition 
 const { t: $t } = useI18n()
 const userStore = useUserStore()
 const syncStore = useSyncStore()
+const floatsStore = useFloatsStore()
+
+/** 悬浮播放器显隐(本机偏好):与拖到底部删除条共用同一个键 */
+const musicFloatOn = computed({
+  get: () => floatsStore.music,
+  set: (v) => floatsStore.setMusic(v),
+})
 const tab = ref('all')
 const loading = ref(false)
 const playlistLoading = ref(false)
@@ -851,6 +864,16 @@ onBeforeUnmount(() => {
 /* ========== Tab 标签栏 ========== */
 .music-tabs-wrapper {
   position: relative;
+}
+/* 工具栏里的浮窗开关:文字随主题次要色,窄屏只留文字与开关不换行 */
+.float-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
 }
 .music-tabs :deep(.el-tabs__header) {
   margin-bottom: 20px;

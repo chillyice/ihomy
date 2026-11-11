@@ -1,6 +1,7 @@
 <!-- 全局聊天浮窗:收起=可拖拽悬浮球(未读角标),展开=桌面可拖拽缩放面板 / 移动端半屏抽屉。
      内部自守卫(登录且非独立页,ChangePasswordDialog 模式);球位置记忆键 ihomy:chat:float:v1。
-     沉浸页(放映厅/GBA/游戏页)只显示收起球,分享注入不自动展开(拍板 #2)。 -->
+     沉浸页(放映厅/GBA/游戏页)只显示收起球,分享注入不自动展开(拍板 #2)。
+     桌面端可拖到窗口底部的删除区松手隐藏(stores/floats.js 开关),聊天室页可重新开启。 -->
 <template>
   <template v-if="show">
     <!-- 移动端:悬浮球 + 半屏抽屉(拍板 #3) -->
@@ -24,7 +25,7 @@
     <!-- 桌面端:可拖拽缩放面板 + 可拖拽球 -->
     <template v-else>
       <div v-if="expanded" class="chat-float-panel" :style="panelStyle">
-        <div class="panel-head" @pointerdown="onDragStart">
+        <div class="panel-head" @pointerdown="onPanelDown">
           <span class="panel-title">{{ $t('chat.roomTitle') }}</span>
           <el-button text circle size="small" @click="collapse">
             <el-icon><Close /></el-icon>
@@ -39,34 +40,44 @@
         </el-badge>
       </button>
     </template>
+
+    <!-- 拖到底部删除区:桌面端拖球/拖面板时出现,松手即隐藏浮窗(可在聊天室重新开启) -->
+    <FloatDeleteDock :active="dockActive" :over="dockOver" />
   </template>
 </template>
 
 <script setup>
 // 浮窗:连接生命周期在 stores/chat.js;球位置 useDragResize(Pointer,位置记忆键登记在 LightSettings 清理清单)
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import { ElMessage } from 'element-plus'
 import { ChatDotRound, Close } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { useChatStore } from '@/stores/chat'
+import { useFloatsStore } from '@/stores/floats'
 import { useDevice } from '@/composables/useDevice'
 import { useDragResize } from '@/utils/useDragResize'
+import { useFloatDelete } from '@/composables/useFloatDelete'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
+import FloatDeleteDock from '@/components/ui/FloatDeleteDock.vue'
 
 const FLOAT_POS_KEY = 'ihomy:chat:float:v1'
 const BALL_SIZE = 48
 const PANEL_W = 360
 const PANEL_H = 520
 
+const { t } = useI18n()
 const route = useRoute()
 const userStore = useUserStore()
 const chatStore = useChatStore()
+const floatsStore = useFloatsStore()
 const { isMobile } = useDevice()
 
 const expanded = ref(false)
 
-/** 登录且非独立页才挂载(独立页自带配色接管,不套外壳) */
-const show = computed(() => userStore.isLoggedIn && !route.meta.standalone)
+/** 登录且非独立页才挂载(独立页自带配色接管,不套外壳);聊天室页开关可隐藏 */
+const show = computed(() => userStore.isLoggedIn && !route.meta.standalone && floatsStore.chat)
 
 /** 沉浸页(游戏/GBA):只显示收起球,不自动展开(拍板 #2) */
 const immersiveRoute = computed(() => route.path.startsWith('/games') || route.path.startsWith('/tools/gba'))
@@ -106,10 +117,64 @@ let ballDown = null
 const onBallDown = (e) => {
   ballDown = { x: e.clientX, y: e.clientY }
   ball.onDragStart(e)
+  if (!isMobile.value) trackToDock(e)
 }
 const onBallUp = (e) => {
   if (ballDown && Math.hypot(e.clientX - ballDown.x, e.clientY - ballDown.y) < 6) expand()
   ballDown = null
+}
+
+// 拖到底部删除:useDragResize 只报位置不报指针,这里补一份窗口级指针监听(位移过 6px 才算拖动)
+const { active: dockActive, over: dockOver, begin: dockBegin, update: dockUpdate, end: dockEnd, cancel: dockCancel } = useFloatDelete()
+let detachTrack = null
+const trackToDock = (e) => {
+  if (e.pointerType === 'mouse' && e.button !== 0) return
+  detachTrack?.()
+  const id = e.pointerId
+  const origin = { x: e.clientX, y: e.clientY }
+  let moved = false
+  const onMove = (ev) => {
+    if (ev.pointerId !== id) return
+    if (!moved) {
+      if (Math.hypot(ev.clientX - origin.x, ev.clientY - origin.y) < 6) return
+      moved = true
+      dockBegin()
+    }
+    dockUpdate(ev.clientY)
+  }
+  const onUp = (ev) => {
+    if (ev.pointerId !== id) return
+    detach()
+    if (dockEnd()) removeFloat()
+  }
+  const onCancel = (ev) => {
+    if (ev.pointerId !== id) return
+    detach()
+    dockCancel()
+  }
+  const detach = () => {
+    window.removeEventListener('pointermove', onMove)
+    window.removeEventListener('pointerup', onUp)
+    window.removeEventListener('pointercancel', onCancel)
+    detachTrack = null
+  }
+  detachTrack = detach
+  window.addEventListener('pointermove', onMove)
+  window.addEventListener('pointerup', onUp)
+  window.addEventListener('pointercancel', onCancel)
+}
+
+// 面板只能从标题栏拖;拖动与 useDragResize 共用同一次 pointerdown
+const onPanelDown = (e) => {
+  onDragStart(e)
+  trackToDock(e)
+}
+
+const removeFloat = () => {
+  floatsStore.setChat(false)
+  expanded.value = false
+  ball.reset()
+  ElMessage.info(t('chat.floatRemoved'))
 }
 
 const expand = () => {
@@ -150,6 +215,12 @@ watch(
 
 onMounted(() => {
   chatStore.ensureConnected()
+})
+
+// 卸载兜底:拖动中被隐藏/路由切走时不残留窗口级监听与删除条
+onBeforeUnmount(() => {
+  detachTrack?.()
+  dockCancel()
 })
 </script>
 

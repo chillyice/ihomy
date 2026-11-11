@@ -54,24 +54,26 @@ public class BlogService {
         }
     }
 
-    /** 分页查询:OWNER 见全家;成员见自己的+家庭可见/公开;游客仅公开 */
+    /** 分页查询:OWNER 见全家(含成员草稿);成员见自己的+家庭可见/公开(自己的草稿也在);游客仅公开已发布 */
     public IPage<Blog> page(int current, int size, Long familyId, Long currentUserId, boolean isOwner, String keyword, String category) {
         LambdaQueryWrapper<Blog> qw = new LambdaQueryWrapper<>();
         if (familyId != null) {
             qw.eq(Blog::getFamilyId, familyId);
             if (isOwner) {
-                // 家长可见全部
+                // 家长代管:全家的已发布 + 草稿(与详情页口径一致);HIDDEN 是「已隐藏」,列表里不出现
+                qw.in(Blog::getStatus, DictConst.BLOG_PUBLISHED, DictConst.BLOG_DRAFT);
             } else if (currentUserId != null) {
-                qw.and(w -> w.eq(Blog::getAuthorId, currentUserId)
-                            .or().in(Blog::getVisibility, DictConst.VIS_FAMILY, DictConst.VIS_PUBLIC));
+                // 自己的草稿必须能回列表找回来(模板上有草稿徽标),别人的只放已发布且家庭/公开可见
+                qw.and(w -> w.nested(n -> n.eq(Blog::getAuthorId, currentUserId).ne(Blog::getStatus, DictConst.BLOG_HIDDEN))
+                            .or(o -> o.eq(Blog::getStatus, DictConst.BLOG_PUBLISHED)
+                                      .in(Blog::getVisibility, DictConst.VIS_FAMILY, DictConst.VIS_PUBLIC)));
             } else {
-                qw.eq(Blog::getVisibility, DictConst.VIS_PUBLIC);
+                qw.eq(Blog::getStatus, DictConst.BLOG_PUBLISHED).eq(Blog::getVisibility, DictConst.VIS_PUBLIC);
             }
         } else {
-            qw.eq(Blog::getVisibility, DictConst.VIS_PUBLIC);
+            qw.eq(Blog::getStatus, DictConst.BLOG_PUBLISHED).eq(Blog::getVisibility, DictConst.VIS_PUBLIC);
         }
-        qw.eq(Blog::getStatus, DictConst.BLOG_PUBLISHED)
-          .eq(StringUtils.hasText(category), Blog::getCategory, category)
+        qw.eq(StringUtils.hasText(category), Blog::getCategory, category)
           .like(StringUtils.hasText(keyword), Blog::getTitle, keyword)
           .orderByDesc(Blog::getCreatedAt);
         return blogMapper.selectPage(new Page<>(current, size), qw);

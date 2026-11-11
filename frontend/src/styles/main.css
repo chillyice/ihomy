@@ -20,6 +20,7 @@
   --color-expense: #b5433b;
   /* 危险动作与失败态(删除/失败数/错误提示)/提示态:语义独立于收支色,由主题×晨暮覆写 */
   --color-danger: #c45656;
+  --color-danger-rgb: 196, 86, 86;
   --color-warning: #9c6f1a;
   /* 表面色(游戏卡/浮层卡等"抬起的面"):浅色纯白,深色随卡片色 */
   --color-surface: #fff;
@@ -42,6 +43,7 @@
   --z-sticky: 30;
   --z-nav: 60; /* 侧栏 / 移动端页头 / 移动端底栏 */
   --z-float: 62; /* 音乐播放器等常驻功能层(压在侧栏之上) */
+  --z-float-top: 63; /* 浮窗拖动时的底部删除条:压在浮窗之上,低于页脚 */
   --z-footer: 70; /* 站点页脚 */
   --z-action: 120; /* 回顶 / 安装提示 / 移动端抽屉:高于内容与外壳,低于弹窗 */
   --z-immersive: 150; /* 自建全屏浮层:照片查看器 / 阅读器 / 相册光箱 / 拖拽幽灵 */
@@ -147,6 +149,7 @@ html.dark {
   --color-income: #86d162;
   --color-expense: #f78989;
   --color-danger: #f78989;
+  --color-danger-rgb: 247, 137, 137;
   --color-warning: #e8c07a;
   --color-border: rgba(232, 220, 200, 0.1);
   /* 表面色随卡片色(游戏卡/浮层卡):深色绝不能再落回纯白,否则浅色字压白底 */
@@ -178,6 +181,7 @@ html.theme-warm {
   /* 强调色要当链接/选中文字用,晨色羊皮底上必须压到 ≥3:1(原 #c9807a 只有 2.1~2.8) */
   --color-accent: #a3564e;
   --color-danger: #b4544c;
+  --color-danger-rgb: 180, 84, 76;
   --color-warning: #96681a;
   --color-bg: #f1e7d6;
   --color-bg-2: #e4d5bf;
@@ -216,6 +220,7 @@ html.theme-warm.dark {
   --color-primary: #efe0c8;
   --color-accent: #e19a8c;
   --color-danger: #e8908a;
+  --color-danger-rgb: 232, 144, 138;
   --color-warning: #e0b476;
   --color-bg: #241a12;
   --color-bg-2: #2e2217;

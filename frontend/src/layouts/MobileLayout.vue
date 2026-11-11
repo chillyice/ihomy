@@ -37,7 +37,7 @@
 
     <BackToTop />
     <InstallPrompt />
-    <MusicPlayer />
+    <MusicPlayer v-if="floatsStore.music" />
     <ChatFloat />
   </div>
 </template>
@@ -56,9 +56,11 @@ import InstallPrompt from '@/components/InstallPrompt.vue'
 import MusicPlayer from '@/components/MusicPlayer.vue'
 const ChatFloat = defineAsyncComponent(() => import('@/components/chat/ChatFloat.vue'))
 import { isMobileHomePath, mobileHeaderTitleKey } from '@/utils/mobileNav'
+import { useFloatsStore } from '@/stores/floats'
 
 const route = useRoute()
 const { t } = useI18n()
+const floatsStore = useFloatsStore()
 const activeTab = ref('home')
 
 // 三个 Tab 常驻缓存,切换时只换当前组件;KeepAlive 保证筛选/输入等状态不丢

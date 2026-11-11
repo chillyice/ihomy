@@ -12,17 +12,23 @@
         ORDER BY category
     </select>
 
+    <!-- 计数口径必须与 BlogService.page 一致:家长=全家已发布+草稿;成员=自己的(不含已隐藏)+别人的已发布家庭/公开;游客=公开已发布 -->
     <select id="selectCategoryCounts" resultType="java.util.Map">
         SELECT category, COUNT(*) AS cnt
         FROM content_blog
         WHERE family_id = #{familyId} AND category IS NOT NULL AND category &lt;&gt; '' AND deleted = 0
-          AND status = 'PUBLISHED'
-          <if test="!isOwner and authorId != null">
-            AND (author_id = #{authorId} OR visibility IN ('FAMILY', 'PUBLIC'))
-          </if>
-          <if test="!isOwner and authorId == null">
-            AND visibility = 'PUBLIC'
-          </if>
+        <choose>
+            <when test="isOwner">
+                AND status IN ('PUBLISHED', 'DRAFT')
+            </when>
+            <when test="authorId != null">
+                AND ((author_id = #{authorId} AND status &lt;&gt; 'HIDDEN')
+                     OR (status = 'PUBLISHED' AND visibility IN ('FAMILY', 'PUBLIC')))
+            </when>
+            <otherwise>
+                AND status = 'PUBLISHED' AND visibility = 'PUBLIC'
+            </otherwise>
+        </choose>
         GROUP BY category
     </select>
 

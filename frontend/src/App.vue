@@ -35,7 +35,7 @@
         </template>
         <BackToTop v-if="!immersive" />
         <InstallPrompt />
-        <MusicPlayer v-if="!immersive" />
+        <MusicPlayer v-if="!immersive && floatsStore.music" />
         <LightTestConsole />
         <SiteFooter v-if="!immersive" />
       </template>
@@ -60,6 +60,7 @@ import en from 'element-plus/es/locale/lang/en'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
+import { useFloatsStore } from '@/stores/floats'
 import { useSunLight, SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { isNativeApp } from '@/utils/platform'
 import { useDevice } from '@/composables/useDevice'
@@ -84,6 +85,8 @@ const { isMobile } = useDevice()
 const appStore = useAppStore()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
+// 浮窗开关(音乐页/聊天室可关,拖到底部删除条关的也是这个键)
+const floatsStore = useFloatsStore()
 const route = useRoute()
 const router = useRouter()
 // 沉浸式页面(如 3D 光影实验台)：隐藏侧边栏 / 页脚 / 回顶 / 播放器，内容区占满全屏

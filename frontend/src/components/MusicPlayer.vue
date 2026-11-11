@@ -1,4 +1,5 @@
-<!-- 悬浮音乐播放器:整体可拖拽,展开/收缩带动画,左下角不动;播放当前家庭绑定的背景音乐歌单 -->
+<!-- 悬浮音乐播放器:整体可拖拽,展开/收缩带动画,左下角不动;播放当前家庭绑定的背景音乐歌单。
+     拖到窗口底部的删除区松手即隐藏(stores/floats.js 开关),音乐页可重新开启。 -->
 <template>
   <div
     v-if="playlist.length"
@@ -7,6 +8,7 @@
     :class="{ expanded }"
     :style="{ left: pos.x + 'px', bottom: pos.bottom + 'px' }"
   >
+    <FloatDeleteDock :active="dockActive" :over="dockOver" />
     <!-- 黑胶可视化 + 展开切换:整个黑胶区就是拖拽手柄,鼠标与触屏都从这里拖 -->
     <div v-a11y-click class="player-left" @pointerdown="onDragStart" @click.stop="onVinylClick">
       <div class="vinyl" :class="{ playing }">
@@ -86,15 +88,20 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ElMessage } from 'element-plus'
 import { musicApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { useFloatsStore } from '@/stores/floats'
 import { useDevice } from '@/composables/useDevice'
+import { useFloatDelete } from '@/composables/useFloatDelete'
 import { useI18n } from 'vue-i18n'
 import { CaretLeft, CaretRight, VideoPlay, VideoPause, List } from '@element-plus/icons-vue'
 import { bindMediaSession, clearMediaSession, syncPlaybackState, updatePosition } from '@/utils/mediaSession'
+import FloatDeleteDock from '@/components/ui/FloatDeleteDock.vue'
 
 const { t } = useI18n()
 const userStore = useUserStore()
+const floatsStore = useFloatsStore()
 const audioEl = ref(null)
 const playlist = ref([])
 const trackIdx = ref(0)
@@ -119,6 +126,14 @@ try {
 let drag = null
 let suppressClickUntil = 0
 let expandClampTimer = 0
+
+// 拖到底部删除区:与位置拖拽共用同一套指针监听,松手命中即隐藏播放器
+const { active: dockActive, over: dockOver, begin: dockBegin, update: dockUpdate, end: dockEnd, cancel: dockCancel } = useFloatDelete()
+
+const removePlayer = () => {
+  floatsStore.setMusic(false)
+  ElMessage.info(t('music.floatRemoved'))
+}
 
 // 位置永远留在视口内:换屏/旋转/展开成宽面板后都不会跑到屏幕外
 const clampPos = () => {
@@ -164,7 +179,11 @@ const onDragMove = (e) => {
   const dx = e.clientX - drag.startX
   const dy = e.clientY - drag.startY
   if (!drag.moved && Math.hypot(dx, dy) < 6) return
+  if (!drag.moved) {
+    dockBegin() // 真拖动才亮删除条,轻点手柄仍是展开/收起
+  }
   drag.moved = true
+  dockUpdate(e.clientY)
   const minBottom = isMobile.value ? MOBILE_MIN_BOTTOM : 8
   pos.value = {
     x: Math.min(Math.max(8, drag.left + dx), Math.max(8, window.innerWidth - drag.width - 8)),
@@ -177,7 +196,12 @@ const onDragUp = (e) => {
   const moved = drag.moved
   drag = null
   detachDrag()
+  const hitDock = dockEnd()
   if (!moved) return
+  if (hitDock) {
+    removePlayer()
+    return
+  }
   // 拖动结束浏览器会补发一次 click,短暂屏蔽,避免松手就展开/收起
   suppressClickUntil = Date.now() + 350
   clampPos()
@@ -371,6 +395,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   clearTimeout(expandClampTimer)
   detachDrag()
+  dockCancel()
   window.removeEventListener('resize', clampPos)
   clearMediaSession('float')
 })

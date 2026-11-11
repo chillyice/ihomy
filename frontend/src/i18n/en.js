@@ -1533,6 +1533,8 @@ export default {
   chat: {
     title: 'Chat',
     roomTitle: 'Family chat room',
+    floatToggle: 'Chat bubble',
+    floatRemoved: 'Chat bubble hidden — turn it back on in Chat',
     placeholder: 'Type a message, press Enter to send',
     send: 'Send',
     noData: 'No messages yet, say something',
@@ -2755,6 +2757,8 @@ export default {
     uploaded: 'Music uploaded, click save to apply',
     // ===== Music page (V9.6 music branch) =====
     pageTitle: 'Music',
+    floatToggle: 'Floating player',
+    floatRemoved: 'Floating player hidden — turn it back on in Music',
     allTracks: 'All Tracks',
     byAlbum: 'By Album',
     byTrack: 'By track',
