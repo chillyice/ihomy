@@ -117,104 +117,124 @@
       </div>
     </PageToolbar>
 
-    <!-- Book Grid/List -->
-    <div v-loading="loading" class="book-area">
-      <!-- Grid View -->
-      <div v-if="viewMode === 'grid'" class="book-grid">
-        <div
-          v-a11y-click
-          v-for="b in list"
-          :key="b.id"
-          class="book-card card"
-          :class="{ selected: selectedIds.includes(b.id) }"
-          @click="onBookClick(b)"
-        >
-          <div v-a11y-click v-if="batchMode" class="book-check" @click.stop="toggleSelect(b.id)">
-            <svg v-if="selectedIds.includes(b.id)" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="3">
-              <path d="M5 12l5 5L20 7" />
-            </svg>
+    <!-- 宽屏(≥900px 且短边 ≥600dp):左书架 + 右详情,两列各自滚;批量模式是纯选择场景,
+         右栏收起、书架整宽。窄屏不加 .wide-cols,仍是「书架 → 640px 详情弹窗」。 -->
+    <div ref="wideEl" class="library-cols" :class="{ 'wide-cols': bookWide }" :style="bookWide ? colStyle : {}">
+      <div v-loading="loading" class="book-area" :class="{ 'wide-col': bookWide }">
+        <!-- Grid View -->
+        <div v-if="viewMode === 'grid'" class="book-grid">
+          <div
+            v-a11y-click
+            v-for="b in list"
+            :key="b.id"
+            class="book-card card"
+            :class="{ selected: selectedIds.includes(b.id) }"
+            @click="onBookClick(b)"
+          >
+            <div v-a11y-click v-if="batchMode" class="book-check" @click.stop="toggleSelect(b.id)">
+              <svg v-if="selectedIds.includes(b.id)" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="3">
+                <path d="M5 12l5 5L20 7" />
+              </svg>
+            </div>
+            <div class="book-cover-wrap">
+              <img v-if="b.coverUrl" :src="b.coverUrl" class="book-cover" :alt="b.title || ''" />
+              <div v-else class="book-cover placeholder">
+                <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.2">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                </svg>
+              </div>
+              <span class="format-badge">{{ b.fileFormat }}</span>
+              <div v-if="!batchMode" class="book-overlay">
+                <button v-if="canReadOnline(b)" class="ovl-btn primary" @click.stop="openReader(b)">{{ $t('library.read') }}</button>
+                <button class="ovl-btn" @click.stop="openDetail(b)">{{ $t('library.viewDetail') }}</button>
+                <button v-if="userStore.isLoggedIn && b.visibility !== 'PRIVATE'" class="ovl-btn" @click.stop="shareBookToChat(b)">
+                  {{ $t('chat.share.toChat') }}
+                </button>
+                <template v-if="userStore.isLoggedIn && canEdit(b)">
+                  <button class="ovl-btn" @click.stop="moveCategory(b)">{{ $t('library.moveCategory') }}</button>
+                  <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+                    <el-button size="small" text type="danger" @click.stop="onDeleteBook(b)"
+                      ><el-icon><Delete /></el-icon
+                    ></el-button>
+                  </el-tooltip>
+                </template>
+              </div>
+            </div>
+            <div class="book-info">
+              <div class="book-title">{{ b.title }}</div>
+              <div v-if="b.author" class="book-author">{{ b.author }}</div>
+              <div class="book-meta">
+                <span class="book-views">{{ b.viewCount }} {{ $t('library.views') }}</span>
+              </div>
+            </div>
           </div>
-          <div class="book-cover-wrap">
-            <img v-if="b.coverUrl" :src="b.coverUrl" class="book-cover" :alt="b.title || ''" />
-            <div v-else class="book-cover placeholder">
-              <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.2">
+        </div>
+
+        <!-- List View -->
+        <div v-else class="book-list">
+          <div
+            v-a11y-click
+            v-for="b in list"
+            :key="b.id"
+            class="book-row card"
+            :class="{ selected: selectedIds.includes(b.id) }"
+            @click="onBookClick(b)"
+          >
+            <div v-a11y-click v-if="batchMode" class="book-check" @click.stop="toggleSelect(b.id)">
+              <svg v-if="selectedIds.includes(b.id)" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="3">
+                <path d="M5 12l5 5L20 7" />
+              </svg>
+            </div>
+            <img v-if="b.coverUrl" :src="b.coverUrl" class="row-cover" :alt="b.title || ''" />
+            <div v-else class="row-cover placeholder">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.2">
                 <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
                 <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
               </svg>
             </div>
-            <span class="format-badge">{{ b.fileFormat }}</span>
-            <div v-if="!batchMode" class="book-overlay">
-              <button v-if="canReadOnline(b)" class="ovl-btn primary" @click.stop="openReader(b)">{{ $t('library.read') }}</button>
-              <button class="ovl-btn" @click.stop="openDetail(b)">{{ $t('library.viewDetail') }}</button>
-              <button v-if="userStore.isLoggedIn && b.visibility !== 'PRIVATE'" class="ovl-btn" @click.stop="shareBookToChat(b)">
-                {{ $t('chat.share.toChat') }}
-              </button>
-              <template v-if="userStore.isLoggedIn && canEdit(b)">
-                <button class="ovl-btn" @click.stop="moveCategory(b)">{{ $t('library.moveCategory') }}</button>
-                <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
-                  <el-button size="small" text type="danger" @click.stop="onDeleteBook(b)"
-                    ><el-icon><Delete /></el-icon
-                  ></el-button>
-                </el-tooltip>
-              </template>
+            <div class="row-info">
+              <div class="row-title">{{ b.title }}</div>
+              <div class="row-sub">
+                <span v-if="b.author">{{ b.author }}</span>
+                <span class="format-badge small">{{ b.fileFormat }}</span>
+                <span class="book-views">{{ b.viewCount }} {{ $t('library.views') }}</span>
+              </div>
             </div>
-          </div>
-          <div class="book-info">
-            <div class="book-title">{{ b.title }}</div>
-            <div v-if="b.author" class="book-author">{{ b.author }}</div>
-            <div class="book-meta">
-              <span class="book-views">{{ b.viewCount }} {{ $t('library.views') }}</span>
+            <div v-if="!batchMode" class="row-actions" @click.stop>
+              <button v-if="canReadOnline(b)" class="ghost-btn small" @click="openReader(b)">{{ $t('library.read') }}</button>
+              <button class="ghost-btn small" @click="openDetail(b)">{{ $t('library.viewDetail') }}</button>
+              <el-tooltip v-if="userStore.isLoggedIn && canEdit(b)" :content="$t('common.delete')" placement="top" :show-after="300">
+                <el-button size="small" text type="danger" @click="onDeleteBook(b)"
+                  ><el-icon><Delete /></el-icon
+                ></el-button>
+              </el-tooltip>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- List View -->
-      <div v-else class="book-list">
-        <div
-          v-a11y-click
-          v-for="b in list"
-          :key="b.id"
-          class="book-row card"
-          :class="{ selected: selectedIds.includes(b.id) }"
-          @click="onBookClick(b)"
-        >
-          <div v-a11y-click v-if="batchMode" class="book-check" @click.stop="toggleSelect(b.id)">
-            <svg v-if="selectedIds.includes(b.id)" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="3">
-              <path d="M5 12l5 5L20 7" />
-            </svg>
-          </div>
-          <img v-if="b.coverUrl" :src="b.coverUrl" class="row-cover" :alt="b.title || ''" />
-          <div v-else class="row-cover placeholder">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.2">
-              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-            </svg>
-          </div>
-          <div class="row-info">
-            <div class="row-title">{{ b.title }}</div>
-            <div class="row-sub">
-              <span v-if="b.author">{{ b.author }}</span>
-              <span class="format-badge small">{{ b.fileFormat }}</span>
-              <span class="book-views">{{ b.viewCount }} {{ $t('library.views') }}</span>
-            </div>
-          </div>
-          <div v-if="!batchMode" class="row-actions" @click.stop>
-            <button v-if="canReadOnline(b)" class="ghost-btn small" @click="openReader(b)">{{ $t('library.read') }}</button>
-            <button class="ghost-btn small" @click="openDetail(b)">{{ $t('library.viewDetail') }}</button>
-            <el-tooltip v-if="userStore.isLoggedIn && canEdit(b)" :content="$t('common.delete')" placement="top" :show-after="300">
-              <el-button size="small" text type="danger" @click="onDeleteBook(b)"
-                ><el-icon><Delete /></el-icon
-              ></el-button>
-            </el-tooltip>
-          </div>
+        <div v-if="!loading && !list.length" class="empty-state">
+          <el-empty :description="userStore.isGuest ? $t('library.noPublic') : $t('library.emptyHint')">
+            <button v-if="userStore.isLoggedIn" class="write-btn" @click="router.push('/library/edit')">{{ $t('library.upload') }}</button>
+          </el-empty>
         </div>
       </div>
 
-      <div v-if="!loading && !list.length" class="empty-state">
-        <el-empty :description="userStore.isGuest ? $t('library.noPublic') : $t('library.emptyHint')">
-          <button v-if="userStore.isLoggedIn" class="write-btn" @click="router.push('/library/edit')">{{ $t('library.upload') }}</button>
-        </el-empty>
+      <!-- 右栏常驻(窄屏 v-show 隐藏),详情体用 KeepAlive 缓存:旋屏/缩窗再放大不会重新取数
+           (宽窄切换不得产生额外接口请求);换一本书时才按新 bookId 重拉。 -->
+      <div v-show="bookWide" class="wide-col library-detail-col">
+        <KeepAlive>
+          <LibraryDetail
+            v-if="bookWide && detailBookId"
+            inline
+            :bookId="detailBookId"
+            @close="clearDetail"
+            @updated="onBookUpdated"
+            @deleted="onBookDeleted"
+            @read="onReadFromDetail"
+          />
+          <div v-else class="card pane-empty">{{ $t('library.pickBookHint') }}</div>
+        </KeepAlive>
       </div>
     </div>
 
@@ -292,6 +312,8 @@ import { useI18n } from 'vue-i18n'
 import { Delete } from '@element-plus/icons-vue'
 import { libraryApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { useDevice } from '@/composables/useDevice'
+import { useWideCols } from '@/composables/useWideCols'
 import { shareToChat } from '@/utils/chatShare'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
@@ -303,6 +325,7 @@ const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const { isWide: viewWide } = useDevice()
 const list = ref([])
 const loading = ref(false)
 const catLoading = ref(false)
@@ -319,6 +342,10 @@ const detailVisible = ref(false)
 const detailBookId = ref(null)
 const readerVisible = ref(false)
 const readerBook = ref(null)
+
+// 宽屏双栏:左书架 + 右详情;批量模式是纯选择场景,不渲染右栏(整宽书架)
+const bookWide = computed(() => viewWide.value && !batchMode.value)
+const { wideEl, colStyle } = useWideCols(bookWide)
 
 // 扁平分类 → el-cascader 树
 const buildCascaderTree = (excludeId = null) => {
@@ -446,6 +473,7 @@ const toggleSelect = (id) => {
 }
 
 const enterBatch = () => {
+  clearDetail()
   batchMode.value = true
   selectedIds.value = []
 }
@@ -456,7 +484,13 @@ const exitBatch = () => {
 
 const openDetail = (b) => {
   detailBookId.value = b.id
-  detailVisible.value = true
+  // 宽屏出右栏(不弹窗),窄屏保持 640px 弹窗
+  detailVisible.value = !bookWide.value
+}
+
+const clearDetail = () => {
+  detailBookId.value = null
+  detailVisible.value = false
 }
 
 const openReader = (b) => {
@@ -487,7 +521,7 @@ const onBookUpdated = () => {
   load()
 }
 const onBookDeleted = () => {
-  detailVisible.value = false
+  clearDetail()
   load()
 }
 
@@ -567,7 +601,11 @@ onMounted(async () => {
   if (bookId > 0) {
     try {
       const b = await libraryApi.detail(bookId)
-      if (b && b.visibility !== 'PRIVATE' && canReadOnline(b)) openReader(b)
+      if (b && b.visibility !== 'PRIVATE' && canReadOnline(b)) {
+        // 宽屏进页直接把书选进右栏;窄屏沿用旧行为(直接打开全屏阅读器)
+        if (bookWide.value) detailBookId.value = bookId
+        else openReader(b)
+      }
     } catch {
       /* 书已删/无权限:落书架空态即可 */
     }
@@ -842,6 +880,25 @@ html.dark .row-cover.placeholder {
 }
 .row-actions :deep(.el-button) {
   padding: 5px 6px;
+}
+
+/* 宽屏双栏:左书架 1fr + 右详情 280–400px 随可用宽度收放(外壳侧栏占掉 320px 左右),
+   列内滚动由 main.css 的 .wide-col 统一 */
+.library-cols.wide-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(280px, 38%, 400px);
+  gap: 16px;
+}
+.library-detail-col {
+  min-width: 0;
+}
+.pane-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
 }
 
 .empty-state {

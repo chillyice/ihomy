@@ -42,63 +42,116 @@
     </PageToolbar>
 
     <div v-loading="loading">
-      <div v-if="topAlbums.length" class="album-grid">
-        <div
-          v-a11y-click
-          v-for="a in topAlbums"
-          :key="a.id"
-          class="album-card card"
-          :class="{ selected: selectMode && selectedIds.includes(a.id) }"
-          @click="selectMode ? togglePick(a) : $router.push(`/album/${a.id}`)"
-        >
-          <div class="album-cover-wrap">
-            <div v-if="a.cover" class="album-cover" :style="{ backgroundImage: `url(${a.cover})` }"></div>
-            <div v-else class="album-cover">
-              <AlbumDefaultCover :size="64" />
+      <!-- 宽屏双栏(≥900px 且屏幕短边 ≥600dp,判定只在 useDevice):
+           左栏紧凑相册行只负责选择,右栏渲详情(受控 id,不走路由);两列各自滚。
+           多选是纯选择场景,退回整宽卡片网格(保留 pick-badge 交互)。 -->
+      <div v-if="wideList" ref="wideEl" class="wide-cols album-wide" :style="colStyle">
+        <div class="wide-col album-pane">
+          <div v-if="topAlbums.length" class="album-pane-list">
+            <div
+              v-a11y-click
+              v-for="a in topAlbums"
+              :key="a.id"
+              class="album-pane-row"
+              :class="{ active: a.id === activeAlbumId }"
+              @click="selectAlbum(a.id)"
+            >
+              <div class="pane-cover" :style="a.cover ? { backgroundImage: `url(${a.cover})` } : {}">
+                <AlbumDefaultCover v-if="!a.cover" :size="28" />
+              </div>
+              <div class="pane-info">
+                <span class="pane-name">{{ a.name }}</span>
+                <span class="pane-meta">{{ t('album.photoCount', { n: a.totalPhotoCount ?? a.photoCount }) }}</span>
+              </div>
             </div>
-            <span v-if="!selectMode" class="album-type" :class="a.type">{{
-              a.type === 'public' ? t('album.public') : t('album.private')
-            }}</span>
-            <span v-if="a.sourceDeviceName" class="album-source">
-              <span class="status-dot" :class="a.syncStatus || 'OFFLINE'"></span>{{ a.sourceDeviceName }}
-            </span>
-            <span class="album-count">{{ t('album.photoCount', { n: a.totalPhotoCount ?? a.photoCount }) }}</span>
-            <span v-if="a.childCount" class="album-subcount">{{ t('album.subAlbumCount', { n: a.childCount }) }}</span>
-            <span v-if="selectMode" class="pick-badge" :class="{ on: selectedIds.includes(a.id) }">
-              <svg viewBox="0 0 16 16" width="12" height="12">
-                <path
-                  d="M3 8.5 L6.5 12 L13 4.5"
-                  fill="none"
-                  stroke="#fff"
-                  stroke-width="2.4"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
-            </span>
           </div>
-          <div class="album-info">
-            <div class="album-name">{{ a.name }}</div>
-            <div class="album-meta">{{ formatDate(a.createdAt) }}</div>
-          </div>
-          <div v-if="!selectMode && canManage(a)" class="album-actions" @click.stop>
-            <el-tooltip :content="t('common.edit')" placement="top" :show-after="300">
-              <el-button size="small" text @click="openEditor(a)"
-                ><el-icon><Edit /></el-icon
-              ></el-button>
-            </el-tooltip>
-            <el-tooltip :content="t('common.delete')" placement="top" :show-after="300">
-              <el-button size="small" text type="danger" @click="onDel(a)"
-                ><el-icon><Delete /></el-icon
-              ></el-button>
-            </el-tooltip>
-          </div>
+          <el-empty v-else :description="userStore.isGuest ? t('album.noPublicAlbum') : t('album.emptyHint')" :image-size="60" />
+        </div>
+        <div class="wide-col album-detail-pane">
+          <AlbumDetail v-if="activeAlbumId" :album-id="activeAlbumId" inline @open-album="selectAlbum" @close="clearActive">
+            <template #actions>
+              <template v-if="activeAlbum && canManage(activeAlbum)">
+                <el-tooltip :content="t('common.edit')" placement="top" :show-after="300">
+                  <el-button size="small" text @click="openEditor(activeAlbum)">
+                    <el-icon><Edit /></el-icon>
+                  </el-button>
+                </el-tooltip>
+                <el-tooltip :content="t('common.delete')" placement="top" :show-after="300">
+                  <el-button size="small" text type="danger" @click="onDel(activeAlbum)">
+                    <el-icon><Delete /></el-icon>
+                  </el-button>
+                </el-tooltip>
+              </template>
+              <el-tooltip :content="t('common.close')" placement="top" :show-after="300">
+                <el-button size="small" text :aria-label="t('common.close')" @click="clearActive">
+                  <el-icon><Close /></el-icon>
+                </el-button>
+              </el-tooltip>
+            </template>
+          </AlbumDetail>
+          <div v-else class="card pane-empty">{{ t('album.pickAlbumHint') }}</div>
         </div>
       </div>
-      <div v-else-if="loadError" style="padding: 20px 0; text-align: center; color: var(--color-text-secondary)">
-        {{ t('common.loadFailed') }} <el-button text size="small" @click="load">{{ t('common.retry') }}</el-button>
-      </div>
-      <el-empty v-else :description="userStore.isGuest ? t('album.noPublicAlbum') : t('album.emptyHint')" />
+
+      <template v-else>
+        <div v-if="topAlbums.length" class="album-grid">
+          <div
+            v-a11y-click
+            v-for="a in topAlbums"
+            :key="a.id"
+            class="album-card card"
+            :class="{ selected: selectMode && selectedIds.includes(a.id) }"
+            @click="selectMode ? togglePick(a) : $router.push(`/album/${a.id}`)"
+          >
+            <div class="album-cover-wrap">
+              <div v-if="a.cover" class="album-cover" :style="{ backgroundImage: `url(${a.cover})` }"></div>
+              <div v-else class="album-cover">
+                <AlbumDefaultCover :size="64" />
+              </div>
+              <span v-if="!selectMode" class="album-type" :class="a.type">{{
+                a.type === 'public' ? t('album.public') : t('album.private')
+              }}</span>
+              <span v-if="a.sourceDeviceName" class="album-source">
+                <span class="status-dot" :class="a.syncStatus || 'OFFLINE'"></span>{{ a.sourceDeviceName }}
+              </span>
+              <span class="album-count">{{ t('album.photoCount', { n: a.totalPhotoCount ?? a.photoCount }) }}</span>
+              <span v-if="a.childCount" class="album-subcount">{{ t('album.subAlbumCount', { n: a.childCount }) }}</span>
+              <span v-if="selectMode" class="pick-badge" :class="{ on: selectedIds.includes(a.id) }">
+                <svg viewBox="0 0 16 16" width="12" height="12">
+                  <path
+                    d="M3 8.5 L6.5 12 L13 4.5"
+                    fill="none"
+                    stroke="#fff"
+                    stroke-width="2.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </span>
+            </div>
+            <div class="album-info">
+              <div class="album-name">{{ a.name }}</div>
+              <div class="album-meta">{{ formatDate(a.createdAt) }}</div>
+            </div>
+            <div v-if="!selectMode && canManage(a)" class="album-actions" @click.stop>
+              <el-tooltip :content="t('common.edit')" placement="top" :show-after="300">
+                <el-button size="small" text @click="openEditor(a)"
+                  ><el-icon><Edit /></el-icon
+                ></el-button>
+              </el-tooltip>
+              <el-tooltip :content="t('common.delete')" placement="top" :show-after="300">
+                <el-button size="small" text type="danger" @click="onDel(a)"
+                  ><el-icon><Delete /></el-icon
+                ></el-button>
+              </el-tooltip>
+            </div>
+          </div>
+        </div>
+        <div v-else-if="loadError" style="padding: 20px 0; text-align: center; color: var(--color-text-secondary)">
+          {{ t('common.loadFailed') }} <el-button text size="small" @click="load">{{ t('common.retry') }}</el-button>
+        </div>
+        <el-empty v-else :description="userStore.isGuest ? t('album.noPublicAlbum') : t('album.emptyHint')" />
+      </template>
     </div>
 
     <el-dialog v-model="editor.visible" append-to-body :title="editor.form.id ? t('album.editTitle') : t('album.newAlbum')" width="420px">
@@ -125,26 +178,30 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { albumApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useSyncStore } from '@/stores/sync'
 import { usePullRefresh } from '@/composables/usePullRefresh'
+import { useDevice } from '@/composables/useDevice'
+import { useWideCols } from '@/composables/useWideCols'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
-import { Edit, Delete } from '@element-plus/icons-vue'
+import { Edit, Delete, Close } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import SyncDialog from '@/components/SyncDialog.vue'
 import AlbumDefaultCover from '@/components/AlbumDefaultCover.vue'
 import PhotoCascade from './PhotoCascade.vue'
+import AlbumDetail from './AlbumDetail.vue'
 import { formatDate } from '@/utils/datetime'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const { isWide: viewWide } = useDevice()
 const root = ref(null)
 const syncVisible = ref(false)
 const cascadeVisible = ref(false)
@@ -178,6 +235,44 @@ const sourceOptions = computed(() => {
 
 // 管理权限:家长或相册创建者本人
 const canManage = (a) => userStore.isLoggedIn && (userStore.isOwner || a.createdBy === userStore.userInfo?.id)
+
+// ---------- 宽屏双栏:左栏选相册,右栏出详情(受控 id,不改路由) ----------
+// 多选是纯选择场景,退回整宽卡片网格;列高由 useWideCols 实测后写 --wide-col-max
+const selectMode = ref(false)
+const wideList = computed(() => viewWide.value && !selectMode.value)
+const { wideEl, colStyle } = useWideCols(wideList)
+const activeAlbumId = ref(null)
+const activeAlbum = computed(() => topAlbums.value.find((a) => a.id === activeAlbumId.value) || null)
+
+// 返回键先回「全部相册」:第一次选中压一层同 URL 历史,popstate 只清选中、不离开页面
+//(Android 壳的返回键在 canGoBack 时走 router.back(),弹出这一层同样只触发 popstate)
+let panelLayerPushed = false
+const selectAlbum = (id) => {
+  if (activeAlbumId.value === id) return
+  activeAlbumId.value = id
+  if (!panelLayerPushed) {
+    history.pushState({ ...(history.state || {}), ihomy: 'album-panel' }, '')
+    panelLayerPushed = true
+  }
+}
+const clearActive = () => {
+  if (panelLayerPushed) {
+    // 交给 popstate 统一清:程序内关闭也把这层退掉,免得下次返回要多按一次
+    history.back()
+    return
+  }
+  activeAlbumId.value = null
+}
+const onPopState = () => {
+  panelLayerPushed = false
+  activeAlbumId.value = null
+}
+// 拖窗口回到窄屏:双栏不渲染了,顺手把压着的历史层退掉,窄屏返回行为与旧版一致
+watch(viewWide, (w) => {
+  if (w) return
+  if (panelLayerPushed) history.back()
+  else activeAlbumId.value = null
+})
 
 const load = async () => {
   loading.value = true
@@ -214,11 +309,11 @@ const onDel = async (a) => {
   await ElMessageBox.confirm(msg, t('common.tip'), { type: 'warning', closeOnClickModal: true })
   await albumApi.remove(a.id)
   ElMessage.success(t('common.deleted'))
+  if (activeAlbumId.value === a.id) clearActive()
   load()
 }
 
 // ---------- 多选删除 ----------
-const selectMode = ref(false)
 const selectedIds = ref([])
 const batchDeleting = ref(false)
 const toggleSelect = () => {
@@ -270,7 +365,12 @@ onMounted(() => {
     cascadeVisible.value = true
     router.replace({ path: '/album' })
   }
+  window.addEventListener('popstate', onPopState)
   load()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('popstate', onPopState)
 })
 </script>
 
@@ -306,6 +406,76 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 16px;
+}
+/* 宽屏双栏:左 280px 相册行(只做选择)+ 右详情;列内滚动由 main.css 的 .wide-col 统一 */
+.album-wide {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 16px;
+}
+.album-pane-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.album-pane-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.album-pane-row:hover {
+  background: rgba(var(--color-brand-rgb), 0.06);
+}
+.album-pane-row.active {
+  background: rgba(var(--color-brand-rgb), 0.12);
+  border-color: rgba(var(--color-brand-rgb), 0.25);
+}
+.pane-cover {
+  width: 48px;
+  height: 48px;
+  flex: none;
+  border-radius: 8px;
+  overflow: hidden;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--color-bg-2, #eef2f7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pane-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pane-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pane-meta {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.album-detail-pane {
+  min-width: 0;
+}
+.pane-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
 }
 .album-card {
   overflow: hidden;

@@ -1,7 +1,8 @@
-<!-- 相册详情页:照片墙 + 分享/上传/备注编辑/删除(悬停显示操作),家长或上传者可管理;?token 分享模式供游客观看公开相册 -->
+<!-- 相册详情页:照片墙 + 分享/上传/备注编辑/删除(悬停显示操作),家长或上传者可管理;?token 分享模式供游客观看公开相册。
+     宽屏双栏时由 Album.vue 以 inline 方式嵌入右栏并传 albumId(路由 /album/:id 直链行为不变)。 -->
 <template>
-  <div class="page">
-    <Breadcrumb :items="breadcrumbItems" />
+  <div :class="inline ? 'album-inline' : 'page'">
+    <Breadcrumb v-if="!inline" :items="breadcrumbItems" />
 
     <div v-if="album.id" class="album-header card">
       <div class="album-head-info">
@@ -57,13 +58,15 @@
           <el-button v-if="album.type === 'public' && album.shareToken" class="ghost-btn" @click="copyAlbumShare">{{
             t('album.share')
           }}</el-button>
-          <el-button v-if="userStore.isLoggedIn && !shareToken && !isMapped" type="primary" @click="photoInput?.click()">{{
+          <el-button v-if="userStore.isLoggedIn && !currentShareToken && !isMapped" type="primary" @click="photoInput?.click()">{{
             t('album.uploadPhotos')
           }}</el-button>
           <!-- 相机直传:只在安卓壳里出现(系统相机拍完直接进当前相册) -->
-          <el-button v-if="canCapture && userStore.isLoggedIn && !shareToken && !isMapped" :loading="capturing" @click="onCapture">
+          <el-button v-if="canCapture && userStore.isLoggedIn && !currentShareToken && !isMapped" :loading="capturing" @click="onCapture">
             {{ t('album.takePhoto') }}
           </el-button>
+          <!-- 宽屏右栏嵌入时由外壳(Album.vue)补改名/删除/收起入口 -->
+          <slot name="actions" />
         </template>
       </div>
     </div>
@@ -80,7 +83,7 @@
           :key="c.id"
           class="child-tile card"
           :class="{ selected: selectMode && selectedChildIds.includes(c.id) }"
-          @click="selectMode ? togglePickChild(c) : $router.push(`/album/${c.id}`)"
+          @click="selectMode ? togglePickChild(c) : openChild(c)"
         >
           <div class="child-tile-cover">
             <template v-if="c.cover">
@@ -118,7 +121,7 @@
           :key="c.id"
           class="child-card card"
           :class="{ selected: selectMode && selectedChildIds.includes(c.id) }"
-          @click="selectMode ? togglePickChild(c) : $router.push(`/album/${c.id}`)"
+          @click="selectMode ? togglePickChild(c) : openChild(c)"
         >
           <div class="child-cover" :style="c.cover ? { backgroundImage: `url(${thumbUrl(c.cover)})` } : {}">
             <AlbumDefaultCover v-if="!c.cover" :size="30" />
@@ -198,7 +201,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { albumApi, photoApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -212,11 +215,20 @@ import { isAndroidApp } from '@/utils/platform'
 import { formatRelativeTime, formatDateTime } from '@/utils/datetime'
 import { useSyncStore } from '@/stores/sync'
 
+// 受控组件:宽屏右栏传 albumId / inline;直接访问 /album/:id 或分享链接时不传,回落路由参数
+const props = defineProps({
+  albumId: { type: [String, Number], default: null },
+  shareToken: { type: String, default: '' },
+  inline: { type: Boolean, default: false },
+})
+const emit = defineEmits(['open-album', 'close'])
+
 const route = useRoute()
+const router = useRouter()
 const userStore = useUserStore()
 const { t } = useI18n()
-const shareToken = route.params.token || ''
-const albumId = route.params.id
+const currentShareToken = computed(() => props.shareToken || route.params.token || '')
+const currentAlbumId = computed(() => props.albumId ?? route.params.id)
 const album = ref({})
 const photos = ref([])
 const children = ref([])
@@ -250,13 +262,13 @@ const shareBase = computed(() => (album.value.shareToken ? `${location.origin}/a
 const load = async () => {
   loading.value = true
   try {
-    const data = shareToken ? await albumApi.shared(shareToken) : await albumApi.detail(albumId)
+    const data = currentShareToken.value ? await albumApi.shared(currentShareToken.value) : await albumApi.detail(currentAlbumId.value)
     album.value = data.album || {}
     photos.value = data.photos || []
     children.value = data.children || []
     parents.value = data.parents || []
-    // 分享链接带 ?p= 混淆照片ID时,定位到该照片并打开播放页
-    const p = route.query.p
+    // 分享链接带 ?p= 混淆照片ID时,定位到该照片并打开播放页(仅整页分享模式;右栏嵌入不受 URL 旧参数影响)
+    const p = props.inline ? null : route.query.p
     if (p) {
       const idx = photos.value.findIndex((x) => shareId(x.id) === String(p))
       if (idx >= 0) {
@@ -285,7 +297,7 @@ const thumbUrl = (url) => (url && url.includes('?') ? `${url}&thumb=1` : url)
 const onRefresh = async () => {
   refreshing.value = true
   try {
-    await albumApi.refresh(albumId)
+    await albumApi.refresh(currentAlbumId.value)
     ElMessage.success(t('album.refreshStarted'))
   } finally {
     refreshing.value = false
@@ -298,7 +310,7 @@ const onPhotosPicked = async (e) => {
   const files = Array.from(e.target.files || [])
   if (!files.length) return
   try {
-    await photoApi.upload(albumId, files)
+    await photoApi.upload(currentAlbumId.value, files)
     ElMessage.success(t('album.uploadSuccess'))
   } finally {
     e.target.value = ''
@@ -324,7 +336,7 @@ const onCapture = async () => {
   try {
     const m = await import('@/native/camera')
     const file = await m.capturePhoto()
-    await photoApi.upload(albumId, [file])
+    await photoApi.upload(currentAlbumId.value, [file])
     ElMessage.success(t('album.uploadSuccess'))
     load()
   } catch (e) {
@@ -375,17 +387,23 @@ const openViewer = (p) => {
   viewer.visible = true
 }
 
+// 子相册下钻:右栏嵌入时交给外壳改选中(不跳页);整页模式仍走路由,深链与窄屏行为不变
+const openChild = (c) => {
+  if (props.inline) emit('open-album', c.id)
+  else router.push(`/album/${c.id}`)
+}
+
 // ---------- 相册封面(自定义,优先于照片封面) ----------
 const coverInput = ref(null)
 // 相册管理权限:家长或创建者,且非游客分享模式
 const canManageAlbum = computed(
-  () => !shareToken && userStore.isLoggedIn && (userStore.isOwner || album.value.createdBy === userStore.userInfo?.id),
+  () => !currentShareToken.value && userStore.isLoggedIn && (userStore.isOwner || album.value.createdBy === userStore.userInfo?.id),
 )
 const pickCover = () => coverInput.value?.click()
 const onCoverPicked = async (e) => {
   const file = e.target.files?.[0]
   if (!file) return
-  await albumApi.setCover(albumId, file)
+  await albumApi.setCover(currentAlbumId.value, file)
   ElMessage.success(t('common.saved'))
   e.target.value = ''
   load()
@@ -447,10 +465,23 @@ const onBatchDelete = async () => {
 const syncStore = useSyncStore()
 watch(syncStore.doneCount, () => load())
 
+// 受控 id 变化(右栏换相册 / 路由参数变化)时重拉,并清掉上一本的选中与播放器状态
+watch(currentAlbumId, () => {
+  selectMode.value = false
+  selectedIds.value = []
+  selectedChildIds.value = []
+  viewer.visible = false
+  load()
+})
+
 onMounted(load)
 </script>
 
 <style scoped>
+/* 右栏嵌入:不再套 .page(全局 1100px/内边距在这里没意义),只保留内容本身 */
+.album-inline {
+  min-width: 0;
+}
 .hidden-input {
   display: none;
 }

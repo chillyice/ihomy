@@ -134,6 +134,7 @@ import { ArrowLeft, ArrowRight, Filter } from '@element-plus/icons-vue'
 import { anniversaryApi, memberApi, planApi, publicApi, reminderApi, scheduleApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useDevice } from '@/composables/useDevice'
+import { useWideCols } from '@/composables/useWideCols'
 import { isNativeApp } from '@/utils/platform'
 import { buildMonthGrid, isDateString, monthKey, monthRange, shiftMonth, todayString } from '@/utils/scheduleCalendar'
 import { buildList, sortEvents } from '@/utils/scheduleList'
@@ -199,28 +200,11 @@ const listGroups = computed(() => buildList(visibleEventsDays.value, filter.valu
 const showUndated = computed(() => userStore.isLoggedIn && undated.value.length > 0)
 
 // ---- 宽屏双栏:列内滚动净高 ----
-// 两列各自滚,所以先要知道「双栏顶边到可视区底边」还剩多高(头高含面包屑 / 工具栏 / 近期条,
-// 暖居与光尘的外壳头高还不一样),量出来的 px 写到 --wide-col-max 交给 main.css 的 .wide-col。
-// 这里只量高度,不做视口形态判定(宽度与短边判定一律在 useDevice)。
-const wideEl = ref(null)
-const colMaxH = ref(0)
-const colStyle = computed(() => (viewWide.value && colMaxH.value > 0 ? { '--wide-col-max': `${colMaxH.value}px` } : {}))
+// 量法抽在 composables/useWideCols(相册 / 文件 / 图书馆共用同一份,这里只负责在
+// 「进出宽屏、切视图、近期条/待安排出现」时重新量)。
+const { wideEl, colStyle, remeasure } = useWideCols(viewWide)
 
-const measureCols = () => {
-  if (!viewWide.value || view.value !== 'calendar') return
-  const el = wideEl.value
-  if (!el) return
-  // 暖居主区是 .gc-main 自己的滚动盒,光尘整页滚:两种都按各自滚动容器算净高
-  const box = el.closest('.gc-main')
-  const areaTop = box ? box.getBoundingClientRect().top : 0
-  const areaHeight = box ? box.clientHeight : window.innerHeight
-  const scrolled = box ? box.scrollTop : window.scrollY
-  const topInArea = el.getBoundingClientRect().top - areaTop + scrolled
-  // 下限 240:再矮就只剩标题栏,宁可让外壳稍微滚一点也不把月历压没
-  colMaxH.value = Math.max(240, Math.round(areaHeight - topInArea - 24))
-}
-
-const onViewportChange = () => nextTick(measureCols)
+const onViewportChange = () => remeasure()
 const detailKind = computed(() => detailRef.value?.kind || 'PLAN')
 const detailRecord = computed(() => {
   if (!detailRef.value) return null
@@ -590,16 +574,12 @@ onMounted(async () => {
   applyQuery()
   await reloadAll()
   scrollToFocus()
-  window.addEventListener('resize', onViewportChange)
-  window.addEventListener('orientationchange', onViewportChange)
   await nextTick()
-  measureCols()
+  remeasure()
 })
 
 onBeforeUnmount(() => {
   stopFocusScroll()
-  window.removeEventListener('resize', onViewportChange)
-  window.removeEventListener('orientationchange', onViewportChange)
 })
 </script>
 
