@@ -9,6 +9,15 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const base = join(__dirname, '..')
 const dataSrc = join(base, 'node_modules', '@emulatorjs', 'emulatorjs', 'data')
 const dest = join(base, 'public', 'emulatorjs', 'data')
+// --app(Android/iOS 壳构建):运行时 + 28MB 核心不进包,壳内按 serverUrl 从生产域名加载
+// (见 EmulatorPlayer.vue 的 EJS_pathtodata),这里只清产物,避免 vite 把上次 web 构建的残留拷进 dist。
+const appBuild = process.argv.includes('--app')
+
+if (appBuild) {
+  rmSync(join(base, 'public', 'emulatorjs'), { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+  console.log('[copy-emulatorjs] 壳构建:运行时不进包,已清空 public/emulatorjs(壳内从生产域名加载)')
+  process.exit(0)
+}
 
 if (!existsSync(dataSrc)) {
   console.warn('[copy-emulatorjs] @emulatorjs/emulatorjs 未安装,跳过(先 npm install)')

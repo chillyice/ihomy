@@ -185,6 +185,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { FullScreen, ArrowLeft } from '@element-plus/icons-vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
+import { serverUrl } from '@/utils/assetUrl'
 import { formatDateTime } from '@/utils/datetime'
 import { gameApi } from '@/api'
 import { useUserStore } from '@/stores/user'
@@ -711,7 +712,8 @@ const loadRom = async (romUrl) => {
     window.EJS_player = '#' + playerId
     window.EJS_core = systemInfo.value.core
     window.EJS_gameUrl = romUrl
-    window.EJS_pathtodata = '/emulatorjs/data/'
+    // 壳内不打包运行时(省 28MB):按 serverUrl 从生产域名取核心与源码;Web 端原样返回站内路径
+    window.EJS_pathtodata = serverUrl('/emulatorjs/data/')
     window.EJS_startOnLoaded = true
     window.EJS_controlScheme = 0
     window.EJS_hideSettings = false
@@ -735,7 +737,7 @@ const loadRom = async (romUrl) => {
 
     // 只注入一次 loader.js(其内部读取全局配置并启动模拟器)
     const s = document.createElement('script')
-    s.src = '/emulatorjs/data/loader.js'
+    s.src = serverUrl('/emulatorjs/data/loader.js')
     document.head.appendChild(s)
 
     // 兜底:回调因异常未触发时,15s 后关 loading 避免永久转圈

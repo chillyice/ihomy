@@ -693,7 +693,7 @@ app:
 | Q1 | 包名 | `top.ihomy.app` | 直接采用;一旦发布不宜改 |
 | Q2 | 分发方式 | 自建下载页 / 内网分发 | 自建 `/app` 页 + 版本检查 |
 | Q3 | 最低 Android 版本 | 10 / 11 | 10(minSdk 29),覆盖更老平板 |
-| Q4 | 游戏资源是否进包 | 进包 / 按需下载 | 先量体积再定 |
+| Q4 | 游戏资源是否进包 | 进包 / 按需下载 | **已定(V11.90):按需下载** —— 包内 emulatorjs 28.73MB + ruffle 9.69MB,整目录不进包改从生产域名取;APK 54.4MB → 14.2MB;前置:生产 nginx 给 `/ruffle`、`/emulatorjs` 放 CORS |
 | Q5 | 是否做系统日历导出 | 做 / 不做 | **建议做**,是 R1 最有效的兜底 |
 | Q6 | 卡片首批数量 | 3 / 4 张 | 3 张(概览/提醒/倒计时),相册回忆二期 |
 | Q7 | 是否需要 iOS 同期 | 否 | 否;但原生模块尽量与平台解耦 |
@@ -776,7 +776,7 @@ npx cap open android
 - **P0 第 10 条「发布」→ 已落地(原「本轮未做」)** — `/public/app/latest` 早于 P1 交付;本轮补齐:站内 `/app` 下载页(公开路由)、`ProductStatService.PRODUCTS` 增加 `app`(计数下载 + 访问打点 + 运维页卡片)、线上 `external.yml` 的 `app.android.*` 三个键、APK 上架。
 - **APK 目录口径** — 计划写「服务器 `uploads/files/` 放 APK」/ 实际放 `{upload-dir}/app/`(`/opt/ihomy/uploads/app/ihomy-V11.80.apk`) / `/files/**` 被 `WebMvcConfig` 整体映射到上传根目录,前缀吃掉一层;放成 `uploads/files/app/` 直链 404(白名单与 302 都正常,极易误判)。同坑记入 踩坑速查 §12.2。
 - **下载入口拆成两条** — 页面上「下载安装包」走 `/public/product/download?page=app&file=...`(先计数再 302,保住下载统计);App 内更新检查直接用 `/public/app/latest` 里的 `/files/app/*` 直链 / 统计口径只覆盖落地页转化,App 自身更新不该再算一次下载。
-- **APK 体积 51.8 MB(54,288,580 字节)** — 计划风险表阈值 30 MB 已超,主因仍是 `public/emulatorjs`(≈30 MB)+ `public/ruffle`(≈28 MB)原样进 assets;Q4「进包 or 游戏资源按需下载」仍待拍板,不影响本轮发布。
+- **APK 体积 51.8 MB(54,288,580 字节)→ V11.90 已收口到 14.2 MB** — 当时主因是 `public/emulatorjs`(≈30 MB)+ `public/ruffle`(≈28 MB)原样进 assets;V11.90 按 Q4 决策改为壳内按需加载(细节见 `docs/daily/2026-11-11.md`),风险表 30 MB 阈值不再越线;R8 未开(dex 8.18MB),留作后续可选项。
 - **`min-supported-version` 与线上唯一包对齐** — 设为 V11.80(旧包已从服务器删除),只有一版可用时留低值会给出「能装但下不到」的死链。
 
 ### P3 实施差异(2026-11-10,V11.82)

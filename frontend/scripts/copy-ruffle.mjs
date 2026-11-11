@@ -2,6 +2,8 @@
 // Ruffle 的 wasm 运行时按文件名字面量在运行时解析,无法被 Vite 打进 bundle,
 // 官方自托管方案即「复制到 web 根目录 + 脚本标签加载」。此处仅复制 .js/.wasm 运行文件,跳过 .map/LICENSE。
 // 产物 public/ruffle/ 已 gitignore,由本脚本在 dev/build 时重新生成(与 dist 同属构建产物)。
+// --app(Android/iOS 壳构建):运行时不进包,壳内按 serverUrl 从生产域名加载(见 utils/ruffle.js),
+// 这里只负责清掉产物,避免 vite 把上一次 web 构建的残留拷进 dist。
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -9,6 +11,13 @@ import { fileURLToPath } from 'node:url'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const src = join(__dirname, '..', 'node_modules', '@ruffle-rs', 'ruffle')
 const dest = join(__dirname, '..', 'public', 'ruffle')
+const appBuild = process.argv.includes('--app')
+
+if (appBuild) {
+  rmSync(dest, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+  console.log('[copy-ruffle] 壳构建:运行时不进包,已清空 public/ruffle(壳内从生产域名加载)')
+  process.exit(0)
+}
 
 if (!existsSync(src)) {
   console.warn('[copy-ruffle] @ruffle-rs/ruffle 未安装,跳过(先 npm install)')

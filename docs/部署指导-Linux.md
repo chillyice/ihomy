@@ -621,6 +621,17 @@ server {
         proxy_read_timeout 3600s;   # 视频/电子书大文件下载别被默认 60s 掐断
     }
 
+    # 游戏/Flash 运行时(壳内从生产域名按需加载,不进 APK)
+    # 壳内页面 origin 是 https://localhost,跨源 fetch 核心 .data / ruffle .wasm 需要 CORS;
+    # 正则 location 按出现顺序匹配,此块必须放在下面通用静态缓存块之前。
+    # 同样带 add_header,必须自带 HSTS(继承规则见下方注意)。
+    location ~* ^/(ruffle|emulatorjs)/ {
+        expires 7d;
+        add_header Cache-Control "public, immutable";
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header Access-Control-Allow-Origin "*" always;
+    }
+
     # 静态资源缓存（排除 /api/ 与 /files/；本 location 有 add_header，必须自带 HSTS，否则被继承规则吃掉）
     # 必须排除 /api/：nginx 正则 location 优先级高于前缀 location，不排除则 /api/swagger-ui/*.css|js
     # 被当作静态资源去 root 里找 → 404，接口文档页空白（2026-10-15 修，见踩坑速查 §7.10）
@@ -638,6 +649,7 @@ EOF
 > - nginx 有条硬规则：**location 里只要写了一条 `add_header`，server 级的同类头就不再继承**——所以图片/JS 缓存 location 必须自己带一行 HSTS（上面已带），否则 HSTS 只对 HTML 生效。
 > - 图片扩展名缓存 location 用负向断言 `^/(?!api/|files/)` 排除 `/api/` 与 `/files/`：nginx **正则 location 优先级高于前缀 location**，`/api/` 不排除则反代路径下带扩展名的响应（`/api/swagger-ui/*.css|js` 等）会被这条静态缓存抢走、从 `dist` 里找不到而 404 ——**接口文档页会变成空白页**（`/api/doc.html` 自身仍 200，所以极易漏检，2026-10-15 修，见踩坑速查 §7.10）。
 > - `/.well-known/acme-challenge/` 必须保留，certbot 续期时要用。
+> - **`/ruffle/` 与 `/emulatorjs/` 必须带 `Access-Control-Allow-Origin`**：APK/iOS 壳内页面 origin 是 `https://localhost`，两套 WASM 运行时按需从生产域名加载（不进包，省 38MB）；缺这个头时壳内模拟器/Flash 报跨域失败。**发新 APK 前先在服务器加这块 location 并 `nginx -t && systemctl reload nginx`**，顺序反过来会让新包的游戏功能直接不可用。
 > - WebSocket 的 `proxy_read_timeout 3600s` 防止长连接被 nginx 默认 60s 超时断开。
 > - **必须显式配 `gzip_types`**（见下）：Ubuntu 自带的 `/etc/nginx/nginx.conf` 只写了 `gzip on;`，
 >   `gzip_types` 整行是注释状态，默认仅压缩 `text/html` —— JS/CSS/API JSON 全部以原始体积传输。

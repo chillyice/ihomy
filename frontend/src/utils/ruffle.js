@@ -1,6 +1,7 @@
 // Ruffle(Flash 模拟器)运行时懒加载:脚本标签加载自托管文件 /ruffle/ruffle.js,
 // 供「本地 Flash 播放器」与「导入的 swf 小游戏」共用。单例 promise,避免重复注入脚本。
 import { isIOS } from '@/utils/platform'
+import { serverUrl } from '@/utils/assetUrl'
 
 let rufflePromise = null
 
@@ -20,14 +21,15 @@ export function loadRuffle() {
       const s = document.createElement('script')
       // ruffle.js 文件名不带内容哈希且 nginx 给 7 天强缓存,而它内部引用的 wasm 文件名带哈希。
       // 升级 Ruffle 后旧脚本会去请求新构建已删掉的旧 wasm 而报错,故用版本号破缓存。
-      s.src = `/ruffle/ruffle.js?v=${__APP_VERSION__}`
+      // 壳内不打包运行时(省 28MB):wasm 从生产域名取(需服务端给 /ruffle/ 放 CORS);Web 端 serverUrl 原样返回
+      s.src = `${serverUrl('/ruffle/ruffle.js')}?v=${__APP_VERSION__}`
       s.onload = resolve
       s.onerror = () => reject(new Error('Ruffle runtime load failed'))
       document.head.appendChild(s)
     }).then(() => {
       try {
         const cfg = window.RufflePlayer.config || (window.RufflePlayer.config = {})
-        cfg.publicPath = '/ruffle'
+        cfg.publicPath = serverUrl('/ruffle')
       } catch (e) {
         // 脚本按自身 src 自动推导 publicPath,显式设置失败也不致命
       }
