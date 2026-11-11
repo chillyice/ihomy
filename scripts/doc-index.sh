@@ -7,6 +7,11 @@
 # 用法:
 #   bash scripts/doc-index.sh          # 写入 docs/归档索引.md
 #   bash scripts/doc-index.sh --check  # 只比对,有漂移退出码 1
+#
+# 注意:排序一律钉 C locale。`sort` 默认跟随 LC_ALL/LANG,en_US.UTF-8 会忽略标点、
+# 按语言规则比较,同一份归档在不同 locale 下会排出不同顺序 → --check 在别人的机器上
+# 假红(2026-11-11 实测:同一归档在 LC_ALL=en_US.UTF-8 与 C.UTF-8 下索引差 32 行)。
+export LC_ALL=C
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
