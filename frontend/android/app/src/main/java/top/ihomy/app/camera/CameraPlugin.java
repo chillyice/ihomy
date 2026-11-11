@@ -1,5 +1,6 @@
 package top.ihomy.app.camera;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
@@ -12,11 +13,14 @@ import androidx.activity.result.ActivityResult;
 import androidx.core.content.FileProvider;
 
 import com.getcapacitor.JSObject;
+import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -30,14 +34,16 @@ import java.util.concurrent.Executors;
 /**
  * 相机直传(插件名 {@code IhomyCamera}):拍照后把图交回前端,走现有相册/记账上传接口。
  *
- * <p>用系统相机 {@code ACTION_IMAGE_CAPTURE} + {@code EXTRA_OUTPUT} 写进应用缓存目录,
- * 不申请 CAMERA 权限(只要 App 自己不声明 CAMERA,系统相机应用代拍就不需要运行时授权;
- * 一旦声明反而会被要求动态申请,所以 manifest 里有意不写)。
+ * <p>用系统相机 {@code ACTION_IMAGE_CAPTURE} + {@code EXTRA_OUTPUT} 写进应用缓存目录。
+ * manifest 里因为通话的 getUserMedia 必须声明 CAMERA,系统相机代拍就变成「应用已声明但未授权会抛
+ * SecurityException」,所以调起系统相机前先补一次运行时授权;用户拒绝就按 denied 回前端。
  *
  * <p>回传用 base64:WebView 侧读 file:// 受同源策略限制,而我们又不希望为此开放
  * Capacitor 的本地文件映射口子。单张限 12MB(与后端图片上限 10MB 留出余量)。
  */
-@CapacitorPlugin(name = "IhomyCamera")
+@CapacitorPlugin(
+        name = "IhomyCamera",
+        permissions = { @Permission(alias = "camera", strings = { Manifest.permission.CAMERA }) })
 public class CameraPlugin extends Plugin {
 
     private static final String TAG = "IhomyCamera";
@@ -65,6 +71,26 @@ public class CameraPlugin extends Plugin {
     /** 打开系统相机;拍好返回 {name,size},取消返回 reject("cancel") */
     @PluginMethod
     public void capture(PluginCall call) {
+        // 应用已声明 CAMERA:未授权时 ACTION_IMAGE_CAPTURE 会直接抛 SecurityException,
+        // 所以先补运行时授权,拿到再进相机
+        if (getPermissionState("camera") != PermissionState.GRANTED) {
+            requestPermissionForAlias("camera", call, "cameraPermissionCallback");
+            return;
+        }
+        openCamera(call);
+    }
+
+    /** 相机授权回调:允许才继续进系统相机,拒绝按 denied 回前端(前端目前统一按失败提示) */
+    @PermissionCallback
+    private void cameraPermissionCallback(PluginCall call) {
+        if (getPermissionState("camera") == PermissionState.GRANTED) {
+            openCamera(call);
+        } else {
+            call.reject("denied");
+        }
+    }
+
+    private void openCamera(PluginCall call) {
         Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         if (intent.resolveActivity(getContext().getPackageManager()) == null) {
             call.reject("no_camera");

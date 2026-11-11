@@ -2,10 +2,22 @@
 // 纯函数式工厂,连接生命周期/状态机在 stores/call.js;本文件只管媒体与 SDP/ICE。
 // 环境硬前提:HTTPS(生产已具备)或 http://localhost(安全上下文);局域网 IP 不可用。
 
-/** getUserMedia 失败 → 稳定错误码:denied(权限被拒)/ notfound(无设备)/ busy(被占用)/ generic */
+/**
+ * 拉流前环境预检:返回错误码,null 表示可以尝试。
+ * 局域网 IP 的 http 页面浏览器会直接摘掉 mediaDevices 或按 SecurityError 拒绝,和「用户拒绝授权」表现不同,
+ * 先分清这两者才能给出用户照做得了的提示(换 https 地址 / 去系统里授权)。
+ */
+export function mediaEnvError() {
+  if (typeof window !== 'undefined' && window.isSecureContext === false) return 'insecure'
+  if (!navigator.mediaDevices?.getUserMedia) return 'unsupported'
+  return null
+}
+
+/** getUserMedia 失败 → 稳定错误码:denied(权限被拒)/ insecure(非安全上下文)/ notfound(无设备)/ busy(被占用)/ generic */
 function mapMediaError(e) {
   const name = e?.name || ''
-  if (name === 'NotAllowedError' || name === 'SecurityError') return 'denied'
+  if (name === 'SecurityError') return 'insecure'
+  if (name === 'NotAllowedError') return 'denied'
   if (name === 'NotFoundError' || name === 'DevicesNotFoundError' || name === 'OverconstrainedError') return 'notfound'
   if (name === 'NotReadableError' || name === 'TrackStartError') return 'busy'
   return 'generic'
@@ -23,8 +35,9 @@ export function mediaErrorKey(code) {
  * 音频也拿不到或环境不支持(非安全上下文/过旧内核)时抛出带 code 的错误,由调用方按码提示。
  */
 export async function getLocalStream(media) {
-  if (!navigator.mediaDevices?.getUserMedia) {
-    throw Object.assign(new Error('media unsupported in this context'), { code: 'unsupported' })
+  const envErr = mediaEnvError()
+  if (envErr) {
+    throw Object.assign(new Error('media unavailable in this context'), { code: envErr })
   }
   const wantVideo = media === 'VIDEO'
   let firstError = null
@@ -39,9 +52,10 @@ export async function getLocalStream(media) {
     return { stream: await navigator.mediaDevices.getUserMedia({ audio: true, video: false }), downgraded: wantVideo }
   } catch (e) {
     const code = mapMediaError(e)
-    throw Object.assign(new Error(e?.message || 'getUserMedia failed'), {
-      code: code === 'generic' && firstError ? mapMediaError(firstError) : code,
-    })
+    const finalCode = code === 'generic' && firstError ? mapMediaError(firstError) : code
+    // 排查用:原始错误名(NotAllowedError / SecurityError / NotFoundError)决定是环境问题还是授权问题
+    console.warn('[call] getUserMedia 失败', finalCode, e?.name || '', e?.message || '')
+    throw Object.assign(new Error(e?.message || 'getUserMedia failed'), { code: finalCode })
   }
 }
 

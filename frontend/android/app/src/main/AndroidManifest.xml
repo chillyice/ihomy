@@ -177,8 +177,20 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- 保险箱进页前的本机指纹/人脸校验(系统 BiometricPrompt,不读生物特征数据) -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
-    <!-- 语音记账:识别时说一句话(录音只交给系统识别服务,不落盘、不上传自家后端) -->
+    <!-- 语音记账 + 语音/视频通话:录音(RECORD_AUDIO 本机展示权限,同时供 WebView getUserMedia 用) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- 语音/视频通话:页面里 getUserMedia 要拿摄像头/麦克风,WebView 会按下面的声明向系统申请运行时权限
+         (Capacitor 的 WebChromeClient.onPermissionRequest 会同时要 CAMERA / RECORD_AUDIO / MODIFY_AUDIO_SETTINGS,
+         少声明一条整组都会被拒,页面侧表现为「权限被拒绝」——2026-11-11 修) -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- 声明 CAMERA 会让商店/系统把本应用判为「需要相机」,显式 required=false 免得无相机设备被过滤 -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera.autofocus"
+        android:required="false" />
     <!-- 系统日历单向导出(兜底提醒):只写本机专属「ihomy」日历,授权在设置页里按需申请 -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />

@@ -7,9 +7,23 @@ import i18n from '@/i18n'
 import { chatApi } from '@/api'
 import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
-import { createPeer, getLocalStream, mediaErrorKey, setAudioEnabled, setVideoEnabled, stopStream } from '@/composables/useWebRTC'
+import {
+  createPeer,
+  getLocalStream,
+  mediaEnvError,
+  mediaErrorKey,
+  setAudioEnabled,
+  setVideoEnabled,
+  stopStream,
+} from '@/composables/useWebRTC'
 
 const RING_TIMEOUT_MS = 30000
+
+/** 通话 ID:安全上下文用 randomUUID,老内核回落时间戳+随机串(不允许在建通话时抛错) */
+function newCallId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+  return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
+}
 
 export const useCallStore = defineStore('call', {
   state: () => ({
@@ -36,9 +50,17 @@ export const useCallStore = defineStore('call', {
     /** 发起通话:拉媒体 → invite → 30s 无应答按超时结束;媒体失败按码提示并记录 failReason */
     async start(peer, media) {
       if (this.inCall) return false
+      this.failReason = ''
       const chat = useChatStore()
       if (chat.socketStatus !== 'open') return false
-      this.callId = crypto.randomUUID()
+      // 环境预检放在建通话之前:非安全上下文(局域网 http 页面)与不支持媒体的壳先按码报出原因,
+      // 不要发 invite 让对端白响铃
+      const envErr = mediaEnvError()
+      if (envErr) {
+        this.failReason = envErr
+        return false
+      }
+      this.callId = newCallId()
       this.peerId = peer.id
       this.peerName = peer.name || ''
       this.media = media === 'VIDEO' ? 'VIDEO' : 'AUDIO'
