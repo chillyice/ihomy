@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseVersion, compareVersion, apkFileName, updatePlan, formatBytes } from './appUpdate'
+import { parseVersion, compareVersion, apkFileName, updatePlan, formatBytes, downloadPercent } from './appUpdate'
 
 describe('parseVersion 版本号解析', () => {
   it('标准形态 V<主>.<次>', () => {
@@ -85,5 +85,29 @@ describe('formatBytes 体积文案', () => {
     expect(formatBytes(2048)).toBe('2 KB')
     expect(formatBytes(0)).toBe('0 MB')
     expect(formatBytes(undefined)).toBe('0 MB')
+  })
+})
+
+describe('downloadPercent 下载进度', () => {
+  it('按已下载/总量四舍五入', () => {
+    expect(downloadPercent(0, 100)).toBe(0)
+    expect(downloadPercent(25, 100)).toBe(25)
+    expect(downloadPercent(54, 100)).toBe(54)
+  })
+
+  it('封顶 99:100% 留给「确认成功」由调用方置位', () => {
+    expect(downloadPercent(100, 100)).toBe(99)
+    expect(downloadPercent(200, 100)).toBe(99)
+  })
+
+  it('总量未知返回 null(界面不显示百分比)', () => {
+    expect(downloadPercent(10, 0)).toBeNull()
+    expect(downloadPercent(10, -1)).toBeNull()
+    expect(downloadPercent(10, undefined)).toBeNull()
+  })
+
+  it('已下载字节非法按 0 处理', () => {
+    expect(downloadPercent(-5, 100)).toBe(0)
+    expect(downloadPercent(undefined, 100)).toBe(0)
   })
 })

@@ -4,4 +4,6 @@
     <cache-path name="my_cache_images" path="." />
     <!-- 相机直传:系统相机写入应用缓存的落点(只共享这一个子目录) -->
     <cache-path name="camera" path="camera/" />
+    <!-- 应用内更新:系统下载器把安装包落到外部私有目录,交给安装器前要换成 content:// -->
+    <external-files-path name="updates" path="updates/" />
 </paths>

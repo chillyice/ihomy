@@ -1,7 +1,8 @@
-// 应用内更新的原生出口(仅原生壳):下载走 @capacitor/filesystem,安装走自写插件 IhomyUpdater。
+// 应用内更新的原生出口(仅原生壳):下载走系统 DownloadManager,安装走自写插件 IhomyUpdater。
 //
-// 分工原因:WebView 里的 JS 没有权限「装应用」——缓存里的 apk 文件也不能直接 file:// 外发,
-// 必须由原生侧经 FileProvider 换成 content:// 再交给系统安装器;这一步只能写插件。
+// 分工原因:WebView 里的 JS 没有权限「装应用」——外部私有目录里的 apk 文件也不能直接 file:// 外发,
+// 必须由原生侧经 FileProvider 换成 content:// 再交给系统安装器;下载同理,WebView 一锁屏 JS 就停,
+// 所以交给系统下载器托管(锁屏/切后台/进程被杀都继续),前端只轮询进度。
 import { registerPlugin } from '@capacitor/core'
 
 const IhomyUpdater = registerPlugin('IhomyUpdater')
@@ -24,6 +25,22 @@ export async function openInstallSettings() {
 /** 调起系统安装器;失败码:file-missing / install-permission / no-installer */
 export async function installApk(file) {
   await IhomyUpdater.install({ file })
+}
+
+/** 交给系统下载器后台下载(锁屏/切后台/进程被杀都继续);返回 { id, file } */
+export async function startApkDownload({ url, file }) {
+  const res = await IhomyUpdater.download({ url, file })
+  return res || null
+}
+
+/** 查后台下载进度:返回 { status, bytes, total, size, file };查询失败返回 null(调用方按「未知」继续等) */
+export async function queryApkDownload() {
+  try {
+    const res = await IhomyUpdater.downloadStatus()
+    return res || null
+  } catch (e) {
+    return null
+  }
 }
 
 /** 清理下载目录里的旧安装包(默认保留 keep) */

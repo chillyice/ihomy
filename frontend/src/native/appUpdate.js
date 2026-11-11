@@ -5,32 +5,33 @@
 // - 有新版本弹 AppUpdateDialog(组件只负责渲染,状态都在这里);
 // - 低于 minSupported = 强制更新,弹窗不给「稍后」;
 // - 版本号解析失败一律不提示(宁漏不误),服务端版本比本机低也不提示降级;
-// - 下载走 @capacitor/filesystem(带进度事件)落到 cache/updates/,安装走插件 IhomyUpdater;
+// - **下载交给系统 DownloadManager**:锁屏、切后台、壳进程被杀都继续下,完成后下拉栏有通知;
+//   前端只按 1 秒轮询进度,回到前台继续看,不再「锁屏就失败」;
+// - 已下好的包(含上次没装成的)直接给「立即安装」,不重下 54MB;
 // - 本机没给「安装未知应用」授权时,引导去系统设置,回来后自动继续安装。
 import { reactive } from 'vue'
 import { App as CapApp } from '@capacitor/app'
-import { Directory, Filesystem } from '@capacitor/filesystem'
 import { ElMessage } from 'element-plus'
 import i18n from '@/i18n'
 import request from '@/api/request'
 import { serverUrl } from '@/utils/assetUrl'
 import { isAndroidApp } from '@/utils/platform'
-import { apkFileName, updatePlan } from '@/utils/appUpdate'
+import { apkFileName, downloadPercent, updatePlan } from '@/utils/appUpdate'
 import { getAppVersion } from './version'
-import { canInstallApk, cleanupApks, installApk, openInstallSettings } from './updater'
+import { canInstallApk, cleanupApks, installApk, openInstallSettings, queryApkDownload, startApkDownload } from './updater'
 
 const t = (key, params) => i18n.global.t(key, params)
 
-/** 下载目录(应用缓存下),与原生插件 UpdaterPlugin 的 DIR_NAME 一致 */
-const DIR = 'updates'
 /** 安装包下限:真包 50MB 上下,低于这个数说明拿到的是错误页/半截文件,不能交给安装器 */
 const MIN_APK_BYTES = 1024 * 1024
+/** 进度轮询间隔:系统下载器没有推送,1 秒一次足够平滑(锁屏后轮询自动停,回前台接着查) */
+const POLL_MS = 1000
 
 /**
  * 更新弹窗状态。phase:
  * - idle        没在更新
- * - available   已发现新版本,等用户点「立即更新」
- * - downloading 下载中(带 percent)
+ * - available   已发现新版本,等用户点「立即更新」(downloaded=true 时是「立即安装」)
+ * - downloading 下载中(带 percent;可以锁屏/切后台)
  * - installer   已调起系统安装器
  * - permission  缺「安装未知应用」授权,等用户去系统设置
  * - error       下载/安装失败,可重试
@@ -41,6 +42,7 @@ export const updateState = reactive({
   version: '',
   notes: '',
   required: false,
+  downloaded: false,
   percent: 0,
   done: 0,
   total: 0,
@@ -51,7 +53,8 @@ export const updateState = reactive({
 let info = null
 /** 本次要下载的文件名(纯文件名,原生侧只认它) */
 let fileName = ''
-let progressHandle = null
+let pollTimer = null
+let pollResolve = null
 let downloading = false
 let resumeHooked = false
 
@@ -64,13 +67,18 @@ async function fetchLatest() {
   }
 }
 
-/** 从系统设置回来后自动续上(只剩授权那一步时) */
+/** 从系统设置回来后续上授权/进度:后台下载可能正好下完,回到前台立刻认领 */
 function hookResume() {
   if (resumeHooked) return
   resumeHooked = true
   CapApp.addListener('appStateChange', async ({ isActive }) => {
-    if (!isActive || !updateState.visible || updateState.phase !== 'permission') return
-    if (await canInstallApk()) installNow()
+    if (!isActive || !updateState.visible) return
+    if (updateState.phase === 'permission') {
+      if (await canInstallApk()) installNow()
+      return
+    }
+    // 下载中切走再回来:立即查一次,别等下一次轮询
+    if (updateState.phase === 'downloading') tick()
   })
 }
 
@@ -101,8 +109,15 @@ export async function checkAppUpdate({ interactive = false } = {}) {
   info = data
   fileName = apkFileName(data.version)
   if (!fileName) return
-  // 顺手清掉更早版本的安装包(缓存里留一个 54MB 的包没必要)
-  cleanupApks(fileName)
+  // 上次的下载还在跑 / 已经下好:接着用,别从头再拉 54MB
+  const pending = await queryApkDownload()
+  const sameFile = !!(pending && pending.file === fileName)
+  const ready = sameFile && pending.status === 'SUCCESSFUL' && Number(pending.size) >= MIN_APK_BYTES
+  // 入队/跑着/等网络都算「在飞」:别清它的落盘文件,也别重复入队
+  const running = sameFile && ['PENDING', 'RUNNING', 'PAUSED'].includes(pending.status)
+  // 其他版本的安装包与残留任务没用了(原生在入队新下载时也会撤掉旧任务);
+  // 查询失败(返回 null)时不清,免得把正在写的包当残留删掉
+  if (pending && !running) cleanupApks(ready ? fileName : '')
   hookResume()
   Object.assign(updateState, {
     visible: true,
@@ -110,77 +125,102 @@ export async function checkAppUpdate({ interactive = false } = {}) {
     version: data.version,
     notes: data.notes || '',
     required: plan.required,
+    downloaded: ready,
     percent: 0,
     done: 0,
     total: 0,
     error: '',
   })
+  if (running) resumeDownload()
 }
 
-async function ensureDir() {
-  try {
-    await Filesystem.mkdir({ path: DIR, directory: Directory.Cache, recursive: true })
-  } catch (e) {
-    // 已存在即目标状态,不当错误
+/** 把一次进度响应落到界面状态上(查询失败不算失败,继续等) */
+function applyStatus(st) {
+  if (!st) return
+  const total = Number(st.total) || 0
+  const done = Number(st.bytes) || 0
+  if (done > 0) updateState.done = done
+  if (total > 0) updateState.total = total
+  const pct = downloadPercent(done, total)
+  if (pct !== null) updateState.percent = pct
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+  pollResolve = null
+}
+
+/** 查一次进度;读到终态(成功/失败/任务没了)就结束轮询并把结果交回去 */
+async function tick() {
+  const st = await queryApkDownload()
+  if (!st) return
+  applyStatus(st)
+  if (st.status === 'SUCCESSFUL' || st.status === 'FAILED' || st.status === 'NONE') {
+    const resolve = pollResolve
+    stopPolling()
+    if (resolve) resolve(st)
   }
 }
 
-/** 开始应用内下载;完成后自动调起安装器 */
+/** 轮询到终态为止;锁屏时定时器会被系统挂起,回前台由 hookResume 补一次 */
+function pollDownload() {
+  return new Promise((resolve) => {
+    pollResolve = resolve
+    pollTimer = setInterval(tick, POLL_MS)
+    tick()
+  })
+}
+
+/** 开始应用内下载(系统托管);完成后自动调起安装器 */
 export async function startDownload() {
   if (downloading || !info || !fileName) return
   downloading = true
-  Object.assign(updateState, { phase: 'downloading', percent: 0, done: 0, total: 0, error: '' })
+  Object.assign(updateState, {
+    phase: 'downloading',
+    downloaded: false,
+    percent: 0,
+    done: 0,
+    total: 0,
+    error: '',
+  })
   try {
-    await ensureDir()
-    progressHandle = await Filesystem.addListener('progress', (p) => {
-      // 同一时刻只允许一个下载,进度事件都归本次(不按 URL 匹配,免得重定向/编码差异漏事件)
-      if (!p) return
-      const total = Number(p.contentLength) || 0
-      const done = Number(p.bytes) || 0
-      updateState.done = done
-      updateState.total = total
-      updateState.percent = total > 0 ? Math.min(99, Math.round((done / total) * 100)) : 0
-    })
-    await Filesystem.downloadFile({
-      url: serverUrl(info.url),
-      path: `${DIR}/${fileName}`,
-      directory: Directory.Cache,
-      progress: true,
-    })
-    await assertApk()
+    await startApkDownload({ url: serverUrl(info.url), file: fileName })
+    const st = await pollDownload()
+    if (st.status !== 'SUCCESSFUL') throw new Error(st.status)
+    // 系统下载器已按 Content-Length 校验过,这里再按「大小下限」兜一层(防错误页落盘)
+    if (Number(st.size) < MIN_APK_BYTES) throw new Error('incomplete-apk')
     updateState.percent = 100
     await installNow()
   } catch (e) {
     console.warn('[appUpdate] 下载安装包失败', e)
-    await dropApk()
     updateState.phase = 'error'
     updateState.error = t('appUpdate.failed')
   } finally {
     downloading = false
-    if (progressHandle) {
-      try {
-        await progressHandle.remove()
-      } catch (e) {
-        /* 已移除 */
-      }
-      progressHandle = null
-    }
+    stopPolling()
   }
 }
 
-/** 下载完先看体积:错误页/半截包交给系统安装器只会得到一句「解析包时出现问题」 */
-async function assertApk() {
-  const st = await Filesystem.stat({ path: `${DIR}/${fileName}`, directory: Directory.Cache })
-  if (!st || Number(st.size) < MIN_APK_BYTES) throw new Error('incomplete-apk')
-}
-
-/** 删掉不可用的安装包,免得下次「重试」直接装坏文件 */
-async function dropApk() {
-  if (!fileName) return
+/** 上次的下载还在跑(比如锁屏期间被系统续上):接着看进度,下完直接装 */
+async function resumeDownload() {
+  if (downloading || !fileName) return
+  downloading = true
+  Object.assign(updateState, { phase: 'downloading', downloaded: false, error: '' })
   try {
-    await Filesystem.deleteFile({ path: `${DIR}/${fileName}`, directory: Directory.Cache })
-  } catch (e) {
-    /* 本来就没有 */
+    const st = await pollDownload()
+    if (st.status === 'SUCCESSFUL' && Number(st.size) >= MIN_APK_BYTES) {
+      updateState.percent = 100
+      await installNow()
+    } else {
+      updateState.phase = 'error'
+      updateState.error = t('appUpdate.failed')
+    }
+  } finally {
+    downloading = false
+    stopPolling()
   }
 }
 
@@ -200,6 +240,8 @@ export async function installNow() {
       updateState.phase = 'permission'
       return
     }
+    // 包不见了(系统清理缓存/用户删了):退回「立即更新」重新下,别让用户卡在错误页
+    if (code.includes('file-missing')) updateState.downloaded = false
     updateState.phase = 'error'
     updateState.error = code.includes('file-missing') ? t('appUpdate.fileMissing') : t('appUpdate.noInstaller')
   }

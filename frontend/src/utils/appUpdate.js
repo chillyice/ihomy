@@ -52,3 +52,17 @@ export function formatBytes(bytes) {
   if (mb >= 1) return `${mb.toFixed(1)} MB`
   return `${Math.max(1, Math.round(n / 1024))} KB`
 }
+
+/**
+ * 下载进度百分比(0–99)。
+ * - 总量未知(系统下载器还没拿到 Content-Length)→ null,界面不显示百分比;
+ * - 满 100 由调用方在「确认为成功」后置位,进度里封顶 99,避免 100% 了却还在装;
+ * - 已下字节非法/为负按 0 处理。
+ */
+export function downloadPercent(bytes, total) {
+  const all = Number(total)
+  if (!Number.isFinite(all) || all <= 0) return null
+  const done = Number(bytes)
+  if (!Number.isFinite(done) || done <= 0) return 0
+  return Math.min(99, Math.round((done / all) * 100))
+}

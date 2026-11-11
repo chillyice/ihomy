@@ -42,8 +42,8 @@
           {{ $t('appUpdate.later') }}
         </el-button>
 
-        <el-button v-if="state.phase === 'available'" type="primary" @click="startDownload">
-          {{ $t('appUpdate.installNow') }}
+        <el-button v-if="state.phase === 'available'" type="primary" @click="onPrimary">
+          {{ state.downloaded ? $t('appUpdate.installReady') : $t('appUpdate.installNow') }}
         </el-button>
 
         <el-button v-else-if="state.phase === 'downloading'" type="primary" disabled>
@@ -81,6 +81,12 @@ const title = computed(() =>
 
 function onVisible(visible) {
   if (!visible) dismissUpdate()
+}
+
+/** 已下好就直接装,否则开始后台下载 */
+function onPrimary() {
+  if (state.downloaded) installNow()
+  else startDownload()
 }
 </script>
 
