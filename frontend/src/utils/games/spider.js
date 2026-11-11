@@ -12,6 +12,7 @@ export const DIFFICULTIES = [1, 2, 4]
 export const STATUS = {
   PLAYING: 'PLAYING',
   WON: 'WON',
+  LOST: 'LOST',
 }
 
 /** 难度 → 八副牌的花色序列(1 色简单 / 2 色普通 / 4 色困难) */
@@ -117,12 +118,13 @@ const collectCompleted = (state) => {
     pile.splice(-SEQUENCE_LEN, SEQUENCE_LEN)
     state.completed += 1
     gained += 100
+    // 收走一整组后,列底可能露出背面牌,必须立刻翻开,否则这一列会永远卡住
+    if (pile.length && !pile[pile.length - 1].faceUp) {
+      pile[pile.length - 1].faceUp = true
+      gained += 5
+    }
   }
   return gained
-}
-
-const finishCheck = (state) => {
-  if (state.completed >= COMPLETE_TARGET) state.status = STATUS.WON
 }
 
 /**
@@ -153,8 +155,7 @@ export function move(state, from, to) {
   gained += collectCompleted(next)
   next.moves = state.moves + 1
   next.score = state.score + gained
-  finishCheck(next)
-  return next
+  return settle(next)
 }
 
 /** 牌堆还能不能发:有空列时不允许(标准规则) */
@@ -173,8 +174,7 @@ export function dealStock(state) {
   const gained = collectCompleted(next)
   next.moves = state.moves + 1
   next.score = state.score + gained
-  finishCheck(next)
-  return next
+  return settle(next)
 }
 
 /** 双点自动移动:优先同花色接续,其次任意可接列(整列搬到空列视为无意义) */
@@ -200,6 +200,87 @@ export function isWon(state) {
   return !!state && state.completed >= COMPLETE_TARGET
 }
 
+/** 是否还有可搬运的合法移动(整列搬到空列视为无意义) */
+function hasAnyMove(state) {
+  for (let from = 0; from < COLUMNS; from++) {
+    const pile = state.tableau[from]
+    for (let index = 0; index < pile.length; index++) {
+      if (!pile[index].faceUp) continue
+      const cards = sequenceAt(state, from, index)
+      if (!cards) continue
+      for (let to = 0; to < COLUMNS; to++) {
+        if (to === from) continue
+        const target = state.tableau[to]
+        const top = target.length ? target[target.length - 1] : null
+        if (!canStackOnTableau(top, cards[0])) continue
+        if (!top && index === 0) continue
+        return true
+      }
+    }
+  }
+  return false
+}
+
+/**
+ * 无路可走判定:既不能发新牌,也没有任何合法搬运。
+ * 只做保守判定,有任何一步能走都不算输。
+ */
+export function isStuck(state) {
+  if (!state || state.status !== STATUS.PLAYING) return false
+  if (isWon(state)) return false
+  const total = state.stock.length + state.tableau.reduce((n, pile) => n + pile.length, 0) + state.completed * SEQUENCE_LEN
+  if (total !== 104) return false
+  if (canDealStock(state)) return false
+  return !hasAnyMove(state)
+}
+
+/** 结算通关 / 无路可走,写回 status */
+function settle(state) {
+  if (isWon(state)) state.status = STATUS.WON
+  else if (isStuck(state)) state.status = STATUS.LOST
+  return state
+}
+
+/**
+ * 给出一个建议走法:优先搬走能露出背面牌的序列,其次同花色接续,最后才发新牌。
+ * 返回 {from,to} 或 {kind:'deal'};没有建议时返回 null。
+ */
+export function findHint(state) {
+  if (!state || state.status !== STATUS.PLAYING) return null
+  let best = null
+  let bestScore = -1
+  for (let from = 0; from < COLUMNS; from++) {
+    const pile = state.tableau[from]
+    for (let index = 0; index < pile.length; index++) {
+      if (!pile[index].faceUp) continue
+      const cards = sequenceAt(state, from, index)
+      if (!cards) continue
+      for (let to = 0; to < COLUMNS; to++) {
+        if (to === from) continue
+        const target = state.tableau[to]
+        const top = target.length ? target[target.length - 1] : null
+        if (!canStackOnTableau(top, cards[0])) continue
+        if (!top && index === 0) continue
+        let score = Math.min(cards.length, 10)
+        if (index > 0 && !pile[index - 1].faceUp) score += 100
+        if (top && top.suit === cards[0].suit) score += 50
+        if (index > 0) score += 20
+        if (top) score += 10
+        if (score > bestScore) {
+          bestScore = score
+          best = {
+            from: { type: 'tableau', pile: from, index },
+            to: { type: 'tableau', pile: to },
+          }
+        }
+      }
+    }
+  }
+  if (best) return best
+  if (canDealStock(state)) return { kind: 'deal' }
+  return null
+}
+
 const isCard = (c) =>
   !!c &&
   Number.isInteger(c.id) &&
@@ -215,7 +296,7 @@ const isCard = (c) =>
 export function isValidState(raw) {
   if (!raw || typeof raw !== 'object') return false
   if (!DIFFICULTIES.includes(raw.difficulty)) return false
-  if (![STATUS.PLAYING, STATUS.WON].includes(raw.status)) return false
+  if (![STATUS.PLAYING, STATUS.WON, STATUS.LOST].includes(raw.status)) return false
   if (!Number.isInteger(raw.moves) || raw.moves < 0) return false
   if (!Number.isInteger(raw.score) || raw.score < 0) return false
   if (!Number.isInteger(raw.completed) || raw.completed < 0 || raw.completed > COMPLETE_TARGET) return false

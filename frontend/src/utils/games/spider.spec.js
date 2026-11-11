@@ -8,6 +8,8 @@ import {
   createDeck,
   deal,
   dealStock,
+  findHint,
+  isStuck,
   isValidState,
   isWon,
   move,
@@ -129,6 +131,35 @@ describe('蜘蛛纸牌发牌堆', () => {
     expect(next.stock).toHaveLength(0)
     expect(next.tableau.every((p) => p.length === 2 && p[1].faceUp)).toBe(true)
     expect(next.moves).toBe(1)
+  })
+})
+
+describe('蜘蛛纸牌收组翻牌', () => {
+  it('收走一组 K→A 后,列底被压住的背面牌会立即翻开', () => {
+    const state = blankState()
+    state.tableau[1] = [card('C', 9, false, 90)]
+    for (let i = 0; i < 12; i++) state.tableau[1].push(card('S', 13 - i, true, i))
+    state.tableau[0] = [card('S', 1, true, 20)]
+    const next = move(state, { type: 'tableau', pile: 0, index: 0 }, { type: 'tableau', pile: 1 })
+    expect(next.completed).toBe(1)
+    expect(next.tableau[1]).toHaveLength(1)
+    expect(next.tableau[1][0].faceUp).toBe(true)
+  })
+
+  it('没有可搬运的牌且不能发牌时判输', () => {
+    const deck = createDeck(4)
+    const tops = deck.filter((c) => c.rank === 2)
+    tops.push(...deck.filter((c) => c.rank === 4).slice(0, COLUMNS - tops.length))
+    const topIds = new Set(tops.map((c) => c.id))
+    const rest = deck.filter((c) => !topIds.has(c.id))
+    const state = blankState()
+    state.difficulty = 4
+    state.stock = []
+    state.tableau = Array.from({ length: COLUMNS }, () => [])
+    rest.forEach((c, i) => state.tableau[i % COLUMNS].push({ ...c, faceUp: true }))
+    tops.forEach((top, i) => state.tableau[i].push({ ...top, faceUp: true }))
+    expect(isStuck(state)).toBe(true)
+    expect(findHint(state)).toBeNull()
   })
 })
 

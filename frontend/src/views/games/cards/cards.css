@@ -71,6 +71,9 @@
   width: 104px;
   margin-right: auto;
 }
+.fc-hint {
+  margin-right: auto;
+}
 
 .sol-felt {
   flex: 1 1 auto;
@@ -125,7 +128,7 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
   cursor: pointer;
   font-weight: 700;
-  touch-action: manipulation;
+  touch-action: none;
   transition:
     transform 0.16s var(--ease-soft),
     box-shadow 0.16s ease;
@@ -184,6 +187,17 @@
 .sol-found {
   cursor: pointer;
 }
+/* 自由纸牌:顶部一行 4 个自由格 + 4 个花色堆 */
+.fc-top {
+  margin-bottom: 10px;
+}
+.fc-free-empty {
+  cursor: pointer;
+  border-color: rgba(255, 255, 255, 0.28);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: clamp(12px, calc(var(--sol-card-w, 80px) * 0.26), 24px);
+  font-weight: 500;
+}
 .sol-stock {
   cursor: pointer;
   background: repeating-linear-gradient(45deg, #2c5f9e 0 6px, #244f85 6px 12px), #244f85;
@@ -208,6 +222,142 @@
 }
 .sol-spacer {
   pointer-events: none;
+}
+/* 废牌堆扇形展开:一次翻三张时能直接看出翻了几张,只有最右(最上)那张可操作 */
+.sol-waste-slot {
+  position: relative;
+  height: calc(var(--sol-card-w, 80px) * 1.4);
+}
+.sol-waste-card {
+  --fan-index: 0;
+  position: absolute;
+  top: 0;
+  left: calc(var(--fan-index, 0) * var(--sol-card-w, 80px) * 0.26);
+  width: 100%;
+  transition: left 0.16s var(--ease-soft);
+}
+.sol-waste-card:not(.is-top) {
+  pointer-events: none;
+}
+.sol-waste-card.is-top {
+  z-index: 3;
+}
+
+/* 提示:源牌泛蓝,目标列/花色堆虚线泛绿,牌堆发黄 */
+.sol-cardface.hint-source {
+  outline: 3px solid #56ccf2;
+  outline-offset: -3px;
+  box-shadow:
+    0 0 0 3px rgba(86, 204, 242, 0.38),
+    0 4px 10px rgba(0, 0, 0, 0.3);
+}
+.sol-pile.hint-target,
+.sol-slot.hint-target {
+  outline: 2px dashed #7fe0a0;
+  outline-offset: 2px;
+  border-radius: 7px;
+}
+.sol-stock.hint-source,
+.sol-empty.hint-source {
+  outline: 3px solid #ffd166;
+  outline-offset: 2px;
+}
+
+/* 拖拽幽灵:由 useCardDrag 定位,层级走全局 --z-immersive */
+.card-drag-ghost {
+  position: fixed;
+  z-index: var(--z-immersive);
+  width: var(--sol-card-w, 80px);
+  height: calc(var(--sol-card-w, 80px) * 1.4);
+  pointer-events: none;
+  filter: drop-shadow(0 14px 18px rgba(0, 0, 0, 0.28));
+  transform: rotate(-1.5deg);
+}
+.card-drag-ghost-card {
+  position: absolute;
+  left: 0;
+  width: 100%;
+}
+body.card-dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+body.card-dragging .sol-cardface {
+  cursor: grabbing;
+}
+
+/* 扑克牌正面:点数图案按牌宽缩放 */
+.pc-face {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.pc-corner {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 0.95;
+  font-weight: 800;
+  font-size: clamp(7px, calc(var(--sol-card-w, 80px) * 0.155), 16px);
+}
+.pc-corner i {
+  font-style: normal;
+  font-size: 0.9em;
+}
+.pc-corner-tl {
+  top: 3.5%;
+  left: 5%;
+}
+.pc-corner-br {
+  right: 5%;
+  bottom: 3.5%;
+  transform: rotate(180deg);
+}
+.pc-pips {
+  position: absolute;
+  inset: 13% 12%;
+}
+.pc-pip {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-style: normal;
+  line-height: 1;
+  font-size: clamp(7px, calc(var(--sol-card-w, 80px) * 0.13), 18px);
+}
+.pc-pips.pc-dense .pc-pip {
+  font-size: clamp(6px, calc(var(--sol-card-w, 80px) * 0.11), 15px);
+}
+.pc-pips.pc-ace .pc-pip {
+  font-size: clamp(18px, calc(var(--sol-card-w, 80px) * 0.42), 52px);
+}
+.pc-court {
+  position: absolute;
+  inset: 14% 15%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pc-court-frame {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4%;
+  width: 100%;
+  height: 100%;
+  border: 1px solid rgba(42, 42, 42, 0.2);
+  border-radius: calc(var(--sol-card-w, 80px) * 0.06);
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.9), rgba(0, 0, 0, 0.05));
+}
+.pc-court-frame b {
+  font-size: clamp(16px, calc(var(--sol-card-w, 80px) * 0.38), 46px);
+  line-height: 1;
+}
+.pc-court-frame i {
+  font-style: normal;
+  font-size: clamp(10px, calc(var(--sol-card-w, 80px) * 0.2), 24px);
+  line-height: 1;
 }
 .sol-tip {
   flex: 0 0 auto;
@@ -316,6 +466,12 @@
   font-size: 14px;
   font-weight: 700;
   color: #e0933a;
+}
+.sol-overlay-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
 }
 
 html.dark .sol-stat {

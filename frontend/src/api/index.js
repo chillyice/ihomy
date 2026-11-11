@@ -346,6 +346,7 @@ export const gameApi = {
   minesweeperReward: () => request.post('/game/minesweeper/reward'),
   solitaireReward: () => request.post('/game/solitaire/reward'),
   spiderReward: () => request.post('/game/spider/reward'),
+  freecellReward: () => request.post('/game/freecell/reward'),
   tetrisReward: () => request.post('/game/tetris/reward'),
   snakeReward: () => request.post('/game/snake/reward'),
   // GBA 存档落在游戏目录的 saves/ 下,列表按最后修改时间倒序

@@ -9,6 +9,8 @@ import {
   createDeck,
   deal,
   drawStock,
+  findHint,
+  isStuck,
   isWon,
   isValidState,
   move,
@@ -192,6 +194,43 @@ describe('纸牌接龙自动操作', () => {
     expect(next.foundations.C).toHaveLength(1)
     expect(next.status).toBe(STATUS.PLAYING)
     expect(autoFinish(next)).toBe(next)
+  })
+})
+
+describe('纸牌接龙提示与无路可走', () => {
+  it('优先提示收进花色堆', () => {
+    const state = blankState()
+    state.foundations.S = [card('S', 1)]
+    state.tableau[0] = [card('S', 2)]
+    const hint = findHint(state)
+    expect(hint.to).toEqual({ type: 'foundation', suit: 'S' })
+  })
+
+  it('没有可搬的牌时提示翻牌堆', () => {
+    const state = blankState()
+    state.stock = [{ ...card('S', 1), faceUp: false }]
+    const hint = findHint(state)
+    expect(hint).toEqual({ kind: 'draw' })
+  })
+
+  it('52 张全在桌面且没有任何合法移动时判输', () => {
+    const deck = createDeck()
+    const tops = [card('S', 2), card('H', 2), card('D', 2), card('C', 2), card('S', 4), card('H', 4), card('D', 4)]
+    const topKeys = new Set(tops.map((c) => `${c.suit}${c.rank}`))
+    const rest = deck.filter((c) => !topKeys.has(`${c.suit}${c.rank}`))
+    const state = blankState()
+    const groups = Array.from({ length: 7 }, () => [])
+    rest.forEach((c, i) => groups[i % 7].push(c))
+    tops.forEach((top, i) => groups[i].push(top))
+    state.tableau = groups
+    expect(isStuck(state)).toBe(true)
+    expect(findHint(state)).toBeNull()
+  })
+
+  it('还能翻牌或收花色堆时不算输', () => {
+    const state = blankState()
+    state.stock = [{ ...card('S', 1), faceUp: false }]
+    expect(isStuck(state)).toBe(false)
   })
 })
 

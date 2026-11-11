@@ -11,6 +11,7 @@ export const DRAW_COUNTS = [1, 3]
 export const STATUS = {
   PLAYING: 'PLAYING',
   WON: 'WON',
+  LOST: 'LOST',
 }
 
 export const cardColor = (card) => (RED_SUITS.has(card.suit) ? 'red' : 'black')
@@ -167,8 +168,7 @@ export function move(state, from, to) {
 
   next.moves = state.moves + 1
   next.score = Math.max(0, state.score + gained)
-  if (SUITS.every((suit) => next.foundations[suit].length === 13)) next.status = STATUS.WON
-  return next
+  return settle(next)
 }
 
 /** 翻牌堆:有牌就翻 drawCount 张到废牌堆,牌堆空则把废牌堆整体扣回牌堆(扣 20 分) */
@@ -184,7 +184,7 @@ export function drawStock(state) {
       card.faceUp = true
       next.waste.push(card)
     }
-    return next
+    return settle(next)
   }
   if (!next.waste.length) return null
 
@@ -194,7 +194,7 @@ export function drawStock(state) {
     next.stock.push(card)
   }
   next.score = Math.max(0, state.score - 20)
-  return next
+  return settle(next)
 }
 
 /** 双点自动收纳:先试花色堆,再试桌面列(整列搬到空列的无意义移动跳过) */
@@ -249,6 +249,112 @@ export function isWon(state) {
   return SUITS.every((suit) => state.foundations[suit].length === 13)
 }
 
+/** 桌面上从 index 搬走是否会露出背面牌(列内背面牌总在正面牌之前) */
+const revealsHidden = (pile, index) => index > 0 && !pile[index - 1].faceUp
+
+/** 是否还存在任何合法移动(不含翻牌堆;花色堆回收到桌面视为无意义) */
+function hasAnyMove(state) {
+  if (state.waste.length) {
+    const card = state.waste[state.waste.length - 1]
+    if (canPutOnFoundation(state, card)) return true
+    for (const pile of state.tableau) {
+      const top = pile.length ? pile[pile.length - 1] : null
+      if (canStackOnTableau(top, card)) return true
+    }
+  }
+  for (let pi = 0; pi < state.tableau.length; pi++) {
+    const pile = state.tableau[pi]
+    for (let index = 0; index < pile.length; index++) {
+      if (!pile[index].faceUp) continue
+      const cards = sequenceAt(state, pi, index)
+      if (!cards) continue
+      if (cards.length === 1 && canPutOnFoundation(state, cards[0])) return true
+      for (let pj = 0; pj < state.tableau.length; pj++) {
+        if (pj === pi) continue
+        const target = state.tableau[pj]
+        const top = target.length ? target[target.length - 1] : null
+        if (!canStackOnTableau(top, cards[0])) continue
+        if (!top && index === 0) continue
+        return true
+      }
+    }
+  }
+  return false
+}
+
+/** 无路可走判定:牌堆与废牌堆都空(再也翻不出牌)且桌面/花色堆都没有合法移动。
+ * 只做保守判定——只要还能翻牌或还有一步可走,就不算输。 */
+export function isStuck(state) {
+  if (!state || state.status !== STATUS.PLAYING) return false
+  if (isWon(state)) return false
+  const total =
+    state.stock.length +
+    state.waste.length +
+    state.tableau.reduce((n, pile) => n + pile.length, 0) +
+    SUITS.reduce((n, suit) => n + state.foundations[suit].length, 0)
+  if (total !== 52) return false
+  if (state.stock.length || state.waste.length) return false
+  return !hasAnyMove(state)
+}
+
+/** 结算通关 / 无路可走,写回 status */
+function settle(state) {
+  if (isWon(state)) state.status = STATUS.WON
+  else if (isStuck(state)) state.status = STATUS.LOST
+  return state
+}
+
+/**
+ * 给出一个建议走法:优先收进花色堆,其次是能露出背面牌的搬运,最后才翻牌堆。
+ * 返回 {from,to} 或 {kind:'draw'};没有建议时返回 null。
+ */
+export function findHint(state) {
+  if (!state || state.status !== STATUS.PLAYING) return null
+  const candidates = []
+  const add = (score, from, to) => candidates.push({ score, from, to })
+
+  if (state.waste.length) {
+    const card = state.waste[state.waste.length - 1]
+    if (canPutOnFoundation(state, card)) add(120, { type: 'waste' }, { type: 'foundation', suit: card.suit })
+    for (let pi = 0; pi < state.tableau.length; pi++) {
+      const pile = state.tableau[pi]
+      const top = pile.length ? pile[pile.length - 1] : null
+      if (!canStackOnTableau(top, card)) continue
+      add(top ? 80 : 60, { type: 'waste' }, { type: 'tableau', pile: pi })
+    }
+  }
+
+  for (let pi = 0; pi < state.tableau.length; pi++) {
+    const pile = state.tableau[pi]
+    for (let index = 0; index < pile.length; index++) {
+      if (!pile[index].faceUp) continue
+      const cards = sequenceAt(state, pi, index)
+      if (!cards) continue
+      if (cards.length === 1 && canPutOnFoundation(state, cards[0])) {
+        add(110, { type: 'tableau', pile: pi, index }, { type: 'foundation', suit: cards[0].suit })
+      }
+      for (let pj = 0; pj < state.tableau.length; pj++) {
+        if (pj === pi) continue
+        const target = state.tableau[pj]
+        const top = target.length ? target[target.length - 1] : null
+        if (!canStackOnTableau(top, cards[0])) continue
+        if (!top && index === 0) continue
+        let score = 50
+        if (revealsHidden(pile, index)) score += 40
+        if (!top) score -= 10
+        add(score, { type: 'tableau', pile: pi, index }, { type: 'tableau', pile: pj })
+      }
+    }
+  }
+
+  if (candidates.length) {
+    candidates.sort((a, b) => b.score - a.score)
+    return { from: candidates[0].from, to: candidates[0].to }
+  }
+  if (state.stock.length || state.waste.length) return { kind: 'draw' }
+  return null
+}
+
 const isCard = (c) =>
   !!c &&
   Number.isInteger(c.id) &&
@@ -268,7 +374,7 @@ const isOrderedRun = (pile) => {
 /** 读档校验:52 张 id 不重不漏、牌堆/废牌堆朝向正确、桌面列正面牌连续收尾、花色堆从 A 起升序 */
 export function isValidState(raw) {
   if (!raw || typeof raw !== 'object') return false
-  if (![STATUS.PLAYING, STATUS.WON].includes(raw.status)) return false
+  if (![STATUS.PLAYING, STATUS.WON, STATUS.LOST].includes(raw.status)) return false
   if (!Number.isInteger(raw.moves) || raw.moves < 0) return false
   if (!Number.isInteger(raw.score) || raw.score < 0) return false
   if (!DRAW_COUNTS.includes(raw.drawCount)) return false

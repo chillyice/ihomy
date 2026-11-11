@@ -36,7 +36,7 @@
           </div>
           <div class="cards-lobby-desc">{{ $t(g.descKey) }}</div>
           <div class="cards-lobby-best">
-            <template v-if="bestOf(g.key) > 0">{{ $t('games.cards.bestScore', { n: bestOf(g.key) }) }}</template>
+            <template v-if="bestOf(g.key) > 0">{{ $t(g.bestLabelKey || 'games.cards.bestScore', { n: bestOf(g.key) }) }}</template>
             <template v-else>{{ $t('games.cards.noBest') }}</template>
           </div>
           <span class="cards-lobby-enter"
@@ -49,7 +49,8 @@
     <!-- 牌桌:固定一屏,牌桌内部再按宽高收缩牌面,页面不再被长牌列顶高 -->
     <div v-else ref="stageEl" class="cards-stage" :style="stageStyle">
       <KlondikeBoard v-if="currentGame === 'klondike'" />
-      <SpiderBoard v-else />
+      <SpiderBoard v-else-if="currentGame === 'spider'" />
+      <FreeCellBoard v-else-if="currentGame === 'freecell'" />
     </div>
   </div>
 </template>
@@ -60,19 +61,27 @@
 // 叠牌步进收进这个高度;大厅展示各玩法最高分与最近在玩标记。
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowRight, Connection, Tickets } from '@element-plus/icons-vue'
+import { ArrowRight, Connection, Grid, Tickets } from '@element-plus/icons-vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import GameTopActions from '@/components/games/GameTopActions.vue'
 import { useGameView } from '@/composables/useGameView'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import KlondikeBoard from './cards/KlondikeBoard.vue'
 import SpiderBoard from './cards/SpiderBoard.vue'
+import FreeCellBoard from './cards/FreeCellBoard.vue'
 import './cards/cards.css'
 
 const LOBBY_KEY = 'ihomy:games:cards:mode:v1'
 const LOBBY_GAMES = [
   { key: 'klondike', titleKey: 'games.solitaire.title', descKey: 'games.solitaire.desc', icon: Tickets },
   { key: 'spider', titleKey: 'games.spider.title', descKey: 'games.spider.desc', icon: Connection },
+  {
+    key: 'freecell',
+    titleKey: 'games.freecell.title',
+    descKey: 'games.freecell.desc',
+    icon: Grid,
+    bestLabelKey: 'games.cards.bestMoves',
+  },
 ]
 const BEST_KEYS = {
   klondike: () => {
@@ -87,6 +96,13 @@ const BEST_KEYS = {
       const raw = JSON.parse(localStorage.getItem('ihomy:games:spider:best:v1') || 'null')
       const values = raw && typeof raw === 'object' ? Object.values(raw) : []
       return { value: values.length ? Math.max(...values) : 0 }
+    } catch (e) {
+      return { value: 0 }
+    }
+  },
+  freecell: () => {
+    try {
+      return { value: Number(localStorage.getItem('ihomy:games:freecell:best:v1')) || 0 }
     } catch (e) {
       return { value: 0 }
     }
@@ -281,7 +297,7 @@ html.theme-warm .cards-page {
   justify-content: center;
   gap: 18px;
   width: 100%;
-  max-width: 720px;
+  max-width: 900px;
 }
 .cards-lobby-card {
   position: relative;

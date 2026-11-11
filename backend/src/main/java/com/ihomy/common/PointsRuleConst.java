@@ -26,6 +26,7 @@ public final class PointsRuleConst {
     public static final String GAME_MINESWEEPER = "game_minesweeper";
     public static final String GAME_SOLITAIRE = "game_solitaire";
     public static final String GAME_SPIDER = "game_spider";
+    public static final String GAME_FREECELL = "game_freecell";
     public static final String GAME_TETRIS = "game_tetris";
     public static final String GAME_SNAKE = "game_snake";
     public static final String GAME_MATCH_WIN = "game_match_win";
@@ -60,6 +61,7 @@ public final class PointsRuleConst {
             new Feature(GAME_MINESWEEPER, GROUP_GAME, 10, true),
             new Feature(GAME_SOLITAIRE, GROUP_GAME, 10, true),
             new Feature(GAME_SPIDER, GROUP_GAME, 10, true),
+            new Feature(GAME_FREECELL, GROUP_GAME, 10, true),
             new Feature(GAME_TETRIS, GROUP_GAME, 10, true),
             new Feature(GAME_SNAKE, GROUP_GAME, 10, true),
             new Feature(GAME_MATCH_WIN, GROUP_GAME, 5, true),

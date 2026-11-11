@@ -260,6 +260,14 @@ public class GameInfoService {
     }
 
     /**
+     * 自由纸牌完成奖励(每日限次口径与其他 H5 小游戏一致)。
+     */
+    public Map<String, Object> freecellReward(Long userId, Long familyId) {
+        return h5GameReward(userId, familyId, PointsRuleConst.GAME_FREECELL, "freecell",
+                GameConst.H5_GAME_DAILY_LIMIT, "自由纸牌完成");
+    }
+
+    /**
      * 俄罗斯方块消行达标奖励(单局消除满 10 行时前端上报,每日限次防刷)。
      */
     public Map<String, Object> tetrisReward(Long userId, Long familyId) {

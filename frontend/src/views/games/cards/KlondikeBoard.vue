@@ -27,6 +27,7 @@
         <el-option :value="1" :label="$t('games.solitaire.draw1')" />
         <el-option :value="3" :label="$t('games.solitaire.draw3')" />
       </el-select>
+      <el-button size="small" round @click="showHint">{{ $t('games.solitaire.hint') }}</el-button>
       <el-button size="small" round :disabled="!history.length" @click="undo">{{ $t('games.solitaire.undo') }}</el-button>
       <el-button size="small" round @click="autoFinishAll">{{ $t('games.solitaire.autoFinish') }}</el-button>
       <el-button type="primary" size="small" round @click="startNew">{{ $t('games.solitaire.newGame') }}</el-button>
@@ -35,90 +36,149 @@
     <div ref="feltEl" class="sol-felt" :style="feltStyle">
       <div class="sol-row sol-top">
         <div class="sol-slot">
-          <div v-if="game.stock.length" class="sol-stock" :aria-label="$t('games.solitaire.stock')" @click="draw">
+          <div
+            v-if="game.stock.length"
+            class="sol-stock"
+            :class="{ 'hint-source': hint && hint.kind === 'draw' }"
+            :aria-label="$t('games.solitaire.stock')"
+            @click="draw"
+          >
             <span class="sol-stock-count">{{ game.stock.length }}</span>
           </div>
-          <div v-else class="sol-empty sol-recycle" :aria-label="$t('games.solitaire.recycle')" @click="draw">↻</div>
-        </div>
-        <div class="sol-slot">
           <div
-            v-if="wasteTop"
-            class="sol-cardface"
-            :class="[cardClass(wasteTop), { selected: selected && selected.type === 'waste' }]"
-            @click="onWasteClick"
+            v-else
+            class="sol-empty sol-recycle"
+            :class="{ 'hint-source': hint && hint.kind === 'draw' }"
+            :aria-label="$t('games.solitaire.recycle')"
+            @click="draw"
           >
-            <span class="sol-corner"
-              >{{ rankLabel(wasteTop.rank) }}<i>{{ SUIT_SYMBOL[wasteTop.suit] }}</i></span
-            >
-            <span class="sol-center">{{ SUIT_SYMBOL[wasteTop.suit] }}</span>
+            ↻
           </div>
+        </div>
+        <div class="sol-slot sol-waste-slot">
+          <template v-if="wasteCards.length">
+            <div
+              v-for="(card, idx) in wasteCards"
+              :key="card.id"
+              class="sol-cardface sol-waste-card"
+              :class="[
+                cardClass(card),
+                {
+                  'is-top': idx === wasteCards.length - 1,
+                  selected: idx === wasteCards.length - 1 && selected && selected.type === 'waste',
+                  'hint-source': idx === wasteCards.length - 1 && hint && hint.from && hint.from.type === 'waste',
+                },
+              ]"
+              :style="{ '--fan-index': idx, zIndex: idx + 1 }"
+              @pointerdown="idx === wasteCards.length - 1 && startDrag({ type: 'waste' }, $event)"
+              @click.stop="idx === wasteCards.length - 1 && onWasteClick()"
+            >
+              <PlayingCard :card="card" />
+            </div>
+          </template>
           <div v-else class="sol-empty"></div>
         </div>
         <div class="sol-slot sol-spacer"></div>
-        <div v-for="suit in SUITS" :key="suit" class="sol-slot">
+        <div
+          v-for="suit in SUITS"
+          :key="suit"
+          class="sol-slot"
+          :class="{ 'hint-target': isFoundationHint(suit) }"
+          data-drop="foundation"
+          :data-suit="suit"
+        >
           <div
             v-if="foundationTop(suit)"
             class="sol-cardface"
             :class="[cardClass(foundationTop(suit)), { selected: selected && selected.type === 'foundation' && selected.suit === suit }]"
+            @pointerdown="startDrag({ type: 'foundation', suit }, $event)"
             @click="onFoundationClick(suit)"
           >
-            <span class="sol-corner"
-              >{{ rankLabel(foundationTop(suit).rank) }}<i>{{ SUIT_SYMBOL[suit] }}</i></span
-            >
-            <span class="sol-center">{{ SUIT_SYMBOL[suit] }}</span>
+            <PlayingCard :card="foundationTop(suit)" />
           </div>
           <div v-else class="sol-empty sol-found" @click="onFoundationClick(suit)">{{ SUIT_SYMBOL[suit] }}</div>
         </div>
       </div>
 
       <div class="sol-row sol-tableau">
-        <div v-for="(pile, pi) in game.tableau" :key="pi" class="sol-pile" @click="onPileClick(pi)">
+        <div
+          v-for="(pile, pi) in game.tableau"
+          :key="pi"
+          class="sol-pile"
+          :class="{ 'hint-target': isPileHint(pi) }"
+          data-drop="tableau"
+          :data-pile="pi"
+          @click="onPileClick(pi)"
+        >
           <div v-if="!pile.length" class="sol-empty"></div>
           <div
             v-for="(card, ci) in pile"
             :key="card.id"
             class="sol-cardface"
-            :class="[cardClass(card), { selected: isSelected(pi, ci) }]"
+            :class="[cardClass(card), { selected: isSelected(pi, ci), 'hint-source': isCardHint(pi, ci) }]"
             :style="ci ? { marginTop: margins[pi][ci - 1] } : null"
+            @pointerdown="onCardPointerDown(pi, ci, card, $event)"
             @click.stop="onCardClick(pi, ci, card)"
           >
-            <template v-if="card.faceUp">
-              <span class="sol-corner"
-                >{{ rankLabel(card.rank) }}<i>{{ SUIT_SYMBOL[card.suit] }}</i></span
-              >
-              <span class="sol-center">{{ SUIT_SYMBOL[card.suit] }}</span>
-            </template>
+            <PlayingCard v-if="card.faceUp" :card="card" />
           </div>
         </div>
       </div>
     </div>
 
-    <div class="sol-tip">{{ $t('games.solitaire.tip') }}</div>
+    <div class="sol-tip">{{ hintNote || $t('games.solitaire.tip') }}</div>
 
     <Transition name="game-overlay">
-      <div v-if="isWon" class="sol-overlay game-overlay">
+      <div v-if="isWon || isLost" class="sol-overlay game-overlay">
         <div class="sol-overlay-card game-overlay-card">
-          <div class="sol-overlay-icon">🏆</div>
-          <div class="sol-overlay-title">{{ $t('games.solitaire.win') }}</div>
-          <div class="sol-overlay-meta">{{ $t('games.solitaire.winMeta', { score: game.score, moves: game.moves }) }}</div>
+          <div class="sol-overlay-icon">{{ isWon ? '🏆' : '🚫' }}</div>
+          <div class="sol-overlay-title">{{ isWon ? $t('games.solitaire.win') : $t('games.solitaire.lose') }}</div>
+          <div class="sol-overlay-meta">
+            {{
+              isWon
+                ? $t('games.solitaire.winMeta', { score: game.score, moves: game.moves })
+                : $t('games.solitaire.loseMeta', { score: game.score, moves: game.moves })
+            }}
+          </div>
           <div v-if="rewardMsg" class="sol-overlay-reward">{{ rewardMsg }}</div>
-          <el-button type="primary" size="small" round @click="startNew">{{ $t('games.solitaire.newGame') }}</el-button>
+          <div class="sol-overlay-actions">
+            <el-button v-if="isLost && history.length" size="small" round @click="undo">{{ $t('games.solitaire.undo') }}</el-button>
+            <el-button type="primary" size="small" round @click="startNew">{{ $t('games.solitaire.newGame') }}</el-button>
+          </div>
         </div>
       </div>
     </Transition>
+
+    <CardDragGhost :drag="drag" />
   </div>
 </template>
 
 <script setup>
-// 纸牌接龙(Klondike):发牌/翻牌/叠牌规则/自动收牌全在 utils/games/solitaire.js(纯函数,单测覆盖)。
-// 本组件负责点选移动、双击自动收纳、撤销快照、计时与最高分;牌宽与叠牌步进来自 utils/games/cardLayout.js,
-// 让牌桌固定在一屏内,叠牌比原先更紧。
+// 纸牌接龙(Klondike):发牌/翻牌/叠牌规则/自动收牌/提示/无路可走判定全在 utils/games/solitaire.js(纯函数,单测覆盖)。
+// 本组件负责点选与拖动移动、双击自动收纳、撤销快照、计时与最高分;牌宽与叠牌步进来自 utils/games/cardLayout.js,
+// 拖拽落点由 useCardDrag 通过 [data-drop] 容器识别,牌面图案统一交给 PlayingCard 渲染。
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { gameApi } from '@/api'
+import PlayingCard from '@/components/games/PlayingCard.vue'
+import { useCardDrag } from '@/composables/useCardDrag'
 import { formatClock } from '@/utils/games/gameClock'
 import { CARD_RATIO, fitCardWidth, pileSteps } from '@/utils/games/cardLayout'
-import { STATUS, SUITS, autoFinish, autoMove, cardColor, cloneState, deal, drawStock, isValidState, move } from '@/utils/games/solitaire'
+import {
+  STATUS,
+  SUITS,
+  autoFinish,
+  autoMove,
+  cardColor,
+  cloneState,
+  deal,
+  drawStock,
+  findHint,
+  isValidState,
+  move,
+  sourceCards,
+} from '@/utils/games/solitaire'
+import CardDragGhost from './CardDragGhost.vue'
 
 const BEST_KEY = 'ihomy:games:solitaire:best:v1'
 const STATE_KEY = 'ihomy:games:solitaire:state:v1'
@@ -140,18 +200,37 @@ const rewardMsg = ref('')
 const selected = ref(null)
 const history = ref([])
 const drawCount = ref(1)
+const hint = ref(null)
+const hintNote = ref('')
 
 const isWon = computed(() => game.value.status === STATUS.WON)
+const isLost = computed(() => game.value.status === STATUS.LOST)
 const wasteTop = computed(() => game.value.waste[game.value.waste.length - 1] || null)
+const wasteCards = computed(() => {
+  const count = Math.min(game.value.drawCount, 3)
+  return game.value.waste.slice(-count)
+})
 const foundationTop = (suit) => {
   const pile = game.value.foundations[suit]
   return pile && pile.length ? pile[pile.length - 1] : null
 }
 
-const rankLabel = (rank) => ({ 1: 'A', 11: 'J', 12: 'Q', 13: 'K' })[rank] || String(rank)
 const cardClass = (card) => ({ red: card.faceUp && cardColor(card) === 'red', back: !card.faceUp })
 const isSelected = (pile, index) =>
   !!selected.value && selected.value.type === 'tableau' && selected.value.pile === pile && index >= selected.value.index
+
+const isCardHint = (pile, index) => {
+  const from = hint.value && hint.value.from
+  return !!from && from.type === 'tableau' && from.pile === pile && index >= from.index
+}
+const isPileHint = (pile) => {
+  const to = hint.value && hint.value.to
+  return !!to && to.type === 'tableau' && to.pile === pile
+}
+const isFoundationHint = (suit) => {
+  const to = hint.value && hint.value.to
+  return !!to && to.type === 'foundation' && to.suit === suit
+}
 
 // ---------- 一屏布局:牌宽随可用宽高收缩,叠牌步进按列长分配 ----------
 const gap = computed(() => (feltSize.value.w > 0 && feltSize.value.w < 560 ? 4 : 6))
@@ -238,7 +317,7 @@ const loadState = () => {
   try {
     const raw = JSON.parse(localStorage.getItem(STATE_KEY) || 'null')
     if (!raw || !isValidState(raw.game) || !Number.isInteger(raw.elapsed) || raw.elapsed < 0) return false
-    if (raw.game.status === STATUS.WON) return false
+    if (raw.game.status !== STATUS.PLAYING) return false
     game.value = raw.game
     elapsed.value = raw.elapsed
     drawCount.value = raw.game.drawCount
@@ -248,9 +327,33 @@ const loadState = () => {
   }
 }
 
+// ---------- 提示 ----------
+let hintTimer = null
+const clearHint = () => {
+  if (hintTimer) {
+    clearTimeout(hintTimer)
+    hintTimer = null
+  }
+  hint.value = null
+  hintNote.value = ''
+}
+const showHint = () => {
+  if (game.value.status !== STATUS.PLAYING) return
+  clearHint()
+  const next = findHint(game.value)
+  hint.value = next
+  if (!next) hintNote.value = t('games.cards.hintNone')
+  hintTimer = setTimeout(() => {
+    hint.value = null
+    hintNote.value = ''
+    hintTimer = null
+  }, 3200)
+}
+
 // ---------- 游戏流程 ----------
 const startNew = () => {
   stopTimer()
+  clearHint()
   game.value = deal(drawCount.value)
   history.value = []
   selected.value = null
@@ -283,26 +386,39 @@ const finishWin = () => {
   grantReward()
 }
 
+// 输局不写最高分,也不保留存档,避免重进后直接卡在死局
+const finishLose = () => {
+  stopTimer()
+  clearHint()
+  clearState()
+  selected.value = null
+}
+
 const commit = (next) => {
   if (!next || next === game.value) return false
   history.value.push(cloneState(game.value))
   if (history.value.length > MAX_HISTORY) history.value.shift()
   game.value = next
+  clearHint()
   if (game.value.status === STATUS.WON) finishWin()
+  else if (game.value.status === STATUS.LOST) finishLose()
   else saveState()
   return true
 }
 
 const draw = () => {
   if (game.value.status !== STATUS.PLAYING) return
+  if (shouldIgnoreClick()) return
   selected.value = null
   commit(drawStock(game.value))
 }
 
 const undo = () => {
-  if (isWon.value || !history.value.length) return
+  if (game.value.status === STATUS.WON || !history.value.length) return
+  clearHint()
   game.value = history.value.pop()
   selected.value = null
+  startTimer()
   if (game.value.score > best.value) {
     best.value = game.value.score
     saveBest()
@@ -316,6 +432,17 @@ const autoFinishAll = () => {
   commit(autoFinish(game.value))
 }
 
+// ---------- 拖动 ----------
+const { drag, startDrag, shouldIgnoreClick, cancelDrag } = useCardDrag({
+  getCards: (from) => sourceCards(game.value, from),
+  onDrop: (from, to) => {
+    if (!to || game.value.status !== STATUS.PLAYING) return
+    selected.value = null
+    if (to.type === 'foundation') commit(move(game.value, from, { type: 'foundation', suit: to.suit }))
+    else if (to.type === 'tableau') commit(move(game.value, from, { type: 'tableau', pile: to.pile }))
+  },
+})
+
 // ---------- 点击与双击 ----------
 let lastTapKey = ''
 let lastTapAt = 0
@@ -328,6 +455,7 @@ const isDoubleTap = (key) => {
 }
 
 const onWasteClick = () => {
+  if (shouldIgnoreClick()) return
   if (game.value.status !== STATUS.PLAYING) return
   if (isDoubleTap('waste')) {
     selected.value = null
@@ -338,6 +466,7 @@ const onWasteClick = () => {
 }
 
 const onFoundationClick = (suit) => {
+  if (shouldIgnoreClick()) return
   if (game.value.status !== STATUS.PLAYING) return
   if (selected.value) {
     const next = move(game.value, selected.value, { type: 'foundation', suit })
@@ -348,7 +477,13 @@ const onFoundationClick = (suit) => {
   if (foundationTop(suit)) selected.value = { type: 'foundation', suit }
 }
 
+const onCardPointerDown = (pile, index, card, event) => {
+  if (game.value.status !== STATUS.PLAYING || !card.faceUp) return
+  startDrag({ type: 'tableau', pile, index }, event)
+}
+
 const onCardClick = (pile, index, card) => {
+  if (shouldIgnoreClick()) return
   if (game.value.status !== STATUS.PLAYING) return
   if (!card.faceUp) return
   if (isDoubleTap(`t${pile}-${index}`)) {
@@ -371,6 +506,7 @@ const onCardClick = (pile, index, card) => {
 }
 
 const onPileClick = (pile) => {
+  if (shouldIgnoreClick()) return
   if (!selected.value || game.value.status !== STATUS.PLAYING) return
   const from = selected.value
   selected.value = null
@@ -395,6 +531,7 @@ watch(drawCount, (value) => {
   if (game.value.drawCount === value) return
   game.value = { ...game.value, drawCount: value }
   selected.value = null
+  clearHint()
   saveState()
 })
 
@@ -419,7 +556,9 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   stopTimer()
-  if (!isWon.value) saveState()
+  clearHint()
+  cancelDrag()
+  if (game.value.status === STATUS.PLAYING) saveState()
   document.removeEventListener('visibilitychange', onVisibility)
   window.removeEventListener('resize', onResize)
   resizeObserver?.disconnect()
