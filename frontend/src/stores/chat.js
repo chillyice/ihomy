@@ -9,6 +9,8 @@ import { createChatSocket, SOCKET_STATUS } from '@/composables/useChatSocket'
 import { serializePayload, mergeMessages } from '@/utils/chatMsg'
 import { useCallStore } from '@/stores/call'
 import { rewriteAssetUrls } from '@/utils/assetUrl'
+import { ensureFreshToken } from '@/api/request'
+import { isNativeApp } from '@/utils/platform'
 
 let socket = null
 let wired = false
@@ -20,6 +22,12 @@ let gameSignalListeners = []
 let historyPromise = null
 /** 登出/换号时递增:在途历史请求回来后按旧世代丢弃,避免把上个账号的消息写进清空后的缓存 */
 let historyGen = 0
+/** 前后台监听只装一次(visibilitychange / pageshow / online / 原生 appStateChange) */
+let lifecycleInstalled = false
+/** 切后台的时刻:回前台按离开时长决定要不要重建连接 */
+let hiddenAt = 0
+/** 最近一次回前台处理时间:原生壳里 visibilitychange 与 appStateChange 会前后脚都触发 */
+let lastWakeAt = 0
 
 /** 本地保留的消息条数上限(更早的靠 /chat/history 翻页) */
 const KEEP_MESSAGES = 200
@@ -54,7 +62,76 @@ export const useChatStore = defineStore('chat', {
         socket = this.createSocket()
         this.wire(userStore)
       }
+      // 冷启动/长挂后台后 access token 可能已过期,而 WS 握手不走 HTTP 预检:
+      // 先触发共享续期,续期成功后由 token 监听重建连接(本次仍先连,失败交给退避)
+      ensureFreshToken()
       socket.connect()
+    },
+
+    /**
+     * 回到前台/恢复可见:锁屏或切后台期间 WebView 的定时器被系统挂起,旧连接多已僵死却收不到 close,
+     * 只靠指数退避最长要等 60s 才重连(用户表现为「App 连不上聊天室」)。
+     * 这里直接重建连接,连接成功后的 open 事件会补拉断档期间的历史与未读数。
+     */
+    async wake() {
+      const userStore = useUserStore()
+      if (!userStore.isLoggedIn) return
+      const now = Date.now()
+      // 原生壳锁屏/解锁时 visibilitychange 与 appStateChange 会前后脚都触发,只处理第一次
+      if (now - lastWakeAt < 2000) return
+      lastWakeAt = now
+      const away = hiddenAt ? now - hiddenAt : Infinity
+      hiddenAt = 0
+      if (!socket) {
+        this.ensureConnected()
+        return
+      }
+      // 极短的切换(系统权限弹窗/键盘弹出)不值得重建,连接还在就直接用
+      if (away < 1500 && socket.status.value === SOCKET_STATUS.OPEN) return
+      // 后台期间 access token 可能已过期:WS 握手不走 HTTP 预检,拿过期令牌会一直握手失败。
+      // 续期成功会改 token,由 wire() 里的 token 监听自动重建连接
+      if (await ensureFreshToken()) return
+      socket.reconnectNow()
+    },
+
+    /** 切后台(仅原生壳调用):静默断开不排重连;Web 后台标签页仍能收消息,不打断 */
+    sleep() {
+      hiddenAt = Date.now()
+      // 通话中的挂断/信令要一直在线,后台不主动断开(媒体本身是 P2P)
+      if (useCallStore().inCall) return
+      if (socket) socket.suspend()
+    },
+
+    /** 装全局前后台监听(只装一次):回前台立即重连,原生壳切后台暂停连接 */
+    installLifecycle() {
+      if (lifecycleInstalled || typeof window === 'undefined') return
+      lifecycleInstalled = true
+      const native = isNativeApp()
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          // 原生壳锁屏/切后台时提前断开,避免 Doze 下留下半开连接
+          if (native) this.sleep()
+        } else {
+          this.wake()
+        }
+      })
+      // 从往返缓存(bfcache)恢复:页面没有重新挂载,连接同样需要确认
+      window.addEventListener('pageshow', (e) => {
+        if (e.persisted) this.wake()
+      })
+      // 断网恢复:退避计时器可能已被打断,直接重连
+      window.addEventListener('online', () => this.wake())
+      if (native) {
+        // 原生壳最可靠的信号:锁屏/切后台/回前台都走 appStateChange
+        import('@capacitor/app')
+          .then(({ App }) => {
+            App.addListener('appStateChange', ({ isActive }) => {
+              if (isActive) this.wake()
+              else this.sleep()
+            })
+          })
+          .catch((e) => console.warn('[chat] 前后台监听装配失败', e))
+      }
     },
 
     createSocket() {
@@ -94,6 +171,7 @@ export const useChatStore = defineStore('chat', {
     wire(userStore) {
       if (wired) return
       wired = true
+      this.installLifecycle()
       watch(
         () => userStore.isLoggedIn,
         (loggedIn) => {
@@ -233,6 +311,8 @@ export const useChatStore = defineStore('chat', {
       historyGen += 1
       historyPromise = null
       wsEverOpened = false
+      hiddenAt = 0
+      lastWakeAt = 0
       if (socket) {
         socket.disconnect()
         socket = null

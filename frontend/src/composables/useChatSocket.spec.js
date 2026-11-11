@@ -152,4 +152,71 @@ describe('createChatSocket', () => {
     sock.connect()
     expect(FakeWebSocket.instances.length).toBe(1)
   })
+
+  it('reconnectNow:立即重建连接并丢弃旧 socket', () => {
+    const sock = make()
+    let closed = 0
+    sock.on('close', () => (closed += 1))
+    sock.connect()
+    const first = FakeWebSocket.instances[0]
+    first.open()
+    sock.reconnectNow()
+    expect(first.readyState).toBe(3)
+    expect(FakeWebSocket.instances.length).toBe(2)
+    expect(sock.status.value).toBe(SOCKET_STATUS.CONNECTING)
+    // 主动重建不算异常断开,不发 close(避免界面闪一下「已断开」)
+    expect(closed).toBe(0)
+    FakeWebSocket.instances[1].open()
+    expect(sock.status.value).toBe(SOCKET_STATUS.OPEN)
+  })
+
+  it('退避等待中 reconnectNow 立即重连,失败计数归零', () => {
+    const sock = make()
+    sock.connect()
+    FakeWebSocket.instances[0].die()
+    vi.advanceTimersByTime(3000)
+    FakeWebSocket.instances[1].die()
+    vi.advanceTimersByTime(1)
+    expect(FakeWebSocket.instances.length).toBe(2)
+    // 不等 6s 退避,立刻重连
+    sock.reconnectNow()
+    expect(FakeWebSocket.instances.length).toBe(3)
+    // 计数归零后再次断开仍从 3s 起步(而不是接着翻倍)
+    FakeWebSocket.instances[2].die()
+    vi.advanceTimersByTime(2999)
+    expect(FakeWebSocket.instances.length).toBe(3)
+    vi.advanceTimersByTime(1)
+    expect(FakeWebSocket.instances.length).toBe(4)
+  })
+
+  it('suspend:静默断开且不排重连,之后 reconnectNow 可恢复', () => {
+    const sock = make()
+    let closed = 0
+    sock.on('close', () => (closed += 1))
+    sock.connect()
+    const ws = FakeWebSocket.instances[0]
+    ws.open()
+    sock.suspend()
+    expect(ws.readyState).toBe(3)
+    expect(sock.status.value).toBe(SOCKET_STATUS.CLOSED)
+    expect(closed).toBe(1)
+    vi.advanceTimersByTime(300000)
+    expect(FakeWebSocket.instances.length).toBe(1)
+    sock.reconnectNow()
+    expect(FakeWebSocket.instances.length).toBe(2)
+    FakeWebSocket.instances[1].open()
+    expect(sock.status.value).toBe(SOCKET_STATUS.OPEN)
+  })
+
+  it('disconnect 之后 reconnectNow / suspend 不再建连', () => {
+    const sock = make()
+    sock.connect()
+    FakeWebSocket.instances[0].open()
+    sock.disconnect()
+    sock.reconnectNow()
+    sock.suspend()
+    vi.advanceTimersByTime(300000)
+    expect(FakeWebSocket.instances.length).toBe(1)
+    expect(sock.status.value).toBe(SOCKET_STATUS.IDLE)
+  })
 })

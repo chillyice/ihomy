@@ -118,6 +118,53 @@ export function createChatSocket({
     }
   }
 
+  /** 静默丢弃当前 socket:先摘回调再关,不触发 close 事件、不排重连 */
+  const dropSocket = () => {
+    stopHeartbeat()
+    if (!ws) return
+    const old = ws
+    ws = null
+    old.onopen = null
+    old.onmessage = null
+    old.onclose = null
+    old.onerror = null
+    try {
+      old.close()
+    } catch {
+      /* 已关闭/正在关闭:忽略 */
+    }
+  }
+
+  /**
+   * 回到前台时立即重建连接(不等指数退避)。
+   * 锁屏/切后台期间 JS 定时器被系统挂起,旧连接多已僵死但收不到 close,
+   * 只靠退避重连最长要等 60s,用户看到的就是「连不上聊天室」。
+   */
+  const reconnectNow = () => {
+    if (disposed) return
+    retryCount = 0
+    if (retryTimer) {
+      clearTimeout(retryTimer)
+      retryTimer = null
+    }
+    dropSocket()
+    status.value = SOCKET_STATUS.CLOSED
+    connect()
+  }
+
+  /** 切后台(原生壳):静默断开且不排重连,避免 Doze 下反复失败;回前台再 reconnectNow */
+  const suspend = () => {
+    if (disposed) return
+    retryCount = 0
+    if (retryTimer) {
+      clearTimeout(retryTimer)
+      retryTimer = null
+    }
+    dropSocket()
+    status.value = SOCKET_STATUS.CLOSED
+    emit('close')
+  }
+
   /** 上行:{type,data} 结构;未连接返回 false 由调用方提示 */
   const send = (obj) => {
     if (!ws || ws.readyState !== 1) return false
@@ -138,5 +185,5 @@ export function createChatSocket({
     status.value = SOCKET_STATUS.IDLE
   }
 
-  return { status, connect, disconnect, send, on }
+  return { status, connect, disconnect, reconnectNow, suspend, send, on }
 }

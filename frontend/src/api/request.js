@@ -33,6 +33,22 @@ const renewToken = (userStore) => {
   return refreshPromise
 }
 
+/**
+ * 非 HTTP 通道(聊天 WS 握手/重连)的续期入口:令牌过期时走与请求拦截器同一条共享续期,
+ * 避免两处并发续期把轮换中的 refresh token 用两次。返回 true 表示已换到新令牌。
+ */
+export async function ensureFreshToken() {
+  const userStore = useUserStore()
+  if (!userStore.token || !userStore.refreshToken) return false
+  if (!isTokenExpired(userStore.token) || isTokenExpired(userStore.refreshToken, 0)) return false
+  try {
+    await renewToken(userStore)
+    return true
+  } catch (e) {
+    return false
+  }
+}
+
 // 请求拦截:登录态下自动附加 Bearer token;令牌已过期就先续期再发
 request.interceptors.request.use(async (config) => {
   const userStore = useUserStore()
