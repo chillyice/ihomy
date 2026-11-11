@@ -6,7 +6,8 @@
 // ANTI_KNIGHT 反马步 / ANTI_KING 反王步(斜对角不同号) / THERMO 温度计(沿线严格递增) /
 // CONSECUTIVE 连续(标记相邻格相差 1) / XV 罗马(标记相邻格和为 5 或 10) /
 // SKYSCRAPER 摩天楼(四边外围给出可见楼层数) / ARITHMETIC 等差(标记连续格成等差数列) /
-// PALINDROME 回文(标记线上的数字正反读一致)。
+// PALINDROME 回文(标记线上的数字正反读一致) / ANTI_BISHOP 无象(象步隔一格不同号) /
+// NON_CONSECUTIVE 不连续(相邻格数字差不等于 1) / DRAGON 九龙(九条龙形额外区域)。
 // 组件只负责渲染与交互,所有判定都在这里,便于单测覆盖。
 
 export const SIZE = 9
@@ -99,13 +100,16 @@ export const VARIANT_KEYS = [
   'DIAGONAL',
   'WINDOW',
   'JIGSAW',
+  'DRAGON',
   'GREATER',
   'ODD_EVEN',
   'KILLER',
   'ANTI_KNIGHT',
   'ANTI_KING',
+  'ANTI_BISHOP',
   'THERMO',
   'CONSECUTIVE',
+  'NON_CONSECUTIVE',
   'XV',
   'SKYSCRAPER',
   'ARITHMETIC',
@@ -178,12 +182,62 @@ const ANTI_KING_GROUPS = (() => {
   return groups
 })()
 
+/** 无象数独:象步隔一格(斜向相距 2 格)的两格不能同号 */
+const ANTI_BISHOP_GROUPS = (() => {
+  const groups = []
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const a = r * SIZE + c
+      for (const [dr, dc] of [
+        [2, 2],
+        [2, -2],
+      ]) {
+        const nr = r + dr
+        const nc = c + dc
+        if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE) continue
+        groups.push([a, nr * SIZE + nc])
+      }
+    }
+  }
+  return groups
+})()
+
+/**
+ * 九龙数独:九条龙形额外区域(每条 9 格、连通),把 9×9 切成三行一带,
+ * 每行按「起止点表」各切三段,使得同一带内三条龙一宽一窄互相咬合:
+ * 第 1、3 带龙身自上而下收窄,第 2 带反向张开,盘面左右对称。
+ */
+const DRAGON_REGIONS = (() => {
+  // 每行的三段起止列(三带共 9 行)
+  const bounds = [
+    [0, 3, 6, 9],
+    [0, 4, 7, 9],
+    [0, 2, 5, 9],
+    [0, 3, 6, 9],
+    [0, 2, 5, 9],
+    [0, 4, 7, 9],
+    [0, 3, 6, 9],
+    [0, 4, 7, 9],
+    [0, 2, 5, 9],
+  ]
+  const groups = Array.from({ length: 9 }, () => [])
+  bounds.forEach((cuts, row) => {
+    const band = Math.floor(row / 3)
+    for (let k = 0; k < 3; k++) {
+      for (let c = cuts[k]; c < cuts[k + 1]; c++) groups[band * 3 + k].push(row * SIZE + c)
+    }
+  })
+  return groups
+})()
+
 /** 变体 → 行/列/宫之外的附加约束组 */
 export function extraGroupsFor(variant) {
   if (variant === 'DIAGONAL') return DIAGONAL_GROUPS
   if (variant === 'WINDOW') return WINDOW_GROUPS
   if (variant === 'ANTI_KNIGHT') return ANTI_KNIGHT_GROUPS
   if (variant === 'ANTI_KING') return ANTI_KING_GROUPS
+  if (variant === 'ANTI_BISHOP') return ANTI_BISHOP_GROUPS
+  if (variant === 'DRAGON') return DRAGON_REGIONS
   return []
 }
 
@@ -212,6 +266,9 @@ const ADJACENT_PAIRS = (() => {
 })()
 
 const ADJACENT_KEYS = new Set(ADJACENT_PAIRS.map(([a, b]) => pairKey(a, b)))
+
+/** 不连续数独:144 条相邻边全部要求「差不为 1」,盘面不画任何标记 */
+const NON_CONSECUTIVE_EDGES = ADJACENT_PAIRS.map(([a, b]) => ({ a, b, rel: EDGE_REL.NOT_CONSECUTIVE }))
 
 /** 关系码 + 邻格数字 → 本格允许的候选掩码(位运算用) */
 const EDGE_MASKS = (() => {
@@ -246,6 +303,19 @@ function edgeAdjacency(edges) {
 }
 
 const edgeAllows = (rel, value, neighbor) => (EDGE_MASKS[rel][neighbor] & (1 << (value - 1))) !== 0
+
+/** 依相邻边关系过滤候选:已填邻格给出本格允许的数字集合;空掩码表示这条支路已死 */
+function edgeCandidatesAt(board, adj, cell, mask) {
+  const rels = adj[cell]
+  if (!rels) return mask
+  for (const rel of rels) {
+    const v = board[rel.other]
+    if (!v) continue
+    mask &= EDGE_MASKS[rel.rel][v]
+    if (!mask) return 0
+  }
+  return mask
+}
 
 /** 序列线索(等差/回文) → 每格所属的线段及在线上的位置 [{ cells, pos }] */
 function sequenceAdjacency(paths) {
@@ -483,8 +553,8 @@ function buildMasks(board, extraGroups = null, regions = null) {
   return { rows, cols, units, unitOf, extras, membership }
 }
 
-/** 最少候选格(MRV),找不到空格时返回 null;无解返回 { dead: true } */
-function pickCell(board, rows, cols, units, unitOf, extras = null, membership = null) {
+/** 最少候选格(MRV),找不到空格时返回 null;无解返回 { dead: true }。filter 可继续裁剪候选掩码 */
+function pickCell(board, rows, cols, units, unitOf, extras = null, membership = null, filter = null) {
   let best = -1
   let bestMask = 0
   let bestCount = SIZE + 1
@@ -493,6 +563,10 @@ function pickCell(board, rows, cols, units, unitOf, extras = null, membership = 
     let mask = ALL & ~(rows[(i / SIZE) | 0] | cols[i % SIZE] | units[unitOf[i]])
     if (extras && membership[i].length) {
       for (const g of membership[i]) mask &= ~extras[g]
+    }
+    if (filter) {
+      mask = filter(i, mask)
+      if (!mask) return { dead: true }
     }
     if (!mask) return { dead: true }
     const n = popcount(mask)
@@ -640,18 +714,8 @@ export function countSolutions(input, limit = 2, opts = {}) {
     return mask
   }
 
-  // 依相邻边关系(连续/罗马)剪枝:已填邻格给出本格允许的数字集合
-  const edgeCandidates = (cell, mask) => {
-    const rels = edgeAdj[cell]
-    if (!rels) return mask
-    for (const rel of rels) {
-      const v = board[rel.other]
-      if (!v) continue
-      mask &= EDGE_MASKS[rel.rel][v]
-      if (!mask) return 0
-    }
-    return mask
-  }
+  // 依相邻边关系(连续/罗马/不连续)剪枝:已填邻格给出本格允许的数字集合
+  const edgeCandidates = (cell, mask) => edgeCandidatesAt(board, edgeAdj, cell, mask)
 
   let count = 0
   let nodes = 0
@@ -743,9 +807,10 @@ export function countSolutions(input, limit = 2, opts = {}) {
 /**
  * 生成一个完整终盘(随机回溯,同一次调用内确定)。
  * extraGroups:附加约束组(如对角线);regions:替代九宫的不规则区;
- * nodeBudget:搜索节点预算,超限返回带空格的盘面(调用方据此判定失败)。
+ * nodeBudget:搜索节点预算,超限返回带空格的盘面(调用方据此判定失败);
+ * edges:相邻边关系(不连续数独靠它约束终盘)。
  */
-export function generateSolution(random = Math.random, extraGroups = null, regions = null, nodeBudget = Infinity) {
+export function generateSolution(random = Math.random, extraGroups = null, regions = null, nodeBudget = Infinity, edges = null) {
   const board = new Array(CELLS).fill(0)
   const rows = new Array(SIZE).fill(0)
   const cols = new Array(SIZE).fill(0)
@@ -753,6 +818,8 @@ export function generateSolution(random = Math.random, extraGroups = null, regio
   const unitOf = regions ? unitIndexOf(regions) : BOX_INDEX
   const membership = extraGroups ? extraMembership(extraGroups) : null
   const extras = extraGroups ? extraGroups.map(() => 0) : null
+  const edgeAdj = edges ? edgeAdjacency(edges) : null
+  const filter = edgeAdj ? (cell, mask) => edgeCandidatesAt(board, edgeAdj, cell, mask) : null
   let nodes = 0
   let aborted = false
 
@@ -762,7 +829,7 @@ export function generateSolution(random = Math.random, extraGroups = null, regio
       aborted = true
       return false
     }
-    const pick = pickCell(board, rows, cols, units, unitOf, extras, membership)
+    const pick = pickCell(board, rows, cols, units, unitOf, extras, membership, filter)
     if (!pick) return true
     if (pick.dead) return false
     const candidates = []
@@ -829,6 +896,7 @@ export function generatePuzzle(difficulty = 'MEDIUM', random = Math.random, { va
   if (variant === 'GREATER') return generateGreater(difficulty, random)
   if (variant === 'THERMO') return generateThermo(difficulty, random)
   if (variant === 'CONSECUTIVE' || variant === 'XV') return generateEdgeVariant(difficulty, random, variant)
+  if (variant === 'NON_CONSECUTIVE') return generateNonConsecutive(difficulty, random)
   if (variant === 'SKYSCRAPER') return generateSkyscraper(difficulty, random)
   if (variant === 'ARITHMETIC') return generateArithmetic(difficulty, random)
   if (variant === 'PALINDROME') return generatePalindrome(difficulty, random)
@@ -1009,6 +1077,35 @@ function generateEdgeVariant(difficulty, random, variant) {
     inequalities: null,
     parity: null,
     edges,
+    thermos: null,
+    blanks,
+    difficulty,
+  }
+}
+
+/**
+ * 不连续数独:相邻格数字之差不能是 1(全盘不画短线)。
+ * 终盘必须本身满足该约束,所以用带边过滤的回溯生成,挖空同样按 144 条边校验唯一解。
+ */
+function generateNonConsecutive(difficulty, random) {
+  const targetBlanks = DIFFICULTIES[difficulty] ?? DIFFICULTIES.MEDIUM
+  let solution = null
+  for (let attempt = 0; attempt < 3 && !solution; attempt++) {
+    const candidate = generateSolution(random, null, null, 200000, NON_CONSECUTIVE_EDGES)
+    if (candidate.every((v) => v)) solution = candidate
+  }
+  // 预算内没搜到就放开预算再搜一次(可行盘一定存在,只是回溯路径长短不定)
+  if (!solution) solution = generateSolution(random, null, null, Infinity, NON_CONSECUTIVE_EDGES)
+  const { puzzle, blanks } = digHoles(solution, targetBlanks, random, { edges: NON_CONSECUTIVE_EDGES })
+  return {
+    variant: 'NON_CONSECUTIVE',
+    puzzle,
+    solution,
+    cages: null,
+    regions: null,
+    inequalities: null,
+    parity: null,
+    edges: NON_CONSECUTIVE_EDGES,
     thermos: null,
     blanks,
     difficulty,

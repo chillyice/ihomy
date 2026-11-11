@@ -89,6 +89,12 @@
               <i v-if="windowSide(index, 'l')" class="sd-win sd-win-l" aria-hidden="true"></i>
               <i v-if="windowSide(index, 'r')" class="sd-win sd-win-r" aria-hidden="true"></i>
             </template>
+            <template v-if="variant === 'DRAGON'">
+              <i v-if="dragonSide(index, 't')" class="sd-dragon sd-dragon-t" aria-hidden="true"></i>
+              <i v-if="dragonSide(index, 'b')" class="sd-dragon sd-dragon-b" aria-hidden="true"></i>
+              <i v-if="dragonSide(index, 'l')" class="sd-dragon sd-dragon-l" aria-hidden="true"></i>
+              <i v-if="dragonSide(index, 'r')" class="sd-dragon sd-dragon-r" aria-hidden="true"></i>
+            </template>
             <template v-if="variant === 'THERMO' && thermoInfo[index]">
               <i
                 v-if="thermoInfo[index].prev"
@@ -281,7 +287,7 @@ const constraintsOf = (key, data) => {
     // 温度计的递增线索复用不等式口径,求解/胜负判定不必再开一套约束
     inequalities: key === 'GREATER' || key === 'THERMO' ? data.inequalities || undefined : undefined,
     parity: key === 'ODD_EVEN' ? data.parity || undefined : undefined,
-    edges: key === 'CONSECUTIVE' || key === 'XV' ? data.edges || undefined : undefined,
+    edges: key === 'CONSECUTIVE' || key === 'XV' || key === 'NON_CONSECUTIVE' ? data.edges || undefined : undefined,
     skyscrapers: key === 'SKYSCRAPER' ? data.skyscrapers || undefined : undefined,
     arith: key === 'ARITHMETIC' ? data.arith || undefined : undefined,
     palindromes: key === 'PALINDROME' ? data.palindromes || undefined : undefined,
@@ -317,7 +323,7 @@ const conflicts = computed(() => {
     extraGroups: extraGroups.length ? extraGroups : null,
     regions: variant.value === 'JIGSAW' ? regions.value : null,
     inequalities: variant.value === 'GREATER' || variant.value === 'THERMO' ? inequalities.value : null,
-    edges: variant.value === 'CONSECUTIVE' || variant.value === 'XV' ? edges.value : null,
+    edges: variant.value === 'CONSECUTIVE' || variant.value === 'XV' || variant.value === 'NON_CONSECUTIVE' ? edges.value : null,
     skyscrapers: variant.value === 'SKYSCRAPER' ? skyscrapers.value : null,
     arith: variant.value === 'ARITHMETIC' ? arith.value : null,
     palindromes: variant.value === 'PALINDROME' ? palindromes.value : null,
@@ -394,6 +400,28 @@ const windowIdx = computed(() => {
 })
 const windowSide = (index, side) => {
   const idx = windowIdx.value
+  if (!idx) return false
+  const g = idx[index]
+  if (g < 0) return false
+  const row = Math.floor(index / 9)
+  const col = index % 9
+  if (side === 't') return row > 0 && idx[index - 9] !== g
+  if (side === 'b') return row < 8 && idx[index + 9] !== g
+  if (side === 'l') return col > 0 && idx[index - 1] !== g
+  return col < 8 && idx[index + 1] !== g
+}
+
+// ---------- 九龙数独:九条龙形额外区域描边(在三行一带内错位咬合) ----------
+const dragonIdx = computed(() => {
+  if (variant.value !== 'DRAGON') return null
+  const map = new Int8Array(CELLS).fill(-1)
+  extraGroupsFor('DRAGON').forEach((cells, g) => {
+    for (const cell of cells) map[cell] = g
+  })
+  return map
+})
+const dragonSide = (index, side) => {
+  const idx = dragonIdx.value
   if (!idx) return false
   const g = idx[index]
   if (g < 0) return false
@@ -607,7 +635,9 @@ const loadState = () => {
     if (savedVariant === 'JIGSAW' && !isValidRegions(raw.regions)) return null
     if (savedVariant === 'GREATER' && !isValidInequalities(raw.inequalities)) return null
     if (savedVariant === 'ODD_EVEN' && !isValidParity(raw.parity)) return null
-    if ((savedVariant === 'CONSECUTIVE' || savedVariant === 'XV') && !isValidEdges(raw.edges)) return null
+    if ((savedVariant === 'CONSECUTIVE' || savedVariant === 'XV' || savedVariant === 'NON_CONSECUTIVE') && !isValidEdges(raw.edges)) {
+      return null
+    }
     if (savedVariant === 'THERMO' && (!isValidThermos(raw.thermos) || !isValidInequalities(raw.inequalities))) return null
     if (savedVariant === 'SKYSCRAPER' && !isValidSkyscrapers(raw.skyscrapers)) return null
     if (savedVariant === 'ARITHMETIC' && !isValidArithPaths(raw.arith)) return null
@@ -992,6 +1022,7 @@ onBeforeUnmount(() => {
   --sd-xv: rgba(62, 138, 156, 0.9);
   --sd-arith: rgba(52, 138, 112, 0.8);
   --sd-pal: rgba(196, 86, 146, 0.7);
+  --sd-dragon: rgba(188, 116, 46, 0.62);
 }
 .sd-card:fullscreen {
   width: 100vw;
@@ -1432,6 +1463,36 @@ onBeforeUnmount(() => {
   border-right: 2px solid var(--sd-window);
 }
 
+/* 九龙数独:九条龙形额外区域的轮廓线(比九宫细一档,避免压住宫线) */
+.sd-dragon {
+  position: absolute;
+  pointer-events: none;
+}
+.sd-dragon-t {
+  top: 0;
+  left: 0;
+  right: 0;
+  border-top: 1.5px solid var(--sd-dragon);
+}
+.sd-dragon-b {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-bottom: 1.5px solid var(--sd-dragon);
+}
+.sd-dragon-l {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-left: 1.5px solid var(--sd-dragon);
+}
+.sd-dragon-r {
+  top: 0;
+  bottom: 0;
+  right: 0;
+  border-right: 1.5px solid var(--sd-dragon);
+}
+
 /* 杀手笼:虚线框在格边内侧描出笼界,笼和标注压在笼内最左上格的角上 */
 .sd-board.is-quick .sd-cell {
   cursor: crosshair;
@@ -1637,6 +1698,7 @@ html.dark .sd-card {
   --sd-xv: rgba(112, 196, 214, 0.95);
   --sd-arith: rgba(96, 196, 164, 0.9);
   --sd-pal: rgba(228, 132, 184, 0.8);
+  --sd-dragon: rgba(234, 168, 92, 0.72);
 }
 html.dark .sd-cell.conflict {
   color: #ff9a9a;
