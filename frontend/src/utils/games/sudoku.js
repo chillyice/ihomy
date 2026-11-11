@@ -2,7 +2,9 @@
 // 棋盘统一用长度 81 的数组表示,索引 = row * 9 + col,值 0 表示空格、1~9 表示数字。
 // 变体:CLASSIC 标准 / DIAGONAL 对角线 / WINDOW 窗口(4 个额外 3×3 区) /
 // JIGSAW 不规则(9 个连通异形区替代九宫) / GREATER 不等式(相邻格比较符号) /
-// ODD_EVEN 奇偶(标记格限定奇数或偶数) / KILLER 杀手(无给定数字,笼内不重复且和等于标注)。
+// ODD_EVEN 奇偶(标记格限定奇数或偶数) / KILLER 杀手(无给定数字,笼内不重复且和等于标注) /
+// ANTI_KNIGHT 反马步 / ANTI_KING 反王步(斜对角不同号) / THERMO 温度计(沿线严格递增) /
+// CONSECUTIVE 连续(标记相邻格相差 1) / XV 罗马(标记相邻格和为 5 或 10)。
 // 组件只负责渲染与交互,所有判定都在这里,便于单测覆盖。
 
 export const SIZE = 9
@@ -34,6 +36,17 @@ const PARITY_MARKS = {
   EXPERT: 14,
 }
 
+/** 温度计:难度 → 温度计条数(条数越少、盘面给定越少,难度越高) */
+const THERMO_COUNTS = {
+  EASY: 15,
+  MEDIUM: 12,
+  HARD: 10,
+  EXPERT: 8,
+}
+
+/** 单条温度计最多跨几格(太长会绕出难看的折线) */
+const THERMO_MAX_LEN = 6
+
 const pickCageSize = (weights, random) => {
   const entries = Object.entries(weights)
   let roll = random() * entries.reduce((acc, [, w]) => acc + w, 0)
@@ -44,7 +57,20 @@ const pickCageSize = (weights, random) => {
   return Number(entries[entries.length - 1][0])
 }
 
-export const VARIANT_KEYS = ['CLASSIC', 'DIAGONAL', 'WINDOW', 'JIGSAW', 'GREATER', 'ODD_EVEN', 'KILLER']
+export const VARIANT_KEYS = [
+  'CLASSIC',
+  'DIAGONAL',
+  'WINDOW',
+  'JIGSAW',
+  'GREATER',
+  'ODD_EVEN',
+  'KILLER',
+  'ANTI_KNIGHT',
+  'ANTI_KING',
+  'THERMO',
+  'CONSECUTIVE',
+  'XV',
+]
 
 /** 对角线数独的两条附加组(主对角线 + 反对角线) */
 const DIAGONAL_GROUPS = [
@@ -60,12 +86,126 @@ const WINDOW_GROUPS = [
   [50, 51, 52, 59, 60, 61, 68, 69, 70],
 ]
 
+/** 反马步:马步位置的两格不能同号(每对只取一次,组内就是一对格) */
+const ANTI_KNIGHT_GROUPS = (() => {
+  const moves = [
+    [1, 2],
+    [2, 1],
+    [1, -2],
+    [2, -1],
+    [-1, 2],
+    [-2, 1],
+    [-1, -2],
+    [-2, -1],
+  ]
+  const groups = []
+  const seen = new Set()
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const a = r * SIZE + c
+      for (const [dr, dc] of moves) {
+        const nr = r + dr
+        const nc = c + dc
+        if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE) continue
+        const b = nr * SIZE + nc
+        const key = a < b ? a * CELLS + b : b * CELLS + a
+        if (seen.has(key)) continue
+        seen.add(key)
+        groups.push([a, b])
+      }
+    }
+  }
+  return groups
+})()
+
+/** 反王步:斜对角相邻的两格不能同号(横竖相邻已由行/列约束保证) */
+const ANTI_KING_GROUPS = (() => {
+  const groups = []
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const a = r * SIZE + c
+      for (const [dr, dc] of [
+        [1, 1],
+        [1, -1],
+      ]) {
+        const nr = r + dr
+        const nc = c + dc
+        if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE) continue
+        groups.push([a, nr * SIZE + nc])
+      }
+    }
+  }
+  return groups
+})()
+
 /** 变体 → 行/列/宫之外的附加约束组 */
 export function extraGroupsFor(variant) {
   if (variant === 'DIAGONAL') return DIAGONAL_GROUPS
   if (variant === 'WINDOW') return WINDOW_GROUPS
+  if (variant === 'ANTI_KNIGHT') return ANTI_KNIGHT_GROUPS
+  if (variant === 'ANTI_KING') return ANTI_KING_GROUPS
   return []
 }
+
+/** 相邻格关系码(连续/罗马数独把 144 条相邻边逐条标注,未标记边走否定约束) */
+export const EDGE_REL = {
+  CONSECUTIVE: 1,
+  SUM_FIVE: 2,
+  SUM_TEN: 3,
+  NOT_CONSECUTIVE: 4,
+  NO_SUM_FIVE_TEN: 5,
+}
+
+const pairKey = (a, b) => (a < b ? a * CELLS + b : b * CELLS + a)
+
+/** 全部左右/上下相邻格(144 对),连续与罗马数独的线索都落在这批边上 */
+const ADJACENT_PAIRS = (() => {
+  const pairs = []
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const i = r * SIZE + c
+      if (c < SIZE - 1) pairs.push([i, i + 1])
+      if (r < SIZE - 1) pairs.push([i, i + SIZE])
+    }
+  }
+  return pairs
+})()
+
+const ADJACENT_KEYS = new Set(ADJACENT_PAIRS.map(([a, b]) => pairKey(a, b)))
+
+/** 关系码 + 邻格数字 → 本格允许的候选掩码(位运算用) */
+const EDGE_MASKS = (() => {
+  const build = (accept) =>
+    Array.from({ length: SIZE + 1 }, (_, w) => {
+      if (!w) return 0
+      let mask = 0
+      for (let v = 1; v <= SIZE; v++) if (accept(v, w)) mask |= 1 << (v - 1)
+      return mask
+    })
+  return {
+    [EDGE_REL.CONSECUTIVE]: build((v, w) => Math.abs(v - w) === 1),
+    [EDGE_REL.SUM_FIVE]: build((v, w) => v + w === 5),
+    [EDGE_REL.SUM_TEN]: build((v, w) => v + w === 10),
+    [EDGE_REL.NOT_CONSECUTIVE]: build((v, w) => Math.abs(v - w) !== 1),
+    [EDGE_REL.NO_SUM_FIVE_TEN]: build((v, w) => v + w !== 5 && v + w !== 10),
+  }
+})()
+
+/** 边约束 → 每格的相邻边 [{ other, rel }] */
+function edgeAdjacency(edges) {
+  const adj = new Array(CELLS).fill(null)
+  const attach = (cell, other, rel) => {
+    if (!adj[cell]) adj[cell] = []
+    adj[cell].push({ other, rel })
+  }
+  for (const edge of edges) {
+    attach(edge.a, edge.b, edge.rel)
+    attach(edge.b, edge.a, edge.rel)
+  }
+  return adj
+}
+
+const edgeAllows = (rel, value, neighbor) => (EDGE_MASKS[rel][neighbor] & (1 << (value - 1))) !== 0
 
 const ALL = 0x1ff
 
@@ -268,6 +408,7 @@ function pickCell(board, rows, cols, units, unitOf, extras = null, membership = 
  * opts.extraGroups:附加约束组(对角线/窗口);opts.regions:替代九宫的不规则区;
  * opts.cages:杀手笼 [{ cells, sum }];opts.inequalities:不等式对 [小, 大];
  * opts.parity:每格奇偶标记(0 无约束 / 1 奇数 / 2 偶数);
+ * opts.edges:相邻边关系(连续/罗马数独的 144 条边);
  * opts.nodeBudget:搜索节点预算,超过即放弃并返回 -1(用于杀手生成时廉价淘汰近唯一盘)。
  * 返回 0 表示无解。
  */
@@ -278,6 +419,7 @@ export function countSolutions(input, limit = 2, opts = {}) {
   const cages = opts.cages || null
   const inequalities = opts.inequalities || null
   const parity = opts.parity || null
+  const edges = opts.edges || null
   const budget = opts.nodeBudget ?? Infinity
   const masks = buildMasks(board, extraGroups, regions)
   if (!masks) return 0
@@ -299,6 +441,17 @@ export function countSolutions(input, limit = 2, opts = {}) {
         const other = board[rel.other]
         if (!other) continue
         if (rel.less ? board[i] >= other : board[i] <= other) return 0
+      }
+    }
+  }
+  const edgeAdj = edges ? edgeAdjacency(edges) : null
+  if (edgeAdj) {
+    for (let i = 0; i < CELLS; i++) {
+      const rels = edgeAdj[i]
+      if (!rels || !board[i]) continue
+      for (const rel of rels) {
+        const other = board[rel.other]
+        if (other && !edgeAllows(rel.rel, board[i], other)) return 0
       }
     }
   }
@@ -370,6 +523,19 @@ export function countSolutions(input, limit = 2, opts = {}) {
     return mask
   }
 
+  // 依相邻边关系(连续/罗马)剪枝:已填邻格给出本格允许的数字集合
+  const edgeCandidates = (cell, mask) => {
+    const rels = edgeAdj[cell]
+    if (!rels) return mask
+    for (const rel of rels) {
+      const v = board[rel.other]
+      if (!v) continue
+      mask &= EDGE_MASKS[rel.rel][v]
+      if (!mask) return 0
+    }
+    return mask
+  }
+
   let count = 0
   let nodes = 0
   let aborted = false
@@ -397,6 +563,7 @@ export function countSolutions(input, limit = 2, opts = {}) {
       }
       if (cageOf) mask = cageCandidates(i, mask)
       if (ineqAdj) mask = inequalityCandidates(i, mask)
+      if (edgeAdj) mask = edgeCandidates(i, mask)
       if (!mask) return
       const n = popcount(mask)
       if (n < bestCount) {
@@ -539,6 +706,8 @@ export function generatePuzzle(difficulty = 'MEDIUM', random = Math.random, { va
   if (variant === 'KILLER') return generateKiller(difficulty, random)
   if (variant === 'JIGSAW') return generateJigsaw(difficulty, random)
   if (variant === 'GREATER') return generateGreater(difficulty, random)
+  if (variant === 'THERMO') return generateThermo(difficulty, random)
+  if (variant === 'CONSECUTIVE' || variant === 'XV') return generateEdgeVariant(difficulty, random, variant)
   const extraGroups = extraGroupsFor(variant)
   const targetBlanks = DIFFICULTIES[difficulty] ?? DIFFICULTIES.MEDIUM
   const solution = generateSolution(random, extraGroups.length ? extraGroups : null)
@@ -555,6 +724,8 @@ export function generatePuzzle(difficulty = 'MEDIUM', random = Math.random, { va
     regions: null,
     inequalities: null,
     parity,
+    edges: null,
+    thermos: null,
     blanks,
     difficulty,
   }
@@ -668,7 +839,123 @@ function generateGreater(difficulty, random) {
   const targetBlanks = DIFFICULTIES[difficulty] ?? DIFFICULTIES.MEDIUM
   // 与标准数独同口径挖空(比较符号是额外线索),难度对应关系保持一致
   const { puzzle, blanks } = digHoles(solution, targetBlanks, random, { inequalities })
-  return { variant: 'GREATER', puzzle, solution, cages: null, regions: null, inequalities, parity: null, blanks, difficulty }
+  return {
+    variant: 'GREATER',
+    puzzle,
+    solution,
+    cages: null,
+    regions: null,
+    inequalities,
+    parity: null,
+    edges: null,
+    thermos: null,
+    blanks,
+    difficulty,
+  }
+}
+
+/** 连续/罗马数独:按终盘给 144 条相邻边逐条定关系(未标记边走否定约束) */
+function classifyEdges(solution, variant) {
+  const edges = []
+  for (const [a, b] of ADJACENT_PAIRS) {
+    const sum = solution[a] + solution[b]
+    let rel
+    if (variant === 'CONSECUTIVE') {
+      rel = Math.abs(solution[a] - solution[b]) === 1 ? EDGE_REL.CONSECUTIVE : EDGE_REL.NOT_CONSECUTIVE
+    } else {
+      rel = sum === 5 ? EDGE_REL.SUM_FIVE : sum === 10 ? EDGE_REL.SUM_TEN : EDGE_REL.NO_SUM_FIVE_TEN
+    }
+    edges.push({ a, b, rel })
+  }
+  return edges
+}
+
+function generateEdgeVariant(difficulty, random, variant) {
+  const solution = generateSolution(random)
+  const edges = classifyEdges(solution, variant)
+  const targetBlanks = DIFFICULTIES[difficulty] ?? DIFFICULTIES.MEDIUM
+  // 边关系是额外线索,挖空口径与标准数独一致
+  const { puzzle, blanks } = digHoles(solution, targetBlanks, random, { edges })
+  return {
+    variant,
+    puzzle,
+    solution,
+    cages: null,
+    regions: null,
+    inequalities: null,
+    parity: null,
+    edges,
+    thermos: null,
+    blanks,
+    difficulty,
+  }
+}
+
+/**
+ * 温度计:从随机未占用格出发,只往数字更大的相邻格走,边走边加长(最多 6 格)。
+ * 每条温度计独占格位,渲染时不会互相压线;条数按难度给。
+ */
+function buildThermometers(solution, random, count) {
+  const used = new Set()
+  const thermos = []
+  let guard = count * 48
+  while (thermos.length < count && guard-- > 0) {
+    const start = Math.floor(random() * CELLS)
+    if (used.has(start)) continue
+    const path = [start]
+    let cur = start
+    while (path.length < THERMO_MAX_LEN) {
+      const options = neighborsOf(cur).filter((nb) => !used.has(nb) && !path.includes(nb) && solution[nb] > solution[cur])
+      if (!options.length) break
+      // 优先走较小的后继,避免一步踩到 9 让温度计过早结束
+      options.sort((a, b) => solution[a] - solution[b])
+      const pick = options[Math.floor(random() * Math.min(2, options.length))]
+      path.push(pick)
+      cur = pick
+    }
+    if (path.length < 2) continue
+    for (const cell of path) used.add(cell)
+    thermos.push(path)
+  }
+  // 兜底:至少给出一条递增的相邻对
+  if (!thermos.length) {
+    for (const [a, b] of ADJACENT_PAIRS) {
+      if (solution[a] < solution[b]) {
+        thermos.push([a, b])
+        break
+      }
+      if (solution[b] < solution[a]) {
+        thermos.push([b, a])
+        break
+      }
+    }
+  }
+  return thermos
+}
+
+function generateThermo(difficulty, random) {
+  const solution = generateSolution(random)
+  const thermos = buildThermometers(solution, random, THERMO_COUNTS[difficulty] ?? THERMO_COUNTS.MEDIUM)
+  // 求解/判定复用不等式口径:温度计相邻两格按线路方向给出「前 < 后」
+  const inequalities = []
+  for (const path of thermos) {
+    for (let i = 1; i < path.length; i++) inequalities.push([path[i - 1], path[i]])
+  }
+  const targetBlanks = DIFFICULTIES[difficulty] ?? DIFFICULTIES.MEDIUM
+  const { puzzle, blanks } = digHoles(solution, targetBlanks, random, { inequalities })
+  return {
+    variant: 'THERMO',
+    puzzle,
+    solution,
+    cages: null,
+    regions: null,
+    inequalities,
+    parity: null,
+    edges: null,
+    thermos,
+    blanks,
+    difficulty,
+  }
 }
 
 /** 奇偶标记:随机挑若干格,按终盘标出该格是奇数还是偶数 */
@@ -757,13 +1044,16 @@ function generateKiller(difficulty, random) {
 
 /**
  * 返回所有重复的格子索引集合。
- * extraGroups:附加组(对角线/窗口/杀手笼);regions:替代九宫的不规则区;
- * inequalities:不等式对(已填但方向不符时把两格都标冲突)。第二个参数兼容旧签名(直接传附加组数组)。
+ * extraGroups:附加组(对角线/窗口/杀手笼/反马步/反王步);regions:替代九宫的不规则区;
+ * inequalities:不等式对(已填但方向不符时把两格都标冲突);
+ * edges:相邻边关系(连续/罗马,已填但不满足关系时把两格都标冲突)。
+ * 第二个参数兼容旧签名(直接传附加组数组)。
  */
 export function findConflicts(board, opts = null) {
   const extraGroups = Array.isArray(opts) ? opts : opts?.extraGroups || null
   const regions = Array.isArray(opts) ? null : opts?.regions || null
   const inequalities = Array.isArray(opts) ? null : opts?.inequalities || null
+  const edges = Array.isArray(opts) ? null : opts?.edges || null
   const conflicts = new Set()
   const check = (group) => {
     const byValue = new Map()
@@ -790,17 +1080,32 @@ export function findConflicts(board, opts = null) {
       }
     }
   }
+  if (edges) {
+    for (const edge of edges) {
+      const { a, b } = edge
+      if (board[a] && board[b] && !edgeAllows(edge.rel, board[a], board[b])) {
+        conflicts.add(a)
+        conflicts.add(b)
+      }
+    }
+  }
   return conflicts
 }
 
 /**
  * 全部填满且无冲突;opts 还要满足附加约束:
- * cages 各笼数字和等于标注、inequalities 比较方向正确、parity 奇偶与标记一致。
+ * cages 各笼数字和等于标注、inequalities 比较方向正确、parity 奇偶与标记一致、
+ * edges 相邻边关系成立。
  */
 export function isSolved(board, opts = {}) {
   for (let i = 0; i < CELLS; i++) if (!board[i]) return false
   if (findConflicts(board, { extraGroups: opts.extraGroups || null, regions: opts.regions || null }).size !== 0) {
     return false
+  }
+  if (opts.edges) {
+    for (const edge of opts.edges) {
+      if (!edgeAllows(edge.rel, board[edge.a], board[edge.b])) return false
+    }
   }
   if (opts.cages) {
     for (const cage of opts.cages) {
@@ -913,6 +1218,41 @@ export function isValidInequalities(list) {
 /** 奇偶标记结构校验:81 格且只取 0(无约束)/1(奇)/2(偶) */
 export function isValidParity(parity) {
   return Array.isArray(parity) && parity.length === CELLS && parity.every((p) => p === 0 || p === 1 || p === 2)
+}
+
+/**
+ * 相邻边关系校验(连续/罗马读档用):恰好覆盖全部 144 条相邻边、每对只出现一次、
+ * 关系码属于 EDGE_REL。
+ */
+export function isValidEdges(edges) {
+  if (!Array.isArray(edges) || edges.length !== ADJACENT_PAIRS.length) return false
+  const seen = new Set()
+  for (const edge of edges) {
+    if (!edge || !Number.isInteger(edge.a) || !Number.isInteger(edge.b)) return false
+    if (!Number.isInteger(edge.rel) || !EDGE_MASKS[edge.rel]) return false
+    const { a, b } = edge
+    if (a < 0 || a >= CELLS || b < 0 || b >= CELLS || a === b) return false
+    const key = pairKey(a, b)
+    if (!ADJACENT_KEYS.has(key) || seen.has(key)) return false
+    seen.add(key)
+  }
+  return seen.size === ADJACENT_PAIRS.length
+}
+
+/** 温度计结构校验:非空、每条至少 2 格、同行相邻/上下相接、格位不重叠 */
+export function isValidThermos(thermos) {
+  if (!Array.isArray(thermos) || !thermos.length) return false
+  const used = new Set()
+  for (const path of thermos) {
+    if (!Array.isArray(path) || path.length < 2) return false
+    for (let i = 0; i < path.length; i++) {
+      const cell = path[i]
+      if (!Number.isInteger(cell) || cell < 0 || cell >= CELLS || used.has(cell)) return false
+      used.add(cell)
+      if (i > 0 && !ADJACENT_KEYS.has(pairKey(path[i - 1], cell))) return false
+    }
+  }
+  return true
 }
 
 /** 笼划分 → 每格所属笼索引(Int16Array,未归属为 -1);KILLER 渲染笼边框/求和标注用 */

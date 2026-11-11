@@ -67,8 +67,17 @@
             <i v-if="windowSide(index, 'l')" class="sd-win sd-win-l" aria-hidden="true"></i>
             <i v-if="windowSide(index, 'r')" class="sd-win sd-win-r" aria-hidden="true"></i>
           </template>
+          <template v-if="variant === 'THERMO' && thermoInfo[index]">
+            <i v-if="thermoInfo[index].prev" class="sd-thermo-seg" :class="'sd-thermo-to-' + thermoInfo[index].prev" aria-hidden="true"></i>
+            <i v-if="thermoInfo[index].next" class="sd-thermo-seg" :class="'sd-thermo-to-' + thermoInfo[index].next" aria-hidden="true"></i>
+            <i v-if="thermoInfo[index].bulb" class="sd-thermo-bulb" aria-hidden="true"></i>
+          </template>
           <span v-if="ineqMark(index, 'r')" class="sd-ineq sd-ineq-r" aria-hidden="true">{{ ineqMark(index, 'r') }}</span>
           <span v-if="ineqMark(index, 'b')" class="sd-ineq sd-ineq-b" aria-hidden="true">{{ ineqMark(index, 'b') }}</span>
+          <span v-if="consecutiveMark(index, 'r')" class="sd-consec sd-consec-r" aria-hidden="true"></span>
+          <span v-if="consecutiveMark(index, 'b')" class="sd-consec sd-consec-b" aria-hidden="true"></span>
+          <span v-if="xvMark(index, 'r')" class="sd-xv sd-xv-r" aria-hidden="true">{{ xvMark(index, 'r') }}</span>
+          <span v-if="xvMark(index, 'b')" class="sd-xv sd-xv-b" aria-hidden="true">{{ xvMark(index, 'b') }}</span>
           <Transition name="sd-pop" mode="out-in">
             <span v-if="value" :key="'v' + value" class="sd-value">{{ value }}</span>
             <span v-else-if="notes[index]" :key="'n' + index" class="sd-notes">
@@ -145,6 +154,7 @@ import { useGameView } from '@/composables/useGameView'
 import {
   CELLS,
   DIFFICULTY_KEYS,
+  EDGE_REL,
   VARIANT_KEYS,
   buildPeers,
   cageIndexOf,
@@ -156,9 +166,11 @@ import {
   isSolved,
   isValidBoard,
   isValidCages,
+  isValidEdges,
   isValidInequalities,
   isValidParity,
   isValidRegions,
+  isValidThermos,
   notesOf,
   pickHintIndex,
   regionIndexOf,
@@ -185,6 +197,8 @@ const cages = ref(null)
 const regions = ref(null)
 const inequalities = ref(null)
 const parity = ref(null)
+const edges = ref(null)
+const thermos = ref(null)
 const board = ref(new Array(CELLS).fill(0))
 const notes = ref(new Array(CELLS).fill(0))
 const selected = ref(-1)
@@ -209,8 +223,10 @@ const constraintsOf = (key, data) => {
     extraGroups: extraGroups.length ? extraGroups : undefined,
     regions: key === 'JIGSAW' ? data.regions || undefined : undefined,
     cages: key === 'KILLER' ? data.cages || undefined : undefined,
-    inequalities: key === 'GREATER' ? data.inequalities || undefined : undefined,
+    // 温度计的递增线索复用不等式口径,求解/胜负判定不必再开一套约束
+    inequalities: key === 'GREATER' || key === 'THERMO' ? data.inequalities || undefined : undefined,
     parity: key === 'ODD_EVEN' ? data.parity || undefined : undefined,
+    edges: key === 'CONSECUTIVE' || key === 'XV' ? data.edges || undefined : undefined,
   }
 }
 const currentConstraints = computed(() =>
@@ -219,6 +235,7 @@ const currentConstraints = computed(() =>
     cages: cages.value,
     inequalities: inequalities.value,
     parity: parity.value,
+    edges: edges.value,
   }),
 )
 
@@ -231,13 +248,15 @@ const unitAt = (index) => {
 
 const solvedNow = () => isSolved(board.value, currentConstraints.value)
 
-// 冲突分组:对角线/窗口加附加组;杀手笼内不重复;不规则区替代九宫
+// 冲突分组:对角线/窗口/反马步/反王步加附加组;杀手笼内不重复;不规则区替代九宫;
+// 温度计沿线递增、连续/罗马的相邻边关系也算冲突依据
 const conflicts = computed(() => {
   const extraGroups = variant.value === 'KILLER' ? (cages.value || []).map((cage) => cage.cells) : extraGroupsFor(variant.value)
   return findConflicts(board.value, {
     extraGroups: extraGroups.length ? extraGroups : null,
     regions: variant.value === 'JIGSAW' ? regions.value : null,
-    inequalities: variant.value === 'GREATER' ? inequalities.value : null,
+    inequalities: variant.value === 'GREATER' || variant.value === 'THERMO' ? inequalities.value : null,
+    edges: variant.value === 'CONSECUTIVE' || variant.value === 'XV' ? edges.value : null,
   })
 })
 const conflictCount = computed(() => conflicts.value.size)
@@ -343,6 +362,60 @@ const ineqMark = (index, side) => {
   return less === undefined ? '' : less ? '∧' : '∨'
 }
 
+// ---------- 连续/罗马数独:相邻边关系标记(连续画短棒,V/X 画在右/下边中点) ----------
+const edgeRelMap = computed(() => {
+  const map = new Map()
+  if ((variant.value !== 'CONSECUTIVE' && variant.value !== 'XV') || !Array.isArray(edges.value)) return map
+  for (const edge of edges.value) {
+    const lo = Math.min(edge.a, edge.b)
+    const hi = Math.max(edge.a, edge.b)
+    map.set(lo * CELLS + hi, edge.rel)
+  }
+  return map
+})
+const relBetween = (a, b) => edgeRelMap.value.get(Math.min(a, b) * CELLS + Math.max(a, b)) || 0
+const consecutiveMark = (index, side) => {
+  if (variant.value !== 'CONSECUTIVE') return false
+  if (side === 'r') {
+    if (index % 9 === 8) return false
+    return relBetween(index, index + 1) === EDGE_REL.CONSECUTIVE
+  }
+  return index < CELLS - 9 && relBetween(index, index + 9) === EDGE_REL.CONSECUTIVE
+}
+const xvMark = (index, side) => {
+  if (variant.value !== 'XV') return ''
+  const rel = side === 'r' ? (index % 9 === 8 ? 0 : relBetween(index, index + 1)) : index >= CELLS - 9 ? 0 : relBetween(index, index + 9)
+  if (rel === EDGE_REL.SUM_FIVE) return 'V'
+  if (rel === EDGE_REL.SUM_TEN) return 'X'
+  return ''
+}
+
+// ---------- 温度计数独:每格画到相邻格中心的半段线,圆头在起点格 ----------
+const directionTo = (from, to) => {
+  const dr = Math.floor(to / 9) - Math.floor(from / 9)
+  const dc = (to % 9) - (from % 9)
+  if (dr === -1) return 't'
+  if (dr === 1) return 'b'
+  if (dc === -1) return 'l'
+  if (dc === 1) return 'r'
+  return ''
+}
+const thermoInfo = computed(() => {
+  const info = new Array(CELLS).fill(null)
+  if (variant.value !== 'THERMO' || !Array.isArray(thermos.value)) return info
+  for (const path of thermos.value) {
+    for (let i = 0; i < path.length; i++) {
+      const cell = path[i]
+      info[cell] = {
+        prev: i > 0 ? directionTo(cell, path[i - 1]) : '',
+        next: i < path.length - 1 ? directionTo(cell, path[i + 1]) : '',
+        bulb: i === 0,
+      }
+    }
+  }
+  return info
+})
+
 // ---------- 杀手笼渲染(虚线边框 + 笼和标注,标在笼内最左上格) ----------
 const cageIdx = computed(() => (variant.value === 'KILLER' && cages.value ? cageIndexOf(cages.value) : null))
 const cageEdge = (index, side) => {
@@ -400,6 +473,8 @@ const saveState = () => {
         regions: regions.value,
         inequalities: inequalities.value,
         parity: parity.value,
+        edges: edges.value,
+        thermos: thermos.value,
       }),
     )
   } catch (e) {
@@ -424,6 +499,8 @@ const loadState = () => {
     if (savedVariant === 'JIGSAW' && !isValidRegions(raw.regions)) return null
     if (savedVariant === 'GREATER' && !isValidInequalities(raw.inequalities)) return null
     if (savedVariant === 'ODD_EVEN' && !isValidParity(raw.parity)) return null
+    if ((savedVariant === 'CONSECUTIVE' || savedVariant === 'XV') && !isValidEdges(raw.edges)) return null
+    if (savedVariant === 'THERMO' && (!isValidThermos(raw.thermos) || !isValidInequalities(raw.inequalities))) return null
     if (!isValidBoard(raw.puzzle) || !isValidBoard(raw.board) || !isValidBoard(raw.solution, { allowZero: false })) {
       return null
     }
@@ -466,6 +543,8 @@ const startNew = async () => {
   regions.value = res.regions
   inequalities.value = res.inequalities
   parity.value = res.parity
+  edges.value = res.edges || null
+  thermos.value = res.thermos || null
   board.value = res.puzzle.slice()
   notes.value = new Array(CELLS).fill(0)
   selected.value = -1
@@ -491,6 +570,8 @@ const changeVariant = () => {
   regions.value = null
   inequalities.value = null
   parity.value = null
+  edges.value = null
+  thermos.value = null
   clearState()
   startNew()
 }
@@ -737,8 +818,10 @@ onMounted(() => {
     solution.value = saved.solution
     cages.value = saved.variant === 'KILLER' ? saved.cages : null
     regions.value = saved.variant === 'JIGSAW' ? saved.regions : null
-    inequalities.value = saved.variant === 'GREATER' ? saved.inequalities : null
+    inequalities.value = saved.variant === 'GREATER' || saved.variant === 'THERMO' ? saved.inequalities : null
     parity.value = saved.variant === 'ODD_EVEN' ? saved.parity : null
+    edges.value = saved.variant === 'CONSECUTIVE' || saved.variant === 'XV' ? saved.edges : null
+    thermos.value = saved.variant === 'THERMO' ? saved.thermos : null
     board.value = saved.board
     notes.value = saved.notes
     elapsed.value = Number.isInteger(saved.elapsed) ? saved.elapsed : 0
@@ -784,6 +867,9 @@ onBeforeUnmount(() => {
   --sd-region: rgba(184, 140, 110, 0.06);
   --sd-window: rgba(64, 150, 170, 0.55);
   --sd-odd: rgba(184, 140, 110, 0.26);
+  --sd-thermo: rgba(208, 118, 72, 0.6);
+  --sd-consec: rgba(122, 96, 184, 0.7);
+  --sd-xv: rgba(62, 138, 156, 0.9);
 }
 .sd-card:fullscreen {
   width: 100vw;
@@ -813,7 +899,7 @@ onBeforeUnmount(() => {
   gap: 8px;
 }
 .sd-variant {
-  width: 108px;
+  width: 124px;
 }
 .sd-difficulty {
   width: 104px;
@@ -951,6 +1037,8 @@ onBeforeUnmount(() => {
   background: var(--sd-hint);
 }
 .sd-value {
+  position: relative;
+  z-index: 2;
   line-height: 1;
 }
 /* 填数/改数/擦除:新数字轻轻弹出,旧数字先淡出,不再硬切 */
@@ -991,6 +1079,97 @@ onBeforeUnmount(() => {
   bottom: 0;
   left: 50%;
   transform: translateX(-50%);
+}
+
+/* 连续数独:标记边画一根短棒,横跨两格交界 */
+.sd-consec {
+  position: absolute;
+  z-index: 1;
+  border-radius: 2px;
+  background: var(--sd-consec);
+  pointer-events: none;
+}
+.sd-consec-r {
+  top: 50%;
+  right: 1px;
+  width: 7px;
+  height: 3px;
+  transform: translateY(-50%);
+}
+.sd-consec-b {
+  bottom: 1px;
+  left: 50%;
+  width: 3px;
+  height: 7px;
+  transform: translateX(-50%);
+}
+
+/* 罗马数独:V(和为 5)/ X(和为 10)贴在边中点 */
+.sd-xv {
+  position: absolute;
+  z-index: 1;
+  padding: 0 2px;
+  border-radius: 3px;
+  background: var(--sd-cell-bg);
+  color: var(--sd-xv);
+  font-size: clamp(8px, 1.9vw, 12px);
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
+.sd-xv-r {
+  top: 50%;
+  right: 1px;
+  transform: translateY(-50%);
+}
+.sd-xv-b {
+  bottom: 1px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* 温度计:每格只画「中心 → 相邻格方向」的半段线,格子之间自然接成折线 */
+.sd-thermo-seg {
+  position: absolute;
+  z-index: 0;
+  background: var(--sd-thermo);
+  pointer-events: none;
+}
+.sd-thermo-to-t {
+  top: 0;
+  left: calc(50% - 1px);
+  width: 2px;
+  height: 50%;
+}
+.sd-thermo-to-b {
+  bottom: 0;
+  left: calc(50% - 1px);
+  width: 2px;
+  height: 50%;
+}
+.sd-thermo-to-l {
+  top: calc(50% - 1px);
+  left: 0;
+  width: 50%;
+  height: 2px;
+}
+.sd-thermo-to-r {
+  top: calc(50% - 1px);
+  right: 0;
+  width: 50%;
+  height: 2px;
+}
+.sd-thermo-bulb {
+  position: absolute;
+  z-index: 0;
+  top: 50%;
+  left: 50%;
+  width: 34%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--sd-thermo);
+  pointer-events: none;
 }
 
 /* 窗口数独:额外 3×3 窗用实线描边(与九宫粗线区分) */
@@ -1072,6 +1251,7 @@ onBeforeUnmount(() => {
 .sd-notes {
   position: absolute;
   inset: 0;
+  z-index: 2;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: repeat(3, 1fr);
@@ -1222,6 +1402,9 @@ html.dark .sd-card {
   --sd-region: rgba(184, 140, 110, 0.1);
   --sd-window: rgba(96, 190, 210, 0.6);
   --sd-odd: rgba(184, 140, 110, 0.36);
+  --sd-thermo: rgba(232, 148, 100, 0.7);
+  --sd-consec: rgba(160, 138, 224, 0.8);
+  --sd-xv: rgba(112, 196, 214, 0.95);
 }
 html.dark .sd-cell.conflict {
   color: #ff9a9a;

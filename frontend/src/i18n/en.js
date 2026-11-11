@@ -1059,7 +1059,7 @@ export default {
     },
     sudoku: {
       title: 'Sudoku',
-      desc: 'Classic / diagonal / window / jigsaw / inequality / odd-even / killer with notes / hints / undo',
+      desc: 'Classic / diagonal / window / jigsaw / inequality / odd-even / killer / anti-knight / anti-king / thermo / consecutive / XV with notes / hints / undo',
       variant: {
         CLASSIC: 'Classic',
         DIAGONAL: 'Diagonal',
@@ -1068,6 +1068,11 @@ export default {
         GREATER: 'Inequality',
         ODD_EVEN: 'Odd/even',
         KILLER: 'Killer',
+        ANTI_KNIGHT: 'Anti-knight',
+        ANTI_KING: 'Anti-king',
+        THERMO: 'Thermo',
+        CONSECUTIVE: 'Consecutive',
+        XV: 'XV',
       },
       variantTip: {
         DIAGONAL: 'Both long diagonals must also hold 1-9 without repeats',
@@ -1076,6 +1081,11 @@ export default {
         GREATER: 'Signs between neighbouring cells open towards the larger digit',
         ODD_EVEN: 'Shaded cells take odd digits; cells with a corner dot take even digits',
         KILLER: 'Each cage holds no repeats and its digits sum to the label',
+        ANTI_KNIGHT: 'Cells a knight move apart cannot hold the same digit',
+        ANTI_KING: 'Diagonally adjacent cells cannot hold the same digit (rows and columns already cover orthogonals)',
+        THERMO: 'Digits strictly increase from the round bulb along each thermometer',
+        CONSECUTIVE: 'Barred pairs differ by 1; neighbouring cells without a bar must not differ by 1',
+        XV: 'V pairs sum to 5 and X pairs sum to 10; unmarked neighbours sum to neither 5 nor 10',
       },
       difficulty: {
         EASY: 'Easy',

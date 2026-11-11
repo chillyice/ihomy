@@ -1053,7 +1053,7 @@ export default {
     },
     sudoku: {
       title: '数独',
-      desc: '标准 / 对角线 / 窗口 / 不规则 / 不等式 / 奇偶 / 杀手，笔记 / 提示 / 撤销',
+      desc: '标准 / 对角线 / 窗口 / 不规则 / 不等式 / 奇偶 / 杀手 / 反马步 / 反王步 / 温度计 / 连续 / 罗马，笔记 / 提示 / 撤销',
       variant: {
         CLASSIC: '标准',
         DIAGONAL: '对角线',
@@ -1062,6 +1062,11 @@ export default {
         GREATER: '不等式',
         ODD_EVEN: '奇偶',
         KILLER: '杀手',
+        ANTI_KNIGHT: '反马步',
+        ANTI_KING: '反王步',
+        THERMO: '温度计',
+        CONSECUTIVE: '连续',
+        XV: '罗马',
       },
       variantTip: {
         DIAGONAL: '两条大对角线也要 1~9 不重复',
@@ -1070,6 +1075,11 @@ export default {
         GREATER: '相邻格之间的符号开口朝向较大的数字',
         ODD_EVEN: '底色格只能填奇数，右上角带点的格只能填偶数',
         KILLER: '各笼内数字不重复，且和等于笼左上角的标注',
+        ANTI_KNIGHT: '马步位置的两格不能是同一个数字',
+        ANTI_KING: '斜对角相邻的两格也不能同号（横竖已由行、列约束保证）',
+        THERMO: '温度计圆头端的数字最小，沿线路严格递增',
+        CONSECUTIVE: '带短棒的两格数字相差 1；没有短棒的相邻格不能相差 1',
+        XV: '标 V 的两格之和为 5，标 X 的两格之和为 10；没标的相邻格两数之和既不是 5 也不是 10',
       },
       difficulty: {
         EASY: '简单',

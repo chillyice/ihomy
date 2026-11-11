@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   CELLS,
   DIFFICULTIES,
+  EDGE_REL,
+  VARIANT_KEYS,
   cageIndexOf,
   clearPeerNotes,
   countSolutions,
@@ -14,9 +16,11 @@ import {
   isSolved,
   isValidBoard,
   isValidCages,
+  isValidEdges,
   isValidInequalities,
   isValidParity,
   isValidRegions,
+  isValidThermos,
   notesOf,
   pickHintIndex,
   regionIndexOf,
@@ -331,5 +335,108 @@ describe('数独变体(窗口/不规则/不等式/奇偶)', () => {
     expect(isValidParity(new Array(80).fill(0))).toBe(false)
     expect(isValidParity([...new Array(80).fill(0), 3])).toBe(false)
     expect(isValidParity(new Array(CELLS).fill(0))).toBe(true)
+  })
+})
+
+describe('数独变体(反马步/反王步)', () => {
+  it('反马步终盘没有马步同号,题目唯一解', () => {
+    const groups = extraGroupsFor('ANTI_KNIGHT')
+    expect(groups.length).toBeGreaterThan(0)
+    const { puzzle, solution } = generatePuzzle('MEDIUM', seeded(71), { variant: 'ANTI_KNIGHT' })
+    for (const [a, b] of groups) expect(solution[a]).not.toBe(solution[b])
+    expect(countSolutions(puzzle, 2, { extraGroups: groups })).toBe(1)
+    expect(isSolved(solution, { extraGroups: groups })).toBe(true)
+  })
+
+  it('反王步:斜对角相邻格不同号,题目唯一解', () => {
+    const groups = extraGroupsFor('ANTI_KING')
+    expect(groups.length).toBeGreaterThan(0)
+    const { puzzle, solution } = generatePuzzle('MEDIUM', seeded(72), { variant: 'ANTI_KING' })
+    for (const [a, b] of groups) expect(solution[a]).not.toBe(solution[b])
+    expect(countSolutions(puzzle, 2, { extraGroups: groups })).toBe(1)
+    expect(isSolved(solution, { extraGroups: groups })).toBe(true)
+  })
+
+  it('反马步冲突:马步位置同号会被标冲突', () => {
+    const board = emptyBoard()
+    board[0] = 5
+    board[11] = 5 // 0 → 11 是马步
+    expect(findConflicts(board, extraGroupsFor('ANTI_KNIGHT')).has(0)).toBe(true)
+    expect(findConflicts(board, extraGroupsFor('ANTI_KNIGHT')).has(11)).toBe(true)
+  })
+})
+
+describe('数独变体(温度计/连续/罗马)', () => {
+  it('温度计:每条线路严格递增,题目唯一解', () => {
+    const { puzzle, solution, thermos, inequalities } = generatePuzzle('MEDIUM', seeded(81), { variant: 'THERMO' })
+    expect(isValidThermos(thermos)).toBe(true)
+    expect(thermos.length).toBeGreaterThan(0)
+    for (const path of thermos) {
+      for (let i = 1; i < path.length; i++) expect(solution[path[i]]).toBeGreaterThan(solution[path[i - 1]])
+    }
+    expect(isValidInequalities(inequalities)).toBe(true)
+    expect(countSolutions(puzzle, 2, { inequalities })).toBe(1)
+    expect(isSolved(solution, { inequalities })).toBe(true)
+  })
+
+  it('连续数独:144 条相邻边逐条标注且与终盘一致,题目唯一解', () => {
+    const { puzzle, solution, edges } = generatePuzzle('MEDIUM', seeded(82), { variant: 'CONSECUTIVE' })
+    expect(isValidEdges(edges)).toBe(true)
+    expect(edges).toHaveLength(144)
+    for (const edge of edges) {
+      const diff = Math.abs(solution[edge.a] - solution[edge.b])
+      if (edge.rel === EDGE_REL.CONSECUTIVE) expect(diff).toBe(1)
+      else expect(diff).not.toBe(1)
+    }
+    expect(countSolutions(puzzle, 2, { edges })).toBe(1)
+    expect(isSolved(solution, { edges })).toBe(true)
+  })
+
+  it('罗马数独:V 边和为 5、X 边和为 10,未标记边两者都不是,题目唯一解', () => {
+    const { puzzle, solution, edges } = generatePuzzle('MEDIUM', seeded(83), { variant: 'XV' })
+    expect(isValidEdges(edges)).toBe(true)
+    for (const edge of edges) {
+      const sum = solution[edge.a] + solution[edge.b]
+      if (edge.rel === EDGE_REL.SUM_FIVE) expect(sum).toBe(5)
+      else if (edge.rel === EDGE_REL.SUM_TEN) expect(sum).toBe(10)
+      else expect(sum).not.toBe(5)
+    }
+    expect(countSolutions(puzzle, 2, { edges })).toBe(1)
+    expect(isSolved(solution, { edges })).toBe(true)
+  })
+
+  it('连续边冲突:未标记的相邻格差 1 会被标冲突', () => {
+    const board = emptyBoard()
+    board[0] = 1
+    board[1] = 2
+    const conflicts = findConflicts(board, { edges: [{ a: 0, b: 1, rel: EDGE_REL.NOT_CONSECUTIVE }] })
+    expect(conflicts.has(0)).toBe(true)
+    expect(conflicts.has(1)).toBe(true)
+    expect(findConflicts(board, { edges: [{ a: 0, b: 1, rel: EDGE_REL.CONSECUTIVE }] }).size).toBe(0)
+  })
+
+  it('新变体都在 VARIANT_KEYS 里,边/温度计结构校验挡脏数据', () => {
+    for (const key of ['ANTI_KNIGHT', 'ANTI_KING', 'THERMO', 'CONSECUTIVE', 'XV']) expect(VARIANT_KEYS).toContain(key)
+    const { edges } = generatePuzzle('EASY', seeded(84), { variant: 'XV' })
+    expect(isValidEdges(edges)).toBe(true)
+    expect(isValidEdges(edges.slice(1))).toBe(false)
+    expect(isValidEdges([{ ...edges[0], rel: 9 }, ...edges.slice(1)])).toBe(false)
+    expect(isValidEdges([{ ...edges[0], b: 80 }, ...edges.slice(1)])).toBe(false)
+
+    expect(isValidThermos([])).toBe(false)
+    expect(isValidThermos([[0, 1]])).toBe(true)
+    expect(isValidThermos([[0, 2]])).toBe(false)
+    expect(
+      isValidThermos([
+        [0, 1],
+        [1, 2],
+      ]),
+    ).toBe(false)
+    expect(
+      isValidThermos([
+        [0, 1],
+        [2, 3],
+      ]),
+    ).toBe(true)
   })
 })
