@@ -6,7 +6,14 @@
     <PageToolbar>
       <template v-if="!selectMode">
         <div class="tb-left">
-          <el-input v-model="searchKeyword" :placeholder="t('album.searchPlaceholder')" clearable size="small" style="width: 200px" data-search-input>
+          <el-input
+            v-model="searchKeyword"
+            :placeholder="t('album.searchPlaceholder')"
+            clearable
+            size="small"
+            style="width: 200px"
+            data-search-input
+          >
             <template #prefix>
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                 <circle cx="11" cy="11" r="8" />
@@ -40,6 +47,15 @@
         }}</el-button>
       </div>
     </PageToolbar>
+
+    <!-- 仅安卓壳 + 已登录 + 自动备份未开:提示条把「功能存在但藏在设置里」变成看得见 -->
+    <div v-if="showBackupBanner" class="backup-banner card">
+      <div class="bb-text">
+        <span class="bb-title">{{ t('album.backupEntryTitle') }}</span>
+        <span class="bb-desc">{{ t('album.backupEntryDesc') }}</span>
+      </div>
+      <el-button type="primary" @click="router.push('/settings?tab=client')">{{ t('album.backupEntryAction') }}</el-button>
+    </div>
 
     <div v-loading="loading">
       <!-- 宽屏双栏(≥900px 且屏幕短边 ≥600dp,判定只在 useDevice):
@@ -196,6 +212,7 @@ import AlbumDefaultCover from '@/components/AlbumDefaultCover.vue'
 import PhotoCascade from './PhotoCascade.vue'
 import AlbumDetail from './AlbumDetail.vue'
 import { formatDate } from '@/utils/datetime'
+import { isAndroidApp } from '@/utils/platform'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -209,6 +226,11 @@ const albums = ref([])
 const loading = ref(false)
 const loadError = ref(false)
 const editor = reactive({ visible: false, form: { id: null, name: '', type: 'public' } })
+
+// 手机照片自动备份入口:只在安卓壳 + 已登录 + 开关关着时出现。
+// 只在挂载时读一次开关(同步读 localStorage,不碰原生扫描);从设置页回来会重新挂载,状态自然更新。
+const backupOff = ref(false)
+const showBackupBanner = computed(() => backupOff.value && userStore.isLoggedIn)
 
 // 顶层相册:层级映射的子相册不直接出现在列表页,进入父相册查看;再按关键词/来源/类型前端过滤(数据量小)
 const searchKeyword = ref('')
@@ -365,9 +387,20 @@ onMounted(() => {
     cascadeVisible.value = true
     router.replace({ path: '/album' })
   }
+  detectBackupEntry()
   window.addEventListener('popstate', onPopState)
   load()
 })
+
+/** 只在安卓壳里读一次备份开关(同步 localStorage,不触发原生扫描);Web 端完全不加载该模块 */
+function detectBackupEntry() {
+  if (!isAndroidApp()) return
+  import('@/native/photoBackup')
+    .then((m) => {
+      backupOff.value = !m.photoBackupEnabled()
+    })
+    .catch(() => {})
+}
 
 onBeforeUnmount(() => {
   window.removeEventListener('popstate', onPopState)
@@ -375,6 +408,31 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.backup-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  margin-bottom: 14px;
+}
+.bb-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.bb-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.bb-desc {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
 .select-count {
   font-size: 13px;
   color: var(--color-text-secondary);

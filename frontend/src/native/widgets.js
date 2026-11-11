@@ -30,6 +30,18 @@ export async function reportReminderSync(ts = Date.now()) {
   }
 }
 
+/**
+ * 站内数据改动后即时刷新桌面卡片(原生侧排一次 WidgetWorker,失败静默)。
+ * 记一笔/改账/删账后调用,用户回到桌面就不用等 30 分钟周期。
+ */
+export async function refreshWidgets() {
+  try {
+    await IhomyWidgets.refreshWidgets()
+  } catch (e) {
+    // 卡片是附加能力:未装壳/桥不可用时安静跳过,不影响业务操作
+  }
+}
+
 /** 设置页:后台未读通知开关(原生 WidgetPrefs 是唯一事实源,Worker 直接读) */
 export async function getUnreadNotifyEnabled() {
   try {

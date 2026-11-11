@@ -8,6 +8,14 @@
     <string name="widget_today_desc">Today and recent schedule</string>
     <string name="widget_reminder_desc">Today\'s reminder times</string>
     <string name="widget_countdown_desc">Next anniversary countdown</string>
+    <string name="widget_book_desc">This month\'s income and spending</string>
+    <string name="widget_book_title">This month</string>
+    <string name="widget_book_expense">Spent</string>
+    <string name="widget_book_income">Income</string>
+    <string name="widget_book_balance">Balance</string>
+    <string name="widget_book_empty">Nothing recorded yet</string>
+    <string name="widget_book_count">%1$d entries</string>
+    <string name="widget_book_month">%1$d</string>
     <string name="widget_toggle_done">Mark done</string>
 
     <!-- Launcher shortcuts (English) -->

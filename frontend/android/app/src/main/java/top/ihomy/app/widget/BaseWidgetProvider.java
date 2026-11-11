@@ -86,7 +86,7 @@ public abstract class BaseWidgetProvider extends AppWidgetProvider {
     }
 
     /** 深链 PendingIntent:显式指向本包,避免外溢 */
-    protected static PendingIntent deepLink(Context context, String path) {
+    public static PendingIntent deepLink(Context context, String path) {
         Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse("ihomy://" + path));
         i.setPackage(context.getPackageName());
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -96,7 +96,7 @@ public abstract class BaseWidgetProvider extends AppWidgetProvider {
     }
 
     /** 更新时间小字:HH:mm 更新 */
-    protected static String updatedText(Context context, String widgetId) {
+    public static String updatedText(Context context, String widgetId) {
         long at = WidgetPrefs.updatedAt(context, widgetId);
         if (at <= 0) return "";
         java.time.LocalTime local = java.time.LocalDateTime

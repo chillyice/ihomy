@@ -64,6 +64,71 @@ public final class WidgetRepository {
         public String weather = "";
     }
 
+    /** 记账本月卡:GET /book/summary 的只读快照(数据已经是「元」,不再做分→元换算) */
+    public static class BookSummary {
+        /** yyyy-MM */
+        public String month = "";
+        public double income;
+        public double expense;
+        public double balance;
+        public int count;
+        /** 本地缓存是否存在(不参与序列化,渲染三态用) */
+        public boolean hasCache;
+    }
+
+    /**
+     * 本月收支摘要:一次只读 GET。
+     * 无账本读权限 / 游客时服务端返回全零摘要(与「本月没记」同形),卡片按「本月还没有记录」展示。
+     */
+    public static BookSummary fetchBookSummary(Context context) throws Exception {
+        String token = WidgetPrefs.token(context);
+        if (token == null || token.isEmpty()) throw new IllegalStateException("no widget token");
+        JSONObject root = new JSONObject(SimpleHttp.get(apiBase() + "/book/summary", token));
+        if (root.optInt("code", -1) != 0) throw new IllegalStateException("bad code " + root.optInt("code"));
+        BookSummary s = new BookSummary();
+        JSONObject data = root.optJSONObject("data");
+        if (data == null) return s;
+        s.month = data.optString("month", "");
+        s.income = data.optDouble("income", 0d);
+        s.expense = data.optDouble("expense", 0d);
+        s.balance = data.optDouble("balance", 0d);
+        s.count = data.optInt("count", 0);
+        return s;
+    }
+
+    /** 摘要缓存:全局单份 {"month","income","expense","balance","count"} */
+    public static void cacheBookSummary(Context context, BookSummary s) {
+        try {
+            JSONObject o = new JSONObject();
+            o.put("month", s.month);
+            o.put("income", s.income);
+            o.put("expense", s.expense);
+            o.put("balance", s.balance);
+            o.put("count", s.count);
+            WidgetPrefs.putCache(context, "book", o.toString());
+        } catch (Exception e) {
+            Log.w(TAG, "book summary cache write failed", e);
+        }
+    }
+
+    public static BookSummary readBookSummary(Context context) {
+        BookSummary out = new BookSummary();
+        try {
+            String raw = WidgetPrefs.cache(context, "book");
+            if (raw == null || raw.isEmpty()) return out;
+            JSONObject o = new JSONObject(raw);
+            out.month = o.optString("month", "");
+            out.income = o.optDouble("income", 0d);
+            out.expense = o.optDouble("expense", 0d);
+            out.balance = o.optDouble("balance", 0d);
+            out.count = o.optInt("count", 0);
+            out.hasCache = true;
+        } catch (Exception e) {
+            Log.w(TAG, "book summary cache read failed", e);
+        }
+        return out;
+    }
+
     /** 拉取并解析;抛异常时调用方保持旧缓存不动 */
     public static List<Occurrence> fetchOccurrences(Context context) throws Exception {
         String token = WidgetPrefs.token(context);

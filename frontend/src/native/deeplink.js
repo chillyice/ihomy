@@ -25,6 +25,9 @@ function joinPath(pathname, query, hash) {
 
 async function navigate(raw) {
   if (!raw) return
+  // content:// / file:// / blob: 是「用 ihomy 打开」的文件地址,不是站内路由:
+  // 文件由原生 ShareIntake 接住,深链入口直接忽略,免得把地址栏打成 404 再弹回首页。
+  if (/^(content|file|blob):/i.test(String(raw))) return
   try {
     // 卡片/外部唤起是 ihomy://plan?date=... 自定义 scheme——URL 解析器对非标准 scheme 的 host/path
     // 切分不可靠(Chromium 会把 //plan 塞进 pathname),所以手动剥前缀;

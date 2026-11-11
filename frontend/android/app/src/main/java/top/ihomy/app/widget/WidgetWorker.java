@@ -69,6 +69,12 @@ public class WidgetWorker extends Worker {
         } catch (Exception e) {
             Log.w(TAG, "today info sync skipped: " + e.getMessage());
         }
+        // 记账本月卡:同样独立失败,拿不到就保留上一份(断网不空白)
+        try {
+            WidgetRepository.cacheBookSummary(ctx, WidgetRepository.fetchBookSummary(ctx));
+        } catch (Exception e) {
+            Log.w(TAG, "book summary sync skipped: " + e.getMessage());
+        }
         Widgets.updateAll(ctx);
         // 后台未读与卡片同一条 30 分钟周期,不新增任务(计划 §5.2);
         // 前台服务运行时另有 30 秒一次的同步,两边共用 UnreadSync(基线互不冲突)

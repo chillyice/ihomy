@@ -131,7 +131,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 || path.startsWith("/anniversary/") || "/reminder".equals(path) || "/reminder/list".equals(path)
                 // 第二批:后台未读轮询。必须精确到路径,不能给 /notification/ 前缀——
                 // /notification/list 返回通知正文,卡片令牌只该读计数,不该读内容。
-                || "/notification/unread-count".equals(path) || "/chat/unread".equals(path);
+                || "/notification/unread-count".equals(path) || "/chat/unread".equals(path)
+                // 第三批 S4:记账本月卡只读摘要(不含 /book/list、/book/ledger 明细)
+                || "/book/summary".equals(path);
     }
 
     /** 卡片令牌访问白名单外接口:直接 401,不走通用异常链 */

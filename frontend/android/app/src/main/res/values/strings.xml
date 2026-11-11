@@ -13,6 +13,14 @@
     <string name="widget_today_desc">今天日期与最近日程</string>
     <string name="widget_reminder_desc">今日提醒时刻清单</string>
     <string name="widget_countdown_desc">下一个纪念日倒计时</string>
+    <string name="widget_book_desc">本月收支与结余</string>
+    <string name="widget_book_title">本月收支</string>
+    <string name="widget_book_expense">支出</string>
+    <string name="widget_book_income">收入</string>
+    <string name="widget_book_balance">结余</string>
+    <string name="widget_book_empty">本月还没有记录</string>
+    <string name="widget_book_count">共 %1$d 笔</string>
+    <string name="widget_book_month">%1$d月</string>
     <string name="widget_toggle_done">标记完成</string>
 
     <!-- 长按图标快捷方式(默认中文;英文覆盖见 values-en) -->

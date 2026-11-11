@@ -23,33 +23,41 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * 系统分享收件桥(插件名 {@code IhomyShare}):把其他应用分享过来的文字/图片交给 WebView,
- * 由站内「分享到家庭」页面决定落到相册 / 愿望 / 日记,原生侧不猜测业务意图。
+ * 系统收件桥(插件名 {@code IhomyShare}):把其他应用分享/打开过来的文字、图片、文档、视频交给 WebView,
+ * 由站内「分享到家庭」页面决定落到相册 / 图书馆 / 放映厅,原生侧不猜测业务意图。
  *
  * <p>约定:
  * <ul>
- *   <li>图片一律**复制进应用缓存目录**再交给前端:分享方给的 content:// 授权只在本次意图内有效,
- *       复制后即使原应用退出也能上传;</li>
- *   <li>预览缩略图在原生侧降到 720px 再 base64 回传,避免把相机原图整份塞进 WebView 内存;</li>
- *   <li>最多 9 个文件、单个 ≤ 10MB(与后端单张上限一致)、合计 ≤ 90MB,超出的跳过并在返回里标明;</li>
- *   <li>{@code getPending} 只读不消费,前端确认落地后再调 {@code clearPending},失败可重试。</li>
+ *   <li><b>图片</b>立即复制进应用缓存目录(分享方给的 content:// 授权只在本次意图内有效),
+ *       并在原生侧降到 720px 生成 base64 缩略图;单张 ≤10MB(与后端一致),一次最多 9 张;</li>
+ *   <li><b>文档 / 视频</b>只回元数据(name/mime/size),用户点「保存」时才 {@code prepare} 复制,
+ *       避免「只是看一眼」也白拷几百 MB 进缓存;单文件 ≤500MB(与后端 multipart 上限一致);</li>
+ *   <li>{@code getPending} 只读不消费,前端确认落地后再调 {@code clearPending},失败可重试;</li>
+ *   <li>{@code readFile} 的 base64 通道保留为兜底(硬限 10MB),大文件走 {@code convertFileSrc} 流式读取。</li>
  * </ul>
  */
 @CapacitorPlugin(name = "IhomyShare")
 public class ShareInboxPlugin extends Plugin {
 
-    private static final int MAX_FILES = 9;
+    /** 图片一次最多 9 张(与原分享口径一致) */
+    private static final int MAX_IMAGE_FILES = 9;
     /** 与后端单张图片上限一致(PhotoController.MAX_IMAGE_BYTES = 10MB) */
-    private static final long MAX_FILE_BYTES = 10L * 1024L * 1024L;
-    private static final long MAX_TOTAL_BYTES = 90L * 1024L * 1024L;
+    private static final long MAX_IMAGE_BYTES = 10L * 1024L * 1024L;
+    private static final long MAX_IMAGE_TOTAL_BYTES = 90L * 1024L * 1024L;
+    /** 文档/视频惰性复制上限,对齐 spring.servlet.multipart.max-file-size = 500MB */
+    private static final long MAX_DOC_BYTES = 500L * 1024L * 1024L;
+    private static final long MAX_DOC_TOTAL_BYTES = 500L * 1024L * 1024L;
     private static final int MAX_TEXT_CHARS = 20000;
     private static final int THUMB_MAX_SIDE = 720;
     private static final int THUMB_QUALITY = 70;
+    private static final String DIR_NAME = "share-in";
     private static final String TAG = "IhomyShare";
 
     private static ShareInboxPlugin instance;
@@ -57,6 +65,8 @@ public class ShareInboxPlugin extends Plugin {
     /** 同一次分享重复调用 getPending 时直接复用上次结果(避免反复复制文件/解码缩略图) */
     private static long cachedFor = -1L;
     private static JSObject cachedPayload;
+    /** 已 prepare 过的文件(index → 缓存路径);同一次收件内不重复复制 */
+    private static final Map<Integer, String> preparedPaths = new HashMap<>();
 
     private final ExecutorService io = Executors.newSingleThreadExecutor();
 
@@ -72,7 +82,7 @@ public class ShareInboxPlugin extends Plugin {
         if (p != null) p.notifyListeners("shareReceived", new JSObject());
     }
 
-    /** 是否有待处理分享(前端启动时调用;只读,确认落地后调 clearPending) */
+    /** 是否有待处理收件(前端启动时调用;只读,确认落地后调 clearPending) */
     @PluginMethod
     public void getPending(PluginCall call) {
         io.execute(() -> {
@@ -90,12 +100,17 @@ public class ShareInboxPlugin extends Plugin {
                 }
                 JSObject ret = new JSObject();
                 ret.put("has", true);
+                ret.put("mode", pending.mode == null ? ShareIntake.MODE_SHARE : pending.mode);
                 ret.put("text", clip(pending.text));
                 ret.put("subject", pending.subject == null ? "" : pending.subject);
                 ret.put("receivedAt", pending.receivedAt);
-                JSArray files = collectFiles(pending.uris);
+                JSArray files = buildFiles(pending);
                 ret.put("files", files);
-                ret.put("skipped", Math.max(0, pending.uris.size() - files.length()));
+                int skippedImages = skipCount.images;
+                int skippedDocs = skipCount.docs;
+                ret.put("skipped", skippedImages + skippedDocs);
+                ret.put("skippedImages", skippedImages);
+                ret.put("skippedDocs", skippedDocs);
                 cachedFor = pending.receivedAt;
                 cachedPayload = ret;
                 call.resolve(ret);
@@ -105,18 +120,93 @@ public class ShareInboxPlugin extends Plugin {
         });
     }
 
-    /** 内容已落到站内(或用户主动放弃),清掉待处理 */
+    /** 内容已落到站内(或用户主动放弃),清掉待处理与缓存文件 */
     @PluginMethod
     public void clearPending(PluginCall call) {
         ShareIntake.clear();
         cachedFor = -1L;
         cachedPayload = null;
+        synchronized (preparedPaths) {
+            preparedPaths.clear();
+        }
+        io.execute(() -> clearDir(shareDir()));
         call.resolve();
+    }
+
+    /**
+     * 文档/视频惰性复制:用户点「保存」时才把 content:// 落进缓存目录,返回真实路径。
+     * 图片也会走这里兜底(若前端发现没有 path,例如页面刷新后缓存被系统清过)。
+     */
+    @PluginMethod
+    public void prepare(PluginCall call) {
+        Integer index = call.getInt("index");
+        if (index == null) {
+            call.reject("index required");
+            return;
+        }
+        io.execute(() -> {
+            try {
+                ShareIntake.Pending pending = ShareIntake.peek();
+                if (pending == null || index < 0 || index >= pending.uris.size()) {
+                    call.reject("文件已失效,请重新分享");
+                    return;
+                }
+                synchronized (preparedPaths) {
+                    String cached = preparedPaths.get(index);
+                    if (cached != null) {
+                        File cf = new File(cached);
+                        if (cf.isFile() && cf.length() > 0) {
+                            resolvePrepared(call, cf, resolveMime(pending.uris.get(index)));
+                            return;
+                        }
+                        preparedPaths.remove(index);
+                    }
+                }
+                Uri uri = pending.uris.get(index);
+                String mime = resolveMime(uri);
+                String name = displayName(uri, index, mime);
+                File dir = shareDir();
+                if (!dir.exists() && !dir.mkdirs()) {
+                    call.reject("copy_failed");
+                    return;
+                }
+                File dest = new File(dir, pending.receivedAt + "-" + index + "-" + name);
+                if (dest.isFile() && dest.length() > 0) {
+                    // 图片在 getPending 时已复制过,直接复用
+                    rememberPrepared(index, dest);
+                    resolvePrepared(call, dest, mime);
+                    return;
+                }
+                long remain = MAX_DOC_TOTAL_BYTES - dirSize(dir);
+                if (remain <= 0) {
+                    call.reject("too_large");
+                    return;
+                }
+                long copied = copyToFile(uri, dest, MAX_DOC_BYTES, remain);
+                if (copied == -1L) {
+                    //noinspection ResultOfMethodCallIgnored
+                    dest.delete();
+                    call.reject("too_large");
+                    return;
+                }
+                if (copied <= 0) {
+                    //noinspection ResultOfMethodCallIgnored
+                    dest.delete();
+                    call.reject("copy_failed");
+                    return;
+                }
+                rememberPrepared(index, dest);
+                resolvePrepared(call, dest, mime);
+            } catch (Exception e) {
+                call.reject("copy_failed", e);
+            }
+        });
     }
 
     /**
      * 读取分享时复制到缓存目录的文件(base64)。只允许读我们自己复制的那批:
      * 路径必须落在 {@code <cache>/share-in/} 内,避免被当成任意文件读取口子。
+     * 只作兜底通道(硬限 10MB),大文件走 {@code prepare} + 本地资源地址流式读取。
      */
     @PluginMethod
     public void readFile(PluginCall call) {
@@ -127,13 +217,13 @@ public class ShareInboxPlugin extends Plugin {
         }
         io.execute(() -> {
             try {
-                File dir = new File(getContext().getCacheDir(), "share-in");
+                File dir = shareDir();
                 File file = new File(path);
                 if (!file.getCanonicalPath().startsWith(dir.getCanonicalPath() + File.separator) || !file.isFile()) {
                     call.reject("文件已失效,请重新分享");
                     return;
                 }
-                if (file.length() > MAX_FILE_BYTES) {
+                if (file.length() > MAX_IMAGE_BYTES) {
                     call.reject("文件超过 10MB");
                     return;
                 }
@@ -157,42 +247,114 @@ public class ShareInboxPlugin extends Plugin {
         });
     }
 
-    // ---- 落地:复制 + 缩略图 ----
+    // ---- 落地:图片立即复制 + 文档只回元数据 ----
 
-    private JSArray collectFiles(List<Uri> uris) {
+    /** 一次 collect 的跳过计数(buildFiles 写完即用,单线程 io 串行不会有并发) */
+    private final SkipCount skipCount = new SkipCount();
+
+    private static final class SkipCount {
+        int images;
+        int docs;
+    }
+
+    private JSArray buildFiles(ShareIntake.Pending pending) {
         JSArray out = new JSArray();
-        File dir = new File(getContext().getCacheDir(), "share-in");
+        File dir = shareDir();
         clearDir(dir);
+        synchronized (preparedPaths) {
+            preparedPaths.clear();
+        }
+        skipCount.images = 0;
+        skipCount.docs = 0;
         if (!dir.exists() && !dir.mkdirs()) return out;
-        long total = 0L;
-        for (int i = 0; i < uris.size() && out.length() < MAX_FILES; i++) {
-            Uri uri = uris.get(i);
+        long imageTotal = 0L;
+        int imageCount = 0;
+        for (int i = 0; i < pending.uris.size(); i++) {
+            Uri uri = pending.uris.get(i);
             try {
                 String mime = resolveMime(uri);
                 String name = displayName(uri, i, mime);
-                File dest = new File(dir, System.currentTimeMillis() + "-" + i + "-" + name);
-                long copied = copyToFile(uri, dest, MAX_FILE_BYTES, MAX_TOTAL_BYTES - total);
-                if (copied <= 0) {
-                    //noinspection ResultOfMethodCallIgnored
-                    dest.delete();
-                    Log.w(TAG, "skip share file: " + uri + " (copy failed or too large)");
-                    continue;
+                if (isImage(mime)) {
+                    if (imageCount >= MAX_IMAGE_FILES) {
+                        skipCount.images++;
+                        continue;
+                    }
+                    File dest = new File(dir, pending.receivedAt + "-" + i + "-" + name);
+                    long copied = copyToFile(uri, dest, MAX_IMAGE_BYTES, MAX_IMAGE_TOTAL_BYTES - imageTotal);
+                    if (copied <= 0) {
+                        //noinspection ResultOfMethodCallIgnored
+                        dest.delete();
+                        Log.w(TAG, "skip share image: " + uri + " (copy failed or too large)");
+                        skipCount.images++;
+                        continue;
+                    }
+                    imageTotal += copied;
+                    imageCount++;
+                    JSObject f = new JSObject();
+                    f.put("index", i);
+                    f.put("kind", "image");
+                    f.put("name", name);
+                    f.put("mime", mime);
+                    f.put("size", copied);
+                    f.put("path", dest.getAbsolutePath());
+                    String thumb = thumbDataUrl(dest, mime);
+                    if (thumb != null) f.put("thumb", thumb);
+                    out.put(f);
+                } else {
+                    long size = fileSize(uri);
+                    if (size > MAX_DOC_BYTES) {
+                        skipCount.docs++;
+                        Log.w(TAG, "skip share doc: " + uri + " (too large)");
+                        continue;
+                    }
+                    JSObject f = new JSObject();
+                    f.put("index", i);
+                    f.put("kind", "doc");
+                    f.put("name", name);
+                    f.put("mime", mime);
+                    // 取不到大小给 -1,前端显示「—」,保存时仍按 500MB 上限校验
+                    f.put("size", size);
+                    out.put(f);
                 }
-                total += copied;
-                JSObject f = new JSObject();
-                f.put("name", name);
-                f.put("mime", mime);
-                f.put("size", copied);
-                f.put("path", dest.getAbsolutePath());
-                String thumb = thumbDataUrl(dest, mime);
-                if (thumb != null) f.put("thumb", thumb);
-                out.put(f);
             } catch (Exception e) {
                 // 单个文件失败不影响其余(分享方给的 URI 可能已失效)
                 Log.w(TAG, "read share file failed: " + uri, e);
             }
         }
         return out;
+    }
+
+    private void resolvePrepared(PluginCall call, File file, String mime) {
+        JSObject ret = new JSObject();
+        ret.put("path", file.getAbsolutePath());
+        ret.put("size", file.length());
+        ret.put("name", stripPrefix(file.getName()));
+        ret.put("mime", mime);
+        call.resolve(ret);
+    }
+
+    private void rememberPrepared(int index, File file) {
+        synchronized (preparedPaths) {
+            preparedPaths.put(index, file.getAbsolutePath());
+        }
+    }
+
+    /** 缓存目录 {@code <cache>/share-in/} */
+    private File shareDir() {
+        return new File(getContext().getCacheDir(), DIR_NAME);
+    }
+
+    private static boolean isImage(String mime) {
+        return mime != null && mime.startsWith("image/");
+    }
+
+    /** 文件名去掉 {@code <receivedAt>-<index>-} 前缀,回传给前端做展示/标题 */
+    private static String stripPrefix(String name) {
+        if (name == null) return "";
+        int first = name.indexOf('-');
+        if (first < 0) return name;
+        int second = name.indexOf('-', first + 1);
+        return second >= 0 ? name.substring(second + 1) : name;
     }
 
     /** 分享方不给 MIME 时按扩展名兜底(常见于 file:// 或自定义 provider) */
@@ -212,6 +374,25 @@ public class ShareInboxPlugin extends Plugin {
         }
         String guess = ext == null ? null : MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext.toLowerCase());
         return guess == null ? "application/octet-stream" : guess;
+    }
+
+    /** 文档大小:取不到给 -1(不阻塞保存,前端仍按接口上限校验) */
+    private long fileSize(Uri uri) {
+        try (Cursor c = getContext().getContentResolver()
+                .query(uri, new String[] { OpenableColumns.SIZE }, null, null, null)) {
+            if (c != null && c.moveToFirst() && !c.isNull(0)) return c.getLong(0);
+        } catch (Exception ignored) {
+            // 部分 provider 不支持 SIZE 列
+        }
+        return -1L;
+    }
+
+    private long dirSize(File dir) {
+        File[] files = dir.listFiles();
+        if (files == null) return 0L;
+        long total = 0L;
+        for (File f : files) total += f.length();
+        return total;
     }
 
     private long copyToFile(Uri uri, File dest, long perFileLimit, long remainTotal) throws Exception {
@@ -235,7 +416,7 @@ public class ShareInboxPlugin extends Plugin {
 
     /** 缩略图 data URL(仅图片);大图先按 2 的幂降采样再按最长边缩放 */
     private String thumbDataUrl(File file, String mime) {
-        if (mime == null || !mime.startsWith("image/")) return null;
+        if (!isImage(mime)) return null;
         try {
             BitmapFactory.Options bounds = new BitmapFactory.Options();
             bounds.inJustDecodeBounds = true;

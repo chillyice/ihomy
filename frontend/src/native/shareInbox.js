@@ -1,6 +1,7 @@
-// 系统分享收件(仅原生壳):其他应用「分享 → ihomy」时,把文字/图片交给站内 /share 页面决定去向。
-// 原生侧只负责接住与复制文件,业务落点(相册/愿望/日记)全在前端,和站内新建走同一批接口。
-import { registerPlugin } from '@capacitor/core'
+// 系统分享收件(仅原生壳):其他应用「分享 → ihomy」或「用 ihomy 打开」时,
+// 把文字/图片/文档/视频交给站内 /share 页面决定去向。
+// 原生侧只负责接住与复制文件,业务落点(相册/图书馆/放映厅/愿望/日记)全在前端,和站内新建走同一批接口。
+import { Capacitor, registerPlugin } from '@capacitor/core'
 import router from '@/router'
 import { useUserStore } from '@/stores/user'
 import { fileFromBase64 } from '@/utils/file'
@@ -49,10 +50,40 @@ export async function clearSharePayload() {
   await IhomyShare.clearPending().catch(() => {})
 }
 
-/** 把原生复制到缓存目录的文件读成 File(上传接口要 FormData) */
+/** 把原生缓存文件读成 File(上传接口要 FormData)。
+ *
+ * 文档/视频在原生侧是**惰性复制**:payload 里只有元数据,这里先 prepare 落盘再取;
+ * 取文件优先走本地资源地址流式读(不占桥内存),读不到才退 base64(硬限 10MB,只作兜底)。
+ */
 export async function readShareFile(file) {
-  const res = await IhomyShare.readFile({ path: file.path })
-  return fileFromBase64(res.data, file.name || 'share', file.mime || 'application/octet-stream')
+  const f = await materialize(file)
+  const name = f.name || 'share'
+  const mime = f.mime || 'application/octet-stream'
+  try {
+    const res = await fetch(Capacitor.convertFileSrc(f.path))
+    if (res.ok) {
+      const blob = await res.blob()
+      if (blob.size > 0) return new File([blob], name, { type: mime })
+    }
+  } catch (e) {
+    /* 退到 base64 通道 */
+  }
+  const out = await IhomyShare.readFile({ path: f.path })
+  return fileFromBase64(out.data, name, mime)
+}
+
+/** 确保 payload 里的这一项已落盘:有 path 直接用,没有则让原生按 index 复制(结果回写到同一份 payload) */
+async function materialize(file) {
+  if (!file) throw new Error('no file')
+  if (file.path) return file
+  if (file.index === undefined || file.index === null) throw new Error('no index')
+  const res = await IhomyShare.prepare({ index: file.index })
+  if (!res || !res.path) throw new Error('prepare failed')
+  file.path = res.path
+  if (res.name) file.name = res.name
+  if (res.mime) file.mime = res.mime
+  if (typeof res.size === 'number' && res.size > 0) file.size = res.size
+  return file
 }
 
 async function openShare({ broadcast = false } = {}) {

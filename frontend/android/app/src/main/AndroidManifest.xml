@@ -46,7 +46,8 @@
                 <data android:scheme="ihomy" />
             </intent-filter>
 
-            <!-- 系统分享收件:微信/浏览器分享文字链接、相册分享图片(单张/多张)→ 站内「分享到家庭」 -->
+            <!-- 系统分享收件:微信/浏览器分享文字链接、相册分享图片(单张/多张)、
+                 文件管理器分享 PDF/视频 → 站内「分享到家庭」 -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -65,9 +66,40 @@
                 <data android:mimeType="image/*" />
             </intent-filter>
 
+            <!-- 接收文件:PDF / 视频(单发);PDF 多发。只列明确类型,不用 */* 抢分享面板 -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/pdf" />
+            </intent-filter>
+
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="video/*" />
+            </intent-filter>
+
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/pdf" />
+            </intent-filter>
+
+            <!-- 用 ihomy 打开:图片 / PDF(content:// 与 file://)。
+                 同一 intent-filter 内的多个 data 是属性合并(scheme ∈ {content,file} 且 mime ∈ {image/*,pdf}) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="application/pdf" />
+            </intent-filter>
+
         </activity>
 
-        <!-- 桌面卡片 ×3:今日概览 / 今日提醒 / 纪念日倒计时(RemoteViews 直写,数据见 widget/ 目录) -->
+        <!-- 桌面卡片 ×4:今日概览 / 今日提醒 / 纪念日倒计时 / 记账本月(RemoteViews 直写,数据见 widget/ 目录) -->
         <receiver
             android:name=".widget.TodayWidgetProvider"
             android:exported="false"
@@ -102,6 +134,18 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info_countdown" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.BookWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_book_desc">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_book" />
         </receiver>
 
         <!-- 卡片勾选动作:提醒卡圆圈 → 广播 → Worker 勾选并整轮刷新(exported=false,仅本包) -->

@@ -260,6 +260,7 @@ import { formatYuan } from '@/utils/money'
 import { isAndroidApp } from '@/utils/platform'
 import { haptic } from '@/utils/haptics'
 import { copyText } from '@/native/shareOut'
+import { refreshWidgets } from '@/native/widgets'
 import { parseVoiceRecord } from '@/utils/voiceRecord'
 import SwipeRow from '@/components/ui/SwipeRow.vue'
 import { bindHorizontalWheel } from '@/utils/horizontalWheel'
@@ -606,6 +607,8 @@ const onSave = async () => {
     editor.visible = false
     // 记一笔会改账户余额,余额条与明细一起刷
     await load()
+    // 桌面「记账本月」卡同步(失败静默,不影响记账成功)
+    refreshWidgets()
   } finally {
     saving.value = false
   }
@@ -619,6 +622,7 @@ const onDel = async (r) => {
   await bookApi.remove(r.id)
   ElMessage.success(t('common.deleted'))
   await load()
+  refreshWidgets()
 }
 
 // 月份由父页持有:选月/父页钻取都走这里,避免两处各自维护一份

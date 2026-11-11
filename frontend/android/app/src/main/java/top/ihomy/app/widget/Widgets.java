@@ -6,12 +6,13 @@ import android.content.Context;
 import android.content.Intent;
 
 /**
- * 三个 provider 的统一刷新入口:provider onUpdate 与 Worker 完成后都走这里重绘全部卡片。
+ * 四个 provider 的统一刷新入口:provider onUpdate 与 Worker 完成后都走这里重绘全部卡片。
  */
 public final class Widgets {
 
     public static final Class<?>[] PROVIDERS = {
-            TodayWidgetProvider.class, ReminderWidgetProvider.class, CountdownWidgetProvider.class
+            TodayWidgetProvider.class, ReminderWidgetProvider.class, CountdownWidgetProvider.class,
+            BookWidgetProvider.class
     };
 
     private Widgets() {
