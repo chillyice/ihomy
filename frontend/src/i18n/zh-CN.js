@@ -5624,6 +5624,15 @@ export default {
     unreadNotifyEvery: '约每 30 分钟',
     unreadNotifyDesc:
       '有人发消息或有新通知时，锁屏会出现一条合并提示。大约每 30 分钟检查一次，23:00–06:00 不打扰；部分手机会限制后台检查，打开应用时仍会立即更新。',
+    // 每日天气推送
+    dailyWeatherTitle: '每日天气',
+    dailyWeatherTimePlaceholder: '推送时间',
+    dailyWeatherPreview: '发一条预览',
+    dailyWeatherPreviewSent: '预览已发出，稍后看通知栏',
+    dailyWeatherPreviewDenied: '系统还没允许 ihomy 发通知，请先在系统设置里打开通知权限',
+    dailyWeatherPreviewOffline: '当前没有网络，等联网后再试',
+    dailyWeatherDesc:
+      '每天在设定时间推送一条当天天气和一句出行建议，只在通知中心和锁屏安静显示，不弹横幅也不响铃。天气用家庭设置的常用城市，点开可以看完整预报。',
     // 诊断信息(崩溃与前端报错,只留本机)
     diagnosticsTitle: '诊断信息',
     diagnosticsCrashes: '崩溃 {n} 份',
@@ -5986,8 +5995,9 @@ export default {
     notesTitle: '这个版本更新了什么',
     downloading: '正在下载 {percent}%',
     downloadingSize: '{done} / {total}',
-    keepForeground: '请保持应用在前台，下载完成后会自动继续。',
+    keepForeground: '可以锁屏或切到后台，下载会继续进行；完成后会自动打开安装界面。',
     installNow: '立即更新',
+    installReady: '立即安装',
     later: '稍后',
     installerTip: '已在系统安装界面，按提示确认安装即可；如果没看到，再点一次。',
     reopenInstaller: '重新打开安装界面',

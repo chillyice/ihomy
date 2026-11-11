@@ -6,14 +6,11 @@ import android.util.Log;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+
+import top.ihomy.app.net.SimpleHttp;
 
 /**
  * 卡片数据仓库:凭 WIDGET 令牌 GET /schedule/occurrences,把三张卡片需要的字段解析成快照缓存。
@@ -74,7 +71,7 @@ public final class WidgetRepository {
         LocalDate from = LocalDate.now();
         LocalDate to = from.plusDays(WINDOW_DAYS - 1L);
         String url = apiBase() + "/schedule/occurrences?from=" + from + "&to=" + to;
-        String body = get(url, token);
+        String body = SimpleHttp.get(url, token);
         JSONObject root = new JSONObject(body);
         if (root.optInt("code", -1) != 0) throw new IllegalStateException("bad code " + root.optInt("code"));
         JSONArray items = root.getJSONObject("data").getJSONArray("items");
@@ -102,10 +99,10 @@ public final class WidgetRepository {
         String token = WidgetPrefs.token(context);
         if (token == null || token.isEmpty()) throw new IllegalStateException("no widget token");
         Unread unread = new Unread();
-        JSONObject notice = new JSONObject(get(apiBase() + "/notification/unread-count", token));
+        JSONObject notice = new JSONObject(SimpleHttp.get(apiBase() + "/notification/unread-count", token));
         if (notice.optInt("code", -1) != 0) throw new IllegalStateException("bad notice code " + notice.optInt("code"));
         unread.notification = notice.optLong("data", 0L);
-        JSONObject chat = new JSONObject(get(apiBase() + "/chat/unread", token));
+        JSONObject chat = new JSONObject(SimpleHttp.get(apiBase() + "/chat/unread", token));
         if (chat.optInt("code", -1) != 0) throw new IllegalStateException("bad chat code " + chat.optInt("code"));
         unread.chat = chat.optJSONObject("data") == null ? 0L : chat.optJSONObject("data").optLong("unread", 0L);
         return unread;
@@ -123,7 +120,7 @@ public final class WidgetRepository {
         info.date = today.toString();
         // 农历:整月数据里取今天这一天
         try {
-            JSONObject cal = new JSONObject(get(apiBase() + "/public/calendar?month=" + today.getYear()
+            JSONObject cal = new JSONObject(SimpleHttp.get(apiBase() + "/public/calendar?month=" + today.getYear()
                     + String.format(java.util.Locale.US, "-%02d", today.getMonthValue()), token));
             JSONArray days = cal.getJSONObject("data").getJSONArray("days");
             for (int i = 0; i < days.length(); i++) {
@@ -141,7 +138,7 @@ public final class WidgetRepository {
         }
         // 天气:Key 未配时服务端返回 data=null,留空即不展示
         try {
-            JSONObject w = new JSONObject(get(apiBase() + "/public/weather", token));
+            JSONObject w = new JSONObject(SimpleHttp.get(apiBase() + "/public/weather", token));
             if (w.optInt("code", -1) == 0 && !w.isNull("data")) {
                 JSONObject data = w.getJSONObject("data");
                 Object temp = data.opt("temp");
@@ -191,7 +188,7 @@ public final class WidgetRepository {
     public static void toggleDone(Context context, long reminderId, String date) throws Exception {
         String token = WidgetPrefs.token(context);
         if (token == null || token.isEmpty()) throw new IllegalStateException("no widget token");
-        post(apiBase() + "/reminder/" + reminderId + "/toggle-done?date=" + date, token);
+        SimpleHttp.post(apiBase() + "/reminder/" + reminderId + "/toggle-done?date=" + date, token);
     }
 
     /** 缓存结构:{"items":[...]}——原样存解析后的最小字段,渲染时不再依赖网络 */
@@ -239,42 +236,5 @@ public final class WidgetRepository {
             Log.w(TAG, "cache read failed", e);
         }
         return out;
-    }
-
-    private static String get(String url, String token) throws Exception {
-        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-        try {
-            conn.setConnectTimeout(8000);
-            conn.setReadTimeout(15000);
-            conn.setRequestMethod("GET");
-            conn.setRequestProperty("Authorization", "Bearer " + token);
-            conn.setRequestProperty("Accept", "application/json");
-            int code = conn.getResponseCode();
-            if (code != 200) throw new IllegalStateException("HTTP " + code);
-            InputStream in = conn.getInputStream();
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            byte[] buf = new byte[4096];
-            int n;
-            while ((n = in.read(buf)) > 0) bos.write(buf, 0, n);
-            in.close();
-            return new String(bos.toByteArray(), StandardCharsets.UTF_8);
-        } finally {
-            conn.disconnect();
-        }
-    }
-
-    /** 无请求体 POST(勾选动作),2xx 即成功 */
-    private static void post(String url, String token) throws Exception {
-        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
-        try {
-            conn.setConnectTimeout(8000);
-            conn.setReadTimeout(15000);
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("Authorization", "Bearer " + token);
-            int code = conn.getResponseCode();
-            if (code < 200 || code >= 300) throw new IllegalStateException("HTTP " + code);
-        } finally {
-            conn.disconnect();
-        }
     }
 }

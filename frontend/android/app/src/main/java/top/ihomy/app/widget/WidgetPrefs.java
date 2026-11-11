@@ -24,6 +24,12 @@ public final class WidgetPrefs {
     public static final String KEY_LAST_UNREAD_CHAT = "last_unread_chat";
     /** 后台未读通知开关(默认开) */
     public static final String KEY_UNREAD_NOTIFY = "unread_notify_enabled";
+    /** 每日天气推送开关(默认开)、推送时刻(当天 0 点起的分钟数)、上次发送日期(yyyy-MM-dd) */
+    public static final String KEY_DAILY_WEATHER = "daily_weather_enabled";
+    public static final String KEY_DAILY_WEATHER_MINUTE = "daily_weather_minute";
+    public static final String KEY_LAST_WEATHER_DATE = "last_weather_date";
+    /** 默认 07:30(与 DailyWeatherWorker.DEFAULT_MINUTE 同口径) */
+    public static final int DEFAULT_DAILY_WEATHER_MINUTE = 7 * 60 + 30;
 
     private WidgetPrefs() {
     }
@@ -104,5 +110,31 @@ public final class WidgetPrefs {
 
     public static void setUnreadNotifyEnabled(Context context, boolean enabled) {
         prefs(context).edit().putBoolean(KEY_UNREAD_NOTIFY, enabled).apply();
+    }
+
+    public static boolean dailyWeatherEnabled(Context context) {
+        return prefs(context).getBoolean(KEY_DAILY_WEATHER, true);
+    }
+
+    public static void setDailyWeatherEnabled(Context context, boolean enabled) {
+        prefs(context).edit().putBoolean(KEY_DAILY_WEATHER, enabled).apply();
+    }
+
+    /** 推送时刻:当天 0 点起的分钟数(0–1439),越界回落到默认 07:30 */
+    public static int dailyWeatherMinute(Context context) {
+        int minute = prefs(context).getInt(KEY_DAILY_WEATHER_MINUTE, DEFAULT_DAILY_WEATHER_MINUTE);
+        return minute >= 0 && minute < 24 * 60 ? minute : DEFAULT_DAILY_WEATHER_MINUTE;
+    }
+
+    public static void setDailyWeatherMinute(Context context, int minute) {
+        prefs(context).edit().putInt(KEY_DAILY_WEATHER_MINUTE, minute).apply();
+    }
+
+    public static String lastWeatherDate(Context context) {
+        return prefs(context).getString(KEY_LAST_WEATHER_DATE, "");
+    }
+
+    public static void setLastWeatherDate(Context context, String date) {
+        prefs(context).edit().putString(KEY_LAST_WEATHER_DATE, date == null ? "" : date).apply();
     }
 }

@@ -35,4 +35,30 @@
     <string name="notify_unread_body">Chat %1$d · Notices %2$d</string>
     <string name="notify_action_chat">Open chat</string>
     <string name="notify_action_notice">Open notices</string>
+
+    <!-- Daily weather (one quiet note a day, notification center + lock screen only) -->
+    <string name="notify_channel_weather">Daily weather</string>
+    <string name="notify_channel_weather_desc">One daily note with today\'s weather and a short tip, shown quietly without sound</string>
+    <string name="notify_weather_title">%1$s · %2$d°~%3$d°</string>
+    <string name="notify_weather_title_now">%1$s · %2$d°</string>
+    <string name="notify_weather_title_fallback">Today\'s weather</string>
+    <string name="notify_weather_now">Now %1$d°, feels like %2$d°</string>
+    <string name="notify_weather_now_only">Now %1$d°</string>
+    <string name="notify_weather_range">High %1$d° · Low %2$d°</string>
+    <string name="notify_weather_range_pop">High %1$d° · Low %2$d° · Rain %3$d%%</string>
+    <string name="notify_weather_wind">Wind %1$s %2$s</string>
+    <string name="notify_weather_air">Air %1$s</string>
+    <string name="notify_weather_advice_warning">%1$s %2$s alert, take care outside</string>
+    <string name="notify_weather_advice_warning_plain">%1$s alert, take care outside</string>
+    <string name="notify_weather_advice_thunder">Thunderstorms possible, stay indoors when you can</string>
+    <string name="notify_weather_advice_snow">Snow today, take it slow and watch your step</string>
+    <string name="notify_weather_advice_rain">Rain possible, take an umbrella</string>
+    <string name="notify_weather_advice_fog">Low visibility, mind the roads</string>
+    <string name="notify_weather_advice_air">Air quality is poor, wear a mask outside</string>
+    <string name="notify_weather_advice_hot">Hot day, keep drinking water</string>
+    <string name="notify_weather_advice_cold">Chilly, dress warm</string>
+    <string name="notify_weather_advice_big_diff">Big day-night swing, bring a jacket</string>
+    <string name="notify_weather_advice_uv">Strong UV, remember sunscreen</string>
+    <string name="notify_weather_advice_windy">Quite windy, hold on to your hat</string>
+    <string name="notify_weather_advice_nice">Nice weather, good day for a walk</string>
 </resources>

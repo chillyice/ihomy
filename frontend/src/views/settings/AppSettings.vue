@@ -80,6 +80,25 @@
         <div class="share-tip">{{ $t('appSettings.unreadNotifyDesc') }}</div>
       </el-form-item>
 
+      <el-form-item :label="$t('appSettings.dailyWeatherTitle')">
+        <div class="cal-head">
+          <el-switch v-model="dailyWeather" @change="onDailyWeatherChange" />
+          <el-time-select
+            v-model="dailyWeatherTime"
+            start="00:00"
+            step="00:30"
+            end="23:30"
+            :disabled="!dailyWeather"
+            :placeholder="$t('appSettings.dailyWeatherTimePlaceholder')"
+            @change="onDailyWeatherTimeChange"
+          />
+          <el-button link :disabled="!dailyWeather" @click="onWeatherPreview">
+            {{ $t('appSettings.dailyWeatherPreview') }}
+          </el-button>
+        </div>
+        <div class="share-tip">{{ $t('appSettings.dailyWeatherDesc') }}</div>
+      </el-form-item>
+
       <el-form-item :label="$t('appSettings.photoBackupTitle')">
         <div class="cal-head">
           <el-switch v-model="backupOn" :disabled="backupBusy" @change="onBackupToggle" />
@@ -176,6 +195,9 @@ const diag = ref({ crashes: 0, errors: 0 })
 const diagBusy = ref(false)
 /** 后台未读提醒(默认开,事实源在原生 WidgetPrefs) */
 const unreadNotify = ref(true)
+/** 每日天气(默认开):开关与时刻都存在原生,时刻按 HH:mm 展示 */
+const dailyWeather = ref(true)
+const dailyWeatherTime = ref('07:30')
 /** 应用锁(默认关;本机无生物识别时禁用) */
 const appLockOn = ref(false)
 
@@ -314,6 +336,72 @@ async function loadUnreadNotify() {
 
 function onUnreadNotifyChange(v) {
   widgetNative().then((m) => m.setUnreadNotifyEnabled(!!v))
+}
+
+const DEFAULT_WEATHER_MINUTE = 7 * 60 + 30
+
+/** 原生存分钟数(0–1439),界面用 HH:mm;非法值回落到 07:30 */
+function minuteToTime(minute) {
+  const m = Number.isFinite(minute) && minute >= 0 && minute < 1440 ? minute : DEFAULT_WEATHER_MINUTE
+  const hh = String(Math.floor(m / 60)).padStart(2, '0')
+  const mm = String(m % 60).padStart(2, '0')
+  return `${hh}:${mm}`
+}
+
+function timeToMinute(time) {
+  const [hh, mm] = String(time || '')
+    .split(':')
+    .map(Number)
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return DEFAULT_WEATHER_MINUTE
+  return hh * 60 + mm
+}
+
+async function loadDailyWeather() {
+  try {
+    const m = await widgetNative()
+    const st = await m.getDailyWeather()
+    dailyWeather.value = !!st.enabled
+    dailyWeatherTime.value = minuteToTime(st.minute)
+  } catch (e) {
+    dailyWeather.value = true
+    dailyWeatherTime.value = minuteToTime(DEFAULT_WEATHER_MINUTE)
+  }
+}
+
+async function onDailyWeatherChange(v) {
+  const m = await widgetNative()
+  await m.setDailyWeatherEnabled(!!v)
+  if (!v) return
+  // 打开开关顺手要一次通知权限:否则第二天早上什么都不会出现,用户会以为坏了
+  try {
+    const { LocalNotifications } = await import('@capacitor/local-notifications')
+    const perm = await LocalNotifications.checkPermissions()
+    if (perm.display !== 'granted') {
+      const req = await LocalNotifications.requestPermissions()
+      if (req.display !== 'granted') ElMessage.warning(t('appSettings.dailyWeatherPreviewDenied'))
+    }
+  } catch (e) {
+    // 权限询问失败不改变开关本身,系统设置里仍可手动补
+    console.warn('[appSettings] 通知权限询问失败', e)
+  }
+}
+
+function onDailyWeatherTimeChange(v) {
+  if (!v) return
+  widgetNative().then((m) => m.setDailyWeatherMinute(timeToMinute(v)))
+}
+
+async function onWeatherPreview() {
+  try {
+    const m = await widgetNative()
+    await m.previewDailyWeather()
+    ElMessage.success(t('appSettings.dailyWeatherPreviewSent'))
+  } catch (e) {
+    const msg = String(e && e.message)
+    if (msg.includes('permission')) ElMessage.warning(t('appSettings.dailyWeatherPreviewDenied'))
+    else if (msg.includes('network')) ElMessage.warning(t('appSettings.dailyWeatherPreviewOffline'))
+    else ElMessage.error(t('appSettings.fail'))
+  }
 }
 
 // 相册自动备份:所有状态都在原生模块里,这里只回填与触发
@@ -485,6 +573,7 @@ onMounted(async () => {
   loadVersion()
   loadDiagnostics()
   loadUnreadNotify()
+  loadDailyWeather()
   loadPhotoBackup()
   await loadBiometric()
   await loadAppLock()

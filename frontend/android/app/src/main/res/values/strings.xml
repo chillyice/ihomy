@@ -40,4 +40,30 @@
     <string name="notify_unread_body">聊天 %1$d 条 · 通知 %2$d 条</string>
     <string name="notify_action_chat">打开聊天</string>
     <string name="notify_action_notice">打开通知</string>
+
+    <!-- 每日天气(每天一条,只进通知中心与锁屏) -->
+    <string name="notify_channel_weather">每日天气</string>
+    <string name="notify_channel_weather_desc">每天一条当天天气与出行建议，安静显示，不响铃</string>
+    <string name="notify_weather_title">%1$s · %2$d°~%3$d°</string>
+    <string name="notify_weather_title_now">%1$s · %2$d°</string>
+    <string name="notify_weather_title_fallback">今日天气</string>
+    <string name="notify_weather_now">现在 %1$d°，体感 %2$d°</string>
+    <string name="notify_weather_now_only">现在 %1$d°</string>
+    <string name="notify_weather_range">最高 %1$d° · 最低 %2$d°</string>
+    <string name="notify_weather_range_pop">最高 %1$d° · 最低 %2$d° · 降水 %3$d%%</string>
+    <string name="notify_weather_wind">%1$s %2$s 级</string>
+    <string name="notify_weather_air">空气%1$s</string>
+    <string name="notify_weather_advice_warning">有%1$s%2$s预警，出门多留意</string>
+    <string name="notify_weather_advice_warning_plain">有%1$s预警，出门多留意</string>
+    <string name="notify_weather_advice_thunder">可能有雷雨，尽量别在户外久留</string>
+    <string name="notify_weather_advice_snow">有雪，出门慢一点，注意路滑</string>
+    <string name="notify_weather_advice_rain">可能有雨，出门带把伞</string>
+    <string name="notify_weather_advice_fog">能见度不高，出门留意路况</string>
+    <string name="notify_weather_advice_air">空气不太好，外出戴口罩</string>
+    <string name="notify_weather_advice_hot">天气偏热，记得多喝水</string>
+    <string name="notify_weather_advice_cold">气温偏低，注意保暖</string>
+    <string name="notify_weather_advice_big_diff">早晚温差大，出门带件外套</string>
+    <string name="notify_weather_advice_uv">紫外线偏强，记得防晒</string>
+    <string name="notify_weather_advice_windy">风有点大，注意防风</string>
+    <string name="notify_weather_advice_nice">天气不错，适合出门走走</string>
 </resources>

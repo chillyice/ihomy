@@ -5691,6 +5691,15 @@ export default {
     unreadNotifyEvery: 'About every 30 minutes',
     unreadNotifyDesc:
       'When someone sends a message or a new notice arrives, one combined alert appears on the lock screen. It checks about every 30 minutes and stays quiet from 23:00 to 06:00. Some phones limit background checks; opening the app still refreshes everything immediately.',
+    // Daily weather push
+    dailyWeatherTitle: 'Daily weather',
+    dailyWeatherTimePlaceholder: 'Time',
+    dailyWeatherPreview: 'Send a preview',
+    dailyWeatherPreviewSent: 'Preview sent — check your notifications',
+    dailyWeatherPreviewDenied: 'Notifications are blocked for ihomy. Allow them in system settings first.',
+    dailyWeatherPreviewOffline: 'No network right now — try again when you are back online.',
+    dailyWeatherDesc:
+      "One note every day at the time you pick, with today's weather and a single practical tip. It only shows in the notification shade and on the lock screen, with no banner and no sound. Weather comes from the family's saved city; tap the note for the full forecast.",
     // Diagnostics (crashes and front-end errors stay on this device)
     diagnosticsTitle: 'Diagnostics',
     diagnosticsCrashes: '{n} crash file(s)',

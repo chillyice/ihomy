@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 深色模式下提高亮度,保证通知标题栏文字对比度 -->
+    <color name="notify_weather_accent">#7CA5F5</color>
+</resources>

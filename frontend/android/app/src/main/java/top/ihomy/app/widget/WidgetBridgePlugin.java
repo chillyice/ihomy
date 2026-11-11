@@ -6,7 +6,11 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
+import androidx.core.app.NotificationManagerCompat;
+
 import top.ihomy.app.reminder.StaleCheckWorker;
+import top.ihomy.app.weather.DailyWeatherNotifier;
+import top.ihomy.app.weather.DailyWeatherWorker;
 
 /**
  * 卡片桥:WebView 侧把 WIDGET 令牌交给原生、登出时清掉、改动后即时刷新。
@@ -27,6 +31,8 @@ public class WidgetBridgePlugin extends Plugin {
         WidgetWorker.schedulePeriodic(getContext());
         WidgetWorker.refreshNow(getContext());
         StaleCheckWorker.schedulePeriodic(getContext());
+        // 每日天气:登录后才有令牌,顺便确保推送周期任务在排(开关关闭时内部会跳过)
+        DailyWeatherWorker.ensureScheduled(getContext());
         call.resolve();
     }
 
@@ -65,6 +71,55 @@ public class WidgetBridgePlugin extends Plugin {
         call.resolve();
     }
 
+    /** 设置页回填:每日天气开关与时刻(时刻按「当天 0 点起的分钟数」回传,前端换算 HH:mm) */
+    @PluginMethod
+    public void getDailyWeather(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("enabled", WidgetPrefs.dailyWeatherEnabled(getContext()));
+        ret.put("minute", WidgetPrefs.dailyWeatherMinute(getContext()));
+        call.resolve(ret);
+    }
+
+    /** 设置页开关:关掉时同时撤掉当天残留的通知 */
+    @PluginMethod
+    public void setDailyWeatherEnabled(PluginCall call) {
+        Boolean enabled = call.getBoolean("enabled", true);
+        WidgetPrefs.setDailyWeatherEnabled(getContext(), Boolean.TRUE.equals(enabled));
+        DailyWeatherWorker.reschedule(getContext());
+        call.resolve();
+    }
+
+    /** 设置页改时刻:重排周期任务,下一跳按新时刻对齐 */
+    @PluginMethod
+    public void setDailyWeatherMinute(PluginCall call) {
+        Integer minute = call.getInt("minute");
+        if (minute == null || minute < 0 || minute >= 24 * 60) {
+            call.reject("minute out of range");
+            return;
+        }
+        WidgetPrefs.setDailyWeatherMinute(getContext(), minute);
+        DailyWeatherWorker.reschedule(getContext());
+        call.resolve();
+    }
+
+    /** 设置页「发一条预览」:立刻跑一次 Worker;权限/网络不满足就直接告诉前端,别让用户白等 */
+    @PluginMethod
+    public void previewDailyWeather(PluginCall call) {
+        if (!NotificationManagerCompat.from(getContext()).areNotificationsEnabled()) {
+            call.reject("permission");
+            return;
+        }
+        android.net.ConnectivityManager cm = (android.net.ConnectivityManager)
+                getContext().getSystemService(android.content.Context.CONNECTIVITY_SERVICE);
+        if (cm == null || cm.getActiveNetwork() == null) {
+            call.reject("network");
+            return;
+        }
+        DailyWeatherNotifier.ensureChannel(getContext());
+        DailyWeatherWorker.preview(getContext());
+        call.resolve();
+    }
+
     @PluginMethod
     public void refreshWidgets(PluginCall call) {
         WidgetWorker.refreshNow(getContext());
@@ -76,5 +131,6 @@ public class WidgetBridgePlugin extends Plugin {
     public void load() {
         WidgetWorker.schedulePeriodic(getContext());
         StaleCheckWorker.schedulePeriodic(getContext());
+        DailyWeatherWorker.ensureScheduled(getContext());
     }
 }

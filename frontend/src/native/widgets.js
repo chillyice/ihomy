@@ -48,6 +48,42 @@ export async function setUnreadNotifyEnabled(enabled) {
   }
 }
 
+/** 设置页:每日天气(开关 + 时刻都在原生,Worker 直接读;时刻是「当天 0 点起的分钟数」) */
+export async function getDailyWeather() {
+  try {
+    const res = await IhomyWidgets.getDailyWeather()
+    const minute = Number(res && res.minute)
+    return {
+      enabled: !!(res && res.enabled),
+      minute: Number.isFinite(minute) && minute >= 0 && minute < 1440 ? minute : 7 * 60 + 30,
+    }
+  } catch (e) {
+    return { enabled: true, minute: 7 * 60 + 30 }
+  }
+}
+
+export async function setDailyWeatherEnabled(enabled) {
+  try {
+    await IhomyWidgets.setDailyWeatherEnabled({ enabled: !!enabled })
+  } catch (e) {
+    console.warn('[widgets] 保存每日天气开关失败', e)
+  }
+}
+
+export async function setDailyWeatherMinute(minute) {
+  try {
+    await IhomyWidgets.setDailyWeatherMinute({ minute: Math.round(minute) })
+  } catch (e) {
+    console.warn('[widgets] 保存每日天气时间失败', e)
+  }
+}
+
+/** 发一条预览:返回 true 表示已交给后台任务;权限没开时原生会 reject('permission') */
+export async function previewDailyWeather() {
+  await IhomyWidgets.previewDailyWeather()
+  return true
+}
+
 /** 原生桥安装:登录态/家庭变化时防抖同步一次(与 chat.js 的换代重建同思路) */
 export async function installWidgetBridge() {
   const { watch } = await import('vue')

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 每日天气通知大图标:雨(云 + 雨滴) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <path
+        android:fillColor="#4A90D9"
+        android:pathData="M24,24m-24,0a24,24 0 1,0 48,0a24,24 0 1,0 -48,0" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M19.5,27m-5.5,0a5.5,5.5 0 1,0 11,0a5.5,5.5 0 1,0 -11,0" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M26.5,24.5m-7,0a7,7 0 1,0 14,0a7,7 0 1,0 -14,0" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32.5,27.5m-4.5,0a4.5,4.5 0 1,0 9,0a4.5,4.5 0 1,0 -9,0" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M14,27 h23 v5 h-23 z" />
+    <path
+        android:strokeColor="#DCEBFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:pathData="M19,35.5 L17.5,40 M26,35.5 L24.5,40 M33,35.5 L31.5,40" />
+</vector>

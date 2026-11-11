@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 每日天气通知的强调色(染小图标与通知标题栏):浅色基线,深色覆盖见 values-night -->
+    <color name="notify_weather_accent">#2F6FE0</color>
+</resources>
