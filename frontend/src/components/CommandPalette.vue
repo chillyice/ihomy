@@ -1,11 +1,12 @@
-<!-- 命令面板:Ctrl/⌘+K 唤起,鼠标/触控板设备专用(触屏不出现)。
+<!-- 命令面板:Ctrl/⌘+K 唤起;触屏可经快捷方式/深链显式打开(键盘快捷键仍只对键鼠生效)。
      由 App.vue 懒加载,独立页(咔哒/比特口袋/壁纸/chillyice)与沉浸页不挂载。
      键盘:↑↓ 循环移动高亮、Enter 执行、Esc 关闭;Escape/方向键在 capture 阶段截住,
-     避免底下的照片查看器 / 阅读器 / 游戏同时响应。 -->
+     避免底下的照片查看器 / 阅读器 / 游戏同时响应。
+     输入 ≥2 字时在静态命令之上并入跨 6 类内容的搜索结果(见 useGlobalSearch)。 -->
 <template>
   <Teleport to="body">
     <Transition name="cmd-fade">
-      <div v-if="paletteOpen && hasPointer" class="cmd-scrim" @pointerdown.self="closePalette">
+      <div v-if="paletteOpen" class="cmd-scrim" @pointerdown.self="closePalette">
         <div class="cmd-panel" role="dialog" aria-modal="true" :aria-label="t('command.title')">
           <input
             ref="inputEl"
@@ -18,25 +19,34 @@
             aria-controls="cmd-list"
             :aria-activedescendant="activeId"
             :placeholder="t('command.placeholder')"
-            @input="active = 0"
+            @input="onInput"
+            @compositionstart="onCompositionStart"
+            @compositionend="onCompositionEnd"
           />
           <ul id="cmd-list" class="cmd-list" role="listbox">
-            <li
-              v-for="(item, i) in items"
-              :id="`cmd-opt-${i}`"
-              :key="item.id"
-              class="cmd-item"
-              :class="{ active: i === active }"
-              role="option"
-              :aria-selected="i === active"
-              @pointermove="active = i"
-              @click="choose(item)"
-            >
-              <span class="cmd-label">{{ item.label }}</span>
-              <span class="cmd-group">{{ item.group === 'nav' ? t('command.groupNav') : t('command.groupAction') }}</span>
-            </li>
+            <template v-for="row in rows" :key="row.key">
+              <li v-if="row.kind === 'header'" class="cmd-group-head" role="presentation">{{ row.label }}</li>
+              <li v-else-if="row.kind === 'info'" class="cmd-info" role="presentation">{{ row.text }}</li>
+              <li v-else-if="row.kind === 'tip'" class="cmd-tip" role="presentation">{{ row.text }}</li>
+              <li
+                v-else
+                :id="`cmd-opt-${row.index}`"
+                class="cmd-item"
+                :class="{ active: row.index === active }"
+                role="option"
+                :aria-selected="row.index === active"
+                @pointermove="active = row.index"
+                @click="choose(row.item)"
+              >
+                <span class="cmd-label">{{ row.item.label }}</span>
+                <span v-if="row.item.sub" class="cmd-group">{{ row.item.sub }}</span>
+                <span v-else-if="row.item.group !== 'search'" class="cmd-group">{{
+                  row.item.group === 'nav' ? t('command.groupNav') : t('command.groupAction')
+                }}</span>
+              </li>
+            </template>
           </ul>
-          <p v-if="!items.length" class="cmd-empty">{{ t('command.empty') }}</p>
+          <p v-if="!items.length && !searchActive" class="cmd-empty">{{ t('command.empty') }}</p>
           <div class="cmd-hint">{{ t('command.hint') }}</div>
         </div>
       </div>
@@ -50,8 +60,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
-import { useDevice } from '@/composables/useDevice'
 import { useHotkeys, focusPageSearch } from '@/composables/useHotkeys'
+import { SEARCH_MIN_LENGTH, SEARCH_VISIBLE_LIMIT, normalizeQuery, useGlobalSearch } from '@/composables/useGlobalSearch'
 import { filterCommands, visibleCommands } from '@/utils/commandRegistry'
 
 const { t } = useI18n()
@@ -59,17 +69,19 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
-const { hasPointer } = useDevice()
 const { paletteOpen, closePalette } = useHotkeys()
-
-// 独立页/沉浸页不挂载本组件;若其间按过 Ctrl/⌘+K,回到站内首帧先收掉残留打开态
-if (paletteOpen.value) closePalette()
+const search = useGlobalSearch()
+const { groups, fileContext, loading: searchLoading } = search
 
 const inputEl = ref(null)
 const query = ref('')
 const active = ref(0)
+// 输入法组字期间不发请求:拼音字母先落进输入框,等 compositionend 再查一次
+let composing = false
 // 打开前的焦点:关闭时还回去,不丢给 body
 let lastFocused = null
+
+const searchActive = computed(() => normalizeQuery(query.value).length >= SEARCH_MIN_LENGTH)
 
 const ctx = computed(() => ({
   isLoggedIn: userStore.isLoggedIn,
@@ -81,11 +93,55 @@ const ctx = computed(() => ({
   focusSearch: focusPageSearch,
 }))
 
-const items = computed(() => {
+const staticCommands = computed(() => {
   const list = visibleCommands(ctx.value).map((c) => ({ ...c, label: t(c.labelKey) }))
   return filterCommands(list, query.value)
 })
 
+// 一次遍历同时产出「键盘可选列表」与「带分组标题的渲染行」,保证两边索引一致
+const view = computed(() => {
+  const items = []
+  const rows = []
+
+  if (searchActive.value) {
+    let budget = SEARCH_VISIBLE_LIMIT
+    if (groups.value.length) rows.push({ kind: 'header', key: 'head-search', label: t('command.groupSearch') })
+    for (const group of groups.value) {
+      if (budget <= 0) break
+      const list = group.items.slice(0, budget)
+      if (!list.length) continue
+      rows.push({ kind: 'header', key: `head-${group.source}`, label: t(`command.source.${group.source}`) })
+      for (const item of list) {
+        rows.push({ kind: 'option', key: item.id, index: items.length, item })
+        items.push(item)
+        budget -= 1
+      }
+    }
+    if (!groups.value.length && !searchLoading.value) rows.push({ kind: 'info', key: 'search-empty', text: t('command.searchEmpty') })
+    if (!fileContext.value) rows.push({ kind: 'tip', key: 'file-scope', text: t('command.fileScopeTip') })
+    if (staticCommands.value.length) {
+      rows.push({ kind: 'header', key: 'head-command', label: t('command.groupCommands') })
+      for (const item of staticCommands.value) {
+        rows.push({ kind: 'option', key: item.id, index: items.length, item })
+        items.push(item)
+      }
+    }
+    return { items, rows }
+  }
+
+  // 只敲了 1 个字:不够搜索门槛,给一句提示,静态命令照常可选中
+  if (normalizeQuery(query.value).length === 1) {
+    rows.push({ kind: 'info', key: 'search-hint', text: t('command.searchHint') })
+  }
+  for (const item of staticCommands.value) {
+    rows.push({ kind: 'option', key: item.id, index: items.length, item })
+    items.push(item)
+  }
+  return { items, rows }
+})
+
+const items = computed(() => view.value.items)
+const rows = computed(() => view.value.rows)
 const activeId = computed(() => (items.value.length ? `cmd-opt-${active.value}` : undefined))
 
 // 明确采用「循环」:在首项按 ↑ 回到末项、末项按 ↓ 回到首项
@@ -122,8 +178,27 @@ const choose = async (item) => {
   closePalette()
   // 等关闭 watch 把焦点还原完,再执行跳转/聚焦,否则「聚焦搜索」会被还原动作抢走焦点
   await nextTick()
-  if (item.path) router.push(item.path)
+  if (item.path) router.push(item.path).catch(() => {})
   else if (typeof item.run === 'function') item.run(ctx.value)
+}
+
+const onInput = (e) => {
+  // v-model 与自定义 @input 同事件:以输入框真值为准,避免顺序依赖
+  const value = e?.target?.value ?? query.value
+  if (query.value !== value) query.value = value
+  active.value = 0
+  if (composing) return
+  search.run(value)
+}
+
+const onCompositionStart = () => {
+  composing = true
+}
+
+const onCompositionEnd = () => {
+  composing = false
+  active.value = 0
+  search.run(query.value)
 }
 
 watch(paletteOpen, async (open) => {
@@ -131,16 +206,27 @@ watch(paletteOpen, async (open) => {
     lastFocused = document.activeElement
     query.value = ''
     active.value = 0
+    search.reset()
     await nextTick()
     inputEl.value?.focus()
     document.addEventListener('keydown', onPanelKeydown, true)
     return
   }
   document.removeEventListener('keydown', onPanelKeydown, true)
+  // 关闭即弃掉上一次的结果与进行中的响应,下次打开是干净的
+  search.reset()
   const back = lastFocused
   lastFocused = null
   if (back && typeof back.focus === 'function' && document.contains(back)) back.focus()
-})
+}, { immediate: true })
+
+// 结果集变短时把高亮收回边界内,避免 Enter 落在已不存在的项上
+watch(
+  () => items.value.length,
+  (n) => {
+    if (active.value >= n) active.value = Math.max(0, n - 1)
+  },
+)
 
 // 路由变化(如点了面板里的页面,或点了别处链接)一律收起,避免面板悬在新页面上
 watch(
@@ -152,6 +238,7 @@ watch(
 
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', onPanelKeydown, true)
+  search.reset()
 })
 </script>
 
@@ -169,7 +256,7 @@ onBeforeUnmount(() => {
 }
 .cmd-panel {
   width: min(560px, 100%);
-  max-height: min(70vh, 480px);
+  max-height: min(76vh, 560px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -196,7 +283,7 @@ onBeforeUnmount(() => {
   margin: 0;
   padding: 6px;
   overflow-y: auto;
-  max-height: 320px; /* 约 8 条可见,超出滚动 */
+  max-height: min(56vh, 440px); /* 约 12 条可见,超出滚动 */
 }
 .cmd-item {
   display: flex;
@@ -220,7 +307,27 @@ onBeforeUnmount(() => {
 }
 .cmd-group {
   flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 11px;
+  color: var(--color-text-tertiary);
+}
+.cmd-group-head {
+  padding: 10px 10px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--color-text-tertiary);
+}
+.cmd-info,
+.cmd-tip {
+  padding: 10px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.cmd-tip {
   color: var(--color-text-tertiary);
 }
 .cmd-empty {
@@ -246,5 +353,18 @@ onBeforeUnmount(() => {
 .cmd-fade-leave-to {
   opacity: 0;
   transform: translateY(2px);
+}
+/* 触屏:行高 ≥44px 好点;面板贴顶一点,把高度让给结果 */
+@media (pointer: coarse) {
+  .cmd-scrim {
+    padding-top: 8vh;
+  }
+  .cmd-item {
+    min-height: 44px;
+    padding: 12px 10px;
+  }
+  .cmd-label {
+    font-size: 15px;
+  }
 }
 </style>

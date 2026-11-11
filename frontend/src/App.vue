@@ -103,7 +103,7 @@ const routeReady = ref(false)
 // 独立站点页(咔哒软件首页等)：完全独立全屏，不套 ihomy 外壳/光影/侧栏/页脚
 const standalone = computed(() => routeReady.value && !!route.meta.standalone)
 // 全局快捷键:模块级单例,只绑一次;面板状态由这里与 CommandPalette 共享
-const { closePalette } = useHotkeys()
+const { closePalette, openPalette } = useHotkeys()
 const { locale } = useI18n()
 
 // 暖居主题:桌面端 + 非纯 OPS 时启用独立外壳
@@ -171,6 +171,19 @@ watch(standalone, (isStandalone) => {
 watch([standalone, immersive], ([isStandalone, isImmersive]) => {
   if (isStandalone || isImmersive) closePalette()
 })
+
+// ?search=1 兜底:原生壳由 deeplink 直接开面板并清参;Web 直接输入 URL / 刷新会走到这里。
+// 打开后立刻把 search 从地址栏摘掉,避免刷新或前进后退时再次弹。
+watch(
+  () => route.query.search,
+  (v) => {
+    if (v !== '1') return
+    if (!standalone.value && !immersive.value) openPalette()
+    const query = { ...route.query }
+    delete query.search
+    router.replace({ path: route.path, query }).catch(() => {})
+  },
+)
 </script>
 
 <style>

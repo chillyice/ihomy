@@ -85,21 +85,24 @@ function onKeydown(e) {
   if (focusPageSearch()) e.preventDefault()
 }
 
+// 模块级开关:深链 / App.vue 的 ?search=1 兜底直接调用,不必先取 useHotkeys 实例。
+// 触屏没有键盘快捷键,但仍可由此显式打开面板(快捷方式「搜索」就是这条路)。
+export function openPalette() {
+  paletteOpen.value = true
+}
+
+export function closePalette() {
+  paletteOpen.value = false
+}
+
+export function togglePalette() {
+  paletteOpen.value = !paletteOpen.value
+}
+
 export function useHotkeys() {
   if (!bound && typeof document !== 'undefined') {
     document.addEventListener('keydown', onKeydown)
     bound = true
   }
-  return {
-    paletteOpen,
-    openPalette: () => {
-      paletteOpen.value = true
-    },
-    closePalette: () => {
-      paletteOpen.value = false
-    },
-    togglePalette: () => {
-      paletteOpen.value = !paletteOpen.value
-    },
-  }
+  return { paletteOpen, openPalette, closePalette, togglePalette }
 }

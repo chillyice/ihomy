@@ -283,8 +283,10 @@ import './bookPage.css'
 const props = defineProps({
   // 月份归属父页(总账页签点某月要能切回来),本页只读写这一份
   month: { type: String, default: '' },
+  // 一次性动作(快捷方式):'' | 'new' | 'voice',消费后 emit intent-consumed 让父页清 query
+  intent: { type: String, default: '' },
 })
-const emit = defineEmits(['update:month'])
+const emit = defineEmits(['update:month', 'intent-consumed'])
 
 // ponytail: 分类为用户自选/自定义数据(入库存储),不做翻译;候选清单与预算弹窗共用一份
 const CATEGORIES = BOOK_CATEGORIES
@@ -494,14 +496,23 @@ const openEditor = (r) => {
 // 语音记账(仅安卓壳):识别一句话 → 前端拆金额/备注 → 预填弹窗,用户确认后再存
 const voiceReady = ref(false)
 const voiceBusy = ref(false)
-if (isAndroidApp()) {
-  import('@/native/speech')
-    .then((m) => m.speechAvailable())
-    .then((ok) => {
-      voiceReady.value = !!ok
-    })
-    .catch(() => {})
+// 探一次能力即可:模板按钮与 ?voice=1 的一次性动作共用同一份结果(避免竞态时前者未就绪)
+let voiceProbe = null
+const probeVoice = () => {
+  if (!voiceProbe) {
+    voiceProbe = isAndroidApp()
+      ? import('@/native/speech')
+          .then((m) => m.speechAvailable())
+          .then((ok) => {
+            voiceReady.value = !!ok
+            return !!ok
+          })
+          .catch(() => false)
+      : Promise.resolve(false)
+  }
+  return voiceProbe
 }
+probeVoice()
 
 const onVoiceRecord = async () => {
   if (voiceBusy.value) return
@@ -544,6 +555,26 @@ const onVoiceRecord = async () => {
 onBeforeUnmount(() => {
   if (voiceBusy.value) import('@/native/speech').then((m) => m.cancelRecognition()).catch(() => {})
 })
+
+// 快捷方式的一次性动作:new → 记一笔表单;voice → 先开表单再进语音(Web / 无识别能力安静降级为普通表单)
+const applyIntent = async (value) => {
+  if (value === 'voice') {
+    openEditor()
+    const ok = await probeVoice()
+    if (ok) await onVoiceRecord()
+  } else {
+    openEditor()
+  }
+  emit('intent-consumed')
+}
+
+watch(
+  () => props.intent,
+  (v) => {
+    if (v) applyIntent(v)
+  },
+  { immediate: true },
+)
 
 const onSave = async () => {
   const f = editor.form

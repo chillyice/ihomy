@@ -56,4 +56,58 @@
             android:targetPackage="top.ihomy.app" />
     </shortcut>
 
+    <!-- 第二批:一次性动作入口。顺序排在老 4 条之后,launcher 显示条数有限时先保证老入口不丢。
+         data 里的 ?new=1 / ?voice=1 / ?search=1 由前端消费并自行清参(deeplink.js / Book.vue / Schedule.vue)。 -->
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_book"
+        android:shortcutId="book-new"
+        android:shortcutShortLabel="@string/shortcut_book_new"
+        android:shortcutLongLabel="@string/shortcut_book_new_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="ihomy://book?new=1"
+            android:targetClass="top.ihomy.app.MainActivity"
+            android:targetPackage="top.ihomy.app" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_schedule"
+        android:shortcutId="reminder-new"
+        android:shortcutShortLabel="@string/shortcut_reminder_new"
+        android:shortcutLongLabel="@string/shortcut_reminder_new_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="ihomy://plan?new=1"
+            android:targetClass="top.ihomy.app.MainActivity"
+            android:targetPackage="top.ihomy.app" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_voice"
+        android:shortcutId="book-voice"
+        android:shortcutShortLabel="@string/shortcut_book_voice"
+        android:shortcutLongLabel="@string/shortcut_book_voice_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="ihomy://book?voice=1"
+            android:targetClass="top.ihomy.app.MainActivity"
+            android:targetPackage="top.ihomy.app" />
+    </shortcut>
+
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_search"
+        android:shortcutId="search"
+        android:shortcutShortLabel="@string/shortcut_search"
+        android:shortcutLongLabel="@string/shortcut_search_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="ihomy://home?search=1"
+            android:targetClass="top.ihomy.app.MainActivity"
+            android:targetPackage="top.ihomy.app" />
+    </shortcut>
+
 </shortcuts>

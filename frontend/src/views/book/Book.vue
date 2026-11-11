@@ -26,7 +26,7 @@
 
     <template v-else-if="ready">
       <!-- 记账本页签:明细/统计/账户都在 BookDaily 里,月份走 v-model 双向同步 -->
-      <BookDaily v-if="tab === 'book'" v-model:month="month" />
+      <BookDaily v-if="tab === 'book'" v-model:month="month" :intent="intent" @intent-consumed="onIntentConsumed" />
 
       <!-- 总账页签:总账组件异步引入,点某月由它 emit 回来钻取到记账本 -->
       <BookLedger v-else-if="tab === 'ledger'" @pick-month="onPickMonth" />
@@ -45,7 +45,7 @@
 <script setup>
 // 记账本外壳:页签切换 + 月份状态;各页签自己管数据与工具栏右侧操作
 import { defineAsyncComponent, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import { bookApi } from '@/api'
 import { useUserStore } from '@/stores/user'
@@ -64,14 +64,39 @@ const FinancePanel = defineAsyncComponent(() => import('@/views/book/finance/Fin
 
 const TABS = ['book', 'ledger', 'loan', 'finance']
 const route = useRoute()
+const router = useRouter()
 const userStore = useUserStore()
 // 支持外部直达某个页签(首页理财卡 → /book?tab=finance);非法值回落到记账本
 const tabFromQuery = () => (TABS.includes(route.query.tab) ? route.query.tab : 'book')
 const tab = ref(tabFromQuery())
 const month = ref(new Date().toISOString().slice(0, 7))
 const permVisible = ref(false)
+// 一次性动作(快捷方式):'' | 'new' | 'voice';子页消费后 emit,父页清 query
+const intent = ref('')
 // 先补记贷款月供、取最新档位,再让各页签取数:首屏的余额/收入支出就包含到期月供
 const ready = ref(false)
+
+const clearIntentQuery = () => {
+  router.replace({ path: '/book', query: { tab: tab.value } }).catch(() => {})
+}
+
+// /book?new=1 | /book?voice=1:只在能写账本时交给子页弹窗;否则静默清参,不报错
+const applyIntent = () => {
+  const q = route.query
+  const next = q.new === '1' ? 'new' : q.voice === '1' ? 'voice' : ''
+  if (!next) return
+  tab.value = 'book'
+  if (!userStore.isLoggedIn || !userStore.canWriteBook) {
+    clearIntentQuery()
+    return
+  }
+  intent.value = next
+}
+
+const onIntentConsumed = () => {
+  intent.value = ''
+  clearIntentQuery()
+}
 
 // 同一路由内换 query(例如首页卡片再点一次)也要跟着切
 watch(
@@ -80,6 +105,14 @@ watch(
     tab.value = tabFromQuery()
   },
 )
+
+// 快捷方式可能指向当前已在的 /book?new=1(deeplink 会先退回基础 URL 再 push),这里跟着重放动作
+watch(
+  () => [route.query.new, route.query.voice],
+  () => applyIntent(),
+)
+
+applyIntent()
 
 // 总账页签点某月 → 回到记账本并定位该月
 const onPickMonth = (m) => {

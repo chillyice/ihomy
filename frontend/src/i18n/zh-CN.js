@@ -6128,5 +6128,18 @@ export default {
       themeGuangchen: '切换到光尘主题',
       focusSearch: '聚焦本页搜索',
     },
+    groupSearch: '搜索结果',
+    groupCommands: '命令',
+    searchEmpty: '没有找到相关内容',
+    searchHint: '再输入一个字开始搜索',
+    fileScopeTip: '文件只在文件页里搜当前目录',
+    source: {
+      blog: '博客',
+      diary: '日记',
+      album: '相册',
+      file: '文件',
+      member: '成员',
+      wish: '愿望',
+    },
   },
 }

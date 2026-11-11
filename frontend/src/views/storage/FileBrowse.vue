@@ -141,7 +141,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { View, Download, EditPen, Share } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
@@ -149,6 +149,7 @@ import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useDevice } from '@/composables/useDevice'
 import { useWideCols } from '@/composables/useWideCols'
+import { useGlobalSearch } from '@/composables/useGlobalSearch'
 import { storageApi } from '@/api'
 import { shareFiles } from '@/native/shareOut'
 import Breadcrumb from '@/components/Breadcrumb.vue'
@@ -159,6 +160,7 @@ const { t } = useI18n()
 const route = useRoute()
 const userStore = useUserStore()
 const { isMobile, isWide: viewWide } = useDevice()
+const search = useGlobalSearch()
 
 const devices = ref([])
 const customDevices = computed(() => devices.value.filter((d) => d.id !== 0))
@@ -363,8 +365,21 @@ onMounted(async () => {
   if (fromQuery && customDevices.value.some((d) => d.id === fromQuery)) activeDeviceId.value = fromQuery
   else if (saved && customDevices.value.some((d) => d.id === saved)) activeDeviceId.value = saved
   else if (customDevices.value.length) activeDeviceId.value = customDevices.value[0].id
+  // 全局搜索的结果要能落到具体目录:?path= 在设备确定后覆盖初始目录
+  if (typeof route.query.path === 'string') activePath.value = route.query.path
   if (activeDeviceId.value) loadFiles()
 })
+
+// 全局搜索的文件类只搜「当前目录」:把这里当作唯一上下文来源,离开文件页即清空
+watch(
+  [activeDeviceId, activePath],
+  () => {
+    search.setFileContext(activeDeviceId.value ? { deviceId: activeDeviceId.value, path: activePath.value } : null)
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(() => search.setFileContext(null))
 </script>
 
 <style scoped>

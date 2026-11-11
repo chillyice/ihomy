@@ -283,6 +283,19 @@ const reloadAll = async () => {
 const applyQuery = () => {
   const q = route.query
   const qd = typeof q.date === 'string' ? q.date : ''
+  // 一次性「新建提醒」(快捷方式):弹一次就清参,刷新不再弹;q 里其它参数(tab/type/focus/date)保留
+  if (q.new === '1') {
+    if (isDateString(qd)) {
+      selectedDate.value = qd
+      cursor.year = Number(qd.slice(0, 4))
+      cursor.month = Number(qd.slice(5, 7))
+    }
+    if (userStore.isLoggedIn) openCreate(isDateString(qd) ? qd : selectedDate.value)
+    const rest = { ...q }
+    delete rest.new
+    router.replace({ path: '/plan', query: rest }).catch(() => {})
+    return
+  }
   if (isDateString(qd)) {
     view.value = 'calendar'
     selectedDate.value = qd

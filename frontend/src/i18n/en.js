@@ -1641,11 +1641,13 @@ export default {
         'No microphone permission, so the call cannot start: open Settings → Apps → ihomy → Permissions, allow the microphone, then retry',
       permDeniedVideo:
         'No microphone or camera permission, so the video call cannot start: open Settings → Apps → ihomy → Permissions, allow them, then retry',
-      permBlocked: 'Microphone/camera permission was permanently denied, so the system will not ask again. Open the app settings and enable it manually, then retry.',
+      permBlocked:
+        'Microphone/camera permission was permanently denied, so the system will not ask again. Open the app settings and enable it manually, then retry.',
       openSettings: 'Open settings',
       connectionFailed:
         'The call could not connect: the two networks cannot reach each other. Switch networks (for example, use the same Wi-Fi) and retry',
-      noMedia: 'No audio has arrived yet: the current networks may not allow a direct connection. If it stays like this, hang up, switch networks and retry',
+      noMedia:
+        'No audio has arrived yet: the current networks may not allow a direct connection. If it stays like this, hang up, switch networks and retry',
       downgradedAudio: 'Camera unavailable, switched to a voice call',
       audio: 'Voice call',
       video: 'Video call',
@@ -5742,7 +5744,8 @@ export default {
     unreadNotifyTitle: 'Background message alerts',
     unreadNotifyDesc:
       'When on, the app keeps running in the background and alerts you in the notification bar when a message or notice arrives (usually within 30 seconds). Android shows a permanent "ihomy is running in the background" notification. Turning it off stops the background checks; home-screen widgets still check about every 30 minutes as a fallback. Quiet from 23:00 to 06:00.',
-    unreadNotifyDenied: 'Notification permission is off, so background alerts will not appear. Allow ihomy to send notifications in system settings.',
+    unreadNotifyDenied:
+      'Notification permission is off, so background alerts will not appear. Allow ihomy to send notifications in system settings.',
     // Daily weather push
     dailyWeatherTitle: 'Daily weather',
     dailyWeatherTimePlaceholder: 'Time',
@@ -6233,6 +6236,19 @@ export default {
       themeWarm: 'Switch to Warm Dwelling theme',
       themeGuangchen: 'Switch to Light & Dust theme',
       focusSearch: 'Focus page search',
+    },
+    groupSearch: 'Results',
+    groupCommands: 'Commands',
+    searchEmpty: 'No matching content',
+    searchHint: 'Type one more character to search',
+    fileScopeTip: 'Files are searched in the current folder on the Files page',
+    source: {
+      blog: 'Blog',
+      diary: 'Diary',
+      album: 'Albums',
+      file: 'Files',
+      member: 'Members',
+      wish: 'Wishes',
     },
   },
 }

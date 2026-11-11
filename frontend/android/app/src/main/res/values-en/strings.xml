@@ -19,6 +19,14 @@
     <string name="shortcut_chat_long">Open the family chat room</string>
     <string name="shortcut_album">Album</string>
     <string name="shortcut_album_long">Browse family albums</string>
+    <string name="shortcut_book_new">Add record</string>
+    <string name="shortcut_book_new_long">Open a new record right away</string>
+    <string name="shortcut_reminder_new">New reminder</string>
+    <string name="shortcut_reminder_new_long">Open the new reminder form</string>
+    <string name="shortcut_book_voice">Voice record</string>
+    <string name="shortcut_book_voice_long">Say it and record it</string>
+    <string name="shortcut_search">Search</string>
+    <string name="shortcut_search_long">Search family content</string>
 
     <!-- Quick settings tiles -->
     <string name="tile_book_label">Ledger</string>

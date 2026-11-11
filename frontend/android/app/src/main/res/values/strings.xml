@@ -24,6 +24,14 @@
     <string name="shortcut_chat_long">打开家庭聊天室</string>
     <string name="shortcut_album">相册回忆</string>
     <string name="shortcut_album_long">浏览家庭相册</string>
+    <string name="shortcut_book_new">记一笔</string>
+    <string name="shortcut_book_new_long">直接打开记一笔</string>
+    <string name="shortcut_reminder_new">新建提醒</string>
+    <string name="shortcut_reminder_new_long">打开新建提醒</string>
+    <string name="shortcut_book_voice">语音记账</string>
+    <string name="shortcut_book_voice_long">说一句就记账</string>
+    <string name="shortcut_search">搜索</string>
+    <string name="shortcut_search_long">搜索家庭内容</string>
 
     <!-- 下拉栏磁贴 -->
     <string name="tile_book_label">记账本</string>

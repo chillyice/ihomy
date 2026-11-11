@@ -3,8 +3,27 @@
 // 两条通道共用同一落点,避免各处自己 router.push 口径不一。
 import { App } from '@capacitor/app'
 import router from '@/router'
+import { openPalette } from '@/composables/useHotkeys'
 
-function navigate(raw) {
+// 一次性动作参数:消费后页面自己会清;同一 URL 再点一次快捷方式时先退回基础 URL,否则 router.push 是空操作
+const ONE_SHOT_KEYS = ['new', 'voice', 'search']
+
+function splitPath(p) {
+  const hashAt = p.indexOf('#')
+  const hash = hashAt >= 0 ? p.slice(hashAt) : ''
+  const noHash = hashAt >= 0 ? p.slice(0, hashAt) : p
+  const queryAt = noHash.indexOf('?')
+  const pathname = queryAt >= 0 ? noHash.slice(0, queryAt) : noHash
+  const query = new URLSearchParams(queryAt >= 0 ? noHash.slice(queryAt + 1) : '')
+  return { pathname, query, hash }
+}
+
+function joinPath(pathname, query, hash) {
+  const rest = query.toString()
+  return pathname + (rest ? `?${rest}` : '') + hash
+}
+
+async function navigate(raw) {
   if (!raw) return
   try {
     // 卡片/外部唤起是 ihomy://plan?date=... 自定义 scheme——URL 解析器对非标准 scheme 的 host/path
@@ -22,6 +41,26 @@ function navigate(raw) {
       const u = new URL(s)
       path = u.pathname + u.search + u.hash
     }
+
+    const { pathname, query, hash } = splitPath(path)
+
+    // 搜索快捷方式:没有独立的 /search 路由,直接开命令面板。同一路由重复导航不会触发 watch,
+    // 所以这里不 push,只把地址栏上的 search 参数清干净。
+    if (query.get('search') === '1') {
+      openPalette()
+      query.delete('search')
+      const target = joinPath(pathname, query, hash)
+      if (router.currentRoute.value.fullPath !== target) router.replace(target).catch(() => {})
+      return
+    }
+
+    const oneShot = ONE_SHOT_KEYS.some((k) => query.get(k) === '1')
+    if (oneShot && router.currentRoute.value.fullPath === path) {
+      const base = new URLSearchParams(query)
+      ONE_SHOT_KEYS.forEach((k) => base.delete(k))
+      await router.replace(joinPath(pathname, base, hash)).catch(() => {})
+    }
+
     if (router.currentRoute.value.fullPath === path) return
     router.push(path).catch(() => {})
   } catch (e) {
