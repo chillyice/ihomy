@@ -13,6 +13,8 @@ import androidx.work.WorkerParameters;
 import java.time.LocalDate;
 import java.util.List;
 
+import top.ihomy.app.live.AppVisibility;
+
 /**
  * 卡片数据同步:WorkManager 周期任务(30 分钟)+ App 内改动后的一次性触发。
  * 成功后把快照写缓存并通知三个 provider 重绘;失败时保持旧缓存(断网显示上次数据,计划 §6.5.3)。
@@ -71,7 +73,8 @@ public class WidgetWorker extends Worker {
         // 后台未读与卡片同一条 30 分钟周期,不新增任务(计划 §5.2);
         // 前台服务运行时另有 30 秒一次的同步,两边共用 UnreadSync(基线互不冲突)
         try {
-            UnreadSync.run(ctx, true);
+            // 前台服务已在跑时,这里只是兜底;用户正看着 App 时不叠系统通知
+            UnreadSync.run(ctx, !AppVisibility.isForeground());
         } catch (Exception e) {
             Log.w(TAG, "unread sync skipped: " + e.getMessage());
         }
