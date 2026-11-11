@@ -1,6 +1,8 @@
 // 路由表 + 登录守卫:默认所有页面游客可浏览,仅纯写/个人页需登录
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { getDisplayMode } from '@/composables/useDisplayMode'
+import { isChildAllowedPath } from '@/utils/displayMode'
 
 const routes = [
   { path: '/login', name: 'Login', component: () => import('@/views/Login.vue'), meta: { public: true } },
@@ -267,6 +269,11 @@ router.beforeEach((to) => {
   }
   // 运维页要求 OPS 或家长(OWNER)身份;家长仅看 AI 统计/天气,其余由页面内角色渲染控制
   if (to.meta.ops && !(userStore.isOps || userStore.isOwner)) {
+    return { name: 'Home' }
+  }
+  // 儿童模式:只放行内容消费白名单(首页/相册/图书馆…),设置、记账、保险箱等一律回首页。
+  // 这是本机 UX 门槛,不改变账号权限;家长点右下角入口输密码即可退出。
+  if (getDisplayMode() === 'child' && !isChildAllowedPath(to.fullPath)) {
     return { name: 'Home' }
   }
 })

@@ -1,6 +1,8 @@
 <!-- 首页:自由布局仪表盘(组件大小/位置自由摆放,不吸附栅格),编辑模式可拖拽/缩放/增删组件 -->
 <template>
-  <div ref="root" class="home-page" :class="{ 'edit-mode': editMode }">
+  <!-- 老人模式:不渲染自由布局仪表盘,只给大字常用入口与今日安排 -->
+  <ElderHome v-if="isElder" />
+  <div v-else ref="root" class="home-page" :class="{ 'edit-mode': editMode }">
     <PhotoViewer v-model:visible="viewerVisible" :photos="sevenDayPhotos" :initial-index="viewerIdx" />
 
     <!-- 编辑模式工具栏(hover隐藏) -->
@@ -22,6 +24,7 @@
         :data-widget-uid="w.uid"
         @mouseenter="onCardEnter(w)"
         @mouseleave="onCardLeave"
+        @pointerdown="onCardPointerDown($event, w)"
         @click="bringToFront(w)"
       >
         <div class="drag-bar" @pointerdown="onDragStart($event, w)"><span class="grip"></span></div>
@@ -438,6 +441,8 @@ import { gsap } from 'gsap'
 import { ElMessage } from 'element-plus'
 import { Search, Microphone } from '@element-plus/icons-vue'
 import PhotoViewer from '@/components/PhotoViewer.vue'
+import ElderHome from '@/components/ElderHome.vue'
+import { useDisplayMode } from '@/composables/useDisplayMode'
 import albumCoverUrl from '@/assets/album-cover.jpg'
 import FloorPlanCanvas from '@/views/item/FloorPlanCanvas.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
@@ -456,6 +461,7 @@ const userStore = useUserStore()
 const appStore = useAppStore()
 const { t } = useI18n()
 const sunLight = inject(SUN_LIGHT_KEY)
+const { isElder } = useDisplayMode()
 const root = ref(null)
 let ctx
 
@@ -1163,24 +1169,75 @@ let dragState = null
 // 指针事件可能一帧内来多次:合并到下一帧统一写一次坐标,避免高频触发 Vue 更新与布局抖动
 let dragRaf = 0
 let pendingPointer = null
+/** 长按刚结束时的 click 要吞掉(否则松手会顺带把卡片抬到最前/触发一次点击) */
+let suppressClickUntil = 0
 
 const bringToFront = (w) => {
+  if (Date.now() < suppressClickUntil) return
   zCounter = Math.min(zCounter + 1, 59)
   w._z = zCounter
+}
+
+/** 拖拽起点统一入口:小条直接拖与触屏长按拖都从这里进 */
+const beginDrag = (w, pointerId, clientX, clientY) => {
+  w._dragging = true
+  zCounter = Math.min(zCounter + 1, 59)
+  w._z = zCounter
+  dragState = { w, pointerId, startX: clientX, startY: clientY, startXf: w.x, startYf: w.y }
+  window.addEventListener('pointermove', onPointerMove)
+  window.addEventListener('pointerup', onPointerUp)
+  window.addEventListener('pointercancel', onPointerUp)
 }
 
 // 统一用 Pointer Events:鼠标、触屏、触控笔同一套逻辑(平板/触屏笔记本也能拖拽与缩放)
 const onDragStart = (e, w) => {
   if (e.pointerType === 'mouse' && e.button !== 0) return
   if (e.target.classList.contains('resize-corner') || e.target.classList.contains('del-btn')) return
-  w._dragging = true
-  zCounter = Math.min(zCounter + 1, 59)
-  w._z = zCounter
-  dragState = { w, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, startXf: w.x, startYf: w.y }
   e.preventDefault()
-  window.addEventListener('pointermove', onPointerMove)
-  window.addEventListener('pointerup', onPointerUp)
-  window.addEventListener('pointercancel', onPointerUp)
+  beginDrag(w, e.pointerId, e.clientX, e.clientY)
+}
+
+// ---- 触屏长按拖拽(T7):编辑态按在卡片主体上 400ms 启动,移动超过 10px 视为想滚动、放弃 ----
+const LONG_PRESS_MS = 400
+const LONG_PRESS_TOLERANCE = 10
+let longPressTimer = 0
+let longPressInfo = null
+
+const clearLongPress = () => {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer)
+    longPressTimer = 0
+  }
+  longPressInfo = null
+  window.removeEventListener('pointermove', onLongPressMove)
+  window.removeEventListener('pointerup', clearLongPress)
+  window.removeEventListener('pointercancel', clearLongPress)
+}
+
+function onLongPressMove(e) {
+  const info = longPressInfo
+  if (!info || e.pointerId !== info.pointerId) return
+  if (Math.hypot(e.clientX - info.x, e.clientY - info.y) > LONG_PRESS_TOLERANCE) clearLongPress()
+}
+
+const onCardPointerDown = (e, w) => {
+  if (!editMode.value || e.pointerType === 'mouse') return
+  // 拖拽小条 / 缩放手柄 / 删除按钮有各自的手势,不重复接管
+  if (e.target.closest?.('.drag-bar, .resize-corner, .del-btn')) return
+  clearLongPress()
+  longPressInfo = { w, pointerId: e.pointerId, x: e.clientX, y: e.clientY }
+  window.addEventListener('pointermove', onLongPressMove)
+  window.addEventListener('pointerup', clearLongPress)
+  window.addEventListener('pointercancel', clearLongPress)
+  longPressTimer = window.setTimeout(() => {
+    const info = longPressInfo
+    longPressTimer = 0
+    if (!info) return
+    clearLongPress()
+    // 从手指当前按下的位置起拖,不跳位
+    suppressClickUntil = Date.now() + 600
+    beginDrag(info.w, info.pointerId, info.x, info.y)
+  }, LONG_PRESS_MS)
 }
 
 const onResizeStart = (e, w) => {
@@ -1242,6 +1299,7 @@ const onPointerUp = (e) => {
 
 onUnmounted(() => {
   if (dragRaf) cancelAnimationFrame(dragRaf)
+  clearLongPress()
   window.removeEventListener('pointermove', onPointerMove)
   window.removeEventListener('pointerup', onPointerUp)
   window.removeEventListener('pointercancel', onPointerUp)
@@ -1407,6 +1465,10 @@ html.dark .edit-toolbar {
   cursor: default;
   border-color: rgba(var(--color-brand-rgb), 0.3);
   box-shadow: 0 4px 16px rgba(var(--color-brand-rgb), 0.15);
+  /* 编辑态整卡可长按拖动:不允许浏览器把手指动作当成滚动,也不弹系统长按菜单 */
+  touch-action: none;
+  user-select: none;
+  -webkit-touch-callout: none;
   transition:
     left 0.15s cubic-bezier(0.4, 0, 0.2, 1),
     top 0.15s cubic-bezier(0.4, 0, 0.2, 1),

@@ -26,7 +26,8 @@
         class="player-video"
         @loadedmetadata="onLoadedMetadata"
         @timeupdate="onTimeUpdate"
-        @pause="reportProgress"
+        @play="onPlay"
+        @pause="onVideoPause"
         @ended="onEnded"
         @error="onPlaybackError"
       >
@@ -56,6 +57,9 @@
           $t(transcodeReason === 'subtitle' ? 'cinema.transcodingSubtitle' : 'cinema.notDirectPlayable')
         }}</span>
         <span v-else-if="failed" class="player-warn">{{ $t('cinema.playFailed') }}</span>
+        <el-button v-if="pipReady" size="small" text class="pip-btn" @click="onPipClick" :title="$t('cinema.pip')">
+          {{ $t('cinema.pip') }}
+        </el-button>
       </div>
     </div>
     <template #footer>
@@ -168,12 +172,44 @@ watch(
   async (open) => {
     if (open) {
       sunLight?.suspendEffects()
+      checkPip()
       await load()
     } else {
       reportProgress()
     }
   },
 )
+
+// ---- 画中画(仅安卓壳):播放中离开 App 自动缩进小窗,播完/暂停即关掉 ----
+const pipReady = ref(false)
+const pipNative = () => import('@/native/pip')
+const checkPip = async () => {
+  try {
+    const m = await pipNative()
+    pipReady.value = await m.pipSupported()
+  } catch (e) {
+    pipReady.value = false
+  }
+}
+const syncPip = (on) => {
+  pipNative()
+    .then((m) => m.setPipActive(on))
+    .catch(() => {})
+}
+const onPlay = () => syncPip(true)
+const onVideoPause = () => {
+  reportProgress()
+  syncPip(false)
+}
+const onPipClick = async () => {
+  try {
+    const m = await pipNative()
+    const ok = await m.enterPip()
+    if (!ok) ElMessage.warning(t('cinema.pipUnavailable'))
+  } catch (e) {
+    ElMessage.warning(t('cinema.pipUnavailable'))
+  }
+}
 
 /**
  * 装载播放地址。
@@ -368,12 +404,14 @@ const onEnded = async () => {
 
 const onClosed = () => {
   reset()
+  syncPip(false)
   sunLight?.restoreEffects()
 }
 
 onBeforeUnmount(() => {
   reportProgress()
   destroyHls()
+  syncPip(false)
   sunLight?.restoreEffects()
 })
 </script>

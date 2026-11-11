@@ -1,130 +1,209 @@
-<!-- 文件浏览页:独立功能页,家庭成员浏览/预览/下载存储设备文件;管理操作(新建/重命名/删除)仅 OWNER -->
+<!-- 文件浏览页:家庭文件(通用文件列表,成员都能存/看) + 存储设备(浏览/预览/下载;管理操作仅 OWNER) -->
 <template>
   <div class="page">
     <Breadcrumb :items="[{ label: $t('storage.browseTitle') }]" />
 
-    <!-- 未初始化设备:引导添加(仅 OWNER),成员只读提示 -->
-    <div v-if="!customDevices.length" class="card browse-empty">
-      <el-empty :description="userStore.isOwner ? $t('storage.noDeviceOwnerHint') : $t('storage.noDevice')">
-        <el-button v-if="userStore.isOwner" type="primary" @click="$router.push('/settings')">{{ $t('storage.goSettings') }}</el-button>
-      </el-empty>
-    </div>
+    <el-radio-group v-model="browseTab" size="small" class="browse-tabs">
+      <el-radio-button value="family">{{ $t('storage.tabFamily') }}</el-radio-button>
+      <el-radio-button value="device">{{ $t('storage.tabDevice') }}</el-radio-button>
+    </el-radio-group>
 
-    <template v-else>
+    <!-- 家庭文件:全家共享的通用文件,删除限上传者本人或家长 -->
+    <template v-if="browseTab === 'family'">
       <PageToolbar>
         <div class="tb-left">
-          <el-select
-            v-model="activeDeviceId"
+          <el-input
+            v-model="familyKeyword"
             size="small"
-            style="width: 180px"
             clearable
-            :placeholder="$t('storage.pickDevice')"
-            @change="onDeviceChange"
-          >
-            <el-option v-for="d in customDevices" :key="d.id" :label="d.name" :value="d.id" />
-          </el-select>
-          <el-button size="small" :disabled="!activePath" @click="goParent">{{ $t('storage.backToParent') }}</el-button>
-          <el-breadcrumb v-if="pathParts.length" separator="/" class="crumb">
-            <el-breadcrumb-item v-a11y-click v-for="(seg, i) in pathParts" :key="i" @click="navigateToPath(seg.path)">
-              {{ seg.name }}
-            </el-breadcrumb-item>
-          </el-breadcrumb>
+            class="family-search"
+            :placeholder="$t('storage.familySearchPh')"
+            @keyup.enter="loadFamilyFiles"
+            @clear="loadFamilyFiles"
+          />
+          <el-button size="small" @click="loadFamilyFiles">{{ $t('common.search') }}</el-button>
         </div>
-        <div v-if="canManage" class="tb-right">
-          <template v-if="!selectMode">
-            <el-button size="small" @click="createDir">{{ $t('storage.mkdir') }}</el-button>
-            <el-button size="small" @click="enterSelect">{{ $t('common.select') }}</el-button>
-          </template>
-          <template v-else>
-            <span class="select-count">{{ $t('storage.selectedCount', { n: selectedPaths.length }) }}</span>
-            <el-button size="small" type="danger" plain :disabled="!selectedPaths.length" @click="deleteSelected">{{
-              $t('common.delete')
-            }}</el-button>
-            <el-button size="small" @click="selectMode = false">{{ $t('common.cancel') }}</el-button>
-          </template>
+        <div class="tb-right">
+          <el-button size="small" type="primary" :loading="familyUploading" @click="pickFamilyFile">
+            {{ $t('storage.familyUpload') }}
+          </el-button>
         </div>
       </PageToolbar>
 
-      <!-- 宽屏右栏预览:≥900px 且非多选时表格与预览并排,两列各自滚
+      <div class="card" v-loading="familyLoading">
+        <el-table v-if="familyFiles.length" :data="familyFiles" stripe>
+          <el-table-column :label="$t('storage.name')" :min-width="isMobile ? 160 : 260">
+            <template #default="{ row }">
+              <div class="file-cell">
+                <span class="file-ico">{{ fileIcon(row.fileName) }}</span>
+                <span class="file-name">{{ row.fileName }}</span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column v-if="!isMobile" :label="$t('storage.size')" width="120">
+            <template #default="{ row }">{{ formatSize(row.fileSize) }}</template>
+          </el-table-column>
+          <el-table-column v-if="!isMobile" :label="$t('storage.uploadedAt')" width="170">
+            <template #default="{ row }">{{ formatIsoTime(row.createdAt) }}</template>
+          </el-table-column>
+          <el-table-column :label="$t('common.actions')" :width="isMobile ? 130 : 170">
+            <template #default="{ row }">
+              <el-tooltip v-if="isFamilyPreviewable(row)" :content="$t('storage.preview')" placement="top" :show-after="300">
+                <el-button size="small" text @click="previewFamily(row)"
+                  ><el-icon><View /></el-icon
+                ></el-button>
+              </el-tooltip>
+              <el-tooltip :content="$t('common.share')" placement="top" :show-after="300">
+                <el-button size="small" text @click="shareFamily(row)"
+                  ><el-icon><Share /></el-icon
+                ></el-button>
+              </el-tooltip>
+              <el-tooltip :content="$t('storage.download')" placement="top" :show-after="300">
+                <el-button size="small" text @click="downloadFamily(row)"
+                  ><el-icon><Download /></el-icon
+                ></el-button>
+              </el-tooltip>
+              <el-tooltip v-if="canDeleteFamily(row)" :content="$t('common.delete')" placement="top" :show-after="300">
+                <el-button size="small" text @click="deleteFamily(row)"
+                  ><el-icon><Delete /></el-icon
+                ></el-button>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-empty v-else-if="!familyLoading" :description="$t('storage.familyEmpty')" :image-size="70">
+          <el-button type="primary" @click="pickFamilyFile">{{ $t('storage.familyUpload') }}</el-button>
+        </el-empty>
+      </div>
+
+      <!-- 隐藏的选文件控件:家庭文件与分享收件的「存到文件」共用同一套上传接口 -->
+      <input ref="familyInput" type="file" class="family-input" @change="onFamilyFilePicked" />
+    </template>
+
+    <!-- 存储设备:未初始化设备时引导添加(仅 OWNER),成员只读提示 -->
+    <template v-else>
+      <div v-if="!customDevices.length" class="card browse-empty">
+        <el-empty :description="userStore.isOwner ? $t('storage.noDeviceOwnerHint') : $t('storage.noDevice')">
+          <el-button v-if="userStore.isOwner" type="primary" @click="$router.push('/settings')">{{ $t('storage.goSettings') }}</el-button>
+        </el-empty>
+      </div>
+
+      <template v-else>
+        <PageToolbar>
+          <div class="tb-left">
+            <el-select
+              v-model="activeDeviceId"
+              size="small"
+              style="width: 180px"
+              clearable
+              :placeholder="$t('storage.pickDevice')"
+              @change="onDeviceChange"
+            >
+              <el-option v-for="d in customDevices" :key="d.id" :label="d.name" :value="d.id" />
+            </el-select>
+            <el-button size="small" :disabled="!activePath" @click="goParent">{{ $t('storage.backToParent') }}</el-button>
+            <el-breadcrumb v-if="pathParts.length" separator="/" class="crumb">
+              <el-breadcrumb-item v-a11y-click v-for="(seg, i) in pathParts" :key="i" @click="navigateToPath(seg.path)">
+                {{ seg.name }}
+              </el-breadcrumb-item>
+            </el-breadcrumb>
+          </div>
+          <div v-if="canManage" class="tb-right">
+            <template v-if="!selectMode">
+              <el-button size="small" @click="createDir">{{ $t('storage.mkdir') }}</el-button>
+              <el-button size="small" @click="enterSelect">{{ $t('common.select') }}</el-button>
+            </template>
+            <template v-else>
+              <span class="select-count">{{ $t('storage.selectedCount', { n: selectedPaths.length }) }}</span>
+              <el-button size="small" type="danger" plain :disabled="!selectedPaths.length" @click="deleteSelected">{{
+                $t('common.delete')
+              }}</el-button>
+              <el-button size="small" @click="selectMode = false">{{ $t('common.cancel') }}</el-button>
+            </template>
+          </div>
+        </PageToolbar>
+
+        <!-- 宽屏右栏预览:≥900px 且非多选时表格与预览并排,两列各自滚
            (列高由 useWideCols 写 --wide-col-max,通用规则在 main.css 的 .wide-col)。
            窄屏不加 .wide-cols,表格整宽,预览仍走 70% 弹窗。 -->
-      <div ref="wideEl" class="file-cols" :class="{ 'wide-cols': previewWide }" :style="previewWide ? colStyle : {}">
-        <div :class="{ 'wide-col': previewWide }">
-          <div class="card" v-loading="loadingFiles">
-            <!-- 未选中/选中设备识别不到:显示空态,不调接口不出错 -->
-            <el-table v-if="activeDeviceId" :data="files" stripe @row-dblclick="onFileDblClick" @row-click="onRowClick">
-              <!-- 宽屏分栏时左栏只有内容区一半宽(900px 视口约 300px),只留名称+操作,
+        <div ref="wideEl" class="file-cols" :class="{ 'wide-cols': previewWide }" :style="previewWide ? colStyle : {}">
+          <div :class="{ 'wide-col': previewWide }">
+            <div class="card" v-loading="loadingFiles">
+              <!-- 未选中/选中设备识别不到:显示空态,不调接口不出错 -->
+              <el-table v-if="activeDeviceId" :data="files" stripe @row-dblclick="onFileDblClick" @row-click="onRowClick">
+                <!-- 宽屏分栏时左栏只有内容区一半宽(900px 视口约 300px),只留名称+操作,
                    大小/时间移到预览栏标题下,避免表格横向滚动 -->
-              <el-table-column :label="$t('storage.name')" :min-width="previewWide ? 160 : isMobile ? 140 : 220">
-                <template #default="{ row }">
-                  <div class="file-cell" :class="{ selectable: selectMode }">
-                    <span v-if="selectMode" class="pick-badge" :class="{ on: isSelected(row) }">
-                      <svg viewBox="0 0 16 16" width="12" height="12">
-                        <path
-                          d="M3 8.5 L6.5 12 L13 4.5"
-                          fill="none"
-                          stroke="#fff"
-                          stroke-width="2.4"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        />
-                      </svg>
-                    </span>
-                    <span class="file-ico">{{ row.isDir ? '📁' : fileIcon(row.name) }}</span>
-                    <span class="file-name">{{ row.name }}</span>
-                  </div>
-                </template>
-              </el-table-column>
-              <el-table-column v-if="!isMobile && !previewWide" :label="$t('storage.size')" width="120">
-                <template #default="{ row }">{{ row.isDir ? '-' : formatSize(row.size) }}</template>
-              </el-table-column>
-              <el-table-column v-if="!isMobile && !previewWide" :label="$t('storage.modified')" width="160">
-                <template #default="{ row }">{{ formatTime(row.modified) }}</template>
-              </el-table-column>
-              <el-table-column :label="$t('common.actions')" :width="isMobile ? 120 : 140">
-                <template #default="{ row }">
-                  <template v-if="!selectMode">
-                    <el-tooltip v-if="isPreviewable(row.name)" :content="$t('storage.preview')" placement="top" :show-after="300">
-                      <el-button size="small" text @click="preview(row)"
-                        ><el-icon><View /></el-icon
-                      ></el-button>
-                    </el-tooltip>
-                    <el-tooltip v-if="userStore.isLoggedIn && !row.isDir" :content="$t('common.share')" placement="top" :show-after="300">
-                      <el-button size="small" text @click="shareFile(row)"
-                        ><el-icon><Share /></el-icon
-                      ></el-button>
-                    </el-tooltip>
-                    <el-tooltip :content="$t('storage.download')" placement="top" :show-after="300">
-                      <el-button size="small" text @click="download(row)"
-                        ><el-icon><Download /></el-icon
-                      ></el-button>
-                    </el-tooltip>
-                    <el-tooltip v-if="canManage" :content="$t('storage.rename')" placement="top" :show-after="300">
-                      <el-button size="small" text @click="renameEntry(row)"
-                        ><el-icon><EditPen /></el-icon
-                      ></el-button>
-                    </el-tooltip>
+                <el-table-column :label="$t('storage.name')" :min-width="previewWide ? 160 : isMobile ? 140 : 220">
+                  <template #default="{ row }">
+                    <div class="file-cell" :class="{ selectable: selectMode }">
+                      <span v-if="selectMode" class="pick-badge" :class="{ on: isSelected(row) }">
+                        <svg viewBox="0 0 16 16" width="12" height="12">
+                          <path
+                            d="M3 8.5 L6.5 12 L13 4.5"
+                            fill="none"
+                            stroke="#fff"
+                            stroke-width="2.4"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                          />
+                        </svg>
+                      </span>
+                      <span class="file-ico">{{ row.isDir ? '📁' : fileIcon(row.name) }}</span>
+                      <span class="file-name">{{ row.name }}</span>
+                    </div>
                   </template>
-                </template>
-              </el-table-column>
-            </el-table>
-            <el-empty v-else :description="$t('storage.pickDevice')" :image-size="60" />
+                </el-table-column>
+                <el-table-column v-if="!isMobile && !previewWide" :label="$t('storage.size')" width="120">
+                  <template #default="{ row }">{{ row.isDir ? '-' : formatSize(row.size) }}</template>
+                </el-table-column>
+                <el-table-column v-if="!isMobile && !previewWide" :label="$t('storage.modified')" width="160">
+                  <template #default="{ row }">{{ formatTime(row.modified) }}</template>
+                </el-table-column>
+                <el-table-column :label="$t('common.actions')" :width="isMobile ? 120 : 140">
+                  <template #default="{ row }">
+                    <template v-if="!selectMode">
+                      <el-tooltip v-if="isPreviewable(row.name)" :content="$t('storage.preview')" placement="top" :show-after="300">
+                        <el-button size="small" text @click="preview(row)"
+                          ><el-icon><View /></el-icon
+                        ></el-button>
+                      </el-tooltip>
+                      <el-tooltip v-if="userStore.isLoggedIn && !row.isDir" :content="$t('common.share')" placement="top" :show-after="300">
+                        <el-button size="small" text @click="shareFile(row)"
+                          ><el-icon><Share /></el-icon
+                        ></el-button>
+                      </el-tooltip>
+                      <el-tooltip :content="$t('storage.download')" placement="top" :show-after="300">
+                        <el-button size="small" text @click="download(row)"
+                          ><el-icon><Download /></el-icon
+                        ></el-button>
+                      </el-tooltip>
+                      <el-tooltip v-if="canManage" :content="$t('storage.rename')" placement="top" :show-after="300">
+                        <el-button size="small" text @click="renameEntry(row)"
+                          ><el-icon><EditPen /></el-icon
+                        ></el-button>
+                      </el-tooltip>
+                    </template>
+                  </template>
+                </el-table-column>
+              </el-table>
+              <el-empty v-else :description="$t('storage.pickDevice')" :image-size="60" />
+            </div>
+          </div>
+          <div v-if="previewWide" class="wide-col preview-col">
+            <FilePreviewPane
+              v-if="previewSrc"
+              class="card"
+              :src="previewSrc"
+              :name="previewName"
+              :meta="previewMeta"
+              :is-image="previewIsImage"
+              :is-video="previewIsVideo"
+              @close="clearPreview"
+            />
+            <div v-else class="card pane-empty">{{ $t('storage.previewHint') }}</div>
           </div>
         </div>
-        <div v-if="previewWide" class="wide-col preview-col">
-          <FilePreviewPane
-            v-if="previewSrc"
-            class="card"
-            :src="previewSrc"
-            :name="previewName"
-            :meta="previewMeta"
-            :is-image="previewIsImage"
-            :is-video="previewIsVideo"
-            @close="clearPreview"
-          />
-          <div v-else class="card pane-empty">{{ $t('storage.previewHint') }}</div>
-        </div>
-      </div>
+      </template>
     </template>
 
     <!-- 图片/视频预览(窄屏弹窗;宽屏走右栏,同一份组件) -->
@@ -143,14 +222,14 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { View, Download, EditPen, Share } from '@element-plus/icons-vue'
+import { View, Download, EditPen, Share, Delete } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useDevice } from '@/composables/useDevice'
 import { useWideCols } from '@/composables/useWideCols'
 import { useGlobalSearch } from '@/composables/useGlobalSearch'
-import { storageApi } from '@/api'
+import { storageApi, familyFileApi } from '@/api'
 import { shareFiles } from '@/native/shareOut'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -161,6 +240,16 @@ const route = useRoute()
 const userStore = useUserStore()
 const { isMobile, isWide: viewWide } = useDevice()
 const search = useGlobalSearch()
+
+// 家庭文件(通用文件列表)与存储设备是两种数据来源,用顶部标签切换;
+// 带 ?deviceId= 的跳转(设置页「浏览」)直接落在设备标签,平时默认看家庭文件。
+const browseTab = ref(route.query.deviceId ? 'device' : 'family')
+const familyFiles = ref([])
+const familyLoading = ref(false)
+const familyUploading = ref(false)
+const familyKeyword = ref('')
+const familyInput = ref(null)
+const canDeleteFamily = (row) => userStore.isOwner || row.uploaderId === userStore.userInfo?.id
 
 const devices = ref([])
 const customDevices = computed(() => devices.value.filter((d) => d.id !== 0))
@@ -329,6 +418,86 @@ function shareFile(row) {
   shareFiles([url], row.name)
 }
 
+// ---- 家庭文件 ----
+async function loadFamilyFiles() {
+  familyLoading.value = true
+  try {
+    familyFiles.value = (await familyFileApi.list(familyKeyword.value.trim())) || []
+  } catch (e) {
+    familyFiles.value = []
+  } finally {
+    familyLoading.value = false
+  }
+}
+
+function pickFamilyFile() {
+  familyInput.value?.click()
+}
+
+async function onFamilyFilePicked(e) {
+  const file = e?.target?.files?.[0]
+  // 同一文件连续选两次也要触发 change:读完即清空输入框
+  if (!file) return
+  familyUploading.value = true
+  try {
+    await familyFileApi.upload(file)
+    ElMessage.success(t('storage.familyUploaded'))
+    await loadFamilyFiles()
+  } catch (err) {
+    ElMessage.error(t('storage.familyUploadFailed'))
+  } finally {
+    familyUploading.value = false
+    if (e?.target) e.target.value = ''
+  }
+}
+
+async function deleteFamily(row) {
+  await ElMessageBox.confirm(t('storage.familyDeleteConfirm', { name: row.fileName }), t('common.warning'), {
+    type: 'warning',
+    closeOnClickModal: true,
+  })
+  try {
+    await familyFileApi.remove(row.id)
+    ElMessage.success(t('common.deleted'))
+    await loadFamilyFiles()
+  } catch (e) {
+    ElMessage.error(t('storage.familyDeleteFailed'))
+  }
+}
+
+function downloadFamily(row) {
+  // 同源直链:用 download 属性让浏览器按原名存盘(能直接看的内容也不会霸屏打开)
+  const a = document.createElement('a')
+  a.href = row.fileUrl
+  a.download = row.fileName || ''
+  a.rel = 'noopener'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+}
+
+function shareFamily(row) {
+  shareFiles([row.fileUrl], row.fileName)
+}
+
+const isFamilyPreviewable = (row) => /^(image|video)\//.test(row.mimeType || '')
+function previewFamily(row) {
+  previewSrc.value = row.fileUrl
+  previewName.value = row.fileName
+  previewMeta.value = [formatSize(row.fileSize), formatIsoTime(row.createdAt)].filter((x) => x && x !== '-').join(' · ')
+  previewIsImage.value = (row.mimeType || '').startsWith('image/')
+  previewIsVideo.value = (row.mimeType || '').startsWith('video/')
+  previewDialog.value = true
+}
+
+/** 后端的 LocalDateTime(ISO 串)统一按本机时区展示到分钟 */
+function formatIsoTime(iso) {
+  if (!iso) return '-'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return String(iso).slice(0, 10)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
 function isPreviewable(name) {
   return /\.(jpg|jpeg|png|gif|webp|bmp|mp4|webm|ogg)$/i.test(name)
 }
@@ -358,6 +527,7 @@ function formatTime(ms) {
 }
 
 onMounted(async () => {
+  loadFamilyFiles()
   devices.value = await storageApi.devices()
   // 初始设备:URL ?deviceId=(设置页跳转) > localStorage 默认设备 > 首个自定义设备
   const fromQuery = Number(route.query.deviceId)
@@ -423,6 +593,17 @@ onBeforeUnmount(() => search.setFileContext(null))
 }
 .browse-empty {
   padding: 40px 20px;
+}
+.browse-tabs {
+  margin-bottom: 12px;
+}
+.family-search {
+  width: 220px;
+  max-width: 100%;
+}
+/* 隐藏的原生选文件控件:只由「上传」按钮触发 */
+.family-input {
+  display: none;
 }
 /* 宽屏右栏预览:预览栏 260–380px 随可用宽度收放(外壳侧栏占掉 320px 左右,
    900px 视口下内容区只有 ~580px,固定 380 会把表格挤到 184px),表格占余下宽度;

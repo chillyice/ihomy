@@ -2197,3 +2197,41 @@ body.dragging-files * {
   cursor: grabbing !important;
 }
 
+/* ===== 显示模式(老人 / 儿童)=====
+   只由 useDisplayMode 在 html 根上切类,不改组件内写死的字号档位:
+   老人模式抬高基准字号与主文字对比度,并去掉半透明表面(高对比);
+   儿童模式只过滤导航与路由,视觉沿用默认主题。 */
+html.elder-mode {
+  --el-font-size-base: 17px;
+  --el-font-size-medium: 19px;
+  --el-font-size-large: 21px;
+  --el-font-size-small: 15px;
+  --color-text: #241c12;
+  --color-text-secondary: #4a3d2e;
+  --color-text-tertiary: #574a3a;
+  --color-border: rgba(36, 28, 18, 0.32);
+}
+html.dark.elder-mode {
+  --color-text: #f6efe2;
+  --color-text-secondary: #d8ccb8;
+  --color-text-tertiary: #c4b7a1;
+  --color-border: rgba(246, 239, 226, 0.34);
+}
+html.elder-mode body {
+  font-size: 18px;
+}
+html.elder-mode .el-button,
+html.elder-mode .el-menu-item,
+html.elder-mode .el-tag,
+html.elder-mode .el-input__inner,
+html.elder-mode .el-textarea__inner {
+  font-size: 17px;
+}
+html.elder-mode .el-button--large {
+  font-size: 19px;
+}
+/* 高对比:卡片表面更实、边框更明显(不做纯白,避免夜里刺眼) */
+html.elder-mode .card,
+html.elder-mode .settings-card {
+  border-width: 2px;
+}

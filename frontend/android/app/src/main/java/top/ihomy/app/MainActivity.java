@@ -14,6 +14,7 @@ import top.ihomy.app.diagnostics.DiagnosticsPlugin;
 import top.ihomy.app.haptics.HapticsPlugin;
 import top.ihomy.app.live.AppVisibility;
 import top.ihomy.app.photo.PhotoBackupPlugin;
+import top.ihomy.app.pip.PipPlugin;
 import top.ihomy.app.screen.ScreenPlugin;
 import top.ihomy.app.share.ShareInboxPlugin;
 import top.ihomy.app.share.ShareIntake;
@@ -52,6 +53,8 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(HapticsPlugin.class);
         // 通话权限前置:发起/接听前主动申请麦克风(视频还要摄像头),拒绝后引导去系统设置
         registerPlugin(CallPermissionPlugin.class);
+        // 画中画:播放中离开 App 时整页缩进小窗(前端播放态驱动,平时离开就是普通后台)
+        registerPlugin(PipPlugin.class);
         // 冷启动时先把分享意图接住,JS 起来后再取(getPending 只读,确认落地才清)
         ShareIntake.capture(getIntent());
         super.onCreate(savedInstanceState);
@@ -80,6 +83,13 @@ public class MainActivity extends BridgeActivity {
     public void onPause() {
         AppVisibility.setForeground(false);
         super.onPause();
+    }
+
+    /** 用户按 Home / 切到别的 App:正在播放视频就直接进画中画(没播放则照常进后台) */
+    @Override
+    protected void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        PipPlugin.enterIfActive(this);
     }
 
     /** 应用已在前台/后台时再次收到分享(singleTask):接住并通知 WebView 去取 */

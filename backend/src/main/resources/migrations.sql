@@ -3210,3 +3210,25 @@ SET @sql := IF(@has = 0,
 PREPARE add_album_backup_key_uk_stmt FROM @sql;
 EXECUTE add_album_backup_key_uk_stmt;
 DEALLOCATE PREPARE add_album_backup_key_uk_stmt;
+
+-- ------------------------------------------------------------
+-- 家庭文件(2026-11-11,V12.2):通用文件入口(分享收件「存到文件」/文件页上传)
+--   只新增一张表,按 family_id 隔离,软删;游客不可见(FileAccessMapper 不登记)
+--   幂等:CREATE TABLE IF NOT EXISTS,重复执行安全
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `family_file` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `uploader_id` BIGINT       DEFAULT NULL COMMENT '上传人ID',
+  `file_name`   VARCHAR(255) NOT NULL COMMENT '原始文件名(展示用)',
+  `file_url`    VARCHAR(500) NOT NULL COMMENT '文件URL(/files/...)',
+  `mime_type`   VARCHAR(120) DEFAULT NULL COMMENT 'MIME 类型',
+  `file_size`   BIGINT       DEFAULT NULL COMMENT '字节数',
+  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  `deleted_at`  DATETIME     DEFAULT NULL COMMENT '删除时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family_deleted_created` (`family_id`, `deleted`, `created_at` DESC),
+  KEY `idx_family_deleted_name` (`family_id`, `deleted`, `file_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭文件(通用文件列表,不进相册/图书馆)';

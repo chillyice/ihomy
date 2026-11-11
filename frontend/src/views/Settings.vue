@@ -21,6 +21,7 @@
           <el-menu-item index="media"> <span class="menu-icon">🎬</span>{{ $t('settings.cat.media') }} </el-menu-item>
           <el-menu-item index="storage"> <span class="menu-icon">🗄️</span>{{ $t('settings.cat.storage') }} </el-menu-item>
           <el-menu-item index="light"> <span class="menu-icon">🎨</span>{{ $t('settings.personalize') }} </el-menu-item>
+          <el-menu-item index="display"> <span class="menu-icon">🖥️</span>{{ $t('settings.cat.display') }} </el-menu-item>
           <el-menu-item v-if="isNativeApp()" index="client">
             <span class="menu-icon">📱</span>{{ $t('settings.cat.client') }}
           </el-menu-item>
@@ -37,6 +38,7 @@
         <template v-if="active === 'storage'"><StorageView /></template>
         <div v-show="active === 'media'"><MediaSettings /></div>
         <div v-show="active === 'light'"><LightSettings /></div>
+        <div v-show="active === 'display'"><ModeSettings /></div>
         <div v-show="active === 'client'"><AppSettings /></div>
       </div>
     </div>
@@ -57,6 +59,7 @@ import DailySettings from './settings/DailySettings.vue'
 import WeatherSettings from './settings/WeatherSettings.vue'
 import MediaSettings from './settings/MediaSettings.vue'
 import LightSettings from './settings/LightSettings.vue'
+import ModeSettings from './settings/ModeSettings.vue'
 import AppSettings from './settings/AppSettings.vue'
 import { isNativeApp } from '@/utils/platform'
 

@@ -35,12 +35,14 @@ import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { iconComp, buildNavGroups } from '@/utils/navModules'
+import { useDisplayMode } from '@/composables/useDisplayMode'
 
 const router = useRouter()
 const appStore = useAppStore()
 const userStore = useUserStore()
+const { isChild } = useDisplayMode()
 
-const groups = computed(() => buildNavGroups(appStore.modules, { hasOps: userStore.isOps || userStore.isOwner }))
+const groups = computed(() => buildNavGroups(appStore.modules, { hasOps: userStore.isOps || userStore.isOwner, child: isChild.value }))
 
 const navigate = (path) => router.push(path)
 </script>

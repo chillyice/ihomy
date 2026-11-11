@@ -222,6 +222,7 @@ import WarnTriangle from '@/components/WarnTriangle.vue'
 import { iconComp, buildNavGroups, isActive } from '@/utils/navModules'
 import { formatRelativeTime } from '@/utils/datetime'
 import { todayString } from '@/utils/scheduleCalendar'
+import { useDisplayMode } from '@/composables/useDisplayMode'
 
 import { applyLocale } from '@/i18n'
 import { useThemeStore } from '@/stores/theme'
@@ -233,6 +234,7 @@ const route = useRoute()
 const appStore = useAppStore()
 const chatStore = useChatStore()
 const userStore = useUserStore()
+const { isChild } = useDisplayMode()
 const { locale, t } = useI18n()
 const { startDrag: startWidgetDrag, dragging: widgetDragging, crossed: crossedEdge } = useWidgetDrag()
 
@@ -280,7 +282,9 @@ const familyName = computed(() => appStore.familyName)
 const userInfo = computed(() => userStore.userInfo)
 
 // 导航分组:复用共享单一数据源(NAV_PATHS + 分组规则),此处只做渲染
-const groupedModules = computed(() => buildNavGroups(appStore.modules, { hasOps: userStore.isOps || userStore.isOwner }))
+const groupedModules = computed(() =>
+  buildNavGroups(appStore.modules, { hasOps: userStore.isOps || userStore.isOwner, child: isChild.value }),
+)
 
 const navigate = (path) => {
   if (route.path === path) return

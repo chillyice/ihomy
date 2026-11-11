@@ -3,17 +3,17 @@
 // 口径见 docs/设计想法/完成/日程提醒重构-计划.md §8。
 
 /** 只读来源:日程页只能看与跳转,不可勾选/编辑/删除 */
-export const READ_ONLY_SOURCES = ['LOAN', 'FINANCE', 'ITEM_EXPIRY']
+export const READ_ONLY_SOURCES = ['LOAN', 'FINANCE', 'ITEM_EXPIRY', 'DEVICE_CALENDAR']
 
-/** 来源开关顺序(与后端 Provider 顺序一致:贷款 → 理财 → 食材,计划子任务在前) */
-export const SOURCE_OPTIONS = ['PLAN_TASK', 'LOAN', 'FINANCE', 'ITEM_EXPIRY']
+/** 来源开关顺序(与后端 Provider 顺序一致:贷款 → 理财 → 食材,计划子任务在前;手机日历在最后) */
+export const SOURCE_OPTIONS = ['PLAN_TASK', 'LOAN', 'FINANCE', 'ITEM_EXPIRY', 'DEVICE_CALENDAR']
 
 /** 前端偏好键:只存本机展示开关,默认全开 */
 export const SOURCE_STORAGE_KEY = 'ihomy:schedule:sources:v1'
 
 /** 全开的一份新对象(调用方直接改不会被共享) */
 export function defaultSourcePrefs() {
-  return { PLAN_TASK: true, LOAN: true, FINANCE: true, ITEM_EXPIRY: true }
+  return { PLAN_TASK: true, LOAN: true, FINANCE: true, ITEM_EXPIRY: true, DEVICE_CALENDAR: true }
 }
 
 /** 读偏好:缺键/坏 JSON/存储不可用都回落全开,不抛错 */

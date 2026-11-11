@@ -69,18 +69,33 @@
               <span class="share-doc-name">{{ d.name }}</span>
               <span class="share-doc-meta">{{ humanSize(d.size) }}</span>
             </div>
-            <span v-if="targetOf(d) === 'unsupported'" class="share-doc-note">{{ $t('shareInbox.unsupportedType') }}</span>
-            <span v-else-if="savedDocs.includes(d.index)" class="share-doc-note">
-              {{ targetOf(d) === 'video' ? $t('shareInbox.savedToVideo') : $t('shareInbox.savedToLibrary') }}
-            </span>
-            <el-button
-              v-else
-              :loading="savingDocIndex === d.index"
-              :disabled="savingText || savingFiles || savingAllDocs"
-              @click="saveDoc(d)"
-            >
-              {{ targetOf(d) === 'video' ? $t('shareInbox.saveToVideo') : $t('shareInbox.saveToLibrary') }}
-            </el-button>
+            <div class="share-doc-actions">
+              <template v-if="targetOf(d) !== 'unsupported'">
+                <span v-if="savedDocs.includes(d.index)" class="share-doc-note">
+                  {{ targetOf(d) === 'video' ? $t('shareInbox.savedToVideo') : $t('shareInbox.savedToLibrary') }}
+                </span>
+                <el-button
+                  v-else
+                  :loading="savingDocIndex === d.index"
+                  :disabled="savingText || savingFiles || savingAllDocs"
+                  @click="saveDoc(d)"
+                >
+                  {{ targetOf(d) === 'video' ? $t('shareInbox.saveToVideo') : $t('shareInbox.saveToLibrary') }}
+                </el-button>
+              </template>
+              <span v-else class="share-doc-note">{{ $t('shareInbox.unsupportedType') }}</span>
+              <span v-if="savedToFamily.includes(d.index)" class="share-doc-note">{{ $t('shareInbox.savedToFile') }}</span>
+              <el-button
+                v-else
+                size="small"
+                text
+                :loading="savingFamilyIndex === d.index"
+                :disabled="savingText || savingFiles || savingAllDocs"
+                @click="saveDocToFamily(d)"
+              >
+                {{ $t('shareInbox.saveToFile') }}
+              </el-button>
+            </div>
           </li>
         </ul>
         <p v-if="payload.skippedDocs" class="share-tip">{{ $t('shareInbox.skippedDocs', { n: payload.skippedDocs }) }}</p>
@@ -104,7 +119,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
-import { albumApi, diaryApi, libraryApi, photoApi, videoApi, wishApi } from '@/api'
+import { albumApi, diaryApi, familyFileApi, libraryApi, photoApi, videoApi, wishApi } from '@/api'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -124,6 +139,9 @@ const savingDocIndex = ref(null)
 const savingAllDocs = ref(false)
 /** 已落到站内的文档下标,避免重复保存 */
 const savedDocs = ref([])
+/** 正在存进「家庭文件」的文档下标 / 已存过的下标 */
+const savingFamilyIndex = ref(null)
+const savedToFamily = ref([])
 let offShare = null
 
 const images = computed(() => ((payload.value && payload.value.files) || []).filter((f) => String(f.mime || '').startsWith('image/')))
@@ -202,6 +220,7 @@ function applyPayload(p) {
   textTarget.value = String(p.text || '').length > 500 ? 'diary' : 'wish'
   uploaded.value = 0
   savedDocs.value = []
+  savedToFamily.value = []
 }
 
 async function loadAlbums() {
@@ -355,6 +374,26 @@ async function saveOneDoc(doc, target) {
   }
 }
 
+/** 存进「家庭文件」:任何类型都能存,不受相册/图书馆/放映厅的格式限制 */
+async function saveDocToFamily(doc) {
+  if (savingFamilyIndex.value !== null || savedToFamily.value.includes(doc.index)) return
+  savingFamilyIndex.value = doc.index
+  try {
+    const { readShareFile } = await import('@/native/shareInbox')
+    const file = await readShareFile(doc)
+    await familyFileApi.upload(file)
+    if (!savedToFamily.value.includes(doc.index)) savedToFamily.value.push(doc.index)
+    ElMessage.success(t('shareInbox.savedToFile'))
+  } catch (e) {
+    console.warn('[shareInbox] 存进家庭文件失败', doc.name, e)
+    const msg = String((e && (e.message || e.code)) || '')
+    if (/too_large/i.test(msg)) ElMessage.error(t('shareInbox.docTooLarge'))
+    else ElMessage.error(t('shareInbox.fail'))
+  } finally {
+    savingFamilyIndex.value = null
+  }
+}
+
 async function discard() {
   const { clearSharePayload } = await import('@/native/shareInbox')
   await clearSharePayload()
@@ -455,6 +494,12 @@ function nowText() {
 .share-doc-note {
   font-size: 12px;
   color: var(--color-text-secondary, #8a8a8a);
+  flex: none;
+}
+.share-doc-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   flex: none;
 }
 .share-actions {

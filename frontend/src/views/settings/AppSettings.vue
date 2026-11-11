@@ -45,6 +45,16 @@
         </div>
       </el-form-item>
 
+      <el-form-item :label="$t('appSettings.deviceCalendarTitle')">
+        <div class="cal-head">
+          <el-switch v-model="deviceCalendar" @change="onDeviceCalendarChange" />
+          <el-tag size="small" :type="deviceCalendar ? 'success' : 'info'">
+            {{ deviceCalendar ? $t('appSettings.deviceCalendarOn') : $t('appSettings.deviceCalendarOff') }}
+          </el-tag>
+        </div>
+        <div class="share-tip">{{ $t('appSettings.deviceCalendarDesc') }}</div>
+      </el-form-item>
+
       <el-form-item :label="$t('appSettings.vaultLockTitle')">
         <div class="cal-head">
           <el-switch v-model="vaultLock" :disabled="!bioAvailable" @change="onVaultLockChange" />
@@ -233,6 +243,8 @@ const dailyWeatherTime = ref('07:30')
 const appLockOn = ref(false)
 /** 触觉反馈(默认开):只影响语义动作的轻震,跟随系统触感开关 */
 const hapticsOn = ref(hapticsEnabled())
+/** 系统日历读取(默认关):开启后日程页会合并手机日历里的事项(只读) */
+const deviceCalendar = ref(false)
 
 // 相册自动备份:开关与进度都在 native/photoBackup 里,这里只做界面与回填
 const backupOn = ref(false)
@@ -271,8 +283,29 @@ async function load() {
   try {
     const m = await native()
     status.value = await m.calendarStatus()
+    deviceCalendar.value = m.deviceCalendarEnabled()
   } catch (e) {
     console.warn('[appSettings] 读取日历状态失败', e)
+  }
+}
+
+// 系统日历读取:开启时先要读权限,被拒就回到关闭(不静默假装成功)
+async function onDeviceCalendarChange(v) {
+  try {
+    const m = await native()
+    if (v) {
+      const ok = await m.requestCalendarPermission().catch(() => false)
+      if (!ok) {
+        deviceCalendar.value = false
+        ElMessage.warning(t('appSettings.deviceCalendarDenied'))
+        return
+      }
+    }
+    m.setDeviceCalendarEnabled(!!v)
+    ElMessage.success(t('appSettings.deviceCalendarSaved'))
+  } catch (e) {
+    console.warn('[appSettings] 设置系统日历读取失败', e)
+    deviceCalendar.value = false
   }
 }
 

@@ -2,6 +2,7 @@
 // AppSidebar(光尘/默认主题)、WarmLayout(暖居主题)、MobileMoreGrid(移动端)三处渲染共用,
 // 未来新增主题或导航样式时,只需写自己的渲染层,复用这里的数据与分组规则。
 // 新增功能模块时,只需在 NAV_PATHS 加一行 code→路由,三端自动同步。
+import { isChildAllowedPath } from './displayMode'
 import {
   Document,
   Notebook,
@@ -114,8 +115,8 @@ export const categoryLabel = (cat) => CATEGORY_LABELS[cat] || '功能'
 const normalizeCategory = (cat) => (cat === 'album' ? 'content' : cat === 'social' ? 'family' : cat || 'life')
 
 // 原始模块 → 扁平导航项:过滤无路径映射/停用模块,追加「设置」+「运维管理」虚拟入口,按 sortOrder 升序。
-// hasOps:是否展示运维管理(拥有 ops:view 权限)。
-export function buildNavItems(modules, { hasOps = false } = {}) {
+// hasOps:是否展示运维管理(拥有 ops:view 权限)。child:儿童模式下只留白名单入口(与路由守卫同一口径)。
+export function buildNavItems(modules, { hasOps = false, child = false } = {}) {
   const list = (modules || [])
     .filter((m) => NAV_PATHS[m.code] && m.enabled !== 0)
     .map((m) => ({
@@ -132,7 +133,8 @@ export function buildNavItems(modules, { hasOps = false } = {}) {
   // 手机上等于「有页面但到不了」。sortOrder 15 落在 vault(14) 与 chat(16) 之间,不破「工具箱殿后」。
   list.push({ code: 'weather', title: '天气', path: '/weather', category: 'life', sortOrder: 15 })
   if (hasOps) list.push({ code: 'ops', title: '运维管理', path: '/ops', category: 'system', sortOrder: 95 })
-  return list.sort((a, b) => a.sortOrder - b.sortOrder)
+  const sorted = list.sort((a, b) => a.sortOrder - b.sortOrder)
+  return child ? sorted.filter((m) => isChildAllowedPath(m.path)) : sorted
 }
 
 // 扁平导航项 → 按 category 分组(顺序 NAV_GROUP_ORDER),每组 { category, label, items }

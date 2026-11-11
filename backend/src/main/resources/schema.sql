@@ -2398,6 +2398,25 @@ CREATE TABLE `family_announcement` (
   KEY `idx_family_sort` (`family_id`, `deleted`, `sort_order`, `id` DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭公告/广告位表(自建,图片+链接)';
 
+-- 家庭文件:通用文件入口(分享收件「存到文件」与文件页上传都落这里);
+-- 与相册/图书馆/放映厅并列,不参与游客公开(FileAccessMapper 刻意不登记)
+CREATE TABLE `family_file` (
+  `id`          BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`   BIGINT       NOT NULL COMMENT '所属家庭ID',
+  `uploader_id` BIGINT       DEFAULT NULL COMMENT '上传人ID',
+  `file_name`   VARCHAR(255) NOT NULL COMMENT '原始文件名(展示用)',
+  `file_url`    VARCHAR(500) NOT NULL COMMENT '文件URL(/files/...)',
+  `mime_type`   VARCHAR(120) DEFAULT NULL COMMENT 'MIME 类型',
+  `file_size`   BIGINT       DEFAULT NULL COMMENT '字节数',
+  `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  `deleted_at`  DATETIME     DEFAULT NULL COMMENT '删除时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_family_deleted_created` (`family_id`, `deleted`, `created_at` DESC),
+  KEY `idx_family_deleted_name` (`family_id`, `deleted`, `file_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭文件(通用文件列表,不进相册/图书馆)';
+
 -- 首页模块:智能家居中控入口(家庭组,排工具箱前);sys_home_module 无唯一约束兜底,用 NOT EXISTS 防重
 INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`)
 SELECT 'iot', '智能家居', 'icon-iot', '/iot', 'family', 'left', 16, 1

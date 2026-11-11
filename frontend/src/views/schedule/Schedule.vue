@@ -223,6 +223,54 @@ const recordOf = (it) => {
   return null
 }
 
+// ---- 系统日历(仅安卓壳,用户主动开启后才读) ----
+// 只做展示:不进近期条、不可勾选/编辑,按「标题+日期+时间」与站内事项去重;
+// 未开启/未授权/网页端一律返回 null,loadMonth 原样用服务端数据。
+const dayStart = (s) => {
+  const [y, m, d] = String(s).split('-').map(Number)
+  return new Date(y, (m || 1) - 1, d || 1)
+}
+const dayEnd = (s) => {
+  const d = dayStart(s)
+  d.setDate(d.getDate() + 1)
+  return d
+}
+const loadDeviceEvents = async (from, to) => {
+  try {
+    const m = await import('@/native/calendarExport')
+    return await m.readDeviceCalendar(dayStart(from), dayEnd(to))
+  } catch (e) {
+    return null
+  }
+}
+const mergeDeviceEvents = (days, deviceItems) => {
+  if (!deviceItems || !deviceItems.length) return days
+  const seen = new Set()
+  Object.values(days).forEach((list) =>
+    (list || []).forEach((it) => seen.add(`${it.title}|${it.date}|${String(it.time || '').slice(0, 5)}`)),
+  )
+  const out = { ...days }
+  for (const d of deviceItems) {
+    const key = `${d.title}|${d.date}|${d.time || ''}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    if (!out[d.date]) out[d.date] = []
+    out[d.date] = [
+      ...out[d.date],
+      {
+        kind: 'DEVICE_CALENDAR',
+        id: d.id,
+        title: d.title,
+        date: d.date,
+        time: d.time || null,
+        source: 'DEVICE_CALENDAR',
+        readOnly: true,
+      },
+    ]
+  }
+  return out
+}
+
 // 月历基础数据 + 区间聚合:两次请求并行;切月只重拉这两个。
 // pending 与 seq 只做两件事:同一月份的并发重复请求直接跳过、旧月份的慢响应丢弃,
 // 否则快速连点翻月会被先发后到的响应覆盖成上个月。
@@ -236,10 +284,10 @@ const loadMonth = async () => {
   loading.value = true
   try {
     const { from, to } = monthRange(cursor.year, cursor.month)
-    const [cal, ev] = await Promise.all([publicApi.calendar(key), scheduleApi.events(from, to)])
+    const [cal, ev, dev] = await Promise.all([publicApi.calendar(key), scheduleApi.events(from, to), loadDeviceEvents(from, to)])
     if (seq !== monthSeq) return
     calendarDays.value = Object.fromEntries((cal?.days || []).map((d) => [d.date, d]))
-    eventsDays.value = ev?.days || {}
+    eventsDays.value = mergeDeviceEvents(ev?.days || {}, dev)
     undated.value = userStore.isLoggedIn && Array.isArray(ev?.undated) ? ev.undated : []
   } catch (e) {
     // 失败保留上一份数据,错误提示由 request 拦截器统一给出

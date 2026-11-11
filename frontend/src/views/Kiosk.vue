@@ -24,9 +24,41 @@
         </div>
       </header>
 
+      <!-- 天气预警:和风预警非空时贴一条(取最严重/最新的一条,颜色沿用预警自身色值) -->
+      <div v-if="topWarning" class="kiosk-warning" :style="{ '--warn-color': topWarning.severityColor || 'var(--color-warning)' }">
+        <span class="kw-type">{{ topWarning.typeName || topWarning.title }}</span>
+        <span class="kw-title">{{ topWarning.title || topWarning.typeName }}</span>
+      </div>
+
       <main class="kiosk-main">
         <section class="kiosk-schedule">
-          <div class="section-label">{{ $t('kiosk.upcoming') }}</div>
+          <div class="section-label">{{ $t('kiosk.todayTodo') }}</div>
+          <ul v-if="todayTodos.length" class="kiosk-list">
+            <li
+              v-for="item in todayTodos"
+              :key="item.key"
+              class="kiosk-row todo-row"
+              :class="{ done: item.done, actionable: item.checkable }"
+            >
+              <button
+                v-if="item.checkable"
+                type="button"
+                class="todo-check"
+                :aria-label="$t('kiosk.toggleDone')"
+                :aria-pressed="item.done"
+                @click="toggleItem(item)"
+              >
+                <span v-if="item.done" aria-hidden="true">✓</span>
+              </button>
+              <span v-else class="todo-dot" aria-hidden="true"></span>
+              <span class="row-time">{{ item.timeLabel }}</span>
+              <span class="row-title">{{ item.title }}</span>
+              <span class="row-source">{{ item.sourceLabel }}</span>
+            </li>
+          </ul>
+          <div v-else class="kiosk-muted">{{ $t('kiosk.noTodo') }}</div>
+
+          <div class="section-label kiosk-upcoming-label">{{ $t('kiosk.upcoming') }}</div>
           <ul v-if="agenda.length" class="kiosk-list">
             <li v-for="item in agenda" :key="item.key" class="kiosk-row">
               <span class="row-day">{{ item.dayLabel }}</span>
@@ -69,11 +101,11 @@
 import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import SunLightLayer from '@/components/SunLightLayer.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useUserStore } from '@/stores/user'
-import { publicApi, scheduleApi } from '@/api'
+import { planApi, publicApi, reminderApi, scheduleApi } from '@/api'
 import { isAndroidApp } from '@/utils/platform'
 
 const { t } = useI18n()
@@ -81,6 +113,12 @@ const router = useRouter()
 const userStore = useUserStore()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 const weather = computed(() => sunLight?.weather?.value || null)
+const weatherDetail = computed(() => sunLight?.weatherDetail?.value || null)
+// 预警条只取第一条(和风按严重度返回);无预警时整条不渲染
+const topWarning = computed(() => {
+  const list = weatherDetail.value?.warning
+  return Array.isArray(list) && list.length ? list[0] : null
+})
 
 // 原生能力一律动态引入(首屏零 Capacitor 运行时)
 const screenNative = () => import('@/native/screen')
@@ -93,6 +131,8 @@ const REFRESH_MS = 600000
 const EXIT_HOLD_MS = 3000
 
 const clock = ref({ time: '', date: '', week: '' })
+// 今日日期串(本地时区),syncClock 每秒对表时顺手更新:勾选后按它分「今日待办 / 未来几天」
+const todayStr = ref('')
 const familyName = ref('')
 const photos = ref([])
 const photoIndex = ref(0)
@@ -110,6 +150,7 @@ let exitTimer = 0
 const holding = ref(false)
 
 const pad = (n) => String(n).padStart(2, '0')
+const localDateStr = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 
 // 每秒对表,只在显示串变化时写 ref(与壁纸页同口径)
 const syncClock = () => {
@@ -117,6 +158,8 @@ const syncClock = () => {
   const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`
   const date = t('kiosk.dateFmt', { m: d.getMonth() + 1, d: d.getDate() })
   const week = t(`weatherPage.w${d.getDay()}`)
+  const ds = localDateStr(d)
+  if (ds !== todayStr.value) todayStr.value = ds
   if (time !== clock.value.time || date !== clock.value.date || week !== clock.value.week) {
     clock.value = { time, date, week }
   }
@@ -140,17 +183,43 @@ const sourceLabel = (kind) => {
   return t(key)
 }
 
-const agenda = computed(() =>
-  scheduleItems.value
-    .map((it) => ({
-      key: it.key || `${it.kind}:${it.id}:${it.date}`,
-      dayLabel: dayLabel(it.date),
-      timeLabel: it.time ? String(it.time).slice(0, 5) : t('kiosk.allDay'),
-      title: it.title || '',
-      sourceLabel: sourceLabel(it.kind),
-    }))
-    .filter((it) => it.title),
-)
+// 可勾选的来源:提醒(含循环)与计划子任务;纪念日/还款日/理财到期只是展示
+const CHECKABLE_KINDS = ['REMINDER', 'TASK', 'PLAN_TASK']
+
+const toAgendaItem = (it) => ({
+  key: it.key || `${it.kind}:${it.id}:${it.date}`,
+  kind: it.kind,
+  id: it.id,
+  date: it.date,
+  done: !!it.done,
+  checkable: CHECKABLE_KINDS.includes(it.kind),
+  dayLabel: dayLabel(it.date),
+  timeLabel: it.time ? String(it.time).slice(0, 5) : t('kiosk.allDay'),
+  title: it.title || '',
+  sourceLabel: sourceLabel(it.kind),
+})
+
+const mappedItems = computed(() => scheduleItems.value.map(toAgendaItem).filter((it) => it.title))
+
+// 今日待办:今天是主角,可勾选的带圆点方框;完成后行变淡(不隐藏,免得客人以为事项消失)
+const todayTodos = computed(() => mappedItems.value.filter((it) => it.date && it.date === todayStr.value))
+// 未来几天:不再重复今天的条目;逾期未完成的仍留在列表里(dayLabel 会显示具体日期)
+const agenda = computed(() => mappedItems.value.filter((it) => it.date !== todayStr.value))
+
+const togglingKey = ref('')
+const toggleItem = async (item) => {
+  if (!item.checkable || togglingKey.value) return
+  togglingKey.value = item.key
+  try {
+    if (item.kind === 'PLAN_TASK') await planApi.updateTask(item.id, { done: item.done ? 0 : 1 })
+    else await reminderApi.toggleDone(item.id, item.date)
+    await loadSchedule()
+  } catch (e) {
+    ElMessage.error(t('kiosk.toggleFailed'))
+  } finally {
+    togglingKey.value = ''
+  }
+}
 
 const loadHome = async () => {
   if (!userStore.isLoggedIn) return
@@ -432,6 +501,71 @@ onBeforeUnmount(() => {
 .kiosk-muted {
   color: var(--color-text-tertiary);
   font-size: clamp(12px, 1.1vw, 16px);
+}
+
+/* 天气预警条:左侧色条用预警自带色,文字只用克制的两行 */
+.kiosk-warning {
+  --warn-color: var(--color-warning);
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 14px;
+  border-left: 5px solid var(--warn-color, var(--color-warning));
+  background: rgba(var(--color-brand-rgb), 0.1);
+  border-radius: 10px;
+  font-size: clamp(13px, 1.2vw, 18px);
+}
+.kw-type {
+  font-weight: 700;
+  color: var(--warn-color, var(--color-warning));
+  white-space: nowrap;
+}
+.kw-title {
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 今日待办:勾选圆点比文字稍大,触屏好点按 */
+.kiosk-upcoming-label {
+  margin-top: 12px;
+}
+.todo-row {
+  grid-template-columns: 1.8em 3.4em minmax(0, 1fr) auto;
+  align-items: center;
+}
+.todo-row.done .row-title {
+  text-decoration: line-through;
+  color: var(--color-text-tertiary);
+}
+.todo-check {
+  width: 1.35em;
+  height: 1.35em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 2px solid var(--color-text-tertiary);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 0.95em;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.todo-row.done .todo-check {
+  border-color: var(--color-green);
+  color: var(--color-green);
+}
+.todo-dot {
+  width: 0.45em;
+  height: 0.45em;
+  margin-left: 0.35em;
+  border-radius: 50%;
+  background: var(--color-text-tertiary);
 }
 
 .kiosk-exit-zone {

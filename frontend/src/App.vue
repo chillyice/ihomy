@@ -42,14 +42,16 @@
     </template>
     <!-- 首登强制改密(种子账号):全局弹窗,由 store 标记驱动 -->
     <ChangePasswordDialog />
-    <!-- 全局聊天浮窗(懒加载,内部自守卫:登录且非独立页) -->
-    <ChatFloat />
+    <!-- 全局聊天浮窗(懒加载,内部自守卫:登录且非独立页);儿童模式不显示 -->
+    <ChatFloat v-if="!isChild" />
     <!-- 1:1 通话覆盖层(懒加载,内部自守卫登录态) -->
     <CallOverlay />
     <!-- 应用内更新弹窗(仅原生壳):懒加载,Web 端永不加载 Capacitor 运行时 -->
     <AppUpdateDialog v-if="isNative" />
-    <!-- 命令面板(Ctrl/⌘+K):独立页与沉浸页不渲染,触屏由组件内 hasPointer 兜底 -->
-    <CommandPalette v-if="!standalone && !immersive" />
+    <!-- 命令面板(Ctrl/⌘+K):独立页与沉浸页不渲染,触屏由组件内 hasPointer 兜底;儿童模式关闭 -->
+    <CommandPalette v-if="!standalone && !immersive && !isChild" />
+    <!-- 儿童模式:右下角家长退出入口(需本机密码) -->
+    <ChildLock v-if="isChild && !standalone && routeReady" />
   </el-config-provider>
 </template>
 
@@ -76,6 +78,8 @@ import MusicPlayer from '@/components/MusicPlayer.vue'
 import SiteFooter from '@/components/SiteFooter.vue'
 import LightTestConsole from '@/components/LightTestConsole.vue'
 import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue'
+import ChildLock from '@/components/ChildLock.vue'
+import { initDisplayMode, useDisplayMode } from '@/composables/useDisplayMode'
 const ChatFloat = defineAsyncComponent(() => import('@/components/chat/ChatFloat.vue'))
 const CallOverlay = defineAsyncComponent(() => import('@/components/chat/CallOverlay.vue'))
 // 命令面板(Ctrl/⌘+K):懒加载,内部只对精细指针显示,独立页/沉浸页不挂载
@@ -94,6 +98,9 @@ const themeStore = useThemeStore()
 const floatsStore = useFloatsStore()
 const route = useRoute()
 const router = useRouter()
+// 显示模式(老人/儿童):启动即把本机保存的模式贴回 html 根类
+const { isChild } = useDisplayMode()
+initDisplayMode()
 // 沉浸式页面(如 3D 光影实验台)：隐藏侧边栏 / 页脚 / 回顶 / 播放器，内容区占满全屏
 const immersive = computed(() => !!route.meta.immersive)
 // 路由首次解析完成前 currentRoute 是 START_LOCATION(meta 为空),此时按「非独立页」渲染会先挂载整个

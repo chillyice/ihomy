@@ -70,6 +70,17 @@ export const fileApi = {
   },
 }
 
+// 家庭文件:通用文件列表(分享收件「存到文件」与文件页上传共用)
+export const familyFileApi = {
+  list: (keyword) => request.get('/file/family/list', { params: keyword ? { keyword } : {} }),
+  upload: (file) => {
+    const form = new FormData()
+    form.append('file', file)
+    return request.post('/file/family/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } })
+  },
+  remove: (id) => request.delete(`/file/family/${id}`),
+}
+
 // 家庭游戏对战(同种子赛/实时对战;实时信令走 WS game-signal)
 export const matchApi = {
   create: (data) => request.post('/game/match', data),

@@ -4,6 +4,7 @@
 import { registerPlugin } from '@capacitor/core'
 import { scheduleApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { isAndroidApp } from '@/utils/platform'
 import i18n from '@/i18n'
 
 const IhomyCalendar = registerPlugin('IhomyCalendar')
@@ -131,4 +132,54 @@ export async function clearCalendar() {
   })
   localStorage.removeItem(LAST_KEY)
   return out
+}
+
+// ---- 系统日历读取(反向:仅展示,不写回) ----
+const DEVICE_CAL_KEY = 'ihomy:deviceCalendar:v1'
+
+/** 本机是否开启「在日程里显示手机日历」(默认关,装了壳也要用户自己去设置里打开) */
+export function deviceCalendarEnabled() {
+  try {
+    return localStorage.getItem(DEVICE_CAL_KEY) === '1'
+  } catch (e) {
+    return false
+  }
+}
+
+export function setDeviceCalendarEnabled(on) {
+  try {
+    if (on) localStorage.setItem(DEVICE_CAL_KEY, '1')
+    else localStorage.removeItem(DEVICE_CAL_KEY)
+  } catch (e) {
+    // 忽略存储失败
+  }
+}
+
+function pad2(n) {
+  return String(n).padStart(2, '0')
+}
+
+/**
+ * 读取本机系统日历在 [from,to] 里的事项(日期对象),已排除 App 自己的 ihomy 日历。
+ * 返回 [{id,title,date,time,allDay}] 或 null(=未开启/未授权,调用方静默跳过)。
+ */
+export async function readDeviceCalendar(from, to) {
+  if (!isAndroidApp() || !deviceCalendarEnabled()) return null
+  const status = await calendarStatus().catch(() => null)
+  if (!status || !status.granted) return null
+  const res = await IhomyCalendar.readEvents({ from: from.getTime(), to: to.getTime() }).catch(() => null)
+  const list = Array.isArray(res?.events) ? res.events : []
+  return list
+    .map((e) => {
+      const d = new Date(Number(e.begin) || 0)
+      if (!e.title || Number.isNaN(d.getTime())) return null
+      return {
+        id: `dev:${e.id}:${e.begin}`,
+        title: String(e.title),
+        date: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`,
+        time: e.allDay ? '' : `${pad2(d.getHours())}:${pad2(d.getMinutes())}`,
+        allDay: !!e.allDay,
+      }
+    })
+    .filter(Boolean)
 }

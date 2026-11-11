@@ -186,6 +186,71 @@ public class CalendarSyncPlugin extends Plugin {
 
     // ---- CalendarContract 读写 ----
 
+    /**
+     * 读取系统日历区间内的事项(只读,供日程页合并展示)。
+     * 跳过本 App 自己的「ihomy」日历,避免与站内数据重复;调用方还需按标题+日期+时间再去一次重。
+     * 入参 {from,to} 为毫秒时间戳;返回 {events:[{id,title,begin,end,allDay,calendarName}]}。
+     */
+    @PluginMethod
+    public void readEvents(PluginCall call) {
+        Long from = call.getLong("from");
+        Long to = call.getLong("to");
+        if (from == null || to == null || to <= from) {
+            call.reject("from/to required");
+            return;
+        }
+        if (getPermissionState("calendar") != PermissionState.GRANTED) {
+            call.reject("PERMISSION_DENIED");
+            return;
+        }
+        io.execute(() -> {
+            JSArray out = new JSArray();
+            try {
+                Uri.Builder builder = CalendarContract.Instances.CONTENT_URI.buildUpon();
+                ContentUris.appendId(builder, from);
+                ContentUris.appendId(builder, to);
+                Uri uri = builder.build();
+                String[] projection = {
+                        CalendarContract.Instances.EVENT_ID,
+                        CalendarContract.Instances.TITLE,
+                        CalendarContract.Instances.BEGIN,
+                        CalendarContract.Instances.END,
+                        CalendarContract.Instances.ALL_DAY,
+                        CalendarContract.Instances.CALENDAR_DISPLAY_NAME,
+                };
+                long ownId = findCalendarId();
+                String selection = null;
+                String[] args = null;
+                if (ownId > 0) {
+                    selection = CalendarContract.Instances.CALENDAR_ID + "!=?";
+                    args = new String[] { String.valueOf(ownId) };
+                }
+                try (Cursor c = resolver().query(uri, projection, selection, args,
+                        CalendarContract.Instances.BEGIN + " ASC")) {
+                    while (c != null && c.moveToNext() && out.length() < 300) {
+                        JSObject e = new JSObject();
+                        e.put("id", c.getLong(0));
+                        String title = c.getString(1);
+                        e.put("title", title == null ? "" : title);
+                        e.put("begin", c.getLong(2));
+                        e.put("end", c.getLong(3));
+                        e.put("allDay", c.getInt(4) == 1);
+                        String cal = c.getString(5);
+                        e.put("calendarName", cal == null ? "" : cal);
+                        out.put(e);
+                    }
+                }
+                JSObject ret = new JSObject();
+                ret.put("events", out);
+                call.resolve(ret);
+            } catch (SecurityException e) {
+                call.reject("PERMISSION_DENIED", e);
+            } catch (Exception e) {
+                call.reject("读取系统日历失败:" + e.getMessage(), e);
+            }
+        });
+    }
+
     private ContentResolver resolver() {
         return getContext().getContentResolver();
     }
