@@ -104,6 +104,15 @@
                 android:resource="@xml/widget_info_countdown" />
         </receiver>
 
+        <!-- 卡片勾选动作:提醒卡圆圈 → 广播 → Worker 勾选并整轮刷新(exported=false,仅本包) -->
+        <receiver
+            android:name=".widget.WidgetActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="top.ihomy.app.action.WIDGET_TOGGLE" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

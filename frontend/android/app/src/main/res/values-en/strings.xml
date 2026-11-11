@@ -8,6 +8,7 @@
     <string name="widget_today_desc">Today and recent schedule</string>
     <string name="widget_reminder_desc">Today\'s reminder times</string>
     <string name="widget_countdown_desc">Next anniversary countdown</string>
+    <string name="widget_toggle_done">Mark done</string>
 
     <!-- Launcher shortcuts (English) -->
     <string name="shortcut_schedule">Schedule</string>

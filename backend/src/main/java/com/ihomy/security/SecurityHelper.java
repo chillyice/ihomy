@@ -33,6 +33,9 @@ public class SecurityHelper {
     private static final String KEY_USER = "ihomy:user:";
     private static final String KEY_PERM = "ihomy:perms:";
 
+    /** 请求属性名:当前令牌是桌面卡片 WIDGET 令牌(JwtAuthenticationFilter 设置,控制器按此收紧约束) */
+    public static final String WIDGET_TOKEN_ATTR = "ihomy.widgetToken";
+
     private final SysUserMapper sysUserMapper;
     private final SysRoleMapper sysRoleMapper;
     private final StringRedisTemplate redis;

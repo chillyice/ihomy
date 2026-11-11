@@ -14,6 +14,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 import java.time.LocalDate;
 import java.util.List;
 
@@ -67,9 +69,16 @@ public class ReminderController {
     @OperationLog(module = "REMINDER", operationType = "UPDATE", description = "提醒完成切换")
     @PostMapping("/{id}/toggle-done")
     public Result<Void> toggleDone(@PathVariable Long id,
-                                   @RequestParam(name = "date", required = false) String date) {
+                                   @RequestParam(name = "date", required = false) String date,
+                                   HttpServletRequest request) {
         LoginUser user = current();
-        reminderService.toggleDone(id, user.getFamilyId(), user.getUserId(), parseDate(date));
+        LocalDate day = parseDate(date);
+        if (Boolean.TRUE.equals(request.getAttribute(SecurityHelper.WIDGET_TOKEN_ATTR))
+                && !LocalDate.now().equals(day == null ? LocalDate.now() : day)) {
+            // 桌面卡片令牌只准勾今天(白名单唯一写例外的配套约束)
+            throw new BizException(ResultCode.BAD_REQUEST, "桌面卡片只能勾选今天的提醒");
+        }
+        reminderService.toggleDone(id, user.getFamilyId(), user.getUserId(), day);
         return Result.success();
     }
 

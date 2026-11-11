@@ -55,6 +55,18 @@ public final class WidgetRepository {
         }
     }
 
+    /** 今日卡副标题:农历与天气全部由服务端算(/public/calendar + /public/weather),客户端零历法实现 */
+    public static class TodayInfo {
+        /** 数据归属的公历日(yyyy-MM-dd),渲染时与设备今天比对,过期即隐藏 */
+        public String date;
+        /** 农历月+日,如「十月廿二」(lunarMonthText 已含「月」) */
+        public String lunar = "";
+        /** 节气或传统节日(节气优先,无则空) */
+        public String mark = "";
+        /** 如「12° 晴」;天气源未配或失败为空 */
+        public String weather = "";
+    }
+
     /** 拉取并解析;抛异常时调用方保持旧缓存不动 */
     public static List<Occurrence> fetchOccurrences(Context context) throws Exception {
         String token = WidgetPrefs.token(context);
@@ -97,6 +109,89 @@ public final class WidgetRepository {
         if (chat.optInt("code", -1) != 0) throw new IllegalStateException("bad chat code " + chat.optInt("code"));
         unread.chat = chat.optJSONObject("data") == null ? 0L : chat.optJSONObject("data").optLong("unread", 0L);
         return unread;
+    }
+
+    /**
+     * 今日卡副标题数据:两次只读 GET,农历与天气各自独立失败(互不拖垮,也不影响日程拉取)。
+     * 天气走服务端家庭偏好位置(WIDGET 令牌可解析),无需设备定位权限。
+     */
+    public static TodayInfo fetchTodayInfo(Context context) throws Exception {
+        String token = WidgetPrefs.token(context);
+        if (token == null || token.isEmpty()) throw new IllegalStateException("no widget token");
+        LocalDate today = LocalDate.now();
+        TodayInfo info = new TodayInfo();
+        info.date = today.toString();
+        // 农历:整月数据里取今天这一天
+        try {
+            JSONObject cal = new JSONObject(get(apiBase() + "/public/calendar?month=" + today.getYear()
+                    + String.format(java.util.Locale.US, "-%02d", today.getMonthValue()), token));
+            JSONArray days = cal.getJSONObject("data").getJSONArray("days");
+            for (int i = 0; i < days.length(); i++) {
+                JSONObject d = days.getJSONObject(i);
+                if (!today.toString().equals(d.optString("date"))) continue;
+                String term = d.optString("term", "");
+                JSONArray festivals = d.optJSONArray("festivals");
+                info.lunar = d.optString("lunarMonthText", "") + d.optString("lunarText", "");
+                info.mark = !term.isEmpty() ? term
+                        : (festivals != null && festivals.length() > 0 ? festivals.optString(0) : "");
+                break;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "lunar fetch skipped", e);
+        }
+        // 天气:Key 未配时服务端返回 data=null,留空即不展示
+        try {
+            JSONObject w = new JSONObject(get(apiBase() + "/public/weather", token));
+            if (w.optInt("code", -1) == 0 && !w.isNull("data")) {
+                JSONObject data = w.getJSONObject("data");
+                Object temp = data.opt("temp");
+                String text = data.optString("text", "");
+                if (temp != null) info.weather = temp + "° " + text;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "weather fetch skipped", e);
+        }
+        return info;
+    }
+
+    /** 今日卡副标题缓存:全局单份 {"date","lunar","mark","weather"} */
+    public static void cacheTodayInfo(Context context, TodayInfo info) {
+        try {
+            JSONObject o = new JSONObject();
+            o.put("date", info.date);
+            o.put("lunar", info.lunar);
+            o.put("mark", info.mark);
+            o.put("weather", info.weather);
+            WidgetPrefs.putTodayInfo(context, o.toString());
+        } catch (Exception e) {
+            Log.w(TAG, "today info cache write failed", e);
+        }
+    }
+
+    public static TodayInfo readTodayInfo(Context context) {
+        TodayInfo out = new TodayInfo();
+        try {
+            String raw = WidgetPrefs.todayInfo(context);
+            if (raw.isEmpty()) return out;
+            JSONObject o = new JSONObject(raw);
+            out.date = o.optString("date", "");
+            out.lunar = o.optString("lunar", "");
+            out.mark = o.optString("mark", "");
+            out.weather = o.optString("weather", "");
+        } catch (Exception e) {
+            Log.w(TAG, "today info cache read failed", e);
+        }
+        return out;
+    }
+
+    /**
+     * 卡片勾选:POST /reminder/{id}/toggle-done?date=——WIDGET 令牌的唯一写例外,
+     * 服务端强制只准今天并做家庭隔离,这里不复算任何状态。
+     */
+    public static void toggleDone(Context context, long reminderId, String date) throws Exception {
+        String token = WidgetPrefs.token(context);
+        if (token == null || token.isEmpty()) throw new IllegalStateException("no widget token");
+        post(apiBase() + "/reminder/" + reminderId + "/toggle-done?date=" + date, token);
     }
 
     /** 缓存结构:{"items":[...]}——原样存解析后的最小字段,渲染时不再依赖网络 */
@@ -163,6 +258,21 @@ public final class WidgetRepository {
             while ((n = in.read(buf)) > 0) bos.write(buf, 0, n);
             in.close();
             return new String(bos.toByteArray(), StandardCharsets.UTF_8);
+        } finally {
+            conn.disconnect();
+        }
+    }
+
+    /** 无请求体 POST(勾选动作),2xx 即成功 */
+    private static void post(String url, String token) throws Exception {
+        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+        try {
+            conn.setConnectTimeout(8000);
+            conn.setReadTimeout(15000);
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Authorization", "Bearer " + token);
+            int code = conn.getResponseCode();
+            if (code < 200 || code >= 300) throw new IllegalStateException("HTTP " + code);
         } finally {
             conn.disconnect();
         }

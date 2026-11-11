@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 今日提醒卡(4×2):四行时刻清单 -->
+<!-- 今日提醒卡(4×2):四行时刻清单,行尾圆圈点击勾选(动作见 WidgetActionReceiver) -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/w_root"
     android:layout_width="match_parent"
@@ -21,49 +21,113 @@
         android:maxLines="1"
         android:ellipsize="end" />
 
-    <TextView
-        android:id="@+id/w_row1"
+    <LinearLayout
+        android:id="@+id/w_wrap1"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:gravity="center_vertical"
-        android:textColor="@color/widget_text_primary"
-        android:textSize="13sp"
-        android:maxLines="1"
-        android:ellipsize="end" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
-    <TextView
-        android:id="@+id/w_row2"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:gravity="center_vertical"
-        android:textColor="@color/widget_text_primary"
-        android:textSize="13sp"
-        android:maxLines="1"
-        android:ellipsize="end" />
+        <TextView
+            android:id="@+id/w_row1"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="@color/widget_text_primary"
+            android:textSize="13sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
 
-    <TextView
-        android:id="@+id/w_row3"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:gravity="center_vertical"
-        android:textColor="@color/widget_text_primary"
-        android:textSize="13sp"
-        android:maxLines="1"
-        android:ellipsize="end" />
+        <ImageView
+            android:id="@+id/w_check1"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_marginStart="8dp"
+            android:src="@drawable/widget_check_ring"
+            android:contentDescription="@string/widget_toggle_done" />
+    </LinearLayout>
 
-    <TextView
-        android:id="@+id/w_row4"
+    <LinearLayout
+        android:id="@+id/w_wrap2"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:gravity="center_vertical"
-        android:textColor="@color/widget_text_primary"
-        android:textSize="13sp"
-        android:maxLines="1"
-        android:ellipsize="end" />
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/w_row2"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="@color/widget_text_primary"
+            android:textSize="13sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <ImageView
+            android:id="@+id/w_check2"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_marginStart="8dp"
+            android:src="@drawable/widget_check_ring"
+            android:contentDescription="@string/widget_toggle_done" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/w_wrap3"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/w_row3"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="@color/widget_text_primary"
+            android:textSize="13sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <ImageView
+            android:id="@+id/w_check3"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_marginStart="8dp"
+            android:src="@drawable/widget_check_ring"
+            android:contentDescription="@string/widget_toggle_done" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/w_wrap4"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/w_row4"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="@color/widget_text_primary"
+            android:textSize="13sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <ImageView
+            android:id="@+id/w_check4"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_marginStart="8dp"
+            android:src="@drawable/widget_check_ring"
+            android:contentDescription="@string/widget_toggle_done" />
+    </LinearLayout>
 
     <TextView
         android:id="@+id/w_footer"

@@ -22,6 +22,7 @@ import com.ihomy.common.ResultCode;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * JWT 认证过滤器:从 Authorization: Bearer 头解析访问令牌,
@@ -69,6 +70,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(auth);
                     request.setAttribute("ihomy.userId", userId);
                     request.setAttribute("ihomy.username", u.getUsername());
+                    // 控制器按此识别卡片令牌并收紧约束(如勾选只准今天)
+                    request.setAttribute(SecurityHelper.WIDGET_TOKEN_ATTR, Boolean.TRUE);
                 } else if ("ACCESS".equals(claims.get("type", String.class))) {
                     Long userId = Long.valueOf(claims.getSubject());
                     String username = claims.get("username", String.class);
@@ -115,10 +118,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return "/profile/password".equals(path) || "/auth/logout".equals(path);
     }
 
-    /** 卡片令牌白名单:仅 GET,只读日程/天气/纪念日/提醒列表/公开接口;不包含 /files(卡片不该拿到文件读权) */
+    /** 卡片勾选的唯一写例外:精确到「提醒完成切换」,服务端还强制只准勾今天(ReminderController.toggleDone) */
+    private static final Pattern WIDGET_TOGGLE_PATH = Pattern.compile("^/reminder/\\d+/toggle-done$");
+
+    /** 卡片令牌白名单:只读日程/天气/纪念日/提醒列表/公开接口 + 唯一写例外(提醒勾选);不包含 /files(卡片不该拿到文件读权) */
     private boolean widgetAllowed(HttpServletRequest request) {
-        if (!"GET".equalsIgnoreCase(request.getMethod())) return false;
+        String method = request.getMethod();
         String path = request.getServletPath();
+        if ("POST".equalsIgnoreCase(method)) return WIDGET_TOGGLE_PATH.matcher(path).matches();
+        if (!"GET".equalsIgnoreCase(method)) return false;
         return path.startsWith("/schedule/") || path.startsWith("/weather/") || path.startsWith("/public/")
                 || path.startsWith("/anniversary/") || "/reminder".equals(path) || "/reminder/list".equals(path)
                 // 第二批:后台未读轮询。必须精确到路径,不能给 /notification/ 前缀——

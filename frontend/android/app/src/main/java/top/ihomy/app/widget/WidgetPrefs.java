@@ -12,6 +12,8 @@ public final class WidgetPrefs {
     private static final String FILE = "ihomy_widget";
     public static final String KEY_TOKEN = "widget_token";
     public static final String KEY_CACHE_PREFIX = "cache_";
+    /** 今日卡副标题数据(农历/天气,WidgetRepository.TodayInfo):全局单份,按归属日期失效 */
+    public static final String KEY_CACHE_TODAY_INFO = "cache_today_info";
     public static final String KEY_UPDATED_AT = "updated_at_";
     /** 前端最近一次成功对账闹钟的时间(ms);0 = 从未上报过 */
     public static final String KEY_REMINDER_SYNC_AT = "reminder_sync_at";
@@ -55,6 +57,14 @@ public final class WidgetPrefs {
 
     public static long updatedAt(Context context, String widgetId) {
         return prefs(context).getLong(KEY_UPDATED_AT + widgetId, 0L);
+    }
+
+    public static String todayInfo(Context context) {
+        return prefs(context).getString(KEY_CACHE_TODAY_INFO, "");
+    }
+
+    public static void putTodayInfo(Context context, String json) {
+        prefs(context).edit().putString(KEY_CACHE_TODAY_INFO, json == null ? "" : json).apply();
     }
 
     public static long reminderSyncAt(Context context) {

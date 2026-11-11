@@ -22,7 +22,8 @@ import static org.mockito.Mockito.when;
 
 /**
  * 桌面卡片令牌:type=WIDGET 的签发往返(30 天/角色家庭快照)与过滤器最小权限白名单
- * (仅 GET 的日程/天气/纪念日/公开接口;写接口与 /files 一律 401;禁用账号失效)。
+ * (只读日程/天气/纪念日/公开接口 + 唯一写例外 POST /reminder/{id}/toggle-done,
+ * 控制器再强制只准勾今天;其余写接口与 /files 一律 401;禁用账号失效)。
  */
 class WidgetTokenTest {
 
@@ -125,6 +126,24 @@ class WidgetTokenTest {
         // 只放行计数,通知正文/聊天历史仍须 401(白名单必须精确到路径)
         assertThat(run(request("GET", "/notification/list"), token).getStatus()).isEqualTo(401);
         assertThat(run(request("GET", "/chat/history"), token).getStatus()).isEqualTo(401);
+    }
+
+    @Test
+    void widgetTokenAllowedOnToggleDonePathOnly() throws Exception {
+        String token = jwtUtils.generateWidgetToken(7L, "widgeter", "OWNER", 2L);
+        when(sysUserMapper.selectById(7L)).thenReturn(user(DictConst.USER_ACTIVE));
+
+        // 唯一写例外:精确路径放行,并标记 WIDGET 令牌供控制器收紧到「只准勾今天」
+        MockHttpServletRequest req = request("POST", "/reminder/5/toggle-done");
+        run(req, token);
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
+        assertThat(req.getAttribute(SecurityHelper.WIDGET_TOKEN_ATTR)).isEqualTo(Boolean.TRUE);
+        SecurityContextHolder.clearContext();
+
+        // 路径变体与其它写接口仍拒绝
+        assertThat(run(request("POST", "/reminder/5/toggle-done/extra"), token).getStatus()).isEqualTo(401);
+        assertThat(run(request("POST", "/reminder/5"), token).getStatus()).isEqualTo(401);
+        assertThat(run(request("POST", "/plan"), token).getStatus()).isEqualTo(401);
     }
 
     @Test

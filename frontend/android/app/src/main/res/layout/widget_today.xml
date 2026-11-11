@@ -22,6 +22,15 @@
         android:ellipsize="end" />
 
     <TextView
+        android:id="@+id/w_subtitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="@color/widget_text_secondary"
+        android:textSize="11sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <TextView
         android:id="@+id/w_row1"
         android:layout_width="match_parent"
         android:layout_height="0dp"

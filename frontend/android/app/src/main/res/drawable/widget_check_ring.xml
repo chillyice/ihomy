@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 提醒卡勾选圆圈:shape 椭圆描边(RemoteViews 对 vector 支持不稳,shape 最稳) -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <stroke
+        android:width="2dp"
+        android:color="@color/widget_accent" />
+    <size
+        android:width="22dp"
+        android:height="22dp" />
+</shape>

@@ -13,6 +13,7 @@
     <string name="widget_today_desc">今天日期与最近日程</string>
     <string name="widget_reminder_desc">今日提醒时刻清单</string>
     <string name="widget_countdown_desc">下一个纪念日倒计时</string>
+    <string name="widget_toggle_done">标记完成</string>
 
     <!-- 长按图标快捷方式(默认中文;英文覆盖见 values-en) -->
     <string name="shortcut_schedule">今日日程</string>
