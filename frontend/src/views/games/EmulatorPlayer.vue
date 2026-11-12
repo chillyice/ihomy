@@ -667,6 +667,18 @@ const onVisibilityChange = () => {
   }
 }
 
+// WebGL 上下文丢失(显存吃紧/驱动重置,常见于 iOS Safari):画面会死但页面不知道,
+// 这里用 capture 监听抓到本容器画布的丢失事件,给出错误与重载入口(webglcontextlost 不冒泡,
+// 必须挂在 document capture 阶段才能收到)。
+const onWebGLContextLost = (e) => {
+  if (!gameStarted.value) return
+  const canvas = e.target
+  if (!(canvas instanceof HTMLCanvasElement) || !container.value?.contains(canvas)) return
+  e.preventDefault() // 声明接管:不做模拟器默认的恢复流程,交给用户点重新加载
+  error.value = t('gba.crashed')
+  loading.value = false
+}
+
 const pick = () => fileInput.value?.click()
 
 // 清理旧模拟器(只清 DOM + 释放全局引用;objectUrl 由调用方在合适时机释放,否则会提前失效)
@@ -821,6 +833,7 @@ onMounted(() => {
   document.addEventListener('visibilitychange', onVisibilityChange)
   document.addEventListener('keydown', onDocumentKey)
   document.addEventListener('keyup', onDocumentKey)
+  document.addEventListener('webglcontextlost', onWebGLContextLost, true)
   window.addEventListener('resize', refreshViewport)
   window.addEventListener('orientationchange', refreshViewport)
   refreshViewport()
@@ -835,6 +848,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', onVisibilityChange)
   document.removeEventListener('keydown', onDocumentKey)
   document.removeEventListener('keyup', onDocumentKey)
+  document.removeEventListener('webglcontextlost', onWebGLContextLost, true)
   window.removeEventListener('resize', refreshViewport)
   window.removeEventListener('orientationchange', refreshViewport)
   // 先取一次当前存档快照再拆模拟器,路由内跳转时请求能照常完成

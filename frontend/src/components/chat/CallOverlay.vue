@@ -147,13 +147,13 @@ const userStore = useUserStore()
 const call = useCallStore()
 const { t } = useI18n()
 
-// 最小化小窗位置(不持久化,通话级临时)
+// 最小化小窗位置(通话间记忆:挂断再打回到上次放的地方;键登记 LightSettings 清理清单)
 const mini = useDragResize({
   x: Math.max(16, window.innerWidth - 236),
   y: 84,
   w: 220,
   h: 150,
-  storageKey: '',
+  storageKey: 'ihomy:call:mini:v1',
 })
 const miniStyle = computed(() => ({
   left: `${mini.pos.value.x}px`,

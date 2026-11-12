@@ -83,6 +83,15 @@
             </template>
             <span class="my-hint">{{ actionHint }}</span>
           </div>
+          <!-- 听牌提示:摸牌后建议打哪张、弃后听哪几张;13 张时显示当前听口 -->
+          <div v-if="advice" class="advice-row">
+            <template v-if="advice.discard != null">
+              <span class="advice-label">{{ $t('games.mahjong.adviceDiscard') }}</span>
+              <span class="tile mini" :class="tileClass(advice.discard)"><TileFace :kind="advice.discard" /></span>
+            </template>
+            <span class="advice-label">{{ $t('games.mahjong.listening') }}</span>
+            <span v-for="k in advice.wins" :key="k" class="tile mini" :class="tileClass(k)"><TileFace :kind="k" /></span>
+          </div>
         </div>
 
         <!-- 结算浮层 -->
@@ -138,6 +147,7 @@ import {
   mahjongCounts,
   mahjongHandScore,
   mahjongKind,
+  mahjongTenpai,
   sortMahjongTiles,
 } from '@/utils/games/mahjong'
 
@@ -206,6 +216,33 @@ const actionHint = computed(() => {
   if (claimPending.value) return t('games.mahjong.claimHint')
   if (turn.value === 0) return t('games.mahjong.discardHint')
   return ''
+})
+
+/**
+ * 听牌提示(纯函数 computed):轮到玩家且手牌 14 张时,
+ * 枚举每张可弃牌算「弃后听几张」,取听口最宽的打法;13 张等待时显示当前听口。
+ * 能自摸/可点炮待决时不提示(按钮优先)。
+ */
+const advice = computed(() => {
+  if (phase.value !== 'playing' || turn.value !== 0 || busyAi.value) return null
+  if (canSelfWin.value || claimPending.value) return null
+  const hand = hands.value[0]
+  const counts = mahjongCounts(hand)
+  if (hand.length === 14) {
+    let best = null
+    for (let k = 0; k < 34; k++) {
+      if (!counts[k]) continue
+      const trial = [...counts]
+      trial[k] -= 1
+      const wins = mahjongTenpai(trial)
+      if (!best || wins.length > best.wins.length) best = { discard: k, wins }
+    }
+    return best
+  }
+  if (hand.length === 13) {
+    return { discard: null, wins: mahjongTenpai(counts) }
+  }
+  return null
 })
 
 const tileClass = (kind) => {
@@ -619,6 +656,21 @@ onBeforeUnmount(() => {
 .my-hint {
   font-size: 12px;
   color: var(--color-text-secondary);
+}
+/* 听牌提示行:小牌列表 + 文案 */
+.advice-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+  margin-top: 8px;
+  min-height: 40px;
+}
+.advice-label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-right: 4px;
 }
 
 /* 结算浮层 */

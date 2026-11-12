@@ -36,7 +36,7 @@
       <el-icon class="pending-close" @click="pendingCard = null"><CircleClose /></el-icon>
     </div>
 
-    <div class="msg-input">
+    <div class="msg-input" @paste="onPaste">
       <el-input
         v-model="draft"
         :placeholder="$t('chat.placeholder')"
@@ -178,6 +178,11 @@ const onFileChange = async (evt) => {
   const file = evt.target.files?.[0]
   evt.target.value = ''
   if (!file) return
+  await sendImageFile(file)
+}
+
+/** 发送一张图片:文件选择与粘贴共用(超限/上传失败按码提示) */
+const sendImageFile = async (file) => {
   if (file.size > IMAGE_MAX_BYTES) {
     ElMessage.warning(t('chat.composer.tooLarge'))
     return
@@ -201,6 +206,22 @@ const onFileChange = async (evt) => {
     ElMessage.error(t('chat.composer.sendImageFailed'))
   } finally {
     uploading.value = false
+  }
+}
+
+/** 输入框粘贴截图直接发图(纯文本粘贴不受影响);未连接时不拦截 */
+const onPaste = (e) => {
+  if (!connected.value || uploading.value) return
+  const items = e.clipboardData?.items || []
+  for (const item of items) {
+    if (item.type && item.type.startsWith('image/')) {
+      const file = item.getAsFile()
+      if (file) {
+        e.preventDefault()
+        sendImageFile(file)
+      }
+      return
+    }
   }
 }
 
