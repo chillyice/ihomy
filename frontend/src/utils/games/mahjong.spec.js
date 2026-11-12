@@ -1,0 +1,193 @@
+import { describe, expect, it } from 'vitest'
+import {
+  MAHJONG_TILE_COUNT,
+  canMahjongWin,
+  createMahjongWall,
+  isMahjongAllSimples,
+  isMahjongFlush,
+  isMahjongHalfFlush,
+  isMahjongSevenPairs,
+  isMahjongToitoi,
+  mahjongAiChooseDiscard,
+  mahjongCounts,
+  mahjongHandScore,
+  mahjongKind,
+  mahjongKindName,
+  mahjongTenpai,
+  sortMahjongTiles,
+} from './mahjong'
+
+/** 用 kind 序号直接构造实例 id(同 kind 依次取副本 0..3) */
+function kindsToTiles(kinds) {
+  const tiles = []
+  const counter = new Map()
+  for (const k of kinds) {
+    const n = counter.get(k) || 0
+    counter.set(k, n + 1)
+    tiles.push(k * 4 + n)
+  }
+  return tiles
+}
+
+describe('mahjong wall', () => {
+  it('整副 136 张,每种恰好 4 张', () => {
+    const wall = createMahjongWall()
+    expect(wall.length).toBe(MAHJONG_TILE_COUNT)
+    const counts = mahjongCounts(wall)
+    expect(counts.every((c) => c === 4)).toBe(true)
+  })
+
+  it('实例 id 与牌种互逆', () => {
+    for (const id of createMahjongWall()) {
+      expect(mahjongKind(id)).toBe(Math.floor(id / 4))
+    }
+  })
+})
+
+describe('mahjong win detection', () => {
+  it('标准牌型:111万 234万 567万 888万 99万 可胡', () => {
+    const tiles = kindsToTiles([0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 7, 7, 8, 8])
+    expect(canMahjongWin(mahjongCounts(tiles))).toBe(true)
+  })
+
+  it('跨花色顺子不相连:789万 + 123筒 456筒 + 789条 + 对子', () => {
+    const tiles = kindsToTiles([6, 7, 8, 9, 10, 11, 12, 13, 14, 24, 25, 26, 30, 30])
+    expect(canMahjongWin(mahjongCounts(tiles))).toBe(true)
+  })
+
+  it('非成对残牌不能胡:111 234 567 777 + 8万 + 白板', () => {
+    const tiles = kindsToTiles([0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 7, 7, 8, 33])
+    expect(canMahjongWin(mahjongCounts(tiles))).toBe(false)
+  })
+
+  it('孤张落在别的花色凑不成面子', () => {
+    // 111万 234万 567万 + 8万 1筒 + 九条对 → 8万/1筒 落单
+    const tiles = kindsToTiles([0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 9, 26, 26, 26])
+    expect(canMahjongWin(mahjongCounts(tiles))).toBe(false)
+  })
+
+  it('七对子可胡;四张同牌当两对(豪华)也算', () => {
+    const pairs = kindsToTiles([0, 0, 5, 5, 14, 14, 27, 27, 31, 31, 26, 26, 9, 9])
+    expect(canMahjongWin(mahjongCounts(pairs))).toBe(true)
+    expect(isMahjongSevenPairs(mahjongCounts(pairs))).toBe(true)
+    const lux = kindsToTiles([0, 0, 0, 0, 5, 5, 14, 14, 27, 27, 31, 31, 26, 26])
+    expect(canMahjongWin(mahjongCounts(lux))).toBe(true)
+  })
+
+  it('两个刻子 + 对子们不是七对', () => {
+    const tiles = kindsToTiles([0, 0, 0, 5, 5, 5, 14, 14, 27, 27, 31, 31, 26, 26])
+    expect(isMahjongSevenPairs(mahjongCounts(tiles))).toBe(false)
+  })
+
+  it('三刻 + 两对不成标准型(缺面子)', () => {
+    const tiles = kindsToTiles([0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 4, 4, 5])
+    expect(canMahjongWin(mahjongCounts(tiles))).toBe(false)
+  })
+})
+
+describe('mahjong tenpai', () => {
+  it('111 234 567 + 888万 + 9万 → 听 7万(567/789 重排)与 9万(789 成顺)', () => {
+    const tiles13 = kindsToTiles([0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 7, 7, 8])
+    const wins = mahjongTenpai(mahjongCounts(tiles13))
+    // 加 7万:111 234 567 789 + 88 对;加 9万:111 234 567 789 + 88 对(另一种拆法)
+    expect(wins).toContain(6)
+    expect(wins).toContain(8)
+    expect(wins.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('离胡很远的手牌听牌为空', () => {
+    const tiles13 = kindsToTiles([0, 6, 12, 18, 24, 27, 28, 29, 31, 32, 33, 9, 21])
+    expect(mahjongTenpai(mahjongCounts(tiles13))).toEqual([])
+  })
+})
+
+describe('mahjong hand score', () => {
+  it('平胡(点炮)= 底分 × 1:三色小牌型', () => {
+    const tiles = kindsToTiles([0, 0, 0, 9, 10, 11, 21, 22, 23, 21, 22, 23, 24, 24])
+    const r = mahjongHandScore(mahjongCounts(tiles), { selfDrawn: false })
+    expect(r.fans.map((f) => f.key)).toEqual(['base'])
+    expect(r.total).toBe(1)
+    expect(r.score).toBe(8)
+  })
+
+  it('自摸 +1 番;清一色 +4 番;断幺九 +1 番', () => {
+    // 222万×3 + 456万 567万 456万 + 77万?改:2-8 万清一色,无幺九字
+    const tiles = kindsToTiles([1, 1, 1, 2, 3, 4, 5, 6, 7, 3, 4, 5, 6, 6])
+    const r = mahjongHandScore(mahjongCounts(tiles), { selfDrawn: true })
+    const keys = r.fans.map((f) => f.key)
+    expect(keys).toContain('selfDrawn')
+    expect(keys).toContain('allSimples')
+    expect(keys).toContain('flush')
+    expect(r.score).toBe(8 * r.total)
+  })
+
+  it('碰碰胡 + 清一色叠加', () => {
+    const tiles = kindsToTiles([0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4])
+    const r = mahjongHandScore(mahjongCounts(tiles), { selfDrawn: false })
+    const keys = r.fans.map((f) => f.key)
+    expect(keys).toContain('toitoi')
+    expect(keys).toContain('flush')
+    expect(r.total).toBe(1 + 2 + 4)
+  })
+
+  it('混一色:一种数牌 + 字牌', () => {
+    const tiles = kindsToTiles([0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 7, 7, 31, 31])
+    const r = mahjongHandScore(mahjongCounts(tiles), { selfDrawn: false })
+    const keys = r.fans.map((f) => f.key)
+    expect(keys).toContain('halfFlush')
+    expect(keys).not.toContain('flush')
+  })
+})
+
+describe('mahjong helpers', () => {
+  it('清一色 / 混一色 / 断幺九判定', () => {
+    // 清一色:全万 123 456 789 + 123 + 66万
+    const flush = mahjongCounts(kindsToTiles([0, 1, 2, 3, 4, 5, 6, 7, 8, 0, 1, 2, 5, 5]))
+    expect(isMahjongFlush(flush)).toBe(true)
+    const half = mahjongCounts(kindsToTiles([0, 1, 2, 3, 4, 5, 6, 7, 8, 27, 27, 27, 31, 31]))
+    expect(isMahjongHalfFlush(half)).toBe(true)
+    expect(isMahjongFlush(half)).toBe(false)
+    // 断幺九:2-8 万 + 2/5/6 筒,无幺九与字牌
+    const simples = mahjongCounts(kindsToTiles([1, 1, 2, 3, 4, 5, 6, 7, 10, 10, 10, 13, 13, 14]))
+    expect(isMahjongAllSimples(simples)).toBe(true)
+    expect(isMahjongAllSimples(half)).toBe(false)
+  })
+
+  it('碰碰胡判定', () => {
+    const toitoi = mahjongCounts(kindsToTiles([0, 0, 0, 9, 9, 9, 18, 18, 18, 27, 27, 27, 31, 31]))
+    expect(isMahjongToitoi(toitoi)).toBe(true)
+    const notToitoi = mahjongCounts(kindsToTiles([0, 1, 2, 9, 9, 9, 18, 18, 18, 27, 27, 27, 31, 31]))
+    expect(isMahjongToitoi(notToitoi)).toBe(false)
+  })
+
+  it('AI 弃牌优先弃字牌孤张', () => {
+    const tiles = kindsToTiles([0, 1, 2, 12, 13, 27, 28, 29, 31, 32, 33, 30, 30])
+    const counts = mahjongCounts(tiles)
+    const discard = mahjongAiChooseDiscard(counts)
+    expect(discard).toBeGreaterThanOrEqual(27)
+    expect(counts[discard]).toBeGreaterThan(0)
+  })
+
+  it('AI 弃牌后计数不为负', () => {
+    const tiles = kindsToTiles([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6])
+    const counts = mahjongCounts(tiles)
+    const discard = mahjongAiChooseDiscard(counts)
+    expect(discard).toBeGreaterThanOrEqual(0)
+    const trial = [...counts]
+    trial[discard] -= 1
+    expect(trial.every((c) => c >= 0)).toBe(true)
+  })
+
+  it('排序按牌种升序', () => {
+    // 实例 id:10→2筒(k2),2→一万副本1(k0),27→七筒副本3(k6),0→一万副本0(k0)
+    const sorted = sortMahjongTiles([10, 2, 27, 0])
+    expect(sorted.map(mahjongKind)).toEqual([0, 0, 2, 6])
+  })
+
+  it('牌名映射', () => {
+    expect(mahjongKindName(0)).toBe('一万')
+    expect(mahjongKindName(17)).toBe('九筒')
+    expect(mahjongKindName(31)).toBe('红中')
+    expect(mahjongKindName(34)).toBe('')
+  })
+})

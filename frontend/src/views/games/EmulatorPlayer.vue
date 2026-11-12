@@ -12,6 +12,10 @@
           <el-icon><FullScreen /></el-icon>
           {{ isFullscreen ? $t('gba.exitFullscreen') : $t('gba.fullscreen') }}
         </el-button>
+        <el-button v-if="fileName || src" size="small" round :loading="loading" @click="reloadGame">
+          <el-icon><RefreshRight /></el-icon>
+          {{ $t('gba.reload') }}
+        </el-button>
         <el-tag v-if="fileName || src" size="small" type="info" effect="plain">
           {{ $t('games.gamepadEmulator') }}
         </el-tag>
@@ -170,7 +174,13 @@
       </template>
 
       <div v-if="loading" class="gba-status">{{ $t('gba.loading') }}</div>
-      <div v-if="error" class="gba-status error">{{ error }}</div>
+      <div v-if="error" class="gba-status error">
+        {{ error }}
+        <el-button v-if="fileName || src" size="small" round class="gba-retry" @click="reloadGame">
+          <el-icon><RefreshRight /></el-icon>
+          {{ $t('gba.reload') }}
+        </el-button>
+      </div>
 
       <input v-if="!src" ref="fileInput" type="file" :accept="romAccept" class="hidden-input" @change="onPick" />
     </div>
@@ -182,7 +192,7 @@ import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, nextTick, i
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { FullScreen, ArrowLeft } from '@element-plus/icons-vue'
+import { FullScreen, ArrowLeft, RefreshRight } from '@element-plus/icons-vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { serverUrl } from '@/utils/assetUrl'
@@ -775,6 +785,12 @@ const onDrop = (e) => {
   const f = e.dataTransfer?.files?.[0]
   if (f) playFile(f)
 }
+// 重新加载当前 ROM:完整 teardown 后重新注入 loader(核心崩溃/画面卡死后走这里,不用整页刷新)
+const reloadGame = () => {
+  const url = props.src || objectUrl
+  if (!url) return
+  loadRom(url)
+}
 const close = () => {
   flushSave()
   teardownEmulator()
@@ -1148,6 +1164,9 @@ onBeforeUnmount(() => {
 }
 .gba-status.error {
   color: var(--color-danger);
+}
+.gba-retry {
+  margin-left: 10px;
 }
 .hidden-input {
   display: none;

@@ -97,6 +97,54 @@ export function setVideoEnabled(stream, enabled) {
   stream?.getVideoTracks().forEach((t) => (t.enabled = enabled))
 }
 
+/**
+ * 切换前后摄像头:按目标 facingMode 重新拉一路视频(音频轨沿用旧的,避免麦克风重新协商),
+ * 失败返回 null(多数桌面只有一个摄像头/安卓 WebView 不认 facingMode)。
+ */
+export async function flipVideoTrack(oldStream, facing) {
+  const envErr = mediaEnvError()
+  if (envErr) return null
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing }, audio: false })
+    const track = stream.getVideoTracks()[0]
+    if (!track) {
+      stream.getTracks().forEach((t) => t.stop())
+      return null
+    }
+    // 旧的视频轨(含它所属的临时流)立即释放;音频轨属于原 localStream,不动
+    oldStream?.getVideoTracks().forEach((t) => {
+      if (t !== track) {
+        t.stop()
+        oldStream.removeTrack(t)
+      }
+    })
+    return track
+  } catch (e) {
+    return null
+  }
+}
+
+/** 视频轨是否支持变焦约束(Android Chrome/部分安卓 WebView 支持,iOS Safari 基本不支持) */
+export function zoomCapabilities(track) {
+  try {
+    const caps = track?.getCapabilities?.()
+    if (!caps || !caps.zoom || caps.zoom.max <= caps.zoom.min) return null
+    return { min: caps.zoom.min, max: caps.zoom.max, step: caps.zoom.step || 0.1 }
+  } catch (e) {
+    return null
+  }
+}
+
+/** 应用变焦值;不支持/超范围静默返回 false */
+export async function applyZoom(track, value) {
+  try {
+    await track.applyConstraints({ advanced: [{ zoom: value }] })
+    return true
+  } catch (e) {
+    return false
+  }
+}
+
 /** 关闭并释放本地流全部轨道 */
 export function stopStream(stream) {
   stream?.getTracks().forEach((t) => t.stop())

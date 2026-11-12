@@ -29,6 +29,7 @@ public final class PointsRuleConst {
     public static final String GAME_FREECELL = "game_freecell";
     public static final String GAME_TETRIS = "game_tetris";
     public static final String GAME_SNAKE = "game_snake";
+    public static final String GAME_MAHJONG = "game_mahjong";
     public static final String GAME_MATCH_WIN = "game_match_win";
     public static final String PLANT_WATER = "plant_water";
     public static final String PLANT_SUN = "plant_sun";

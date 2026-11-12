@@ -9,13 +9,16 @@ import { useChatStore } from '@/stores/chat'
 import { useUserStore } from '@/stores/user'
 import { isNativeApp } from '@/utils/platform'
 import {
+  applyZoom,
   createPeer,
+  flipVideoTrack,
   getLocalStream,
   mediaEnvError,
   mediaErrorKey,
   setAudioEnabled,
   setVideoEnabled,
   stopStream,
+  zoomCapabilities,
 } from '@/composables/useWebRTC'
 
 const RING_TIMEOUT_MS = 30000
@@ -42,6 +45,8 @@ export const useCallStore = defineStore('call', {
     minimized: false,
     startedAt: 0,
     failReason: '',
+    facing: 'user', // user | environment(视频通话切前后置)
+    zoom: { supported: false, min: 1, max: 1, step: 0.1, value: 1 },
   }),
   getters: {
     inCall: (s) => ['ringing-out', 'ringing-in', 'connecting', 'active'].includes(s.status),
@@ -73,6 +78,7 @@ export const useCallStore = defineStore('call', {
       try {
         const { stream, downgraded } = await getLocalStream(this.media)
         this.localStream = stream
+        this.refreshZoomCaps()
         if (downgraded) {
           // 摄像头不可用:整通按语音走(invite 改带 AUDIO,对端界面同步),并明确告知发起人
           this.media = 'AUDIO'
@@ -183,6 +189,7 @@ export const useCallStore = defineStore('call', {
       try {
         const { stream, downgraded } = await getLocalStream(this.media)
         this.localStream = stream
+        this.refreshZoomCaps()
         if (downgraded) ElMessage.warning(i18n.global.t('chat.call.downgradedAudio'))
       } catch (e) {
         ElMessage.error(i18n.global.t(mediaErrorKey(e?.code)))
@@ -337,6 +344,8 @@ export const useCallStore = defineStore('call', {
       this.minimized = false
       this.startedAt = 0
       this.failReason = ''
+      this.facing = 'user'
+      this.zoom = { supported: false, min: 1, max: 1, step: 0.1, value: 1 }
     },
 
     toggleMute() {
@@ -346,6 +355,45 @@ export const useCallStore = defineStore('call', {
     toggleCamera() {
       this.cameraOff = !this.cameraOff
       setVideoEnabled(this.localStream, !this.cameraOff)
+    },
+
+    /** 探测当前视频轨的变焦能力(拉到流后调一次;轨道换了要重探) */
+    refreshZoomCaps() {
+      const track = this.localStream?.getVideoTracks()[0]
+      const caps = zoomCapabilities(track)
+      if (caps) {
+        this.zoom = { supported: true, min: caps.min, max: caps.max, step: caps.step, value: caps.min }
+      } else {
+        this.zoom = { supported: false, min: 1, max: 1, step: 0.1, value: 1 }
+      }
+    },
+
+    /** 切换前置/后置:新视频轨 replaceTrack 进已建立的连接,不重协商 */
+    async switchCamera() {
+      if (!this.isVideo || !this.localStream) return false
+      const facing = this.facing === 'user' ? 'environment' : 'user'
+      const track = await flipVideoTrack(this.localStream, facing)
+      if (!track) return false
+      this.facing = facing
+      this.localStream.addTrack(track)
+      const sender = this.pc?.getSenders?.().find((s) => s.track?.kind === 'video')
+      if (sender) {
+        try {
+          await sender.replaceTrack(track)
+        } catch (e) {
+          /* 换轨失败保持原画面 */
+        }
+      }
+      this.refreshZoomCaps()
+      return true
+    },
+
+    /** 变焦(仅支持的设备显示控件) */
+    async setZoom(value) {
+      if (!this.zoom.supported) return
+      const v = Math.min(this.zoom.max, Math.max(this.zoom.min, value))
+      const ok = await applyZoom(this.localStream?.getVideoTracks()[0], v)
+      if (ok) this.zoom.value = v
     },
   },
 })

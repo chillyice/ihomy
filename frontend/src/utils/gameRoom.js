@@ -19,7 +19,8 @@ export const ROOM_RESULT = {
 }
 
 /**
- * 可开房游戏:modes 为允许玩法,result 为结算口径,
+ * 可开房游戏:modes 为允许玩法,result 为结算口径,maxSeats 为单局玩家席位数
+ * (房间人数超出时随机分派为观战;与后端 GameConst.ROOM_GAMES 同口径),
  * path 为游戏页路由(纸牌是二级路由,房间页按此直达牌桌)。
  */
 export const ROOM_GAMES = {
@@ -29,6 +30,7 @@ export const ROOM_GAMES = {
     path: '/games/petlink',
     modes: [ROOM_MODE.PK, ROOM_MODE.COOP],
     result: ROOM_RESULT.FIRST,
+    maxSeats: 6,
   },
   game_minesweeper: {
     code: 'game_minesweeper',
@@ -36,6 +38,7 @@ export const ROOM_GAMES = {
     path: '/games/minesweeper',
     modes: [ROOM_MODE.COOP],
     result: ROOM_RESULT.COOP,
+    maxSeats: 4,
   },
   game_sudoku: {
     code: 'game_sudoku',
@@ -43,15 +46,31 @@ export const ROOM_GAMES = {
     path: '/games/sudoku',
     modes: [ROOM_MODE.COOP],
     result: ROOM_RESULT.COOP,
+    maxSeats: 4,
   },
-  game_2048: { code: 'game_2048', nameKey: 'games.g2048.title', path: '/games/2048', modes: [ROOM_MODE.PK], result: ROOM_RESULT.SCORE },
-  game_snake: { code: 'game_snake', nameKey: 'games.snake.title', path: '/games/snake', modes: [ROOM_MODE.PK], result: ROOM_RESULT.SCORE },
+  game_2048: {
+    code: 'game_2048',
+    nameKey: 'games.g2048.title',
+    path: '/games/2048',
+    modes: [ROOM_MODE.PK],
+    result: ROOM_RESULT.SCORE,
+    maxSeats: 6,
+  },
+  game_snake: {
+    code: 'game_snake',
+    nameKey: 'games.snake.title',
+    path: '/games/snake',
+    modes: [ROOM_MODE.PK],
+    result: ROOM_RESULT.SCORE,
+    maxSeats: 6,
+  },
   game_tetris: {
     code: 'game_tetris',
     nameKey: 'games.tetris.title',
     path: '/games/tetris',
     modes: [ROOM_MODE.PK],
     result: ROOM_RESULT.SCORE,
+    maxSeats: 6,
   },
   game_solitaire: {
     code: 'game_solitaire',
@@ -59,6 +78,7 @@ export const ROOM_GAMES = {
     path: '/games/cards/klondike',
     modes: [ROOM_MODE.PK],
     result: ROOM_RESULT.SCORE,
+    maxSeats: 4,
   },
   game_spider: {
     code: 'game_spider',
@@ -66,6 +86,7 @@ export const ROOM_GAMES = {
     path: '/games/cards/spider',
     modes: [ROOM_MODE.PK],
     result: ROOM_RESULT.SCORE,
+    maxSeats: 4,
   },
   game_freecell: {
     code: 'game_freecell',
@@ -73,12 +94,25 @@ export const ROOM_GAMES = {
     path: '/games/cards/freecell',
     modes: [ROOM_MODE.PK],
     result: ROOM_RESULT.SCORE,
+    maxSeats: 4,
   },
 }
 
 export const roomGame = (code) => ROOM_GAMES[code] || null
 
 export const roomModes = (code) => roomGame(code)?.modes || []
+
+/** 单局玩家席位数(超出人数随机转观战) */
+export const roomMaxSeats = (code) => roomGame(code)?.maxSeats || 8
+
+/** 成员席位角色(与后端 GameConst.ROOM_ROLE_* 同口径) */
+export const ROOM_ROLE = {
+  HOST: 'HOST',
+  PLAYER: 'PLAYER',
+  SPECTATOR: 'SPECTATOR',
+}
+
+export const isSpectatorRole = (role) => role === ROOM_ROLE.SPECTATOR
 
 export const defaultRoomMode = (code) => {
   const modes = roomModes(code)

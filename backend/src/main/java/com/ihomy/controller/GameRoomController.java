@@ -6,6 +6,7 @@ import com.ihomy.common.GameConst;
 import com.ihomy.common.Result;
 import com.ihomy.dto.GameRoomCreateDTO;
 import com.ihomy.dto.GameRoomFinishDTO;
+import com.ihomy.dto.GameRoomGameDTO;
 import com.ihomy.dto.GameRoomReadyDTO;
 import com.ihomy.security.LoginUser;
 import com.ihomy.security.SecurityHelper;
@@ -92,6 +93,17 @@ public class GameRoomController {
     public Result<Map<String, Object>> ready(@PathVariable Long id, @RequestBody GameRoomReadyDTO dto) {
         LoginUser user = current();
         Map<String, Object> room = roomService.ready(user.getUserId(), user.getFamilyId(), id, dto.getReady());
+        broadcast(id, room);
+        return Result.success(room);
+    }
+
+    @Operation(summary = "房主换游戏(随机重新分配席位)")
+    @OperationLog(module = "GAME", operationType = "UPDATE", description = "房间切换游戏")
+    @PostMapping("/{id}/game")
+    public Result<Map<String, Object>> setGame(@PathVariable Long id,
+                                               @RequestBody @jakarta.validation.Valid GameRoomGameDTO dto) {
+        LoginUser user = current();
+        Map<String, Object> room = roomService.setGame(user.getUserId(), user.getFamilyId(), id, dto.getGameCode());
         broadcast(id, room);
         return Result.success(room);
     }

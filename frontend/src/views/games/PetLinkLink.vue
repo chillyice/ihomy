@@ -78,8 +78,10 @@
                   :class="{
                     'is-empty': cell.value === 0,
                     'is-selected': selected === cell.idx,
+                    'is-peer-anchor': !!peerAnchorAt(cell.idx),
                     'is-hint': hinted.includes(cell.idx),
                   }"
+                  :style="peerAnchorAt(cell.idx) ? { boxShadow: `0 0 0 2px ${peerAnchorAt(cell.idx).color}` } : null"
                   :disabled="animating || paused || won || lost"
                   @click="onClick(cell.idx)"
                 >
@@ -189,6 +191,7 @@ import GameRoomBar from '@/components/games/GameRoomBar.vue'
 import { useGameView } from '@/composables/useGameView'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { seededRng } from '@/utils/games/seededRng'
+import { isSpectatorRole } from '@/utils/gameRoom'
 import {
   PETLINK_CELLS,
   PETLINK_LEVEL_TIME,
@@ -248,7 +251,9 @@ const score = ref(0)
 const level = ref(1)
 const shufflesLeft = ref(BASE_SHUFFLE)
 const timeLeft = ref(LEVEL_TIME)
+// 自己的选中锚点(待配对的第一张牌);房间合作模式里另有 peerAnchors 存其他玩家的锚点
 const selected = ref(-1)
+const peerAnchors = ref({})
 const hinted = ref([])
 const animating = ref(false)
 const paused = ref(false)
@@ -262,6 +267,8 @@ const savedState = ref(null)
 // ---------- 「一起玩」房间(?room=<id>) ----------
 // PK:双端同 seed 独立跑,先通关者胜(交卷/终局上报);
 // COOP:房主权威,共享盘面由房主广播快照,其他成员只发操作意图,消除结果所有人都能看到。
+// 每个玩家有自己的选中锚点(host 按 op.from 分开记账),不再共享一个 selected——
+// 多人同时点击不再互相顶掉对方的「第一张牌」,谁先点中配对的那张谁消除。
 const play = useGameRoomPlay({ onSignal: onRoomSignal, onRoom: onRoomChange })
 const coopGuest = computed(() => play.active && play.coop && !play.isHost)
 
@@ -270,6 +277,27 @@ let roomTimer = null
 // 「再来一局」看起来像没反应)。访客只看房主快照,不参与计算。
 let coopRound = 0
 
+// ---------- 每人一个锚点 ----------
+function anchorGet(uid) {
+  if (String(uid) === String(play.myId)) return selected.value
+  return peerAnchors.value[String(uid)] ?? -1
+}
+function anchorSet(uid, idx) {
+  if (String(uid) === String(play.myId)) {
+    selected.value = idx
+    return
+  }
+  peerAnchors.value = { ...peerAnchors.value, [String(uid)]: idx }
+}
+function anchorClearAll() {
+  selected.value = -1
+  peerAnchors.value = {}
+}
+/** 房主广播用的完整锚点表(自己的 + 其他人的) */
+function anchorsSnapshot() {
+  return { [String(play.myId)]: selected.value, ...peerAnchors.value }
+}
+
 function snapshotRoomState() {
   return {
     board: board.value.map((t) => (t ? { id: t.id, type: t.type } : null)),
@@ -277,7 +305,7 @@ function snapshotRoomState() {
     level: level.value,
     shufflesLeft: shufflesLeft.value,
     timeLeft: timeLeft.value,
-    selected: selected.value,
+    anchors: anchorsSnapshot(),
     won: won.value,
     lost: lost.value,
   }
@@ -297,7 +325,18 @@ function applyRoomState(state) {
   level.value = Math.min(MAX_LEVEL, Math.max(1, Number(state.level) || 1))
   shufflesLeft.value = Math.max(0, Number(state.shufflesLeft) || 0)
   timeLeft.value = Math.max(0, Number(state.timeLeft) || 0)
-  selected.value = Number.isInteger(state.selected) ? state.selected : -1
+  const anchors = {}
+  if (state.anchors && typeof state.anchors === 'object') {
+    for (const [uid, idx] of Object.entries(state.anchors)) {
+      if (Number.isInteger(idx) && idx >= -1 && idx < PETLINK_CELLS) anchors[String(uid)] = idx
+    }
+  }
+  selected.value = anchors[String(play.myId)] ?? -1
+  const peers = {}
+  for (const [uid, idx] of Object.entries(anchors)) {
+    if (String(uid) !== String(play.myId)) peers[String(uid)] = idx
+  }
+  peerAnchors.value = peers
   won.value = !!state.won
   lost.value = !!state.lost
   linePoints.value = ''
@@ -332,9 +371,12 @@ function onRoomSignal(data) {
       return
     }
     if (data.event === 'op' && play.isHost) {
+      // 观战成员的误操作直接忽略(前端已拦,这里兜底)
+      const sender = play.members.find((m) => String(m.userId) === String(data.from))
+      if (sender && isSpectatorRole(sender.role)) return
       if (data.kind === 'click') {
         const index = Number(data.index)
-        if (Number.isInteger(index) && index >= 0 && index < PETLINK_CELLS) onClick(index, true)
+        if (Number.isInteger(index) && index >= 0 && index < PETLINK_CELLS) onClick(index, true, data.from)
       } else if (data.kind === 'shuffle') {
         doShuffle()
       } else if (data.kind === 'restart') {
@@ -388,12 +430,23 @@ const svgW = boardW + PAD * 2
 const svgH = boardH + PAD * 2
 
 const cells = computed(() => board.value.map((t, idx) => ({ idx, value: t ? t.type : 0, tid: t ? t.id : 0 })))
+
+// ---------- 其他玩家的锚点展示(房间合作模式):按成员序固定配色 ----------
+const PEER_COLORS = ['#e8a13a', '#4da3ff', '#9d6bff', '#3ecf8e', '#ff7ab2', '#59c2c9']
+const peerAnchorList = computed(() =>
+  Object.entries(peerAnchors.value)
+    .filter(([, idx]) => Number.isInteger(idx) && idx >= 0)
+    .map(([uid, idx], i) => ({ uid, idx, color: PEER_COLORS[i % PEER_COLORS.length] })),
+)
+const peerAnchorAt = (idx) => peerAnchorList.value.find((p) => p.idx === idx)
+
 const boardScrollRef = ref(null)
 const boardEl = ref(null)
 const boardScale = ref(1)
 const scaledW = computed(() => Math.round(svgW * boardScale.value))
 const scaledH = computed(() => Math.round(svgH * boardScale.value))
-const frozen = computed(() => animating.value || paused.value || won.value || lost.value || play.ended)
+// 观战成员整体冻结:只看盘面,不参与任何交互(计时也由玩家端推进)
+const frozen = computed(() => animating.value || paused.value || won.value || lost.value || play.ended || play.isSpectator)
 const levelName = computed(() => t(`games.petlink.levelNames.${level.value}`) || '')
 const CN_NUMS = ['一', '二', '三', '四', '五', '六', '七', '八', '九']
 // 原版关卡号用中文数字:第一关/第二关…(英文回退 Level N)
@@ -525,7 +578,7 @@ const applySavedState = (saved) => {
   shufflesLeft.value = saved.shufflesLeft
   timeLeft.value = saved.timeLeft
   paused.value = saved.paused
-  selected.value = -1
+  anchorClearAll()
   hinted.value = []
   animating.value = false
   won.value = false
@@ -552,9 +605,10 @@ const findAnyPair = () => findPetLinkPair(board.value)
 
 // ---------- 交互 ----------
 
-function onClick(i, remote = false) {
+function onClick(i, remote = false, remoteUid = null) {
   if (!remote && coopGuest.value) {
-    // 合作模式:非房主只上报意图,盘面由房主统一改动后再广播回来
+    // 合作模式:非房主只上报意图,盘面由房主统一改动后再广播回来;
+    // 本地先乐观预选(自己的锚点),房主快照到达后以权威值覆盖
     if (frozen.value) return
     hinted.value = []
     if (selected.value === -1) {
@@ -571,24 +625,27 @@ function onClick(i, remote = false) {
   if (frozen.value) return
   if (!board.value[i]) return
   hinted.value = []
-  if (selected.value === -1) {
-    selected.value = i
+  // 房主按操作者分开记账(remote=成员 op,本地=房主自己),各自维护自己的锚点
+  const uid = remote ? remoteUid : play.myId
+  const cur = anchorGet(uid)
+  // 锚点落在已消除的格子上(另一名玩家抢先消了这对):当作没有锚点重新选
+  if (cur === -1 || cur === i || !board.value[cur]) {
+    if (cur === i) {
+      anchorSet(uid, -1)
+      return
+    }
+    anchorSet(uid, i)
     playClick()
     return
   }
-  if (selected.value === i) {
-    selected.value = -1
-    return
-  }
-  const s = selected.value
-  if (board.value[i].type !== board.value[s].type) {
-    selected.value = i
+  if (board.value[i].type !== board.value[cur].type) {
+    anchorSet(uid, i)
     playClick()
     return
   }
-  const path = findPetLinkPath(board.value, Math.floor(s / COLS), s % COLS, Math.floor(i / COLS), i % COLS)
-  selected.value = -1
-  if (path) match(s, i, path)
+  const path = findPetLinkPath(board.value, Math.floor(cur / COLS), cur % COLS, Math.floor(i / COLS), i % COLS)
+  anchorSet(uid, -1)
+  if (path) match(cur, i, path)
   else playClick()
 }
 
@@ -656,7 +713,8 @@ function applyShuffle() {
   const rand = play.active ? seededRng((Number(play.seed) + level.value * 7919 + shufflesLeft.value * 104729) >>> 0) : Math.random
   shufflePetLinkBoard(board.value, rand)
   shufflesLeft.value -= 1
-  selected.value = -1
+  // 盘面洗过了:所有人的锚点都作废(旧格子位置已失效)
+  anchorClearAll()
   hinted.value = []
 }
 
@@ -705,7 +763,7 @@ function debugJump(lv) {
   board.value = buildBoard(next)
   shufflesLeft.value = DEBUG_SHUFFLES
   timeLeft.value = LEVEL_TIME
-  selected.value = -1
+  anchorClearAll()
   hinted.value = []
   animating.value = false
   won.value = false
@@ -808,7 +866,7 @@ async function levelComplete() {
   shufflesLeft.value = BASE_SHUFFLE + (level.value - 1) + Math.max(0, level.value - 4)
   board.value = buildBoard(level.value)
   timeLeft.value = LEVEL_TIME
-  selected.value = -1
+  anchorClearAll()
   hinted.value = []
   startTicker()
   saveState()
@@ -831,8 +889,8 @@ async function grantReward() {
 
 function startTicker() {
   stopTicker()
-  // 合作模式只有房主计时,访客按房主快照显示倒计时
-  if (coopGuest.value) return
+  // 合作模式只有房主计时,访客按房主快照显示倒计时;观战不跑计时
+  if (coopGuest.value || play.isSpectator) return
   ticker = setInterval(() => {
     if (paused.value || won.value || lost.value) return
     timeLeft.value -= 1
@@ -905,7 +963,7 @@ function restart() {
   score.value = 0
   shufflesLeft.value = BASE_SHUFFLE
   timeLeft.value = LEVEL_TIME
-  selected.value = -1
+  anchorClearAll()
   hinted.value = []
   animating.value = false
   paused.value = false
@@ -1324,6 +1382,10 @@ function onKeydown(e) {
     0 0 0 2px #0033ff,
     inset 0 0 0 1px rgba(27, 28, 250, 0.25);
   transform: translateY(-1px);
+}
+/* 其他玩家的锚点:描边颜色由内联样式按成员配色注入(不加位移,和自己的选中区分) */
+.tile.is-peer-anchor {
+  cursor: default;
 }
 .tile.is-hint {
   animation: hintPulse 0.8s ease-in-out infinite;

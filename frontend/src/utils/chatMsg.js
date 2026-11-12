@@ -12,7 +12,7 @@ export const MSG_TYPE = {
 /** 站内对象卡可引用的对象类型 */
 export const CARD_OBJ_TYPES = ['ALBUM', 'PHOTO', 'VIDEO', 'BLOG', 'DIARY', 'BOOK', 'WISH', 'MATCH']
 
-/** 九个 H5 小游戏:code 与后端 GameConst.H5_GAME_CODES 一致,route 为邀请卡跳转页 */
+/** H5 小游戏全集:code 与后端 GameConst.H5_GAME_CODES 一致,route 为邀请卡跳转页 */
 export const H5_GAMES = [
   { code: 'game_2048', nameKey: 'games.g2048.title', route: '/games/2048' },
   { code: 'game_sudoku', nameKey: 'games.sudoku.title', route: '/games/sudoku' },
@@ -20,6 +20,7 @@ export const H5_GAMES = [
   { code: 'game_petlink', nameKey: 'games.petlink.title', route: '/games/petlink' },
   { code: 'game_tetris', nameKey: 'games.tetris.title', route: '/games/tetris' },
   { code: 'game_snake', nameKey: 'games.snake.title', route: '/games/snake' },
+  { code: 'game_mahjong', nameKey: 'games.mahjong.title', route: '/games/mahjong' },
   { code: 'game_solitaire', nameKey: 'games.solitaire.title', route: '/games/cards/klondike' },
   { code: 'game_spider', nameKey: 'games.spider.title', route: '/games/cards/spider' },
   { code: 'game_freecell', nameKey: 'games.freecell.title', route: '/games/cards/freecell' },

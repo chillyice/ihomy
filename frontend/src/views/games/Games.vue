@@ -80,7 +80,8 @@
             class="room-open"
             :title="$t('games.room.together')"
             :aria-label="$t('games.room.together')"
-            @click.stop="openRoomDialog(b)"
+            :disabled="roomOpening"
+            @click.stop="quickCreateRoom(b)"
           >
             <el-icon :size="18"><Promotion /></el-icon>
           </button>
@@ -213,36 +214,11 @@
       </template>
     </el-dialog>
 
-    <!-- 「一起玩」建房:一个人点一下就把房间开好,邀请卡自动发到聊天室 -->
-    <el-dialog v-model="roomDialog" append-to-body :title="$t('games.room.createTitle')" width="420px" destroy-on-close>
-      <el-form label-position="top">
-        <el-form-item v-if="roomOptions.length > 1" :label="$t('games.room.gameLabel')">
-          <el-select v-model="roomForm.gameCode" style="width: 100%" @change="onRoomGameChange">
-            <el-option v-for="o in roomOptions" :key="o.code" :label="$t(o.nameKey)" :value="o.code" />
-          </el-select>
-        </el-form-item>
-        <el-form-item :label="$t('games.room.modeLabel')">
-          <el-radio-group v-model="roomForm.mode">
-            <el-radio-button v-for="m in roomModesOf(roomForm.gameCode)" :key="m" :value="m">
-              {{ $t(m === 'COOP' ? 'games.room.modeCoop' : 'games.room.modePk') }}
-            </el-radio-button>
-          </el-radio-group>
-          <div class="room-dialog-hint">{{ $t(roomForm.mode === 'COOP' ? 'games.room.modeCoopHint' : 'games.room.modePkHint') }}</div>
-        </el-form-item>
-        <el-form-item :label="$t('games.room.playersLabel')">
-          <el-select v-model="roomForm.maxPlayers" style="width: 100%">
-            <el-option v-for="n in 7" :key="n + 1" :label="$t('games.room.playersOption', { n: n + 1 })" :value="n + 1" />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button size="small" @click="roomDialog = false">{{ $t('games.cancel') }}</el-button>
-        <el-button type="primary" size="small" :loading="roomCreating" @click="submitRoom">{{ $t('games.room.create') }}</el-button>
-      </template>
-    </el-dialog>
-
     <!-- 许愿想加的游戏:只有「想加什么游戏」这一个语义,不带来源记录ID -->
     <AddToWishDialog v-model="wishOpen" :source="wishSource" :title-placeholder="$t('wish.gameTitlePlaceholder')" />
+
+    <!-- 加载骨架:建房请求进行中 -->
+    <div v-if="roomOpening" v-loading="roomOpening" class="room-opening"></div>
   </div>
 </template>
 
@@ -267,6 +243,7 @@ import {
   Tickets,
   Box,
   Cherry,
+  Medal,
   Promotion,
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
@@ -278,7 +255,7 @@ import { useUserStore } from '@/stores/user'
 import { GAME_CATEGORIES, countGameCategories, inGameCategory, normalizeGameCategory } from '@/utils/games/gameCategory'
 import { importAccept, typeForFile, typeLabel } from '@/utils/games/emulatorSystems'
 import { UNSERIES, inGameSeries, normalizeGameSeries, seriesOptionsOf } from '@/utils/games/gameSeries'
-import { defaultRoomMode, roomGame, roomModes } from '@/utils/gameRoom'
+import { defaultRoomMode } from '@/utils/gameRoom'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -369,6 +346,14 @@ const builtinGames = [
     category: 'ARCADE',
     roomCodes: ['game_snake'],
   },
+  {
+    key: 'mahjong',
+    titleKey: 'games.mahjong.title',
+    descKey: 'games.mahjong.desc',
+    icon: Medal,
+    path: '/games/mahjong',
+    category: 'CASUAL',
+  },
 ]
 
 const categoryText = (category) => dictText(t, 'game_category', normalizeGameCategory(category))
@@ -409,14 +394,10 @@ const wishOpen = ref(false)
 const wishSource = computed(() => ({ type: 'GAME', title: t('wish.gameSourceTitle') }))
 
 // ---------- 「一起玩」房间 ----------
+// 点「一起玩」直接建房进游戏室:不再预选玩法/人数,进游戏室后房主还能换游戏重新分配席位
 const rooms = ref([])
 const activeRooms = computed(() => rooms.value.filter((r) => r.status === 'WAITING' || r.status === 'PLAYING').slice(0, 4))
-const roomDialog = ref(false)
-const roomCreating = ref(false)
-const roomCodePool = ref([])
-const roomForm = reactive({ gameCode: '', mode: 'PK', maxPlayers: 4 })
-const roomOptions = computed(() => roomCodePool.value.map((code) => roomGame(code)).filter(Boolean))
-const roomModesOf = (code) => roomModes(code)
+const roomOpening = ref(false)
 const roomChipMeta = (r) =>
   `${t(r.mode === 'COOP' ? 'games.room.modeCoop' : 'games.room.modePk')} · ${r.members.length}/${r.maxPlayers}${r.status === 'PLAYING' ? ' · ' + t('games.room.playingTag') : ''}`
 
@@ -428,33 +409,17 @@ const loadRooms = async () => {
   }
 }
 
-const openRoomDialog = (b) => {
-  roomCodePool.value = [...(b.roomCodes || [])]
-  if (!roomCodePool.value.length) return
-  roomForm.gameCode = roomCodePool.value[0]
-  roomForm.mode = defaultRoomMode(roomForm.gameCode)
-  roomForm.maxPlayers = 4
-  roomDialog.value = true
-}
-
-const onRoomGameChange = () => {
-  roomForm.mode = defaultRoomMode(roomForm.gameCode)
-}
-
-const submitRoom = async () => {
-  roomCreating.value = true
+const quickCreateRoom = async (b) => {
+  const code = (b.roomCodes || [])[0]
+  if (!code || roomOpening.value) return
+  roomOpening.value = true
   try {
-    const created = await roomApi.create({
-      gameCode: roomForm.gameCode,
-      mode: roomForm.mode,
-      maxPlayers: roomForm.maxPlayers,
-    })
-    roomDialog.value = false
+    const created = await roomApi.create({ gameCode: code, mode: defaultRoomMode(code) })
     router.push(`/games/room/${created.id}`)
   } catch (e) {
     ElMessage.warning(e?.response?.data?.message || t('games.room.createFailed'))
   } finally {
-    roomCreating.value = false
+    roomOpening.value = false
   }
 }
 
@@ -859,10 +824,13 @@ onMounted(() => {
 .room-open:hover {
   background: rgba(var(--color-brand-rgb), 0.22);
 }
-.room-dialog-hint {
-  margin-top: 6px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--color-text-secondary);
+.room-open:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.room-opening {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
 }
 </style>

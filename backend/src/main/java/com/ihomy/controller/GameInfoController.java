@@ -216,4 +216,12 @@ public class GameInfoController {
         LoginUser user = current();
         return Result.success(gameService.snakeReward(user.getUserId(), user.getFamilyId()));
     }
+
+    @Operation(summary = "H5 小游戏胡牌奖励")
+    @OperationLog(module = "GAME", operationType = "UPDATE", description = "麻将胡牌奖励")
+    @PostMapping("/mahjong/reward")
+    public Result<Map<String, Object>> mahjongReward() {
+        LoginUser user = current();
+        return Result.success(gameService.mahjongReward(user.getUserId(), user.getFamilyId()));
+    }
 }

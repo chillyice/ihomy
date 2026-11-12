@@ -11,19 +11,31 @@
       <template v-else>
         <div class="room-hero card">
           <div class="room-hero-main">
-            <div class="room-game">{{ gameName }}</div>
+            <!-- 游戏室内选游戏:房主等待中可换,换完按新游戏席位随机分配玩家/观战 -->
+            <div v-if="isHost && room.status === 'WAITING'" class="room-game-picker">
+              <el-select v-model="pickedGame" size="default" class="room-game-select" :loading="switchingGame" @change="changeGame">
+                <el-option v-for="o in roomOptions" :key="o.code" :label="$t(o.nameKey)" :value="o.code" />
+              </el-select>
+              <span class="room-picker-hint">{{ $t('games.room.gamePickerHint') }}</span>
+            </div>
+            <div v-else class="room-game">{{ gameName }}</div>
             <div class="room-tags">
               <span class="room-tag mode">{{ modeText }}</span>
               <span class="room-tag" :class="statusClass">{{ statusText }}</span>
-              <span v-if="room.seed" class="room-tag seed">#{{ room.seed }}</span>
+              <span class="room-tag">{{ seatText }}</span>
             </div>
             <div class="room-desc">{{ $t(resultKeyText) }}</div>
           </div>
           <div class="room-hero-actions">
-            <el-button size="small" round @click="invite">
-              <el-icon><Promotion /></el-icon>
-              {{ $t('games.room.invite') }}
-            </el-button>
+            <el-tooltip :disabled="canInvite" :content="$t('games.room.inviteLocked')" placement="top">
+              <span class="room-invite-wrap">
+                <el-button size="small" round :disabled="!canInvite" @click="invite">
+                  <el-icon><Promotion /></el-icon>
+                  {{ $t('games.room.invite') }}
+                </el-button>
+              </span>
+            </el-tooltip>
+            <RoomCallPicker :members="room.members" :my-id="myId" />
             <el-button size="small" round :loading="leaving" @click="leave">{{ $t('games.room.leave') }}</el-button>
           </div>
         </div>
@@ -37,10 +49,12 @@
               <div class="room-member-name">
                 {{ m.name }}
                 <span v-if="m.userId === room.hostId" class="room-badge">{{ $t('games.room.host') }}</span>
+                <span v-if="isSpectatorMember(m)" class="room-badge spectate">{{ $t('games.room.roleSpectator') }}</span>
                 <span v-if="m.userId === myId" class="room-badge me">{{ $t('games.room.me') }}</span>
               </div>
               <div class="room-member-state">
-                <template v-if="room.status === 'WAITING'">
+                <template v-if="isSpectatorMember(m)">{{ $t('games.room.spectating') }}</template>
+                <template v-else-if="room.status === 'WAITING'">
                   {{ m.ready ? $t('games.room.ready') : $t('games.room.notReady') }}
                 </template>
                 <template v-else-if="m.finishedAt">
@@ -70,8 +84,18 @@
 
         <div class="room-actions">
           <template v-if="room.status === 'WAITING'">
-            <el-button v-if="!isHost" size="default" round :type="myReady ? 'default' : 'primary'" :loading="busy" @click="toggleReady">
+            <el-button
+              v-if="!isHost && !myIsSpectator"
+              size="default"
+              round
+              :type="myReady ? 'default' : 'primary'"
+              :loading="busy"
+              @click="toggleReady"
+            >
               {{ myReady ? $t('games.room.cancelReady') : $t('games.room.setReady') }}
+            </el-button>
+            <el-button v-else-if="!isHost" size="default" round disabled>
+              {{ $t('games.room.spectatorHint') }}
             </el-button>
             <el-button v-else type="primary" size="default" round :disabled="!canStart" :loading="busy" @click="start">
               {{ $t('games.room.start') }}
@@ -80,7 +104,7 @@
           </template>
           <template v-else-if="room.status === 'PLAYING'">
             <el-button type="primary" size="default" round @click="enterGame">{{ $t('games.room.enterGame') }}</el-button>
-            <span class="room-hint">{{ $t('games.room.playingHint') }}</span>
+            <span class="room-hint">{{ myIsSpectator ? $t('games.room.spectatorHint') : $t('games.room.playingHint') }}</span>
           </template>
           <template v-else-if="room.status === 'FINISHED'">
             <div class="room-result">
@@ -106,18 +130,20 @@
 
 <script setup>
 // 「一起玩」房间大厅:成员/准备/开赛/邀请/1:1 通话/自动进游戏。
-// 建房已由 Games.vue 完成并发了邀请卡;这里只负责把成员聚起来(2~8 人)再进游戏页。
+// 建房已由 Games.vue 完成并发了邀请卡;这里负责把成员聚起来(2~8 人)再进游戏页。
+// 游戏室内房主可换游戏:换完按新游戏的玩家席位随机分配玩家/观战(后端随机,前端只展示)。
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Phone, Plus, Promotion, UserFilled, VideoCamera } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import RoomCallPicker from '@/components/games/RoomCallPicker.vue'
 import { roomApi } from '@/api'
 import { useChatStore } from '@/stores/chat'
 import { useCallStore } from '@/stores/call'
 import { useUserStore } from '@/stores/user'
-import { ROOM_STATUS, isCoop, resultKey, roomGame, roomGamePath } from '@/utils/gameRoom'
+import { ROOM_GAMES, ROOM_STATUS, isCoop, isSpectatorRole, resultKey, roomGame, roomGamePath } from '@/utils/gameRoom'
 
 const route = useRoute()
 const router = useRouter()
@@ -131,6 +157,8 @@ const room = ref(null)
 const loading = ref(false)
 const busy = ref(false)
 const leaving = ref(false)
+const switchingGame = ref(false)
+const pickedGame = ref('')
 let entered = false
 let unsubscribe = null
 let pollTimer = null
@@ -138,6 +166,9 @@ let pollTimer = null
 const myId = computed(() => userStore.userInfo?.id)
 const isHost = computed(() => room.value?.hostId === myId.value)
 const myReady = computed(() => !!room.value?.members.find((m) => m.userId === myId.value)?.ready)
+const myIsSpectator = computed(() => isSpectatorRole(room.value?.members.find((m) => m.userId === myId.value)?.role))
+const isSpectatorMember = (m) => isSpectatorRole(m?.role)
+const roomOptions = computed(() => Object.values(ROOM_GAMES))
 const gameName = computed(() => (room.value ? t(roomGame(room.value.gameCode)?.nameKey || 'games.title') : t('games.room.title')))
 const roomTitle = computed(() => (room.value ? gameName.value : t('games.room.title')))
 const modeText = computed(() => (isCoop(room.value?.mode) ? t('games.room.modeCoop') : t('games.room.modePk')))
@@ -145,16 +176,25 @@ const resultKeyText = computed(() => (room.value ? resultKey(room.value.gameCode
 const statusText = computed(() => t(`games.room.status.${String(room.value?.status || 'WAITING').toLowerCase()}`))
 const statusClass = computed(() => String(room.value?.status || '').toLowerCase())
 const canCall = computed(() => chatStore.socketStatus === 'open' && !callStore.inCall)
+const canInvite = computed(() => !!room.value && room.value.status === ROOM_STATUS.WAITING)
+const seatText = computed(() => {
+  if (!room.value) return ''
+  const players = room.value.playersCount ?? room.value.members.filter((m) => !isSpectatorMember(m)).length
+  const spectators = room.value.members.length - players
+  return t('games.room.seatSummary', { players, max: room.value.maxSeatPlayers || 8, spectators })
+})
 const emptySeats = computed(() => {
-  const max = Math.min(Number(room.value?.maxPlayers) || 4, 8)
+  const max = Math.min(Number(room.value?.maxPlayers) || 8, 8)
   return Math.max(0, max - (room.value?.members.length || 0))
 })
-const canStart = computed(() => (room.value?.members.length || 0) >= 2 && room.value.members.every((m) => m.ready))
+/** 玩家(非观战)都就绪才能开赛;观战不要求准备 */
+const players = computed(() => (room.value?.members || []).filter((m) => !isSpectatorMember(m)))
+const canStart = computed(() => players.value.length >= 2 && players.value.every((m) => m.ready))
 const startHint = computed(() => {
   if (!room.value) return ''
-  if (room.value.members.length < 2) return t('games.room.needTwo')
-  const waiting = room.value.members.filter((m) => !m.ready).length
-  return waiting ? t('games.room.waitReady', { n: waiting }) : t('games.room.allReady')
+  if (players.value.length < 2) return t('games.room.needTwoPlayers')
+  const waiting = players.value.filter((m) => !m.ready).length
+  return waiting ? t('games.room.waitPlayersReady', { n: waiting }) : t('games.room.allPlayersReady')
 })
 const resultTitle = computed(() => {
   if (!room.value) return ''
@@ -170,10 +210,25 @@ const scoreList = computed(() => {
     .join(' · ')
 })
 
+/** 房主换游戏:后端随机重新分配席位,广播后全员更新 */
+const changeGame = async (code) => {
+  if (!code || !room.value || code === room.value.gameCode) return
+  switchingGame.value = true
+  try {
+    applyRoom(await roomApi.setGame(roomId.value, code))
+  } catch (e) {
+    ElMessage.warning(e?.response?.data?.message || t('games.room.actFailed'))
+    pickedGame.value = room.value.gameCode // 回弹到当前游戏
+  } finally {
+    switchingGame.value = false
+  }
+}
+
 const applyRoom = (next) => {
   if (!next) return
   const wasPlaying = room.value?.status === ROOM_STATUS.PLAYING
   room.value = next
+  pickedGame.value = next.gameCode
   // 只有「本页停留期间房间开赛」才自动进游戏页:直接从大厅刷新/后退回来时留在大厅,
   // 否则浏览器返回到 /games/room 会被立刻弹回游戏页,退不出去。
   if (next.status === ROOM_STATUS.PLAYING && !wasPlaying && !entered) {
@@ -280,7 +335,6 @@ const again = async () => {
     const created = await roomApi.create({
       gameCode: room.value.gameCode,
       mode: room.value.mode,
-      maxPlayers: room.value.maxPlayers,
     })
     entered = false
     applyRoom(created)
@@ -336,6 +390,19 @@ watch(roomId, () => {
 .room-game {
   font-size: 22px;
   font-weight: 700;
+}
+.room-game-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.room-game-select {
+  width: 200px;
+}
+.room-picker-hint {
+  font-size: 12px;
+  color: var(--color-text-secondary);
 }
 .room-tags {
   display: flex;
@@ -438,6 +505,13 @@ watch(roomId, () => {
 .room-badge.me {
   background: rgba(0, 0, 0, 0.08);
   color: var(--color-text-secondary);
+}
+.room-badge.spectate {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--color-text-secondary);
+}
+.room-invite-wrap {
+  display: inline-flex;
 }
 .room-member-state {
   margin-top: 4px;

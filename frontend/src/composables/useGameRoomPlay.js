@@ -41,6 +41,8 @@ export function useGameRoomPlay({ onSignal, onRoom } = {}) {
   const spec = computed(() => (room.value ? roomGame(room.value.gameCode) : null))
   const members = computed(() => room.value?.members || [])
   const myMember = computed(() => members.value.find((m) => m.userId === myId.value) || null)
+  const myRole = computed(() => myMember.value?.role || '')
+  const isSpectator = computed(() => myRole.value === 'SPECTATOR')
   const rivalName = computed(() => {
     const other = members.value.find((m) => m.userId !== myId.value)
     return other?.name || ''
@@ -116,9 +118,9 @@ export function useGameRoomPlay({ onSignal, onRoom } = {}) {
     attempt()
   }
 
-  /** 上报成绩(每人只报一次);PK 先完成制首报即终局,高分制等全员报完 */
+  /** 上报成绩(每人只报一次;观战不参与计分);PK 先完成制首报即终局,高分制等全员报完 */
   const report = async (score = 0) => {
-    if (!active.value || reported.value) return null
+    if (!active.value || reported.value || isSpectator.value) return null
     reported.value = true
     try {
       const res = await roomApi.finish(roomId.value, Math.max(0, Math.round(Number(score) || 0)))
@@ -194,6 +196,8 @@ export function useGameRoomPlay({ onSignal, onRoom } = {}) {
     members,
     myId,
     myMember,
+    myRole,
+    isSpectator,
     rivalName,
     reported,
     finishResult,

@@ -31,7 +31,8 @@ public final class GameConst {
     public static final java.util.Set<String> H5_GAME_CODES = java.util.Set.of(
             PointsRuleConst.GAME_PETLINK, PointsRuleConst.GAME_SUDOKU, PointsRuleConst.GAME_2048,
             PointsRuleConst.GAME_MINESWEEPER, PointsRuleConst.GAME_SOLITAIRE, PointsRuleConst.GAME_SPIDER,
-            PointsRuleConst.GAME_FREECELL, PointsRuleConst.GAME_TETRIS, PointsRuleConst.GAME_SNAKE);
+            PointsRuleConst.GAME_FREECELL, PointsRuleConst.GAME_TETRIS, PointsRuleConst.GAME_SNAKE,
+            PointsRuleConst.GAME_MAHJONG);
 
     /** 对战赛制 mode:同种子赛(各自打完上报)/ 实时对战(WS 输入级同步) */
     public static final String MATCH_MODE_ASYNC = "ASYNC_SEED";
@@ -70,40 +71,47 @@ public final class GameConst {
     public static final String ROOM_RESULT_SCORE = "HIGH_SCORE";
     public static final String ROOM_RESULT_COOP = "COOP";
 
-    /** 房间人数上限(家庭场景,含房主) */
+    /** 房间可容纳人数上限(家庭场景,含观战) */
     public static final int ROOM_MAX_PLAYERS = 8;
     public static final int ROOM_DEFAULT_PLAYERS = 4;
 
     /** 单个房间的成员/操作数量上限,防止异常客户端刷数据 */
     public static final int ROOM_MEMBER_LIMIT = 8;
 
-    /** 房间游戏能力:允许的玩法 + 结算口径(与前端 utils/gameRoom.js 同口径) */
-    public record RoomGame(String code, java.util.Set<String> modes, String result) {
+    /** 成员席位角色:HOST 房主(恒为玩家)/ PLAYER 玩家 / SPECTATOR 观战 */
+    public static final String ROOM_ROLE_HOST = "HOST";
+    public static final String ROOM_ROLE_PLAYER = "PLAYER";
+    public static final String ROOM_ROLE_SPECTATOR = "SPECTATOR";
+
+    /** 房间游戏能力:允许的玩法 + 结算口径 + 单局玩家席位数(与前端 utils/gameRoom.js 同口径) */
+    public record RoomGame(String code, java.util.Set<String> modes, String result, int maxSeats) {
     }
 
     /**
      * 可开房的 H5 游戏:按玩法性质给模式——
      * 连连看/扫雷/数独天然适合合作,其余单人解谜/实时类按同种子 PK。
+     * maxSeats = 单局最多几名玩家(超出部分随机分配为观战):
+     * 共享盘面的合作局 4 人,同种子竞速局 6 人。
      */
     public static final java.util.Map<String, RoomGame> ROOM_GAMES = java.util.Map.of(
             PointsRuleConst.GAME_PETLINK, new RoomGame(PointsRuleConst.GAME_PETLINK,
-                    java.util.Set.of(ROOM_MODE_PK, ROOM_MODE_COOP), ROOM_RESULT_FIRST),
+                    java.util.Set.of(ROOM_MODE_PK, ROOM_MODE_COOP), ROOM_RESULT_FIRST, 6),
             PointsRuleConst.GAME_MINESWEEPER, new RoomGame(PointsRuleConst.GAME_MINESWEEPER,
-                    java.util.Set.of(ROOM_MODE_COOP), ROOM_RESULT_COOP),
+                    java.util.Set.of(ROOM_MODE_COOP), ROOM_RESULT_COOP, 4),
             PointsRuleConst.GAME_SUDOKU, new RoomGame(PointsRuleConst.GAME_SUDOKU,
-                    java.util.Set.of(ROOM_MODE_COOP), ROOM_RESULT_COOP),
+                    java.util.Set.of(ROOM_MODE_COOP), ROOM_RESULT_COOP, 4),
             PointsRuleConst.GAME_2048, new RoomGame(PointsRuleConst.GAME_2048,
-                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE),
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 6),
             PointsRuleConst.GAME_SNAKE, new RoomGame(PointsRuleConst.GAME_SNAKE,
-                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE),
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 6),
             PointsRuleConst.GAME_TETRIS, new RoomGame(PointsRuleConst.GAME_TETRIS,
-                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE),
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 6),
             PointsRuleConst.GAME_SOLITAIRE, new RoomGame(PointsRuleConst.GAME_SOLITAIRE,
-                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE),
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4),
             PointsRuleConst.GAME_SPIDER, new RoomGame(PointsRuleConst.GAME_SPIDER,
-                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE),
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4),
             PointsRuleConst.GAME_FREECELL, new RoomGame(PointsRuleConst.GAME_FREECELL,
-                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE));
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4));
 
     /** 房间游戏名快照(邀请卡/结果卡用) */
     public static final java.util.Map<String, String> ROOM_GAME_NAMES = java.util.Map.ofEntries(

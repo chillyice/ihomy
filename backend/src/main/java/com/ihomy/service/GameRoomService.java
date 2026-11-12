@@ -46,28 +46,77 @@ public class GameRoomService {
     private final PointsService pointsService;
     private final StringRedisTemplate redis;
 
-    /** 创建房间:发起人即房主,并自动准备 */
+    /** 创建房间:发起人即房主,并自动准备;房间容量固定 8 人,玩家席位按游戏能力分配 */
     public Map<String, Object> create(Long userId, Long familyId, String gameCode, String mode, Integer maxPlayers) {
         GameConst.RoomGame spec = GameConst.ROOM_GAMES.get(gameCode);
         if (spec == null) {
             throw new BizException(ResultCode.BAD_REQUEST, "这个游戏还不支持一起玩");
         }
-        if (!spec.modes().contains(mode)) {
+        String finalMode = mode == null || mode.isBlank() ? defaultMode(spec) : mode;
+        if (!spec.modes().contains(finalMode)) {
             throw new BizException(ResultCode.BAD_REQUEST, "这个游戏不支持这种玩法");
         }
-        int max = maxPlayers == null ? GameConst.ROOM_DEFAULT_PLAYERS : maxPlayers;
+        int max = maxPlayers == null ? GameConst.ROOM_MAX_PLAYERS : maxPlayers;
         max = Math.max(2, Math.min(GameConst.ROOM_MAX_PLAYERS, max));
         GameRoom room = new GameRoom();
         room.setFamilyId(familyId);
         room.setGameCode(gameCode);
-        room.setMode(mode);
+        room.setMode(finalMode);
         room.setSeed(Math.abs(RandomUtil.randomLong()));
         room.setHostId(userId);
         room.setMaxPlayers(max);
         room.setStatus(GameConst.ROOM_WAITING);
         roomMapper.insert(room);
-        addMember(room, userId, "HOST");
+        addMember(room, userId, GameConst.ROOM_ROLE_HOST);
         return view(room);
+    }
+
+    /** 玩法缺省口径:能 PK 就 PK,否则 COOP(与前端 defaultRoomMode 同口径) */
+    private String defaultMode(GameConst.RoomGame spec) {
+        return spec.modes().contains(GameConst.ROOM_MODE_PK) ? GameConst.ROOM_MODE_PK : GameConst.ROOM_MODE_COOP;
+    }
+
+    /**
+     * 房主换游戏(仅 WAITING):玩法随游戏走,并按新游戏的玩家席位随机重新分配席位——
+     * 房主恒为玩家,其余成员洗牌后先补满玩家席,剩下的转观战。观战成员可看可聊,不参与对局。
+     */
+    public Map<String, Object> setGame(Long userId, Long familyId, Long id, String gameCode) {
+        GameRoom room = require(familyId, id);
+        if (!Objects.equals(room.getHostId(), userId)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "只有房主可以换游戏");
+        }
+        if (!GameConst.ROOM_WAITING.equals(room.getStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST, "对局已经开始,下一局再换");
+        }
+        GameConst.RoomGame spec = GameConst.ROOM_GAMES.get(gameCode);
+        if (spec == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "这个游戏还不支持一起玩");
+        }
+        roomMapper.update(null, new LambdaUpdateWrapper<GameRoom>()
+                .eq(GameRoom::getId, id)
+                .set(GameRoom::getGameCode, gameCode)
+                .set(GameRoom::getMode, defaultMode(spec))
+                .set(GameRoom::getSeed, Math.abs(RandomUtil.randomLong())));
+        assignSeats(id, spec);
+        return get(familyId, id);
+    }
+
+    /** 按游戏席位随机分配:房主恒为玩家,其余洗牌后先补满玩家席,剩下的转观战;非房主重新准备 */
+    private void assignSeats(Long roomId, GameConst.RoomGame spec) {
+        List<GameRoomMember> members = members(roomId);
+        List<GameRoomMember> others = members.stream()
+                .filter(m -> !GameConst.ROOM_ROLE_HOST.equals(m.getRole()))
+                .collect(Collectors.toList());
+        java.util.Collections.shuffle(others, new java.util.Random());
+        int playerSeats = Math.max(1, spec.maxSeats()) - 1; // 房主已占一席
+        for (int i = 0; i < others.size(); i++) {
+            GameRoomMember m = others.get(i);
+            String role = i < playerSeats ? GameConst.ROOM_ROLE_PLAYER : GameConst.ROOM_ROLE_SPECTATOR;
+            memberMapper.update(null, new LambdaUpdateWrapper<GameRoomMember>()
+                    .eq(GameRoomMember::getId, m.getId())
+                    .set(GameRoomMember::getRole, role)
+                    .set(GameRoomMember::getReady, 0));
+        }
     }
 
     /** 家庭房间列表(最近在前,≤20 条) */
@@ -85,7 +134,7 @@ public class GameRoomService {
         return view(require(familyId, id));
     }
 
-    /** 加入房间:仅 WAITING;已在房间内幂等返回 */
+    /** 加入房间:仅 WAITING;已在房间内幂等返回。玩家席满则自动转为观战 */
     public Map<String, Object> join(Long userId, Long familyId, Long id) {
         synchronized (("game-room-" + id).intern()) {
             GameRoom room = require(familyId, id);
@@ -100,19 +149,32 @@ public class GameRoomService {
             if (count >= room.getMaxPlayers()) {
                 throw new BizException(ResultCode.BAD_REQUEST, "房间已经满员了");
             }
-            addMember(room, userId, "PLAYER");
+            addMember(room, userId, joinRole(room, id));
             return view(room);
         }
     }
 
-    /** 准备/取消准备:仅房主之外成员可切换(房主默认已准备) */
+    /** 加入时的席位:游戏玩家席未满则当玩家,满了当观战 */
+    private String joinRole(GameRoom room, Long roomId) {
+        GameConst.RoomGame spec = GameConst.ROOM_GAMES.get(room.getGameCode());
+        if (spec == null) {
+            return GameConst.ROOM_ROLE_PLAYER;
+        }
+        long players = memberMapper.selectCount(new LambdaQueryWrapper<GameRoomMember>()
+                .eq(GameRoomMember::getRoomId, roomId)
+                .ne(GameRoomMember::getRole, GameConst.ROOM_ROLE_SPECTATOR));
+        return players < spec.maxSeats() ? GameConst.ROOM_ROLE_PLAYER : GameConst.ROOM_ROLE_SPECTATOR;
+    }
+
+    /** 准备/取消准备:仅房主之外成员可切换(房主默认已准备);观战席没有准备动作 */
     public Map<String, Object> ready(Long userId, Long familyId, Long id, Boolean ready) {
         GameRoom room = require(familyId, id);
         if (!GameConst.ROOM_WAITING.equals(room.getStatus())) {
             throw new BizException(ResultCode.BAD_REQUEST, "对局已经开始");
         }
         GameRoomMember member = requireMember(id, userId);
-        if ("HOST".equals(member.getRole())) {
+        if (GameConst.ROOM_ROLE_HOST.equals(member.getRole())
+                || GameConst.ROOM_ROLE_SPECTATOR.equals(member.getRole())) {
             return view(room);
         }
         memberMapper.update(null, new LambdaUpdateWrapper<GameRoomMember>()
@@ -121,7 +183,7 @@ public class GameRoomService {
         return view(room);
     }
 
-    /** 房主开赛:至少 2 人且全部准备 */
+    /** 房主开赛:至少 2 名玩家且玩家全部准备(观战不要求准备) */
     public Map<String, Object> start(Long userId, Long familyId, Long id) {
         GameRoom room = require(familyId, id);
         if (!Objects.equals(room.getHostId(), userId)) {
@@ -130,13 +192,15 @@ public class GameRoomService {
         if (!GameConst.ROOM_WAITING.equals(room.getStatus())) {
             throw new BizException(ResultCode.BAD_REQUEST, "这个房间已经开过了");
         }
-        List<GameRoomMember> members = members(id);
-        if (members.size() < 2) {
-            throw new BizException(ResultCode.BAD_REQUEST, "至少要有两个人才能开始");
+        List<GameRoomMember> players = members(id).stream()
+                .filter(m -> !GameConst.ROOM_ROLE_SPECTATOR.equals(m.getRole()))
+                .toList();
+        if (players.size() < 2) {
+            throw new BizException(ResultCode.BAD_REQUEST, "至少要有两名玩家才能开始");
         }
-        boolean allReady = members.stream().allMatch(m -> Integer.valueOf(1).equals(m.getReady()));
+        boolean allReady = players.stream().allMatch(m -> Integer.valueOf(1).equals(m.getReady()));
         if (!allReady) {
-            throw new BizException(ResultCode.BAD_REQUEST, "还有成员没有准备好");
+            throw new BizException(ResultCode.BAD_REQUEST, "还有玩家没有准备好");
         }
         int updated = roomMapper.update(null, new LambdaUpdateWrapper<GameRoom>()
                 .eq(GameRoom::getId, id)
@@ -161,6 +225,9 @@ public class GameRoomService {
             throw new BizException(ResultCode.BAD_REQUEST, "对局还没有开始");
         }
         GameRoomMember member = requireMember(id, userId);
+        if (GameConst.ROOM_ROLE_SPECTATOR.equals(member.getRole())) {
+            return get(familyId, id);
+        }
         boolean firstReport = memberMapper.update(null, new LambdaUpdateWrapper<GameRoomMember>()
                 .eq(GameRoomMember::getId, member.getId())
                 .isNull(GameRoomMember::getFinishedAt)
@@ -421,6 +488,8 @@ public class GameRoomService {
             v.put("hostId", room.getHostId());
             v.put("hostName", names.getOrDefault(room.getHostId(), "成员"));
             v.put("maxPlayers", room.getMaxPlayers());
+            GameConst.RoomGame spec = GameConst.ROOM_GAMES.get(room.getGameCode());
+            v.put("maxSeatPlayers", spec == null ? GameConst.ROOM_MAX_PLAYERS : spec.maxSeats());
             v.put("winnerId", room.getWinnerId());
             v.put("startedAt", room.getStartedAt());
             v.put("finishedAt", room.getFinishedAt());
@@ -437,6 +506,8 @@ public class GameRoomService {
                 members.add(mv);
             }
             v.put("members", members);
+            v.put("playersCount", members.stream()
+                    .filter(m -> !GameConst.ROOM_ROLE_SPECTATOR.equals(m.get("role"))).count());
             v.put("readyCount", members.stream().filter(m -> Boolean.TRUE.equals(m.get("ready"))).count());
             out.add(v);
         }

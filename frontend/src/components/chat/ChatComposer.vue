@@ -184,8 +184,9 @@ const onFileChange = async (evt) => {
   }
   uploading.value = true
   try {
-    const res = await fileApi.upload(file)
-    const url = res?.data?.url
+    // request.js 拦截器已解包返回 data 字段(与其他 fileApi.upload 调用方同口径)
+    const data = await fileApi.upload(file)
+    const url = data?.url
     if (!url) throw new Error('no url')
     const size = await imageSize(url)
     const caption = draft.value.trim()

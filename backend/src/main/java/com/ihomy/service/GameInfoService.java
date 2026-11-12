@@ -283,6 +283,14 @@ public class GameInfoService {
                 GameConst.H5_GAME_DAILY_LIMIT, "贪吃蛇得分");
     }
 
+    /**
+     * 麻将胡牌奖励(玩家胡一局上报一次,每日限次防刷)。
+     */
+    public Map<String, Object> mahjongReward(Long userId, Long familyId) {
+        return h5GameReward(userId, familyId, PointsRuleConst.GAME_MAHJONG, "mahjong",
+                GameConst.H5_GAME_DAILY_LIMIT, "麻将胡牌");
+    }
+
     private Map<String, Object> h5GameReward(Long userId, Long familyId, String featureCode,
                                              String counterKey, int dailyLimit, String remark) {
         Map<String, Object> map = new HashMap<>();

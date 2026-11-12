@@ -349,6 +349,7 @@ export const gameApi = {
   freecellReward: () => request.post('/game/freecell/reward'),
   tetrisReward: () => request.post('/game/tetris/reward'),
   snakeReward: () => request.post('/game/snake/reward'),
+  mahjongReward: () => request.post('/game/mahjong/reward'),
   // GBA 存档落在游戏目录的 saves/ 下,列表按最后修改时间倒序
   listSaves: (id) => request.get(`/game/${id}/saves`),
   downloadSave: (id, name) => request.get(`/game/${id}/saves/${encodeURIComponent(name)}`, { responseType: 'arraybuffer' }),
@@ -366,6 +367,8 @@ export const roomApi = {
   list: (status) => request.get('/game/room', { params: status ? { status } : {} }),
   get: (id) => request.get(`/game/room/${id}`),
   join: (id) => request.post(`/game/room/${id}/join`),
+  // 房主换游戏(仅等待中):换完按新游戏席位随机分配玩家/观战
+  setGame: (id, gameCode) => request.post(`/game/room/${id}/game`, { gameCode }),
   ready: (id, ready) => request.post(`/game/room/${id}/ready`, { ready }),
   start: (id) => request.post(`/game/room/${id}/start`),
   finish: (id, score) => request.post(`/game/room/${id}/finish`, { score }),

@@ -196,6 +196,8 @@ const routes = [
   { path: '/games/tetris', name: 'Tetris', component: () => import('@/views/games/Tetris.vue'), meta: { requiresAuth: true } },
   // 贪吃蛇 H5(键盘/滑动/方向键,得分达标发积分),需登录
   { path: '/games/snake', name: 'Snake', component: () => import('@/views/games/Snake.vue'), meta: { requiresAuth: true } },
+  // 麻将 H5(推倒胡简化版,玩家对三 AI,胡牌发积分),需登录
+  { path: '/games/mahjong', name: 'Mahjong', component: () => import('@/views/games/Mahjong.vue'), meta: { requiresAuth: true } },
   // 贪吃蛇 1v1 对战(实时,WS 输入同步)
   {
     path: '/games/snake/match/:id',
