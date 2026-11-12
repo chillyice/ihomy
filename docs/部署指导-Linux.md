@@ -939,6 +939,31 @@ powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1
 - **数据库变更**：结构性变更写进 `migrations.sql`（幂等段），部署时自动执行；临时修复也可手动 `mysql -uroot -p ihomy < 增量.sql`。
 - **回滚**：失败时脚本自动回滚 jar/dist。若需手动回滚，登录服务器 `mv ihomy-backend.jar.bak ihomy-backend.jar && systemctl restart ihomy-backend`。
 
+### 8·补.5 Android 客户端（APK）发版
+
+壳内前端是**打进 APK 的构建产物**——`deploy.ps1` 发了新 dist 客户端也不会变，必须跟着发一个同版本的 APK；客户端启动时会查 `GET /api/public/app/latest`，发现新版本才弹更新。**重启 App 没用**，不是重新加载网页。
+
+1. 本地打包（先把仓库根 `VERSION` 提到目标版本，gradle 直接读它作 `versionName`/`versionCode`，`V12.10` → `12010`）：
+
+   ```powershell
+   cd frontend; npm run app:sync     # --mode app 构建 + npx cap sync android
+   cd android; $env:JAVA_HOME='C:\Program Files\Java\jdk-21'; .\gradlew.bat :app:assembleRelease
+   ```
+
+   产物 `android/app/build/outputs/apk/release/app-release.apk`（约 14MB）；签名读 `android/keystore.properties` + `ihomy-release.jks`（均不入库），文件缺失会产出未签名包。
+2. 核对版本与签名（覆盖安装必须同一签名，否则装不上）：`aapt dump badging app-release.apk` 首行应有 `versionName='V<版本>'`；`apksigner verify --print-certs` 的证书 SHA-256 与上一包一致（当前 `93634d1b24e4a1ec1d9f4b8863f5feb8134d3a2233b9ffd276cf573ea4dd1c98`）。
+3. 上传为 `{upload-dir}/app/ihomy-V<版本>.apk`：文件名就是接口拼出的下载地址，版本号写法（小数点、大写 V）必须与 external.yml 完全一致。
+
+   ```bash
+   scp -P 19068 app-release.apk root@ihomy.top:/tmp/
+   ssh -p 19068 root@ihomy.top 'mv /tmp/app-release.apk /opt/ihomy/uploads/app/ihomy-V<版本>.apk \
+     && chown ihomy:ihomy /opt/ihomy/uploads/app/ihomy-V<版本>.apk && chmod 644 /opt/ihomy/uploads/app/ihomy-V<版本>.apk'
+   ```
+
+4. 改生产 `/opt/ihomy/config/external.yml` 的 `app.android`：`latest-version` 与仓库 `VERSION` 对齐、`latest-notes` 写用户看得懂的更新说明；`min-supported-version` 是强制更新下限，一般不动。**该文件含生产 DB/Redis 密码，别用 `-UploadExternal` 拿本地文件覆盖**；改完 `chown ihomy:ihomy` + `chmod 640`。
+5. `systemctl restart ihomy-backend`（外挂配置只在启动时加载），约 40 秒后核对：`curl -s https://ihomy.top/api/public/app/latest` 的 `version`/`url` 是新版本；`curl -sI https://ihomy.top/files/app/ihomy-V<版本>.apk` 返回 200 且 `Content-Length` 与本地一致。
+6. 客户端：App 启动时静默检查（设置页可手动「检查更新」）→ 应用内下载（系统 DownloadManager，可锁屏/切后台）→ 覆盖安装。内容都在服务器，不用重新登录；Web/PWA 与 APK 两条通道互不影响。
+
 ---
 
 ## 九、验证清单
