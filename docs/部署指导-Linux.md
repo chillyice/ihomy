@@ -17,7 +17,7 @@
 | 4 | Redis | 6+ | 缓存 / JWT 令牌 | ✅ 必须（Docker 部署） |
 | 5 | Docker Engine | 24+ | 运行 Redis 容器 | ✅ 必须（仅 Redis 用） |
 | 6 | Nginx | 1.18+ | 托管前端 + 反向代理 + HTTPS | ✅ 生产推荐 |
-| 7 | Certbot | 最新 | 申请/续期 Let's Encrypt 证书 | 🔒 HTTPS 时需要 |
+| 7 | acme.sh | 最新 | 申请/续期 Let's Encrypt 证书（走 80 端口 webroot，零停服） | 🔒 HTTPS 时需要 |
 | 8 | systemd | 系统自带 | 服务管理与开机自启 | ✅ 自带 |
 | 9 | ufw / firewalld | 系统自带 | 防火墙 | ✅ 自带 |
 | 10 | rsync | 最新 | 每日备份镜像 `uploads` 目录（见「附:数据备份」） | 🔒 备份时需要 |
@@ -313,16 +313,21 @@ sudo dnf install -y nginx
 sudo systemctl enable --now nginx
 ```
 
-### 2.8 安装 Certbot（申请 HTTPS 证书）
+### 2.8 安装 acme.sh（申请 HTTPS 证书）
+
+> **别再装 certbot**：certbot 4.x 的 standalone 插件只剩 HTTP-01，且其 systemd timer 与 acme.sh 并存会抢同一份证书配置空转。本仓生产统一用 acme.sh（`--webroot` 走 80 端口续期，全程不停 nginx）。
 
 **Ubuntu：**
 ```bash
-sudo apt install -y certbot python3-certbot-nginx
+sudo apt install -y acme.sh        # 发行版源里有，免走 GitHub 直连
 ```
 **CentOS/RHEL：**
 ```bash
-sudo dnf install -y certbot python3-certbot-nginx
+sudo dnf install -y acme.sh
+# 源里没有时：curl -sS https://get.acme.sh | sh -s email=<你的邮箱>
 ```
+
+> **前置硬条件**：云服务器必须在**控制台安全组放行入方向 80**（`ufw allow 80` 不够，安全组是外层，包根本到不了 ufw）。80 不通会让 HTTP-01 续期**静默失败**，直到证书过期整站打不开（踩坑速查 §7.18）。
 
 ---
 
@@ -338,7 +343,7 @@ sudo dnf install -y certbot python3-certbot-nginx
 | Nginx | `www-data`(Ubuntu) / `nginx`(CentOS) | apt/dnf 安装自动创建 | 系统服务 |
 
 > **原则**：除下列关键步骤外，均不使用 root。
-> **必须 root 的关键步骤**：安装软件包、创建用户、systemd 服务管理、写 `/etc/` 下配置、防火墙、certbot、执行 schema.sql（数据库 root）。
+> **必须 root 的关键步骤**：安装软件包、创建用户、systemd 服务管理、写 `/etc/` 下配置、防火墙、acme.sh 签证书、执行 schema.sql（数据库 root）。
 > **应用操作（代码/构建/配置）**：由 `ihomy` 用户执行，不用 root。
 
 ### 3.1 创建应用用户与目录（root 操作一次）
@@ -546,7 +551,7 @@ sudo tee /etc/nginx/conf.d/ihomy.conf > /dev/null <<'EOF'
 server {
     listen 80;
     server_name ihomy.top www.ihomy.top;
-    # certbot 验证用（证书续期时需保留）
+    # ACME 验证用（acme.sh --webroot 续期时要用，必须保留）
     location /.well-known/acme-challenge/ {
         root /var/www/html;
     }
@@ -565,9 +570,9 @@ server {
     charset utf-8;
     charset_types text/plain text/css text/javascript application/javascript application/json application/xml image/svg+xml;
 
-    # 证书（certbot --nginx 自动生成，路径如下）
-    ssl_certificate     /etc/letsencrypt/live/ihomy.top/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/ihomy.top/privkey.pem;
+    # 证书（acme.sh --install-cert 安装到固定路径，续期后自动 reload，见第六章）
+    ssl_certificate     /etc/ihomy-cert/fullchain.pem;
+    ssl_certificate_key /etc/ihomy-cert/privkey.pem;
 
     # SSL 优化
     ssl_session_cache shared:SSL:10m;
@@ -648,7 +653,7 @@ EOF
 > - `location /files/` 必须**反代到后端**（`proxy_pass .../api/files/`）。改回 `alias` 静态直出 = 绕过读取鉴权，拿到 URL 的任何人都能读私有文件（V10.7 起文件访问由后端判定，见踩坑速查 §7.8）。
 > - nginx 有条硬规则：**location 里只要写了一条 `add_header`，server 级的同类头就不再继承**——所以图片/JS 缓存 location 必须自己带一行 HSTS（上面已带），否则 HSTS 只对 HTML 生效。
 > - 图片扩展名缓存 location 用负向断言 `^/(?!api/|files/)` 排除 `/api/` 与 `/files/`：nginx **正则 location 优先级高于前缀 location**，`/api/` 不排除则反代路径下带扩展名的响应（`/api/swagger-ui/*.css|js` 等）会被这条静态缓存抢走、从 `dist` 里找不到而 404 ——**接口文档页会变成空白页**（`/api/doc.html` 自身仍 200，所以极易漏检，2026-10-15 修，见踩坑速查 §7.10）。
-> - `/.well-known/acme-challenge/` 必须保留，certbot 续期时要用。
+> - `/.well-known/acme-challenge/` 必须保留，acme.sh `--webroot` 续期时要用（返回的是 `root /var/www/html` 下的静态文件，别被 301 跳转抢走）。
 > - **`/ruffle/` 与 `/emulatorjs/` 必须带 `Access-Control-Allow-Origin`**：APK/iOS 壳内页面 origin 是 `https://localhost`，两套 WASM 运行时按需从生产域名加载（不进包，省 38MB）；缺这个头时壳内模拟器/Flash 报跨域失败。**发新 APK 前先在服务器加这块 location 并 `nginx -t && systemctl reload nginx`**，顺序反过来会让新包的游戏功能直接不可用。
 > - WebSocket 的 `proxy_read_timeout 3600s` 防止长连接被 nginx 默认 60s 超时断开。
 > - **必须显式配 `gzip_types`**（见下）：Ubuntu 自带的 `/etc/nginx/nginx.conf` 只写了 `gzip on;`，
@@ -684,18 +689,35 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-**申请证书**（先确保 DNS A 记录已指向本机 IP，且 80 端口可公网访问）：
+**申请证书**（先确保 DNS A 记录已指向本机 IP，且**云安全组已放行入方向 80**）：
 ```bash
-sudo certbot --nginx -d ihomy.top -d www.ihomy.top -m <你的邮箱> --agree-tos --no-eff-email
-```
-certbot 会自动：申请证书 → 修改 nginx 配置（加上 443 ssl）→ 设置 systemd timer 自动续期。证书路径：
-- `/etc/letsencrypt/live/ihomy.top/fullchain.pem`
-- `/etc/letsencrypt/live/ihomy.top/privkey.pem`
+# 1) 签发（webroot 走 80，不停 nginx）
+sudo mkdir -p /var/www/html/.well-known/acme-challenge
+sudo acme.sh --issue --server letsencrypt --webroot /var/www/html \
+  -d ihomy.top -d www.ihomy.top --keylength ec-256 -m <你的邮箱>
 
-续期测试：
-```bash
-sudo certbot renew --dry-run
+# 2) 装到固定路径，并把 reload 挂上（续期成功后自动生效）
+sudo mkdir -p /etc/ihomy-cert && sudo chmod 700 /etc/ihomy-cert
+sudo acme.sh --install-cert -d ihomy.top --ecc \
+  --key-file       /etc/ihomy-cert/privkey.pem \
+  --fullchain-file /etc/ihomy-cert/fullchain.pem \
+  --reloadcmd      "systemctl reload nginx"
+
+# 3) 挂定时续期（cron 每天跑，未到期的日子会自行跳过）
+( sudo crontab -l 2>/dev/null | grep -v 'acme.sh --cron' ; echo '17 3 * * * /usr/bin/acme.sh --cron --home /root/.acme.sh > /dev/null 2>&1' ) | sudo crontab -
 ```
+
+证书落在 `/etc/ihomy-cert/fullchain.pem` 与 `/etc/ihomy-cert/privkey.pem`（固定路径，**不随域名层级变化**，nginx 直接指这里）。
+
+续期演练（等价于到期前 30 天内那次 cron，验证完 nginx 仍须 `active`）：
+```bash
+sudo systemctl is-active nginx
+sudo acme.sh --cron --home /root/.acme.sh --force
+sudo systemctl is-active nginx          # 必须仍是 active（webroot 方案全程不停服）
+echo | openssl s_client -connect 127.0.0.1:443 -servername ihomy.top 2>/dev/null | openssl x509 -noout -dates -ext subjectAltName
+```
+
+> **进不去 80 的兜底**：安全组实在开不了 80 时，用 `acme.sh --issue --alpn -d <域名>`（靠 443 的 TLS-ALPN-01 验，需先 `systemctl stop nginx`、签完 `start`，约停 15 秒）。注意 **certbot 4.x 做不了这件事**——它的 standalone 插件只支持 HTTP-01，`--preferred-challenges tls-alpn-01` 会直接报 `None of the preferred challenges are supported by the selected plugin`。
 
 ---
 
@@ -703,26 +725,41 @@ sudo certbot renew --dry-run
 
 iOS Safari 的 PWA "添加到主屏幕"要求 **HTTPS**。使用 Let's Encrypt 免费证书。
 
-### 6.1 申请证书（需有域名，且 80 端口可公网访问）
+### 6.1 申请证书（需有域名，且**云安全组放行入方向 80**）
 
 ```bash
-sudo certbot --nginx -d 你的域名 -m 你的邮箱 --agree-tos --no-eff-email
+sudo acme.sh --issue --server letsencrypt --webroot /var/www/html -d 你的域名 -m 你的邮箱 --keylength ec-256
+sudo acme.sh --install-cert -d 你的域名 --ecc \
+  --key-file /etc/ihomy-cert/privkey.pem \
+  --fullchain-file /etc/ihomy-cert/fullchain.pem \
+  --reloadcmd "systemctl reload nginx"
 ```
-Certbot 会自动：
-- 申请证书
-- 修改 nginx 配置（加 443 ssl、80 跳转 443）
-- 设置 systemd timer 自动续期
+acme.sh 只**签发 + 安装证书到固定路径 + 挂 reload 钩子**，共三步：
+
+- 证书 `/etc/ihomy-cert/fullchain.pem`、私钥 `/etc/ihomy-cert/privkey.pem`
+- 续期靠 cron（见第五章「申请证书」第 3 步）；acme.sh **不自动改 nginx 配置**（与 certbot 的 `--nginx` 不同），443 server 块要自己写好
+- 需要多域名就在 `-d` 后继续追加（`-d a.com -d www.a.com`）；之后增减域名用 `--force` 重签同一套
 
 ### 6.2 手动续期测试
 
 ```bash
-sudo certbot renew --dry-run
+sudo acme.sh --cron --home /root/.acme.sh --force   # 强制走一遍真实续期
+sudo systemctl is-active nginx                      # 必须仍是 active
 ```
 
 ### 6.3 证书路径（手动配 nginx 时用）
 
-- 证书：`/etc/letsencrypt/live/你的域名/fullchain.pem`
-- 私钥：`/etc/letsencrypt/live/你的域名/privkey.pem`
+- 证书：`/etc/ihomy-cert/fullchain.pem`
+- 私钥：`/etc/ihomy-cert/privkey.pem`
+
+### 6.4 到期前自检（巡检必看）
+
+```bash
+openssl x509 -in /etc/ihomy-cert/fullchain.pem -noout -dates -ext subjectAltName
+acme.sh --cron --home /root/.acme.sh     # 未到时间会打印 Next renewal time，不报错即正常
+```
+
+**证书过期表现为「整站打不开」，但 systemd 全绿、本机 curl 全 200**——只查服务状态发现不了，必须查 `notAfter`（踩坑速查 §7.18）。
 
 ---
 
@@ -767,6 +804,9 @@ sudo ufw deny 22/tcp           # CentOS: firewall-cmd --permanent --remove-servi
 > 后续 SSH/SCP 命令都需加 `-p 19068`：`ssh -p 19068 ihomy@IP`、`scp -P 19068 文件 ihomy@IP:路径`。
 
 ### 7.2 开放 Web 端口
+
+> **两层防火墙都要开**：`ufw`/`firewalld` 是本机层，云服务器（阿里云/腾讯云/AWS）还有一层**安全组**。安全组没放行时，包到不了 ufw，`ufw status` 显示 `ALLOW` 也会骗人。**入方向**至少放行 `80`（证书续期必需）、`443`、`19068`（SSH）、`3478`（TCP+UDP，通话 TURN）。
+> 判据：从**外部**机器 `Test-NetConnection <域名> -Port 80`；443 通而 80 不通就是安全组问题（踩坑速查 §7.18）。
 
 **Ubuntu (ufw)：**
 ```bash
@@ -915,7 +955,7 @@ powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1
 | Redis | `docker exec ihomy-redis redis-cli -a '<Redis密码>' --no-auth-warning ping`(不带 `-a` 应报 `NOAUTH`) | PONG |
 | Redis 端口 | 从外网 `nc -vz <公网IP> 6379` | 拒绝连接(只绑回环) |
 | Nginx | `sudo nginx -t` | syntax ok |
-| 证书 | `sudo certbot certificates` | 有效 |
+| 证书 | `openssl x509 -in /etc/ihomy-cert/fullchain.pem -noout -dates` | `notAfter` 在未来 30 天以上 |
 | PWA 安装 | Chrome/Safari 地址栏安装图标 | 可安装到桌面 |
 | 开机自启 | `sudo systemctl is-enabled ihomy-backend nginx` | enabled |
 | 上传文件 | 浏览器访问 `/files/pictures/...` 图片 URL | 200 OK |
@@ -959,8 +999,11 @@ sudo ss -tlnp | grep -E '8080|80|443'
 **Q10：磁盘/内存不足？**
 后端 JVM 已通过 systemd 配置限制为 `-Xmx384m`（见第四节）。MySQL 已通过 `my.cnf` 调优（见第十一节）。可用 `free -h`、`df -h` 查看。若仍紧张，参考第十一节"资源优化"。
 
-**Q11：DNS 不生效，certbot 申请证书失败 `no valid A records`？**
-域名未指向服务器 IP。先去域名注册商 DNS 面板添加 A 记录（主机 `@`，值=服务器公网 IP），等 5-10 分钟用 `dig 你的域名` 验证能解析后再重跑 certbot。
+**Q11：DNS 不生效，acme.sh 申请证书失败 `no valid A records`？**
+域名未指向服务器 IP。先去域名注册商 DNS 面板添加 A 记录（主机 `@`，值=服务器公网 IP），等 5-10 分钟用 `dig 你的域名` 验证能解析后再重跑。要加 `www.` 也必须**先有 `www` 的 A 记录**，否则该域名取不到授权，整单失败。
+
+**Q11b：证书没过期前一直好好的，突然整站打不开、浏览器报证书过期？**
+续期早就失败了。查 `/var/log/letsencrypt/letsencrypt.log` 或 `acme.sh --cron` 的输出，若见到 `Timeout during connect (likely firewall problem)`，就是**云安全组没放行入方向 80**（`ufw status` 显示放行也不算数，安全组在更外层）。放行 80 后手动跑一次续期即可恢复；完整成因与判据见踩坑速查 §7.18。
 
 **Q12：后端起不来，日志提示 jwt.secret 缺失 / IHOMY_CONFIG_PATH？**
 external.yml 缺失或未生效（见 3.3）：确认文件存在、`IHOMY_CONFIG_PATH` 已在 systemd unit 设置（见第四节）、`daemon-reload` 后重启。这是 fail-closed 设计，防误用默认密钥。
@@ -1134,8 +1177,8 @@ server {
     http2 on;
     server_name media.ihomy.top;
 
-    ssl_certificate     /etc/letsencrypt/live/media.ihomy.top/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/media.ihomy.top/privkey.pem;
+    ssl_certificate     /etc/ihomy-cert-media/fullchain.pem;
+    ssl_certificate_key /etc/ihomy-cert-media/privkey.pem;
 
     location / {
         proxy_pass http://192.168.1.10:8096;     # NAS 上的 Jellyfin
@@ -1155,8 +1198,12 @@ EOF
 
 sudo nginx -t && sudo systemctl reload nginx
 
-# 子域名解析到本机的 443 后签证书（详见第六章）
-sudo certbot --nginx -d media.<你的域名> -m <你的邮箱> --agree-tos --no-eff-email
+# 子域名解析到本机的 443 后签证书（详见第六章；DNS 的 A 记录必须先就位）
+sudo acme.sh --issue --server letsencrypt --webroot /var/www/html -d media.<你的域名> --keylength ec-256 -m <你的邮箱>
+sudo acme.sh --install-cert -d media.<你的域名> --ecc \
+  --key-file /etc/ihomy-cert-media/privkey.pem \
+  --fullchain-file /etc/ihomy-cert-media/fullchain.pem \
+  --reloadcmd "systemctl reload nginx"
 ```
 
 「播放地址」填 `https://media.<你的域名>`。DNS 里把子域名解析到**应用服务器**即可，NAS 的 8096 **不必对公网开放**（只要应用服务器能连到它）——把 Jellyfin 直接暴露到公网等于把整个媒体库敞开。
@@ -1223,7 +1270,9 @@ IHOMY_TEST_PWD=<密码> python test/automation/media_engine_check.py --base http
 /etc/systemd/system/ihomy-backend.service   # root 管理，User=ihomy + IHOMY_CONFIG_PATH
 /etc/systemd/system/ihomy-backup.{service,timer}   # root 管理，每日 03:00 备份（安装见「附:数据备份」）
 /etc/systemd/system/multi-user.target.wants/ihomy-backup.timer   # enable 后生成
-/etc/letsencrypt/live/ihomy.top/    # HTTPS 证书（root 管理）
+/etc/ihomy-cert/               # HTTPS 证书固定路径（acme.sh --install-cert 安装，root 管理）
+/root/.acme.sh/                # acme.sh 的工作目录（账号密钥与续期状态）
+/etc/nginx/conf.d/             # 证书配置变更前先备份 ihomy.conf.bak-<日期>
 ```
 
 ---
