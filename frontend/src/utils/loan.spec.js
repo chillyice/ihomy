@@ -181,8 +181,10 @@ describe('提前还款过渡期按日计息', () => {
     firstPayDate: '2026-01-05',
   }
   const base = loanLedger(loanEngineInput(loan))
-  // 过渡期利息基数 = 第 13 期还款后的剩余本金
-  const expectedDayInterest = Math.round((base.rows[12].balance * 100 * 3.0 * 1) / 36000) / 100
+  /** 过渡期利息(元) = 基数 × 年利率 × 天数 ÷ 360;基数是「本次提前还款金额」(结清时不超过剩余本金) */
+  const dayInterest = (baseYuan, days = 1) => Math.round((baseYuan * 100 * 3.0 * days) / 36000) / 100
+  // 全额结清:90 万 ≥ 第 13 期还款后的剩余本金 → 基数被夹到剩余本金
+  const settleInterest = dayInterest(base.rows[12].balance)
 
   const ledgerWith = (event) => loanLedger(loanEngineInput({ ...loan, events: [event] }))
 
@@ -203,12 +205,12 @@ describe('提前还款过渡期按日计息', () => {
     const row = led.rows[12]
     expect(row.period).toBe(13)
     expect(row.prepayDays).toBe(1)
-    expect(row.prepayInterest).toBeCloseTo(expectedDayInterest, 2)
+    expect(row.prepayInterest).toBeCloseTo(settleInterest, 2)
     // 过渡期利息并入该期利息与还款额(本金不变),结清时这就是除剩余本金外要多付的钱
-    expect(row.interest).toBeCloseTo(base.rows[12].interest + expectedDayInterest, 2)
+    expect(row.interest).toBeCloseTo(base.rows[12].interest + settleInterest, 2)
     expect(row.payment).toBeCloseTo(row.principal + row.interest, 2)
     expect(row.balance).toBe(0)
-    expect(led.summary.prepayInterest).toBeCloseTo(expectedDayInterest, 2)
+    expect(led.summary.prepayInterest).toBeCloseTo(settleInterest, 2)
   })
 
   it('结清日就是还款日:不收过渡期利息', () => {
@@ -230,7 +232,7 @@ describe('提前还款过渡期按日计息', () => {
     expect(led.rows[12].interest).toBeCloseTo(base.rows[12].interest, 2)
   })
 
-  it('部分提前还款同样按天补息,贷款继续按新月供还到结清', () => {
+  it('部分提前还款只按「本次还掉的钱」补天息,贷款继续按新月供还到结清', () => {
     const led = ledgerWith({
       type: LOAN_EVENT.PREPAY,
       effectivePeriod: 13,
@@ -241,9 +243,38 @@ describe('提前还款过渡期按日计息', () => {
     expect(led.settledAt).toBe(360)
     expect(led.rows).toHaveLength(360)
     expect(led.rows[12].prepayDays).toBe(1)
-    expect(led.rows[12].prepayInterest).toBeCloseTo(expectedDayInterest, 2)
+    // 10 万 × 3% ÷ 360 = 8.33,不是按还款前剩余本金(≈87 万)算
+    expect(led.rows[12].prepayInterest).toBeCloseTo(dayInterest(100000), 2)
     // 减少月供:第 14 期起月供比原来低
     expect(led.rows[13].payment).toBeLessThan(base.rows[13].payment)
+  })
+
+  it('生产案例:248 万商贷第 22 期后部分还 90 万,单日利息 75 元(不是按剩余本金 200 多万算的 190+)', () => {
+    // 与生产贷款 5 同参数:2,480,000 / 3.1% / 360 期,首期 2025-03-05;
+    // 第 10 期后调息到 3.0%(调息日 2026-01-01),第 22 期(2026-12-05)后一天提前还款 90 万
+    const led = loanLedger(
+      loanEngineInput({
+        amount: 2480000,
+        months: 360,
+        method: REPAY_METHOD.EQUAL_INSTALLMENT,
+        rate: 3.1,
+        loanDate: '2025-02-17',
+        firstPayDate: '2025-03-05',
+        events: [
+          { type: LOAN_EVENT.RATE_CHANGE, effectivePeriod: 10, rate: 3.0, triggerDate: '2026-01-01' },
+          { type: LOAN_EVENT.PREPAY, effectivePeriod: 22, amount: 900000, strategy: PREPAY_STRATEGY.SHORTEN, triggerDate: '2026-12-06' },
+        ],
+      }),
+    )
+    const row = led.rows[21]
+    expect(led.valid).toBe(true)
+    expect(row.prepayDays).toBe(1)
+    // 90 万 × 3% ÷ 360 = 75 元
+    expect(row.prepayInterest).toBeCloseTo(75, 2)
+    expect(led.summary.prepayInterest).toBeCloseTo(75, 2)
+    // 提前还款后余额、剩余期数照旧缩短
+    expect(row.balance).toBeCloseTo(1484645.31, 2)
+    expect(led.settledAt).toBe(198)
   })
 })
 

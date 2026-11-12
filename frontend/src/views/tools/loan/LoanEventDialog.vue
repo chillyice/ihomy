@@ -129,8 +129,8 @@ const eventTarget = () => targetView.value
 const money = (v, digits = 2) => formatYuan(v, digits)
 
 /**
- * 提前还款「过渡期利息」预览:按当前填的日期/金额重跑一次流水,把「上次还款日 → 结清日」
- * 按天补收的利息提前告诉用户 —— 口径与 utils/loan 完全一致,这里不另算一遍。
+ * 提前还款「过渡期利息」预览:按当前填的日期/金额重跑一次流水,把「上次还款日 → 还款日」
+ * 按天补收的利息(基数是本次还款金额)提前告诉用户 —— 口径与 utils/loan 完全一致,这里不另算一遍。
  */
 const prepayExtra = computed(() => {
   const target = targetView.value

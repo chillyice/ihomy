@@ -11,7 +11,8 @@
  * - 提前还款只有「缩短年限(月供不变)」与「减少月供(期限不变)」两种银行常规处理方式;
  *   不含提前还款违约金、评估费、保险费等费用。
  * - 提前还款带结清日期(triggerDate)时补收「过渡期利息」:上次还款日到实际还款日之间,
- *   剩余本金按天计息(日利率 = 年利率 ÷ 360,与首期计息同口径),记在「第 N 期」那一行;
+ *   **按本次提前还款金额**按天计息(日利率 = 年利率 ÷ 360,与首期计息同口径),记在「第 N 期」那一行;
+ *   后续各期利息已按扣减后的余额计,这 N 天只差这笔钱(全额结清时金额 = 剩余本金,即银行「结清日多付一天利息」)。
  *   老数据没填日期则不计,行为与以前完全一致。
  * - 反推利率:已知「总额 + 期数 + 每期还款额」求利率。等额本息无解析解,靠「月供随利率单调递增」
  *   二分求根;等额本金首期月供 = 本金/期数 + 本金×月利率,直接解出。组合贷款两个利率无法由
@@ -887,15 +888,16 @@ function rateChangeDaysInPeriod(firstPayDate, period, triggerDate) {
 }
 
 /**
- * 提前还款过渡期利息(分):上次还款日 → 实际还款日的剩余本金按天计息。
+ * 提前还款过渡期利息(分):上次还款日 → 实际还款日的**本次提前还款金额**按天计息。
  * 日利率 = 年利率 ÷ 360(与首期计息同口径);没填日期、日期不晚于上次还款日都算 0 天,不收这笔钱。
+ * 基数只取这次提前还款的钱 —— 后续各期利息已经按扣减后的余额算过了,这 N 天里其余本金并不差。
  * 天数封顶 30 天 —— 超过下一期还款日的日期应把事件放到后一期,「一期区间」最长只到下一期还款日前一天。
  */
-function prepayDayInterestC(remainC, ratePct, fromDate, toDate) {
+function prepayDayInterestC(baseC, ratePct, fromDate, toDate) {
   if (!fromDate || !toDate) return { days: 0, interestC: 0 }
   const days = Math.max(0, Math.min(DEFAULT_FIRST_DAYS, daysBetween(fromDate, toDate)))
   if (days <= 0) return { days: 0, interestC: 0 }
-  return { days, interestC: Math.round((remainC * (Number(ratePct) || 0) * days) / 36000) }
+  return { days, interestC: Math.round((baseC * (Number(ratePct) || 0) * days) / 36000) }
 }
 
 /**
@@ -908,7 +910,7 @@ function prepayDayInterestC(remainC, ratePct, fromDate, toDate) {
  * **下一期起**才按「剩余本金 + 剩余期数 + 新利率」重算月供。没填调息日的老数据保持旧口径
  * (整期按新利率、当期重算),避免历史流水跳变。
  *
- * 提前还款带结清日期时同理按天计息:上次还款日 → 结清日的剩余本金 × 年利率 ÷ 360,记在「第 N 期」
+ * 提前还款带结清日期时同理按天计息:上次还款日 → 结清日的**本次提前还款金额** × 年利率 ÷ 360,记在「第 N 期」
  * (该期利息与还款额都含这笔过渡期利息,本金不变);结清时它就是当天除剩余本金外还要多付的钱。
  */
 function runLedgerC({ amountC, months, method, rate0, firstDays, firstPaymentC, firstPayDate, events }) {
@@ -956,15 +958,16 @@ function runLedgerC({ amountC, months, method, rate0, firstDays, firstPaymentC, 
         }
         flags.push({ type: e.type, rate: e.ratePct })
       } else {
-        // 提前还款:先按「上次还款日(或同日上一笔还款日)→ 实际还款日」补收过渡期利息
-        // (基数是本笔还款前的剩余本金,日利率 = 年利率 ÷ 360),再扣减本金;金额 ≥ 剩余本金即结清
+        // 提前还款:先扣减本金(金额 ≥ 剩余本金即结清),再为「本次提前还款金额」补收
+        // 「上次还款日(或同日上一笔还款日)→ 实际还款日」的过渡期利息(日利率 = 年利率 ÷ 360)。
+        // 基数只按这次还掉的钱算:后续各期利息已按扣减后的余额计,这 N 天里其余本金并不差。
+        const cut = Math.min(e.amountC, remain)
         if (e.type === LOAN_EVENT.PREPAY) {
-          const extra = prepayDayInterestC(remain, rate, accruedTo, e.triggerDate)
+          const extra = prepayDayInterestC(cut, rate, accruedTo, e.triggerDate)
           prepayExtraC += extra.interestC
           prepayExtraDays += extra.days
           if (extra.days > 0) accruedTo = e.triggerDate
         }
-        const cut = Math.min(e.amountC, remain)
         remain -= cut
         prepaidTotal += cut
         flags.push({ type: e.type, amount: toYuan(cut), strategy: e.strategy })
@@ -1059,7 +1062,7 @@ function runLedgerC({ amountC, months, method, rate0, firstDays, firstPaymentC, 
  *
  * 事件统一语义 —— **在第 N 期还款之后生效**(effectivePeriod = N,必须 ≥ 1):
  *   利率调整 → 第 N+1 期起按新利率计息;提前还款 → 第 N 期后减少剩余本金(金额 ≥ 剩余本金即结清)。
- *   提前还款带结清日期(triggerDate)时,「上次还款日 → 结清日」之间的剩余本金按天计息(日利率 = 年利率 ÷ 360),
+ *   提前还款带结清日期(triggerDate)时,「上次还款日 → 结清日」之间的**本次提前还款金额**按天计息(日利率 = 年利率 ÷ 360),
  *   这笔过渡期利息一并记在第 N 期那一行(没填日期则不计,与老口径一致)。
  *   第 1 期的利率由贷款的初始年利率决定,同一件事不在两处表达,故事件生效期次不能填 0。
  *

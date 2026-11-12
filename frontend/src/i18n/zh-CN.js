@@ -4374,7 +4374,7 @@ export default {
         tipTriggerDate: '事件时间',
         tipPrepayInterest: '提前还款过渡期利息',
         prepayInterestValue: '{d} 天 · {v}',
-        prepayExtraHint: '结清当天另按 {d} 天计息 {v} 元（上次还款日到结清日）',
+        prepayExtraHint: '提前还款另按 {d} 天计息 {v} 元（上次还款日到还款日，基数=本次还款金额）',
         tipProjected: '该期还没到，金额为按当前计划的推算值',
         triggerDateLabel: '触发时间（选填）',
         triggerDateHint: '填写后自动推算生效期次；也可以不填，直接在下方自己填生效期次',

@@ -4414,7 +4414,7 @@ export default {
         tipTriggerDate: 'Event date',
         tipPrepayInterest: 'Prepay bridge interest',
         prepayInterestValue: '{d} day(s) · {v}',
-        prepayExtraHint: 'Settling on this date adds {d} day(s) of interest: {v} CNY (from the last payment date)',
+        prepayExtraHint: 'Prepaying adds {d} day(s) of interest on the prepaid amount: {v} CNY (from the last payment date)',
         tipProjected: 'This period has not arrived; amounts are projected',
         triggerDateLabel: 'Trigger date (optional)',
         triggerDateHint:
