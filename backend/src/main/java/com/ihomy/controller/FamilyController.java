@@ -3,6 +3,7 @@ package com.ihomy.controller;
 import com.ihomy.annotation.OperationLog;
 import com.ihomy.annotation.RequirePermission;
 import com.ihomy.common.BizException;
+import com.ihomy.common.CoverImageUrl;
 import com.ihomy.common.Result;
 import com.ihomy.common.ResultCode;
 import com.ihomy.dto.FamilyDTO;
@@ -15,6 +16,7 @@ import com.ihomy.mapper.SysRoleMapper;
 import com.ihomy.mapper.SysUserRoleMapper;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.BlogService;
+import com.ihomy.service.FileService;
 import com.ihomy.service.MultiFamilyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -45,6 +47,7 @@ public class FamilyController {
     private final SysUserRoleMapper sysUserRoleMapper;
     private final StringRedisTemplate redisTemplate;
     private final BlogService blogService;
+    private final FileService fileService;
     private final com.ihomy.service.ParameterService parameterService;
     private final PublicController publicController;
 
@@ -159,7 +162,10 @@ public class FamilyController {
         Family f = familyMapper.selectById(user.getFamilyId());
         if (f == null) throw new BizException(ResultCode.NOT_FOUND);
         if (dto.getName() != null && !dto.getName().isBlank()) f.setName(dto.getName());
-        if (dto.getCoverImage() != null) f.setCoverImage(dto.getCoverImage());
+        // 封面:null 表示本次不改;空串(老客户端「移除」)表示清除,归一为 NULL
+        String oldCover = f.getCoverImage();
+        String newCover = dto.getCoverImage() == null ? oldCover : CoverImageUrl.normalize(dto.getCoverImage());
+        f.setCoverImage(newCover);
         if (dto.getCoverText() != null) f.setCoverText(dto.getCoverText());
         if (dto.getCoverSubtitle() != null) f.setCoverSubtitle(dto.getCoverSubtitle());
         if (dto.getDescription() != null) f.setDescription(dto.getDescription());
@@ -173,11 +179,16 @@ public class FamilyController {
         w.eq(Family::getId, f.getId())
             .set(Family::getWeatherLat, dto.getWeatherLat())
             .set(Family::getWeatherLng, dto.getWeatherLng())
-            .set(Family::getWeatherCity, dto.getWeatherCity());
+            .set(Family::getWeatherCity, dto.getWeatherCity())
+            // 清除封面必须显式 SET NULL(updateById 会跳过 null 字段,库里会残留旧地址)
+            .set(Family::getCoverImage, newCover);
         familyMapper.update(null, w);
         f.setWeatherLat(dto.getWeatherLat());
         f.setWeatherLng(dto.getWeatherLng());
         f.setWeatherCity(dto.getWeatherCity());
+        // 换图/清除时删旧文件:只认本站 /files/ 前缀,随前端包部署的静态演示图不受影响
+        String obsoleteCover = CoverImageUrl.obsoleteFile(oldCover, newCover);
+        if (obsoleteCover != null) fileService.deleteByUrl(obsoleteCover);
         // 家庭信息公开可见(简介/封面等):失效访客首页整包缓存,避免最长 5 分钟残留旧信息
         publicController.invalidateHomeCache(f.getId());
         return Result.success(f);

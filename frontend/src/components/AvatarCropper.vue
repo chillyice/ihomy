@@ -1,11 +1,12 @@
-<!-- 头像裁剪对话框:图片固定显示,滚轮/滑块缩放正方形选择框(中心锚定),canvas 裁剪,无外部依赖 -->
+<!-- 图片裁剪对话框:图片固定显示,滚轮/滑块缩放选区(中心锚定),canvas 裁剪,无外部依赖。
+     比例由 ratio 决定(默认 1:1 头像,家庭封面传 16/9),几何计算全部走 utils/cropGeometry.js -->
 <template>
   <el-dialog v-model="visible" append-to-body :title="title" width="500px" :close-on-click-modal="false" @closed="onClosed">
     <div v-if="imgSrc" class="cropper-box" ref="boxRef" @wheel.prevent="onWheel">
       <img :src="imgSrc" class="cropper-img" alt="" :style="{ width: imgW + 'px', height: imgH + 'px' }" @load="onImgLoad" ref="imgRef" />
-      <!-- 遮罩 + 正方形选区 -->
+      <!-- 遮罩 + 选区 -->
       <div class="cropper-overlay" :style="overlayStyle"></div>
-      <div class="crop-square" :style="squareStyle" @mousedown="onDragStart" @touchstart="onDragStart">
+      <div class="crop-box" :style="boxStyle" @mousedown="onDragStart" @touchstart="onDragStart">
         <div class="crop-grid"></div>
       </div>
     </div>
@@ -24,11 +25,20 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { clampCropPosition, cropBoxSize, cropOutputSize, cropSourceRect } from '@/utils/cropGeometry'
 
-defineProps({
+const props = defineProps({
   title: { type: String, default: '' },
   cancelText: { type: String, default: '' },
   confirmText: { type: String, default: '' },
+  /** 选区宽高比:1 = 方图(头像),16/9 = 横图(家庭封面) */
+  ratio: { type: Number, default: 1 },
+  /** 导出宽度(像素),高度按 ratio 换算 */
+  outputWidth: { type: Number, default: 256 },
+  /** 导出 MIME:头像 png,封面 jpeg(体积更小) */
+  mimeType: { type: String, default: 'image/png' },
+  /** 导出文件名(不含扩展名,扩展名按 mimeType 补) */
+  fileName: { type: String, default: 'avatar' },
 })
 const emit = defineEmits(['cropped'])
 
@@ -38,18 +48,20 @@ const imgLoaded = ref(false)
 const boxRef = ref(null)
 const imgRef = ref(null)
 
-// 图片实际显示尺寸 + 选区位置(正方形)
+// 图片实际显示尺寸 + 选区位置/尺寸(按 props.ratio 的矩形)
 const imgW = ref(0)
 const imgH = ref(0)
 const baseW = ref(0) // 适配容器的基准宽度(图片固定显示,不再缩放)
 const baseH = ref(0) // 适配容器的基准高度
-const zoom = ref(1) // 选择框大小 = 图片短边 × zoom(0.2~1)
+const zoom = ref(1) // 选区大小 = 图片内可放下的最大同比例矩形 × zoom(0.2~1)
 const natW = ref(0) // 原图尺寸
 const natH = ref(0)
-const sqX = ref(0) // 选区左上角(相对显示图)
-const sqSize = ref(0)
+const boxX = ref(0) // 选区左上角(相对显示图)
+const boxY = ref(0)
+const boxW = ref(0)
+const boxH = ref(0)
 
-// 图片加载后初始化:计算固定显示尺寸,选区居中铺满短边
+// 图片加载后初始化:计算固定显示尺寸,选区居中铺满图片
 const onImgLoad = () => {
   const img = imgRef.value
   if (!img) return
@@ -62,47 +74,52 @@ const onImgLoad = () => {
   baseW.value = natW.value * ratio
   baseH.value = natH.value * ratio
   zoom.value = 1
-  sqSize.value = 0 // 触发 applyZoom 的居中初始化
+  boxW.value = 0 // 触发 applyZoom 的居中初始化
+  boxH.value = 0
   applyZoom()
   imgLoaded.value = true
 }
 
-// 应用选择框大小:图片固定,选区以自身中心为锚缩放(中心不动),边界 clamp 在图片内
+// 应用选区大小:图片固定,选区以自身中心为锚缩放(中心不动),边界 clamp 在图片内
 const applyZoom = () => {
   imgW.value = Math.round(baseW.value)
   imgH.value = Math.round(baseH.value)
-  const short = Math.min(imgW.value, imgH.value)
-  const newSize = Math.round(short * zoom.value)
-  const cx = sqSize.value > 0 ? sqX.value + sqSize.value / 2 : imgW.value / 2
-  const cy = sqSize.value > 0 ? sqY.value + sqSize.value / 2 : imgH.value / 2
-  sqSize.value = newSize
-  sqX.value = Math.max(0, Math.min(imgW.value - newSize, cx - newSize / 2))
-  sqY.value = Math.max(0, Math.min(imgH.value - newSize, cy - newSize / 2))
+  const { w, h } = cropBoxSize(imgW.value, imgH.value, props.ratio, zoom.value)
+  const cx = boxW.value > 0 ? boxX.value + boxW.value / 2 : imgW.value / 2
+  const cy = boxH.value > 0 ? boxY.value + boxH.value / 2 : imgH.value / 2
+  boxW.value = w
+  boxH.value = h
+  const pos = clampCropPosition(cx - w / 2, cy - h / 2, w, h, imgW.value, imgH.value)
+  boxX.value = pos.x
+  boxY.value = pos.y
 }
 
-// 滚轮缩放选择框
+// 滚轮缩放选区
 const onWheel = (e) => {
   const delta = e.deltaY > 0 ? -0.05 : 0.05
   zoom.value = Math.max(0.2, Math.min(1, Math.round((zoom.value + delta) * 100) / 100))
   applyZoom()
 }
-const sqY = ref(0)
 
-const squareStyle = computed(() => ({
-  left: sqX.value + 'px',
-  top: sqY.value + 'px',
-  width: sqSize.value + 'px',
-  height: sqSize.value + 'px',
+const boxStyle = computed(() => ({
+  left: boxX.value + 'px',
+  top: boxY.value + 'px',
+  width: boxW.value + 'px',
+  height: boxH.value + 'px',
 }))
 
-// 四周半透明遮罩(用 4 个 div 模拟,不阻塞选区拖动)
-const overlayStyle = computed(() => ({
-  position: 'absolute',
-  inset: 0,
-  background: `rgba(0,0,0,0.5)`,
-  // 用 clip-path 挖出选区透明区域
-  clipPath: `polygon(0 0, 0 100%, ${sqX.value}px 100%, ${sqX.value}px ${sqY.value}px, ${sqX.value + sqSize.value}px ${sqY.value}px, ${sqX.value + sqSize.value}px ${sqY.value + sqSize.value}px, ${sqX.value}px ${sqY.value + sqSize.value}px, ${sqX.value}px 100%, 100% 100%, 100% 0)`,
-}))
+// 四周半透明遮罩:用 clip-path 挖出选区透明区域,不阻塞选区拖动
+const overlayStyle = computed(() => {
+  const { x, y } = { x: boxX.value, y: boxY.value }
+  const r = x + boxW.value
+  const b = y + boxH.value
+  return {
+    position: 'absolute',
+    inset: 0,
+    background: `rgba(0,0,0,0.5)`,
+    clipPath: `polygon(0 0, 0 100%, ${x}px 100%, ${x}px ${y}px, ${r}px ${y}px, ${r}px ${b}px, ${x}px ${b}px, ${x}px 100%, 100% 100%, 100% 0)`,
+  }
+})
 
 // 拖动选区
 let dragging = false
@@ -116,8 +133,8 @@ const onDragStart = (e) => {
   const pt = e.touches ? e.touches[0] : e
   startX = pt.clientX
   startY = pt.clientY
-  origX = sqX.value
-  origY = sqY.value
+  origX = boxX.value
+  origY = boxY.value
   window.addEventListener('mousemove', onDragMove)
   window.addEventListener('mouseup', onDragEnd)
   window.addEventListener('touchmove', onDragMove, { passive: false })
@@ -130,8 +147,9 @@ const onDragMove = (e) => {
   const pt = e.touches ? e.touches[0] : e
   const dx = pt.clientX - startX
   const dy = pt.clientY - startY
-  sqX.value = Math.max(0, Math.min(imgW.value - sqSize.value, origX + dx))
-  sqY.value = Math.max(0, Math.min(imgH.value - sqSize.value, origY + dy))
+  const pos = clampCropPosition(origX + dx, origY + dy, boxW.value, boxH.value, imgW.value, imgH.value)
+  boxX.value = pos.x
+  boxY.value = pos.y
 }
 const onDragEnd = () => {
   dragging = false
@@ -143,31 +161,37 @@ const onDragEnd = () => {
 
 // 确认裁剪:canvas 绘制选区对应原图区域,导出 Blob
 const onConfirm = () => {
-  const scaleX = natW.value / imgW.value
-  const scaleY = natH.value / imgH.value
-  const sx = sqX.value * scaleX
-  const sy = sqY.value * scaleY
-  const sSize = sqSize.value * scaleX
-  const out = 256 // 输出 256x256
+  const src = cropSourceRect({ x: boxX.value, y: boxY.value, w: boxW.value, h: boxH.value }, imgW.value, imgH.value, natW.value, natH.value)
+  const out = cropOutputSize(props.outputWidth, props.ratio)
   const canvas = document.createElement('canvas')
-  canvas.width = out
-  canvas.height = out
+  canvas.width = out.width
+  canvas.height = out.height
   const ctx = canvas.getContext('2d')
   const img = imgRef.value
-  ctx.drawImage(img, sx, sy, sSize, sSize, 0, 0, out, out)
-  canvas.toBlob((blob) => {
-    if (blob) {
-      const file = new File([blob], 'avatar.png', { type: 'image/png' })
-      emit('cropped', file)
-    }
-    visible.value = false
-  }, 'image/png')
+  ctx.drawImage(img, src.sx, src.sy, src.sw, src.sh, 0, 0, out.width, out.height)
+  const jpeg = props.mimeType === 'image/jpeg'
+  const mime = jpeg ? 'image/jpeg' : 'image/png'
+  canvas.toBlob(
+    (blob) => {
+      if (blob) {
+        const file = new File([blob], `${props.fileName}.${jpeg ? 'jpg' : 'png'}`, { type: mime })
+        emit('cropped', file)
+      }
+      visible.value = false
+    },
+    mime,
+    jpeg ? 0.92 : undefined,
+  )
 }
 
 const onClosed = () => {
   imgSrc.value = ''
   imgLoaded.value = false
   zoom.value = 1
+  boxX.value = 0
+  boxY.value = 0
+  boxW.value = 0
+  boxH.value = 0
 }
 
 // 打开:传入 File
@@ -186,7 +210,8 @@ defineExpose({ open })
 <style scoped>
 .cropper-box {
   position: relative;
-  display: inline-block;
+  display: block;
+  width: fit-content;
   margin: 0 auto;
   user-select: none;
 }
@@ -216,7 +241,7 @@ defineExpose({ open })
   inset: 0;
   pointer-events: none;
 }
-.crop-square {
+.crop-box {
   position: absolute;
   cursor: move;
   border: 2px solid #fff;

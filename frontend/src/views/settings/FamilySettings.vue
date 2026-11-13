@@ -11,7 +11,7 @@
       </el-form-item>
       <el-form-item :label="$t('settings.cover')">
         <div class="upload-row">
-          <el-upload :show-file-list="false" :http-request="uploadCover" accept="image/*">
+          <el-upload ref="coverUploadRef" :show-file-list="false" :auto-upload="false" :on-change="pickCover" accept="image/*">
             <el-button>{{ $t('settings.uploadCover') }}</el-button>
           </el-upload>
           <img v-if="family.coverImage" :src="family.coverImage" class="cover-preview" :alt="$t('settings.cover')" />
@@ -85,6 +85,19 @@
       </el-button>
     </template>
   </el-dialog>
+
+  <!-- 封面裁剪:横图 16:9,与顶栏相框/移动端横幅同口径 -->
+  <AvatarCropper
+    ref="coverCropperRef"
+    :ratio="16 / 9"
+    :output-width="1280"
+    mime-type="image/jpeg"
+    file-name="cover"
+    :title="$t('settings.coverCropTitle')"
+    :cancel-text="$t('common.cancel')"
+    :confirm-text="$t('common.confirm')"
+    @cropped="onCoverCropped"
+  />
 </template>
 
 <script setup>
@@ -95,6 +108,7 @@ import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
 import BgmSettings from './BgmSettings.vue'
+import AvatarCropper from '@/components/AvatarCropper.vue'
 
 const { t } = useI18n()
 const userStore = useUserStore()
@@ -121,6 +135,7 @@ const shareUrl = computed(() => {
 const saveFamily = async () => {
   familySaving.value = true
   try {
+    // 封面「移除」提交的是空串(null 在本接口表示「不修改」),后端把空白归一成 NULL 并删除旧文件
     const updated = await familyApi.update({ ...family })
     // 顶栏/侧栏展示的家庭名与简介来自 appStore,保存后当场同步,不必等刷新
     if (appStore.family && updated) Object.assign(appStore.family, updated)
@@ -130,9 +145,25 @@ const saveFamily = async () => {
   }
 }
 
-const uploadCover = async (options) => {
+const coverUploadRef = ref(null)
+const coverCropperRef = ref(null)
+
+// 选图后先进裁剪(16:9),确认才上传;取消不发请求
+const pickCover = (uploadFile) => {
+  const raw = uploadFile?.raw
+  if (!raw) return
+  if (raw.type && !raw.type.startsWith('image/')) {
+    ElMessage.error(t('settings.uploadFailed'))
+    return
+  }
+  // 清空 el-upload 内部列表:再选同一张图也能触发 on-change
+  coverUploadRef.value?.clearFiles()
+  coverCropperRef.value?.open(raw)
+}
+
+const onCoverCropped = async (file) => {
   try {
-    const data = await fileApi.upload(options.file)
+    const data = await fileApi.upload(file)
     family.coverImage = data.url
     ElMessage.success(t('settings.coverUploaded'))
   } catch {

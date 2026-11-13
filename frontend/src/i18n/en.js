@@ -2243,7 +2243,8 @@ export default {
     familyName: 'Family name',
     description: 'Description',
     cover: 'Cover image',
-    coverTip: 'Shown in family switcher and family search lists',
+    coverTip:
+      'Landscape images work best; they are cropped to fit each spot and appear in the top bar, sidebar, family switcher and search lists',
     visitorPublic: 'Public to visitors',
     shareLink: 'Share link',
     copy: 'Copy link',
@@ -2319,6 +2320,7 @@ export default {
     },
     personalize: 'Look & feel',
     avatarCropTitle: 'Crop avatar',
+    coverCropTitle: 'Crop family cover',
     bgmTitle: 'Background music',
     bgmUploadMusic: 'Upload music',
     bgmUploadTrack: 'Upload track',

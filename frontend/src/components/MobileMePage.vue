@@ -1,5 +1,8 @@
 <template>
   <div class="mobile-me">
+    <!-- 家庭封面:横图门脸,有封面才占位(无封面不留空框),不挂任何点击,避免与下面的设置入口抢手势 -->
+    <img v-if="appStore.family?.coverImage" :src="appStore.family.coverImage" class="me-cover" :alt="appStore.familyName" />
+
     <!-- 用户信息 -->
     <div class="me-header">
       <el-avatar :size="56" :src="userInfo?.avatar">{{ (userInfo?.nickname || 'U').charAt(0) }}</el-avatar>
@@ -29,7 +32,10 @@
             :class="{ active: f.isCurrent }"
             @click="switchFamily(f.familyId)"
           >
-            <span>{{ f.name }}</span>
+            <el-avatar :size="44" shape="square" :src="f.coverImage || undefined" class="family-item-cover">{{
+              (f.name || 'i').charAt(0)
+            }}</el-avatar>
+            <span class="family-item-name">{{ f.name }}</span>
             <el-icon v-if="f.isCurrent"><Check /></el-icon>
           </div>
         </div>
@@ -164,6 +170,17 @@ onMounted(async () => {
   padding: 16px 16px 80px;
 }
 
+/* 家庭封面横幅:16:9 定高,圆角与下方卡片一致;深色模式不加遮罩(图本身就是内容) */
+.me-cover {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 14px;
+  margin-bottom: 12px;
+  background: rgba(0, 0, 0, 0.04);
+}
+
 .me-header {
   display: flex;
   align-items: center;
@@ -289,7 +306,7 @@ html.dark .me-row.logout .me-row-text {
 .family-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
   padding: 12px 16px 12px 52px;
   font-size: 14px;
   color: var(--color-text-primary, #333);
@@ -299,6 +316,19 @@ html.dark .me-row.logout .me-row-text {
 html.dark .family-item {
   color: #e8dcc8;
   border-bottom-color: rgba(255, 255, 255, 0.04);
+}
+/* 家庭封面缩略图:与桌面 56px 同口径,移动端行高更紧,降一档到 44px */
+.family-item-cover {
+  border-radius: 11px;
+  flex-shrink: 0;
+}
+/* 长家庭名省略不换行(名称占满剩余宽度,勾选图标始终靠右) */
+.family-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .family-item:last-child {
   border-bottom: none;
