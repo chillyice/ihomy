@@ -45,7 +45,9 @@
     <div class="section-label">{{ $t('nav.switchFamily') }}</div>
     <div v-if="families.length" class="family-switch-list">
       <div v-for="f in families" :key="f.familyId" class="family-switch-item">
-        <el-avatar :size="28" :src="f.coverImage || undefined">{{ (f.name || 'i').charAt(0) }}</el-avatar>
+        <el-avatar :size="56" shape="square" :src="f.coverImage || undefined" class="family-switch-cover">{{
+          (f.name || 'i').charAt(0)
+        }}</el-avatar>
         <span class="family-switch-name">{{ f.name }}</span>
         <el-tag v-if="f.isCurrent" size="small" type="success">{{ $t('settings.currentFamily') }}</el-tag>
         <el-button v-else size="small" type="primary" plain @click="switchFamily(f.familyId)">{{ $t('settings.switchTo') }}</el-button>
@@ -296,6 +298,11 @@ html.dark .create-family-btn:hover {
   padding: 10px 14px;
   background: var(--color-card-2);
   border-radius: 10px;
+}
+/* 家庭封面(无封面时 el-avatar 回落首字母):圆角与卡片口径一致 */
+.family-switch-cover {
+  border-radius: 14px;
+  flex-shrink: 0;
 }
 .family-switch-name {
   flex: 1;

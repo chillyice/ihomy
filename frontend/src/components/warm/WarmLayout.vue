@@ -9,7 +9,11 @@
       <!-- 顶栏:家庭名 + 返回按钮 + 工具栏(滚动时胞吐进来) + 晨/暮分段开关 -->
       <div class="gc-topbar">
         <div v-a11y-click class="gc-brand" :title="$t('warm.backHome')" @click="navigate('/')">
-          <div class="gc-logo">{{ familyInitial }}</div>
+          <!-- 门脸:家庭封面(家庭设置里上传),无封面回落首字母 -->
+          <div class="gc-logo" :class="{ 'gc-logo-img': familyCover }">
+            <img v-if="familyCover" :src="familyCover" :alt="familyName || 'ihomy'" />
+            <template v-else>{{ familyInitial }}</template>
+          </div>
           <div>
             <h1 class="gc-title">{{ familyName || 'ihomy' }}</h1>
             <p class="gc-sub">{{ familyDescription || $t('warm.tagline') }}</p>
@@ -175,6 +179,7 @@ const { dragging, label, x, y, overGrid, startDrag } = useWarmWidgetDrag()
 const familyName = computed(() => appStore.familyName)
 const familyDescription = computed(() => appStore.family?.description || '')
 const familyInitial = computed(() => (familyName.value || 'ihomy').charAt(0))
+const familyCover = computed(() => appStore.family?.coverImage || '')
 
 // 当前登录用户信息(侧栏顶部 .user 位置:头像 + 昵称 + 所在家庭)
 const userInfo = computed(() => userStore.userInfo)
@@ -501,6 +506,18 @@ watch(
   font-size: 20px;
   box-shadow: var(--shadow);
   flex-shrink: 0;
+}
+/* 有封面时方块改成「相框」:图铺满,首字母兜底逻辑仍在上层模板 */
+.gc-logo-img {
+  display: block;
+  padding: 0;
+  overflow: hidden;
+}
+.gc-logo-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 .gc-title {
   font-size: 18px;

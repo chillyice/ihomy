@@ -100,7 +100,9 @@
       </el-input>
       <div v-loading="searchLoading" class="search-result">
         <div v-for="f in searchResult" :key="f.id" class="search-item">
-          <el-avatar :size="40" :src="f.coverImage || undefined">{{ (f.name || 'F').charAt(0) }}</el-avatar>
+          <el-avatar :size="56" shape="square" :src="f.coverImage || undefined" class="search-item-cover">{{
+            (f.name || 'F').charAt(0)
+          }}</el-avatar>
           <div class="search-item-info">
             <div class="search-item-name">
               {{ f.name }}
@@ -356,6 +358,11 @@ onMounted(load)
   padding: 10px 12px;
   border: 1px solid var(--color-border);
   border-radius: 8px;
+}
+/* 家庭封面(无封面时 el-avatar 回落首字母):搜家庭时靠它认家,比 40px 圆头像好认 */
+.search-item-cover {
+  border-radius: 14px;
+  flex-shrink: 0;
 }
 .search-item-info {
   flex: 1;

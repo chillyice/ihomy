@@ -2,9 +2,13 @@
 <!-- 全局挂载(含沉浸式页),替代原顶部导航 -->
 <template>
   <aside class="app-sidebar" :class="{ collapsed, 'dragging-edge': widgetDragging && !crossedEdge }">
-    <!-- 顶部:家庭名 + 折叠按钮 -->
+    <!-- 顶部:家庭封面 + 家庭名 + 折叠按钮 -->
     <div class="sidebar-head">
-      <span class="sidebar-brand" v-a11y-click @click="$router.push('/')">{{ familyName || 'ihomy' }}</span>
+      <span class="sidebar-brand" v-a11y-click @click="$router.push('/')">
+        <!-- 门脸:与暖居顶栏同一张封面;无封面时只留文字 -->
+        <img v-if="familyCover" :src="familyCover" :alt="familyName || 'ihomy'" class="brand-cover" />
+        <span class="brand-text">{{ familyName || 'ihomy' }}</span>
+      </span>
       <span
         class="sidebar-toggle"
         v-a11y-click
@@ -279,6 +283,7 @@ const collapsed = ref(false)
 const themeStore = useThemeStore()
 
 const familyName = computed(() => appStore.familyName)
+const familyCover = computed(() => appStore.family?.coverImage || '')
 const userInfo = computed(() => userStore.userInfo)
 
 // 导航分组:复用共享单一数据源(NAV_PATHS + 分组规则),此处只做渲染
@@ -450,6 +455,10 @@ html.dark .app-sidebar {
   gap: 8px;
 }
 .sidebar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
   font-size: 18px;
   font-weight: 600;
   color: var(--color-primary);
@@ -458,6 +467,20 @@ html.dark .app-sidebar {
   overflow: hidden;
   text-overflow: ellipsis;
   transition: color 0.2s;
+}
+/* 家庭封面缩略图:侧栏头高 64px、上下 padding 16px,30px 刚好不撑高 */
+.brand-cover {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  object-fit: cover;
+  display: block;
+  flex-shrink: 0;
+}
+.brand-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .sidebar-brand:hover {
   color: var(--color-accent);
