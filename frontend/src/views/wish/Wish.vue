@@ -28,6 +28,11 @@
             <span class="wish-title">{{ w.title }}</span>
             <el-tag :type="statusTag(w.status)" size="small">{{ statusText(w.status) }}</el-tag>
           </div>
+          <!-- 亲友圈分享进来的愿望:标来源家庭,只能看不能改 -->
+          <div v-if="w.sharedFrom" class="wish-shared">
+            <el-icon><Share /></el-icon>
+            <span>{{ sharedFromText(w.sharedFrom) }}</span>
+          </div>
           <div v-if="w.sourceType" class="wish-source">
             <el-tag v-a11y-click size="small" effect="plain" class="wish-source-tag" @click="goSource(w)">
               {{ $t('wish.fromSource', { source: dictText(t, 'wishSource', w.sourceType) }) }}
@@ -43,7 +48,7 @@
             <span v-if="w.status === 'ACHIEVED' && w.achievedAt">{{ $t('wish.achievedAt', { date: w.achievedAt.slice(0, 10) }) }}</span>
             <span v-else>{{ w.createdAt.slice(0, 10) }}</span>
           </div>
-          <div v-if="userStore.isLoggedIn" class="wish-actions">
+          <div v-if="userStore.isLoggedIn && !w.readOnly" class="wish-actions">
             <el-button v-if="w.status === 'PENDING'" size="small" type="success" plain @click="onSetStatus(w, 'ACHIEVED')">{{
               $t('wish.achieved')
             }}</el-button>
@@ -51,6 +56,11 @@
               $t('wish.abandon')
             }}</el-button>
             <el-button v-if="w.status !== 'PENDING'" size="small" @click="onSetStatus(w, 'PENDING')">{{ $t('wish.restore') }}</el-button>
+            <el-tooltip :content="$t('audience.label')" placement="top" :show-after="300">
+              <el-button size="small" text @click="openShare(w)"
+                ><el-icon><Share /></el-icon
+              ></el-button>
+            </el-tooltip>
             <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
               <el-button size="small" text @click="openEditor(w)"
                 ><el-icon><Edit /></el-icon
@@ -97,6 +107,18 @@
         <el-button type="primary" :loading="saving" @click="onSave">{{ $t('common.save') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- 分享范围:不选圈 = 只给自家人 -->
+    <el-dialog v-model="share.visible" append-to-body :title="$t('audience.label')" width="420px">
+      <div v-loading="share.loading">
+        <AudiencePicker v-if="audience.canShare" v-model="audience.selected" :circles="audience.circles" />
+        <p v-else class="audience-tip">{{ $t('audience.canShareFalse') }}</p>
+      </div>
+      <template #footer>
+        <el-button @click="share.visible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :disabled="!audience.canShare" @click="onShareSave">{{ $t('common.save') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -105,14 +127,16 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Edit, Delete } from '@element-plus/icons-vue'
+import { Edit, Delete, Share } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { wishApi } from '@/api'
+import { wishApi, audienceApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { useAudience } from '@/composables/useAudience'
 import { dictText } from '@/utils/dict'
 import { WISH_CATEGORIES, wishSourceRoute } from '@/utils/wish'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
+import AudiencePicker from '@/components/common/AudiencePicker.vue'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -129,6 +153,34 @@ const editor = reactive({ visible: false, form: {}, cats: [] })
 
 const statusText = (s) => dictText(t, 'wishStatus', s)
 const statusTag = (s) => ({ PENDING: '', ACHIEVED: 'success', ABANDONED: 'info' })[s] || 'info'
+
+// 被分享进来的愿望:标题下标注来源家庭(圈内称呼优先)
+const sharedFromText = (s) => t('audience.sharedFrom', { name: s.alias || s.familyName || '' })
+
+// 分享范围:面板打开时才读该愿望已分享的圈,取消保存不改动
+const share = reactive({ visible: false, id: null, loading: false })
+const { state: audience, load: loadAudience } = useAudience('wish')
+const openShare = async (w) => {
+  share.id = w.id
+  share.visible = true
+  share.loading = true
+  try {
+    await loadAudience(w.id)
+  } finally {
+    share.loading = false
+  }
+}
+const onShareSave = async () => {
+  share.visible = false
+  if (!share.id) return
+  try {
+    const res = await audienceApi.save('wish', share.id, [...audience.selected])
+    if (audience.selected.length && res?.targetCount === 0) ElMessage.info(t('audience.noTarget'))
+    else ElMessage.success(t('common.saved'))
+  } catch {
+    /* 请求层已提示 */
+  }
+}
 
 // 来源标签回跳:放映厅回该作品详情,其余回来源页;来源被删也保留标签(标题是快照)
 const goSource = (w) => {
@@ -230,6 +282,19 @@ onMounted(load)
 .wish-reason {
   color: var(--color-text-secondary);
   font-size: 13px;
+}
+/* 亲友圈分享来的愿望:来源家庭标签 */
+.wish-shared {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--color-accent);
+}
+.audience-tip {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
 }
 .wish-source {
   display: flex;

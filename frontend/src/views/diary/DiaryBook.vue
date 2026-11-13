@@ -185,7 +185,7 @@ const indicator = computed(() => {
   return b > a ? t('diary.pageOf', { a, b, n }) : t('diary.singlePageOf', { a, n })
 })
 
-const canEdit = (page) => !!page && !page.blank && (userStore.isOwner || page.e.authorId === userStore.userInfo?.id)
+const canEdit = (page) => !!page && !page.blank && !page.e.readOnly && (userStore.isOwner || page.e.authorId === userStore.userInfo?.id)
 const shortDate = (s) => String(s || '').slice(0, 10)
 
 const buildPages = () => {

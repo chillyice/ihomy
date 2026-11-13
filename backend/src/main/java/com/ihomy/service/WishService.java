@@ -31,24 +31,27 @@ public class WishService {
     private final WishMapper wishMapper;
     private final SysUserMapper sysUserMapper;
     private final ContentAccessService contentAccess;
+    private final AudienceService audienceService;
 
     /** 愿望列表(带提出人昵称),待实现优先;游客只看演示家庭的公开愿望 */
     public List<Map<String, Object>> list(ViewerScope viewer) {
         if (viewer.familyId() == null) return List.of();
         LambdaQueryWrapper<Wish> qw = new LambdaQueryWrapper<>();
         contentAccess.applyVisible(qw, ContentKind.WISH, viewer,
-                Wish::getFamilyId, Wish::getRequesterId, Wish::getVisibility);
+                Wish::getFamilyId, Wish::getRequesterId, Wish::getVisibility, Wish::getId);
         return toMaps(wishMapper.selectList(qw
                 .orderByAsc(Wish::getStatus)
-                .orderByDesc(Wish::getCreatedAt)));
+                .orderByDesc(Wish::getCreatedAt)), viewer.familyId());
     }
 
-    /** 愿望实体 → 视图对象(附提出人昵称) */
-    private List<Map<String, Object>> toMaps(List<Wish> wishes) {
+    /** 愿望实体 → 视图对象(附提出人昵称;被分享的来源标 sharedFrom/readOnly) */
+    private List<Map<String, Object>> toMaps(List<Wish> wishes, Long viewerFamilyId) {
         if (wishes.isEmpty()) return List.of();
         Map<Long, String> names = sysUserMapper.selectBatchIds(
                         wishes.stream().map(Wish::getRequesterId).collect(Collectors.toList())).stream()
                 .collect(Collectors.toMap(SysUser::getId, SysUser::getNickname));
+        Map<Long, Map<String, Object>> shared = audienceService.sharedSources(
+                ContentKind.WISH, wishes.stream().map(Wish::getId).toList(), viewerFamilyId);
         return wishes.stream().map(w -> {
             Map<String, Object> map = new HashMap<>();
             map.put("id", w.getId());
@@ -62,6 +65,11 @@ public class WishService {
             map.put("requesterName", names.getOrDefault(w.getRequesterId(), "未知成员"));
             map.put("achievedAt", w.getAchievedAt());
             map.put("createdAt", w.getCreatedAt());
+            map.put("familyId", w.getFamilyId());
+            if (shared.containsKey(w.getId())) {
+                map.put("readOnly", true);
+                map.put("sharedFrom", shared.get(w.getId()));
+            }
             return map;
         }).collect(Collectors.toList());
     }
@@ -103,6 +111,7 @@ public class WishService {
 
     public void delete(Long id, Long familyId) {
         wishMapper.deleteById(require(id, familyId).getId());
+        audienceService.revokeContent(ContentKind.WISH, id);
     }
 
     /** 状态联动达成时间:已实现(1)→记录/保留,未实现(0/2)→清空 */

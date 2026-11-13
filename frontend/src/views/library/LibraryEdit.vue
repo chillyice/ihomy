@@ -59,6 +59,10 @@
         <el-form-item :label="$t('library.visibility')">
           <VisibilityPicker v-model="form.visibility" :options="visibilityOptions" />
         </el-form-item>
+        <div v-if="form.visibility !== 'PRIVATE'" class="editor-audience">
+          <AudiencePicker v-if="audience.canShare" v-model="audience.selected" :circles="audience.circles" />
+          <p v-else class="audience-tip">{{ $t('audience.canShareFalse') }}</p>
+        </div>
         <div class="form-footer">
           <el-button type="primary" :loading="loading" @click="onSave">{{ $t('common.save') }}</el-button>
         </div>
@@ -94,11 +98,13 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { libraryApi, fileApi } from '@/api'
+import { libraryApi, audienceApi, fileApi } from '@/api'
+import { useAudience } from '@/composables/useAudience'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
+import AudiencePicker from '@/components/common/AudiencePicker.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -106,6 +112,7 @@ const router = useRouter()
 const isEdit = computed(() => !!route.params.id)
 const loading = ref(false)
 const uploading = ref(false)
+const { state: audience, load: loadAudience } = useAudience('book')
 
 // visibility/status 走字典词(PRIVATE/FAMILY、DRAFT/PUBLISHED/HIDDEN),与后端枚举一致
 const form = reactive({
@@ -217,8 +224,21 @@ const onSave = async () => {
   if (!form.fileUrl) return ElMessage.warning(t('library.inputFile'))
   loading.value = true
   try {
+    const picked = audience.loaded && audience.canShare && form.visibility !== 'PRIVATE' ? [...audience.selected] : null
+    let bookId = isEdit.value ? route.params.id : null
     if (isEdit.value) await libraryApi.update(route.params.id, form)
-    else await libraryApi.create(form)
+    else {
+      const created = await libraryApi.create(form)
+      bookId = created?.id
+    }
+    if (bookId && picked !== null) {
+      try {
+        const res = await audienceApi.save('book', bookId, picked)
+        if (picked.length && res?.targetCount === 0) ElMessage.info(t('audience.noTarget'))
+      } catch {
+        ElMessage.warning(t('audience.saveFailed'))
+      }
+    }
     ElMessage.success(t('common.saveSuccess'))
     router.push('/library')
   } finally {
@@ -244,10 +264,22 @@ onMounted(async () => {
     })
   }
   loadCategories()
+  loadAudience(isEdit.value ? route.params.id : null)
 })
 </script>
 
 <style scoped>
+.editor-audience {
+  margin: 4px 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+.audience-tip {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
 .category-row {
   display: flex;
   gap: 8px;

@@ -42,6 +42,10 @@
         <el-form-item :label="$t('blog.visibility')">
           <VisibilityPicker v-model="form.visibility" :options="visibilityOptions" />
         </el-form-item>
+        <div v-if="form.status === 'PUBLISHED'" class="editor-audience">
+          <AudiencePicker v-if="audience.canShare" v-model="audience.selected" :circles="audience.circles" />
+          <p v-else class="audience-tip">{{ $t('audience.canShareFalse') }}</p>
+        </div>
         <div class="form-footer">
           <el-button type="primary" :loading="loading" @click="onSave">{{ $t('common.save') }}</el-button>
         </div>
@@ -78,11 +82,13 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { blogApi, fileApi } from '@/api'
+import { blogApi, audienceApi, fileApi } from '@/api'
+import { useAudience } from '@/composables/useAudience'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
+import AudiencePicker from '@/components/common/AudiencePicker.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -90,6 +96,8 @@ const router = useRouter()
 // 路由带 id 即为编辑模式,否则是新增
 const isEdit = computed(() => !!route.params.id)
 const loading = ref(false)
+// 分享范围:仅已发布内容可分享(草稿在接收方列表里也不会出现)
+const { state: audience, load: loadAudience } = useAudience('blog')
 
 const form = reactive({ title: '', content: '', coverImage: '', category: '', status: 'PUBLISHED', visibility: 'FAMILY' })
 // 可见范围选项(共用选择器,文案随博客命名空间)
@@ -175,8 +183,21 @@ const onSave = async () => {
   loading.value = true
   try {
     const payload = { ...form, category: form.category || '' }
+    const picked = audience.loaded && audience.canShare && form.status === 'PUBLISHED' ? [...audience.selected] : null
+    let blogId = isEdit.value ? route.params.id : null
     if (isEdit.value) await blogApi.update(route.params.id, payload)
-    else await blogApi.create(payload)
+    else {
+      const created = await blogApi.create(payload)
+      blogId = created?.id
+    }
+    if (blogId && picked !== null) {
+      try {
+        const res = await audienceApi.save('blog', blogId, picked)
+        if (picked.length && res?.targetCount === 0) ElMessage.info(t('audience.noTarget'))
+      } catch {
+        ElMessage.warning(t('audience.saveFailed'))
+      }
+    }
     ElMessage.success(t('common.saveSuccess'))
     router.push('/blog')
   } finally {
@@ -198,10 +219,22 @@ onMounted(async () => {
     })
   }
   loadCategories()
+  loadAudience(isEdit.value ? route.params.id : null)
 })
 </script>
 
 <style scoped>
+.editor-audience {
+  margin: 4px 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+.audience-tip {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
 .category-row {
   display: flex;
   gap: 8px;

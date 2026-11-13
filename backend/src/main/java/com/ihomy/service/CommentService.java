@@ -16,6 +16,7 @@ import com.ihomy.mapper.CommentMapper;
 import com.ihomy.mapper.DiaryMapper;
 import com.ihomy.mapper.PhotoMapper;
 import com.ihomy.mapper.SysUserMapper;
+import com.ihomy.service.access.ContentKind;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -24,6 +25,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 评论业务:博客/日记/照片统一评论,支持 parentId 回复树;
@@ -39,6 +41,7 @@ public class CommentService {
     private final DiaryMapper diaryMapper;
     private final PhotoMapper photoMapper;
     private final NotificationService notificationService;
+    private final AudienceService audienceService;
 
     /** 评论列表:先校验内容可访问性(同家庭或公开),再按时间排好组装回复树 */
     public List<Map<String, Object>> list(String contentType, Long contentId, Long familyId) {
@@ -125,19 +128,13 @@ public class CommentService {
         commentMapper.deleteById(id);
     }
 
-    /** 校验内容可被当前调用方访问(同家庭或公开内容),否则 404 */
+    /** 校验内容可被当前调用方访问(同家庭、公开,或已分享给本家庭),否则 404 */
     private void checkContentAccessible(String contentType, Long contentId, Long familyId) {
-        if (contentId == null) throw new BizException(ResultCode.BAD_REQUEST);
-        String vis = null;
-        Long contentFam = null;
-        switch (contentType == null ? "" : contentType) {
-            case "blog" -> { Blog b = blogMapper.selectById(contentId); if (b == null) throw new BizException(ResultCode.NOT_FOUND); vis = b.getVisibility(); contentFam = b.getFamilyId(); }
-            case "diary" -> { Diary d = diaryMapper.selectById(contentId); if (d == null) throw new BizException(ResultCode.NOT_FOUND); vis = d.getVisibility(); contentFam = d.getFamilyId(); }
-            case "photo" -> { Photo p = photoMapper.selectById(contentId); if (p == null) throw new BizException(ResultCode.NOT_FOUND); vis = p.getVisibility(); contentFam = p.getFamilyId(); }
-            default -> throw new BizException(ResultCode.BAD_REQUEST);
-        }
-        boolean sameFamily = familyId != null && familyId.equals(contentFam);
-        if (!sameFamily && !DictConst.VIS_PUBLIC.equals(vis)) {
+        ContentInfo info = loadContent(contentType, contentId);
+        if (Objects.equals(familyId, info.familyId())) return;
+        if (DictConst.VIS_PUBLIC.equals(info.visibility())) return;
+        if (DictConst.VIS_PRIVATE.equals(info.visibility())) throw new BizException(ResultCode.NOT_FOUND);
+        if (!audienceService.sharedTo(info.kind(), contentId, familyId)) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
     }
@@ -146,27 +143,43 @@ public class CommentService {
     private record TargetContent(Long authorId, Long familyId) {
     }
 
-    /** 校验目标内容存在且与评论者同家庭,返回作者与家庭(跨家庭一律 404) */
-    private TargetContent validateTarget(String contentType, Long contentId, Long familyId) {
-        if (contentId == null) return new TargetContent(null, null);
+    /** 内容基本信息(kind 用于查受众) */
+    private record ContentInfo(ContentKind kind, Long authorId, Long familyId, String visibility) {
+    }
+
+    /** 载入评论目标内容;跨家庭能否互动看下面两处规则 */
+    private ContentInfo loadContent(String contentType, Long contentId) {
+        if (contentId == null) throw new BizException(ResultCode.BAD_REQUEST);
         switch (contentType == null ? "" : contentType) {
             case "blog" -> {
                 Blog b = blogMapper.selectById(contentId);
-                if (b == null || !familyId.equals(b.getFamilyId())) throw new BizException(ResultCode.NOT_FOUND);
-                return new TargetContent(b.getAuthorId(), b.getFamilyId());
+                if (b == null) throw new BizException(ResultCode.NOT_FOUND);
+                return new ContentInfo(ContentKind.BLOG, b.getAuthorId(), b.getFamilyId(), b.getVisibility());
             }
             case "diary" -> {
                 Diary d = diaryMapper.selectById(contentId);
-                if (d == null || !familyId.equals(d.getFamilyId())) throw new BizException(ResultCode.NOT_FOUND);
-                return new TargetContent(d.getAuthorId(), d.getFamilyId());
+                if (d == null) throw new BizException(ResultCode.NOT_FOUND);
+                return new ContentInfo(ContentKind.DIARY, d.getAuthorId(), d.getFamilyId(), d.getVisibility());
             }
             case "photo" -> {
                 Photo p = photoMapper.selectById(contentId);
-                if (p == null || !familyId.equals(p.getFamilyId())) throw new BizException(ResultCode.NOT_FOUND);
-                return new TargetContent(p.getAuthorId(), p.getFamilyId());
+                if (p == null) throw new BizException(ResultCode.NOT_FOUND);
+                return new ContentInfo(ContentKind.PHOTO, p.getAuthorId(), p.getFamilyId(), p.getVisibility());
             }
             default -> throw new BizException(ResultCode.BAD_REQUEST);
         }
+    }
+
+    /** 校验目标内容存在且可评论(同家庭 or 已分享给本家庭),返回作者与家庭 */
+    private TargetContent validateTarget(String contentType, Long contentId, Long familyId) {
+        if (contentId == null) return new TargetContent(null, null);
+        ContentInfo info = loadContent(contentType, contentId);
+        if (!Objects.equals(familyId, info.familyId())) {
+            boolean shared = !DictConst.VIS_PRIVATE.equals(info.visibility())
+                    && audienceService.sharedTo(info.kind(), contentId, familyId);
+            if (!shared) throw new BizException(ResultCode.NOT_FOUND);
+        }
+        return new TargetContent(info.authorId(), info.familyId());
     }
 
     /** 发送站内通知:回复优先通知被回复人,否则通知内容作者(自己评论自己不通知) */

@@ -82,7 +82,11 @@ public class ContentAccessService {
         return kind != ContentKind.VAULT && viewer.userId() != null && viewer.familyId() != null;
     }
 
-    private String audienceInSql(ContentKind kind, Long familyId) {
+    /**
+     * 「分享给这个家庭」的子查询,供需要自定义组合条件的查询复用(如博客的发布状态分支)。
+     * 只拼接枚举 code 与数值 id,无外部字符串。
+     */
+    public String audienceInSql(ContentKind kind, Long familyId) {
         return "SELECT content_id FROM content_audience WHERE content_type = '" + kind.code()
                 + "' AND target_type = 'FAMILY' AND target_id = " + familyId;
     }

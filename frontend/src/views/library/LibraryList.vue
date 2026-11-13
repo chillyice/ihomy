@@ -146,6 +146,7 @@
                 </svg>
               </div>
               <span class="format-badge">{{ b.fileFormat }}</span>
+              <span v-if="b.sharedFrom" class="book-shared">{{ sharedFromText(b.sharedFrom) }}</span>
               <div v-if="!batchMode" class="book-overlay">
                 <button v-if="canReadOnline(b)" class="ovl-btn primary" @click.stop="openReader(b)">{{ $t('library.read') }}</button>
                 <button class="ovl-btn" @click.stop="openDetail(b)">{{ $t('library.viewDetail') }}</button>
@@ -199,6 +200,7 @@
               <div class="row-sub">
                 <span v-if="b.author">{{ b.author }}</span>
                 <span class="format-badge small">{{ b.fileFormat }}</span>
+                <span v-if="b.sharedFrom" class="row-shared">{{ sharedFromText(b.sharedFrom) }}</span>
                 <span class="book-views">{{ b.viewCount }} {{ $t('library.views') }}</span>
               </div>
             </div>
@@ -400,8 +402,10 @@ const parentCascaderTree = computed(() => {
   return build(0)
 })
 
-const canEdit = (b) => userStore.isOwner || b.uploaderId === userStore.userInfo?.id
+const canEdit = (b) => !b.readOnly && (userStore.isOwner || b.uploaderId === userStore.userInfo?.id)
 const canReadOnline = (b) => b.fileFormat === 'PDF' || b.fileFormat === 'EPUB' || b.fileFormat === 'TXT'
+// 亲友圈分享进来的图书:标来源家庭(圈内称呼优先)
+const sharedFromText = (s) => t('audience.sharedFrom', { name: s.alias || s.familyName || '' })
 
 const load = async () => {
   loading.value = true
@@ -733,6 +737,25 @@ html.dark .book-cover.placeholder {
   position: static;
   font-size: 10px;
   padding: 1px 5px;
+}
+/* 亲友圈分享来的图书:封面上标来源家庭(右下角留给格式徽章) */
+.book-shared {
+  position: absolute;
+  left: 5px;
+  bottom: 5px;
+  max-width: calc(100% - 10px);
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(var(--color-brand-rgb), 0.85);
+  color: #fff;
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.row-shared {
+  font-size: 11px;
+  color: var(--color-accent);
 }
 .book-overlay {
   position: absolute;

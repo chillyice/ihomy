@@ -219,12 +219,12 @@
     <!-- 单张照片的分享范围:不选圈 = 只给自家人 -->
     <el-dialog v-model="photoAudience.visible" append-to-body :title="t('audience.label')" width="420px">
       <div v-loading="photoAudience.loading">
-        <AudiencePicker v-if="photoAudience.canShare" v-model="photoAudience.selected" :circles="photoAudience.circles" />
+        <AudiencePicker v-if="photoShare.canShare" v-model="photoShare.selected" :circles="photoShare.circles" />
         <p v-else class="audience-hint">{{ t('audience.canShareFalse') }}</p>
       </div>
       <template #footer>
         <el-button @click="photoAudience.visible = false">{{ t('common.cancel') }}</el-button>
-        <el-button type="primary" :disabled="photoAudience.loading || !photoAudience.canShare" @click="savePhotoAudience">
+        <el-button type="primary" :disabled="photoAudience.loading || !photoShare.canShare" @click="savePhotoAudience">
           {{ t('common.save') }}
         </el-button>
       </template>
@@ -237,7 +237,8 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { albumApi, photoApi, audienceApi, circleApi } from '@/api'
+import { albumApi, photoApi, audienceApi } from '@/api'
+import { useAudience } from '@/composables/useAudience'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Edit, Delete, Location, Clock, Share } from '@element-plus/icons-vue'
@@ -274,8 +275,8 @@ const loading = ref(false)
 const descEditor = reactive({ visible: false, value: '', currentId: null })
 const viewer = reactive({ visible: false, index: 0 })
 // 单张照片的分享范围(亲友圈):不选圈 = 只给自家人
-const photoAudience = reactive({ visible: false, loading: false, photoId: null, canShare: true, circles: [], selected: [] })
-let circleCache = null
+const photoAudience = reactive({ visible: false, loading: false, photoId: null })
+const { state: photoShare, load: loadPhotoAudience } = useAudience('photo')
 
 // 映射相册:只读(影子记录),隐藏上传与照片管理;别人家分享进来的相册同样只读
 const isMapped = computed(() => !!album.value.sourceDeviceId)
@@ -447,17 +448,8 @@ const openPhotoAudience = async (p) => {
   photoAudience.visible = true
   photoAudience.loading = true
   photoAudience.photoId = p.id
-  photoAudience.selected = []
-  photoAudience.canShare = true
-  photoAudience.circles = []
   try {
-    if (!circleCache) circleCache = (await circleApi.list()) || []
-    const data = await audienceApi.get('photo', p.id)
-    photoAudience.circles = data.circles || []
-    photoAudience.selected = data.selectedCircleIds || []
-    photoAudience.canShare = !!data.canShare
-  } catch {
-    photoAudience.canShare = false
+    await loadPhotoAudience(p.id)
   } finally {
     photoAudience.loading = false
   }
@@ -466,7 +458,7 @@ const openPhotoAudience = async (p) => {
 const savePhotoAudience = async () => {
   if (!photoAudience.photoId) return
   try {
-    const picked = [...photoAudience.selected]
+    const picked = [...photoShare.selected]
     const res = await audienceApi.save('photo', photoAudience.photoId, picked)
     photoAudience.visible = false
     load()

@@ -107,14 +107,16 @@ public class BlogController {
     @OperationLog(module = "BLOG", operationType = "UPDATE", description = "修改博客")
     @PutMapping("/{id}")
     public Result<Blog> update(@PathVariable Long id, @Valid @RequestBody BlogDTO dto) {
-        return Result.success(blogService.update(id, securityHelper.currentUserId(), dto));
+        return Result.success(blogService.update(id, securityHelper.currentUserId(),
+                securityHelper.currentUser().getFamilyId(), dto));
     }
 
     @Operation(summary = "删除博客")
     @OperationLog(module = "BLOG", operationType = "DELETE", description = "删除博客")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
-        blogService.delete(id, securityHelper.currentUserId(), securityHelper.isOwner());
+        blogService.delete(id, securityHelper.currentUserId(), securityHelper.currentUser().getFamilyId(),
+                securityHelper.isOwner());
         return Result.success();
     }
 }

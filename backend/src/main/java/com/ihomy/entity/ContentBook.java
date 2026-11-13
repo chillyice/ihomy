@@ -35,4 +35,10 @@ public class ContentBook {
     @TableLogic
     private Integer deleted;
     private LocalDateTime deletedAt;
+    /** 被哪个家庭分享过来(列表角标);非数据库字段 */
+    @TableField(exist = false)
+    private java.util.Map<String, Object> sharedFrom;
+    /** 别人家分享来的内容只读;非数据库字段 */
+    @TableField(exist = false)
+    private Boolean readOnly;
 }

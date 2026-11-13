@@ -31,6 +31,7 @@
             <div class="nb-spine"></div>
             <div class="nb-label">
               <div class="nb-name" :title="b.authorName">{{ b.authorName || '-' }}</div>
+              <div v-if="b.sharedFrom" class="nb-shared">{{ sharedFromText(b.sharedFrom) }}</div>
               <div class="nb-count">{{ $t('diary.entryCount', { n: b.count }) }}</div>
               <div class="nb-latest">
                 <div v-if="b.count > 1">{{ $t('diary.startDate', { date: fmtShort(b.earliest) }) }}</div>
@@ -58,11 +59,13 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { diaryApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 
+const { t } = useI18n()
 const router = useRouter()
 const userStore = useUserStore()
 const books = ref([])
@@ -70,6 +73,8 @@ const loading = ref(false)
 const loadError = ref(false)
 
 const fmtShort = (s) => String(s || '').slice(0, 10)
+// 亲友圈分享进来的日记:整本标注来源家庭(圈内称呼优先),只要有一篇是分享来的就标
+const sharedFromText = (s) => t('audience.sharedFrom', { name: s.alias || s.familyName || '' })
 
 const load = async () => {
   loading.value = true
@@ -83,6 +88,7 @@ const load = async () => {
       const key = d.authorId ?? 0
       if (!map.has(key)) map.set(key, { authorId: d.authorId, authorName: d.authorName, count: 0, latest: '', earliest: '' })
       const b = map.get(key)
+      if (d.sharedFrom) b.sharedFrom = d.sharedFrom
       b.count++
       const day = fmtShort(d.createdAt)
       if (!b.latest || day > b.latest) b.latest = day
@@ -205,6 +211,15 @@ onMounted(load)
   font-size: 12px;
   color: #6b5c4a;
   margin-top: 6px;
+}
+/* 亲友圈分享来的日记本:封签上标来源家庭(暖木底上用深一号的陶土色) */
+.nb-shared {
+  margin-top: 3px;
+  font-size: 11px;
+  color: #7a4b32;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .nb-latest {
   margin-top: 4px;

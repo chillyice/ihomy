@@ -200,8 +200,9 @@
 <script setup>
 import { ref, reactive, computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { albumApi, audienceApi, circleApi } from '@/api'
+import { albumApi, audienceApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { useAudience } from '@/composables/useAudience'
 import { useSyncStore } from '@/stores/sync'
 import { usePullRefresh } from '@/composables/usePullRefresh'
 import { useDevice } from '@/composables/useDevice'
@@ -323,28 +324,7 @@ const load = async () => {
 }
 
 // 分享范围面板:可选圈只随家庭变化,首次打开缓存一次;编辑时读当前相册已分享的圈
-const audience = reactive({ loaded: false, canShare: true, selected: [], circles: [] })
-let circleCache = null
-const loadAudience = async (albumId) => {
-  if (!userStore.isLoggedIn) return
-  try {
-    if (!circleCache) circleCache = (await circleApi.list()) || []
-    if (!albumId) {
-      audience.circles = circleCache
-      audience.loaded = true
-      return
-    }
-    const data = await audienceApi.get('album', albumId)
-    audience.circles = data.circles || []
-    audience.selected = data.selectedCircleIds || []
-    audience.canShare = !!data.canShare
-  } catch {
-    // 面板加载失败不阻断改名:按「不能分享」处理,不提交分享范围
-    audience.canShare = false
-  } finally {
-    audience.loaded = true
-  }
-}
+const { state: audience, load: loadAudience } = useAudience('album')
 
 const openEditor = (a) => {
   if (a) Object.assign(editor.form, { id: a.id, name: a.name, type: a.type })

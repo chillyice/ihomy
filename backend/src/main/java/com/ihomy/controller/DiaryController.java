@@ -51,14 +51,16 @@ public class DiaryController {
     @OperationLog(module = "DIARY", operationType = "UPDATE", description = "修改日记")
     @PutMapping("/{id}")
     public Result<Diary> update(@PathVariable Long id, @RequestBody DiaryDTO dto) {
-        return Result.success(diaryService.update(id, securityHelper.currentUserId(), dto));
+        return Result.success(diaryService.update(id, securityHelper.currentUserId(),
+                securityHelper.currentUser().getFamilyId(), dto));
     }
 
     @Operation(summary = "删除日志")
     @OperationLog(module = "DIARY", operationType = "DELETE", description = "删除日记")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
-        diaryService.delete(id, securityHelper.currentUserId(), securityHelper.isOwner());
+        diaryService.delete(id, securityHelper.currentUserId(), securityHelper.currentUser().getFamilyId(),
+                securityHelper.isOwner());
         return Result.success();
     }
 }

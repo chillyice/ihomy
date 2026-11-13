@@ -241,6 +241,11 @@ public class CircleService {
                 .set(FamilyCircle::getStatus, DictConst.CIRCLE_CLOSED)
                 .set(FamilyCircle::getInviteCode, null)
                 .set(FamilyCircle::getInviteExpiresAt, null));
+        // 成员行一并置为已退出:否则已解散的圈仍占着「最多加入 N 个圈」的名额
+        memberMapper.update(null, new LambdaUpdateWrapper<FamilyCircleMember>()
+                .eq(FamilyCircleMember::getCircleId, circleId)
+                .eq(FamilyCircleMember::getStatus, DictConst.CIRCLE_MEMBER_ACTIVE)
+                .set(FamilyCircleMember::getStatus, DictConst.CIRCLE_MEMBER_LEFT));
         revokeByCircle(circleId, null);
     }
 

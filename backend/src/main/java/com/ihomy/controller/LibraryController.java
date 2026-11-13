@@ -71,6 +71,10 @@ public class LibraryController {
             m.put("likeCount", b.getLikeCount());
             m.put("createdAt", b.getCreatedAt());
             m.put("updatedAt", b.getUpdatedAt());
+            if (Boolean.TRUE.equals(b.getReadOnly())) {
+                m.put("readOnly", true);
+                m.put("sharedFrom", b.getSharedFrom());
+            }
             records.add(m);
         }
         Map<String, Object> data = new LinkedHashMap<>();
@@ -145,6 +149,10 @@ public class LibraryController {
         data.put("likeCount", book.getLikeCount());
         data.put("createdAt", book.getCreatedAt());
         data.put("updatedAt", book.getUpdatedAt());
+        if (Boolean.TRUE.equals(book.getReadOnly())) {
+            data.put("readOnly", true);
+            data.put("sharedFrom", book.getSharedFrom());
+        }
         return Result.success(data);
     }
 

@@ -11,6 +11,7 @@ import com.ihomy.mapper.BlogMapper;
 import com.ihomy.mapper.ContentLikeMapper;
 import com.ihomy.mapper.DiaryMapper;
 import com.ihomy.mapper.PhotoMapper;
+import com.ihomy.service.access.ContentKind;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,7 +21,8 @@ import java.util.Map;
 
 /**
  * 统一点赞业务:博客/日记/照片共用一张 content_like 表,
- * 切换点赞状态并回写各内容的 likeCount 冗余字段。
+ * 切换点赞状态并回写各内容的 likeCount 冗余字段;
+ * 同家庭内容直接可赞,跨家庭只允许「已分享给本家庭」的内容。
  */
 @Service
 @RequiredArgsConstructor
@@ -30,6 +32,7 @@ public class ContentLikeService {
     private final BlogMapper blogMapper;
     private final DiaryMapper diaryMapper;
     private final PhotoMapper photoMapper;
+    private final AudienceService audienceService;
 
     /** 切换点赞:已赞则取消,未赞则插入(表 UNIQUE 防重复),返回最新状态与总数 */
     @Transactional
@@ -95,19 +98,31 @@ public class ContentLikeService {
         return likeMapper.selectCount(qw) > 0;
     }
 
-    /** 目标内容必须存在且与操作者同家庭,否则视为资源不存在 */
+    /** 目标内容必须存在,且与操作者同家庭或已分享给本家庭,否则视为资源不存在 */
     private boolean validContent(String contentType, Long contentId, Long familyId) {
-        if (contentId == null) return false;
+        if (contentId == null || familyId == null) return false;
         switch (contentType == null ? "" : contentType) {
-            case "blog":
+            case "blog": {
                 Blog b = blogMapper.selectById(contentId);
-                return b != null && b.getFamilyId().equals(familyId);
-            case "diary":
+                if (b == null) return false;
+                if (b.getFamilyId().equals(familyId)) return true;
+                return !com.ihomy.common.DictConst.VIS_PRIVATE.equals(b.getVisibility())
+                        && audienceService.sharedTo(ContentKind.BLOG, contentId, familyId);
+            }
+            case "diary": {
                 Diary d = diaryMapper.selectById(contentId);
-                return d != null && d.getFamilyId().equals(familyId);
-            case "photo":
+                if (d == null) return false;
+                if (d.getFamilyId().equals(familyId)) return true;
+                return !com.ihomy.common.DictConst.VIS_PRIVATE.equals(d.getVisibility())
+                        && audienceService.sharedTo(ContentKind.DIARY, contentId, familyId);
+            }
+            case "photo": {
                 Photo p = photoMapper.selectById(contentId);
-                return p != null && p.getFamilyId().equals(familyId);
+                if (p == null) return false;
+                if (p.getFamilyId().equals(familyId)) return true;
+                return !com.ihomy.common.DictConst.VIS_PRIVATE.equals(p.getVisibility())
+                        && audienceService.sharedTo(ContentKind.PHOTO, contentId, familyId);
+            }
             default:
                 return false;
         }

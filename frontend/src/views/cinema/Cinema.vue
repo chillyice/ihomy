@@ -7,7 +7,14 @@
       <!-- 媒体库(家庭媒体服务器):按题材/地区/年代/类型前端过滤,数据量小 -->
       <template v-if="tab === 'media'">
         <div class="tb-left">
-          <el-input v-model="mediaKeyword" :placeholder="$t('cinema.searchPlaceholder')" clearable size="small" style="width: 180px" data-search-input>
+          <el-input
+            v-model="mediaKeyword"
+            :placeholder="$t('cinema.searchPlaceholder')"
+            clearable
+            size="small"
+            style="width: 180px"
+            data-search-input
+          >
             <template #prefix>
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                 <circle cx="11" cy="11" r="8" />
@@ -50,7 +57,14 @@
       </template>
       <template v-else-if="!selectMode">
         <div class="tb-left">
-          <el-input v-model="searchKeyword" :placeholder="$t('cinema.searchPlaceholder')" clearable size="small" style="width: 200px" data-search-input>
+          <el-input
+            v-model="searchKeyword"
+            :placeholder="$t('cinema.searchPlaceholder')"
+            clearable
+            size="small"
+            style="width: 200px"
+            data-search-input
+          >
             <template #prefix>
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                 <circle cx="11" cy="11" r="8" />
@@ -180,6 +194,7 @@
                 <img v-if="v.poster" :src="v.poster" class="poster-img" :alt="$t('cinema.poster')" />
                 <div v-else class="poster-placeholder">🎬</div>
                 <div v-if="!selectMode" class="play-overlay">▶ {{ $t('cinema.play') }}</div>
+                <span v-if="v.sharedFrom && !selectMode" class="video-shared">{{ sharedFromText(v.sharedFrom) }}</span>
                 <span v-if="v.sourceDeviceName && !selectMode" class="video-source">
                   <span class="status-dot" :class="v.syncStatus || 'OFFLINE'"></span>{{ v.sourceDeviceName }}
                 </span>
@@ -213,7 +228,12 @@
                 <div v-if="v.actors" class="video-credit">{{ $t('cinema.actorsMeta') }}{{ v.actors }}</div>
                 <div class="video-footer">
                   <span class="video-uploader">{{ v.uploaderName }}</span>
-                  <span v-if="userStore.isLoggedIn" class="video-actions">
+                  <span v-if="userStore.isLoggedIn && !v.readOnly" class="video-actions">
+                    <el-tooltip :content="$t('audience.label')" placement="top" :show-after="300">
+                      <el-button size="small" text @click="openShare(v)"
+                        ><el-icon><Share /></el-icon
+                      ></el-button>
+                    </el-tooltip>
                     <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
                       <el-button size="small" text @click="openEditor(v)"
                         ><el-icon><Edit /></el-icon
@@ -409,6 +429,18 @@
     </el-dialog>
     <MediaPlayer v-model="mediaPlayer.visible" :item="mediaPlayer.item" @played="loadMedia" />
     <SyncDialog v-model="syncVisible" target="video" @synced="load" />
+
+    <!-- 分享范围:不选圈 = 只给自家人 -->
+    <el-dialog v-model="share.visible" append-to-body :title="$t('audience.label')" width="420px">
+      <div v-loading="share.loading">
+        <AudiencePicker v-if="audience.canShare" v-model="audience.selected" :circles="audience.circles" />
+        <p v-else class="audience-tip">{{ $t('audience.canShareFalse') }}</p>
+      </div>
+      <template #footer>
+        <el-button @click="share.visible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" :disabled="!audience.canShare" @click="onShareSave">{{ $t('common.save') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -416,13 +448,15 @@
 import { ref, reactive, computed, onMounted, watch, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { Edit, Delete } from '@element-plus/icons-vue'
-import { videoApi, mediaApi } from '@/api'
+import { Edit, Delete, Share } from '@element-plus/icons-vue'
+import { videoApi, mediaApi, audienceApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useSyncStore } from '@/stores/sync'
+import { useAudience } from '@/composables/useAudience'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
+import AudiencePicker from '@/components/common/AudiencePicker.vue'
 import SyncDialog from '@/components/SyncDialog.vue'
 import MediaPlayer from '@/components/MediaPlayer.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
@@ -609,6 +643,34 @@ const genreOptions = computed(() => {
   return [...set]
 })
 const hasMapped = computed(() => list.value.some((v) => v.sourceDeviceId))
+
+// 被亲友圈分享进来的影片:标来源家庭,保存按钮之外不再给改/删入口
+const sharedFromText = (s) => t('audience.sharedFrom', { name: s.alias || s.familyName || '' })
+
+// 分享范围:面板打开时才读该影片已分享的圈,取消保存不改动
+const share = reactive({ visible: false, id: null, loading: false })
+const { state: audience, load: loadAudience } = useAudience('video')
+const openShare = async (v) => {
+  share.id = v.id
+  share.visible = true
+  share.loading = true
+  try {
+    await loadAudience(v.id)
+  } finally {
+    share.loading = false
+  }
+}
+const onShareSave = async () => {
+  share.visible = false
+  if (!share.id) return
+  try {
+    const res = await audienceApi.save('video', share.id, [...audience.selected])
+    if (audience.selected.length && res?.targetCount === 0) ElMessage.info(t('audience.noTarget'))
+    else ElMessage.success(t('common.saved'))
+  } catch {
+    /* 请求层已提示 */
+  }
+}
 
 // 新影片/编辑共用的空表单(剧集数保存时由 duration 字段转换而来,表单内不单独维护)
 const emptyForm = () => ({
@@ -983,6 +1045,26 @@ onMounted(() => {
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
+}
+/* 亲友圈分享来的影片:海报左上角标来源家庭(右上角留给来源设备) */
+.video-shared {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  max-width: 60%;
+  font-size: 11px;
+  color: #fff;
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: rgba(var(--color-brand-rgb), 0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.audience-tip {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
 }
 .status-dot {
   width: 7px;

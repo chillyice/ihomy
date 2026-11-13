@@ -54,7 +54,8 @@ public class ActivityFeedService {
             contentAccess.applyVisible(bq, ContentKind.BLOG, viewer,
                     com.ihomy.entity.Blog::getFamilyId,
                     com.ihomy.entity.Blog::getAuthorId,
-                    com.ihomy.entity.Blog::getVisibility);
+                    com.ihomy.entity.Blog::getVisibility,
+                    com.ihomy.entity.Blog::getId);
             bq.eq(com.ihomy.entity.Blog::getStatus, com.ihomy.common.DictConst.BLOG_PUBLISHED);
             bq.orderByDesc(com.ihomy.entity.Blog::getCreatedAt).last("LIMIT " + limit);
             for (com.ihomy.entity.Blog b : blogMapper.selectList(bq)) {
@@ -76,7 +77,8 @@ public class ActivityFeedService {
             contentAccess.applyVisible(dq, ContentKind.DIARY, viewer,
                     com.ihomy.entity.Diary::getFamilyId,
                     com.ihomy.entity.Diary::getAuthorId,
-                    com.ihomy.entity.Diary::getVisibility);
+                    com.ihomy.entity.Diary::getVisibility,
+                    com.ihomy.entity.Diary::getId);
             dq.orderByDesc(com.ihomy.entity.Diary::getCreatedAt).last("LIMIT " + limit);
             for (com.ihomy.entity.Diary d : diaryMapper.selectList(dq)) {
                 Map<String, Object> m = base("diary", d.getId(), d.getAuthorId(), d.getFamilyId(), d.getCreatedAt(), null);
@@ -118,7 +120,8 @@ public class ActivityFeedService {
             contentAccess.applyVisible(vq, ContentKind.VIDEO, viewer,
                     com.ihomy.entity.Video::getFamilyId,
                     com.ihomy.entity.Video::getUploaderId,
-                    com.ihomy.entity.Video::getVisibility);
+                    com.ihomy.entity.Video::getVisibility,
+                    com.ihomy.entity.Video::getId);
             vq.orderByDesc(com.ihomy.entity.Video::getCreatedAt).last("LIMIT " + limit);
             for (com.ihomy.entity.Video v : videoMapper.selectList(vq)) {
                 Map<String, Object> m = base("video", v.getId(), v.getUploaderId(), v.getFamilyId(), v.getCreatedAt(), null);
@@ -134,7 +137,8 @@ public class ActivityFeedService {
             contentAccess.applyVisible(wq, ContentKind.WISH, viewer,
                     com.ihomy.entity.Wish::getFamilyId,
                     com.ihomy.entity.Wish::getRequesterId,
-                    com.ihomy.entity.Wish::getVisibility);
+                    com.ihomy.entity.Wish::getVisibility,
+                    com.ihomy.entity.Wish::getId);
             wq.orderByDesc(com.ihomy.entity.Wish::getCreatedAt).last("LIMIT " + limit);
             for (com.ihomy.entity.Wish w : wishMapper.selectList(wq)) {
                 Map<String, Object> m = base("wish", w.getId(), w.getRequesterId(), w.getFamilyId(), w.getCreatedAt(), null);
@@ -183,7 +187,8 @@ public class ActivityFeedService {
             contentAccess.applyVisible(bkq, ContentKind.BOOK, viewer,
                     com.ihomy.entity.ContentBook::getFamilyId,
                     com.ihomy.entity.ContentBook::getUploaderId,
-                    com.ihomy.entity.ContentBook::getVisibility);
+                    com.ihomy.entity.ContentBook::getVisibility,
+                    com.ihomy.entity.ContentBook::getId);
             bkq.eq(com.ihomy.entity.ContentBook::getStatus, com.ihomy.common.DictConst.BLOG_PUBLISHED);
             bkq.orderByDesc(com.ihomy.entity.ContentBook::getCreatedAt).last("LIMIT " + limit);
             for (com.ihomy.entity.ContentBook bk : contentBookMapper.selectList(bkq)) {
@@ -205,6 +210,8 @@ public class ActivityFeedService {
                 com.ihomy.entity.SysUser u = aid == null ? null : userMap.get(aid);
                 m.put("authorName", UserNames.of(u));
                 m.put("authorAvatar", u != null ? u.getAvatar() : null);
+                Object fid = m.get("familyId");
+                m.put("shared", fid != null && !fid.equals(familyId));
             }
         }
 

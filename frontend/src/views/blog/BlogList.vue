@@ -165,10 +165,11 @@
         <div v-a11y-click v-for="b in filteredList" :key="b.id" class="blog-item card" @click="router.push(`/blog/${b.id}`)">
           <img v-if="b.coverImage" :src="thumbUrl(b.coverImage)" class="blog-cover" :alt="b.title || ''" />
           <div class="blog-info">
-            <!-- 第一行:标题+草稿标记 -->
+            <!-- 第一行:标题+草稿/来源标记 -->
             <div class="blog-title-row">
               <span class="blog-title">{{ b.title }}</span>
               <span v-if="b.status === 'DRAFT'" class="draft-badge">{{ $t('blog.draft') }}</span>
+              <span v-if="b.sharedFrom" class="shared-badge">{{ sharedFromText(b.sharedFrom) }}</span>
             </div>
             <!-- 第二行:内容摘要 -->
             <p class="blog-summary">{{ getSummary(b) }}</p>
@@ -295,7 +296,10 @@ const sortBy = ref('recent')
 const loading = ref(false)
 const expanded = ref({})
 
-const canEdit = (b) => userStore.isOwner || b.authorId === userStore.userInfo?.id
+const canEdit = (b) => !b.readOnly && (userStore.isOwner || b.authorId === userStore.userInfo?.id)
+
+// 亲友圈分享进来的博客:标题旁标来源家庭(圈内称呼优先)
+const sharedFromText = (s) => t('audience.sharedFrom', { name: s.alias || s.familyName || '' })
 
 const showSidePanel = ref(window.innerWidth >= 1400)
 const onResize = () => {
@@ -851,6 +855,16 @@ html.dark .blog-item:hover {
 html.dark .draft-badge {
   background: rgba(var(--color-brand-rgb), 0.15);
   color: #d4b86a;
+}
+/* 亲友圈分享来的博客:来源家庭角标(与草稿徽标同尺寸,主色系区分) */
+.shared-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 6px;
+  background: rgba(var(--color-brand-rgb), 0.12);
+  color: var(--color-accent);
+  font-weight: 500;
 }
 
 /* 第二行:摘要 */

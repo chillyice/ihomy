@@ -42,6 +42,7 @@ public class BlogService {
     private final BlogCategoryMapper blogCategoryMapper;
     private final PointsService pointsService;
     private final ContentAccessService contentAccess;
+    private final AudienceService audienceService;
 
     /** 为家庭注入初始分类(幂等:已有任意分类的家庭跳过,不干扰用户自建树) */
     public void seedDefaultCategories(Long familyId) {
@@ -64,7 +65,23 @@ public class BlogService {
         qw.eq(StringUtils.hasText(category), Blog::getCategory, category)
           .like(StringUtils.hasText(keyword), Blog::getTitle, keyword)
           .orderByDesc(Blog::getCreatedAt);
-        return blogMapper.selectPage(new Page<>(current, size), qw);
+        IPage<Blog> page = blogMapper.selectPage(new Page<>(current, size), qw);
+        markShared(page.getRecords(), viewer.familyId());
+        return page;
+    }
+
+    /** 批量回填「被分享」来源与只读标记(禁 N+1) */
+    private void markShared(List<Blog> records, Long familyId) {
+        if (records.isEmpty()) return;
+        Map<Long, Map<String, Object>> shared = audienceService.sharedSources(
+                ContentKind.BLOG, records.stream().map(Blog::getId).toList(), familyId);
+        for (Blog b : records) {
+            Map<String, Object> from = shared.get(b.getId());
+            if (from != null) {
+                b.setSharedFrom(from);
+                b.setReadOnly(true);
+            }
+        }
     }
 
     /**
@@ -73,24 +90,31 @@ public class BlogService {
      */
     private LambdaQueryWrapper<Blog> visibleQuery(ViewerScope viewer) {
         LambdaQueryWrapper<Blog> qw = new LambdaQueryWrapper<>();
-        if (viewer.owner() && viewer.hasFamily()) {
-            contentAccess.applyVisible(qw, ContentKind.BLOG, viewer,
-                    Blog::getFamilyId, Blog::getAuthorId, Blog::getVisibility);
-            // HIDDEN 是「已隐藏」,列表里不出现
-            qw.in(Blog::getStatus, DictConst.BLOG_PUBLISHED, DictConst.BLOG_DRAFT);
-        } else if (viewer.userId() != null && viewer.hasFamily()) {
-            // 自己的草稿必须能回列表找回来(模板上有草稿徽标),别人的只放已发布且家庭/公开可见
-            qw.eq(Blog::getFamilyId, viewer.familyId())
-              .and(w -> w.nested(n -> n.eq(Blog::getAuthorId, viewer.userId())
-                                        .ne(Blog::getStatus, DictConst.BLOG_HIDDEN))
-                          .or(o -> o.eq(Blog::getStatus, DictConst.BLOG_PUBLISHED)
-                                    .in(Blog::getVisibility, contentAccess.memberVisibilities())));
-        } else {
-            // 游客:只读演示家庭的公开已发布(不再全库扫 PUBLIC)
-            contentAccess.applyVisible(qw, ContentKind.BLOG, viewer,
-                    Blog::getFamilyId, Blog::getAuthorId, Blog::getVisibility);
-            qw.eq(Blog::getStatus, DictConst.BLOG_PUBLISHED);
+        if (viewer.userId() != null && viewer.hasFamily()) {
+            String audienceSql = contentAccess.audienceInSql(ContentKind.BLOG, viewer.familyId());
+            qw.and(w -> {
+                if (viewer.owner()) {
+                    // 家长见全家已发布+草稿,HIDDEN 不出现
+                    w.eq(Blog::getFamilyId, viewer.familyId())
+                            .in(Blog::getStatus, DictConst.BLOG_PUBLISHED, DictConst.BLOG_DRAFT);
+                } else {
+                    // 自己的草稿必须能回列表找回来(模板上有草稿徽标),别人的只放已发布且家庭/公开可见
+                    w.eq(Blog::getFamilyId, viewer.familyId())
+                            .and(i -> i.eq(Blog::getAuthorId, viewer.userId())
+                                    .ne(Blog::getStatus, DictConst.BLOG_HIDDEN)
+                                    .or(o -> o.eq(Blog::getStatus, DictConst.BLOG_PUBLISHED)
+                                            .in(Blog::getVisibility, contentAccess.memberVisibilities())));
+                }
+                // 被分享进来的只认已发布:草稿/已隐藏不因分享外泄
+                w.or(s -> s.inSql(Blog::getId, audienceSql)
+                        .eq(Blog::getStatus, DictConst.BLOG_PUBLISHED));
+            });
+            return qw;
         }
+        // 游客:只读演示家庭的公开已发布(不再全库扫 PUBLIC)
+        contentAccess.applyVisible(qw, ContentKind.BLOG, viewer,
+                Blog::getFamilyId, Blog::getAuthorId, Blog::getVisibility);
+        qw.eq(Blog::getStatus, DictConst.BLOG_PUBLISHED);
         return qw;
     }
 
@@ -311,7 +335,8 @@ public class BlogService {
         if (blog == null) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
-        contentAccess.assertViewable(ContentKind.BLOG, blog.getFamilyId(), blog.getAuthorId(), blog.getVisibility(), viewer);
+        boolean shared = audienceService.sharedTo(ContentKind.BLOG, id, viewer.familyId());
+        contentAccess.assertViewable(ContentKind.BLOG, blog.getFamilyId(), blog.getAuthorId(), blog.getVisibility(), viewer, shared);
         boolean canManage = viewer.hasFamily() && viewer.familyId().equals(blog.getFamilyId())
                 && (viewer.owner() || (viewer.userId() != null && viewer.userId().equals(blog.getAuthorId())));
         if (!DictConst.BLOG_PUBLISHED.equals(blog.getStatus()) && !canManage) {
@@ -340,10 +365,10 @@ public class BlogService {
         return blog;
     }
 
-    /** 更新博客:仅作者本人可改,可部分更新标签/状态/可见性 */
-    public Blog update(Long id, Long currentUserId, BlogDTO dto) {
+    /** 更新博客:仅作者本人可改,可部分更新标签/状态/可见性;跨家庭一律当不存在 */
+    public Blog update(Long id, Long currentUserId, Long familyId, BlogDTO dto) {
         Blog blog = blogMapper.selectById(id);
-        if (blog == null) {
+        if (blog == null || familyId == null || !familyId.equals(blog.getFamilyId())) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
         if (!blog.getAuthorId().equals(currentUserId)) {
@@ -361,15 +386,16 @@ public class BlogService {
         return blog;
     }
 
-    /** 删除博客:作者本人或家长可删 */
-    public void delete(Long id, Long currentUserId, boolean isOwner) {
+    /** 删除博客:作者本人或家长可删;跨家庭一律当不存在 */
+    public void delete(Long id, Long currentUserId, Long familyId, boolean isOwner) {
         Blog blog = blogMapper.selectById(id);
-        if (blog == null) {
+        if (blog == null || familyId == null || !familyId.equals(blog.getFamilyId())) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
         if (!isOwner && !blog.getAuthorId().equals(currentUserId)) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
         blogMapper.deleteById(id);
+        audienceService.revokeContent(ContentKind.BLOG, id);
     }
 }

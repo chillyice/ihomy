@@ -36,6 +36,7 @@ public class LibraryService {
     private final BookBookmarkMapper bookmarkMapper;
     private final FileService fileService;
     private final ContentAccessService contentAccess;
+    private final AudienceService audienceService;
 
     // ponytail: 关系表查询本可拆独立 Mapper 更规整,家庭数据量小,先复用 bookMapper 的自定义 XML
 
@@ -57,7 +58,7 @@ public class LibraryService {
 
         LambdaQueryWrapper<ContentBook> qw = new LambdaQueryWrapper<>();
         contentAccess.applyVisible(qw, ContentKind.BOOK, viewer,
-                ContentBook::getFamilyId, ContentBook::getUploaderId, ContentBook::getVisibility);
+                ContentBook::getFamilyId, ContentBook::getUploaderId, ContentBook::getVisibility, ContentBook::getId);
         qw.eq(ContentBook::getStatus, DictConst.BLOG_PUBLISHED)
                 .and(StringUtils.hasText(keyword), w -> w.like(ContentBook::getTitle, keyword).or().like(ContentBook::getAuthor, keyword))
                 .eq(StringUtils.hasText(fileFormat), ContentBook::getFileFormat, fileFormat)
@@ -71,7 +72,23 @@ public class LibraryService {
         } else {
             qw.orderByDesc(ContentBook::getCreatedAt);
         }
-        return bookMapper.selectPage(new Page<>(current, size), qw);
+        IPage<ContentBook> page = bookMapper.selectPage(new Page<>(current, size), qw);
+        markShared(page.getRecords(), viewer.familyId());
+        return page;
+    }
+
+    /** 批量回填「被分享」来源与只读标记(禁 N+1) */
+    private void markShared(List<ContentBook> records, Long familyId) {
+        if (records.isEmpty()) return;
+        Map<Long, Map<String, Object>> shared = audienceService.sharedSources(
+                com.ihomy.service.access.ContentKind.BOOK, records.stream().map(ContentBook::getId).toList(), familyId);
+        for (ContentBook b : records) {
+            Map<String, Object> from = shared.get(b.getId());
+            if (from != null) {
+                b.setSharedFrom(from);
+                b.setReadOnly(true);
+            }
+        }
     }
 
     public Map<Long, List<Long>> getBookCategoryIds(List<Long> bookIds) {
@@ -169,7 +186,9 @@ public class LibraryService {
     @Transactional
     public ContentBook update(Long id, Long familyId, Long currentUserId, boolean isOwner, LibraryDTO dto) {
         ContentBook book = bookMapper.selectById(id);
-        if (book == null) throw new BizException(ResultCode.NOT_FOUND);
+        if (book == null || familyId == null || !familyId.equals(book.getFamilyId())) {
+            throw new BizException(ResultCode.NOT_FOUND); // 跨家庭一律当不存在
+        }
         if (!isOwner && !book.getUploaderId().equals(currentUserId)) throw new BizException(ResultCode.FORBIDDEN);
         book.setTitle(dto.getTitle());
         book.setAuthor(dto.getAuthor());
@@ -195,10 +214,13 @@ public class LibraryService {
     @Transactional
     public void delete(Long id, Long familyId, Long currentUserId, boolean isOwner) {
         ContentBook book = bookMapper.selectById(id);
-        if (book == null) throw new BizException(ResultCode.NOT_FOUND);
+        if (book == null || familyId == null || !familyId.equals(book.getFamilyId())) {
+            throw new BizException(ResultCode.NOT_FOUND); // 跨家庭一律当不存在
+        }
         if (!isOwner && !book.getUploaderId().equals(currentUserId)) throw new BizException(ResultCode.FORBIDDEN);
         // 逻辑删入回收站;分类关系与文件保留至彻底删除
         bookMapper.softDeleteById(id);
+        audienceService.revokeContent(ContentKind.BOOK, id);
     }
 
     /** 批量删除:返回未能删除的 id 列表(无权限/已不存在),供前端提示,不再静默吞掉失败 */
@@ -227,10 +249,13 @@ public class LibraryService {
     public ContentBook getDetail(Long id, ViewerScope viewer) {
         ContentBook book = bookMapper.selectById(id);
         if (book == null) throw new BizException(ResultCode.NOT_FOUND);
-        contentAccess.assertViewable(ContentKind.BOOK, book.getFamilyId(), book.getUploaderId(), book.getVisibility(), viewer);
+        boolean shared = audienceService.sharedTo(ContentKind.BOOK, id, viewer.familyId());
+        contentAccess.assertViewable(ContentKind.BOOK, book.getFamilyId(), book.getUploaderId(), book.getVisibility(), viewer,
+                shared);
         boolean canManage = viewer.hasFamily() && viewer.familyId().equals(book.getFamilyId())
                 && (viewer.owner() || (viewer.userId() != null && viewer.userId().equals(book.getUploaderId())));
         if (!DictConst.BLOG_PUBLISHED.equals(book.getStatus()) && !canManage) throw new BizException(ResultCode.NOT_FOUND);
+        if (shared) markShared(List.of(book), viewer.familyId());
         bookMapper.incrViewCount(id);
         return book;
     }

@@ -30,4 +30,10 @@ public class Blog {
     private LocalDateTime updatedAt;
     @TableLogic
     private Integer deleted;
+    /** 被哪个家庭分享过来(列表角标);非数据库字段 */
+    @TableField(exist = false)
+    private java.util.Map<String, Object> sharedFrom;
+    /** 别人家分享来的内容只读;非数据库字段 */
+    @TableField(exist = false)
+    private Boolean readOnly;
 }

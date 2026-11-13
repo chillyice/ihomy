@@ -6,22 +6,32 @@ import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
 import com.ihomy.controller.PublicController;
 import com.ihomy.entity.Album;
+import com.ihomy.entity.Blog;
 import com.ihomy.entity.ContentAudience;
+import com.ihomy.entity.ContentBook;
+import com.ihomy.entity.Diary;
 import com.ihomy.entity.Family;
 import com.ihomy.entity.FamilyCircle;
 import com.ihomy.entity.FamilyCircleMember;
 import com.ihomy.entity.Photo;
+import com.ihomy.entity.Video;
+import com.ihomy.entity.Wish;
 import com.ihomy.entity.SysRole;
 import com.ihomy.entity.SysUser;
 import com.ihomy.entity.SysUserRole;
 import com.ihomy.mapper.AlbumMapper;
+import com.ihomy.mapper.BlogMapper;
 import com.ihomy.mapper.ContentAudienceMapper;
+import com.ihomy.mapper.ContentBookMapper;
+import com.ihomy.mapper.DiaryMapper;
 import com.ihomy.mapper.FamilyCircleMapper;
 import com.ihomy.mapper.FamilyCircleMemberMapper;
 import com.ihomy.mapper.FamilyMapper;
 import com.ihomy.mapper.PhotoMapper;
 import com.ihomy.mapper.SysRoleMapper;
 import com.ihomy.mapper.SysUserRoleMapper;
+import com.ihomy.mapper.VideoMapper;
+import com.ihomy.mapper.WishMapper;
 import com.ihomy.service.access.ContentAccessService;
 import com.ihomy.service.access.ContentKind;
 import com.ihomy.service.access.ViewerScope;
@@ -57,6 +67,11 @@ public class AudienceService {
     private final FamilyCircleMemberMapper memberMapper;
     private final PhotoMapper photoMapper;
     private final AlbumMapper albumMapper;
+    private final BlogMapper blogMapper;
+    private final DiaryMapper diaryMapper;
+    private final VideoMapper videoMapper;
+    private final WishMapper wishMapper;
+    private final ContentBookMapper bookMapper;
     private final FamilyMapper familyMapper;
     private final SysUserRoleMapper userRoleMapper;
     private final SysRoleMapper sysRoleMapper;
@@ -187,6 +202,21 @@ public class AudienceService {
         return deleted;
     }
 
+    /** 内容被删除/移入回收站时收起它的分享行,接收方随即看不到(首页缓存同步失效) */
+    @Transactional
+    public void revokeContent(ContentKind kind, Long contentId) {
+        if (contentId == null) return;
+        List<ContentAudience> rows = audienceMapper.selectList(new LambdaQueryWrapper<ContentAudience>()
+                .eq(ContentAudience::getContentType, kind.code())
+                .eq(ContentAudience::getContentId, contentId));
+        if (rows.isEmpty()) return;
+        audienceMapper.delete(new LambdaQueryWrapper<ContentAudience>()
+                .eq(ContentAudience::getContentType, kind.code())
+                .eq(ContentAudience::getContentId, contentId));
+        rows.stream().map(ContentAudience::getTargetId).distinct()
+                .forEach(publicController::invalidateHomeCache);
+    }
+
     /** 单条收回(详情页「不再分享」) */
     @Transactional
     public void revokeOne(ContentKind kind, Long contentId, ViewerScope viewer) {
@@ -290,13 +320,27 @@ public class AudienceService {
         if (fresh.isEmpty()) return;
         Family owner = familyMapper.selectById(ownerFamilyId);
         String ownerName = owner == null ? "家人" : owner.getName();
-        String what = kind == ContentKind.ALBUM ? "相册" : "照片";
+        String what = contentLabel(kind);
         for (Long familyId : fresh) {
             for (Long userId : adultUserIds(familyId)) {
                 notificationService.createInFamily(userId, familyId, "share",
                         "「" + ownerName + "」分享了" + what + "给你", contentId, kind.code(), contentId);
             }
         }
+    }
+
+    /** 提醒文案里的内容叫法(用户语言,不出现内部类型码) */
+    private String contentLabel(ContentKind kind) {
+        return switch (kind) {
+            case ALBUM -> "相册";
+            case PHOTO -> "照片";
+            case BLOG -> "一篇博客";
+            case DIARY -> "一篇日记";
+            case VIDEO -> "一部影片";
+            case WISH -> "一个愿望";
+            case BOOK -> "一本书";
+            default -> "内容";
+        };
     }
 
     /** 家庭里的成人成员(OWNER/MEMBER),儿童与访客不在分享提醒范围内 */
@@ -331,6 +375,26 @@ public class AudienceService {
             if (a == null) return null;
             String visibility = "private".equals(a.getType()) ? DictConst.VIS_PRIVATE : DictConst.VIS_FAMILY;
             return new Shareable(a.getId(), a.getFamilyId(), a.getCreatedBy(), visibility);
+        }
+        if (kind == ContentKind.BLOG) {
+            Blog b = blogMapper.selectById(contentId);
+            return b == null ? null : new Shareable(b.getId(), b.getFamilyId(), b.getAuthorId(), b.getVisibility());
+        }
+        if (kind == ContentKind.DIARY) {
+            Diary d = diaryMapper.selectById(contentId);
+            return d == null ? null : new Shareable(d.getId(), d.getFamilyId(), d.getAuthorId(), d.getVisibility());
+        }
+        if (kind == ContentKind.VIDEO) {
+            Video v = videoMapper.selectById(contentId);
+            return v == null ? null : new Shareable(v.getId(), v.getFamilyId(), v.getUploaderId(), v.getVisibility());
+        }
+        if (kind == ContentKind.WISH) {
+            Wish w = wishMapper.selectById(contentId);
+            return w == null ? null : new Shareable(w.getId(), w.getFamilyId(), w.getRequesterId(), w.getVisibility());
+        }
+        if (kind == ContentKind.BOOK) {
+            ContentBook b = bookMapper.selectById(contentId);
+            return b == null ? null : new Shareable(b.getId(), b.getFamilyId(), b.getUploaderId(), b.getVisibility());
         }
         throw new BizException(ResultCode.BAD_REQUEST, "这个内容暂时还不能分享到亲友圈");
     }

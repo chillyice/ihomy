@@ -80,6 +80,7 @@
               <span class="page-num">{{ pageCount }} {{ $t('diary.pagesUnit') }} · {{ wordCount }} {{ $t('diary.words') }}</span>
               <div class="vis-row">
                 <VisibilityPicker v-model="form.visibility" :options="visibilityOptions" button size="small" />
+                <el-button v-if="form.visibility !== 'PRIVATE'" size="small" @click="openShare">{{ $t('audience.label') }}</el-button>
                 <el-button type="primary" :loading="loading" @click="onSave">{{ $t('common.save') }}</el-button>
               </div>
             </div>
@@ -124,17 +125,31 @@
         </div>
       </div>
     </teleport>
+
+    <!-- 分享范围:仅非私密日记可分享;不选圈 = 只给自家人 -->
+    <el-dialog v-model="shareDialog" append-to-body :title="t('audience.label')" width="420px">
+      <div v-loading="shareLoading">
+        <AudiencePicker v-if="audience.canShare" v-model="audience.selected" :circles="audience.circles" />
+        <p v-else class="audience-tip">{{ t('audience.canShareFalse') }}</p>
+      </div>
+      <template #footer>
+        <el-button @click="shareDialog = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" :disabled="!audience.canShare" @click="confirmShare">{{ t('common.confirm') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { diaryApi, publicApi } from '@/api'
+import { diaryApi, audienceApi, publicApi } from '@/api'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
+import AudiencePicker from '@/components/common/AudiencePicker.vue'
+import { useAudience } from '@/composables/useAudience'
 import DoodleTray from './DoodleTray.vue'
 import { INK_COLORS, parseDoodle, renderStroke, renderStrokes, erasePixel, eraseObject, setupCanvas, clearCanvas } from '@/utils/doodle'
 import { PAGE_H, PAPER_W, MOODS, WEATHERS, moodLabel as moodLabelOf, weatherLabel as weatherLabelOf } from '@/utils/diary'
@@ -157,6 +172,30 @@ const form = reactive({
   time: new Date().toTimeString().slice(0, 5),
   visibility: 'PRIVATE',
 })
+// 分享范围:仅非私密日记可分享;打开面板才载入,没打开就不动已有设置
+const shareDialog = ref(false)
+const shareLoading = ref(false)
+const { state: audience, load: loadAudience } = useAudience('diary')
+const openShare = async () => {
+  shareDialog.value = true
+  shareLoading.value = true
+  try {
+    await loadAudience(route.params.id || null)
+  } finally {
+    shareLoading.value = false
+  }
+}
+const confirmShare = async () => {
+  shareDialog.value = false
+  if (!isEdit.value || !route.params.id) return
+  try {
+    const res = await audienceApi.save('diary', route.params.id, [...audience.selected])
+    if (audience.selected.length && res?.targetCount === 0) ElMessage.info(t('audience.noTarget'))
+    else ElMessage.success(t('common.saved'))
+  } catch {
+    /* 请求层已提示 */
+  }
+}
 // 可见范围选项(共用选择器,文案随日记命名空间)
 const visibilityOptions = computed(() => [
   { value: 'PRIVATE', label: t('diary.onlySelf') },
@@ -496,8 +535,21 @@ const onSave = async () => {
       visibility: form.visibility,
       doodle: strokes.value.length ? JSON.stringify({ v: 1, strokes: strokes.value }) : null,
     }
+    const picked = audience.loaded && audience.canShare && form.visibility !== 'PRIVATE' ? [...audience.selected] : null
+    let diaryId = isEdit.value ? route.params.id : null
     if (isEdit.value) await diaryApi.update(route.params.id, payload)
-    else await diaryApi.create(payload)
+    else {
+      const created = await diaryApi.create(payload)
+      diaryId = created?.id
+    }
+    if (diaryId && picked !== null) {
+      try {
+        const res = await audienceApi.save('diary', diaryId, picked)
+        if (picked.length && res?.targetCount === 0) ElMessage.info(t('audience.noTarget'))
+      } catch {
+        ElMessage.warning(t('audience.saveFailed'))
+      }
+    }
     clearDraft() // 保存成功,草稿使命完成
     ElMessage.success(t('common.saveSuccess'))
     // 编辑完成回到该作者的日记本翻书视图;新建回到书架
@@ -756,6 +808,11 @@ html.dark .paper-sheet {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+.audience-tip {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
 }
 
 /* 涂鸦画布层:荧光笔专用画布 multiply 叠在文字上(深色模式 screen),墨迹/实时画布普通叠加 */

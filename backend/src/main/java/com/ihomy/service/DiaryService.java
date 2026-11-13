@@ -35,6 +35,7 @@ public class DiaryService {
     private final SysUserMapper sysUserMapper;
     private final PointsService pointsService;
     private final ContentAccessService contentAccess;
+    private final AudienceService audienceService;
 
     /** 查询单条日记详情:跨家庭或不可见一律 404(不泄露存在性) */
     public Diary getById(Long id, ViewerScope viewer) {
@@ -42,7 +43,8 @@ public class DiaryService {
         if (diary == null) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
-        contentAccess.assertViewable(ContentKind.DIARY, diary.getFamilyId(), diary.getAuthorId(), diary.getVisibility(), viewer);
+        contentAccess.assertViewable(ContentKind.DIARY, diary.getFamilyId(), diary.getAuthorId(), diary.getVisibility(), viewer,
+                audienceService.sharedTo(ContentKind.DIARY, id, viewer.familyId()));
         return diary;
     }
 
@@ -50,7 +52,7 @@ public class DiaryService {
     public IPage<Diary> page(int current, int size, ViewerScope viewer) {
         LambdaQueryWrapper<Diary> qw = new LambdaQueryWrapper<>();
         contentAccess.applyVisible(qw, ContentKind.DIARY, viewer,
-                Diary::getFamilyId, Diary::getAuthorId, Diary::getVisibility);
+                Diary::getFamilyId, Diary::getAuthorId, Diary::getVisibility, Diary::getId);
         qw.orderByDesc(Diary::getCreatedAt);
         IPage<Diary> page = diaryMapper.selectPage(new Page<>(current, size), qw);
         List<Diary> records = page.getRecords();
@@ -60,6 +62,15 @@ public class DiaryService {
                 Map<Long, String> nameMap = sysUserMapper.selectBatchIds(authorIds).stream()
                         .collect(Collectors.toMap(SysUser::getId, u -> u.getNickname() != null ? u.getNickname() : u.getUsername(), (a, b) -> a));
                 records.forEach(d -> d.setAuthorName(nameMap.get(d.getAuthorId())));
+            }
+            Map<Long, Map<String, Object>> shared = audienceService.sharedSources(
+                    ContentKind.DIARY, records.stream().map(Diary::getId).toList(), viewer.familyId());
+            for (Diary d : records) {
+                Map<String, Object> from = shared.get(d.getId());
+                if (from != null) {
+                    d.setSharedFrom(from);
+                    d.setReadOnly(true);
+                }
             }
         }
         return page;
@@ -82,10 +93,10 @@ public class DiaryService {
         return diary;
     }
 
-    /** 更新日记:仅作者本人可改 */
-    public Diary update(Long id, Long currentUserId, DiaryDTO dto) {
+    /** 更新日记:仅作者本人可改;跨家庭一律当不存在 */
+    public Diary update(Long id, Long currentUserId, Long familyId, DiaryDTO dto) {
         Diary diary = diaryMapper.selectById(id);
-        if (diary == null) {
+        if (diary == null || familyId == null || !familyId.equals(diary.getFamilyId())) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
         if (!diary.getAuthorId().equals(currentUserId)) {
@@ -105,16 +116,17 @@ public class DiaryService {
         return diary;
     }
 
-    /** 删除日记:作者本人或家长可删 */
-    public void delete(Long id, Long currentUserId, boolean isOwner) {
+    /** 删除日记:作者本人或家长可删;跨家庭一律当不存在 */
+    public void delete(Long id, Long currentUserId, Long familyId, boolean isOwner) {
         Diary diary = diaryMapper.selectById(id);
-        if (diary == null) {
+        if (diary == null || familyId == null || !familyId.equals(diary.getFamilyId())) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
         if (!isOwner && !diary.getAuthorId().equals(currentUserId)) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
         diaryMapper.deleteById(id);
+        audienceService.revokeContent(ContentKind.DIARY, id);
     }
 
     /** 解析日记日期:兼容 yyyy-MM-dd、yyyy-MM-dd HH:mm(编辑页提交格式) */

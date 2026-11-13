@@ -42,6 +42,7 @@ public class VideoService {
     private final PointsService pointsService;
     private final FileService fileService;
     private final ContentAccessService contentAccess;
+    private final AudienceService audienceService;
 
     /** 视频列表:按家庭/可见范围过滤(补上此前漏掉的可见性判定),支持关键字/类型搜索,附带上传者昵称与来源设备信息 */
     public List<Map<String, Object>> list(ViewerScope viewer, String keyword, String mediaType) {
@@ -49,7 +50,7 @@ public class VideoService {
         if (viewer.familyId() == null) return result;
         LambdaQueryWrapper<Video> qw = new LambdaQueryWrapper<>();
         contentAccess.applyVisible(qw, ContentKind.VIDEO, viewer,
-                Video::getFamilyId, Video::getUploaderId, Video::getVisibility);
+                Video::getFamilyId, Video::getUploaderId, Video::getVisibility, Video::getId);
         qw.eq(Video::getDeleted, 0)
           .eq(mediaType != null && !mediaType.isBlank(), Video::getMediaType, mediaType)
           .like(keyword != null && !keyword.isBlank(), Video::getTitle, keyword)
@@ -57,6 +58,9 @@ public class VideoService {
         List<Video> videos = videoMapper.selectList(qw);
         Map<Long, SysUser> userMap = batchUsers(videos.stream().map(Video::getUploaderId));
         Map<Long, StorageDevice> deviceMap = batchDevices(videos);
+        Map<Long, Map<String, Object>> shared = audienceService.sharedSources(
+                com.ihomy.service.access.ContentKind.VIDEO,
+                videos.stream().map(Video::getId).toList(), viewer.familyId());
         for (Video v : videos) {
             Map<String, Object> m = new HashMap<>();
             m.put("id", v.getId());
@@ -84,6 +88,11 @@ public class VideoService {
             StorageDevice d = v.getSourceDeviceId() == null ? null : deviceMap.get(v.getSourceDeviceId());
             m.put("sourceDeviceName", d == null ? null : d.getName());
             m.put("createdAt", v.getCreatedAt());
+            m.put("familyId", v.getFamilyId());
+            if (shared.containsKey(v.getId())) {
+                m.put("readOnly", true);
+                m.put("sharedFrom", shared.get(v.getId()));
+            }
             result.add(m);
         }
         return result;
@@ -118,7 +127,9 @@ public class VideoService {
         if (v == null || (v.getDeleted() != null && v.getDeleted() == 1)) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
-        if (familyId != null && !familyId.equals(v.getFamilyId())) {
+        // 本家庭或亲友圈分享过来的影片都能播;其余一律当不存在
+        if (familyId != null && !familyId.equals(v.getFamilyId())
+                && !audienceService.sharedTo(ContentKind.VIDEO, id, familyId)) {
             throw new BizException(ResultCode.FORBIDDEN);
         }
         return Map.of("url", signedUrlService.resolve(v.getVideoUrl()));
@@ -128,6 +139,7 @@ public class VideoService {
     public void delete(Long id, Long familyId, Long currentUserId, boolean isOwner) {
         requireOwn(id, familyId, currentUserId, isOwner);
         videoMapper.softDeleteById(id);
+        audienceService.revokeContent(ContentKind.VIDEO, id);
     }
 
     /** DTO 字段落库,mediaType 缺省补 movie */
@@ -156,7 +168,7 @@ public class VideoService {
             throw new BizException(ResultCode.NOT_FOUND);
         }
         if (familyId != null && !familyId.equals(v.getFamilyId())) {
-            throw new BizException(ResultCode.FORBIDDEN);
+            throw new BizException(ResultCode.NOT_FOUND); // 跨家庭一律当不存在,不泄露分享来的内容
         }
         if (!isOwner && !v.getUploaderId().equals(currentUserId)) {
             throw new BizException(ResultCode.FORBIDDEN);
