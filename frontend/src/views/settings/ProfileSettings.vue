@@ -34,7 +34,6 @@
           <el-color-picker v-model="labelForm.color" />
           <el-button v-if="labelForm.label" link type="danger" @click="clearLabel">{{ $t('common.cancel') }}</el-button>
         </div>
-        <div class="form-tip">{{ $t('settings.labelHint') }}</div>
       </el-form-item>
       <el-form-item :label="$t('settings.language')">
         <el-radio-group :model-value="locale" @change="onChangeLang">
@@ -51,7 +50,6 @@
   <!-- 退出登录:个人设置最下方 -->
   <div class="card settings-card">
     <div class="section-label">{{ $t('nav.logout') }}</div>
-    <p class="share-tip">{{ $t('settings.logoutHint') }}</p>
     <el-button type="danger" plain @click="onLogout">{{ $t('nav.logout') }}</el-button>
   </div>
 
@@ -190,24 +188,6 @@ onMounted(async () => {
   gap: 8px;
   align-items: center;
   flex-wrap: wrap;
-}
-.form-tip {
-  color: #776e62;
-  font-size: 12px;
-  margin-top: 8px;
-  line-height: 1.4;
-  width: 100%;
-}
-.share-tip {
-  color: #776e62;
-  font-size: 12px;
-  margin-top: 8px;
-  line-height: 1.4;
-  width: 100%;
-}
-html.dark .form-tip,
-html.dark .share-tip {
-  color: #9a9088;
 }
 .upload-row {
   display: flex;

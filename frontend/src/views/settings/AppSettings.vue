@@ -1,107 +1,52 @@
-<!-- 手机客户端设置(仅壳内可见):系统日历单向导出做提醒兜底。文案只讲用户能做什么。 -->
+<!-- 手机客户端设置(仅壳内可见):按「更新 / 提醒 / 备份与安全 / 设备」分区,一行一个开关。
+     文案只讲用户能做什么,机制细节留在代码注释里。 -->
 <template>
+  <!-- 应用与更新 -->
   <div class="card settings-card">
-    <div class="section-label">{{ $t('appSettings.title') }}</div>
+    <div class="section-label">{{ $t('appSettings.section.update') }}</div>
 
-    <p class="share-tip app-lead">{{ $t('appSettings.lead') }}</p>
+    <div class="opt">
+      <div class="opt-main">
+        <div class="opt-title">{{ $t('appSettings.aboutTitle') }}</div>
+        <div class="opt-meta">{{ $t('appSettings.currentVersion', { version: appVersion }) }}</div>
+        <div class="opt-desc">{{ isIOS ? $t('appSettings.updateDescIos') : $t('appSettings.updateDesc') }}</div>
+      </div>
+      <el-button v-if="!isIOS" type="primary" plain :loading="checking" @click="onCheckUpdate">
+        {{ $t('appUpdate.check') }}
+      </el-button>
+    </div>
 
-    <el-form label-position="top" class="settings-form">
-      <el-form-item :label="$t('appSettings.aboutTitle')">
-        <div class="ver-now">{{ $t('appSettings.currentVersion', { version: appVersion }) }}</div>
-        <div class="share-tip">{{ isIOS ? $t('appSettings.updateDescIos') : $t('appSettings.updateDesc') }}</div>
-        <div v-if="!isIOS" class="cal-actions">
-          <el-button type="primary" :loading="checking" @click="onCheckUpdate">
-            {{ $t('appUpdate.check') }}
-          </el-button>
-        </div>
-      </el-form-item>
-
-      <el-form-item :label="$t('appSettings.calendarTitle')">
-        <div class="cal-head">
-          <el-tag size="small" :type="status.granted ? 'success' : 'info'">
-            {{ status.granted ? $t('appSettings.calendarGranted') : $t('appSettings.calendarNotGranted') }}
-          </el-tag>
-          <span class="share-tip">{{ $t('appSettings.calendarCount', { n: status.count }) }}</span>
-        </div>
-
-        <div class="share-tip">{{ $t('appSettings.calendarDesc') }}</div>
-
-        <ul class="cal-points">
-          <li v-for="(x, i) in $tm('appSettings.calendarPoints')" :key="i">{{ x }}</li>
-        </ul>
-
-        <div class="cal-last">
-          {{ $t('appSettings.calendarLast') }}: <b>{{ lastText }}</b>
-        </div>
-
-        <div class="cal-actions">
-          <el-button type="primary" :loading="busy" @click="onExport">
-            {{ $t('appSettings.calendarExport') }}
-          </el-button>
-          <el-button :disabled="busy || !status.count" @click="onClear">
-            {{ $t('appSettings.calendarClear') }}
-          </el-button>
-          <el-button link :disabled="busy" @click="load">{{ $t('appSettings.refresh') }}</el-button>
-        </div>
-      </el-form-item>
-
-      <el-form-item :label="$t('appSettings.deviceCalendarTitle')">
-        <div class="cal-head">
-          <el-switch v-model="deviceCalendar" @change="onDeviceCalendarChange" />
-          <el-tag size="small" :type="deviceCalendar ? 'success' : 'info'">
-            {{ deviceCalendar ? $t('appSettings.deviceCalendarOn') : $t('appSettings.deviceCalendarOff') }}
+    <div v-if="isAndroid" class="opt">
+      <div class="opt-main">
+        <div class="opt-title">{{ $t('appSettings.autoUpdateTitle') }}</div>
+        <div class="opt-desc">{{ $t('appSettings.autoUpdateDesc') }}</div>
+        <div class="opt-meta">
+          <el-tag size="small" :type="autoUpdateDeviceOwner ? 'success' : 'info'">
+            {{ autoUpdateDeviceOwner ? $t('appSettings.autoUpdateSilent') : $t('appSettings.autoUpdateNeedConfirm') }}
           </el-tag>
         </div>
-        <div class="share-tip">{{ $t('appSettings.deviceCalendarDesc') }}</div>
-      </el-form-item>
+      </div>
+      <el-switch v-model="autoUpdate" @change="onAutoUpdateChange" />
+    </div>
+  </div>
 
-      <el-form-item :label="$t('appSettings.vaultLockTitle')">
-        <div class="cal-head">
-          <el-switch v-model="vaultLock" :disabled="!bioAvailable" @change="onVaultLockChange" />
-          <el-tag size="small" :type="bioAvailable ? 'success' : 'info'">
-            {{ bioAvailable ? $t('appSettings.vaultLockOn') : $t('appSettings.vaultLockNoHardware') }}
-          </el-tag>
-        </div>
-        <div class="share-tip">{{ $t('appSettings.vaultLockDesc') }}</div>
-      </el-form-item>
+  <!-- 提醒 -->
+  <div class="card settings-card">
+    <div class="section-label">{{ $t('appSettings.section.remind') }}</div>
 
-      <el-form-item :label="$t('appSettings.appLockTitle')">
-        <div class="cal-head">
-          <el-switch v-model="appLockOn" :disabled="!bioAvailable" @change="onAppLockChange" />
-          <el-tag size="small" :type="bioAvailable ? 'success' : 'info'">
-            {{ bioAvailable ? $t('appSettings.vaultLockOn') : $t('appSettings.vaultLockNoHardware') }}
-          </el-tag>
-        </div>
-        <div class="share-tip">{{ $t('appSettings.appLockDesc') }}</div>
-      </el-form-item>
+    <div class="opt">
+      <div class="opt-main">
+        <div class="opt-title">{{ $t('appSettings.unreadNotifyTitle') }}</div>
+        <div class="opt-desc">{{ isIOS ? $t('appSettings.unreadNotifyDescIos') : $t('appSettings.unreadNotifyDesc') }}</div>
+      </div>
+      <el-switch v-model="unreadNotify" @change="onUnreadNotifyChange" />
+    </div>
 
-      <el-form-item :label="$t('appSettings.hapticsTitle')">
-        <div class="cal-head">
-          <el-switch v-model="hapticsOn" @change="onHapticsChange" />
-          <el-tag size="small" :type="hapticsOn ? 'success' : 'info'">
-            {{ hapticsOn ? $t('appSettings.hapticsOn') : $t('appSettings.hapticsOff') }}
-          </el-tag>
-        </div>
-        <div class="share-tip">{{ $t('appSettings.hapticsDesc') }}</div>
-      </el-form-item>
-
-      <el-form-item :label="$t('appSettings.kioskTitle')">
-        <div class="share-tip">{{ $t('appSettings.kioskDesc') }}</div>
-        <div class="cal-actions">
-          <el-button @click="router.push('/kiosk')">{{ $t('appSettings.kioskOpen') }}</el-button>
-        </div>
-      </el-form-item>
-
-      <el-form-item :label="$t('appSettings.unreadNotifyTitle')">
-        <div class="cal-head">
-          <el-switch v-model="unreadNotify" @change="onUnreadNotifyChange" />
-        </div>
-        <div class="share-tip">{{ isIOS ? $t('appSettings.unreadNotifyDescIos') : $t('appSettings.unreadNotifyDesc') }}</div>
-      </el-form-item>
-
-      <el-form-item :label="$t('appSettings.dailyWeatherTitle')">
-        <div class="cal-head">
-          <el-switch v-model="dailyWeather" @change="onDailyWeatherChange" />
+    <div class="opt">
+      <div class="opt-main">
+        <div class="opt-title">{{ $t('appSettings.dailyWeatherTitle') }}</div>
+        <div class="opt-desc">{{ $t('appSettings.dailyWeatherDesc') }}</div>
+        <div class="opt-extra">
           <el-time-select
             v-model="dailyWeatherTime"
             start="00:00"
@@ -111,82 +56,146 @@
             :placeholder="$t('appSettings.dailyWeatherTimePlaceholder')"
             @change="onDailyWeatherTimeChange"
           />
-          <el-button link :disabled="!dailyWeather" @click="onWeatherPreview">
-            {{ $t('appSettings.dailyWeatherPreview') }}
-          </el-button>
+          <el-button link :disabled="!dailyWeather" @click="onWeatherPreview">{{ $t('appSettings.dailyWeatherPreview') }}</el-button>
         </div>
-        <div class="share-tip">{{ $t('appSettings.dailyWeatherDesc') }}</div>
-      </el-form-item>
+      </div>
+      <el-switch v-model="dailyWeather" @change="onDailyWeatherChange" />
+    </div>
 
-      <el-form-item :label="$t('appSettings.notifySettingsTitle')">
-        <div class="cal-head">
-          <el-tag size="small" type="info">{{
-            isIOS ? $t('appSettings.notifySettingsChannelsIos') : $t('appSettings.notifySettingsChannels')
-          }}</el-tag>
+    <div class="opt">
+      <div class="opt-main">
+        <div class="opt-title">
+          {{ $t('appSettings.calendarTitle') }}
+          <el-tag size="small" :type="status.granted ? 'success' : 'info'">
+            {{ status.granted ? $t('appSettings.calendarGranted') : $t('appSettings.calendarNotGranted') }}
+          </el-tag>
         </div>
-        <div class="share-tip">{{ isIOS ? $t('appSettings.notifySettingsDescIos') : $t('appSettings.notifySettingsDesc') }}</div>
-        <div class="cal-actions">
+        <div class="opt-desc">{{ $t('appSettings.calendarDesc') }}</div>
+        <div class="opt-meta">
+          {{ $t('appSettings.calendarCount', { n: status.count }) }} · {{ $t('appSettings.calendarLast') }}：{{ lastText }}
+        </div>
+        <div class="opt-extra">
+          <el-button type="primary" plain :loading="busy" @click="onExport">{{ $t('appSettings.calendarExport') }}</el-button>
+          <el-button :disabled="busy || !status.count" @click="onClear">{{ $t('appSettings.calendarClear') }}</el-button>
+          <el-button link :disabled="busy" @click="load">{{ $t('appSettings.refresh') }}</el-button>
+        </div>
+      </div>
+    </div>
+
+    <div class="opt">
+      <div class="opt-main">
+        <div class="opt-title">{{ $t('appSettings.deviceCalendarTitle') }}</div>
+        <div class="opt-desc">{{ $t('appSettings.deviceCalendarDesc') }}</div>
+      </div>
+      <el-switch v-model="deviceCalendar" @change="onDeviceCalendarChange" />
+    </div>
+
+    <div class="opt">
+      <div class="opt-main">
+        <div class="opt-title">{{ $t('appSettings.notifySettingsTitle') }}</div>
+        <div class="opt-desc">{{ isIOS ? $t('appSettings.notifySettingsDescIos') : $t('appSettings.notifySettingsDesc') }}</div>
+        <div class="opt-meta">{{ isIOS ? $t('appSettings.notifySettingsChannelsIos') : $t('appSettings.notifySettingsChannels') }}</div>
+        <div class="opt-extra">
           <el-button @click="onOpenNotificationSettings">{{ $t('appSettings.notifySettingsOpen') }}</el-button>
         </div>
-      </el-form-item>
+      </div>
+    </div>
+  </div>
 
-      <el-form-item v-if="isAndroid" :label="$t('appSettings.autoUpdateTitle')">
-        <div class="cal-head">
-          <el-switch v-model="autoUpdate" @change="onAutoUpdateChange" />
-          <el-tag v-if="autoUpdateDeviceOwner" size="small" type="success">
-            {{ $t('appSettings.autoUpdateSilent') }}
-          </el-tag>
-          <el-tag v-else size="small" type="info">{{ $t('appSettings.autoUpdateNeedConfirm') }}</el-tag>
-        </div>
-        <div class="share-tip">{{ $t('appSettings.autoUpdateDesc') }}</div>
-      </el-form-item>
+  <!-- 备份与安全 -->
+  <div class="card settings-card">
+    <div class="section-label">{{ $t('appSettings.section.backup') }}</div>
 
-      <el-form-item :label="$t('appSettings.photoBackupTitle')">
-        <div class="cal-head">
-          <el-switch v-model="backupOn" :disabled="backupBusy" @change="onBackupToggle" />
-          <el-tag size="small" :type="backupOn ? 'success' : 'info'">
-            {{ backupOn ? $t('appSettings.photoBackupOn') : $t('appSettings.photoBackupOff') }}
-          </el-tag>
+    <div class="opt">
+      <div class="opt-main">
+        <div class="opt-title">
+          {{ $t('appSettings.photoBackupTitle') }}
           <el-tag size="small" type="info">{{ $t('appSettings.photoBackupPending', { n: backupPending }) }}</el-tag>
         </div>
-        <div class="share-tip">{{ $t('appSettings.photoBackupDesc') }}</div>
-        <div class="share-tip">{{ $t('appSettings.photoBackupPartialHint') }}</div>
-
-        <div class="cal-head bk-switches">
-          <span class="share-tip bk-switch">
+        <div class="opt-desc">{{ $t('appSettings.photoBackupDesc') }}</div>
+        <div class="opt-desc">{{ $t('appSettings.photoBackupPartialHint') }}</div>
+        <div class="opt-extra">
+          <span class="opt-sub">
             <el-switch v-model="backupWifi" size="small" @change="onBackupWifiChange" />
             {{ $t('appSettings.photoBackupWifi') }}
           </span>
-          <span class="share-tip bk-switch">
+          <span class="opt-sub">
             <el-switch v-model="backupCharge" size="small" @change="onBackupChargeChange" />
             {{ $t('appSettings.photoBackupCharge') }}
           </span>
         </div>
-        <div class="share-tip">{{ $t('appSettings.photoBackupSwitchHint') }}</div>
-
-        <div class="cal-last">
-          {{ $t('appSettings.photoBackupLast') }}: <b>{{ backupLastText }}</b>
-        </div>
-        <div v-if="pbState.running" class="cal-last">
+        <div class="opt-meta">{{ $t('appSettings.photoBackupLast') }}：{{ backupLastText }}</div>
+        <div v-if="pbState.running" class="opt-meta">
           {{ $t('appSettings.photoBackupRunning', { done: pbState.scanned }) }}
         </div>
-
-        <div class="cal-actions">
-          <el-button type="primary" :loading="pbState.running" @click="onBackupNow">
+        <div class="opt-extra">
+          <el-button type="primary" plain :loading="pbState.running" @click="onBackupNow">
             {{ $t('appSettings.photoBackupNow') }}
           </el-button>
           <el-button :disabled="pbState.running || backupBusy" @click="onBackupFull">
             {{ $t('appSettings.photoBackupFull') }}
           </el-button>
-          <el-button v-if="pbState.running" @click="onBackupStop">
-            {{ $t('appSettings.photoBackupStop') }}
-          </el-button>
+          <el-button v-if="pbState.running" @click="onBackupStop">{{ $t('appSettings.photoBackupStop') }}</el-button>
           <el-button link :disabled="pbState.running" @click="loadPhotoBackup">{{ $t('appSettings.refresh') }}</el-button>
         </div>
-      </el-form-item>
+      </div>
+      <el-switch v-model="backupOn" :disabled="backupBusy" @change="onBackupToggle" />
+    </div>
 
-      <el-form-item :label="$t('appSettings.diagnosticsTitle')">
-        <div class="cal-head">
+    <div class="opt">
+      <div class="opt-main">
+        <div class="opt-title">
+          {{ $t('appSettings.vaultLockTitle') }}
+          <el-tag size="small" :type="bioAvailable ? 'success' : 'info'">
+            {{ bioAvailable ? $t('appSettings.vaultLockOn') : $t('appSettings.vaultLockNoHardware') }}
+          </el-tag>
+        </div>
+        <div class="opt-desc">{{ $t('appSettings.vaultLockDesc') }}</div>
+      </div>
+      <el-switch v-model="vaultLock" :disabled="!bioAvailable" @change="onVaultLockChange" />
+    </div>
+
+    <div class="opt">
+      <div class="opt-main">
+        <div class="opt-title">
+          {{ $t('appSettings.appLockTitle') }}
+          <el-tag size="small" :type="bioAvailable ? 'success' : 'info'">
+            {{ bioAvailable ? $t('appSettings.vaultLockOn') : $t('appSettings.vaultLockNoHardware') }}
+          </el-tag>
+        </div>
+        <div class="opt-desc">{{ $t('appSettings.appLockDesc') }}</div>
+      </div>
+      <el-switch v-model="appLockOn" :disabled="!bioAvailable" @change="onAppLockChange" />
+    </div>
+  </div>
+
+  <!-- 设备与诊断 -->
+  <div class="card settings-card">
+    <div class="section-label">{{ $t('appSettings.section.device') }}</div>
+
+    <div class="opt">
+      <div class="opt-main">
+        <div class="opt-title">{{ $t('appSettings.hapticsTitle') }}</div>
+        <div class="opt-desc">{{ $t('appSettings.hapticsDesc') }}</div>
+      </div>
+      <el-switch v-model="hapticsOn" @change="onHapticsChange" />
+    </div>
+
+    <div class="opt">
+      <div class="opt-main">
+        <div class="opt-title">{{ $t('appSettings.kioskTitle') }}</div>
+        <div class="opt-desc">{{ $t('appSettings.kioskDesc') }}</div>
+        <div class="opt-extra">
+          <el-button @click="router.push('/kiosk')">{{ $t('appSettings.kioskOpen') }}</el-button>
+        </div>
+      </div>
+    </div>
+
+    <div class="opt">
+      <div class="opt-main">
+        <div class="opt-title">{{ $t('appSettings.diagnosticsTitle') }}</div>
+        <div class="opt-desc">{{ $t('appSettings.diagnosticsDesc') }}</div>
+        <div class="opt-meta">
           <el-tag size="small" :type="diag.crashes ? 'warning' : 'info'">
             {{ $t('appSettings.diagnosticsCrashes', { n: diag.crashes }) }}
           </el-tag>
@@ -194,10 +203,10 @@
             {{ $t('appSettings.diagnosticsErrors', { n: diag.errors }) }}
           </el-tag>
         </div>
-        <div class="share-tip">{{ $t('appSettings.diagnosticsDesc') }}</div>
-        <div class="cal-actions">
+        <div class="opt-extra">
           <el-button
             type="primary"
+            plain
             :loading="diagBusy"
             :disabled="diagBusy || (!diag.crashes && !diag.errors)"
             @click="onExportDiagnostics"
@@ -209,8 +218,8 @@
           </el-button>
           <el-button link :disabled="diagBusy" @click="loadDiagnostics">{{ $t('appSettings.refresh') }}</el-button>
         </div>
-      </el-form-item>
-    </el-form>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -708,57 +717,70 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.share-tip {
-  color: #776e62;
-  font-size: 12px;
-  margin-top: 8px;
-  line-height: 1.4;
-  width: 100%;
+.settings-card {
+  margin-bottom: 16px;
+  background: var(--color-card);
 }
-html.dark .share-tip {
-  color: #9a9088;
+/* 一行一项:左侧标题/说明,右侧开关;动作按钮排在说明下 */
+.opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
 }
-.app-lead {
-  margin-bottom: 12px;
+.opt + .opt {
+  border-top: 1px solid var(--color-border);
 }
-.ver-now {
-  font-size: 13.5px;
-  font-weight: 600;
+.opt-main {
+  flex: 1;
+  min-width: 0;
 }
-.cal-head {
+.opt-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--color-text);
+  line-height: 1.5;
+}
+.opt-desc {
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+.opt-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+.opt-extra {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  margin-bottom: 6px;
-}
-.bk-switches {
   margin-top: 10px;
-  gap: 18px;
 }
-.bk-switch {
+.opt-sub {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-top: 0;
-}
-.cal-points {
-  margin: 8px 0 0;
-  padding-left: 1.2em;
   font-size: 12.5px;
-  line-height: 1.8;
-  color: var(--color-text-secondary, #8a8a8a);
+  color: var(--color-text-secondary);
 }
-.cal-last {
-  margin-top: 10px;
-  font-size: 12.5px;
-  color: var(--color-text-secondary, #8a8a8a);
+/* 开关固定在右侧,不被长说明挤扁 */
+.opt :deep(.el-switch) {
+  flex-shrink: 0;
 }
-.cal-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 12px;
+@media (max-width: 768px) {
+  .opt-extra :deep(.el-button) {
+    margin-left: 0;
+  }
 }
 </style>

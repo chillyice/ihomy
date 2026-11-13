@@ -2223,6 +2223,14 @@ export default {
   },
   settings: {
     title: 'Settings',
+    allSettings: 'All settings',
+    // Group headings on the mobile list (same groups in the desktop sidebar)
+    group: {
+      account: 'Account',
+      family: 'Family',
+      content: 'Content & media',
+      device: 'Look & device',
+    },
     profile: 'Profile',
     nickname: 'Nickname',
     avatar: 'Avatar',
@@ -2239,12 +2247,11 @@ export default {
     visitorPublic: 'Public to visitors',
     shareLink: 'Share link',
     copy: 'Copy link',
-    shareTip: 'Visitors can browse public content via this link (requires "Public to visitors" on)',
+    shareTip: 'Visitors can browse public content once "Public to visitors" is on',
     uploadAvatar: 'Click to upload avatar',
     uploadCover: 'Upload cover',
     label: 'Identity label',
     labelPlaceholder: 'Select label',
-    labelHint: 'Click "New label" to create custom identity labels like "Big Treasure"',
     newLabel: 'New label',
     language: 'Language',
     languageZh: '中文',
@@ -2268,8 +2275,7 @@ export default {
       regionHint: 'Saved automatically once a city is selected',
       regionSaved: 'Weather region updated',
       apiTitle: 'Weather API configuration',
-      apiHint:
-        'Configure weather data sources: QWeather / OpenWeather / Amap (only QWeather fetches data for now). You can add several (e.g. test/prod); only one is active as the default. Keys cannot be displayed again after saving.',
+      apiHint: 'Add several if you like; only the default one is used. Keys cannot be shown again after saving.',
       addCredential: 'Add credential',
       name: 'Name',
       namePh: 'e.g. Windows test / Linux prod',
@@ -2313,7 +2319,6 @@ export default {
     },
     personalize: 'Look & feel',
     avatarCropTitle: 'Crop avatar',
-    logoutHint: 'Sign out of this account and return to the signed-out home page.',
     bgmTitle: 'Background music',
     bgmUploadMusic: 'Upload music',
     bgmUploadTrack: 'Upload track',
@@ -2332,7 +2337,7 @@ export default {
     currentFamily: 'Current home',
     switchTo: 'Switch',
     createFamily: 'Create a home',
-    createFamilyHint: 'Create a new home; you will be its owner. You are switched to it right away and can switch back from the top bar.',
+    createFamilyHint: 'You will own the new home and are switched to it right away; you can switch back any time.',
     createFamilyDialogHint: 'You will be the owner of the new home and switched to it right away.',
     familyNamePh: 'e.g. The Zhang family cottage',
     creating: 'Creating...',
@@ -2345,8 +2350,7 @@ export default {
     weatherSearchPh: 'Search a city (e.g. Jinan)',
     alertPushTitle: 'Weather alerts',
     alertPushLabel: 'Push to the notification bell',
-    alertPushHint:
-      'When on, local weather alerts (heavy rain, strong wind and so on) are sent to every family member. This is not real-time and may lag by around half an hour.',
+    alertPushHint: 'Local weather alerts go to every family member (may lag by around half an hour)',
     lampMode: 'Lamp mode',
     lampAuto: 'Auto (on at night, off by day)',
     lampOn: 'Always on',
@@ -2355,23 +2359,19 @@ export default {
     colorTempHint: '0 = warm (amber), 100 = cool (blue-white)',
     brightness: 'Brightness',
     shadowEffect: 'Shadow effect',
-    shadowHint: 'When off, window shadows and vignette are hidden for a cleaner picture',
     shadowDepth: 'Shadow depth',
-    shadowDepthHint: 'How deep the window shadows are; higher is darker (70 is the default)',
     blobs: 'Background blobs',
-    blobsHint: 'When off, the drifting background blobs stop (helps on low-resolution screens)',
+    blobsHint: 'When off, the blobs stop drifting',
     glass: 'Frosted glass',
-    glassHint: 'When off, the blur on the navbar, dialogs and panels is replaced with opaque backgrounds (much lower GPU use)',
+    glassHint: 'When off, panels use opaque backgrounds and need less GPU',
     weatherEffect: 'Weather effect',
-    weatherEffectHint:
-      'When on, light shafts, shadows and rain or snow follow the real weather; when off, lighting only follows the time of day',
+    weatherEffectHint: 'Light shafts and rain or snow follow the real weather',
     idleLabel: 'Night idle lamp timeout (minutes)',
-    idleHint: 'At night the lamp turns off after this much inactivity and comes back on at the first action (only in Auto mode).',
+    idleHint: 'Only applies in Auto lamp mode',
     idleState: 'Current state: lamp off after idle timeout',
     enterLightTest: 'Enter light test',
     panelLayout: 'Panel layout',
     resetPanelLayout: 'Restore default panel layout',
-    resetPanelHint: 'Reset the position and size of every draggable home panel (feed, tasks, weather, anniversaries, today, music player)',
     resetPanelTitle: 'Restore default layout',
     resetPanelConfirm: 'Restore the default position and size for every home panel? Your custom layout will be cleared.',
     resetPanelDone: 'Panel layout reset, refreshing...',
@@ -2390,7 +2390,7 @@ export default {
     dailyImage: 'Show daily image',
     dailyKnowledge: 'Show daily knowledge',
     knowledgeTypes: 'Knowledge categories',
-    knowledgeTip: 'Pick what interests you — daily knowledge only draws from these categories',
+    knowledgeTip: 'Daily knowledge only draws from these categories',
     knowledgeType: {
       history: 'History',
       science: 'Science',
@@ -2404,18 +2404,20 @@ export default {
       family: 'Family',
       ai: 'AI',
       pointsRule: 'Points rules',
+      content: 'Home content',
       daily: 'Daily Content',
       member: 'Members',
       storage: 'Storage',
       media: 'Cinema',
       weather: 'Weather',
       client: 'Phone app',
+      appearance: 'Look & display',
       display: 'Display mode',
     },
     // Cinema engine (home media server)
     media: {
       title: 'Cinema engine',
-      hint: 'Install a media server on the family NAS or PC (one folder per title), then enter its address and account here. Movies and shows will show up in the cinema, with posters, ratings and watch progress managed by the server.',
+      hint: 'Enter the server address and an account, and your family movies show up in the cinema.',
       serverType: 'Engine type',
       serverUrl: 'Server address',
       serverUrlHint: 'An address reachable from home, e.g. http://192.168.1.10:8096',
@@ -2443,11 +2445,11 @@ export default {
       savedOffline: 'Saved, but not reachable right now — check the address and account',
       testOk: 'Connected: {name} {version}',
       testFail: 'Connection failed',
-      ownerOnly: 'The cinema engine is configured by the owner below; here you can set your own playback profile.',
+      ownerOnly: 'The engine is set up by the owner; here you can set your own playback profile.',
     },
     mediaMine: {
       title: 'My playback profile',
-      hint: 'Create one account per family member on the media server and enter yours here: everyone keeps their own progress and resume list. Leave it empty to share the family account.',
+      hint: 'One account per family member keeps everyone\u2019s resume list separate.',
       username: 'My username',
       password: 'Password',
       passwordHint: 'Leave empty if the account has no password',
@@ -2461,7 +2463,7 @@ export default {
     },
     ai: {
       title: 'Family AI config (model pool + feature binding)',
-      hint: 'Add models first (language / image / voice), then pick a model of the matching type for each feature. A capability is enabled once base URL, API key and model are all filled. Keys cannot be displayed again after saving, so keep a copy.',
+      hint: 'Add a model first, then pick one for each feature. Keys cannot be shown again after saving.',
       models: 'Model pool',
       addModel: 'Add model',
       modelName: 'Model name',
@@ -2507,7 +2509,7 @@ export default {
     },
     pointsRule: {
       title: 'Points earning rules',
-      hint: 'Control whether each feature can earn points and how many. The switch only affects point rewards, not the feature itself (a disabled feature still works but grants no points). Task points are set per task; here you only control the switch.',
+      hint: 'Turning a switch off only stops points; the feature still works. Task points are set per task.',
       saved: 'Points rules saved',
       taskPoints: 'Set per task',
       group: {
@@ -5730,11 +5732,9 @@ export default {
     copyToken: 'Copy wallpaper token',
     copied: 'Copied',
     settingsTitle: 'Ambient wallpaper',
-    settingsHint:
-      'The ambient wallpaper (/wallpaper) is a display-only screen for a desktop or secondary monitor: clock, weather, family photos, anniversaries, to-dos, activity feed, plans and reminders. Which widgets appear can be added or removed in the "Widgets" panel in the page corner (drag them and the position is remembered). A desktop wallpaper cannot type an email and password, so it signs in with a wallpaper token — copy the token below, paste it into the "Wallpaper token" field of the Wallpaper Engine property panel, then use File → Restart preview.',
+    settingsHint: 'The wallpaper screen is display-only; a desktop wallpaper cannot sign in, so use the token below.',
     tokenLabel: 'Wallpaper token',
-    tokenWarn:
-      'The token is a credential, do not share it. It is valid for 7 days; copy a fresh one after it expires or after a password change. Inside Wallpaper Engine the wallpaper runs in its own environment (switch language in the panel Language field, or with the 中/EN buttons in the page corner) and is independent of your browser sign-in.',
+    tokenWarn: 'The token is a credential, do not share it. Copy a fresh one after it expires or after a password change.',
     openPage: 'Open wallpaper screen',
     tokenEmpty: 'Not signed in — no token to copy',
   },
@@ -5874,19 +5874,19 @@ export default {
   },
   appSettings: {
     title: 'Phone app',
-    lead: 'These settings only appear in the phone app, not on the website.',
+    // Sections: update / reminders / backup & security / device & diagnostics
+    section: {
+      update: 'App & updates',
+      remind: 'Reminders',
+      backup: 'Backup & security',
+      device: 'Device & diagnostics',
+    },
     calendarTitle: 'Export to system calendar',
     calendarGranted: 'Allowed',
     calendarNotGranted: 'Not allowed',
     calendarName: 'ihomy reminders',
     calendarCount: '{n} ihomy entries in this calendar',
-    calendarDesc:
-      'Write reminders, anniversaries and loan due dates into your phone calendar. Even if the system closes the app, the calendar alarm still rings on time.',
-    calendarPoints: [
-      'Exports the next 90 days; each export replaces the whole set, so nothing piles up.',
-      'Only writes to the "ihomy reminders" calendar. Your other calendars are untouched, and the phone calendar is never read back.',
-      'Events you edit by hand in the system calendar return to the app version on the next export.',
-    ],
+    calendarDesc: 'Writes into the phone calendar, so it still rings on time if the app is closed.',
     calendarLast: 'Last export',
     calendarNever: 'Not exported yet',
     calendarLastValue: '{time} · {n} entries',
@@ -5912,38 +5912,31 @@ export default {
     calendarEventSource: 'From ihomy',
     // Reading the phone calendar (merged into the schedule page)
     deviceCalendarTitle: 'Show the phone calendar in schedule',
-    deviceCalendarDesc:
-      'When on, the schedule page also shows events from this phone’s system calendar, read-only. Edit them in the phone calendar; reminders ihomy exported will not appear twice.',
+    deviceCalendarDesc: 'The schedule page also shows phone calendar events, read-only.',
     deviceCalendarOn: 'Shown',
     deviceCalendarOff: 'Hidden',
     deviceCalendarDenied: 'Calendar permission was not granted, so the phone calendar stays hidden',
     deviceCalendarSaved: 'Updated; the schedule page follows the new setting',
     // Vault biometric gate
     vaultLockTitle: 'Fingerprint unlock for the vault',
-    vaultLockDesc:
-      'When on, opening the vault asks for your fingerprint or face first, then stays unlocked for 5 minutes. It only guards against someone browsing this device; password checks still happen on the server.',
+    vaultLockDesc: 'Asks for your fingerprint or face before opening the vault, then stays unlocked for 5 minutes.',
     vaultLockOn: 'Available on this device',
     vaultLockNoHardware: 'Not available on this device',
     appLockTitle: 'App lock',
-    appLockDesc:
-      'After 5 minutes away, the app asks for your fingerprint or face before it opens again. Cancelling returns to the sign-in page, where the password can still be used. The switch turns itself off if the fingerprint is removed from this device.',
+    appLockDesc: 'After 5 minutes away, the app asks for your fingerprint or face before it opens.',
     // Haptics
     hapticsTitle: 'Haptic feedback',
-    hapticsOn: 'On',
-    hapticsOff: 'Off',
-    hapticsDesc:
-      'A light tap when you check an item, long-press, drop something, save, or hit a validation error. It follows the system "Touch feedback" setting and stays silent in silent mode.',
+    hapticsDesc: 'A light tap on check, long-press and successful saves.',
     // Tablet kiosk / photo frame
     kioskTitle: 'Kiosk mode',
     kioskDesc:
-      'Turn an idle tablet into a family display: large clock, weather, the next few days and a slow slideshow of family photos, with the screen kept on. Press and hold the bottom-right corner for 3 seconds to exit.',
+      'A landscape display: big clock, weather, schedule and a photo slideshow. Press the bottom-right corner for 3 seconds to exit.',
     kioskOpen: 'Open kiosk mode',
     // Background unread alert
     unreadNotifyTitle: 'Background message alerts',
-    unreadNotifyDesc:
-      'When on, the app keeps running in the background and alerts you in the notification bar when a message or notice arrives (usually within 30 seconds). Android shows a permanent "ihomy is running in the background" notification. Turning it off stops the background checks; home-screen widgets still check about every 30 minutes as a fallback. Quiet from 23:00 to 06:00.',
+    unreadNotifyDesc: 'The app keeps running in the background and alerts you when a message or notice arrives. Quiet from 23:00 to 06:00.',
     unreadNotifyDescIos:
-      'When on, iOS runs a background check for messages and notices at times it chooses: the interval depends on power conditions and may be tens of minutes or longer, so keep "Export to system calendar" on as a fallback for important reminders. "Background App Refresh" must stay enabled in system settings. Quiet from 23:00 to 06:00.',
+      'iOS checks for messages and notices in the background at times it chooses; for important reminders also turn on "Export to system calendar". Quiet from 23:00 to 06:00.',
     unreadNotifyDenied:
       'Notification permission is off, so background alerts will not appear. Allow ihomy to send notifications in system settings.',
     // Daily weather push
@@ -5953,28 +5946,24 @@ export default {
     dailyWeatherPreviewSent: 'Preview sent — check your notifications',
     dailyWeatherPreviewDenied: 'Notifications are blocked for ihomy. Allow them in system settings first.',
     dailyWeatherPreviewOffline: 'No network right now — try again when you are back online.',
-    dailyWeatherDesc:
-      "One note every day at the time you pick, with today's weather and a single practical tip. It only shows in the notification shade and on the lock screen, with no banner and no sound. Weather comes from the family's saved city; tap the note for the full forecast.",
+    dailyWeatherDesc: "One note a day with today's weather and a practical tip, with no banner and no sound.",
     // System notification settings entry (four independent channels, never rebuilt)
     notifySettingsTitle: 'Notification settings',
     notifySettingsChannels: 'Reminders · Family updates · Daily weather · App updates',
     notifySettingsOpen: 'Open system notification settings',
-    notifySettingsDesc:
-      'These four kinds of notices use separate channels, so you can turn off just one. The other three keep working as before.',
+    notifySettingsDesc: 'These four kinds of notices use separate channels, so you can turn off just one.',
     notifySettingsChannelsIos: 'Reminders · Family updates · Daily weather',
-    notifySettingsDescIos: 'Reminders, family updates and daily weather can each be turned off on their own; the other two keep working.',
+    notifySettingsDescIos: 'These three can each be turned off on their own.',
     // Idle auto-update
     autoUpdateTitle: 'Idle auto-update',
     autoUpdateSilent: 'Installs silently',
     autoUpdateNeedConfirm: 'One tap to install',
-    autoUpdateDesc:
-      'Downloads new versions while the phone is idle and on Wi-Fi, so it never gets in your way or uses mobile data. Whether it installs without confirmation depends on a system permission: unless this phone has made ihomy its device owner, you get one notification to tap.',
+    autoUpdateDesc: 'Downloads new versions while the phone is idle and on Wi-Fi.',
     // Diagnostics (crashes and front-end errors stay on this device)
     diagnosticsTitle: 'Diagnostics',
     diagnosticsCrashes: '{n} crash file(s)',
     diagnosticsErrors: '{n} front-end error(s)',
-    diagnosticsDesc:
-      'Crashes and page errors stay on this phone and are never uploaded. If something goes wrong, tap Export and send the record to the developer so the cause is easier to find.',
+    diagnosticsDesc: 'Crashes and page errors stay on this phone; export them to send to the developer.',
     diagnosticsExport: 'Export diagnostics',
     diagnosticsExportTitle: 'ihomy diagnostics',
     diagnosticsClear: 'Clear',
@@ -5983,16 +5972,11 @@ export default {
     diagnosticsFail: 'That did not work. Please try again later.',
     // Photo auto backup (photos stay in your own family album)
     photoBackupTitle: 'Photo auto backup',
-    photoBackupDesc:
-      'New photos on this phone are saved into the family album "Phone backup". Only the last 90 days by default; older photos can be backed up manually, and the same photo is never stored twice.',
+    photoBackupDesc: 'New photos go into the family album "Phone backup", last 90 days by default.',
     photoBackupAlbumName: 'Phone backup',
-    photoBackupPartialHint:
-      'If the system only allows access to selected photos, only those are backed up. To back up the whole library, allow access to all photos in system settings.',
-    photoBackupOn: 'On',
-    photoBackupOff: 'Off',
+    photoBackupPartialHint: 'If the system only allows selected photos, only those are backed up.',
     photoBackupWifi: 'Wi-Fi only',
     photoBackupCharge: 'Only while charging',
-    photoBackupSwitchHint: 'When on, backups run only while the conditions are met; tapping "Back up now" also respects both switches.',
     photoBackupPending: '{n} photo(s) waiting',
     photoBackupLast: 'Last backup',
     photoBackupNever: 'Not backed up yet',
@@ -6012,7 +5996,7 @@ export default {
     // About / in-app update
     aboutTitle: 'Client version',
     currentVersion: 'Current version {version}',
-    updateDesc: 'When a new version is out you can download and install it right here, no need to fetch the installer from the web page.',
+    updateDesc: 'New versions can be downloaded and installed right here.',
     updateDescIos: 'New versions ship through the App Store. Open ihomy in the App Store to update.',
   },
   shareInbox: {
@@ -6435,16 +6419,16 @@ export default {
   // Display modes (elder / child): local UI preference only, never changes account permissions
   displayMode: {
     title: 'Display mode',
-    lead: 'Pick a better interface for each person at home. This setting is stored on this device only.',
+    lead: 'This setting is stored on this device only.',
     normal: 'Default',
     normalDesc: 'Full features and the free-form home dashboard, for everyday use.',
     elder: 'Elder mode',
-    elderDesc: 'Larger text, higher contrast, and a simple home with only common entries and today’s plans.',
+    elderDesc: 'Larger text and higher contrast; the home shows only common entries.',
     child: 'Child mode',
-    childDesc: 'Only viewing and play pages stay available; settings, ledger and similar pages are blocked. Parents exit with a password.',
+    childDesc: 'Only viewing and play pages stay available; parents exit with a password.',
     setPinFirst: 'Set a 4–8 digit exit password before turning on child mode.',
     pinTitle: 'Set exit password',
-    pinTip: 'Parents use this password to leave child mode. You can set it again here if you forget.',
+    pinTip: 'Parents use this password to leave child mode.',
     pinPlaceholder: '4–8 digits',
     pinSave: 'Turn on child mode',
     pinInvalid: 'Enter a 4–8 digit password',
@@ -6457,7 +6441,7 @@ export default {
     exitDone: 'Child mode is off',
     wrongPin: 'Wrong password, please try again',
     childLock: 'Parent',
-    note: 'The exit password only guards this device so children cannot wander off; it does not change account permissions and is not a substitute for the account password.',
+    note: 'The exit password only guards this device; it does not change account permissions.',
   },
   // Elder-mode home: large entries + today's plans
   elderHome: {

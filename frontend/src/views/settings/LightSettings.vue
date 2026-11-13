@@ -33,11 +33,9 @@
           <el-switch v-model="shadowEnabled" />
           <span class="setting-label">{{ $t('settings.shadowEffect') }}</span>
         </div>
-        <div class="share-tip">{{ $t('settings.shadowHint') }}</div>
       </el-form-item>
       <el-form-item v-if="shadowEnabled" :label="$t('settings.shadowDepth')">
         <el-slider v-model.number="shadowDepth" :min="0" :max="100" show-input />
-        <div class="share-tip">{{ $t('settings.shadowDepthHint') }}</div>
       </el-form-item>
       <el-form-item v-if="themeStore.theme !== 'warm'">
         <div class="setting-row">
@@ -75,7 +73,6 @@
       <el-divider />
       <el-form-item :label="$t('settings.panelLayout')">
         <el-button type="warning" plain @click="resetPanelLayout">{{ $t('settings.resetPanelLayout') }}</el-button>
-        <div class="share-tip">{{ $t('settings.resetPanelHint') }}</div>
       </el-form-item>
     </el-form>
   </div>
