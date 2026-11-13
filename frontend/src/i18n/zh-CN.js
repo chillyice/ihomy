@@ -6285,6 +6285,8 @@ export default {
     checkFailed: '检查更新失败，请稍后再试',
     check: '检查更新',
     iosAppStore: 'iOS 版本请到 App Store 更新。',
+    webReady: '网页已更新到 {version}，刷新即可用上新版本',
+    webReload: '刷新页面',
   },
   // 平板看板 / 相框(全屏常亮页)
   kiosk: {

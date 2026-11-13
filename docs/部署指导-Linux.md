@@ -939,30 +939,33 @@ powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1
 - **数据库变更**：结构性变更写进 `migrations.sql`（幂等段），部署时自动执行；临时修复也可手动 `mysql -uroot -p ihomy < 增量.sql`。
 - **回滚**：失败时脚本自动回滚 jar/dist。若需手动回滚，登录服务器 `mv ihomy-backend.jar.bak ihomy-backend.jar && systemctl restart ihomy-backend`。
 
-### 8·补.5 Android 客户端（APK）发版
+### 8·补.5 多端发版:网页 / Android / iOS 各给谁发
 
-壳内前端是**打进 APK 的构建产物**——`deploy.ps1` 发了新 dist 客户端也不会变，必须跟着发一个同版本的 APK；客户端启动时会查 `GET /api/public/app/latest`，发现新版本才弹更新。**重启 App 没用**，不是重新加载网页。
+**一次发版要同时顾到几端**——仓库根 `VERSION` 是唯一版本源,但每一端有各自的投递通道,漏一端就只会在那一端看到旧版本:
 
-1. 本地打包（先把仓库根 `VERSION` 提到目标版本，gradle 直接读它作 `versionName`/`versionCode`，`V12.10` → `12010`）：
+| 端 | 投递物 | 怎么做 | 何时生效 |
+|----|--------|--------|----------|
+| 网页 / PWA(PC、手机浏览器、iOS 主屏) | `frontend/dist` | `scripts/deploy.ps1`(纯前端改动加 `-FrontendOnly`) | nginx 静态根换新即生效;老页面会跑 PWA 预缓存的旧 bundle,新版上线后站内底部提示「有新版本/刷新」(`/public/version` 与应用内版本比对),点一下即换新(也可 Ctrl+Shift+R) |
+| Android(`frontend/android` 壳) | `ihomy-V<版本>.apk` | `scripts/release-app.ps1`(构建 → 校验版本/签名 → 上传 → 回验) | 上传即生效:`/public/app/latest` 以 `{upload-dir}/app/` 里最高版本为准(扫目录缓存 60s),**不用改 external.yml、不用重启**;App 下次启动弹更新 |
+| iOS | App Store 包 / PWA | 原生包走 App Store;PWA 走上面的网页通道 | App Store 审核通过后用户升级 |
+
+**壳内前端是打进 APK 的构建产物**——`deploy.ps1` 发了新 dist 客户端也不会变,必须跟着发一个同版本的 APK;客户端启动时查 `GET /api/public/app/latest` 才会弹更新。**重启 App 没用**,不是重新加载网页(网页那套「刷新」在壳内不生效)。
+
+1. **打 APK(一条命令)**:
 
    ```powershell
-   cd frontend; npm run app:sync     # --mode app 构建 + npx cap sync android
-   cd android; $env:JAVA_HOME='C:\Program Files\Java\jdk-21'; .\gradlew.bat :app:assembleRelease
+   powershell -ExecutionPolicy Bypass -File scripts/release-app.ps1
    ```
 
-   产物 `android/app/build/outputs/apk/release/app-release.apk`（约 14MB）；签名读 `android/keystore.properties` + `ihomy-release.jks`（均不入库），文件缺失会产出未签名包。
-2. 核对版本与签名（覆盖安装必须同一签名，否则装不上）：`aapt dump badging app-release.apk` 首行应有 `versionName='V<版本>'`；`apksigner verify --print-certs` 的证书 SHA-256 与上一包一致（当前 `93634d1b24e4a1ec1d9f4b8863f5feb8134d3a2233b9ffd276cf573ea4dd1c98`）。
-3. 上传为 `{upload-dir}/app/ihomy-V<版本>.apk`：文件名就是接口拼出的下载地址，版本号写法（小数点、大写 V）必须与 external.yml 完全一致。
+   脚本会:读仓库根 `VERSION` → `npm run app:sync`(`--mode app` 构建 + cap sync)→ `gradlew :app:assembleRelease` → `aapt2` 校验 `versionName` 与 `VERSION` 一致 → `apksigner` 校验证书指纹(覆盖安装必须同一签名,当前 `93634d1b24e4a1ec1d9f4b8863f5feb8134d3a2233b9ffd276cf573ea4dd1c98`)→ scp 上传为 `{upload-dir}/app/ihomy-V<版本>.apk`(`chown ihomy:ihomy` + 644)→ 回验接口与直链 → 重新 `npm run build` 复原网页 dist。已构建过只想重传:`-SkipBuild`。
 
-   ```bash
-   scp -P 19068 app-release.apk root@ihomy.top:/tmp/
-   ssh -p 19068 root@ihomy.top 'mv /tmp/app-release.apk /opt/ihomy/uploads/app/ihomy-V<版本>.apk \
-     && chown ihomy:ihomy /opt/ihomy/uploads/app/ihomy-V<版本>.apk && chmod 644 /opt/ihomy/uploads/app/ihomy-V<版本>.apk'
-   ```
+2. **改更新说明(可选)**:生产 `/opt/ihomy/config/external.yml` 的 `app.android.latest-notes` 只描述「配置里 `latest-version` 那一版」——磁盘版本比配置高时接口不返回旧文案,所以**想给用户看这次更新说明,才需要**改配置并 `systemctl restart ihomy-backend`(外挂配置只在启动时加载)。`min-supported-version` 是强制更新下限,一般不动。**该文件含生产 DB/Redis 密码,别用 `-UploadExternal` 拿本地文件覆盖**;改完 `chown ihomy:ihomy` + `chmod 640`。
 
-4. 改生产 `/opt/ihomy/config/external.yml` 的 `app.android`：`latest-version` 与仓库 `VERSION` 对齐、`latest-notes` 写用户看得懂的更新说明；`min-supported-version` 是强制更新下限，一般不动。**该文件含生产 DB/Redis 密码，别用 `-UploadExternal` 拿本地文件覆盖**；改完 `chown ihomy:ihomy` + `chmod 640`。
-5. `systemctl restart ihomy-backend`（外挂配置只在启动时加载），约 40 秒后核对：`curl -s https://ihomy.top/api/public/app/latest` 的 `version`/`url` 是新版本；`curl -sI https://ihomy.top/files/app/ihomy-V<版本>.apk` 返回 200 且 `Content-Length` 与本地一致。
-6. 客户端：App 启动时静默检查（设置页可手动「检查更新」）→ 应用内下载（系统 DownloadManager，可锁屏/切后台）→ 覆盖安装。内容都在服务器，不用重新登录；Web/PWA 与 APK 两条通道互不影响。
+3. **手动兜底(脚本不可用时)**:`cd frontend; npm run app:sync` → `cd android; $env:JAVA_HOME='C:\Program Files\Java\jdk-21'; .\gradlew.bat :app:assembleRelease` → `scp -P 19068 app-release.apk root@ihomy.top:/tmp/` → `ssh -p 19068 root@ihomy.top 'mv /tmp/app-release.apk /opt/ihomy/uploads/app/ihomy-V<版本>.apk && chown ihomy:ihomy … && chmod 644 …'`。文件名写法(大写 V、小数点)必须与接口拼出的地址完全一致。
+
+4. **验收**:`curl -s https://ihomy.top/api/public/app/latest` 的 `version`/`url` 是新版本;`curl -sI https://ihomy.top/files/app/ihomy-V<版本>.apk` 返回 200 且 `Content-Length` 与本地一致;`curl -s https://ihomy.top/api/public/version` 与 `VERSION` 一致。手机上重启 App 应弹更新,应用内下载(系统 DownloadManager,可锁屏/切后台)后覆盖安装;内容都在服务器,不用重新登录。
+
+> **app 模式构建会覆盖 `frontend/dist`**:`npm run app:sync` 之后不复原网页构建的话,后续 `deploy.ps1 -SkipBuild` 会把「没有 Service Worker 的网页」发上线——`release-app.ps1` 默认已复原,手动流程记得补 `npm run build`。
 
 ---
 

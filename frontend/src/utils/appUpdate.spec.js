@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseVersion, compareVersion, apkFileName, updatePlan, formatBytes, downloadPercent } from './appUpdate'
+import { parseVersion, compareVersion, apkFileName, updatePlan, formatBytes, downloadPercent, webRefreshNeeded } from './appUpdate'
 
 describe('parseVersion 版本号解析', () => {
   it('标准形态 V<主>.<次>', () => {
@@ -76,6 +76,24 @@ describe('updatePlan 更新必要性判定', () => {
 
   it('服务端版本低于本机(开发自装包):不提示降级', () => {
     expect(updatePlan({ current: 'V11.90', latest: 'V11.84' }).kind).toBe('none')
+  })
+})
+
+describe('webRefreshNeeded 网页端新版本提示', () => {
+  it('服务端版本更高才提示刷新', () => {
+    expect(webRefreshNeeded({ server: 'V12.13', current: 'V12.12' })).toBe(true)
+    expect(webRefreshNeeded({ server: 'V13.1', current: 'V12.99' })).toBe(true)
+  })
+
+  it('同版本或本机更新时不提示', () => {
+    expect(webRefreshNeeded({ server: 'V12.12', current: 'V12.12' })).toBe(false)
+    expect(webRefreshNeeded({ server: 'V12.10', current: 'V12.12' })).toBe(false)
+  })
+
+  it('任一侧解析失败(dev/unknown)不提示', () => {
+    expect(webRefreshNeeded({ server: 'unknown', current: 'V12.12' })).toBe(false)
+    expect(webRefreshNeeded({ server: 'V12.13', current: undefined })).toBe(false)
+    expect(webRefreshNeeded({})).toBe(false)
   })
 })
 

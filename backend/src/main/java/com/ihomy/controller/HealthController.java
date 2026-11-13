@@ -1,6 +1,7 @@
 package com.ihomy.controller;
 
 import com.ihomy.annotation.RequirePermission;
+import com.ihomy.common.AppVersion;
 import com.ihomy.common.Result;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -14,8 +15,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.sql.DataSource;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.sql.Connection;
 import java.time.Instant;
 import java.util.HashMap;
@@ -42,9 +41,6 @@ public class HealthController {
     private final DataSource dataSource;
     private final StringRedisTemplate redis;
 
-    /** 版本号:仓库根 VERSION 文件,进程启动后读一次缓存 */
-    private static final String VERSION = readVersion();
-
     @Operation(summary = "健康检查(免登录;整体 UP 返回 200,DEGRADED 返回 503)")
     @GetMapping("/public/health")
     public ResponseEntity<Result<Map<String, Object>>> health() {
@@ -53,7 +49,7 @@ public class HealthController {
 
         Map<String, Object> data = new HashMap<>();
         data.put("status", up ? "UP" : "DEGRADED");
-        data.put("version", VERSION);
+        data.put("version", AppVersion.VERSION);
         data.put("timestamp", Instant.now().toString());
         return ResponseEntity.status(up ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE)
                 .body(Result.success(data));
@@ -67,7 +63,7 @@ public class HealthController {
         Map<String, Object> data = new HashMap<>();
         data.put("status", components.values().stream()
                 .allMatch(c -> "UP".equals(((Map<?, ?>) c).get("status"))) ? "UP" : "DEGRADED");
-        data.put("version", VERSION);
+        data.put("version", AppVersion.VERSION);
         data.put("timestamp", Instant.now().toString());
         data.put("components", components);
         return Result.success(data);
@@ -114,20 +110,5 @@ public class HealthController {
     @FunctionalInterface
     private interface ProbeAction {
         boolean check() throws Exception;
-    }
-
-    private static String readVersion() {
-        for (String candidate : new String[]{ "../VERSION", "VERSION" }) {
-            try {
-                Path p = Path.of(candidate);
-                if (Files.isReadable(p)) {
-                    String v = Files.readString(p).trim();
-                    if (!v.isEmpty()) return v;
-                }
-            } catch (Exception ignored) {
-                // 逐个候选路径尝试,全失败回落 unknown
-            }
-        }
-        return "unknown";
     }
 }

@@ -6396,6 +6396,8 @@ export default {
     checkFailed: 'Could not check for updates. Please try again later.',
     check: 'Check for updates',
     iosAppStore: 'Please update the iOS app from the App Store.',
+    webReady: 'The site has been updated to {version} — refresh to get it',
+    webReload: 'Refresh now',
   },
   // Tablet kiosk / photo frame (always-on full screen page)
   kiosk: {

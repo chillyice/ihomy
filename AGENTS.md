@@ -212,6 +212,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 - **重装/新服务器四条必查**(nginx `mime.types` 有 `.mjs`、站点 conf 有 gzip、静态缓存排除 `/api/`+`/files/`、媒体播放地址同为 HTTPS):见 踩坑速查 §7.1/§7.3/§7.10。
 - **部署新前端后老客户端仍跑旧 bundle(PWA 预缓存)**:冒烟前先 unregister SW + 清 caches;不带内容哈希的运行时换版本必须带 `?v=` 破缓存(踩坑速查 §7.2/§3.55)。
 - 详细步骤 `docs/部署指导-Linux.md` / `docs/部署指导-Windows.md`。
+- **多端发版(强制)**:`VERSION` 是唯一版本源,但每端各有投递通道,漏一端那一端就只有旧版本——网页/PWA 走 `scripts/deploy.ps1`(dist)、Android 走 `scripts/release-app.ps1`(APK;**`/public/app/latest` 以 `uploads/app/` 里最高版本包为准,上传即生效**,只有改「更新说明」才动 external.yml + 重启)、iOS 原生包走 App Store。**壳内前端打进 APK,只发 dist 客户端不会变**;站内 `/public/version` 比对当前 bundle 版本,线上更新后自动提示刷新。详细清单 `docs/部署指导-Linux.md` §8·补.5。
 
 ## 归档与规划
 

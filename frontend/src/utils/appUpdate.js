@@ -44,8 +44,16 @@ export function updatePlan({ current, latest, minSupported } = {}) {
   return { kind: required ? 'required' : 'optional', required }
 }
 
-/** 字节数 → '54.4 MB'(下载进度展示用) */
-export function formatBytes(bytes) {
+/**
+ * 网页端是否需要提示刷新:服务端版本严格高于当前页面跑的 bundle 版本才提示。
+ * 版本号解析失败(dev 构建、unknown)一律不提示——宁漏不误;同版本刷新毫无意义。
+ */
+export function webRefreshNeeded({ server, current } = {}) {
+  const cmp = compareVersion(server, current)
+  return cmp !== null && cmp > 0
+}
+
+/** 字节数 → '54.4 MB'(下载进度展示用) */ export function formatBytes(bytes) {
   const n = Number(bytes)
   if (!Number.isFinite(n) || n <= 0) return '0 MB'
   const mb = n / (1024 * 1024)

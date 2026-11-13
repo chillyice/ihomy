@@ -42,6 +42,8 @@
     </template>
     <!-- 首登强制改密(种子账号):全局弹窗,由 store 标记驱动 -->
     <ChangePasswordDialog />
+    <!-- 网页端新版本提示(仅 Web):线上 dist 已更新就提示刷新,别让 PWA 预缓存拖着跑旧 bundle -->
+    <WebUpdateBanner v-if="!isNative && routeReady" />
     <!-- 全局聊天浮窗(懒加载,内部自守卫:登录且非独立页);儿童模式不显示 -->
     <ChatFloat v-if="!isChild" />
     <!-- 1:1 通话覆盖层(懒加载,内部自守卫登录态) -->
@@ -79,6 +81,7 @@ import SiteFooter from '@/components/SiteFooter.vue'
 import LightTestConsole from '@/components/LightTestConsole.vue'
 import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue'
 import ChildLock from '@/components/ChildLock.vue'
+import WebUpdateBanner from '@/components/WebUpdateBanner.vue'
 import { initDisplayMode, useDisplayMode } from '@/composables/useDisplayMode'
 const ChatFloat = defineAsyncComponent(() => import('@/components/chat/ChatFloat.vue'))
 const CallOverlay = defineAsyncComponent(() => import('@/components/chat/CallOverlay.vue'))

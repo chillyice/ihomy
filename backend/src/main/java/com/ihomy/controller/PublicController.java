@@ -2,6 +2,7 @@ package com.ihomy.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import tools.jackson.databind.ObjectMapper;
+import com.ihomy.common.AppVersion;
 import com.ihomy.common.BizException;
 import com.ihomy.common.Result;
 import com.ihomy.common.ResultCode;
@@ -16,6 +17,7 @@ import com.ihomy.mapper.PhotoMapper;
 import com.ihomy.mapper.WeatherLocationMapper;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.ActivityFeedService;
+import com.ihomy.service.AndroidReleaseService;
 import com.ihomy.service.CalendarService;
 import com.ihomy.service.HomeStatsService;
 import com.ihomy.service.MultiFamilyService;
@@ -79,16 +81,9 @@ public class PublicController {
     private final SunService sunService;
     private final ProductStatService productStatService;
     private final CalendarService calendarService;
+    private final AndroidReleaseService androidReleaseService;
     private final StringRedisTemplate redis;
     private final ObjectMapper mapper;
-
-    /** Android 客户端版本信息(app.android.*,发布新版时与仓库根 VERSION 同步;留空 = 尚未发布 Android 包) */
-    @org.springframework.beans.factory.annotation.Value("${app.android.latest-version:}")
-    private String androidLatestVersion;
-    @org.springframework.beans.factory.annotation.Value("${app.android.min-supported-version:}")
-    private String androidMinSupportedVersion;
-    @org.springframework.beans.factory.annotation.Value("${app.android.latest-notes:}")
-    private String androidLatestNotes;
 
     @Operation(summary = "太阳信息(日出日落 + 三档晨昏 + 月相 + 当前太阳位置与直射点,可指定日期查看任意一天)")
     @GetMapping("/sun-info")
@@ -204,19 +199,26 @@ public class PublicController {
     }
 
     /**
-     * Android 客户端更新检查:App 启动时比对安装包 versionName 与这里返回的版本。
-     * 免登录;版本留空表示尚未发布 Android 包,客户端不提示。url 为 /files 直链,客户端拼接服务端 origin 下载。
+     * 服务端版本号(免登录、只读缓存值,不探依赖):前端比对自身 bundle 版本,发现线上已更新就提示刷新。
+     * 与页脚/运维页/健康检查同源(仓库根 VERSION)。
      */
-    @Operation(summary = "Android 客户端最新版本与下载地址(免登录)")
+    @Operation(summary = "服务端版本号(免登录;前端自查 bundle 是否过期)")
+    @GetMapping("/version")
+    public Result<Map<String, Object>> version() {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("version", AppVersion.VERSION);
+        return Result.success(data);
+    }
+
+    /**
+     * Android 客户端更新检查:App 启动时比对安装包 versionName 与这里返回的版本。
+     * 免登录;版本以 uploads/app 下实际存在的安装包为准(见 AndroidReleaseService),留空 = 尚未发布。
+     * url 为 /files 直链,客户端拼接服务端 origin 下载。
+     */
+    @Operation(summary = "Android 客户端最新版本与下载地址(免登录;以实际发布的安装包为准)")
     @GetMapping("/app/latest")
     public Result<Map<String, Object>> appLatest() {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("version", androidLatestVersion);
-        data.put("url", androidLatestVersion.isBlank() ? ""
-                : "/files/app/ihomy-" + androidLatestVersion + ".apk");
-        data.put("notes", androidLatestNotes);
-        data.put("minSupported", androidMinSupportedVersion);
-        return Result.success(data);
+        return Result.success(androidReleaseService.latest());
     }
 
     @Operation(summary = "首页聚合（支持 ?hid= 混淆ID / ?home_id= 指定家庭）")
