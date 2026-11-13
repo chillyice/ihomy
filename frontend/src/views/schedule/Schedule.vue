@@ -208,7 +208,8 @@ const onViewportChange = () => remeasure()
 const detailKind = computed(() => detailRef.value?.kind || 'PLAN')
 const detailRecord = computed(() => {
   if (!detailRef.value) return null
-  const pool = detailRef.value.kind === 'ANNIVERSARY' ? anniversaries.value : plans.value
+  const kind = detailRef.value.kind
+  const pool = kind === 'ANNIVERSARY' ? anniversaries.value : kind === 'REMINDER' ? reminders.value : plans.value
   return pool.find((x) => x.id === detailRef.value.id) || null
 })
 
@@ -423,9 +424,16 @@ const openCreate = (date) => {
   editorVisible.value = true
 }
 
+// 亲友圈分享来的条目只读:详情页看,不弹编辑(写侧永远在所属家庭)
+const openReadOnlyDetail = (it) => {
+  detailRef.value = { kind: it.kind === 'TASK' ? 'REMINDER' : it.kind, id: it.id }
+  detailVisible.value = true
+}
+
 const openEdit = (it) => {
   const record = recordOf(it)
   if (!record) return ElMessage.warning(t('schedule.detail.noData'))
+  if (record.readOnly) return openReadOnlyDetail(it)
   editing.value = { kind: it.kind, record }
   editorVisible.value = true
 }
@@ -446,6 +454,8 @@ const openDetail = (it) => {
     if (it.link) router.push(it.link)
     return
   }
+  // 分享来的提醒/每日任务:只读详情(不要落到编辑弹窗)
+  if (it.readOnly) return openReadOnlyDetail(it)
   if (it.kind === 'REMINDER' || it.kind === 'TASK') return openEdit(it)
   if (it.kind === 'PLAN_TASK') detailRef.value = { kind: 'PLAN', id: it.planId }
   else detailRef.value = { kind: it.kind, id: it.id }
@@ -459,12 +469,15 @@ const setSource = (source, on) => {
 }
 
 const onDetailEdit = ({ kind, record }) => {
+  if (record?.readOnly) return
   detailVisible.value = false
   editing.value = { kind, record }
   editorVisible.value = true
 }
 
 const onToggle = async (it) => {
+  // 亲友圈分享来的提醒:完成态跟所属家庭走,本家庭不勾(后端也会按别家口径落库)
+  if (it.readOnly) return
   // 循环提醒按当日勾选;一次性提醒忽略日期
   await reminderApi.toggleDone(it.id, it.kind === 'TASK' ? it.date : undefined)
   await Promise.all([loadMonth(), loadUpcoming()])
@@ -484,6 +497,8 @@ const onDelete = async (payload) => {
   const record = payload.record || recordOf(payload)
   const id = record?.id ?? payload.id
   if (!id) return
+  // 分享来的条目不能删(行内按钮已隐藏,这里再兜一层)
+  if (record?.readOnly) return
   const title = payload.kind === 'ANNIVERSARY' ? record?.name : record?.title
   await ElMessageBox.confirm(t('schedule.dialog.deleteMessage', { title: title || '' }), t('common.deleteConfirm'), {
     type: 'warning',

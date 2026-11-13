@@ -9,12 +9,15 @@
         <span class="detail-title">{{ title }}</span>
       </div>
 
+      <!-- 亲友圈分享来的:标明来源,只能查看与送祝福,不能改删 -->
+      <p v-if="sharedFromText" class="shared-tip">{{ sharedFromText }}</p>
+
       <template v-if="kind === 'ANNIVERSARY'">
         <div class="detail-line">
           <span class="k">{{ $t('schedule.detail.dateLabel') }}</span>
           <span class="v">{{ anniversaryDate }}</span>
         </div>
-        <div class="detail-line">
+        <div v-if="memberText" class="detail-line">
           <span class="k">{{ $t('schedule.detail.members') }}</span>
           <span class="v">{{ memberText }}</span>
         </div>
@@ -23,64 +26,76 @@
           <span class="v">{{ record.remindTime ? String(record.remindTime).slice(0, 5) : '' }}</span>
         </div>
         <div v-if="isLoggedIn" class="detail-actions">
-          <el-button size="small" plain @click="wishOpen = true">{{ $t('schedule.detail.addWish') }}</el-button>
+          <!-- 圈内轻互动:送祝福只写 content_like,不动对方的纪念日数据 -->
+          <el-button size="small" :type="blessed ? 'primary' : 'default'" plain :loading="blessLoading" @click="toggleBless">
+            {{ $t(blessed ? 'schedule.detail.blessed' : 'schedule.detail.bless') }}
+          </el-button>
+          <span v-if="blessCount > 0" class="bless-count">{{ $t('schedule.detail.blessCount', { n: blessCount }) }}</span>
+          <el-button v-if="!readOnly" size="small" plain @click="wishOpen = true">{{ $t('schedule.detail.addWish') }}</el-button>
         </div>
       </template>
 
       <template v-else>
         <div class="detail-line">
           <span class="k">{{ $t('schedule.detail.dateLabel') }}</span>
-          <span class="v">{{ record.targetDate || $t('schedule.undated') }}</span>
+          <span class="v">{{ detailDate || $t('schedule.undated') }}</span>
         </div>
-        <div v-if="record.description" class="detail-line">
+        <div v-if="kind === 'REMINDER' && record.remindTime" class="detail-line">
+          <span class="k">{{ $t('schedule.detail.timeLabel') }}</span>
+          <span class="v">{{ String(record.remindTime).slice(0, 5) }}</span>
+        </div>
+        <div v-if="detailDescription" class="detail-line">
           <span class="k">{{ $t('schedule.detail.description') }}</span>
-          <span class="v">{{ record.description }}</span>
-        </div>
-        <div class="detail-line">
-          <span class="k">{{ $t('schedule.detail.progress', { done: record.doneCount || 0, total: record.totalCount || 0 }) }}</span>
+          <span class="v">{{ detailDescription }}</span>
         </div>
 
-        <div class="section-label">{{ $t('schedule.detail.subtasks') }}</div>
-        <div v-if="tasks.length" class="task-list">
-          <div v-for="task in tasks" :key="task.id" class="task-row">
-            <el-checkbox :model-value="task.done === 1" @change="toggleTask(task)" />
-            <span class="task-title" :class="{ done: task.done === 1 }">{{ task.title }}</span>
-            <span v-if="task.dueDate" class="task-due">{{ task.dueDate }}</span>
-            <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
-              <el-button size="small" text type="danger" @click="removeTask(task)"
-                ><el-icon><Delete /></el-icon
-              ></el-button>
-            </el-tooltip>
+        <template v-if="kind === 'PLAN'">
+          <div class="detail-line">
+            <span class="k">{{ $t('schedule.detail.progress', { done: record.doneCount || 0, total: record.totalCount || 0 }) }}</span>
           </div>
-        </div>
-        <div v-else class="empty-hint">{{ $t('schedule.detail.noSubtasks') }}</div>
-        <div class="task-add">
-          <el-input
-            v-model="newTask"
-            size="small"
-            maxlength="100"
-            :placeholder="$t('schedule.detail.addTaskPlaceholder')"
-            @keyup.enter="addTask"
-          />
-          <el-button size="small" type="primary" plain :loading="taskSaving" @click="addTask">{{
-            $t('schedule.detail.addTask')
-          }}</el-button>
-        </div>
+
+          <div class="section-label">{{ $t('schedule.detail.subtasks') }}</div>
+          <div v-if="tasks.length" class="task-list">
+            <div v-for="task in tasks" :key="task.id" class="task-row">
+              <el-checkbox :model-value="task.done === 1" @change="toggleTask(task)" />
+              <span class="task-title" :class="{ done: task.done === 1 }">{{ task.title }}</span>
+              <span v-if="task.dueDate" class="task-due">{{ task.dueDate }}</span>
+              <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
+                <el-button size="small" text type="danger" @click="removeTask(task)"
+                  ><el-icon><Delete /></el-icon
+                ></el-button>
+              </el-tooltip>
+            </div>
+          </div>
+          <div v-else class="empty-hint">{{ $t('schedule.detail.noSubtasks') }}</div>
+          <div class="task-add">
+            <el-input
+              v-model="newTask"
+              size="small"
+              maxlength="100"
+              :placeholder="$t('schedule.detail.addTaskPlaceholder')"
+              @keyup.enter="addTask"
+            />
+            <el-button size="small" type="primary" plain :loading="taskSaving" @click="addTask">{{
+              $t('schedule.detail.addTask')
+            }}</el-button>
+          </div>
+        </template>
       </template>
     </template>
 
     <template #footer>
-      <el-button v-if="record && isLoggedIn" type="danger" plain @click="$emit('delete', { kind, record })">{{
+      <el-button v-if="record && isLoggedIn && !readOnly" type="danger" plain @click="$emit('delete', { kind, record })">{{
         $t('schedule.detail.delete')
       }}</el-button>
-      <el-button v-if="record && isLoggedIn" type="primary" @click="$emit('edit', { kind, record })">{{
+      <el-button v-if="record && isLoggedIn && !readOnly" type="primary" @click="$emit('edit', { kind, record })">{{
         $t('schedule.detail.edit')
       }}</el-button>
       <el-button @click="visible = false">{{ $t('schedule.detail.close') }}</el-button>
     </template>
 
     <AddToWishDialog
-      v-if="isLoggedIn && kind === 'ANNIVERSARY' && record"
+      v-if="isLoggedIn && !readOnly && kind === 'ANNIVERSARY' && record"
       v-model="wishOpen"
       :source="{ type: 'ANNIVERSARY', id: record.id, title: record.name }"
       :title-placeholder="$t('wish.anniversaryTitlePlaceholder', { name: record.name })"
@@ -90,11 +105,11 @@
 
 <script setup>
 // 只读详情 + 计划子任务维护(子任务接口沿用 planApi,写侧不出现第二入口)
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
-import { planApi } from '@/api'
+import { likeApi, planApi } from '@/api'
 import { classify } from '@/utils/scheduleType'
 import { useUserStore } from '@/stores/user'
 import AddToWishDialog from '@/components/wish/AddToWishDialog.vue'
@@ -119,9 +134,20 @@ const userStore = useUserStore()
 const isLoggedIn = computed(() => userStore.isLoggedIn)
 
 const title = computed(() => (props.kind === 'ANNIVERSARY' ? props.record?.name : props.record?.title) || '')
-// 徽标按用户叫法:有目标日 → 事项,没有 → 计划(与弹窗、清单共用 classify)
-const typeName = computed(() => (props.kind === 'ANNIVERSARY' ? 'ANNIVERSARY' : classify({ hasDate: !!props.record?.targetDate })))
+// 徽标按用户叫法:有目标日 → 事项,没有 → 计划(与弹窗、清单共用 classify);提醒用自身类型
+const typeName = computed(() => {
+  if (props.kind === 'ANNIVERSARY') return 'ANNIVERSARY'
+  if (props.kind === 'REMINDER') return 'REMINDER'
+  return classify({ hasDate: !!props.record?.targetDate })
+})
 const tasks = computed(() => (Array.isArray(props.record?.tasks) ? props.record.tasks : []))
+// 亲友圈分享来的条目标 readOnly:只能查看与送祝福(写侧永远在所属家庭)
+const readOnly = computed(() => !!props.record?.readOnly)
+const sharedFromText = computed(() => {
+  const s = props.record?.sharedFrom
+  if (!s) return ''
+  return t('audience.sharedFrom', { name: s.alias || s.familyName || '' })
+})
 const anniversaryDate = computed(() => {
   const a = props.record
   if (!a) return ''
@@ -135,8 +161,50 @@ const anniversaryDate = computed(() => {
 })
 const memberText = computed(() => {
   const names = props.record?.memberNames
-  return Array.isArray(names) && names.length ? names.join('、') : t('schedule.detail.familyAnniversary')
+  if (Array.isArray(names) && names.length) return names.join('、')
+  // 别人家的纪念日不显示「家庭纪念日」占位(成员名单不跨家庭)
+  return readOnly.value ? '' : t('schedule.detail.familyAnniversary')
 })
+const detailDate = computed(() => props.record?.targetDate || props.record?.remindDate || '')
+const detailDescription = computed(() => props.record?.description || props.record?.content || '')
+
+// ---- 送祝福:复用统一点赞(contentType=anniversary),只写 content_like,不动对方的纪念日 ----
+const blessed = ref(false)
+const blessCount = ref(0)
+const blessLoading = ref(false)
+
+const loadBless = async () => {
+  blessed.value = false
+  blessCount.value = 0
+  if (!isLoggedIn.value || props.kind !== 'ANNIVERSARY' || !props.record?.id) return
+  try {
+    const data = await likeApi.state('anniversary', props.record.id)
+    blessed.value = !!data?.liked
+    blessCount.value = Number(data?.likeCount) || 0
+  } catch {
+    // 状态取不到不影响查看详情,按钮仍可点(点后再校验)
+  }
+}
+
+const toggleBless = async () => {
+  if (!props.record?.id) return
+  blessLoading.value = true
+  try {
+    const data = await likeApi.toggle({ contentType: 'anniversary', contentId: props.record.id })
+    blessed.value = !!data?.liked
+    blessCount.value = Number(data?.likeCount) || 0
+  } finally {
+    blessLoading.value = false
+  }
+}
+
+watch(
+  () => [props.modelValue, props.kind, props.record?.id],
+  ([open]) => {
+    if (open) loadBless()
+  },
+  { immediate: true },
+)
 
 const newTask = ref('')
 const taskSaving = ref(false)
@@ -198,7 +266,19 @@ const removeTask = async (task) => {
   word-break: break-word;
 }
 .detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 10px 0 4px;
+}
+.bless-count {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.shared-tip {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
 }
 .task-list {
   display: grid;

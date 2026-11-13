@@ -462,6 +462,8 @@ const KIND_LABELS = {
   diary: 'circle.kindDiary',
   wish: 'circle.kindWish',
   book: 'circle.kindBook',
+  anniversary: 'circle.kindAnniversary',
+  reminder: 'circle.kindReminder',
 }
 const kindLabel = (code) => (KIND_LABELS[code] ? t(KIND_LABELS[code]) : code)
 

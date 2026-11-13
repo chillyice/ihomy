@@ -423,8 +423,9 @@ const loadWidgetData = async (only) => {
   if ((!only || only === 'reminder') && isOn('reminder')) {
     try {
       const list = await reminderApi.list()
+      // 亲友圈分享来的提醒只读:完成态跟所属家庭走,壁纸上不列(避免误当自己的待办)
       reminders.value = (Array.isArray(list) ? list : [])
-        .filter((r) => r && r.done !== 1)
+        .filter((r) => r && r.done !== 1 && !r.readOnly)
         .sort((a, b) => String(a.remindDate + a.remindTime).localeCompare(String(b.remindDate + b.remindTime)))
         .slice(0, WIDGET_ROWS)
     } catch (e) {

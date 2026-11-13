@@ -6,6 +6,7 @@ import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
 import com.ihomy.controller.PublicController;
 import com.ihomy.entity.Album;
+import com.ihomy.entity.Anniversary;
 import com.ihomy.entity.Blog;
 import com.ihomy.entity.ContentAudience;
 import com.ihomy.entity.ContentBook;
@@ -14,12 +15,14 @@ import com.ihomy.entity.Family;
 import com.ihomy.entity.FamilyCircle;
 import com.ihomy.entity.FamilyCircleMember;
 import com.ihomy.entity.Photo;
+import com.ihomy.entity.Reminder;
 import com.ihomy.entity.Video;
 import com.ihomy.entity.Wish;
 import com.ihomy.entity.SysRole;
 import com.ihomy.entity.SysUser;
 import com.ihomy.entity.SysUserRole;
 import com.ihomy.mapper.AlbumMapper;
+import com.ihomy.mapper.AnniversaryMapper;
 import com.ihomy.mapper.BlogMapper;
 import com.ihomy.mapper.ContentAudienceMapper;
 import com.ihomy.mapper.ContentBookMapper;
@@ -28,6 +31,7 @@ import com.ihomy.mapper.FamilyCircleMapper;
 import com.ihomy.mapper.FamilyCircleMemberMapper;
 import com.ihomy.mapper.FamilyMapper;
 import com.ihomy.mapper.PhotoMapper;
+import com.ihomy.mapper.ReminderMapper;
 import com.ihomy.mapper.SysRoleMapper;
 import com.ihomy.mapper.SysUserRoleMapper;
 import com.ihomy.mapper.VideoMapper;
@@ -72,6 +76,8 @@ public class AudienceService {
     private final VideoMapper videoMapper;
     private final WishMapper wishMapper;
     private final ContentBookMapper bookMapper;
+    private final AnniversaryMapper anniversaryMapper;
+    private final ReminderMapper reminderMapper;
     private final FamilyMapper familyMapper;
     private final SysUserRoleMapper userRoleMapper;
     private final SysRoleMapper sysRoleMapper;
@@ -339,6 +345,8 @@ public class AudienceService {
             case VIDEO -> "一部影片";
             case WISH -> "一个愿望";
             case BOOK -> "一本书";
+            case ANNIVERSARY -> "一个纪念日";
+            case REMINDER -> "一条提醒";
             default -> "内容";
         };
     }
@@ -395,6 +403,15 @@ public class AudienceService {
         if (kind == ContentKind.BOOK) {
             ContentBook b = bookMapper.selectById(contentId);
             return b == null ? null : new Shareable(b.getId(), b.getFamilyId(), b.getUploaderId(), b.getVisibility());
+        }
+        if (kind == ContentKind.ANNIVERSARY) {
+            Anniversary a = anniversaryMapper.selectById(contentId);
+            // 纪念日/提醒没有 visibility 列:本身是家庭级共享,统一按 FAMILY 口径参与分享判定
+            return a == null ? null : new Shareable(a.getId(), a.getFamilyId(), a.getCreatedBy(), DictConst.VIS_FAMILY);
+        }
+        if (kind == ContentKind.REMINDER) {
+            Reminder r = reminderMapper.selectById(contentId);
+            return r == null ? null : new Shareable(r.getId(), r.getFamilyId(), r.getCreatedBy(), DictConst.VIS_FAMILY);
         }
         throw new BizException(ResultCode.BAD_REQUEST, "这个内容暂时还不能分享到亲友圈");
     }

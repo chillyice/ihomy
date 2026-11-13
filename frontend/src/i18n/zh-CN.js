@@ -487,6 +487,8 @@ export default {
     kindDiary: '日记',
     kindWish: '愿望',
     kindBook: '图书',
+    kindAnniversary: '纪念日',
+    kindReminder: '提醒',
   },
   // 内容分享范围(「给谁看」面板 + 被分享内容角标)
   audience: {
@@ -897,6 +899,10 @@ export default {
       addTask: '添加',
       progress: '已完成 {done}/{total}',
       addWish: '许个愿',
+      bless: '送祝福',
+      blessed: '已送祝福',
+      blessCount: '共 {n} 条祝福',
+      timeLabel: '时间',
       edit: '编辑',
       delete: '删除',
       close: '关闭',

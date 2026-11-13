@@ -58,14 +58,21 @@ const emit = defineEmits(['open', 'edit', 'delete', 'toggle', 'toggle-task'])
 const { t } = useI18n()
 
 const type = computed(() => typeOfKind(props.item.kind))
-const readOnly = computed(() => isReadOnlySource(props.item))
-const badgeText = computed(() => (readOnly.value ? t('schedule.source.' + sourceOf(props.item)) : t('schedule.type.' + type.value)))
-const badgeClass = computed(() => (readOnly.value ? sourceOf(props.item).toLowerCase() : type.value.toLowerCase()))
+// 只读来源(贷款/理财/食材/设备日历)+ 亲友圈分享来的条目:都只展示,不可改删/勾完成
+const readOnly = computed(() => isReadOnlySource(props.item) || !!props.item.readOnly || !!props.record?.readOnly)
+const sharedFrom = computed(() => props.item.sharedFrom || props.record?.sharedFrom || null)
+const badgeText = computed(() =>
+  isReadOnlySource(props.item) ? t('schedule.source.' + sourceOf(props.item)) : t('schedule.type.' + type.value),
+)
+const badgeClass = computed(() => (isReadOnlySource(props.item) ? sourceOf(props.item).toLowerCase() : type.value.toLowerCase()))
 
 const REPEAT_KEY = { DAILY: 'repeatDaily', WEEKLY: 'repeatWeekly', MONTHLY: 'repeatMonthly', YEARLY: 'repeatYearly' }
 
-// 提示优先级:纪念日提前提醒 > 贷款期次 > 循环周期(当天时刻已在左侧显示)
+// 提示优先级:分享来源 > 纪念日提前提醒 > 贷款期次 > 循环周期(当天时刻已在左侧显示)
 const hint = computed(() => {
+  if (sharedFrom.value) {
+    return t('audience.sharedFrom', { name: sharedFrom.value.alias || sharedFrom.value.familyName || '' })
+  }
   if (props.item.kind === 'ANNIVERSARY' && props.record?.remindDaysBefore > 0) {
     return t('schedule.remindAdvance', { n: props.record.remindDaysBefore })
   }

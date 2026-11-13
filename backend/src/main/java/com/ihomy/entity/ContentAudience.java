@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 public class ContentAudience {
     @TableId(type = IdType.AUTO)
     private Long id;
-    /** photo / album / video / blog / diary / wish / book */
+    /** photo / album / video / blog / diary / wish / book / anniversary / reminder */
     private String contentType;
     private Long contentId;
     /** 内容所属家庭(校验 + 首页缓存失效用) */

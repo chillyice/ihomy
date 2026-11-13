@@ -88,6 +88,11 @@
       </div>
 
       <div v-if="planReminderHint" class="field-hint">{{ planReminderHint }}</div>
+      <!-- 「给谁看」:纪念日/提醒可分享到亲友圈;计划与待办(计划本身)不参与分享 -->
+      <div v-if="shareable && audience.state.loaded" class="audience-block">
+        <AudiencePicker v-if="audience.state.canShare" v-model="audience.state.selected" :circles="audience.state.circles" />
+        <p v-else class="field-hint">{{ $t('audience.canShareFalse') }}</p>
+      </div>
       <div v-if="isEdit" class="field-hint">{{ $t('schedule.dialog.lockType') }}</div>
     </el-form>
 
@@ -107,6 +112,8 @@ import { ElMessage } from 'element-plus'
 import { anniversaryApi, planApi, reminderApi } from '@/api'
 import { classify, REPEAT, REPEAT_OPTIONS } from '@/utils/scheduleType'
 import { isDateString, todayString } from '@/utils/scheduleCalendar'
+import { useAudience } from '@/composables/useAudience'
+import AudiencePicker from '@/components/common/AudiencePicker.vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -219,8 +226,12 @@ const fill = (it) => {
 
 watch(
   () => props.modelValue,
-  (open) => {
-    if (open) Object.assign(form, fill(props.item))
+  async (open) => {
+    if (!open) return
+    Object.assign(form, fill(props.item))
+    // 编辑时载入该条已选的圈;新建只载圈列表(类型可能随表单变化,保存时再定)
+    const editingType = !props.item ? 'reminder' : props.item.kind === 'ANNIVERSARY' ? 'anniversary' : 'reminder'
+    await audience.load(props.item ? form.id : null, editingType)
   },
 )
 
@@ -234,6 +245,10 @@ const kind = computed(() =>
   }),
 )
 const typeText = computed(() => t('schedule.type.' + kind.value))
+
+// 「给谁看」:只有纪念日与提醒(family_anniversary / family_reminder)可分享,计划与待办不参与
+const audience = useAudience('reminder')
+const shareable = computed(() => ['ANNIVERSARY', 'REMINDER', 'TASK'].includes(kind.value))
 
 // 每年循环用月/日选择器代替日期选择器
 const showDatePicker = computed(() => form.repeat !== REPEAT.YEARLY)
@@ -346,6 +361,7 @@ const onSave = async () => {
 
   saving.value = true
   try {
+    let savedId = form.id
     if (k === 'PLAN' || k === 'ITEM') {
       const payload = {
         title: form.title.trim(),
@@ -373,7 +389,7 @@ const onSave = async () => {
         isLeap: lunar ? form.isLeap : 0,
       }
       if (form.id) await reminderApi.update(form.id, payload)
-      else await reminderApi.create(payload)
+      else savedId = (await reminderApi.create(payload))?.id
     } else {
       const payload = {
         name: form.title.trim(),
@@ -387,14 +403,28 @@ const onSave = async () => {
         remindTime: form.remind === 'ADVANCE' ? form.time : null,
       }
       if (form.id) await anniversaryApi.update(form.id, payload)
-      else await anniversaryApi.create(payload)
+      else savedId = (await anniversaryApi.create(payload))?.id
     }
+    await saveAudience(k, savedId)
     ElMessage.success(t('schedule.dialog.saved'))
     visible.value = false
     emit('saved', { kind: k, id: form.id })
   } finally {
     saving.value = false
   }
+}
+
+/**
+ * 保存分享范围:新建没勾圈就不发请求;编辑时按面板现状整体覆盖(勾选全取消=收回)。
+ * 面板被判定为「不能分享」时不动已有分享,避免一次保存顺手清空。
+ */
+const saveAudience = async (k, savedId) => {
+  if (!savedId || !audience.state.loaded || !audience.state.canShare) return
+  if (!['ANNIVERSARY', 'REMINDER', 'TASK'].includes(k)) return
+  if (!audience.state.selected.length && !isEdit.value) return
+  const type = k === 'ANNIVERSARY' ? 'anniversary' : 'reminder'
+  const data = await audience.save(savedId, audience.state.selected, type)
+  if (data?.targetCount === 0 && audience.state.selected.length) ElMessage.warning(t('audience.noTarget'))
 }
 </script>
 
@@ -417,5 +447,8 @@ const onSave = async () => {
   font-size: 12px;
   color: var(--color-text-secondary);
   line-height: 1.5;
+}
+.audience-block {
+  margin: 4px 0 10px;
 }
 </style>

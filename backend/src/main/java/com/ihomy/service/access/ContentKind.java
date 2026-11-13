@@ -13,6 +13,9 @@ public enum ContentKind {
     VIDEO("video"),
     WISH("wish"),
     BOOK("book"),
+    /** 纪念日/提醒本身没有 visibility 列,按家庭级可见(FAMILY)处理,分享口径与内容一致 */
+    ANNIVERSARY("anniversary"),
+    REMINDER("reminder"),
     /** 保险箱:只有 PRIVATE/FAMILY 两档,永不进亲友圈 */
     VAULT("vault");
 

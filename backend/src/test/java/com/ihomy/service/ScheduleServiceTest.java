@@ -12,6 +12,7 @@ import com.ihomy.mapper.FamilyPlanMapper;
 import com.ihomy.mapper.FamilyPlanTaskMapper;
 import com.ihomy.mapper.ReminderCheckMapper;
 import com.ihomy.mapper.ReminderMapper;
+import com.ihomy.service.access.ContentKind;
 import com.ihomy.service.schedule.ScheduleSourceProvider;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
@@ -49,9 +50,11 @@ class ScheduleServiceTest {
     private final FamilyPlanMapper planMapper = mock(FamilyPlanMapper.class);
     private final FamilyPlanTaskMapper planTaskMapper = mock(FamilyPlanTaskMapper.class);
     private final AnniversaryService anniversaryService = mock(AnniversaryService.class);
+    private final AudienceService audienceService = mock(AudienceService.class);
     private final ScheduleSourceProvider sourceProvider = mock(ScheduleSourceProvider.class);
     private final ScheduleService service = new ScheduleService(
-            reminderMapper, checkMapper, planMapper, planTaskMapper, anniversaryService, List.of(sourceProvider));
+            reminderMapper, checkMapper, planMapper, planTaskMapper, anniversaryService, audienceService,
+            List.of(sourceProvider));
 
     /** 单测没有 MyBatis-Plus 启动扫描,手动注册实体信息,否则 LambdaWrapper 的列名解析会报错 */
     @BeforeAll
@@ -137,7 +140,7 @@ class ScheduleServiceTest {
 
     @Test
     void anniversaryExpandsIntoSolarMonthDay() {
-        when(anniversaryService.list(FAMILY)).thenReturn(List.of(anniversary(1, "solar", 10, 30, 0)));
+        when(anniversaryService.list(FAMILY, true)).thenReturn(List.of(anniversary(1, "solar", 10, 30, 0)));
 
         Map<String, Object> result = service.events(FAMILY,
                 LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), false);
@@ -153,7 +156,7 @@ class ScheduleServiceTest {
     @Test
     void anniversaryLunarExpandsToGregorianDay() {
         // 农历八月十五 → 2026-09-25
-        when(anniversaryService.list(FAMILY)).thenReturn(List.of(anniversary(2, "lunar", 8, 15, 0)));
+        when(anniversaryService.list(FAMILY, true)).thenReturn(List.of(anniversary(2, "lunar", 8, 15, 0)));
 
         Map<String, Object> result = service.events(FAMILY,
                 LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), false);
@@ -164,7 +167,7 @@ class ScheduleServiceTest {
 
     @Test
     void guestSeesOnlyAnniversaries() {
-        when(anniversaryService.list(FAMILY)).thenReturn(List.of(anniversary(1, "solar", 10, 30, 0)));
+        when(anniversaryService.list(FAMILY, false)).thenReturn(List.of(anniversary(1, "solar", 10, 30, 0)));
 
         Map<String, Object> result = service.events(FAMILY,
                 LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), true);
@@ -184,11 +187,87 @@ class ScheduleServiceTest {
         assertThat(undated(result)).isEmpty();
     }
 
+    // ---------------------------------------------------------------- 亲友圈分享来的(只读)
+
+    /** 分享来的纪念日:带 readOnly/sharedFrom */
+    private Map<String, Object> sharedAnniversary(long id, int month, int day) {
+        Map<String, Object> m = anniversary(id, "solar", month, day, 0);
+        m.put("readOnly", true);
+        m.put("sharedFrom", Map.of("familyName", "爸妈家", "alias", "我爸妈"));
+        m.put("memberIds", List.of());
+        return m;
+    }
+
+    private Reminder sharedReminder(Long id, String repeatType, LocalDate date, LocalTime time) {
+        Reminder r = reminder(id, repeatType, date, time, 0);
+        r.setFamilyId(99L);
+        return r;
+    }
+
+    @Test
+    void sharedAnniversaryAppearsReadOnly() {
+        when(anniversaryService.list(FAMILY, true)).thenReturn(List.of(sharedAnniversary(8, 10, 30)));
+        when(planMapper.selectList(any())).thenReturn(List.of());
+        when(reminderMapper.selectList(any())).thenReturn(List.of());
+
+        Map<String, Object> result = service.events(FAMILY,
+                LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), false);
+
+        Map<String, Object> item = day(result, "2026-10-30").get(0);
+        assertThat(item).containsEntry("kind", "ANNIVERSARY")
+                .containsEntry("readOnly", true)
+                .containsEntry("shared", true);
+        assertThat((Map<String, Object>) item.get("sharedFrom")).containsEntry("familyName", "爸妈家");
+    }
+
+    @Test
+    void sharedReminderAppearsReadOnlyAndCannotBeChecked() {
+        LocalDate day = LocalDate.of(2026, 10, 30);
+        when(anniversaryService.list(FAMILY, true)).thenReturn(List.of());
+        when(planMapper.selectList(any())).thenReturn(List.of());
+        when(reminderMapper.selectList(any())).thenReturn(List.of());
+        when(audienceService.sharedIds(ContentKind.REMINDER, FAMILY)).thenReturn(List.of(12L));
+        when(reminderMapper.selectBatchIds(List.of(12L)))
+                .thenReturn(List.of(sharedReminder(12L, DictConst.REPEAT_ONCE, day, LocalTime.of(9, 0))));
+        when(audienceService.sharedSources(ContentKind.REMINDER, List.of(12L), FAMILY))
+                .thenReturn(Map.of(12L, Map.of("familyName", "爸妈家", "alias", "我爸妈")));
+
+        Map<String, Object> result = service.events(FAMILY, day, day, false);
+
+        Map<String, Object> item = day(result, day.toString()).get(0);
+        assertThat(item).containsEntry("kind", "REMINDER")
+                .containsEntry("readOnly", true)
+                .containsEntry("shared", true);
+        assertThat((Map<String, Object>) item.get("sharedFrom")).containsEntry("alias", "我爸妈");
+    }
+
+    @Test
+    void occurrencesSkipSharedItems() {
+        LocalDate day = LocalDate.of(2026, 10, 30);
+        when(anniversaryService.list(FAMILY, true)).thenReturn(List.of(sharedAnniversary(8, 10, 30)));
+        when(planMapper.selectList(any())).thenReturn(List.of());
+        when(reminderMapper.selectList(any())).thenReturn(List.of());
+
+        Map<String, Object> result = service.occurrences(FAMILY, day, day);
+
+        // 分享来的条目只读:只在本站展示,不注册本机闹钟(写侧只在所属家庭)
+        assertThat(occurrenceItems(result)).isEmpty();
+    }
+
+    @Test
+    void guestDoesNotSeeSharedItems() {
+        when(anniversaryService.list(FAMILY, false)).thenReturn(List.of(anniversary(1, "solar", 10, 30, 0)));
+
+        service.events(FAMILY, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), true);
+
+        verify(audienceService, never()).sharedIds(any(), any());
+    }
+
     // ---------------------------------------------------------------- 提醒与每日任务
 
     @Test
     void remindersExpandPerDayWithCheckedState() {
-        when(anniversaryService.list(FAMILY)).thenReturn(List.of());
+        when(anniversaryService.list(FAMILY, true)).thenReturn(List.of());
         when(planMapper.selectList(any())).thenReturn(List.of());
         // doneToday 只对「今天」这一列置 true(服务端拿 LocalDate.now() 比),日期必须跟着当前日走,不能写死
         LocalDate today = LocalDate.now();
@@ -225,7 +304,7 @@ class ScheduleServiceTest {
 
     @Test
     void plansAndSubtasksByDateWithUndatedList() {
-        when(anniversaryService.list(FAMILY)).thenReturn(List.of());
+        when(anniversaryService.list(FAMILY, true)).thenReturn(List.of());
         FamilyPlan dated = plan(1L, "换滤芯", LocalDate.of(2026, 10, 30), DictConst.PLAN_ACTIVE);
         FamilyPlan undated = plan(2L, "学做三道新菜", null, DictConst.PLAN_ACTIVE);
         // 取数顺序:先按目标日取计划(1),再取无日期计划(2);已取消的由 SQL 条件排除,不在此列
@@ -266,7 +345,7 @@ class ScheduleServiceTest {
 
     @Test
     void upcomingCollapsesRecurringAndKeepsOneOff() {
-        when(anniversaryService.list(FAMILY)).thenReturn(List.of());
+        when(anniversaryService.list(FAMILY, true)).thenReturn(List.of());
         when(planMapper.selectList(any())).thenReturn(List.of());
         LocalDate today = LocalDate.now();
         Reminder daily = reminder(3L, DictConst.REPEAT_DAILY, today.minusMonths(1), LocalTime.of(7, 30), 0);
@@ -285,7 +364,7 @@ class ScheduleServiceTest {
 
     @Test
     void upcomingSkipsDoneItems() {
-        when(anniversaryService.list(FAMILY)).thenReturn(List.of());
+        when(anniversaryService.list(FAMILY, true)).thenReturn(List.of());
         when(planMapper.selectList(any())).thenReturn(List.of());
         LocalDate today = LocalDate.now();
         Reminder done = reminder(4L, DictConst.REPEAT_ONCE, today, LocalTime.of(9, 0), 1);
@@ -303,7 +382,7 @@ class ScheduleServiceTest {
 
     @Test
     void readOnlySourceItemsAreMergedIntoThatDay() {
-        when(anniversaryService.list(FAMILY)).thenReturn(List.of());
+        when(anniversaryService.list(FAMILY, true)).thenReturn(List.of());
         when(planMapper.selectList(any())).thenReturn(List.of(), List.of());
         when(reminderMapper.selectList(any())).thenReturn(List.of());
         when(sourceProvider.available(FAMILY)).thenReturn(true);
@@ -329,7 +408,7 @@ class ScheduleServiceTest {
 
     @Test
     void unavailableSourceIsSkippedEntirely() {
-        when(anniversaryService.list(FAMILY)).thenReturn(List.of());
+        when(anniversaryService.list(FAMILY, true)).thenReturn(List.of());
         when(planMapper.selectList(any())).thenReturn(List.of(), List.of());
         when(reminderMapper.selectList(any())).thenReturn(List.of());
         when(sourceProvider.available(FAMILY)).thenReturn(false);
@@ -343,7 +422,7 @@ class ScheduleServiceTest {
 
     @Test
     void guestNeverTouchesReadOnlySources() {
-        when(anniversaryService.list(FAMILY)).thenReturn(List.of(anniversary(1, "solar", 10, 30, 0)));
+        when(anniversaryService.list(FAMILY, false)).thenReturn(List.of(anniversary(1, "solar", 10, 30, 0)));
 
         service.events(FAMILY, LocalDate.of(2026, 10, 1), LocalDate.of(2026, 10, 31), true);
 
@@ -359,7 +438,7 @@ class ScheduleServiceTest {
 
     @Test
     void occurrencesExpandRecurringPerOccurrenceWithKeys() {
-        when(anniversaryService.list(FAMILY)).thenReturn(List.of());
+        when(anniversaryService.list(FAMILY, true)).thenReturn(List.of());
         when(planMapper.selectList(any())).thenReturn(List.of(), List.of());
         LocalDate today = LocalDate.now();
         // 每日任务:区间 3 天应出 3 条(upcoming 会去重成 1 条,这里不做合并——闹钟每期都要响)
@@ -382,7 +461,7 @@ class ScheduleServiceTest {
 
     @Test
     void occurrencesDropDoneAndPlanTasksAndPlanManagedReminders() {
-        when(anniversaryService.list(FAMILY)).thenReturn(List.of());
+        when(anniversaryService.list(FAMILY, true)).thenReturn(List.of());
         when(planMapper.selectList(any())).thenReturn(List.of(), List.of());
         LocalDate today = LocalDate.now();
         Reminder onceDone = reminder(1L, DictConst.REPEAT_ONCE, today, LocalTime.of(9, 0), 1);
@@ -408,7 +487,7 @@ class ScheduleServiceTest {
 
     @Test
     void occurrencesAnniversaryAndProviderLinkRules() {
-        when(anniversaryService.list(FAMILY)).thenReturn(List.of(anniversary(3, "solar", 10, 30, 0)));
+        when(anniversaryService.list(FAMILY, true)).thenReturn(List.of(anniversary(3, "solar", 10, 30, 0)));
         when(planMapper.selectList(any())).thenReturn(List.of(), List.of());
         when(reminderMapper.selectList(any())).thenReturn(List.of());
         when(sourceProvider.available(FAMILY)).thenReturn(true);
@@ -444,7 +523,7 @@ class ScheduleServiceTest {
 
     @Test
     void occurrencesTruncateAt500() {
-        when(anniversaryService.list(FAMILY)).thenReturn(List.of());
+        when(anniversaryService.list(FAMILY, true)).thenReturn(List.of());
         when(planMapper.selectList(any())).thenReturn(List.of(), List.of());
         when(reminderMapper.selectList(any())).thenReturn(List.of());
         when(sourceProvider.available(FAMILY)).thenReturn(true);

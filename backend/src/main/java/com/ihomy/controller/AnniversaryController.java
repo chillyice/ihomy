@@ -29,14 +29,16 @@ public class AnniversaryController {
     private final SecurityHelper securityHelper;
     private final PublicController publicController;
 
-    @Operation(summary = "纪念日列表(支持 ?hid= / ?home_id= 指定公开家庭)")
+    @Operation(summary = "纪念日列表(支持 ?hid= / ?home_id= 指定公开家庭;登录后含分享给本家庭的)")
     @GetMapping("/list")
     public Result<List<Map<String, Object>>> list(@RequestParam(name = "hid", required = false) String hid,
                                                  @RequestParam(name = "home_id", required = false) Long homeId) {
         // 访客(未登录)按公开家庭取数 —— 与公告同一入口(publicController.resolveVisibleFamilyId)。
         // 此前游客分支 familyId=null 直接返回空列表,于是首页纪念日卡片有内容、纪念日页却「暂无纪念日」。
         Long familyId = publicController.resolveVisibleFamilyId(hid, homeId);
-        return Result.success(anniversaryService.list(familyId));
+        // 分享给本家庭的纪念日只给登录成员看;游客只读演示家庭自家的纪念日
+        boolean includeShared = securityHelper.currentUser() != null;
+        return Result.success(anniversaryService.list(familyId, includeShared));
     }
 
     @Operation(summary = "新增纪念日")

@@ -12,11 +12,13 @@ import com.ihomy.entity.SysUser;
 import com.ihomy.mapper.AnniversaryMapper;
 import com.ihomy.mapper.FamilyAnniversaryMemberMapper;
 import com.ihomy.mapper.SysUserMapper;
+import com.ihomy.service.access.ContentKind;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -28,6 +30,8 @@ import java.util.Set;
 /**
  * 家庭纪念日业务:支持阳历/农历(+闰月),每年重复,可关联多位家庭成员(V10.11)。
  * 全员可增删改本家庭纪念日;列表对同家庭访客也可读。
+ * 亲友圈分享(V12.21):接收家庭在列表里看到别人家分享来的纪念日,只读 + 带来源家庭;
+ * 写侧永远只在所属家庭(跨家庭改删一律 404)。
  */
 @Service
 @RequiredArgsConstructor
@@ -36,14 +40,30 @@ public class AnniversaryService {
     private final AnniversaryMapper anniversaryMapper;
     private final FamilyAnniversaryMemberMapper memberMapper;
     private final SysUserMapper sysUserMapper;
+    private final AudienceService audienceService;
 
-    /** 家庭纪念日列表,附带关联成员账号与展示名 */
-    public List<Map<String, Object>> list(Long familyId) {
+    /**
+     * 家庭纪念日列表:本家庭 + (可选)亲友圈里分享给本家庭的,按 id 倒序。
+     * 被分享的条目标 readOnly 并带 sharedFrom(家庭名/圈内称呼),不返回对方的成员账号 id。
+     *
+     * @param includeShared 游客口径传 false:只出本家庭(演示家庭)的纪念日
+     */
+    public List<Map<String, Object>> list(Long familyId, boolean includeShared) {
         List<Map<String, Object>> result = new ArrayList<>();
         if (familyId == null) return result;
-        List<Anniversary> list = anniversaryMapper.selectList(new LambdaQueryWrapper<Anniversary>()
+        List<Anniversary> list = new ArrayList<>(anniversaryMapper.selectList(new LambdaQueryWrapper<Anniversary>()
                 .eq(Anniversary::getFamilyId, familyId)
-                .orderByDesc(Anniversary::getId));
+                .orderByDesc(Anniversary::getId)));
+        Map<Long, Map<String, Object>> sharedSources = Map.of();
+        if (includeShared) {
+            List<Long> sharedIds = audienceService.sharedIds(ContentKind.ANNIVERSARY, familyId);
+            if (!sharedIds.isEmpty()) {
+                sharedSources = audienceService.sharedSources(ContentKind.ANNIVERSARY, sharedIds, familyId);
+                List<Anniversary> shared = anniversaryMapper.selectBatchIds(sharedIds);
+                shared.sort(Comparator.comparing(Anniversary::getId).reversed());
+                list.addAll(shared);
+            }
+        }
         if (list.isEmpty()) return result;
 
         // 一次取全部关联行,按纪念日分组;再批量取账号,避免 N+1
@@ -60,27 +80,37 @@ public class AnniversaryService {
         Map<Long, SysUser> userMap = batchUsers(userIds);
 
         for (Anniversary a : list) {
-            Map<String, Object> m = new HashMap<>();
-            m.put("id", a.getId());
-            m.put("name", a.getName());
-            m.put("calendar", a.getCalendar());
-            m.put("month", a.getMonth());
-            m.put("day", a.getDay());
-            m.put("isLeap", a.getIsLeap());
-            m.put("recurring", a.getRecurring());
-            m.put("remindDaysBefore", a.getRemindDaysBefore());
-            m.put("remindTime", a.getRemindTime());
-            List<Long> ids = memberIdsByAnniv.getOrDefault(a.getId(), List.of());
-            m.put("memberIds", ids);
-            List<String> names = new ArrayList<>(ids.size());
-            for (Long uid : ids) {
-                String n = UserNames.of(userMap.get(uid));
-                if (n != null) names.add(n);
-            }
-            m.put("memberNames", names);
-            result.add(m);
+            result.add(toView(a, familyId, memberIdsByAnniv.getOrDefault(a.getId(), List.of()),
+                    userMap, sharedSources.get(a.getId())));
         }
         return result;
+    }
+
+    /** 单条纪念日 → 展示结构;跨家庭条目带 readOnly 与来源,不回传成员账号 id */
+    private Map<String, Object> toView(Anniversary a, Long viewerFamilyId, List<Long> memberIds,
+                                       Map<Long, SysUser> userMap, Map<String, Object> sharedFrom) {
+        boolean readOnly = !Objects.equals(viewerFamilyId, a.getFamilyId());
+        Map<String, Object> m = new HashMap<>();
+        m.put("id", a.getId());
+        m.put("name", a.getName());
+        m.put("calendar", a.getCalendar());
+        m.put("month", a.getMonth());
+        m.put("day", a.getDay());
+        m.put("isLeap", a.getIsLeap());
+        m.put("recurring", a.getRecurring());
+        m.put("remindDaysBefore", a.getRemindDaysBefore());
+        m.put("remindTime", a.getRemindTime());
+        // 别人的纪念日只给展示名(谁生日就是标题的一部分),不给账号 id,防止被拿去拼请求
+        m.put("memberIds", readOnly ? List.of() : memberIds);
+        List<String> names = new ArrayList<>(memberIds.size());
+        for (Long uid : memberIds) {
+            String n = UserNames.of(userMap.get(uid));
+            if (n != null) names.add(n);
+        }
+        m.put("memberNames", names);
+        m.put("readOnly", readOnly);
+        if (readOnly) m.put("sharedFrom", sharedFrom);
+        return m;
     }
 
     /** 批量取用户,返回 id→SysUser 映射(空集返空 Map) */
@@ -122,13 +152,14 @@ public class AnniversaryService {
         return a;
     }
 
-    /** 删除纪念日,仅限本家庭;关联行一并清除 */
+    /** 删除纪念日,仅限本家庭;关联行与分享范围一并清除 */
     @Transactional
     public void delete(Long id, Long familyId) {
         requireOwn(id, familyId);
         memberMapper.delete(new LambdaQueryWrapper<FamilyAnniversaryMember>()
                 .eq(FamilyAnniversaryMember::getAnniversaryId, id));
         anniversaryMapper.deleteById(id);
+        audienceService.revokeContent(ContentKind.ANNIVERSARY, id);
     }
 
     /** DTO 字段落库,isLeap/recurring 缺省补默认值;提醒天数为 0/空表示关闭,两列一并置空 */
@@ -183,11 +214,11 @@ public class AnniversaryService {
         }
     }
 
-    /** 校验纪念日存在且属于该家庭 */
+    /** 校验纪念日存在且属于该家庭;跨家庭一律 404(不泄露存在性) */
     private Anniversary requireOwn(Long id, Long familyId) {
         Anniversary a = anniversaryMapper.selectById(id);
         if (a == null) throw new BizException(ResultCode.NOT_FOUND);
-        if (familyId != null && !familyId.equals(a.getFamilyId())) throw new BizException(ResultCode.FORBIDDEN);
+        if (familyId == null || !familyId.equals(a.getFamilyId())) throw new BizException(ResultCode.NOT_FOUND);
         return a;
     }
 }

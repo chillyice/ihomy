@@ -486,6 +486,8 @@ export default {
     kindDiary: 'Diary',
     kindWish: 'Wish',
     kindBook: 'Book',
+    kindAnniversary: 'Anniversary',
+    kindReminder: 'Reminder',
   },
   // Content audience ("who can see this" panel + badges on shared content)
   audience: {
@@ -903,6 +905,10 @@ export default {
       addTask: 'Add',
       progress: 'Done {done}/{total}',
       addWish: 'Add to wishlist',
+      bless: 'Send blessings',
+      blessed: 'Blessed',
+      blessCount: '{n} blessings',
+      timeLabel: 'Time',
       edit: 'Edit',
       delete: 'Delete',
       close: 'Close',

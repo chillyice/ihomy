@@ -12,6 +12,7 @@ import com.ihomy.mapper.NotificationMapper;
 import com.ihomy.mapper.ReminderCheckMapper;
 import com.ihomy.mapper.ReminderMapper;
 import com.ihomy.mapper.SysUserMapper;
+import com.ihomy.service.access.ContentKind;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -50,8 +51,9 @@ class ReminderServiceTest {
     private final NotificationMapper notificationMapper = mock(NotificationMapper.class);
     private final SysUserMapper userMapper = mock(SysUserMapper.class);
     private final NotificationService notificationService = mock(NotificationService.class);
+    private final AudienceService audienceService = mock(AudienceService.class);
     private final ReminderService service = new ReminderService(
-            reminderMapper, checkMapper, notificationMapper, userMapper, notificationService);
+            reminderMapper, checkMapper, notificationMapper, userMapper, notificationService, audienceService);
 
     /** 单测没有 MyBatis-Plus 启动扫描,手动注册实体信息,否则 LambdaWrapper 的列名解析会报错 */
     @BeforeAll
@@ -148,6 +150,40 @@ class ReminderServiceTest {
 
         verify(reminderMapper).deleteById(REMINDER_ID);
         verify(checkMapper).deleteByReminderId(REMINDER_ID);
+        verify(audienceService).revokeContent(ContentKind.REMINDER, REMINDER_ID);
+    }
+
+    @Test
+    void listMergesSharedRemindersAsReadOnly() {
+        Reminder own = reminder(DictConst.REPEAT_ONCE, TODAY, LocalTime.of(8, 0), 0);
+        Reminder shared = reminder(DictConst.REPEAT_ONCE, TODAY, LocalTime.of(9, 0), 0);
+        shared.setId(77L);
+        shared.setFamilyId(99L);
+        shared.setTitle("爸妈体检");
+        when(reminderMapper.selectList(any())).thenReturn(List.of(own));
+        when(audienceService.sharedIds(ContentKind.REMINDER, FAMILY)).thenReturn(List.of(77L));
+        when(reminderMapper.selectBatchIds(List.of(77L))).thenReturn(List.of(shared));
+        when(audienceService.sharedSources(ContentKind.REMINDER, List.of(77L), FAMILY))
+                .thenReturn(Map.of(77L, Map.of("familyName", "爸妈家", "alias", "我爸妈")));
+
+        List<Map<String, Object>> list = service.list(FAMILY, true);
+
+        assertThat(list).hasSize(2);
+        assertThat(list.get(0)).containsEntry("title", "吃药").containsEntry("readOnly", false);
+        Map<String, Object> sharedView = list.get(1);
+        assertThat(sharedView).containsEntry("title", "爸妈体检").containsEntry("readOnly", true);
+        assertThat((Map<String, Object>) sharedView.get("sharedFrom")).containsEntry("alias", "我爸妈");
+    }
+
+    @Test
+    void listWithoutSharedSkipsAudienceLookup() {
+        when(reminderMapper.selectList(any())).thenReturn(List.of(
+                reminder(DictConst.REPEAT_ONCE, TODAY, LocalTime.of(8, 0), 0)));
+
+        List<Map<String, Object>> list = service.list(FAMILY, false);
+
+        assertThat(list).hasSize(1);
+        verify(audienceService, never()).sharedIds(any(), any());
     }
 
     @Test

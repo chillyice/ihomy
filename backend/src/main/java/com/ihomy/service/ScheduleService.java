@@ -14,6 +14,7 @@ import com.ihomy.mapper.FamilyPlanMapper;
 import com.ihomy.mapper.FamilyPlanTaskMapper;
 import com.ihomy.mapper.ReminderCheckMapper;
 import com.ihomy.mapper.ReminderMapper;
+import com.ihomy.service.access.ContentKind;
 import com.ihomy.service.schedule.ScheduleSourceProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -65,6 +66,8 @@ public class ScheduleService {
     private final FamilyPlanMapper planMapper;
     private final FamilyPlanTaskMapper planTaskMapper;
     private final AnniversaryService anniversaryService;
+    /** 亲友圈分享给本家庭的纪念日/提醒只读并入(标记 readOnly,不进闹钟、不可勾完成) */
+    private final AudienceService audienceService;
     /** 只读来源实现列表(贷款/理财/食材),顺序由各实现的 @Order 决定 */
     private final List<ScheduleSourceProvider> sourceProviders;
 
@@ -144,6 +147,8 @@ public class ScheduleService {
             String kind = (String) raw.get("kind");
             if ("PLAN_TASK".equals(kind)) continue;
             if (Boolean.TRUE.equals(raw.get("done"))) continue;
+            // 亲友圈分享来的条目只读:不注册本机闹钟(写侧只在所属家庭,通知里的「完成」不该落到别家)
+            if (Boolean.TRUE.equals(raw.get("shared"))) continue;
             String date = (String) raw.get("date");
             Map<String, Object> item = new LinkedHashMap<>(raw);
             item.put("key", kind + ":" + raw.get("id") + ":" + date);
@@ -170,9 +175,11 @@ public class ScheduleService {
                                                         boolean anniversaryOnly) {
         List<Map<String, Object>> items = new ArrayList<>();
         if (familyId == null) return items;
-        appendAnniversaries(familyId, from, to, items);
+        // 游客口径(anniversaryOnly)不并入亲友圈分享给本家庭的条目
+        boolean includeShared = !anniversaryOnly;
+        appendAnniversaries(familyId, from, to, items, includeShared);
         if (anniversaryOnly) return items;
-        appendReminders(familyId, from, to, items);
+        appendReminders(familyId, from, to, items, includeShared);
         appendPlans(familyId, from, to, items);
         appendReadOnlySources(familyId, from, to, items);
         return items;
@@ -189,10 +196,14 @@ public class ScheduleService {
         }
     }
 
-    /** 纪念日:按 AnniversaryDate 展开到区间内的每年发生日(阳历/农历同一套口径) */
-    private void appendAnniversaries(Long familyId, LocalDate from, LocalDate to, List<Map<String, Object>> items) {
+    /**
+     * 纪念日:按 AnniversaryDate 展开到区间内的每年发生日(阳历/农历同一套口径);
+     * 亲友圈分享给本家庭的纪念日一并展开,带 readOnly 与来源家庭(只读)。
+     */
+    private void appendAnniversaries(Long familyId, LocalDate from, LocalDate to, List<Map<String, Object>> items,
+                                     boolean includeShared) {
         LocalDate today = LocalDate.now();
-        for (Map<String, Object> a : anniversaryService.list(familyId)) {
+        for (Map<String, Object> a : anniversaryService.list(familyId, includeShared)) {
             if (!DictConst.RECUR_YEARLY.equals(a.get("recurring"))) continue;
             String calendar = (String) a.get("calendar");
             Integer month = intValue(a.get("month"));
@@ -211,6 +222,11 @@ public class ScheduleService {
                 item.put("days", (int) ChronoUnit.DAYS.between(today, occurrence));
                 item.put("calendar", calendar);
                 item.put("members", a.getOrDefault("memberNames", List.of()));
+                if (Boolean.TRUE.equals(a.get("readOnly"))) {
+                    item.put("readOnly", true);
+                    item.put("shared", true);
+                    item.put("sharedFrom", a.get("sharedFrom"));
+                }
                 items.add(item);
                 cursor = occurrence.plusDays(1);
             }
@@ -220,10 +236,20 @@ public class ScheduleService {
     /**
      * 提醒与每日任务:一次性未完成的按当天落一个,循环事项逐日判定。
      * 计划托管的提醒(planId 非空)跳过:同一天的计划项已带提醒时刻,避免一条日程出现两次。
+     * includeShared=true 时并入亲友圈分享给本家庭的提醒,只读(完成态跟所属家庭走,本家庭不能勾)。
      */
-    private void appendReminders(Long familyId, LocalDate from, LocalDate to, List<Map<String, Object>> items) {
-        List<Reminder> reminders = reminderMapper.selectList(new LambdaQueryWrapper<Reminder>()
-                .eq(Reminder::getFamilyId, familyId));
+    private void appendReminders(Long familyId, LocalDate from, LocalDate to, List<Map<String, Object>> items,
+                                 boolean includeShared) {
+        List<Reminder> reminders = new ArrayList<>(reminderMapper.selectList(new LambdaQueryWrapper<Reminder>()
+                .eq(Reminder::getFamilyId, familyId)));
+        Map<Long, Map<String, Object>> sharedSources = Map.of();
+        if (includeShared) {
+            List<Long> sharedIds = audienceService.sharedIds(ContentKind.REMINDER, familyId);
+            if (!sharedIds.isEmpty()) {
+                sharedSources = audienceService.sharedSources(ContentKind.REMINDER, sharedIds, familyId);
+                reminders.addAll(reminderMapper.selectBatchIds(sharedIds));
+            }
+        }
         if (reminders.isEmpty()) return;
         List<Long> recurringIds = new ArrayList<>();
         for (Reminder r : reminders) {
@@ -232,6 +258,7 @@ public class ScheduleService {
         Set<String> checked = checkedKeys(recurringIds, from, to);
         for (Reminder r : reminders) {
             if (r.getPlanId() != null) continue;
+            boolean shared = !familyId.equals(r.getFamilyId());
             boolean recurring = ReminderService.isRecurring(r);
             if (!recurring && r.getDone() != null && r.getDone() == 1) continue;
             String kind = recurring ? "TASK" : "REMINDER";
@@ -249,6 +276,11 @@ public class ScheduleService {
                 item.put("calendar", r.getCalendar());
                 item.put("done", done);
                 item.put("doneToday", done && d.equals(LocalDate.now()));
+                if (shared) {
+                    item.put("readOnly", true);
+                    item.put("shared", true);
+                    item.put("sharedFrom", sharedSources.get(r.getId()));
+                }
                 items.add(item);
             }
         }

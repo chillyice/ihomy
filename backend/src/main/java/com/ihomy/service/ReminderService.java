@@ -13,6 +13,7 @@ import com.ihomy.mapper.NotificationMapper;
 import com.ihomy.mapper.ReminderCheckMapper;
 import com.ihomy.mapper.ReminderMapper;
 import com.ihomy.mapper.SysUserMapper;
+import com.ihomy.service.access.ContentKind;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -21,7 +22,9 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -47,13 +50,56 @@ public class ReminderService {
     private final NotificationMapper notificationMapper;
     private final SysUserMapper sysUserMapper;
     private final NotificationService notificationService;
+    private final AudienceService audienceService;
 
-    /** 家庭提醒列表:未完成优先,再按触发时间升序 */
-    public List<Reminder> list(Long familyId) {
-        return reminderMapper.selectList(new LambdaQueryWrapper<Reminder>()
-                .eq(Reminder::getFamilyId, familyId)
-                .orderByAsc(Reminder::getDone)
-                .orderByAsc(Reminder::getRemindTime));
+    /**
+     * 家庭提醒列表:未完成优先,再按触发时间升序。
+     * includeShared=true 时并入亲友圈分享给本家庭的提醒(只读,带来源家庭)。
+     */
+    public List<Map<String, Object>> list(Long familyId, boolean includeShared) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (familyId == null) return result;
+        List<Reminder> all = new ArrayList<>(reminderMapper.selectList(new LambdaQueryWrapper<Reminder>()
+                .eq(Reminder::getFamilyId, familyId)));
+        Map<Long, Map<String, Object>> sharedSources = Map.of();
+        if (includeShared) {
+            List<Long> sharedIds = audienceService.sharedIds(ContentKind.REMINDER, familyId);
+            if (!sharedIds.isEmpty()) {
+                sharedSources = audienceService.sharedSources(ContentKind.REMINDER, sharedIds, familyId);
+                all.addAll(reminderMapper.selectBatchIds(sharedIds));
+            }
+        }
+        // 合并两批数据后在内存里排一次(未完成在前,再按提醒时刻,空时刻在前)
+        all.sort(Comparator
+                .comparing((Reminder r) -> r.getDone() == null ? 0 : r.getDone())
+                .thenComparing(Reminder::getRemindTime, Comparator.nullsFirst(Comparator.naturalOrder()))
+                .thenComparing(Reminder::getId));
+        for (Reminder r : all) {
+            result.add(toView(r, familyId, sharedSources.get(r.getId())));
+        }
+        return result;
+    }
+
+    /** 提醒 → 展示结构;跨家庭条目带 readOnly 与来源家庭 */
+    private Map<String, Object> toView(Reminder r, Long viewerFamilyId, Map<String, Object> sharedFrom) {
+        boolean readOnly = !viewerFamilyId.equals(r.getFamilyId());
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", r.getId());
+        m.put("title", r.getTitle());
+        m.put("content", r.getContent());
+        m.put("remindDate", r.getRemindDate());
+        m.put("remindTime", r.getRemindTime());
+        m.put("repeatType", r.getRepeatType());
+        m.put("calendar", r.getCalendar());
+        m.put("lunarMonth", r.getLunarMonth());
+        m.put("lunarDay", r.getLunarDay());
+        m.put("isLeap", r.getIsLeap());
+        m.put("done", r.getDone());
+        m.put("planId", r.getPlanId());
+        m.put("createdBy", r.getCreatedBy());
+        m.put("readOnly", readOnly);
+        if (readOnly) m.put("sharedFrom", sharedFrom);
+        return m;
     }
 
     /** 新建提醒(校验标题、日期与时刻;每年重复校验历法与农历字段) */
@@ -93,12 +139,13 @@ public class ReminderService {
         reminderMapper.updateById(r);
     }
 
-    /** 删除提醒:连带清理按日完成记录(表无逻辑删列,走自定义 XML 物理删) */
+    /** 删除提醒:连带清理按日完成记录与分享范围(表无逻辑删列,走自定义 XML 物理删) */
     public void delete(Long id, Long familyId) {
         Reminder r = require(id, familyId);
         if (r.getPlanId() != null) throw new BizException(ResultCode.BAD_REQUEST, PLAN_MANAGED);
         reminderMapper.deleteById(id);
         reminderCheckMapper.deleteByReminderId(id);
+        audienceService.revokeContent(ContentKind.REMINDER, id);
     }
 
     /**

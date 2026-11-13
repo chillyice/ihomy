@@ -18,6 +18,7 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 提醒事项接口:家庭内全员可增删改与完成勾选,到点由定时任务发站内通知。
@@ -35,10 +36,10 @@ public class ReminderController {
         return securityHelper.current();
     }
 
-    @Operation(summary = "家庭提醒列表")
+    @Operation(summary = "家庭提醒列表(含亲友圈分享给本家庭的,只读)")
     @GetMapping("/list")
-    public Result<List<Reminder>> list() {
-        return Result.success(reminderService.list(current().getFamilyId()));
+    public Result<List<Map<String, Object>>> list() {
+        return Result.success(reminderService.list(current().getFamilyId(), true));
     }
 
     @Operation(summary = "新增提醒")

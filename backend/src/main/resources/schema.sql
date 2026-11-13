@@ -2980,7 +2980,7 @@ CREATE TABLE `family_circle_member` (
 DROP TABLE IF EXISTS `content_audience`;
 CREATE TABLE `content_audience` (
   `id`               BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `content_type`     VARCHAR(20) NOT NULL COMMENT '内容类型: photo/album/video/blog/diary/wish/book',
+  `content_type`     VARCHAR(20) NOT NULL COMMENT '内容类型: photo/album/video/blog/diary/wish/book/anniversary/reminder',
   `content_id`       BIGINT      NOT NULL COMMENT '内容ID',
   `owner_family_id`  BIGINT      NOT NULL COMMENT '内容所属家庭ID',
   `target_type`      VARCHAR(20) NOT NULL DEFAULT 'FAMILY' COMMENT '接收方类型(仅 FAMILY,圈在写入时已展开)',

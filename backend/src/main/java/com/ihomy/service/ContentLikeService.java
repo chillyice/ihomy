@@ -6,7 +6,9 @@ import com.ihomy.common.ResultCode;
 import com.ihomy.entity.Blog;
 import com.ihomy.entity.ContentLike;
 import com.ihomy.entity.Diary;
+import com.ihomy.entity.Anniversary;
 import com.ihomy.entity.Photo;
+import com.ihomy.mapper.AnniversaryMapper;
 import com.ihomy.mapper.BlogMapper;
 import com.ihomy.mapper.ContentLikeMapper;
 import com.ihomy.mapper.DiaryMapper;
@@ -23,6 +25,7 @@ import java.util.Map;
  * 统一点赞业务:博客/日记/照片共用一张 content_like 表,
  * 切换点赞状态并回写各内容的 likeCount 冗余字段;
  * 同家庭内容直接可赞,跨家庭只允许「已分享给本家庭」的内容。
+ * 纪念日没有 like_count 列,只记 content_like 行(亲友圈里的「送祝福」,总数实时 COUNT)。
  */
 @Service
 @RequiredArgsConstructor
@@ -32,6 +35,7 @@ public class ContentLikeService {
     private final BlogMapper blogMapper;
     private final DiaryMapper diaryMapper;
     private final PhotoMapper photoMapper;
+    private final AnniversaryMapper anniversaryMapper;
     private final AudienceService audienceService;
 
     /** 切换点赞:已赞则取消,未赞则插入(表 UNIQUE 防重复),返回最新状态与总数 */
@@ -122,6 +126,13 @@ public class ContentLikeService {
                 if (p.getFamilyId().equals(familyId)) return true;
                 return !com.ihomy.common.DictConst.VIS_PRIVATE.equals(p.getVisibility())
                         && audienceService.sharedTo(ContentKind.PHOTO, contentId, familyId);
+            }
+            // 纪念日没有 visibility 列:本家庭可送祝福;亲友圈分享给本家庭的也可(祝福不写对方数据)
+            case "anniversary": {
+                Anniversary a = anniversaryMapper.selectById(contentId);
+                if (a == null) return false;
+                if (a.getFamilyId().equals(familyId)) return true;
+                return audienceService.sharedTo(ContentKind.ANNIVERSARY, contentId, familyId);
             }
             default:
                 return false;
