@@ -1,0 +1,272 @@
+[
+  {
+    "id": "S-1",
+    "suit": "S",
+    "rank": 1
+  },
+  {
+    "id": "S-2",
+    "suit": "S",
+    "rank": 2
+  },
+  {
+    "id": "S-3",
+    "suit": "S",
+    "rank": 3
+  },
+  {
+    "id": "S-4",
+    "suit": "S",
+    "rank": 4
+  },
+  {
+    "id": "S-5",
+    "suit": "S",
+    "rank": 5
+  },
+  {
+    "id": "S-6",
+    "suit": "S",
+    "rank": 6
+  },
+  {
+    "id": "S-7",
+    "suit": "S",
+    "rank": 7
+  },
+  {
+    "id": "S-8",
+    "suit": "S",
+    "rank": 8
+  },
+  {
+    "id": "S-9",
+    "suit": "S",
+    "rank": 9
+  },
+  {
+    "id": "S-10",
+    "suit": "S",
+    "rank": 10
+  },
+  {
+    "id": "S-11",
+    "suit": "S",
+    "rank": 11
+  },
+  {
+    "id": "S-12",
+    "suit": "S",
+    "rank": 12
+  },
+  {
+    "id": "S-13",
+    "suit": "S",
+    "rank": 13
+  },
+  {
+    "id": "H-1",
+    "suit": "H",
+    "rank": 1
+  },
+  {
+    "id": "H-2",
+    "suit": "H",
+    "rank": 2
+  },
+  {
+    "id": "H-3",
+    "suit": "H",
+    "rank": 3
+  },
+  {
+    "id": "H-4",
+    "suit": "H",
+    "rank": 4
+  },
+  {
+    "id": "H-5",
+    "suit": "H",
+    "rank": 5
+  },
+  {
+    "id": "H-6",
+    "suit": "H",
+    "rank": 6
+  },
+  {
+    "id": "H-7",
+    "suit": "H",
+    "rank": 7
+  },
+  {
+    "id": "H-8",
+    "suit": "H",
+    "rank": 8
+  },
+  {
+    "id": "H-9",
+    "suit": "H",
+    "rank": 9
+  },
+  {
+    "id": "H-10",
+    "suit": "H",
+    "rank": 10
+  },
+  {
+    "id": "H-11",
+    "suit": "H",
+    "rank": 11
+  },
+  {
+    "id": "H-12",
+    "suit": "H",
+    "rank": 12
+  },
+  {
+    "id": "H-13",
+    "suit": "H",
+    "rank": 13
+  },
+  {
+    "id": "C-1",
+    "suit": "C",
+    "rank": 1
+  },
+  {
+    "id": "C-2",
+    "suit": "C",
+    "rank": 2
+  },
+  {
+    "id": "C-3",
+    "suit": "C",
+    "rank": 3
+  },
+  {
+    "id": "C-4",
+    "suit": "C",
+    "rank": 4
+  },
+  {
+    "id": "C-5",
+    "suit": "C",
+    "rank": 5
+  },
+  {
+    "id": "C-6",
+    "suit": "C",
+    "rank": 6
+  },
+  {
+    "id": "C-7",
+    "suit": "C",
+    "rank": 7
+  },
+  {
+    "id": "C-8",
+    "suit": "C",
+    "rank": 8
+  },
+  {
+    "id": "C-9",
+    "suit": "C",
+    "rank": 9
+  },
+  {
+    "id": "C-10",
+    "suit": "C",
+    "rank": 10
+  },
+  {
+    "id": "C-11",
+    "suit": "C",
+    "rank": 11
+  },
+  {
+    "id": "C-12",
+    "suit": "C",
+    "rank": 12
+  },
+  {
+    "id": "C-13",
+    "suit": "C",
+    "rank": 13
+  },
+  {
+    "id": "D-1",
+    "suit": "D",
+    "rank": 1
+  },
+  {
+    "id": "D-2",
+    "suit": "D",
+    "rank": 2
+  },
+  {
+    "id": "D-3",
+    "suit": "D",
+    "rank": 3
+  },
+  {
+    "id": "D-4",
+    "suit": "D",
+    "rank": 4
+  },
+  {
+    "id": "D-5",
+    "suit": "D",
+    "rank": 5
+  },
+  {
+    "id": "D-6",
+    "suit": "D",
+    "rank": 6
+  },
+  {
+    "id": "D-7",
+    "suit": "D",
+    "rank": 7
+  },
+  {
+    "id": "D-8",
+    "suit": "D",
+    "rank": 8
+  },
+  {
+    "id": "D-9",
+    "suit": "D",
+    "rank": 9
+  },
+  {
+    "id": "D-10",
+    "suit": "D",
+    "rank": 10
+  },
+  {
+    "id": "D-11",
+    "suit": "D",
+    "rank": 11
+  },
+  {
+    "id": "D-12",
+    "suit": "D",
+    "rank": 12
+  },
+  {
+    "id": "D-13",
+    "suit": "D",
+    "rank": 13
+  },
+  {
+    "id": "joker-small",
+    "suit": "JOKER",
+    "rank": 14
+  },
+  {
+    "id": "joker-big",
+    "suit": "JOKER",
+    "rank": 15
+  }
+]

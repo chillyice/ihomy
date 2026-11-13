@@ -93,6 +93,8 @@
                 class="tile hand"
                 :class="[tileClass(tile.kind), { drawn: tile.justDrawn, dim: phase !== 'playing' }]"
                 :disabled="!canDiscardNow"
+                :title="tileLabel(tile.kind)"
+                :aria-label="tileLabel(tile.kind)"
                 @click="onTileClick(tile)"
               >
                 <TileFace :kind="tile.kind" />
@@ -170,6 +172,7 @@ import { useGameView } from '@/composables/useGameView'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { isSpectatorRole } from '@/utils/gameRoom'
 import { useChatStore } from '@/stores/chat'
+import { mahjongFaceStyle } from '@/utils/games/tileAtlas'
 import {
   canMahjongWin,
   createMahjongWall,
@@ -186,21 +189,31 @@ const { t } = useI18n()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 const chatStore = useChatStore()
 
-// 牌面组件:数字 + 花色(内联函数式组件,免一个单文件)
+// 牌面组件:优先用图集(assets/games/tiles-cards-atlas.json)里的麻将牌面,
+// 取不到时退回原来的「数字 + 花色」文字,保证任何数据都不会画出空白牌
+const HONOR_KEYS = ['east', 'south', 'west', 'north', 'zhong', 'fa', 'bai']
+
+/** 牌的读屏名字:字牌取字名,数牌「点数 + 花色」 */
+const tileLabel = (kind) => {
+  if (kind >= 27) return t(`games.mahjong.honor.${HONOR_KEYS[kind - 27]}`)
+  return `${(kind % 9) + 1}${t(`games.mahjong.suit.${['w', 't', 's'][Math.floor(kind / 9)]}`)}`
+}
+
 const TileFace = (props) => {
   const kind = props.kind
+  const style = mahjongFaceStyle(kind)
+  if (style) return h('span', { class: ['tile-face', 'atlas'], style, 'aria-hidden': 'true' })
   if (kind >= 27) {
-    const honorKeys = ['east', 'south', 'west', 'north', 'zhong', 'fa', 'bai']
     const zhongRed = kind === 31
     return h(
       'span',
-      { class: ['tile-face', 'honor', { red: zhongRed, green: kind === 32, blue: kind === 33 }] },
-      t(`games.mahjong.honor.${honorKeys[kind - 27]}`),
+      { class: ['tile-face', 'honor', { red: zhongRed, green: kind === 32, blue: kind === 33 }], 'aria-hidden': 'true' },
+      t(`games.mahjong.honor.${HONOR_KEYS[kind - 27]}`),
     )
   }
   const num = (kind % 9) + 1
   const suitKey = ['w', 't', 's'][Math.floor(kind / 9)]
-  return h('span', { class: ['tile-face'] }, [
+  return h('span', { class: ['tile-face'], 'aria-hidden': 'true' }, [
     h('span', { class: 'tile-num' }, String(num)),
     h('span', { class: 'tile-suit' }, t(`games.mahjong.suit.${suitKey}`)),
   ])
@@ -987,8 +1000,10 @@ onBeforeUnmount(() => {
   padding: 60px 0;
 }
 
-/* 牌面:白底圆角,数字大花色小;字牌按颜色 */
+/* 牌面:图集整张当 sprite 铺进牌框(见 utils/games/tileAtlas.js);文字牌面是兜底 */
 .tile {
+  position: relative;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1006,6 +1021,12 @@ onBeforeUnmount(() => {
     transform 0.12s ease,
     box-shadow 0.12s ease;
   flex: none;
+}
+.tile-face.atlas {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-repeat: no-repeat;
 }
 .tile .tile-face {
   display: inline-flex;

@@ -1,0 +1,32 @@
+{
+  "image": "tiles-cards-atlas.png",
+  "columns": 8,
+  "rows": 6,
+  "coordinateUnit": "normalized",
+  "frame": { "x": "(index % 8) / 8", "y": "Math.floor(index / 8) / 6", "width": 0.125, "height": 0.16666666666666666 },
+  "mahjong": { "start": 0, "count": 34, "order": "wan 1-9, dots 1-9, bamboo 1-9, east, south, west, north, red, green, white" },
+  "poker": [
+    "spades-J",
+    "spades-Q",
+    "spades-K",
+    "hearts-J",
+    "hearts-Q",
+    "hearts-K",
+    "clubs-J",
+    "clubs-Q",
+    "clubs-K",
+    "diamonds-J",
+    "diamonds-Q",
+    "diamonds-K",
+    "joker-small",
+    "joker-big"
+  ],
+  "pokerStart": 34,
+  "status": "ready-with-override",
+  "overrides": { "15": "mahjong-seven-dots.png" },
+  "knownIssues": [],
+  "generation": {
+    "tool": "built-in image_gen",
+    "promptSummary": "8 by 6 atlas; 34 traditional mahjong faces followed by spades/hearts/clubs/diamonds J Q K and black/red jokers; ivory tiles, flat front view, classic mirrored court illustrations."
+  }
+}
