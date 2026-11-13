@@ -253,9 +253,11 @@ public class GameRoomService {
             }
             return get(familyId, id);
         }
-        // 高分制:所有成员都上报后自动结算
+        // 高分制:所有玩家(观战不算)都上报后自动结算
         List<GameRoomMember> members = members(id);
-        boolean allReported = members.stream().allMatch(m -> m.getFinishedAt() != null);
+        boolean allReported = members.stream()
+                .filter(m -> !GameConst.ROOM_ROLE_SPECTATOR.equals(m.getRole()))
+                .allMatch(m -> m.getFinishedAt() != null);
         if (allReported) {
             GameRoom finished = finishByScore(room);
             if (finished != null && finished.getWinnerId() != null) {
@@ -286,6 +288,38 @@ public class GameRoomService {
             if (finished != null && finished.getWinnerId() != null) {
                 awardWinner(finished, finished.getWinnerId());
             }
+        }
+        return get(familyId, id);
+    }
+
+    /** 房主再来一局:保留成员与席位,重置房间与成绩回到等待(不用重建房间、重新邀请) */
+    public Map<String, Object> again(Long userId, Long familyId, Long id) {
+        GameRoom room = require(familyId, id);
+        if (!Objects.equals(room.getHostId(), userId)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "只有房主可以再来一局");
+        }
+        if (!GameConst.ROOM_FINISHED.equals(room.getStatus())
+                && !GameConst.ROOM_CANCELLED.equals(room.getStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST, "这局还没结束");
+        }
+        int updated = roomMapper.update(null, new LambdaUpdateWrapper<GameRoom>()
+                .eq(GameRoom::getId, id)
+                .in(GameRoom::getStatus, GameConst.ROOM_FINISHED, GameConst.ROOM_CANCELLED)
+                .set(GameRoom::getStatus, GameConst.ROOM_WAITING)
+                .set(GameRoom::getWinnerId, null)
+                .set(GameRoom::getStartedAt, null)
+                .set(GameRoom::getFinishedAt, null)
+                .set(GameRoom::getSeed, Math.abs(RandomUtil.randomLong())));
+        if (updated == 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "这局还没结束");
+        }
+        for (GameRoomMember m : members(id)) {
+            memberMapper.update(null, new LambdaUpdateWrapper<GameRoomMember>()
+                    .eq(GameRoomMember::getId, m.getId())
+                    .set(GameRoomMember::getReady,
+                            GameConst.ROOM_ROLE_HOST.equals(m.getRole()) ? 1 : 0)
+                    .set(GameRoomMember::getScore, null)
+                    .set(GameRoomMember::getFinishedAt, null));
         }
         return get(familyId, id);
     }

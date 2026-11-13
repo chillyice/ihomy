@@ -1,6 +1,6 @@
 // 麻将内核(推倒胡简化规则,与页面解耦的纯函数):
-// 136 张牌(万/筒/条 1-9 各 4 张 + 东南西北中发白各 4 张),4 人(玩家 + 3 AI),
-// 无吃碰杠(全门清),胡牌型 = 4 面子 + 1 对子 或 七对子。
+// 136 张牌(万/筒/条 1-9 各 4 张 + 东南西北中发白各 4 张),4 人(单机玩家 + 3 AI / 房间真人 + AI 补位),
+// 可碰、可点炮,无吃/杠,胡牌型 = 4 面子 + 1 对子 或 七对子(七对只在门清时成立)。
 // 番数口径:基础 1,自摸 +1,七对子 +3,碰碰胡 +2,清一色 +4,混一色 +2,断幺九 +1。
 // 本局得分 = 底分 8 × 番数。牌的表示:kind 0..33(0-8 万,9-17 筒,18-26 条,27-33 字),
 // 实例 id = kind × 4 + 副本号(0..3)。
@@ -111,12 +111,15 @@ export function mahjongCountsValid(counts) {
 
 /**
  * 判胡:标准牌型(4 面子 + 1 对子,面子=刻子或顺子)或七对子。
- * 入参为 14 张牌的 kind 计数表;只判型,不记番。
+ * 入参为暗手牌的 kind 计数表;openMelds 为已碰出的面子数(碰出的刻子不再占暗手牌)。
+ * 只判型,不记番。
  */
-export function canMahjongWin(counts) {
-  if (counts.reduce((a, b) => a + b, 0) !== 14) return false
-  if (isSevenPairs(counts)) return true
-  return canFormMelds(counts, 4) !== null
+export function canMahjongWin(counts, openMelds = 0) {
+  const melds = Math.max(0, Math.min(4, Number(openMelds) || 0))
+  const total = counts.reduce((a, b) => a + b, 0)
+  if (total !== 14 - melds * 3) return false
+  if (melds === 0 && isSevenPairs(counts)) return true
+  return canFormMelds(counts, 4 - melds) !== null
 }
 
 /** 七对子:7 个对子(杠过的四张不算,推倒胡无副露不涉及) */
@@ -223,31 +226,42 @@ export function isMahjongSevenPairs(counts) {
 /**
  * 计番:返回 { fans: [{ key, points }], total }。
  * 番:基础 1 + 自摸 1 + 七对 3 + 碰碰胡 2 + 清一色 4 + 混一色 2 + 断幺九 1。
- * 七对与碰碰胡/清一色等可叠加(如清一色七对)。
+ * 七对与碰碰胡/清一色等可叠加(如清一色七对);melds 为已碰出的面子(只支持 pong),
+ * 计番时按三张同牌并入整手牌型,七对只在门清(无副露)时成立。
  */
-export function mahjongHandScore(counts, { selfDrawn = false } = {}) {
+export function mahjongHandScore(counts, { selfDrawn = false, melds = [] } = {}) {
+  const openMelds = Array.isArray(melds) ? melds.filter((m) => m && Number.isInteger(m.kind)) : []
+  const full = [...counts]
+  for (const m of openMelds) {
+    if (m.kind >= 0 && m.kind < MAHJONG_KINDS) full[m.kind] += 3
+  }
   const fans = [{ key: 'base', points: 1 }]
   if (selfDrawn) fans.push({ key: 'selfDrawn', points: 1 })
-  if (isSevenPairs(counts)) fans.push({ key: 'sevenPairs', points: 3 })
-  if (isMahjongToitoi(counts)) fans.push({ key: 'toitoi', points: 2 })
-  if (isMahjongFlush(counts)) fans.push({ key: 'flush', points: 4 })
-  else if (isMahjongHalfFlush(counts)) fans.push({ key: 'halfFlush', points: 2 })
-  if (isMahjongAllSimples(counts)) fans.push({ key: 'allSimples', points: 1 })
+  if (!openMelds.length && isSevenPairs(full)) fans.push({ key: 'sevenPairs', points: 3 })
+  if (isMahjongToitoi(full) && openMelds.every((m) => !m.type || m.type === 'pong')) {
+    fans.push({ key: 'toitoi', points: 2 })
+  }
+  if (isMahjongFlush(full)) fans.push({ key: 'flush', points: 4 })
+  else if (isMahjongHalfFlush(full)) fans.push({ key: 'halfFlush', points: 2 })
+  if (isMahjongAllSimples(full)) fans.push({ key: 'allSimples', points: 1 })
   const total = fans.reduce((a, f) => a + f.points, 0)
   return { fans, total, score: MAHJONG_BASE_SCORE * total }
 }
 
 /**
- * 听牌:13 张牌种计数 → 可胡的牌种数组(空的返回 [])。
- * 思路:对每种「还允许加一张」的 kind 试成 14 张判胡。
+ * 听牌:暗手 13-3×openMelds 张的 kind 计数 → 可胡的牌种数组(空的返回 [])。
+ * 思路:对每种「还允许加一张」的 kind 试成可胡牌型。
  */
-export function mahjongTenpai(counts13) {
+export function mahjongTenpai(counts13, openMelds = 0) {
+  const melds = Math.max(0, Math.min(4, Number(openMelds) || 0))
+  const total = counts13.reduce((a, b) => a + b, 0)
+  if (total !== 13 - melds * 3) return []
   const wins = []
   for (let k = 0; k < MAHJONG_KINDS; k++) {
     if (counts13[k] >= MAHJONG_KIND_COPIES) continue
     const trial = [...counts13]
     trial[k] += 1
-    if (canMahjongWin(trial)) wins.push(k)
+    if (canMahjongWin(trial, melds)) wins.push(k)
   }
   return wins
 }

@@ -1,13 +1,7 @@
 <template>
   <div ref="pageEl" class="page game-page">
     <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <GameTopActions
-        :is-fullscreen="isFullscreen"
-        :wide="isWide"
-        @back="router.push('/games')"
-        @fullscreen="toggleFullscreen"
-        @wide="toggleWide"
-      />
+      <GameTopActions :is-fullscreen="isFullscreen" :wide="isWide" @back="goBack" @fullscreen="toggleFullscreen" @wide="toggleWide" />
     </PageToolbar>
 
     <div ref="gameCardEl" class="ms-card card game-surface" @contextmenu.prevent @dblclick.prevent>
@@ -141,6 +135,11 @@ const bestTimes = ref({})
 // ---------- 「一起玩」房间(扫雷只允许合作) ----------
 // 房主权威:只有房主布雷/翻格/插旗,操作结果全量广播;其他成员点击只发意图,倒计时跟房主走。
 const play = useGameRoomPlay({ onSignal: onRoomSignal, onRoom: onRoomChange })
+/** 房间局返回房间大厅;单机回小游戏列表 */
+const goBack = () => {
+  if (play.active && play.room?.id) router.push(`/games/room/${play.room.id}`)
+  else router.push('/games')
+}
 const coopGuest = computed(() => play.active && play.coop && !play.isHost)
 const submitRoomScore = () => play.report(elapsed.value)
 

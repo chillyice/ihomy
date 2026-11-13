@@ -101,6 +101,40 @@ describe('mahjong tenpai', () => {
   })
 })
 
+describe('mahjong open melds (碰)', () => {
+  it('碰出一副后,暗手 11 张 + 碰出的刻子可胡', () => {
+    // 碰 111万;暗手 234万 567万 888万 99万 = 11 张
+    const counts = mahjongCounts(kindsToTiles([1, 2, 3, 4, 5, 6, 7, 7, 7, 8, 8]))
+    expect(canMahjongWin(counts, 1)).toBe(true)
+    expect(canMahjongWin(counts, 0)).toBe(false)
+  })
+
+  it('碰出后听牌:暗手 10 张,补 8万成 4 面子 + 对子', () => {
+    const counts = mahjongCounts(kindsToTiles([1, 2, 3, 4, 5, 6, 7, 7, 7, 8]))
+    const wins = mahjongTenpai(counts, 1)
+    expect(wins).toContain(8)
+  })
+
+  it('有碰出的面子时七对子不成立', () => {
+    const counts = mahjongCounts(kindsToTiles([0, 0, 5, 5, 14, 14, 27, 27, 31, 31]))
+    expect(mahjongTenpai(counts, 1)).toEqual([])
+  })
+
+  it('碰碰胡把碰出的刻子算进去', () => {
+    // 暗手 111 222 333 + 44,碰出 555万
+    const counts = mahjongCounts(kindsToTiles([0, 0, 0, 1, 1, 1, 2, 2, 2, 4, 4]))
+    const r = mahjongHandScore(counts, { melds: [{ kind: 3, type: 'pong' }] })
+    expect(r.fans.map((f) => f.key)).toContain('toitoi')
+  })
+
+  it('清一色按含碰出的整手牌判', () => {
+    // 暗手 234 567 777 88(万),碰出 111万 → 全万清一色
+    const counts = mahjongCounts(kindsToTiles([1, 2, 3, 4, 5, 6, 7, 7, 7, 8, 8]))
+    const r = mahjongHandScore(counts, { melds: [{ kind: 0, type: 'pong' }] })
+    expect(r.fans.map((f) => f.key)).toContain('flush')
+  })
+})
+
 describe('mahjong hand score', () => {
   it('平胡(点炮)= 底分 × 1:三色小牌型', () => {
     const tiles = kindsToTiles([0, 0, 0, 9, 10, 11, 21, 22, 23, 21, 22, 23, 24, 24])

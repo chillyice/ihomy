@@ -7,7 +7,7 @@
         :wide="isWide"
         :fullscreen-label="$t('games.petlink.fullscreen')"
         :exit-label="$t('games.petlink.exitFullscreen')"
-        @back="router.push('/games')"
+        @back="goBack"
         @fullscreen="toggleFullscreen"
         @wide="toggleWide"
       />
@@ -271,6 +271,11 @@ const savedState = ref(null)
 // 多人同时点击不再互相顶掉对方的「第一张牌」,谁先点中配对的那张谁消除。
 const play = useGameRoomPlay({ onSignal: onRoomSignal, onRoom: onRoomChange })
 const coopGuest = computed(() => play.active && play.coop && !play.isHost)
+/** 房间局返回房间大厅(别把玩家丢回小游戏列表,大厅里还要准备/邀请);单机回列表 */
+const goBack = () => {
+  if (play.active && play.room?.id) router.push(`/games/room/${play.room.id}`)
+  else router.push('/games')
+}
 
 let roomTimer = null
 // 合作模式:房主每重开一局本地推进一轮,换一副新牌面(同 seed + 同关卡原本会发出一样的牌,

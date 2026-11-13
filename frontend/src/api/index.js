@@ -400,6 +400,7 @@ export const roomApi = {
   setGame: (id, gameCode) => request.post(`/game/room/${id}/game`, { gameCode }),
   ready: (id, ready) => request.post(`/game/room/${id}/ready`, { ready }),
   start: (id) => request.post(`/game/room/${id}/start`),
+  again: (id) => request.post(`/game/room/${id}/again`),
   finish: (id, score) => request.post(`/game/room/${id}/finish`, { score }),
   end: (id) => request.post(`/game/room/${id}/end`),
   leave: (id) => request.post(`/game/room/${id}/leave`),

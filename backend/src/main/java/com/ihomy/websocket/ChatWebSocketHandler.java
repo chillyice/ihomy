@@ -170,6 +170,18 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             Map<String, Object> out = new java.util.LinkedHashMap<>();
             data.forEach((k, v) -> out.put(String.valueOf(k), v));
             out.put("from", userId);
+            // 定向信令:麻将等真人对局只把本人手牌发给本人,目标必须也是本房间成员
+            Long to = data.get("to") instanceof Number n ? n.longValue() : null;
+            if (to != null) {
+                if (!roomService.isMember(familyId, roomId, to)) {
+                    replyError(session, "BAD_SIGNAL");
+                    return;
+                }
+                if (!to.equals(userId)) {
+                    sendToUser(to, "game-signal", out);
+                }
+                return;
+            }
             sendToUsers(roomService.memberIds(familyId, roomId), "game-signal", out, userId);
             return;
         }

@@ -142,6 +142,16 @@ public class GameRoomController {
         return Result.success(room);
     }
 
+    @Operation(summary = "房主再来一局(保留成员,重置成绩)")
+    @OperationLog(module = "GAME", operationType = "UPDATE", description = "房间再来一局")
+    @PostMapping("/{id}/again")
+    public Result<Map<String, Object>> again(@PathVariable Long id) {
+        LoginUser user = current();
+        Map<String, Object> room = roomService.again(user.getUserId(), user.getFamilyId(), id);
+        broadcast(id, room);
+        return Result.success(room);
+    }
+
     @Operation(summary = "离开房间")
     @OperationLog(module = "GAME", operationType = "UPDATE", description = "离开游戏房间")
     @PostMapping("/{id}/leave")

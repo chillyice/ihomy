@@ -18,6 +18,10 @@
         </el-select>
       </div>
       <div class="tb-right">
+        <el-button class="room-toolbar-btn" size="small" round :loading="roomOpening" @click="openRoom">
+          <el-icon><Promotion /></el-icon>
+          {{ $t('games.room.together') }}
+        </el-button>
         <el-button v-if="unsortedCount" size="small" round :loading="autoSeriesLoading" @click="autoClassify">
           <el-icon><MagicStick /></el-icon>
           {{ $t('games.autoSeries') }}
@@ -353,6 +357,7 @@ const builtinGames = [
     icon: Medal,
     path: '/games/mahjong',
     category: 'CASUAL',
+    roomCodes: ['game_mahjong'],
   },
 ]
 
@@ -406,6 +411,36 @@ const loadRooms = async () => {
     rooms.value = (await roomApi.list()) || []
   } catch {
     rooms.value = []
+  }
+}
+
+const myId = computed(() => userStore.userInfo?.id)
+/** 我已在其中的进行中房间:点「一起玩」直接回房间,不再重复建房 */
+const myActiveRoom = computed(() =>
+  rooms.value.find(
+    (r) => (r.status === 'WAITING' || r.status === 'PLAYING') && (r.members || []).some((m) => String(m.userId) === String(myId.value)),
+  ),
+)
+
+/**
+ * 工具栏「一起玩」:先建房进房间大厅,进房后再选游戏、邀请家人。
+ * 大厅里房主可以随时换游戏(席位会按新游戏重新分配),不需要在列表页先选玩法。
+ */
+const openRoom = async () => {
+  if (myActiveRoom.value) {
+    router.push(`/games/room/${myActiveRoom.value.id}`)
+    return
+  }
+  if (roomOpening.value) return
+  roomOpening.value = true
+  try {
+    const gameCode = 'game_petlink'
+    const created = await roomApi.create({ gameCode, mode: defaultRoomMode(gameCode) })
+    router.push(`/games/room/${created.id}`)
+  } catch (e) {
+    ElMessage.warning(e?.response?.data?.message || t('games.room.createFailed'))
+  } finally {
+    roomOpening.value = false
   }
 }
 

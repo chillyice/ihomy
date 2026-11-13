@@ -90,6 +90,7 @@ public final class GameConst {
     /**
      * 可开房的 H5 游戏:按玩法性质给模式——
      * 连连看/扫雷/数独天然适合合作,其余单人解谜/实时类按同种子 PK。
+     * 麻将按 4 人真人对局(空位 AI 补),座位固定 4。
      * maxSeats = 单局最多几名玩家(超出部分随机分配为观战):
      * 共享盘面的合作局 4 人,同种子竞速局 6 人。
      */
@@ -111,6 +112,8 @@ public final class GameConst {
             PointsRuleConst.GAME_SPIDER, new RoomGame(PointsRuleConst.GAME_SPIDER,
                     java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4),
             PointsRuleConst.GAME_FREECELL, new RoomGame(PointsRuleConst.GAME_FREECELL,
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4),
+            PointsRuleConst.GAME_MAHJONG, new RoomGame(PointsRuleConst.GAME_MAHJONG,
                     java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4));
 
     /** 房间游戏名快照(邀请卡/结果卡用) */
@@ -123,5 +126,6 @@ public final class GameConst {
             java.util.Map.entry(PointsRuleConst.GAME_TETRIS, "俄罗斯方块"),
             java.util.Map.entry(PointsRuleConst.GAME_SOLITAIRE, "克朗代克纸牌"),
             java.util.Map.entry(PointsRuleConst.GAME_SPIDER, "蜘蛛纸牌"),
-            java.util.Map.entry(PointsRuleConst.GAME_FREECELL, "自由纸牌"));
+            java.util.Map.entry(PointsRuleConst.GAME_FREECELL, "自由纸牌"),
+            java.util.Map.entry(PointsRuleConst.GAME_MAHJONG, "麻将"));
 }

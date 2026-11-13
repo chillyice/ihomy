@@ -1,13 +1,7 @@
 <template>
   <div ref="pageEl" class="page game-page">
     <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <GameTopActions
-        :is-fullscreen="isFullscreen"
-        :wide="isWide"
-        @back="router.push('/games')"
-        @fullscreen="toggleFullscreen"
-        @wide="toggleWide"
-      />
+      <GameTopActions :is-fullscreen="isFullscreen" :wide="isWide" @back="goBack" @fullscreen="toggleFullscreen" @wide="toggleWide" />
     </PageToolbar>
 
     <div ref="gameCardEl" class="tt-card card game-surface" @contextmenu.prevent @dblclick.prevent>
@@ -163,6 +157,11 @@ const pageEl = ref(null)
 const gameCardEl = ref(null)
 const { isFullscreen, isWide, toggleFullscreen, toggleWide } = useGameView({ page: pageEl, stage: gameCardEl })
 const play = useGameRoomPlay()
+/** 房间局返回房间大厅;单机回小游戏列表 */
+const goBack = () => {
+  if (play.active && play.room?.id) router.push(`/games/room/${play.room.id}`)
+  else router.push('/games')
+}
 /** 房间模式下的种子随机数:7-bag 序列两端一致 */
 let rng = null
 const game = ref(createGame())

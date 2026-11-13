@@ -226,12 +226,13 @@ const changeGame = async (code) => {
 
 const applyRoom = (next) => {
   if (!next) return
-  const wasPlaying = room.value?.status === ROOM_STATUS.PLAYING
+  // 只有「本页停留期间,房间从等待变成开赛」才自动进游戏页。
+  // 从游戏页点「退出对局」回大厅时会重新挂载本页、首次拿到的是 PLAYING,
+  // 以前这里会立刻把玩家又弹回牌桌,表现为「退不出对局」。
+  const prevStatus = room.value?.status
   room.value = next
   pickedGame.value = next.gameCode
-  // 只有「本页停留期间房间开赛」才自动进游戏页:直接从大厅刷新/后退回来时留在大厅,
-  // 否则浏览器返回到 /games/room 会被立刻弹回游戏页,退不出去。
-  if (next.status === ROOM_STATUS.PLAYING && !wasPlaying && !entered) {
+  if (next.status === ROOM_STATUS.PLAYING && prevStatus === ROOM_STATUS.WAITING && !entered) {
     entered = true
     enterGame()
   }
@@ -329,16 +330,12 @@ const leave = async () => {
   }
 }
 
+// 原地重开:保留成员与席位、重置成绩,再点「开始」即可;不用重建房间重新邀请
 const again = async () => {
   busy.value = true
   try {
-    const created = await roomApi.create({
-      gameCode: room.value.gameCode,
-      mode: room.value.mode,
-    })
     entered = false
-    applyRoom(created)
-    router.replace(`/games/room/${created.id}`)
+    applyRoom(await roomApi.again(roomId.value))
   } catch (e) {
     ElMessage.warning(e?.response?.data?.message || t('games.room.actFailed'))
   } finally {

@@ -11,6 +11,10 @@
       <el-button v-if="canSubmit && !isSpectator" size="small" type="primary" round :disabled="reported" @click="$emit('submit')">
         {{ reported ? $t('games.room.submitted') : $t('games.room.submitScore') }}
       </el-button>
+      <!-- 房主收尾:有人挂机没交卷时不必干等,直接按当前成绩结算 -->
+      <el-button v-if="isHost && !ended" size="small" round type="danger" plain @click="endRoom">
+        {{ $t('games.room.endRoom') }}
+      </el-button>
       <!-- 退出对局:回到房间大厅保留成员身份,不再留在牌桌上 -->
       <el-button v-if="!ended" size="small" round @click="exitToHall">{{ $t('games.room.exitGame') }}</el-button>
       <el-button v-if="ended" size="small" round @click="$emit('leave')">{{ $t('games.room.backGames') }}</el-button>
@@ -25,6 +29,8 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { roomApi } from '@/api'
 import { resultKey, isSpectatorRole } from '@/utils/gameRoom'
 import RoomCallPicker from '@/components/games/RoomCallPicker.vue'
 
@@ -36,6 +42,8 @@ const props = defineProps({
   ended: { type: Boolean, default: false },
   result: { type: String, default: 'HIGH_SCORE' },
   myId: { type: [Number, String], default: null },
+  /** 实时权威牌局(麻将):房主中途退出即结束房间,否则其他人会一直等不到操作 */
+  exitEndsRoom: { type: Boolean, default: false },
 })
 defineEmits(['submit', 'leave'])
 
@@ -62,9 +70,35 @@ const hintText = computed(() => {
   return `${t('games.room.myScore', { n: props.score })} · ${t(resultKey(props.room.gameCode))}`
 })
 
-/** 退出对局 = 回房间大厅(不走 leave 接口,保留席位,大厅里可再进) */
-const exitToHall = () => {
+/** 退出对局:普通游戏回房间大厅(保留席位,大厅里可再进) */
+const exitToHall = async () => {
+  if (props.exitEndsRoom && props.room?.status === 'PLAYING') {
+    // 实时权威牌局(麻将):房主退出即结束;访客退出则离开房间,人位交给 AI,
+    // 否则房主每回合都要等这个已经不在牌桌前的人超时。
+    try {
+      await (props.isHost ? roomApi.end(props.room.id) : roomApi.leave(props.room.id))
+    } catch {
+      // 房间已结束时忽略
+    }
+    router.push(props.isHost ? `/games/room/${props.room.id}` : '/games')
+    return
+  }
   if (props.room?.id) router.push(`/games/room/${props.room.id}`)
+}
+
+/** 房主结束房间:按当前成绩结算(避免有人挂机时整桌卡住) */
+const endRoom = async () => {
+  if (!props.room?.id) return
+  try {
+    await ElMessageBox.confirm(t('games.room.endRoomConfirm'), t('games.room.endRoom'), { type: 'warning' })
+  } catch {
+    return
+  }
+  try {
+    await roomApi.end(props.room.id)
+  } catch (e) {
+    ElMessage.warning(e?.response?.data?.message || t('games.room.actFailed'))
+  }
 }
 </script>
 

@@ -1,13 +1,7 @@
 <template>
   <div ref="pageEl" class="page game-page">
     <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <GameTopActions
-        :is-fullscreen="isFullscreen"
-        :wide="isWide"
-        @back="router.push('/games')"
-        @fullscreen="toggleFullscreen"
-        @wide="toggleWide"
-      />
+      <GameTopActions :is-fullscreen="isFullscreen" :wide="isWide" @back="goBack" @fullscreen="toggleFullscreen" @wide="toggleWide" />
     </PageToolbar>
 
     <div ref="gameCardEl" class="bf-card game-surface" @contextmenu.prevent @dblclick.prevent>
@@ -128,6 +122,11 @@ const sunLight = inject(SUN_LIGHT_KEY, null)
 
 // ---------- 「一起玩」房间(?room=<id>):同 seed 各自跑,终局/交卷上报 ----------
 const play = useGameRoomPlay()
+/** 房间局返回房间大厅;单机回小游戏列表 */
+const goBack = () => {
+  if (play.active && play.room?.id) router.push(`/games/room/${play.room.id}`)
+  else router.push('/games')
+}
 
 // ---------- 对战模式(?match=<id>):同种子赛,禁存档/撤销/列宽/奖励,终局自动上报 ----------
 const matchId = computed(() => Number(route.query.match) || 0)

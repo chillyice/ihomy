@@ -2,13 +2,7 @@
   <div ref="pageEl" class="page game-page">
     <!-- 顶栏:返回 + 全屏 + 宽屏(与连连看/物品定位同构) -->
     <PageToolbar root-class="game-topbar" :holder-margin="0" always>
-      <GameTopActions
-        :is-fullscreen="isFullscreen"
-        :wide="isWide"
-        @back="router.push('/games')"
-        @fullscreen="toggleFullscreen"
-        @wide="toggleWide"
-      />
+      <GameTopActions :is-fullscreen="isFullscreen" :wide="isWide" @back="goBack" @fullscreen="toggleFullscreen" @wide="toggleWide" />
     </PageToolbar>
 
     <div ref="gameCardEl" v-loading="generating" class="sd-card game-surface" @contextmenu.prevent @dblclick.prevent>
@@ -296,6 +290,11 @@ const hintFlash = ref(-1)
 // 房主把整盘(题面/答案/笔记/线索/用时/提示次数)广播回来,所有人看到同一盘。
 const play = useGameRoomPlay({ onSignal: onRoomSignal, onRoom: onRoomChange })
 const coopGuest = computed(() => play.active && play.coop && !play.isHost)
+/** 房间局返回房间大厅;单机回小游戏列表 */
+const goBack = () => {
+  if (play.active && play.room?.id) router.push(`/games/room/${play.room.id}`)
+  else router.push('/games')
+}
 const submitRoomScore = () => play.report(elapsed.value)
 
 function snapshotRoomState() {

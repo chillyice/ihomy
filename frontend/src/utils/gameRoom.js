@@ -96,6 +96,14 @@ export const ROOM_GAMES = {
     result: ROOM_RESULT.SCORE,
     maxSeats: 4,
   },
+  game_mahjong: {
+    code: 'game_mahjong',
+    nameKey: 'games.mahjong.title',
+    path: '/games/mahjong',
+    modes: [ROOM_MODE.PK],
+    result: ROOM_RESULT.SCORE,
+    maxSeats: 4,
+  },
 }
 
 export const roomGame = (code) => ROOM_GAMES[code] || null
