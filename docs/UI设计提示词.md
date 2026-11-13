@@ -252,7 +252,7 @@
   - 编辑工具栏 hover 隐藏(`opacity:0; translateY(-10px); pointer-events:none`)。
 - **h=1 时标题行消失(V9.63 改 tinyCard)**:`w.h*canvasH<120px` 时 `.card-head` opacity→0 + max-height→0 + padding→0(0.3s ease 动效)。
 - 点击组件置顶(zCounter,编辑/非编辑模式均可)。
-- 布局持久化 localStorage `ihomy:dashboard:layout:v3`(V9.63 版本号升级,旧 v1/v2 栅格布局弃用)。
+- 布局持久化 localStorage `ihomy:dashboard:layout:v3`(V9.63 版本号升级,旧 v1/v2 栅格布局弃用);登录后另存一份到账号(`sys_user_pref` 键 `home.layout.v3`,暖居 `home.warm.v3`),换设备登录即恢复(需求 §4.7.7「布局跟账号走」)。
 - **默认布局 9 组件(V9.53)**:feed(4×5)/weather(3×3)/anni(3×3)/today(3×2)/album(4×4)/search(4×5)/recipe(2×2)/wish(2×2)/finance(2×2);task 由侧边栏拖入;**删除「背景音乐」格子**(与悬浮黑胶播放器冗余)。
 - 相册组件照片可溢出边界(`overflow: visible`,z-index:40)。
 

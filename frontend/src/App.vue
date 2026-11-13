@@ -69,6 +69,7 @@ import { useThemeStore } from '@/stores/theme'
 import { useFloatsStore } from '@/stores/floats'
 import { useSunLight, SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { isNativeApp } from '@/utils/platform'
+import { initPrefSync } from '@/utils/userPref'
 import { useDevice } from '@/composables/useDevice'
 import { useHotkeys } from '@/composables/useHotkeys'
 import SunLightLayer from '@/components/SunLightLayer.vue'
@@ -145,6 +146,8 @@ const elLocale = computed(() => (locale.value === 'en' ? en : zhCn))
 onMounted(async () => {
   // 原生壳能力(返回键/状态栏/下载/外链/断网提示):懒加载,Web 端 bootNative 直接返回
   import('@/native').then((m) => m.bootNative()).catch((e) => console.warn('[native] 初始化失败', e))
+  // 界面偏好同步:页面隐藏/关闭前把未发的那次上传发出去(纯事件绑定,不发请求)
+  initPrefSync()
   // 等首次导航解析完再判定独立页,否则会把独立页当普通页初始化一次 ihomy 家庭数据
   await router.isReady()
   routeReady.value = true

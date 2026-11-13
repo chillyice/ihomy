@@ -3276,3 +3276,19 @@ CREATE TABLE IF NOT EXISTS `family_game_room_member` (
   KEY `idx_room` (`room_id`, `deleted`, `id`),
   KEY `idx_user` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭游戏房间成员(准备/成绩/完成时间)';
+
+-- ------------------------------------------------------------
+-- 用户界面偏好(2026-11-13,V12.13):首页布局跟账号走,换设备登录即恢复
+--   一人一键一行,不带 family_id(布局跟人走)、不做逻辑删除(恢复默认是覆盖写)
+--   幂等:CREATE TABLE IF NOT EXISTS,重复执行安全
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `sys_user_pref` (
+  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`    BIGINT      NOT NULL COMMENT '用户ID',
+  `pref_key`   VARCHAR(64) NOT NULL COMMENT '偏好键(点分小写,键里带布局版本号)',
+  `pref_value` TEXT        NOT NULL COMMENT '偏好值(JSON 文本,原样存取)',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_key` (`user_id`, `pref_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户界面偏好(跨设备同步)';

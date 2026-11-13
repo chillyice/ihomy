@@ -427,6 +427,8 @@ import { feedSummary as feedSummaryOf } from '@/utils/feed'
 import { pickDefaultFloor } from '@/utils/floorPlanGeom'
 import { summarizePortfolio } from '@/utils/finance'
 import { dictText } from '@/utils/dict'
+import { parseWarmLayout } from '@/utils/warmHomeLayout'
+import { readPref, syncPref, writePref } from '@/utils/userPref'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -554,32 +556,36 @@ const DEFAULT_LAYOUT = [
 ]
 const STORAGE_KEY = 'ihomy:guangchen:home:v3'
 const LEGACY_KEY = 'ihomy:guangchen:home:v1'
+// 账号同步键(服务端 sys_user_pref.pref_key):布局跟人走,换设备登录即恢复
+const PREF_KEY = 'home.warm.v3'
 
-const loadLayout = () => {
-  const parse = (raw) => {
-    try {
-      if (!raw) return null
-      const arr = JSON.parse(raw)
-      if (!Array.isArray(arr) || !arr.length) return null
-      return arr
-        .map((it) =>
-          typeof it === 'string' ? { id: it, span: defaultSpan(it), row: defaultRow(it) } : { ...it, row: it.row || defaultRow(it.id) },
-        )
-        .filter((it) => resolveWidget(it))
-    } catch (e) {
-      return null
-    }
-  }
-  return parse(localStorage.getItem(STORAGE_KEY)) || parse(localStorage.getItem(LEGACY_KEY))
-}
+// 解析交给 utils/warmHomeLayout(纯函数),组件注册表相关的默认值与合法性在这里注入
+const parseStoredLayout = (raw) =>
+  parseWarmLayout(raw, {
+    spanOf: defaultSpan,
+    rowOf: defaultRow,
+    isValid: (item) => !!resolveWidget(item),
+  })
+const loadLayout = () => parseStoredLayout(readPref(STORAGE_KEY)) || parseStoredLayout(readPref(LEGACY_KEY))
+// 用户已经动过布局:此后不再用服务端下发的旧排版覆盖页面
+const layoutTouched = ref(false)
+// 落盘 = 本机缓存 + 账号同步(登录后去抖上传)
 const saveLayout = () => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(layout.value))
-  } catch (e) {}
+  layoutTouched.value = true
+  writePref(STORAGE_KEY, PREF_KEY, JSON.stringify(layout.value))
 }
 
 const layout = ref((loadLayout() || DEFAULT_LAYOUT).map((e) => ({ ...e })))
 const widgets = computed(() => layout.value.map(resolveWidget).filter(Boolean))
+
+// 进页面与服务端对齐一次:账号里有布局就以它为准(换设备即恢复);
+// 账号里还没有而本机有,则由 syncPref 把本机这份交上去。正在编辑时不覆盖。
+const applyRemoteLayout = async () => {
+  const raw = await syncPref(STORAGE_KEY, PREF_KEY)
+  if (!raw || layoutTouched.value || editMode.value) return
+  const parsed = parseStoredLayout(raw)
+  if (parsed) layout.value = parsed
+}
 // 托盘仅列富组件(含无侧栏入口的天气);入口卡片经侧栏拖入
 const availableWidgets = computed(() =>
   WIDGETS.filter((w) => !layout.value.some((e) => e.id === w.id)).map((w) => ({ ...w, label: widgetLabel(w) })),
@@ -1367,6 +1373,8 @@ onMounted(async () => {
   clockTimer = setInterval(() => {
     now.value = new Date()
   }, 60000)
+  // 账号里的布局对齐一次(游客/拉取失败都直接返回,不影响首屏)
+  applyRemoteLayout()
 })
 onBeforeUnmount(() => {
   stopPhotoTimer()

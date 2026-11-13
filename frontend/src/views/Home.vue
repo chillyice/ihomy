@@ -454,6 +454,7 @@ import { resolveAssetCard } from '@/utils/assetCard'
 import { formatRelativeTime } from '@/utils/datetime'
 import { pickDefaultFloor } from '@/utils/floorPlanGeom'
 import { dictText } from '@/utils/dict'
+import { syncPref, writePref } from '@/utils/userPref'
 
 const router = useRouter()
 const route = useRoute()
@@ -821,6 +822,8 @@ const DEFAULT_LAYOUT = [
 
 // 布局键加版本号:v3 起组件改为自由布局(x/y/w/h 画布比例),旧 v1/v2 栅格布局语义不兼容,直接丢弃
 const STORAGE_KEY = 'ihomy:dashboard:layout:v3'
+// 账号同步键(服务端 sys_user_pref.pref_key):布局跟人走,换设备登录即恢复;版本号同样写在键里
+const PREF_KEY = 'home.layout.v3'
 
 // 拖入/拖出默认尺寸(排版方案 §三「拖出默认尺寸」)
 const WIDGET_DEFAULT_SIZE = {
@@ -896,10 +899,12 @@ const loadLayout = () => {
   } catch (e) {}
   return null
 }
+// 用户已经动过布局:此后不再用服务端下发的旧排版覆盖页面
+const layoutTouched = ref(false)
+// 落盘 = 本机缓存(刷新即读)+ 账号同步(登录后去抖上传,换设备能拿回自己的排版)
 const saveLayout = () => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(widgets.value.map((w) => ({ id: w.id, x: w.x, y: w.y, w: w.w, h: w.h }))))
-  } catch (e) {}
+  layoutTouched.value = true
+  writePref(STORAGE_KEY, PREF_KEY, JSON.stringify(widgets.value.map((w) => ({ id: w.id, x: w.x, y: w.y, w: w.w, h: w.h }))))
 }
 
 const makeWidget = (cfg) => ({
@@ -910,6 +915,17 @@ const makeWidget = (cfg) => ({
 })
 
 const widgets = ref((loadLayout() || DEFAULT_LAYOUT).map(makeWidget))
+
+// 进页面与服务端对齐一次:账号里有布局就以它为准(换设备即恢复);
+// 账号里还没有而本机有,则由 syncPref 把本机这份交上去。正在编辑时不覆盖。
+const applyRemoteLayout = async () => {
+  const raw = await syncPref(STORAGE_KEY, PREF_KEY)
+  if (!raw || layoutTouched.value || editMode.value) return
+  try {
+    const arr = JSON.parse(raw)
+    if (Array.isArray(arr) && arr.length) widgets.value = arr.map(makeWidget)
+  } catch (e) {}
+}
 
 const visibleWidgets = computed(() =>
   widgets.value.filter((w) => {
@@ -1375,7 +1391,7 @@ usePullRefresh({
     Promise.all([loadAll(), loadPoints(), loadReminders(), loadBookSummary(), loadWishes(), loadTodayRecipes(), loadItemHouses()]),
 })
 
-onMounted(() => {
+onMounted(async () => {
   loadAll()
   loadPoints()
   loadReminders()
@@ -1383,6 +1399,8 @@ onMounted(() => {
   loadWishes()
   loadTodayRecipes()
   loadItemHouses()
+  // 账号里的布局对齐一次(游客/拉取失败都直接返回,不影响首屏)
+  applyRemoteLayout()
   nextTick(() => {
     if (!root.value) return
     ctx = gsap.context(() => {

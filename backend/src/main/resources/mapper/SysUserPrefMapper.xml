@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.SysUserPrefMapper">
+
+    <!-- 唯一键 uk_user_key 命中就原位覆盖:多设备同账号保存天然幂等,不撞主键也不多出行 -->
+    <insert id="upsert">
+        INSERT INTO sys_user_pref (user_id, pref_key, pref_value)
+        VALUES (#{userId}, #{prefKey}, #{prefValue})
+        ON DUPLICATE KEY UPDATE pref_value = #{prefValue}
+    </insert>
+
+</mapper>

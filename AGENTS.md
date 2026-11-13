@@ -68,7 +68,7 @@ ihomy:家庭内部内容共享平台(PC / 安卓 / iOS,均 PWA),功能域见 需
 
 - **root 仅初始化**:`mysql -uroot -p < schema.sql`(建库/建表/建账号/种子),只执行一次;本地 `.\scripts\start-db.ps1`(Docker 首启自动导入)。**业务运行用 `ihomy` 账号**(仅 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`,无 DDL),建 `localhost` 与 `%` 两个 host。
 - 生产 MySQL `validate_password` MEDIUM:密码须含特殊字符(避开 `' " \ $ |`,建议 `!@%^&*-_+=.`),改密顺序见 踩坑速查 §2.7。
-- **95 张表**,前缀:`sys_` 27(系统/账号/权限/配置/存储)、`report_` 5(报表/日志)、`family_` 41(家庭事务)、`content_` 21(内容数据)、`game_` 1(games 域);完整清单见 需求 §6.2。游戏域顶层前缀 `game_`(格式 `game_<code>_<module>_<entity>`);`game_info` 遗留未带 `family_` 前缀,类型/分类/系列口径见 需求 §4.13。
+- **96 张表**,前缀:`sys_` 28(系统/账号/权限/配置/存储)、`report_` 5(报表/日志)、`family_` 41(家庭事务)、`content_` 21(内容数据)、`game_` 1(games 域);完整清单见 需求 §6.2。游戏域顶层前缀 `game_`(格式 `game_<code>_<module>_<entity>`);`game_info` 遗留未带 `family_` 前缀,类型/分类/系列口径见 需求 §4.13。
 - **结构变更双文件**:同时改 `schema.sql`(全量)与 `migrations.sql`(增量、**幂等**),并按 CI 同路径做空库全量导入实测(`migrations` 跑通 ≠ `schema.sql` 可用,踩坑速查 §7.4)。
 - **枚举不用数字**:状态/类型一律大写英文(`PUBLISHED/PUBLIC/ACTIVE...`),含义在 `sys_dict_item`,Java 常量在 `common/DictConst.java`,前端映射 `utils/dict.js`;**禁止写回 0/1/2 判断**。
 - `content_blog/diary/photo/video/wish/book` 的 `visibility` 为 `VARCHAR(20) DEFAULT 'FAMILY'`(PRIVATE/FAMILY/PUBLIC);`family_vault_item` 只有 PRIVATE/FAMILY 两档。清单见 需求 §6.4。
@@ -119,7 +119,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 
 ## 跨模块规则
 
-- **首页/导航**:分组顺序固定 `content → life → family → system`;`sys_home_module.sort_order` 决定组内顺序(改完重启后端);**移动端导航唯一数据源 `utils/navModules.js`**(虚拟入口 + `NAV_GROUP_ORDER`,漏登记整组消失)。家谱并入「家庭成员」(`?tab=tree`),提醒/纪念日/计划并入「日程提醒」(`/plan`),被并模块 `enabled=0`;「今日」卡与 `/plan/today` 同源。**纪念日下一次日期只由 `common/AnniversaryDate` 算**。愿望来源三列与模块清单见 需求 §4.3.6/§4.9/§4.13。
+- **首页/导航**:分组顺序固定 `content → life → family → system`;`sys_home_module.sort_order` 决定组内顺序(改完重启后端);**移动端导航唯一数据源 `utils/navModules.js`**(虚拟入口 + `NAV_GROUP_ORDER`,漏登记整组消失)。家谱并入「家庭成员」(`?tab=tree`),提醒/纪念日/计划并入「日程提醒」(`/plan`),被并模块 `enabled=0`;「今日」卡与 `/plan/today` 同源。**纪念日下一次日期只由 `common/AnniversaryDate` 算**。愿望来源三列与模块清单见 需求 §4.3.6/§4.9/§4.13。**首页布局(两套)跟账号走**:localStorage 即时缓存 + `sys_user_pref` 同步,进页面服务端为准覆盖、服务端空则推本机,改动去抖上传;游客只写本机(细则 需求 §4.7.7)
 - **日程提醒写侧分类唯一来源**:`utils/scheduleType.classify({hasDate,repeat,remind})` 决定用户叫法与落表,弹窗/保存路由/清单筛选共用(**后端不做分类推断**,五类对照见 需求 §4.3.6)。月历数据全来自 `/public/calendar`,前端禁引农历库;游客只读且不发需登录请求。改这页先读 踩坑速查 §3.39–§3.42。
 - **工具箱**:元数据唯一来源 `frontend/src/tools/registry.js`;12 个开发者工具只在 `/bit-pouch/tools/<id>` 维护界面,ihomy 旧 `/tools/<id>` 重定向(registry 标 `toolbox:false`);颜色/单位/图片/文件/PDF 两处入口共用内核;比特口袋在线目录 24 项(`tools/bitPouchTools.js`)另含 7 项只在线页维护。清单见 需求 §4.12。
 - **天文**:后端 `SolarUtil` 唯一计算来源(`/public/sun-info`),前端 `utils/terminator.js` 只做渲染,**禁止再移植 NOAA/Meeus**;直射点漂移是**西移** 0.25°/min;共享 sun-info 由 `useSunLight` 30 分钟换新,**长开页面禁止把启动时那份当此刻**(踩坑速查 §4.5)。
@@ -198,7 +198,7 @@ cd frontend; npm run lint; npx vitest run; npm run build
 - **外挂配置是唯一开发/生产差异**:`IHOMY_CONFIG_PATH` 指向 yml,`ExternalConfigLoader` 启动早期加载并覆盖 `application.yml`;**改配置前先核实该变量实际指向**。
 - DB/Redis 密码明文(避免鸡生蛋);业务凭证 AES-GCM(`AesUtil`,PBKDF2 100000 次 + GCM 128bit),密文 `ENC(Base64)`,盐值存 `sys_parameter(aes-salt)`。
 - OPS 加解密接口:`GET /api/ops/crypto/encrypt|decrypt`(`ops:view`)。
-- **可扩展点**:①天气 = `WeatherService` 门面 + `WeatherProvider`(新增=常量+实现+前端下拉);②首页组件 = 四档 snap + hover 推开,布局键 `ihomy:dashboard:layout:v2`;③AI = 家庭模型池 `sys_family_ai_model` + 按功能绑定 `sys_family_ai_feature`(`resolveForFeature/resolveChain` 主+兜底)。
+- **可扩展点**:①天气 = `WeatherService` 门面 + `WeatherProvider`(新增=常量+实现+前端下拉);②首页组件 = 四档 snap + hover 推开,布局键 `ihomy:dashboard:layout:v3`(本机缓存)+ 账号同步键 `home.layout.v3`(暖居 `home.warm.v3`,`sys_user_pref` / `GET/PUT /user-pref`,同步层 `utils/userPref.js`);③AI = 家庭模型池 `sys_family_ai_model` + 按功能绑定 `sys_family_ai_feature`(`resolveForFeature/resolveChain` 主+兜底)。
 - 不用 profile;`application.yml` 即生产基线。
 
 ## 部署约定(Linux 2GB 求稳)

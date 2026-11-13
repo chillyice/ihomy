@@ -220,6 +220,12 @@ export const profileApi = {
   removeLabel: () => request.delete('/profile/label'),
 }
 
+// 用户界面偏好(首页布局等):跟账号走、跨设备同步;服务端只做不透明存取
+export const userPrefApi = {
+  all: () => request.get('/user-pref'),
+  save: (key, value) => request.put('/user-pref', { key, value }),
+}
+
 // 放映厅:视频库 + 想看列表 + 设备目录映射
 export const videoApi = {
   list: (params) => request.get('/video/list', { params }),

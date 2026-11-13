@@ -2907,3 +2907,23 @@ CREATE TABLE `family_game_room_member` (
   KEY `idx_room` (`room_id`, `deleted`, `id`),
   KEY `idx_user` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭游戏房间成员(准备/成绩/完成时间)';
+
+-- ------------------------------------------------------------
+-- 77. sys_user_pref 用户界面偏好(V12.13):首页布局这类「跟人走」的前端偏好上云,
+--     换设备/清缓存/重装 App 后登录即恢复自己的布局。pref_key 是点分小写键
+--     (home.layout.v3 光尘仪表盘 / home.warm.v3 暖居首页),pref_value 是不透明 JSON 文本,
+--     服务端不解析结构,键里带版本号即完成布局语义升级。
+--     刻意不带 family_id:布局是人的习惯,换家庭也该跟着人走;
+--     不做逻辑删除:恢复默认是覆盖写,没有「删了还要留痕」的语义。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `sys_user_pref`;
+CREATE TABLE `sys_user_pref` (
+  `id`         BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `user_id`    BIGINT      NOT NULL COMMENT '用户ID',
+  `pref_key`   VARCHAR(64) NOT NULL COMMENT '偏好键(点分小写,键里带布局版本号)',
+  `pref_value` TEXT        NOT NULL COMMENT '偏好值(JSON 文本,原样存取)',
+  `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_key` (`user_id`, `pref_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户界面偏好(跨设备同步)';
