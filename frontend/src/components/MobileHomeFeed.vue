@@ -1,5 +1,9 @@
 <template>
   <div ref="root" class="mobile-home">
+    <!-- 分享落地:被分享家庭的封面门脸(自己家不挂) -->
+    <div v-if="showDoorSign" class="m-door-sign">
+      <FamilyCoverBanner :family="appStore.family" />
+    </div>
     <!-- 顶部筛选栏 -->
     <div class="filter-bar">
       <div class="filter-scroll">
@@ -55,18 +59,24 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
+import { useAppStore } from '@/stores/app'
+import FamilyCoverBanner from '@/components/FamilyCoverBanner.vue'
 import { publicApi, homeApi } from '@/api'
 import { feedTypeLabel as feedTypeLabelOf, feedSummary as feedSummaryOf } from '@/utils/feed'
 import { formatRelativeTime } from '@/utils/datetime'
+import { parseShareQuery, showCoverBanner } from '@/utils/shareLanding'
 import { usePullRefresh } from '@/composables/usePullRefresh'
 
 const router = useRouter()
 const userStore = useUserStore()
+const appStore = useAppStore()
 const { t } = useI18n()
 const root = ref(null)
 const feeds = ref([])
 const loading = ref(true)
 const activeFilter = ref('all')
+// 分享落地门脸:别人家有封面才挂横幅,自己家不挂(判定见 utils/shareLanding)
+const showDoorSign = computed(() => showCoverBanner(appStore.family, userStore.userInfo?.familyId))
 
 const FILTER_KEYS = ['all', 'blog', 'diary', 'photo', 'video', 'wish', 'task', 'recipe', 'book']
 const filters = computed(() => FILTER_KEYS.map((k) => ({ key: k, label: k === 'all' ? t('feed.all') : t('feed.type.' + k) })))
@@ -98,8 +108,13 @@ const goFeed = (f) => {
 const load = async () => {
   loading.value = true
   try {
-    const fn = userStore.isLoggedIn ? homeApi.getFeed : publicApi.getFeed
-    feeds.value = await fn(20)
+    if (userStore.isLoggedIn) {
+      feeds.value = await homeApi.getFeed(20)
+    } else {
+      // 分享落地(/?hid=xxx):动态流按链接里的家庭取,否则游客看到的是演示家庭
+      const { hid, homeId } = parseShareQuery(window.location.search)
+      feeds.value = await publicApi.getFeed(20, homeId ?? undefined, hid || undefined)
+    }
   } catch (e) {
     feeds.value = []
     throw e
@@ -117,6 +132,11 @@ onMounted(() => load().catch(() => {}))
 <style scoped>
 .mobile-home {
   min-height: 100%;
+}
+
+/* 分享门脸:与下方动态列表同一条 16px 边距线 */
+.m-door-sign {
+  padding: 12px 16px 0;
 }
 
 .filter-bar {

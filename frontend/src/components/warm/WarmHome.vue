@@ -1,6 +1,8 @@
 <!-- 暖居首页:12 列网格,组件化 + 可编辑(OWNER 增删/拖拽排序),布局持久化 localStorage(与光尘仪表盘同款思路) -->
 <template>
   <div class="gc-home" :class="{ 'gc-editing': editMode }">
+    <!-- 分享落地:被分享家庭的封面门脸(自己家不挂) -->
+    <FamilyCoverBanner v-if="showDoorSign" :family="appStore.family" class="gc-door-sign" />
     <div class="gc-main-head">
       <div>
         <h2 class="gc-h2">{{ greeting }}</h2>
@@ -415,6 +417,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
+import FamilyCoverBanner from '@/components/FamilyCoverBanner.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useWarmWidgetDrag } from '@/utils/widgetDragData'
 import { pickInsertIndex } from '@/utils/dragInsert'
@@ -428,6 +431,7 @@ import { pickDefaultFloor } from '@/utils/floorPlanGeom'
 import { summarizePortfolio } from '@/utils/finance'
 import { dictText } from '@/utils/dict'
 import { parseWarmLayout } from '@/utils/warmHomeLayout'
+import { parseShareQuery, showCoverBanner } from '@/utils/shareLanding'
 import { readPref, syncPref, writePref } from '@/utils/userPref'
 
 const router = useRouter()
@@ -450,6 +454,8 @@ const dailyEmptyHint = computed(() => (dailyImageOn || dailyKnowledgeOn ? t('dai
 defineProps({ weatherBg: { type: String, default: '' } })
 
 const familyName = computed(() => appStore.familyName)
+// 分享落地门脸:别人家有封面才挂横幅,自己家不挂(判定见 utils/shareLanding)
+const showDoorSign = computed(() => showCoverBanner(appStore.family, userStore.userInfo?.familyId))
 const memberCount = computed(() => appStore.stats.memberCount || 0)
 const anniversaries = computed(() => appStore.stats.upcomingEvents || [])
 
@@ -1348,8 +1354,10 @@ onMounted(async () => {
   const loggedIn = userStore.isLoggedIn
   // 记账/理财数据只对账本可读的成员取(家长可把某成员设为不可见)
   const canReadBook = loggedIn && userStore.canReadBook
+  // 分享落地(/?hid=xxx):动态流按链接里的家庭取,否则会回落到默认演示家庭
+  const { hid, homeId } = parseShareQuery(window.location.search)
   const [feed, book, fin, it, task, wish, rem, houses] = await Promise.all([
-    publicApi.getFeed(20).catch(() => []),
+    publicApi.getFeed(20, homeId ?? undefined, hid || undefined).catch(() => []),
     canReadBook ? bookApi.summary().catch(() => null) : Promise.resolve(null),
     // 理财持仓:与收支卡同卡展示,失败不影响收支
     canReadBook ? financeApi.list().catch(() => []) : Promise.resolve([]),
@@ -1481,6 +1489,10 @@ html.theme-warm.dark .gc-home {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
+  margin-bottom: 20px;
+}
+/* 分享门脸:与下方问候标题同宽 16:9 横幅 */
+.gc-door-sign {
   margin-bottom: 20px;
 }
 .gc-h2 {

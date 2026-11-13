@@ -5,6 +5,9 @@
   <div v-else ref="root" class="home-page" :class="{ 'edit-mode': editMode }">
     <PhotoViewer v-model:visible="viewerVisible" :photos="sevenDayPhotos" :initial-index="viewerIdx" />
 
+    <!-- 分享落地:被分享家庭的封面门脸(自己家不挂),卡片区整体下移让位 -->
+    <FamilyCoverBanner v-if="showDoorSign" :family="family" :height="doorSignH" class="door-sign" :style="doorSignStyle" />
+
     <!-- 编辑模式工具栏(hover隐藏) -->
     <Transition name="fade">
       <div v-if="editMode" class="edit-toolbar edit-toolbar-hover">
@@ -442,6 +445,7 @@ import { ElMessage } from 'element-plus'
 import { Search, Microphone } from '@element-plus/icons-vue'
 import PhotoViewer from '@/components/PhotoViewer.vue'
 import ElderHome from '@/components/ElderHome.vue'
+import FamilyCoverBanner from '@/components/FamilyCoverBanner.vue'
 import { useDisplayMode } from '@/composables/useDisplayMode'
 import albumCoverUrl from '@/assets/album-cover.jpg'
 import FloorPlanCanvas from '@/views/item/FloorPlanCanvas.vue'
@@ -454,6 +458,7 @@ import { resolveAssetCard } from '@/utils/assetCard'
 import { formatRelativeTime } from '@/utils/datetime'
 import { pickDefaultFloor } from '@/utils/floorPlanGeom'
 import { dictText } from '@/utils/dict'
+import { showCoverBanner } from '@/utils/shareLanding'
 import { syncPref, writePref } from '@/utils/userPref'
 
 const router = useRouter()
@@ -497,12 +502,18 @@ onUnmounted(() => window.removeEventListener('resize', onWinResize))
 // 自由布局画布:组件以画布内的比例坐标 x/y/w/h(0~1)存储,渲染时换算成 px,窗口缩放等比例自适应。
 // x/y 为左上角相对画布左上角的比例,w/h 为相对画布宽高的比例。
 const canvasW = computed(() => Math.max(0, winW.value - MARGIN.left - MARGIN.right))
-const canvasH = computed(() => Math.max(0, winH.value - MARGIN.top - MARGIN.bottom))
+// 分享落地的封面门脸:只在看别人家的分享链接时出现,自己家不挂(见 utils/shareLanding)
+const showDoorSign = computed(() => showCoverBanner(family.value, userStore.userInfo?.familyId))
+// 低矮横条:按画布宽度取比例并夹在 96~150px,占一条「门牌」的高度,不挤掉卡片区
+const doorSignH = computed(() => (showDoorSign.value ? Math.round(Math.min(150, Math.max(96, canvasW.value * 0.11))) : 0))
+// 横幅与卡片共用画布坐标系:卡片是 fixed 定位,横幅同样 fixed 贴在画布左上角
+const doorSignStyle = computed(() => ({ left: MARGIN.left + 'px', top: MARGIN.top + 'px', width: canvasW.value + 'px' }))
+const canvasH = computed(() => Math.max(0, winH.value - MARGIN.top - MARGIN.bottom - doorSignH.value))
 
 const cardStyle = (w) => {
   const s = {
     left: MARGIN.left + w.x * canvasW.value + 'px',
-    top: MARGIN.top + w.y * canvasH.value + 'px',
+    top: MARGIN.top + doorSignH.value + w.y * canvasH.value + 'px',
     width: w.w * canvasW.value + 'px',
     height: w.h * canvasH.value + 'px',
   }
@@ -1371,7 +1382,7 @@ onDrop((type, x, y) => {
   const wf = size.w / COLS
   const hf = size.h / ROWS
   const wx = Math.max(0, Math.min(1 - wf, (x - MARGIN.left) / canvasW.value))
-  const wy = Math.max(0, Math.min(1 - hf, (y - MARGIN.top) / canvasH.value))
+  const wy = Math.max(0, Math.min(1 - hf, (y - MARGIN.top - doorSignH.value) / canvasH.value))
   const widget = makeWidget({ id: type, x: wx, y: wy, w: wf, h: hf })
   widgets.value.push(widget)
   saveLayout()
@@ -1417,6 +1428,11 @@ onBeforeUnmount(() => {
 <style scoped>
 .home-page {
   min-height: 100vh;
+}
+/* 分享门脸:与卡片同一画布坐标系(fixed),压在光影层之下 */
+.door-sign {
+  position: fixed;
+  z-index: 20;
 }
 .home-page.edit-mode {
   user-select: none;

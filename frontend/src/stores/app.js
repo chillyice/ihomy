@@ -1,6 +1,7 @@
 // 首页聚合 store:家庭信息/模块/照片/统计集中拉取,避免各组件各自重复请求
 import { defineStore } from 'pinia'
 import { publicApi, homeApi } from '@/api'
+import { parseShareQuery } from '@/utils/shareLanding'
 
 export const useAppStore = defineStore('app', {
   state: () => ({
@@ -25,7 +26,13 @@ export const useAppStore = defineStore('app', {
       if (this.loading) return
       this.loading = true
       try {
-        const [pub, dash] = await Promise.all([publicApi.getHome().catch(() => null), homeApi.getDashboard().catch(() => null)])
+        // 分享落地(/?hid=xxx 或 ?home_id=):游客打开分享链接时按链接里的家庭取数,
+        // 否则暖居/移动端会一律回落到「默认演示家庭」,看到的是别人家。
+        const { hid, homeId } = parseShareQuery(window.location.search)
+        const [pub, dash] = await Promise.all([
+          publicApi.getHome(homeId ?? undefined, hid || undefined).catch(() => null),
+          homeApi.getDashboard().catch(() => null),
+        ])
         if (pub) {
           this.family = pub.family || null
           this.modules = pub.modules || []
