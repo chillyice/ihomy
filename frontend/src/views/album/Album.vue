@@ -77,6 +77,7 @@
               </div>
               <div class="pane-info">
                 <span class="pane-name">{{ a.name }}</span>
+                <span v-if="a.sharedFrom" class="pane-shared">{{ sharedFromText(a.sharedFrom) }}</span>
                 <span class="pane-meta">{{ t('album.photoCount', { n: a.totalPhotoCount ?? a.photoCount }) }}</span>
               </div>
             </div>
@@ -127,6 +128,7 @@
               <span v-if="!selectMode" class="album-type" :class="a.type">{{
                 a.type === 'public' ? t('album.public') : t('album.private')
               }}</span>
+              <span v-if="a.sharedFrom" class="album-shared">{{ sharedFromText(a.sharedFrom) }}</span>
               <span v-if="a.sourceDeviceName" class="album-source">
                 <span class="status-dot" :class="a.syncStatus || 'OFFLINE'"></span>{{ a.sourceDeviceName }}
               </span>
@@ -178,6 +180,11 @@
         <el-form-item :label="t('album.visibility')">
           <VisibilityPicker v-model="editor.form.type" :options="visibilityOptions" />
         </el-form-item>
+        <!-- 分享范围:私密相册不进亲友圈;面板数据随编辑对象加载 -->
+        <div v-if="audience.loaded && editor.form.type !== 'private'" class="editor-audience">
+          <AudiencePicker v-if="audience.canShare" v-model="audience.selected" :circles="audience.circles" />
+          <p v-else class="editor-audience-tip">{{ t('audience.canShareFalse') }}</p>
+        </div>
       </el-form>
       <template #footer>
         <el-button @click="editor.visible = false">{{ t('common.cancel') }}</el-button>
@@ -193,7 +200,7 @@
 <script setup>
 import { ref, reactive, computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { albumApi } from '@/api'
+import { albumApi, audienceApi, circleApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useSyncStore } from '@/stores/sync'
 import { usePullRefresh } from '@/composables/usePullRefresh'
@@ -204,6 +211,7 @@ import { useI18n } from 'vue-i18n'
 import { Edit, Delete, Close } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
+import AudiencePicker from '@/components/common/AudiencePicker.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import SyncDialog from '@/components/SyncDialog.vue'
 import AlbumDefaultCover from '@/components/AlbumDefaultCover.vue'
@@ -258,8 +266,11 @@ const sourceOptions = computed(() => {
   return [...map.entries()].map(([value, label]) => ({ value, label }))
 })
 
-// 管理权限:家长或相册创建者本人
-const canManage = (a) => userStore.isLoggedIn && (userStore.isOwner || a.createdBy === userStore.userInfo?.id)
+// 管理权限:家长或相册创建者本人;别人家分享来的相册只能看
+const canManage = (a) => userStore.isLoggedIn && !a.readOnly && (userStore.isOwner || a.createdBy === userStore.userInfo?.id)
+
+// 被分享进来的相册:标题旁标出来源家庭(圈内称呼优先)
+const sharedFromText = (s) => t('audience.sharedFrom', { name: s.alias || s.familyName || '' })
 
 // ---------- 宽屏双栏:左栏选相册,右栏出详情(受控 id,不改路由) ----------
 // 多选是纯选择场景,退回整宽卡片网格;列高由 useWideCols 实测后写 --wide-col-max
@@ -311,16 +322,59 @@ const load = async () => {
   }
 }
 
+// 分享范围面板:可选圈只随家庭变化,首次打开缓存一次;编辑时读当前相册已分享的圈
+const audience = reactive({ loaded: false, canShare: true, selected: [], circles: [] })
+let circleCache = null
+const loadAudience = async (albumId) => {
+  if (!userStore.isLoggedIn) return
+  try {
+    if (!circleCache) circleCache = (await circleApi.list()) || []
+    if (!albumId) {
+      audience.circles = circleCache
+      audience.loaded = true
+      return
+    }
+    const data = await audienceApi.get('album', albumId)
+    audience.circles = data.circles || []
+    audience.selected = data.selectedCircleIds || []
+    audience.canShare = !!data.canShare
+  } catch {
+    // 面板加载失败不阻断改名:按「不能分享」处理,不提交分享范围
+    audience.canShare = false
+  } finally {
+    audience.loaded = true
+  }
+}
+
 const openEditor = (a) => {
   if (a) Object.assign(editor.form, { id: a.id, name: a.name, type: a.type })
   else Object.assign(editor.form, { id: null, name: '', type: 'public' })
+  audience.loaded = false
+  audience.canShare = true
+  audience.selected = []
+  audience.circles = []
   editor.visible = true
+  loadAudience(a?.id ?? null)
 }
 
 const onSave = async () => {
   if (!editor.form.name) return ElMessage.warning(t('album.nameRequired'))
-  if (editor.form.id) await albumApi.update(editor.form.id, editor.form)
-  else await albumApi.create(editor.form)
+  const picked = audience.loaded && audience.canShare ? [...audience.selected] : null
+  let albumId = editor.form.id
+  if (albumId) await albumApi.update(albumId, editor.form)
+  else {
+    const created = await albumApi.create(editor.form)
+    albumId = created?.id
+  }
+  // 只有面板真正展示过、且相册不是私密时才提交分享范围;失败不影响相册本身已保存
+  if (albumId && picked !== null && editor.form.type !== 'private') {
+    try {
+      const res = await audienceApi.save('album', albumId, picked)
+      if (picked.length && res?.targetCount === 0) ElMessage.info(t('audience.noTarget'))
+    } catch {
+      ElMessage.warning(t('audience.saveFailed'))
+    }
+  }
   ElMessage.success(t('album.saved'))
   editor.visible = false
   load()
@@ -346,6 +400,7 @@ const toggleSelect = () => {
   selectedIds.value = []
 }
 const togglePick = (a) => {
+  if (a.readOnly) return
   const i = selectedIds.value.indexOf(a.id)
   if (i >= 0) selectedIds.value.splice(i, 1)
   else selectedIds.value.push(a.id)
@@ -527,6 +582,34 @@ onBeforeUnmount(() => {
 }
 .pane-meta {
   font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.pane-shared {
+  font-size: 11px;
+  color: var(--color-accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* 别人家分享进来的相册:左下角标来源家庭,与「子相册数」同位置(被分享相册无子相册) */
+.album-shared {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  font-size: 11px;
+  color: #fff;
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: rgba(var(--color-brand-rgb), 0.85);
+}
+/* 新建/编辑相册弹窗里的分享范围:与表单字段同宽,私密相册不显示 */
+.editor-audience {
+  margin-top: 2px;
+}
+.editor-audience-tip {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
   color: var(--color-text-secondary);
 }
 .album-detail-pane {

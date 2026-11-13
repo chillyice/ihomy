@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ihomy.mapper.ContentAudienceMapper">
+
+    <!-- 分享对象:接收家庭名/封面 + 圈内称呼(称呼是「本圈其他家庭」看发起方的叫法,
+         发起方看自己时取对方家庭的 alias)。不暴露任何成员名单。 -->
+    <select id="selectTargets" resultType="java.util.Map">
+        SELECT ca.target_id      AS familyId,
+               f.name            AS familyName,
+               f.cover_image     AS familyCoverImage,
+               m.alias           AS alias,
+               ca.source_circle_id AS sourceCircleId,
+               ca.created_at     AS createdAt
+        FROM content_audience ca
+        JOIN sys_family_info f ON f.id = ca.target_id AND f.deleted = 0
+        LEFT JOIN family_circle_member m
+               ON m.circle_id = ca.source_circle_id AND m.family_id = ca.target_id
+        WHERE ca.content_type = #{contentType} AND ca.content_id = #{contentId}
+        ORDER BY ca.id
+    </select>
+
+    <!-- 列表批量回填:对当前家庭只返回「别人分享给我家」的行(自家内容不走这里) -->
+    <select id="selectSharedSources" resultType="java.util.Map">
+        SELECT ca.content_id    AS contentId,
+               ca.owner_family_id AS familyId,
+               f.name           AS familyName,
+               f.cover_image    AS familyCoverImage,
+               m.alias          AS alias
+        FROM content_audience ca
+        JOIN sys_family_info f ON f.id = ca.owner_family_id AND f.deleted = 0
+        LEFT JOIN family_circle_member m
+               ON m.circle_id = ca.source_circle_id AND m.family_id = ca.owner_family_id
+        WHERE ca.content_type = #{contentType}
+          AND ca.target_type = 'FAMILY'
+          AND ca.target_id = #{targetId}
+          AND ca.content_id IN
+        <foreach item="id" collection="contentIds" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
+    <select id="countSharedTo" resultType="int">
+        SELECT COUNT(*) FROM content_audience
+        WHERE content_type = #{contentType} AND content_id = #{contentId}
+          AND target_type = 'FAMILY' AND target_id = #{targetId}
+    </select>
+
+    <select id="selectAudit" resultType="java.util.Map">
+        SELECT ca.id             AS id,
+               ca.content_type   AS contentType,
+               ca.content_id     AS contentId,
+               ca.target_id      AS targetFamilyId,
+               f.name            AS targetFamilyName,
+               ca.source_circle_id AS sourceCircleId,
+               c.name            AS circleName,
+               ca.created_at     AS createdAt
+        FROM content_audience ca
+        LEFT JOIN sys_family_info f ON f.id = ca.target_id
+        LEFT JOIN family_circle c ON c.id = ca.source_circle_id
+        WHERE ca.owner_family_id = #{ownerFamilyId}
+        ORDER BY ca.id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countAudit" resultType="long">
+        SELECT COUNT(*) FROM content_audience WHERE owner_family_id = #{ownerFamilyId}
+    </select>
+
+    <select id="countByOwner" resultType="long">
+        SELECT COUNT(*) FROM content_audience WHERE owner_family_id = #{ownerFamilyId}
+    </select>
+
+    <delete id="deleteByCircle">
+        DELETE FROM content_audience
+        WHERE source_circle_id = #{circleId}
+        <if test="targetId != null">AND target_id = #{targetId}</if>
+    </delete>
+
+    <select id="selectOwnerFamilyIdsByCircle" resultType="java.lang.Long">
+        SELECT DISTINCT owner_family_id FROM content_audience
+        WHERE source_circle_id = #{circleId}
+        <if test="targetId != null">AND target_id = #{targetId}</if>
+    </select>
+
+</mapper>

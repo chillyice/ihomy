@@ -30,6 +30,9 @@
           <div v-if="c.hovered" class="photo-info">
             <div v-if="c.photo.description" class="info-desc">{{ c.photo.description }}</div>
             <div class="info-meta">
+              <span v-if="c.photo.sharedFrom">{{
+                $t('audience.sharedFrom', { name: c.photo.sharedFrom.alias || c.photo.sharedFrom.familyName })
+              }}</span>
               <span v-if="c.photo.uploaderName">{{ c.photo.uploaderName }}</span>
               <span v-if="c.photo.takenAt">{{ formatDate(c.photo.takenAt) }}</span>
             </div>

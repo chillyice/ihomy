@@ -125,4 +125,52 @@ class ContentAccessServiceTest {
     void memberVisibilities_excludesPrivate() {
         assertThat(service.memberVisibilities()).containsExactly("FAMILY", "PUBLIC");
     }
+
+    // ---------- 阶段 B:「被分享」与分享入口 ----------
+
+    @Test
+    void sharedContent_isVisibleToTargetFamilyMembersOnly() {
+        assertThat(service.canView(ContentKind.PHOTO, FAMILY_A, AUTHOR, "FAMILY", memberOfB(), true)).isTrue();
+        assertThat(service.canView(ContentKind.PHOTO, FAMILY_A, AUTHOR, "FAMILY", memberOfB(), false)).isFalse();
+        // 第三个家庭没有受众行,仍然看不到
+        assertThat(service.canView(ContentKind.PHOTO, FAMILY_A, AUTHOR, "FAMILY",
+                ViewerScope.of(400L, 30L, false), false)).isFalse();
+    }
+
+    @Test
+    void sharedPrivateContent_staysInvisible() {
+        assertThat(service.canView(ContentKind.PHOTO, FAMILY_A, AUTHOR, "PRIVATE", memberOfB(), true)).isFalse();
+        assertThat(service.canView(ContentKind.PHOTO, FAMILY_A, AUTHOR, "PRIVATE", ownerOfA(), true)).isTrue();
+    }
+
+    @Test
+    void sharedContent_isInvisibleToGuests() {
+        // 游客没有登录主体,即便演示家庭被分享过也不能看
+        assertThat(service.canView(ContentKind.PHOTO, FAMILY_A, AUTHOR, "FAMILY", guestOnA(), true)).isFalse();
+    }
+
+    @Test
+    void visibleFilter_marksSharedOnlyForLoggedInUsers() {
+        assertThat(service.visibleFilter(memberOfA()).isShared()).isTrue();
+        assertThat(service.visibleFilter(ownerOfA()).isShared()).isTrue();
+        assertThat(service.visibleFilter(guestOnA()).isShared()).isFalse();
+        assertThat(service.visibleFilter(ViewerScope.publicView(FAMILY_A)).isShared()).isFalse();
+    }
+
+    @Test
+    void canShare_onlyAuthorOrOwnerUnderOwnerOnlyPolicy() {
+        // 作者本人:任何非 OFF、非 PRIVATE 都能分享
+        assertThat(service.canShare(ContentKind.PHOTO, FAMILY_A, MEMBER, "FAMILY", memberOfA(), "SELF_ONLY")).isTrue();
+        // 同家庭其他成员:默认策略下不能分享别人的内容
+        assertThat(service.canShare(ContentKind.PHOTO, FAMILY_A, AUTHOR, "FAMILY", memberOfA(), "SELF_ONLY")).isFalse();
+        // 家长 + OWNER_ONLY:可以分享家庭共有内容
+        assertThat(service.canShare(ContentKind.PHOTO, FAMILY_A, AUTHOR, "FAMILY", ownerOfA(), "OWNER_ONLY")).isTrue();
+        // 关闭外分享:谁都不行
+        assertThat(service.canShare(ContentKind.PHOTO, FAMILY_A, MEMBER, "FAMILY", memberOfA(), "OFF")).isFalse();
+        // 私密内容与保险箱永不进圈
+        assertThat(service.canShare(ContentKind.PHOTO, FAMILY_A, MEMBER, "PRIVATE", memberOfA(), "SELF_ONLY")).isFalse();
+        assertThat(service.canShare(ContentKind.VAULT, FAMILY_A, MEMBER, "FAMILY", memberOfA(), "SELF_ONLY")).isFalse();
+        // 跨家庭:不是自己的内容不能分享
+        assertThat(service.canShare(ContentKind.PHOTO, FAMILY_A, AUTHOR, "FAMILY", memberOfB(), "SELF_ONLY")).isFalse();
+    }
 }

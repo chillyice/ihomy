@@ -154,6 +154,22 @@ public final class DictConst {
     public static final String INVITE_UNUSED = "UNUSED";
     private static final String INVITE_FALLBACK = INVITE_UNUSED;
 
+    /** 亲友圈状态 family_circle.status */
+    public static final String CIRCLE_ACTIVE = "ACTIVE";
+    public static final String CIRCLE_CLOSED = "CLOSED";
+
+    /** 圈内家庭状态 family_circle_member.status */
+    public static final String CIRCLE_MEMBER_ACTIVE = "ACTIVE";
+    public static final String CIRCLE_MEMBER_LEFT = "LEFT";
+
+    /** 家庭外分享策略 sys_family_info.share_policy */
+    public static final String SHARE_SELF_ONLY = "SELF_ONLY";
+    public static final String SHARE_OWNER_ONLY = "OWNER_ONLY";
+    public static final String SHARE_OFF = "OFF";
+
+    /** 分享受众接收方类型 content_audience.target_type(圈在写入时已展开) */
+    public static final String AUDIENCE_FAMILY = "FAMILY";
+
     /** 菜谱类别 recipe_category */
     public static final String RECIPE_HOT = "HOT";
     public static final String RECIPE_HARD = "HARD";

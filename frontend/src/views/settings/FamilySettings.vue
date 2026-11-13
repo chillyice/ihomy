@@ -38,6 +38,149 @@
     </el-form>
   </div>
 
+  <!-- 亲友圈:只维护「谁和谁能互相分享」,加入本身不共享任何内容 -->
+  <div v-if="userStore.isLoggedIn" class="card settings-card">
+    <div class="section-label">{{ t('circle.title') }}</div>
+    <p class="share-tip">{{ t('circle.hint') }}</p>
+
+    <!-- 家庭级策略:只有家长能改 -->
+    <div v-if="canManageFamily" class="circle-policy">
+      <el-form label-position="top">
+        <el-form-item :label="t('circle.enabled')">
+          <el-switch v-model="family.circleEnabled" :active-value="1" :inactive-value="0" @change="saveCirclePolicy" />
+        </el-form-item>
+        <el-form-item :label="t('circle.policy')">
+          <el-select v-model="family.sharePolicy" style="width: 100%" @change="saveCirclePolicy">
+            <el-option value="SELF_ONLY" :label="t('circle.policySelfOnly')" />
+            <el-option value="OWNER_ONLY" :label="t('circle.policyOwnerOnly')" />
+            <el-option value="OFF" :label="t('circle.policyOff')" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <p class="share-tip">{{ t('circle.policyHint') }}</p>
+    </div>
+
+    <div class="circle-toolbar">
+      <template v-if="canManageFamily">
+        <el-button size="small" @click="showCreateCircle = true">{{ t('circle.create') }}</el-button>
+        <el-button size="small" @click="showJoinCircle = true">{{ t('circle.join') }}</el-button>
+      </template>
+      <span v-else class="share-tip">{{ t('circle.manageOnly') }}</span>
+    </div>
+
+    <div v-if="circles.length" class="circle-list">
+      <div v-for="c in circles" :key="c.id" class="circle-item">
+        <div class="circle-head">
+          <span class="circle-name">{{ c.name }}</span>
+          <el-tag v-if="c.mine" size="small" type="success">{{ t('circle.ownerTag') }}</el-tag>
+          <span class="circle-count">{{ t('circle.familyCount', { n: c.families.length }) }}</span>
+        </div>
+        <div class="circle-families">
+          <span v-for="f in c.families" :key="f.familyId" class="circle-family" :class="{ self: f.self }">
+            {{ f.self ? t('circle.selfTag') : f.alias || f.familyName }}
+          </span>
+        </div>
+        <div class="circle-actions">
+          <el-button v-if="c.mine && canManageFamily" size="small" @click="generateInvite(c)">{{ t('circle.invite') }}</el-button>
+          <el-button v-if="canManageFamily" size="small" @click="editAlias(c)">{{ t('circle.alias') }}</el-button>
+          <el-button v-if="c.mine && canManageFamily" size="small" type="danger" plain @click="disbandCircle(c)">
+            {{ t('circle.disband') }}
+          </el-button>
+          <el-button v-else-if="canManageFamily" size="small" type="danger" plain @click="leaveCircle(c)">
+            {{ t('circle.leave') }}
+          </el-button>
+          <template v-if="c.mine && canManageFamily">
+            <el-button
+              v-for="f in c.families.filter((x) => !x.self)"
+              :key="f.familyId"
+              size="small"
+              text
+              type="danger"
+              @click="removeFamily(c, f)"
+            >
+              {{ t('circle.removeFamily') }} {{ f.alias || f.familyName }}
+            </el-button>
+          </template>
+        </div>
+      </div>
+    </div>
+    <el-empty v-else :description="t('circle.empty')" :image-size="40" />
+  </div>
+
+  <!-- 分享记录:本家庭分享给其他家庭的内容,可随时收回 -->
+  <div v-if="userStore.isLoggedIn" class="card settings-card">
+    <div class="section-label">{{ t('circle.auditTitle') }}</div>
+    <p class="share-tip">{{ t('circle.auditHint') }}</p>
+    <template v-if="audit.items.length">
+      <div class="audit-list">
+        <div v-for="row in audit.items" :key="row.id" class="audit-row">
+          <span class="audit-kind">{{ kindLabel(row.contentType) }}</span>
+          <span class="audit-to">{{ t('circle.sharedTo', { name: row.targetFamilyName || '—' }) }}</span>
+          <span v-if="row.circleName" class="audit-circle">{{ row.circleName }}</span>
+          <span class="audit-time">{{ formatDateTime(row.createdAt) }}</span>
+        </div>
+      </div>
+      <el-pagination
+        v-if="audit.total > audit.size"
+        class="audit-pager"
+        small
+        layout="prev, pager, next"
+        :current-page="audit.page"
+        :page-size="audit.size"
+        :total="audit.total"
+        @current-change="loadAudit"
+      />
+      <div v-if="canManageFamily" class="form-footer">
+        <el-button type="danger" plain @click="revokeAllShares">{{ t('circle.revokeAll') }}</el-button>
+      </div>
+    </template>
+    <el-empty v-else :description="t('circle.auditEmpty')" :image-size="40" />
+  </div>
+
+  <!-- 新建亲友圈 -->
+  <el-dialog v-model="showCreateCircle" :title="t('circle.create')" width="380px" append-to-body @keyup.esc="showCreateCircle = false">
+    <p class="fm-hint">{{ t('circle.createHint') }}</p>
+    <el-input
+      ref="circleNameInputRef"
+      v-model="newCircleName"
+      :placeholder="t('circle.namePlaceholder')"
+      maxlength="30"
+      @keyup.enter="confirmCreateCircle"
+    />
+    <template #footer>
+      <el-button @click="showCreateCircle = false">{{ t('common.cancel') }}</el-button>
+      <el-button type="primary" :disabled="!newCircleName.trim() || creatingCircle" :loading="creatingCircle" @click="confirmCreateCircle">
+        {{ t('settings.create') }}
+      </el-button>
+    </template>
+  </el-dialog>
+
+  <!-- 凭邀请码加入 -->
+  <el-dialog v-model="showJoinCircle" :title="t('circle.join')" width="380px" append-to-body @keyup.esc="showJoinCircle = false">
+    <p class="fm-hint">{{ t('circle.joinHint') }}</p>
+    <el-input v-model="joinCode" :placeholder="t('circle.codePlaceholder')" maxlength="8" @keyup.enter="confirmJoinCircle" />
+    <template #footer>
+      <el-button @click="showJoinCircle = false">{{ t('common.cancel') }}</el-button>
+      <el-button type="primary" :disabled="!joinCode.trim() || joiningCircle" :loading="joiningCircle" @click="confirmJoinCircle">
+        {{ t('common.confirm') }}
+      </el-button>
+    </template>
+  </el-dialog>
+
+  <!-- 邀请码展示 -->
+  <el-dialog v-model="inviteDialog.visible" :title="t('circle.invite')" width="380px" append-to-body>
+    <p class="fm-hint">{{ t('circle.inviteHint') }}</p>
+    <el-input v-model="inviteDialog.code" readonly>
+      <template #append>
+        <el-button class="ghost-btn" @click="copyInviteCode">{{ t('circle.copy') }}</el-button>
+      </template>
+    </el-input>
+    <p class="share-tip">{{ t('circle.inviteExpires', { time: formatDateTime(inviteDialog.expiresAt) }) }}</p>
+    <template #footer>
+      <el-button type="primary" @click="inviteDialog.visible = false">{{ t('common.close') }}</el-button>
+    </template>
+  </el-dialog>
+
   <BgmSettings />
 
   <!-- 切换家庭:在当前加入的家庭之间切换(全部主题通用) -->
@@ -103,12 +246,13 @@
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { familyApi, fileApi, authApi } from '@/api'
-import { ElMessage } from 'element-plus'
+import { familyApi, fileApi, authApi, circleApi } from '@/api'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
 import BgmSettings from './BgmSettings.vue'
 import AvatarCropper from '@/components/AvatarCropper.vue'
+import { formatDateTime } from '@/utils/datetime'
 
 const { t } = useI18n()
 const userStore = useUserStore()
@@ -121,6 +265,8 @@ const family = reactive({
   isPublic: 1,
   musicUrl: '',
   musicTitle: '',
+  circleEnabled: 1,
+  sharePolicy: 'SELF_ONLY',
 })
 const shareToken = ref('')
 const familySaving = ref(false)
@@ -142,6 +288,209 @@ const saveFamily = async () => {
     ElMessage.success(t('settings.familySaved'))
   } finally {
     familySaving.value = false
+  }
+}
+
+// ---------- 亲友圈 ----------
+const canManageFamily = computed(() => userStore.hasPerm('family:manage'))
+const circles = ref([])
+const showCreateCircle = ref(false)
+const newCircleName = ref('')
+const creatingCircle = ref(false)
+const circleNameInputRef = ref(null)
+const showJoinCircle = ref(false)
+const joinCode = ref('')
+const joiningCircle = ref(false)
+const inviteDialog = reactive({ visible: false, code: '', expiresAt: '' })
+
+const loadCircles = async () => {
+  if (!userStore.isLoggedIn) return
+  try {
+    circles.value = (await circleApi.list()) || []
+  } catch {
+    circles.value = []
+  }
+}
+
+// 家庭级策略:只提交这两项,不动基本信息(后端按字段部分更新)
+const saveCirclePolicy = async () => {
+  try {
+    await familyApi.update({ circleEnabled: family.circleEnabled, sharePolicy: family.sharePolicy })
+    ElMessage.success(t('circle.saved'))
+  } catch {
+    // 具体原因由请求层提示
+  }
+}
+
+watch(showCreateCircle, (v) => {
+  if (v) {
+    newCircleName.value = ''
+    nextTick(() => circleNameInputRef.value?.focus?.())
+  }
+})
+
+const confirmCreateCircle = async () => {
+  const name = newCircleName.value.trim()
+  if (!name || creatingCircle.value) return
+  creatingCircle.value = true
+  try {
+    const created = await circleApi.create({ name })
+    showCreateCircle.value = false
+    ElMessage.success(t('circle.created'))
+    await loadCircles()
+    if (created?.inviteCode) {
+      inviteDialog.code = created.inviteCode
+      inviteDialog.expiresAt = created.inviteExpiresAt || ''
+      inviteDialog.visible = true
+    }
+  } catch {
+    // 请求层已提示(如已达上限)
+  } finally {
+    creatingCircle.value = false
+  }
+}
+
+const confirmJoinCircle = async () => {
+  const code = joinCode.value.trim()
+  if (!code || joiningCircle.value) return
+  joiningCircle.value = true
+  try {
+    await circleApi.join(code)
+    showJoinCircle.value = false
+    joinCode.value = ''
+    ElMessage.success(t('circle.joined'))
+    loadCircles()
+  } catch {
+    // 请求层已提示(邀请码无效/已过期/圈已满)
+  } finally {
+    joiningCircle.value = false
+  }
+}
+
+const generateInvite = async (c) => {
+  try {
+    const data = await circleApi.invite(c.id)
+    inviteDialog.code = data.code
+    inviteDialog.expiresAt = data.expiresAt
+    inviteDialog.visible = true
+  } catch {
+    /* 请求层已提示 */
+  }
+}
+
+const copyInviteCode = async () => {
+  try {
+    await navigator.clipboard.writeText(inviteDialog.code)
+    ElMessage.success(t('circle.copied'))
+  } catch {
+    ElMessage.error(t('circle.copyFailed'))
+  }
+}
+
+const editAlias = async (c) => {
+  try {
+    const { value } = await ElMessageBox.prompt(t('circle.aliasHint'), t('circle.alias'), {
+      inputValue: c.myAlias || '',
+      inputPlaceholder: t('circle.alias'),
+      confirmButtonText: t('common.save'),
+      cancelButtonText: t('common.cancel'),
+    })
+    await circleApi.setAlias(c.id, (value || '').trim())
+    ElMessage.success(t('circle.aliasSaved'))
+    loadCircles()
+  } catch {
+    /* 取消或请求层已提示 */
+  }
+}
+
+const leaveCircle = async (c) => {
+  try {
+    await ElMessageBox.confirm(t('circle.leaveConfirm', { name: c.name }), t('common.tip'), { type: 'warning' })
+  } catch {
+    return
+  }
+  try {
+    await circleApi.leave(c.id)
+    ElMessage.success(t('circle.left'))
+    loadCircles()
+    loadAudit(1)
+  } catch {
+    /* 请求层已提示 */
+  }
+}
+
+const disbandCircle = async (c) => {
+  try {
+    await ElMessageBox.confirm(t('circle.disbandConfirm', { name: c.name }), t('common.tip'), { type: 'warning' })
+  } catch {
+    return
+  }
+  try {
+    await circleApi.disband(c.id)
+    ElMessage.success(t('circle.disbanded'))
+    loadCircles()
+    loadAudit(1)
+  } catch {
+    /* 请求层已提示 */
+  }
+}
+
+const removeFamily = async (c, f) => {
+  const name = f.alias || f.familyName || ''
+  try {
+    await ElMessageBox.confirm(t('circle.removeConfirm', { name }), t('common.tip'), { type: 'warning' })
+  } catch {
+    return
+  }
+  try {
+    await circleApi.removeFamily(c.id, f.familyId)
+    ElMessage.success(t('circle.removed'))
+    loadCircles()
+    loadAudit(1)
+  } catch {
+    /* 请求层已提示 */
+  }
+}
+
+// ---------- 分享记录 ----------
+const audit = reactive({ items: [], total: 0, page: 1, size: 10 })
+const KIND_LABELS = {
+  photo: 'circle.kindPhoto',
+  album: 'circle.kindAlbum',
+  video: 'circle.kindVideo',
+  blog: 'circle.kindBlog',
+  diary: 'circle.kindDiary',
+  wish: 'circle.kindWish',
+  book: 'circle.kindBook',
+}
+const kindLabel = (code) => (KIND_LABELS[code] ? t(KIND_LABELS[code]) : code)
+
+const loadAudit = async (page = 1) => {
+  if (!userStore.isLoggedIn) return
+  try {
+    const data = await familyApi.shareAudit({ page, size: audit.size })
+    audit.items = data.items || []
+    audit.total = data.total || 0
+    audit.page = data.page || page
+    audit.size = data.size || audit.size
+  } catch {
+    audit.items = []
+    audit.total = 0
+  }
+}
+
+const revokeAllShares = async () => {
+  try {
+    await ElMessageBox.confirm(t('circle.revokeAllConfirm'), t('common.tip'), { type: 'warning' })
+  } catch {
+    return
+  }
+  try {
+    const data = await familyApi.revokeAllShares()
+    ElMessage.success(t('circle.revokedAll', { n: data.revoked ?? 0 }))
+    loadAudit(1)
+  } catch {
+    /* 请求层已提示 */
   }
 }
 
@@ -237,10 +586,14 @@ onMounted(async () => {
       isPublic: f.isPublic ?? 1,
       musicUrl: f.musicUrl || '',
       musicTitle: f.musicTitle || '',
+      circleEnabled: f.circleEnabled ?? 1,
+      sharePolicy: f.sharePolicy || 'SELF_ONLY',
     })
     shareToken.value = f.shareToken || ''
   }
   loadFamilies()
+  loadCircles()
+  loadAudit(1)
 })
 </script>
 
@@ -344,6 +697,119 @@ html.dark .create-family-btn:hover {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ---------- 亲友圈 ---------- */
+.circle-policy {
+  margin: 12px 0 4px;
+  padding: 12px 14px 4px;
+  border-radius: 12px;
+  background: var(--color-card-2);
+}
+.circle-policy :deep(.el-form-item) {
+  margin-bottom: 12px;
+}
+.circle-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+}
+.circle-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.circle-item {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--color-card-2);
+  border: 1px solid var(--color-border);
+}
+.circle-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.circle-name {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.circle-count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.circle-families {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.circle-family {
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  color: var(--color-text-secondary);
+  background: rgba(var(--color-brand-rgb), 0.08);
+}
+.circle-family.self {
+  color: var(--color-brand);
+  background: rgba(var(--color-brand-rgb), 0.16);
+}
+.circle-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+/* ---------- 分享记录 ---------- */
+.audit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+.audit-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--color-text);
+}
+.audit-row + .audit-row {
+  border-top: 1px solid var(--color-border);
+}
+.audit-kind {
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 8px;
+  background: rgba(var(--color-brand-rgb), 0.1);
+  color: var(--color-brand);
+}
+.audit-to {
+  font-weight: 500;
+}
+.audit-circle {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.audit-time {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.audit-pager {
+  margin-top: 10px;
+  justify-content: center;
 }
 
 @media (max-width: 768px) {

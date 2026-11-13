@@ -24,6 +24,10 @@ public class Family {
     private Integer isDemo;
     /** 16 位混淆分享 token,公开访问 URL 用 ?hid= 而非裸 ID */
     private String shareToken;
+    /** 0=本家庭不参与亲友圈(加入也不生效) */
+    private Integer circleEnabled;
+    /** 外分享策略:SELF_ONLY 只能分享自己创建的 / OWNER_ONLY 家长可分享家庭共有内容 / OFF 禁止 */
+    private String sharePolicy;
     /** 家庭背景音乐:URL(本地上传 /files/... 或外链) */
     private String musicUrl;
     private String musicTitle;

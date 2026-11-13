@@ -3,18 +3,26 @@
 <mapper namespace="com.ihomy.mapper.PhotoMapper">
 
     <!-- 照片可见性条件(单点判定在 ContentAccessService.visibleFilter,这里只机械套用):
-         all=true(家长)=只看家庭维度;否则 家庭 + (本人授权的 OR 可见档位)。
+         all=true(家长)=本家庭全部;否则 家庭 + (本人授权的 OR 可见档位);
+         shared=true 时并上「别人家分享给我家」的照片(content_audience 命中)。
          照片自身 deleted 由调用处各自声明,XML 不走 @TableLogic。 -->
     <sql id="photoVisible">
-        AND p.family_id = #{visible.familyId}
-        <if test="!visible.all">
-            AND (p.author_id = #{visible.authorId}
-            <if test="visible.visibilities != null and visible.visibilities.size() > 0">
-                 OR p.visibility IN
-                 <foreach item="v" collection="visible.visibilities" open="(" separator="," close=")">#{v}</foreach>
+        AND (
+            p.family_id = #{visible.familyId}
+            <if test="!visible.all">
+                AND (p.author_id = #{visible.authorId}
+                <if test="visible.visibilities != null and visible.visibilities.size() > 0">
+                     OR p.visibility IN
+                     <foreach item="v" collection="visible.visibilities" open="(" separator="," close=")">#{v}</foreach>
+                </if>
+                )
             </if>
-            )
-        </if>
+            <if test="visible.shared">
+                OR EXISTS (SELECT 1 FROM content_audience ca
+                            WHERE ca.content_type = 'photo' AND ca.content_id = p.id
+                              AND ca.target_type = 'FAMILY' AND ca.target_id = #{visible.familyId})
+            </if>
+        )
     </sql>
 
     <select id="selectLatestByFamily" resultType="com.ihomy.entity.Photo">

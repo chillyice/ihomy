@@ -16,6 +16,8 @@ import com.ihomy.mapper.AlbumMapper;
 import com.ihomy.mapper.FamilyMapper;
 import com.ihomy.mapper.PhotoMapper;
 import com.ihomy.mapper.StorageDeviceMapper;
+import com.ihomy.service.access.ContentKind;
+import com.ihomy.service.access.ViewerScope;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -58,14 +60,29 @@ public class AlbumService {
     private final SignedUrlService signedUrlService;
     private final AlbumMapService albumMapService;
     private final ThumbnailService thumbnailService;
+    private final com.ihomy.service.AudienceService audienceService;
 
-    /** 相册列表(全部层级):游客只返回 public;含来源设备名/映射状态/子相册数/子树照片合计 */
-    public List<Map<String, Object>> list(Long familyId, boolean isGuest) {
+    /** 相册列表(全部层级):游客只返回 public;含来源设备名/映射状态/子相册数/子树照片合计。
+     *  登录用户额外混入「别人家分享给我家」的相册(带 sharedFrom 角标信息)。 */
+    public List<Map<String, Object>> list(ViewerScope viewer) {
         List<Map<String, Object>> result = new ArrayList<>();
+        Long familyId = viewer.familyId();
         if (familyId == null) return result;
         LambdaQueryWrapper<Album> qw = new LambdaQueryWrapper<>();
-        qw.eq(Album::getFamilyId, familyId);
-        if (isGuest) qw.eq(Album::getType, "public");
+        Map<Long, Map<String, Object>> sharedSources = Map.of();
+        if (viewer.guest()) {
+            qw.eq(Album::getFamilyId, familyId);
+            qw.eq(Album::getType, "public");
+        } else {
+            List<Long> sharedIds = audienceService.sharedIds(ContentKind.ALBUM, familyId);
+            if (sharedIds.isEmpty()) {
+                qw.eq(Album::getFamilyId, familyId);
+            } else {
+                sharedSources = audienceService.sharedSources(ContentKind.ALBUM, sharedIds, familyId);
+                List<Long> shared = sharedIds;
+                qw.and(w -> w.eq(Album::getFamilyId, familyId).or().in(Album::getId, shared));
+            }
+        }
         qw.orderByDesc(Album::getId);
         List<Album> albums = albumMapper.selectList(qw);
         if (albums.isEmpty()) return result;
@@ -95,6 +112,11 @@ public class AlbumService {
             m.put("lastSyncedAt", a.getLastSyncedAt());
             m.put("createdBy", a.getCreatedBy());
             m.put("createdAt", a.getCreatedAt());
+            Map<String, Object> source = sharedSources.get(a.getId());
+            if (source != null) {
+                m.put("sharedFrom", source);
+                m.put("readOnly", true);
+            }
             result.add(m);
         }
         return result;
@@ -105,20 +127,25 @@ public class AlbumService {
         return albumMapper.selectById(id);
     }
 
-    /** 相册详情+照片+子相册;游客仅可访问默认家庭的公开相册;映射相册静默触发当前层刷新 */
-    public Map<String, Object> detail(Long albumId, SysUser user, Long currentFamilyId) {
+    /** 相册详情+照片+子相册;游客仅可访问默认家庭的公开相册。
+     *  跨家庭只放行「相册被分享给我家」的情形,且只出非 PRIVATE 照片、不暴露子相册与成员信息。 */
+    public Map<String, Object> detail(Long albumId, SysUser user, ViewerScope viewer) {
         Album a = albumMapper.selectById(albumId);
         if (a == null) throw new BizException(ResultCode.NOT_FOUND);
+        boolean shared = false;
         if (user == null) {
             if (!"public".equals(a.getType())) throw new BizException(ResultCode.FORBIDDEN);
             Family def = familyMapper.selectDefault();
             if (def == null || !def.getId().equals(a.getFamilyId())) throw new BizException(ResultCode.FORBIDDEN);
-        } else if (!a.getFamilyId().equals(currentFamilyId)) {
-            throw new BizException(ResultCode.FORBIDDEN);
+        } else if (!a.getFamilyId().equals(viewer.familyId())) {
+            shared = viewer.familyId() != null && audienceService.sharedTo(ContentKind.ALBUM, albumId, viewer.familyId());
+            if (!shared) throw new BizException(ResultCode.NOT_FOUND);
         }
 
         LambdaQueryWrapper<Photo> qw = new LambdaQueryWrapper<>();
-        qw.eq(Photo::getAlbumId, albumId).orderByDesc(Photo::getCreatedAt);
+        qw.eq(Photo::getAlbumId, albumId);
+        if (shared) qw.ne(Photo::getVisibility, DictConst.VIS_PRIVATE);
+        qw.orderByDesc(Photo::getCreatedAt);
         List<Photo> photos = photoMapper.selectList(qw);
         for (Photo p : photos) {
             p.setUrl(signedUrlService.resolve(p.getUrl()));
@@ -170,8 +197,14 @@ public class AlbumService {
         Map<String, Object> data = new HashMap<>();
         data.put("album", a);
         data.put("photos", photos);
-        data.put("children", childMaps);
-        data.put("parents", parents);
+        data.put("children", shared ? List.of() : childMaps);
+        data.put("parents", shared ? List.of() : parents);
+        if (shared) {
+            // 被分享进来的相册:标出来源家庭,前端隐藏一切编辑入口(只留点赞/评论)
+            data.put("sharedFrom", audienceService.sharedSources(ContentKind.ALBUM, List.of(albumId), viewer.familyId())
+                    .get(albumId));
+            data.put("readOnly", true);
+        }
         return data;
     }
 
@@ -450,21 +483,28 @@ public class AlbumService {
         return p == null ? null : p.getUrl();
     }
 
-    /** 校验相册归属:存在且是创建者(或家长),否则 404/403 */
+    /** 校验相册归属:存在、属于当前家庭,且是创建者(或家长),否则 404/403。
+     *  家长身份只在自家家庭内有效,跨家庭一律 NOT_FOUND(别人家分享来的相册只读)。 */
     private Album requireOwn(Long id, SysUser user, boolean isOwner) {
         Album a = albumMapper.selectById(id);
         if (a == null) throw new BizException(ResultCode.NOT_FOUND);
         if (user == null) throw new BizException(ResultCode.FORBIDDEN);
+        if (user.getFamilyId() == null || !a.getFamilyId().equals(user.getFamilyId())) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
         boolean creator = a.getCreatedBy() != null && a.getCreatedBy().equals(user.getId());
         if (!isOwner && !creator) throw new BizException(ResultCode.FORBIDDEN);
         return a;
     }
 
-    /** 校验照片归属:存在且是上传者(或家长) */
+    /** 校验照片归属:存在、属于当前家庭且是上传者(或家长) */
     private Photo requirePhoto(Long id, SysUser user, boolean isOwner) {
         Photo p = photoMapper.selectById(id);
         if (p == null) throw new BizException(ResultCode.NOT_FOUND);
         if (user == null) throw new BizException(ResultCode.FORBIDDEN);
+        if (user.getFamilyId() == null || !p.getFamilyId().equals(user.getFamilyId())) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
         boolean author = p.getAuthorId() != null && p.getAuthorId().equals(user.getId());
         if (!isOwner && !author) throw new BizException(ResultCode.FORBIDDEN);
         return p;

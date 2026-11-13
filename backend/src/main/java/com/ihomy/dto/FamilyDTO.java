@@ -24,4 +24,8 @@ public class FamilyDTO {
     private java.math.BigDecimal weatherLat;
     private java.math.BigDecimal weatherLng;
     private String weatherCity;
+    /** 0=本家庭不参与亲友圈;null=不修改 */
+    private Integer circleEnabled;
+    /** 外分享策略 SELF_ONLY/OWNER_ONLY/OFF;null=不修改 */
+    private String sharePolicy;
 }

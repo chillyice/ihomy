@@ -10,6 +10,7 @@
         <el-tag size="small" :type="album.type === 'public' ? 'primary' : 'warning'">
           {{ album.type === 'public' ? t('album.public') : t('album.private') }}
         </el-tag>
+        <span v-if="sharedFrom" class="shared-badge">{{ sharedFromText }}</span>
         <span v-if="isMapped" class="mapped-badge">
           <span class="status-dot" :class="album.syncStatus || 'OFFLINE'" :title="statusText"></span>
           {{ t('album.mappedReadOnly') }} · {{ album.sourceDeviceName || '' }}
@@ -59,14 +60,18 @@
             t('album.share')
           }}</el-button>
           <el-button
-            v-if="userStore.isLoggedIn && !currentShareToken && !isMapped"
+            v-if="userStore.isLoggedIn && !currentShareToken && !isMapped && !readOnly"
             type="primary"
             :loading="uploading"
             @click="photoInput?.click()"
             >{{ t('album.uploadPhotos') }}</el-button
           >
           <!-- 相机直传:只在原生壳里出现(系统相机拍完直接进当前相册) -->
-          <el-button v-if="canCapture && userStore.isLoggedIn && !currentShareToken && !isMapped" :loading="capturing" @click="onCapture">
+          <el-button
+            v-if="canCapture && userStore.isLoggedIn && !currentShareToken && !isMapped && !readOnly"
+            :loading="capturing"
+            @click="onCapture"
+          >
             {{ t('album.takePhoto') }}
           </el-button>
           <!-- 宽屏右栏嵌入时由外壳(Album.vue)补改名/删除/收起入口 -->
@@ -185,6 +190,9 @@
               <span v-a11y-click v-if="canManagePhoto(p)" @click.stop="openDesc(p)"
                 ><el-icon><Edit /></el-icon>{{ t('album.editNote') }}</span
               >
+              <span v-a11y-click v-if="canManagePhoto(p)" @click.stop="openPhotoAudience(p)"
+                ><el-icon><Share /></el-icon>{{ t('album.share') }}</span
+              >
               <span v-a11y-click v-if="canManagePhoto(p)" class="danger" @click.stop="onDelPhoto(p)"
                 ><el-icon><Delete /></el-icon>{{ t('common.delete') }}</span
               >
@@ -208,6 +216,20 @@
       </template>
     </el-dialog>
 
+    <!-- 单张照片的分享范围:不选圈 = 只给自家人 -->
+    <el-dialog v-model="photoAudience.visible" append-to-body :title="t('audience.label')" width="420px">
+      <div v-loading="photoAudience.loading">
+        <AudiencePicker v-if="photoAudience.canShare" v-model="photoAudience.selected" :circles="photoAudience.circles" />
+        <p v-else class="audience-hint">{{ t('audience.canShareFalse') }}</p>
+      </div>
+      <template #footer>
+        <el-button @click="photoAudience.visible = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" :disabled="photoAudience.loading || !photoAudience.canShare" @click="savePhotoAudience">
+          {{ t('common.save') }}
+        </el-button>
+      </template>
+    </el-dialog>
+
     <PhotoViewer v-model:visible="viewer.visible" :photos="photos" :initial-index="viewer.index" :share-base="shareBase" />
   </div>
 </template>
@@ -215,14 +237,15 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { albumApi, photoApi } from '@/api'
+import { albumApi, photoApi, audienceApi, circleApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Edit, Delete, Location, Clock } from '@element-plus/icons-vue'
+import { Edit, Delete, Location, Clock, Share } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PhotoViewer from '@/components/PhotoViewer.vue'
 import AlbumDefaultCover from '@/components/AlbumDefaultCover.vue'
+import AudiencePicker from '@/components/common/AudiencePicker.vue'
 import { shareId } from '@/utils/shareId'
 import { isNativeApp } from '@/utils/platform'
 import { formatRelativeTime, formatDateTime } from '@/utils/datetime'
@@ -250,9 +273,19 @@ const refreshing = ref(false)
 const loading = ref(false)
 const descEditor = reactive({ visible: false, value: '', currentId: null })
 const viewer = reactive({ visible: false, index: 0 })
+// 单张照片的分享范围(亲友圈):不选圈 = 只给自家人
+const photoAudience = reactive({ visible: false, loading: false, photoId: null, canShare: true, circles: [], selected: [] })
+let circleCache = null
 
-// 映射相册:只读(影子记录),隐藏上传与照片管理
+// 映射相册:只读(影子记录),隐藏上传与照片管理;别人家分享进来的相册同样只读
 const isMapped = computed(() => !!album.value.sourceDeviceId)
+const sharedFrom = ref(null)
+const readOnly = ref(false)
+const sharedFromText = computed(() => {
+  const s = sharedFrom.value
+  if (!s) return ''
+  return t('audience.sharedFrom', { name: s.alias || s.familyName || '' })
+})
 const statusText = computed(
   () =>
     ({
@@ -266,8 +299,9 @@ const statusText = computed(
 // 相对时间(x 前)
 const timeAgo = (d) => formatRelativeTime(t, d)
 
-// 照片管理权限:家长或上传者本人;映射相册只读,不提供编辑/删除
-const canManagePhoto = (p) => !isMapped.value && userStore.isLoggedIn && (userStore.isOwner || p.authorId === userStore.userInfo?.id)
+// 照片管理权限:家长或上传者本人;映射相册与别人家分享来的相册只读
+const canManagePhoto = (p) =>
+  !isMapped.value && !readOnly.value && userStore.isLoggedIn && (userStore.isOwner || p.authorId === userStore.userInfo?.id)
 
 // 相册分享链接基准(公开相册才有):游客凭链接查看,家庭需已公开
 const shareBase = computed(() => (album.value.shareToken ? `${location.origin}/album/shared/${album.value.shareToken}` : ''))
@@ -281,6 +315,8 @@ const load = async () => {
     photos.value = data.photos || []
     children.value = data.children || []
     parents.value = data.parents || []
+    sharedFrom.value = data.sharedFrom || null
+    readOnly.value = !!data.readOnly
     // 分享链接带 ?p= 混淆照片ID时,定位到该照片并打开播放页(仅整页分享模式;右栏嵌入不受 URL 旧参数影响)
     const p = props.inline ? null : route.query.p
     if (p) {
@@ -406,6 +442,41 @@ const onDelPhoto = async (p) => {
   load()
 }
 
+// 照片分享范围:打开时读当前设置(可选圈随家庭缓存一次)
+const openPhotoAudience = async (p) => {
+  photoAudience.visible = true
+  photoAudience.loading = true
+  photoAudience.photoId = p.id
+  photoAudience.selected = []
+  photoAudience.canShare = true
+  photoAudience.circles = []
+  try {
+    if (!circleCache) circleCache = (await circleApi.list()) || []
+    const data = await audienceApi.get('photo', p.id)
+    photoAudience.circles = data.circles || []
+    photoAudience.selected = data.selectedCircleIds || []
+    photoAudience.canShare = !!data.canShare
+  } catch {
+    photoAudience.canShare = false
+  } finally {
+    photoAudience.loading = false
+  }
+}
+
+const savePhotoAudience = async () => {
+  if (!photoAudience.photoId) return
+  try {
+    const picked = [...photoAudience.selected]
+    const res = await audienceApi.save('photo', photoAudience.photoId, picked)
+    photoAudience.visible = false
+    load()
+    if (picked.length && res?.targetCount === 0) ElMessage.info(t('audience.noTarget'))
+    else ElMessage.success(t('common.saved'))
+  } catch {
+    /* 请求层已提示 */
+  }
+}
+
 const openViewer = (p) => {
   viewer.index = photos.value.findIndex((x) => x.id === p.id)
   if (viewer.index < 0) viewer.index = 0
@@ -422,7 +493,11 @@ const openChild = (c) => {
 const coverInput = ref(null)
 // 相册管理权限:家长或创建者,且非游客分享模式
 const canManageAlbum = computed(
-  () => !currentShareToken.value && userStore.isLoggedIn && (userStore.isOwner || album.value.createdBy === userStore.userInfo?.id),
+  () =>
+    !currentShareToken.value &&
+    !readOnly.value &&
+    userStore.isLoggedIn &&
+    (userStore.isOwner || album.value.createdBy === userStore.userInfo?.id),
 )
 const pickCover = () => coverInput.value?.click()
 const onCoverPicked = async (e) => {
@@ -450,7 +525,9 @@ const dropActive = ref(false)
 // 进入计数:照片卡等子元素间移动会连续触发 enter/leave,计数归零才算真正离开
 let dragDepth = 0
 // 登录、非公开分享、非映射只读、非多选、且有精细指针时才接
-const canDrop = computed(() => userStore.isLoggedIn && !currentShareToken.value && !isMapped.value && !selectMode.value && hasPointer.value)
+const canDrop = computed(
+  () => userStore.isLoggedIn && !currentShareToken.value && !isMapped.value && !readOnly.value && !selectMode.value && hasPointer.value,
+)
 const isFileDrag = (e) => Array.from(e.dataTransfer?.types || []).includes('Files')
 const clearDrop = () => {
   dragDepth = 0
@@ -614,6 +691,22 @@ onBeforeUnmount(() => {
 .mapped-badge .synced-at {
   color: var(--color-text-secondary);
   opacity: 0.7;
+}
+/* 别人家分享进来的相册:标题旁标出来源,只读 */
+.shared-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: rgba(var(--color-brand-rgb), 0.85);
+}
+.audience-hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
 }
 .status-dot {
   width: 8px;
@@ -842,9 +935,11 @@ onBeforeUnmount(() => {
   position: absolute;
   inset: 0;
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  padding: 6px;
   background: rgba(0, 0, 0, 0.45);
   opacity: 0;
   transition: opacity 0.2s;

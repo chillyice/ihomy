@@ -50,6 +50,7 @@ public class FamilyController {
     private final FileService fileService;
     private final com.ihomy.service.ParameterService parameterService;
     private final PublicController publicController;
+    private final com.ihomy.service.AudienceService audienceService;
 
     @Operation(summary = "创建新家庭(当前用户绑定 OWNER)")
     @OperationLog(module = "FAMILY", operationType = "CREATE", description = "创建新家庭", saveArgs = false)
@@ -172,6 +173,15 @@ public class FamilyController {
         if (dto.getIsPublic() != null) f.setIsPublic(dto.getIsPublic());
         if (dto.getMusicUrl() != null) f.setMusicUrl(dto.getMusicUrl());
         if (dto.getMusicTitle() != null) f.setMusicTitle(dto.getMusicTitle());
+        if (dto.getCircleEnabled() != null) f.setCircleEnabled(dto.getCircleEnabled() == 0 ? 0 : 1);
+        if (dto.getSharePolicy() != null && !dto.getSharePolicy().isBlank()) {
+            String policy = dto.getSharePolicy().trim().toUpperCase();
+            if (!List.of(com.ihomy.common.DictConst.SHARE_SELF_ONLY, com.ihomy.common.DictConst.SHARE_OWNER_ONLY,
+                    com.ihomy.common.DictConst.SHARE_OFF).contains(policy)) {
+                throw new BizException(ResultCode.BAD_REQUEST, "不支持的外分享策略");
+            }
+            f.setSharePolicy(policy);
+        }
         // 常规字段落库:updateById 写回实体非空字段(updatedAt 已被 @TableField(updateStrategy=NEVER) 跳过)
         familyMapper.updateById(f);
         // 天气位置偏好:显式 SET NULL(清空)或值(设置),绕过 MyBatis-Plus 默认忽略 null
@@ -192,5 +202,21 @@ public class FamilyController {
         // 家庭信息公开可见(简介/封面等):失效访客首页整包缓存,避免最长 5 分钟残留旧信息
         publicController.invalidateHomeCache(f.getId());
         return Result.success(f);
+    }
+
+    @Operation(summary = "本家庭分享记录(谁在看我们的内容)")
+    @GetMapping("/share-audit")
+    public Result<Map<String, Object>> shareAudit(@RequestParam(defaultValue = "1") int page,
+                                                  @RequestParam(defaultValue = "10") int size) {
+        return Result.success(audienceService.audit(securityHelper.current().getFamilyId(), page, size));
+    }
+
+    @Operation(summary = "收回本家庭分享出去的全部内容")
+    @OperationLog(module = "SHARE", operationType = "DELETE", description = "收回全部分享")
+    @RequirePermission("family:manage")
+    @PostMapping("/share-audit/revoke-all")
+    public Result<Map<String, Object>> revokeAllShares() {
+        int count = audienceService.revokeAll(securityHelper.current().getFamilyId());
+        return Result.success(Map.of("revoked", count));
     }
 }

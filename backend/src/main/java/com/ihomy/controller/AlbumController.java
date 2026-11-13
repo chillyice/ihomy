@@ -35,15 +35,13 @@ public class AlbumController {
     private final AlbumMapService albumMapService;
     private final SecurityHelper securityHelper;
     private final FamilyMapper familyMapper;
+    private final com.ihomy.service.access.ViewerScopeResolver viewerScopeResolver;
     private final com.ihomy.service.FileService fileService;
 
     @Operation(summary = "相册列表")
     @GetMapping("/list")
     public Result<List<Map<String, Object>>> list() {
-        SysUser user = securityHelper.currentUser();
-        boolean isGuest = user == null;
-        Long familyId = user == null ? resolveDefaultFamily() : securityHelper.current().getFamilyId();
-        return Result.success(albumService.list(familyId, isGuest));
+        return Result.success(albumService.list(viewerScopeResolver.resolve()));
     }
 
     private Long resolveDefaultFamily() {
@@ -55,7 +53,7 @@ public class AlbumController {
     @GetMapping("/{id}")
     public Result<Map<String, Object>> detail(@PathVariable Long id) {
         return Result.success(albumService.detail(id, securityHelper.currentUser(),
-                securityHelper.currentUser() == null ? null : securityHelper.current().getFamilyId()));
+                viewerScopeResolver.resolve()));
     }
 
     @Operation(summary = "分享令牌查看相册(游客可访问,相册 public 且家庭公开)")

@@ -3292,3 +3292,86 @@ CREATE TABLE IF NOT EXISTS `sys_user_pref` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_user_key` (`user_id`, `pref_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户界面偏好(跨设备同步)';
+
+-- ------------------------------------------------------------
+-- 亲友圈与跨家庭分享(2026-11-13,V12.18):3 张新表 + 家庭策略两列
+--   ① family_circle / family_circle_member:家庭之间的「可分享关系」容器,
+--      入圈不共享内容;公婆圈与岳父母圈默认互不相通。
+--   ② content_audience:分享时把圈展开成逐家庭行,列表只多一个等值条件。
+--   ③ sys_family_info.circle_enabled / share_policy:家庭级开关与外分享策略。
+--   表数 96 → 99;幂等:CREATE TABLE IF NOT EXISTS + information_schema 守卫 + INSERT IGNORE。
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `family_circle` (
+  `id`                BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `name`              VARCHAR(50)  NOT NULL COMMENT '圈名',
+  `cover_image`       VARCHAR(500) DEFAULT NULL COMMENT '封面图片URL',
+  `owner_family_id`   BIGINT       NOT NULL COMMENT '发起家庭(可改圈名/邀请/移除/解散)',
+  `invite_code`       VARCHAR(16)  DEFAULT NULL COMMENT '邀请码',
+  `invite_expires_at` DATETIME     DEFAULT NULL COMMENT '邀请码过期时间',
+  `max_families`      INT          NOT NULL DEFAULT 6 COMMENT '家庭数上限(含发起家庭)',
+  `status`            VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE进行中/CLOSED已解散',
+  `created_by`        BIGINT       DEFAULT NULL COMMENT '创建人用户ID',
+  `created_at`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at`        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted`           TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_invite_code` (`invite_code`),
+  KEY `idx_owner` (`owner_family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='亲友圈(家庭关联)';
+
+CREATE TABLE IF NOT EXISTS `family_circle_member` (
+  `id`                   BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `circle_id`            BIGINT      NOT NULL COMMENT '圈ID',
+  `family_id`            BIGINT      NOT NULL COMMENT '家庭ID',
+  `alias`                VARCHAR(30) DEFAULT NULL COMMENT '圈内称呼(仅本圈可见)',
+  `invited_by_family_id` BIGINT      DEFAULT NULL COMMENT '邀请方家庭ID',
+  `joined_at`            DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '加入时间',
+  `status`               VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' COMMENT 'ACTIVE在圈/LEFT已退出',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_circle_family` (`circle_id`, `family_id`),
+  KEY `idx_family` (`family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='亲友圈-家庭';
+
+CREATE TABLE IF NOT EXISTS `content_audience` (
+  `id`               BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `content_type`     VARCHAR(20) NOT NULL COMMENT '内容类型: photo/album/video/blog/diary/wish/book',
+  `content_id`       BIGINT      NOT NULL COMMENT '内容ID',
+  `owner_family_id`  BIGINT      NOT NULL COMMENT '内容所属家庭ID',
+  `target_type`      VARCHAR(20) NOT NULL DEFAULT 'FAMILY' COMMENT '接收方类型(仅 FAMILY,圈在写入时已展开)',
+  `target_id`        BIGINT      NOT NULL COMMENT '接收家庭ID',
+  `source_circle_id` BIGINT      DEFAULT NULL COMMENT '由哪个圈展开(退出/解散时按此批量收回;NULL=单独给某家)',
+  `granted_by`       BIGINT      DEFAULT NULL COMMENT '分享人用户ID',
+  `created_at`       DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '分享时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_audience` (`content_type`, `content_id`, `target_type`, `target_id`),
+  KEY `idx_target` (`target_type`, `target_id`, `content_type`, `content_id`),
+  KEY `idx_content` (`content_type`, `content_id`),
+  KEY `idx_circle` (`source_circle_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='内容分享受众(展开为逐家庭行)';
+
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sys_family_info' AND COLUMN_NAME = 'circle_enabled');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `sys_family_info` ADD COLUMN `circle_enabled` TINYINT NOT NULL DEFAULT 1 COMMENT ''0=本家庭不参与亲友圈(加入也不生效)'' AFTER `share_token`',
+  'SELECT 1');
+PREPARE add_family_circle_enabled_stmt FROM @sql;
+EXECUTE add_family_circle_enabled_stmt;
+DEALLOCATE PREPARE add_family_circle_enabled_stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sys_family_info' AND COLUMN_NAME = 'share_policy');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `sys_family_info` ADD COLUMN `share_policy` VARCHAR(20) NOT NULL DEFAULT ''SELF_ONLY'' COMMENT ''外分享策略: SELF_ONLY只能分享自己创建的/OWNER_ONLY家长可分享家庭共有内容/OFF禁止外分享'' AFTER `circle_enabled`',
+  'SELECT 1');
+PREPARE add_family_share_policy_stmt FROM @sql;
+EXECUTE add_family_share_policy_stmt;
+DEALLOCATE PREPARE add_family_share_policy_stmt;
+
+INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('circle_status', 'ACTIVE', '正常'),
+('circle_status', 'CLOSED', '已解散'),
+('circle_member_status', 'ACTIVE', '在圈'),
+('circle_member_status', 'LEFT',   '已退出'),
+('share_policy', 'SELF_ONLY',  '只能分享自己创建的'),
+('share_policy', 'OWNER_ONLY', '家长可分享家庭共有内容'),
+('share_policy', 'OFF',        '禁止对外分享');

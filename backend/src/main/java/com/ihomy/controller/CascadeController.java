@@ -25,6 +25,7 @@ public class CascadeController {
 
     private final PhotoMapper photoMapper;
     private final com.ihomy.service.SignedUrlService signedUrlService;
+    private final com.ihomy.service.AudienceService audienceService;
     private final com.ihomy.service.access.ViewerScopeResolver viewerScopeResolver;
     private final com.ihomy.service.access.ContentAccessService contentAccess;
 
@@ -34,8 +35,23 @@ public class CascadeController {
         int capped = Math.min(limit, 200);
         var viewer = viewerScopeResolver.resolve();
         List<Map<String, Object>> photos = photoMapper.selectCascadeByFamily(contentAccess.visibleFilter(viewer), capped);
+        // 别人家分享进来的照片标出来源家庭(一次批量查询,禁逐条回填)
+        Map<Long, Map<String, Object>> sources = Map.of();
+        if (viewer.userId() != null && !photos.isEmpty()) {
+            List<Long> ids = photos.stream()
+                    .map(p -> ((Number) p.get("id")).longValue()).toList();
+            sources = audienceService.sharedSources(com.ihomy.service.access.ContentKind.PHOTO, ids, viewer.familyId());
+        }
         for (Map<String, Object> p : photos) {
             p.put("url", signedUrlService.resolve((String) p.get("url"))); // storage:// → 签名中转
+            Object id = p.get("id");
+            if (id != null) {
+                Map<String, Object> source = sources.get(((Number) id).longValue());
+                if (source != null) {
+                    p.put("sharedFrom", source);
+                    p.put("readOnly", true);
+                }
+            }
         }
         return Result.success(photos);
     }

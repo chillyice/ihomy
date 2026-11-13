@@ -199,6 +199,29 @@ export const familyApi = {
   handleApply: (id, action) => request.put(`/family/apply/${id}`, null, { params: { action } }),
   getWeatherAlertPush: () => request.get('/family/weather-alert-push'),
   setWeatherAlertPush: (enabled) => request.put(`/family/weather-alert-push`, null, { params: { enabled } }),
+  /** 本家庭分享出去的记录(审计/撤回) */
+  shareAudit: (params) => request.get('/family/share-audit', { params }),
+  revokeAllShares: () => request.post('/family/share-audit/revoke-all'),
+}
+
+// 亲友圈:家庭之间的「可分享关系」容器;入圈不共享任何内容
+export const circleApi = {
+  list: () => request.get('/circle/list'),
+  create: (data) => request.post('/circle', data),
+  update: (id, data) => request.put(`/circle/${id}`, data),
+  invite: (id) => request.post(`/circle/${id}/invite`),
+  join: (code) => request.post('/circle/join', { code }),
+  setAlias: (id, alias) => request.put(`/circle/${id}/alias`, { alias }),
+  leave: (id) => request.post(`/circle/${id}/leave`),
+  removeFamily: (id, familyId) => request.delete(`/circle/${id}/family/${familyId}`),
+  disband: (id) => request.delete(`/circle/${id}`),
+}
+
+// 内容分享范围(「给谁看」):照片/相册先接入
+export const audienceApi = {
+  get: (type, id) => request.get(`/${type}/${id}/audience`),
+  save: (type, id, circleIds) => request.put(`/${type}/${id}/audience`, { circleIds }),
+  revoke: (type, id) => request.delete(`/${type}/${id}/audience`),
 }
 
 // 天气 API 配置(和风天气凭证,家长可管理)
