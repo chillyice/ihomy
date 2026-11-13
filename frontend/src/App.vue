@@ -9,6 +9,8 @@
       <template v-else-if="routeReady">
         <SunLightLayer v-if="anyEffectEnabled && !immersive" />
         <MobileLayout />
+        <!-- 手机端空闲屏保(背景/看板):懒加载,触发判定与「点击不穿透」都在组件内 -->
+        <ScreensaverOverlay v-if="userStore.isLoggedIn" />
       </template>
     </template>
 
@@ -89,6 +91,8 @@ const CallOverlay = defineAsyncComponent(() => import('@/components/chat/CallOve
 // 命令面板(Ctrl/⌘+K):懒加载,内部只对精细指针显示,独立页/沉浸页不挂载
 const CommandPalette = defineAsyncComponent(() => import('@/components/CommandPalette.vue'))
 import MobileLayout from '@/layouts/MobileLayout.vue'
+// 手机端空闲屏保:只在手机分支挂载并懒加载,桌面端不下载该 chunk
+const ScreensaverOverlay = defineAsyncComponent(() => import('@/components/screensaver/ScreensaverOverlay.vue'))
 // 应用内更新弹窗:内部 import Capacitor 插件,必须懒加载且只在壳内渲染
 const AppUpdateDialog = defineAsyncComponent(() => import('@/components/AppUpdateDialog.vue'))
 // 壳内判定(静态读一次,不随运行期变化)

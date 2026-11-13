@@ -52,10 +52,11 @@
         </div>
         <div v-show="activeId === 'media'"><MediaSettings /></div>
         <template v-if="activeId === 'storage'"><StorageView /></template>
-        <!-- 外观与显示:光照/主题 + 显示模式 -->
+        <!-- 外观与显示:光照/主题 + 显示模式 + 屏保(仅手机端) -->
         <div v-show="activeId === 'appearance'">
           <div id="settings-light"><LightSettings /></div>
           <div id="settings-display"><ModeSettings /></div>
+          <div v-if="isMobile" id="settings-screensaver"><ScreensaverSettings /></div>
         </div>
         <div v-show="activeId === 'client'"><AppSettings /></div>
       </div>
@@ -80,6 +81,7 @@ import WeatherSettings from './settings/WeatherSettings.vue'
 import MediaSettings from './settings/MediaSettings.vue'
 import LightSettings from './settings/LightSettings.vue'
 import ModeSettings from './settings/ModeSettings.vue'
+import ScreensaverSettings from './settings/ScreensaverSettings.vue'
 import AppSettings from './settings/AppSettings.vue'
 import { isNativeApp } from '@/utils/platform'
 
