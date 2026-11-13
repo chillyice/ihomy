@@ -17,6 +17,8 @@ import com.ihomy.security.LoginUser;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.ItemAiService;
 import com.ihomy.service.ItemService;
+import com.ihomy.service.access.ViewerScope;
+import com.ihomy.service.access.ViewerScopeResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -38,9 +40,14 @@ public class ItemController {
     private final ItemService itemService;
     private final ItemAiService itemAiService;
     private final SecurityHelper securityHelper;
+    private final ViewerScopeResolver viewerScopeResolver;
 
     private LoginUser current() {
         return securityHelper.current();
+    }
+
+    private ViewerScope viewer() {
+        return viewerScopeResolver.resolve();
     }
 
     // ---------- 房子 ----------
@@ -161,7 +168,7 @@ public class ItemController {
                                                        @RequestParam(required = false) Long roomId,
                                                        @RequestParam(required = false) Long furnitureId,
                                                        @RequestParam(required = false) String type) {
-        return Result.success(itemService.itemList(current().getFamilyId(), keyword, roomId, furnitureId, type));
+        return Result.success(itemService.itemList(viewer(), keyword, roomId, furnitureId, type));
     }
 
     @Operation(summary = "新增物品")
@@ -176,7 +183,7 @@ public class ItemController {
     @OperationLog(module = "ITEM", operationType = "UPDATE", description = "编辑物品")
     @PutMapping("/{id}")
     public Result<Void> itemUpdate(@PathVariable Long id, @RequestBody ItemDTO dto) {
-        itemService.itemUpdate(id, current().getFamilyId(), dto);
+        itemService.itemUpdate(id, current().getFamilyId(), dto, viewer());
         return Result.success();
     }
 
@@ -184,7 +191,7 @@ public class ItemController {
     @OperationLog(module = "ITEM", operationType = "DELETE", description = "删除物品")
     @DeleteMapping("/{id}")
     public Result<Void> itemDelete(@PathVariable Long id) {
-        itemService.itemDelete(id, current().getFamilyId());
+        itemService.itemDelete(id, current().getFamilyId(), viewer());
         return Result.success();
     }
 
@@ -192,7 +199,7 @@ public class ItemController {
     @OperationLog(module = "ITEM", operationType = "UPDATE", description = "取出食材")
     @PostMapping("/{id}/take")
     public Result<Void> itemTake(@PathVariable Long id, @RequestBody ItemTakeDTO dto) {
-        itemService.takeItem(id, current().getFamilyId(), dto.getAmount());
+        itemService.takeItem(id, current().getFamilyId(), dto.getAmount(), viewer());
         return Result.success();
     }
 
@@ -200,7 +207,7 @@ public class ItemController {
     @OperationLog(module = "ITEM", operationType = "UPDATE", description = "批量设置物品所属家具")
     @PutMapping("/batch/furniture")
     public Result<Void> itemBatchAssignFurniture(@RequestBody ItemBatchDTO dto) {
-        itemService.itemBatchAssignFurniture(current().getFamilyId(), dto.getIds(), dto.getFurnitureId());
+        itemService.itemBatchAssignFurniture(current().getFamilyId(), dto.getIds(), dto.getFurnitureId(), viewer());
         return Result.success();
     }
 
@@ -210,7 +217,7 @@ public class ItemController {
     @GetMapping("/floor-plan")
     public Result<Map<String, Object>> floorPlan(@RequestParam Long houseId,
                                                  @RequestParam(required = false) Integer floor) {
-        return Result.success(itemService.floorPlan(current().getFamilyId(), houseId, floor));
+        return Result.success(itemService.floorPlan(viewer(), houseId, floor));
     }
 
     @Operation(summary = "保存楼层配置(底图/比例尺)")
@@ -241,7 +248,7 @@ public class ItemController {
     @OperationLog(module = "ITEM", operationType = "UPDATE", description = "保存物品相对坐标")
     @PutMapping("/{id}/place")
     public Result<Void> itemPlace(@PathVariable Long id, @RequestBody ItemDTO dto) {
-        itemService.saveItemPlace(id, current().getFamilyId(), dto);
+        itemService.saveItemPlace(id, current().getFamilyId(), dto, viewer());
         return Result.success();
     }
 
@@ -251,14 +258,13 @@ public class ItemController {
     @OperationLog(module = "ITEM", operationType = "QUERY", description = "AI 找物")
     @PostMapping("/ai/find")
     public Result<Map<String, Object>> aiFind(@RequestBody ItemAiDTO dto) {
-        return Result.success(itemAiService.find(current().getFamilyId(), dto.getQuery()));
+        return Result.success(itemAiService.find(viewer(), dto.getQuery()));
     }
 
     @Operation(summary = "AI 放物(自然语言登记位置)")
     @OperationLog(module = "ITEM", operationType = "CREATE", description = "AI 放物")
     @PostMapping("/ai/put")
     public Result<Map<String, Object>> aiPut(@RequestBody ItemAiDTO dto) {
-        LoginUser u = current();
-        return Result.success(itemAiService.put(u.getUserId(), u.getFamilyId(), dto.getText()));
+        return Result.success(itemAiService.put(viewer(), dto.getText()));
     }
 }

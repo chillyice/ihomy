@@ -202,6 +202,9 @@ export const familyApi = {
   /** 本家庭分享出去的记录(审计/撤回) */
   shareAudit: (params) => request.get('/family/share-audit', { params }),
   revokeAllShares: () => request.post('/family/share-audit/revoke-all'),
+  /** 默认分享目标:选「亲友圈」时预勾选的家庭(家庭级设置) */
+  shareDefaults: () => request.get('/family/share-default'),
+  saveShareDefaults: (targetFamilyIds) => request.put('/family/share-default', { targetFamilyIds }),
 }
 
 // 亲友圈:家庭之间的「可分享关系」容器;入圈不共享任何内容
@@ -217,10 +220,10 @@ export const circleApi = {
   disband: (id) => request.delete(`/circle/${id}`),
 }
 
-// 内容分享范围(「给谁看」):照片/相册先接入
+// 内容分享范围(「给谁看」):传具体接收家庭 id(亲友圈在写入时展开为家庭行)
 export const audienceApi = {
   get: (type, id) => request.get(`/${type}/${id}/audience`),
-  save: (type, id, circleIds) => request.put(`/${type}/${id}/audience`, { circleIds }),
+  save: (type, id, targetFamilyIds) => request.put(`/${type}/${id}/audience`, { targetFamilyIds }),
   revoke: (type, id) => request.delete(`/${type}/${id}/audience`),
 }
 

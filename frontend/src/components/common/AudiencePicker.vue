@@ -1,5 +1,5 @@
 <template>
-  <!-- 分享范围选择器:不选任何圈 = 只给自家人;圈与圈内家庭由调用方传入(纯展示) -->
+  <!-- 分享家庭选择器:不勾任何家庭 = 只给自家人;可选家庭来自家庭设置里的亲友圈 -->
   <div class="audience-picker">
     <div class="ap-label">{{ $t('audience.label') }}</div>
     <div class="ap-family-only" :class="{ active: !modelValue.length }">
@@ -8,25 +8,18 @@
       <span class="ap-note">{{ $t('audience.familyOnlyHint') }}</span>
     </div>
     <el-checkbox-group
-      v-if="circles.length"
-      class="ap-circles"
+      v-if="families.length"
+      class="ap-families"
       :model-value="modelValue"
       :disabled="disabled"
       @update:model-value="onChange"
     >
-      <el-checkbox
-        v-for="c in circles"
-        :key="c.id"
-        :value="c.id"
-        :disabled="disabled || (!modelValue.includes(c.id) && modelValue.length >= 3)"
-        border
-      >
-        <span class="ap-circle-name">{{ c.name }}</span>
-        <span v-if="familyNames(c)" class="ap-families">{{ familyNames(c) }}</span>
+      <el-checkbox v-for="f in families" :key="f.familyId" :value="f.familyId" :disabled="disabled" border>
+        <span class="ap-family-name">{{ f.alias || f.familyName }}</span>
+        <span v-if="circleLabel(f)" class="ap-circle">{{ circleLabel(f) }}</span>
       </el-checkbox>
     </el-checkbox-group>
-    <p class="ap-hint">{{ circles.length ? $t('audience.circleHint') : $t('audience.noCircle') }}</p>
-    <p v-if="circles.length && modelValue.length >= 3" class="ap-hint">{{ $t('audience.maxCircles') }}</p>
+    <p class="ap-hint">{{ families.length ? $t('audience.circleHint') : $t('audience.noCircle') }}</p>
   </div>
 </template>
 
@@ -34,10 +27,10 @@
 import { Lock } from '@element-plus/icons-vue'
 
 defineProps({
-  /** 选中的亲友圈 id 列表;空数组 = 只给自家人 */
+  /** 选中的接收家庭 id 列表;空数组 = 只给自家人 */
   modelValue: { type: Array, default: () => [] },
-  /** [{ id, name, families: [{ familyName, alias }] }] */
-  circles: { type: Array, default: () => [] },
+  /** [{ familyId, familyName, alias, circleName }] */
+  families: { type: Array, default: () => [] },
   disabled: { type: Boolean, default: false },
 })
 
@@ -47,10 +40,10 @@ function onChange(value) {
   emit('update:modelValue', value)
 }
 
-// 圈内其他家庭:优先圈内称呼,没有就用家庭名;只做一行摘要,不暴露成员
-function familyNames(circle) {
-  const list = (circle.families || []).map((f) => f.alias || f.familyName).filter(Boolean)
-  return list.join('、')
+// 家庭名可能与圈名重复,只在有圈名时做小字补充,不暴露成员
+function circleLabel(family) {
+  const name = family.alias ? family.familyName : null
+  return [name, family.circleName].filter(Boolean).join(' · ')
 }
 </script>
 
@@ -82,32 +75,31 @@ function familyNames(circle) {
   font-size: 12px;
   color: var(--color-text-secondary);
 }
-.ap-circles {
+.ap-families {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 10px;
 }
-.ap-circles :deep(.el-checkbox) {
+.ap-families :deep(.el-checkbox) {
   margin-right: 0;
   height: auto;
-  padding: 8px 12px;
+  padding: 7px 12px;
   border-radius: 10px;
-  align-items: flex-start;
 }
-.ap-circles :deep(.el-checkbox__label) {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.ap-families :deep(.el-checkbox__label) {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
   white-space: normal;
   line-height: 1.4;
   padding-left: 8px;
 }
-.ap-circle-name {
+.ap-family-name {
   font-size: 13.5px;
   color: var(--color-text);
 }
-.ap-families {
+.ap-circle {
   font-size: 12px;
   color: var(--color-text-secondary);
 }

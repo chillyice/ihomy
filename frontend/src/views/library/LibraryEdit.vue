@@ -59,8 +59,8 @@
         <el-form-item :label="$t('library.visibility')">
           <VisibilityPicker v-model="form.visibility" :options="visibilityOptions" />
         </el-form-item>
-        <div v-if="form.visibility !== 'PRIVATE'" class="editor-audience">
-          <AudiencePicker v-if="audience.canShare" v-model="audience.selected" :circles="audience.circles" />
+        <div v-if="needsAudience(form.visibility)" class="editor-audience">
+          <AudiencePicker v-if="audience.canShare" v-model="audience.selected" :families="audience.families" />
           <p v-else class="audience-tip">{{ $t('audience.canShareFalse') }}</p>
         </div>
         <div class="form-footer">
@@ -105,6 +105,7 @@ import { ElMessage } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
 import AudiencePicker from '@/components/common/AudiencePicker.vue'
+import { visibilityOptions as buildVisibilityOptions, needsAudience } from '@/utils/visibility'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -128,11 +129,8 @@ const form = reactive({
   status: 'PUBLISHED',
   visibility: 'FAMILY',
 })
-// 可见范围选项(共用选择器,文案随书架命名空间)
-const visibilityOptions = computed(() => [
-  { value: 'PRIVATE', label: t('library.onlySelf') },
-  { value: 'FAMILY', label: t('library.familyVisible') },
-])
+// 可见范围四档(共用选择器与文案,顺序:公开 > 亲友圈 > 家庭 > 私密)
+const visibilityOptions = computed(() => buildVisibilityOptions(t))
 const categories = ref([])
 const showCategoryDialog = ref(false)
 const newCategoryName = ref('')
@@ -224,7 +222,7 @@ const onSave = async () => {
   if (!form.fileUrl) return ElMessage.warning(t('library.inputFile'))
   loading.value = true
   try {
-    const picked = audience.loaded && audience.canShare && form.visibility !== 'PRIVATE' ? [...audience.selected] : null
+    const picked = audience.loaded && audience.canShare ? (needsAudience(form.visibility) ? [...audience.selected] : []) : null
     let bookId = isEdit.value ? route.params.id : null
     if (isEdit.value) await libraryApi.update(route.params.id, form)
     else {
@@ -264,7 +262,7 @@ onMounted(async () => {
     })
   }
   loadCategories()
-  loadAudience(isEdit.value ? route.params.id : null)
+  loadAudience(isEdit.value ? route.params.id : null, 'book', { applyDefaults: !isEdit.value })
 })
 </script>
 

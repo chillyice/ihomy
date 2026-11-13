@@ -16,6 +16,7 @@ import com.ihomy.mapper.AlbumMapper;
 import com.ihomy.mapper.FamilyMapper;
 import com.ihomy.mapper.PhotoMapper;
 import com.ihomy.mapper.StorageDeviceMapper;
+import com.ihomy.service.access.ContentAccessService;
 import com.ihomy.service.access.ContentKind;
 import com.ihomy.service.access.ViewerScope;
 import lombok.RequiredArgsConstructor;
@@ -61,6 +62,7 @@ public class AlbumService {
     private final AlbumMapService albumMapService;
     private final ThumbnailService thumbnailService;
     private final com.ihomy.service.AudienceService audienceService;
+    private final ContentAccessService contentAccess;
 
     /** 相册列表(全部层级):游客只返回 public;含来源设备名/映射状态/子相册数/子树照片合计。
      *  登录用户额外混入「别人家分享给我家」的相册(带 sharedFrom 角标信息)。 */
@@ -71,17 +73,16 @@ public class AlbumService {
         LambdaQueryWrapper<Album> qw = new LambdaQueryWrapper<>();
         Map<Long, Map<String, Object>> sharedSources = Map.of();
         if (viewer.guest()) {
+            // 游客只看演示家庭的公开相册(不能跨家庭取 PUBLIC)
             qw.eq(Album::getFamilyId, familyId);
-            qw.eq(Album::getType, "public");
+            qw.eq(Album::getVisibility, DictConst.VIS_PUBLIC);
         } else {
             List<Long> sharedIds = audienceService.sharedIds(ContentKind.ALBUM, familyId);
-            if (sharedIds.isEmpty()) {
-                qw.eq(Album::getFamilyId, familyId);
-            } else {
+            if (!sharedIds.isEmpty()) {
                 sharedSources = audienceService.sharedSources(ContentKind.ALBUM, sharedIds, familyId);
-                List<Long> shared = sharedIds;
-                qw.and(w -> w.eq(Album::getFamilyId, familyId).or().in(Album::getId, shared));
             }
+            contentAccess.applyVisible(qw, ContentKind.ALBUM, viewer,
+                    Album::getFamilyId, Album::getCreatedBy, Album::getVisibility, Album::getId);
         }
         qw.orderByDesc(Album::getId);
         List<Album> albums = albumMapper.selectList(qw);
@@ -99,6 +100,7 @@ public class AlbumService {
             m.put("id", a.getId());
             m.put("name", a.getName());
             m.put("type", a.getType());
+            m.put("visibility", albumVisibility(a));
             m.put("coverPhotoUrl", a.getCoverPhotoUrl());
             m.put("cover", signedUrlService.resolve(resolveCover(a)));
             m.put("photoCount", photoCounts.getOrDefault(a.getId(), 0L));
@@ -134,12 +136,15 @@ public class AlbumService {
         if (a == null) throw new BizException(ResultCode.NOT_FOUND);
         boolean shared = false;
         if (user == null) {
-            if (!"public".equals(a.getType())) throw new BizException(ResultCode.FORBIDDEN);
+            if (!DictConst.VIS_PUBLIC.equals(albumVisibility(a))) throw new BizException(ResultCode.FORBIDDEN);
             Family def = familyMapper.selectDefault();
             if (def == null || !def.getId().equals(a.getFamilyId())) throw new BizException(ResultCode.FORBIDDEN);
         } else if (!a.getFamilyId().equals(viewer.familyId())) {
             shared = viewer.familyId() != null && audienceService.sharedTo(ContentKind.ALBUM, albumId, viewer.familyId());
             if (!shared) throw new BizException(ResultCode.NOT_FOUND);
+        } else if (!contentAccess.canView(ContentKind.ALBUM, a.getFamilyId(), a.getCreatedBy(),
+                albumVisibility(a), viewer)) {
+            throw new BizException(ResultCode.NOT_FOUND);
         }
 
         LambdaQueryWrapper<Photo> qw = new LambdaQueryWrapper<>();
@@ -208,11 +213,13 @@ public class AlbumService {
         return data;
     }
 
-    /** 新建相册,归属当前用户所在家庭,默认 public 类型;生成 16 位混淆分享令牌 */
+    /** 新建相册,归属当前用户所在家庭;生成 16 位混淆分享令牌 */
     public Album create(SysUser user, Long currentFamilyId, AlbumDTO dto) {
         Album a = new Album();
         a.setName(dto.getName());
-        a.setType(dto.getType() == null || dto.getType().isBlank() ? "public" : dto.getType());
+        String type = dto.getType() == null || dto.getType().isBlank() ? "public" : dto.getType();
+        a.setType(type);
+        a.setVisibility(resolveAlbumVisibility(dto.getVisibility(), type));
         a.setShareToken(java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 16));
         a.setFamilyId(currentFamilyId);
         a.setCreatedBy(user.getId());
@@ -223,7 +230,7 @@ public class AlbumService {
     /** 游客凭分享令牌查看公开相册:相册 public 且所属家庭已公开(is_public=1),否则 404 不泄露存在性 */
     public Map<String, Object> shared(String token) {
         Album a = albumMapper.selectOne(new LambdaQueryWrapper<Album>().eq(Album::getShareToken, token));
-        if (a == null || !"public".equals(a.getType())) throw new BizException(ResultCode.NOT_FOUND);
+        if (a == null || !DictConst.VIS_PUBLIC.equals(albumVisibility(a))) throw new BizException(ResultCode.NOT_FOUND);
         Family family = familyMapper.selectById(a.getFamilyId());
         if (family == null || family.getIsPublic() == null || family.getIsPublic() != 1) {
             throw new BizException(ResultCode.NOT_FOUND);
@@ -249,6 +256,7 @@ public class AlbumService {
         album.put("id", a.getId());
         album.put("name", a.getName());
         album.put("type", a.getType());
+        album.put("visibility", albumVisibility(a));
         album.put("shareToken", a.getShareToken());
         album.put("createdAt", a.getCreatedAt());
 
@@ -263,6 +271,11 @@ public class AlbumService {
         Album a = requireOwn(id, user, isOwner);
         a.setName(dto.getName());
         if (dto.getType() != null && !dto.getType().isBlank()) a.setType(dto.getType());
+        if (dto.getVisibility() != null && !dto.getVisibility().isBlank()) {
+            a.setVisibility(resolveAlbumVisibility(dto.getVisibility(), a.getType()));
+            // type 同步成旧口径,老客户端与游客分享链接判定不受影响
+            a.setType(DictConst.VIS_PRIVATE.equals(a.getVisibility()) ? "private" : "public");
+        }
         albumMapper.updateById(a);
         return a;
     }
@@ -290,7 +303,7 @@ public class AlbumService {
         photoMapper.softDeleteByAlbumIds(ids);
     }
 
-    /** 添加照片:可见性随相册类型(public→PUBLIC,private→FAMILY);首张自动成为相册封面 */
+    /** 添加照片:可见性随相册(公开→PUBLIC,亲友圈→CIRCLE,其余→FAMILY);首张自动成为相册封面 */
     @Transactional
     public Photo addPhoto(Long albumId, SysUser user, Long currentFamilyId, String url, String description, String liveVideoUrl) {
         Album a = albumMapper.selectById(albumId);
@@ -304,7 +317,7 @@ public class AlbumService {
         p.setLiveVideoUrl(liveVideoUrl);
         p.setAuthorId(user.getId());
         p.setFamilyId(a.getFamilyId());
-        p.setVisibility("public".equals(a.getType()) ? DictConst.VIS_PUBLIC : DictConst.VIS_FAMILY);
+        p.setVisibility(photoVisibilityFor(albumVisibility(a)));
         photoMapper.insert(p);
 
         if (a.getCoverPhotoUrl() == null || a.getCoverPhotoUrl().isBlank()) {
@@ -481,6 +494,26 @@ public class AlbumService {
         qw.eq(Photo::getAlbumId, a.getId()).orderByDesc(Photo::getCreatedAt).last("LIMIT 1");
         Photo p = photoMapper.selectOne(qw);
         return p == null ? null : p.getUrl();
+    }
+
+    /** 相册可见范围:新列优先,老数据按 type 推导(public→PUBLIC, private→PRIVATE) */
+    private String albumVisibility(Album a) {
+        if (a.getVisibility() != null && !a.getVisibility().isBlank()) return a.getVisibility();
+        return "private".equals(a.getType()) ? DictConst.VIS_PRIVATE : DictConst.VIS_PUBLIC;
+    }
+
+    /** 提交值优先;没给就按 type 推导,保证老客户端行为不变 */
+    private String resolveAlbumVisibility(String raw, String type) {
+        if (raw != null && !raw.isBlank()) return DictConst.visibility(raw);
+        return "private".equals(type) ? DictConst.VIS_PRIVATE : DictConst.VIS_PUBLIC;
+    }
+
+    /** 相册内新照片的可见范围:与相册同档(私密相册的照片也标私密,避免被家庭相册流看到) */
+    private String photoVisibilityFor(String albumVisibility) {
+        if (DictConst.VIS_PUBLIC.equals(albumVisibility)) return DictConst.VIS_PUBLIC;
+        if (DictConst.VIS_CIRCLE.equals(albumVisibility)) return DictConst.VIS_CIRCLE;
+        if (DictConst.VIS_PRIVATE.equals(albumVisibility)) return DictConst.VIS_PRIVATE;
+        return DictConst.VIS_FAMILY;
     }
 
     /** 校验相册归属:存在、属于当前家庭,且是创建者(或家长),否则 404/403。

@@ -42,6 +42,7 @@ public class GameInfoController {
 
     private final GameInfoService gameService;
     private final SecurityHelper securityHelper;
+    private final com.ihomy.service.access.ViewerScopeResolver viewerScopeResolver;
 
     private LoginUser current() {
         return securityHelper.current();
@@ -50,14 +51,13 @@ public class GameInfoController {
     @Operation(summary = "游戏列表")
     @GetMapping
     public Result<List<GameInfo>> list() {
-        LoginUser user = current();
-        return Result.success(gameService.list(user.getFamilyId()));
+        return Result.success(gameService.list(viewerScopeResolver.resolve()));
     }
 
     @Operation(summary = "游戏详情")
     @GetMapping("/{id}")
     public Result<GameInfo> get(@PathVariable Long id) {
-        return Result.success(gameService.get(current().getFamilyId(), id));
+        return Result.success(gameService.get(viewerScopeResolver.resolve(), id));
     }
 
     @Operation(summary = "导入游戏")
@@ -67,10 +67,11 @@ public class GameInfoController {
                                        @RequestParam("name") String name,
                                        @RequestParam(value = "description", required = false) String description,
                                        @RequestParam(value = "category", required = false) String category,
-                                       @RequestParam(value = "series", required = false) String series) {
+                                       @RequestParam(value = "series", required = false) String series,
+                                       @RequestParam(value = "visibility", required = false) String visibility) {
         LoginUser user = current();
         return Result.success(gameService.importGame(user.getUserId(), user.getFamilyId(), file, name, description,
-                category, series));
+                category, series, visibility));
     }
 
     @Operation(summary = "添加网页游戏")

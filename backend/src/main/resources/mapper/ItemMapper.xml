@@ -2,12 +2,35 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ihomy.mapper.ItemMapper">
 
+    <!-- 物品可见性条件(单点判定在 ContentAccessService.visibleFilter,这里只机械套用):
+         all=true(家长)=本家庭全部;否则 家庭 + (本人创建的 OR 可见档位);
+         shared=true 时并上「别人家分享给我家」的物品(亲友圈档)。 -->
+    <sql id="itemVisible">
+        AND (
+            i.family_id = #{visible.familyId}
+            <if test="!visible.all">
+                AND (i.created_by = #{visible.authorId}
+                <if test="visible.visibilities != null and visible.visibilities.size() > 0">
+                     OR i.visibility IN
+                     <foreach item="v" collection="visible.visibilities" open="(" separator="," close=")">#{v}</foreach>
+                </if>
+                )
+            </if>
+            <if test="visible.shared">
+                OR EXISTS (SELECT 1 FROM content_audience ca
+                            WHERE ca.content_type = 'item' AND ca.content_id = i.id
+                              AND ca.target_type = 'FAMILY' AND ca.target_id = #{visible.familyId})
+            </if>
+        )
+    </sql>
+
     <select id="selectItemByFamily" resultType="map">
         SELECT i.id, i.family_id, i.name,
                IFNULL(i.aliases,'')   AS aliases,
                IFNULL(i.position,'')  AS position,
                IFNULL(i.image_url,'') AS image_url,
                IFNULL(i.type,'OTHER') AS type,
+               IFNULL(i.visibility,'FAMILY') AS visibility,
                i.quantity,
                IFNULL(i.unit,'')      AS unit,
                IFNULL(i.note,'')      AS note,
@@ -31,7 +54,15 @@
                  LEFT JOIN family_house h ON r.house_id = h.id
                  LEFT JOIN family_room ir ON i.room_id = ir.id
                  LEFT JOIN family_house ih ON ir.house_id = ih.id
-        WHERE i.family_id = #{familyId}
+        WHERE 1 = 1
+        <choose>
+            <when test="visible != null">
+                <include refid="itemVisible"/>
+            </when>
+            <otherwise>
+                AND i.family_id = #{familyId}
+            </otherwise>
+        </choose>
         <if test="type != null and type != ''">
             AND i.type = #{type}
         </if>

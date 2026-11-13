@@ -7,6 +7,8 @@ import com.ihomy.entity.Room;
 import com.ihomy.mapper.FurnitureMapper;
 import com.ihomy.mapper.ItemMapper;
 import com.ihomy.mapper.RoomMapper;
+import com.ihomy.service.access.ContentAccessService;
+import com.ihomy.service.access.ViewerScope;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -45,6 +47,7 @@ public class ItemLocalParser {
     private final RoomMapper roomMapper;
     private final FurnitureMapper furnitureMapper;
     private final SynonymService synonymService;
+    private final ContentAccessService contentAccess;
 
     /** 放物解析结果(供 ItemAiService 执行落库;aliases/quantity/unit 本地规则不强求) */
     public record PutPlan(String name, String aliases, String type, String position,
@@ -54,12 +57,13 @@ public class ItemLocalParser {
     // ---------- 找物 ----------
 
     /** 闭集反向匹配:家庭物品行(name/aliases/position/room/furniture/house)逐候选词查是否为 query 子串,命中打分排序 */
-    public List<Map<String, Object>> findLocal(Long familyId, String query) {
+    public List<Map<String, Object>> findLocal(ViewerScope viewer, String query) {
         String q = query == null ? "" : query.trim();
         if (q.isEmpty()) return List.of();
         // 同义词变体:原文 + 把 query 中命中的别名替换为组内其它成员,任一叫法都能命中同一条
         List<String> variants = synonymService.expand(q);
-        return itemMapper.selectItemByFamily(familyId, null, null, null, null).stream()
+        return itemMapper.selectItemByFamily(viewer.familyId(), null, null, null, null,
+                        contentAccess.visibleFilter(viewer)).stream()
                 .map(row -> Map.entry(maxScore(row, variants), row))
                 .filter(e -> e.getKey() > 0)
                 .sorted((a, b) -> b.getKey() - a.getKey())

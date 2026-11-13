@@ -43,6 +43,12 @@
       <el-form-item :label="$t('item.note')">
         <el-input v-model="form.note" type="textarea" :rows="2" />
       </el-form-item>
+      <el-form-item :label="$t('visibility.label')">
+        <VisibilityPicker v-model="form.visibility" :options="visibilityOptions" />
+      </el-form-item>
+      <el-form-item v-if="needsAudience(form.visibility)" :label="$t('audience.label')">
+        <AudiencePicker v-if="audience.canShare" v-model="audience.selected" :families="audience.families" />
+      </el-form-item>
     </el-form>
     <template #footer>
       <el-button @click="visible = false">{{ $t('common.cancel') }}</el-button>
@@ -52,12 +58,16 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
-import { itemApi, fileApi } from '@/api'
+import { audienceApi, itemApi, fileApi } from '@/api'
 import { useI18n } from 'vue-i18n'
 import { dictText } from '@/utils/dict'
+import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
+import AudiencePicker from '@/components/common/AudiencePicker.vue'
+import { visibilityOptions as buildVisibilityOptions, needsAudience } from '@/utils/visibility'
+import { useAudience } from '@/composables/useAudience'
 
 const props = defineProps({
   houses: { type: Array, default: () => [] },
@@ -71,12 +81,17 @@ const { t } = useI18n()
 const visible = ref(false)
 const form = ref({})
 
+const visibilityOptions = computed(() => buildVisibilityOptions(t))
+const { state: audience, load: loadAudience } = useAudience('item')
+
 const roomsOf = (houseId) => props.rooms.filter((r) => r.houseId === houseId || r.houseId === Number(houseId))
 const furnOf = (roomId) => props.furnitures.filter((f) => f.roomId === roomId || f.roomId === Number(roomId))
 
 const open = (f) => {
-  form.value = f
+  form.value = { ...f, visibility: f.visibility || 'FAMILY' }
   visible.value = true
+  // 新建套家庭默认分享家庭;编辑读该物品已有的分享家庭
+  loadAudience(f.id ?? null, 'item', { applyDefaults: !f.id })
 }
 const uploadItemImage = async (file) => {
   try {
@@ -103,9 +118,20 @@ const save = async () => {
     shelfLifeUnit: form.value.shelfLifeUnit || null,
     relX: form.value.furnitureId ? 0.5 : null,
     relY: form.value.furnitureId ? 0.5 : null,
+    visibility: form.value.visibility,
   }
-  if (form.value.id) await itemApi.update(form.value.id, body)
-  else await itemApi.create(body)
+  const saved = form.value.id ? await itemApi.update(form.value.id, body) : await itemApi.create(body)
+  // 亲友圈保存勾选的家庭;其余档位清空受众(取消分享)
+  const itemId = form.value.id || saved?.id
+  const picked = audience.loaded && audience.canShare ? (needsAudience(form.value.visibility) ? [...audience.selected] : []) : null
+  if (itemId && picked !== null) {
+    try {
+      const res = await audienceApi.save('item', itemId, picked)
+      if (picked.length && res?.targetCount === 0) ElMessage.info(t('audience.noTarget'))
+    } catch {
+      ElMessage.warning(t('audience.saveFailed'))
+    }
+  }
   ElMessage.success(t('common.success'))
   visible.value = false
   emit('saved')

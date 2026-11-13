@@ -112,6 +112,7 @@
               <el-icon><Collection /></el-icon>{{ g.series }}
             </div>
             <div class="tool-type-tag">{{ typeText(g) }}</div>
+            <div v-if="g.visibility && g.visibility !== 'FAMILY'" class="tool-type-tag vis-tag">{{ visibilityLabel(t, g.visibility) }}</div>
           </div>
           <span class="tool-enter">
             {{ g.type === 'LINK' ? $t('games.open') : $t('games.play') }}<el-icon><ArrowRight /></el-icon
@@ -174,6 +175,12 @@
         <el-form-item :label="$t('games.desc')">
           <el-input v-model="importForm.description" type="textarea" :rows="2" maxlength="500" :placeholder="$t('games.descPlaceholder')" />
         </el-form-item>
+        <el-form-item :label="$t('visibility.label')">
+          <VisibilityPicker v-model="importForm.visibility" :options="visibilityOptions" />
+        </el-form-item>
+        <div v-if="needsAudience(importForm.visibility)" class="editor-audience">
+          <AudiencePicker v-if="importAudience.canShare" v-model="importAudience.selected" :families="importAudience.families" />
+        </div>
       </el-form>
       <template #footer>
         <el-button size="small" @click="importVisible = false">{{ $t('games.cancel') }}</el-button>
@@ -211,6 +218,12 @@
         <el-form-item :label="$t('games.desc')">
           <el-input v-model="editForm.description" type="textarea" :rows="2" maxlength="500" :placeholder="$t('games.descPlaceholder')" />
         </el-form-item>
+        <el-form-item :label="$t('visibility.label')">
+          <VisibilityPicker v-model="editForm.visibility" :options="visibilityOptions" />
+        </el-form-item>
+        <div v-if="needsAudience(editForm.visibility)" class="editor-audience">
+          <AudiencePicker v-if="editAudience.canShare" v-model="editAudience.selected" :families="editAudience.families" />
+        </div>
       </el-form>
       <template #footer>
         <el-button size="small" @click="editVisible = false">{{ $t('games.cancel') }}</el-button>
@@ -253,8 +266,12 @@ import {
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import AddToWishDialog from '@/components/wish/AddToWishDialog.vue'
-import { gameApi, roomApi } from '@/api'
+import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
+import AudiencePicker from '@/components/common/AudiencePicker.vue'
+import { audienceApi, gameApi, roomApi } from '@/api'
 import { dictText } from '@/utils/dict'
+import { visibilityOptions as buildVisibilityOptions, visibilityLabel, needsAudience } from '@/utils/visibility'
+import { useAudience } from '@/composables/useAudience'
 import { useUserStore } from '@/stores/user'
 import { GAME_CATEGORIES, countGameCategories, inGameCategory, normalizeGameCategory } from '@/utils/games/gameCategory'
 import { importAccept, typeForFile, typeLabel } from '@/utils/games/emulatorSystems'
@@ -461,12 +478,29 @@ const quickCreateRoom = async (b) => {
 const importVisible = ref(false)
 const importing = ref(false)
 const importMode = ref('file')
-const importForm = reactive({ file: null, url: '', name: '', description: '', category: 'OTHER', series: '' })
+const importForm = reactive({ file: null, url: '', name: '', description: '', category: 'OTHER', series: '', visibility: 'FAMILY' })
 
 const editVisible = ref(false)
 const saving = ref(false)
 const editGameType = ref('')
-const editForm = reactive({ id: null, name: '', description: '', linkUrl: '', category: 'OTHER', series: '' })
+const editForm = reactive({ id: null, name: '', description: '', linkUrl: '', category: 'OTHER', series: '', visibility: 'FAMILY' })
+
+const visibilityOptions = computed(() => buildVisibilityOptions(t))
+const { state: importAudience, load: loadImportAudience } = useAudience('game')
+const { state: editAudience, load: loadEditAudience } = useAudience('game')
+
+/** 保存游戏后同步分享家庭:非「亲友圈」档位清空受众(取消对外分享) */
+const saveAudience = async (id, visibility, state) => {
+  if (!id) return
+  const picked = state.loaded && state.canShare ? (needsAudience(visibility) ? [...state.selected] : []) : null
+  if (picked === null) return
+  try {
+    const res = await audienceApi.save('game', id, picked)
+    if (picked.length && res?.targetCount === 0) ElMessage.info(t('audience.noTarget'))
+  } catch {
+    ElMessage.warning(t('audience.saveFailed'))
+  }
+}
 
 const load = async () => {
   loading.value = true
@@ -516,7 +550,9 @@ const openImport = () => {
   importForm.description = ''
   importForm.category = 'OTHER'
   importForm.series = ''
+  importForm.visibility = 'FAMILY'
   importVisible.value = true
+  loadImportAudience(null, 'game', { applyDefaults: true })
 }
 
 /** 网址前置粗校验:必须像 http(s) 绝对地址(带 scheme 或至少有域名点分),严格校验交给后端 */
@@ -549,13 +585,15 @@ const submitImport = async () => {
     }
     importing.value = true
     try {
-      await gameApi.addLink({
+      const created = await gameApi.addLink({
         name: importForm.name.trim(),
         url,
         description: importForm.description.trim(),
         category: importForm.category,
         series: normalizeGameSeries(importForm.series),
+        visibility: importForm.visibility,
       })
+      await saveAudience(created?.id, importForm.visibility, importAudience)
       ElMessage.success(t('games.linkImported'))
       importVisible.value = false
       load()
@@ -584,7 +622,9 @@ const submitImport = async () => {
     fd.append('description', importForm.description.trim())
     fd.append('category', importForm.category)
     fd.append('series', normalizeGameSeries(importForm.series))
-    await gameApi.import(fd)
+    fd.append('visibility', importForm.visibility)
+    const created = await gameApi.import(fd)
+    await saveAudience(created?.id, importForm.visibility, importAudience)
     ElMessage.success(t('games.imported'))
     importVisible.value = false
     load()
@@ -601,7 +641,9 @@ const openEdit = (g) => {
   editForm.linkUrl = g.linkUrl || ''
   editForm.category = normalizeGameCategory(g.category)
   editForm.series = normalizeGameSeries(g.series)
+  editForm.visibility = g.visibility || 'FAMILY'
   editVisible.value = true
+  loadEditAudience(g.id, 'game')
 }
 
 const submitEdit = async () => {
@@ -616,9 +658,11 @@ const submitEdit = async () => {
       description: editForm.description.trim(),
       category: editForm.category,
       series: normalizeGameSeries(editForm.series),
+      visibility: editForm.visibility,
     }
     if (editGameType.value === 'LINK') data.linkUrl = editForm.linkUrl.trim()
     await gameApi.update(editForm.id, data)
+    await saveAudience(editForm.id, editForm.visibility, editAudience)
     ElMessage.success(t('games.saved'))
     editVisible.value = false
     load()
@@ -772,6 +816,13 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.tool-type-tag.vis-tag {
+  background: rgba(var(--color-brand-rgb), 0.1);
+  color: var(--color-brand);
+}
+.editor-audience {
+  margin: 4px 0 14px;
 }
 .tool-enter {
   display: inline-flex;

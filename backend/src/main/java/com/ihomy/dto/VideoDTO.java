@@ -37,4 +37,6 @@ public class VideoDTO {
     private String poster;
     @Size(max = 500, message = "视频地址过长")
     private String videoUrl;
+    @Size(max = 20, message = "可见范围取值不正确")
+    private String visibility;
 }

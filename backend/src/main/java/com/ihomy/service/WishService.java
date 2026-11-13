@@ -66,6 +66,7 @@ public class WishService {
             map.put("achievedAt", w.getAchievedAt());
             map.put("createdAt", w.getCreatedAt());
             map.put("familyId", w.getFamilyId());
+            map.put("visibility", w.getVisibility());
             if (shared.containsKey(w.getId())) {
                 map.put("readOnly", true);
                 map.put("sharedFrom", shared.get(w.getId()));
@@ -89,7 +90,7 @@ public class WishService {
         wish.setSourceTitle(blankToNull(dto.getSourceTitle()));
         wish.setStatus(DictConst.wishStatus(dto.getStatus()));
         wish.setRequesterId(userId);
-        wish.setVisibility(DictConst.VIS_FAMILY);
+        wish.setVisibility(DictConst.visibility(dto.getVisibility()));
         apply(wish); // 新建即带已实现状态时记录达成时间
         wishMapper.insert(wish);
         return wish;
@@ -105,6 +106,7 @@ public class WishService {
         if (dto.getSourceType() != null) wish.setSourceType(requireSourceType(dto.getSourceType()));
         if (dto.getSourceId() != null) wish.setSourceId(blankToNull(dto.getSourceId()));
         if (dto.getSourceTitle() != null) wish.setSourceTitle(blankToNull(dto.getSourceTitle()));
+        if (dto.getVisibility() != null && !dto.getVisibility().isBlank()) wish.setVisibility(DictConst.visibility(dto.getVisibility()));
         apply(wish);
         wishMapper.updateById(wish);
     }

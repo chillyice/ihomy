@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.ihomy.common.BizException;
+import com.ihomy.common.DictConst;
 import com.ihomy.common.HttpUrlUtil;
 import com.ihomy.common.ResultCode;
 import com.ihomy.common.ThirdPartyHttp;
@@ -17,6 +18,7 @@ import com.ihomy.entity.IotDevice;
 import com.ihomy.mapper.IotConfigMapper;
 import com.ihomy.mapper.IotDataMapper;
 import com.ihomy.mapper.IotDeviceMapper;
+import com.ihomy.service.access.ViewerScope;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -199,34 +201,56 @@ public class HomeAssistantService {
 
     // ==================== 设备 ====================
 
-    public List<Map<String, Object>> devices(Long familyId) {
+    /** 设备列表:PRIVATE 档只有家长看得到(设备无作者,不按成员细分) */
+    public List<Map<String, Object>> devices(ViewerScope viewer) {
+        Long familyId = viewer.familyId();
         if (familyId == null) return List.of();
-        return deviceMapper.selectList(new LambdaQueryWrapper<IotDevice>()
-                        .eq(IotDevice::getFamilyId, familyId)
-                        .orderByAsc(IotDevice::getRoom, IotDevice::getName))
-                .stream().map(this::view).toList();
+        LambdaQueryWrapper<IotDevice> qw = new LambdaQueryWrapper<IotDevice>()
+                .eq(IotDevice::getFamilyId, familyId)
+                .orderByAsc(IotDevice::getRoom, IotDevice::getName);
+        if (!viewer.owner()) {
+            qw.and(w -> w.isNull(IotDevice::getVisibility).or().eq(IotDevice::getVisibility, DictConst.VIS_FAMILY));
+        }
+        return deviceMapper.selectList(qw).stream().map(this::view).toList();
     }
 
-    public Map<String, Object> updateDevice(Long familyId, Long deviceId, IotDeviceDTO dto) {
-        IotDevice d = requireDevice(familyId, deviceId, null);
+    public Map<String, Object> updateDevice(ViewerScope viewer, Long deviceId, IotDeviceDTO dto) {
+        IotDevice d = requireDevice(viewer, deviceId, null);
         String name = notBlank(dto.getName()) ? truncate(dto.getName().trim(), MAX_NAME) : d.getName();
         String room = dto.getRoom() == null ? d.getRoom()
                 : (dto.getRoom().trim().isEmpty() ? null : truncate(dto.getRoom().trim(), 50));
         int enabled = dto.getEnabled() == null ? (d.getEnabled() == null ? 1 : d.getEnabled())
                 : (dto.getEnabled() ? 1 : 0);
-        deviceMapper.update(null, new LambdaUpdateWrapper<IotDevice>()
+        LambdaUpdateWrapper<IotDevice> updater = new LambdaUpdateWrapper<IotDevice>()
                 .eq(IotDevice::getId, d.getId())
                 .set(IotDevice::getName, name)
                 .set(IotDevice::getRoom, room)
-                .set(IotDevice::getEnabled, enabled));
+                .set(IotDevice::getEnabled, enabled);
+        if (dto.getVisibility() != null && !dto.getVisibility().isBlank()) {
+            // 设备不跨家庭,也不按成员区分可见对象:只允许「仅家长」与「家庭成员」两档
+            if (!viewer.owner()) throw new BizException(ResultCode.FORBIDDEN, "只有家长可以调整设备可见范围");
+            updater.set(IotDevice::getVisibility, deviceVisibility(dto.getVisibility()));
+        }
+        deviceMapper.update(null, updater);
         d.setName(name);
         d.setRoom(room);
         d.setEnabled(enabled);
+        if (dto.getVisibility() != null && !dto.getVisibility().isBlank()) {
+            d.setVisibility(deviceVisibility(dto.getVisibility()));
+        }
         return view(d);
     }
 
-    public List<Map<String, Object>> history(Long familyId, Long deviceId, Integer hours) {
-        requireDevice(familyId, deviceId, null);
+    /** 智能设备只有两档可见范围:仅家长 / 家庭成员 */
+    private String deviceVisibility(String raw) {
+        if (DictConst.VIS_PRIVATE.equalsIgnoreCase(raw == null ? "" : raw.trim())) {
+            return DictConst.VIS_PRIVATE;
+        }
+        return DictConst.VIS_FAMILY;
+    }
+
+    public List<Map<String, Object>> history(ViewerScope viewer, Long deviceId, Integer hours) {
+        requireDevice(viewer, deviceId, null);
         int h = hours == null || hours <= 0 ? 24 : Math.min(hours, HISTORY_HOURS_MAX);
         List<Map<String, Object>> out = new ArrayList<>();
         for (IotData r : dataMapper.selectList(new LambdaQueryWrapper<IotData>()
@@ -244,7 +268,8 @@ public class HomeAssistantService {
 
     // ==================== 控制 ====================
 
-    public Map<String, Object> control(Long familyId, IotControlDTO dto) {
+    public Map<String, Object> control(ViewerScope viewer, IotControlDTO dto) {
+        Long familyId = viewer.familyId();
         IotConfig cfg = requireReady(familyId);
         String entityId = dto.getEntityId() == null ? "" : dto.getEntityId().trim();
         if (!ENTITY_ID.matcher(entityId).matches()) {
@@ -258,7 +283,7 @@ public class HomeAssistantService {
         if (!SERVICES.contains(service)) {
             throw new BizException(ResultCode.BAD_REQUEST, "不支持这个操作");
         }
-        IotDevice device = requireDevice(familyId, null, entityId);
+        IotDevice device = requireDevice(viewer, null, entityId);
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("entity_id", entityId);
@@ -430,6 +455,7 @@ public class HomeAssistantService {
         m.put("room", d.getRoom());
         m.put("state", d.getState());
         m.put("enabled", d.getEnabled() == null || d.getEnabled() == 1);
+        m.put("visibility", d.getVisibility() == null ? DictConst.VIS_FAMILY : d.getVisibility());
         m.put("controllable", CONTROLLABLE.contains(d.getDomain()));
         m.put("lastSeenAt", d.getLastSeenAt());
         return m;
@@ -450,10 +476,14 @@ public class HomeAssistantService {
         return row;
     }
 
-    private IotDevice requireDevice(Long familyId, Long deviceId, String entityId) {
+    private IotDevice requireDevice(ViewerScope viewer, Long deviceId, String entityId) {
+        Long familyId = viewer.familyId();
         if (familyId == null) throw new BizException(ResultCode.NOT_FOUND, "设备不存在");
         LambdaQueryWrapper<IotDevice> qw = new LambdaQueryWrapper<IotDevice>()
                 .eq(IotDevice::getFamilyId, familyId);
+        if (!viewer.owner()) {
+            qw.and(w -> w.isNull(IotDevice::getVisibility).or().eq(IotDevice::getVisibility, DictConst.VIS_FAMILY));
+        }
         if (deviceId != null) qw.eq(IotDevice::getId, deviceId);
         if (entityId != null) qw.eq(IotDevice::getEntityId, entityId);
         IotDevice d = deviceMapper.selectOne(qw.last("limit 1"));

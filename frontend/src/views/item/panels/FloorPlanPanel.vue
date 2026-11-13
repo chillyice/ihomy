@@ -1575,6 +1575,7 @@ const openItem = (row) => {
           storedAt: row.stored_at || '',
           shelfLife: row.shelf_life != null ? Number(row.shelf_life) : null,
           shelfLifeUnit: row.shelf_life_unit || '',
+          visibility: row.visibility || 'FAMILY',
         }
       : {
           houseId: null,
@@ -1588,6 +1589,7 @@ const openItem = (row) => {
           quantity: null,
           unit: '',
           note: '',
+          visibility: 'FAMILY',
         },
   )
 }

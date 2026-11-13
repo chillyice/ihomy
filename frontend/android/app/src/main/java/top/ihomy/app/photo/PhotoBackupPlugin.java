@@ -105,7 +105,7 @@ public class PhotoBackupPlugin extends Plugin {
         call.resolve(ret);
     }
 
-    /** 待备份张数(只数拍摄/添加时间不早于给定时刻的照片),用于界面显示「还有多少」 */
+    /** 待备份张数(只数拍摄/添加时间不早于给定时刻的照片),用于界面显示「还有多少」;excludeFolders 里的相册目录不数 */
     @PluginMethod
     public void count(PluginCall call) {
         if (getPermissionState(imageAlias()) != PermissionState.GRANTED) {
@@ -116,15 +116,40 @@ public class PhotoBackupPlugin extends Plugin {
             return;
         }
         long sinceMs = call.getLong("sinceMs", 0L);
+        JSArray exclude = call.getArray("excludeFolders");
         io.execute(() -> {
             try {
                 JSObject ret = new JSObject();
-                ret.put("total", countSince(sinceMs));
+                ret.put("total", countSince(sinceMs, exclude));
                 ret.put("granted", true);
                 call.resolve(ret);
             } catch (Exception e) {
                 Log.w(TAG, "count failed", e);
                 call.reject("读取相册张数失败");
+            }
+        });
+    }
+
+    /**
+     * 系统相册目录(按 MediaStore 桶分组):供用户选「哪些目录不同步」。
+     * 只返回有照片的目录,计数为该目录下的图片张数。
+     */
+    @PluginMethod
+    public void folders(PluginCall call) {
+        if (getPermissionState(imageAlias()) != PermissionState.GRANTED) {
+            JSObject ret = new JSObject();
+            ret.put("folders", new JSArray());
+            call.resolve(ret);
+            return;
+        }
+        io.execute(() -> {
+            try {
+                JSObject ret = new JSObject();
+                ret.put("folders", queryFolders());
+                call.resolve(ret);
+            } catch (Exception e) {
+                Log.w(TAG, "folders failed", e);
+                call.reject("读取相册目录失败");
             }
         });
     }
@@ -145,10 +170,11 @@ public class PhotoBackupPlugin extends Plugin {
         int limit = call.getInt("limit", 50);
         if (limit <= 0 || limit > 200) limit = 50;
         final int pageSize = limit;
+        final JSArray exclude = call.getArray("excludeFolders");
         io.execute(() -> {
             try {
                 JSArray items = new JSArray();
-                boolean hasMore = queryPage(sinceMs, afterDateAdded, afterId, pageSize, items);
+                boolean hasMore = queryPage(sinceMs, afterDateAdded, afterId, pageSize, exclude, items);
                 JSObject ret = new JSObject();
                 ret.put("items", items);
                 ret.put("hasMore", hasMore);
@@ -314,14 +340,17 @@ public class PhotoBackupPlugin extends Plugin {
 
     // ---- 相册读取 ----
 
-    private long countSince(long sinceMs) {
+    private long countSince(long sinceMs, JSArray exclude) {
         long sinceSec = Math.max(0L, sinceMs / 1000L);
         Uri uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
         String[] projection = { MediaStore.Images.Media._ID };
-        String selection = MediaStore.Images.Media.DATE_ADDED + " >= ?";
-        String[] args = { String.valueOf(sinceSec) };
+        StringBuilder selection = new StringBuilder(MediaStore.Images.Media.DATE_ADDED + " >= ?");
+        java.util.List<String> args = new java.util.ArrayList<>();
+        args.add(String.valueOf(sinceSec));
+        appendExcludeBuckets(selection, args, exclude);
         long total = 0L;
-        try (Cursor c = getContext().getContentResolver().query(uri, projection, selection, args, null)) {
+        try (Cursor c = getContext().getContentResolver()
+                .query(uri, projection, selection.toString(), args.toArray(new String[0]), null)) {
             if (c != null) total = c.getCount();
         } catch (Exception e) {
             Log.w(TAG, "countSince failed", e);
@@ -329,8 +358,66 @@ public class PhotoBackupPlugin extends Plugin {
         return total;
     }
 
+    /** 系统相册目录列表(MediaStore 桶):id 用桶 ID,名称取目录显示名,count 为图片张数 */
+    private JSArray queryFolders() {
+        Uri uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
+        String[] projection = {
+            MediaStore.Images.Media.BUCKET_ID,
+            MediaStore.Images.Media.BUCKET_DISPLAY_NAME
+        };
+        java.util.Map<Long, String> names = new java.util.LinkedHashMap<>();
+        java.util.Map<Long, Integer> counts = new java.util.HashMap<>();
+        String order = MediaStore.Images.Media.BUCKET_DISPLAY_NAME + " ASC, " + MediaStore.Images.Media._ID + " ASC";
+        try (Cursor c = getContext().getContentResolver().query(uri, projection, null, null, order)) {
+            if (c != null) {
+                while (c.moveToNext()) {
+                    long bucketId = c.getLong(0);
+                    String name = c.getString(1);
+                    if (name == null || name.trim().isEmpty()) name = "其他";
+                    if (!names.containsKey(bucketId)) names.put(bucketId, name);
+                    Integer old = counts.get(bucketId);
+                    counts.put(bucketId, old == null ? 1 : old + 1);
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "queryFolders failed", e);
+        }
+        JSArray arr = new JSArray();
+        for (java.util.Map.Entry<Long, String> e : names.entrySet()) {
+            try {
+                JSObject item = new JSObject();
+                item.put("id", String.valueOf(e.getKey()));
+                item.put("name", e.getValue());
+                Integer n = counts.get(e.getKey());
+                item.put("count", n == null ? 0 : n);
+                arr.put(item);
+            } catch (Exception ignored) {
+                // 单个目录拼装失败不影响其它目录
+            }
+        }
+        return arr;
+    }
+
+    /**
+     * 排除用户选中的相册目录(桶 ID):只接受纯数字,最多 200 个。
+     * 桶为空的照片(极少见)仍然备份,避免因为怪数据整批漏备。
+     */
+    private void appendExcludeBuckets(StringBuilder selection, java.util.List<String> args, JSArray exclude) {
+        if (exclude == null || exclude.length() == 0) return;
+        java.util.List<String> ids = new java.util.ArrayList<>();
+        for (int i = 0; i < exclude.length() && ids.size() < 200; i++) {
+            String id = exclude.optString(i, null);
+            if (id != null && !id.isEmpty() && id.matches("\\d+")) ids.add(id);
+        }
+        if (ids.isEmpty()) return;
+        selection.append(" AND (").append(MediaStore.Images.Media.BUCKET_ID).append(" IS NULL OR ")
+                .append(MediaStore.Images.Media.BUCKET_ID).append(" NOT IN (")
+                .append(String.join(",", java.util.Collections.nCopies(ids.size(), "?"))).append("))");
+        args.addAll(ids);
+    }
+
     /** 返回是否还有下一页(读到 pageSize 条就认为可能有,前端再探一页即可) */
-    private boolean queryPage(long sinceMs, long afterDateAdded, long afterId, int pageSize, JSArray out) {
+    private boolean queryPage(long sinceMs, long afterDateAdded, long afterId, int pageSize, JSArray exclude, JSArray out) {
         long sinceSec = Math.max(0L, sinceMs / 1000L);
         long afterSec = Math.max(0L, afterDateAdded / 1000L);
         Uri uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI;
@@ -354,6 +441,7 @@ public class PhotoBackupPlugin extends Plugin {
             args.add(String.valueOf(afterSec));
             args.add(String.valueOf(afterId));
         }
+        appendExcludeBuckets(selection, args, exclude);
         String order = MediaStore.Images.Media.DATE_ADDED + " ASC, " + MediaStore.Images.Media._ID + " ASC";
         int read = 0;
         try (Cursor c = getContext().getContentResolver()

@@ -17,6 +17,8 @@ public class ItemDTO {
     private String position;
     private String imageUrl;
     private String type;
+    /** 可见范围(PRIVATE/CIRCLE/FAMILY/PUBLIC);null=新建默认 FAMILY */
+    private String visibility;
     private java.math.BigDecimal quantity;
     private String unit;
     private String note;

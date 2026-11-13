@@ -90,7 +90,7 @@
       <div v-if="planReminderHint" class="field-hint">{{ planReminderHint }}</div>
       <!-- 「给谁看」:纪念日/提醒可分享到亲友圈;计划与待办(计划本身)不参与分享 -->
       <div v-if="shareable && audience.state.loaded" class="audience-block">
-        <AudiencePicker v-if="audience.state.canShare" v-model="audience.state.selected" :circles="audience.state.circles" />
+        <AudiencePicker v-if="audience.state.canShare" v-model="audience.state.selected" :families="audience.state.families" />
         <p v-else class="field-hint">{{ $t('audience.canShareFalse') }}</p>
       </div>
       <div v-if="isEdit" class="field-hint">{{ $t('schedule.dialog.lockType') }}</div>

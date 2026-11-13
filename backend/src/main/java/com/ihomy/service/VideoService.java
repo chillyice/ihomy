@@ -89,6 +89,7 @@ public class VideoService {
             m.put("sourceDeviceName", d == null ? null : d.getName());
             m.put("createdAt", v.getCreatedAt());
             m.put("familyId", v.getFamilyId());
+            m.put("visibility", v.getVisibility());
             if (shared.containsKey(v.getId())) {
                 m.put("readOnly", true);
                 m.put("sharedFrom", shared.get(v.getId()));
@@ -104,7 +105,7 @@ public class VideoService {
         apply(v, dto);
         v.setUploaderId(userId);
         v.setFamilyId(familyId);
-        v.setVisibility(DictConst.VIS_FAMILY);
+        v.setVisibility(DictConst.visibility(dto.getVisibility()));
         v.setDeleted(0);
         videoMapper.insert(v);
         pointsService.addRecordIfEnabled(userId, familyId, PointsRuleConst.VIDEO, "REWARD", "发布视频");
@@ -159,6 +160,9 @@ public class VideoService {
         v.setIntro(dto.getIntro());
         v.setPoster(dto.getPoster());
         v.setVideoUrl(dto.getVideoUrl());
+        if (dto.getVisibility() != null && !dto.getVisibility().isBlank()) {
+            v.setVisibility(DictConst.visibility(dto.getVisibility()));
+        }
     }
 
     /** 校验视频存在、未删除、同家庭,且操作者为上传者或家长 */

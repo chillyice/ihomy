@@ -16,7 +16,7 @@ import java.util.List;
  * <ul>
  *   <li>游客:只读基准家庭(未登录时=默认演示家庭)里 {@code visibility=PUBLIC} 的内容;</li>
  *   <li>家长(OWNER):本家庭全部内容;</li>
- *   <li>家庭成员:本家庭 + (自己创建的 OR 家庭/公开可见);PRIVATE 只对作者本人与家长可见;</li>
+ *   <li>家庭成员:本家庭 + (自己创建的 OR 家庭/亲友圈/公开可见);PRIVATE 只对作者本人与家长可见;</li>
  *   <li>跨家庭:除 PUBLIC 外一律不可见,调用方抛 NOT_FOUND(不泄露存在性)。</li>
  * </ul>
  *
@@ -26,9 +26,9 @@ import java.util.List;
 @Service
 public class ContentAccessService {
 
-    /** 家庭成员之间可见的档位:PRIVATE 只对作者本人与家长 */
+    /** 家庭成员之间可见的档位:PRIVATE 只对作者本人与家长;CIRCLE = 自家人 + 被分享的圈内家庭 */
     public List<String> memberVisibilities() {
-        return List.of(DictConst.VIS_FAMILY, DictConst.VIS_PUBLIC);
+        return List.of(DictConst.VIS_FAMILY, DictConst.VIS_CIRCLE, DictConst.VIS_PUBLIC);
     }
 
     /**
@@ -77,9 +77,15 @@ public class ContentAccessService {
         });
     }
 
-    /** 能否收到别人的分享:必须登录、有家庭,而且不是保险箱(永不进圈) */
+    /** 能否收到别人的分享:必须登录、有家庭,而且不是保险箱/智能家居(设备控制不跨家庭) */
     private boolean canReceiveShare(ContentKind kind, ViewerScope viewer) {
-        return kind != ContentKind.VAULT && viewer.userId() != null && viewer.familyId() != null;
+        return kind != ContentKind.VAULT && kind != ContentKind.IOT_DEVICE
+                && viewer.userId() != null && viewer.familyId() != null;
+    }
+
+    /** 这个类型是否支持「亲友圈」档(保险箱/智能家居不跨家庭) */
+    public boolean supportsCircle(ContentKind kind) {
+        return kind != ContentKind.VAULT && kind != ContentKind.IOT_DEVICE;
     }
 
     /**
@@ -93,7 +99,8 @@ public class ContentAccessService {
 
     /**
      * 详情/点赞/评论:能否看到这一条。
-     * PUBLIC 对所有人可见;同家庭内非 PRIVATE 可见;PRIVATE 仅作者本人与家长;跨家庭仅「被分享」可见。
+     * PUBLIC 对所有人可见;同家庭内非 PRIVATE 可见;PRIVATE 仅作者本人与家长;跨家庭仅「被分享」可见
+     * (亲友圈档的内容就是靠受众行放行)。
      */
     public boolean canView(ContentKind kind, Long contentFamilyId, Long authorId, String visibility, ViewerScope viewer) {
         return canView(kind, contentFamilyId, authorId, visibility, viewer, false);
@@ -141,7 +148,7 @@ public class ContentAccessService {
      */
     public boolean canShare(ContentKind kind, Long contentFamilyId, Long authorId, String visibility,
                             ViewerScope viewer, String sharePolicy) {
-        if (kind == ContentKind.VAULT) return false;
+        if (kind == ContentKind.VAULT || kind == ContentKind.IOT_DEVICE) return false;
         if (DictConst.SHARE_OFF.equals(sharePolicy)) return false;
         if (viewer.userId() == null || viewer.familyId() == null) return false;
         if (!viewer.familyId().equals(contentFamilyId)) return false;

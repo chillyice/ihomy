@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.ihomy.common.BizException;
+import com.ihomy.common.DictConst;
 import com.ihomy.common.ResultCode;
 import com.ihomy.dto.FurnitureDTO;
 import com.ihomy.dto.HouseDTO;
@@ -18,6 +19,9 @@ import com.ihomy.mapper.FurnitureMapper;
 import com.ihomy.mapper.HouseMapper;
 import com.ihomy.mapper.ItemMapper;
 import com.ihomy.mapper.RoomMapper;
+import com.ihomy.service.access.ContentAccessService;
+import com.ihomy.service.access.ContentKind;
+import com.ihomy.service.access.ViewerScope;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +42,7 @@ public class ItemService {
     private final RoomMapper roomMapper;
     private final FurnitureMapper furnitureMapper;
     private final ItemMapper itemMapper;
+    private final ContentAccessService contentAccess;
     private final ObjectMapper mapper = new ObjectMapper();
 
     // ---------- 房子 ----------
@@ -240,10 +245,11 @@ public class ItemService {
 
     // ---------- 物品 ----------
 
-    public List<Map<String, Object>> itemList(Long familyId, String keyword, Long roomId, Long furnitureId, String type) {
-        return itemMapper.selectItemByFamily(familyId,
+    /** 物品列表/搜索:自家按可见性过滤,并混入分享给我家的物品(判定在 ContentAccessService) */
+    public List<Map<String, Object>> itemList(ViewerScope viewer, String keyword, Long roomId, Long furnitureId, String type) {
+        return itemMapper.selectItemByFamily(viewer.familyId(),
                 keyword == null || keyword.isBlank() ? null : keyword.trim(),
-                roomId, furnitureId, type);
+                roomId, furnitureId, type, contentAccess.visibleFilter(viewer));
     }
 
     public Item itemCreate(Long userId, Long familyId, ItemDTO dto) {
@@ -263,6 +269,7 @@ public class ItemService {
         i.setPosition(dto.getPosition());
         i.setImageUrl(dto.getImageUrl());
         i.setType(dto.getType() == null ? "OTHER" : dto.getType());
+        i.setVisibility(DictConst.visibility(dto.getVisibility()));
         i.setQuantity(dto.getQuantity());
         i.setUnit(dto.getUnit());
         i.setNote(dto.getNote());
@@ -279,8 +286,8 @@ public class ItemService {
         return i;
     }
 
-    public void itemUpdate(Long id, Long familyId, ItemDTO dto) {
-        Item i = requireItem(id, familyId);
+    public void itemUpdate(Long id, Long familyId, ItemDTO dto, ViewerScope viewer) {
+        Item i = requireEditable(id, familyId, viewer);
         if (dto.getName() != null) i.setName(dto.getName());
         if (dto.getFurnitureId() != null) {
             requireFurniture(dto.getFurnitureId(), familyId);
@@ -294,6 +301,9 @@ public class ItemService {
         i.setPosition(dto.getPosition());
         i.setImageUrl(dto.getImageUrl());
         if (dto.getType() != null) i.setType(dto.getType());
+        if (dto.getVisibility() != null && !dto.getVisibility().isBlank()) {
+            i.setVisibility(DictConst.visibility(dto.getVisibility()));
+        }
         i.setQuantity(dto.getQuantity());
         i.setUnit(dto.getUnit());
         i.setNote(dto.getNote());
@@ -305,15 +315,15 @@ public class ItemService {
         itemMapper.updateById(i);
     }
 
-    public void itemDelete(Long id, Long familyId) {
-        itemMapper.deleteById(requireItem(id, familyId).getId());
+    public void itemDelete(Long id, Long familyId, ViewerScope viewer) {
+        itemMapper.deleteById(requireEditable(id, familyId, viewer).getId());
     }
 
     /**
      * 取出食材:原子扣减库存(quantity = quantity - amount)。amount 必须 > 0,且不超过现有数量。
      */
-    public void takeItem(Long id, Long familyId, java.math.BigDecimal amount) {
-        requireItem(id, familyId);
+    public void takeItem(Long id, Long familyId, java.math.BigDecimal amount, ViewerScope viewer) {
+        requireEditable(id, familyId, viewer);
         if (amount == null || amount.compareTo(java.math.BigDecimal.ZERO) <= 0) {
             throw new BizException(ResultCode.BAD_REQUEST, "取出数量必须大于 0");
         }
@@ -326,7 +336,7 @@ public class ItemService {
     /**
      * 批量设置物品所属家具:furnitureId 为空时解除归属;非空时物品归入该家具(散放房间与相对坐标随之重置)。
      */
-    public void itemBatchAssignFurniture(Long familyId, List<Long> ids, Long furnitureId) {
+    public void itemBatchAssignFurniture(Long familyId, List<Long> ids, Long furnitureId, ViewerScope viewer) {
         if (ids == null || ids.isEmpty()) {
             throw new BizException(ResultCode.BAD_REQUEST, "请选择物品");
         }
@@ -340,6 +350,7 @@ public class ItemService {
         if (found.size() != distinct) {
             throw new BizException(ResultCode.NOT_FOUND, "部分物品不存在或不属于当前家庭");
         }
+        found.forEach(i -> assertEditable(i, viewer));
         LambdaUpdateWrapper<Item> uw = new LambdaUpdateWrapper<Item>()
                 .eq(Item::getFamilyId, familyId)
                 .in(Item::getId, ids);
@@ -360,7 +371,8 @@ public class ItemService {
 
     // ---------- 户型图(2期) ----------
 
-    public Map<String, Object> floorPlan(Long familyId, Long houseId, Integer floor) {
+    public Map<String, Object> floorPlan(ViewerScope viewer, Long houseId, Integer floor) {
+        Long familyId = viewer.familyId();
         House h = requireHouse(houseId, familyId);
         int fl = floor == null ? 1 : floor;
         Map<String, Object> result = new LinkedHashMap<>();
@@ -401,21 +413,22 @@ public class ItemService {
         result.put("furnitures", furnitures);
 
         List<Long> furnitureIds = furnitures.stream().map(Furniture::getId).toList();
-        List<Item> items;
+        LambdaQueryWrapper<Item> iq = new LambdaQueryWrapper<>();
+        iq.eq(Item::getFamilyId, familyId);
         if (!furnitureIds.isEmpty() && !roomIds.isEmpty()) {
-            items = itemMapper.selectList(new LambdaQueryWrapper<Item>()
-                    .eq(Item::getFamilyId, familyId)
-                    .and(q -> q.in(Item::getFurnitureId, furnitureIds).or().in(Item::getRoomId, roomIds)));
+            iq.and(q -> q.in(Item::getFurnitureId, furnitureIds).or().in(Item::getRoomId, roomIds));
         } else if (!furnitureIds.isEmpty()) {
-            items = itemMapper.selectList(new LambdaQueryWrapper<Item>()
-                    .eq(Item::getFamilyId, familyId).in(Item::getFurnitureId, furnitureIds));
+            iq.in(Item::getFurnitureId, furnitureIds);
         } else if (!roomIds.isEmpty()) {
-            items = itemMapper.selectList(new LambdaQueryWrapper<Item>()
-                    .eq(Item::getFamilyId, familyId).in(Item::getRoomId, roomIds));
+            iq.in(Item::getRoomId, roomIds);
         } else {
-            items = List.of();
+            result.put("items", List.of());
+            return result;
         }
-        result.put("items", items);
+        // 户型图只画自家物品:PRIVATE 只对作者本人与家长显示,不混入圈内分享来的物品
+        contentAccess.applyVisible(iq, ContentKind.ITEM, viewer,
+                Item::getFamilyId, Item::getCreatedBy, Item::getVisibility);
+        result.put("items", itemMapper.selectList(iq));
         return result;
     }
 
@@ -449,8 +462,8 @@ public class ItemService {
         furnitureMapper.update(null, uw);
     }
 
-    public void saveItemPlace(Long id, Long familyId, ItemDTO dto) {
-        requireItem(id, familyId);
+    public void saveItemPlace(Long id, Long familyId, ItemDTO dto, ViewerScope viewer) {
+        requireEditable(id, familyId, viewer);
         itemMapper.update(null, new LambdaUpdateWrapper<Item>()
                 .eq(Item::getId, id)
                 .set(Item::getRelX, dto.getRelX())
@@ -485,5 +498,18 @@ public class ItemService {
         Item i = itemMapper.selectById(id);
         if (i == null || !i.getFamilyId().equals(familyId)) throw new BizException(ResultCode.NOT_FOUND);
         return i;
+    }
+
+    /** 改/删/取用物品:除了同家庭,还得看得见(PRIVATE 只作者本人与家长能动) */
+    private Item requireEditable(Long id, Long familyId, ViewerScope viewer) {
+        Item i = requireItem(id, familyId);
+        assertEditable(i, viewer);
+        return i;
+    }
+
+    private void assertEditable(Item i, ViewerScope viewer) {
+        if (!contentAccess.canView(ContentKind.ITEM, i.getFamilyId(), i.getCreatedBy(), i.getVisibility(), viewer)) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
     }
 }

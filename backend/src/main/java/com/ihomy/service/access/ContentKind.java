@@ -16,6 +16,12 @@ public enum ContentKind {
     /** 纪念日/提醒本身没有 visibility 列,按家庭级可见(FAMILY)处理,分享口径与内容一致 */
     ANNIVERSARY("anniversary"),
     REMINDER("reminder"),
+    /** 家庭小游戏(导入/网页游戏):四档可见性,可分享到亲友圈 */
+    GAME("game"),
+    /** 物品定位条目:四档可见性,可分享到亲友圈 */
+    ITEM("item"),
+    /** 智能家居设备:只支持家庭/私密两档(控制别家设备无意义) */
+    IOT_DEVICE("iot_device"),
     /** 保险箱:只有 PRIVATE/FAMILY 两档,永不进亲友圈 */
     VAULT("vault");
 

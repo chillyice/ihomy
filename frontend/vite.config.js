@@ -56,7 +56,9 @@ export default defineConfig(({ mode }) => {
               },
               workbox: {
                 globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-                globIgnores: ['ruffle/**', 'emulatorjs/**'],
+                // 麻将/扑克牌面图集 2.3MB:只在牌类游戏页按需加载,不进预缓存
+                // (预缓存会让每个访客首装多下 2.3MB,workbox 默认也会因 >2MiB 直接构建失败)
+                globIgnores: ['ruffle/**', 'emulatorjs/**', 'assets/tiles-cards-atlas-*.png'],
                 runtimeCaching: [
                   {
                     // 缓存 GET 接口(离线浏览/弱网);排除敏感接口:保险箱、认证、运维、个人资料

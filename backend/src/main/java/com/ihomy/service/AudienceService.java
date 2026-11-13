@@ -14,6 +14,9 @@ import com.ihomy.entity.Diary;
 import com.ihomy.entity.Family;
 import com.ihomy.entity.FamilyCircle;
 import com.ihomy.entity.FamilyCircleMember;
+import com.ihomy.entity.GameInfo;
+import com.ihomy.entity.IotDevice;
+import com.ihomy.entity.Item;
 import com.ihomy.entity.Photo;
 import com.ihomy.entity.Reminder;
 import com.ihomy.entity.Video;
@@ -30,6 +33,9 @@ import com.ihomy.mapper.DiaryMapper;
 import com.ihomy.mapper.FamilyCircleMapper;
 import com.ihomy.mapper.FamilyCircleMemberMapper;
 import com.ihomy.mapper.FamilyMapper;
+import com.ihomy.mapper.GameInfoMapper;
+import com.ihomy.mapper.IotDeviceMapper;
+import com.ihomy.mapper.ItemMapper;
 import com.ihomy.mapper.PhotoMapper;
 import com.ihomy.mapper.ReminderMapper;
 import com.ihomy.mapper.SysRoleMapper;
@@ -78,6 +84,9 @@ public class AudienceService {
     private final ContentBookMapper bookMapper;
     private final AnniversaryMapper anniversaryMapper;
     private final ReminderMapper reminderMapper;
+    private final GameInfoMapper gameInfoMapper;
+    private final ItemMapper itemMapper;
+    private final IotDeviceMapper iotDeviceMapper;
     private final FamilyMapper familyMapper;
     private final SysUserRoleMapper userRoleMapper;
     private final SysRoleMapper sysRoleMapper;
@@ -97,11 +106,14 @@ public class AudienceService {
                 .eq(ContentAudience::getContentId, contentId));
         Set<Long> selected = rows.stream().map(ContentAudience::getSourceCircleId)
                 .filter(Objects::nonNull).collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<Long> selectedFamilies = rows.stream().map(ContentAudience::getTargetId)
+                .filter(Objects::nonNull).collect(Collectors.toCollection(LinkedHashSet::new));
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("contentType", kind.code());
         data.put("contentId", contentId);
         data.put("selectedCircleIds", new ArrayList<>(selected));
+        data.put("selectedFamilyIds", new ArrayList<>(selectedFamilies));
         data.put("circles", myCircles(content.familyId()));
         data.put("targets", audienceMapper.selectTargets(kind.code(), contentId));
         data.put("canShare", contentAccess.canShare(kind, content.familyId(), content.authorId(),
@@ -111,10 +123,11 @@ public class AudienceService {
 
     /**
      * 改分享范围:传空=只给自家人(全部收回)。
+     * 新前端按「家庭」直接选(familyIds);老客户端仍按「圈」传(circleIds),两种可同时给。
      * 旧目标撤回、新目标写入,并对涉及的每个家庭失效首页缓存(接收方首页会多/少一条)。
      */
     @Transactional
-    public Map<String, Object> set(ContentKind kind, Long contentId, List<Long> circleIds,
+    public Map<String, Object> set(ContentKind kind, Long contentId, List<Long> circleIds, List<Long> familyIds,
                                    SysUser user, ViewerScope viewer) {
         if (viewer.familyId() == null || viewer.userId() == null) {
             throw new BizException(ResultCode.UNAUTHORIZED);
@@ -122,21 +135,26 @@ public class AudienceService {
         Shareable content = requireOwn(kind, contentId, viewer);
         Family family = familyMapper.selectById(content.familyId());
         String policy = family == null ? null : family.getSharePolicy();
-        if (!contentAccess.canShare(kind, content.familyId(), content.authorId(), content.visibility(), viewer, policy)) {
+        // 只收回(不传任何目标)永远允许:关掉外分享后也要能把历史分享撤回来
+        boolean adding = (circleIds != null && !circleIds.isEmpty()) || (familyIds != null && !familyIds.isEmpty());
+        if (adding && !contentAccess.canShare(kind, content.familyId(), content.authorId(), content.visibility(), viewer, policy)) {
             throw new BizException(ResultCode.FORBIDDEN, DictConst.SHARE_OFF.equals(policy)
                     ? "家里关闭了对外分享" : "只有内容作者本人可以分享");
         }
 
-        List<Long> wanted = circleIds == null ? List.of() : circleIds.stream()
+        List<Long> wantedCircles = circleIds == null ? List.of() : circleIds.stream()
                 .filter(Objects::nonNull).distinct().toList();
-        if (wanted.size() > MAX_CIRCLES) {
+        if (wantedCircles.size() > MAX_CIRCLES) {
             throw new BizException(ResultCode.BAD_REQUEST, "最多同时分享到 " + MAX_CIRCLES + " 个亲友圈");
         }
-        Map<Long, FamilyCircle> circles = validateCircles(wanted, content.familyId());
+        Map<Long, FamilyCircle> circles = validateCircles(wantedCircles, content.familyId());
 
-        // 圈 → 接收家庭(排除自己家):同一个家庭命中多个圈时按第一个圈记账
+        // 家庭 → 所属圈(只接受当前家庭所在活跃圈里的家庭);同一个家庭命中多个圈时按第一个记账
+        Map<Long, Long> familyToCircle = validateFamilyTargets(familyIds, content.familyId());
+
+        // 圈 → 接收家庭(排除自己家)
         Map<Long, Long> targetToCircle = new LinkedHashMap<>();
-        for (Long circleId : wanted) {
+        for (Long circleId : wantedCircles) {
             List<FamilyCircleMember> members = memberMapper.selectList(new LambdaQueryWrapper<FamilyCircleMember>()
                     .eq(FamilyCircleMember::getCircleId, circleId)
                     .eq(FamilyCircleMember::getStatus, DictConst.CIRCLE_MEMBER_ACTIVE));
@@ -145,6 +163,7 @@ public class AudienceService {
                 targetToCircle.putIfAbsent(m.getFamilyId(), circleId);
             }
         }
+        familyToCircle.forEach(targetToCircle::putIfAbsent);
 
         Set<Long> oldTargets = audienceMapper.selectList(new LambdaQueryWrapper<ContentAudience>()
                         .eq(ContentAudience::getContentType, kind.code())
@@ -302,6 +321,32 @@ public class AudienceService {
         return result;
     }
 
+    /** 直接选的接收家庭:必须在本家庭当前所在的活跃圈里;返回 家庭→圈 */
+    private Map<Long, Long> validateFamilyTargets(List<Long> familyIds, Long familyId) {
+        if (familyIds == null || familyIds.isEmpty()) return Map.of();
+        List<Long> wanted = familyIds.stream().filter(Objects::nonNull).distinct().toList();
+        List<FamilyCircleMember> mine = memberMapper.selectList(new LambdaQueryWrapper<FamilyCircleMember>()
+                .eq(FamilyCircleMember::getFamilyId, familyId)
+                .eq(FamilyCircleMember::getStatus, DictConst.CIRCLE_MEMBER_ACTIVE));
+        Map<Long, Long> familyToCircle = new LinkedHashMap<>();
+        for (FamilyCircleMember m : mine) {
+            FamilyCircle circle = circleMapper.selectById(m.getCircleId());
+            if (circle == null || !DictConst.CIRCLE_ACTIVE.equals(circle.getStatus())) continue;
+            for (FamilyCircleMember other : memberMapper.selectList(new LambdaQueryWrapper<FamilyCircleMember>()
+                    .eq(FamilyCircleMember::getCircleId, m.getCircleId())
+                    .eq(FamilyCircleMember::getStatus, DictConst.CIRCLE_MEMBER_ACTIVE))) {
+                if (other.getFamilyId().equals(familyId) || !wanted.contains(other.getFamilyId())) continue;
+                familyToCircle.putIfAbsent(other.getFamilyId(), m.getCircleId());
+            }
+        }
+        for (Long id : wanted) {
+            if (!familyToCircle.containsKey(id)) {
+                throw new BizException(ResultCode.BAD_REQUEST, "只能分享给同一亲友圈里的家庭");
+            }
+        }
+        return familyToCircle;
+    }
+
     /** 圈必须是当前家庭所在的活跃圈 */
     private Map<Long, FamilyCircle> validateCircles(List<Long> circleIds, Long familyId) {
         if (circleIds.isEmpty()) return Map.of();
@@ -347,6 +392,9 @@ public class AudienceService {
             case BOOK -> "一本书";
             case ANNIVERSARY -> "一个纪念日";
             case REMINDER -> "一条提醒";
+            case GAME -> "一个小游戏";
+            case ITEM -> "一件物品";
+            case IOT_DEVICE -> "一个智能设备";
             default -> "内容";
         };
     }
@@ -381,7 +429,8 @@ public class AudienceService {
         if (kind == ContentKind.ALBUM) {
             Album a = albumMapper.selectById(contentId);
             if (a == null) return null;
-            String visibility = "private".equals(a.getType()) ? DictConst.VIS_PRIVATE : DictConst.VIS_FAMILY;
+            String visibility = a.getVisibility() != null && !a.getVisibility().isBlank() ? a.getVisibility()
+                    : ("private".equals(a.getType()) ? DictConst.VIS_PRIVATE : DictConst.VIS_PUBLIC);
             return new Shareable(a.getId(), a.getFamilyId(), a.getCreatedBy(), visibility);
         }
         if (kind == ContentKind.BLOG) {
@@ -412,6 +461,21 @@ public class AudienceService {
         if (kind == ContentKind.REMINDER) {
             Reminder r = reminderMapper.selectById(contentId);
             return r == null ? null : new Shareable(r.getId(), r.getFamilyId(), r.getCreatedBy(), DictConst.VIS_FAMILY);
+        }
+        if (kind == ContentKind.GAME) {
+            GameInfo g = gameInfoMapper.selectById(contentId);
+            return g == null ? null : new Shareable(g.getId(), g.getFamilyId(), g.getUserId(),
+                    g.getVisibility() == null ? DictConst.VIS_FAMILY : g.getVisibility());
+        }
+        if (kind == ContentKind.ITEM) {
+            Item i = itemMapper.selectById(contentId);
+            return i == null ? null : new Shareable(i.getId(), i.getFamilyId(), i.getCreatedBy(),
+                    i.getVisibility() == null ? DictConst.VIS_FAMILY : i.getVisibility());
+        }
+        if (kind == ContentKind.IOT_DEVICE) {
+            IotDevice d = iotDeviceMapper.selectById(contentId);
+            return d == null ? null : new Shareable(d.getId(), d.getFamilyId(), null,
+                    d.getVisibility() == null ? DictConst.VIS_FAMILY : d.getVisibility());
         }
         throw new BizException(ResultCode.BAD_REQUEST, "这个内容暂时还不能分享到亲友圈");
     }

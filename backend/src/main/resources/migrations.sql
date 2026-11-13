@@ -3375,3 +3375,128 @@ INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUE
 ('share_policy', 'SELF_ONLY',  '只能分享自己创建的'),
 ('share_policy', 'OWNER_ONLY', '家长可分享家庭共有内容'),
 ('share_policy', 'OFF',        '禁止对外分享');
+
+-- ------------------------------------------------------------
+-- 可见性四档 + 默认分享目标 + 小游戏/物品/智能家居可见性(2026-11-13,V12.23)
+--   ① visibility 新增 CIRCLE(亲友圈):自家人 + 发布时选中的圈内家庭(content_audience)。
+--   ② family_share_default:家庭级默认分享目标,选「亲友圈」时预勾选。
+--   ③ game_info / family_item 加 visibility(四档);sys_iot_device 加 visibility(仅两档)。
+--   幂等:INSERT IGNORE + information_schema 条件加列/加索引 + CREATE TABLE IF NOT EXISTS。
+-- ------------------------------------------------------------
+INSERT IGNORE INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
+('visibility', 'CIRCLE', '亲友圈可见');
+
+CREATE TABLE IF NOT EXISTS `family_share_default` (
+  `id`               BIGINT   NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`        BIGINT   NOT NULL COMMENT '本家庭ID',
+  `target_family_id` BIGINT   NOT NULL COMMENT '默认分享到的圈内家庭ID',
+  `created_by`       BIGINT   DEFAULT NULL COMMENT '设置人用户ID',
+  `created_at`       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_family_target` (`family_id`, `target_family_id`),
+  KEY `idx_target` (`target_family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭默认分享目标(亲友圈预选)';
+
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'game_info' AND COLUMN_NAME = 'visibility');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `game_info` ADD COLUMN `visibility` VARCHAR(20) NOT NULL DEFAULT ''FAMILY'' COMMENT ''可见范围:PRIVATE仅导入人+家长/CIRCLE亲友圈/FAMILY家庭/PUBLIC公开'' AFTER `status`',
+  'SELECT 1');
+PREPARE add_game_visibility_stmt FROM @sql;
+EXECUTE add_game_visibility_stmt;
+DEALLOCATE PREPARE add_game_visibility_stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'game_info' AND INDEX_NAME = 'idx_family_visibility');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `game_info` ADD KEY `idx_family_visibility` (`family_id`, `visibility`)',
+  'SELECT 1');
+PREPARE add_game_visibility_idx_stmt FROM @sql;
+EXECUTE add_game_visibility_idx_stmt;
+DEALLOCATE PREPARE add_game_visibility_idx_stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_item' AND COLUMN_NAME = 'visibility');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `family_item` ADD COLUMN `visibility` VARCHAR(20) NOT NULL DEFAULT ''FAMILY'' COMMENT ''可见范围:PRIVATE仅录入人+家长/CIRCLE亲友圈/FAMILY家庭/PUBLIC公开'' AFTER `type`',
+  'SELECT 1');
+PREPARE add_item_visibility_stmt FROM @sql;
+EXECUTE add_item_visibility_stmt;
+DEALLOCATE PREPARE add_item_visibility_stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'family_item' AND INDEX_NAME = 'idx_family_visibility');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `family_item` ADD KEY `idx_family_visibility` (`family_id`, `visibility`)',
+  'SELECT 1');
+PREPARE add_item_visibility_idx_stmt FROM @sql;
+EXECUTE add_item_visibility_idx_stmt;
+DEALLOCATE PREPARE add_item_visibility_idx_stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sys_iot_device' AND COLUMN_NAME = 'visibility');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `sys_iot_device` ADD COLUMN `visibility` VARCHAR(20) NOT NULL DEFAULT ''FAMILY'' COMMENT ''可见范围:PRIVATE仅家长/FAMILY家庭成员'' AFTER `enabled`',
+  'SELECT 1');
+PREPARE add_iot_visibility_stmt FROM @sql;
+EXECUTE add_iot_visibility_stmt;
+DEALLOCATE PREPARE add_iot_visibility_stmt;
+
+SET @has := (SELECT COUNT(*) FROM information_schema.STATISTICS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sys_iot_device' AND INDEX_NAME = 'idx_family_visibility');
+SET @sql := IF(@has = 0,
+  'ALTER TABLE `sys_iot_device` ADD KEY `idx_family_visibility` (`family_id`, `visibility`)',
+  'SELECT 1');
+PREPARE add_iot_visibility_idx_stmt FROM @sql;
+EXECUTE add_iot_visibility_idx_stmt;
+DEALLOCATE PREPARE add_iot_visibility_idx_stmt;
+
+-- 工具箱归回生活组(殿后):category 是纯展示字段,sort_order 17 已在 life 组内最大,不动
+UPDATE `sys_home_module` SET `category` = 'life'
+WHERE `family_id` IS NULL AND `code` = 'tools' AND `category` <> 'life';
+
+-- ④ content_photo_album 加 visibility(四档):首次加列时按 type 回填,保证游客与老客户端行为不变
+SET @album_visibility_added := (SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'content_photo_album' AND COLUMN_NAME = 'visibility');
+SET @sql := IF(@album_visibility_added = 0,
+  'ALTER TABLE `content_photo_album` ADD COLUMN `visibility` VARCHAR(20) NOT NULL DEFAULT ''FAMILY'' COMMENT ''可见范围:PRIVATE仅创建人+家长/CIRCLE亲友圈/FAMILY家庭/PUBLIC公开'' AFTER `type`',
+  'SELECT 1');
+PREPARE add_album_visibility_stmt FROM @sql;
+EXECUTE add_album_visibility_stmt;
+DEALLOCATE PREPARE add_album_visibility_stmt;
+
+SET @sql := IF(@album_visibility_added = 0,
+  'UPDATE `content_photo_album` SET `visibility` = CASE WHEN `type` = ''private'' THEN ''PRIVATE'' ELSE ''PUBLIC'' END',
+  'SELECT 1');
+PREPARE backfill_album_visibility_stmt FROM @sql;
+EXECUTE backfill_album_visibility_stmt;
+DEALLOCATE PREPARE backfill_album_visibility_stmt;
+
+-- ⑤ 存量「已分享」内容回填为 CIRCLE(幂等:回填后不再满足 visibility='FAMILY')
+UPDATE `content_blog` b JOIN `content_audience` ca
+  ON ca.`content_type` = 'blog' AND ca.`content_id` = b.`id`
+SET b.`visibility` = 'CIRCLE' WHERE b.`visibility` = 'FAMILY';
+UPDATE `content_photo` p JOIN `content_audience` ca
+  ON ca.`content_type` = 'photo' AND ca.`content_id` = p.`id`
+SET p.`visibility` = 'CIRCLE' WHERE p.`visibility` = 'FAMILY';
+UPDATE `content_diary` d JOIN `content_audience` ca
+  ON ca.`content_type` = 'diary' AND ca.`content_id` = d.`id`
+SET d.`visibility` = 'CIRCLE' WHERE d.`visibility` = 'FAMILY';
+UPDATE `content_video` v JOIN `content_audience` ca
+  ON ca.`content_type` = 'video' AND ca.`content_id` = v.`id`
+SET v.`visibility` = 'CIRCLE' WHERE v.`visibility` = 'FAMILY';
+UPDATE `content_wish` w JOIN `content_audience` ca
+  ON ca.`content_type` = 'wish' AND ca.`content_id` = w.`id`
+SET w.`visibility` = 'CIRCLE' WHERE w.`visibility` = 'FAMILY';
+UPDATE `content_book` b JOIN `content_audience` ca
+  ON ca.`content_type` = 'book' AND ca.`content_id` = b.`id`
+SET b.`visibility` = 'CIRCLE' WHERE b.`visibility` = 'FAMILY';
+UPDATE `content_photo_album` a JOIN `content_audience` ca
+  ON ca.`content_type` = 'album' AND ca.`content_id` = a.`id`
+SET a.`visibility` = 'CIRCLE'
+WHERE a.`visibility` NOT IN ('CIRCLE', 'PRIVATE');
+
+-- 私密相册里的照片同步为私密(只动仍是家庭档的存量照片,幂等)
+UPDATE `content_photo` p JOIN `content_photo_album` a ON p.`album_id` = a.`id`
+SET p.`visibility` = 'PRIVATE'
+WHERE a.`visibility` = 'PRIVATE' AND p.`visibility` = 'FAMILY';

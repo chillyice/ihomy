@@ -47,7 +47,7 @@ public class AudienceController {
     @OperationLog(module = "SHARE", operationType = "UPDATE", description = "设置内容分享范围")
     @PutMapping("/{type}/{id}/audience")
     public Result<Map<String, Object>> set(@PathVariable String type, @PathVariable Long id, @RequestBody AudienceDTO dto) {
-        return Result.success(audienceService.set(kind(type), id, dto.getCircleIds(),
+        return Result.success(audienceService.set(kind(type), id, dto.getCircleIds(), dto.getTargetFamilyIds(),
                 securityHelper.currentUser(), viewerScopeResolver.resolve()));
     }
 
@@ -59,10 +59,10 @@ public class AudienceController {
         return Result.success();
     }
 
-    /** 路径里的类型码 → 内容类型;保险箱与未知类型一律拒绝(不暴露内部枚举) */
+    /** 路径里的类型码 → 内容类型;保险箱/智能家居与未知类型一律拒绝(不暴露内部枚举) */
     private ContentKind kind(String type) {
         for (ContentKind k : ContentKind.values()) {
-            if (k != ContentKind.VAULT && k.code().equalsIgnoreCase(type)) return k;
+            if (k != ContentKind.VAULT && k != ContentKind.IOT_DEVICE && k.code().equalsIgnoreCase(type)) return k;
         }
         throw new BizException(ResultCode.BAD_REQUEST, "这个内容暂时还不能分享到亲友圈");
     }

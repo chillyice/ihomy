@@ -8,4 +8,6 @@ public class IotDeviceDTO {
     private String name;
     private String room;
     private Boolean enabled;
+    /** 可见范围:PRIVATE 仅家长 / FAMILY 家庭成员 */
+    private String visibility;
 }

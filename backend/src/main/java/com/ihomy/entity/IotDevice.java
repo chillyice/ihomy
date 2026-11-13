@@ -27,6 +27,8 @@ public class IotDevice {
     private String room;
     private String state;
     private Integer enabled;
+    /** 可见范围:PRIVATE 仅家长 / FAMILY 家庭成员(设备无作者,不跨家庭) */
+    private String visibility;
     private LocalDateTime lastSeenAt;
     private LocalDateTime lastSampleAt;
     private LocalDateTime createdAt;

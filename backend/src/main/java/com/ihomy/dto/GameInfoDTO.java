@@ -20,4 +20,7 @@ public class GameInfoDTO {
 
     @Size(max = 500, message = "网址不能超过 500 字")
     private String linkUrl;
+
+    /** 可见范围(PRIVATE/CIRCLE/FAMILY/PUBLIC);null=不修改 */
+    private String visibility;
 }

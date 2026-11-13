@@ -14,6 +14,8 @@ public final class DictConst {
     public static final String VIS_MEMBERS = "MEMBERS";
     public static final String VIS_GROUPS = "GROUPS";
     public static final String VIS_FAMILY = "FAMILY";
+    /** 亲友圈:自家人 + 发布时选中的圈内家庭(目标落在 content_audience) */
+    public static final String VIS_CIRCLE = "CIRCLE";
     public static final String VIS_PUBLIC = "PUBLIC";
     private static final String VIS_FALLBACK = VIS_FAMILY;
 
@@ -316,6 +318,7 @@ public final class DictConst {
             case VIS_PRIVATE, "0" -> VIS_PRIVATE;
             case VIS_MEMBERS, "1" -> VIS_MEMBERS;
             case VIS_GROUPS, "2" -> VIS_GROUPS;
+            case VIS_CIRCLE -> VIS_CIRCLE;
             case VIS_PUBLIC, "4" -> VIS_PUBLIC;
             default -> VIS_FAMILY;
         };

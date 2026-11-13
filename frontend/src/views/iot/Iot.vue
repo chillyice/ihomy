@@ -41,6 +41,9 @@
             <div v-for="d in g.items" :key="d.id" class="iot-card card" v-a11y-click @click="openHistory(d)">
               <div class="iot-card-top">
                 <span class="iot-name">{{ d.name }}</span>
+                <el-tag v-if="d.visibility === 'PRIVATE'" size="small" type="warning" effect="plain">{{
+                  $t('iot.manage.visibilityOwner')
+                }}</el-tag>
                 <el-tag size="small" effect="plain">{{ $t('iot.domain.' + d.domain) }}</el-tag>
               </div>
 
@@ -135,8 +138,7 @@
       <div v-loading="hist.loading" class="hist-box">
         <template v-if="shape">
           <div class="hist-axis">
-            <span>{{ shape.hi }}</span
-            ><span>{{ shape.lo }}</span>
+            <span>{{ shape.hi }}</span><span>{{ shape.lo }}</span>
           </div>
           <svg class="hist-svg" :viewBox="'0 0 ' + shape.w + ' ' + shape.h" preserveAspectRatio="none" aria-hidden="true">
             <polyline
@@ -149,8 +151,7 @@
             />
           </svg>
           <div class="hist-axis">
-            <span>{{ shape.from }}</span
-            ><span>{{ shape.to }}</span>
+            <span>{{ shape.from }}</span><span>{{ shape.to }}</span>
           </div>
         </template>
         <el-empty v-else-if="!hist.loading" :description="$t('iot.historyEmpty')" :image-size="80" />
@@ -169,6 +170,19 @@
         <el-table-column :label="$t('iot.manage.room')" min-width="130">
           <template #default="{ row }">
             <el-input v-model="row.room" size="small" clearable :placeholder="$t('iot.manage.roomPlaceholder')" @change="saveDevice(row)" />
+          </template>
+        </el-table-column>
+        <el-table-column :label="$t('iot.manage.visibility')" width="130">
+          <template #default="{ row }">
+            <el-select
+              :model-value="row.visibility || 'FAMILY'"
+              size="small"
+              style="width: 100%"
+              @change="(v) => saveDevice(row, { visibility: v })"
+            >
+              <el-option value="FAMILY" :label="$t('iot.manage.visibilityFamily')" />
+              <el-option value="PRIVATE" :label="$t('iot.manage.visibilityOwner')" />
+            </el-select>
           </template>
         </el-table-column>
         <el-table-column :label="$t('iot.manage.show')" width="90">

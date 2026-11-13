@@ -15,6 +15,12 @@
       <el-form-item :label="$t('item.note')">
         <el-input v-model="form.note" type="textarea" :rows="2" />
       </el-form-item>
+      <el-form-item :label="$t('visibility.label')">
+        <VisibilityPicker v-model="form.visibility" :options="visibilityOptions" />
+      </el-form-item>
+      <el-form-item v-if="needsAudience(form.visibility)" :label="$t('audience.label')">
+        <AudiencePicker v-if="audience.canShare" v-model="audience.selected" :families="audience.families" />
+      </el-form-item>
     </el-form>
     <template #footer>
       <el-button @click="visible = false">{{ $t('common.cancel') }}</el-button>
@@ -24,11 +30,15 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { itemApi } from '@/api'
+import { audienceApi, itemApi } from '@/api'
 import { useI18n } from 'vue-i18n'
 import { dictText } from '@/utils/dict'
+import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
+import AudiencePicker from '@/components/common/AudiencePicker.vue'
+import { visibilityOptions as buildVisibilityOptions, needsAudience } from '@/utils/visibility'
+import { useAudience } from '@/composables/useAudience'
 
 const props = defineProps({
   itemTypes: { type: Array, default: () => [] },
@@ -41,11 +51,22 @@ const { t } = useI18n()
 const visible = ref(false)
 const form = ref({})
 
+const visibilityOptions = computed(() => buildVisibilityOptions(t))
+const { state: audience, load: loadAudience } = useAudience('item')
+
 const open = (row) => {
   form.value = row
-    ? { id: row.id, name: row.name, type: row.type, position: row.position || '', note: row.note || '' }
-    : { name: '', type: 'OTHER', position: '', note: '' }
+    ? {
+        id: row.id,
+        name: row.name,
+        type: row.type,
+        position: row.position || '',
+        note: row.note || '',
+        visibility: row.visibility || 'FAMILY',
+      }
+    : { name: '', type: 'OTHER', position: '', note: '', visibility: 'FAMILY' }
   visible.value = true
+  loadAudience(row?.id ?? null, 'item', { applyDefaults: !row })
 }
 const save = async () => {
   if (!form.value.name) return ElMessage.warning(t('item.itemNameRequired'))
@@ -61,9 +82,19 @@ const save = async () => {
     note: form.value.note,
     relX: 0.5,
     relY: 0.5,
+    visibility: form.value.visibility,
   }
-  if (form.value.id) await itemApi.update(form.value.id, body)
-  else await itemApi.create(body)
+  const saved = form.value.id ? await itemApi.update(form.value.id, body) : await itemApi.create(body)
+  const itemId = form.value.id || saved?.id
+  const picked = audience.loaded && audience.canShare ? (needsAudience(form.value.visibility) ? [...audience.selected] : []) : null
+  if (itemId && picked !== null) {
+    try {
+      const res = await audienceApi.save('item', itemId, picked)
+      if (picked.length && res?.targetCount === 0) ElMessage.info(t('audience.noTarget'))
+    } catch {
+      ElMessage.warning(t('audience.saveFailed'))
+    }
+  }
   ElMessage.success(t('common.success'))
   visible.value = false
   emit('saved')

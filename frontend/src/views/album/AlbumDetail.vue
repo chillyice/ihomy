@@ -7,8 +7,8 @@
     <div v-if="album.id" class="album-header card">
       <div class="album-head-info">
         <span class="album-name">{{ album.name }}</span>
-        <el-tag size="small" :type="album.type === 'public' ? 'primary' : 'warning'">
-          {{ album.type === 'public' ? t('album.public') : t('album.private') }}
+        <el-tag size="small" :type="visTagType">
+          {{ visibilityLabel(t, albumVisibility) }}
         </el-tag>
         <span v-if="sharedFrom" class="shared-badge">{{ sharedFromText }}</span>
         <span v-if="isMapped" class="mapped-badge">
@@ -52,13 +52,30 @@
           <el-button v-if="isMapped && userStore.isOwner" class="ghost-btn" :loading="refreshing" @click="onRefresh">{{
             t('album.refreshMap')
           }}</el-button>
-          <el-button v-if="canManageAlbum" class="ghost-btn" @click="pickCover">{{ t('album.setCover') }}</el-button>
-          <el-button v-if="canManageAlbum && ((photos.length && !isMapped) || children.length)" class="ghost-btn" @click="toggleSelect">{{
-            t('album.select')
-          }}</el-button>
-          <el-button v-if="album.type === 'public' && album.shareToken" class="ghost-btn" @click="copyAlbumShare">{{
-            t('album.share')
-          }}</el-button>
+          <template v-if="!isMobile">
+            <el-button v-if="canManageAlbum" class="ghost-btn" @click="pickCover">{{ t('album.setCover') }}</el-button>
+            <el-button v-if="canManageAlbum && ((photos.length && !isMapped) || children.length)" class="ghost-btn" @click="toggleSelect">{{
+              t('album.select')
+            }}</el-button>
+            <el-button v-if="albumVisibility === 'PUBLIC' && album.shareToken" class="ghost-btn" @click="copyAlbumShare">{{
+              t('album.share')
+            }}</el-button>
+          </template>
+          <!-- 手机:改名/封面/多选/分享链接收进「更多」,标题行不再被按钮挤成多行 -->
+          <el-dropdown v-else trigger="click" @command="onHeaderCommand">
+            <el-button class="ghost-btn">{{ t('album.moreActions') }}</el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item v-if="canManageAlbum" command="cover">{{ t('album.setCover') }}</el-dropdown-item>
+                <el-dropdown-item v-if="canManageAlbum && ((photos.length && !isMapped) || children.length)" command="select">{{
+                  t('album.select')
+                }}</el-dropdown-item>
+                <el-dropdown-item v-if="albumVisibility === 'PUBLIC' && album.shareToken" command="share">{{
+                  t('album.share')
+                }}</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
           <el-button
             v-if="userStore.isLoggedIn && !currentShareToken && !isMapped && !readOnly"
             type="primary"
@@ -171,7 +188,16 @@
       <div v-if="dropActive" class="drop-hint" aria-hidden="true">{{ t('album.dropHere') }}</div>
       <div v-if="photos.length" class="photo-wall">
         <div v-for="p in photos" :key="p.id" class="photo-card" :class="{ selected: selectMode && selectedIds.includes(p.id) }">
-          <div v-a11y-click class="photo-wrap" @click="selectMode ? togglePick(p) : openViewer(p)">
+          <div
+            v-a11y-click
+            class="photo-wrap"
+            @click="onPhotoClick(p)"
+            @pointerdown="onPhotoPointerDown(p)"
+            @pointerup="cancelPress"
+            @pointercancel="cancelPress"
+            @pointerleave="cancelPress"
+            @contextmenu.prevent
+          >
             <img :src="thumbUrl(p.url)" :alt="p.description || album.name" loading="lazy" />
             <span v-if="p.liveVideoUrl" class="live-badge">LIVE</span>
             <span v-if="selectMode" class="pick-badge" :class="{ on: selectedIds.includes(p.id) }">
@@ -186,11 +212,11 @@
                 />
               </svg>
             </span>
-            <div v-if="!selectMode" class="photo-hover">
+            <div v-if="!selectMode" class="photo-hover" @pointerdown.stop>
               <span v-a11y-click v-if="canManagePhoto(p)" @click.stop="openDesc(p)"
                 ><el-icon><Edit /></el-icon>{{ t('album.editNote') }}</span
               >
-              <span v-a11y-click v-if="canManagePhoto(p)" @click.stop="openPhotoAudience(p)"
+              <span v-a11y-click v-if="canManagePhoto(p) && canSharePhotos" @click.stop="openPhotoAudience(p)"
                 ><el-icon><Share /></el-icon>{{ t('album.share') }}</span
               >
               <span v-a11y-click v-if="canManagePhoto(p)" class="danger" @click.stop="onDelPhoto(p)"
@@ -219,7 +245,7 @@
     <!-- 单张照片的分享范围:不选圈 = 只给自家人 -->
     <el-dialog v-model="photoAudience.visible" append-to-body :title="t('audience.label')" width="420px">
       <div v-loading="photoAudience.loading">
-        <AudiencePicker v-if="photoShare.canShare" v-model="photoShare.selected" :circles="photoShare.circles" />
+        <AudiencePicker v-if="photoShare.canShare" v-model="photoShare.selected" :families="photoShare.families" />
         <p v-else class="audience-hint">{{ t('audience.canShareFalse') }}</p>
       </div>
       <template #footer>
@@ -249,6 +275,7 @@ import AlbumDefaultCover from '@/components/AlbumDefaultCover.vue'
 import AudiencePicker from '@/components/common/AudiencePicker.vue'
 import { shareId } from '@/utils/shareId'
 import { isNativeApp } from '@/utils/platform'
+import { VISIBILITY, visibilityLabel } from '@/utils/visibility'
 import { formatRelativeTime, formatDateTime } from '@/utils/datetime'
 import { useSyncStore } from '@/stores/sync'
 import { useDevice } from '@/composables/useDevice'
@@ -280,6 +307,11 @@ const { state: photoShare, load: loadPhotoAudience } = useAudience('photo')
 
 // 映射相册:只读(影子记录),隐藏上传与照片管理;别人家分享进来的相册同样只读
 const isMapped = computed(() => !!album.value.sourceDeviceId)
+// 相册可见范围:新列优先,老数据按 type 推导;照片可见范围跟随相册
+const albumVisibility = computed(() => album.value.visibility || (album.value.type === 'private' ? VISIBILITY.PRIVATE : VISIBILITY.PUBLIC))
+const visTagType = computed(() => (albumVisibility.value === VISIBILITY.PUBLIC ? 'primary' : 'warning'))
+// 单张照片分享只在「亲友圈」相册里有意义(照片本身跟随相册可见范围)
+const canSharePhotos = computed(() => albumVisibility.value === VISIBILITY.CIRCLE)
 const sharedFrom = ref(null)
 const readOnly = ref(false)
 const sharedFromText = computed(() => {
@@ -512,7 +544,7 @@ const setChildView = (v) => {
 const selectMode = ref(false)
 
 // ---------- 拖拽上传(T7):鼠标把系统文件拖进照片墙,松手即上传 ----------
-const { hasPointer } = useDevice()
+const { hasPointer, isMobile } = useDevice()
 const dropActive = ref(false)
 // 进入计数:照片卡等子元素间移动会连续触发 enter/leave,计数归零才算真正离开
 let dragDepth = 0
@@ -627,7 +659,46 @@ onMounted(() => {
   // 拖拽中切窗/失焦时浏览器不再补 dragleave,兜底清掉高亮与光标
   window.addEventListener('blur', clearDrop)
 })
+// ---------- 手机长按多选:长按照片直接进入选择模式并选中,删除不必再精确点小按钮 ----------
+let pressTimer = null
+let longPressed = false
+const onPhotoPointerDown = (p) => {
+  if (!isMobile.value || selectMode.value) return
+  longPressed = false
+  if (pressTimer) clearTimeout(pressTimer)
+  pressTimer = setTimeout(() => {
+    pressTimer = null
+    longPressed = true
+    selectMode.value = true
+    selectedIds.value = [p.id]
+    selectedChildIds.value = []
+  }, 450)
+}
+const cancelPress = () => {
+  if (pressTimer) {
+    clearTimeout(pressTimer)
+    pressTimer = null
+  }
+}
+const onPhotoClick = (p) => {
+  // 长按已经选中了这张:吞掉松手后的 click,避免又弹出播放页
+  if (longPressed) {
+    longPressed = false
+    return
+  }
+  if (selectMode.value) togglePick(p)
+  else openViewer(p)
+}
+
+// 手机标题行「更多」:封面/多选/分享链接
+const onHeaderCommand = (cmd) => {
+  if (cmd === 'cover') pickCover()
+  else if (cmd === 'select') toggleSelect()
+  else if (cmd === 'share') copyAlbumShare()
+}
+
 onBeforeUnmount(() => {
+  cancelPress()
   window.removeEventListener('blur', clearDrop)
   clearDrop()
 })
@@ -976,6 +1047,19 @@ onBeforeUnmount(() => {
   .album-header {
     flex-direction: column;
     align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+  }
+  /* 标题行按钮:手机上只留上传/拍照 + 更多,间距收紧,不再挤成好几行 */
+  .album-head-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 100%;
+  }
+  .album-head-actions :deep(.el-button) {
+    margin-left: 0;
+    padding: 5px 9px;
+    font-size: 12.5px;
   }
   .album-title {
     font-size: 18px;

@@ -34,6 +34,7 @@ const CHARGE_KEY = 'ihomy:photo:backup:chargeOnly'
 const CURSOR_KEY = 'ihomy:photo:backup:cursor'
 const LAST_KEY = 'ihomy:photo:backup:last'
 const DEVICE_KEY = 'ihomy:photo:backup:device'
+const EXCLUDE_KEY = 'ihomy:photo:backup:excludeFolders'
 
 /** 首次备份只处理这么多天内的照片(再早的走「全部备份」);口径在 utils/photoBackupWindow */
 export { DEFAULT_DAYS }
@@ -96,6 +97,27 @@ export function chargeOnlyEnabled() {
 
 export function setChargeOnly(on) {
   writeFlag(CHARGE_KEY, on)
+}
+
+/** 不同步的相册目录 id(Android=MediaStore 桶 ID,iOS=相册 localIdentifier);空 = 全部备份 */
+export function excludedPhotoFolders() {
+  const list = readJson(EXCLUDE_KEY, [])
+  return Array.isArray(list) ? list.filter((v) => typeof v === 'string' && v) : []
+}
+
+export function setExcludedPhotoFolders(list) {
+  writeJson(EXCLUDE_KEY, Array.isArray(list) ? list.filter((v) => typeof v === 'string' && v) : [])
+}
+
+/** 读取本机相册目录清单(名称 + 张数),设置页用来勾选「不备份哪些」 */
+export async function photoBackupFolders() {
+  if (!isNativeApp()) return []
+  try {
+    const res = await Plugin.folders()
+    return (res && res.folders) || []
+  } catch (e) {
+    return []
+  }
 }
 
 function readJson(key, fallback) {
@@ -168,7 +190,7 @@ export async function photoBackupPending() {
   try {
     const cursor = readCursor()
     const sinceMs = pendingSinceMs(cursor, Date.now())
-    const res = await Plugin.count({ sinceMs })
+    const res = await Plugin.count({ sinceMs, excludeFolders: excludedPhotoFolders() })
     return res && res.granted ? Number(res.total) || 0 : 0
   } catch (e) {
     return 0
@@ -248,6 +270,8 @@ async function doRun({ full = false } = {}) {
     let afterDateAdded = cursor ? cursor.d : 0
     let afterId = cursor ? cursor.i : 0
     let stoppedByFailure = false
+    // 用户选择不同步的目录:原生按目录过滤(Android 桶 ID / iOS 相册标识)
+    const excludeFolders = excludedPhotoFolders()
 
     for (let page = 0; page < 500; page++) {
       if (stopRequested) break
@@ -256,6 +280,7 @@ async function doRun({ full = false } = {}) {
         afterDateAdded,
         afterId,
         limit: PAGE_SIZE,
+        excludeFolders,
       })
       const items = (res && res.items) || []
       if (!items.length) break

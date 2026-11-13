@@ -20,6 +20,8 @@ public class Album {
     private Long id;
     private String name;
     private String type;
+    /** 可见范围:PRIVATE/CIRCLE/FAMILY/PUBLIC(type 仍保留给旧客户端与游客分享链接判定) */
+    private String visibility;
     private String coverPhotoUrl;
     private String coverUrl;
     private String shareToken;

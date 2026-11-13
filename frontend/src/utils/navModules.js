@@ -104,7 +104,8 @@ export const ICON_MAP = {
 export const iconComp = (code) => ICON_MAP[code] || Document
 
 // 分组顺序 + 中文名(相册 album 已并入 content,不单独成组)
-// family 组(V10.85):物品定位/家庭公告/智能家居/工具箱 从生活组拆出,固定排在生活之后;
+// family 组(V10.85):物品定位/家庭公告/智能家居 从生活组拆出,固定排在生活之后;
+// 工具箱(V12.23)归回生活组殿后(sort_order 17 仍是生活组内最大);
 // member(V10.93)并入 family 组成为组内第一位,「成员(social)」分组随之取消。
 // 只在此处登记顺序与名称,三端(sidebar/暖居/移动端)自动同步
 export const NAV_GROUP_ORDER = ['content', 'life', 'family', 'system']

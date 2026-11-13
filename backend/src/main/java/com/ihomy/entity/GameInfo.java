@@ -31,6 +31,8 @@ public class GameInfo {
     /** 外部网页游戏地址(仅 LINK 类型有值) */
     private String linkUrl;
     private String status;
+    /** 可见范围(PRIVATE/CIRCLE/FAMILY/PUBLIC):CIRCLE 靠 content_audience 落到具体家庭 */
+    private String visibility;
     @TableLogic
     private Integer deleted;
     private LocalDateTime createdAt;

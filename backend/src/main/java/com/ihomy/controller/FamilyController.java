@@ -16,6 +16,7 @@ import com.ihomy.mapper.SysRoleMapper;
 import com.ihomy.mapper.SysUserRoleMapper;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.BlogService;
+import com.ihomy.service.CircleService;
 import com.ihomy.service.FileService;
 import com.ihomy.service.MultiFamilyService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -51,6 +52,7 @@ public class FamilyController {
     private final com.ihomy.service.ParameterService parameterService;
     private final PublicController publicController;
     private final com.ihomy.service.AudienceService audienceService;
+    private final CircleService circleService;
 
     @Operation(summary = "创建新家庭(当前用户绑定 OWNER)")
     @OperationLog(module = "FAMILY", operationType = "CREATE", description = "创建新家庭", saveArgs = false)
@@ -209,6 +211,29 @@ public class FamilyController {
     public Result<Map<String, Object>> shareAudit(@RequestParam(defaultValue = "1") int page,
                                                   @RequestParam(defaultValue = "10") int size) {
         return Result.success(audienceService.audit(securityHelper.current().getFamilyId(), page, size));
+    }
+
+    @Operation(summary = "本家庭默认分享目标(选亲友圈时预勾选)")
+    @GetMapping("/share-default")
+    public Result<Map<String, Object>> shareDefaults() {
+        return Result.success(circleService.shareDefaults(securityHelper.current().getFamilyId()));
+    }
+
+    @Operation(summary = "保存本家庭默认分享目标")
+    @OperationLog(module = "SHARE", operationType = "CONFIG", description = "保存默认分享目标", saveArgs = false)
+    @RequirePermission("family:manage")
+    @PutMapping("/share-default")
+    public Result<Map<String, Object>> saveShareDefaults(@RequestBody Map<String, Object> body) {
+        SysUser user = securityHelper.currentUser();
+        List<Long> ids = new java.util.ArrayList<>();
+        Object raw = body.get("targetFamilyIds");
+        if (raw instanceof List<?> list) {
+            for (Object o : list) {
+                if (o instanceof Number n) ids.add(n.longValue());
+                else if (o != null) ids.add(Long.valueOf(o.toString()));
+            }
+        }
+        return Result.success(circleService.saveShareDefaults(user.getFamilyId(), ids, user.getId()));
     }
 
     @Operation(summary = "收回本家庭分享出去的全部内容")

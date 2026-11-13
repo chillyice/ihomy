@@ -1,5 +1,6 @@
 package com.ihomy.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -14,6 +15,9 @@ import com.ihomy.mapper.FurnitureMapper;
 import com.ihomy.mapper.HouseMapper;
 import com.ihomy.mapper.ItemMapper;
 import com.ihomy.mapper.RoomMapper;
+import com.ihomy.service.access.ContentAccessService;
+import com.ihomy.service.access.ContentKind;
+import com.ihomy.service.access.ViewerScope;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -73,30 +77,32 @@ public class ItemAiService {
     private final RoomMapper roomMapper;
     private final FurnitureMapper furnitureMapper;
     private final ItemMapper itemMapper;
+    private final ContentAccessService contentAccess;
     private final ObjectMapper mapper = new ObjectMapper();
 
     // ---------- 找物 ----------
 
-    public Map<String, Object> find(Long familyId, String query) {
+    public Map<String, Object> find(ViewerScope viewer, String query) {
+        Long familyId = viewer.familyId();
         String q = requireText(query, "请描述要找的物品");
         FamilyAiConfigService.Chain chain = familyAiConfigService.resolveChain(familyId, AiConst.FEATURE_ITEM_FIND);
-        Map<String, Object> result = findWith(familyId, q, chain.primary());
+        Map<String, Object> result = findWith(viewer, q, chain.primary());
         if (hasMatches(result) || !chain.hasFallback()) return result;
         log.info("[AI找物] 主模型无命中,回退兜底模型 family={}", familyId);
-        return findWith(familyId, q, chain.fallback());
+        return findWith(viewer, q, chain.fallback());
     }
 
     /** 按单个模型配置找物:LOCAL/未配置 → 纯本地;LLM → 本地优先,无命中才 LLM */
-    private Map<String, Object> findWith(Long familyId, String q, FamilyAiConfigService.AiConfig cfg) {
+    private Map<String, Object> findWith(ViewerScope viewer, String q, FamilyAiConfigService.AiConfig cfg) {
         boolean localOnly = cfg == null || cfg.type() == null || AiConst.TYPE_LOCAL.equals(cfg.type());
         if (localOnly) {
-            return findResult(q, itemLocalParser.findLocal(familyId, q), true);
+            return findResult(q, itemLocalParser.findLocal(viewer, q), true);
         }
-        List<Map<String, Object>> localMatches = itemLocalParser.findLocal(familyId, q);
+        List<Map<String, Object>> localMatches = itemLocalParser.findLocal(viewer, q);
         if (!localMatches.isEmpty()) {
             return findResult(q, localMatches, true);
         }
-        return llmFind(familyId, q, cfg);
+        return llmFind(viewer, q, cfg);
     }
 
     private boolean hasMatches(Map<String, Object> result) {
@@ -105,7 +111,8 @@ public class ItemAiService {
     }
 
     /** LLM 找物兜底:提取关键词+类型 → 内存打分;模型不可用/异常回退原文关键词 */
-    private Map<String, Object> llmFind(Long familyId, String q, FamilyAiConfigService.AiConfig cfg) {
+    private Map<String, Object> llmFind(ViewerScope viewer, String q, FamilyAiConfigService.AiConfig cfg) {
+        Long familyId = viewer.familyId();
         boolean aiParsed = true;
         JsonNode plan = null;
         try {
@@ -118,7 +125,8 @@ public class ItemAiService {
         String type = plan == null ? null : normTypeOrNull(plan.path("type"));
         List<String> keywords = parsed.isEmpty() ? List.of(q.trim()) : parsed; // AI 拆解失败回退原文
 
-        List<Map<String, Object>> matches = itemMapper.selectItemByFamily(familyId, null, null, null, null)
+        List<Map<String, Object>> matches = itemMapper.selectItemByFamily(familyId, null, null, null, null,
+                        contentAccess.visibleFilter(viewer))
                 .stream()
                 .filter(row -> type == null || type.equals(str(row.get("type"))))
                 .map(row -> Map.entry(score(row, keywords), row))
@@ -166,33 +174,34 @@ public class ItemAiService {
 
     // ---------- 放物 ----------
 
-    public Map<String, Object> put(Long userId, Long familyId, String text) {
+    public Map<String, Object> put(ViewerScope viewer, String text) {
+        Long familyId = viewer.familyId();
         String q = requireText(text, "请描述物品放置位置");
         FamilyAiConfigService.Chain chain = familyAiConfigService.resolveChain(familyId, AiConst.FEATURE_ITEM_PUT);
         // 本地规则优先:能解析直接落库(无论主模型是 LOCAL 还是 LLM)
         ItemLocalParser.PutPlan localPlan = itemLocalParser.parsePut(familyId, q);
         if (localPlan != null) {
-            return executePut(userId, familyId, localPlan);
+            return executePut(viewer, localPlan);
         }
-        return putViaLlm(userId, familyId, q, chain);
+        return putViaLlm(viewer, q, chain);
     }
 
     /** 本地解析不出时走 LLM:主模型优先,不足/失败再兜底 */
-    private Map<String, Object> putViaLlm(Long userId, Long familyId, String q, FamilyAiConfigService.Chain chain) {
+    private Map<String, Object> putViaLlm(ViewerScope viewer, String q, FamilyAiConfigService.Chain chain) {
         if (isLlm(chain.primary())) {
             try {
-                return llmPut(userId, familyId, q, chain.primary());
+                return llmPut(viewer, q, chain.primary());
             } catch (RuntimeException e) {
                 if (chain.hasFallback() && isLlm(chain.fallback())) {
                     log.warn("[AI放物] 主模型失败,回退兜底模型 err={}", e.getMessage());
-                    return llmPut(userId, familyId, q, chain.fallback());
+                    return llmPut(viewer, q, chain.fallback());
                 }
                 throw e;
             }
         }
         // 主模型是 LOCAL/未配置(本地已试过失败):兜底是 LLM 才回退,否则提示
         if (chain.hasFallback() && isLlm(chain.fallback())) {
-            return llmPut(userId, familyId, q, chain.fallback());
+            return llmPut(viewer, q, chain.fallback());
         }
         throw new BizException(ResultCode.BAD_REQUEST, "未能识别物品与位置,请换个说法(如「把温度计放厨房的橱柜里」)");
     }
@@ -202,9 +211,10 @@ public class ItemAiService {
     }
 
     /** LLM 放物兜底:解析五级粒度目标(防编造),再走统一落库 */
-    private Map<String, Object> llmPut(Long userId, Long familyId, String q, FamilyAiConfigService.AiConfig cfg) {
+    private Map<String, Object> llmPut(ViewerScope viewer, String q, FamilyAiConfigService.AiConfig cfg) {
+        Long familyId = viewer.familyId();
         JsonNode plan = aiService.chatJson(familyId, AiConst.FEATURE_ITEM_PUT, cfg, putSystemPrompt(),
-                "家庭上下文清单:\n" + toJson(buildContext(familyId)) + "\n\n用户描述:" + q);
+                "家庭上下文清单:\n" + toJson(buildContext(viewer)) + "\n\n用户描述:" + q);
 
         String name = plan.path("name").asText("").trim();
         if (name.isEmpty()) {
@@ -239,13 +249,15 @@ public class ItemAiService {
             roomId = furniture.getRoomId();
         }
 
-        return executePut(userId, familyId, new ItemLocalParser.PutPlan(
+        return executePut(viewer, new ItemLocalParser.PutPlan(
                 name, aliases, type, position, quantity, unit, roomId, furnitureId, move));
     }
 
     /** 统一落库:命中同名/别名且 move 则 UPDATE(挪位),否则 INSERT */
-    private Map<String, Object> executePut(Long userId, Long familyId, ItemLocalParser.PutPlan p) {
-        Item existing = findByNameOrAlias(familyId, p.name());
+    private Map<String, Object> executePut(ViewerScope viewer, ItemLocalParser.PutPlan p) {
+        Long userId = viewer.userId();
+        Long familyId = viewer.familyId();
+        Item existing = findByNameOrAlias(viewer, p.name());
         boolean moved;
         Long itemId;
         String itemName;
@@ -317,10 +329,13 @@ public class ItemAiService {
         }
     }
 
-    /** 同名或别名命中(忽略大小写;优先精确同名) */
-    private Item findByNameOrAlias(Long familyId, String name) {
-        List<Item> items = itemMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<Item>()
-                .eq(Item::getFamilyId, familyId));
+    /** 同名或别名命中(忽略大小写;优先精确同名),只在本成员看得见的物品里找 */
+    private Item findByNameOrAlias(ViewerScope viewer, String name) {
+        LambdaQueryWrapper<Item> qw = new LambdaQueryWrapper<>();
+        qw.eq(Item::getFamilyId, viewer.familyId());
+        contentAccess.applyVisible(qw, ContentKind.ITEM, viewer,
+                Item::getFamilyId, Item::getCreatedBy, Item::getVisibility);
+        List<Item> items = itemMapper.selectList(qw);
         String lower = name.toLowerCase(Locale.ROOT);
         Item aliasHit = null;
         for (Item it : items) {
@@ -357,7 +372,8 @@ public class ItemAiService {
     // ---------- 上下文 ----------
 
     /** 家庭五级粒度上下文(房子/房间/家具 + 已有物品),供 AI 从清单中选目标与判定挪位 */
-    private Map<String, Object> buildContext(Long familyId) {
+    private Map<String, Object> buildContext(ViewerScope viewer) {
+        Long familyId = viewer.familyId();
         Map<String, Object> ctx = new LinkedHashMap<>();
         ctx.put("houses", houseMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<House>()
                 .eq(House::getFamilyId, familyId)).stream()
@@ -383,7 +399,8 @@ public class ItemAiService {
                     return m;
                 })
                 .toList());
-        ctx.put("items", itemMapper.selectItemByFamily(familyId, null, null, null, null).stream()
+        ctx.put("items", itemMapper.selectItemByFamily(familyId, null, null, null, null,
+                        contentAccess.visibleFilter(viewer)).stream()
                 .limit(CONTEXT_LIMIT)
                 .map(row -> {
                     // 紧凑"名称(别名1/别名2)"文本:省 id(AI 无需回传物品 id,后端按名称/别名匹配)与 JSON 键名 token

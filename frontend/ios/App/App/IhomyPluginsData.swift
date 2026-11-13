@@ -341,6 +341,7 @@ class IhomyPhotoBackupPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "requestPermission", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "count", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "list", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "folders", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "prepare", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "drop", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "readBase64", returnType: CAPPluginReturnPromise),
@@ -404,6 +405,7 @@ class IhomyPhotoBackupPlugin: CAPPlugin, CAPBridgedPlugin {
             return
         }
         let sinceMs = call.getDouble("sinceMs") ?? 0
+        let excluded = call.getArray("excludeFolders") as? [String] ?? []
         queue.async {
             let options = PHFetchOptions()
             options.predicate = NSPredicate(format: "mediaType == %d AND (creationDate >= %@ OR modificationDate >= %@)",
@@ -411,8 +413,57 @@ class IhomyPhotoBackupPlugin: CAPPlugin, CAPBridgedPlugin {
                                             Date(timeIntervalSince1970: sinceMs / 1000),
                                             Date(timeIntervalSince1970: sinceMs / 1000))
             let result = PHAsset.fetchAssets(with: options)
-            call.resolve(["total": result.count, "granted": true])
+            let hidden = self.hiddenIdentifiers(excluded)
+            if hidden.isEmpty {
+                call.resolve(["total": result.count, "granted": true])
+                return
+            }
+            var total = 0
+            result.enumerateObjects { asset, _, _ in
+                if !hidden.contains(asset.localIdentifier) { total += 1 }
+            }
+            call.resolve(["total": total, "granted": true])
         }
+    }
+
+    /// 系统相册目录(智能相册 + 用户相册):只返回含照片的,用于「哪些目录不同步」。
+    @objc func folders(_ call: CAPPluginCall) {
+        guard permissionState() == "granted" else {
+            call.resolve(["folders": []])
+            return
+        }
+        queue.async {
+            var out: [[String: Any]] = []
+            func append(_ collections: PHFetchResult<PHAssetCollection>) {
+                collections.enumerateObjects { collection, _, _ in
+                    let assets = PHAsset.fetchAssets(in: collection, options: nil)
+                    let count = assets.countOfAssets(with: .image)
+                    guard count > 0 else { return }
+                    out.append([
+                        "id": collection.localIdentifier,
+                        "name": collection.localizedTitle ?? "其他",
+                        "count": count
+                    ])
+                }
+            }
+            append(PHAssetCollection.fetchAssetCollections(with: .smartAlbum, subtype: .any, options: nil))
+            append(PHAssetCollection.fetchAssetCollections(with: .album, subtype: .any, options: nil))
+            call.resolve(["folders": out])
+        }
+    }
+
+    /// 用户选择不同步的目录里包含的照片 localIdentifier(排除用)
+    private func hiddenIdentifiers(_ collectionIds: [String]) -> Set<String> {
+        guard !collectionIds.isEmpty else { return [] }
+        var hidden = Set<String>()
+        let collections = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: collectionIds, options: nil)
+        collections.enumerateObjects { collection, _, _ in
+            let assets = PHAsset.fetchAssets(in: collection, options: nil)
+            assets.enumerateObjects { asset, _, _ in
+                hidden.insert(asset.localIdentifier)
+            }
+        }
+        return hidden
     }
 
     @objc func list(_ call: CAPPluginCall) {
@@ -426,12 +477,14 @@ class IhomyPhotoBackupPlugin: CAPPlugin, CAPBridgedPlugin {
         var limit = call.getInt("limit") ?? 50
         if limit <= 0 || limit > 200 { limit = 50 }
         let pageSize = limit
+        let excluded = call.getArray("excludeFolders") as? [String] ?? []
 
         queue.async {
             let options = PHFetchOptions()
             options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
             options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
             let result = PHAsset.fetchAssets(with: options)
+            let hidden = self.hiddenIdentifiers(excluded)
 
             var manifest = self.loadManifest()
             var items: [[String: Any]] = []
@@ -441,6 +494,7 @@ class IhomyPhotoBackupPlugin: CAPPlugin, CAPBridgedPlugin {
             while index < result.count {
                 let asset = result.object(at: index)
                 index += 1
+                if hidden.contains(asset.localIdentifier) { continue }
                 let dateAdded = self.dateAdded(of: asset)
                 if dateAdded < Int64(sinceMs) { continue }
                 let mediaId = self.mediaId(for: asset)

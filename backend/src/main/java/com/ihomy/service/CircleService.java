@@ -10,11 +10,13 @@ import com.ihomy.dto.CircleDTO;
 import com.ihomy.entity.Family;
 import com.ihomy.entity.FamilyCircle;
 import com.ihomy.entity.FamilyCircleMember;
+import com.ihomy.entity.FamilyShareDefault;
 import com.ihomy.entity.SysUser;
 import com.ihomy.mapper.ContentAudienceMapper;
 import com.ihomy.mapper.FamilyCircleMapper;
 import com.ihomy.mapper.FamilyCircleMemberMapper;
 import com.ihomy.mapper.FamilyMapper;
+import com.ihomy.mapper.FamilyShareDefaultMapper;
 import com.ihomy.mapper.SysUserRoleMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -53,6 +55,7 @@ public class CircleService {
     private final FamilyCircleMemberMapper memberMapper;
     private final ContentAudienceMapper audienceMapper;
     private final FamilyMapper familyMapper;
+    private final FamilyShareDefaultMapper shareDefaultMapper;
     private final SysUserRoleMapper userRoleMapper;
     private final PublicController publicController;
 
@@ -247,6 +250,80 @@ public class CircleService {
                 .eq(FamilyCircleMember::getStatus, DictConst.CIRCLE_MEMBER_ACTIVE)
                 .set(FamilyCircleMember::getStatus, DictConst.CIRCLE_MEMBER_LEFT));
         revokeByCircle(circleId, null);
+    }
+
+    /** 本家庭在圈内可选的家庭(去重,带圈名与称呼),供「默认分享目标」与可见性面板共用 */
+    public List<Map<String, Object>> targetFamilies(Long familyId) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (familyId == null) return result;
+        List<FamilyCircleMember> mine = memberMapper.selectList(new LambdaQueryWrapper<FamilyCircleMember>()
+                .eq(FamilyCircleMember::getFamilyId, familyId)
+                .eq(FamilyCircleMember::getStatus, DictConst.CIRCLE_MEMBER_ACTIVE));
+        if (mine.isEmpty()) return result;
+        Map<Long, FamilyCircle> circles = circleMapper.selectBatchIds(
+                        mine.stream().map(FamilyCircleMember::getCircleId).toList()).stream()
+                .filter(c -> DictConst.CIRCLE_ACTIVE.equals(c.getStatus()))
+                .collect(Collectors.toMap(FamilyCircle::getId, c -> c));
+        Set<Long> seen = new java.util.HashSet<>();
+        for (FamilyCircleMember m : mine) {
+            FamilyCircle circle = circles.get(m.getCircleId());
+            if (circle == null) continue;
+            List<FamilyCircleMember> members = memberMapper.selectList(new LambdaQueryWrapper<FamilyCircleMember>()
+                    .eq(FamilyCircleMember::getCircleId, circle.getId())
+                    .eq(FamilyCircleMember::getStatus, DictConst.CIRCLE_MEMBER_ACTIVE)
+                    .orderByAsc(FamilyCircleMember::getId));
+            Map<Long, Family> families = memberFamilyMap(members);
+            for (FamilyCircleMember other : members) {
+                if (other.getFamilyId().equals(familyId) || !seen.add(other.getFamilyId())) continue;
+                Family f = families.get(other.getFamilyId());
+                Map<String, Object> fm = new LinkedHashMap<>();
+                fm.put("familyId", other.getFamilyId());
+                fm.put("familyName", f == null ? null : f.getName());
+                fm.put("familyCoverImage", f == null ? null : f.getCoverImage());
+                fm.put("alias", other.getAlias());
+                fm.put("circleId", circle.getId());
+                fm.put("circleName", circle.getName());
+                result.add(fm);
+            }
+        }
+        return result;
+    }
+
+    /** 默认分享目标:家庭的预勾选家庭 id + 可选家庭列表(读设置页与发布面板共用) */
+    public Map<String, Object> shareDefaults(Long familyId) {
+        Set<Long> targets = shareDefaultMapper.selectList(new LambdaQueryWrapper<FamilyShareDefault>()
+                        .eq(FamilyShareDefault::getFamilyId, familyId)).stream()
+                .map(FamilyShareDefault::getTargetFamilyId)
+                .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("targetFamilyIds", new ArrayList<>(targets));
+        data.put("families", targetFamilies(familyId));
+        return data;
+    }
+
+    /** 保存默认分享目标:只接受当前仍在同一活跃圈里的家庭,先清后写(整体覆盖) */
+    @Transactional
+    public Map<String, Object> saveShareDefaults(Long familyId, List<Long> targetFamilyIds, Long userId) {
+        Set<Long> available = targetFamilies(familyId).stream()
+                .map(m -> ((Number) m.get("familyId")).longValue())
+                .collect(Collectors.toSet());
+        List<Long> wanted = targetFamilyIds == null ? List.of() : targetFamilyIds.stream()
+                .filter(Objects::nonNull).distinct().toList();
+        for (Long id : wanted) {
+            if (!available.contains(id)) {
+                throw new BizException(ResultCode.BAD_REQUEST, "只能选择同一亲友圈里的家庭");
+            }
+        }
+        shareDefaultMapper.delete(new LambdaQueryWrapper<FamilyShareDefault>()
+                .eq(FamilyShareDefault::getFamilyId, familyId));
+        for (Long id : wanted) {
+            FamilyShareDefault row = new FamilyShareDefault();
+            row.setFamilyId(familyId);
+            row.setTargetFamilyId(id);
+            row.setCreatedBy(userId);
+            shareDefaultMapper.insert(row);
+        }
+        return shareDefaults(familyId);
     }
 
     /** 某家庭当前在圈的家庭 id(除自己),供分享时展开 */

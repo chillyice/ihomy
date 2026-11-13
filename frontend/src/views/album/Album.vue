@@ -5,13 +5,13 @@
 
     <PageToolbar>
       <template v-if="!selectMode">
-        <div class="tb-left">
+        <div class="tb-left album-tb-left">
           <el-input
             v-model="searchKeyword"
+            class="album-search"
             :placeholder="t('album.searchPlaceholder')"
             clearable
             size="small"
-            style="width: 200px"
             data-search-input
           >
             <template #prefix>
@@ -21,21 +21,37 @@
               </svg>
             </template>
           </el-input>
-          <el-select v-model="sourceFilter" size="small" style="width: 150px" :placeholder="t('album.filterSource')">
+          <el-select v-model="sourceFilter" class="album-filter-source" size="small" :placeholder="t('album.filterSource')">
             <el-option value="" :label="t('album.allSources')" />
             <el-option value="LOCAL" :label="t('album.localUpload')" />
             <el-option v-for="s in sourceOptions" :key="s.value" :value="s.value" :label="s.label" />
           </el-select>
-          <el-select v-model="typeFilter" size="small" style="width: 120px" :placeholder="t('album.filterType')">
+          <el-select v-model="visibilityFilter" class="album-filter-vis" size="small" :placeholder="t('album.filterType')">
             <el-option value="" :label="t('album.allTypes')" />
-            <el-option value="public" :label="t('album.public')" />
-            <el-option value="private" :label="t('album.private')" />
+            <el-option v-for="o in visibilityOptions" :key="o.value" :value="o.value" :label="o.label" />
           </el-select>
         </div>
         <div class="tb-right">
-          <el-button v-if="userStore.isLoggedIn" @click="cascadeVisible = true">{{ t('cascade.title') }}</el-button>
-          <el-button v-if="userStore.isLoggedIn && topAlbums.length" @click="toggleSelect">{{ t('album.select') }}</el-button>
-          <el-button v-if="userStore.isOwner" @click="syncVisible = true">{{ t('album.syncFromDevice') }}</el-button>
+          <template v-if="!isMobile">
+            <el-button v-if="userStore.isLoggedIn" @click="cascadeVisible = true">{{ t('cascade.title') }}</el-button>
+            <el-button v-if="userStore.isLoggedIn && topAlbums.length" @click="toggleSelect">{{ t('album.select') }}</el-button>
+            <el-button v-if="userStore.isOwner" @click="syncVisible = true">{{ t('album.syncFromDevice') }}</el-button>
+            <el-button v-if="backupAvailable" @click="openBackupSettings">{{ t('album.backupToolbar') }}</el-button>
+          </template>
+          <!-- 手机:其余动作收进「更多」,只留搜索 + 更多 + 新建,工具栏不再换行挤压 -->
+          <el-dropdown v-else trigger="click" @command="onMoreCommand">
+            <el-button :aria-label="t('album.moreActions')"
+              ><el-icon><MoreFilled /></el-icon
+            ></el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="cascade">{{ t('cascade.title') }}</el-dropdown-item>
+                <el-dropdown-item v-if="topAlbums.length" command="select">{{ t('album.select') }}</el-dropdown-item>
+                <el-dropdown-item v-if="userStore.isOwner" command="sync">{{ t('album.syncFromDevice') }}</el-dropdown-item>
+                <el-dropdown-item v-if="backupAvailable" command="backup">{{ t('album.backupToolbar') }}</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
           <el-button v-if="userStore.isLoggedIn" type="primary" @click="openEditor()">{{ t('album.newAlbum') }}</el-button>
         </div>
       </template>
@@ -47,15 +63,6 @@
         }}</el-button>
       </div>
     </PageToolbar>
-
-    <!-- 仅原生壳 + 已登录 + 自动备份未开:提示条把「功能存在但藏在设置里」变成看得见 -->
-    <div v-if="showBackupBanner" class="backup-banner card">
-      <div class="bb-text">
-        <span class="bb-title">{{ t('album.backupEntryTitle') }}</span>
-        <span class="bb-desc">{{ t('album.backupEntryDesc') }}</span>
-      </div>
-      <el-button type="primary" @click="router.push('/settings?tab=client')">{{ t('album.backupEntryAction') }}</el-button>
-    </div>
 
     <div v-loading="loading">
       <!-- 宽屏双栏(≥900px 且屏幕短边 ≥600dp,判定只在 useDevice):
@@ -125,9 +132,7 @@
               <div v-else class="album-cover">
                 <AlbumDefaultCover :size="64" />
               </div>
-              <span v-if="!selectMode" class="album-type" :class="a.type">{{
-                a.type === 'public' ? t('album.public') : t('album.private')
-              }}</span>
+              <span v-if="!selectMode" class="album-vis" :class="albumVis(a)">{{ visibilityLabel(t, albumVis(a)) }}</span>
               <span v-if="a.sharedFrom" class="album-shared">{{ sharedFromText(a.sharedFrom) }}</span>
               <span v-if="a.sourceDeviceName" class="album-source">
                 <span class="status-dot" :class="a.syncStatus || 'OFFLINE'"></span>{{ a.sourceDeviceName }}
@@ -178,11 +183,11 @@
           <el-input v-model="editor.form.name" :placeholder="t('album.namePlaceholder')" />
         </el-form-item>
         <el-form-item :label="t('album.visibility')">
-          <VisibilityPicker v-model="editor.form.type" :options="visibilityOptions" />
+          <VisibilityPicker v-model="editor.form.visibility" :options="visibilityOptions" />
         </el-form-item>
-        <!-- 分享范围:私密相册不进亲友圈;面板数据随编辑对象加载 -->
-        <div v-if="audience.loaded && editor.form.type !== 'private'" class="editor-audience">
-          <AudiencePicker v-if="audience.canShare" v-model="audience.selected" :circles="audience.circles" />
+        <!-- 分享范围:只有「亲友圈」才需要选家庭;面板数据随编辑对象加载 -->
+        <div v-if="needsAudience(editor.form.visibility)" class="editor-audience">
+          <AudiencePicker v-if="audience.canShare" v-model="audience.selected" :families="audience.families" />
           <p v-else class="editor-audience-tip">{{ t('audience.canShareFalse') }}</p>
         </div>
       </el-form>
@@ -209,7 +214,7 @@ import { useDevice } from '@/composables/useDevice'
 import { useWideCols } from '@/composables/useWideCols'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
-import { Edit, Delete, Close } from '@element-plus/icons-vue'
+import { Edit, Delete, Close, MoreFilled } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
 import AudiencePicker from '@/components/common/AudiencePicker.vue'
@@ -220,39 +225,46 @@ import PhotoCascade from './PhotoCascade.vue'
 import AlbumDetail from './AlbumDetail.vue'
 import { formatDate } from '@/utils/datetime'
 import { isNativeApp } from '@/utils/platform'
+import { VISIBILITY, visibilityOptions as buildVisibilityOptions, visibilityLabel, needsAudience } from '@/utils/visibility'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-const { isWide: viewWide } = useDevice()
+const { isWide: viewWide, isMobile } = useDevice()
 const root = ref(null)
 const syncVisible = ref(false)
 const cascadeVisible = ref(false)
 const albums = ref([])
 const loading = ref(false)
 const loadError = ref(false)
-const editor = reactive({ visible: false, form: { id: null, name: '', type: 'public' } })
-// 相册可见范围:public=公开相册(照片 PUBLIC),private=仅家庭可见
-const visibilityOptions = computed(() => [
-  { value: 'public', label: t('album.publicOption') },
-  { value: 'private', label: t('album.privateOption') },
-])
+const editor = reactive({ visible: false, form: { id: null, name: '', visibility: VISIBILITY.PUBLIC } })
+// 相册可见范围四档(顺序:公开 > 亲友圈 > 家庭 > 私密);访客/分享链接只看公开
+const visibilityOptions = computed(() => buildVisibilityOptions(t))
 
-// 手机照片自动备份入口:只在原生壳 + 已登录 + 开关关着时出现。
-// 只在挂载时读一次开关(同步读 localStorage,不碰原生扫描);从设置页回来会重新挂载,状态自然更新。
-const backupOff = ref(false)
-const showBackupBanner = computed(() => backupOff.value && userStore.isLoggedIn)
+// 手机自动备份入口:原生壳里显示在工具栏,点进设置页;Web 端不出现
+const backupAvailable = computed(() => isNativeApp() && userStore.isLoggedIn)
+const openBackupSettings = () => router.push('/settings?tab=client')
+// 手机工具栏「更多」里的动作
+const onMoreCommand = (cmd) => {
+  if (cmd === 'cascade') cascadeVisible.value = true
+  else if (cmd === 'select') toggleSelect()
+  else if (cmd === 'sync') syncVisible.value = true
+  else if (cmd === 'backup') openBackupSettings()
+}
 
-// 顶层相册:层级映射的子相册不直接出现在列表页,进入父相册查看;再按关键词/来源/类型前端过滤(数据量小)
+// 相册可见范围:新列优先,老数据按 type 推导,列表角标与筛选同一口径
+const albumVis = (a) => a.visibility || (a.type === 'private' ? VISIBILITY.PRIVATE : VISIBILITY.PUBLIC)
+
+// 顶层相册:层级映射的子相册不直接出现在列表页,进入父相册查看;再按关键词/来源/可见范围前端过滤(数据量小)
 const searchKeyword = ref('')
 const sourceFilter = ref('')
-const typeFilter = ref('')
+const visibilityFilter = ref('')
 const topAlbums = computed(() =>
   albums.value.filter((a) => {
     if (a.parentId) return false
     if (searchKeyword.value && !a.name.toLowerCase().includes(searchKeyword.value.toLowerCase())) return false
-    if (typeFilter.value && a.type !== typeFilter.value) return false
+    if (visibilityFilter.value && albumVis(a) !== visibilityFilter.value) return false
     if (sourceFilter.value === 'LOCAL' && a.sourceDeviceId) return false
     if (sourceFilter.value && sourceFilter.value !== 'LOCAL' && String(a.sourceDeviceId) !== sourceFilter.value) return false
     return true
@@ -327,27 +339,30 @@ const load = async () => {
 const { state: audience, load: loadAudience } = useAudience('album')
 
 const openEditor = (a) => {
-  if (a) Object.assign(editor.form, { id: a.id, name: a.name, type: a.type })
-  else Object.assign(editor.form, { id: null, name: '', type: 'public' })
-  audience.loaded = false
-  audience.canShare = true
-  audience.selected = []
-  audience.circles = []
+  if (a) Object.assign(editor.form, { id: a.id, name: a.name, visibility: albumVis(a) })
+  else Object.assign(editor.form, { id: null, name: '', visibility: VISIBILITY.PUBLIC })
   editor.visible = true
-  loadAudience(a?.id ?? null)
+  // 新建套家庭默认分享家庭;编辑读该相册已有的分享家庭
+  loadAudience(a?.id ?? null, 'album', { applyDefaults: !a })
 }
 
 const onSave = async () => {
   if (!editor.form.name) return ElMessage.warning(t('album.nameRequired'))
-  const picked = audience.loaded && audience.canShare ? [...audience.selected] : null
+  // type 同步成旧口径:公开相册=public,其余=private(老客户端与分享链接判定不变)
+  const payload = {
+    name: editor.form.name,
+    visibility: editor.form.visibility,
+    type: editor.form.visibility === VISIBILITY.PUBLIC ? 'public' : 'private',
+  }
   let albumId = editor.form.id
-  if (albumId) await albumApi.update(albumId, editor.form)
+  if (albumId) await albumApi.update(albumId, payload)
   else {
-    const created = await albumApi.create(editor.form)
+    const created = await albumApi.create(payload)
     albumId = created?.id
   }
-  // 只有面板真正展示过、且相册不是私密时才提交分享范围;失败不影响相册本身已保存
-  if (albumId && picked !== null && editor.form.type !== 'private') {
+  // 亲友圈保存勾选的家庭;其余档位清空受众(取消分享);失败不影响相册本身已保存
+  const picked = audience.loaded && audience.canShare ? (needsAudience(editor.form.visibility) ? [...audience.selected] : []) : null
+  if (albumId && picked !== null) {
     try {
       const res = await audienceApi.save('album', albumId, picked)
       if (picked.length && res?.targetCount === 0) ElMessage.info(t('audience.noTarget'))
@@ -425,20 +440,9 @@ onMounted(() => {
     cascadeVisible.value = true
     router.replace({ path: '/album' })
   }
-  detectBackupEntry()
   window.addEventListener('popstate', onPopState)
   load()
 })
-
-/** 只在原生壳里读一次备份开关(同步 localStorage,不触发原生扫描);Web 端完全不加载该模块 */
-function detectBackupEntry() {
-  if (!isNativeApp()) return
-  import('@/native/photoBackup')
-    .then((m) => {
-      backupOff.value = !m.photoBackupEnabled()
-    })
-    .catch(() => {})
-}
 
 onBeforeUnmount(() => {
   window.removeEventListener('popstate', onPopState)
@@ -446,31 +450,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.backup-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 12px 16px;
-  margin-bottom: 14px;
-}
-.bb-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.bb-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text);
-}
-.bb-desc {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  line-height: 1.5;
-}
 .select-count {
   font-size: 13px;
   color: var(--color-text-secondary);
@@ -624,7 +603,7 @@ onBeforeUnmount(() => {
   background-size: cover;
   background-position: center;
 }
-.album-type {
+.album-vis {
   position: absolute;
   top: 10px;
   left: 10px;
@@ -634,7 +613,13 @@ onBeforeUnmount(() => {
   border-radius: 10px;
   background: rgba(46, 116, 181, 0.85);
 }
-.album-type.private {
+.album-vis.CIRCLE {
+  background: rgba(126, 87, 194, 0.88);
+}
+.album-vis.FAMILY {
+  background: rgba(76, 145, 116, 0.88);
+}
+.album-vis.PRIVATE {
   background: rgba(230, 162, 60, 0.9);
 }
 .album-source {
@@ -726,11 +711,11 @@ html.theme-warm .album-card:hover {
 html.theme-warm .album-cover-wrap {
   aspect-ratio: 1 / 1;
 }
-html.theme-warm .album-type {
+html.theme-warm .album-vis {
   background: var(--color-brand);
   color: var(--color-card);
 }
-html.theme-warm .album-type.private {
+html.theme-warm .album-vis.PRIVATE {
   background: var(--color-accent);
   color: #fff7f0;
 }
@@ -738,7 +723,32 @@ html.theme-warm .album-grid {
   gap: 18px;
 }
 
+.album-search {
+  width: 200px;
+}
+.album-filter-source {
+  width: 150px;
+}
+.album-filter-vis {
+  width: 120px;
+}
+
 @media (max-width: 768px) {
+  /* 手机工具栏:搜索独占一行,筛选两个一行,操作收进「更多」+ 新建 */
+  .album-tb-left {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    width: 100%;
+  }
+  .album-tb-left .album-search {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+  .album-tb-left .album-filter-source,
+  .album-tb-left .album-filter-vis {
+    width: 100%;
+  }
   .album-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;

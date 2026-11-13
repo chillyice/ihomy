@@ -11,11 +11,16 @@ import com.ihomy.common.GameSeries;
 import com.ihomy.common.GameSystem;
 import com.ihomy.common.ResultCode;
 import com.ihomy.common.PointsRuleConst;
+import com.ihomy.common.DictConst;
 import com.ihomy.dto.GameInfoDTO;
 import com.ihomy.dto.GameLinkDTO;
 import com.ihomy.dto.GameSaveDTO;
 import com.ihomy.entity.GameInfo;
 import com.ihomy.mapper.GameInfoMapper;
+import com.ihomy.service.access.ContentAccessService;
+import com.ihomy.service.access.ContentKind;
+import com.ihomy.service.access.ViewerScope;
+import com.ihomy.service.access.ViewerScopeResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -46,19 +51,36 @@ public class GameInfoService {
     private final FileService fileService;
     private final StringRedisTemplate redis;
     private final PointsService pointsService;
+    private final ContentAccessService contentAccess;
+    private final AudienceService audienceService;
+    private final ViewerScopeResolver viewerScopeResolver;
 
-    public List<GameInfo> list(Long familyId) {
-        return gameMapper.selectList(new LambdaQueryWrapper<GameInfo>()
-                .eq(GameInfo::getFamilyId, familyId)
-                .orderByDesc(GameInfo::getCreatedAt));
+    /** 列表:自家游戏按可见性过滤,并混入分享给我家的圈内游戏(禁 N+1) */
+    public List<GameInfo> list(ViewerScope viewer) {
+        LambdaQueryWrapper<GameInfo> qw = new LambdaQueryWrapper<>();
+        contentAccess.applyVisible(qw, ContentKind.GAME, viewer,
+                GameInfo::getFamilyId, GameInfo::getUserId, GameInfo::getVisibility, GameInfo::getId);
+        qw.orderByDesc(GameInfo::getCreatedAt);
+        return gameMapper.selectList(qw);
     }
 
     public GameInfo get(Long familyId, Long id) {
         return require(familyId, id);
     }
 
+    /** 详情/开玩:按可见性判定,跨家庭未授权一律 404(不泄露存在性) */
+    public GameInfo get(ViewerScope viewer, Long id) {
+        GameInfo g = id == null ? null : gameMapper.selectById(id);
+        boolean shared = g != null && audienceService.sharedTo(ContentKind.GAME, id, viewer.familyId());
+        if (g == null || !contentAccess.canView(ContentKind.GAME, g.getFamilyId(), g.getUserId(),
+                g.getVisibility(), viewer, shared)) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
+        return g;
+    }
+
     public GameInfo importGame(Long userId, Long familyId, MultipartFile file, String name, String description,
-                               String category, String series) {
+                               String category, String series, String visibility) {
         String cleanName = normalizeName(name);
         if (file == null || file.isEmpty()) {
             throw new BizException(ResultCode.BAD_REQUEST, "请选择要导入的游戏文件");
@@ -79,6 +101,7 @@ public class GameInfoService {
         g.setSeries(resolveSeries(series, cleanName));
         g.setFileUrl(url);
         g.setStatus(GameConst.STATUS_ACTIVE);
+        g.setVisibility(DictConst.visibility(visibility));
         gameMapper.insert(g);
         return require(familyId, g.getId());
     }
@@ -97,6 +120,7 @@ public class GameInfoService {
         g.setSeries(resolveSeries(dto.getSeries(), cleanName));
         g.setLinkUrl(linkUrl);
         g.setStatus(GameConst.STATUS_ACTIVE);
+        g.setVisibility(DictConst.visibility(dto.getVisibility()));
         gameMapper.insert(g);
         return require(familyId, g.getId());
     }
@@ -120,6 +144,9 @@ public class GameInfoService {
         if (GameConst.TYPE_LINK.equals(game.getType()) && dto != null && dto.getLinkUrl() != null
                 && !dto.getLinkUrl().isBlank()) {
             updater.set(GameInfo::getLinkUrl, GameLinkUrl.normalize(dto.getLinkUrl()));
+        }
+        if (dto != null && dto.getVisibility() != null && !dto.getVisibility().isBlank()) {
+            updater.set(GameInfo::getVisibility, DictConst.visibility(dto.getVisibility()));
         }
         gameMapper.update(null, updater);
         return require(familyId, id);

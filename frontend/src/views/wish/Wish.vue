@@ -56,7 +56,7 @@
               $t('wish.abandon')
             }}</el-button>
             <el-button v-if="w.status !== 'PENDING'" size="small" @click="onSetStatus(w, 'PENDING')">{{ $t('wish.restore') }}</el-button>
-            <el-tooltip :content="$t('audience.label')" placement="top" :show-after="300">
+            <el-tooltip v-if="w.visibility === 'CIRCLE'" :content="$t('audience.label')" placement="top" :show-after="300">
               <el-button size="small" text @click="openShare(w)"
                 ><el-icon><Share /></el-icon
               ></el-button>
@@ -101,6 +101,13 @@
             <el-option v-for="c in CATEGORIES" :key="c" :label="c" :value="c" />
           </el-select>
         </el-form-item>
+        <el-form-item :label="$t('visibility.label')">
+          <VisibilityPicker v-model="editor.form.visibility" :options="visibilityOptions" />
+        </el-form-item>
+        <div v-if="needsAudience(editor.form.visibility)" class="editor-audience">
+          <AudiencePicker v-if="editorAudience.canShare" v-model="editorAudience.selected" :families="editorAudience.families" />
+          <p v-else class="audience-tip">{{ $t('audience.canShareFalse') }}</p>
+        </div>
       </el-form>
       <template #footer>
         <el-button @click="editor.visible = false">{{ $t('common.cancel') }}</el-button>
@@ -111,7 +118,7 @@
     <!-- 分享范围:不选圈 = 只给自家人 -->
     <el-dialog v-model="share.visible" append-to-body :title="$t('audience.label')" width="420px">
       <div v-loading="share.loading">
-        <AudiencePicker v-if="audience.canShare" v-model="audience.selected" :circles="audience.circles" />
+        <AudiencePicker v-if="audience.canShare" v-model="audience.selected" :families="audience.families" />
         <p v-else class="audience-tip">{{ $t('audience.canShareFalse') }}</p>
       </div>
       <template #footer>
@@ -137,6 +144,8 @@ import { WISH_CATEGORIES, wishSourceRoute } from '@/utils/wish'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import AudiencePicker from '@/components/common/AudiencePicker.vue'
+import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
+import { visibilityOptions as buildVisibilityOptions, needsAudience } from '@/utils/visibility'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -150,6 +159,8 @@ const saving = ref(false)
 const list = ref([])
 const filter = ref('all')
 const editor = reactive({ visible: false, form: {}, cats: [] })
+// 可见范围四档(顺序:公开 > 亲友圈 > 家庭 > 私密)
+const visibilityOptions = computed(() => buildVisibilityOptions(t))
 
 const statusText = (s) => dictText(t, 'wishStatus', s)
 const statusTag = (s) => ({ PENDING: '', ACHIEVED: 'success', ABANDONED: 'info' })[s] || 'info'
@@ -160,6 +171,8 @@ const sharedFromText = (s) => t('audience.sharedFrom', { name: s.alias || s.fami
 // 分享范围:面板打开时才读该愿望已分享的圈,取消保存不改动
 const share = reactive({ visible: false, id: null, loading: false })
 const { state: audience, load: loadAudience } = useAudience('wish')
+// 编辑弹窗里的「亲友圈」家庭选择(与分享弹窗分开,避免互相覆盖)
+const { state: editorAudience, load: loadEditorAudience } = useAudience('wish')
 const openShare = async (w) => {
   share.id = w.id
   share.visible = true
@@ -208,9 +221,11 @@ const load = async () => {
 const openEditor = (w) => {
   editor.visible = true
   editor.form = w
-    ? { id: w.id, title: w.title, reason: w.reason || '', category: w.category || '' }
-    : { id: null, title: '', reason: '', category: '' }
+    ? { id: w.id, title: w.title, reason: w.reason || '', category: w.category || '', visibility: w.visibility || 'FAMILY' }
+    : { id: null, title: '', reason: '', category: '', visibility: 'FAMILY' }
   editor.cats = editor.form.category ? editor.form.category.split(',') : []
+  // 新建套家庭默认分享家庭;编辑读已有的分享家庭
+  loadEditorAudience(w?.id ?? null, 'wish', { applyDefaults: !w })
 }
 
 const onSave = async () => {
@@ -219,8 +234,23 @@ const onSave = async () => {
   try {
     const { id, ...data } = editor.form
     data.category = editor.cats.join(',')
+    let wishId = id
     if (id) await wishApi.update(id, data)
-    else await wishApi.create(data)
+    else {
+      const created = await wishApi.create(data)
+      wishId = created?.id
+    }
+    // 亲友圈:保存勾选的家庭;其余档位清空受众(取消分享)
+    const picked =
+      editorAudience.loaded && editorAudience.canShare ? (needsAudience(editor.form.visibility) ? [...editorAudience.selected] : []) : null
+    if (wishId && picked !== null) {
+      try {
+        const res = await audienceApi.save('wish', wishId, picked)
+        if (picked.length && res?.targetCount === 0) ElMessage.info(t('audience.noTarget'))
+      } catch {
+        ElMessage.warning(t('audience.saveFailed'))
+      }
+    }
     ElMessage.success(t('common.success'))
     editor.visible = false
     await load()
@@ -295,6 +325,12 @@ onMounted(load)
   margin: 0;
   font-size: 12px;
   color: var(--color-text-secondary);
+}
+.editor-audience {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
 }
 .wish-source {
   display: flex;

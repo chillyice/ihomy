@@ -22,4 +22,6 @@ public class WishDTO {
     private String sourceId;
     @Size(max = 100, message = "来源标题最多 100 字")
     private String sourceTitle;
+    @Size(max = 20, message = "可见范围取值不正确")
+    private String visibility;
 }

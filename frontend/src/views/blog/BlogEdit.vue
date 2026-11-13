@@ -42,8 +42,8 @@
         <el-form-item :label="$t('blog.visibility')">
           <VisibilityPicker v-model="form.visibility" :options="visibilityOptions" />
         </el-form-item>
-        <div v-if="form.status === 'PUBLISHED'" class="editor-audience">
-          <AudiencePicker v-if="audience.canShare" v-model="audience.selected" :circles="audience.circles" />
+        <div v-if="form.status === 'PUBLISHED' && needsAudience(form.visibility)" class="editor-audience">
+          <AudiencePicker v-if="audience.canShare" v-model="audience.selected" :families="audience.families" />
           <p v-else class="audience-tip">{{ $t('audience.canShareFalse') }}</p>
         </div>
         <div class="form-footer">
@@ -89,6 +89,7 @@ import { ElMessage } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
 import AudiencePicker from '@/components/common/AudiencePicker.vue'
+import { visibilityOptions as buildVisibilityOptions, needsAudience } from '@/utils/visibility'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -100,12 +101,8 @@ const loading = ref(false)
 const { state: audience, load: loadAudience } = useAudience('blog')
 
 const form = reactive({ title: '', content: '', coverImage: '', category: '', status: 'PUBLISHED', visibility: 'FAMILY' })
-// 可见范围选项(共用选择器,文案随博客命名空间)
-const visibilityOptions = computed(() => [
-  { value: 'PRIVATE', label: t('blog.onlySelf') },
-  { value: 'FAMILY', label: t('blog.familyVisible') },
-  { value: 'PUBLIC', label: t('blog.publicVisible') },
-])
+// 可见范围四档(共用选择器与文案,顺序:公开 > 亲友圈 > 家庭 > 私密)
+const visibilityOptions = computed(() => buildVisibilityOptions(t))
 const categories = ref([])
 const legacyCategory = ref(null)
 const showCategoryDialog = ref(false)
@@ -183,7 +180,12 @@ const onSave = async () => {
   loading.value = true
   try {
     const payload = { ...form, category: form.category || '' }
-    const picked = audience.loaded && audience.canShare && form.status === 'PUBLISHED' ? [...audience.selected] : null
+    const picked =
+      audience.loaded && audience.canShare && form.status === 'PUBLISHED'
+        ? needsAudience(form.visibility)
+          ? [...audience.selected]
+          : []
+        : null
     let blogId = isEdit.value ? route.params.id : null
     if (isEdit.value) await blogApi.update(route.params.id, payload)
     else {
@@ -219,7 +221,7 @@ onMounted(async () => {
     })
   }
   loadCategories()
-  loadAudience(isEdit.value ? route.params.id : null)
+  loadAudience(isEdit.value ? route.params.id : null, 'blog', { applyDefaults: !isEdit.value })
 })
 </script>
 

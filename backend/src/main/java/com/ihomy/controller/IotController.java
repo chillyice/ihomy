@@ -37,10 +37,15 @@ public class IotController {
 
     private final HomeAssistantService homeAssistantService;
     private final SecurityHelper securityHelper;
+    private final com.ihomy.service.access.ViewerScopeResolver viewerScopeResolver;
 
     private Long familyId() {
         SysUser user = securityHelper.currentUser();
         return user == null ? null : user.getFamilyId();
+    }
+
+    private com.ihomy.service.access.ViewerScope viewer() {
+        return viewerScopeResolver.resolve();
     }
 
     // ==================== 接入配置(家长) ====================
@@ -82,21 +87,21 @@ public class IotController {
     @Operation(summary = "家庭智能设备列表(含隐藏项与所属房间)")
     @GetMapping("/devices")
     public Result<List<Map<String, Object>>> devices() {
-        return Result.success(homeAssistantService.devices(familyId()));
+        return Result.success(homeAssistantService.devices(viewer()));
     }
 
     @Operation(summary = "修改智能设备的显示名/所属房间/是否展示")
     @OperationLog(module = "IOT", operationType = "UPDATE", description = "修改智能设备信息")
     @PutMapping("/devices/{id}")
     public Result<Map<String, Object>> updateDevice(@PathVariable Long id, @RequestBody IotDeviceDTO dto) {
-        return Result.success(homeAssistantService.updateDevice(familyId(), id, dto));
+        return Result.success(homeAssistantService.updateDevice(viewer(), id, dto));
     }
 
     @Operation(summary = "设备历史曲线数据点")
     @GetMapping("/history")
     public Result<List<Map<String, Object>>> history(@RequestParam Long deviceId,
                                                      @RequestParam(required = false) Integer hours) {
-        return Result.success(homeAssistantService.history(familyId(), deviceId, hours));
+        return Result.success(homeAssistantService.history(viewer(), deviceId, hours));
     }
 
     // ==================== 控制 ====================
@@ -106,6 +111,6 @@ public class IotController {
     @RequirePermission("iot:control")
     @PostMapping("/control")
     public Result<Map<String, Object>> control(@RequestBody IotControlDTO dto) {
-        return Result.success(homeAssistantService.control(familyId(), dto));
+        return Result.success(homeAssistantService.control(viewer(), dto));
     }
 }

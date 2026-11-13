@@ -44,12 +44,13 @@ describe('buildNavItems 天气入口', () => {
   })
 })
 
-// 「家庭」组(V10.85):物品定位/家庭公告/智能家居/工具箱 从生活组拆出,排在生活之后;
-// 成员(V10.93)从 social 组并入并排组内首位,「成员」分组不再出现
+// 「家庭」组(V10.85):物品定位/家庭公告/智能家居 从生活组拆出,排在生活之后;
+// 成员(V10.93)从 social 组并入并排组内首位,「成员」分组不再出现;
+// 工具箱(V12.23)归回生活组殿后(排序 17 仍是生活组内最大)
 describe('buildNavGroups 家庭组', () => {
   const modules = [
     { code: 'item', title: '物品定位', path: '/item', category: 'family', sortOrder: 4, enabled: 1 },
-    { code: 'tools', title: '工具箱', path: '/tools', category: 'family', sortOrder: 17, enabled: 1 },
+    { code: 'tools', title: '工具箱', path: '/tools', category: 'life', sortOrder: 17, enabled: 1 },
     { code: 'iot', title: '智能家居', path: '/iot', category: 'family', sortOrder: 16, enabled: 1 },
     { code: 'announcement', title: '家庭公告', path: '/announcement', category: 'family', sortOrder: 15, enabled: 1 },
     { code: 'reminder', title: '今日提醒', path: '/reminder', category: 'life', sortOrder: 6, enabled: 1 },
@@ -62,12 +63,12 @@ describe('buildNavGroups 家庭组', () => {
     expect(groups.map((g) => g.category)).toEqual(['content', 'life', 'family', 'system'])
     const family = groups.find((g) => g.category === 'family')
     expect(family.label).toBe('家庭')
-    expect(family.items.map((i) => i.code)).toEqual(['member', 'item', 'announcement', 'iot', 'tools'])
+    expect(family.items.map((i) => i.code)).toEqual(['member', 'item', 'announcement', 'iot'])
   })
 
-  it('家庭组模块不会再出现在生活组', () => {
+  it('家庭组模块不会再出现在生活组,工具箱归回生活组殿后', () => {
     const life = buildNavGroups(modules).find((g) => g.category === 'life')
-    expect(life.items.map((i) => i.code)).toEqual(['reminder', 'weather'])
+    expect(life.items.map((i) => i.code)).toEqual(['reminder', 'weather', 'tools'])
   })
 
   it('仍停在旧 social 分类的自定义模块归入家庭组,不会整组消失', () => {

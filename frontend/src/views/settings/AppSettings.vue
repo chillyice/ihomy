@@ -135,6 +135,10 @@
           <el-button :disabled="pbState.running || backupBusy" @click="onBackupFull">
             {{ $t('appSettings.photoBackupFull') }}
           </el-button>
+          <el-button :disabled="pbState.running" @click="openFolderDialog">{{ $t('appSettings.photoBackupFolders') }}</el-button>
+          <el-tag v-if="excludeFolders.length" size="small" type="info">
+            {{ $t('appSettings.photoBackupFoldersExcluded', { n: excludeFolders.length }) }}
+          </el-tag>
           <el-button v-if="pbState.running" @click="onBackupStop">{{ $t('appSettings.photoBackupStop') }}</el-button>
           <el-button link :disabled="pbState.running" @click="loadPhotoBackup">{{ $t('appSettings.refresh') }}</el-button>
         </div>
@@ -221,10 +225,28 @@
       </div>
     </div>
   </div>
+
+  <!-- 不同步的手机相册目录:勾选=跳过,不勾=全部备份 -->
+  <el-dialog v-model="folderDialog.visible" :title="$t('appSettings.photoBackupFolders')" width="440px" append-to-body>
+    <div v-loading="folderDialog.loading">
+      <p class="opt-desc folder-hint">{{ $t('appSettings.photoBackupFoldersHint') }}</p>
+      <el-checkbox-group v-if="folderDialog.folders.length" v-model="folderDialog.selected" class="folder-list">
+        <el-checkbox v-for="f in folderDialog.folders" :key="f.id" :value="f.id" class="folder-item">
+          <span class="folder-name">{{ f.name }}</span>
+          <span class="folder-count">{{ $t('album.photoCount', { n: f.count }) }}</span>
+        </el-checkbox>
+      </el-checkbox-group>
+      <el-empty v-else :description="$t('appSettings.photoBackupFoldersEmpty')" :image-size="60" />
+    </div>
+    <template #footer>
+      <el-button @click="folderDialog.visible = false">{{ $t('common.cancel') }}</el-button>
+      <el-button type="primary" :disabled="folderDialog.loading" @click="saveFolderDialog">{{ $t('common.save') }}</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -267,6 +289,9 @@ const backupCharge = ref(false)
 const backupPending = ref(0)
 const backupBusy = ref(false)
 const backupLast = ref({ at: 0, created: 0 })
+// 不同步的相册目录(空 = 全部备份);目录清单在对话框打开时向原生要
+const excludeFolders = ref([])
+const folderDialog = reactive({ visible: false, loading: false, folders: [], selected: [] })
 const pbState = ref({ running: false, scanned: 0, created: 0, skipped: 0, failed: 0, phase: 'idle' })
 
 const backupModule = () => import('@/native/photoBackup')
@@ -548,6 +573,7 @@ async function loadPhotoBackup() {
     backupWifi.value = m.wifiOnlyEnabled()
     backupCharge.value = m.chargeOnlyEnabled()
     backupLast.value = m.photoBackupLast()
+    excludeFolders.value = m.excludedPhotoFolders()
     backupPending.value = await m.photoBackupPending()
   } catch (e) {
     console.warn('[appSettings] 读取备份状态失败', e)
@@ -626,6 +652,35 @@ async function onBackupFull() {
 
 function onBackupStop() {
   backupModule().then((m) => m.stopPhotoBackup())
+}
+
+// ---- 不同步的相册目录 ----
+async function openFolderDialog() {
+  folderDialog.visible = true
+  folderDialog.loading = true
+  folderDialog.selected = [...excludeFolders.value]
+  try {
+    const m = await backupModule()
+    folderDialog.folders = await m.photoBackupFolders()
+  } catch (e) {
+    folderDialog.folders = []
+  } finally {
+    folderDialog.loading = false
+  }
+}
+
+async function saveFolderDialog() {
+  try {
+    const m = await backupModule()
+    m.setExcludedPhotoFolders(folderDialog.selected)
+    excludeFolders.value = [...folderDialog.selected]
+    folderDialog.visible = false
+    // 待备份数按新目录口径重算
+    backupPending.value = await m.photoBackupPending()
+    ElMessage.success(t('common.saved'))
+  } catch (e) {
+    ElMessage.error(t('common.saveFailed'))
+  }
 }
 
 // 诊断信息:只读摘要;导出走系统分享,清空会删掉原生里的崩溃与错误文件
@@ -720,6 +775,33 @@ onMounted(async () => {
 .settings-card {
   margin-bottom: 16px;
   background: var(--color-card);
+}
+/* 不同步目录选择:一行一个目录,名称与张数分开对齐 */
+.folder-hint {
+  margin: 0 0 10px;
+}
+.folder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.folder-item {
+  width: 100%;
+  margin-right: 0;
+  height: auto;
+  padding: 6px 0;
+}
+.folder-item :deep(.el-checkbox__label) {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  gap: 12px;
+}
+.folder-count {
+  font-size: 12px;
+  color: var(--color-text-secondary);
 }
 /* 一行一项:左侧标题/说明,右侧开关;动作按钮排在说明下 */
 .opt {

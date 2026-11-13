@@ -102,7 +102,7 @@ class ContentAccessServiceTest {
         assertThat(f.isAll()).isFalse();
         assertThat(f.getFamilyId()).isEqualTo(FAMILY_A);
         assertThat(f.getAuthorId()).isEqualTo(MEMBER);
-        assertThat(f.getVisibilities()).containsExactly("FAMILY", "PUBLIC");
+        assertThat(f.getVisibilities()).containsExactly("FAMILY", "CIRCLE", "PUBLIC");
     }
 
     @Test
@@ -123,7 +123,7 @@ class ContentAccessServiceTest {
 
     @Test
     void memberVisibilities_excludesPrivate() {
-        assertThat(service.memberVisibilities()).containsExactly("FAMILY", "PUBLIC");
+        assertThat(service.memberVisibilities()).containsExactly("FAMILY", "CIRCLE", "PUBLIC");
     }
 
     // ---------- 阶段 B:「被分享」与分享入口 ----------

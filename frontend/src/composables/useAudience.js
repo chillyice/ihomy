@@ -1,37 +1,50 @@
 import { reactive } from 'vue'
-import { audienceApi, circleApi } from '@/api'
+import { audienceApi, familyApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 
 /**
- * 「给谁看」面板状态:可选亲友圈 + 当前内容已选中的圈。
- * 圈列表只随家庭变化,同一页面实例内缓存一次;内容 id 为空(新建)时只用缓存。
- * 不选任何圈 = 只给自家人;保存失败由请求层统一提示。
+ * 「给谁看」面板状态(四档可见性里的「亲友圈」档):
+ * - families:当前家庭可选分享的圈内家庭(家庭名/圈内称呼/所属圈),来自家庭设置里的可选清单
+ * - defaults:家庭级「默认分享」预选的家庭,新建内容选亲友圈时直接勾上
+ * - selected:本条内容当前勾选的家庭 id
  *
- * 默认类型在创建时给(相册/博客…),调用方也可在 load/save 里临时指定 type
- * (日程弹窗同一个表单会在纪念日与提醒之间切换)。
+ * load(contentId) 传了内容 id 时以服务端已选家庭为准;新建时用 applyDefaults=true 套默认值。
+ * 不勾任何家庭 = 仍然只有自家人能看到,保存时不写受众行。
  */
 export function useAudience(defaultType) {
   const userStore = useUserStore()
-  const state = reactive({ loaded: false, canShare: true, selected: [], circles: [] })
-  let circleCache = null
+  const state = reactive({ loaded: false, canShare: true, selected: [], families: [], defaults: [], hasCircles: false })
+  let familyCache = null
 
-  /** 打开面板前调用:重置并载入圈列表(传内容 id 时再读已选圈与可分享性) */
-  async function load(contentId, type = defaultType) {
+  async function loadFamilies() {
+    if (!familyCache) {
+      familyCache = (await familyApi.shareDefaults()) || {}
+    }
+    state.families = familyCache.families || []
+    state.defaults = familyCache.targetFamilyIds || []
+    state.hasCircles = state.families.length > 0
+    return familyCache
+  }
+
+  /** 打开面板前调用:重置并载入可选家庭(传内容 id 时再读已选家庭与可分享性) */
+  async function load(contentId, type = defaultType, { applyDefaults = false } = {}) {
     state.selected = []
     state.canShare = true
-    state.circles = []
+    state.families = []
+    state.defaults = []
+    state.hasCircles = false
     if (!userStore.isLoggedIn) {
       state.loaded = true
       return
     }
     try {
-      if (!circleCache) circleCache = (await circleApi.list()) || []
-      state.circles = circleCache
+      await loadFamilies()
       if (contentId) {
         const data = await audienceApi.get(type, contentId)
-        state.circles = data.circles || circleCache
-        state.selected = data.selectedCircleIds || []
+        state.selected = data.selectedFamilyIds || []
         state.canShare = !!data.canShare
+      } else if (applyDefaults) {
+        state.selected = [...state.defaults]
       }
     } catch {
       // 面板加载失败按「不能分享」处理,不阻断内容本身的保存
@@ -41,9 +54,22 @@ export function useAudience(defaultType) {
     }
   }
 
-  async function save(contentId, circleIds, type = defaultType) {
-    return audienceApi.save(type, contentId, [...circleIds])
+  /** 换家庭后圈关系会变,设置页保存后也用它刷新 */
+  function invalidateFamilies() {
+    familyCache = null
   }
 
-  return { state, load, save }
+  async function save(contentId, familyIds, type = defaultType) {
+    return audienceApi.save(type, contentId, [...familyIds])
+  }
+
+  /** 保存后把默认值/可选清单同步到本地缓存(家庭设置页改完后调用) */
+  function setFamilies(data) {
+    familyCache = data || null
+    state.families = (data && data.families) || []
+    state.defaults = (data && data.targetFamilyIds) || []
+    state.hasCircles = state.families.length > 0
+  }
+
+  return { state, load, save, invalidateFamilies, setFamilies }
 }

@@ -416,7 +416,7 @@ CREATE TABLE `content_blog` (
   `author_id`   BIGINT       NOT NULL COMMENT '作者ID',
   `family_id`   BIGINT       DEFAULT NULL COMMENT '所属家庭ID',
 `status`      VARCHAR(20) NOT NULL DEFAULT 'DRAFT' COMMENT 'DRAFT草稿 PUBLISHED已发布',
-  `visibility`  VARCHAR(20)  NOT NULL DEFAULT 'FAMILY' COMMENT 'PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开',
+  `visibility`  VARCHAR(20)  NOT NULL DEFAULT 'FAMILY' COMMENT 'PRIVATE仅自己/CIRCLE亲友圈/FAMILY家庭可见/PUBLIC公开',
   `view_count`  INT          NOT NULL DEFAULT 0 COMMENT '浏览数',
   `like_count`  INT          NOT NULL DEFAULT 0 COMMENT '点赞数',
   `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -460,7 +460,7 @@ CREATE TABLE `content_diary` (
   `like_count` INT          NOT NULL DEFAULT 0 COMMENT '点赞数',
   `author_id`  BIGINT       NOT NULL COMMENT '作者ID',
   `family_id`  BIGINT       DEFAULT NULL COMMENT '所属家庭ID',
-  `visibility` VARCHAR(20)  NOT NULL DEFAULT 'FAMILY' COMMENT 'PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开',
+  `visibility` VARCHAR(20)  NOT NULL DEFAULT 'FAMILY' COMMENT 'PRIVATE仅自己/CIRCLE亲友圈/FAMILY家庭可见/PUBLIC公开',
   `created_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted`    TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
@@ -477,7 +477,8 @@ DROP TABLE IF EXISTS `content_photo_album`;
 CREATE TABLE `content_photo_album` (
   `id`             BIGINT       NOT NULL AUTO_INCREMENT COMMENT '主键',
   `name`           VARCHAR(100) NOT NULL COMMENT '相册名称',
-  `type`           VARCHAR(20)  NOT NULL DEFAULT 'public' COMMENT 'public/private',
+  `type`           VARCHAR(20)  NOT NULL DEFAULT 'public' COMMENT 'public/private(旧口径,与 visibility 同步)',
+  `visibility`     VARCHAR(20)  NOT NULL DEFAULT 'FAMILY' COMMENT '可见范围:PRIVATE仅创建人+家长/CIRCLE亲友圈/FAMILY家庭/PUBLIC公开',
   `cover_photo_url` VARCHAR(255) DEFAULT NULL COMMENT '封面图URL',
   `cover_url`       VARCHAR(255) DEFAULT NULL COMMENT '自定义封面URL(用户上传,优先于照片封面)',
   `share_token`    VARCHAR(16)  DEFAULT NULL COMMENT '分享令牌(混淆ID,游客凭令牌查看相册)',
@@ -514,7 +515,7 @@ CREATE TABLE `content_photo` (
   `like_count`  INT          NOT NULL DEFAULT 0 COMMENT '点赞数',
   `author_id`   BIGINT       NOT NULL COMMENT '上传者ID',
   `family_id`  BIGINT       NOT NULL COMMENT '家庭ID',
-  `visibility` VARCHAR(20) NOT NULL DEFAULT 'FAMILY' COMMENT '可见范围：PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开',
+  `visibility` VARCHAR(20) NOT NULL DEFAULT 'FAMILY' COMMENT '可见范围：PRIVATE仅自己/CIRCLE亲友圈/FAMILY家庭可见/PUBLIC公开',
   `source_path` VARCHAR(500) DEFAULT NULL COMMENT '来源存储路径（一键同步去重用,系统上传为空）',
   `source_fs_id` BIGINT      DEFAULT NULL COMMENT '远程文件fs_id(百度网盘,免列目录直达dlink)',
   `live_video_url` VARCHAR(255) DEFAULT NULL COMMENT '实况照片关联短视频URL(苹果 Live Photo,MOV;普通照片为空)',
@@ -552,7 +553,7 @@ CREATE TABLE `content_video` (
   `video_url`      VARCHAR(500) NOT NULL COMMENT '视频文件URL（本地上传/files/ 或设备映射 storage:// 逻辑地址）',
   `uploader_id`    BIGINT       NOT NULL COMMENT '上传者ID',
   `family_id`      BIGINT       NOT NULL COMMENT '家庭ID',
-  `visibility` VARCHAR(20) NOT NULL DEFAULT 'FAMILY' COMMENT '可见范围：PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开',
+  `visibility` VARCHAR(20) NOT NULL DEFAULT 'FAMILY' COMMENT '可见范围：PRIVATE仅自己/CIRCLE亲友圈/FAMILY家庭可见/PUBLIC公开',
   `source_device_id` BIGINT       DEFAULT NULL COMMENT '来源设备ID（设备目录映射）',
   `source_path`    VARCHAR(500) DEFAULT NULL COMMENT '设备文件去重键 dev:{deviceId}:{path}',
   `source_fs_id`   BIGINT       DEFAULT NULL COMMENT '百度网盘 fs_id',
@@ -847,8 +848,9 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('library','书架',     'icon-library','/library','content',  'left',  20, 1),
 ('games',  '小游戏', 'icon-games',   '/games',  'content',  'left',  21, 1);
 -- 生活组:厨房恒为组内第 1 位;组内相对序生效,与 content 组数值交错无影响。
--- 家庭组(V10.85):物品定位/家庭公告/智能家居/工具箱 从生活组拆出,侧栏固定排在生活之后;
--- 组内相对序 member(3) < item(4) < announcement(15) < iot(16) < tools(17)。照片瀑布已并入相册,不再单列为模块。
+-- 家庭组(V10.85):物品定位/家庭公告/智能家居 从生活组拆出,侧栏固定排在生活之后;
+-- 组内相对序 member(3) < item(4) < announcement(15) < iot(16)。工具箱(V12.23)归回生活组殿后(17)。
+-- 照片瀑布已并入相册,不再单列为模块。
 -- member(V10.94):从 social 组并入家庭组并排在首位,「成员」分组随之消失。
 -- reminder/anniversary(V10.88):入口并入「日程提醒」(原家庭计划)页,置 enabled=0 保留行与路由映射兜底旧链接。
 INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `position`, `sort_order`, `enabled`) VALUES
@@ -864,7 +866,7 @@ INSERT INTO `sys_home_module` (`code`, `title`, `icon`, `path`, `category`, `pos
 ('tree',      '家谱',     'icon-tree',      '/tree',   'life', 'left', 13, 0),
 ('vault',     '保险箱',   'icon-vault',     '/vault',  'life', 'left', 14, 1),
 ('chat',      '聊天室',   'icon-chat',      '/chat',   'life', 'left', 16, 1),
-('tools',     '工具箱',   'icon-tools',     '/tools',  'family', 'left', 17, 1),
+('tools',     '工具箱',   'icon-tools',     '/tools',  'life', 'left', 17, 1),
 ('plant',     '花园',     'icon-plant',     '/tools/plant',  'life', 'left', 40, 0),
 ('member', '家庭成员', 'icon-member', '/member', 'family',  'right',  3, 1),
 ('storage','文件浏览','icon-storage','/storage/files','system',  'left',  16, 1);
@@ -1202,11 +1204,13 @@ CREATE TABLE `game_info` (
   `file_url`    VARCHAR(500) DEFAULT NULL COMMENT '文件URL(/files/games/...,LINK 类型为空)',
   `link_url`    VARCHAR(500) DEFAULT NULL COMMENT '外部网页游戏地址(仅 LINK 类型,http/https)',
   `status`      VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE' COMMENT '状态:ACTIVE启用/DISABLED禁用',
+  `visibility`  VARCHAR(20)  NOT NULL DEFAULT 'FAMILY' COMMENT '可见范围:PRIVATE仅导入人+家长/CIRCLE亲友圈/FAMILY家庭/PUBLIC公开',
   `deleted`     TINYINT      NOT NULL DEFAULT 0 COMMENT '逻辑删除',
   `created_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at`  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
-  KEY `idx_family_created` (`family_id`, `deleted`, `created_at`)
+  KEY `idx_family_created` (`family_id`, `deleted`, `created_at`),
+  KEY `idx_family_visibility` (`family_id`, `visibility`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭小游戏表';
 
 -- ------------------------------------------------------------
@@ -1260,7 +1264,7 @@ CREATE TABLE `content_wish` (
   `source_title` VARCHAR(100)  DEFAULT NULL COMMENT '来源标题快照(来源被删也能显示)',
   `status`       VARCHAR(20)   NOT NULL DEFAULT 'PENDING' COMMENT '状态: PENDING待实现/ACHIEVED已实现/ABANDONED放弃',
   `requester_id` BIGINT        NOT NULL COMMENT '提出人ID',
-  `visibility`   VARCHAR(20)   NOT NULL DEFAULT 'FAMILY' COMMENT '可见范围：PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开（默认家庭可见）',
+  `visibility`   VARCHAR(20)   NOT NULL DEFAULT 'FAMILY' COMMENT '可见范围：PRIVATE仅自己/CIRCLE亲友圈/FAMILY家庭可见/PUBLIC公开（默认家庭可见）',
   `achieved_at`  DATETIME      DEFAULT NULL COMMENT '达成时间（标记实现时记录）',
   `created_at`   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '提出时间',
   PRIMARY KEY (`id`),
@@ -1356,6 +1360,7 @@ INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
 ('visibility', 'MEMBERS',   '指定成员'),
 ('visibility', 'GROUPS',    '指定群组'),
 ('visibility', 'FAMILY',    '家庭可见'),
+('visibility', 'CIRCLE',    '亲友圈可见'),
 ('visibility', 'PUBLIC',    '公开'),
 ('user_status', 'ACTIVE',   '正常'),
 ('user_status', 'DISABLED', '禁用'),
@@ -1620,6 +1625,7 @@ CREATE TABLE `family_item` (
   `position`      VARCHAR(50)  DEFAULT NULL COMMENT '位置(最上层抽屉/台面/地面...)',
   `image_url`     VARCHAR(500) DEFAULT NULL COMMENT '物品图片URL',
   `type`          VARCHAR(20)  NOT NULL DEFAULT 'OTHER' COMMENT '类型:KITCHENWARE厨具/INGREDIENT食材/DAILY日化/CLOTHES衣服/TOOL工具/OTHER其他',
+  `visibility`    VARCHAR(20)  NOT NULL DEFAULT 'FAMILY' COMMENT '可见范围:PRIVATE仅录入人+家长/CIRCLE亲友圈/FAMILY家庭/PUBLIC公开',
   `quantity`      DECIMAL(10,2) DEFAULT NULL COMMENT '数量(食材用)',
   `unit`          VARCHAR(20)  DEFAULT NULL COMMENT '单位(个/斤/瓶/袋/克)',
   `note`          VARCHAR(500) DEFAULT NULL COMMENT '备注',
@@ -1633,7 +1639,8 @@ CREATE TABLE `family_item` (
   `updated_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   KEY `idx_furniture` (`furniture_id`),
-  KEY `idx_family_type` (`family_id`, `type`)
+  KEY `idx_family_type` (`family_id`, `type`),
+  KEY `idx_family_visibility` (`family_id`, `visibility`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='物品表(物品定位)';
 
 -- ------------------------------------------------------------
@@ -1896,7 +1903,7 @@ CREATE TABLE `content_book` (
   `category`    VARCHAR(50)  DEFAULT NULL COMMENT '分类(家庭级)',
   `tags`        VARCHAR(255) DEFAULT NULL COMMENT '标签(逗号分隔)',
   `status`      VARCHAR(20)  NOT NULL DEFAULT 'PUBLISHED' COMMENT 'DRAFT草稿 PUBLISHED已发布',
-  `visibility`  VARCHAR(20)  NOT NULL DEFAULT 'FAMILY' COMMENT 'PRIVATE仅自己/FAMILY家庭可见/PUBLIC公开',
+  `visibility`  VARCHAR(20)  NOT NULL DEFAULT 'FAMILY' COMMENT 'PRIVATE仅自己/CIRCLE亲友圈/FAMILY家庭可见/PUBLIC公开',
   `uploader_id` BIGINT       NOT NULL COMMENT '上传者ID',
   `family_id`   BIGINT       DEFAULT NULL COMMENT '所属家庭ID',
   `view_count`  INT          NOT NULL DEFAULT 0 COMMENT '浏览数',
@@ -2352,13 +2359,15 @@ CREATE TABLE `sys_iot_device` (
   `room`            VARCHAR(50)  DEFAULT NULL COMMENT '所属房间(自由文本,中控页手工分组)',
   `state`           VARCHAR(255) DEFAULT NULL COMMENT '最近状态值',
   `enabled`         TINYINT      NOT NULL DEFAULT 1 COMMENT '是否展示: 1展示/0隐藏',
+  `visibility`      VARCHAR(20)  NOT NULL DEFAULT 'FAMILY' COMMENT '可见范围:PRIVATE仅家长/FAMILY家庭成员(设备无作者,只支持两档)',
   `last_seen_at`    DATETIME     DEFAULT NULL COMMENT 'HA 最近一次上报时间',
   `last_sample_at`  DATETIME     DEFAULT NULL COMMENT '最近一次写入历史的时间(采样节流用)',
   `created_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_family_entity` (`family_id`, `entity_id`),
-  KEY `idx_family_enabled_room` (`family_id`, `enabled`, `room`)
+  KEY `idx_family_enabled_room` (`family_id`, `enabled`, `room`),
+  KEY `idx_family_visibility` (`family_id`, `visibility`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭智能设备(从 Home Assistant 同步)';
 
 -- ------------------------------------------------------------
@@ -2470,9 +2479,9 @@ SET @demo_member = (SELECT id FROM `sys_user` WHERE username = 'demo_member');
 SET @demo_child  = (SELECT id FROM `sys_user` WHERE username = 'demo_child');
 
 -- share_token 显式给固定值：空库安装（只跑 schema.sql，不跑 migrations 的兜底回填）时相册也有分享链接
-INSERT INTO `content_photo_album` (`name`, `type`, `share_token`, `family_id`, `created_by`) VALUES
-('四季风景', 'public', 'd3m0seasons2026v', @fid, @demo_owner),
-('周末出游', 'public', 'd3m0weekend2026v', @fid, @demo_member);
+INSERT INTO `content_photo_album` (`name`, `type`, `visibility`, `share_token`, `family_id`, `created_by`) VALUES
+('四季风景', 'public', 'PUBLIC', 'd3m0seasons2026v', @fid, @demo_owner),
+('周末出游', 'public', 'PUBLIC', 'd3m0weekend2026v', @fid, @demo_member);
 SET @album_season = (SELECT id FROM `content_photo_album` WHERE `name` = '四季风景' AND `family_id` = @fid LIMIT 1);
 SET @album_trip   = (SELECT id FROM `content_photo_album` WHERE `name` = '周末出游' AND `family_id` = @fid LIMIT 1);
 
@@ -2980,7 +2989,7 @@ CREATE TABLE `family_circle_member` (
 DROP TABLE IF EXISTS `content_audience`;
 CREATE TABLE `content_audience` (
   `id`               BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `content_type`     VARCHAR(20) NOT NULL COMMENT '内容类型: photo/album/video/blog/diary/wish/book/anniversary/reminder',
+  `content_type`     VARCHAR(20) NOT NULL COMMENT '内容类型: photo/album/video/blog/diary/wish/book/anniversary/reminder/game/item',
   `content_id`       BIGINT      NOT NULL COMMENT '内容ID',
   `owner_family_id`  BIGINT      NOT NULL COMMENT '内容所属家庭ID',
   `target_type`      VARCHAR(20) NOT NULL DEFAULT 'FAMILY' COMMENT '接收方类型(仅 FAMILY,圈在写入时已展开)',
@@ -3006,3 +3015,21 @@ INSERT INTO `sys_dict_item` (`dict_group`, `dict_value`, `meaning`) VALUES
 ('share_policy', 'SELF_ONLY',  '只能分享自己创建的'),
 ('share_policy', 'OWNER_ONLY', '家长可分享家庭共有内容'),
 ('share_policy', 'OFF',        '禁止对外分享');
+
+-- ------------------------------------------------------------
+-- 82. family_share_default 家庭默认分享目标(V12.23)
+--     「选亲友圈时默认勾选哪些家庭」的家庭级配置;只做预选,发布时仍可逐条取消。
+--     目标必须是本家庭当前所在活跃亲友圈里的其他家庭(写入时校验)。
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `family_share_default`;
+CREATE TABLE `family_share_default` (
+  `id`             BIGINT   NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `family_id`      BIGINT   NOT NULL COMMENT '本家庭ID',
+  `target_family_id` BIGINT NOT NULL COMMENT '默认分享到的圈内家庭ID',
+  `created_by`     BIGINT   DEFAULT NULL COMMENT '设置人用户ID',
+  `created_at`     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_family_target` (`family_id`, `target_family_id`),
+  KEY `idx_target` (`target_family_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='家庭默认分享目标(亲友圈预选)';
+

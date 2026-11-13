@@ -80,7 +80,7 @@
               <span class="page-num">{{ pageCount }} {{ $t('diary.pagesUnit') }} · {{ wordCount }} {{ $t('diary.words') }}</span>
               <div class="vis-row">
                 <VisibilityPicker v-model="form.visibility" :options="visibilityOptions" button size="small" />
-                <el-button v-if="form.visibility !== 'PRIVATE'" size="small" @click="openShare">{{ $t('audience.label') }}</el-button>
+                <el-button v-if="form.visibility === 'CIRCLE'" size="small" @click="openShare">{{ $t('audience.label') }}</el-button>
                 <el-button type="primary" :loading="loading" @click="onSave">{{ $t('common.save') }}</el-button>
               </div>
             </div>
@@ -129,7 +129,7 @@
     <!-- 分享范围:仅非私密日记可分享;不选圈 = 只给自家人 -->
     <el-dialog v-model="shareDialog" append-to-body :title="t('audience.label')" width="420px">
       <div v-loading="shareLoading">
-        <AudiencePicker v-if="audience.canShare" v-model="audience.selected" :circles="audience.circles" />
+        <AudiencePicker v-if="audience.canShare" v-model="audience.selected" :families="audience.families" />
         <p v-else class="audience-tip">{{ t('audience.canShareFalse') }}</p>
       </div>
       <template #footer>
@@ -150,6 +150,7 @@ import Breadcrumb from '@/components/Breadcrumb.vue'
 import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
 import AudiencePicker from '@/components/common/AudiencePicker.vue'
 import { useAudience } from '@/composables/useAudience'
+import { visibilityOptions as buildVisibilityOptions, needsAudience } from '@/utils/visibility'
 import DoodleTray from './DoodleTray.vue'
 import { INK_COLORS, parseDoodle, renderStroke, renderStrokes, erasePixel, eraseObject, setupCanvas, clearCanvas } from '@/utils/doodle'
 import { PAGE_H, PAPER_W, MOODS, WEATHERS, moodLabel as moodLabelOf, weatherLabel as weatherLabelOf } from '@/utils/diary'
@@ -180,7 +181,7 @@ const openShare = async () => {
   shareDialog.value = true
   shareLoading.value = true
   try {
-    await loadAudience(route.params.id || null)
+    await loadAudience(route.params.id || null, 'diary', { applyDefaults: !route.params.id })
   } finally {
     shareLoading.value = false
   }
@@ -196,12 +197,8 @@ const confirmShare = async () => {
     /* 请求层已提示 */
   }
 }
-// 可见范围选项(共用选择器,文案随日记命名空间)
-const visibilityOptions = computed(() => [
-  { value: 'PRIVATE', label: t('diary.onlySelf') },
-  { value: 'FAMILY', label: t('diary.familyVisible') },
-  { value: 'PUBLIC', label: t('diary.publicVisible') },
-])
+// 可见范围四档(共用选择器与文案,顺序:公开 > 亲友圈 > 家庭 > 私密)
+const visibilityOptions = computed(() => buildVisibilityOptions(t))
 const content = ref('')
 const pickerOpen = ref(null)
 const pickerStyle = ref({})
@@ -277,7 +274,7 @@ const applyDraft = (o) => {
   if (typeof o.w === 'string') form.weather = o.w
   if (typeof o.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.d)) form.date = o.d
   if (typeof o.t === 'string' && /^\d{2}:\d{2}$/.test(o.t)) form.time = o.t
-  if (['PRIVATE', 'FAMILY', 'PUBLIC'].includes(o.v)) form.visibility = o.v
+  if (['PRIVATE', 'FAMILY', 'CIRCLE', 'PUBLIC'].includes(o.v)) form.visibility = o.v
   if (Array.isArray(o.s)) strokes.value = o.s.filter((s) => s && typeof s.t === 'string' && Array.isArray(s.pts) && s.pts.length)
 }
 const flushDraftIfDirty = () => {
@@ -535,7 +532,7 @@ const onSave = async () => {
       visibility: form.visibility,
       doodle: strokes.value.length ? JSON.stringify({ v: 1, strokes: strokes.value }) : null,
     }
-    const picked = audience.loaded && audience.canShare && form.visibility !== 'PRIVATE' ? [...audience.selected] : null
+    const picked = audience.loaded && audience.canShare ? (needsAudience(form.visibility) ? [...audience.selected] : []) : null
     let diaryId = isEdit.value ? route.params.id : null
     if (isEdit.value) await diaryApi.update(route.params.id, payload)
     else {
@@ -572,9 +569,10 @@ onMounted(async () => {
       weather: d.weather || '',
       date: raw.slice(0, 10) || form.date,
       time: raw.slice(11, 16) || form.time,
-      visibility: d.visibility === 'PRIVATE' ? 'PRIVATE' : d.visibility === 'PUBLIC' ? 'PUBLIC' : 'FAMILY',
+      visibility: d.visibility || 'FAMILY',
     })
     if (draft) applyDraft(draft) // 旋转/刷新丢内容后回来:草稿是本设备最近一次编辑,覆盖服务端数据
+    if (form.visibility === 'CIRCLE') loadAudience(route.params.id)
   } else {
     if (draft) applyDraft(draft)
     else loadCurrentWeather()

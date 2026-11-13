@@ -105,6 +105,31 @@
       </div>
     </div>
     <el-empty v-else :description="t('circle.empty')" :image-size="40" />
+
+    <!-- 默认分享:发内容选「亲友圈」时预勾选这些家庭,只是默认值,每次发布都能改 -->
+    <div v-if="canManageFamily" class="circle-defaults">
+      <div class="circle-defaults-head">
+        <span class="circle-defaults-title">{{ t('circle.defaultTitle') }}</span>
+        <el-button
+          v-if="shareDefault.families.length"
+          size="small"
+          type="primary"
+          plain
+          :loading="shareDefault.saving"
+          @click="saveShareDefaults"
+        >
+          {{ t('common.save') }}
+        </el-button>
+      </div>
+      <p class="share-tip">{{ t('circle.defaultHint') }}</p>
+      <el-checkbox-group v-if="shareDefault.families.length" v-model="shareDefault.selected" class="circle-default-list">
+        <el-checkbox v-for="f in shareDefault.families" :key="f.familyId" :value="f.familyId">
+          {{ f.alias || f.familyName }}
+          <span v-if="f.circleName" class="circle-default-circle">{{ f.circleName }}</span>
+        </el-checkbox>
+      </el-checkbox-group>
+      <p v-else class="share-tip">{{ t('circle.defaultEmpty') }}</p>
+    </div>
   </div>
 
   <!-- 分享记录:本家庭分享给其他家庭的内容,可随时收回 -->
@@ -303,6 +328,34 @@ const joinCode = ref('')
 const joiningCircle = ref(false)
 const inviteDialog = reactive({ visible: false, code: '', expiresAt: '' })
 
+// 复制统一入口:内嵌壳/局域网 http 下 navigator.clipboard 不可用,退回 execCommand
+const copyText = async (text) => {
+  if (!text) return false
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      /* 权限被拒时继续走兜底 */
+    }
+  }
+  const ta = document.createElement('textarea')
+  ta.value = text
+  ta.setAttribute('readonly', '')
+  ta.style.position = 'fixed'
+  ta.style.opacity = '0'
+  document.body.appendChild(ta)
+  ta.select()
+  let ok
+  try {
+    ok = document.execCommand('copy')
+  } catch {
+    ok = false
+  }
+  document.body.removeChild(ta)
+  return ok
+}
+
 const loadCircles = async () => {
   if (!userStore.isLoggedIn) return
   try {
@@ -379,12 +432,9 @@ const generateInvite = async (c) => {
 }
 
 const copyInviteCode = async () => {
-  try {
-    await navigator.clipboard.writeText(inviteDialog.code)
-    ElMessage.success(t('circle.copied'))
-  } catch {
-    ElMessage.error(t('circle.copyFailed'))
-  }
+  const ok = await copyText(inviteDialog.code)
+  if (ok) ElMessage.success(t('circle.copied'))
+  else ElMessage.error(t('circle.copyFailed'))
 }
 
 const editAlias = async (c) => {
@@ -496,6 +546,35 @@ const revokeAllShares = async () => {
   }
 }
 
+// ---------- 默认分享目标(家庭级):发内容选「亲友圈」时预勾选哪些家庭 ----------
+const shareDefault = reactive({ families: [], selected: [], saving: false })
+
+const loadShareDefaults = async () => {
+  if (!userStore.isLoggedIn || !canManageFamily.value) return
+  try {
+    const data = await familyApi.shareDefaults()
+    shareDefault.families = data?.families || []
+    shareDefault.selected = (data?.targetFamilyIds || []).map(Number)
+  } catch {
+    shareDefault.families = []
+    shareDefault.selected = []
+  }
+}
+
+const saveShareDefaults = async () => {
+  shareDefault.saving = true
+  try {
+    const data = await familyApi.saveShareDefaults(shareDefault.selected)
+    shareDefault.families = data?.families || []
+    shareDefault.selected = (data?.targetFamilyIds || []).map(Number)
+    ElMessage.success(t('circle.defaultSaved'))
+  } catch {
+    // 请求层已提示(例如目标家庭已不在同一亲友圈)
+  } finally {
+    shareDefault.saving = false
+  }
+}
+
 const coverUploadRef = ref(null)
 const coverCropperRef = ref(null)
 
@@ -523,12 +602,9 @@ const onCoverCropped = async (file) => {
 }
 
 const copyShare = async () => {
-  try {
-    await navigator.clipboard.writeText(shareUrl.value)
-    ElMessage.success(t('settings.linkCopied'))
-  } catch {
-    ElMessage.error(t('settings.copyFailed'))
-  }
+  const ok = await copyText(shareUrl.value)
+  if (ok) ElMessage.success(t('settings.linkCopied'))
+  else ElMessage.error(t('settings.copyFailed'))
 }
 
 const showCreateFamily = ref(false)
@@ -548,8 +624,10 @@ const confirmCreateFamily = async () => {
   if (!name || creatingFamily.value) return
   creatingFamily.value = true
   try {
-    await familyApi.create({ name })
+    const created = await familyApi.create({ name })
     ElMessage.success(t('settings.familyCreated'))
+    // 创建接口只切了后端的当前家庭,JWT 里的家庭快照还是旧的:先换令牌再刷新,否则回来还是旧家庭
+    if (created?.id) await userStore.switchFamily(created.id, true)
     location.reload()
   } catch (e) {
     ElMessage.error(e.message || t('settings.createFailed'))
@@ -596,6 +674,7 @@ onMounted(async () => {
   loadFamilies()
   loadCircles()
   loadAudit(1)
+  loadShareDefaults()
 })
 </script>
 
@@ -768,6 +847,35 @@ html.dark .create-family-btn:hover {
   align-items: center;
   gap: 6px;
   margin-top: 10px;
+}
+.circle-defaults {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--color-card-2);
+}
+.circle-defaults-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.circle-defaults-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.circle-defaults-head .el-button {
+  margin-left: auto;
+}
+.circle-default-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+.circle-default-circle {
+  margin-left: 6px;
+  font-size: 11.5px;
+  color: var(--color-text-secondary);
 }
 
 /* ---------- 分享记录 ---------- */

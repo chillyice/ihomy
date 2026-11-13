@@ -229,7 +229,7 @@
                 <div class="video-footer">
                   <span class="video-uploader">{{ v.uploaderName }}</span>
                   <span v-if="userStore.isLoggedIn && !v.readOnly" class="video-actions">
-                    <el-tooltip :content="$t('audience.label')" placement="top" :show-after="300">
+                    <el-tooltip v-if="v.visibility === 'CIRCLE'" :content="$t('audience.label')" placement="top" :show-after="300">
                       <el-button size="small" text @click="openShare(v)"
                         ><el-icon><Share /></el-icon
                       ></el-button>
@@ -402,6 +402,13 @@
         <el-form-item :label="$t('cinema.intro')">
           <el-input v-model="editor.form.intro" type="textarea" :rows="3" />
         </el-form-item>
+        <el-form-item :label="$t('visibility.label')">
+          <VisibilityPicker v-model="editor.form.visibility" :options="visibilityOptions" />
+        </el-form-item>
+        <div v-if="needsAudience(editor.form.visibility)" class="editor-audience">
+          <AudiencePicker v-if="editorAudience.canShare" v-model="editorAudience.selected" :families="editorAudience.families" />
+          <p v-else class="audience-tip">{{ $t('audience.canShareFalse') }}</p>
+        </div>
         <el-form-item :label="$t('cinema.poster')">
           <el-upload :show-file-list="false" :http-request="uploadPoster" accept="image/*">
             <img v-if="editor.form.poster" :src="editor.form.poster" class="poster-upload-preview" :alt="$t('cinema.poster')" />
@@ -433,7 +440,7 @@
     <!-- 分享范围:不选圈 = 只给自家人 -->
     <el-dialog v-model="share.visible" append-to-body :title="$t('audience.label')" width="420px">
       <div v-loading="share.loading">
-        <AudiencePicker v-if="audience.canShare" v-model="audience.selected" :circles="audience.circles" />
+        <AudiencePicker v-if="audience.canShare" v-model="audience.selected" :families="audience.families" />
         <p v-else class="audience-tip">{{ $t('audience.canShareFalse') }}</p>
       </div>
       <template #footer>
@@ -457,6 +464,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import AudiencePicker from '@/components/common/AudiencePicker.vue'
+import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
+import { visibilityOptions as buildVisibilityOptions, needsAudience } from '@/utils/visibility'
 import SyncDialog from '@/components/SyncDialog.vue'
 import MediaPlayer from '@/components/MediaPlayer.vue'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
@@ -650,6 +659,8 @@ const sharedFromText = (s) => t('audience.sharedFrom', { name: s.alias || s.fami
 // 分享范围:面板打开时才读该影片已分享的圈,取消保存不改动
 const share = reactive({ visible: false, id: null, loading: false })
 const { state: audience, load: loadAudience } = useAudience('video')
+// 编辑弹窗里的「亲友圈」家庭选择(与分享弹窗分开,避免互相覆盖)
+const { state: editorAudience, load: loadEditorAudience } = useAudience('video')
 const openShare = async (v) => {
   share.id = v.id
   share.visible = true
@@ -690,9 +701,12 @@ const emptyForm = () => ({
   poster: '',
   videoUrl: '',
   sourceDeviceId: null,
+  visibility: 'FAMILY',
 })
 
 const editor = reactive({ visible: false, form: emptyForm() })
+// 可见范围四档(顺序:公开 > 亲友圈 > 家庭 > 私密)
+const visibilityOptions = computed(() => buildVisibilityOptions(t))
 const wishDialog = reactive({ visible: false, form: { title: '', genres: [], reason: '' } })
 const player = reactive({ visible: false, video: null })
 watch(
@@ -745,12 +759,15 @@ const openEditor = (v) => {
   if (v) {
     editor.form = {
       ...v,
+      visibility: v.visibility || 'FAMILY',
       genres: v.genres ? String(v.genres).split(',').filter(Boolean) : [],
     }
   } else {
     editor.form = emptyForm()
   }
   editor.visible = true
+  // 新建套家庭默认分享家庭;编辑读该影片已有的分享家庭
+  loadEditorAudience(v?.id ?? null, 'video', { applyDefaults: !v })
 }
 
 const uploadPoster = async ({ file }) => {
@@ -785,9 +802,25 @@ const onSave = async () => {
     intro: editor.form.intro || null,
     poster: editor.form.poster || null,
     videoUrl: editor.form.sourceDeviceId ? null : editor.form.videoUrl,
+    visibility: editor.form.visibility,
   }
+  let videoId = editor.form.id
   if (editor.form.id) await videoApi.update(editor.form.id, data)
-  else await videoApi.create(data)
+  else {
+    const created = await videoApi.create(data)
+    videoId = created?.id
+  }
+  // 亲友圈:保存勾选的家庭;其余档位清空受众(取消分享)
+  const picked =
+    editorAudience.loaded && editorAudience.canShare ? (needsAudience(editor.form.visibility) ? [...editorAudience.selected] : []) : null
+  if (videoId && picked !== null) {
+    try {
+      const res = await audienceApi.save('video', videoId, picked)
+      if (picked.length && res?.targetCount === 0) ElMessage.info(t('audience.noTarget'))
+    } catch {
+      ElMessage.warning(t('audience.saveFailed'))
+    }
+  }
   ElMessage.success(t('common.success'))
   editor.visible = false
   load()
@@ -1065,6 +1098,12 @@ onMounted(() => {
   margin: 0;
   font-size: 12px;
   color: var(--color-text-secondary);
+}
+.editor-audience {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
 }
 .status-dot {
   width: 7px;

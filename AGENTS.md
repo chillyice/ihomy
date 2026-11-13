@@ -10,6 +10,8 @@
 | UI/交互/视觉细则 | `docs/UI设计提示词.md` |
 | 代码路径索引(功能 ↔ 文件) | `docs/代码地图.md`(**自动生成,勿手改**:`bash scripts/gen-code-map.sh`) |
 
+> 跨项目经验(同类问题别的项目怎么解、踩过哪些坑):`../经验库/README.md` —— 只读参考,改它要回那个仓库改。
+
 ## 任务 → 先读哪几个文件
 
 | 任务 | 顺序(先定位,再动手) |
@@ -68,7 +70,7 @@ ihomy:家庭内部内容共享平台(PC / 安卓 / iOS,均 PWA),功能域见 需
 
 - **root 仅初始化**:`mysql -uroot -p < schema.sql`(建库/建表/建账号/种子),只执行一次;本地 `.\scripts\start-db.ps1`(Docker 首启自动导入)。**业务运行用 `ihomy` 账号**(仅 `SELECT/INSERT/UPDATE/DELETE` on `ihomy.*`,无 DDL),建 `localhost` 与 `%` 两个 host。
 - 生产 MySQL `validate_password` MEDIUM:密码须含特殊字符(避开 `' " \ $ |`,建议 `!@%^&*-_+=.`),改密顺序见 踩坑速查 §2.7。
-- **99 张表**,前缀:`sys_` 28(系统/账号/权限/配置/存储)、`report_` 5(报表/日志)、`family_` 43(家庭事务)、`content_` 22(内容数据)、`game_` 1(games 域);完整清单见 需求 §6.2。游戏域顶层前缀 `game_`(格式 `game_<code>_<module>_<entity>`);`game_info` 遗留未带 `family_` 前缀,类型/分类/系列口径见 需求 §4.13。
+- **100 张表**,前缀:`sys_` 28(系统/账号/权限/配置/存储)、`report_` 5(报表/日志)、`family_` 44(家庭事务)、`content_` 22(内容数据)、`game_` 1(games 域);完整清单见 需求 §6.2。游戏域顶层前缀 `game_`(格式 `game_<code>_<module>_<entity>`);`game_info` 遗留未带 `family_` 前缀,类型/分类/系列口径见 需求 §4.13。
 - **结构变更双文件**:同时改 `schema.sql`(全量)与 `migrations.sql`(增量、**幂等**),并按 CI 同路径做空库全量导入实测(`migrations` 跑通 ≠ `schema.sql` 可用,踩坑速查 §7.4)。
 - **枚举不用数字**:状态/类型一律大写英文(`PUBLISHED/PUBLIC/ACTIVE...`),含义在 `sys_dict_item`,Java 常量在 `common/DictConst.java`,前端映射 `utils/dict.js`;**禁止写回 0/1/2 判断**。
 - `content_blog/diary/photo/video/wish/book` 的 `visibility` 为 `VARCHAR(20) DEFAULT 'FAMILY'`(PRIVATE/FAMILY/PUBLIC);`family_vault_item` 只有 PRIVATE/FAMILY 两档。清单见 需求 §6.4。
