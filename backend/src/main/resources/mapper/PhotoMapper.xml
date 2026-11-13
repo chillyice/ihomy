@@ -2,11 +2,26 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ihomy.mapper.PhotoMapper">
 
+    <!-- 照片可见性条件(单点判定在 ContentAccessService.visibleFilter,这里只机械套用):
+         all=true(家长)=只看家庭维度;否则 家庭 + (本人授权的 OR 可见档位)。
+         照片自身 deleted 由调用处各自声明,XML 不走 @TableLogic。 -->
+    <sql id="photoVisible">
+        AND p.family_id = #{visible.familyId}
+        <if test="!visible.all">
+            AND (p.author_id = #{visible.authorId}
+            <if test="visible.visibilities != null and visible.visibilities.size() > 0">
+                 OR p.visibility IN
+                 <foreach item="v" collection="visible.visibilities" open="(" separator="," close=")">#{v}</foreach>
+            </if>
+            )
+        </if>
+    </sql>
+
     <select id="selectLatestByFamily" resultType="com.ihomy.entity.Photo">
         SELECT p.* FROM content_photo p
         JOIN content_photo_album a ON p.album_id = a.id
-        WHERE p.family_id = #{familyId}
-        AND p.deleted = 0 AND a.deleted = 0
+        WHERE p.deleted = 0 AND a.deleted = 0
+        <include refid="photoVisible"/>
         ORDER BY p.created_at DESC
         LIMIT #{limit}
     </select>
@@ -32,13 +47,8 @@
         FROM content_photo p
         JOIN content_photo_album a ON p.album_id = a.id
         LEFT JOIN sys_user u ON p.author_id = u.id
-        WHERE p.family_id = #{familyId}
-        AND p.deleted = 0 AND a.deleted = 0
-        AND (
-            p.visibility = 'PUBLIC'
-            OR p.visibility = 'FAMILY'
-            OR (p.visibility = 'PRIVATE' AND p.author_id = #{userId})
-        )
+        WHERE p.deleted = 0 AND a.deleted = 0
+        <include refid="photoVisible"/>
         ORDER BY RAND()
         LIMIT #{limit}
     </select>

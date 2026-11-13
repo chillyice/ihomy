@@ -24,21 +24,19 @@ public class DiaryController {
 
     private final DiaryService diaryService;
     private final SecurityHelper securityHelper;
+    private final com.ihomy.service.access.ViewerScopeResolver viewerScopeResolver;
 
     @Operation(summary = "日志分页列表")
     @GetMapping("/list")
     public Result<IPage<Diary>> list(@RequestParam(defaultValue = "1") int current,
                                      @RequestParam(defaultValue = "20") int size) {
-        SysUser user = securityHelper.currentUser();
-        Long familyId = user == null ? null : user.getFamilyId();
-        Long userId = user == null ? null : user.getId();
-        return Result.success(diaryService.page(current, size, familyId, userId, securityHelper.isOwner()));
+        return Result.success(diaryService.page(current, size, viewerScopeResolver.resolve()));
     }
 
     @Operation(summary = "日志详情")
     @GetMapping("/{id}")
     public Result<Diary> detail(@PathVariable Long id) {
-        return Result.success(diaryService.getById(id));
+        return Result.success(diaryService.getById(id, viewerScopeResolver.resolve()));
     }
 
     @Operation(summary = "新建日志")

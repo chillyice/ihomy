@@ -9,6 +9,9 @@ import com.ihomy.entity.SysUser;
 import com.ihomy.entity.Wish;
 import com.ihomy.mapper.SysUserMapper;
 import com.ihomy.mapper.WishMapper;
+import com.ihomy.service.access.ContentAccessService;
+import com.ihomy.service.access.ContentKind;
+import com.ihomy.service.access.ViewerScope;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -27,20 +30,15 @@ public class WishService {
 
     private final WishMapper wishMapper;
     private final SysUserMapper sysUserMapper;
+    private final ContentAccessService contentAccess;
 
-    /** 家庭愿望列表(带提出人昵称),待实现优先 */
-    public List<Map<String, Object>> list(Long familyId) {
-        return toMaps(wishMapper.selectList(new LambdaQueryWrapper<Wish>()
-                .eq(Wish::getFamilyId, familyId)
-                .orderByAsc(Wish::getStatus)
-                .orderByDesc(Wish::getCreatedAt)));
-    }
-
-    /** 公开愿望列表(游客可读):只取 visibility=PUBLIC 的愿望,口径与动态流 publicOnly 分支一致 */
-    public List<Map<String, Object>> listPublic(Long familyId) {
-        return toMaps(wishMapper.selectList(new LambdaQueryWrapper<Wish>()
-                .eq(Wish::getFamilyId, familyId)
-                .eq(Wish::getVisibility, DictConst.VIS_PUBLIC)
+    /** 愿望列表(带提出人昵称),待实现优先;游客只看演示家庭的公开愿望 */
+    public List<Map<String, Object>> list(ViewerScope viewer) {
+        if (viewer.familyId() == null) return List.of();
+        LambdaQueryWrapper<Wish> qw = new LambdaQueryWrapper<>();
+        contentAccess.applyVisible(qw, ContentKind.WISH, viewer,
+                Wish::getFamilyId, Wish::getRequesterId, Wish::getVisibility);
+        return toMaps(wishMapper.selectList(qw
                 .orderByAsc(Wish::getStatus)
                 .orderByDesc(Wish::getCreatedAt)));
     }

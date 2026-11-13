@@ -57,10 +57,7 @@
           <el-input v-model="form.tags" :placeholder="$t('library.tagsPlaceholder')" />
         </el-form-item>
         <el-form-item :label="$t('library.visibility')">
-          <el-radio-group v-model="form.visibility">
-            <el-radio value="PRIVATE">{{ $t('library.onlySelf') }}</el-radio>
-            <el-radio value="FAMILY">{{ $t('library.familyVisible') }}</el-radio>
-          </el-radio-group>
+          <VisibilityPicker v-model="form.visibility" :options="visibilityOptions" />
         </el-form-item>
         <div class="form-footer">
           <el-button type="primary" :loading="loading" @click="onSave">{{ $t('common.save') }}</el-button>
@@ -101,6 +98,7 @@ import { libraryApi, fileApi } from '@/api'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -123,6 +121,11 @@ const form = reactive({
   status: 'PUBLISHED',
   visibility: 'FAMILY',
 })
+// 可见范围选项(共用选择器,文案随书架命名空间)
+const visibilityOptions = computed(() => [
+  { value: 'PRIVATE', label: t('library.onlySelf') },
+  { value: 'FAMILY', label: t('library.familyVisible') },
+])
 const categories = ref([])
 const showCategoryDialog = ref(false)
 const newCategoryName = ref('')

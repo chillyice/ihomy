@@ -176,10 +176,7 @@
           <el-input v-model="editor.form.name" :placeholder="t('album.namePlaceholder')" />
         </el-form-item>
         <el-form-item :label="t('album.visibility')">
-          <el-radio-group v-model="editor.form.type">
-            <el-radio value="public">{{ t('album.publicOption') }}</el-radio>
-            <el-radio value="private">{{ t('album.privateOption') }}</el-radio>
-          </el-radio-group>
+          <VisibilityPicker v-model="editor.form.type" :options="visibilityOptions" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -206,6 +203,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { Edit, Delete, Close } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import SyncDialog from '@/components/SyncDialog.vue'
 import AlbumDefaultCover from '@/components/AlbumDefaultCover.vue'
@@ -226,6 +224,11 @@ const albums = ref([])
 const loading = ref(false)
 const loadError = ref(false)
 const editor = reactive({ visible: false, form: { id: null, name: '', type: 'public' } })
+// 相册可见范围:public=公开相册(照片 PUBLIC),private=仅家庭可见
+const visibilityOptions = computed(() => [
+  { value: 'public', label: t('album.publicOption') },
+  { value: 'private', label: t('album.privateOption') },
+])
 
 // 手机照片自动备份入口:只在原生壳 + 已登录 + 开关关着时出现。
 // 只在挂载时读一次开关(同步读 localStorage,不碰原生扫描);从设置页回来会重新挂载,状态自然更新。

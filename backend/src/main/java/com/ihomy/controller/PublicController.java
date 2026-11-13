@@ -24,6 +24,9 @@ import com.ihomy.service.MultiFamilyService;
 import com.ihomy.service.ProductStatService;
 import com.ihomy.service.SunService;
 import com.ihomy.service.WeatherService;
+import com.ihomy.service.access.ContentAccessService;
+import com.ihomy.service.access.ViewerScope;
+import com.ihomy.service.access.ViewerScopeResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -82,6 +85,8 @@ public class PublicController {
     private final ProductStatService productStatService;
     private final CalendarService calendarService;
     private final AndroidReleaseService androidReleaseService;
+    private final ContentAccessService contentAccess;
+    private final ViewerScopeResolver viewerScopeResolver;
     private final StringRedisTemplate redis;
     private final ObjectMapper mapper;
 
@@ -241,6 +246,7 @@ public class PublicController {
 
         // 非成员视图(访客):走整包 Redis 缓存,5min TTL,模块/相册/家庭设置变更时主动失效
         if (!member) {
+            ViewerScope publicScope = viewerScopeResolver.publicView(familyId);
             String key = KEY_HOME_PUBLIC + familyId;
             try {
                 String cached = redis.opsForValue().get(key);
@@ -252,7 +258,7 @@ public class PublicController {
             } catch (Exception e) {
                 log.warn("read home cache failed fid={}, fallback to DB", familyId, e);
             }
-            Map<String, Object> data = buildHomeData(family, member, familyId);
+            Map<String, Object> data = buildHomeData(family, publicScope);
             try {
                 redis.opsForValue().set(key, mapper.writeValueAsString(data), HOME_TTL);
             } catch (Exception e) {
@@ -261,12 +267,15 @@ public class PublicController {
             return Result.success(data);
         }
 
-        // 成员视图:不缓存(数据敏感 + 频繁更新),直接组装
-        return Result.success(buildHomeData(family, member, familyId));
+        // 成员视图:不缓存(数据敏感 + 频繁更新),直接组装。家长身份只在该家庭是自己当前家庭时成立
+        boolean ownerOfFamily = currentFamily != null && currentFamily.equals(familyId) && securityHelper.isOwner();
+        return Result.success(buildHomeData(family, ViewerScope.of(user.getId(), familyId, ownerOfFamily)));
     }
 
     /** 组装首页聚合数据:family + isMember + modules + photos + stats */
-    private Map<String, Object> buildHomeData(Family family, boolean member, Long familyId) {
+    private Map<String, Object> buildHomeData(Family family, ViewerScope viewer) {
+        Long familyId = family.getId();
+        boolean member = !viewer.guest();
         Map<String, Object> data = new HashMap<>();
         data.put("family", family);
         data.put("isMember", member);
@@ -281,7 +290,7 @@ public class PublicController {
         data.put("modules", homeModuleMapper.selectList(qw));
 
         if (member) {
-            data.put("photos", resolvePhotoUrls(photoMapper.selectLatestByFamily(familyId, 20)));
+            data.put("photos", resolvePhotoUrls(photoMapper.selectLatestByFamily(contentAccess.visibleFilter(viewer), 20)));
         } else {
             data.put("photos", resolvePhotoUrls(photoMapper.selectLatestPublicByFamily(familyId, 20)));
         }
@@ -321,7 +330,7 @@ public class PublicController {
                 throw new BizException(ResultCode.NOT_FOUND);
             }
         }
-        return Result.success(activityFeedService.getFeed(family.getId(), limit, true, null, false));
+        return Result.success(activityFeedService.getFeed(viewerScopeResolver.publicView(family.getId()), limit));
     }
 
     /**

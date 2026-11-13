@@ -12,6 +12,9 @@ import com.ihomy.entity.Diary;
 import com.ihomy.entity.SysUser;
 import com.ihomy.mapper.DiaryMapper;
 import com.ihomy.mapper.SysUserMapper;
+import com.ihomy.service.access.ContentAccessService;
+import com.ihomy.service.access.ContentKind;
+import com.ihomy.service.access.ViewerScope;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -22,7 +25,7 @@ import java.util.stream.Collectors;
 
 /**
  * 生活日志(日记)业务:分页按家庭/可见范围过滤,增删改校验归属与权限。
- * 可见性:3=家庭可见,4=公开,0=仅自己。
+ * 可见性判定统一走 {@link ContentAccessService}(PRIVATE 仅自己 / FAMILY 家庭 / PUBLIC 公开)。
  */
 @Service
 @RequiredArgsConstructor
@@ -31,26 +34,23 @@ public class DiaryService {
     private final DiaryMapper diaryMapper;
     private final SysUserMapper sysUserMapper;
     private final PointsService pointsService;
+    private final ContentAccessService contentAccess;
 
-    /** 查询单条日记详情 */
-    public Diary getById(Long id) {
-        return diaryMapper.selectById(id);
+    /** 查询单条日记详情:跨家庭或不可见一律 404(不泄露存在性) */
+    public Diary getById(Long id, ViewerScope viewer) {
+        Diary diary = diaryMapper.selectById(id);
+        if (diary == null) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
+        contentAccess.assertViewable(ContentKind.DIARY, diary.getFamilyId(), diary.getAuthorId(), diary.getVisibility(), viewer);
+        return diary;
     }
 
-    /** 分页查询:家长见全部,成员见自己的+家庭可见/公开,游客仅公开 */
-    public IPage<Diary> page(int current, int size, Long familyId, Long currentUserId, boolean isOwner) {
+    /** 分页查询:家长见全部,成员见自己的+家庭可见/公开,游客见演示家庭公开 */
+    public IPage<Diary> page(int current, int size, ViewerScope viewer) {
         LambdaQueryWrapper<Diary> qw = new LambdaQueryWrapper<>();
-        if (familyId != null) {
-            qw.eq(Diary::getFamilyId, familyId);
-            if (isOwner) {
-                // 家长可见全部
-            } else {
-                qw.and(w -> w.eq(Diary::getAuthorId, currentUserId)
-                            .or().in(Diary::getVisibility, DictConst.VIS_FAMILY, DictConst.VIS_PUBLIC));
-            }
-        } else {
-            qw.eq(Diary::getVisibility, DictConst.VIS_PUBLIC);
-        }
+        contentAccess.applyVisible(qw, ContentKind.DIARY, viewer,
+                Diary::getFamilyId, Diary::getAuthorId, Diary::getVisibility);
         qw.orderByDesc(Diary::getCreatedAt);
         IPage<Diary> page = diaryMapper.selectPage(new Page<>(current, size), qw);
         List<Diary> records = page.getRecords();

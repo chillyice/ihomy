@@ -14,6 +14,9 @@ import com.ihomy.entity.VideoWish;
 import com.ihomy.mapper.SysUserMapper;
 import com.ihomy.mapper.VideoMapper;
 import com.ihomy.mapper.VideoWishMapper;
+import com.ihomy.service.access.ContentAccessService;
+import com.ihomy.service.access.ContentKind;
+import com.ihomy.service.access.ViewerScope;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -38,14 +41,16 @@ public class VideoService {
     private final SignedUrlService signedUrlService;
     private final PointsService pointsService;
     private final FileService fileService;
+    private final ContentAccessService contentAccess;
 
-    /** 视频列表:按家庭过滤,支持关键字/类型搜索,附带上传者昵称与来源设备信息 */
-    public List<Map<String, Object>> list(Long familyId, String keyword, String mediaType) {
+    /** 视频列表:按家庭/可见范围过滤(补上此前漏掉的可见性判定),支持关键字/类型搜索,附带上传者昵称与来源设备信息 */
+    public List<Map<String, Object>> list(ViewerScope viewer, String keyword, String mediaType) {
         List<Map<String, Object>> result = new ArrayList<>();
-        if (familyId == null) return result;
+        if (viewer.familyId() == null) return result;
         LambdaQueryWrapper<Video> qw = new LambdaQueryWrapper<>();
-        qw.eq(Video::getFamilyId, familyId)
-          .eq(Video::getDeleted, 0)
+        contentAccess.applyVisible(qw, ContentKind.VIDEO, viewer,
+                Video::getFamilyId, Video::getUploaderId, Video::getVisibility);
+        qw.eq(Video::getDeleted, 0)
           .eq(mediaType != null && !mediaType.isBlank(), Video::getMediaType, mediaType)
           .like(keyword != null && !keyword.isBlank(), Video::getTitle, keyword)
           .orderByDesc(Video::getCreatedAt);

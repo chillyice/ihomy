@@ -16,15 +16,16 @@ import java.util.Map;
 @Mapper
 public interface PhotoMapper extends BaseMapper<Photo> {
 
-    /** 家庭内最新公开照片(按时间倒序),供首页等公开位置使用 */
-    List<Photo> selectLatestByFamily(@Param("familyId") Long familyId, @Param("limit") int limit);
+    /** 家庭内最新照片(按时间倒序),可见范围由 ContentAccessService.visibleFilter 决定,供首页等位置使用 */
+    List<Photo> selectLatestByFamily(@Param("visible") com.ihomy.service.access.ContentAccessService.VisibleFilter visible,
+                                     @Param("limit") int limit);
 
     /**
-     * 照片瀑布:按可见性过滤后随机取样。
-     * 私有照片只对上传者本人可见(userId 即当前登录用户,驱动 PRIVATE 行的过滤);
+     * 照片瀑布:按可见性过滤后随机取样(PRIVATE 只对上传者本人与家长可见)。
      * 随机序见 XML 的 ponytail 说明。
      */
-    List<Map<String, Object>> selectCascadeByFamily(@Param("familyId") Long familyId, @Param("userId") Long userId, @Param("limit") int limit);
+    List<Map<String, Object>> selectCascadeByFamily(@Param("visible") com.ihomy.service.access.ContentAccessService.VisibleFilter visible,
+                                                    @Param("limit") int limit);
 
     /** 仅公开照片(游客/壁纸等无登录态场景) */
     List<Photo> selectLatestPublicByFamily(@Param("familyId") Long familyId, @Param("limit") int limit);

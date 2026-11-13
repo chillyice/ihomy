@@ -3,7 +3,9 @@ package com.ihomy.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.ihomy.entity.Notification;
+import com.ihomy.entity.SysUserRole;
 import com.ihomy.mapper.NotificationMapper;
+import com.ihomy.mapper.SysUserRoleMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -20,6 +22,7 @@ import java.util.Map;
 public class NotificationService {
 
     private final NotificationMapper notificationMapper;
+    private final SysUserRoleMapper sysUserRoleMapper;
 
     /** 创建通知,receiverId 为空(如无作者)时忽略 */
     public void create(Long receiverId, String type, String content, Long sourceId, String contentType, Long contentId) {
@@ -33,6 +36,24 @@ public class NotificationService {
         n.setContentId(contentId);
         n.setIsRead(0);
         notificationMapper.insert(n);
+    }
+
+    /**
+     * 家庭内通知:先校验接收者确实在该家庭有角色绑定,否则丢弃。
+     * 跨家庭内容不外泄(评论/回复/分享等带家庭上下文的通知一律走这里)。
+     */
+    public void createInFamily(Long receiverId, Long familyId, String type, String content,
+                               Long sourceId, String contentType, Long contentId) {
+        if (receiverId == null || familyId == null) return;
+        if (!isFamilyMember(receiverId, familyId)) return;
+        create(receiverId, type, content, sourceId, contentType, contentId);
+    }
+
+    /** 用户是否是该家庭成员(查 sys_user_role,不以 sys_user.family_id 为准) */
+    private boolean isFamilyMember(Long userId, Long familyId) {
+        LambdaQueryWrapper<SysUserRole> qw = new LambdaQueryWrapper<>();
+        qw.eq(SysUserRole::getUserId, userId).eq(SysUserRole::getFamilyId, familyId);
+        return sysUserRoleMapper.selectCount(qw) > 0;
     }
 
     /** 最近 50 条通知(倒序) */

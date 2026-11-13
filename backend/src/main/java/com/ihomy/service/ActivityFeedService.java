@@ -1,6 +1,9 @@
 package com.ihomy.service;
 
 import com.ihomy.common.UserNames;
+import com.ihomy.service.access.ContentAccessService;
+import com.ihomy.service.access.ContentKind;
+import com.ihomy.service.access.ViewerScope;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -30,9 +33,14 @@ public class ActivityFeedService {
     private final com.ihomy.mapper.RecipeMapper recipeMapper;
     private final com.ihomy.mapper.ContentBookMapper contentBookMapper;
     private final SignedUrlService signedUrlService;
+    private final ContentAccessService contentAccess;
 
-    /** 组装动态:照片按上传者分组聚合为一条(带数量/前 5 张预览),最后统一按时间倒序取前 limit 条 */
-    public List<Map<String, Object>> getFeed(Long familyId, int limit, boolean publicOnly, Long currentUserId, boolean isOwner) {
+    /**
+     * 组装动态:照片按上传者分组聚合为一条(带数量/前 5 张预览),最后统一按时间倒序取前 limit 条。
+     * 可见范围由 ViewerScope 决定(游客=演示家庭公开,成员=本人/家庭可见,家长=全家)。
+     */
+    public List<Map<String, Object>> getFeed(ViewerScope viewer, int limit) {
+        Long familyId = viewer.familyId();
         List<Map<String, Object>> items = new ArrayList<>();
         List<Map<String, Object>> blogItems = new ArrayList<>();
         List<Map<String, Object>> diaryItems = new ArrayList<>();
@@ -43,14 +51,11 @@ public class ActivityFeedService {
         if (familyId != null) {
             com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.ihomy.entity.Blog> bq =
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
-            bq.eq(com.ihomy.entity.Blog::getFamilyId, familyId)
-              .eq(com.ihomy.entity.Blog::getStatus, com.ihomy.common.DictConst.BLOG_PUBLISHED);
-            if (publicOnly) {
-                bq.eq(com.ihomy.entity.Blog::getVisibility, com.ihomy.common.DictConst.VIS_PUBLIC);
-            } else if (!isOwner) {
-                bq.and(w -> w.eq(com.ihomy.entity.Blog::getAuthorId, currentUserId)
-                          .or().in(com.ihomy.entity.Blog::getVisibility, com.ihomy.common.DictConst.VIS_FAMILY, com.ihomy.common.DictConst.VIS_PUBLIC));
-            }
+            contentAccess.applyVisible(bq, ContentKind.BLOG, viewer,
+                    com.ihomy.entity.Blog::getFamilyId,
+                    com.ihomy.entity.Blog::getAuthorId,
+                    com.ihomy.entity.Blog::getVisibility);
+            bq.eq(com.ihomy.entity.Blog::getStatus, com.ihomy.common.DictConst.BLOG_PUBLISHED);
             bq.orderByDesc(com.ihomy.entity.Blog::getCreatedAt).last("LIMIT " + limit);
             for (com.ihomy.entity.Blog b : blogMapper.selectList(bq)) {
                 Map<String, Object> m = base("blog", b.getId(), b.getAuthorId(), b.getFamilyId(), b.getCreatedAt(), null);
@@ -68,13 +73,10 @@ public class ActivityFeedService {
 
             com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.ihomy.entity.Diary> dq =
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
-            dq.eq(com.ihomy.entity.Diary::getFamilyId, familyId);
-            if (publicOnly) {
-                dq.eq(com.ihomy.entity.Diary::getVisibility, com.ihomy.common.DictConst.VIS_PUBLIC);
-            } else if (!isOwner) {
-                dq.and(w -> w.eq(com.ihomy.entity.Diary::getAuthorId, currentUserId)
-                          .or().in(com.ihomy.entity.Diary::getVisibility, com.ihomy.common.DictConst.VIS_FAMILY, com.ihomy.common.DictConst.VIS_PUBLIC));
-            }
+            contentAccess.applyVisible(dq, ContentKind.DIARY, viewer,
+                    com.ihomy.entity.Diary::getFamilyId,
+                    com.ihomy.entity.Diary::getAuthorId,
+                    com.ihomy.entity.Diary::getVisibility);
             dq.orderByDesc(com.ihomy.entity.Diary::getCreatedAt).last("LIMIT " + limit);
             for (com.ihomy.entity.Diary d : diaryMapper.selectList(dq)) {
                 Map<String, Object> m = base("diary", d.getId(), d.getAuthorId(), d.getFamilyId(), d.getCreatedAt(), null);
@@ -89,9 +91,9 @@ public class ActivityFeedService {
                 if (d.getAuthorId() != null) authorIds.add(d.getAuthorId());
             }
 
-            List<com.ihomy.entity.Photo> photos = publicOnly
+            List<com.ihomy.entity.Photo> photos = viewer.guest()
                     ? photoMapper.selectLatestPublicByFamily(familyId, limit * 3)
-                    : photoMapper.selectLatestByFamily(familyId, limit * 3);
+                    : photoMapper.selectLatestByFamily(contentAccess.visibleFilter(viewer), limit * 3);
             Map<Long, List<com.ihomy.entity.Photo>> grouped = new HashMap<>();
             for (com.ihomy.entity.Photo p : photos) {
                 grouped.computeIfAbsent(p.getAuthorId(), k -> new ArrayList<>()).add(p);
@@ -113,13 +115,10 @@ public class ActivityFeedService {
             // 视频(放映厅):poster 出接口走签名解析(本地 /files/ 原样返回)
             com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.ihomy.entity.Video> vq =
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
-            vq.eq(com.ihomy.entity.Video::getFamilyId, familyId);
-            if (publicOnly) {
-                vq.eq(com.ihomy.entity.Video::getVisibility, com.ihomy.common.DictConst.VIS_PUBLIC);
-            } else if (!isOwner) {
-                vq.and(w -> w.eq(com.ihomy.entity.Video::getUploaderId, currentUserId)
-                          .or().in(com.ihomy.entity.Video::getVisibility, com.ihomy.common.DictConst.VIS_FAMILY, com.ihomy.common.DictConst.VIS_PUBLIC));
-            }
+            contentAccess.applyVisible(vq, ContentKind.VIDEO, viewer,
+                    com.ihomy.entity.Video::getFamilyId,
+                    com.ihomy.entity.Video::getUploaderId,
+                    com.ihomy.entity.Video::getVisibility);
             vq.orderByDesc(com.ihomy.entity.Video::getCreatedAt).last("LIMIT " + limit);
             for (com.ihomy.entity.Video v : videoMapper.selectList(vq)) {
                 Map<String, Object> m = base("video", v.getId(), v.getUploaderId(), v.getFamilyId(), v.getCreatedAt(), null);
@@ -132,13 +131,10 @@ public class ActivityFeedService {
             // 愿望单
             com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.ihomy.entity.Wish> wq =
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
-            wq.eq(com.ihomy.entity.Wish::getFamilyId, familyId);
-            if (publicOnly) {
-                wq.eq(com.ihomy.entity.Wish::getVisibility, com.ihomy.common.DictConst.VIS_PUBLIC);
-            } else if (!isOwner) {
-                wq.and(w -> w.eq(com.ihomy.entity.Wish::getRequesterId, currentUserId)
-                          .or().in(com.ihomy.entity.Wish::getVisibility, com.ihomy.common.DictConst.VIS_FAMILY, com.ihomy.common.DictConst.VIS_PUBLIC));
-            }
+            contentAccess.applyVisible(wq, ContentKind.WISH, viewer,
+                    com.ihomy.entity.Wish::getFamilyId,
+                    com.ihomy.entity.Wish::getRequesterId,
+                    com.ihomy.entity.Wish::getVisibility);
             wq.orderByDesc(com.ihomy.entity.Wish::getCreatedAt).last("LIMIT " + limit);
             for (com.ihomy.entity.Wish w : wishMapper.selectList(wq)) {
                 Map<String, Object> m = base("wish", w.getId(), w.getRequesterId(), w.getFamilyId(), w.getCreatedAt(), null);
@@ -148,8 +144,8 @@ public class ActivityFeedService {
                 if (w.getRequesterId() != null) authorIds.add(w.getRequesterId());
             }
 
-            // 任务悬赏(家庭内部可见,游客模式跳过)
-            if (!publicOnly) {
+            // 任务悬赏(家庭内部可见,游客视图跳过)
+            if (!viewer.guest()) {
                 com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.ihomy.entity.Task> tq =
                         new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
                 tq.eq(com.ihomy.entity.Task::getFamilyId, familyId)
@@ -166,8 +162,8 @@ public class ActivityFeedService {
                 }
             }
 
-            // 菜谱(家庭内部可见,游客模式跳过)
-            if (!publicOnly) {
+            // 菜谱(家庭内部可见,游客视图跳过)
+            if (!viewer.guest()) {
                 com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.ihomy.entity.Recipe> rq =
                         new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
                 rq.eq(com.ihomy.entity.Recipe::getFamilyId, familyId)
@@ -184,14 +180,11 @@ public class ActivityFeedService {
             // 图书(书架,仅已发布)
             com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.ihomy.entity.ContentBook> bkq =
                     new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<>();
-            bkq.eq(com.ihomy.entity.ContentBook::getFamilyId, familyId)
-               .eq(com.ihomy.entity.ContentBook::getStatus, com.ihomy.common.DictConst.BLOG_PUBLISHED);
-            if (publicOnly) {
-                bkq.eq(com.ihomy.entity.ContentBook::getVisibility, com.ihomy.common.DictConst.VIS_PUBLIC);
-            } else if (!isOwner) {
-                bkq.and(w -> w.eq(com.ihomy.entity.ContentBook::getUploaderId, currentUserId)
-                          .or().in(com.ihomy.entity.ContentBook::getVisibility, com.ihomy.common.DictConst.VIS_FAMILY, com.ihomy.common.DictConst.VIS_PUBLIC));
-            }
+            contentAccess.applyVisible(bkq, ContentKind.BOOK, viewer,
+                    com.ihomy.entity.ContentBook::getFamilyId,
+                    com.ihomy.entity.ContentBook::getUploaderId,
+                    com.ihomy.entity.ContentBook::getVisibility);
+            bkq.eq(com.ihomy.entity.ContentBook::getStatus, com.ihomy.common.DictConst.BLOG_PUBLISHED);
             bkq.orderByDesc(com.ihomy.entity.ContentBook::getCreatedAt).last("LIMIT " + limit);
             for (com.ihomy.entity.ContentBook bk : contentBookMapper.selectList(bkq)) {
                 Map<String, Object> m = base("book", bk.getId(), bk.getUploaderId(), bk.getFamilyId(), bk.getCreatedAt(), null);

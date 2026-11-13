@@ -31,6 +31,7 @@ public class BlogController {
 
     private final BlogService blogService;
     private final SecurityHelper securityHelper;
+    private final com.ihomy.service.access.ViewerScopeResolver viewerScopeResolver;
 
     @Operation(summary = "博客分页列表")
     @GetMapping("/list")
@@ -38,29 +39,19 @@ public class BlogController {
                                     @RequestParam(defaultValue = "20") int size,
                                     @RequestParam(required = false) String keyword,
                                     @RequestParam(required = false) String category) {
-        SysUser user = securityHelper.currentUser();
-        Long familyId = user == null ? null : user.getFamilyId();
-        Long userId = user == null ? null : user.getId();
-        boolean isOwner = securityHelper.isOwner();
-        return Result.success(blogService.page(current, size, familyId, userId, isOwner, keyword, category));
+        return Result.success(blogService.page(current, size, viewerScopeResolver.resolve(), keyword, category));
     }
 
     @Operation(summary = "博客分类列表（家庭级树形）")
     @GetMapping("/categories")
     public Result<List<Map<String, Object>>> categories() {
-        SysUser user = securityHelper.currentUser();
-        Long familyId = user == null ? 1L : user.getFamilyId();
-        return Result.success(blogService.categories(familyId));
+        return Result.success(blogService.categories(viewerScopeResolver.resolve().familyId()));
     }
 
-    @Operation(summary = "博客分类计数（按权限全量统计）")
+    @Operation(summary = "博客分类计数（按可见权限全量统计）")
     @GetMapping("/categories/counts")
     public Result<List<Map<String, Object>>> categoryCounts() {
-        SysUser user = securityHelper.currentUser();
-        Long familyId = user == null ? 1L : user.getFamilyId();
-        Long userId = user == null ? null : user.getId();
-        boolean isOwner = securityHelper.isOwner();
-        return Result.success(blogService.categoryCounts(familyId, userId, isOwner));
+        return Result.success(blogService.categoryCounts(viewerScopeResolver.resolve()));
     }
 
     @Operation(summary = "新增分类")
@@ -101,11 +92,7 @@ public class BlogController {
     @Operation(summary = "博客详情")
     @GetMapping("/{id}")
     public Result<Blog> detail(@PathVariable Long id) {
-        SysUser user = securityHelper.currentUser();
-        Long familyId = user == null ? null : user.getFamilyId();
-        Long userId = user == null ? null : user.getId();
-        boolean isOwner = securityHelper.isOwner();
-        return Result.success(blogService.getDetail(id, familyId, userId, isOwner));
+        return Result.success(blogService.getDetail(id, viewerScopeResolver.resolve()));
     }
 
     @Operation(summary = "新建博客")

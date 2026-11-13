@@ -12,6 +12,9 @@ import com.ihomy.entity.Blog;
 import com.ihomy.entity.BlogCategory;
 import com.ihomy.mapper.BlogCategoryMapper;
 import com.ihomy.mapper.BlogMapper;
+import com.ihomy.service.access.ContentAccessService;
+import com.ihomy.service.access.ContentKind;
+import com.ihomy.service.access.ViewerScope;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,7 +24,7 @@ import java.util.*;
 
 /**
  * 博客业务:分页查询按家庭/可见范围过滤,增删改校验归属与权限。
- * 可见性:0仅自己/1指定成员/2指定群组/3家庭可见/4公开。
+ * 可见性判定统一走 {@link ContentAccessService}(PRIVATE/FAMILY/PUBLIC),本类只接条件与发布状态口径。
  */
 @Service
 @RequiredArgsConstructor
@@ -38,6 +41,7 @@ public class BlogService {
     private final BlogMapper blogMapper;
     private final BlogCategoryMapper blogCategoryMapper;
     private final PointsService pointsService;
+    private final ContentAccessService contentAccess;
 
     /** 为家庭注入初始分类(幂等:已有任意分类的家庭跳过,不干扰用户自建树) */
     public void seedDefaultCategories(Long familyId) {
@@ -55,28 +59,39 @@ public class BlogService {
     }
 
     /** 分页查询:OWNER 见全家(含成员草稿);成员见自己的+家庭可见/公开(自己的草稿也在);游客仅公开已发布 */
-    public IPage<Blog> page(int current, int size, Long familyId, Long currentUserId, boolean isOwner, String keyword, String category) {
-        LambdaQueryWrapper<Blog> qw = new LambdaQueryWrapper<>();
-        if (familyId != null) {
-            qw.eq(Blog::getFamilyId, familyId);
-            if (isOwner) {
-                // 家长代管:全家的已发布 + 草稿(与详情页口径一致);HIDDEN 是「已隐藏」,列表里不出现
-                qw.in(Blog::getStatus, DictConst.BLOG_PUBLISHED, DictConst.BLOG_DRAFT);
-            } else if (currentUserId != null) {
-                // 自己的草稿必须能回列表找回来(模板上有草稿徽标),别人的只放已发布且家庭/公开可见
-                qw.and(w -> w.nested(n -> n.eq(Blog::getAuthorId, currentUserId).ne(Blog::getStatus, DictConst.BLOG_HIDDEN))
-                            .or(o -> o.eq(Blog::getStatus, DictConst.BLOG_PUBLISHED)
-                                      .in(Blog::getVisibility, DictConst.VIS_FAMILY, DictConst.VIS_PUBLIC)));
-            } else {
-                qw.eq(Blog::getStatus, DictConst.BLOG_PUBLISHED).eq(Blog::getVisibility, DictConst.VIS_PUBLIC);
-            }
-        } else {
-            qw.eq(Blog::getStatus, DictConst.BLOG_PUBLISHED).eq(Blog::getVisibility, DictConst.VIS_PUBLIC);
-        }
+    public IPage<Blog> page(int current, int size, ViewerScope viewer, String keyword, String category) {
+        LambdaQueryWrapper<Blog> qw = visibleQuery(viewer);
         qw.eq(StringUtils.hasText(category), Blog::getCategory, category)
           .like(StringUtils.hasText(keyword), Blog::getTitle, keyword)
           .orderByDesc(Blog::getCreatedAt);
         return blogMapper.selectPage(new Page<>(current, size), qw);
+    }
+
+    /**
+     * 列表可见口径:家庭/可见档位由 ContentAccessService 决定,这里只叠加博客特有的发布状态。
+     * 家长见全家已发布+草稿;成员见自己的(含草稿、已隐藏除外)+ 别人的已发布家庭/公开;游客见演示家庭公开已发布。
+     */
+    private LambdaQueryWrapper<Blog> visibleQuery(ViewerScope viewer) {
+        LambdaQueryWrapper<Blog> qw = new LambdaQueryWrapper<>();
+        if (viewer.owner() && viewer.hasFamily()) {
+            contentAccess.applyVisible(qw, ContentKind.BLOG, viewer,
+                    Blog::getFamilyId, Blog::getAuthorId, Blog::getVisibility);
+            // HIDDEN 是「已隐藏」,列表里不出现
+            qw.in(Blog::getStatus, DictConst.BLOG_PUBLISHED, DictConst.BLOG_DRAFT);
+        } else if (viewer.userId() != null && viewer.hasFamily()) {
+            // 自己的草稿必须能回列表找回来(模板上有草稿徽标),别人的只放已发布且家庭/公开可见
+            qw.eq(Blog::getFamilyId, viewer.familyId())
+              .and(w -> w.nested(n -> n.eq(Blog::getAuthorId, viewer.userId())
+                                        .ne(Blog::getStatus, DictConst.BLOG_HIDDEN))
+                          .or(o -> o.eq(Blog::getStatus, DictConst.BLOG_PUBLISHED)
+                                    .in(Blog::getVisibility, contentAccess.memberVisibilities())));
+        } else {
+            // 游客:只读演示家庭的公开已发布(不再全库扫 PUBLIC)
+            contentAccess.applyVisible(qw, ContentKind.BLOG, viewer,
+                    Blog::getFamilyId, Blog::getAuthorId, Blog::getVisibility);
+            qw.eq(Blog::getStatus, DictConst.BLOG_PUBLISHED);
+        }
+        return qw;
     }
 
     /** 家庭级分类列表:返回树形结构(含 id/name/parentId/path) */
@@ -116,16 +131,17 @@ public class BlogService {
         }
     }
 
-    /** 分类计数:分类表全量 + 博客表按权限统计,合并后返回(空分类count=0) */
-    public List<Map<String, Object>> categoryCounts(Long familyId, Long authorId, boolean isOwner) {
+    /** 分类计数:分类表全量 + 博客表按「与列表同一套可见口径」统计,合并后返回(空分类count=0) */
+    public List<Map<String, Object>> categoryCounts(ViewerScope viewer) {
         // 1. 从分类表拿全量树(含path)
-        List<Map<String, Object>> tree = categories(familyId);
+        List<Map<String, Object>> tree = categories(viewer.familyId());
 
-        // 2. 从博客表按权限统计每个分类(按category字段=全路径)文章数
-        List<Map<String, Object>> counts = blogMapper.selectCategoryCounts(familyId, authorId, isOwner);
+        // 2. 用列表同一套可见条件统计每个分类(按category字段=全路径)文章数
+        LambdaQueryWrapper<Blog> countQw = visibleQuery(viewer).select(Blog::getCategory);
+        countQw.isNotNull(Blog::getCategory).ne(Blog::getCategory, "");
         Map<String, Long> countMap = new HashMap<>();
-        for (Map<String, Object> row : counts) {
-            countMap.put((String) row.get("category"), ((Number) row.get("cnt")).longValue());
+        for (Blog b : blogMapper.selectList(countQw)) {
+            countMap.merge(b.getCategory(), 1L, Long::sum);
         }
 
         // 3. 合并:分类表全量(按path匹配count) + 博客表可能有分类表中不存在的旧分类
@@ -138,8 +154,8 @@ public class BlogService {
             result.add(row);
             seen.add(path);
         }
-        for (Map<String, Object> row : counts) {
-            String cat = (String) row.get("category");
+        for (Map.Entry<String, Long> e : countMap.entrySet()) {
+            String cat = e.getKey();
             if (!seen.contains(cat)) {
                 Map<String, Object> legacy = new LinkedHashMap<>();
                 legacy.put("id", null);
@@ -148,7 +164,7 @@ public class BlogService {
                 legacy.put("path", cat);
                 legacy.put("depth", 0);
                 legacy.put("childCount", 0);
-                legacy.put("cnt", ((Number) row.get("cnt")).longValue());
+                legacy.put("cnt", e.getValue());
                 result.add(legacy);
                 seen.add(cat);
             }
@@ -290,21 +306,15 @@ public class BlogService {
     }
 
     /** 详情:校验可见性与家庭归属后累加浏览量(跨家庭或不可见返回 404) */
-    public Blog getDetail(Long id, Long familyId, Long currentUserId, boolean isOwner) {
+    public Blog getDetail(Long id, ViewerScope viewer) {
         Blog blog = blogMapper.selectById(id);
         if (blog == null) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
-        boolean sameFamily = familyId != null && familyId.equals(blog.getFamilyId());
-        boolean isAuthor = currentUserId != null && currentUserId.equals(blog.getAuthorId());
-        boolean famOwner = isOwner && sameFamily;
-        if (!DictConst.VIS_PUBLIC.equals(blog.getVisibility()) && !sameFamily) {
-            throw new BizException(ResultCode.NOT_FOUND);
-        }
-        if (DictConst.VIS_PRIVATE.equals(blog.getVisibility()) && !isAuthor && !famOwner) {
-            throw new BizException(ResultCode.NOT_FOUND);
-        }
-        if (!DictConst.BLOG_PUBLISHED.equals(blog.getStatus()) && !isAuthor && !famOwner) {
+        contentAccess.assertViewable(ContentKind.BLOG, blog.getFamilyId(), blog.getAuthorId(), blog.getVisibility(), viewer);
+        boolean canManage = viewer.hasFamily() && viewer.familyId().equals(blog.getFamilyId())
+                && (viewer.owner() || (viewer.userId() != null && viewer.userId().equals(blog.getAuthorId())));
+        if (!DictConst.BLOG_PUBLISHED.equals(blog.getStatus()) && !canManage) {
             throw new BizException(ResultCode.NOT_FOUND);
         }
         blogMapper.incrViewCount(id);

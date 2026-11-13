@@ -40,11 +40,7 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item :label="$t('blog.visibility')">
-          <el-radio-group v-model="form.visibility">
-            <el-radio value="PRIVATE">{{ $t('blog.onlySelf') }}</el-radio>
-            <el-radio value="FAMILY">{{ $t('blog.familyVisible') }}</el-radio>
-            <el-radio value="PUBLIC">{{ $t('blog.publicVisible') }}</el-radio>
-          </el-radio-group>
+          <VisibilityPicker v-model="form.visibility" :options="visibilityOptions" />
         </el-form-item>
         <div class="form-footer">
           <el-button type="primary" :loading="loading" @click="onSave">{{ $t('common.save') }}</el-button>
@@ -86,6 +82,7 @@ import { blogApi, fileApi } from '@/api'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -95,6 +92,12 @@ const isEdit = computed(() => !!route.params.id)
 const loading = ref(false)
 
 const form = reactive({ title: '', content: '', coverImage: '', category: '', status: 'PUBLISHED', visibility: 'FAMILY' })
+// 可见范围选项(共用选择器,文案随博客命名空间)
+const visibilityOptions = computed(() => [
+  { value: 'PRIVATE', label: t('blog.onlySelf') },
+  { value: 'FAMILY', label: t('blog.familyVisible') },
+  { value: 'PUBLIC', label: t('blog.publicVisible') },
+])
 const categories = ref([])
 const legacyCategory = ref(null)
 const showCategoryDialog = ref(false)

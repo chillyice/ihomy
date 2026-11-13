@@ -38,14 +38,13 @@ public class VideoController {
     private final VideoMapService videoMapService;
     private final FileService fileService;
     private final SecurityHelper securityHelper;
+    private final com.ihomy.service.access.ViewerScopeResolver viewerScopeResolver;
 
     @Operation(summary = "视频列表")
     @GetMapping("/list")
     public Result<List<Map<String, Object>>> list(@RequestParam(required = false) String keyword,
                                                   @RequestParam(required = false) String mediaType) {
-        SysUser user = securityHelper.currentUser();
-        Long familyId = user == null ? null : user.getFamilyId();
-        return Result.success(videoService.list(familyId, keyword, mediaType));
+        return Result.success(videoService.list(viewerScopeResolver.resolve(), keyword, mediaType));
     }
 
     @Operation(summary = "获取视频播放地址")

@@ -101,7 +101,7 @@ public class CommentService {
         if (dto.getContent() == null || dto.getContent().isBlank()) {
             throw new BizException(ResultCode.BAD_REQUEST);
         }
-        Long targetAuthorId = validateTarget(dto.getContentType(), dto.getContentId(), user.getFamilyId());
+        TargetContent target = validateTarget(dto.getContentType(), dto.getContentId(), user.getFamilyId());
         Comment comment = new Comment();
         comment.setContentType(dto.getContentType());
         comment.setContentId(dto.getContentId());
@@ -111,7 +111,7 @@ public class CommentService {
         comment.setAuthorId(user.getId());
         comment.setFamilyId(user.getFamilyId());
         commentMapper.insert(comment);
-        notifyTo(dto, user.getId(), comment.getId(), targetAuthorId);
+        notifyTo(dto, user.getId(), comment.getId(), target);
         return comment;
     }
 
@@ -142,39 +142,46 @@ public class CommentService {
         }
     }
 
-    /** 校验目标内容存在且与评论者同家庭,返回内容作者 ID(跨家庭一律 404) */
-    private Long validateTarget(String contentType, Long contentId, Long familyId) {        if (contentId == null) return null;
+    /** 目标内容摘要:作者与所属家庭(通知前校验接收者确实在这个家庭) */
+    private record TargetContent(Long authorId, Long familyId) {
+    }
+
+    /** 校验目标内容存在且与评论者同家庭,返回作者与家庭(跨家庭一律 404) */
+    private TargetContent validateTarget(String contentType, Long contentId, Long familyId) {
+        if (contentId == null) return new TargetContent(null, null);
         switch (contentType == null ? "" : contentType) {
             case "blog" -> {
                 Blog b = blogMapper.selectById(contentId);
                 if (b == null || !familyId.equals(b.getFamilyId())) throw new BizException(ResultCode.NOT_FOUND);
-                return b.getAuthorId();
+                return new TargetContent(b.getAuthorId(), b.getFamilyId());
             }
             case "diary" -> {
                 Diary d = diaryMapper.selectById(contentId);
                 if (d == null || !familyId.equals(d.getFamilyId())) throw new BizException(ResultCode.NOT_FOUND);
-                return d.getAuthorId();
+                return new TargetContent(d.getAuthorId(), d.getFamilyId());
             }
             case "photo" -> {
                 Photo p = photoMapper.selectById(contentId);
                 if (p == null || !familyId.equals(p.getFamilyId())) throw new BizException(ResultCode.NOT_FOUND);
-                return p.getAuthorId();
+                return new TargetContent(p.getAuthorId(), p.getFamilyId());
             }
             default -> throw new BizException(ResultCode.BAD_REQUEST);
         }
     }
 
     /** 发送站内通知:回复优先通知被回复人,否则通知内容作者(自己评论自己不通知) */
-    private void notifyTo(CommentDTO dto, Long currentUserId, Long commentId, Long targetAuthorId) {
-        if (targetAuthorId != null && targetAuthorId.equals(currentUserId)) {
+    private void notifyTo(CommentDTO dto, Long currentUserId, Long commentId, TargetContent target) {
+        if (target.authorId() != null && target.authorId().equals(currentUserId)) {
             return;
         }
         String type = dto.getParentId() != null ? "reply" : "comment";
         String snippet = truncate(dto.getContent(), 50);
         if (dto.getReplyToUserId() != null && !dto.getReplyToUserId().equals(currentUserId)) {
-            notificationService.create(dto.getReplyToUserId(), "reply", "回复了你: " + snippet, commentId, dto.getContentType(), dto.getContentId());
-        } else if (targetAuthorId != null) {
-            notificationService.create(targetAuthorId, type, (dto.getParentId() != null ? "回复了你的内容: " : "评论了你的内容: ") + snippet,
+            notificationService.createInFamily(dto.getReplyToUserId(), target.familyId(), "reply", "回复了你: " + snippet,
+                    commentId, dto.getContentType(), dto.getContentId());
+        } else if (target.authorId() != null) {
+            notificationService.createInFamily(target.authorId(), target.familyId(), type,
+                    (dto.getParentId() != null ? "回复了你的内容: " : "评论了你的内容: ") + snippet,
                     commentId, dto.getContentType(), dto.getContentId());
         }
     }

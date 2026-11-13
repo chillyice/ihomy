@@ -9,6 +9,9 @@ import com.ihomy.common.ResultCode;
 import com.ihomy.dto.LibraryDTO;
 import com.ihomy.entity.*;
 import com.ihomy.mapper.*;
+import com.ihomy.service.access.ContentAccessService;
+import com.ihomy.service.access.ContentKind;
+import com.ihomy.service.access.ViewerScope;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,7 +24,7 @@ import java.util.stream.Collectors;
  * 书架服务:图书分页/增删改、分类树(删分类递归)、借阅状态、书签(EPUB CFI 定位)、在线阅读。
  * 书与分类是多对多:分类树在 content_book_category,归属关系在 content_book_category_rel;
  * 删分类只清关系行,书籍本身保留(变成未分类),不因删类而删书。
- * 可见性口径:家长(isOwner)看全部;非家长看自己上传的 + 家庭/公开的;未登录只看公开。
+ * 可见性口径统一走 {@link ContentAccessService}:家长看全部;成员看自己上传的 + 家庭/公开的;游客看演示家庭公开。
  */
 @Service
 @RequiredArgsConstructor
@@ -32,10 +35,11 @@ public class LibraryService {
     private final BookCategoryMapper categoryMapper;
     private final BookBookmarkMapper bookmarkMapper;
     private final FileService fileService;
+    private final ContentAccessService contentAccess;
 
     // ponytail: 关系表查询本可拆独立 Mapper 更规整,家庭数据量小,先复用 bookMapper 的自定义 XML
 
-    public IPage<ContentBook> page(int current, int size, Long familyId, Long currentUserId, boolean isOwner,
+    public IPage<ContentBook> page(int current, int size, ViewerScope viewer,
                                    String keyword, Long categoryId, String fileFormat, String borrowStatus, String sortBy) {
         // 按分类筛选:先从关系表取出书 ID 集,再与后面的查询条件取交集
         Set<Long> bookIds = null;
@@ -45,26 +49,15 @@ public class LibraryService {
         }
 
         // 按借阅状态筛选:同样先查借阅表拿到书 ID 集,与分类条件取交集(取交集是因为两个条件都要满足)
-        if (StringUtils.hasText(borrowStatus) && currentUserId != null) {
-            Set<Long> borrowBookIds = getBookIdsByBorrowStatus(currentUserId, borrowStatus);
+        if (StringUtils.hasText(borrowStatus) && viewer.userId() != null) {
+            Set<Long> borrowBookIds = getBookIdsByBorrowStatus(viewer.userId(), borrowStatus);
             bookIds = bookIds == null ? borrowBookIds : intersection(bookIds, borrowBookIds);
             if (bookIds.isEmpty()) return new Page<>(current, size);
         }
 
         LambdaQueryWrapper<ContentBook> qw = new LambdaQueryWrapper<>();
-        if (familyId != null) {
-            qw.eq(ContentBook::getFamilyId, familyId);
-            if (!isOwner) {
-                if (currentUserId != null) {
-                    qw.and(w -> w.eq(ContentBook::getUploaderId, currentUserId)
-                            .or().in(ContentBook::getVisibility, DictConst.VIS_FAMILY, DictConst.VIS_PUBLIC));
-                } else {
-                    qw.eq(ContentBook::getVisibility, DictConst.VIS_PUBLIC);
-                }
-            }
-        } else {
-            qw.eq(ContentBook::getVisibility, DictConst.VIS_PUBLIC);
-        }
+        contentAccess.applyVisible(qw, ContentKind.BOOK, viewer,
+                ContentBook::getFamilyId, ContentBook::getUploaderId, ContentBook::getVisibility);
         qw.eq(ContentBook::getStatus, DictConst.BLOG_PUBLISHED)
                 .and(StringUtils.hasText(keyword), w -> w.like(ContentBook::getTitle, keyword).or().like(ContentBook::getAuthor, keyword))
                 .eq(StringUtils.hasText(fileFormat), ContentBook::getFileFormat, fileFormat)
@@ -72,7 +65,7 @@ public class LibraryService {
 
         if ("title".equals(sortBy)) {
             qw.orderByAsc(ContentBook::getTitle);
-        } else if ("recent".equals(sortBy) && currentUserId != null) {
+        } else if ("recent".equals(sortBy) && viewer.userId() != null) {
             // 按最近阅读时间排序需 JOIN 阅读进度表,当前回退为按创建时间倒序
             qw.orderByDesc(ContentBook::getCreatedAt);
         } else {
@@ -231,15 +224,13 @@ public class LibraryService {
         }
     }
 
-    public ContentBook getDetail(Long id, Long familyId, Long currentUserId, boolean isOwner) {
+    public ContentBook getDetail(Long id, ViewerScope viewer) {
         ContentBook book = bookMapper.selectById(id);
         if (book == null) throw new BizException(ResultCode.NOT_FOUND);
-        boolean sameFamily = familyId != null && familyId.equals(book.getFamilyId());
-        boolean isAuthor = currentUserId != null && currentUserId.equals(book.getUploaderId());
-        boolean famOwner = isOwner && sameFamily;
-        if (!DictConst.VIS_PUBLIC.equals(book.getVisibility()) && !sameFamily) throw new BizException(ResultCode.NOT_FOUND);
-        if (DictConst.VIS_PRIVATE.equals(book.getVisibility()) && !isAuthor && !famOwner) throw new BizException(ResultCode.NOT_FOUND);
-        if (!DictConst.BLOG_PUBLISHED.equals(book.getStatus()) && !isAuthor && !famOwner) throw new BizException(ResultCode.NOT_FOUND);
+        contentAccess.assertViewable(ContentKind.BOOK, book.getFamilyId(), book.getUploaderId(), book.getVisibility(), viewer);
+        boolean canManage = viewer.hasFamily() && viewer.familyId().equals(book.getFamilyId())
+                && (viewer.owner() || (viewer.userId() != null && viewer.userId().equals(book.getUploaderId())));
+        if (!DictConst.BLOG_PUBLISHED.equals(book.getStatus()) && !canManage) throw new BizException(ResultCode.NOT_FOUND);
         bookMapper.incrViewCount(id);
         return book;
     }

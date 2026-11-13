@@ -7,7 +7,6 @@ import com.ihomy.common.Result;
 import com.ihomy.common.ResultCode;
 import com.ihomy.dto.LibraryDTO;
 import com.ihomy.entity.*;
-import com.ihomy.mapper.FamilyMapper;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.FileService;
 import com.ihomy.service.LibraryService;
@@ -22,8 +21,8 @@ import java.util.*;
 
 /**
  * 书架控制器:图书列表/详情/增删改、分类树维护、借阅与归还、书签、阅读进度。
- * 列表为公开可见接口的一部分——未登录(securityHelper.currentUser() 为 null)时按游客口径只回公开图书,
- * 故这里不直接取当前用户,而是允许 user 为 null 再交给 Service 决定可见范围。
+ * 列表为公开可见接口的一部分——未登录时按游客口径(演示家庭的公开图书)返回,
+ * 可见范围由 ViewerScopeResolver + ContentAccessService 统一判定。
  */
 @Tag(name = "书架")
 @RestController
@@ -34,7 +33,7 @@ public class LibraryController {
     private final LibraryService libraryService;
     private final FileService fileService;
     private final SecurityHelper securityHelper;
-    private final FamilyMapper familyMapper;
+    private final com.ihomy.service.access.ViewerScopeResolver viewerScopeResolver;
 
     @Operation(summary = "图书分页列表")
     @GetMapping("/list")
@@ -45,11 +44,7 @@ public class LibraryController {
                                             @RequestParam(required = false) String fileFormat,
                                             @RequestParam(required = false) String borrowStatus,
                                             @RequestParam(required = false) String sortBy) {
-        SysUser user = securityHelper.currentUser();
-        Long familyId = user == null ? null : user.getFamilyId();
-        Long userId = user == null ? null : user.getId();
-        boolean isOwner = securityHelper.isOwner();
-        IPage<ContentBook> page = libraryService.page(current, size, familyId, userId, isOwner, keyword, categoryId, fileFormat, borrowStatus, sortBy);
+        IPage<ContentBook> page = libraryService.page(current, size, viewerScopeResolver.resolve(), keyword, categoryId, fileFormat, borrowStatus, sortBy);
         List<ContentBook> books = page.getRecords();
         // 批量取每本书的分类 ID,回填到列表项(避免逐本查询)
         List<Long> bookIds = books.stream().map(ContentBook::getId).toList();
@@ -89,15 +84,8 @@ public class LibraryController {
     @Operation(summary = "分类树")
     @GetMapping("/categories")
     public Result<List<BookCategory>> categories() {
-        SysUser user = securityHelper.currentUser();
-        Long familyId;
-        if (user != null) {
-            familyId = user.getFamilyId();
-        } else {
-            // 游客:按演示家庭给分类树(与 /library/list 的公开图书口径一致),别写死家庭 id
-            Family demo = familyMapper.selectDefault();
-            familyId = demo == null ? null : demo.getId();
-        }
+        // 游客按演示家庭给分类树(与 /library/list 的公开图书口径一致),别写死家庭 id
+        Long familyId = viewerScopeResolver.resolve().familyId();
         return Result.success(familyId == null ? List.of() : libraryService.categoryTree(familyId));
     }
 
@@ -136,11 +124,7 @@ public class LibraryController {
     @Operation(summary = "图书详情")
     @GetMapping("/{id}")
     public Result<Map<String, Object>> detail(@PathVariable Long id) {
-        SysUser user = securityHelper.currentUser();
-        Long familyId = user == null ? null : user.getFamilyId();
-        Long userId = user == null ? null : user.getId();
-        boolean isOwner = securityHelper.isOwner();
-        ContentBook book = libraryService.getDetail(id, familyId, userId, isOwner);
+        ContentBook book = libraryService.getDetail(id, viewerScopeResolver.resolve());
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("id", book.getId());
         data.put("title", book.getTitle());

@@ -3,9 +3,7 @@ package com.ihomy.controller;
 import com.ihomy.annotation.OperationLog;
 import com.ihomy.common.Result;
 import com.ihomy.dto.WishDTO;
-import com.ihomy.entity.Family;
 import com.ihomy.entity.Wish;
-import com.ihomy.mapper.FamilyMapper;
 import com.ihomy.security.LoginUser;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.WishService;
@@ -30,7 +28,7 @@ public class WishController {
 
     private final WishService wishService;
     private final SecurityHelper securityHelper;
-    private final FamilyMapper familyMapper;
+    private final com.ihomy.service.access.ViewerScopeResolver viewerScopeResolver;
 
     private LoginUser current() {
         return securityHelper.current();
@@ -39,10 +37,7 @@ public class WishController {
     @Operation(summary = "家庭愿望列表(游客可读,只返回公开愿望)")
     @GetMapping("/list")
     public Result<List<Map<String, Object>>> list() {
-        LoginUser user = current();
-        if (user != null) return Result.success(wishService.list(user.getFamilyId()));
-        Family f = familyMapper.selectDefault();
-        return Result.success(f == null ? List.of() : wishService.listPublic(f.getId()));
+        return Result.success(wishService.list(viewerScopeResolver.resolve()));
     }
 
     @Operation(summary = "新增愿望")

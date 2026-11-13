@@ -33,6 +33,7 @@ public class HomeController {
     private final SecurityHelper securityHelper;
     private final ActivityFeedService activityFeedService;
     private final PublicController publicController;
+    private final com.ihomy.service.access.ViewerScopeResolver viewerScopeResolver;
 
     @Operation(summary = "获取首页启用的模块列表(预留接口,前端暂未接入)")
     @GetMapping("/modules")
@@ -87,9 +88,7 @@ public class HomeController {
     @Operation(summary = "家人动态流（登录用户）")
     @GetMapping("/feed")
     public Result<List<Map<String, Object>>> feed(@RequestParam(defaultValue = "20") int limit) {
-        SysUser user = securityHelper.currentUser();
-        Long familyId = user == null ? null : user.getFamilyId();
-        return Result.success(activityFeedService.getFeed(familyId, limit, false, user == null ? null : user.getId(), securityHelper.isOwner()));
+        return Result.success(activityFeedService.getFeed(viewerScopeResolver.resolve(), limit));
     }
 
     private void assertOwner() {

@@ -79,11 +79,7 @@
             <div class="paper-footer">
               <span class="page-num">{{ pageCount }} {{ $t('diary.pagesUnit') }} · {{ wordCount }} {{ $t('diary.words') }}</span>
               <div class="vis-row">
-                <el-radio-group v-model="form.visibility" size="small">
-                  <el-radio-button value="PRIVATE">{{ $t('diary.onlySelf') }}</el-radio-button>
-                  <el-radio-button value="FAMILY">{{ $t('diary.familyVisible') }}</el-radio-button>
-                  <el-radio-button value="PUBLIC">{{ $t('diary.publicVisible') }}</el-radio-button>
-                </el-radio-group>
+                <VisibilityPicker v-model="form.visibility" :options="visibilityOptions" button size="small" />
                 <el-button type="primary" :loading="loading" @click="onSave">{{ $t('common.save') }}</el-button>
               </div>
             </div>
@@ -138,6 +134,7 @@ import { diaryApi, publicApi } from '@/api'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
+import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
 import DoodleTray from './DoodleTray.vue'
 import { INK_COLORS, parseDoodle, renderStroke, renderStrokes, erasePixel, eraseObject, setupCanvas, clearCanvas } from '@/utils/doodle'
 import { PAGE_H, PAPER_W, MOODS, WEATHERS, moodLabel as moodLabelOf, weatherLabel as weatherLabelOf } from '@/utils/diary'
@@ -160,6 +157,12 @@ const form = reactive({
   time: new Date().toTimeString().slice(0, 5),
   visibility: 'PRIVATE',
 })
+// 可见范围选项(共用选择器,文案随日记命名空间)
+const visibilityOptions = computed(() => [
+  { value: 'PRIVATE', label: t('diary.onlySelf') },
+  { value: 'FAMILY', label: t('diary.familyVisible') },
+  { value: 'PUBLIC', label: t('diary.publicVisible') },
+])
 const content = ref('')
 const pickerOpen = ref(null)
 const pickerStyle = ref({})

@@ -6,7 +6,6 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 博客自定义 SQL(接口不写注解,全部在 resources/mapper/BlogMapper.xml)。
@@ -20,12 +19,6 @@ public interface BlogMapper extends BaseMapper<Blog> {
 
     /** 家庭内已用过的分类去重列表(仅未删且分类非空),供筛选下拉 */
     List<String> selectCategoriesByFamily(@Param("familyId") Long familyId);
-
-    /**
-     * 按分类聚合篇数。非家长(isOwner=false)只统计自己可见的:
-     * 自己写的 + 家庭/公开的,避免泄露他人私有博客的存在。
-     */
-    List<Map<String, Object>> selectCategoryCounts(@Param("familyId") Long familyId, @Param("authorId") Long authorId, @Param("isOwner") boolean isOwner);
 
     /** 重命名单个分类(精确匹配整段分类名) */
     int renameCategory(@Param("familyId") Long familyId, @Param("oldName") String oldName, @Param("newName") String newName);
