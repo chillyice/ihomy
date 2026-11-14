@@ -1,10 +1,11 @@
-"""Build web-sized poker card faces from the local high-res PNG deck.
+"""Build web-sized poker card faces from a local high-res PNG deck.
 
-Source: 高清全套扑克牌/PNG (750x1044 PNG, untracked local material)
+Source: an external 750x1044 PNG card pack, NOT shipped with the repo
+(expects <suit><rank>.png, e.g. SpadeA.png, JOKER-A.png)
 Output: frontend/src/assets/games/poker/deck/<suit>-<rank>.webp
 
 Usage (from repo root):
-    python scripts/art/build-poker-webp.py
+    python scripts/art/build-poker-webp.py --src path/to/PNG
     python scripts/art/build-poker-webp.py --src path/to/PNG --width 240 --quality 84
 """
 
@@ -50,7 +51,7 @@ def convert(src: Path, dst: Path, width: int, quality: int) -> None:
 def main() -> None:
     root = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser()
-    parser.add_argument("--src", default=str(root / "高清全套扑克牌" / "PNG"))
+    parser.add_argument("--src", required=True, help="directory containing the source <suit><rank>.png files")
     parser.add_argument("--out", default=str(root / "frontend" / "src" / "assets" / "games" / "poker" / "deck"))
     parser.add_argument("--width", type=int, default=240)
     parser.add_argument("--quality", type=int, default=84)
