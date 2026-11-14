@@ -286,11 +286,19 @@ body.card-dragging .sol-cardface {
   cursor: grabbing;
 }
 
-/* 扑克牌正面:点数图案按牌宽缩放 */
+/* 扑克牌正面:整张牌面由素材图铺满;缺图时才走下面的点数图案兜底 */
 .pc-face {
   position: absolute;
   inset: 0;
   pointer-events: none;
+}
+.pc-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  user-select: none;
 }
 .pc-corner {
   position: absolute;
@@ -331,12 +339,33 @@ body.card-dragging .sol-cardface {
 .pc-pips.pc-ace .pc-pip {
   font-size: clamp(18px, calc(var(--sol-card-w, 80px) * 0.42), 52px);
 }
-/* 人头牌:图集里的宫廷画(整张牌面,已含角标),放在牌框内铺满 */
-.pc-art {
+.pc-court {
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background-repeat: no-repeat;
+  inset: 14% 15%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pc-court-frame {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4%;
+  width: 100%;
+  height: 100%;
+  border: 1px solid rgba(42, 42, 42, 0.2);
+  border-radius: calc(var(--sol-card-w, 80px) * 0.06);
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.9), rgba(0, 0, 0, 0.05));
+}
+.pc-court-frame b {
+  font-size: clamp(16px, calc(var(--sol-card-w, 80px) * 0.38), 46px);
+  line-height: 1;
+}
+.pc-court-frame i {
+  font-style: normal;
+  font-size: clamp(10px, calc(var(--sol-card-w, 80px) * 0.2), 24px);
+  line-height: 1;
 }
 .sol-tip {
   flex: 0 0 auto;

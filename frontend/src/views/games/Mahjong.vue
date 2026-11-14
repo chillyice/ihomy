@@ -172,7 +172,6 @@ import { useGameView } from '@/composables/useGameView'
 import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { isSpectatorRole } from '@/utils/gameRoom'
 import { useChatStore } from '@/stores/chat'
-import { mahjongFaceStyle } from '@/utils/games/tileAtlas'
 import {
   canMahjongWin,
   createMahjongWall,
@@ -183,37 +182,39 @@ import {
   mahjongTenpai,
   sortMahjongTiles,
 } from '@/utils/games/mahjong'
+import { mahjongTileSrc } from '@/utils/games/mahjongTiles'
 
 const router = useRouter()
 const { t } = useI18n()
 const sunLight = inject(SUN_LIGHT_KEY, null)
 const chatStore = useChatStore()
 
-// 牌面组件:优先用图集(assets/games/tiles-cards-atlas.json)里的麻将牌面,
-// 取不到时退回原来的「数字 + 花色」文字,保证任何数据都不会画出空白牌
 const HONOR_KEYS = ['east', 'south', 'west', 'north', 'zhong', 'fa', 'bai']
 
-/** 牌的读屏名字:字牌取字名,数牌「点数 + 花色」 */
-const tileLabel = (kind) => {
-  if (kind >= 27) return t(`games.mahjong.honor.${HONOR_KEYS[kind - 27]}`)
-  return `${(kind % 9) + 1}${t(`games.mahjong.suit.${['w', 't', 's'][Math.floor(kind / 9)]}`)}`
-}
+/** 牌的读屏名字:字牌取字,数牌「点数 + 花色」 */
+const tileLabel = (kind) =>
+  kind >= 27
+    ? t(`games.mahjong.honor.${HONOR_KEYS[kind - 27]}`)
+    : `${(kind % 9) + 1}${t(`games.mahjong.suit.${['w', 't', 's'][Math.floor(kind / 9)]}`)}`
 
+// 牌面组件:开源 SVG 牌面(assets/games/mahjong,见同目录 LICENSE.md),
+// 牌身与尺寸交给 `.tile` 的 CSS;白板(33)就是空白牌,素材缺失时退回「数字 + 花色」文本
 const TileFace = (props) => {
   const kind = props.kind
-  const style = mahjongFaceStyle(kind)
-  if (style) return h('span', { class: ['tile-face', 'atlas'], style, 'aria-hidden': 'true' })
+  const src = mahjongTileSrc(kind)
+  if (src) return h('img', { class: 'tile-img', src, alt: '', draggable: false })
   if (kind >= 27) {
-    const zhongRed = kind === 31
     return h(
       'span',
-      { class: ['tile-face', 'honor', { red: zhongRed, green: kind === 32, blue: kind === 33 }], 'aria-hidden': 'true' },
-      t(`games.mahjong.honor.${HONOR_KEYS[kind - 27]}`),
+      {
+        class: ['tile-face', 'honor', { red: kind === 31, green: kind === 32, blue: kind === 33, blank: kind === 33 }],
+      },
+      kind === 33 ? '' : t(`games.mahjong.honor.${HONOR_KEYS[kind - 27]}`),
     )
   }
   const num = (kind % 9) + 1
   const suitKey = ['w', 't', 's'][Math.floor(kind / 9)]
-  return h('span', { class: ['tile-face'], 'aria-hidden': 'true' }, [
+  return h('span', { class: ['tile-face'] }, [
     h('span', { class: 'tile-num' }, String(num)),
     h('span', { class: 'tile-suit' }, t(`games.mahjong.suit.${suitKey}`)),
   ])
@@ -1000,10 +1001,8 @@ onBeforeUnmount(() => {
   padding: 60px 0;
 }
 
-/* 牌面:图集整张当 sprite 铺进牌框(见 utils/games/tileAtlas.js);文字牌面是兜底 */
+/* 牌面:开源 SVG 贴进白底牌身;白板留白,资源缺失时退回「数字 + 花色」文本 */
 .tile {
-  position: relative;
-  overflow: hidden;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1022,11 +1021,15 @@ onBeforeUnmount(() => {
     box-shadow 0.12s ease;
   flex: none;
 }
-.tile-face.atlas {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background-repeat: no-repeat;
+.tile .tile-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 7%;
+  box-sizing: border-box;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
 }
 .tile .tile-face {
   display: inline-flex;
