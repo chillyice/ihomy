@@ -10,15 +10,28 @@ import { useUserStore } from '@/stores/user'
  *
  * load(contentId) 传了内容 id 时以服务端已选家庭为准;新建时用 applyDefaults=true 套默认值。
  * 不勾任何家庭 = 仍然只有自家人能看到,保存时不写受众行。
+ *
+ * 可选家庭清单是模块级缓存(跨组件实例共用):记录生成时的家庭 id,切换家庭自动重拉;
+ * 入圈/退圈等圈关系变化由家庭设置页调用 invalidateFamilies() 清缓存,面板下次 load 时重新取数。
  */
+let familyCache = null
+let familyCacheFamilyId = null
+
+/** 清空可选家庭缓存(圈关系或默认分享变化后调用,所有面板实例下次取数时重新拉) */
+export function invalidateFamilies() {
+  familyCache = null
+  familyCacheFamilyId = null
+}
+
 export function useAudience(defaultType) {
   const userStore = useUserStore()
   const state = reactive({ loaded: false, canShare: true, selected: [], families: [], defaults: [], hasCircles: false })
-  let familyCache = null
 
   async function loadFamilies() {
-    if (!familyCache) {
+    const familyId = userStore.userInfo?.familyId ?? null
+    if (!familyCache || familyCacheFamilyId !== familyId) {
       familyCache = (await familyApi.shareDefaults()) || {}
+      familyCacheFamilyId = familyId
     }
     state.families = familyCache.families || []
     state.defaults = familyCache.targetFamilyIds || []
@@ -54,11 +67,6 @@ export function useAudience(defaultType) {
     }
   }
 
-  /** 换家庭后圈关系会变,设置页保存后也用它刷新 */
-  function invalidateFamilies() {
-    familyCache = null
-  }
-
   async function save(contentId, familyIds, type = defaultType) {
     return audienceApi.save(type, contentId, [...familyIds])
   }
@@ -66,10 +74,11 @@ export function useAudience(defaultType) {
   /** 保存后把默认值/可选清单同步到本地缓存(家庭设置页改完后调用) */
   function setFamilies(data) {
     familyCache = data || null
+    familyCacheFamilyId = userStore.userInfo?.familyId ?? null
     state.families = (data && data.families) || []
     state.defaults = (data && data.targetFamilyIds) || []
     state.hasCircles = state.families.length > 0
   }
 
-  return { state, load, save, invalidateFamilies, setFamilies }
+  return { state, load, save, setFamilies }
 }

@@ -78,17 +78,6 @@
           <div class="tool-meta-left">
             <div class="tool-type-tag cat-tag">{{ categoryText(b.category) }}</div>
           </div>
-          <button
-            v-if="b.roomCodes?.length"
-            type="button"
-            class="room-open"
-            :title="$t('games.room.together')"
-            :aria-label="$t('games.room.together')"
-            :disabled="roomOpening"
-            @click.stop="quickCreateRoom(b)"
-          >
-            <el-icon :size="18"><Promotion /></el-icon>
-          </button>
           <span class="tool-enter"
             >{{ $t('games.enter') }}<el-icon><ArrowRight /></el-icon
           ></span>
@@ -137,6 +126,9 @@
       </div>
       <div v-else-if="!loading && visibleTotal === 0" class="tool-empty">{{ $t('games.emptyFiltered') }}</div>
     </div>
+
+    <!-- 开房配置:选小游戏 + 玩法,确认后建房进游戏室 -->
+    <GameRoomCreate v-model:visible="roomCreateVisible" :creating="roomOpening" @confirm="onCreateRoom" />
 
     <!-- 导入对话框(游戏文件 / 网页游戏两种方式) -->
     <el-dialog v-model="importVisible" append-to-body :title="$t('games.import')" width="440px" destroy-on-close>
@@ -266,6 +258,7 @@ import {
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import AddToWishDialog from '@/components/wish/AddToWishDialog.vue'
+import GameRoomCreate from '@/components/games/GameRoomCreate.vue'
 import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
 import AudiencePicker from '@/components/common/AudiencePicker.vue'
 import { audienceApi, gameApi, roomApi } from '@/api'
@@ -276,7 +269,6 @@ import { useUserStore } from '@/stores/user'
 import { GAME_CATEGORIES, countGameCategories, inGameCategory, normalizeGameCategory } from '@/utils/games/gameCategory'
 import { importAccept, typeForFile, typeLabel } from '@/utils/games/emulatorSystems'
 import { UNSERIES, inGameSeries, normalizeGameSeries, seriesOptionsOf } from '@/utils/games/gameSeries'
-import { defaultRoomMode } from '@/utils/gameRoom'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -311,7 +303,6 @@ const builtinGames = [
     icon: Grid,
     path: '/games/petlink',
     category: 'PUZZLE',
-    roomCodes: ['game_petlink'],
   },
   {
     key: 'sudoku',
@@ -320,7 +311,6 @@ const builtinGames = [
     icon: Cpu,
     path: '/games/sudoku',
     category: 'PUZZLE',
-    roomCodes: ['game_sudoku'],
   },
   {
     key: 'g2048',
@@ -329,7 +319,6 @@ const builtinGames = [
     icon: Histogram,
     path: '/games/2048',
     category: 'PUZZLE',
-    roomCodes: ['game_2048'],
   },
   {
     key: 'minesweeper',
@@ -338,7 +327,6 @@ const builtinGames = [
     icon: Aim,
     path: '/games/minesweeper',
     category: 'PUZZLE',
-    roomCodes: ['game_minesweeper'],
   },
   {
     key: 'cards',
@@ -347,7 +335,6 @@ const builtinGames = [
     icon: Tickets,
     path: '/games/cards',
     category: 'CASUAL',
-    roomCodes: ['game_solitaire', 'game_spider', 'game_freecell'],
   },
   {
     key: 'tetris',
@@ -356,7 +343,6 @@ const builtinGames = [
     icon: Box,
     path: '/games/tetris',
     category: 'ARCADE',
-    roomCodes: ['game_tetris'],
   },
   {
     key: 'snake',
@@ -365,7 +351,6 @@ const builtinGames = [
     icon: Cherry,
     path: '/games/snake',
     category: 'ARCADE',
-    roomCodes: ['game_snake'],
   },
   {
     key: 'mahjong',
@@ -374,7 +359,6 @@ const builtinGames = [
     icon: Medal,
     path: '/games/mahjong',
     category: 'CASUAL',
-    roomCodes: ['game_mahjong'],
   },
 ]
 
@@ -440,33 +424,24 @@ const myActiveRoom = computed(() =>
 )
 
 /**
- * 工具栏「一起玩」:先建房进房间大厅,进房后再选游戏、邀请家人。
- * 大厅里房主可以随时换游戏(席位会按新游戏重新分配),不需要在列表页先选玩法。
+ * 工具栏「一起玩」:已有进行中的房间直接回房,否则弹开房配置(选小游戏 + 玩法)再建房进大厅。
+ * 大厅里房主仍可换游戏(席位按新游戏重新分配),邀请在房间页完成。
  */
-const openRoom = async () => {
+const roomCreateVisible = ref(false)
+const openRoom = () => {
   if (myActiveRoom.value) {
     router.push(`/games/room/${myActiveRoom.value.id}`)
     return
   }
+  roomCreateVisible.value = true
+}
+
+const onCreateRoom = async ({ gameCode, mode }) => {
   if (roomOpening.value) return
   roomOpening.value = true
   try {
-    const gameCode = 'game_petlink'
-    const created = await roomApi.create({ gameCode, mode: defaultRoomMode(gameCode) })
-    router.push(`/games/room/${created.id}`)
-  } catch (e) {
-    ElMessage.warning(e?.response?.data?.message || t('games.room.createFailed'))
-  } finally {
-    roomOpening.value = false
-  }
-}
-
-const quickCreateRoom = async (b) => {
-  const code = (b.roomCodes || [])[0]
-  if (!code || roomOpening.value) return
-  roomOpening.value = true
-  try {
-    const created = await roomApi.create({ gameCode: code, mode: defaultRoomMode(code) })
+    const created = await roomApi.create({ gameCode, mode })
+    roomCreateVisible.value = false
     router.push(`/games/room/${created.id}`)
   } catch (e) {
     ElMessage.warning(e?.response?.data?.message || t('games.room.createFailed'))
@@ -892,27 +867,6 @@ onMounted(() => {
 .room-chip-meta {
   color: var(--color-text-secondary);
   font-size: 12px;
-}
-.room-open {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  margin-right: 4px;
-  border: none;
-  border-radius: 8px;
-  background: rgba(var(--color-brand-rgb), 0.12);
-  color: var(--color-accent);
-  cursor: pointer;
-  transition: background-color 0.16s ease;
-}
-.room-open:hover {
-  background: rgba(var(--color-brand-rgb), 0.22);
-}
-.room-open:disabled {
-  opacity: 0.5;
-  cursor: wait;
 }
 .room-opening {
   position: fixed;

@@ -12,7 +12,8 @@
       <div class="call-picker-title">{{ $t('games.room.quickCall') }}</div>
       <el-empty v-if="!others.length" :description="$t('games.room.callNoOne')" :image-size="48" />
       <div v-for="m in others" :key="m.userId" class="call-picker-row">
-        <el-avatar :size="28">{{ m.name?.charAt(0) }}</el-avatar>
+        <img v-if="m.avatar" :src="m.avatar" class="call-picker-avatar" :alt="m.name" />
+        <el-avatar v-else :size="28">{{ m.name?.charAt(0) }}</el-avatar>
         <span class="call-picker-name">{{ m.name }}</span>
         <el-tooltip :content="$t('games.room.callAudio')" placement="top">
           <el-button circle size="small" :disabled="!canCall" @click="call(m)">
@@ -73,6 +74,13 @@ const call = async (m) => {
   align-items: center;
   gap: 8px;
   padding: 4px 2px;
+}
+.call-picker-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
 }
 .call-picker-name {
   flex: 1;

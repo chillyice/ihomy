@@ -22,7 +22,11 @@
       <div class="album-head-actions">
         <template v-if="selectMode">
           <span class="select-count">{{ selectSummary }}</span>
-          <el-button :disabled="batchDeleting" @click="toggleSelect">{{ t('album.cancelSelect') }}</el-button>
+          <el-button :disabled="batchDeleting || moveDialog.moving" @click="selectAllPhotos">{{ t('common.selectAll') }}</el-button>
+          <el-button :disabled="batchDeleting || moveDialog.moving" @click="toggleSelect">{{ t('album.cancelSelect') }}</el-button>
+          <el-button v-if="!isMapped && !readOnly" :disabled="!selectedIds.length" :loading="moveDialog.moving" @click="openMoveDialog">{{
+            t('album.moveSelected')
+          }}</el-button>
           <el-button
             type="danger"
             :loading="batchDeleting"
@@ -32,6 +36,23 @@
           >
         </template>
         <template v-else>
+          <div v-if="photos.length" class="view-toggle">
+            <button class="vt-btn" :class="{ active: photoView === 'grid' }" :title="t('common.viewGrid')" @click="photoView = 'grid'">
+              <svg viewBox="0 0 16 16" width="14" height="14">
+                <rect x="1.5" y="1.5" width="5" height="5" rx="1" fill="currentColor" />
+                <rect x="9.5" y="1.5" width="5" height="5" rx="1" fill="currentColor" />
+                <rect x="1.5" y="9.5" width="5" height="5" rx="1" fill="currentColor" />
+                <rect x="9.5" y="9.5" width="5" height="5" rx="1" fill="currentColor" />
+              </svg>
+            </button>
+            <button class="vt-btn" :class="{ active: photoView === 'list' }" :title="t('common.viewList')" @click="photoView = 'list'">
+              <svg viewBox="0 0 16 16" width="14" height="14">
+                <rect x="1.5" y="2.5" width="13" height="3" rx="1" fill="currentColor" />
+                <rect x="1.5" y="6.5" width="13" height="3" rx="1" fill="currentColor" />
+                <rect x="1.5" y="10.5" width="13" height="3" rx="1" fill="currentColor" />
+              </svg>
+            </button>
+          </div>
           <div v-if="children.length" class="view-toggle">
             <button class="vt-btn" :class="{ active: childView === 'grid' }" :title="t('album.gridView')" @click="setChildView('grid')">
               <svg viewBox="0 0 16 16" width="14" height="14">
@@ -186,7 +207,52 @@
       @drop="onDrop"
     >
       <div v-if="dropActive" class="drop-hint" aria-hidden="true">{{ t('album.dropHere') }}</div>
-      <div v-if="photos.length" class="photo-wall">
+      <!-- 列表模式:缩略图行 + 多选,照片多时比瀑布好翻 -->
+      <div v-if="photos.length && photoView === 'list'" class="resource-list">
+        <div
+          v-a11y-click
+          v-for="p in photos"
+          :key="p.id"
+          class="rl-row card"
+          :class="{ selected: selectMode && selectedIds.includes(p.id) }"
+          @click="onPhotoClick(p)"
+          @pointerdown="onPhotoPointerDown(p)"
+          @pointerup="cancelPress"
+          @pointercancel="cancelPress"
+          @pointerleave="cancelPress"
+          @contextmenu.prevent
+        >
+          <span v-if="selectMode" class="pick-badge" :class="{ on: selectedIds.includes(p.id) }" @click.stop="togglePick(p.id)">
+            <svg viewBox="0 0 16 16" width="11" height="11">
+              <path
+                d="M3 8.5 L6.5 12 L13 4.5"
+                fill="none"
+                stroke="#fff"
+                stroke-width="2.4"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </span>
+          <div class="rl-thumb" :style="{ backgroundImage: `url(${thumbUrl(p.url)})` }">
+            <span v-if="p.liveVideoUrl" class="live-badge">LIVE</span>
+          </div>
+          <div class="rl-main">
+            <span class="rl-name">{{ p.description || t('album.photoFallbackName') }}</span>
+            <span class="rl-meta">
+              <template v-if="p.uploaderName">{{ p.uploaderName }} · </template>{{ formatDateTime(p.takenAt) || p.location }}
+            </span>
+          </div>
+          <div v-if="!selectMode && canManagePhoto(p)" class="rl-actions" @click.stop>
+            <el-tooltip :content="t('common.delete')" placement="top" :show-after="300">
+              <el-button size="small" text type="danger" @click="onDelPhoto(p)"
+                ><el-icon><Delete /></el-icon
+              ></el-button>
+            </el-tooltip>
+          </div>
+        </div>
+      </div>
+      <div v-else-if="photos.length" class="photo-wall">
         <div v-for="p in photos" :key="p.id" class="photo-card" :class="{ selected: selectMode && selectedIds.includes(p.id) }">
           <div
             v-a11y-click
@@ -234,6 +300,21 @@
       <el-empty v-else-if="!children.length" :description="userStore.isGuest ? t('album.noPublicPhotos') : t('album.emptyPhotoHint')" />
     </div>
 
+    <!-- 多选移动:把选中的照片挪到另一本相册 -->
+    <el-dialog v-model="moveDialog.visible" append-to-body :title="t('album.moveSelected')" width="420px">
+      <div v-loading="moveDialog.loading">
+        <el-select v-model="moveDialog.albumId" filterable :placeholder="t('album.moveTargetPlaceholder')" style="width: 100%">
+          <el-option v-for="a in moveDialog.albums" :key="a.id" :label="a.name" :value="a.id" />
+        </el-select>
+      </div>
+      <template #footer>
+        <el-button @click="moveDialog.visible = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" :disabled="!moveDialog.albumId" :loading="moveDialog.moving" @click="onBatchMove">
+          {{ t('common.confirm') }}
+        </el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="descEditor.visible" append-to-body :title="t('album.noteTitle')" width="420px">
       <el-input v-model="descEditor.value" type="textarea" :rows="3" :placeholder="t('album.notePlaceholder')" />
       <template #footer>
@@ -256,7 +337,14 @@
       </template>
     </el-dialog>
 
-    <PhotoViewer v-model:visible="viewer.visible" :photos="photos" :initial-index="viewer.index" :share-base="shareBase" />
+    <PhotoViewer
+      v-model:visible="viewer.visible"
+      :photos="photos"
+      :initial-index="viewer.index"
+      :share-base="shareBase"
+      :can-delete-of="canManagePhoto"
+      @delete="onViewerDelete"
+    />
   </div>
 </template>
 
@@ -265,6 +353,8 @@ import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { albumApi, photoApi, audienceApi } from '@/api'
 import { useAudience } from '@/composables/useAudience'
+import { usePickSelect } from '@/composables/usePickSelect'
+import { useViewMode } from '@/composables/useViewMode'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Edit, Delete, Location, Clock, Share } from '@element-plus/icons-vue'
@@ -475,6 +565,16 @@ const onDelPhoto = async (p) => {
   load()
 }
 
+// 查看器右上角删除:复用相册页确认与删除流程,删完关掉查看器(照片列表已变)
+const onViewerDelete = async ({ photo }) => {
+  try {
+    await onDelPhoto(photo)
+    viewer.visible = false
+  } catch {
+    /* 取消确认或请求层已提示 */
+  }
+}
+
 // 照片分享范围:打开时读当前设置(可选圈随家庭缓存一次)
 const openPhotoAudience = async (p) => {
   photoAudience.visible = true
@@ -539,9 +639,28 @@ const setChildView = (v) => {
   childView.value = v
   localStorage.setItem('ihomy:album:childView', v)
 }
+// 照片展示模式(网格/列表):本机记忆,切换即持久化
+const photoView = useViewMode('album-photos')
+const selectAllPhotos = () => selectAll(photos.value.map((p) => p.id))
 
-// ---------- 子相册 + 照片多选删除(混合选择) ----------
-const selectMode = ref(false)
+// ---------- 子相册 + 照片多选(照片走 usePickSelect:含长按进多选;子相册选择集页面自管) ----------
+const {
+  selectMode,
+  selectedIds,
+  toggle: togglePick,
+  enter,
+  exit,
+  selectAll,
+  pressStart,
+  cancelPress,
+  swallowClick,
+  dispose,
+} = usePickSelect({
+  enabled: () => isMobile.value && !readOnly.value,
+  onLongPress: () => {
+    selectedChildIds.value = []
+  },
+})
 
 // ---------- 拖拽上传(T7):鼠标把系统文件拖进照片墙,松手即上传 ----------
 const { hasPointer, isMobile } = useDevice()
@@ -597,18 +716,12 @@ const onDrop = async (e) => {
   await uploadFiles(accepted)
 }
 
-const selectedIds = ref([]) // 选中照片 id
 const selectedChildIds = ref([]) // 选中子相册 id
 const batchDeleting = ref(false)
 const toggleSelect = () => {
-  selectMode.value = !selectMode.value
-  selectedIds.value = []
+  if (selectMode.value) exit()
+  else enter()
   selectedChildIds.value = []
-}
-const togglePick = (p) => {
-  const i = selectedIds.value.indexOf(p.id)
-  if (i >= 0) selectedIds.value.splice(i, 1)
-  else selectedIds.value.push(p.id)
 }
 const togglePickChild = (c) => {
   const i = selectedChildIds.value.indexOf(c.id)
@@ -640,14 +753,45 @@ const onBatchDelete = async () => {
   }
 }
 
+// ---------- 多选移动到其他相册 ----------
+const moveDialog = reactive({ visible: false, loading: false, moving: false, albumId: null, albums: [] })
+const openMoveDialog = async () => {
+  moveDialog.visible = true
+  moveDialog.albumId = null
+  moveDialog.loading = true
+  try {
+    // 排除当前相册(移动到自己没有意义);路由 id 是字符串,按数字比
+    moveDialog.albums = ((await albumApi.list()) || []).filter((a) => a.id !== Number(currentAlbumId.value))
+  } catch {
+    moveDialog.albums = []
+  } finally {
+    moveDialog.loading = false
+  }
+}
+const onBatchMove = async () => {
+  if (!moveDialog.albumId || !selectedIds.value.length) return
+  moveDialog.moving = true
+  try {
+    const moved = await photoApi.batchMove([...selectedIds.value], moveDialog.albumId)
+    ElMessage.success(t('album.moveDone', { n: moved }))
+    moveDialog.visible = false
+    exit()
+    selectedChildIds.value = []
+    load()
+  } catch {
+    /* 请求层已提示 */
+  } finally {
+    moveDialog.moving = false
+  }
+}
+
 // ---------- 后台同步完成时自动刷新(停留在本页也能看到新照片) ----------
 const syncStore = useSyncStore()
 watch(syncStore.doneCount, () => load())
 
 // 受控 id 变化(右栏换相册 / 路由参数变化)时重拉,并清掉上一本的选中与播放器状态
 watch(currentAlbumId, () => {
-  selectMode.value = false
-  selectedIds.value = []
+  exit()
   selectedChildIds.value = []
   viewer.visible = false
   clearDrop()
@@ -660,33 +804,12 @@ onMounted(() => {
   window.addEventListener('blur', clearDrop)
 })
 // ---------- 手机长按多选:长按照片直接进入选择模式并选中,删除不必再精确点小按钮 ----------
-let pressTimer = null
-let longPressed = false
-const onPhotoPointerDown = (p) => {
-  if (!isMobile.value || selectMode.value) return
-  longPressed = false
-  if (pressTimer) clearTimeout(pressTimer)
-  pressTimer = setTimeout(() => {
-    pressTimer = null
-    longPressed = true
-    selectMode.value = true
-    selectedIds.value = [p.id]
-    selectedChildIds.value = []
-  }, 450)
-}
-const cancelPress = () => {
-  if (pressTimer) {
-    clearTimeout(pressTimer)
-    pressTimer = null
-  }
-}
+// 计时/吞 click/选择集都在 usePickSelect;这里只做模板事件转发
+const onPhotoPointerDown = (p) => pressStart(p)
 const onPhotoClick = (p) => {
   // 长按已经选中了这张:吞掉松手后的 click,避免又弹出播放页
-  if (longPressed) {
-    longPressed = false
-    return
-  }
-  if (selectMode.value) togglePick(p)
+  if (swallowClick()) return
+  if (selectMode.value) togglePick(p.id)
   else openViewer(p)
 }
 
@@ -698,7 +821,7 @@ const onHeaderCommand = (cmd) => {
 }
 
 onBeforeUnmount(() => {
-  cancelPress()
+  dispose()
   window.removeEventListener('blur', clearDrop)
   clearDrop()
 })

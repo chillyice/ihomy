@@ -1,7 +1,10 @@
-// 麻将内核(推倒胡简化规则,与页面解耦的纯函数):
-// 136 张牌(万/筒/条 1-9 各 4 张 + 东南西北中发白各 4 张),4 人(单机玩家 + 3 AI / 房间真人 + AI 补位),
-// 可碰、可点炮,无吃/杠,胡牌型 = 4 面子 + 1 对子 或 七对子(七对只在门清时成立)。
-// 番数口径:基础 1,自摸 +1,七对子 +3,碰碰胡 +2,清一色 +4,混一色 +2,断幺九 +1。
+// 麻将内核(与页面解耦的纯函数):
+// 136 张牌(万/筒/条 1-9 各 4 张 + 东南西北中发白各 4 张),4 人(单机玩家 + 3 AI / 房间真人 + AI 补位)。
+// 规则参数(MahjongRules,开局可选、随房间广播):允许吃 / 允许杠 / 将牌约束(任意对子或二五八将)。
+// 碰恒可;胡牌型 = 4 面子 + 1 对子 或 七对子(七对只在门清时成立,不受将牌约束)。
+// 副露面子里 type: 'pong'(碰)/ 'gang'(明杠,含别家点杠)/ 'angang'(暗杠)/ 'bugang'(补杠);
+// 杠后摸岭上牌补回,暗手张数恒为 13-3×面子数,判定等式不变。
+// 番数口径:基础 1,自摸 +1,七对子 +3,碰碰胡 +2,清一色 +4,混一色 +2,断幺九 +1,明杠/补杠每杠 +1,暗杠每杠 +2。
 // 本局得分 = 底分 8 × 番数。牌的表示:kind 0..33(0-8 万,9-17 筒,18-26 条,27-33 字),
 // 实例 id = kind × 4 + 副本号(0..3)。
 
@@ -10,6 +13,32 @@ export const MAHJONG_KINDS = 34
 export const MAHJONG_KIND_COPIES = 4
 export const MAHJONG_TILE_COUNT = MAHJONG_KINDS * MAHJONG_KIND_COPIES
 export const MAHJONG_BASE_SCORE = 8
+
+/** 将牌约束:任意对子 / 二五八将(将牌须为数牌 2/5/8) */
+export const MAHJONG_PAIR_ANY = 'any'
+export const MAHJONG_PAIR_258 = '258'
+
+/** 规则预设:推倒胡简化(默认,无吃无杠)/ 口口胡(吃碰杠全开) */
+export const MAHJONG_RULE_PRESETS = {
+  tuiDaoHu: { key: 'tuiDaoHu', allowChi: false, allowGang: false, pairConstraint: MAHJONG_PAIR_ANY },
+  kouKouHu: { key: 'kouKouHu', allowChi: true, allowGang: true, pairConstraint: MAHJONG_PAIR_ANY },
+}
+
+/** 归一化规则参数(房间信令/本地开局共用;缺省即推倒胡简化口径) */
+export function normalizeMahjongRules(rules) {
+  const r = rules && typeof rules === 'object' ? rules : {}
+  return {
+    allowChi: r.allowChi === true,
+    allowGang: r.allowGang === true,
+    pairConstraint: r.pairConstraint === MAHJONG_PAIR_258 ? MAHJONG_PAIR_258 : MAHJONG_PAIR_ANY,
+  }
+}
+
+/** 规则是否二五八将 */
+export const isPair258Rules = (rules) => normalizeMahjongRules(rules).pairConstraint === MAHJONG_PAIR_258
+
+/** kind 是不是数牌 2/5/8(二五八将的可作将牌种) */
+export const isSuit258 = (kind) => isSuitKind(kind) && (kind % 9 === 1 || kind % 9 === 4 || kind % 9 === 7)
 
 /** 牌种序号 → 名称(0-8 万 / 9-17 筒 / 18-26 条 / 27-33 字) */
 export const MAHJONG_KIND_NAMES = [
@@ -111,15 +140,16 @@ export function mahjongCountsValid(counts) {
 
 /**
  * 判胡:标准牌型(4 面子 + 1 对子,面子=刻子或顺子)或七对子。
- * 入参为暗手牌的 kind 计数表;openMelds 为已碰出的面子数(碰出的刻子不再占暗手牌)。
+ * 入参为暗手牌的 kind 计数表;openMelds 为已碰/杠出的面子数(副露不再占暗手牌)。
+ * rules 传规则参数:二五八将时对子必须是数牌 2/5/8(七对不受此约束)。
  * 只判型,不记番。
  */
-export function canMahjongWin(counts, openMelds = 0) {
+export function canMahjongWin(counts, openMelds = 0, rules = null) {
   const melds = Math.max(0, Math.min(4, Number(openMelds) || 0))
   const total = counts.reduce((a, b) => a + b, 0)
   if (total !== 14 - melds * 3) return false
   if (melds === 0 && isSevenPairs(counts)) return true
-  return canFormMelds(counts, 4 - melds) !== null
+  return canFormMelds(counts, 4 - melds, isPair258Rules(rules))
 }
 
 /** 七对子:7 个对子(杠过的四张不算,推倒胡无副露不涉及) */
@@ -128,56 +158,45 @@ function isSevenPairs(counts) {
 }
 
 /**
- * 从计数表中拆出 need 副面子(剩余必须恰好一对)——标准牌型 DFS。
- * 返回拆出的面子列表或 null;只用于判胡,不要求最优。
+ * 判定 counts 能否拆成 need 副面子 + 1 对将(pair258 时将必须是数牌 2/5/8)。
+ * 结构:先枚举将(每种 kind 抽一对),再对剩余牌做纯面子 DFS——
+ * 避免「拆面子最后剩对」写法在部分牌型上漏解(将牌被贪心拆掉,如 111 234 55 678 888)。
+ * 只用于判胡,不要求最优。
  */
-function canFormMelds(counts, need) {
+function canFormMelds(counts, need, pair258 = false) {
   const work = [...counts]
-  const melds = []
-  const take = (k) => {
-    work[k] -= 1
-  }
-  const putBack = (k) => {
-    work[k] += 1
-  }
   const dfs = (left) => {
-    // 面子拆够时,剩余必须恰好一对;不是就退回去换别的拆法(回溯)
-    if (left === 0) {
-      const idx = work.findIndex((c) => c > 0)
-      if (idx === -1) return false
-      return work[idx] === 2 && work.every((c, i) => i === idx || c === 0)
-    }
-    // 找到第一个还有牌的种
+    if (left === 0) return work.every((c) => c === 0)
     let k = 0
     while (k < MAHJONG_KINDS && work[k] === 0) k++
-    if (k === MAHJONG_KINDS) {
-      // 还有面子没拆但没牌了:废型
-      return false
-    }
+    if (k === MAHJONG_KINDS) return false
     // 刻子
     if (work[k] >= 3) {
-      for (let i = 0; i < 3; i++) take(k)
-      melds.push({ type: 'triplet', kind: k })
+      work[k] -= 3
       if (dfs(left - 1)) return true
-      melds.pop()
-      for (let i = 0; i < 3; i++) putBack(k)
+      work[k] += 3
     }
     // 顺子(数牌)
     if (isSuitKind(k) && k % 9 <= 6 && work[k] > 0 && work[k + 1] > 0 && work[k + 2] > 0) {
-      take(k)
-      take(k + 1)
-      take(k + 2)
-      melds.push({ type: 'run', kind: k })
+      work[k] -= 1
+      work[k + 1] -= 1
+      work[k + 2] -= 1
       if (dfs(left - 1)) return true
-      melds.pop()
-      putBack(k)
-      putBack(k + 1)
-      putBack(k + 2)
+      work[k] += 1
+      work[k + 1] += 1
+      work[k + 2] += 1
     }
     return false
   }
-  if (!dfs(need)) return null
-  return melds
+  for (let p = 0; p < MAHJONG_KINDS; p++) {
+    if (pair258 && !isSuit258(p)) continue
+    if (counts[p] < 2) continue
+    // 每轮从原始计数重建(上一轮 DFS 只回溯它动过的位,work 可能残留 -2 污染)
+    for (let i = 0; i < MAHJONG_KINDS; i++) work[i] = counts[i]
+    work[p] -= 2
+    if (dfs(need)) return true
+  }
+  return false
 }
 
 /** 牌型是不是碰碰胡:4 个刻子 + 1 对(七对不算碰碰胡) */
@@ -225,9 +244,9 @@ export function isMahjongSevenPairs(counts) {
 
 /**
  * 计番:返回 { fans: [{ key, points }], total }。
- * 番:基础 1 + 自摸 1 + 七对 3 + 碰碰胡 2 + 清一色 4 + 混一色 2 + 断幺九 1。
- * 七对与碰碰胡/清一色等可叠加(如清一色七对);melds 为已碰出的面子(只支持 pong),
- * 计番时按三张同牌并入整手牌型,七对只在门清(无副露)时成立。
+ * 番:基础 1 + 自摸 1 + 七对 3 + 碰碰胡 2 + 清一色 4 + 混一色 2 + 断幺九 1 + 杠(明杠/补杠每杠 1,暗杠每杠 2)。
+ * 七对与碰碰胡/清一色等可叠加(如清一色七对);melds 为已碰/杠出的面子,
+ * 计番时按三张同牌并入整手牌型(杠的多余一张不参与牌型),七对只在门清(无副露)时成立。
  */
 export function mahjongHandScore(counts, { selfDrawn = false, melds = [] } = {}) {
   const openMelds = Array.isArray(melds) ? melds.filter((m) => m && Number.isInteger(m.kind)) : []
@@ -244,6 +263,9 @@ export function mahjongHandScore(counts, { selfDrawn = false, melds = [] } = {})
   if (isMahjongFlush(full)) fans.push({ key: 'flush', points: 4 })
   else if (isMahjongHalfFlush(full)) fans.push({ key: 'halfFlush', points: 2 })
   if (isMahjongAllSimples(full)) fans.push({ key: 'allSimples', points: 1 })
+  const angangs = openMelds.filter((m) => m.type === 'angang').length
+  const gangs = openMelds.filter((m) => m.type === 'gang' || m.type === 'bugang').length
+  if (gangs + angangs > 0) fans.push({ key: 'gang', points: gangs + angangs * 2 })
   const total = fans.reduce((a, f) => a + f.points, 0)
   return { fans, total, score: MAHJONG_BASE_SCORE * total }
 }
@@ -252,7 +274,7 @@ export function mahjongHandScore(counts, { selfDrawn = false, melds = [] } = {})
  * 听牌:暗手 13-3×openMelds 张的 kind 计数 → 可胡的牌种数组(空的返回 [])。
  * 思路:对每种「还允许加一张」的 kind 试成可胡牌型。
  */
-export function mahjongTenpai(counts13, openMelds = 0) {
+export function mahjongTenpai(counts13, openMelds = 0, rules = null) {
   const melds = Math.max(0, Math.min(4, Number(openMelds) || 0))
   const total = counts13.reduce((a, b) => a + b, 0)
   if (total !== 13 - melds * 3) return []
@@ -261,9 +283,74 @@ export function mahjongTenpai(counts13, openMelds = 0) {
     if (counts13[k] >= MAHJONG_KIND_COPIES) continue
     const trial = [...counts13]
     trial[k] += 1
-    if (canMahjongWin(trial, melds)) wins.push(k)
+    if (canMahjongWin(trial, melds, rules)) wins.push(k)
   }
   return wins
+}
+
+/**
+ * 可吃的顺子组合(暗手两张 + 别人弃的 discardedKind 组成顺子):
+ * 返回组合数组,每项为 [a, b](a<b,顺子里除弃牌外的另两个 kind);字牌不可吃。
+ */
+export function mahjongChiOptions(counts, discardedKind) {
+  const k = discardedKind
+  if (!isSuitKind(k)) return []
+  const base = k - (k % 9)
+  const end = base + 9
+  const has = (x) => x >= base && x < end && counts[x] > 0
+  const opts = []
+  // 弃牌作顺子第三张:k-2, k-1
+  if (k - base >= 2 && has(k - 2) && has(k - 1)) opts.push([k - 2, k - 1])
+  // 弃牌居中:k-1, k+1
+  if (k - base >= 1 && k + 1 < end && has(k - 1) && has(k + 1)) opts.push([k - 1, k + 1])
+  // 弃牌作顺子第一张:k+1, k+2
+  if (k + 2 < end && has(k + 1) && has(k + 2)) opts.push([k + 1, k + 2])
+  return opts
+}
+
+/** 明杠(别家弃 kind 而暗手已有三张):可行返回 true */
+export const canMahjongMingGang = (counts, kind) => Number.isInteger(kind) && kind >= 0 && kind < MAHJONG_KINDS && counts[kind] === 3
+
+/** 暗杠:暗手凑成四张的 kind 列表(摸牌后自杠用) */
+export function mahjongAnGangKinds(counts) {
+  const out = []
+  for (let k = 0; k < MAHJONG_KINDS; k++) {
+    if (counts[k] === MAHJONG_KIND_COPIES) out.push(k)
+  }
+  return out
+}
+
+/** 补杠:此前碰出过 kind 且暗手又摸到一张(返回 true 可补) */
+export const canMahjongBuGang = (counts, melds, kind) =>
+  Number.isInteger(kind) &&
+  kind >= 0 &&
+  kind < MAHJONG_KINDS &&
+  counts[kind] > 0 &&
+  Array.isArray(melds) &&
+  melds.some((m) => m && m.kind === kind && (!m.type || m.type === 'pong'))
+
+/**
+ * AI 是否愿意吃:吃成一副顺子(固定收益 10)+ 剩余暗手潜力,不低于吃前的整体潜力才吃。
+ * 返回选中的 [a, b] 组合或 null。
+ */
+export function mahjongAiChooseChi(counts13, discardedKind) {
+  const opts = mahjongChiOptions(counts13, discardedKind)
+  if (!opts.length) return null
+  const base = mahjongHandPotential([...counts13])
+  let best = null
+  let bestAfter = -Infinity
+  for (const pair of opts) {
+    const work = [...counts13]
+    work[pair[0]] -= 1
+    work[pair[1]] -= 1
+    if (!mahjongCountsValid(work)) continue
+    const after = mahjongHandPotential(work) + 10
+    if (after >= base && after > bestAfter) {
+      best = pair
+      bestAfter = after
+    }
+  }
+  return best
 }
 
 /**

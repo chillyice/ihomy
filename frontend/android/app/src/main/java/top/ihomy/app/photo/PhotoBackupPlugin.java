@@ -53,6 +53,9 @@ import java.util.concurrent.Executors;
         name = "IhomyPhotoBackup",
         permissions = {
             @Permission(alias = "images", strings = { Manifest.permission.READ_MEDIA_IMAGES }),
+            @Permission(
+                    alias = "imagesSelected",
+                    strings = { Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED }),
             @Permission(alias = "imagesLegacy", strings = { Manifest.permission.READ_EXTERNAL_STORAGE })
         })
 public class PhotoBackupPlugin extends Plugin {
@@ -69,10 +72,22 @@ public class PhotoBackupPlugin extends Plugin {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ? "images" : "imagesLegacy";
     }
 
+    /** Android 14「仅允许访问选中的照片」:用户给了部分授权,能读到被选中的那些 */
+    private boolean hasSelectedAccess() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+                && getPermissionState("imagesSelected") == PermissionState.GRANTED;
+    }
+
+    /** 只要能读到照片(完整授权或部分授权)就算可读 */
+    private boolean hasImageAccess() {
+        return getPermissionState(imageAlias()) == PermissionState.GRANTED || hasSelectedAccess();
+    }
+
     @PluginMethod
     public void status(PluginCall call) {
         JSObject ret = new JSObject();
-        ret.put("permission", getPermissionState(imageAlias()).toString());
+        ret.put("permission", hasImageAccess() ? PermissionState.GRANTED.toString() : getPermissionState(imageAlias()).toString());
+        ret.put("partial", hasSelectedAccess());
         ret.put("charging", isCharging());
         ret.put("wifi", isWifi());
         ret.put("metered", isMetered());
@@ -83,13 +98,13 @@ public class PhotoBackupPlugin extends Plugin {
     @PluginMethod
     public void checkPermission(PluginCall call) {
         JSObject ret = new JSObject();
-        ret.put("state", getPermissionState(imageAlias()).toString());
+        ret.put("state", hasImageAccess() ? PermissionState.GRANTED.toString() : getPermissionState(imageAlias()).toString());
         call.resolve(ret);
     }
 
     @PluginMethod
     public void requestPermission(PluginCall call) {
-        if (getPermissionState(imageAlias()) == PermissionState.GRANTED) {
+        if (hasImageAccess()) {
             JSObject ret = new JSObject();
             ret.put("state", PermissionState.GRANTED.toString());
             call.resolve(ret);
@@ -101,14 +116,16 @@ public class PhotoBackupPlugin extends Plugin {
     @PermissionCallback
     private void permissionCallback(PluginCall call) {
         JSObject ret = new JSObject();
-        ret.put("state", getPermissionState(imageAlias()).toString());
+        // Android 14 部分授权弹窗(选了部分照片)不会把 images 置为 GRANTED,按实际可读性回报
+        ret.put("state", hasImageAccess() ? PermissionState.GRANTED.toString() : getPermissionState(imageAlias()).toString());
+        ret.put("partial", hasSelectedAccess());
         call.resolve(ret);
     }
 
     /** 待备份张数(只数拍摄/添加时间不早于给定时刻的照片),用于界面显示「还有多少」;excludeFolders 里的相册目录不数 */
     @PluginMethod
     public void count(PluginCall call) {
-        if (getPermissionState(imageAlias()) != PermissionState.GRANTED) {
+        if (!hasImageAccess()) {
             JSObject ret = new JSObject();
             ret.put("total", 0);
             ret.put("granted", false);
@@ -136,10 +153,9 @@ public class PhotoBackupPlugin extends Plugin {
      */
     @PluginMethod
     public void folders(PluginCall call) {
-        if (getPermissionState(imageAlias()) != PermissionState.GRANTED) {
-            JSObject ret = new JSObject();
-            ret.put("folders", new JSArray());
-            call.resolve(ret);
+        if (!hasImageAccess()) {
+            // 未授权不再静默返回空列表:让上层弹权限或提示,否则「没读到相册」无法区分原因
+            call.reject("未获授权读取相册");
             return;
         }
         io.execute(() -> {

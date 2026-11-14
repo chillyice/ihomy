@@ -88,6 +88,23 @@
           </el-select>
         </div>
         <div class="tb-right">
+          <div class="view-toggle">
+            <button class="vt-btn" :class="{ active: viewMode === 'grid' }" :title="$t('common.viewGrid')" @click="viewMode = 'grid'">
+              <svg viewBox="0 0 16 16" width="14" height="14">
+                <rect x="1.5" y="1.5" width="5" height="5" rx="1" fill="currentColor" />
+                <rect x="9.5" y="1.5" width="5" height="5" rx="1" fill="currentColor" />
+                <rect x="1.5" y="9.5" width="5" height="5" rx="1" fill="currentColor" />
+                <rect x="9.5" y="9.5" width="5" height="5" rx="1" fill="currentColor" />
+              </svg>
+            </button>
+            <button class="vt-btn" :class="{ active: viewMode === 'list' }" :title="$t('common.viewList')" @click="viewMode = 'list'">
+              <svg viewBox="0 0 16 16" width="14" height="14">
+                <rect x="1.5" y="2.5" width="13" height="3" rx="1" fill="currentColor" />
+                <rect x="1.5" y="6.5" width="13" height="3" rx="1" fill="currentColor" />
+                <rect x="1.5" y="10.5" width="13" height="3" rx="1" fill="currentColor" />
+              </svg>
+            </button>
+          </div>
           <el-button v-if="userStore.isLoggedIn && filteredList.length" @click="toggleSelect">{{ $t('cinema.select') }}</el-button>
           <el-button v-if="userStore.isLoggedIn" @click="openWishDialog">{{ $t('cinema.wish') }}</el-button>
           <el-button v-if="userStore.isOwner && hasMapped" :loading="refreshing" @click="onRefreshMap">{{
@@ -99,6 +116,7 @@
       </template>
       <div v-else class="tb-right">
         <span class="select-count">{{ $t('cinema.selectedVideos', { n: selectedIds.length }) }}</span>
+        <el-button @click="selectAllVideos">{{ $t('common.selectAll') }}</el-button>
         <el-button @click="toggleSelect">{{ $t('cinema.cancelSelect') }}</el-button>
         <el-button type="danger" :loading="batchDeleting" :disabled="!selectedIds.length" @click="onBatchDelete">{{
           $t('cinema.deleteSelected')
@@ -183,14 +201,63 @@
 
       <el-tab-pane :label="$t('cinema.library')" name="library">
         <div v-loading="loading">
-          <div v-if="filteredList.length" class="video-grid">
+          <div v-if="filteredList.length && viewMode === 'list'" class="resource-list">
+            <div
+              v-a11y-click
+              v-for="v in filteredList"
+              :key="v.id"
+              class="rl-row card"
+              :class="{ selected: selectMode && selectedIds.includes(v.id) }"
+              @click="onVideoClick(v)"
+              @pointerdown="pressStart(v)"
+              @pointerup="cancelPress"
+              @pointercancel="cancelPress"
+              @pointerleave="cancelPress"
+              @contextmenu.prevent
+            >
+              <span v-if="selectMode" class="pick-badge" :class="{ on: selectedIds.includes(v.id) }" @click.stop="togglePick(v)">
+                <svg viewBox="0 0 16 16" width="11" height="11">
+                  <path
+                    d="M3 8.5 L6.5 12 L13 4.5"
+                    fill="none"
+                    stroke="#fff"
+                    stroke-width="2.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </span>
+              <div class="rl-thumb" :style="v.poster ? { backgroundImage: `url(${v.poster})` } : {}">
+                <span v-if="!v.poster">🎬</span>
+              </div>
+              <div class="rl-main">
+                <span class="rl-name">{{ v.title }}</span>
+                <span class="rl-meta">
+                  <template v-if="v.year">{{ v.year }}</template
+                  ><template v-if="v.genres"> · {{ String(v.genres).split(',').filter(Boolean).slice(0, 3).join(' / ') }}</template
+                  ><template v-if="v.uploaderName"> · {{ v.uploaderName }}</template
+                  ><template v-if="v.sourceDeviceName"> · {{ v.sourceDeviceName }}</template>
+                </span>
+              </div>
+            </div>
+          </div>
+          <div v-else-if="filteredList.length" class="video-grid">
             <div
               v-for="v in filteredList"
               :key="v.id"
               class="video-card card"
               :class="{ selected: selectMode && selectedIds.includes(v.id) }"
             >
-              <div v-a11y-click class="video-poster" @click="selectMode ? togglePick(v) : play(v)">
+              <div
+                v-a11y-click
+                class="video-poster"
+                @click="onVideoClick(v)"
+                @pointerdown="pressStart(v)"
+                @pointerup="cancelPress"
+                @pointercancel="cancelPress"
+                @pointerleave="cancelPress"
+                @contextmenu.prevent
+              >
                 <img v-if="v.poster" :src="v.poster" class="poster-img" :alt="$t('cinema.poster')" />
                 <div v-else class="poster-placeholder">🎬</div>
                 <div v-if="!selectMode" class="play-overlay">▶ {{ $t('cinema.play') }}</div>
@@ -452,7 +519,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch, inject } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Edit, Delete, Share } from '@element-plus/icons-vue'
@@ -460,6 +527,8 @@ import { videoApi, mediaApi, audienceApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useSyncStore } from '@/stores/sync'
 import { useAudience } from '@/composables/useAudience'
+import { usePickSelect } from '@/composables/usePickSelect'
+import { useViewMode } from '@/composables/useViewMode'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
@@ -833,18 +902,22 @@ const onDel = async (v) => {
   load()
 }
 
-// ---------- 多选批量删除 ----------
-const selectMode = ref(false)
-const selectedIds = ref([])
+// ---------- 多选批量删除(手机长按海报进多选) ----------
+const { selectMode, selectedIds, toggle, enter, exit, selectAll, pressStart, cancelPress, swallowClick, dispose } = usePickSelect()
+// 视图模式(网格/列表):本机记忆
+const viewMode = useViewMode('cinema')
+const selectAllVideos = () => selectAll(filteredList.value.map((v) => v.id))
 const batchDeleting = ref(false)
 const toggleSelect = () => {
-  selectMode.value = !selectMode.value
-  selectedIds.value = []
+  if (selectMode.value) exit()
+  else enter()
 }
-const togglePick = (v) => {
-  const i = selectedIds.value.indexOf(v.id)
-  if (i >= 0) selectedIds.value.splice(i, 1)
-  else selectedIds.value.push(v.id)
+const togglePick = (v) => toggle(v.id)
+const onVideoClick = (v) => {
+  // 长按已选中这张:吞掉松手后的 click,避免又进入播放
+  if (swallowClick()) return
+  if (selectMode.value) togglePick(v)
+  else play(v)
 }
 // 批量删除:混有设备映射视频时提示只删记录不动设备文件
 const onBatchDelete = async () => {
@@ -859,8 +932,7 @@ const onBatchDelete = async () => {
       await videoApi.remove(id)
     }
     ElMessage.success(t('common.deleted'))
-    selectedIds.value = []
-    selectMode.value = false
+    exit()
     load()
   } finally {
     batchDeleting.value = false
@@ -1011,6 +1083,10 @@ onMounted(() => {
   load()
   loadWishes()
   if (tab.value === 'media') loadMedia()
+})
+
+onBeforeUnmount(() => {
+  dispose()
 })
 </script>
 

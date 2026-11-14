@@ -91,6 +91,12 @@
                 />
               </svg>
             </button>
+            <!-- 删除当前照片(宿主页按照片判定权限;确认与落库由宿主处理) -->
+            <button v-if="canDeleteCurrent" class="pv-icon-btn pv-danger" :title="t('common.delete')" @click="requestDelete">
+              <svg viewBox="0 0 24 24" width="22" height="22">
+                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" fill="currentColor" />
+              </svg>
+            </button>
             <!-- 下载当前照片 -->
             <button class="pv-icon-btn" :title="t('photoViewer.download')" @click="download">
               <svg viewBox="0 0 24 24" width="22" height="22">
@@ -194,8 +200,10 @@ const props = defineProps({
   photos: { type: Array, default: () => [] },
   initialIndex: { type: Number, default: 0 },
   shareBase: { type: String, default: '' },
+  /** (photo) => boolean:当前照片是否可删(宿主页按自身权限判定);不传则不显示删除按钮 */
+  canDeleteOf: { type: Function, default: null },
 })
-const emit = defineEmits(['update:visible', 'close'])
+const emit = defineEmits(['update:visible', 'close', 'delete'])
 
 const { t } = useI18n()
 const userStore = useUserStore()
@@ -235,6 +243,16 @@ watch(index, () => {
 
 const current = computed(() => props.photos[index.value] || {})
 const hasMeta = computed(() => current.value.description || current.value.uploaderName || current.value.location || current.value.takenAt)
+
+const canDeleteCurrent = computed(() => {
+  return Boolean(props.canDeleteOf && userStore.isLoggedIn && current.value.id && props.canDeleteOf(current.value))
+})
+
+// 查看器内发起删除:确认框与删除请求都由宿主页处理(宿主知道自己照片的确认文案与刷新方式)
+const requestDelete = () => {
+  if (!canDeleteCurrent.value) return
+  emit('delete', { photo: current.value, index: index.value })
+}
 
 const formatDate = (d) => {
   if (!d) return ''
@@ -609,6 +627,13 @@ onBeforeUnmount(() => {
 .pv-icon-btn:hover {
   background: rgba(255, 255, 255, 0.2);
   color: #fff;
+}
+.pv-icon-btn.pv-danger {
+  color: rgba(255, 255, 255, 0.75);
+}
+.pv-icon-btn.pv-danger:hover {
+  background: rgba(var(--color-danger-rgb), 0.35);
+  color: var(--color-danger);
 }
 
 /* 播放进度条 */

@@ -31,10 +31,33 @@
         @leave="play.leave"
       />
 
-      <!-- 封面(仅单机;房间局由房主直接开牌) -->
+      <!-- 封面(仅单机;房间局由房主选规则后开牌) -->
       <div v-if="phase === 'idle' && !play.active" class="cover">
         <h1 class="cover-title">{{ $t('games.mahjong.title') }}</h1>
         <div class="cover-desc">{{ $t('games.mahjong.desc') }}</div>
+
+        <!-- 开局规则选择:预设 + 吃/杠/二五八将开关 -->
+        <div class="rules-panel">
+          <div class="rules-title">{{ $t('games.mahjong.rulesTitle') }}</div>
+          <div class="rules-presets">
+            <button
+              v-for="(p, key) in MAHJONG_RULE_PRESETS"
+              :key="key"
+              type="button"
+              class="rules-preset"
+              :class="{ active: rulesLabel === key }"
+              @click="rulesDraft = normalizeMahjongRules(p)"
+            >
+              {{ $t(`games.mahjong.presets.${key}`) }}
+            </button>
+          </div>
+          <div class="rules-switches">
+            <label class="rules-switch"><input v-model="rulesDraft.allowChi" type="checkbox" />{{ $t('games.mahjong.ruleChi') }}</label>
+            <label class="rules-switch"><input v-model="rulesDraft.allowGang" type="checkbox" />{{ $t('games.mahjong.ruleGang') }}</label>
+            <label class="rules-switch"><input v-model="pair258Draft" type="checkbox" />{{ $t('games.mahjong.rulePair258') }}</label>
+          </div>
+        </div>
+
         <button class="start-btn" type="button" @click="startGame">{{ $t('games.mahjong.start') }}</button>
         <div v-if="rounds > 0" class="cover-stats">{{ $t('games.mahjong.roundStats', { win: playerWins, lose: aiWins }) }}</div>
         <div class="cover-hint">{{ $t('games.mahjong.coverHint') }}</div>
@@ -42,84 +65,211 @@
 
       <!-- 牌桌 -->
       <template v-else>
+        <!-- 房间局:房主开牌前先定规则(访客等待盘面) -->
+        <div v-if="rulesPickerOpen && play.isHost" class="rules-overlay">
+          <div class="rules-panel rules-panel-float">
+            <div class="rules-title">{{ $t('games.mahjong.rulesPickTitle') }}</div>
+            <div class="rules-presets">
+              <button
+                v-for="(p, key) in MAHJONG_RULE_PRESETS"
+                :key="key"
+                type="button"
+                class="rules-preset"
+                :class="{ active: rulesDraftLabel === key }"
+                @click="rulesDraft = normalizeMahjongRules(p)"
+              >
+                {{ $t(`games.mahjong.presets.${key}`) }}
+              </button>
+            </div>
+            <div class="rules-switches">
+              <label class="rules-switch"><input v-model="rulesDraft.allowChi" type="checkbox" />{{ $t('games.mahjong.ruleChi') }}</label>
+              <label class="rules-switch"><input v-model="rulesDraft.allowGang" type="checkbox" />{{ $t('games.mahjong.ruleGang') }}</label>
+              <label class="rules-switch"><input v-model="pair258Draft" type="checkbox" />{{ $t('games.mahjong.rulePair258') }}</label>
+            </div>
+            <el-button type="primary" round @click="startGame">{{ $t('games.mahjong.rulesConfirm') }}</el-button>
+          </div>
+        </div>
+
         <div v-if="waitingHost" class="table-waiting">{{ $t('games.mahjong.waitingHost') }}</div>
         <template v-else>
-          <!-- 对手:名字 + 剩牌 + 碰出的面子 + 弃牌河 -->
-          <div class="opponents">
-            <div v-for="s in opponents" :key="s.seat" class="opponent" :class="{ active: turn === s.seat && phase === 'playing' }">
-              <div class="opponent-head">
-                <span class="opponent-name">{{ seatName(s.seat) }}</span>
-                <span class="opponent-count">{{ seatTileCount(s.seat) }}</span>
-              </div>
-              <div v-if="melds[s.seat]?.length" class="melds-row">
-                <span v-for="(m, i) in melds[s.seat]" :key="'m' + i" class="meld-group" :title="$t('games.mahjong.pong')">
-                  <span v-for="n in 3" :key="n" class="tile mini" :class="tileClass(m.kind)"><TileFace :kind="m.kind" /></span>
+          <!-- 方位式牌桌:对家在上、上家在左、下家在右、我在下,中央是牌桌信息 -->
+          <div class="mj-table">
+            <!-- 对家(上) -->
+            <div v-if="topSeat" class="mj-area mj-top" :class="{ active: turn === topSeat.seat && phase === 'playing' }">
+              <div class="mj-seat-head">
+                <span class="mj-seat-name">{{ seatName(topSeat.seat) }}</span>
+                <span class="mj-backs">
+                  <span v-for="n in seatTileCount(topSeat.seat)" :key="n" class="tile back" aria-hidden="true" />
                 </span>
               </div>
-              <div class="opponent-river">
-                <span v-for="(kind, i) in rivers[s.seat]" :key="i" class="tile mini" :class="tileClass(kind)">
+              <div v-if="melds[topSeat.seat]?.length" class="melds-row">
+                <span v-for="(m, i) in melds[topSeat.seat]" :key="'tm' + i" class="meld-group">
+                  <template v-if="meldView(m).dark"
+                    ><span v-for="n in 4" :key="'d' + n" class="tile mini back" aria-hidden="true"
+                  /></template>
+                  <template v-else
+                    ><span v-for="(kind, j) in meldView(m).kinds" :key="j" class="tile mini" :class="tileClass(kind)"
+                      ><TileFace :kind="kind" /></span
+                  ></template>
+                </span>
+              </div>
+              <div class="mj-river">
+                <span v-for="(kind, i) in rivers[topSeat.seat]" :key="i" class="tile mini" :class="tileClass(kind)">
                   <TileFace :kind="kind" />
                 </span>
               </div>
             </div>
-          </div>
 
-          <!-- 中央信息:牌墙 / 最近一张弃牌 -->
-          <div class="table-center">
-            <span class="wall-count">{{ $t('games.mahjong.wallLeft', { n: wallLeft }) }}</span>
-            <span class="turn-label">{{ turnLabel }}</span>
-            <span v-if="lastDiscard" class="last-discard tile" :class="tileClass(lastDiscard.kind)">
-              <TileFace :kind="lastDiscard.kind" />
-            </span>
-          </div>
+            <!-- 上家(左) / 下家(右) -->
+            <div v-if="leftSeat" class="mj-area mj-left" :class="{ active: turn === leftSeat.seat && phase === 'playing' }">
+              <div class="mj-seat-head">
+                <span class="mj-seat-name">{{ seatName(leftSeat.seat) }}</span>
+              </div>
+              <div class="mj-backs-col">
+                <span v-for="n in seatTileCount(leftSeat.seat)" :key="n" class="tile back" aria-hidden="true" />
+              </div>
+              <div v-if="melds[leftSeat.seat]?.length" class="melds-col">
+                <span v-for="(m, i) in melds[leftSeat.seat]" :key="'lm' + i" class="meld-group">
+                  <template v-if="meldView(m).dark"
+                    ><span v-for="n in 4" :key="'d' + n" class="tile mini back" aria-hidden="true"
+                  /></template>
+                  <template v-else
+                    ><span v-for="(kind, j) in meldView(m).kinds" :key="j" class="tile mini" :class="tileClass(kind)"
+                      ><TileFace :kind="kind" /></span
+                  ></template>
+                </span>
+              </div>
+              <div class="mj-river-col">
+                <span v-for="(kind, i) in rivers[leftSeat.seat]" :key="i" class="tile mini" :class="tileClass(kind)">
+                  <TileFace :kind="kind" />
+                </span>
+              </div>
+            </div>
 
-          <!-- 自己的手牌(观战只看看公共盘面) -->
-          <div v-if="!play.isSpectator" class="my-side" :class="{ active: myTurn }">
-            <div v-if="myMelds.length" class="melds-row my-melds">
-              <span v-for="(m, i) in myMelds" :key="'mm' + i" class="meld-group" :title="$t('games.mahjong.pong')">
-                <span v-for="n in 3" :key="n" class="tile mini" :class="tileClass(m.kind)"><TileFace :kind="m.kind" /></span>
+            <!-- 中央:牌墙 / 规则 / 轮次 / 最近弃牌 -->
+            <div class="mj-center">
+              <span class="wall-count">{{ $t('games.mahjong.wallLeft', { n: wallLeft }) }}</span>
+              <span class="rules-chip">{{ $t(`games.mahjong.presets.${rulesLabel}`) }}</span>
+              <span class="turn-label">{{ turnLabel }}</span>
+              <span v-if="lastDiscard" class="last-discard tile" :class="tileClass(lastDiscard.kind)">
+                <TileFace :kind="lastDiscard.kind" />
               </span>
             </div>
-            <div class="my-river">
-              <span v-for="(kind, i) in myRiver" :key="i" class="tile mini" :class="tileClass(kind)">
-                <TileFace :kind="kind" />
-              </span>
+
+            <div v-if="rightSeat" class="mj-area mj-right" :class="{ active: turn === rightSeat.seat && phase === 'playing' }">
+              <div class="mj-seat-head">
+                <span class="mj-seat-name">{{ seatName(rightSeat.seat) }}</span>
+              </div>
+              <div class="mj-backs-col">
+                <span v-for="n in seatTileCount(rightSeat.seat)" :key="n" class="tile back" aria-hidden="true" />
+              </div>
+              <div v-if="melds[rightSeat.seat]?.length" class="melds-col">
+                <span v-for="(m, i) in melds[rightSeat.seat]" :key="'rm' + i" class="meld-group">
+                  <template v-if="meldView(m).dark"
+                    ><span v-for="n in 4" :key="'d' + n" class="tile mini back" aria-hidden="true"
+                  /></template>
+                  <template v-else
+                    ><span v-for="(kind, j) in meldView(m).kinds" :key="j" class="tile mini" :class="tileClass(kind)"
+                      ><TileFace :kind="kind" /></span
+                  ></template>
+                </span>
+              </div>
+              <div class="mj-river-col">
+                <span v-for="(kind, i) in rivers[rightSeat.seat]" :key="i" class="tile mini" :class="tileClass(kind)">
+                  <TileFace :kind="kind" />
+                </span>
+              </div>
             </div>
-            <div class="hand-row">
-              <button
-                v-for="tile in myHandView"
-                :key="tile.id"
-                type="button"
-                class="tile hand"
-                :class="[tileClass(tile.kind), { drawn: tile.justDrawn, dim: phase !== 'playing' }]"
-                :disabled="!canDiscardNow"
-                :title="tileLabel(tile.kind)"
-                :aria-label="tileLabel(tile.kind)"
-                @click="onTileClick(tile)"
-              >
-                <TileFace :kind="tile.kind" />
-              </button>
-            </div>
-            <div class="my-actions">
-              <el-button v-if="canSelfWin" type="primary" size="default" round @click="declareSelfWin">
-                {{ $t('games.mahjong.selfWin') }}
-              </el-button>
-              <template v-if="claimPrompt">
-                <el-button type="primary" size="default" round @click="answerClaim(true)">
-                  {{ claimPrompt === 'win' ? $t('games.mahjong.claimWin') : $t('games.mahjong.pong') }}
+
+            <!-- 我方(下):副露 + 弃牌河 + 立牌手牌 + 操作 -->
+            <div class="mj-area mj-bottom" :class="{ active: myTurn }">
+              <div v-if="!play.isSpectator" class="mj-bottom-inner">
+                <div class="my-river">
+                  <span v-for="(kind, i) in myRiver" :key="i" class="tile mini" :class="tileClass(kind)">
+                    <TileFace :kind="kind" />
+                  </span>
+                </div>
+                <div v-if="myMelds.length" class="melds-row my-melds">
+                  <span v-for="(m, i) in myMelds" :key="'mm' + i" class="meld-group">
+                    <template v-if="meldView(m).dark"
+                      ><span v-for="n in 4" :key="'d' + n" class="tile mini back" aria-hidden="true"
+                    /></template>
+                    <template v-else
+                      ><span v-for="(kind, j) in meldView(m).kinds" :key="j" class="tile mini" :class="tileClass(kind)"
+                        ><TileFace :kind="kind" /></span
+                    ></template>
+                  </span>
+                </div>
+              </div>
+              <div class="hand-row">
+                <button
+                  v-for="tile in myHandView"
+                  :key="tile.id"
+                  type="button"
+                  class="tile hand"
+                  :class="[tileClass(tile.kind), { drawn: tile.justDrawn, dim: phase !== 'playing' }]"
+                  :disabled="!canDiscardNow"
+                  :title="tileLabel(tile.kind)"
+                  :aria-label="tileLabel(tile.kind)"
+                  @click="onTileClick(tile)"
+                >
+                  <TileFace :kind="tile.kind" />
+                </button>
+                <template v-if="!play.isSpectator">
+                  <span v-for="n in handBackFill" :key="'ph' + n" class="tile back hand" aria-hidden="true" />
+                </template>
+              </div>
+              <div v-if="!play.isSpectator" class="my-actions">
+                <el-button v-if="canSelfWin" type="primary" size="default" round @click="declareSelfWin">
+                  {{ $t('games.mahjong.selfWin') }}
                 </el-button>
-                <el-button size="default" round @click="answerClaim(false)">{{ $t('games.mahjong.pass') }}</el-button>
-              </template>
-              <span class="my-hint">{{ actionHint }}</span>
-            </div>
-            <!-- 听牌提示:摸牌后建议打哪张、弃后听哪几张;听牌时显示当前听口 -->
-            <div v-if="advice" class="advice-row">
-              <template v-if="advice.discard != null">
-                <span class="advice-label">{{ $t('games.mahjong.adviceDiscard') }}</span>
-                <span class="tile mini" :class="tileClass(advice.discard)"><TileFace :kind="advice.discard" /></span>
-              </template>
-              <span class="advice-label">{{ $t('games.mahjong.listening') }}</span>
-              <span v-for="k in advice.wins" :key="k" class="tile mini" :class="tileClass(k)"><TileFace :kind="k" /></span>
+                <el-button
+                  v-for="opt in myGangOptions"
+                  :key="opt.kind + '-' + opt.type"
+                  type="warning"
+                  size="default"
+                  round
+                  @click="declareSelfGang(opt)"
+                >
+                  {{ $t(opt.type === 'angang' ? 'games.mahjong.anGang' : 'games.mahjong.buGang') }}
+                </el-button>
+                <template v-if="claimPrompt">
+                  <el-button type="primary" size="default" round @click="answerClaim(true)">
+                    {{
+                      claimPrompt === 'win'
+                        ? $t('games.mahjong.claimWin')
+                        : claimPrompt === 'gang'
+                          ? $t('games.mahjong.mingGang')
+                          : claimPrompt === 'chi'
+                            ? $t('games.mahjong.chi')
+                            : $t('games.mahjong.pong')
+                    }}
+                  </el-button>
+                  <el-button
+                    v-for="(pair, i) in activeChiOptions"
+                    :key="'chi' + i"
+                    type="primary"
+                    size="default"
+                    round
+                    @click="answerClaim(true, pair)"
+                  >
+                    {{ $t('games.mahjong.chi') }}
+                    <span class="tile mini" :class="tileClass(pair[0])"><TileFace :kind="pair[0]" /></span>
+                    <span class="tile mini" :class="tileClass(pair[1])"><TileFace :kind="pair[1]" /></span>
+                  </el-button>
+                  <el-button size="default" round @click="answerClaim(false)">{{ $t('games.mahjong.pass') }}</el-button>
+                </template>
+                <span class="my-hint">{{ actionHint }}</span>
+              </div>
+              <!-- 听牌提示:摸牌后建议打哪张、弃后听哪几张;听牌时显示当前听口 -->
+              <div v-if="advice" class="advice-row">
+                <template v-if="advice.discard != null">
+                  <span class="advice-label">{{ $t('games.mahjong.adviceDiscard') }}</span>
+                  <span class="tile mini" :class="tileClass(advice.discard)"><TileFace :kind="advice.discard" /></span>
+                </template>
+                <span class="advice-label">{{ $t('games.mahjong.listening') }}</span>
+                <span v-for="k in advice.wins" :key="k" class="tile mini" :class="tileClass(k)"><TileFace :kind="k" /></span>
+              </div>
             </div>
           </div>
         </template>
@@ -173,13 +323,21 @@ import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { isSpectatorRole } from '@/utils/gameRoom'
 import { useChatStore } from '@/stores/chat'
 import {
+  MAHJONG_PAIR_258,
+  MAHJONG_RULE_PRESETS,
+  canMahjongBuGang,
+  canMahjongMingGang,
   canMahjongWin,
   createMahjongWall,
+  mahjongAiChooseChi,
   mahjongAiChooseDiscard,
+  mahjongAnGangKinds,
+  mahjongChiOptions,
   mahjongCounts,
   mahjongHandScore,
   mahjongKind,
   mahjongTenpai,
+  normalizeMahjongRules,
   sortMahjongTiles,
 } from '@/utils/games/mahjong'
 import { mahjongTileSrc } from '@/utils/games/mahjongTiles'
@@ -237,7 +395,7 @@ const turn = ref(0) // 0..3 座次
 const seatList = ref([]) // [{ seat, userId, name, ai }]
 const hands = ref([[], [], [], []]) // 暗手牌实例 id;访客只有自己那格
 const guestHand = ref([]) // 访客收到的本人手牌
-const melds = ref([[], [], [], []]) // 碰出的面子 [{ kind, from }]
+const melds = ref([[], [], [], []]) // 副露面子 [{ kind, from, type: 'pong'|'gang'|'angang'|'chi', pair? }]
 const rivers = ref([[], [], [], []]) // 弃牌 kind
 const wall = ref([])
 const wallCount = ref(0)
@@ -245,14 +403,32 @@ const handCounts = ref([0, 0, 0, 0])
 const lastDiscard = ref(null) // { kind, from }
 const drawnTileId = ref(null)
 const canSelfWin = ref(false)
-const localClaim = ref(null) // 房主/单机本座收到的碰胡询问:'win' | 'pong' | null
-const guestClaim = ref(null) // 访客收到的碰胡询问
+const localClaim = ref(null) // 房主/单机本座收到的询问:'win' | 'pong' | 'chi' | 'gang' | null
+const guestClaim = ref(null) // 访客收到的询问
+const guestChiOptions = ref([]) // 访客收到的吃组合候选
+const guestGangKinds = ref([]) // 访客回合内可杠(来自 mj:hand)
 const busyAi = ref(false)
 const result = ref(null)
 const rewardMsg = ref('')
 const playerWins = ref(0)
 const aiWins = ref(0)
 const rounds = ref(0)
+
+// ---------- 规则(开局可选,随房间广播) ----------
+const rules = ref(normalizeMahjongRules(null))
+const rulesDraft = ref(normalizeMahjongRules(null))
+const rulesPickerOpen = ref(false) // 房间局:房主开牌前先选规则
+const claimChiOptions = ref([]) // 本机收到的吃组合候选
+const selfGangKinds = ref([]) // 本机回合内可杠(暗杠/补杠)[{ kind, type }]
+
+const rulesLabel = computed(() => {
+  const r = rules.value
+  for (const key of Object.keys(MAHJONG_RULE_PRESETS)) {
+    const p = MAHJONG_RULE_PRESETS[key]
+    if (p.allowChi === r.allowChi && p.allowGang === r.allowGang && p.pairConstraint === r.pairConstraint) return key
+  }
+  return 'custom'
+})
 
 let session = 0 // 会话令牌:重开/离开时旧循环自行退出
 const turnWaiters = new Map() // seat -> resolve(action)
@@ -270,6 +446,12 @@ const myHandTiles = computed(() => (isGuest.value ? guestHand.value : hands.valu
 const myMelds = computed(() => melds.value[mySeat.value] || [])
 const myRiver = computed(() => rivers.value[mySeat.value] || [])
 const claimPrompt = computed(() => guestClaim.value || localClaim.value)
+// 吃询问时给本机的组合候选(访客来自信令,房主/单机来自询问下发)
+const activeChiOptions = computed(() =>
+  claimPrompt.value === 'chi' ? (isGuest.value ? guestChiOptions.value : claimChiOptions.value) : [],
+)
+// 本机回合内可杠(暗杠/补杠):房主/单机在摸牌后由主循环写;访客在 mj:hand 里收 canGangKinds
+const myGangOptions = computed(() => (isGuest.value ? guestGangKinds.value : selfGangKinds.value))
 const waitingHost = computed(() => isGuest.value && phase.value === 'playing' && !result.value && handCounts.value.every((n) => !n))
 const wallLeft = computed(() => (isGuest.value ? wallCount.value : wall.value.length))
 const seatTileCount = (seat) => (isGuest.value ? handCounts.value[seat] || 0 : hands.value[seat]?.length || 0)
@@ -289,10 +471,42 @@ const seatName = (seat) => {
   const ordinal = aiSeats.indexOf(seat)
   return t(`games.mahjong.ai${Math.min(ordinal + 1, 3)}`)
 }
-const opponents = computed(() => seatList.value.filter((s) => s.seat !== mySeat.value))
 const myHandView = computed(() =>
   sortMahjongTiles(myHandTiles.value).map((id) => ({ id, kind: mahjongKind(id), justDrawn: id === drawnTileId.value })),
 )
+
+// ---------- 方位式牌桌:以本机座位为基准,1=下家(右) 2=对家(上) 3=上家(左);观战固定 0 号视角 ----------
+const viewSeat = computed(() => (mySeat.value >= 0 ? mySeat.value : 0))
+const relPos = (seat) => (seat - viewSeat.value + 4) % 4
+const topSeat = computed(() => seatList.value.find((s) => relPos(s.seat) === 2))
+const leftSeat = computed(() => seatList.value.find((s) => relPos(s.seat) === 3))
+const rightSeat = computed(() => seatList.value.find((s) => relPos(s.seat) === 1))
+const handBackFill = computed(() => (play.isSpectator ? 0 : Math.max(0, 13 - myHandTiles.value.length)))
+
+/** 副露面子的渲染视图:暗杠整排牌背,吃按顺子序,明杠/补杠四张 */
+const meldView = (m) => {
+  const type = m.type || 'pong'
+  if (type === 'chi') return { dark: false, kinds: [m.pair[0], m.kind, m.pair[1]].sort((a, b) => a - b) }
+  if (type === 'angang') return { dark: true, kinds: [] }
+  if (type === 'gang' || type === 'bugang') return { dark: false, kinds: [m.kind, m.kind, m.kind, m.kind] }
+  return { dark: false, kinds: [m.kind, m.kind, m.kind] }
+}
+
+// 规则草稿的显示名与二五八将开关(封面与开局浮层共用)
+const rulesDraftLabel = computed(() => {
+  const r = normalizeMahjongRules(rulesDraft.value)
+  for (const key of Object.keys(MAHJONG_RULE_PRESETS)) {
+    const p = MAHJONG_RULE_PRESETS[key]
+    if (p.allowChi === r.allowChi && p.allowGang === r.allowGang && p.pairConstraint === r.pairConstraint) return key
+  }
+  return 'custom'
+})
+const pair258Draft = computed({
+  get: () => normalizeMahjongRules(rulesDraft.value).pairConstraint === MAHJONG_PAIR_258,
+  set: (v) => {
+    rulesDraft.value = normalizeMahjongRules({ ...normalizeMahjongRules(rulesDraft.value), pairConstraint: v ? MAHJONG_PAIR_258 : 'any' })
+  },
+})
 
 const turnLabel = computed(() => {
   if (phase.value !== 'playing') return ''
@@ -307,6 +521,8 @@ const actionHint = computed(() => {
   if (canSelfWin.value) return t('games.mahjong.selfWinHint')
   if (claimPrompt.value === 'win') return t('games.mahjong.claimHint')
   if (claimPrompt.value === 'pong') return t('games.mahjong.pongHint')
+  if (claimPrompt.value === 'chi') return t('games.mahjong.chiHint')
+  if (claimPrompt.value === 'gang') return t('games.mahjong.gangHint')
   if (myTurn.value) return t('games.mahjong.discardHint')
   if (turn.value === mySeat.value) return ''
   return t('games.mahjong.waitOthers')
@@ -328,13 +544,13 @@ const advice = computed(() => {
       if (!counts[k]) continue
       const trial = [...counts]
       trial[k] -= 1
-      const wins = mahjongTenpai(trial, open)
+      const wins = mahjongTenpai(trial, open, rules.value)
       if (!best || wins.length > best.wins.length) best = { discard: k, wins }
     }
     return best
   }
   if (hand.length === 13 - open * 3) {
-    return { discard: null, wins: mahjongTenpai(counts, open) }
+    return { discard: null, wins: mahjongTenpai(counts, open, rules.value) }
   }
   return null
 })
@@ -399,18 +615,50 @@ function drawOne() {
 }
 
 function canSeatWin(seat) {
-  return canMahjongWin(mahjongCounts(hands.value[seat]), melds.value[seat]?.length || 0)
+  return canMahjongWin(mahjongCounts(hands.value[seat]), melds.value[seat]?.length || 0, rules.value)
 }
 
 function canSeatClaimWin(seat, kind) {
   const c = mahjongCounts(hands.value[seat])
   if (c[kind] >= 4) return false
   c[kind] += 1
-  return canMahjongWin(c, melds.value[seat]?.length || 0)
+  return canMahjongWin(c, melds.value[seat]?.length || 0, rules.value)
 }
 
 function canSeatPong(seat, kind) {
   return mahjongCounts(hands.value[seat])[kind] >= 2 && (melds.value[seat]?.length || 0) < 3
+}
+
+/** 吃:仅上家可吃,规则开关 + 手里能凑出顺子组合 */
+function canSeatChi(seat, kind) {
+  if (!rules.value.allowChi) return []
+  if (seat !== (lastDiscardSeat() + 3) % 4) return []
+  if ((melds.value[seat]?.length || 0) >= 3) return []
+  return mahjongChiOptions(mahjongCounts(hands.value[seat]), kind)
+}
+
+/** 上家(刚弃牌那位的上一位)座次 */
+function lastDiscardSeat() {
+  return lastDiscard.value?.from ?? -1
+}
+
+/** 明杠:规则开关 + 暗手有三张同牌 + 面子数未满 */
+function canSeatMingGang(seat, kind) {
+  if (!rules.value.allowGang) return false
+  if ((melds.value[seat]?.length || 0) >= 4) return false
+  return canMahjongMingGang(mahjongCounts(hands.value[seat]), kind)
+}
+
+/** 本回合内可杠(暗杠 / 补杠):摸牌后自杠用 */
+function seatGangOptions(seat) {
+  if (!rules.value.allowGang) return []
+  const counts = mahjongCounts(hands.value[seat])
+  const out = []
+  for (const k of mahjongAnGangKinds(counts)) out.push({ kind: k, type: 'angang' })
+  for (const m of melds.value[seat] || []) {
+    if ((m.type || 'pong') === 'pong' && canMahjongBuGang(counts, melds.value[seat], m.kind)) out.push({ kind: m.kind, type: 'bugang' })
+  }
+  return out
 }
 
 /** AI 碰牌倾向:字牌/幺九必碰,数牌中张在已有多对时碰,避免拆掉成顺子 */
@@ -420,6 +668,11 @@ function aiShouldPong(seat, kind) {
   if ((melds.value[seat]?.length || 0) >= 3) return false
   if (kind >= 27 || kind % 9 === 0 || kind % 9 === 8) return true
   return c.filter((n) => n === 2).length >= 2
+}
+
+/** AI 吃牌倾向:吃后潜力不降才吃(mahjongAiChooseChi 已内置比较) */
+function aiChooseChi(seat, kind) {
+  return mahjongAiChooseChi(mahjongCounts(hands.value[seat]), kind)
 }
 
 async function startGame() {
@@ -432,11 +685,15 @@ async function startGame() {
   result.value = null
   guestClaim.value = null
   localClaim.value = null
+  claimChiOptions.value = []
+  selfGangKinds.value = []
+  rulesPickerOpen.value = false
   rewardMsg.value = ''
   lastDiscard.value = null
   drawnTileId.value = null
   canSelfWin.value = false
   busyAi.value = false
+  rules.value = normalizeMahjongRules(rulesDraft.value)
   rivers.value = [[], [], [], []]
   melds.value = [[], [], [], []]
   guestHand.value = []
@@ -454,10 +711,11 @@ async function startGame() {
   runGameLoop(mySession)
 }
 
-/** 主循环:回合制驱动;轮到人时挂起等操作(房间局超时由 AI 代打),碰牌后不摸牌直接出牌 */
+/** 主循环:回合制驱动;轮到人时挂起等操作(房间局超时由 AI 代打),碰/杠/吃后不摸牌直接出牌 */
 async function runGameLoop(mySession) {
   let current = turn.value
   let skipDraw = false
+  let justGangDrawn = false // 明杠/暗杠/补杠已在 apply 里摸了岭上牌,循环里保留 drawn 态
   while (phase.value === 'playing' && mySession === session) {
     const seat = current
     turn.value = seat
@@ -468,11 +726,16 @@ async function runGameLoop(mySession) {
       hands.value[seat] = [...hands.value[seat], id]
       drawnTileId.value = id
       canSelfWin.value = !ai && seat === mySeat.value && canSeatWin(seat)
+      selfGangKinds.value = !ai && seat === mySeat.value ? seatGangOptions(seat) : []
       publishAll()
       if (ai && canSeatWin(seat)) return finishHand(seat, true, mySession)
+    } else if (justGangDrawn) {
+      // 杠后岭上牌已在 apply 时摸好:保留 drawn 与自摸/杠状态,不重复摸
+      justGangDrawn = false
     } else {
       drawnTileId.value = null
       canSelfWin.value = false
+      selfGangKinds.value = []
       publishAll()
     }
     skipDraw = false
@@ -485,7 +748,11 @@ async function runGameLoop(mySession) {
         return
       }
       busyAi.value = false
-      action = { type: 'discard', kind: mahjongAiChooseDiscard(mahjongCounts(hands.value[seat])) }
+      // AI 摸牌后有杠先杠(暗杠/补杠),否则选一张弃
+      const gangOpts = seatGangOptions(seat)
+      action = gangOpts.length
+        ? { type: 'gang', kind: gangOpts[0].kind, gangType: gangOpts[0].type }
+        : { type: 'discard', kind: mahjongAiChooseDiscard(mahjongCounts(hands.value[seat])) }
     } else {
       // 房间局 35s 不出牌由 AI 代打,避免一个人挂机把整桌拖死;单机不限时
       action = await waitSeat(seat, play.active ? 35000 : 0)
@@ -495,6 +762,13 @@ async function runGameLoop(mySession) {
       }
     }
     if (action.type === 'win') return finishHand(seat, true, mySession)
+    if (action.type === 'gang') {
+      applySeatGang(seat, action)
+      publishAll()
+      justGangDrawn = true
+      skipDraw = true
+      continue
+    }
     let kind = action.kind != null ? action.kind : mahjongKind(action.tileId)
     if (kind == null || !hands.value[seat].some((tile) => mahjongKind(tile) === kind)) {
       // 非法/过期操作:兜底让 AI 选一张,避免死循环
@@ -506,10 +780,25 @@ async function runGameLoop(mySession) {
     const claim = await resolveClaims(seat, kind, mySession)
     if (mySession !== session || phase.value !== 'playing') return
     if (claim && claim.win != null) return finishHand(claim.win, false, mySession, kind)
+    if (claim && claim.gang != null) {
+      applyMingGang(claim.gang, seat, kind)
+      publishAll()
+      current = claim.gang
+      justGangDrawn = true
+      skipDraw = true
+      continue
+    }
     if (claim && claim.pong != null) {
       applyPong(claim.pong, seat, kind)
       publishAll()
       current = claim.pong
+      skipDraw = true
+      continue
+    }
+    if (claim && claim.chi != null) {
+      applyChi(claim.chi.seat, seat, kind, claim.chi.pair)
+      publishAll()
+      current = claim.chi.seat
       skipDraw = true
       continue
     }
@@ -573,19 +862,84 @@ function applyPong(seat, fromSeat, kind) {
   turn.value = seat
 }
 
-/** 碰胡询问:胡优先于碰;本机玩家用按钮,远端玩家发定向信令;到点没人应即继续 */
+/** 吃:暗手两张 + 弃牌组成顺子(仅上家),不摸牌直接出牌 */
+function applyChi(seat, fromSeat, kind, pair) {
+  const ids = hands.value[seat].filter((id) => pair.includes(mahjongKind(id))).slice(0, 2)
+  if (ids.length < 2) return
+  hands.value[seat] = hands.value[seat].filter((id) => !ids.includes(id))
+  melds.value[seat] = [...melds.value[seat], { kind, from: fromSeat, type: 'chi', pair: [...pair] }]
+  rivers.value[fromSeat] = rivers.value[fromSeat].slice(0, -1)
+  lastDiscard.value = null
+  drawnTileId.value = null
+  canSelfWin.value = false
+  handCounts.value = hands.value.map((h) => h.length)
+  turn.value = seat
+}
+
+/** 明杠(别家点杠):暗手三张 + 弃牌入副露,摸岭上牌补位 */
+function applyMingGang(seat, fromSeat, kind) {
+  const ids = hands.value[seat].filter((id) => mahjongKind(id) === kind).slice(0, 3)
+  if (ids.length < 3) return
+  hands.value[seat] = hands.value[seat].filter((id) => !ids.includes(id))
+  melds.value[seat] = [...melds.value[seat], { kind, from: fromSeat, type: 'gang' }]
+  rivers.value[fromSeat] = rivers.value[fromSeat].slice(0, -1)
+  lastDiscard.value = null
+  drawnTileId.value = null
+  canSelfWin.value = false
+  drawRinshan(seat)
+}
+
+/** 自己回合内的杠(暗杠:四张全亮;补杠:碰出后再摸到一张),摸岭上牌补位 */
+function applySeatGang(seat, { kind, type }) {
+  if (type === 'bugang') {
+    const ids = hands.value[seat].filter((id) => mahjongKind(id) === kind).slice(0, 1)
+    if (!ids.length) return
+    hands.value[seat] = hands.value[seat].filter((id) => !ids.includes(id))
+    melds.value[seat] = (melds.value[seat] || []).map((m) =>
+      m.kind === kind && (m.type || 'pong') === 'pong' ? { ...m, type: 'gang' } : m,
+    )
+  } else {
+    const ids = hands.value[seat].filter((id) => mahjongKind(id) === kind).slice(0, 4)
+    if (ids.length < 4) return
+    hands.value[seat] = hands.value[seat].filter((id) => !ids.includes(id))
+    melds.value[seat] = [...melds.value[seat], { kind, from: seat, type: 'angang' }]
+  }
+  drawRinshan(seat)
+}
+
+/** 岭上牌:杠后从牌墙尾摸一张补位,并重算自摸与可杠 */
+function drawRinshan(seat) {
+  const id = drawOne()
+  if (id != null) {
+    hands.value[seat] = [...hands.value[seat], id]
+    drawnTileId.value = id
+  }
+  const ai = !!seatList.value.find((s) => s.seat === seat)?.ai
+  canSelfWin.value = !ai && seat === mySeat.value && canSeatWin(seat)
+  selfGangKinds.value = !ai && seat === mySeat.value && id != null ? seatGangOptions(seat) : []
+  handCounts.value = hands.value.map((h) => h.length)
+}
+
+/** 碰/杠/吃/胡询问:胡 > 杠 > 碰 > 吃;本机玩家用按钮,远端玩家发定向信令;到点没人应即继续 */
 function resolveClaims(fromSeat, kind, mySession) {
   return new Promise((resolve) => {
     const order = [1, 2, 3].map((i) => (fromSeat + i) % 4)
     const winSeats = order.filter((seat) => canSeatClaimWin(seat, kind))
-    const pongSeats = order.filter((seat) => !winSeats.includes(seat) && canSeatPong(seat, kind))
+    const gangSeats = order.filter((seat) => !winSeats.includes(seat) && canSeatMingGang(seat, kind))
+    const pongSeats = order.filter((seat) => !winSeats.includes(seat) && !gangSeats.includes(seat) && canSeatPong(seat, kind))
+    // 吃只有上家((fromSeat+3)%4)能吃
+    const chiSeat = order[2]
+    const chiOptions = chiSeat != null && !winSeats.includes(chiSeat) && !gangSeats.includes(chiSeat) ? canSeatChi(chiSeat, kind) : []
     const isAiSeat = (seat) => !!seatList.value.find((s) => s.seat === seat)?.ai
     const humanWin = winSeats.filter((seat) => !isAiSeat(seat))
     const aiWin = winSeats.find(isAiSeat)
+    const humanGang = gangSeats.filter((seat) => !isAiSeat(seat))
+    const aiGang = gangSeats.find(isAiSeat)
     const humanPong = pongSeats.filter((seat) => !isAiSeat(seat))
     const aiPong = pongSeats.find((seat) => isAiSeat(seat) && aiShouldPong(seat, kind))
+    const aiChiPair = !isAiSeat(chiSeat) || !chiOptions.length ? null : aiChooseChi(chiSeat, kind)
 
-    const ask = (seats, claimKind, timeoutMs) => {
+    const ask = (seats, claimKind, timeoutMs, options = null) => {
       if (!seats.length) return Promise.resolve(null)
       return new Promise((done) => {
         let settled = false
@@ -597,17 +951,18 @@ function resolveClaims(fromSeat, kind, mySession) {
             claimWaiters.delete(seat)
             if (seat === mySeat.value) {
               localClaim.value = null
+              claimChiOptions.value = []
               continue
             }
             const st = seatList.value.find((s) => s.seat === seat)
             if (st && !st.ai) play.send('mj:claim', { to: st.userId, seat, kind: null })
           }
         }
-        const finish = (seat) => {
+        const finish = (seat, extra = null) => {
           if (settled) return
           settled = true
           cleanup()
-          done(seat)
+          done({ seat, extra })
         }
         // 所有被问的人都选了「过」就不用干等到超时
         const declined = (seat) => {
@@ -618,11 +973,13 @@ function resolveClaims(fromSeat, kind, mySession) {
         for (const seat of seats) {
           if (seat === mySeat.value) {
             localClaim.value = claimKind
-            claimWaiters.set(seat, (ans) => {
-              if (ans === 'claim') finish(seat)
+            claimChiOptions.value = options || []
+            claimWaiters.set(seat, (ans, extra) => {
+              if (ans === 'claim') finish(seat, extra)
               else {
                 claimWaiters.delete(seat)
                 localClaim.value = null
+                claimChiOptions.value = []
                 declined(seat)
               }
             })
@@ -632,14 +989,14 @@ function resolveClaims(fromSeat, kind, mySession) {
               pending.delete(seat)
               continue
             }
-            claimWaiters.set(seat, (ans) => {
-              if (ans === 'claim') finish(seat)
+            claimWaiters.set(seat, (ans, extra) => {
+              if (ans === 'claim') finish(seat, extra)
               else {
                 claimWaiters.delete(seat)
                 declined(seat)
               }
             })
-            play.send('mj:claim', { to: st.userId, seat, kind: claimKind })
+            play.send('mj:claim', { to: st.userId, seat, kind: claimKind, options })
           }
         }
         if (!pending.size) finish(null)
@@ -651,25 +1008,37 @@ function resolveClaims(fromSeat, kind, mySession) {
       if (humanWin.length) {
         const hit = await ask(humanWin, 'win', 8000)
         if (mySession !== session) return resolve(null)
-        if (hit != null) return resolve({ win: hit })
+        if (hit && hit.seat != null) return resolve({ win: hit.seat })
       }
       if (aiWin != null) return resolve({ win: aiWin })
+      if (humanGang.length) {
+        const hit = await ask(humanGang, 'gang', 6000)
+        if (mySession !== session) return resolve(null)
+        if (hit && hit.seat != null) return resolve({ gang: hit.seat })
+      }
+      if (aiGang != null) return resolve({ gang: aiGang })
       if (humanPong.length) {
         const hit = await ask(humanPong, 'pong', 6000)
         if (mySession !== session) return resolve(null)
-        if (hit != null) return resolve({ pong: hit })
+        if (hit && hit.seat != null) return resolve({ pong: hit.seat })
       }
       if (aiPong != null) return resolve({ pong: aiPong })
+      if (chiOptions.length && aiChiPair != null && isAiSeat(chiSeat)) return resolve({ chi: { seat: chiSeat, pair: aiChiPair } })
+      if (chiOptions.length && !isAiSeat(chiSeat)) {
+        const hit = await ask([chiSeat], 'chi', 6000, chiOptions)
+        if (mySession !== session) return resolve(null)
+        if (hit && hit.seat != null && hit.extra) return resolve({ chi: { seat: chiSeat, pair: hit.extra } })
+      }
       resolve(null)
     })()
   })
 }
 
-function resolveClaim(seat, answer) {
+function resolveClaim(seat, answer, extra = null) {
   const done = claimWaiters.get(seat)
   if (!done) return false
   claimWaiters.delete(seat)
-  done(answer)
+  done(answer, extra)
   return true
 }
 
@@ -681,7 +1050,7 @@ function handleGuestAction(data) {
   if (!st || st.ai || String(st.userId) !== String(data.from)) return
   const action = data.action || {}
   if (claimWaiters.has(seat)) {
-    resolveClaim(seat, action.type === 'win' || action.type === 'pong' ? 'claim' : 'pass')
+    resolveClaim(seat, action.type === 'pass' ? 'pass' : 'claim', action.chi || null)
     return
   }
   resolveSeatAction(seat, action)
@@ -707,15 +1076,24 @@ function declareSelfWin() {
   else resolveSeatAction(mySeat.value, { type: 'win' })
 }
 
-function answerClaim(take) {
+/** 本机回合内杠(暗杠/补杠):访客发意图,房主/单机直接进主循环 */
+function declareSelfGang(opt) {
+  if (!myTurn.value || !opt) return
+  if (isGuest.value) sendToHost({ type: 'gang', kind: opt.kind, gangType: opt.type })
+  else resolveSeatAction(mySeat.value, { type: 'gang', kind: opt.kind, gangType: opt.type })
+}
+
+/** 应答碰/杠/吃/胡询问:take=true 吃时 extra 为选中的两张组合 */
+function answerClaim(take, extra = null) {
   if (!claimPrompt.value) return
-  const kind = claimPrompt.value === 'win' ? 'win' : 'pong'
+  const kind = claimPrompt.value
   if (isGuest.value) {
     guestClaim.value = null
-    sendToHost({ type: take ? kind : 'pass' })
+    guestChiOptions.value = []
+    sendToHost({ type: take ? kind : 'pass', chi: extra })
     return
   }
-  resolveClaim(mySeat.value, take ? 'claim' : 'pass')
+  resolveClaim(mySeat.value, take ? 'claim' : 'pass', take && kind === 'chi' ? extra : null)
 }
 
 // ---------- 房间同步 ----------
@@ -725,6 +1103,7 @@ function publicSnapshot() {
     seats: seatList.value,
     phase: phase.value,
     turn: turn.value,
+    rules: rules.value,
     wallCount: wall.value.length,
     handCounts: hands.value.map((h) => h.length),
     rivers: rivers.value,
@@ -749,6 +1128,7 @@ function publishAll() {
       tiles: hands.value[s.seat],
       drawnId: mine ? drawnTileId.value : null,
       canWin: mine && canSeatWin(s.seat),
+      canGangKinds: mine ? seatGangOptions(s.seat) : [],
       myTurn: mine,
     })
   }
@@ -759,6 +1139,7 @@ function applyPublic(state) {
   if (Array.isArray(state.seats) && state.seats.length === 4) seatList.value = state.seats
   phase.value = state.phase === 'ended' ? 'ended' : state.phase === 'playing' ? 'playing' : phase.value
   turn.value = Number(state.turn) || 0
+  if (state.rules) rules.value = normalizeMahjongRules(state.rules)
   wallCount.value = Math.max(0, Number(state.wallCount) || 0)
   if (Array.isArray(state.handCounts) && state.handCounts.length === 4) {
     handCounts.value = state.handCounts.map((n) => Math.max(0, Number(n) || 0))
@@ -789,12 +1170,14 @@ function onRoomSignal(data) {
     guestHand.value = Array.isArray(data.tiles) ? data.tiles : []
     drawnTileId.value = data.drawnId == null ? null : Number(data.drawnId)
     canSelfWin.value = !!data.canWin
+    guestGangKinds.value = Array.isArray(data.canGangKinds) ? data.canGangKinds : []
     return
   }
   if (data.event === 'mj:claim' && isGuest.value) {
     if (!fromHost) return
     if (Number(data.seat) !== mySeat.value) return
     guestClaim.value = data.kind || null
+    guestChiOptions.value = Array.isArray(data.options) ? data.options : []
     return
   }
   if (data.event === 'mj:act' && play.isHost) {
@@ -827,14 +1210,14 @@ function onRoomChange(next) {
   if (changed) publishAll()
 }
 
-/** 房间状态:开赛后房主自动开牌,访客进入等待并主动要一次全量同步 */
+/** 房间状态:开赛后房主先选规则再开牌,访客进入等待并主动要一次全量同步 */
 watch(
   () => [play.active, play.status, play.isHost],
   () => {
     if (!play.active) return
     if (play.status !== 'PLAYING' || phase.value !== 'idle') return
     if (play.isHost) {
-      startGame()
+      if (!rulesPickerOpen.value) rulesPickerOpen.value = true
       return
     }
     seatList.value = buildRoomSeats()
@@ -1001,7 +1384,8 @@ onBeforeUnmount(() => {
   padding: 60px 0;
 }
 
-/* 牌面:开源 SVG 贴进白底牌身;白板留白,资源缺失时退回「数字 + 花色」文本 */
+/* 牌面:开源 SVG 贴进白底牌身;白板留白,资源缺失时退回「数字 + 花色」文本。
+   立体感 = 底边厚度侧影(0 3px 0 实体边)+ 落影,顶面保留高光内阴影 */
 .tile {
   display: inline-flex;
   align-items: center;
@@ -1009,11 +1393,12 @@ onBeforeUnmount(() => {
   width: 44px;
   height: 60px;
   border-radius: 6px;
-  background: #f8f6ef;
+  background: linear-gradient(180deg, #fdfcf7 0%, #f1eddf 88%, #ddd6c2 100%);
   border: 1px solid rgba(0, 0, 0, 0.18);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    0 1px 2px rgba(0, 0, 0, 0.14);
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 3px 0 #c9c1ab,
+    0 4px 5px rgba(0, 0, 0, 0.22);
   color: #1b2b33;
   cursor: pointer;
   transition:
@@ -1060,7 +1445,7 @@ onBeforeUnmount(() => {
   color: #2471a3;
 }
 
-/* 小牌(河里/碰出的面子) */
+/* 小牌(河里/副露) */
 .tile.mini {
   width: 30px;
   height: 42px;
@@ -1076,47 +1461,144 @@ onBeforeUnmount(() => {
   font-size: 12px;
 }
 
-/* 对手区 */
-.opponents {
+/* 牌背:深色底 + 中央回形纹(纯 CSS,不引素材);叠放省空间 */
+.tile.back {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.16) 0 8%, transparent 9%),
+    linear-gradient(160deg, #2e6e5e 0%, #245a4e 60%, #1d4a40 100%);
+  border-color: rgba(0, 0, 0, 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 0 3px rgba(255, 255, 255, 0.1),
+    0 2px 0 #143530,
+    0 3px 4px rgba(0, 0, 0, 0.3);
+  cursor: default;
+}
+
+/* ===== 方位式牌桌:对家在上 / 上家在左 / 下家在右 / 我在下,中央信息 ===== */
+.mj-table {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  grid-template-areas:
+    '. top .'
+    'left center right'
+    '. bottom .';
+  grid-template-columns: auto 1fr auto;
+  grid-template-rows: auto 1fr auto;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 18px;
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(255, 255, 255, 0.14) 0%, transparent 62%),
+    linear-gradient(155deg, var(--mj-felt-a) 0%, var(--mj-felt-b) 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.08),
+    inset 0 0 40px rgba(0, 0, 0, 0.25);
+  --mj-felt-a: #3f7d5c;
+  --mj-felt-b: #2c5f45;
 }
-.opponent {
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 8px 10px;
+html.dark .mj-table {
+  --mj-felt-a: #294f3f;
+  --mj-felt-b: #1c3a2e;
+}
+.mj-area {
   min-width: 0;
-  opacity: 0.75;
+  min-height: 0;
+  border-radius: 12px;
+  padding: 6px 8px;
+  opacity: 0.82;
   transition:
-    border-color 0.16s ease,
-    opacity 0.16s ease;
+    opacity 0.16s ease,
+    box-shadow 0.16s ease;
 }
-.opponent.active {
+.mj-area.active {
   opacity: 1;
-  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 2px rgba(var(--color-brand-rgb), 0.75);
 }
-.opponent-head {
+.mj-top {
+  grid-area: top;
+}
+.mj-left {
+  grid-area: left;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: 96px;
+}
+.mj-right {
+  grid-area: right;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: 96px;
+}
+.mj-bottom {
+  grid-area: bottom;
+}
+.mj-seat-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
 }
-.opponent-name {
+.mj-seat-name {
   font-size: 13px;
   font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  white-space: nowrap;
 }
-.opponent-count {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  font-variant-numeric: tabular-nums;
+html:not(.dark) .mj-seat-name {
+  color: rgba(255, 255, 255, 0.96);
 }
-.opponent-river {
+/* 对家手牌:横排牌背重叠 */
+.mj-backs {
+  display: inline-flex;
+  min-width: 0;
+  overflow: hidden;
+  max-width: 320px;
+}
+.mj-backs .tile.back {
+  width: 22px;
+  height: 30px;
+  margin-left: -14px;
+  border-radius: 4px;
+}
+.mj-backs .tile.back:first-child {
+  margin-left: 0;
+}
+/* 左右家手牌:竖排牌背重叠 */
+.mj-backs-col {
+  display: inline-flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: 190px;
+}
+.mj-backs-col .tile.back {
+  width: 30px;
+  height: 22px;
+  margin-top: -14px;
+  border-radius: 4px;
+}
+.mj-backs-col .tile.back:first-child {
+  margin-top: 0;
+}
+/* 弃牌河:对家横排、左右家竖排 */
+.mj-river {
   display: flex;
   flex-wrap: wrap;
   gap: 3px;
   margin-top: 6px;
   min-height: 44px;
+  max-width: 420px;
+}
+.mj-river-col,
+.melds-col {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-content: flex-start;
+  max-height: 170px;
 }
 .melds-row {
   display: flex;
@@ -1129,61 +1611,82 @@ onBeforeUnmount(() => {
   gap: 1px;
   padding: 1px;
   border-radius: 5px;
-  background: rgba(var(--color-brand-rgb), 0.12);
+  background: rgba(255, 255, 255, 0.22);
+}
+html.dark .meld-group {
+  background: rgba(0, 0, 0, 0.28);
 }
 .my-melds {
   justify-content: center;
   margin: 0 0 6px;
 }
 
-/* 中央 */
-.table-center {
+/* 中央:牌墙/规则/轮次/最近弃牌 */
+.mj-center {
+  grid-area: center;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 14px;
-  padding: 12px 0;
+  gap: 8px;
+  min-width: 140px;
 }
-.wall-count,
+.wall-count {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  font-variant-numeric: tabular-nums;
+}
+.rules-chip {
+  font-size: 12px;
+  padding: 2px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.92);
+}
+html.dark .rules-chip {
+  background: rgba(0, 0, 0, 0.3);
+}
 .turn-label {
   font-size: 13px;
-  color: var(--color-text-secondary);
-}
-.turn-label {
   font-weight: 600;
-  color: var(--color-text);
+  color: rgba(255, 255, 255, 0.96);
+  text-align: center;
 }
 .last-discard {
   cursor: default;
 }
 
-/* 自己这边 */
-.my-side {
-  margin-top: auto;
-  border-top: 1px dashed var(--color-border);
-  padding-top: 10px;
+/* 我方区域 */
+.mj-bottom-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 }
 .my-river {
   display: flex;
   flex-wrap: wrap;
   gap: 3px;
   min-height: 44px;
-  margin-bottom: 8px;
+  justify-content: center;
+  max-width: 480px;
 }
 .hand-row {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   justify-content: center;
+  align-items: flex-end;
 }
 .tile.hand.drawn {
-  transform: translateY(-6px);
+  transform: translateY(-8px);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    0 4px 10px rgba(var(--color-brand-rgb), 0.45);
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 3px 0 #c9c1ab,
+    0 8px 12px rgba(var(--color-brand-rgb), 0.5);
 }
 .tile.hand:not(:disabled):hover {
-  transform: translateY(-4px);
+  transform: translateY(-5px);
 }
 .tile.hand.dim {
   opacity: 0.6;
@@ -1201,6 +1704,87 @@ onBeforeUnmount(() => {
   font-size: 12px;
   color: var(--color-text-secondary);
 }
+/* 吃按钮里内嵌的两张候选小牌 */
+.my-actions .tile.mini {
+  width: 22px;
+  height: 30px;
+  margin-left: 4px;
+  box-shadow: none;
+  border-radius: 4px;
+}
+
+/* ===== 开局规则面板(封面内联 + 房间局浮层) ===== */
+.rules-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  min-width: 300px;
+}
+.rules-panel-float {
+  background: var(--color-bg);
+  box-shadow: var(--shadow-hover);
+}
+.rules-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+.rules-presets {
+  display: flex;
+  gap: 8px;
+}
+.rules-preset {
+  padding: 7px 18px;
+  border: 1.5px solid var(--color-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.rules-preset.active {
+  border-color: var(--color-brand);
+  background: rgba(var(--color-brand-rgb), 0.1);
+  color: var(--color-brand);
+  font-weight: 600;
+}
+.rules-switches {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.rules-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.rules-switch input {
+  accent-color: var(--color-brand);
+  width: 15px;
+  height: 15px;
+}
+.rules-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--overlay-scrim);
+  backdrop-filter: var(--overlay-blur);
+  border-radius: inherit;
+  z-index: 5;
+}
+
 /* 听牌提示行:小牌列表 + 文案 */
 .advice-row {
   display: flex;
@@ -1281,14 +1865,45 @@ onBeforeUnmount(() => {
     font-size: 18px;
   }
   .tile.mini {
-    width: 26px;
-    height: 36px;
+    width: 24px;
+    height: 34px;
   }
   .mahjong-card {
-    padding: 12px;
+    padding: 10px;
   }
-  .opponents {
-    gap: 6px;
+  .mj-table {
+    gap: 5px;
+    padding: 8px;
+  }
+  .mj-left,
+  .mj-right {
+    max-width: 66px;
+    padding: 4px;
+  }
+  .mj-backs-col .tile.back {
+    width: 24px;
+    height: 18px;
+    margin-top: -11px;
+  }
+  .mj-backs .tile.back {
+    width: 18px;
+    height: 25px;
+    margin-left: -11px;
+  }
+  .mj-river-col,
+  .melds-col {
+    max-height: 130px;
+  }
+  .mj-river {
+    max-width: 260px;
+  }
+  .my-river {
+    max-width: 340px;
+    min-height: 36px;
+  }
+  .rules-panel {
+    min-width: 0;
+    width: 100%;
   }
 }
 </style>

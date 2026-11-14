@@ -6,7 +6,14 @@
     <PageToolbar>
       <template v-if="!selectMode">
         <div class="tb-left">
-          <el-input v-model="searchKeyword" :placeholder="$t('music.searchPlaceholder')" clearable size="small" style="width: 200px" data-search-input>
+          <el-input
+            v-model="searchKeyword"
+            :placeholder="$t('music.searchPlaceholder')"
+            clearable
+            size="small"
+            style="width: 200px"
+            data-search-input
+          >
             <template #prefix>
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                 <circle cx="11" cy="11" r="8" />
@@ -27,6 +34,23 @@
             <span class="float-toggle-label">{{ $t('music.floatToggle') }}</span>
             <el-switch v-model="musicFloatOn" size="small" />
           </label>
+          <div v-if="tab !== 'playlist'" class="view-toggle">
+            <button class="vt-btn" :class="{ active: viewMode === 'grid' }" :title="$t('common.viewGrid')" @click="viewMode = 'grid'">
+              <svg viewBox="0 0 16 16" width="14" height="14">
+                <rect x="1.5" y="1.5" width="5" height="5" rx="1" fill="currentColor" />
+                <rect x="9.5" y="1.5" width="5" height="5" rx="1" fill="currentColor" />
+                <rect x="1.5" y="9.5" width="5" height="5" rx="1" fill="currentColor" />
+                <rect x="9.5" y="9.5" width="5" height="5" rx="1" fill="currentColor" />
+              </svg>
+            </button>
+            <button class="vt-btn" :class="{ active: viewMode === 'list' }" :title="$t('common.viewList')" @click="viewMode = 'list'">
+              <svg viewBox="0 0 16 16" width="14" height="14">
+                <rect x="1.5" y="2.5" width="13" height="3" rx="1" fill="currentColor" />
+                <rect x="1.5" y="6.5" width="13" height="3" rx="1" fill="currentColor" />
+                <rect x="1.5" y="10.5" width="13" height="3" rx="1" fill="currentColor" />
+              </svg>
+            </button>
+          </div>
           <el-button v-if="userStore.isLoggedIn && tab !== 'playlist' && filteredTracks.length" @click="enterSelect">{{
             $t('music.select')
           }}</el-button>
@@ -53,6 +77,8 @@
             n: tab === 'all' ? selectedIds.length : selectedAlbums.length,
           })
         }}</span>
+        <el-button v-if="tab === 'all'" @click="selectAllTracks">{{ $t('common.selectAll') }}</el-button>
+        <el-button v-if="tab === 'albums'" @click="selectAllAlbums">{{ $t('common.selectAll') }}</el-button>
         <el-button @click="exitSelect">{{ $t('music.cancelSelect') }}</el-button>
         <el-button
           type="danger"
@@ -67,14 +93,62 @@
       <el-tabs v-model="tab" class="music-tabs" @tab-change="exitSelect">
         <el-tab-pane :label="$t('music.allTracks')" name="all">
           <div v-loading="loading">
-            <div v-if="filteredTracks.length" class="music-grid">
+            <div v-if="filteredTracks.length && viewMode === 'list'" class="resource-list">
+              <div
+                v-a11y-click
+                v-for="t in filteredTracks"
+                :key="t.id"
+                class="rl-row card"
+                :class="{ selected: selectMode && selectedIds.includes(t.id) }"
+                @click="onTrackClick(t)"
+                @pointerdown="pressStart(t)"
+                @pointerup="cancelPress"
+                @pointercancel="cancelPress"
+                @pointerleave="cancelPress"
+                @contextmenu.prevent
+              >
+                <span v-if="selectMode" class="pick-badge" :class="{ on: selectedIds.includes(t.id) }" @click.stop="toggleTrack(t.id)">
+                  <svg viewBox="0 0 16 16" width="11" height="11">
+                    <path
+                      d="M3 8.5 L6.5 12 L13 4.5"
+                      fill="none"
+                      stroke="#fff"
+                      stroke-width="2.4"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </span>
+                <div class="rl-thumb" :style="t.coverUrl ? { backgroundImage: `url(${t.coverUrl})` } : {}">
+                  <span v-if="!t.coverUrl">🎵</span>
+                </div>
+                <div class="rl-main">
+                  <span class="rl-name">{{ t.title }}</span>
+                  <span class="rl-meta">
+                    <template v-if="t.artist">{{ t.artist }}</template
+                    ><template v-if="t.album"> · {{ t.album }}</template
+                    ><template v-if="t.sourceDeviceName"> · {{ t.sourceDeviceName }}</template>
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div v-else-if="filteredTracks.length" class="music-grid">
               <div
                 v-for="t in filteredTracks"
                 :key="t.id"
                 class="music-card card"
                 :class="{ selected: selectMode && selectedIds.includes(t.id) }"
               >
-                <div v-a11y-click class="music-cover" @click="selectMode ? toggleTrack(t.id) : play(t)">
+                <div
+                  v-a11y-click
+                  class="music-cover"
+                  @click="onTrackClick(t)"
+                  @pointerdown="pressStart(t)"
+                  @pointerup="cancelPress"
+                  @pointercancel="cancelPress"
+                  @pointerleave="cancelPress"
+                  @contextmenu.prevent
+                >
                   <img v-if="t.coverUrl" :src="t.coverUrl" class="cover-img" alt="" />
                   <div v-else class="cover-placeholder"><span>🎵</span></div>
                   <div class="play-btn-overlay"><div class="play-btn-circle">▶</div></div>
@@ -143,7 +217,42 @@
 
         <el-tab-pane :label="$t('music.byAlbum')" name="album">
           <div v-loading="loading">
-            <div v-if="albums.length" class="album-grid">
+            <div v-if="albums.length && viewMode === 'list'" class="resource-list">
+              <div
+                v-a11y-click
+                v-for="al in albums"
+                :key="al.album"
+                class="rl-row card"
+                :class="{ selected: selectMode && selectedAlbums.includes(al.album) }"
+                @click="selectMode ? toggleAlbum(al.album) : playAlbum(al)"
+              >
+                <span
+                  v-if="selectMode"
+                  class="pick-badge"
+                  :class="{ on: selectedAlbums.includes(al.album) }"
+                  @click.stop="toggleAlbum(al.album)"
+                >
+                  <svg viewBox="0 0 16 16" width="11" height="11">
+                    <path
+                      d="M3 8.5 L6.5 12 L13 4.5"
+                      fill="none"
+                      stroke="#fff"
+                      stroke-width="2.4"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </span>
+                <div class="rl-thumb" :style="al.coverUrl ? { backgroundImage: `url(${al.coverUrl})` } : {}">
+                  <span v-if="!al.coverUrl">💿</span>
+                </div>
+                <div class="rl-main">
+                  <span class="rl-name">{{ al.album }}</span>
+                  <span class="rl-meta">{{ $t('music.tracksCount', { n: al.count }) }}</span>
+                </div>
+              </div>
+            </div>
+            <div v-else-if="albums.length" class="album-grid">
               <div
                 v-for="al in albums"
                 :key="al.album"
@@ -430,6 +539,8 @@ import { musicApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useSyncStore } from '@/stores/sync'
 import { useFloatsStore } from '@/stores/floats'
+import { usePickSelect } from '@/composables/usePickSelect'
+import { useViewMode } from '@/composables/useViewMode'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MoreFilled, Delete } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
@@ -497,25 +608,40 @@ const sourceOptions = computed(() => {
 })
 const hasMapped = computed(() => tracks.value.some((t) => t.sourceDeviceId))
 
-// 多选模式
-const selectMode = ref(false)
-const selectedIds = ref([])
+// 多选模式:曲目选择集走 usePickSelect(手机长按封面进多选);专辑选择集页面自管
+const {
+  selectMode,
+  selectedIds,
+  toggle: toggleTrack,
+  enter,
+  exit,
+  selectAll,
+  pressStart,
+  cancelPress,
+  swallowClick,
+  dispose,
+} = usePickSelect()
 const selectedAlbums = ref([])
 
 const enterSelect = () => {
-  selectMode.value = true
-  selectedIds.value = []
+  enter()
   selectedAlbums.value = []
 }
 const exitSelect = () => {
-  selectMode.value = false
-  selectedIds.value = []
+  exit()
   selectedAlbums.value = []
 }
-const toggleTrack = (id) => {
-  const i = selectedIds.value.indexOf(id)
-  if (i >= 0) selectedIds.value.splice(i, 1)
-  else selectedIds.value.push(id)
+const onTrackClick = (t) => {
+  // 长按已选中这张:吞掉松手后的 click,避免又开始播放
+  if (swallowClick()) return
+  if (selectMode.value) toggleTrack(t.id)
+  else play(t)
+}
+// 视图模式(网格/列表):本机记忆
+const viewMode = useViewMode('music')
+const selectAllTracks = () => selectAll(filteredTracks.value.map((t) => t.id))
+const selectAllAlbums = () => {
+  selectedAlbums.value = albums.value.map((a) => a.album)
 }
 const toggleAlbum = (album) => {
   const i = selectedAlbums.value.indexOf(album)
@@ -855,6 +981,7 @@ onMounted(() => {
   loadPlaylists()
 })
 onBeforeUnmount(() => {
+  dispose()
   // 离开音乐页时清掉试听会话;浮窗播放器若仍在放,它的会话会在下次 play/pause 时重新接管
   clearMediaSession('music-preview')
 })

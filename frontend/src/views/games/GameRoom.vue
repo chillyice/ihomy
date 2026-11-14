@@ -43,7 +43,8 @@
         <div class="room-members">
           <div v-for="m in room.members" :key="m.userId" class="room-member card" :class="{ host: m.userId === room.hostId }">
             <div class="room-avatar">
-              <el-icon :size="22"><UserFilled /></el-icon>
+              <img v-if="m.avatar" :src="m.avatar" :alt="m.name" />
+              <el-icon v-else :size="22"><UserFilled /></el-icon>
             </div>
             <div class="room-member-main">
               <div class="room-member-name">
@@ -476,6 +477,13 @@ watch(roomId, () => {
   background: rgba(var(--color-brand-rgb), 0.14);
   color: var(--color-accent);
   flex: none;
+  overflow: hidden;
+}
+.room-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 .room-member-main {
   min-width: 0;

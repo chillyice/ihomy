@@ -272,6 +272,7 @@
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { familyApi, fileApi, authApi, circleApi } from '@/api'
+import { invalidateFamilies } from '@/composables/useAudience'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
@@ -413,6 +414,8 @@ const confirmJoinCircle = async () => {
     joinCode.value = ''
     ElMessage.success(t('circle.joined'))
     loadCircles()
+    loadShareDefaults()
+    invalidateFamilies()
   } catch {
     // 请求层已提示(邀请码无效/已过期/圈已满)
   } finally {
@@ -448,6 +451,8 @@ const editAlias = async (c) => {
     await circleApi.setAlias(c.id, (value || '').trim())
     ElMessage.success(t('circle.aliasSaved'))
     loadCircles()
+    loadShareDefaults()
+    invalidateFamilies()
   } catch {
     /* 取消或请求层已提示 */
   }
@@ -463,6 +468,8 @@ const leaveCircle = async (c) => {
     await circleApi.leave(c.id)
     ElMessage.success(t('circle.left'))
     loadCircles()
+    loadShareDefaults()
+    invalidateFamilies()
     loadAudit(1)
   } catch {
     /* 请求层已提示 */
@@ -479,6 +486,8 @@ const disbandCircle = async (c) => {
     await circleApi.disband(c.id)
     ElMessage.success(t('circle.disbanded'))
     loadCircles()
+    loadShareDefaults()
+    invalidateFamilies()
     loadAudit(1)
   } catch {
     /* 请求层已提示 */
@@ -496,6 +505,8 @@ const removeFamily = async (c, f) => {
     await circleApi.removeFamily(c.id, f.familyId)
     ElMessage.success(t('circle.removed'))
     loadCircles()
+    loadShareDefaults()
+    invalidateFamilies()
     loadAudit(1)
   } catch {
     /* 请求层已提示 */
@@ -567,6 +578,7 @@ const saveShareDefaults = async () => {
     const data = await familyApi.saveShareDefaults(shareDefault.selected)
     shareDefault.families = data?.families || []
     shareDefault.selected = (data?.targetFamilyIds || []).map(Number)
+    invalidateFamilies()
     ElMessage.success(t('circle.defaultSaved'))
   } catch {
     // 请求层已提示(例如目标家庭已不在同一亲友圈)

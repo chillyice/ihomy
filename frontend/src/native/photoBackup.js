@@ -109,15 +109,33 @@ export function setExcludedPhotoFolders(list) {
   writeJson(EXCLUDE_KEY, Array.isArray(list) ? list.filter((v) => typeof v === 'string' && v) : [])
 }
 
-/** 读取本机相册目录清单(名称 + 张数),设置页用来勾选「不备份哪些」 */
+/**
+ * 读取本机相册目录清单(名称 + 张数),设置页用来勾选「不备份哪些」。
+ * 未授权时先向用户申请权限;被拒绝或非原生环境抛错(code: permission / native / unavailable),
+ * 调用方按 code 提示,不再静默返回空列表(否则「没读到相册」无法区分原因)。
+ */
 export async function photoBackupFolders() {
-  if (!isNativeApp()) return []
-  try {
-    const res = await Plugin.folders()
-    return (res && res.folders) || []
-  } catch (e) {
-    return []
+  if (!isNativeApp()) {
+    const err = new Error('photo backup is native-only')
+    err.code = 'native'
+    throw err
   }
+  const device = await photoBackupStatus()
+  if (!device) {
+    const err = new Error('photo backup unavailable')
+    err.code = 'unavailable'
+    throw err
+  }
+  if (String(device.permission) !== 'granted') {
+    const asked = await Plugin.requestPermission()
+    if (!asked || String(asked.state) !== 'granted') {
+      const err = new Error('photo permission denied')
+      err.code = 'permission'
+      throw err
+    }
+  }
+  const res = await Plugin.folders()
+  return (res && res.folders) || []
 }
 
 function readJson(key, fallback) {

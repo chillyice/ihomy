@@ -133,6 +133,27 @@ public class PhotoController {
         return Result.success();
     }
 
+    /** 批量移动照片到另一本相册(多选操作条用);每张按上传者或家长守门 */
+    @Operation(summary = "批量移动照片到相册")
+    @OperationLog(module = "PHOTO", operationType = "UPDATE", description = "批量移动照片")
+    @PutMapping("/photo/batch/move")
+    public Result<Integer> batchMove(@RequestBody Map<String, Object> body) {
+        SysUser user = securityHelper.currentUser();
+        if (user == null) throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.UNAUTHORIZED);
+        @SuppressWarnings("unchecked")
+        List<Number> idNums = (List<Number>) body.get("photoIds");
+        Number albumNum = (Number) body.get("albumId");
+        if (idNums == null || idNums.isEmpty() || albumNum == null) {
+            throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.BAD_REQUEST);
+        }
+        if (idNums.size() > 200) {
+            throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.BAD_REQUEST);
+        }
+        List<Long> photoIds = idNums.stream().map(Number::longValue).toList();
+        int moved = albumService.batchMovePhotos(photoIds, albumNum.longValue(), user, securityHelper.isOwner());
+        return Result.success(moved);
+    }
+
     @Operation(summary = "保存网络/Base64 图片到相册(AI 生图落库)")
     @OperationLog(module = "PHOTO", operationType = "CREATE", description = "保存 AI 生图到相册", saveArgs = false)
     @PostMapping("/album/{albumId}/photos/from-url")

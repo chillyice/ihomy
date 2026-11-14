@@ -91,6 +91,13 @@
           {{ $t('library.upload') }}
         </button>
         <template v-if="batchMode">
+          <button class="ghost-btn" @click="selectAllBooks">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M9 11l3 3L22 4" />
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+            </svg>
+            {{ $t('common.selectAll') }}
+          </button>
           <button class="ghost-btn" @click="batchMove">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8">
               <path d="M22 12H2" />
@@ -131,13 +138,25 @@
             class="book-card card"
             :class="{ selected: selectedIds.includes(b.id) }"
             @click="onBookClick(b)"
+            @pointerdown="pressStart(b)"
+            @pointerup="cancelPress"
+            @pointercancel="cancelPress"
+            @pointerleave="cancelPress"
+            @contextmenu.prevent
           >
-            <div v-a11y-click v-if="batchMode" class="book-check" @click.stop="toggleSelect(b.id)">
-              <svg v-if="selectedIds.includes(b.id)" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="3">
-                <path d="M5 12l5 5L20 7" />
-              </svg>
-            </div>
             <div class="book-cover-wrap">
+              <span v-if="batchMode" class="pick-badge" :class="{ on: selectedIds.includes(b.id) }" @click.stop="toggleSelect(b.id)">
+                <svg viewBox="0 0 16 16" width="11" height="11">
+                  <path
+                    d="M3 8.5 L6.5 12 L13 4.5"
+                    fill="none"
+                    stroke="#fff"
+                    stroke-width="2.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </span>
               <img v-if="b.coverUrl" :src="b.coverUrl" class="book-cover" :alt="b.title || ''" />
               <div v-else class="book-cover placeholder">
                 <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.2">
@@ -182,12 +201,24 @@
             class="book-row card"
             :class="{ selected: selectedIds.includes(b.id) }"
             @click="onBookClick(b)"
+            @pointerdown="pressStart(b)"
+            @pointerup="cancelPress"
+            @pointercancel="cancelPress"
+            @pointerleave="cancelPress"
+            @contextmenu.prevent
           >
-            <div v-a11y-click v-if="batchMode" class="book-check" @click.stop="toggleSelect(b.id)">
-              <svg v-if="selectedIds.includes(b.id)" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="3">
-                <path d="M5 12l5 5L20 7" />
+            <span v-if="batchMode" class="pick-badge" :class="{ on: selectedIds.includes(b.id) }" @click.stop="toggleSelect(b.id)">
+              <svg viewBox="0 0 16 16" width="11" height="11">
+                <path
+                  d="M3 8.5 L6.5 12 L13 4.5"
+                  fill="none"
+                  stroke="#fff"
+                  stroke-width="2.4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
               </svg>
-            </div>
+            </span>
             <img v-if="b.coverUrl" :src="b.coverUrl" class="row-cover" :alt="b.title || ''" />
             <div v-else class="row-cover placeholder">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.2">
@@ -309,7 +340,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Delete } from '@element-plus/icons-vue'
@@ -317,6 +348,8 @@ import { libraryApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useDevice } from '@/composables/useDevice'
 import { useWideCols } from '@/composables/useWideCols'
+import { usePickSelect } from '@/composables/usePickSelect'
+import { useViewMode } from '@/composables/useViewMode'
 import { shareToChat } from '@/utils/chatShare'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Breadcrumb from '@/components/Breadcrumb.vue'
@@ -338,9 +371,8 @@ const searchKeyword = ref('')
 const sortBy = ref('created')
 const filterFormat = ref('')
 const filterStatus = ref('')
-const viewMode = ref('grid')
-const batchMode = ref(false)
-const selectedIds = ref([])
+// 书架视图(网格/列表):本机记忆,切换即持久化
+const viewMode = useViewMode('library')
 const detailVisible = ref(false)
 const detailBookId = ref(null)
 const readerVisible = ref(false)
@@ -462,8 +494,22 @@ const saveCategory = async () => {
   }
 }
 
-// Book actions
+// Book actions(批量模式与选择集走 usePickSelect:手机长按书卡进多选)
+const {
+  selectMode: batchMode,
+  selectedIds,
+  toggle: toggleSelect,
+  enter,
+  exit,
+  selectAll,
+  pressStart,
+  cancelPress,
+  swallowClick,
+  dispose,
+} = usePickSelect()
 const onBookClick = (b) => {
+  // 长按已选中这本:吞掉松手后的 click,避免又打开详情
+  if (swallowClick()) return
   if (batchMode.value) {
     toggleSelect(b.id)
   } else {
@@ -471,21 +517,14 @@ const onBookClick = (b) => {
   }
 }
 
-const toggleSelect = (id) => {
-  const idx = selectedIds.value.indexOf(id)
-  if (idx >= 0) selectedIds.value.splice(idx, 1)
-  else selectedIds.value.push(id)
-}
-
 const enterBatch = () => {
   clearDetail()
-  batchMode.value = true
-  selectedIds.value = []
+  enter()
 }
 const exitBatch = () => {
-  batchMode.value = false
-  selectedIds.value = []
+  exit()
 }
+const selectAllBooks = () => selectAll(list.value.map((b) => b.id))
 
 const openDetail = (b) => {
   detailBookId.value = b.id
@@ -597,6 +636,10 @@ const batchDeleteAction = async () => {
   }
 }
 
+onBeforeUnmount(() => {
+  dispose()
+})
+
 onMounted(async () => {
   loadCategories()
   await load()
@@ -675,29 +718,6 @@ html.dark .book-card:hover {
 }
 .book-card.selected {
   box-shadow: 0 0 0 2px var(--color-accent, var(--color-brand));
-}
-.book-check {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  border: 2px solid rgba(255, 255, 255, 0.6);
-  background: rgba(0, 0, 0, 0.3);
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-.book-check:has(svg) {
-  background: var(--color-accent, var(--color-brand));
-  border-color: var(--color-accent, var(--color-brand));
-}
-html.dark .book-check:has(svg) {
-  background: var(--color-brand);
-  border-color: var(--color-brand);
 }
 .book-cover-wrap {
   position: relative;

@@ -152,6 +152,8 @@ export const photoApi = {
   },
   updateDesc: (id, description) => request.put(`/photo/${id}`, { description }),
   remove: (id) => request.delete(`/photo/${id}`),
+  /** 批量移动照片到另一本相册,返回实际移动张数 */
+  batchMove: (photoIds, albumId) => request.put('/photo/batch/move', { photoIds, albumId }),
   cascade: (limit = 60) => request.get('/photo/cascade', { params: { limit } }),
   saveFromUrl: (albumId, data) => request.post(`/album/${albumId}/photos/from-url`, data),
   /** 自动备份单张照片:带内容哈希,服务端命中已存在的会返回 skipped=true */

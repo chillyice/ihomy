@@ -115,10 +115,11 @@
             </template>
             <template v-else>
               <span class="select-count">{{ $t('storage.selectedCount', { n: selectedPaths.length }) }}</span>
+              <el-button size="small" @click="selectAllFiles">{{ $t('common.selectAll') }}</el-button>
               <el-button size="small" type="danger" plain :disabled="!selectedPaths.length" @click="deleteSelected">{{
                 $t('common.delete')
               }}</el-button>
-              <el-button size="small" @click="selectMode = false">{{ $t('common.cancel') }}</el-button>
+              <el-button size="small" @click="exitSelect">{{ $t('common.cancel') }}</el-button>
             </template>
           </div>
         </PageToolbar>
@@ -135,7 +136,15 @@
                    大小/时间移到预览栏标题下,避免表格横向滚动 -->
                 <el-table-column :label="$t('storage.name')" :min-width="previewWide ? 160 : isMobile ? 140 : 220">
                   <template #default="{ row }">
-                    <div class="file-cell" :class="{ selectable: selectMode }">
+                    <div
+                      class="file-cell"
+                      :class="{ selectable: selectMode }"
+                      @pointerdown="pressStart(row)"
+                      @pointerup="cancelPress"
+                      @pointercancel="cancelPress"
+                      @pointerleave="cancelPress"
+                      @contextmenu.prevent
+                    >
                       <span v-if="selectMode" class="pick-badge" :class="{ on: isSelected(row) }">
                         <svg viewBox="0 0 16 16" width="12" height="12">
                           <path
@@ -228,6 +237,7 @@ import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useDevice } from '@/composables/useDevice'
 import { useWideCols } from '@/composables/useWideCols'
+import { usePickSelect } from '@/composables/usePickSelect'
 import { useGlobalSearch } from '@/composables/useGlobalSearch'
 import { storageApi, familyFileApi } from '@/api'
 import { shareFiles } from '@/native/shareOut'
@@ -261,8 +271,22 @@ const loadingFiles = ref(false)
 
 // 文件管理(新建/重命名/删除):仅 OWNER + 自定义设备(系统设备存业务内容,后端只读)
 const canManage = computed(() => userStore.isOwner && activeDeviceId.value > 0)
-const selectMode = ref(false)
-const selectedPaths = ref([])
+// 多选(手机长按文件行进多选):选择集存「路径字符串」(同一文件树里的稳定标识)
+const {
+  selectMode,
+  selectedIds: selectedPaths,
+  toggle,
+  enter,
+  exit,
+  pressStart,
+  cancelPress,
+  swallowClick,
+  dispose,
+} = usePickSelect({
+  onLongPress: (row) => {
+    if (row) toggle(entryPath(row))
+  },
+})
 const previewDialog = ref(false)
 const previewSrc = ref('')
 const previewName = ref('')
@@ -288,16 +312,22 @@ function clearPreview() {
 
 function enterSelect() {
   clearPreview()
-  selectedPaths.value = []
-  selectMode.value = true
+  enter()
+}
+
+function exitSelect() {
+  exit()
+}
+
+function selectAllFiles() {
+  selectedPaths.value = files.value.map(entryPath)
 }
 
 function onRowClick(row, column, event) {
+  // 长按已选中这一行:吞掉松手后的 row-click,避免重复切换
+  if (swallowClick()) return
   if (selectMode.value) {
-    const p = entryPath(row)
-    const i = selectedPaths.value.indexOf(p)
-    if (i >= 0) selectedPaths.value.splice(i, 1)
-    else selectedPaths.value.push(p)
+    toggle(entryPath(row))
     return
   }
   // 点操作列按钮(下载/分享/重命名/预览)时不顺带切预览
@@ -336,8 +366,7 @@ async function deleteSelected() {
   })
   await storageApi.removeEntries(activeDeviceId.value, selectedPaths.value)
   ElMessage.success(t('common.deleted'))
-  selectMode.value = false
-  selectedPaths.value = []
+  exit()
   loadFiles()
 }
 
@@ -354,14 +383,14 @@ const pathParts = computed(() => {
 
 function onDeviceChange() {
   activePath.value = ''
-  selectedPaths.value = []
+  exit()
   clearPreview()
   loadFiles()
 }
 
 function navigateToPath(path) {
   activePath.value = path
-  selectedPaths.value = []
+  exit()
   clearPreview()
   loadFiles()
 }
@@ -370,7 +399,7 @@ function goParent() {
   if (!activePath.value) return
   const idx = activePath.value.lastIndexOf('/')
   activePath.value = idx >= 0 ? activePath.value.slice(0, idx) : ''
-  selectedPaths.value = []
+  exit()
   clearPreview()
   loadFiles()
 }
@@ -549,7 +578,10 @@ watch(
   { immediate: true },
 )
 
-onBeforeUnmount(() => search.setFileContext(null))
+onBeforeUnmount(() => {
+  dispose()
+  search.setFileContext(null)
+})
 </script>
 
 <style scoped>

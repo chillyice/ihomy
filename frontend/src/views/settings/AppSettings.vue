@@ -236,7 +236,7 @@
           <span class="folder-count">{{ $t('album.photoCount', { n: f.count }) }}</span>
         </el-checkbox>
       </el-checkbox-group>
-      <el-empty v-else :description="$t('appSettings.photoBackupFoldersEmpty')" :image-size="60" />
+      <el-empty v-else :description="folderDialog.error || $t('appSettings.photoBackupFoldersEmpty')" :image-size="60" />
     </div>
     <template #footer>
       <el-button @click="folderDialog.visible = false">{{ $t('common.cancel') }}</el-button>
@@ -291,7 +291,7 @@ const backupBusy = ref(false)
 const backupLast = ref({ at: 0, created: 0 })
 // 不同步的相册目录(空 = 全部备份);目录清单在对话框打开时向原生要
 const excludeFolders = ref([])
-const folderDialog = reactive({ visible: false, loading: false, folders: [], selected: [] })
+const folderDialog = reactive({ visible: false, loading: false, folders: [], selected: [], error: '' })
 const pbState = ref({ running: false, scanned: 0, created: 0, skipped: 0, failed: 0, phase: 'idle' })
 
 const backupModule = () => import('@/native/photoBackup')
@@ -659,11 +659,19 @@ async function openFolderDialog() {
   folderDialog.visible = true
   folderDialog.loading = true
   folderDialog.selected = [...excludeFolders.value]
+  folderDialog.error = ''
   try {
     const m = await backupModule()
     folderDialog.folders = await m.photoBackupFolders()
+    if (!folderDialog.folders.length) folderDialog.error = t('appSettings.photoBackupFoldersEmpty')
   } catch (e) {
     folderDialog.folders = []
+    folderDialog.error =
+      e && e.code === 'permission'
+        ? t('appSettings.photoBackupFoldersPermission')
+        : e && e.code === 'native'
+          ? t('appSettings.photoBackupFoldersNative')
+          : t('appSettings.photoBackupFoldersEmpty')
   } finally {
     folderDialog.loading = false
   }

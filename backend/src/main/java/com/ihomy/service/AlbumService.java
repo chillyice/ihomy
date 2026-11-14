@@ -432,6 +432,56 @@ public class AlbumService {
         photoMapper.softDeleteById(photoId);
     }
 
+    /**
+     * 批量移动照片到另一本相册:每张仍按「上传者或家长」守门(与单张删除同口径),
+     * 目标相册必须同家庭;已在目标相册的照片跳过。来源相册封面被移走时从剩余照片换一张。
+     *
+     * @return 实际移动的张数
+     */
+    @Transactional
+    public int batchMovePhotos(List<Long> photoIds, Long albumId, SysUser user, boolean isOwner) {
+        List<Long> ids = photoIds == null ? List.of()
+                : photoIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (ids.isEmpty()) return 0;
+        if (user == null) throw new BizException(ResultCode.UNAUTHORIZED);
+        Album target = albumMapper.selectById(albumId);
+        if (target == null || user.getFamilyId() == null || !target.getFamilyId().equals(user.getFamilyId())) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
+        int moved = 0;
+        Set<Long> sourceAlbumIds = new HashSet<>();
+        Set<String> movedUrls = new HashSet<>();
+        for (Long id : ids) {
+            Photo p = requirePhoto(id, user, isOwner);
+            if (albumId.equals(p.getAlbumId())) continue;
+            sourceAlbumIds.add(p.getAlbumId());
+            if (p.getUrl() != null) movedUrls.add(p.getUrl());
+            LambdaUpdateWrapper<Photo> uw = new LambdaUpdateWrapper<Photo>()
+                    .eq(Photo::getId, p.getId())
+                    .set(Photo::getAlbumId, albumId);
+            photoMapper.update(null, uw);
+            moved++;
+        }
+        if (moved > 0) refreshCoverIfMovedAway(sourceAlbumIds, movedUrls);
+        return moved;
+    }
+
+    /** 来源相册封面指向被移走的照片时,从剩余照片里挑最新一张补封面(没有就清空) */
+    private void refreshCoverIfMovedAway(Set<Long> sourceAlbumIds, Set<String> movedUrls) {
+        if (sourceAlbumIds.isEmpty() || movedUrls.isEmpty()) return;
+        for (Long srcId : sourceAlbumIds) {
+            if (srcId == null) continue;
+            Album src = albumMapper.selectById(srcId);
+            if (src == null || src.getCoverPhotoUrl() == null || !movedUrls.contains(src.getCoverPhotoUrl())) continue;
+            Photo next = photoMapper.selectOne(new LambdaQueryWrapper<Photo>()
+                    .eq(Photo::getAlbumId, srcId)
+                    .orderByDesc(Photo::getId)
+                    .last("LIMIT 1"));
+            src.setCoverPhotoUrl(next == null ? null : next.getUrl());
+            albumMapper.updateById(src);
+        }
+    }
+
     /* ---------- 私有工具 ---------- */
 
     /** 子树照片总数(含自身),内存递归 + 备忘录(相册表数据量小) */

@@ -33,6 +33,21 @@
         </div>
         <div class="tb-right">
           <template v-if="!isMobile">
+            <div v-if="!wideList" class="view-toggle">
+              <button class="vt-btn" :class="{ active: viewMode === 'grid' }" :title="t('common.viewGrid')" @click="viewMode = 'grid'">
+                <svg viewBox="0 0 16 16" width="14" height="14">
+                  <rect x="1.5" y="1.5" width="5" height="5" rx="1" fill="currentColor" />
+                  <rect x="9.5" y="1.5" width="5" height="5" rx="1" fill="currentColor" />
+                  <rect x="1.5" y="9.5" width="5" height="5" rx="1" fill="currentColor" />
+                  <rect x="9.5" y="9.5" width="5" height="5" rx="1" fill="currentColor" />
+                </svg>
+              </button>
+              <button class="vt-btn" :class="{ active: viewMode === 'list' }" :title="t('common.viewList')" @click="viewMode = 'list'">
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+                  <path d="M2 4h12M2 8h12M2 12h12" />
+                </svg>
+              </button>
+            </div>
             <el-button v-if="userStore.isLoggedIn" @click="cascadeVisible = true">{{ t('cascade.title') }}</el-button>
             <el-button v-if="userStore.isLoggedIn && topAlbums.length" @click="toggleSelect">{{ t('album.select') }}</el-button>
             <el-button v-if="userStore.isOwner" @click="syncVisible = true">{{ t('album.syncFromDevice') }}</el-button>
@@ -47,6 +62,9 @@
               <el-dropdown-menu>
                 <el-dropdown-item command="cascade">{{ t('cascade.title') }}</el-dropdown-item>
                 <el-dropdown-item v-if="topAlbums.length" command="select">{{ t('album.select') }}</el-dropdown-item>
+                <el-dropdown-item v-if="!wideList" command="toggleView">{{
+                  viewMode === 'grid' ? t('common.viewList') : t('common.viewGrid')
+                }}</el-dropdown-item>
                 <el-dropdown-item v-if="userStore.isOwner" command="sync">{{ t('album.syncFromDevice') }}</el-dropdown-item>
                 <el-dropdown-item v-if="backupAvailable" command="backup">{{ t('album.backupToolbar') }}</el-dropdown-item>
               </el-dropdown-menu>
@@ -57,6 +75,7 @@
       </template>
       <div v-else class="tb-right">
         <span class="select-count">{{ t('album.selectedAlbums', { n: selectedIds.length }) }}</span>
+        <el-button :disabled="batchDeleting" @click="selectAllVisible">{{ t('common.selectAll') }}</el-button>
         <el-button :disabled="batchDeleting" @click="toggleSelect">{{ t('album.cancelSelect') }}</el-button>
         <el-button type="danger" :loading="batchDeleting" :disabled="!selectedIds.length" @click="onBatchDelete">{{
           t('album.deleteSelected')
@@ -118,14 +137,58 @@
       </div>
 
       <template v-else>
-        <div v-if="topAlbums.length" class="album-grid">
+        <div v-if="topAlbums.length && viewMode === 'list'" class="resource-list">
+          <div
+            v-a11y-click
+            v-for="a in topAlbums"
+            :key="a.id"
+            class="rl-row card"
+            :class="{ selected: selectMode && selectedIds.includes(a.id) }"
+            @click="onAlbumClick(a)"
+            @pointerdown="pressStart(a)"
+            @pointerup="cancelPress"
+            @pointercancel="cancelPress"
+            @pointerleave="cancelPress"
+            @contextmenu.prevent
+          >
+            <span v-if="selectMode" class="pick-badge" :class="{ on: selectedIds.includes(a.id) }" @click.stop="togglePick(a)">
+              <svg viewBox="0 0 16 16" width="11" height="11">
+                <path
+                  d="M3 8.5 L6.5 12 L13 4.5"
+                  fill="none"
+                  stroke="#fff"
+                  stroke-width="2.4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </span>
+            <div class="rl-thumb" :style="a.cover ? { backgroundImage: `url(${a.cover})` } : {}">
+              <AlbumDefaultCover v-if="!a.cover" :size="28" />
+            </div>
+            <div class="rl-main">
+              <span class="rl-name">{{ a.name }}</span>
+              <span class="rl-meta">
+                {{ t('album.photoCount', { n: a.totalPhotoCount ?? a.photoCount }) }} · {{ formatDate(a.createdAt) }}
+                <template v-if="a.sourceDeviceName"> · {{ a.sourceDeviceName }}</template>
+              </span>
+            </div>
+            <span v-if="!selectMode" class="rl-actions album-vis" :class="albumVis(a)">{{ visibilityLabel(t, albumVis(a)) }}</span>
+          </div>
+        </div>
+        <div v-else-if="topAlbums.length" class="album-grid">
           <div
             v-a11y-click
             v-for="a in topAlbums"
             :key="a.id"
             class="album-card card"
             :class="{ selected: selectMode && selectedIds.includes(a.id) }"
-            @click="selectMode ? togglePick(a) : $router.push(`/album/${a.id}`)"
+            @click="onAlbumClick(a)"
+            @pointerdown="pressStart(a)"
+            @pointerup="cancelPress"
+            @pointercancel="cancelPress"
+            @pointerleave="cancelPress"
+            @contextmenu.prevent
           >
             <div class="album-cover-wrap">
               <div v-if="a.cover" class="album-cover" :style="{ backgroundImage: `url(${a.cover})` }"></div>
@@ -208,6 +271,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { albumApi, audienceApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useAudience } from '@/composables/useAudience'
+import { usePickSelect } from '@/composables/usePickSelect'
+import { useViewMode } from '@/composables/useViewMode'
 import { useSyncStore } from '@/stores/sync'
 import { usePullRefresh } from '@/composables/usePullRefresh'
 import { useDevice } from '@/composables/useDevice'
@@ -249,6 +314,7 @@ const openBackupSettings = () => router.push('/settings?tab=client')
 const onMoreCommand = (cmd) => {
   if (cmd === 'cascade') cascadeVisible.value = true
   else if (cmd === 'select') toggleSelect()
+  else if (cmd === 'toggleView') viewMode.value = viewMode.value === 'grid' ? 'list' : 'grid'
   else if (cmd === 'sync') syncVisible.value = true
   else if (cmd === 'backup') openBackupSettings()
 }
@@ -287,7 +353,13 @@ const sharedFromText = (s) => t('audience.sharedFrom', { name: s.alias || s.fami
 
 // ---------- 宽屏双栏:左栏选相册,右栏出详情(受控 id,不改路由) ----------
 // 多选是纯选择场景,退回整宽卡片网格;列高由 useWideCols 实测后写 --wide-col-max
-const selectMode = ref(false)
+// 手机长按相册卡进多选(计时/吞 click/选择集在 usePickSelect)
+const { selectMode, selectedIds, toggle, enter, exit, selectAll, pressStart, cancelPress, swallowClick, dispose } = usePickSelect({
+  enabled: () => isMobile.value,
+})
+// 视图模式(网格/列表):进页按本机记忆,切换即持久化
+const viewMode = useViewMode('album')
+const selectAllVisible = () => selectAll(topAlbums.value.filter((a) => !a.readOnly).map((a) => a.id))
 const wideList = computed(() => viewWide.value && !selectMode.value)
 const { wideEl, colStyle } = useWideCols(wideList)
 const activeAlbumId = ref(null)
@@ -387,18 +459,21 @@ const onDel = async (a) => {
   load()
 }
 
-// ---------- 多选删除 ----------
-const selectedIds = ref([])
+// ---------- 多选删除(选择集在上方宽屏双栏段解构) ----------
 const batchDeleting = ref(false)
 const toggleSelect = () => {
-  selectMode.value = !selectMode.value
-  selectedIds.value = []
+  if (selectMode.value) exit()
+  else enter()
 }
 const togglePick = (a) => {
   if (a.readOnly) return
-  const i = selectedIds.value.indexOf(a.id)
-  if (i >= 0) selectedIds.value.splice(i, 1)
-  else selectedIds.value.push(a.id)
+  toggle(a.id)
+}
+const onAlbumClick = (a) => {
+  // 长按已选中这张:吞掉松手后的 click,避免又跳详情
+  if (swallowClick()) return
+  if (selectMode.value) togglePick(a)
+  else router.push(`/album/${a.id}`)
 }
 const onBatchDelete = async () => {
   const targets = topAlbums.value.filter((a) => selectedIds.value.includes(a.id))
@@ -413,8 +488,7 @@ const onBatchDelete = async () => {
       await albumApi.remove(id)
     }
     ElMessage.success(t('common.deleted'))
-    selectedIds.value = []
-    selectMode.value = false
+    exit()
     load()
   } finally {
     batchDeleting.value = false
@@ -445,6 +519,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  dispose()
   window.removeEventListener('popstate', onPopState)
 })
 </script>

@@ -503,10 +503,12 @@ public class GameRoomService {
                         rooms.stream().map(GameRoom::getHostId),
                         allMembers.stream().map(GameRoomMember::getUserId))
                 .filter(Objects::nonNull).distinct().collect(Collectors.toList());
-        Map<Long, String> names = userIds.isEmpty() ? Map.of()
+        Map<Long, SysUser> users = userIds.isEmpty() ? Map.of()
                 : sysUserMapper.selectBatchIds(userIds).stream()
-                        .collect(Collectors.toMap(SysUser::getId,
-                                u -> u.getNickname() != null ? u.getNickname() : u.getUsername()));
+                        .collect(Collectors.toMap(SysUser::getId, u -> u));
+        Map<Long, String> names = users.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey,
+                        e -> e.getValue().getNickname() != null ? e.getValue().getNickname() : e.getValue().getUsername()));
         Map<Long, List<GameRoomMember>> byRoom = allMembers.stream()
                 .collect(Collectors.groupingBy(GameRoomMember::getRoomId));
 
@@ -531,8 +533,10 @@ public class GameRoomService {
             List<Map<String, Object>> members = new ArrayList<>();
             for (GameRoomMember m : byRoom.getOrDefault(room.getId(), List.of())) {
                 Map<String, Object> mv = new LinkedHashMap<>();
+                SysUser u = users.get(m.getUserId());
                 mv.put("userId", m.getUserId());
                 mv.put("name", names.getOrDefault(m.getUserId(), "成员"));
+                mv.put("avatar", u == null ? null : u.getAvatar());
                 mv.put("role", m.getRole());
                 mv.put("ready", Integer.valueOf(1).equals(m.getReady()));
                 mv.put("score", m.getScore());
