@@ -13,14 +13,19 @@
           <div class="wt-hero-top">
             <div class="wt-now">
               <div class="wt-city">{{ detail?.now?.city || '—' }} · {{ todayLabel }}</div>
+              <!-- 图标与温度成组:任何宽度下都保持左右并排,只有「高低温 + 天气」整组可换行到下一行 -->
               <div class="wt-main">
-                <i :class="'qi-' + (detail?.now?.iconCode || '100')" class="wt-big-icon"></i>
-                <span class="wt-temp">{{ detail?.now?.temp ?? '—' }}<span class="wt-degree">°</span></span>
-                <span class="wt-hilo">
-                  <span class="wt-hi">↑ {{ todayHigh }}°</span>
-                  <span class="wt-lo">↓ {{ todayLow }}°</span>
+                <span class="wt-readout">
+                  <i :class="'qi-' + (detail?.now?.iconCode || '100')" class="wt-big-icon"></i>
+                  <span class="wt-temp">{{ detail?.now?.temp ?? '—' }}<span class="wt-degree">°</span></span>
                 </span>
-                <span class="wt-text">{{ detail?.now?.text || '' }}</span>
+                <span class="wt-aside">
+                  <span class="wt-hilo">
+                    <span class="wt-hi">↑ {{ todayHigh }}°</span>
+                    <span class="wt-lo">↓ {{ todayLow }}°</span>
+                  </span>
+                  <span class="wt-text">{{ detail?.now?.text || '' }}</span>
+                </span>
               </div>
             </div>
             <div v-if="sortedWarnings.length" class="wt-warnings">
@@ -944,9 +949,27 @@ onBeforeUnmount(() => {
 .wt-main {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px 10px;
   margin: 8px 0 4px;
   flex-wrap: wrap;
+}
+/* 图标 + 温度是一个不可拆分的读数组:安卓壳内 WebView 会跟随系统「字体大小」放大文字,
+   平板用户把字号调大后原来的单层 flex 换行会把温度挤到图标下方(变成上下排版)。
+   成组 + nowrap 后,放大只会让「高低温/天气」整组掉到下一行,读数本身永远左右并排。 */
+.wt-readout {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+}
+.wt-aside {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-width: 0;
 }
 .wt-big-icon {
   font-size: 56px;

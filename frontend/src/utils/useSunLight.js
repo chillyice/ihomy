@@ -80,15 +80,24 @@ export function useSunLight() {
   const precipLevel = ref(0)
   let testTimer = null
 
-  // 昏暗天气(雾/阴):雾层/压暗常驻(不再 3 秒消散),进入后 3 秒自动开灯补光,天气转晴才消散;
-  // 雨/雪/雷粒子保持常驻但不压暗页面(无阴影),晴/多云维持原有常驻表现
+  // 雾/阴(昏暗天气):雾层是「几秒的转瞬雾」——进入即浮现,约 4 秒后淡出消散,不常驻;
+  // 压光(weatherLightMul 0.15)与「进入 3 秒自动开灯补光」保持常驻(天气本身仍是昏暗,灯亮后页面照常可读);
+  // 雨/雪/雷粒子保持常驻但不压暗页面,晴/多云维持原有表现
   const DIM_MODES = ['fog', 'overcast']
   const LAMP_AUTO_ON_MS = 3000
+  const FOG_VISIBLE_MS = 4000
   const fogVisible = ref(false)
   const lampAutoOn = ref(false)
   let lampAutoTimer = null
+  let fogTimer = null
   const playTransient = () => {
     fogVisible.value = true
+    // 重新进入昏暗(含 30 分钟一次的天气刷新)时重播一次;不在雾里越积越多
+    if (fogTimer) clearTimeout(fogTimer)
+    fogTimer = setTimeout(() => {
+      fogVisible.value = false
+      fogTimer = null
+    }, FOG_VISIBLE_MS)
     if (!lampAutoTimer) {
       lampAutoTimer = setTimeout(() => {
         lampAutoOn.value = true
@@ -100,6 +109,10 @@ export function useSunLight() {
     if (lampAutoTimer) {
       clearTimeout(lampAutoTimer)
       lampAutoTimer = null
+    }
+    if (fogTimer) {
+      clearTimeout(fogTimer)
+      fogTimer = null
     }
     fogVisible.value = false
     lampAutoOn.value = false
@@ -548,6 +561,7 @@ export function useSunLight() {
     if (cloudTimer) clearInterval(cloudTimer)
     cloudTween?.kill()
     if (lampAutoTimer) clearTimeout(lampAutoTimer)
+    if (fogTimer) clearTimeout(fogTimer)
     if (lightningTimer) clearTimeout(lightningTimer)
     if (slotTimer) clearInterval(slotTimer)
     if (flickerTimer) clearInterval(flickerTimer)

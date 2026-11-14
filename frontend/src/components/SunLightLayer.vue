@@ -143,10 +143,10 @@
       ></div>
     </div>
 
-    <!-- 雾霭层:不规则雾团(雾/阴天昏暗氛围,常驻至天气转晴才消散;进入 3 秒后台灯自动开灯补光) -->
+    <!-- 雾霭层:高斯噪声雾(进页后几秒内浮现再淡出消散,不常驻;雾/阴的昏暗压光与 3 秒后台灯补光不受影响) -->
     <Transition name="fog">
-      <div v-if="weatherEffectEnabled && fogVisible" class="fog-layer">
-        <div v-for="b in FOG_BLOBS" :key="b.id" class="fog-blob" :style="fogBlobStyle(b)"></div>
+      <div v-if="weatherEffectEnabled && fogVisible" class="fog-layer" aria-hidden="true">
+        <div v-for="b in FOG_LAYERS" :key="b.id" class="fog-noise" :style="fogLayerStyle(b)"></div>
       </div>
     </Transition>
   </div>
@@ -185,31 +185,31 @@ const {
   fogVisible,
 } = light || {}
 
-// 雾团静态配置:位置/尺寸/漂移各异拼出不规则雾,负 delay 让动画起始就在中途;
-// 用预模糊 radial-gradient 而非 filter:blur——带 filter 的层随动画会周期性重栅格化
-// (与 .bg-blobs 的 ponytail 注记同因),translate-only 漂移是纯合成器变换
-const FOG_TONES = [
-  'radial-gradient(ellipse at center, rgba(208, 215, 226, 0.6) 0%, rgba(208, 215, 226, 0.3) 40%, rgba(208, 215, 226, 0.1) 62%, transparent 78%)',
-  'radial-gradient(ellipse at center, rgba(224, 226, 231, 0.55) 0%, rgba(219, 222, 228, 0.26) 45%, rgba(219, 222, 228, 0.08) 64%, transparent 76%)',
+// 雾层用「高斯噪声」而不是几个径向渐变雾团:内联 SVG 的 feTurbulence(fractalNoise)
+// 生成一张可无缝平铺(stitchTiles)的云絮噪声图,经 feGaussianBlur 软化(高斯模糊后的噪声 =
+// 细颗粒的雾),再用 feColorMatrix 把颜色定成雾的冷灰、透明度取噪声本身。
+// 浏览器只栅格化这一次,之后当普通背景图缓存;动画只走 transform/opacity(纯合成器),
+// 不像 filter:blur 那样随动画周期性重栅格化(与 .bg-blobs 的 ponytail 注记同因)。
+// 三层不同颗粒尺寸(260/420/680px)与漂移速度叠在一起,避免平铺接缝被看出来。
+const FOG_NOISE_SVG = `<svg xmlns='http://www.w3.org/2000/svg' width='320' height='320'>
+  <filter id='fog' x='0' y='0' width='100%' height='100%'>
+    <feTurbulence type='fractalNoise' baseFrequency='0.012 0.018' numOctaves='4' seed='7' stitchTiles='stitch'/>
+    <feGaussianBlur stdDeviation='3'/>
+    <feColorMatrix type='matrix' values='0 0 0 0 0.83 0 0 0 0 0.86 0 0 0 0 0.9 0.3 0.3 0.3 0 0'/>
+  </filter>
+  <rect width='320' height='320' filter='url(#fog)'/>
+</svg>`
+const FOG_NOISE = `url("data:image/svg+xml,${encodeURIComponent(FOG_NOISE_SVG)}")`
+// 每层的颗粒尺寸 / 不透明度 / 漂移幅度与周期(负 delay 让动画起始就在中途)
+const FOG_LAYERS = [
+  { id: 1, size: 260, o: 0.28, dx: '4vw', dy: '2vh', dur: 26, delay: -4 },
+  { id: 2, size: 420, o: 0.2, dx: '-3vw', dy: '-2vh', dur: 34, delay: -11 },
+  { id: 3, size: 680, o: 0.14, dx: '2vw', dy: '-3vh', dur: 46, delay: -18 },
 ]
-const FOG_BLOBS = [
-  { id: 1, left: '-10%', top: '-15%', w: 65, o: 0.5, dx: '6vw', dy: '3vh', dur: 12, delay: -2, tone: 0 },
-  { id: 2, left: '55%', top: '-20%', w: 70, o: 0.45, dx: '-5vw', dy: '4vh', dur: 16, delay: -7, tone: 1 },
-  { id: 3, left: '10%', top: '30%', w: 80, o: 0.5, dx: '8vw', dy: '-3vh', dur: 18, delay: -4, tone: 1 },
-  { id: 4, left: '60%', top: '35%', w: 75, o: 0.55, dx: '-7vw', dy: '-4vh', dur: 14, delay: -9, tone: 0 },
-  { id: 5, left: '-15%', top: '55%', w: 70, o: 0.5, dx: '6vw', dy: '-5vh', dur: 15, delay: -5, tone: 0 },
-  { id: 6, left: '40%', top: '65%', w: 90, o: 0.45, dx: '-6vw', dy: '-3vh', dur: 19, delay: -11, tone: 1 },
-  { id: 7, left: '20%', top: '80%', w: 65, o: 0.5, dx: '5vw', dy: '-4vh', dur: 13, delay: -8, tone: 0 },
-  { id: 8, left: '75%', top: '70%', w: 60, o: 0.4, dx: '-8vw', dy: '-6vh', dur: 17, delay: -13, tone: 1 },
-  { id: 9, left: '30%', top: '5%', w: 55, o: 0.38, dx: '4vw', dy: '5vh', dur: 11, delay: -3, tone: 1 },
-]
-const fogBlobStyle = (b) => ({
-  left: b.left,
-  top: b.top,
-  width: b.w + 'vw',
-  height: Math.round(b.w * 0.62) + 'vw',
+const fogLayerStyle = (b) => ({
+  backgroundImage: FOG_NOISE,
+  backgroundSize: b.size + 'px ' + b.size + 'px',
   opacity: b.o,
-  background: FOG_TONES[b.tone],
   animationDuration: b.dur + 's',
   animationDelay: b.delay + 's',
   '--dx': b.dx,
@@ -664,7 +664,8 @@ html.dark .blob-5 {
   transform: translateZ(0);
 }
 
-/* 雾霭层(背景光影最高一处):不规则雾团慢漂移,整层经 Vue Transition 淡入/消散(雾/阴昏暗氛围,常驻) */
+/* 雾霭层(背景光影最高一处):高斯噪声雾,三层不同颗粒尺寸/漂移速度叠出云絮感(减少平铺接缝感);
+   整层经 Vue Transition 淡入/淡出——雾/阴进入后只出现几秒就消散,不常驻(可见时长由 useSunLight 的 FOG_VISIBLE_MS 控制) */
 .fog-layer {
   position: fixed;
   inset: 0;
@@ -672,29 +673,33 @@ html.dark .blob-5 {
   overflow: hidden;
   pointer-events: none;
   transform: translateZ(0);
+  /* 贴地雾:底部浓、向上渐淡 */
+  -webkit-mask-image: linear-gradient(to top, #000 0%, rgba(0, 0, 0, 0.75) 40%, rgba(0, 0, 0, 0.3) 72%, transparent 94%);
+  mask-image: linear-gradient(to top, #000 0%, rgba(0, 0, 0, 0.75) 40%, rgba(0, 0, 0, 0.3) 72%, transparent 94%);
 }
-.fog-blob {
+.fog-noise {
   position: absolute;
-  border-radius: 50%;
+  inset: -12% -8%;
+  background-repeat: repeat;
   will-change: transform;
-  animation: fog-drift 14s ease-in-out infinite alternate;
+  animation: fog-drift 24s ease-in-out infinite alternate;
 }
 @keyframes fog-drift {
   from {
-    transform: translate(0, 0) scale(1);
+    transform: translate3d(0, 0, 0) scale(1);
   }
   to {
-    transform: translate(var(--dx, 6vw), var(--dy, 3vh)) scale(1.12);
+    transform: translate3d(var(--dx, 4vw), var(--dy, 2vh), 0) scale(1.08);
   }
 }
 /* 进入快速浮现,消散缓慢淡出并轻微上浮,像雾被风带走 */
 .fog-enter-active {
-  transition: opacity 0.4s ease;
+  transition: opacity 0.6s ease;
 }
 .fog-leave-active {
   transition:
-    opacity 1.4s ease,
-    transform 1.4s ease;
+    opacity 2.2s ease,
+    transform 2.2s ease;
 }
 .fog-enter-from,
 .fog-leave-to {
