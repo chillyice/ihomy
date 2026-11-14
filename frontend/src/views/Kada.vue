@@ -238,9 +238,13 @@ import { serverUrl } from '@/utils/assetUrl'
 // Windows 绿色版 + 安装版(NSIS) 与 Linux(deb / AppImage) 都发 ihomy 直链
 // (放服务器 /opt/ihomy/uploads/kada/,nginx /files/ 反代托管),免登录、免过 GitHub;
 // macOS(universal dmg) 本机无 Mac 打不出来,仍指向 GitHub Releases 同 tag 产物。
+// 安卓是独立的测试通道:探针包(debug 签名)也放服务器 /opt/ihomy/uploads/kada/,
+// 版本号自带 0.2.0-s1,跟桌面 version 常量无关 —— 别把两者对齐。
 // ⚠ 换版本时同步:version 常量、下面各包的 meta 体积、服务器上的同名文件。
 const version = '1.1.0'
 const fileSize = '14.0 MB'
+const androidVersion = '0.2.0-s4'
+const androidApk = `kada-android-${androidVersion}-debug.apk`
 const repoUrl = 'https://github.com/chillyice/Kada'
 const releasesUrl = `${repoUrl}/releases`
 const assetUrl = (name) => `${repoUrl}/releases/download/v${version}/${name}`
@@ -298,6 +302,8 @@ const platformIcons = {
   win: '<svg viewBox="0 0 24 24"><path d="M4 5.6 10.6 4.7v6.8H4zM13.4 4.3 20 3.4v8.1h-6.6zM4 12.5h6.6v6.8L4 18.4zM13.4 12.5H20v8.1l-6.6-.9z"/></svg>',
   linux: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9.5 10 12l-3 2.5M13.5 15h3.5"/></svg>',
   mac: '<svg viewBox="0 0 24 24"><path d="M9 9h6v6H9z"/><circle cx="7" cy="7" r="2"/><circle cx="17" cy="7" r="2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>',
+  android:
+    '<svg viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="2.5"/><path d="M10.5 18.2h3"/><path d="M9.4 4.2 8.6 2.6M14.6 4.2l.8-1.6"/></svg>',
 }
 
 const platforms = [
@@ -329,6 +335,14 @@ const platforms = [
     downloads: [
       { labelKey: 'kada.dlMacDmg', meta: 'universal', href: assetUrl(`Kada_${version}_universal.dmg`), primary: true, local: false },
     ],
+  },
+  // 安卓:测试通道。debug 签名 + 只做按键过滤,别跟上面三端的正式包混在一起描述。
+  {
+    key: 'android',
+    icon: platformIcons.android,
+    nameKey: 'kada.platAndroid',
+    archKey: 'kada.archAndroid',
+    downloads: [{ labelKey: 'kada.dlAndroidApk', meta: '7.7 MB', href: fileUrl(androidApk), primary: true, local: true }],
   },
 ]
 
@@ -443,6 +457,7 @@ const notes = [
   { titleKey: 'kada.noteWinTitle', bodyKey: 'kada.noteWinBody' },
   { titleKey: 'kada.noteLinuxTitle', bodyKey: 'kada.noteLinuxBody' },
   { titleKey: 'kada.noteMacTitle', bodyKey: 'kada.noteMacBody' },
+  { titleKey: 'kada.noteAndroidTitle', bodyKey: 'kada.noteAndroidBody' },
   { titleKey: 'kada.noteUpdateTitle', bodyKey: 'kada.noteUpdateBody' },
   { titleKey: 'kada.noteExpTitle', bodyKey: 'kada.noteExpBody' },
 ]

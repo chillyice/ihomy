@@ -626,6 +626,9 @@ html {
   height: 100%;
   background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
+  /* 关掉移动端点击时浏览器/WebView 叠加的淡蓝触碰高亮(可继承,一处覆盖全站;
+     iOS 上无此效果,Android Chrome 与 App 内核默认会闪) */
+  -webkit-tap-highlight-color: transparent;
 }
 body,
 #app {

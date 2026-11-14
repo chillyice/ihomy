@@ -83,13 +83,15 @@
       </div>
     </div>
 
-    <!-- 隐形退出热区:长按 3 秒(不显示边界,按住时给一句提示) -->
+    <!-- 隐形退出热区:长按 3 秒(不显示边界,按住时给一句提示)。
+         pointercancel/pointerleave 只对鼠标算放弃:触屏长按会被系统手势(文字选择/长按菜单)接管并取消指针事件,
+         手指其实还在屏幕上,当松手处理就永远退不出去(平板实测)。 -->
     <div
       class="kiosk-exit-zone"
-      @pointerdown="onExitDown"
+      @pointerdown.prevent="onExitDown"
       @pointerup="onExitUp"
-      @pointercancel="onExitUp"
-      @pointerleave="onExitUp"
+      @pointercancel="onExitAbort"
+      @pointerleave="onExitAbort"
       @contextmenu.prevent
     >
       <span v-if="holding" class="exit-hint">{{ $t('kiosk.exitHoldHint') }}</span>
@@ -252,11 +254,17 @@ const refreshAll = async () => {
 const goLogin = () => router.push('/login')
 
 // ---- 退出:长按 3 秒 → 指纹(无指纹/网页降级为确认框) ----
+// 触屏长按到一半时,系统会为了「文字选择 / 长按菜单」接管手势并发 pointercancel,手指并没有离开屏幕;
+// 只有 pointerup 是真正的松手。鼠标移出热区才算放弃。
+let holdPointerType = ''
+
 const onExitDown = (e) => {
   if (e.pointerType === 'mouse' && e.button !== 0) return
+  holdPointerType = e.pointerType
   holding.value = true
   clearTimeout(exitTimer)
   exitTimer = setTimeout(async () => {
+    exitTimer = 0
     holding.value = false
     if (await confirmExit()) exitKiosk()
   }, EXIT_HOLD_MS)
@@ -266,6 +274,13 @@ const onExitUp = () => {
   clearTimeout(exitTimer)
   exitTimer = 0
   holding.value = false
+}
+
+// 指针被取消 / 触屏离开元素:手指可能还在屏幕上,触屏不算松手,继续计时;鼠标才算放弃
+const onExitAbort = (e) => {
+  const type = (e && e.pointerType) || holdPointerType
+  if (type !== 'mouse') return
+  onExitUp()
 }
 
 const confirmExit = async () => {
@@ -581,10 +596,18 @@ onBeforeUnmount(() => {
   cursor: default;
   touch-action: none;
   -webkit-tap-highlight-color: transparent;
+  /* 长按不被系统当成选字/长按菜单:一旦浏览器接管手势会取消指针事件,3 秒永远按不满 */
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 .exit-hint {
   color: var(--color-text-tertiary);
   font-size: 12px;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 @media (max-width: 900px), (orientation: portrait) {
