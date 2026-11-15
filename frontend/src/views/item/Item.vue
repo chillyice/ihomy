@@ -110,11 +110,20 @@ const togglePick = (it) => panelRef.value?.togglePick(it)
 }
 .fp-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+}
+/* 暖居外壳为户型图全出血把 gc-main/.page 的留白清零(见 main.css item 段),
+ * 列表模式只是普通内容页,补回与其它内容页一致的 24px 留白,表格不再顶到容器边界 */
+html.theme-warm .fp-list {
+  padding: 24px;
 }
 @media (max-width: 768px) {
   .fp-page {
     height: calc(100dvh - 120px);
+  }
+  html.theme-warm .fp-list {
+    padding: 16px;
   }
 }
 </style>

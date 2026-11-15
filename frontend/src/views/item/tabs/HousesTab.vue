@@ -5,8 +5,8 @@
     </div>
   </PageToolbar>
   <el-table :data="houses" stripe>
-    <el-table-column prop="name" :label="$t('item.houseName')" />
-    <el-table-column prop="address" :label="$t('item.houseAddress')" show-overflow-tooltip />
+    <el-table-column prop="name" :label="$t('item.houseName')" min-width="160" show-overflow-tooltip />
+    <el-table-column prop="address" :label="$t('item.houseAddress')" min-width="280" show-overflow-tooltip />
     <el-table-column :label="$t('common.actions')" width="160">
       <template #default="{ row }">
         <el-tooltip :content="$t('common.edit')" placement="top" :show-after="300">
