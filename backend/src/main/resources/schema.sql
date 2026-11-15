@@ -1198,7 +1198,7 @@ CREATE TABLE `game_info` (
   `user_id`     BIGINT       NOT NULL COMMENT '导入人ID',
   `name`        VARCHAR(100) NOT NULL COMMENT '游戏名',
   `description` VARCHAR(500) DEFAULT NULL COMMENT '描述',
-  `type`        VARCHAR(20)  NOT NULL DEFAULT 'SWF' COMMENT '类型:SWF/GBA/LINK(外部网页)',
+  `type`        VARCHAR(20)  NOT NULL DEFAULT 'SWF' COMMENT '类型:SWF/GBA/LINK(外部网页)/DESKTOP(桌面游戏安装包,仅下载)',
   `category`    VARCHAR(20)  NOT NULL DEFAULT 'OTHER' COMMENT '分类:ACTION动作/PUZZLE益智/CASUAL休闲/SIMULATION模拟养成/ADVENTURE冒险/RPG角色扮演/STRATEGY策略/ARCADE街机/OTHER其他',
   `series`      VARCHAR(50)  DEFAULT NULL COMMENT '游戏系列(手动填写或按名称自动归类,如「宝可梦」)',
   `file_url`    VARCHAR(500) DEFAULT NULL COMMENT '文件URL(/files/games/...,LINK 类型为空)',

@@ -2,16 +2,20 @@ package com.ihomy.common;
 
 /**
  * 小游戏常量:类型/状态/长度上限。
- * 文件型游戏分 SWF(Flash 播放器)与模拟器 ROM(机种码见 common/GameSystem),LINK 为外部网页。
+ * 文件型游戏分 SWF(Flash 播放器)与模拟器 ROM(机种码见 common/GameSystem),LINK 为外部网页,
+ * DESKTOP 为 PC 安装包(站内只托管原包 + 安装说明,浏览器里不运行)。
  */
 public final class GameConst {
 
     private GameConst() {
     }
 
-    /** 游戏类型 type(SWF/LINK;模拟器机种码见 GameSystem) */
+    /** 游戏类型 type(SWF/LINK/DESKTOP;模拟器机种码见 GameSystem) */
     public static final String TYPE_SWF = "SWF";
     public static final String TYPE_LINK = "LINK";
+
+    /** 桌面游戏:PC 安装包原样托管,详情页只给下载与安装说明(浏览器没有对应运行环境) */
+    public static final String TYPE_DESKTOP = "DESKTOP";
 
     /** 状态 status */
     public static final String STATUS_ACTIVE = "ACTIVE";

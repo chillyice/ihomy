@@ -68,10 +68,11 @@ public class GameInfoController {
                                        @RequestParam(value = "description", required = false) String description,
                                        @RequestParam(value = "category", required = false) String category,
                                        @RequestParam(value = "series", required = false) String series,
-                                       @RequestParam(value = "visibility", required = false) String visibility) {
+                                       @RequestParam(value = "visibility", required = false) String visibility,
+                                       @RequestParam(value = "type", required = false) String type) {
         LoginUser user = current();
         return Result.success(gameService.importGame(user.getUserId(), user.getFamilyId(), file, name, description,
-                category, series, visibility));
+                category, series, visibility, type));
     }
 
     @Operation(summary = "添加网页游戏")

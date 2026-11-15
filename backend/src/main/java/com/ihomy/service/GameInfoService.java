@@ -37,7 +37,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 家庭小游戏业务:导入 .swf(存 games/{游戏名}/)与模拟器 ROM(机种码见 GameSystem)、添加外部网页游戏(LINK)、列表/详情/改名/改描述/删除,家庭隔离。
+ * 家庭小游戏业务:导入 .swf(存 games/{游戏名}/)与模拟器 ROM(机种码见 GameSystem)、添加外部网页游戏(LINK)、
+ * 添加桌面游戏安装包(DESKTOP,浏览器不运行,只托管原包给成员下载安装)、列表/详情/改名/改描述/删除,家庭隔离。
  * 文件型游戏按扩展名判定机种(GBA/GB/NES/SNES/SEGA/ARCADE/NDS),扩机种只加 GameSystem 映射与前端注册表;LINK 类型只存外链,由站内网页游戏页 iframe 打开。
  * 分类(category)是固定枚举,系列(series)是自由文本:手动优先,留空时按名称自动归类,并可批量归类存量未归类的游戏。
  * 改名不移动物理文件夹(文件夹名在导入时固定)。有电池存档的机种把存档写进游戏目录下的 saves/(模拟器自动同步),
@@ -80,23 +81,34 @@ public class GameInfoService {
     }
 
     public GameInfo importGame(Long userId, Long familyId, MultipartFile file, String name, String description,
-                               String category, String series, String visibility) {
+                               String category, String series, String visibility, String type) {
         String cleanName = normalizeName(name);
         if (file == null || file.isEmpty()) {
             throw new BizException(ResultCode.BAD_REQUEST, "请选择要导入的游戏文件");
         }
-        String type = GameSystem.typeForName(file.getOriginalFilename());
-        if (type == null) {
-            throw new BizException(ResultCode.BAD_REQUEST,
-                    "仅支持导入 .swf 或模拟器 ROM(" + GameSystem.importHint() + ")");
+        boolean desktop = GameConst.TYPE_DESKTOP.equalsIgnoreCase(type == null ? "" : type.trim());
+        String resolvedType;
+        if (desktop) {
+            // 桌面游戏只认安装包扩展名:类型由用户显式选择,.zip/.7z 不会被当成街机 romset
+            if (!GameSystem.isDesktopPackage(file.getOriginalFilename())) {
+                throw new BizException(ResultCode.BAD_REQUEST,
+                        "桌面游戏请选择安装包(" + GameSystem.desktopHint() + ")");
+            }
+            resolvedType = GameConst.TYPE_DESKTOP;
+        } else {
+            resolvedType = GameSystem.typeForName(file.getOriginalFilename());
+            if (resolvedType == null) {
+                throw new BizException(ResultCode.BAD_REQUEST,
+                        "仅支持导入 .swf 或模拟器 ROM(" + GameSystem.importHint() + ")");
+            }
         }
-        String url = fileService.uploadGame(file, cleanName);
+        String url = desktop ? fileService.uploadDesktopGame(file, cleanName) : fileService.uploadGame(file, cleanName);
         GameInfo g = new GameInfo();
         g.setFamilyId(familyId);
         g.setUserId(userId);
         g.setName(cleanName);
         g.setDescription(normalizeDescription(description));
-        g.setType(type);
+        g.setType(resolvedType);
         g.setCategory(GameCategory.normalize(category));
         g.setSeries(resolveSeries(series, cleanName));
         g.setFileUrl(url);

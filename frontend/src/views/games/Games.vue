@@ -86,6 +86,7 @@
         <div class="tool-icon">
           <el-icon :size="30">
             <Link v-if="g.type === 'LINK'" />
+            <Monitor v-else-if="g.type === DESKTOP_TYPE" />
             <VideoPlay v-else />
           </el-icon>
         </div>
@@ -128,11 +129,18 @@
     <el-dialog v-model="importVisible" append-to-body :title="$t('games.import')" width="440px" destroy-on-close>
       <el-radio-group v-model="importMode" size="small" class="import-mode">
         <el-radio-button value="file">{{ $t('games.importModeFile') }}</el-radio-button>
+        <el-radio-button value="desktop">{{ $t('games.importModeDesktop') }}</el-radio-button>
         <el-radio-button value="link">{{ $t('games.importModeLink') }}</el-radio-button>
       </el-radio-group>
       <el-form label-position="top">
-        <el-form-item v-if="importMode === 'file'" :label="$t('games.file')">
-          <input ref="fileInput" type="file" :accept="importFileAccept" class="game-file-input" @change="onFilePicked" />
+        <el-form-item v-if="importMode !== 'link'" :label="importMode === 'desktop' ? $t('games.desktopFile') : $t('games.file')">
+          <input
+            ref="fileInput"
+            type="file"
+            :accept="importMode === 'desktop' ? desktopFileAccept : importFileAccept"
+            class="game-file-input"
+            @change="onFilePicked"
+          />
         </el-form-item>
         <el-form-item v-else :label="$t('games.url')">
           <el-input v-model="importForm.url" maxlength="500" :placeholder="$t('games.urlPlaceholder')" clearable />
@@ -240,6 +248,7 @@ import {
   Cpu,
   Histogram,
   Link,
+  Monitor,
   MagicStick,
   Collection,
   Aim,
@@ -267,6 +276,7 @@ import { useAudience } from '@/composables/useAudience'
 import { useUserStore } from '@/stores/user'
 import { GAME_CATEGORIES, countGameCategories, inGameCategory, normalizeGameCategory } from '@/utils/games/gameCategory'
 import { importAccept, typeForFile, typeLabel } from '@/utils/games/emulatorSystems'
+import { DESKTOP_TYPE, desktopAccept, isDesktopPackage, isDesktopType } from '@/utils/games/desktopGames'
 import { EMBEDDED_GAMES } from '@/utils/games/embeddedGames'
 import { UNSERIES, inGameSeries, normalizeGameSeries, seriesOptionsOf } from '@/utils/games/gameSeries'
 
@@ -276,6 +286,9 @@ const userStore = useUserStore()
 
 /** 导入文件选择器接受的格式:.swf + 全部模拟器 ROM(与后端 GameSystem 同口径) */
 const importFileAccept = importAccept()
+
+/** 桌面游戏安装包选择器接受的格式:.exe/.msi/.zip/.7z/.rar(显式类型,后端再校验) */
+const desktopFileAccept = desktopAccept()
 
 /** 保险箱写权限(新增条目要 vault:manage);没有权限就不显示「存入保险箱」,避免点了白跑 */
 const canVault = computed(() => userStore.isOwner || userStore.hasPerm('vault:manage'))
@@ -529,10 +542,11 @@ const autoClassify = async () => {
   }
 }
 
-const typeText = (g) => (g.type === 'LINK' ? t('games.typeLink') : typeLabel(g.type) || g.type)
+const typeText = (g) =>
+  g.type === 'LINK' ? t('games.typeLink') : isDesktopType(g.type) ? t('games.typeDesktop') : typeLabel(g.type) || g.type
 
 const play = (g) => {
-  // 网页游戏在站内嵌入打开(不跳走、不丢 ihomy 外壳);文件类游戏走播放器页
+  // 网页游戏在站内嵌入打开(不跳走、不丢 ihomy 外壳);桌面游戏进详情页(只有下载与说明);其余走播放器页
   router.push(g.type === 'LINK' ? `/games/web/${g.id}` : `/games/play/${g.id}`)
 }
 
@@ -600,7 +614,14 @@ const submitImport = async () => {
     ElMessage.warning(t('games.needFile'))
     return
   }
-  if (!typeForFile(importForm.file.name) && !/\.swf$/i.test(importForm.file.name)) {
+  // 桌面游戏安装包由用户显式选类型,不走扩展名自动判定(zip/7z 会被当成街机包)
+  const desktop = importMode.value === 'desktop'
+  if (desktop) {
+    if (!isDesktopPackage(importForm.file.name)) {
+      ElMessage.warning(t('games.invalidDesktopFile'))
+      return
+    }
+  } else if (!typeForFile(importForm.file.name) && !/\.swf$/i.test(importForm.file.name)) {
     ElMessage.warning(t('games.invalidFile'))
     return
   }
@@ -617,6 +638,7 @@ const submitImport = async () => {
     fd.append('category', importForm.category)
     fd.append('series', normalizeGameSeries(importForm.series))
     fd.append('visibility', importForm.visibility)
+    if (desktop) fd.append('type', DESKTOP_TYPE)
     const created = await gameApi.import(fd)
     await saveAudience(created?.id, importForm.visibility, importAudience)
     ElMessage.success(t('games.imported'))

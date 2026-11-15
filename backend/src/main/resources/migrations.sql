@@ -3500,3 +3500,10 @@ WHERE a.`visibility` NOT IN ('CIRCLE', 'PRIVATE');
 UPDATE `content_photo` p JOIN `content_photo_album` a ON p.`album_id` = a.`id`
 SET p.`visibility` = 'PRIVATE'
 WHERE a.`visibility` = 'PRIVATE' AND p.`visibility` = 'FAMILY';
+
+-- ------------------------------------------------------------
+-- V12.40 小游戏新增 DESKTOP 类型(桌面游戏安装包:站内只给下载与安装说明,浏览器里不运行)
+-- 只改列注释,可重复执行
+-- ------------------------------------------------------------
+ALTER TABLE `game_info`
+  MODIFY COLUMN `type` VARCHAR(20) NOT NULL DEFAULT 'SWF' COMMENT '类型:SWF/GBA/LINK(外部网页)/DESKTOP(桌面游戏安装包,仅下载)';

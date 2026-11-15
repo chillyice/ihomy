@@ -7,6 +7,7 @@
     :system="game.type"
     back-to="/games"
   />
+  <DesktopGame v-else-if="game && isDesktopType(game.type)" :game="game" back-to="/games" />
   <FlashPlayer v-else-if="game && game.type !== 'LINK'" :src="game.fileUrl" :title="game.name" back-to="/games" />
 </template>
 
@@ -15,7 +16,9 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import FlashPlayer from '@/views/tools/FlashPlayer.vue'
 import EmulatorPlayer from '@/views/games/EmulatorPlayer.vue'
+import DesktopGame from '@/views/games/DesktopGame.vue'
 import { isEmulatorType } from '@/utils/games/emulatorSystems'
+import { isDesktopType } from '@/utils/games/desktopGames'
 import { gameApi } from '@/api'
 
 const route = useRoute()

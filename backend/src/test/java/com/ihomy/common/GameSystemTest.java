@@ -60,4 +60,18 @@ class GameSystemTest {
         assertThat(GameSystem.importHint())
                 .contains(".gba", ".gb", ".gbc", ".nes", ".sfc", ".smc", ".md", ".gen", ".smd", ".sms", ".gg", ".zip", ".7z", ".nds");
     }
+
+    @Test
+    void desktopPackagesNeedExplicitType() {
+        // 桌面游戏安装包必须由导入方显式指定类型:zip/7z 与街机 romset 同后缀,不能靠扩展名自动判定
+        assertThat(GameSystem.isDesktopPackage("DemonStar Setup.exe")).isTrue();
+        assertThat(GameSystem.isDesktopPackage("game.ZIP")).isTrue();
+        assertThat(GameSystem.isDesktopPackage("game.msi")).isTrue();
+        assertThat(GameSystem.isDesktopPackage("mario.nes")).isFalse();
+        assertThat(GameSystem.isDesktopPackage(null)).isFalse();
+        assertThat(GameSystem.typeForName("DemonStar Setup.exe")).isNull();
+        assertThat(GameSystem.desktopHint()).contains(".exe", ".msi", ".zip", ".7z", ".rar");
+        assertThat(GameSystem.hasSave(GameConst.TYPE_DESKTOP)).isFalse();
+        assertThat(GameSystem.isEmulator(GameConst.TYPE_DESKTOP)).isFalse();
+    }
 }

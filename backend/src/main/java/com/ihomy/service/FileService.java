@@ -119,6 +119,14 @@ public class FileService {
     }
 
     /**
+     * 桌面游戏安装包上传(流式):存 games/{游戏名}/ 平铺。
+     * 唯一允许 .exe/.msi 的入口(其余上传仍被扩展名黑名单挡住);文件由成员下载到自己电脑安装。
+     */
+    public String uploadDesktopGame(MultipartFile file, String gameName) {
+        return saveTo(file, file.getOriginalFilename(), "games", gameName, null, true);
+    }
+
+    /**
      * 小游戏目录:{uploadDir}/games/{游戏名},由游戏文件 URL 反推。
      * URL 不在 /files/games/<一层目录>/ 下(外链、历史数据)时返回 null。
      */
@@ -357,7 +365,13 @@ public class FileService {
 
     /** 流式版本(大文件优先):直接 transferTo 不入堆 */
     private String saveTo(MultipartFile file, String originalName, String root, String sub, Long albumId) {
-        validateName(originalName);
+        return saveTo(file, originalName, root, sub, albumId, false);
+    }
+
+    /** 流式版本;allowInstaller=true 时放行 .exe/.msi(仅桌面游戏安装包入口传 true) */
+    private String saveTo(MultipartFile file, String originalName, String root, String sub, Long albumId,
+                          boolean allowInstaller) {
+        validateName(originalName, allowInstaller);
         try {
             String[] parts = buildPath(originalName, root, sub, albumId);
             Path dir = Paths.get(parts[0]);
@@ -395,14 +409,26 @@ public class FileService {
         }
     }
 
+    /** 一律拒绝的可执行/脚本类扩展名(防存储型 XSS、防站内托管可执行文件) */
+    private static final java.util.Set<String> BLOCKED_EXTENSIONS = java.util.Set.of(
+            "html", "htm", "xhtml", "xht", "shtml", "phtml", "mhtml", "xml", "svg", "js",
+            "jsp", "jspx", "php", "asp", "aspx", "exe", "bat", "cmd", "sh", "css");
+
+    /** 安装包扩展名:只有 uploadDesktopGame 一个入口放行,其余上传路径仍按黑名单拒绝 */
+    private static final java.util.Set<String> INSTALLER_EXTENSIONS = java.util.Set.of("exe", "msi");
+
     /** 校验文件名扩展名黑名单(防存储型 XSS) */
     private void validateName(String originalName) {
+        validateName(originalName, false);
+    }
+
+    private void validateName(String originalName, boolean allowInstaller) {
         if (originalName != null) {
             int dot = originalName.lastIndexOf('.');
             if (dot >= 0) {
                 String ext = originalName.substring(dot + 1).toLowerCase();
-                if (java.util.Set.of("html", "htm", "xhtml", "xht", "shtml", "phtml", "mhtml", "xml", "svg", "js",
-                        "jsp", "jspx", "php", "asp", "aspx", "exe", "bat", "cmd", "sh", "css").contains(ext)) {
+                boolean installer = allowInstaller && INSTALLER_EXTENSIONS.contains(ext);
+                if (!installer && BLOCKED_EXTENSIONS.contains(ext)) {
                     throw new BizException(ResultCode.BAD_REQUEST, "不支持的文件类型: " + ext);
                 }
             }

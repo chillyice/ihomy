@@ -10,6 +10,8 @@ import java.util.Set;
  * type 存大写机种码(GBA/GB/NES/SNES/SEGA/ARCADE/NDS),前端用同一份口径
  * (utils/games/emulatorSystems.js)映射到 EmulatorJS 核心与虚拟按键,两边取值必须一致。
  * 只收单文件 ROM:光盘镜像与多文件格式(cue+bin/iso)要伴随文件,当前导入接口只收一个文件,故不支持。
+ * 桌面游戏(GameConst.TYPE_DESKTOP)不参与扩展名自动识别:导入时显式指定类型,
+ * 否则 .zip/.7z 的安装包会被误判成街机 romset。
  */
 public final class GameSystem {
 
@@ -52,6 +54,24 @@ public final class GameSystem {
     /** 有电池存档的机种(街机靠即时存档,没有 SRAM,不进存档面板) */
     private static final Set<String> SAVE_TYPES = Set.of(
             TYPE_GBA, TYPE_GB, TYPE_NES, TYPE_SNES, TYPE_SEGA, TYPE_NDS);
+
+    /**
+     * 桌面游戏安装包扩展名:只在导入时显式选「桌面游戏」才认,不走扩展名自动识别
+     * (zip/7z 与街机 romset 同后缀,自动判定会把人带沟里)。顺序即提示里的展示顺序。
+     */
+    private static final java.util.List<String> DESKTOP_EXTENSIONS =
+            java.util.List.of("exe", "msi", "zip", "7z", "rar");
+
+    /** 桌面游戏安装包判定(供导入显式选类型时校验) */
+    public static boolean isDesktopPackage(String filename) {
+        String ext = extensionOf(filename);
+        return ext != null && DESKTOP_EXTENSIONS.contains(ext);
+    }
+
+    /** 桌面游戏安装包格式清单(错误提示用,如 .exe / .msi / .zip) */
+    public static String desktopHint() {
+        return DESKTOP_EXTENSIONS.stream().map(e -> "." + e).collect(java.util.stream.Collectors.joining(" / "));
+    }
 
     /** 文件名 → 机种码;.swf 返回 SWF(LINK 由接口单独指定),未识别返回 null */
     public static String typeForName(String filename) {
