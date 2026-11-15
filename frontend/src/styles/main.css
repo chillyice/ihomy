@@ -425,6 +425,19 @@ html.theme-warm .fp-page {
 html.theme-warm .fp-main {
   border-radius: 0;
 }
+/* 网页/开源小游戏页(iframe):与画板同款「铺满主区」——gc-main 让出内边距,页面高度由
+ * CSS 拉满(useGameView fullBleed 暖居下不再写内联高度)。iframe 的 100vh 口径由此与主区
+ * 可视高一致,小游戏自身按视口自适应的内容才装得下,不再出游戏内滚动条。 */
+html.theme-warm .gc-main:has(.web-game-page) {
+  padding: 0;
+}
+html.theme-warm .gc-main .page.web-game-page {
+  height: 100%;
+  padding: 0;
+}
+html.theme-warm .gc-main:has(.web-game-page) .wg-stage {
+  border-radius: 0;
+}
 
 /* 内容页 sticky 侧栏(设置导航/博客分类/文章目录):暖居下顶部偏移归零——
  * gc-main 是滚动容器,顶栏已被隔离在容器之外;sticky 相对滚动容器的内容顶定位,
@@ -437,8 +450,8 @@ html.theme-warm .ops-tabs .el-tabs__header {
   top: 0;
 }
 
-/* 内容区滚动边缘过渡;画板和需要完整显示的游戏面板保持清晰。 */
-html.theme-warm .gc-main:not(:has(.fp-page, .game-page-readable)) {
+/* 内容区滚动边缘过渡;画板、铺满主区的 iframe 游戏页和需要完整显示的游戏面板保持清晰。 */
+html.theme-warm .gc-main:not(:has(.fp-page, .game-page-readable, .web-game-page)) {
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
   mask-image: linear-gradient(to bottom, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
 }

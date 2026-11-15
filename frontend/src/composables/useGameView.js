@@ -15,8 +15,10 @@ import { useGamepad } from './useGamepad'
  * @param {import('vue').Ref<HTMLElement|null>} options.stage 游戏卡(全屏目标 / 适配对象)
  * @param {boolean} [options.fit=true] 是否锁成一屏高
  * @param {boolean} [options.scale=true] 是否按高度等比缩小(fit=true 时生效;false 时由页面自身 flex 撑满)
+ * @param {boolean} [options.fullBleed=false] 全出血页(iframe 游戏页):暖居下高度交给 CSS
+ *   height:100% 拉满 gc-main,不再写内联高度;光尘/移动端无 gc-main,仍走下方 JS 实测
  */
-export function useGameView({ page, stage, fit = true, scale = true } = {}) {
+export function useGameView({ page, stage, fit = true, scale = true, fullBleed = false } = {}) {
   const isFullscreen = ref(false)
   const isWide = ref(false)
   // 手柄:统一在这里接(所有小游戏都走 useGameView),只派发键盘事件,不写逐帧状态
@@ -47,6 +49,12 @@ export function useGameView({ page, stage, fit = true, scale = true } = {}) {
     }
     const viewportH = window.visualViewport?.height || window.innerHeight
     const rect = pageNode.getBoundingClientRect()
+    // 全出血页在暖居(有 gc-main)下交给 CSS height:100% 拉满主区,不写内联高度——
+    // JS 实测在外壳初装的头几帧会量出偏小值,把页面钉死在 220px 下限,iframe 游戏只拿到 320px
+    if (fullBleed && pageNode.closest('.gc-main')) {
+      clearStageTransform()
+      return
+    }
     // 暖居是主区内部滚动:按主区可视底边算;光尘/移动端按视口算
     const scroller = pageNode.closest('.gc-main')
     let bottom = viewportH

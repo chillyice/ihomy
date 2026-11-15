@@ -95,7 +95,8 @@ const stageEl = ref(null)
 const frameKey = ref(0)
 const frameLoaded = ref(false)
 const pageFull = ref(false)
-const { isFullscreen, toggleFullscreen } = useGameView({ page: pageEl, stage: stageEl, scale: false })
+// iframe 本身不缩放(缩了字会糊);暖居下 fullBleed 把高度交给 CSS 拉满主区,游戏拿满内容区高
+const { isFullscreen, toggleFullscreen } = useGameView({ page: pageEl, stage: stageEl, scale: false, fullBleed: true })
 
 const game = computed(() => findEmbeddedGame(String(route.params.slug || '')))
 const title = computed(() => (game.value ? t(game.value.titleKey) : t('games.title')))

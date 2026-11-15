@@ -105,8 +105,8 @@ const frameKey = ref(0)
 const frameLoaded = ref(false)
 const loadError = ref(false)
 const pageFull = ref(false)
-// iframe 本身不缩放(缩了字会糊),页面按内容区锁高、iframe 用 flex 撑满
-const { isFullscreen, toggleFullscreen } = useGameView({ page: pageEl, stage: stageEl, scale: false })
+// iframe 本身不缩放(缩了字会糊);暖居下 fullBleed 把高度交给 CSS 拉满主区,iframe 用 flex 撑满
+const { isFullscreen, toggleFullscreen } = useGameView({ page: pageEl, stage: stageEl, scale: false, fullBleed: true })
 
 /** 保险箱写权限(新增条目要 vault:manage);没有权限就不显示入口,避免点了才报错 */
 const canVault = computed(() => userStore.isOwner || userStore.hasPerm('vault:manage'))
