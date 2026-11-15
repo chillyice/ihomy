@@ -15,11 +15,11 @@ describe('embeddedGames', () => {
   })
 
   it('builds a same-origin static path instead of an external url', () => {
-    expect(embeddedGameSrc('sokoban')).toBe('/mini-games/sokoban/index.html')
+    expect(embeddedGameSrc('bubble')).toBe('/mini-games/bubble/index.html')
   })
 
   it('returns null for an unknown slug so a hand-typed route does not crash', () => {
-    expect(findEmbeddedGame('sokoban')).toMatchObject({ slug: 'sokoban' })
+    expect(findEmbeddedGame('bubble')).toMatchObject({ slug: 'bubble' })
     expect(findEmbeddedGame('nope')).toBeNull()
     expect(findEmbeddedGame(undefined)).toBeNull()
   })

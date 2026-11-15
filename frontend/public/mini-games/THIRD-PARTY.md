@@ -4,7 +4,7 @@
 
 | 目录 | 游戏 | 出处 | 协议 |
 |---|---|---|---|
-| `xiangqi/` `reversi/` `sokoban/` `klotski/` `nonogram/` `match3/` `bubble/` `assets/` | 中国象棋 / 黑白棋 / 推箱子 / 华容道 / 数织 / 消消乐 / 泡泡龙 | [litegame-hub/litegame-hub.github.io](https://github.com/litegame-hub/litegame-hub.github.io) | MIT © 2026 DongGuoTao |
+| `xiangqi/` `reversi/` `match3/` `bubble/` `assets/` | 中国象棋 / 黑白棋 / 消消乐 / 泡泡龙 | [litegame-hub/litegame-hub.github.io](https://github.com/litegame-hub/litegame-hub.github.io) | MIT © 2026 DongGuoTao |
 | `trex/` | 小恐龙快跑 | [wayou/t-rex-runner](https://github.com/wayou/t-rex-runner)(源自 Chromium 的离线小恐龙) | BSD 3-Clause © 2022 牛さとみ / The Chromium Authors |
 | `space-cadet/` | 三维弹球·太空军校生 | 引擎 [k4zmu2a/SpaceCadetPinball](https://github.com/k4zmu2a/SpaceCadetPinball)(反编译 Windows 自带的 `pinball.exe`),网页构建取 [alula/SpaceCadetPinball](https://github.com/alula/SpaceCadetPinball) 的 Emscripten 产物 | 引擎 MIT © k4zmu2a 及贡献者;原始美术/音效 © Microsoft / Cinematronics / Maxis,已取得授权在本站分发 |
 

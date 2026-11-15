@@ -997,9 +997,6 @@ export default {
     embedded: {
       xiangqi: { title: '中国象棋', desc: '楚河汉界，与电脑对弈，三档难度可调' },
       reversi: { title: '黑白棋', desc: '夹住对方的棋子就能翻面，最后棋子多的一方获胜' },
-      sokoban: { title: '推箱子', desc: '把所有箱子推到目标点上，只能推不能拉' },
-      klotski: { title: '华容道', desc: '挪开挡路的方块，帮曹操逃出重围' },
-      nonogram: { title: '数织', desc: '按行列数字涂格子，全部涂对就出现一幅画' },
       match3: { title: '消消乐', desc: '交换相邻宝石，三个以上同色即可消除，连锁越高分越多' },
       bubble: { title: '泡泡龙', desc: '瞄准发射，三个同色泡泡粘在一起就爆掉' },
       'space-cadet': {
