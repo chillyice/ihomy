@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#172522">
+<title>航线 52 · 飞行棋桌面</title>
+<style>
+:root{color-scheme:dark;--ink:#172522;--panel:#20312c;--edge:#40524a;--text:#f4f4e7;--muted:#b2c2b6;--signal:#dfef86;--chart:#f0edda;--mono:"Cascadia Mono",Consolas,monospace;--body:system-ui,"Microsoft YaHei",sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ink);color:var(--text);font:15px/1.5 var(--body)}
+button,select{font:inherit}button,select,summary{touch-action:manipulation}
+button{cursor:pointer}button:disabled{cursor:default}button:focus-visible,select:focus-visible{outline:3px solid #eeffc2;outline-offset:4px}
+.shell{max-width:1210px;margin:auto;padding:0 clamp(14px,4vw,48px) 28px}
+.top{min-height:81px;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--edge)}
+.brand{display:flex;align-items:center;gap:11px}.brand-icon{width:39px;height:39px;border-radius:50%;display:grid;place-items:center;background:var(--signal);color:var(--ink);font-size:23px}
+h1{margin:0;font-size:24px;line-height:1.1;letter-spacing:.03em}h1 em{font-family:var(--mono);font-style:normal;font-weight:700}
+.kicker,.label,.tag{font:700 11px/1.4 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.top-actions{display:flex;gap:8px}.quiet{border:1px solid var(--edge);background:transparent;color:var(--text);padding:7px 13px;border-radius:7px}.quiet:hover{background:#30433a}
+.intro{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:17px 0 10px}.intro h2{margin:0;font-size:15px}.tag{margin:0}.intro .tag{text-align:right}
+.table{display:grid;grid-template-columns:minmax(0,1fr) minmax(285px,330px);gap:18px;align-items:start}
+.chart-frame{background:#40534a;padding:6px;box-shadow:0 16px 38px #09130e66;border-radius:14px}
+.chart{position:relative;aspect-ratio:1;background:var(--chart);border-radius:9px;overflow:hidden;isolation:isolate}
+.chart>svg{width:100%;height:100%;display:block}
+.piece{position:absolute;left:var(--x);top:var(--y);translate:-50% -50%;width:4.2%;aspect-ratio:1;min-width:0;padding:0;border-radius:50%;border:1px solid #1c2824;color:#15262a;background:var(--team);box-shadow:0 2px 2px #18292360;display:grid;place-items:center;font:800 clamp(8px,1.12vw,14px) var(--mono);transition:left .26s ease,top .26s ease,box-shadow .15s}
+.piece[hidden]{display:none}.piece.parked{width:5.1%}.piece:not(:disabled){z-index:3;outline:2px solid #192b24;outline-offset:2px;box-shadow:0 0 0 5px #fff,0 2px 5px 6px #25382d44}
+.piece:not(:disabled):hover{filter:brightness(1.13);scale:1.15}
+.piece:focus-visible{outline:3px solid #192b24;box-shadow:0 0 0 7px white}
+.key{display:flex;flex-wrap:wrap;gap:7px 19px;color:var(--muted);font-size:12px;margin:11px 0 0}.key b{color:var(--signal);font-size:14px;margin-right:3px}
+.console{display:grid;gap:10px}.card{border:1px solid var(--edge);border-radius:10px;background:var(--panel);padding:14px}.card h2{margin:0;font-size:13px}
+.meta{display:flex;justify-content:space-between;align-items:center;gap:10px}.badge{font-size:11px;border:1px solid #587065;background:#273c33;color:#d0ddce;padding:3px 8px;border-radius:99px}
+.now{margin:6px 0 0;font-size:25px;letter-spacing:.02em}.instruction{margin:4px 0 11px;color:var(--muted);min-height:23px;font-size:13px}
+.controls{display:grid;grid-template-columns:48px 1fr;gap:9px;align-items:stretch}
+.die{height:48px;background:var(--chart);color:#1b2b22;border-radius:8px;display:grid;place-items:center;box-shadow:inset 0 -3px 0 #0002}.die svg{width:33px;height:33px}.die.rolling svg{animation:shake .24s ease both}@keyframes shake{30%{transform:rotate(-20deg)}70%{transform:rotate(18deg)}}
+.roll{border-radius:8px;background:var(--signal);color:#1a2722;border:1px solid transparent;font-weight:850;min-height:48px}.roll:not(:disabled):hover{background:#f3ffaf}.roll:disabled{background:#34483d;color:#afc1b1;border-color:#4b6054}
+.routes{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}
+.route{display:grid;grid-template-columns:10px 1fr max-content;gap:8px;align-items:center;padding:6px 8px;background:#1a2a24;border:1px solid transparent;border-radius:6px}.route.active{border-color:var(--team);background:#2c3e33}.route .chip{width:8px;height:8px;border-radius:50%;background:var(--team)}.route strong{font-size:13px}.route small{color:var(--muted);margin-left:5px}.marks{display:flex;align-items:center;gap:3px}.marks i{width:7px;height:7px;border:1px solid var(--team);border-radius:50%}.marks i.filled{background:var(--team)}.marks span{margin-left:4px;font:700 11px var(--mono);color:var(--muted)}
+.log{margin:8px 0 0;padding:0;list-style:none;min-height:57px;color:var(--muted);font-size:12px}.log li{margin-top:4px}.log li:first-child{color:var(--text)}.log li::before{content:'›';color:var(--signal);margin-right:6px}
+dialog{color:var(--text);background:var(--panel);border:1px solid #657c6d;border-radius:13px;padding:22px;width:min(450px,calc(100vw - 28px))}dialog::backdrop{background:#0a1510bd}dialog h2{margin:2px 0 8px}dialog p,dialog ol{color:#d4dfd4}dialog ol{padding-left:22px}dialog li{margin:7px 0}.dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}.dialog-actions .roll{padding:8px 17px;min-height:39px}.fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}.fields label{display:grid;gap:4px}.fields select{background:#182922;color:var(--text);border:1px solid #718777;border-radius:6px;padding:8px;min-width:0}
+@media(max-width:780px){.table{grid-template-columns:1fr}.console{grid-template-columns:1fr 1fr}.console .history{grid-column:1/-1}.top{min-height:64px}.intro{margin:12px 0 8px}.key{margin-bottom:2px}}
+.choices{display:flex;gap:6px;margin-top:9px}.choices[hidden]{display:none}.choice{flex:1;border:1px solid #839688;border-radius:6px;background:#273e33;color:var(--text);padding:6px;font:700 12px var(--body)}.choice:hover{background:#405b4b}.choice:disabled{opacity:.6}
+@media(max-width:470px){.shell{padding-bottom:calc(140px + env(safe-area-inset-bottom))}.turn-card{position:fixed;z-index:8;inset:auto 8px calc(7px + env(safe-area-inset-bottom));box-shadow:0 1px 25px #0a140dc9;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:0 10px;padding:8px 10px}.turn-card .meta{display:none}.turn-live .now{font-size:17px;margin:0}.turn-live .instruction{font-size:11px;min-height:0;margin:2px 0 0}.turn-card .controls{grid-template-columns:35px minmax(70px,auto);gap:6px}.turn-card .die,.turn-card .roll{height:36px;min-height:36px}.turn-card .roll{font-size:12px;padding:0 6px}.turn-card .die svg{width:27px;height:27px}.turn-card .choices{grid-column:1/-1}.turn-card .choice{min-height:37px}.console{grid-template-columns:1fr}.console .history{grid-column:auto}.top-actions{gap:5px}.quiet{padding:6px 9px}.brand-icon{width:31px;height:31px;font-size:18px}h1{font-size:20px}.brand{gap:7px}.kicker{font-size:9px}.intro .tag{font-size:9px}.chart-frame{padding:4px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<main class="shell">
+<header class="top">
+<div class="brand"><span class="brand-icon" aria-hidden="true">⌁</span><div><div class="kicker">Runway / Flight game</div><h1>航线 <em>52</em></h1></div></div>
+<nav class="top-actions" aria-label="对局选项"><button type="button" class="quiet" id="help">规则</button><button type="button" class="quiet" id="new">新对局</button></nav>
+</header>
+<div class="intro"><h2>飞行棋桌面</h2><p class="tag" id="table-label"></p></div>
+<div class="table">
+<section aria-label="飞行棋盘">
+<div class="chart-frame"><div class="chart" id="chart"><svg viewBox="0 0 700 700" aria-hidden="true"></svg><div id="tokens"></div></div></div>
+<div class="key"><span><b>★</b>起飞格（安全）</span><span><b>⇢</b>本色航线，飞跃 12 格</span><span><b>◎</b>归航跑道</span></div>
+</section>
+<aside class="console" aria-label="回合控制">
+<section class="card turn-card" aria-labelledby="turn-label">
+<div class="meta"><h2 id="turn-label">当前回合</h2><span class="badge" id="turn-badge"></span></div>
+<div class="turn-live" role="status" aria-live="polite"><h3 class="now" id="turn-name"></h3><p class="instruction" id="instruction"></p></div>
+<div class="controls"><div class="die" id="die" role="img" aria-label="尚未掷骰"></div><button type="button" id="roll" class="roll">掷骰子</button></div><div id="choices" class="choices" aria-label="可走的飞机" hidden></div>
+</section>
+<section class="card" aria-labelledby="fleet-label"><div class="meta"><h2 id="fleet-label">机队归航</h2><span class="label">Arrivals</span></div><ul class="routes" id="routes"></ul></section>
+<section class="card history" aria-labelledby="log-label"><div class="meta"><h2 id="log-label">飞行记录</h2><span class="label">Flight log</span></div><ul class="log" id="log"></ul></section>
+</aside>
+</div>
+</main>
+<dialog id="rules"><form method="dialog"><div class="label">Flight handbook</div><h2>怎么飞？</h2>
+<ol><li>轮流掷骰。掷出 6 可起飞，也可以走已经起飞的飞机；有棋可走时，走完再掷一次。</li><li>落在本色航线箭头上，沿虚线飞跃 12 格；落在其他本色航点上可跳 4 格。起飞格和归航跑道不触发跳格。</li><li>落到对方飞机所在的位置，对方返回机库。带星的四个起飞格不会撞机。</li><li>绕完公共航线后转入本色跑道。到终点需要刚好的点数；没有可走的飞机就换下一位。</li><li>第一支让四架飞机全部归航的机队获胜。</li></ol>
+<div class="dialog-actions"><button class="roll">回到棋盘</button></div></form></dialog>
+<dialog id="settings"><form id="configure"><div class="label">Prepare for takeoff</div><h2>新对局</h2><p>选择对局方式和席位数量。开始后会替换当前棋局。</p>
+<div class="fields"><label>对局方式<select name="mode"><option value="cpu">人机对局</option><option value="local">同屏轮流</option></select></label><label>席位数量<select name="size"><option value="2">2 席</option><option value="3">3 席</option><option value="4">4 席</option></select></label></div>
+<div class="dialog-actions"><button class="quiet" type="button" id="cancel">取消</button><button class="roll" type="submit">开始对局</button></div></form></dialog>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const TEAMS = [
+ {name:'珊瑚',code:'CRL',paint:'#f58772',ink:'#9d3627',x:38,y:38},
+ {name:'海蓝',code:'BLU',paint:'#7dc7f3',ink:'#236691',x:522,y:38},
+ {name:'金鹏',code:'GLD',paint:'#f3c455',ink:'#8a5d12',x:522,y:522},
+ {name:'翡翠',code:'JDE',paint:'#71c8a4',ink:'#23684d',x:38,y:522},
+];
+const N = 52, GOAL = 57, HANGAR = -1;
+const STORE = 'runway52.table.v1';
+const mod = (i,n=N) => (i%n+n)%n;
+const point = (i,r=244) => {
+ const a = (-135+mod(i)*360/N)*Math.PI/180;
+ return [350+r*Math.cos(a),350+r*Math.sin(a)];
+};
+const publicIndex = (color,progress) => mod(13*color+progress);
+const isPublic = p => p>=0&&p<N;
+const stand = (color,p) => {
+ const t=TEAMS[color];return [t.x+48+p%2*45,t.y+65+Math.floor(p/2)*39];
+};
+function coords(color,progress,piece) {
+ if(progress===HANGAR) return stand(color,piece);
+ if(isPublic(progress)) return point(publicIndex(color,progress));
+ return point(publicIndex(color,51),209-29*(progress-N));
+}
+const last = state => state.order[state.turn];
+const arrivals = (state,c) => state.planes[c].filter(p=>p===GOAL).length;
+function fresh(size,mode) {
+ const order = size===2?[0,2]:Array.from({length:size},(_,i)=>i);
+ return {order,mode,turn:0,planes:Array.from({length:4},()=>Array(4).fill(HANGAR)),
+  phase:'roll',face:0,winner:null,round:0,log:['塔台就绪，珊瑚机队先掷。']};
+}
+function movesFor(g,face=g.face) {
+ const c=last(g);
+ return g.planes[c].flatMap((from,piece)=>{
+  if (from===GOAL || (from===HANGAR&&face!==6)) return [];
+  let to=from===HANGAR?0:from+face, kind=from===HANGAR?'起飞':'前进', captures=[];
+  if(to>GOAL) return [];
+  if(from>=0&&to===6){to+=12;kind='跨场飞跃';}
+  else if(from>=0&&to<N&&to%4===0&&to+4<N&&publicIndex(c,to)%13!==0){to+=4;kind='同色跳格';}
+  if(to===GOAL) kind='归航';
+  if(isPublic(to)){
+   const spot=publicIndex(c,to);
+   if(spot%13!==0) for(const rival of g.order) if(rival!==c) {
+    g.planes[rival].forEach((p,i)=>{if(isPublic(p)&&publicIndex(rival,p)===spot) captures.push([rival,i]);});
+   }
+  }
+  return [{piece,to,kind,captures}];
+ });
+}
+function note(g, line) {g.log.unshift(line);g.log=g.log.slice(0,4);}
+function advance(g){g.turn=(g.turn+1)%g.order.length;g.phase='roll';}
+function cast(g,face) {
+ if(g.phase!=='roll') return;
+ g.face=face;g.round++;
+ if(movesFor(g).length){g.phase='move';note(g,TEAMS[last(g)].name+'掷出 '+face+' 点。');}
+ else {note(g,TEAMS[last(g)].name+'掷出 '+face+' 点，无棋可走。');advance(g);}
+}
+function play(g,index) {
+ if(g.phase!=='move') return false;
+ const c=last(g), move=movesFor(g).find(m=>m.piece===index);
+ if(!move) return false;
+ g.planes[c][index]=move.to;
+ for(const [r,p] of move.captures) g.planes[r][p]=HANGAR;
+ const action=TEAMS[c].name+' '+(index+1)+' 号'+move.kind+(move.captures.length?'，撞回 '+move.captures.length+' 架飞机':'');
+ if(arrivals(g,c)===4){g.phase='won';g.winner=c;note(g,action+'，全队归航！');}
+ else if(g.face===6){g.phase='roll';note(g,action+'，再掷一次。');}
+ else {note(g,action+'。');advance(g);}
+ return true;
+}
+function choose(g){
+ const score=m=>100*m.captures.length+(m.to===GOAL?80:0)+(m.kind==='起飞'?36:0)+(m.kind==='跨场飞跃'?22:0)+m.to*.42;
+ return movesFor(g).sort((a,b)=>score(b)-score(a))[0]?.piece;
+}
+function load(){
+ try{
+  const s=JSON.parse(localStorage.getItem(STORE));
+  if(s && ['cpu','local'].includes(s.mode) && [[0,2],[0,1,2],[0,1,2,3]].some(o=>String(o)===String(s.order))
+   && Array.isArray(s.planes)&&s.planes.length===4&&s.planes.every(row=>Array.isArray(row)&&row.length===4&&row.every(p=>Number.isInteger(p)&&p>=HANGAR&&p<=GOAL))
+   && Number.isInteger(s.turn)&&s.turn>=0&&s.turn<s.order.length&&['roll','move','won'].includes(s.phase)
+   && Number.isInteger(s.face)&&s.face>=0&&s.face<=6&&(s.phase!=='move'||s.face>0&&movesFor(s).length>0)
+   && (s.phase!=='won'||s.order.includes(s.winner)&&arrivals(s,s.winner)===4)
+   && Number.isInteger(s.round)&&s.round>=0&&Array.isArray(s.log)&&s.log.every(l=>typeof l==='string')) return s;
+ }catch{}
+ return fresh(4,'cpu');
+}
+function save(){try{localStorage.setItem(STORE,JSON.stringify(game));}catch{}}
+function svgBoard(){
+ const chart=$('chart').querySelector('svg');
+ const circle=(x,y,r,attrs='')=>'<circle cx="'+x+'" cy="'+y+'" r="'+r+'" '+attrs+'/>';
+ const line=(from,to,attrs='')=>'<path d="M'+from.join(',')+'L'+to.join(',')+'" '+attrs+'/>';
+ const text=(x,y,content,size,attrs='')=>'<text x="'+x+'" y="'+y+'" font-size="'+size+'" '+attrs+'>'+content+'</text>';
+ let art='<defs><pattern id="paper-grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#c3c9ad" stroke-width="1" opacity=".38"/></pattern></defs>';
+ art+='<rect width="700" height="700" fill="#f0edda"/><rect width="700" height="700" fill="url(#paper-grid)"/><rect x="17" y="17" width="666" height="666" rx="8" fill="none" stroke="#9da891" stroke-width="1"/>';
+ const middle='text-anchor="middle"';
+ const tech='font-family="Consolas,monospace" font-weight="700"';
+ art+=text(350,52,'CIRCUIT / 52',12,middle+' '+tech+' letter-spacing="3" fill="#516956"');
+ art+=text(350,660,'航图 · 顺时针飞行',11,middle+' fill="#516956" font-weight="700" letter-spacing="2"');
+ art+=circle(350,350,244,'fill="none" stroke="#7d927e" stroke-width="2"');
+ art+=circle(350,350,264,'fill="none" stroke="#acb39b" stroke-width="1" stroke-dasharray="3 6"');
+ art+=circle(350,350,73,'fill="#dce0c7" stroke="#819783" stroke-width="1"');
+ art+=circle(350,350,45,'fill="#233c32"');
+ art+=text(350,350,'✈',28,middle+' fill="#e9f1b9"');
+ art+=text(350,372,'归航',12,middle+' fill="#f0edda" letter-spacing="3"');
+ for(let c=0;c<4;c++){
+  const t=TEAMS[c], a=point(c*13+6), b=point(c*13+18);
+  art+=line(a,b,'fill="none" stroke="'+t.ink+'" stroke-width="2" stroke-dasharray="6 5" opacity=".5"');
+ }
+ for(let c=0;c<4;c++){
+  const t=TEAMS[c], [x,y]=[t.x,t.y];
+  art+='<rect x="'+x+'" y="'+y+'" width="140" height="140" rx="9" fill="'+t.paint+'" stroke="'+t.ink+'" stroke-width="1.5"/>';
+  art+='<path d="M'+(x+13)+' '+(y+36)+'h114" stroke="'+t.ink+'" opacity=".6"/>';
+  art+=text(x+13,y+25,t.name,16,'fill="#162923" font-weight="800"');
+  art+=text(x+127,y+25,t.code,12,'text-anchor="end" fill="'+t.ink+'" '+tech);
+  art+=text(x+70,y+128,'HANGAR 0'+(c+1),9,middle+' '+tech+' fill="'+t.ink+'" letter-spacing="2"');
+  for(let i=0;i<4;i++){const [px,py]=stand(c,i);art+=circle(px,py,16,'fill="#f0edda" fill-opacity=".55" stroke="'+t.ink+'" stroke-dasharray="2 2"');}
+  art+=line(point(c*13+51),coords(c,GOAL,0),'stroke="'+t.ink+'" stroke-width="4" opacity=".53"');
+  for(let p=N;p<=GOAL;p++){
+   const [px,py]=coords(c,p,0);
+   art+=circle(px,py,p===GOAL?13:11,'fill="'+t.paint+'" stroke="'+t.ink+'" stroke-width="1.2"');
+   if(p===GOAL) art+=circle(px,py,6,'fill="none" stroke="'+t.ink+'" stroke-width="1.6"');
+  }
+ }
+ for(let i=0;i<N;i++){
+  const [x,y]=point(i), launch=i%13===0, jet=mod(i-6,13)===0;
+  const slot=jet?Math.floor(i/13):i%4, t=TEAMS[slot];
+  art+=circle(x,y,launch?13:jet?12:9.6,'fill="'+t.paint+'" stroke="'+t.ink+'" stroke-width="'+(launch||jet?1.5:1)+'"');
+  if(launch||jet) art+=text(x,y+(launch?5:5.4),launch?'★':'⇢',launch?15:17,middle+' fill="#162923" font-weight="900"');
+ }
+ chart.innerHTML=art;
+}
+let game=load(), timer=0, spinning=false, blocked=false;
+const tokenMap=new Map();
+function rebuild(){
+ $('tokens').replaceChildren();tokenMap.clear();
+ for(const c of game.order)for(let i=0;i<4;i++){
+  const button=document.createElement('button');button.type='button';button.className='piece';button.textContent=i+1;
+  button.style.setProperty('--team',TEAMS[c].paint);
+  button.addEventListener('click',()=>{if(!spinning&&!blocked&&!isCpu()&&last(game)===c) act(i,true);});
+  $('tokens').append(button);tokenMap.set(c+':'+i,button);
+ }
+}
+function isCpu(){return game.mode==='cpu'&&last(game)!==0;}
+function die(face){
+ const layouts=[[],[4],[0,8],[0,4,8],[0,2,6,8],[0,2,4,6,8],[0,2,3,5,6,8]];
+ const marks=layouts[face]||[];
+ return '<svg viewBox="0 0 36 36" aria-hidden="true">'+(face?marks.map(n=>'<circle cx="'+(8+n%3*10)+'" cy="'+(8+Math.floor(n/3)*10)+'" r="2.7" fill="currentColor"/>').join(''):'<path d="M13 18h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>')+'</svg>';
+}
+function sync(){
+ const c=last(game), cpu=isCpu(), won=game.phase==='won', pick=game.phase==='move', done=game.winner;
+ $('table-label').textContent=game.order.length+' 席 / '+(game.mode==='cpu'?'人机对局':'同屏轮流');
+ $('turn-badge').textContent=won?'对局结束':'第 '+(game.round+(pick||spinning?0:1)||1)+' 掷';
+ $('turn-name').textContent=TEAMS[won?done:c].name+'机队'+(won?'获胜':'');
+ $('turn-name').style.color=TEAMS[won?done:c].paint;
+ $('instruction').textContent=won?'四架飞机全部归航。':spinning?'骰子滚动中…':pick?(cpu?'电脑正在选棋。':'点一架高亮的飞机走子。'):(cpu?'等待电脑掷骰。':'掷骰子，开始这一回合。');
+ $('roll').textContent=won?'再开一局':cpu?'电脑回合':pick?'请选择飞机':'掷骰子';
+ $('roll').disabled=blocked||!won&&(cpu||pick||spinning);
+ const face=$('die');face.classList.toggle('rolling',spinning);face.innerHTML=die(game.face);face.setAttribute('aria-label',spinning?'掷骰中':game.face?game.face+' 点':'尚未掷骰');
+ $('routes').innerHTML=game.order.map(k=>{
+  const t=TEAMS[k], n=arrivals(game,k);
+  return '<li class="route'+(!won&&k===c?' active':'')+'" style="--team:'+t.paint+'"'+(!won&&k===c?' aria-current="true"':'')+'><i class="chip" aria-hidden="true"></i><div><strong>'+t.name+'</strong><small>'+(game.mode==='cpu'?(k===0?'你':'电脑'):'玩家 '+(game.order.indexOf(k)+1))+'</small></div><div class="marks" aria-label="归航 '+n+' 架">'+Array.from({length:4},(_,i)=>'<i aria-hidden="true" class="'+(i<n?'filled':'')+'"></i>').join('')+'<span aria-hidden="true">'+n+'/4</span></div></li>';
+ }).join('');
+ $('log').replaceChildren(...game.log.slice(0,3).map(line=>{const li=document.createElement('li');li.textContent=line;return li;}));
+ const legal=new Set(!won&&pick&&!cpu&&!blocked?movesFor(game).map(m=>m.piece):[]), stacks=new Map();
+ const choices=$('choices');choices.hidden=!legal.size;
+ choices.replaceChildren(...[...legal].map(i=>{const b=document.createElement('button');b.className='choice';b.type='button';b.textContent=(i+1)+' 号飞机';b.onclick=()=>act(i,true);return b;}));
+ for(const k of game.order)game.planes[k].forEach((p,i)=>{
+  const el=tokenMap.get(k+':'+i);
+  el.hidden=p===GOAL;el.disabled=k!==c||!legal.has(i);el.classList.toggle('parked',p===HANGAR);
+  el.setAttribute('aria-label',TEAMS[k].name+' '+(i+1)+' 号飞机，'+(p===HANGAR?'在机库':p>=N?'在归航跑道':'在公共航线'));
+  if(p===GOAL)return;
+  const [x,y]=coords(k,p,i), key=x.toFixed(3)+':'+y.toFixed(3);
+  if(!stacks.has(key))stacks.set(key,[]);
+  stacks.get(key).push({el,x,y});
+ });
+ for(const group of stacks.values()){
+  group.sort((a,b)=>Number(a.el.disabled)-Number(b.el.disabled));
+  group.forEach(({el,x,y},i)=>{
+   const n=group.length, spread=n===1?0:n<5?16:22, angle=i*Math.PI*2/n-Math.PI/2;
+   el.style.setProperty('--x',(x+spread*Math.cos(angle))/7+'%');el.style.setProperty('--y',(y+spread*Math.sin(angle))/7+'%');
+   el.style.zIndex=el.disabled?1:3;
+  });
+ }
+}
+function schedule(){
+ clearTimeout(timer);
+ if(blocked||spinning||!isCpu()||game.phase==='won')return;
+ timer=setTimeout(()=>game.phase==='roll'?throwDie():act(choose(game)),game.phase==='roll'?680:490);
+}
+function throwDie(){
+ if(blocked||spinning||game.phase!=='roll')return;
+ spinning=true;sync();clearTimeout(timer);
+ timer=setTimeout(()=>{
+  spinning=false;cast(game,Math.floor(Math.random()*6)+1);
+  save();sync();schedule();
+  if(!isCpu()&&game.phase==='move')$('choices').querySelector('button')?.focus({preventScroll:true});
+  else if(!$('roll').disabled)$('roll').focus({preventScroll:true});
+ },270);
+}
+function act(i,focus=false){
+ if(!play(game,i))return;
+ save();sync();schedule();
+ if(focus&&!$('roll').disabled)$('roll').focus({preventScroll:true});
+}
+function openDialog(id){
+ if(spinning){clearTimeout(timer);spinning=false;}
+ blocked=true;sync();schedule();$(id).showModal();
+}
+$('help').onclick=()=>openDialog('rules');
+$('new').onclick=()=>{
+ $('configure').elements.mode.value=game.mode;$('configure').elements.size.value=game.order.length;
+ openDialog('settings');
+};
+$('roll').onclick=()=>game.phase==='won'?$('new').click():throwDie();
+$('cancel').onclick=()=>$('settings').close();
+for(const id of ['rules','settings'])$(id).addEventListener('close',()=>{blocked=false;sync();schedule();});
+$('configure').addEventListener('submit',e=>{
+ e.preventDefault();
+ const f=new FormData(e.currentTarget);game=fresh(+f.get('size'),f.get('mode'));rebuild();save();$('settings').close();
+});
+svgBoard();rebuild();sync();schedule();
+</script>
+</body>
+</html>
