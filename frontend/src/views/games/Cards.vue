@@ -93,7 +93,10 @@ onBeforeUnmount(() => sunLight?.restoreEffects())
 <style scoped>
 .cards-stage {
   display: flex;
-  flex: 1 0 320px;
+  /* 允许收缩:矮视口(手机横屏)下 useGameView 锁定的页高小于基础高度时,
+     舞台要能让出空间,牌面由 fitCardWidth 按 felt 实测高度自适应 */
+  flex: 1 1 320px;
+  min-height: 0;
   flex-direction: column;
   gap: 8px;
   min-width: 0;

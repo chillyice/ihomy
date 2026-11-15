@@ -115,7 +115,9 @@
 }
 
 .sol-felt {
-  flex: 1 0 200px;
+  /* 允许收缩(min-height:0):矮视口下页高被 useGameView 锁死时让出空间,牌面自行缩放 */
+  flex: 1 1 200px;
+  min-height: 0;
   width: 100%;
   padding: 10px;
   border-radius: 12px;

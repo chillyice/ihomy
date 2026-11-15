@@ -1393,9 +1393,9 @@ onBeforeUnmount(() => {
   overflow: auto;
   background: var(--color-bg);
 }
-/* 全屏没有顶栏/页脚,视口扣减放宽 */
+/* 全屏没有顶栏/页脚,扣全屏态卡内边距 + 卡内全屏动作行 + 组间距,横幅实测高度由变量如实上报 */
 .mahjong-card:fullscreen .mj-table {
-  width: min(100%, calc((100vh - 32px) * 1.6));
+  width: min(100%, calc((100dvh - 88px - var(--room-bar-h, 0px)) * 1.6));
 }
 
 /* 封面 */
@@ -1548,8 +1548,9 @@ onBeforeUnmount(() => {
   position: relative;
   aspect-ratio: 16 / 10;
   /* 恒定宽高比:宽取「撑满卡片」与「视口高扣除顶栏页脚后按比例折算」较小者,
-     窗口怎么变桌面形状都不变;200px ≈ 顶栏 + 页脚 + 页面/卡片内边距 */
-  width: min(100%, calc((100vh - 200px) * 1.6));
+     窗口怎么变桌面形状都不变;216px ≈ 顶栏 + 页脚 + 页面/卡片内边距 + 组间距;
+     「一起玩」横幅(含换行增高)由 --room-bar-h 实测变量扣减,保一屏不滚动 */
+  width: min(100%, calc((100dvh - 216px - var(--room-bar-h, 0px)) * 1.6));
   /* 半俯视:顶边向后倒,像坐在桌边看 */
   transform: perspective(1700px) rotateX(12deg);
   display: grid;

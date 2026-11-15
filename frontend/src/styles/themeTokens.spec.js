@@ -54,6 +54,7 @@ const RUNTIME_VARS = {
   '--sol-cols': '纸牌棋盘列数',
   '--sol-gap': '纸牌棋盘间距',
   '--sol-card-w': '纸牌卡宽(useGameView 实测)',
+  '--room-bar-h': '一起玩横幅实测高度(GameRoomBar 写进父级游戏卡,盘面公式扣减)',
   '--pc': 'Ludo 玩家卡按座位配色注入(与盘面棋子同色)',
   '--pc-soft': 'Ludo 玩家卡的座位色淡底',
   '--wide-col-max': '大屏双栏列内滚动净高(Schedule.vue 按实测头高注入)',

@@ -873,7 +873,10 @@ onBeforeUnmount(() => {
   padding: 14px clamp(10px, 2vw, 22px) 18px;
   --ludo-paper: #f8f0dd;
   --ludo-cell-line: rgba(58, 46, 34, 0.07);
-  --ludo-board-max: 620px;
+  /* 棋盘 1:1 恒定方形:宽取「撑满卡片」与「视口高扣除顶栏页脚后折算」较小者;
+     230px ≈ 顶栏 + 页脚 + 页面/卡片内边距 + 组间距 + 页底留白(方形盘比 16:10 桌多扣);
+     「一起玩」横幅实测高度走 --room-bar-h */
+  --ludo-board-max: min(620px, calc(100dvh - 230px - var(--room-bar-h, 0px)));
 }
 
 html.dark .ludo-card {
@@ -884,7 +887,8 @@ html.dark .ludo-card {
 .ludo-card:fullscreen {
   overflow: auto;
   background: var(--color-bg);
-  --ludo-board-max: min(84vh, 780px);
+  /* 全屏扣卡内边距 + 卡内全屏动作行 + 组间距,横幅实测高度由变量如实上报 */
+  --ludo-board-max: min(780px, calc(84dvh - 84px - var(--room-bar-h, 0px)));
 }
 
 .ludo-card:fullscreen .ludo-board {
@@ -1089,6 +1093,10 @@ html.dark .ludo-card {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  /* 左右布局时侧栏随棋盘同高封顶:矮视口(手机横屏/矮窗)下状态+骰子仍在首屏,
+     玩家明细在侧栏内部滚动,页面不破一屏;纵向堆叠分支放开 */
+  max-height: var(--ludo-board-max, 620px);
+  overflow-y: auto;
 }
 
 .ludo-status {
@@ -1417,16 +1425,24 @@ html.dark .ludo-card {
   justify-content: center;
 }
 
-/* ---------- 窄屏 ---------- */
-@media (max-width: 860px) {
+/* ---------- 窄屏(仅竖屏堆叠;横屏窄窗保持左右布局,靠 --ludo-board-max 高度约束保一屏) ---------- */
+@media (max-width: 860px) and (orientation: portrait) {
   .ludo-layout {
     flex-direction: column;
     align-items: stretch;
   }
 
+  /* 纵向堆叠:棋盘再扣侧栏(状态+骰子+玩家压缩态实测约 308px)与顶栏页脚约 475px,
+     横幅走 --room-bar-h;堆叠态侧栏全宽展开,不封顶 */
+  .ludo-card {
+    --ludo-board-max: min(620px, calc(100dvh - 475px - var(--room-bar-h, 0px)));
+  }
+
   .ludo-side {
     flex: 1 1 auto;
     width: auto;
+    max-height: none;
+    overflow-y: visible;
   }
 
   .ludo-dice-box {
@@ -1465,6 +1481,13 @@ html.dark .ludo-card {
     width: 54px;
     height: 54px;
     padding: 8px;
+  }
+}
+
+/* 矮视口(手机横屏):侧栏内部滚动时骰子排到最前,掷骰动作始终在首屏可达 */
+@media (max-height: 500px) {
+  .ludo-dice-box {
+    order: -1;
   }
 }
 </style>

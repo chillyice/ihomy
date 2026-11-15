@@ -1291,7 +1291,9 @@ onBeforeUnmount(() => {
 }
 
 .sd-layout {
-  --sd-frame-size: min(100%, clamp(280px, calc(100dvh - 212px), 520px));
+  /* 442px = 顶栏/页脚/内边距 212 + 竖屏时下方数字盘面板(统计+9键+工具+帮助)实测约 230;
+     「一起玩」横幅高度由 --room-bar-h 实测变量扣减,横竖屏都保一屏不滚动 */
+  --sd-frame-size: min(100%, clamp(280px, calc(100dvh - 442px - var(--room-bar-h, 0px)), 520px));
   display: grid;
   justify-items: center;
   align-items: center;
@@ -1305,7 +1307,8 @@ onBeforeUnmount(() => {
 }
 @container sudoku (min-width: 550px) {
   .sd-layout {
-    grid-template-columns: minmax(0, clamp(280px, calc(100dvh - 166px), 540px)) minmax(0, 232px);
+    /* 宽卡双栏:棋盘列宽按视口高折算,166px ≈ 顶栏/页脚/内边距,横幅走 --room-bar-h */
+    grid-template-columns: minmax(0, clamp(280px, calc(100dvh - 166px - var(--room-bar-h, 0px)), 540px)) minmax(0, 232px);
     justify-content: center;
     gap: clamp(16px, 4cqi, 36px);
   }
