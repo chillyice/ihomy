@@ -389,6 +389,7 @@ export const gameApi = {
   guandanReward: () => request.post('/game/guandan/reward'),
   baohuangReward: () => request.post('/game/baohuang/reward'),
   goujiReward: () => request.post('/game/gouji/reward'),
+  mahjong3dReward: () => request.post('/game/mahjong3d/reward'),
   // GBA 存档落在游戏目录的 saves/ 下,列表按最后修改时间倒序
   listSaves: (id) => request.get(`/game/${id}/saves`),
   downloadSave: (id, name) => request.get(`/game/${id}/saves/${encodeURIComponent(name)}`, { responseType: 'arraybuffer' }),

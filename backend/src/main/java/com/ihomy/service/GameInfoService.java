@@ -362,6 +362,14 @@ public class GameInfoService {
                 GameConst.H5_GAME_DAILY_LIMIT, "够级获胜");
     }
 
+    /**
+     * 立体麻将获胜奖励(玩家胡一局上报一次,每日限次防刷)。
+     */
+    public Map<String, Object> mahjong3dReward(Long userId, Long familyId) {
+        return h5GameReward(userId, familyId, PointsRuleConst.GAME_MAHJONG3D, "mahjong3d",
+                GameConst.H5_GAME_DAILY_LIMIT, "立体麻将获胜");
+    }
+
     private Map<String, Object> h5GameReward(Long userId, Long familyId, String featureCode,
                                              String counterKey, int dailyLimit, String remark) {
         Map<String, Object> map = new HashMap<>();

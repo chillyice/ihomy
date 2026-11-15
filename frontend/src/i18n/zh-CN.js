@@ -1640,6 +1640,13 @@ export default {
       roomEnded: '这局已经结束了',
       coverHint: '一个人也能玩：其余座位由电脑补上',
     },
+    mahjong3d: {
+      title: '立体麻将',
+      desc: '真 3D 牌桌：透视主视角坐在桌边，圆角立体牌、实时牌墙与双骰；规则与「麻将」一致，胡牌发积分',
+      viewMain: '主视角',
+      viewTop: '俯视',
+      you: '我',
+    },
     doudizhu: {
       title: '斗地主',
       desc: '三人斗地主，叫分抢地主，炸弹翻倍，你打两位电脑',

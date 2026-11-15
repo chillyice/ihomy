@@ -1649,6 +1649,13 @@ export default {
       roomEnded: 'This game has ended',
       coverHint: 'Play solo too: empty seats are filled by the computer',
     },
+    mahjong3d: {
+      title: 'Mahjong 3D',
+      desc: 'A true 3D table: sit at the table in perspective view with rounded tiles, a live wall and dice; same rules as Mahjong — winning hands earn points',
+      viewMain: 'Main view',
+      viewTop: 'Top-down',
+      you: 'You',
+    },
     doudizhu: {
       title: 'Dou Dizhu',
       desc: 'Three-player climbing game — bid for landlord, bombs double the stake, you face two computers',

@@ -35,6 +35,7 @@ public final class PointsRuleConst {
     public static final String GAME_GUANDAN = "game_guandan";
     public static final String GAME_BAOHUANG = "game_baohuang";
     public static final String GAME_GOUJI = "game_gouji";
+    public static final String GAME_MAHJONG3D = "game_mahjong3d";
     public static final String GAME_MATCH_WIN = "game_match_win";
     public static final String PLANT_WATER = "plant_water";
     public static final String PLANT_SUN = "plant_sun";
@@ -74,6 +75,7 @@ public final class PointsRuleConst {
             new Feature(GAME_GUANDAN, GROUP_GAME, 10, true),
             new Feature(GAME_BAOHUANG, GROUP_GAME, 10, true),
             new Feature(GAME_GOUJI, GROUP_GAME, 10, true),
+            new Feature(GAME_MAHJONG3D, GROUP_GAME, 10, true),
             new Feature(GAME_MATCH_WIN, GROUP_GAME, 5, true),
             new Feature(PLANT_WATER, GROUP_GARDEN, 2, true),
             new Feature(PLANT_SUN, GROUP_GARDEN, 2, true),

@@ -258,4 +258,12 @@ public class GameInfoController {
         LoginUser user = current();
         return Result.success(gameService.goujiReward(user.getUserId(), user.getFamilyId()));
     }
+
+    @Operation(summary = "H5 小游戏获胜奖励")
+    @OperationLog(module = "GAME", operationType = "UPDATE", description = "立体麻将获胜奖励")
+    @PostMapping("/mahjong3d/reward")
+    public Result<Map<String, Object>> mahjong3dReward() {
+        LoginUser user = current();
+        return Result.success(gameService.mahjong3dReward(user.getUserId(), user.getFamilyId()));
+    }
 }

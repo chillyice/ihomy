@@ -408,6 +408,14 @@ const builtinGames = [
     category: 'CASUAL',
   },
   {
+    key: 'mahjong3d',
+    titleKey: 'games.mahjong3d.title',
+    descKey: 'games.mahjong3d.desc',
+    icon: Coin,
+    path: '/games/mahjong3d',
+    category: 'CASUAL',
+  },
+  {
     key: 'guandan',
     titleKey: 'games.guandan.title',
     descKey: 'games.guandan.desc',
