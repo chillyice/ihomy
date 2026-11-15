@@ -173,14 +173,69 @@
     button { padding: 6px 10px; font-size: 12px; }
     .stat { min-width: 48px; font-size: 12px; }
   }
+
+  /* ---------- orientation layout ----------
+   * 竖屏:.side/.board-col 用 display:contents 摊平进 .app 纵列,
+   * 顺序=标题→提示→统计→题名→棋盘→状态→操作(操作挪到棋盘下)。
+   * 横屏:统计移左、操作移右,棋盘拿满剩余高(fitCell 同步感知横屏扣减)。 */
+  .app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+  .side, .board-col { display: contents; }
+
+  @media (orientation: landscape) and (min-width: 640px) {
+    body {
+      height: 100vh;
+      padding: 10px 16px 8px;
+    }
+    .lang-switch { margin-bottom: 4px; }
+    .app {
+      flex-direction: row;
+      align-items: stretch;
+      justify-content: center;
+      gap: 16px;
+      flex: 1 1 auto;
+      min-height: 0;
+      max-width: 1120px;
+    }
+    .side {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 0 0 176px;
+      min-height: 0;
+      overflow-y: auto;
+    }
+    .side-l { align-items: flex-start; }
+    .side-l h1 { font-size: 21px; margin: 0; }
+    .side-l .tip { margin: 0; text-align: left; }
+    .side .bar {
+      flex-direction: column;
+      flex-wrap: nowrap;
+      align-items: stretch;
+      gap: 8px;
+      margin: 0;
+    }
+    .side .stat { display: flex; justify-content: space-between; }
+    .side-r { align-items: stretch; }
+    .board-col {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-width: 0;
+      min-height: 0;
+      align-items: center;
+      justify-content: center;
+    }
+  }
 </style>
 </head>
 <body>
 
 <div class="lang-switch" data-lang-switch></div>
-
-<h1 data-i18n="title"></h1>
-<p class="tip" data-i18n="tip"></p>
 
 <!-- Start overlay: the visible entry point before a puzzle is generated. -->
 <div id="startOverlay" class="overlay show">
@@ -196,20 +251,35 @@
   </div>
 </div>
 
-<div class="panel">
-  <div class="bar">
-    <div class="stat"><small data-i18n="time"></small> <span id="time">0</span></div>
-    <div class="stat"><small data-i18n="progress"></small> <span id="progress">0/0</span></div>
-    <div class="stat"><small data-i18n="hints"></small> <span id="hints">0</span></div>
-    <button id="btnHint" data-i18n="hint"></button>
-    <button id="btnUndo" data-i18n="undo"></button>
-    <button id="btnRestart" data-i18n="restart"></button>
-    <button id="btnNew" data-i18n="newGame"></button>
-    <label class="chk"><input type="checkbox" id="errToggle" checked> <span data-i18n="errors"></span></label>
+<!-- 三段式:竖屏 信息上/棋盘中/操作下;横屏 信息左/棋盘满高/操作右 -->
+<div class="app">
+  <aside class="side side-l">
+    <h1 data-i18n="title"></h1>
+    <p class="tip" data-i18n="tip"></p>
+    <div class="bar">
+      <div class="stat"><small data-i18n="time"></small> <span id="time">0</span></div>
+      <div class="stat"><small data-i18n="progress"></small> <span id="progress">0/0</span></div>
+      <div class="stat"><small data-i18n="hints"></small> <span id="hints">0</span></div>
+    </div>
+  </aside>
+
+  <div class="board-col">
+    <div id="patternInfo"></div>
+    <div class="panel">
+      <div id="frame"></div>
+    </div>
+    <div id="status"></div>
   </div>
-  <div id="patternInfo"></div>
-  <div id="frame"></div>
-  <div id="status"></div>
+
+  <aside class="side side-r">
+    <div class="bar">
+      <button id="btnHint" data-i18n="hint"></button>
+      <button id="btnUndo" data-i18n="undo"></button>
+      <button id="btnRestart" data-i18n="restart"></button>
+      <button id="btnNew" data-i18n="newGame"></button>
+      <label class="chk"><input type="checkbox" id="errToggle" checked> <span data-i18n="errors"></span></label>
+    </div>
+  </aside>
 </div>
 
 <!-- Win overlay -->
@@ -671,8 +741,12 @@ var errToggleEl    = document.getElementById('errToggle');
 function fitCell(n, mrc, mcc) {
   var iw = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 480;
   var ih = (typeof window !== 'undefined' && window.innerHeight) ? window.innerHeight : 800;
-  var availW = Math.min(iw, 680) - 28;
-  var availH = Math.max(260, ih - 250);
+  // 横屏(与 CSS 断点一致):信息/操作移到左右侧栏,棋盘拿满剩余高,
+  // 宽度扣两侧栏;竖屏维持原扣减(顶部信息条)。
+  var landscape = typeof window.matchMedia === 'function' &&
+    window.matchMedia('(orientation: landscape) and (min-width: 640px)').matches;
+  var availW = landscape ? iw - 420 : Math.min(iw, 680) - 28;
+  var availH = Math.max(260, ih - (landscape ? 110 : 250));
   var cw = Math.floor(availW / (n + mrc));
   var ch = Math.floor(availH / (n + mcc));
   return Math.max(13, Math.min(36, Math.min(cw, ch)));

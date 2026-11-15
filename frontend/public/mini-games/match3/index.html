@@ -51,7 +51,7 @@
     gap: 7px;
     margin-bottom: 10px;
   }
-  .bar:last-child { margin-bottom: 0; margin-top: 10px; }
+  .side-r .bar { margin: 10px 0 0; }
 
   .stat {
     background: #f5f7fd;
@@ -430,36 +430,105 @@
     button { padding: 7px 11px; font-size: 12px; }
     .stat { padding: 4px 7px; font-size: 11px; }
   }
+
+  /* ---------- orientation layout ----------
+   * 竖屏:.side/.board-col 用 display:contents 摊平进 .app 纵列,
+   * 视觉顺序=标题→提示→统计→棋盘→操作→状态行,与旧单列一致。
+   * 横屏:统计移左、操作移右,棋盘区拿满剩余宽高;
+   * 方形棋盘宽度取 min(列宽, 视口高预留),保证不出滚动条。 */
+  .app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+  .side, .board-col { display: contents; }
+
+  @media (orientation: landscape) and (min-width: 640px) {
+    body {
+      height: 100vh;
+      padding: 10px 16px 8px;
+    }
+    .lang-switch { margin-bottom: 4px; }
+    .app {
+      flex-direction: row;
+      align-items: stretch;
+      justify-content: center;
+      gap: 16px;
+      flex: 1 1 auto;
+      min-height: 0;
+      max-width: 1120px;
+    }
+    .side {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 0 0 176px;
+      min-height: 0;
+      overflow-y: auto;
+    }
+    .side-l { align-items: flex-start; }
+    .side-l h1 { font-size: 21px; margin: 0; }
+    .side-l .tip { margin: 0; text-align: left; }
+    .side .bar {
+      flex-direction: column;
+      flex-wrap: nowrap;
+      align-items: stretch;
+      gap: 8px;
+      margin: 0;
+    }
+    .side .stat { justify-content: space-between; }
+    .side-r .bar { margin: 0; }
+    .side-r .notice { margin: 0; text-align: left; }
+    .board-col {
+      display: flex;
+      flex: 1 1 auto;
+      min-width: 0;
+      min-height: 0;
+      align-items: center;
+      justify-content: center;
+    }
+    .board-col .panel { display: contents; }
+    .board-wrap { width: min(100%, calc(100vh - 110px)); }
+  }
 </style>
 </head>
 <body>
 
 <div class="lang-switch" data-lang-switch></div>
 
-<h1 data-i18n="title"></h1>
-<p class="tip" data-i18n="tip"></p>
+<!-- 三段式:竖屏 信息上/棋盘中/操作下;横屏 信息左/棋盘满高/操作右 -->
+<div class="app">
+  <aside class="side side-l">
+    <h1 data-i18n="title"></h1>
+    <p class="tip" data-i18n="tip"></p>
+    <div class="bar">
+      <span class="stat"><small data-i18n="score"></small> <b id="score">0</b></span>
+      <span class="stat"><small data-i18n="moves"></small> <b id="moves">0</b></span>
+      <span class="stat"><small data-i18n="target"></small> <b id="target">0</b></span>
+      <span class="stat"><small data-i18n="best"></small> <b id="best">0</b></span>
+      <span class="stat"><small data-i18n="combo"></small> <b id="combo">-</b></span>
+      <span class="stat"><small data-i18n="level"></small> <b id="levelLabel">Normal</b></span>
+    </div>
+  </aside>
 
-<div class="panel">
-  <div class="bar">
-    <span class="stat"><small data-i18n="score"></small> <b id="score">0</b></span>
-    <span class="stat"><small data-i18n="moves"></small> <b id="moves">0</b></span>
-    <span class="stat"><small data-i18n="target"></small> <b id="target">0</b></span>
-    <span class="stat"><small data-i18n="best"></small> <b id="best">0</b></span>
-    <span class="stat"><small data-i18n="combo"></small> <b id="combo">-</b></span>
-    <span class="stat"><small data-i18n="level"></small> <b id="levelLabel">Normal</b></span>
+  <div class="board-col">
+    <div class="panel">
+      <div class="board-wrap">
+        <div id="board"></div>
+        <div id="fxLayer"></div>
+      </div>
+    </div>
   </div>
 
-  <div class="board-wrap">
-    <div id="board"></div>
-    <div id="fxLayer"></div>
-  </div>
-
-  <div class="bar">
-    <button id="btnHint" data-i18n="hint"></button>
-    <button id="btnShuffle" data-i18n="shuffle"></button>
-    <button id="btnNew" data-i18n="newgame"></button>
-  </div>
-  <p class="notice" id="notice"></p>
+  <aside class="side side-r">
+    <div class="bar">
+      <button id="btnHint" data-i18n="hint"></button>
+      <button id="btnShuffle" data-i18n="shuffle"></button>
+      <button id="btnNew" data-i18n="newgame"></button>
+    </div>
+    <p class="notice" id="notice"></p>
+  </aside>
 </div>
 
 <!-- Start overlay: the required entry point out of the ready state. -->

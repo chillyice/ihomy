@@ -173,33 +173,111 @@
     button { padding: 6px 10px; font-size: 12px; }
     .stat { padding: 4px 7px; font-size: 11px; }
   }
+
+  /* ---------- orientation layout ----------
+   * 竖屏:.side/.board-col 用 display:contents 摊平进 .app 纵列,
+   * 视觉顺序=标题→提示→统计→棋盘→操作,与旧单列一致。
+   * 横屏:信息/操作移到左右定宽侧栏,棋盘区拿满剩余宽高,
+   * canvas 用替换元素约束算法(max 双限 + auto)contain-fit,不出滚动条。 */
+  .app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+  .side, .board-col { display: contents; }
+  .side-r .bar { margin-top: 2px; }
+
+  @media (orientation: landscape) and (min-width: 640px) {
+    body {
+      height: 100vh;
+      padding: 10px 16px 8px;
+    }
+    .lang-switch { margin-bottom: 4px; }
+    .app {
+      flex-direction: row;
+      align-items: stretch;
+      justify-content: center;
+      gap: 16px;
+      flex: 1 1 auto;
+      min-height: 0;
+      max-width: 1120px;
+    }
+    .side {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 0 0 172px;
+      min-height: 0;
+      overflow-y: auto;
+    }
+    .side-l { align-items: stretch; }
+    .side-l h1 { font-size: 21px; margin: 0; }
+    .side-l .tip { margin: 0; text-align: left; font-size: 12px; }
+    .side .bar {
+      flex-direction: column;
+      flex-wrap: nowrap;
+      align-items: stretch;
+      gap: 8px;
+      margin: 0;
+    }
+    .side .stat { justify-content: space-between; }
+    .side-r { align-items: stretch; }
+    .board-col {
+      display: flex;
+      flex: 1 1 auto;
+      min-width: 0;
+      min-height: 0;
+      align-items: center;
+      justify-content: center;
+    }
+    .board-col .panel { display: contents; }
+    #board {
+      width: auto;
+      height: auto;
+      max-width: 100%;
+      max-height: 100%;
+    }
+  }
 </style>
 </head>
 <body>
 
 <div class="lang-switch" data-lang-switch></div>
 
-<h1 data-i18n="title"></h1>
-<p class="tip" data-i18n="tip"></p>
+<!-- 三段式:竖屏 信息上/棋盘中/操作下;横屏 信息左/棋盘满高/操作右 -->
+<div class="app">
+  <aside class="side side-l">
+    <h1 data-i18n="title"></h1>
+    <p class="tip" data-i18n="tip"></p>
+    <div class="bar">
+      <span class="stat"><small data-i18n="score"></small> <b id="score">0</b></span>
+      <span class="stat"><small data-i18n="shots"></small> <b id="shots">0</b></span>
+      <span class="stat"><small data-i18n="progress"></small> <b id="progress">-</b></span>
+      <span class="stat"><small data-i18n="best"></small> <b id="best">0</b></span>
+    </div>
+  </aside>
 
-<div class="panel">
-  <div class="bar">
-    <span class="stat"><small data-i18n="score"></small> <b id="score">0</b></span>
-    <span class="stat"><small data-i18n="shots"></small> <b id="shots">0</b></span>
-    <span class="stat"><small data-i18n="progress"></small> <b id="progress">-</b></span>
-    <span class="stat"><small data-i18n="best"></small> <b id="best">0</b></span>
-    <span class="stat"><small data-i18n="level"></small> <b id="levelLabel">Normal</b></span>
-    <label class="stat" style="gap:6px">
-      <span data-i18n="difficulty"></span>
-      <select id="difficulty">
-        <option value="easy" data-i18n="diff_easy"></option>
-        <option value="normal" selected data-i18n="diff_normal"></option>
-        <option value="hard" data-i18n="diff_hard"></option>
-      </select>
-    </label>
-    <button id="btnNew" data-i18n="newgame"></button>
+  <div class="board-col">
+    <div class="panel">
+      <canvas id="board"></canvas>
+    </div>
   </div>
-  <canvas id="board"></canvas>
+
+  <aside class="side side-r">
+    <div class="bar">
+      <span class="stat"><small data-i18n="level"></small> <b id="levelLabel">Normal</b></span>
+      <label class="stat" style="gap:6px">
+        <span data-i18n="difficulty"></span>
+        <select id="difficulty">
+          <option value="easy" data-i18n="diff_easy"></option>
+          <option value="normal" selected data-i18n="diff_normal"></option>
+          <option value="hard" data-i18n="diff_hard"></option>
+        </select>
+      </label>
+      <button id="btnNew" data-i18n="newgame"></button>
+    </div>
+  </aside>
 </div>
 
 <!-- Start overlay: the only required entry point from the ready state. -->

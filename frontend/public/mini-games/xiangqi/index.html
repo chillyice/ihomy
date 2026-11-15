@@ -58,29 +58,99 @@
   @keyframes thinkspin { to { transform: rotate(360deg); } }
   canvas { display: block; border-radius: 6px; }
   .tip { color: #cbd5c0; font-size: 12px; margin-top: 10px; }
+
+  /* ---------- orientation layout ----------
+   * 竖屏:.side/.board-col 用 display:contents 摊平进 .app 纵列,
+   * 顺序=标题→状态→棋盘→操作→说明(操作挪到棋盘下,拇指更近)。
+   * 横屏:标题/状态/说明移左,操作移右,棋盘限高居中。
+   * 画布显示尺寸由 CSS 控制(min 三限,含 500px 自然宽防放大发虚),
+   * 点击映射按 rect.width/W 补比例换算(见下方 click 监听)。 */
+  .app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+  .side, .board-col { display: contents; }
+  #cv { width: min(100%, 500px); height: auto; }
+
+  @media (orientation: landscape) and (min-width: 640px) {
+    body {
+      height: 100vh;
+      padding: 10px 16px 8px;
+    }
+    .lang-switch { margin-bottom: 4px; }
+    .app {
+      flex-direction: row;
+      align-items: stretch;
+      justify-content: center;
+      gap: 16px;
+      flex: 1 1 auto;
+      min-height: 0;
+      max-width: 1120px;
+    }
+    .side {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 0 0 190px;
+      min-height: 0;
+      overflow-y: auto;
+    }
+    .side-l { align-items: flex-start; }
+    .side-l h1 { font-size: 18px; margin: 0; }
+    .side-l #status { margin: 0; }
+    .side-l .tip { margin: 0; }
+    .side-r .toolbar {
+      flex-direction: column;
+      flex-wrap: nowrap;
+      align-items: stretch;
+      margin-bottom: 0;
+    }
+    .board-col {
+      display: flex;
+      flex: 1 1 auto;
+      min-width: 0;
+      min-height: 0;
+      align-items: center;
+      justify-content: center;
+    }
+    #cv { width: min(100%, 500px, calc(100vh - 120px)); }
+  }
 </style>
 </head>
 <body>
 <div class="lang-switch" data-lang-switch></div>
-<h1 data-i18n="title"></h1>
-<div class="toolbar">
-  <button id="btnNew" data-i18n="restart"></button>
-  <button id="btnUndo" data-i18n="undo"></button>
-  <button id="btnExport" data-i18n="export"></button>
-  <label style="color:#f5e6c8;font-size:14px;"><span data-i18n="level"></span>
-    <select id="selLevel">
-      <option value="1" data-i18n="lv1"></option>
-      <option value="3" selected data-i18n="lv3"></option>
-      <option value="4" data-i18n="lv4"></option>
-    </select>
-  </label>
-  <label style="color:#f5e6c8;font-size:14px;">
-    <input type="checkbox" id="chkAI" style="vertical-align:middle"> <span data-i18n="aiFirst"></span>
-  </label>
+<!-- 三段式:竖屏 标题/状态上、棋盘中、操作下;横屏 标题/状态左、棋盘满高、操作右 -->
+<div class="app">
+  <aside class="side side-l">
+    <h1 data-i18n="title"></h1>
+    <div id="status"></div>
+    <p class="tip" data-i18n="tip"></p>
+  </aside>
+
+  <div class="board-col">
+    <div id="boardWrap"><canvas id="cv"></canvas><div id="thinkOverlay"><div class="box"><div class="spinner"></div><span id="thinkText"></span></div></div></div>
+  </div>
+
+  <aside class="side side-r">
+    <div class="toolbar">
+      <button id="btnNew" data-i18n="restart"></button>
+      <button id="btnUndo" data-i18n="undo"></button>
+      <button id="btnExport" data-i18n="export"></button>
+      <label style="color:#f5e6c8;font-size:14px;"><span data-i18n="level"></span>
+        <select id="selLevel">
+          <option value="1" data-i18n="lv1"></option>
+          <option value="3" selected data-i18n="lv3"></option>
+          <option value="4" data-i18n="lv4"></option>
+        </select>
+      </label>
+      <label style="color:#f5e6c8;font-size:14px;">
+        <input type="checkbox" id="chkAI" style="vertical-align:middle"> <span data-i18n="aiFirst"></span>
+      </label>
+    </div>
+  </aside>
 </div>
-<div id="status"></div>
-<div id="boardWrap"><canvas id="cv"></canvas><div id="thinkOverlay"><div class="box"><div class="spinner"></div><span id="thinkText"></span></div></div></div>
-<div class="tip" data-i18n="tip"></div>
 
 <script src="../assets/i18n.js"></script>
 <script>
@@ -493,7 +563,7 @@ const W = MX*2 + CELL*8, H = MY*2 + CELL*9;
 function setupCanvas() {
   const dpr = window.devicePixelRatio || 1;
   cv.width = W*dpr; cv.height = H*dpr;
-  cv.style.width = W+'px'; cv.style.height = H+'px';
+  // 显示尺寸交给 CSS(#cv 的 min 三限响应式);位图固定 W×H×dpr 保证清晰
   ctx.setTransform(dpr,0,0,dpr,0,0);
 }
 setupCanvas();
@@ -734,7 +804,9 @@ function aiMove() {
 cv.addEventListener('click', e => {
   if (gameOver || aiThinking || turn !== RED) return;
   const rect = cv.getBoundingClientRect();
-  const x = e.clientX - rect.left, y = e.clientY - rect.top;
+  // CSS 可缩放显示尺寸:按 rect/W 把视口坐标换算回逻辑坐标
+  const k = rect.width ? W / rect.width : 1;
+  const x = (e.clientX - rect.left) * k, y = (e.clientY - rect.top) * k;
   const c = Math.round((x-MX)/CELL), r = Math.round((y-MY)/CELL);
   if (!inB(r,c)) return;
   if (Math.hypot(x-px(c), y-py(r)) > PR+6) return;

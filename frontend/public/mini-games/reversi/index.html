@@ -127,75 +127,143 @@
     .score { flex-basis: 80px; }
     .score b { font-size: 22px; }
   }
+
+  /* ---------- orientation layout ----------
+   * 竖屏:.side/.board-col 用 display:contents 摊平进 .app 纵列,
+   * 顺序=标题→提示→记分→棋盘→操作→规则(操作挪到棋盘下,拇指更近)。
+   * 横屏:记分/状态移左(纵向堆叠),操作与规则移右,棋盘限高居中。 */
+  .app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+  .side, .board-col { display: contents; }
+
+  @media (orientation: landscape) and (min-width: 640px) {
+    body {
+      height: 100vh;
+      padding: 10px 16px 8px;
+    }
+    .lang-switch { margin-bottom: 4px; }
+    .app {
+      flex-direction: row;
+      align-items: stretch;
+      justify-content: center;
+      gap: 16px;
+      flex: 1 1 auto;
+      min-height: 0;
+      max-width: 1120px;
+    }
+    .side {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 0 0 180px;
+      min-height: 0;
+      overflow-y: auto;
+    }
+    .side-l { align-items: stretch; }
+    .side-l h1 { font-size: 21px; margin: 0; }
+    .side-l .tip { margin: 0; text-align: left; max-width: none; }
+    .side-l .hud { flex-direction: column; width: 100%; margin-bottom: 0; }
+    .side-l .hud .score { flex: 0 0 auto; width: 100%; }
+    .side-l .hud .center { flex: 0 0 auto; }
+    .side-r .bar {
+      flex-direction: column;
+      flex-wrap: nowrap;
+      align-items: stretch;
+      margin-bottom: 0;
+    }
+    .side-r .bar label { justify-content: space-between; }
+    .side-r .tip { margin: 0; text-align: left; max-width: none; font-size: 12px; }
+    .board-col {
+      display: flex;
+      flex: 1 1 auto;
+      min-width: 0;
+      min-height: 0;
+      align-items: center;
+      justify-content: center;
+    }
+    #boardWrap { width: min(100%, calc(100vh - 110px)); }
+    #board { width: 100%; }
+  }
 </style>
 </head>
 <body>
 
 <div class="lang-switch" data-lang-switch></div>
 
-<h1 data-i18n="title"></h1>
-<p class="tip" data-i18n="tip"></p>
-
-<div class="bar">
-  <label><span data-i18n="mode"></span>
-    <select id="mode">
-      <option value="pve" selected data-i18n="modePve"></option>
-      <option value="pvp" data-i18n="modePvp"></option>
-    </select>
-  </label>
-  <label><span data-i18n="level"></span>
-    <select id="level">
-      <option value="easy" data-i18n="levelEasy"></option>
-      <option value="normal" selected data-i18n="levelNormal"></option>
-      <option value="hard" data-i18n="levelHard"></option>
-    </select>
-  </label>
-  <label class="chk"><input type="checkbox" id="chkAI"><span data-i18n="aiFirst"></span></label>
-  <button id="btnUndo" data-i18n="undo" disabled></button>
-  <button id="btnNew" data-i18n="restart" disabled></button>
-</div>
-
-<div class="hud">
-  <div class="score black">
-    <span class="lab"><span class="dot black"></span><span data-i18n="black"></span></span>
-    <b id="blackCount">2</b>
-  </div>
-  <div class="center">
-    <div id="status"></div>
-    <div class="sub">
-      <span class="dot" id="turnDot"></span> <b id="turnText">—</b> &nbsp;·&nbsp;
-      <span data-i18n="moveLabel"></span> <b id="move">0</b> &nbsp;·&nbsp;
-      <span data-i18n="leadLabel"></span> <b id="lead">0</b>
+<!-- 三段式:竖屏 信息上/棋盘中/操作下;横屏 记分左/棋盘满高/操作右 -->
+<div class="app">
+  <aside class="side side-l">
+    <h1 data-i18n="title"></h1>
+    <p class="tip" data-i18n="tip"></p>
+    <div class="hud">
+      <div class="score black">
+        <span class="lab"><span class="dot black"></span><span data-i18n="black"></span></span>
+        <b id="blackCount">2</b>
+      </div>
+      <div class="center">
+        <div id="status"></div>
+        <div class="sub">
+          <span class="dot" id="turnDot"></span> <b id="turnText">—</b> &nbsp;·&nbsp;
+          <span data-i18n="moveLabel"></span> <b id="move">0</b> &nbsp;·&nbsp;
+          <span data-i18n="leadLabel"></span> <b id="lead">0</b>
+        </div>
+      </div>
+      <div class="score white">
+        <span class="lab"><span class="dot white"></span><span data-i18n="white"></span></span>
+        <b id="whiteCount">2</b>
+      </div>
     </div>
-  </div>
-  <div class="score white">
-    <span class="lab"><span class="dot white"></span><span data-i18n="white"></span></span>
-    <b id="whiteCount">2</b>
-  </div>
-</div>
+  </aside>
 
-<div id="boardWrap">
-  <div id="board"></div>
+  <div class="board-col">
+    <div id="boardWrap">
+      <div id="board"></div>
 
-  <div id="startScreen" class="overlay">
-    <div class="panel-card">
-      <h2 data-i18n="title"></h2>
-      <p data-i18n="intro"></p>
-      <button id="btnStart" class="big" data-i18n="start"></button>
+      <div id="startScreen" class="overlay">
+        <div class="panel-card">
+          <h2 data-i18n="title"></h2>
+          <p data-i18n="intro"></p>
+          <button id="btnStart" class="big" data-i18n="start"></button>
+        </div>
+      </div>
+
+      <div id="resultScreen" class="overlay hidden">
+        <div class="panel-card">
+          <h2 id="resultTitle"></h2>
+          <p id="resultScore"></p>
+          <button id="btnAgain" data-i18n="playAgain"></button>
+          <button id="btnClose" data-i18n="close"></button>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div id="resultScreen" class="overlay hidden">
-    <div class="panel-card">
-      <h2 id="resultTitle"></h2>
-      <p id="resultScore"></p>
-      <button id="btnAgain" data-i18n="playAgain"></button>
-      <button id="btnClose" data-i18n="close"></button>
+  <aside class="side side-r">
+    <div class="bar">
+      <label><span data-i18n="mode"></span>
+        <select id="mode">
+          <option value="pve" selected data-i18n="modePve"></option>
+          <option value="pvp" data-i18n="modePvp"></option>
+        </select>
+      </label>
+      <label><span data-i18n="level"></span>
+        <select id="level">
+          <option value="easy" data-i18n="levelEasy"></option>
+          <option value="normal" selected data-i18n="levelNormal"></option>
+          <option value="hard" data-i18n="levelHard"></option>
+        </select>
+      </label>
+      <label class="chk"><input type="checkbox" id="chkAI"><span data-i18n="aiFirst"></span></label>
+      <button id="btnUndo" data-i18n="undo" disabled></button>
+      <button id="btnNew" data-i18n="restart" disabled></button>
     </div>
-  </div>
+    <p class="tip rules-tip" data-i18n="rules"></p>
+  </aside>
 </div>
-
-<p class="tip" data-i18n="rules"></p>
 
 <script src="../assets/i18n.js"></script>
 <script>

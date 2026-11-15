@@ -280,37 +280,109 @@
     .level { min-width: 112px; font-size: 13px; }
     .stat { min-width: 62px; font-size: 12px; }
   }
+
+  /* ---------- orientation layout ----------
+   * 竖屏:.side/.board-col 用 display:contents 摊平进 .app 纵列,
+   * 顺序=标题→提示→统计→棋盘→状态→操作→方向键(操作挪到棋盘下)。
+   * 横屏:统计移左、操作+方向键移右,棋盘拿满剩余高(fitCell 同步感知横屏扣减)。 */
+  .app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+  }
+  .side, .board-col { display: contents; }
+
+  @media (orientation: landscape) and (min-width: 640px) {
+    body {
+      height: 100vh;
+      padding: 10px 16px 8px;
+    }
+    .lang-switch { margin-bottom: 4px; }
+    .app {
+      flex-direction: row;
+      align-items: stretch;
+      justify-content: center;
+      gap: 16px;
+      flex: 1 1 auto;
+      min-height: 0;
+      max-width: 1120px;
+    }
+    .side {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 0 0 176px;
+      min-height: 0;
+      overflow-y: auto;
+    }
+    .side-l { align-items: stretch; }
+    .side-l h1 { font-size: 21px; margin: 0; }
+    .side-l .tip { margin: 0; text-align: left; }
+    .side .bar {
+      flex-direction: column;
+      flex-wrap: nowrap;
+      align-items: stretch;
+      gap: 8px;
+      margin: 0;
+    }
+    .side .stat { display: flex; justify-content: space-between; }
+    .side-r { align-items: stretch; }
+    .side-r .level { min-width: 0; }
+    .side-r .pad { grid-template-columns: repeat(3, 50px); margin-top: 0; }
+    .board-col {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-width: 0;
+      min-height: 0;
+      align-items: center;
+      justify-content: center;
+    }
+    .board-col #status { margin-top: 10px; }
+  }
 </style>
 </head>
 <body>
 
 <div class="lang-switch" data-lang-switch></div>
 
-<h1 data-i18n="title"></h1>
-<p class="tip" data-i18n="tip"></p>
+<!-- 三段式:竖屏 信息上/棋盘中/操作与方向键下;横屏 信息左/棋盘满高/操作与方向键右 -->
+<div class="app">
+  <aside class="side side-l">
+    <h1 data-i18n="title"></h1>
+    <p class="tip" data-i18n="tip"></p>
+    <div class="bar">
+      <div class="stat"><small data-i18n="movesL"></small> <span id="moves">0</span></div>
+      <div class="stat"><small data-i18n="pushesL"></small> <span id="pushes">0</span></div>
+    </div>
+  </aside>
 
-<div class="panel">
-  <div class="bar">
-    <button id="btnPrev" data-i18n="prev"></button>
-    <div class="level" id="lvLabel"></div>
-    <button id="btnNext" data-i18n="next"></button>
-    <button id="btnUndo" data-i18n="undo"></button>
-    <button id="btnRestart" data-i18n="restart"></button>
-    <div class="stat"><small data-i18n="movesL"></small> <span id="moves">0</span></div>
-    <div class="stat"><small data-i18n="pushesL"></small> <span id="pushes">0</span></div>
+  <div class="board-col">
+    <div class="panel">
+      <div id="stage">
+        <div id="tiles"></div>
+        <div id="actors"></div>
+      </div>
+    </div>
+    <div id="status"></div>
   </div>
-  <div id="stage">
-    <div id="tiles"></div>
-    <div id="actors"></div>
-  </div>
-  <div id="status"></div>
-</div>
 
-<div class="pad">
-  <button id="btnUp" class="pad-up" type="button" aria-label="up">&#9650;</button>
-  <button id="btnLeft" class="pad-left" type="button" aria-label="left">&#9664;</button>
-  <button id="btnDown" class="pad-down" type="button" aria-label="down">&#9660;</button>
-  <button id="btnRight" class="pad-right" type="button" aria-label="right">&#9654;</button>
+  <aside class="side side-r">
+    <div class="bar">
+      <button id="btnPrev" data-i18n="prev"></button>
+      <div class="level" id="lvLabel"></div>
+      <button id="btnNext" data-i18n="next"></button>
+      <button id="btnUndo" data-i18n="undo"></button>
+      <button id="btnRestart" data-i18n="restart"></button>
+    </div>
+    <div class="pad">
+      <button id="btnUp" class="pad-up" type="button" aria-label="up">&#9650;</button>
+      <button id="btnLeft" class="pad-left" type="button" aria-label="left">&#9664;</button>
+      <button id="btnDown" class="pad-down" type="button" aria-label="down">&#9660;</button>
+      <button id="btnRight" class="pad-right" type="button" aria-label="right">&#9654;</button>
+    </div>
+  </aside>
 </div>
 
 <div id="overlay">
@@ -474,9 +546,13 @@
   /* ---------------------------------------------------------------- board */
 
   // Pick the largest cell size that keeps the whole board on screen.
+  // 横屏(与 CSS 断点一致):信息/方向键移到左右侧栏,纵向只剩少量留白,
+  // 宽度要扣掉两侧栏;竖屏维持原扣减(顶部信息条 + 底部方向键)。
   function fitCell(c, r) {
-    var availW = Math.min(620, (window.innerWidth || 480) - 44);
-    var availH = Math.max(200, (window.innerHeight || 700) - 320);
+    var landscape = window.matchMedia &&
+      window.matchMedia('(orientation: landscape) and (min-width: 640px)').matches;
+    var availW = Math.min(620, (window.innerWidth || 480) - (landscape ? 420 : 44));
+    var availH = Math.max(200, (window.innerHeight || 700) - (landscape ? 60 : 320));
     return Math.max(22, Math.min(52, Math.floor(availW / c), Math.floor(availH / r)));
   }
 
