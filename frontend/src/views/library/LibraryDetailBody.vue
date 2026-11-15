@@ -5,7 +5,13 @@
     <div v-loading="loading" class="detail-body">
       <div v-if="book" class="book-header">
         <div class="cover-wrap">
-          <img v-if="book.coverUrl" :src="book.coverUrl" class="book-cover" :alt="book.title || ''" />
+          <img
+            v-if="book.coverUrl && failedCover !== book.coverUrl"
+            :src="book.coverUrl"
+            class="book-cover"
+            alt=""
+            @error="failedCover = book.coverUrl"
+          />
           <div v-else class="book-cover placeholder">
             <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1">
               <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
@@ -27,6 +33,10 @@
           <div class="meta-date">{{ formatDate(book.createdAt) }}</div>
         </div>
       </div>
+      <div v-if="!loading && !book" class="detail-empty" role="status">
+        <p>{{ $t('library.loadFailed') }}</p>
+        <el-button size="small" @click="$emit('retry')">{{ $t('common.retry') }}</el-button>
+      </div>
       <div v-if="book?.description" class="book-desc">
         <div class="section-label">{{ $t('library.description') }}</div>
         <div class="desc-text">{{ book.description }}</div>
@@ -40,34 +50,24 @@
       </div>
     </div>
     <div v-if="book" class="detail-footer">
-      <div class="footer-left">
-        <template v-if="userStore.isLoggedIn">
-          <el-button v-if="borrow?.status === 'WANT_READ'" size="small" @click="$emit('set-borrow', 'READING')">{{
-            $t('library.startReading')
-          }}</el-button>
-          <el-button v-else-if="borrow?.status === 'READING'" size="small" @click="$emit('set-borrow', 'FINISHED')">{{
-            $t('library.markFinished')
-          }}</el-button>
-          <el-button v-else-if="!borrow" size="small" @click="$emit('set-borrow', 'WANT_READ')">{{ $t('library.wantRead') }}</el-button>
-          <el-button v-if="borrow?.status === 'FINISHED'" size="small" @click="$emit('set-borrow', 'READING')">{{
-            $t('library.reread')
-          }}</el-button>
-        </template>
-      </div>
-      <div class="footer-right">
-        <el-button v-if="canReadOnline" type="primary" size="small" @click="$emit('read', book)">{{ $t('library.readOnline') }}</el-button>
-        <a v-if="book.fileUrl" :href="book.fileUrl" :download="book.title" class="el-button is-default is-small">{{
-          $t('library.download')
-        }}</a>
-        <el-button v-if="canEdit" size="small" @click="router.push(`/library/edit/${book.id}`)">{{ $t('library.editBook') }}</el-button>
-        <el-button size="small" @click="$emit('close')">{{ $t('common.close') }}</el-button>
-      </div>
+      <el-button v-if="canReadOnline" type="primary" size="small" @click="$emit('read', book)">
+        {{ $t('library.readOnline') }}
+      </el-button>
+      <a v-if="book.fileUrl" :href="book.fileUrl" :download="book.title" class="el-button is-default is-small">
+        {{ $t('library.download') }}
+      </a>
+      <el-button v-if="nextStatus" size="small" :disabled="updating" @click="$emit('set-borrow', nextStatus.value)">
+        {{ $t(nextStatus.label) }}
+      </el-button>
+      <el-button v-if="canEdit" size="small" @click="router.push(`/library/edit/${book.id}`)">
+        {{ $t('library.editBook') }}
+      </el-button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { formatDate } from '@/utils/datetime'
@@ -76,17 +76,31 @@ const props = defineProps({
   book: { type: Object, default: null },
   borrow: { type: Object, default: null },
   categories: { type: Array, default: () => [] },
-  loading: { type: Boolean, default: false },
+  loading: Boolean,
+  updating: Boolean,
 })
-defineEmits(['set-borrow', 'read', 'close'])
+defineEmits(['set-borrow', 'read', 'retry'])
 
 const router = useRouter()
 const userStore = useUserStore()
 
-const canEdit = computed(() => !!props.book && (userStore.isOwner || props.book.uploaderId === userStore.userInfo?.id))
+const failedCover = ref('')
+const canEdit = computed(
+  () =>
+    userStore.isLoggedIn && props.book && !props.book.readOnly && (userStore.isOwner || props.book.uploaderId === userStore.userInfo?.id),
+)
 // 在线阅读只支持 PDF/EPUB/TXT(与 LibraryReader 的三种渲染一致);
 // 上传时 accept 含 .mobi,MOBI 可入库/下载但这里不给在线阅读入口——两处格式清单需一起改
-const canReadOnline = computed(() => !!props.book && ['PDF', 'EPUB', 'TXT'].includes(props.book.fileFormat))
+const canReadOnline = computed(() => !!props.book?.fileUrl && ['PDF', 'EPUB', 'TXT'].includes(props.book.fileFormat))
+
+const nextStatus = computed(() => {
+  if (!userStore.isLoggedIn) return null
+  const status = props.borrow?.status
+  if (status === 'WANT_READ') return { value: 'READING', label: 'library.startReading' }
+  if (status === 'READING') return { value: 'FINISHED', label: 'library.markFinished' }
+  if (status === 'FINISHED') return { value: 'READING', label: 'library.reread' }
+  return { value: 'WANT_READ', label: 'library.wantRead' }
+})
 
 const catName = (id) => props.categories.find((c) => c.id === id)?.name || ''
 
@@ -103,21 +117,22 @@ const formatSize = (bytes) => {
   min-width: 0;
 }
 .detail-body {
-  min-height: 200px;
+  min-height: 124px;
 }
 .book-header {
   display: flex;
-  gap: 20px;
+  gap: 12px;
   margin-bottom: 16px;
 }
 .cover-wrap {
-  width: 120px;
+  width: clamp(60px, 32%, 114px);
   flex-shrink: 0;
 }
 .book-cover {
   width: 100%;
   aspect-ratio: 3/4;
-  object-fit: cover;
+  object-fit: contain;
+  background: var(--color-card);
   border-radius: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
@@ -143,8 +158,9 @@ html.dark .book-cover.placeholder {
 .book-title-text {
   font-size: 20px;
   font-weight: 700;
-  color: var(--color-primary);
-  line-height: 1.4;
+  color: var(--color-text-primary);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 .book-author-text {
   font-size: 14px;
@@ -224,6 +240,7 @@ html.dark .format-tag {
   line-height: 1.8;
   color: var(--color-text);
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .book-cats {
   margin-top: 12px;
@@ -254,7 +271,6 @@ html.dark .cat-tag {
 /* 宽屏右栏只有 380px:两组按钮各自换行,不让「在线阅读/下载/编辑/关闭」被挤爆 */
 .detail-footer {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
@@ -262,14 +278,15 @@ html.dark .cat-tag {
   padding-top: 12px;
   border-top: 1px solid var(--color-border);
 }
-.footer-right {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
+.detail-footer .el-button + .el-button {
+  margin-inline-start: 0;
 }
-.footer-right a {
+.detail-footer a {
   text-decoration: none;
+}
+.detail-empty {
+  text-align: center;
+  color: var(--color-text-secondary);
 }
 .is-small {
   height: 28px;

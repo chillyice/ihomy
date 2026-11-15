@@ -1,151 +1,133 @@
 <template>
-  <div class="page">
+  <div class="page library-page">
     <Breadcrumb :items="[{ label: $t('library.title') }]" />
 
-    <!-- Toolbar -->
     <PageToolbar>
-      <div class="tb-left">
+      <div class="tb-left library-toolbar-search">
         <el-input
           v-model="searchKeyword"
           :placeholder="$t('library.search')"
+          :aria-label="$t('library.search')"
           clearable
-          size="small"
-          style="width: 180px"
           data-search-input
-          @keyup.enter="load"
-          @clear="load"
-        />
-        <el-cascader
-          v-model="activeCategoryId"
-          :options="categoryCascader"
-          :props="{ expandTrigger: 'hover', checkStrictly: true, emitPath: false }"
-          :placeholder="$t('library.category')"
-          clearable
-          size="small"
-          style="width: 160px"
-          @change="load"
-        />
-        <el-select v-model="sortBy" size="small" style="width: 120px" @change="load">
-          <el-option :label="$t('library.sortRecent')" value="recent" />
-          <el-option :label="$t('library.sortCreated')" value="created" />
-          <el-option :label="$t('library.sortTitle')" value="title" />
-        </el-select>
-        <el-select
-          v-model="filterFormat"
-          size="small"
-          style="width: 110px"
-          clearable
-          :placeholder="$t('library.filterFormat')"
-          @change="load"
+          @keyup.enter="applySearch"
+          @clear="applySearch"
         >
-          <el-option :label="$t('library.allFormats')" value="" />
-          <el-option label="EPUB" value="EPUB" />
-          <el-option label="PDF" value="PDF" />
-          <el-option label="TXT" value="TXT" />
-          <el-option label="MOBI" value="MOBI" />
-        </el-select>
-        <el-select
-          v-model="filterStatus"
-          size="small"
-          style="width: 120px"
-          clearable
-          :placeholder="$t('library.filterStatus')"
-          @change="load"
-        >
-          <el-option :label="$t('library.allStatuses')" value="" />
-          <el-option :label="$t('library.statusUnread')" value="UNREAD" />
-          <el-option :label="$t('library.statusReading')" value="READING" />
-          <el-option :label="$t('library.statusFinished')" value="FINISHED" />
-        </el-select>
-        <button v-if="userStore.isLoggedIn" class="cat-add-btn" :title="$t('library.newCategory')" @click="openCatDialog()">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-        </button>
+          <template #append>
+            <el-button :icon="Search" :aria-label="$t('common.search')" @click="applySearch" />
+          </template>
+        </el-input>
       </div>
-      <div class="tb-right">
-        <div class="view-toggle">
-          <button class="vt-btn" :class="{ active: viewMode === 'grid' }" @click="viewMode = 'grid'">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8">
-              <rect x="3" y="3" width="7" height="7" rx="1" />
-              <rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="3" y="14" width="7" height="7" rx="1" />
-              <rect x="14" y="14" width="7" height="7" rx="1" />
-            </svg>
-          </button>
-          <button class="vt-btn" :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8">
-              <line x1="8" y1="6" x2="21" y2="6" />
-              <line x1="8" y1="12" x2="21" y2="12" />
-              <line x1="8" y1="18" x2="21" y2="18" />
-              <line x1="3" y1="6" x2="3.01" y2="6" />
-              <line x1="3" y1="12" x2="3.01" y2="12" />
-              <line x1="3" y1="18" x2="3.01" y2="18" />
-            </svg>
+
+      <div class="tb-right library-toolbar-actions">
+        <el-popover placement="bottom-start" trigger="click" :width="268">
+          <template #reference>
+            <el-button size="small" :icon="Filter" :type="activeFilterCount ? 'primary' : 'default'" plain>
+              {{ $t('library.filters') }}{{ activeFilterCount ? ' · ' + activeFilterCount : '' }}
+            </el-button>
+          </template>
+          <div class="library-filter-fields">
+            <label for="library-category">{{ $t('library.category') }}</label>
+            <el-cascader
+              id="library-category"
+              v-model="activeCategoryId"
+              :options="categoryCascader"
+              :props="{ checkStrictly: true, emitPath: false }"
+              :placeholder="$t('library.allCategories')"
+              :teleported="false"
+              clearable
+              @change="goToPage(1)"
+            />
+            <label for="library-format">{{ $t('library.filterFormat') }}</label>
+            <el-select id="library-format" v-model="filterFormat" :teleported="false" @change="goToPage(1)">
+              <el-option :label="$t('library.allFormats')" value="" />
+              <el-option v-for="format in FORMATS" :key="format" :label="format" :value="format" />
+            </el-select>
+            <template v-if="userStore.isLoggedIn">
+              <label for="library-status">{{ $t('library.filterStatus') }}</label>
+              <el-select id="library-status" v-model="filterStatus" :teleported="false" @change="goToPage(1)">
+                <el-option :label="$t('library.allStatuses')" value="" />
+                <el-option :label="$t('library.statusUnread')" value="UNREAD" />
+                <el-option :label="$t('library.statusReading')" value="READING" />
+                <el-option :label="$t('library.statusFinished')" value="FINISHED" />
+              </el-select>
+            </template>
+            <label for="library-sort">{{ $t('library.sortBy') }}</label>
+            <el-select id="library-sort" v-model="sortBy" :teleported="false" @change="goToPage(1)">
+              <el-option v-if="userStore.isLoggedIn" :label="$t('library.sortRecent')" value="recent" />
+              <el-option :label="$t('library.sortCreated')" value="created" />
+              <el-option :label="$t('library.sortTitle')" value="title" />
+            </el-select>
+            <el-button v-if="userStore.isLoggedIn" size="small" :icon="Plus" @click="openCatDialog()">
+              {{ $t('library.newCategory') }}
+            </el-button>
+          </div>
+        </el-popover>
+        <div class="library-view-toggle">
+          <button
+            v-for="choice in VIEW_OPTIONS"
+            :key="choice.mode"
+            type="button"
+            :aria-label="$t(choice.label)"
+            :title="$t(choice.label)"
+            :aria-pressed="viewMode === choice.mode"
+            @click="viewMode = choice.mode"
+          >
+            <el-icon><component :is="choice.icon" /></el-icon>
           </button>
         </div>
-        <button v-if="userStore.isLoggedIn && !batchMode" class="write-btn" @click="router.push('/library/edit')">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-          {{ $t('library.upload') }}
-        </button>
-        <template v-if="batchMode">
-          <button class="ghost-btn" @click="selectAllBooks">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8">
-              <path d="M9 11l3 3L22 4" />
-              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-            </svg>
-            {{ $t('common.selectAll') }}
-          </button>
-          <button class="ghost-btn" @click="batchMove">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8">
-              <path d="M22 12H2" />
-              <path d="M5 9l-3 3 3 3" />
-              <path d="M19 9l3 3-3 3" />
-            </svg>
-            {{ $t('library.batchMove') }}
-          </button>
-          <button class="danger-btn" @click="batchDeleteAction">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8">
-              <path d="M3 6h18" />
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-            </svg>
-            {{ $t('library.batchDelete') }}
-          </button>
-          <button class="ghost-btn" @click="exitBatch">{{ $t('library.cancelBatch') }}</button>
+        <template v-if="!batchMode && userStore.isLoggedIn">
+          <el-button size="small" @click="enterBatch">{{ $t('library.batchMode') }}</el-button>
+          <el-button size="small" type="primary" :icon="Plus" @click="router.push('/library/edit')">
+            {{ $t('library.upload') }}
+          </el-button>
         </template>
-        <button v-if="userStore.isLoggedIn && !batchMode" class="ghost-btn" @click="enterBatch">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8">
-            <path d="M9 11l3 3L22 4" />
-            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-          </svg>
-          {{ $t('library.batchMode') }}
-        </button>
       </div>
     </PageToolbar>
 
-    <!-- 宽屏(≥900px 且短边 ≥600dp):左书架 + 右详情,两列各自滚;批量模式是纯选择场景,
-         右栏收起、书架整宽。窄屏不加 .wide-cols,仍是「书架 → 640px 详情弹窗」。 -->
-    <div ref="wideEl" class="library-cols" :class="{ 'wide-cols': bookWide }" :style="bookWide ? colStyle : {}">
-      <div v-loading="loading" class="book-area" :class="{ 'wide-col': bookWide }">
-        <!-- Grid View -->
-        <div v-if="viewMode === 'grid'" class="book-grid">
-          <div
-            v-a11y-click
+    <div class="library-summary">
+      <span v-if="batchMode" role="status">{{ $t('library.selectedBooks', { n: selectedIds.length }) }}</span>
+      <span v-else-if="!loading && !loadError" role="status">{{ $t('library.bookCount', { n: total }) }}</span>
+      <el-button v-if="hasQuery" size="small" link @click="clearFilters">{{ $t('library.clearFilters') }}</el-button>
+      <div v-if="batchMode" class="library-batch-actions">
+        <el-button size="small" :disabled="!selectableBooks.length || loading" @click="selectAllBooks">
+          {{ $t('library.selectPage') }}
+        </el-button>
+        <el-button size="small" :disabled="!selectedIds.length || loading" @click="batchMove">{{ $t('library.batchMove') }}</el-button>
+        <el-button size="small" type="danger" plain :disabled="!selectedIds.length || loading" @click="batchDeleteAction">
+          {{ $t('library.batchDelete') }}
+        </el-button>
+        <el-button size="small" @click="exitBatch">{{ $t('library.cancelBatch') }}</el-button>
+      </div>
+    </div>
+
+    <div ref="wideEl" class="library-cols" :class="{ 'wide-cols': bookWide, 'with-detail': bookWide && detailBookId }" :style="colStyle">
+      <div ref="bookArea" v-loading="loading" class="book-area" :class="{ 'wide-col': bookWide }">
+        <div v-if="loadError" class="library-empty" role="status">
+          <p>{{ $t('library.loadFailed') }}</p>
+          <el-button size="small" @click="load()">{{ $t('common.retry') }}</el-button>
+        </div>
+        <div v-else-if="list.length" class="library-books" :class="'view-' + viewMode">
+          <article
             v-for="b in list"
             :key="b.id"
-            class="book-card card"
-            :class="{ selected: selectedIds.includes(b.id) }"
-            @click="onBookClick(b)"
-            @pointerdown="pressStart(b)"
-            @pointerup="cancelPress"
-            @pointercancel="cancelPress"
-            @pointerleave="cancelPress"
-            @contextmenu.prevent
+            class="shelf-book"
+            :class="{ selected: batchMode ? selectedIds.includes(b.id) : detailBookId === b.id }"
           >
-            <div class="book-cover-wrap">
-              <span v-if="batchMode" class="pick-badge" :class="{ on: selectedIds.includes(b.id) }" @click.stop="toggleSelect(b.id)">
+            <button
+              type="button"
+              class="book-entry"
+              :data-book-id="b.id"
+              :disabled="batchMode && !canEdit(b)"
+              :aria-pressed="batchMode ? selectedIds.includes(b.id) : undefined"
+              @click="onBookClick(b)"
+              @pointerdown="(event) => startBookPress(event, b)"
+              @pointerup="cancelPress"
+              @pointercancel="cancelPress"
+              @pointerleave="cancelPress"
+              @contextmenu.prevent
+            >
+              <span v-if="batchMode && canEdit(b)" class="pick-badge" :class="{ on: selectedIds.includes(b.id) }" aria-hidden="true">
                 <svg viewBox="0 0 16 16" width="11" height="11">
                   <path
                     d="M3 8.5 L6.5 12 L13 4.5"
@@ -157,119 +139,80 @@
                   />
                 </svg>
               </span>
-              <img v-if="b.coverUrl" :src="b.coverUrl" class="book-cover" :alt="b.title || ''" />
-              <div v-else class="book-cover placeholder">
-                <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.2">
-                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-                </svg>
-              </div>
-              <span class="format-badge">{{ b.fileFormat }}</span>
-              <span v-if="b.sharedFrom" class="book-shared">{{ sharedFromText(b.sharedFrom) }}</span>
-              <div v-if="!batchMode" class="book-overlay">
-                <button v-if="canReadOnline(b)" class="ovl-btn primary" @click.stop="openReader(b)">{{ $t('library.read') }}</button>
-                <button class="ovl-btn" @click.stop="openDetail(b)">{{ $t('library.viewDetail') }}</button>
-                <button v-if="userStore.isLoggedIn && b.visibility !== 'PRIVATE'" class="ovl-btn" @click.stop="shareBookToChat(b)">
-                  {{ $t('chat.share.toChat') }}
-                </button>
-                <template v-if="userStore.isLoggedIn && canEdit(b)">
-                  <button class="ovl-btn" @click.stop="moveCategory(b)">{{ $t('library.moveCategory') }}</button>
-                  <el-tooltip :content="$t('common.delete')" placement="top" :show-after="300">
-                    <el-button size="small" text type="danger" @click.stop="onDeleteBook(b)"
-                      ><el-icon><Delete /></el-icon
-                    ></el-button>
-                  </el-tooltip>
-                </template>
-              </div>
-            </div>
-            <div class="book-info">
-              <div class="book-title">{{ b.title }}</div>
-              <div v-if="b.author" class="book-author">{{ b.author }}</div>
-              <div class="book-meta">
-                <span class="book-views">{{ b.viewCount }} {{ $t('library.views') }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- List View -->
-        <div v-else class="book-list">
-          <div
-            v-a11y-click
-            v-for="b in list"
-            :key="b.id"
-            class="book-row card"
-            :class="{ selected: selectedIds.includes(b.id) }"
-            @click="onBookClick(b)"
-            @pointerdown="pressStart(b)"
-            @pointerup="cancelPress"
-            @pointercancel="cancelPress"
-            @pointerleave="cancelPress"
-            @contextmenu.prevent
-          >
-            <span v-if="batchMode" class="pick-badge" :class="{ on: selectedIds.includes(b.id) }" @click.stop="toggleSelect(b.id)">
-              <svg viewBox="0 0 16 16" width="11" height="11">
-                <path
-                  d="M3 8.5 L6.5 12 L13 4.5"
-                  fill="none"
-                  stroke="#fff"
-                  stroke-width="2.4"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
+              <span class="book-cover-wrap">
+                <img
+                  v-if="b.coverUrl && !failedCovers.has(b.coverUrl)"
+                  :src="b.coverUrl"
+                  class="book-cover"
+                  alt=""
+                  loading="lazy"
+                  draggable="false"
+                  @error="failedCovers.add(b.coverUrl)"
                 />
-              </svg>
-            </span>
-            <img v-if="b.coverUrl" :src="b.coverUrl" class="row-cover" :alt="b.title || ''" />
-            <div v-else class="row-cover placeholder">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.2">
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-              </svg>
+                <span v-else class="book-cover book-placeholder" aria-hidden="true">
+                  <el-icon><Reading /></el-icon>
+                </span>
+              </span>
+              <span class="book-info">
+                <span class="book-title" :title="b.title">{{ b.title }}</span>
+                <span v-if="b.author" class="book-author" :title="b.author">{{ b.author }}</span>
+                <span class="book-meta">
+                  <span v-if="b.fileFormat" class="book-format">{{ b.fileFormat }}</span>
+                  <span v-if="b.sharedFrom" class="book-origin" :title="sharedFromText(b.sharedFrom)">{{
+                    sharedFromText(b.sharedFrom)
+                  }}</span>
+                </span>
+              </span>
+            </button>
+            <div v-if="!batchMode" class="book-actions">
+              <button v-if="canReadOnline(b)" type="button" class="book-read" @click="openReader(b)">{{ $t('library.read') }}</button>
+              <el-dropdown
+                v-if="userStore.isLoggedIn && (canEdit(b) || b.visibility !== 'PRIVATE')"
+                trigger="click"
+                @command="(action) => onBookAction(action, b)"
+              >
+                <button type="button" class="book-more" :aria-label="$t('library.bookActions', { title: b.title })">
+                  <el-icon><MoreFilled /></el-icon>
+                </button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item v-if="b.visibility !== 'PRIVATE'" command="share">{{ $t('chat.share.toChat') }}</el-dropdown-item>
+                    <template v-if="canEdit(b)">
+                      <el-dropdown-item command="move">{{ $t('library.moveCategory') }}</el-dropdown-item>
+                      <el-dropdown-item command="delete" divided>{{ $t('common.delete') }}</el-dropdown-item>
+                    </template>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
             </div>
-            <div class="row-info">
-              <div class="row-title">{{ b.title }}</div>
-              <div class="row-sub">
-                <span v-if="b.author">{{ b.author }}</span>
-                <span class="format-badge small">{{ b.fileFormat }}</span>
-                <span v-if="b.sharedFrom" class="row-shared">{{ sharedFromText(b.sharedFrom) }}</span>
-                <span class="book-views">{{ b.viewCount }} {{ $t('library.views') }}</span>
-              </div>
-            </div>
-            <div v-if="!batchMode" class="row-actions" @click.stop>
-              <button v-if="canReadOnline(b)" class="ghost-btn small" @click="openReader(b)">{{ $t('library.read') }}</button>
-              <button class="ghost-btn small" @click="openDetail(b)">{{ $t('library.viewDetail') }}</button>
-              <el-tooltip v-if="userStore.isLoggedIn && canEdit(b)" :content="$t('common.delete')" placement="top" :show-after="300">
-                <el-button size="small" text type="danger" @click="onDeleteBook(b)"
-                  ><el-icon><Delete /></el-icon
-                ></el-button>
-              </el-tooltip>
-            </div>
-          </div>
+          </article>
+        </div>
+        <div v-else-if="!loading" class="library-empty" role="status">
+          <p>{{ hasQuery ? $t('library.noMatches') : userStore.isGuest ? $t('library.noPublic') : $t('library.emptyHint') }}</p>
+          <el-button v-if="!hasQuery && userStore.isLoggedIn" size="small" type="primary" @click="router.push('/library/edit')">
+            {{ $t('library.upload') }}
+          </el-button>
         </div>
 
-        <div v-if="!loading && !list.length" class="empty-state">
-          <el-empty :description="userStore.isGuest ? $t('library.noPublic') : $t('library.emptyHint')">
-            <button v-if="userStore.isLoggedIn" class="write-btn" @click="router.push('/library/edit')">{{ $t('library.upload') }}</button>
-          </el-empty>
-        </div>
+        <nav v-if="!loadError && lastPage > 1" class="library-pagination" :aria-label="$t('library.pagination')">
+          <el-button size="small" :disabled="page <= 1 || loading" @click="goToPage(page - 1)">{{ $t('library.prevPage') }}</el-button>
+          <span>{{ page }} / {{ lastPage }}</span>
+          <el-button size="small" :disabled="page >= lastPage || loading" @click="goToPage(page + 1)">{{
+            $t('library.nextPage')
+          }}</el-button>
+        </nav>
       </div>
 
-      <!-- 右栏常驻(窄屏 v-show 隐藏),详情体用 KeepAlive 缓存:旋屏/缩窗再放大不会重新取数
-           (宽窄切换不得产生额外接口请求);换一本书时才按新 bookId 重拉。 -->
-      <div v-show="bookWide" class="wide-col library-detail-col">
-        <KeepAlive>
-          <LibraryDetail
-            v-if="bookWide && detailBookId"
-            inline
-            :bookId="detailBookId"
-            @close="clearDetail"
-            @updated="onBookUpdated"
-            @deleted="onBookDeleted"
-            @read="onReadFromDetail"
-          />
-          <div v-else class="card pane-empty">{{ $t('library.pickBookHint') }}</div>
-        </KeepAlive>
-      </div>
+      <aside v-if="detailBookId" v-show="bookWide" class="wide-col library-detail-col" :aria-label="$t('library.detail')">
+        <LibraryDetail
+          :inline="bookWide"
+          :book-id="detailBookId"
+          :categories="categories"
+          @close="clearDetail"
+          @updated="load()"
+          @read="onReadFromDetail"
+        />
+      </aside>
     </div>
 
     <!-- Category Dialog -->
@@ -324,26 +267,16 @@
       </template>
     </el-dialog>
 
-    <!-- Detail Dialog -->
-    <LibraryDetail
-      v-if="detailVisible"
-      :bookId="detailBookId"
-      @close="detailVisible = false"
-      @updated="onBookUpdated"
-      @deleted="onBookDeleted"
-      @read="onReadFromDetail"
-    />
-
     <!-- Reader Overlay -->
-    <LibraryReader v-if="readerVisible" :book="readerBook" @close="readerVisible = false" @statusChanged="load" />
+    <LibraryReader v-if="readerVisible" :book="readerBook" @close="readerVisible = false" @status-changed="load()" />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Delete } from '@element-plus/icons-vue'
+import { Filter, Grid, List, MoreFilled, Plus, Reading, Search } from '@element-plus/icons-vue'
 import { libraryApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useDevice } from '@/composables/useDevice'
@@ -357,46 +290,72 @@ import PageToolbar from '@/components/PageToolbar.vue'
 import LibraryDetail from './LibraryDetail.vue'
 import LibraryReader from './LibraryReader.vue'
 
+const PAGE_SIZE = 48
+const READABLE_FORMATS = ['EPUB', 'PDF', 'TXT']
+const FORMATS = [...READABLE_FORMATS, 'MOBI']
+const VIEW_OPTIONS = [
+  { mode: 'grid', label: 'library.gridView', icon: Grid },
+  { mode: 'list', label: 'library.listView', icon: List },
+]
+
 const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 const { isWide: viewWide } = useDevice()
 const list = ref([])
-const loading = ref(false)
-const catLoading = ref(false)
+const page = ref(1)
+const total = ref(0)
+const loading = ref(true)
+const loadError = ref(false)
 const categories = ref([])
 const activeCategoryId = ref(null)
 const searchKeyword = ref('')
+const appliedKeyword = ref('')
 const sortBy = ref('created')
 const filterFormat = ref('')
 const filterStatus = ref('')
-// 书架视图(网格/列表):本机记忆,切换即持久化
 const viewMode = useViewMode('library')
-const detailVisible = ref(false)
 const detailBookId = ref(null)
 const readerVisible = ref(false)
 const readerBook = ref(null)
+const bookArea = ref(null)
+const failedCovers = reactive(new Set())
 
-// 宽屏双栏:左书架 + 右详情;批量模式是纯选择场景,不渲染右栏(整宽书架)
+// 双栏会在 setup 中读取 bookWide,先初始化多选状态。
+const {
+  selectMode: batchMode,
+  selectedIds,
+  toggle: toggleSelect,
+  enter,
+  exit,
+  clear: clearSelection,
+  selectAll,
+  pressStart,
+  cancelPress,
+  swallowClick,
+  dispose,
+} = usePickSelect({ enabled: () => userStore.isLoggedIn, onLongPress: clearDetail })
 const bookWide = computed(() => viewWide.value && !batchMode.value)
-const { wideEl, colStyle } = useWideCols(bookWide)
+const { wideEl, colStyle, remeasure } = useWideCols(bookWide)
+const activeFilterCount = computed(() => [activeCategoryId.value, filterFormat.value, filterStatus.value].filter(Boolean).length)
+const hasQuery = computed(() => Boolean(appliedKeyword.value || activeFilterCount.value))
+const lastPage = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
 
 // 扁平分类 → el-cascader 树
-const buildCascaderTree = (excludeId = null) => {
+const buildCascaderTree = (excludeIds = new Set()) => {
   const byParent = {}
   for (const c of categories.value) {
-    if (c.id === excludeId) continue
+    if (excludeIds.has(c.id)) continue
     const pid = c.parentId || 0
     if (!byParent[pid]) byParent[pid] = []
     byParent[pid].push(c)
   }
   const build = (pid) =>
-    (byParent[pid] || []).map((c) => ({
-      value: c.id,
-      label: c.name,
-      children: build(c.id).length ? build(c.id) : undefined,
-    }))
+    (byParent[pid] || []).map((c) => {
+      const children = build(c.id)
+      return { value: c.id, label: c.name, children: children.length ? children : undefined }
+    })
   return build(0)
 }
 
@@ -418,50 +377,77 @@ const parentCascaderTree = computed(() => {
     }
     collectDescendants(catDialog.id)
   }
-  const byParent = {}
-  for (const c of categories.value) {
-    if (excludeIds.has(c.id)) continue
-    const pid = c.parentId || 0
-    if (!byParent[pid]) byParent[pid] = []
-    byParent[pid].push(c)
-  }
-  const build = (pid) =>
-    (byParent[pid] || []).map((c) => ({
-      value: c.id,
-      label: c.name,
-      children: build(c.id).length ? build(c.id) : undefined,
-    }))
-  return build(0)
+  return buildCascaderTree(excludeIds)
 })
 
-const canEdit = (b) => !b.readOnly && (userStore.isOwner || b.uploaderId === userStore.userInfo?.id)
-const canReadOnline = (b) => b.fileFormat === 'PDF' || b.fileFormat === 'EPUB' || b.fileFormat === 'TXT'
+const canEdit = (b) => userStore.isLoggedIn && !b.readOnly && (userStore.isOwner || b.uploaderId === userStore.userInfo?.id)
+const canReadOnline = (b) => Boolean(b.fileUrl) && READABLE_FORMATS.includes(b.fileFormat)
+const selectableBooks = computed(() => list.value.filter(canEdit))
 // 亲友圈分享进来的图书:标来源家庭(圈内称呼优先)
 const sharedFromText = (s) => t('audience.sharedFrom', { name: s.alias || s.familyName || '' })
 
-const load = async () => {
+let listRequest = 0
+async function load(current = page.value) {
+  const request = ++listRequest
   loading.value = true
+  loadError.value = false
+  page.value = current
   try {
-    const params = { current: 1, size: 200 }
-    if (activeCategoryId.value) params.categoryId = activeCategoryId.value
-    if (searchKeyword.value) params.keyword = searchKeyword.value
-    if (filterFormat.value) params.fileFormat = filterFormat.value
-    if (filterStatus.value) params.borrowStatus = filterStatus.value
-    if (sortBy.value) params.sortBy = sortBy.value
-    const data = await libraryApi.list(params)
-    list.value = data.records || []
+    const data = await libraryApi.list({
+      current,
+      size: PAGE_SIZE,
+      categoryId: activeCategoryId.value || undefined,
+      keyword: appliedKeyword.value || undefined,
+      fileFormat: filterFormat.value || undefined,
+      borrowStatus: filterStatus.value || undefined,
+      sortBy: sortBy.value,
+    })
+    if (request !== listRequest) return
+    if (!Array.isArray(data?.records)) throw new Error('Unexpected library data')
+    total.value = Number(data.total) || 0
+    if (current > lastPage.value) return load(lastPage.value)
+    list.value = data.records
+    if (batchMode.value) {
+      const editableIds = new Set(selectableBooks.value.map((book) => book.id))
+      selectedIds.value = selectedIds.value.filter((id) => editableIds.has(id))
+    }
+  } catch {
+    if (request === listRequest) loadError.value = true
   } finally {
-    loading.value = false
+    if (request === listRequest) loading.value = false
   }
 }
 
+async function goToPage(current) {
+  clearDetail()
+  clearSelection()
+  const pending = load(current)
+  const request = listRequest
+  await pending
+  if (request !== listRequest || loadError.value || !bookArea.value) return
+  bookArea.value.scrollTop = 0
+  bookArea.value.scrollIntoView({ block: 'nearest' })
+}
+
+function applySearch() {
+  appliedKeyword.value = searchKeyword.value.trim()
+  goToPage(1)
+}
+
+function clearFilters() {
+  searchKeyword.value = ''
+  appliedKeyword.value = ''
+  activeCategoryId.value = null
+  filterFormat.value = ''
+  filterStatus.value = ''
+  goToPage(1)
+}
+
 const loadCategories = async () => {
-  catLoading.value = true
   try {
     categories.value = (await libraryApi.categories()) || []
-  } catch (e) {
-  } finally {
-    catLoading.value = false
+  } catch {
+    // 请求层统一显示加载错误。
   }
 }
 
@@ -494,24 +480,15 @@ const saveCategory = async () => {
   }
 }
 
-// Book actions(批量模式与选择集走 usePickSelect:手机长按书卡进多选)
-const {
-  selectMode: batchMode,
-  selectedIds,
-  toggle: toggleSelect,
-  enter,
-  exit,
-  selectAll,
-  pressStart,
-  cancelPress,
-  swallowClick,
-  dispose,
-} = usePickSelect()
+function startBookPress(event, book) {
+  if (event.button === 0 && !loading.value && canEdit(book)) pressStart(book)
+}
+
 const onBookClick = (b) => {
   // 长按已选中这本:吞掉松手后的 click,避免又打开详情
-  if (swallowClick()) return
+  if (swallowClick() || loading.value) return
   if (batchMode.value) {
-    toggleSelect(b.id)
+    if (canEdit(b)) toggleSelect(b.id)
   } else {
     openDetail(b)
   }
@@ -524,17 +501,19 @@ const enterBatch = () => {
 const exitBatch = () => {
   exit()
 }
-const selectAllBooks = () => selectAll(list.value.map((b) => b.id))
+const selectAllBooks = () => selectAll(selectableBooks.value.map((b) => b.id))
 
-const openDetail = (b) => {
-  detailBookId.value = b.id
-  // 宽屏出右栏(不弹窗),窄屏保持 640px 弹窗
-  detailVisible.value = !bookWide.value
+const openDetail = async (book) => {
+  detailBookId.value = book.id
+  if (!bookWide.value) return
+  await nextTick()
+  if (detailBookId.value === book.id) {
+    bookArea.value?.querySelector(`[data-book-id="${CSS.escape(String(book.id))}"]`)?.scrollIntoView({ block: 'nearest' })
+  }
 }
 
-const clearDetail = () => {
+function clearDetail() {
   detailBookId.value = null
-  detailVisible.value = false
 }
 
 const openReader = (b) => {
@@ -556,17 +535,14 @@ const shareBookToChat = (b) => {
 }
 
 const onReadFromDetail = (book) => {
-  detailVisible.value = false
-  readerBook.value = book
-  readerVisible.value = true
+  if (!bookWide.value) clearDetail()
+  openReader(book)
 }
 
-const onBookUpdated = () => {
-  load()
-}
-const onBookDeleted = () => {
-  clearDetail()
-  load()
+const onBookAction = (action, book) => {
+  if (action === 'share') shareBookToChat(book)
+  if (action === 'move') moveCategory(book)
+  if (action === 'delete') onDeleteBook(book)
 }
 
 const onDeleteBook = async (b) => {
@@ -578,6 +554,7 @@ const onDeleteBook = async (b) => {
       closeOnClickModal: true,
     })
     await libraryApi.delete(b.id)
+    if (detailBookId.value === b.id) clearDetail()
     ElMessage.success(t('common.deleted'))
     await load()
   } catch (e) {
@@ -637,12 +614,13 @@ const batchDeleteAction = async () => {
 }
 
 onBeforeUnmount(() => {
+  listRequest += 1
   dispose()
 })
 
 onMounted(async () => {
-  loadCategories()
-  await load()
+  await Promise.all([loadCategories(), load()])
+  remeasure()
   // 聊天图书卡深链:?book=<id> 直接打开阅读器(卡片点击落书架后无动作断裂);
   // 直查详情,不受书架当前筛选影响
   const bookId = Number(route.query.book)
@@ -662,329 +640,301 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* Toolbar: global .page-toolbar */
-.cat-add-btn {
-  width: 28px;
-  height: 28px;
-  border: none;
-  background: transparent;
-  border-radius: 8px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-secondary);
-  transition:
-    background 0.2s,
-    color 0.2s,
-    transform 0.2s;
+.library-page {
+  --shelf-hover: rgba(var(--color-brand-rgb), 0.09);
 }
-.cat-add-btn:hover {
-  background: rgba(var(--color-brand-rgb), 0.1);
-  color: var(--color-accent, var(--color-brand));
-  transform: scale(1.1);
+.library-toolbar-search {
+  flex: 1 1 220px;
+  min-width: min(100%, 180px);
+  max-width: 360px;
 }
-html.dark .cat-add-btn:hover {
-  background: rgba(var(--color-brand-rgb), 0.12);
-  color: var(--color-brand);
-}
-/* Book Grid */
-.book-area {
-  min-height: 200px;
-}
-.book-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 14px;
-}
-.book-card {
-  cursor: pointer;
-  padding: 12px;
-  border-radius: 14px;
-  position: relative;
-  transition:
-    transform 0.25s ease,
-    box-shadow 0.25s ease;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.book-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 28px rgba(58, 46, 34, 0.12);
-}
-html.dark .book-card:hover {
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3);
-}
-.book-card.selected {
-  box-shadow: 0 0 0 2px var(--color-accent, var(--color-brand));
-}
-.book-cover-wrap {
-  position: relative;
-  aspect-ratio: 3/4;
-  border-radius: 8px;
-  overflow: hidden;
-}
-.book-cover {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.book-cover.placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, rgba(var(--color-brand-rgb), 0.12), rgba(var(--color-brand-rgb), 0.04));
-  color: var(--color-text-secondary);
-  opacity: 0.4;
-}
-html.dark .book-cover.placeholder {
-  background: linear-gradient(135deg, rgba(var(--color-brand-rgb), 0.1), rgba(var(--color-brand-rgb), 0.03));
-}
-.format-badge {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.5);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 600;
-  backdrop-filter: blur(4px);
-}
-.format-badge.small {
-  position: static;
-  font-size: 10px;
-  padding: 1px 5px;
-}
-/* 亲友圈分享来的图书:封面上标来源家庭(右下角留给格式徽章) */
-.book-shared {
-  position: absolute;
-  left: 5px;
-  bottom: 5px;
-  max-width: calc(100% - 10px);
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: rgba(var(--color-brand-rgb), 0.85);
-  color: #fff;
-  font-size: 10px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.row-shared {
-  font-size: 11px;
-  color: var(--color-accent);
-}
-.book-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  opacity: 0;
-  transition: opacity 0.2s;
-  border-radius: 8px;
-}
-.book-card:hover .book-overlay {
-  opacity: 1;
-}
-.book-overlay :deep(.el-button) {
-  padding: 5px 6px;
-}
-.ovl-btn {
-  padding: 4px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.15);
-  color: #fff;
-  border-radius: 8px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: background 0.2s;
-  backdrop-filter: blur(4px);
-}
-.ovl-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
-.ovl-btn.primary {
-  background: rgba(var(--color-brand-rgb), 0.8);
-  border-color: rgba(var(--color-brand-rgb), 0.8);
-}
-.ovl-btn.primary:hover {
-  background: rgba(168, 124, 94, 0.9);
-}
-.book-info {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.book-title {
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--color-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-.book-author {
-  font-size: 11px;
-  color: var(--color-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.book-meta {
-  display: flex;
-  gap: 6px;
-  align-items: center;
+.library-toolbar-actions {
   flex-wrap: wrap;
 }
-.book-views {
-  font-size: 11px;
-  color: var(--color-text-secondary);
-  opacity: 0.6;
+.library-toolbar-actions .el-button + .el-button,
+.library-batch-actions .el-button + .el-button {
+  margin-inline-start: 0;
 }
-
-/* Book List */
-.book-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.book-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  border-radius: 12px;
-  cursor: pointer;
-  transition:
-    transform 0.2s,
-    box-shadow 0.2s;
-}
-.book-row:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(58, 46, 34, 0.08);
-}
-html.dark .book-row:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-}
-.book-row.selected {
-  box-shadow: 0 0 0 2px var(--color-accent, var(--color-brand));
-}
-.row-cover {
-  width: 40px;
-  height: 54px;
-  border-radius: 4px;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-.row-cover.placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, rgba(var(--color-brand-rgb), 0.12), rgba(var(--color-brand-rgb), 0.04));
-  color: var(--color-text-secondary);
-  opacity: 0.3;
-}
-html.dark .row-cover.placeholder {
-  background: linear-gradient(135deg, rgba(var(--color-brand-rgb), 0.1), rgba(var(--color-brand-rgb), 0.03));
-}
-.row-info {
-  flex: 1;
-  min-width: 0;
-}
-.row-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.row-sub {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-top: 2px;
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
-.row-actions {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
-}
-.row-actions :deep(.el-button) {
-  padding: 5px 6px;
-}
-
-/* 宽屏双栏:左书架 1fr + 右详情 280–400px 随可用宽度收放(外壳侧栏占掉 320px 左右),
-   列内滚动由 main.css 的 .wide-col 统一 */
-.library-cols.wide-cols {
+.library-filter-fields {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(280px, 38%, 400px);
-  gap: 16px;
+  gap: 6px;
+}
+.library-filter-fields label:not(:first-child) {
+  margin-top: 4px;
+}
+.library-filter-fields > .el-button {
+  justify-self: end;
+  margin-top: 6px;
+}
+.library-view-toggle {
+  display: flex;
+  padding: 2px;
+  gap: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+.library-view-toggle button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 28px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.library-view-toggle button:hover,
+.library-view-toggle button[aria-pressed='true'] {
+  background: var(--shelf-hover);
+  color: var(--color-text-primary);
+}
+.library-view-toggle .el-icon {
+  font-size: 16px;
+}
+.library-summary,
+.library-batch-actions,
+.library-pagination {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+.library-summary {
+  min-height: 32px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.library-summary > .el-button {
+  margin: 0;
+}
+.library-batch-actions {
+  margin-inline-start: auto;
+}
+
+.library-cols.wide-cols.with-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(244px, 38%, 340px);
+  gap: 14px;
 }
 .library-detail-col {
   min-width: 0;
 }
-.pane-empty {
+.book-area {
+  min-width: 0;
+  min-height: 160px;
+  padding: 2px;
+}
+.library-books {
+  display: grid;
+  gap: 12px;
+}
+.library-books.view-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 128px), 1fr));
+}
+.shelf-book {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 12px;
+}
+.shelf-book:hover,
+.shelf-book:focus-within {
+  background: var(--shelf-hover);
+}
+.shelf-book.selected {
+  background: var(--shelf-hover);
+  border-color: var(--color-brand);
+}
+.book-entry {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  padding: 7px;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: var(--color-text-primary);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.book-entry:disabled {
+  opacity: 0.46;
+  cursor: default;
+}
+.book-cover-wrap {
+  position: relative;
+  display: block;
+  min-width: 0;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 4px 8px 8px 4px;
+  background: var(--color-card);
+}
+.book-cover-wrap::after {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.15), transparent);
+  content: '';
+  pointer-events: none;
+}
+.book-cover {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.book-placeholder {
+  display: grid;
+  place-items: center;
+  background: rgba(var(--color-brand-rgb), 0.12);
+  color: var(--color-text-secondary);
+  font-size: 34px;
+}
+.book-info {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  min-width: 0;
+}
+.book-title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.book-author,
+.book-origin {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.book-author,
+.book-meta {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+.book-meta {
   display: flex;
   align-items: center;
-  justify-content: center;
-  min-height: 200px;
+  gap: 6px;
+}
+.book-format {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.book-actions {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 2px;
+  padding: 0 4px 3px;
+}
+.book-actions > .el-dropdown {
+  margin-inline-start: auto;
+}
+.book-read,
+.book-more {
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text-primary);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.book-read {
+  font-weight: 600;
+}
+.book-more {
+  display: grid;
+  place-items: center;
+  min-width: 32px;
+  font-size: 15px;
+}
+.book-read:hover,
+.book-more:hover {
+  background: var(--shelf-hover);
+}
+.view-list {
+  gap: 2px;
+}
+.view-list .shelf-book {
+  flex-direction: row;
+  align-items: center;
+  border-bottom-color: var(--color-border);
+}
+.view-list .shelf-book.selected {
+  border-bottom-color: var(--color-brand);
+}
+.view-list .book-entry {
+  grid-template-columns: 42px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+.view-list .book-placeholder {
+  font-size: 18px;
+}
+.view-list .book-actions {
+  padding: 0 5px 0 0;
+}
+.library-pagination {
+  padding-inline: 7px;
+  margin: 16px 0 8px;
   color: var(--color-text-secondary);
   font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
-
-.empty-state {
-  padding: 48px 0;
+.library-empty {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 10px;
+  min-height: 160px;
+  padding: 12px;
+  color: var(--color-text-secondary);
+  text-align: center;
 }
-
-@media (max-width: 768px) {
-  .lib-layout {
-    grid-template-columns: 1fr;
+.library-empty p {
+  margin: 0;
+}
+@media (max-width: 600px) {
+  .library-toolbar-search {
+    max-width: none;
   }
-  .cat-panel {
-    display: flex;
-    gap: 4px;
-    overflow-x: auto;
-    padding: 8px;
+  .library-toolbar-actions {
+    justify-content: flex-start;
+    margin-inline-start: 0;
   }
-  .cat-head {
-    display: none;
+  .library-books.view-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 120px), 1fr));
+    gap: 8px;
   }
-  .cat-tree {
-    flex-direction: row;
-    max-height: none;
+  .book-read,
+  .book-more {
+    min-height: 36px;
   }
-  .cat-node {
-    white-space: nowrap;
-  }
-  .cat-ops {
-    display: none !important;
-  }
-  .cat-node.child {
-    padding-left: 8px;
-  }
-  .cat-toggle,
-  .cat-toggle-placeholder {
-    display: none;
-  }
-  .book-grid {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 10px;
-  }
-  .tb-left {
-    width: 100%;
+  .book-more {
+    min-width: 36px;
   }
 }
 </style>
