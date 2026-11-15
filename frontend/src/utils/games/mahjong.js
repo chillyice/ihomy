@@ -18,10 +18,11 @@ export const MAHJONG_BASE_SCORE = 8
 export const MAHJONG_PAIR_ANY = 'any'
 export const MAHJONG_PAIR_258 = '258'
 
-/** 规则预设:推倒胡简化(默认,无吃无杠)/ 口口胡(吃碰杠全开) */
+/** 规则预设:推倒胡简化(默认,无吃无杠)/ 口口胡(吃碰杠全开)/ 二五八将(吃碰杠全开,将牌限 2/5/8) */
 export const MAHJONG_RULE_PRESETS = {
   tuiDaoHu: { key: 'tuiDaoHu', allowChi: false, allowGang: false, pairConstraint: MAHJONG_PAIR_ANY },
   kouKouHu: { key: 'kouKouHu', allowChi: true, allowGang: true, pairConstraint: MAHJONG_PAIR_ANY },
+  erWuBaJiang: { key: 'erWuBaJiang', allowChi: true, allowGang: true, pairConstraint: MAHJONG_PAIR_258 },
 }
 
 /** 归一化规则参数(房间信令/本地开局共用;缺省即推倒胡简化口径) */
@@ -148,7 +149,8 @@ export function canMahjongWin(counts, openMelds = 0, rules = null) {
   const melds = Math.max(0, Math.min(4, Number(openMelds) || 0))
   const total = counts.reduce((a, b) => a + b, 0)
   if (total !== 14 - melds * 3) return false
-  if (melds === 0 && isSevenPairs(counts)) return true
+  // 七对子只在允许任意将的规则下成立;二五八将的胡牌形状固定为「4 组面子 + 1 对将」
+  if (melds === 0 && !isPair258Rules(rules) && isSevenPairs(counts)) return true
   return canFormMelds(counts, 4 - melds, isPair258Rules(rules))
 }
 

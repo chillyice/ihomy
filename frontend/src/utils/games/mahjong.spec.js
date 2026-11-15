@@ -250,7 +250,7 @@ describe('mahjong rules (吃/杠/二五八将)', () => {
     expect(normalizeMahjongRules({ pairConstraint: 'bogus' }).pairConstraint).toBe(MAHJONG_PAIR_ANY)
   })
 
-  it('二五八将:将牌为 2/5/8 可胡,幺九对与字牌对不可胡;七对不受约束', () => {
+  it('二五八将:胡牌形状固定为 4 组面子 + 1 对将,将牌为 2/5/8;七对不是该形状不可胡', () => {
     const r258 = { pairConstraint: MAHJONG_PAIR_258 }
     // 111万 234万 55万 678万 888万 → 将 5万(数牌5)✓
     const ok = kindsToTiles([0, 0, 0, 1, 2, 3, 4, 4, 5, 6, 7, 7, 7, 7])
@@ -261,9 +261,9 @@ describe('mahjong rules (吃/杠/二五八将)', () => {
     // 111万 234万 567万 888万 中中 → 字牌将不可胡
     const honor = kindsToTiles([0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 7, 7, 31, 31])
     expect(canMahjongWin(mahjongCounts(honor), 0, r258)).toBe(false)
-    // 七对不受二五八约束(含幺九对与字牌对)
+    // 七对不是「4 组面子 + 1 对将」的形状,二五八将下不可胡(含幺九对与字牌对)
     const seven = kindsToTiles([0, 0, 8, 8, 17, 17, 26, 26, 27, 27, 31, 31, 33, 33])
-    expect(canMahjongWin(mahjongCounts(seven), 0, r258)).toBe(true)
+    expect(canMahjongWin(mahjongCounts(seven), 0, r258)).toBe(false)
     // 默认规则下同牌型可胡(9万将)
     expect(canMahjongWin(mahjongCounts(bad), 0)).toBe(true)
   })

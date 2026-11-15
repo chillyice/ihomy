@@ -78,9 +78,6 @@
           <div class="tool-meta-left">
             <div class="tool-type-tag cat-tag">{{ categoryText(b.category) }}</div>
           </div>
-          <span class="tool-enter"
-            >{{ $t('games.enter') }}<el-icon><ArrowRight /></el-icon
-          ></span>
         </div>
       </div>
 
@@ -103,9 +100,6 @@
             <div class="tool-type-tag">{{ typeText(g) }}</div>
             <div v-if="g.visibility && g.visibility !== 'FAMILY'" class="tool-type-tag vis-tag">{{ visibilityLabel(t, g.visibility) }}</div>
           </div>
-          <span class="tool-enter">
-            {{ g.type === 'LINK' ? $t('games.open') : $t('games.play') }}<el-icon><ArrowRight /></el-icon
-          ></span>
           <el-dropdown trigger="click" @command="(cmd) => onGameAction(cmd, g)">
             <span class="game-more" @click.stop
               ><el-icon><MoreFilled /></el-icon
@@ -798,13 +792,6 @@ onMounted(() => {
 }
 .editor-audience {
   margin: 4px 0 14px;
-}
-.tool-enter {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
-  color: var(--color-accent, var(--color-brand));
 }
 .game-more {
   display: inline-flex;

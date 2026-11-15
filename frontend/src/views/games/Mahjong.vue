@@ -37,26 +37,25 @@
         <div class="cover-title">{{ $t('games.mahjong.title') }}</div>
         <div class="cover-desc">{{ $t('games.mahjong.desc') }}</div>
 
-        <!-- 开局规则选择:预设 + 吃/杠/二五八将开关 -->
+        <!-- 开局规则选择:按规则名单选(每条规则自带胡牌口径) -->
         <div class="rules-panel">
           <div class="rules-title">{{ $t('games.mahjong.rulesTitle') }}</div>
-          <div class="rules-presets">
+          <div class="rules-list" role="radiogroup" :aria-label="$t('games.mahjong.rulesTitle')">
             <button
               v-for="(p, key) in MAHJONG_RULE_PRESETS"
               :key="key"
               type="button"
-              class="rules-preset"
-              :class="{ active: rulesLabel === key }"
-              @click="rulesDraft = normalizeMahjongRules(p)"
+              class="rules-option"
+              role="radio"
+              :aria-checked="rulesDraftKey === key"
+              :class="{ active: rulesDraftKey === key }"
+              @click="rulesDraftKey = key"
             >
-              {{ $t(`games.mahjong.presets.${key}`) }}
+              <span class="rules-option-name">{{ $t(`games.mahjong.presets.${key}`) }}</span>
+              <span class="rules-option-desc">{{ $t(`games.mahjong.presetDescs.${key}`) }}</span>
             </button>
           </div>
-          <div class="rules-switches">
-            <label class="rules-switch"><input v-model="rulesDraft.allowChi" type="checkbox" />{{ $t('games.mahjong.ruleChi') }}</label>
-            <label class="rules-switch"><input v-model="rulesDraft.allowGang" type="checkbox" />{{ $t('games.mahjong.ruleGang') }}</label>
-            <label class="rules-switch"><input v-model="pair258Draft" type="checkbox" />{{ $t('games.mahjong.rulePair258') }}</label>
-          </div>
+          <div class="rules-hint">{{ $t('games.mahjong.rulesHint') }}</div>
         </div>
 
         <button class="start-btn" type="button" @click="startGame">{{ $t('games.mahjong.start') }}</button>
@@ -70,22 +69,20 @@
         <div v-if="rulesPickerOpen && play.isHost" class="rules-overlay">
           <div class="rules-panel rules-panel-float">
             <div class="rules-title">{{ $t('games.mahjong.rulesPickTitle') }}</div>
-            <div class="rules-presets">
+            <div class="rules-list" role="radiogroup" :aria-label="$t('games.mahjong.rulesPickTitle')">
               <button
                 v-for="(p, key) in MAHJONG_RULE_PRESETS"
                 :key="key"
                 type="button"
-                class="rules-preset"
-                :class="{ active: rulesDraftLabel === key }"
-                @click="rulesDraft = normalizeMahjongRules(p)"
+                class="rules-option"
+                role="radio"
+                :aria-checked="rulesDraftKey === key"
+                :class="{ active: rulesDraftKey === key }"
+                @click="rulesDraftKey = key"
               >
-                {{ $t(`games.mahjong.presets.${key}`) }}
+                <span class="rules-option-name">{{ $t(`games.mahjong.presets.${key}`) }}</span>
+                <span class="rules-option-desc">{{ $t(`games.mahjong.presetDescs.${key}`) }}</span>
               </button>
-            </div>
-            <div class="rules-switches">
-              <label class="rules-switch"><input v-model="rulesDraft.allowChi" type="checkbox" />{{ $t('games.mahjong.ruleChi') }}</label>
-              <label class="rules-switch"><input v-model="rulesDraft.allowGang" type="checkbox" />{{ $t('games.mahjong.ruleGang') }}</label>
-              <label class="rules-switch"><input v-model="pair258Draft" type="checkbox" />{{ $t('games.mahjong.rulePair258') }}</label>
             </div>
             <el-button type="primary" round @click="startGame">{{ $t('games.mahjong.rulesConfirm') }}</el-button>
           </div>
@@ -268,7 +265,6 @@ import { useGameRoomPlay } from '@/composables/useGameRoomPlay'
 import { isSpectatorRole } from '@/utils/gameRoom'
 import { useChatStore } from '@/stores/chat'
 import {
-  MAHJONG_PAIR_258,
   MAHJONG_RULE_PRESETS,
   canMahjongBuGang,
   canMahjongMingGang,
@@ -359,9 +355,9 @@ const playerWins = ref(0)
 const aiWins = ref(0)
 const rounds = ref(0)
 
-// ---------- 规则(开局可选,随房间广播) ----------
+// ---------- 规则(按规则名单选,随房间广播) ----------
 const rules = ref(normalizeMahjongRules(null))
-const rulesDraft = ref(normalizeMahjongRules(null))
+const rulesDraftKey = ref('tuiDaoHu') // 开局草稿:所选规则名
 const rulesPickerOpen = ref(false) // 房间局:房主开牌前先选规则
 const claimChiOptions = ref([]) // 本机收到的吃组合候选
 const selfGangKinds = ref([]) // 本机回合内可杠(暗杠/补杠)[{ kind, type }]
@@ -457,22 +453,6 @@ const meldView = (m) => {
   if (type === 'gang' || type === 'bugang') return { dark: false, kinds: [m.kind, m.kind, m.kind, m.kind] }
   return { dark: false, kinds: [m.kind, m.kind, m.kind] }
 }
-
-// 规则草稿的显示名与二五八将开关(封面与开局浮层共用)
-const rulesDraftLabel = computed(() => {
-  const r = normalizeMahjongRules(rulesDraft.value)
-  for (const key of Object.keys(MAHJONG_RULE_PRESETS)) {
-    const p = MAHJONG_RULE_PRESETS[key]
-    if (p.allowChi === r.allowChi && p.allowGang === r.allowGang && p.pairConstraint === r.pairConstraint) return key
-  }
-  return 'custom'
-})
-const pair258Draft = computed({
-  get: () => normalizeMahjongRules(rulesDraft.value).pairConstraint === MAHJONG_PAIR_258,
-  set: (v) => {
-    rulesDraft.value = normalizeMahjongRules({ ...normalizeMahjongRules(rulesDraft.value), pairConstraint: v ? MAHJONG_PAIR_258 : 'any' })
-  },
-})
 
 const turnLabel = computed(() => {
   if (phase.value !== 'playing') return ''
@@ -659,7 +639,7 @@ async function startGame() {
   drawnTileId.value = null
   canSelfWin.value = false
   busyAi.value = false
-  rules.value = normalizeMahjongRules(rulesDraft.value)
+  rules.value = normalizeMahjongRules(MAHJONG_RULE_PRESETS[rulesDraftKey.value])
   rivers.value = [[], [], [], []]
   melds.value = [[], [], [], []]
   guestHand.value = []
@@ -1637,48 +1617,47 @@ html.dark .mj-table {
   font-size: 14px;
   font-weight: 700;
 }
-.rules-presets {
+.rules-list {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  flex-direction: column;
   gap: 8px;
+  width: 100%;
 }
-.rules-preset {
-  padding: 7px 18px;
+.rules-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 9px 14px;
   border: 1.5px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: 10px;
   background: transparent;
   color: var(--color-text);
-  font-size: 13px;
   cursor: pointer;
+  text-align: left;
   transition:
     border-color 0.15s,
     background 0.15s;
 }
-.rules-preset.active {
+.rules-option.active {
   border-color: var(--color-brand);
   background: rgba(var(--color-brand-rgb), 0.1);
-  color: var(--color-brand);
+}
+.rules-option-name {
+  font-size: 13px;
   font-weight: 600;
 }
-.rules-switches {
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
-  justify-content: center;
+.rules-option.active .rules-option-name {
+  color: var(--color-brand);
 }
-.rules-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
+.rules-option-desc {
+  font-size: 12px;
   color: var(--color-text-secondary);
-  cursor: pointer;
 }
-.rules-switch input {
-  accent-color: var(--color-brand);
-  width: 15px;
-  height: 15px;
+.rules-hint {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-align: center;
 }
 .rules-overlay {
   position: absolute;
