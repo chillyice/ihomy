@@ -15,7 +15,6 @@ export const EMBEDDED_GAMES = [
     descKey: 'games.embedded.space-cadet.desc',
     category: 'ARCADE',
   },
-  { slug: 'pinball', titleKey: 'games.embedded.pinball.title', descKey: 'games.embedded.pinball.desc', category: 'ARCADE' },
   { slug: 'trex', titleKey: 'games.embedded.trex.title', descKey: 'games.embedded.trex.desc', category: 'ARCADE' },
 ]
 

@@ -86,6 +86,94 @@
     .tk-wide { width: 88px; border-radius: 32px; font-size: 13px; }
     .tk-sm { width: 48px; height: 48px; font-size: 11px; font-weight: 500; align-self: flex-start; opacity: 0.85; }
   }
+
+  /* 按键设置:齿轮入口 + 重绑定面板(桌面与触屏都可用) */
+  #gear {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(20, 26, 40, 0.5);
+    color: #c8d2e4;
+    font-size: 17px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.65;
+    transition: opacity 0.15s ease, background 0.15s ease;
+  }
+  #gear:hover { opacity: 1; background: rgba(60, 80, 130, 0.55); }
+  #kbPanel {
+    position: absolute;
+    top: 52px;
+    right: 10px;
+    width: 250px;
+    padding: 14px 16px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(16, 20, 32, 0.92);
+    color: #c8d2e4;
+    font-size: 13px;
+    display: none;
+  }
+  #kbPanel.open { display: block; }
+  #kbPanel h3 {
+    margin: 0 0 10px;
+    font-size: 14px;
+    color: #e6edf8;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  #kbClose {
+    border: 0;
+    background: none;
+    color: #8b9ab5;
+    font-size: 15px;
+    cursor: pointer;
+    padding: 2px 4px;
+  }
+  #kbClose:hover { color: #dbe4f5; }
+  .kb-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .kb-key {
+    min-width: 84px;
+    padding: 5px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(40, 50, 78, 0.6);
+    color: #dbe4f5;
+    font-size: 12px;
+    cursor: pointer;
+    text-align: center;
+  }
+  .kb-key:hover { background: rgba(70, 90, 140, 0.65); }
+  .kb-key.listening { border-color: #7aa2ff; color: #bcd0ff; background: rgba(60, 90, 170, 0.5); }
+  .kb-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  #kbReset {
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 8px;
+    background: none;
+    color: #8b9ab5;
+    font-size: 12px;
+    padding: 4px 10px;
+    cursor: pointer;
+  }
+  #kbReset:hover { color: #dbe4f5; background: rgba(60, 80, 130, 0.4); }
+  .kb-hint { margin: 0; font-size: 11px; color: #76839c; line-height: 1.6; }
 </style>
 </head>
 <body>
@@ -99,6 +187,18 @@
       <button class="tk tk-wide" data-key="32" aria-label="发球">发球</button>
     </div>
     <button class="tk" data-key="88" aria-label="右挡板">▶</button>
+  </div>
+  <button id="gear" aria-label="按键设置">⚙</button>
+  <div id="kbPanel" role="dialog" aria-label="按键设置">
+    <h3>按键设置 <button id="kbClose" aria-label="关闭">✕</button></h3>
+    <div class="kb-row"><span>左挡板</span><button class="kb-key" data-slot="left"></button></div>
+    <div class="kb-row"><span>右挡板</span><button class="kb-key" data-slot="right"></button></div>
+    <div class="kb-row"><span>发球</span><button class="kb-key" data-slot="launch"></button></div>
+    <div class="kb-row"><span>开新局</span><button class="kb-key" data-slot="new"></button></div>
+    <div class="kb-foot">
+      <button id="kbReset">恢复默认</button>
+      <p class="kb-hint">点键位后按新键即可改绑;<br>Esc 取消,原默认键始终有效。</p>
+    </div>
   </div>
 </div>
 
@@ -174,8 +274,143 @@
     })
     Object.defineProperty(ev, 'keyCode', { get: () => code })
     Object.defineProperty(ev, 'which', { get: () => code })
+    ev.__pbSynthetic = true
     target.dispatchEvent(ev)
   }
+
+  // —— 按键设置:重绑定 + 翻译层 ——
+  // 四个动作各自绑一个物理键(code 匹配);SDL 内部只认默认键码,改绑靠
+  // 捕获阶段把用户的键翻译成默认键再转发给 SDL,原默认键始终直通。
+  const SLOT_CANON = {
+    left: { code: 'KeyZ', keyCode: 90 },
+    right: { code: 'KeyX', keyCode: 88 },
+    launch: { code: 'Space', keyCode: 32 },
+    new: { code: 'F2', keyCode: 113 },
+  }
+  const DEFAULT_KEYS = {
+    left: { code: 'KeyZ', key: 'z', keyCode: 90, label: 'Z' },
+    right: { code: 'KeyX', key: 'x', keyCode: 88, label: 'X' },
+    launch: { code: 'Space', key: ' ', keyCode: 32, label: '空格' },
+    new: { code: 'F2', key: 'F2', keyCode: 113, label: 'F2' },
+  }
+  const KB_STORE = 'ihomy:pinball:keys:v1'
+  let bindings = loadBindings()
+  let listeningSlot = null
+
+  function loadBindings() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(KB_STORE) || '{}')
+      const out = {}
+      for (const slot of Object.keys(SLOT_CANON)) {
+        const b = raw[slot]
+        out[slot] =
+          b && b.code && typeof b.keyCode === 'number'
+            ? { code: b.code, key: b.key || '', keyCode: b.keyCode, label: b.label || b.code }
+            : DEFAULT_KEYS[slot]
+      }
+      return out
+    } catch (_) {
+      return { ...DEFAULT_KEYS }
+    }
+  }
+  function saveBindings() {
+    try {
+      localStorage.setItem(KB_STORE, JSON.stringify(bindings))
+    } catch (_) {
+      /* 隐私模式等写不进就算了,本次会话仍生效 */
+    }
+  }
+  function keyLabel(key, code) {
+    if (key === ' ') return '空格'
+    if (!key) return code
+    return key.length === 1 ? key.toUpperCase() : key
+  }
+
+  // 翻译层:window 捕获先于 document 上的 SDL 监听;命中改绑键就吃掉并
+  // 转发默认键码。默认键与合成事件(触屏按钮/面板)直通不拦。
+  function translateKey(e, down) {
+    if (e.__pbSynthetic || listeningSlot) return
+    for (const slot of Object.keys(SLOT_CANON)) {
+      const b = bindings[slot]
+      if (b.code === SLOT_CANON[slot].code) continue // 绑的就是默认键,无需翻译
+      if (b.code === e.code) {
+        e.preventDefault()
+        e.stopPropagation()
+        pressKey(SLOT_CANON[slot].keyCode, down)
+        return
+      }
+    }
+  }
+  window.addEventListener(
+    'keydown',
+    function (e) {
+      translateKey(e, true)
+    },
+    true,
+  )
+  window.addEventListener(
+    'keyup',
+    function (e) {
+      translateKey(e, false)
+    },
+    true,
+  )
+
+  // —— 设置面板 ——
+  const kbPanel = document.getElementById('kbPanel')
+  const kbKeyBtns = document.querySelectorAll('#kbPanel .kb-key')
+  function renderPanel() {
+    kbKeyBtns.forEach(function (btn) {
+      const slot = btn.dataset.slot
+      btn.textContent = listeningSlot === slot ? '按新按键…' : bindings[slot].label
+      btn.classList.toggle('listening', listeningSlot === slot)
+    })
+  }
+  document.getElementById('gear').addEventListener('click', function () {
+    listeningSlot = null
+    kbPanel.classList.toggle('open')
+    renderPanel()
+  })
+  document.getElementById('kbClose').addEventListener('click', function () {
+    listeningSlot = null
+    kbPanel.classList.remove('open')
+  })
+  document.getElementById('kbReset').addEventListener('click', function () {
+    for (const slot of Object.keys(SLOT_CANON)) bindings[slot] = { ...DEFAULT_KEYS[slot] }
+    listeningSlot = null
+    saveBindings()
+    renderPanel()
+  })
+  kbKeyBtns.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      listeningSlot = btn.dataset.slot
+      renderPanel()
+    })
+  })
+  // 监听态:window 捕获抢先吃掉这一下,绑定为「物理键 code + 当时的键码」。
+  // Esc 取消;没有 code 的键(修饰键怪异态等)忽略。
+  window.addEventListener(
+    'keydown',
+    function (e) {
+      if (!listeningSlot) return
+      e.preventDefault()
+      e.stopPropagation()
+      if (e.key === 'Escape') {
+        listeningSlot = null
+        renderPanel()
+        return
+      }
+      if (!e.code) return
+      const slot = listeningSlot
+      bindings[slot] = { code: e.code, key: e.key, keyCode: e.keyCode, label: keyLabel(e.key, e.code) }
+      listeningSlot = null
+      saveBindings()
+      renderPanel()
+    },
+    true,
+  )
+  renderPanel()
+
 
   document.querySelectorAll('#touch .tk').forEach(function (btn) {
     const code = Number(btn.dataset.key)

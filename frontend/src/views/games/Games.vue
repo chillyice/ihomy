@@ -255,7 +255,6 @@ import {
   DataBoard,
   Star,
   Grape,
-  Basketball,
   Compass,
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
@@ -300,7 +299,6 @@ const EMBEDDED_ICONS = {
   match3: Star,
   bubble: Grape,
   'space-cadet': Promotion,
-  pinball: Basketball,
   trex: Compass,
 }
 const embeddedEntries = EMBEDDED_GAMES.map((g) => ({
