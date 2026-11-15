@@ -122,6 +122,23 @@ export const ROOM_ROLE = {
 
 export const isSpectatorRole = (role) => role === ROOM_ROLE.SPECTATOR
 
+/** 房间参战人数(HOST/PLAYER,观战不算;与后端 views.playersCount 同口径) */
+export const roomPlayerCount = (room) => (room?.members || []).filter((m) => !isSpectatorRole(m.role)).length
+
+/**
+ * 参战席是否还有空位:满员时观战者不能直切参战,只能申请与参战玩家换位。
+ * 与后端 switchRole 同口径:非观战成员数 < 游戏席位数(maxSeatPlayers 缺失时按 gameCode 兜底)。
+ */
+export const canTakePlayerSeat = (room) => !!room && roomPlayerCount(room) < (room.maxSeatPlayers || roomMaxSeats(room.gameCode))
+
+/** 自己能否自助调整席位:在房间、非房主(房主恒为玩家)、未开局/已结算(对局进行中锁定) */
+export const canSwitchRole = (room, myId) =>
+  !!room &&
+  !!myId &&
+  room.hostId !== myId &&
+  (room.status === ROOM_STATUS.WAITING || room.status === ROOM_STATUS.FINISHED) &&
+  (room.members || []).some((m) => m.userId === myId)
+
 export const defaultRoomMode = (code) => {
   const modes = roomModes(code)
   return modes.includes(ROOM_MODE.PK) ? ROOM_MODE.PK : ROOM_MODE.COOP

@@ -40,11 +40,15 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class GameRoomService {
 
+    /** 换位申请待处理时长,超时自动作废 */
+    private static final long SWAP_TTL_MINUTES = 10;
+
     private final GameRoomMapper roomMapper;
     private final GameRoomMemberMapper memberMapper;
     private final SysUserMapper sysUserMapper;
     private final PointsService pointsService;
     private final StringRedisTemplate redis;
+    private final tools.jackson.databind.ObjectMapper objectMapper;
 
     /** 创建房间:发起人即房主,并自动准备;房间容量固定 8 人,玩家席位按游戏能力分配 */
     public Map<String, Object> create(Long userId, Long familyId, String gameCode, String mode, Integer maxPlayers) {
@@ -98,6 +102,7 @@ public class GameRoomService {
                 .set(GameRoom::getMode, defaultMode(spec))
                 .set(GameRoom::getSeed, Math.abs(RandomUtil.randomLong())));
         assignSeats(id, spec);
+        clearSwap(id);
         return get(familyId, id);
     }
 
@@ -183,6 +188,162 @@ public class GameRoomService {
         return view(room);
     }
 
+    // ---------- 席位自助调整(参战⇄观战) ----------
+
+    /**
+     * 直切席位:参战玩家随时可转观战让席;观战者在席位有空时可直接参战。
+     * 对局进行中锁定;房主恒为玩家,不能转观战;转参战后需重新准备。
+     */
+    public Map<String, Object> switchRole(Long userId, Long familyId, Long id, String role) {
+        boolean toPlayer = GameConst.ROOM_ROLE_PLAYER.equals(role);
+        boolean toSpectator = GameConst.ROOM_ROLE_SPECTATOR.equals(role);
+        if (!toPlayer && !toSpectator) {
+            throw new BizException(ResultCode.BAD_REQUEST, "要切换的席位不对");
+        }
+        synchronized (("game-room-" + id).intern()) {
+            GameRoom room = require(familyId, id);
+            requireSwitchable(room);
+            GameRoomMember member = requireMember(id, userId);
+            if (GameConst.ROOM_ROLE_HOST.equals(member.getRole())) {
+                throw new BizException(ResultCode.BAD_REQUEST, "房主要负责开局,不能转观战");
+            }
+            if (role.equals(member.getRole())) {
+                return view(room);
+            }
+            if (toPlayer) {
+                requireFreeSeat(room, id);
+            }
+            updateRole(member, role);
+            return view(room);
+        }
+    }
+
+    /** 观战者向参战玩家发起换位申请:对方同意后两人互换席位(每房间同时只有一份待处理申请) */
+    public Map<String, Object> requestSwap(Long userId, Long familyId, Long id, Long targetUserId) {
+        if (targetUserId == null || targetUserId.equals(userId)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "要交换的对象不对");
+        }
+        synchronized (("game-room-" + id).intern()) {
+            GameRoom room = require(familyId, id);
+            requireSwitchable(room);
+            GameRoomMember me = requireMember(id, userId);
+            if (!GameConst.ROOM_ROLE_SPECTATOR.equals(me.getRole())) {
+                throw new BizException(ResultCode.BAD_REQUEST, "你在参战中,不需要申请换位");
+            }
+            GameRoomMember target = memberOf(id, targetUserId);
+            if (target == null || !GameConst.ROOM_ROLE_PLAYER.equals(target.getRole())) {
+                throw new BizException(ResultCode.BAD_REQUEST, "只能和参战中的玩家换位");
+            }
+            if (readSwap(id) != null) {
+                throw new BizException(ResultCode.BAD_REQUEST, "已有一份换位申请待处理,先等等");
+            }
+            try {
+                redis.opsForValue().set(swapKey(id),
+                        objectMapper.writeValueAsString(Map.of("from", userId, "target", targetUserId)),
+                        Duration.ofMinutes(SWAP_TTL_MINUTES));
+            } catch (Exception e) {
+                log.warn("房间换位申请写入失败 roomId={} from={} target={}", id, userId, targetUserId, e);
+                throw new BizException(ResultCode.BAD_REQUEST, "换位申请没发出去,再试一次");
+            }
+            return view(room);
+        }
+    }
+
+    /** 参战玩家同意换位:与申请者互换席位,双方重新准备 */
+    public Map<String, Object> acceptSwap(Long userId, Long familyId, Long id) {
+        synchronized (("game-room-" + id).intern()) {
+            GameRoom room = require(familyId, id);
+            Map<String, Long> swap = readSwap(id);
+            if (swap == null || !userId.equals(swap.get("target"))) {
+                throw new BizException(ResultCode.BAD_REQUEST, "没有等你处理的换位申请");
+            }
+            clearSwap(id);
+            requireSwitchable(room);
+            GameRoomMember from = memberOf(id, swap.get("from"));
+            GameRoomMember me = requireMember(id, userId);
+            if (from == null || !GameConst.ROOM_ROLE_SPECTATOR.equals(from.getRole())
+                    || !GameConst.ROOM_ROLE_PLAYER.equals(me.getRole())) {
+                throw new BizException(ResultCode.BAD_REQUEST, "席位已经变了,这份申请作废了");
+            }
+            updateRole(from, GameConst.ROOM_ROLE_PLAYER);
+            updateRole(me, GameConst.ROOM_ROLE_SPECTATOR);
+            return view(room);
+        }
+    }
+
+    /** 取消/拒绝换位申请:发起者或目标都可撤 */
+    public Map<String, Object> cancelSwap(Long userId, Long familyId, Long id) {
+        synchronized (("game-room-" + id).intern()) {
+            GameRoom room = require(familyId, id);
+            Map<String, Long> swap = readSwap(id);
+            if (swap != null && (userId.equals(swap.get("from")) || userId.equals(swap.get("target")))) {
+                clearSwap(id);
+            }
+            return view(room);
+        }
+    }
+
+    /** 席位调整的时间窗:等待中/已结算可调,对局进行中与已取消锁定 */
+    private void requireSwitchable(GameRoom room) {
+        if (GameConst.ROOM_PLAYING.equals(room.getStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST, "对局进行中,这局结束后再换");
+        }
+        if (GameConst.ROOM_CANCELLED.equals(room.getStatus())) {
+            throw new BizException(ResultCode.BAD_REQUEST, "房间已经结束了");
+        }
+    }
+
+    /** 参战席是否还有空位(与 joinRole 同口径:非观战成员数 < 游戏席位数) */
+    private void requireFreeSeat(GameRoom room, Long roomId) {
+        GameConst.RoomGame spec = GameConst.ROOM_GAMES.get(room.getGameCode());
+        int seats = spec == null ? GameConst.ROOM_MAX_PLAYERS : spec.maxSeats();
+        long players = memberMapper.selectCount(new LambdaQueryWrapper<GameRoomMember>()
+                .eq(GameRoomMember::getRoomId, roomId)
+                .ne(GameRoomMember::getRole, GameConst.ROOM_ROLE_SPECTATOR));
+        if (players >= seats) {
+            throw new BizException(ResultCode.BAD_REQUEST, "参战席位已满");
+        }
+    }
+
+    /** 换席位并重置准备:转回参战后要重新点准备,与随机分席口径一致 */
+    private void updateRole(GameRoomMember member, String role) {
+        memberMapper.update(null, new LambdaUpdateWrapper<GameRoomMember>()
+                .eq(GameRoomMember::getId, member.getId())
+                .set(GameRoomMember::getRole, role)
+                .set(GameRoomMember::getReady, 0));
+    }
+
+    private String swapKey(Long roomId) {
+        return "ihomy:game:room:swap:" + roomId;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Long> readSwap(Long roomId) {
+        try {
+            String json = redis.opsForValue().get(swapKey(roomId));
+            if (json == null || json.isBlank()) {
+                return null;
+            }
+            Map<String, Object> raw = objectMapper.readValue(json, Map.class);
+            Object from = raw.get("from");
+            Object target = raw.get("target");
+            if (from instanceof Number n1 && target instanceof Number n2) {
+                return Map.of("from", n1.longValue(), "target", n2.longValue());
+            }
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void clearSwap(Long roomId) {
+        try {
+            redis.delete(swapKey(roomId));
+        } catch (Exception e) {
+            log.warn("房间换位申请清理失败 roomId={}", roomId, e);
+        }
+    }
+
     /** 房主开赛:至少 2 名玩家且玩家全部准备(观战不要求准备) */
     public Map<String, Object> start(Long userId, Long familyId, Long id) {
         GameRoom room = require(familyId, id);
@@ -210,6 +371,7 @@ public class GameRoomService {
         if (updated == 0) {
             throw new BizException(ResultCode.BAD_REQUEST, "这个房间已经开过了");
         }
+        clearSwap(id);
         return get(familyId, id);
     }
 
@@ -321,6 +483,7 @@ public class GameRoomService {
                     .set(GameRoomMember::getScore, null)
                     .set(GameRoomMember::getFinishedAt, null));
         }
+        clearSwap(id);
         return get(familyId, id);
     }
 
@@ -330,6 +493,10 @@ public class GameRoomService {
         GameRoomMember member = memberOf(id, userId);
         if (member == null) {
             return view(room);
+        }
+        Map<String, Long> swap = readSwap(id);
+        if (swap != null && (userId.equals(swap.get("from")) || userId.equals(swap.get("target")))) {
+            clearSwap(id);
         }
         boolean isHost = Objects.equals(room.getHostId(), userId);
         if (GameConst.ROOM_WAITING.equals(room.getStatus())) {
@@ -487,8 +654,14 @@ public class GameRoomService {
                 .orderByAsc(GameRoomMember::getId));
     }
 
+    /** 单房间视图:附带待处理的换位申请(列表视图不带,前端从 members 里解析名字) */
     private Map<String, Object> view(GameRoom room) {
-        return views(List.of(room)).get(0);
+        Map<String, Object> v = views(List.of(room)).get(0);
+        Map<String, Long> swap = readSwap(room.getId());
+        if (swap != null) {
+            v.put("pendingSwap", Map.of("userId", swap.get("from"), "targetUserId", swap.get("target")));
+        }
+        return v;
     }
 
     private List<Map<String, Object>> views(List<GameRoom> rooms) {

@@ -15,6 +15,15 @@
       <el-button v-if="isHost && !ended" size="small" round type="danger" plain @click="endRoom">
         {{ $t('games.room.endRoom') }}
       </el-button>
+      <!-- 局终换位:参战随时可转观战;观战有空位可参战,满员回大厅申请换位 -->
+      <el-tooltip v-if="canToggleSeat && isSpectator && !canTakeSeat" :content="$t('games.room.seatFull')" placement="top">
+        <span class="room-bar-seat-wrap">
+          <el-button size="small" round disabled>{{ $t('games.room.toPlayer') }}</el-button>
+        </span>
+      </el-tooltip>
+      <el-button v-else-if="canToggleSeat" size="small" round :loading="switching" @click="toggleSeat">
+        {{ isSpectator ? $t('games.room.toPlayer') : $t('games.room.toSpectator') }}
+      </el-button>
       <!-- 退出对局:回到房间大厅保留成员身份,不再留在牌桌上 -->
       <el-button v-if="!ended" size="small" round @click="exitToHall">{{ $t('games.room.exitGame') }}</el-button>
       <el-button v-if="ended" size="small" round @click="$emit('leave')">{{ $t('games.room.backGames') }}</el-button>
@@ -26,12 +35,12 @@
 // 游戏内「一起玩」横幅:玩法/对手/当前比分/交卷与结算出口。
 // COOP 不发积分也不交卷(房主完成即结算);PK 可随时交卷,避免一局太久把房间挂住。
 // 观战成员不显示交卷;对局中可一键退回房间大厅(保留席位)或快速发起语音。
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { roomApi } from '@/api'
-import { resultKey, isSpectatorRole } from '@/utils/gameRoom'
+import { canTakePlayerSeat, isSpectatorRole, resultKey } from '@/utils/gameRoom'
 import RoomCallPicker from '@/components/games/RoomCallPicker.vue'
 
 const props = defineProps({
@@ -53,6 +62,22 @@ const router = useRouter()
 const isCoopMode = computed(() => props.room?.mode === 'COOP')
 const isSpectator = computed(() => isSpectatorRole((props.room?.members || []).find((m) => m.userId === props.myId)?.role))
 const canSubmit = computed(() => !!props.room && props.room.status === 'PLAYING' && !isCoopMode.value && props.result === 'HIGH_SCORE')
+// 局终(FINISHED)可在横幅直切席位;对局中与已取消不提供,换位申请只在大厅
+const canToggleSeat = computed(() => !!props.room && props.room.status === 'FINISHED' && !props.isHost)
+const canTakeSeat = computed(() => canTakePlayerSeat(props.room))
+const switching = ref(false)
+
+/** 直切席位:状态刷新靠房间广播(endRoom 同模式) */
+const toggleSeat = async () => {
+  switching.value = true
+  try {
+    await roomApi.switchRole(props.room.id, isSpectator.value ? 'PLAYER' : 'SPECTATOR')
+  } catch (e) {
+    ElMessage.warning(e?.response?.data?.message || t('games.room.actFailed'))
+  } finally {
+    switching.value = false
+  }
+}
 const playerText = computed(() => {
   const list = props.room?.members || []
   return list.map((m) => `${m.name}${m.userId === props.myId ? `(${t('games.room.me')})` : ''}`).join(' · ')
@@ -154,5 +179,8 @@ const endRoom = async () => {
   display: flex;
   gap: 8px;
   flex: none;
+}
+.room-bar-seat-wrap {
+  display: inline-flex;
 }
 </style>

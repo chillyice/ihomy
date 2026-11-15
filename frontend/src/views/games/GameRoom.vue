@@ -76,6 +76,14 @@
                 </el-button>
               </el-tooltip>
             </div>
+            <!-- 观战者申请与参战玩家换位(满员时的上位通道;房主卡与观战卡不显示) -->
+            <div v-if="canOfferSwapTo(m)" class="room-member-call">
+              <el-tooltip :content="$t('games.room.swapRequest')" placement="top">
+                <el-button circle size="small" :disabled="busy" @click="offerSwap(m)">
+                  <el-icon><Switch /></el-icon>
+                </el-button>
+              </el-tooltip>
+            </div>
           </div>
           <div v-for="n in emptySeats" :key="'seat' + n" class="room-member empty card">
             <el-icon :size="20"><Plus /></el-icon>
@@ -85,23 +93,26 @@
 
         <div class="room-actions">
           <template v-if="room.status === 'WAITING'">
-            <el-button
-              v-if="!isHost && !myIsSpectator"
-              size="default"
-              round
-              :type="myReady ? 'default' : 'primary'"
-              :loading="busy"
-              @click="toggleReady"
-            >
-              {{ myReady ? $t('games.room.cancelReady') : $t('games.room.setReady') }}
-            </el-button>
-            <el-button v-else-if="!isHost" size="default" round disabled>
-              {{ $t('games.room.spectatorHint') }}
-            </el-button>
+            <!-- 参战成员:准备 + 随时转观战让席 -->
+            <template v-if="!isHost && !myIsSpectator">
+              <el-button size="default" round :type="myReady ? 'default' : 'primary'" :loading="busy" @click="toggleReady">
+                {{ myReady ? $t('games.room.cancelReady') : $t('games.room.setReady') }}
+              </el-button>
+              <el-button size="default" round :disabled="busy" @click="switchMyRole('SPECTATOR')">
+                {{ $t('games.room.toSpectator') }}
+              </el-button>
+            </template>
+            <!-- 观战成员:有空位直切参战,满员去成员卡申请换位 -->
+            <template v-else-if="!isHost">
+              <el-button v-if="canTakeSeat" size="default" round type="primary" :loading="busy" @click="switchMyRole('PLAYER')">
+                {{ $t('games.room.toPlayer') }}
+              </el-button>
+              <span v-else class="room-hint">{{ $t('games.room.seatFullHint') }}</span>
+            </template>
             <el-button v-else type="primary" size="default" round :disabled="!canStart" :loading="busy" @click="start">
               {{ $t('games.room.start') }}
             </el-button>
-            <span class="room-hint">{{ startHint }}</span>
+            <span v-if="isHost" class="room-hint">{{ startHint }}</span>
           </template>
           <template v-else-if="room.status === 'PLAYING'">
             <el-button type="primary" size="default" round @click="enterGame">{{ $t('games.room.enterGame') }}</el-button>
@@ -117,11 +128,36 @@
             <el-button v-if="isHost" type="primary" size="default" round :loading="busy" @click="again">{{
               $t('games.room.again')
             }}</el-button>
+            <!-- 局终调整席位:下一局换人打/换人看 -->
+            <el-button v-if="!isHost && !myIsSpectator" size="default" round :disabled="busy" @click="switchMyRole('SPECTATOR')">
+              {{ $t('games.room.toSpectator') }}
+            </el-button>
+            <el-button v-else-if="!isHost && canTakeSeat" size="default" round :loading="busy" @click="switchMyRole('PLAYER')">
+              {{ $t('games.room.toPlayer') }}
+            </el-button>
             <el-button size="default" round @click="router.push('/games')">{{ $t('games.room.backGames') }}</el-button>
           </template>
           <template v-else>
             <span class="room-hint">{{ $t('games.room.cancelled') }}</span>
             <el-button size="default" round @click="router.push('/games')">{{ $t('games.room.backGames') }}</el-button>
+          </template>
+          <!-- 换位申请条:目标玩家处理,发起者可撤回(对局中不展示,后端同样拒绝) -->
+          <template v-if="pendingSwap && canSelfSwitch">
+            <template v-if="pendingSwap.targetUserId === myId">
+              <span class="room-swap-incoming">{{ $t('games.room.swapIncoming', { name: swapFromName }) }}</span>
+              <el-button type="primary" size="default" round :loading="busy" @click="acceptSwapAct">
+                {{ $t('games.room.swapAccept') }}
+              </el-button>
+              <el-button size="default" round :loading="busy" @click="cancelSwapAct">
+                {{ $t('games.room.swapDecline') }}
+              </el-button>
+            </template>
+            <template v-else-if="pendingSwap.userId === myId">
+              <span class="room-hint">{{ $t('games.room.swapPending', { name: swapTargetName }) }}</span>
+              <el-button size="small" round :loading="busy" @click="cancelSwapAct">
+                {{ $t('games.room.swapCancel') }}
+              </el-button>
+            </template>
           </template>
         </div>
       </template>
@@ -137,14 +173,25 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { Phone, Plus, Promotion, UserFilled, VideoCamera } from '@element-plus/icons-vue'
+import { Phone, Plus, Promotion, Switch, UserFilled, VideoCamera } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import RoomCallPicker from '@/components/games/RoomCallPicker.vue'
 import { roomApi } from '@/api'
 import { useChatStore } from '@/stores/chat'
 import { useCallStore } from '@/stores/call'
 import { useUserStore } from '@/stores/user'
-import { ROOM_GAMES, ROOM_STATUS, isCoop, isSpectatorRole, resultKey, roomGame, roomGamePath } from '@/utils/gameRoom'
+import {
+  ROOM_GAMES,
+  ROOM_ROLE,
+  ROOM_STATUS,
+  canSwitchRole,
+  canTakePlayerSeat,
+  isCoop,
+  isSpectatorRole,
+  resultKey,
+  roomGame,
+  roomGamePath,
+} from '@/utils/gameRoom'
 
 const route = useRoute()
 const router = useRouter()
@@ -210,6 +257,61 @@ const scoreList = computed(() => {
     .map((m) => `${m.name} ${m.score ?? 0}`)
     .join(' · ')
 })
+
+// ---------- 自助换位(参战⇄观战) ----------
+const canSelfSwitch = computed(() => canSwitchRole(room.value, myId.value))
+const canTakeSeat = computed(() => canTakePlayerSeat(room.value))
+const pendingSwap = computed(() => room.value?.pendingSwap || null)
+const swapFromName = computed(() => (room.value?.members || []).find((m) => m.userId === pendingSwap.value?.userId)?.name || '')
+const swapTargetName = computed(() => (room.value?.members || []).find((m) => m.userId === pendingSwap.value?.targetUserId)?.name || '')
+/** 自己是观战且无待处理申请时,可向参战玩家(非房主)发换位申请 */
+const canOfferSwapTo = (m) =>
+  !!room.value && canSelfSwitch.value && myIsSpectator.value && !pendingSwap.value && m.role === ROOM_ROLE.PLAYER && m.userId !== myId.value
+
+const switchMyRole = async (role) => {
+  busy.value = true
+  try {
+    applyRoom(await roomApi.switchRole(roomId.value, role))
+  } catch (e) {
+    ElMessage.warning(e?.response?.data?.message || t('games.room.actFailed'))
+  } finally {
+    busy.value = false
+  }
+}
+
+const offerSwap = async (m) => {
+  busy.value = true
+  try {
+    applyRoom(await roomApi.requestSwap(roomId.value, m.userId))
+  } catch (e) {
+    ElMessage.warning(e?.response?.data?.message || t('games.room.actFailed'))
+  } finally {
+    busy.value = false
+  }
+}
+
+const acceptSwapAct = async () => {
+  busy.value = true
+  try {
+    applyRoom(await roomApi.acceptSwap(roomId.value))
+  } catch (e) {
+    ElMessage.warning(e?.response?.data?.message || t('games.room.actFailed'))
+  } finally {
+    busy.value = false
+  }
+}
+
+/** 拒绝与取消同一个接口:发起者或目标都可撤 */
+const cancelSwapAct = async () => {
+  busy.value = true
+  try {
+    applyRoom(await roomApi.cancelSwap(roomId.value))
+  } catch (e) {
+    ElMessage.warning(e?.response?.data?.message || t('games.room.actFailed'))
+  } finally {
+    busy.value = false
+  }
+}
 
 /** 房主换游戏:后端随机重新分配席位,广播后全员更新 */
 const changeGame = async (code) => {
@@ -538,6 +640,11 @@ watch(roomId, () => {
 .room-hint {
   font-size: 13px;
   color: var(--color-text-secondary);
+}
+.room-swap-incoming {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-accent);
 }
 .room-result {
   display: flex;

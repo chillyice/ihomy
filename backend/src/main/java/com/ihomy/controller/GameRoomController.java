@@ -8,6 +8,8 @@ import com.ihomy.dto.GameRoomCreateDTO;
 import com.ihomy.dto.GameRoomFinishDTO;
 import com.ihomy.dto.GameRoomGameDTO;
 import com.ihomy.dto.GameRoomReadyDTO;
+import com.ihomy.dto.GameRoomRoleDTO;
+import com.ihomy.dto.GameRoomSwapDTO;
 import com.ihomy.security.LoginUser;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.ChatService;
@@ -93,6 +95,48 @@ public class GameRoomController {
     public Result<Map<String, Object>> ready(@PathVariable Long id, @RequestBody GameRoomReadyDTO dto) {
         LoginUser user = current();
         Map<String, Object> room = roomService.ready(user.getUserId(), user.getFamilyId(), id, dto.getReady());
+        broadcast(id, room);
+        return Result.success(room);
+    }
+
+    @Operation(summary = "直切席位(参战⇄观战,满员不能转参战)")
+    @OperationLog(module = "GAME", operationType = "UPDATE", description = "切换房间参战/观战席位")
+    @PostMapping("/{id}/role")
+    public Result<Map<String, Object>> switchRole(@PathVariable Long id,
+                                                  @RequestBody @jakarta.validation.Valid GameRoomRoleDTO dto) {
+        LoginUser user = current();
+        Map<String, Object> room = roomService.switchRole(user.getUserId(), user.getFamilyId(), id, dto.getRole());
+        broadcast(id, room);
+        return Result.success(room);
+    }
+
+    @Operation(summary = "观战者向参战玩家发起换位申请(对方同意后互换)")
+    @OperationLog(module = "GAME", operationType = "CREATE", description = "发起房间换位申请")
+    @PostMapping("/{id}/swap")
+    public Result<Map<String, Object>> requestSwap(@PathVariable Long id,
+                                                   @RequestBody @jakarta.validation.Valid GameRoomSwapDTO dto) {
+        LoginUser user = current();
+        Map<String, Object> room = roomService.requestSwap(user.getUserId(), user.getFamilyId(), id, dto.getTargetUserId());
+        broadcast(id, room);
+        return Result.success(room);
+    }
+
+    @Operation(summary = "同意换位申请(与申请者互换席位)")
+    @OperationLog(module = "GAME", operationType = "UPDATE", description = "同意房间换位申请")
+    @PostMapping("/{id}/swap/accept")
+    public Result<Map<String, Object>> acceptSwap(@PathVariable Long id) {
+        LoginUser user = current();
+        Map<String, Object> room = roomService.acceptSwap(user.getUserId(), user.getFamilyId(), id);
+        broadcast(id, room);
+        return Result.success(room);
+    }
+
+    @Operation(summary = "取消/拒绝换位申请")
+    @OperationLog(module = "GAME", operationType = "UPDATE", description = "取消房间换位申请")
+    @PostMapping("/{id}/swap/cancel")
+    public Result<Map<String, Object>> cancelSwap(@PathVariable Long id) {
+        LoginUser user = current();
+        Map<String, Object> room = roomService.cancelSwap(user.getUserId(), user.getFamilyId(), id);
         broadcast(id, room);
         return Result.success(room);
     }

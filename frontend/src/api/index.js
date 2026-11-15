@@ -404,6 +404,11 @@ export const roomApi = {
   // 房主换游戏(仅等待中):换完按新游戏席位随机分配玩家/观战
   setGame: (id, gameCode) => request.post(`/game/room/${id}/game`, { gameCode }),
   ready: (id, ready) => request.post(`/game/room/${id}/ready`, { ready }),
+  // 自助换位:参战⇄观战直切;满员时观战者向指定参战玩家申请换位,对方同意后互换
+  switchRole: (id, role) => request.post(`/game/room/${id}/role`, { role }),
+  requestSwap: (id, targetUserId) => request.post(`/game/room/${id}/swap`, { targetUserId }),
+  acceptSwap: (id) => request.post(`/game/room/${id}/swap/accept`),
+  cancelSwap: (id) => request.post(`/game/room/${id}/swap/cancel`),
   start: (id) => request.post(`/game/room/${id}/start`),
   again: (id) => request.post(`/game/room/${id}/again`),
   finish: (id, score) => request.post(`/game/room/${id}/finish`, { score }),
