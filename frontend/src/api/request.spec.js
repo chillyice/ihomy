@@ -6,9 +6,10 @@ vi.mock('@/stores/user', () => ({ useUserStore: () => store }))
 vi.mock('@/router', () => ({
   default: { currentRoute: { value: { meta: {}, fullPath: '/home' } }, push: vi.fn() },
 }))
-vi.mock('element-plus', () => ({ ElMessage: { error: vi.fn() } }))
+vi.mock('element-plus', () => ({ ElMessage: { error: vi.fn(), warning: vi.fn() } }))
 
 const { default: request } = await import('./request')
+import { ElMessage } from 'element-plus'
 
 const token = (expOffsetSec) => {
   const seg = (o) => Buffer.from(JSON.stringify(o)).toString('base64url')
@@ -20,13 +21,24 @@ const REFRESH_OK = token(7 * 86400) // 刷新令牌仍在有效期
 
 // 假 adapter:记录每次真正发出的请求,直接回成功响应
 let sent = []
-request.defaults.adapter = async (config) => {
+const okAdapter = async (config) => {
   sent.push({ url: config.url, auth: config.headers?.Authorization })
   return { data: { code: 0, message: 'success', data: {} }, status: 200, statusText: 'OK', headers: {}, config }
+}
+request.defaults.adapter = okAdapter
+
+// 网络层失败(没拿到任何响应):断网/连接被拒
+const offlineAdapter = async () => {
+  const err = new Error('Network Error')
+  err.code = 'ERR_NETWORK'
+  throw err
 }
 
 beforeEach(() => {
   sent = []
+  request.defaults.adapter = okAdapter
+  ElMessage.error.mockClear()
+  ElMessage.warning.mockClear()
   store.token = ''
   store.refreshToken = ''
   store.refresh.mockReset()
@@ -84,5 +96,37 @@ describe('请求预检续期', () => {
     store.refresh.mockRejectedValue(new Error('refresh failed'))
     await request.get('/public/weather')
     expect(sent).toHaveLength(1)
+  })
+})
+
+describe('连不上网的提示节奏', () => {
+  it('单次连不上不弹提示,请求照常失败', async () => {
+    request.defaults.adapter = offlineAdapter
+    await expect(request.get('/public/weather')).rejects.toThrow('Network Error')
+    expect(ElMessage.error).not.toHaveBeenCalled()
+    expect(ElMessage.warning).not.toHaveBeenCalled()
+  })
+
+  it('主动取消的请求不弹提示,也不计入断网次数', async () => {
+    request.defaults.adapter = async () => {
+      const err = new Error('canceled')
+      err.code = 'ERR_CANCELED'
+      throw err
+    }
+    await expect(request.get('/public/weather')).rejects.toThrow('canceled')
+    expect(ElMessage.error).not.toHaveBeenCalled()
+    expect(ElMessage.warning).not.toHaveBeenCalled()
+  })
+
+  it('拿到 HTTP 响应(含 5xx)仍按原有方式提示', async () => {
+    request.defaults.adapter = async (config) => {
+      const err = new Error('Request failed with status code 500')
+      err.config = config
+      err.response = { status: 500, headers: {}, data: { code: 500, message: '服务器开小差了' } }
+      throw err
+    }
+    await expect(request.get('/public/weather')).rejects.toThrow('500')
+    expect(ElMessage.error).toHaveBeenCalledTimes(1)
+    expect(ElMessage.warning).not.toHaveBeenCalled()
   })
 })

@@ -33,6 +33,7 @@ export default {
     saveFailed: '保存失败',
     requestFailed: '请求失败',
     networkError: '网络错误',
+    networkUnstable: '网络连不上,请检查网络后重试',
     pressAgainToExit: '再按一次退出',
     networkOffline: '网络已断开,部分内容暂不可用',
     networkBack: '网络已恢复',
@@ -1001,6 +1002,10 @@ export default {
       nonogram: { title: '数织', desc: '按行列数字涂格子，全部涂对就出现一幅画' },
       match3: { title: '消消乐', desc: '交换相邻宝石，三个以上同色即可消除，连锁越高分越多' },
       bubble: { title: '泡泡龙', desc: '瞄准发射，三个同色泡泡粘在一起就爆掉' },
+      'space-cadet': {
+        title: '三维弹球·太空军校生',
+        desc: 'Windows 自带的那台弹珠机：Z 左挡板、/ 右挡板、空格发球，打进太空军校拿勋章',
+      },
       pinball: { title: '弹球台', desc: '拨动挡板把球弹回去，别让它掉下去' },
       trex: { title: '小恐龙快跑', desc: '跳过仙人掌、躲开翼龙，看你能跑多远' },
     },

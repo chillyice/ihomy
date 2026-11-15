@@ -6,6 +6,7 @@ import { ElMessage } from 'element-plus'
 import router from '@/router'
 import i18n from '@/i18n'
 import { rewriteAssetUrls } from '@/utils/assetUrl'
+import { createNetFailGate } from '@/utils/netFailGate'
 
 // 基址:Web/开发走同源相对路径;Capacitor 壳内由 .env.app 注入服务端绝对地址
 // (壳内页面 origin 是 https://localhost,相对路径会打到壳自己)
@@ -83,8 +84,15 @@ const redirectToLogin = (query) => {
   router.push(query ? { name: 'Login', query } : '/login')
 }
 
+// 「连不上网」提示闸门:单次抖动/页面加载时一批请求同时失败都静默,连续多次连不上才提示一次
+const netFailGate = createNetFailGate()
+
+// 网络层失败:一个响应都没拿到(断网/连接被拒/超时);主动取消在上面已单独静默
+const isConnectFailure = (error) => !error.response
+
 request.interceptors.response.use(
   (response) => {
+    netFailGate.ok()
     const res = response.data
     if (res.code !== undefined && res.code !== 0) {
       // 5xx 级系统异常附上 tid,用户报障时可直接拿它到运维"详细日志"页检索
@@ -105,6 +113,10 @@ request.interceptors.response.use(
   },
   async (error) => {
     const status = error.response?.status
+    // 拿到了真实响应(哪怕 4xx/5xx)说明网络是通的:断网计数清零
+    if (error.response) netFailGate.ok()
+    // 主动取消(切换页面/同一接口后发先至前一次被弃):静默,不算断网也不打扰用户
+    if (error.code === 'ERR_CANCELED') return Promise.reject(error)
     // HTTP 401:已登录尝试续期(仅重放一次,防死循环),未登录直接跳登录页(仅写操作)
     if (status === 401 && error.config && !error.config._retried) {
       const userStore = useUserStore()
@@ -124,6 +136,12 @@ request.interceptors.response.use(
         if (error.config.method !== 'get') redirectToLogin()
         return Promise.reject(e)
       }
+    }
+    // 连不上网:不立刻弹窗(一次抖动/首屏一批请求同时失败都静默),
+    // 连续多次连不上才提示一次,提示后这一轮不再重复打扰
+    if (isConnectFailure(error)) {
+      if (netFailGate.fail()) ElMessage.warning(i18n.global.t('common.networkUnstable'))
+      return Promise.reject(error)
     }
     const tid = error.response?.headers?.['x-trace-id']
     ElMessage.error((tid ? `[tid:${tid}] ` : '') + (error.response?.data?.message || error.message || i18n.global.t('common.networkError')))
