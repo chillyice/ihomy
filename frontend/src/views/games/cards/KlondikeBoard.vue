@@ -47,68 +47,71 @@
 
     <div ref="feltEl" class="sol-felt" :style="feltStyle" tabindex="0" role="region" :aria-label="$t('games.solitaire.title')">
       <div class="sol-row sol-top">
-        <div class="sol-slot">
-          <div
-            v-if="game.stock.length"
-            class="sol-stock"
-            :class="{ 'hint-source': hint && hint.kind === 'draw' }"
-            :aria-label="$t('games.solitaire.stock')"
-            @click="draw"
-          >
-            <span class="sol-stock-count">{{ game.stock.length }}</span>
-          </div>
-          <div
-            v-else
-            class="sol-empty sol-recycle"
-            :class="{ 'hint-source': hint && hint.kind === 'draw' }"
-            :aria-label="$t('games.solitaire.recycle')"
-            @click="draw"
-          >
-            ↻
-          </div>
-        </div>
-        <div class="sol-slot sol-waste-slot">
-          <template v-if="wasteCards.length">
+        <div class="sol-pile-group sol-stock-waste">
+          <div class="sol-slot">
             <div
-              v-for="(card, idx) in wasteCards"
-              :key="card.id"
-              class="sol-cardface sol-waste-card"
-              :class="[
-                cardClass(card),
-                {
-                  'is-top': idx === wasteCards.length - 1,
-                  selected: idx === wasteCards.length - 1 && selected && selected.type === 'waste',
-                  'hint-source': idx === wasteCards.length - 1 && hint && hint.from && hint.from.type === 'waste',
-                },
-              ]"
-              :style="{ '--fan-index': idx, zIndex: idx + 1 }"
-              @pointerdown="idx === wasteCards.length - 1 && startDrag({ type: 'waste' }, $event)"
-              @click.stop="idx === wasteCards.length - 1 && onWasteClick()"
+              v-if="game.stock.length"
+              class="sol-stock"
+              :class="{ 'hint-source': hint && hint.kind === 'draw' }"
+              :aria-label="$t('games.solitaire.stock')"
+              @click="draw"
             >
-              <PlayingCard :card="card" :index-layout="idx < wasteCards.length - 1 ? 'fan' : ''" />
+              <span class="sol-stock-count">{{ game.stock.length }}</span>
             </div>
-          </template>
-          <div v-else class="sol-empty"></div>
-        </div>
-        <div class="sol-slot sol-spacer"></div>
-        <div
-          v-for="suit in SUITS"
-          :key="suit"
-          class="sol-slot"
-          :class="{ 'hint-target': isFoundationHint(suit) }"
-          data-drop="foundation"
-          :data-suit="suit"
-        >
-          <div
-            v-if="foundationTop(suit)"
-            class="sol-cardface"
-            :class="[cardClass(foundationTop(suit)), { selected: selected && selected.type === 'foundation' && selected.suit === suit }]"
-            @pointerdown="startDrag({ type: 'foundation', suit }, $event)"
-            @click="onFoundationClick(suit)"
-          >
-            <PlayingCard :card="foundationTop(suit)" />
+            <div
+              v-else
+              class="sol-empty sol-recycle"
+              :class="{ 'hint-source': hint && hint.kind === 'draw' }"
+              :aria-label="$t('games.solitaire.recycle')"
+              @click="draw"
+            >
+              ↻
+            </div>
           </div>
-          <div v-else class="sol-empty sol-found" @click="onFoundationClick(suit)">{{ SUIT_SYMBOL[suit] }}</div>
+          <div class="sol-slot sol-waste-slot">
+            <template v-if="wasteCards.length">
+              <div
+                v-for="(card, idx) in wasteCards"
+                :key="card.id"
+                class="sol-cardface sol-waste-card"
+                :class="[
+                  cardClass(card),
+                  {
+                    'is-top': idx === wasteCards.length - 1,
+                    selected: idx === wasteCards.length - 1 && selected && selected.type === 'waste',
+                    'hint-source': idx === wasteCards.length - 1 && hint && hint.from && hint.from.type === 'waste',
+                  },
+                ]"
+                :style="{ '--fan-index': idx, zIndex: idx + 1 }"
+                @pointerdown="idx === wasteCards.length - 1 && startDrag({ type: 'waste' }, $event)"
+                @click.stop="idx === wasteCards.length - 1 && onWasteClick()"
+              >
+                <PlayingCard :card="card" />
+              </div>
+            </template>
+            <div v-else class="sol-empty"></div>
+          </div>
+        </div>
+        <div class="sol-pile-group">
+          <div
+            v-for="suit in SUITS"
+            :key="suit"
+            class="sol-slot"
+            :class="{ 'hint-target': isFoundationHint(suit) }"
+            data-drop="foundation"
+            :data-suit="suit"
+          >
+            <div
+              v-if="foundationTop(suit)"
+              class="sol-cardface"
+              :class="[cardClass(foundationTop(suit)), { selected: selected && selected.type === 'foundation' && selected.suit === suit }]"
+              @pointerdown="startDrag({ type: 'foundation', suit }, $event)"
+              @click="onFoundationClick(suit)"
+            >
+              <PlayingCard :card="foundationTop(suit)" />
+            </div>
+            <div v-else class="sol-empty sol-found" @click="onFoundationClick(suit)">{{ SUIT_SYMBOL[suit] }}</div>
+          </div>
         </div>
       </div>
 
@@ -132,7 +135,7 @@
             @pointerdown="onCardPointerDown(pi, ci, card, $event)"
             @click.stop="onCardClick(pi, ci, card)"
           >
-            <PlayingCard v-if="card.faceUp" :card="card" :index-layout="ci < pile.length - 1 ? 'stack' : ''" />
+            <PlayingCard v-if="card.faceUp" :card="card" />
           </div>
         </div>
       </div>
@@ -259,7 +262,6 @@ const layout = computed(() =>
     columns: COLUMNS,
     gap: gap.value,
     topUnits: CARD_RATIO,
-    rowGap: 10,
   }),
 )
 const feltStyle = computed(() => ({

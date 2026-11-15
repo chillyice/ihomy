@@ -7,7 +7,7 @@
         class="sol-cardface card-drag-ghost-card"
         :style="{ top: `${idx * drag.step}px`, zIndex: idx + 1 }"
       >
-        <PlayingCard :card="card" :index-layout="idx < drag.cards.length - 1 ? 'stack' : ''" />
+        <PlayingCard :card="card" />
       </div>
     </div>
   </Teleport>

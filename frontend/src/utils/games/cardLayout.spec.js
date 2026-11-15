@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { BACK_STEP, CARD_RATIO, FACEUP_INDEX_HEIGHT, FACEUP_STEP, MIN_BACK_STEP, fitCardWidth, pileSteps } from './cardLayout'
+import { BACK_STEP, CARD_RATIO, FACEUP_STEP, MIN_BACK_STEP, MIN_FACEUP_PIXELS, fitCardWidth, pileSteps } from './cardLayout'
 
 const pile = (n, faceUpFrom = 0) => Array.from({ length: n }, (_, i) => ({ faceUp: i >= faceUpFrom }))
 
@@ -11,16 +11,17 @@ describe('纸牌叠牌步进', () => {
   })
 
   it('有空间时将长列收进高度预算,同时保留牌标', () => {
-    const steps = pileSteps(pile(19, 8), 5, 80)
+    const steps = pileSteps(pile(19, 8), 6.6, 80)
     expect(steps[0]).toBeGreaterThanOrEqual(MIN_BACK_STEP)
-    expect(steps[8] * 80).toBeGreaterThanOrEqual(FACEUP_INDEX_HEIGHT)
-    expect(CARD_RATIO + steps.reduce((sum, step) => sum + step, 0)).toBeCloseTo(5)
+    // 素材图左上角的原始花色需要约 36% 牌宽的露出高度。
+    expect(steps[8]).toBeGreaterThanOrEqual(0.36)
+    expect(CARD_RATIO + steps.reduce((sum, step) => sum + step, 0)).toBeCloseTo(6.6)
   })
 
   it('空间不足时允许长列溢出,每张正面牌仍露出完整牌标', () => {
     const steps = pileSteps(pile(30), 4, 44)
     expect(steps).toHaveLength(29)
-    expect(steps.every((step) => step * 44 >= FACEUP_INDEX_HEIGHT)).toBe(true)
+    expect(steps.every((step) => step * 44 >= MIN_FACEUP_PIXELS)).toBe(true)
     expect(CARD_RATIO + steps.reduce((sum, step) => sum + step, 0)).toBeGreaterThan(4)
   })
 

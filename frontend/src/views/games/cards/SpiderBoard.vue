@@ -44,26 +44,28 @@
     />
 
     <div ref="feltEl" class="sol-felt" :style="feltStyle" tabindex="0" role="region" :aria-label="$t('games.spider.title')">
-      <div class="sp-top">
+      <div class="sol-row sol-top sp-top">
+        <div class="sp-stock-wrap">
+          <div class="sol-slot">
+            <button
+              v-if="game.stock.length"
+              type="button"
+              class="sol-stock sp-stock"
+              :class="{ 'hint-source': hint && hint.kind === 'deal' }"
+              :disabled="!canDealNow"
+              :aria-label="$t('games.spider.deal')"
+              @click="dealRow"
+            >
+              <span class="sol-stock-count">{{ dealsLeft }}</span>
+            </button>
+            <div v-else class="sol-empty"></div>
+          </div>
+          <span class="sp-deal-hint">{{ dealHint }}</span>
+        </div>
         <div class="sp-completed">
           <span>{{ $t('games.spider.completed') }}</span>
           <b>{{ game.completed }}</b>
           <span>/ {{ COMPLETE_TARGET }}</span>
-        </div>
-        <div class="sp-stock-wrap">
-          <span class="sp-deal-hint">{{ dealHint }}</span>
-          <button
-            v-if="game.stock.length"
-            type="button"
-            class="sol-stock sp-stock"
-            :class="{ 'hint-source': hint && hint.kind === 'deal' }"
-            :disabled="!canDealNow"
-            :aria-label="$t('games.spider.deal')"
-            @click="dealRow"
-          >
-            <span class="sp-stock-count">{{ dealsLeft }}</span>
-          </button>
-          <div v-else class="sp-stock-empty"></div>
         </div>
       </div>
 
@@ -87,7 +89,7 @@
             @pointerdown="onCardPointerDown(pi, ci, card, $event)"
             @click.stop="onCardClick(pi, ci, card)"
           >
-            <PlayingCard v-if="card.faceUp" :card="card" :index-layout="ci < pile.length - 1 ? 'stack' : ''" />
+            <PlayingCard v-if="card.faceUp" :card="card" />
           </div>
         </div>
       </div>
@@ -204,9 +206,7 @@ const layout = computed(() =>
     availH: feltSize.value.h,
     columns: COLUMNS,
     gap: gap.value,
-    topUnits: 0,
-    fixedTop: 44,
-    rowGap: 10,
+    topUnits: CARD_RATIO,
     maxWidth: 96,
     minWidth: 44,
   }),

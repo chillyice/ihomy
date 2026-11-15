@@ -3,14 +3,16 @@ export const CARD_RATIO = 1.4
 export const FACEUP_STEP = 0.42
 export const BACK_STEP = 0.22
 export const MIN_BACK_STEP = 0.12
-export const FACEUP_INDEX_HEIGHT = 16
+export const MIN_FACEUP_PIXELS = 16
+// 整张牌图的左上角花色约在牌宽 36% 的高度内,留一点空隙避免压住图案。
+const MIN_FACEUP_STEP = 0.37
 export const MAX_CARD_W = 132
 export const MIN_CARD_W = 36
 
 // 返回每张被覆盖的牌露出的高度(以牌宽为单位)。空间不足时保留完整牌标,余下交给牌桌滚动。
 export function pileSteps(pile, unitsBudget, cardW) {
   const covered = pile.slice(0, -1)
-  const faceMin = FACEUP_INDEX_HEIGHT / cardW
+  const faceMin = Math.max(MIN_FACEUP_PIXELS / cardW, MIN_FACEUP_STEP)
   const facePreferred = Math.max(faceMin, FACEUP_STEP)
   let min = 0
   let extra = 0
@@ -31,7 +33,7 @@ export function fitCardWidth({
   gap = 6,
   topUnits = 0,
   fixedTop = 0,
-  rowGap = 10,
+  rowGap = 16,
   maxWidth = MAX_CARD_W,
   minWidth = MIN_CARD_W,
 } = {}) {

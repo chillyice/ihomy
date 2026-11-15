@@ -103,26 +103,4 @@ onBeforeUnmount(() => sunLight?.restoreEffects())
   overflow: auto;
   background: var(--color-bg);
 }
-.cards-modes,
-.cards-nav {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 12px;
-}
-.cards-nav a {
-  padding: 7px 2px;
-  border-bottom: 2px solid transparent;
-  color: var(--color-text-secondary);
-  font-size: 14px;
-  font-weight: 600;
-  text-decoration: none;
-}
-.cards-nav a:hover,
-.cards-nav a.active {
-  color: var(--color-text-primary);
-}
-.cards-nav a.active {
-  border-color: var(--color-brand);
-}
 </style>

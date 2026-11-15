@@ -38,50 +38,54 @@
     />
 
     <div ref="feltEl" class="sol-felt" :style="feltStyle" tabindex="0" role="region" :aria-label="$t('games.freecell.title')">
-      <div class="sol-row sol-top fc-top">
-        <div
-          v-for="(card, cell) in game.freeCells"
-          :key="`free-${cell}`"
-          class="sol-slot fc-cell"
-          :class="{ 'hint-target': isCellHint(cell) }"
-          data-drop="free"
-          :data-cell="cell"
-        >
+      <div class="sol-row sol-top">
+        <div class="sol-pile-group">
           <div
-            v-if="card"
-            class="sol-cardface"
-            :class="[
-              cardClass(card),
-              {
-                selected: selected && selected.type === 'free' && selected.cell === cell,
-                'hint-source': isFreeHint(cell),
-              },
-            ]"
-            @pointerdown="startDrag({ type: 'free', cell }, $event)"
-            @click="onFreeClick(cell)"
+            v-for="(card, cell) in game.freeCells"
+            :key="`free-${cell}`"
+            class="sol-slot fc-cell"
+            :class="{ 'hint-target': isCellHint(cell) }"
+            data-drop="free"
+            :data-cell="cell"
           >
-            <PlayingCard :card="card" />
+            <div
+              v-if="card"
+              class="sol-cardface"
+              :class="[
+                cardClass(card),
+                {
+                  selected: selected && selected.type === 'free' && selected.cell === cell,
+                  'hint-source': isFreeHint(cell),
+                },
+              ]"
+              @pointerdown="startDrag({ type: 'free', cell }, $event)"
+              @click="onFreeClick(cell)"
+            >
+              <PlayingCard :card="card" />
+            </div>
+            <div v-else class="sol-empty fc-free-empty" @click="onFreeClick(cell)">＋</div>
           </div>
-          <div v-else class="sol-empty fc-free-empty" @click="onFreeClick(cell)">＋</div>
         </div>
-        <div
-          v-for="suit in SUITS"
-          :key="suit"
-          class="sol-slot"
-          :class="{ 'hint-target': isFoundationHint(suit) }"
-          data-drop="foundation"
-          :data-suit="suit"
-        >
+        <div class="sol-pile-group">
           <div
-            v-if="foundationTop(suit)"
-            class="sol-cardface"
-            :class="[cardClass(foundationTop(suit)), { selected: selected && selected.type === 'foundation' && selected.suit === suit }]"
-            @pointerdown="startDrag({ type: 'foundation', suit }, $event)"
-            @click="onFoundationClick(suit)"
+            v-for="suit in SUITS"
+            :key="suit"
+            class="sol-slot"
+            :class="{ 'hint-target': isFoundationHint(suit) }"
+            data-drop="foundation"
+            :data-suit="suit"
           >
-            <PlayingCard :card="foundationTop(suit)" />
+            <div
+              v-if="foundationTop(suit)"
+              class="sol-cardface"
+              :class="[cardClass(foundationTop(suit)), { selected: selected && selected.type === 'foundation' && selected.suit === suit }]"
+              @pointerdown="startDrag({ type: 'foundation', suit }, $event)"
+              @click="onFoundationClick(suit)"
+            >
+              <PlayingCard :card="foundationTop(suit)" />
+            </div>
+            <div v-else class="sol-empty sol-found" @click="onFoundationClick(suit)">{{ SUIT_SYMBOL[suit] }}</div>
           </div>
-          <div v-else class="sol-empty sol-found" @click="onFoundationClick(suit)">{{ SUIT_SYMBOL[suit] }}</div>
         </div>
       </div>
 
@@ -105,7 +109,7 @@
             @pointerdown="onCardPointerDown(pi, ci, card, $event)"
             @click.stop="onCardClick(pi, ci)"
           >
-            <PlayingCard :card="card" :index-layout="ci < pile.length - 1 ? 'stack' : ''" />
+            <PlayingCard :card="card" />
           </div>
         </div>
       </div>
@@ -229,7 +233,6 @@ const layout = computed(() =>
     columns: COLUMNS,
     gap: gap.value,
     topUnits: CARD_RATIO,
-    rowGap: 10,
   }),
 )
 const feltStyle = computed(() => ({
