@@ -36,7 +36,7 @@ public final class GameConst {
             PointsRuleConst.GAME_PETLINK, PointsRuleConst.GAME_SUDOKU, PointsRuleConst.GAME_2048,
             PointsRuleConst.GAME_MINESWEEPER, PointsRuleConst.GAME_SOLITAIRE, PointsRuleConst.GAME_SPIDER,
             PointsRuleConst.GAME_FREECELL, PointsRuleConst.GAME_TETRIS, PointsRuleConst.GAME_SNAKE,
-            PointsRuleConst.GAME_MAHJONG);
+            PointsRuleConst.GAME_MAHJONG, PointsRuleConst.GAME_LUDO);
 
     /** 对战赛制 mode:同种子赛(各自打完上报)/ 实时对战(WS 输入级同步) */
     public static final String MATCH_MODE_ASYNC = "ASYNC_SEED";
@@ -95,30 +95,33 @@ public final class GameConst {
      * 可开房的 H5 游戏:按玩法性质给模式——
      * 连连看/扫雷/数独天然适合合作,其余单人解谜/实时类按同种子 PK。
      * 麻将按 4 人真人对局(空位 AI 补),座位固定 4。
+     * 飞行棋按 4 人真人对局(空位 AI 补),先走完四架飞机者胜(FIRST_FINISH)。
      * maxSeats = 单局最多几名玩家(超出部分随机分配为观战):
      * 共享盘面的合作局 4 人,同种子竞速局 6 人。
      */
-    public static final java.util.Map<String, RoomGame> ROOM_GAMES = java.util.Map.of(
-            PointsRuleConst.GAME_PETLINK, new RoomGame(PointsRuleConst.GAME_PETLINK,
-                    java.util.Set.of(ROOM_MODE_PK, ROOM_MODE_COOP), ROOM_RESULT_FIRST, 6),
-            PointsRuleConst.GAME_MINESWEEPER, new RoomGame(PointsRuleConst.GAME_MINESWEEPER,
-                    java.util.Set.of(ROOM_MODE_COOP), ROOM_RESULT_COOP, 4),
-            PointsRuleConst.GAME_SUDOKU, new RoomGame(PointsRuleConst.GAME_SUDOKU,
-                    java.util.Set.of(ROOM_MODE_COOP), ROOM_RESULT_COOP, 4),
-            PointsRuleConst.GAME_2048, new RoomGame(PointsRuleConst.GAME_2048,
-                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 6),
-            PointsRuleConst.GAME_SNAKE, new RoomGame(PointsRuleConst.GAME_SNAKE,
-                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 6),
-            PointsRuleConst.GAME_TETRIS, new RoomGame(PointsRuleConst.GAME_TETRIS,
-                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 6),
-            PointsRuleConst.GAME_SOLITAIRE, new RoomGame(PointsRuleConst.GAME_SOLITAIRE,
-                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4),
-            PointsRuleConst.GAME_SPIDER, new RoomGame(PointsRuleConst.GAME_SPIDER,
-                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4),
-            PointsRuleConst.GAME_FREECELL, new RoomGame(PointsRuleConst.GAME_FREECELL,
-                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4),
-            PointsRuleConst.GAME_MAHJONG, new RoomGame(PointsRuleConst.GAME_MAHJONG,
-                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4));
+    public static final java.util.Map<String, RoomGame> ROOM_GAMES = java.util.Map.ofEntries(
+            java.util.Map.entry(PointsRuleConst.GAME_PETLINK, new RoomGame(PointsRuleConst.GAME_PETLINK,
+                    java.util.Set.of(ROOM_MODE_PK, ROOM_MODE_COOP), ROOM_RESULT_FIRST, 6)),
+            java.util.Map.entry(PointsRuleConst.GAME_MINESWEEPER, new RoomGame(PointsRuleConst.GAME_MINESWEEPER,
+                    java.util.Set.of(ROOM_MODE_COOP), ROOM_RESULT_COOP, 4)),
+            java.util.Map.entry(PointsRuleConst.GAME_SUDOKU, new RoomGame(PointsRuleConst.GAME_SUDOKU,
+                    java.util.Set.of(ROOM_MODE_COOP), ROOM_RESULT_COOP, 4)),
+            java.util.Map.entry(PointsRuleConst.GAME_2048, new RoomGame(PointsRuleConst.GAME_2048,
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 6)),
+            java.util.Map.entry(PointsRuleConst.GAME_SNAKE, new RoomGame(PointsRuleConst.GAME_SNAKE,
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 6)),
+            java.util.Map.entry(PointsRuleConst.GAME_TETRIS, new RoomGame(PointsRuleConst.GAME_TETRIS,
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 6)),
+            java.util.Map.entry(PointsRuleConst.GAME_SOLITAIRE, new RoomGame(PointsRuleConst.GAME_SOLITAIRE,
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4)),
+            java.util.Map.entry(PointsRuleConst.GAME_SPIDER, new RoomGame(PointsRuleConst.GAME_SPIDER,
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4)),
+            java.util.Map.entry(PointsRuleConst.GAME_FREECELL, new RoomGame(PointsRuleConst.GAME_FREECELL,
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4)),
+            java.util.Map.entry(PointsRuleConst.GAME_MAHJONG, new RoomGame(PointsRuleConst.GAME_MAHJONG,
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4)),
+            java.util.Map.entry(PointsRuleConst.GAME_LUDO, new RoomGame(PointsRuleConst.GAME_LUDO,
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_FIRST, 4)));
 
     /** 房间游戏名快照(邀请卡/结果卡用) */
     public static final java.util.Map<String, String> ROOM_GAME_NAMES = java.util.Map.ofEntries(
@@ -131,5 +134,6 @@ public final class GameConst {
             java.util.Map.entry(PointsRuleConst.GAME_SOLITAIRE, "克朗代克纸牌"),
             java.util.Map.entry(PointsRuleConst.GAME_SPIDER, "蜘蛛纸牌"),
             java.util.Map.entry(PointsRuleConst.GAME_FREECELL, "自由纸牌"),
-            java.util.Map.entry(PointsRuleConst.GAME_MAHJONG, "麻将"));
+            java.util.Map.entry(PointsRuleConst.GAME_MAHJONG, "麻将"),
+            java.util.Map.entry(PointsRuleConst.GAME_LUDO, "飞行棋"));
 }

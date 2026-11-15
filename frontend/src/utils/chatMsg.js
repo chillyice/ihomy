@@ -21,6 +21,7 @@ export const H5_GAMES = [
   { code: 'game_tetris', nameKey: 'games.tetris.title', route: '/games/tetris' },
   { code: 'game_snake', nameKey: 'games.snake.title', route: '/games/snake' },
   { code: 'game_mahjong', nameKey: 'games.mahjong.title', route: '/games/mahjong' },
+  { code: 'game_ludo', nameKey: 'games.ludo.title', route: '/games/ludo' },
   { code: 'game_solitaire', nameKey: 'games.solitaire.title', route: '/games/cards/klondike' },
   { code: 'game_spider', nameKey: 'games.spider.title', route: '/games/cards/spider' },
   { code: 'game_freecell', nameKey: 'games.freecell.title', route: '/games/cards/freecell' },

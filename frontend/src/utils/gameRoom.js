@@ -104,6 +104,14 @@ export const ROOM_GAMES = {
     result: ROOM_RESULT.SCORE,
     maxSeats: 4,
   },
+  game_ludo: {
+    code: 'game_ludo',
+    nameKey: 'games.ludo.title',
+    path: '/games/ludo',
+    modes: [ROOM_MODE.PK],
+    result: ROOM_RESULT.FIRST,
+    maxSeats: 4,
+  },
 }
 
 export const roomGame = (code) => ROOM_GAMES[code] || null

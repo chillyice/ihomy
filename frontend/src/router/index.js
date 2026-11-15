@@ -200,6 +200,8 @@ const routes = [
   { path: '/games/snake', name: 'Snake', component: () => import('@/views/games/Snake.vue'), meta: { requiresAuth: true } },
   // 麻将 H5(推倒胡简化版,玩家对三 AI,胡牌发积分),需登录
   { path: '/games/mahjong', name: 'Mahjong', component: () => import('@/views/games/Mahjong.vue'), meta: { requiresAuth: true } },
+  // 飞行棋(自绘盘面,单机对 AI / 房间四人联机,房主权威同步),需登录
+  { path: '/games/ludo', name: 'Ludo', component: () => import('@/views/games/Ludo.vue'), meta: { requiresAuth: true } },
   // 贪吃蛇 1v1 对战(实时,WS 输入同步)
   {
     path: '/games/snake/match/:id',

@@ -391,6 +391,14 @@ const builtinGames = [
     path: '/games/mahjong',
     category: 'CASUAL',
   },
+  {
+    key: 'ludo',
+    titleKey: 'games.ludo.title',
+    descKey: 'games.ludo.desc',
+    icon: Promotion,
+    path: '/games/ludo',
+    category: 'CASUAL',
+  },
   ...embeddedEntries,
 ]
 
