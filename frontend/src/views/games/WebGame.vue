@@ -47,6 +47,7 @@
     <div ref="stageEl" class="wg-stage card game-surface" :class="{ 'is-page-full': pageFull }">
       <iframe
         v-if="game?.linkUrl"
+        ref="frameEl"
         :key="frameKey"
         class="wg-frame"
         :src="game.linkUrl"
@@ -54,7 +55,7 @@
         allow="fullscreen; autoplay; gamepad; clipboard-read; clipboard-write"
         allowfullscreen
         referrerpolicy="no-referrer"
-        @load="frameLoaded = true"
+        @load="onFrameLoad"
       ></iframe>
       <div v-if="!frameLoaded" class="wg-cover">
         <template v-if="loadError">
@@ -92,6 +93,7 @@ import { gameApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useGameView } from '@/composables/useGameView'
+import { useIframeFit } from '@/composables/useIframeFit'
 
 const route = useRoute()
 const router = useRouter()
@@ -101,12 +103,20 @@ const sunLight = inject(SUN_LIGHT_KEY, null)
 const pageEl = ref(null)
 const game = ref(null)
 const stageEl = ref(null)
+const frameEl = ref(null)
 const frameKey = ref(0)
 const frameLoaded = ref(false)
 const loadError = ref(false)
 const pageFull = ref(false)
 // iframe 本身不缩放(缩了字会糊);暖居下 fullBleed 把高度交给 CSS 拉满主区,iframe 用 flex 撑满
 const { isFullscreen, toggleFullscreen } = useGameView({ page: pageEl, stage: stageEl, scale: false, fullBleed: true })
+// 站内同源页面内容比可视区高时等比缩小;跨源外部网页读不到文档,自动跳过照常滚动
+const { refit: refitFrame } = useIframeFit({ stage: stageEl, frame: frameEl })
+
+const onFrameLoad = () => {
+  frameLoaded.value = true
+  refitFrame()
+}
 
 /** 保险箱写权限(新增条目要 vault:manage);没有权限就不显示入口,避免点了才报错 */
 const canVault = computed(() => userStore.isOwner || userStore.hasPerm('vault:manage'))

@@ -42,6 +42,7 @@
     <div ref="stageEl" class="wg-stage card game-surface" :class="{ 'is-page-full': pageFull }">
       <iframe
         v-if="src"
+        ref="frameEl"
         :key="frameKey"
         class="wg-frame"
         :src="src"
@@ -49,7 +50,7 @@
         allow="fullscreen; autoplay; gamepad"
         allowfullscreen
         referrerpolicy="no-referrer"
-        @load="frameLoaded = true"
+        @load="onFrameLoad"
       ></iframe>
       <div v-if="!frameLoaded" class="wg-cover">
         <template v-if="!src">
@@ -84,6 +85,7 @@ import PageToolbar from '@/components/PageToolbar.vue'
 import { findEmbeddedGame, embeddedGameSrc } from '@/utils/games/embeddedGames'
 import { SUN_LIGHT_KEY } from '@/utils/useSunLight'
 import { useGameView } from '@/composables/useGameView'
+import { useIframeFit } from '@/composables/useIframeFit'
 
 const route = useRoute()
 const router = useRouter()
@@ -92,11 +94,19 @@ const sunLight = inject(SUN_LIGHT_KEY, null)
 
 const pageEl = ref(null)
 const stageEl = ref(null)
+const frameEl = ref(null)
 const frameKey = ref(0)
 const frameLoaded = ref(false)
 const pageFull = ref(false)
 // iframe 本身不缩放(缩了字会糊);暖居下 fullBleed 把高度交给 CSS 拉满主区,游戏拿满内容区高
 const { isFullscreen, toggleFullscreen } = useGameView({ page: pageEl, stage: stageEl, scale: false, fullBleed: true })
+// 游戏内容比可视区高时等比缩小(useIframeFit 拉高 iframe 再 transform 缩回,不出游戏内滚动条)
+const { refit: refitFrame } = useIframeFit({ stage: stageEl, frame: frameEl })
+
+const onFrameLoad = () => {
+  frameLoaded.value = true
+  refitFrame()
+}
 
 const game = computed(() => findEmbeddedGame(String(route.params.slug || '')))
 const title = computed(() => (game.value ? t(game.value.titleKey) : t('games.title')))
