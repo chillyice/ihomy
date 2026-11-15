@@ -22,6 +22,7 @@
         exit-ends-room
         @submit="submitRoomScore"
         @leave="play.leave"
+        @auto="onAutoToggle"
       />
 
       <div class="ludo-layout">
@@ -357,7 +358,7 @@ const isMyTurn = computed(() => {
   const st = state.value
   if (!st || st.phase !== 'playing') return false
   const seat = st.seats[st.turn]
-  return !!seat && !seat.ai && String(seat.userId) === String(play.myId)
+  return !!seat && !seat.ai && !seat.auto && String(seat.userId) === String(play.myId)
 })
 const canRoll = computed(() => isMyTurn.value && state.value?.awaiting === 'roll' && !animating.value && !rolling.value)
 const diceFace = computed(() => state.value?.dice || lastFace.value || 6)
@@ -635,12 +636,14 @@ function onPieceClick(piece) {
 // ---------- AI ----------
 const canHostRun = () => !play.active || play.isHost
 
-function scheduleAi(delay = 620) {
+/** 电脑步频放慢:默认带 1.1~2.3s 的可感停顿(调用方显式传短值只用于动画后的快速轮询) */
+function scheduleAi(delay) {
   clearTimeout(aiTimer)
   const st = state.value
   if (!st || st.phase !== 'playing' || !canHostRun()) return
-  if (!st.seats[st.turn]?.ai) return
-  aiTimer = setTimeout(runAi, delay)
+  if (!st.seats[st.turn]?.ai && !st.seats[st.turn]?.auto) return
+  const wait = delay == null ? 1100 + Math.floor(Math.random() * 1200) : delay
+  aiTimer = setTimeout(runAi, wait)
 }
 
 function runAi() {
@@ -653,7 +656,7 @@ function runAi() {
   }
   if (st.awaiting === 'roll') {
     doRoll()
-    scheduleAi(780)
+    scheduleAi()
     return
   }
   const pick = ludoAiPick(st)
@@ -722,6 +725,17 @@ function onRoomSignal(data) {
     handleGuestAction(data)
     return
   }
+  // 托管开关:访客请求房主把自己席位交给 AI(或收回)
+  if (data.event === 'auto' && play.isHost) {
+    const seat = state.value?.seats.find((s) => String(s.userId) === String(data.from))
+    if (seat && !seat.ai) {
+      seat.auto = !!data.on
+      state.value.seq = (state.value.seq || 0) + 1
+      publishState()
+      scheduleAi(320)
+    }
+    return
+  }
   // 访客刚进房就可能发 sync,这时房主还没开桌:顺手把桌开了,免得一直等
   if (data.event === 'sync' && play.isHost) {
     if (!state.value && play.status === 'PLAYING') startRoomGame()
@@ -729,12 +743,27 @@ function onRoomSignal(data) {
   }
 }
 
-/** 房主收到的远端意图(只接受当前座位本人发来的) */
+/** 本机托管开关:房主直接生效;访客发信令给房主 */
+function onAutoToggle(on) {
+  if (!play.active) return
+  if (play.isHost) {
+    const seat = state.value?.seats.find((s) => !s.ai && String(s.userId) === String(play.myId))
+    if (!seat) return
+    seat.auto = !!on
+    state.value.seq = (state.value.seq || 0) + 1
+    publishState()
+    scheduleAi(320)
+  } else {
+    play.send('auto', { to: play.room.hostId, on: !!on })
+  }
+}
+
+/** 房主收到的远端意图(只接受当前座位本人发来的;托管中由 AI 代打,忽略其操作) */
 function handleGuestAction(data) {
   const st = state.value
   if (!st || st.phase !== 'playing') return
   const seat = st.seats[st.turn]
-  if (!seat || seat.ai || String(seat.userId) !== String(data.from)) return
+  if (!seat || seat.ai || seat.auto || String(seat.userId) !== String(data.from)) return
   const action = data.action || {}
   if (action.type === 'roll') doRoll()
   else if (action.type === 'move') {
@@ -756,15 +785,30 @@ async function receiveState(next) {
 function onRoomChange(next) {
   if (!next || !play.active) return
   if (!play.isHost || !state.value || state.value.phase !== 'playing') return
-  // 有人中途离开:把他的人位交给 AI,免得全桌等他
+  // 席位交接:退出/转观战的人位交给 AI;新参战者(如让位接手)优先接管刚空出的席
   const players = (next.members || []).filter((m) => !isSpectatorRole(m.role))
   let changed = false
+  const freed = []
   for (const seat of state.value.seats) {
     if (seat.ai || !seat.userId) continue
     if (players.some((m) => String(m.userId) === String(seat.userId))) continue
     seat.ai = true
+    seat.auto = false
     seat.name = ''
     changed = true
+    freed.push(seat)
+  }
+  const seated = new Set(state.value.seats.filter((s) => !s.ai).map((s) => String(s.userId)))
+  for (const m of players) {
+    if (seated.has(String(m.userId))) continue
+    const free = freed.shift() || state.value.seats.find((s) => s.ai)
+    if (!free) break
+    free.ai = false
+    free.auto = false
+    free.userId = m.userId
+    free.name = m.name
+    changed = true
+    seated.add(String(m.userId))
   }
   if (changed) {
     // 人选变了但盘面本身没走子,序号要自己抬一格,否则访客按 seq 去重会收不到

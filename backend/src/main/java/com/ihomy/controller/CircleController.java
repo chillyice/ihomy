@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -51,6 +52,13 @@ public class CircleController {
     @GetMapping("/list")
     public Result<List<Map<String, Object>>> list() {
         return Result.success(circleService.list(securityHelper.current().getFamilyId()));
+    }
+
+    /** 同圈家庭的成员名单(仅 id/名字/头像):私聊与游戏邀请的对象目录 */
+    @Operation(summary = "同圈家庭的成员名单")
+    @GetMapping("/family-members")
+    public Result<List<Map<String, Object>>> familyMembers(@RequestParam Long familyId) {
+        return Result.success(circleService.familyMembers(securityHelper.current().getFamilyId(), familyId));
     }
 
     @Operation(summary = "生成邀请码(7 天有效)")

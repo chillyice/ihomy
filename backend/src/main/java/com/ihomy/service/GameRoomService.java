@@ -9,9 +9,11 @@ import com.ihomy.common.PointsRuleConst;
 import com.ihomy.common.ResultCode;
 import com.ihomy.entity.GameRoom;
 import com.ihomy.entity.GameRoomMember;
+import com.ihomy.entity.GameRoomRound;
 import com.ihomy.entity.SysUser;
 import com.ihomy.mapper.GameRoomMapper;
 import com.ihomy.mapper.GameRoomMemberMapper;
+import com.ihomy.mapper.GameRoomRoundMapper;
 import com.ihomy.mapper.SysUserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +47,7 @@ public class GameRoomService {
 
     private final GameRoomMapper roomMapper;
     private final GameRoomMemberMapper memberMapper;
+    private final GameRoomRoundMapper roundMapper;
     private final SysUserMapper sysUserMapper;
     private final PointsService pointsService;
     private final StringRedisTemplate redis;
@@ -81,10 +84,11 @@ public class GameRoomService {
     }
 
     /**
-     * 房主换游戏(仅 WAITING):玩法随游戏走,并按新游戏的玩家席位随机重新分配席位——
-     * 房主恒为玩家,其余成员洗牌后先补满玩家席,剩下的转观战。观战成员可看可聊,不参与对局。
+     * 房主换游戏/玩法(仅 WAITING):
+     * 换游戏——按新游戏的玩家席位、按进房顺序重新分配席位(房主恒为玩家,不踢人,超出的转观战),seed 重掷;
+     * 只换玩法——不动席位与 seed(避免切 PK⇄COOP 白白打散座位)。
      */
-    public Map<String, Object> setGame(Long userId, Long familyId, Long id, String gameCode) {
+    public Map<String, Object> setGame(Long userId, Long familyId, Long id, String gameCode, String mode) {
         GameRoom room = require(familyId, id);
         if (!Objects.equals(room.getHostId(), userId)) {
             throw new BizException(ResultCode.BAD_REQUEST, "只有房主可以换游戏");
@@ -96,23 +100,35 @@ public class GameRoomService {
         if (spec == null) {
             throw new BizException(ResultCode.BAD_REQUEST, "这个游戏还不支持一起玩");
         }
+        boolean sameGame = gameCode.equals(room.getGameCode());
+        if (sameGame && (mode == null || mode.isBlank() || mode.equals(room.getMode()))) {
+            return get(familyId, id);
+        }
+        String finalMode = mode == null || mode.isBlank() ? (sameGame ? room.getMode() : defaultMode(spec)) : mode;
+        if (!spec.modes().contains(finalMode)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "这个游戏不支持这种玩法");
+        }
+        if (sameGame) {
+            roomMapper.update(null, new LambdaUpdateWrapper<GameRoom>()
+                    .eq(GameRoom::getId, id)
+                    .set(GameRoom::getMode, finalMode));
+            return get(familyId, id);
+        }
         roomMapper.update(null, new LambdaUpdateWrapper<GameRoom>()
                 .eq(GameRoom::getId, id)
                 .set(GameRoom::getGameCode, gameCode)
-                .set(GameRoom::getMode, defaultMode(spec))
+                .set(GameRoom::getMode, finalMode)
                 .set(GameRoom::getSeed, Math.abs(RandomUtil.randomLong())));
         assignSeats(id, spec);
         clearSwap(id);
         return get(familyId, id);
     }
 
-    /** 按游戏席位随机分配:房主恒为玩家,其余洗牌后先补满玩家席,剩下的转观战;非房主重新准备 */
+    /** 按游戏席位、按进房顺序分配:房主恒为玩家,其余按加入先后先补满玩家席,剩下的转观战;非房主重新准备 */
     private void assignSeats(Long roomId, GameConst.RoomGame spec) {
-        List<GameRoomMember> members = members(roomId);
-        List<GameRoomMember> others = members.stream()
+        List<GameRoomMember> others = members(roomId).stream()
                 .filter(m -> !GameConst.ROOM_ROLE_HOST.equals(m.getRole()))
                 .collect(Collectors.toList());
-        java.util.Collections.shuffle(others, new java.util.Random());
         int playerSeats = Math.max(1, spec.maxSeats()) - 1; // 房主已占一席
         for (int i = 0; i < others.size(); i++) {
             GameRoomMember m = others.get(i);
@@ -283,6 +299,33 @@ public class GameRoomService {
         }
     }
 
+    /**
+     * 让位(对局进行中):参战玩家把自己的席位让给指定的观战者,两人立即互换角色。
+     * 与局中锁定的自助换位不同,让位是牌局进行时的主动交接,由游戏页把席位接管给新人。
+     */
+    public Map<String, Object> yieldSeat(Long userId, Long familyId, Long id, Long toUserId) {
+        if (toUserId == null || toUserId.equals(userId)) {
+            throw new BizException(ResultCode.BAD_REQUEST, "要让位的对象不对");
+        }
+        synchronized (("game-room-" + id).intern()) {
+            GameRoom room = require(familyId, id);
+            if (!GameConst.ROOM_PLAYING.equals(room.getStatus())) {
+                throw new BizException(ResultCode.BAD_REQUEST, "对局中才能让位,等待中直接切换席位");
+            }
+            GameRoomMember me = requireMember(id, userId);
+            if (GameConst.ROOM_ROLE_SPECTATOR.equals(me.getRole())) {
+                throw new BizException(ResultCode.BAD_REQUEST, "你在观战中,不需要让位");
+            }
+            GameRoomMember target = memberOf(id, toUserId);
+            if (target == null || !GameConst.ROOM_ROLE_SPECTATOR.equals(target.getRole())) {
+                throw new BizException(ResultCode.BAD_REQUEST, "只能让位给观战中的成员");
+            }
+            updateRole(me, GameConst.ROOM_ROLE_SPECTATOR);
+            updateRole(target, GameConst.ROOM_ROLE_PLAYER);
+            return view(room);
+        }
+    }
+
     /** 席位调整的时间窗:等待中/已结算可调,对局进行中与已取消锁定 */
     private void requireSwitchable(GameRoom room) {
         if (GameConst.ROOM_PLAYING.equals(room.getStatus())) {
@@ -356,8 +399,10 @@ public class GameRoomService {
         List<GameRoomMember> players = members(id).stream()
                 .filter(m -> !GameConst.ROOM_ROLE_SPECTATOR.equals(m.getRole()))
                 .toList();
-        if (players.size() < 2) {
-            throw new BizException(ResultCode.BAD_REQUEST, "至少要有两名玩家才能开始");
+        GameConst.RoomGame spec = GameConst.ROOM_GAMES.get(room.getGameCode());
+        int minPlayers = spec != null && spec.ai() ? 1 : 2; // 有电脑玩家的游戏 1 名真人即可开局,空位由电脑补
+        if (players.size() < minPlayers) {
+            throw new BizException(ResultCode.BAD_REQUEST, minPlayers < 2 ? "至少要有两名玩家才能开始" : "至少要有一名玩家才能开始");
         }
         boolean allReady = players.stream().allMatch(m -> Integer.valueOf(1).equals(m.getReady()));
         if (!allReady) {
@@ -405,14 +450,11 @@ public class GameRoomService {
             if (!Objects.equals(room.getHostId(), userId)) {
                 return get(familyId, id);
             }
-            finishRoom(room, null);
+            settle(finishRoom(room, null));
             return get(familyId, id);
         }
         if (GameConst.ROOM_RESULT_FIRST.equals(result)) {
-            GameRoom finished = finishFirst(room, userId);
-            if (finished != null && finished.getWinnerId() != null) {
-                awardWinner(finished, finished.getWinnerId());
-            }
+            settle(finishFirst(room, userId));
             return get(familyId, id);
         }
         // 高分制:所有玩家(观战不算)都上报后自动结算
@@ -421,10 +463,7 @@ public class GameRoomService {
                 .filter(m -> !GameConst.ROOM_ROLE_SPECTATOR.equals(m.getRole()))
                 .allMatch(m -> m.getFinishedAt() != null);
         if (allReported) {
-            GameRoom finished = finishByScore(room);
-            if (finished != null && finished.getWinnerId() != null) {
-                awardWinner(finished, finished.getWinnerId());
-            }
+            settle(finishByScore(room));
         }
         return get(familyId, id);
     }
@@ -446,10 +485,7 @@ public class GameRoomService {
         if (GameConst.ROOM_PLAYING.equals(room.getStatus())) {
             GameConst.RoomGame spec = GameConst.ROOM_GAMES.get(room.getGameCode());
             String result = spec == null ? GameConst.ROOM_RESULT_SCORE : spec.result();
-            GameRoom finished = GameConst.ROOM_RESULT_SCORE.equals(result) ? finishByScore(room) : finishRoom(room, null);
-            if (finished != null && finished.getWinnerId() != null) {
-                awardWinner(finished, finished.getWinnerId());
-            }
+            settle(GameConst.ROOM_RESULT_SCORE.equals(result) ? finishByScore(room) : finishRoom(room, null));
         }
         return get(familyId, id);
     }
@@ -513,10 +549,7 @@ public class GameRoomService {
             if (isHost) {
                 GameConst.RoomGame spec = GameConst.ROOM_GAMES.get(room.getGameCode());
                 String result = spec == null ? GameConst.ROOM_RESULT_SCORE : spec.result();
-                GameRoom finished = GameConst.ROOM_RESULT_SCORE.equals(result) ? finishByScore(room) : finishRoom(room, null);
-                if (finished != null && finished.getWinnerId() != null) {
-                    awardWinner(finished, finished.getWinnerId());
-                }
+                settle(GameConst.ROOM_RESULT_SCORE.equals(result) ? finishByScore(room) : finishRoom(room, null));
             }
         }
         return get(familyId, id);
@@ -609,6 +642,110 @@ public class GameRoomService {
             String name = GameConst.ROOM_GAME_NAMES.getOrDefault(room.getGameCode(), room.getGameCode());
             pointsService.addRecord(winnerId, room.getFamilyId(), "REWARD", awarded, "一起玩获胜(" + name + ")");
         }
+    }
+
+    /** 结算收尾:胜者积分 + 本局成绩落房间排行榜(跨「再来一局」累计,只记本房间) */
+    private void settle(GameRoom finished) {
+        if (finished == null) {
+            return;
+        }
+        if (finished.getWinnerId() != null) {
+            awardWinner(finished, finished.getWinnerId());
+        }
+        recordRound(finished);
+    }
+
+    /** 本局成绩入房间排行榜:每个参战成员一行(观战不入榜),round_no 按房间累计局数递增 */
+    private void recordRound(GameRoom room) {
+        try {
+            long played = roundMapper.selectCount(new LambdaQueryWrapper<GameRoomRound>()
+                    .eq(GameRoomRound::getRoomId, room.getId()));
+            int roundNo = (int) played + 1;
+            List<GameRoomMember> ms = members(room.getId()).stream()
+                    .filter(m -> !GameConst.ROOM_ROLE_SPECTATOR.equals(m.getRole()))
+                    .toList();
+            List<Long> userIds = ms.stream().map(GameRoomMember::getUserId).filter(Objects::nonNull).toList();
+            Map<Long, SysUser> users = userIds.isEmpty() ? Map.of()
+                    : sysUserMapper.selectBatchIds(userIds).stream()
+                            .collect(Collectors.toMap(SysUser::getId, u -> u));
+            for (GameRoomMember m : ms) {
+                GameRoomRound row = new GameRoomRound();
+                row.setRoomId(room.getId());
+                row.setFamilyId(room.getFamilyId());
+                row.setGameCode(room.getGameCode());
+                row.setRoundNo(roundNo);
+                row.setUserId(m.getUserId());
+                SysUser u = m.getUserId() == null ? null : users.get(m.getUserId());
+                row.setSeatName(u == null ? "成员"
+                        : (u.getNickname() != null && !u.getNickname().isBlank() ? u.getNickname() : u.getUsername()));
+                row.setScore(m.getScore() == null ? null : m.getScore().intValue());
+                row.setIsWinner(m.getUserId() != null && m.getUserId().equals(room.getWinnerId()) ? 1 : 0);
+                row.setCreatedAt(LocalDateTime.now());
+                roundMapper.insert(row);
+            }
+        } catch (Exception e) {
+            log.warn("房间排行榜记录失败 roomId={}", room.getId(), e);
+        }
+    }
+
+    /** 房间排行榜:各局流水 + 按人累计(局数/胜场/累计分),只统计本房间 */
+    public Map<String, Object> board(Long familyId, Long id) {
+        require(familyId, id);
+        List<GameRoomRound> rounds = roundMapper.selectList(new LambdaQueryWrapper<GameRoomRound>()
+                .eq(GameRoomRound::getRoomId, id)
+                .orderByAsc(GameRoomRound::getRoundNo)
+                .orderByAsc(GameRoomRound::getId));
+        List<Long> userIds = rounds.stream().map(GameRoomRound::getUserId).filter(Objects::nonNull).distinct().toList();
+        Map<Long, SysUser> users = userIds.isEmpty() ? Map.of()
+                : sysUserMapper.selectBatchIds(userIds).stream()
+                        .collect(Collectors.toMap(SysUser::getId, u -> u));
+        List<Map<String, Object>> roundViews = new ArrayList<>();
+        Map<Long, Map<String, Object>> totals = new LinkedHashMap<>();
+        for (GameRoomRound r : rounds) {
+            Map<String, Object> rv = new LinkedHashMap<>();
+            rv.put("roundNo", r.getRoundNo());
+            rv.put("gameCode", r.getGameCode());
+            rv.put("userId", r.getUserId());
+            SysUser u = r.getUserId() == null ? null : users.get(r.getUserId());
+            String name = u == null ? r.getSeatName()
+                    : (u.getNickname() != null && !u.getNickname().isBlank() ? u.getNickname() : u.getUsername());
+            rv.put("name", name);
+            rv.put("score", r.getScore());
+            rv.put("winner", Integer.valueOf(1).equals(r.getIsWinner()));
+            rv.put("createdAt", r.getCreatedAt());
+            roundViews.add(rv);
+            if (r.getUserId() == null) {
+                continue;
+            }
+            Map<String, Object> t = totals.computeIfAbsent(r.getUserId(), k -> {
+                Map<String, Object> init = new LinkedHashMap<>();
+                init.put("userId", r.getUserId());
+                init.put("name", name);
+                init.put("rounds", 0);
+                init.put("wins", 0);
+                init.put("totalScore", 0L);
+                return init;
+            });
+            t.put("rounds", (int) t.get("rounds") + 1);
+            if (Integer.valueOf(1).equals(r.getIsWinner())) {
+                t.put("wins", (int) t.get("wins") + 1);
+            }
+            t.put("totalScore", (long) t.get("totalScore") + (r.getScore() == null ? 0 : r.getScore()));
+        }
+        List<Map<String, Object>> ranking = new ArrayList<>(totals.values());
+        ranking.sort((a, b) -> {
+            int byWins = Integer.compare((int) b.get("wins"), (int) a.get("wins"));
+            if (byWins != 0) {
+                return byWins;
+            }
+            return Long.compare((long) b.get("totalScore"), (long) a.get("totalScore"));
+        });
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("roundsCount", roundViews.isEmpty() ? 0
+                : ((Number) roundViews.get(roundViews.size() - 1).get("roundNo")).intValue());
+        out.put("rounds", roundViews);
+        out.put("ranking", ranking);
+        return out;
     }
 
     // ---------- 基础查询 ----------

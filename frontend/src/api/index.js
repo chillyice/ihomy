@@ -209,7 +209,7 @@ export const familyApi = {
   saveShareDefaults: (targetFamilyIds) => request.put('/family/share-default', { targetFamilyIds }),
 }
 
-// 亲友圈:家庭之间的「可分享关系」容器;入圈不共享任何内容
+// 亲友圈:家庭之间的「可分享关系」容器;入圈不共享内容,同圈家庭之间可见成员名单(私聊/邀请用)
 export const circleApi = {
   list: () => request.get('/circle/list'),
   create: (data) => request.post('/circle', data),
@@ -220,6 +220,7 @@ export const circleApi = {
   leave: (id) => request.post(`/circle/${id}/leave`),
   removeFamily: (id, familyId) => request.delete(`/circle/${id}/family/${familyId}`),
   disband: (id) => request.delete(`/circle/${id}`),
+  familyMembers: (familyId) => request.get('/circle/family-members', { params: { familyId } }),
 }
 
 // 内容分享范围(「给谁看」):传具体接收家庭 id(亲友圈在写入时展开为家庭行)
@@ -384,6 +385,10 @@ export const gameApi = {
   tetrisReward: () => request.post('/game/tetris/reward'),
   snakeReward: () => request.post('/game/snake/reward'),
   mahjongReward: () => request.post('/game/mahjong/reward'),
+  doudizhuReward: () => request.post('/game/doudizhu/reward'),
+  guandanReward: () => request.post('/game/guandan/reward'),
+  baohuangReward: () => request.post('/game/baohuang/reward'),
+  goujiReward: () => request.post('/game/gouji/reward'),
   // GBA 存档落在游戏目录的 saves/ 下,列表按最后修改时间倒序
   listSaves: (id) => request.get(`/game/${id}/saves`),
   downloadSave: (id, name) => request.get(`/game/${id}/saves/${encodeURIComponent(name)}`, { responseType: 'arraybuffer' }),
@@ -395,20 +400,26 @@ export const gameApi = {
   deleteSave: (id, name) => request.delete(`/game/${id}/saves/${encodeURIComponent(name)}`),
 }
 
-// 「一起玩」房间(2~8 人,PK/COOP):建房自动往聊天流发邀请卡,状态变化经 WS game-signal(event=room)推送
+// 「一起玩」房间(2~8 人,PK/COOP):点「一起玩」直接进房、房内选游戏;状态变化经 WS game-signal(event=room)推送
 export const roomApi = {
   create: (data) => request.post('/game/room', data),
   list: (status) => request.get('/game/room', { params: status ? { status } : {} }),
   get: (id) => request.get(`/game/room/${id}`),
   join: (id) => request.post(`/game/room/${id}/join`),
-  // 房主换游戏(仅等待中):换完按新游戏席位随机分配玩家/观战
-  setGame: (id, gameCode) => request.post(`/game/room/${id}/game`, { gameCode }),
+  // 房主换游戏/玩法(仅等待中):换游戏按进房顺序重排席位,只换玩法不动席位
+  setGame: (id, gameCode, mode) => request.post(`/game/room/${id}/game`, mode ? { gameCode, mode } : { gameCode }),
   ready: (id, ready) => request.post(`/game/room/${id}/ready`, { ready }),
   // 自助换位:参战⇄观战直切;满员时观战者向指定参战玩家申请换位,对方同意后互换
   switchRole: (id, role) => request.post(`/game/room/${id}/role`, { role }),
   requestSwap: (id, targetUserId) => request.post(`/game/room/${id}/swap`, { targetUserId }),
   acceptSwap: (id) => request.post(`/game/room/${id}/swap/accept`),
   cancelSwap: (id) => request.post(`/game/room/${id}/swap/cancel`),
+  // 对局中让位:把自己的席位让给指定观战者
+  yieldSeat: (id, toUserId) => request.post(`/game/room/${id}/yield`, { toUserId }),
+  // 邀请:成员走私聊、家庭走对方聊天流(多选,服务端逐个校验同圈/同家庭)
+  invite: (id, memberIds, familyIds) => request.post(`/game/room/${id}/invite`, { memberIds, familyIds }),
+  // 房间排行榜:只统计本房间的各局成绩
+  board: (id) => request.get(`/game/room/${id}/board`),
   start: (id) => request.post(`/game/room/${id}/start`),
   again: (id) => request.post(`/game/room/${id}/again`),
   finish: (id, score) => request.post(`/game/room/${id}/finish`, { score }),
@@ -591,6 +602,10 @@ export const chatApi = {
   read: (msgId) => request.post('/chat/read', { msgId }),
   unfurl: (url) => request.post('/chat/unfurl', { url }),
   iceServers: () => request.get('/chat/ice-servers'),
+  // 私聊(DM):历史翻页、按人未读分组、把某人发来的全部置已读
+  dmHistory: (peerId, params) => request.get('/chat/dm/history', { params: { peerId, ...params } }),
+  dmUnread: () => request.get('/chat/dm/unread'),
+  dmRead: (peerId) => request.post('/chat/dm/read', { peerId }),
 }
 
 // 存储管理(家庭级设备 + 文件浏览 + 目录映射同步)

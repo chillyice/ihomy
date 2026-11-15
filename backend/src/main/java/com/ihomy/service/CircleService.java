@@ -17,6 +17,7 @@ import com.ihomy.mapper.FamilyCircleMapper;
 import com.ihomy.mapper.FamilyCircleMemberMapper;
 import com.ihomy.mapper.FamilyMapper;
 import com.ihomy.mapper.FamilyShareDefaultMapper;
+import com.ihomy.mapper.SysUserMapper;
 import com.ihomy.mapper.SysUserRoleMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -37,9 +38,10 @@ import java.util.stream.Collectors;
 /**
  * 亲友圈业务:建圈/邀请/加入/改称呼/退出/解散。
  *
- * <p>铁律:入圈不共享任何内容——本类只维护「谁和谁可以互相分享」的关系,内容可见性仍由
- * {@link com.ihomy.service.access.ContentAccessService} 与 content_audience 决定。
- * 圈内只暴露家庭名/封面/称呼,不暴露成员名单与家谱。
+ * <p>内容口径(2026-11 放宽):入圈仍不共享任何内容——内容可见性由
+ * {@link com.ihomy.service.access.ContentAccessService} 与 content_audience 决定,家谱不开放。
+ * 成员名单对同圈家庭开放(仅名单本身):同圈家庭之间可见对方成员并发起私聊/游戏邀请,
+ * 见 {@link #connectedFamilyIds(Long)} 与 {@link #familyMembers(Long, Long)}。
  */
 @Service
 @RequiredArgsConstructor
@@ -56,6 +58,7 @@ public class CircleService {
     private final ContentAudienceMapper audienceMapper;
     private final FamilyMapper familyMapper;
     private final FamilyShareDefaultMapper shareDefaultMapper;
+    private final SysUserMapper userMapper;
     private final SysUserRoleMapper userRoleMapper;
     private final PublicController publicController;
 
@@ -334,6 +337,44 @@ public class CircleService {
                 .map(FamilyCircleMember::getFamilyId)
                 .filter(id -> !id.equals(selfFamilyId))
                 .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
+    }
+
+    /**
+     * 与某家庭「连通」的家庭集合(含本家):所有活跃圈里同圈的全部家庭并集。
+     * 私聊与跨家庭游戏邀请的准入口径(2026-11 起:同圈家庭之间可见成员名单、可私聊/邀请)。
+     */
+    public Set<Long> connectedFamilyIds(Long familyId) {
+        Set<Long> out = new java.util.LinkedHashSet<>();
+        out.add(familyId);
+        List<FamilyCircleMember> mine = memberMapper.selectList(new LambdaQueryWrapper<FamilyCircleMember>()
+                .eq(FamilyCircleMember::getFamilyId, familyId)
+                .eq(FamilyCircleMember::getStatus, DictConst.CIRCLE_MEMBER_ACTIVE));
+        for (FamilyCircleMember m : mine) {
+            out.addAll(siblingFamilyIds(m.getCircleId(), familyId));
+        }
+        return out;
+    }
+
+    /**
+     * 同圈家庭的成员名单(仅 id/名字/头像,不含家谱与联系方式)。
+     * 目标家庭必须与发起家庭连通(同家庭或同圈),否则 NOT_FOUND。
+     */
+    public List<Map<String, Object>> familyMembers(Long selfFamilyId, Long targetFamilyId) {
+        if (targetFamilyId == null || !connectedFamilyIds(selfFamilyId).contains(targetFamilyId)) {
+            throw new BizException(ResultCode.NOT_FOUND);
+        }
+        List<SysUser> users = userMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getFamilyId, targetFamilyId)
+                .orderByAsc(SysUser::getId));
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (SysUser u : users) {
+            Map<String, Object> v = new LinkedHashMap<>();
+            v.put("id", u.getId());
+            v.put("name", u.getNickname() != null && !u.getNickname().isBlank() ? u.getNickname() : u.getUsername());
+            v.put("avatar", u.getAvatar());
+            out.add(v);
+        }
+        return out;
     }
 
     /** 圈内家庭概要(家庭名/封面/称呼),不返回成员列表 */

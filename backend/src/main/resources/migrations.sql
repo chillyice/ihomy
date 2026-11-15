@@ -3507,3 +3507,40 @@ WHERE a.`visibility` = 'PRIVATE' AND p.`visibility` = 'FAMILY';
 -- ------------------------------------------------------------
 ALTER TABLE `game_info`
   MODIFY COLUMN `type` VARCHAR(20) NOT NULL DEFAULT 'SWF' COMMENT '类型:SWF/GBA/LINK(外部网页)/DESKTOP(桌面游戏安装包,仅下载)';
+
+-- ------------------------------------------------------------
+-- 2026-11-15(V12.47):一起玩房间优化 + 私聊 + 房间排行榜
+--   ① sys_chat_dm_message 私聊消息(同家庭/同亲友圈成员之间)
+--   ② family_game_room_round 房间对局成绩(只记本房间,跨再来一局累计)
+--   幂等:CREATE TABLE IF NOT EXISTS,可重复执行
+-- ------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS `sys_chat_dm_message` (
+  `id`           BIGINT        NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `sender_id`    BIGINT        NOT NULL COMMENT '发送人ID',
+  `recipient_id` BIGINT        NOT NULL COMMENT '收件人ID',
+  `content`      VARCHAR(2000) NOT NULL COMMENT '消息内容(文本正文/卡片标题等快照摘要)',
+  `msg_type`     VARCHAR(20)   NOT NULL DEFAULT 'TEXT' COMMENT '消息类型: TEXT/IMAGE/LINK/CARD/GAME_INVITE',
+  `payload`      TEXT          NULL COMMENT '结构化负载(JSON,≤4KB,按 msg_type 定义;TEXT 为 NULL)',
+  `created_at`   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '发送时间',
+  `read_at`      DATETIME      DEFAULT NULL COMMENT '收件人已读时间(NULL=未读)',
+  PRIMARY KEY (`id`),
+  KEY `idx_recipient` (`recipient_id`, `id`),
+  KEY `idx_sender` (`sender_id`, `id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='私聊消息表(同家庭/同亲友圈)';
+
+CREATE TABLE IF NOT EXISTS `family_game_room_round` (
+  `id`          BIGINT      NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `room_id`     BIGINT      NOT NULL COMMENT '房间ID',
+  `family_id`   BIGINT      NOT NULL COMMENT '所属家庭ID',
+  `game_code`   VARCHAR(32) NOT NULL COMMENT '本局游戏code',
+  `round_no`    INT         NOT NULL DEFAULT 1 COMMENT '本房间第几局(从 1 递增)',
+  `user_id`     BIGINT      NOT NULL COMMENT '成员ID',
+  `seat_name`   VARCHAR(50) DEFAULT NULL COMMENT '成员名快照(排行榜展示兜底)',
+  `score`       BIGINT      DEFAULT NULL COMMENT '本局成绩(NULL=未计分,如 COOP)',
+  `is_winner`   TINYINT     NOT NULL DEFAULT 0 COMMENT '是否本局胜者:0否 1是',
+  `created_at`  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '结算时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_room_round` (`room_id`, `round_no`),
+  KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='房间对局成绩(一起玩排行榜)';

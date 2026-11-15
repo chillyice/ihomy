@@ -61,6 +61,44 @@ public class ChatController {
         return Result.success();
     }
 
+    // ---------- 私聊(DM) ----------
+
+    /** 私聊关系不满足时把协议错误码转成用户可读提示 */
+    private long requirePeer(Long peerId) {
+        if (peerId == null || peerId <= 0) {
+            throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.BAD_REQUEST, "要私聊的对象不对");
+        }
+        try {
+            chatService.requireCanChat(current().getUserId(), peerId);
+        } catch (IllegalArgumentException e) {
+            throw new com.ihomy.common.BizException(com.ihomy.common.ResultCode.BAD_REQUEST, "只能和同家庭或亲友圈家庭的成员私聊");
+        }
+        return peerId;
+    }
+
+    @Operation(summary = "私聊历史(与某人,beforeId 翻页)")
+    @GetMapping("/dm/history")
+    public Result<List<Map<String, Object>>> dmHistory(@RequestParam Long peerId,
+                                                       @RequestParam(required = false) Long beforeId,
+                                                       @RequestParam(defaultValue = "50") int limit) {
+        LoginUser user = current();
+        return Result.success(chatService.dmHistory(user.getUserId(), requirePeer(peerId), beforeId, limit));
+    }
+
+    @Operation(summary = "私聊未读(按人分组)")
+    @GetMapping("/dm/unread")
+    public Result<List<Map<String, Object>>> dmUnread() {
+        return Result.success(chatService.dmUnread(current().getUserId()));
+    }
+
+    @Operation(summary = "私聊标记已读(某个人发来的全部置已读)")
+    @PostMapping("/dm/read")
+    public Result<Map<String, Object>> dmRead(@RequestBody ChatReadDTO dto) {
+        LoginUser user = current();
+        int n = chatService.dmMarkRead(user.getUserId(), requirePeer(dto == null ? null : dto.getPeerId()));
+        return Result.success(Map.of("read", n));
+    }
+
     /**
      * WebRTC ICE 服务器配置(1:1 通话用):app.webrtc.ice-servers 解析为标准 iceServers 结构。
      * 配置形如 "stun:…;turn:…|user|pass",凭证只在后端,前端拿结构化结果。

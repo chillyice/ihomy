@@ -9,6 +9,14 @@
       </div>
       <div class="room-bar-actions">
         <RoomCallPicker v-if="!ended" :members="room.members" :my-id="myId" />
+        <!-- 托管:有电脑玩家的游戏,对局中把自己的席位交给电脑(再点恢复) -->
+        <el-button v-if="showAuto" size="small" round :type="autoOn ? 'warning' : 'default'" @click="toggleAuto">
+          {{ autoOn ? $t('games.room.autoOff') : $t('games.room.autoOn') }}
+        </el-button>
+        <!-- 让位:对局中把席位让给指定观战者 -->
+        <el-button v-if="showYield" size="small" round @click="yieldOpen = true">
+          {{ $t('games.room.yieldSeat') }}
+        </el-button>
         <el-button v-if="canSubmit && !isSpectator" size="small" type="primary" round :disabled="reported" @click="$emit('submit')">
           {{ reported ? $t('games.room.submitted') : $t('games.room.submitScore') }}
         </el-button>
@@ -28,13 +36,29 @@
         <!-- 退出对局:回到房间大厅保留成员身份,不再留在牌桌上 -->
         <el-button v-if="!ended" size="small" round @click="exitToHall">{{ $t('games.room.exitGame') }}</el-button>
         <el-button v-if="ended" size="small" round @click="$emit('leave')">{{ $t('games.room.backGames') }}</el-button>
+        <!-- 结束自动回房:倒计时结束前也可直接点 -->
+        <el-button v-if="returnCountdown > 0" size="small" type="primary" round @click="goHall">
+          {{ $t('games.room.autoReturn', { n: returnCountdown }) }}
+        </el-button>
       </div>
     </div>
+
+    <!-- 让位:选择一名观战成员接管我的席位 -->
+    <el-dialog v-model="yieldOpen" :title="$t('games.room.yieldSeat')" width="dialog-sm" append-to-body>
+      <el-empty v-if="!spectators.length" :description="$t('games.room.yieldNoSpectator')" :image-size="60" />
+      <div v-for="m in spectators" :key="m.userId" class="yield-row">
+        <el-avatar :size="30">{{ m.name?.charAt(0) }}</el-avatar>
+        <span class="yield-name">{{ m.name }}</span>
+        <el-button size="small" type="primary" round :loading="yielding" @click="yieldTo(m)">
+          {{ $t('games.room.yieldTo', { name: m.name }) }}
+        </el-button>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-// 游戏内「一起玩」横幅:玩法/对手/当前比分/交卷与结算出口。
+// 游戏内「一起玩」横幅:玩法/对手/当前比分/交卷与结算出口 + 对局动作(托管/让位/语音/离开)。
 // COOP 不发积分也不交卷(房主完成即结算);PK 可随时交卷,避免一局太久把房间挂住。
 // 观战成员不显示交卷;对局中可一键退回房间大厅(保留席位)或快速发起语音。
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
@@ -42,7 +66,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { roomApi } from '@/api'
-import { canTakePlayerSeat, isSpectatorRole, resultKey } from '@/utils/gameRoom'
+import { canTakePlayerSeat, isSpectatorRole, resultKey, roomHasAi } from '@/utils/gameRoom'
 import RoomCallPicker from '@/components/games/RoomCallPicker.vue'
 
 const props = defineProps({
@@ -56,7 +80,7 @@ const props = defineProps({
   /** 实时权威牌局(麻将):房主中途退出即结束房间,否则其他人会一直等不到操作 */
   exitEndsRoom: { type: Boolean, default: false },
 })
-defineEmits(['submit', 'leave'])
+const emit = defineEmits(['submit', 'leave', 'auto'])
 
 const { t } = useI18n()
 const router = useRouter()
@@ -168,6 +192,74 @@ const endRoom = async () => {
     ElMessage.warning(e?.response?.data?.message || t('games.room.actFailed'))
   }
 }
+
+// ---------- 对局动作:托管 / 让位 / 自动回房 ----------
+
+/** 托管:仅有电脑玩家的游戏,对局中参战者可用(观战没有可托管的事) */
+const isPlaying = computed(() => props.room?.status === 'PLAYING')
+const showAuto = computed(() => roomHasAi(props.room?.gameCode) && isPlaying.value && !props.ended && !isSpectator.value)
+const autoOn = ref(false)
+const toggleAuto = () => {
+  autoOn.value = !autoOn.value
+  emit('auto', autoOn.value)
+}
+watch(
+  () => props.room?.status,
+  (s) => {
+    if (s !== 'PLAYING') autoOn.value = false
+  },
+)
+
+/** 让位:对局中把自己的席位让给指定观战者(REST 换角色,广播后游戏页把席位接管过去) */
+const spectators = computed(() => (props.room?.members || []).filter((m) => isSpectatorRole(m.role)))
+const showYield = computed(() => isPlaying.value && !props.ended && !isSpectator.value && spectators.value.length > 0)
+const yieldOpen = ref(false)
+const yielding = ref(false)
+const yieldTo = async (m) => {
+  if (!props.room?.id || yielding.value) return
+  yielding.value = true
+  try {
+    await roomApi.yieldSeat(props.room.id, m.userId)
+    yieldOpen.value = false
+    ElMessage.success(t('games.room.yieldDone', { name: m.name }))
+  } catch (e) {
+    ElMessage.warning(e?.response?.data?.message || t('games.room.actFailed'))
+  } finally {
+    yielding.value = false
+  }
+}
+
+/** 一局结束自动回房间大厅(倒计时 4s,期间可提前点) */
+const AUTO_RETURN_SECONDS = 4
+const returnCountdown = ref(0)
+let returnTimer = null
+const stopReturn = () => {
+  if (returnTimer) {
+    clearInterval(returnTimer)
+    returnTimer = null
+  }
+  returnCountdown.value = 0
+}
+const goHall = () => {
+  stopReturn()
+  if (props.room?.id) router.push(`/games/room/${props.room.id}`)
+}
+watch(
+  () => props.room?.status,
+  (s, prev) => {
+    if (s === 'FINISHED' && prev === 'PLAYING') {
+      stopReturn()
+      returnCountdown.value = AUTO_RETURN_SECONDS
+      returnTimer = setInterval(() => {
+        returnCountdown.value -= 1
+        if (returnCountdown.value <= 0) goHall()
+      }, 1000)
+    } else if (s !== 'FINISHED') {
+      stopReturn()
+    }
+  },
+)
+onBeforeUnmount(stopReturn)
 </script>
 
 <style scoped>
@@ -254,5 +346,18 @@ const endRoom = async () => {
 }
 .room-bar-seat-wrap {
   display: inline-flex;
+}
+.yield-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+.yield-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

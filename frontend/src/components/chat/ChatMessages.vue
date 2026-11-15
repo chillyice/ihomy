@@ -36,9 +36,9 @@ import MsgCardHost from '@/components/chat/cards/MsgCardHost.vue'
 const userStore = useUserStore()
 const chatStore = useChatStore()
 const myId = computed(() => userStore.userInfo?.id)
-const messages = computed(() => chatStore.messages)
+const messages = computed(() => chatStore.activeMessages)
 // 历史没到位才转圈;WS 已经把消息推上来时不能还盖着遮罩(旧版只看 hydrated,浮窗首次展开会一直转)
-const loading = computed(() => !chatStore.hydrated && !chatStore.messages.length)
+const loading = computed(() => !chatStore.activeLoaded && !messages.value.length)
 
 const msgBox = ref(null)
 // 距底多少像素内算「贴着底部」:在这个范围内收消息才自动滚
@@ -84,6 +84,15 @@ onMounted(() => {
   scrollBottom({ clearUnread: true })
 })
 onBeforeUnmount(() => {})
+
+// 切换会话(家庭⇄私聊)重置滚动与浮标
+watch(
+  () => chatStore.activePeer,
+  () => {
+    unreadNew.value = 0
+    scrollBottom({ clearUnread: true })
+  },
+)
 </script>
 
 <style scoped>

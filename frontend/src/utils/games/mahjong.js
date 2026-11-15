@@ -124,6 +124,20 @@ export function createMahjongWall(rand = Math.random) {
 /** 实例 id → 牌种 */
 export const mahjongKind = (tileId) => Math.floor(tileId / MAHJONG_KIND_COPIES)
 
+/**
+ * 庄家掷骰:两颗六面骰,返回 [d1, d2](各 1~6;可选注入随机源,测试用)。
+ * 出牌顺序按和值确定:从庄家自己数第 1 位,数到「和值 % 4」对应座位先摸打(0 = 庄家)。
+ */
+export function mahjongRollDice(rand = Math.random) {
+  return [1 + Math.floor(rand() * 6), 1 + Math.floor(rand() * 6)]
+}
+
+/** 两颗骰子定首家:和值 % 4(0 = 庄家自己,1 = 下家,2 = 对家,3 = 上家) */
+export function mahjongDiceFirstSeat(d1, d2) {
+  const sum = (Math.max(1, Math.min(6, Math.round(d1) || 1)) + Math.max(1, Math.min(6, Math.round(d2) || 1))) % 4
+  return sum
+}
+
 /** 实例 id 数组 → 牌种计数表(长度 34) */
 export function mahjongCounts(tiles) {
   const counts = new Array(MAHJONG_KINDS).fill(0)

@@ -17,9 +17,11 @@ import {
   mahjongAnGangKinds,
   mahjongChiOptions,
   mahjongCounts,
+  mahjongDiceFirstSeat,
   mahjongHandScore,
   mahjongKind,
   mahjongKindName,
+  mahjongRollDice,
   mahjongTenpai,
   normalizeMahjongRules,
   sortMahjongTiles,
@@ -49,6 +51,31 @@ describe('mahjong wall', () => {
     for (const id of createMahjongWall()) {
       expect(mahjongKind(id)).toBe(Math.floor(id / 4))
     }
+  })
+})
+
+describe('mahjong dice (庄家掷骰定首家)', () => {
+  it('两颗骰子各在 1~6', () => {
+    for (let i = 0; i < 200; i++) {
+      const [a, b] = mahjongRollDice()
+      expect(a).toBeGreaterThanOrEqual(1)
+      expect(a).toBeLessThanOrEqual(6)
+      expect(Number.isInteger(a)).toBe(true)
+      expect(b).toBeGreaterThanOrEqual(1)
+      expect(b).toBeLessThanOrEqual(6)
+    }
+  })
+
+  it('和值 % 4 定首家(0 = 庄家)', () => {
+    expect(mahjongDiceFirstSeat(1, 1)).toBe(2) // 和 2 % 4 = 2 → 对家
+    expect(mahjongDiceFirstSeat(2, 2)).toBe(0) // 和 4 % 4 = 0 → 庄家
+    expect(mahjongDiceFirstSeat(3, 2)).toBe(1) // 和 5 % 4 = 1 → 下家
+    expect(mahjongDiceFirstSeat(6, 6)).toBe(0) // 和 12 % 4 = 0 → 庄家
+  })
+
+  it('非法入参按 1/6 夹紧,不抛错', () => {
+    expect(mahjongDiceFirstSeat(0, 0)).toBe(2) // 1+1=2 → 对家
+    expect(mahjongDiceFirstSeat(99, -3)).toBe(3) // 6+1=7 → 上家
   })
 })
 

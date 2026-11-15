@@ -312,7 +312,7 @@ const onLang = () => {
 // 通知
 const unreadCount = ref(0)
 // 聊天未读:全局 WS 连接在 stores/chat.js,浮窗展开或进 /chat 时自动清零
-const chatUnread = computed(() => chatStore.unread)
+const chatUnread = computed(() => chatStore.totalUnread)
 const notifications = ref([])
 const loadUnread = async () => {
   if (!userStore.isLoggedIn) return

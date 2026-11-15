@@ -16,7 +16,7 @@
         <ChatPanel />
       </div>
       <button v-else type="button" class="chat-float-ball mobile-ball" @pointerdown="onBallDown" @pointerup="onBallUp">
-        <el-badge :value="chatStore.unread" :hidden="!chatStore.unread" :max="99" class="ball-badge">
+        <el-badge :value="chatStore.totalUnread" :hidden="!chatStore.totalUnread" :max="99" class="ball-badge">
           <el-icon :size="22"><ChatDotRound /></el-icon>
         </el-badge>
       </button>
@@ -32,10 +32,17 @@
           </el-button>
         </div>
         <ChatPanel />
-        <div class="resize-handle" @pointerdown="onResizeStart"></div>
+        <!-- 四角 + 四边缩放把手 -->
+        <div
+          v-for="dir in RESIZE_DIRS"
+          :key="dir"
+          class="resize-handle"
+          :class="'dir-' + dir"
+          @pointerdown="onResizeStart($event, dir)"
+        ></div>
       </div>
       <button v-else type="button" class="chat-float-ball" :style="ballStyle" @pointerdown="onBallDown" @pointerup="onBallUp">
-        <el-badge :value="chatStore.unread" :hidden="!chatStore.unread" :max="99" class="ball-badge">
+        <el-badge :value="chatStore.totalUnread" :hidden="!chatStore.totalUnread" :max="99" class="ball-badge">
           <el-icon :size="22"><ChatDotRound /></el-icon>
         </el-badge>
       </button>
@@ -75,9 +82,12 @@ import ChatPanel from '@/components/chat/ChatPanel.vue'
 import FloatDeleteDock from '@/components/ui/FloatDeleteDock.vue'
 
 const FLOAT_POS_KEY = 'ihomy:chat:float:v1'
+const PANEL_POS_KEY = 'ihomy:chat:panel:v1'
 const BALL_SIZE = 48
 const PANEL_W = 360
 const PANEL_H = 520
+/** 缩放把手方向:四角 + 四边 */
+const RESIZE_DIRS = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
 
 const { t } = useI18n()
 const route = useRoute()
@@ -94,7 +104,7 @@ const show = computed(() => userStore.isLoggedIn && !route.meta.standalone && fl
 /** 沉浸页(游戏/GBA):只显示收起球,不自动展开(拍板 #2) */
 const immersiveRoute = computed(() => route.path.startsWith('/games') || route.path.startsWith('/tools/gba'))
 
-// 球位置(持久化);面板位置不持久化,每次展开落右侧
+// 球位置(持久化);面板位置/尺寸也持久化(四角四边缩放后的窗口形态跟着走)
 const ball = useDragResize({
   x: Math.max(16, window.innerWidth - 84),
   y: Math.max(80, window.innerHeight - 200),
@@ -112,7 +122,7 @@ const {
   y: 84,
   w: PANEL_W,
   h: PANEL_H,
-  storageKey: '',
+  storageKey: PANEL_POS_KEY,
 })
 
 const ballStyle = computed(() => ({ left: `${ball.pos.value.x}px`, top: `${ball.pos.value.y}px`, zIndex: 'var(--z-float)' }))
@@ -339,22 +349,86 @@ onBeforeUnmount(() => {
 }
 .resize-handle {
   position: absolute;
+  touch-action: none; /* 缩放把手 */
+  z-index: 1;
+}
+/* 四角:可见的斜角标记 */
+.resize-handle.dir-se {
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+}
+.resize-handle.dir-sw {
   left: 0;
   bottom: 0;
-  width: 18px;
-  height: 18px;
-  cursor: nwse-resize;
-  touch-action: none; /* 缩放把手 */
+  width: 16px;
+  height: 16px;
+  cursor: nesw-resize;
 }
-.resize-handle::after {
+.resize-handle.dir-ne {
+  right: 0;
+  top: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nesw-resize;
+}
+.resize-handle.dir-nw {
+  left: 0;
+  top: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+}
+.resize-handle.dir-nw::after {
   content: '';
   position: absolute;
   left: 4px;
-  bottom: 4px;
+  top: 4px;
   width: 8px;
   height: 8px;
   border-left: 2px solid var(--color-border, rgba(128, 128, 128, 0.4));
+  border-top: 2px solid var(--color-border, rgba(128, 128, 128, 0.4));
+}
+.resize-handle.dir-se::after {
+  content: '';
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--color-border, rgba(128, 128, 128, 0.4));
   border-bottom: 2px solid var(--color-border, rgba(128, 128, 128, 0.4));
+}
+/* 四边:细长热区(面板 overflow:hidden,把手内贴边放置) */
+.resize-handle.dir-n {
+  left: 12px;
+  right: 12px;
+  top: 0;
+  height: 6px;
+  cursor: ns-resize;
+}
+.resize-handle.dir-s {
+  left: 12px;
+  right: 12px;
+  bottom: 0;
+  height: 6px;
+  cursor: ns-resize;
+}
+.resize-handle.dir-e {
+  top: 12px;
+  bottom: 12px;
+  right: 0;
+  width: 6px;
+  cursor: ew-resize;
+}
+.resize-handle.dir-w {
+  top: 12px;
+  bottom: 12px;
+  left: 0;
+  width: 6px;
+  cursor: ew-resize;
 }
 
 /* 移动端半屏抽屉 */

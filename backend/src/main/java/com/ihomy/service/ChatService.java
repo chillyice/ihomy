@@ -1,9 +1,14 @@
 package com.ihomy.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.ihomy.common.BizException;
+import com.ihomy.common.ResultCode;
+import com.ihomy.entity.ChatDmMessage;
 import com.ihomy.entity.ChatMessage;
 import com.ihomy.entity.ChatRead;
 import com.ihomy.entity.SysUser;
+import com.ihomy.mapper.ChatDmMessageMapper;
 import com.ihomy.mapper.ChatMessageMapper;
 import com.ihomy.mapper.ChatReadMapper;
 import com.ihomy.mapper.SysUserMapper;
@@ -26,8 +31,10 @@ import java.util.stream.Collectors;
 public class ChatService {
 
     private final ChatMessageMapper messageMapper;
+    private final ChatDmMessageMapper dmMapper;
     private final ChatReadMapper readMapper;
     private final SysUserMapper sysUserMapper;
+    private final CircleService circleService;
     private final tools.jackson.databind.ObjectMapper objectMapper;
     private final org.springframework.data.redis.core.StringRedisTemplate stringRedisTemplate;
 
@@ -266,6 +273,171 @@ public class ChatService {
         return view(m);
     }
 
+    // ---------- 私聊(DM) ----------
+
+    /**
+     * 私聊关系校验:双方同家庭,或双方家庭在同一亲友圈里(同圈家庭之间可见成员名单、可私聊)。
+     * 不满足抛 IllegalArgumentException("BAD_TARGET"),WS 层转 error envelope,REST 层转友好提示。
+     */
+    public void requireCanChat(Long userId, Long peerId) {
+        if (userId == null || peerId == null || userId.equals(peerId)) {
+            throw new IllegalArgumentException("BAD_TARGET");
+        }
+        SysUser a = sysUserMapper.selectById(userId);
+        SysUser b = sysUserMapper.selectById(peerId);
+        if (a == null || b == null || a.getFamilyId() == null || b.getFamilyId() == null) {
+            throw new IllegalArgumentException("BAD_TARGET");
+        }
+        if (!a.getFamilyId().equals(b.getFamilyId())
+                && !circleService.connectedFamilyIds(a.getFamilyId()).contains(b.getFamilyId())) {
+            throw new IllegalArgumentException("BAD_TARGET");
+        }
+    }
+
+    /** 私聊关系是否成立(requireCanChat 的布尔版,批量列表过滤用) */
+    public boolean canChat(Long userId, Long peerId) {
+        try {
+            requireCanChat(userId, peerId);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    /**
+     * 发送私聊消息:类型/负载校验与家庭消息同一套口径,另校验私聊关系。
+     * WS 与 REST 共用;校验失败抛 IllegalArgumentException(协议错误码),由调用方转换。
+     */
+    public Map<String, Object> sendDm(Long senderId, Long recipientId, String msgType, String content, String payload) {
+        requireCanChat(senderId, recipientId);
+        String type = msgType == null || msgType.isBlank() ? com.ihomy.common.ChatMsgType.TEXT : msgType;
+        if (!com.ihomy.common.ChatMsgType.isKnown(type) || com.ihomy.common.ChatMsgType.CALL.equals(type)) {
+            throw new IllegalArgumentException("BAD_TYPE");
+        }
+        if (payload != null && payload.length() > PAYLOAD_MAX_BYTES) {
+            throw new IllegalArgumentException("BAD_PAYLOAD");
+        }
+        if (com.ihomy.common.ChatMsgType.TEXT.equals(type)) {
+            if (content == null || content.isBlank() || content.length() > 2000) {
+                throw new IllegalArgumentException("BAD_CONTENT");
+            }
+            if (payload != null && !payload.isBlank()) {
+                throw new IllegalArgumentException("BAD_PAYLOAD");
+            }
+        } else {
+            validateRichPayload(type, content, payload);
+        }
+        ChatDmMessage m = new ChatDmMessage();
+        m.setSenderId(senderId);
+        m.setRecipientId(recipientId);
+        m.setContent(content == null ? "" : content);
+        m.setMsgType(type);
+        m.setPayload(payload);
+        m.setCreatedAt(java.time.LocalDateTime.now());
+        dmMapper.insert(m);
+        return dmView(m);
+    }
+
+    /** 私聊历史(与某人,双向前翻页),视图附 peerId=对方 id 便于前端分桶 */
+    public List<Map<String, Object>> dmHistory(Long userId, Long peerId, Long beforeId, int limit) {
+        requireCanChat(userId, peerId);
+        List<ChatDmMessage> list = dmMapper.selectList(new LambdaQueryWrapper<ChatDmMessage>()
+                .and(w -> w.eq(ChatDmMessage::getSenderId, userId).eq(ChatDmMessage::getRecipientId, peerId))
+                .or(w -> w.eq(ChatDmMessage::getSenderId, peerId).eq(ChatDmMessage::getRecipientId, userId))
+                .lt(beforeId != null && beforeId > 0, ChatDmMessage::getId, beforeId)
+                .orderByDesc(ChatDmMessage::getId)
+                .last("LIMIT " + Math.min(Math.max(limit, 1), 200)));
+        java.util.Collections.reverse(list);
+        Map<Long, String> names = dmNames(list);
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (ChatDmMessage m : list) {
+            Map<String, Object> v = dmView(m, names);
+            v.put("peerId", userId.equals(m.getSenderId()) ? m.getRecipientId() : m.getSenderId());
+            out.add(v);
+        }
+        return out;
+    }
+
+    /** 私聊未读:按发送人分组 [{userId,name,unread,lastMsg}](按 read_at 精确计数,单次最多聚合 500 条) */
+    public List<Map<String, Object>> dmUnread(Long userId) {
+        List<ChatDmMessage> list = dmMapper.selectList(new LambdaQueryWrapper<ChatDmMessage>()
+                .eq(ChatDmMessage::getRecipientId, userId)
+                .isNull(ChatDmMessage::getReadAt)
+                .orderByAsc(ChatDmMessage::getId)
+                .last("LIMIT 500"));
+        Map<Long, List<ChatDmMessage>> bySender = list.stream()
+                .collect(Collectors.groupingBy(ChatDmMessage::getSenderId, LinkedHashMap::new, Collectors.toList()));
+        Map<Long, String> names = dmNames(list);
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map.Entry<Long, List<ChatDmMessage>> e : bySender.entrySet()) {
+            List<ChatDmMessage> rows = e.getValue();
+            Map<String, Object> v = new LinkedHashMap<>();
+            v.put("userId", e.getKey());
+            v.put("name", names.getOrDefault(e.getKey(), "成员"));
+            v.put("unread", rows.size());
+            v.put("lastMsg", dmView(rows.get(rows.size() - 1), names));
+            out.add(v);
+        }
+        return out;
+    }
+
+    /** 私聊已读:把某人发给我的未读全部置已读,返回置读条数 */
+    public int dmMarkRead(Long userId, Long peerId) {
+        return dmMapper.update(null, new LambdaUpdateWrapper<ChatDmMessage>()
+                .eq(ChatDmMessage::getRecipientId, userId)
+                .eq(ChatDmMessage::getSenderId, peerId)
+                .isNull(ChatDmMessage::getReadAt)
+                .set(ChatDmMessage::getReadAt, java.time.LocalDateTime.now()));
+    }
+
+    /**
+     * 「一起玩」房间邀请批量发送:成员走私聊,家庭走对方家庭聊天流(含本家)。
+     * 目标必须是同家庭或同亲友圈;没有任何有效目标抛 BizException。
+     * 返回 {dmSent, familySent, familyViews(各家庭聊天流已落库的邀请卡视图,调用方负责 WS 下发)}。
+     */
+    public Map<String, Object> sendRoomInvites(Long senderId, Long senderFamilyId, Map<String, Object> room,
+                                               List<Long> memberIds, List<Long> familyIds) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("gameCode", room.get("gameCode"));
+        payload.put("roomId", room.get("id"));
+        payload.put("mode", room.get("mode"));
+        String content = String.valueOf(room.get("gameName"));
+        String json;
+        try {
+            json = objectMapper.writeValueAsString(payload);
+        } catch (Exception e) {
+            throw new BizException(ResultCode.BAD_REQUEST, "邀请没发出去,再试一次");
+        }
+        int dmSent = 0;
+        int familySent = 0;
+        List<Map<String, Object>> familyViews = new ArrayList<>();
+        if (memberIds != null) {
+            for (Long peerId : memberIds.stream().filter(java.util.Objects::nonNull).distinct().toList()) {
+                sendDm(senderId, peerId, com.ihomy.common.ChatMsgType.GAME_INVITE, content, json);
+                dmSent++;
+            }
+        }
+        if (familyIds != null) {
+            java.util.Set<Long> connected = circleService.connectedFamilyIds(senderFamilyId);
+            for (Long familyId : familyIds.stream().filter(java.util.Objects::nonNull).distinct().toList()) {
+                if (!connected.contains(familyId)) {
+                    throw new BizException(ResultCode.BAD_REQUEST, "只能发给自己家庭或亲友圈里的家庭");
+                }
+                Map<String, Object> view = sendMessage(familyId, senderId, com.ihomy.common.ChatMsgType.GAME_INVITE, content, json);
+                familyViews.add(Map.of("familyId", familyId, "view", view));
+                familySent++;
+            }
+        }
+        if (dmSent + familySent == 0) {
+            throw new BizException(ResultCode.BAD_REQUEST, "先选择要邀请的成员或家庭");
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("dmSent", dmSent);
+        out.put("familySent", familySent);
+        out.put("familyViews", familyViews);
+        return out;
+    }
+
     private long lastMsgId(Long familyId) {
         ChatMessage last = messageMapper.selectOne(new LambdaQueryWrapper<ChatMessage>()
                 .eq(ChatMessage::getFamilyId, familyId)
@@ -294,5 +466,36 @@ public class ChatService {
         v.put("payload", m.getPayload());
         v.put("createdAt", m.getCreatedAt());
         return v;
+    }
+
+    /** 单条私聊消息的统一视图(WS 下发与 REST 历史同构,带发送人昵称) */
+    private Map<String, Object> dmView(ChatDmMessage m) {
+        return dmView(m, dmNames(List.of(m)));
+    }
+
+    private Map<String, Object> dmView(ChatDmMessage m, Map<Long, String> names) {
+        Map<String, Object> v = new LinkedHashMap<>();
+        v.put("id", m.getId());
+        v.put("senderId", m.getSenderId());
+        v.put("recipientId", m.getRecipientId());
+        v.put("senderName", names.getOrDefault(m.getSenderId(), "未知成员"));
+        v.put("content", m.getContent());
+        v.put("msgType", m.getMsgType());
+        v.put("payload", m.getPayload());
+        v.put("createdAt", m.getCreatedAt());
+        return v;
+    }
+
+    /** 批查私聊发送人昵称(昵称缺失回退用户名,避免 toMap 空值) */
+    private Map<Long, String> dmNames(List<ChatDmMessage> messages) {
+        if (messages.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> ids = messages.stream().map(ChatDmMessage::getSenderId).distinct().collect(Collectors.toList());
+        Map<Long, String> names = new LinkedHashMap<>();
+        for (SysUser u : sysUserMapper.selectBatchIds(ids)) {
+            names.put(u.getId(), u.getNickname() != null && !u.getNickname().isBlank() ? u.getNickname() : u.getUsername());
+        }
+        return names;
     }
 }

@@ -35,7 +35,18 @@ const KEEP_MESSAGES = 200
 export const useChatStore = defineStore('chat', {
   state: () => ({
     socketStatus: SOCKET_STATUS.IDLE,
+    /** 家庭聊天流(默认会话) */
     messages: [],
+    /** 私聊会话分桶:peerId(字符串)→ 消息数组 */
+    dmMessages: {},
+    /** 私聊未读:peerId(字符串)→ 条数 */
+    dmUnread: {},
+    /** 私聊历史是否已拉过:peerId(字符串)→ bool */
+    dmLoaded: {},
+    /** 当前会话:null=家庭聊天室,数字=私聊对方 userId */
+    activePeer: null,
+    /** 当前私聊对方的展示名(打开会话时传入,标题用) */
+    activePeerName: '',
     /** 全局未读(非本人且不在聊天界面时累加;进界面清零)——P2 浮窗角标/AppSidebar 用 */
     unread: 0,
     /** 最近一条 WS 到达的消息(驱动页面滚动/浮标,历史加载不触发) */
@@ -52,6 +63,12 @@ export const useChatStore = defineStore('chat', {
   getters: {
     /** 聊天界面是否在前台(/chat 页或浮窗展开) */
     viewing: (s) => s.chatPageActive || s.floatOpen,
+    /** 总未读 = 家庭流 + 全部私聊(浮球/侧栏角标) */
+    totalUnread: (s) => s.unread + Object.values(s.dmUnread).reduce((a, b) => a + (Number(b) || 0), 0),
+    /** 当前会话的消息列表(家庭流或私聊分桶) */
+    activeMessages: (s) => (s.activePeer == null ? s.messages : s.dmMessages[String(s.activePeer)] || []),
+    /** 当前会话是否已加载过历史(私聊按会话记,家庭流看 hydrated) */
+    activeLoaded: (s) => (s.activePeer == null ? s.hydrated : !!s.dmLoaded[String(s.activePeer)]),
   },
   actions: {
     /** 建连入口:已连接/连接中是幂等空转;登出态直接忽略 */
@@ -195,15 +212,20 @@ export const useChatStore = defineStore('chat', {
       )
     },
 
-    /** WS 到达一条消息:进缓存、驱动 lastIncoming、按界面状态推进已读/未读 */
+    /** WS 到达一条消息:进缓存、驱动 lastIncoming、按界面状态推进已读/未读;私聊按 dm 标记分桶 */
     onIncoming(data) {
       if (!data || data.id == null) return
       // 壳内消息里的图片/封面是 /files/... 相对路径,补成服务端绝对地址(Web 端恒等)
       data = rewriteAssetUrls(data)
-      // 重连补拉与实时推送可能撞车:同一 id 只留一份
-      if (this.messages.some((m) => m.id === data.id)) return
       const userStore = useUserStore()
       const mine = data.senderId === userStore.userInfo?.id
+      // 私聊:data.dm.userId = 对方 id(我的回声里是收件人,对方的下发里是发送人)
+      if (data.dm && data.dm.userId != null) {
+        this.onDmIncoming(data, mine)
+        return
+      }
+      // 重连补拉与实时推送可能撞车:同一 id 只留一份
+      if (this.messages.some((m) => m.id === data.id)) return
       this.messages.push(data)
       if (this.messages.length > KEEP_MESSAGES) {
         this.messages.splice(0, this.messages.length - KEEP_MESSAGES)
@@ -217,20 +239,90 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    /** 发送文本消息(≤2000 字);连接不可用时返回 false 由调用方提示 */
+    /** 私聊消息进对应分桶;在看的会话立即置已读,否则累计该会话未读 */
+    onDmIncoming(data, mine) {
+      const key = String(data.dm.userId)
+      const bucket = this.dmMessages[key] || (this.dmMessages[key] = [])
+      if (bucket.some((m) => m.id === data.id)) return
+      bucket.push(data)
+      if (bucket.length > KEEP_MESSAGES) {
+        bucket.splice(0, bucket.length - KEEP_MESSAGES)
+      }
+      this.lastIncoming = data
+      const openHere = this.viewing && this.activePeer != null && String(this.activePeer) === key
+      if (mine || openHere) {
+        chatApi.dmRead(Number(key)).catch(() => {})
+        if (openHere) this.dmUnread[key] = 0
+      } else {
+        this.dmUnread[key] = (Number(this.dmUnread[key]) || 0) + 1
+      }
+    },
+
+    /**
+     * 打开私聊会话:切 activePeer、拉历史(拉过就跳过)、把对方发来的未读置已读。
+     * name 为对方展示名(标题用,可省)。
+     */
+    async openDm(peerId, name = '') {
+      if (peerId == null) return
+      this.activePeer = Number(peerId)
+      this.activePeerName = name || this.activePeerName || ''
+      await this.loadDmHistory(this.activePeer)
+      if (this.viewing) {
+        chatApi.dmRead(Number(peerId)).catch(() => {})
+        this.dmUnread[String(peerId)] = 0
+      }
+    },
+
+    /** 回到家庭聊天室 */
+    closeDm() {
+      this.activePeer = null
+      this.activePeerName = ''
+    },
+
+    /** 拉某个私聊会话的历史(与本地缓存按 id 合并,幂等) */
+    async loadDmHistory(peerId, { force = false } = {}) {
+      const key = String(peerId)
+      if (this.dmLoaded[key] && !force) return
+      try {
+        const msgs = await chatApi.dmHistory(Number(peerId))
+        this.dmMessages[key] = mergeMessages(this.dmMessages[key], msgs, KEEP_MESSAGES)
+        this.dmLoaded[key] = true
+      } catch {
+        // 拉失败不装死:保留已有缓存,下次打开重试
+      }
+    },
+
+    /** 私聊未读基线(登录后/重连后拉一次;实时增量靠 WS onDmIncoming) */
+    async loadDmUnread() {
+      try {
+        const list = await chatApi.dmUnread()
+        const next = {}
+        for (const row of list || []) {
+          next[String(row.userId)] = Number(row.unread) || 0
+        }
+        this.dmUnread = next
+      } catch {
+        // 未读基线拉不到就用现有值
+      }
+    },
+
+    /** 发送文本消息(≤2000 字);连接不可用时返回 false 由调用方提示。activePeer 非空走私聊 */
     sendText(text) {
       const t = (text || '').trim()
       if (!t || t.length > 2000 || !socket) return false
-      return socket.send({ type: 'message', data: { content: t } })
+      const data = { content: t }
+      if (this.activePeer != null) data.dm = { userId: this.activePeer }
+      return socket.send({ type: 'message', data })
     },
 
     /**
      * 发送富内容消息({msgType, content, payload});payload 传结构化对象,这里统一序列化。
-     * 返回 false 表示未发出(连接断开或负载非法),由调用方保留草稿提示重试。
+     * activePeer 非空时发到该私聊会话。返回 false 表示未发出(连接断开或负载非法)。
      */
     sendContent({ msgType, content, payload }) {
       if (!socket) return false
       const data = { content: content == null ? '' : String(content), msgType: msgType || 'TEXT' }
+      if (this.activePeer != null) data.dm = { userId: this.activePeer }
       if (payload) {
         const s = serializePayload(payload)
         if (!s) return false
@@ -282,6 +374,8 @@ export const useChatStore = defineStore('chat', {
           }
         }
         this.hydrated = true
+        // 私聊未读基线(不阻塞本次加载,失败只影响角标精度)
+        this.loadDmUnread()
       })().finally(() => {
         historyPromise = null
       })
@@ -319,6 +413,11 @@ export const useChatStore = defineStore('chat', {
       }
       this.socketStatus = SOCKET_STATUS.IDLE
       this.messages = []
+      this.dmMessages = {}
+      this.dmUnread = {}
+      this.dmLoaded = {}
+      this.activePeer = null
+      this.activePeerName = ''
       this.unread = 0
       this.lastIncoming = null
       this.chatPageActive = false

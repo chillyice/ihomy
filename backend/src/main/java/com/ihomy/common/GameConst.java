@@ -87,41 +87,44 @@ public final class GameConst {
     public static final String ROOM_ROLE_PLAYER = "PLAYER";
     public static final String ROOM_ROLE_SPECTATOR = "SPECTATOR";
 
-    /** 房间游戏能力:允许的玩法 + 结算口径 + 单局玩家席位数(与前端 utils/gameRoom.js 同口径) */
-    public record RoomGame(String code, java.util.Set<String> modes, String result, int maxSeats) {
+    /**
+     * 房间游戏能力:允许的玩法 + 结算口径 + 单局玩家席位数 + 是否有电脑玩家(与前端 utils/gameRoom.js 同口径)。
+     * ai=true 的游戏空参战席由前端补电脑玩家,开局只要求 1 名真人。
+     */
+    public record RoomGame(String code, java.util.Set<String> modes, String result, int maxSeats, boolean ai) {
     }
 
     /**
      * 可开房的 H5 游戏:按玩法性质给模式——
      * 连连看/扫雷/数独天然适合合作,其余单人解谜/实时类按同种子 PK。
-     * 麻将按 4 人真人对局(空位 AI 补),座位固定 4。
-     * 飞行棋按 4 人真人对局(空位 AI 补),先走完四架飞机者胜(FIRST_FINISH)。
-     * maxSeats = 单局最多几名玩家(超出部分随机分配为观战):
+     * 麻将按 4 人对局(空位电脑补,ai=true),座位固定 4。
+     * 飞行棋按 4 人对局(空位电脑补,ai=true),先走完四架飞机者胜(FIRST_FINISH)。
+     * maxSeats = 单局最多几名玩家(超出部分按进房顺序分配为观战):
      * 共享盘面的合作局 4 人,同种子竞速局 6 人。
      */
     public static final java.util.Map<String, RoomGame> ROOM_GAMES = java.util.Map.ofEntries(
             java.util.Map.entry(PointsRuleConst.GAME_PETLINK, new RoomGame(PointsRuleConst.GAME_PETLINK,
-                    java.util.Set.of(ROOM_MODE_PK, ROOM_MODE_COOP), ROOM_RESULT_FIRST, 6)),
+                    java.util.Set.of(ROOM_MODE_PK, ROOM_MODE_COOP), ROOM_RESULT_FIRST, 6, false)),
             java.util.Map.entry(PointsRuleConst.GAME_MINESWEEPER, new RoomGame(PointsRuleConst.GAME_MINESWEEPER,
-                    java.util.Set.of(ROOM_MODE_COOP), ROOM_RESULT_COOP, 4)),
+                    java.util.Set.of(ROOM_MODE_COOP), ROOM_RESULT_COOP, 4, false)),
             java.util.Map.entry(PointsRuleConst.GAME_SUDOKU, new RoomGame(PointsRuleConst.GAME_SUDOKU,
-                    java.util.Set.of(ROOM_MODE_COOP), ROOM_RESULT_COOP, 4)),
+                    java.util.Set.of(ROOM_MODE_COOP), ROOM_RESULT_COOP, 4, false)),
             java.util.Map.entry(PointsRuleConst.GAME_2048, new RoomGame(PointsRuleConst.GAME_2048,
-                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 6)),
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 6, false)),
             java.util.Map.entry(PointsRuleConst.GAME_SNAKE, new RoomGame(PointsRuleConst.GAME_SNAKE,
-                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 6)),
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 6, false)),
             java.util.Map.entry(PointsRuleConst.GAME_TETRIS, new RoomGame(PointsRuleConst.GAME_TETRIS,
-                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 6)),
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 6, false)),
             java.util.Map.entry(PointsRuleConst.GAME_SOLITAIRE, new RoomGame(PointsRuleConst.GAME_SOLITAIRE,
-                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4)),
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4, false)),
             java.util.Map.entry(PointsRuleConst.GAME_SPIDER, new RoomGame(PointsRuleConst.GAME_SPIDER,
-                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4)),
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4, false)),
             java.util.Map.entry(PointsRuleConst.GAME_FREECELL, new RoomGame(PointsRuleConst.GAME_FREECELL,
-                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4)),
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4, false)),
             java.util.Map.entry(PointsRuleConst.GAME_MAHJONG, new RoomGame(PointsRuleConst.GAME_MAHJONG,
-                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4)),
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_SCORE, 4, true)),
             java.util.Map.entry(PointsRuleConst.GAME_LUDO, new RoomGame(PointsRuleConst.GAME_LUDO,
-                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_FIRST, 4)));
+                    java.util.Set.of(ROOM_MODE_PK), ROOM_RESULT_FIRST, 4, true)));
 
     /** 房间游戏名快照(邀请卡/结果卡用) */
     public static final java.util.Map<String, String> ROOM_GAME_NAMES = java.util.Map.ofEntries(

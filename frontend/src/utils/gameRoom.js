@@ -20,7 +20,8 @@ export const ROOM_RESULT = {
 
 /**
  * 可开房游戏:modes 为允许玩法,result 为结算口径,maxSeats 为单局玩家席位数
- * (房间人数超出时随机分派为观战;与后端 GameConst.ROOM_GAMES 同口径),
+ * (房间人数超出时按进房顺序分派为观战;与后端 GameConst.ROOM_GAMES 同口径),
+ * ai 为是否有电脑玩家(空参战席补电脑、1 名真人可开局),
  * path 为游戏页路由(纸牌是二级路由,房间页按此直达牌桌)。
  */
 export const ROOM_GAMES = {
@@ -31,6 +32,7 @@ export const ROOM_GAMES = {
     modes: [ROOM_MODE.PK, ROOM_MODE.COOP],
     result: ROOM_RESULT.FIRST,
     maxSeats: 6,
+    ai: false,
   },
   game_minesweeper: {
     code: 'game_minesweeper',
@@ -39,6 +41,7 @@ export const ROOM_GAMES = {
     modes: [ROOM_MODE.COOP],
     result: ROOM_RESULT.COOP,
     maxSeats: 4,
+    ai: false,
   },
   game_sudoku: {
     code: 'game_sudoku',
@@ -47,6 +50,7 @@ export const ROOM_GAMES = {
     modes: [ROOM_MODE.COOP],
     result: ROOM_RESULT.COOP,
     maxSeats: 4,
+    ai: false,
   },
   game_2048: {
     code: 'game_2048',
@@ -55,6 +59,7 @@ export const ROOM_GAMES = {
     modes: [ROOM_MODE.PK],
     result: ROOM_RESULT.SCORE,
     maxSeats: 6,
+    ai: false,
   },
   game_snake: {
     code: 'game_snake',
@@ -63,6 +68,7 @@ export const ROOM_GAMES = {
     modes: [ROOM_MODE.PK],
     result: ROOM_RESULT.SCORE,
     maxSeats: 6,
+    ai: false,
   },
   game_tetris: {
     code: 'game_tetris',
@@ -71,6 +77,7 @@ export const ROOM_GAMES = {
     modes: [ROOM_MODE.PK],
     result: ROOM_RESULT.SCORE,
     maxSeats: 6,
+    ai: false,
   },
   game_solitaire: {
     code: 'game_solitaire',
@@ -79,6 +86,7 @@ export const ROOM_GAMES = {
     modes: [ROOM_MODE.PK],
     result: ROOM_RESULT.SCORE,
     maxSeats: 4,
+    ai: false,
   },
   game_spider: {
     code: 'game_spider',
@@ -87,6 +95,7 @@ export const ROOM_GAMES = {
     modes: [ROOM_MODE.PK],
     result: ROOM_RESULT.SCORE,
     maxSeats: 4,
+    ai: false,
   },
   game_freecell: {
     code: 'game_freecell',
@@ -95,6 +104,7 @@ export const ROOM_GAMES = {
     modes: [ROOM_MODE.PK],
     result: ROOM_RESULT.SCORE,
     maxSeats: 4,
+    ai: false,
   },
   game_mahjong: {
     code: 'game_mahjong',
@@ -103,6 +113,7 @@ export const ROOM_GAMES = {
     modes: [ROOM_MODE.PK],
     result: ROOM_RESULT.SCORE,
     maxSeats: 4,
+    ai: true,
   },
   game_ludo: {
     code: 'game_ludo',
@@ -111,6 +122,7 @@ export const ROOM_GAMES = {
     modes: [ROOM_MODE.PK],
     result: ROOM_RESULT.FIRST,
     maxSeats: 4,
+    ai: true,
   },
 }
 
@@ -118,8 +130,46 @@ export const roomGame = (code) => ROOM_GAMES[code] || null
 
 export const roomModes = (code) => roomGame(code)?.modes || []
 
-/** 单局玩家席位数(超出人数随机转观战) */
+/** 单局玩家席位数(超出人数按进房顺序转观战) */
 export const roomMaxSeats = (code) => roomGame(code)?.maxSeats || 8
+
+/** 该游戏是否有电脑玩家(空参战席补电脑、1 名真人可开局) */
+export const roomHasAi = (code) => !!roomGame(code)?.ai
+
+/** 直进房默认游戏:上次玩的游戏,没有玩过用连连看(与「点击一起玩直接进房」配套) */
+export const DEFAULT_ROOM_GAME = 'game_petlink'
+export const LAST_ROOM_GAME_KEY = 'ihomy:games:lastRoomGame'
+export const lastRoomGame = () => {
+  try {
+    const code = localStorage.getItem(LAST_ROOM_GAME_KEY)
+    return ROOM_GAMES[code] ? code : DEFAULT_ROOM_GAME
+  } catch {
+    return DEFAULT_ROOM_GAME
+  }
+}
+export const rememberRoomGame = (code) => {
+  if (!ROOM_GAMES[code]) return
+  try {
+    localStorage.setItem(LAST_ROOM_GAME_KEY, code)
+  } catch {}
+}
+
+/**
+ * 房间席位视图:玩家 → 空参战席(有 AI 的游戏由电脑补位)→ 观战 → 空观战席。
+ * 席位数跟游戏走(maxSeatPlayers),房间容量(maxPlayers)只限制总人数,
+ * 空出的容量都是观战席。空参战席数量夹在 [0, 空位总数] 内,不为负也不虚标。
+ */
+export function seatLayout(room) {
+  const members = room?.members || []
+  const players = members.filter((m) => !isSpectatorRole(m.role))
+  const spectators = members.filter((m) => isSpectatorRole(m.role))
+  const maxSeats = room?.maxSeatPlayers || roomMaxSeats(room?.gameCode)
+  const capacity = Math.min(Number(room?.maxPlayers) || 8, 8)
+  const emptyTotal = Math.max(0, capacity - members.length)
+  const emptyPlayerSeats = Math.max(0, Math.min(maxSeats - players.length, emptyTotal))
+  const emptySpectatorSeats = Math.max(0, emptyTotal - emptyPlayerSeats)
+  return { players, spectators, emptyPlayerSeats, emptySpectatorSeats, maxSeats, capacity }
+}
 
 /** 成员席位角色(与后端 GameConst.ROOM_ROLE_* 同口径) */
 export const ROOM_ROLE = {

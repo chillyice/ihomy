@@ -92,11 +92,24 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    /** 聊天消息:校验+落库+广播(校验失败回 error envelope,连接保留) */
+    /** 聊天消息:校验+落库+广播;带 dm 目标则走私聊(定向投递+发送者回声)。校验失败回 error envelope,连接保留 */
     private void onChatMessage(WebSocketSession session, Long familyId, Long userId, Map<?, ?> data) {
         try {
             String payload = data.get("payload") == null ? null
                     : data.get("payload") instanceof String s ? s : objectMapper.writeValueAsString(data.get("payload"));
+            // 私聊:data.dm.userId 指定收件人;落库后定向发对方并回声给发送者(多标签同步),
+            // 下行视图带 dm:{userId:对方id} 供前端按会话分桶
+            if (data.get("dm") instanceof Map<?, ?> dm && dm.get("userId") instanceof Number n) {
+                Map<String, Object> view = chatService.sendDm(userId, n.longValue(), str(data.get("msgType")),
+                        str(data.get("content")), payload);
+                Map<String, Object> toTarget = new java.util.LinkedHashMap<>(view);
+                toTarget.put("dm", Map.of("userId", userId));
+                sendToUser(n.longValue(), "message", toTarget);
+                Map<String, Object> echo = new java.util.LinkedHashMap<>(view);
+                echo.put("dm", Map.of("userId", n.longValue()));
+                sendToUser(userId, "message", echo);
+                return;
+            }
             Map<String, Object> view = chatService.sendMessage(familyId, userId, str(data.get("msgType")),
                     str(data.get("content")), payload);
             broadcast(familyId, envelope("message", view));

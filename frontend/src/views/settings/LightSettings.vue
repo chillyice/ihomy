@@ -130,6 +130,8 @@ const enterLightTest = () => {
 
 // 恢复默认面板布局:清除 localStorage 中所有面板持久化记录,刷新页面生效。
 // 当前确实在写的键:ihomy:music:pos(MusicPlayer 拖拽位置)、ihomy:chat:float:v1(ChatFloat 悬浮球位置)、
+// ihomy:chat:panel:v1(ChatFloat 面板位置/尺寸)、ihomy:chat:rail:v1(聊天对象列收起)、
+// ihomy:games:lastRoomGame(一起玩默认游戏)、ihomy:room:autoReady(自动准备)、
 // ihomy:call:mini:v1(通话小窗位置)、ihomy:haptics:v1(触觉反馈总开关);ihomy:float:chat / ihomy:float:music(浮窗显隐开关)
 // 是功能偏好不是布局,这里不清,要重新打开去聊天室 / 音乐页。
 // ihomy:panel:* 与 ihomy:vinyl:pos 是历史键(现已无写入方),保留清理是为了清掉老浏览器里的残留。
@@ -148,6 +150,10 @@ const resetPanelLayout = () => {
       localStorage.removeItem('ihomy:vinyl:pos')
       localStorage.removeItem('ihomy:music:pos')
       localStorage.removeItem('ihomy:chat:float:v1')
+      localStorage.removeItem('ihomy:chat:panel:v1')
+      localStorage.removeItem('ihomy:chat:rail:v1')
+      localStorage.removeItem('ihomy:games:lastRoomGame')
+      localStorage.removeItem('ihomy:room:autoReady')
       localStorage.removeItem('ihomy:call:mini:v1')
       ElMessage.success(t('settings.resetPanelDone'))
       setTimeout(() => location.reload(), 800)

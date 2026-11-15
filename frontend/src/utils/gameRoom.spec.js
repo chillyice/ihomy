@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canSwitchRole, canTakePlayerSeat, roomPlayerCount } from './gameRoom'
+import { canSwitchRole, canTakePlayerSeat, roomHasAi, roomPlayerCount, seatLayout } from './gameRoom'
 
 const member = (userId, role) => ({ userId, role, name: `u${userId}`, ready: false, score: null, finishedAt: null })
 
@@ -67,5 +67,52 @@ describe('canSwitchRole', () => {
   it('不在房间内不可调', () => {
     expect(canSwitchRole(room(), 99)).toBe(false)
     expect(canSwitchRole(null, 2)).toBe(false)
+  })
+})
+
+describe('roomHasAi', () => {
+  it('只有麻将/飞行棋有电脑玩家', () => {
+    expect(roomHasAi('game_mahjong')).toBe(true)
+    expect(roomHasAi('game_ludo')).toBe(true)
+    expect(roomHasAi('game_petlink')).toBe(false)
+    expect(roomHasAi('game_unknown')).toBe(false)
+  })
+})
+
+describe('seatLayout', () => {
+  it('席位跟游戏走:玩家之外先补空参战席,再排观战', () => {
+    const layout = seatLayout(room())
+    expect(layout.players).toHaveLength(3)
+    expect(layout.spectators).toHaveLength(1)
+    expect(layout.emptyPlayerSeats).toBe(1) // 4 席 - 3 玩家
+    expect(layout.emptySpectatorSeats).toBe(3) // 容量 8 - 5 人
+  })
+
+  it('超员时空参战席不为负(麻将 4 席坐满 5 人)', () => {
+    const full = room({
+      members: [
+        member(1, 'HOST'),
+        member(2, 'PLAYER'),
+        member(3, 'PLAYER'),
+        member(4, 'PLAYER'),
+        member(5, 'SPECTATOR'),
+        member(6, 'SPECTATOR'),
+      ],
+    })
+    const layout = seatLayout(full)
+    expect(layout.emptyPlayerSeats).toBe(0)
+    expect(layout.emptySpectatorSeats).toBe(2)
+  })
+
+  it('空参战席优先占空位,容量不足时观战席为 0', () => {
+    const tight = room({ members: [member(1, 'HOST'), member(2, 'PLAYER')], maxPlayers: 3 })
+    const layout = seatLayout(tight)
+    expect(layout.emptyPlayerSeats).toBe(1)
+    expect(layout.emptySpectatorSeats).toBe(0)
+  })
+
+  it('空房间/缺字段不抛错', () => {
+    expect(seatLayout(null).emptyPlayerSeats).toBeGreaterThan(0)
+    expect(seatLayout({ members: [] }).players).toHaveLength(0)
   })
 })

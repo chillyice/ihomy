@@ -104,6 +104,9 @@ export function useDragResize(initial) {
     clampToViewport()
   })
 
+  /** 当前缩放方向(按下时定死):n/s/e/w 的组合,如 ne/nw/se/sw/纯边 */
+  let resizeDir = 'se'
+
   /** 指针捕获期间移动/抬起都派发到捕获元素上,直接改 pos/size */
   const onPointerMove = (e) => {
     const vw = window.innerWidth
@@ -128,23 +131,27 @@ export function useDragResize(initial) {
       pos.value = { x: nx, y: ny }
     }
     if (resizing.value) {
+      // 8 向缩放:按方向移动对应边,固定边不动;先按边夹紧(视口/最小尺寸),再写回 pos/size
       const dx = e.clientX - startX
       const dy = e.clientY - startY
-      if (anchorRight) {
-        // right 模式 + 左下角把手:右边缘固定(pos.x 不变),指针向左(dx<0)→ 宽度增大(左边缘左移)
-        // 左边缘 = vw - pos.x - startSize.w,新左边缘 = 左边缘 + dx,新宽度 = startSize.w - dx
-        // 宽度范围:最小 200,最大 = vw - marginLeft - startPos.x(左边缘不越过 marginLeft)
-        const maxW = Math.max(200, vw - marginLeft - startPos.x)
-        const newW = Math.min(Math.max(200, startSize.w - dx), maxW)
-        pos.value = { x: startPos.x, y: startPos.y }
-        size.value = { w: newW, h: Math.min(Math.max(120, startSize.h + dy), Math.max(120, vh - startPos.y)) }
-      } else {
-        // left 模式:左边固定,指针向右(dx>0)→ 宽度增大,右边右移,但不超过 vw
-        size.value = {
-          w: Math.min(Math.max(200, startSize.w + dx), Math.max(200, vw - startPos.x)),
-          h: Math.min(Math.max(120, startSize.h + dy), Math.max(120, vh - startPos.y)),
-        }
-      }
+      const { minW, minH } = clampOptions()
+      const left0 = anchorRight ? vw - startPos.x - startSize.w : startPos.x
+      const top0 = startPos.y
+      const right0 = left0 + startSize.w
+      const bottom0 = top0 + startSize.h
+      let newLeft = left0
+      let newRight = right0
+      let newTop = top0
+      let newBottom = bottom0
+      if (resizeDir.includes('e')) newRight = Math.min(vw, Math.max(right0 + dx, left0 + minW))
+      if (resizeDir.includes('s')) newBottom = Math.min(vh, Math.max(bottom0 + dy, top0 + minH))
+      if (resizeDir.includes('w')) newLeft = Math.max(marginLeft, Math.min(left0 + dx, right0 - minW))
+      if (resizeDir.includes('n')) newTop = Math.max(minY, Math.min(top0 + dy, bottom0 - minH))
+      const w = Math.max(minW, newRight - newLeft)
+      const h = Math.max(minH, newBottom - newTop)
+      // anchorRight 时 pos.x 表示离右边缘距离:x = vw - 右边缘 = vw - (newLeft + w)
+      pos.value = anchorRight ? { x: Math.max(0, vw - newLeft - w), y: newTop } : { x: newLeft, y: newTop }
+      size.value = { w, h }
     }
   }
 
@@ -183,6 +190,9 @@ export function useDragResize(initial) {
 
   const onDragStart = (e) => {
     if (e.target.classList.contains('resize-handle')) return
+    // 拖拽把手容器里常有真实按钮(如浮窗标题栏的关闭):点按钮不能变成拖拽,
+    // 否则指针被捕获吞掉 click,「点关闭没反应」就是这么来的
+    if (e.target.closest?.('button, .el-button, a, input, textarea, select, label')) return
     dragging.value = true
     bringToFront()
     startX = e.clientX
@@ -192,7 +202,9 @@ export function useDragResize(initial) {
     // 拖拽开始才捕获指针挂监听器,空闲无 listener(参考 AvatarCropper.vue 的写法)
     beginPointer(e)
   }
-  const onResizeStart = (e) => {
+  /** dir:n/s/e/w 及组合(ne/nw/se/sw…),决定缩放时移动哪些边 */
+  const onResizeStart = (e, dir = 'se') => {
+    resizeDir = dir
     resizing.value = true
     bringToFront()
     startX = e.clientX

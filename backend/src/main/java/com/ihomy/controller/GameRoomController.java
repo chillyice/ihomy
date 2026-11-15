@@ -7,9 +7,11 @@ import com.ihomy.common.Result;
 import com.ihomy.dto.GameRoomCreateDTO;
 import com.ihomy.dto.GameRoomFinishDTO;
 import com.ihomy.dto.GameRoomGameDTO;
+import com.ihomy.dto.GameRoomInviteDTO;
 import com.ihomy.dto.GameRoomReadyDTO;
 import com.ihomy.dto.GameRoomRoleDTO;
 import com.ihomy.dto.GameRoomSwapDTO;
+import com.ihomy.dto.GameRoomYieldDTO;
 import com.ihomy.security.LoginUser;
 import com.ihomy.security.SecurityHelper;
 import com.ihomy.service.ChatService;
@@ -28,7 +30,7 @@ import java.util.Map;
 
 /**
  * 「一起玩」房间接口:建房/加入/准备/开赛/上报/结束/离开。
- * 建房即往聊天流发 GAME_INVITE 邀请卡(带 roomId 与玩法),在线成员点卡片进房间;
+ * 建房不再自动发邀请,房主点「邀请」后选择成员(私聊)与家庭(对方聊天流)定向发送;
  * 房间状态变化经 WS game-signal(event=room)广播给全部成员,实时对局状态由房主广播。
  */
 @Tag(name = "游戏房间")
@@ -48,21 +50,13 @@ public class GameRoomController {
         return securityHelper.current();
     }
 
-    @Operation(summary = "创建房间(同时往聊天室发邀请卡)")
+    @Operation(summary = "创建房间")
     @OperationLog(module = "GAME", operationType = "CREATE", description = "创建游戏房间")
     @PostMapping
     public Result<Map<String, Object>> create(@RequestBody @jakarta.validation.Valid GameRoomCreateDTO dto) {
         LoginUser user = current();
         Map<String, Object> room = roomService.create(user.getUserId(), user.getFamilyId(),
                 dto.getGameCode(), dto.getMode(), dto.getMaxPlayers());
-        String name = String.valueOf(room.get("gameName"));
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("gameCode", dto.getGameCode());
-        payload.put("roomId", room.get("id"));
-        payload.put("mode", room.get("mode"));
-        Map<String, Object> view = chatService.sendMessage(user.getFamilyId(), user.getUserId(),
-                ChatMsgType.GAME_INVITE, name, json(payload));
-        wsHandler.broadcastMessage(user.getFamilyId(), view);
         return Result.success(room);
     }
 
@@ -141,15 +135,60 @@ public class GameRoomController {
         return Result.success(room);
     }
 
-    @Operation(summary = "房主换游戏(随机重新分配席位)")
+    @Operation(summary = "房主换游戏/玩法(按进房顺序重排席位)")
     @OperationLog(module = "GAME", operationType = "UPDATE", description = "房间切换游戏")
     @PostMapping("/{id}/game")
     public Result<Map<String, Object>> setGame(@PathVariable Long id,
                                                @RequestBody @jakarta.validation.Valid GameRoomGameDTO dto) {
         LoginUser user = current();
-        Map<String, Object> room = roomService.setGame(user.getUserId(), user.getFamilyId(), id, dto.getGameCode());
+        Map<String, Object> room = roomService.setGame(user.getUserId(), user.getFamilyId(), id,
+                dto.getGameCode(), dto.getMode());
         broadcast(id, room);
         return Result.success(room);
+    }
+
+    @Operation(summary = "邀请成员/家庭加入房间(成员走私聊,家庭走对方聊天流)")
+    @OperationLog(module = "GAME", operationType = "CREATE", description = "发送房间邀请")
+    @PostMapping("/{id}/invite")
+    public Result<Map<String, Object>> invite(@PathVariable Long id,
+                                              @RequestBody @jakarta.validation.Valid GameRoomInviteDTO dto) {
+        LoginUser user = current();
+        Map<String, Object> room = roomService.get(user.getFamilyId(), id);
+        Map<String, Object> sent = chatService.sendRoomInvites(user.getUserId(), user.getFamilyId(), room,
+                dto.getMemberIds(), dto.getFamilyIds());
+        // 家庭聊天流已落库的邀请卡实时下发给对应家庭的在线成员(私聊已在 sendDm 链路里由 WS 定向)
+        Object views = sent.get("familyViews");
+        if (views instanceof List<?> list) {
+            for (Object v : list) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> pair = (Map<String, Object>) v;
+                Object familyId = pair.get("familyId");
+                Object view = pair.get("view");
+                if (familyId instanceof Number n && view instanceof Map<?, ?> m) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> viewMap = (Map<String, Object>) m;
+                    wsHandler.broadcastMessage(n.longValue(), viewMap);
+                }
+            }
+        }
+        return Result.success(Map.of("dmSent", sent.get("dmSent"), "familySent", sent.get("familySent")));
+    }
+
+    @Operation(summary = "对局中让位给指定观战者")
+    @OperationLog(module = "GAME", operationType = "UPDATE", description = "房间让位")
+    @PostMapping("/{id}/yield")
+    public Result<Map<String, Object>> yieldSeat(@PathVariable Long id,
+                                                 @RequestBody @jakarta.validation.Valid GameRoomYieldDTO dto) {
+        LoginUser user = current();
+        Map<String, Object> room = roomService.yieldSeat(user.getUserId(), user.getFamilyId(), id, dto.getToUserId());
+        broadcast(id, room);
+        return Result.success(room);
+    }
+
+    @Operation(summary = "房间排行榜(只统计本房间)")
+    @GetMapping("/{id}/board")
+    public Result<Map<String, Object>> board(@PathVariable Long id) {
+        return Result.success(roomService.board(current().getFamilyId(), id));
     }
 
     @Operation(summary = "房主开始游戏")

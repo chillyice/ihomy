@@ -122,9 +122,6 @@
       <div v-else-if="!loading && visibleTotal === 0" class="tool-empty">{{ $t('games.emptyFiltered') }}</div>
     </div>
 
-    <!-- 开房配置:选小游戏 + 玩法,确认后建房进游戏室 -->
-    <GameRoomCreate v-model:visible="roomCreateVisible" :creating="roomOpening" @confirm="onCreateRoom" />
-
     <!-- 导入对话框(游戏文件 / 网页游戏两种方式) -->
     <el-dialog v-model="importVisible" append-to-body :title="$t('games.import')" width="440px" destroy-on-close>
       <el-radio-group v-model="importMode" size="small" class="import-mode">
@@ -262,11 +259,13 @@ import {
   Star,
   Grape,
   Compass,
+  Postcard,
+  Trophy,
+  Coin,
 } from '@element-plus/icons-vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 import PageToolbar from '@/components/PageToolbar.vue'
 import AddToWishDialog from '@/components/wish/AddToWishDialog.vue'
-import GameRoomCreate from '@/components/games/GameRoomCreate.vue'
 import VisibilityPicker from '@/components/common/VisibilityPicker.vue'
 import AudiencePicker from '@/components/common/AudiencePicker.vue'
 import { audienceApi, gameApi, roomApi } from '@/api'
@@ -279,6 +278,7 @@ import { importAccept, typeForFile, typeLabel } from '@/utils/games/emulatorSyst
 import { DESKTOP_TYPE, desktopAccept, isDesktopPackage, isDesktopType } from '@/utils/games/desktopGames'
 import { EMBEDDED_GAMES } from '@/utils/games/embeddedGames'
 import { UNSERIES, inGameSeries, normalizeGameSeries, seriesOptionsOf } from '@/utils/games/gameSeries'
+import { lastRoomGame, rememberRoomGame } from '@/utils/gameRoom'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -399,6 +399,38 @@ const builtinGames = [
     path: '/games/ludo',
     category: 'CASUAL',
   },
+  {
+    key: 'doudizhu',
+    titleKey: 'games.doudizhu.title',
+    descKey: 'games.doudizhu.desc',
+    icon: Postcard,
+    path: '/games/doudizhu',
+    category: 'CASUAL',
+  },
+  {
+    key: 'guandan',
+    titleKey: 'games.guandan.title',
+    descKey: 'games.guandan.desc',
+    icon: Trophy,
+    path: '/games/guandan',
+    category: 'STRATEGY',
+  },
+  {
+    key: 'baohuang',
+    titleKey: 'games.baohuang.title',
+    descKey: 'games.baohuang.desc',
+    icon: Medal,
+    path: '/games/baohuang',
+    category: 'STRATEGY',
+  },
+  {
+    key: 'gouji',
+    titleKey: 'games.gouji.title',
+    descKey: 'games.gouji.desc',
+    icon: Coin,
+    path: '/games/gouji',
+    category: 'STRATEGY',
+  },
   ...embeddedEntries,
 ]
 
@@ -464,24 +496,20 @@ const myActiveRoom = computed(() =>
 )
 
 /**
- * 工具栏「一起玩」:已有进行中的房间直接回房,否则弹开房配置(选小游戏 + 玩法)再建房进大厅。
- * 大厅里房主仍可换游戏(席位按新游戏重新分配),邀请在房间页完成。
+ * 工具栏「一起玩」:已有进行中的房间直接回房;否则用默认游戏(上次玩的,没玩过用连连看)
+ * 直接建房进游戏室——选游戏/玩法都在房间内完成,邀请也在房间页点「邀请」再发。
  */
-const roomCreateVisible = ref(false)
-const openRoom = () => {
+const openRoom = async () => {
   if (myActiveRoom.value) {
     router.push(`/games/room/${myActiveRoom.value.id}`)
     return
   }
-  roomCreateVisible.value = true
-}
-
-const onCreateRoom = async ({ gameCode, mode }) => {
   if (roomOpening.value) return
   roomOpening.value = true
   try {
-    const created = await roomApi.create({ gameCode, mode })
-    roomCreateVisible.value = false
+    const gameCode = lastRoomGame()
+    const created = await roomApi.create({ gameCode })
+    rememberRoomGame(gameCode)
     router.push(`/games/room/${created.id}`)
   } catch (e) {
     ElMessage.warning(e?.response?.data?.message || t('games.room.createFailed'))
