@@ -1010,7 +1010,7 @@ export default {
       bubble: { title: 'Bubble Shooter', desc: 'Aim and fire; three bubbles of a colour pop once they touch' },
       'space-cadet': {
         title: '3D Pinball: Space Cadet',
-        desc: 'The table that shipped with Windows — Z left flipper, / right flipper, Space to launch',
+        desc: 'The table that shipped with Windows — Z left flipper, X right flipper, Space to launch',
       },
       pinball: { title: 'Pinball', desc: 'Flip the paddles and keep the ball off the drain' },
       trex: { title: 'Dino Run', desc: 'Leap over cacti, duck under pterodactyls, and see how far you get' },

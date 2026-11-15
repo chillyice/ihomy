@@ -299,6 +299,7 @@ const EMBEDDED_ICONS = {
   nonogram: DataBoard,
   match3: Star,
   bubble: Grape,
+  'space-cadet': Promotion,
   pinball: Basketball,
   trex: Compass,
 }

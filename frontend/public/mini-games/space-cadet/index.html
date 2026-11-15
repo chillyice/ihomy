@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>3D Pinball · Space Cadet</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+    background: radial-gradient(120% 120% at 50% 0%, #1c2333 0%, #0a0c12 70%);
+    color: #c8d2e4;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    user-select: none;
+  }
+
+  /* 舞台:canvas 用 object-fit 等比塞满,留黑边而不是拉伸变形 */
+  #stage {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    outline: none;
+    background: #000;
+    touch-action: manipulation;
+  }
+  #canvas:fullscreen { width: 100vw; height: 100vh; }
+
+  /* 载入/报错状态 */
+  #status {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    max-width: 80%;
+    text-align: center;
+    font-size: 13px;
+    line-height: 1.8;
+    color: #8b9ab5;
+    pointer-events: none;
+  }
+  #status[hidden] { display: none; }
+
+  /* 触屏操作条:键位与桌面一致(Z 左挡板 / X 右挡板 / 空格发球 / F2 开新局) */
+  #touch { display: none; }
+  @media (pointer: coarse) {
+    #touch {
+      position: absolute;
+      inset: auto 0 0 0;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 12px 14px;
+      pointer-events: none;
+    }
+    .tk {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(20, 26, 40, 0.55);
+      color: #dbe4f5;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      backdrop-filter: blur(6px);
+      transition: transform 0.08s ease, background 0.12s ease;
+    }
+    .tk:active { transform: scale(0.94); background: rgba(120, 160, 255, 0.42); }
+    .tk-center { display: flex; flex: 1 1 auto; gap: 10px; justify-content: center; }
+    .tk-wide { width: 88px; border-radius: 32px; font-size: 13px; }
+    .tk-sm { width: 48px; height: 48px; font-size: 11px; font-weight: 500; align-self: flex-start; opacity: 0.85; }
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+  <div id="status">载入中…</div>
+  <div id="touch">
+    <button class="tk" data-key="90" aria-label="左挡板">◀</button>
+    <div class="tk-center">
+      <button class="tk tk-sm" data-key="113" aria-label="开新局">新局</button>
+      <button class="tk tk-wide" data-key="32" aria-label="发球">发球</button>
+    </div>
+    <button class="tk" data-key="88" aria-label="右挡板">▶</button>
+  </div>
+</div>
+
+<script>
+  // 记录 SDL 把键盘监听挂在了哪个目标上(document / window / canvas 都可能有),
+  // 触屏按钮才能把合成按键事件投递到真正收得到的地方。
+  const keyTargets = new Set()
+  const rawAdd = EventTarget.prototype.addEventListener
+  EventTarget.prototype.addEventListener = function (type, fn, opts) {
+    if (type === 'keydown' || type === 'keyup') keyTargets.add(this)
+    return rawAdd.call(this, type, fn, opts)
+  }
+
+  const statusEl = document.getElementById('status')
+  let statusDone = false
+
+  window.Module = {
+    canvas: (function () {
+      const c = document.getElementById('canvas')
+      c.addEventListener(
+        'webglcontextlost',
+        function (e) {
+          e.preventDefault()
+          showStatus('图形上下文丢失,刷新页面继续', false)
+        },
+        false,
+      )
+      return c
+    })(),
+    print: function () {},
+    printErr: function (msg) {
+      if (window.console) console.warn('[pinball]', msg)
+    },
+    setStatus: function (text) {
+      if (!text) {
+        statusEl.hidden = true
+        statusDone = true
+        return
+      }
+      if (statusDone || /All downloads complete/.test(text)) {
+        statusEl.hidden = true
+        return
+      }
+      showStatus(text, true)
+    },
+    monitorRunDependencies: function (left) {
+      if (left === 0) statusEl.hidden = true
+    },
+  }
+
+  function showStatus(text, spinner) {
+    statusEl.hidden = false
+    statusEl.textContent = spinner ? text : text
+  }
+
+  window.addEventListener('error', function (e) {
+    if (!statusDone) showStatus('载入失败:' + (e.message || '未知错误'), false)
+  })
+
+  // —— 触屏 → 键盘 ——
+  function pressKey(code, down) {
+    // SDL 的键盘监听实测挂在 document 上;window 是 Emscripten 运行时先注册的,
+    // 事件派发到 window 不会向下传到 document,SDL 收不到 —— 所以优先 document。
+    const target = keyTargets.has(document)
+      ? document
+      : keyTargets.size
+        ? keyTargets.values().next().value
+        : document
+    const ev = new KeyboardEvent(down ? 'keydown' : 'keyup', {
+      key: String.fromCharCode(code),
+      bubbles: true,
+      cancelable: true,
+    })
+    Object.defineProperty(ev, 'keyCode', { get: () => code })
+    Object.defineProperty(ev, 'which', { get: () => code })
+    target.dispatchEvent(ev)
+  }
+
+  document.querySelectorAll('#touch .tk').forEach(function (btn) {
+    const code = Number(btn.dataset.key)
+    btn.addEventListener('pointerdown', function (e) {
+      e.preventDefault()
+      try {
+        btn.setPointerCapture(e.pointerId)
+      } catch (_) {
+        /* 合成事件没有真实 pointerId,捕获失败不影响按键 */
+      }
+      pressKey(code, true)
+    })
+    const up = function (e) {
+      e.preventDefault()
+      pressKey(code, false)
+    }
+    btn.addEventListener('pointerup', up)
+    btn.addEventListener('pointercancel', up)
+  })
+
+  // 点一下画面把焦点交给 canvas,否则外框里按键可能被父页面吃掉
+  document.getElementById('stage').addEventListener('pointerdown', function () {
+    const c = document.getElementById('canvas')
+    if (c && c.focus) c.focus()
+  })
+</script>
+<script async src="SpaceCadetPinball.js"></script>
+</body>
+</html>
