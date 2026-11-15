@@ -91,189 +91,193 @@
         <div v-if="waitingHost" class="table-waiting">{{ $t('games.mahjong.waitingHost') }}</div>
         <template v-else>
           <!-- 立体牌桌:对家在上 / 上家在左 / 下家在右 / 我在下;
-               吃碰杠副露贴在各家名牌旁,散牌弃张全部汇进中央牌池 -->
-          <div class="mj-table">
-            <!-- 对家(上) -->
-            <div v-if="topSeat" class="mj-edge mj-top" :class="{ active: turn === topSeat.seat && phase === 'playing' }">
-              <span class="mj-seat-name" :title="seatName(topSeat.seat)">
-                {{ seatName(topSeat.seat) }}<span v-if="topSeat.seat === 0" class="dealer-badge">{{ $t('games.mahjong.dealer') }}</span>
-              </span>
-              <!-- 对家视角的右手侧在屏幕左,故副露排到手牌牌背前面 -->
-              <div v-if="meldGroups(topSeat.seat).length" class="mj-meld-corner">
-                <span v-for="(group, i) in meldGroups(topSeat.seat)" :key="i" class="meld-group">
-                  <template v-if="group.dark">
-                    <span v-for="n in 4" :key="n" class="tile mini back" aria-hidden="true" />
-                  </template>
-                  <template v-else>
-                    <span v-for="(kind, j) in group.kinds" :key="j" class="tile mini" :class="tileClass(kind)" :title="tileLabel(kind)">
-                      <TileFace :kind="kind" />
-                    </span>
-                  </template>
+               吃碰杠副露贴在各家名牌旁,散牌弃张全部汇进中央牌池;
+               桌面按固定宽高比居中,整桌带半俯视透视 -->
+          <div class="mj-stage">
+            <div class="mj-table">
+              <!-- 对家(上) -->
+              <div v-if="topSeat" class="mj-edge mj-top" :class="{ active: turn === topSeat.seat && phase === 'playing' }">
+                <span class="mj-seat-name" :title="seatName(topSeat.seat)">
+                  {{ seatName(topSeat.seat) }}<span v-if="topSeat.seat === 0" class="dealer-badge">{{ $t('games.mahjong.dealer') }}</span>
+                </span>
+                <!-- 对家视角的右手侧在屏幕左,故副露排到手牌牌背前面 -->
+                <div v-if="meldGroups(topSeat.seat).length" class="mj-meld-corner">
+                  <span v-for="(group, i) in meldGroups(topSeat.seat)" :key="i" class="meld-group">
+                    <template v-if="group.dark">
+                      <span v-for="n in 4" :key="n" class="tile mini back" aria-hidden="true" />
+                    </template>
+                    <template v-else>
+                      <span v-for="(kind, j) in group.kinds" :key="j" class="tile mini" :class="tileClass(kind)" :title="tileLabel(kind)">
+                        <TileFace :kind="kind" />
+                      </span>
+                    </template>
+                  </span>
+                </div>
+                <span class="mj-backs">
+                  <span v-for="n in seatTileCount(topSeat.seat)" :key="n" class="tile back sm" aria-hidden="true" />
                 </span>
               </div>
-              <span class="mj-backs">
-                <span v-for="n in seatTileCount(topSeat.seat)" :key="n" class="tile back sm" aria-hidden="true" />
-              </span>
-            </div>
 
-            <!-- 上家(左) -->
-            <div v-if="leftSeat" class="mj-edge mj-left" :class="{ active: turn === leftSeat.seat && phase === 'playing' }">
-              <span class="mj-seat-name" :title="seatName(leftSeat.seat)">
-                {{ seatName(leftSeat.seat) }}<span v-if="leftSeat.seat === 0" class="dealer-badge">{{ $t('games.mahjong.dealer') }}</span>
-              </span>
-              <span class="mj-backs-col">
-                <span v-for="n in seatTileCount(leftSeat.seat)" :key="n" class="tile back sm" aria-hidden="true" />
-              </span>
-              <div v-if="meldGroups(leftSeat.seat).length" class="mj-meld-corner">
-                <span v-for="(group, i) in meldGroups(leftSeat.seat)" :key="i" class="meld-group">
-                  <template v-if="group.dark">
-                    <span v-for="n in 4" :key="n" class="tile mini back" aria-hidden="true" />
-                  </template>
-                  <template v-else>
-                    <span v-for="(kind, j) in group.kinds" :key="j" class="tile mini" :class="tileClass(kind)" :title="tileLabel(kind)">
-                      <TileFace :kind="kind" />
-                    </span>
-                  </template>
+              <!-- 上家(左) -->
+              <div v-if="leftSeat" class="mj-edge mj-left" :class="{ active: turn === leftSeat.seat && phase === 'playing' }">
+                <span class="mj-seat-name" :title="seatName(leftSeat.seat)">
+                  {{ seatName(leftSeat.seat) }}<span v-if="leftSeat.seat === 0" class="dealer-badge">{{ $t('games.mahjong.dealer') }}</span>
                 </span>
+                <span class="mj-backs-col">
+                  <span v-for="n in seatTileCount(leftSeat.seat)" :key="n" class="tile back sm" aria-hidden="true" />
+                </span>
+                <div v-if="meldGroups(leftSeat.seat).length" class="mj-meld-corner">
+                  <span v-for="(group, i) in meldGroups(leftSeat.seat)" :key="i" class="meld-group">
+                    <template v-if="group.dark">
+                      <span v-for="n in 4" :key="n" class="tile mini back" aria-hidden="true" />
+                    </template>
+                    <template v-else>
+                      <span v-for="(kind, j) in group.kinds" :key="j" class="tile mini" :class="tileClass(kind)" :title="tileLabel(kind)">
+                        <TileFace :kind="kind" />
+                      </span>
+                    </template>
+                  </span>
+                </div>
               </div>
-            </div>
 
-            <!-- 中央弃牌池:四方牌河围着牌桌信息 -->
-            <div class="mj-pool">
-              <div
-                v-for="river in poolRivers"
-                :key="river.pos"
-                :ref="(el) => setRiverEl(river.seat, el)"
-                class="mj-river"
-                :class="'river-' + river.pos"
-                role="region"
-                :aria-label="$t('games.mahjong.discards', { name: river.seat >= 0 ? seatName(river.seat) : '', n: river.kinds.length })"
-              >
-                <span
-                  v-for="(kind, i) in river.kinds"
-                  :key="i"
-                  class="tile mini"
-                  :class="[tileClass(kind), { latest: lastDiscard?.from === river.seat && i === river.kinds.length - 1 }]"
-                  :title="tileLabel(kind)"
-                  :aria-label="tileLabel(kind)"
-                  role="img"
+              <!-- 中央弃牌池:四方牌河围着牌桌信息 -->
+              <div class="mj-pool">
+                <div
+                  v-for="river in poolRivers"
+                  :key="river.pos"
+                  :ref="(el) => setRiverEl(river.seat, el)"
+                  class="mj-river"
+                  :class="'river-' + river.pos"
+                  role="region"
+                  :aria-label="$t('games.mahjong.discards', { name: river.seat >= 0 ? seatName(river.seat) : '', n: river.kinds.length })"
                 >
-                  <TileFace :kind="kind" />
-                </span>
+                  <span
+                    v-for="(kind, i) in river.kinds"
+                    :key="i"
+                    class="tile mini"
+                    :class="[tileClass(kind), { latest: lastDiscard?.from === river.seat && i === river.kinds.length - 1 }]"
+                    :title="tileLabel(kind)"
+                    :aria-label="tileLabel(kind)"
+                    role="img"
+                  >
+                    <TileFace :kind="kind" />
+                  </span>
+                </div>
+                <div class="mj-hub">
+                  <span class="wall-count">{{ $t('games.mahjong.wallLeft', { n: wallLeft }) }}</span>
+                  <span class="rules-chip">{{ $t(`games.mahjong.presets.${rulesLabel}`) }}</span>
+                  <span class="turn-label">{{ turnLabel }}</span>
+                </div>
               </div>
-              <div class="mj-hub">
-                <span class="wall-count">{{ $t('games.mahjong.wallLeft', { n: wallLeft }) }}</span>
-                <span class="rules-chip">{{ $t(`games.mahjong.presets.${rulesLabel}`) }}</span>
-                <span class="turn-label">{{ turnLabel }}</span>
-              </div>
-            </div>
 
-            <!-- 下家(右) -->
-            <div v-if="rightSeat" class="mj-edge mj-right" :class="{ active: turn === rightSeat.seat && phase === 'playing' }">
-              <span class="mj-seat-name" :title="seatName(rightSeat.seat)">
-                {{ seatName(rightSeat.seat) }}<span v-if="rightSeat.seat === 0" class="dealer-badge">{{ $t('games.mahjong.dealer') }}</span>
-              </span>
-              <!-- 下家视角的右手侧在屏幕上,副露排到手牌牌背前面 -->
-              <div v-if="meldGroups(rightSeat.seat).length" class="mj-meld-corner">
-                <span v-for="(group, i) in meldGroups(rightSeat.seat)" :key="i" class="meld-group">
-                  <template v-if="group.dark">
-                    <span v-for="n in 4" :key="n" class="tile mini back" aria-hidden="true" />
-                  </template>
-                  <template v-else>
-                    <span v-for="(kind, j) in group.kinds" :key="j" class="tile mini" :class="tileClass(kind)" :title="tileLabel(kind)">
-                      <TileFace :kind="kind" />
-                    </span>
-                  </template>
+              <!-- 下家(右) -->
+              <div v-if="rightSeat" class="mj-edge mj-right" :class="{ active: turn === rightSeat.seat && phase === 'playing' }">
+                <span class="mj-seat-name" :title="seatName(rightSeat.seat)">
+                  {{ seatName(rightSeat.seat)
+                  }}<span v-if="rightSeat.seat === 0" class="dealer-badge">{{ $t('games.mahjong.dealer') }}</span>
+                </span>
+                <!-- 下家视角的右手侧在屏幕上,副露排到手牌牌背前面 -->
+                <div v-if="meldGroups(rightSeat.seat).length" class="mj-meld-corner">
+                  <span v-for="(group, i) in meldGroups(rightSeat.seat)" :key="i" class="meld-group">
+                    <template v-if="group.dark">
+                      <span v-for="n in 4" :key="n" class="tile mini back" aria-hidden="true" />
+                    </template>
+                    <template v-else>
+                      <span v-for="(kind, j) in group.kinds" :key="j" class="tile mini" :class="tileClass(kind)" :title="tileLabel(kind)">
+                        <TileFace :kind="kind" />
+                      </span>
+                    </template>
+                  </span>
+                </div>
+                <span class="mj-backs-col">
+                  <span v-for="n in seatTileCount(rightSeat.seat)" :key="n" class="tile back sm" aria-hidden="true" />
                 </span>
               </div>
-              <span class="mj-backs-col">
-                <span v-for="n in seatTileCount(rightSeat.seat)" :key="n" class="tile back sm" aria-hidden="true" />
-              </span>
-            </div>
 
-            <!-- 我方(下):碰/杠/吃/胡询问浮层 + 副露 + 立牌手牌 + 操作 -->
-            <div class="mj-edge mj-bottom" :class="{ active: myTurn }">
-              <!-- 询问浮层:悬在手牌上方,出现即须表态,「过」=放弃全部 -->
-              <div v-if="claimPrompt" class="claim-float" role="alert">
-                <el-button type="primary" size="large" round @click="answerClaim(true)">
-                  {{
-                    claimPrompt === 'win'
-                      ? $t('games.mahjong.claimWin')
-                      : claimPrompt === 'gang'
-                        ? $t('games.mahjong.mingGang')
-                        : claimPrompt === 'chi'
-                          ? $t('games.mahjong.chi')
-                          : $t('games.mahjong.pong')
-                  }}
-                </el-button>
-                <el-button
-                  v-for="(pair, i) in activeChiOptions"
-                  :key="'chi' + i"
-                  type="primary"
-                  size="large"
-                  round
-                  @click="answerClaim(true, pair)"
-                >
-                  {{ $t('games.mahjong.chi') }}
-                  <span class="tile mini" :class="tileClass(pair[0])"><TileFace :kind="pair[0]" /></span>
-                  <span class="tile mini" :class="tileClass(pair[1])"><TileFace :kind="pair[1]" /></span>
-                </el-button>
-                <el-button size="large" round @click="answerClaim(false)">{{ $t('games.mahjong.pass') }}</el-button>
-              </div>
-              <div v-if="meldGroups(mySeat).length" class="mj-meld-corner">
-                <span v-for="(group, i) in meldGroups(mySeat)" :key="i" class="meld-group">
-                  <template v-if="group.dark">
-                    <span v-for="n in 4" :key="n" class="tile mini back" aria-hidden="true" />
+              <!-- 我方(下):碰/杠/吃/胡询问浮层 + 副露 + 立牌手牌 + 操作 -->
+              <div class="mj-edge mj-bottom" :class="{ active: myTurn }">
+                <!-- 询问浮层:悬在手牌上方,出现即须表态,「过」=放弃全部 -->
+                <div v-if="claimPrompt" class="claim-float" role="alert">
+                  <el-button type="primary" size="large" round @click="answerClaim(true)">
+                    {{
+                      claimPrompt === 'win'
+                        ? $t('games.mahjong.claimWin')
+                        : claimPrompt === 'gang'
+                          ? $t('games.mahjong.mingGang')
+                          : claimPrompt === 'chi'
+                            ? $t('games.mahjong.chi')
+                            : $t('games.mahjong.pong')
+                    }}
+                  </el-button>
+                  <el-button
+                    v-for="(pair, i) in activeChiOptions"
+                    :key="'chi' + i"
+                    type="primary"
+                    size="large"
+                    round
+                    @click="answerClaim(true, pair)"
+                  >
+                    {{ $t('games.mahjong.chi') }}
+                    <span class="tile mini" :class="tileClass(pair[0])"><TileFace :kind="pair[0]" /></span>
+                    <span class="tile mini" :class="tileClass(pair[1])"><TileFace :kind="pair[1]" /></span>
+                  </el-button>
+                  <el-button size="large" round @click="answerClaim(false)">{{ $t('games.mahjong.pass') }}</el-button>
+                </div>
+                <div v-if="meldGroups(mySeat).length" class="mj-meld-corner">
+                  <span v-for="(group, i) in meldGroups(mySeat)" :key="i" class="meld-group">
+                    <template v-if="group.dark">
+                      <span v-for="n in 4" :key="n" class="tile mini back" aria-hidden="true" />
+                    </template>
+                    <template v-else>
+                      <span v-for="(kind, j) in group.kinds" :key="j" class="tile mini" :class="tileClass(kind)" :title="tileLabel(kind)">
+                        <TileFace :kind="kind" />
+                      </span>
+                    </template>
+                  </span>
+                </div>
+                <div v-if="!play.isSpectator" class="hand-row">
+                  <button
+                    v-for="tile in myHandView"
+                    :key="tile.id"
+                    type="button"
+                    class="tile hand"
+                    :class="[tileClass(tile.kind), { drawn: tile.justDrawn, dim: phase !== 'playing' }]"
+                    :disabled="!canDiscardNow"
+                    :title="tileLabel(tile.kind)"
+                    :aria-label="tileLabel(tile.kind)"
+                    @click="onTileClick(tile)"
+                  >
+                    <TileFace :kind="tile.kind" />
+                  </button>
+                  <template v-if="!play.isSpectator">
+                    <span v-for="n in handBackFill" :key="'ph' + n" class="tile back hand" aria-hidden="true" />
                   </template>
-                  <template v-else>
-                    <span v-for="(kind, j) in group.kinds" :key="j" class="tile mini" :class="tileClass(kind)" :title="tileLabel(kind)">
-                      <TileFace :kind="kind" />
-                    </span>
+                </div>
+                <div v-if="!play.isSpectator" class="my-actions">
+                  <el-button v-if="canSelfWin" type="primary" size="default" round @click="declareSelfWin">
+                    {{ $t('games.mahjong.selfWin') }}
+                  </el-button>
+                  <el-button
+                    v-for="opt in myGangOptions"
+                    :key="opt.kind + '-' + opt.type"
+                    type="warning"
+                    size="default"
+                    round
+                    @click="declareSelfGang(opt)"
+                  >
+                    {{ $t(opt.type === 'angang' ? 'games.mahjong.anGang' : 'games.mahjong.buGang') }}
+                  </el-button>
+                  <span class="my-hint">{{ actionHint }}</span>
+                </div>
+                <!-- 听牌提示:摸牌后建议打哪张、弃后听哪几张;听牌时显示当前听口 -->
+                <div v-if="advice" class="advice-row">
+                  <template v-if="advice.discard != null">
+                    <span class="advice-label">{{ $t('games.mahjong.adviceDiscard') }}</span>
+                    <span class="tile mini" :class="tileClass(advice.discard)"><TileFace :kind="advice.discard" /></span>
                   </template>
-                </span>
-              </div>
-              <div v-if="!play.isSpectator" class="hand-row">
-                <button
-                  v-for="tile in myHandView"
-                  :key="tile.id"
-                  type="button"
-                  class="tile hand"
-                  :class="[tileClass(tile.kind), { drawn: tile.justDrawn, dim: phase !== 'playing' }]"
-                  :disabled="!canDiscardNow"
-                  :title="tileLabel(tile.kind)"
-                  :aria-label="tileLabel(tile.kind)"
-                  @click="onTileClick(tile)"
-                >
-                  <TileFace :kind="tile.kind" />
-                </button>
-                <template v-if="!play.isSpectator">
-                  <span v-for="n in handBackFill" :key="'ph' + n" class="tile back hand" aria-hidden="true" />
-                </template>
-              </div>
-              <div v-if="!play.isSpectator" class="my-actions">
-                <el-button v-if="canSelfWin" type="primary" size="default" round @click="declareSelfWin">
-                  {{ $t('games.mahjong.selfWin') }}
-                </el-button>
-                <el-button
-                  v-for="opt in myGangOptions"
-                  :key="opt.kind + '-' + opt.type"
-                  type="warning"
-                  size="default"
-                  round
-                  @click="declareSelfGang(opt)"
-                >
-                  {{ $t(opt.type === 'angang' ? 'games.mahjong.anGang' : 'games.mahjong.buGang') }}
-                </el-button>
-                <span class="my-hint">{{ actionHint }}</span>
-              </div>
-              <!-- 听牌提示:摸牌后建议打哪张、弃后听哪几张;听牌时显示当前听口 -->
-              <div v-if="advice" class="advice-row">
-                <template v-if="advice.discard != null">
-                  <span class="advice-label">{{ $t('games.mahjong.adviceDiscard') }}</span>
-                  <span class="tile mini" :class="tileClass(advice.discard)"><TileFace :kind="advice.discard" /></span>
-                </template>
-                <span class="advice-label">{{ $t('games.mahjong.listening') }}</span>
-                <span v-for="k in advice.wins" :key="k" class="tile mini" :class="tileClass(k)"><TileFace :kind="k" /></span>
+                  <span class="advice-label">{{ $t('games.mahjong.listening') }}</span>
+                  <span v-for="k in advice.wins" :key="k" class="tile mini" :class="tileClass(k)"><TileFace :kind="k" /></span>
+                </div>
               </div>
             </div>
           </div>
@@ -1389,6 +1393,10 @@ onBeforeUnmount(() => {
   overflow: auto;
   background: var(--color-bg);
 }
+/* 全屏没有顶栏/页脚,视口扣减放宽 */
+.mahjong-card:fullscreen .mj-table {
+  width: min(100%, calc((100vh - 32px) * 1.6));
+}
 
 /* 封面 */
 .cover {
@@ -1527,10 +1535,23 @@ onBeforeUnmount(() => {
   cursor: default;
 }
 
+/* 牌桌舞台:桌面按恒定宽高比居中,透视做在桌面上 */
+.mj-stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
 /* ===== 立体牌桌:对家上 / 上家左 / 下家右 / 我在下,中央弃牌池,副露贴各家名牌 ===== */
 .mj-table {
   container: mahjong / inline-size;
   position: relative;
+  aspect-ratio: 16 / 10;
+  /* 恒定宽高比:宽取「撑满卡片」与「视口高扣除顶栏页脚后按比例折算」较小者,
+     窗口怎么变桌面形状都不变;200px ≈ 顶栏 + 页脚 + 页面/卡片内边距 */
+  width: min(100%, calc((100vh - 200px) * 1.6));
+  /* 半俯视:顶边向后倒,像坐在桌边看 */
+  transform: perspective(1700px) rotateX(12deg);
   display: grid;
   grid-template-areas:
     'top top top'
@@ -1642,37 +1663,33 @@ html.dark .mj-table {
   line-height: 1.6;
   vertical-align: 1px;
 }
-/* 对家:横排牌背重叠 */
+/* 对家:横排牌背平铺(不叠,像摆在桌上) */
 .mj-backs {
   display: inline-flex;
+  gap: 2px;
   min-width: 0;
-  max-width: 260px;
+  max-width: 340px;
   overflow: hidden;
 }
 .mj-backs .tile.back.sm {
-  width: 17px;
-  height: 24px;
-  margin-left: -10px;
+  width: 21px;
+  height: 29px;
+  flex: none;
   border-radius: 4px;
 }
-.mj-backs .tile.back.sm:first-child {
-  margin-left: 0;
-}
-/* 上下家:竖排牌背重叠 */
+/* 上下家:竖排牌背平铺(横躺的牌一张挨一张) */
 .mj-backs-col {
   display: inline-flex;
   flex-direction: column;
-  max-height: 168px;
+  gap: 1px;
+  max-height: 320px;
   overflow: hidden;
 }
 .mj-backs-col .tile.back.sm {
-  width: 24px;
-  height: 17px;
-  margin-top: -10px;
+  width: 26px;
+  height: 18px;
+  flex: none;
   border-radius: 4px;
-}
-.mj-backs-col .tile.back.sm:first-child {
-  margin-top: 0;
 }
 
 /* 中央弃牌池:四方牌河 + 中央信息 */
@@ -1699,7 +1716,7 @@ html.dark .mj-table {
   display: grid;
   align-content: start;
   justify-content: start;
-  gap: 3px 2px;
+  gap: 2px 1px;
   overflow: hidden;
   scrollbar-width: none;
 }
